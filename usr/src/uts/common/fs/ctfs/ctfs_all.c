@@ -50,7 +50,8 @@
 
 static int ctfs_adir_do_readdir(vnode_t *, struct dirent64 *, int *, offset_t *,
     offset_t *, void *);
-static int ctfs_adir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *);
+static int ctfs_adir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
+    cred_t *);
 
 /*
  * ctfs_create_adirnode
@@ -71,7 +72,12 @@ ctfs_create_adirnode(vnode_t *pvp)
  */
 /* ARGSUSED */
 static int
-ctfs_adir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_adir_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int i, total;
 
@@ -89,8 +95,10 @@ ctfs_adir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-ctfs_adir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop)
+ctfs_adir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
+    cred_t *cr)
 {
 	int i;
 	contract_t *ct;

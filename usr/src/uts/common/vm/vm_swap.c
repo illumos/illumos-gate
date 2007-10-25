@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -653,7 +652,7 @@ lout:
 		if (vp->v_vfsp && vn_is_readonly(vp))
 			error = EROFS;
 		else
-			error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED());
+			error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED(), NULL);
 		break;
 
 	case VDIR:
@@ -858,7 +857,7 @@ lout:
 		if (vp->v_vfsp && vn_is_readonly(vp))
 			error = EROFS;
 		else
-			error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED());
+			error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED(), NULL);
 		break;
 
 	case VDIR:
@@ -918,7 +917,7 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 	mutex_exit(&cvp->v_lock);
 
 	mutex_enter(&swap_lock);
-	if (error = VOP_OPEN(&cvp, FREAD|FWRITE, CRED())) {
+	if (error = VOP_OPEN(&cvp, FREAD|FWRITE, CRED(), NULL)) {
 		mutex_exit(&swap_lock);
 		/* restore state of v_flag */
 		if (!wasswap) {
@@ -939,7 +938,7 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 	 * on a machine with a different size swap partition.
 	 */
 	vattr.va_mask = AT_SIZE;
-	if (error = VOP_GETATTR(cvp, &vattr, ATTR_COMM, CRED()))
+	if (error = VOP_GETATTR(cvp, &vattr, ATTR_COMM, CRED(), NULL))
 		goto out;
 
 	/*
@@ -973,7 +972,8 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 		goto out;
 
 	/* Fail if fs does not support VOP_PAGEIO */
-	error = VOP_PAGEIO(cvp, (page_t *)NULL, (u_offset_t)0, 0, 0, CRED());
+	error = VOP_PAGEIO(cvp, (page_t *)NULL, (u_offset_t)0, 0, 0, CRED(),
+		NULL);
 
 	if (error == ENOSYS)
 		goto out;
@@ -1165,7 +1165,8 @@ out:
 			kmem_free(nsip, sizeof (*nsip));
 		}
 		mutex_enter(&swap_lock);
-		(void) VOP_CLOSE(cvp, FREAD|FWRITE, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(cvp, FREAD|FWRITE, 1, (offset_t)0, CRED(),
+			NULL);
 		mutex_exit(&swap_lock);
 	}
 	return (error);
@@ -1361,7 +1362,7 @@ top:
 	/* Release the vnode */
 
 	mutex_enter(&swap_lock);
-	(void) VOP_CLOSE(cvp, FREAD|FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(cvp, FREAD|FWRITE, 1, (offset_t)0, CRED(), NULL);
 	mutex_enter(&cvp->v_lock);
 	cvp->v_flag &= ~VISSWAP;
 	mutex_exit(&cvp->v_lock);
@@ -1391,7 +1392,7 @@ swapslot_free(
 	 * Users of the physical slot will synchronize on the i/o lock.
 	 */
 	if (error = VOP_GETPAGE(vp, (offset_t)off, ptob(1), NULL,
-	    pl, ptob(1), segkmap, NULL, S_READ, CRED())) {
+	    pl, ptob(1), segkmap, NULL, S_READ, CRED(), NULL)) {
 		/*
 		 * Anon slot went away (EIDRM) or vp was truncated (EFAULT)
 		 * while we got the page. Thus the physical slot must be

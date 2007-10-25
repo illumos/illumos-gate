@@ -37,6 +37,8 @@
 extern "C" {
 #endif
 
+#include <sys/types.h>
+
 /*
  * Basic datatypes for most functions
  */
@@ -46,6 +48,7 @@ typedef void *sa_property_t;
 typedef void *sa_optionset_t;
 typedef void *sa_security_t;
 typedef void *sa_protocol_properties_t;
+typedef void *sa_resource_t;
 
 typedef void *sa_handle_t;	/* opaque handle to access core functions */
 
@@ -77,6 +80,11 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_NOT_SUPPORTED	21	/* operation not supported for proto */
 #define	SA_PROP_SHARE_ONLY	22	/* property valid on share only */
 #define	SA_NOT_SHARED		23	/* path is not shared */
+#define	SA_NO_SUCH_RESOURCE	24	/* resource not found */
+#define	SA_RESOURCE_REQUIRED	25	/* resource name is required  */
+#define	SA_MULTIPLE_ERROR	26	/* multiple protocols reported error */
+#define	SA_PATH_IS_SUBDIR	27	/* check_path found path is subdir */
+#define	SA_PATH_IS_PARENTDIR	28	/* check_path found path is parent */
 
 /* API Initialization */
 #define	SA_INIT_SHARE_API	0x0001	/* init share specific interface */
@@ -90,8 +98,9 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
  */
 
 #define	SA_MAX_NAME_LEN		100	/* must fit service instance name */
+#define	SA_MAX_RESOURCE_NAME	255	/* Maximum length of resource name */
 
-/* Used in calls to sa_add_share() */
+/* Used in calls to sa_add_share() and sa_add_resource() */
 #define	SA_SHARE_TRANSIENT	0	/* shared but not across reboot */
 #define	SA_SHARE_LEGACY		1	/* share is in dfstab only */
 #define	SA_SHARE_PERMANENT	2	/* share goes to repository */
@@ -103,6 +112,16 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 /* RBAC related */
 #define	SA_RBAC_MANAGE	"solaris.smf.manage.shares"
 #define	SA_RBAC_VALUE	"solaris.smf.value.shares"
+
+/*
+ * Feature set bit definitions
+ */
+
+#define	SA_FEATURE_NONE		0x0000	/* no feature flags set */
+#define	SA_FEATURE_RESOURCE	0x0001	/* resource names are required */
+#define	SA_FEATURE_DFSTAB	0x0002	/* need to manage in dfstab */
+#define	SA_FEATURE_ALLOWSUBDIRS	0x0004	/* allow subdirs to be shared */
+#define	SA_FEATURE_ALLOWPARDIRS	0x0008	/* allow parent dirs to be shared */
 
 /*
  * legacy files
@@ -143,7 +162,6 @@ extern int sa_check_path(sa_group_t, char *, int);
 extern int sa_move_share(sa_group_t, sa_share_t);
 extern int sa_remove_share(sa_share_t);
 extern sa_share_t sa_get_share(sa_group_t, char *);
-extern sa_share_t sa_get_resource(sa_group_t, char *);
 extern sa_share_t sa_find_share(sa_handle_t, char *);
 extern sa_share_t sa_get_next_share(sa_share_t);
 extern char *sa_get_share_attr(sa_share_t, char *);
@@ -152,8 +170,25 @@ extern sa_group_t sa_get_parent_group(sa_share_t);
 extern int sa_set_share_attr(sa_share_t, char *, char *);
 extern int sa_set_share_description(sa_share_t, char *);
 extern int sa_enable_share(sa_group_t, char *);
-extern int sa_disable_share(sa_group_t, char *);
+extern int sa_disable_share(sa_share_t, char *);
 extern int sa_is_share(void *);
+
+/* resource name related */
+extern sa_resource_t sa_find_resource(sa_handle_t, char *);
+extern sa_resource_t sa_get_resource(sa_group_t, char *);
+extern sa_resource_t sa_get_next_resource(sa_resource_t);
+extern sa_share_t sa_get_resource_parent(sa_resource_t);
+extern sa_resource_t sa_get_share_resource(sa_share_t, char *);
+extern sa_resource_t sa_add_resource(sa_share_t, char *, int, int *);
+extern int sa_remove_resource(sa_resource_t);
+extern char *sa_get_resource_attr(sa_resource_t, char *);
+extern int sa_set_resource_attr(sa_resource_t, char *, char *);
+extern int sa_set_resource_description(sa_resource_t, char *);
+extern char *sa_get_resource_description(sa_resource_t);
+extern int sa_enable_resource(sa_resource_t, char *);
+extern int sa_disable_resource(sa_resource_t, char *);
+extern int sa_rename_resource(sa_resource_t, char *);
+extern void sa_fix_resource_name(char *);
 
 /* data structure free calls */
 extern void sa_free_attr_string(char *);
@@ -179,6 +214,7 @@ extern int sa_update_property(sa_property_t, char *);
 extern int sa_remove_property(sa_property_t);
 extern int sa_commit_properties(sa_optionset_t, int);
 extern int sa_valid_property(void *, char *, sa_property_t);
+extern int sa_is_persistent(void *);
 
 /* security control */
 extern sa_security_t sa_get_security(sa_group_t, char *, char *);
@@ -196,6 +232,7 @@ extern int sa_parse_legacy_options(sa_group_t, char *, char *);
 extern char *sa_proto_legacy_format(char *, sa_group_t, int);
 extern int sa_is_security(char *, char *);
 extern sa_protocol_properties_t sa_proto_get_properties(char *);
+extern uint64_t sa_proto_get_featureset(char *);
 extern sa_property_t sa_get_protocol_property(sa_protocol_properties_t, char *);
 extern sa_property_t sa_get_next_protocol_property(sa_property_t);
 extern int sa_set_protocol_property(sa_property_t, char *);
@@ -206,9 +243,12 @@ extern int sa_add_protocol_property(sa_protocol_properties_t, sa_property_t);
 extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
 extern int sa_proto_valid_space(char *, char *);
 extern char *sa_proto_space_alias(char *, char *);
+extern int sa_proto_get_transients(sa_handle_t, char *);
+extern int sa_proto_notify_resource(sa_resource_t, char *);
+extern int sa_proto_change_notify(sa_share_t, char *);
 
 /* handle legacy (dfstab/sharetab) files */
-extern int sa_delete_legacy(sa_share_t);
+extern int sa_delete_legacy(sa_share_t, char *);
 extern int sa_update_legacy(sa_share_t, char *);
 extern int sa_update_sharetab(sa_share_t, char *);
 extern int sa_delete_sharetab(char *, char *);

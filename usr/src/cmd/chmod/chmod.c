@@ -44,7 +44,8 @@
  * where
  *	mode is [ugoa][+-=][rwxXlstugo] or an octal number
  *	mode is [<+|->A[# <number] ]<aclspec>
- *	option is -R and -f
+ *	mode is S<attrspec>
+ *	option is -R, -f, and -@
  */
 
 /*
@@ -58,6 +59,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <dirent.h>
 #include <locale.h>
 #include <string.h>	/* strerror() */
@@ -67,6 +69,10 @@
 #include <errno.h>
 #include <sys/acl.h>
 #include <aclutils.h>
+#include <libnvpair.h>
+#include <libcmdutils.h>
+#include <libgen.h>
+#include <attr.h>
 
 static int	rflag;
 static int	fflag;
@@ -79,11 +85,37 @@ static char	**mav;		/* Alternate to argv (for parseargs) */
 
 static char	*ms;		/* Points to the mode argument */
 
-#define	ACL_ADD		1
-#define	ACL_DELETE	2
-#define	ACL_SLOT_DELETE 3
-#define	ACL_REPLACE	4
-#define	ACL_STRIP	5
+#define	ACL_ADD			1
+#define	ACL_DELETE		2
+#define	ACL_SLOT_DELETE		3
+#define	ACL_REPLACE		4
+#define	ACL_STRIP		5
+
+#define	LEFTBRACE	'{'
+#define	RIGHTBRACE	'}'
+#define	A_SEP		','
+#define	A_SEP_TOK	","
+
+#define	A_COMPACT_TYPE	'c'
+#define	A_VERBOSE_TYPE	'v'
+#define	A_ALLATTRS_TYPE	'a'
+
+#define	A_SET_OP	'+'
+#define	A_INVERSE_OP	'-'
+#define	A_REPLACE_OP	'='
+#define	A_UNDEF_OP	'\0'
+
+#define	A_SET_TEXT	"set"
+#define	A_INVERSE_TEXT	"clear"
+
+#define	A_SET_VAL	B_TRUE
+#define	A_CLEAR_VAL	B_FALSE
+
+#define	ATTR_OPTS	0
+#define	ATTR_NAMES	1
+
+#define	sec_acls	secptr.acls
+#define	sec_attrs	secptr.attrs
 
 typedef struct acl_args {
 	acl_t	*acl_aclp;
@@ -91,34 +123,55 @@ typedef struct acl_args {
 	int	acl_action;
 } acl_args_t;
 
-extern mode_t
-newmode_common(char *ms, mode_t new_mode, mode_t umsk, char *file, char *path,
-	o_mode_t *group_clear_bits, o_mode_t *group_set_bits);
+typedef enum {
+	SEC_ACL,
+	SEC_ATTR
+} chmod_sec_t;
 
-static int
-dochmod(char *name, char *path, mode_t umsk, acl_args_t *aclp),
-chmodr(char *dir, char *path, mode_t mode, mode_t umsk, acl_args_t *aclp);
+typedef struct {
+	chmod_sec_t		sec_type;
+	union {
+		acl_args_t	*acls;
+		nvlist_t	*attrs;
+	} secptr;
+} sec_args_t;
+
+typedef struct attr_name {
+	char			*name;
+	struct attr_name	*next;
+} attr_name_t;
+
+
+extern mode_t newmode_common(char *ms, mode_t new_mode, mode_t umsk,
+    char *file, char *path, o_mode_t *group_clear_bits,
+    o_mode_t *group_set_bits);
+
+static int chmodr(char *dir, char *path, mode_t mode, mode_t umsk,
+    sec_args_t *secp, attr_name_t *attrname);
 static int doacl(char *file, struct stat *st, acl_args_t *aclp);
-
+static int dochmod(char *name, char *path, mode_t umsk, sec_args_t *secp,
+    attr_name_t *attrnames);
 static void handle_acl(char *name, o_mode_t group_clear_bits,
     o_mode_t group_set_bits);
-
-static void usage(void);
-
 void errmsg(int severity, int code, char *format, ...);
-
+static void free_attr_names(attr_name_t *attrnames);
 static void parseargs(int ac, char *av[]);
-
-int
-parse_acl_args(char *arg, acl_args_t **acl_args);
+static int parse_acl_args(char *arg, sec_args_t **sec_args);
+static int parse_attr_args(char *arg, sec_args_t **sec_args);
+static void print_attrs(int flag);
+static int set_attrs(char *file, attr_name_t *attrnames, nvlist_t *attr_nvlist);
+static void usage(void);
 
 int
 main(int argc, char *argv[])
 {
-	int i, c;
-	int status = 0;
-	mode_t umsk;
-	acl_args_t *acl_args = NULL;
+	int		i, c;
+	int		status = 0;
+	mode_t		umsk;
+	sec_args_t	*sec_args = NULL;
+	attr_name_t	*attrnames = NULL;
+	attr_name_t	*attrend = NULL;
+	attr_name_t	*tattr;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -128,13 +181,27 @@ main(int argc, char *argv[])
 
 	parseargs(argc, argv);
 
-	while ((c = getopt(mac, mav, "Rf")) != EOF) {
+	while ((c = getopt(mac, mav, "Rf@:")) != EOF) {
 		switch (c) {
 		case 'R':
 			rflag++;
 			break;
 		case 'f':
 			fflag++;
+			break;
+		case '@':
+			if (((tattr = malloc(sizeof (attr_name_t))) == NULL) ||
+			    ((tattr->name = strdup(optarg)) == NULL)) {
+				perror("chmod");
+				exit(2);
+			}
+			if (attrnames == NULL) {
+				attrnames = tattr;
+				attrnames->next = NULL;
+			} else {
+				attrend->next = tattr;
+			}
+			attrend = tattr;
 			break;
 		case '?':
 			usage();
@@ -149,15 +216,32 @@ main(int argc, char *argv[])
 
 	mac -= optind;
 	mav += optind;
-	if (mac >= 2 && (mav[0][0] == 'A')) {
-		if (parse_acl_args(*mav, &acl_args)) {
+	if ((mac >= 2) && (mav[0][0] == 'A')) {
+		if (attrnames != NULL) {
+			free_attr_names(attrnames);
+			attrnames = NULL;
+		}
+		if (parse_acl_args(*mav, &sec_args)) {
 			usage();
 			exit(2);
+		}
+	} else if ((mac >= 2) && (mav[0][0] == 'S')) {
+		if (parse_attr_args(*mav, &sec_args)) {
+			usage();
+			exit(2);
+
+		/* A no-op attribute operation was specified. */
+		} else if (sec_args->sec_attrs == NULL) {
+			exit(0);
 		}
 	} else {
 		if (mac < 2) {
 			usage();
 			exit(2);
+		}
+		if (attrnames != NULL) {
+			free_attr_names(attrnames);
+			attrnames = NULL;
 		}
 	}
 
@@ -167,14 +251,30 @@ main(int argc, char *argv[])
 	(void) umask(umsk);
 
 	for (i = 1; i < mac; i++) {
-		status += dochmod(mav[i], mav[i], umsk, acl_args);
+		status += dochmod(mav[i], mav[i], umsk, sec_args, attrnames);
 	}
 
 	return (fflag ? 0 : status);
 }
 
+static void
+free_attr_names(attr_name_t *attrnames)
+{
+	attr_name_t	*attrnamesptr = attrnames;
+	attr_name_t	*tptr;
+
+	while (attrnamesptr != NULL) {
+		tptr = attrnamesptr->next;
+		if (attrnamesptr->name != NULL) {
+			free(attrnamesptr->name);
+		}
+		attrnamesptr = tptr;
+	}
+}
+
 static int
-dochmod(char *name, char *path, mode_t umsk, acl_args_t *aclp)
+dochmod(char *name, char *path, mode_t umsk, sec_args_t *secp,
+    attr_name_t *attrnames)
 {
 	static struct stat st;
 	int linkflg = 0;
@@ -194,15 +294,24 @@ dochmod(char *name, char *path, mode_t umsk, acl_args_t *aclp)
 	}
 
 	/* Do not recurse if directory is object of symbolic link */
-	if (rflag && ((st.st_mode & S_IFMT) == S_IFDIR) && !linkflg)
-		return (chmodr(name, path, st.st_mode, umsk, aclp));
+	if (rflag && ((st.st_mode & S_IFMT) == S_IFDIR) && !linkflg) {
+		return (chmodr(name, path, st.st_mode, umsk, secp, attrnames));
+	}
 
-	if (aclp) {
-		return (doacl(name, &st, aclp));
-	} else if (chmod(name, newmode_common(ms, st.st_mode, umsk, name, path,
-	    &group_clear_bits, &group_set_bits)) == -1) {
-		errmsg(2, 0, gettext("can't change %s\n"), path);
-		return (1);
+	if (secp != NULL) {
+		if (secp->sec_type == SEC_ACL) {
+			return (doacl(name, &st, secp->sec_acls));
+		} else if (secp->sec_type == SEC_ATTR) {
+			return (set_attrs(name, attrnames, secp->sec_attrs));
+		} else {
+			return (1);
+		}
+	} else {
+		if (chmod(name, newmode_common(ms, st.st_mode, umsk, name, path,
+		    &group_clear_bits, &group_set_bits)) == -1) {
+			errmsg(2, 0, gettext("can't change %s\n"), path);
+			return (1);
+		}
 	}
 
 	/*
@@ -218,9 +327,9 @@ dochmod(char *name, char *path, mode_t umsk, acl_args_t *aclp)
 	return (0);
 }
 
-
 static int
-chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
+chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, sec_args_t *secp,
+    attr_name_t *attrnames)
 {
 
 	DIR *dirp;
@@ -239,13 +348,21 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 	/*
 	 * Change what we are given before doing it's contents
 	 */
-	if (aclp) {
+	if (secp != NULL) {
 		if (lstat(dir, &st) < 0) {
 			errmsg(2, 0, gettext("can't access %s\n"), path);
 			return (1);
 		}
-		if (doacl(dir, &st, aclp) != 0)
+		if (secp->sec_type == SEC_ACL) {
+			if (doacl(dir, &st, secp->sec_acls) != 0)
+				return (1);
+		} else if (secp->sec_type == SEC_ATTR) {
+			if (set_attrs(dir, attrnames, secp->sec_attrs) != 0) {
+				return (1);
+			}
+		} else {
 			return (1);
+		}
 	} else if (chmod(dir, newmode_common(ms, mode, umsk, dir, path,
 	    &group_clear_bits, &group_set_bits)) < 0) {
 		errmsg(2, 0, gettext("can't change %s\n"), path);
@@ -260,7 +377,8 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 	 * general group permissions.
 	 */
 
-	if (aclp == NULL) { /* only necessary when not setting ACL */
+	if (secp != NULL) {
+		/* only necessary when not setting ACL or system attributes */
 		if (group_clear_bits || group_set_bits)
 			handle_acl(dir, group_clear_bits, group_set_bits);
 	}
@@ -315,7 +433,7 @@ chmodr(char *dir, char *path,  mode_t mode, mode_t umsk, acl_args_t *aclp)
 			    currdir, dp->d_name);
 			return (1);
 		}
-		ecode += dochmod(dp->d_name, currdir, umsk, aclp);
+		ecode += dochmod(dp->d_name, currdir, umsk, secp, attrnames);
 	}
 	(void) closedir(dirp);
 	if (chdir(savedir) < 0) {
@@ -344,7 +462,7 @@ errmsg(int severity, int code, char *format, ...)
 	 */
 	if (!fflag || (code != 0)) {
 		(void) fprintf(stderr,
-			"chmod: %s: ", gettext(msg[severity]));
+		    "chmod: %s: ", gettext(msg[severity]));
 		(void) vfprintf(stderr, format, ap);
 	}
 
@@ -361,17 +479,36 @@ usage(void)
 	    "usage:\tchmod [-fR] <absolute-mode> file ...\n"));
 
 	(void) fprintf(stderr, gettext(
+	    "\tchmod [-fR] [-@ attribute] ... "
+	    "S<attribute-operation> file ...\n"));
+
+	(void) fprintf(stderr, gettext(
 	    "\tchmod [-fR] <ACL-operation> file ...\n"));
 
 	(void) fprintf(stderr, gettext(
-	    "\tchmod [-fR] <symbolic-mode-list> file ...\n"));
-
+	    "\tchmod [-fR] <symbolic-mode-list> file ...\n\n"));
 
 	(void) fprintf(stderr, gettext(
 	    "where \t<symbolic-mode-list> is a comma-separated list of\n"));
+	(void) fprintf(stderr, gettext(
+	    "\t[ugoa]{+|-|=}[rwxXlstugo]\n\n"));
 
 	(void) fprintf(stderr, gettext(
-	    "\t[ugoa]{+|-|=}[rwxXlstugo]\n"));
+	    "where \t<attribute-operation> is a comma-separated list of\n"
+	    "\tone or more of the following\n"));
+	(void) fprintf(stderr, gettext(
+	    "\t[+|-|=]c[<compact-attribute-list>|{<compact-attribute-list>}]\n"
+	    "\t[+|-|=]v[<verbose-attribute-setting>|"
+	    "\'{\'<verbose-attribute-setting-list>\'}\']\n"
+	    "\t[+|-|=]a\n"));
+	(void) fprintf(stderr, gettext(
+	    "where \t<compact-attribute-list> is a list of zero or more of\n"));
+	print_attrs(ATTR_OPTS);
+	(void) fprintf(stderr, gettext(
+	    "where \t<verbose-attribute-setting> is one of\n"));
+	print_attrs(ATTR_NAMES);
+	(void) fprintf(stderr, gettext(
+	    "\tand can be, optionally, immediately preceded by \"no\"\n\n"));
 
 	(void) fprintf(stderr, gettext(
 	    "where \t<ACL-operation> is one of the following\n"));
@@ -416,7 +553,7 @@ parseargs(int ac, char *av[])
 
 	for (fflag = i = 0; i < ac; i ++) {
 		if (strcmp(av[i], "--") == 0)
-		    fflag = 1;
+			fflag = 1;
 	}
 
 	/* process the arguments */
@@ -435,19 +572,26 @@ parseargs(int ac, char *av[])
 			 */
 
 			if ((strchr(av[i], 'R') == NULL &&
-			    strchr(av[i], 'f') == NULL)) {
-				mav[mac++] = strdup("--");
+			    strchr(av[i], 'f') == NULL) &&
+			    strchr(av[i], '@') == NULL) {
+				if ((mav[mac++] = strdup("--")) == NULL) {
+					perror("chmod");
+					exit(2);
+				}
 			}
 		}
 
-		mav[mac++] = strdup(av[i]);
+		if ((mav[mac++] = strdup(av[i])) == NULL) {
+			perror("chmod");
+			exit(2);
+		}
 	}
 
 	mav[mac] = (char *)NULL;
 }
 
-int
-parse_acl_args(char *arg, acl_args_t **acl_args)
+static int
+parse_acl_args(char *arg, sec_args_t **sec_args)
 {
 	acl_t *new_acl = NULL;
 	int slot;
@@ -512,7 +656,12 @@ parse_acl_args(char *arg, acl_args_t **acl_args)
 	new_acl_args->acl_slot = slot;
 	new_acl_args->acl_action = action;
 
-	*acl_args = new_acl_args;
+	if ((*sec_args = malloc(sizeof (sec_args_t))) == NULL) {
+		perror("chmod");
+		exit(2);
+	}
+	(*sec_args)->sec_type = SEC_ACL;
+	(*sec_args)->sec_acls = new_acl_args;
 
 	return (0);
 }
@@ -593,10 +742,10 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 	switch (acl_args->acl_action) {
 	case ACL_ADD:
 		if ((error = acl_addentries(aclp,
-			acl_args->acl_aclp, acl_args->acl_slot)) != 0) {
-				errmsg(1, 1, "%s\n", acl_strerror(error));
-				acl_free(aclp);
-				return (1);
+		    acl_args->acl_aclp, acl_args->acl_slot)) != 0) {
+			errmsg(1, 1, "%s\n", acl_strerror(error));
+			acl_free(aclp);
+			return (1);
 		}
 		set_aclp = aclp;
 		break;
@@ -697,5 +846,632 @@ doacl(char *file, struct stat *st, acl_args_t *acl_args)
 			return (1);
 	}
 	acl_free(aclp);
+	return (0);
+}
+
+/*
+ * Prints out the attributes in their verbose form:
+ *	'{'[["no"]<attribute-name>][,["no"]<attribute-name>]...'}'
+ * similar to output of ls -/v.
+ */
+static void
+print_nvlist(nvlist_t *attr_nvlist)
+{
+	int		firsttime = 1;
+	boolean_t	value;
+	nvlist_t	*lptr = attr_nvlist;
+	nvpair_t	*pair = NULL;
+
+	(void) fprintf(stderr, "\t%c", LEFTBRACE);
+	while (pair = nvlist_next_nvpair(lptr, pair)) {
+		if (nvpair_value_boolean_value(pair, &value) == 0) {
+			(void) fprintf(stderr, "%s%s%s",
+			    firsttime ? "" : A_SEP_TOK,
+			    (value == A_SET_VAL) ? "" : "no",
+			    nvpair_name(pair));
+			firsttime = 0;
+		} else {
+			(void) fprintf(stderr, gettext(
+			    "<error retrieving attributes: %s>"),
+			    strerror(errno));
+			break;
+		}
+	}
+	(void) fprintf(stderr, "%c\n", RIGHTBRACE);
+}
+
+/*
+ * Add an attribute name and boolean value to an nvlist if an action is to be
+ * performed for that attribute.  The nvlist will be used later to set all the
+ * attributes in the nvlist in one operation through a call to setattrat().
+ *
+ * If a set operation ('+') was specified, then a boolean representation of the
+ * attribute's value will be added to the nvlist for that attribute name.  If an
+ * inverse operation ('-') was specified, then a boolean representation of the
+ * inverse of the attribute's value will be added to the nvlist for that
+ * attribute name.
+ *
+ * Returns an nvlist of attribute name and boolean value pairs if there are
+ * attribute actions to be performed, otherwise returns NULL.
+ */
+static nvlist_t *
+set_attrs_nvlist(char *attractptr, int numofattrs)
+{
+	int		attribute_set = 0;
+	f_attr_t	i;
+	nvlist_t	*attr_nvlist;
+
+	if (nvlist_alloc(&attr_nvlist, NV_UNIQUE_NAME, 0) != 0) {
+		perror("chmod");
+		exit(2);
+	}
+
+	for (i = 0; i < numofattrs; i++) {
+		if (attractptr[i] != '\0') {
+			if ((nvlist_add_boolean_value(attr_nvlist,
+			    attr_to_name(i),
+			    (attractptr[i] == A_SET_OP))) != 0) {
+				errmsg(1, 2, gettext(
+				    "unable to propagate attribute names and"
+				    "values: %s\n"), strerror(errno));
+			} else {
+				attribute_set = 1;
+			}
+		}
+	}
+	return (attribute_set ? attr_nvlist : NULL);
+}
+
+/*
+ * Set the attributes of file, or if specified, of the named attribute file,
+ * attrname.  Build an nvlist of attribute names and values and call setattrat()
+ * to set the attributes in one operation.
+ *
+ * Returns 0 if successful, otherwise returns 1.
+ */
+static int
+set_file_attrs(char *file, char *attrname, nvlist_t *attr_nvlist)
+{
+	int	rc;
+	char	*filename;
+
+	if (attrname != NULL) {
+		filename = attrname;
+	} else {
+		filename = basename(file);
+	}
+
+	if ((rc = setattrat(AT_FDCWD, XATTR_VIEW_READWRITE, filename,
+	    attr_nvlist)) != 0) {
+		char *emsg;
+		switch (errno) {
+		case EINVAL:
+			emsg = gettext("not supported");
+			break;
+		case EPERM:
+			emsg = gettext("not privileged");
+			break;
+		default:
+			emsg = strerror(rc);
+		}
+		errmsg(1, 0, gettext(
+		    "cannot set the following attributes on "
+		    "%s%s%s%s: %s\n"),
+		    (attrname == NULL) ? "" : gettext("attribute "),
+		    (attrname == NULL) ? "" : attrname,
+		    (attrname == NULL) ? "" : gettext(" of "),
+		    file, emsg);
+		print_nvlist(attr_nvlist);
+	}
+
+	return (rc);
+}
+
+static int
+save_cwd(void)
+{
+	return (open(".", O_RDONLY));
+}
+
+static void
+rest_cwd(int cwd)
+{
+	if (cwd != -1) {
+		if (fchdir(cwd) != 0) {
+			errmsg(1, 1, gettext(
+			    "can't change to current working directory\n"));
+		}
+		(void) close(cwd);
+	}
+}
+
+/*
+ * Returns 1 if filename is a system attribute file, otherwise
+ * returns 0.
+ */
+static int
+is_sattr(char *filename)
+{
+	return (sysattr_type(filename) != _NOT_SATTR);
+}
+
+/*
+ * Perform the action on the specified named attribute file for the file
+ * associated with the input file descriptor.  If the named attribute file
+ * is "*", then the action is to be performed on all the named attribute files
+ * of the file associated with the input file descriptor.
+ */
+static int
+set_named_attrs(char *file, int parentfd, char *attrname, nvlist_t *attr_nvlist)
+{
+	int		dirfd;
+	int		error = 0;
+	DIR		*dirp = NULL;
+	struct dirent	*dp;
+	struct stat	st;
+
+	if ((attrname == NULL) || (strcmp(attrname, "*") != 0)) {
+		/*
+		 * Make sure the named attribute exists and extended system
+		 * attributes are supported on the underlying file system.
+		 */
+		if (attrname != NULL) {
+			if (fstatat(parentfd, attrname, &st,
+			    AT_SYMLINK_NOFOLLOW) < 0) {
+				errmsg(2, 0, gettext(
+				    "can't access attribute %s of %s\n"),
+				    attrname, file);
+				return (1);
+			}
+			if (sysattr_support(attrname, _PC_SATTR_ENABLED) != 1) {
+				errmsg(1, 0, gettext(
+				    "extended system attributes not supported "
+				    "for attribute %s of %s\n"),
+				    attrname, file);
+				return (1);
+			}
+		}
+
+		error = set_file_attrs(file, attrname, attr_nvlist);
+
+	} else {
+		if (((dirfd = dup(parentfd)) == -1) ||
+		    ((dirp = fdopendir(dirfd)) == NULL)) {
+			errmsg(1, 0, gettext(
+			    "cannot open dir pointer of file %s\n"), file);
+			if (dirfd > 0) {
+				(void) close(dirfd);
+			}
+			return (1);
+		}
+
+		while (dp = readdir(dirp)) {
+			/*
+			 * Process all extended attribute files except
+			 * ".", "..", and extended system attribute files.
+			 */
+			if ((strcmp(dp->d_name, ".") == 0) ||
+			    (strcmp(dp->d_name, "..") == 0) ||
+			    is_sattr(dp->d_name)) {
+				continue;
+			}
+
+			if (set_named_attrs(file, parentfd, dp->d_name,
+			    attr_nvlist) != 0) {
+				error++;
+			}
+		}
+		if (dirp != NULL) {
+			(void) closedir(dirp);
+		}
+	}
+
+	return ((error == 0) ? 0 : 1);
+}
+
+/*
+ * Set the attributes of the specified file, or if specified with -@ on the
+ * command line, the specified named attributes of the specified file.
+ *
+ * Returns 0 if successful, otherwise returns 1.
+ */
+static int
+set_attrs(char *file, attr_name_t *attrnames, nvlist_t *attr_nvlist)
+{
+	char		*parentd;
+	char		*tpath = NULL;
+	int		cwd;
+	int		error = 0;
+	int		parentfd;
+	attr_name_t	*tattr = attrnames;
+
+	if (attr_nvlist == NULL) {
+		return (0);
+	}
+
+	if (sysattr_support(file, _PC_SATTR_ENABLED) != 1) {
+		errmsg(1, 0, gettext(
+		    "extended system attributes not supported for %s\n"), file);
+		return (1);
+	}
+
+	/*
+	 * Open the parent directory and change into it before attempting
+	 * to set the attributes of the file.
+	 */
+	if (attrnames == NULL) {
+		tpath = strdup(file);
+		parentd = dirname(tpath);
+		parentfd = open(parentd, O_RDONLY);
+	} else {
+		parentfd = attropen(file, ".", O_RDONLY);
+	}
+	if (parentfd == -1) {
+		errmsg(1, 0, gettext(
+		    "cannot open attribute directory of %s\n"), file);
+		if (tpath != NULL) {
+			free(tpath);
+		}
+		return (1);
+	}
+
+	if ((cwd = save_cwd()) < 0) {
+		errmsg(1, 1, gettext(
+		    "can't get current working directory\n"));
+	}
+	if (fchdir(parentfd) != 0) {
+		errmsg(1, 0, gettext(
+		    "can't change to parent %sdirectory of %s\n"),
+		    (attrnames == NULL) ? "" : gettext("attribute "), file);
+		(void) close(cwd);
+		(void) close(parentfd);
+		if (tpath != NULL) {
+			free(tpath);
+		}
+		return (1);
+	}
+
+	/*
+	 * If no named attribute file names were provided on the command line
+	 * then set the attributes of the base file, otherwise, set the
+	 * attributes for each of the named attribute files specified.
+	 */
+	if (attrnames == NULL) {
+		error = set_named_attrs(file, parentfd, NULL, attr_nvlist);
+		free(tpath);
+	} else {
+		while (tattr != NULL) {
+			if (set_named_attrs(file, parentfd, tattr->name,
+			    attr_nvlist) != 0) {
+				error++;
+			}
+			tattr = tattr->next;
+		}
+	}
+	(void) close(parentfd);
+	rest_cwd(cwd);
+
+	return ((error == 0) ? 0 : 1);
+}
+
+/*
+ * Prints the attributes in either the compact or verbose form indicated
+ * by flag.
+ */
+static void
+print_attrs(int flag)
+{
+	f_attr_t	i;
+	static int	numofattrs;
+	int		firsttime = 1;
+
+	numofattrs = attr_count();
+
+	(void) fprintf(stderr, gettext("\t["));
+	for (i = 0; i < numofattrs; i++) {
+		if ((attr_to_xattr_view(i) != XATTR_VIEW_READWRITE) ||
+		    (attr_to_data_type(i) != DATA_TYPE_BOOLEAN_VALUE)) {
+			continue;
+		}
+		(void) fprintf(stderr, "%s%s",
+		    (firsttime == 1) ? "" : gettext("|"),
+		    (flag == ATTR_OPTS) ? attr_to_option(i) : attr_to_name(i));
+		firsttime = 0;
+	}
+	(void) fprintf(stderr, gettext("]\n"));
+}
+
+/*
+ * Record what action should be taken on the specified attribute. Only boolean
+ * read-write attributes can be manipulated.
+ *
+ * Returns 0 if successful, otherwise returns 1.
+ */
+static int
+set_attr_args(f_attr_t attr, char action, char *attractptr)
+{
+	if ((attr_to_xattr_view(attr) == XATTR_VIEW_READWRITE) &&
+	    (attr_to_data_type(attr) == DATA_TYPE_BOOLEAN_VALUE)) {
+		attractptr[attr] = action;
+		return (0);
+	}
+	return (1);
+}
+
+/*
+ * Parses the entry and assigns the appropriate action (either '+' or '-' in
+ * attribute's position in the character array pointed to by attractptr, where
+ * upon exit, attractptr is positional and the value of each character specifies
+ * whether to set (a '+'), clear (a '-'), or leave untouched (a '\0') the
+ * attribute value.
+ *
+ * If the entry is an attribute name, then the A_SET_OP action is to be
+ * performed for this attribute.  If the entry is an attribute name proceeded
+ * with "no", then the A_INVERSE_OP action is to be performed for this
+ * attribute.  If the entry is one or more attribute option letters, then step
+ * through each of the option letters marking the action to be performed for
+ * each of the attributes associated with the letter as A_SET_OP.
+ *
+ * Returns 0 if the entry was a valid attribute(s) and the action to be
+ * performed on that attribute(s) has been recorded, otherwise returns 1.
+ */
+static int
+parse_entry(char *entry, char action, char atype, int len, char *attractptr)
+{
+	char		aopt[2] = {'\0', '\0'};
+	char		*aptr;
+	f_attr_t	attr;
+
+	if (atype == A_VERBOSE_TYPE) {
+		if ((attr = name_to_attr(entry)) != F_ATTR_INVAL) {
+			return (set_attr_args(attr,
+			    (action == A_REPLACE_OP) ? A_SET_OP : action,
+			    attractptr));
+		} else if ((len > 2) && (strncmp(entry, "no", 2) == 0) &&
+		    ((attr = name_to_attr(entry + 2)) != F_ATTR_INVAL)) {
+			return (set_attr_args(attr, ((action == A_REPLACE_OP) ||
+			    (action == A_SET_OP)) ? A_INVERSE_OP : A_SET_OP,
+			    attractptr));
+		} else {
+			return (1);
+		}
+	} else if (atype == A_COMPACT_TYPE) {
+		for (aptr = entry; *aptr != '\0'; aptr++) {
+			*aopt = *aptr;
+			/*
+			 * The output of 'ls' can be used as the attribute mode
+			 * specification for chmod.  This output can contain a
+			 * hypen ('-') for each attribute that is not set.  If
+			 * so, ignore them.  If a replace action is being
+			 * performed, then all attributes that don't have an
+			 * action set here, will be cleared down the line.
+			 */
+			if (*aptr == '-') {
+				continue;
+			}
+			if (set_attr_args(option_to_attr(aopt),
+			    (action == A_REPLACE_OP) ? A_SET_OP : action,
+			    attractptr) != 0) {
+				return (1);
+			}
+		}
+		return (0);
+	}
+	return (1);
+}
+
+/*
+ * Parse the attribute specification, aoptsstr.  Upon completion, attr_nvlist
+ * will point to an nvlist which contains pairs of attribute names and values
+ * to be set; attr_nvlist will be NULL if it is a no-op.
+ *
+ * The attribute specification format is
+ *	S[oper]attr_type[attribute_list]
+ * where oper is
+ *	+	set operation of specified attributes in attribute list.
+ *		This is the default operation.
+ *	-	inverse operation of specified attributes in attribute list
+ *	=	replace operation of all attributes.  All attribute operations
+ *		depend on those specified in the attribute list.  Attributes
+ *		not specified in the attribute list will be cleared.
+ * where attr_type is
+ *	c	compact type.  Each entry in the attribute list is a character
+ *		option representing an associated attribute name.
+ *	v	verbose type.  Each entry in the attribute list is an
+ *		an attribute name which can optionally be preceeded with "no"
+ *		(to imply the attribute should be cleared).
+ *	a	all attributes type.  The oper should be applied to all
+ *		read-write boolean system attributes.  No attribute list should
+ *		be specified after an 'a' attribute type.
+ *
+ * Returns 0 if aoptsstr contained a valid attribute specification,
+ * otherwise, returns 1.
+ */
+static int
+parse_attr_args(char *aoptsstr, sec_args_t **sec_args)
+{
+	char		action;
+	char		*attractptr;
+	char		atype;
+	char		*entry;
+	char		*eptr;
+	char		*nextattr;
+	char		*nextentry;
+	char		*subentry;
+	char		*teptr;
+	char		tok[] = {'\0', '\0'};
+	int		len;
+	f_attr_t	i;
+	int		numofattrs;
+
+	if ((*aoptsstr != 'S') || (*(aoptsstr + 1) == '\0')) {
+		return (1);
+	}
+
+	if ((eptr = strdup(aoptsstr + 1)) == NULL) {
+		perror("chmod");
+		exit(2);
+	}
+	entry = eptr;
+
+	/*
+	 * Create a positional character array to determine a single attribute
+	 * operation to be performed, where each index represents the system
+	 * attribute affected, and it's value in the array represents the action
+	 * to be performed, i.e., a value of '+' means to set the attribute, a
+	 * value of '-' means to clear the attribute, and a value of '\0' means
+	 * to leave the attribute untouched.  Initially, this positional
+	 * character array is all '\0's, representing a no-op.
+	 */
+	if ((numofattrs = attr_count()) < 1) {
+		errmsg(1, 1, gettext("system attributes not supported\n"));
+	}
+
+	if ((attractptr = calloc(numofattrs, sizeof (char))) == NULL) {
+		perror("chmod");
+		exit(2);
+	}
+
+	if ((*sec_args = malloc(sizeof (sec_args_t))) == NULL) {
+		perror("chmod");
+		exit(2);
+	}
+	(*sec_args)->sec_type = SEC_ATTR;
+	(*sec_args)->sec_attrs = NULL;
+
+	/* Parse each attribute operation within the attribute specification. */
+	while ((entry != NULL) && (*entry != '\0')) {
+		action = A_SET_OP;
+		atype = '\0';
+
+		/* Get the operator. */
+		switch (*entry) {
+		case A_SET_OP:
+		case A_INVERSE_OP:
+		case A_REPLACE_OP:
+			action = *entry++;
+			break;
+		case A_COMPACT_TYPE:
+		case A_VERBOSE_TYPE:
+		case A_ALLATTRS_TYPE:
+			atype = *entry++;
+			action = A_SET_OP;
+			break;
+		default:
+			break;
+		}
+
+		/* An attribute type must be specified. */
+		if (atype == '\0') {
+			if ((*entry == A_COMPACT_TYPE) ||
+			    (*entry == A_VERBOSE_TYPE) ||
+			    (*entry == A_ALLATTRS_TYPE)) {
+				atype = *entry++;
+			} else {
+				return (1);
+			}
+		}
+
+		/* Get the attribute specification separator. */
+		if (*entry == LEFTBRACE) {
+			*tok = RIGHTBRACE;
+			entry++;
+		} else {
+			*tok = A_SEP;
+		}
+
+		/* Get the attribute operation */
+		if ((nextentry = strpbrk(entry, tok)) != NULL) {
+			*nextentry = '\0';
+			nextentry++;
+		}
+
+		/* Check for a no-op */
+		if ((*entry == '\0') && (atype != A_ALLATTRS_TYPE) &&
+		    (action != A_REPLACE_OP)) {
+			entry = nextentry;
+			continue;
+		}
+
+		/*
+		 * Step through the attribute operation, setting the
+		 * appropriate values for the specified attributes in the
+		 * character array, attractptr. A value of '+' will mean the
+		 * attribute is to be set, and a value of '-' will mean the
+		 * attribute is to be cleared.  If the value of an attribute
+		 * remains '\0', then no action is to be taken on that
+		 * attribute.  As multiple operations specified are
+		 * accumulated, a single attribute setting operation is
+		 * represented in attractptr.
+		 */
+		len = strlen(entry);
+		if ((*tok == RIGHTBRACE) || (action == A_REPLACE_OP) ||
+		    (atype == A_ALLATTRS_TYPE)) {
+
+			if ((action == A_REPLACE_OP) ||
+			    (atype == A_ALLATTRS_TYPE)) {
+				(void) memset(attractptr, '\0', numofattrs);
+			}
+
+			if (len > 0) {
+				if ((teptr = strdup(entry)) == NULL) {
+					perror("chmod");
+					exit(2);
+				}
+				subentry = teptr;
+				while (subentry != NULL) {
+					if ((nextattr = strpbrk(subentry,
+					    A_SEP_TOK)) != NULL) {
+						*nextattr = '\0';
+						nextattr++;
+					}
+					if (parse_entry(subentry, action,
+					    atype, len, attractptr) != 0) {
+						return (1);
+					}
+					subentry = nextattr;
+				}
+				free(teptr);
+			}
+
+			/*
+			 * If performing the replace action, record the
+			 * attributes and values for the rest of the
+			 * attributes that have not already been recorded,
+			 * otherwise record the specified action for all
+			 * attributes.  Note: set_attr_args() will only record
+			 * the attribute and action if it is a boolean
+			 * read-write attribute so we don't need to worry
+			 * about checking it here.
+			 */
+			if ((action == A_REPLACE_OP) ||
+			    (atype == A_ALLATTRS_TYPE)) {
+				for (i = 0; i < numofattrs; i++) {
+					if (attractptr[i] == A_UNDEF_OP) {
+						(void) set_attr_args(i,
+						    (action == A_SET_OP) ?
+						    A_SET_OP : A_INVERSE_OP,
+						    attractptr);
+					}
+				}
+			}
+
+		} else {
+			if (parse_entry(entry, action, atype, len,
+			    attractptr) != 0) {
+				return (1);
+			}
+		}
+		entry = nextentry;
+	}
+
+	/*
+	 * Populate an nvlist with attribute name and boolean value pairs
+	 * using the single attribute operation.
+	 */
+	(*sec_args)->sec_attrs = set_attrs_nvlist(attractptr, numofattrs);
+	free(attractptr);
+	free(eptr);
+
 	return (0);
 }

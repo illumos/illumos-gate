@@ -1628,7 +1628,7 @@ nfs4delegreturn_impl(rnode4_t *rp, int flags, struct nfs4_callback_globals *ncg)
 	 * before doing DELEGRETURN.
 	 */
 	if (flags & NFS4_DR_PUSH)
-		(void) VOP_PUTPAGE(vp, 0, 0, 0, cr);
+		(void) VOP_PUTPAGE(vp, 0, 0, 0, cr, NULL);
 
 	/*
 	 * Take r_deleg_recall_lock in WRITE mode, this will prevent
@@ -1989,7 +1989,7 @@ retry:
  * We have already taken the 'r_deleg_recall_lock' as WRITER, which
  * prevents new OPENs from going OTW (as start_fop takes this
  * lock in READ mode); thus, no new open streams can be created
- * (which inheretly means no new delegation open streams are
+ * (which inherently means no new delegation open streams are
  * being created).
  */
 
@@ -2096,7 +2096,7 @@ nfs4delegreturn_thread(struct cb_recall_pass *args)
 		mutex_exit(&rp->r_statelock);
 
 		if (rdirty) {
-			error = VOP_PUTPAGE(vp, 0, 0, 0, cr);
+			error = VOP_PUTPAGE(vp, 0, 0, 0, cr, NULL);
 
 			if (error)
 				CB_WARN1("nfs4delegreturn_thread:"
@@ -2114,7 +2114,7 @@ nfs4delegreturn_thread(struct cb_recall_pass *args)
 
 	if (rip) {
 
-		error = VOP_PUTPAGE(vp, 0, 0, B_INVAL, cr);
+		error = VOP_PUTPAGE(vp, 0, 0, B_INVAL, cr, NULL);
 
 		if (error)
 			CB_WARN1("nfs4delegreturn_thread: VOP_PUTPAGE: %d\n",

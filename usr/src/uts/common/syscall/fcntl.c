@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +205,8 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		flag = fp->f_flag;
 		if ((iarg & (FNONBLOCK|FNDELAY)) == (FNONBLOCK|FNDELAY))
 			iarg &= ~FNDELAY;
-		if ((error = VOP_SETFL(vp, flag, iarg, fp->f_cred)) == 0) {
+		if ((error = VOP_SETFL(vp, flag, iarg, fp->f_cred, NULL)) ==
+		    0) {
 			iarg &= FMASK;
 			mutex_enter(&fp->f_tlock);
 			fp->f_flag &= ~FMASK | (FREAD|FWRITE);
@@ -317,7 +318,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		 * there's no need for them to know.  Map it to F_GETLK.
 		 */
 		if ((error = VOP_FRLOCK(vp, (cmd == F_O_GETLK) ? F_GETLK : cmd,
-		    &bf, flag, offset, NULL, fp->f_cred)) != 0)
+		    &bf, flag, offset, NULL, fp->f_cred, NULL)) != 0)
 			break;
 
 		/*
@@ -527,12 +528,14 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			nbl_start_crit(vp, RW_READER);
 			in_crit = 1;
 			vattr.va_mask = AT_SIZE;
-			if ((error = VOP_GETATTR(vp, &vattr, 0, CRED())) != 0)
+			if ((error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
+			    != 0)
 				break;
 			begin = start > vattr.va_size ? vattr.va_size : start;
 			length = vattr.va_size > start ? vattr.va_size - start :
 				start - vattr.va_size;
-			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0)) {
+			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0,
+			    NULL)) {
 				error = EACCES;
 				break;
 			}
@@ -599,7 +602,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			break;
 
 		if ((error = VOP_FRLOCK(vp, cmd, &bf, flag, offset,
-		    NULL, fp->f_cred)) != 0)
+		    NULL, fp->f_cred, NULL)) != 0)
 			break;
 
 		if ((cmd == F_GETLK) && bf.l_type == F_UNLCK) {
@@ -658,7 +661,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		shr_own.sl_id = fsh.f_id;
 		shr.s_own_len = sizeof (shr_own);
 		shr.s_owner = (caddr_t)&shr_own;
-		error = VOP_SHRLOCK(vp, cmd, &shr, flag, fp->f_cred);
+		error = VOP_SHRLOCK(vp, cmd, &shr, flag, fp->f_cred, NULL);
 /* ONC_PLUS EXTRACT END */
 		break;
 
@@ -710,7 +713,7 @@ flock_check(vnode_t *vp, flock64_t *flp, offset_t offset, offset_t max)
 		break;
 	case 2:		/* SEEK_END */
 		vattr.va_mask = AT_SIZE;
-		if (error = VOP_GETATTR(vp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
 			return (error);
 		if (flp->l_start > (max - (offset_t)vattr.va_size))
 			return (EOVERFLOW);
@@ -774,7 +777,7 @@ flock_get_start(vnode_t *vp, flock64_t *flp, offset_t offset, u_offset_t *start)
 		break;
 	case 2:		/* SEEK_END */
 		vattr.va_mask = AT_SIZE;
-		if (error = VOP_GETATTR(vp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
 			return (error);
 		*start = (u_offset_t)(flp->l_start + (offset_t)vattr.va_size);
 		break;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,14 +127,27 @@ prctioctl(prnode_t *pnp, int cmd, intptr_t arg, int flag, cred_t *cr)
 /*
  * Control operations (lots).
  */
+/*ARGSUSED*/
 #ifdef _SYSCALL32_IMPL
 static int
-prioctl64(struct vnode *vp, int cmd, intptr_t arg, int flag,
-    cred_t *cr, int *rvalp)
+prioctl64(
+	struct vnode *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 #else
 int
-prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-    cred_t *cr, int *rvalp)
+prioctl(
+	struct vnode *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 #endif	/* _SYSCALL32_IMPL */
 {
 	caddr_t cmaddr = (caddr_t)arg;
@@ -1657,9 +1670,16 @@ oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 	}
 }
 
+/*ARGSUSED*/
 static int
-prioctl32(struct vnode *vp, int cmd, intptr_t arg, int flag,
-	cred_t *cr, int *rvalp)
+prioctl32(
+	struct vnode *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 {
 	caddr_t cmaddr = (caddr_t)arg;
 	proc_t *p;
@@ -3126,7 +3146,7 @@ propenm(prnode_t *pnp, caddr_t cmaddr, caddr_t va, int *rvalp, cred_t *cr)
 	prunlock(pnp);
 
 	if (error == 0) {
-		if ((error = VOP_ACCESS(xvp, VREAD, 0, cr)) == 0)
+		if ((error = VOP_ACCESS(xvp, VREAD, 0, cr, NULL)) == 0)
 			error = fassign(&xvp, FREAD, &n);
 		if (error) {
 			VN_RELE(xvp);
@@ -3876,16 +3896,23 @@ again:
 }
 #endif	/* _SYSCALL32_IMPL */
 
+/*ARGSUSED*/
 #ifdef _SYSCALL32_IMPL
 int
-prioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-	cred_t *cr, int *rvalp)
+prioctl(
+	struct vnode *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 {
 	switch (curproc->p_model) {
 	case DATAMODEL_ILP32:
-		return (prioctl32(vp, cmd, arg, flag, cr, rvalp));
+		return (prioctl32(vp, cmd, arg, flag, cr, rvalp, ct));
 	case DATAMODEL_LP64:
-		return (prioctl64(vp, cmd, arg, flag, cr, rvalp));
+		return (prioctl64(vp, cmd, arg, flag, cr, rvalp, ct));
 	default:
 		return (ENOSYS);
 	}

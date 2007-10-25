@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,7 @@ cpathconf(register vnode_t *vp, int cmd, struct cred *cr)
 
 	switch (cmd) {
 	case _PC_2_SYMLINKS:
-		if (error = VOP_PATHCONF(vp, _PC_SYMLINK_MAX, &val, cr))
+		if (error = VOP_PATHCONF(vp, _PC_SYMLINK_MAX, &val, cr, NULL))
 			return ((long)set_errno(error));
 		return ((long)(val > 0));
 
@@ -77,7 +77,7 @@ cpathconf(register vnode_t *vp, int cmd, struct cred *cr)
 		return ((long)set_errno(EINVAL));
 
 	case _PC_SYNC_IO:
-		if (!(error = VOP_FSYNC(vp, FSYNC, cr)))
+		if (!(error = VOP_FSYNC(vp, FSYNC, cr, NULL)))
 			return (1l);
 		return ((long)set_errno(error));
 
@@ -85,7 +85,7 @@ cpathconf(register vnode_t *vp, int cmd, struct cred *cr)
 		return ((vp->v_vfsp->vfs_flag & VFS_XATTR) ? 1 : 0);
 
 	default:
-		if (error = VOP_PATHCONF(vp, cmd, &val, cr))
+		if (error = VOP_PATHCONF(vp, cmd, &val, cr, NULL))
 			return ((long)set_errno(error));
 		return (val);
 	}

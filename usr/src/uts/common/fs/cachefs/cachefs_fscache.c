@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -257,7 +256,7 @@ fscache_setup(fscache_t *fscp, ino64_t fsid, char *namep,
 			return (error);
 		}
 	} else if (optp) {
-		/* compare the options to make sure they are compatable */
+		/* compare the options to make sure they are compatible */
 		error = fscache_compare_options(fscp, optp);
 		if (error) {
 			cmn_err(CE_WARN,
@@ -507,8 +506,8 @@ out:
 
 /*
  * Compares fscache state with new mount options
- * to make sure compatable.
- * Returns ESRCH if not compatable or 0 for success.
+ * to make sure compatible.
+ * Returns ESRCH if not compatible or 0 for success.
  */
 int
 fscache_compare_options(fscache_t *fscp, struct cachefsoptions *optp)
@@ -811,7 +810,8 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	attrp->va_gid = 0;
 	attrp->va_type = VDIR;
 	attrp->va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
-	error = VOP_MKDIR(cachep->c_dirvp, namep, attrp, &fscdirvp, kcred);
+	error = VOP_MKDIR(cachep->c_dirvp, namep, attrp, &fscdirvp, kcred,
+	    NULL, 0, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "Can't create fs cache directory");
 		goto out;
@@ -821,7 +821,7 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	 * Created the directory. Get the fileno. That'll be the cachefs_fsid.
 	 */
 	attrp->va_mask = AT_NODEID;
-	error = VOP_GETATTR(fscdirvp, attrp, 0, kcred);
+	error = VOP_GETATTR(fscdirvp, attrp, 0, kcred, NULL);
 	if (error) {
 		goto out;
 	}
@@ -832,7 +832,7 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	attrp->va_type = VREG;
 	attrp->va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	error = VOP_CREATE(fscdirvp, CACHEFS_FSINFO, attrp, EXCL,
-			0600, &infovp, kcred, 0);
+			0600, &infovp, kcred, 0, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "Can't create fs option file");
 		goto out;
@@ -858,7 +858,7 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	cid.cid_fileno = fsid;
 	make_ascii_name(&cid, name);
 	error = VOP_RENAME(cachep->c_dirvp, namep, cachep->c_dirvp,
-		name, kcred);
+		name, kcred, NULL, 0);
 	if (error) {
 		cmn_err(CE_WARN, "Can't rename cache directory");
 		goto out;
@@ -866,7 +866,8 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	attrp->va_mask = AT_MODE | AT_TYPE;
 	attrp->va_mode = 0777;
 	attrp->va_type = VLNK;
-	error = VOP_SYMLINK(cachep->c_dirvp, namep, attrp, name, kcred);
+	error = VOP_SYMLINK(cachep->c_dirvp, namep, attrp, name, kcred, NULL,
+	    0);
 	if (error) {
 		cmn_err(CE_WARN, "Can't create cache directory symlink");
 		goto out;
@@ -880,7 +881,8 @@ fscdir_create(cachefscache_t *cachep, char *namep, fscache_t *fscp)
 	attrp->va_gid = 0;
 	attrp->va_type = VDIR;
 	attrp->va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
-	error = VOP_MKDIR(fscdirvp, ATTRCACHE_NAME, attrp, &attrvp, kcred);
+	error = VOP_MKDIR(fscdirvp, ATTRCACHE_NAME, attrp, &attrvp, kcred, NULL,
+	    0, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "Can't create attrcache dir for fscache");
 		goto out;
@@ -939,7 +941,7 @@ fscdir_find(cachefscache_t *cachep, ino64_t fsid, fscache_t *fscp)
 
 	/* try to find the directory */
 	error = VOP_LOOKUP(cachep->c_dirvp, dirname, &fscdirvp, NULL,
-			0, NULL, kcred);
+			0, NULL, kcred, NULL, NULL, NULL);
 	if (error)
 		goto out;
 
@@ -953,7 +955,7 @@ fscdir_find(cachefscache_t *cachep, ino64_t fsid, fscache_t *fscp)
 
 	/* try to find the info file */
 	error = VOP_LOOKUP(fscdirvp, CACHEFS_FSINFO, &infovp,
-	    NULL, 0, NULL, kcred);
+	    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: fscdir_find_b: cache corruption"
 			" run fsck, %s", dirname);
@@ -975,7 +977,7 @@ fscdir_find(cachefscache_t *cachep, ino64_t fsid, fscache_t *fscp)
 
 	/* try to find the attrcache directory */
 	error = VOP_LOOKUP(fscdirvp, ATTRCACHE_NAME,
-	    &attrvp, NULL, 0, NULL, kcred);
+	    &attrvp, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: fscdir_find_d: cache corruption"
 			" run fsck, %s", dirname);
@@ -1076,7 +1078,7 @@ fscache_name_to_fsid(cachefscache_t *cachep, char *namep, ino64_t *fsidp)
 
 	/* get the vnode of the name */
 	error = VOP_LOOKUP(cachep->c_dirvp, namep, &linkvp, NULL, 0, NULL,
-		kcred);
+		kcred, NULL, NULL, NULL);
 	if (error)
 		goto out;
 
@@ -1096,7 +1098,7 @@ fscache_name_to_fsid(cachefscache_t *cachep, char *namep, ino64_t *fsidp)
 	uio.uio_loffset = 0;
 	uio.uio_fmode = 0;
 	uio.uio_extflg = UIO_COPY_CACHED;
-	error = VOP_READLINK(linkvp, &uio, kcred);
+	error = VOP_READLINK(linkvp, &uio, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't read filesystem cache link");
 		goto out;

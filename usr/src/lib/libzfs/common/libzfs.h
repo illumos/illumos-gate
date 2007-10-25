@@ -110,6 +110,8 @@ enum {
 	EZFS_BADPERMSET,	/* invalid permission set name */
 	EZFS_NODELEGATION,	/* delegated administration is disabled */
 	EZFS_PERMRDONLY,	/* pemissions are readonly */
+	EZFS_UNSHARESMBFAILED,	/* failed to unshare over smb */
+	EZFS_SHARESMBFAILED,	/* failed to share over smb */
 	EZFS_UNKNOWN
 };
 
@@ -320,7 +322,6 @@ extern const char *zfs_get_name(const zfs_handle_t *);
 /*
  * zfs dataset property management
  */
-extern int zfs_prop_valid_for_type(zfs_prop_t, int);
 extern const char *zfs_prop_default_string(zfs_prop_t);
 extern uint64_t zfs_prop_default_numeric(zfs_prop_t);
 extern const char *zfs_prop_column_name(zfs_prop_t);
@@ -459,15 +460,22 @@ extern int zfs_unshare(zfs_handle_t *);
  * Protocol-specific share support functions.
  */
 extern boolean_t zfs_is_shared_nfs(zfs_handle_t *, char **);
+extern boolean_t zfs_is_shared_smb(zfs_handle_t *, char **);
 extern int zfs_share_nfs(zfs_handle_t *);
+extern int zfs_share_smb(zfs_handle_t *);
+extern int zfs_shareall(zfs_handle_t *);
 extern int zfs_unshare_nfs(zfs_handle_t *, const char *);
+extern int zfs_unshare_smb(zfs_handle_t *, const char *);
 extern int zfs_unshareall_nfs(zfs_handle_t *);
+extern int zfs_unshareall_smb(zfs_handle_t *);
+extern int zfs_unshareall_bypath(zfs_handle_t *, const char *);
+extern int zfs_unshareall(zfs_handle_t *);
 extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
 extern int zfs_share_iscsi(zfs_handle_t *);
 extern int zfs_unshare_iscsi(zfs_handle_t *);
 extern int zfs_iscsi_perm_check(libzfs_handle_t *, char *, ucred_t *);
 extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *,
-    void *, void *, int, boolean_t);
+    void *, void *, int, zfs_share_op_t);
 
 /*
  * When dealing with nvlists, verify() is extremely useful

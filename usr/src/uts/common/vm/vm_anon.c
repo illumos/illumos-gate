@@ -1418,7 +1418,8 @@ anon_fill_cow_holes(
 				page_t *pp;
 
 				err = VOP_GETPAGE(vp, vp_off, PAGESIZE, NULL,
-				    pl, PAGESIZE, seg, addr, S_READ, cred);
+				    pl, PAGESIZE, seg, addr, S_READ, cred,
+				    NULL);
 				if (err) {
 					break;
 				}
@@ -1770,7 +1771,7 @@ anon_getpage(
 		seg, addr, vp);
 
 	err = VOP_GETPAGE(vp, (u_offset_t)off, PAGESIZE, protp, pl, plsz,
-	    seg, addr, rw, cred);
+	    seg, addr, rw, cred, NULL);
 
 	if (err == 0 && pl != NULL) {
 		ahm = &anonhash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
@@ -1787,8 +1788,8 @@ anon_getpage(
  * page cannot be allocated. returns -2 if some other process has allocated a
  * larger page.
  *
- * For cowfault it will alocate any size pages to fill the requested area to
- * avoid partially overwritting anon slots (i.e. sharing only some of the anon
+ * For cowfault it will allocate any size pages to fill the requested area to
+ * avoid partially overwriting anon slots (i.e. sharing only some of the anon
  * slots within a large page with other processes). This policy greatly
  * simplifies large page freeing (which is only freed when all anon slot
  * refcnts are 0).
@@ -2271,7 +2272,7 @@ anon_private(
 	 * vnode at the same time.
 	 */
 	err = VOP_GETPAGE(vp, (u_offset_t)off, PAGESIZE, NULL,
-	    anon_pl, PAGESIZE, seg, addr, S_CREATE, cred);
+	    anon_pl, PAGESIZE, seg, addr, S_CREATE, cred, NULL);
 	if (err)
 		goto out;
 
@@ -2640,7 +2641,7 @@ anon_zero(struct seg *seg, caddr_t addr, struct anon **app, struct cred *cred)
 	 * the vnode at the same time since it is locked.
 	 */
 	err = VOP_GETPAGE(vp, off, PAGESIZE, NULL,
-	    anon_pl, PAGESIZE, seg, addr, S_CREATE, cred);
+	    anon_pl, PAGESIZE, seg, addr, S_CREATE, cred, NULL);
 	if (err) {
 		*app = NULL;
 		anon_decref(ap);
@@ -3109,7 +3110,7 @@ top:
  * have at most one reference at this point. This means underlying pages can
  * be exclusively locked and demoted or freed.  If not freeing the entire
  * large pages demote the ends of the region we free to be able to free
- * subpages. Page roots correspend to aligned index positions in anon map.
+ * subpages. Page roots correspond to aligned index positions in anon map.
  */
 void
 anon_shmap_free_pages(struct anon_map *amp, ulong_t sidx, size_t len)
@@ -3216,7 +3217,7 @@ anonmap_free(struct anon_map *amp)
 
 /*
  * Returns true if the app array has some empty slots.
- * The offp and lenp paramters are in/out paramters.  On entry
+ * The offp and lenp parameters are in/out parameters.  On entry
  * these values represent the starting offset and length of the
  * mapping.  When true is returned, these values may be modified
  * to be the largest range which includes empty slots.
@@ -3272,7 +3273,7 @@ anon_pages(struct anon_hdr *ahp, ulong_t anon_index, pgcnt_t nslots)
 /*
  * Move reserved phys swap into memory swap (unreserve phys swap
  * and reserve mem swap by the same amount).
- * Used by segspt when it needs to lock resrved swap npages in memory
+ * Used by segspt when it needs to lock reserved swap npages in memory
  */
 int
 anon_swap_adjust(pgcnt_t npages)

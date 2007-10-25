@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1264,7 +1264,7 @@ pcache_insert(pollstate_t *ps, file_t *fp, pollfd_t *pollfdp, int *fdcntp,
 	 */
 	ASSERT(curthread->t_pollcache == NULL);
 	error = VOP_POLL(fp->f_vnode, pollfdp->events, 0, &pollfdp->revents,
-	    &memphp);
+	    &memphp, NULL);
 	if (error) {
 		return (error);
 	}
@@ -1979,7 +1979,7 @@ retry:
 			 */
 			ASSERT(curthread->t_pollcache == NULL);
 			error = VOP_POLL(fp->f_vnode, pollfdp[entry].events, 0,
-			    &pollfdp[entry].revents, &php);
+			    &pollfdp[entry].revents, &php, NULL);
 			/*
 			 * releasef after completely done with this cached
 			 * poll entry. To prevent close() coming in to clear
@@ -2804,7 +2804,7 @@ plist_chkdupfd(file_t *fp, polldat_t *pdp, pollstate_t *psp, pollfd_t *pollfdp,
 				ASSERT(curthread->t_pollcache == NULL);
 				error = VOP_POLL(fp->f_vnode,
 				    pollfdp[i].events, 0,
-				    &pollfdp[i].revents, &php);
+				    &pollfdp[i].revents, &php, NULL);
 				if (error) {
 					return (error);
 				}

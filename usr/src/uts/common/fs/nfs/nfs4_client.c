@@ -351,7 +351,7 @@ flush_pages(vnode_t *vp, cred_t *cr)
 	int error;
 	rnode4_t *rp = VTOR4(vp);
 
-	error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_INVAL, cr);
+	error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_INVAL, cr, NULL);
 	if (error == ENOSPC || error == EDQUOT) {
 		mutex_enter(&rp->r_statelock);
 		if (!rp->r_error)
@@ -858,7 +858,7 @@ nfs4_getattr_otw_norecovery(vnode_t *vp, nfs4_ga_res_t *garp,
 	/* getattr */
 	/*
 	 * Unlike nfs version 2 and 3, where getattr returns all the
-	 * attributes, nfs version 4 returns only the ones explicitely
+	 * attributes, nfs version 4 returns only the ones explicitly
 	 * asked for. This creates problems, as some system functions
 	 * (e.g. cache check) require certain attributes and if the
 	 * cached node lacks some attributes such as uid/gid, it can
@@ -1566,7 +1566,7 @@ nfs4_async_stop(struct vfs *vfsp)
  * Wait for all outstanding putpage operations and the inactive thread to
  * complete. If a signal is delivered we will abort and return non-zero;
  * otherwise return 0. Since this routine is called from nfs4_unmount, we
- * need to make it interruptable.
+ * need to make it interruptible.
  */
 int
 nfs4_async_stop_sig(struct vfs *vfsp)
@@ -2086,7 +2086,7 @@ nfs4_async_inactive(vnode_t *vp, cred_t *cr)
 	 * set nfs4_max_threads to zero in /etc/system.
 	 *
 	 * The manager thread knows about this and is willing to create
-	 * at least one thread to accomodate us.
+	 * at least one thread to accommodate us.
 	 */
 	mutex_enter(&mi->mi_async_lock);
 	if (mi->mi_inactive_thread == NULL) {
@@ -2404,7 +2404,7 @@ nfs4_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 		    flags, cr);
 
 		/*
-		 * If an error occured and the file was marked as dirty
+		 * If an error occurred and the file was marked as dirty
 		 * before and we aren't forcibly invalidating pages, then
 		 * reset the R4DIRTY flag.
 		 */
@@ -2716,7 +2716,7 @@ nfs4_map_lost_lock_conflict(vnode_t *vp)
 		if (lrp->lr_op != OP_LOCK && lrp->lr_op != OP_LOCKU)
 			continue;
 		ASSERT(lrp->lr_vp != NULL);
-		if (!VOP_CMP(lrp->lr_vp, vp))
+		if (!VOP_CMP(lrp->lr_vp, vp, NULL))
 			continue;	/* different file */
 		if (!SAFE_LOCK(*lrp->lr_flk)) {
 			conflict = TRUE;

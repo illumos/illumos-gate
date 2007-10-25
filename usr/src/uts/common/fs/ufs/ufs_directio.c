@@ -600,7 +600,8 @@ skip_alloc:
 			rw_exit(&ip->i_contents);
 			rw_enter(&ip->i_contents, RW_WRITER);
 		}
-		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_INVAL, cr);
+		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0,
+		    B_INVAL, cr, NULL);
 		if (vn_has_cached_data(vp))
 			goto errout;
 		if (!exclusive)
@@ -737,7 +738,7 @@ skip_alloc:
 			rw_exit(&ip->i_contents);
 			rw_enter(&ip->i_contents, RW_WRITER);
 			(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0,
-			    B_INVAL, cr);
+			    B_INVAL, cr, NULL);
 			ufs_directio_kstats.nflushes.value.ui64++;
 			rw_downgrade(&ip->i_contents);
 		}
@@ -912,7 +913,8 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 	if (vn_has_cached_data(vp)) {
 		rw_exit(&ip->i_contents);
 		rw_enter(&ip->i_contents, RW_WRITER);
-		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_INVAL, cr);
+		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0,
+		    B_INVAL, cr, NULL);
 		if (vn_has_cached_data(vp))
 			return (0);
 		rw_downgrade(&ip->i_contents);

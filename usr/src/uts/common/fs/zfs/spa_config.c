@@ -197,13 +197,13 @@ spa_config_sync(void)
 
 	if (vn_rdwr(UIO_WRITE, vp, buf, buflen, 0, UIO_SYSSPACE,
 	    0, RLIM64_INFINITY, kcred, NULL) == 0 &&
-	    VOP_FSYNC(vp, FSYNC, kcred) == 0) {
+	    VOP_FSYNC(vp, FSYNC, kcred, NULL) == 0) {
 		(void) snprintf(pathname2, sizeof (pathname2), "%s/%s",
 		    spa_config_dir, ZPOOL_CACHE_FILE);
 		(void) vn_rename(pathname, pathname2, UIO_SYSSPACE);
 	}
 
-	(void) VOP_CLOSE(vp, oflags, 1, 0, kcred);
+	(void) VOP_CLOSE(vp, oflags, 1, 0, kcred, NULL);
 	VN_RELE(vp);
 
 out:

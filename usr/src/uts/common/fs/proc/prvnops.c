@@ -216,10 +216,10 @@ static prdirent_t lwpiddir[] = {
 
 static void rebuild_objdir(struct as *);
 static void prfreecommon(prcommon_t *);
-static int praccess(vnode_t *, int, int, cred_t *);
+static int praccess(vnode_t *, int, int, cred_t *, caller_context_t *);
 
 static int
-propen(vnode_t **vpp, int flag, cred_t *cr)
+propen(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t *vp = *vpp;
 	prnode_t *pnp = VTOP(vp);
@@ -259,7 +259,7 @@ propen(vnode_t **vpp, int flag, cred_t *cr)
 			 * Need to hold rvp since VOP_OPEN() may release it.
 			 */
 			VN_HOLD(rvp);
-			error = VOP_OPEN(&rvp, flag, cr);
+			error = VOP_OPEN(&rvp, flag, cr, ct);
 			if (error) {
 				VN_RELE(rvp);
 			} else {
@@ -403,7 +403,8 @@ out:
 
 /* ARGSUSED */
 static int
-prclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+prclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+	caller_context_t *ct)
 {
 	prnode_t *pnp = VTOP(vp);
 	prcommon_t *pcp = pnp->pr_pcommon;
@@ -2692,7 +2693,8 @@ prwrite(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 }
 
 static int
-prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	prnode_t *pnp = VTOP(vp);
 	prnodetype_t type = pnp->pr_type;
@@ -2742,13 +2744,13 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 		if (!(flags & ATTR_REAL))
 			break;
 		/* restrict full knowledge of the attributes to owner or root */
-		if ((error = praccess(vp, 0, 0, cr)) != 0)
+		if ((error = praccess(vp, 0, 0, cr, ct)) != 0)
 			return (error);
 		/* FALLTHROUGH */
 	case PR_OBJECT:
 	case PR_FD:
 		rvp = pnp->pr_realvp;
-		error = VOP_GETATTR(rvp, vap, flags, cr);
+		error = VOP_GETATTR(rvp, vap, flags, cr, ct);
 		if (error)
 			return (error);
 		if (type == PR_FD) {
@@ -3093,7 +3095,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 }
 
 static int
-praccess(vnode_t *vp, int mode, int flags, cred_t *cr)
+praccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	prnode_t *pnp = VTOP(vp);
 	prnodetype_t type = pnp->pr_type;
@@ -3126,7 +3128,7 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr)
 		    (type == PR_FD && (vmode & mode) != mode &&
 		    secpolicy_proc_access(cr) != 0))
 			return (EACCES);
-		return (VOP_ACCESS(rvp, mode, flags, cr));
+		return (VOP_ACCESS(rvp, mode, flags, cr, ct));
 
 	case PR_PSINFO:		/* these files can be read by anyone */
 	case PR_LPSINFO:
@@ -3166,7 +3168,7 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr)
 			 */
 			VN_HOLD(xvp);
 			prunlock(pnp);
-			error = VOP_ACCESS(xvp, VREAD, 0, cr);
+			error = VOP_ACCESS(xvp, VREAD, 0, cr, ct);
 			VN_RELE(xvp);
 		}
 		if (error)
@@ -3178,7 +3180,7 @@ praccess(vnode_t *vp, int mode, int flags, cred_t *cr)
 		/*
 		 * Final access check on the underlying directory vnode.
 		 */
-		return (VOP_ACCESS(pnp->pr_realvp, mode, flags, cr));
+		return (VOP_ACCESS(pnp->pr_realvp, mode, flags, cr, ct));
 	}
 
 	/*
@@ -3255,7 +3257,8 @@ static vnode_t *(*pr_lookup_function[PR_NFILES])() = {
 
 static int
 prlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
-	int flags, vnode_t *rdir, cred_t *cr)
+	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+	int *direntflags, pathname_t *realpnp)
 {
 	prnode_t *pnp = VTOP(dp);
 	prnodetype_t type = pnp->pr_type;
@@ -3281,20 +3284,22 @@ prlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	case PR_CURDIR:
 	case PR_ROOTDIR:
 		/* restrict lookup permission to owner or root */
-		if ((error = praccess(dp, VEXEC, 0, cr)) != 0)
+		if ((error = praccess(dp, VEXEC, 0, cr, ct)) != 0)
 			return (error);
 		/* FALLTHROUGH */
 	case PR_FD:
 		dp = pnp->pr_realvp;
-		return (VOP_LOOKUP(dp, comp, vpp, pathp, flags, rdir, cr));
+		return (VOP_LOOKUP(dp, comp, vpp, pathp, flags, rdir, cr, ct,
+		    direntflags, realpnp));
 	default:
 		break;
 	}
 
 	if ((type == PR_OBJECTDIR || type == PR_FDDIR || type == PR_PATHDIR) &&
-	    (error = praccess(dp, VEXEC, 0, cr)) != 0)
+	    (error = praccess(dp, VEXEC, 0, cr, ct)) != 0)
 		return (error);
 
+	/* XXX - Do we need to pass ct, direntflags, or realpnp? */
 	*vpp = (pr_lookup_function[type](dp, comp));
 
 	return ((*vpp == NULL) ? ENOENT : 0);
@@ -3303,11 +3308,13 @@ prlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 /* ARGSUSED */
 static int
 prcreate(vnode_t *dp, char *comp, vattr_t *vap, vcexcl_t excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag)
+	int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 
-	if ((error = prlookup(dp, comp, vpp, NULL, 0, NULL, cr)) != 0) {
+	if ((error = prlookup(dp, comp, vpp, NULL, 0, NULL, cr,
+	    ct, NULL, NULL)) != 0) {
 		if (error == ENOENT)	/* can't O_CREAT nonexistent files */
 			error = EACCES;		/* unwriteable directories */
 	} else {
@@ -3326,7 +3333,7 @@ prcreate(vnode_t *dp, char *comp, vattr_t *vap, vcexcl_t excl,
 				vp = VTOP(vp)->pr_realvp;
 				mask = vap->va_mask;
 				vap->va_mask = AT_SIZE;
-				error = VOP_SETATTR(vp, vap, 0, cr, NULL);
+				error = VOP_SETATTR(vp, vap, 0, cr, ct);
 				vap->va_mask = mask;
 			}
 		}
@@ -3615,7 +3622,7 @@ pr_lookup_objectdir(vnode_t *dp, char *comp)
 		if (seg->s_ops == &segvn_ops &&
 		    SEGOP_GETVP(seg, seg->s_base, &vp) == 0 &&
 		    vp != NULL && vp->v_type == VREG &&
-		    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+		    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 			char name[64];
 
 			if (vp == p->p_exec)	/* "a.out" */
@@ -4067,8 +4074,8 @@ pr_lookup_pathdir(vnode_t *dp, char *comp)
 					    SEGOP_GETVP(seg, seg->s_base, &vp)
 					    == 0 &&
 					    vp != NULL && vp->v_type == VREG &&
-					    VOP_GETATTR(vp, &vattr, 0, CRED())
-					    == 0) {
+					    VOP_GETATTR(vp, &vattr, 0, CRED(),
+					    NULL) == 0) {
 						char name[64];
 
 						if (vp == p->p_exec)
@@ -4513,7 +4520,7 @@ prfreenode(prnode_t *pnp)
 }
 
 /*
- * Free a prcommon structure, if the refrence count reaches zero.
+ * Free a prcommon structure, if the reference count reaches zero.
  */
 static void
 prfreecommon(prcommon_t *pcp)
@@ -4596,12 +4603,14 @@ static int (*pr_readdir_function[PR_NFILES])() = {
 
 /* ARGSUSED */
 static int
-prreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
+prreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
+	caller_context_t *ct, int flags)
 {
 	prnode_t *pnp = VTOP(vp);
 
 	ASSERT(pnp->pr_type < PR_NFILES);
 
+	/* XXX - Do we need to pass ct and flags? */
 	return (pr_readdir_function[pnp->pr_type](pnp, uiop, eofp));
 }
 
@@ -4764,7 +4773,7 @@ rebuild_objdir(struct as *as)
 		if (seg->s_ops == &segvn_ops &&
 		    SEGOP_GETVP(seg, seg->s_base, &vp) == 0 &&
 		    vp != NULL && vp->v_type == VREG &&
-		    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+		    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 			for (i = 0; i < nentries; i++)
 				if (vp == dir[i])
 					break;
@@ -4920,7 +4929,8 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		 */
 		vattr.va_mask = AT_FSID | AT_NODEID;
 		while (n < objdirsize && (((vp = obj_entry(as, n)) == NULL) ||
-		    (VOP_GETATTR(vp, &vattr, 0, CRED()) != 0))) {
+		    (VOP_GETATTR(vp, &vattr, 0, CRED(), NULL)
+		    != 0))) {
 			vattr.va_mask = AT_FSID | AT_NODEID;
 			n++;
 		}
@@ -5275,7 +5285,7 @@ pr_readdir_pathdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			if ((vp = obj_entry(as, obj)) == NULL)
 				continue;
 			vattr.va_mask = AT_FSID|AT_NODEID;
-			if (VOP_GETATTR(vp, &vattr, 0, CRED()) != 0)
+			if (VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) != 0)
 				continue;
 			if (vp == p->p_exec)
 				(void) strcpy(dirent->d_name, "a.out");
@@ -5429,7 +5439,7 @@ pr_readdir_ctdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 
 /* ARGSUSED */
 static int
-prfsync(vnode_t *vp, int syncflag, cred_t *cr)
+prfsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 {
 	return (0);
 }
@@ -5456,7 +5466,7 @@ pr_list_unlink(vnode_t *pvp, vnode_t **listp)
 
 /* ARGSUSED */
 static void
-prinactive(vnode_t *vp, cred_t *cr)
+prinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	prnode_t *pnp = VTOP(vp);
 	prnodetype_t type = pnp->pr_type;
@@ -5574,7 +5584,7 @@ prinactive(vnode_t *vp, cred_t *cr)
 
 /* ARGSUSED */
 static int
-prseek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+prseek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	return (0);
 }
@@ -5706,7 +5716,7 @@ prreadlink_lookup(prnode_t *pnp, char *buf, size_t size, cred_t *cr)
 
 /* ARGSUSED */
 static int
-prreadlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
+prreadlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ctp)
 {
 	prnode_t *pnp = VTOP(vp);
 	char *buf;
@@ -5754,8 +5764,9 @@ prreadlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
 	return (ret);
 }
 
+/*ARGSUSED2*/
 static int
-prcmp(vnode_t *vp1, vnode_t *vp2)
+prcmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
 	prnode_t *pp1, *pp2;
 
@@ -5783,13 +5794,13 @@ prcmp(vnode_t *vp1, vnode_t *vp2)
 }
 
 static int
-prrealvp(vnode_t *vp, vnode_t **vpp)
+prrealvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	vnode_t *rvp;
 
 	if ((rvp = VTOP(vp)->pr_realvp) != NULL) {
 		vp = rvp;
-		if (VOP_REALVP(vp, &rvp) == 0)
+		if (VOP_REALVP(vp, &rvp, ct) == 0)
 			vp = rvp;
 	}
 
@@ -5805,9 +5816,10 @@ prrealvp(vnode_t *vp, vnode_t **vpp)
  *	POLLERR		/proc file descriptor is invalid
  *	POLLHUP		process or lwp has terminated
  */
+/*ARGSUSED5*/
 static int
 prpoll(vnode_t *vp, short events, int anyyet, short *reventsp,
-	pollhead_t **phpp)
+	pollhead_t **phpp, caller_context_t *ct)
 {
 	prnode_t *pnp = VTOP(vp);
 	prcommon_t *pcp = pnp->pr_common;
@@ -5922,7 +5934,8 @@ prpoll(vnode_t *vp, short events, int anyyet, short *reventsp,
 }
 
 /* in prioctl.c */
-extern int prioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
+extern int prioctl(vnode_t *, int, intptr_t, int, cred_t *, int *,
+	caller_context_t *);
 
 /*
  * /proc vnode operations vector

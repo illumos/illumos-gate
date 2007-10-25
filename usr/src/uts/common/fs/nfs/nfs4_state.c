@@ -41,6 +41,7 @@
 #include <sys/sdt.h>
 #include <sys/nvpair.h>
 
+extern u_longlong_t nfs4_srv_caller_id;
 
 extern time_t rfs4_start_time;
 extern uint_t nfs4_srv_vkey;
@@ -493,17 +494,17 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	}
 
 	if (vp->v_type != VREG) {
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		return (NULL);
 	}
 
-	err = VOP_ACCESS(vp, VREAD, 0, CRED());
+	err = VOP_ACCESS(vp, VREAD, 0, CRED(), NULL);
 	if (err) {
 		/*
 		 * We don't have read access? better get the heck out.
 		 */
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		return (NULL);
 	}
@@ -513,17 +514,17 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	 * get the file size to do some basic validation
 	 */
 	va.va_mask = AT_SIZE;
-	err = VOP_GETATTR(vp, &va, 0, CRED());
+	err = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
 
 	kill_file = (va.va_size == 0 || va.va_size <
 	    (NFS4_VERIFIER_SIZE + sizeof (uint_t)+1));
 
 	if (err || kill_file) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		if (kill_file) {
-			(void) VOP_REMOVE(dvp, ss_pn->leaf, CRED());
+			(void) VOP_REMOVE(dvp, ss_pn->leaf, CRED(), NULL, 0);
 		}
 		return (NULL);
 	}
@@ -548,7 +549,7 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 
 	if (err = VOP_READ(vp, &uio, FREAD, CRED(), NULL)) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		kmem_free(cl_ss, sizeof (rfs4_oldstate_t));
 		return (NULL);
@@ -565,11 +566,11 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 
 	if (err || kill_file) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		kmem_free(cl_ss, sizeof (rfs4_oldstate_t));
 		if (kill_file) {
-			(void) VOP_REMOVE(dvp, ss_pn->leaf, CRED());
+			(void) VOP_REMOVE(dvp, ss_pn->leaf, CRED(), NULL, 0);
 		}
 		return (NULL);
 	}
@@ -588,7 +589,7 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 
 	if (err = VOP_READ(vp, &uio, FREAD, CRED(), NULL)) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		kmem_free(cl_ss->cl_id4.id_val, id_len);
 		kmem_free(cl_ss, sizeof (rfs4_oldstate_t));
@@ -596,7 +597,7 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	}
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 	return (cl_ss);
 }
@@ -629,7 +630,7 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 	if (vn_open(statedir, UIO_SYSSPACE, FREAD, 0, &dvp, 0, 0))
 		return;
 
-	if (dvp->v_type != VDIR || VOP_ACCESS(dvp, VREAD, 0, CRED()))
+	if (dvp->v_type != VDIR || VOP_ACCESS(dvp, VREAD, 0, CRED(), NULL))
 		goto out;
 
 	dirt = kmem_alloc(RFS4_SS_DIRSIZE, KM_SLEEP);
@@ -647,7 +648,7 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 		uio.uio_loffset = dirchunk_offset;
 		uio.uio_resid = RFS4_SS_DIRSIZE;
 
-		err = VOP_READDIR(dvp, &uio, CRED(), &dir_eof);
+		err = VOP_READDIR(dvp, &uio, CRED(), &dir_eof, NULL, 0);
 		VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 		if (err)
 			goto out;
@@ -690,7 +691,7 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 	}
 
 out:
-	(void) VOP_CLOSE(dvp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(dvp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(dvp);
 	if (dirt)
 		kmem_free((caddr_t)dirt, RFS4_SS_DIRSIZE);
@@ -1047,7 +1048,7 @@ rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
 	(void) VOP_WRITE(vp, &uio, ioflag, CRED(), NULL);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
-	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 }
 
@@ -3425,11 +3426,11 @@ out:
 
 /*
  * Given the I/O mode (FREAD or FWRITE), the vnode, the stateid and whether
- * the file is being truncated, return NFS4_OK if allowed or approriate
+ * the file is being truncated, return NFS4_OK if allowed or appropriate
  * V4 error if not. Note NFS4ERR_DELAY will be returned and a recall on
  * the associated file will be done if the I/O is not consistent with any
  * delegation in effect on the file. Should be holding VOP_RWLOCK, either
- * as reader or writer as appropriate. rfs4_op_open will accquire the
+ * as reader or writer as appropriate. rfs4_op_open will acquire the
  * VOP_RWLOCK as writer when setting up delegation. If the stateid is bad
  * this routine will return NFS4ERR_BAD_STATEID. In addition, through the
  * deleg parameter, we will return whether a write delegation is held by
@@ -3441,7 +3442,7 @@ out:
 nfsstat4
 rfs4_check_stateid(int mode, vnode_t *vp,
 		stateid4 *stateid, bool_t trunc, bool_t *deleg,
-		bool_t do_access)
+		bool_t do_access, caller_context_t *ct)
 {
 	rfs4_file_t *fp;
 	bool_t create = FALSE;
@@ -3450,6 +3451,12 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 	rfs4_lo_state_t *lsp;
 	stateid_t *id = (stateid_t *)stateid;
 	nfsstat4 stat = NFS4_OK;
+
+	if (ct != NULL) {
+		ct->cc_sysid = 0;
+		ct->cc_pid = 0;
+		ct->cc_caller_id = nfs4_srv_caller_id;
+	}
 
 	if (ISSPECIAL(stateid)) {
 		fp = rfs4_findfile(vp, NULL, &create);
@@ -3503,6 +3510,10 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 						rfs4_state_rele_nounlock(sp);
 					return (NFS4ERR_BAD_STATEID);
 				}
+			}
+			if (ct != NULL) {
+				ct->cc_sysid = lsp->locker->client->sysidt;
+				ct->cc_pid = lsp->locker->pid;
 			}
 			rfs4_lo_state_rele(lsp, FALSE);
 		}
@@ -3832,13 +3843,19 @@ rfs4_file_walk_callout(rfs4_entry_t u_entry, void *e)
 		if (fp->vp) {
 			vnode_t *vp = fp->vp;
 
-			/* don't leak monitors */
-			if (fp->dinfo->dtype == OPEN_DELEGATE_READ)
+			/*
+			 * don't leak monitors and remove the reference
+			 * put on the vnode when the delegation was granted.
+			 */
+			if (fp->dinfo->dtype == OPEN_DELEGATE_READ) {
 				(void) fem_uninstall(vp, deleg_rdops,
 				    (void *)fp);
-			else if (fp->dinfo->dtype == OPEN_DELEGATE_WRITE)
+				vn_open_downgrade(vp, FREAD);
+			} else if (fp->dinfo->dtype == OPEN_DELEGATE_WRITE) {
 				(void) fem_uninstall(vp, deleg_wrops,
 				    (void *)fp);
+				vn_open_downgrade(vp, FREAD|FWRITE);
+			}
 			mutex_enter(&vp->v_lock);
 			(void) vsd_set(vp, nfs4_srv_vkey, NULL);
 			mutex_exit(&vp->v_lock);

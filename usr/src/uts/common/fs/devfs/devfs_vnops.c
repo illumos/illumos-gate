@@ -72,7 +72,8 @@ extern dev_t rconsdev;
  */
 /*ARGSUSED*/
 static int
-devfs_open(struct vnode **vpp, int flag, struct cred *cred)
+devfs_open(struct vnode **vpp, int flag, struct cred *cred,
+    caller_context_t *ct)
 {
 	struct dv_node	*dv = VTODV(*vpp);
 
@@ -88,7 +89,7 @@ devfs_open(struct vnode **vpp, int flag, struct cred *cred)
 /*ARGSUSED1*/
 static int
 devfs_close(struct vnode *vp, int flag, int count,
-    offset_t offset, struct cred *cred)
+    offset_t offset, struct cred *cred, caller_context_t *ct)
 {
 	struct dv_node	*dv = VTODV(vp);
 
@@ -137,7 +138,7 @@ devfs_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 /*ARGSUSED*/
 static int
 devfs_ioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-    struct cred *cred, int *rvalp)
+    struct cred *cred, int *rvalp, caller_context_t *ct)
 {
 	dcmn_err2(("devfs_ioctl %s\n", VTODV(vp)->dv_name));
 	ASSERT(vp->v_type == VDIR);
@@ -159,7 +160,8 @@ devfs_ioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
  * memory based attributes.
  */
 static int
-devfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
+devfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct dv_node	*dv = VTODV(vp);
 	int		error = 0;
@@ -189,7 +191,7 @@ devfs_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 		vap->va_mask = mask;
 	} else {
 		/* obtain from attribute store and merge */
-		error = VOP_GETATTR(dv->dv_attrvp, vap, flags, cr);
+		error = VOP_GETATTR(dv->dv_attrvp, vap, flags, cr, ct);
 		dsysdebug(error, ("vop_getattr %s %d\n", dv->dv_name, error));
 		dv_vattr_merge(dv, vap);
 	}
@@ -238,8 +240,8 @@ devfs_setattr_dir(
 
 again:	if (dv->dv_attr) {
 
-		error = secpolicy_vnode_setattr(cr, vp, vap, dv->dv_attr,
-					flags, devfs_unlocked_access, dv);
+		error = secpolicy_vnode_setattr(cr, vp, vap,
+				dv->dv_attr, flags, devfs_unlocked_access, dv);
 
 		if (error)
 			goto out;
@@ -296,8 +298,8 @@ again:	if (dv->dv_attr) {
 				 * read/write.
 				 */
 				vattr = dv_vattr_dir;
-				if (VOP_GETATTR(dv->dv_attrvp, &vattr,
-				    flags, cr) == 0) {
+				if (VOP_GETATTR(dv->dv_attrvp,
+				    &vattr, flags, cr, NULL) == 0) {
 					dv->dv_attr = kmem_alloc(
 					    sizeof (struct vattr), KM_SLEEP);
 					*dv->dv_attr = vattr;
@@ -456,7 +458,7 @@ devfs_setattr(
 		ASSERT(dv->dv_attrvp);
 		ASSERT(vp->v_type != VDIR);
 		*vattrp = dv_vattr_file;
-		error = VOP_GETATTR(dv->dv_attrvp, vattrp, 0, cr);
+		error = VOP_GETATTR(dv->dv_attrvp, vattrp, 0, cr, ct);
 		dsysdebug(error, ("vop_getattr %s %d\n",
 			dv->dv_name, error));
 		if (error)
@@ -514,7 +516,7 @@ devfs_setattr(
 				ddv = dv->dv_dotdot;
 				ASSERT(ddv->dv_attrvp);
 				error = VOP_REMOVE(ddv->dv_attrvp,
-				    dv->dv_name, cr);
+				    dv->dv_name, cr, ct, 0);
 				dsysdebug(error,
 				    ("vop_remove %s %s %d\n",
 				    ddv->dv_name, dv->dv_name, error));
@@ -573,7 +575,8 @@ out:
 }
 
 static int
-devfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+devfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+    caller_context_t *ct)
 {
 	switch (cmd) {
 	case _PC_ACL_ENABLED:
@@ -587,11 +590,11 @@ devfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 		 */
 		ASSERT(dvroot);
 		ASSERT(dvroot->dv_attrvp);
-		return (VOP_PATHCONF(dvroot->dv_attrvp, cmd, valp, cr));
+		return (VOP_PATHCONF(dvroot->dv_attrvp, cmd, valp, cr, ct));
 		/*NOTREACHED*/
 	}
 
-	return (fs_pathconf(vp, cmd, valp, cr));
+	return (fs_pathconf(vp, cmd, valp, cr, ct));
 }
 
 /*
@@ -599,7 +602,7 @@ devfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
  */
 static int
 devfs_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	dvnode_t *dv = VTODV(vp);
 	struct vnode *avp;
@@ -614,12 +617,12 @@ devfs_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 
 	/* fabricate the acl */
 	if (avp == NULL) {
-		error = fs_fab_acl(vp, vsap, flags, cr);
+		error = fs_fab_acl(vp, vsap, flags, cr, ct);
 		rw_exit(&dv->dv_contents);
 		return (error);
 	}
 
-	error = VOP_GETSECATTR(avp, vsap, flags, cr);
+	error = VOP_GETSECATTR(avp, vsap, flags, cr, ct);
 	dsysdebug(error, ("vop_getsecattr %s %d\n", VTODV(vp)->dv_name, error));
 	rw_exit(&dv->dv_contents);
 	return (error);
@@ -633,7 +636,7 @@ devfs_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
  */
 static int
 devfs_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	dvnode_t *dv = VTODV(vp);
 	struct vnode *avp;
@@ -672,7 +675,7 @@ devfs_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 	 * store before forwarding the ACL.
 	 */
 	(void) VOP_RWLOCK(avp, V_WRITELOCK_TRUE, NULL);
-	error = VOP_SETSECATTR(avp, vsap, flags, cr);
+	error = VOP_SETSECATTR(avp, vsap, flags, cr, ct);
 	dsysdebug(error, ("vop_setsecattr %s %d\n", VTODV(vp)->dv_name, error));
 	VOP_RWUNLOCK(avp, V_WRITELOCK_TRUE, NULL);
 
@@ -717,7 +720,8 @@ devfs_unlocked_access(void *vdv, int mode, struct cred *cr)
 }
 
 static int
-devfs_access(struct vnode *vp, int mode, int flags, struct cred *cr)
+devfs_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct dv_node	*dv = VTODV(vp);
 	int		res;
@@ -739,7 +743,7 @@ devfs_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 		}
 		rw_exit(&dv->dv_contents);
 	}
-	return (VOP_ACCESS(dv->dv_attrvp, mode, flags, cr));
+	return (VOP_ACCESS(dv->dv_attrvp, mode, flags, cr, ct));
 }
 
 /*
@@ -801,7 +805,8 @@ devfs_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 /*ARGSUSED3*/
 static int
 devfs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
-    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred)
+    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
+    caller_context_t *ct, int *direntflags, pathname_t *realpnp)
 {
 	ASSERT(dvp->v_type == VDIR);
 	dcmn_err2(("devfs_lookup: %s\n", nm));
@@ -820,7 +825,8 @@ devfs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 /*ARGSUSED2*/
 static int
 devfs_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
-    int mode, struct vnode **vpp, struct cred *cred, int flag)
+    int mode, struct vnode **vpp, struct cred *cred, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int error;
 	struct vnode *vp;
@@ -833,7 +839,7 @@ devfs_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 		else if (vp->v_type == VDIR && (mode & VWRITE))
 			error = EISDIR;
 		else
-			error = VOP_ACCESS(vp, mode, 0, cred);
+			error = VOP_ACCESS(vp, mode, 0, cred, ct);
 
 		if (error) {
 			VN_RELE(vp);
@@ -850,8 +856,10 @@ devfs_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
  * Otherwise, simply return cached dv_node's. Hotplug code always call
  * devfs_clean() to invalid the dv_node cache.
  */
+/*ARGSUSED5*/
 static int
-devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
+devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
+    caller_context_t *ct, int flags)
 {
 	struct dv_node *ddv, *dv;
 	struct dirent64 *de, *bufp;
@@ -994,7 +1002,7 @@ full:	dcmn_err3(("devfs_readdir: moving %lu bytes: "
 		va.va_mask = AT_ATIME;
 		gethrestime(&va.va_atime);
 		rw_exit(&ddv->dv_contents);
-		(void) devfs_setattr(dvp, &va, 0, cred, NULL);
+		(void) devfs_setattr(dvp, &va, 0, cred, ct);
 		rw_enter(&ddv->dv_contents, RW_READER);
 	}
 
@@ -1004,7 +1012,8 @@ full:	dcmn_err3(("devfs_readdir: moving %lu bytes: "
 
 /*ARGSUSED*/
 static int
-devfs_fsync(struct vnode *vp, int syncflag, struct cred *cred)
+devfs_fsync(struct vnode *vp, int syncflag, struct cred *cred,
+    caller_context_t *ct)
 {
 	/*
 	 * Message goes to console only. Otherwise, the message
@@ -1024,7 +1033,7 @@ devfs_fsync(struct vnode *vp, int syncflag, struct cred *cred)
  */
 /*ARGSUSED1*/
 static void
-devfs_inactive(struct vnode *vp, struct cred *cred)
+devfs_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 {
 	int destroy;
 	struct dv_node *dv = VTODV(vp);
@@ -1045,8 +1054,9 @@ devfs_inactive(struct vnode *vp, struct cred *cred)
  * XXX Why do we need this?  NFS mounted /dev directories?
  * XXX Talk to peter staubach about this.
  */
+/*ARGSUSED2*/
 static int
-devfs_fid(struct vnode *vp, struct fid *fidp)
+devfs_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct dv_node	*dv = VTODV(vp);
 	struct dv_fid	*dv_fid;
@@ -1095,7 +1105,8 @@ devfs_rwunlock(struct vnode *vp, int write_flag, caller_context_t *ct)
  */
 /*ARGSUSED1*/
 static int
-devfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+devfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
+    caller_context_t *ct)
 {
 	ASSERT(vp->v_type == VDIR);
 	dcmn_err2(("devfs_seek %s\n", VTODV(vp)->dv_name));

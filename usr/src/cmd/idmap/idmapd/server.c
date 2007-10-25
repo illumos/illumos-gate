@@ -251,7 +251,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		}
 	}
 
-	/* Commit if we have atleast one successful update */
+	/* Commit if we have at least one successful update */
 	if (state.sid2pid_done == FALSE || state.pid2sid_done == FALSE)
 		(void) sql_exec_no_cb(cache, "COMMIT TRANSACTION;");
 	else

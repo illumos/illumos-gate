@@ -415,7 +415,7 @@ devlookup_done:
 		error = ENXIO;
 
 	if ((error != 0) ||
-	    (error = VOP_ACCESS(bvp, aflag, 0, cr)) != 0 ||
+	    (error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
 	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
 		VN_RELE(bvp);
 		return (error);
@@ -695,7 +695,7 @@ pcfs_mount(
 		return (EBUSY);
 	}
 	error = VOP_OPEN(&devvp,
-	    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD | FWRITE, cr);
+	    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD | FWRITE, cr, NULL);
 	if (error) {
 		VN_RELE(devvp);
 		return (error);
@@ -770,7 +770,7 @@ pcfs_mount(
 errout:
 	(void) VOP_CLOSE(devvp,
 	    vfsp->vfs_flag & VFS_RDONLY ? FREAD : FREAD | FWRITE,
-	    1, (offset_t)0, cr);
+	    1, (offset_t)0, cr, NULL);
 	VN_RELE(devvp);
 	mutex_destroy(&fsp->pcfs_lock);
 	kmem_free(fsp, sizeof (*fsp));
@@ -1100,7 +1100,7 @@ pc_invalfat(struct pcfs *fsp)
 	 */
 	(void) VOP_CLOSE(fsp->pcfs_devvp,
 	    (PCFSTOVFS(fsp)->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE,
-	    1, (offset_t)0, CRED());
+	    1, (offset_t)0, CRED(), NULL);
 }
 
 void

@@ -62,7 +62,7 @@
  *
  *    These routines are designed to play a support role for existing
  *    pseudo-filesystems (such as procfs).  They simplify common tasks,
- *    without enforcing the filesystem to hand over management to GFS.  The
+ *    without forcing the filesystem to hand over management to GFS.  The
  *    routines covered are:
  *
  *	gfs_readdir_init()
@@ -538,7 +538,7 @@ gfs_file_inactive(vnode_t *vp)
 	gfs_dir_t *dp = NULL;
 	void *data;
 
-	if (fp->gfs_parent == NULL)
+	if (fp->gfs_parent == NULL || (vp->v_flag & V_XATTRDIR))
 		goto found;
 
 	dp = fp->gfs_parent->v_data;
@@ -564,6 +564,9 @@ gfs_file_inactive(vnode_t *vp)
 	ge = NULL;
 
 found:
+	if (vp->v_flag & V_XATTRDIR) {
+		mutex_enter(&fp->gfs_parent->v_lock);
+	}
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		/*
@@ -577,13 +580,19 @@ found:
 			 */
 			ge->gfse_vnode = NULL;
 		}
+		if (vp->v_flag & V_XATTRDIR) {
+			fp->gfs_parent->v_xattrdir = NULL;
+			mutex_exit(&fp->gfs_parent->v_lock);
+		}
 		mutex_exit(&vp->v_lock);
 
 		/*
 		 * Free vnode and release parent
 		 */
 		if (fp->gfs_parent) {
-			gfs_dir_unlock(dp);
+			if (dp) {
+				gfs_dir_unlock(dp);
+			}
 			VN_RELE(fp->gfs_parent);
 		} else {
 			ASSERT(vp->v_vfsp != NULL);
@@ -594,6 +603,9 @@ found:
 		vp->v_count--;
 		data = NULL;
 		mutex_exit(&vp->v_lock);
+		if (vp->v_flag & V_XATTRDIR) {
+			mutex_exit(&fp->gfs_parent->v_lock);
+		}
 		if (dp)
 			gfs_dir_unlock(dp);
 	}
@@ -637,16 +649,17 @@ gfs_dir_inactive(vnode_t *vp)
  * If no static entry is found, we invoke the lookup callback, if any.  The
  * arguments to this callback are:
  *
- *	int gfs_lookup_cb(vnode_t *pvp, const char *nm, vnode_t **vpp);
+ * int gfs_lookup_cb(vnode_t *pvp, const char *nm, vnode_t **vpp, cred_t *cr);
  *
  *	pvp	- parent vnode
  *	nm	- name of entry
  *	vpp	- pointer to resulting vnode
+ *	cr	- pointer to cred
  *
  * 	Returns 0 on success, non-zero on error.
  */
 int
-gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp)
+gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp, cred_t *cr)
 {
 	int i;
 	gfs_dirent_t *ge;
@@ -732,14 +745,22 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp)
 		 * directory.
 		 */
 		gfs_dir_unlock(dp);
-		ret = dp->gfsd_lookup(dvp, nm, &vp, &ino);
+		ret = dp->gfsd_lookup(dvp, nm, &vp, &ino, cr);
 		gfs_dir_lock(dp);
 		if (ret != 0)
 			goto out;
 
-		fp = (gfs_file_t *)vp->v_data;
-		fp->gfs_index = -1;
-		fp->gfs_ino = ino;
+		/*
+		 * The lookup_cb might be returning a non-GFS vnode.
+		 * Currently this is true for extended attributes,
+		 * where we're returning a vnode with v_data from an
+		 * underlying fs.
+		 */
+		if ((dvp->v_flag & V_XATTRDIR) == 0) {
+			fp = (gfs_file_t *)vp->v_data;
+			fp->gfs_index = -1;
+			fp->gfs_ino = ino;
+		}
 	} else {
 		/*
 		 * No static entry found, and there is no lookup callback, so
@@ -803,21 +824,31 @@ out:
  *	Return 0 on success, or error on failure.
  */
 int
-gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data)
+gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data, cred_t *cr,
+    caller_context_t *ct)
 {
 	gfs_readdir_state_t gstate;
 	int error, eof = 0;
 	ino64_t ino, pino;
 	offset_t off, next;
 	gfs_dir_t *dp = dvp->v_data;
+	vnode_t *parent;
 
 	ino = dp->gfsd_file.gfs_ino;
+	parent = dp->gfsd_file.gfs_parent;
 
-	if (dp->gfsd_file.gfs_parent == NULL)
+	if (parent == NULL)
 		pino = ino;		/* root of filesystem */
-	else
-		pino = ((gfs_file_t *)
-		    (dp->gfsd_file.gfs_parent->v_data))->gfs_ino;
+	else if (dvp->v_flag & V_XATTRDIR) {
+		vattr_t va;
+
+		va.va_mask = AT_NODEID;
+		error = VOP_GETATTR(parent, &va, 0, cr, ct);
+		if (error)
+			return (error);
+		pino = va.va_nodeid;
+	} else
+		pino = ((gfs_file_t *)(parent->v_data))->gfs_ino;
 
 	if ((error = gfs_readdir_init(&gstate, dp->gfsd_maxlen, 1, uiop,
 	    pino, ino)) != 0)
@@ -870,9 +901,10 @@ gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data)
 /* ARGSUSED */
 int
 gfs_vop_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
-    int flags, vnode_t *rdir, cred_t *cr)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+    int *direntflags, pathname_t *realpnp)
 {
-	return (gfs_dir_lookup(dvp, nm, vpp));
+	return (gfs_dir_lookup(dvp, nm, vpp, cr));
 }
 
 /*
@@ -883,9 +915,10 @@ gfs_vop_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
  */
 /* ARGSUSED */
 int
-gfs_vop_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
+gfs_vop_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
+    caller_context_t *ct, int flags)
 {
-	return (gfs_dir_readdir(vp, uiop, eofp, NULL));
+	return (gfs_dir_readdir(vp, uiop, eofp, NULL, cr, ct));
 }
 
 
@@ -901,7 +934,8 @@ gfs_vop_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
 /* ARGSUSED */
 int
 gfs_vop_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
-    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cred)
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cred,
+    caller_context_t *ct)
 {
 	int rv;
 	ssize_t resid = len;
@@ -972,7 +1006,7 @@ gfs_vop_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
  */
 /* ARGSUSED */
 void
-gfs_vop_inactive(vnode_t *vp, cred_t *cr)
+gfs_vop_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	gfs_file_t *fp = vp->v_data;
 	void *data;

@@ -223,7 +223,8 @@ zvol_minor_lookup(const char *name)
 void
 zvol_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 {
-	nvlist_t *nvprops = arg;
+	zfs_creat_t *zct = arg;
+	nvlist_t *nvprops = zct->zct_props;
 	int error;
 	uint64_t volblocksize, volsize;
 

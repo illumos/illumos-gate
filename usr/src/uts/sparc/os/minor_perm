@@ -74,6 +74,7 @@ sd:* 0640 root sys
 dad:* 0640 root sys
 sdt:sdt 0644 root sys
 sgen:* 0600 root sys
+smbsrv:* 0640 root sys
 ssd:* 0640 root sys
 st:* 0666 root sys
 su:[a-z] 0666 root sys

@@ -171,7 +171,7 @@ port_cache_lookup_fp(port_fdcache_t *pcp, int fd, file_t *fp)
  * will be submitted to the event port with port_send_event().
  * Otherwise VOP_POLL does not return events but it delivers a pointer to a
  * pollhead_t structure. In such a case the corresponding file system behind
- * VOP_POLL will use the pollwakeup() function to notify about exisiting
+ * VOP_POLL will use the pollwakeup() function to notify about existing
  * events.
  */
 int
@@ -314,7 +314,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	 * poll routine to change.
 	 */
 	curthread->t_pollcache = (pollcache_t *)pcp;
-	error = VOP_POLL(fp->f_vnode, events, 0, &revents, &php);
+	error = VOP_POLL(fp->f_vnode, events, 0, &revents, &php, NULL);
 	curthread->t_pollcache = NULL;
 
 	/*
@@ -512,7 +512,7 @@ port_bind_pollhead(pollhead_t **php, polldat_t *pdp, short *revents)
 	pdp->pd_php = *php;
 	fp = pdp->pd_fp;
 	curthread->t_pollcache = (pollcache_t *)pdp->pd_pcache;
-	error = VOP_POLL(fp->f_vnode, pdp->pd_events, 0, revents, php);
+	error = VOP_POLL(fp->f_vnode, pdp->pd_events, 0, revents, php, NULL);
 	curthread->t_pollcache = NULL;
 	return (error);
 }

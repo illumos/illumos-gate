@@ -73,7 +73,7 @@ static int 	tmp_putapage(struct vnode *, page_t *, u_offset_t *, size_t *,
 
 /* ARGSUSED1 */
 static int
-tmp_open(struct vnode **vpp, int flag, struct cred *cred)
+tmp_open(struct vnode **vpp, int flag, struct cred *cred, caller_context_t *ct)
 {
 	/*
 	 * swapon to a tmpfs file is not supported so access
@@ -86,8 +86,13 @@ tmp_open(struct vnode **vpp, int flag, struct cred *cred)
 
 /* ARGSUSED1 */
 static int
-tmp_close(struct vnode *vp, int flag, int count,
-    offset_t offset, struct cred *cred)
+tmp_close(
+	struct vnode *vp,
+	int flag,
+	int count,
+	offset_t offset,
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
@@ -269,7 +274,7 @@ wrtmp(
 
 		/*
 		 * We have to drop the contents lock to allow the VM
-		 * system to reaquire it in tmp_getpage()
+		 * system to reacquire it in tmp_getpage()
 		 */
 		rw_exit(&tp->tn_contents);
 
@@ -496,7 +501,7 @@ rdtmp(
 
 		/*
 		 * We have to drop the contents lock to prevent the VM
-		 * system from trying to reaquire it in tmp_getpage()
+		 * system from trying to reacquire it in tmp_getpage()
 		 * should the uiomove cause a pagefault.
 		 */
 		rw_exit(&tp->tn_contents);
@@ -621,15 +626,26 @@ tmp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 
 /* ARGSUSED */
 static int
-tmp_ioctl(struct vnode *vp, int com, intptr_t data, int flag,
-    struct cred *cred, int *rvalp)
+tmp_ioctl(
+	struct vnode *vp,
+	int com,
+	intptr_t data,
+	int flag,
+	struct cred *cred,
+	int *rvalp,
+	caller_context_t *ct)
 {
 	return (ENOTTY);
 }
 
 /* ARGSUSED2 */
 static int
-tmp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred)
+tmp_getattr(
+	struct vnode *vp,
+	struct vattr *vap,
+	int flags,
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct vnode *mvp;
@@ -651,7 +667,7 @@ tmp_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred)
 			mutex_exit(&tp->tn_tlock);
 			bzero(&va, sizeof (struct vattr));
 			va.va_mask = AT_UID|AT_GID;
-			attrs = VOP_GETATTR(mvp, &va, 0, cred);
+			attrs = VOP_GETATTR(mvp, &va, 0, cred, ct);
 		} else {
 			mutex_exit(&tp->tn_tlock);
 		}
@@ -703,7 +719,7 @@ tmp_setattr(
 	/*
 	 * Cannot set these attributes
 	 */
-	if (vap->va_mask & AT_NOSET)
+	if ((vap->va_mask & AT_NOSET) || (vap->va_mask & AT_XVATTR))
 		return (EINVAL);
 
 	mutex_enter(&tp->tn_tlock);
@@ -763,7 +779,12 @@ out1:
 
 /* ARGSUSED2 */
 static int
-tmp_access(struct vnode *vp, int mode, int flags, struct cred *cred)
+tmp_access(
+	struct vnode *vp,
+	int mode,
+	int flags,
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	int error;
@@ -783,7 +804,10 @@ tmp_lookup(
 	struct pathname *pnp,
 	int flags,
 	struct vnode *rdir,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct,
+	int *direntflags,
+	pathname_t *realpnp)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(dvp);
 	struct tmpnode *ntp = NULL;
@@ -794,6 +818,12 @@ tmp_lookup(
 	if (flags & LOOKUP_XATTR) {
 		struct tmpnode *xdp;
 		struct tmount *tm;
+
+		/*
+		 * don't allow attributes if not mounted XATTR support
+		 */
+		if (!(dvp->v_vfsp->vfs_flag & VFS_XATTR))
+			return (EINVAL);
 
 		if (tp->tn_flags & ISXATTR)
 			/* No attributes on attributes */
@@ -894,7 +924,9 @@ tmp_create(
 	int mode,
 	struct vnode **vpp,
 	struct cred *cred,
-	int flag)
+	int flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	struct tmpnode *parent;
 	struct tmount *tm;
@@ -977,7 +1009,7 @@ again:
 		}
 
 		if (error == 0) {
-			vnevent_create(*vpp);
+			vnevent_create(*vpp, ct);
 		}
 		return (0);
 	}
@@ -988,7 +1020,7 @@ again:
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, parent, nm, DE_CREATE,
 	    (struct tmpnode *)NULL, (struct tmpnode *)NULL,
-	    vap, &self, cred);
+	    vap, &self, cred, ct);
 	rw_exit(&parent->tn_rwlock);
 
 	if (error) {
@@ -1026,8 +1058,14 @@ again:
 	return (0);
 }
 
+/* ARGSUSED3 */
 static int
-tmp_remove(struct vnode *dvp, char *nm, struct cred *cred)
+tmp_remove(
+	struct vnode *dvp,
+	char *nm,
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *parent = (struct tmpnode *)VTOTN(dvp);
 	int error;
@@ -1047,7 +1085,7 @@ tmp_remove(struct vnode *dvp, char *nm, struct cred *cred)
 
 	rw_exit(&tp->tn_rwlock);
 	rw_exit(&parent->tn_rwlock);
-	vnevent_remove(TNTOV(tp), dvp, nm);
+	vnevent_remove(TNTOV(tp), dvp, nm, ct);
 	tmpnode_rele(tp);
 
 	TRACE_3(TR_FAC_TMPFS, TR_TMPFS_REMOVE,
@@ -1055,8 +1093,15 @@ tmp_remove(struct vnode *dvp, char *nm, struct cred *cred)
 	return (error);
 }
 
+/* ARGSUSED4 */
 static int
-tmp_link(struct vnode *dvp, struct vnode *srcvp, char *tnm, struct cred *cred)
+tmp_link(
+	struct vnode *dvp,
+	struct vnode *srcvp,
+	char *tnm,
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *parent;
 	struct tmpnode *from;
@@ -1065,7 +1110,7 @@ tmp_link(struct vnode *dvp, struct vnode *srcvp, char *tnm, struct cred *cred)
 	struct tmpnode *found = NULL;
 	struct vnode *realvp;
 
-	if (VOP_REALVP(srcvp, &realvp) == 0)
+	if (VOP_REALVP(srcvp, &realvp, ct) == 0)
 		srcvp = realvp;
 
 	parent = (struct tmpnode *)VTOTN(dvp);
@@ -1095,21 +1140,24 @@ tmp_link(struct vnode *dvp, struct vnode *srcvp, char *tnm, struct cred *cred)
 
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, parent, tnm, DE_LINK, (struct tmpnode *)NULL,
-		from, NULL, (struct tmpnode **)NULL, cred);
+		from, NULL, (struct tmpnode **)NULL, cred, ct);
 	rw_exit(&parent->tn_rwlock);
 	if (error == 0) {
-		vnevent_link(srcvp);
+		vnevent_link(srcvp, ct);
 	}
 	return (error);
 }
 
+/* ARGSUSED5 */
 static int
 tmp_rename(
 	struct vnode *odvp,	/* source parent vnode */
 	char *onm,		/* source name */
 	struct vnode *ndvp,	/* destination parent vnode */
 	char *nnm,		/* destination name */
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *fromparent;
 	struct tmpnode *toparent;
@@ -1119,7 +1167,7 @@ tmp_rename(
 	int samedir = 0;	/* set if odvp == ndvp */
 	struct vnode *realvp;
 
-	if (VOP_REALVP(ndvp, &realvp) == 0)
+	if (VOP_REALVP(ndvp, &realvp, ct) == 0)
 		ndvp = realvp;
 
 	fromparent = (struct tmpnode *)VTOTN(odvp);
@@ -1178,7 +1226,7 @@ tmp_rename(
 	rw_enter(&toparent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, toparent, nnm, DE_RENAME,
 	    fromparent, fromtp, (struct vattr *)NULL,
-	    (struct tmpnode **)NULL, cred);
+	    (struct tmpnode **)NULL, cred, ct);
 	rw_exit(&toparent->tn_rwlock);
 
 	if (error) {
@@ -1191,14 +1239,14 @@ tmp_rename(
 			error = 0;
 		goto done;
 	}
-	vnevent_rename_src(TNTOV(fromtp), odvp, onm);
+	vnevent_rename_src(TNTOV(fromtp), odvp, onm, ct);
 
 	/*
 	 * Notify the target directory if not same as
 	 * source directory.
 	 */
 	if (ndvp != odvp) {
-		vnevent_rename_dest_dir(ndvp);
+		vnevent_rename_dest_dir(ndvp, ct);
 	}
 
 	/*
@@ -1232,13 +1280,17 @@ done:
 	return (error);
 }
 
+/* ARGSUSED5 */
 static int
 tmp_mkdir(
 	struct vnode *dvp,
 	char *nm,
 	struct vattr *va,
 	struct vnode **vpp,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)
 {
 	struct tmpnode *parent = (struct tmpnode *)VTOTN(dvp);
 	struct tmpnode *self = NULL;
@@ -1269,7 +1321,7 @@ tmp_mkdir(
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, parent, nm, DE_MKDIR,
 		(struct tmpnode *)NULL, (struct tmpnode *)NULL, va,
-		&self, cred);
+		&self, cred, ct);
 	if (error) {
 		rw_exit(&parent->tn_rwlock);
 		if (self)
@@ -1281,12 +1333,15 @@ tmp_mkdir(
 	return (0);
 }
 
+/* ARGSUSED4 */
 static int
 tmp_rmdir(
 	struct vnode *dvp,
 	char *nm,
 	struct vnode *cdir,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *parent = (struct tmpnode *)VTOTN(dvp);
 	struct tmpnode *self = NULL;
@@ -1354,16 +1409,21 @@ done:
 done1:
 	rw_exit(&self->tn_rwlock);
 	rw_exit(&parent->tn_rwlock);
-	vnevent_rmdir(TNTOV(self), dvp, nm);
+	vnevent_rmdir(TNTOV(self), dvp, nm, ct);
 	tmpnode_rele(self);
 
 	return (error);
 }
 
 /* ARGSUSED2 */
-
 static int
-tmp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp)
+tmp_readdir(
+	struct vnode *vp,
+	struct uio *uiop,
+	struct cred *cred,
+	int *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tdirent *tdp;
@@ -1467,13 +1527,16 @@ tmp_readdir(struct vnode *vp, struct uio *uiop, struct cred *cred, int *eofp)
 	return (error);
 }
 
+/* ARGSUSED5 */
 static int
 tmp_symlink(
 	struct vnode *dvp,
 	char *lnm,
 	struct vattr *tva,
 	char *tnm,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	struct tmpnode *parent = (struct tmpnode *)VTOTN(dvp);
 	struct tmpnode *self = (struct tmpnode *)NULL;
@@ -1503,7 +1566,7 @@ tmp_symlink(
 
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, parent, lnm, DE_CREATE, (struct tmpnode *)NULL,
-	    (struct tmpnode *)NULL, tva, &self, cred);
+	    (struct tmpnode *)NULL, tva, &self, cred, ct);
 	rw_exit(&parent->tn_rwlock);
 
 	if (error) {
@@ -1527,7 +1590,11 @@ tmp_symlink(
 
 /* ARGSUSED2 */
 static int
-tmp_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
+tmp_readlink(
+	struct vnode *vp,
+	struct uio *uiop,
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	int error = 0;
@@ -1546,14 +1613,18 @@ tmp_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
 
 /* ARGSUSED */
 static int
-tmp_fsync(struct vnode *vp, int syncflag, struct cred *cred)
+tmp_fsync(
+	struct vnode *vp,
+	int syncflag,
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static void
-tmp_inactive(struct vnode *vp, struct cred *cred)
+tmp_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tmount *tm = (struct tmount *)VFSTOTM(vp->v_vfsp);
@@ -1634,8 +1705,9 @@ top:
 	tmp_memfree(tp, sizeof (struct tmpnode));
 }
 
+/* ARGSUSED2 */
 static int
-tmp_fid(struct vnode *vp, struct fid *fidp)
+tmp_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tfid *tfid;
@@ -1659,6 +1731,7 @@ tmp_fid(struct vnode *vp, struct fid *fidp)
 /*
  * Return all the pages from [off..off+len] in given file
  */
+/* ARGSUSED */
 static int
 tmp_getpage(
 	struct vnode *vp,
@@ -1670,7 +1743,8 @@ tmp_getpage(
 	struct seg *seg,
 	caddr_t addr,
 	enum seg_rw rw,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int err = 0;
 	struct tmpnode *tp = VTOTN(vp);
@@ -1788,7 +1862,7 @@ again:
 		if (pvp) {
 			flags = (pl == NULL ? B_ASYNC|B_READ : B_READ);
 			err = VOP_PAGEIO(pvp, pp, (u_offset_t)poff, PAGESIZE,
-			    flags, cr);
+			    flags, cr, NULL);
 			if (flags & B_ASYNC)
 				pp = NULL;
 		} else if (rw != S_CREATE) {
@@ -1820,7 +1894,8 @@ tmp_putpage(
 	offset_t off,
 	size_t len,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	register page_t *pp;
 	u_offset_t io_off;
@@ -2037,7 +2112,7 @@ tmp_putapage(
 
 	/* Do i/o on the remaining kluster */
 	err = VOP_PAGEIO(pvp, pplist, (u_offset_t)pstart, io_len,
-	    B_WRITE | flags, cr);
+	    B_WRITE | flags, cr, NULL);
 
 	if ((flags & B_ASYNC) == 0) {
 		pvn_write_done(pplist, ((err) ? B_ERROR : 0) | B_WRITE | flags);
@@ -2056,6 +2131,7 @@ out:
 	return (err);
 }
 
+/* ARGSUSED */
 static int
 tmp_map(
 	struct vnode *vp,
@@ -2066,7 +2142,8 @@ tmp_map(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
@@ -2139,7 +2216,8 @@ tmp_addmap(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -2155,7 +2233,8 @@ tmp_delmap(
 	uint_t prot,
 	uint_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -2243,7 +2322,11 @@ tmp_space(
 
 /* ARGSUSED */
 static int
-tmp_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+tmp_seek(
+	struct vnode *vp,
+	offset_t ooff,
+	offset_t *noffp,
+	caller_context_t *ct)
 {
 	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
 }
@@ -2272,7 +2355,12 @@ tmp_rwunlock(struct vnode *vp, int write_lock, caller_context_t *ctp)
 }
 
 static int
-tmp_pathconf(struct vnode *vp, int cmd, ulong_t *valp, cred_t *cr)
+tmp_pathconf(
+	struct vnode *vp,
+	int cmd,
+	ulong_t *valp,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	struct tmpnode *tp = NULL;
 	int error;
@@ -2296,8 +2384,14 @@ tmp_pathconf(struct vnode *vp, int cmd, ulong_t *valp, cred_t *cr)
 			error = EINVAL;
 		}
 		break;
+	case _PC_SATTR_ENABLED:
+	case _PC_SATTR_EXISTS:
+		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+		    (vp->v_type == VREG || vp->v_type == VDIR);
+		error = 0;
+		break;
 	default:
-		error = fs_pathconf(vp, cmd, valp, cr);
+		error = fs_pathconf(vp, cmd, valp, cr, ct);
 	}
 	return (error);
 }

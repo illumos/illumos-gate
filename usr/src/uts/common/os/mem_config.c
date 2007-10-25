@@ -296,7 +296,7 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	mem_node_add_slice(base, pnum);
 
 	/*
-	 * Allocate or resize page counters as necessary to accomodate
+	 * Allocate or resize page counters as necessary to accommodate
 	 * the increase in memory pages.
 	 */
 	mnode = PFN_2_MEM_NODE(pnum);
@@ -508,7 +508,7 @@ kphysm_addmem_error_undospan(pfn_t pt_base, pgcnt_t tpgs)
  * Only return an available memseg of exactly the right size.
  * When the meta data area has it's own virtual address space
  * we will need to manage this more carefully and do best fit
- * allocations, possibly splitting an availble area.
+ * allocations, possibly splitting an available area.
  */
 static struct memseg *
 memseg_reuse(pgcnt_t metapgs)
@@ -2013,7 +2013,7 @@ delete_memory_thread(caddr_t amhp)
 				VN_HOLD(vp);
 				page_unlock(pp);
 				(void) VOP_PUTPAGE(vp, offset, PAGESIZE,
-				    B_INVAL|B_FORCE, kcred);
+				    B_INVAL|B_FORCE, kcred, NULL);
 				VN_RELE(vp);
 #ifdef MEM_DEL_STATS
 				ntick_pgrp = (uint64_t)ddi_get_lbolt() -

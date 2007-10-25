@@ -33,6 +33,7 @@
 #include <sys/devops.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/taskq.h>
+#include <sys/tzfile.h>
 
 /*
  * XXXX
@@ -166,7 +167,7 @@ typedef struct pm_component {
  * kidsupcnt counts (the number of components of new-style children at non-zero
  * level (unknown counts as non-zero)) + (the number of old-style children with
  * component 0 at non-zero level) for parents that have not asked for
- * notifcation.  When kidsupcnt is 0 for a nexus node, then pm scans it,
+ * notification.  When kidsupcnt is 0 for a nexus node, then pm scans it,
  * otherwise it leaves it alone.
  * Parents that ask for notification always get get scanned,
  * so we keep their kidsupcnt at zero.
@@ -911,7 +912,7 @@ typedef struct pscc {			/* pm_state_change_control */
 #define	PSCCOUNT 128	/* number of state change entries kept per process */
 
 /*
- * Struct used to track the existance of devices exporting the
+ * Struct used to track the existence of devices exporting the
  * no-involuntary-power-cycles property, and remember things from their
  * devinfo node for later attach.
  */
@@ -985,14 +986,6 @@ typedef struct pm_desc_pwrchk {
  * These defines are used by pm_trans_check() to calculate time.
  * Mostly copied from "tzfile.h".
  */
-#define	EPOCH_YEAR		1970
-#define	SECSPERMIN		60
-#define	MINSPERHOUR		60
-#define	HOURSPERDAY		24
-#define	DAYSPERWEEK		7
-#define	DAYSPERNYEAR		365
-#define	SECSPERHOUR		(SECSPERMIN * MINSPERHOUR)
-#define	SECSPERDAY		(SECSPERHOUR * HOURSPERDAY)
 #define	DC_SPY			(SECSPERDAY * DAYSPERNYEAR)
 #define	DC_SPW			(SECSPERDAY * DAYSPERWEEK)
 #define	DC_SPD			SECSPERDAY

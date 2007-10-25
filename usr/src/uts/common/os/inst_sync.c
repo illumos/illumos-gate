@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +220,7 @@ in_fclose(File *fp)
 {
 	int error;
 
-	error = VOP_CLOSE(fp->vp, FCREAT, 1, (offset_t)0, CRED());
+	error = VOP_CLOSE(fp->vp, FCREAT, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(fp->vp);
 	kmem_free(fp, sizeof (File));
 	return (error);
@@ -235,7 +234,7 @@ in_fflush(File *fp)
 	if (fp->count)
 		error = in_write(fp->vp, &fp->voffset, fp->buf, fp->count);
 	if (error == 0)
-		error = VOP_FSYNC(fp->vp, FSYNC,  CRED());
+		error = VOP_FSYNC(fp->vp, FSYNC, CRED(), NULL);
 	return (error);
 }
 

@@ -23,7 +23,7 @@
 /*	All Rights Reserved */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -918,7 +918,7 @@ closef(file_t *fp)
 
 	vp = fp->f_vnode;
 
-	error = VOP_CLOSE(vp, flag, count, offset, fp->f_cred);
+	error = VOP_CLOSE(vp, flag, count, offset, fp->f_cred, NULL);
 
 	if (count > 1) {
 		mutex_exit(&fp->f_tlock);
@@ -1348,7 +1348,7 @@ fassign(vnode_t **vpp, int mode, int *fdp)
 
 	if (error = falloc((vnode_t *)NULL, mode, &fp, &fd))
 		return (error);
-	if (error = VOP_OPEN(vpp, mode, fp->f_cred)) {
+	if (error = VOP_OPEN(vpp, mode, fp->f_cred, NULL)) {
 		setf(fd, NULL);
 		unfalloc(fp);
 		return (error);
@@ -1506,14 +1506,15 @@ vpsetattr(vnode_t *vp, vattr_t *vap, int flags)
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
 		vattr.va_mask = AT_SIZE;
-		if (!(error = VOP_GETATTR(vp, &vattr, 0, CRED()))) {
+		if (!(error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))) {
 			begin = vap->va_size > vattr.va_size ?
 					vattr.va_size : vap->va_size;
 			length = vattr.va_size > vap->va_size ?
 					vattr.va_size - vap->va_size :
 					vap->va_size - vattr.va_size;
 
-			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0)) {
+			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0,
+			    NULL)) {
 				error = EACCES;
 			}
 		}

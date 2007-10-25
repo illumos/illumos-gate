@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +89,7 @@ ioctl(int fdes, int cmd, intptr_t arg)
 			int32_t offset;
 
 			vattr.va_mask = AT_SIZE;
-			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred);
+			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL);
 			if (error) {
 				releasef(fdes);
 				return (set_errno(error));
@@ -127,7 +126,7 @@ ioctl(int fdes, int cmd, intptr_t arg)
 	 * ioctl() now passes in the model information in some high bits.
 	 */
 	flag = fp->f_flag | get_udatamodel();
-	error = VOP_IOCTL(fp->f_vnode, cmd, arg, flag, CRED(), &rv);
+	error = VOP_IOCTL(fp->f_vnode, cmd, arg, flag, CRED(), &rv, NULL);
 	if (error != 0) {
 		releasef(fdes);
 		return (set_errno(error));

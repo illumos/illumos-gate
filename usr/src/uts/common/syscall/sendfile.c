@@ -916,7 +916,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			}
 
 			readvp = ffp->f_vnode;
-			if (VOP_REALVP(readvp, &realvp) == 0)
+			if (VOP_REALVP(readvp, &realvp, NULL) == 0)
 				readvp = realvp;
 			if (readvp->v_type != VREG) {
 				releasef(sfv->sfv_fd);

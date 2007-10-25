@@ -266,7 +266,7 @@ map_unset(regp, owner)
 	/*
 	 * We return 1 either when the entry was not there or it
 	 * was able to unset it.  It can come to this point only if
-	 * atleast one of the conditions is true.
+	 * at least one of the conditions is true.
 	 */
 	return (1);
 }

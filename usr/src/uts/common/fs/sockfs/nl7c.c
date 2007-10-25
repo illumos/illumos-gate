@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,21 +31,21 @@
  * (Hypertext Transfer Protocol, see HTTP/1.1 RFC2616) in a semantically
  * transparent manner.
  *
- * Neither the requesting user agent (client, e.g. web broweser) nor the
+ * Neither the requesting user agent (client, e.g. web browser) nor the
  * origin server (e.g. webserver) that provided the response cached by
  * NL7C are impacted in any way.
  *
  * Note, currently NL7C only processes HTTP messages via the embedded
  * URI of scheme http (not https nor any other), additional scheme are
- * intended to be supproted as is practical such that much of the NL7C
- * framework may appear more gerneral purpose then would be needed just
+ * intended to be supported as is practical such that much of the NL7C
+ * framework may appear more general purpose then would be needed just
  * for an HTTP gateway cache.
  *
  * NL7C replaces NCA (Network Cache and Accelerator) and in the future
  * NCAS (NCA/SSL).
  *
  * Further, NL7C uses all NCA configuration files, see "/etc/nca/", the
- * NCA socket API, "AF_NCA", and "ndd /dev/nca" for backwards compatability.
+ * NCA socket API, "AF_NCA", and "ndd /dev/nca" for backwards compatibility.
  */
 
 #include <sys/systm.h>
@@ -351,7 +351,7 @@ inet_atob(char *s, nl7c_addr_t *p)
  *  IPaddr - an IPv4 numeric dot address (e.g. 192.168.84.71) or '*' for
  *           INADDR_ANY, or an IPv6 numeric address or "::" for IN6ADDR_ANY.
  *
- *       / - IPaddr/Port seperator.
+ *       / - IPaddr/Port separator.
  *
  *    Port - a TCP decimal port number.
  *
@@ -517,7 +517,7 @@ ncaportconf_read(void)
 	if (addrp != NULL) {
 		kmem_free(addrp, sizeof (*addrp));
 	}
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 }
 
@@ -620,7 +620,7 @@ ncakmodconf_read(void)
 
 	}
 done:
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 }
 
@@ -797,7 +797,7 @@ ncalogdconf_read(void)
 					/* Opening delimiter, skip */
 					/*EMPTY*/;
 				} else if (c == '"' || c == ' ') {
-					/* List delim or filename seperator */
+					/* List delim or filename separator */
 					*fnvp++ = strdup(file);
 					fp = file;
 				} else if (fp < &file[sizeof (file) - 1]) {
@@ -820,7 +820,7 @@ ncalogdconf_read(void)
 
 	}
 done:
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 
 	if (nl7c_logd_enabled) {
@@ -912,7 +912,7 @@ nl7c_init()
  *
  * 2) URI scheme not reqcognized.
  *
- * 3) A request which can't be procesed.
+ * 3) A request which can't be processed.
  *
  * 4) A request which could be processed but NL7C dosen't currently have
  *    the response data. In which case NL7C will parse the returned response
@@ -980,9 +980,9 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 		 * First time through, if no data left over from a previous
 		 * kstrgetmsg() then try to get some, else just process it.
 		 *
-		 * Thereafter, rmp = NULL after the successfull kstrgetmsg()
+		 * Thereafter, rmp = NULL after the successful kstrgetmsg()
 		 * so try to get some new data and append to list (i.e. until
-		 * enough fragments are collected for a successfull parse).
+		 * enough fragments are collected for a successful parse).
 		 */
 		if (rmp == NULL) {
 

@@ -167,6 +167,7 @@ all_zones_files="
 	etc/user_attr
 	etc/uucp/[A-Z]*
 	etc/vfstab
+	var/smb/*
 	var/spool/cron/crontabs/*
 	var/yp/Makefile
 	var/yp/aliases

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +114,8 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 
 	*vpp = vp = NULL;
 
-	if (error = VOP_LOOKUP(dvp, d_name, &vp, NULL, 0, NULL, cs->cr))
+	if (error = VOP_LOOKUP(dvp, d_name, &vp, NULL, 0, NULL, cs->cr,
+	    NULL, NULL, NULL))
 		return (error);
 
 	/* Is this object mounted upon? */
@@ -152,7 +152,7 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 	 * etc.), then return attrs for stub instead of VROOT object.
 	 * If it fails for any other reason, then return the error.
 	 */
-	if (error = VOP_FID(vp, &fid)) {
+	if (error = VOP_FID(vp, &fid, NULL)) {
 		if (ismntpt == 0) {
 			VN_RELE(vp);
 			return (error);
@@ -232,7 +232,8 @@ rfs4_get_pc_encode(vnode_t *vp, rfs4_pc_encode_t *pce, bitmap4 ar, cred_t *cr)
 
 	if (ar & FATTR4_MAXFILESIZE_MASK) {
 		/* Maximum File Size */
-		if (error = VOP_PATHCONF(vp, _PC_FILESIZEBITS, &pc_val, cr))
+		if (error = VOP_PATHCONF(vp, _PC_FILESIZEBITS, &pc_val, cr,
+		    NULL))
 			return (error);
 
 		if (pc_val >= (sizeof (uint64_t) * 8))
@@ -243,7 +244,7 @@ rfs4_get_pc_encode(vnode_t *vp, rfs4_pc_encode_t *pce, bitmap4 ar, cred_t *cr)
 
 	if (ar & FATTR4_MAXLINK_MASK) {
 		/* Maximum Link Count */
-		if (error = VOP_PATHCONF(vp, _PC_LINK_MAX, &pc_val, cr))
+		if (error = VOP_PATHCONF(vp, _PC_LINK_MAX, &pc_val, cr, NULL))
 			return (error);
 
 		pce->maxlink = pc_val;
@@ -251,7 +252,7 @@ rfs4_get_pc_encode(vnode_t *vp, rfs4_pc_encode_t *pce, bitmap4 ar, cred_t *cr)
 
 	if (ar & FATTR4_MAXNAME_MASK) {
 		/* Maximum Name Length */
-		if (error = VOP_PATHCONF(vp, _PC_NAME_MAX, &pc_val, cr))
+		if (error = VOP_PATHCONF(vp, _PC_NAME_MAX, &pc_val, cr, NULL))
 			return (error);
 
 		pce->maxname = pc_val;
@@ -441,7 +442,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 		return;
 	}
 
-	error = VOP_ACCESS(dvp, VREAD, 0, cs->cr);
+	error = VOP_ACCESS(dvp, VREAD, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		return;
@@ -610,7 +611,7 @@ readagain:
 
 	(void) VOP_RWLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 
-	error = VOP_READDIR(dvp, &uio, cs->cr, &iseofdir);
+	error = VOP_READDIR(dvp, &uio, cs->cr, &iseofdir, NULL, 0);
 
 	VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 
@@ -788,7 +789,7 @@ reencode_attrs:
 			} else {
 				va.va_mask = AT_ALL;
 				rddirattr_error =
-					VOP_GETATTR(vp, &va, 0, cs->cr);
+					VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 				if (rddirattr_error)
 					ae = ar & (FATTR4_RDATTR_ERROR_MASK |
 						FATTR4_MOUNTED_ON_FILEID_MASK);
@@ -877,7 +878,7 @@ reencode_attrs:
 					} else {
 						(void) VOP_PATHCONF(vp,
 							_PC_XATTR_EXISTS,
-							&pc_val, cs->cr);
+							&pc_val, cs->cr, NULL);
 					}
 					isit = (pc_val ? TRUE : FALSE);
 					IXDR_PUT_U_INT32(ptr, isit);
@@ -965,7 +966,7 @@ reencode_attrs:
 					pc_val = FALSE;
 					(void) VOP_PATHCONF(vp,
 							_PC_CHOWN_RESTRICTED,
-							&pc_val, cs->cr);
+							&pc_val, cs->cr, NULL);
 					isit = (pc_val ? TRUE : FALSE);
 					IXDR_PUT_U_INT32(ptr, isit);
 				}

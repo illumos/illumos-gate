@@ -101,7 +101,7 @@ lookup:
 	}
 
 	if (mode) {
-		error = VOP_ACCESS(vp, mode, 0, tmpcr);
+		error = VOP_ACCESS(vp, mode, 0, tmpcr, NULL);
 		if (error) {
 			if ((error == ESTALE) &&
 			    fs_need_estale_retry(estale_retry++)) {

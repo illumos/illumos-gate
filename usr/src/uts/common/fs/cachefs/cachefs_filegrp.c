@@ -224,12 +224,12 @@ filegrp_create(struct fscache *fscp, cfs_cid_t *cidp)
 	fgp->fg_offsets = NULL;
 	fgp->fg_alloclist = NULL;
 
-	fgp->fg_headersize = (u_int)sizeof (struct attrcache_header) +
-	    (fgsize * (u_int)sizeof (struct attrcache_index)) +
+	fgp->fg_headersize = (uint_t)sizeof (struct attrcache_header) +
+	    (fgsize * (uint_t)sizeof (struct attrcache_index)) +
 	    ((fgsize + 7) >> 3);
 
 	fgp->fg_filesize = fgp->fg_headersize +
-	    (fgsize * (u_int)sizeof (struct cfs_cachefs_metadata));
+	    (fgsize * (uint_t)sizeof (struct cfs_cachefs_metadata));
 
 	flags = fscp->fs_flags;
 	if (flags & CFS_FS_READ) {
@@ -324,7 +324,8 @@ filegrp_destroy(filegrp_t *fgp)
 			/* remove the attrcache file */
 			make_ascii_name(&fgp->fg_id, name);
 			fname = name;
-			error = VOP_REMOVE(fscp->fs_fsattrdir, fname, kcred);
+			error = VOP_REMOVE(fscp->fs_fsattrdir, fname, kcred,
+			    NULL, 0);
 			if (error) {
 				cmn_err(CE_WARN,
 				    "cachefs: error in cache, run fsck");
@@ -452,7 +453,7 @@ filegrp_hold(filegrp_t *fgp)
  * Returns:
  * Preconditions:
  *	precond(fgp is a valid filegrp object)
- *	precond(number of refrences to filegrp is > 0)
+ *	precond(number of references to filegrp is > 0)
  */
 
 void
@@ -498,7 +499,7 @@ filegrp_rele(filegrp_t *fgp)
  *	Returns 0 for success or a non-zero errno.
  * Preconditions:
  *	precond(fgp is a valid filegrp object)
- *	precond(number of refrences to filegrp is > 0)
+ *	precond(number of references to filegrp is > 0)
  *	precond(filegrp is writable)
  */
 
@@ -586,7 +587,7 @@ out:
  * Preconditions:
  *	precond(fgp is a valid filegrp object)
  *	precond(filegrp is writable)
- *	precond(number of refrences to filegrp is > 0)
+ *	precond(number of references to filegrp is > 0)
  *	precond(number of front file references is > 0)
  */
 
@@ -620,7 +621,7 @@ filegrp_ffrele(filegrp_t *fgp)
 		make_ascii_name(&fgp->fg_id, name);
 		fname = name;
 		error = VOP_RMDIR(fscp->fs_fscdirvp, fname,
-		    fscp->fs_fscdirvp, kcred);
+		    fscp->fs_fscdirvp, kcred, NULL, 0);
 		if (error == 0) {
 			cachefs_freefile(fscp->fs_cache);
 			cachefs_freeblocks(fscp->fs_cache, 1,
@@ -687,7 +688,7 @@ filegrp_sync(filegrp_t *fgp)
 	    kcred, NULL);
 
 	if (error == 0)
-		error = VOP_FSYNC(fgp->fg_attrvp, FSYNC, kcred);
+		error = VOP_FSYNC(fgp->fg_attrvp, FSYNC, kcred, NULL);
 
 	if (error == 0)
 		fgp->fg_flags &= ~CFS_FG_UPDATED;
@@ -746,7 +747,7 @@ filegrp_read_metadata(filegrp_t *fgp, cfs_cid_t *cidp,
 
 
 	/* see if metadata was ever written */
-	index = (int) (cidp->cid_fileno - fgp->fg_id.cid_fileno);
+	index = (int)(cidp->cid_fileno - fgp->fg_id.cid_fileno);
 	if (fgp->fg_offsets[index].ach_written == 0) {
 		mutex_exit(&fgp->fg_mutex);
 		return (ENOENT);
@@ -794,7 +795,7 @@ filegrp_create_metadata(filegrp_t *fgp, struct cachefs_metadata *md,
 	cachefscache_t *cachep = fscp->fs_cache;
 	int slot;
 	int bitno;
-	u_char mask;
+	uchar_t mask;
 	int last;
 	int xx;
 	int index;
@@ -816,13 +817,13 @@ filegrp_create_metadata(filegrp_t *fgp, struct cachefs_metadata *md,
 		return (0);
 	}
 
-	index = (int) (cidp->cid_fileno - fgp->fg_id.cid_fileno);
+	index = (int)(cidp->cid_fileno - fgp->fg_id.cid_fileno);
 
 	ASSERT(index < fgp->fg_fscp->fs_info.fi_fgsize);
 
 	last = (((fgp->fg_fscp->fs_info.fi_fgsize + 7) & ~(7)) / 8);
 	for (xx = 0; xx < last; xx++) {
-		if (fgp->fg_alloclist[xx] != (u_char)0xff) {
+		if (fgp->fg_alloclist[xx] != (uchar_t)0xff) {
 			for (mask = 1, bitno = 0; bitno < 8; bitno++) {
 				if ((mask & fgp->fg_alloclist[xx]) == 0) {
 					slot = (xx * 8) + bitno;
@@ -948,7 +949,7 @@ filegrp_write_metadata(filegrp_t *fgp, cfs_cid_t *cidp,
 	}
 
 	/* mark metadata as having been written */
-	index = (int) (cidp->cid_fileno - fgp->fg_id.cid_fileno);
+	index = (int)(cidp->cid_fileno - fgp->fg_id.cid_fileno);
 	fgp->fg_offsets[index].ach_written = 1;
 
 	/* update number of blocks used by the attrcache file */
@@ -983,7 +984,7 @@ filegrp_destroy_metadata(filegrp_t *fgp, cfs_cid_t *cidp)
 {
 	int i;
 	int bitno;
-	u_char mask = 1;
+	uchar_t mask = 1;
 
 	int slot;
 
@@ -1064,7 +1065,7 @@ filegrp_list_find(struct fscache *fscp, cfs_cid_t *cidp)
 	fileno = fxx * fgsize;
 
 	/* hash into array of file groups */
-	findex = (int) (fxx & (CFS_FS_FGP_BUCKET_SIZE - 1));
+	findex = (int)(fxx & (CFS_FS_FGP_BUCKET_SIZE - 1));
 
 	/* search set of file groups for this hash bucket */
 	for (fgp = fscp->fs_filegrp[findex];
@@ -1106,7 +1107,7 @@ filegrp_list_add(struct fscache *fscp, filegrp_t *fgp)
 	ASSERT(fgp->fg_next == NULL);
 
 	/* hash into array of file groups */
-	findex = (int) ((fgp->fg_id.cid_fileno / fgsize) &
+	findex = (int)((fgp->fg_id.cid_fileno / fgsize) &
 	    (CFS_FS_FGP_BUCKET_SIZE - 1));
 
 	fgp->fg_next = fscp->fs_filegrp[findex];
@@ -1144,7 +1145,7 @@ filegrp_list_remove(struct fscache *fscp, filegrp_t *fgp)
 	ASSERT(MUTEX_HELD(&fscp->fs_fslock));
 
 	/* hash into array of file groups */
-	findex = (int) ((fgp->fg_id.cid_fileno / fgsize) &
+	findex = (int)((fgp->fg_id.cid_fileno / fgsize) &
 	    (CFS_FS_FGP_BUCKET_SIZE - 1));
 	fp = fscp->fs_filegrp[findex];
 	pfgp = &fscp->fs_filegrp[findex];
@@ -1360,7 +1361,7 @@ filegrpdir_find(filegrp_t *fgp)
 	make_ascii_name(&fgp->fg_id, name);
 	fname = name;
 	error = VOP_LOOKUP(fscp->fs_fscdirvp, fname, &dirvp, NULL,
-			0, NULL, kcred);
+			0, NULL, kcred, NULL, NULL, NULL);
 	if (error == 0) {
 		fgp->fg_dirvp = dirvp;
 		fgp->fg_flags &= ~CFS_FG_ALLOC_FILE;
@@ -1421,7 +1422,7 @@ filegrpattr_find(struct filegrp *fgp)
 	make_ascii_name(&fgp->fg_id, name);
 	fname = name;
 	error = VOP_LOOKUP(fscp->fs_fsattrdir, fname,
-	    &attrvp, NULL, 0, NULL, kcred);
+	    &attrvp, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error) {
 		return (error);
 	}
@@ -1442,7 +1443,7 @@ filegrpattr_find(struct filegrp *fgp)
 		fgp->fg_attrvp = attrvp;
 		fgp->fg_header = ahp;
 		fgp->fg_offsets = (struct attrcache_index *)(ahp + 1);
-		fgp->fg_alloclist = ((u_char *)fgp->fg_offsets) +
+		fgp->fg_alloclist = ((uchar_t *)fgp->fg_offsets) +
 			(fscp->fs_info.fi_fgsize *
 			sizeof (struct attrcache_index));
 		fgp->fg_flags &= ~CFS_FG_ALLOC_ATTR;
@@ -1565,7 +1566,8 @@ filegrpdir_create(filegrp_t *fgp)
 	attrp->va_gid = 0;
 	attrp->va_type = VDIR;
 	attrp->va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
-	error = VOP_MKDIR(fscp->fs_fscdirvp, fname, attrp, &dirvp, kcred);
+	error = VOP_MKDIR(fscp->fs_fscdirvp, fname, attrp, &dirvp, kcred, NULL,
+	    0, NULL);
 	if (error) {
 		fgp->fg_flags |= CFS_FG_NOCACHE;
 		cachefs_freefile(fscp->fs_cache);
@@ -1637,7 +1639,7 @@ filegrpattr_create(struct filegrp *fgp)
 	attrp->va_type = VREG;
 	attrp->va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	error = VOP_CREATE(fscp->fs_fsattrdir, fname, attrp, EXCL, 0666,
-			&attrvp, kcred, 0);
+			&attrvp, kcred, 0, NULL, NULL);
 	if (error) {
 		cachefs_freefile(fscp->fs_cache);
 		goto out;
@@ -1664,7 +1666,7 @@ filegrpattr_create(struct filegrp *fgp)
 		(nblks * MAXBSIZE) - fgp->fg_headersize);
 	if (error)
 		goto out;
-	error = VOP_FSYNC(attrvp, FSYNC, kcred);
+	error = VOP_FSYNC(attrvp, FSYNC, kcred, NULL);
 	if (error)
 		goto out;
 
@@ -1694,7 +1696,8 @@ out:
 		fgp->fg_flags |= CFS_FG_NOCACHE;
 		if (attrvp) {
 			VN_RELE(attrvp);
-			(void) VOP_REMOVE(fscp->fs_fsattrdir, fname, kcred);
+			(void) VOP_REMOVE(fscp->fs_fsattrdir, fname, kcred,
+			    NULL, 0);
 			cachefs_freefile(fscp->fs_cache);
 		}
 		if (nblks)
@@ -1709,7 +1712,7 @@ out:
 		fgp->fg_attrvp = attrvp;
 		fgp->fg_header = ahp;
 		fgp->fg_offsets = (struct attrcache_index *)(ahp + 1);
-		fgp->fg_alloclist = ((u_char *)fgp->fg_offsets) +
+		fgp->fg_alloclist = ((uchar_t *)fgp->fg_offsets) +
 			(fscp->fs_info.fi_fgsize *
 			sizeof (struct attrcache_index));
 		ahp->ach_count = 0;
@@ -1751,7 +1754,7 @@ filegrp_cid_to_slot(filegrp_t *fgp, cfs_cid_t *cidp)
 	int slot;
 	int index;
 
-	index = (int) (cidp->cid_fileno - fgp->fg_id.cid_fileno);
+	index = (int)(cidp->cid_fileno - fgp->fg_id.cid_fileno);
 
 	if (index > fgp->fg_fscp->fs_info.fi_fgsize) {
 		cmn_err(CE_WARN, "cachefs: attrcache error, run fsck");

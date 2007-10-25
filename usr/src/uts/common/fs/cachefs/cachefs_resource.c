@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,7 +75,7 @@ static void cachefs_packed_pending(cachefscache_t *cachep);
 	(&(cachep->c_rlinfo.rl_items[CACHEFS_RL_INDEX(type)]))
 
 /*
- * This function moves an RL entry from whereever it currently is to
+ * This function moves an RL entry from wherever it currently is to
  * the back of the requested list.
  */
 void
@@ -989,7 +988,7 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	fl.l_sysid = 0;
 	fl.l_pid = 0;
 	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl, FWRITE,
-		(offset_t)0, NULL, kcred);
+		(offset_t)0, NULL, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN,
 		    "cachefs: Can't lock Cache Lock File(r); Error %d\n",
@@ -1058,7 +1057,7 @@ cachefs_cachep_worker_thread(cachefscache_t *cachep)
 	fl.l_sysid = 0;
 	fl.l_pid = 0;
 	error = VOP_FRLOCK(cachep->c_lockvp, F_SETLK, &fl,
-		FWRITE, (offset_t)0, NULL, kcred);
+		FWRITE, (offset_t)0, NULL, kcred, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't unlock lock file\n");
 	}
@@ -1407,7 +1406,7 @@ cachefs_gc_front_atime(cachefscache_t *cachep)
 		make_ascii_name(&dircid, namebuf);
 		if (VOP_LOOKUP(fscp->fs_fscdirvp, namebuf,
 		    &dirvp, (struct pathname *)NULL, 0,
-		    (vnode_t *)NULL, kcred) == 0) {
+		    (vnode_t *)NULL, kcred, NULL, NULL, NULL) == 0) {
 			make_ascii_name(&cid, namebuf);
 			reledir++;
 		} else {
@@ -1417,7 +1416,7 @@ cachefs_gc_front_atime(cachefscache_t *cachep)
 	}
 	if (dirvp && VOP_LOOKUP(dirvp, namebuf, &filevp,
 	    (struct pathname *)NULL, 0,
-	    (vnode_t *)NULL, kcred) == 0) {
+	    (vnode_t *)NULL, kcred, NULL, NULL, NULL) == 0) {
 		gotfile = 1;
 	}
 	if (reledir)
@@ -1426,7 +1425,7 @@ cachefs_gc_front_atime(cachefscache_t *cachep)
 
 	if (gotfile) {
 		va.va_mask = AT_ATIME;
-		if (VOP_GETATTR(filevp, &va, 0, kcred) == 0)
+		if (VOP_GETATTR(filevp, &va, 0, kcred, NULL) == 0)
 			rc = va.va_atime.tv_sec;
 		VN_RELE(filevp);
 	}

@@ -105,6 +105,7 @@ struct list {
 	struct list *next;
 	void *item;
 	void *itemdata;
+	char *proto;
 };
 
 /* shareutil entry points */

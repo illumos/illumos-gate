@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -707,7 +707,7 @@ segmap_fault(
 	TRACE_3(TR_FAC_VM, TR_SEGMAP_GETPAGE,
 		"segmap_getpage:seg %p addr %p vp %p", seg, addr, vp);
 	err = VOP_GETPAGE(vp, (offset_t)off, len, &prot, pl, MAXBSIZE,
-	    seg, addr, rw, CRED());
+	    seg, addr, rw, CRED(), NULL);
 
 	if (err)
 		return (FC_MAKE_ERR(err));
@@ -829,7 +829,7 @@ segmap_faulta(struct seg *seg, caddr_t addr)
 
 	err = VOP_GETPAGE(vp, (offset_t)(off + ((offset_t)((uintptr_t)addr
 	    & MAXBOFFSET))), PAGESIZE, (uint_t *)NULL, (page_t **)NULL, 0,
-	    seg, addr, S_READ, CRED());
+	    seg, addr, S_READ, CRED(), NULL);
 
 	if (err)
 		return (FC_MAKE_ERR(err));
@@ -1369,7 +1369,7 @@ next_smap:
  */
 
 /*
- * Create pages (without using VOP_GETPAGE) and load up tranlations to them.
+ * Create pages (without using VOP_GETPAGE) and load up translations to them.
  * If softlock is TRUE, then set things up so that it looks like a call
  * to segmap_fault with F_SOFTLOCK.
  *
@@ -1455,7 +1455,7 @@ segmap_pagecreate(struct seg *seg, caddr_t addr, size_t len, int softlock)
 			 * "exclusive" lock will not be dropped to prevent
 			 * other users from accessing the page.  We also
 			 * have to lock the translation to prevent a fault
-			 * from occuring when the virtual address mapped by
+			 * from occurring when the virtual address mapped by
 			 * this page is written into.  This is necessary to
 			 * avoid a deadlock since we haven't dropped the
 			 * "exclusive" lock.
@@ -1898,7 +1898,7 @@ vrfy_smp:
 
 	base = segkpm_create_va(baseoff);
 	error = VOP_GETPAGE(vp, (offset_t)baseoff, len, &prot, pl, MAXBSIZE,
-	    seg, base, rw, CRED());
+	    seg, base, rw, CRED(), NULL);
 
 	pp = pl[0];
 	if (error || pp == NULL) {
@@ -2010,7 +2010,7 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 		smtx = SMAPMTX(smp);
 
 		/*
-		 * For compatibilty reasons segmap_pagecreate_kpm sets this
+		 * For compatibility reasons segmap_pagecreate_kpm sets this
 		 * flag to allow a following segmap_pagecreate to return
 		 * this as "newpage" flag. When segmap_pagecreate is not
 		 * called at all we clear it now.
@@ -2117,7 +2117,7 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 	 */
 	if ((flags & ~SM_DONTNEED) != 0) {
 		error = VOP_PUTPAGE(vp, offset, MAXBSIZE,
-		    bflags, CRED());
+		    bflags, CRED(), NULL);
 	} else {
 		error = 0;
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,9 @@
 #include <libgen.h>
 #include <errno.h>
 #include <aclutils.h>
+#include <libnvpair.h>
+#include <libcmdutils.h>
+#include <attr.h>
 
 #ifndef STANDALONE
 #define	TERMINFO
@@ -69,7 +72,7 @@
 /*
  * -DNOTERMINFO can be defined on the cc command line to prevent
  * the use of terminfo.  This should be done on systems not having
- * the terminfo feature(pre 6.0 sytems ?).
+ * the terminfo feature(pre 6.0 systems ?).
  * As a result, columnar listings assume 80 columns for output,
  * unless told otherwise via the COLUMNS environment variable.
  */
@@ -119,6 +122,16 @@ struct ditem {
 	ino_t	ino;			/* directory items inode number */
 	struct ditem *parent;		/* dir items ptr to its parent's info */
 };
+/* Holds boolean extended system attributes */
+struct attrb {
+	char		*name;
+};
+/* Holds timestamp extended system attributes */
+struct attrtm {
+	char		*name;
+	uint64_t	stm;
+	uint64_t	nstm;
+};
 
 struct	lbuf	{
 	union	{
@@ -134,11 +147,16 @@ struct	lbuf	{
 	off_t	lsize;		/* filesize or major/minor dev numbers */
 	blkcnt_t	lblocks;	/* number of file blocks */
 	timestruc_t	lmtime;
+	timestruc_t	lat;
+	timestruc_t	lct;
+	timestruc_t	lmt;
 	char	*flinkto;	/* symbolic link contents */
 	char 	acl;		/* indicate there are additional acl entries */
 	int	cycle;		/* cycle detected flag */
 	struct ditem *ancinfo;	/* maintains ancestor info */
 	acl_t *aclp;		/* ACL if present */
+	struct attrb *exttr;	/* boolean extended system attributes */
+	struct attrtm *extm;	/* timestamp extended system attributes */
 };
 
 struct dchain {
@@ -221,6 +239,16 @@ static int		Rflg;
 static int		Sflg;
 static int		vflg;
 static int		Vflg;
+static int		saflg;		/* boolean extended system attr. */
+static int		sacnt;		/* number of extended system attr. */
+static int		copt;
+static int		vopt;
+static int		tmflg;		/* create time ext. system attr. */
+static int		ctm;
+static int		atm;
+static int		mtm;
+static int		crtm;
+static int		alltm;
 static long		hscale;
 static mode_t		flags;
 static int		err = 0;	/* Contains return code */
@@ -247,13 +275,25 @@ static int		curcol;
 
 static struct	winsize	win;
 
-static char	time_buf[50];	/* array to hold day and time */
+static char	time_buf[FMTSIZE];	/* array to hold day and time */
 
 #define	NOTWORKINGDIR(d, l)	(((l) < 2) || \
 				    (strcmp((d) + (l) - 2, "/.") != 0))
 
 #define	NOTPARENTDIR(d, l)	(((l) < 3) || \
 				    (strcmp((d) + (l) - 3, "/..") != 0))
+/* Extended system attributes support */
+static int get_sysxattr(char *, struct lbuf *);
+static void set_sysattrb_display(char *, boolean_t, struct lbuf *);
+static void set_sysattrtm_display(char *, struct lbuf *);
+static void format_time(const char *, time_t);
+static void format_etime(const char *, time_t, time_t);
+static void print_time(struct lbuf *);
+static void format_attrtime(struct lbuf *);
+static void *xmalloc(size_t, struct lbuf *);
+static void free_sysattr(struct lbuf *);
+static nvpair_t *pair;
+static nvlist_t	*response;
 
 int
 main(int argc, char *argv[])
@@ -287,7 +327,7 @@ main(int argc, char *argv[])
 	}
 
 	while ((c = getopt(argc, argv,
-	    "aAbcCdeEfFghHilLmnopqrRsStux1@vV")) != EOF)
+	    "aAbcCdeEfFghHilLmnopqrRsStux1@vV/:%:")) != EOF)
 		switch (c) {
 		case 'a':
 			aflg++;
@@ -301,6 +341,10 @@ main(int argc, char *argv[])
 			continue;
 		case 'c':
 			uflg = 0;
+			atm = 0;
+			ctm = 0;
+			mtm = 0;
+			crtm = 0;
 			cflg++;
 			continue;
 		case 'C':
@@ -414,6 +458,10 @@ main(int argc, char *argv[])
 			continue;
 		case 'u':
 			cflg = 0;
+			atm = 0;
+			ctm = 0;
+			mtm = 0;
+			crtm = 0;
 			uflg++;
 			continue;
 		case 'V':
@@ -457,13 +505,78 @@ main(int argc, char *argv[])
 			xflg = 0;
 			mflg = 0;
 			continue;
+		case '/':
+			saflg++;
+			if (optarg != NULL) {
+				if (strcmp(optarg, "c") == 0) {
+					copt++;
+					vopt = 0;
+				} else if (strcmp(optarg, "v") == 0) {
+					vopt++;
+					copt = 0;
+				} else
+					opterr++;
+			} else
+				opterr++;
+			lflg++;
+			statreq++;
+			Cflg = 0;
+			xflg = 0;
+			mflg = 0;
+			continue;
+		case '%':
+			tmflg++;
+			if (optarg != NULL) {
+				if (strcmp(optarg, "ctime") == 0) {
+					ctm++;
+					atm = 0;
+					mtm = 0;
+					crtm = 0;
+				} else if (strcmp(optarg, "atime") == 0) {
+					atm++;
+					ctm = 0;
+					mtm = 0;
+					crtm = 0;
+					uflg = 0;
+					cflg = 0;
+				} else if (strcmp(optarg, "mtime") == 0) {
+					mtm++;
+					atm = 0;
+					ctm = 0;
+					crtm = 0;
+					uflg = 0;
+					cflg = 0;
+				} else if (strcmp(optarg, "crtime") == 0) {
+					crtm++;
+					atm = 0;
+					ctm = 0;
+					mtm = 0;
+					uflg = 0;
+					cflg = 0;
+				} else if (strcmp(optarg, "all") == 0) {
+					alltm++;
+					atm = 0;
+					ctm = 0;
+					mtm = 0;
+					crtm = 0;
+				} else
+					opterr++;
+			} else
+				opterr++;
+
+			Sflg = 0;
+			statreq++;
+			mflg = 0;
+			continue;
 		case '?':
 			opterr++;
 			continue;
 		}
 	if (opterr) {
 		(void) fprintf(stderr, gettext(
-		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxvV1@ [files]\n"));
+		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxvV1@/%[c | v]"
+		    "%%[atime | crtime | ctime | mtime | all]"
+		    " [files]\n"));
 		exit(2);
 	}
 
@@ -745,7 +858,6 @@ pentry(struct lbuf *ap)
 	struct lbuf *p;
 	numbuf_t hbuf;
 	char buf[BUFSIZ];
-	char fmt_buf[FMTSIZE];
 	char *dmark = "";	/* Used if -p or -F option active */
 	char *cp;
 
@@ -758,9 +870,9 @@ pentry(struct lbuf *ap)
 			curcol += printf("%10llu ", (long long)p->lnum);
 	if (sflg)
 		curcol += printf((mflg && !lflg) ? "%lld " :
-			(p->lblocks < 10000) ? "%4lld " : "%lld ",
-			(p->ltype != 'b' && p->ltype != 'c') ?
-				p->lblocks : 0LL);
+		    (p->lblocks < 10000) ? "%4lld " : "%lld ",
+		    (p->ltype != 'b' && p->ltype != 'c') ?
+		    p->lblocks : 0LL);
 	if (lflg) {
 		(void) putchar(p->ltype);
 		curcol++;
@@ -794,31 +906,26 @@ pentry(struct lbuf *ap)
 			curcol += printf((p->lsize < (off_t)10000000) ?
 			    "%7lld" : "%lld", p->lsize);
 		}
-		if (eflg) {
-			(void) strftime(time_buf, sizeof (time_buf),
-			    dcgettext(NULL, FORMAT3, LC_TIME),
-			    localtime(&p->lmtime.tv_sec));
-		} else if (Eflg) {
+		if (eflg)
+			format_time(FORMAT3, p->lmtime.tv_sec);
+		else if (Eflg)
 			/* fill in nanoseconds first */
-			(void) snprintf(fmt_buf, sizeof (fmt_buf),
-			    FORMAT4, p->lmtime.tv_nsec);
-			(void) strftime(time_buf, sizeof (time_buf),
-			    fmt_buf, localtime(&p->lmtime.tv_sec));
-		} else {
+			format_etime(FORMAT4, p->lmtime.tv_sec,
+			    p->lmtime.tv_nsec);
+		else {
 			if ((p->lmtime.tv_sec < year) ||
-			    (p->lmtime.tv_sec > now)) {
-				(void) strftime(time_buf, sizeof (time_buf),
-				    dcgettext(NULL, FORMAT1, LC_TIME),
-				    localtime(&p->lmtime.tv_sec));
-			} else {
-				(void) strftime(time_buf, sizeof (time_buf),
-				    dcgettext(NULL, FORMAT2, LC_TIME),
-				    localtime(&p->lmtime.tv_sec));
-			}
+			    (p->lmtime.tv_sec > now))
+				format_time(FORMAT1, p->lmtime.tv_sec);
+			else
+				format_time(FORMAT2, p->lmtime.tv_sec);
 		}
-		curcol += printf("%s", time_buf);
-	}
+		/* format extended system attribute time */
+		if (tmflg && crtm)
+			format_attrtime(p);
 
+		curcol += printf("%s", time_buf);
+
+	}
 	/*
 	 * prevent both "->" and trailing marks
 	 * from appearing
@@ -868,12 +975,44 @@ pentry(struct lbuf *ap)
 		}
 	}
 
+	/* Display extended system attributes */
+	if (saflg) {
+		int i;
+
+		new_line();
+		(void) printf("	\t{");
+		if (p->exttr != NULL) {
+			int k = 0;
+			for (i = 0; i < sacnt; i++) {
+				if (p->exttr[i].name != NULL)
+					k++;
+			}
+			for (i = 0; i < sacnt; i++) {
+				if (p->exttr[i].name != NULL) {
+					(void) printf("%s", p->exttr[i].name);
+					k--;
+					if (vopt && (k != 0))
+						(void) printf(",");
+				}
+			}
+		}
+		(void) printf("}\n");
+	}
+	/* Display file timestamps and extended system attribute timestamps */
+	if (tmflg && alltm) {
+		new_line();
+		print_time(p);
+		new_line();
+	}
 	if (vflg) {
 		new_line();
 		if (p->aclp) {
 			acl_printacl(p->aclp, num_cols, Vflg);
 		}
 	}
+	/* Free extended system attribute lists */
+	if (saflg || tmflg)
+		free_sysattr(p);
 }
 
 /* print various r,w,x permissions */
@@ -1016,7 +1155,7 @@ rddir(char *dir, struct ditem *myinfo)
 			ep = gstat(makename(dir, dentry->d_name), 0, myinfo);
 			if (ep == NULL) {
 				if (nomocore)
-					return;
+					exit(2);
 				continue;
 			} else {
 				ep->lnum = dentry->d_ino;
@@ -1394,6 +1533,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 
 			if (atflg && pathconf(file, _PC_XATTR_EXISTS) == 1)
 				rep->acl = '@';
+
 		} else
 			rep->acl = ' ';
 
@@ -1402,15 +1542,48 @@ gstat(char *file, int argfl, struct ditem *myparent)
 		rep->luid = statb.st_uid;
 		rep->lgid = statb.st_gid;
 		rep->lnl = statb.st_nlink;
-		if (uflg)
+		if (uflg || (tmflg && atm))
 			rep->lmtime = statb.st_atim;
-		else if (cflg)
+		else if (cflg || (tmflg && ctm))
 			rep->lmtime = statb.st_ctim;
 		else
 			rep->lmtime = statb.st_mtim;
+		rep->lat = statb.st_atim;
+		rep->lct = statb.st_ctim;
+		rep->lmt = statb.st_mtim;
 
 		if (rep->ltype != 'b' && rep->ltype != 'c')
 			tblocks += rep->lblocks;
+
+		/* Get extended system attributes */
+
+		rep->exttr = NULL;
+		rep->extm = NULL;
+		if ((saflg || (tmflg && crtm) || (tmflg && alltm)) &&
+		    (sysattr_support(file, _PC_SATTR_EXISTS) == 1)) {
+			int i;
+
+			sacnt = attr_count();
+			/*
+			 * Allocate 'sacnt' size array to hold extended
+			 * system attribute name (verbose) or respective
+			 * symbol represenation (compact).
+			 */
+			rep->exttr = xmalloc(sacnt * sizeof (struct attrb),
+			    rep);
+
+			/* initialize boolean attribute list */
+			for (i = 0; i < sacnt; i++)
+				rep->exttr[i].name = NULL;
+			if (get_sysxattr(file, rep) != 0) {
+				(void) fprintf(stderr,
+				    gettext("ls:Failed to retrieve "
+				    "extended system attribute from "
+				    "%s\n"), file);
+				rep->exttr[0].name = xmalloc(2, rep);
+				(void) strlcpy(rep->exttr[0].name, "?", 2);
+			}
+		}
 	}
 	return (rep);
 }
@@ -1595,9 +1768,9 @@ compar(struct lbuf **pp1, struct lbuf **pp2)
 		 * sort by name.
 		 */
 		off_t	p1size = (p1->ltype == 'b') ||
-			    (p1->ltype == 'c') ? 0 : p1->lsize;
+		    (p1->ltype == 'c') ? 0 : p1->lsize;
 		off_t	p2size = (p2->ltype == 'b') ||
-			    (p2->ltype == 'c') ? 0 : p2->lsize;
+		    (p2->ltype == 'c') ? 0 : p2->lsize;
 		if (p2size > p1size) {
 			return (rflg);
 		} else if (p2size < p1size) {
@@ -1795,4 +1968,263 @@ number_to_scaled_string(
 		    number, *uom);
 	}
 	return (buf);
+}
+
+/* Get extended system attributes and set the display */
+
+int
+get_sysxattr(char *fname, struct lbuf *rep)
+{
+	boolean_t	value;
+	data_type_t	type;
+	int		error;
+	char		*name;
+	int		i;
+
+	if ((error = nvlist_alloc(&response, NV_UNIQUE_NAME, 0)) != 0) {
+		perror("ls:nvlist_alloc");
+		return (error);
+	}
+	if ((error = getattrat(AT_FDCWD, XATTR_VIEW_READWRITE, fname,
+	    &response)) != 0) {
+		perror("ls:getattrat");
+		nvlist_free(response);
+		return (error);
+	}
+
+	/*
+	 * Allocate 'sacnt' size array to hold extended timestamp
+	 * system attributes and initialize the array.
+	 */
+	rep->extm = xmalloc(sacnt * sizeof (struct attrtm), rep);
+	for (i = 0; i < sacnt; i++) {
+		rep->extm[i].stm = 0;
+		rep->extm[i].nstm = 0;
+		rep->extm[i].name = NULL;
+	}
+	while ((pair = nvlist_next_nvpair(response, pair)) != NULL) {
+		name = nvpair_name(pair);
+		type = nvpair_type(pair);
+		if (type == DATA_TYPE_BOOLEAN_VALUE) {
+			error = nvpair_value_boolean_value(pair, &value);
+			if (error) {
+				(void) fprintf(stderr,
+				    gettext("nvpair_value_boolean_value "
+				    "failed: error = %d\n"), error);
+				continue;
+			}
+			if (name != NULL)
+				set_sysattrb_display(name, value, rep);
+			continue;
+		} else if (type == DATA_TYPE_UINT64_ARRAY) {
+			if (name != NULL)
+				set_sysattrtm_display(name, rep);
+			continue;
+		}
+	}
+	nvlist_free(response);
+	return (0);
+}
+
+/* Set extended system attribute boolean display */
+
+void
+set_sysattrb_display(char *name, boolean_t val, struct lbuf *rep)
+{
+	f_attr_t	fattr;
+	const char	*opt;
+	size_t		len;
+
+	fattr = name_to_attr(name);
+	if (fattr != F_ATTR_INVAL && fattr < sacnt) {
+		if (vopt) {
+			len = strlen(name);
+			if (val) {
+				rep->exttr[fattr].name = xmalloc(len + 1, rep);
+				(void) strlcpy(rep->exttr[fattr].name, name,
+				    len + 1);
+			} else {
+				rep->exttr[fattr].name = xmalloc(len + 3, rep);
+				(void) snprintf(rep->exttr[fattr].name, len + 3,
+				    "no%s", name);
+			}
+		} else {
+			opt = attr_to_option(fattr);
+			if (opt != NULL) {
+				len = strlen(opt);
+				rep->exttr[fattr].name = xmalloc(len + 1, rep);
+				if (val)
+					(void) strlcpy(rep->exttr[fattr].name,
+					    opt, len + 1);
+				else
+					(void) strlcpy(rep->exttr[fattr].name,
+					    "-", len + 1);
+			}
+		}
+	}
+}
+
+/* Set extended system attribute timestamp display */
+
+void
+set_sysattrtm_display(char *name, struct lbuf *rep)
+{
+	uint_t		nelem;
+	uint64_t	*value;
+	int		i;
+	size_t		len;
+
+	if (nvpair_value_uint64_array(pair, &value, &nelem) == 0) {
+		if (*value != NULL) {
+			len = strlen(name);
+			i = 0;
+			while (rep->extm[i].stm != 0 && i < sacnt)
+				i++;
+			rep->extm[i].stm = value[0];
+			rep->extm[i].nstm = value[1];
+			rep->extm[i].name = xmalloc(len + 1, rep);
+			(void) strlcpy(rep->extm[i].name, name, len + 1);
+		}
+	}
+}
+
+void
+format_time(const char *format, time_t sec)
+{
+
+	(void) strftime(time_buf, sizeof (time_buf),
+	    dcgettext(NULL, format, LC_TIME),
+	    localtime(&sec));
+}
+
+void
+format_etime(const char *format, time_t sec, time_t nsec)
+{
+	char fmt_buf[FMTSIZE];
+
+	(void) snprintf(fmt_buf, FMTSIZE,
+	    format, nsec);
+	(void) strftime(time_buf, sizeof (time_buf),
+	    fmt_buf, localtime(&sec));
+}
+
+/* Format timestamp extended system attributes */
+
+void
+format_attrtime(struct lbuf *p)
+{
+	int	tmattr = 0;
+	int i;
+
+	if (p->extm != NULL) {
+		for (i = 0; i < sacnt; i++) {
+			if (p->extm[i].name != NULL) {
+				tmattr = 1;
+				break;
+			}
+		}
+	}
+	if (tmattr) {
+		if (Eflg)
+			format_etime(FORMAT4, (time_t)p->extm[i].stm,
+			    (time_t)p->extm[i].nstm);
+		else  {
+			if ((p->lmtime.tv_sec < year) ||
+			    (p->lmtime.tv_sec > now))
+				format_time(FORMAT1,
+				    (time_t)p->extm[i].stm);
+			else
+				format_time(FORMAT2,
+				    (time_t)p->extm[i].stm);
+		}
+	}
+}
+
+void
+print_time(struct lbuf *p)
+{
+	int i = 0;
+
+	new_line();
+	if (Eflg) {
+		format_etime(FORMAT4, p->lat.tv_sec, p->lat.tv_nsec);
+		(void) printf("		timestamp: atime	%s\n",
+		    time_buf);
+		format_etime(FORMAT4, p->lct.tv_sec, p->lct.tv_nsec);
+		(void) printf("		timestamp: ctime	%s\n",
+		    time_buf);
+		format_etime(FORMAT4, p->lmt.tv_sec, p->lmt.tv_nsec);
+		(void) printf("		timestamp: mtime	%s\n",
+		    time_buf);
+		if (p->extm != NULL) {
+			while (p->extm[i].nstm != 0 && i < sacnt) {
+				format_etime(FORMAT4, p->extm[i].stm,
+				    p->extm[i].nstm);
+				if (p->extm[i].name != NULL) {
+					(void) printf("		timestamp:"
+					    " %s	%s\n",
+					    p->extm[i].name, time_buf);
+				}
+				i++;
+			}
+		}
+	} else {
+		format_time(FORMAT3, p->lat.tv_sec);
+		(void) printf("		timestamp: atime	%s\n",
+		    time_buf);
+		format_time(FORMAT3, p->lct.tv_sec);
+		(void) printf("		timestamp: ctime	%s\n",
+		    time_buf);
+		format_time(FORMAT3, p->lmt.tv_sec);
+		(void) printf("		timestamp: mtime	%s\n",
+		    time_buf);
+		if (p->extm != NULL) {
+			while (p->extm[i].stm != 0 && i < sacnt) {
+				format_time(FORMAT3, p->extm[i].stm);
+				if (p->extm[i].name != NULL) {
+					(void) printf("		timestamp:"
+					    " %s	%s\n",
+					    p->extm[i].name, time_buf);
+				}
+				i++;
+			}
+		}
+	}
+}
+
+/* Free extended system attribute lists */
+
+void
+free_sysattr(struct lbuf *p)
+{
+	int i;
+
+	if (p->exttr != NULL) {
+		for (i = 0; i < sacnt; i++) {
+			if (p->exttr[i].name != NULL)
+				free(p->exttr[i].name);
+		}
+		free(p->exttr);
+	}
+	if (p->extm != NULL) {
+		for (i = 0; i < sacnt; i++) {
+			if (p->extm[i].name != NULL)
+				free(p->extm[i].name);
+		}
+		free(p->extm);
+	}
+}
+
+/* Allocate extended system attribute list */
+
+void *
+xmalloc(size_t size, struct lbuf *p)
+{
+	if ((p = malloc(size)) == NULL) {
+		perror("ls");
+		free_sysattr(p);
+		nvlist_free(response);
+		exit(2);
+	}
+	return (p);
 }

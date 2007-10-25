@@ -357,7 +357,7 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	 */
 	rvp = NULLVP;
 	if (vn_matchops(mvp, spec_getvnodeops()) &&
-	    VOP_REALVP(mvp, &rvp) == 0 && rvp &&
+	    VOP_REALVP(mvp, &rvp, NULL) == 0 && rvp &&
 	    vn_matchops(rvp, devpts_getvnodeops())) {
 		releasef(namefdp.fd);
 		return (ENOTSUP);
@@ -397,11 +397,11 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	mutex_init(&nodep->nm_lock, NULL, MUTEX_DEFAULT, NULL);
 	vattrp = &nodep->nm_vattr;
 	vattrp->va_mask = AT_ALL;
-	if (error = VOP_GETATTR(mvp, vattrp, 0, crp))
+	if (error = VOP_GETATTR(mvp, vattrp, 0, crp, NULL))
 		goto out;
 
 	filevattr.va_mask = AT_ALL;
-	if (error = VOP_GETATTR(filevp, &filevattr, 0, crp))
+	if (error = VOP_GETATTR(filevp, &filevattr, 0, crp, NULL))
 		goto out;
 	/*
 	 * Make sure the user is the owner of the mount point
@@ -652,7 +652,7 @@ nm_sync(vfs_t *vfsp, short flag, cred_t *crp)
 	if (flag & SYNC_CLOSE)
 		return (nm_umountall(nodep->nm_filevp, crp));
 
-	return (VOP_FSYNC(nodep->nm_filevp, FSYNC, crp));
+	return (VOP_FSYNC(nodep->nm_filevp, FSYNC, crp, NULL));
 }
 
 /*

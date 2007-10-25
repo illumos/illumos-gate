@@ -51,6 +51,7 @@
 #include <sys/spa.h>
 #include <sys/zio.h>
 #include <sys/zap.h>
+#include <sys/zfs_i18n.h>
 #include <libzfs.h>
 
 #include "zfs_namecheck.h"
@@ -376,7 +377,7 @@ top:
 		if (ioctl(hdl->libzfs_fd, ZFS_IOC_ROLLBACK, &zc) == 0)
 			goto top;
 		/*
-		 * If we can sucessfully destroy it, pretend that it
+		 * If we can successfully destroy it, pretend that it
 		 * never existed.
 		 */
 		if (ioctl(hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc) == 0) {
@@ -481,6 +482,8 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	char *strval;
 	zfs_prop_t prop;
 	nvlist_t *ret;
+	int chosen_normal = -1;
+	int chosen_utf = -1;
 
 	if (type == ZFS_TYPE_SNAPSHOT) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -545,7 +548,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 		}
 
 		if (zfs_prop_readonly(prop) &&
-		    (prop != ZFS_PROP_VOLBLOCKSIZE || zhp != NULL)) {
+		    (!zfs_prop_setonce(prop) || zhp != NULL)) {
 			zfs_error_aux(hdl,
 			    dgettext(TEXT_DOMAIN, "'%s' is readonly"),
 			    propname);
@@ -636,19 +639,23 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 
 			/*FALLTHRU*/
 
+		case ZFS_PROP_SHARESMB:
 		case ZFS_PROP_SHARENFS:
 			/*
-			 * For the mountpoint and sharenfs properties, check if
-			 * it can be set in a global/non-global zone based on
+			 * For the mountpoint and sharenfs or sharesmb
+			 * properties, check if it can be set in a
+			 * global/non-global zone based on
 			 * the zoned property value:
 			 *
 			 *		global zone	    non-global zone
 			 * --------------------------------------------------
 			 * zoned=on	mountpoint (no)	    mountpoint (yes)
 			 *		sharenfs (no)	    sharenfs (no)
+			 *		sharesmb (no)	    sharesmb (no)
 			 *
 			 * zoned=off	mountpoint (yes)	N/A
 			 *		sharenfs (yes)
+			 *		sharesmb (yes)
 			 */
 			if (zoned) {
 				if (getzoneid() == GLOBAL_ZONEID) {
@@ -659,7 +666,8 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 					(void) zfs_error(hdl, EZFS_ZONED,
 					    errbuf);
 					goto error;
-				} else if (prop == ZFS_PROP_SHARENFS) {
+				} else if (prop == ZFS_PROP_SHARENFS ||
+				    prop == ZFS_PROP_SHARESMB) {
 					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 					    "'%s' cannot be set in "
 					    "a non-global zone"), propname);
@@ -684,17 +692,24 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			 * property. Now we want to make sure that the
 			 * property value is valid if it is sharenfs.
 			 */
-			if (prop == ZFS_PROP_SHARENFS &&
+			if ((prop == ZFS_PROP_SHARENFS ||
+			    prop == ZFS_PROP_SHARESMB) &&
 			    strcmp(strval, "on") != 0 &&
 			    strcmp(strval, "off") != 0) {
+				zfs_share_proto_t proto;
+
+				if (prop == ZFS_PROP_SHARESMB)
+					proto = PROTO_SMB;
+				else
+					proto = PROTO_NFS;
 
 				/*
-				 * Must be an NFS option string so
-				 * init the libshare in order to
-				 * enable the parser and then parse
-				 * the options. We use the control API
-				 * since we don't care about the
-				 * current configuration and don't
+				 * Must be an valid sharing protocol
+				 * option string so init the libshare
+				 * in order to enable the parser and
+				 * then parse the options. We use the
+				 * control API since we don't care about
+				 * the current configuration and don't
 				 * want the overhead of loading it
 				 * until we actually do something.
 				 */
@@ -714,7 +729,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 					goto error;
 				}
 
-				if (zfs_parse_options(strval, "nfs") != SA_OK) {
+				if (zfs_parse_options(strval, proto) != SA_OK) {
 					/*
 					 * There was an error in parsing so
 					 * deal with it by issuing an error
@@ -733,6 +748,12 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				zfs_uninit_libshare(hdl);
 			}
 
+			break;
+		case ZFS_PROP_UTF8ONLY:
+			chosen_utf = (int)intval;
+			break;
+		case ZFS_PROP_NORMALIZE:
+			chosen_normal = (int)intval;
 			break;
 		}
 
@@ -783,6 +804,27 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				break;
 			}
 		}
+	}
+
+	/*
+	 * If normalization was chosen, but no UTF8 choice was made,
+	 * enforce rejection of non-UTF8 names.
+	 *
+	 * If normalization was chosen, but rejecting non-UTF8 names
+	 * was explicitly not chosen, it is an error.
+	 */
+	if (chosen_normal > ZFS_NORMALIZE_NONE && chosen_utf < 0) {
+		if (nvlist_add_uint64(ret,
+		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), 1) != 0) {
+			(void) no_memory(hdl);
+			goto error;
+		}
+	} else if (chosen_normal > ZFS_NORMALIZE_NONE && chosen_utf == 0) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "'%s' must be set 'on' if normalization chosen"),
+		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY));
+		(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+		goto error;
 	}
 
 	/*
@@ -941,7 +983,7 @@ zfs_perms_add_who_nvlist(nvlist_t *who_nvp, uint64_t whoid, void *whostr,
  *           whostr may be null for everyone or create perms.
  * who_type: is the type of entry in whostr.  Typically this will be
  *           ZFS_DELEG_WHO_UNKNOWN.
- * perms:    comman separated list of permissions.  May be null if user
+ * perms:    common separated list of permissions.  May be null if user
  *           is requested to remove permissions by who.
  * inherit:  Specifies the inheritance of the permissions.  Will be either
  *           ZFS_DELEG_PERM_LOCAL and/or  ZFS_DELEG_PERM_DESCENDENT.
@@ -1833,6 +1875,11 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		mntopt_on = MNTOPT_XATTR;
 		mntopt_off = MNTOPT_NOXATTR;
 		break;
+
+	case ZFS_PROP_NBMAND:
+		mntopt_on = MNTOPT_NBMAND;
+		mntopt_off = MNTOPT_NONBMAND;
+		break;
 	}
 
 	/*
@@ -1871,6 +1918,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 	case ZFS_PROP_READONLY:
 	case ZFS_PROP_SETUID:
 	case ZFS_PROP_XATTR:
+	case ZFS_PROP_NBMAND:
 		*val = getprop_uint64(zhp, prop, source);
 
 		if (hasmntopt(&mnt, mntopt_on) && !*val) {
@@ -4177,7 +4225,7 @@ zfs_iscsi_perm_check(libzfs_handle_t *hdl, char *dataset, ucred_t *cred)
 
 int
 zfs_deleg_share_nfs(libzfs_handle_t *hdl, char *dataset, char *path,
-    void *export, void *sharetab, int sharemax, boolean_t share_on)
+    void *export, void *sharetab, int sharemax, zfs_share_op_t operation)
 {
 	zfs_cmd_t zc = { 0 };
 	int error;
@@ -4186,7 +4234,7 @@ zfs_deleg_share_nfs(libzfs_handle_t *hdl, char *dataset, char *path,
 	(void) strlcpy(zc.zc_value, path, sizeof (zc.zc_value));
 	zc.zc_share.z_sharedata = (uint64_t)(uintptr_t)sharetab;
 	zc.zc_share.z_exportdata = (uint64_t)(uintptr_t)export;
-	zc.zc_share.z_sharetype = share_on;
+	zc.zc_share.z_sharetype = operation;
 	zc.zc_share.z_sharemax = sharemax;
 
 	error = ioctl(hdl->libzfs_fd, ZFS_IOC_SHARE, &zc);

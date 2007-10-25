@@ -130,7 +130,8 @@ acct_shutdown(zoneid_t zoneid, void *arg)
 		 * held vnode may cause filesystems to be busy, and the zone
 		 * shutdown operation to fail.
 		 */
-		(void) VOP_CLOSE(ag->acctvp, FWRITE, 1, (offset_t)0, kcred);
+		(void) VOP_CLOSE(ag->acctvp, FWRITE, 1, (offset_t)0, kcred,
+		    NULL);
 		VN_RELE(ag->acctvp);
 	}
 	ag->acctvp = NULL;
@@ -211,7 +212,7 @@ acct_find(vnode_t *vp, boolean_t compare_vfs)
 	ASSERT(MUTEX_HELD(&acct_list_lock));
 	ASSERT(vp != NULL);
 
-	if (VOP_REALVP(vp, &realvp))
+	if (VOP_REALVP(vp, &realvp, NULL))
 		realvp = vp;
 	for (ag = list_head(&acct_list); ag != NULL;
 	    ag = list_next(&acct_list, ag)) {
@@ -223,7 +224,7 @@ acct_find(vnode_t *vp, boolean_t compare_vfs)
 			mutex_exit(&ag->aclock);
 			continue;
 		}
-		if (VOP_REALVP(ag->acctvp, &racctvp))
+		if (VOP_REALVP(ag->acctvp, &racctvp, NULL))
 			racctvp = ag->acctvp;
 		if (compare_vfs) {
 			if (racctvp->v_vfsp == realvp->v_vfsp)
@@ -281,7 +282,8 @@ sysacct(char *fname)
 		ag->acctvp = NULL;
 		mutex_exit(&ag->aclock);
 		if (vp) {
-			error = VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+			error = VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(),
+			    NULL);
 			VN_RELE(vp);
 		}
 		return (error == 0 ? 0 : set_errno(error));
@@ -333,7 +335,7 @@ sysacct(char *fname)
 	}
 
 	if (vp) {
-		(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 	}
 	return (error == 0 ? 0 : set_errno(error));
@@ -425,7 +427,7 @@ acct(char st)
 	 * currently large file aware.
 	 */
 	va.va_mask = AT_SIZE;
-	if (VOP_GETATTR(vp, &va, 0, kcred) == 0) {
+	if (VOP_GETATTR(vp, &va, 0, kcred, NULL) == 0) {
 		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&ag->acctbuf,
 		    sizeof (ag->acctbuf), 0LL, UIO_SYSSPACE, FAPPEND,
 		    (rlim64_t)MAXOFF32_T, kcred, &resid);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -254,7 +254,7 @@ extern bool_t		nfs_allow_preepoch_time;
  * If no negative otw values are allowed, may use the full 32-bits of the
  * time to represent time later than 2038, by presenting the value as an
  * unsigned (but this can only be used by 64-bit apps due to cstat32
- * retrictions). If negative values are allowed, cannot represent times
+ * restrictions). If negative values are allowed, cannot represent times
  * after 2038. Either way, all 32 bits have a valid representation.
  */
 
@@ -496,7 +496,7 @@ struct nfsfattr {
 	uint32_t	na_uid;		/* owner user id */
 	uint32_t	na_gid;		/* owner group id */
 	uint32_t	na_size;	/* file size in bytes */
-	uint32_t	na_blocksize;	/* prefered block size */
+	uint32_t	na_blocksize;	/* preferred block size */
 	uint32_t	na_rdev;	/* special device # */
 	uint32_t	na_blocks;	/* Kb of disk used by file */
 	uint32_t	na_fsid;	/* device # */
@@ -907,7 +907,7 @@ extern int	nfsinit(int, char *);
 extern void	nfsfini(void);
 extern int	nfs_vfsinit(void);
 extern void	nfs_vfsfini(void);
-extern int	nfs_dump(vnode_t *, caddr_t, int, int);
+extern int	nfs_dump(vnode_t *, caddr_t, int, int, caller_context_t *);
 extern void	nfs_perror(int error, char *fmt, ...);
 extern void	nfs_cmn_err(int error, int level, char *fmt, ...);
 extern int	nfs_addcllock(vnode_t *vp, struct flock64 *bfp);

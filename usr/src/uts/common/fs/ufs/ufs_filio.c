@@ -171,10 +171,10 @@ ufs_fioio(
 	 *	Adapted from vn_open: check access and then open the file
 	 */
 	vpio = ITOV(ipio);
-	if (error = VOP_ACCESS(vpio, VREAD, 0, cr))
+	if (error = VOP_ACCESS(vpio, VREAD, 0, cr, NULL))
 		goto errout;
 
-	if (error = VOP_OPEN(&vpio, FREAD, cr))
+	if (error = VOP_OPEN(&vpio, FREAD, cr, NULL))
 		goto errout;
 
 	/*

@@ -76,7 +76,7 @@
 
 /*ARGSUSED*/
 static int
-sdev_open(struct vnode **vpp, int flag, struct cred *cred)
+sdev_open(struct vnode **vpp, int flag, struct cred *cred, caller_context_t *ct)
 {
 	struct sdev_node *dv = VTOSDEV(*vpp);
 	struct sdev_node *ddv = dv->sdev_dotdot;
@@ -98,7 +98,7 @@ sdev_open(struct vnode **vpp, int flag, struct cred *cred)
 		rw_exit(&ddv->sdev_contents);
 		return (ENOENT);
 	}
-	error = VOP_OPEN(&(dv->sdev_attrvp), flag, cred);
+	error = VOP_OPEN(&(dv->sdev_attrvp), flag, cred, ct);
 	rw_exit(&ddv->sdev_contents);
 	return (error);
 }
@@ -106,7 +106,7 @@ sdev_open(struct vnode **vpp, int flag, struct cred *cred)
 /*ARGSUSED1*/
 static int
 sdev_close(struct vnode *vp, int flag, int count,
-    offset_t offset, struct cred *cred)
+    offset_t offset, struct cred *cred, caller_context_t *ct)
 {
 	struct sdev_node *dv = VTOSDEV(vp);
 
@@ -124,7 +124,7 @@ sdev_close(struct vnode *vp, int flag, int count,
 		return (ENOTSUP);
 
 	ASSERT(dv->sdev_attrvp);
-	return (VOP_CLOSE(dv->sdev_attrvp, flag, count, offset, cred));
+	return (VOP_CLOSE(dv->sdev_attrvp, flag, count, offset, cred, ct));
 }
 
 /*ARGSUSED*/
@@ -148,9 +148,9 @@ sdev_read(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
 
 	ASSERT(RW_READ_HELD(&VTOSDEV(vp)->sdev_contents));
 	ASSERT(dv->sdev_attrvp);
-	(void) VOP_RWLOCK(dv->sdev_attrvp, 0, NULL);
+	(void) VOP_RWLOCK(dv->sdev_attrvp, 0, ct);
 	error = VOP_READ(dv->sdev_attrvp, uio, ioflag, cred, ct);
-	VOP_RWUNLOCK(dv->sdev_attrvp, 0, NULL);
+	VOP_RWUNLOCK(dv->sdev_attrvp, 0, ct);
 	return (error);
 }
 
@@ -175,9 +175,9 @@ sdev_write(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
 
 	ASSERT(dv->sdev_attrvp);
 
-	(void) VOP_RWLOCK(dv->sdev_attrvp, 1, NULL);
+	(void) VOP_RWLOCK(dv->sdev_attrvp, 1, ct);
 	error = VOP_WRITE(dv->sdev_attrvp, uio, ioflag, cred, ct);
-	VOP_RWUNLOCK(dv->sdev_attrvp, 1, NULL);
+	VOP_RWUNLOCK(dv->sdev_attrvp, 1, ct);
 	if (error == 0) {
 		sdev_update_timestamps(dv->sdev_attrvp, kcred,
 		    AT_MTIME);
@@ -188,7 +188,7 @@ sdev_write(struct vnode *vp, struct uio *uio, int ioflag, struct cred *cred,
 /*ARGSUSED*/
 static int
 sdev_ioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-    struct cred *cred, int *rvalp)
+    struct cred *cred, int *rvalp,  caller_context_t *ct)
 {
 	struct sdev_node *dv = VTOSDEV(vp);
 
@@ -200,11 +200,12 @@ sdev_ioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		return (EINVAL);
 
 	ASSERT(dv->sdev_attrvp);
-	return (VOP_IOCTL(dv->sdev_attrvp, cmd, arg, flag, cred, rvalp));
+	return (VOP_IOCTL(dv->sdev_attrvp, cmd, arg, flag, cred, rvalp, ct));
 }
 
 static int
-sdev_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
+sdev_getattr(struct vnode *vp, struct vattr *vap, int flags,
+    struct cred *cr, caller_context_t *ct)
 {
 	int			error = 0;
 	struct sdev_node	*dv = VTOSDEV(vp);
@@ -229,7 +230,7 @@ sdev_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 	 */
 	if (dv->sdev_attrvp) {
 		rw_exit(&parent->sdev_contents);
-		error = VOP_GETATTR(dv->sdev_attrvp, vap, flags, cr);
+		error = VOP_GETATTR(dv->sdev_attrvp, vap, flags, cr, ct);
 		sdev_vattr_merge(dv, vap);
 	} else if (dirops && (fn = dirops->devnops_getattr)) {
 		sdev_vattr_merge(dv, vap);
@@ -255,7 +256,7 @@ sdev_setattr(struct vnode *vp, struct vattr *vap, int flags,
 
 static int
 sdev_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	int	error;
 	struct sdev_node *dv = VTOSDEV(vp);
@@ -267,20 +268,20 @@ sdev_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 		    (vsap->vsa_mask & (VSA_ACLCNT | VSA_DFACLCNT))) ||
 		    (SDEV_ACL_FLAVOR(vp) == _ACL_ACE_ENABLED &&
 		    (vsap->vsa_mask & (VSA_ACECNT | VSA_ACE))))
-			return (fs_fab_acl(vp, vsap, flags, cr));
+			return (fs_fab_acl(vp, vsap, flags, cr, ct));
 
 		return (ENOSYS);
 	}
 
-	(void) VOP_RWLOCK(avp, 1, NULL);
-	error = VOP_GETSECATTR(avp, vsap, flags, cr);
-	VOP_RWUNLOCK(avp, 1, NULL);
+	(void) VOP_RWLOCK(avp, 1, ct);
+	error = VOP_GETSECATTR(avp, vsap, flags, cr, ct);
+	VOP_RWUNLOCK(avp, 1, ct);
 	return (error);
 }
 
 static int
 sdev_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	int	error;
 	struct sdev_node *dv = VTOSDEV(vp);
@@ -301,7 +302,7 @@ sdev_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 		 */
 		ASSERT(RW_WRITE_HELD(&dv->sdev_contents));
 		sdev_vattr_merge(dv, dv->sdev_attr);
-		error =  sdev_shadow_node(dv, cr);
+		error = sdev_shadow_node(dv, cr);
 		if (error) {
 			return (fs_nosys());
 		}
@@ -316,9 +317,9 @@ sdev_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 	}
 	ASSERT(avp);
 
-	(void) VOP_RWLOCK(avp, V_WRITELOCK_TRUE, NULL);
-	error = VOP_SETSECATTR(avp, vsap, flags, cr);
-	VOP_RWUNLOCK(avp, V_WRITELOCK_TRUE, NULL);
+	(void) VOP_RWLOCK(avp, V_WRITELOCK_TRUE, ct);
+	error = VOP_SETSECATTR(avp, vsap, flags, cr, ct);
+	VOP_RWUNLOCK(avp, V_WRITELOCK_TRUE, ct);
 	return (error);
 }
 
@@ -343,7 +344,8 @@ sdev_unlocked_access(void *vdv, int mode, struct cred *cr)
 }
 
 static int
-sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr)
+sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct sdev_node	*dv = VTOSDEV(vp);
 	int ret = 0;
@@ -351,7 +353,7 @@ sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 	ASSERT(dv->sdev_attr || dv->sdev_attrvp);
 
 	if (dv->sdev_attrvp) {
-		ret = VOP_ACCESS(dv->sdev_attrvp, mode, flags, cr);
+		ret = VOP_ACCESS(dv->sdev_attrvp, mode, flags, cr, ct);
 	} else if (dv->sdev_attr) {
 		rw_enter(&dv->sdev_contents, RW_READER);
 		ret = sdev_unlocked_access(dv, mode, cr);
@@ -369,7 +371,8 @@ sdev_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 /*ARGSUSED3*/
 static int
 sdev_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
-    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred)
+    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
+    caller_context_t *ct, int *direntflags, pathname_t *realpnp)
 {
 	struct sdev_node *parent;
 	int error;
@@ -378,7 +381,7 @@ sdev_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	ASSERT(parent);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
 		return (error);
 
 	if (!SDEV_IS_GLOBAL(parent))
@@ -389,7 +392,8 @@ sdev_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 /*ARGSUSED2*/
 static int
 sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
-    int mode, struct vnode **vpp, struct cred *cred, int flag)
+    int mode, struct vnode **vpp, struct cred *cred, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp)
 {
 	struct vnode		*vp = NULL;
 	struct vnode		*avp;
@@ -421,11 +425,12 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred, ct)) != 0)
 		return (error);
 
 	/* check existing name */
-	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred);
+/* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
+	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred, ct, NULL, NULL);
 
 	/* name found */
 	if (error == 0) {
@@ -436,7 +441,7 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 			/* allowing create/read-only an existing directory */
 			error = EISDIR;
 		} else {
-			error = VOP_ACCESS(vp, mode, flag, cred);
+			error = VOP_ACCESS(vp, mode, flag, cred, ct);
 		}
 
 		if (error) {
@@ -449,7 +454,7 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 		    (vap->va_size == 0)) {
 			ASSERT(parent->sdev_attrvp);
 			error = VOP_CREATE(parent->sdev_attrvp,
-			    nm, vap, excl, mode, &avp, cred, flag);
+			    nm, vap, excl, mode, &avp, cred, flag, ct, vsecp);
 
 			if (error) {
 				VN_RELE(vp);
@@ -505,7 +510,8 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 }
 
 static int
-sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
+sdev_remove(struct vnode *dvp, char *nm, struct cred *cred,
+    caller_context_t *ct, int flags)
 {
 	int	error;
 	struct sdev_node *parent = (struct sdev_node *)VTOSDEV(dvp);
@@ -535,7 +541,7 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
 	}
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0) {
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0) {
 		rw_exit(&parent->sdev_contents);
 		return (error);
 	}
@@ -556,7 +562,7 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
 	}
 
 	/* write access is required to remove an entry */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0) {
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (error);
@@ -601,7 +607,8 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
 		 */
 		if (bkstore) {
 			ASSERT(parent->sdev_attrvp);
-			error = VOP_REMOVE(parent->sdev_attrvp, nm, cred);
+			error = VOP_REMOVE(parent->sdev_attrvp, nm, cred,
+			    ct, flags);
 			/*
 			 * do not report BUSY error
 			 * because the backing store ref count is released
@@ -627,9 +634,10 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
  *  - both oldnm and newnm are in the scope of /dev file system,
  *    to simply the namespace management model.
  */
+/*ARGSUSED6*/
 static int
 sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
-    struct cred *cred)
+    struct cred *cred, caller_context_t *ct, int flags)
 {
 	struct sdev_node	*fromparent = NULL;
 	struct vattr		vattr;
@@ -690,7 +698,9 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	mutex_enter(&sdev_lock);
 
 	/* check existence of the source node */
-	error = VOP_LOOKUP(odvp, onm, &ovp, NULL, 0, NULL, cred);
+/* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
+	error = VOP_LOOKUP(odvp, onm, &ovp, NULL, 0, NULL, cred, ct,
+	    NULL, NULL);
 	if (error) {
 		sdcmn_err2(("sdev_rename: the source node %s exists\n",
 		    onm));
@@ -698,21 +708,23 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 		return (error);
 	}
 
-	if (VOP_REALVP(ovp, &realvp) == 0) {
+	if (VOP_REALVP(ovp, &realvp, ct) == 0) {
 		VN_HOLD(realvp);
 		VN_RELE(ovp);
 		ovp = realvp;
 	}
 
 	/* check existence of destination */
-	error = VOP_LOOKUP(ndvp, nnm, &nvp, NULL, 0, NULL, cred);
+/* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
+	error = VOP_LOOKUP(ndvp, nnm, &nvp, NULL, 0, NULL, cred, ct,
+	    NULL, NULL);
 	if (error && (error != ENOENT)) {
 		mutex_exit(&sdev_lock);
 		VN_RELE(ovp);
 		return (error);
 	}
 
-	if (nvp && (VOP_REALVP(nvp, &realvp) == 0)) {
+	if (nvp && (VOP_REALVP(nvp, &realvp, ct) == 0)) {
 		VN_HOLD(realvp);
 		VN_RELE(nvp);
 		nvp = realvp;
@@ -724,14 +736,14 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	 */
 	if (odvp != ndvp) {
 		vattr.va_mask = AT_FSID;
-		if (error = VOP_GETATTR(odvp, &vattr, 0, cred)) {
+		if (error = VOP_GETATTR(odvp, &vattr, 0, cred, ct)) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (error);
 		}
 		fsid = vattr.va_fsid;
 		vattr.va_mask = AT_FSID;
-		if (error = VOP_GETATTR(ndvp, &vattr, 0, cred)) {
+		if (error = VOP_GETATTR(ndvp, &vattr, 0, cred, ct)) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
 			return (error);
@@ -744,7 +756,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	}
 
 	/* make sure the old entry can be deleted */
-	error = VOP_ACCESS(odvp, VWRITE, 0, cred);
+	error = VOP_ACCESS(odvp, VWRITE, 0, cred, ct);
 	if (error) {
 		mutex_exit(&sdev_lock);
 		VN_RELE(ovp);
@@ -754,7 +766,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	/* make sure the destination allows creation */
 	samedir = (fromparent == toparent);
 	if (!samedir) {
-		error = VOP_ACCESS(ndvp, VEXEC|VWRITE, 0, cred);
+		error = VOP_ACCESS(ndvp, VEXEC|VWRITE, 0, cred, ct);
 		if (error) {
 			mutex_exit(&sdev_lock);
 			VN_RELE(ovp);
@@ -856,11 +868,13 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	if (bkstore) {
 		ASSERT(fromparent->sdev_attrvp);
 		if (type != VDIR) {
+/* XXXci - We may need to translate the C-I flags on VOP_REMOVE */
 			error = VOP_REMOVE(fromparent->sdev_attrvp,
-			    onm, kcred);
+			    onm, kcred, ct, 0);
 		} else {
+/* XXXci - We may need to translate the C-I flags on VOP_RMDIR */
 			error = VOP_RMDIR(fromparent->sdev_attrvp,
-			    onm, fromparent->sdev_attrvp, kcred);
+			    onm, fromparent->sdev_attrvp, kcred, ct, 0);
 		}
 
 		if (error) {
@@ -882,9 +896,10 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
  *	tnm - path, e.g. /devices/... or /dev/...
  *	lnm - dev_name
  */
+/*ARGSUSED6*/
 static int
 sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
-    char *tnm, struct cred *cred)
+    char *tnm, struct cred *cred, caller_context_t *ct, int flags)
 {
 	int error;
 	struct vnode *vp = NULL;
@@ -907,11 +922,12 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search a directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
 		return (error);
 
 	/* find existing name */
-	error = VOP_LOOKUP(dvp, lnm, &vp, NULL, 0, NULL, cred);
+/* XXXci - We may need to translate the C-I flags here */
+	error = VOP_LOOKUP(dvp, lnm, &vp, NULL, 0, NULL, cred, ct, NULL, NULL);
 	if (error == 0) {
 		ASSERT(vp);
 		VN_RELE(vp);
@@ -922,7 +938,7 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 		return (error);
 
 	/* write access is required to create a symlink */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0)
 		return (error);
 
 	/* put it into memory cache */
@@ -955,9 +971,10 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 	return (0);
 }
 
+/*ARGSUSED6*/
 static int
 sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
-    struct cred *cred)
+    struct cred *cred, caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int error;
 	struct sdev_node *parent = (struct sdev_node *)VTOSDEV(dvp);
@@ -979,12 +996,13 @@ sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0) {
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0) {
 		return (error);
 	}
 
 	/* find existing name */
-	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred);
+/* XXXci - We may need to translate the C-I flags on VOP_LOOKUP */
+	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred, ct, NULL, NULL);
 	if (error == 0) {
 		VN_RELE(vp);
 		return (EEXIST);
@@ -993,7 +1011,7 @@ sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 		return (error);
 
 	/* require write access to create a directory */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0) {
 		return (error);
 	}
 
@@ -1030,7 +1048,8 @@ sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
  */
 /*ARGSUSED*/
 static int
-sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
+sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred,
+    caller_context_t *ct, int flags)
 {
 	int error = 0;
 	struct sdev_node *parent = (struct sdev_node *)VTOSDEV(dvp);
@@ -1053,7 +1072,7 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
 		return (error);
 
 	/* check existing name */
@@ -1073,7 +1092,7 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 	}
 
 	/* write access is required to remove a directory */
-	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred, ct)) != 0) {
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (error);
@@ -1132,7 +1151,7 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 		if (SDEV_IS_PERSIST(parent)) {
 			ASSERT(parent->sdev_attrvp);
 			error = VOP_RMDIR(parent->sdev_attrvp, nm,
-			    parent->sdev_attrvp, kcred);
+			    parent->sdev_attrvp, kcred, ct, flags);
 			sdcmn_err2(("sdev_rmdir: cleaning device %s is on"
 			    " disk error %d\n", parent->sdev_path, error));
 		}
@@ -1148,7 +1167,8 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
  * read the contents of a symbolic link
  */
 static int
-sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
+sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred,
+    caller_context_t *ct)
 {
 	struct sdev_node *dv;
 	int	error = 0;
@@ -1159,7 +1179,7 @@ sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
 
 	if (dv->sdev_attrvp) {
 		/* non-NULL attrvp implys a persisted node at READY state */
-		return (VOP_READLINK(dv->sdev_attrvp, uiop, cred));
+		return (VOP_READLINK(dv->sdev_attrvp, uiop, cred, ct));
 	} else if (dv->sdev_symlink != NULL) {
 		/* memory nodes, e.g. local nodes */
 		rw_enter(&dv->sdev_contents, RW_READER);
@@ -1173,14 +1193,16 @@ sdev_readlink(struct vnode *vp, struct uio *uiop, struct cred *cred)
 	return (ENOENT);
 }
 
+/*ARGSUSED4*/
 static int
-sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
+sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
+    caller_context_t *ct, int flags)
 {
 	struct sdev_node *parent = VTOSDEV(dvp);
 	int error;
 
 	/* execute access is required to search the directory */
-	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct)) != 0)
 		return (error);
 
 	ASSERT(parent);
@@ -1191,7 +1213,7 @@ sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 
 /*ARGSUSED1*/
 static void
-sdev_inactive(struct vnode *vp, struct cred *cred)
+sdev_inactive(struct vnode *vp, struct cred *cred, caller_context_t *ct)
 {
 	int clean;
 	struct sdev_node *dv = VTOSDEV(vp);
@@ -1250,8 +1272,9 @@ sdev_inactive(struct vnode *vp, struct cred *cred)
 	rw_exit(&ddv->sdev_contents);
 }
 
+/*ARGSUSED2*/
 static int
-sdev_fid(struct vnode *vp, struct fid *fidp)
+sdev_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct sdev_node	*dv = VTOSDEV(vp);
 	struct sdev_fid	*sdev_fid;
@@ -1293,7 +1316,8 @@ sdev_rwunlock(struct vnode *vp, int write_flag, caller_context_t *ctp)
 
 /*ARGSUSED1*/
 static int
-sdev_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+sdev_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
+    caller_context_t *ct)
 {
 	struct vnode *attrvp = VTOSDEV(vp)->sdev_attrvp;
 
@@ -1301,16 +1325,17 @@ sdev_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
 	    vp->v_type != VBLK && vp->v_type != VLNK);
 
 	if (vp->v_type == VDIR)
-		return (fs_seek(vp, ooff, noffp));
+		return (fs_seek(vp, ooff, noffp, ct));
 
 	ASSERT(attrvp);
-	return (VOP_SEEK(attrvp, ooff, noffp));
+	return (VOP_SEEK(attrvp, ooff, noffp, ct));
 }
 
 /*ARGSUSED1*/
 static int
 sdev_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
-    offset_t offset, struct flk_callback *flk_cbp, struct cred *cr)
+    offset_t offset, struct flk_callback *flk_cbp, struct cred *cr,
+    caller_context_t *ct)
 {
 	int error;
 	struct sdev_node *dv = VTOSDEV(vp);
@@ -1318,23 +1343,25 @@ sdev_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 	ASSERT(dv);
 	ASSERT(dv->sdev_attrvp);
 	error = VOP_FRLOCK(dv->sdev_attrvp, cmd, bfp, flag, offset,
-	    flk_cbp, cr);
+	    flk_cbp, cr, ct);
 
 	return (error);
 }
 
 static int
-sdev_setfl(struct vnode *vp, int oflags, int nflags, cred_t *cr)
+sdev_setfl(struct vnode *vp, int oflags, int nflags, cred_t *cr,
+    caller_context_t *ct)
 {
 	struct sdev_node *dv = VTOSDEV(vp);
 	ASSERT(dv);
 	ASSERT(dv->sdev_attrvp);
 
-	return (VOP_SETFL(dv->sdev_attrvp, oflags, nflags, cr));
+	return (VOP_SETFL(dv->sdev_attrvp, oflags, nflags, cr, ct));
 }
 
 static int
-sdev_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+sdev_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+    caller_context_t *ct)
 {
 	switch (cmd) {
 	case _PC_ACL_ENABLED:
@@ -1342,7 +1369,7 @@ sdev_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 		return (0);
 	}
 
-	return (fs_pathconf(vp, cmd, valp, cr));
+	return (fs_pathconf(vp, cmd, valp, cr, ct));
 }
 
 vnodeops_t *sdev_vnodeops;

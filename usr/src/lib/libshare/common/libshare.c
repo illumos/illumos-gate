@@ -58,6 +58,16 @@
 #define	SA_STRSIZE	256	/* max string size for names */
 
 /*
+ * internal object type values returned by sa_get_object_type()
+ */
+#define	SA_TYPE_UNKNOWN		0
+#define	SA_TYPE_GROUP		1
+#define	SA_TYPE_SHARE		2
+#define	SA_TYPE_RESOURCE	3
+#define	SA_TYPE_OPTIONSET	4
+#define	SA_TYPE_ALTSPACE	5
+
+/*
  * internal data structures
  */
 
@@ -69,16 +79,20 @@ extern int gettransients(sa_handle_impl_t, xmlNodePtr *);
 extern int sa_valid_property(void *, char *, sa_property_t);
 extern char *sa_fstype(char *);
 extern int sa_is_share(void *);
+extern int sa_is_resource(void *);
 extern ssize_t scf_max_name_len; /* defined in scfutil during initialization */
 extern int sa_group_is_zfs(sa_group_t);
 extern int sa_path_is_zfs(char *);
 extern int sa_zfs_set_sharenfs(sa_group_t, char *, int);
+extern int sa_zfs_set_sharesmb(sa_group_t, char *, int);
 extern void update_legacy_config(sa_handle_t);
 extern int issubdir(char *, char *);
 extern int sa_zfs_init(sa_handle_impl_t);
 extern void sa_zfs_fini(sa_handle_impl_t);
 extern void sablocksigs(sigset_t *);
 extern void saunblocksigs(sigset_t *);
+static sa_group_t sa_get_optionset_parent(sa_optionset_t);
+static char *get_node_attr(void *, char *);
 
 /*
  * Data structures for finding/managing the document root to access
@@ -187,6 +201,21 @@ sa_errorstr(int err)
 		break;
 	case SA_NOT_SHARED:
 		ret = dgettext(TEXT_DOMAIN, "not shared");
+		break;
+	case SA_NO_SUCH_RESOURCE:
+		ret = dgettext(TEXT_DOMAIN, "no such resource");
+		break;
+	case SA_RESOURCE_REQUIRED:
+		ret = dgettext(TEXT_DOMAIN, "resource name required");
+		break;
+	case SA_MULTIPLE_ERROR:
+		ret = dgettext(TEXT_DOMAIN, "errors from multiple protocols");
+		break;
+	case SA_PATH_IS_SUBDIR:
+		ret = dgettext(TEXT_DOMAIN, "path is a subpath of share");
+		break;
+	case SA_PATH_IS_PARENTDIR:
+		ret = dgettext(TEXT_DOMAIN, "path is parent of a share");
 		break;
 	default:
 		(void) snprintf(errstr, sizeof (errstr),
@@ -376,6 +405,36 @@ is_shared(sa_share_t share)
 }
 
 /*
+ * excluded_protocol(share, proto)
+ *
+ * Returns B_TRUE if the specified protocol appears in the "exclude"
+ * property. This is used to prevent sharing special case shares
+ * (e.g. subdirs when SMB wants a subdir and NFS doesn't. B_FALSE is
+ * returned if the protocol isn't in the list.
+ */
+static boolean_t
+excluded_protocol(sa_share_t share, char *proto)
+{
+	char *protolist;
+	char *str;
+	char *token;
+
+	protolist = sa_get_share_attr(share, "exclude");
+	if (protolist != NULL) {
+		str = protolist;
+		while ((token = strtok(str, ",")) != NULL) {
+			if (strcmp(token, proto) == 0) {
+				sa_free_attr_string(protolist);
+				return (B_TRUE);
+			}
+			str = NULL;
+		}
+		sa_free_attr_string(protolist);
+	}
+	return (B_FALSE);
+}
+
+/*
  * checksubdirgroup(group, newpath, strictness)
  *
  * check all the specified newpath against all the paths in the
@@ -392,6 +451,11 @@ checksubdirgroup(sa_group_t group, char *newpath, int strictness)
 	sa_share_t share;
 	char *path;
 	int issub = SA_OK;
+	int subdir;
+	int parent;
+
+	if (newpath == NULL)
+		return (SA_INVALID_PATH);
 
 	for (share = sa_get_share(group, NULL); share != NULL;
 	    share = sa_get_next_share(share)) {
@@ -417,13 +481,18 @@ checksubdirgroup(sa_group_t group, char *newpath, int strictness)
 		 */
 		if (path == NULL)
 			continue;
-		if (newpath != NULL &&
-		    (strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
-		    issubdir(path, newpath))) {
-			sa_free_attr_string(path);
-			path = NULL;
+
+		if (strcmp(path, newpath) == 0) {
 			issub = SA_INVALID_PATH;
-			break;
+		} else {
+			subdir = issubdir(newpath, path);
+			parent = issubdir(path, newpath);
+			if (subdir || parent) {
+				sa_free_attr_string(path);
+				path = NULL;
+				return (subdir ?
+				    SA_PATH_IS_SUBDIR : SA_PATH_IS_PARENTDIR);
+			}
 		}
 		sa_free_attr_string(path);
 		path = NULL;
@@ -446,15 +515,16 @@ static int
 checksubdir(sa_handle_t handle, char *newpath, int strictness)
 {
 	sa_group_t group;
-	int issub;
+	int issub = SA_OK;
 	char *path = NULL;
 
-	for (issub = 0, group = sa_get_group(handle, NULL);
-	    group != NULL && !issub; group = sa_get_next_group(group)) {
+	for (group = sa_get_group(handle, NULL);
+	    group != NULL && issub == SA_OK;
+	    group = sa_get_next_group(group)) {
 		if (sa_group_is_zfs(group)) {
 			sa_group_t subgroup;
 			for (subgroup = sa_get_sub_group(group);
-			    subgroup != NULL && !issub;
+			    subgroup != NULL && issub == SA_OK;
 			    subgroup = sa_get_next_group(subgroup))
 				issub = checksubdirgroup(subgroup, newpath,
 				    strictness);
@@ -517,14 +587,17 @@ validpath(sa_handle_t handle, char *path, int strictness)
 
 /*
  * check to see if group/share is persistent.
+ *
+ * "group" can be either an sa_group_t or an sa_share_t. (void *)
+ * works since both thse types are also void *.
  */
-static int
-is_persistent(sa_group_t group)
+int
+sa_is_persistent(void *group)
 {
 	char *type;
 	int persist = 1;
 
-	type = sa_get_group_attr(group, "type");
+	type = sa_get_group_attr((sa_group_t)group, "type");
 	if (type != NULL && strcmp(type, "transient") == 0)
 		persist = 0;
 	if (type != NULL)
@@ -590,6 +663,35 @@ is_zfs_group(sa_group_t group)
 }
 
 /*
+ * sa_get_object_type(object)
+ *
+ * This function returns a numeric value representing the object
+ * type. This allows using simpler checks when doing type specific
+ * operations.
+ */
+
+static int
+sa_get_object_type(void *object)
+{
+	xmlNodePtr node = (xmlNodePtr)object;
+	int type;
+
+	if (xmlStrcmp(node->name, (xmlChar *)"group") == 0)
+		type = SA_TYPE_GROUP;
+	else if (xmlStrcmp(node->name, (xmlChar *)"share") == 0)
+		type = SA_TYPE_SHARE;
+	else if (xmlStrcmp(node->name, (xmlChar *)"resource") == 0)
+		type = SA_TYPE_RESOURCE;
+	else if (xmlStrcmp(node->name, (xmlChar *)"optionset") == 0)
+		type = SA_TYPE_OPTIONSET;
+	else if (xmlStrcmp(node->name, (xmlChar *)"security") == 0)
+		type = SA_TYPE_ALTSPACE;
+	else
+		assert(0);
+	return (type);
+}
+
+/*
  * sa_optionset_name(optionset, oname, len, id)
  *	return the SMF name for the optionset. If id is not NULL, it
  *	will have the GUID value for a share and should be used
@@ -605,15 +707,34 @@ static int
 sa_optionset_name(sa_optionset_t optionset, char *oname, size_t len, char *id)
 {
 	char *proto;
+	void *parent;
+	int ptype;
 
 	if (id == NULL)
 		id = "optionset";
 
-	proto = sa_get_optionset_attr(optionset, "type");
-	len = snprintf(oname, len, "%s_%s", id, proto ? proto : "default");
+	parent = sa_get_optionset_parent(optionset);
+	if (parent != NULL) {
+		ptype = sa_get_object_type(parent);
+		proto = sa_get_optionset_attr(optionset, "type");
+		if (ptype != SA_TYPE_RESOURCE) {
+			len = snprintf(oname, len, "%s_%s", id,
+			    proto ? proto : "default");
+		} else {
+			char *index;
+			index = get_node_attr((void *)parent, "id");
+			if (index != NULL)
+				len = snprintf(oname, len, "%s_%s_%s", id,
+				    proto ? proto : "default", index);
+			else
+				len = 0;
+		}
 
-	if (proto != NULL)
-		sa_free_attr_string(proto);
+		if (proto != NULL)
+			sa_free_attr_string(proto);
+	} else {
+		len = 0;
+	}
 	return (len);
 }
 
@@ -660,6 +781,7 @@ verifydefgroupopts(sa_handle_t handle)
 {
 	sa_group_t defgrp;
 	sa_optionset_t opt;
+
 	defgrp = sa_get_group(handle, "default");
 	if (defgrp != NULL) {
 		opt = sa_get_optionset(defgrp, NULL);
@@ -1187,7 +1309,7 @@ sa_find_share(sa_handle_t handle, char *sharepath)
 /*
  *  sa_check_path(group, path, strictness)
  *
- * check that path is a valid path relative to the group.  Currently,
+ * Check that path is a valid path relative to the group.  Currently,
  * we are ignoring the group and checking only the NFS rules. Later,
  * we may want to use the group to then check against the protocols
  * enabled on the group. The strictness values mean:
@@ -1206,16 +1328,84 @@ sa_check_path(sa_group_t group, char *path, int strictness)
 }
 
 /*
- * _sa_add_share(group, sharepath, persist, *error)
+ * mark_excluded_protos(group, share, flags)
  *
- * common code for all types of add_share. sa_add_share() is the
+ * Walk through all the protocols enabled for the group and check to
+ * see if the share has any of them should be in the exclude list
+ * based on the featureset of the protocol. If there are any, add the
+ * "exclude" property to the share.
+ */
+static void
+mark_excluded_protos(sa_group_t group, xmlNodePtr share, uint64_t flags)
+{
+	sa_optionset_t optionset;
+	char exclude_list[SA_STRSIZE];
+	char *sep = "";
+
+	exclude_list[0] = '\0';
+	for (optionset = sa_get_optionset(group, NULL);
+	    optionset != NULL;
+	    optionset = sa_get_next_optionset(optionset)) {
+		char *value;
+		uint64_t features;
+		value = sa_get_optionset_attr(optionset, "type");
+		if (value == NULL)
+			continue;
+		features = sa_proto_get_featureset(value);
+		sa_free_attr_string(value);
+		if (!(features & flags)) {
+			(void) strlcat(exclude_list, sep,
+			    sizeof (exclude_list));
+			(void) strlcat(exclude_list, value,
+			    sizeof (exclude_list));
+			sep = ",";
+		}
+	}
+	if (exclude_list[0] != '\0')
+		xmlSetProp(share, (xmlChar *)"exclude",
+		    (xmlChar *)exclude_list);
+}
+
+/*
+ * get_all_features(group)
+ *
+ * Walk through all the protocols on the group and collect all
+ * possible enabled features. This is the OR of all the featuresets.
+ */
+static uint64_t
+get_all_features(sa_group_t group)
+{
+	sa_optionset_t optionset;
+	uint64_t features = 0;
+
+	for (optionset = sa_get_optionset(group, NULL);
+	    optionset != NULL;
+	    optionset = sa_get_next_optionset(optionset)) {
+		char *value;
+		value = sa_get_optionset_attr(optionset, "type");
+		if (value == NULL)
+			continue;
+		features |= sa_proto_get_featureset(value);
+		sa_free_attr_string(value);
+	}
+	return (features);
+}
+
+
+/*
+ * _sa_add_share(group, sharepath, persist, *error, flags)
+ *
+ * Common code for all types of add_share. sa_add_share() is the
  * public API, we also need to be able to do this when parsing legacy
  * files and construction of the internal configuration while
- * extracting config info from SMF.
+ * extracting config info from SMF. "flags" indicates if some
+ * protocols need relaxed rules while other don't. These values are
+ * the featureset values defined in libshare.h.
  */
 
 sa_share_t
-_sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
+_sa_add_share(sa_group_t group, char *sharepath, int persist, int *error,
+    uint64_t flags)
 {
 	xmlNodePtr node = NULL;
 	int err;
@@ -1223,52 +1413,60 @@ _sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 	err  = SA_OK; /* assume success */
 
 	node = xmlNewChild((xmlNodePtr)group, NULL, (xmlChar *)"share", NULL);
-	if (node != NULL) {
-		xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
-		xmlSetProp(node, (xmlChar *)"type",
-		    persist ? (xmlChar *)"persist" : (xmlChar *)"transient");
-		if (persist != SA_SHARE_TRANSIENT) {
-			/*
-			 * persistent shares come in two flavors: SMF and
-			 * ZFS. Sort this one out based on target group and
-			 * path type. Currently, only NFS is supported in the
-			 * ZFS group and it is always on.
-			 */
-			if (sa_group_is_zfs(group) &&
-			    sa_path_is_zfs(sharepath)) {
+	if (node == NULL) {
+		if (error != NULL)
+			*error = SA_NO_MEMORY;
+		return (node);
+	}
+
+	xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
+	xmlSetProp(node, (xmlChar *)"type",
+	    persist ? (xmlChar *)"persist" : (xmlChar *)"transient");
+	if (flags != 0)
+		mark_excluded_protos(group, node, flags);
+	if (persist != SA_SHARE_TRANSIENT) {
+		/*
+		 * persistent shares come in two flavors: SMF and
+		 * ZFS. Sort this one out based on target group and
+		 * path type. Both NFS and SMB are supported. First,
+		 * check to see if the protocol is enabled on the
+		 * subgroup and then setup the share appropriately.
+		 */
+		if (sa_group_is_zfs(group) &&
+		    sa_path_is_zfs(sharepath)) {
+			if (sa_get_optionset(group, "nfs") != NULL)
 				err = sa_zfs_set_sharenfs(group, sharepath, 1);
+			else if (sa_get_optionset(group, "smb") != NULL)
+				err = sa_zfs_set_sharesmb(group, sharepath, 1);
+		} else {
+			sa_handle_impl_t impl_handle;
+			impl_handle =
+			    (sa_handle_impl_t)sa_find_group_handle(group);
+			if (impl_handle != NULL) {
+				err = sa_commit_share(impl_handle->scfhandle,
+				    group, (sa_share_t)node);
 			} else {
-				sa_handle_impl_t impl_handle;
-				impl_handle =
-				    (sa_handle_impl_t)sa_find_group_handle(
-				    group);
-				if (impl_handle != NULL) {
-					err = sa_commit_share(
-					    impl_handle->scfhandle, group,
-					    (sa_share_t)node);
-				} else {
-					err = SA_SYSTEM_ERR;
-				}
+				err = SA_SYSTEM_ERR;
 			}
 		}
-		if (err == SA_NO_PERMISSION && persist & SA_SHARE_PARSER) {
-			/* called by the dfstab parser so could be a show */
-			err = SA_OK;
-		}
-		if (err != SA_OK) {
-			/*
-			 * we couldn't commit to the repository so undo
-			 * our internal state to reflect reality.
-			 */
-			xmlUnlinkNode(node);
-			xmlFreeNode(node);
-			node = NULL;
-		}
-	} else {
-		err = SA_NO_MEMORY;
 	}
+	if (err == SA_NO_PERMISSION && persist & SA_SHARE_PARSER)
+		/* called by the dfstab parser so could be a show */
+		err = SA_OK;
+
+	if (err != SA_OK) {
+		/*
+		 * we couldn't commit to the repository so undo
+		 * our internal state to reflect reality.
+		 */
+		xmlUnlinkNode(node);
+		xmlFreeNode(node);
+		node = NULL;
+	}
+
 	if (error != NULL)
 		*error = err;
+
 	return (node);
 }
 
@@ -1285,9 +1483,10 @@ sa_share_t
 sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 {
 	xmlNodePtr node = NULL;
-	sa_share_t dup;
 	int strictness = SA_CHECK_NORMAL;
 	sa_handle_t handle;
+	uint64_t special = 0;
+	uint64_t features;
 
 	/*
 	 * If the share is to be permanent, use strict checking so a
@@ -1304,12 +1503,33 @@ sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 
 	handle = sa_find_group_handle(group);
 
-	if ((dup = sa_find_share(handle, sharepath)) == NULL &&
-	    (*error = sa_check_path(group, sharepath, strictness)) == SA_OK) {
-		node = _sa_add_share(group, sharepath, persist, error);
-	}
-	if (dup != NULL)
+	/*
+	 * need to determine if the share is valid. The rules are:
+	 *	- The path must not already exist
+	 *	- The path must not be a subdir or parent dir of an
+	 *	  existing path unless at least one protocol allows it.
+	 * The sub/parent check is done in sa_check_path().
+	 */
+
+	if (sa_find_share(handle, sharepath) == NULL) {
+		*error = sa_check_path(group, sharepath, strictness);
+		features = get_all_features(group);
+		switch (*error) {
+		case SA_PATH_IS_SUBDIR:
+			if (features & SA_FEATURE_ALLOWSUBDIRS)
+				special |= SA_FEATURE_ALLOWSUBDIRS;
+			break;
+		case SA_PATH_IS_PARENTDIR:
+			if (features & SA_FEATURE_ALLOWPARDIRS)
+				special |= SA_FEATURE_ALLOWPARDIRS;
+			break;
+		}
+		if (*error == SA_OK || special != SA_FEATURE_NONE)
+			node = _sa_add_share(group, sharepath, persist,
+			    error, special);
+	} else {
 		*error = SA_DUPLICATE_NAME;
+	}
 
 	return ((sa_share_t)node);
 }
@@ -1324,28 +1544,52 @@ sa_enable_share(sa_share_t share, char *protocol)
 {
 	char *sharepath;
 	struct stat st;
-	int err = 0;
+	int err = SA_OK;
+	int ret;
 
 	sharepath = sa_get_share_attr(share, "path");
+	if (sharepath == NULL)
+		return (SA_NO_MEMORY);
 	if (stat(sharepath, &st) < 0) {
 		err = SA_NO_SUCH_PATH;
 	} else {
 		/* tell the server about the share */
 		if (protocol != NULL) {
+			if (excluded_protocol(share, protocol))
+				goto done;
+
 			/* lookup protocol specific handler */
 			err = sa_proto_share(protocol, share);
 			if (err == SA_OK)
-				(void) sa_set_share_attr(share, "shared",
-				    "true");
+				(void) sa_set_share_attr(share,
+				    "shared", "true");
 		} else {
-			/*
-			 * Tell all protocols.  Only NFS for now but
-			 * SMB is coming.
-			 */
-			err = sa_proto_share("nfs", share);
+			/* Tell all protocols about the share */
+			sa_group_t group;
+			sa_optionset_t optionset;
+
+			group = sa_get_parent_group(share);
+
+			for (optionset = sa_get_optionset(group, NULL);
+			    optionset != NULL;
+			    optionset = sa_get_next_optionset(optionset)) {
+				char *proto;
+				proto = sa_get_optionset_attr(optionset,
+				    "type");
+				if (proto != NULL) {
+					if (!excluded_protocol(share, proto)) {
+						ret = sa_proto_share(proto,
+						    share);
+						if (ret != SA_OK)
+							err = ret;
+					}
+					sa_free_attr_string(proto);
+				}
+			}
 			(void) sa_set_share_attr(share, "shared", "true");
 		}
 	}
+done:
 	if (sharepath != NULL)
 		sa_free_attr_string(sharepath);
 	return (err);
@@ -1353,31 +1597,47 @@ sa_enable_share(sa_share_t share, char *protocol)
 
 /*
  * sa_disable_share(share, protocol)
- *	Disable the specified share to the specified protocol.
- *	If protocol is NULL, then all protocols.
+ *	Disable the specified share to the specified protocol.  If
+ *	protocol is NULL, then all protocols that are enabled for the
+ *	share should be disabled.
  */
 int
 sa_disable_share(sa_share_t share, char *protocol)
 {
 	char *path;
-	char *shared;
+	int err = SA_OK;
 	int ret = SA_OK;
 
 	path = sa_get_share_attr(share, "path");
-	shared = sa_get_share_attr(share, "shared");
 
 	if (protocol != NULL) {
 		ret = sa_proto_unshare(share, protocol, path);
 	} else {
 		/* need to do all protocols */
-		ret = sa_proto_unshare(share, "nfs", path);
+		sa_group_t group;
+		sa_optionset_t optionset;
+
+		group = sa_get_parent_group(share);
+
+		/* Tell all protocols about the share */
+		for (optionset = sa_get_optionset(group, NULL);
+		    optionset != NULL;
+		    optionset = sa_get_next_optionset(optionset)) {
+			char *proto;
+
+			proto = sa_get_optionset_attr(optionset, "type");
+			if (proto != NULL) {
+				err = sa_proto_unshare(share, proto, path);
+				if (err != SA_OK)
+					ret = err;
+				sa_free_attr_string(proto);
+			}
+		}
 	}
 	if (ret == SA_OK)
 		(void) sa_set_share_attr(share, "shared", NULL);
 	if (path != NULL)
 		sa_free_attr_string(path);
-	if (shared != NULL)
-		sa_free_attr_string(shared);
 	return (ret);
 }
 
@@ -1415,7 +1675,7 @@ sa_remove_share(sa_share_t share)
 	/* only do SMF action if permanent */
 	if (!transient || zfs != NULL) {
 		/* remove from legacy dfstab as well as possible SMF */
-		ret = sa_delete_legacy(share);
+		ret = sa_delete_legacy(share, NULL);
 		if (ret == SA_OK) {
 			if (!sa_group_is_zfs(group)) {
 				sa_handle_impl_t impl_handle;
@@ -1497,7 +1757,7 @@ sa_move_share(sa_group_t group, sa_share_t share)
 /*
  * sa_get_parent_group(share)
  *
- * Return the containg group for the share. If a group was actually
+ * Return the containing group for the share. If a group was actually
  * passed in, we don't want a parent so return NULL.
  */
 
@@ -1728,7 +1988,7 @@ sa_update_config(sa_handle_t handle)
 /*
  * get_node_attr(node, tag)
  *
- * Get the speficied tag(attribute) if it exists on the node.  This is
+ * Get the specified tag(attribute) if it exists on the node.  This is
  * used internally by a number of attribute oriented functions.
  */
 
@@ -1746,7 +2006,7 @@ get_node_attr(void *nodehdl, char *tag)
 /*
  * get_node_attr(node, tag)
  *
- * Set the speficied tag(attribute) to the specified value This is
+ * Set the specified tag(attribute) to the specified value This is
  * used internally by a number of attribute oriented functions. It
  * doesn't update the repository, only the internal document state.
  */
@@ -1792,6 +2052,14 @@ sa_set_group_attr(sa_group_t group, char *tag, char *value)
 	char *groupname;
 	sa_handle_impl_t impl_handle;
 
+	/*
+	 * ZFS group/subgroup doesn't need the handle so shortcut.
+	 */
+	if (sa_group_is_zfs(group)) {
+		set_node_attr((void *)group, tag, value);
+		return (SA_OK);
+	}
+
 	impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 	if (impl_handle != NULL) {
 		groupname = sa_get_group_attr(group, "name");
@@ -1833,47 +2101,15 @@ sa_get_share_attr(sa_share_t share, char *tag)
 }
 
 /*
- * sa_get_resource(group, resource)
- *
- * Search all the shares in the speified group for a share with a
- * resource name matching the one specified.
- *
- * In the future, it may be advantageous to allow group to be NULL and
- * search all groups but that isn't needed at present.
- */
-
-sa_share_t
-sa_get_resource(sa_group_t group, char *resource)
-{
-	sa_share_t share = NULL;
-	char *name = NULL;
-
-	if (resource != NULL) {
-		for (share = sa_get_share(group, NULL); share != NULL;
-		    share = sa_get_next_share(share)) {
-			name = sa_get_share_attr(share, "resource");
-			if (name != NULL) {
-				if (strcmp(name, resource) == 0)
-					break;
-				sa_free_attr_string(name);
-				name = NULL;
-			}
-		}
-		if (name != NULL)
-			sa_free_attr_string(name);
-	}
-	return ((sa_share_t)share);
-}
-
-/*
  * _sa_set_share_description(share, description)
  *
- * Add a description tag with text contents to the specified share.
- * A separate XML tag is used rather than a property.
+ * Add a description tag with text contents to the specified share.  A
+ * separate XML tag is used rather than a property. This can also be
+ * used with resources.
  */
 
 xmlNodePtr
-_sa_set_share_description(sa_share_t share, char *content)
+_sa_set_share_description(void *share, char *content)
 {
 	xmlNodePtr node;
 	node = xmlNewChild((xmlNodePtr)share, NULL, (xmlChar *)"description",
@@ -2205,7 +2441,6 @@ sa_set_share_description(sa_share_t share, char *content)
 			break;
 		}
 	}
-	group = sa_get_parent_group(share);
 	/* no existing description but want to add */
 	if (node == NULL && content != NULL) {
 		/* add a description */
@@ -2218,7 +2453,8 @@ sa_set_share_description(sa_share_t share, char *content)
 		xmlUnlinkNode(node);
 		xmlFreeNode(node);
 	}
-	if (group != NULL && is_persistent((sa_group_t)share)) {
+	group = sa_get_parent_group(share);
+	if (group != NULL && sa_is_persistent(share)) {
 		sa_handle_impl_t impl_handle;
 		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 		if (impl_handle != NULL) {
@@ -2269,7 +2505,7 @@ sa_get_share_description(sa_share_t share)
 		}
 	}
 	if (node != NULL) {
-		description = xmlNodeGetContent((xmlNodePtr)share);
+		description = xmlNodeGetContent(node);
 		fixproblemchars((char *)description);
 	}
 	return ((char *)description);
@@ -2299,12 +2535,44 @@ sa_create_optionset(sa_group_t group, char *proto)
 {
 	sa_optionset_t optionset;
 	sa_group_t parent = group;
+	sa_share_t share = NULL;
+	int err = SA_OK;
+	char *id = NULL;
 
 	optionset = sa_get_optionset(group, proto);
 	if (optionset != NULL) {
 		/* can't have a duplicate protocol */
 		optionset = NULL;
 	} else {
+		/*
+		 * Account for resource names being slightly
+		 * different.
+		 */
+		if (sa_is_share(group)) {
+			/*
+			 * Transient shares do not have an "id" so not an
+			 * error to not find one.
+			 */
+			id = sa_get_share_attr((sa_share_t)group, "id");
+		} else if (sa_is_resource(group)) {
+			share = sa_get_resource_parent(
+			    (sa_resource_t)group);
+			id = sa_get_resource_attr(share, "id");
+
+			/* id can be NULL if the group is transient (ZFS) */
+			if (id == NULL && sa_is_persistent(group))
+				err = SA_NO_MEMORY;
+		}
+		if (err == SA_NO_MEMORY) {
+			/*
+			 * Couldn't get the id for the share or
+			 * resource. While this could be a
+			 * configuration issue, it is most likely an
+			 * out of memory. In any case, fail the create.
+			 */
+			return (NULL);
+		}
+
 		optionset = (sa_optionset_t)xmlNewChild((xmlNodePtr)group,
 		    NULL, (xmlChar *)"optionset", NULL);
 		/*
@@ -2314,38 +2582,44 @@ sa_create_optionset(sa_group_t group, char *proto)
 		if (optionset != NULL) {
 			char oname[SA_STRSIZE];
 			char *groupname;
-			char *id = NULL;
 
-			if (sa_is_share(group))
+			/*
+			 * Need to get parent group in all cases, but also get
+			 * the share if this is a resource.
+			 */
+			if (sa_is_share(group)) {
 				parent = sa_get_parent_group((sa_share_t)group);
+			} else if (sa_is_resource(group)) {
+				share = sa_get_resource_parent(
+				    (sa_resource_t)group);
+				parent = sa_get_parent_group(share);
+			}
 
 			sa_set_optionset_attr(optionset, "type", proto);
 
-			if (sa_is_share(group)) {
-				id = sa_get_share_attr((sa_share_t)group, "id");
-			}
 			(void) sa_optionset_name(optionset, oname,
 			    sizeof (oname), id);
 			groupname = sa_get_group_attr(parent, "name");
-			if (groupname != NULL && is_persistent(group)) {
+			if (groupname != NULL && sa_is_persistent(group)) {
 				sa_handle_impl_t impl_handle;
-				impl_handle = (sa_handle_impl_t)
-				    sa_find_group_handle(group);
+				impl_handle =
+				    (sa_handle_impl_t)sa_find_group_handle(
+				    group);
 				assert(impl_handle != NULL);
 				if (impl_handle != NULL) {
 					(void) sa_get_instance(
-					    impl_handle->scfhandle,
-					    groupname);
+					    impl_handle->scfhandle, groupname);
 					(void) sa_create_pgroup(
 					    impl_handle->scfhandle, oname);
 				}
 			}
 			if (groupname != NULL)
 				sa_free_attr_string(groupname);
-			if (id != NULL)
-				sa_free_attr_string(id);
 		}
 	}
+
+	if (id != NULL)
+		sa_free_attr_string(id);
 	return (optionset);
 }
 
@@ -2388,7 +2662,7 @@ sa_get_optionset_parent(sa_optionset_t optionset)
  *
  * In order to avoid making multiple updates to a ZFS share when
  * setting properties, the share attribute "changed" will be set to
- * true when a property is added or modifed.  When done adding
+ * true when a property is added or modified.  When done adding
  * properties, we can then detect that an update is needed.  We then
  * clear the state here to detect additional changes.
  */
@@ -2470,7 +2744,7 @@ sa_commit_properties(sa_optionset_t optionset, int clear)
 /*
  * sa_destroy_optionset(optionset)
  *
- * Remove the optionset from its group. Update the repostory to
+ * Remove the optionset from its group. Update the repository to
  * reflect this change.
  */
 
@@ -2486,9 +2760,16 @@ sa_destroy_optionset(sa_optionset_t optionset)
 
 	/* now delete the prop group */
 	group = sa_get_optionset_parent(optionset);
-	if (group != NULL && sa_is_share(group)) {
-		ispersist = is_persistent(group);
-		id = sa_get_share_attr((sa_share_t)group, "id");
+	if (group != NULL) {
+		if (sa_is_resource(group)) {
+			sa_resource_t resource = group;
+			sa_share_t share = sa_get_resource_parent(resource);
+			group = sa_get_parent_group(share);
+			id = sa_get_share_attr(share, "id");
+		} else if (sa_is_share(group)) {
+			id = sa_get_share_attr((sa_share_t)group, "id");
+		}
+		ispersist = sa_is_persistent(group);
 	}
 	if (ispersist) {
 		sa_handle_impl_t impl_handle;
@@ -2559,7 +2840,7 @@ sa_create_security(sa_group_t group, char *sectype, char *proto)
 			sa_set_security_attr(security, "sectype", sectype);
 			(void) sa_security_name(security, oname,
 			    sizeof (oname), id);
-			if (groupname != NULL && is_persistent(group)) {
+			if (groupname != NULL && sa_is_persistent(group)) {
 				sa_handle_impl_t impl_handle;
 				impl_handle =
 				    (sa_handle_impl_t)sa_find_group_handle(
@@ -2603,7 +2884,7 @@ sa_destroy_security(sa_security_t security)
 
 	if (group != NULL && !iszfs) {
 		if (sa_is_share(group))
-			ispersist = is_persistent(group);
+			ispersist = sa_is_persistent(group);
 		id = sa_get_share_attr((sa_share_t)group, "id");
 	}
 	if (ispersist) {
@@ -2666,7 +2947,6 @@ is_nodetype(void *node, char *type)
 	return (strcmp((char *)((xmlNodePtr)node)->name, type) == 0);
 }
 
-
 /*
  * add_or_update()
  *
@@ -2721,12 +3001,12 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 	int opttype; /* 1 == optionset, 0 == security */
 	char *id = NULL;
 	int iszfs = 0;
-	int isshare = 0;
 	sa_group_t parent = NULL;
+	sa_share_t share = NULL;
 	sa_handle_impl_t impl_handle;
 	scfutilhandle_t  *scf_handle;
 
-	if (!is_persistent(group)) {
+	if (!sa_is_persistent(group)) {
 		/*
 		 * if the group/share is not persistent we don't need
 		 * to do anything here
@@ -2742,12 +3022,20 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 	entry = scf_entry_create(scf_handle->handle);
 	opttype = is_nodetype((void *)optionset, "optionset");
 
+	/*
+	 * Check for share vs. resource since they need slightly
+	 * different treatment given the hierarchy.
+	 */
 	if (valstr != NULL && entry != NULL) {
 		if (sa_is_share(group)) {
-			isshare = 1;
 			parent = sa_get_parent_group(group);
+			share = (sa_share_t)group;
 			if (parent != NULL)
 				iszfs = is_zfs_group(parent);
+		} else if (sa_is_resource(group)) {
+			share = sa_get_parent_group(group);
+			if (share != NULL)
+				parent = sa_get_parent_group(share);
 		} else {
 			iszfs = is_zfs_group(group);
 		}
@@ -2755,15 +3043,13 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 			if (scf_handle->trans == NULL) {
 				char oname[SA_STRSIZE];
 				char *groupname = NULL;
-				if (isshare) {
-					if (parent != NULL) {
+				if (share != NULL) {
+					if (parent != NULL)
 						groupname =
 						    sa_get_group_attr(parent,
 						    "name");
-					}
-					id =
-					    sa_get_share_attr((sa_share_t)group,
-					    "id");
+					id = sa_get_share_attr(
+					    (sa_share_t)share, "id");
 				} else {
 					groupname = sa_get_group_attr(group,
 					    "name");
@@ -2870,14 +3156,22 @@ sa_add_property(void *object, sa_property_t property)
 		sa_free_attr_string(proto);
 
 	parent = sa_get_parent_group(object);
-	if (!is_persistent(parent)) {
+	if (!sa_is_persistent(parent))
 		return (ret);
-	}
 
-	if (sa_is_share(parent))
+	if (sa_is_resource(parent)) {
+		/*
+		 * Resources are children of share.  Need to go up two
+		 * levels to find the group but the parent needs to be
+		 * the share at this point in order to get the "id".
+		 */
+		parent = sa_get_parent_group(parent);
 		group = sa_get_parent_group(parent);
-	else
+	} else if (sa_is_share(parent)) {
+		group = sa_get_parent_group(parent);
+	} else {
 		group = parent;
+	}
 
 	if (property == NULL) {
 		ret = SA_NO_MEMORY;
@@ -3110,7 +3404,7 @@ sa_set_protocol_property(sa_property_t prop, char *value)
 /*
  * sa_add_protocol_property(propset, prop)
  *
- * Add a new property to the protocol sepcific property set.
+ * Add a new property to the protocol specific property set.
  */
 
 int
@@ -3128,7 +3422,7 @@ sa_add_protocol_property(sa_protocol_properties_t propset, sa_property_t prop)
 /*
  * sa_create_protocol_properties(proto)
  *
- * Create a protocol specifity property set.
+ * Create a protocol specific property set.
  */
 
 sa_protocol_properties_t
@@ -3140,4 +3434,584 @@ sa_create_protocol_properties(char *proto)
 	if (node != NULL)
 		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
 	return (node);
+}
+
+/*
+ * sa_get_share_resource(share, resource)
+ *
+ * Get the named resource from the share, if it exists. If resource is
+ * NULL, get the first resource.
+ */
+
+sa_resource_t
+sa_get_share_resource(sa_share_t share, char *resource)
+{
+	xmlNodePtr node = NULL;
+	xmlChar *name;
+
+	if (share != NULL) {
+		for (node = ((xmlNodePtr)share)->children; node != NULL;
+		    node = node->next) {
+			if (xmlStrcmp(node->name, (xmlChar *)"resource") == 0) {
+				if (resource == NULL) {
+					/*
+					 * We are looking for the first
+					 * resource node and not a names
+					 * resource.
+					 */
+					break;
+				} else {
+					/* is it the correct share? */
+					name = xmlGetProp(node,
+					    (xmlChar *)"name");
+					if (name != NULL &&
+					    xmlStrcasecmp(name,
+					    (xmlChar *)resource) == 0) {
+						xmlFree(name);
+						break;
+					}
+					xmlFree(name);
+				}
+			}
+		}
+	}
+	return ((sa_resource_t)node);
+}
+
+/*
+ * sa_get_next_resource(resource)
+ *	Return the next share following the specified share
+ *	from the internal list of shares. Returns NULL if there
+ *	are no more shares.  The list is relative to the same
+ *	group.
+ */
+sa_share_t
+sa_get_next_resource(sa_resource_t resource)
+{
+	xmlNodePtr node = NULL;
+
+	if (resource != NULL) {
+		for (node = ((xmlNodePtr)resource)->next; node != NULL;
+		    node = node->next) {
+			if (xmlStrcmp(node->name, (xmlChar *)"resource") == 0)
+				break;
+		}
+	}
+	return ((sa_share_t)node);
+}
+
+/*
+ * _sa_get_next_resource_index(share)
+ *
+ * get the next resource index number (one greater then current largest)
+ */
+
+static int
+_sa_get_next_resource_index(sa_share_t share)
+{
+	sa_resource_t resource;
+	int index = 0;
+	char *id;
+
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL;
+	    resource = sa_get_next_resource(resource)) {
+		id = get_node_attr((void *)resource, "id");
+		if (id != NULL) {
+			int val;
+			val = atoi(id);
+			if (val > index)
+				index = val;
+			sa_free_attr_string(id);
+		}
+	}
+	return (index + 1);
+}
+
+
+/*
+ * sa_add_resource(share, resource, persist, &err)
+ *
+ * Adds a new resource name associated with share. The resource name
+ * must be unique in the system and will be case insensitive (eventually).
+ */
+
+sa_resource_t
+sa_add_resource(sa_share_t share, char *resource, int persist, int *error)
+{
+	xmlNodePtr node;
+	int err = SA_OK;
+	sa_resource_t res;
+	sa_group_t group;
+	sa_handle_t handle;
+	char istring[8]; /* just big enough for an integer value */
+	int index;
+
+	group = sa_get_parent_group(share);
+	handle = sa_find_group_handle(group);
+	res = sa_find_resource(handle, resource);
+	if (res != NULL) {
+		err = SA_DUPLICATE_NAME;
+		res = NULL;
+	} else {
+		node = xmlNewChild((xmlNodePtr)share, NULL,
+		    (xmlChar *)"resource", NULL);
+		if (node != NULL) {
+			xmlSetProp(node, (xmlChar *)"name",
+			    (xmlChar *)resource);
+			xmlSetProp(node, (xmlChar *)"type", persist ?
+			    (xmlChar *)"persist" : (xmlChar *)"transient");
+			if (persist != SA_SHARE_TRANSIENT) {
+				index = _sa_get_next_resource_index(share);
+				(void) snprintf(istring, sizeof (istring), "%d",
+				    index);
+				xmlSetProp(node, (xmlChar *)"id",
+				    (xmlChar *)istring);
+				if (!sa_group_is_zfs(group) &&
+				    sa_is_persistent((sa_group_t)share)) {
+					/* ZFS doesn't use resource names */
+					sa_handle_impl_t ihandle;
+					ihandle = (sa_handle_impl_t)
+					    sa_find_group_handle(
+					    group);
+					if (ihandle != NULL)
+						err = sa_commit_share(
+						    ihandle->scfhandle, group,
+						    share);
+					else
+						err = SA_SYSTEM_ERR;
+				}
+			}
+		}
+	}
+	if (error != NULL)
+		*error = err;
+	return ((sa_resource_t)node);
+}
+
+/*
+ * sa_remove_resource(resource)
+ *
+ * Remove the resource name from the share (and the system)
+ */
+
+int
+sa_remove_resource(sa_resource_t resource)
+{
+	sa_share_t share;
+	sa_group_t group;
+	char *type;
+	int ret = SA_OK;
+	int transient = 0;
+
+	share = sa_get_resource_parent(resource);
+	type = sa_get_share_attr(share, "type");
+	group = sa_get_parent_group(share);
+
+
+	if (type != NULL) {
+		if (strcmp(type, "persist") != 0)
+			transient = 1;
+		sa_free_attr_string(type);
+	}
+
+	/* Remove from the share */
+	xmlUnlinkNode((xmlNode *)resource);
+	xmlFreeNode((xmlNode *)resource);
+
+	/* only do SMF action if permanent and not ZFS */
+	if (!transient && !sa_group_is_zfs(group)) {
+		sa_handle_impl_t ihandle;
+		ihandle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (ihandle != NULL)
+			ret = sa_commit_share(ihandle->scfhandle, group, share);
+		else
+			ret = SA_SYSTEM_ERR;
+	}
+	return (ret);
+}
+
+/*
+ * proto_resource_rename(handle, group, resource, newname)
+ *
+ * Helper function for sa_rename_resource that notifies the protocol
+ * of a resource name change prior to a config repository update.
+ */
+static int
+proto_rename_resource(sa_handle_t handle, sa_group_t group,
+    sa_resource_t resource, char *newname)
+{
+	sa_optionset_t optionset;
+	int ret = SA_OK;
+	int err;
+
+	for (optionset = sa_get_optionset(group, NULL);
+	    optionset != NULL;
+	    optionset = sa_get_next_optionset(optionset)) {
+		char *type;
+		type = sa_get_optionset_attr(optionset, "type");
+		if (type != NULL) {
+			err = sa_proto_rename_resource(handle, type, resource,
+			    newname);
+			if (err != SA_OK)
+				ret = err;
+			sa_free_attr_string(type);
+		}
+	}
+	return (ret);
+}
+
+/*
+ * sa_rename_resource(resource, newname)
+ *
+ * Rename the resource to the new name, if it is unique.
+ */
+
+int
+sa_rename_resource(sa_resource_t resource, char *newname)
+{
+	sa_share_t share;
+	sa_group_t group = NULL;
+	sa_resource_t target;
+	int ret = SA_CONFIG_ERR;
+	sa_handle_t handle = NULL;
+
+	share = sa_get_resource_parent(resource);
+	if (share == NULL)
+		return (ret);
+
+	group = sa_get_parent_group(share);
+	if (group == NULL)
+		return (ret);
+
+	handle = (sa_handle_impl_t)sa_find_group_handle(group);
+	if (handle == NULL)
+		return (ret);
+
+	target = sa_find_resource(handle, newname);
+	if (target != NULL) {
+		ret = SA_DUPLICATE_NAME;
+	} else {
+		/*
+		 * Everything appears to be valid at this
+		 * point. Change the name of the active share and then
+		 * update the share in the appropriate repository.
+		 */
+		ret = proto_rename_resource(handle, group, resource, newname);
+		set_node_attr(resource, "name", newname);
+		if (!sa_group_is_zfs(group) &&
+		    sa_is_persistent((sa_group_t)share)) {
+			sa_handle_impl_t ihandle = (sa_handle_impl_t)handle;
+			ret = sa_commit_share(ihandle->scfhandle, group,
+			    share);
+		}
+	}
+	return (ret);
+}
+
+/*
+ * sa_get_resource_attr(resource, tag)
+ *
+ * Get the named attribute of the resource. "name" and "id" are
+ * currently defined.  NULL if tag not defined.
+ */
+
+char *
+sa_get_resource_attr(sa_resource_t resource, char *tag)
+{
+	return (get_node_attr((void *)resource, tag));
+}
+
+/*
+ * sa_set_resource_attr(resource, tag, value)
+ *
+ * Get the named attribute of the resource. "name" and "id" are
+ * currently defined.  NULL if tag not defined. Currently we don't do
+ * much, but additional checking may be needed in the future.
+ */
+
+int
+sa_set_resource_attr(sa_resource_t resource, char *tag, char *value)
+{
+	set_node_attr((void *)resource, tag, value);
+	return (SA_OK);
+}
+
+/*
+ * sa_get_resource_parent(resource_t)
+ *
+ * Returns the share associated with the resource.
+ */
+
+sa_share_t
+sa_get_resource_parent(sa_resource_t resource)
+{
+	sa_share_t share = NULL;
+
+	if (resource != NULL)
+		share = (sa_share_t)((xmlNodePtr)resource)->parent;
+	return (share);
+}
+
+/*
+ * find_resource(group, name)
+ *
+ * Find the resource within the group.
+ */
+
+static sa_resource_t
+find_resource(sa_group_t group, char *resname)
+{
+	sa_share_t share;
+	sa_resource_t resource = NULL;
+	char *name;
+
+	/* Iterate over all the shares and resources in the group. */
+	for (share = sa_get_share(group, NULL);
+	    share != NULL && resource == NULL;
+	    share = sa_get_next_share(share)) {
+		for (resource = sa_get_share_resource(share, NULL);
+		    resource != NULL;
+		    resource = sa_get_next_resource(resource)) {
+			name = sa_get_resource_attr(resource, "name");
+			if (name != NULL && xmlStrcasecmp((xmlChar*)name,
+			    (xmlChar*)resname) == 0) {
+				sa_free_attr_string(name);
+				break;
+			}
+			if (name != NULL) {
+				sa_free_attr_string(name);
+			}
+		}
+	}
+	return (resource);
+}
+
+/*
+ * sa_find_resource(name)
+ *
+ * Find the named resource in the system.
+ */
+
+sa_resource_t
+sa_find_resource(sa_handle_t handle, char *name)
+{
+	sa_group_t group;
+	sa_group_t zgroup;
+	sa_resource_t resource = NULL;
+
+	/*
+	 * Iterate over all groups and zfs subgroups and check for
+	 * resource name in them.
+	 */
+	for (group = sa_get_group(handle, NULL); group != NULL;
+	    group = sa_get_next_group(group)) {
+
+		if (is_zfs_group(group)) {
+			for (zgroup =
+			    (sa_group_t)_sa_get_child_node((xmlNodePtr)group,
+			    (xmlChar *)"group");
+			    zgroup != NULL && resource == NULL;
+			    zgroup = sa_get_next_group(zgroup)) {
+				resource = find_resource(zgroup, name);
+			}
+		} else {
+			resource = find_resource(group, name);
+		}
+		if (resource != NULL)
+			break;
+	}
+	return (resource);
+}
+
+/*
+ * sa_get_resource(group, resource)
+ *
+ * Search all the shares in the specified group for a share with a
+ * resource name matching the one specified.
+ *
+ * In the future, it may be advantageous to allow group to be NULL and
+ * search all groups but that isn't needed at present.
+ */
+
+sa_resource_t
+sa_get_resource(sa_group_t group, char *resource)
+{
+	sa_share_t share = NULL;
+	sa_resource_t res = NULL;
+
+	if (resource != NULL) {
+		for (share = sa_get_share(group, NULL);
+		    share != NULL && res == NULL;
+		    share = sa_get_next_share(share)) {
+			res = sa_get_share_resource(share, resource);
+		}
+	}
+	return (res);
+}
+
+/*
+ * sa_enable_resource, protocol)
+ *	Disable the specified share to the specified protocol.
+ *	If protocol is NULL, then all protocols.
+ */
+int
+sa_enable_resource(sa_resource_t resource, char *protocol)
+{
+	int ret = SA_OK;
+	char **protocols;
+	int numproto;
+
+	if (protocol != NULL) {
+		ret = sa_proto_share_resource(protocol, resource);
+	} else {
+		/* need to do all protocols */
+		if ((numproto = sa_get_protocols(&protocols)) >= 0) {
+			int i, err;
+			for (i = 0; i < numproto; i++) {
+				err = sa_proto_share_resource(
+				    protocols[i], resource);
+				if (err != SA_OK)
+					ret = err;
+			}
+			free(protocols);
+		}
+	}
+	if (ret == SA_OK)
+		(void) sa_set_resource_attr(resource, "shared", NULL);
+
+	return (ret);
+}
+
+/*
+ * sa_disable_resource(resource, protocol)
+ *
+ *	Disable the specified share for the specified protocol.  If
+ *	protocol is NULL, then all protocols.  If the underlying
+ *	protocol doesn't implement disable at the resource level, we
+ *	disable at the share level.
+ */
+int
+sa_disable_resource(sa_resource_t resource, char *protocol)
+{
+	int ret = SA_OK;
+	char **protocols;
+	int numproto;
+
+	if (protocol != NULL) {
+		ret = sa_proto_unshare_resource(protocol, resource);
+		if (ret == SA_NOT_IMPLEMENTED) {
+			sa_share_t parent;
+			/*
+			 * The protocol doesn't implement unshare
+			 * resource. That implies that resource names are
+			 * simple aliases for this protocol so we need to
+			 * unshare the share.
+			 */
+			parent = sa_get_resource_parent(resource);
+			if (parent != NULL)
+				ret = sa_disable_share(parent, protocol);
+			else
+				ret = SA_CONFIG_ERR;
+		}
+	} else {
+		/* need to do all protocols */
+		if ((numproto = sa_get_protocols(&protocols)) >= 0) {
+			int i, err;
+			for (i = 0; i < numproto; i++) {
+				err = sa_proto_unshare_resource(protocols[i],
+				    resource);
+				if (err == SA_NOT_SUPPORTED) {
+					sa_share_t parent;
+					parent = sa_get_resource_parent(
+					    resource);
+					if (parent != NULL)
+						err = sa_disable_share(parent,
+						    protocols[i]);
+					else
+						err = SA_CONFIG_ERR;
+				}
+				if (err != SA_OK)
+					ret = err;
+			}
+			free(protocols);
+		}
+	}
+	if (ret == SA_OK)
+		(void) sa_set_resource_attr(resource, "shared", NULL);
+
+	return (ret);
+}
+
+/*
+ * sa_set_resource_description(resource, content)
+ *
+ * Set the description of share to content.
+ */
+
+int
+sa_set_resource_description(sa_resource_t resource, char *content)
+{
+	xmlNodePtr node;
+	sa_group_t group;
+	sa_share_t share;
+	int ret = SA_OK;
+
+	for (node = ((xmlNodePtr)resource)->children;
+	    node != NULL;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"description") == 0) {
+			break;
+		}
+	}
+
+	/* no existing description but want to add */
+	if (node == NULL && content != NULL) {
+		/* add a description */
+		node = _sa_set_share_description(resource, content);
+	} else if (node != NULL && content != NULL) {
+		/* update a description */
+		xmlNodeSetContent(node, (xmlChar *)content);
+	} else if (node != NULL && content == NULL) {
+		/* remove an existing description */
+		xmlUnlinkNode(node);
+		xmlFreeNode(node);
+	}
+	share = sa_get_resource_parent(resource);
+	group = sa_get_parent_group(share);
+	if (group != NULL && sa_is_persistent(share)) {
+		sa_handle_impl_t impl_handle;
+		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (impl_handle != NULL)
+			ret = sa_commit_share(impl_handle->scfhandle,
+			    group, share);
+		else
+			ret = SA_SYSTEM_ERR;
+	}
+	return (ret);
+}
+
+/*
+ * sa_get_resource_description(share)
+ *
+ * Return the description text for the specified share if it
+ * exists. NULL if no description exists.
+ */
+
+char *
+sa_get_resource_description(sa_resource_t resource)
+{
+	xmlChar *description = NULL;
+	xmlNodePtr node;
+
+	for (node = ((xmlNodePtr)resource)->children; node != NULL;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"description") == 0)
+			break;
+	}
+	if (node != NULL) {
+		description = xmlNodeGetContent(node);
+		fixproblemchars((char *)description);
+	}
+	return ((char *)description);
 }

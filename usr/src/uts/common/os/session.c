@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +166,7 @@ tty_hold(void)
 		/*
 		 * Now we need to drop our hold on the session structure,
 		 * but we can't hold any locks when we do this because
-		 * sess_rele() may need to aquire pidlock.
+		 * sess_rele() may need to acquire pidlock.
 		 */
 		mutex_exit(&sp->s_lock);
 		sess_rele(sp, B_FALSE);
@@ -306,9 +306,9 @@ strctty(stdata_t *stp)
 	 * We are going to try to make stp the default ctty for the session
 	 * associated with curproc.  Not only does this require holding a
 	 * bunch of locks but it also requires waiting for any outstanding
-	 * holds on the session structure (aquired via tty_hold()) to be
+	 * holds on the session structure (acquired via tty_hold()) to be
 	 * released.  Hence, we have the following for(;;) loop that will
-	 * aquire our locks, do some sanity checks, and wait for the hold
+	 * acquire our locks, do some sanity checks, and wait for the hold
 	 * count on the session structure to hit zero.  If we get a signal
 	 * while waiting for outstanding holds to be released then we abort
 	 * the operation and return.
@@ -370,12 +370,12 @@ strctty(stdata_t *stp)
 }
 
 /*
- * freectty_lock() attempts to aquire the army of locks required to free
+ * freectty_lock() attempts to acquire the army of locks required to free
  * the ctty associated with a given session leader process.  If it returns
  * successfully the following locks will be held:
  *	sd_lock, pidlock, p_splock, s_lock
  *
- * as a secondary bit of convience, freectty_lock() will also return
+ * as a secondary bit of convenience, freectty_lock() will also return
  * pointers to the session, ctty, and ctty stream associated with the
  * specified session leader process.
  */
@@ -543,10 +543,10 @@ freectty(boolean_t at_exit)
 	/*
 	 * If the current process is a session leader we are going to
 	 * try to release the ctty associated our current session.  To
-	 * do this we need to aquire a bunch of locks, signal any
+	 * do this we need to acquire a bunch of locks, signal any
 	 * processes in the forground that are associated with the ctty,
 	 * and make sure no one has any outstanding holds on the current
-	 * session * structure (aquired via tty_hold()).  Hence, we have
+	 * session * structure (acquired via tty_hold()).  Hence, we have
 	 * the following for(;;) loop that will do all this work for
 	 * us and break out when the hold count on the session structure
 	 * hits zero.
@@ -556,7 +556,7 @@ freectty(boolean_t at_exit)
 			return (EIO);
 
 		if (freectty_signal(p, sp, stp, at_exit)) {
-			/* loop around to re-aquire locks */
+			/* loop around to re-acquire locks */
 			continue;
 		}
 
@@ -643,7 +643,7 @@ freectty(boolean_t at_exit)
 	mutex_exit(&stp->sd_lock);
 
 	/* This is the only remaining thread with access to this vnode */
-	(void) VOP_CLOSE(vp, 0, 1, (offset_t)0, cred);
+	(void) VOP_CLOSE(vp, 0, 1, (offset_t)0, cred, NULL);
 	VN_RELE(vp);
 	crfree(cred);
 

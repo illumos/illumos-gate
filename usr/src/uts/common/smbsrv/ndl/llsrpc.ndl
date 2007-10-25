@@ -1,0 +1,110 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_LLSR_NDL_
+#define _MLSVC_LLSR_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+
+/*
+ * LLSRPC interface.
+ *
+ *	0x50	takes the 3a handle + DWORD, returns 2 DWORDs
+ *	0x3c
+ *	0x3f	list of services?
+ *	0x3d	unknown
+ *	0x3e	unknown
+ *	0x4f
+ *	0x4d
+ *	0x4e
+ *	0x01	closes the handle obtained via 0x00
+ *	0x3b	closes the handle obtained via 0x3a
+ */
+
+#include "ndrtypes.ndl"
+
+#define LLSR_OPNUM_Open			0x00
+#define LLSR_OPNUM_Close		0x01
+#define LLSR_OPNUM_Connect		0x3a
+#define LLSR_OPNUM_Disconnect		0x3b
+#define LLSR_OPNUM_Unknown3c		0x3c
+#define LLSR_OPNUM_Unknown3d		0x3d
+#define LLSR_OPNUM_Unknown3e		0x3e
+#define LLSR_OPNUM_Unknown3f		0x3f
+#define LLSR_OPNUM_Unknown4d		0x4d
+#define LLSR_OPNUM_Unknown4e		0x4e
+#define LLSR_OPNUM_Unknown4f		0x4f
+#define LLSR_OPNUM_Unknown50		0x50
+
+
+struct llsr_handle {
+	DWORD opaque[5];
+};
+typedef struct llsr_handle llsr_handle_t;
+
+
+OPERATION(LLSR_OPNUM_Open)
+struct llsr_Open {
+	IN	LPTSTR hostname;
+	OUT	llsr_handle_t open_handle;
+	OUT	DWORD status;
+};
+
+
+OPERATION(LLSR_OPNUM_Close)
+struct llsr_Close {
+	IN	llsr_handle_t open_handle;
+	OUT	DWORD status;
+};
+
+
+OPERATION(LLSR_OPNUM_Connect)
+struct llsr_Connect {
+	IN	LPTSTR hostname;
+	OUT	llsr_handle_t connect_handle;
+	OUT	DWORD status;
+};
+
+
+OPERATION(LLSR_OPNUM_Disconnect)
+struct llsr_Disconnect {
+	IN	llsr_handle_t connect_handle;
+	OUT	llsr_handle_t echoed_handle;
+	OUT	DWORD status;
+};
+
+
+OPERATION(LLSR_OPNUM_Unknown50)
+struct llsr_Unknown50 {
+	IN	llsr_handle_t open_handle;
+	IN	DWORD unknown1;	/* 0x00000004 */
+	OUT	DWORD unknown2;	/* 0x00000004 */
+	OUT	DWORD unknown3;	/* 0x0000003F */
+	OUT	DWORD status;
+};
+
+
+#endif /* _MLSVC_LLSR_NDL_ */

@@ -1231,8 +1231,61 @@ Use is subject to license terms.
 	<see>uadmin(1M)</see>
     </event>
 
+<!-- smbd service event; smbd session setup -->
+    <event id="AUE_smbd_session" header="0" idNo="58" omit="JNI">
+	<title>smbd</title>
+	<program>/usr/lib/smbsrv/smbd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>domain</comment>
+	</entry>
+	<entry id="username">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>username</comment>
+	</entry>
+	<entry id="sid">
+	    <internal token="text"/>
+	    <external opt="optional" type="char*"/>
+	<comment>sid</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- smbd service event; smbd session logoff -->
+    <event id="AUE_smbd_logoff" header="0" idNo="59" omit="JNI">
+	<title>smbd</title>
+	<program>/usr/lib/smbsrv/smbd</program>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="domain">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>domain</comment>
+	</entry>
+	<entry id="username">
+	    <internal token="text"/>
+	    <external opt="required" type="char*"/>
+	<comment>username</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 57, so next is 58, then fix this comment -->
+<!-- Highest idNo is 59, so next is 60, then fix this comment -->
 <!-- end of C Only events -->
 
 

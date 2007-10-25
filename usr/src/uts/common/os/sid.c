@@ -41,8 +41,6 @@
 #include <sys/kidmap.h>
 #include <sys/idmap.h>
 
-#define	KSIDLIST_MEM(n)	(sizeof (ksidlist_t) + ((n) - 1) * sizeof (ksid_t))
-
 static kmutex_t sid_lock;
 static avl_tree_t sid_tree;
 static boolean_t sid_inited = B_FALSE;

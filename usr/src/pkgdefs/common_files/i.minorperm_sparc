@@ -332,6 +332,7 @@ profile:profile
 sdt:sdt
 systrace:systrace
 physmem:*
+smbsrv:*
 EOF
 }
 

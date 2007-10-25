@@ -55,7 +55,7 @@
 /*
  * ctfs, the contract filesystem.
  *
- * Exposes the constract subsystem to userland.  The structure of the
+ * Exposes the construct subsystem to userland.  The structure of the
  * filesytem is a public interface, but the behavior of the files is
  * private and unstable.  Contract consumers are expected to use
  * libcontract(3lib) to operate on ctfs file descriptors.
@@ -399,7 +399,7 @@ ctfs_common_getattr(vnode_t *vp, vattr_t *vap)
  */
 /* ARGSUSED */
 int
-ctfs_open(vnode_t **vpp, int flag, cred_t *cr)
+ctfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	if ((flag & (FOFFMAX | FWRITE)) != FOFFMAX)
 		return (EINVAL);
@@ -414,7 +414,13 @@ ctfs_open(vnode_t **vpp, int flag, cred_t *cr)
  */
 /* ARGSUSED */
 int
-ctfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+ctfs_close(
+	vnode_t *vp,
+	int flag,
+	int count,
+	offset_t offset,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -424,7 +430,12 @@ ctfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
  */
 /* ARGSUSED */
 int
-ctfs_access_dir(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_access_dir(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	if (mode & VWRITE)
 		return (EACCES);
@@ -437,7 +448,12 @@ ctfs_access_dir(vnode_t *vp, int mode, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 int
-ctfs_access_readonly(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_access_readonly(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	if (mode & (VWRITE | VEXEC))
 		return (EACCES);
@@ -450,7 +466,12 @@ ctfs_access_readonly(vnode_t *vp, int mode, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 int
-ctfs_access_readwrite(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_access_readwrite(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	if (mode & VEXEC)
 		return (EACCES);
@@ -463,7 +484,12 @@ ctfs_access_readwrite(vnode_t *vp, int mode, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_root_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_root_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vap->va_type = VDIR;
 	vap->va_mode = 0555;

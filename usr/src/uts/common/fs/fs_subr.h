@@ -56,32 +56,46 @@ extern int	fs_nosys();
 extern int	fs_inval();
 extern int	fs_notdir();
 extern int	fs_nosys_map(struct vnode *, offset_t, struct as *, caddr_t *,
-			size_t, uchar_t, uchar_t, uint_t, struct cred *);
+			size_t, uchar_t, uchar_t, uint_t, struct cred *,
+			caller_context_t *);
 extern int	fs_nosys_addmap(struct vnode *, offset_t, struct as *, caddr_t,
-			size_t, uchar_t, uchar_t, uint_t, struct cred *);
+			size_t, uchar_t, uchar_t, uint_t, struct cred *,
+			caller_context_t *);
 extern int	fs_nosys_poll(struct vnode *, short, int, short *,
-			struct pollhead **);
-
+			struct pollhead **, caller_context_t *);
+extern int	fs_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
+extern int	fs_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
+			caller_context_t *);
+extern int	fs_fsync(vnode_t *, int, cred_t *, caller_context_t *);
 extern int	fs_sync(struct vfs *, short, cred_t *);
 extern int	fs_rwlock(vnode_t *, int, caller_context_t *);
 extern void	fs_rwunlock(vnode_t *, int, caller_context_t *);
-extern int	fs_cmp(vnode_t *, vnode_t *);
-extern int	fs_seek(vnode_t *, offset_t, offset_t *);
+extern int	fs_cmp(vnode_t *, vnode_t *, caller_context_t *);
+extern int	fs_seek(vnode_t *, offset_t, offset_t *, caller_context_t *);
 extern int	fs_frlock(vnode_t *, int, struct flock64 *, int, offset_t,
-			struct flk_callback *, cred_t *);
-extern int	fs_setfl(vnode_t *, int, int, cred_t *);
-extern int	fs_poll(vnode_t *, short, int, short *, struct pollhead **);
-extern int	fs_pathconf(struct vnode *, int, ulong_t *, struct cred *);
+			struct flk_callback *, cred_t *, caller_context_t *);
+extern int	fs_setfl(vnode_t *, int, int, cred_t *, caller_context_t *);
+extern int	fs_poll(vnode_t *, short, int, short *, struct pollhead **,
+			caller_context_t *);
+extern int	fs_pathconf(struct vnode *, int, ulong_t *, struct cred *,
+			caller_context_t *);
 extern void	clkset(time_t);
-extern void	fs_dispose(struct vnode *, page_t *, int, int, struct cred *);
-extern void	fs_nodispose(struct vnode *, page_t *, int, int, struct cred *);
-extern int	fs_fab_acl(struct vnode *, vsecattr_t *, int flag, cred_t *);
+extern void	fs_dispose(struct vnode *, page_t *, int, int, struct cred *,
+			caller_context_t *);
+extern void	fs_nodispose(struct vnode *, page_t *, int, int, struct cred *,
+			caller_context_t *);
+extern int	fs_fab_acl(struct vnode *, vsecattr_t *, int flag, cred_t *,
+			caller_context_t *);
 extern int	fs_shrlock(struct vnode *, int, struct shrlock *, int,
-			cred_t *);
-extern int	fs_vnevent_nosupport(vnode_t *, vnevent_t, vnode_t *, char *);
-extern int	fs_vnevent_support(vnode_t *, vnevent_t, vnode_t *, char *);
+			cred_t *, caller_context_t *);
+extern int	fs_vnevent_nosupport(vnode_t *, vnevent_t, vnode_t *dvp,
+			char *fnm, caller_context_t *);
+extern int	fs_vnevent_support(vnode_t *, vnevent_t, vnode_t *dvp,
+			char *fnm, caller_context_t *);
 extern int	fs_acl_nontrivial(struct vnode *vp, struct cred *cr);
 extern int	fs_need_estale_retry(int);
+extern void	fs_vscan_register(int (*av_scan)(vnode_t *, cred_t *, int));
+extern int	fs_vscan(vnode_t *, cred_t *, int);
 
 #endif	/* _KERNEL */
 

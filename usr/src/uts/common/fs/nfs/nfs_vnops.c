@@ -91,7 +91,8 @@ static int	nfsread(vnode_t *, caddr_t, uint_t, int, size_t *, cred_t *);
 static int	nfssetattr(vnode_t *, struct vattr *, int, cred_t *);
 static int	nfslookup_dnlc(vnode_t *, char *, vnode_t **, cred_t *);
 static int	nfslookup_otw(vnode_t *, char *, vnode_t **, cred_t *, int);
-static int	nfsrename(vnode_t *, char *, vnode_t *, char *, cred_t *);
+static int	nfsrename(vnode_t *, char *, vnode_t *, char *, cred_t *,
+			caller_context_t *);
 static int	nfsreaddir(vnode_t *, rddir_cache *, cred_t *);
 static int	nfs_bio(struct buf *, cred_t *);
 static int	nfs_getapage(vnode_t *, u_offset_t, size_t, uint_t *,
@@ -123,59 +124,75 @@ static void	nfs_delmap_callback(struct as *, void *, uint_t);
  * more details on rnode locking.
  */
 
-static int	nfs_open(vnode_t **, int, cred_t *);
-static int	nfs_close(vnode_t *, int, int, offset_t, cred_t *);
+static int	nfs_open(vnode_t **, int, cred_t *, caller_context_t *);
+static int	nfs_close(vnode_t *, int, int, offset_t, cred_t *,
+			caller_context_t *);
 static int	nfs_read(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
 static int	nfs_write(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
-static int	nfs_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
-static int	nfs_getattr(vnode_t *, struct vattr *, int, cred_t *);
+static int	nfs_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *,
+			caller_context_t *);
+static int	nfs_getattr(vnode_t *, struct vattr *, int, cred_t *,
+			caller_context_t *);
 static int	nfs_setattr(vnode_t *, struct vattr *, int, cred_t *,
 			caller_context_t *);
-static int	nfs_access(vnode_t *, int, int, cred_t *);
+static int	nfs_access(vnode_t *, int, int, cred_t *, caller_context_t *);
 static int	nfs_accessx(void *, int, cred_t *);
-static int	nfs_readlink(vnode_t *, struct uio *, cred_t *);
-static int	nfs_fsync(vnode_t *, int, cred_t *);
-static void	nfs_inactive(vnode_t *, cred_t *);
+static int	nfs_readlink(vnode_t *, struct uio *, cred_t *,
+			caller_context_t *);
+static int	nfs_fsync(vnode_t *, int, cred_t *, caller_context_t *);
+static void	nfs_inactive(vnode_t *, cred_t *, caller_context_t *);
 static int	nfs_lookup(vnode_t *, char *, vnode_t **, struct pathname *,
-			int, vnode_t *, cred_t *);
+			int, vnode_t *, cred_t *, caller_context_t *,
+			int *, pathname_t *);
 static int	nfs_create(vnode_t *, char *, struct vattr *, enum vcexcl,
-			int, vnode_t **, cred_t *, int);
-static int	nfs_remove(vnode_t *, char *, cred_t *);
-static int	nfs_link(vnode_t *, vnode_t *, char *, cred_t *);
-static int	nfs_rename(vnode_t *, char *, vnode_t *, char *, cred_t *);
-static int	nfs_mkdir(vnode_t *, char *, struct vattr *,
-			vnode_t **, cred_t *);
-static int	nfs_rmdir(vnode_t *, char *, vnode_t *, cred_t *);
+			int, vnode_t **, cred_t *, int, caller_context_t *,
+			vsecattr_t *);
+static int	nfs_remove(vnode_t *, char *, cred_t *, caller_context_t *,
+			int);
+static int	nfs_link(vnode_t *, vnode_t *, char *, cred_t *,
+			caller_context_t *, int);
+static int	nfs_rename(vnode_t *, char *, vnode_t *, char *, cred_t *,
+			caller_context_t *, int);
+static int	nfs_mkdir(vnode_t *, char *, struct vattr *, vnode_t **,
+			cred_t *, caller_context_t *, int, vsecattr_t *);
+static int	nfs_rmdir(vnode_t *, char *, vnode_t *, cred_t *,
+			caller_context_t *, int);
 static int	nfs_symlink(vnode_t *, char *, struct vattr *, char *,
-			cred_t *);
-static int	nfs_readdir(vnode_t *, struct uio *, cred_t *, int *);
-static int	nfs_fid(vnode_t *, fid_t *);
+			cred_t *, caller_context_t *, int);
+static int	nfs_readdir(vnode_t *, struct uio *, cred_t *, int *,
+			caller_context_t *, int);
+static int	nfs_fid(vnode_t *, fid_t *, caller_context_t *);
 static int	nfs_rwlock(vnode_t *, int, caller_context_t *);
 static void	nfs_rwunlock(vnode_t *, int, caller_context_t *);
-static int	nfs_seek(vnode_t *, offset_t, offset_t *);
+static int	nfs_seek(vnode_t *, offset_t, offset_t *, caller_context_t *);
 static int	nfs_getpage(vnode_t *, offset_t, size_t, uint_t *,
 			page_t *[], size_t, struct seg *, caddr_t,
-			enum seg_rw, cred_t *);
-static int	nfs_putpage(vnode_t *, offset_t, size_t, int, cred_t *);
-static int	nfs_map(vnode_t *, offset_t, struct as *, caddr_t *,
-			size_t, uchar_t, uchar_t, uint_t, cred_t *);
-static int	nfs_addmap(vnode_t *, offset_t, struct as *, caddr_t,
-			size_t, uchar_t, uchar_t, uint_t, cred_t *);
+			enum seg_rw, cred_t *, caller_context_t *);
+static int	nfs_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
+			caller_context_t *);
+static int	nfs_map(vnode_t *, offset_t, struct as *, caddr_t *, size_t,
+			uchar_t, uchar_t, uint_t, cred_t *, caller_context_t *);
+static int	nfs_addmap(vnode_t *, offset_t, struct as *, caddr_t, size_t,
+			uchar_t, uchar_t, uint_t, cred_t *, caller_context_t *);
 static int	nfs_frlock(vnode_t *, int, struct flock64 *, int, offset_t,
-			struct flk_callback *, cred_t *);
+			struct flk_callback *, cred_t *, caller_context_t *);
 static int	nfs_space(vnode_t *, int, struct flock64 *, int, offset_t,
 			cred_t *, caller_context_t *);
-static int	nfs_realvp(vnode_t *, vnode_t **);
-static int	nfs_delmap(vnode_t *, offset_t, struct as *, caddr_t,
-			size_t, uint_t, uint_t, uint_t, cred_t *);
-static int	nfs_pathconf(vnode_t *, int, ulong_t *, cred_t *);
+static int	nfs_realvp(vnode_t *, vnode_t **, caller_context_t *);
+static int	nfs_delmap(vnode_t *, offset_t, struct as *, caddr_t, size_t,
+			uint_t, uint_t, uint_t, cred_t *, caller_context_t *);
+static int	nfs_pathconf(vnode_t *, int, ulong_t *, cred_t *,
+			caller_context_t *);
 static int	nfs_pageio(vnode_t *, page_t *, u_offset_t, size_t, int,
-			cred_t *);
-static int	nfs_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
-static int	nfs_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
-static int	nfs_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *);
+			cred_t *, caller_context_t *);
+static int	nfs_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+			caller_context_t *);
+static int	nfs_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+			caller_context_t *);
+static int	nfs_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *,
+			caller_context_t *);
 
 struct vnodeops *nfs_vnodeops;
 
@@ -233,7 +250,7 @@ nfs_getvnodeops(void)
 
 /* ARGSUSED */
 static int
-nfs_open(vnode_t **vpp, int flag, cred_t *cr)
+nfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	struct vattr va;
@@ -282,8 +299,10 @@ nfs_open(vnode_t **vpp, int flag, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+nfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+	caller_context_t *ct)
 {
 	rnode_t *rp;
 	int error;
@@ -357,11 +376,12 @@ nfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	 */
 	if ((flag & FWRITE) && vn_has_cached_data(vp)) {
 		if ((VTOMI(vp)->mi_flags & MI_NOCTO)) {
-			error = nfs_putpage(vp, (offset_t)0, 0, B_ASYNC, cr);
+			error = nfs_putpage(vp, (offset_t)0, 0, B_ASYNC,
+			    cr, ct);
 			if (error == EAGAIN)
 				error = 0;
 		} else
-			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr, ct);
 		if (!error) {
 			mutex_enter(&rp->r_statelock);
 			error = rp->r_error;
@@ -478,10 +498,10 @@ nfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			 * Copy data.
 			 */
 			error = vpm_data_copy(vp, off + on, n, uiop,
-						1, NULL, 0, S_READ);
+			    1, NULL, 0, S_READ);
 		} else {
 			base = segmap_getmapflt(segkmap, vp, off + on, n,
-								1, S_READ);
+			    1, S_READ);
 			error = uiomove(base + on, n, UIO_READ, uiop);
 		}
 
@@ -679,23 +699,23 @@ nfs_fwrite:
 			if (segmap_kpm) {
 				int pon = uiop->uio_loffset & PAGEOFFSET;
 				size_t pn = MIN(PAGESIZE - pon,
-							uiop->uio_resid);
+				    uiop->uio_resid);
 				int pagecreate;
 
 				mutex_enter(&rp->r_statelock);
 				pagecreate = (pon == 0) && (pn == PAGESIZE ||
-					uiop->uio_loffset + pn >= rp->r_size);
+				    uiop->uio_loffset + pn >= rp->r_size);
 				mutex_exit(&rp->r_statelock);
 
 				base = segmap_getmapflt(segkmap, vp, off + on,
-						pn, !pagecreate, S_WRITE);
+				    pn, !pagecreate, S_WRITE);
 
 				error = writerp(rp, base + pon, n, uiop,
-								pagecreate);
+				    pagecreate);
 
 			} else {
 				base = segmap_getmapflt(segkmap, vp, off + on,
-							n, 0, S_READ);
+				    n, 0, S_READ);
 				error = writerp(rp, base + on, n, uiop, 0);
 			}
 		}
@@ -856,9 +876,10 @@ nfswrite(vnode_t *vp, caddr_t base, uint_t offset, int count, cred_t *cr)
 				offset += tsize;
 				if (mi->mi_io_kstats) {
 					mutex_enter(&mi->mi_lock);
-				    KSTAT_IO_PTR(mi->mi_io_kstats)->writes++;
-				    KSTAT_IO_PTR(mi->mi_io_kstats)->nwritten +=
-					    tsize;
+					KSTAT_IO_PTR(mi->mi_io_kstats)->
+					    writes++;
+					KSTAT_IO_PTR(mi->mi_io_kstats)->
+					    nwritten += tsize;
 					mutex_exit(&mi->mi_lock);
 				}
 				lwp_stat_update(LWP_STAT_OUBLK, 1);
@@ -995,7 +1016,8 @@ nfsread(vnode_t *vp, caddr_t base, uint_t offset, int count, size_t *residp,
 
 /* ARGSUSED */
 static int
-nfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
+nfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp,
+	caller_context_t *ct)
 {
 
 	if (nfs_zone() != VTOMI(vp)->mi_zone)
@@ -1008,8 +1030,10 @@ nfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	}
 }
 
+/* ARGSUSED */
 static int
-nfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
+nfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -1052,7 +1076,7 @@ nfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 			mutex_enter(&rp->r_statelock);
 			rp->r_gcount++;
 			mutex_exit(&rp->r_statelock);
-			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr, ct);
 			mutex_enter(&rp->r_statelock);
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				if (!rp->r_error)
@@ -1096,7 +1120,7 @@ nfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 		return (error);
 
 	error = secpolicy_vnode_setattr(cr, vp, vap, &va, flags, nfs_accessx,
-			vp);
+	    vp);
 
 	if (error)
 		return (error);
@@ -1141,7 +1165,7 @@ nfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	    rp->r_count > 0 ||
 	    rp->r_mapcnt > 0)) {
 		ASSERT(vp->v_type != VCHR);
-		error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+		error = nfs_putpage(vp, (offset_t)0, 0, 0, cr, NULL);
 		if (error && (error == ENOSPC || error == EDQUOT)) {
 			mutex_enter(&rp->r_statelock);
 			if (!rp->r_error)
@@ -1324,11 +1348,12 @@ static int
 nfs_accessx(void *vp, int mode, cred_t *cr)
 {
 	ASSERT(nfs_zone() == VTOMI((vnode_t *)vp)->mi_zone);
-	return (nfs_access(vp, mode, 0, cr));
+	return (nfs_access(vp, mode, 0, cr, NULL));
 }
 
+/* ARGSUSED */
 static int
-nfs_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+nfs_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	struct vattr va;
 	int error;
@@ -1387,8 +1412,9 @@ found:
 
 static int nfs_do_symlink_cache = 1;
 
+/* ARGSUSED */
 static int
-nfs_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
+nfs_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	struct nfsrdlnres rl;
@@ -1483,8 +1509,9 @@ nfs_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
  * metadata changes are not cached on the client before being
  * sent to the server.
  */
+/* ARGSUSED */
 static int
-nfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
+nfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 
@@ -1494,7 +1521,7 @@ nfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
-	error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+	error = nfs_putpage(vp, (offset_t)0, 0, 0, cr, ct);
 	if (!error)
 		error = VTOR(vp)->r_error;
 	return (error);
@@ -1506,8 +1533,9 @@ nfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
  * operation while it was open, it got renamed instead.  Here we
  * remove the renamed file.
  */
+/* ARGSUSED */
 static void
-nfs_inactive(vnode_t *vp, cred_t *cr)
+nfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	rnode_t *rp;
 
@@ -1566,7 +1594,8 @@ redo:
 			if (vn_has_cached_data(vp) &&
 			    ((rp->r_flags & RDIRTY) || rp->r_count > 0)) {
 				ASSERT(vp->v_type != VCHR);
-				error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+				error = nfs_putpage(vp, (offset_t)0, 0, 0,
+				    cr, ct);
 				if (error) {
 					mutex_enter(&rp->r_statelock);
 					if (!rp->r_error)
@@ -1609,9 +1638,11 @@ redo:
  * Remote file system operations having to do with directory manipulation.
  */
 
+/* ARGSUSED */
 static int
 nfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-	int flags, vnode_t *rdir, cred_t *cr)
+	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+	int *direntflags, pathname_t *realpnp)
 {
 	int error;
 	vnode_t *vp;
@@ -1734,7 +1765,7 @@ nfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	 * just need to check access.
 	 */
 	if (strcmp(nm, ".") == 0) {
-		error = nfs_access(dvp, VEXEC, 0, cr);
+		error = nfs_access(dvp, VEXEC, 0, cr, NULL);
 		if (error)
 			return (error);
 		VN_HOLD(dvp);
@@ -1789,7 +1820,7 @@ nfslookup_dnlc(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
 			return (error);
 		vp = dnlc_lookup(dvp, nm);
 		if (vp != NULL) {
-			error = nfs_access(dvp, VEXEC, 0, cr);
+			error = nfs_access(dvp, VEXEC, 0, cr, NULL);
 			if (error) {
 				VN_RELE(vp);
 				return (error);
@@ -1884,7 +1915,8 @@ nfslookup_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 /* ARGSUSED */
 static int
 nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-	int mode, vnode_t **vpp, cred_t *cr, int lfaware)
+	int mode, vnode_t **vpp, cred_t *cr, int lfaware, caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 	struct nfscreatargs args;
@@ -1925,7 +1957,7 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	 * just need to check access.
 	 */
 	} else if (strcmp(nm, ".") == 0) {
-		error = nfs_access(dvp, VEXEC, 0, cr);
+		error = nfs_access(dvp, VEXEC, 0, cr, ct);
 		if (error) {
 			nfs_rw_exit(&drp->r_rwlock);
 			return (error);
@@ -1954,7 +1986,7 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 				vp = specvp(vp, vp->v_rdev, vp->v_type, cr);
 				VN_RELE(tempvp);
 			}
-			if (!(error = VOP_ACCESS(vp, mode, 0, cr))) {
+			if (!(error = VOP_ACCESS(vp, mode, 0, cr, ct))) {
 				if ((vattr.va_mask & AT_SIZE) &&
 				    vp->v_type == VREG) {
 					vattr.va_mask = AT_SIZE;
@@ -1969,7 +2001,7 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 			/*
 			 * existing file got truncated, notify.
 			 */
-			vnevent_create(vp);
+			vnevent_create(vp, ct);
 			*vpp = vp;
 		}
 		return (error);
@@ -2130,8 +2162,9 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
  * we rename it instead of removing it and nfs_inactive
  * will remove the new name.
  */
+/* ARGSUSED */
 static int
-nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
+nfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct, int flags)
 {
 	int error;
 	struct nfsdiropargs da;
@@ -2184,7 +2217,7 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	    (rp->r_unldvp == NULL || strcmp(nm, rp->r_unlname) == 0)) {
 		mutex_exit(&rp->r_statelock);
 		tmpname = newname();
-		error = nfsrename(dvp, nm, dvp, tmpname, cr);
+		error = nfsrename(dvp, nm, dvp, tmpname, cr, ct);
 		if (error)
 			kmem_free(tmpname, MAXNAMELEN);
 		else {
@@ -2213,7 +2246,7 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 		 */
 		if (vn_has_cached_data(vp) &&
 		    ((rp->r_flags & RDIRTY) || rp->r_count > 0)) {
-			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
+			error = nfs_putpage(vp, (offset_t)0, 0, 0, cr, ct);
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				mutex_enter(&rp->r_statelock);
 				if (!rp->r_error)
@@ -2253,7 +2286,7 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	}
 
 	if (error == 0) {
-		vnevent_remove(vp, dvp, nm);
+		vnevent_remove(vp, dvp, nm, ct);
 	}
 	VN_RELE(vp);
 
@@ -2262,8 +2295,10 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
+nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
+	caller_context_t *ct, int flags)
 {
 	int error;
 	struct nfslinkargs args;
@@ -2274,7 +2309,7 @@ nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 
 	if (nfs_zone() != VTOMI(tdvp)->mi_zone)
 		return (EPERM);
-	if (VOP_REALVP(svp, &realvp) == 0)
+	if (VOP_REALVP(svp, &realvp, ct) == 0)
 		svp = realvp;
 
 	args.la_from = VTOFH(svp);
@@ -2310,29 +2345,32 @@ nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 		/*
 		 * Notify the source file of this link operation.
 		 */
-		vnevent_link(svp);
+		vnevent_link(svp, ct);
 	}
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
+nfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
+	caller_context_t *ct, int flags)
 {
 	vnode_t *realvp;
 
 	if (nfs_zone() != VTOMI(odvp)->mi_zone)
 		return (EPERM);
-	if (VOP_REALVP(ndvp, &realvp) == 0)
+	if (VOP_REALVP(ndvp, &realvp, ct) == 0)
 		ndvp = realvp;
 
-	return (nfsrename(odvp, onm, ndvp, nnm, cr));
+	return (nfsrename(odvp, onm, ndvp, nnm, cr, ct));
 }
 
 /*
  * nfsrename does the real work of renaming in NFS Version 2.
  */
 static int
-nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
+nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 	enum nfsstat status;
@@ -2465,10 +2503,10 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 			 * the server removing the file completely.
 			 */
 			tmpname = newname();
-			error = nfs_link(ndvp, nvp, tmpname, cr);
+			error = nfs_link(ndvp, nvp, tmpname, cr, NULL, 0);
 			if (error == EOPNOTSUPP) {
 				error = nfs_rename(ndvp, nnm, ndvp, tmpname,
-				    cr);
+				    cr, NULL, 0);
 			}
 			if (error) {
 				kmem_free(tmpname, MAXNAMELEN);
@@ -2570,7 +2608,7 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 			if (rp->r_unldvp != NULL) {
 				if (strcmp(rp->r_unlname, onm) == 0) {
 					(void) strncpy(rp->r_unlname,
-						    nnm, MAXNAMELEN);
+					    nnm, MAXNAMELEN);
 					rp->r_unlname[MAXNAMELEN - 1] = '\0';
 
 					if (ndvp != rp->r_unldvp) {
@@ -2595,13 +2633,13 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 
 	if (error == 0) {
 		if (nvp)
-			vnevent_rename_dest(nvp, ndvp, nnm);
+			vnevent_rename_dest(nvp, ndvp, nnm, ct);
 
 		if (odvp != ndvp)
-			vnevent_rename_dest_dir(ndvp);
+			vnevent_rename_dest_dir(ndvp, ct);
 
 		ASSERT(ovp != NULL);
-		vnevent_rename_src(ovp, odvp, onm);
+		vnevent_rename_src(ovp, odvp, onm, ct);
 	}
 
 	if (nvp) {
@@ -2615,8 +2653,10 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
+nfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr,
+	caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int error;
 	struct nfscreatargs args;
@@ -2701,8 +2741,10 @@ nfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
+nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
+	caller_context_t *ct, int flags)
 {
 	int error;
 	enum nfsstat status;
@@ -2789,7 +2831,7 @@ nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	}
 
 	if (error == 0) {
-		vnevent_rmdir(vp, dvp, nm);
+		vnevent_rmdir(vp, dvp, nm, ct);
 	}
 	VN_RELE(vp);
 
@@ -2798,8 +2840,10 @@ nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr)
+nfs_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr,
+	caller_context_t *ct, int flags)
 {
 	int error;
 	struct nfsslargs args;
@@ -2868,8 +2912,10 @@ static int nfs_shrinkreaddir = 0;
  * may return only one block's worth of entries.  Entries may be compressed
  * on the server.
  */
+/* ARGSUSED */
 static int
-nfs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp)
+nfs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
+	caller_context_t *ct, int flags)
 {
 	int error;
 	size_t count;
@@ -2980,7 +3026,7 @@ top:
 				 */
 				mutex_exit(&rp->r_statelock);
 				(void) nfs_rw_enter_sig(&rp->r_rwlock,
-					RW_READER, FALSE);
+				    RW_READER, FALSE);
 				rddir_cache_rele(rdc);
 				if (nrdc != NULL)
 					rddir_cache_rele(nrdc);
@@ -2988,7 +3034,7 @@ top:
 			}
 			mutex_exit(&rp->r_statelock);
 			(void) nfs_rw_enter_sig(&rp->r_rwlock,
-				RW_READER, FALSE);
+			    RW_READER, FALSE);
 			rddir_cache_rele(rdc);
 			goto top;
 		}
@@ -3434,8 +3480,9 @@ nfs_bio(struct buf *bp, cred_t *cr)
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_fid(vnode_t *vp, fid_t *fidp)
+nfs_fid(vnode_t *vp, fid_t *fidp, caller_context_t *ct)
 {
 	struct nfs_fid *fp;
 	rnode_t *rp;
@@ -3486,7 +3533,7 @@ nfs_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ctp)
 
 /* ARGSUSED */
 static int
-nfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+nfs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 
 	/*
@@ -3514,10 +3561,11 @@ static int nfs_lostpage = 0;	/* number of times we lost original page */
 /*
  * Return all the pages from [off..off+len) in file
  */
+/* ARGSUSED */
 static int
 nfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 	page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-	enum seg_rw rw, cred_t *cr)
+	enum seg_rw rw, cred_t *cr, caller_context_t *ct)
 {
 	rnode_t *rp;
 	int error;
@@ -3661,8 +3709,8 @@ reread:
 		else if (blkoff == rp->r_nextr)
 			readahead = nfs_nra;
 		else if (rp->r_nextr > blkoff &&
-				((ra_window = (rp->r_nextr - blkoff) / bsize)
-					<= (nfs_nra - 1)))
+		    ((ra_window = (rp->r_nextr - blkoff) / bsize)
+		    <= (nfs_nra - 1)))
 			readahead = nfs_nra - ra_window;
 		else
 			readahead = 0;
@@ -3736,7 +3784,7 @@ again:
 				} else
 					blksize = rp->r_size - blkoff;
 			} else if ((off == 0) ||
-				(off != rp->r_nextr && !readahead_issued)) {
+			    (off != rp->r_nextr && !readahead_issued)) {
 				blksize = PAGESIZE;
 				blkoff = off; /* block = page here */
 			} else
@@ -3818,9 +3866,9 @@ again:
 			}
 
 			if (!readahead_issued && !error) {
-			    mutex_enter(&rp->r_statelock);
-			    rp->r_nextr = io_off + io_len;
-			    mutex_exit(&rp->r_statelock);
+				mutex_enter(&rp->r_statelock);
+				rp->r_nextr = io_off + io_len;
+				mutex_exit(&rp->r_statelock);
 			}
 		}
 	}
@@ -3970,8 +4018,10 @@ nfs_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
  * len == MAXBSIZE (from segmap_release actions), and len == PAGESIZE
  * (from pageout).
  */
+/* ARGSUSED */
 static int
-nfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
+nfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -4172,7 +4222,7 @@ nfs_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		 */
 		if (!(flags & B_ASYNC)) {
 			error = nfs_putpage(vp, io_off, io_len,
-			    B_INVAL | B_FORCE, cr);
+			    B_INVAL | B_FORCE, cr, NULL);
 		}
 	} else {
 		if (error)
@@ -4188,9 +4238,11 @@ nfs_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
-	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr)
+	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int error;
@@ -4292,7 +4344,8 @@ done:
 /* ARGSUSED */
 static int
 nfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr)
+	size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	rnode_t *rp;
 
@@ -4315,9 +4368,10 @@ nfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-nfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-	offset_t offset, struct flk_callback *flk_cbp, cred_t *cr)
+nfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag, offset_t offset,
+	struct flk_callback *flk_cbp, cred_t *cr, caller_context_t *ct)
 {
 	netobj lm_fh;
 	int rc;
@@ -4374,7 +4428,7 @@ nfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			if (!lm_safelock(vp, bfp, cr))
 				return (EAGAIN);
 		}
-		return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr));
+		return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 	}
 
 	rp = VTOR(vp);
@@ -4404,26 +4458,27 @@ nfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	if (cmd != F_GETLK) {
 		mutex_enter(&rp->r_statelock);
 		while (rp->r_count > 0) {
-		    if (intr) {
-			klwp_t *lwp = ttolwp(curthread);
+			if (intr) {
+				klwp_t *lwp = ttolwp(curthread);
 
-			if (lwp != NULL)
-				lwp->lwp_nostop++;
-			if (cv_wait_sig(&rp->r_cv, &rp->r_statelock) == 0) {
+				if (lwp != NULL)
+					lwp->lwp_nostop++;
+				if (cv_wait_sig(&rp->r_cv, &rp->r_statelock)
+				    == 0) {
+					if (lwp != NULL)
+						lwp->lwp_nostop--;
+					rc = EINTR;
+					break;
+				}
 				if (lwp != NULL)
 					lwp->lwp_nostop--;
-				rc = EINTR;
-				break;
-			}
-			if (lwp != NULL)
-				lwp->lwp_nostop--;
-		    } else
+			} else
 			cv_wait(&rp->r_cv, &rp->r_statelock);
 		}
 		mutex_exit(&rp->r_statelock);
 		if (rc != 0)
 			goto done;
-		error = nfs_putpage(vp, (offset_t)0, 0, B_INVAL, cr);
+		error = nfs_putpage(vp, (offset_t)0, 0, B_INVAL, cr, ct);
 		if (error) {
 			if (error == ENOSPC || error == EDQUOT) {
 				mutex_enter(&rp->r_statelock);
@@ -4512,7 +4567,7 @@ nfs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 
 /* ARGSUSED */
 static int
-nfs_realvp(vnode_t *vp, vnode_t **vpp)
+nfs_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 
 	return (EINVAL);
@@ -4531,7 +4586,8 @@ nfs_realvp(vnode_t *vp, vnode_t **vpp)
 /* ARGSUSED */
 static int
 nfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-	size_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr)
+	size_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	int			caller_found;
 	int			error;
@@ -4661,10 +4717,10 @@ nfs_delmap_callback(struct as *as, void *arg, uint_t event)
 		if ((mi->mi_flags & MI_NOCTO) ||
 		    nfs_zone() != mi->mi_zone)
 			error = nfs_putpage(dmapp->vp, dmapp->off, dmapp->len,
-			    B_ASYNC, dmapp->cr);
+			    B_ASYNC, dmapp->cr, NULL);
 		else
 			error = nfs_putpage(dmapp->vp, dmapp->off, dmapp->len,
-			    0, dmapp->cr);
+			    0, dmapp->cr, NULL);
 		if (!error) {
 			mutex_enter(&rp->r_statelock);
 			error = rp->r_error;
@@ -4676,7 +4732,7 @@ nfs_delmap_callback(struct as *as, void *arg, uint_t event)
 
 	if ((rp->r_flags & RDIRECTIO) || (mi->mi_flags & MI_DIRECTIO))
 		(void) nfs_putpage(dmapp->vp, dmapp->off, dmapp->len,
-		    B_INVAL, dmapp->cr);
+		    B_INVAL, dmapp->cr, NULL);
 
 	dmapp->caller->error = error;
 	(void) as_delete_callback(as, arg);
@@ -4685,7 +4741,8 @@ nfs_delmap_callback(struct as *as, void *arg, uint_t event)
 
 /* ARGSUSED */
 static int
-nfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+nfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error = 0;
 
@@ -4748,7 +4805,7 @@ nfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 			break;
 		}
 		return (error ? EINVAL : 0);
-	    }
+		}
 
 	case _PC_XATTR_EXISTS:
 		*valp = 0;
@@ -4806,9 +4863,10 @@ nfs_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 nfs_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr)
+	int flags, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	rnode_t *rp;
@@ -4837,8 +4895,10 @@ nfs_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
+nfs_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	mntinfo_t *mi;
@@ -4856,8 +4916,10 @@ nfs_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 	return (ENOSYS);
 }
 
+/* ARGSUSED */
 static int
-nfs_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
+nfs_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	mntinfo_t *mi;
@@ -4872,11 +4934,13 @@ nfs_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 			return (error);
 	}
 
-	return (fs_fab_acl(vp, vsecattr, flag, cr));
+	return (fs_fab_acl(vp, vsecattr, flag, cr, ct));
 }
 
+/* ARGSUSED */
 static int
-nfs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
+nfs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	struct shrlock nshr;
@@ -4905,7 +4969,7 @@ nfs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 	 * request off to the local share code.
 	 */
 	if (VTOMI(vp)->mi_flags & MI_LLOCK)
-		return (fs_shrlock(vp, cmd, shr, flag, cr));
+		return (fs_shrlock(vp, cmd, shr, flag, cr, ct));
 
 	switch (cmd) {
 	case F_SHARE:

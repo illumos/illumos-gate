@@ -51,6 +51,7 @@
 #include <sys/param.h>
 #include <signal.h>
 #include <libintl.h>
+#include <dirent.h>
 
 #include <sharefs/share.h>
 #include "sharetab.h"
@@ -88,7 +89,7 @@ extern char *get_token(char *);
 static void dfs_free_list(xfs_sharelist_t *);
 /* prototypes */
 void getlegacyconfig(sa_handle_t, char *, xmlNodePtr *);
-extern sa_share_t _sa_add_share(sa_group_t, char *, int, int *);
+extern sa_share_t _sa_add_share(sa_group_t, char *, int, int *, uint64_t);
 extern sa_group_t _sa_create_group(sa_handle_impl_t, char *);
 static void outdfstab(FILE *, xfs_sharelist_t *);
 extern int _sa_remove_optionset(sa_optionset_t);
@@ -563,13 +564,13 @@ sa_comment_line(char *line, char *err)
 }
 
 /*
- * sa_delete_legacy(share)
+ * sa_delete_legacy(share, protocol)
  *
  * Delete the specified share from the legacy config file.
  */
 
 int
-sa_delete_legacy(sa_share_t share)
+sa_delete_legacy(sa_share_t share, char *protocol)
 {
 	FILE *dfstab;
 	int err;
@@ -580,39 +581,54 @@ sa_delete_legacy(sa_share_t share)
 	sa_group_t parent;
 	sigset_t old;
 
+	/*
+	 * Protect against shares that don't have paths. This is not
+	 * really an error at this point.
+	 */
+	path = sa_get_share_attr(share, "path");
+	if (path == NULL)
+		return (ret);
+
 	dfstab = open_dfstab(SA_LEGACY_DFSTAB);
 	if (dfstab != NULL) {
 		(void) setvbuf(dfstab, NULL, _IOLBF, BUFSIZ * 8);
 		sablocksigs(&old);
-		path = sa_get_share_attr(share, "path");
 		parent = sa_get_parent_group(share);
 		if (parent != NULL) {
 			(void) lockf(fileno(dfstab), F_LOCK, 0);
 			list = getdfstab(dfstab);
 			rewind(dfstab);
-			for (optionset = sa_get_optionset(parent, NULL);
-			    optionset != NULL;
-			    optionset = sa_get_next_optionset(optionset)) {
-				char *proto = sa_get_optionset_attr(optionset,
-				    "type");
-				if (list != NULL && proto != NULL)
+			if (protocol != NULL) {
+				if (list != NULL)
 					list = remdfsentry(list, path,
-					    proto);
-				if (proto == NULL)
-					ret = SA_NO_MEMORY;
-				/*
-				 * May want to only do the dfstab if
-				 * this call returns NOT IMPLEMENTED
-				 * but it shouldn't hurt.
-				 */
-				if (ret == SA_OK) {
-					err = sa_proto_delete_legacy(proto,
-					    share);
-					if (err != SA_NOT_IMPLEMENTED)
-						ret = err;
+					    protocol);
+			} else {
+				for (optionset = sa_get_optionset(parent, NULL);
+				    optionset != NULL;
+				    optionset =
+				    sa_get_next_optionset(optionset)) {
+					char *proto = sa_get_optionset_attr(
+					    optionset, "type");
+
+					if (list != NULL && proto != NULL)
+						list = remdfsentry(list, path,
+						    proto);
+					if (proto == NULL)
+						ret = SA_NO_MEMORY;
+					/*
+					 * may want to only do the dfstab if
+					 * this call returns NOT IMPLEMENTED
+					 * but it shouldn't hurt.
+					 */
+					if (ret == SA_OK) {
+						err = sa_proto_delete_legacy(
+						    proto, share);
+						if (err != SA_NOT_IMPLEMENTED)
+							ret = err;
+					}
+					if (proto != NULL)
+						sa_free_attr_string(proto);
 				}
-				if (proto != NULL)
-					sa_free_attr_string(proto);
 			}
 			outdfstab(dfstab, list);
 			if (list != NULL)
@@ -623,13 +639,16 @@ sa_delete_legacy(sa_share_t share)
 		(void) fsync(fileno(dfstab));
 		saunblocksigs(&old);
 		(void) fclose(dfstab);
-		sa_free_attr_string(path);
 	} else {
 		if (errno == EACCES || errno == EPERM)
 			ret = SA_NO_PERMISSION;
 		else
 			ret = SA_CONFIG_ERR;
 	}
+
+	if (path != NULL)
+		sa_free_attr_string(path);
+
 	return (ret);
 }
 
@@ -639,7 +658,7 @@ sa_delete_legacy(sa_share_t share)
  * There is an assumption that dfstab will be the most common form of
  * legacy configuration file for shares, but not the only one. Because
  * of that, dfstab handling is done in the main code with calls to
- * this function and protocol specific calls to deal with formating
+ * this function and protocol specific calls to deal with formatting
  * options into dfstab/share compatible syntax. Since not everything
  * will be dfstab, there is a provision for calling a protocol
  * specific plugin interface that allows the protocol plugin to do its
@@ -655,10 +674,16 @@ sa_update_legacy(sa_share_t share, char *proto)
 	char *path;
 	sigset_t old;
 	char *persist;
+	uint64_t features;
 
 	ret = sa_proto_update_legacy(proto, share);
 	if (ret != SA_NOT_IMPLEMENTED)
 		return (ret);
+
+	features = sa_proto_get_featureset(proto);
+	if (!(features & SA_FEATURE_DFSTAB))
+		return (ret);
+
 	/* do the dfstab format */
 	persist = sa_get_share_attr(share, "type");
 	/*
@@ -745,6 +770,21 @@ sa_is_share(void *object)
 	if (object != NULL) {
 		if (strcmp((char *)((xmlNodePtr)object)->name, "share") == 0)
 		return (1);
+	}
+	return (0);
+}
+/*
+ * sa_is_resource(object)
+ *
+ * returns true of the object is of type "share".
+ */
+
+int
+sa_is_resource(void *object)
+{
+	if (object != NULL) {
+		if (strcmp((char *)((xmlNodePtr)object)->name, "resource") == 0)
+			return (1);
 	}
 	return (0);
 }
@@ -1392,6 +1432,7 @@ parse_sharetab(sa_handle_t handle)
 	sa_group_t lgroup;
 	char *groupname;
 	int legacy = 0;
+	char shareopts[MAXNAMLEN];
 
 	list = get_share_list(&err);
 	if (list == NULL)
@@ -1410,7 +1451,9 @@ parse_sharetab(sa_handle_t handle)
 			 * share with no arguments.
 			 */
 			set_node_attr(share, "shared", "true");
-			set_node_attr(share, "shareopts", tmplist->options);
+			(void) snprintf(shareopts, MAXNAMLEN, "shareopts-%s",
+			    tmplist->fstype);
+			set_node_attr(share, shareopts, tmplist->options);
 			continue;
 		}
 
@@ -1426,9 +1469,9 @@ parse_sharetab(sa_handle_t handle)
 			*groupname++ = '\0';
 			group = sa_get_group(handle, groupname);
 			if (group != NULL) {
-				share = _sa_add_share(group,
-				    tmplist->path,
-				    SA_SHARE_TRANSIENT, &err);
+				share = _sa_add_share(group, tmplist->path,
+				    SA_SHARE_TRANSIENT, &err,
+				    (uint64_t)SA_FEATURE_NONE);
 			} else {
 				/*
 				 * While this case shouldn't
@@ -1447,7 +1490,7 @@ parse_sharetab(sa_handle_t handle)
 				 */
 				share = _sa_add_share(lgroup,
 				    tmplist->path, SA_SHARE_TRANSIENT,
-				    &err);
+				    &err, (uint64_t)SA_FEATURE_NONE);
 			}
 		} else {
 			if (sa_zfs_is_shared(handle, tmplist->path)) {
@@ -1472,11 +1515,12 @@ parse_sharetab(sa_handle_t handle)
 				if (group != NULL) {
 					share = _sa_add_share(group,
 					    tmplist->path, SA_SHARE_TRANSIENT,
-					    &err);
+					    &err, (uint64_t)SA_FEATURE_NONE);
 				}
 			} else {
 				share = _sa_add_share(lgroup, tmplist->path,
-				    SA_SHARE_TRANSIENT, &err);
+				    SA_SHARE_TRANSIENT, &err,
+				    (uint64_t)SA_FEATURE_NONE);
 			}
 		}
 		if (share == NULL)
@@ -1517,12 +1561,22 @@ int
 gettransients(sa_handle_impl_t ihandle, xmlNodePtr *root)
 {
 	int legacy = 0;
+	int numproto;
+	char **protocols = NULL;
+	int i;
 
 	if (root != NULL) {
 		if (*root == NULL)
 			*root = xmlNewNode(NULL, (xmlChar *)"sharecfg");
-		if (*root != NULL)
+		if (*root != NULL) {
 			legacy = parse_sharetab(ihandle);
+			numproto = sa_get_protocols(&protocols);
+			for (i = 0; i < numproto; i++)
+				legacy |= sa_proto_get_transients(
+				    (sa_handle_t)ihandle, protocols[i]);
+			if (protocols != NULL)
+				free(protocols);
+		}
 	}
 	return (legacy);
 }
@@ -1630,7 +1684,7 @@ sa_free_fstype(char *type)
  *	Work backward to the top of the share object tree and start
  *	copying protocol specific optionsets into a newly created
  *	optionset that doesn't have a parent (it will be freed
- *	later). This provides for the property inheritence model. That
+ *	later). This provides for the property inheritance model. That
  *	is, properties closer to the share take precedence over group
  *	level. This also provides for groups of groups in the future.
  */
@@ -1719,7 +1773,7 @@ sa_free_derived_optionset(sa_optionset_t optionset)
  *	Find all the security types set for this object.  This is
  *	preliminary to getting a derived security set. The return value is an
  *	optionset containg properties which are the sectype values found by
- *	walking up the XML document struture. The returned optionset
+ *	walking up the XML document structure. The returned optionset
  *	is a derived optionset.
  *
  *	If hier is 0, only look at object. If non-zero, walk up the tree.
@@ -1885,6 +1939,19 @@ sa_fillshare(sa_share_t share, char *proto, struct share *sh)
 	sa_group_t group;
 	char *buff;
 	char *zfs;
+	sa_resource_t resource;
+	char *rsrcname = NULL;
+	char *defprop;
+
+	/*
+	 * We only want to deal with the path level shares for the
+	 * sharetab file. If a resource, get the parent.
+	 */
+	if (sa_is_resource(share)) {
+		resource = (sa_resource_t)share;
+		share = sa_get_resource_parent(resource);
+		rsrcname = sa_get_resource_attr(resource, "name");
+	}
 
 	group = sa_get_parent_group(share);
 	if (group != NULL) {
@@ -1912,30 +1979,37 @@ sa_fillshare(sa_share_t share, char *proto, struct share *sh)
 		sa_free_attr_string(value);
 	}
 
-	value = sa_get_share_attr(share, "resource");
-	if (value != NULL || groupname != NULL) {
+	if (rsrcname != NULL || groupname != NULL) {
 		int len = 0;
 
-		if (value != NULL)
-			len += strlen(value);
+		if (rsrcname != NULL)
+			len += strlen(rsrcname);
 		if (groupname != NULL)
 			len += strlen(groupname);
 		len += 3; /* worst case */
 		buff = malloc(len);
 		(void) snprintf(buff, len, "%s%s%s",
-		    (value != NULL && strlen(value) > 0) ? value : "-",
+		    (rsrcname != NULL &&
+		    strlen(rsrcname) > 0) ? rsrcname : "-",
 		    groupname != NULL ? "@" : "",
 		    groupname != NULL ? groupname : "");
 		sh->sh_res = buff;
-		if (value != NULL)
-			sa_free_attr_string(value);
-		if (groupname != NULL) {
+		if (rsrcname != NULL)
+			sa_free_attr_string(rsrcname);
+		if (groupname != NULL)
 			sa_free_attr_string(groupname);
-			groupname = NULL;
-		}
 	} else {
 		sh->sh_res = strdup("-");
 	}
+
+	/*
+	 * Get correct default prop string. NFS uses "rw", others use
+	 * "".
+	 */
+	if (strcmp(proto, "nfs") != 0)
+		defprop = "\"\"";
+	else
+		defprop = "rw";
 
 	sh->sh_fstype = strdup(proto);
 	value = sa_proto_legacy_format(proto, share, 1);
@@ -1943,10 +2017,10 @@ sa_fillshare(sa_share_t share, char *proto, struct share *sh)
 		if (strlen(value) > 0)
 			sh->sh_opts = strdup(value);
 		else
-			sh->sh_opts = strdup("rw");
+			sh->sh_opts = strdup(defprop);
 		free(value);
 	} else {
-		sh->sh_opts = strdup("rw");
+		sh->sh_opts = strdup(defprop);
 	}
 
 	value = sa_get_share_description(share);
@@ -2040,4 +2114,68 @@ sa_delete_sharetab(char *path, char *proto)
 	}
 
 	return (ret);
+}
+/*
+ * sa_fix_resource_name(path)
+ *
+ * change all illegal characters to something else.  For now, all get
+ * converted to '_' and the leading '/' is stripped off. This is used
+ * to construct an resource name (SMB share name) that is valid.
+ * Caller must pass a valid path.
+ */
+void
+sa_fix_resource_name(char *path)
+{
+	char *cp;
+	size_t len;
+
+	assert(path != NULL);
+
+	/* make sure we are appropriate length */
+	cp = path;
+	if (*cp == '/')
+		cp++; /* skip leading slash */
+	while (cp != NULL && strlen(cp) > SA_MAX_RESOURCE_NAME) {
+		cp = strchr(cp, '/');
+		if (cp != NULL)
+			cp++;
+	}
+	/* two cases - cp == NULL and cp is substring of path */
+	if (cp == NULL) {
+		/* just take last SA_MAX_RESOURCE_NAME chars */
+		len = 1 + strlen(path) - SA_MAX_RESOURCE_NAME;
+		(void) memmove(path, path + len, SA_MAX_RESOURCE_NAME);
+		path[SA_MAX_RESOURCE_NAME] = '\0';
+	} else {
+		len = strlen(cp) + 1;
+		(void) memmove(path, cp, len);
+	}
+
+	/*
+	 * Don't want any of the characters that are not allowed
+	 * in an SMB share name. Replace them with '_'.
+	 */
+	while (*path) {
+		switch (*path) {
+		case '/':
+		case '"':
+		case '\\':
+		case '[':
+		case ']':
+		case ':':
+		case '|':
+		case '<':
+		case '>':
+		case '+':
+		case ';':
+		case ',':
+		case '?':
+		case '*':
+		case '=':
+		case '\t':
+			*path = '_';
+			break;
+		}
+		path++;
+	}
 }

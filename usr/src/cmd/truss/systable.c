@@ -720,6 +720,7 @@ static const	struct systable fsatsystable[] = {
 {"futimesat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 6 */
 {"renameat",	5, DEC, NOV, HID, ATC, STG, DEC, STG},		/* 7 */
 {"__accessat",	5, DEC, NOV, HID, ATC, STG, ACC},		/* 8 */
+{"__openattrdirat", 3, DEC, NOV, HID, ATC, STG},		/* 9 */
 {"openat",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 2 */
 {"openat64",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 1 */
 };
@@ -955,6 +956,7 @@ const	struct sysalias sysalias[] = {
 	{ "futimesat",		SYS_fsat	},
 	{ "renameat",		SYS_fsat	},
 	{ "__accessat",		SYS_fsat	},
+	{ "__openattrdirat",	SYS_fsat	},
 	{ "lgrpsys",		SYS_lgrpsys	},
 	{ "getrusage",		SYS_rusagesys	},
 	{ "getrusage_chld",	SYS_rusagesys	},
@@ -1248,6 +1250,7 @@ getsubcode(private_t *pri)
 			case 6:
 			case 7:
 			case 8:
+			case 9:
 				subcode = arg0;
 			}
 			break;

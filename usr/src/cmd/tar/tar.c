@@ -61,26 +61,32 @@
 #include <stdarg.h>
 #include <widec.h>
 #include <sys/mtio.h>
-#include <libintl.h>
 #include <sys/acl.h>
 #include <strings.h>
 #include <deflt.h>
 #include <limits.h>
 #include <iconv.h>
 #include <assert.h>
+#include <libgen.h>
+#include <libintl.h>
 #include <aclutils.h>
-#include "getresponse.h"
+#include <libnvpair.h>
+#include <archives.h>
 
 #if defined(__SunOS_5_6) || defined(__SunOS_5_7)
 extern int defcntl();
 #endif
-#include <archives.h>
+#if defined(_PC_SATTR_ENABLED)
+#include <attr.h>
+#include <libcmdutils.h>
+#endif
 
 /* Trusted Extensions */
 #include <zone.h>
 #include <tsol/label.h>
 #include <sys/tsol/label_macro.h>
 
+#include "getresponse.h"
 /*
  * Source compatibility
  */
@@ -180,6 +186,14 @@ int utimes(const char *path, const struct timeval timeval_ptr[]);
 #define	PUT_AS_LINK	1
 #define	PUT_NOTAS_LINK	0
 
+#ifndef VIEW_READONLY
+#define	VIEW_READONLY	"SUNWattr_ro"
+#endif
+
+#ifndef VIEW_READWRITE
+#define	VIEW_READWRITE	"SUNWattr_rw"
+#endif
+
 #if _FILE_OFFSET_BITS == 64
 #define	FMT_off_t "lld"
 #define	FMT_off_t_o "llo"
@@ -198,6 +212,31 @@ struct	sec_attr {
 	char	attr_len[7];
 	char	attr_info[1];
 } *attr;
+
+#if defined(O_XATTR)
+typedef enum {
+	ATTR_OK,
+	ATTR_SKIP,
+	ATTR_CHDIR_ERR,
+	ATTR_OPEN_ERR,
+	ATTR_XATTR_ERR,
+	ATTR_SATTR_ERR
+} attr_status_t;
+#endif
+
+#if defined(O_XATTR)
+typedef enum {
+	ARC_CREATE,
+	ARC_RESTORE
+} arc_action_t;
+#endif
+
+typedef struct attr_data {
+	char	*attr_parent;
+	char	*attr_path;
+	int	attr_parentfd;
+	int	attr_rw_sysattr;
+} attr_data_t;
 
 /*
  *
@@ -306,7 +345,7 @@ struct	sec_attr {
 static struct xattr_hdr *xattrhead;
 static struct xattr_buf *xattrp;
 static struct xattr_buf *xattr_linkp;	/* pointer to link info, if any */
-static char *xattraname;		/* attribute name */
+static char *xattrapath;		/* attribute name */
 static char *xattr_linkaname;		/* attribute attribute is linked to */
 static char Hiddendir;			/* are we processing hidden xattr dir */
 static char xattrbadhead;
@@ -394,7 +433,7 @@ static void assert_string(char *s, char *msg);
 static int istape(int fd, int type);
 static void backtape(void);
 static void build_table(struct file_list *table[], char *file);
-static void check_prefix(char **namep, char **dirp, char **compp);
+static int check_prefix(char **namep, char **dirp, char **compp);
 static void closevol(void);
 static void copy(void *dst, void *src);
 static int convtoreg(off_t);
@@ -421,7 +460,7 @@ static void newvol(void);
 static void passtape(void);
 static void putempty(blkcnt_t n);
 static int putfile(char *longname, char *shortname, char *parent,
-		int filetype, int lev, int symlink_lev);
+    attr_data_t *attrinfo, int filetype, int lev, int symlink_lev);
 static void readtape(char *buffer);
 static void seekdisk(blkcnt_t blocks);
 static void setPathTimes(int dirfd, char *path, timestruc_t modTime);
@@ -429,8 +468,8 @@ static void splitfile(char *longname, int ifd, char *name,
 	char *prefix, int filetype);
 static void tomodes(struct stat *sp);
 static void usage(void);
-static void xblocks(off_t bytes, int ofile);
-static void xsfile(int ofd);
+static int xblocks(int issysattr, off_t bytes, int ofile);
+static int xsfile(int issysattr, int ofd);
 static void resugname(int dirfd, char *name, int symflag);
 static int bcheck(char *bstr);
 static int checkdir(char *name);
@@ -466,7 +505,8 @@ static char *getname(gid_t);
 static char *getgroup(gid_t);
 static int checkf(char *name, int mode, int howmuch);
 static int writetbuf(char *buffer, int n);
-static int wantit(char *argv[], char **namep, char **dirp, char **comp);
+static int wantit(char *argv[], char **namep, char **dirp, char **comp,
+    attr_data_t **attrinfo);
 static void append_ext_attr(char *shortname, char **secinfo, int *len);
 static int get_xdata(void);
 static void gen_num(const char *keyword, const u_longlong_t number);
@@ -481,17 +521,18 @@ static int utf8_local(char *option, char **Xhdr_ptrptr, char *target,
 static int local_utf8(char **Xhdr_ptrptr, char *target, const char *src,
     iconv_t iconv_cd, int xhdrflg, int max_val);
 static int c_utf8(char *target, const char *source);
-static int getstat(int dirfd, char *longname, char *shortname);
-static void xattrs_put(char *, char *, char *);
+static int getstat(int dirfd, char *longname, char *shortname,
+    char *attrparent);
+static void xattrs_put(char *, char *, char *, char *);
 static void prepare_xattr(char **, char	*, char	*,
     char, struct linkbuf *, int *);
-static int put_link(char *name, char *longname, char *component, char *prefix,
-    int filetype, char typeflag);
+static int put_link(char *name, char *longname, char *component,
+    char *longattrname, char *prefix, int filetype, char typeflag);
 static int put_extra_attributes(char *longname, char *shortname,
-    char *prefix, int filetype, char typeflag);
-static int put_xattr_hdr(char *longname, char *shortname, char *prefix,
-    int typeflag, int filetype, struct linkbuf *lp);
-static int read_xattr_hdr();
+    char *longattrname, char *prefix, int filetype, char typeflag);
+static int put_xattr_hdr(char *longname, char *shortname, char *longattrname,
+    char *prefix, int typeflag, int filetype, struct linkbuf *lp);
+static int read_xattr_hdr(attr_data_t **attrinfo);
 
 /* Trusted Extensions */
 #define	AUTO_ZONE	"/zone"
@@ -503,12 +544,14 @@ static int rebuild_lk_comp_path(char *str, char **namep);
 
 static void get_parent(char *path, char *dir);
 static char *get_component(char *path);
-static int retry_attrdir_open(char *name);
+static int retry_open_attr(int pdirfd, int cwd, char *dirp, char *pattr,
+    char *name, int oflag, mode_t mode);
 static char *skipslashes(char *string, char *start);
 static void chop_endslashes(char *path);
 
 static	struct stat stbuf;
 
+static	char	*myname;
 static	int	checkflag = 0;
 #ifdef	_iBCS2
 static	int	Fileflag;
@@ -523,6 +566,7 @@ static	int	bflag, kflag, Aflag;
 static 	int	Pflag;			/* POSIX conformant archive */
 static	int	Eflag;			/* Allow files greater than 8GB */
 static	int	atflag;			/* traverse extended attributes */
+static	int	saflag;			/* traverse extended sys attributes */
 static	int	Dflag;			/* Data change flag */
 /* Trusted Extensions */
 static	int	Tflag;			/* Trusted Extensions attr flags */
@@ -657,6 +701,11 @@ main(int argc, char *argv[])
 		usage();
 
 	tfile = NULL;
+	if ((myname = strdup(argv[0])) == NULL) {
+		(void) fprintf(stderr, gettext(
+		    "tar: cannot allocate program name\n"));
+		exit(1);
+	}
 
 	if (init_yes() < 0) {
 		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
@@ -737,7 +786,12 @@ main(int argc, char *argv[])
 		case '@':
 			atflag++;
 			break;
-#endif
+#endif	/* O_XATTR */
+#if defined(_PC_SATTR_ENABLED)
+		case '/':
+			saflag++;
+			break;
+#endif	/* _PC_SATTR_ENABLED */
 		case 'u':
 			uflag++;	/* moved code after signals caught */
 			rflag++;
@@ -1047,10 +1101,14 @@ usage(void)
 	if (sysv3_env) {
 		(void) fprintf(stderr, gettext(
 #if defined(O_XATTR)
+#if defined(_PC_SATTR_ENABLED)
+		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw@/[0-7]][bfFk][X...] "
+#else
 		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw@[0-7]][bfFk][X...] "
+#endif	/* _PC_SATTR_ENABLED */
 #else
 		"Usage: tar {c|r|t|u|x}[BDeEhilmnopPqTvw[0-7]][bfFk][X...] "
-#endif
+#endif	/* O_XATTR */
 		"[blocksize] [tarfile] [filename] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
 	} else
@@ -1058,10 +1116,14 @@ usage(void)
 	{
 		(void) fprintf(stderr, gettext(
 #if defined(O_XATTR)
+#if defined(_PC_SATTR_ENABLED)
+		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw@/[0-7]][bfk][X...] "
+#else
 		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw@[0-7]][bfk][X...] "
+#endif	/* _PC_SATTR_ENABLED */
 #else
 		"Usage: tar {c|r|t|u|x}[BDeEFhilmnopPqTvw[0-7]][bfk][X...] "
-#endif
+#endif	/* O_XATTR */
 		"[blocksize] [tarfile] [size] [exclude-file...] "
 		"{file | -I include-file | -C directory file}...\n"));
 	}
@@ -1196,7 +1258,7 @@ dorep(char *argv[])
 
 			if (chdir(*++argv) < 0)
 				vperror(0, gettext(
-				"can't change directories to %s"), *argv);
+				    "can't change directories to %s"), *argv);
 			else
 				(void) getcwd(wdir, (sizeof (wdir)));
 			argv++;
@@ -1235,7 +1297,7 @@ dorep(char *argv[])
 			*cp2 = '\0';
 			if (chdir(file) < 0) {
 				vperror(0, gettext(
-				"can't change directories to %s"), file);
+				    "can't change directories to %s"), file);
 				continue;
 			}
 			*cp2 = '/';
@@ -1243,13 +1305,15 @@ dorep(char *argv[])
 		}
 
 		parent = getcwd(tempdir, (sizeof (tempdir)));
-		archtype = putfile(file, cp2, parent, NORMAL_FILE,
+
+		archtype = putfile(file, cp2, parent, NULL, NORMAL_FILE,
 		    LEV0, SYMLINK_LEV0);
 
 #if defined(O_XATTR)
 		if (!exitflag) {
-			if (atflag && archtype == PUT_NOTAS_LINK) {
-				xattrs_put(file, cp2, parent);
+			if ((atflag || saflag) &&
+			    (archtype == PUT_NOTAS_LINK)) {
+				xattrs_put(file, cp2, parent, NULL);
 			}
 		}
 #endif
@@ -1447,7 +1511,11 @@ top:
 			xattr_linkp = NULL;
 			xattrhead = NULL;
 		} else {
-			if (xattraname[0] == '.' && xattraname[1] == '\0' &&
+			char	*aname = basename(xattrapath);
+			size_t	xindex  = aname - xattrapath;
+
+			if (xattrapath[xindex] == '.' &&
+			    xattrapath[xindex + 1] == '\0' &&
 			    xattrp->h_typeflag == '5') {
 				Hiddendir = 1;
 				sp->st_mode =
@@ -1495,9 +1563,102 @@ passtape(void)
 			readtape(buf);
 }
 
+#if defined(O_XATTR)
+static int
+is_sysattr(char *name)
+{
+	return ((strcmp(name, VIEW_READONLY) == 0) ||
+	    (strcmp(name, VIEW_READWRITE) == 0));
+}
+#endif
+
+#if defined(O_XATTR)
+/*
+ * Verify the attribute, attrname, is an attribute we want to restore.
+ * Never restore read-only system attribute files.  Only restore read-write
+ * system attributes files when -/ was specified, and only traverse into
+ * the 2nd level attribute directory containing only system attributes if
+ * -@ was specified.  This keeps us from archiving
+ *	<attribute name>/<read-write system attribute file>
+ * when -/ was specified without -@.
+ *
+ * attrname	- attribute file name
+ * attrparent	- attribute's parent name within the base file's attribute
+ *		directory hierarchy
+ */
+static attr_status_t
+verify_attr(char *attrname, char *attrparent, int arc_rwsysattr,
+    int *rw_sysattr)
+{
+#if defined(_PC_SATTR_ENABLED)
+	int	attr_supported;
+
+	/* Never restore read-only system attribute files */
+	if ((attr_supported = sysattr_type(attrname)) == _RO_SATTR) {
+		*rw_sysattr = 0;
+		return (ATTR_SKIP);
+	} else {
+		*rw_sysattr = (attr_supported == _RW_SATTR);
+	}
+#else
+	/*
+	 * Only need to check if this attribute is an extended system
+	 * attribute.
+	 */
+	if (*rw_sysattr = is_sysattr(attrname)) {
+		return (ATTR_SKIP);
+	} else {
+		return (ATTR_OK);
+	}
+#endif	/* _PC_SATTR_ENABLED */
+
+	/*
+	 * If the extended system attribute file is specified with the
+	 * arc_rwsysattr flag, as being transient (default extended
+	 * attributes), then don't archive it.
+	 */
+	if (*rw_sysattr && !arc_rwsysattr) {
+		return (ATTR_SKIP);
+	}
+
+	/*
+	 * Only restore read-write system attribute files
+	 * when -/ was specified.  Only restore extended
+	 * attributes when -@ was specified.
+	 */
+	if (atflag) {
+		if (!saflag) {
+			/*
+			 * Only archive/restore the hidden directory "." if
+			 * we're processing the top level hidden attribute
+			 * directory.  We don't want to process the
+			 * hidden attribute directory of the attribute
+			 * directory that contains only extended system
+			 * attributes.
+			 */
+			if (*rw_sysattr || (Hiddendir &&
+			    (attrparent != NULL))) {
+				return (ATTR_SKIP);
+			}
+		}
+	} else if (saflag) {
+		/*
+		 * Only archive/restore read-write extended system attribute
+		 * files of the base file.
+		 */
+		if (!*rw_sysattr || (attrparent != NULL)) {
+			return (ATTR_SKIP);
+		}
+	} else {
+		return (ATTR_SKIP);
+	}
+
+	return (ATTR_OK);
+}
+#endif
 
 static int
-putfile(char *longname, char *shortname, char *parent,
+putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
     int filetype, int lev, int symlink_lev)
 {
 	int infile = -1;	/* deliberately invalid */
@@ -1509,6 +1670,8 @@ putfile(char *longname, char *shortname, char *parent,
 	char filetmp[PATH_MAX + 1];
 	char *cp;
 	char *name;
+	char *attrparent = NULL;
+	char *longattrname = NULL;
 	struct dirent *dp;
 	DIR *dirp;
 	int i;
@@ -1517,6 +1680,7 @@ putfile(char *longname, char *shortname, char *parent,
 	int dirfd = -1;
 	int rc = PUT_NOTAS_LINK;
 	int archtype = 0;
+	int rw_sysattr = 0;
 	char newparent[PATH_MAX + MAXNAMLEN + 1];
 	char *prefix = "";
 	char *tmpbuf;
@@ -1533,26 +1697,22 @@ putfile(char *longname, char *shortname, char *parent,
 	xhdr_flgs = 0;
 
 	if (filetype == XATTR_FILE) {
-		dirfd = attropen(get_component(longname), ".", O_RDONLY);
+		attrparent = attrinfo->attr_parent;
+		longattrname = attrinfo->attr_path;
+		dirfd = attrinfo->attr_parentfd;
 	} else {
 		dirfd = open(".", O_RDONLY);
 	}
 
 	if (dirfd == -1) {
 		(void) fprintf(stderr, gettext(
-		    "tar: unable to open%sdirectory %s\n"),
+		    "tar: unable to open%sdirectory %s%s%s%s\n"),
 		    (filetype == XATTR_FILE) ? gettext(" attribute ") : " ",
+		    (attrparent == NULL) ? "" : gettext("of attribute "),
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : gettext(" of "),
 		    (filetype == XATTR_FILE) ? longname : parent);
 		goto out;
-	}
-
-	if (filetype == XATTR_FILE) {
-		if (fchdir(dirfd) < 0) {
-			(void) fprintf(stderr, gettext(
-			    "tar: unable to fchdir into attribute directory"
-			    " of file %s\n"), longname);
-			goto out;
-		}
 	}
 
 	if (lev > MAXLEV) {
@@ -1562,7 +1722,7 @@ putfile(char *longname, char *shortname, char *parent,
 		goto out;
 	}
 
-	if (getstat(dirfd, longname, shortname))
+	if (getstat(dirfd, longname, shortname, attrparent))
 		goto out;
 
 	if (hflag) {
@@ -1588,7 +1748,12 @@ putfile(char *longname, char *shortname, char *parent,
 	 */
 	if ((mt_ino == stbuf.st_ino) && (mt_dev == stbuf.st_dev)) {
 		(void) fprintf(stderr, gettext(
-		    "tar: %s same as archive file\n"), longname);
+		    "tar: %s%s%s%s%s same as archive file\n"),
+		    rw_sysattr ? gettext("system ") : "",
+		    (longattrname == NULL) ? "" : gettext("attribute "),
+		    (longattrname == NULL) ? "" : longattrname,
+		    (longattrname == NULL) ? "" : gettext(" of "),
+		    longname);
 		Errflg = 1;
 		goto out;
 	}
@@ -1605,8 +1770,13 @@ putfile(char *longname, char *shortname, char *parent,
 	    !S_ISBLK(stbuf.st_mode) &&
 	    (Eflag == 0)) {
 		(void) fprintf(stderr, gettext(
-		    "tar: %s too large to archive.  "
-		    "Use E function modifier.\n"), longname);
+		    "tar: %s%s%s%s%s too large to archive.  "
+		    "Use E function modifier.\n"),
+		    rw_sysattr ? gettext("system ") : "",
+		    (longattrname == NULL) ? "" : gettext("attribute "),
+		    (longattrname == NULL) ? "" : longattrname,
+		    (longattrname == NULL) ? "" : gettext(" of "),
+		    longname);
 		if (errflag)
 			exitflag = 1;
 		Errflg = 1;
@@ -1787,8 +1957,8 @@ putfile(char *longname, char *shortname, char *parent,
 				}
 			}
 
-			if (put_extra_attributes(longname, shortname, prefix,
-			    filetype, '5') != 0)
+			if (put_extra_attributes(longname, shortname,
+			    longattrname, prefix, filetype, '5') != 0)
 				goto out;
 
 #if defined(O_XATTR)
@@ -1817,8 +1987,8 @@ putfile(char *longname, char *shortname, char *parent,
 				    0);
 #endif
 			if (filetype == XATTR_FILE && Hiddendir) {
-				(void) fprintf(vfile, "a %s attribute . ",
-				    longname);
+				(void) fprintf(vfile, "a %s attribute %s ",
+				    longname, longattrname);
 
 			} else {
 				(void) fprintf(vfile, "a %s/ ", longname);
@@ -1835,9 +2005,9 @@ putfile(char *longname, char *shortname, char *parent,
 		 * If hidden dir then break now since xattrs_put() will do
 		 * the iterating of the directory.
 		 *
-		 * At the moment, there can't be attributes on attributes
-		 * or directories within the attributes hidden directory
-		 * hierarchy.
+		 * At the moment, there can only be system attributes on
+		 * attributes.  There can be no attributes on attributes or
+		 * directories within the attributes hidden directory hierarchy.
 		 */
 		if (filetype == XATTR_FILE)
 			break;
@@ -1854,7 +2024,7 @@ putfile(char *longname, char *shortname, char *parent,
 
 		if ((dirp = opendir(".")) == NULL) {
 			vperror(0, gettext(
-			"can't open directory %s"), longname);
+			    "can't open directory %s"), longname);
 			if (chdir(parent) < 0)
 				vperror(0, gettext("cannot change back?: %s"),
 				    parent);
@@ -1873,12 +2043,13 @@ putfile(char *longname, char *shortname, char *parent,
 			} else
 				l = -1;
 
-			archtype = putfile(buf, cp, newparent,
+			archtype = putfile(buf, cp, newparent, NULL,
 			    NORMAL_FILE, lev + 1, symlink_lev);
 
 			if (!exitflag) {
-				if (atflag && archtype == PUT_NOTAS_LINK) {
-					xattrs_put(buf, cp, newparent);
+				if ((atflag || saflag) &&
+				    (archtype == PUT_NOTAS_LINK)) {
+					xattrs_put(buf, cp, newparent, NULL);
 				}
 			}
 			if (exitflag)
@@ -1962,17 +2133,18 @@ putfile(char *longname, char *shortname, char *parent,
 		break;
 	case S_IFREG:
 		if ((infile = openat(dirfd, shortname, 0)) < 0) {
-			vperror(0, "%s%s%s", longname,
+			vperror(0, "unable to open %s%s%s%s", longname,
+			    rw_sysattr ? gettext(" system") : "",
 			    (filetype == XATTR_FILE) ?
 			    gettext(" attribute ") : "",
-			    (filetype == XATTR_FILE) ?
-			    shortname : "");
+			    (filetype == XATTR_FILE) ? (longattrname == NULL) ?
+			    shortname : longattrname : "");
 			goto out;
 		}
 
 		blocks = TBLOCKS(stbuf.st_size);
 
-		if (put_link(name, longname, shortname,
+		if (put_link(name, longname, shortname, longattrname,
 		    prefix, filetype, '1') == 0) {
 			(void) close(infile);
 			rc = PUT_AS_LINK;
@@ -2018,11 +2190,12 @@ putfile(char *longname, char *shortname, char *parent,
 				DEBUG("seek = %" FMT_blkcnt_t "K\t", K(tapepos),
 				    0);
 #endif
-			(void) fprintf(vfile, "a %s%s%s ", longname,
+			(void) fprintf(vfile, "a %s%s%s%s ", longname,
+			    rw_sysattr ? gettext(" system") : "",
+			    (filetype == XATTR_FILE) ? gettext(
+			    " attribute ") : "",
 			    (filetype == XATTR_FILE) ?
-			    gettext(" attribute ") : "",
-			    (filetype == XATTR_FILE) ?
-			    shortname : "");
+			    longattrname : "");
 			if (NotTape)
 				(void) fprintf(vfile, "%" FMT_blkcnt_t "K\n",
 				    K(blocks));
@@ -2032,8 +2205,8 @@ putfile(char *longname, char *shortname, char *parent,
 				    blocks);
 		}
 
-		if (put_extra_attributes(longname, shortname, prefix,
-		    filetype, '0') != 0)
+		if (put_extra_attributes(longname, shortname, longattrname,
+		    prefix, filetype, '0') != 0)
 			goto out;
 
 		/*
@@ -2082,7 +2255,7 @@ putfile(char *longname, char *shortname, char *parent,
 		blocks = TBLOCKS(stbuf.st_size);
 		stbuf.st_size = (off_t)0;
 
-		if (put_link(name, longname, shortname,
+		if (put_link(name, longname, shortname, longattrname,
 		    prefix, filetype, '6') == 0) {
 			rc = PUT_AS_LINK;
 			goto out;
@@ -2132,8 +2305,8 @@ putfile(char *longname, char *shortname, char *parent,
 		    &stbuf, stbuf.st_dev, prefix) != 0)
 			goto out;
 
-		if (put_extra_attributes(longname, shortname, prefix,
-		    filetype, '6') != 0)
+		if (put_extra_attributes(longname, shortname, longattrname,
+		    prefix, filetype, '6') != 0)
 			goto out;
 
 		(void) sprintf(dblock.dbuf.chksum, "%07o", checksum(&dblock));
@@ -2144,8 +2317,8 @@ putfile(char *longname, char *shortname, char *parent,
 	case S_IFCHR:
 		stbuf.st_size = (off_t)0;
 		blocks = TBLOCKS(stbuf.st_size);
-		if (put_link(name, longname,
-		    shortname, prefix, filetype, '3') == 0) {
+		if (put_link(name, longname, shortname, longattrname,
+		    prefix, filetype, '3') == 0) {
 			rc = PUT_AS_LINK;
 			goto out;
 		}
@@ -2193,7 +2366,7 @@ putfile(char *longname, char *shortname, char *parent,
 		    filetype, &stbuf, stbuf.st_rdev, prefix) != 0)
 			goto out;
 
-		if (put_extra_attributes(longname, shortname,
+		if (put_extra_attributes(longname, shortname, longattrname,
 		    prefix, filetype, '3') != 0)
 			goto out;
 
@@ -2205,8 +2378,8 @@ putfile(char *longname, char *shortname, char *parent,
 	case S_IFBLK:
 		stbuf.st_size = (off_t)0;
 		blocks = TBLOCKS(stbuf.st_size);
-		if (put_link(name, longname,
-		    shortname, prefix, filetype, '4') == 0) {
+		if (put_link(name, longname, shortname, longattrname,
+		    prefix, filetype, '4') == 0) {
 			rc = PUT_AS_LINK;
 			goto out;
 		}
@@ -2254,7 +2427,7 @@ putfile(char *longname, char *shortname, char *parent,
 		    filetype, &stbuf, stbuf.st_rdev, prefix) != 0)
 			goto out;
 
-		if (put_extra_attributes(longname, shortname,
+		if (put_extra_attributes(longname, shortname, longattrname,
 		    prefix, filetype, '4') != 0)
 			goto out;
 
@@ -2273,9 +2446,7 @@ putfile(char *longname, char *shortname, char *parent,
 	}
 
 out:
-	if (dirfd != -1) {
-		if (filetype == XATTR_FILE)
-			(void) chdir(parent);
+	if ((dirfd != -1) && (filetype != XATTR_FILE)) {
 		(void) close(dirfd);
 	}
 	return (rc);
@@ -2417,6 +2588,210 @@ convtoreg(off_t size)
 	return (0);
 }
 
+#if defined(O_XATTR)
+static int
+save_cwd(void)
+{
+	return (open(".", O_RDONLY));
+}
+#endif
+
+#if defined(O_XATTR)
+static void
+rest_cwd(int *cwd)
+{
+	if (*cwd != -1) {
+		if (fchdir(*cwd) < 0) {
+			vperror(0, gettext(
+			    "Cannot fchdir to attribute directory"));
+			exit(1);
+		}
+		(void) close(*cwd);
+		*cwd = -1;
+	}
+}
+#endif
+
+/*
+ * Verify the underlying file system supports the attribute type.
+ * Only archive extended attribute files when '-@' was specified.
+ * Only archive system extended attribute files if '-/' was specified.
+ */
+#if defined(O_XATTR)
+static attr_status_t
+verify_attr_support(char *filename, arc_action_t actflag)
+{
+	/*
+	 */
+	if (atflag) {
+		/* Verify extended attributes are supported */
+		if (pathconf(filename, (actflag == ARC_CREATE) ?
+		    _PC_XATTR_EXISTS : _PC_XATTR_ENABLED) != 1) {
+#if defined(_PC_SATTR_ENABLED)
+			if (saflag) {
+				/* Verify system attributes are supported */
+				if (sysattr_support(filename,
+				    (actflag == ARC_CREATE) ? _PC_SATTR_EXISTS :
+				    _PC_SATTR_ENABLED) != 1) {
+					return (ATTR_SATTR_ERR);
+				}
+			} else
+				return (ATTR_XATTR_ERR);
+#else
+				return (ATTR_XATTR_ERR);
+#endif	/* _PC_SATTR_ENABLED */
+		}
+
+#if defined(_PC_SATTR_ENABLED)
+	} else if (saflag) {
+		/* Verify system attributes are supported */
+		if (sysattr_support(filename, (actflag == ARC_CREATE) ?
+		    _PC_SATTR_EXISTS : _PC_SATTR_ENABLED) != 1) {
+			return (ATTR_SATTR_ERR);
+		}
+#endif	/* _PC_SATTR_ENABLED */
+	} else {
+		return (ATTR_SKIP);
+	}
+
+	return (ATTR_OK);
+}
+#endif
+
+#if defined(O_XATTR)
+/*
+ * Recursively open attribute directories until the attribute directory
+ * containing the specified attribute, attrname, is opened.
+ *
+ * Currently, only 2 directory levels of attributes are supported, (i.e.,
+ * extended system attributes on extended attributes).  The following are
+ * the possible input combinations:
+ *	1.  Open the attribute directory of the base file (don't change
+ *	    into it).
+ *		attrinfo->parent = NULL
+ *		attrname = '.'
+ *	2.  Open the attribute directory of the base file and change into it.
+ *		attrinfo->parent = NULL
+ *		attrname = <attr> | <sys_attr>
+ *	3.  Open the attribute directory of the base file, change into it,
+ *	    then recursively call open_attr_dir() to open the attribute's
+ *	    parent directory (don't change into it).
+ *		attrinfo->parent = <attr>
+ *		attrname = '.'
+ *	4.  Open the attribute directory of the base file, change into it,
+ *	    then recursively call open_attr_dir() to open the attribute's
+ *	    parent directory and change into it.
+ *		attrinfo->parent = <attr>
+ *		attrname = <attr> | <sys_attr>
+ *
+ * An attribute directory will be opened only if the underlying file system
+ * supports the attribute type, and if the command line specifications (atflag
+ * and saflag) enable the processing of the attribute type.
+ *
+ * On succesful return, attrinfo->parentfd will be the file descriptor of the
+ * opened attribute directory.  In addition, if the attribute is a read-write
+ * extended system attribute, attrinfo->rw_sysattr will be set to 1, otherwise
+ * it will be set to 0.
+ *
+ * Possible return values:
+ * 	ATTR_OK		Successfully opened and, if needed, changed into the
+ *			attribute directory containing attrname.
+ *	ATTR_SKIP	The command line specifications don't enable the
+ *			processing of the attribute type.
+ * 	ATTR_CHDIR_ERR	An error occurred while trying to change into an
+ *			attribute directory.
+ * 	ATTR_OPEN_ERR	An error occurred while trying to open an
+ *			attribute directory.
+ *	ATTR_XATTR_ERR	The underlying file system doesn't support extended
+ *			attributes.
+ *	ATTR_SATTR_ERR	The underlying file system doesn't support extended
+ *			system attributes.
+ */
+static int
+open_attr_dir(char *attrname, char *dirp, int cwd, attr_data_t *attrinfo)
+{
+	attr_status_t	rc;
+	int		firsttime = (attrinfo->attr_parentfd == -1);
+	int		saveerrno;
+
+	/*
+	 * open_attr_dir() was recursively called (input combination number 4),
+	 * close the previously opened file descriptor as we've already changed
+	 * into it.
+	 */
+	if (!firsttime) {
+		(void) close(attrinfo->attr_parentfd);
+		attrinfo->attr_parentfd = -1;
+	}
+
+	/*
+	 * Verify that the underlying file system supports the restoration
+	 * of the attribute.
+	 */
+	if ((rc = verify_attr_support(dirp, ARC_RESTORE)) != ATTR_OK) {
+		return (rc);
+	}
+
+	/* Open the base file's attribute directory */
+	if ((attrinfo->attr_parentfd = attropen(dirp, ".", O_RDONLY)) == -1) {
+		/*
+		 * Save the errno from the attropen so it can be reported
+		 * if the retry of the attropen fails.
+		 */
+		saveerrno = errno;
+		if ((attrinfo->attr_parentfd = retry_open_attr(-1, cwd, dirp,
+		    NULL, ".", O_RDONLY, 0)) == -1) {
+			/*
+			 * Reset typeflag back to real value so passtape
+			 * will skip ahead correctly.
+			 */
+			dblock.dbuf.typeflag = _XATTR_HDRTYPE;
+			(void) close(attrinfo->attr_parentfd);
+			attrinfo->attr_parentfd = -1;
+			errno = saveerrno;
+			return (ATTR_OPEN_ERR);
+		}
+	}
+
+	/*
+	 * Change into the parent attribute's directory unless we are
+	 * processing the hidden attribute directory of the base file itself.
+	 */
+	if ((Hiddendir == 0) || (firsttime && attrinfo->attr_parent != NULL)) {
+		if (fchdir(attrinfo->attr_parentfd) != 0) {
+			saveerrno = errno;
+			(void) close(attrinfo->attr_parentfd);
+			attrinfo->attr_parentfd = -1;
+			errno = saveerrno;
+			return (ATTR_CHDIR_ERR);
+		}
+	}
+
+	/* Determine if the attribute should be processed */
+	if ((rc = verify_attr(attrname, attrinfo->attr_parent, 1,
+	    &attrinfo->attr_rw_sysattr)) != ATTR_OK) {
+		saveerrno = errno;
+		(void) close(attrinfo->attr_parentfd);
+		attrinfo->attr_parentfd = -1;
+		errno = saveerrno;
+		return (rc);
+	}
+
+	/*
+	 * If the attribute is an extended attribute, or extended system
+	 * attribute, of an attribute (i.e., <attr>/<sys_attr>), then
+	 * recursively call open_attr_dir() to open the attribute directory
+	 * of the parent attribute.
+	 */
+	if (firsttime && (attrinfo->attr_parent != NULL)) {
+		return (open_attr_dir(attrname, attrinfo->attr_parent,
+		    attrinfo->attr_parentfd, attrinfo));
+	}
+
+	return (ATTR_OK);
+}
+#endif
+
 static void
 #ifdef	_iBCS2
 doxtract(char *argv[], int tbl_cnt)
@@ -2433,15 +2808,18 @@ doxtract(char *argv[])
 	int fcnt = 0;			/* count # files in argv list */
 	int dir;
 	int dirfd = -1;
+	int cwd = -1;
+	int rw_sysattr = 0;
+	int saveerrno;
 	uid_t Uid;
 	char *namep, *dirp, *comp, *linkp; /* for removing absolute paths */
 	char dirname[PATH_MAX+1];
 	char templink[PATH_MAX+1];	/* temp link with terminating NULL */
-	char origdir[PATH_MAX+1];
 	int once = 1;
 	int error;
 	int symflag;
 	int want;
+	attr_data_t *attrinfo = NULL;	/* attribute info */
 	acl_t	*aclp = NULL;	/* acl info */
 	char dot[] = ".";		/* dirp for using realpath */
 	timestruc_t	time_zero;	/* used for call to doDirTimes */
@@ -2480,10 +2858,26 @@ doxtract(char *argv[])
 		dir = 0;
 		ofile = -1;
 
-		/* namep is set by wantit to point to the full name */
-		if ((want = wantit(argv, &namep, &dirp, &comp)) == 0) {
+		if (dirfd != -1) {
+			(void) close(dirfd);
+			dirfd = -1;
+		}
+		if (ofile != -1) {
+			if (close(ofile) != 0)
+				vperror(2, gettext("close error"));
+		}
+
 #if defined(O_XATTR)
-			if (xattrp != (struct xattr_buf *)NULL) {
+		if (cwd != -1) {
+			rest_cwd(&cwd);
+		}
+#endif
+
+		/* namep is set by wantit to point to the full name */
+		if ((want = wantit(argv, &namep, &dirp, &comp,
+		    &attrinfo)) == 0) {
+#if defined(O_XATTR)
+			if (xattrp != NULL) {
 				free(xattrhead);
 				xattrp = NULL;
 				xattr_linkp = NULL;
@@ -2522,51 +2916,49 @@ doxtract(char *argv[])
 		dircreate = checkdir(&dirname[0]);
 
 #if defined(O_XATTR)
-		if (xattrp != (struct xattr_buf *)NULL) {
-			dirfd = attropen(dirp, ".", O_RDONLY);
+		if (xattrp != NULL) {
+			int	rc;
+
+			if (((cwd = save_cwd()) == -1) ||
+			    ((rc = open_attr_dir(comp, dirp, cwd,
+			    attrinfo)) != ATTR_OK)) {
+				if (cwd == -1) {
+					vperror(0, gettext(
+					    "unable to save current working "
+					    "directory while processing "
+					    "attribute %s of %s"),
+					    dirp, attrinfo->attr_path);
+				} else if (rc != ATTR_SKIP) {
+					(void) fprintf(vfile,
+					    gettext("tar: cannot open "
+					    "%sattribute %s of file %s: %s\n"),
+					    attrinfo->attr_rw_sysattr ? gettext(
+					    "system ") : "",
+					    comp, dirp, strerror(errno));
+				}
+				free(xattrhead);
+				xattrp = NULL;
+				xattr_linkp = NULL;
+				xattrhead = NULL;
+
+				passtape();
+				continue;
+			} else {
+				dirfd = attrinfo->attr_parentfd;
+				rw_sysattr = attrinfo->attr_rw_sysattr;
+			}
 		} else {
 			dirfd = open(dirp, O_RDONLY);
 		}
 #else
 		dirfd = open(dirp, O_RDONLY);
 #endif
-
 		if (dirfd == -1) {
-#if defined(O_XATTR)
-			if (xattrp) {
-				dirfd = retry_attrdir_open(dirp);
-			}
-#endif
-			if (dirfd == -1) {
-#if defined(O_XATTR)
-				if (xattrp) {
-					(void) fprintf(vfile,
-					    gettext("tar: cannot open "
-					    "attribute %s of file %s: %s\n"),
-					    xattraname, dirp, strerror(errno));
-					/*
-					 * Reset typeflag back to real
-					 * value so passtape will skip
-					 * ahead correctly.
-					 */
-					dblock.dbuf.typeflag = _XATTR_HDRTYPE;
-					free(xattrhead);
-					xattrp = NULL;
-					xattr_linkp = NULL;
-					xattrhead = NULL;
-				} else {
-					(void) fprintf(vfile,
-					    gettext("tar: cannot open %s %s\n"),
-					    dirp, strerror(errno));
-				}
-#else
-				(void) fprintf(vfile,
-				    gettext("tar: cannot open %s %s\n"),
-				    dirp, strerror(errno));
-#endif
-				passtape();
-				continue;
-			}
+			(void) fprintf(vfile, gettext(
+			    "tar: cannot open %s: %s\n"),
+			    dirp, strerror(errno));
+			passtape();
+			continue;
 		}
 
 		if (xhdr_flgs & _X_LINKPATH)
@@ -2635,18 +3027,51 @@ doxtract(char *argv[])
 		 * Dir is automatically created, we only
 		 * need to update mode and perm's.
 		 */
-		if ((xattrp != (struct xattr_buf *)NULL) && Hiddendir == 1) {
-			if (fchownat(dirfd, ".", stbuf.st_uid,
-			    stbuf.st_gid, 0) != 0) {
-				vperror(0, gettext(
-				    "%s: failed to set ownership of attribute"
-				    " directory"), namep);
+		if ((xattrp != NULL) && Hiddendir == 1) {
+			bytes = stbuf.st_size;
+			blocks = TBLOCKS(bytes);
+			if (vflag) {
+				(void) fprintf(vfile,
+				    "x %s%s%s, %" FMT_off_t " bytes, ", namep,
+				    gettext(" attribute "),
+				    xattrapath, bytes);
+				if (NotTape)
+					(void) fprintf(vfile,
+					    "%" FMT_blkcnt_t "K\n", K(blocks));
+				else
+					(void) fprintf(vfile, gettext("%"
+					    FMT_blkcnt_t " tape blocks\n"),
+					    blocks);
 			}
 
-			if (fchmod(dirfd, stbuf.st_mode) != 0) {
-				vperror(0, gettext(
-				    "%s: failed to set permissions of"
-				    " attribute directory"), namep);
+			/*
+			 * Set the permissions and mode of the attribute
+			 * unless the attribute is a system attribute (can't
+			 * successfully do this) or the hidden attribute
+			 * directory (".") of an attribute (when the attribute
+			 * is restored, the hidden attribute directory of an
+			 * attribute is transient).  Note:  when the permissions
+			 * and mode are set for the hidden attribute directory
+			 * of a file on a system supporting extended system
+			 * attributes, even though it returns successfully, it
+			 * will not have any affect since the attribute
+			 * directory is transient.
+			 */
+			if (attrinfo->attr_parent == NULL) {
+				if (fchownat(dirfd, ".", stbuf.st_uid,
+				    stbuf.st_gid, 0) != 0) {
+					vperror(0, gettext(
+					    "%s%s%s: failed to set ownership "
+					    "of attribute directory"), namep,
+					    gettext(" attribute "), xattrapath);
+				}
+
+				if (fchmod(dirfd, stbuf.st_mode) != 0) {
+					vperror(0, gettext(
+					    "%s%s%s: failed to set permissions "
+					    "of attribute directory"), namep,
+					    gettext(" attribute "), xattrapath);
+				}
 			}
 			goto filedone;
 		}
@@ -2683,7 +3108,8 @@ doxtract(char *argv[])
 				}
 				if (vflag)
 					(void) fprintf(vfile, gettext(
-					    "%s linked to %s\n"), namep, linkp);
+					    "x %s linked to %s\n"), namep,
+					    linkp);
 				xcnt++;	 /* increment # files extracted */
 				continue;
 			}
@@ -2723,14 +3149,15 @@ doxtract(char *argv[])
 				}
 				if (vflag)
 					(void) fprintf(vfile, gettext(
-					    "%s linked to %s\n"), namep, linkp);
+					    "x %s linked to %s\n"), namep,
+					    linkp);
 				xcnt++;	 /* increment # files extracted */
 				continue;
 			}
 			if (mknod(namep, (int)(Gen.g_mode|S_IFCHR),
 			    (int)makedev(Gen.g_devmajor, Gen.g_devminor)) < 0) {
 				vperror(0, gettext(
-				"%s: mknod failed"), namep);
+				    "%s: mknod failed"), namep);
 				continue;
 			}
 			bytes = stbuf.st_size;
@@ -2771,7 +3198,8 @@ doxtract(char *argv[])
 				}
 				if (vflag)
 					(void) fprintf(vfile, gettext(
-					    "%s linked to %s\n"), namep, linkp);
+					    "x %s linked to %s\n"), namep,
+					    linkp);
 				xcnt++;	 /* increment # files extracted */
 				continue;
 			}
@@ -2833,28 +3261,16 @@ doxtract(char *argv[])
 			}
 #if defined(O_XATTR)
 			if (xattrp && xattr_linkp) {
-				if (getcwd(origdir, (PATH_MAX+1)) ==
-				    (char *)NULL) {
-					vperror(0, gettext(
-					    "A parent directory cannot"
-					    " be read"));
-					exit(1);
-				}
-
 				if (fchdir(dirfd) < 0) {
 					vperror(0, gettext(
 					    "Cannot fchdir to attribute "
-					    "directory"));
+					    "directory %s"),
+					    (attrinfo->attr_parent == NULL) ?
+					    dirp : attrinfo->attr_parent);
 					exit(1);
 				}
 
-				error = link(xattr_linkaname, xattraname);
-				if (chdir(origdir) < 0) {
-					vperror(0, gettext(
-					    "Cannot chdir out of attribute "
-					    "directory"));
-					exit(1);
-				}
+				error = link(xattr_linkaname, xattrapath);
 			} else {
 				error = link(linkp, namep);
 			}
@@ -2868,23 +3284,23 @@ doxtract(char *argv[])
 				    namep, (xattr_linkp != NULL) ?
 				    gettext(" attribute ") : "",
 				    (xattr_linkp != NULL) ?
-				    xattraname : "");
+				    xattrapath : "");
 				continue;
 			}
 			if (vflag)
 				(void) fprintf(vfile, gettext(
-				    "%s%s%s linked to %s%s%s\n"), namep,
+				    "x %s%s%s linked to %s%s%s\n"), namep,
 				    (xattr_linkp != NULL) ?
 				    gettext(" attribute ") : "",
 				    (xattr_linkp != NULL) ?
 				    xattr_linkaname : "",
-				    linkp, (xattr_linkp != NULL) ?
-				    gettext(" attribute ") : "",
+				    linkp,
 				    (xattr_linkp != NULL) ?
-				    xattraname : "");
+				    gettext(" attribute ") : "",
+				    (xattr_linkp != NULL) ? xattrapath : "");
 			xcnt++;		/* increment # files extracted */
 #if defined(O_XATTR)
-			if (xattrp != (struct xattr_buf *)NULL) {
+			if (xattrp != NULL) {
 				free(xattrhead);
 				xattrp = NULL;
 				xattr_linkp = NULL;
@@ -2925,20 +3341,58 @@ doxtract(char *argv[])
 				}
 				if (vflag)
 					(void) fprintf(vfile, gettext(
-					    "%s linked to %s\n"), comp, linkp);
+					    "x %s linked to %s\n"), comp,
+					    linkp);
 				xcnt++;	 /* increment # files extracted */
+#if defined(O_XATTR)
+				if (xattrp != NULL) {
+					free(xattrhead);
+					xattrp = NULL;
+					xattr_linkp = NULL;
+					xattrhead = NULL;
+				}
+#endif
 				continue;
 			}
 		newfile = ((fstatat(dirfd, comp,
 		    &xtractbuf, 0) == -1) ? TRUE : FALSE);
-		if ((ofile = openat(dirfd, comp, O_RDWR|O_CREAT|O_TRUNC,
-		    stbuf.st_mode & MODEMASK)) < 0) {
+		ofile = openat(dirfd, comp, O_RDWR|O_CREAT|O_TRUNC,
+		    stbuf.st_mode & MODEMASK);
+		saveerrno = errno;
+
+#if defined(O_XATTR)
+		if (xattrp != NULL) {
+			if (ofile < 0) {
+				ofile = retry_open_attr(dirfd, cwd,
+				    dirp, attrinfo->attr_parent, comp,
+				    O_RDWR|O_CREAT|O_TRUNC,
+				    stbuf.st_mode & MODEMASK);
+			}
+		}
+#endif
+		if (ofile < 0) {
+			errno = saveerrno;
 			(void) fprintf(stderr, gettext(
-			    "tar: %s - cannot create\n"), comp);
+			    "tar: %s%s%s%s - cannot create\n"),
+			    (xattrp == NULL) ? "" : (rw_sysattr ?
+			    gettext("system attribure ") :
+			    gettext("attribute ")),
+			    (xattrp == NULL) ? "" : xattrapath,
+			    (xattrp == NULL) ? "" : gettext(" of "),
+			    (xattrp == NULL) ? comp : namep);
 			if (errflag)
 				done(1);
 			else
 				Errflg = 1;
+#if defined(O_XATTR)
+			if (xattrp != NULL) {
+				dblock.dbuf.typeflag = _XATTR_HDRTYPE;
+				free(xattrhead);
+				xattrp = NULL;
+				xattr_linkp = NULL;
+				xattrhead = NULL;
+			}
+#endif
 			passtape();
 			continue;
 		}
@@ -2955,11 +3409,17 @@ doxtract(char *argv[])
 		if (extno != 0) {	/* file is in pieces */
 			if (extotal < 1 || extotal > MAXEXT)
 				(void) fprintf(stderr, gettext(
-				    "tar: ignoring bad extent info for %s\n"),
-				    comp);
+				    "tar: ignoring bad extent info for "
+				    "%s%s%s%s\n"),
+				    (xattrp == NULL) ? "" : (rw_sysattr ?
+				    gettext("system attribute ") :
+				    gettext("attribute ")),
+				    (xattrp == NULL) ? "" : xattrapath,
+				    (xattrp == NULL) ? "" : gettext(" of "),
+				    (xattrp == NULL) ? comp : namep);
 			else {
-				xsfile(ofile);	/* extract it */
-				goto filedone;
+				/* extract it */
+				(void) xsfile(rw_sysattr, ofile);
 			}
 		}
 		extno = 0;	/* let everyone know file is not split */
@@ -2969,8 +3429,10 @@ doxtract(char *argv[])
 			(void) fprintf(vfile,
 			    "x %s%s%s, %" FMT_off_t " bytes, ",
 			    (xattrp == NULL) ? "" : dirp,
-			    (xattrp == NULL) ? "" : gettext(" attribute "),
-			    (xattrp == NULL) ? namep : comp, bytes);
+			    (xattrp == NULL) ? "" : (rw_sysattr ?
+			    gettext(" system attribute ") :
+			    gettext(" attribute ")),
+			    (xattrp == NULL) ? namep : xattrapath, bytes);
 			if (NotTape)
 				(void) fprintf(vfile, "%" FMT_blkcnt_t "K\n",
 				    K(blocks));
@@ -2979,18 +3441,50 @@ doxtract(char *argv[])
 				    FMT_blkcnt_t " tape blocks\n"), blocks);
 		}
 
-		xblocks(bytes, ofile);
+		if (xblocks(rw_sysattr, bytes, ofile) != 0) {
+#if defined(O_XATTR)
+			if (xattrp != NULL) {
+				free(xattrhead);
+				xattrp = NULL;
+				xattr_linkp = NULL;
+				xattrhead = NULL;
+			}
+#endif
+			continue;
+		}
 filedone:
 		if (mflag == 0 && !symflag) {
 			if (dir)
 				doDirTimes(namep, stbuf.st_mtim);
+
 			else
+#if defined(O_XATTR)
+				if (xattrp != NULL) {
+					/*
+					 * Set the time on the attribute unless
+					 * the attribute is a system attribute
+					 * (can't successfully do this) or the
+					 * hidden attribute directory, "." (the
+					 * time on the hidden attribute
+					 * directory will be updated when
+					 * attributes are restored, otherwise
+					 * it's transient).
+					 */
+					if (!rw_sysattr && (Hiddendir == 0)) {
+						setPathTimes(dirfd, comp,
+						    stbuf.st_mtim);
+					}
+				} else
+					setPathTimes(dirfd, comp,
+					    stbuf.st_mtim);
+#else
 				setPathTimes(dirfd, comp, stbuf.st_mtim);
+#endif
 		}
 
 		/* moved this code from above */
 		if (pflag && !symflag && Hiddendir == 0) {
-			if (xattrp != (struct xattr_buf *)NULL)
+			if (xattrp != NULL)
 				(void) fchmod(ofile, stbuf.st_mode & MODEMASK);
 			else
 				(void) chmod(namep, stbuf.st_mode & MODEMASK);
@@ -3007,7 +3501,7 @@ filedone:
 			int ret;
 
 #if defined(O_XATTR)
-			if (xattrp != (struct xattr_buf *)NULL) {
+			if (xattrp != NULL) {
 				if (Hiddendir)
 					ret = facl_set(dirfd, aclp);
 				else
@@ -3021,8 +3515,14 @@ filedone:
 			if (ret < 0) {
 				if (pflag) {
 					(void) fprintf(stderr, gettext(
-					    "%s: failed to set acl entries\n"),
-					    namep);
+					    "%s%s%s%s: failed to set acl "
+					    "entries\n"), namep,
+					    (xattrp == NULL) ? "" :
+					    (rw_sysattr ? gettext(
+					    " system attribute ") :
+					    gettext(" attribute ")),
+					    (xattrp == NULL) ? "" :
+					    xattrapath);
 				}
 				/* else: silent and continue */
 			}
@@ -3031,7 +3531,7 @@ filedone:
 		}
 
 #if defined(O_XATTR)
-		if (xattrp != (struct xattr_buf *)NULL) {
+		if (xattrp != NULL) {
 			free(xattrhead);
 			xattrp = NULL;
 			xattr_linkp = NULL;
@@ -3048,15 +3548,29 @@ filedone:
 		    convflag || dblock.dbuf.typeflag == '1')) {
 			if (fstat(ofile, &xtractbuf) == -1)
 				(void) fprintf(stderr, gettext(
-				    "tar: cannot stat extracted file %s\n"),
-				    namep);
+				    "tar: cannot stat extracted file "
+				    "%s%s%s%s\n"),
+				    (xattrp == NULL) ? "" : (rw_sysattr ?
+				    gettext("system attribute ") :
+				    gettext("attribute ")),
+				    (xattrp == NULL) ? "" : xattrapath,
+				    (xattrp == NULL) ? "" :
+				    gettext(" of "), namep);
+
 			else if ((xtractbuf.st_mode & (MODEMASK & ~S_IFMT))
 			    != (stbuf.st_mode & (MODEMASK & ~S_IFMT))) {
 				(void) fprintf(stderr, gettext(
 				    "tar: warning - file permissions have "
-				    "changed for %s (are 0%o, should be "
+				    "changed for %s%s%s%s (are 0%o, should be "
 				    "0%o)\n"),
-				    namep, xtractbuf.st_mode, stbuf.st_mode);
+				    (xattrp == NULL) ? "" : (rw_sysattr ?
+				    gettext("system attribute ") :
+				    gettext("attribute ")),
+				    (xattrp == NULL) ? "" : xattrapath,
+				    (xattrp == NULL) ? "" :
+				    gettext(" of "), namep,
+				    xtractbuf.st_mode, stbuf.st_mode);
+
 			}
 		}
 		if (ofile != -1) {
@@ -3064,6 +3578,7 @@ filedone:
 			dirfd = -1;
 			if (close(ofile) != 0)
 				vperror(2, gettext("close error"));
+			ofile = -1;
 		}
 		xcnt++;			/* increment # files extracted */
 		}
@@ -3188,8 +3703,9 @@ filedone:
 					tp += attrsize;
 				} while (bytes != 0);
 				free(secp);
-			} else
+			} else {
 				passtape();
+			}
 		} /* acl */
 
 	} /* for */
@@ -3201,6 +3717,15 @@ filedone:
 	 */
 
 	doDirTimes(NULL, time_zero);
+
+#if defined(O_XATTR)
+		if (xattrp != NULL) {
+			free(xattrhead);
+			xattrp = NULL;
+			xattr_linkp = NULL;
+			xattrhead = NULL;
+		}
+#endif
 
 	/*
 	 * Check if the number of files extracted is different from the
@@ -3223,8 +3748,8 @@ filedone:
  *	called by doxtract() and xsfile()
  */
 
-static void
-xblocks(off_t bytes, int ofile)
+static int
+xblocks(int issysattr, off_t bytes, int ofile)
 {
 	blkcnt_t blocks;
 	char buf[TBLOCK];
@@ -3239,17 +3764,36 @@ xblocks(off_t bytes, int ofile)
 		else
 			write_count = bytes;
 		if (write(ofile, buf, write_count) < 0) {
+			int saveerrno = errno;
+
 			if (xhdr_flgs & _X_PATH)
 				(void) strcpy(tempname, Xtarhdr.x_path);
 			else
 				(void) sprintf(tempname, "%.*s", NAMSIZ,
 				    dblock.dbuf.name);
-			(void) fprintf(stderr, gettext(
-			    "tar: %s: HELP - extract write error\n"), tempname);
-			done(2);
+			/*
+			 * If the extended system attribute being extracted
+			 * contains attributes that the user needs privileges
+			 * for, then just display a warning message, skip
+			 * the extraction of this file, and return.
+			 */
+			if ((saveerrno == EPERM) && issysattr) {
+				(void) fprintf(stderr, gettext(
+				    "tar: unable to extract system attribute "
+				    "%s: insufficient privileges\n"), tempname);
+				Errflg = 1;
+				return (1);
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "tar: %s: HELP - extract write error\n"),
+				    tempname);
+				done(2);
+			}
 		}
 		bytes -= TBLOCK;
 	}
+
+	return (0);
 }
 
 
@@ -3265,10 +3809,11 @@ xblocks(off_t bytes, int ofile)
 
 static	union	hblock	savedblock;	/* to ensure same file across volumes */
 
-static void
-xsfile(int ofd)
+static int
+xsfile(int issysattr, int ofd)
 {
 	int i, c;
+	int sysattrerr = 0;
 	char name[PATH_MAX+1];	/* holds name for diagnostics */
 	int extents, totalext;
 	off_t bytes, totalbytes;
@@ -3295,7 +3840,11 @@ canit:
 			passtape();
 			if (close(ofd) != 0)
 				vperror(2, gettext("close error"));
-			return;
+			if (sysattrerr) {
+				return (1);
+			} else {
+				return (0);
+			}
 		}
 	}
 	extents = extotal;
@@ -3312,7 +3861,10 @@ canit:
 			(void) fprintf(vfile, "+++ x %s [extent #%d], %"
 			    FMT_off_t " bytes, %ldK\n", name, extno, bytes,
 			    (long)K(TBLOCKS(bytes)));
-		xblocks(bytes, ofd);
+		if (xblocks(issysattr, bytes, ofd) != 0) {
+			sysattrerr = 1;
+			goto canit;
+		}
 
 		totalbytes += bytes;
 		totalext++;
@@ -3361,6 +3913,8 @@ asknicely:
 		(void) fprintf(vfile, gettext(
 		    "x %s (in %d extents), %" FMT_off_t " bytes, %ldK\n"),
 		    name, totalext, totalbytes, (long)K(TBLOCKS(totalbytes)));
+
+	return (0);
 }
 
 
@@ -3394,7 +3948,6 @@ notsame(void)
 	    (strcmp(savedblock.dbuf.efsize, dblock.dbuf.efsize)));
 }
 
-
 static void
 #ifdef	_iBCS2
 dotable(char *argv[], int tbl_cnt)
@@ -3409,7 +3962,7 @@ dotable(char *argv[])
 	int want;
 	char aclchar = ' ';			/* either blank or '+' */
 	char templink[PATH_MAX+1];
-	char  *np;
+	attr_data_t *attrinfo = NULL;
 
 	dumping = 0;
 
@@ -3436,7 +3989,7 @@ dotable(char *argv[])
 	for (;;) {
 
 		/* namep is set by wantit to point to the full name */
-		if ((want = wantit(argv, &namep, &dirp, &comp)) == 0)
+		if ((want = wantit(argv, &namep, &dirp, &comp, &attrinfo)) == 0)
 			continue;
 		if (want == -1)
 			break;
@@ -3460,11 +4013,27 @@ dotable(char *argv[])
 
 
 #if defined(O_XATTR)
-		if (xattrp != (struct xattr_buf *)NULL) {
-			np = xattrp->h_names + strlen(xattrp->h_names) + 1;
-			(void) printf(gettext("%s attribute %s"),
-			    xattrp->h_names, np);
+		if (xattrp != NULL) {
+			int	issysattr;
+			char	*bn = basename(attrinfo->attr_path);
 
+			/*
+			 * We could use sysattr_type() to test whether or not
+			 * the attribute we are processing is really an
+			 * extended system attribute, which as of this writing
+			 * just does a strcmp(), however, sysattr_type() may
+			 * be changed to issue a pathconf() call instead, which
+			 * would require being changed into the parent attribute
+			 * directory.  So instead, just do simple string
+			 * comparisons to see if we are processing an extended
+			 * system attribute.
+			 */
+			issysattr = is_sysattr(bn);
+
+			(void) printf(gettext("%s %sattribute %s"),
+			    xattrp->h_names,
+			    issysattr ? gettext("system ") : "",
+			    attrinfo->attr_path);
 		} else {
 			(void) printf("%s", namep);
 		}
@@ -3486,7 +4055,7 @@ dotable(char *argv[])
 			(void) strcpy(templink, Xtarhdr.x_linkpath);
 		} else {
 #if defined(O_XATTR)
-			if (xattrp != (struct xattr_buf *)NULL) {
+			if (xattrp != NULL) {
 				(void) sprintf(templink,
 				    "file %.*s", NAMSIZ, xattrp->h_names);
 			} else {
@@ -3507,7 +4076,7 @@ dotable(char *argv[])
 			 *		<subject> linked to %s
 			 */
 #if defined(O_XATTR)
-			if (xattrp != (struct xattr_buf *)NULL) {
+			if (xattrp != NULL) {
 				(void) printf(
 				    gettext(" linked to attribute %s"),
 				    xattr_linkp->h_names +
@@ -3533,7 +4102,7 @@ dotable(char *argv[])
 			" symbolic link to %s"), templink);
 		(void) printf("\n");
 #if defined(O_XATTR)
-		if (xattrp != (struct xattr_buf *)NULL) {
+		if (xattrp != NULL) {
 			free(xattrhead);
 			xattrp = NULL;
 			xattrhead = NULL;
@@ -5027,7 +5596,8 @@ mterr(char *operation, int i, int exitcode)
 }
 
 static int
-wantit(char *argv[], char **namep, char **dirp, char **component)
+wantit(char *argv[], char **namep, char **dirp, char **component,
+    attr_data_t **attrinfo)
 {
 	char **cp;
 	int gotit;		/* true if we've found a match */
@@ -5044,17 +5614,29 @@ top:
 
 #if defined(O_XATTR)
 	if (dblock.dbuf.typeflag == _XATTR_HDRTYPE && xattrbadhead == 0) {
-		if (atflag || tflag) {
-			(void) read_xattr_hdr();
-		} else {
-			passtape();
-		}
+		/*
+		 * Always needs to read the extended header.  If atflag, saflag,
+		 * or tflag isn't set, then we'll have the correct info for
+		 * passtape() later.
+		 */
+		(void) read_xattr_hdr(attrinfo);
 		goto top;
+	}
+	/*
+	 * Now that we've read the extended header, call passtape() if we aren't
+	 * processing extended attributes.
+	 */
+	if ((xattrp != NULL) && !atflag && !saflag && !tflag) {
+		passtape();
+		return (0);
 	}
 #endif
 
 	/* sets *namep to point at the proper name */
-	check_prefix(namep, dirp, component);
+	if (check_prefix(namep, dirp, component) != 0) {
+		passtape();
+		return (0);
+	}
 
 	if (endtape()) {
 		if (Bflag) {
@@ -5104,13 +5686,96 @@ top:
 	return (1);
 }
 
+static int
+fill_in_attr_info(char *attr, char *longname, char *attrparent, int atparentfd,
+    int rw_sysattr, attr_data_t **attrinfo)
+{
+	size_t	pathlen;
+	char	*tpath;
+	char	*tparent;
+
+	/* parent info */
+	if (attrparent != NULL) {
+		if ((tparent = strdup(attrparent)) == NULL) {
+			vperror(0, gettext(
+			    "unable to allocate memory for attribute parent "
+			    "name for %sattribute %s/%s of %s"),
+			    rw_sysattr ? gettext("system ") : "",
+			    attrparent, attr, longname);
+			return (1);
+		}
+	} else {
+		tparent = NULL;
+	}
+
+	/* path info */
+	pathlen = strlen(attr) + 1;
+	if (attrparent != NULL) {
+		pathlen += strlen(attrparent) + 1;	/* add 1 for '/' */
+	}
+	if ((tpath = calloc(1, pathlen)) == NULL) {
+		vperror(0, gettext(
+		    "unable to allocate memory for full "
+		    "attribute path name for %sattribute %s%s%s of %s"),
+		    rw_sysattr ? gettext("system ") : "",
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : "/",
+		    attr, longname);
+		if (tparent != NULL) {
+			free(tparent);
+		}
+		return (1);
+	}
+	(void) snprintf(tpath, pathlen, "%s%s%s",
+	    (attrparent == NULL) ? "" : attrparent,
+	    (attrparent == NULL) ? "" : "/",
+	    attr);
+
+	/* fill in the attribute info */
+	if (*attrinfo == NULL) {
+		if ((*attrinfo = malloc(sizeof (attr_data_t))) == NULL) {
+			vperror(0, gettext(
+			    "unable to allocate memory for attribute "
+			    "information for %sattribute %s%s%s of %s"),
+			    rw_sysattr ? gettext("system ") : "",
+			    (attrparent == NULL) ? "" : attrparent,
+			    (attrparent == NULL) ? "" : gettext("/"),
+			    attr, longname);
+			if (tparent != NULL) {
+				free(tparent);
+			}
+			free(tpath);
+			return (1);
+		}
+	} else {
+		if ((*attrinfo)->attr_parent != NULL) {
+			free((*attrinfo)->attr_parent);
+		}
+		if ((*attrinfo)->attr_path != NULL) {
+			free((*attrinfo)->attr_path);
+		}
+		/*
+		 * The parent file descriptor is passed in, so don't
+		 * close it here as it should be closed by the function
+		 * that opened it.
+		 */
+	}
+	(*attrinfo)->attr_parent = tparent;
+	(*attrinfo)->attr_path = tpath;
+	(*attrinfo)->attr_rw_sysattr = rw_sysattr;
+	(*attrinfo)->attr_parentfd = atparentfd;
+
+	return (0);
+}
 
 /*
  *  Return through *namep a pointer to the proper fullname (i.e  "<name> |
  *  <prefix>/<name>"), as represented in the header entry dblock.dbuf.
+ *
+ * Returns 0 if successful, otherwise returns 1.
  */
 
-static void
+static int
 check_prefix(char **namep, char **dirp, char **compp)
 {
 	static char fullname[PATH_MAX + 1];
@@ -5140,7 +5805,7 @@ check_prefix(char **namep, char **dirp, char **compp)
 	get_parent(fullname, dir);
 
 #if defined(O_XATTR)
-	if (xattrp == (struct xattr_buf *)NULL) {
+	if (xattrp == NULL) {
 #endif
 		/*
 		 * Save of real name since were going to chop off the
@@ -5158,13 +5823,15 @@ check_prefix(char **namep, char **dirp, char **compp)
 	} else {
 		(void) strcpy(fullname, xattrp->h_names);
 		(void) strcpy(dir, fullname);
-		(void) strcpy(component, xattrp->h_names +
-		    strlen(xattrp->h_names) + 1);
+		(void) strcpy(component, basename(xattrp->h_names +
+		    strlen(xattrp->h_names) + 1));
 	}
 #endif
 	*namep = fullname;
 	*dirp = dir;
 	*compp = component;
+
+	return (0);
 }
 
 /*
@@ -6540,12 +7207,13 @@ static void
 prepare_xattr(
 	char		**attrbuf,
 	char		*filename,
-	char		*attrname,
+	char		*attrpath,
 	char		typeflag,
 	struct linkbuf	*linkinfo,
 	int		*rlen)
 {
 	char			*bufhead;	/* ptr to full buffer */
+	char			*aptr;
 	struct xattr_hdr 	*hptr;		/* ptr to header in bufhead */
 	struct xattr_buf	*tptr;		/* ptr to pathing pieces */
 	int			totalen;	/* total buffer length */
@@ -6558,6 +7226,7 @@ prepare_xattr(
 	int			linkstringlen;
 	int			complen;	/* length of pathing section */
 	int			linklen;	/* length of link section */
+	int			attrnames_index; /* attrnames starting index */
 
 	/*
 	 * Release previous buffer
@@ -6576,7 +7245,7 @@ prepare_xattr(
 	/*
 	 * Add space for two nulls
 	 */
-	stringlen = strlen(attrname) + strlen(filename) + 2;
+	stringlen = strlen(attrpath) + strlen(filename) + 2;
 	complen = stringlen + sizeof (struct xattr_buf);
 
 	len += stringlen;
@@ -6591,7 +7260,10 @@ prepare_xattr(
 		 */
 		linkstringlen = strlen(linkinfo->pathname) +
 		    strlen(linkinfo->attrname) + 2;
-		len += linkstringlen;
+		linklen = linkstringlen + sizeof (struct xattr_buf);
+		len += linklen;
+	} else {
+		linklen = 0;
 	}
 
 	/*
@@ -6611,12 +7283,6 @@ prepare_xattr(
 	 * Now we can fill in the necessary pieces
 	 */
 
-	if (linkinfo != (struct linkbuf *)NULL) {
-		linklen = linkstringlen + (sizeof (struct xattr_buf));
-	} else {
-		linklen = 0;
-	}
-
 	/*
 	 * first fill in the fixed header
 	 */
@@ -6630,14 +7296,37 @@ prepare_xattr(
 
 	/*
 	 * Now fill in the filename + attrnames section
+	 * The filename and attrnames section can be composed of two or more
+	 * path segments separated by a null character.  The first segment
+	 * is the path to the parent file that roots the entire sequence in
+	 * the normal name space. The remaining segments describes a path
+	 * rooted at the hidden extended attribute directory of the leaf file of
+	 * the previous segment, making it possible to name attributes on
+	 * attributes.  Thus, if we are just archiving an extended attribute,
+	 * the second segment will contain the attribute name.  If we are
+	 * archiving a system attribute of an extended attribute, then the
+	 * second segment will contain the attribute name, and a third segment
+	 * will contain the system attribute name.  The attribute pathing
+	 * information is obtained from 'attrpath'.
 	 */
 
 	tptr = (struct xattr_buf *)(bufhead + sizeof (struct xattr_hdr));
 	(void) sprintf(tptr->h_namesz, "%0*d", sizeof (tptr->h_namesz) - 1,
 	    stringlen);
 	(void) strcpy(tptr->h_names, filename);
-	(void) strcpy(&tptr->h_names[strlen(filename) + 1], attrname);
+	attrnames_index = strlen(filename) + 1;
+	(void) strcpy(&tptr->h_names[attrnames_index], attrpath);
 	tptr->h_typeflag = typeflag;
+
+	/*
+	 * Split the attrnames section into two segments if 'attrpath'
+	 * contains pathing information for a system attribute of an
+	 * extended attribute.  We split them by replacing the '/' with
+	 * a '\0'.
+	 */
+	if ((aptr = strpbrk(&tptr->h_names[attrnames_index], "/")) != NULL) {
+		*aptr = '\0';
+	}
 
 	/*
 	 * Now fill in the optional link section if we have one
@@ -6675,7 +7364,7 @@ prepare_xattr(
 #endif
 
 int
-getstat(int dirfd, char *longname, char *shortname)
+getstat(int dirfd, char *longname, char *shortname, char *attrparent)
 {
 
 	int i, j;
@@ -6722,7 +7411,11 @@ getstat(int dirfd, char *longname, char *shortname)
 
 		if (printerr) {
 			(void) fprintf(stderr, gettext(
-			    "tar: %s: %s\n"), longname, strerror(errno));
+			    "tar: %s%s%s%s: %s\n"),
+			    (attrparent == NULL) ? "" : gettext("attribute "),
+			    (attrparent == NULL) ? "" : attrparent,
+			    (attrparent == NULL) ? "" : gettext(" of "),
+			    longname, strerror(errno));
 			Errflg = 1;
 		}
 		return (1);
@@ -6730,60 +7423,208 @@ getstat(int dirfd, char *longname, char *shortname)
 	return (0);
 }
 
+/*
+ * Recursively archive the extended attributes and/or extended system attributes
+ * of the base file, longname.  Note:  extended system attribute files will be
+ * archived only if the extended system attributes are not transient (i.e. the
+ * extended system attributes are other than the default values).
+ *
+ * If -@ was specified and the underlying file system supports it, archive the
+ * extended attributes, and if there is a system attribute associated with the
+ * extended attribute, then recursively call xattrs_put() to archive the
+ * hidden attribute directory and the extended system attribute.  If -/ was
+ * specified and the underlying file system supports it, archive the extended
+ * system attributes.  Read-only extended system attributes are never archived.
+ *
+ * Currently, there cannot be attributes on attributes; only system
+ * attributes on attributes.  In addition, there cannot be attributes on
+ * system attributes.  A file and it's attribute directory hierarchy looks as
+ * follows:
+ *	longname ---->	.	("." is the hidden attribute directory)
+ *			|
+ *	     ----------------------------
+ *	     |				|
+ *	<sys_attr_name>		   <attr_name> ---->	.
+ *							|
+ *						  <sys_attr_name>
+ *
+ */
 #if defined(O_XATTR)
 static void
-xattrs_put(char *longname, char *shortname, char *parent)
+xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 {
+	char *filename = (attrparent == NULL) ? shortname : attrparent;
+	int arc_rwsysattr = 0;
 	int dirfd;
+	int fd = -1;
+	int rw_sysattr = 0;
+	int rc;
 	DIR *dirp;
 	struct dirent *dp;
+	attr_data_t *attrinfo = NULL;
 
-	if (pathconf(shortname, _PC_XATTR_EXISTS) != 1) {
+	/*
+	 * If the underlying file system supports it, then archive the extended
+	 * attributes if -@ was specified, and the extended system attributes
+	 * if -/ was specified.
+	 */
+	if (verify_attr_support(filename, ARC_CREATE) != ATTR_OK) {
 		return;
 	}
 
-	if ((dirfd = attropen(shortname, ".", O_RDONLY)) < 0) {
-		(void) fprintf(stderr, gettext(
-		    "tar: unable to open attribute directory for file %s\n"),
+	/*
+	 * Only want to archive a read-write extended system attribute file
+	 * if it contains extended system attribute settings that are not the
+	 * default values.
+	 */
+#if defined(_PC_SATTR_ENABLED)
+	if (saflag) {
+		int	filefd;
+		nvlist_t *slist = NULL;
+
+		/* Determine if there are non-transient system attributes */
+		errno = 0;
+		if ((filefd = open(filename, O_RDONLY)) == -1) {
+			if (attrparent == NULL) {
+				vperror(0, gettext(
+				    "unable to open file %s"), longname);
+			}
+			return;
+		}
+		if (((slist = sysattr_list(basename(myname), filefd,
+		    filename)) != NULL) || (errno != 0)) {
+			arc_rwsysattr = 1;
+		}
+		if (slist != NULL) {
+			(void) nvlist_free(slist);
+			slist = NULL;
+		}
+		(void) close(filefd);
+	}
+#endif	/* _PC_SATTR_ENABLED */
+
+	/* open the parent attribute directory */
+	fd = attropen(filename, ".", O_RDONLY);
+	if (fd < 0) {
+		vperror(0, gettext(
+		    "unable to open attribute directory for %s%s%sfile %s"),
+		    (attrparent == NULL) ? "" : gettext("attribute "),
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : gettext(" of "),
 		    longname);
 		return;
 	}
 
-	if ((dirp = fdopendir(dirfd)) == NULL) {
+	/*
+	 * We need to change into the parent's attribute directory to determine
+	 * if each of the attributes should be archived.
+	 */
+	if (fchdir(fd) < 0) {
+		vperror(0, gettext(
+		    "cannot change to attribute directory of %s%s%sfile %s"),
+		    (attrparent == NULL) ? "" : gettext("attribute "),
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : gettext(" of "),
+		    longname);
+		(void) close(fd);
+		return;
+	}
+
+	if (((dirfd = dup(fd)) == -1) ||
+	    ((dirp = fdopendir(dirfd)) == NULL)) {
 		(void) fprintf(stderr, gettext(
-		    "tar: unable to open dir pointer for file %s\n"), longname);
+		    "tar: unable to open dir pointer for %s%s%sfile %s\n"),
+		    (attrparent == NULL) ? "" : gettext("attribute "),
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : gettext(" of "),
+		    longname);
+		if (fd > 0) {
+			(void) close(fd);
+		}
 		return;
 	}
 
 	while (dp = readdir(dirp)) {
-		if (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-		    dp->d_name[2] == '\0')
+		if (strcmp(dp->d_name, "..") == 0) {
 			continue;
-
-		if (dp->d_name[0] == '.' && dp->d_name[1] == '\0')
+		} else if (strcmp(dp->d_name, ".") == 0) {
 			Hiddendir = 1;
-		else
+		} else {
 			Hiddendir = 0;
+		}
 
-		(void) putfile(longname, dp->d_name, parent,
+		/* Determine if this attribute should be archived */
+		if (verify_attr(dp->d_name, attrparent, arc_rwsysattr,
+		    &rw_sysattr) != ATTR_OK) {
+			continue;
+		}
+
+		/* gather the attribute's information to pass to putfile() */
+		if ((fill_in_attr_info(dp->d_name, longname, attrparent,
+		    fd, rw_sysattr, &attrinfo)) == 1) {
+			continue;
+		}
+
+		/* add the attribute to the archive */
+		rc = putfile(longname, dp->d_name, parent, attrinfo,
 		    XATTR_FILE, LEV0, SYMLINK_LEV0);
 
-		if (exitflag)
+		if (exitflag) {
 			break;
+		}
+
+#if defined(_PC_SATTR_ENABLED)
+		/*
+		 * If both -/ and -@ were specified, then archive the
+		 * attribute's extended system attributes and hidden directory
+		 * by making a recursive call to xattrs_put().
+		 */
+		if (!rw_sysattr && saflag && atflag && (rc != PUT_AS_LINK) &&
+		    (Hiddendir == 0)) {
+
+			xattrs_put(longname, shortname, parent, dp->d_name);
+
+			/*
+			 * Change back to the parent's attribute directory
+			 * to process any further attributes.
+			 */
+			if (fchdir(fd) < 0) {
+				vperror(0, gettext(
+				    "cannot change back to attribute directory "
+				    "of file %s"), longname);
+				break;
+			}
+		}
+#endif	/* _PC_SATTR_ENABLED */
 	}
 
+	if (attrinfo != NULL) {
+		if (attrinfo->attr_parent != NULL) {
+			free(attrinfo->attr_parent);
+		}
+		free(attrinfo->attr_path);
+		free(attrinfo);
+	}
 	(void) closedir(dirp);
+	if (fd != -1) {
+		(void) close(fd);
+	}
+
+	/* Change back to the parent directory of the base file */
+	if (attrparent == NULL) {
+		(void) chdir(parent);
+	}
 }
 #else
 static void
-xattrs_put(char *longname, char *shortname, char *parent)
+xattrs_put(char *longname, char *shortname, char *parent, char *attrppath)
 {
 }
 #endif /* O_XATTR */
 
 static int
-put_link(char *name, char *longname, char *component,
-		char *prefix, int filetype, char type)
+put_link(char *name, char *longname, char *component, char *longattrname,
+    char *prefix, int filetype, char type)
 {
 
 	if (stbuf.st_nlink > 1) {
@@ -6799,8 +7640,8 @@ put_link(char *name, char *longname, char *component,
 		if (found) {
 #if defined(O_XATTR)
 			if (filetype == XATTR_FILE)
-				if (put_xattr_hdr(longname, component, prefix,
-				    type, filetype, lp)) {
+				if (put_xattr_hdr(longname, component,
+				    longattrname, prefix, type, filetype, lp)) {
 					goto out;
 			}
 #endif
@@ -6833,8 +7674,9 @@ put_link(char *name, char *longname, char *component,
 				if (filetype == XATTR_FILE) {
 					(void) fprintf(vfile, gettext(
 					    "a %s attribute %s link to "
-					    "attribute %s\n"),
-					    name, component, lp->attrname);
+					    "%s attribute %s\n"),
+					    name, component, name,
+					    lp->attrname);
 				} else {
 					(void) fprintf(vfile, gettext(
 					    "a %s link to %s\n"),
@@ -6853,7 +7695,8 @@ put_link(char *name, char *longname, char *component,
 				lp->count = stbuf.st_nlink - 1;
 				if (filetype == XATTR_FILE) {
 					(void) strcpy(lp->pathname, longname);
-					(void) strcpy(lp->attrname, component);
+					(void) strcpy(lp->attrname,
+					    component);
 				} else {
 					(void) strcpy(lp->pathname, longname);
 					(void) strcpy(lp->attrname, "");
@@ -6867,8 +7710,8 @@ out:
 }
 
 static int
-put_extra_attributes(char *longname, char *shortname, char *prefix,
-		int filetype, char typeflag)
+put_extra_attributes(char *longname, char *shortname, char *longattrname,
+    char *prefix, int filetype, char typeflag)
 {
 	static acl_t *aclp = NULL;
 	int error;
@@ -6878,8 +7721,8 @@ put_extra_attributes(char *longname, char *shortname, char *prefix,
 		aclp = NULL;
 	}
 #if defined(O_XATTR)
-	if (atflag && filetype == XATTR_FILE) {
-		if (put_xattr_hdr(longname, shortname, prefix,
+	if ((atflag || saflag) && (filetype == XATTR_FILE)) {
+		if (put_xattr_hdr(longname, shortname, longattrname, prefix,
 		    typeflag, filetype, NULL)) {
 			return (1);
 		}
@@ -6927,7 +7770,7 @@ put_extra_attributes(char *longname, char *shortname, char *prefix,
 
 #if defined(O_XATTR)
 static int
-put_xattr_hdr(char *longname, char *shortname, char *prefix,
+put_xattr_hdr(char *longname, char *shortname, char *longattrname, char *prefix,
 	int typeflag, int filetype, struct linkbuf *lp)
 {
 	char *lname = NULL;
@@ -6943,7 +7786,7 @@ put_xattr_hdr(char *longname, char *shortname, char *prefix,
 		fatal(gettext("Out of Memory."));
 	}
 	sname = malloc(sizeof (char) * strlen(shortname) +
-	    strlen(".hdr"));
+	    strlen(".hdr") + 1);
 	if (sname == NULL) {
 		fatal(gettext("Out of Memory."));
 	}
@@ -6960,7 +7803,7 @@ put_xattr_hdr(char *longname, char *shortname, char *prefix,
 	/*
 	 * dump extended attr lookup info
 	 */
-	prepare_xattr(&attrbuf, longname, shortname, typeflag, lp, &attrlen);
+	prepare_xattr(&attrbuf, longname, longattrname, typeflag, lp, &attrlen);
 	write_ancillary(&dblock, attrbuf, attrlen, _XATTR_HDRTYPE);
 
 	(void) sprintf(lname, "/dev/null/%s", shortname);
@@ -6981,15 +7824,17 @@ put_xattr_hdr(char *longname, char *shortname, char *prefix,
 
 #if defined(O_XATTR)
 static int
-read_xattr_hdr()
+read_xattr_hdr(attr_data_t **attrinfo)
 {
 	char		buf[TBLOCK];
+	char		*attrparent = NULL;
 	blkcnt_t	blocks;
 	char		*tp;
 	off_t		bytes;
 	int		comp_len, link_len;
 	int		namelen;
-
+	int		attrparentlen;
+	int		parentfilelen;
 
 	if (dblock.dbuf.typeflag != _XATTR_HDRTYPE)
 		return (1);
@@ -7037,7 +7882,40 @@ read_xattr_hdr()
 	else
 		xattr_linkp = NULL;
 
-	xattraname = xattrp->h_names + strlen(xattrp->h_names) + 1;
+	/*
+	 * Gather the attribute path from the filename and attrnames section.
+	 * The filename and attrnames section can be composed of two or more
+	 * path segments separated by a null character.  The first segment
+	 * is the path to the parent file that roots the entire sequence in
+	 * the normal name space. The remaining segments describes a path
+	 * rooted at the hidden extended attribute directory of the leaf file of
+	 * the previous segment, making it possible to name attributes on
+	 * attributes.
+	 */
+	parentfilelen = strlen(xattrp->h_names);
+	xattrapath = xattrp->h_names + parentfilelen + 1;
+	if ((strlen(xattrapath) + parentfilelen + 2) < namelen) {
+		/*
+		 * The attrnames section contains a system attribute on an
+		 * attribute.  Save the name of the attribute for use later,
+		 * and replace the null separating the attribute name from
+		 * the system attribute name with a '/' so that xattrapath can
+		 * be used to display messages with the full attribute path name
+		 * rooted at the hidden attribute directory of the base file
+		 * in normal name space.
+		 */
+		attrparent = strdup(xattrapath);
+		attrparentlen = strlen(attrparent);
+		xattrapath[attrparentlen] = '/';
+	}
+	if ((fill_in_attr_info((attrparent == NULL) ? xattrapath :
+	    xattrapath + attrparentlen + 1, xattrapath, attrparent,
+	    -1, 0, attrinfo)) == 1) {
+		free(attrparent);
+		return (1);
+	}
+
+	/* Gather link info */
 	if (xattr_linkp) {
 		xattr_linkaname = xattr_linkp->h_names +
 		    strlen(xattr_linkp->h_names) + 1;
@@ -7049,7 +7927,7 @@ read_xattr_hdr()
 }
 #else
 static int
-read_xattr_hdr()
+read_xattr_hdr(attr_data_t **attrinfo)
 {
 	return (0);
 }
@@ -7138,10 +8016,13 @@ get_component(char *path)
 }
 #endif
 
+#if defined(O_XATTR)
 static int
-retry_attrdir_open(char *name)
+retry_open_attr(int pdirfd, int cwd, char *dirp, char *pattr, char *name,
+    int oflag, mode_t mode)
 {
-	int dirfd = -1;
+	int dirfd;
+	int ofilefd = -1;
 	struct timeval times[2];
 	mode_t newmode;
 	struct stat parentstat;
@@ -7152,57 +8033,82 @@ retry_attrdir_open(char *name)
 	 * We couldn't get to attrdir. See if its
 	 * just a mode problem on the parent file.
 	 * for example: a mode such as r-xr--r--
-	 * won't let us create an attribute dir
-	 * if it doesn't already exist.
+	 * on a ufs file system without extended
+	 * system attribute support won't let us
+	 * create an attribute dir if it doesn't
+	 * already exist, and on a ufs file system
+	 * with extended system attribute support
+	 * won't let us open the attribute for
+	 * write.
 	 *
 	 * If file has a non-trivial ACL, then save it
 	 * off so that we can place it back on after doing
 	 * chmod's.
 	 */
-
-	if (stat(name, &parentstat) == -1) {
-		(void) fprintf(stderr, gettext("tar: cannot stat file %s %s\n"),
-		    name, strerror(errno));
+	if ((dirfd = openat(cwd, (pattr == NULL) ? dirp : pattr,
+	    O_RDONLY)) == -1) {
+		return (-1);
+	}
+	if (fstat(dirfd, &parentstat) == -1) {
+		(void) fprintf(stderr, gettext(
+		    "tar: cannot stat %sfile %s: %s\n"),
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? dirp : name, strerror(errno));
 			return (-1);
 	}
-	if ((error = acl_get(name, ACL_NO_TRIVIAL, &aclp)) != 0) {
-		(void) fprintf(stderr, gettext("tar: failed to retrieve ACL on"
-		    " %s %s\n"), name, strerror(errno));
+	if ((error = facl_get(dirfd, ACL_NO_TRIVIAL, &aclp)) != 0) {
+		(void) fprintf(stderr, gettext(
+		    "tar: failed to retrieve ACL on %sfile %s: %s\n"),
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? dirp : name, strerror(errno));
 			return (-1);
 	}
 
 	newmode = S_IWUSR | parentstat.st_mode;
-	if (chmod(name, newmode) == -1) {
+	if (fchmod(dirfd, newmode) == -1) {
 		(void) fprintf(stderr,
-		    gettext("tar: cannot chmod file %s to %o %s\n"),
-		    name, newmode, strerror(errno));
+		    gettext(
+		    "tar: cannot fchmod %sfile %s to %o: %s\n"),
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? dirp : name, newmode, strerror(errno));
 		if (aclp)
 			acl_free(aclp);
 		return (-1);
 	}
 
-	dirfd = attropen(name, ".", O_RDONLY);
 
-	/*
-	 * Don't print error message if attropen() failed,
-	 * caller will print message.
-	 */
+	if (pdirfd == -1) {
+		/*
+		 * We weren't able to create the attribute directory before.
+		 * Now try again.
+		 */
+		ofilefd = attropen(dirp, ".", oflag);
+	} else {
+		/*
+		 * We weren't able to create open the attribute before.
+		 * Now try again.
+		 */
+		ofilefd = openat(pdirfd, name, oflag, mode);
+	}
 
 	/*
 	 * Put mode back to original
 	 */
-	if (chmod(name, parentstat.st_mode) == -1) {
+	if (fchmod(dirfd, parentstat.st_mode) == -1) {
 		(void) fprintf(stderr,
-		    gettext("tar: cannot chmod file %s to %o %s\n"),
-		    name, newmode, strerror(errno));
+		    gettext("tar: cannot chmod %sfile %s to %o: %s\n"),
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? dirp : name, newmode, strerror(errno));
 	}
 
 	if (aclp) {
-		error = acl_set(name, aclp);
+		error = facl_set(dirfd, aclp);
 		if (error) {
 			(void) fprintf(stderr,
-			    gettext("tar: %s: failed to set acl entries\n"),
-			    name);
+			    gettext("tar: failed to set acl entries on "
+			    "%sfile %s\n"),
+			    (pdirfd == -1) ? "" : gettext("parent of "),
+			    (pdirfd == -1) ? dirp : name);
 		}
 		acl_free(aclp);
 	}
@@ -7215,10 +8121,14 @@ retry_attrdir_open(char *name)
 	times[0].tv_usec = 0;
 	times[1].tv_sec = parentstat.st_mtime;
 	times[1].tv_usec = 0;
-	(void) utimes(name, times);
 
-	return (dirfd);
+	(void) futimesat(cwd, (pattr == NULL) ? dirp : pattr, times);
+
+	(void) close(dirfd);
+
+	return (ofilefd);
 }
+#endif
 
 #if !defined(O_XATTR)
 static int

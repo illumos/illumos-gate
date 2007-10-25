@@ -64,7 +64,7 @@ void proto_plugin_fini();
  * /usr/lib/fs/nfs/libshare_nfs.so. The protocol specific directory
  * would have a modules with name libshare_<proto>.so. If one is
  * found, initialize it and add to the internal list of
- * protocols. These are used for protocol specifici operations.
+ * protocols. These are used for protocol specific operations.
  */
 
 int
@@ -242,9 +242,9 @@ sa_proto_share(char *proto, sa_share_t share)
 }
 
 /*
- * sa_proto_unshare(proto, path)
+ * sa_proto_unshare(proto, share)
  *
- * Deactivate (unshare) the path for this protocol.
+ * Deactivate (unshare) the share for this protocol.
  */
 
 int
@@ -255,6 +255,52 @@ sa_proto_unshare(sa_share_t share, char *proto, char *path)
 
 	if (ops != NULL && ops->sa_unshare != NULL)
 		ret = ops->sa_unshare(share, path);
+	return (ret);
+}
+
+/*
+ * sa_proto_share_resource(char *proto, sa_resource_t resource)
+ *
+ * For protocols that actually enable at the resource level, do the
+ * protocol specific resource enable. If it doesn't, return an error.
+ * Note that the resource functions are optional so can return
+ * SA_NOT_SUPPORTED.
+ */
+
+int
+sa_proto_share_resource(char *proto, sa_resource_t resource)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_INVALID_PROTOCOL;
+
+	if (ops != NULL) {
+		if (ops->sa_enable_resource != NULL)
+			ret = ops->sa_enable_resource(resource);
+		else
+			ret = SA_NOT_SUPPORTED;
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_unshare_resource(char *proto, sa_resource_t resource)
+ *
+ * For protocols that actually disable at the resource level, do the
+ * protocol specific resource disable. If it doesn't, return an error.
+ */
+
+int
+sa_proto_unshare_resource(char *proto, sa_resource_t resource)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_INVALID_PROTOCOL;
+
+	if (ops != NULL) {
+		if (ops->sa_disable_resource != NULL)
+			ret = ops->sa_disable_resource(resource);
+		else
+			ret = SA_NOT_SUPPORTED;
+	}
 	return (ret);
 }
 
@@ -395,7 +441,7 @@ sa_proto_get_properties(char *proto)
 /*
  * sa_proto_set_property(proto, prop)
  *
- * Update the protocol specifiec property.
+ * Update the protocol specific property.
  */
 
 int
@@ -467,16 +513,127 @@ int
 sa_proto_delete_legacy(char *proto, sa_share_t share)
 {
 	struct sa_plugin_ops *ops = find_protocol(proto);
-	int ret = SA_OK;
+	int ret = SA_NOT_IMPLEMENTED;
 
 	if (ops != NULL) {
 		if (ops->sa_delete_legacy != NULL)
 			ret = ops->sa_delete_legacy(share);
-	} else {
-		if (proto != NULL)
-			ret = SA_NOT_IMPLEMENTED;
-		else
+	} else 	if (proto == NULL) {
+		ret = SA_INVALID_PROTOCOL;
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_change_notify(share, char *protocol)
+ *
+ * Notify the protocol that a change has been made to the share
+ */
+
+int
+sa_proto_change_notify(sa_share_t share, char *proto)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_NOT_IMPLEMENTED;
+
+	if (ops != NULL) {
+		if (ops->sa_change_notify != NULL)
+			ret = ops->sa_change_notify(share);
+	} else	if (proto == NULL) {
 			ret = SA_INVALID_PROTOCOL;
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_notify_resource(resource, char *protocol)
+ *
+ * Notify the protocol that a change has been made to the share
+ */
+
+int
+sa_proto_notify_resource(sa_resource_t resource, char *proto)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_NOT_IMPLEMENTED;
+
+	if (ops != NULL) {
+		if (ops->sa_notify_resource != NULL)
+			ret = ops->sa_notify_resource(resource);
+	} else if (proto == NULL) {
+			ret = SA_INVALID_PROTOCOL;
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_get_featureset(protocol)
+ *
+ * Get bitmask of defined features of the protocol. These are
+ * primarily things like SA_FEATURE_RESOURCE (shares are by resource
+ * name rather than path) and other operational features that affect
+ * behavior.
+ */
+
+uint64_t
+sa_proto_get_featureset(char *proto)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	uint64_t ret = 0;
+
+	if (ops != NULL) {
+		if (ops->sa_features != NULL)
+			ret = ops->sa_features();
+	}
+	/* if not implemented, zero is valid */
+	return (ret);
+}
+
+/*
+ * sa_proto_get_transients(sa_handle_t)
+ *
+ * Called to get any protocol specific transient shares.  NFS doesn't
+ * use this since the info is in sharetab which is processed as a
+ * common transient store.
+ *
+ * The protocol plugin should verify that the share isn't in the
+ * repository and then add it as a transient.
+ *
+ * Not having an entry is not a problem. It returns 0 in that case.
+ */
+
+int
+sa_proto_get_transients(sa_handle_t handle, char *proto)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = 0;
+
+	if (ops != NULL) {
+		if (ops->sa_get_transient_shares != NULL)
+			ret = ops->sa_get_transient_shares(handle);
+	}
+	return (ret);
+}
+
+/*
+ * sa_proto_rename_resource(sa_handle_t, proto, sa_resource_t, newname)
+ *
+ * Protocols may need to know when a resource has changed names in
+ * order to notify clients. This must be done "before" the name in the
+ * resource has been changed. Not being implemented is not a problem.
+ */
+
+int
+sa_proto_rename_resource(sa_handle_t handle, char *proto,
+    sa_resource_t resource, char *newname)
+{
+	struct sa_plugin_ops *ops = find_protocol(proto);
+	int ret = SA_OK;
+
+	if (ops != NULL) {
+		if (ops->sa_rename_resource != NULL)
+			ret = ops->sa_rename_resource(handle, resource,
+			    newname);
 	}
 	return (ret);
 }

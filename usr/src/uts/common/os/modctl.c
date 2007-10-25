@@ -3129,7 +3129,7 @@ static char load_msg[] = "load '%s' id %d loaded @ 0x%p/0x%p size %d/%d\n";
 
 /*
  * Common code for loading a module (but not installing it).
- * Handoff the task of module loading to a seperate thread
+ * Handoff the task of module loading to a separate thread
  * with a large stack if possible, since this code may recurse a few times.
  * Return zero if there are no errors or an errno value.
  */
@@ -3513,7 +3513,7 @@ moduninstall(struct modctl *mp)
 
 		/*
 		 * Even though we only set mod_installed to zero here, a zero
-		 * return value means we are commited to a code path were
+		 * return value means we are committed to a code path were
 		 * mod_loaded will also end up as zero - we have no other
 		 * way to get the module data and bss back to the pre _init
 		 * state except a reload. To ensure this, after return,

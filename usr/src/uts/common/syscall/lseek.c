@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +112,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 
 	case SEEK_END:
 		vattr.va_mask = AT_SIZE;
-		if (error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred)) {
+		if (error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL)) {
 			goto out;
 		}
 		if (reg && (off  > (max - (offset_t)vattr.va_size))) {
@@ -134,7 +133,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 		 */
 		noff = (u_offset_t)off;
 		error = VOP_IOCTL(vp, _FIO_SEEK_DATA, (intptr_t)(&noff),
-		    FKIOCTL, kcred, NULL);
+		    FKIOCTL, kcred, NULL, NULL);
 		if (error) {
 			if (error != ENOTTY)
 				return (error);
@@ -143,7 +142,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 			 * "off" is not past the end of file
 			 */
 			vattr.va_mask = AT_SIZE;
-			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred);
+			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL);
 			if (error)
 				return (error);
 			if (noff >= (u_offset_t)vattr.va_size)
@@ -163,7 +162,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 		 */
 		noff = (u_offset_t)off;
 		error = VOP_IOCTL(vp, _FIO_SEEK_HOLE, (intptr_t)(&noff),
-		    FKIOCTL, kcred, NULL);
+		    FKIOCTL, kcred, NULL, NULL);
 		if (error) {
 			if (error != ENOTTY)
 				return (error);
@@ -172,7 +171,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 			 * the "virtual hole" at the end of the file.
 			 */
 			vattr.va_mask = AT_SIZE;
-			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred);
+			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL);
 			if (error)
 				return (error);
 			if (off < (offset_t)vattr.va_size)
@@ -194,7 +193,7 @@ lseek32_common(file_t *fp, int stype, offset_t off, offset_t max,
 
 	ASSERT((reg && noff <= max) || !reg);
 	newoff = (offset_t)noff;
-	if ((error = VOP_SEEK(vp, curoff, &newoff)) == 0) {
+	if ((error = VOP_SEEK(vp, curoff, &newoff, NULL)) == 0) {
 		fp->f_offset = newoff;
 		(*retoff) = newoff;
 		return (0);
@@ -294,7 +293,7 @@ lseek64(int fdes, off_t off, int stype)
 
 	case SEEK_END:
 		vattr.va_mask = AT_SIZE;
-		if ((error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred)) != 0)
+		if ((error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL)) != 0)
 			goto lseek64error;
 		new_off += vattr.va_size;
 		break;
@@ -309,7 +308,7 @@ lseek64(int fdes, off_t off, int stype)
 		 */
 		new_off = (offset_t)off;
 		error = VOP_IOCTL(vp, _FIO_SEEK_DATA, (intptr_t)(&new_off),
-		    FKIOCTL, kcred, NULL);
+		    FKIOCTL, kcred, NULL, NULL);
 		if (error) {
 			if (error != ENOTTY) {
 				goto lseek64error;
@@ -319,7 +318,7 @@ lseek64(int fdes, off_t off, int stype)
 			 * is not past end of file
 			 */
 			vattr.va_mask = AT_SIZE;
-			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred);
+			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL);
 			if (error)
 				goto lseek64error;
 			if (new_off >= (offset_t)vattr.va_size) {
@@ -338,7 +337,7 @@ lseek64(int fdes, off_t off, int stype)
 		 */
 		new_off = off;
 		error = VOP_IOCTL(vp, _FIO_SEEK_HOLE, (intptr_t)(&new_off),
-		    FKIOCTL, kcred, NULL);
+		    FKIOCTL, kcred, NULL, NULL);
 		if (error) {
 			if (error != ENOTTY)
 				goto lseek64error;
@@ -347,7 +346,7 @@ lseek64(int fdes, off_t off, int stype)
 			 * the "virtual hole" at the end of the file.
 			 */
 			vattr.va_mask = AT_SIZE;
-			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred);
+			error = VOP_GETATTR(vp, &vattr, 0, fp->f_cred, NULL);
 			if (error)
 				goto lseek64error;
 			if (off < (offset_t)vattr.va_size) {
@@ -367,7 +366,7 @@ lseek64(int fdes, off_t off, int stype)
 	}
 
 	old_off = fp->f_offset;
-	if ((error = VOP_SEEK(vp, old_off, &new_off)) == 0) {
+	if ((error = VOP_SEEK(vp, old_off, &new_off, NULL)) == 0) {
 		fp->f_offset = new_off;
 		releasef(fdes);
 		return (new_off);

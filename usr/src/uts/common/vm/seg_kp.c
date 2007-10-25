@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -536,7 +536,7 @@ segkp_get_internal(
 			 */
 			err = VOP_GETPAGE(vp, (offset_t)off, PAGESIZE,
 			    NULL, pl, PAGESIZE, seg, va, S_CREATE,
-			    kcred);
+			    kcred, NULL);
 			if (err) {
 				/*
 				 * XXX - This should not fail.
@@ -1129,7 +1129,7 @@ segkp_load(
 		 * which is returned to us already kept.
 		 */
 		err = VOP_GETPAGE(vp, (offset_t)off, PAGESIZE, NULL,
-		    pl, PAGESIZE, seg, va, S_READ, kcred);
+		    pl, PAGESIZE, seg, va, S_READ, kcred, NULL);
 
 		if (err) {
 			/*
@@ -1242,7 +1242,7 @@ segkp_unlock(
 			 * use kcred.
 			 */
 			(void) VOP_PUTPAGE(vp, (offset_t)off, PAGESIZE,
-			    B_ASYNC | B_FREE, kcred);
+			    B_ASYNC | B_FREE, kcred, NULL);
 			VN_RELE(vp);
 		} else {
 			page_unlock(pp);

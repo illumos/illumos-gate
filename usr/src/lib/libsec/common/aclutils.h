@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/acl.h>
 #include <strings.h>
 #include <locale.h>
 #include <ctype.h>
@@ -50,26 +51,6 @@ extern "C" {
  * append_data/add_subdirectory
  * when object of ACL is known.
  */
-#define	ACL_IS_DIR	0x2
-
-typedef enum acl_type {
-	ACLENT_T = 0,
-	ACE_T = 1
-} acl_type_t;
-
-/*
- * acl flags
- */
-#define	ACL_IS_TRIVIAL	0x1
-
-struct acl_info {
-	acl_type_t acl_type;		/* style of acl */
-	int acl_cnt;			/* number of acl entries */
-	int acl_entry_size;		/* sizeof acl entry */
-	int acl_flags;			/* special flags about acl */
-	void *acl_aclp;			/* the acl */
-};
-
 
 #define	PERM_TYPE_ACE		0x1	/* permissions are of ACE type */
 #define	PERM_TYPE_UNKNOWN	0x2	/* permission type not yet known */
@@ -105,7 +86,6 @@ extern void acl_error(const char *, ...);
 extern int acl_parse(const char *, acl_t **);
 extern int yyparse(void);
 extern void yyreset(void);
-extern acl_t *acl_alloc(enum acl_type);
 extern acl_t *acl_to_aclp(enum acl_type, void *, int);
 
 #ifdef	__cplusplus

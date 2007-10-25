@@ -77,7 +77,7 @@
  * file system, with the parent being the initial mount.
  */
 int
-nm_open(vnode_t **vpp, int flag, cred_t *crp)
+nm_open(vnode_t **vpp, int flag, cred_t *crp, caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(*vpp);
 	int error = 0;
@@ -95,7 +95,7 @@ nm_open(vnode_t **vpp, int flag, cred_t *crp)
 	infilevp = outfilevp = nodep->nm_filevp;
 	VN_HOLD(outfilevp);
 
-	if ((error = VOP_OPEN(&outfilevp, flag, crp)) != 0) {
+	if ((error = VOP_OPEN(&outfilevp, flag, crp, ct)) != 0) {
 		VN_RELE(outfilevp);
 		return (error);
 	}
@@ -163,16 +163,17 @@ gotit:
  * the file descriptor.
  */
 static int
-nm_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp)
+nm_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
+	caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	int error = 0;
 
 	(void) cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
-	error = VOP_CLOSE(nodep->nm_filevp, flag, count, offset, crp);
+	error = VOP_CLOSE(nodep->nm_filevp, flag, count, offset, crp, ct);
 	if (count == 1) {
-		(void) VOP_FSYNC(nodep->nm_filevp, FSYNC, crp);
+		(void) VOP_FSYNC(nodep->nm_filevp, FSYNC, crp, ct);
 		/*
 		 * Before VN_RELE() we need to remove the vnode from
 		 * the hash table.  We should only do so in the  NMNMNT case.
@@ -205,9 +206,10 @@ nm_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *crp,
 }
 
 static int
-nm_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr, int *rvalp)
+nm_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr, int *rvalp,
+	caller_context_t *ct)
 {
-	return (VOP_IOCTL(VTONM(vp)->nm_filevp, cmd, arg, mode, cr, rvalp));
+	return (VOP_IOCTL(VTONM(vp)->nm_filevp, cmd, arg, mode, cr, rvalp, ct));
 }
 
 /*
@@ -216,7 +218,8 @@ nm_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr, int *rvalp)
  */
 /* ARGSUSED */
 static int
-nm_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp)
+nm_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
+	caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	struct vattr va;
@@ -227,7 +230,7 @@ nm_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp)
 	mutex_exit(&nodep->nm_lock);
 
 	if ((va.va_mask = vap->va_mask & AT_SIZE) != 0) {
-		if (error = VOP_GETATTR(nodep->nm_filevp, &va, flags, crp))
+		if (error = VOP_GETATTR(nodep->nm_filevp, &va, flags, crp, ct))
 			return (error);
 		vap->va_size = va.va_size;
 	}
@@ -336,7 +339,8 @@ out:
  */
 /* ARGSUSED */
 static int
-nm_access(vnode_t *vp, int mode, int flags, cred_t *crp)
+nm_access(vnode_t *vp, int mode, int flags, cred_t *crp,
+	caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 	int error;
@@ -345,7 +349,7 @@ nm_access(vnode_t *vp, int mode, int flags, cred_t *crp)
 	error = nm_access_unlocked(nodep, mode, crp);
 	mutex_exit(&nodep->nm_lock);
 	if (error == 0)
-		return (VOP_ACCESS(nodep->nm_filevp, mode, flags, crp));
+		return (VOP_ACCESS(nodep->nm_filevp, mode, flags, crp, ct));
 	else
 		return (error);
 }
@@ -358,13 +362,14 @@ nm_access(vnode_t *vp, int mode, int flags, cred_t *crp)
 /*ARGSUSED*/
 static int
 nm_create(vnode_t *dvp, char *name, vattr_t *vap, enum vcexcl excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag)
+	int mode, vnode_t **vpp, cred_t *cr, int flag,
+	caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int error;
 
 	ASSERT(dvp && *name == '\0');
 	if (excl == NONEXCL) {
-		if (mode && (error = nm_access(dvp, mode, 0, cr)) != 0)
+		if (mode && (error = nm_access(dvp, mode, 0, cr, ct)) != 0)
 			return (error);
 		VN_HOLD(dvp);
 		return (0);
@@ -377,21 +382,22 @@ nm_create(vnode_t *dvp, char *name, vattr_t *vap, enum vcexcl excl,
  */
 /*ARGSUSED*/
 static int
-nm_link(vnode_t *tdvp, vnode_t *vp, char *tnm, cred_t *crp)
+nm_link(vnode_t *tdvp, vnode_t *vp, char *tnm, cred_t *crp,
+	caller_context_t *ct, int flags)
 {
 	return (EXDEV);
 }
 
 static int
-nm_fsync(vnode_t *vp, int syncflag, cred_t *crp)
+nm_fsync(vnode_t *vp, int syncflag, cred_t *crp, caller_context_t *ct)
 {
-	return (VOP_FSYNC(VTONM(vp)->nm_filevp, syncflag, crp));
+	return (VOP_FSYNC(VTONM(vp)->nm_filevp, syncflag, crp, ct));
 }
 
 /* Free the namenode */
 /* ARGSUSED */
 static void
-nm_inactive(vnode_t *vp, cred_t *crp)
+nm_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
 
@@ -413,9 +419,9 @@ nm_inactive(vnode_t *vp, cred_t *crp)
 }
 
 static int
-nm_fid(vnode_t *vp, struct fid *fidnodep)
+nm_fid(vnode_t *vp, struct fid *fidnodep, caller_context_t *ct)
 {
-	return (VOP_FID(VTONM(vp)->nm_filevp, fidnodep));
+	return (VOP_FID(VTONM(vp)->nm_filevp, fidnodep, ct));
 }
 
 static int
@@ -431,21 +437,21 @@ nm_rwunlock(vnode_t *vp, int write, caller_context_t *ctp)
 }
 
 static int
-nm_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+nm_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
-	return (VOP_SEEK(VTONM(vp)->nm_filevp, ooff, noffp));
+	return (VOP_SEEK(VTONM(vp)->nm_filevp, ooff, noffp, ct));
 }
 
 /*
  * Return the vnode representing the file descriptor in vpp.
  */
 static int
-nm_realvp(vnode_t *vp, vnode_t **vpp)
+nm_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	struct vnode *rvp;
 
 	vp = VTONM(vp)->nm_filevp;
-	if (VOP_REALVP(vp, &rvp) == 0)
+	if (VOP_REALVP(vp, &rvp, ct) == 0)
 		vp = rvp;
 	*vpp = vp;
 	return (0);
@@ -453,9 +459,10 @@ nm_realvp(vnode_t *vp, vnode_t **vpp)
 
 static int
 nm_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-	pollhead_t **phpp)
+	pollhead_t **phpp, caller_context_t *ct)
 {
-	return (VOP_POLL(VTONM(vp)->nm_filevp, events, anyyet, reventsp, phpp));
+	return (VOP_POLL(VTONM(vp)->nm_filevp, events, anyyet, reventsp,
+	    phpp, ct));
 }
 
 struct vnodeops *nm_vnodeops;

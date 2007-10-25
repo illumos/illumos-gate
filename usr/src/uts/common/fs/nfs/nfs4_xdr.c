@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2006 Sun Microsystems, Inc.
+ *	Copyright 2007 Sun Microsystems, Inc.
  *	All rights reserved.  Use is subject to license terms.
  */
 
@@ -190,7 +190,7 @@ xdr_inline_decode_nfs_fh4(uint32_t *ptr, nfs_fh4_fmt_t *fhp, uint32_t fhsize)
 	fhsize -= 2 * BYTES_PER_XDR_UNIT + sizeof (ushort_t);
 
 	/*
-	 * For backwards compatability, the fid length may be less than
+	 * For backwards compatibility, the fid length may be less than
 	 * NFS_FHMAXDATA, but it was always encoded as NFS_FHMAXDATA bytes.
 	 */
 	dsize = fhp->fh4_len < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh4_len;
@@ -849,6 +849,7 @@ xdr_ga_fattr_res(XDR *xdrs, struct nfs4_ga_res *garp, bitmap4 resbmap,
 			vsap->vsa_aclcnt = acl.fattr4_acl_len;
 			vsap->vsa_aclentp = acl.fattr4_acl_val;
 			vsap->vsa_mask = VSA_ACE | VSA_ACECNT;
+			vsap->vsa_aclentsz = vsap->vsa_aclcnt * sizeof (ace_t);
 
 		}
 		if (resbmap & FATTR4_ACLSUPPORT_MASK) {

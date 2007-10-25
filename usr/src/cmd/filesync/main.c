@@ -634,7 +634,7 @@ check_access(char *name, int *newflag)
 		return (0);
 	}
 
-	/* if the problem is isn't non-existance, lose	*/
+	/* if the problem is isn't non-existence, lose	*/
 	if (errno != ENOENT) {
 		*newflag = 0;
 		fprintf(stderr, gettext(ERR_rdwri), name);

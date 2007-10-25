@@ -38,6 +38,8 @@
 #include <sys/cmn_err.h>
 #include <sys/stat.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/zfs_i18n.h>
+#include <sys/zfs_znode.h>
 #include <sys/zap.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
@@ -60,6 +62,7 @@
 #include <sys/sdt.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/zfs_dir.h>
 #include <sys/zvol.h>
 #include <sharefs/share.h>
 #include <sys/zfs_znode.h>
@@ -152,6 +155,22 @@ history_str_get(zfs_cmd_t *zc)
 	buf[HIS_MAX_RECORD_LEN -1] = '\0';
 
 	return (buf);
+}
+
+static int
+zfs_check_version(const char *name, int version)
+{
+
+	spa_t *spa;
+
+	if (spa_open(name, &spa, FTAG) == 0) {
+		if (spa_version(spa) < version) {
+			spa_close(spa, FTAG);
+			return (1);
+		}
+		spa_close(spa, FTAG);
+	}
+	return (0);
 }
 
 static void
@@ -1280,9 +1299,8 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 			    nvpair_type(elem) != DATA_TYPE_STRING)
 				return (EINVAL);
 
-			error = zfs_secpolicy_write_perms(name,
-			    ZFS_DELEG_PERM_USERPROP, CRED());
-			if (error)
+			if (error = zfs_secpolicy_write_perms(name,
+			    ZFS_DELEG_PERM_USERPROP, CRED()))
 				return (error);
 			continue;
 		}
@@ -1304,35 +1322,25 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 			    nvpair_value_uint64(elem, &intval) == 0 &&
 			    intval >= ZIO_COMPRESS_GZIP_1 &&
 			    intval <= ZIO_COMPRESS_GZIP_9) {
-				spa_t *spa;
-
-				if (spa_open(name, &spa, FTAG) == 0) {
-					if (spa_version(spa) <
-					    SPA_VERSION_GZIP_COMPRESSION) {
-						spa_close(spa, FTAG);
-						return (ENOTSUP);
-					}
-
-					spa_close(spa, FTAG);
-				}
+				if (zfs_check_version(name,
+				    SPA_VERSION_GZIP_COMPRESSION))
+					return (ENOTSUP);
 			}
 			break;
 
 		case ZFS_PROP_COPIES:
-		{
-			spa_t *spa;
-
-			if (spa_open(name, &spa, FTAG) == 0) {
-				if (spa_version(spa) <
-				    SPA_VERSION_DITTO_BLOCKS) {
-					spa_close(spa, FTAG);
-					return (ENOTSUP);
-				}
-				spa_close(spa, FTAG);
-			}
+			if (zfs_check_version(name, SPA_VERSION_DITTO_BLOCKS))
+				return (ENOTSUP);
 			break;
+		case ZFS_PROP_NORMALIZE:
+		case ZFS_PROP_UTF8ONLY:
+		case ZFS_PROP_CASE:
+			if (zfs_check_version(name, SPA_VERSION_NORMALIZATION))
+				return (ENOTSUP);
+
 		}
-		}
+		if ((error = zfs_secpolicy_setprop(name, prop, CRED())) != 0)
+			return (error);
 	}
 
 	elem = NULL;
@@ -1642,13 +1650,163 @@ zfs_get_vfs(const char *resource)
 static void
 zfs_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 {
-	nvlist_t *nvprops = arg;
-	uint64_t version = ZPL_VERSION;
+	zfs_creat_t *zct = arg;
+	uint64_t version;
 
-	(void) nvlist_lookup_uint64(nvprops,
+	if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
+		version = ZPL_VERSION;
+	else
+		version = ZPL_VERSION_FUID - 1;
+
+	(void) nvlist_lookup_uint64(zct->zct_props,
 	    zfs_prop_to_name(ZFS_PROP_VERSION), &version);
 
-	zfs_create_fs(os, cr, version, tx);
+	zfs_create_fs(os, cr, version, zct->zct_norm, tx);
+}
+
+/*
+ * zfs_prop_lookup()
+ *
+ * Look for the property first in the existing property nvlist.  If
+ * it's already present, you're done.  If it's not there, attempt to
+ * find the property value from a parent dataset.  If that fails, fall
+ * back to the property's default value.  In either of these two
+ * cases, if update is TRUE, add a value for the property to the
+ * property nvlist.
+ *
+ * If the rval pointer is non-NULL, copy the discovered value to rval.
+ *
+ * If we get any unexpected errors, bail and return the error number
+ * to the caller.
+ *
+ * If we succeed, return 0.
+ */
+static int
+zfs_prop_lookup(const char *parentname, zfs_prop_t propnum,
+    nvlist_t *proplist, uint64_t *rval, boolean_t update)
+{
+	const char *propname;
+	uint64_t value;
+	int error = ENOENT;
+
+	propname = zfs_prop_to_name(propnum);
+	if (proplist != NULL)
+		error = nvlist_lookup_uint64(proplist, propname, &value);
+	if (error == ENOENT) {
+		error = dsl_prop_get_integer(parentname, propname,
+		    &value, NULL);
+		if (error == ENOENT)
+			value = zfs_prop_default_numeric(propnum);
+		else if (error != 0)
+			return (error);
+		if (update) {
+			ASSERT(proplist != NULL);
+			error = nvlist_add_uint64(proplist, propname, value);
+		}
+	}
+	if (error == 0 && rval)
+		*rval = value;
+	return (error);
+}
+
+/*
+ * zfs_normalization_get
+ *
+ * Get the normalization flag value.  If the properties have
+ * non-default values, make sure the pool version is recent enough to
+ * support these choices.
+ */
+static int
+zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
+    boolean_t update)
+{
+	char parentname[MAXNAMELEN];
+	char poolname[MAXNAMELEN];
+	char *cp;
+	uint64_t value;
+	int check = 0;
+	int error;
+
+	ASSERT(norm != NULL);
+	*norm = 0;
+
+	(void) strncpy(parentname, dataset, sizeof (parentname));
+	cp = strrchr(parentname, '@');
+	if (cp != NULL) {
+		cp[0] = '\0';
+	} else {
+		cp = strrchr(parentname, '/');
+		if (cp == NULL)
+			return (ENOENT);
+		cp[0] = '\0';
+	}
+
+	(void) strncpy(poolname, dataset, sizeof (poolname));
+	cp = strchr(poolname, '/');
+	if (cp != NULL)
+		cp[0] = '\0';
+
+	error = zfs_prop_lookup(parentname, ZFS_PROP_UTF8ONLY,
+	    proplist, &value, update);
+	if (error != 0)
+		return (error);
+	if (value != zfs_prop_default_numeric(ZFS_PROP_UTF8ONLY))
+		check = 1;
+
+	error = zfs_prop_lookup(parentname, ZFS_PROP_NORMALIZE,
+	    proplist, &value, update);
+	if (error != 0)
+		return (error);
+	if (value != zfs_prop_default_numeric(ZFS_PROP_NORMALIZE)) {
+		check = 1;
+		switch ((int)value) {
+		case ZFS_NORMALIZE_NONE:
+			break;
+		case ZFS_NORMALIZE_C:
+			*norm |= U8_TEXTPREP_NFC;
+			break;
+		case ZFS_NORMALIZE_D:
+			*norm |= U8_TEXTPREP_NFD;
+			break;
+		case ZFS_NORMALIZE_KC:
+			*norm |= U8_TEXTPREP_NFKC;
+			break;
+		case ZFS_NORMALIZE_KD:
+			*norm |= U8_TEXTPREP_NFKD;
+			break;
+		default:
+			ASSERT((int)value >= ZFS_NORMALIZE_NONE);
+			ASSERT((int)value <= ZFS_NORMALIZE_KD);
+			break;
+		}
+	}
+
+	error = zfs_prop_lookup(parentname, ZFS_PROP_CASE,
+	    proplist, &value, update);
+	if (error != 0)
+		return (error);
+	if (value != zfs_prop_default_numeric(ZFS_PROP_CASE)) {
+		check = 1;
+		switch ((int)value) {
+		case ZFS_CASE_SENSITIVE:
+			break;
+		case ZFS_CASE_INSENSITIVE:
+			*norm |= U8_TEXTPREP_TOUPPER;
+			break;
+		case ZFS_CASE_MIXED:
+			*norm |= U8_TEXTPREP_TOUPPER;
+			break;
+		default:
+			ASSERT((int)value >= ZFS_CASE_SENSITIVE);
+			ASSERT((int)value <= ZFS_CASE_MIXED);
+			break;
+		}
+	}
+
+	if (check == 1)
+		if (zfs_check_version(poolname, SPA_VERSION_NORMALIZATION))
+			return (ENOTSUP);
+	return (0);
 }
 
 static int
@@ -1656,6 +1814,7 @@ zfs_ioc_create(zfs_cmd_t *zc)
 {
 	objset_t *clone;
 	int error = 0;
+	zfs_creat_t zct;
 	nvlist_t *nvprops = NULL;
 	void (*cbfunc)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx);
 	dmu_objset_type_t type = zc->zc_objset_type;
@@ -1682,6 +1841,9 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	    &nvprops)) != 0)
 		return (error);
 
+	zct.zct_norm = 0;
+	zct.zct_props = nvprops;
+
 	if (zc->zc_value[0] != '\0') {
 		/*
 		 * We're creating a clone of an existing snapshot.
@@ -1699,6 +1861,34 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			return (error);
 		}
 		error = dmu_objset_create(zc->zc_name, type, clone, NULL, NULL);
+		if (error) {
+			dmu_objset_close(clone);
+			nvlist_free(nvprops);
+			return (error);
+		}
+		/*
+		 * If caller did not provide any properties, allocate
+		 * an nvlist for properties, as we will be adding our set-once
+		 * properties to it.  This carries the choices made on the
+		 * original file system into the clone.
+		 */
+		if (nvprops == NULL)
+			VERIFY(nvlist_alloc(&nvprops,
+			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+		/*
+		 * We have to have normalization and case-folding
+		 * flags correct when we do the file system creation,
+		 * so go figure them out now.  All we really care about
+		 * here is getting these values into the property list.
+		 */
+		error = zfs_normalization_get(zc->zc_value, nvprops,
+		    &zct.zct_norm, B_TRUE);
+		if (error != 0) {
+			dmu_objset_close(clone);
+			nvlist_free(nvprops);
+			return (error);
+		}
 		dmu_objset_close(clone);
 	} else {
 		if (cbfunc == NULL) {
@@ -1737,18 +1927,38 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			}
 		} else if (type == DMU_OST_ZFS) {
 			uint64_t version;
+			int error;
 
-			if (0 == nvlist_lookup_uint64(nvprops,
-			    zfs_prop_to_name(ZFS_PROP_VERSION), &version) &&
-			    (version < ZPL_VERSION_INITIAL ||
+			error = nvlist_lookup_uint64(nvprops,
+			    zfs_prop_to_name(ZFS_PROP_VERSION), &version);
+
+			if (error == 0 && (version < ZPL_VERSION_INITIAL ||
 			    version > ZPL_VERSION)) {
 				nvlist_free(nvprops);
-				return (EINVAL);
+				return (ENOTSUP);
+			} else if (error == 0 && version >= ZPL_VERSION_FUID &&
+			    zfs_check_version(zc->zc_name, SPA_VERSION_FUID)) {
+				nvlist_free(nvprops);
+				return (ENOTSUP);
+			}
+
+			/*
+			 * We have to have normalization and
+			 * case-folding flags correct when we do the
+			 * file system creation, so go figure them out
+			 * now.  The final argument to zfs_normalization_get()
+			 * tells that routine not to update the nvprops
+			 * list.
+			 */
+			error = zfs_normalization_get(zc->zc_name, nvprops,
+			    &zct.zct_norm, B_FALSE);
+			if (error != 0) {
+				nvlist_free(nvprops);
+				return (error);
 			}
 		}
-
 		error = dmu_objset_create(zc->zc_name, type, NULL, cbfunc,
-		    nvprops);
+		    &zct);
 	}
 
 	/*
@@ -1952,7 +2162,7 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 	if (zfsvfs != NULL)
 		VFS_RELE(zfsvfs->z_vfs);
 	new_off = fp->f_offset + zc->zc_cookie;
-	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &new_off) == 0)
+	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &new_off, NULL) == 0)
 		fp->f_offset = new_off;
 
 	releasef(fd);
@@ -2123,17 +2333,41 @@ zfs_ioc_promote(zfs_cmd_t *zc)
 /*
  * We don't want to have a hard dependency
  * against some special symbols in sharefs
- * and nfs.  Determine them if needed when
+ * nfs, and smbsrv.  Determine them if needed when
  * the first file system is shared.
- * Neither sharefs or nfs are unloadable modules.
+ * Neither sharefs, nfs or smbsrv are unloadable modules.
  */
-int (*zexport_fs)(void *arg);
+int (*znfsexport_fs)(void *arg);
 int (*zshare_fs)(enum sharefs_sys_op, share_t *, uint32_t);
+int (*zsmbexport_fs)(void *arg, boolean_t add_share);
 
-int zfs_share_inited;
+int zfs_nfsshare_inited;
+int zfs_smbshare_inited;
+
 ddi_modhandle_t nfs_mod;
 ddi_modhandle_t sharefs_mod;
+ddi_modhandle_t smbsrv_mod;
 kmutex_t zfs_share_lock;
+
+static int
+zfs_init_sharefs()
+{
+	int error;
+
+	ASSERT(MUTEX_HELD(&zfs_share_lock));
+	/* Both NFS and SMB shares also require sharetab support. */
+	if (sharefs_mod == NULL && ((sharefs_mod =
+	    ddi_modopen("fs/sharefs",
+	    KRTLD_MODE_FIRST, &error)) == NULL)) {
+		return (ENOSYS);
+	}
+	if (zshare_fs == NULL && ((zshare_fs =
+	    (int (*)(enum sharefs_sys_op, share_t *, uint32_t))
+	    ddi_modsym(sharefs_mod, "sharefs_impl", &error)) == NULL)) {
+		return (ENOSYS);
+	}
+	return (0);
+}
 
 static int
 zfs_ioc_share(zfs_cmd_t *zc)
@@ -2141,37 +2375,87 @@ zfs_ioc_share(zfs_cmd_t *zc)
 	int error;
 	int opcode;
 
-	if (zfs_share_inited == 0) {
-		mutex_enter(&zfs_share_lock);
-		nfs_mod = ddi_modopen("fs/nfs", KRTLD_MODE_FIRST, &error);
-		sharefs_mod = ddi_modopen("fs/sharefs",
-		    KRTLD_MODE_FIRST, &error);
-		if (nfs_mod == NULL || sharefs_mod == NULL) {
+	switch (zc->zc_share.z_sharetype) {
+	case ZFS_SHARE_NFS:
+	case ZFS_UNSHARE_NFS:
+		if (zfs_nfsshare_inited == 0) {
+			mutex_enter(&zfs_share_lock);
+			if (nfs_mod == NULL && ((nfs_mod = ddi_modopen("fs/nfs",
+			    KRTLD_MODE_FIRST, &error)) == NULL)) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			if (znfsexport_fs == NULL &&
+			    ((znfsexport_fs = (int (*)(void *))
+			    ddi_modsym(nfs_mod,
+			    "nfs_export", &error)) == NULL)) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			error = zfs_init_sharefs();
+			if (error) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			zfs_nfsshare_inited = 1;
 			mutex_exit(&zfs_share_lock);
-			return (ENOSYS);
 		}
-		if (zexport_fs == NULL && ((zexport_fs = (int (*)(void *))
-		    ddi_modsym(nfs_mod, "nfs_export", &error)) == NULL)) {
+		break;
+	case ZFS_SHARE_SMB:
+	case ZFS_UNSHARE_SMB:
+		if (zfs_smbshare_inited == 0) {
+			mutex_enter(&zfs_share_lock);
+			if (smbsrv_mod == NULL && ((smbsrv_mod =
+			    ddi_modopen("drv/smbsrv",
+			    KRTLD_MODE_FIRST, &error)) == NULL)) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			if (zsmbexport_fs == NULL && ((zsmbexport_fs =
+			    (int (*)(void *, boolean_t))ddi_modsym(smbsrv_mod,
+			    "lmshrd_share_upcall", &error)) == NULL)) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			error = zfs_init_sharefs();
+			if (error) {
+				mutex_exit(&zfs_share_lock);
+				return (ENOSYS);
+			}
+			zfs_smbshare_inited = 1;
 			mutex_exit(&zfs_share_lock);
-			return (ENOSYS);
 		}
-
-		if (zshare_fs == NULL && ((zshare_fs =
-		    (int (*)(enum sharefs_sys_op, share_t *, uint32_t))
-		    ddi_modsym(sharefs_mod, "sharefs_impl", &error)) == NULL)) {
-			mutex_exit(&zfs_share_lock);
-			return (ENOSYS);
-		}
-		zfs_share_inited = 1;
-		mutex_exit(&zfs_share_lock);
+		break;
+	default:
+		return (EINVAL);
 	}
 
-	if (error = zexport_fs((void *)(uintptr_t)zc->zc_share.z_exportdata))
-		return (error);
+	switch (zc->zc_share.z_sharetype) {
+	case ZFS_SHARE_NFS:
+	case ZFS_UNSHARE_NFS:
+		if (error =
+		    znfsexport_fs((void *)
+		    (uintptr_t)zc->zc_share.z_exportdata))
+			return (error);
+		break;
+	case ZFS_SHARE_SMB:
+	case ZFS_UNSHARE_SMB:
+		if (error = zsmbexport_fs((void *)
+		    (uintptr_t)zc->zc_share.z_exportdata,
+		    zc->zc_share.z_sharetype == ZFS_SHARE_SMB ?
+		    B_TRUE : B_FALSE)) {
+			return (error);
+		}
+		break;
+	}
 
-	opcode = (zc->zc_share.z_sharetype == B_TRUE) ?
+	opcode = (zc->zc_share.z_sharetype == ZFS_SHARE_NFS ||
+	    zc->zc_share.z_sharetype == ZFS_SHARE_SMB) ?
 	    SHAREFS_ADD : SHAREFS_REMOVE;
 
+	/*
+	 * Add or remove share from sharetab
+	 */
 	error = zshare_fs(opcode,
 	    (void *)(uintptr_t)zc->zc_share.z_sharedata,
 	    zc->zc_share.z_sharemax);
@@ -2447,10 +2731,12 @@ _fini(void)
 	zvol_fini();
 	zfs_fini();
 	spa_fini();
-	if (zfs_share_inited) {
+	if (zfs_nfsshare_inited)
 		(void) ddi_modclose(nfs_mod);
+	if (zfs_smbshare_inited)
+		(void) ddi_modclose(smbsrv_mod);
+	if (zfs_nfsshare_inited || zfs_smbshare_inited)
 		(void) ddi_modclose(sharefs_mod);
-	}
 
 	tsd_destroy(&zfs_fsyncer_key);
 	ldi_ident_release(zfs_li);

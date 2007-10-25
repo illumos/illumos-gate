@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +121,7 @@ static struct dev_ops cn_ops = {
  * Global variables associated with the console device:
  *
  * XXX:	There are too many of these!
- * moved to space.c to becone resident in the kernel so that cons
+ * moved to space.c to become resident in the kernel so that cons
  * can be loadable.
  */
 
@@ -310,7 +310,7 @@ cnopen(dev_t *dev, int flag, int state, struct cred *cred)
 			    LOG_HIWAT / LOG_MSGSIZE, TASKQ_PREPOPULATE);
 	}
 
-	if ((err = VOP_OPEN(&vp, flag, cred)) != 0)
+	if ((err = VOP_OPEN(&vp, flag, cred, NULL)) != 0)
 		return (err);
 
 	/*
@@ -323,7 +323,7 @@ cnopen(dev_t *dev, int flag, int state, struct cred *cred)
 		 * whilst we were in the middle of the open.
 		 */
 		if (rconsvp == NULL) {
-			(void) VOP_CLOSE(vp, flag, 1, (offset_t)0, cred);
+			(void) VOP_CLOSE(vp, flag, 1, (offset_t)0, cred, NULL);
 			return (0);
 		}
 		cmn_err(CE_PANIC, "cnopen: cloned open");
@@ -354,7 +354,7 @@ cnclose(dev_t dev, int flag, int state, struct cred *cred)
 		return (0);
 
 	while ((rconsopen != 0) && ((vp = rconsvp) != NULL)) {
-		err = VOP_CLOSE(vp, flag, 1, (offset_t)0, cred);
+		err = VOP_CLOSE(vp, flag, 1, (offset_t)0, cred, NULL);
 		if (!err) {
 			vp->v_stream = NULL;
 			rconsopen--;

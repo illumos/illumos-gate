@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 	caddr_t		uaddrp;
 	aclent_t	*aclp, *aaclp;
 	vsecattr_t	vsecattr;
+	size_t		entry_size;
 
 	ASSERT(vp);
 
@@ -142,20 +143,23 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 
 	case ACE_GETACLCNT:
 	case GETACLCNT:
-		if (cmd == GETACLCNT)
+		if (cmd == GETACLCNT) {
+			entry_size = sizeof (aclent_t);
 			vsecattr.vsa_mask = VSA_ACLCNT | VSA_DFACLCNT;
-		else
+		} else {
+			entry_size = sizeof (ace_t);
 			vsecattr.vsa_mask = VSA_ACECNT;
-		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED()))
+		}
+		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED(), NULL))
 			return (error);
 		*rv = vsecattr.vsa_aclcnt + vsecattr.vsa_dfaclcnt;
 		if (vsecattr.vsa_aclcnt && vsecattr.vsa_aclentp) {
 			kmem_free(vsecattr.vsa_aclentp,
-			    vsecattr.vsa_aclcnt * sizeof (aclent_t));
+			    vsecattr.vsa_aclcnt * entry_size);
 		}
 		if (vsecattr.vsa_dfaclcnt && vsecattr.vsa_dfaclentp) {
 			kmem_free(vsecattr.vsa_dfaclentp,
-			    vsecattr.vsa_dfaclcnt * sizeof (aclent_t));
+			    vsecattr.vsa_dfaclcnt * entry_size);
 		}
 		break;
 	case GETACL:
@@ -172,7 +176,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 			return (EFAULT);
 		vsecattr.vsa_mask = VSA_ACL | VSA_ACLCNT | VSA_DFACL |
 		    VSA_DFACLCNT;
-		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED()))
+		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED(), NULL))
 			return (error);
 		/* Check user's buffer is big enough */
 		numacls = vsecattr.vsa_aclcnt + vsecattr.vsa_dfaclcnt;
@@ -222,7 +226,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 			return (EFAULT);
 
 		vsecattr.vsa_mask = VSA_ACE | VSA_ACECNT;
-		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED()))
+		if (error = VOP_GETSECATTR(vp, &vsecattr, 0, CRED(), NULL))
 			return (error);
 
 		aclbsize = vsecattr.vsa_aclcnt * sizeof (ace_t);
@@ -240,8 +244,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 
 		*rv = vsecattr.vsa_aclcnt;
 		if (vsecattr.vsa_aclcnt) {
-			kmem_free(vsecattr.vsa_aclentp,
-			    vsecattr.vsa_aclcnt * sizeof (ace_t));
+			kmem_free(vsecattr.vsa_aclentp, vsecattr.vsa_aclentsz);
 		}
 		break;
 
@@ -300,7 +303,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 			return (ENOTDIR);
 		}
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
-		if (error = VOP_SETSECATTR(vp, &vsecattr, 0, CRED())) {
+		if (error = VOP_SETSECATTR(vp, &vsecattr, 0, CRED(), NULL)) {
 			kmem_free(aaclp, aclbsize);
 			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			return (error);
@@ -327,13 +330,14 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 		vsecattr.vsa_aclentp = kmem_alloc(aclbsize, KM_SLEEP);
 		aaclp = vsecattr.vsa_aclentp;
 		vsecattr.vsa_aclcnt = nentries;
+		vsecattr.vsa_aclentsz = aclbsize;
 		uaddrp = (caddr_t)aclbufp;
 		if (copyin(uaddrp, vsecattr.vsa_aclentp, aclbsize)) {
 			kmem_free(aaclp, aclbsize);
 			return (EFAULT);
 		}
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
-		if (error = VOP_SETSECATTR(vp, &vsecattr, 0, CRED())) {
+		if (error = VOP_SETSECATTR(vp, &vsecattr, 0, CRED(), NULL)) {
 			kmem_free(aaclp, aclbsize);
 			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			return (error);

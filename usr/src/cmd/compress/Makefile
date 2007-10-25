@@ -39,7 +39,7 @@ CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 LINTFLAGS += -u
 
-LDLIBS += -lsec
+LDLIBS += -lcmdutils -lsec
 
 all: $(PROG) 
 

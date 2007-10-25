@@ -1,0 +1,204 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_LOGR_NDL_
+#define _MLSVC_LOGR_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ ***********************************************************************
+ *
+ * Event log RPC (EVENTLOG) interface definition.
+ *
+ ***********************************************************************
+ */
+
+#include "ndrtypes.ndl"
+
+#define LOGR_OPNUM_EventLogClose		0x02
+#define LOGR_OPNUM_EventLogQueryCount		0x04
+#define LOGR_OPNUM_EventLogGetOldestRec		0x05
+#define LOGR_OPNUM_EventLogOpen			0x07
+#define LOGR_OPNUM_EventLogRead			0x0A
+
+#define LOGR_INFOLEN	200
+#define LOGR_RECBUFLEN	0x4000
+
+struct logr_handle {
+	DWORD hand1;
+	DWORD hand2;
+	WORD  hand3[2];
+	BYTE  hand4[8];
+};
+
+typedef struct logr_handle logr_handle_t;
+
+
+struct logr_string {
+	WORD		length;
+	WORD		allosize;
+	LPTSTR		str;
+};
+typedef struct logr_string logr_string_t;
+
+
+struct logr_record {
+	DWORD  Length1;        // Length of full record
+	DWORD  Reserved;      // Used by the service
+	DWORD  RecordNumber;  // Absolute record number
+	DWORD  TimeGenerated; // Seconds since 1-1-1970
+	DWORD  TimeWritten;   // Seconds since 1-1-1970
+	DWORD  EventID;
+	WORD   EventType;
+	WORD   NumStrings;
+	WORD   EventCategory;
+	WORD   ReservedFlags; // For use with paired events (auditing)
+	DWORD  ClosingRecordNumber; // For use with paired events (auditing)
+	DWORD  StringOffset;  // Offset from beginning of record
+	DWORD  UserSidLength;
+	DWORD  UserSidOffset;
+	DWORD  DataLength;
+	DWORD  DataOffset;
+	//
+	// Then follow:
+	//
+	// WCHAR SourceName[]	null terminated
+	// WCHAR Computername[]	null terminated
+	// SID   UserSid
+	// WCHAR Strings[]
+	// BYTE  Data[]
+	// CHAR  Pad[]	to DWORD
+	// DWORD Length; must be appear
+	BYTE   info[LOGR_INFOLEN];	
+	DWORD  Length2;
+};
+typedef struct logr_record logr_record_t;
+
+/*
+ ***********************************************************************
+ * LOGR_OPNUM_EventLogClose
+ ***********************************************************************
+ */
+OPERATION(LOGR_OPNUM_EventLogClose)
+struct logr_EventLogClose {
+	IN		logr_handle_t handle;
+	OUT		logr_handle_t result_handle;
+	OUT	DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * LOGR_OPNUM_EventLogQueryCount
+ ***********************************************************************
+ */
+OPERATION(LOGR_OPNUM_EventLogQueryCount)
+struct logr_EventLogQueryCount {
+	IN		logr_handle_t handle;
+	OUT		DWORD rec_num;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * LOGR_OPNUM_EventLogGetOldestRec
+ ***********************************************************************
+ */
+OPERATION(LOGR_OPNUM_EventLogGetOldestRec)
+struct logr_EventLogGetOldestRec {
+	IN		logr_handle_t handle;
+	OUT		DWORD oldest_rec;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * LOGR_OPNUM_EventLogOpen
+ ***********************************************************************
+ */
+OPERATION(LOGR_OPNUM_EventLogOpen)
+struct logr_EventLogOpen {
+	IN		DWORD *whatever;
+	IN		logr_string_t log_name;
+	IN		DWORD unknown1;
+	IN		DWORD unknown2;
+	IN		DWORD unknown3;
+	OUT		logr_handle_t handle;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * LOGR_OPNUM_EventLogRead
+ ***********************************************************************
+ */
+union logr_read_u {
+	CASE(1024)	BYTE rec[1024];
+	DEFAULT	BYTE	recs[LOGR_RECBUFLEN];
+};
+
+
+struct logr_read_info {
+	DWORD nbytes_to_read;
+  SWITCH(nbytes_to_read)
+	union logr_read_u ru;
+};
+
+OPERATION(LOGR_OPNUM_EventLogRead)
+struct logr_EventLogRead {
+	IN		logr_handle_t handle;
+	IN		DWORD read_flags;
+	IN		DWORD rec_offset;
+	INOUT		DWORD nbytes_to_read;
+SWITCH (nbytes_to_read)
+	OUT		union logr_read_u ru;
+	OUT		DWORD sent_size;
+	OUT		DWORD unknown;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * The EVENTLOG interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union logr_interface {
+	CASE(LOGR_OPNUM_EventLogClose)
+		struct logr_EventLogClose		EventLogClose;
+	CASE(LOGR_OPNUM_EventLogQueryCount)
+		struct logr_EventLogQueryCount		EventLogQueryCount;
+	CASE(LOGR_OPNUM_EventLogGetOldestRec)
+		struct logr_EventLogGetOldestRec	EventLogGetOldestRec;
+	CASE(LOGR_OPNUM_EventLogOpen)
+		struct logr_EventLogOpen		EventLogOpen;
+	CASE(LOGR_OPNUM_EventLogRead)
+		struct logr_EventLogRead		EventLogRead;
+};
+typedef union logr_interface	logr_interface_t;
+EXTERNTYPEINFO(logr_interface)
+
+
+#endif /* _MLSVC_LOGR_NDL_ */

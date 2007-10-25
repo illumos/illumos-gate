@@ -36,13 +36,16 @@
 #include <sys/port_impl.h>
 
 /* local functions */
-static int port_open(struct vnode **, int, cred_t *);
-static int port_close(struct vnode *, int, int, offset_t, cred_t *);
-static int port_getattr(struct vnode *, struct vattr *, int, cred_t *);
-static int port_access(struct vnode *, int, int, cred_t *);
-static int port_realvp(vnode_t *, vnode_t **);
-static int port_poll(vnode_t *, short, int, short *, struct pollhead **);
-static void port_inactive(struct vnode *, cred_t *);
+static int port_open(struct vnode **, int, cred_t *, caller_context_t *);
+static int port_close(struct vnode *, int, int, offset_t, cred_t *,
+	caller_context_t *);
+static int port_getattr(struct vnode *, struct vattr *, int, cred_t *,
+	caller_context_t *);
+static int port_access(struct vnode *, int, int, cred_t *, caller_context_t *);
+static int port_realvp(vnode_t *, vnode_t **, caller_context_t *);
+static int port_poll(vnode_t *, short, int, short *, struct pollhead **,
+	caller_context_t *);
+static void port_inactive(struct vnode *, cred_t *, caller_context_t *);
 
 const fs_operation_def_t port_vnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = port_open },
@@ -62,7 +65,7 @@ const fs_operation_def_t port_vnodeops_template[] = {
 
 /* ARGSUSED */
 static int
-port_open(struct vnode **vpp, int flag, cred_t *cr)
+port_open(struct vnode **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	return (0);
 }
@@ -146,7 +149,8 @@ port_close_events(port_queue_t *portq)
  */
 /* ARGSUSED */
 static int
-port_close(struct vnode *vp, int flag, int count, offset_t offset, cred_t *cr)
+port_close(struct vnode *vp, int flag, int count, offset_t offset, cred_t *cr,
+    caller_context_t *ct)
 {
 	port_t		*pp;
 	port_queue_t	*portq;
@@ -276,7 +280,7 @@ port_close(struct vnode *vp, int flag, int count, offset_t offset, cred_t *cr)
 /*ARGSUSED*/
 static int
 port_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-    struct pollhead **phpp)
+    struct pollhead **phpp, caller_context_t *ct)
 {
 	port_t		*pp;
 	port_queue_t	*portq;
@@ -308,7 +312,8 @@ port_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 
 /* ARGSUSED */
 static int
-port_getattr(struct vnode *vp, struct vattr *vap, int flags, cred_t *cr)
+port_getattr(struct vnode *vp, struct vattr *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	port_t	*pp;
 	extern dev_t portdev;
@@ -340,7 +345,7 @@ port_getattr(struct vnode *vp, struct vattr *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static void
-port_inactive(struct vnode *vp, cred_t *cr)
+port_inactive(struct vnode *vp, cred_t *cr, caller_context_t *ct)
 {
 	port_t 	*pp = VTOEP(vp);
 	extern 	port_kstat_t port_kstat;
@@ -359,14 +364,15 @@ port_inactive(struct vnode *vp, cred_t *cr)
 
 /* ARGSUSED */
 static int
-port_access(struct vnode *vp, int mode, int flags, cred_t *cr)
+port_access(struct vnode *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static int
-port_realvp(vnode_t *vp, vnode_t **vpp)
+port_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	*vpp = vp;
 	return (0);

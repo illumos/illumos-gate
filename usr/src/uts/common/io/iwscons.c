@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,7 @@ static iwscn_list_t	*iwscn_list;
  * the redirection streams module (redirmod) pushed on them.
  *
  * If both iwscn_redirect_lock and iwscn_list_lock must be held then
- * iwscn_redirect_lock must be aquired first.
+ * iwscn_redirect_lock must be acquired first.
  */
 static kcondvar_t	iwscn_list_cv;
 static kmutex_t		iwscn_list_lock;
@@ -320,7 +320,7 @@ iwscnpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	ASSERT(getminor(dev) == 0);
 
 	lp = srhold();
-	error = VOP_POLL(lp->wl_vp, events, anyyet, reventsp, phpp);
+	error = VOP_POLL(lp->wl_vp, events, anyyet, reventsp, phpp, NULL);
 	srrele(lp);
 
 	return (error);
@@ -448,7 +448,7 @@ iwscnioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		}
 
 		/* Process the ioctl normally */
-		error = VOP_IOCTL(lp->wl_vp, cmd, arg, flag, cred, rvalp);
+		error = VOP_IOCTL(lp->wl_vp, cmd, arg, flag, cred, rvalp, NULL);
 
 		srrele(lp);
 		mutex_exit(&iwscn_redirect_lock);
@@ -457,7 +457,7 @@ iwscnioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 
 	/* Process the ioctl normally */
 	lp = srhold();
-	error = VOP_IOCTL(lp->wl_vp, cmd, arg, flag, cred, rvalp);
+	error = VOP_IOCTL(lp->wl_vp, cmd, arg, flag, cred, rvalp, NULL);
 	srrele(lp);
 	return (error);
 }
@@ -498,11 +498,11 @@ iwscnopen(dev_t *devp, int flag, int state, cred_t *cred)
 		 * There is currently no redirection going on.
 		 * pass this open request onto the console driver
 		 */
-		error = VOP_OPEN(&vp, flag, cred);
+		error = VOP_OPEN(&vp, flag, cred, NULL);
 		if (error != 0)
 			return (error);
 
-		/* Re-aquire the list lock */
+		/* Re-acquire the list lock */
 		mutex_enter(&iwscn_list_lock);
 
 		if (iwscn_list == NULL) {
@@ -513,7 +513,7 @@ iwscnopen(dev_t *devp, int flag, int state, cred_t *cred)
 			 * In this case there must already be a copy of
 			 * this vnode on the list, so we can free up this one.
 			 */
-			(void) VOP_CLOSE(vp, flag, 1, (offset_t)0, cred);
+			(void) VOP_CLOSE(vp, flag, 1, (offset_t)0, cred, NULL);
 		}
 	}
 
@@ -588,7 +588,8 @@ iwscnclose(dev_t dev, int flag, int state, cred_t *cred)
 
 		if (lp->wl_is_console == B_TRUE)
 			/* Close the underlying console device. */
-			(void) VOP_CLOSE(lp->wl_vp, 0, 1, (offset_t)0, kcred);
+			(void) VOP_CLOSE(lp->wl_vp, 0, 1, (offset_t)0, kcred,
+			    NULL);
 
 		kmem_free(lp, sizeof (*lp));
 	}

@@ -223,7 +223,8 @@ lofi_free_handle(dev_t dev, minor_t minor, struct lofi_state *lsp,
 	char	namebuf[50];
 
 	if (lsp->ls_vp) {
-		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0, credp);
+		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag,
+		    1, 0, credp, NULL);
 		VN_RELE(lsp->ls_vp);
 		lsp->ls_vp = NULL;
 	}
@@ -864,7 +865,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		}
 	}
 	vattr.va_mask = AT_SIZE;
-	error = VOP_GETATTR(vp, &vattr, 0, credp);
+	error = VOP_GETATTR(vp, &vattr, 0, credp, NULL);
 	if (error) {
 		goto closeout;
 	}
@@ -936,7 +937,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	 * Try to handle stacked lofs vnodes.
 	 */
 	if (vp->v_type == VREG) {
-		if (VOP_REALVP(vp, &lsp->ls_vp) != 0) {
+		if (VOP_REALVP(vp, &lsp->ls_vp, NULL) != 0) {
 			lsp->ls_vp = vp;
 		} else {
 			/*
@@ -971,7 +972,7 @@ propout:
 	(void) ddi_prop_remove(newdev, lofi_dip, SIZE_PROP_NAME);
 	(void) ddi_prop_remove(newdev, lofi_dip, NBLOCKS_PROP_NAME);
 closeout:
-	(void) VOP_CLOSE(vp, flag, 1, 0, credp);
+	(void) VOP_CLOSE(vp, flag, 1, 0, credp, NULL);
 	VN_RELE(vp);
 out:
 	if (zalloced)
@@ -1035,7 +1036,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 			while (lsp->ls_vp_iocount > 0)
 				cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
 			(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0,
-			    credp);
+			    credp, NULL);
 			VN_RELE(lsp->ls_vp);
 			lsp->ls_vp = NULL;
 			cv_broadcast(&lsp->ls_vp_cv);

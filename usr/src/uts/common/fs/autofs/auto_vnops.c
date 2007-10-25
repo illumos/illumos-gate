@@ -53,29 +53,39 @@
 /*
  *  Vnode ops for autofs
  */
-static int auto_open(vnode_t **, int, cred_t *);
-static int auto_close(vnode_t *, int, int, offset_t, cred_t *);
-static int auto_getattr(vnode_t *, vattr_t *, int, cred_t *);
+static int auto_open(vnode_t **, int, cred_t *, caller_context_t *);
+static int auto_close(vnode_t *, int, int, offset_t, cred_t *,
+	caller_context_t *);
+static int auto_getattr(vnode_t *, vattr_t *, int, cred_t *,
+	caller_context_t *);
 static int auto_setattr(vnode_t *, vattr_t *, int, cred_t *,
 	caller_context_t *);
-static int auto_access(vnode_t *, int, int, cred_t *);
+static int auto_access(vnode_t *, int, int, cred_t *, caller_context_t *);
 static int auto_lookup(vnode_t *, char *, vnode_t **,
-	pathname_t *, int, vnode_t *, cred_t *);
+	pathname_t *, int, vnode_t *, cred_t *, caller_context_t *, int *,
+	pathname_t *);
 static int auto_create(vnode_t *, char *, vattr_t *, vcexcl_t,
-	int, vnode_t **, cred_t *, int);
-static int auto_remove(vnode_t *, char *, cred_t *);
-static int auto_link(vnode_t *, vnode_t *, char *, cred_t *);
-static int auto_rename(vnode_t *, char *, vnode_t *, char *, cred_t *);
-static int auto_mkdir(vnode_t *, char *, vattr_t *, vnode_t **, cred_t *);
-static int auto_rmdir(vnode_t *, char *, vnode_t *, cred_t *);
-static int auto_readdir(vnode_t *, uio_t *, cred_t *, int *);
-static int auto_symlink(vnode_t *, char *, vattr_t *, char *, cred_t *);
-static int auto_readlink(vnode_t *, struct uio *, cred_t *);
-static int auto_fsync(vnode_t *, int, cred_t *);
-static void auto_inactive(vnode_t *, cred_t *);
+	int, vnode_t **, cred_t *, int, caller_context_t *,  vsecattr_t *);
+static int auto_remove(vnode_t *, char *, cred_t *, caller_context_t *, int);
+static int auto_link(vnode_t *, vnode_t *, char *, cred_t *,
+	caller_context_t *, int);
+static int auto_rename(vnode_t *, char *, vnode_t *, char *, cred_t *,
+	caller_context_t *, int);
+static int auto_mkdir(vnode_t *, char *, vattr_t *, vnode_t **, cred_t *,
+	caller_context_t *, int, vsecattr_t *);
+static int auto_rmdir(vnode_t *, char *, vnode_t *, cred_t *,
+	caller_context_t *, int);
+static int auto_readdir(vnode_t *, uio_t *, cred_t *, int *,
+	caller_context_t *, int);
+static int auto_symlink(vnode_t *, char *, vattr_t *, char *, cred_t *,
+	caller_context_t *, int);
+static int auto_readlink(vnode_t *, struct uio *, cred_t *,
+	caller_context_t *);
+static int auto_fsync(vnode_t *, int, cred_t *, caller_context_t *);
+static void auto_inactive(vnode_t *, cred_t *, caller_context_t *);
 static int auto_rwlock(vnode_t *, int, caller_context_t *);
 static void auto_rwunlock(vnode_t *vp, int, caller_context_t *);
-static int auto_seek(vnode_t *vp, offset_t, offset_t *);
+static int auto_seek(vnode_t *vp, offset_t, offset_t *, caller_context_t *);
 
 static int auto_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 
@@ -113,7 +123,7 @@ const fs_operation_def_t auto_vnodeops_template[] = {
 
 /* ARGSUSED */
 static int
-auto_open(vnode_t **vpp, int flag, cred_t *cred)
+auto_open(vnode_t **vpp, int flag, cred_t *cred, caller_context_t *ct)
 {
 	vnode_t *newvp;
 	int error;
@@ -130,9 +140,9 @@ auto_open(vnode_t **vpp, int flag, cred_t *cred)
 		 */
 		VN_RELE(*vpp);
 		*vpp = newvp;
-		error = VOP_ACCESS(*vpp, VREAD, 0, cred);
+		error = VOP_ACCESS(*vpp, VREAD, 0, cred, ct);
 		if (!error)
-			error = VOP_OPEN(vpp, flag, cred);
+			error = VOP_OPEN(vpp, flag, cred, ct);
 	}
 
 done:
@@ -143,13 +153,24 @@ done:
 
 /* ARGSUSED */
 static int
-auto_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cred)
+auto_close(
+	vnode_t *vp,
+	int flag,
+	int count,
+	offset_t offset,
+	cred_t *cred,
+	caller_context_t *ct)
 {
 	return (0);
 }
 
 static int
-auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
+auto_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cred,
+	caller_context_t *ct)
 {
 	fnnode_t *fnp = vntofn(vp);
 	vnode_t *newvp;
@@ -211,7 +232,7 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 			fnp->fn_thread = curthread;
 			fnp->fn_seen = newvp;
 			mutex_exit(&fnp->fn_lock);
-			error = VOP_GETATTR(newvp, vap, flags, cred);
+			error = VOP_GETATTR(newvp, vap, flags, cred, ct);
 			VN_RELE(newvp);
 			mutex_enter(&fnp->fn_lock);
 			fnp->fn_seen = 0;
@@ -272,7 +293,7 @@ auto_setattr(
 		if (vn_is_readonly(newvp))
 			error = EROFS;
 		else
-			error = VOP_SETATTR(newvp, vap, flags, cred, NULL);
+			error = VOP_SETATTR(newvp, vap, flags, cred, ct);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -284,7 +305,12 @@ done:
 
 /* ARGSUSED */
 static int
-auto_access(vnode_t *vp, int mode, int flags, cred_t *cred)
+auto_access(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cred,
+	caller_context_t *ct)
 {
 	fnnode_t *fnp = vntofn(vp);
 	vnode_t *newvp;
@@ -299,7 +325,7 @@ auto_access(vnode_t *vp, int mode, int flags, cred_t *cred)
 		/*
 		 * Node is mounted on.
 		 */
-		error = VOP_ACCESS(newvp, mode, 0, cred);
+		error = VOP_ACCESS(newvp, mode, 0, cred, ct);
 		VN_RELE(newvp);
 	} else {
 		int shift = 0;
@@ -333,7 +359,10 @@ auto_lookup(
 	pathname_t *pnp,
 	int flags,
 	vnode_t *rdir,
-	cred_t *cred)
+	cred_t *cred,
+	caller_context_t *ct,
+	int *direntflags,
+	pathname_t *realpnp)
 {
 	int error = 0;
 	vnode_t *newvp = NULL;
@@ -354,7 +383,7 @@ auto_lookup(
 		return (0);
 	}
 
-	if (error = VOP_ACCESS(dvp, VEXEC, 0, cred))
+	if (error = VOP_ACCESS(dvp, VEXEC, 0, cred, ct))
 		return (error);
 
 	if (nm[0] == '.' && nm[1] == 0) {
@@ -387,7 +416,8 @@ auto_lookup(
 			vp = dvp->v_vfsp->vfs_vnodecovered;
 			VN_HOLD(vp);
 			vfs_unlock(dvp->v_vfsp);
-			error = VOP_LOOKUP(vp, nm, vpp, pnp, flags, rdir, cred);
+			error = VOP_LOOKUP(vp, nm, vpp, pnp, flags, rdir, cred,
+			    ct, direntflags, realpnp);
 			VN_RELE(vp);
 			return (error);
 		} else {
@@ -434,7 +464,7 @@ top:
 		vn_vfsunlock(dvp);
 		if (!error) {
 			error = VOP_LOOKUP(newvp, nm, vpp, pnp,
-			    flags, rdir, cred);
+			    flags, rdir, cred, ct, direntflags, realpnp);
 			VN_RELE(newvp);
 		}
 		return (error);
@@ -640,7 +670,9 @@ auto_create(
 	int mode,
 	vnode_t **vpp,
 	cred_t *cred,
-	int flag)
+	int flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	vnode_t *newvp;
 	int error;
@@ -658,7 +690,7 @@ auto_create(
 			error = EROFS;
 		else
 			error = VOP_CREATE(newvp, nm, va, excl,
-			    mode, vpp, cred, flag);
+			    mode, vpp, cred, flag, ct, vsecp);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -669,7 +701,12 @@ done:
 }
 
 static int
-auto_remove(vnode_t *dvp, char *nm, cred_t *cred)
+auto_remove(
+	vnode_t *dvp,
+	char *nm,
+	cred_t *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *newvp;
 	int error;
@@ -686,7 +723,7 @@ auto_remove(vnode_t *dvp, char *nm, cred_t *cred)
 		if (vn_is_readonly(newvp))
 			error = EROFS;
 		else
-			error = VOP_REMOVE(newvp, nm, cred);
+			error = VOP_REMOVE(newvp, nm, cred, ct, flags);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -697,7 +734,13 @@ done:
 }
 
 static int
-auto_link(vnode_t *tdvp, vnode_t *svp, char *nm, cred_t *cred)
+auto_link(
+	vnode_t *tdvp,
+	vnode_t *svp,
+	char *nm,
+	cred_t *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *newvp;
 	int error;
@@ -731,7 +774,7 @@ auto_link(vnode_t *tdvp, vnode_t *svp, char *nm, cred_t *cred)
 		goto done;
 	}
 
-	error = VOP_LINK(newvp, svp, nm, cred);
+	error = VOP_LINK(newvp, svp, nm, cred, ct, flags);
 	VN_RELE(newvp);
 
 done:
@@ -740,7 +783,14 @@ done:
 }
 
 static int
-auto_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
+auto_rename(
+	vnode_t *odvp,
+	char *onm,
+	vnode_t *ndvp,
+	char *nnm,
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *o_newvp, *n_newvp;
 	int error;
@@ -801,7 +851,7 @@ auto_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 		goto done;
 	}
 
-	error = VOP_RENAME(o_newvp, onm, n_newvp, nnm, cr);
+	error = VOP_RENAME(o_newvp, onm, n_newvp, nnm, cr, ct, flags);
 	VN_RELE(o_newvp);
 	if (n_newvp != ndvp)
 		VN_RELE(n_newvp);
@@ -812,7 +862,15 @@ done:
 }
 
 static int
-auto_mkdir(vnode_t *dvp, char *nm, vattr_t *va, vnode_t **vpp, cred_t *cred)
+auto_mkdir(
+	vnode_t *dvp,
+	char *nm,
+	vattr_t *va,
+	vnode_t **vpp,
+	cred_t *cred,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)
 {
 	vnode_t *newvp;
 	int error;
@@ -829,7 +887,8 @@ auto_mkdir(vnode_t *dvp, char *nm, vattr_t *va, vnode_t **vpp, cred_t *cred)
 		if (vn_is_readonly(newvp))
 			error = EROFS;
 		else
-			error = VOP_MKDIR(newvp, nm, va, vpp, cred);
+			error = VOP_MKDIR(newvp, nm, va, vpp, cred, ct,
+			    flags, vsecp);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -840,7 +899,13 @@ done:
 }
 
 static int
-auto_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cred)
+auto_rmdir(
+	vnode_t *dvp,
+	char *nm,
+	vnode_t *cdir,
+	cred_t *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *newvp;
 	int error;
@@ -857,7 +922,7 @@ auto_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cred)
 		if (vn_is_readonly(newvp))
 			error = EROFS;
 		else
-			error = VOP_RMDIR(newvp, nm, cdir, cred);
+			error = VOP_RMDIR(newvp, nm, cdir, cred, ct, flags);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -874,8 +939,15 @@ static int autofs_nobrowse = 0;
 #endif
 #define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
 
+/* ARGSUSED */
 static int
-auto_readdir(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp)
+auto_readdir(
+	vnode_t *vp,
+	uio_t *uiop,
+	cred_t *cred,
+	int *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 	struct autofs_rddirargs	rda;
 	autofs_rddirres rd;
@@ -1161,7 +1233,9 @@ auto_symlink(
 	char *lnknm,		/* new entry */
 	vattr_t *tva,
 	char *tnm,		/* existing entry */
-	cred_t *cred)
+	cred_t *cred,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *newvp;
 	int error;
@@ -1179,7 +1253,8 @@ auto_symlink(
 		if (vn_is_readonly(newvp))
 			error = EROFS;
 		else
-			error = VOP_SYMLINK(newvp, lnknm, tva, tnm, cred);
+			error = VOP_SYMLINK(newvp, lnknm, tva, tnm, cred,
+			    ct, flags);
 		VN_RELE(newvp);
 	} else
 		error = ENOSYS;
@@ -1191,7 +1266,7 @@ done:
 
 /* ARGSUSED */
 static int
-auto_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
+auto_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr, caller_context_t *ct)
 {
 	fnnode_t *fnp = vntofn(vp);
 	int error;
@@ -1217,14 +1292,14 @@ auto_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
 
 /* ARGSUSED */
 static int
-auto_fsync(vnode_t *cp, int syncflag, cred_t *cred)
+auto_fsync(vnode_t *cp, int syncflag, cred_t *cred, caller_context_t *ct)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static void
-auto_inactive(vnode_t *vp, cred_t *cred)
+auto_inactive(vnode_t *vp, cred_t *cred, caller_context_t *ct)
 {
 	fnnode_t *fnp = vntofn(vp);
 	fnnode_t *dfnp = fnp->fn_parent;
@@ -1287,7 +1362,11 @@ auto_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ct)
 
 /* ARGSUSED */
 static int
-auto_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+auto_seek(
+	struct vnode *vp,
+	offset_t ooff,
+	offset_t *noffp,
+	caller_context_t *ct)
 {
 	/*
 	 * Return 0 unconditionally, since we expect

@@ -73,6 +73,7 @@ static int nfs_set_proto_prop(sa_property_t);
 static sa_protocol_properties_t nfs_get_proto_set();
 static char *nfs_get_status();
 static char *nfs_space_alias(char *);
+static uint64_t nfs_features();
 
 /*
  * ops vector that provides the protocol specific info and operations
@@ -95,7 +96,14 @@ struct sa_plugin_ops sa_plugin_ops = {
 	nfs_get_proto_set,
 	nfs_get_status,
 	nfs_space_alias,
-	NULL,
+	NULL,	/* update_legacy */
+	NULL,	/* delete_legacy */
+	NULL,	/* change_notify */
+	NULL,	/* enable_resource */
+	NULL,	/* disable_resource */
+	nfs_features,
+	NULL,	/* transient shares */
+	NULL,	/* notify resource */
 	NULL
 };
 
@@ -543,13 +551,16 @@ nfs_parse_legacy_options(sa_group_t group, char *options)
 		optionset = sa_create_optionset(group, "nfs");
 	} else {
 		/*
-		 * have an existing optionset so we need to compare
-		 * options in order to detect errors. For now, we
-		 * assume that the first optionset is the correct one
-		 * and the others will be the same. This needs to be
-		 * fixed before the final code is ready.
+		 * Have an existing optionset . Ideally, we would need
+		 * to compare options in order to detect errors. For
+		 * now, we assume that the first optionset is the
+		 * correct one and the others will be the same. An
+		 * empty optionset is the same as no optionset so we
+		 * don't want to exit in that case. Getting an empty
+		 * optionset can occur with ZFS property checking.
 		 */
-		return (ret);
+		if (sa_get_property(optionset, NULL) != NULL)
+			return (ret);
 	}
 
 	if (strcmp(options, SHOPT_RW) == 0) {
@@ -839,7 +850,7 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 		/*
 		 * since options may be set/reset multiple times, always do an
 		 * explicit set or clear of the option. This allows defaults
-		 * to be set and then the protocol specifici to override.
+		 * to be set and then the protocol specific to override.
 		 */
 
 		name = sa_get_property_attr(option, "type");
@@ -1804,7 +1815,8 @@ nfs_enable_share(sa_share_t share)
 			ea.uex = &export;
 
 			sa_sharetab_fill_zfs(share, &sh, "nfs");
-			err = sa_share_zfs(share, path, &sh, &ea, B_TRUE);
+			err = sa_share_zfs(share, path, &sh,
+			    &ea, ZFS_SHARE_NFS);
 			sa_emptyshare(&sh);
 		}
 	} else {
@@ -1909,7 +1921,8 @@ nfs_disable_share(sa_share_t share, char *path)
 			sh.sh_path = path;
 			sh.sh_fstype = "nfs";
 
-			err = sa_share_zfs(share, path, &sh, &ea, B_FALSE);
+			err = sa_share_zfs(share, path, &sh,
+			    &ea, ZFS_UNSHARE_NFS);
 		} else
 			err = exportfs(path, NULL);
 		if (err < 0) {
@@ -2802,7 +2815,7 @@ nfs_minmax_check(int index, int value)
 /*
  * nfs_validate_proto_prop(index, name, value)
  *
- * Verify that the property specifed by name can take the new
+ * Verify that the property specified by name can take the new
  * value. This is a sanity check to prevent bad values getting into
  * the default files. All values need to be checked against what is
  * allowed by their defined type. If a type isn't explicitly defined
@@ -2966,4 +2979,16 @@ nfs_space_alias(char *space)
 			name = secconf.sc_name;
 	}
 	return (strdup(name));
+}
+
+/*
+ * nfs_features()
+ *
+ * Return a mask of the features required.
+ */
+
+static uint64_t
+nfs_features()
+{
+	return ((uint64_t)SA_FEATURE_DFSTAB);
 }

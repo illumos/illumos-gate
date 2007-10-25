@@ -53,7 +53,7 @@ vop_fid_pseudo(vnode_t *vp, fid_t *fidp)
 	struct vattr va;
 	int error;
 
-	error = VOP_FID(vp, fidp);
+	error = VOP_FID(vp, fidp, NULL);
 
 	/*
 	 * XXX nfs4_fid() does nothing and returns EREMOTE.
@@ -68,7 +68,7 @@ vop_fid_pseudo(vnode_t *vp, fid_t *fidp)
 	    (error == 0 && fidp->fid_len > NFS_FH4MAXDATA)) {
 
 		va.va_mask = AT_NODEID;
-		error = VOP_GETATTR(vp, &va, 0, CRED());
+		error = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
 		if (error)
 			return (error);
 
@@ -449,7 +449,7 @@ less_visible(struct exportinfo *exi, struct exp_visible *vis_head)
  * PSEUDO - a pseudo node
  * vis - visible list
  * f# - security flavor#
- * (f#) - security flavor# propagated from its decendents
+ * (f#) - security flavor# propagated from its descendents
  * "" - covered vnode
  *
  *
@@ -557,7 +557,7 @@ treeclimb_export(struct exportinfo *exip)
 		 * for this vnode.
 		 */
 		va.va_mask = AT_NODEID;
-		error = VOP_GETATTR(vp, &va, 0, CRED());
+		error = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
 		if (error)
 			break;
 
@@ -579,7 +579,8 @@ treeclimb_export(struct exportinfo *exip)
 		/*
 		 * Now, do a ".." to find parent dir of vp.
 		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED());
+		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
+		    NULL, NULL, NULL);
 
 		if (error == ENOTDIR && exportdir) {
 			dvp = exip->exi_dvp;
@@ -709,7 +710,8 @@ treeclimb_unexport(struct exportinfo *exip)
 		/*
 		 * Do a ".." to find parent dir of vp.
 		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED());
+		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
+		    NULL, NULL, NULL);
 
 		if (error == ENOTDIR && exportdir) {
 			dvp = exip->exi_dvp;
@@ -813,7 +815,8 @@ get_root_export(struct exportinfo *exip)
 		/*
 		 * Now, do a ".." to find parent dir of vp.
 		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED());
+		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
+		    NULL, NULL, NULL);
 
 		if (error) {
 			exi = NULL;

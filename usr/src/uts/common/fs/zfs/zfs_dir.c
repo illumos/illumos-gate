@@ -52,7 +52,51 @@
 #include <sys/dmu.h>
 #include <sys/atomic.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/zfs_fuid.h>
 #include <sys/dnlc.h>
+#include <sys/extdirent.h>
+#include <sys/zfs_i18n.h>
+
+/*
+ * zfs_match_find() is used by zfs_dirent_lock() to peform zap lookups
+ * of names after deciding which is the appropriate lookup interface.
+ */
+static int
+zfs_match_find(zfsvfs_t *zfsvfs, znode_t *dzp, char *name, boolean_t exact,
+    boolean_t update, int *deflags, pathname_t *rpnp, uint64_t *zoid)
+{
+	int error;
+
+	if (zfsvfs->z_norm) {
+		matchtype_t mt = MT_FIRST;
+		boolean_t conflict = B_FALSE;
+		size_t bufsz = 0;
+		char *buf = NULL;
+
+		if (rpnp) {
+			buf = rpnp->pn_path;
+			bufsz = rpnp->pn_bufsize;
+		}
+		if (exact)
+			mt = MT_EXACT;
+		/*
+		 * In the non-mixed case we only expect there would ever
+		 * be one match, but we need to use the normalizing lookup.
+		 */
+		error = zap_lookup_norm(zfsvfs->z_os, dzp->z_id, name, 8, 1,
+		    zoid, mt, buf, bufsz, &conflict);
+		if (deflags)
+			*deflags = conflict ? ED_CASE_CONFLICT : 0;
+	} else {
+		error = zap_lookup(zfsvfs->z_os, dzp->z_id, name, 8, 1, zoid);
+	}
+	*zoid = ZFS_DIRENT_OBJ(*zoid);
+
+	if (error == ENOENT && update)
+		dnlc_update(ZTOV(dzp), name, DNLC_NO_VNODE);
+
+	return (error);
+}
 
 /*
  * Lock a directory entry.  A dirlock on <dzp, name> protects that name
@@ -67,24 +111,38 @@
  *		  ZEXISTS: if the entry does not exist, fail with ENOENT.
  *		  ZSHARED: allow concurrent access with other ZSHARED callers.
  *		  ZXATTR: we want dzp's xattr directory
+ *		  ZCILOOK: On a mixed sensitivity file system,
+ *			   this lookup should be case-insensitive.
+ *		  ZCIEXACT: On a purely case-insensitive file system,
+ *			    this lookup should be case-sensitive.
+ *		  ZRENAMING: we are locking for renaming, force narrow locks
  *
  * Output arguments:
  *	zpp	- pointer to the znode for the entry (NULL if there isn't one)
  *	dlpp	- pointer to the dirlock for this entry (NULL on error)
+ *      direntflags - (case-insensitive lookup only)
+ *		flags if multiple case-sensitive matches exist in directory
+ *      realpnp     - (case-insensitive lookup only)
+ *		actual name matched within the directory
  *
  * Return value: 0 on success or errno on failure.
  *
  * NOTE: Always checks for, and rejects, '.' and '..'.
+ * NOTE: For case-insensitive file systems we take wide locks (see below),
+ *	 but return znode pointers to a single match.
  */
 int
 zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
-	int flag)
+    int flag, int *direntflags, pathname_t *realpnp)
 {
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zfs_dirlock_t	*dl;
+	boolean_t	update;
+	boolean_t	exact;
 	uint64_t	zoid;
-	int		error;
-	vnode_t		*vp;
+	vnode_t		*vp = NULL;
+	int		error = 0;
+	int		cmpflags;
 
 	*zpp = NULL;
 	*dlpp = NULL;
@@ -98,6 +156,58 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 		return (EEXIST);
 
 	/*
+	 * Case sensitivity and normalization preferences are set when
+	 * the file system is created.  These are stored in the
+	 * zfsvfs->z_case and zfsvfs->z_norm fields.  These choices
+	 * affect what vnodes can be cached in the DNLC, how we
+	 * perform zap lookups, and the "width" of our dirlocks.
+	 *
+	 * A normal dirlock locks a single name.  Note that with
+	 * normalization a name can be composed multiple ways, but
+	 * when normalized, these names all compare equal.  A wide
+	 * dirlock locks multiple names.  We need these when the file
+	 * system is supporting mixed-mode access.  It is sometimes
+	 * necessary to lock all case permutations of file name at
+	 * once so that simultaneous case-insensitive/case-sensitive
+	 * behaves as rationally as possible.
+	 */
+
+	/*
+	 * Decide if exact matches should be requested when performing
+	 * a zap lookup on file systems supporting case-insensitive
+	 * access.
+	 */
+	exact = ((zfsvfs->z_case & ZFS_CI_ONLY) && (flag & ZCIEXACT)) ||
+	    ((zfsvfs->z_case & ZFS_CI_MIXD) && !(flag & ZCILOOK));
+
+	/*
+	 * Only look in or update the DNLC if we are looking for the
+	 * name on a file system that does not require normalization
+	 * or case folding.  We can also look there if we happen to be
+	 * on a non-normalizing, mixed sensitivity file system IF we
+	 * are looking for the exact name.
+	 *
+	 * Maybe can add TO-UPPERed version of name to dnlc in ci-only
+	 * case for performance improvement?
+	 */
+	update = !zfsvfs->z_norm ||
+	    ((zfsvfs->z_case & ZFS_CI_MIXD) &&
+	    !(zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) && !(flag & ZCILOOK));
+
+	/*
+	 * ZRENAMING indicates we are in a situation where we should
+	 * take narrow locks regardless of the file system's
+	 * preferences for normalizing and case folding.  This will
+	 * prevent us deadlocking trying to grab the same wide lock
+	 * twice if the two names happen to be case-insensitive
+	 * matches.
+	 */
+	if (flag & ZRENAMING)
+		cmpflags = 0;
+	else
+		cmpflags = zfsvfs->z_norm;
+
+	/*
 	 * Wait until there are no locks on this name.
 	 */
 	rw_enter(&dzp->z_name_lock, RW_READER);
@@ -108,9 +218,16 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 			rw_exit(&dzp->z_name_lock);
 			return (ENOENT);
 		}
-		for (dl = dzp->z_dirlocks; dl != NULL; dl = dl->dl_next)
-			if (strcmp(name, dl->dl_name) == 0)
+		for (dl = dzp->z_dirlocks; dl != NULL; dl = dl->dl_next) {
+			if ((u8_strcmp(name, dl->dl_name, 0, cmpflags,
+			    U8_UNICODE_LATEST, &error) == 0) || error != 0)
 				break;
+		}
+		if (error != 0) {
+			mutex_exit(&dzp->z_lock);
+			rw_exit(&dzp->z_name_lock);
+			return (ENOENT);
+		}
 		if (dl == NULL)	{
 			/*
 			 * Allocate a new dirlock and add it to the list.
@@ -156,7 +273,8 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 		zoid = dzp->z_phys->zp_xattr;
 		error = (zoid == 0 ? ENOENT : 0);
 	} else {
-		vp = dnlc_lookup(ZTOV(dzp), name);
+		if (update)
+			vp = dnlc_lookup(ZTOV(dzp), name);
 		if (vp == DNLC_NO_VNODE) {
 			VN_RELE(vp);
 			error = ENOENT;
@@ -170,11 +288,8 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 			*zpp = VTOZ(vp);
 			return (0);
 		} else {
-			error = zap_lookup(zfsvfs->z_os, dzp->z_id, name,
-			    8, 1, &zoid);
-			zoid = ZFS_DIRENT_OBJ(zoid);
-			if (error == ENOENT)
-				dnlc_update(ZTOV(dzp), name, DNLC_NO_VNODE);
+			error = zfs_match_find(zfsvfs, dzp, name, exact,
+			    update, direntflags, realpnp, &zoid);
 		}
 	}
 	if (error) {
@@ -192,7 +307,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 			zfs_dirent_unlock(dl);
 			return (error);
 		}
-		if (!(flag & ZXATTR))
+		if (!(flag & ZXATTR) && update)
 			dnlc_update(ZTOV(dzp), name, ZTOV(*zpp));
 	}
 
@@ -239,7 +354,8 @@ zfs_dirent_unlock(zfs_dirlock_t *dl)
  *	special pseudo-directory.
  */
 int
-zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
+zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp, int flags,
+    int *deflg, pathname_t *rpnp)
 {
 	zfs_dirlock_t *dl;
 	znode_t *zp;
@@ -257,7 +373,8 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
 		if (dzp->z_phys->zp_parent == dzp->z_id &&
 		    zfsvfs->z_parent != zfsvfs) {
 			error = zfsctl_root_lookup(zfsvfs->z_parent->z_ctldir,
-			    "snapshot", vpp, NULL, 0, NULL, kcred);
+			    "snapshot", vpp, NULL, 0, NULL, kcred,
+			    NULL, NULL, NULL);
 			return (error);
 		}
 		rw_enter(&dzp->z_parent_lock, RW_READER);
@@ -268,13 +385,23 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
 	} else if (zfs_has_ctldir(dzp) && strcmp(name, ZFS_CTLDIR_NAME) == 0) {
 		*vpp = zfsctl_root(dzp);
 	} else {
-		error = zfs_dirent_lock(&dl, dzp, name, &zp, ZEXISTS | ZSHARED);
+		int zf;
+
+		zf = ZEXISTS | ZSHARED;
+		if (flags & FIGNORECASE)
+			zf |= ZCILOOK;
+
+		error = zfs_dirent_lock(&dl, dzp, name, &zp, zf, deflg, rpnp);
 		if (error == 0) {
 			*vpp = ZTOV(zp);
 			zfs_dirent_unlock(dl);
 			dzp->z_zn_prefetch = B_TRUE; /* enable prefetching */
 		}
+		rpnp = NULL;
 	}
+
+	if ((flags & FIGNORECASE) && rpnp)
+		(void) strlcpy(rpnp->pn_path, name, rpnp->pn_bufsize);
 
 	return (error);
 }
@@ -633,7 +760,20 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	zfs_time_stamper_locked(dzp, CONTENT_MODIFIED, tx);
 	mutex_exit(&dzp->z_lock);
 
-	error = zap_remove(zp->z_zfsvfs->z_os, dzp->z_id, dl->dl_name, tx);
+	if (zp->z_zfsvfs->z_norm) {
+		if (((zp->z_zfsvfs->z_case & ZFS_CI_ONLY) &&
+		    (flag & ZCIEXACT)) ||
+		    ((zp->z_zfsvfs->z_case & ZFS_CI_MIXD) &&
+		    !(flag & ZCILOOK)))
+			error = zap_remove_norm(zp->z_zfsvfs->z_os,
+			    dzp->z_id, dl->dl_name, MT_EXACT, tx);
+		else
+			error = zap_remove_norm(zp->z_zfsvfs->z_os,
+			    dzp->z_id, dl->dl_name, MT_FIRST, tx);
+	} else {
+		error = zap_remove(zp->z_zfsvfs->z_os,
+		    dzp->z_id, dl->dl_name, tx);
+	}
 	ASSERT(error == 0);
 
 	if (unlinkedp != NULL)
@@ -663,15 +803,24 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 	dmu_tx_t *tx;
 	uint64_t xoid;
 	int error;
+	zfs_fuid_info_t *fuidp = NULL;
 
 	*xvpp = NULL;
 
-	if (error = zfs_zaccess(zp, ACE_WRITE_NAMED_ATTRS, cr))
+	if (error = zfs_zaccess(zp, ACE_WRITE_NAMED_ATTRS, 0, B_FALSE, cr))
 		return (error);
 
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
+	if (zfsvfs->z_fuid_obj == 0) {
+		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, SPA_MAXBLOCKSIZE);
+		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+	} else {
+		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0, SPA_MAXBLOCKSIZE);
+	}
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT)
@@ -679,13 +828,16 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 		dmu_tx_abort(tx);
 		return (error);
 	}
-	zfs_mknode(zp, vap, &xoid, tx, cr, IS_XATTR, &xzp, 0);
+	zfs_mknode(zp, vap, &xoid, tx, cr, IS_XATTR, &xzp, 0, NULL, &fuidp);
 	ASSERT(xzp->z_id == xoid);
 	ASSERT(xzp->z_phys->zp_parent == zp->z_id);
 	dmu_buf_will_dirty(zp->z_dbuf, tx);
 	zp->z_phys->zp_xattr = xoid;
 
-	(void) zfs_log_create(zfsvfs->z_log, tx, TX_MKXATTR, zp, xzp, "");
+	(void) zfs_log_create(zfsvfs->z_log, tx, TX_MKXATTR, zp,
+	    xzp, "", NULL, fuidp, vap);
+	if (fuidp)
+		zfs_fuid_info_free(fuidp);
 	dmu_tx_commit(tx);
 
 	*xvpp = ZTOV(xzp);
@@ -715,7 +867,7 @@ zfs_get_xattrdir(znode_t *zp, vnode_t **xvpp, cred_t *cr, int flags)
 	vattr_t		va;
 	int		error;
 top:
-	error = zfs_dirent_lock(&dl, zp, "", &xzp, ZXATTR);
+	error = zfs_dirent_lock(&dl, zp, "", &xzp, ZXATTR, NULL, NULL);
 	if (error)
 		return (error);
 
@@ -750,8 +902,7 @@ top:
 	va.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	va.va_type = VDIR;
 	va.va_mode = S_IFDIR | S_ISVTX | 0777;
-	va.va_uid = (uid_t)zp->z_phys->zp_uid;
-	va.va_gid = (gid_t)zp->z_phys->zp_gid;
+	zfs_fuid_map_ids(zp, &va.va_uid, &va.va_gid);
 
 	error = zfs_make_xattrdir(zp, &va, xvpp, cr);
 	zfs_dirent_unlock(dl);
@@ -781,15 +932,22 @@ int
 zfs_sticky_remove_access(znode_t *zdp, znode_t *zp, cred_t *cr)
 {
 	uid_t  		uid;
+	uid_t		downer;
+	uid_t		fowner;
+	zfsvfs_t	*zfsvfs = zdp->z_zfsvfs;
 
 	if (zdp->z_zfsvfs->z_assign >= TXG_INITIAL)	/* ZIL replay */
 		return (0);
 
-	if ((zdp->z_phys->zp_mode & S_ISVTX) == 0 ||
-	    (uid = crgetuid(cr)) == zdp->z_phys->zp_uid ||
-	    uid == zp->z_phys->zp_uid ||
+	if ((zdp->z_phys->zp_mode & S_ISVTX) == 0)
+		return (0);
+
+	zfs_fuid_map_id(zfsvfs, zdp->z_phys->zp_uid, ZFS_OWNER, &downer);
+	zfs_fuid_map_id(zfsvfs, zp->z_phys->zp_uid, ZFS_OWNER, &fowner);
+
+	if ((uid = crgetuid(cr)) == downer || uid == fowner ||
 	    (ZTOV(zp)->v_type == VREG &&
-	    zfs_zaccess(zp, ACE_WRITE_DATA, cr) == 0))
+	    zfs_zaccess(zp, ACE_WRITE_DATA, 0, B_FALSE, cr) == 0))
 		return (0);
 	else
 		return (secpolicy_vnode_remove(cr));

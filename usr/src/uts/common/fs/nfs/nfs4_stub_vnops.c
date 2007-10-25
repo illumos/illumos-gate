@@ -152,40 +152,52 @@ typedef struct domount_args {
 /*
  * The vnode ops functions for a trigger stub vnode
  */
-static int	nfs4_trigger_open(vnode_t **, int, cred_t *);
-static int	nfs4_trigger_getattr(vnode_t *, struct vattr *, int, cred_t *);
-static int	nfs4_trigger_setattr(vnode_t *, struct vattr *, int, cred_t *,
-			caller_context_t *);
-static int	nfs4_trigger_access(vnode_t *, int, int, cred_t *);
-static int	nfs4_trigger_readlink(vnode_t *, struct uio *, cred_t *);
-static int	nfs4_trigger_lookup(vnode_t *, char *, vnode_t **,
-			struct pathname *, int, vnode_t *, cred_t *);
-static int	nfs4_trigger_create(vnode_t *, char *, struct vattr *,
-			enum vcexcl, int, vnode_t **, cred_t *, int);
-static int	nfs4_trigger_remove(vnode_t *, char *, cred_t *);
-static int	nfs4_trigger_link(vnode_t *, vnode_t *, char *, cred_t *);
-static int	nfs4_trigger_rename(vnode_t *, char *, vnode_t *, char *,
-			cred_t *);
-static int	nfs4_trigger_mkdir(vnode_t *, char *, struct vattr *,
-			vnode_t **, cred_t *);
-static int	nfs4_trigger_rmdir(vnode_t *, char *, vnode_t *, cred_t *);
-static int	nfs4_trigger_symlink(vnode_t *, char *, struct vattr *, char *,
-			cred_t *);
-static int	nfs4_trigger_cmp(vnode_t *, vnode_t *);
+static int nfs4_trigger_open(vnode_t **, int, cred_t *, caller_context_t *);
+static int nfs4_trigger_getattr(vnode_t *, struct vattr *, int, cred_t *,
+    caller_context_t *);
+static int nfs4_trigger_setattr(vnode_t *, struct vattr *, int, cred_t *,
+    caller_context_t *);
+static int nfs4_trigger_access(vnode_t *, int, int, cred_t *,
+    caller_context_t *);
+static int nfs4_trigger_readlink(vnode_t *, struct uio *, cred_t *,
+    caller_context_t *);
+static int nfs4_trigger_lookup(vnode_t *, char *, vnode_t **,
+    struct pathname *, int, vnode_t *, cred_t *, caller_context_t *,
+    int *, pathname_t *);
+static int nfs4_trigger_create(vnode_t *, char *, struct vattr *,
+    enum vcexcl, int, vnode_t **, cred_t *, int, caller_context_t *,
+    vsecattr_t *);
+static int nfs4_trigger_remove(vnode_t *, char *, cred_t *, caller_context_t *,
+    int);
+static int nfs4_trigger_link(vnode_t *, vnode_t *, char *, cred_t *,
+    caller_context_t *, int);
+static int nfs4_trigger_rename(vnode_t *, char *, vnode_t *, char *,
+    cred_t *, caller_context_t *, int);
+static int nfs4_trigger_mkdir(vnode_t *, char *, struct vattr *,
+    vnode_t **, cred_t *, caller_context_t *, int, vsecattr_t *vsecp);
+static int nfs4_trigger_rmdir(vnode_t *, char *, vnode_t *, cred_t *,
+    caller_context_t *, int);
+static int nfs4_trigger_symlink(vnode_t *, char *, struct vattr *, char *,
+    cred_t *, caller_context_t *, int);
+static int nfs4_trigger_cmp(vnode_t *, vnode_t *, caller_context_t *);
 
 /*
  * Regular NFSv4 vnodeops that we need to reference directly
  */
-extern int	nfs4_getattr(vnode_t *, struct vattr *, int, cred_t *);
-extern void	nfs4_inactive(vnode_t *, cred_t *);
+extern int	nfs4_getattr(vnode_t *, struct vattr *, int, cred_t *,
+		    caller_context_t *);
+extern void	nfs4_inactive(vnode_t *, cred_t *, caller_context_t *);
 extern int	nfs4_rwlock(vnode_t *, int, caller_context_t *);
 extern void	nfs4_rwunlock(vnode_t *, int, caller_context_t *);
 extern int	nfs4_lookup(vnode_t *, char *, vnode_t **,
-    struct pathname *, int, vnode_t *, cred_t *);
-extern int	nfs4_pathconf(vnode_t *, int, ulong_t *, cred_t *);
-extern int	nfs4_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
-extern int	nfs4_fid(vnode_t *, fid_t *);
-extern int	nfs4_realvp(vnode_t *, vnode_t **);
+		    struct pathname *, int, vnode_t *, cred_t *,
+		    caller_context_t *, int *, pathname_t *);
+extern int	nfs4_pathconf(vnode_t *, int, ulong_t *, cred_t *,
+		    caller_context_t *);
+extern int	nfs4_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+		    caller_context_t *);
+extern int	nfs4_fid(vnode_t *, fid_t *, caller_context_t *);
+extern int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
 
 static int	nfs4_trigger_mount(vnode_t *, vnode_t **);
 static int	nfs4_trigger_domount(vnode_t *, domount_args_t *, vfs_t **,
@@ -305,7 +317,7 @@ const fs_operation_def_t nfs4_trigger_vnodeops_template[] = {
  */
 
 static int
-nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr)
+nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	vnode_t *newvp;
@@ -321,7 +333,7 @@ nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr)
 	*vpp = newvp;
 
 	/* return with VN_HELD(newvp) */
-	return (VOP_OPEN(vpp, flag, cr));
+	return (VOP_OPEN(vpp, flag, cr, ct));
 }
 
 /*
@@ -332,7 +344,8 @@ nfs4_trigger_open(vnode_t **vpp, int flag, cred_t *cr)
  * testing.
  */
 static int
-nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
+nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 
@@ -343,10 +356,10 @@ nfs4_trigger_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 		if (error)
 			return (error);
 
-		error = VOP_GETATTR(newvp, vap, flags, cr);
+		error = VOP_GETATTR(newvp, vap, flags, cr, ct);
 		VN_RELE(newvp);
 	} else {
-		error = nfs4_getattr(vp, vap, flags, cr);
+		error = nfs4_getattr(vp, vap, flags, cr, ct);
 	}
 
 	return (error);
@@ -370,7 +383,8 @@ nfs4_trigger_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 }
 
 static int
-nfs4_trigger_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+nfs4_trigger_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 	vnode_t *newvp;
@@ -379,15 +393,16 @@ nfs4_trigger_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	if (error)
 		return (error);
 
-	error = VOP_ACCESS(newvp, mode, flags, cr);
+	error = VOP_ACCESS(newvp, mode, flags, cr, ct);
 	VN_RELE(newvp);
 
 	return (error);
 }
 
 static int
-nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-	int flags, vnode_t *rdir, cred_t *cr)
+nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp,
+    struct pathname *pnp, int flags, vnode_t *rdir, cred_t *cr,
+    caller_context_t *ct, int *deflags, pathname_t *rpnp)
 {
 	int error;
 	vnode_t *newdvp;
@@ -404,13 +419,15 @@ nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	 * we've triggered a mount.
 	 */
 	if (strcmp(nm, "..") == 0)
-		return (nfs4_lookup(dvp, nm, vpp, pnp, flags, rdir, cr));
+		return (nfs4_lookup(dvp, nm, vpp, pnp, flags, rdir, cr,
+		    ct, deflags, rpnp));
 
 	error = nfs4_trigger_mount(dvp, &newdvp);
 	if (error)
 		return (error);
 
-	error = VOP_LOOKUP(newdvp, nm, vpp, pnp, flags, rdir, cr);
+	error = VOP_LOOKUP(newdvp, nm, vpp, pnp, flags, rdir, cr, ct,
+	    deflags, rpnp);
 	VN_RELE(newdvp);
 
 	return (error);
@@ -418,8 +435,8 @@ nfs4_trigger_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 
 static int
 nfs4_trigger_create(vnode_t *dvp, char *nm, struct vattr *va,
-		enum vcexcl exclusive, int mode, vnode_t **vpp, cred_t *cr,
-		int flags)
+    enum vcexcl exclusive, int mode, vnode_t **vpp, cred_t *cr,
+    int flags, caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *newdvp;
@@ -428,14 +445,16 @@ nfs4_trigger_create(vnode_t *dvp, char *nm, struct vattr *va,
 	if (error)
 		return (error);
 
-	error = VOP_CREATE(newdvp, nm, va, exclusive, mode, vpp, cr, flags);
+	error = VOP_CREATE(newdvp, nm, va, exclusive, mode, vpp, cr,
+	    flags, ct, vsecp);
 	VN_RELE(newdvp);
 
 	return (error);
 }
 
 static int
-nfs4_trigger_remove(vnode_t *dvp, char *nm, cred_t *cr)
+nfs4_trigger_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
+    int flags)
 {
 	int error;
 	vnode_t *newdvp;
@@ -444,14 +463,15 @@ nfs4_trigger_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	if (error)
 		return (error);
 
-	error = VOP_REMOVE(newdvp, nm, cr);
+	error = VOP_REMOVE(newdvp, nm, cr, ct, flags);
 	VN_RELE(newdvp);
 
 	return (error);
 }
 
 static int
-nfs4_trigger_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
+nfs4_trigger_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int error;
 	vnode_t *newtdvp;
@@ -464,7 +484,7 @@ nfs4_trigger_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 	 * We don't check whether svp is a stub. Let the NFSv4 code
 	 * detect that error, and return accordingly.
 	 */
-	error = VOP_LINK(newtdvp, svp, tnm, cr);
+	error = VOP_LINK(newtdvp, svp, tnm, cr, ct, flags);
 	VN_RELE(newtdvp);
 
 	return (error);
@@ -472,7 +492,7 @@ nfs4_trigger_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 
 static int
 nfs4_trigger_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
-		cred_t *cr)
+    cred_t *cr, caller_context_t *ct, int flags)
 {
 	int error;
 	vnode_t *newsdvp;
@@ -501,16 +521,17 @@ nfs4_trigger_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	if (error)
 		return (error);
 
-	error = VOP_RENAME(newsdvp, snm, tdvp, tnm, cr);
+	error = VOP_RENAME(newsdvp, snm, tdvp, tnm, cr, ct, flags);
 
 	VN_RELE(newsdvp);
 
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 nfs4_trigger_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
-		cred_t *cr)
+    cred_t *cr, caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *newdvp;
@@ -519,14 +540,15 @@ nfs4_trigger_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	if (error)
 		return (error);
 
-	error = VOP_MKDIR(newdvp, nm, va, vpp, cr);
+	error = VOP_MKDIR(newdvp, nm, va, vpp, cr, ct, flags, vsecp);
 	VN_RELE(newdvp);
 
 	return (error);
 }
 
 static int
-nfs4_trigger_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
+nfs4_trigger_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int error;
 	vnode_t *newdvp;
@@ -535,7 +557,7 @@ nfs4_trigger_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	if (error)
 		return (error);
 
-	error = VOP_RMDIR(newdvp, nm, cdir, cr);
+	error = VOP_RMDIR(newdvp, nm, cdir, cr, ct, flags);
 	VN_RELE(newdvp);
 
 	return (error);
@@ -543,7 +565,7 @@ nfs4_trigger_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 
 static int
 nfs4_trigger_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm,
-	cred_t *cr)
+    cred_t *cr, caller_context_t *ct, int flags)
 {
 	int error;
 	vnode_t *newdvp;
@@ -552,14 +574,15 @@ nfs4_trigger_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm,
 	if (error)
 		return (error);
 
-	error = VOP_SYMLINK(newdvp, lnm, tva, tnm, cr);
+	error = VOP_SYMLINK(newdvp, lnm, tva, tnm, cr, ct, flags);
 	VN_RELE(newdvp);
 
 	return (error);
 }
 
 static int
-nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
+nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 	vnode_t *newvp;
@@ -568,7 +591,7 @@ nfs4_trigger_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
 	if (error)
 		return (error);
 
-	error = VOP_READLINK(newvp, uiop, cr);
+	error = VOP_READLINK(newvp, uiop, cr, ct);
 	VN_RELE(newvp);
 
 	return (error);

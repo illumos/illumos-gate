@@ -158,7 +158,8 @@ error_fault:
 
 /* ARGSUSED */
 static int
-sharefs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+sharefs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	timestruc_t	now;
 	shnode_t	*sft = VTOSH(vp);
@@ -204,7 +205,8 @@ sharefs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 
 /* ARGSUSED */
 static int
-sharefs_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+sharefs_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	if (mode & (VWRITE|VEXEC))
 		return (EROFS);
@@ -214,7 +216,7 @@ sharefs_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 
 /* ARGSUSED */
 int
-sharefs_open(vnode_t **vpp, int flag, cred_t *cr)
+sharefs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t		*vp;
 	vnode_t		*ovp = *vpp;
@@ -267,7 +269,7 @@ sharefs_open(vnode_t **vpp, int flag, cred_t *cr)
 /* ARGSUSED */
 int
 sharefs_close(vnode_t *vp, int flag, int count,
-			offset_t off, cred_t *cr)
+    offset_t off, cred_t *cr, caller_context_t *ct)
 {
 	shnode_t	*sft = VTOSH(vp);
 
@@ -338,7 +340,7 @@ sharefs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr,
 
 /* ARGSUSED */
 static void
-sharefs_inactive(vnode_t *vp, cred_t *cr)
+sharefs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *tx)
 {
 	gfs_file_t	*fp = vp->v_data;
 	shnode_t	*sft;

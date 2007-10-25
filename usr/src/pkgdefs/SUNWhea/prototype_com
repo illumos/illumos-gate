@@ -164,6 +164,7 @@ f none usr/include/ast/vmalloc.h 644 root bin
 f none usr/include/ast/wait.h 644 root bin
 f none usr/include/ast/wchar.h 644 root bin
 f none usr/include/ast/wordexp.h 644 root bin
+f none usr/include/attr.h 644 root bin
 f none usr/include/atomic.h 644 root bin
 f none usr/include/auth_attr.h 644 root bin
 d none usr/include/bsm 755 root bin
@@ -624,6 +625,7 @@ d none usr/include/sys 755 root bin
 f none usr/include/sys/acct.h 644 root bin
 f none usr/include/sys/acctctl.h 644 root bin
 f none usr/include/sys/acl.h 644 root bin
+f none usr/include/sys/acl_impl.h 644 root bin
 f none usr/include/sys/aio.h 644 root bin
 f none usr/include/sys/aio_impl.h 644 root bin
 f none usr/include/sys/aio_req.h 644 root bin
@@ -634,6 +636,7 @@ f none usr/include/sys/asm_linkage.h 644 root bin
 f none usr/include/sys/asynch.h 644 root bin
 f none usr/include/sys/atomic.h 644 root bin
 f none usr/include/sys/autoconf.h 644 root bin
+f none usr/include/sys/attr.h 644 root bin
 f none usr/include/sys/auxv.h 644 root bin
 f none usr/include/sys/auxv_386.h 644 root bin
 f none usr/include/sys/auxv_SPARC.h 644 root bin
@@ -1296,6 +1299,7 @@ f none usr/include/sys/tuneable.h 644 root bin
 f none usr/include/sys/turnstile.h 644 root bin
 f none usr/include/sys/types.h 644 root bin
 f none usr/include/sys/types32.h 644 root bin
+f none usr/include/sys/tzfile.h 644 root bin
 f none usr/include/sys/u8_textprep.h 644 root bin
 f none usr/include/sys/uadmin.h 644 root bin
 f none usr/include/sys/ucontext.h 644 root bin

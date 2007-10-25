@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-1998,2001,2003 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,11 +72,11 @@ add_share(struct vnode *vp, struct shrlock *shr)
 	 * Sanity check to make sure we have valid options.
 	 * There is known overlap but it doesn't hurt to be careful.
 	 */
-	if (shr->s_access & ~(F_RDACC|F_WRACC|F_RWACC)) {
+	if (shr->s_access & ~(F_RDACC|F_WRACC|F_RWACC|F_RMACC|F_MDACC)) {
 		return (EINVAL);
 	}
 	if (shr->s_deny & ~(F_NODNY|F_RDDNY|F_WRDNY|F_RWDNY|F_COMPAT|
-	    F_MANDDNY)) {
+	    F_MANDDNY|F_RMDNY)) {
 		return (EINVAL);
 	}
 
@@ -115,7 +113,7 @@ add_share(struct vnode *vp, struct shrlock *shr)
 			if ((shrl->shr->s_deny & F_COMPAT) &&
 			    (shr->s_deny & F_COMPAT) &&
 			    ((shrl->next == NULL) ||
-				(shrl->shr->s_access & F_WRACC)))
+			    (shrl->shr->s_access & F_WRACC)))
 				break;
 		}
 
@@ -280,13 +278,13 @@ is_match_for_del(struct shrlock *shr, struct shrlock *element)
 			 * and pids.
 			 */
 			result = (nlmid1 == nlmid2 &&
-				shr->s_pid == element->s_pid);
+			    shr->s_pid == element->s_pid);
 		}
 	} else {			/* not in a cluster */
 		result = ((shr->s_sysid == 0 &&
-			shr->s_pid == element->s_pid) ||
-			(shr->s_sysid != 0 &&
-				shr->s_sysid == element->s_sysid));
+		    shr->s_pid == element->s_pid) ||
+		    (shr->s_sysid != 0 &&
+		    shr->s_sysid == element->s_sysid));
 	}
 	return (result);
 }
@@ -315,11 +313,11 @@ del_share(struct vnode *vp, struct shrlock *shr)
 	shrlp = &vp->v_shrlocks;
 	while (*shrlp) {
 		if ((shr->s_own_len == (*shrlp)->shr->s_own_len &&
-				    (bcmp(shr->s_owner, (*shrlp)->shr->s_owner,
-						shr->s_own_len) == 0)) ||
+		    (bcmp(shr->s_owner, (*shrlp)->shr->s_owner,
+		    shr->s_own_len) == 0)) ||
 
-			(shr->s_own_len == 0 &&
-				is_match_for_del(shr, (*shrlp)->shr))) {
+		    (shr->s_own_len == 0 &&
+		    is_match_for_del(shr, (*shrlp)->shr))) {
 
 			shrl = *shrlp;
 			*shrlp = shrl->next;
@@ -427,7 +425,7 @@ static int
 isreadonly(struct vnode *vp)
 {
 	return (vp->v_type != VCHR && vp->v_type != VBLK &&
-		vp->v_type != VFIFO && vn_is_readonly(vp));
+	    vp->v_type != VFIFO && vn_is_readonly(vp));
 }
 
 #ifdef DEBUG
@@ -489,46 +487,117 @@ print_share(struct shrlock *shr)
 /*
  * Return non-zero if the given I/O request conflicts with a registered
  * share reservation.
+ *
+ * A process is identified by the tuple (sysid, pid). When the caller
+ * context is passed to nbl_share_conflict, the sysid and pid in the
+ * caller context are used. Otherwise the sysid is zero, and the pid is
+ * taken from the current process.
+ *
+ * Conflict Algorithm:
+ *   1. An op request of NBL_READ will fail if a different
+ *      process has a mandatory share reservation with deny read.
+ *
+ *   2. An op request of NBL_WRITE will fail if a different
+ *      process has a mandatory share reservation with deny write.
+ *
+ *   3. An op request of NBL_READWRITE will fail if a different
+ *      process has a mandatory share reservation with deny read
+ *      or deny write.
+ *
+ *   4. An op request of NBL_REMOVE will fail if there is
+ *      a mandatory share reservation with an access of read,
+ *      write, or remove. (Anything other than meta data access).
+ *
+ *   5. An op request of NBL_RENAME will fail if there is
+ *      a mandatory share reservation with:
+ *        a) access write or access remove
+ *      or
+ *        b) access read and deny remove
+ *
+ *   Otherwise there is no conflict and the op request succeeds.
+ *
+ * This behavior is required for interoperability between
+ * the nfs server, cifs server, and local access.
+ * This behavior can result in non-posix semantics.
+ *
+ * When mandatory share reservations are enabled, a process
+ * should call nbl_share_conflict to determine if the
+ * desired operation would conflict with an existing share
+ * reservation.
+ *
+ * The call to nbl_share_conflict may be skipped if the
+ * process has an existing share reservation and the operation
+ * is being performed in the context of that existing share
+ * reservation.
  */
-
 int
-nbl_share_conflict(vnode_t *vp, nbl_op_t op)
+nbl_share_conflict(vnode_t *vp, nbl_op_t op, caller_context_t *ct)
 {
 	struct shrlocklist *shrl;
 	int conflict = 0;
+	pid_t pid;
+	int sysid;
 
 	ASSERT(nbl_in_crit(vp));
 
+	if (ct == NULL) {
+		pid = curproc->p_pid;
+		sysid = 0;
+	} else {
+		pid = ct->cc_pid;
+		sysid = ct->cc_sysid;
+	}
+
 	mutex_enter(&vp->v_lock);
 	for (shrl = vp->v_shrlocks; shrl != NULL; shrl = shrl->next) {
-		if (shrl->shr->s_sysid == 0 &&
-		    (shrl->shr->s_deny & F_MANDDNY) &&
-		    shrl->shr->s_pid != curproc->p_pid) {
-			switch (op) {
-			case NBL_READ:
-				if (shrl->shr->s_deny & F_RDDNY)
-					conflict = 1;
-				break;
-			case NBL_WRITE:
-				if (shrl->shr->s_deny & F_WRDNY)
-					conflict = 1;
-				break;
-			case NBL_READWRITE:
-				if (shrl->shr->s_deny & F_RWDNY)
-					conflict = 1;
-				break;
-			case NBL_RENAME:
-			case NBL_REMOVE:
+		if (!(shrl->shr->s_deny & F_MANDDNY))
+			continue;
+		/*
+		 * NBL_READ, NBL_WRITE, and NBL_READWRITE need to
+		 * check if the share reservation being examined
+		 * belongs to the current process.
+		 * NBL_REMOVE and NBL_RENAME do not.
+		 * This behavior is required by the conflict
+		 * algorithm described above.
+		 */
+		switch (op) {
+		case NBL_READ:
+			if ((shrl->shr->s_deny & F_RDDNY) &&
+			    (shrl->shr->s_sysid != sysid ||
+			    shrl->shr->s_pid != pid))
 				conflict = 1;
-				break;
+			break;
+		case NBL_WRITE:
+			if ((shrl->shr->s_deny & F_WRDNY) &&
+			    (shrl->shr->s_sysid != sysid ||
+			    shrl->shr->s_pid != pid))
+				conflict = 1;
+			break;
+		case NBL_READWRITE:
+			if ((shrl->shr->s_deny & F_RWDNY) &&
+			    (shrl->shr->s_sysid != sysid ||
+			    shrl->shr->s_pid != pid))
+				conflict = 1;
+			break;
+		case NBL_REMOVE:
+			if (shrl->shr->s_access & (F_RWACC|F_RMACC))
+				conflict = 1;
+			break;
+		case NBL_RENAME:
+			if (shrl->shr->s_access & (F_WRACC|F_RMACC))
+				conflict = 1;
+
+			else if ((shrl->shr->s_access & F_RDACC) &&
+			    (shrl->shr->s_deny & F_RMDNY))
+				conflict = 1;
+			break;
 #ifdef DEBUG
-			default:
-				cmn_err(CE_PANIC,
-					"nbl_share_conflict: bogus op (%d)",
-					op);
-				break;
+		default:
+			cmn_err(CE_PANIC,
+			    "nbl_share_conflict: bogus op (%d)",
+			    op);
+			break;
 #endif
-			}
 		}
 		if (conflict)
 			break;
@@ -546,10 +615,16 @@ nbl_share_conflict(vnode_t *vp, nbl_op_t op)
 int
 share_blocks_lock(vnode_t *vp, flock64_t *flkp)
 {
+	caller_context_t ct;
+
 	ASSERT(nbl_in_crit(vp));
 
+	ct.cc_pid = flkp->l_pid;
+	ct.cc_sysid = flkp->l_sysid;
+	ct.cc_caller_id = 0;
+
 	if ((flkp->l_type == F_RDLCK || flkp->l_type == F_WRLCK) &&
-	    nbl_share_conflict(vp, nbl_lock_to_op(flkp->l_type)))
+	    nbl_share_conflict(vp, nbl_lock_to_op(flkp->l_type), &ct))
 		return (1);
 	else
 		return (0);
@@ -602,35 +677,34 @@ lock_blocks_share(vnode_t *vp, struct shrlock *shr)
 {
 	struct flock64 lck;
 	int error;
-
-	/*
-	 * We don't currently have a good way to match lock
-	 * ownership with share ownership for remote requests.
-	 * Fortunately, we know that only local processes (in particular,
-	 * local CIFS servers) care about conflicts between locks and
-	 * share reservations, and we can distinguish local processes from
-	 * each other and from remote processes.
-	 */
-	ASSERT(shr->s_sysid == 0);
+	v_mode_t mode = 0;
 
 	if ((shr->s_deny & (F_RWDNY|F_COMPAT)) == 0) {
 		/* if no deny mode, then there's no conflict */
 		return (0);
 	}
 
-	lck.l_type = ((shr->s_deny & F_RDDNY) ? F_WRLCK : F_RDLCK);
+	/* check for conflict with mapped region */
+	if ((shr->s_deny & F_RWDNY) == F_WRDNY) {
+		mode = V_WRITE;
+	} else if ((shr->s_deny & F_RWDNY) == F_RDDNY) {
+		mode = V_READ;
+	} else {
+		mode = V_RDORWR;
+	}
+	if (vn_is_mapped(vp, mode))
+		return (1);
 
+	lck.l_type = ((shr->s_deny & F_RDDNY) ? F_WRLCK : F_RDLCK);
 	lck.l_whence = 0;
 	lck.l_start = 0;
 	lck.l_len = 0;			/* to EOF */
 
-	/* would check here for conflict with mapped region */
-
 	/* XXX should use non-NULL cred? */
-	error = VOP_FRLOCK(vp, F_GETLK, &lck, 0, 0, NULL, NULL);
+	error = VOP_FRLOCK(vp, F_GETLK, &lck, 0, 0, NULL, NULL, NULL);
 	if (error != 0) {
 		cmn_err(CE_WARN, "lock_blocks_share: unexpected error (%d)",
-			error);
+		    error);
 		return (1);
 	}
 

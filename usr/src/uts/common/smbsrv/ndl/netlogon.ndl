@@ -1,0 +1,395 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_NETR_NDL_
+#define _MLSVC_NETR_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ ***********************************************************************
+ *
+ * NetLogon RPC (NETR) interface definition.
+ *
+ ***********************************************************************
+ */
+
+#include "ndrtypes.ndl"
+
+
+#define NETR_OPNUM_SamLogon			0x02
+#define NETR_OPNUM_SamLogoff			0x03
+#define NETR_OPNUM_ServerReqChallenge		0x04
+#define NETR_OPNUM_ServerPasswordSet		0x06
+#define NETR_OPNUM_LogonControl2		0x0E
+#define NETR_OPNUM_ServerAuthenticate2		0x0F
+#define NETR_OPNUM_TrustDomainList		0x13
+
+
+struct netr_sid {
+	BYTE		Revision;
+	BYTE		SubAuthCount;
+	BYTE		Authority[6];
+  SIZE_IS(SubAuthCount)
+	DWORD		SubAuthority[ANY_SIZE_ARRAY];
+};
+
+
+struct netr_string {
+	WORD		length;
+	WORD		allosize;
+	LPTSTR		str;
+};
+typedef struct netr_string netr_string_t;
+
+
+/*
+ * Alternative varying/conformant string definition - for
+ * non-null terminated strings. This definition must match
+ * mlrpc_vcbuf_t.
+ */
+struct netr_vcb {
+	/*
+	 * size_is (actually a copy of length_is) will
+	 * be inserted here by the marshalling library.
+	 */
+	DWORD vc_first_is;
+	DWORD vc_length_is;
+  SIZE_IS(vc_length_is)
+	WORD buffer[ANY_SIZE_ARRAY];
+};
+
+struct netr_vcbuf {
+	WORD wclen;
+	WORD wcsize;
+	struct netr_vcb *vcb;
+};
+typedef struct netr_vcbuf netr_vcbuf_t;
+
+
+struct netr_credential {
+	BYTE data[8];
+};
+
+
+struct netr_authenticator {
+	struct netr_credential credential;
+	DWORD timestamp;
+};
+typedef struct netr_authenticator netr_auth_t;
+
+
+struct OLD_LARGE_INTEGER {
+	DWORD LowPart;
+	DWORD HighPart;
+};
+typedef struct OLD_LARGE_INTEGER netr_int64_t;
+
+
+struct OWF_PASSWORD {
+	BYTE data[16];
+};
+typedef struct OWF_PASSWORD netr_owf_password_t;
+
+
+struct CYPHER_BLOCK {
+	BYTE data[8];
+};
+
+
+struct USER_SESSION_KEY {
+	struct CYPHER_BLOCK data[2];
+};
+
+
+
+
+/*
+ ***********************************************************************
+ * ServerReqChallenge
+ ***********************************************************************
+ */
+ALIGN(2)
+OPERATION(NETR_OPNUM_ServerReqChallenge)
+struct netr_ServerReqChallenge {
+	IN		LPTSTR servername;
+	IN REFERENCE	LPTSTR hostname;
+	IN		struct netr_credential client_challenge;
+	OUT		struct netr_credential server_challenge;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * ServerAuthenticate2
+ ***********************************************************************
+ */
+ALIGN(2)
+OPERATION(NETR_OPNUM_ServerAuthenticate2)
+struct netr_ServerAuthenticate2 {
+	IN		LPTSTR servername;
+	IN REFERENCE	LPTSTR account_name;
+	IN		WORD account_type;
+	IN REFERENCE	LPTSTR hostname;
+	IN		struct netr_credential client_credential;
+	OUT		struct netr_credential server_credential;
+	INOUT	DWORD negotiate_flags;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * ServerPasswordSet
+ ***********************************************************************
+ */
+ALIGN(2)
+OPERATION(NETR_OPNUM_ServerPasswordSet)
+struct netr_PasswordSet {
+	IN		LPTSTR servername;
+	IN REFERENCE	LPTSTR account_name;
+	IN		WORD account_type;
+	IN REFERENCE	LPTSTR hostname;
+	INOUT	struct netr_authenticator auth;
+	IN		netr_owf_password_t uas_new_password;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * SamLogon
+ ***********************************************************************
+ */
+
+/*
+ * The challenge-response data should always be 24 bytes.
+ */
+#define NETR_CR_PASSWORD_SIZE			24
+
+
+struct lm_challenge {
+	BYTE data[8];
+};
+typedef struct lm_challenge lm_challenge_t;
+
+
+struct netr_response {
+	DWORD 	length;
+	DWORD	start;
+	DWORD 	max_length;
+	BYTE	data[NETR_CR_PASSWORD_SIZE];
+};
+typedef struct netr_response netr_response_t;
+
+
+struct netr_response_desc {
+	WORD 	length;
+	WORD	max_length;	
+	netr_response_t *data;
+};
+typedef struct netr_response_desc netr_response_desc_t;
+
+/*
+ * Input data
+ */
+struct netr_logon_identity_info {
+	netr_vcbuf_t domain_name;
+	DWORD parameter_control;
+	struct OLD_LARGE_INTEGER logon_id;
+	netr_vcbuf_t username;
+	netr_vcbuf_t workstation;
+};
+typedef struct netr_logon_identity_info netr_logon_id_t;
+
+
+/*
+ * Level 1: interactive logon
+ */
+struct netr_logon_info1 {
+	netr_logon_id_t identity;
+	netr_owf_password_t lm_owf_password;
+	netr_owf_password_t nt_owf_password;
+};
+
+
+/*
+ * Level 2: network logon.
+ */
+struct netr_logon_info2 {
+	netr_logon_id_t identity;
+	lm_challenge_t lm_challenge;
+	netr_response_desc_t nt_response;
+	netr_response_desc_t lm_response;
+};
+
+
+union netr_logon_info_u {
+	UNION_INFO_PTR(1,netr_logon_info);
+	UNION_INFO_PTR(2,netr_logon_info);
+	DEFAULT	DWORD nothing;
+};
+
+
+struct netr_login_info {
+	WORD logon_level;
+	WORD switch_value;
+  SWITCH(switch_value)
+	union netr_logon_info_u ru;
+};
+
+
+/*
+ * Output data
+ */
+struct netr_group_membership {
+	DWORD rid;
+	DWORD attributes;
+};
+
+
+struct netr_sid_and_attributes {
+	struct netr_sid *sid;
+	DWORD attributes;
+};
+
+
+struct netr_validation_info3 {
+	struct OLD_LARGE_INTEGER LogonTime;
+	struct OLD_LARGE_INTEGER LogoffTime;
+	struct OLD_LARGE_INTEGER KickOffTime;
+	struct OLD_LARGE_INTEGER PasswordLastSet;
+	struct OLD_LARGE_INTEGER PasswordCanChange;
+	struct OLD_LARGE_INTEGER PasswordMustChange;
+	netr_string_t EffectiveName;
+	netr_string_t FullName;
+	netr_string_t LogonScript;
+	netr_string_t ProfilePath;
+	netr_string_t HomeDirectory;
+	netr_string_t HomeDirectoryDrive;
+	WORD LogonCount;
+	WORD BadPasswordCount;
+	DWORD UserId;
+	DWORD PrimaryGroupId;
+	DWORD GroupCount;
+  SIZE_IS(GroupCount)
+	struct netr_group_membership *GroupIds;
+	DWORD UserFlags;
+	struct USER_SESSION_KEY UserSessionKey;
+	netr_string_t LogonServer;
+	netr_string_t LogonDomainName;
+	struct netr_sid *LogonDomainId;
+	DWORD ExpansionRoom[10];
+	DWORD SidCount;
+  SIZE_IS(SidCount)
+	struct netr_sid_and_attributes *ExtraSids;
+};
+
+
+union netr_validation_u {
+	CASE(3) struct netr_validation_info3 *info3;
+	DEFAULT	DWORD nothing;
+};
+
+
+/*
+ * This structure needs to be declared, even though it can't be used
+ * in netr_SamLogon, in order to get the appropriate size to calculate
+ * the correct fixup offsets.  If ndrgen did the right thing,
+ * netr_validation_info would be one of the out parameters. However,
+ * if we do it that way, the switch_value isn't known early enough to
+ * do the fixup calculation. So it all has to go in netr_SamLogon.
+ */
+struct netr_validation_info {
+	WORD validation_level;
+  SWITCH(validation_level)
+	union netr_validation_u ru;
+};
+
+
+/*
+ * WARNING
+ *
+ * Validation_level is really a WORD and authoritative is really a
+ * BYTE. They are declared as DWORD here due to the way things are
+ * unmarshalled. NT does not clear out the unused bytes in the
+ * DWORD so they must be cast to get the correct value.
+ */
+OPERATION(NETR_OPNUM_SamLogon)
+struct netr_SamLogon {
+	IN		LPTSTR servername;
+	IN		LPTSTR hostname;
+	IN		struct netr_authenticator *auth;
+	INOUT	struct netr_authenticator *ret_auth;
+	IN		struct netr_login_info logon_info;
+	INOUT	WORD validation_level;
+  SWITCH(validation_level)
+	OUT		union netr_validation_u ru;
+	OUT		DWORD authoritative;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * SamLogoff
+ ***********************************************************************
+ */
+OPERATION(NETR_OPNUM_SamLogoff)
+struct netr_SamLogoff {
+	IN		LPTSTR servername;
+	IN REFERENCE	LPTSTR hostname;
+	IN		struct netr_authenticator auth;
+	INOUT	struct netr_authenticator ret_auth;
+	IN		DWORD logon_level;
+  SWITCH(logon_level)
+	IN		union netr_logon_info_u ru;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * The NETR interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union netr_interface {
+	CASE(NETR_OPNUM_ServerReqChallenge)
+		struct netr_ServerReqChallenge		ServerReqChallenge;
+	CASE(NETR_OPNUM_ServerAuthenticate2)
+		struct netr_ServerAuthenticate2		ServerAuthenticate2;
+	CASE(NETR_OPNUM_SamLogon)
+		struct netr_SamLogon			SamLogon;
+	CASE(NETR_OPNUM_SamLogoff)
+		struct netr_SamLogoff			SamLogoff;
+	CASE(NETR_OPNUM_ServerPasswordSet)
+		struct netr_PasswordSet			PasswordSet;
+};
+typedef union netr_interface netr_interface_t;
+EXTERNTYPEINFO(netr_interface)
+
+#endif /* _MLSVC_NETR_NDL_ */

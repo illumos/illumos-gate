@@ -1,0 +1,97 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+SUNWprivate {
+    global:
+	lmshare_add;
+	lmshare_close_iterator;
+	lmshare_delete;
+	lmshare_exists;
+	lmshare_getinfo;
+	lmshare_get_realpath;
+	lmshare_is_admin;
+	lmshare_is_dir;
+	lmshare_is_restricted;
+	lmshare_is_special;
+	lmshare_is_valid;
+	lmshare_iterate;
+	lmshare_list;
+	lmshare_num_shares;
+	lmshare_open_iterator;
+	lmshare_rename;
+	lmshare_setinfo;
+	lmshare_start;
+	lmshare_stop;
+	lsa_lookup_name2;
+	lsa_lookup_sid2;
+	lsa_query_primary_domain_info;
+	lsa_query_account_domain_info;
+	lsa_enum_trusted_domains;
+	mlsvc_init;
+	mlsvc_validate_user;
+	mlsvc_is_local_domain;
+	nt_group_add;
+	nt_group_add_groupprivs;
+	nt_group_add_member_byname;
+	nt_group_cache_size;
+	nt_group_close_iterator;
+	nt_group_delete;
+	nt_group_del_member_byname;
+	nt_group_getinfo;
+	nt_group_getpriv;
+	nt_group_ht_lock;
+	nt_group_ht_unlock;
+	nt_group_is_member;
+	nt_group_iterate;
+	nt_group_modify;
+	nt_group_num_groups;
+	nt_group_num_members;
+	nt_group_open_iterator;
+	nt_group_putinfo;
+	nt_groups_count;
+	nt_group_setpriv;
+	nt_groups_lookup_rid;
+	nt_groups_member_groups;
+	nt_groups_member_ngroups;
+	nt_groups_member_privs;
+	nt_group_list;
+	nt_group_member_list;
+	sam_init;
+	smb_logon;
+	smb_token_destroy;
+	smb_build_lmshare_info;
+	smb_get_smb_share_group;
+	smb_autohome_add;
+	smb_autohome_endent;
+	smb_autohome_getent;
+	smb_autohome_lookup;
+	smb_autohome_remove;
+	smb_autohome_setent;
+	smb_is_autohome;
+    local:
+	*;
+};

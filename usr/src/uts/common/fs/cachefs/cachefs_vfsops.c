@@ -403,7 +403,7 @@ again:
 		}
 		fscache_list_add(cachep, fscp);
 	} else {
-		/* compare the options to make sure they are compatable */
+		/* compare the options to make sure they are compatible */
 		error = fscache_compare_options(fscp, cfs_options);
 		if (error) {
 			cmn_err(CE_WARN,
@@ -426,7 +426,7 @@ again:
 	error = 0;
 	if (fscp->fs_fscdirvp) {
 		error = VOP_LOOKUP(fscp->fs_fscdirvp, CACHEFS_DLOG_FILE,
-		    &tmpdirvp, NULL, 0, NULL, kcred);
+		    &tmpdirvp, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 
 		/*
 		 * If a log file exists and the cache is being mounted without
@@ -550,7 +550,7 @@ again:
 	 */
 
 	error = VOP_PATHCONF(backrootvp, _PC_FILESIZEBITS, &maxfilesizebits,
-		    kcred);
+		    kcred, NULL);
 
 	if (error) {
 		cmn_err(CE_WARN,
@@ -562,7 +562,8 @@ again:
 	mutex_exit(&fscp->fs_fslock);
 
 	/* remove the unmount file if it is there */
-	(void) VOP_REMOVE(fscp->fs_fscdirvp, CACHEFS_UNMNT_FILE, kcred);
+	(void) VOP_REMOVE(fscp->fs_fscdirvp, CACHEFS_UNMNT_FILE, kcred, NULL,
+	    0);
 
 	/* wake up the cache worker if ANY packed pending work */
 	mutex_enter(&cachep->c_contentslock);
@@ -957,7 +958,7 @@ cachefs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	attr.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	if (fscp->fs_fscdirvp != NULL)
 		xx = VOP_CREATE(fscp->fs_fscdirvp, CACHEFS_UNMNT_FILE, &attr,
-		    NONEXCL, 0600, &nmvp, kcred, 0);
+		    NONEXCL, 0600, &nmvp, kcred, 0, NULL, NULL);
 	else
 		xx = ENOENT; /* for unmounting when NOCACHE */
 	if (xx == 0) {
@@ -1207,7 +1208,7 @@ cachefs_remount(struct vfs *vfsp, struct mounta *uap)
 	error = 0;
 	if (cachedirvp) {
 		error = VOP_LOOKUP(cachedirvp, CACHEFS_DLOG_FILE,
-		    &tmpdirvp, NULL, 0, NULL, kcred);
+		    &tmpdirvp, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	}
 	cfs_options = (struct cachefsoptions *)STRUCT_FADDR(map, cfs_options);
 	cacheid = (char *)STRUCT_FGETP(map, cfs_cacheid);

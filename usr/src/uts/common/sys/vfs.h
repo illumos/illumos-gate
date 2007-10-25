@@ -175,6 +175,24 @@ extern avl_tree_t	vskstat_tree;
 extern kmutex_t		vskstat_tree_lock;
 
 /*
+ * Private vfs data, NOT to be used by a file system implementation.
+ */
+
+#define	VFS_FEATURE_MAXSZ	4
+
+typedef struct vfs_impl {
+	/* Counted array - Bitmap of vfs features */
+	uint32_t	vi_featureset[VFS_FEATURE_MAXSZ];
+	/*
+	 * Support for statistics on the vnode operations
+	 */
+	vsk_anchor_t	*vi_vskap;		/* anchor for vopstats' kstat */
+	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
+	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
+} vfs_impl_t;
+
+
+/*
  * Structure per mounted file system.  Each mounted file system has
  * an array of operations and an instance record.
  *
@@ -199,19 +217,6 @@ extern kmutex_t		vskstat_tree_lock;
  */
 struct zone;		/* from zone.h */
 struct fem_head;	/* from fem.h */
-
-/*
- * Private vfs data, NOT to be used by a file system implementation.
- */
-typedef struct vfs_impl {
-	struct fem_head	*vi_femhead;		/* fs monitoring */
-	/*
-	 * Support for statistics on the vnode operations
-	 */
-	vsk_anchor_t	*vi_vskap;		/* anchor for vopstats' kstat */
-	vopstats_t	*vi_fstypevsp;		/* ptr to per-fstype vopstats */
-	vopstats_t	vi_vopstats;		/* per-mount vnode op stats */
-} vfs_impl_t;
 
 typedef struct vfs {
 	struct vfs	*vfs_next;		/* next VFS in VFS list */
@@ -246,9 +251,10 @@ typedef struct vfs {
 	struct zone	*vfs_zone;		/* zone that owns the mount */
 	struct vfs	*vfs_zone_next;		/* next VFS visible in zone */
 	struct vfs	*vfs_zone_prev;		/* prev VFS visible in zone */
+	struct fem_head	*vfs_femhead;		/* fs monitoring */
 } vfs_t;
 
-#define	vfs_femhead	vfs_implp->vi_femhead
+#define	vfs_featureset	vfs_implp->vi_featureset
 #define	vfs_vskap	vfs_implp->vi_vskap
 #define	vfs_fstypevsp	vfs_implp->vi_fstypevsp
 #define	vfs_vopstats	vfs_implp->vi_vopstats
@@ -273,6 +279,22 @@ typedef struct vfs {
 
 #define	VFS_NORESOURCE	"unspecified_resource"
 #define	VFS_NOMNTPT	"unspecified_mountpoint"
+
+/*
+ * VFS features are implemented as bits set in the vfs_t.
+ * The vfs_feature_t typedef is a 64-bit number that will translate
+ * into an element in an array of bitmaps and a bit in that element.
+ * Developers must not depend on the implementation of this and
+ * need to use vfs_has_feature()/vfs_set_feature() routines.
+ */
+typedef	uint64_t	vfs_feature_t;
+
+#define	VFSFT_XVATTR		0x100000001	/* Supports xvattr for attrs */
+#define	VFSFT_CASEINSENSITIVE	0x100000002	/* Supports case-insensitive */
+#define	VFSFT_NOCASESENSITIVE	0x100000004	/* NOT case-sensitive */
+#define	VFSFT_DIRENTFLAGS	0x100000008	/* Supports dirent flags */
+#define	VFSFT_ACLONCREATE	0x100000010	/* Supports ACL on create */
+#define	VFSFT_ACEMASKONACCESS	0x100000020	/* Can use ACEMASK for access */
 
 /*
  * Argument structure for mount(2).
@@ -380,21 +402,22 @@ typedef struct vfssw {
 
 /*
  * Filesystem type definition record.  All file systems must export a record
- * of this type through their modlfs structure.
+ * of this type through their modlfs structure.  N.B., changing the version
+ * number requires a change in sys/modctl.h.
  */
 
-typedef struct vfsdef_v3 {
+typedef struct vfsdef_v4 {
 	int		def_version;	/* structure version, must be first */
 	char		*name;		/* filesystem type name */
 	int		(*init) (int, char *);	/* init routine */
 	int		flags;		/* filesystem flags */
 	mntopts_t	*optproto;	/* mount options table prototype */
-} vfsdef_v3;
+} vfsdef_v4;
 
-typedef struct vfsdef_v3 vfsdef_t;
+typedef struct vfsdef_v4 vfsdef_t;
 
 enum {
-	VFSDEF_VERSION = 3
+	VFSDEF_VERSION = 4
 };
 
 /*
@@ -424,6 +447,8 @@ void	vfs_setops(vfs_t *, vfsops_t *);
 vfsops_t *vfs_getops(vfs_t *vfsp);
 int	vfs_matchops(vfs_t *, vfsops_t *);
 int	vfs_can_sync(vfs_t *vfsp);
+vfs_t	*vfs_alloc(int);
+void	vfs_free(vfs_t *);
 void	vfs_init(vfs_t *vfsp, vfsops_t *, void *);
 void	vfsimpl_setup(vfs_t *vfsp);
 void	vfsimpl_teardown(vfs_t *vfsp);
@@ -449,6 +474,10 @@ void	vfs_sync(int);
 void	vfs_mountroot(void);
 void	vfs_add(vnode_t *, struct vfs *, int);
 void	vfs_remove(struct vfs *);
+
+/* VFS feature routines */
+void	vfs_set_feature(vfs_t *, vfs_feature_t);
+int	vfs_has_feature(vfs_t *, vfs_feature_t);
 
 /* The following functions are not for general use by filesystems */
 
@@ -545,7 +574,6 @@ extern const mntopts_t vfs_mntopts;	/* globally recognized options */
 
 #define	VFS_INIT(vfsp, op, data) { \
 	vfs_init((vfsp), (op), (data)); \
-	vfsimpl_setup((vfsp)); \
 }
 
 

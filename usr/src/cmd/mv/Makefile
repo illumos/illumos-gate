@@ -47,9 +47,9 @@ LINTFLAGS += -DXPG4 -u
 XGETFLAGS += -a -x mv.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I $(SRC)/common/util
 
-lint :=	LDLIBS += -lcmdutils -lavl -lsec
-$(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
-$(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
+lint :=	LDLIBS += -lcmdutils -lavl -lsec -lnvpair
+$(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec -lnvpair $(ZNOLAZYLOAD)
+$(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec -lnvpair $(ZNOLAZYLOAD)
 
 .KEEP_STATE:
 

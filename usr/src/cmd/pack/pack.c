@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,28 +30,18 @@
 
 /*
  *	Huffman encoding program
- *	Usage:	pack [[ -f ] [ - ] filename ... ] filename ...
+ *	Usage:	pack [[ -f ] [ - ] [-/] filename ... ] filename ...
  *		- option: enable/disable listing of statistics
  */
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <locale.h>
 #include <stdarg.h>
-#include <errno.h>
 #include <sys/isa_defs.h>
-#include <stdlib.h>
-#include <limits.h>
 #include <sys/param.h>
-#include <fcntl.h>
 #include <utime.h>
-#include <string.h>
-#include <dirent.h>
-#include <unistd.h>
 #include <sys/acl.h>
 #include <aclutils.h>
+#include <libcmdutils.h>
 
 #undef lint
 
@@ -82,7 +72,6 @@ int	force = 0;	/* allow forced packing for consistency in directory */
 
 static	char filename [MAXPATHLEN];
 static int max_name;
-static int max_path = MAXPATHLEN;
 
 int	infile;		/* unpacked file */
 int	outfile;	/* packed file */
@@ -123,7 +112,11 @@ struct	heap {
 #define	hmove(a, b) {(b).count = (a).count; (b).node = (a).node; }
 
 static void heapify(int i);
-static int mv_xattrs(int, int, char *, int);
+
+/* Extended system attribute support */
+
+static int saflg = 0;
+
 
 /* gather character frequency statistics */
 /* return 1 if successful, 0 otherwise */
@@ -138,8 +131,8 @@ input(char *source)
 			count[inbuff[--i]&0377] += 2;
 	if (i == 0)
 		return (1);
-	fprintf(stderr, gettext(
-		"pack: %s: read error - file unchanged: "), source);
+	(void) fprintf(stderr, gettext(
+	    "pack: %s: read error - file unchanged: "), source);
 	perror("");
 	return (0);
 }
@@ -176,7 +169,7 @@ output(char *source)
 	dictsize = outp-&outbuff[0];
 
 	/* output the text */
-	lseek(infile, 0L, 0);
+	(void) lseek(infile, 0L, 0);
 	outsize = 0;
 	bitsleft = 8;
 	inleft = 0;
@@ -184,9 +177,9 @@ output(char *source)
 		if (inleft <= 0) {
 			inleft = read(infile, inp = &inbuff[0], BUFSIZ);
 			if (inleft < 0) {
-				fprintf(stderr, gettext(
+				(void) fprintf(stderr, gettext(
 				    "pack: %s: read error - file unchanged: "),
-					    source);
+				    source);
 				perror("");
 				return (0);
 			}
@@ -205,14 +198,14 @@ output(char *source)
 		}
 		if (outp >= &outbuff[BUFSIZ]) {
 			if (write(outfile, outbuff, BUFSIZ) != BUFSIZ) {
-wrerr:				fprintf(stderr, gettext(
-				"pack: %s.z: write error - file unchanged: "),
-					source);
+wrerr:				(void) fprintf(stderr, gettext(
+				    "pack: %s.z: write error - "
+				    "file unchanged: "), source);
 				perror("");
 				return (0);
 			}
 			((union FOUR *)outbuff)->lint.lng =
-				    ((union FOUR *)&outbuff[BUFSIZ])->lint.lng;
+			    ((union FOUR *)&outbuff[BUFSIZ])->lint.lng;
 			outp -= BUFSIZ;
 			outsize += BUFSIZ;
 		}
@@ -272,8 +265,8 @@ packfile(char *source)
 		}
 	}
 	if (diffbytes == 1) {
-		fprintf(stderr, gettext(
-			"pack: %s: trivial file - file unchanged\n"), source);
+		(void) fprintf(stderr, gettext(
+		    "pack: %s: trivial file - file unchanged\n"), source);
 		return (0);
 	}
 	insize.lint.lng >>= 1;
@@ -311,18 +304,18 @@ packfile(char *source)
 	}
 	if (maxlev > 24) {
 		/* can't occur unless insize.lint.lng >= 2**24 */
-		fprintf(stderr, gettext(
-	"pack: %s: Huffman tree has too many levels - file unchanged\n"),
-			source);
+		(void) fprintf(stderr, gettext(
+		    "pack: %s: Huffman tree has too many levels - "
+		    "file unchanged\n"), source);
 		return (0);
 	}
 
 	/* don't bother if no compression results */
 	outsize = ((bitsout+7)>>3)+6+maxlev+diffbytes;
 	if ((insize.lint.lng+BUFSIZ-1)/BUFSIZ <=
-				    (outsize+BUFSIZ-1)/BUFSIZ && !force) {
-		printf(gettext(
-			"pack: %s: no saving - file unchanged\n"), source);
+	    (outsize+BUFSIZ-1)/BUFSIZ && !force) {
+		(void) printf(gettext(
+		    "pack: %s: no saving - file unchanged\n"), source);
 		return (0);
 	}
 
@@ -354,6 +347,9 @@ main(int argc, char *argv[])
 	int error;
 	int fcount = 0; /* count failures */
 	acl_t *aclp = NULL;
+	char *progname;
+	int sattr_exist = 0;
+	int xattr_exist = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -361,9 +357,16 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "f-")) != EOF) {
+	if (progname = strrchr(argv[0], '/'))
+		++progname;
+	else
+		progname = argv[0];
+
+	while ((c = getopt(argc, argv, "f-/")) != EOF) {
 		if (c == 'f')
 			force++;
+		else if (c == '/')
+			saflg++;
 		else
 			++errflg;
 	}
@@ -374,18 +377,20 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv = &argv[optind];
 	if (errflg || argc < 1 ||
-		(argc == 1 && argv[0][0] == '-' && argv[0][1] == '\0')) {
-		fprintf(stderr, gettext(
-			"usage: pack [-f] [-] file...\n"));
+	    (argc == 1 && (argv[0][0] == '-' || argv[0][0] == '/' &&
+	    argv[0][1] == '\0'))) {
+		(void) fprintf(stderr, gettext(
+		    "usage: pack [-f] [-] [-/] file...\n"));
 		if (argc < 1 ||
-			(argc == 1 && argv[0][0] == '-' &&
-				argv[0][1] == '\0')) {
+		    (argc == 1 && (argv[0][0] == '-' || argv[0][0] == '/') &&
+		    argv[0][1] == '\0')) {
 			/*
 			 * return 1 for usage error when no file was specified
 			 */
 			return (1);
 		}
 	}
+
 	/* loop through the file names */
 	for (k = 0; k < argc; k++) {
 		if (argv[k][0] == '-' && argv[k][1] == '\0') {
@@ -416,45 +421,45 @@ main(int argc, char *argv[])
 		for (i = 0; i < (MAXPATHLEN-3) && (*cp = argv[k][i]); i++)
 			if (*cp++ == '/') sep = i;
 		if ((infile = open(filename, 0)) < 0) {
-			fprintf(stderr, gettext(
-				"pack: %s: cannot open: "), filename);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: cannot open: "), filename);
 			perror("");
 			continue;
 		}
 		if (i >= (MAXPATHLEN-3) || (i-sep) > (max_name - 1)) {
-			fprintf(stderr, gettext(
-				"pack: %s: file name too long\n"), argv[k]);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: file name too long\n"), argv[k]);
 			continue;
 		}
-		fstat(infile, &status);
+		(void) fstat(infile, &status);
 		if (S_ISDIR(status.st_mode)) {
-			fprintf(stderr, gettext(
-				"pack: %s: cannot pack a directory\n"),
-				    argv[k]);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: cannot pack a directory\n"),
+			    argv[k]);
 			goto closein;
 		}
 		if (status.st_size == 0) {
-			fprintf(stderr, gettext(
-				"pack: %s: cannot pack a zero length file\n"),
-				argv[k]);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: cannot pack a zero length file\n"),
+			    argv[k]);
 			goto closein;
 		}
 		if (status.st_nlink != 1) {
-			fprintf(stderr, gettext(
-				"pack: %s: has links\n"),
-				argv[k]);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: has links\n"),
+			    argv[k]);
 			goto closein;
 		}
 		*cp++ = SUF0;  *cp++ = SUF1;  *cp = '\0';
 		if (stat(filename, &ostatus) != -1) {
-			fprintf(stderr, gettext(
-				"pack: %s: already exists\n"), filename);
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: already exists\n"), filename);
 			goto closein;
 		}
-
-		if ((outfile = creat(filename, status.st_mode)) < 0) {
-			fprintf(stderr, gettext(
-				"pack: %s: cannot create: "), filename);
+		if ((outfile = creat(filename, status.st_mode | O_RDONLY))
+		    < 0) {
+			(void) fprintf(stderr, gettext(
+			    "pack: %s: cannot create: "), filename);
 			perror("");
 			goto closein;
 		}
@@ -462,155 +467,126 @@ main(int argc, char *argv[])
 		error = facl_get(infile, ACL_NO_TRIVIAL, &aclp);
 
 		if (error != 0) {
-			fprintf(stderr, gettext(
+			(void) fprintf(stderr, gettext(
 			    "pack: %s: cannot retrieve ACL: %s\n"), argv[k],
 			    acl_strerror(error));
 		}
-		if (packfile(argv[k]) &&
-		    ((pathconf(argv[k], _PC_XATTR_EXISTS) != 1) ||
-				(mv_xattrs(infile, outfile,
-					argv[k], 0) == 0))) {
-			if (unlink(argv[k]) != 0) {
-				fprintf(stderr, gettext(
-					"pack: %s: cannot unlink: "),
-					argv[k]);
-				perror("");
+
+		if (packfile(argv[k])) {
+			if (pathconf(argv[k], _PC_XATTR_EXISTS) == 1)
+				xattr_exist = 1;
+			if (saflg && sysattr_support(argv[k],
+			    _PC_SATTR_EXISTS) == 1)
+				sattr_exist = 1;
+			if (sattr_exist || xattr_exist) {
+				if (mv_xattrs(progname, argv[k], filename,
+				    sattr_exist, 0) != 0) {
+				/* Move attributes back ... */
+					xattr_exist = 0;
+					sattr_exist = 0;
+					if (pathconf(filename,
+					    _PC_XATTR_EXISTS) == 1)
+						xattr_exist = 1;
+					if (saflg && sysattr_support(filename,
+					    _PC_SATTR_EXISTS) == 1)
+						sattr_exist = 1;
+					if (xattr_exist || sattr_exist) {
+						(void) mv_xattrs(progname,
+						    filename, argv[k],
+						    sattr_exist, 1);
+						(void) unlink(filename);
+						goto out;
+					}
+				} else {
+					errno = 0;
+					if (unlink(argv[k]) != 0) {
+						(void) fprintf(stderr, gettext(
+						    "pack: %s :cannot unlink:"),
+						    argv[k]);
+						if (errno == EPERM)
+							perror("No permission");
+						else
+							perror("");
+					}
+				}
+			} else {
+				errno = 0;
+				if (unlink(argv[k]) != 0) {
+					(void) fprintf(stderr, gettext(
+					    "pack: %s :cannot unlink"),
+					    argv[k]);
+					if (errno == EPERM)
+						perror("No permission");
+					else
+						perror("");
+				}
 			}
-			printf(gettext(
-				"pack: %s: %.1f%% Compression\n"),
-				argv[k],
-	    ((double)(-outsize+(insize.lint.lng))/(double)insize.lint.lng)*100);
+			(void) printf(gettext(
+			    "pack: %s: %.1f%% Compression\n"),
+			    argv[k],
+			    ((double)(-outsize+(insize.lint.lng))/
+			    (double)insize.lint.lng)*100);
 			/* output statistics */
 			if (vflag) {
-				printf(gettext("\tfrom %ld to %ld bytes\n"),
-					insize.lint.lng, outsize);
-				printf(gettext(
-				"\tHuffman tree has %d levels below root\n"),
-				    maxlev);
-				printf(gettext(
-					"\t%d distinct bytes in input\n"),
-					diffbytes);
-				printf(gettext(
-					"\tdictionary overhead = %ld bytes\n"),
-					dictsize);
-				printf(gettext(
+				(void) printf(gettext(
+				    "\tfrom %ld to %ld bytes\n"),
+				    insize.lint.lng, outsize);
+				(void) printf(gettext(
+				    "\tHuffman tree has %d levels below "
+				    "root\n"), maxlev);
+				(void) printf(gettext(
+				    "\t%d distinct bytes in input\n"),
+				    diffbytes);
+				(void) printf(gettext(
+				    "\tdictionary overhead = %ld bytes\n"),
+				    dictsize);
+				(void) printf(gettext(
 				    "\teffective  entropy  = %.2f bits/byte\n"),
-			    ((double)outsize / (double)insize.lint.lng) * 8);
-				printf(gettext(
+				    ((double)outsize / (double)insize.lint.lng)
+				    * 8);
+				(void) printf(gettext(
 				    "\tasymptotic entropy  = %.2f bits/byte\n"),
-					((double)(outsize-dictsize) /
-					(double)insize.lint.lng) * 8);
+				    ((double)(outsize-dictsize) /
+				    (double)insize.lint.lng) * 8);
 			}
+
 			u_times.actime = status.st_atime;
 			u_times.modtime = status.st_mtime;
 			if (utime(filename, &u_times) != 0) {
 				errflg++;
-				fprintf(stderr,
-					gettext(
-					"pack: cannot change times on %s: "),
-					filename);
+				(void) fprintf(stderr,
+				    gettext(
+				    "pack: cannot change times on %s: "),
+				    filename);
 				perror("");
 			}
 			if (chmod(filename, status.st_mode) != 0) {
 				errflg++;
-				fprintf(stderr,
-					gettext(
-				"pack: can't change mode to %o on %s: "),
-					status.st_mode, filename);
+				(void) fprintf(stderr,
+				    gettext(
+				    "pack: can't change mode to %o on %s: "),
+				    status.st_mode, filename);
 				perror("");
 			}
-			chown(filename, status.st_uid, status.st_gid);
+			(void) chown(filename, status.st_uid, status.st_gid);
 			if (aclp && (facl_set(outfile, aclp) < 0)) {
-				fprintf(stderr, gettext(
+				(void) fprintf(stderr, gettext(
 				    "pack: %s: failed to set acl entries\n"),
 				    filename);
 				perror("");
 			}
 			if (!errflg)
 				fcount--;  /* success after all */
-		} else {
-			if (pathconf(filename, _PC_XATTR_EXISTS) == 1) {
-				(void) mv_xattrs(outfile, infile, filename, 1);
-			}
-			unlink(filename);
-		}
 
+		}
+out:
 		if (aclp) {
 			acl_free(aclp);
 			aclp = NULL;
 		}
 
-closein:	close(outfile);
-		close(infile);
+closein:	(void) close(outfile);
+		(void) close(infile);
 	}
 	return (fcount);
-}
-
-/*
- * mv_xattrs - move (via renameat) all of the extended attributes
- *	associated with the file referenced by infd to the file
- *	referenced by outfd.  The infile and silent arguments are
- *	provided for error message processing.  This function
- *	returns 0 on success and -1 on error.
- */
-static int
-mv_xattrs(int infd, int outfd, char *infile, int silent)
-{
-	int indfd, outdfd, tmpfd;
-	DIR *dirp = NULL;
-	struct dirent *dp = NULL;
-	int error = 0;
-	char *etext;
-
-	indfd = outdfd = tmpfd = -1;
-
-	if ((indfd = openat(infd, ".", O_RDONLY|O_XATTR)) == -1) {
-		etext = gettext("cannot open source");
-		error = -1;
-		goto out;
-	}
-
-	if ((outdfd = openat(outfd, ".", O_RDONLY|O_XATTR)) == -1) {
-		etext = gettext("cannot open target");
-		error = -1;
-		goto out;
-	}
-
-	if ((tmpfd = dup(indfd)) == -1) {
-		etext = gettext("cannot dup descriptor");
-		error = -1;
-		goto out;
-
-	}
-	if ((dirp = fdopendir(tmpfd)) == NULL) {
-		etext = gettext("cannot access source");
-		error = -1;
-		goto out;
-	}
-
-	while (dp = readdir(dirp)) {
-		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-		    dp->d_name[2] == '\0'))
-			continue;
-		if ((renameat(indfd, dp->d_name, outdfd, dp->d_name)) == -1) {
-			etext = dp->d_name;
-			error = -1;
-			goto out;
-		}
-	}
-out:
-	if (error == -1 && silent == 0) {
-		fprintf(stderr, gettext(
-			"pack: %s: cannot move extended attributes, "),
-			infile);
-		perror(etext);
-	}
-	if (dirp)
-		closedir(dirp);
-	if (indfd != -1)
-		close(indfd);
-	if (outdfd != -1)
-		close(outdfd);
-	return (error);
 }

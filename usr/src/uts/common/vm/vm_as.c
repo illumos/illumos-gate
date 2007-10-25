@@ -1160,7 +1160,7 @@ setprot_top:
 	/*
 	 * Normally we only lock the as as a reader. But
 	 * if due to setprot the segment driver needs to split
-	 * a segment it will return IE_RETRY. Therefore we re-aquire
+	 * a segment it will return IE_RETRY. Therefore we re-acquire
 	 * the as lock as a writer so the segment driver can change
 	 * the seg list. Also the segment driver will return IE_RETRY
 	 * after it has changed the segment list so we therefore keep
@@ -1602,7 +1602,7 @@ again:
 	}
 
 	va.va_mask = AT_SIZE;
-	if (VOP_GETATTR(vn_a->vp, &va, ATTR_HINT, vn_a->cred) != 0) {
+	if (VOP_GETATTR(vn_a->vp, &va, ATTR_HINT, vn_a->cred, NULL) != 0) {
 		szcvec = 0;
 		goto again;
 	}

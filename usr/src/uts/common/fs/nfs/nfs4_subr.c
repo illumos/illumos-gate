@@ -2319,7 +2319,7 @@ nfs4_printfhandle(nfs4_fhandle_t *fhp)
  * We provide a set of interfaces to allow the rest of the system to utilize
  * a caching mechanism while encapsulating the details of the actual
  * implementation.  This should allow for better maintainability and
- * extensibilty by consolidating the implementation details in one location.
+ * extensibility by consolidating the implementation details in one location.
  */
 
 /*
@@ -2875,7 +2875,7 @@ nfs4_directio(vnode_t *vp, int cmd, cred_t *cr)
 		if (nfs4_has_pages(vp) &&
 		    ((rp->r_flags & R4DIRTY) || rp->r_awcount > 0)) {
 			error = VOP_PUTPAGE(vp, (offset_t)0, (uint_t)0,
-			    B_INVAL, cr);
+			    B_INVAL, cr, NULL);
 			if (error) {
 				if (error == ENOSPC || error == EDQUOT) {
 					mutex_enter(&rp->r_statelock);

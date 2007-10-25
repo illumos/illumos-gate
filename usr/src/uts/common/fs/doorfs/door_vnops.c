@@ -38,15 +38,17 @@
 #include <sys/tsol/label.h>
 
 kmutex_t	door_knob;
-static int	door_open(struct vnode **vpp, int flag, struct cred *cr);
+static int	door_open(struct vnode **vpp, int flag, struct cred *cr,
+			caller_context_t *ct);
 static int	door_close(struct vnode *vp, int flag, int count,
-			offset_t offset, struct cred *cr);
+			offset_t offset, struct cred *cr, caller_context_t *ct);
 static int	door_getattr(struct vnode *vp, struct vattr *vap,
-			int flags, struct cred *cr);
-static void	door_inactive(struct vnode *vp, struct cred *cr);
+			int flags, struct cred *cr, caller_context_t *ct);
+static void	door_inactive(struct vnode *vp, struct cred *cr,
+			caller_context_t *ct);
 static int	door_access(struct vnode *vp, int mode, int flags,
-			struct cred *cr);
-static int	door_realvp(vnode_t *vp, vnode_t **vpp);
+			struct cred *cr, caller_context_t *ct);
+static int	door_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct);
 
 struct vfs door_vfs;
 
@@ -70,7 +72,7 @@ const fs_operation_def_t door_vnodeops_template[] = {
 
 /* ARGSUSED */
 static int
-door_open(struct vnode **vpp, int flag, struct cred *cr)
+door_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *ct)
 {
 	/*
 	 * MAC policy for doors.  Restrict cross-zone open()s so that only
@@ -103,7 +105,8 @@ door_close(
 	int flag,
 	int count,
 	offset_t offset,
-	struct cred *cr
+	struct cred *cr,
+	caller_context_t *ct
 )
 {
 	door_node_t	*dp = VTOD(vp);
@@ -142,7 +145,8 @@ door_close(
 
 /* ARGSUSED */
 static int
-door_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
+door_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr,
+	caller_context_t *ct)
 {
 	static timestruc_t tzero = {0, 0};
 	extern dev_t doordev;
@@ -169,7 +173,7 @@ door_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 
 /* ARGSUSED */
 static void
-door_inactive(struct vnode *vp, struct cred *cr)
+door_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 {
 	door_node_t *dp = VTOD(vp);
 
@@ -231,19 +235,20 @@ door_unbind_thread(door_node_t *dp)
 	mutex_exit(&vp->v_lock);
 
 	if (do_inactive)
-		door_inactive(vp, NULL);
+		door_inactive(vp, NULL, NULL);
 }
 
 /* ARGSUSED */
 static int
-door_access(struct vnode *vp, int mode, int flags, struct cred *cr)
+door_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static int
-door_realvp(vnode_t *vp, vnode_t **vpp)
+door_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	*vpp = vp;
 	return (0);

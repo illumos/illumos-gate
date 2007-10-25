@@ -96,17 +96,17 @@ kmutex_t physmem_mutex;		/* protects phsymem_vnodecnt */
 
 static int physmem_getpage(struct vnode *vp, offset_t off, size_t len,
     uint_t *protp, page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-    enum seg_rw rw, struct cred *cr);
+    enum seg_rw rw, struct cred *cr, caller_context_t *ct);
 
 static int physmem_addmap(struct vnode *vp, offset_t off, struct as *as,
     caddr_t addr, size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
-    struct cred *cred);
+    struct cred *cred, caller_context_t *ct);
 
 static int physmem_delmap(struct vnode *vp, offset_t off, struct as *as,
     caddr_t addr, size_t len, uint_t prot, uint_t maxprot, uint_t flags,
-    struct cred *cred);
+    struct cred *cred, caller_context_t *ct);
 
-static void physmem_inactive(vnode_t *vp, cred_t *crp);
+static void physmem_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct);
 
 const fs_operation_def_t physmem_vnodeops_template[] = {
 	VOPNAME_GETPAGE,	{ .vop_getpage = physmem_getpage },
@@ -334,7 +334,7 @@ physmem_setup_vnops()
  * The guts of the PHYSMEM_SETUP ioctl.
  * Create a segment in the address space with the specified parameters.
  * If pspp->user_va is NULL, as_gap will be used to find an appropriate VA.
- * We do not do bounds checking on the requested phsycial addresses, if they
+ * We do not do bounds checking on the requested physical addresses, if they
  * do not exist in the system, they will not be mappable.
  * Returns 0 on success with the following error codes on failure:
  *	ENOMEM - The VA range requested was already mapped if pspp->user_va is
@@ -643,7 +643,7 @@ physmem_destroy_addrs(uint64_t p_cookie)
 static int
 physmem_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
     page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr, enum seg_rw rw,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	page_t *pp;
 
@@ -674,7 +674,7 @@ physmem_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 static int
 physmem_addmap(struct vnode *vp, offset_t off, struct as *as,
     caddr_t addr, size_t len, uchar_t prot, uchar_t maxprot, uint_t flags,
-    struct cred *cred)
+    struct cred *cred, caller_context_t *ct)
 {
 	if (curproc->p_as != as) {
 		return (EINVAL);
@@ -687,7 +687,7 @@ physmem_addmap(struct vnode *vp, offset_t off, struct as *as,
 static int
 physmem_delmap(struct vnode *vp, offset_t off, struct as *as,
     caddr_t addr, size_t len, uint_t prot, uint_t maxprot, uint_t flags,
-    struct cred *cred)
+    struct cred *cred, caller_context_t *ct)
 {
 	/*
 	 * Release our hold on the vnode so that the final VN_RELE will
@@ -703,7 +703,7 @@ physmem_delmap(struct vnode *vp, offset_t off, struct as *as,
  */
 /*ARGSUSED*/
 static void
-physmem_inactive(vnode_t *vp, cred_t *crp)
+physmem_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 {
 	page_t *pp;
 

@@ -259,7 +259,7 @@ cpr_log_status(int enable, int *svstat, vnode_t *vp)
 	 */
 	if (enable == 0) {
 		if (error = VOP_IOCTL(vp, _FIOISLOG,
-		    (uintptr_t)&status, FKIOCTL, CRED(), NULL)) {
+		    (uintptr_t)&status, FKIOCTL, CRED(), NULL, NULL)) {
 			mntpt = vfs_getmntpoint(vp->v_vfsp);
 			prom_printf("%s: \"%s\", cant get logging "
 			    "status, error %d\n", str, refstr_value(mntpt),
@@ -287,7 +287,7 @@ cpr_log_status(int enable, int *svstat, vnode_t *vp)
 	 */
 	if (*svstat == 1) {
 		error = VOP_IOCTL(vp, cmd, (uintptr_t)&fl,
-		    FKIOCTL, CRED(), NULL);
+		    FKIOCTL, CRED(), NULL, NULL);
 		if (error) {
 			mntpt = vfs_getmntpoint(vp->v_vfsp);
 			prom_printf("%s: \"%s\", cant %s logging, error %d\n",
@@ -338,7 +338,7 @@ cpr_ufs_logging(int enable)
 		return (error);
 	cpr_log_status(enable, &def_status, vp);
 	vfsp = vp->v_vfsp;
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 
 	fname = cpr_build_statefile_path();
@@ -357,7 +357,7 @@ cpr_ufs_logging(int enable)
 	 */
 	if (vp->v_vfsp != vfsp && vp->v_type == VREG)
 		cpr_log_status(enable, &sf_status, vp);
-	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 
 	return (0);
@@ -739,7 +739,7 @@ alloc_statefile:
 	rc = cpr_dump(C_VP);
 
 	/*
-	 * if any error occured during dump, more
+	 * if any error occurred during dump, more
 	 * special handling for reusable:
 	 */
 	if (rc && cpr_reusable_mode) {

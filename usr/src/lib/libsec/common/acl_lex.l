@@ -59,6 +59,7 @@ int yybufpos;
 
 %}
 
+%e 1500
 %s TS NS PS AIS AS US ES
 /*
  * TS = type state
@@ -73,7 +74,7 @@ int yybufpos;
 ID	[0-9]+
 LOGNAME [^:]+:
 PERM_STR [rRwWxpdDaAcCos-]+
-INHERIT_STR [fdinFS-]+
+INHERIT_STR [fdinFSI-]+
 
 %%
 
@@ -398,6 +399,32 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = ACE_ACCESS_DENIED_ACE_TYPE;
 				return (ACCESS_TYPE);
 			}
+<AS>audit/[:,\n]	{
+				int c;
+				
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+
+				yylval.val = ACE_SYSTEM_AUDIT_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
+<AS>alarm/[:,\n]	{
+				int c;
+				
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+
+				yylval.val = ACE_SYSTEM_ALARM_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
 <AS>:			{
 				
 				acl_error(dgettext(TEXT_DOMAIN,
@@ -466,6 +493,33 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = ACE_ACCESS_DENIED_ACE_TYPE;
 				return (ACCESS_TYPE);
 			}
+<AIS>audit/[:,\n]	{
+				int c;
+				
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+
+				yylval.val = ACE_SYSTEM_AUDIT_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
+<AIS>alarm/[:,\n]	{
+
+				int c;
+				
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+
+				yylval.val = ACE_SYSTEM_ALARM_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
 <AIS>file_inherit/[:/,] {
 				yylval.val = ACE_FILE_INHERIT_ACE;
 				return (ACE_INHERIT);
@@ -480,6 +534,19 @@ INHERIT_STR [fdinFS-]+
 			}
 <AIS>inherit_only/[/:,]	{
 				yylval.val = ACE_INHERIT_ONLY_ACE;
+				return (ACE_INHERIT);
+			}
+
+<AIS>successful_access/[/:,] {
+				yylval.val = ACE_SUCCESSFUL_ACCESS_ACE_FLAG;
+				return (ACE_INHERIT);
+			}
+<AIS>failed_access/[/:,] {
+				yylval.val = ACE_FAILED_ACCESS_ACE_FLAG;
+				return (ACE_INHERIT);
+			}
+<AIS>inherited/[/:,] {
+				yylval.val = ACE_INHERITED_ACE;
 				return (ACE_INHERIT);
 			}
 <AIS>{INHERIT_STR}/[:]	{
@@ -625,7 +692,7 @@ INHERIT_STR [fdinFS-]+
  * used for retrieving illegal data in ACL specification.
  *
  * The first set of characters is retrieved from yytext.
- * subseequent characters are pulled from the input stream,
+ * subsequent characters are pulled from the input stream,
  * until either EOF or one of the requested terminators is scene.
  * Result is returned in yylval.str which is malloced.
  */
@@ -783,7 +850,7 @@ acl_str_to_id(char *str, int *id)
 	uid_t value;
 
 	errno = 0;
-	value = strtol(str, &end, 10);
+	value = strtoul(str, &end, 10);
 
 	if (errno != 0 || *end != '\0')
 		return (EACL_INVALID_USER_GROUP);

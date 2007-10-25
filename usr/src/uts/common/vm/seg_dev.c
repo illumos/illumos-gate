@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,7 +422,7 @@ segdev_create(struct seg *seg, void *argsp)
 	 */
 	error = VOP_ADDMAP(VTOCVP(sdp->vp), sdp->offset,
 	    seg->s_as, seg->s_base, seg->s_size,
-	    sdp->prot, sdp->maxprot, sdp->type, CRED());
+	    sdp->prot, sdp->maxprot, sdp->type, CRED(), NULL);
 
 	if (error != 0) {
 		sdp->devmap_data = NULL;
@@ -522,7 +522,7 @@ segdev_dup(struct seg *seg, struct seg *newseg)
 	return (VOP_ADDMAP(VTOCVP(newsdp->vp),
 		newsdp->offset, newseg->s_as,
 		newseg->s_base, newseg->s_size, newsdp->prot,
-		newsdp->maxprot, sdp->type, CRED()));
+		newsdp->maxprot, sdp->type, CRED(), NULL));
 }
 
 /*
@@ -707,7 +707,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 	 */
 	ASSERT(sdp->vp != NULL);
 	(void) VOP_DELMAP(VTOCVP(sdp->vp), off, seg->s_as, addr, len,
-		sdp->prot, sdp->maxprot, sdp->type, CRED());
+		sdp->prot, sdp->maxprot, sdp->type, CRED(), NULL);
 
 	/*
 	 * Check for entire segment
@@ -2889,7 +2889,7 @@ devmap_get_large_pgsize(devmap_handle_t *dhp, size_t len, caddr_t addr,
 		*llen += pgsize;
 		off = ptob(pfn - dhp->dh_pfn) + pgsize;
 	}
-	/* Large page mapping len/addr cover more range than orginal fault */
+	/* Large page mapping len/addr cover more range than original fault */
 	ASSERT(*llen >= len && *laddr <= addr);
 	ASSERT((*laddr + *llen) >= (addr + len));
 }
@@ -3799,7 +3799,7 @@ devmap_alloc_pages(vmem_t *vmp, size_t size, int vmflag)
 }
 
 /*
- * This is where things are a bit incestrous with seg_kmem: unlike
+ * This is where things are a bit incestuous with seg_kmem: unlike
  * seg_kp, seg_kmem does not keep its pages long-term sharelocked, so
  * we need to do a bit of a dance around that to prevent duplication of
  * code until we decide to bite the bullet and implement a new kernel
@@ -3851,7 +3851,7 @@ devmap_free_pages(vmem_t *vmp, void *inaddr, size_t size)
  * default request. For now we allocate our own pages and we keep
  * them long-term sharelocked, since: A) the fault routines expect the
  * memory to already be locked; B) pageable umem is already long-term
- * locked; C) it's a lot of work to make it otherwise, particuarly
+ * locked; C) it's a lot of work to make it otherwise, particularly
  * since the nexus layer expects the pages to never fault. An RFE is to
  * not keep the pages long-term locked, but instead to be able to
  * take faults on them and simply look them up in kvp in case we

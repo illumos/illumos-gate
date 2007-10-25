@@ -367,7 +367,7 @@ ufs_flush(struct vfs *vfsp)
 	 * flush w/invalidate block device pages and buf cache
 	 */
 	if ((error = VOP_PUTPAGE(common_specvp(ufsvfsp->vfs_devvp),
-	    (offset_t)0, 0, B_INVAL, CRED())) > 0)
+	    (offset_t)0, 0, B_INVAL, CRED(), NULL)) > 0)
 		saverror = error;
 
 	(void) bflush((dev_t)vfsp->vfs_dev);

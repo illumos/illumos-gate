@@ -294,7 +294,8 @@ devpts_prunedir(struct sdev_node *ddv)
 /*ARGSUSED3*/
 static int
 devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
-    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred)
+    struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred,
+    caller_context_t *ct, int *direntflags, pathname_t *realpnp)
 {
 	struct sdev_node *sdvp = VTOSDEV(dvp);
 	struct sdev_node *dv;
@@ -308,7 +309,7 @@ devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 		switch ((*vpp)->v_type) {
 		case VCHR:
 			dv = VTOSDEV(VTOS(*vpp)->s_realvp);
-			ASSERT(VOP_REALVP(SDEVTOV(dv), &rvp) == ENOSYS);
+			ASSERT(VOP_REALVP(SDEVTOV(dv), &rvp, NULL) == ENOSYS);
 			break;
 		case VDIR:
 			dv = VTOSDEV(*vpp);
@@ -333,21 +334,23 @@ devpts_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 /*ARGSUSED2*/
 static int
 devpts_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
-    int mode, struct vnode **vpp, struct cred *cred, int flag)
+    int mode, struct vnode **vpp, struct cred *cred, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int error;
 	struct vnode *vp;
 
 	*vpp = NULL;
 
-	error = devpts_lookup(dvp, nm, &vp, NULL, 0, NULL, cred);
+	error = devpts_lookup(dvp, nm, &vp, NULL, 0, NULL, cred, ct, NULL,
+	    NULL);
 	if (error == 0) {
 		if (excl == EXCL)
 			error = EEXIST;
 		else if (vp->v_type == VDIR && (mode & VWRITE))
 			error = EISDIR;
 		else
-			error = VOP_ACCESS(vp, mode, 0, cred);
+			error = VOP_ACCESS(vp, mode, 0, cred, ct);
 
 		if (error) {
 			VN_RELE(vp);
@@ -365,9 +368,10 @@ devpts_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
  * A /dev/pts entry will be created only after the first lookup of the slave
  * device succeeds.
  */
+/*ARGSUSED4*/
 static int
 devpts_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred,
-    int *eofp)
+    int *eofp, caller_context_t *ct, int flags)
 {
 	struct sdev_node *sdvp = VTOSDEV(dvp);
 	if (uiop->uio_offset == 0) {

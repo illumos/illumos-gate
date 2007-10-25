@@ -1,0 +1,552 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLRPCPDU_NDL_
+#define _MLRPCPDU_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "ndrtypes.ndl"
+
+/*
+ * Normally, constructs are (un)marshalled atoms first, then
+ * constructs, then pointers. This can be confusing sometimes
+ * when debugging. We know that everything in here can be
+ * safely (un)marshalled in member order, so we say so.
+ */
+#ifdef NDRGEN
+#define _NO_REORDER_ [_no_reorder]
+#else
+#define _NO_REORDER_
+#endif
+
+/*
+ * UUID (Universal Unique IDentifier)
+ */
+/* (X/Open CAE Spec Appendix A) */
+struct mlrpc_uuid_dce {
+	DWORD		time_low;
+	WORD		time_mid;
+	WORD		time_hi_and_version;
+	BYTE		clock_seq_hi_and_reserved;
+	BYTE		clock_seq_low;
+	BYTE		node[6];
+};
+
+struct mlrpc_uuid {
+	DWORD		data1;
+	WORD		data2;
+	WORD		data3;
+	BYTE		data4[8];
+};
+typedef struct mlrpc_uuid	mlrpc_uuid_t;
+
+/*
+ * Representation label -- needed for RPC header
+ * (X/Open CAE Spec Chapter 14.1)
+ *
+ * Bits   Data Type   Description
+ * ----   ---------   -----------
+ * 0-3    charset     0=ASCII
+ *                    1=EBCDIC
+ * 4-7    byte-order  0=big-endian
+ *                    1=little-endian
+ * 8-15   float       0=IEEE
+ *                    1=VAX
+ *                    2=Cray
+ *                    3=IBM
+ * 16-31  reserved
+ */
+#define MLRPC_REPLAB_CHAR_MASK		0x0F	/* low nibble of intg_char */
+#define MLRPC_REPLAB_CHAR_ASCII		0x00	/* ASCII */
+#define MLRPC_REPLAB_CHAR_EBCDIC	0x01	/* EBCDIC (never happen) */
+#define MLRPC_REPLAB_INTG_MASK		0xF0	/* hi nibble of intg_char */
+#define MLRPC_REPLAB_INTG_BIG_ENDIAN	0x00	/* big endian */
+#define MLRPC_REPLAB_INTG_LITTLE_ENDIAN	0x10	/* little endian (x86) */
+#define MLRPC_REPLAB_FLOAT_IEEE		0x00
+#define MLRPC_REPLAB_FLOAT_VAX		0x01
+#define MLRPC_REPLAB_FLOAT_CRAY		0x02
+#define MLRPC_REPLAB_FLOAT_IBM		0x03
+
+struct mlrpc_representation_label {
+	BYTE		intg_char_rep;		/* integer and charset */
+	BYTE		float_rep;
+	BYTE		_spare[2];
+};
+
+
+
+/*
+ * RPC PDU (Protocol Data Unit) types
+ ****************************************************************
+ * (X/Open CAE Spec 12.1)
+ */
+
+#define MLRPC_PTYPE_REQUEST		0x00	/* CO/CL */
+#define MLRPC_PTYPE_PING		0x01	/*    CL */
+#define MLRPC_PTYPE_RESPONSE		0x02	/* CO/CL */
+#define MLRPC_PTYPE_FAULT		0x03	/* CL/CL */
+#define MLRPC_PTYPE_WORKING		0x04	/*    CL */
+#define MLRPC_PTYPE_NOCALL		0x05	/*    CL */
+#define MLRPC_PTYPE_REJECT		0x06	/*    CL */
+#define MLRPC_PTYPE_ACK			0x07	/*    CL */
+#define MLRPC_PTYPE_CL_CANCEL		0x08	/*    CL */
+#define MLRPC_PTYPE_FACK		0x09	/*    CL */
+#define MLRPC_PTYPE_CANCEL_ACK		0x0A	/*    CL */
+#define MLRPC_PTYPE_BIND		0x0B	/* CO    */
+#define MLRPC_PTYPE_BIND_ACK		0x0C	/* CO    */
+#define MLRPC_PTYPE_BIND_NAK		0x0D	/* CO    */
+#define MLRPC_PTYPE_ALTER_CONTEXT	0x0E	/* CO    */
+#define MLRPC_PTYPE_ALTER_CONTEXT_RESP	0x0F	/* CO    */
+						/* 0x10 missing from DCE/RPC */
+#define MLRPC_PTYPE_SHUTDOWN		0x11	/* CO    */
+#define MLRPC_PTYPE_CO_CANCEL		0x12	/* CO    */
+#define MLRPC_PTYPE_ORPHANED		0x13	/* CO    */
+
+/*
+ * Flags in the RPC header for Connection-oriented PDU data types
+ * (X/Open CAE Spec 12.6.3.1)
+ */
+#define MLRPC_PFC_FIRST_FRAG		0x01	/* First fragment */
+#define MLRPC_PFC_LAST_FRAG		0x02	/* Last framgent */
+#define MLRPC_PFC_PENDING_CANCEL	0x04	/* Cancel was pending@sender*/
+#define MLRPC_PFC_RESERVED_1		0x08	/* */
+#define MLRPC_PFC_CONC_MPX		0x10	/* supports concurrent muxing
+						 * of single connection */
+#define MLRPC_PFC_DID_NOT_EXECUTE	0x20	/* for PTYPE_FAULT, guarantee
+						 * call did not execute */
+#define MLRPC_PFC_MAYBE			0x40	/* "maybe" semantics req'ed*/
+#define MLRPC_PFC_OBJECT_UUID		0x80	/* */
+
+
+/*
+ * Header common to all Connection-oriented RPC PDUs
+ ****************************************************************
+ * (X/Open CAE Spec 12.6.3.1)
+ */
+_NO_REORDER_
+struct mlrpcconn_common_header {
+	BYTE		rpc_vers;	/* 00:01 5 */
+	BYTE		rpc_vers_minor;	/* 01:01 0 */
+	BYTE		ptype;		/* 02:01 MLRPC_PTYPE_... */
+	BYTE		pfc_flags;	/* 03:01 MLRPC_PFC_... */
+	struct mlrpc_representation_label
+			packed_drep;	/* 04:04 NDR representation label */
+	WORD		frag_length;	/* 08:02 total length of frag */
+	WORD		auth_length;	/* 10:02 length of auth_value */
+	DWORD		call_id;	/* 12:04 call identifier */
+					/* 16: */
+};
+typedef struct mlrpcconn_common_header	mlrpcconn_common_header_t;
+EXTERNTYPEINFO(mlrpcconn_common_header)
+
+
+/*
+ * A plethora of supporting types, only defined the ones we need
+ * (X/Open CAE Spec 12.6.3.1)
+ */
+typedef WORD	mlrpc_p_context_id_t;
+
+_NO_REORDER_
+struct mlrpc_p_syntax_id {
+	mlrpc_uuid_t	if_uuid;
+	DWORD		if_version;
+};
+typedef struct mlrpc_p_syntax_id	mlrpc_p_syntax_id_t;
+
+_NO_REORDER_
+struct mlrpc_p_cont_elem {
+	mlrpc_p_context_id_t	p_cont_id;
+	BYTE			n_transfer_syn;
+	BYTE			_reserved;
+	mlrpc_p_syntax_id_t	abstract_syntax;
+  /*SIZE_IS(n_transfer_syn)*/
+	mlrpc_p_syntax_id_t	transfer_syntaxes[1];
+};
+typedef struct mlrpc_p_cont_elem	mlrpc_p_cont_elem_t;
+EXTERNTYPEINFO(mlrpc_p_cont_elem)
+
+_NO_REORDER_
+struct mlrpc_p_cont_list {
+	BYTE		n_context_elem;
+	BYTE		_reserved;
+	WORD		_reserved2;
+  /*SIZE_IS(n_context_elem)*/
+	mlrpc_p_cont_elem_t p_cont_elem[1];
+};
+typedef struct mlrpc_p_cont_list	mlrpc_p_cont_list_t;
+EXTERNTYPEINFO(mlrpc_p_cont_list)
+
+typedef WORD	mlrpc_p_cont_def_result_t;
+#define MLRPC_PCDR_ACCEPTANCE		0
+#define MLRPC_PCDR_USER_REJECTION	1
+#define MLRPC_PCDR_PROVIDER_REJECTION	2
+
+typedef WORD	mlrpc_p_provider_reason_t;
+#define MLRPC_PPR_REASON_NOT_SPECIFIED		0
+#define MLRPC_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED	1
+#define MLRPC_PPR_PROPOSED_TRANSFER_SYNTAXES_NOT_SUPPORTED 2
+#define MLRPC_PPR_LOCAL_LIMIT_EXCEEDED		3
+
+
+_NO_REORDER_
+struct mlrpc_p_result {
+	mlrpc_p_cont_def_result_t	result;		/* MLRPC_PCDR_... */
+	mlrpc_p_provider_reason_t	reason;		/* MLRPC_PPR_... */
+	mlrpc_p_syntax_id_t		transfer_syntax; /* 0-fill if 
+							  * result!=ACCEPT*/
+};
+typedef struct mlrpc_p_result		mlrpc_p_result_t;
+EXTERNTYPEINFO(mlrpc_p_result)
+
+_NO_REORDER_
+struct mlrpc_p_result_list {
+	BYTE		n_results;
+	BYTE		reserved;
+	WORD		reserved2;
+  /*SIZE_IS(n_results)*/
+	mlrpc_p_result_t p_results[1];
+};
+typedef struct mlrpc_p_result_list	mlrpc_p_result_list_t;
+EXTERNTYPEINFO(mlrpc_p_result_list)
+
+#define MLRPC_PORT_ANY_MAX_PORT_SPEC	30
+_NO_REORDER_
+struct mlrpc_port_any {
+	WORD		length;		/* always 18 */
+  /*SIZE_IS(length)*/
+	BYTE		port_spec[MLRPC_PORT_ANY_MAX_PORT_SPEC];
+						/* \PIPE\ntsvcs */
+  /* We cheat by using 18, and pad on the right with zeroes */
+};
+typedef struct mlrpc_port_any		mlrpc_port_any_t;
+EXTERNTYPEINFO(mlrpc_port_any)
+
+
+/*
+ * Alter Context PDU (0x0E)
+ * (X/Open CAE Spec 12.6.4.1)
+ */
+_NO_REORDER_
+struct mlrpcconn_alter_context_hdr {
+	mlrpcconn_common_header_t common_hdr; /* 00:16 (see above) */
+
+	WORD max_xmit_frag;		/* 16:02 ignored */
+	WORD max_recv_frag;		/* 18:02 ignored */
+	DWORD assoc_group_id;	/* 20:04 ignored */
+
+	/* 
+	 * Presentation context list (see bind hdr comments).
+	 */
+	mlrpc_p_cont_list_t p_context_elem;	/* 24: */
+
+	/* optional authentication verifier if auth_length != 0 */
+	/* auth_verifier_co_t auth_verifier; */
+};
+typedef struct mlrpcconn_alter_context_hdr mlrpcconn_alter_context_hdr_t;
+
+
+/*
+ * Alter Context Response PDU (0x0F)
+ * (X/Open CAE Spec 12.6.4.2)
+ */
+_NO_REORDER_
+struct mlrpcconn_alter_context_rsp_hdr {
+	mlrpcconn_common_header_t common_hdr; /* 00:16 (see above) */
+
+	WORD max_xmit_frag;			/* 16:02 ignored */
+	WORD max_recv_frag;			/* 18:02 ignored */
+	DWORD assoc_group_id;		/* 20:04 ignored */
+	mlrpc_port_any_t sec_addr;	/* 24:20 ignored */
+
+	/* 
+	 * Presentation context list (see bind hdr comments).
+	 */
+	mlrpc_p_result_list_t p_result_list; /* 44:nn */
+
+	/* optional authentication verifier if auth_length != 0 */
+	/* auth_verifier_co_t auth_verifier; */
+};
+typedef struct mlrpcconn_alter_context_rsp_hdr mlrpcconn_alter_context_rsp_hdr_t;
+
+
+/*
+ * Bind PDU (0x0B)
+ ****************************************************************
+ * (X/Open CAE Spec 12.6.4.3)
+ */
+
+_NO_REORDER_
+struct mlrpcconn_bind_hdr {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+	WORD		max_xmit_frag;	/* 16:02 max xmit frag size, bytes */
+	WORD		max_recv_frag;	/* 18:02 max recv frag size, bytes */
+	DWORD		assoc_group_id;	/* 20:04 incarnation of client-server
+					 * association group (???) */
+					/* 24: */
+
+	/* presentation, a variable**2 list, of presentation contexts */
+	mlrpc_p_cont_list_t p_context_elem;
+	/*
+	 * This could be follow by more transfer_syntaxes[] for
+	 * the p_cont_elem[0], and subsequently followed by
+	 * more p_cont_elem[] each with one ore more
+	 * transfer_syntaxes[]. The single p_cont_elem[]
+	 * with a single transfer_syntaxes[] is so common,
+	 * though, we embed such right in the bind_hdr.
+	 * The mlrpc_s_bind() processor must walk through
+	 * this tail if there is one.
+	 */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+typedef struct mlrpcconn_bind_hdr	mlrpcconn_bind_hdr_t;
+
+
+
+
+/*
+ * Bind_Ack PDU (0x0C)
+ ****************************************************************
+ * (X/Open CAE Spec 12.6.4.4)
+ */
+
+/*
+ * hand coded in mlrpc_encdec.c because sec_addr is an
+ * interior conformant (variable length) array.
+ */
+
+IMPORT_EXTERN /* don't generate function */
+_NO_REORDER_
+struct mlrpcconn_bind_ack_hdr {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+	WORD		max_xmit_frag;	/* 16:02 max xmit frag size, bytes */
+	WORD		max_recv_frag;	/* 18:02 max recv frag size, bytes */
+	DWORD		assoc_group_id;	/* 20:04 incarnation of client-server
+					 * association group (???) */
+					/* 24: */
+
+	mlrpc_port_any_t sec_addr;	/* 24:20 */
+
+	mlrpc_p_result_list_t p_result_list; /* 44:nn */
+	/* This could be followed by more. See bind_hdr above */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+typedef struct mlrpcconn_bind_ack_hdr	mlrpcconn_bind_ack_hdr_t;
+
+
+
+
+/*
+ * Request PDU (0x00)
+ ****************************************************************
+ * Two flavors, selected based on MLRPC_PFC_OBJECT_UUID in hdr.pfc_flags
+ *	one without the "object" (flag clear)
+ *	one with the "object" (flag set)
+ * (X/Open CAE Spec 12.6.4.9)
+ */
+
+_NO_REORDER_
+struct mlrpcconn_request_hdr {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+  /* needed for request, response, or fault */
+	DWORD		alloc_hint;	/* 16:04 allocation hint */
+	mlrpc_p_context_id_t
+			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+
+	WORD		opnum;		/* 22:02 op number w/i interface */
+
+    /* optional field if PFC_OBJECT_UUID, not present */
+	/* mlrpc_uuid_t	object; */
+
+	/* stub-data, 8-octet aligned */ /* 24:nn */
+	/* nn = frag_len - sizeof(common_header) - auth_len */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+typedef struct mlrpcconn_request_hdr	mlrpcconn_request_hdr_t;
+
+_NO_REORDER_
+struct mlrpcconn_request_hdr_with_object {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+  /* needed for request, response, or fault */
+	DWORD		alloc_hint;	/* 16:04 allocation hint */
+	mlrpc_p_context_id_t
+			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+
+	WORD		opnum;		/* 22:02 op number w/i interface */
+
+    /* optional field if PFC_OBJECT_UUID, is present */
+	mlrpc_uuid_t	object;		/* 24:16 object UUID, unknown purpose*/
+
+	/* stub-data, 8-octet aligned */ /* 28:nn */
+	/* nn = frag_len - sizeof(common_header) - auth_len */
+	/* nn -= sizeof(mlrpc_uuid_t); */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+
+
+
+/*
+ * Hack for response header sizing and multi-fragment responses.
+ * We know the header is going to be 24 bytes.
+ */
+#define MLRPC_RSP_HDR_SIZE			24
+
+
+/*
+ * Response PDU (0x02)
+ * (X/Open CAE Spec 12.6.4.10)
+ */
+
+_NO_REORDER_
+struct mlrpcconn_response_hdr {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+  /* needed for request, response, or fault */
+	DWORD		alloc_hint;	/* 16:04 allocation hint */
+	mlrpc_p_context_id_t
+			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+
+  /* needed for response or fault */
+	BYTE		cancel_count;	/* 22:01 cancel count */
+	BYTE		reserved;	/* 23:01 mbz */
+
+	/* stub-data, 8-octet aligned */ /* 24:nn */
+	/* nn = frag_len - sizeof(common_header) - auth_len */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+typedef struct mlrpcconn_response_hdr	mlrpcconn_response_hdr_t;
+
+
+
+/*
+ * Fault PDU (0x03)
+ * (X/Open CAE Spec 12.6.4.7)
+ */
+
+_NO_REORDER_
+struct mlrpcconn_fault_hdr {
+	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
+
+	DWORD		alloc_hint;	/* 16:04 allocation hint */
+	mlrpc_p_context_id_t
+			p_cont_id;	/* 20:02 pres context, i.e. data rep */
+
+  /* needed for response or fault */
+	BYTE		cancel_count;	/* 22:01 cancel count */
+	BYTE		reserved;	/* 23:01 mbz */
+
+  /* fault code */
+	DWORD		status;		/* 24:04 run-time fault code or 0 */
+
+  /* pad to 8-byte alignment */
+	BYTE		reserved2[4];	/* 28:04 must-be-zero */
+
+  /* stub-data here if status==0. We do not use this mode. */
+
+	/* optional authentication verifier iff auth_length != 0 */
+	/* auth_verifier_co_t	auth_verifier; */
+};
+typedef struct mlrpcconn_fault_hdr	mlrpcconn_fault_hdr_t;
+
+
+/* Fault status code (X/Open CAE Spec Appendix E) */
+#define MLRPC_FAULT_NCA_RPC_VERSION_MISMATCH	0x1c000008	/* CO/CL */
+#define MLRPC_FAULT_NCA_UNSPEC_REJECT		0x1c000009	/* CO/CL */
+#define MLRPC_FAULT_NCA_S_BAD_ACTID		0x1c00000A	/*    CL */
+#define MLRPC_FAULT_NCA_WHO_ARE_YOU_FAILED	0x1c00000B	/*    CL */
+#define MLRPC_FAULT_NCA_MANAGER_NOT_ENTERED	0x1c00000C	/* CO/CL */
+#define MLRPC_FAULT_NCA_OP_RNG_ERROR		0x1c010002	/* CO/CL */
+#define MLRPC_FAULT_NCA_UNK_IF			0x1c010003	/* CO/CL */
+#define MLRPC_FAULT_NCA_WRONG_BOOT_TIME		0x1c010006	/*    CL */
+#define MLRPC_FAULT_NCA_S_YOU_CRASHED		0x1c010009	/*    CL */
+#define MLRPC_FAULT_NCA_PROTO_ERROR		0x1c01000B	/* CO/CL */
+#define MLRPC_FAULT_NCA_OUT_ARGS_TOO_BIG	0x1c010013	/* CO/CL */
+#define MLRPC_FAULT_NCA_SERVER_TOO_BUSY		0x1c010014	/* CO/CL */
+#define MLRPC_FAULT_NCA_UNSUPPORTED_TYPE	0x1c010017	/* CO/CL */
+#define MLRPC_FAULT_NCA_INVALID_PRES_CONTEXT_ID	0x1c00001c	/* CO    */
+#define MLRPC_FAULT_NCA_UNSUPPORTED_AUTHN_LEVEL	0x1c00001d	/* CO/CL */
+#define MLRPC_FAULT_NCA_INVALID_CHECKSUM	0x1c00001f	/* CO/CL */
+#define MLRPC_FAULT_NCA_INVALID_CRC		0x1c000020	/* CO/CL */
+
+
+
+
+/*
+ * The Header Union/Switch
+ ****************************************************************
+ */
+
+#define MLRPC_PTYPE_COMMON		999
+#define MLRPC_PTYPE_REQUEST_WITH	998
+
+
+INTERFACE(0)
+union mlrpcconn_hdr {
+    CASE(MLRPC_PTYPE_COMMON)	/* exceeds BYTE range, obtains common hdr */
+	struct mlrpcconn_common_header		common_hdr;
+
+    CASE(MLRPC_PTYPE_BIND)
+	struct mlrpcconn_bind_hdr		bind_hdr;
+
+    CASE(MLRPC_PTYPE_BIND_ACK)
+	struct mlrpcconn_bind_ack_hdr		bind_ack_hdr;
+
+    CASE(MLRPC_PTYPE_REQUEST)
+	struct mlrpcconn_request_hdr		request_hdr;
+
+    CASE(MLRPC_PTYPE_REQUEST_WITH)	/* exceeds BYTE range, ... */
+	struct mlrpcconn_request_hdr_with_object request_hdr_with;
+
+    CASE(MLRPC_PTYPE_RESPONSE)
+	struct mlrpcconn_response_hdr		response_hdr;
+
+    CASE(MLRPC_PTYPE_ALTER_CONTEXT)
+	struct mlrpcconn_alter_context_hdr	alter_context_hdr;
+
+    CASE(MLRPC_PTYPE_ALTER_CONTEXT_RESP)
+	struct mlrpcconn_alter_context_rsp_hdr	alter_context_rsp_hdr;
+
+    CASE(MLRPC_PTYPE_FAULT)
+	struct mlrpcconn_fault_hdr		fault_hdr;
+};
+typedef union mlrpcconn_hdr	mlrpcconn_hdr_t;
+EXTERNTYPEINFO(mlrpcconn_hdr)
+
+#endif /* _MLRPCPDU_NDL_ */
+

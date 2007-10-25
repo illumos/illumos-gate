@@ -56,11 +56,13 @@
 #include <sys/prsystm.h>
 #include <sys/modctl.h>
 #include <sys/avl.h>
+#include <sys/door.h>
 #include <c2/audit.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
 #include <sys/sid.h>
 #include <sys/idmap.h>
+#include <sys/varargs.h>
 
 typedef struct ephidmap_data {
 	uid_t		min_uid, last_uid;
@@ -1028,8 +1030,8 @@ eph_gid_alloc(int flags, gid_t *start, int count)
 }
 
 /*
- * If the credential contains any ephemeral IDs, map the credential
- * to nobody.
+ * If the credential user SID or group SID is mapped to an ephemeral
+ * ID, map the credential to nobody.
  */
 cred_t *
 crgetmapped(const cred_t *cr)
@@ -1042,15 +1044,11 @@ crgetmapped(const cred_t *cr)
 		return (NULL);
 
 	if (cr->cr_ksid != NULL) {
-		int i;
+		if (cr->cr_ksid->kr_sidx[KSID_USER].ks_id > MAXUID)
+			return (ephemeral_data.nobody);
 
-		for (i = 0; i < KSID_COUNT; i++)
-			if (cr->cr_ksid->kr_sidx[i].ks_id > MAXUID)
-				return (ephemeral_data.nobody);
-		if (cr->cr_ksid->kr_sidlist != NULL &&
-		    cr->cr_ksid->kr_sidlist->ksl_neid > 0) {
-				return (ephemeral_data.nobody);
-		}
+		if (cr->cr_ksid->kr_sidx[KSID_GROUP].ks_id > MAXUID)
+			return (ephemeral_data.nobody);
 	}
 
 	return ((cred_t *)cr);
@@ -1088,7 +1086,38 @@ crgetsid(const cred_t *cr, int i)
 ksidlist_t *
 crgetsidlist(const cred_t *cr)
 {
-	if (cr->cr_ksid != NULL && cr->cr_ksid->kr_sidlist != NULL)
+	if (cr->cr_ksid != NULL)
 		return (cr->cr_ksid->kr_sidlist);
 	return (NULL);
+}
+
+/*
+ * Interface to set the effective and permitted privileges for
+ * a credential; this interface does no security checks and is
+ * intended for kernel (file)servers creating credentials with
+ * specific privileges.
+ */
+int
+crsetpriv(cred_t *cr, ...)
+{
+	va_list ap;
+	const char *privnm;
+
+	ASSERT(cr->cr_ref <= 2);
+
+	priv_set_PA(cr);
+
+	va_start(ap, cr);
+
+	while ((privnm = va_arg(ap, const char *)) != NULL) {
+		int priv = priv_getbyname(privnm, 0);
+		if (priv < 0)
+			return (-1);
+
+		priv_addset(&CR_PPRIV(cr), priv);
+		priv_addset(&CR_EPRIV(cr), priv);
+	}
+	priv_adjust_PA(cr);
+	va_end(ap);
+	return (0);
 }

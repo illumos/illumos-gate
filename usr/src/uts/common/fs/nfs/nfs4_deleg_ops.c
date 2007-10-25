@@ -54,16 +54,21 @@ int
 deleg_rdopen(
 	femarg_t *arg,
 	int mode,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	clock_t rc;
 	rfs4_file_t *fp;
 
 	/*
+	 * Now that the NFSv4 server calls VOP_OPEN, we need to check to
+	 * to make sure it is not us calling open (like for DELEG_CUR) or
+	 * we will end up panicing the system.
 	 * Since this monitor is for a read delegated file, we know that
 	 * only an open for write will cause a conflict.
 	 */
-	if (mode & (FWRITE|FTRUNC)) {
+	if ((ct == NULL || ct->cc_caller_id != nfs4_srv_caller_id) &&
+	    (mode & (FWRITE|FTRUNC))) {
 		fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
 		rfs4_recall_deleg(fp, FALSE, NULL);
 		rfs4_dbe_lock(fp->dbe);
@@ -79,7 +84,7 @@ deleg_rdopen(
 		rfs4_dbe_unlock(fp->dbe);
 	}
 
-	return (vnext_open(arg, mode, cr));
+	return (vnext_open(arg, mode, cr, ct));
 }
 
 /* monitor for open on write delegated file */
@@ -87,31 +92,36 @@ int
 deleg_wropen(
 	femarg_t *arg,
 	int mode,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	clock_t rc;
 	rfs4_file_t *fp;
 
-	fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
-
 	/*
+	 * Now that the NFSv4 server calls VOP_OPEN, we need to check to
+	 * to make sure it is not us calling open (like for DELEG_CUR) or
+	 * we will end up panicing the system.
 	 * Since this monitor is for a write delegated file, we know that
 	 * any open will cause a conflict.
 	 */
-	rfs4_recall_deleg(fp, FALSE, NULL);
-	rfs4_dbe_lock(fp->dbe);
-	while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
-		rc = rfs4_dbe_twait(fp->dbe,
-		    lbolt + SEC_TO_TICK(rfs4_lease_time));
-		if (rc == -1) { /* timed out */
-			rfs4_dbe_unlock(fp->dbe);
-			rfs4_recall_deleg(fp, FALSE, NULL);
-			rfs4_dbe_lock(fp->dbe);
+	if (ct == NULL || ct->cc_caller_id != nfs4_srv_caller_id) {
+		fp = (rfs4_file_t *)arg->fa_fnode->fn_available;
+		rfs4_recall_deleg(fp, FALSE, NULL);
+		rfs4_dbe_lock(fp->dbe);
+		while (fp->dinfo->dtype != OPEN_DELEGATE_NONE) {
+			rc = rfs4_dbe_twait(fp->dbe,
+			    lbolt + SEC_TO_TICK(rfs4_lease_time));
+			if (rc == -1) { /* timed out */
+				rfs4_dbe_unlock(fp->dbe);
+				rfs4_recall_deleg(fp, FALSE, NULL);
+				rfs4_dbe_lock(fp->dbe);
+			}
 		}
+		rfs4_dbe_unlock(fp->dbe);
 	}
-	rfs4_dbe_unlock(fp->dbe);
 
-	return (vnext_open(arg, mode, cr));
+	return (vnext_open(arg, mode, cr, ct));
 }
 
 /*
@@ -319,7 +329,8 @@ deleg_setsecattr(
 	femarg_t *arg,
 	vsecattr_t *vsap,
 	int flag,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	clock_t rc;
 	rfs4_file_t *fp;
@@ -340,7 +351,7 @@ deleg_setsecattr(
 	}
 	rfs4_dbe_unlock(fp->dbe);
 
-	return (vnext_setsecattr(arg, vsap, flag, cr));
+	return (vnext_setsecattr(arg, vsap, flag, cr, ct));
 }
 
 /* ARGSUSED */
@@ -349,7 +360,8 @@ deleg_vnevent(
 	femarg_t *arg,
 	vnevent_t vnevent,
 	vnode_t *dvp,
-	char *name)
+	char *name,
+	caller_context_t *ct)
 {
 	clock_t rc;
 	rfs4_file_t *fp;
@@ -380,5 +392,5 @@ deleg_vnevent(
 	default:
 		break;
 	}
-	return (vnext_vnevent(arg, vnevent, dvp, name));
+	return (vnext_vnevent(arg, vnevent, dvp, name, ct));
 }

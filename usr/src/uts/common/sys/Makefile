@@ -76,6 +76,7 @@ CHKHDRS=			\
 	acct.h			\
 	acctctl.h		\
 	acl.h			\
+	acl_impl.h		\
 	aggr.h			\
 	aggr_impl.h		\
 	aio.h			\
@@ -85,6 +86,7 @@ CHKHDRS=			\
 	ascii.h			\
 	asynch.h		\
 	atomic.h		\
+	attr.h			\
 	audio.h			\
 	audiodebug.h		\
 	audioio.h		\
@@ -223,6 +225,7 @@ CHKHDRS=			\
 	exacct_impl.h		\
 	exec.h			\
 	exechdr.h		\
+	extdirent.h		\
 	fault.h			\
 	fasttrap.h		\
 	fasttrap_impl.h		\
@@ -540,6 +543,7 @@ CHKHDRS=			\
 	turnstile.h		\
 	types.h			\
 	types32.h		\
+	tzfile.h		\
 	u8_textprep.h		\
 	u8_textprep_data.h	\
 	uadmin.h		\

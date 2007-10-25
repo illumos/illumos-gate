@@ -40,6 +40,7 @@
 #include "fs/fs_subr.h"
 #include <sys/zfs_znode.h>
 #include <sys/zfs_dir.h>
+#include <sys/zfs_i18n.h>
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
@@ -56,6 +57,7 @@
 #include <sys/refstr.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/zfs_fuid.h>
 #include <sys/bootconf.h>
 #include <sys/sunddi.h>
 #include <sys/dnlc.h>
@@ -329,12 +331,41 @@ exec_changed_cb(void *arg, uint64_t newval)
 	}
 }
 
+/*
+ * The nbmand mount option can be changed at mount time.
+ * We can't allow it to be toggled on live file systems or incorrect
+ * behavior may be seen from cifs clients
+ *
+ * This property isn't registered via dsl_prop_register(), but this callback
+ * will be called when a file system is first mounted
+ */
+static void
+nbmand_changed_cb(void *arg, uint64_t newval)
+{
+	zfsvfs_t *zfsvfs = arg;
+	if (newval == FALSE) {
+		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_NBMAND);
+		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_NONBMAND, NULL, 0);
+	} else {
+		vfs_clearmntopt(zfsvfs->z_vfs, MNTOPT_NONBMAND);
+		vfs_setmntopt(zfsvfs->z_vfs, MNTOPT_NBMAND, NULL, 0);
+	}
+}
+
 static void
 snapdir_changed_cb(void *arg, uint64_t newval)
 {
 	zfsvfs_t *zfsvfs = arg;
 
 	zfsvfs->z_show_ctldir = newval;
+}
+
+static void
+vscan_changed_cb(void *arg, uint64_t newval)
+{
+	zfsvfs_t *zfsvfs = arg;
+
+	zfsvfs->z_vscan = newval;
 }
 
 static void
@@ -354,17 +385,85 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 }
 
 static int
+zfs_normalization_set(char *osname, zfsvfs_t *zfsvfs)
+{
+	uint64_t pval;
+	int error;
+
+	if (zfsvfs->z_version < ZPL_VERSION_FUID)
+		return (0);
+
+	error = dsl_prop_get_integer(osname, "normalization", &pval, NULL);
+	if (error)
+		goto normquit;
+	switch ((int)pval) {
+	case ZFS_NORMALIZE_NONE:
+		break;
+	case ZFS_NORMALIZE_C:
+		zfsvfs->z_norm |= U8_TEXTPREP_NFC;
+		break;
+	case ZFS_NORMALIZE_KC:
+		zfsvfs->z_norm |= U8_TEXTPREP_NFKC;
+		break;
+	case ZFS_NORMALIZE_D:
+		zfsvfs->z_norm |= U8_TEXTPREP_NFD;
+		break;
+	case ZFS_NORMALIZE_KD:
+		zfsvfs->z_norm |= U8_TEXTPREP_NFKD;
+		break;
+	default:
+		ASSERT(pval <= ZFS_NORMALIZE_KD);
+		break;
+	}
+
+	error = dsl_prop_get_integer(osname, "utf8only", &pval, NULL);
+	if (error)
+		goto normquit;
+	if (pval)
+		zfsvfs->z_case |= ZFS_UTF8_ONLY;
+	else
+		zfsvfs->z_case &= ~ZFS_UTF8_ONLY;
+
+	error = dsl_prop_get_integer(osname, "casesensitivity", &pval, NULL);
+	if (error)
+		goto normquit;
+	vfs_set_feature(zfsvfs->z_vfs, VFSFT_DIRENTFLAGS);
+	switch ((int)pval) {
+	case ZFS_CASE_SENSITIVE:
+		break;
+	case ZFS_CASE_INSENSITIVE:
+		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
+		zfsvfs->z_case |= ZFS_CI_ONLY;
+		vfs_set_feature(zfsvfs->z_vfs, VFSFT_CASEINSENSITIVE);
+		vfs_set_feature(zfsvfs->z_vfs, VFSFT_NOCASESENSITIVE);
+		break;
+	case ZFS_CASE_MIXED:
+		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
+		zfsvfs->z_case |= ZFS_CI_MIXD;
+		vfs_set_feature(zfsvfs->z_vfs, VFSFT_CASEINSENSITIVE);
+		break;
+	default:
+		ASSERT(pval <= ZFS_CASE_MIXED);
+		break;
+	}
+
+normquit:
+	return (error);
+}
+
+static int
 zfs_register_callbacks(vfs_t *vfsp)
 {
 	struct dsl_dataset *ds = NULL;
 	objset_t *os = NULL;
 	zfsvfs_t *zfsvfs = NULL;
-	int readonly, do_readonly = FALSE;
-	int setuid, do_setuid = FALSE;
-	int exec, do_exec = FALSE;
-	int devices, do_devices = FALSE;
-	int xattr, do_xattr = FALSE;
-	int atime, do_atime = FALSE;
+	uint64_t nbmand;
+	int readonly, do_readonly = B_FALSE;
+	int setuid, do_setuid = B_FALSE;
+	int exec, do_exec = B_FALSE;
+	int devices, do_devices = B_FALSE;
+	int xattr, do_xattr = B_FALSE;
+	int atime, do_atime = B_FALSE;
 	int error = 0;
 
 	ASSERT(vfsp);
@@ -430,6 +529,26 @@ zfs_register_callbacks(vfs_t *vfsp)
 	}
 
 	/*
+	 * nbmand is a special property.  It can only be changed at
+	 * mount time.
+	 *
+	 * This is weird, but it is documented to only be changeable
+	 * at mount time.
+	 */
+	if (vfs_optionisset(vfsp, MNTOPT_NONBMAND, NULL)) {
+		nbmand = B_FALSE;
+	} else if (vfs_optionisset(vfsp, MNTOPT_NBMAND, NULL)) {
+		nbmand = B_TRUE;
+	} else {
+		char osname[MAXNAMELEN];
+
+		dmu_objset_name(os, osname);
+		if (error = dsl_prop_get_integer(osname, "nbmand", &nbmand,
+		    NULL))
+		return (error);
+	}
+
+	/*
 	 * Register property callbacks.
 	 *
 	 * It would probably be fine to just check for i/o error from
@@ -456,6 +575,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 	    "aclmode", acl_mode_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    "aclinherit", acl_inherit_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "vscan", vscan_changed_cb, zfsvfs);
 	if (error)
 		goto unregister;
 
@@ -474,6 +595,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 		xattr_changed_cb(zfsvfs, xattr);
 	if (do_atime)
 		atime_changed_cb(zfsvfs, atime);
+
+	nbmand_changed_cb(zfsvfs, nbmand);
 
 	return (0);
 
@@ -494,6 +617,7 @@ unregister:
 	(void) dsl_prop_unregister(ds, "aclmode", acl_mode_changed_cb, zfsvfs);
 	(void) dsl_prop_unregister(ds, "aclinherit", acl_inherit_changed_cb,
 	    zfsvfs);
+	(void) dsl_prop_unregister(ds, "vscan", vscan_changed_cb, zfsvfs);
 	return (error);
 
 }
@@ -643,15 +767,34 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	/* The call to zfs_init_fs leaves the vnode held, release it here. */
 	VN_RELE(ZTOV(zp));
 
+	/*
+	 * Set features for file system.
+	 */
+	zfsvfs->z_use_fuids = USE_FUIDS(zfsvfs->z_version, zfsvfs->z_os);
+	if (zfsvfs->z_use_fuids) {
+		vfs_set_feature(vfsp, VFSFT_XVATTR);
+		vfs_set_feature(vfsp, VFSFT_ACEMASKONACCESS);
+		vfs_set_feature(vfsp, VFSFT_ACLONCREATE);
+	}
+
+	/*
+	 * Set normalization regardless of whether or not the object
+	 * set is a snapshot.  Snapshots and clones need to have
+	 * identical normalization as did the file system they
+	 * originated from.
+	 */
+	if ((error = zfs_normalization_set(osname, zfsvfs)) != 0)
+		goto out;
+
 	if (dmu_objset_is_snapshot(zfsvfs->z_os)) {
-		uint64_t xattr;
+		uint64_t pval;
 
 		ASSERT(mode & DS_MODE_READONLY);
 		atime_changed_cb(zfsvfs, B_FALSE);
 		readonly_changed_cb(zfsvfs, B_TRUE);
-		if (error = dsl_prop_get_integer(osname, "xattr", &xattr, NULL))
+		if (error = dsl_prop_get_integer(osname, "xattr", &pval, NULL))
 			goto out;
-		xattr_changed_cb(zfsvfs, xattr);
+		xattr_changed_cb(zfsvfs, pval);
 		zfsvfs->z_issnap = B_TRUE;
 	} else {
 		error = zfsvfs_setup(zfsvfs, B_TRUE);
@@ -715,6 +858,9 @@ zfs_unregister_callbacks(zfsvfs_t *zfsvfs)
 
 		VERIFY(dsl_prop_unregister(ds, "aclinherit",
 		    acl_inherit_changed_cb, zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "vscan",
+		    vscan_changed_cb, zfsvfs) == 0);
 	}
 }
 
@@ -916,7 +1062,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 			vattr.va_mask = AT_UID;
 
-			if (error = VOP_GETATTR(mvp, &vattr, 0, cr)) {
+			if (error = VOP_GETATTR(mvp, &vattr, 0, cr, NULL)) {
 				goto out;
 			}
 
@@ -924,7 +1070,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 				goto out;
 			}
 
-			if (error = VOP_ACCESS(mvp, VWRITE, 0, cr)) {
+			if (error = VOP_ACCESS(mvp, VWRITE, 0, cr, NULL)) {
 				goto out;
 			}
 
@@ -1301,7 +1447,7 @@ zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 		ASSERT(*vpp != NULL);
 		if (object == ZFSCTL_INO_SNAPDIR) {
 			VERIFY(zfsctl_root_lookup(*vpp, "snapshot", vpp, NULL,
-			    0, NULL, NULL) == 0);
+			    0, NULL, NULL, NULL, NULL, NULL) == 0);
 		} else {
 			VN_HOLD(*vpp);
 		}
@@ -1415,6 +1561,7 @@ zfs_freevfs(vfs_t *vfsp)
 	list_destroy(&zfsvfs->z_all_znodes);
 	rrw_destroy(&zfsvfs->z_teardown_lock);
 	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
+	zfs_fuid_destroy(zfsvfs);
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));
 
 	atomic_add_32(&zfs_active_fs_count, -1);
@@ -1553,7 +1700,8 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	MNTTYPE_ZFS,
 	zfs_vfsinit,
-	VSW_HASPROTO|VSW_CANRWRO|VSW_CANREMOUNT|VSW_VOLATILEDEV|VSW_STATS,
+	VSW_HASPROTO|VSW_CANRWRO|VSW_CANREMOUNT|VSW_VOLATILEDEV|VSW_STATS|
+	    VSW_XID,
 	&zfs_mntopts
 };
 

@@ -185,7 +185,7 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 		    &protocol,
 		    (t_uscalar_t)sizeof (protocol));
 		if (error) {
-			(void) VOP_CLOSE(vp, 0, 1, 0, CRED());
+			(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
 			VN_RELE(vp);
 			/*
 			 * Setsockopt often fails with ENOPROTOOPT but socket()
@@ -199,7 +199,7 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 		}
 	}
 	if (error = falloc(vp, FWRITE|FREAD, &fp, &fd)) {
-		(void) VOP_CLOSE(vp, 0, 1, 0, CRED());
+		(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
 		VN_RELE(vp);
 		return (set_errno(error));
 	}
@@ -533,14 +533,14 @@ so_socketpair(int sv[2])
 		mutex_exit(&so2->so_lock);
 		nvp = SOTOV(nso);
 		if (error != 0) {
-			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 			VN_RELE(nvp);
 			eprintsoline(so2, error);
 			goto done;
 		}
 
 		if (error = falloc(nvp, FWRITE|FREAD, &nfp, &nfd)) {
-			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 			VN_RELE(nvp);
 			eprintsoline(nso, error);
 			goto done;
@@ -720,13 +720,13 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	    nso->so_faddr_sa, (socklen_t)nso->so_faddr_len);
 	if (error) {
 		setf(nfd, NULL);
-		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 		VN_RELE(nvp);
 		return (set_errno(error));
 	}
 	if (error = falloc(NULL, FWRITE|FREAD, &nfp, NULL)) {
 		setf(nfd, NULL);
-		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 		VN_RELE(nvp);
 		eprintsoline(so, error);
 		return (set_errno(error));
@@ -754,7 +754,8 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 		 * This code is a simplification of the F_SETFL code in fcntl()
 		 * Ignore any errors from VOP_SETFL.
 		 */
-		if ((error = VOP_SETFL(nvp, oflag, arg, nfp->f_cred)) != 0) {
+		if ((error = VOP_SETFL(nvp, oflag, arg, nfp->f_cred, NULL))
+		    != 0) {
 			eprintsoline(so, error);
 			error = 0;
 		} else {
@@ -1734,7 +1735,7 @@ done:
  * processed by a thread, it produces a number of mblk_t structures to
  * be consumed by the sendfile thread. snf_deque and snf_enque are
  * used for consuming and producing mblks. Size of the filesystem
- * read is determined by the tuneable (sendfile_read_size). A single
+ * read is determined by the tunable (sendfile_read_size). A single
  * mblk holds sendfile_read_size worth of data (except the last
  * read of the file) which is sent down as a whole to the network.
  * sendfile_read_size is set to 1 MB as this seems to be the optimal
@@ -1752,7 +1753,7 @@ done:
  * a) One of the threads need to clean the mblks.
  * b) When one thread encounters an error, the other should stop.
  *
- * For (a), we don't want to penalise the reader thread as it could do
+ * For (a), we don't want to penalize the reader thread as it could do
  * some useful work processing other requests. For (b), the error can
  * be detected by examining sr_read_error or sr_write_error.
  * sr_lock protects sr_read_error and sr_write_error. If both reader and
@@ -1795,7 +1796,7 @@ done:
  * control, it would take 25ms to get new data ready for transmission.
  * We have to make sure that network is not idling, while we are initiating
  * new transfers. So, at 100MB/sec, to keep network busy we would need
- * 2.5MB of data. Roundig off, we keep the low water mark to be 3MB of data.
+ * 2.5MB of data. Rounding off, we keep the low water mark to be 3MB of data.
  * We need to pick a high water mark so that the woken up thread would
  * do considerable work before blocking again to prevent thrashing. Currently,
  * we pick this to be 10 times that of the low water mark.
@@ -1946,7 +1947,7 @@ snf_async_read(snf_req_t *sr)
 	 * Ignore the error for filesystems that doesn't support DIRECTIO.
 	 */
 	(void) VOP_IOCTL(fp->f_vnode, _FIODIRECTIO, DIRECTIO_ON, 0,
-	    kcred, NULL);
+	    kcred, NULL, NULL);
 
 	while ((size != 0) && (sr->sr_write_error == 0)) {
 
@@ -1970,7 +1971,7 @@ snf_async_read(snf_req_t *sr)
 		fileoff += ret_size;
 	}
 	(void) VOP_IOCTL(fp->f_vnode, _FIODIRECTIO, DIRECTIO_OFF, 0,
-	    kcred, NULL);
+	    kcred, NULL, NULL);
 	mutex_enter(&sr->sr_lock);
 	sr->sr_read_error = error;
 	sr->sr_read_error |= SR_READ_DONE;
@@ -2301,7 +2302,7 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 
 		(void) VOP_RWLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 		va.va_mask = AT_SIZE;
-		error = VOP_GETATTR(fvp, &va, 0, kcred);
+		error = VOP_GETATTR(fvp, &va, 0, kcred, NULL);
 		if (error)
 			break;
 		/* Read as much as possible. */
@@ -2401,7 +2402,7 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		fileoff += iosize;
 		(void) VOP_RWLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 		va.va_mask = AT_SIZE;
-		error = VOP_GETATTR(fvp, &va, 0, kcred);
+		error = VOP_GETATTR(fvp, &va, 0, kcred, NULL);
 		if (error)
 			break;
 		/* Read as much as possible. */
@@ -2466,7 +2467,7 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 		goto out;
 	}
 	fvp = rfp->f_vnode;
-	if (VOP_REALVP(fvp, &realvp) == 0)
+	if (VOP_REALVP(fvp, &realvp, NULL) == 0)
 		fvp = realvp;
 	/*
 	 * Grab the lock as a reader to prevent the file size
@@ -2474,7 +2475,7 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	 */
 	(void) VOP_RWLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(fvp, &va, 0, kcred);
+	error = VOP_GETATTR(fvp, &va, 0, kcred, NULL);
 	va_size = va.va_size;
 	if ((error != 0) || (va_size == 0) || (sfv_off >= va_size)) {
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
@@ -2560,7 +2561,7 @@ sendto32(int32_t sock, caddr32_t buffer, size32_t len, int32_t flags,
 #endif	/* _SYSCALL32_IMPL */
 
 /*
- * Function wrappers (mostly arround the sonode switch) for
+ * Function wrappers (mostly around the sonode switch) for
  * backward compatibility.
  */
 

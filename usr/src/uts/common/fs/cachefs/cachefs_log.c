@@ -57,7 +57,7 @@
 
 /*
  * cfs_time_t is an int in both LP64 and ILP32. To avoid compiler warnings
- * define its xdr here explicitely
+ * define its xdr here explicitly
  */
 #define	xdr_cfs_time_t(xdrs, p)	xdr_int((xdrs), (int *)(p))
 
@@ -198,7 +198,8 @@ cachefs_log_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 		bzero(lc, sizeof (*lc));
 		lc->lc_magic = CACHEFS_LOG_MAGIC;
 		lc->lc_cachep = (uint64_t)(uintptr_t)cachep;
-		(void) VOP_REMOVE(cachep->c_dirvp, LOG_STATUS_NAME, kcred);
+		(void) VOP_REMOVE(cachep->c_dirvp, LOG_STATUS_NAME, kcred, NULL,
+		    0);
 		return (0);
 	}
 
@@ -246,9 +247,9 @@ cachefs_log_save_lc(cachefscache_t *cachep)
 	attr.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 
 	if (((error = VOP_LOOKUP(cachep->c_dirvp, LOG_STATUS_NAME, &savevp,
-	    NULL, 0, NULL, kcred)) != 0) &&
+	    NULL, 0, NULL, kcred, NULL, NULL, NULL)) != 0) &&
 	    ((error = VOP_CREATE(cachep->c_dirvp, LOG_STATUS_NAME, &attr, EXCL,
-	    0600, &savevp, kcred, 0)) != 0))
+	    0600, &savevp, kcred, 0, NULL, NULL)) != 0))
 		return (error);
 	ASSERT(savevp != NULL);
 	if (savevp == NULL)
@@ -322,7 +323,7 @@ cachefs_log_destroy_cookie(cachefs_log_cookie_t *cl)
  *
  * opens the logfile, and stores the path string if its successful.
  *
- * returns an errno if one occured.
+ * returns an errno if one occurred.
  *
  */
 
@@ -406,7 +407,7 @@ out:
 }
 
 /*
- * called when an error occured during logging.  send the error to
+ * called when an error occurred during logging.  send the error to
  * syslog, invalidate the logfile, and stop logging.
  */
 
@@ -437,7 +438,8 @@ cachefs_log_error(cachefscache_t *cachep, int error, int getlock)
 	lc->lc_magic = CACHEFS_LOG_MAGIC;
 	lc->lc_cachep = (uint64_t)(uintptr_t)cachep;
 	if (writable)
-		(void) VOP_REMOVE(cachep->c_dirvp, LOG_STATUS_NAME, kcred);
+		(void) VOP_REMOVE(cachep->c_dirvp, LOG_STATUS_NAME, kcred, NULL,
+		    0);
 
 	if (getlock)
 		mutex_exit(&cachep->c_log_mutex);
@@ -454,7 +456,7 @@ cachefs_log_write_header(struct vnode *vp, cachefscache_t *cachep, int error)
 	XDR xdrm;
 
 	attr.va_mask = AT_SIZE;
-	if ((error = VOP_GETATTR(vp, &attr, 0, kcred)) != 0)
+	if ((error = VOP_GETATTR(vp, &attr, 0, kcred, NULL)) != 0)
 		goto out;
 	if (attr.va_size != 0) {
 		error = vn_rdwr(UIO_READ, vp, buffy,
@@ -664,7 +666,7 @@ out:
 		cachefs_kmem_free(buffy, CACHEFS_LOG_ENCODE_SIZE);
 
 	/*
-	 * if an error occured, we need to free the buffers ourselves.
+	 * if an error occurred, we need to free the buffers ourselves.
 	 * cachefs_destory_cookie() can't do it.
 	 */
 

@@ -1,0 +1,81 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate {
+    global:
+	adjoin;
+	adjoin_report_err;
+	ads_add_share;
+	ads_build_unc_name;
+	ads_close;
+	ads_lookup_share;
+	ads_open;
+	ads_publish_share;
+	ads_remove_share;
+	dyndns_clear_rev_zone;
+	dyndns_update;
+	msdcs_lookup_ads;
+	smb_browser_config;
+	smb_get_nameservers;
+	smb_get_next_resid;
+	smb_kinit;
+	smb_netbios_name_reconfig;
+	smb_netbios_start;
+	smb_netbios_shutdown;
+	smb_netlogon_request;
+	smb_nic_build_if_name;
+	smb_nic_build_network_structures;
+	smb_nic_clear_ip_alias;
+	smb_nic_clear_name_list;
+	smb_nic_clear_niclist;
+	smb_nic_free_niclist;
+	smb_nic_get_IP;
+	smb_nic_get_IP_aliases;
+	smb_nic_get_broadcast;
+	smb_nic_build_info;
+	smb_nic_get_byind;
+	smb_nic_get_byip;
+	smb_nic_get_bysubnet;
+	smb_nic_get_default_gateway;
+	smb_nic_get_group;
+	smb_nic_get_ifnames;
+	smb_nic_get_netmask;
+	smb_nic_get_num;
+	smb_nic_get_num_aliases;
+	smb_nic_get_number;
+	smb_nic_get_num_logical;
+	smb_nic_get_num_physical;
+	smb_nic_init;
+	smb_nic_lock;
+	smb_nic_status;
+	smb_nic_unlock;
+	smb_nic_validate_ip_address;
+	smb_resolver_close;
+	smb_resolver_init;
+    local:
+	*;
+};

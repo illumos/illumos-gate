@@ -468,7 +468,7 @@ audit_addcomponent(struct pathname *pnp)
  * flag = 1, path is absolute. Free any saved path and set flag to PAD_ABSPATH.
  *
  * If the (new) path is absolute, then we have to throw away whatever we have
- * already accumulated since it is being superceeded by new path which is
+ * already accumulated since it is being superseded by new path which is
  * anchored at the root.
  *		Note that if the path is relative, this function does nothing
  * TODO:
@@ -641,7 +641,7 @@ file_is_public(struct vattr *attr)
 
 /*
  * ROUTINE:	AUDIT_ATTRIBUTES
- * PURPOSE:	Audit the attributes so we can tell why the error occured
+ * PURPOSE:	Audit the attributes so we can tell why the error occurred
  * CALLBY:	AUDIT_SAVEPATH
  *		AUDIT_VNCREATE_FINISH
  *		AUS_FCHOWN...audit_event.c...audit_path.c
@@ -659,7 +659,7 @@ audit_attributes(struct vnode *vp)
 
 	if (vp) {
 		attr.va_mask = AT_ALL;
-		if (VOP_GETATTR(vp, &attr, 0, CRED()) != 0)
+		if (VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
 			return;
 
 		if (file_is_public(&attr) && (tad->tad_ctrl & PAD_PUBLIC_EV)) {
@@ -1047,7 +1047,7 @@ audit_closef(struct file *fp)
 	 */
 	if ((vp = fp->f_vnode) != NULL) {
 		attr.va_mask = AT_ALL;
-		getattr_ret = VOP_GETATTR(vp, &attr, 0, CRED());
+		getattr_ret = VOP_GETATTR(vp, &attr, 0, CRED(), NULL);
 	}
 
 	/*
@@ -1294,7 +1294,14 @@ audit_setfsat_path(int argnum)
 	t_audit_data_t *tad;
 	struct f_audit_data *fad;
 	p_audit_data_t *pad;	/* current process */
-
+	struct a {
+		long id;
+		long arg1;
+		long arg2;
+		long arg3;
+		long arg4;
+		long arg5;
+	} *uap;
 	struct b {
 		long arg1;
 		long arg2;
@@ -1306,6 +1313,7 @@ audit_setfsat_path(int argnum)
 	if (clwp == NULL)
 		return;
 	uap1 = (struct b *)&clwp->lwp_ap[1];
+	uap = (struct a *)clwp->lwp_ap;
 
 	tad = U2A(u);
 
@@ -1334,6 +1342,10 @@ audit_setfsat_path(int argnum)
 		return;
 	}
 
+	if (uap->id == 9 && tad->tad_atpath != NULL) { /* openattrdir */
+		tad->tad_ctrl |= PAD_ATPATH;
+		return;
+	}
 	if (tad->tad_atpath != NULL) {
 		au_pathrele(tad->tad_atpath);
 		tad->tad_atpath = NULL;
@@ -1373,7 +1385,8 @@ audit_symlink_create(vnode_t *dvp, char *sname, char *target, int error)
 	if (error)
 		return;
 
-	error = VOP_LOOKUP(dvp, sname, &vp, NULL, 0, NULL, CRED());
+	error = VOP_LOOKUP(dvp, sname, &vp, NULL, 0, NULL, CRED(),
+			NULL, NULL, NULL);
 	if (error == 0) {
 		audit_attributes(vp);
 		VN_RELE(vp);
@@ -1648,7 +1661,7 @@ audit_chdirec(vnode_t *vp, vnode_t **vpp)
  * the same object, it will not panic our system
  * QUESTION:
  * where to decrement the f_count?????????????????
- * seems like I need to set a flag if f_count incrmented through audit_getf
+ * seems like I need to set a flag if f_count incremented through audit_getf
  */
 
 /*ARGSUSED*/
@@ -1898,7 +1911,7 @@ audit_fdsend(fd, fp, error)
 }
 
 /*
- * Record privileges sucessfully used and we attempted to use but
+ * Record privileges successfully used and we attempted to use but
  * didn't have.
  */
 void

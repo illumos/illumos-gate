@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,8 +123,8 @@ typedef struct fifodata {
 #define	FIFOPOLLR	0x1000	/* process waiting on poll read */
 #define	FIFOISOPEN	0x2000	/* pipe is open */
 #define	FIFOSYNC	0x4000	/* FIFO is waiting for open sync */
-#define	FIFOWOCR	0x8000	/* Write open occured */
-#define	FIFOROCR	0x10000	/* Read open occured */
+#define	FIFOWOCR	0x8000	/* Write open occurred */
+#define	FIFOROCR	0x10000	/* Read open occurred */
 /*
  * process waiting on poll read on band data
  * this can only occur if we go to streams
@@ -165,8 +165,9 @@ struct queue;
 
 extern int	fifoinit(int, char *);
 extern int	fifo_stropen(vnode_t **, int, cred_t *, int, int);
-extern int	fifo_open(vnode_t **, int, cred_t *);
-extern int	fifo_close(vnode_t *, int, int, offset_t, cred_t *);
+extern int	fifo_open(vnode_t **, int, cred_t *, caller_context_t *);
+extern int	fifo_close(vnode_t *, int, int, offset_t, cred_t *,
+			caller_context_t *);
 extern void	fifo_cleanup(vnode_t *, int);
 extern void	fiforemove(fifonode_t *);
 extern ino_t	fifogetid(void);

@@ -69,45 +69,57 @@
 
 #include <fs/fs_subr.h>
 
-static int pcfs_open(struct vnode **, int, struct cred *);
-static int pcfs_close(struct vnode *, int, int, offset_t, struct cred *);
+static int pcfs_open(struct vnode **, int, struct cred *, caller_context_t *ct);
+static int pcfs_close(struct vnode *, int, int, offset_t, struct cred *,
+	caller_context_t *ct);
 static int pcfs_read(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
+	caller_context_t *);
 static int pcfs_write(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
-static int pcfs_getattr(struct vnode *, struct vattr *, int, struct cred *);
+	caller_context_t *);
+static int pcfs_getattr(struct vnode *, struct vattr *, int, struct cred *,
+	caller_context_t *ct);
 static int pcfs_setattr(struct vnode *, struct vattr *, int, struct cred *,
 	caller_context_t *);
-static int pcfs_access(struct vnode *, int, int, struct cred *);
+static int pcfs_access(struct vnode *, int, int, struct cred *,
+	caller_context_t *ct);
 static int pcfs_lookup(struct vnode *, char *, struct vnode **,
-	struct pathname *, int, struct vnode *, struct cred *);
+	struct pathname *, int, struct vnode *, struct cred *,
+	caller_context_t *, int *, pathname_t *);
 static int pcfs_create(struct vnode *, char *, struct vattr *,
-	enum vcexcl, int mode, struct vnode **, struct cred *, int);
-static int pcfs_remove(struct vnode *, char *, struct cred *);
+	enum vcexcl, int mode, struct vnode **, struct cred *, int,
+	caller_context_t *, vsecattr_t *);
+static int pcfs_remove(struct vnode *, char *, struct cred *,
+	caller_context_t *, int);
 static int pcfs_rename(struct vnode *, char *, struct vnode *, char *,
-	struct cred *);
+	struct cred *, caller_context_t *, int);
 static int pcfs_mkdir(struct vnode *, char *, struct vattr *, struct vnode **,
-	struct cred *);
-static int pcfs_rmdir(struct vnode *, char *, struct vnode *, struct cred *);
-static int pcfs_readdir(struct vnode *, struct uio *, struct cred *, int *);
-static int pcfs_fsync(struct vnode *, int, struct cred *);
-static void pcfs_inactive(struct vnode *, struct cred *);
-static int pcfs_fid(struct vnode *vp, struct fid *fidp);
+	struct cred *, caller_context_t *, int, vsecattr_t *);
+static int pcfs_rmdir(struct vnode *, char *, struct vnode *, struct cred *,
+	caller_context_t *, int);
+static int pcfs_readdir(struct vnode *, struct uio *, struct cred *, int *,
+	caller_context_t *, int);
+static int pcfs_fsync(struct vnode *, int, struct cred *, caller_context_t *);
+static void pcfs_inactive(struct vnode *, struct cred *, caller_context_t *);
+static int pcfs_fid(struct vnode *vp, struct fid *fidp, caller_context_t *);
 static int pcfs_space(struct vnode *, int, struct flock64 *, int,
 	offset_t, cred_t *, caller_context_t *);
 static int pcfs_getpage(struct vnode *, offset_t, size_t, uint_t *, page_t *[],
-	size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
+	size_t, struct seg *, caddr_t, enum seg_rw, struct cred *,
+	caller_context_t *);
 static int pcfs_getapage(struct vnode *, u_offset_t, size_t, uint_t *,
 	page_t *[], size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
-static int pcfs_putpage(struct vnode *, offset_t, size_t, int, struct cred *);
+static int pcfs_putpage(struct vnode *, offset_t, size_t, int, struct cred *,
+	caller_context_t *);
 static int pcfs_map(struct vnode *, offset_t, struct as *, caddr_t *, size_t,
-	uchar_t, uchar_t, uint_t, struct cred *);
+	uchar_t, uchar_t, uint_t, struct cred *, caller_context_t *);
 static int pcfs_addmap(struct vnode *, offset_t, struct as *, caddr_t,
-	size_t, uchar_t, uchar_t, uint_t, struct cred *);
+	size_t, uchar_t, uchar_t, uint_t, struct cred *, caller_context_t *);
 static int pcfs_delmap(struct vnode *, offset_t, struct as *, caddr_t,
-	size_t, uint_t, uint_t, uint_t, struct cred *);
-static int pcfs_seek(struct vnode *, offset_t, offset_t *);
-static int pcfs_pathconf(struct vnode *, int, ulong_t *, struct cred *);
+	size_t, uint_t, uint_t, uint_t, struct cred *, caller_context_t *);
+static int pcfs_seek(struct vnode *, offset_t, offset_t *,
+	caller_context_t *);
+static int pcfs_pathconf(struct vnode *, int, ulong_t *, struct cred *,
+	caller_context_t *);
 
 int pcfs_putapage(struct vnode *, page_t *, u_offset_t *, size_t *, int,
 	struct cred *);
@@ -175,7 +187,8 @@ static int
 pcfs_open(
 	struct vnode **vpp,
 	int flag,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -191,7 +204,8 @@ pcfs_close(
 	int flag,
 	int count,
 	offset_t offset,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -537,7 +551,8 @@ pcfs_getattr(
 	struct vnode *vp,
 	struct vattr *vap,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcnode *pcp;
 	struct pcfs *fsp;
@@ -556,7 +571,7 @@ pcfs_getattr(
 	/*
 	 * Note that we don't check for "invalid node" (PC_INVAL) here
 	 * only in order to make stat() succeed. We allow no I/O on such
-	 * a node, but do allow to check for its existance.
+	 * a node, but do allow to check for its existence.
 	 */
 	if ((pcp = VTOPC(vp)) == NULL) {
 		pc_unlockfs(fsp);
@@ -816,7 +831,8 @@ pcfs_access(
 	struct vnode *vp,
 	int mode,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcnode *pcp;
 	struct pcfs *fsp;
@@ -847,7 +863,8 @@ static int
 pcfs_fsync(
 	struct vnode *vp,
 	int syncflag,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcfs *fsp;
 	struct pcnode *pcp;
@@ -875,7 +892,8 @@ pcfs_fsync(
 static void
 pcfs_inactive(
 	struct vnode *vp,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcnode *pcp;
 	struct pcfs *fsp;
@@ -946,7 +964,10 @@ pcfs_lookup(
 	struct pathname *pnp,
 	int flags,
 	struct vnode *rdir,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int *direntflags,
+	pathname_t *realpnp)
 {
 	struct pcfs *fsp;
 	struct pcnode *pcp;
@@ -1001,7 +1022,9 @@ pcfs_create(
 	int mode,
 	struct vnode **vpp,
 	struct cred *cr,
-	int flag)
+	int flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 	struct pcnode *pcp;
@@ -1055,7 +1078,7 @@ pcfs_create(
 				error = EISDIR;
 			} else if (mode) {
 				error = pcfs_access(PCTOV(pcp), mode, 0,
-				    cr);
+				    cr, ct);
 			} else {
 				error = 0;
 			}
@@ -1068,7 +1091,7 @@ pcfs_create(
 			if (error) {
 				VN_RELE(PCTOV(pcp));
 			} else {
-				vnevent_create(PCTOV(pcp));
+				vnevent_create(PCTOV(pcp), ct);
 			}
 		}
 	}
@@ -1087,7 +1110,9 @@ static int
 pcfs_remove(
 	struct vnode *vp,
 	char *nm,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	struct pcfs *fsp;
 	struct pcnode *pcp;
@@ -1109,7 +1134,7 @@ pcfs_remove(
 			return (EACCES);
 		}
 	}
-	error = pc_dirremove(pcp, nm, (struct vnode *)0, VREG);
+	error = pc_dirremove(pcp, nm, (struct vnode *)0, VREG, ct);
 	pc_unlockfs(fsp);
 	return (error);
 }
@@ -1126,7 +1151,9 @@ pcfs_rename(
 	char *snm,			/* old (source) entry name */
 	struct vnode *tdvp,		/* new (target) parent vnode */
 	char *tnm,			/* new (target) entry name */
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	struct pcfs *fsp;
 	struct pcnode *dp;	/* parent pcnode */
@@ -1140,7 +1167,7 @@ pcfs_rename(
 	/*
 	 * make sure we can muck with this directory.
 	 */
-	error = pcfs_access(sdvp, VWRITE, 0, cr);
+	error = pcfs_access(sdvp, VWRITE, 0, cr, ct);
 	if (error) {
 		return (error);
 	}
@@ -1152,7 +1179,7 @@ pcfs_rename(
 		pc_unlockfs(fsp);
 		return (EIO);
 	}
-	error = pc_rename(dp, tdp, snm, tnm);
+	error = pc_rename(dp, tdp, snm, tnm, ct);
 	pc_unlockfs(fsp);
 	return (error);
 }
@@ -1164,7 +1191,10 @@ pcfs_mkdir(
 	char *nm,
 	struct vattr *vap,
 	struct vnode **vpp,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)
 {
 	struct pcfs *fsp;
 	struct pcnode *pcp;
@@ -1206,7 +1236,9 @@ pcfs_rmdir(
 	struct vnode *dvp,
 	char *nm,
 	struct vnode *cdir,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	struct pcfs *fsp;
 	struct pcnode *pcp;
@@ -1230,7 +1262,7 @@ pcfs_rmdir(
 		}
 	}
 
-	error = pc_dirremove(pcp, nm, cdir, VDIR);
+	error = pc_dirremove(pcp, nm, cdir, VDIR, ct);
 	pc_unlockfs(fsp);
 	return (error);
 }
@@ -1246,7 +1278,9 @@ pcfs_readdir(
 	struct vnode *dvp,
 	struct uio *uiop,
 	struct cred *cr,
-	int *eofp)
+	int *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 	struct pcnode *pcp;
 	struct pcfs *fsp;
@@ -1517,6 +1551,7 @@ out:
 /*
  * Return all the pages from [off..off+len] in given file
  */
+/* ARGSUSED */
 static int
 pcfs_getpage(
 	struct vnode *vp,
@@ -1528,7 +1563,8 @@ pcfs_getpage(
 	struct seg *seg,
 	caddr_t addr,
 	enum seg_rw rw,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcfs *fsp = VFSTOPCFS(vp->v_vfsp);
 	int err;
@@ -1574,7 +1610,8 @@ pcfs_putpage(
 	offset_t off,
 	size_t len,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct pcnode *pcp;
 	page_t *pp;
@@ -1814,7 +1851,8 @@ pcfs_map(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int error;
@@ -1861,7 +1899,8 @@ static int
 pcfs_seek(
 	struct vnode *vp,
 	offset_t ooff,
-	offset_t *noffp)
+	offset_t *noffp,
+	caller_context_t *ct)
 {
 	if (*noffp < 0)
 		return (EINVAL);
@@ -1882,7 +1921,8 @@ pcfs_addmap(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
@@ -1900,7 +1940,8 @@ pcfs_delmap(
 	uint_t prot,
 	uint_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
@@ -1916,7 +1957,8 @@ pcfs_pathconf(
 	struct vnode *vp,
 	int cmd,
 	ulong_t *valp,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	ulong_t val;
 	int error = 0;
@@ -2018,7 +2060,7 @@ pcfs_space(
 			return (EINVAL);
 		vattr.va_mask = AT_SIZE;
 		vattr.va_size = bfp->l_start;
-		error = VOP_SETATTR(vp, &vattr, 0, cr, ct);
+		error = VOP_SETATTR(vp, (vattr_t *)&vattr, 0, cr, ct);
 	}
 	return (error);
 }
@@ -2373,8 +2415,9 @@ pc_read_short_fn(struct vnode *dvp, struct uio *uiop, struct pc_dirent *ld,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-pcfs_fid(struct vnode *vp, struct fid *fidp)
+pcfs_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct pc_fid *pcfid;
 	struct pcnode *pcp;

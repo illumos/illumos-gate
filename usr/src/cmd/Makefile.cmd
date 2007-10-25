@@ -92,6 +92,7 @@ ROOTUSRSBIN64=	$(ROOTUSRSBIN)/$(MACH64)
 ROOTMAN1=	$(ROOT)/usr/share/man/man1
 ROOTMAN1M=	$(ROOT)/usr/share/man/man1m
 ROOTMAN3=	$(ROOT)/usr/share/man/man3
+ROOTVARSMB=	$(ROOT)/var/smb
 
 #
 
@@ -246,6 +247,7 @@ ROOTSVCNETWORKSECURITY=		$(ROOTSVCNETWORK)/security
 ROOTSVCNETWORKSSL=		$(ROOTSVCNETWORK)/ssl
 ROOTSVCNETWORKIPSEC=		$(ROOTSVCNETWORK)/ipsec
 ROOTSVCNETWORKSHARES=		$(ROOTSVCNETWORK)/shares
+ROOTSVCSMB=			$(ROOTSVCNETWORK)/smb
 ROOTSVCPLATFORM=		$(ROOTVARSVCMANIFEST)/platform
 ROOTSVCPLATFORMSUN4U=		$(ROOTSVCPLATFORM)/sun4u
 ROOTSVCPLATFORMSUN4V=		$(ROOTSVCPLATFORM)/sun4v
@@ -459,6 +461,9 @@ $(ROOTMAN1M)/%: %.sunman
 
 $(ROOTMAN3)/%: %.sunman
 	$(INS.rename)
+
+$(ROOTVARSMB)/%: %
+	$(INS.file)
 
 # build rule for statically linked programs with single source file.
 %.static: %.c

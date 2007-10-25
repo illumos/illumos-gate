@@ -162,7 +162,8 @@ void	sdelete(struct snode *);
 void 	smark(struct snode *, int);
 int	specinit(int, char *);
 int	device_close(struct vnode *, int, struct cred *);
-int	spec_putpage(struct vnode *, offset_t, size_t, int, struct cred *);
+int	spec_putpage(struct vnode *, offset_t, size_t, int, struct cred *,
+		caller_context_t *);
 int	spec_segmap(dev_t, off_t, struct as *, caddr_t *, off_t,
 		    uint_t, uint_t, uint_t, cred_t *);
 struct vnode *specvp_devfs(struct vnode *, dev_t, vtype_t,

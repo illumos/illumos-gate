@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1123,7 +1122,7 @@ cachefs_io_getinfo(vnode_t *vp, void *dinp, void *doutp)
 
 	/* Get the length of the directory */
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(dcp->c_frontvp, &va, 0, kcred);
+	error = VOP_GETATTR(dcp->c_frontvp, &va, 0, kcred, NULL);
 	if (error) {
 		error = 0;
 		goto out;
@@ -1248,7 +1247,7 @@ cachefs_io_getattrfid(vnode_t *vp, void *dinp, void *doutp)
 	cr = conj_cred(&gafid->cg_cred);
 	CACHEFS_TMPPTR_SET(attrp, &va, tmpvap, vattr_t);
 	tmpvap->va_mask = AT_ALL;
-	error = VOP_GETATTR(backvp, tmpvap, 0, cr);
+	error = VOP_GETATTR(backvp, tmpvap, 0, cr, NULL);
 	CACHEFS_VATTR_COPYOUT(tmpvap, attrp, error);
 	crfree(cr);
 
@@ -1298,7 +1297,7 @@ cachefs_io_getattrname(vnode_t *vp, void *dinp, void *doutp)
 	/* lookup the file name */
 	cr = conj_cred(&gap->cg_cred);
 	error = VOP_LOOKUP(pbackvp, gap->cg_name, &cbackvp,
-	    (struct pathname *)NULL, 0, (vnode_t *)NULL, cr);
+	    (struct pathname *)NULL, 0, (vnode_t *)NULL, cr, NULL, NULL, NULL);
 	if (error) {
 		crfree(cr);
 		VN_RELE(pbackvp);
@@ -1307,12 +1306,12 @@ cachefs_io_getattrname(vnode_t *vp, void *dinp, void *doutp)
 
 	CACHEFS_TMPPTR_SET(&retp->cg_attr, &va, tmpvap, vattr_t);
 	tmpvap->va_mask = AT_ALL;
-	error = VOP_GETATTR(cbackvp, tmpvap, 0, cr);
+	error = VOP_GETATTR(cbackvp, tmpvap, 0, cr, NULL);
 	CACHEFS_VATTR_COPYOUT(tmpvap, &retp->cg_attr, error);
 	if (!error) {
 		CACHEFS_TMPPTR_SET(&retp->cg_fid, &tmpfid, tmpfidp, fid_t);
 		tmpfidp->fid_len = MAXFIDSZ;
-		error = VOP_FID(cbackvp, tmpfidp);
+		error = VOP_FID(cbackvp, tmpfidp, NULL);
 		CACHEFS_FID_COPYOUT(tmpfidp, &retp->cg_fid);
 	}
 
@@ -1415,7 +1414,7 @@ cachefs_io_pushback(vnode_t *vp, void *dinp, void *doutp)
 	}
 
 	/* do open so NFS gets correct creds on writes */
-	error = VOP_OPEN(&backvp, FWRITE, cr);
+	error = VOP_OPEN(&backvp, FWRITE, cr, NULL);
 	if (error) {
 		mutex_exit(&cp->c_statelock);
 		goto out;
@@ -1450,9 +1449,9 @@ cachefs_io_pushback(vnode_t *vp, void *dinp, void *doutp)
 		off += amt;
 	}
 
-	error = VOP_FSYNC(backvp, FSYNC, cr);
+	error = VOP_FSYNC(backvp, FSYNC, cr, NULL);
 	if (error == 0)
-		error = VOP_CLOSE(backvp, FWRITE, 1, (offset_t)0, cr);
+		error = VOP_CLOSE(backvp, FWRITE, 1, (offset_t)0, cr, NULL);
 	if (error) {
 		mutex_exit(&cp->c_statelock);
 		goto out;
@@ -1469,7 +1468,7 @@ cachefs_io_pushback(vnode_t *vp, void *dinp, void *doutp)
 	 * new ctime and mtimes.
 	 */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(backvp, &va, 0, cr);
+	error = VOP_GETATTR(backvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->pb_ctime, error);
@@ -1527,21 +1526,21 @@ cachefs_io_create(vnode_t *vp, void *dinp, void *doutp)
 	CACHEFS_TMPPTR_SET(&crp->cr_va, &va, tmpvap, vattr_t);
 	CACHEFS_VATTR_COPYIN(&crp->cr_va, tmpvap);
 	error = VOP_CREATE(dvp, crp->cr_name, tmpvap,
-	    crp->cr_exclusive, crp->cr_mode, &cvp, cr, 0);
+	    crp->cr_exclusive, crp->cr_mode, &cvp, cr, 0, NULL, NULL);
 	if (error)
 		goto out;
 
 	/* get the fid of the file */
 	CACHEFS_TMPPTR_SET(&retp->cr_newfid, &tmpfid, tmpfidp, fid_t);
 	tmpfidp->fid_len = MAXFIDSZ;
-	error = VOP_FID(cvp, tmpfidp);
+	error = VOP_FID(cvp, tmpfidp, NULL);
 	if (error)
 		goto out;
 	CACHEFS_FID_COPYOUT(tmpfidp, &retp->cr_newfid);
 
 	/* get attributes for the file */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(cvp, &va, 0, cr);
+	error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->cr_ctime, error);
@@ -1614,10 +1613,11 @@ cachefs_io_remove(vnode_t *vp, void *dinp, void *doutp)
 
 	/* if the caller wants the ctime after the remove */
 	if (ctimep) {
-		error = VOP_LOOKUP(dvp, rmp->rm_name, &cvp, NULL, 0, NULL, cr);
+		error = VOP_LOOKUP(dvp, rmp->rm_name, &cvp, NULL, 0, NULL, cr,
+			NULL, NULL, NULL);
 		if (error == 0) {
 			child_fid.fid_len = MAXFIDSZ;
-			error = VOP_FID(cvp, &child_fid);
+			error = VOP_FID(cvp, &child_fid, NULL);
 			VN_RELE(cvp);
 		}
 		if (error)
@@ -1625,7 +1625,7 @@ cachefs_io_remove(vnode_t *vp, void *dinp, void *doutp)
 	}
 
 	/* do the remove */
-	error = VOP_REMOVE(dvp, rmp->rm_name, cr);
+	error = VOP_REMOVE(dvp, rmp->rm_name, cr, NULL, 0);
 	if (error)
 		goto out;
 
@@ -1634,7 +1634,7 @@ cachefs_io_remove(vnode_t *vp, void *dinp, void *doutp)
 		error = VFS_VGET(fscp->fs_backvfsp, &cvp, &child_fid);
 		if (error == 0) {
 			va.va_mask = AT_ALL;
-			error = VOP_GETATTR(cvp, &va, 0, cr);
+			error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 			if (error == 0) {
 				CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime,
 					ctimep, error);
@@ -1697,13 +1697,13 @@ cachefs_io_link(vnode_t *vp, void *dinp, void *doutp)
 	cr = conj_cred(&linkp->ln_cred);
 
 	/* do the link */
-	error = VOP_LINK(dvp, lvp, linkp->ln_name, cr);
+	error = VOP_LINK(dvp, lvp, linkp->ln_name, cr, NULL, 0);
 	if (error)
 		goto out;
 
 	/* get the ctime */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(lvp, &va, 0, cr);
+	error = VOP_GETATTR(lvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, ctimep, error);
@@ -1771,14 +1771,14 @@ cachefs_io_rename(vnode_t *vp, void *dinp, void *doutp)
 	/* if the caller wants the ctime of the target after deletion */
 	if (rnp->rn_del_getctime) {
 		error = VOP_LOOKUP(ndvp, rnp->rn_newname, &cvp, NULL, 0,
-		    NULL, cr);
+		    NULL, cr, NULL, NULL, NULL);
 		if (error) {
 			cvp = NULL; /* paranoia */
 			goto out;
 		}
 
 		child_fid.fid_len = MAXFIDSZ;
-		error = VOP_FID(cvp, &child_fid);
+		error = VOP_FID(cvp, &child_fid, NULL);
 		if (error)
 			goto out;
 		VN_RELE(cvp);
@@ -1786,17 +1786,19 @@ cachefs_io_rename(vnode_t *vp, void *dinp, void *doutp)
 	}
 
 	/* do the rename */
-	error = VOP_RENAME(odvp, rnp->rn_oldname, ndvp, rnp->rn_newname, cr);
+	error = VOP_RENAME(odvp, rnp->rn_oldname, ndvp, rnp->rn_newname, cr,
+		NULL, 0);
 	if (error)
 		goto out;
 
 	/* get the new ctime on the renamed file */
-	error = VOP_LOOKUP(ndvp, rnp->rn_newname, &cvp, NULL, 0, NULL, cr);
+	error = VOP_LOOKUP(ndvp, rnp->rn_newname, &cvp, NULL, 0, NULL, cr,
+		NULL, NULL, NULL);
 	if (error)
 		goto out;
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(cvp, &va, 0, cr);
+	error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->rn_ctime, error);
@@ -1815,7 +1817,7 @@ cachefs_io_rename(vnode_t *vp, void *dinp, void *doutp)
 			goto out;
 		}
 		va.va_mask = AT_ALL;
-		error = VOP_GETATTR(cvp, &va, 0, cr);
+		error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 		if (error)
 			goto out;
 		CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->rn_del_ctime,
@@ -1878,14 +1880,14 @@ cachefs_io_mkdir(vnode_t *vp, void *dinp, void *doutp)
 	/* make the directory */
 	CACHEFS_TMPPTR_SET(&mdirp->md_vattr, &va, tmpvap, vattr_t);
 	CACHEFS_VATTR_COPYIN(&mdirp->md_vattr, tmpvap);
-	error = VOP_MKDIR(dvp, mdirp->md_name, tmpvap, &cvp, cr);
+	error = VOP_MKDIR(dvp, mdirp->md_name, tmpvap, &cvp, cr, NULL, 0, NULL);
 	if (error) {
 		if (error != EEXIST)
 			goto out;
 
 		/* if the directory already exists, then use it */
 		error = VOP_LOOKUP(dvp, mdirp->md_name, &cvp,
-		    NULL, 0, NULL, cr);
+		    NULL, 0, NULL, cr, NULL, NULL, NULL);
 		if (error) {
 			cvp = NULL;
 			goto out;
@@ -1899,14 +1901,14 @@ cachefs_io_mkdir(vnode_t *vp, void *dinp, void *doutp)
 	/* get the fid of the directory */
 	CACHEFS_TMPPTR_SET(fidp, &tmpfid, tmpfidp, fid_t);
 	tmpfidp->fid_len = MAXFIDSZ;
-	error = VOP_FID(cvp, tmpfidp);
+	error = VOP_FID(cvp, tmpfidp, NULL);
 	if (error)
 		goto out;
 	CACHEFS_FID_COPYOUT(tmpfidp, fidp);
 
 	/* get attributes of the directory */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(cvp, &va, 0, cr);
+	error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -1969,7 +1971,7 @@ cachefs_io_rmdir(vnode_t *vp, void *dinp, void *doutp)
 	}
 
 	cr = conj_cred(&rdp->rd_cred);
-	error = VOP_RMDIR(dvp, rdp->rd_name, dvp, cr);
+	error = VOP_RMDIR(dvp, rdp->rd_name, dvp, cr, NULL, 0);
 	crfree(cr);
 
 	VN_RELE(dvp);
@@ -2019,18 +2021,19 @@ cachefs_io_symlink(vnode_t *vp, void *dinp, void *doutp)
 	CACHEFS_TMPPTR_SET(&symp->sy_vattr, &va, tmpvap, vattr_t);
 	CACHEFS_VATTR_COPYIN(&symp->sy_vattr, tmpvap);
 	error = VOP_SYMLINK(dvp, symp->sy_name, tmpvap,
-	    symp->sy_link, cr);
+	    symp->sy_link, cr, NULL, 0);
 	if (error)
 		goto out;
 
 	/* get the vnode for the symlink */
-	error = VOP_LOOKUP(dvp, symp->sy_name, &svp, NULL, 0, NULL, cr);
+	error = VOP_LOOKUP(dvp, symp->sy_name, &svp, NULL, 0, NULL, cr,
+		NULL, NULL, NULL);
 	if (error)
 		goto out;
 
 	/* get the attributes of the symlink */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(svp, &va, 0, cr);
+	error = VOP_GETATTR(svp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->sy_ctime, error);
@@ -2041,7 +2044,7 @@ cachefs_io_symlink(vnode_t *vp, void *dinp, void *doutp)
 	/* get the fid */
 	CACHEFS_TMPPTR_SET(&retp->sy_newfid, &tmpfid, tmpfidp, fid_t);
 	tmpfidp->fid_len = MAXFIDSZ;
-	error = VOP_FID(svp, tmpfidp);
+	error = VOP_FID(svp, tmpfidp, NULL);
 	if (error)
 		goto out;
 	CACHEFS_FID_COPYOUT(tmpfidp, &retp->sy_newfid);
@@ -2120,7 +2123,7 @@ cachefs_io_setattr(vnode_t *vp, void *dinp, void *doutp)
 
 	/* get the new ctime and mtime */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(cvp, &va, 0, cr);
+	error = VOP_GETATTR(cvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->sa_ctime, error);
@@ -2181,14 +2184,14 @@ cachefs_io_setsecattr(vnode_t *vp, void *dinp, void *doutp)
 
 	/* set the ACL */
 	(void) VOP_RWLOCK(tvp, V_WRITELOCK_TRUE, NULL);
-	error = VOP_SETSECATTR(tvp, &vsec, 0, cr);
+	error = VOP_SETSECATTR(tvp, &vsec, 0, cr, NULL);
 	VOP_RWUNLOCK(tvp, V_WRITELOCK_TRUE, NULL);
 	if (error != 0)
 		goto out;
 
 	/* get the new ctime and mtime */
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(tvp, &va, 0, cr);
+	error = VOP_GETATTR(tvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 	CACHEFS_TS_TO_CFS_TS_COPY(&va.va_ctime, &retp->sc_ctime, error);
@@ -2223,7 +2226,7 @@ drop_backvp(cnode_t *cp)
 		if (cp->c_backvp) {
 			/* dump any pages, may be a dirty one */
 			(void) VOP_PUTPAGE(cp->c_backvp, (offset_t)0, 0,
-			    B_INVAL | B_TRUNC, kcred);
+			    B_INVAL | B_TRUNC, kcred, NULL);
 		}
 		mutex_exit(&cp->c_statelock);
 	}

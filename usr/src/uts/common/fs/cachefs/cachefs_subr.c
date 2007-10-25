@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,7 +276,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* get the mode bits of the cache directory */
 	attrp->va_mask = AT_ALL;
-	error = VOP_GETATTR(cdvp, attrp, 0, kcred);
+	error = VOP_GETATTR(cdvp, attrp, 0, kcred, NULL);
 	if (error)
 		goto out;
 
@@ -290,7 +289,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* Get the lock file */
 	error = VOP_LOOKUP(cdvp, CACHEFS_LOCK_FILE, &lockvp, NULL, 0, NULL,
-		kcred);
+		kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_a: cache corruption"
 			" run fsck.\n");
@@ -299,7 +298,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* Get the label file */
 	error = VOP_LOOKUP(cdvp, CACHELABEL_NAME, &labelvp, NULL, 0, NULL,
-		kcred);
+		kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_b: cache corruption"
 			" run fsck.\n");
@@ -324,7 +323,8 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 	}
 
 	/* Open the resource file */
-	error = VOP_LOOKUP(cdvp, RESOURCE_NAME, &rifvp, NULL, 0, NULL, kcred);
+	error = VOP_LOOKUP(cdvp, RESOURCE_NAME, &rifvp, NULL, 0, NULL, kcred,
+	    NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_d: cache corruption"
 			" run fsck.\n");
@@ -360,7 +360,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* Open the lost+found directory */
 	error = VOP_LOOKUP(cdvp, CACHEFS_LOSTFOUND_NAME, &lostfoundvp,
-	    NULL, 0, NULL, kcred);
+	    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: activate_g: cache corruption"
 			" run fsck.\n");
@@ -389,7 +389,7 @@ cachefs_cache_activate_ro(cachefscache_t *cachep, vnode_t *cdvp)
 
 	/* if the LOG_STATUS_NAME file exists, read it in and set up logging */
 	error = VOP_LOOKUP(cachep->c_dirvp, LOG_STATUS_NAME, &statevp,
-	    NULL, 0, NULL, kcred);
+	    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error == 0) {
 		int vnrw_error;
 
@@ -738,7 +738,7 @@ cachefs_cache_rssync(struct cachefscache *cachep)
 	if (error) {
 		cmn_err(CE_WARN, "cachefs: Can't Write Cache RL Info\n");
 	}
-	error = VOP_FSYNC(cachep->c_resfilevp, FSYNC, kcred);
+	error = VOP_FSYNC(cachep->c_resfilevp, FSYNC, kcred, NULL);
 	return (error);
 }
 
@@ -974,11 +974,11 @@ cachefs_createfrontfile(cnode_t *cp, struct filegrp *fgp)
 	if (cp->c_flags & CN_ASYNC_POP_WORKING) {
 		/* lookup the already created front file */
 		error = VOP_LOOKUP(fgp->fg_dirvp, name, &cp->c_frontvp,
-		    NULL, 0, NULL, kcred);
+		    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	} else {
 		/* create the front file */
 		error = VOP_CREATE(fgp->fg_dirvp, name, attrp, EXCL, mode,
-		    &cp->c_frontvp, kcred, 0);
+		    &cp->c_frontvp, kcred, 0, NULL, NULL);
 	}
 	if (error) {
 #ifdef CFSDEBUG
@@ -992,7 +992,7 @@ cachefs_createfrontfile(cnode_t *cp, struct filegrp *fgp)
 
 	/* get a copy of the fid of the front file */
 	cp->c_metadata.md_fid.fid_len = MAXFIDSZ;
-	error = VOP_FID(cp->c_frontvp, &cp->c_metadata.md_fid);
+	error = VOP_FID(cp->c_frontvp, &cp->c_metadata.md_fid, NULL);
 	if (error) {
 		/*
 		 * If we get back ENOSPC then the fid we passed in was too
@@ -1013,7 +1013,7 @@ out:
 	if (error) {
 		if (cp->c_frontvp) {
 			VN_RELE(cp->c_frontvp);
-			(void) VOP_REMOVE(fgp->fg_dirvp, name, kcred);
+			(void) VOP_REMOVE(fgp->fg_dirvp, name, kcred, NULL, 0);
 			cp->c_frontvp = NULL;
 		}
 		if (ffrele)
@@ -1064,7 +1064,7 @@ cachefs_removefrontfile(cachefs_metadata_t *mdp, cfs_cid_t *cidp,
 			return;
 		}
 		make_ascii_name(cidp, name);
-		error = VOP_REMOVE(fgp->fg_dirvp, name, kcred);
+		error = VOP_REMOVE(fgp->fg_dirvp, name, kcred, NULL, 0);
 		if (error == ENOENT)
 			enoent = 1;
 		if ((error) && (error != ENOENT)) {
@@ -1074,7 +1074,7 @@ cachefs_removefrontfile(cachefs_metadata_t *mdp, cfs_cid_t *cidp,
 		if (mdp->md_flags & MD_ACLDIR) {
 			(void) strcat(name, ".d");
 			error = VOP_RMDIR(fgp->fg_dirvp, name, fgp->fg_dirvp,
-			    kcred);
+			    kcred, NULL, 0);
 			if ((error) && (error != ENOENT)) {
 				cmn_err(CE_WARN, "frontfs rmdir error %s %d"
 				    "; run fsck\n", name, error);
@@ -1210,7 +1210,7 @@ cachefs_getfrontfile(cnode_t *cp)
 
 		/* get modify time of the front file */
 		va.va_mask = AT_MTIME;
-		error = VOP_GETATTR(cp->c_frontvp, &va, 0, kcred);
+		error = VOP_GETATTR(cp->c_frontvp, &va, 0, kcred, NULL);
 		if (error) {
 			cmn_err(CE_WARN, "cachefs: gff2: front file"
 				" system error %d", error);
@@ -1721,7 +1721,7 @@ out:
 
 /*
  * due to compiler error we shifted cnode to the last argument slot.
- * occured during large files project - XXX.
+ * occurred during large files project - XXX.
  */
 void
 cachefs_cluster_allocmap(u_offset_t off, u_offset_t *popoffp,
@@ -1911,7 +1911,7 @@ cachefs_readlink_back(cnode_t *cp, cred_t *cr, caddr_t *bufp, int *buflenp)
 	CFS_DPRINT_BACKFS_NFSV4(fscp,
 		("cachefs_readlink (nfsv4): cnode %p, backvp %p\n",
 		cp, cp->c_backvp));
-	error = VOP_READLINK(cp->c_backvp, &uio, cr);
+	error = VOP_READLINK(cp->c_backvp, &uio, cr, NULL);
 	if (error) {
 		cachefs_kmem_free(buf, MAXPATHLEN);
 	} else {
@@ -1980,7 +1980,7 @@ cachefs_getbackvp(struct fscache *fscp, struct cnode *cp)
 				flag |= FWRITE;
 			}
 		}
-		error = VOP_OPEN(&cp->c_backvp, flag, cp->c_cred);
+		error = VOP_OPEN(&cp->c_backvp, flag, cp->c_cred, NULL);
 		if (error) {
 			VN_RELE(cp->c_backvp);
 			cp->c_backvp = NULL;
@@ -2028,7 +2028,7 @@ cachefs_getcookie(
 		 * variable length fids we will need to change this.
 		 */
 		cookiep->fid_len = MAXFIDSZ;
-		error = VOP_FID(vp, cookiep);
+		error = VOP_FID(vp, cookiep, NULL);
 	} else {
 		bzero(cookiep, sizeof (*cookiep));
 	}
@@ -2037,7 +2037,7 @@ cachefs_getcookie(
 		if (attrp) {
 			ASSERT(attrp != NULL);
 			attrp->va_mask = AT_ALL;
-			error = VOP_GETATTR(vp, attrp, 0, cr);
+			error = VOP_GETATTR(vp, attrp, 0, cr, NULL);
 		}
 	} else {
 		if (error == ENOSPC) {
@@ -2254,7 +2254,7 @@ cachefs_async_putpage(struct cachefs_putpage_req *prp, cred_t *cr)
 	ASSERT(CFS_ISFS_BACKFS_NFSV4(C_TO_FSCACHE(cp)) == 0);
 
 	(void) VOP_PUTPAGE(prp->cp_vp, prp->cp_off, prp->cp_len,
-		prp->cp_flags, cr);
+		prp->cp_flags, cr, NULL);
 
 	mutex_enter(&cp->c_iomutex);
 	if (--cp->c_nio == 0)
@@ -2378,7 +2378,7 @@ cachefs_async_populate(struct cachefs_populate_req *pop, cred_t *cr)
 				make_ascii_name(&cid, name);
 
 				(void) VOP_CREATE(fgp->fg_dirvp, name, attrp,
-				    EXCL, 0666, &frontvp, kcred, 0);
+				    EXCL, 0666, &frontvp, kcred, 0, NULL, NULL);
 
 				cachefs_kmem_free(attrp,
 				    sizeof (struct vattr));
@@ -2433,7 +2433,7 @@ cachefs_async_populate(struct cachefs_populate_req *pop, cred_t *cr)
 	if (error != 0)
 		goto out;
 
-	error = VOP_FSYNC(frontvp, FSYNC, cr);
+	error = VOP_FSYNC(frontvp, FSYNC, cr, NULL);
 	if (error != 0) {
 #ifdef CFSDEBUG
 		CFS_DEBUG(CFSDEBUG_ASYNCPOP)
@@ -2453,7 +2453,7 @@ cachefs_async_populate(struct cachefs_populate_req *pop, cred_t *cr)
 	}
 
 	va.va_mask = AT_MTIME;
-	error = VOP_GETATTR(cp->c_frontvp, &va, 0, cr);
+	error = VOP_GETATTR(cp->c_frontvp, &va, 0, cr, NULL);
 	if (error) {
 #ifdef CFSDEBUG
 		CFS_DEBUG(CFSDEBUG_ASYNCPOP)

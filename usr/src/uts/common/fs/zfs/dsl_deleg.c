@@ -31,7 +31,7 @@
  * it is a local or descendent permission.  The first letter
  * identifies the type of entry.
  *
- * ul$<id>    identifies permssions granted locally for this userid.
+ * ul$<id>    identifies permissions granted locally for this userid.
  * ud$<id>    identifies permissions granted on descendent datasets for
  *            this userid.
  * Ul$<id>    identifies permission sets granted locally for this userid.
@@ -55,7 +55,7 @@
  * s-$@<name> permissions defined in specified set @<name>
  * S-$@<name> Sets defined in named set @<name>
  *
- * Each of the above entiies points to another zap attribute that contains one
+ * Each of the above entities points to another zap attribute that contains one
  * attribute for each allowed permission, such as create, destroy,...
  * All of the "upper" case class types will specify permission set names
  * rather than permissions.

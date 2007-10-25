@@ -95,7 +95,12 @@ ctfs_create_cdirnode(vnode_t *pvp, contract_t *ct)
  */
 /* ARGSUSED */
 static int
-ctfs_cdir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_cdir_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	ctfs_cdirnode_t *cdirnode = vp->v_data;
 
@@ -129,7 +134,7 @@ ctfs_cdir_do_inode(vnode_t *vp, int index)
  */
 /* ARGSUSED */
 static void
-ctfs_cdir_inactive(vnode_t *vp, cred_t *cr)
+ctfs_cdir_inactive(vnode_t *vp, cred_t *cr, caller_context_t *cct)
 {
 	ctfs_cdirnode_t *cdirnode = vp->v_data;
 	contract_t *ct = cdirnode->ctfs_cn_contract;

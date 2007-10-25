@@ -1,0 +1,57 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate {
+    global:
+        mlndr_inner;
+        mlndr_params;
+        mlndr_topmost;
+        mlnds_destruct;
+        mlnds_initialize;
+        mlrpc_binding_pool_initialize;
+        mlrpc_c_bind;
+        mlrpc_c_call;
+        mlrpc_c_free_heap;
+        mlrpc_heap_avail;
+        mlrpc_heap_create;
+        mlrpc_heap_destroy;
+        mlrpc_heap_malloc;
+        mlrpc_heap_mkvcs;
+        mlrpc_heap_strsave;
+        mlrpc_heap_used;
+        mlrpc_register_service;
+        mlsvc_lookup_context;
+        mlsvc_rpc_process;
+        mlsvc_rpc_release;
+        ndt__char;
+        ndt_s_wchar;
+        ndt__uchar;
+        ndt__ulong;
+        ndt__ushort;
+    local:
+	*;
+};

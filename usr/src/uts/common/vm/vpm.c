@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,7 +237,7 @@ vpm_init()
 		 * Use prefetch as we have to walk thru a large number of
 		 * these data structures. We just use the smap's prefetch
 		 * routine as it does the same. This should work fine
-		 * for x64(this needs to be modifed when enabled on sparc).
+		 * for x64(this needs to be modified when enabled on sparc).
 		 */
 		prefetch_smap_w((void *)vpm);
 
@@ -866,7 +866,7 @@ vpm_map_pages(
 			base = segkpm_create_va(baseoff);
 
 			error = VOP_GETPAGE(vp, baseoff, len, &prot, &pplist[i],
-			len, segkmap, base, rw, CRED());
+			len, segkmap, base, rw, CRED(), NULL);
 			if (error) {
 				VPM_DEBUG(vpmd_getpagefailed);
 				pplist[i] = NULL;
@@ -1070,7 +1070,7 @@ vpm_sync_pages(struct vnode *vp,
 		if (flags & SM_DONTNEED)
 			bflags |= B_DONTNEED;
 
-		error = VOP_PUTPAGE(vp, off, psize, bflags, CRED());
+		error = VOP_PUTPAGE(vp, off, psize, bflags, CRED(), NULL);
 	}
 
 	return (error);

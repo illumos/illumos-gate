@@ -329,6 +329,8 @@ typedef struct fshare {
 #define	F_RDACC		0x1	/* Read-only share access */
 #define	F_WRACC		0x2	/* Write-only share access */
 #define	F_RWACC		0x3	/* Read-Write share access */
+#define	F_RMACC		0x4	/* private flag: Delete share access */
+#define	F_MDACC		0x20	/* private flag: Metadata share access */
 
 /*
  * f_deny values
@@ -337,6 +339,7 @@ typedef struct fshare {
 #define	F_RDDNY		0x1	/* Deny others read share access */
 #define	F_WRDNY		0x2	/* Deny others write share access */
 #define	F_RWDNY		0x3	/* Deny others read or write share access */
+#define	F_RMDNY		0x4	/* private flag: Deny delete share access */
 #define	F_COMPAT	0x8	/* Set share to old DOS compatibility mode */
 #define	F_MANDDNY	0x10	/* private flag: mandatory enforcement */
 #endif /* defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) */

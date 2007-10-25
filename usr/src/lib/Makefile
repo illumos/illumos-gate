@@ -234,6 +234,7 @@ SUBDIRS += \
 	libidmap	\
 	libipmi		\
 	libexacct/demo	\
+	smbsrv		\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -421,6 +422,7 @@ HDRSUBDIRS=		\
 	libkrb5		\
 	libshare	\
 	libidmap	\
+	smbsrv		\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -506,7 +508,7 @@ libinetcfg:	libnsl libsocket libdevinfo
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
-libuuid:	libdlpi libdladm 
+libuuid:	libdlpi libdladm
 libinetutil:	libsocket
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd
@@ -528,7 +530,7 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
-pam_modules:	libproject passwdutil $(SMARTCARD)
+pam_modules:	libproject passwdutil $(SMARTCARD) smbsrv
 libscf:		libuutil libmd libgen
 libinetsvc:	libscf
 librestart:	libuutil libscf
@@ -545,6 +547,8 @@ brand:		libc libsocket
 libshare:	libscf libzfs libuuid libfsmgt libsecdb
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
+smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
+		libshare libidmap pkcs11
 
 #
 # The reason this rule checks for the existence of the

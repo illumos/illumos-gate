@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ top:
 			vattr.va_mode = 0777;
 			vattr.va_mask = AT_TYPE|AT_MODE;
 			error = VOP_SYMLINK(dvp, lpn.pn_path, &vattr,
-				tbuf, CRED());
+				tbuf, CRED(), NULL, 0);
 #ifdef	C2_AUDIT
 			if (audit_active)
 				audit_symlink_create(dvp, lpn.pn_path,

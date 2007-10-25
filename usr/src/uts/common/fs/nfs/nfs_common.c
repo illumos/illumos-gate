@@ -70,7 +70,7 @@
 #include <rpc/svc.h>
 
 /*
- * The psuedo NFS filesystem to allow diskless booting to dynamically
+ * The pseudo NFS filesystem to allow diskless booting to dynamically
  * mount either a NFS V2, NFS V3, or NFS V4 filesystem.  This only implements
  * the VFS_MOUNTROOT op and is only intended to be used by the
  * diskless booting code until the real root filesystem is mounted.
@@ -273,7 +273,7 @@ _info(struct modinfo *modinfop)
  */
 
 /*
- * Returns the prefered transfer size in bytes based on
+ * Returns the preferred transfer size in bytes based on
  * what network interfaces are available.
  */
 int
@@ -287,7 +287,7 @@ nfstsize(void)
 }
 
 /*
- * Returns the prefered transfer size in bytes based on
+ * Returns the preferred transfer size in bytes based on
  * what network interfaces are available.
  */
 
@@ -607,7 +607,7 @@ nfs_directio(vnode_t *vp, int cmd, cred_t *cr)
 		if (vn_has_cached_data(vp) &&
 		    ((rp->r_flags & RDIRTY) || rp->r_awcount > 0)) {
 			error = VOP_PUTPAGE(vp, (offset_t)0, (uint_t)0,
-			    B_INVAL, cr);
+			    B_INVAL, cr, NULL);
 			if (error) {
 				if (error == ENOSPC || error == EDQUOT) {
 					mutex_enter(&rp->r_statelock);

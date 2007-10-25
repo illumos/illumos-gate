@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,13 +75,14 @@ prof_getattr(struct sdev_node *dir, char *name, struct vnode *gdv,
 
 	/* get attribute from shadow, if present; else get default */
 	advp = dir->sdev_attrvp;
-	if (advp && VOP_LOOKUP(advp, name, avpp, NULL, 0, NULL, kcred) == 0) {
-		(void) VOP_GETATTR(*avpp, vap, 0, kcred);
+	if (advp && VOP_LOOKUP(advp, name, avpp, NULL, 0, NULL, kcred,
+	    NULL, NULL, NULL) == 0) {
+		(void) VOP_GETATTR(*avpp, vap, 0, kcred, NULL);
 	} else if (gdv == NULL || gdv->v_type == VDIR) {
 		/* always create shadow directory */
 		*vap = sdev_vattr_dir;
-		if (advp && VOP_MKDIR(advp, name,
-		    &sdev_vattr_dir, avpp, kcred) != 0) {
+		if (advp && VOP_MKDIR(advp, name, &sdev_vattr_dir,
+		    avpp, kcred, NULL, 0, NULL) != 0) {
 			*avpp = NULLVP;
 			sdcmn_err10(("prof_getattr: failed to create "
 			    "shadow directory %s/%s\n", dir->sdev_path, name));
@@ -95,7 +96,7 @@ prof_getattr(struct sdev_node *dir, char *name, struct vnode *gdv,
 		 * attr for device nodes.
 		 */
 		struct vnode *rvp;
-		if (VOP_REALVP(gdv, &rvp) != 0)
+		if (VOP_REALVP(gdv, &rvp, NULL) != 0)
 			rvp = gdv;
 		devfs_get_defattr(rvp, vap, no_fs_perm);
 		*avpp = NULLVP;
@@ -209,7 +210,7 @@ prof_make_dir(char *name, struct sdev_node **gdirp, struct sdev_node **dirp)
 	/* find corresponding dir node in global dev */
 	if (gdir) {
 		error = VOP_LOOKUP(SDEVTOV(gdir), name, &gnewdir,
-		    NULL, 0, NULL, kcred);
+		    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 		if (error == 0) {
 			*gdirp = VTOSDEV(gnewdir);
 		} else { 	/* it's ok if there no global dir */
@@ -390,7 +391,8 @@ is_nonempty_dir(char *name, char *pathleft, struct sdev_node *dir)
 	struct vnode *gvp;
 	struct sdev_node *gdir = dir->sdev_origin;
 
-	if (VOP_LOOKUP(SDEVTOV(gdir), name, &gvp, NULL, 0, NULL, kcred) != 0)
+	if (VOP_LOOKUP(SDEVTOV(gdir), name, &gvp, NULL, 0, NULL, kcred,
+	    NULL, NULL, NULL) != 0)
 		return (0);
 
 	if (gvp->v_type != VDIR) {
@@ -502,7 +504,7 @@ walk_dir(struct vnode *dvp, void *arg, int (*callback)(char *, void *))
 		iov.iov_base = (char *)dbuf;
 		iov.iov_len = dlen;
 		(void) VOP_RWLOCK(dvp, V_WRITELOCK_FALSE, NULL);
-		error = VOP_READDIR(dvp, &uio, kcred, &eof);
+		error = VOP_READDIR(dvp, &uio, kcred, &eof, NULL, 0);
 		VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 
 		dbuflen = dlen - uio.uio_resid;

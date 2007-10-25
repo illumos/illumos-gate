@@ -418,7 +418,7 @@ char	Adir,			/* Flags object as a directory */
 static
 int	Append = 0,	/* Flag set while searching to end of archive */
 	Archive,	/* File descriptor of the archive */
-	Buf_error = 0,	/* I/O error occured during buffer fill */
+	Buf_error = 0,	/* I/O error occurred during buffer fill */
 	Def_mode = 0777,	/* Default file/directory protection modes */
 	Device,		/* Device type being accessed (used with libgenIO) */
 	Error_cnt = 0,	/* Cumulative count of I/O errors */
@@ -1986,7 +1986,7 @@ creat_tmp(char *nam_p)
 
 	/*
 	 * If it's a regular file, write to the temporary file, and then rename
-	 * in order to accomodate potential executables.
+	 * in order to accommodate potential executables.
 	 *
 	 * Note: g_typeflag is only defined (set) for USTAR archive types.  It
 	 * defaults to 0 in the cpio-format-regular file case, so this test
@@ -3269,6 +3269,15 @@ flush_lnks(void)
 	} /* l_p != &Lnk_hd */
 }
 
+#if defined(O_XATTR)
+static int
+is_sysattr(char *name)
+{
+	return ((strcmp(name, VIEW_READONLY) == 0) ||
+	    (strcmp(name, VIEW_READWRITE) == 0));
+}
+#endif
+
 /*
  * gethdr: Get a header from the archive, validate it and check for the trailer.
  * Any user specified Hdr_type is ignored (set to NONE in main).  Hdr_type is
@@ -3548,6 +3557,8 @@ gethdr(void)
 	if (((Gen.g_mode & S_IFMT) == _XATTR_CPIO_MODE) ||
 	    ((Hdr_type == USTAR || Hdr_type == TAR) &&
 	    Thdr_p->tbuf.t_typeflag == _XATTR_HDRTYPE)) {
+		char	*tapath;
+
 		if (xattrp != (struct xattr_buf *)NULL) {
 			if (xattrbadhead) {
 				free(xattrhead);
@@ -3556,7 +3567,18 @@ gethdr(void)
 				xattrhead = NULL;
 				return (1);
 			}
-			if (Atflag == 0 && ((Args & OCt) == 0)) {
+
+			/*
+			 * Skip processing of an attribute if -@ wasn't
+			 * specified, or if -@ was specified and the attribute
+			 * is either an extended system attribute or if the
+			 * attribute name is not a file name, but a path name
+			 * (-@ should only process extended attributes).
+			 */
+			tapath = xattrp->h_names + strlen(xattrp->h_names) + 1;
+			if (((Args & OCt) == 0) && ((Atflag == 0) ||
+			    (is_sysattr(tapath) ||
+			    (strpbrk(tapath, "/") != NULL)))) {
 				data_in(P_SKIP);
 				free(xattrhead);
 				xattrhead = NULL;
@@ -3581,8 +3603,7 @@ gethdr(void)
 				    xattrp->h_names);
 			}
 
-			Gen.g_attrnam_p = e_strdup(E_EXIT,
-			    xattrp->h_names + strlen(xattrp->h_names) + 1);
+			Gen.g_attrnam_p = e_strdup(E_EXIT, tapath);
 
 			if (Hdr_type != USTAR && Hdr_type != TAR) {
 				Gen.g_mode = Gen.g_mode & (~_XATTR_CPIO_MODE);
@@ -3602,8 +3623,7 @@ gethdr(void)
 				Gen.g_linktoattrfnam_p = e_strdup(E_EXIT,
 				    xattr_linkp->h_names);
 				Gen.g_linktoattrnam_p = e_strdup(E_EXIT,
-				    xattr_linkp->h_names +
-				    strlen(xattr_linkp->h_names) + 1);
+				    tapath);
 				xattr_linkp = NULL;
 			}
 			ftype = Gen.g_mode & Ftype;
@@ -3738,7 +3758,7 @@ gethdr(void)
  * getname: Get file names for inclusion in the archive.  When end of file
  * on the input stream of file names is reached, flush the link buffer out.
  * For each filename, remove leading "./"s and multiple "/"s, and remove
- * any trailing newline "\n".  Finally, verify the existance of the file,
+ * any trailing newline "\n".  Finally, verify the existence of the file,
  * and call creat_hdr() to fill in the gen_hdr structure.
  */
 
@@ -4065,7 +4085,7 @@ matched(void)
 
 		if ((result == 0 && ! negatep) ||
 		    (result == FNM_NOMATCH && negatep)) {
-			/* match occured */
+			/* match occurred */
 			return (!(Args & OCf));
 		}
 	}
@@ -4760,7 +4780,7 @@ setpasswd(char *nam)
  *
  * Note that if Do_rename is set, then the roles of original and temporary
  * file are reversed. If all went well, we will rename() the temporary file
- * over the original in order to accomodate potentially executing files.
+ * over the original in order to accommodate potentially executing files.
  */
 static void
 rstfiles(int over, int dirfd)
@@ -5567,7 +5587,12 @@ verbose(char *nam_p)
 		 * Translation note:
 		 * 'attribute' is a noun.
 		 */
-		name_fmt = gettext("%s attribute %s");
+
+		if (is_sysattr(basename(Gen.g_attrnam_p))) {
+			name_fmt = gettext("%s system attribute %s");
+		} else {
+			name_fmt = gettext("%s attribute %s");
+		}
 
 		name = (Args & OCp) ? nam_p : Gen.g_attrfnam_p;
 		attribute = Gen.g_attrnam_p;
@@ -6890,7 +6915,8 @@ xattrs_out(int (*func)())
 	}
 
 	while ((dp = readdir(dirp)) != (struct dirent *)NULL) {
-		if (strcmp(dp->d_name, "..") == 0) {
+		if ((strcmp(dp->d_name, "..") == 0) ||
+		    is_sysattr(dp->d_name)) {
 			continue;
 		}
 
@@ -7200,9 +7226,12 @@ read_xattr_hdr()
 	off_t		bytes;
 	int		comp_len, link_len;
 	int		namelen;
+	int		asz;
 	int		cnt;
 	char		*tp;
+	char		*xattrapath;
 	int		pad;
+	int		parentfilelen;
 
 	/*
 	 * Include any padding in the read.  We need to be positioned
@@ -7257,6 +7286,32 @@ read_xattr_hdr()
 		xattr_linkp = (struct xattr_buf *)((int)xattrp + (int)comp_len);
 	} else {
 		xattr_linkp = NULL;
+	}
+
+	/*
+	 * Gather the attribute path from the filename and attrnames section.
+	 * The filename and attrnames section can be composed of two or more
+	 * path segments separated by a null character.  The first segment
+	 * is the path to the parent file that roots the entire sequence in
+	 * the normal name space. The remaining segments describes a path
+	 * rooted at the hidden extended attribute directory of the leaf file of
+	 * the previous segment, making it possible to name attributes on
+	 * attributes.
+	 */
+	parentfilelen = strlen(xattrp->h_names);
+	xattrapath = xattrp->h_names + parentfilelen + 1;
+	asz = strlen(xattrapath);
+	if ((asz + parentfilelen + 2) < namelen) {
+		/*
+		 * The attrnames section contains a system attribute on an
+		 * attribute.  Save the name of the attribute for use later,
+		 * and replace the null separating the attribute name from
+		 * the system attribute name with a '/' so that xattrapath can
+		 * be used to display messages with the full attribute path name
+		 * rooted at the hidden attribute directory of the base file
+		 * in normal name space.
+		 */
+		xattrapath[asz] = '/';
 	}
 
 	return (0);
@@ -7885,7 +7940,8 @@ sl_preview_synonyms(void)
 				    dp->d_name[1] == '\0') ||
 				    (dp->d_name[0] == '.' &&
 				    dp->d_name[1] == '.' &&
-				    dp->d_name[2] == '\0'))
+				    dp->d_name[2] == '\0') ||
+				    is_sysattr(dp->d_name))
 					continue;
 
 				if (fstatat(dirfd, dp->d_name, &sb,

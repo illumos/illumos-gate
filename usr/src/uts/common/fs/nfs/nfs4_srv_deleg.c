@@ -805,7 +805,7 @@ rfs4_vop_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
 	int error;
 
 	mask = vap->va_mask;
-	error = VOP_GETATTR(vp, vap, flag, cr);
+	error = VOP_GETATTR(vp, vap, flag, cr, NULL);
 	/*
 	 * Some file systems clobber va_mask. it is probably wrong of
 	 * them to do so, nonethless we practice defensive coding.
@@ -825,7 +825,7 @@ rfs4_vop_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
 int
 rfs4_delegated_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
 {
-	return (VOP_GETATTR(vp, vap, flag, cr));
+	return (VOP_GETATTR(vp, vap, flag, cr, NULL));
 }
 
 /*
@@ -1547,6 +1547,8 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	rfs4_deleg_state_t *dsp;
 	vnode_t *vp;
 	int open_prev = *recall;
+	int ret;
+	int fflags = 0;
 
 	ASSERT(rfs4_dbe_islocked(sp->dbe));
 	ASSERT(rfs4_dbe_islocked(fp->dbe));
@@ -1605,14 +1607,27 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 
 	vp = fp->vp;
 	/* vnevent_support returns 0 if file system supports vnevents */
-	if (vnevent_support(vp)) {
+	if (vnevent_support(vp, NULL)) {
 		rfs4_deleg_state_rele(dsp);
 		return (NULL);
 	}
 
+	/* Calculate the fflags for this OPEN. */
+	if (sp->share_access & OPEN4_SHARE_ACCESS_READ)
+		fflags |= FREAD;
+	if (sp->share_access & OPEN4_SHARE_ACCESS_WRITE)
+		fflags |= FWRITE;
+
 	*recall = 0;
+	/*
+	 * Before granting a delegation we need to know if anyone else has
+	 * opened the file in a conflicting mode.  However, first we need to
+	 * know how we opened the file to check the counts properly.
+	 */
 	if (dtype == OPEN_DELEGATE_READ) {
-		if (vn_is_opened(vp, V_WRITE) || vn_is_mapped(vp, V_WRITE)) {
+		if (((fflags & FWRITE) && vn_has_other_opens(vp, V_WRITE)) ||
+		    (((fflags & FWRITE) == 0) && vn_is_opened(vp, V_WRITE)) ||
+		    vn_is_mapped(vp, V_WRITE)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
@@ -1620,9 +1635,11 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 				return (NULL);
 			}
 		}
-		(void) fem_install(vp, deleg_rdops, (void *)fp, OPUNIQ,
+		ret = fem_install(vp, deleg_rdops, (void *)fp, OPUNIQ,
 		    rfs4_mon_hold, rfs4_mon_rele);
-		if (vn_is_opened(vp, V_WRITE) || vn_is_mapped(vp, V_WRITE)) {
+		if (((fflags & FWRITE) && vn_has_other_opens(vp, V_WRITE)) ||
+		    (((fflags & FWRITE) == 0) && vn_is_opened(vp, V_WRITE)) ||
+		    vn_is_mapped(vp, V_WRITE)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
@@ -1632,8 +1649,24 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 				return (NULL);
 			}
 		}
+		/*
+		 * Because a client can hold onto a delegation after the
+		 * file has been closed, we need to keep track of the
+		 * access to this file.  Otherwise the CIFS server would
+		 * not know about the client accessing the file and could
+		 * inappropriately grant an OPLOCK.
+		 * fem_install() returns EBUSY when asked to install a
+		 * OPUNIQ monitor more than once.  Therefore, check the
+		 * return code because we only want this done once.
+		 */
+		if (ret == 0)
+			vn_open_upgrade(vp, FREAD);
 	} else { /* WRITE */
-		if (vn_is_opened(vp, V_RDORWR) || vn_is_mapped(vp, V_RDORWR)) {
+		if (((fflags & FWRITE) && vn_has_other_opens(vp, V_WRITE)) ||
+		    (((fflags & FWRITE) == 0) && vn_is_opened(vp, V_WRITE)) ||
+		    ((fflags & FREAD) && vn_has_other_opens(vp, V_READ)) ||
+		    (((fflags & FREAD) == 0) && vn_is_opened(vp, V_READ)) ||
+		    vn_is_mapped(vp, V_RDORWR)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
@@ -1641,9 +1674,13 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 				return (NULL);
 			}
 		}
-		(void) fem_install(vp, deleg_wrops, (void *)fp, OPUNIQ,
+		ret = fem_install(vp, deleg_wrops, (void *)fp, OPUNIQ,
 		    rfs4_mon_hold, rfs4_mon_rele);
-		if (vn_is_opened(vp, V_RDORWR) || vn_is_mapped(vp, V_RDORWR)) {
+		if (((fflags & FWRITE) && vn_has_other_opens(vp, V_WRITE)) ||
+		    (((fflags & FWRITE) == 0) && vn_is_opened(vp, V_WRITE)) ||
+		    ((fflags & FREAD) && vn_has_other_opens(vp, V_READ)) ||
+		    (((fflags & FREAD) == 0) && vn_is_opened(vp, V_READ)) ||
+		    vn_is_mapped(vp, V_RDORWR)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
@@ -1653,6 +1690,18 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 				return (NULL);
 			}
 		}
+		/*
+		 * Because a client can hold onto a delegation after the
+		 * file has been closed, we need to keep track of the
+		 * access to this file.  Otherwise the CIFS server would
+		 * not know about the client accessing the file and could
+		 * inappropriately grant an OPLOCK.
+		 * fem_install() returns EBUSY when asked to install a
+		 * OPUNIQ monitor more than once.  Therefore, check the
+		 * return code because we only want this done once.
+		 */
+		if (ret == 0)
+			vn_open_upgrade(vp, FREAD|FWRITE);
 	}
 	/* Place on delegation list for file */
 	insque(&dsp->delegationlist, fp->delegationlist.prev);
@@ -1697,12 +1746,22 @@ rfs4_return_deleg(rfs4_deleg_state_t *dsp, bool_t revoked)
 
 		/* if file system was unshared, the vp will be NULL */
 		if (fp->vp != NULL) {
-			if (dtypewas == OPEN_DELEGATE_READ)
+			/*
+			 * Once a delegation is no longer held by any client,
+			 * the monitor is uninstalled.  At this point, the
+			 * client must send OPEN otw, so we don't need the
+			 * reference on the vnode anymore.  The open
+			 * downgrade removes the reference put on earlier.
+			 */
+			if (dtypewas == OPEN_DELEGATE_READ) {
 				(void) fem_uninstall(fp->vp, deleg_rdops,
 				    (void *)fp);
-			else
+				vn_open_downgrade(fp->vp, FREAD);
+			} else if (dtypewas == OPEN_DELEGATE_WRITE) {
 				(void) fem_uninstall(fp->vp, deleg_wrops,
 				    (void *)fp);
+				vn_open_downgrade(fp->vp, FREAD|FWRITE);
+			}
 		}
 	}
 

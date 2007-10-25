@@ -349,6 +349,7 @@ COMMON_SUBDIRS=		\
 	sh		\
 	sleep		\
 	smbios		\
+	smbsrv		\
 	smserverd	\
 	soelim		\
 	sort		\

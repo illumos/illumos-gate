@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,14 +27,14 @@
 
 LIBRARY=	libcmdutils.a
 VERS=		.1
-OBJECTS=	avltree.o
+OBJECTS=	avltree.o sysattrs.o writefile.o process_xattrs.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lc -lavl
+LDLIBS +=	-lc -lavl -lnvpair
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
@@ -43,7 +43,7 @@ CFLAGS +=	$(CCVERBOSE)
 
 # All commands using the common avltree interfaces must
 # be largefile aware.
-CPPFLAGS +=	-I.. -D_REENTRANT -D_FILE_OFFSET_BITS=64
+CPPFLAGS +=	-I.. -I../../common/inc -D_REENTRANT -D_FILE_OFFSET_BITS=64
 
 .KEEP_STATE:
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *  	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -232,7 +232,7 @@ nfs_purge_caches(vnode_t *vp, int purge_dnlc, cred_t *cr)
 	 * Flush the page cache.
 	 */
 	if (vn_has_cached_data(vp)) {
-		error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_INVAL, cr);
+		error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_INVAL, cr, NULL);
 		if (error && (error == ENOSPC || error == EDQUOT)) {
 			mutex_enter(&rp->r_statelock);
 			if (!rp->r_error)
@@ -1807,7 +1807,7 @@ noasync:
 
 void
 nfs_async_inactive(vnode_t *vp, cred_t *cr,
-    void (*inactive)(vnode_t *, cred_t *))
+    void (*inactive)(vnode_t *, cred_t *, caller_context_t *))
 {
 	mntinfo_t *mi;
 	struct nfs_async_reqs *args;
@@ -1832,7 +1832,7 @@ nfs_async_inactive(vnode_t *vp, cred_t *cr,
 	 * set nfs3_max_threads/nfs_max_threads to zero in /etc/system.
 	 *
 	 * The manager thread knows about this and is willing to create
-	 * at least one thread to accomodate us.
+	 * at least one thread to accommodate us.
 	 */
 	mutex_enter(&mi->mi_async_lock);
 	if (mi->mi_manager_thread == NULL) {
@@ -2029,7 +2029,7 @@ nfs_async_start(struct vfs *vfsp)
 					args->a_nfs_offset, args->a_nfs_count,
 					args->a_cred);
 		} else if (args->a_io == NFS_INACTIVE) {
-			(*args->a_nfs_inactive)(args->a_vp, args->a_cred);
+			(*args->a_nfs_inactive)(args->a_vp, args->a_cred, NULL);
 		}
 
 		/*
@@ -2066,7 +2066,7 @@ nfs_async_stop(struct vfs *vfsp)
  * Wait for all outstanding putpage operation to complete. If a signal
  * is deliver we will abort and return non-zero. If we can put all the
  * pages we will return 0. This routine is called from nfs_unmount and
- * nfs3_unmount to make these operations interruptable.
+ * nfs3_unmount to make these operations interruptible.
  */
 int
 nfs_async_stop_sig(struct vfs *vfsp)
@@ -2329,7 +2329,7 @@ nfs_putpages(vnode_t *vp, u_offset_t off, size_t len, int flags, cred_t *cr)
 					flags, cr);
 
 		/*
-		 * If an error occured and the file was marked as dirty
+		 * If an error occurred and the file was marked as dirty
 		 * before and we aren't forcibly invalidating pages, then
 		 * reset the RDIRTY flag.
 		 */
@@ -2762,7 +2762,8 @@ nfs_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 		ld.l_whence = 0;	/* unlock from start of file */
 		ld.l_start = 0;
 		ld.l_len = 0;		/* do entire file */
-		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL, cr);
+		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL, cr,
+			NULL);
 
 		if (ret != 0) {
 			/*
@@ -2802,7 +2803,7 @@ nfs_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 		shr.s_sysid = 0;
 		shr.s_pid = curproc->p_pid;
 
-		ret = VOP_SHRLOCK(vp, F_UNSHARE, &shr, flag, cr);
+		ret = VOP_SHRLOCK(vp, F_UNSHARE, &shr, flag, cr, NULL);
 #ifdef DEBUG
 		if (ret != 0) {
 			nfs_perror(ret,
@@ -2975,7 +2976,7 @@ nfs_add_locking_id(vnode_t *vp, pid_t pid, int type, char *id, int len)
 				nowners++;
 			} else {
 				cmn_err(CE_PANIC, "nfs_add_locking_id: "
-				    "unrecognised lmpl_type %d",
+				    "unrecognized lmpl_type %d",
 				    cur->lmpl_type);
 			}
 		}
@@ -3055,7 +3056,7 @@ nfs_remove_locking_id(vnode_t *vp, int type, char *id, char *rid, int *rlen)
 				nowners++;
 			} else {
 				cmn_err(CE_PANIC,
-					"nrli: unrecognised lmpl_type %d",
+					"nrli: unrecognized lmpl_type %d",
 					cur->lmpl_type);
 			}
 		}

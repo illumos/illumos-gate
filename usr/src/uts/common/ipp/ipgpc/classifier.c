@@ -71,7 +71,7 @@ static void get_port_info(ipgpc_packet_t *, void *, int, mblk_t *);
  * common_classify(packet, fid_table, slctrs_srchd)
  *
  * searches each of the common selectors
- * - will return NORMAL_MATCH on sucess.  NO_MATCHES on error
+ * - will return NORMAL_MATCH on success.  NO_MATCHES on error
  */
 static int
 common_classify(ipgpc_packet_t *packet, ht_match_t *fid_table,

@@ -159,16 +159,16 @@ remove_core_file(char *fp, enum core_types core_type)
 	else if ((dvfsp = dvp->v_vfsp) != NULL &&
 	    (dvfsp->vfs_flag & VFS_RDONLY))
 		error = EROFS;
-	else if ((error = VOP_ACCESS(vp, VWRITE, 0, CRED())) == 0) {
+	else if ((error = VOP_ACCESS(vp, VWRITE, 0, CRED(), NULL)) == 0) {
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_READER);
 			in_crit = 1;
-			if (nbl_share_conflict(vp, NBL_REMOVE)) {
+			if (nbl_share_conflict(vp, NBL_REMOVE, NULL)) {
 				error = EACCES;
 			}
 		}
 		if (!error) {
-			error = VOP_REMOVE(dvp, pn.pn_path, CRED());
+			error = VOP_REMOVE(dvp, pn.pn_path, CRED(), NULL, 0);
 		}
 	}
 
@@ -254,8 +254,9 @@ create_core_file(char *fp, enum core_types core_type, vnode_t **vpp)
 		pn_setlast(&pn);
 		file = pn.pn_path;
 	}
-	error =  vn_openat(file, UIO_SYSSPACE, FWRITE | FTRUNC | FEXCL |
-	    FCREAT | FOFFMAX, perms, &vp, CRCREAT, PTOU(curproc)->u_cmask, dvp);
+	error =  vn_openat(file, UIO_SYSSPACE,
+	    FWRITE | FTRUNC | FEXCL | FCREAT | FOFFMAX,
+	    perms, &vp, CRCREAT, PTOU(curproc)->u_cmask, dvp, -1);
 	if (core_type != CORE_PROC) {
 		VN_RELE(dvp);
 		pn_free(&pn);
@@ -265,10 +266,10 @@ create_core_file(char *fp, enum core_types core_type, vnode_t **vpp)
 	 */
 	vattr.va_mask = AT_UID;
 	if (error == 0 &&
-	    (VOP_GETATTR(vp, &vattr, 0, credp) != 0 ||
+	    (VOP_GETATTR(vp, &vattr, 0, credp, NULL) != 0 ||
 	    vattr.va_uid != crgetuid(credp))) {
 		(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0,
-		    credp);
+		    credp, NULL);
 		VN_RELE(vp);
 		(void) remove_core_file(fp, core_type);
 		error = EACCES;
@@ -448,7 +449,7 @@ do_core(char *fp, int sig, enum core_types core_type, struct core_globals *cg)
 			rw_exit(eswp->exec_lock);
 		}
 
-		closerr = VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, credp);
+		closerr = VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, credp, NULL);
 		VN_RELE(vp);
 		if (error == 0)
 			error = closerr;

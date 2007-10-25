@@ -262,7 +262,7 @@ struct sonode {
 	 * but one of the key reasons for their existence and careful
 	 * tracking in sockfs is to support getsockname and getpeername
 	 * when the transport does not handle the TI_GET*NAME ioctls
-	 * and caching when it does (signalled by valid bits in so_state).
+	 * and caching when it does (signaled by valid bits in so_state).
 	 * When all transports support the new TPI (with T_ADDR_REQ)
 	 * we can revisit this code.
 	 * The other usage of so_faddr is to keep the "connected to"
@@ -704,7 +704,8 @@ extern int	sock_putmsg(vnode_t *, struct strbuf *, struct strbuf *,
 			uchar_t, int, int);
 struct sonode	*sotpi_create(vnode_t *, int, int, int, int, struct sonode *,
 			int *);
-extern int	socktpi_open(struct vnode **, int, struct cred *);
+extern int	socktpi_open(struct vnode **, int, struct cred *,
+			caller_context_t *);
 extern int	so_sock2stream(struct sonode *);
 extern void	so_stream2sock(struct sonode *);
 extern int	sockinit(int, char *);
@@ -783,7 +784,7 @@ extern int	sotpi_getsockopt(struct sonode *, int, int, void *,
 extern int	sotpi_setsockopt(struct sonode *, int, int, const void *,
 		    socklen_t);
 extern int	socktpi_ioctl(struct vnode *, int, intptr_t, int,
-		    struct cred *, int *);
+		    struct cred *, int *, caller_context_t *);
 extern int	sodisconnect(struct sonode *, t_scalar_t, int);
 extern ssize_t	soreadfile(file_t *, uchar_t *, u_offset_t, int *, size_t);
 extern int	so_set_asyncsigs(vnode_t *, pid_t, int, int, cred_t *);
@@ -795,7 +796,7 @@ extern void	sock_kstat_fini(zoneid_t, void *);
 extern struct sonode *getsonode(int, int *, file_t **);
 
 /*
- * Function wrappers (mostly arround the sonode switch) for
+ * Function wrappers (mostly around the sonode switch) for
  * backward compatibility.
  */
 extern int	soaccept(struct sonode *, int, struct sonode **);
@@ -820,15 +821,19 @@ extern struct sonode	*socreate(vnode_t *, int, int, int, int,
 extern int	so_copyin(const void *, void *, size_t, int);
 extern int	so_copyout(const void *, void *, size_t, int);
 
-extern int	socktpi_access(struct vnode *, int, int, struct cred *);
-extern int	socktpi_fid(struct vnode *, struct fid *);
-extern int	socktpi_fsync(struct vnode *, int, struct cred *);
+extern int	socktpi_access(struct vnode *, int, int, struct cred *,
+		    caller_context_t *);
+extern int	socktpi_fid(struct vnode *, struct fid *, caller_context_t *);
+extern int	socktpi_fsync(struct vnode *, int, struct cred *,
+		    caller_context_t *);
 extern int	socktpi_getattr(struct vnode *, struct vattr *, int,
-		    struct cred *);
-extern int	socktpi_seek(struct vnode *, offset_t, offset_t *);
+		    struct cred *, caller_context_t *);
+extern int	socktpi_seek(struct vnode *, offset_t, offset_t *,
+		    caller_context_t *);
 extern int	socktpi_setattr(struct vnode *, struct vattr *, int,
 		    struct cred *, caller_context_t *);
-extern int	socktpi_setfl(vnode_t *, int, int, cred_t *);
+extern int	socktpi_setfl(vnode_t *, int, int, cred_t *,
+		    caller_context_t *);
 
 /* SCTP sockfs */
 extern struct sonode	*sosctp_create(vnode_t *, int, int, int, int,

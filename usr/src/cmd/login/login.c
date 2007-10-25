@@ -60,7 +60,7 @@
  * -z <zonename>: This flag is passed to login when zlogin(1) executes a
  *    zone login.  This tells login(1) to skip it's normal CONSOLE check
  *    (i.e. that the root login must be on /dev/console) and tells us the
- *    name of the zone from which the login is occuring.
+ *    name of the zone from which the login is occurring.
  */
 
 #include <sys/types.h>

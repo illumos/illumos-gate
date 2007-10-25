@@ -246,6 +246,7 @@ COMMON_SUBDIRS = \
 	cmd/sdpadm \
 	cmd/setpgrp \
 	cmd/smbios \
+	cmd/smbsrv \
 	cmd/smserverd \
 	cmd/sort \
 	cmd/split \
@@ -400,6 +401,7 @@ COMMON_SUBDIRS = \
 	lib/pkcs11 \
 	lib/print \
 	lib/raidcfg_plugins \
+	lib/smbsrv \
 	lib/fm \
 	lib/udapl \
 	lib/watchmalloc \

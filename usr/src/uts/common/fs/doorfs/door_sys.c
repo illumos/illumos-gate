@@ -69,14 +69,14 @@
 #include <sys/rctl.h>
 
 /*
- * The maximum amount of data (in bytes) that will be transfered using
+ * The maximum amount of data (in bytes) that will be transferred using
  * an intermediate kernel buffer.  For sizes greater than this we map
  * in the destination pages and perform a 1-copy transfer.
  */
 size_t	door_max_arg = 16 * 1024;
 
 /*
- * Maximum amount of data that will be transfered in a reply to a
+ * Maximum amount of data that will be transferred in a reply to a
  * door_upcall.  Need to guard against a process returning huge amounts
  * of data and getting the kernel stuck in kmem_alloc.
  */
@@ -168,7 +168,7 @@ _init(void)
 		cmn_err(CE_WARN, "door init: bad vfs ops");
 		return (error);
 	}
-	vfs_setops(&door_vfs, door_vfsops);
+	VFS_INIT(&door_vfs, door_vfsops, NULL);
 	door_vfs.vfs_flag = VFS_RDONLY;
 	door_vfs.vfs_dev = doordev;
 	vfs_make_fsid(&(door_vfs.vfs_fsid), doordev, 0);
@@ -1726,7 +1726,7 @@ door_insert(struct file *fp, door_desc_t *dp)
 	dp->d_data.d_desc.d_descriptor = fd;
 
 	/* Fill in the attributes */
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 	if (vp && vp->v_type == VDOOR) {
 		if (VTOD(vp)->door_target == curproc)
@@ -1796,7 +1796,7 @@ door_get_server(door_node_t *dp)
 		if (!cv_wait_sig_swap_core(&pool->dp_cv, &door_knob,
 		    &signalled)) {
 			/*
-			 * If we were signalled and the door is still
+			 * If we were signaled and the door is still
 			 * valid, pass the signal on to another waiter.
 			 */
 			if (signalled && !DOOR_INVALID(dp))
@@ -1905,7 +1905,7 @@ door_lookup(int did, file_t **fpp)
 	/*
 	 * Use the underlying vnode (we may be namefs mounted)
 	 */
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 
 	if (vp == NULL || vp->v_type != VDOOR) {
@@ -2562,7 +2562,7 @@ door_translate_in(void)
 					(void) closeandsetf(fd, NULL);
 				}
 
-				if (VOP_REALVP(fp->f_vnode, &vp))
+				if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 					vp = fp->f_vnode;
 
 				/* Set attributes */
@@ -3217,7 +3217,7 @@ shuttle_return:
 			struct file *fp;
 
 			fp = *fpp;
-			if (VOP_REALVP(fp->f_vnode, &vp))
+			if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 				vp = fp->f_vnode;
 
 			didpp->d_attributes = DOOR_HANDLE |
@@ -3297,7 +3297,7 @@ door_ki_upcall(door_handle_t dh, door_arg_t *param)
 	file_t *fp = DHTOF(dh);
 	vnode_t *realvp;
 
-	if (VOP_REALVP(fp->f_vnode, &realvp))
+	if (VOP_REALVP(fp->f_vnode, &realvp, NULL))
 		realvp = fp->f_vnode;
 	return (door_upcall(realvp, param));
 }
@@ -3365,7 +3365,7 @@ door_ki_open(char *pathname, door_handle_t *dhp)
 
 	if ((err = lookupname(pathname, UIO_SYSSPACE, FOLLOW, NULL, &vp)) != 0)
 		return (err);
-	if (err = VOP_OPEN(&vp, FREAD, kcred)) {
+	if (err = VOP_OPEN(&vp, FREAD, kcred, NULL)) {
 		VN_RELE(vp);
 		return (err);
 	}
@@ -3389,7 +3389,7 @@ door_ki_info(door_handle_t dh, struct door_info *dip)
 	file_t *fp = DHTOF(dh);
 	vnode_t *vp;
 
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 	if (vp->v_type != VDOOR)
 		return (EINVAL);
@@ -3419,7 +3419,7 @@ door_ki_setparam(door_handle_t dh, int type, size_t val)
 	file_t *fp = DHTOF(dh);
 	vnode_t *vp;
 
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 	if (vp->v_type != VDOOR)
 		return (EINVAL);
@@ -3432,7 +3432,7 @@ door_ki_getparam(door_handle_t dh, int type, size_t *out)
 	file_t *fp = DHTOF(dh);
 	vnode_t *vp;
 
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 	if (vp->v_type != VDOOR)
 		return (EINVAL);

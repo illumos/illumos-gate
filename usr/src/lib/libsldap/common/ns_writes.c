@@ -86,7 +86,7 @@ replace_mapped_attr_in_dn(
 	*new_dn = NULL;
 
 	/*
-	 * seperate dn into individual componets
+	 * separate dn into individual componets
 	 * e.g.
 	 * "automountKey=user_01" , "automountMapName_test=auto_home", ...
 	 */

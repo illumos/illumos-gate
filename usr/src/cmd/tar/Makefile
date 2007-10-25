@@ -40,7 +40,7 @@ DCFILE= $(PROG).dc
 LINTFLAGS += -u
 LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsol
-LDLIBS += -lsec $(LAZYLIBS)
+LDLIBS += -lsec -lcmdutils -lnvpair $(LAZYLIBS)
 
 CFLAGS += $(CCVERBOSE)
 

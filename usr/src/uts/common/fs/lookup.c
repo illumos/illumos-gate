@@ -209,6 +209,8 @@ lookuppnvp(
 	int error;
 	int nlink;
 	int lookup_flags;
+	struct pathname presrvd; /* case preserved name */
+	struct pathname *pp = NULL;
 	vnode_t *startvp;
 	vnode_t *zonevp = curproc->p_zone->zone_rootvp;		/* zone root */
 	int must_be_directory = 0;
@@ -219,7 +221,14 @@ lookuppnvp(
 	cvp = NULL;
 	if (rpnp)
 		rpnp->pn_pathlen = 0;
+
 	lookup_flags = dirvpp ? LOOKUP_DIR : 0;
+	if (flags & FIGNORECASE) {
+		lookup_flags |= FIGNORECASE;
+		pn_alloc(&presrvd);
+		pp = &presrvd;
+	}
+
 #ifdef C2_AUDIT
 	if (audit_active)
 		audit_anchorpath(pnp, vp == rootvp);
@@ -319,6 +328,8 @@ checkforroot:
 			    (cvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)) {
 				vfs_unlock(vfsp);
 				VN_RELE(cvp);
+				if (pp)
+					pn_free(pp);
 				return (EIO);
 			}
 			VN_HOLD(vp);
@@ -346,14 +357,14 @@ checkforroot:
 	 * be found.
 	 */
 	if ((flags & LOOKUP_CHECKREAD) &&
-	    (error = VOP_ACCESS(vp, VREAD, 0, cr)) != 0)
+	    (error = VOP_ACCESS(vp, VREAD, 0, cr, NULL)) != 0)
 		goto bad;
 
 	/*
 	 * Perform a lookup in the current directory.
 	 */
 	error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
-	    rootvp, cr);
+	    rootvp, cr, NULL, NULL, pp);
 
 	/*
 	 * Retry with kcred - If crossing mount points & error is EACCES.
@@ -371,7 +382,7 @@ checkforroot:
 	 */
 	if ((error == EACCES) && retry_with_kcred)
 		error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
-		    rootvp, zone_kcred());
+		    rootvp, zone_kcred(), NULL, NULL, pp);
 
 	cvp = tvp;
 	if (error) {
@@ -402,6 +413,8 @@ checkforroot:
 			*compvpp = NULL;
 		if (rootvp != rootdir)
 			VN_RELE(rootvp);
+		if (pp)
+			pn_free(pp);
 		return (0);
 	}
 
@@ -521,9 +534,19 @@ checkforroot:
 			if (rpnp->pn_pathlen != 0 &&
 			    rpnp->pn_path[rpnp->pn_pathlen-1] != '/')
 				rpnp->pn_path[rpnp->pn_pathlen++] = '/';
-			error = copystr(component,
-			    rpnp->pn_path + rpnp->pn_pathlen,
-			    rpnp->pn_bufsize - rpnp->pn_pathlen, &len);
+			if (flags & FIGNORECASE) {
+				/*
+				 * Return the case-preserved name
+				 * within the resolved path.
+				 */
+				error = copystr(pp->pn_path,
+				    rpnp->pn_path + rpnp->pn_pathlen,
+				    rpnp->pn_bufsize - rpnp->pn_pathlen, &len);
+			} else {
+				error = copystr(component,
+				    rpnp->pn_path + rpnp->pn_pathlen,
+				    rpnp->pn_bufsize - rpnp->pn_pathlen, &len);
+			}
 			if (error)	/* copystr() returns ENAMETOOLONG */
 				goto bad;
 			rpnp->pn_pathlen += (len - 1);
@@ -560,6 +583,8 @@ checkforroot:
 				VN_RELE(cvp);
 				if (rootvp != rootdir)
 					VN_RELE(rootvp);
+				if (pp)
+					pn_free(pp);
 				return (EINVAL);
 			}
 #ifdef C2_AUDIT
@@ -592,6 +617,8 @@ checkforroot:
 			VN_RELE(cvp);
 		if (rootvp != rootdir)
 			VN_RELE(rootvp);
+		if (pp)
+			pn_free(pp);
 		return (0);
 	}
 
@@ -649,6 +676,8 @@ bad_noaudit:
 	VN_RELE(vp);
 	if (rootvp != rootdir)
 		VN_RELE(rootvp);
+	if (pp)
+		pn_free(pp);
 	return (error);
 }
 
@@ -791,15 +820,15 @@ vnode_match(vnode_t *v1, vnode_t *v2, cred_t *cr)
 	 * are currently in '/proc/self/fd', then '/proc/self/cwd' will compare
 	 * as the same vnode.
 	 */
-	if (VOP_GETATTR(v1, &v1attr, 0, cr) != 0 ||
-	    VOP_GETATTR(v2, &v2attr, 0, cr) != 0 ||
+	if (VOP_GETATTR(v1, &v1attr, 0, cr, NULL) != 0 ||
+	    VOP_GETATTR(v2, &v2attr, 0, cr, NULL) != 0 ||
 	    v1attr.va_type == VLNK || v2attr.va_type == VLNK)
 		return (0);
 
 	v1attr.va_mask = v2attr.va_mask = AT_TYPE | AT_FSID | AT_NODEID;
 
-	if (VOP_GETATTR(v1, &v1attr, ATTR_REAL, cr) != 0 ||
-	    VOP_GETATTR(v2, &v2attr, ATTR_REAL, cr) != 0)
+	if (VOP_GETATTR(v1, &v1attr, ATTR_REAL, cr, NULL) != 0 ||
+	    VOP_GETATTR(v2, &v2attr, ATTR_REAL, cr, NULL) != 0)
 		return (0);
 
 	return (v1attr.va_fsid == v2attr.va_fsid &&
@@ -839,7 +868,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	uio.uio_extflg = UIO_COPY_CACHED;
 	uio.uio_loffset = 0;
 
-	if ((error = VOP_ACCESS(dvp, VREAD, 0, cr)) != 0)
+	if ((error = VOP_ACCESS(dvp, VREAD, 0, cr, NULL)) != 0)
 		return (error);
 
 	while (!eof) {
@@ -848,7 +877,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 		iov.iov_len = dlen;
 
 		(void) VOP_RWLOCK(dvp, V_WRITELOCK_FALSE, NULL);
-		error = VOP_READDIR(dvp, &uio, cr, &eof);
+		error = VOP_READDIR(dvp, &uio, cr, &eof, NULL, 0);
 		VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 
 		dbuflen = dlen - uio.uio_resid;
@@ -869,7 +898,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 			}
 
 			error = VOP_LOOKUP(dvp, dp->d_name, &cmpvp, &pnp, 0,
-			    vrootp, cr);
+			    vrootp, cr, NULL, NULL, NULL);
 
 			/*
 			 * We only want to bail out if there was an error other
@@ -900,7 +929,8 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	 * rare conditions (races and the special .zfs directory).
 	 */
 	if (error == 0) {
-		error = VOP_LOOKUP(dvp, ".zfs", &cmpvp, &pnp, 0, vrootp, cr);
+		error = VOP_LOOKUP(dvp, ".zfs", &cmpvp, &pnp, 0, vrootp, cr,
+		    NULL, NULL, NULL);
 		if (error == 0) {
 			if (vnode_match(tvp, cmpvp, cr)) {
 				(void) strcpy(dp->d_name, ".zfs");
@@ -955,7 +985,8 @@ localpath(char *path, struct vnode *vrootp, cred_t *cr)
 		if (vn_ismntpt(vp) && traverse(&vp) != 0)
 			break;
 
-		if (VOP_LOOKUP(vp, component, &cvp, &pn, 0, rootdir, cr) != 0)
+		if (VOP_LOOKUP(vp, component, &cvp, &pn, 0, rootdir, cr,
+		    NULL, NULL, NULL) != 0)
 			break;
 
 		VN_RELE(vp);
@@ -1087,8 +1118,8 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 		 */
 		if (vp->v_flag & VROOT)
 			vp = vn_under(vp);
-		if ((err = VOP_LOOKUP(vp, "..", &pvp, &emptypn, 0, vrootp, cr))
-		    != 0)
+		if ((err = VOP_LOOKUP(vp, "..", &pvp, &emptypn, 0, vrootp, cr,
+		    NULL, NULL, NULL)) != 0)
 			goto out;
 
 		/*
@@ -1210,10 +1241,10 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 	 * lofs.  The only difference between procfs and lofs is that opening
 	 * the file will return the underling vnode in the case of procfs.
 	 */
-	if (vp->v_type == VDIR && VOP_REALVP(vp, &realvp) == 0 &&
+	if (vp->v_type == VDIR && VOP_REALVP(vp, &realvp, NULL) == 0 &&
 	    realvp != vp) {
 		VN_HOLD(vp);
-		if (VOP_OPEN(&vp, FREAD, cr) == 0)
+		if (VOP_OPEN(&vp, FREAD, cr, NULL) == 0)
 			doclose = 1;
 		else
 			VN_RELE(vp);
@@ -1314,7 +1345,7 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 			pn_free(&rpn);
 			VN_RELE(vrootp);
 			if (doclose) {
-				(void) VOP_CLOSE(vp, FREAD, 1, 0, cr);
+				(void) VOP_CLOSE(vp, FREAD, 1, 0, cr, NULL);
 				VN_RELE(vp);
 			}
 			return (0);
@@ -1356,7 +1387,7 @@ notcached:
 
 	VN_RELE(vrootp);
 	if (doclose) {
-		(void) VOP_CLOSE(vp, FREAD, 1, 0, cr);
+		(void) VOP_CLOSE(vp, FREAD, 1, 0, cr, NULL);
 		VN_RELE(vp);
 	}
 
@@ -1394,7 +1425,7 @@ dogetcwd(char *buf, size_t buflen)
 	/*
 	 * Make sure we have permission to access the current directory.
 	 */
-	if ((ret = VOP_ACCESS(vp, VEXEC, 0, CRED())) != 0) {
+	if ((ret = VOP_ACCESS(vp, VEXEC, 0, CRED(), NULL)) != 0) {
 		if (cwd != NULL)
 			refstr_rele(cwd);
 		VN_RELE(vp);

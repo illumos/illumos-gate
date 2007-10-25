@@ -55,13 +55,14 @@
  * Define the routines within this file.
  */
 static int	swap_getpage(struct vnode *vp, offset_t off, size_t len,
-    uint_t *protp, struct page **plarr, size_t plsz,
-    struct seg *seg, caddr_t addr, enum seg_rw rw, struct cred *cr);
+    uint_t *protp, struct page **plarr, size_t plsz, struct seg *seg,
+    caddr_t addr, enum seg_rw rw, struct cred *cr, caller_context_t *ct);
 static int	swap_putpage(struct vnode *vp, offset_t off, size_t len,
-    int flags, struct cred *cr);
-static void	swap_inactive(struct vnode *vp, struct cred *cr);
+    int flags, struct cred *cr, caller_context_t *ct);
+static void	swap_inactive(struct vnode *vp, struct cred *cr,
+    caller_context_t *ct);
 static void	swap_dispose(vnode_t *vp, page_t *pp, int fl, int dn,
-    cred_t *cr);
+    cred_t *cr, caller_context_t *ct);
 
 static int	swap_getapage(struct vnode *vp, u_offset_t off, size_t len,
     uint_t *protp, page_t **plarr, size_t plsz,
@@ -94,7 +95,8 @@ vnodeops_t *swap_vnodeops;
 static void
 swap_inactive(
 	struct vnode *vp,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	SWAPFS_PRINT(SWAP_VOPS, "swap_inactive: vp %x\n", vp, 0, 0, 0, 0);
 }
@@ -102,6 +104,7 @@ swap_inactive(
 /*
  * Return all the pages from [off..off+len] in given file
  */
+/*ARGSUSED*/
 static int
 swap_getpage(
 	struct vnode *vp,
@@ -113,7 +116,8 @@ swap_getpage(
 	struct seg *seg,
 	caddr_t addr,
 	enum seg_rw rw,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int err;
 
@@ -236,7 +240,7 @@ again:
 
 				flags = (pl == NULL ? B_ASYNC|B_READ : B_READ);
 				err = VOP_PAGEIO(pvp, pp, poff,
-				    PAGESIZE, flags, cr);
+				    PAGESIZE, flags, cr, NULL);
 
 				if (!err) {
 					ahm = &anonhash_lock[AH_LOCK(vp, off)];
@@ -412,7 +416,8 @@ swap_getconpage(
 		}
 
 		if (pvp) {
-			err = VOP_PAGEIO(pvp, pp, poff, PAGESIZE, B_READ, cr);
+			err = VOP_PAGEIO(pvp, pp, poff, PAGESIZE, B_READ, cr,
+				NULL);
 		} else {
 			pagezero(pp, 0, PAGESIZE);
 		}
@@ -464,7 +469,8 @@ swap_putpage(
 	offset_t off,
 	size_t len,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	page_t *pp;
 	u_offset_t io_off;
@@ -709,7 +715,7 @@ swap_putapage(
 	}
 
 	err = VOP_PAGEIO(klvp, pplist, klstart, klsz,
-		    B_WRITE | flags, cr);
+		    B_WRITE | flags, cr, NULL);
 
 	if ((flags & B_ASYNC) == 0)
 		pvn_write_done(pp, ((err) ? B_ERROR : 0) | B_WRITE | flags);
@@ -731,7 +737,13 @@ out:
 }
 
 static void
-swap_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
+swap_dispose(
+	vnode_t *vp,
+	page_t *pp,
+	int fl,
+	int dn,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int err;
 	u_offset_t off = pp->p_offset;
@@ -751,7 +763,7 @@ swap_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
 
 	err = swap_getphysname(vp, off, &pvp, &poff);
 	if (!err && pvp != NULL)
-		VOP_DISPOSE(pvp, pp, fl, dn, cr);
+		VOP_DISPOSE(pvp, pp, fl, dn, cr, ct);
 	else
-		fs_dispose(vp, pp, fl, dn, cr);
+		fs_dispose(vp, pp, fl, dn, cr, ct);
 }

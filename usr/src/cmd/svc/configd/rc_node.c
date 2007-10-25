@@ -900,7 +900,7 @@ perm_add_enabling(permcheck_t *pcp, const char *auth)
  * perm_granted() returns 1 if the current door caller has one of the enabling
  * authorizations in pcp, 0 if it doesn't, and -1 if an error (usually lack of
  * memory) occurs.  check_auth_list() checks an RBAC_AUTH_SEP-separated list
- * of authorizations for existance in pcp, and check_prof_list() checks the
+ * of authorizations for existence in pcp, and check_prof_list() checks the
  * authorizations granted to an RBAC_AUTH_SEP-separated list of profiles.
  */
 static int

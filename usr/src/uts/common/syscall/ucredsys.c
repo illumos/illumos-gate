@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ getpeerucred(int fd, void *buf)
 	case VFIFO:
 	case VSOCK:
 		err = VOP_IOCTL(vp, _I_GETPEERCRED, (intptr_t)&kpc,
-		    FKIOCTL, CRED(), &rval);
+		    FKIOCTL, CRED(), &rval, NULL);
 		break;
 	case VCHR: {
 		struct strioctl strioc;

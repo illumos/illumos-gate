@@ -466,7 +466,7 @@ struct sockaddr_in *sin;
 	 *	there is no way to do the "pam_close_session()".
 	 *
 	 *	Processes like "init" can do a pam_close_session()
-	 *	because they can use the utmp entry to retrive
+	 *	because they can use the utmp entry to retrieve
 	 *	the proper username, ttyname, etc. --
 	 *	uucpd only writes to the wtmp file.
 	 *

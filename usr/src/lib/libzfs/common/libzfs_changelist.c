@@ -71,6 +71,7 @@ typedef struct prop_changenode {
 struct prop_changelist {
 	zfs_prop_t		cl_prop;
 	zfs_prop_t		cl_realprop;
+	zfs_prop_t		cl_shareprop;  /* used with sharenfs/sharesmb */
 	uu_list_pool_t		*cl_pool;
 	uu_list_t		*cl_list;
 	boolean_t		cl_waslegacy;
@@ -185,6 +186,7 @@ changelist_postfix(prop_changelist_t *clp)
 	    cn = uu_list_prev(clp->cl_list, cn)) {
 
 		boolean_t sharenfs;
+		boolean_t sharesmb;
 
 		/*
 		 * If we are in the global zone, but this dataset is exported
@@ -222,14 +224,18 @@ changelist_postfix(prop_changelist_t *clp)
 
 		/*
 		 * Remount if previously mounted or mountpoint was legacy,
-		 * or sharenfs property is set.
+		 * or sharenfs or sharesmb  property is set.
 		 */
 		sharenfs = ((zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARENFS,
 		    shareopts, sizeof (shareopts), NULL, NULL, 0,
 		    B_FALSE) == 0) && (strcmp(shareopts, "off") != 0));
 
-		if ((cn->cn_mounted || clp->cl_waslegacy || sharenfs) &&
-		    !zfs_is_mounted(cn->cn_handle, NULL) &&
+		sharesmb = ((zfs_prop_get(cn->cn_handle, ZFS_PROP_SHARESMB,
+		    shareopts, sizeof (shareopts), NULL, NULL, 0,
+		    B_FALSE) == 0) && (strcmp(shareopts, "off") != 0));
+
+		if ((cn->cn_mounted || clp->cl_waslegacy || sharenfs ||
+		    sharesmb) && !zfs_is_mounted(cn->cn_handle, NULL) &&
 		    zfs_mount(cn->cn_handle, NULL, 0) != 0)
 			ret = -1;
 
@@ -237,11 +243,16 @@ changelist_postfix(prop_changelist_t *clp)
 		 * We always re-share even if the filesystem is currently
 		 * shared, so that we can adopt any new options.
 		 */
-		if (cn->cn_shared || clp->cl_waslegacy || sharenfs) {
+		if (cn->cn_shared || clp->cl_waslegacy ||
+		    sharenfs || sharesmb) {
 			if (sharenfs)
 				ret = zfs_share_nfs(cn->cn_handle);
 			else
 				ret = zfs_unshare_nfs(cn->cn_handle, NULL);
+			if (sharesmb)
+				ret = zfs_share_smb(cn->cn_handle);
+			else
+				ret = zfs_unshare_smb(cn->cn_handle, NULL);
 		}
 	}
 
@@ -302,21 +313,22 @@ changelist_rename(prop_changelist_t *clp, const char *src, const char *dst)
 }
 
 /*
- * Given a gathered changelist for the 'sharenfs' property, unshare all the
- * datasets in the list.
+ * Given a gathered changelist for the 'sharenfs' or 'sharesmb' property,
+ * unshare all the datasets in the list.
  */
 int
-changelist_unshare(prop_changelist_t *clp)
+changelist_unshare(prop_changelist_t *clp, zfs_share_proto_t *proto)
 {
 	prop_changenode_t *cn;
 	int ret = 0;
 
-	if (clp->cl_prop != ZFS_PROP_SHARENFS)
+	if (clp->cl_prop != ZFS_PROP_SHARENFS &&
+	    clp->cl_prop != ZFS_PROP_SHARESMB)
 		return (0);
 
 	for (cn = uu_list_first(clp->cl_list); cn != NULL;
 	    cn = uu_list_next(clp->cl_list, cn)) {
-		if (zfs_unshare_nfs(cn->cn_handle, NULL) != 0)
+		if (zfs_unshare_proto(cn->cn_handle, NULL, proto) != 0)
 			ret = -1;
 	}
 
@@ -386,6 +398,7 @@ change_one(zfs_handle_t *zhp, void *data)
 	char where[64];
 	prop_changenode_t *cn;
 	zprop_source_t sourcetype;
+	zprop_source_t share_sourcetype;
 
 	/*
 	 * We only want to unmount/unshare those filesystems that may inherit
@@ -405,9 +418,25 @@ change_one(zfs_handle_t *zhp, void *data)
 		return (0);
 	}
 
+	/*
+	 * If we are "watching" sharenfs or sharesmb
+	 * then check out the companion property which is tracked
+	 * in cl_shareprop
+	 */
+	if (clp->cl_shareprop != ZPROP_INVAL &&
+	    zfs_prop_get(zhp, clp->cl_shareprop, property,
+	    sizeof (property), &share_sourcetype, where, sizeof (where),
+	    B_FALSE) != 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
 	if (clp->cl_alldependents || clp->cl_allchildren ||
 	    sourcetype == ZPROP_SRC_DEFAULT ||
-	    sourcetype == ZPROP_SRC_INHERITED) {
+	    sourcetype == ZPROP_SRC_INHERITED ||
+	    (clp->cl_shareprop != ZPROP_INVAL &&
+	    (share_sourcetype == ZPROP_SRC_DEFAULT ||
+	    share_sourcetype == ZPROP_SRC_INHERITED))) {
 		if ((cn = zfs_alloc(zfs_get_handle(zhp),
 		    sizeof (prop_changenode_t))) == NULL) {
 			zfs_close(zhp);
@@ -507,7 +536,8 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * order, regardless of their position in the hierarchy.
 	 */
 	if (prop == ZFS_PROP_NAME || prop == ZFS_PROP_ZONED ||
-	    prop == ZFS_PROP_MOUNTPOINT || prop == ZFS_PROP_SHARENFS) {
+	    prop == ZFS_PROP_MOUNTPOINT || prop == ZFS_PROP_SHARENFS ||
+	    prop == ZFS_PROP_SHARESMB) {
 		compare = compare_mountpoints;
 		clp->cl_sorted = B_TRUE;
 	}
@@ -561,8 +591,18 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 
 	if (clp->cl_prop != ZFS_PROP_MOUNTPOINT &&
 	    clp->cl_prop != ZFS_PROP_SHARENFS &&
+	    clp->cl_prop != ZFS_PROP_SHARESMB &&
 	    clp->cl_prop != ZFS_PROP_SHAREISCSI)
 		return (clp);
+
+	/*
+	 * If watching SHARENFS or SHARESMB then
+	 * also watch its companion property.
+	 */
+	if (clp->cl_prop == ZFS_PROP_SHARENFS)
+		clp->cl_shareprop = ZFS_PROP_SHARESMB;
+	else if (clp->cl_prop == ZFS_PROP_SHARESMB)
+		clp->cl_shareprop = ZFS_PROP_SHARENFS;
 
 	if (clp->cl_alldependents) {
 		if (zfs_iter_dependents(zhp, B_TRUE, change_one, clp) != 0) {

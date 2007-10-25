@@ -3630,11 +3630,11 @@ di_cache_write(struct di_cache *cache)
 	/*
 	 * Now sync the file and close it
 	 */
-	if (error = VOP_FSYNC(vp, FSYNC, kcred)) {
+	if (error = VOP_FSYNC(vp, FSYNC, kcred, NULL)) {
 		CACHE_DEBUG((DI_ERR, "FSYNC failed: %d", error));
 	}
 
-	if (error = VOP_CLOSE(vp, oflags, 1, (offset_t)0, kcred)) {
+	if (error = VOP_CLOSE(vp, oflags, 1, (offset_t)0, kcred, NULL)) {
 		CACHE_DEBUG((DI_ERR, "close() failed: %d", error));
 		VN_RELE(vp);
 		return;
@@ -3655,7 +3655,7 @@ di_cache_write(struct di_cache *cache)
 	return;
 
 fail:
-	(void) VOP_CLOSE(vp, oflags, 1, (offset_t)0, kcred);
+	(void) VOP_CLOSE(vp, oflags, 1, (offset_t)0, kcred, NULL);
 	VN_RELE(vp);
 }
 

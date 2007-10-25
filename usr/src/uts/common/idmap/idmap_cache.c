@@ -368,8 +368,8 @@ kidmap_cache_purge_avl(idmap_avl_cache_t *cache)
 			if (rw_tryupgrade(&cache->lock) == 0) {
 				/*
 				 * Could not upgrade lock so release lock
-				 * and aquire the write lock. It is valid to
-				 * release abd re-aquire the lock as there
+				 * and acquire the write lock. It is valid to
+				 * release abd re-acquire the lock as there
 				 * can only be one purge routine running on an
 				 * avl tree and no other routine removes
 				 * entries.
@@ -451,7 +451,7 @@ kidmap_find_sid_prefix(const char *sid_prefix) {
 	if (rw_tryupgrade(&kidmap_sid_prefix_store->lock) == 0) {
 		/*
 		 * Could not upgrade lock so release lock
-		 * and aquire the write lock
+		 * and acquire the write lock
 		 */
 		rw_exit(&kidmap_sid_prefix_store->lock);
 		rw_enter(&kidmap_sid_prefix_store->lock, RW_WRITER);

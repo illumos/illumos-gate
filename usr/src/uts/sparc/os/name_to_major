@@ -149,6 +149,7 @@ bscbus 198
 bscv 199
 i2bsc 200
 mc-us3i 201
+smbsrv 202
 rmc_comm 203
 rmclomv 204
 rmcadm 205

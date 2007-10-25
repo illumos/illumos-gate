@@ -1460,7 +1460,7 @@ pr_setsig(prnode_t *pnp, siginfo_t *sip)
 		}
 		thread_lock(t);
 		if (ISWAKEABLE(t) || ISWAITING(t)) {
-			/* Set signalled sleeping/waiting lwp running */
+			/* Set signaled sleeping/waiting lwp running */
 			setrun_locked(t);
 		} else if (t->t_state == TS_STOPPED && sig == SIGKILL) {
 			/* If SIGKILL, set stopped lwp running */

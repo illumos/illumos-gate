@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,12 +128,12 @@ static struct modlinkage modlinkage = {
  * This assumption is not true for /dev/poll; hence the need for extra
  * locking.
  *
- * To allow more paralellism, each /dev/poll file descriptor (indexed by
+ * To allow more parallelism, each /dev/poll file descriptor (indexed by
  * minor number) has its own lock. Since read (dpioctl) is a much more
  * frequent operation than write, we want to allow multiple reads on same
  * /dev/poll fd. However, we prevent writes from being starved by giving
  * priority to write operation. Theoretically writes can starve reads as
- * well. But in pratical sense this is not important because (1) writes
+ * well. But in practical sense this is not important because (1) writes
  * happens less often than reads, and (2) write operation defines the
  * content of poll fd a cache set. If writes happens so often that they
  * can starve reads, that means the cached set is very unstable. It may
@@ -348,7 +348,7 @@ retry:
 			 */
 			curthread->t_pollcache = pcp;
 			error = VOP_POLL(fp->f_vnode, pdp->pd_events, 0,
-			    &revent, &php);
+			    &revent, &php, NULL);
 			curthread->t_pollcache = NULL;
 			releasef(fd);
 			if (error != 0) {
@@ -623,7 +623,7 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			 */
 			curthread->t_pollcache = pcp;
 			error = VOP_POLL(fp->f_vnode, pfdp->events, 0,
-			    &pfdp->revents, &php);
+			    &pfdp->revents, &php, NULL);
 			curthread->t_pollcache = NULL;
 			/*
 			 * We always set the bit when this fd is cached.
@@ -809,7 +809,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 				continue;
 
 			/*
-			 * Sleep until we are notified, signalled, or timed out.
+			 * Sleep until we are notified, signaled, or timed out.
 			 * Do not check for signals if we have a zero timeout.
 			 */
 			if (time_out == 0)	/* immediate timeout */

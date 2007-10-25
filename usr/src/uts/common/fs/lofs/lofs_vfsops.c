@@ -287,7 +287,7 @@ lo_mount(struct vfs *vfsp,
 	 * intended filesystem, so we loopback mount the intended
 	 * filesystem instead of the AUTOFS filesystem.
 	 */
-	(void) VOP_ACCESS(realrootvp, 0, 0, cr);
+	(void) VOP_ACCESS(realrootvp, 0, 0, cr, NULL);
 
 	/*
 	 * We're interested in the top most filesystem.

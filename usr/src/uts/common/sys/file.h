@@ -89,10 +89,6 @@ typedef struct fpollinfo {
 #define	FREVOKED	0x20	/* C2 Security - Revoke Subsystem */
 #endif
 #define	FDSYNC		0x40	/* file data only integrity while writing */
-#define	FRSYNC		0x8000	/* sync read operations at same level of */
-				/* integrity as specified for writes by */
-				/* FSYNC and FDSYNC flags */
-#define	FOFFMAX		0x2000	/* large file */
 #define	FNONBLOCK	0x80
 
 #define	FMASK		0xa0ff	/* all flags that can be changed by F_SETFL */
@@ -102,14 +98,20 @@ typedef struct fpollinfo {
 #define	FCREAT		0x0100
 #define	FTRUNC		0x0200
 #define	FEXCL		0x0400
-#define	FNOCTTY		0x0800
-#define	FXATTR		0x4000	/* open as extended attribute */
-
 #define	FASYNC		0x1000	/* asyncio in progress pseudo flag */
+#define	FOFFMAX		0x2000	/* large file */
+#define	FXATTR		0x4000	/* open as extended attribute */
+#define	FNOCTTY		0x0800
+#define	FRSYNC		0x8000	/* sync read operations at same level of */
+				/* integrity as specified for writes by */
+				/* FSYNC and FDSYNC flags */
+
 #define	FNODSYNC	0x10000 /* fsync pseudo flag */
 
 #define	FNOFOLLOW	0x20000	/* don't follow symlinks */
 #define	FNOLINKS	0x40000	/* don't allow multiple hard links */
+#define	FIGNORECASE	0x80000 /* request case-insensitive lookups */
+#define	FXATTRDIROPEN	0x100000  /* only opening hidden attribute directory */
 
 #ifdef _KERNEL
 

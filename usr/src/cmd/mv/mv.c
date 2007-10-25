@@ -44,22 +44,10 @@
  *	mv dir1 dir2
  *	mv file1 ... filen dir1
  */
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/avl.h>
-#include <sys/mman.h>
-#include <fcntl.h>
 #include <sys/time.h>
 #include <signal.h>
-#include <errno.h>
-#include <dirent.h>
-#include <stdlib.h>
 #include <locale.h>
 #include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
-#include <limits.h>
 #include <sys/acl.h>
 #include <libcmdutils.h>
 #include <aclutils.h>
@@ -107,14 +95,13 @@ static int		getrealpath(char *, char *);
 static void		usage(void);
 static void		Perror(char *);
 static void		Perror2(char *, char *);
-static int		writefile(int, int, char *, char *,
-			    struct stat *, struct stat *);
 static int		use_stdin(void);
 static int		copyattributes(char *, char *);
+static int		copy_sysattr(char *, char *);
 static void		timestruc_to_timeval(timestruc_t *, struct timeval *);
 static tree_node_t	*create_tnode(dev_t, ino_t);
 
-static struct stat 	s1, s2;
+static struct stat 	s1, s2, s3, s4;
 static int 		cpy = FALSE;
 static int 		mve = FALSE;
 static int 		lnk = FALSE;
@@ -135,6 +122,25 @@ static int		targetexists = 0;
 static int		cmdarg;		/* command line argument */
 static avl_tree_t	*stree = NULL;	/* source file inode search tree */
 static acl_t		*s1acl;
+static int		saflg = 0;	/* 'cp' extended system attr. */
+static int		srcfd;
+static int		targfd;
+static int		sourcedirfd;
+static int		targetdirfd;
+static DIR 		*srcdirp;
+static int		srcattrfd;
+static int		targattrfd;
+static struct stat 	attrdir;
+
+/* Extended system attributes support */
+
+static int open_source(char  *);
+static int open_target_srctarg_attrdirs(char  *, char *);
+static int open_attrdirp(char *);
+static int traverse_attrfile(struct dirent *, char *, char *, int);
+static void rewind_attrdir(DIR *);
+static void close_all();
+
 
 int
 main(int argc, char *argv[])
@@ -182,8 +188,8 @@ main(int argc, char *argv[])
 
 	/*
 	 * Check for options:
-	 * 	cp  -r|-R [-H|-L|-P] [-fip@] file1 [file2 ...] target
-	 * 	cp [-fiprR@] file1 [file2 ...] target
+	 * 	cp  -r|-R [-H|-L|-P] [-fip@/] file1 [file2 ...] target
+	 * 	cp [-fiprR@/] file1 [file2 ...] target
 	 *	ln [-f] [-n] [-s] file1 [file2 ...] target
 	 *	ln [-f] [-n] [-s] file1 [file2 ...]
 	 *	mv [-f|i] file1 [file2 ...] target
@@ -191,7 +197,7 @@ main(int argc, char *argv[])
 	 */
 
 	if (cpy) {
-		while ((c = getopt(argc, argv, "fHiLpPrR@")) != EOF)
+		while ((c = getopt(argc, argv, "fHiLpPrR@/")) != EOF)
 			switch (c) {
 			case 'f':
 				fflg++;
@@ -204,8 +210,9 @@ main(int argc, char *argv[])
 #ifdef XPG4
 				attrsilent = 1;
 				atflg = 0;
+				saflg = 0;
 #else
-				if (atflg == 0)
+				if ((atflg == 0) && (saflg == 0))
 					attrsilent = 1;
 #endif
 				break;
@@ -239,6 +246,13 @@ main(int argc, char *argv[])
 				break;
 			case '@':
 				atflg++;
+				attrsilent = 0;
+#ifdef XPG4
+				pflg = 0;
+#endif
+				break;
+			case '/':
+				saflg++;
 				attrsilent = 0;
 #ifdef XPG4
 				pflg = 0;
@@ -491,6 +505,7 @@ cpymve(char *source, char *target)
 	int fi, fo;
 	int ret = 0;
 	int attret = 0;
+	int sattret = 0;
 	int errno_save;
 
 	switch (chkfiles(source, &target)) {
@@ -831,8 +846,8 @@ copy:
 					return (1);
 				}
 
-				if (writefile(fi, fo, source, target,
-				    &s1, &s2) != 0) {
+				if (writefile(fi, fo, source, target, NULL,
+				    NULL, &s1, &s2) != 0) {
 					return (1);
 				}
 
@@ -842,8 +857,8 @@ copy:
 					return (1);
 				}
 			}
-
-			if (pflg || atflg || mve) {
+			/* Copy regular extended attributes */
+			if (pflg || atflg || mve || saflg) {
 				attret = copyattributes(source, target);
 				if (attret != 0 && !attrsilent) {
 					(void) fprintf(stderr, gettext(
@@ -851,14 +866,25 @@ copy:
 					    " extended attributes of file"
 					    " %s\n"), cmd, source);
 				}
-
+				/* Copy extended system attributes */
+				if (pflg || mve || saflg) {
+					sattret = copy_sysattr(source, target);
+					if (sattret != 0 && !attrsilent) {
+						(void) fprintf(stderr, gettext(
+						    "%s: Failed to preserve "
+						    "extended system "
+						    "attributes of file "
+						    "%s\n"), cmd, source);
+					}
+				}
 				if (mve && attret != 0) {
 					(void) unlink(target);
 					return (1);
 				}
-
-				if (attrsilent)
+				if (attrsilent) {
 					attret = 0;
+					sattret = 0;
+				}
 			}
 
 			/*
@@ -918,132 +944,6 @@ cleanup:
 	}
 	/*NOTREACHED*/
 	return (ret);
-}
-
-static int
-writefile(int fi, int fo, char *source, char *target,
-		struct stat *s1p, struct stat *s2p)
-{
-	int mapsize, munmapsize;
-	caddr_t cp;
-	off_t filesize = s1p->st_size;
-	off_t offset;
-	int nbytes;
-	int remains;
-	int n;
-
-	if (ISREG(*s1p) && s1p->st_size > SMALLFILESIZE) {
-		/*
-		 * Determine size of initial mapping.  This will determine the
-		 * size of the address space chunk we work with.  This initial
-		 * mapping size will be used to perform munmap() in the future.
-		 */
-		mapsize = MAXMAPSIZE;
-		if (s1p->st_size < mapsize) mapsize = s1p->st_size;
-		munmapsize = mapsize;
-
-		/*
-		 * Mmap time!
-		 */
-		if ((cp = mmap((caddr_t)NULL, mapsize, PROT_READ,
-		    MAP_SHARED, fi, (off_t)0)) == MAP_FAILED)
-			mapsize = 0;   /* can't mmap today */
-	} else
-		mapsize = 0;
-
-	if (mapsize != 0) {
-		offset = 0;
-
-		for (;;) {
-			nbytes = write(fo, cp, mapsize);
-			/*
-			 * if we write less than the mmaped size it's due to a
-			 * media error on the input file or out of space on
-			 * the output file.  So, try again, and look for errno.
-			 */
-			if ((nbytes >= 0) && (nbytes != (int)mapsize)) {
-				remains = mapsize - nbytes;
-				while (remains > 0) {
-					nbytes = write(fo,
-					    cp + mapsize - remains, remains);
-					if (nbytes < 0) {
-						if (errno == ENOSPC)
-							Perror(target);
-						else
-							Perror(source);
-						(void) close(fi);
-						(void) close(fo);
-						(void) munmap(cp, munmapsize);
-						if (ISREG(*s2p))
-							(void) unlink(target);
-						return (1);
-					}
-					remains -= nbytes;
-					if (remains == 0)
-						nbytes = mapsize;
-				}
-			}
-			/*
-			 * although the write manual page doesn't specify this
-			 * as a possible errno, it is set when the nfs read
-			 * via the mmap'ed file is accessed, so report the
-			 * problem as a source access problem, not a target file
-			 * problem
-			 */
-			if (nbytes < 0) {
-				if (errno == EACCES)
-					Perror(source);
-				else
-					Perror(target);
-				(void) close(fi);
-				(void) close(fo);
-				(void) munmap(cp, munmapsize);
-				if (ISREG(*s2p))
-					(void) unlink(target);
-				return (1);
-			}
-			filesize -= nbytes;
-			if (filesize == 0)
-				break;
-			offset += nbytes;
-			if (filesize < mapsize)
-				mapsize = filesize;
-			if (mmap(cp, mapsize, PROT_READ, MAP_SHARED | MAP_FIXED,
-			    fi, offset) == MAP_FAILED) {
-				Perror(source);
-				(void) close(fi);
-				(void) close(fo);
-				(void) munmap(cp, munmapsize);
-				if (ISREG(*s2p))
-					(void) unlink(target);
-				return (1);
-			}
-		}
-		(void) munmap(cp, munmapsize);
-	} else {
-		char buf[SMALLFILESIZE];
-		for (;;) {
-			n = read(fi, buf, sizeof (buf));
-			if (n == 0) {
-				return (0);
-			} else if (n < 0) {
-				Perror2(source, "read");
-				(void) close(fi);
-				(void) close(fo);
-				if (ISREG(*s2p))
-					(void) unlink(target);
-				return (1);
-			} else if (write(fo, buf, n) != n) {
-				Perror2(target, "write");
-				(void) close(fi);
-				(void) close(fo);
-				if (ISREG(*s2p))
-					(void) unlink(target);
-				return (1);
-			}
-		}
-	}
-	return (0);
 }
 
 /*
@@ -1415,9 +1315,9 @@ usage(void)
 #endif
 	} else if (cpy) {
 		(void) fprintf(stderr, gettext(
-		    "Usage: cp [-f] [-i] [-p] [-@] f1 f2\n"
-		    "       cp [-f] [-i] [-p] [-@] f1 ... fn d1\n"
-		    "       cp -r|-R [-H|-L|-P] [-f] [-i] [-p] [-@] "
+		    "Usage: cp [-f] [-i] [-p] [-@] [-/] f1 f2\n"
+		    "       cp [-f] [-i] [-p] [-@] [-/] f1 ... fn d1\n"
+		    "       cp -r|-R [-H|-L|-P] [-f] [-i] [-p] [-@] [-/] "
 		    "d1 ... dn-1 dn\n"));
 	}
 	exit(2);
@@ -1644,7 +1544,7 @@ copydir(char *source, char *target)
 	} else if (fixmode != (mode_t)0)
 		(void) chmod(target, fixmode & MODEBITS);
 
-	if (pflg || atflg || mve) {
+	if (pflg || atflg || mve || saflg) {
 		attret = copyattributes(source, target);
 		if (!attrsilent && attret != 0) {
 			(void) fprintf(stderr, gettext("%s: Failed to preserve"
@@ -1655,6 +1555,18 @@ copydir(char *source, char *target)
 			 * Otherwise ignore failure.
 			 */
 			attret = 0;
+		}
+		/* Copy extended system attributes */
+		if (pflg || mve || saflg) {
+			attret = copy_sysattr(source, target);
+			if (attret != 0 && !attrsilent) {
+				(void) fprintf(stderr, gettext(
+				    "%s: Failed to preserve "
+				    "extended system attributes "
+				    "of directory %s\n"), cmd, source);
+			} else {
+				attret = 0;
+			}
 		}
 	}
 	if (attret != 0)
@@ -1692,34 +1604,25 @@ use_stdin(void)
 #endif
 }
 
+/* Copy non-system extended attributes */
+
 static int
 copyattributes(char *source, char *target)
 {
-	int sourcedirfd, targetdirfd;
-	int srcfd, targfd;
-	int tmpfd;
-	DIR *srcdirp;
-	int srcattrfd, targattrfd;
 	struct dirent *dp;
-	char *attrstr;
 	char *srcbuf, *targbuf;
-	size_t src_size, targ_size;
 	int error = 0;
 	int aclerror;
 	mode_t mode;
 	int clearflg = 0;
 	acl_t *xacl = NULL;
 	acl_t *attrdiracl = NULL;
-	struct stat attrdir, s3, s4;
 	struct timeval times[2];
-	mode_t	targmode;
 
-	srcdirp = NULL;
-	srcfd = targfd = tmpfd = -1;
-	sourcedirfd = targetdirfd = srcattrfd = targattrfd = -1;
 	srcbuf = targbuf = NULL;
 
-	if (pathconf(source, _PC_XATTR_EXISTS) != 1)
+
+	if (pathconf(source,  _PC_XATTR_EXISTS) != 1)
 		return (0);
 
 	if (pathconf(target, _PC_XATTR_ENABLED) != 1) {
@@ -1732,135 +1635,12 @@ copyattributes(char *source, char *target)
 		}
 		return (1);
 	}
-
-
-	if ((srcfd = open(source, O_RDONLY)) == -1) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: cannot open file"
-			    " %s: "), cmd, source);
-			perror("");
-		}
-		++error;
-		goto out;
-	}
-	if ((targfd = open(target, O_RDONLY)) == -1) {
-
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: cannot open file"
-			    " %s: "), cmd, source);
-			perror("");
-		}
-		++error;
-		goto out;
-	}
-
-	if ((sourcedirfd = openat(srcfd, ".", O_RDONLY|O_XATTR)) == -1) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: cannot open attribute"
-			    " directory for %s: "), cmd, source);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
-
-	if (fstat(sourcedirfd, &attrdir) == -1) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not retrieve stat"
-			    " information for attribute directory"
-			    "of file %s: "), cmd, source);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
-	if ((targetdirfd = openat(targfd, ".", O_RDONLY|O_XATTR)) == -1) {
-		/*
-		 * We couldn't create the attribute directory
-		 *
-		 * Lets see if we can add write support to the mode
-		 * and create the directory and then put the mode back
-		 * to way it should be.
-		 */
-
-		targmode = FMODE(s1) | S_IWUSR;
-		if (fchmod(targfd, targmode) == 0) {
-			targetdirfd = openat(targfd, ".", O_RDONLY|O_XATTR);
-			/*
-			 * Put mode back to what it was
-			 */
-			targmode = FMODE(s1) & MODEBITS;
-			if (fchmod(targfd, targmode) == -1) {
-				if (pflg && attrsilent) {
-					error = 0;
-					goto out;
-				}
-				if (!attrsilent) {
-					(void) fprintf(stderr,
-					    gettext("%s: failed to set"
-					    " mode correctly on file"
-					    " %s: "), cmd, target);
-					perror("");
-					++error;
-					goto out;
-				}
-			}
-		} else {
-			if (pflg && attrsilent) {
-				error = 0;
-				goto out;
-			}
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: cannot open attribute"
-				    " directory for %s: "), cmd, target);
-				perror("");
-				++error;
-			}
-			goto out;
-		}
-	}
-
-	if (targetdirfd == -1) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: cannot open attribute directory"
-			    " for %s: "), cmd, target);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
-
-	/*
-	 * Set mode of attribute directory same as on source,
-	 * if pflg set or this is a move.
-	 */
+	if (open_source(source) != 0)
+		return (1);
+	if (open_target_srctarg_attrdirs(source, target) !=  0)
+		return (1);
+	if (open_attrdirp(source) != 0)
+		return (1);
 
 	if (pflg || mve) {
 		if (fchmod(targetdirfd, attrdir.st_mode) == -1) {
@@ -1933,70 +1713,14 @@ copyattributes(char *source, char *target)
 		}
 	}
 
-	/*
-	 * dup sourcedirfd for use by fdopendir().
-	 * fdopendir will take ownership of given fd and will close
-	 * it when closedir() is called.
-	 */
+	while ((dp = readdir(srcdirp)) != NULL) {
+		int ret;
 
-	if ((tmpfd = dup(sourcedirfd)) == -1) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext(
-			    "%s: unable to dup attribute directory"
-			    " file descriptor for %s: "), cmd, source);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
-	if ((srcdirp = fdopendir(tmpfd)) == NULL) {
-		if (pflg && attrsilent) {
-			error = 0;
-			goto out;
-		}
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: failed to open attribute"
-			    " directory for %s: "), cmd, source);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
-
-	while (dp = readdir(srcdirp)) {
-		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-		    dp->d_name[2] == '\0'))
+		if ((ret = traverse_attrfile(dp, source, target, 1)) == -1)
 			continue;
-
-		if ((srcattrfd = openat(sourcedirfd, dp->d_name,
-		    O_RDONLY)) == -1) {
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: cannot open attribute %s on"
-				    " file %s: "), cmd, dp->d_name, source);
-				perror("");
-				++error;
-				goto next;
-			}
-		}
-
-		if (fstat(srcattrfd, &s3) < 0) {
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: could not stat attribute"
-				    " %s on file"
-				    " %s: "), cmd, dp->d_name, source);
-				perror("");
-				++error;
-			}
-			goto next;
+		else if (ret > 0) {
+			++error;
+			goto out;
 		}
 
 		if (pflg || mve) {
@@ -2011,20 +1735,6 @@ copyattributes(char *source, char *target)
 					++error;
 				}
 			}
-		}
-
-		(void) unlinkat(targetdirfd, dp->d_name, 0);
-		if ((targattrfd = openat(targetdirfd, dp->d_name,
-		    O_RDWR|O_CREAT|O_TRUNC, s3.st_mode & MODEBITS)) == -1) {
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: could not create attribute"
-				    " %s on file"
-				    " %s: "), cmd, dp->d_name, target);
-				perror("");
-				++error;
-			}
-			goto next;
 		}
 
 		/*
@@ -2044,60 +1754,8 @@ copyattributes(char *source, char *target)
 			}
 		}
 
-		if (fstat(targattrfd, &s4) < 0) {
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: could not stat attribute"
-				    " %s on file"
-				    " %s: "), cmd, dp->d_name, source);
-				perror("");
-				++error;
-			}
-			goto next;
-		}
-
-/*
- * setup path string to be passed to writefile
- *
- * We need to include attribute in the string so that
- * a useful error message can be printed in the case of a failure.
- */
-		attrstr = gettext(" attribute ");
-		src_size = strlen(source) +
-		    strlen(dp->d_name) + strlen(attrstr) + 1;
-		srcbuf = malloc(src_size);
-
-		if (srcbuf == NULL) {
-			if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not allocate memory"
-			    " for path buffer: "), cmd);
-				perror("");
-				++error;
-			}
-			goto next;
-		}
-		targ_size = strlen(target) +
-		    strlen(dp->d_name) + strlen(attrstr) + 1;
-		targbuf = malloc(targ_size);
-		if (targbuf == NULL) {
-			if (!attrsilent) {
-				(void) fprintf(stderr,
-				    gettext("%s: could not allocate memory"
-				    " for path buffer: "), cmd);
-				perror("");
-				++error;
-			}
-			goto next;
-		}
-
-		(void) snprintf(srcbuf, src_size, "%s%s%s",
-		    source, attrstr, dp->d_name);
-		(void) snprintf(targbuf, targ_size, "%s%s%s",
-		    target, attrstr, dp->d_name);
-
-		if (writefile(srcattrfd, targattrfd,
-		    srcbuf, targbuf, &s3, &s4) != 0) {
+		if (writefile(srcattrfd, targattrfd, source, target,
+		    dp->d_name, dp->d_name, &s3, &s4) != 0) {
 			if (!attrsilent) {
 				++error;
 			}
@@ -2194,16 +1852,138 @@ out:
 		free(srcbuf);
 	if (targbuf)
 		free(targbuf);
-	if (sourcedirfd != -1)
-		(void) close(sourcedirfd);
-	if (targetdirfd != -1)
-		(void) close(targetdirfd);
-	if (srcdirp != NULL)
-		(void) closedir(srcdirp);
-	if (srcfd != -1)
-		(void) close(srcfd);
-	if (targfd != -1)
-		(void) close(targfd);
+
+	if (!saflg && !pflg && !mve)
+		close_all();
+	return (error == 0 ? 0 : 1);
+}
+
+/* Copy extended system attributes from source to target */
+
+static int
+copy_sysattr(char *source, char *target)
+{
+	struct dirent	*dp;
+	nvlist_t	*response;
+	int		error = 0;
+	int		chk_support = 0;
+	int		sa_support = 1;
+
+	if (sysattr_support(source, _PC_SATTR_EXISTS) != 1)
+		return (0);
+
+	if (open_source(source) != 0)
+		return (1);
+
+	/*
+	 * Gets non default extended system attributes from the
+	 * source file to copy to the target. The target has
+	 * the defaults set when its created and thus  no need
+	 * to copy the defaults.
+	 */
+	response = sysattr_list(cmd, srcfd, source);
+
+	if (response != NULL &&
+	    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext(
+			    "%s: cannot preserve extended system "
+			    "attribute, operation not supported on file"
+			    " %s\n"), cmd, target);
+		}
+		error++;
+		goto out;
+	}
+
+	if (srcdirp == NULL) {
+		if (open_target_srctarg_attrdirs(source, target) !=  0) {
+			error++;
+			goto out;
+		}
+		if (open_attrdirp(source) != 0) {
+			error++;
+			goto out;
+		}
+	} else {
+		rewind_attrdir(srcdirp);
+	}
+	while (sa_support && (dp = readdir(srcdirp)) != NULL) {
+		nvlist_t	*res;
+		int		ret;
+
+		if ((ret = traverse_attrfile(dp, source, target, 0)) == -1)
+			continue;
+		else if (ret > 0) {
+			++error;
+			goto out;
+		}
+		/*
+		 * Gets non default extended system attributes from the
+		 * attribute file to copy to the target. The target has
+		 * the defaults set when its created and thus  no need
+		 * to copy the defaults.
+		 */
+		if (dp->d_name != NULL) {
+			res = sysattr_list(cmd, srcattrfd, dp->d_name);
+			if (res == NULL)
+				goto next;
+
+			if (!chk_support &&
+			    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
+				if (!attrsilent) {
+					(void) fprintf(stderr,
+					    gettext(
+					    "%s: cannot preserve extended "
+					    "system attribute, operation not "
+					    " %s\n"), cmd, target);
+				}
+				error++;
+				sa_support = 0;
+			} else {
+				chk_support = 1;
+			}
+
+			/*
+			 * Copy non default extended system attributes of named
+			 * attribute file.
+			 */
+			if (sa_support && fsetattr(targattrfd,
+			    XATTR_VIEW_READWRITE, res) != 0) {
+				++error;
+				if (!attrsilent) {
+					(void) fprintf(stderr, gettext("%s: "
+					    "Failed to copy extended system "
+					    "attributes from attribute file "
+					    "%s of %s to %s\n"), cmd,
+					    dp->d_name, source, target);
+				}
+			}
+		}
+next:
+		if (srcattrfd != -1)
+			(void) close(srcattrfd);
+		if (targattrfd != -1)
+			(void) close(targattrfd);
+		srcattrfd = targattrfd = -1;
+		if (res != NULL)
+			nvlist_free(res);
+	}
+
+	/* Copy source file non default extended system attributes to target */
+	if ((response != NULL) &&
+	    (fsetattr(targfd, XATTR_VIEW_READWRITE, response)) != 0) {
+		++error;
+		if (!attrsilent) {
+			(void) fprintf(stderr, gettext("%s: Failed to "
+			    "copy extended system attributes from "
+			    "%s to %s\n"), cmd, source, target);
+		}
+	}
+out:
+	if (response != NULL)
+		nvlist_free(response);
+	close_all();
 	return (error == 0 ? 0 : 1);
 }
 
@@ -2215,4 +1995,269 @@ timestruc_to_timeval(timestruc_t *ts, struct timeval *tv)
 {
 	tv->tv_sec = ts->tv_sec;
 	tv->tv_usec = ts->tv_nsec / 1000;
+}
+
+/* Open the source file */
+
+int
+open_source(char  *src)
+{
+	int	error = 0;
+
+	srcfd = -1;
+	if ((srcfd = open(src, O_RDONLY)) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: cannot open file"
+			    " %s: "), cmd, src);
+			perror("");
+		}
+		++error;
+	}
+out:
+	if (error)
+		close_all();
+	return (error == 0 ? 0 : 1);
+}
+
+/* Open source attribute dir, target and target attribute dir. */
+
+int
+open_target_srctarg_attrdirs(char  *src, char *targ)
+{
+	int		error = 0;
+
+	targfd = sourcedirfd = targetdirfd = -1;
+
+	if ((targfd = open(targ, O_RDONLY)) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: cannot open file"
+			    " %s: "), cmd, targ);
+			perror("");
+		}
+		++error;
+		goto out;
+	}
+
+	if ((sourcedirfd = openat(srcfd, ".", O_RDONLY|O_XATTR)) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: cannot open attribute"
+			    " directory for %s: "), cmd, src);
+			perror("");
+		}
+		++error;
+		goto out;
+	}
+
+	if (fstat(sourcedirfd, &attrdir) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: could not retrieve stat"
+			    " information for attribute directory"
+			    "of file %s: "), cmd, src);
+			perror("");
+		}
+		++error;
+		goto out;
+	}
+	if ((targetdirfd = openat(targfd, ".", O_RDONLY|O_XATTR)) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: cannot open attribute"
+			    " directory for %s: "), cmd, targ);
+			perror("");
+		}
+		++error;
+	}
+out:
+	if (error)
+		close_all();
+	return (error == 0 ? 0 : 1);
+}
+
+int
+open_attrdirp(char *source)
+{
+	int tmpfd = -1;
+	int error = 0;
+
+	/*
+	 * dup sourcedirfd for use by fdopendir().
+	 * fdopendir will take ownership of given fd and will close
+	 * it when closedir() is called.
+	 */
+
+	if ((tmpfd = dup(sourcedirfd)) == -1) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext(
+			    "%s: unable to dup attribute directory"
+			    " file descriptor for %s: "), cmd, source);
+			perror("");
+			++error;
+		}
+		goto out;
+	}
+	if ((srcdirp = fdopendir(tmpfd)) == NULL) {
+		if (pflg && attrsilent) {
+			error++;
+			goto out;
+		}
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: failed to open attribute"
+			    " directory for %s: "), cmd, source);
+			perror("");
+			++error;
+		}
+	}
+out:
+	if (error)
+		close_all();
+	return (error == 0 ? 0 : 1);
+}
+
+/* Skips through ., .., and system attribute 'view' files */
+int
+traverse_attrfile(struct dirent *dp, char *source, char *target, int  first)
+{
+	int		error = 0;
+
+	if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
+	    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
+	    dp->d_name[2] == '\0') ||
+	    (sysattr_type(dp->d_name) == _RO_SATTR) ||
+	    (sysattr_type(dp->d_name) == _RW_SATTR))
+		return (-1);
+
+	if ((srcattrfd = openat(sourcedirfd, dp->d_name,
+	    O_RDONLY)) == -1) {
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: cannot open attribute %s on"
+			    " file %s: "), cmd, dp->d_name, source);
+			perror("");
+			++error;
+			goto out;
+		}
+	}
+
+	if (fstat(srcattrfd, &s3) < 0) {
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: could not stat attribute"
+			    " %s on file"
+			    " %s: "), cmd, dp->d_name, source);
+			perror("");
+			++error;
+		}
+		goto out;
+	}
+
+	if (first) {
+		(void) unlinkat(targetdirfd, dp->d_name, 0);
+		targattrfd = openat(targetdirfd, dp->d_name,
+		    O_RDWR|O_CREAT|O_TRUNC, s3.st_mode & MODEBITS);
+	} else {
+		targattrfd = openat(targetdirfd, dp->d_name, O_RDWR);
+	}
+
+	if (targattrfd == -1) {
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: could not create attribute"
+			    " %s on file %s: "), cmd, dp->d_name,
+			    target);
+			perror("");
+			++error;
+		}
+		goto out;
+	}
+
+	if (fstat(targattrfd, &s4) < 0) {
+		if (!attrsilent) {
+			(void) fprintf(stderr,
+			    gettext("%s: could not stat attribute"
+			    " %s on file"
+			    " %s: "), cmd, dp->d_name, target);
+			perror("");
+			++error;
+		}
+	}
+
+out:
+	if (error) {
+		if (srcattrfd != -1)
+			(void) close(srcattrfd);
+		if (targattrfd != -1)
+		(void) close(targattrfd);
+	}
+	return (error == 0 ? 0 :1);
+}
+
+void
+rewind_attrdir(DIR * sdp)
+{
+	int pwdfd;
+
+	pwdfd = open(".", O_RDONLY);
+	if ((pwdfd != -1) && (fchdir(sourcedirfd) == 0)) {
+		rewinddir(sdp);
+		(void) fchdir(pwdfd);
+		(void) close(pwdfd);
+	} else {
+		if (!attrsilent) {
+			(void) fprintf(stderr, gettext("%s: "
+			    "failed to rewind attribute dir\n"),
+			    cmd);
+		}
+	}
+}
+
+void
+close_all()
+{
+	if (srcattrfd != -1)
+		(void) close(srcattrfd);
+	if (targattrfd != -1)
+		(void) close(targattrfd);
+	if (sourcedirfd != -1)
+		(void) close(sourcedirfd);
+	if (targetdirfd != -1)
+		(void) close(targetdirfd);
+	if (srcdirp != NULL) {
+		(void) closedir(srcdirp);
+		srcdirp = NULL;
+	}
+	if (srcfd != -1)
+		(void) close(srcfd);
+	if (targfd != -1)
+		(void) close(targfd);
 }

@@ -744,6 +744,7 @@ extern "C" {
 #define	readv				_readv
 #define	realpath			_realpath
 #define	remque				_remque
+#define	renameat			_renameat
 #define	resolvepath			_resolvepath
 #define	rmdir				_rmdir
 #define	rwlock_destroy			_rwlock_destroy

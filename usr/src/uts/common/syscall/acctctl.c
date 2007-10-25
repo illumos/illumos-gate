@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +160,8 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 		 * Closing accounting file
 		 */
 		if (info->ac_vnode != NULL) {
-			error = VOP_CLOSE(info->ac_vnode, FWRITE, 1, 0, CRED());
+			error = VOP_CLOSE(info->ac_vnode, FWRITE, 1, 0,
+			    CRED(), NULL);
 			if (error) {
 				mutex_exit(&info->ac_lock);
 				return (error);
@@ -265,7 +265,7 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 		/*
 		 * We still need to close the old file.
 		 */
-		if ((error = VOP_CLOSE(vp, FWRITE, 1, 0, CRED())) != 0) {
+		if ((error = VOP_CLOSE(vp, FWRITE, 1, 0, CRED(), NULL)) != 0) {
 			VN_RELE(vp);
 			mutex_exit(&info->ac_lock);
 			kmem_free(namebuf, namelen);
@@ -545,7 +545,7 @@ exacct_free_info(ac_info_t *info)
 {
 	mutex_enter(&info->ac_lock);
 	if (info->ac_vnode) {
-		(void) VOP_CLOSE(info->ac_vnode, FWRITE, 1, 0, kcred);
+		(void) VOP_CLOSE(info->ac_vnode, FWRITE, 1, 0, kcred, NULL);
 		VN_RELE(info->ac_vnode);
 		kmem_free(info->ac_file, strlen(info->ac_file) + 1);
 	}

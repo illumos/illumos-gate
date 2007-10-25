@@ -48,6 +48,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	archives.h	\
 	assert.h	\
 	atomic.h	\
+	attr.h		\
 	config_admin.h	\
 	cpio.h		\
 	crypt.h		\

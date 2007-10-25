@@ -1681,7 +1681,7 @@ prgetmap(proc_t *p, int reserved, list_t *iolhead)
 			if (seg->s_ops == &segvn_ops &&
 			    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 			    vp != NULL && vp->v_type == VREG &&
-			    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+			    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 				if (vp == p->p_exec)
 					(void) strcpy(mp->pr_mapname, "a.out");
 				else
@@ -1793,7 +1793,7 @@ prgetmap32(proc_t *p, int reserved, list_t *iolhead)
 			if (seg->s_ops == &segvn_ops &&
 			    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 			    vp != NULL && vp->v_type == VREG &&
-			    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+			    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 				if (vp == p->p_exec)
 					(void) strcpy(mp->pr_mapname, "a.out");
 				else
@@ -1996,7 +1996,7 @@ again:
 			if (seg->s_ops == &segvn_ops &&
 			    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 			    vp != NULL && vp->v_type == VREG &&
-			    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+			    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 				if (vp == p->p_exec)
 					(void) strcpy(pmp->pr_mapname, "a.out");
 				else
@@ -2143,7 +2143,7 @@ again:
 			if (seg->s_ops == &segvn_ops &&
 			    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 			    vp != NULL && vp->v_type == VREG &&
-			    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+			    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 				if (vp == p->p_exec)
 					(void) strcpy(pmp->pr_mapname, "a.out");
 				else
@@ -3678,7 +3678,7 @@ pr_getsegsize(struct seg *seg, int reserved)
 
 		if (SEGOP_GETVP(seg, seg->s_base, &vp) == 0 &&
 		    vp != NULL && vp->v_type == VREG &&
-		    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+		    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 
 			u_offset_t fsize = vattr.va_size;
 			u_offset_t offset = SEGOP_GETOFFSET(seg, seg->s_base);
@@ -3981,7 +3981,8 @@ prgetxmap(proc_t *p, list_t *iolhead)
 				if (seg->s_ops == &segvn_ops &&
 				    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 				    vp != NULL && vp->v_type == VREG &&
-				    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+				    VOP_GETATTR(vp, &vattr, 0, CRED(),
+					NULL) == 0) {
 					mp->pr_dev = vattr.va_fsid;
 					mp->pr_ino = vattr.va_nodeid;
 					if (vp == p->p_exec)
@@ -4164,7 +4165,8 @@ prgetxmap32(proc_t *p, list_t *iolhead)
 				if (seg->s_ops == &segvn_ops &&
 				    SEGOP_GETVP(seg, saddr, &vp) == 0 &&
 				    vp != NULL && vp->v_type == VREG &&
-				    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+				    VOP_GETATTR(vp, &vattr, 0, CRED(),
+					NULL) == 0) {
 					(void) cmpldev(&mp->pr_dev,
 					    vattr.va_fsid);
 					mp->pr_ino = vattr.va_nodeid;

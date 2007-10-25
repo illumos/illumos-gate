@@ -1,0 +1,1428 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/param.h>
+#include <sys/isa_defs.h>
+#include <sys/types.h>
+#include <sys/sysmacros.h>
+#include <sys/cred.h>
+#include <sys/systm.h>
+#include <sys/errno.h>
+#include <sys/fcntl.h>
+#include <sys/pathname.h>
+#include <sys/stat.h>
+#include <sys/vfs.h>
+#include <sys/acl.h>
+#include <sys/file.h>
+#include <sys/sunddi.h>
+#include <sys/debug.h>
+#include <sys/cmn_err.h>
+#include <sys/vnode.h>
+#include <sys/mode.h>
+#include <sys/nvpair.h>
+#include <sys/attr.h>
+#include <sys/gfs.h>
+#include <sys/mutex.h>
+#include <fs/fs_subr.h>
+#include <sys/kidmap.h>
+
+typedef struct {
+	gfs_file_t	gfs_private;
+	xattr_view_t	xattr_view;
+} xattr_file_t;
+
+/* ARGSUSED */
+static int
+xattr_file_open(vnode_t **vpp, int flags, cred_t *cr, caller_context_t *ct)
+{
+	xattr_file_t *np = (*vpp)->v_data;
+
+	if ((np->xattr_view == XATTR_VIEW_READONLY) && (flags & FWRITE))
+		return (EACCES);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_file_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	xattr_file_t *np = vp->v_data;
+
+	if ((np->xattr_view == XATTR_VIEW_READONLY) && (mode & VWRITE))
+		return (EACCES);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_file_close(vnode_t *vp, int flags, int count, offset_t off,
+    cred_t *cr, caller_context_t *ct)
+{
+	cleanlocks(vp, ddi_get_pid(), 0);
+	cleanshares(vp, ddi_get_pid());
+	return (0);
+}
+
+static int
+xattr_common_fid(vnode_t *vp, fid_t *fidp, caller_context_t *ct)
+{
+	xattr_fid_t	*xfidp;
+	vnode_t		*pvp, *savevp;
+	int		error;
+	uint16_t	orig_len;
+
+	if (fidp->fid_len < XATTR_FIDSZ) {
+		fidp->fid_len = XATTR_FIDSZ;
+		return (ENOSPC);
+	}
+
+	savevp = pvp = gfs_file_parent(vp);
+	mutex_enter(&savevp->v_lock);
+	if (pvp->v_flag & V_XATTRDIR) {
+		pvp = gfs_file_parent(pvp);
+	}
+	mutex_exit(&savevp->v_lock);
+
+	xfidp = (xattr_fid_t *)fidp;
+	orig_len = fidp->fid_len;
+	fidp->fid_len = sizeof (xfidp->parent_fid);
+
+	error = VOP_FID(pvp, fidp, ct);
+	if (error) {
+		fidp->fid_len = orig_len;
+		return (error);
+	}
+
+	xfidp->parent_len = fidp->fid_len;
+	fidp->fid_len = XATTR_FIDSZ;
+	xfidp->dir_offset = gfs_file_inode(vp);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
+    cred_t *cr, caller_context_t *ct)
+{
+	int error;
+	f_attr_t attr;
+	uint64_t fsid;
+	dev_t mdev;
+	xvattr_t xvattr;
+	xoptattr_t *xoap;	/* Pointer to optional attributes */
+	vnode_t *ppvp;
+	const char *domain;
+	uint32_t rid;
+
+	xva_init(&xvattr);
+
+	if ((xoap = xva_getxoptattr(&xvattr)) == NULL)
+		return (EINVAL);
+
+	/*
+	 * For detecting ephemeral uid/gid
+	 */
+	xvattr.xva_vattr.va_mask |= (AT_UID|AT_GID);
+
+	/*
+	 * We need to access the real fs object.
+	 * vp points to a GFS file; ppvp points to the real object.
+	 */
+	ppvp = gfs_file_parent(gfs_file_parent(vp));
+
+	/*
+	 * Iterate through the attrs associated with this view
+	 */
+
+	for (attr = 0; attr < F_ATTR_ALL; attr++) {
+		if (xattr_view != attr_to_xattr_view(attr)) {
+			continue;
+		}
+
+		switch (attr) {
+		case F_SYSTEM:
+			XVA_SET_REQ(&xvattr, XAT_SYSTEM);
+			break;
+		case F_READONLY:
+			XVA_SET_REQ(&xvattr, XAT_READONLY);
+			break;
+		case F_HIDDEN:
+			XVA_SET_REQ(&xvattr, XAT_HIDDEN);
+			break;
+		case F_ARCHIVE:
+			XVA_SET_REQ(&xvattr, XAT_ARCHIVE);
+			break;
+		case F_IMMUTABLE:
+			XVA_SET_REQ(&xvattr, XAT_IMMUTABLE);
+			break;
+		case F_APPENDONLY:
+			XVA_SET_REQ(&xvattr, XAT_APPENDONLY);
+			break;
+		case F_NOUNLINK:
+			XVA_SET_REQ(&xvattr, XAT_NOUNLINK);
+			break;
+		case F_OPAQUE:
+			XVA_SET_REQ(&xvattr, XAT_OPAQUE);
+			break;
+		case F_NODUMP:
+			XVA_SET_REQ(&xvattr, XAT_NODUMP);
+			break;
+		case F_AV_QUARANTINED:
+			XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
+			break;
+		case F_AV_MODIFIED:
+			XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
+			break;
+		case F_AV_SCANSTAMP:
+			if (ppvp->v_type == VREG)
+				XVA_SET_REQ(&xvattr, XAT_AV_SCANSTAMP);
+			break;
+		case F_CRTIME:
+			XVA_SET_REQ(&xvattr, XAT_CREATETIME);
+			break;
+		case F_FSID:
+			fsid = (((uint64_t)vp->v_vfsp->vfs_fsid.val[0] << 32) |
+			    (uint64_t)(vp->v_vfsp->vfs_fsid.val[1] &
+			    0xffffffff));
+			VERIFY(nvlist_add_uint64(nvlp, attr_to_name(attr),
+			    fsid) == 0);
+			break;
+		case F_MDEV:
+			mdev = ((int16_t)vp->v_vfsp->vfs_dev);
+			VERIFY(nvlist_add_uint16(nvlp, attr_to_name(attr),
+			    mdev) == 0);
+			break;
+		default:
+			break;
+		}
+	}
+
+	error = VOP_GETATTR(ppvp, &xvattr.xva_vattr, 0, cr, ct);
+	if (error)
+		return (error);
+
+	/*
+	 * Process all the optional attributes together here.  Notice that
+	 * xoap was set when the optional attribute bits were set above.
+	 */
+	if ((xvattr.xva_vattr.va_mask & AT_XVATTR) && xoap) {
+		if (XVA_ISSET_RTN(&xvattr, XAT_READONLY)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_READONLY),
+			    xoap->xoa_readonly) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_HIDDEN)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_HIDDEN),
+			    xoap->xoa_hidden) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_SYSTEM)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_SYSTEM),
+			    xoap->xoa_system) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_ARCHIVE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_ARCHIVE),
+			    xoap->xoa_archive) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_IMMUTABLE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_IMMUTABLE),
+			    xoap->xoa_immutable) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_NOUNLINK)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_NOUNLINK),
+			    xoap->xoa_nounlink) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_APPENDONLY)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_APPENDONLY),
+			    xoap->xoa_appendonly) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_NODUMP)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_NODUMP),
+			    xoap->xoa_nodump) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_OPAQUE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_OPAQUE),
+			    xoap->xoa_opaque) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_AV_QUARANTINED)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_AV_QUARANTINED),
+			    xoap->xoa_av_quarantined) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_AV_MODIFIED)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_AV_MODIFIED),
+			    xoap->xoa_av_modified) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_AV_SCANSTAMP)) {
+			VERIFY(nvlist_add_uint8_array(nvlp,
+			    attr_to_name(F_AV_SCANSTAMP),
+			    xoap->xoa_av_scanstamp,
+			    sizeof (xoap->xoa_av_scanstamp)) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_CREATETIME)) {
+			VERIFY(nvlist_add_uint64_array(nvlp,
+			    attr_to_name(F_CRTIME),
+			    (uint64_t *)&(xoap->xoa_createtime),
+			    sizeof (xoap->xoa_createtime) /
+			    sizeof (uint64_t)) == 0);
+		}
+	}
+	/*
+	 * Check for optional ownersid/groupsid
+	 */
+
+	if (xvattr.xva_vattr.va_uid > MAXUID) {
+		nvlist_t *nvl_sid;
+
+		if (nvlist_alloc(&nvl_sid, NV_UNIQUE_NAME, KM_SLEEP))
+			return (ENOMEM);
+
+		if (kidmap_getsidbyuid(xvattr.xva_vattr.va_uid,
+		    &domain, &rid) == 0) {
+			VERIFY(nvlist_add_string(nvl_sid,
+			    SID_DOMAIN, domain) == 0);
+			VERIFY(nvlist_add_uint32(nvl_sid, SID_RID, rid) == 0);
+			VERIFY(nvlist_add_nvlist(nvlp, attr_to_name(F_OWNERSID),
+			    nvl_sid) == 0);
+		}
+		nvlist_free(nvl_sid);
+	}
+	if (xvattr.xva_vattr.va_gid > MAXUID) {
+		nvlist_t *nvl_sid;
+
+		if (nvlist_alloc(&nvl_sid, NV_UNIQUE_NAME, KM_SLEEP))
+			return (ENOMEM);
+
+		if (kidmap_getsidbygid(xvattr.xva_vattr.va_gid,
+		    &domain, &rid) == 0) {
+			VERIFY(nvlist_add_string(nvl_sid,
+			    SID_DOMAIN, domain) == 0);
+			VERIFY(nvlist_add_uint32(nvl_sid, SID_RID, rid) == 0);
+			VERIFY(nvlist_add_nvlist(nvlp, attr_to_name(F_GROUPSID),
+			    nvl_sid) == 0);
+		}
+		nvlist_free(nvl_sid);
+	}
+
+	return (0);
+}
+
+/*
+ * The size of a sysattr file is the size of the nvlist that will be
+ * returned by xattr_file_read().  A call to xattr_file_write() could
+ * change the size of that nvlist.  That size is not stored persistently
+ * so xattr_fill_nvlist() calls VOP_GETATTR so that it can be calculated.
+ */
+static int
+xattr_file_size(vnode_t *vp, xattr_view_t xattr_view, size_t *size,
+    cred_t *cr, caller_context_t *ct)
+{
+	nvlist_t *nvl;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP)) {
+		return (ENOMEM);
+	}
+
+	if (xattr_fill_nvlist(vp, xattr_view, nvl, cr, ct)) {
+		nvlist_free(nvl);
+		return (EFAULT);
+	}
+
+	VERIFY(nvlist_size(nvl, size, NV_ENCODE_XDR) == 0);
+	nvlist_free(nvl);
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_file_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	xattr_file_t *np = vp->v_data;
+	timestruc_t now;
+	size_t size;
+	int error;
+	vnode_t *pvp;
+	vattr_t pvattr;
+
+	vap->va_type = VREG;
+	vap->va_mode = MAKEIMODE(vap->va_type,
+	    (np->xattr_view == XATTR_VIEW_READONLY ? 0444 : 0644));
+	vap->va_nodeid = gfs_file_inode(vp);
+	vap->va_nlink = 1;
+	pvp = gfs_file_parent(vp);
+	(void) memset(&pvattr, 0, sizeof (pvattr));
+	pvattr.va_mask = AT_CTIME|AT_MTIME;
+	error = VOP_GETATTR(pvp, &pvattr, flags, cr, ct);
+	if (error) {
+		return (error);
+	}
+	vap->va_ctime = pvattr.va_ctime;
+	vap->va_mtime = pvattr.va_mtime;
+	gethrestime(&now);
+	vap->va_atime = now;
+	vap->va_uid = 0;
+	vap->va_gid = 0;
+	vap->va_rdev = 0;
+	vap->va_blksize = DEV_BSIZE;
+	vap->va_seq = 0;
+	vap->va_fsid = vp->v_vfsp->vfs_dev;
+	error = xattr_file_size(vp, np->xattr_view, &size, cr, ct);
+	vap->va_size = size;
+	vap->va_nblocks = howmany(vap->va_size, vap->va_blksize);
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+xattr_file_read(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
+    caller_context_t *ct)
+{
+	xattr_file_t *np = vp->v_data;
+	xattr_view_t xattr_view = np->xattr_view;
+	char *buf;
+	size_t filesize;
+	nvlist_t *nvl;
+	int error;
+
+	/*
+	 * Validate file offset and fasttrack empty reads
+	 */
+	if (uiop->uio_loffset < (offset_t)0)
+		return (EINVAL);
+
+	if (uiop->uio_resid == 0)
+		return (0);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP))
+		return (ENOMEM);
+
+	if (xattr_fill_nvlist(vp, xattr_view, nvl, cr, ct)) {
+		nvlist_free(nvl);
+		return (EFAULT);
+	}
+
+	VERIFY(nvlist_size(nvl, &filesize, NV_ENCODE_XDR) == 0);
+
+	if (uiop->uio_loffset >= filesize) {
+		nvlist_free(nvl);
+		return (0);
+	}
+
+	buf = kmem_alloc(filesize, KM_SLEEP);
+	VERIFY(nvlist_pack(nvl, &buf, &filesize, NV_ENCODE_XDR,
+	    KM_SLEEP) == 0);
+
+	error = uiomove((caddr_t)buf, filesize, UIO_READ, uiop);
+	kmem_free(buf, filesize);
+	nvlist_free(nvl);
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+xattr_file_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
+    caller_context_t *ct)
+{
+	int error = 0;
+	char *buf;
+	char *domain;
+	uint32_t rid;
+	ssize_t size = uiop->uio_resid;
+	nvlist_t *nvp;
+	nvpair_t *pair = NULL;
+	vnode_t *ppvp;
+	xvattr_t xvattr;
+	xoptattr_t *xoap = NULL;	/* Pointer to optional attributes */
+
+	/*
+	 * Validate file offset and size.
+	 */
+	if (uiop->uio_loffset < (offset_t)0)
+		return (EINVAL);
+
+	if (size == 0)
+		return (EINVAL);
+
+	xva_init(&xvattr);
+
+	if ((xoap = xva_getxoptattr(&xvattr)) == NULL) {
+		return (EINVAL);
+	}
+
+	/*
+	 * Copy and unpack the nvlist
+	 */
+	buf = kmem_alloc(size, KM_SLEEP);
+	if (uiomove((caddr_t)buf, size, UIO_WRITE, uiop)) {
+		return (EFAULT);
+	}
+
+	if (nvlist_unpack(buf, size, &nvp, KM_SLEEP) != 0) {
+		kmem_free(buf, size);
+		uiop->uio_resid = size;
+		return (EINVAL);
+	}
+	kmem_free(buf, size);
+
+	/*
+	 * Fasttrack empty writes (nvlist with no nvpairs)
+	 */
+	if (nvlist_next_nvpair(nvp, NULL) == 0)
+		return (0);
+
+	ppvp = gfs_file_parent(gfs_file_parent(vp));
+
+	while (pair = nvlist_next_nvpair(nvp, pair)) {
+		data_type_t type;
+		f_attr_t attr;
+		boolean_t value;
+		uint64_t *time, *times;
+		uint_t elem, nelems;
+		nvlist_t *nvp_sid;
+		uint8_t *scanstamp;
+
+		/*
+		 * Validate the name and type of each attribute.
+		 * Log any unknown names and continue.  This will
+		 * help if additional attributes are added later.
+		 */
+		type = nvpair_type(pair);
+		if ((attr = name_to_attr(nvpair_name(pair))) == F_ATTR_INVAL) {
+			cmn_err(CE_WARN, "Unknown attribute %s",
+			    nvpair_name(pair));
+			continue;
+		}
+
+		/*
+		 * Verify nvlist type matches required type and view is OK
+		 */
+
+		if (type != attr_to_data_type(attr) ||
+		    (attr_to_xattr_view(attr) == XATTR_VIEW_READONLY)) {
+			nvlist_free(nvp);
+			return (EINVAL);
+		}
+
+		/*
+		 * For OWNERSID/GROUPSID make sure the target
+		 * file system support ephemeral ID's
+		 */
+		if ((attr == F_OWNERSID || attr == F_GROUPSID) &&
+		    (!(vp->v_vfsp->vfs_flag & VFS_XID))) {
+			nvlist_free(nvp);
+			return (EINVAL);
+		}
+
+		/*
+		 * Retrieve data from nvpair
+		 */
+		switch (type) {
+		case DATA_TYPE_BOOLEAN_VALUE:
+			if (nvpair_value_boolean_value(pair, &value)) {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+			break;
+		case DATA_TYPE_UINT64_ARRAY:
+			if (nvpair_value_uint64_array(pair, &times, &nelems)) {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+			break;
+		case DATA_TYPE_NVLIST:
+			if (nvpair_value_nvlist(pair, &nvp_sid)) {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+			break;
+		case DATA_TYPE_UINT8_ARRAY:
+			if (nvpair_value_uint8_array(pair,
+			    &scanstamp, &nelems)) {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+			break;
+		default:
+			nvlist_free(nvp);
+			return (EINVAL);
+		}
+
+		switch (attr) {
+		/*
+		 * If we have several similar optional attributes to
+		 * process then we should do it all together here so that
+		 * xoap and the requested bitmap can be set in one place.
+		 */
+		case F_READONLY:
+			XVA_SET_REQ(&xvattr, XAT_READONLY);
+			xoap->xoa_readonly = value;
+			break;
+		case F_HIDDEN:
+			XVA_SET_REQ(&xvattr, XAT_HIDDEN);
+			xoap->xoa_hidden = value;
+			break;
+		case F_SYSTEM:
+			XVA_SET_REQ(&xvattr, XAT_SYSTEM);
+			xoap->xoa_system = value;
+			break;
+		case F_ARCHIVE:
+			XVA_SET_REQ(&xvattr, XAT_ARCHIVE);
+			xoap->xoa_archive = value;
+			break;
+		case F_IMMUTABLE:
+			XVA_SET_REQ(&xvattr, XAT_IMMUTABLE);
+			xoap->xoa_immutable = value;
+			break;
+		case F_NOUNLINK:
+			XVA_SET_REQ(&xvattr, XAT_NOUNLINK);
+			xoap->xoa_nounlink = value;
+			break;
+		case F_APPENDONLY:
+			XVA_SET_REQ(&xvattr, XAT_APPENDONLY);
+			xoap->xoa_appendonly = value;
+			break;
+		case F_NODUMP:
+			XVA_SET_REQ(&xvattr, XAT_NODUMP);
+			xoap->xoa_nodump = value;
+			break;
+		case F_AV_QUARANTINED:
+			XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
+			xoap->xoa_av_quarantined = value;
+			break;
+		case F_AV_MODIFIED:
+			XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
+			xoap->xoa_av_modified = value;
+			break;
+		case F_CRTIME:
+			XVA_SET_REQ(&xvattr, XAT_CREATETIME);
+			time = (uint64_t *)&(xoap->xoa_createtime);
+			for (elem = 0; elem < nelems; elem++)
+				*time++ = times[elem];
+			break;
+		case F_OWNERSID:
+		case F_GROUPSID:
+			if (nvlist_lookup_string(nvp_sid, SID_DOMAIN,
+			    &domain) || nvlist_lookup_uint32(nvp_sid, SID_RID,
+			    &rid)) {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+
+			/*
+			 * Now map domain+rid to ephemeral id's
+			 *
+			 * If mapping fails, then the uid/gid will
+			 * be set to UID_NOBODY by Winchester.
+			 */
+
+			if (attr == F_OWNERSID) {
+				(void) kidmap_getuidbysid(domain, rid,
+				    &xvattr.xva_vattr.va_uid);
+				xvattr.xva_vattr.va_mask |= AT_UID;
+			} else {
+				(void) kidmap_getgidbysid(domain, rid,
+				    &xvattr.xva_vattr.va_gid);
+				xvattr.xva_vattr.va_mask |= AT_GID;
+			}
+			break;
+		case F_AV_SCANSTAMP:
+			if (ppvp->v_type == VREG) {
+				XVA_SET_REQ(&xvattr, XAT_AV_SCANSTAMP);
+				(void) memcpy(xoap->xoa_av_scanstamp,
+				    scanstamp, nelems);
+			} else {
+				nvlist_free(nvp);
+				return (EINVAL);
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	ppvp = gfs_file_parent(gfs_file_parent(vp));
+	error = VOP_SETATTR(ppvp, &xvattr.xva_vattr, 0, cr, ct);
+	if (error)
+		uiop->uio_resid = size;
+
+	nvlist_free(nvp);
+	return (error);
+}
+
+static int
+xattr_file_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+    caller_context_t *ct)
+{
+	switch (cmd) {
+	case _PC_XATTR_EXISTS:
+	case _PC_SATTR_ENABLED:
+	case _PC_SATTR_EXISTS:
+		*valp = 0;
+		return (0);
+	default:
+		return (fs_pathconf(vp, cmd, valp, cr, ct));
+	}
+}
+
+vnodeops_t *xattr_file_ops;
+
+static const fs_operation_def_t xattr_file_tops[] = {
+	{ VOPNAME_OPEN,		{ .vop_open = xattr_file_open }		},
+	{ VOPNAME_CLOSE,	{ .vop_close = xattr_file_close }	},
+	{ VOPNAME_READ,		{ .vop_read = xattr_file_read }		},
+	{ VOPNAME_WRITE,	{ .vop_write = xattr_file_write }	},
+	{ VOPNAME_IOCTL,	{ .error = fs_ioctl }			},
+	{ VOPNAME_GETATTR,	{ .vop_getattr = xattr_file_getattr }	},
+	{ VOPNAME_ACCESS,	{ .vop_access = xattr_file_access }	},
+	{ VOPNAME_READDIR,	{ .error = fs_notdir }			},
+	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek }			},
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = gfs_vop_inactive }	},
+	{ VOPNAME_FID,		{ .vop_fid = xattr_common_fid }		},
+	{ VOPNAME_PATHCONF,	{ .vop_pathconf = xattr_file_pathconf }	},
+	{ VOPNAME_PUTPAGE,	{ .error = fs_putpage }			},
+	{ VOPNAME_FSYNC,	{ .error = fs_fsync }			},
+	{ NULL }
+};
+
+vnode_t *
+xattr_mkfile(vnode_t *pvp, xattr_view_t xattr_view)
+{
+	vnode_t *vp;
+	xattr_file_t *np;
+
+	vp = gfs_file_create(sizeof (xattr_file_t), pvp, xattr_file_ops);
+	np = vp->v_data;
+	np->xattr_view = xattr_view;
+	vp->v_flag |= V_SYSATTR;
+	return (vp);
+}
+
+vnode_t *
+xattr_mkfile_ro(vnode_t *pvp)
+{
+	return (xattr_mkfile(pvp, XATTR_VIEW_READONLY));
+}
+
+vnode_t *
+xattr_mkfile_rw(vnode_t *pvp)
+{
+	return (xattr_mkfile(pvp, XATTR_VIEW_READWRITE));
+}
+
+vnodeops_t *xattr_dir_ops;
+
+static gfs_dirent_t xattr_dirents[] = {
+	{ VIEW_READONLY, xattr_mkfile_ro, GFS_CACHE_VNODE, },
+	{ VIEW_READWRITE, xattr_mkfile_rw, GFS_CACHE_VNODE, },
+	{ NULL },
+};
+
+#define	XATTRDIR_NENTS	((sizeof (xattr_dirents) / sizeof (gfs_dirent_t)) - 1)
+
+static int
+is_sattr_name(char *s)
+{
+	int i;
+
+	for (i = 0; i < XATTRDIR_NENTS; ++i) {
+		if (strcmp(s, xattr_dirents[i].gfse_name) == 0) {
+			return (1);
+		}
+	}
+	return (0);
+}
+
+static int
+xattr_copy(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
+    cred_t *cr, caller_context_t *ct)
+{
+	xvattr_t xvattr;
+	vnode_t *pdvp;
+	int error;
+
+	/*
+	 * Only copy system attrs if the views are the same
+	 */
+	if (strcmp(snm, tnm) != 0)
+		return (EINVAL);
+
+	xva_init(&xvattr);
+
+	XVA_SET_REQ(&xvattr, XAT_SYSTEM);
+	XVA_SET_REQ(&xvattr, XAT_READONLY);
+	XVA_SET_REQ(&xvattr, XAT_HIDDEN);
+	XVA_SET_REQ(&xvattr, XAT_ARCHIVE);
+	XVA_SET_REQ(&xvattr, XAT_APPENDONLY);
+	XVA_SET_REQ(&xvattr, XAT_NOUNLINK);
+	XVA_SET_REQ(&xvattr, XAT_IMMUTABLE);
+	XVA_SET_REQ(&xvattr, XAT_NODUMP);
+	XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
+	XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
+	XVA_SET_REQ(&xvattr, XAT_CREATETIME);
+
+	pdvp = gfs_file_parent(sdvp);
+	error = VOP_GETATTR(pdvp, &xvattr.xva_vattr, 0, cr, ct);
+	if (error)
+		return (error);
+
+	pdvp = gfs_file_parent(tdvp);
+	error = VOP_SETATTR(pdvp, &xvattr.xva_vattr, 0, cr, ct);
+	return (error);
+}
+
+static int
+xattr_dir_realdir(vnode_t *dvp, vnode_t **realdvp, int lookup_flags,
+    cred_t *cr, caller_context_t *ct)
+{
+	vnode_t *pvp;
+	int error;
+	struct pathname pn;
+	char *startnm = "";
+
+	*realdvp = NULL;
+
+	pvp = gfs_file_parent(dvp);
+
+	error = pn_get(startnm, UIO_SYSSPACE, &pn);
+	if (error) {
+		VN_RELE(pvp);
+		return (error);
+	}
+
+	/*
+	 * Set the LOOKUP_HAVE_SYSATTR_DIR flag so that we don't get into an
+	 * infinite loop with fop_lookup calling back to xattr_dir_lookup.
+	 */
+	lookup_flags |= LOOKUP_HAVE_SYSATTR_DIR;
+	error = VOP_LOOKUP(pvp, startnm, realdvp, &pn, lookup_flags,
+	    rootvp, cr, ct, NULL, NULL);
+	pn_free(&pn);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+xattr_dir_open(vnode_t **vpp, int flags, cred_t *cr, caller_context_t *ct)
+{
+	if (flags & FWRITE) {
+		return (EACCES);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_dir_close(vnode_t *vpp, int flags, int count, offset_t off, cred_t *cr,
+    caller_context_t *ct)
+{
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+xattr_dir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	timestruc_t now;
+	vnode_t *pvp;
+	int error;
+	vattr_t pvattr;
+
+	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_GETATTR(pvp, vap, 0, cr, ct);
+		VN_RELE(pvp);
+		if (error) {
+			return (error);
+		}
+		vap->va_nlink += XATTRDIR_NENTS;
+		vap->va_size += XATTRDIR_NENTS;
+		return (0);
+	}
+
+	/*
+	 * There is no real xattr directory.  Cobble together
+	 * an entry using info from the parent object.
+	 */
+	pvp = gfs_file_parent(vp);
+	(void) memset(&pvattr, 0, sizeof (pvattr));
+	pvattr.va_mask = AT_UID|AT_GID|AT_RDEV|AT_CTIME|AT_MTIME;
+	error = VOP_GETATTR(pvp, &pvattr, 0, cr, ct);
+	if (error) {
+		return (error);
+	}
+	*vap = pvattr;
+	vap->va_type = VDIR;
+	vap->va_mode = MAKEIMODE(vap->va_type, S_ISVTX | 0777);
+	vap->va_fsid = vp->v_vfsp->vfs_dev;
+	vap->va_nodeid = gfs_file_inode(vp);
+	vap->va_nlink = XATTRDIR_NENTS+2;
+	vap->va_size = vap->va_nlink;
+	gethrestime(&now);
+	vap->va_atime = now;
+	vap->va_blksize = 0;
+	vap->va_nblocks = 0;
+	vap->va_seq = 0;
+	return (0);
+}
+
+static int
+xattr_dir_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	vnode_t *realvp;
+	int error;
+
+	/*
+	 * If there is a real xattr directory, do the setattr there.
+	 * Otherwise, just return success.  The GFS directory is transient,
+	 * and any setattr changes can disappear anyway.
+	 */
+	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_SETATTR(realvp, vap, flags, cr, ct);
+		VN_RELE(realvp);
+	}
+	if (error == ENOENT) {
+		error = 0;
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+xattr_dir_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ct)
+{
+	int error;
+	vnode_t *realvp = NULL;
+
+	if (mode & VWRITE) {
+		return (EACCES);
+	}
+
+	error = xattr_dir_realdir(vp, &realvp, LOOKUP_XATTR, cr, ct);
+
+	if (realvp)
+		VN_RELE(realvp);
+
+	/*
+	 * No real xattr dir isn't an error
+	 * an error of EINVAL indicates attributes on attributes
+	 * are not supported.  In that case just allow access to the
+	 * transient directory.
+	 */
+	return ((error == ENOENT || error == EINVAL) ? 0 : error);
+}
+
+static int
+xattr_dir_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
+    int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+    vsecattr_t *vsecp)
+{
+	vnode_t *pvp;
+	int error;
+
+	*vpp = NULL;
+
+	/*
+	 * Don't allow creation of extended attributes with sysattr names.
+	 */
+	if (is_sattr_name(name)) {
+		return (gfs_dir_lookup(dvp, name, vpp, cr));
+	}
+
+	error = xattr_dir_realdir(dvp, &pvp, LOOKUP_XATTR|CREATE_XATTR_DIR,
+	    cr, ct);
+	if (error == 0) {
+		error = VOP_CREATE(pvp, name, vap, excl, mode, vpp, cr, flag,
+		    ct, vsecp);
+		VN_RELE(pvp);
+	}
+	return (error);
+}
+
+static int
+xattr_dir_remove(vnode_t *dvp, char *name, cred_t *cr, caller_context_t *ct,
+    int flags)
+{
+	vnode_t *pvp;
+	int error;
+
+	if (is_sattr_name(name)) {
+		return (EACCES);
+	}
+
+	error = xattr_dir_realdir(dvp, &pvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_REMOVE(pvp, name, cr, ct, flags);
+		VN_RELE(pvp);
+	}
+	return (error);
+}
+
+static int
+xattr_dir_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
+    caller_context_t *ct, int flags)
+{
+	vnode_t *pvp;
+	int error;
+
+	if (svp->v_flag & V_SYSATTR) {
+		return (EINVAL);
+	}
+
+	error = xattr_dir_realdir(tdvp, &pvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		error = VOP_LINK(pvp, svp, name, cr, ct, flags);
+		VN_RELE(pvp);
+	}
+	return (error);
+}
+
+static int
+xattr_dir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
+    cred_t *cr, caller_context_t *ct, int flags)
+{
+	vnode_t *spvp, *tpvp;
+	int error;
+	int held_tgt;
+
+	if (is_sattr_name(snm) || is_sattr_name(tnm))
+		return (xattr_copy(sdvp, snm, tdvp, tnm, cr, ct));
+	/*
+	 * We know that sdvp is a GFS dir, or we wouldn't be here.
+	 * Get the real unnamed directory.
+	 */
+	error = xattr_dir_realdir(sdvp, &spvp, LOOKUP_XATTR, cr, ct);
+	if (error) {
+		return (error);
+	}
+
+	if (sdvp == tdvp) {
+		/*
+		 * If the source and target are the same GFS directory, the
+		 * underlying unnamed source and target dir will be the same.
+		 */
+		tpvp = spvp;
+		VN_HOLD(tpvp);
+		held_tgt = 1;
+	} else if (tdvp->v_flag & V_SYSATTR) {
+		/*
+		 * If the target dir is a different GFS directory,
+		 * find its underlying unnamed dir.
+		 */
+		error = xattr_dir_realdir(tdvp, &tpvp, LOOKUP_XATTR, cr, ct);
+		if (error) {
+			VN_RELE(spvp);
+			return (error);
+		}
+		held_tgt = 1;
+	} else {
+		/*
+		 * Target dir is outside of GFS, pass it on through.
+		 */
+		tpvp = tdvp;
+		held_tgt = 0;
+	}
+
+	error = VOP_RENAME(spvp, snm, tpvp, tnm, cr, ct, flags);
+
+	if (held_tgt) {
+		VN_RELE(tpvp);
+	}
+	VN_RELE(spvp);
+
+	return (error);
+}
+
+static int
+xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
+    caller_context_t *ct, int flags)
+{
+	vnode_t *pvp;
+	int error;
+	int local_eof = 0;
+	int reset_off = 0;
+	int has_xattrs = 0;
+
+	if (eofp == NULL) {
+		eofp = &local_eof;
+	}
+
+	/*
+	 * See if there is a real extended attribute directory.
+	 */
+	error = xattr_dir_realdir(dvp, &pvp, LOOKUP_XATTR, cr, ct);
+	if (error == 0) {
+		has_xattrs = 1;
+	}
+
+	/*
+	 * Start by reading up the static entries.
+	 */
+	if (uiop->uio_loffset == 0) {
+		if (has_xattrs) {
+			/*
+			 * If there is a real xattr dir, skip . and ..
+			 * in the GFS dir.  We'll pick them up below
+			 * when we call into the underlying fs.
+			 */
+			uiop->uio_loffset = GFS_STATIC_ENTRY_OFFSET;
+		}
+		error = gfs_dir_readdir(dvp, uiop, eofp, NULL, cr, ct);
+		if (error) {
+			if (has_xattrs) {
+				VN_RELE(pvp);
+			}
+			return (error);
+		}
+		/*
+		 * We must read all of the static entries in the first
+		 * call.  Otherwise we won't know if uio_loffset in a
+		 * subsequent call refers to the static entries or to those
+		 * in an underlying fs.
+		 */
+		ASSERT(*eofp);
+		reset_off = 1;
+	}
+
+	if (!has_xattrs) {
+		*eofp = 1;
+		return (0);
+	}
+
+	*eofp = 0;
+	if (reset_off) {
+		uiop->uio_loffset = 0;
+	}
+	(void) VOP_RWLOCK(pvp, V_WRITELOCK_FALSE, NULL);
+	error = VOP_READDIR(pvp, uiop, cr, eofp, ct, flags);
+	VOP_RWUNLOCK(pvp, V_WRITELOCK_FALSE, NULL);
+	VN_RELE(pvp);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static void
+xattr_dir_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
+{
+	gfs_file_t *fp;
+
+	fp = gfs_dir_inactive(vp);
+	if (fp != NULL) {
+		kmem_free(fp, fp->gfs_size);
+	}
+}
+
+static int
+xattr_dir_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+    caller_context_t *ct)
+{
+	switch (cmd) {
+	case _PC_XATTR_EXISTS:
+	case _PC_SATTR_ENABLED:
+	case _PC_SATTR_EXISTS:
+		*valp = 0;
+		return (0);
+	default:
+		return (fs_pathconf(vp, cmd, valp, cr, ct));
+	}
+}
+
+static const fs_operation_def_t xattr_dir_tops[] = {
+	{ VOPNAME_OPEN,		{ .vop_open = xattr_dir_open }		},
+	{ VOPNAME_CLOSE,	{ .vop_close = xattr_dir_close }	},
+	{ VOPNAME_IOCTL,	{ .error = fs_inval }			},
+	{ VOPNAME_GETATTR,	{ .vop_getattr = xattr_dir_getattr }	},
+	{ VOPNAME_SETATTR,	{ .vop_setattr = xattr_dir_setattr }	},
+	{ VOPNAME_ACCESS,	{ .vop_access = xattr_dir_access }	},
+	{ VOPNAME_READDIR,	{ .vop_readdir = xattr_dir_readdir }	},
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = gfs_vop_lookup }	},
+	{ VOPNAME_CREATE,	{ .vop_create = xattr_dir_create }	},
+	{ VOPNAME_REMOVE,	{ .vop_remove = xattr_dir_remove }	},
+	{ VOPNAME_LINK,		{ .vop_link = xattr_dir_link }		},
+	{ VOPNAME_RENAME,	{ .vop_rename = xattr_dir_rename }	},
+	{ VOPNAME_MKDIR,	{ .error = fs_inval }			},
+	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek }			},
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = xattr_dir_inactive }	},
+	{ VOPNAME_FID,		{ .vop_fid = xattr_common_fid }		},
+	{ VOPNAME_PATHCONF,	{ .vop_pathconf = xattr_dir_pathconf }	},
+	{ NULL, NULL }
+};
+
+static gfs_opsvec_t xattr_opsvec[] = {
+	{ "xattr dir", xattr_dir_tops, &xattr_dir_ops },
+	{ "system attributes", xattr_file_tops, &xattr_file_ops },
+	{ NULL, NULL, NULL }
+};
+
+static int
+xattr_lookup_cb(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
+    cred_t *cr)
+{
+	vnode_t *pvp;
+	struct pathname pn;
+	int error;
+
+	*vpp = NULL;
+	*inop = 0;
+
+	error = xattr_dir_realdir(vp, &pvp, LOOKUP_XATTR|CREATE_XATTR_DIR,
+	    cr, NULL);
+
+	/*
+	 * Return ENOENT for EACCES requests during lookup.  Once an
+	 * attribute create is attempted EACCES will be returned.
+	 */
+	if (error) {
+		if (error == EACCES)
+			return (ENOENT);
+		return (error);
+	}
+
+	error = pn_get((char *)nm, UIO_SYSSPACE, &pn);
+	if (error == 0) {
+		error = VOP_LOOKUP(pvp, (char *)nm, vpp, &pn, 0, rootvp,
+		    cr, NULL, NULL, NULL);
+		pn_free(&pn);
+	}
+	VN_RELE(pvp);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static ino64_t
+xattrdir_do_ino(vnode_t *vp, int index)
+{
+	/*
+	 * We use index 0 for the directory fid.  Start
+	 * the file numbering at 1.
+	 */
+	return ((ino64_t)index+1);
+}
+
+void
+xattr_init(void)
+{
+	VERIFY(gfs_make_opsvec(xattr_opsvec) == 0);
+}
+
+int
+xattr_dir_lookup(vnode_t *dvp, vnode_t **vpp, int flags, cred_t *cr)
+{
+	int error = 0;
+
+	*vpp = NULL;
+
+	if (dvp->v_type != VDIR && dvp->v_type != VREG)
+		return (EINVAL);
+
+	mutex_enter(&dvp->v_lock);
+
+	/*
+	 * If we're already in sysattr space, don't allow creation
+	 * of another level of sysattrs.
+	 */
+	if (dvp->v_flag & V_SYSATTR) {
+		mutex_exit(&dvp->v_lock);
+		return (EINVAL);
+	}
+
+	if (dvp->v_xattrdir != NULL) {
+		*vpp = dvp->v_xattrdir;
+		VN_HOLD(*vpp);
+	} else {
+		ulong_t val;
+		int xattrs_allowed = dvp->v_vfsp->vfs_flag & VFS_XATTR;
+		int sysattrs_allowed = 1;
+
+		/*
+		 * We have to drop the lock on dvp.  gfs_dir_create will
+		 * grab it for a VN_HOLD.
+		 */
+		mutex_exit(&dvp->v_lock);
+
+		/*
+		 * If dvp allows xattr creation, but not sysattr
+		 * creation, return the real xattr dir vp. We can't
+		 * use the vfs feature mask here because _PC_SATTR_ENABLED
+		 * has vnode-level granularity (e.g. .zfs).
+		 */
+		error = VOP_PATHCONF(dvp, _PC_SATTR_ENABLED, &val, cr, NULL);
+		if (error != 0 || val == 0)
+			sysattrs_allowed = 0;
+
+		if (!xattrs_allowed && !sysattrs_allowed)
+			return (EINVAL);
+
+		if (!sysattrs_allowed) {
+			struct pathname pn;
+			char *nm = "";
+
+			error = pn_get(nm, UIO_SYSSPACE, &pn);
+			if (error)
+				return (error);
+			error = VOP_LOOKUP(dvp, nm, vpp, &pn,
+			    flags|LOOKUP_HAVE_SYSATTR_DIR, rootvp, cr, NULL,
+			    NULL, NULL);
+			pn_free(&pn);
+			return (error);
+		}
+
+		/*
+		 * Note that we act as if we were given CREATE_XATTR_DIR,
+		 * but only for creation of the GFS directory.
+		 */
+		*vpp = gfs_dir_create(
+		    sizeof (gfs_dir_t), dvp, xattr_dir_ops, xattr_dirents,
+		    xattrdir_do_ino, MAXNAMELEN, NULL, xattr_lookup_cb);
+		mutex_enter(&dvp->v_lock);
+		if (dvp->v_xattrdir != NULL) {
+			/*
+			 * We lost the race to create the xattr dir.
+			 * Destroy this one, use the winner.  We can't
+			 * just call VN_RELE(*vpp), because the vnode
+			 * is only partially initialized.
+			 */
+			gfs_dir_t *dp = (*vpp)->v_data;
+
+			ASSERT((*vpp)->v_count == 1);
+			vn_free(*vpp);
+
+			mutex_destroy(&dp->gfsd_lock);
+			kmem_free(dp->gfsd_static,
+			    dp->gfsd_nstatic * sizeof (gfs_dirent_t));
+			kmem_free(dp, dp->gfsd_file.gfs_size);
+
+			/*
+			 * There is an implied VN_HOLD(dvp) here.  We should
+			 * be doing a VN_RELE(dvp) to clean up the reference
+			 * from *vpp, and then a VN_HOLD(dvp) for the new
+			 * reference.  Instead, we just leave the count alone.
+			 */
+
+			*vpp = dvp->v_xattrdir;
+			VN_HOLD(*vpp);
+		} else {
+			(*vpp)->v_flag |= (V_XATTRDIR|V_SYSATTR);
+			dvp->v_xattrdir = *vpp;
+		}
+	}
+	mutex_exit(&dvp->v_lock);
+
+	return (error);
+}
+
+int
+xattr_dir_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
+{
+	int error;
+	vnode_t *pvp, *dvp;
+	xattr_fid_t *xfidp;
+	struct pathname pn;
+	char *nm;
+	uint16_t orig_len;
+
+	*vpp = NULL;
+
+	if (fidp->fid_len < XATTR_FIDSZ)
+		return (EINVAL);
+
+	xfidp = (xattr_fid_t *)fidp;
+	orig_len = fidp->fid_len;
+	fidp->fid_len = xfidp->parent_len;
+
+	error = VFS_VGET(vfsp, &pvp, fidp);
+	fidp->fid_len = orig_len;
+	if (error)
+		return (error);
+
+	/*
+	 * Start by getting the GFS sysattr directory.	We might need
+	 * to recreate it during the VOP_LOOKUP.
+	 */
+	nm = "";
+	error = pn_get(nm, UIO_SYSSPACE, &pn);
+	if (error) {
+		VN_RELE(pvp);
+		return (EINVAL);
+	}
+
+	error = VOP_LOOKUP(pvp, nm, &dvp, &pn, LOOKUP_XATTR|CREATE_XATTR_DIR,
+	    rootvp, CRED(), NULL, NULL, NULL);
+	pn_free(&pn);
+	VN_RELE(pvp);
+	if (error)
+		return (error);
+
+	if (xfidp->dir_offset == 0) {
+		/*
+		 * If we were looking for the directory, we're done.
+		 */
+		*vpp = dvp;
+		return (0);
+	}
+
+	if (xfidp->dir_offset > XATTRDIR_NENTS) {
+		VN_RELE(dvp);
+		return (EINVAL);
+	}
+
+	nm = xattr_dirents[xfidp->dir_offset - 1].gfse_name;
+
+	error = pn_get(nm, UIO_SYSSPACE, &pn);
+	if (error) {
+		VN_RELE(dvp);
+		return (EINVAL);
+	}
+
+	error = VOP_LOOKUP(dvp, nm, vpp, &pn, 0, rootvp, CRED(), NULL,
+	    NULL, NULL);
+
+	pn_free(&pn);
+	VN_RELE(dvp);
+
+	return (error);
+}

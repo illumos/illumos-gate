@@ -49,6 +49,7 @@
 #include <sys/uio.h>
 #include <sys/debug.h>
 #include <c2/audit.h>
+#include <sys/cmn_err.h>
 
 /*
  * Common code for open()/openat() and creat().  Check permissions, allocate
@@ -66,6 +67,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	int fd, dupfd;
 	vnode_t *startvp;
 	proc_t *p = curproc;
+	uio_seg_t seg = UIO_USERSPACE;
+	char *open_filename = fname;
 
 	if (startfd == AT_FDCWD) {
 		/*
@@ -95,7 +98,31 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		}
 	}
 
-	if (filemode & FXATTR) {
+	/*
+	 * Handle openattrdirat request
+	 */
+	if (filemode & FXATTRDIROPEN) {
+#ifdef C2_AUDIT
+			if (audit_active)
+				audit_setfsat_path(1);
+#endif /* C2_AUDIT */
+
+		if (error = lookupnameat(fname, seg, FOLLOW,
+		    NULLVPP, &vp, startvp))
+			return (set_errno(error));
+		if (startvp) {
+			VN_RELE(startvp);
+			startvp = NULL;
+		}
+
+		startvp = vp;
+	}
+
+	/*
+	 * Do we need to go into extended attribute space?
+	 */
+	if (filemode & (FXATTR|FXATTRDIROPEN)) {
+		vattr_t vattr;
 
 		/*
 		 * Make sure we have a valid request.
@@ -111,7 +138,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			goto out;
 		}
 
-		if (startfd == AT_FDCWD) {
+		if (startfd == AT_FDCWD && !(filemode & FXATTRDIROPEN)) {
 			mutex_enter(&p->p_lock);
 			startvp = PTOU(p)->u_cdir;
 			VN_HOLD(startvp);
@@ -119,23 +146,34 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		}
 
 		/*
-		 * Verify permission to put attributes on file
+		 * In order to access hidden attribute directory the
+		 * user must be able to stat() the file
 		 */
 
-		if ((VOP_ACCESS(startvp, VREAD, 0, CRED()) != 0) &&
-		    (VOP_ACCESS(startvp, VWRITE, 0, CRED()) != 0) &&
-		    (VOP_ACCESS(startvp, VEXEC, 0, CRED()) != 0)) {
-			error = EACCES;
+		vattr.va_mask = AT_ALL;
+		if (error = VOP_GETATTR(startvp, &vattr, 0, CRED(), NULL)) {
 			pn_free(&pn);
 			goto out;
 		}
 
-		if ((startvp->v_vfsp->vfs_flag & VFS_XATTR) != 0) {
+		if ((startvp->v_vfsp->vfs_flag & VFS_XATTR) != 0 ||
+		    vfs_has_feature(startvp->v_vfsp, VFSFT_XVATTR)) {
 			error = VOP_LOOKUP(startvp, "", &sdvp, &pn,
-			    LOOKUP_XATTR|CREATE_XATTR_DIR, rootvp, CRED());
+			    LOOKUP_XATTR|CREATE_XATTR_DIR, rootvp, CRED(),
+			    NULL, NULL, NULL);
 		} else {
 			error = EINVAL;
 		}
+
+		/*
+		 * For openattrdirat use "." as filename to open
+		 * as part of vn_openat()
+		 */
+		if (error == 0 && (filemode & FXATTRDIROPEN)) {
+			open_filename = ".";
+			seg = UIO_SYSSPACE;
+		}
+
 		pn_free(&pn);
 		if (error != 0)
 			goto out;
@@ -144,7 +182,7 @@ copen(int startfd, char *fname, int filemode, int createmode)
 		startvp = sdvp;
 	}
 
-	if ((filemode & (FREAD|FWRITE)) != 0) {
+	if ((filemode & (FREAD|FWRITE|FXATTRDIROPEN)) != 0) {
 		if ((filemode & (FNONBLOCK|FNDELAY)) == (FNONBLOCK|FNDELAY))
 			filemode &= ~FNDELAY;
 		error = falloc((vnode_t *)NULL, filemode, &fp, &fd);
@@ -157,9 +195,11 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			 * Last arg is a don't-care term if
 			 * !(filemode & FCREAT).
 			 */
-			error = vn_openat(fname, UIO_USERSPACE, filemode,
-			    (int)(createmode & MODEMASK), &vp, CRCREAT,
-			    PTOU(curproc)->u_cmask, startvp);
+
+			error = vn_openat(open_filename, seg, filemode,
+			    (int)(createmode & MODEMASK),
+			    &vp, CRCREAT, PTOU(curproc)->u_cmask,
+			    startvp, fd);
 
 			if (startvp != NULL)
 				VN_RELE(startvp);
@@ -223,6 +263,7 @@ out:
 #define	OPENMODE32(fmode)	((int)((fmode)-FOPEN))
 #define	CREATMODE32		(FWRITE|FCREAT|FTRUNC)
 #define	OPENMODE64(fmode)	(OPENMODE32(fmode) | FOFFMAX)
+#define	OPENMODEATTRDIR		FXATTRDIROPEN
 #define	CREATMODE64		(CREATMODE32 | FOFFMAX)
 #ifdef _LP64
 #define	OPENMODE(fmode)		OPENMODE64(fmode)
@@ -301,4 +342,14 @@ openat32(int fd, char *path, int fmode, int cmode)
 {
 	return (copen(fd, path, OPENMODE32(fmode), cmode));
 }
+
 #endif	/* _SYSCALL32_IMPL */
+
+/*
+ * Special interface to open hidden attribute directory.
+ */
+int
+openattrdirat(int fd, char *fname)
+{
+	return (copen(fd, fname, OPENMODEATTRDIR, 0));
+}

@@ -1270,7 +1270,7 @@ vd_reset_if_needed(vd_t *vd)
 	ddi_taskq_wait(vd->completionq);
 
 	if (vd->file) {
-		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred);
+		status = VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL);
 		if (status) {
 			PR0("VOP_FSYNC returned errno %d", status);
 		}
@@ -1982,7 +1982,7 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		return (0);
 
 	case DKIOCFLUSHWRITECACHE:
-		return (VOP_FSYNC(vd->file_vnode, FSYNC, kcred));
+		return (VOP_FSYNC(vd->file_vnode, FSYNC, kcred, NULL));
 
 	default:
 		return (ENOTSUP);
@@ -2550,7 +2550,7 @@ vd_process_ver_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	 * the negotiated major and minor version values in the "vd" data
 	 * structure to govern further communication; in particular, note that
 	 * the client might have specified a lower minor version for the
-	 * agreed major version than specifed in the vds_version[] array.  The
+	 * agreed major version than specified in the vds_version[] array.  The
 	 * following assertions should help remind future maintainers to make
 	 * the appropriate changes to support multiple versions.
 	 */
@@ -3758,7 +3758,8 @@ vd_setup_backend_vnode(vd_t *vd)
 	vd->file = B_TRUE;
 
 	vattr.va_mask = AT_SIZE;
-	if ((status = VOP_GETATTR(vd->file_vnode, &vattr, 0, kcred)) != 0) {
+	if ((status = VOP_GETATTR(vd->file_vnode, &vattr, 0, kcred, NULL))
+	    != 0) {
 		PRN("VOP_GETATTR(%s) = errno %d", file_path, status);
 		return (EIO);
 	}
@@ -4376,10 +4377,11 @@ vds_destroy_vd(void *arg)
 		kmem_free(vd->inband_task.msg, vd->max_msglen);
 		vd->inband_task.msg = NULL;
 	}
+
 	if (vd->file) {
 		/* Close file */
 		(void) VOP_CLOSE(vd->file_vnode, vd->open_flags, 1,
-		    0, kcred);
+		    0, kcred, NULL);
 		VN_RELE(vd->file_vnode);
 		if (vd->file_devid != NULL)
 			ddi_devid_free(vd->file_devid);

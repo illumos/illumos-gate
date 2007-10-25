@@ -2417,7 +2417,8 @@ zone_set_root(zone_t *zone, const char *upath)
 			 * filesystem, if 'vp' is an autoFS vnode.
 			 * Get the new 'vp' if so.
 			 */
-			if ((error = VOP_ACCESS(vp, VEXEC, 0, CRED())) == 0 &&
+			if ((error =
+			    VOP_ACCESS(vp, VEXEC, 0, CRED(), NULL)) == 0 &&
 			    (!vn_ismntpt(vp) ||
 			    (error = traverse(&vp)) == 0)) {
 				pathlen = pn.pn_pathlen + 2;
@@ -4381,7 +4382,7 @@ done:
  *
  * Also return zero if the process has any shared mappings which reserve
  * swap.  This is because the counting for zone.max-swap does not allow swap
- * revervation to be shared between zones.  zone swap reservation is counted
+ * reservation to be shared between zones.  zone swap reservation is counted
  * on zone->zone_max_swap.
  */
 static int
@@ -5645,7 +5646,7 @@ zone_check_datalink(zoneid_t *zoneidp, char *dlname)
 /*
  * Get the names of the datalinks assigned to a zone.
  * Here *nump is the number of datalinks, and the assumption
- * is that the caller will gurantee that the the supplied buffer is
+ * is that the caller will guarantee that the the supplied buffer is
  * big enough to hold at least #*nump datalink names, that is,
  * LIFNAMSIZ X *nump
  * On return, *nump will be the "new" number of datalinks, if it

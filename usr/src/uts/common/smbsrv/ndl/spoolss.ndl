@@ -1,0 +1,489 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_SPOOLSS_NDL_
+#define _MLSVC_SPOOLSS_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Printing and Spooling RPC interface definition.
+ */
+
+#include "ndrtypes.ndl"
+
+
+/*
+ * The spoolss opcodes.
+ */
+#define SPOOLSS_OPNUM_OpenPrinter			0x01
+#define SPOOLSS_OPNUM_GetJob				0x03
+#define SPOOLSS_OPNUM_DeletePrinter			0x06
+#define SPOOLSS_OPNUM_GetPrinterDriver			0x0b
+#define SPOOLSS_OPNUM_DeletePrinterDriver		0x0d
+#define SPOOLSS_OPNUM_AddPrintProcessor			0x0e
+#define SPOOLSS_OPNUM_GetPrintProcessorDirectory	0x10
+#define SPOOLSS_OPNUM_AbortPrinter			0x15
+#define SPOOLSS_OPNUM_ReadPrinter			0x16
+#define SPOOLSS_OPNUM_WaitForPrinterChange		0x1c
+#define SPOOLSS_OPNUM_AddForm				0x1e
+#define SPOOLSS_OPNUM_DeleteForm			0x1f
+#define SPOOLSS_OPNUM_GetForm				0x20
+#define SPOOLSS_OPNUM_SetForm				0x21
+#define SPOOLSS_OPNUM_EnumMonitors			0x24
+#define SPOOLSS_OPNUM_AddPort				0x25
+#define SPOOLSS_OPNUM_ConfigurePort			0x26
+#define SPOOLSS_OPNUM_DeletePort			0x27
+#define SPOOLSS_OPNUM_CreatePrinterIc			0x28
+#define SPOOLSS_OPNUM_PlayDescriptionPrinterIc		0x29
+#define SPOOLSS_OPNUM_DeletePrinterIc			0x2a
+#define SPOOLSS_OPNUM_AddPrinterConnection		0x2b
+#define SPOOLSS_OPNUM_DeletePrinterConnection		0x2c
+#define SPOOLSS_OPNUM_PrinterMessageBox			0x2d
+#define SPOOLSS_OPNUM_AddMonitor			0x2e
+#define SPOOLSS_OPNUM_DeleteMonitor			0x2f
+#define SPOOLSS_OPNUM_DeletePrintProcessor		0x30
+#define SPOOLSS_OPNUM_AddPrintProvider			0x31
+#define SPOOLSS_OPNUM_DeletePrintProvider		0x32
+#define SPOOLSS_OPNUM_ResetPrinter			0x34
+#define SPOOLSS_OPNUM_FindFirstChangeNotify		0x36
+#define SPOOLSS_OPNUM_FindNextChangeNotify		0x37
+#define SPOOLSS_OPNUM_RouterFindFirstNotify		0x39
+#define SPOOLSS_OPNUM_ReplyOpenPrinter			0x3a
+#define SPOOLSS_OPNUM_RouterReplyPrinter                0x3b
+#define SPOOLSS_OPNUM_ReplyClosePrinter			0x3c
+#define SPOOLSS_OPNUM_AddPortEx				0x3d
+#define SPOOLSS_OPNUM_RemoteFindFirstChangeNotify	0x3e
+#define SPOOLSS_OPNUM_SpoolerInitialize			0x3f
+#define SPOOLSS_OPNUM_ResetPrinterEx			0x40
+#define SPOOLSS_OPNUM_RouterRefreshChangeNotify		0x42
+#define SPOOLSS_OPNUM_OpenPrinter2			0x45
+
+
+/*
+ * The private handle definition for this interface.
+ */
+struct spoolss_handle {
+	DWORD data[5];
+};
+typedef struct spoolss_handle spoolss_handle_t;
+
+
+OPERATION(SPOOLSS_OPNUM_OpenPrinter)
+struct spoolss_OpenPrinter {
+	IN	DWORD dontcare;
+	OUT	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_GetJob)
+struct spoolss_GetJob {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrinter)
+struct spoolss_DeletePrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_GetPrinterDriver)
+struct spoolss_GetPrinterDriver {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrinterDriver)
+struct spoolss_DeletePrinterDriver {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddPrintProcessor)
+struct spoolss_AddPrintProcessor {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_GetPrintProcessorDirectory)
+struct spoolss_GetPrintProcessorDirectory {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AbortPrinter)
+struct spoolss_AbortPrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ReadPrinter)
+struct spoolss_ReadPrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_WaitForPrinterChange)
+struct spoolss_WaitForPrinterChange {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddForm)
+struct spoolss_AddForm {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeleteForm)
+struct spoolss_DeleteForm {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_GetForm)
+struct spoolss_GetForm {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_SetForm)
+struct spoolss_SetForm {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_EnumMonitors)
+struct spoolss_EnumMonitors {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddPort)
+struct spoolss_AddPort {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ConfigurePort)
+struct spoolss_ConfigurePort {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePort)
+struct spoolss_DeletePort {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_CreatePrinterIc)
+struct spoolss_CreatePrinterIc {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_PlayDescriptionPrinterIc)
+struct spoolss_PlayDescriptionPrinterIc {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrinterIc)
+struct spoolss_DeletePrinterIc {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddPrinterConnection)
+struct spoolss_AddPrinterConnection {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrinterConnection)
+struct spoolss_DeletePrinterConnection {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_PrinterMessageBox)
+struct spoolss_PrinterMessageBox {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddMonitor)
+struct spoolss_AddMonitor {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeleteMonitor)
+struct spoolss_DeleteMonitor {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrintProcessor)
+struct spoolss_DeletePrintProcessor {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddPrintProvider)
+struct spoolss_AddPrintProvider {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_DeletePrintProvider)
+struct spoolss_DeletePrintProvider {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ResetPrinter)
+struct spoolss_ResetPrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_FindFirstChangeNotify)
+struct spoolss_FindFirstChangeNotify {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_FindNextChangeNotify)
+struct spoolss_FindNextChangeNotify {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_RouterFindFirstNotify)
+struct spoolss_RouterFindFirstNotify {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ReplyOpenPrinter)
+struct spoolss_ReplyOpenPrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_RouterReplyPrinter)
+struct spoolss_RouterReplyPrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ReplyClosePrinter)
+struct spoolss_ReplyClosePrinter {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_AddPortEx)
+struct spoolss_AddPortEx {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_RemoteFindFirstChangeNotify)
+struct spoolss_RemoteFindFirstChangeNotify {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_SpoolerInitialize)
+struct spoolss_SpoolerInitialize {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_ResetPrinterEx)
+struct spoolss_ResetPrinterEx {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_RouterRefreshChangeNotify)
+struct spoolss_RouterRefreshChangeNotify {
+	IN	DWORD dontcare;
+	OUT	DWORD status;
+};
+
+
+OPERATION(SPOOLSS_OPNUM_OpenPrinter2)
+struct spoolss_OpenPrinter2 {
+	IN	DWORD dontcare;
+	OUT	spoolss_handle_t handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * The spoolss interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union spoolss_interface {
+ 	CASE(SPOOLSS_OPNUM_OpenPrinter)
+		struct spoolss_OpenPrinter		OpenPrinter;
+ 	CASE(SPOOLSS_OPNUM_GetJob)
+		struct spoolss_GetJob			GetJob;
+	CASE(SPOOLSS_OPNUM_DeletePrinter)
+		struct spoolss_DeletePrinter		DeletePrinter;
+	CASE(SPOOLSS_OPNUM_GetPrinterDriver)
+		struct spoolss_GetPrinterDriver		GetPrinterDriver;
+	CASE(SPOOLSS_OPNUM_DeletePrinterDriver)
+		struct spoolss_DeletePrinterDriver	DeletePrinterDriver;
+	CASE(SPOOLSS_OPNUM_AddPrintProcessor)
+		struct spoolss_AddPrintProcessor	AddPrintProcessor;
+	CASE(SPOOLSS_OPNUM_GetPrintProcessorDirectory)
+		struct spoolss_GetPrintProcessorDirectory
+						GetPrintProcessorDirectory;
+	CASE(SPOOLSS_OPNUM_AbortPrinter)
+		struct spoolss_AbortPrinter		AbortPrinter;
+	CASE(SPOOLSS_OPNUM_ReadPrinter)
+		struct spoolss_ReadPrinter		ReadPrinter;
+	CASE(SPOOLSS_OPNUM_WaitForPrinterChange)
+		struct spoolss_WaitForPrinterChange	WaitForPrinterChange;
+	CASE(SPOOLSS_OPNUM_AddForm)
+		struct spoolss_AddForm			AddForm;
+	CASE(SPOOLSS_OPNUM_DeleteForm)
+		struct spoolss_DeleteForm		DeleteForm;
+	CASE(SPOOLSS_OPNUM_GetForm)
+		struct spoolss_GetForm			GetForm;
+	CASE(SPOOLSS_OPNUM_SetForm)
+		struct spoolss_SetForm			SetForm;
+	CASE(SPOOLSS_OPNUM_EnumMonitors)
+		struct spoolss_EnumMonitors		EnumMonitors;
+	CASE(SPOOLSS_OPNUM_AddPort)
+		struct spoolss_AddPort			AddPort;
+	CASE(SPOOLSS_OPNUM_ConfigurePort)
+		struct spoolss_ConfigurePort		ConfigurePort;
+	CASE(SPOOLSS_OPNUM_DeletePort)
+		struct spoolss_DeletePort		DeletePort;
+	CASE(SPOOLSS_OPNUM_CreatePrinterIc)
+		struct spoolss_CreatePrinterIc		CreatePrinterIc;
+	CASE(SPOOLSS_OPNUM_PlayDescriptionPrinterIc)
+		struct spoolss_PlayDescriptionPrinterIc
+						PlayDescriptionPrinterIc;
+	CASE(SPOOLSS_OPNUM_DeletePrinterIc)
+		struct spoolss_DeletePrinterIc		DeletePrinterIc;
+	CASE(SPOOLSS_OPNUM_AddPrinterConnection)
+		struct spoolss_AddPrinterConnection	AddPrinterConnection;
+	CASE(SPOOLSS_OPNUM_DeletePrinterConnection)
+		struct spoolss_DeletePrinterConnection	DeletePrinterConnection;
+	CASE(SPOOLSS_OPNUM_PrinterMessageBox)
+		struct spoolss_PrinterMessageBox	PrinterMessageBox;
+	CASE(SPOOLSS_OPNUM_AddMonitor)
+		struct spoolss_AddMonitor		AddMonitor;
+	CASE(SPOOLSS_OPNUM_DeleteMonitor)
+		struct spoolss_DeleteMonitor		DeleteMonitor;
+	CASE(SPOOLSS_OPNUM_DeletePrintProcessor)
+		struct spoolss_DeletePrintProcessor	DeletePrintProcessor;
+	CASE(SPOOLSS_OPNUM_AddPrintProvider)
+		struct spoolss_AddPrintProvider		AddPrintProvider;
+	CASE(SPOOLSS_OPNUM_DeletePrintProvider)
+		struct spoolss_DeletePrintProvider	DeletePrintProvider;
+	CASE(SPOOLSS_OPNUM_ResetPrinter)
+		struct spoolss_ResetPrinter		ResetPrinter;
+	CASE(SPOOLSS_OPNUM_FindFirstChangeNotify)
+		struct spoolss_FindFirstChangeNotify	FindFirstChangeNotify;
+	CASE(SPOOLSS_OPNUM_FindNextChangeNotify)
+		struct spoolss_FindNextChangeNotify	FindNextChangeNotify;
+	CASE(SPOOLSS_OPNUM_RouterFindFirstNotify)
+		struct spoolss_RouterFindFirstNotify	RouterFindFirstNotify;
+	CASE(SPOOLSS_OPNUM_ReplyOpenPrinter)
+		struct spoolss_ReplyOpenPrinter		ReplyOpenPrinter;
+	CASE(SPOOLSS_OPNUM_RouterReplyPrinter)
+		struct spoolss_RouterReplyPrinter	RouterReplyPrinter;
+	CASE(SPOOLSS_OPNUM_ReplyClosePrinter)
+		struct spoolss_ReplyClosePrinter	ReplyClosePrinter;
+	CASE(SPOOLSS_OPNUM_AddPortEx)
+		struct spoolss_AddPortEx		AddPortEx;
+	CASE(SPOOLSS_OPNUM_RemoteFindFirstChangeNotify)
+		struct spoolss_RemoteFindFirstChangeNotify
+						RemoteFindFirstChangeNotify;
+	CASE(SPOOLSS_OPNUM_SpoolerInitialize)
+		struct spoolss_SpoolerInitialize	SpoolerInitialize;
+	CASE(SPOOLSS_OPNUM_ResetPrinterEx)
+		struct spoolss_ResetPrinterEx		ResetPrinterEx;
+	CASE(SPOOLSS_OPNUM_RouterRefreshChangeNotify)
+		struct spoolss_RouterRefreshChangeNotify
+						RouterRefreshChangeNotify;
+	CASE(SPOOLSS_OPNUM_OpenPrinter2)
+		struct spoolss_OpenPrinter2		OpenPrinter2;
+};
+typedef union spoolss_interface	spoolss_interface_t;
+EXTERNTYPEINFO(spoolss_interface)
+
+#endif /* _MLSVC_SPOOLSS_NDL_ */

@@ -1040,6 +1040,9 @@ aui_fsat(au_event_t e)
 	case 7: /* renameat */
 		e = AUE_RENAMEAT;
 		break;
+	case 9: /* __openattrdirat */
+		tad->tad_ctrl |= PAD_SAVPATH;
+		/*FALLTHROUGH*/
 	default:
 		e = AUE_NULL;
 		break;
@@ -1866,7 +1869,7 @@ aus_close(struct t_audit_data *tad)
 		au_uwrite(au_to_path(fad->fad_aupath));
 		if ((vp = fp->f_vnode) != NULL) {
 			attr.va_mask = AT_ALL;
-			if (VOP_GETATTR(vp, &attr, 0, CRED()) == 0) {
+			if (VOP_GETATTR(vp, &attr, 0, CRED(), NULL) == 0) {
 				/*
 				 * When write was not used and the file can be
 				 * considered public, skip the audit.
@@ -4585,7 +4588,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 }
 
 /*
- * XXX socket(2) may be equivilent to open(2) on a unix domain
+ * XXX socket(2) may be equivalent to open(2) on a unix domain
  * socket. This needs investigation.
  */
 
@@ -4910,7 +4913,7 @@ au_door_lookup(int did)
 	/*
 	 * Use the underlying vnode (we may be namefs mounted)
 	 */
-	if (VOP_REALVP(fp->f_vnode, &vp))
+	if (VOP_REALVP(fp->f_vnode, &vp, NULL))
 		vp = fp->f_vnode;
 
 	if (vp == NULL || vp->v_type != VDOOR) {

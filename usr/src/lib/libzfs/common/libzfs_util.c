@@ -136,6 +136,10 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "unshare(1M) failed"));
 	case EZFS_SHARENFSFAILED:
 		return (dgettext(TEXT_DOMAIN, "share(1M) failed"));
+	case EZFS_UNSHARESMBFAILED:
+		return (dgettext(TEXT_DOMAIN, "smb remove share failed"));
+	case EZFS_SHARESMBFAILED:
+		return (dgettext(TEXT_DOMAIN, "smb add share failed"));
 	case EZFS_ISCSISVCUNAVAIL:
 		return (dgettext(TEXT_DOMAIN,
 		    "iscsitgt service need to be enabled by "

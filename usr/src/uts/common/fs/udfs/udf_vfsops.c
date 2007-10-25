@@ -282,7 +282,7 @@ udf_mount(struct vfs *vfsp, struct vnode *mvp,
 		oflag = FREAD | FWRITE;
 		aflag = VREAD | VWRITE;
 	}
-	if ((error = VOP_ACCESS(bvp, aflag, 0, cr)) != 0 ||
+	if ((error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
 	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
 		goto out;
 	}
@@ -365,8 +365,8 @@ udf_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 
 	ud_destroy_fsp(udf_vfsp);
 
-	(void) VOP_PUTPAGE(bvp, (offset_t)0, (uint32_t)0, B_INVAL, cr);
-	(void) VOP_CLOSE(bvp, flag, 1, (offset_t)0, cr);
+	(void) VOP_PUTPAGE(bvp, (offset_t)0, (uint32_t)0, B_INVAL, cr, NULL);
+	(void) VOP_CLOSE(bvp, flag, 1, (offset_t)0, cr, NULL);
 
 	(void) bfinval(vfsp->vfs_dev, 1);
 	VN_RELE(bvp);
@@ -555,7 +555,7 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 		(void) dnlc_purge_vfsp(vfsp, 0);
 		vp = common_specvp(vp);
 		(void) VOP_PUTPAGE(vp, (offset_t)0,
-			(uint32_t)0, B_INVAL, CRED());
+			(uint32_t)0, B_INVAL, CRED(), NULL);
 		binval(vfsp->vfs_dev);
 
 		ovflags = vfsp->vfs_flag;
@@ -566,7 +566,7 @@ udf_mountroot(struct vfs *vfsp, enum whymountroot why)
 		ud_update(0);
 		vp = ((struct udf_vfs *)vfsp->vfs_data)->udf_devvp;
 		(void) VOP_CLOSE(vp, FREAD|FWRITE, 1,
-					(offset_t)0, CRED());
+					(offset_t)0, CRED(), NULL);
 		return (0);
 	}
 
@@ -630,7 +630,8 @@ ud_mountfs(struct vfs *vfsp,
 		 * operations.
 		 */
 		error = VOP_OPEN(&devvp,
-		    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE, cr);
+		    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE,
+		    cr, NULL);
 		if (error) {
 			goto out;
 		}
@@ -677,7 +678,7 @@ ud_mountfs(struct vfs *vfsp,
 		if (udf_vfsp->udf_flags & UDF_FL_RDONLY) {
 			(void) dnlc_purge_vfsp(vfsp, 0);
 			(void) VOP_PUTPAGE(devvp, (offset_t)0, (uint_t)0,
-					B_INVAL, CRED());
+					B_INVAL, CRED(), NULL);
 			(void) ud_iflush(vfsp);
 			bflush(dev);
 			binval(dev);
@@ -769,7 +770,7 @@ remountout:
 	 * they really should be using the raw device.
 	 */
 	(void) VOP_PUTPAGE(common_specvp(devvp), (offset_t)0,
-	    (uint32_t)0, B_INVAL, cr);
+	    (uint32_t)0, B_INVAL, cr, NULL);
 
 
 	/*
@@ -936,7 +937,7 @@ out:
 	ud_destroy_fsp(udf_vfsp);
 	if (needclose) {
 		(void) VOP_CLOSE(devvp, (vfsp->vfs_flag & VFS_RDONLY) ?
-			FREAD : FREAD|FWRITE, 1, (offset_t)0, cr);
+			FREAD : FREAD|FWRITE, 1, (offset_t)0, cr, NULL);
 		bflush(dev);
 		binval(dev);
 	}

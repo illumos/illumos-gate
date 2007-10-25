@@ -191,7 +191,12 @@ ctfs_create_evnode(vnode_t *pvp)
  */
 /*ARGSUSED*/
 static int
-ctfs_ev_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_ev_access(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *cct)
 {
 	ctfs_evnode_t *evnode = vp->v_data;
 	contract_t *ct = evnode->ctfs_ev_contract;
@@ -214,7 +219,7 @@ ctfs_ev_access(vnode_t *vp, int mode, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_ev_open(vnode_t **vpp, int flag, cred_t *cr)
+ctfs_ev_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *cct)
 {
 	ctfs_evnode_t *evnode = (*vpp)->v_data;
 	contract_t *ct = evnode->ctfs_ev_contract;
@@ -235,7 +240,7 @@ ctfs_ev_open(vnode_t **vpp, int flag, cred_t *cr)
  */
 /* ARGSUSED */
 static void
-ctfs_ev_inactive(vnode_t *vp, cred_t *cr)
+ctfs_ev_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	ctfs_evnode_t *evnode;
 	vnode_t *pvp = gfs_file_parent(vp);
@@ -258,7 +263,12 @@ ctfs_ev_inactive(vnode_t *vp, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_ev_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_ev_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	ctfs_evnode_t *evnode = vp->v_data;
 
@@ -281,8 +291,14 @@ ctfs_ev_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_ev_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
-    int *rvalp)
+ctfs_ev_ioctl(
+	vnode_t *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 {
 	ctfs_evnode_t *evnode = vp->v_data;
 
@@ -293,9 +309,15 @@ ctfs_ev_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 /*
  * ctfs_ev_poll - VOP_POLL entry point
  */
+/*ARGSUSED*/
 static int
-ctfs_ev_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-    pollhead_t **php)
+ctfs_ev_poll(
+	vnode_t *vp,
+	short events,
+	int anyyet,
+	short *reventsp,
+	pollhead_t **php,
+	caller_context_t *ct)
 {
 	ctfs_evnode_t *evnode = vp->v_data;
 
@@ -361,7 +383,7 @@ ctfs_create_bundle(vnode_t *pvp)
  */
 /* ARGSUSED */
 static int
-ctfs_bu_open(vnode_t **vpp, int flag, cred_t *cr)
+ctfs_bu_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	ctfs_bunode_t *bunode = (*vpp)->v_data;
 
@@ -379,7 +401,7 @@ ctfs_bu_open(vnode_t **vpp, int flag, cred_t *cr)
  */
 /* ARGSUSED */
 static void
-ctfs_bu_inactive(vnode_t *vp, cred_t *cr)
+ctfs_bu_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	ctfs_bunode_t *bunode;
 	vnode_t *pvp = gfs_file_parent(vp);
@@ -400,7 +422,12 @@ ctfs_bu_inactive(vnode_t *vp, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_bu_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_bu_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	ctfs_bunode_t *bunode = vp->v_data;
 
@@ -424,8 +451,14 @@ ctfs_bu_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_bu_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
-    int *rvalp)
+ctfs_bu_ioctl(
+	vnode_t *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *ct)
 {
 	ctfs_bunode_t *bunode = vp->v_data;
 
@@ -436,9 +469,15 @@ ctfs_bu_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 /*
  * ctfs_bu_poll - VOP_POLL entry point
  */
+/*ARGSUSED*/
 static int
-ctfs_bu_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-    pollhead_t **php)
+ctfs_bu_poll(
+	vnode_t *vp,
+	short events,
+	int anyyet,
+	short *reventsp,
+	pollhead_t **php,
+	caller_context_t *ct)
 {
 	ctfs_bunode_t *bunode = vp->v_data;
 

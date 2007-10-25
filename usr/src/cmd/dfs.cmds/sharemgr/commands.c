@@ -48,6 +48,10 @@
 #include <libscf.h>
 #include <libxml/tree.h>
 #include <libintl.h>
+#include <assert.h>
+#include <iconv.h>
+#include <langinfo.h>
+#include <dirent.h>
 
 static char *sa_get_usage(sa_usage_t);
 
@@ -75,13 +79,175 @@ has_protocol(sa_group_t group, char *protocol)
 }
 
 /*
- * add_list(list, item)
- *	Adds a new list member that points to item to the list.
+ * validresource(name)
+ *
+ * Check that name only has valid characters in it. The current valid
+ * set are the printable characters but not including:
+ *	" / \ [ ] : | < > + ; , ? * = \t
+ * Note that space is included and there is a maximum length.
+ */
+static int
+validresource(const char *name)
+{
+	const char *cp;
+	size_t len;
+
+	if (name == NULL)
+		return (B_FALSE);
+
+	len = strlen(name);
+	if (len == 0 || len > SA_MAX_RESOURCE_NAME)
+		return (B_FALSE);
+
+	if (strpbrk(name, "\"/\\[]:|<>+;,?*=\t") != NULL) {
+		return (B_FALSE);
+	}
+
+	for (cp = name; *cp != '\0'; cp++)
+		if (iscntrl(*cp))
+			return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * conv_to_utf8(input)
+ *
+ * Convert the input string to utf8 from the current locale.  If the
+ * conversion fails, use the current locale, it is likely close
+ * enough. For example, the "C" locale is a subset of utf-8. The
+ * return value may be a new string or the original input string.
+ */
+
+static char *
+conv_to_utf8(char *input)
+{
+	iconv_t cd;
+	char *output = input;
+	char *outleft;
+	char *curlocale;
+	size_t bytesleft;
+	size_t size;
+	size_t osize;
+	static int warned = 0;
+
+	curlocale = nl_langinfo(CODESET);
+	if (curlocale == NULL)
+		curlocale = "C";
+	cd = iconv_open("UTF-8", curlocale);
+	if (cd != NULL && cd != (iconv_t)-1) {
+		size = strlen(input);
+		/* Assume worst case of characters expanding to 4 bytes. */
+		bytesleft = size * 4;
+		output = calloc(bytesleft, 1);
+		if (output != NULL) {
+			outleft = output;
+			osize = iconv(cd, (const char **)&input, &size,
+			    &outleft, &bytesleft);
+			if (osize == (size_t)-1 || size != 0) {
+				free(output);
+				output = input;
+			}
+		}
+		(void) iconv_close(cd);
+	} else {
+		if (!warned)
+			(void) fprintf(stderr,
+			    gettext("Cannot convert to UTF-8 from %s\n"),
+			    curlocale ? curlocale : gettext("unknown"));
+		warned = 1;
+	}
+	return (output);
+}
+
+/*
+ * conv_from(input)
+ *
+ * Convert the input string from utf8 to current locale.  If the
+ * conversion isn't supported, just use as is. The return value may be
+ * a new string or the original input string.
+ */
+
+static char *
+conv_from_utf8(char *input)
+{
+	iconv_t cd;
+	char *output = input;
+	char *outleft;
+	char *curlocale;
+	size_t bytesleft;
+	size_t size;
+	size_t osize;
+	static int warned = 0;
+
+	curlocale = nl_langinfo(CODESET);
+	if (curlocale == NULL)
+		curlocale = "C";
+	cd = iconv_open(curlocale, "UTF-8");
+	if (cd != NULL && cd != (iconv_t)-1) {
+		size = strlen(input);
+		/* Assume worst case of characters expanding to 4 bytes. */
+		bytesleft = size * 4;
+		output = calloc(bytesleft, 1);
+		if (output != NULL) {
+			outleft = output;
+			osize = iconv(cd, (const char **)&input, &size,
+			    &outleft, &bytesleft);
+			if (osize == (size_t)-1 || size != 0) {
+				free(output);
+				output = input;
+			}
+		}
+		(void) iconv_close(cd);
+	} else {
+		if (!warned)
+			(void) fprintf(stderr,
+			    gettext("Cannot convert to %s from UTF-8\n"),
+			    curlocale ? curlocale : gettext("unknown"));
+		warned = 1;
+	}
+	return (output);
+}
+
+static void
+print_rsrc_desc(char *resource)
+{
+	char *description;
+	char *desc;
+
+	description = sa_get_resource_description(resource);
+	if (description != NULL) {
+		desc = conv_from_utf8(description);
+		if (desc != description) {
+			sa_free_share_description(description);
+			description = desc;
+		}
+		(void) printf("\t\"%s\"", description);
+		sa_free_share_description(description);
+	}
+}
+
+static int
+set_share_desc(sa_share_t share, char *description)
+{
+	char *desc;
+	int ret;
+
+	desc = conv_to_utf8(description);
+	ret = sa_set_share_description(share, desc);
+	if (description != desc)
+		sa_free_share_description(desc);
+	return (ret);
+}
+
+/*
+ * add_list(list, item, data, proto)
+ *	Adds a new list member that points holds item in the list.
  *	If list is NULL, it starts a new list.  The function returns
  *	the first member of the list.
  */
 struct list *
-add_list(struct list *listp, void *item, void *data)
+add_list(struct list *listp, void *item, void *data, char *proto)
 {
 	struct list *new, *tmp;
 
@@ -90,6 +256,7 @@ add_list(struct list *listp, void *item, void *data)
 		new->next = NULL;
 		new->item = item;
 		new->itemdata = data;
+		new->proto = proto;
 	} else {
 		return (listp);
 	}
@@ -229,15 +396,92 @@ check_authorizations(char *instname, int flags)
 }
 
 /*
- * enable_group(group, updateproto)
+ * notify_or_enable_share(share, protocol)
+ *
+ * Since some protocols don't want an "enable" when properties change,
+ * this function will use the protocol specific notify function
+ * first. If that fails, it will then attempt to use the
+ * sa_enable_share().  "protocol" is the protocol that was specified
+ * on the command line.
+ */
+static void
+notify_or_enable_share(sa_share_t share, char *protocol)
+{
+	sa_group_t group;
+	sa_optionset_t opt;
+	int ret = SA_OK;
+	char *path;
+	char *groupproto;
+	sa_share_t parent = share;
+
+	/* If really a resource, get parent share */
+	if (!sa_is_share(share)) {
+		parent = sa_get_resource_parent((sa_resource_t)share);
+	}
+
+	/*
+	 * Now that we've got a share in "parent", make sure it has a path.
+	 */
+	path = sa_get_share_attr(parent, "path");
+	if (path == NULL)
+		return;
+
+	group = sa_get_parent_group(parent);
+
+	if (group == NULL) {
+		sa_free_attr_string(path);
+		return;
+	}
+	for (opt = sa_get_optionset(group, NULL);
+	    opt != NULL;
+	    opt = sa_get_next_optionset(opt)) {
+		groupproto = sa_get_optionset_attr(opt, "type");
+		if (groupproto == NULL ||
+		    (protocol != NULL && strcmp(groupproto, protocol) != 0)) {
+			sa_free_attr_string(groupproto);
+			continue;
+		}
+		if (sa_is_share(share)) {
+			if ((ret = sa_proto_change_notify(share,
+			    groupproto)) != SA_OK) {
+				ret = sa_enable_share(share, groupproto);
+				if (ret != SA_OK) {
+					(void) printf(
+					    gettext("Could not reenable"
+					    " share %s: %s\n"),
+					    path, sa_errorstr(ret));
+				}
+			}
+		} else {
+			/* Must be a resource */
+			if ((ret = sa_proto_notify_resource(share,
+			    groupproto)) != SA_OK) {
+				ret = sa_enable_resource(share, groupproto);
+				if (ret != SA_OK) {
+					(void) printf(
+					    gettext("Could not "
+					    "reenable resource %s: "
+					    "%s\n"), path,
+					    sa_errorstr(ret));
+				}
+			}
+		}
+		sa_free_attr_string(groupproto);
+	}
+	sa_free_attr_string(path);
+}
+
+/*
+ * enable_group(group, updateproto, notify, proto)
  *
  * enable all the shares in the specified group. This is a helper for
  * enable_all_groups in order to simplify regular and subgroup (zfs)
- * disabling. Group has already been checked for non-NULL.
+ * enabling. Group has already been checked for non-NULL. If notify
+ * is non-zero, attempt to use the notify interface rather than
+ * enable.
  */
-
 static void
-enable_group(sa_group_t group, char *updateproto)
+enable_group(sa_group_t group, char *updateproto, int notify, char *proto)
 {
 	sa_share_t share;
 
@@ -246,7 +490,10 @@ enable_group(sa_group_t group, char *updateproto)
 	    share = sa_get_next_share(share)) {
 		if (updateproto != NULL)
 			(void) sa_update_legacy(share, updateproto);
-		(void) sa_enable_share(share, NULL);
+		if (notify)
+			notify_or_enable_share(share, proto);
+		else
+			(void) sa_enable_share(share, proto);
 	}
 }
 
@@ -266,6 +513,7 @@ isenabled(sa_group_t group)
 	if (group != NULL) {
 		state = sa_get_group_attr(group, "state");
 		if (state != NULL) {
+
 			if (strcmp(state, "enabled") == 0)
 				ret = B_TRUE;
 			sa_free_attr_string(state);
@@ -276,13 +524,15 @@ isenabled(sa_group_t group)
 
 /*
  * enable_all_groups(list, setstate, online, updateproto)
- *	Given a list of groups, enable each one found.  If updateproto
- *	is not NULL, then update all the shares for the protocol that
- *	was passed in.
+ *
+ * Given a list of groups, enable each one found.  If updateproto is
+ * not NULL, then update all the shares for the protocol that was
+ * passed in. If enable is non-zero, tell enable_group to try the
+ * notify interface since this is a property change.
  */
 static int
 enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
-	int online, char *updateproto)
+    int online, char *updateproto, int enable)
 {
 	int ret;
 	char instance[SA_MAX_NAME_LEN + sizeof (SA_SVC_FMRI_BASE) + 1];
@@ -319,7 +569,23 @@ enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 
 		/* if itemdata != NULL then a single share */
 		if (work->itemdata != NULL) {
-			ret = sa_enable_share((sa_share_t)work->itemdata, NULL);
+			if (enable) {
+				if (work->itemdata != NULL)
+					notify_or_enable_share(work->itemdata,
+					    updateproto);
+				else
+					ret = SA_CONFIG_ERR;
+			} else {
+				if (sa_is_share(work->itemdata)) {
+					ret = sa_enable_share(
+					    (sa_share_t)work->itemdata,
+					    updateproto);
+				} else {
+					ret = sa_enable_resource(
+					    (sa_resource_t)work->itemdata,
+					    updateproto);
+				}
+			}
 		}
 		if (ret != SA_OK)
 			break;
@@ -328,18 +594,20 @@ enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 		if (work->itemdata == NULL) {
 			zfs = sa_get_group_attr(group, "zfs");
 			/*
-			 * if the share is managed by ZFS, don't
+			 * If the share is managed by ZFS, don't
 			 * update any of the protocols since ZFS is
-			 * handling this.  updateproto will contain
+			 * handling this.  Updateproto will contain
 			 * the name of the protocol that we want to
 			 * update legacy files for.
 			 */
-			enable_group(group, zfs == NULL ? updateproto : NULL);
+			enable_group(group, zfs == NULL ? updateproto : NULL,
+			    enable, work->proto);
 			for (subgroup = sa_get_sub_group(group);
 			    subgroup != NULL;
 			    subgroup = sa_get_next_group(subgroup)) {
 				/* never update legacy for ZFS subgroups */
-				enable_group(subgroup, NULL);
+				enable_group(subgroup, NULL, enable,
+				    work->proto);
 			}
 		}
 		if (online) {
@@ -497,12 +765,14 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 {
 	sa_optionset_t optionset;
 	int ret = SA_OK;
-	int result = 0;
+	int result = B_FALSE;
 
 	optionset = sa_get_optionset(group, proto);
 	if (optionset == NULL) {
 		optionset = sa_create_optionset(group, proto);
-		result = 1; /* adding a protocol is a change */
+		if (optionset == NULL)
+			ret = SA_NO_MEMORY;
+		result = B_TRUE; /* adding a protocol is a change */
 	}
 	if (optionset == NULL) {
 		ret = SA_NO_MEMORY;
@@ -541,7 +811,7 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 						    sa_errorstr(ret));
 					} else {
 						/* there was a change */
-						result = 1;
+						result = B_TRUE;
 					}
 				}
 			}
@@ -553,7 +823,7 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
 				    "property %s: %s\n"), optlist->optname,
 				    sa_errorstr(ret));
 			} else {
-				result = 1;
+				result = B_TRUE;
 			}
 		}
 		optlist = optlist->next;
@@ -564,6 +834,160 @@ out:
 	if (err != NULL)
 		*err = ret;
 	return (result);
+}
+
+/*
+ * resource_compliant(group)
+ *
+ * Go through all the shares in the group. Assume compliant, but if
+ * any share doesn't have at least one resource name, it isn't
+ * compliant.
+ */
+static int
+resource_compliant(sa_group_t group)
+{
+	sa_share_t share;
+
+	for (share = sa_get_share(group, NULL); share != NULL;
+	    share = sa_get_next_share(share)) {
+		if (sa_get_share_resource(share, NULL) == NULL) {
+			return (B_FALSE);
+		}
+	}
+	return (B_TRUE);
+}
+
+/*
+ * fix_path(path)
+ *
+ * change all illegal characters to something else.  For now, all get
+ * converted to '_' and the leading '/' is stripped off. This is used
+ * to construct an resource name (SMB share name) that is valid.
+ * Caller must pass a valid path.
+ */
+static void
+fix_path(char *path)
+{
+	char *cp;
+	size_t len;
+
+	assert(path != NULL);
+
+	/* make sure we are appropriate length */
+	cp = path + 1; /* skip leading slash */
+	while (cp != NULL && strlen(cp) > SA_MAX_RESOURCE_NAME) {
+		cp = strchr(cp, '/');
+		if (cp != NULL)
+			cp++;
+	}
+	/* two cases - cp == NULL and cp is substring of path */
+	if (cp == NULL) {
+		/* just take last SA_MAX_RESOURCE_NAME chars */
+		len = 1 + strlen(path) - SA_MAX_RESOURCE_NAME;
+		(void) memmove(path, path + len, SA_MAX_RESOURCE_NAME);
+		path[SA_MAX_RESOURCE_NAME] = '\0';
+	} else {
+		len = strlen(cp) + 1;
+		(void) memmove(path, cp, len);
+	}
+
+	/*
+	 * Don't want any of the characters that are not allowed
+	 * in and SMB share name. Replace them with '_'.
+	 */
+	while (*path) {
+		switch (*path) {
+		case '/':
+		case '"':
+		case '\\':
+		case '[':
+		case ']':
+		case ':':
+		case '|':
+		case '<':
+		case '>':
+		case '+':
+		case ';':
+		case ',':
+		case '?':
+		case '*':
+		case '=':
+		case '\t':
+			*path = '_';
+			break;
+		}
+		path++;
+	}
+}
+
+/*
+ * name_adjust(path, count)
+ *
+ * Add a ~<count> in place of last few characters. The total number of
+ * characters is dependent on count.
+ */
+#define	MAX_MANGLE_NUMBER	10000
+
+static int
+name_adjust(char *path, int count)
+{
+	size_t len;
+
+	len = strlen(path) - 2;
+	if (count > 10)
+		len--;
+	if (count > 100)
+		len--;
+	if (count > 1000)
+		len--;
+	if (len > 0)
+		(void) sprintf(path + len, "~%d", count);
+	else
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+/*
+ * make_resources(group)
+ *
+ * Go through all the shares in the group and make them have resource
+ * names.
+ */
+static void
+make_resources(sa_group_t group)
+{
+	sa_share_t share;
+	int count;
+	int err = SA_OK;
+
+	for (share = sa_get_share(group, NULL); share != NULL;
+	    share = sa_get_next_share(share)) {
+		/* Skip those with resources */
+		if (sa_get_share_resource(share, NULL) == NULL) {
+			char *path;
+			path = sa_get_share_attr(share, "path");
+			if (path == NULL)
+				continue;
+			fix_path(path);
+			count = 0;	/* reset for next resource */
+			while (sa_add_resource(share, path,
+			    SA_SHARE_PERMANENT, &err) == NULL &&
+			    err == SA_DUPLICATE_NAME) {
+				int ret;
+				ret = name_adjust(path, count);
+				count++;
+				if (ret != SA_OK ||
+				    count >= MAX_MANGLE_NUMBER) {
+					(void) printf(gettext(
+					    "Cannot create resource name for"
+					    " path: %s\n"), path);
+					break;
+				}
+			}
+			sa_free_attr_string(path);
+		}
+	}
 }
 
 /*
@@ -578,6 +1002,7 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *groupname;
 
 	sa_group_t group;
+	int force = 0;
 	int verbose = 0;
 	int dryrun = 0;
 	int c;
@@ -587,8 +1012,11 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 	int err = 0;
 	int auth;
 
-	while ((c = getopt(argc, argv, "?hvnP:p:")) != EOF) {
+	while ((c = getopt(argc, argv, "?fhvnP:p:")) != EOF) {
 		switch (c) {
+		case 'f':
+			force++;
+			break;
 		case 'v':
 			verbose++;
 			break;
@@ -596,6 +1024,12 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext("Specifying "
+				    "multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (sa_valid_protocol(protocol))
 				break;
@@ -714,6 +1148,31 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 		}
 		if (group != NULL) {
 			sa_optionset_t optionset;
+			/*
+			 * First check to see if the new protocol is one that
+			 * requires resource names and make sure we are
+			 * compliant before proceeding.
+			 */
+			if (protocol != NULL) {
+				uint64_t features;
+
+				features = sa_proto_get_featureset(protocol);
+				if ((features & SA_FEATURE_RESOURCE) &&
+				    !resource_compliant(group)) {
+					if (force) {
+						make_resources(group);
+					} else {
+						ret = SA_RESOURCE_REQUIRED;
+						(void) printf(
+						    gettext("Protocol "
+						    "requires resource "
+						    "names to be "
+						    "set: %s\n"),
+						    protocol);
+						goto err;
+					}
+				}
+			}
 			if (optlist != NULL) {
 				(void) add_optionset(group, optlist, protocol,
 				    &ret);
@@ -760,6 +1219,7 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 		    sa_errorstr(SA_NO_PERMISSION));
 		ret = SA_NO_PERMISSION;
 	}
+err:
 	free_opt(optlist);
 	return (ret);
 }
@@ -816,14 +1276,26 @@ sa_delete(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext("Specifying "
+				    "multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext("Invalid protocol "
-				    "specified: %s\n"),   protocol);
+				    "specified: %s\n"), protocol);
 				return (SA_INVALID_PROTOCOL);
 			}
 			break;
 		case 'S':
+			if (sectype != NULL) {
+				(void) printf(gettext("Specifying "
+				    "multiple property "
+				    "spaces not supported: %s\n"), sectype);
+				return (SA_SYNTAX_ERR);
+			}
 			sectype = optarg;
 			break;
 		case 'f':
@@ -909,7 +1381,7 @@ sa_delete(sa_handle_t handle, int flags, int argc, char *argv[])
 		/* a protocol delete */
 		sa_optionset_t optionset;
 		sa_security_t security;
-			if (sectype != NULL) {
+		if (sectype != NULL) {
 			/* only delete specified security */
 			security = sa_get_security(group, sectype, protocol);
 			if (security != NULL && !dryrun)
@@ -948,6 +1420,16 @@ sa_delete(sa_handle_t handle, int flags, int argc, char *argv[])
 				if (!dryrun)
 					ret = SA_INVALID_PROTOCOL;
 			}
+		}
+		/*
+		 * With the protocol items removed, make sure that all
+		 * the shares are updated in the legacy files, if
+		 * necessary.
+		 */
+		for (share = sa_get_share(group, NULL);
+		    share != NULL;
+		    share = sa_get_next_share(share)) {
+			(void) sa_delete_legacy(share, protocol);
 		}
 	}
 
@@ -1045,7 +1527,6 @@ group_proto(sa_group_t group)
  * their state and protocols.
  */
 
-/*ARGSUSED*/
 static int
 sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -1053,6 +1534,9 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 	int verbose = 0;
 	int c;
 	char *protocol = NULL;
+#ifdef lint
+	flags = flags;
+#endif
 
 	while ((c = getopt(argc, argv, "?hvP:")) != EOF) {
 		switch (c) {
@@ -1060,6 +1544,13 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 			verbose++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"),
+				    protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -1227,6 +1718,229 @@ show_properties(sa_group_t group, char *protocol, char *prefix)
 }
 
 /*
+ * get_resource(share)
+ *
+ * Get the first resource name, if any, and fix string to be in
+ * current locale and have quotes if it has embedded spaces.  Return
+ * an attr string that must be freed.
+ */
+
+static char *
+get_resource(sa_share_t share)
+{
+	sa_resource_t resource;
+	char *resstring = NULL;
+	char *retstring;
+
+	if ((resource = sa_get_share_resource(share, NULL)) != NULL) {
+		resstring = sa_get_resource_attr(resource, "name");
+		if (resstring != NULL) {
+			char *cp;
+			int len;
+
+			retstring = conv_from_utf8(resstring);
+			if (retstring != resstring) {
+				sa_free_attr_string(resstring);
+				resstring = retstring;
+			}
+			if (strpbrk(resstring, " ") != NULL) {
+				/* account for quotes */
+				len = strlen(resstring) + 3;
+				cp = calloc(len, sizeof (char));
+				if (cp != NULL) {
+					(void) snprintf(cp, len,
+					    "\"%s\"", resstring);
+					sa_free_attr_string(resstring);
+					resstring = cp;
+				} else {
+					sa_free_attr_string(resstring);
+					resstring = NULL;
+				}
+			}
+		}
+	}
+	return (resstring);
+}
+
+/*
+ * has_resource_with_opt(share)
+ *
+ * Check to see if the share has any resource names with optionsets
+ * set. Also indicate if multiple resource names since the syntax
+ * would be about the same.
+ */
+static int
+has_resource_with_opt(sa_share_t share)
+{
+	sa_resource_t resource;
+	int ret = B_FALSE;
+
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL;
+	    resource = sa_get_next_resource(resource)) {
+
+		if (sa_get_optionset(resource, NULL) != NULL) {
+			ret = B_TRUE;
+			break;
+		}
+	}
+	return (ret);
+}
+
+/*
+ * has_multiple_resource(share)
+ *
+ * Check to see if the share has any resource names with optionsets
+ * set. Also indicate if multiple resource names since the syntax
+ * would be about the same.
+ */
+static int
+has_multiple_resource(sa_share_t share)
+{
+	sa_resource_t resource;
+	int num;
+
+	for (num = 0, resource = sa_get_share_resource(share, NULL);
+	    resource != NULL;
+	    resource = sa_get_next_resource(resource)) {
+		num++;
+		if (num > 1)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * show_share(share, verbose, properties, proto, iszfs, sharepath)
+ *
+ * print out the share information. With the addition of resource as a
+ * full object that can have multiple instances below the share, we
+ * need to display that as well.
+ */
+
+static void
+show_share(sa_share_t share, int verbose, int properties, char *proto,
+    int iszfs, char *sharepath)
+{
+	char *drive;
+	char *exclude;
+	sa_resource_t resource = NULL;
+	char *description;
+	char *desc;
+	char *rsrcname;
+	int rsrcwithopt;
+	int multiple;
+	char *type;
+
+	rsrcwithopt = has_resource_with_opt(share);
+
+	if (verbose || (properties && rsrcwithopt)) {
+		/* First, indicate if transient */
+		type = sa_get_share_attr(share, "type");
+		if (type != NULL && !iszfs && verbose &&
+		    strcmp(type, "transient") == 0)
+			(void) printf("\t* ");
+		else
+			(void) printf("\t  ");
+
+		if (type != NULL)
+			sa_free_attr_string(type);
+
+		/*
+		 * If we came in with verbose, we want to handle the case of
+		 * multiple resources as though they had properties set.
+		 */
+		multiple = has_multiple_resource(share);
+
+		/* Next, if not multiple follow old model */
+		if (!multiple && !rsrcwithopt) {
+			rsrcname = get_resource(share);
+			if (rsrcname != NULL && strlen(rsrcname) > 0) {
+				(void) printf("%s=%s", rsrcname, sharepath);
+			} else {
+				(void) printf("%s", sharepath);
+			}
+			if (rsrcname != NULL)
+				sa_free_attr_string(rsrcname);
+		} else {
+			/* Treat as simple and then resources come later */
+			(void) printf("%s", sharepath);
+		}
+		drive = sa_get_share_attr(share, "drive-letter");
+		if (drive != NULL) {
+			if (strlen(drive) > 0)
+				(void) printf(gettext("\tdrive-letter=\"%s:\""),
+				    drive);
+			sa_free_attr_string(drive);
+		}
+		if (properties)
+			show_properties(share, proto, "\t");
+		exclude = sa_get_share_attr(share, "exclude");
+		if (exclude != NULL) {
+			(void) printf(gettext("\tnot-shared-with=[%s]"),
+			    exclude);
+			sa_free_attr_string(exclude);
+		}
+		description = sa_get_share_description(share);
+		if (description != NULL) {
+			if (strlen(description) > 0) {
+				desc = conv_from_utf8(description);
+				if (desc != description) {
+					sa_free_share_description(description);
+					description = desc;
+				}
+				(void) printf("\t\"%s\"", description);
+			}
+			sa_free_share_description(description);
+		}
+
+		/*
+		 * If there are resource names with options, show them
+		 * here, with one line per resource. Resource specific
+		 * options are at the end of the line followed by
+		 * description, if any.
+		 */
+		if (rsrcwithopt || multiple) {
+			for (resource = sa_get_share_resource(share, NULL);
+			    resource != NULL;
+			    resource = sa_get_next_resource(resource)) {
+				int has_space;
+				char *rsrc;
+
+				(void) printf("\n\t\t  ");
+				rsrcname = sa_get_resource_attr(resource,
+				    "name");
+				if (rsrcname == NULL)
+					continue;
+
+				rsrc = conv_from_utf8(rsrcname);
+				has_space = strpbrk(rsrc, " ") != NULL;
+
+				if (has_space)
+					(void) printf("\"%s\"=%s", rsrc,
+					    sharepath);
+				else
+					(void) printf("%s=%s", rsrc,
+					    sharepath);
+				if (rsrc != rsrcname)
+					sa_free_attr_string(rsrc);
+				sa_free_attr_string(rsrcname);
+				if (properties || rsrcwithopt)
+					show_properties(resource, proto, "\t");
+
+				/* Get description string if any */
+				print_rsrc_desc(resource);
+			}
+		}
+	} else {
+		(void) printf("\t  %s", sharepath);
+		if (properties)
+			show_properties(share, proto, "\t");
+	}
+	(void) printf("\n");
+}
+
+/*
  * show_group(group, verbose, properties, proto, subgroup)
  *
  * helper function to show the contents of a group.
@@ -1234,16 +1948,13 @@ show_properties(sa_group_t group, char *protocol, char *prefix)
 
 static void
 show_group(sa_group_t group, int verbose, int properties, char *proto,
-		char *subgroup)
+    char *subgroup)
 {
 	sa_share_t share;
 	char *groupname;
-	char *sharepath;
-	char *resource;
-	char *description;
-	char *type;
 	char *zfs = NULL;
 	int iszfs = 0;
+	char *sharepath;
 
 	groupname = sa_get_group_attr(group, "name");
 	if (groupname != NULL) {
@@ -1292,48 +2003,8 @@ show_group(sa_group_t group, int verbose, int properties, char *proto,
 		    share = sa_get_next_share(share)) {
 			sharepath = sa_get_share_attr(share, "path");
 			if (sharepath != NULL) {
-				if (verbose) {
-					resource = sa_get_share_attr(share,
-					    "resource");
-					description =
-					    sa_get_share_description(share);
-					type = sa_get_share_attr(share,
-					    "type");
-					if (type != NULL && !iszfs &&
-					    strcmp(type, "transient") == 0)
-						(void) printf("\t* ");
-					else
-						(void) printf("\t  ");
-					if (resource != NULL &&
-					    strlen(resource) > 0) {
-						(void) printf("%s=%s",
-						    resource, sharepath);
-					} else {
-						(void) printf("%s", sharepath);
-					}
-					if (resource != NULL)
-						sa_free_attr_string(resource);
-					if (properties)
-						show_properties(share, NULL,
-						    "\t");
-					if (description != NULL) {
-						if (strlen(description) > 0) {
-							(void) printf(
-							    "\t\"%s\"",
-							    description);
-						}
-						sa_free_share_description(
-						    description);
-					}
-					if (type != NULL)
-						sa_free_attr_string(type);
-				} else {
-					(void) printf("\t%s", sharepath);
-					if (properties)
-						show_properties(share, NULL,
-						    "\t");
-				}
-				(void) printf("\n");
+				show_share(share, verbose, properties, proto,
+				    iszfs, sharepath);
 				sa_free_attr_string(sharepath);
 			}
 		}
@@ -1395,7 +2066,6 @@ show_group_xml(xmlDocPtr doc, sa_group_t group)
  * Implements the show subcommand.
  */
 
-/*ARGSUSED*/
 int
 sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -1407,6 +2077,9 @@ sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *protocol = NULL;
 	int xml = 0;
 	xmlDocPtr doc;
+#ifdef lint
+	flags = flags;
+#endif
 
 	while ((c = getopt(argc, argv, "?hvP:px")) !=	EOF) {
 		switch (c) {
@@ -1417,6 +2090,13 @@ sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 			properties++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"),
+				    protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -1491,14 +2171,16 @@ sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 
 static int
 enable_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
-		int update_legacy)
+    int update_legacy)
 {
 	char *value;
 	int enabled;
 	sa_optionset_t optionset;
+	int err;
 	int ret = SA_OK;
 	char *zfs = NULL;
 	int iszfs = 0;
+	int isshare;
 
 	/*
 	 * need to enable this share if the group is enabled but not
@@ -1511,7 +2193,7 @@ enable_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
 		sa_free_attr_string(value);
 	/* remove legacy config if necessary */
 	if (update_legacy)
-		ret = sa_delete_legacy(share);
+		ret = sa_delete_legacy(share, NULL);
 	zfs = sa_get_group_attr(group, "zfs");
 	if (zfs != NULL) {
 		iszfs++;
@@ -1524,15 +2206,47 @@ enable_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
 	 * works because protocols must be set on the group
 	 * for the protocol to be enabled.
 	 */
+	isshare = sa_is_share(share);
 	for (optionset = sa_get_optionset(group, NULL);
 	    optionset != NULL && ret == SA_OK;
 	    optionset = sa_get_next_optionset(optionset)) {
 		value = sa_get_optionset_attr(optionset, "type");
 		if (value != NULL) {
-			if (enabled)
-				ret = sa_enable_share(share, value);
-			if (update_legacy && !iszfs)
-				(void) sa_update_legacy(share, value);
+			if (enabled) {
+				if (isshare) {
+					err = sa_enable_share(share, value);
+				} else {
+					err = sa_enable_resource(share, value);
+					if (err == SA_NOT_SUPPORTED) {
+						sa_share_t parent;
+						parent = sa_get_resource_parent(
+						    share);
+						if (parent != NULL)
+							err = sa_enable_share(
+							    parent, value);
+					}
+				}
+				if (err != SA_OK) {
+					ret = err;
+					(void) printf(gettext(
+					    "Failed to enable share for "
+					    "\"%s\": %s\n"),
+					    value, sa_errorstr(ret));
+				}
+			}
+			/*
+			 * If we want to update the legacy, use a copy of
+			 * share so we can avoid breaking the loop we are in
+			 * since we might also need to go up the tree to the
+			 * parent.
+			 */
+			if (update_legacy && !iszfs) {
+				sa_share_t update = share;
+				if (!sa_is_share(share)) {
+					update = sa_get_resource_parent(share);
+				}
+				(void) sa_update_legacy(update, value);
+			}
 			sa_free_attr_string(value);
 		}
 	}
@@ -1542,12 +2256,44 @@ enable_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
 }
 
 /*
+ * sa_require_resource(group)
+ *
+ * if any of the defined protocols on the group require resource
+ * names, then all shares must have them.
+ */
+
+static int
+sa_require_resource(sa_group_t group)
+{
+	sa_optionset_t optionset;
+
+	for (optionset = sa_get_optionset(group, NULL);
+	    optionset != NULL;
+	    optionset = sa_get_next_optionset(optionset)) {
+		char *proto;
+
+		proto = sa_get_optionset_attr(optionset, "type");
+		if (proto != NULL) {
+			uint64_t features;
+
+			features = sa_proto_get_featureset(proto);
+			if (features & SA_FEATURE_RESOURCE) {
+				sa_free_attr_string(proto);
+				return (B_TRUE);
+			}
+			sa_free_attr_string(proto);
+		}
+	}
+	return (B_FALSE);
+}
+
+/*
  * sa_addshare(flags, argc, argv)
  *
  * implements add-share subcommand.
  */
 
-int
+static int
 sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
@@ -1556,9 +2302,11 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	int ret = SA_OK;
 	sa_group_t group;
 	sa_share_t share;
+	sa_resource_t resource = NULL;
 	char *sharepath = NULL;
 	char *description = NULL;
-	char *resource = NULL;
+	char *rsrcname = NULL;
+	char *rsrc = NULL;
 	int persist = SA_SHARE_PERMANENT; /* default to persist */
 	int auth;
 	char dir[MAXPATHLEN];
@@ -1575,7 +2323,13 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			description = optarg;
 			break;
 		case 'r':
-			resource = optarg;
+			if (rsrcname != NULL) {
+				(void) printf(gettext("Adding multiple "
+				    "resource names not"
+				    " supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
 			break;
 		case 's':
 			/*
@@ -1585,7 +2339,7 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			if (sharepath != NULL) {
 				(void) printf(gettext(
 				    "Adding multiple shares not supported\n"));
-				return (1);
+				return (SA_SYNTAX_ERR);
 			}
 			sharepath = optarg;
 			break;
@@ -1605,7 +2359,7 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 		(void) printf(gettext("usage: %s\n"),
 		    sa_get_usage(USAGE_ADD_SHARE));
 		if (dryrun || sharepath != NULL || description != NULL ||
-		    resource != NULL || verbose || persist) {
+		    rsrcname != NULL || verbose || persist) {
 			(void) printf(gettext("\tgroup must be specified\n"));
 			ret = SA_NO_SUCH_GROUP;
 		} else {
@@ -1617,115 +2371,173 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			    sa_get_usage(USAGE_ADD_SHARE));
 			(void) printf(gettext(
 			    "\t-s sharepath must be specified\n"));
-			return (SA_BAD_PATH);
+			ret = SA_BAD_PATH;
 		}
-		if (realpath(sharepath, dir) == NULL) {
-			(void) printf(gettext(
-			    "Path is not valid: %s\n"), sharepath);
-			return (SA_BAD_PATH);
-		} else {
-			sharepath = dir;
+		if (ret == SA_OK) {
+			if (realpath(sharepath, dir) == NULL) {
+				ret = SA_BAD_PATH;
+				(void) printf(gettext("Path "
+				    "is not valid: %s\n"),
+				    sharepath);
+			} else {
+				sharepath = dir;
+			}
 		}
-
-		/* Check for valid syntax */
-		if (resource != NULL && strpbrk(resource, " \t/") != NULL) {
-			(void) printf(gettext("usage: %s\n"),
-			    sa_get_usage(USAGE_ADD_SHARE));
-			(void) printf(gettext(
-			    "\tresource must not contain white"
-			    "space or '/' characters\n"));
-			return (SA_BAD_PATH);
-		}
-		group = sa_get_group(handle, argv[optind]);
-		if (group == NULL) {
-			(void) printf(gettext("Group \"%s\" not found\n"),
-			    argv[optind]);
-			return (SA_NO_SUCH_GROUP);
-		}
-		auth = check_authorizations(argv[optind],  flags);
-		share = sa_find_share(handle, sharepath);
-		if (share != NULL) {
-			group = sa_get_parent_group(share);
-			if (group != NULL) {
-				char *groupname;
-				groupname = sa_get_group_attr(
-				    group, "name");
-				if (groupname != NULL) {
+		if (ret == SA_OK && rsrcname != NULL) {
+			/* check for valid syntax */
+			if (validresource(rsrcname)) {
+				rsrc = conv_to_utf8(rsrcname);
+				resource = sa_find_resource(handle, rsrc);
+				if (resource != NULL) {
+					/*
+					 * Resource names must be
+					 * unique in the system
+					 */
+					ret = SA_DUPLICATE_NAME;
+					(void) printf(gettext("usage: %s\n"),
+					    sa_get_usage(USAGE_ADD_SHARE));
 					(void) printf(gettext(
-					    "Share path already "
-					    "shared in group "
-					    "\"%s\": %s\n"),
-					    groupname, sharepath);
-					sa_free_attr_string(groupname);
-				} else {
-					(void) printf(gettext(
-					    "Share path already"
-					    "shared: %s\n"),
-					    groupname, sharepath);
+					    "\tresource names must be unique "
+					    "in the system\n"));
 				}
 			} else {
+				(void) printf(gettext("usage: %s\n"),
+				    sa_get_usage(USAGE_ADD_SHARE));
 				(void) printf(gettext(
-				    "Share path %s already shared\n"),
-				    sharepath);
+				    "\tresource names use restricted "
+				    "character set\n"));
+				ret = SA_INVALID_NAME;
 			}
-			return (SA_DUPLICATE_NAME);
-		} else {
+		}
+
+		if (ret != SA_OK) {
+			if (rsrc != NULL && rsrcname != rsrc)
+				sa_free_attr_string(rsrc);
+			return (ret);
+		}
+
+		share = sa_find_share(handle, sharepath);
+		if (share != NULL) {
+			if (rsrcname == NULL) {
+				/*
+				 * Can only have a duplicate share if a new
+				 * resource name is being added.
+				 */
+				ret = SA_DUPLICATE_NAME;
+				(void) printf(gettext("Share path already "
+				    "shared: %s\n"), sharepath);
+			}
+		}
+		if (ret != SA_OK)
+			return (ret);
+
+		group = sa_get_group(handle, argv[optind]);
+		if (group != NULL) {
+			if (sa_require_resource(group) == B_TRUE &&
+			    rsrcname == NULL) {
+				(void) printf(gettext(
+				    "Resource name is required "
+				    "by at least one enabled protocol "
+				    "in group\n"));
+				return (SA_RESOURCE_REQUIRED);
+			}
+			if (share == NULL && ret == SA_OK) {
+				if (dryrun)
+					ret = sa_check_path(group, sharepath,
+					    SA_CHECK_NORMAL);
+				else
+					share = sa_add_share(group, sharepath,
+					    persist, &ret);
+			}
 			/*
-			 * Need to check that resource name is
-			 * unique at some point. Path checking
-			 * should use the "normal" rules which
-			 * don't check the repository.
+			 * Make sure this isn't an attempt to put a resourced
+			 * share into a different group than it already is in.
 			 */
-			if (dryrun)
-				ret = sa_check_path(group, sharepath,
-				    SA_CHECK_NORMAL);
-			else
-				share = sa_add_share(group, sharepath,
-				    persist, &ret);
+			if (share != NULL) {
+				sa_group_t parent;
+				parent = sa_get_parent_group(share);
+				if (parent != group) {
+					ret = SA_DUPLICATE_NAME;
+					(void) printf(gettext(
+					    "Share path already "
+					    "shared: %s\n"), sharepath);
+				}
+			}
 			if (!dryrun && share == NULL) {
 				(void) printf(gettext(
 				    "Could not add share: %s\n"),
 				    sa_errorstr(ret));
 			} else {
+				auth = check_authorizations(argv[optind],
+				    flags);
 				if (!dryrun && ret == SA_OK) {
-					if (resource != NULL &&
-					    strpbrk(resource, " \t/") == NULL) {
-						ret = sa_set_share_attr(share,
-						    "resource", resource);
+					if (rsrcname != NULL) {
+						resource = sa_add_resource(
+						    share,
+						    rsrc,
+						    SA_SHARE_PERMANENT,
+						    &ret);
 					}
 					if (ret == SA_OK &&
 					    description != NULL) {
-						ret = sa_set_share_description(
-						    share, description);
+						if (description != NULL) {
+							ret =
+							    set_share_desc(
+							    share,
+							    description);
+						}
 					}
 					if (ret == SA_OK) {
-						/* Now enable the share(s) */
-						ret = enable_share(handle,
-						    group, share, 1);
+						/* now enable the share(s) */
+						if (resource != NULL) {
+							ret = enable_share(
+							    handle,
+							    group,
+							    resource,
+							    1);
+						} else {
+							ret = enable_share(
+							    handle,
+							    group,
+							    share,
+							    1);
+						}
 						ret = sa_update_config(handle);
 					}
 					switch (ret) {
 					case SA_DUPLICATE_NAME:
 						(void) printf(gettext(
 						    "Resource name in"
-						    "use: %s\n"), resource);
+						    "use: %s\n"),
+						    rsrcname);
 						break;
 					default:
-						(void) printf(
-						    gettext("Could not set "
+						(void) printf(gettext(
+						    "Could not set "
 						    "attribute: %s\n"),
 						    sa_errorstr(ret));
 						break;
 					case SA_OK:
 						break;
 					}
-				} else if (dryrun && ret == SA_OK && !auth &&
-				    verbose) {
+				} else if (dryrun && ret == SA_OK &&
+				    !auth && verbose) {
 					(void) printf(gettext(
 					    "Command would fail: %s\n"),
 					    sa_errorstr(SA_NO_PERMISSION));
 					ret = SA_NO_PERMISSION;
 				}
+			}
+		} else {
+			switch (ret) {
+			default:
+				(void) printf(gettext(
+				    "Group \"%s\" not found\n"), argv[optind]);
+				ret = SA_NO_SUCH_GROUP;
+				break;
+			case SA_BAD_PATH:
+			case SA_DUPLICATE_NAME:
+				break;
 			}
 		}
 	}
@@ -1747,16 +2559,26 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	int ret = SA_OK;
 	sa_group_t group;
 	sa_share_t share;
+	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	int authsrc = 0, authdst = 0;
 
-	while ((c = getopt(argc, argv, "?hvns:")) != EOF) {
+	while ((c = getopt(argc, argv, "?hvnr:s:")) != EOF) {
 		switch (c) {
 		case 'n':
 			dryrun++;
 			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'r':
+			if (rsrcname != NULL) {
+				(void) printf(gettext(
+				    "Moving multiple resource names not"
+				    " supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
 			break;
 		case 's':
 			/*
@@ -1765,8 +2587,8 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			 */
 			if (sharepath != NULL) {
 				(void) printf(gettext("Moving multiple shares"
-				    "not supported\n"));
-				return (SA_BAD_PATH);
+				    " not supported\n"));
+				return (SA_SYNTAX_ERR);
 			}
 			sharepath = optarg;
 			break;
@@ -1780,21 +2602,20 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	}
 
 	if (optind >= argc || sharepath == NULL) {
-			(void) printf(gettext("usage: %s\n"),
-			    sa_get_usage(USAGE_MOVE_SHARE));
-			if (dryrun || verbose || sharepath != NULL) {
+		(void) printf(gettext("usage: %s\n"),
+		    sa_get_usage(USAGE_MOVE_SHARE));
+		if (dryrun || verbose || sharepath != NULL) {
+			(void) printf(gettext("\tgroup must be specified\n"));
+			ret = SA_NO_SUCH_GROUP;
+		} else {
+			if (sharepath == NULL) {
+				ret = SA_SYNTAX_ERR;
 				(void) printf(gettext(
-				    "\tgroup must be specified\n"));
-				ret = SA_NO_SUCH_GROUP;
+				    "\tsharepath must be specified\n"));
 			} else {
-				if (sharepath == NULL) {
-					ret = SA_SYNTAX_ERR;
-					(void) printf(gettext(
-					    "\tsharepath must be specified\n"));
-				} else {
-					ret = SA_OK;
-				}
+				ret = SA_OK;
 			}
+		}
 	} else {
 		sa_group_t parent;
 		char *zfsold;
@@ -1839,28 +2660,39 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			if (zfsnew != NULL)
 				sa_free_attr_string(zfsnew);
 		}
-		if (!dryrun && ret == SA_OK)
-			ret = sa_move_share(group, share);
 
 		if (ret == SA_OK && parent != group && !dryrun) {
 			char *oldstate;
-			ret = sa_update_config(handle);
 			/*
 			 * Note that the share may need to be
-			 * "unshared" if the new group is
-			 * disabled and the old was enabled or
-			 * it may need to be share to update
-			 * if the new group is enabled.
+			 * "unshared" if the new group is disabled and
+			 * the old was enabled or it may need to be
+			 * share to update if the new group is
+			 * enabled. We disable before the move and
+			 * will have to enable after the move in order
+			 * to cleanup entries for protocols that
+			 * aren't in the new group.
 			 */
 			oldstate = sa_get_group_attr(parent, "state");
 
 			/* enable_share determines what to do */
-			if (strcmp(oldstate, "enabled") == 0) {
+			if (strcmp(oldstate, "enabled") == 0)
 				(void) sa_disable_share(share, NULL);
-			}
-			(void) enable_share(handle, group, share, 1);
+
 			if (oldstate != NULL)
 				sa_free_attr_string(oldstate);
+		}
+
+		if (!dryrun && ret == SA_OK)
+			ret = sa_move_share(group, share);
+
+		/*
+		 * Reenable and update any config information.
+		 */
+		if (ret == SA_OK && parent != group && !dryrun) {
+			ret = sa_update_config(handle);
+
+			(void) enable_share(handle, group, share, 1);
 		}
 
 		if (ret != SA_OK)
@@ -1891,12 +2723,14 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	int c;
 	int ret = SA_OK;
 	sa_group_t group;
-	sa_share_t share;
+	sa_resource_t resource = NULL;
+	sa_share_t share = NULL;
+	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	char dir[MAXPATHLEN];
 	int auth;
 
-	while ((c = getopt(argc, argv, "?hfns:v")) != EOF) {
+	while ((c = getopt(argc, argv, "?hfnr:s:v")) != EOF) {
 		switch (c) {
 		case 'n':
 			dryrun++;
@@ -1920,6 +2754,19 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			sharepath = optarg;
 			break;
+		case 'r':
+			/*
+			 * Remove share from group if last resource or remove
+			 * resource from share if multiple resources.
+			 */
+			if (rsrcname != NULL) {
+				(void) printf(gettext(
+				    "Removing multiple resource names not "
+				    "supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
+			break;
 		default:
 		case 'h':
 		case '?':
@@ -1929,12 +2776,12 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 		}
 	}
 
-	if (optind >= argc || sharepath == NULL) {
-		if (sharepath == NULL) {
+	if (optind >= argc || (rsrcname == NULL && sharepath == NULL)) {
+		if (sharepath == NULL && rsrcname == NULL) {
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_REMOVE_SHARE));
-			(void) printf(gettext(
-			    "\t-s sharepath must be specified\n"));
+			(void) printf(gettext("\t-s sharepath or -r resource"
+			    " must be specified\n"));
 			ret = SA_BAD_PATH;
 		} else {
 			ret = SA_OK;
@@ -1961,6 +2808,16 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 		group = NULL;
 	}
 
+	if (rsrcname != NULL) {
+		resource = sa_find_resource(handle, rsrcname);
+		if (resource == NULL) {
+			ret = SA_NO_SUCH_RESOURCE;
+			(void) printf(gettext(
+			    "Resource name not found for share: %s\n"),
+			    rsrcname);
+		}
+	}
+
 	/*
 	 * Lookup the path in the internal configuration. Care
 	 * must be taken to handle the case where the
@@ -1968,10 +2825,27 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	 * be able to deal with that as well.
 	 */
 	if (ret == SA_OK) {
-		if (group != NULL)
-			share = sa_get_share(group, sharepath);
-		else
-			share = sa_find_share(handle, sharepath);
+		if (sharepath != NULL) {
+			if (group != NULL)
+				share = sa_get_share(group, sharepath);
+			else
+				share = sa_find_share(handle, sharepath);
+		}
+
+		if (resource != NULL) {
+			sa_share_t rsrcshare;
+			rsrcshare = sa_get_resource_parent(resource);
+			if (share == NULL)
+				share = rsrcshare;
+			else if (share != rsrcshare) {
+				ret = SA_NO_SUCH_RESOURCE;
+				(void) printf(gettext(
+				    "Bad resource name for share: %s\n"),
+				    rsrcname);
+				share = NULL;
+			}
+		}
+
 		/*
 		 * If we didn't find the share with the provided path,
 		 * it may be a symlink so attempt to resolve it using
@@ -2013,13 +2887,17 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 		else
 			(void) printf(gettext("Share not found: %s\n"),
 			    sharepath);
-			ret = SA_NO_SUCH_PATH;
+		ret = SA_NO_SUCH_PATH;
 	} else {
 		if (group == NULL)
 			group = sa_get_parent_group(share);
 		if (!dryrun) {
 			if (ret == SA_OK) {
-				ret = sa_disable_share(share, NULL);
+				if (resource != NULL)
+					ret = sa_disable_resource(resource,
+					    NULL);
+				else
+					ret = sa_disable_share(share, NULL);
 				/*
 				 * We don't care if it fails since it
 				 * could be disabled already. Some
@@ -2027,19 +2905,37 @@ sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 				 * prevent removal, so also check for
 				 * force being set.
 				 */
-				if (ret == SA_OK || ret == SA_NO_SUCH_PATH ||
+				if ((ret == SA_OK || ret == SA_NO_SUCH_PATH ||
 				    ret == SA_NOT_SUPPORTED ||
-				    ret == SA_SYSTEM_ERR || force) {
+				    ret == SA_SYSTEM_ERR || force) &&
+				    resource == NULL)
 					ret = sa_remove_share(share);
+
+				if ((ret == SA_OK || ret == SA_NO_SUCH_PATH ||
+				    ret == SA_NOT_SUPPORTED ||
+				    ret == SA_SYSTEM_ERR || force) &&
+				    resource != NULL) {
+					ret = sa_remove_resource(resource);
+					if (ret == SA_OK) {
+						/*
+						 * If this was the
+						 * last one, remove
+						 * the share as well.
+						 */
+						resource =
+						    sa_get_share_resource(
+						    share, NULL);
+						if (resource == NULL)
+							ret = sa_remove_share(
+							    share);
+					}
 				}
 				if (ret == SA_OK)
 					ret = sa_update_config(handle);
 			}
 			if (ret != SA_OK)
-				(void) printf(gettext(
-				    "Could not remove share: %s\n"),
-				    sa_errorstr(ret));
-
+				(void) printf(gettext("Could not remove share:"
+				    " %s\n"), sa_errorstr(ret));
 		} else if (ret == SA_OK) {
 			char *pname;
 			pname = sa_get_group_attr(group, "name");
@@ -2071,12 +2967,17 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	int ret = SA_OK;
 	sa_group_t group, sharegroup;
 	sa_share_t share;
+	sa_resource_t resource = NULL;
 	char *sharepath = NULL;
 	char *description = NULL;
-	char *resource = NULL;
+	char *desc;
+	char *rsrcname = NULL;
+	char *rsrc = NULL;
+	char *newname = NULL;
+	char *newrsrc;
+	char *groupname = NULL;
 	int auth;
 	int verbose = 0;
-	char *groupname;
 
 	while ((c = getopt(argc, argv, "?hnd:r:s:")) != EOF) {
 		switch (c) {
@@ -2086,11 +2987,20 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 		case 'd':
 			description = optarg;
 			break;
-		case 'r':
-			resource = optarg;
-			break;
 		case 'v':
 			verbose++;
+			break;
+		case 'r':
+			/*
+			 * Update share by resource name
+			 */
+			if (rsrcname != NULL) {
+				(void) printf(gettext(
+				    "Updating multiple resource names not "
+				    "supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
 			break;
 		case 's':
 			/*
@@ -2101,7 +3011,7 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 				(void) printf(gettext(
 				    "Updating multiple shares not "
 				    "supported\n"));
-				return (SA_BAD_PATH);
+				return (SA_SYNTAX_ERR);
 			}
 			sharepath = optarg;
 			break;
@@ -2114,7 +3024,7 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 		}
 	}
 
-	if (optind >= argc || sharepath == NULL) {
+	if (optind >= argc && sharepath == NULL && rsrcname == NULL) {
 		if (sharepath == NULL) {
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_SET_SHARE));
@@ -2131,6 +3041,16 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 		ret = SA_SYNTAX_ERR;
 	}
 
+	/*
+	 * Must have at least one of sharepath and rsrcrname.
+	 * It is a syntax error to be missing both.
+	 */
+	if (sharepath == NULL && rsrcname == NULL) {
+		(void) printf(gettext("usage: %s\n"),
+		    sa_get_usage(USAGE_SET_SHARE));
+		ret = SA_SYNTAX_ERR;
+	}
+
 	if (ret != SA_OK)
 		return (ret);
 
@@ -2141,70 +3061,132 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 		group = NULL;
 		groupname = NULL;
 	}
-	share = sa_find_share(handle, sharepath);
-	if (share == NULL) {
-		(void) printf(gettext("Share path \"%s\" not found\n"),
-		    sharepath);
-		return (SA_NO_SUCH_PATH);
-	}
-	sharegroup = sa_get_parent_group(share);
-	if (group != NULL && group != sharegroup) {
-		(void) printf(gettext("Group \"%s\" does not contain "
-		    "share %s\n"), argv[optind], sharepath);
-		ret = SA_BAD_PATH;
-	} else {
-		int delgroupname = 0;
-		if (groupname == NULL) {
-			groupname = sa_get_group_attr(sharegroup, "name");
-			delgroupname = 1;
+	if (rsrcname != NULL) {
+		/*
+		 * If rsrcname exists, split rename syntax and then
+		 * convert to utf 8 if no errors.
+		 */
+		newname = strchr(rsrcname, '=');
+		if (newname != NULL) {
+			*newname++ = '\0';
 		}
-		if (groupname != NULL) {
-			auth = check_authorizations(groupname, flags);
-			if (delgroupname) {
-				sa_free_attr_string(groupname);
-				groupname = NULL;
-			}
+		if (!validresource(rsrcname)) {
+			ret = SA_INVALID_NAME;
+			(void) printf(gettext("Invalid resource name: "
+			    "\"%s\"\n"), rsrcname);
 		} else {
-			ret = SA_NO_MEMORY;
+			rsrc = conv_to_utf8(rsrcname);
 		}
+		if (newname != NULL) {
+			if (!validresource(newname)) {
+				ret = SA_INVALID_NAME;
+				(void) printf(gettext("Invalid resource name: "
+				    "%s\n"), newname);
+			} else {
+				newrsrc = conv_to_utf8(newname);
+			}
+		}
+	}
+
+	if (ret != SA_OK) {
+		if (rsrcname != NULL && rsrcname != rsrc)
+			sa_free_attr_string(rsrc);
+		if (newname != NULL && newname != newrsrc)
+			sa_free_attr_string(newrsrc);
+		return (ret);
+	}
+
+	if (sharepath != NULL) {
+		share = sa_find_share(handle, sharepath);
+	} else if (rsrcname != NULL) {
+		resource = sa_find_resource(handle, rsrc);
 		if (resource != NULL) {
-			if (strpbrk(resource, " \t/") == NULL) {
-				if (!dryrun) {
-					ret = sa_set_share_attr(share,
-					    "resource", resource);
-				} else {
-					sa_share_t resshare;
-					resshare = sa_get_resource(sharegroup,
-					    resource);
-					if (resshare != NULL &&
-					    resshare != share)
-						ret = SA_DUPLICATE_NAME;
+			share = sa_get_resource_parent(resource);
+		}
+	}
+	if (share != NULL) {
+		sharegroup = sa_get_parent_group(share);
+		if (group != NULL && group != sharegroup) {
+			(void) printf(gettext("Group \"%s\" does not contain "
+			    "share %s\n"),
+			    argv[optind], sharepath);
+			ret = SA_BAD_PATH;
+		} else {
+			int delgroupname = 0;
+			if (groupname == NULL) {
+				groupname = sa_get_group_attr(sharegroup,
+				    "name");
+				delgroupname = 1;
+			}
+			if (groupname != NULL) {
+				auth = check_authorizations(groupname, flags);
+				if (delgroupname) {
+					sa_free_attr_string(groupname);
+					groupname = NULL;
 				}
 			} else {
-				ret = SA_BAD_PATH;
-				(void) printf(gettext("Resource must not "
-				    "contain white space or '/'\n"));
+				ret = SA_NO_MEMORY;
+			}
+			if (rsrcname != NULL) {
+				resource = sa_find_resource(handle, rsrc);
+				if (!dryrun) {
+					if (newname != NULL &&
+					    resource != NULL)
+						ret = sa_rename_resource(
+						    resource, newrsrc);
+					else if (newname != NULL)
+						ret = SA_NO_SUCH_RESOURCE;
+					if (newname != NULL &&
+					    newname != newrsrc)
+						sa_free_attr_string(newrsrc);
+				}
+				if (rsrc != rsrcname)
+					sa_free_attr_string(rsrc);
+			}
+
+			/*
+			 * If the user has set a description, it will be
+			 * on the resource if -r was used otherwise it
+			 * must be on the share.
+			 */
+			if (ret == SA_OK && description != NULL) {
+				desc = conv_to_utf8(description);
+				if (resource != NULL)
+					ret = sa_set_resource_description(
+					    resource, desc);
+				else
+					ret = sa_set_share_description(share,
+					    desc);
+				if (desc != description)
+					sa_free_share_description(desc);
 			}
 		}
-		if (ret == SA_OK && description != NULL)
-			ret = sa_set_share_description(share, description);
-	}
-	if (!dryrun && ret == SA_OK)
-		ret = sa_update_config(handle);
-
-	switch (ret) {
-	case SA_DUPLICATE_NAME:
-		(void) printf(gettext("Resource name in use: %s\n"), resource);
-		break;
-	default:
-		(void) printf(gettext("Could not set attribute: %s\n"),
-		    sa_errorstr(ret));
-		break;
-	case SA_OK:
-		if (dryrun && !auth && verbose)
-			(void) printf(gettext("Command would fail: %s\n"),
-			    sa_errorstr(SA_NO_PERMISSION));
-		break;
+		if (!dryrun && ret == SA_OK) {
+			if (resource != NULL)
+				(void) sa_enable_resource(resource, NULL);
+			ret = sa_update_config(handle);
+		}
+		switch (ret) {
+		case SA_DUPLICATE_NAME:
+			(void) printf(gettext("Resource name in use: %s\n"),
+			    rsrcname);
+			break;
+		default:
+			(void) printf(gettext("Could not set: %s\n"),
+			    sa_errorstr(ret));
+			break;
+		case SA_OK:
+			if (dryrun && !auth && verbose) {
+				(void) printf(gettext(
+				    "Command would fail: %s\n"),
+				    sa_errorstr(SA_NO_PERMISSION));
+			}
+			break;
+		}
+	} else {
+		(void) printf(gettext("Share path \"%s\" not found\n"),
+		    sharepath);
+		ret = SA_NO_SUCH_PATH;
 	}
 
 	return (ret);
@@ -2219,7 +3201,7 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 
 static int
 add_security(sa_group_t group, char *sectype,
-		struct options *optlist, char *proto, int *err)
+    struct options *optlist, char *proto, int *err)
 {
 	sa_security_t security;
 	int ret = SA_OK;
@@ -2248,8 +3230,8 @@ add_security(sa_group_t group, char *sectype,
 				prop = sa_create_property(optlist->optname,
 				    optlist->optvalue);
 				if (prop != NULL) {
-					ret = sa_valid_property(security, proto,
-					    prop);
+					ret = sa_valid_property(security,
+					    proto, prop);
 					if (ret != SA_OK) {
 						(void) sa_remove_property(prop);
 						(void) printf(gettext(
@@ -2264,8 +3246,8 @@ add_security(sa_group_t group, char *sectype,
 						if (ret != SA_OK) {
 							(void) printf(gettext(
 							    "Could not add "
-							    "property (%s=%s): "
-							    "%s\n"),
+							    "property (%s=%s):"
+							    " %s\n"),
 							    optlist->optname,
 							    optlist->optvalue,
 							    sa_errorstr(ret));
@@ -2334,16 +3316,24 @@ zfscheck(sa_group_t group, sa_share_t share)
 }
 
 /*
- * basic_set(groupname, optlist, protocol, sharepath, dryrun)
+ * basic_set(groupname, optlist, protocol, sharepath, rsrcname, dryrun)
  *
  * This function implements "set" when a name space (-S) is not
  * specified. It is a basic set. Options and other CLI parsing has
  * already been done.
+ *
+ * "rsrcname" is a "resource name". If it is non-NULL, it must match
+ * the sharepath if present or group if present, otherwise it is used
+ * to set options.
+ *
+ * Resource names may take options if the protocol supports it. If the
+ * protocol doesn't support resource level options, rsrcname is just
+ * an alias for the share.
  */
 
 static int
 basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
-		char *protocol,	char *sharepath, int dryrun)
+    char *protocol, char *sharepath, char *rsrcname, int dryrun)
 {
 	sa_group_t group;
 	int ret = SA_OK;
@@ -2353,6 +3343,12 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 		sa_share_t share = NULL;
+		sa_resource_t resource = NULL;
+
+		/*
+		 * If there is a sharepath, make sure it belongs to
+		 * the group.
+		 */
 		if (sharepath != NULL) {
 			share = sa_get_share(group, sharepath);
 			if (share == NULL) {
@@ -2372,6 +3368,41 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 					    "not supported: %s\n"), sharepath);
 			}
 		}
+
+		/*
+		 * If a resource name exists, make sure it belongs to
+		 * the share if present else it belongs to the
+		 * group. Also check the protocol to see if it
+		 * supports resource level properties or not. If not,
+		 * use share only.
+		 */
+		if (rsrcname != NULL) {
+			if (share != NULL) {
+				resource = sa_get_share_resource(share,
+				    rsrcname);
+				if (resource == NULL)
+					ret = SA_NO_SUCH_RESOURCE;
+			} else {
+				resource = sa_get_resource(group, rsrcname);
+				if (resource != NULL)
+					share = sa_get_resource_parent(
+					    resource);
+				else
+					ret = SA_NO_SUCH_RESOURCE;
+			}
+			if (ret == SA_OK && resource != NULL) {
+				uint64_t features;
+				/*
+				 * Check to see if the resource can take
+				 * properties. If so, stick the resource into
+				 * "share" so it will all just work.
+				 */
+				features = sa_proto_get_featureset(protocol);
+				if (features & SA_FEATURE_RESOURCE)
+					share = (sa_share_t)resource;
+			}
+		}
+
 		if (ret == SA_OK) {
 			/* group must exist */
 			ret = valid_options(optlist, protocol,
@@ -2385,7 +3416,7 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 					    protocol, &ret);
 				if (ret == SA_OK && change)
 					worklist = add_list(worklist, group,
-					    share);
+					    share, protocol);
 			}
 		}
 		free_opt(optlist);
@@ -2403,7 +3434,8 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 	 */
 	if (!dryrun && ret == SA_OK && change && worklist != NULL)
 		/* properties changed, so update all shares */
-		(void) enable_all_groups(handle, worklist, 0, 0, protocol);
+		(void) enable_all_groups(handle, worklist, 0, 0, protocol,
+		    B_TRUE);
 
 	if (worklist != NULL)
 		free_list(worklist);
@@ -2420,7 +3452,7 @@ basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
 
 static int
 space_set(sa_handle_t handle, char *groupname, struct options *optlist,
-		char *protocol,	char *sharepath, int dryrun, char *sectype)
+    char *protocol, char *sharepath, int dryrun, char *sectype)
 {
 	sa_group_t group;
 	int ret = SA_OK;
@@ -2476,15 +3508,17 @@ space_set(sa_handle_t handle, char *groupname, struct options *optlist,
 					    sa_errorstr(ret));
 			}
 			if (ret == SA_OK && change)
-				worklist = add_list(worklist, group, share);
+				worklist = add_list(worklist, group, share,
+				    protocol);
 		}
 		free_opt(optlist);
 	} else {
 		(void) printf(gettext("Group \"%s\" not found\n"), groupname);
 		ret = SA_NO_SUCH_GROUP;
 	}
+
 	/*
-	 * we have a group and potentially legal additions
+	 * We have a group and potentially legal additions.
 	 */
 
 	/* Commit to configuration if not a dryrun */
@@ -2492,7 +3526,7 @@ space_set(sa_handle_t handle, char *groupname, struct options *optlist,
 		if (change && worklist != NULL) {
 			/* properties changed, so update all shares */
 			(void) enable_all_groups(handle, worklist, 0, 0,
-			    protocol);
+			    protocol, B_TRUE);
 		}
 		ret = sa_update_config(handle);
 	}
@@ -2518,11 +3552,12 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *protocol = NULL;
 	int ret = SA_OK;
 	struct options *optlist = NULL;
+	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	char *optset = NULL;
 	int auth;
 
-	while ((c = getopt(argc, argv, "?hvnP:p:s:S:")) != EOF) {
+	while ((c = getopt(argc, argv, "?hvnP:p:r:s:S:")) != EOF) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -2531,6 +3566,12 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -2554,10 +3595,30 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 				break;
 			}
 			break;
+		case 'r':
+			if (rsrcname != NULL) {
+				(void) printf(gettext(
+				    "Setting multiple resource names not"
+				    " supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
+			break;
 		case 's':
+			if (sharepath != NULL) {
+				(void) printf(gettext(
+				    "Setting multiple shares not supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
 			sharepath = optarg;
 			break;
 		case 'S':
+			if (optset != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple property "
+				    "spaces not supported: %s\n"), optset);
+				return (SA_SYNTAX_ERR);
+			}
 			optset = optarg;
 			break;
 		default:
@@ -2610,7 +3671,7 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 		auth = check_authorizations(groupname, flags);
 		if (optset == NULL)
 			ret = basic_set(handle, groupname, optlist, protocol,
-			    sharepath, dryrun);
+			    sharepath, rsrcname, dryrun);
 		else
 			ret = space_set(handle, groupname, optlist, protocol,
 			    sharepath, dryrun, optset);
@@ -2631,7 +3692,7 @@ sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 
 static int
 remove_options(sa_group_t group, struct options *optlist,
-		char *proto, int *err)
+    char *proto, int *err)
 {
 	struct options *cur;
 	sa_optionset_t optionset;
@@ -2698,7 +3759,7 @@ valid_unset(sa_group_t group, struct options *optlist, char *proto)
 
 static int
 valid_unset_security(sa_group_t group, struct options *optlist, char *proto,
-	    char *sectype)
+    char *sectype)
 {
 	struct options *cur;
 	sa_security_t security;
@@ -2736,7 +3797,7 @@ valid_unset_security(sa_group_t group, struct options *optlist, char *proto,
 
 static int
 remove_security(sa_group_t group, char *sectype,
-		struct options *optlist, char *proto, int *err)
+    struct options *optlist, char *proto, int *err)
 {
 	sa_security_t security;
 	int ret = SA_OK;
@@ -2775,25 +3836,30 @@ remove_security(sa_group_t group, char *sectype,
 }
 
 /*
- * basic_unset(groupname, optlist, protocol, sharepath, dryrun)
+ * basic_unset(groupname, optlist, protocol, sharepath, rsrcname, dryrun)
  *
  * Unset non-named optionset properties.
  */
 
 static int
 basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
-		char *protocol,	char *sharepath, int dryrun)
+    char *protocol, char *sharepath, char *rsrcname, int dryrun)
 {
 	sa_group_t group;
 	int ret = SA_OK;
 	int change = 0;
 	struct list *worklist = NULL;
 	sa_share_t share = NULL;
+	sa_resource_t resource = NULL;
 
 	group = sa_get_group(handle, groupname);
 	if (group == NULL)
 		return (ret);
 
+	/*
+	 * If there is a sharepath, make sure it belongs to
+	 * the group.
+	 */
 	if (sharepath != NULL) {
 		share = sa_get_share(group, sharepath);
 		if (share == NULL) {
@@ -2803,6 +3869,39 @@ basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 			ret = SA_NO_SUCH_PATH;
 		}
 	}
+	/*
+	 * If a resource name exists, make sure it belongs to
+	 * the share if present else it belongs to the
+	 * group. Also check the protocol to see if it
+	 * supports resource level properties or not. If not,
+	 * use share only.
+	 */
+	if (rsrcname != NULL) {
+		if (share != NULL) {
+			resource = sa_get_share_resource(share, rsrcname);
+			if (resource == NULL)
+				ret = SA_NO_SUCH_RESOURCE;
+		} else {
+			resource = sa_get_resource(group, rsrcname);
+			if (resource != NULL) {
+				share = sa_get_resource_parent(resource);
+			} else {
+				ret = SA_NO_SUCH_RESOURCE;
+			}
+		}
+		if (ret == SA_OK && resource != NULL) {
+			uint64_t features;
+			/*
+			 * Check to see if the resource can take
+			 * properties. If so, stick the resource into
+			 * "share" so it will all just work.
+			 */
+			features = sa_proto_get_featureset(protocol);
+			if (features & SA_FEATURE_RESOURCE)
+				share = (sa_share_t)resource;
+		}
+	}
+
 	if (ret == SA_OK) {
 		/* group must exist */
 		ret = valid_unset(share != NULL ? share : group,
@@ -2830,16 +3929,15 @@ basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 				    optlist, protocol, &ret);
 			}
 			if (ret == SA_OK && change)
-				worklist = add_list(worklist, group,
-				    share);
+				worklist = add_list(worklist, group, share,
+				    protocol);
 			if (ret != SA_OK)
 				(void) printf(gettext(
 				    "Could not remove properties: "
 				    "%s\n"), sa_errorstr(ret));
 		}
 	} else {
-		(void) printf(gettext("Group \"%s\" not found\n"),
-		    groupname);
+		(void) printf(gettext("Group \"%s\" not found\n"), groupname);
 		ret = SA_NO_SUCH_GROUP;
 	}
 	free_opt(optlist);
@@ -2853,7 +3951,7 @@ basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 		if (change && worklist != NULL) {
 			/* properties changed, so update all shares */
 			(void) enable_all_groups(handle, worklist, 0, 0,
-			    protocol);
+			    protocol, B_TRUE);
 		}
 	}
 	if (worklist != NULL)
@@ -2868,7 +3966,7 @@ basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
  */
 static int
 space_unset(sa_handle_t handle, char *groupname, struct options *optlist,
-		char *protocol, char *sharepath, int dryrun, char *sectype)
+    char *protocol, char *sharepath, int dryrun, char *sectype)
 {
 	sa_group_t group;
 	int ret = SA_OK;
@@ -2890,8 +3988,8 @@ space_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 			return (SA_NO_SUCH_PATH);
 		}
 	}
-	ret = valid_unset_security(share != NULL ? share : group, optlist,
-	    protocol, sectype);
+	ret = valid_unset_security(share != NULL ? share : group,
+	    optlist, protocol, sectype);
 
 	if (ret == SA_OK && !dryrun) {
 		if (optlist != NULL) {
@@ -2936,7 +4034,7 @@ space_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 	}
 
 	if (ret == SA_OK && change)
-		worklist = add_list(worklist, group, 0);
+		worklist = add_list(worklist, group, 0, protocol);
 
 	free_opt(optlist);
 	/*
@@ -2948,7 +4046,7 @@ space_unset(sa_handle_t handle, char *groupname, struct options *optlist,
 		/* properties changed, so update all shares */
 		if (change && worklist != NULL)
 			(void) enable_all_groups(handle, worklist, 0, 0,
-			    protocol);
+			    protocol, B_TRUE);
 		ret = sa_update_config(handle);
 	}
 	if (worklist != NULL)
@@ -2973,11 +4071,12 @@ sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *protocol = NULL;
 	int ret = SA_OK;
 	struct options *optlist = NULL;
+	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	char *optset = NULL;
 	int auth;
 
-	while ((c = getopt(argc, argv, "?hvnP:p:s:S:")) != EOF) {
+	while ((c = getopt(argc, argv, "?hvnP:p:r:s:S:")) != EOF) {
 		switch (c) {
 		case 'v':
 			verbose++;
@@ -2986,6 +4085,12 @@ sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -3011,10 +4116,35 @@ sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 				break;
 			}
 			break;
+		case 'r':
+			/*
+			 * Unset properties on resource if applicable or on
+			 * share if resource for this protocol doesn't use
+			 * resources.
+			 */
+			if (rsrcname != NULL) {
+				(void) printf(gettext(
+				    "Unsetting multiple resource "
+				    "names not supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
+			rsrcname = optarg;
+			break;
 		case 's':
+			if (sharepath != NULL) {
+				(void) printf(gettext(
+				    "Adding multiple shares not supported\n"));
+				return (SA_SYNTAX_ERR);
+			}
 			sharepath = optarg;
 			break;
 		case 'S':
+			if (optset != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple property "
+				    "spaces not supported: %s\n"), optset);
+				return (SA_SYNTAX_ERR);
+			}
 			optset = optarg;
 			break;
 		default:
@@ -3063,7 +4193,7 @@ sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 		auth = check_authorizations(groupname, flags);
 		if (optset == NULL)
 			ret = basic_unset(handle, groupname, optlist, protocol,
-			    sharepath, dryrun);
+			    sharepath, rsrcname, dryrun);
 		else
 			ret = space_unset(handle, groupname, optlist, protocol,
 			    sharepath, dryrun, optset);
@@ -3104,6 +4234,12 @@ sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -3148,7 +4284,7 @@ sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 					ret = SA_BUSY; /* already enabled */
 				} else {
 					worklist = add_list(worklist, group,
-					    0);
+					    0, protocol);
 					if (verbose)
 						(void) printf(gettext(
 						    "Enabling group \"%s\"\n"),
@@ -3165,11 +4301,11 @@ sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		for (group = sa_get_group(handle, NULL);
 		    group != NULL;
 		    group = sa_get_next_group(group)) {
-			worklist = add_list(worklist, group, 0);
+			worklist = add_list(worklist, group, 0, protocol);
 		}
 	}
 	if (!dryrun && ret == SA_OK)
-		ret = enable_all_groups(handle, worklist, 1, 0, NULL);
+		ret = enable_all_groups(handle, worklist, 1, 0, NULL, B_FALSE);
 
 	if (ret != SA_OK && ret != SA_BUSY)
 		(void) printf(gettext("Could not enable group: %s\n"),
@@ -3187,24 +4323,30 @@ sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 }
 
 /*
- * disable_group(group, setstate)
+ * disable_group(group, proto)
  *
- * Disable all the shares in the specified group honoring the setstate
- * argument. This is a helper for disable_all_groups in order to
- * simplify regular and subgroup (zfs) disabling. Group has already
- * been checked for non-NULL.
+ * Disable all the shares in the specified group.. This is a helper
+ * for disable_all_groups in order to simplify regular and subgroup
+ * (zfs) disabling. Group has already been checked for non-NULL.
  */
 
 static int
-disable_group(sa_group_t group)
+disable_group(sa_group_t group, char *proto)
 {
 	sa_share_t share;
 	int ret = SA_OK;
 
+	/*
+	 * If the protocol isn't enabled, skip it and treat as
+	 * successful.
+	 */
+	if (!has_protocol(group, proto))
+		return (ret);
+
 	for (share = sa_get_share(group, NULL);
 	    share != NULL && ret == SA_OK;
 	    share = sa_get_next_share(share)) {
-		ret = sa_disable_share(share, NULL);
+		ret = sa_disable_share(share, proto);
 		if (ret == SA_NO_SUCH_PATH) {
 			/*
 			 * this is OK since the path is gone. we can't
@@ -3215,7 +4357,6 @@ disable_group(sa_group_t group)
 	}
 	return (ret);
 }
-
 
 /*
  * disable_all_groups(work, setstate)
@@ -3243,10 +4384,11 @@ disable_all_groups(sa_handle_t handle, struct list *work, int setstate)
 				for (subgroup = sa_get_sub_group(group);
 				    subgroup != NULL;
 				    subgroup = sa_get_next_group(subgroup)) {
-					ret = disable_group(subgroup);
+					ret = disable_group(subgroup,
+					    work->proto);
 				}
 			} else {
-				ret = disable_group(group);
+				ret = disable_group(group, work->proto);
 			}
 			/*
 			 * We don't want to "disable" since it won't come
@@ -3276,7 +4418,7 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 	int all = 0;
 	int c;
 	int ret = SA_OK;
-	char *protocol;
+	char *protocol = NULL;
 	char *state;
 	struct list *worklist = NULL;
 	sa_group_t group;
@@ -3291,6 +4433,12 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			dryrun++;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -3332,9 +4480,10 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 						    "Group \"%s\" is "
 						    "already disabled\n"),
 						    argv[optind]);
-					ret = SA_BUSY; /* already disable */
+					ret = SA_BUSY; /* already disabled */
 				} else {
-					worklist = add_list(worklist, group, 0);
+					worklist = add_list(worklist, group, 0,
+					    protocol);
 					if (verbose)
 						(void) printf(gettext(
 						    "Disabling group "
@@ -3351,7 +4500,7 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		for (group = sa_get_group(handle, NULL);
 		    group != NULL;
 		    group = sa_get_next_group(group))
-			worklist = add_list(worklist, group, 0);
+			worklist = add_list(worklist, group, 0, protocol);
 	}
 
 	if (ret == SA_OK && !dryrun)
@@ -3377,7 +4526,7 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
  * of the group(s) and only enables shares if the group is already
  * enabled.
  */
-/*ARGSUSED*/
+
 int
 sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -3389,6 +4538,9 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *state;
 	struct list *worklist = NULL;
 	sa_group_t group;
+#ifdef lint
+	flags = flags;
+#endif
 
 	while ((c = getopt(argc, argv, "?havP:")) != EOF) {
 		switch (c) {
@@ -3396,6 +4548,12 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			all = 1;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -3429,7 +4587,8 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 				state = sa_get_group_attr(group, "state");
 				if (state == NULL ||
 				    strcmp(state, "enabled") == 0) {
-					worklist = add_list(worklist, group, 0);
+					worklist = add_list(worklist, group, 0,
+					    protocol);
 					if (verbose)
 						(void) printf(gettext(
 						    "Starting group \"%s\"\n"),
@@ -3437,7 +4596,7 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 				} else {
 					/*
 					 * Determine if there are any
-					 * protocols.  if there aren't any,
+					 * protocols.  If there aren't any,
 					 * then there isn't anything to do in
 					 * any case so no error.
 					 */
@@ -3452,17 +4611,19 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			optind++;
 		}
 	} else {
-		for (group = sa_get_group(handle, NULL); group != NULL;
+		for (group = sa_get_group(handle, NULL);
+		    group != NULL;
 		    group = sa_get_next_group(group)) {
 			state = sa_get_group_attr(group, "state");
 			if (state == NULL || strcmp(state, "enabled") == 0)
-				worklist = add_list(worklist, group, 0);
+				worklist = add_list(worklist, group, 0,
+				    protocol);
 			if (state != NULL)
 				sa_free_attr_string(state);
 		}
 	}
 
-	(void) enable_all_groups(handle, worklist, 0, 1, NULL);
+	(void) enable_all_groups(handle, worklist, 0, 1, protocol, B_FALSE);
 
 	if (worklist != NULL)
 		free_list(worklist);
@@ -3477,7 +4638,6 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
  * of the group(s) and only disables shares if the group is already
  * enabled.
  */
-/*ARGSUSED*/
 int
 sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -3489,6 +4649,9 @@ sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *state;
 	struct list *worklist = NULL;
 	sa_group_t group;
+#ifdef lint
+	flags = flags;
+#endif
 
 	while ((c = getopt(argc, argv, "?havP:")) != EOF) {
 		switch (c) {
@@ -3496,6 +4659,12 @@ sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			all = 1;
 			break;
 		case 'P':
+			if (protocol != NULL) {
+				(void) printf(gettext(
+				    "Specifying multiple protocols "
+				    "not supported: %s\n"), protocol);
+				return (SA_SYNTAX_ERR);
+			}
 			protocol = optarg;
 			if (!sa_valid_protocol(protocol)) {
 				(void) printf(gettext(
@@ -3527,7 +4696,8 @@ sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 				state = sa_get_group_attr(group, "state");
 				if (state == NULL ||
 				    strcmp(state, "enabled") == 0) {
-					worklist = add_list(worklist, group, 0);
+					worklist = add_list(worklist, group, 0,
+					    protocol);
 					if (verbose)
 						(void) printf(gettext(
 						    "Stopping group \"%s\"\n"),
@@ -3541,16 +4711,17 @@ sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 			optind++;
 		}
 	} else {
-		for (group = sa_get_group(handle, NULL); group != NULL;
+		for (group = sa_get_group(handle, NULL);
+		    group != NULL;
 		    group = sa_get_next_group(group)) {
 			state = sa_get_group_attr(group, "state");
 			if (state == NULL || strcmp(state, "enabled") == 0)
-				worklist = add_list(worklist, group, 0);
+				worklist = add_list(worklist, group, 0,
+				    protocol);
 			if (state != NULL)
 				sa_free_attr_string(state);
 		}
 	}
-
 	(void) disable_all_groups(handle, worklist, 0);
 	ret = sa_update_config(handle);
 
@@ -3686,6 +4857,27 @@ out_share(FILE *out, sa_group_t group, char *proto)
 {
 	sa_share_t share;
 	char resfmt[128];
+	char *defprop;
+
+	/*
+	 * The original share command defaulted to displaying NFS
+	 * shares or allowed a protocol to be specified. We want to
+	 * skip those shares that are not the specified protocol.
+	 */
+	if (proto != NULL && sa_get_optionset(group, proto) == NULL)
+		return;
+
+	if (proto == NULL)
+		proto = "nfs";
+
+	/*
+	 * get the default property string.  NFS uses "rw" but
+	 * everything else will use "".
+	 */
+	if (proto != NULL && strcmp(proto, "nfs") != 0)
+		defprop = "\"\"";
+	else
+		defprop = "rw";
 
 	for (share = sa_get_share(group, NULL);
 	    share != NULL;
@@ -3698,11 +4890,12 @@ out_share(FILE *out, sa_group_t group, char *proto)
 		char *sharedstate;
 		int shared = 1;
 		char *soptions;
+		char shareopts[MAXNAMLEN];
 
 		sharedstate = sa_get_share_attr(share, "shared");
 		path = sa_get_share_attr(share, "path");
 		type = sa_get_share_attr(share, "type");
-		resource = sa_get_share_attr(share, "resource");
+		resource = get_resource(share);
 		groupname = sa_get_group_attr(group, "name");
 
 		if (groupname != NULL && strcmp(groupname, "default") == 0) {
@@ -3711,8 +4904,12 @@ out_share(FILE *out, sa_group_t group, char *proto)
 		}
 		description = sa_get_share_description(share);
 
-		/* Want the sharetab version if it exists */
-		soptions = sa_get_share_attr(share, "shareopts");
+		/*
+		 * Want the sharetab version if it exists, defaulting
+		 * to NFS if no protocol specified.
+		 */
+		(void) snprintf(shareopts, MAXNAMLEN, "shareopts-%s", proto);
+		soptions = sa_get_share_attr(share, shareopts);
 
 		if (sharedstate == NULL)
 			shared = 0;
@@ -3729,7 +4926,7 @@ out_share(FILE *out, sa_group_t group, char *proto)
 			(void) fprintf(out, "%-14.14s  %s   %s   \"%s\"  \n",
 			    resfmt, path,
 			    (soptions != NULL && strlen(soptions) > 0) ?
-			    soptions : "rw",
+			    soptions : defprop,
 			    (description != NULL) ? description : "");
 		}
 
@@ -3763,22 +4960,21 @@ output_legacy_file(FILE *out, char *proto, sa_handle_t handle)
 {
 	sa_group_t group;
 
-	for (group = sa_get_group(handle, NULL); group != NULL;
+	for (group = sa_get_group(handle, NULL);
+	    group != NULL;
 	    group = sa_get_next_group(group)) {
-		char *options;
 		char *zfs;
 
 		/*
-		 * Get default options preformated, being careful to
-		 * handle legacy shares differently from new style
-		 * shares. Legacy share have options on the share.
+		 * Go through all the groups and ZFS
+		 * sub-groups. out_share() will format the shares in
+		 * the group appropriately.
 		 */
 
 		zfs = sa_get_group_attr(group, "zfs");
 		if (zfs != NULL) {
 			sa_group_t zgroup;
 			sa_free_attr_string(zfs);
-			options = sa_proto_legacy_format(proto, group, 1);
 			for (zgroup = sa_get_sub_group(group);
 			    zgroup != NULL;
 			    zgroup = sa_get_next_group(zgroup)) {
@@ -3787,15 +4983,11 @@ output_legacy_file(FILE *out, char *proto, sa_handle_t handle)
 				out_share(out, zgroup, proto);
 			}
 		} else {
-			options = sa_proto_legacy_format(proto, group, 1);
 			out_share(out, group, proto);
 		}
-		if (options != NULL)
-			free(options);
 	}
 }
 
-/*ARGSUSED*/
 int
 sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -3815,8 +5007,13 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	int curtype = SA_SHARE_TRANSIENT;
 	char cmd[MAXPATHLEN];
 	sa_group_t group = NULL;
+	sa_resource_t rsrc = NULL;
 	sa_share_t share;
 	char dir[MAXPATHLEN];
+	uint64_t features;
+#ifdef lint
+	flags = flags;
+#endif
 
 	while ((c = getopt(argc, argv, "?hF:d:o:p")) != EOF) {
 		switch (c) {
@@ -3859,7 +5056,7 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	/* Have the info so construct what is needed */
 	if (!argsused && optind == argc) {
 		/* display current info in share format */
-		(void) output_legacy_file(stdout, "nfs", handle);
+		(void) output_legacy_file(stdout, protocol, handle);
 		return (ret);
 	}
 
@@ -3891,79 +5088,130 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	else
 		share = NULL;
 
+	features = sa_proto_get_featureset(protocol);
+
 	if (groupname != NULL) {
 		ret = SA_NOT_ALLOWED;
 	} else if (ret == SA_OK) {
-		char *legacygroup = "default";
+		char *legacygroup;
 		/*
 		 * The legacy group is always present and zfs groups
 		 * come and go.  zfs shares may be in sub-groups and
 		 * the zfs share will already be in that group so it
-		 * isn't an error.
+		 * isn't an error. If the protocol is "smb", the group
+		 * "smb" is used when "default" would otherwise be
+		 * used.  "default" is NFS only and "smb" is SMB only.
 		 */
+		if (strcmp(protocol, "smb") == 0)
+			legacygroup = "smb";
+		else
+			legacygroup = "default";
+
 		/*
 		 * If the share exists (not NULL), then make sure it
 		 * is one we want to handle by getting the parent
 		 * group.
 		 */
-		if (share != NULL)
+		if (share != NULL) {
 			group = sa_get_parent_group(share);
-		else
+		} else {
 			group = sa_get_group(handle, legacygroup);
+			if (group == NULL && strcmp(legacygroup, "smb") == 0) {
+				/*
+				 * This group may not exist, so create
+				 * as necessary. It only contains the
+				 * "smb" protocol.
+				 */
+				group = sa_create_group(handle, legacygroup,
+				    &ret);
+				if (group != NULL)
+					(void) sa_create_optionset(group,
+					    protocol);
+			}
+		}
 
-		if (group != NULL) {
-			groupstatus = group_status(group);
-			if (share == NULL) {
-				share = sa_add_share(group, sharepath,
-				    persist, &ret);
-				if (share == NULL &&
-				    ret == SA_DUPLICATE_NAME) {
-					/*
-					 * Could be a ZFS path being started
-					 */
-					if (sa_zfs_is_shared(handle,
-					    sharepath)) {
-						ret = SA_OK;
-						group = sa_get_group(handle,
-						    "zfs");
-						if (group == NULL) {
-							/*
-							 * This shouldn't
-							 * happen.
-							 */
-							ret = SA_CONFIG_ERR;
-						} else {
-							share = sa_add_share(
-							    group, sharepath,
-							    persist, &ret);
-						}
+		if (group == NULL) {
+			ret = SA_SYSTEM_ERR;
+			goto err;
+		}
+
+		groupstatus = group_status(group);
+		if (share == NULL) {
+			share = sa_add_share(group, sharepath,
+			    persist, &ret);
+			if (share == NULL &&
+			    ret == SA_DUPLICATE_NAME) {
+				/*
+				 * Could be a ZFS path being started
+				 */
+				if (sa_zfs_is_shared(handle,
+				    sharepath)) {
+					ret = SA_OK;
+					group = sa_get_group(handle,
+					    "zfs");
+					if (group == NULL) {
+						/*
+						 * This shouldn't
+						 * happen.
+						 */
+						ret = SA_CONFIG_ERR;
+					} else {
+						share = sa_add_share(
+						    group, sharepath,
+						    persist, &ret);
 					}
 				}
-			} else {
-				char *type;
-				/*
-				 * May want to change persist state, but the
-				 * important thing is to change options. We
-				 * need to change them regardless of the
-				 * source.
-				 */
-				if (sa_zfs_is_shared(handle, sharepath)) {
-					zfs = 1;
-				}
-				remove_all_options(share, protocol);
-				type = sa_get_share_attr(share, "type");
-				if (type != NULL &&
-				    strcmp(type, "transient") != 0) {
-					curtype = SA_SHARE_PERMANENT;
-				}
-				if (type != NULL)
-					sa_free_attr_string(type);
-				if (curtype != persist) {
-					(void) sa_set_share_attr(share, "type",
-					    persist == SA_SHARE_PERMANENT ?
-					    "persist" : "transient");
-				}
 			}
+		} else {
+			char *type;
+			/*
+			 * May want to change persist state, but the
+			 * important thing is to change options. We
+			 * need to change them regardless of the
+			 * source.
+			 */
+
+			if (sa_zfs_is_shared(handle, sharepath)) {
+				zfs = 1;
+			}
+			remove_all_options(share, protocol);
+			type = sa_get_share_attr(share, "type");
+			if (type != NULL &&
+			    strcmp(type, "transient") != 0) {
+				curtype = SA_SHARE_PERMANENT;
+			}
+			if (type != NULL)
+				sa_free_attr_string(type);
+			if (curtype != persist) {
+				(void) sa_set_share_attr(share, "type",
+				    persist == SA_SHARE_PERMANENT ?
+				    "persist" : "transient");
+			}
+		}
+
+		/*
+		 * If there is a resource name, we may
+		 * actually care about it if this is share for
+		 * a protocol that uses resource level sharing
+		 * (SMB). We need to find the resource and, if
+		 * it exists, make sure it belongs to the
+		 * current share. If it doesn't exist, attempt
+		 * to create it.
+		 */
+
+		if (ret == SA_OK && resource != NULL) {
+			rsrc = sa_find_resource(handle, resource);
+			if (rsrc != NULL) {
+				if (share != sa_get_resource_parent(rsrc))
+					ret = SA_DUPLICATE_NAME;
+				} else {
+					rsrc = sa_add_resource(share, resource,
+					    persist, &ret);
+				}
+				if (features & SA_FEATURE_RESOURCE)
+					share = rsrc;
+			}
+
 			/* Have a group to hold this share path */
 			if (ret == SA_OK && options != NULL &&
 			    strlen(options) > 0) {
@@ -3973,20 +5221,21 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			if (!zfs) {
 				/*
-				 * ZFS shares never have resource or
-				 * description and we can't store the values
-				 * so don't try.
+				 * ZFS shares never have a description
+				 * and we can't store the values so
+				 * don't try.
 				 */
 				if (ret == SA_OK && description != NULL)
 					ret = sa_set_share_description(share,
 					    description);
-				if (ret == SA_OK && resource != NULL)
-					ret = sa_set_share_attr(share,
-					    "resource", resource);
 			}
-			if (ret == SA_OK) {
-				if (strcmp(groupstatus, "enabled") == 0)
+			if (ret == SA_OK &&
+			    strcmp(groupstatus, "enabled") == 0) {
+				if (rsrc != share)
 					ret = sa_enable_share(share, protocol);
+				else
+					ret = sa_enable_resource(rsrc,
+					    protocol);
 				if (ret == SA_OK &&
 				    persist == SA_SHARE_PERMANENT) {
 					(void) sa_update_legacy(share,
@@ -3995,15 +5244,12 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 				if (ret == SA_OK)
 					ret = sa_update_config(handle);
 			}
-		} else {
-			ret = SA_SYSTEM_ERR;
-		}
 	}
+err:
 	if (ret != SA_OK) {
 		(void) fprintf(stderr, gettext("Could not share: %s: %s\n"),
 		    sharepath, sa_errorstr(ret));
 		ret = SA_LEGACY_ERR;
-
 	}
 	return (ret);
 }
@@ -4013,7 +5259,6 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
  *
  * Implements the original unshare command.
  */
-/*ARGSUSED*/
 int
 sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
@@ -4025,7 +5270,13 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	int c;
 	int ret = SA_OK;
 	int true_legacy = 0;
+	uint64_t features = 0;
+	sa_resource_t resource = NULL;
 	char cmd[MAXPATHLEN];
+#ifdef lint
+	flags = flags;
+	options = options;
+#endif
 
 	while ((c = getopt(argc, argv, "?hF:o:p")) != EOF) {
 		switch (c) {
@@ -4086,7 +5337,37 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 				share = sa_find_share(handle, dir);
 			}
 		}
-		if (share != NULL) {
+		if (share == NULL) {
+			/* Could be a resource name so check that next */
+			features = sa_proto_get_featureset(protocol);
+			resource = sa_find_resource(handle, sharepath);
+			if (resource != NULL) {
+				share = sa_get_resource_parent(resource);
+				if (features & SA_FEATURE_RESOURCE)
+					(void) sa_disable_resource(resource,
+					    protocol);
+				if (persist == SA_SHARE_PERMANENT) {
+					ret = sa_remove_resource(resource);
+					if (ret == SA_OK)
+						ret = sa_update_config(handle);
+				}
+				/*
+				 * If we still have a resource on the
+				 * share, we don't disable the share
+				 * itself. IF there aren't anymore, we
+				 * need to remove the share. The
+				 * removal will be done in the next
+				 * section if appropriate.
+				 */
+				resource = sa_get_share_resource(share, NULL);
+				if (resource != NULL)
+					share = NULL;
+			} else if (ret == SA_OK) {
+				/* Didn't find path and no  resource */
+				ret = SA_BAD_PATH;
+			}
+		}
+		if (share != NULL && resource == NULL) {
 			ret = sa_disable_share(share, protocol);
 			/*
 			 * Errors are ok and removal should still occur. The
@@ -4101,7 +5382,13 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 				if (ret == SA_OK)
 					ret = sa_update_config(handle);
 			}
-		} else {
+		} else if (ret == SA_OK && share == NULL && resource == NULL) {
+			/*
+			 * If both share and resource are NULL, then
+			 * share not found. If one or the other was
+			 * found or there was an earlier error, we
+			 * assume it was handled earlier.
+			 */
 			ret = SA_NOT_SHARED;
 		}
 	}
@@ -4122,7 +5409,7 @@ sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 
 /*
  * Common commands that implement the sub-commands used by all
- * protcols. The entries are found via the lookup command
+ * protocols. The entries are found via the lookup command
  */
 
 static sa_command_t commands[] = {
@@ -4139,7 +5426,7 @@ static sa_command_t commands[] = {
 	{"show", 0, sa_show, USAGE_SHOW},
 	{"share", 0, sa_legacy_share, USAGE_SHARE, SVC_SET|SVC_ACTION},
 	{"start", CMD_NODISPLAY, sa_start_group, USAGE_START,
-		SVC_SET|SVC_ACTION},
+	    SVC_SET|SVC_ACTION},
 	{"stop", CMD_NODISPLAY, sa_stop_group, USAGE_STOP, SVC_SET|SVC_ACTION},
 	{"unset", 0, sa_unset, USAGE_UNSET, SVC_SET},
 	{"unshare", 0, sa_legacy_unshare, USAGE_UNSHARE, SVC_SET|SVC_ACTION},
@@ -4176,11 +5463,14 @@ sa_get_usage(sa_usage_t index)
 		    "move-share [-nvh] -s sharepath destination-group");
 		break;
 	case USAGE_REMOVE_SHARE:
-		ret = gettext("remove-share [-fnvh] -s sharepath group");
+		ret = gettext(
+		    "remove-share [-fnvh] {-s sharepath | -r resource} "
+		    "group");
 		break;
 	case USAGE_SET:
 		ret = gettext("set [-nvh] -P proto [-S optspace] "
-		    "[-p property=value]* [-s sharepath] group");
+		    "[-p property=value]* [-s sharepath] [-r resource]] "
+		    "group");
 		break;
 	case USAGE_SET_SECURITY:
 		ret = gettext("set-security [-nvh] -P proto -S security-type "
@@ -4208,12 +5498,12 @@ sa_get_usage(sa_usage_t index)
 		    "[-p property]* group");
 		break;
 	case USAGE_UNSET_SECURITY:
-		ret = gettext("unset-security [-nvh] -P proto -S security-type"
-		    " [-p property]* group");
+		ret = gettext("unset-security [-nvh] -P proto "
+		    "-S security-type [-p property]* group");
 		break;
 	case USAGE_UNSHARE:
 		ret = gettext(
-		    "unshare [-F fstype] [-p] sharepath");
+		    "unshare [-F fstype] [-p] [-o optionlist] sharepath");
 		break;
 	}
 	return (ret);
@@ -4225,12 +5515,14 @@ sa_get_usage(sa_usage_t index)
  * Lookup the sub-command. proto isn't currently used, but it may
  * eventually provide a way to provide protocol specific sub-commands.
  */
-/*ARGSUSED*/
 sa_command_t *
 sa_lookup(char *cmd, char *proto)
 {
 	int i;
 	size_t len;
+#ifdef lint
+	proto = proto;
+#endif
 
 	len = strlen(cmd);
 	for (i = 0; commands[i].cmdname != NULL; i++) {
@@ -4240,11 +5532,13 @@ sa_lookup(char *cmd, char *proto)
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void
 sub_command_help(char *proto)
 {
 	int i;
+#ifdef lint
+	proto = proto;
+#endif
 
 	(void) printf(gettext("\tsub-commands:\n"));
 	for (i = 0; commands[i].cmdname != NULL; i++) {

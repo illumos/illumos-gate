@@ -1300,7 +1300,7 @@ ipgpc_addclass(ipgpc_class_t *in_class, ipp_flags_t flags) {
  * - number of bytes that matched this class
  * - number of packets that matched this class
  * - time in hrtime of last match for this class
- * any failures are returned, zero on sucess
+ * any failures are returned, zero on success
  */
 static int
 class_statinit(ipgpc_class_t *in_class, int in_class_id)
@@ -1742,7 +1742,7 @@ ipgpc_modifyfilter(nvlist_t **nvlpp, ipp_flags_t flags)
 		if (ret == 0) {	/* no error, add filter */
 			ret = ipgpc_addfilter(filter, name, flags);
 			if (ret != 0) {
-				/* error occured, free filter fields */
+				/* error occurred, free filter fields */
 				ipgpc0dbg(("ipgpc_modifyfilter: invalid " \
 				    "filter given, unable to modify " \
 				    "existing filter %s",
@@ -1756,7 +1756,7 @@ ipgpc_modifyfilter(nvlist_t **nvlpp, ipp_flags_t flags)
 			}
 			ipgpc_filter_destructor(&old_filter);
 		} else {
-			ipgpc0dbg(("ipgpc_modifyfilter: error %d occured " \
+			ipgpc0dbg(("ipgpc_modifyfilter: error %d occurred " \
 			    "when modifying filter", ret));
 			ipgpc_filter_destructor(&old_filter);
 			ipgpc_filter_destructor(filter);
@@ -1863,7 +1863,7 @@ ipgpc_modifyclass(nvlist_t **nvlpp, ipp_flags_t flags)
 			if ((rc = ipp_action_ref(ipgpc_aid,
 			    in_class.next_action, 0)) != 0) {
 				ipgpc0dbg(("ipgpc_modifyclass: error " \
-				    "occured while adding a reference to " \
+				    "occurred while adding a reference to " \
 				    "the new next_action %d",
 				    in_class.next_action));
 				mutex_exit(&ipgpc_cid_list_lock);

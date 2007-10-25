@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +92,7 @@ c_cod_init_cached_object(fscache_t *fscp, cnode_t *cp, vattr_t *vap,
 
 		/* get the attributes */
 		cp->c_attr.va_mask = AT_ALL;
-		error = VOP_GETATTR(cp->c_backvp, &cp->c_attr, 0, cr);
+		error = VOP_GETATTR(cp->c_backvp, &cp->c_attr, 0, cr, NULL);
 		if (error)
 			return (error);
 	} else {
@@ -170,7 +169,7 @@ again:
 
 	/* get the file attributes from the back fs */
 	attrs.va_mask = AT_ALL;
-	error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr);
+	error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr, NULL);
 	backhit = 1;
 	if (error)
 		goto out;
@@ -210,7 +209,7 @@ again:
 		}
 		if ((CTOV(cp))->v_type == VREG) {
 			attrs.va_mask = AT_ALL;
-			error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr);
+			error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr, NULL);
 			if (error)
 				goto out;
 		}
@@ -295,7 +294,7 @@ c_cod_modify_cached_object(struct fscache *fscp, struct cnode *cp, cred_t *cr)
 	}
 	attrs.va_mask = AT_ALL;
 	ASSERT(cp->c_backvp != NULL);
-	error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr);
+	error = VOP_GETATTR(cp->c_backvp, &attrs, 0, cr, NULL);
 	if (error) {
 		mdp->md_vattr.va_mtime.tv_sec = 0;
 		goto out;

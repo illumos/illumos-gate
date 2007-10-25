@@ -252,7 +252,7 @@ cstat(vnode_t *vp, struct stat *ubp, int flag, cred_t *cr)
 	int error;
 
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
-	if ((error = VOP_GETATTR(vp, &vattr, flag, cr)) != 0)
+	if ((error = VOP_GETATTR(vp, &vattr, flag, cr, NULL)) != 0)
 		return (error);
 #ifdef	_ILP32
 	/*
@@ -339,7 +339,6 @@ out:
  */
 static int cstatat32(int, char *, int, struct stat32 *, int, int);
 static int cstat32(vnode_t *, struct stat32 *, int, cred_t *);
-
 int
 stat32(char *fname, struct stat32 *sb)
 {
@@ -401,7 +400,7 @@ cstat32(vnode_t *vp, struct stat32 *ubp, int flag, struct cred *cr)
 	dev32_t st_dev, st_rdev;
 
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
-	if (error = VOP_GETATTR(vp, &vattr, flag, cr))
+	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
 
 	/* devices are a special case, see comments in cstat */
@@ -521,7 +520,7 @@ cstat64(vnode_t *vp, struct stat64 *ubp, int flag, cred_t *cr)
 	int error;
 
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
-	if (error = VOP_GETATTR(vp, &vattr, flag, cr))
+	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
 
 	bzero(&lsb, sizeof (lsb));
@@ -627,7 +626,7 @@ cstat64_32(vnode_t *vp, struct stat64_32 *ubp, int flag, cred_t *cr)
 	dev32_t st_dev, st_rdev;
 
 	vattr.va_mask = AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
-	if (error = VOP_GETATTR(vp, &vattr, flag, cr))
+	if (error = VOP_GETATTR(vp, &vattr, flag, cr, NULL))
 		return (error);
 
 	if (!cmpldev(&st_dev, vattr.va_fsid) ||

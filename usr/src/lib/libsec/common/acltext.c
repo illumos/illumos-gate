@@ -540,8 +540,12 @@ ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
 			buf[5] = 'F';
 		else
 			buf[5] = '-';
-		buf[6] = '\0';
-		*endp = buf + 6;
+		if (iflags & ACE_INHERITED_ACE)
+			buf[6] = 'I';
+		else
+			buf[6] = '-';
+		buf[7] = '\0';
+		*endp = buf + 7;
 	} else {
 		if (iflags & ACE_FILE_INHERIT_ACE) {
 			strcpy(lend, "file_inherit/");
@@ -558,6 +562,18 @@ ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
 		if (iflags & ACE_INHERIT_ONLY_ACE) {
 			strcpy(lend, "inherit_only/");
 			lend += sizeof ("inherit_only/") - 1;
+		}
+		if (iflags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG) {
+			strcpy(lend, "successful_access/");
+			lend += sizeof ("successful_access/") - 1;
+		}
+		if (iflags & ACE_FAILED_ACCESS_ACE_FLAG) {
+			strcpy(lend, "failed_access/");
+			lend += sizeof ("failed_access/") - 1;
+		}
+		if (iflags & ACE_INHERITED_ACE) {
+			strcpy(lend, "inherited/");
+			lend += sizeof ("inherited/") - 1;
 		}
 
 		if (*(lend - 1) == '/')
@@ -829,16 +845,19 @@ increase_length(struct dynaclstr *dacl, size_t increase)
  * The length of a perms entry is 144 i.e read_data/write_data...
  * to each acl entry.
  *
- * iflags: file_inherit/dir_inherit/inherit_only/no_propagate
+ * iflags: file_inherit/dir_inherit/inherit_only/no_propagate/successful_access
+ *         /failed_access
  *
  */
 
 #define	ACE_ENTRYTYPLEN		6
-#define	IFLAGS_SIZE		51
+#define	IFLAGS_STR "file_inherit/dir_inherit/inherit_only/no_propagate/" \
+	"successful_access/failed_access/inherited"
+#define	IFLAGS_SIZE		(sizeof (IFLAGS_STR) - 1)
 #define	ACCESS_TYPE_SIZE	7	/* if unknown */
 #define	COLON_CNT		3
 #define	PERMS_LEN		216
-#define	ACE_ENTRY_SIZE	(ACE_ENTRYTYPLEN + ID_STR_MAX + PERMS_LEN +\
+#define	ACE_ENTRY_SIZE	(ACE_ENTRYTYPLEN + ID_STR_MAX + PERMS_LEN + \
     ACCESS_TYPE_SIZE + IFLAGS_SIZE + COLON_CNT + APPENDED_ID_MAX)
 
 static char *
@@ -871,7 +890,9 @@ ace_acltotext(acl_t *aceaclp, int flags)
 		(void) ace_inherit_txt(endp, &endp, aclp->a_flags, flags);
 		if (flags & ACL_COMPACT_FMT || aclp->a_flags &
 		    (ACE_FILE_INHERIT_ACE | ACE_DIRECTORY_INHERIT_ACE |
-		    (ACE_INHERIT_ONLY_ACE | ACE_NO_PROPAGATE_INHERIT_ACE))) {
+		    (ACE_INHERIT_ONLY_ACE | ACE_NO_PROPAGATE_INHERIT_ACE |
+		    ACE_INHERITED_ACE | ACE_SUCCESSFUL_ACCESS_ACE_FLAG |
+		    ACE_FAILED_ACCESS_ACE_FLAG))) {
 			*endp++ = ':';
 			*endp = '\0';
 		}
@@ -972,7 +993,7 @@ ace_compact_printacl(acl_t *aclp)
 		    aclp->acl_flags & ACL_IS_DIR, ACL_COMPACT_FMT));
 		(void) printf("%s:",
 		    ace_inherit_txt(endp, &endp, acep->a_flags,
-			ACL_COMPACT_FMT));
+		    ACL_COMPACT_FMT));
 		(void) printf("%s\n", ace_access_txt(endp, &endp,
 		    acep->a_type));
 	}
@@ -1038,16 +1059,14 @@ typedef struct value_table {
 	uint32_t	p_value; /* value for perm when pletter found */
 } value_table_t;
 
-#define	ACE_PERM_COUNT 14
-
 /*
- * The permission tables are layed out in positional order
+ * The permission tables are laid out in positional order
  * a '-' character will indicate a permission at a given
  * position is not specified.  The '-' is not part of the
  * table, but will be checked for in the permission computation
  * routine.
  */
-value_table_t ace_perm_table[ACE_PERM_COUNT] = {
+value_table_t ace_perm_table[] = {
 	{ 'r', ACE_READ_DATA},
 	{ 'w', ACE_WRITE_DATA},
 	{ 'x', ACE_EXECUTE},
@@ -1064,23 +1083,27 @@ value_table_t ace_perm_table[ACE_PERM_COUNT] = {
 	{ 's', ACE_SYNCHRONIZE}
 };
 
-#define	ACLENT_PERM_COUNT 3
+#define	ACE_PERM_COUNT (sizeof (ace_perm_table) / sizeof (value_table_t))
 
-value_table_t aclent_perm_table[ACLENT_PERM_COUNT] = {
+value_table_t aclent_perm_table[] = {
 	{ 'r', S_IROTH},
 	{ 'w', S_IWOTH},
 	{ 'x', S_IXOTH}
 };
 
-#define	IFLAG_COUNT	6
-value_table_t inherit_table[IFLAG_COUNT] = {
+#define	ACLENT_PERM_COUNT (sizeof (aclent_perm_table) / sizeof (value_table_t))
+
+value_table_t inherit_table[] = {
 	{'f', ACE_FILE_INHERIT_ACE},
 	{'d', ACE_DIRECTORY_INHERIT_ACE},
 	{'i', ACE_INHERIT_ONLY_ACE},
 	{'n', ACE_NO_PROPAGATE_INHERIT_ACE},
 	{'S', ACE_SUCCESSFUL_ACCESS_ACE_FLAG},
-	{'F', ACE_FAILED_ACCESS_ACE_FLAG}
+	{'F', ACE_FAILED_ACCESS_ACE_FLAG},
+	{'I', ACE_INHERITED_ACE}
 };
+
+#define	IFLAG_COUNT (sizeof (inherit_table) / sizeof (value_table_t))
 
 /*
  * compute value from a permission table or inheritance table

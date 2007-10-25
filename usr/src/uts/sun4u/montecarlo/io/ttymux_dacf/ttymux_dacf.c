@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -536,7 +535,7 @@ fs_devtype(char *fspath)
 		return (NODEV);
 	} else {
 		dev = vp->v_rdev;
-		VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		return (dev);
 	}
@@ -568,7 +567,7 @@ open_stream(vnode_t **vp, int *fd, dev_t dev)
 
 	/* create a vnode for the device and open it */
 	*vp = makespecvp(dev, VCHR);
-	if ((rv = VOP_OPEN(vp, FREAD+FWRITE+FNOCTTY, CRED())) != 0) {
+	if ((rv = VOP_OPEN(vp, FREAD+FWRITE+FNOCTTY, CRED(), NULL)) != 0) {
 		goto out2;
 	}
 	/* Associate a file pointer with the vnode */
@@ -586,7 +585,7 @@ open_stream(vnode_t **vp, int *fd, dev_t dev)
 	return (0);
 
 out1:
-	VOP_CLOSE(*vp, FREAD+FWRITE+FNOCTTY, 1, (offset_t)0, CRED());
+	VOP_CLOSE(*vp, FREAD+FWRITE+FNOCTTY, 1, (offset_t)0, CRED(), NULL);
 out2:
 	VN_RELE(*vp);
 	return (rv);
@@ -669,7 +668,7 @@ link_aconsole(vnode_t *mux_avp, sm_console_t *cn)
 	return (rv);
 
 out:
-	VOP_CLOSE(lvp, FREAD+FWRITE+FNOCTTY, 1, (offset_t)0, CRED());
+	VOP_CLOSE(lvp, FREAD+FWRITE+FNOCTTY, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(lvp);
 	return (rv);
 }
@@ -905,12 +904,12 @@ ttymux_config(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 
 	muxvp = dacf_makevp(info_hdl);
 
-	if ((rv = VOP_OPEN(&muxvp, OFLAGS, CRED())) == 0) {
+	if ((rv = VOP_OPEN(&muxvp, OFLAGS, CRED(), NULL)) == 0) {
 
 		(void) enable_all_consoles(ms, muxvp);
 		(void) usable_consoles(ms, &icnt, &ocnt);
 
-		VOP_CLOSE(muxvp, OFLAGS, 1, (offset_t)0, CRED());
+		VOP_CLOSE(muxvp, OFLAGS, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(muxvp);
 	} else {
 		ttymux_dprintf(DPRINT_L3,

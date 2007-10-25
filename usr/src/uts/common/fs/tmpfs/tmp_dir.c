@@ -237,7 +237,8 @@ tdirenter(
 	struct tmpnode	*tp,		/* source tmpnode, if link/rename */
 	struct vattr	*va,
 	struct tmpnode	**tpp,		/* return tmpnode, if create/mkdir */
-	struct cred	*cred)
+	struct cred	*cred,
+	caller_context_t *ctp)
 {
 	struct tdirent *tdp;
 	struct tmpnode *found = NULL;
@@ -346,7 +347,7 @@ tdirenter(
 			if (error == 0) {
 				if (found != NULL) {
 					vnevent_rename_dest(TNTOV(found),
-					    TNTOV(dir), name);
+					    TNTOV(dir), name, ctp);
 				}
 			}
 

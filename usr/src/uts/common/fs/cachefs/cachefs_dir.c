@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -108,7 +107,7 @@ cachefs_dir_look(cnode_t *dcp, char *nm, fid_t *cookiep, uint_t *flagp,
 
 	dvp = dcp->c_frontvp;
 	va.va_mask = AT_SIZE;		/* XXX should save dir size */
-	error = VOP_GETATTR(dvp, &va, 0, kcred);
+	error = VOP_GETATTR(dvp, &va, 0, kcred, NULL);
 	if (error) {
 		cachefs_inval_object(dcp);
 		error = ENOTDIR;
@@ -201,7 +200,7 @@ cachefs_dir_new(cnode_t *dcp, cnode_t *cp)
 
 #ifdef CFSDEBUG
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(cp->c_frontvp, &va, 0, kcred);
+	error = VOP_GETATTR(cp->c_frontvp, &va, 0, kcred, NULL);
 	if (error)
 		goto out;
 	ASSERT(va.va_size == 0);
@@ -307,7 +306,7 @@ cachefs_dir_enter(cnode_t *dcp, char *nm, fid_t *cookiep, cfs_cid_t *cidp,
 	 * Get the current EOF for the directory(data file)
 	 */
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(dvp, &va, 0, kcred);
+	error = VOP_GETATTR(dvp, &va, 0, kcred, NULL);
 	if (error) {
 		cachefs_inval_object(dcp);
 		error = ENOTDIR;
@@ -465,7 +464,7 @@ cachefs_dir_rmentry(cnode_t *dcp, char *nm)
 	ASSERT((dcp->c_flags & CN_NOCACHE) == 0);
 	ASSERT(dvp != NULL);
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(dvp, &va, 0, kcred);
+	error = VOP_GETATTR(dvp, &va, 0, kcred, NULL);
 	if (error) {
 		cachefs_inval_object(dcp);
 		error = ENOTDIR;
@@ -624,7 +623,7 @@ cachefs_dir_getentrys(struct cnode *dcp, u_offset_t beg_off,
 	gdp = (struct dirent64 *)buf;
 	*cntp = bufsize;
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(dvp, &va, 0, kcred);
+	error = VOP_GETATTR(dvp, &va, 0, kcred, NULL);
 	if (error) {
 		*cntp = 0;
 		*last_offp = 0;
@@ -950,7 +949,7 @@ cachefs_dir_fill_common(cnode_t *dcp, cred_t *cr,
 		iov.iov_base = buf;
 		iov.iov_len = MAXBSIZE;
 		(void) VOP_RWLOCK(backvp, V_WRITELOCK_FALSE, NULL);
-		error = VOP_READDIR(backvp, &uio, cr, &eof);
+		error = VOP_READDIR(backvp, &uio, cr, &eof, NULL, 0);
 		VOP_RWUNLOCK(backvp, V_WRITELOCK_FALSE, NULL);
 		if (error)
 			goto out;
@@ -1017,7 +1016,7 @@ cachefs_dir_empty(cnode_t *dcp)
 		return (ENOTDIR);
 
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(dvp, &va, 0, kcred);
+	error = VOP_GETATTR(dvp, &va, 0, kcred, NULL);
 	if (error)
 		return (ENOTDIR);
 
@@ -1258,7 +1257,7 @@ cachefs_dir_complete(fscache_t *fscp, vnode_t *backvp, vnode_t *frontvp,
 	 */
 
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(frontvp, &va, 0, cr);
+	error = VOP_GETATTR(frontvp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -1296,7 +1295,7 @@ cachefs_dir_complete(fscache_t *fscp, vnode_t *backvp, vnode_t *frontvp,
 
 			error = VOP_LOOKUP(backvp, dep->d_name,
 			    &entry_vp, (struct pathname *)NULL, 0,
-			    (vnode_t *)NULL, cr);
+			    (vnode_t *)NULL, cr, NULL, NULL, NULL);
 			if (error) {
 				/* lookup on .. in / on coc gets ENOENT */
 				if (error == ENOENT) {

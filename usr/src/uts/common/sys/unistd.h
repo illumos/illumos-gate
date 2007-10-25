@@ -310,6 +310,10 @@ extern "C" {
 #define	_PC_2_SYMLINKS		19
 #define	_PC_ACL_ENABLED		20
 #define	_PC_MIN_HOLE_SIZE	21
+#define	_PC_CASE_BEHAVIOR	22
+#define	_PC_SATTR_ENABLED	23
+#define	_PC_SATTR_EXISTS	24
+
 /*
  * Large File Summit names
  *
@@ -324,6 +328,12 @@ extern "C" {
  */
 #define	_PC_XATTR_ENABLED	100
 #define	_PC_XATTR_EXISTS	101
+
+/*
+ * Case sensitivity values (related to _PC_CASE_BEHAVIOR)
+ */
+#define	_CASE_SENSITIVE		0x1
+#define	_CASE_INSENSITIVE	0x2
 
 /*
  * The value of 0 is returned when

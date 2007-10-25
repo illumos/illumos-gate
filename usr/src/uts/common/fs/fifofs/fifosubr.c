@@ -29,7 +29,7 @@
 
 /*
  * The routines defined in this file are supporting routines for FIFOFS
- * file sytem type.
+ * file system type.
  */
 #include <sys/types.h>
 #include <sys/param.h>
@@ -164,7 +164,7 @@ static void fifo_reinit_vp(vnode_t *);
  * we can determine the fifodata address from any of its member fnodes.
  * This is essential for fifo_inactive.
  *
- * The fnode constructor is designed to handle any fifodata struture,
+ * The fnode constructor is designed to handle any fifodata structure,
  * deducing the number of fnodes from the total size.  Thus, the fnode
  * constructor does most of the work for the pipe constructor.
  */
@@ -410,8 +410,9 @@ fifovp(vnode_t *vp, cred_t *crp)
 	 * This way different fifo nodes sharing the same real vnode
 	 * can use realvp for communication.
 	 */
-	if (VOP_REALVP(vp, &rvp) == 0)
-		vp = rvp;
+
+	if (VOP_REALVP(vp, &rvp, NULL) == 0)
+			vp = rvp;
 
 	fnp->fn_realvp	= vp;
 	fnp->fn_wcnt	= 0;
@@ -431,7 +432,7 @@ fifovp(vnode_t *vp, cred_t *crp)
 	 * initialize the times from vp.
 	 */
 	va.va_mask = AT_TIMES;
-	if (VOP_GETATTR(vp, &va, 0, crp) == 0) {
+	if (VOP_GETATTR(vp, &va, 0, crp, NULL) == 0) {
 		fnp->fn_atime = va.va_atime.tv_sec;
 		fnp->fn_mtime = va.va_mtime.tv_sec;
 		fnp->fn_ctime = va.va_ctime.tv_sec;
@@ -652,7 +653,7 @@ fifo_stropen(vnode_t **vpp, int flag, cred_t *crp, int dotwist, int lockheld)
 		 * Create new pipe on behalf of connld
 		 */
 		if (error = fifo_connld(vpp, flag, crp)) {
-			(void) fifo_close(oldvp, flag, 1, 0, crp);
+			(void) fifo_close(oldvp, flag, 1, 0, crp, NULL);
 			mutex_enter(&fn_lock->flk_lock);
 			goto out;
 		}
@@ -663,7 +664,7 @@ fifo_stropen(vnode_t **vpp, int flag, cred_t *crp, int dotwist, int lockheld)
 		 * we were in fifo_connld(), so
 		 * we want to make sure the close completes (yuk)
 		 */
-		(void) fifo_close(oldvp, flag, 1, 0, crp);
+		(void) fifo_close(oldvp, flag, 1, 0, crp, NULL);
 		/*
 		 * fifo_connld has changed the vp, so we
 		 * need to re-initialize locals
@@ -1006,7 +1007,7 @@ out:
 	crhold(c);
 	(void) closef(filep);
 	VTOF(vp2)->fn_flag &= ~FIFOOPEN;
-	(void) fifo_close(vp2, flag, 1, (offset_t)0, c);
+	(void) fifo_close(vp2, flag, 1, (offset_t)0, c, NULL);
 	crfree(c);
 	VN_RELE(vp2);
 	return (error);

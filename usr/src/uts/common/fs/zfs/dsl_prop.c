@@ -44,8 +44,13 @@ dodefault(const char *propname, int intsz, int numint, void *buf)
 {
 	zfs_prop_t prop;
 
+	/*
+	 * The setonce properties are read-only, BUT they still
+	 * have a default value that can be used as the initial
+	 * value.
+	 */
 	if ((prop = zfs_name_to_prop(propname)) == ZPROP_INVAL ||
-	    zfs_prop_readonly(prop))
+	    (zfs_prop_readonly(prop) && !zfs_prop_setonce(prop)))
 		return (ENOENT);
 
 	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
@@ -93,8 +98,7 @@ dsl_prop_get_impl(dsl_dir_t *dd, const char *propname,
 		/*
 		 * Break out of this loop for non-inheritable properties.
 		 */
-		if (prop != ZPROP_INVAL &&
-		    !zfs_prop_inheritable(prop))
+		if (prop != ZPROP_INVAL && !zfs_prop_inheritable(prop))
 			break;
 	}
 	if (err == ENOENT)
@@ -418,14 +422,12 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 {
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
 	dsl_dir_t *dd = ds->ds_dir;
+	boolean_t snapshot;
 	int err = 0;
 	dsl_pool_t *dp;
 	objset_t *mos;
 
-	if (dsl_dataset_is_snapshot(ds)) {
-		VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-		return (0);
-	}
+	snapshot = dsl_dataset_is_snapshot(ds);
 
 	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
@@ -451,6 +453,10 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 			if ((prop = zfs_name_to_prop(za.za_name)) !=
 			    ZPROP_INVAL && !zfs_prop_inheritable(prop) &&
 			    dd != ds->ds_dir)
+				continue;
+
+			if (snapshot &&
+			    !zfs_prop_valid_for_type(prop, ZFS_TYPE_SNAPSHOT))
 				continue;
 
 			if (nvlist_lookup_nvlist(*nvp, za.za_name,

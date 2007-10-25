@@ -327,9 +327,16 @@ done:
 }
 
 int
-ud_direnter(struct ud_inode *tdp,
-	char *namep, enum de_op op, struct ud_inode *sdp, struct ud_inode *sip,
-	struct vattr *vap, struct ud_inode **ipp, struct cred *cr)
+ud_direnter(
+	struct ud_inode *tdp,
+	char *namep,
+	enum de_op op,
+	struct ud_inode *sdp,
+	struct ud_inode *sip,
+	struct vattr *vap,
+	struct ud_inode **ipp,
+	struct cred *cr,
+	caller_context_t *ctp)
 {
 	struct udf_vfs *udf_vfsp;
 	struct ud_inode *tip;
@@ -556,11 +563,11 @@ out:
 		if (err == 0) {
 			if (tip) {
 				vnevent_rename_dest(ITOV(tip), ITOV(tdp),
-				    namep);
+				    namep, ctp);
 			}
 
 			if (sdp != tdp) {
-				vnevent_rename_dest_dir(ITOV(tdp));
+				vnevent_rename_dest_dir(ITOV(tdp), ctp);
 			}
 		}
 
@@ -594,9 +601,14 @@ out2:
  * function seems to be really weird
  */
 int
-ud_dirremove(struct ud_inode *dp,
-	char *namep, struct ud_inode *oip, struct vnode *cdir,
-	enum dr_op op, struct cred *cr)
+ud_dirremove(
+	struct ud_inode *dp,
+	char *namep,
+	struct ud_inode *oip,
+	struct vnode *cdir,
+	enum dr_op op,
+	struct cred *cr,
+	caller_context_t *ctp)
 {
 	struct udf_vfs *udf_vfsp;
 	int32_t namelen, err = 0;
@@ -852,9 +864,9 @@ out_novfs:
 		 */
 		if (err == 0) {
 			if (op == DR_REMOVE) {
-				vnevent_remove(ITOV(ip), ITOV(dp), namep);
+				vnevent_remove(ITOV(ip), ITOV(dp), namep, ctp);
 			} else if (op == DR_RMDIR) {
-				vnevent_rmdir(ITOV(ip), ITOV(dp), namep);
+				vnevent_rmdir(ITOV(ip), ITOV(dp), namep, ctp);
 			}
 		}
 		VN_RELE(ITOV(ip));

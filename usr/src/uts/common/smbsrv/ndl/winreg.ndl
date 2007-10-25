@@ -1,0 +1,288 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_WINREG_NDL_
+#define _MLSVC_WINREG_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Windows Registry (WINREG) RPC interface definition.
+ */
+
+#include "ndrtypes.ndl"
+
+#define WINREG_OPNUM_OpenHKLM		0x02
+#define WINREG_OPNUM_OpenHKUsers	0x04
+#define WINREG_OPNUM_Close		0x05
+#define WINREG_OPNUM_CreateKey		0x06
+#define WINREG_OPNUM_DeleteKey		0x07
+#define WINREG_OPNUM_DeleteValue	0x08
+#define WINREG_OPNUM_EnumKey		0x09
+#define WINREG_OPNUM_EnumValue		0x0a
+#define WINREG_OPNUM_FlushKey		0x0b
+#define WINREG_OPNUM_GetKeySec		0x0c
+#define WINREG_OPNUM_OpenKey		0x0f
+#define WINREG_OPNUM_QueryKey		0x10
+#define WINREG_OPNUM_QueryValue		0x11
+#define WINREG_OPNUM_SetKeySec		0x15
+#define WINREG_OPNUM_CreateValue	0x16
+#define WINREG_OPNUM_Shutdown		0x18
+#define WINREG_OPNUM_GetVersion		0x1a
+
+
+struct msreg_handle {
+	DWORD hand1;
+	DWORD hand2;
+	WORD  hand3[2];
+	BYTE  hand4[8];
+};
+typedef struct msreg_handle	msreg_handle_t;
+
+struct msreg_string_desc {
+	WORD	length;
+	WORD	allosize;
+	LPTSTR	str;
+};
+typedef struct msreg_string_desc msreg_string_t;
+
+/*
+ * Fake Varying/Conformant with a funny conformant.
+ */
+struct msreg_value {
+	DWORD	vc_first_is;	/* 0 */
+	DWORD	vc_length_is;
+  SIZE_IS(vc_length_is)
+	BYTE	value[ANY_SIZE_ARRAY];
+};
+
+struct file_time {
+	DWORD	low;
+	DWORD	high;
+};
+typedef struct file_time file_time_t;
+
+
+OPERATION(WINREG_OPNUM_OpenHKLM)
+struct msreg_OpenHKLM {
+	IN  BYTE		whatever[8];
+	IN  DWORD		access_mask;
+	OUT msreg_handle_t	handle;
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_OpenHKUsers)
+struct msreg_OpenHKUsers {
+	IN  BYTE		whatever[8];
+	IN  DWORD		access_mask;
+	OUT msreg_handle_t	handle;
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_Close)
+struct msreg_Close {
+	IN  msreg_handle_t	handle;
+	OUT msreg_handle_t	result_handle;
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_CreateKey)
+struct msreg_CreateKey {
+	IN	msreg_handle_t	handle;
+	IN	msreg_string_t	subkey;
+	/* IN	ignore the remaining input data */
+
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_DeleteKey)
+struct msreg_DeleteKey {
+	IN	msreg_handle_t	handle;
+	IN	msreg_string_t	subkey;
+	/* IN	ignore the remaining input data */
+
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_DeleteValue)
+struct msreg_DeleteValue {
+	IN	msreg_handle_t	handle;
+	IN	msreg_string_t	name;
+	/* IN	ignore the remaining input data */
+
+	OUT DWORD		status;
+};
+
+
+/*
+ * Some of the OUT parameters are also supplied
+ * as IN parameters but we can ignore them.
+ */
+OPERATION(WINREG_OPNUM_EnumValue)
+struct msreg_EnumValue {
+	IN	msreg_handle_t	handle;
+	IN	DWORD		index;
+	/* IN	ignore the remaining input data */
+
+	OUT	msreg_string_t	name;
+	OUT DWORD		*type;
+	OUT struct msreg_value *value;
+	OUT DWORD		*value_size;
+	OUT DWORD		*value_size_total;
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_OpenKey)
+struct msreg_OpenKey {
+	IN  msreg_handle_t	handle;
+	IN  msreg_string_t	name;
+	IN  DWORD		unknown;
+	IN  DWORD		access_mask;
+	OUT msreg_handle_t	result_handle;
+	OUT DWORD		status;
+};
+
+
+/*
+ * 000000A0                    00 00 00 00 C1 F9 C0 86 18 B1       ..........
+ * 000000B0  D5 11 99 C8 00 C0 F0 1F 42 26 00 00 10 04 CC ED ........B&......
+ * 000000C0  12 00 08 02 00 00 00 00 00 00 00 00 00 00       ..............  
+	DWORD unknown_0x04100000;
+	DWORD unkown_ptr;
+	DWORD unknown_0x00000208;
+	DWORD unknown2;
+	DWORD unknown3;
+ */
+
+OPERATION(WINREG_OPNUM_QueryKey)
+struct msreg_QueryKey {
+	IN  msreg_handle_t	handle;
+	/*
+	 * Ignore the remaining input data
+	 * (2 * DWORD, possibly msreg_string_t).
+	 */
+
+	OUT msreg_string_t	name;
+	OUT DWORD		unknown;
+	OUT DWORD 		sub_keys;
+	OUT DWORD 		max_subkey_len;
+	OUT DWORD 		max_class_len;
+	OUT DWORD 		values;
+	OUT DWORD 		max_value_namelen;
+	OUT DWORD 		max_value_len;
+	OUT DWORD 		security_desc;
+	OUT file_time_t 	last_write_time;
+	OUT DWORD		status;
+};
+
+
+/*
+ * Some of the OUT parameters are also supplied
+ * as IN parameters but we can ignore them.
+ */
+OPERATION(WINREG_OPNUM_QueryValue)
+struct msreg_QueryValue {
+	IN  msreg_handle_t	handle;
+	IN  msreg_string_t	value_name;
+	/* IN	ignore the remaining input data */
+
+	OUT DWORD		*type;
+	OUT struct msreg_value	*value;
+	OUT DWORD		*value_size;
+	OUT DWORD		*value_size_total;
+	OUT DWORD		status;
+};
+
+
+OPERATION(WINREG_OPNUM_CreateValue)
+struct msreg_CreateValue {
+	IN	msreg_handle_t	handle;
+	IN	msreg_string_t	name;
+	/* IN	ignore the remaining input data */
+
+	OUT DWORD		status;
+};
+
+
+/*
+ * The real structure of shutdown passes some strings, a timeout
+ * and reboot/shutdown flags but this allows us to accept the call,
+ * without anything appearing in the log, and return access denied.
+ */
+OPERATION(WINREG_OPNUM_Shutdown)
+struct msreg_Shutdown {
+	IN	DWORD ignored;
+	OUT	DWORD status;
+};
+
+
+OPERATION(WINREG_OPNUM_GetVersion)
+struct msreg_GetVersion {
+	IN	msreg_handle_t handle;
+	OUT	DWORD version;
+	OUT	DWORD status;
+};
+
+
+/*
+ * The WINREG interface.
+ */
+INTERFACE(0)
+union winreg_interface {
+	CASE(WINREG_OPNUM_OpenHKLM)
+		struct msreg_OpenHKLM		OpenHKLM;
+	CASE(WINREG_OPNUM_OpenHKUsers)
+		struct msreg_OpenHKUsers	OpenHKUsers;
+	CASE(WINREG_OPNUM_Close)
+		struct msreg_Close		Close;
+	CASE(WINREG_OPNUM_CreateKey)
+		struct msreg_CreateKey		CreateKey;
+	CASE(WINREG_OPNUM_DeleteKey)
+		struct msreg_DeleteKey		DeleteKey;
+	CASE(WINREG_OPNUM_DeleteValue)
+		struct msreg_DeleteValue	DeleteValue;
+	CASE(WINREG_OPNUM_OpenKey)
+		struct msreg_OpenKey		OpenKey;
+	CASE(WINREG_OPNUM_QueryKey)
+		struct msreg_QueryKey		QueryKey;
+	CASE(WINREG_OPNUM_QueryValue)
+		struct msreg_QueryValue		QueryValue;
+	CASE(WINREG_OPNUM_CreateValue)
+		struct msreg_CreateValue	CreateValue;
+	CASE(WINREG_OPNUM_Shutdown)
+		struct msreg_Shutdown		Shutdown;
+	CASE(WINREG_OPNUM_GetVersion)
+		struct msreg_GetVersion		GetVersion;
+};
+typedef union winreg_interface	winreg_interface_t;
+EXTERNTYPEINFO(winreg_interface)
+
+#endif /* _MLSVC_WINREG_NDL_ */

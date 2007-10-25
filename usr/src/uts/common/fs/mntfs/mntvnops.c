@@ -670,7 +670,7 @@ mntfs_getmntopts(struct vfs *vfsp, char **bufp, size_t *lenp)
 
 /* ARGSUSED */
 static int
-mntopen(vnode_t **vpp, int flag, cred_t *cr)
+mntopen(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t *vp = *vpp;
 	mntnode_t *nmnp;
@@ -694,7 +694,8 @@ mntopen(vnode_t **vpp, int flag, cred_t *cr)
 
 /* ARGSUSED */
 static int
-mntclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+mntclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 
@@ -767,7 +768,8 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 
 
 static int
-mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 	int error;
@@ -786,7 +788,7 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	/*
 	 * Attributes are same as underlying file with modifications
 	 */
-	if (error = VOP_GETATTR(rvp, vap, flags, cr))
+	if (error = VOP_GETATTR(rvp, vap, flags, cr, ct))
 		return (error);
 
 	/*
@@ -830,7 +832,8 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 
 
 static int
-mntaccess(vnode_t *vp, int mode, int flags, cred_t *cr)
+mntaccess(vnode_t *vp, int mode, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 
@@ -840,7 +843,7 @@ mntaccess(vnode_t *vp, int mode, int flags, cred_t *cr)
 	/*
 	 * Do access check on the underlying directory vnode.
 	 */
-	return (VOP_ACCESS(mnp->mnt_mountvp, mode, flags, cr));
+	return (VOP_ACCESS(mnp->mnt_mountvp, mode, flags, cr, ct));
 }
 
 
@@ -882,14 +885,14 @@ mntfreenode(mntnode_t *mnp)
 
 /* ARGSUSED */
 static int
-mntfsync(vnode_t *vp, int syncflag, cred_t *cr)
+mntfsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 {
 	return (0);
 }
 
 /* ARGSUSED */
 static void
-mntinactive(vnode_t *vp, cred_t *cr)
+mntinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 
@@ -898,7 +901,8 @@ mntinactive(vnode_t *vp, cred_t *cr)
 
 /* ARGSUSED */
 static int
-mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp,
+	caller_context_t *ct)
 {
 	if (*noffp == 0)
 		VTOM(vp)->mnt_offset = 0;
@@ -913,7 +917,8 @@ mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp)
  */
 /* ARGSUSED */
 static int
-mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp)
+mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
+	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 	mntsnap_t *snap = &mnp->mnt_read;
@@ -951,7 +956,7 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp)
 /* ARGSUSED */
 static int
 mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-	cred_t *cr, int *rvalp)
+	cred_t *cr, int *rvalp, caller_context_t *ct)
 {
 	uint_t *up = (uint_t *)arg;
 	mntnode_t *mnp = VTOM(vp);

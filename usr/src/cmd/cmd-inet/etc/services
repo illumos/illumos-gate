@@ -93,6 +93,8 @@ slp		427/tcp		slp		# Service Location Protocol, V2
 slp             427/udp         slp             # Service Location Protocol, V2
 mobile-ip	434/udp		mobile-ip	# Mobile-IP
 cvc_hostd	442/tcp				# Network Console
+microsoft-ds	445/tcp				# Microsoft Directory Services
+microsoft-ds	445/udp				# Microsoft Directory Services
 ike		500/udp		ike		# Internet Key Exchange
 uuidgen		697/tcp				# UUID Generator
 uuidgen		697/udp				# UUID Generator

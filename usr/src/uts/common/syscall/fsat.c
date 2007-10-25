@@ -42,6 +42,7 @@ extern int fchownat(int, char *, uid_t, gid_t, int);
 extern int fstatat(int, char *, struct stat *, int);
 extern int futimesat(int, char *, struct timeval *);
 extern int accessat(int, char *, int);
+extern int openattrdirat(int, char *);
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
 extern int fstatat64_32(int, char *, struct stat64_32 *, int);
 extern int fstatat32(int, char *, struct stat32 *, int);
@@ -65,6 +66,7 @@ extern int fstatat64_32(int, char *, struct stat64_32 *, int);
  * 6 - futimesat
  * 7 - renameat
  * 8 - accessat
+ * 9 - openattrdirat
  *
  * The code for handling the at functionality exists in the file where the
  * base syscall is defined.  For example openat is in open.c
@@ -81,43 +83,45 @@ fsat32(int code, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 	case 0: /* openat */
 #if defined(_LP64)
 		return (openat32((int)arg1, (char *)arg2,
-			(int)arg3, (int)arg4));
+		    (int)arg3, (int)arg4));
 #else
 		return (openat((int)arg1, (char *)arg2,
-			(int)arg3, (int)arg4));
+		    (int)arg3, (int)arg4));
 #endif
 	case 1: /* openat64 */
 		return (openat64((int)arg1, (char *)arg2,
-			(int)arg3, (int)arg4));
+		    (int)arg3, (int)arg4));
 	case 2: /* fstatat64 */
 #if defined(_LP64)
 		return (fstatat64_32((int)arg1, (char *)arg2,
-			(struct stat64_32 *)arg3, (int)arg4));
+		    (struct stat64_32 *)arg3, (int)arg4));
 #else
 		return (fstatat64((int)arg1, (char *)arg2,
-			(struct stat64 *)arg3, (int)arg4));
+		    (struct stat64 *)arg3, (int)arg4));
 #endif
 	case 3: /* fstatat */
 #if defined(_LP64)
 		return (fstatat32((int)arg1, (char *)arg2,
-			(struct stat32 *)arg3, (int)arg4));
+		    (struct stat32 *)arg3, (int)arg4));
 #else
 		return (fstatat((int)arg1, (char *)arg2,
-			(struct stat *)arg3, (int)arg4));
+		    (struct stat *)arg3, (int)arg4));
 #endif
 	case 4: /* fchownat */
 		return (fchownat((int)arg1, (char *)arg2,
-			(uid_t)arg3, (gid_t)arg4, (int)arg5));
+		    (uid_t)arg3, (gid_t)arg4, (int)arg5));
 	case 5: /* unlinkat */
 		return (unlinkat((int)arg1, (char *)arg2, (int)arg3));
 	case 6: /* futimesat */
 		return (futimesat((int)arg1,
-			(char *)arg2, (struct timeval *)arg3));
+		    (char *)arg2, (struct timeval *)arg3));
 	case 7: /* renameat */
 		return (renameat((int)arg1, (char *)arg2, (int)arg3,
-			(char *)arg4));
+		    (char *)arg4));
 	case 8: /* accessat */
 		return (accessat((int)arg1, (char *)arg2, (int)arg3));
+	case 9: /* openattrdirat */
+		return (openattrdirat((int)arg1, (char *)arg2));
 	default:
 		return (set_errno(EINVAL));
 	}
@@ -139,27 +143,29 @@ fsat64(int code, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 
 	case 0: /* openat */
 		return (openat((int)arg1, (char *)arg2,
-			(int)arg3, (int)arg4));
+		    (int)arg3, (int)arg4));
 	case 1: /* openat64 */
 		return (set_errno(ENOSYS));
 	case 2: /* fstatat64 */
 		return (set_errno(ENOSYS));
 	case 3: /* fstatat */
 		return (fstatat((int)arg1, (char *)arg2,
-			(struct stat *)arg3, (int)arg4));
+		    (struct stat *)arg3, (int)arg4));
 	case 4: /* fchownat */
 		return (fchownat((int)arg1, (char *)arg2,
-			(uid_t)arg3, (gid_t)arg4, (int)arg5));
+		    (uid_t)arg3, (gid_t)arg4, (int)arg5));
 	case 5: /* unlinkat */
 		return (unlinkat((int)arg1, (char *)arg2, (int)arg3));
 	case 6: /* futimesat */
 		return (futimesat((int)arg1,
-			(char *)arg2, (struct timeval *)arg3));
+		    (char *)arg2, (struct timeval *)arg3));
 	case 7: /* renameat */
 		return (renameat((int)arg1, (char *)arg2, (int)arg3,
-			(char *)arg4));
+		    (char *)arg4));
 	case 8: /* accessat */
 		return (accessat((int)arg1, (char *)arg2, (int)arg3));
+	case 9: /* openattrdirat */
+		return (openattrdirat((int)arg1, (char *)arg2));
 	default:
 		return (set_errno(EINVAL));
 	}

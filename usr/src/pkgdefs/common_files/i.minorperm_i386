@@ -315,6 +315,7 @@ asy:*
 asy:*,cu
 ucode:*
 battery:*
+smbsrv:*
 EOF
 }
 

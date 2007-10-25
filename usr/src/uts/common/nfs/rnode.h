@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -334,7 +334,7 @@ extern void	nfs_async_commit(vnode_t *, page_t *, offset3, count3,
 				cred_t *, void (*)(vnode_t *, page_t *,
 				offset3, count3, cred_t *));
 extern void	nfs_async_inactive(vnode_t *, cred_t *, void (*)(vnode_t *,
-				cred_t *));
+				cred_t *, caller_context_t *));
 extern int	writerp(rnode_t *, caddr_t, int, struct uio *, int);
 extern int	nfs_putpages(vnode_t *, u_offset_t, size_t, int, cred_t *);
 extern void	nfs_invalidate_pages(vnode_t *, u_offset_t, cred_t *);

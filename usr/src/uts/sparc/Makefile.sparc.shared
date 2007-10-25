@@ -241,6 +241,7 @@ DRV_KMODS	+= vni vnic
 DRV_KMODS	+= xge
 DRV_KMODS	+= rds
 DRV_KMODS	+= chxge
+DRV_KMODS	+= smbsrv
 
 #
 # Don't build some of these for OpenSolaris, since they will be

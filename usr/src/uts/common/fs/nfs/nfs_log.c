@@ -461,7 +461,7 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 	rfsl_log_file++;
 
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(vp, &va, 0, CRED());
+	error = VOP_GETATTR(vp, &va, 0, CRED(), NULL);
 	if (error) {
 		nfs_cmn_err(error, CE_WARN,
 		    "log_file_create: Can not stat %s - error = %m",  name);
@@ -510,7 +510,7 @@ out:
 	if (vp != NULL) {
 		int error1;
 		error1 = VOP_CLOSE(vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
-		    CRED());
+		    CRED(), NULL);
 		if (error1) {
 			nfs_cmn_err(error1, CE_WARN,
 			    "log_file_create: Can not close %s - "
@@ -561,7 +561,7 @@ log_file_rele(struct log_file *lfp)
 	ASSERT(lfp->lf_writers == 0);
 
 	if (error = VOP_CLOSE(lfp->lf_vp, FCREAT|FWRITE|FOFFMAX, 1, (offset_t)0,
-	    CRED())) {
+	    CRED(), NULL)) {
 		nfs_cmn_err(error, CE_WARN,
 		    "NFS: Could not close log buffer %s - error = %m",
 		    lfp->lf_path);
@@ -825,7 +825,7 @@ nfslog_write_logrecords(struct log_file *lfp,
 	va.va_mask = AT_SIZE;
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);  /* UIO_WRITE */
-	if ((error = VOP_GETATTR(vp, &va, 0, CRED())) == 0) {
+	if ((error = VOP_GETATTR(vp, &va, 0, CRED(), NULL)) == 0) {
 		if ((len + va.va_size) < (MAXOFF32_T)) {
 			error = VOP_WRITE(vp, &uio, ioflag, CRED(), NULL);
 			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
@@ -1173,7 +1173,7 @@ nfsl_flush(struct nfsl_flush_args *args, model_t model)
  * This is where buffer flushing would occur, but there is no buffering
  * at this time.
  * Possibly rename the log buffer for processing.
- * Sets tparams->ta_error equal to the value of the error that occured,
+ * Sets tparams->ta_error equal to the value of the error that occurred,
  * 0 otherwise.
  * Returns ENOENT if the buffer is not found.
  */

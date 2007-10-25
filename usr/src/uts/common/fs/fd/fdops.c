@@ -82,7 +82,7 @@ static int fdget(vnode_t *, char *, vnode_t **);
 
 /* ARGSUSED */
 static int
-fdopen(vnode_t **vpp, int mode, cred_t *cr)
+fdopen(vnode_t **vpp, int mode, cred_t *cr, caller_context_t *ct)
 {
 	if ((*vpp)->v_type != VDIR) {
 		mutex_enter(&(*vpp)->v_lock);
@@ -94,7 +94,8 @@ fdopen(vnode_t **vpp, int mode, cred_t *cr)
 
 /* ARGSUSED */
 static int
-fdclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+fdclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -163,7 +164,8 @@ fdread(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr, caller_context_t *ct)
 
 /* ARGSUSED */
 static int
-fdgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+fdgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	vfs_t *vfsp = vp->v_vfsp;
 	timestruc_t now;
@@ -195,7 +197,7 @@ fdgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 
 /* ARGSUSED */
 static int
-fdaccess(vnode_t *vp, int mode, int flags, cred_t *cr)
+fdaccess(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	return (0);
 }
@@ -203,7 +205,8 @@ fdaccess(vnode_t *vp, int mode, int flags, cred_t *cr)
 /* ARGSUSED */
 static int
 fdlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pnp,
-	int flags, vnode_t *rdir, cred_t *cr)
+	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+	int *direntflags, pathname_t *realpnp)
 {
 	if (comp[0] == 0 || strcmp(comp, ".") == 0 || strcmp(comp, "..") == 0) {
 		VN_HOLD(dp);
@@ -216,14 +219,16 @@ fdlookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pnp,
 /* ARGSUSED */
 static int
 fdcreate(vnode_t *dvp, char *comp, vattr_t *vap, enum vcexcl excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag)
+	int mode, vnode_t **vpp, cred_t *cr, int flag, caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	return (fdget(dvp, comp, vpp));
 }
 
 /* ARGSUSED */
 static int
-fdreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
+fdreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp, caller_context_t *ct,
+	int flags)
 {
 	/* bp holds one dirent structure */
 	u_offset_t bp[DIRENT64_RECLEN(FDNSIZE) / sizeof (u_offset_t)];
@@ -300,7 +305,7 @@ fdreaddir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
 
 /* ARGSUSED */
 static void
-fdinactive(vnode_t *vp, cred_t *cr)
+fdinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);

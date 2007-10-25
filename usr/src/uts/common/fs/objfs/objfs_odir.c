@@ -63,7 +63,8 @@ objfs_create_odirnode(vnode_t *pvp, struct modctl *mp)
 
 /* ARGSUSED */
 static int
-objfs_odir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+objfs_odir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	timestruc_t now;
 

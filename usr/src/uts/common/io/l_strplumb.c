@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ kstr_open(major_t maj, minor_t min, vnode_t **vpp, int *fd)
 	if (fd != NULL)
 		error = fassign(&vp, FREAD|FWRITE, fd);
 	else
-		error = VOP_OPEN(&vp, FREAD|FWRITE, CRED());
+		error = VOP_OPEN(&vp, FREAD|FWRITE, CRED(), NULL);
 
 	/*
 	 * Must set vpp after calling fassign()/VOP_OPEN()
@@ -135,7 +135,7 @@ kstr_close(vnode_t *vp, int fd)
 			return (EINVAL);
 		}
 	} else {
-		ret =  VOP_CLOSE(vp, FREAD|FWRITE, 1, (offset_t)0, CRED());
+		ret = VOP_CLOSE(vp, FREAD|FWRITE, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 		return (ret);
 	}

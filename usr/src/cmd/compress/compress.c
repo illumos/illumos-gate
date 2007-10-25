@@ -116,29 +116,19 @@ static char_type magic_header[] = { "\037\235" }; /* 1F 9D */
 static char rcs_ident[] =
 	"$Header: compress.c,v 4.0 85/07/30 12:50:00 joe Release $";
 
-#include <stdio.h>
 #include <ctype.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <sys/param.h>
-#include <stdlib.h>			/* XCU4 */
-#include <limits.h>
-#include <libintl.h>
 #include <locale.h>
 #include <langinfo.h>
-#include <string.h>
 #include <sys/acl.h>
 #include <utime.h>
 #include <libgen.h>
 #include <setjmp.h>
-#include <strings.h>
-#include <fcntl.h>
-#include <dirent.h>
 #include <aclutils.h>
-#include <errno.h>
+#include <libcmdutils.h>
 #include "getresponse.h"
+
 
 static int n_bits;			/* number of bits/code */
 static int maxbits = BITS;	/* user settable max # bits/code */
@@ -246,7 +236,6 @@ static void oops();
 static void output(code_int);
 static void prratio(FILE *, count_long, count_long);
 static void version(void);
-static int mv_xattrs(char *, char *, int);
 
 #ifdef DEBUG
 static int in_stack(int, int);
@@ -287,6 +276,10 @@ static count_long bytes_out;	/* length of compressed output */
 code_int sorttab[1<<BITS];	/* sorted pointers into htab */
 #endif
 
+/* Extended system attribute support */
+
+static int saflg = 0;
+
 /*
  * *************************************************************
  * TAG( main )
@@ -294,7 +287,7 @@ code_int sorttab[1<<BITS];	/* sorted pointers into htab */
  * Algorithm from "A Technique for High Performance Data Compression",
  * Terry A. Welch, IEEE Computer Vol 17, No 6 (June 1984), pp 8-19.
  *
- * Usage: compress [-dfvc] [-b bits] [file ...]
+ * Usage: compress [-dfvc/] [-b bits] [file ...]
  * Inputs:
  *	-d:	    If given, decompression is done instead.
  *
@@ -306,6 +299,8 @@ code_int sorttab[1<<BITS];	/* sorted pointers into htab */
  *		    exists, and even if no space is saved by compressing.
  *		    If -f is not used, the user will be prompted if stdin is
  *		    a tty, otherwise, the output file will not be overwritten.
+ *
+ *	-/	    Copies extended attributes and extended system attributes.
  *
  *  -v:	    Write compression statistics
  *
@@ -397,9 +392,9 @@ main(int argc, char *argv[])
 	 * if a string is left, must be an input filename.
 	 */
 #ifdef DEBUG
-	optstr = "b:cCdDfFnqvV";
+	optstr = "b:cCdDfFnqvV/";
 #else
-	optstr = "b:cCdfFnqvV";
+	optstr = "b:cCdfFnqvV/";
 #endif
 
 	while ((ch = getopt(argc, argv, optstr)) != EOF) {
@@ -465,6 +460,9 @@ main(int argc, char *argv[])
 			case 'q':
 				qflg++;
 				quiet = 1;
+				break;
+			case '/':
+				saflg++;
 				break;
 			default:
 				(void) fprintf(stderr, gettext(
@@ -797,7 +795,9 @@ main(int argc, char *argv[])
 			}
 		}
 		if (!use_stdout) {
-			if (pathconf(ofname, _PC_XATTR_EXISTS) == 1) {
+			if ((pathconf(ofname, _PC_XATTR_EXISTS) == 1) ||
+			    (saflg && sysattr_support(ofname,
+			    _PC_SATTR_EXISTS) == 1)) {
 				(void) unlink(ofname);
 			}
 			/* Open output file */
@@ -1582,6 +1582,13 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 	struct utimbuf timep;
 	acl_t *aclp = NULL;
 	int error;
+	int sattr_exist = 0;
+	int xattr_exist = 0;
+
+	if (pathconf(ifname, _PC_XATTR_EXISTS) == 1)
+		xattr_exist = 1;
+	if (saflg && sysattr_support(ifname, _PC_SATTR_EXISTS) == 1)
+		sattr_exist = 1;
 
 	if (fclose(outp)) {
 		perror(ofname);
@@ -1618,20 +1625,34 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 			    " -- file unchanged"));
 			newline_needed = 1;
 		}
-	} else if ((pathconf(ifname, _PC_XATTR_EXISTS) == 1) &&
-	    (mv_xattrs(ifname, ofname, 0) < 0)) {
+	} else 	if ((xattr_exist || sattr_exist) &&
+	    (mv_xattrs(progname, ifname, ofname, sattr_exist, 0)
+	    != 0)) {
 		(void) fprintf(stderr, gettext(
-		    "%s: -- cannot preserve extended attributes, "
-		    "file unchanged"), ifname);
+		    "%s: -- cannot preserve extended attributes or "
+		    "system attributes, file unchanged"), ifname);
 		newline_needed = 1;
 		/* Move attributes back ... */
-		(void) mv_xattrs(ofname, ifname, 1);
+		xattr_exist = 0;
+		sattr_exist = 0;
+		if (pathconf(ofname, _PC_XATTR_EXISTS) == 1)
+			xattr_exist = 1;
+		if (saflg && sysattr_support(ofname, _PC_SATTR_EXISTS) == 1)
+			sattr_exist = 1;
+		if (sattr_exist || xattr_exist)
+			(void) mv_xattrs(progname, ofname, ifname,
+			    sattr_exist, 1);
 		perm_stat = 1;
-	} else {	/* ***** Successful Compression ***** */
+	} else { /* ***** Successful Compression ***** */
 		mode = ifstat->st_mode & 07777;
-		if (chmod(ofname, mode))	 /* Copy modes */
+		if (chmod(ofname, mode)) {	 /* Copy modes */
+			if (errno == EPERM) {
+				(void) fprintf(stderr,
+				    gettext("failed to chmod %s"
+				    "- permisssion denied\n"), ofname);
+			}
 			perror(ofname);
-
+		}
 		error = acl_get(ifname, ACL_NO_TRIVIAL, &aclp);
 		if (error != 0) {
 			(void) fprintf(stderr, gettext(
@@ -1640,7 +1661,8 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 			perm_stat = 1;
 		}
 		if (aclp && (acl_set(ofname, aclp) < 0)) {
-			(void) fprintf(stderr, gettext("%s: failed to set acl "
+			(void) fprintf(stderr,
+			    gettext("%s: failed to set acl "
 			    "entries\n"), ofname);
 			perm_stat = 1;
 		}
@@ -1655,8 +1677,14 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 		timep.modtime = ifstat->st_mtime;
 		/* Update last accessed and modified times */
 		(void) utime(ofname, &timep);
-		if (unlink(ifname))	/* Remove input file */
+		if (unlink(ifname)) { /* Remove input file */
+			if (errno == EPERM) {
+				(void) fprintf(stderr,
+				    gettext("failed to remove %s"
+				    "- permisssion denied\n"), ifname);
+			}
 			perror(ifname);
+		}
 		if (!quiet) {
 			(void) fprintf(stderr, gettext(
 			    " -- replaced with %s"), ofname);
@@ -1668,6 +1696,11 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 	/* Unsuccessful return -- one of the tests failed */
 	if (ofname[0] != '\0') {
 		if (unlink(ofname)) {
+			if (errno == EPERM) {
+				(void) fprintf(stderr,
+				    gettext("failed to remove %s"
+				    "- permisssion denied\n"), ifname);
+			}
 			perror(ofname);
 		}
 
@@ -1804,16 +1837,16 @@ Usage()
 {
 #ifdef DEBUG
 	(void) fprintf(stderr,
-	"Usage: compress [-dDVfc] [-b maxbits] [file ...]\n");
+	"Usage: compress [-dDVfc/] [-b maxbits] [file ...]\n");
 #else
 	if (strcmp(progname, "compress") == 0) {
 		(void) fprintf(stderr,
 		    gettext(
-		    "Usage: compress [-fv] [-b maxbits] [file ...]\n"\
-		    "       compress [-cfv] [-b maxbits] [file]\n"));
+		    "Usage: compress [-fv/] [-b maxbits] [file ...]\n"\
+		    "       compress c [-fv] [-b maxbits] [file]\n"));
 	} else if (strcmp(progname, "uncompress") == 0)
 		(void) fprintf(stderr, gettext(
-		    "Usage: uncompress [-cfv] [file ...]\n"));
+		    "Usage: uncompress [-fv] [-c || -/] [file ...]\n"));
 	else if (strcmp(progname, "zcat") == 0)
 		(void) fprintf(stderr, gettext("Usage: zcat [file ...]\n"));
 
@@ -1871,74 +1904,4 @@ addDotZ(char *fn, size_t fnsize)
 	}
 
 	return (0);
-}
-
-/*
- * mv_xattrs - move (via renameat) all of the extended attributes
- *	associated with the file infile to the file outfile.
- *	This function returns 0 on success and -1 on error.
- */
-static int
-mv_xattrs(char *infile, char *outfile, int silent)
-{
-	int indfd, outdfd, tmpfd;
-	DIR *dirp = NULL;
-	struct dirent *dp = NULL;
-	int error = 0;
-	char *etext;
-
-	indfd = outdfd = tmpfd = -1;
-
-	if ((indfd = attropen(infile, ".", O_RDONLY)) == -1) {
-		etext = gettext("cannot open source");
-		error = -1;
-		goto out;
-	}
-
-	if ((outdfd = attropen(outfile, ".", O_RDONLY)) == -1) {
-		etext = gettext("cannot open target");
-		error = -1;
-		goto out;
-	}
-
-	if ((tmpfd = dup(indfd)) == -1) {
-		etext = gettext("cannot dup descriptor");
-		error = -1;
-		goto out;
-
-	}
-	if ((dirp = fdopendir(tmpfd)) == NULL) {
-		etext = gettext("cannot access source");
-		error = -1;
-		goto out;
-	}
-
-	while (dp = readdir(dirp)) {
-		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-		    dp->d_name[2] == '\0'))
-			continue;
-		if ((renameat(indfd, dp->d_name, outdfd, dp->d_name)) == -1) {
-			etext = dp->d_name;
-			error = -1;
-			goto out;
-		}
-	}
-out:
-	if (error == -1 && silent == 0) {
-		if (quiet) {
-			(void) fprintf(stderr, "%s: ", infile);
-		} else {
-			(void) fprintf(stderr, ", ");
-		}
-		(void) fprintf(stderr, gettext("extended attribute error: "));
-		perror(etext);
-	}
-	if (dirp)
-		(void) closedir(dirp);
-	if (indfd != -1)
-		(void) close(indfd);
-	if (outdfd != -1)
-		(void) close(outdfd);
-	return (error);
 }

@@ -35,7 +35,7 @@ $(BUILD64)MACHS += $(MACH64)
 
 # Add plugin module directories here. They need to build after the libshare
 # objects are built.
-PLUGINS =	nfs
+PLUGINS =	smb nfs
 $(PLUGINS):	$(MACHS)
 
 SUBDIRS =	$(MACHS) $(PLUGINS)

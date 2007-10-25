@@ -556,7 +556,7 @@ devfs_devpolicy(vnode_t *vp, devplcy_t **dpp)
 	if (devfs_mntinfo == NULL)
 		return (rval);
 
-	if (VOP_REALVP(vp, &rvp) == 0 && vn_matchops(rvp, dv_vnodeops)) {
+	if (VOP_REALVP(vp, &rvp, NULL) == 0 && vn_matchops(rvp, dv_vnodeops)) {
 		dvp = VTODV(rvp);
 		rw_enter(&dvp->dv_contents, RW_READER);
 		if (dvp->dv_priv) {

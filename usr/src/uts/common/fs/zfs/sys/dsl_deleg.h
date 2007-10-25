@@ -50,6 +50,7 @@ extern "C" {
 #define	ZFS_DELEG_PERM_RECEIVE		"receive"
 #define	ZFS_DELEG_PERM_ALLOW		"allow"
 #define	ZFS_DELEG_PERM_USERPROP		"userprop"
+#define	ZFS_DELEG_PERM_VSCAN		"vscan"
 
 /*
  * Note: the names of properties that are marked delegatable are also

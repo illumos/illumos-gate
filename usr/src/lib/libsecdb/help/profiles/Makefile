@@ -62,6 +62,7 @@ HTMLENTS = \
 	RtPrntAdmin.html \
 	RtProcManagement.html \
 	RtRightsDelegate.html \
+	RtSMBMngmnt.html \
 	RtSoftwareInstall.html \
 	RtSysEvMngmnt.html \
 	RtUserMngmnt.html \

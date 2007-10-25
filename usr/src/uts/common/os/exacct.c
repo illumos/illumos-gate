@@ -181,7 +181,7 @@ exacct_vn_write(ac_info_t *info, void *buf, ssize_t bufsize)
 	 * the present accounting file.
 	 */
 	va.va_mask = AT_SIZE;
-	error = VOP_GETATTR(info->ac_vnode, &va, 0, kcred);
+	error = VOP_GETATTR(info->ac_vnode, &va, 0, kcred, NULL);
 	if (error == 0) {
 		error = vn_rdwr(UIO_WRITE, info->ac_vnode, (caddr_t)buf,
 		    bufsize, 0LL, UIO_SYSSPACE, FAPPEND, (rlim64_t)MAXOFFSET_T,

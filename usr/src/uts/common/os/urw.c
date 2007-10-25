@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +74,7 @@ page_valid(struct seg *seg, caddr_t addr)
 	if (seg->s_ops == &segvn_ops &&
 	    SEGOP_GETVP(seg, addr, &vp) == 0 &&
 	    vp != NULL && vp->v_type == VREG &&
-	    VOP_GETATTR(vp, &vattr, 0, CRED()) == 0) {
+	    VOP_GETATTR(vp, &vattr, 0, CRED(), NULL) == 0) {
 		u_offset_t size = roundup(vattr.va_size, (u_offset_t)PAGESIZE);
 		u_offset_t offset = SEGOP_GETOFFSET(seg, addr);
 
@@ -177,7 +176,7 @@ mapout(struct as *as, caddr_t addr, caddr_t vaddr, int writing)
 }
 
 /*
- * Perform I/O to a given process. This will return EIO if we dectect
+ * Perform I/O to a given process. This will return EIO if we detect
  * corrupt memory and ENXIO if there is no such mapped address in the
  * user process's address space.
  */

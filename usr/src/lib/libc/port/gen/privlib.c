@@ -442,7 +442,7 @@ priv_set(priv_op_t op, priv_ptype_t setname, ...)
 
 /*
  * priv_ineffect(privilege).
- * tests the existance of a privilege against the effective set.
+ * tests the existence of a privilege against the effective set.
  */
 boolean_t
 priv_ineffect(const char *priv)

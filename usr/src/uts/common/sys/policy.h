@@ -129,6 +129,7 @@ int secpolicy_rpcmod_open(const cred_t *);
 int secpolicy_rsm_access(const cred_t *, uid_t, mode_t);
 int secpolicy_setpriority(const cred_t *);
 int secpolicy_settime(const cred_t *);
+int secpolicy_smb(const cred_t *);
 int secpolicy_spec_open(const cred_t *, struct vnode *, int);
 int secpolicy_sti(const cred_t *);
 int secpolicy_swapctl(const cred_t *);
@@ -154,6 +155,7 @@ void secpolicy_setid_clear(vattr_t *, cred_t *);
 void secpolicy_fs_mount_clearopts(cred_t *, struct vfs *);
 int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,
     const vattr_t *, cred_t *);
+int secpolicy_xvattr(xvattr_t *, uid_t, cred_t *, vtype_t);
 
 int secpolicy_basic_exec(const cred_t *);
 int secpolicy_basic_fork(const cred_t *);

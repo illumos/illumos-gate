@@ -42,7 +42,7 @@ Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
-File System Management:::Manage, mount, share file systems:auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
+File System Management:::Manage, mount, share file systems:profiles=SMB Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
@@ -75,6 +75,7 @@ Crypto Management:::Cryptographic Framework Administration:help=RtCryptoMngmnt.h
 Kerberos Client Management:::Maintain and Administer Kerberos excluding the servers:help=RtKerberosClntMngmnt.html
 Kerberos Server Management:::Maintain and Administer Kerberos Servers:profiles=Kerberos Client Management;help=RtKerberosSrvrMngmnt.html
 DAT Administration:::Manage the DAT configuration:help=RtDatAdmin.html
+SMB Management:::Manage the SMB service:auths=solaris.smf.manage.smb,solaris.smf.value.smb,solaris.smf.read.smb;help=RtSMBMngmnt.html
 ZFS File System Management:::Create and Manage ZFS File Systems:help=RtZFSFileSysMngmnt.html
 ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMngmnt.html
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html

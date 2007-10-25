@@ -361,6 +361,36 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	NULL, 0, NULL, NULL
 };
 
+/* Extensible attribute (xva) routines. */
+
+/*
+ * Zero out the structure, set the size of the requested/returned bitmaps,
+ * set AT_XVATTR in the embedded vattr_t's va_mask, and set up the pointer
+ * to the returned attributes array.
+ */
+void
+xva_init(xvattr_t *xvap)
+{
+	bzero(xvap, sizeof (xvattr_t));
+	xvap->xva_mapsize = XVA_MAPSIZE;
+	xvap->xva_magic = XVA_MAGIC;
+	xvap->xva_vattr.va_mask = AT_XVATTR;
+	xvap->xva_rtnattrmapp = &(xvap->xva_rtnattrmap)[0];
+}
+
+/*
+ * If AT_XVATTR is set, returns a pointer to the embedded xoptattr_t
+ * structure.  Otherwise, returns NULL.
+ */
+xoptattr_t *
+xva_getxoptattr(xvattr_t *xvap)
+{
+	xoptattr_t *xoap = NULL;
+	if (xvap->xva_vattr.va_mask & AT_XVATTR)
+		xoap = &xvap->xva_xoptattrs;
+	return (xoap);
+}
+
 /*
  * Used by the AVL routines to compare two vsk_anchor_t structures in the tree.
  * We use the f_fsid reported by VFS_STATVFS() since we use that for the
@@ -740,7 +770,7 @@ vn_rdwr(
 		if (error != 0)
 			goto done;
 		if (nbl_conflict(vp, rw == UIO_WRITE ? NBL_WRITE : NBL_READ,
-		    uio.uio_offset, uio.uio_resid, svmand)) {
+		    uio.uio_offset, uio.uio_resid, svmand, NULL)) {
 			error = EACCES;
 			goto done;
 		}
@@ -757,8 +787,8 @@ vn_rdwr(
 		uio.uio_extflg = UIO_COPY_CACHED;
 		error = VOP_READ(vp, &uio, ioflag, cr, NULL);
 	}
-	VOP_RWUNLOCK(vp, rw == UIO_WRITE ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE,
-	    NULL);
+	VOP_RWUNLOCK(vp,
+	    rw == UIO_WRITE ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE, NULL);
 	if (residp)
 		*residp = uio.uio_resid;
 	else if (uio.uio_resid)
@@ -789,7 +819,7 @@ vn_rele(vnode_t *vp)
 	mutex_enter(&vp->v_lock);
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
-		VOP_INACTIVE(vp, CRED());
+		VOP_INACTIVE(vp, CRED(), NULL);
 	} else {
 		vp->v_count--;
 		mutex_exit(&vp->v_lock);
@@ -812,7 +842,7 @@ vn_rele_stream(vnode_t *vp)
 	vp->v_stream = NULL;
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
-		VOP_INACTIVE(vp, CRED());
+		VOP_INACTIVE(vp, CRED(), NULL);
 	} else {
 		vp->v_count--;
 		mutex_exit(&vp->v_lock);
@@ -829,8 +859,8 @@ vn_open(
 	enum create crwhy,
 	mode_t umask)
 {
-	return (vn_openat(pnamep, seg, filemode,
-	    createmode, vpp, crwhy, umask, NULL));
+	return (vn_openat(pnamep, seg, filemode, createmode, vpp, crwhy,
+	    umask, NULL, -1));
 }
 
 
@@ -849,27 +879,39 @@ vn_openat(
 	struct vnode **vpp,
 	enum create crwhy,
 	mode_t umask,
-	struct vnode *startvp)
+	struct vnode *startvp,
+	int fd)
 {
 	struct vnode *vp;
 	int mode;
+	int accessflags;
 	int error;
 	int in_crit = 0;
+	int open_done = 0;
+	int shrlock_done = 0;
 	struct vattr vattr;
 	enum symfollow follow;
 	int estale_retry = 0;
+	struct shrlock shr;
+	struct shr_locowner shr_own;
 
 	mode = 0;
+	accessflags = 0;
 	if (filemode & FREAD)
 		mode |= VREAD;
 	if (filemode & (FWRITE|FTRUNC))
 		mode |= VWRITE;
+	if (filemode & FXATTRDIROPEN)
+		mode |= VEXEC;
 
 	/* symlink interpretation */
 	if (filemode & FNOFOLLOW)
 		follow = NO_FOLLOW;
 	else
 		follow = FOLLOW;
+
+	if (filemode & FAPPEND)
+		accessflags |= V_APPEND;
 
 top:
 	if (filemode & FCREAT) {
@@ -914,7 +956,8 @@ top:
 
 		if (!(filemode & FOFFMAX) && (vp->v_type == VREG)) {
 			vattr.va_mask = AT_SIZE;
-			if ((error = VOP_GETATTR(vp, &vattr, 0, CRED()))) {
+			if ((error = VOP_GETATTR(vp, &vattr, 0,
+			    CRED(), NULL))) {
 				goto out;
 			}
 			if (vattr.va_size > (u_offset_t)MAXOFF32_T) {
@@ -944,36 +987,19 @@ top:
 				goto out;
 			}
 			/*
-			 * Can't truncate files on which mandatory locking
-			 * or non-blocking mandatory locking is in effect.
+			 * Can't truncate files on which
+			 * sysv mandatory locking is in effect.
 			 */
 			if (filemode & FTRUNC) {
 				vnode_t *rvp;
 
-				if (VOP_REALVP(vp, &rvp) != 0)
+				if (VOP_REALVP(vp, &rvp, NULL) != 0)
 					rvp = vp;
-				if (nbl_need_check(vp)) {
-					nbl_start_crit(vp, RW_READER);
-					in_crit = 1;
-					vattr.va_mask = AT_MODE|AT_SIZE;
-					if ((error = VOP_GETATTR(vp, &vattr, 0,
-					    CRED())) == 0) {
-						if (rvp->v_filocks != NULL)
-							if (MANDLOCK(vp,
-							    vattr.va_mode))
-								error = EAGAIN;
-						if (!error) {
-							if (nbl_conflict(vp,
-							    NBL_WRITE, 0,
-							    vattr.va_size, 0))
-								error = EACCES;
-						}
-					}
-				} else if (rvp->v_filocks != NULL) {
+				if (rvp->v_filocks != NULL) {
 					vattr.va_mask = AT_MODE;
-					if ((error = VOP_GETATTR(vp, &vattr,
-					    0, CRED())) == 0 && MANDLOCK(vp,
-					    vattr.va_mode))
+					if ((error = VOP_GETATTR(vp,
+					    &vattr, 0, CRED(), NULL)) == 0 &&
+					    MANDLOCK(vp, vattr.va_mode))
 						error = EAGAIN;
 				}
 			}
@@ -983,7 +1009,7 @@ top:
 		/*
 		 * Check permissions.
 		 */
-		if (error = VOP_ACCESS(vp, mode, 0, CRED()))
+		if (error = VOP_ACCESS(vp, mode, accessflags, CRED(), NULL))
 			goto out;
 	}
 
@@ -996,7 +1022,7 @@ top:
 	}
 	if (filemode & FNOLINKS) {
 		vattr.va_mask = AT_NLINK;
-		if ((error = VOP_GETATTR(vp, &vattr, 0, CRED()))) {
+		if ((error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))) {
 			goto out;
 		}
 		if (vattr.va_nlink != 1) {
@@ -1020,25 +1046,66 @@ top:
 	if (vp->v_type == VSOCK) {
 		struct vnode *nvp;
 
-		error = VOP_REALVP(vp, &nvp);
+		error = VOP_REALVP(vp, &nvp, NULL);
 		if (error != 0 || nvp == NULL || nvp == vp ||
 		    nvp->v_type != VSOCK) {
 			error = EOPNOTSUPP;
 			goto out;
 		}
 	}
+
+	if ((vp->v_type == VREG) && nbl_need_check(vp)) {
+		/* get share reservation */
+		shr.s_access = 0;
+		if (filemode & FWRITE)
+			shr.s_access |= F_WRACC;
+		if (filemode & FREAD)
+			shr.s_access |= F_RDACC;
+		shr.s_deny = 0;
+		shr.s_sysid = 0;
+		shr.s_pid = ttoproc(curthread)->p_pid;
+		shr_own.sl_pid = shr.s_pid;
+		shr_own.sl_id = fd;
+		shr.s_own_len = sizeof (shr_own);
+		shr.s_owner = (caddr_t)&shr_own;
+		error = VOP_SHRLOCK(vp, F_SHARE_NBMAND, &shr, filemode, CRED(),
+		    NULL);
+		if (error)
+			goto out;
+		shrlock_done = 1;
+
+		/* nbmand conflict check if truncating file */
+		if ((filemode & FTRUNC) && !(filemode & FCREAT)) {
+			nbl_start_crit(vp, RW_READER);
+			in_crit = 1;
+
+			vattr.va_mask = AT_SIZE;
+			if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
+				goto out;
+			if (nbl_conflict(vp, NBL_WRITE, 0, vattr.va_size, 0,
+			    NULL)) {
+				error = EACCES;
+				goto out;
+			}
+		}
+	}
+
 	/*
 	 * Do opening protocol.
 	 */
-	error = VOP_OPEN(&vp, filemode, CRED());
+	error = VOP_OPEN(&vp, filemode, CRED(), NULL);
+	if (error)
+		goto out;
+	open_done = 1;
+
 	/*
 	 * Truncate if required.
 	 */
-	if (error == 0 && (filemode & FTRUNC) && !(filemode & FCREAT)) {
+	if ((filemode & FTRUNC) && !(filemode & FCREAT)) {
 		vattr.va_size = 0;
 		vattr.va_mask = AT_SIZE;
 		if ((error = VOP_SETATTR(vp, &vattr, 0, CRED(), NULL)) != 0)
-			(void) VOP_CLOSE(vp, filemode, 1, (offset_t)0, CRED());
+			goto out;
 	}
 out:
 	ASSERT(vp->v_count > 0);
@@ -1048,6 +1115,18 @@ out:
 		in_crit = 0;
 	}
 	if (error) {
+		if (open_done) {
+			(void) VOP_CLOSE(vp, filemode, 1, (offset_t)0, CRED(),
+			    NULL);
+			open_done = 0;
+			shrlock_done = 0;
+		}
+		if (shrlock_done) {
+			(void) VOP_SHRLOCK(vp, F_UNSHARE, &shr, 0, CRED(),
+			    NULL);
+			shrlock_done = 0;
+		}
+
 		/*
 		 * The following clause was added to handle a problem
 		 * with NFS consistency.  It is possible that a lookup
@@ -1068,6 +1147,49 @@ out:
 	return (error);
 }
 
+/*
+ * The following two accessor functions are for the NFSv4 server.  Since there
+ * is no VOP_OPEN_UP/DOWNGRADE we need a way for the NFS server to keep the
+ * vnode open counts correct when a client "upgrades" an open or does an
+ * open_downgrade.  In NFS, an upgrade or downgrade can not only change the
+ * open mode (add or subtract read or write), but also change the share/deny
+ * modes.  However, share reservations are not integrated with OPEN, yet, so
+ * we need to handle each separately.  These functions are cleaner than having
+ * the NFS server manipulate the counts directly, however, nobody else should
+ * use these functions.
+ */
+void
+vn_open_upgrade(
+	vnode_t *vp,
+	int filemode)
+{
+	ASSERT(vp->v_type == VREG);
+
+	if (filemode & FREAD)
+		atomic_add_32(&(vp->v_rdcnt), 1);
+	if (filemode & FWRITE)
+		atomic_add_32(&(vp->v_wrcnt), 1);
+
+}
+
+void
+vn_open_downgrade(
+	vnode_t *vp,
+	int filemode)
+{
+	ASSERT(vp->v_type == VREG);
+
+	if (filemode & FREAD) {
+		ASSERT(vp->v_rdcnt > 0);
+		atomic_add_32(&(vp->v_rdcnt), -1);
+	}
+	if (filemode & FWRITE) {
+		ASSERT(vp->v_wrcnt > 0);
+		atomic_add_32(&(vp->v_wrcnt), -1);
+	}
+
+}
+
 int
 vn_create(
 	char *pnamep,
@@ -1080,8 +1202,8 @@ vn_create(
 	int flag,
 	mode_t umask)
 {
-	return (vn_createat(pnamep, seg, vap, excl, mode, vpp,
-	    why, flag, umask, NULL));
+	return (vn_createat(pnamep, seg, vap, excl, mode, vpp, why, flag,
+	    umask, NULL));
 }
 
 /*
@@ -1171,7 +1293,7 @@ top:
 		vsec.vsa_dfaclcnt = 0;
 		vsec.vsa_dfaclentp = NULL;
 		vsec.vsa_mask = VSA_DFACLCNT;
-		error =  VOP_GETSECATTR(dvp, &vsec, 0, CRED());
+		error = VOP_GETSECATTR(dvp, &vsec, 0, CRED(), NULL);
 		/*
 		 * If error is ENOSYS then treat it as no error
 		 * Don't want to force all file systems to support
@@ -1230,7 +1352,7 @@ top:
 		 * applied, return error.
 		 */
 		vp = *vpp;
-		if (VOP_REALVP(vp, &rvp) != 0)
+		if (VOP_REALVP(vp, &rvp, NULL) != 0)
 			rvp = vp;
 		if ((vap->va_mask & AT_SIZE) && nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_READER);
@@ -1238,7 +1360,7 @@ top:
 		}
 		if (rvp->v_filocks != NULL || rvp->v_shrlocks != NULL) {
 			vattr.va_mask = AT_MODE|AT_SIZE;
-			if (error = VOP_GETATTR(vp, &vattr, 0, CRED())) {
+			if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL)) {
 				goto out;
 			}
 			if (MANDLOCK(vp, vattr.va_mode)) {
@@ -1259,7 +1381,7 @@ top:
 				    vap->va_size - vattr.va_size :
 				    vattr.va_size - vap->va_size;
 				if (nbl_conflict(vp, NBL_WRITE, offset,
-				    length, 0)) {
+				    length, 0, NULL)) {
 					error = EACCES;
 					goto out;
 				}
@@ -1281,9 +1403,8 @@ top:
 		 */
 		if (vp->v_flag & VROOT) {
 			ASSERT(why != CRMKDIR);
-			error =
-			    VOP_CREATE(vp, "", vap, excl, mode, vpp, CRED(),
-			    flag);
+			error = VOP_CREATE(vp, "", vap, excl, mode, vpp,
+			    CRED(), flag, NULL, NULL);
 			/*
 			 * If the create succeeded, it will have created
 			 * a new reference to the vnode.  Give up the
@@ -1307,7 +1428,8 @@ top:
 		    !(flag & FOFFMAX) &&
 		    (vp->v_type == VREG)) {
 			vattr.va_mask = AT_SIZE;
-			if ((error = VOP_GETATTR(vp, &vattr, 0, CRED()))) {
+			if ((error = VOP_GETATTR(vp, &vattr, 0,
+			    CRED(), NULL))) {
 				goto out;
 			}
 			if ((vattr.va_size > (u_offset_t)MAXOFF32_T)) {
@@ -1324,10 +1446,17 @@ top:
 		int must_be_dir = pn_fixslash(&pn);	/* trailing '/'? */
 
 		if (why == CRMKDIR)
-			error = VOP_MKDIR(dvp, pn.pn_path, vap, vpp, CRED());
+			/*
+			 * N.B., if vn_createat() ever requests
+			 * case-insensitive behavior then it will need
+			 * to be passed to VOP_MKDIR().  VOP_CREATE()
+			 * will already get it via "flag"
+			 */
+			error = VOP_MKDIR(dvp, pn.pn_path, vap, vpp, CRED(),
+			    NULL, 0, NULL);
 		else if (!must_be_dir)
 			error = VOP_CREATE(dvp, pn.pn_path, vap,
-			    excl, mode, vpp, CRED(), flag);
+			    excl, mode, vpp, CRED(), flag, NULL, NULL);
 		else
 			error = ENOTDIR;
 	}
@@ -1389,11 +1518,11 @@ top:
 	 * in the same vfs and that it is writeable.
 	 */
 	vattr.va_mask = AT_FSID;
-	if (error = VOP_GETATTR(fvp, &vattr, 0, CRED()))
+	if (error = VOP_GETATTR(fvp, &vattr, 0, CRED(), NULL))
 		goto out;
 	fsid = vattr.va_fsid;
 	vattr.va_mask = AT_FSID;
-	if (error = VOP_GETATTR(tdvp, &vattr, 0, CRED()))
+	if (error = VOP_GETATTR(tdvp, &vattr, 0, CRED(), NULL))
 		goto out;
 	if (fsid != vattr.va_fsid) {
 		error = EXDEV;
@@ -1407,7 +1536,7 @@ top:
 	 * Do the link.
 	 */
 	(void) pn_fixslash(&pn);
-	error = VOP_LINK(tdvp, fvp, pn.pn_path, CRED());
+	error = VOP_LINK(tdvp, fvp, pn.pn_path, CRED(), NULL, 0);
 out:
 	pn_free(&pn);
 	if (fvp)
@@ -1434,13 +1563,14 @@ vn_renameat(vnode_t *fdvp, char *fname, vnode_t *tdvp,
 	struct pathname fpn;		/* from pathname */
 	struct pathname tpn;		/* to pathname */
 	dev_t fsid;
-	int in_crit = 0;
+	int in_crit_src, in_crit_targ;
 	vnode_t *fromvp, *fvp;
-	vnode_t *tovp;
+	vnode_t *tovp, *targvp;
 	int estale_retry = 0;
 
 top:
-	fvp = fromvp = tovp = NULL;
+	fvp = fromvp = tovp = targvp = NULL;
+	in_crit_src = in_crit_targ = 0;
 	/*
 	 * Get to and from pathnames.
 	 */
@@ -1483,7 +1613,7 @@ top:
 	if (audit_active)
 		audit_setfsat_path(3);
 #endif /* C2_AUDIT */
-	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, NULLVPP, tdvp)) {
+	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, &targvp, tdvp)) {
 		goto out;
 	}
 
@@ -1494,11 +1624,11 @@ top:
 	 */
 	if (fromvp != tovp) {
 		vattr.va_mask = AT_FSID;
-		if (error = VOP_GETATTR(fromvp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(fromvp, &vattr, 0, CRED(), NULL))
 			goto out;
 		fsid = vattr.va_fsid;
 		vattr.va_mask = AT_FSID;
-		if (error = VOP_GETATTR(tovp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(tovp, &vattr, 0, CRED(), NULL))
 			goto out;
 		if (fsid != vattr.va_fsid) {
 			error = EXDEV;
@@ -1511,10 +1641,19 @@ top:
 		goto out;
 	}
 
+	if (targvp && (fvp != targvp)) {
+		nbl_start_crit(targvp, RW_READER);
+		in_crit_targ = 1;
+		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0, NULL)) {
+			error = EACCES;
+			goto out;
+		}
+	}
+
 	if (nbl_need_check(fvp)) {
 		nbl_start_crit(fvp, RW_READER);
-		in_crit = 1;
-		if (nbl_conflict(fvp, NBL_RENAME, 0, 0, 0)) {
+		in_crit_src = 1;
+		if (nbl_conflict(fvp, NBL_RENAME, 0, 0, 0, NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -1524,19 +1663,22 @@ top:
 	 * Do the rename.
 	 */
 	(void) pn_fixslash(&tpn);
-	error = VOP_RENAME(fromvp, fpn.pn_path, tovp, tpn.pn_path, CRED());
+	error = VOP_RENAME(fromvp, fpn.pn_path, tovp, tpn.pn_path, CRED(),
+	    NULL, 0);
 
 out:
 	pn_free(&fpn);
 	pn_free(&tpn);
-	if (in_crit) {
+	if (in_crit_src)
 		nbl_end_crit(fvp);
-		in_crit = 0;
-	}
+	if (in_crit_targ)
+		nbl_end_crit(targvp);
 	if (fromvp)
 		VN_RELE(fromvp);
 	if (tovp)
 		VN_RELE(tovp);
+	if (targvp)
+		VN_RELE(targvp);
 	if (fvp)
 		VN_RELE(fvp);
 	if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
@@ -1691,7 +1833,7 @@ top:
 	if (nbl_need_check(vp)) {
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
-		if (nbl_conflict(vp, NBL_REMOVE, 0, 0, 0)) {
+		if (nbl_conflict(vp, NBL_REMOVE, 0, 0, 0, NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -1715,14 +1857,15 @@ top:
 			cwd = PTOU(pp)->u_cdir;
 			VN_HOLD(cwd);
 			mutex_exit(&pp->p_lock);
-			error = VOP_RMDIR(dvp, pn.pn_path, cwd, CRED());
+			error = VOP_RMDIR(dvp, pn.pn_path, cwd, CRED(),
+			    NULL, 0);
 			VN_RELE(cwd);
 		}
 	} else {
 		/*
 		 * Unlink(2) can be applied to anything.
 		 */
-		error = VOP_REMOVE(dvp, pn.pn_path, CRED());
+		error = VOP_REMOVE(dvp, pn.pn_path, CRED(), NULL, 0);
 	}
 
 out:
@@ -1750,9 +1893,9 @@ vn_compare(vnode_t *vp1, vnode_t *vp2)
 {
 	vnode_t *realvp;
 
-	if (vp1 != NULL && VOP_REALVP(vp1, &realvp) == 0)
+	if (vp1 != NULL && VOP_REALVP(vp1, &realvp, NULL) == 0)
 		vp1 = realvp;
-	if (vp2 != NULL && VOP_REALVP(vp2, &realvp) == 0)
+	if (vp2 != NULL && VOP_REALVP(vp2, &realvp, NULL) == 0)
 		vp2 = realvp;
 	return (VN_CMP(vp1, vp2));
 }
@@ -2170,6 +2313,7 @@ vn_reinit(vnode_t *vp)
 	vp->v_msflags = 0;
 	vp->v_msnext = NULL;
 	vp->v_msprev = NULL;
+	vp->v_xattrdir = NULL;
 
 	/* Handles v_femhead, v_path, and the r/w/map counts */
 	vn_recycle(vp);
@@ -2194,6 +2338,9 @@ vn_alloc(int kmflag)
 void
 vn_free(vnode_t *vp)
 {
+	ASSERT(vp->v_shrlocks == NULL);
+	ASSERT(vp->v_filocks == NULL);
+
 	/*
 	 * Some file systems call vn_free() with v_count of zero,
 	 * some with v_count of 1.  In any case, the value should
@@ -2275,84 +2422,85 @@ vn_invalid(vnode_t *vp)
 /* Vnode event notification */
 
 int
-vnevent_support(vnode_t *vp)
+vnevent_support(vnode_t *vp, caller_context_t *ct)
 {
 	if (vp == NULL)
 		return (EINVAL);
 
-	return (VOP_VNEVENT(vp, VE_SUPPORT, NULL, NULL));
+	return (VOP_VNEVENT(vp, VE_SUPPORT, NULL, NULL, ct));
 }
 
 void
-vnevent_rename_src(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rename_src(vnode_t *vp, vnode_t *dvp, char *name, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_SRC, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_RENAME_SRC, dvp, name, ct);
 }
 
 void
-vnevent_rename_dest(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rename_dest(vnode_t *vp, vnode_t *dvp, char *name,
+    caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_DEST, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_RENAME_DEST, dvp, name, ct);
 }
 
 void
-vnevent_rename_dest_dir(vnode_t *vp)
+vnevent_rename_dest_dir(vnode_t *vp, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RENAME_DEST_DIR, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_RENAME_DEST_DIR, NULL, NULL, ct);
 }
 
 void
-vnevent_remove(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_remove(vnode_t *vp, vnode_t *dvp, char *name, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_REMOVE, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_REMOVE, dvp, name, ct);
 }
 
 void
-vnevent_rmdir(vnode_t *vp, vnode_t *dvp, char *name)
+vnevent_rmdir(vnode_t *vp, vnode_t *dvp, char *name, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_RMDIR, dvp, name);
+	(void) VOP_VNEVENT(vp, VE_RMDIR, dvp, name, ct);
 }
 
 void
-vnevent_create(vnode_t *vp)
+vnevent_create(vnode_t *vp, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_CREATE, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_CREATE, NULL, NULL, ct);
 }
 
 void
-vnevent_link(vnode_t *vp)
+vnevent_link(vnode_t *vp, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_LINK, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_LINK, NULL, NULL, ct);
 }
 
 void
-vnevent_mountedover(vnode_t *vp)
+vnevent_mountedover(vnode_t *vp, caller_context_t *ct)
 {
 	if (vp == NULL || vp->v_femhead == NULL) {
 		return;
 	}
-	(void) VOP_VNEVENT(vp, VE_MOUNTEDOVER, NULL, NULL);
+	(void) VOP_VNEVENT(vp, VE_MOUNTEDOVER, NULL, NULL, ct);
 }
 
 /*
@@ -2400,7 +2548,7 @@ vn_can_change_zones(vnode_t *vp)
 	/*
 	 * We always want to look at the underlying vnode if there is one.
 	 */
-	if (VOP_REALVP(vp, &rvp) != 0)
+	if (VOP_REALVP(vp, &rvp, NULL) != 0)
 		rvp = vp;
 	/*
 	 * Some pseudo filesystems (including doorfs) don't actually register
@@ -2430,6 +2578,45 @@ vfs_t *
 vn_mountedvfs(vnode_t *vp)
 {
 	return (vp->v_vfsmountedhere);
+}
+
+/*
+ * vn_has_other_opens() checks whether a particular file is opened by more than
+ * just the caller and whether the open is for read and/or write.
+ * This routine is for calling after the caller has already called VOP_OPEN()
+ * and the caller wishes to know if they are the only one with it open for
+ * the mode(s) specified.
+ *
+ * Vnode counts are only kept on regular files (v_type=VREG).
+ */
+int
+vn_has_other_opens(
+	vnode_t *vp,
+	v_mode_t mode)
+{
+
+	ASSERT(vp != NULL);
+
+	switch (mode) {
+	case V_WRITE:
+		if (vp->v_wrcnt > 1)
+			return (V_TRUE);
+		break;
+	case V_RDORWR:
+		if ((vp->v_rdcnt > 1) || (vp->v_wrcnt > 1))
+			return (V_TRUE);
+		break;
+	case V_RDANDWR:
+		if ((vp->v_rdcnt > 1) && (vp->v_wrcnt > 1))
+			return (V_TRUE);
+		break;
+	case V_READ:
+		if (vp->v_rdcnt > 1)
+			return (V_TRUE);
+		break;
+	}
+
+	return (V_FALSE);
 }
 
 /*
@@ -2821,7 +3008,8 @@ int
 fop_open(
 	vnode_t **vpp,
 	int mode,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int ret;
 	vnode_t *vp = *vpp;
@@ -2848,7 +3036,7 @@ fop_open(
 
 	VOPXID_MAP_CR(vp, cr);
 
-	ret = (*(*(vpp))->v_op->vop_open)(vpp, mode, cr);
+	ret = (*(*(vpp))->v_op->vop_open)(vpp, mode, cr, ct);
 
 	if (ret) {
 		/*
@@ -2892,13 +3080,14 @@ fop_close(
 	int flag,
 	int count,
 	offset_t offset,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr);
+	err = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr, ct);
 	VOPSTATS_UPDATE(vp, close);
 	/*
 	 * Check passed in count to handle possible dups. Vnode counts are only
@@ -2923,7 +3112,7 @@ fop_read(
 	uio_t *uiop,
 	int ioflag,
 	cred_t *cr,
-	struct caller_context *ct)
+	caller_context_t *ct)
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
@@ -2942,7 +3131,7 @@ fop_write(
 	uio_t *uiop,
 	int ioflag,
 	cred_t *cr,
-	struct caller_context *ct)
+	caller_context_t *ct)
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
@@ -2962,13 +3151,14 @@ fop_ioctl(
 	intptr_t arg,
 	int flag,
 	cred_t *cr,
-	int *rvalp)
+	int *rvalp,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp);
+	err = (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp, ct);
 	VOPSTATS_UPDATE(vp, ioctl);
 	return (err);
 }
@@ -2978,13 +3168,14 @@ fop_setfl(
 	vnode_t *vp,
 	int oflags,
 	int nflags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr);
+	err = (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr, ct);
 	VOPSTATS_UPDATE(vp, setfl);
 	return (err);
 }
@@ -2994,13 +3185,30 @@ fop_getattr(
 	vnode_t *vp,
 	vattr_t *vap,
 	int flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr);
+	/*
+	 * If this file system doesn't understand the xvattr extensions
+	 * then turn off the xvattr bit.
+	 */
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) == 0) {
+		vap->va_mask &= ~AT_XVATTR;
+	}
+
+	/*
+	 * We're only allowed to skip the ACL check iff we used a 32 bit
+	 * ACE mask with VOP_ACCESS() to determine permissions.
+	 */
+	if ((flags & ATTR_NOACLCHECK) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS) == 0) {
+		return (EINVAL);
+	}
+	err = (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, getattr);
 	return (err);
 }
@@ -3017,6 +3225,22 @@ fop_setattr(
 
 	VOPXID_MAP_CR(vp, cr);
 
+	/*
+	 * If this file system doesn't understand the xvattr extensions
+	 * then turn off the xvattr bit.
+	 */
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) == 0) {
+		vap->va_mask &= ~AT_XVATTR;
+	}
+
+	/*
+	 * We're only allowed to skip the ACL check iff we used a 32 bit
+	 * ACE mask with VOP_ACCESS() to determine permissions.
+	 */
+	if ((flags & ATTR_NOACLCHECK) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS) == 0) {
+		return (EINVAL);
+	}
 	err = (*(vp)->v_op->vop_setattr)(vp, vap, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, setattr);
 	return (err);
@@ -3027,13 +3251,19 @@ fop_access(
 	vnode_t *vp,
 	int mode,
 	int flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
+	if ((flags & V_ACE_MASK) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS) == 0) {
+		return (EINVAL);
+	}
+
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_access)(vp, mode, flags, cr);
+	err = (*(vp)->v_op->vop_access)(vp, mode, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, access);
 	return (err);
 }
@@ -3046,13 +3276,32 @@ fop_lookup(
 	pathname_t *pnp,
 	int flags,
 	vnode_t *rdir,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int *deflags,		/* Returned per-dirent flags */
+	pathname_t *ppnp)	/* Returned case-preserved name in directory */
 {
 	int ret;
 
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.  It is required
+	 * that if the vfs supports case-insensitive lookup, it also
+	 * supports extended dirent flags.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(dvp, cr);
 
-	ret = (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
+	if ((flags & LOOKUP_XATTR) && (flags & LOOKUP_HAVE_SYSATTR_DIR) == 0) {
+		ret = xattr_dir_lookup(dvp, vpp, flags, cr);
+	} else {
+		ret = (*(dvp)->v_op->vop_lookup)
+		    (dvp, nm, vpp, pnp, flags, rdir, cr, ct, deflags, ppnp);
+	}
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, lookup);
 		if ((*vpp)->v_path == NULL) {
@@ -3072,14 +3321,29 @@ fop_create(
 	int mode,
 	vnode_t **vpp,
 	cred_t *cr,
-	int flag)
+	int flags,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)	/* ACL to set during create */
 {
 	int ret;
+
+	if (vsecp != NULL &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_ACLONCREATE) == 0) {
+		return (EINVAL);
+	}
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
 
 	VOPXID_MAP_CR(dvp, cr);
 
 	ret = (*(dvp)->v_op->vop_create)
-	    (dvp, name, vap, excl, mode, vpp, cr, flag);
+	    (dvp, name, vap, excl, mode, vpp, cr, flags, ct, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, create);
 		if ((*vpp)->v_path == NULL) {
@@ -3094,13 +3358,24 @@ int
 fop_remove(
 	vnode_t *dvp,
 	char *nm,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(dvp, cr);
 
-	err = (*(dvp)->v_op->vop_remove)(dvp, nm, cr);
+	err = (*(dvp)->v_op->vop_remove)(dvp, nm, cr, ct, flags);
 	VOPSTATS_UPDATE(dvp, remove);
 	return (err);
 }
@@ -3110,13 +3385,24 @@ fop_link(
 	vnode_t *tdvp,
 	vnode_t *svp,
 	char *tnm,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 
+	/*
+	 * If the target file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(tdvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(tdvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(tdvp, cr);
 
-	err = (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr);
+	err = (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr, ct, flags);
 	VOPSTATS_UPDATE(tdvp, link);
 	return (err);
 }
@@ -3127,13 +3413,25 @@ fop_rename(
 	char *snm,
 	vnode_t *tdvp,
 	char *tnm,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 
+	/*
+	 * If the file system involved does not support
+	 * case-insensitive access and said access is requested, fail
+	 * quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    ((vfs_has_feature(sdvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(sdvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0)))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(tdvp, cr);
 
-	err = (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr);
+	err = (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr, ct, flags);
 	VOPSTATS_UPDATE(sdvp, rename);
 	return (err);
 }
@@ -3144,13 +3442,30 @@ fop_mkdir(
 	char *dirname,
 	vattr_t *vap,
 	vnode_t **vpp,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)	/* ACL to set during create */
 {
 	int ret;
 
+	if (vsecp != NULL &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_ACLONCREATE) == 0) {
+		return (EINVAL);
+	}
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(dvp, cr);
 
-	ret = (*(dvp)->v_op->vop_mkdir)(dvp, dirname, vap, vpp, cr);
+	ret = (*(dvp)->v_op->vop_mkdir)
+	    (dvp, dirname, vap, vpp, cr, ct, flags, vsecp);
 	if (ret == 0 && *vpp) {
 		VOPSTATS_UPDATE(*vpp, mkdir);
 		if ((*vpp)->v_path == NULL) {
@@ -3167,13 +3482,24 @@ fop_rmdir(
 	vnode_t *dvp,
 	char *nm,
 	vnode_t *cdir,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(dvp, cr);
 
-	err = (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr);
+	err = (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr, ct, flags);
 	VOPSTATS_UPDATE(dvp, rmdir);
 	return (err);
 }
@@ -3183,14 +3509,24 @@ fop_readdir(
 	vnode_t *vp,
 	uio_t *uiop,
 	cred_t *cr,
-	int *eofp)
+	int *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
 
+	/*
+	 * If this file system doesn't support retrieving directory
+	 * entry flags and said access is requested, fail quickly.
+	 */
+	if (flags & V_RDDIR_ENTFLAGS &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS) == 0)
+		return (EINVAL);
+
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp);
+	err = (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp, ct, flags);
 	VOPSTATS_UPDATE_IO(vp, readdir,
 	    readdir_bytes, (resid_start - uiop->uio_resid));
 	return (err);
@@ -3202,13 +3538,25 @@ fop_symlink(
 	char *linkname,
 	vattr_t *vap,
 	char *target,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int	err;
 
+	/*
+	 * If this file system doesn't support case-insensitive access
+	 * and said access is requested, fail quickly.
+	 */
+	if (flags & FIGNORECASE &&
+	    (vfs_has_feature(dvp->v_vfsp, VFSFT_CASEINSENSITIVE) == 0 &&
+	    vfs_has_feature(dvp->v_vfsp, VFSFT_NOCASESENSITIVE) == 0))
+		return (EINVAL);
+
 	VOPXID_MAP_CR(dvp, cr);
 
-	err = (*(dvp)->v_op->vop_symlink) (dvp, linkname, vap, target, cr);
+	err = (*(dvp)->v_op->vop_symlink)
+	    (dvp, linkname, vap, target, cr, ct, flags);
 	VOPSTATS_UPDATE(dvp, symlink);
 	return (err);
 }
@@ -3217,13 +3565,14 @@ int
 fop_readlink(
 	vnode_t *vp,
 	uio_t *uiop,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_readlink)(vp, uiop, cr);
+	err = (*(vp)->v_op->vop_readlink)(vp, uiop, cr, ct);
 	VOPSTATS_UPDATE(vp, readlink);
 	return (err);
 }
@@ -3232,13 +3581,14 @@ int
 fop_fsync(
 	vnode_t *vp,
 	int syncflag,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_fsync)(vp, syncflag, cr);
+	err = (*(vp)->v_op->vop_fsync)(vp, syncflag, cr, ct);
 	VOPSTATS_UPDATE(vp, fsync);
 	return (err);
 }
@@ -3246,24 +3596,26 @@ fop_fsync(
 void
 fop_inactive(
 	vnode_t *vp,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	/* Need to update stats before vop call since we may lose the vnode */
 	VOPSTATS_UPDATE(vp, inactive);
 
 	VOPXID_MAP_CR(vp, cr);
 
-	(*(vp)->v_op->vop_inactive)(vp, cr);
+	(*(vp)->v_op->vop_inactive)(vp, cr, ct);
 }
 
 int
 fop_fid(
 	vnode_t *vp,
-	fid_t *fidp)
+	fid_t *fidp,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_fid)(vp, fidp);
+	err = (*(vp)->v_op->vop_fid)(vp, fidp, ct);
 	VOPSTATS_UPDATE(vp, fid);
 	return (err);
 }
@@ -3295,11 +3647,12 @@ int
 fop_seek(
 	vnode_t *vp,
 	offset_t ooff,
-	offset_t *noffp)
+	offset_t *noffp,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_seek)(vp, ooff, noffp);
+	err = (*(vp)->v_op->vop_seek)(vp, ooff, noffp, ct);
 	VOPSTATS_UPDATE(vp, seek);
 	return (err);
 }
@@ -3307,11 +3660,12 @@ fop_seek(
 int
 fop_cmp(
 	vnode_t *vp1,
-	vnode_t *vp2)
+	vnode_t *vp2,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp1)->v_op->vop_cmp)(vp1, vp2);
+	err = (*(vp1)->v_op->vop_cmp)(vp1, vp2, ct);
 	VOPSTATS_UPDATE(vp1, cmp);
 	return (err);
 }
@@ -3324,14 +3678,15 @@ fop_frlock(
 	int flag,
 	offset_t offset,
 	struct flk_callback *flk_cbp,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_frlock)
-	    (vp, cmd, bfp, flag, offset, flk_cbp, cr);
+	    (vp, cmd, bfp, flag, offset, flk_cbp, cr, ct);
 	VOPSTATS_UPDATE(vp, frlock);
 	return (err);
 }
@@ -3358,11 +3713,12 @@ fop_space(
 int
 fop_realvp(
 	vnode_t *vp,
-	vnode_t **vpp)
+	vnode_t **vpp,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_realvp)(vp, vpp);
+	err = (*(vp)->v_op->vop_realvp)(vp, vpp, ct);
 	VOPSTATS_UPDATE(vp, realvp);
 	return (err);
 }
@@ -3378,14 +3734,15 @@ fop_getpage(
 	struct seg *seg,
 	caddr_t addr,
 	enum seg_rw rw,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_getpage)
-	    (vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
+	    (vp, off, len, protp, plarr, plsz, seg, addr, rw, cr, ct);
 	VOPSTATS_UPDATE(vp, getpage);
 	return (err);
 }
@@ -3396,13 +3753,14 @@ fop_putpage(
 	offset_t off,
 	size_t len,
 	int flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr);
+	err = (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, putpage);
 	return (err);
 }
@@ -3417,14 +3775,15 @@ fop_map(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_map)
-	    (vp, off, as, addrp, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addrp, len, prot, maxprot, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, map);
 	return (err);
 }
@@ -3439,7 +3798,8 @@ fop_addmap(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	u_longlong_t delta;
@@ -3447,7 +3807,7 @@ fop_addmap(
 	VOPXID_MAP_CR(vp, cr);
 
 	error = (*(vp)->v_op->vop_addmap)
-	    (vp, off, as, addr, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addr, len, prot, maxprot, flags, cr, ct);
 
 	if ((!error) && (vp->v_type == VREG)) {
 		delta = (u_longlong_t)btopr(len);
@@ -3488,7 +3848,8 @@ fop_delmap(
 	uint_t prot,
 	uint_t maxprot,
 	uint_t flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	u_longlong_t delta;
@@ -3496,7 +3857,7 @@ fop_delmap(
 	VOPXID_MAP_CR(vp, cr);
 
 	error = (*(vp)->v_op->vop_delmap)
-	    (vp, off, as, addr, len, prot, maxprot, flags, cr);
+	    (vp, off, as, addr, len, prot, maxprot, flags, cr, ct);
 
 	/*
 	 * NFS calls into delmap twice, the first time
@@ -3539,11 +3900,12 @@ fop_poll(
 	short events,
 	int anyyet,
 	short *reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_poll)(vp, events, anyyet, reventsp, phpp);
+	err = (*(vp)->v_op->vop_poll)(vp, events, anyyet, reventsp, phpp, ct);
 	VOPSTATS_UPDATE(vp, poll);
 	return (err);
 }
@@ -3553,11 +3915,12 @@ fop_dump(
 	vnode_t *vp,
 	caddr_t addr,
 	int lbdn,
-	int dblks)
+	int dblks,
+	caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_dump)(vp, addr, lbdn, dblks);
+	err = (*(vp)->v_op->vop_dump)(vp, addr, lbdn, dblks, ct);
 	VOPSTATS_UPDATE(vp, dump);
 	return (err);
 }
@@ -3567,13 +3930,14 @@ fop_pathconf(
 	vnode_t *vp,
 	int cmd,
 	ulong_t *valp,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr);
+	err = (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr, ct);
 	VOPSTATS_UPDATE(vp, pathconf);
 	return (err);
 }
@@ -3585,13 +3949,14 @@ fop_pageio(
 	u_offset_t io_off,
 	size_t io_len,
 	int flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr);
+	err = (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, pageio);
 	return (err);
 }
@@ -3600,10 +3965,11 @@ int
 fop_dumpctl(
 	vnode_t *vp,
 	int action,
-	int *blkp)
+	int *blkp,
+	caller_context_t *ct)
 {
 	int	err;
-	err = (*(vp)->v_op->vop_dumpctl)(vp, action, blkp);
+	err = (*(vp)->v_op->vop_dumpctl)(vp, action, blkp, ct);
 	VOPSTATS_UPDATE(vp, dumpctl);
 	return (err);
 }
@@ -3614,14 +3980,15 @@ fop_dispose(
 	page_t *pp,
 	int flag,
 	int dn,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	/* Must do stats first since it's possible to lose the vnode */
 	VOPSTATS_UPDATE(vp, dispose);
 
 	VOPXID_MAP_CR(vp, cr);
 
-	(*(vp)->v_op->vop_dispose)(vp, pp, flag, dn, cr);
+	(*(vp)->v_op->vop_dispose)(vp, pp, flag, dn, cr, ct);
 }
 
 int
@@ -3629,13 +3996,22 @@ fop_setsecattr(
 	vnode_t *vp,
 	vsecattr_t *vsap,
 	int flag,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr);
+	/*
+	 * We're only allowed to skip the ACL check iff we used a 32 bit
+	 * ACE mask with VOP_ACCESS() to determine permissions.
+	 */
+	if ((flag & ATTR_NOACLCHECK) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS) == 0) {
+		return (EINVAL);
+	}
+	err = (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr, ct);
 	VOPSTATS_UPDATE(vp, setsecattr);
 	return (err);
 }
@@ -3645,13 +4021,23 @@ fop_getsecattr(
 	vnode_t *vp,
 	vsecattr_t *vsap,
 	int flag,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
+	/*
+	 * We're only allowed to skip the ACL check iff we used a 32 bit
+	 * ACE mask with VOP_ACCESS() to determine permissions.
+	 */
+	if ((flag & ATTR_NOACLCHECK) &&
+	    vfs_has_feature(vp->v_vfsp, VFSFT_ACEMASKONACCESS) == 0) {
+		return (EINVAL);
+	}
+
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr);
+	err = (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr, ct);
 	VOPSTATS_UPDATE(vp, getsecattr);
 	return (err);
 }
@@ -3662,23 +4048,25 @@ fop_shrlock(
 	int cmd,
 	struct shrlock *shr,
 	int flag,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int	err;
 
 	VOPXID_MAP_CR(vp, cr);
 
-	err = (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr);
+	err = (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr, ct);
 	VOPSTATS_UPDATE(vp, shrlock);
 	return (err);
 }
 
 int
-fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm)
+fop_vnevent(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *fnm,
+    caller_context_t *ct)
 {
 	int	err;
 
-	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent, dvp, fnm);
+	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent, dvp, fnm, ct);
 	VOPSTATS_UPDATE(vp, vnevent);
 	return (err);
 }

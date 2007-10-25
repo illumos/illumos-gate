@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,7 +295,7 @@ trans_test_trypage(void *d, int mode, IOLOCK *lock)
 	/*
 	 * get rid of the devices pages
 	 */
-	(void) VOP_PUTPAGE(cvp, (offset_t)0, (uint_t)0, B_INVAL, CRED());
+	(void) VOP_PUTPAGE(cvp, (offset_t)0, (uint_t)0, B_INVAL, CRED(), NULL);
 
 	/*
 	 * test 1 -- don't find nonexistant page
@@ -335,7 +334,7 @@ errout:
 	/*
 	 * get rid of the file's pages
 	 */
-	(void) VOP_PUTPAGE(cvp, (offset_t)0, (uint_t)0, B_INVAL, CRED());
+	(void) VOP_PUTPAGE(cvp, (offset_t)0, (uint_t)0, B_INVAL, CRED(), NULL);
 	VN_RELE(devvp);
 
 	migp->size = test;
@@ -1301,7 +1300,7 @@ trans_detach_ioctl(void *d, int mode, IOLOCK *lock)
 
 	mdclrerror(&migp->mde);
 
-	/* aquire both md_unit_array_rw, and unit_reader lock */
+	/* acquire both md_unit_array_rw, and unit_reader lock */
 	un = trans_getun(migp->id, &migp->mde,
 		READERS, lock);
 	if (un == NULL)
@@ -2239,7 +2238,7 @@ trans_renexch_update_kids(
 }
 
 /*
- * MDRNM_SELF_UPDATE_FROM (exhange down) [self->child]
+ * MDRNM_SELF_UPDATE_FROM (exchange down) [self->child]
  */
 void
 trans_exchange_self_update_from_down(
@@ -2366,7 +2365,7 @@ trans_exchange_self_update_from_down(
 }
 
 /*
- * MDRNM_PARENT_UPDATE_TO (exhange down) [parent->self]
+ * MDRNM_PARENT_UPDATE_TO (exchange down) [parent->self]
  */
 void
 trans_exchange_parent_update_to(

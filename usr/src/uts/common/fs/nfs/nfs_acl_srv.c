@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.
  * All rights reserved.
  * Use is subject to license terms.
  */
@@ -94,7 +94,7 @@ acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
 
 	resp->resok.acl.vsa_mask = args->mask;
 
-	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr);
+	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr, NULL);
 
 	if (error == ENOSYS) {
 		/*
@@ -112,7 +112,7 @@ acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
 		 * Note: if the fs_fab_acl() fails, we have other problems.
 		 * This error should be returned to the caller.
 		 */
-		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr);
+		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr, NULL);
 	}
 
 	if (error) {
@@ -211,7 +211,7 @@ acl2_setacl(SETACL2args *args, SETACL2res *resp, struct exportinfo *exi,
 	}
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
-	error = VOP_SETSECATTR(vp, &args->acl, 0, cr);
+	error = VOP_SETSECATTR(vp, &args->acl, 0, cr, NULL);
 	if (error) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 		VN_RELE(vp);
@@ -317,7 +317,7 @@ acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
 	 * as well be reflected to the server during the open.
 	 */
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error) {
 		VN_RELE(vp);
 		resp->status = puterrno(error);
@@ -327,30 +327,30 @@ acl2_access(ACCESS2args *args, ACCESS2res *resp, struct exportinfo *exi,
 	resp->resok.access = 0;
 
 	if (args->access & ACCESS2_READ) {
-		error = VOP_ACCESS(vp, VREAD, 0, cr);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode))
 			resp->resok.access |= ACCESS2_READ;
 	}
 	if ((args->access & ACCESS2_LOOKUP) && vp->v_type == VDIR) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (!error)
 			resp->resok.access |= ACCESS2_LOOKUP;
 	}
 	if (checkwriteperm &&
 	    (args->access & (ACCESS2_MODIFY|ACCESS2_EXTEND))) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode))
 			resp->resok.access |=
 			    (args->access & (ACCESS2_MODIFY|ACCESS2_EXTEND));
 	}
 	if (checkwriteperm &&
 	    (args->access & ACCESS2_DELETE) && (vp->v_type == VDIR)) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (!error)
 			resp->resok.access |= ACCESS2_DELETE;
 	}
 	if (args->access & ACCESS2_EXECUTE) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode))
 			resp->resok.access |= ACCESS2_EXECUTE;
 	}
@@ -399,7 +399,7 @@ acl2_getxattrdir(GETXATTRDIR2args *args, GETXATTRDIR2res *resp,
 		flags |= CREATE_XATTR_DIR;
 	else {
 		ulong_t val = 0;
-		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr);
+		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr, NULL);
 		if (!error && val == 0) {
 			VN_RELE(vp);
 			resp->status = NFSERR_NOENT;
@@ -407,7 +407,8 @@ acl2_getxattrdir(GETXATTRDIR2args *args, GETXATTRDIR2res *resp,
 		}
 	}
 
-	error = VOP_LOOKUP(vp, "", &avp, NULL, flags, NULL, cr);
+	error = VOP_LOOKUP(vp, "", &avp, NULL, flags, NULL, cr,
+	    NULL, NULL, NULL);
 	if (!error && avp == vp) {	/* lookup of "" on old FS? */
 		error = EINVAL;
 		VN_RELE(avp);
@@ -472,7 +473,7 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 
 	resp->resok.acl.vsa_mask = args->mask;
 
-	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr);
+	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr, NULL);
 
 	if (error == ENOSYS) {
 		/*
@@ -490,7 +491,7 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 		 * Note: if the fs_fab_acl() fails, we have other problems.
 		 * This error should be returned to the caller.
 		 */
-		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr);
+		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr, NULL);
 	}
 
 	if (error)
@@ -602,7 +603,7 @@ acl3_setacl(SETACL3args *args, SETACL3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	error = VOP_SETSECATTR(vp, &args->acl, 0, cr);
+	error = VOP_SETSECATTR(vp, &args->acl, 0, cr, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -666,7 +667,7 @@ acl3_getxattrdir(GETXATTRDIR3args *args, GETXATTRDIR3res *resp,
 		flags |= CREATE_XATTR_DIR;
 	else {
 		ulong_t val = 0;
-		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr);
+		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr, NULL);
 		if (!error && val == 0) {
 			VN_RELE(vp);
 			resp->status = NFS3ERR_NOENT;
@@ -674,7 +675,8 @@ acl3_getxattrdir(GETXATTRDIR3args *args, GETXATTRDIR3res *resp,
 		}
 	}
 
-	error = VOP_LOOKUP(vp, "", &avp, NULL, flags, NULL, cr);
+	error = VOP_LOOKUP(vp, "", &avp, NULL, flags, NULL, cr,
+	    NULL, NULL, NULL);
 	if (!error && avp == vp) {	/* lookup of "" on old FS? */
 		error = EINVAL;
 		VN_RELE(avp);

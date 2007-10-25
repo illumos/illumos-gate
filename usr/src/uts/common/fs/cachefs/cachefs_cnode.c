@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +132,7 @@ cachefs_cnode_idle(struct vnode *vp, cred_t *cr)
 			    unlname, unlcred, vp);
 		}
 
-		/* reaquire cnode lock */
+		/* reacquire cnode lock */
 		mutex_enter(&cp->c_statelock);
 
 		/* if a timeout occurred */
@@ -1340,7 +1339,7 @@ cachefs_cnode_move(cnode_t *cp)
 		make_ascii_name(&cp->c_id, oname);
 		make_ascii_name(&cid, nname);
 		error = VOP_RENAME(ofgp->fg_dirvp, oname, fgp->fg_dirvp,
-			nname, kcred);
+			nname, kcred, NULL, 0);
 		if (error) {
 			ffnuke = 1;
 #ifdef CFSDEBUG
@@ -1470,7 +1469,8 @@ cachefs_cnode_sync(cnode_t *cp)
 		    cp->c_backvp) {
 			mutex_enter(&cp->c_statelock);
 			if (cp->c_backvp) {
-				error = VOP_FSYNC(cp->c_backvp, FSYNC, kcred);
+				error = VOP_FSYNC(cp->c_backvp, FSYNC, kcred,
+				    NULL);
 				if (CFS_TIMEOUT(fscp, error)) {
 					mutex_exit(&cp->c_statelock);
 					cachefs_cd_release(fscp);
@@ -1554,7 +1554,7 @@ cachefs_cnode_lostfound(cnode_t *cp, char *rname)
 	else
 		namep = "lostfile";
 	error = VOP_LOOKUP(cachep->c_lostfoundvp, namep, &nvp,
-	    NULL, 0, NULL, kcred);
+	    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error == 0)
 		VN_RELE(nvp);
 	if (error != ENOENT) {
@@ -1569,7 +1569,7 @@ cachefs_cnode_lostfound(cnode_t *cp, char *rname)
 			else
 				namep = namebuf;
 			error = VOP_LOOKUP(cachep->c_lostfoundvp, namep, &nvp,
-			    NULL, 0, NULL, kcred);
+			    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 			if (error == 0)
 				VN_RELE(nvp);
 			if (error == ENOENT)
@@ -1587,7 +1587,7 @@ cachefs_cnode_lostfound(cnode_t *cp, char *rname)
 
 	/* rename the file into the lost+found directory */
 	error = VOP_RENAME(fgp->fg_dirvp, oname, cachep->c_lostfoundvp,
-	    namep, kcred);
+	    namep, kcred, NULL, 0);
 	if (error) {
 		mutex_exit(&cachep->c_contentslock);
 		goto out;
@@ -1675,7 +1675,7 @@ cachefs_cnode_traverse(fscache_t *fscp, void (*routinep)(cnode_t *))
 				 */
 				(routinep)(cp);
 
-				/* reaquire the cnode list lock */
+				/* reacquire the cnode list lock */
 				mutex_enter(&fgp->fg_cnodelock);
 			}
 
@@ -1687,7 +1687,7 @@ cachefs_cnode_traverse(fscache_t *fscp, void (*routinep)(cnode_t *))
 				VN_RELE(CTOV(ocp));
 			}
 
-			/* reaquire the fscache lock */
+			/* reacquire the fscache lock */
 			mutex_enter(&fscp->fs_fslock);
 		}
 
@@ -1730,7 +1730,7 @@ cnode_enable_caching(struct cnode *cp)
 		iovp = cp->c_backvp;
 	if (iovp) {
 		(void) VOP_PUTPAGE(iovp, (offset_t)0,
-		    (uint_t)0, B_INVAL, kcred);
+		    (uint_t)0, B_INVAL, kcred, NULL);
 	}
 	mutex_enter(&cp->c_statelock);
 	if (cp->c_backvp) {

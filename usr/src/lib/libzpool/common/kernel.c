@@ -389,9 +389,10 @@ vn_open(char *path, int x1, int flags, int mode, vnode_t **vpp, int x2, int x3)
 	return (0);
 }
 
+/*ARGSUSED*/
 int
 vn_openat(char *path, int x1, int flags, int mode, vnode_t **vpp, int x2,
-    int x3, vnode_t *startvp)
+    int x3, vnode_t *startvp, int fd)
 {
 	char *realpath = umem_alloc(strlen(path) + 2, UMEM_NOFAIL);
 	int ret;
@@ -399,6 +400,7 @@ vn_openat(char *path, int x1, int flags, int mode, vnode_t **vpp, int x2,
 	ASSERT(startvp == rootdir);
 	(void) sprintf(realpath, "/%s", path);
 
+	/* fd ignored for now, need if want to simulate nbmand support */
 	ret = vn_open(realpath, x1, flags, mode, vpp, x2, x3);
 
 	umem_free(realpath, strlen(path) + 2);
@@ -622,7 +624,8 @@ kobj_open_file(char *name)
 	vnode_t *vp;
 
 	/* set vp as the _fd field of the file */
-	if (vn_openat(name, UIO_SYSSPACE, FREAD, 0, &vp, 0, 0, rootdir) != 0)
+	if (vn_openat(name, UIO_SYSSPACE, FREAD, 0, &vp, 0, 0, rootdir,
+	    -1) != 0)
 		return ((void *)-1UL);
 
 	file = umem_zalloc(sizeof (struct _buf), UMEM_NOFAIL);
@@ -812,6 +815,14 @@ z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
 		*dstlen = (size_t)len;
 
 	return (ret);
+}
+
+/*ARGSUSED*/
+size_t u8_textprep_str(char *i, size_t *il, char *o, size_t *ol, int nf,
+    size_t vers, int *err)
+{
+	*err = EINVAL;
+	return ((size_t)-1);
 }
 
 uid_t

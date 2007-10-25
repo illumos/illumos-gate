@@ -271,7 +271,7 @@ opendq(
 				    " from quota file\n");
 			rw_exit(&qip->i_contents);
 			(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)qip->i_size,
-			    B_INVAL, kcred);
+			    B_INVAL, kcred, NULL);
 		} else {
 			rw_exit(&qip->i_contents);
 		}
@@ -642,7 +642,7 @@ setquota(int cmd, uid_t uid, struct ufsvfs *ufsvfsp,
 	rw_exit(&qip->i_contents);
 
 	(void) VOP_PUTPAGE(ITOV(qip), dqoff(dqp->dq_uid) & ~qip->i_fs->fs_bmask,
-	    qip->i_fs->fs_bsize, B_INVAL, kcred);
+	    qip->i_fs->fs_bsize, B_INVAL, kcred, NULL);
 
 	/*
 	 * We must set the dq_mof even if not we are not logging in case

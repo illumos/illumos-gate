@@ -1040,7 +1040,7 @@ reqpath(char *file, char **idnumber)
 }
 
 /*
- * The client is sending a peer connection to retreive label information
+ * The client is sending a peer connection to retrieve label information
  * from.  This is used in the event that the client is an intermediary for
  * the actual requestor in a Trusted environment.
  */

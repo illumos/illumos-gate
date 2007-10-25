@@ -105,7 +105,7 @@
  * freelist and then trying to place them back on the freelist
  * when their reference is released.  This means that the when an
  * rnode is looked up in the hash queues, then either the rnode
- * is removed from the freelist and that reference is tranfered to
+ * is removed from the freelist and that reference is transferred to
  * the new reference or the vnode reference count must be incremented
  * accordingly.  The mutex for the freelist must be held in order to
  * accurately test to see if the rnode is on the freelist or not.
@@ -2095,7 +2095,7 @@ setdirgid(vnode_t *dvp, gid_t *gidp, cred_t *cr)
 	struct vattr va;
 
 	va.va_mask = AT_MODE | AT_GID;
-	error = VOP_GETATTR(dvp, &va, 0, cr);
+	error = VOP_GETATTR(dvp, &va, 0, cr, NULL);
 	if (error)
 		return (error);
 
@@ -2123,7 +2123,7 @@ setdirmode(vnode_t *dvp, mode_t *omp, cred_t *cr)
 	struct vattr va;
 
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(dvp, &va, 0, cr);
+	error = VOP_GETATTR(dvp, &va, 0, cr, NULL);
 	if (error)
 		return (error);
 
@@ -2189,7 +2189,7 @@ rinactive(rnode_t *rp, cred_t *cr)
 	if (vn_has_cached_data(vp)) {
 		ASSERT(vp->v_type != VCHR);
 		if ((rp->r_flags & RDIRTY) && !rp->r_error) {
-			error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, 0, cr);
+			error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, 0, cr, NULL);
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				mutex_enter(&rp->r_statelock);
 				if (!rp->r_error)
@@ -3084,7 +3084,7 @@ toomany:
 	 */
 	while (cnt-- > 0) {
 		vp = vplist[cnt];
-		(void) VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_ASYNC, cr);
+		(void) VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_ASYNC, cr, NULL);
 		VN_RELE(vp);
 	}
 

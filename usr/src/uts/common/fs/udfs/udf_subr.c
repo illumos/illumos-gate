@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,7 +222,7 @@ ud_xlate_to_daddr(struct udf_vfs *udf_vfsp,
 					continue;
 				}
 				if ((end_req < begin_bad) ||
-					(begin_req >= end_bad)) {
+				    (begin_req >= end_bad)) {
 					continue;
 				}
 
@@ -232,7 +231,7 @@ ud_xlate_to_daddr(struct udf_vfs *udf_vfsp,
 					end_req = begin_bad;
 				} else {
 					retblkno = SWAP_32(te->sent_ml) +
-						begin_req - begin_bad;
+					    begin_req - begin_bad;
 					if (end_req < end_bad) {
 						*count = end_req - begin_req;
 					} else {
@@ -319,10 +318,10 @@ ud_ip_off2bno(struct ud_inode *ip, uint32_t offset, uint32_t *bno)
 	for (i = 0; i < ip->i_ext_used; i++) {
 		iext = &ip->i_ext[i];
 		if ((iext->ib_offset <= offset) &&
-			(offset < (iext->ib_offset + iext->ib_count))) {
+		    (offset < (iext->ib_offset + iext->ib_count))) {
 			*bno = iext->ib_block +
-				((offset - iext->ib_offset) >>
-				ip->i_udf->udf_l2b_shift);
+			    ((offset - iext->ib_offset) >>
+			    ip->i_udf->udf_l2b_shift);
 			break;
 		}
 	}
@@ -338,8 +337,6 @@ static uint32_t cum_sec_leap[] = {
 	0xeff100, 0x118cf80, 0x141ae00, 0x1693b00, 0x1921980, 0x1b9a680
 };
 
-#define	SECS_PER_MIN	60
-#define	SECS_PER_HOUR	3600
 #define	DAYS_PER_YEAR	365
 
 #define	SEC_PER_DAY	0x15180
@@ -363,8 +360,8 @@ ud_dtime2utime(struct timespec32 *utime,
 	utime->tv_sec = cp[dtime->ts_month - 1];
 	utime->tv_sec += (dtime->ts_day - 1) * SEC_PER_DAY;
 	utime->tv_sec += ((dtime->ts_hour * 60) +
-				dtime->ts_min) * 60 +
-				dtime->ts_sec;
+	    dtime->ts_min) * 60 +
+	    dtime->ts_sec;
 
 	tzone = SWAP_16(dtime->ts_tzone);
 	if ((tzone & TMODE) == 0x1000) {
@@ -384,15 +381,15 @@ ud_dtime2utime(struct timespec32 *utime,
 	}
 
 	utime->tv_nsec = ((((dtime->ts_csec * 100) +
-					dtime->ts_husec) * 100) +
-					dtime->ts_usec) * 1000;
+	    dtime->ts_husec) * 100) +
+	    dtime->ts_usec) * 1000;
 	if (year >= 1970) {
 		utime->tv_sec += (year - 1970) * SEC_PER_YEAR;
 		utime->tv_sec += ((year - 1969) / 4) * SEC_PER_DAY;
 	} else {
 		utime->tv_sec = ((1970 - year) * SEC_PER_YEAR +
-					((1972 - year) / 4) * SEC_PER_DAY -
-					utime->tv_sec) * -1;
+		    ((1972 - year) / 4) * SEC_PER_DAY -
+		    utime->tv_sec) * -1;
 		if (utime->tv_nsec) {
 			utime->tv_sec++;
 			utime->tv_nsec = 1000 * 1000 * 1000 - utime->tv_nsec;
@@ -498,7 +495,7 @@ ud_syncip(struct ud_inode *ip, int32_t flags, int32_t waitfor)
 	} else {
 		rw_exit(&ip->i_contents);
 		error = VOP_PUTPAGE(vp, (offset_t)0,
-				(uint32_t)0, flags, CRED());
+		    (uint32_t)0, flags, CRED(), NULL);
 		rw_enter(&ip->i_contents, RW_WRITER);
 	}
 
@@ -561,10 +558,10 @@ ud_sbwrite(struct udf_vfs *udf_vfsp)
 	ud_update_regid(&iu->lvidiu_regid);
 
 	ud_make_tag(udf_vfsp, &lvid->lvid_tag,
-		UD_LOG_VOL_INT, udf_vfsp->udf_iseq_loc,
-			sizeof (struct log_vol_int_desc) - 8 +
-				8 * udf_vfsp->udf_npart +
-				SWAP_32(lvid->lvid_liu));
+	    UD_LOG_VOL_INT, udf_vfsp->udf_iseq_loc,
+	    sizeof (struct log_vol_int_desc) - 8 +
+	    8 * udf_vfsp->udf_npart +
+	    SWAP_32(lvid->lvid_liu));
 
 	/*
 	 * Don't release the buffer after writing to the disk
@@ -627,7 +624,7 @@ ud_update(int32_t flag)
 	 */
 	mutex_enter(&udf_vfs_mutex);
 	for (udfsp = udf_vfs_instances;
-			udfsp != NULL; udfsp = udfsp->udf_next) {
+	    udfsp != NULL; udfsp = udfsp->udf_next) {
 		vfsp = udfsp->udf_vfs;
 		if (vfs_lock(vfsp) != 0) {
 			continue;
@@ -762,7 +759,7 @@ ud_still_mounted(struct check_node *checkp)
 
 	mutex_enter(&udf_vfs_mutex);
 	for (udf_vfsp = udf_vfs_instances;
-		udf_vfsp != NULL; udf_vfsp = udf_vfsp->udf_next) {
+	    udf_vfsp != NULL; udf_vfsp = udf_vfsp->udf_next) {
 		if (udf_vfsp != checkp->udf_vfs) {
 			continue;
 		}
@@ -802,7 +799,7 @@ ud_checkclean(struct vfs *vfsp,
 	 * ignore if buffers or inodes are busy
 	 */
 	if ((bcheck(dev, udf_vfsp->udf_iseq)) ||
-		(ud_icheck(udf_vfsp))) {
+	    (ud_icheck(udf_vfsp))) {
 		return;
 	}
 	mutex_enter(&udf_vfsp->udf_lock);
@@ -856,8 +853,8 @@ ud_flushi(int32_t flag)
 		lip = NULL;
 
 		for (ip = ih->ih_chain[0], lip = NULL;
-				ip && ip != (struct ud_inode *)ih;
-				ip = ip->i_forw) {
+		    ip && ip != (struct ud_inode *)ih;
+		    ip = ip->i_forw) {
 			int flag = ip->i_flag;
 
 			vp = ITOV(ip);
@@ -867,9 +864,9 @@ ud_flushi(int32_t flag)
 			 * Skip read-only vnodes
 			 */
 			if ((flag & IREF) == 0 ||
-				(!vn_has_cached_data(vp) &&
-				((flag & (IMOD|IACC|IUPD|ICHG)) == 0)) ||
-				(vp->v_vfsp == NULL) || vn_is_readonly(vp)) {
+			    (!vn_has_cached_data(vp) &&
+			    ((flag & (IMOD|IACC|IUPD|ICHG)) == 0)) ||
+			    (vp->v_vfsp == NULL) || vn_is_readonly(vp)) {
 				continue;
 			}
 
@@ -1010,7 +1007,7 @@ ud_get_next_fid(struct ud_inode *ip, struct fbuf **fbp, uint32_t offset,
 
 
 	if ((offset % lbsize) ||
-		(offset == 0)) {
+	    (offset == 0)) {
 		sz = end - beg;
 	} else {
 		sz = 0;
@@ -1276,14 +1273,14 @@ ud_verify_tag_and_desc(struct tag *tag, uint16_t id, uint32_t blockno,
 			eah = (struct ext_attr_hdr *)tag;
 			if (SWAP_32(eah->eah_aal) > desc_len) {
 				cmn_err(CE_NOTE,
-			"eah_all(0x%x) exceeds desc. len(0x%x) blockno 0x%x\n",
+		    "eah_all(0x%x) exceeds desc. len(0x%x) blockno 0x%x\n",
 				    SWAP_32(eah->eah_aal), desc_len, blockno);
-			    return (1);
+				return (1);
 			}
 			ea_off = GET_32(&eah->eah_ial);
 			if (ea_off >= desc_len) {
 				cmn_err(CE_NOTE,
-		"ea_off(0x%x) is not less than ea_len(0x%x) blockno 0x%x\n",
+		    "ea_off(0x%x) is not less than ea_len(0x%x) blockno 0x%x\n",
 				    ea_off, desc_len, blockno);
 				return (1);
 			}
@@ -1293,8 +1290,8 @@ ud_verify_tag_and_desc(struct tag *tag, uint16_t id, uint32_t blockno,
 	}
 	if (SWAP_32(blockno) != tag->tag_loc) {
 		cmn_err(CE_NOTE,
-			"Tag Location mismatch blockno %x tag_blockno %x\n",
-			blockno, SWAP_32(tag->tag_loc));
+		    "Tag Location mismatch blockno %x tag_blockno %x\n",
+		    blockno, SWAP_32(tag->tag_loc));
 		return (1);
 	}
 	return (0);
@@ -1455,41 +1452,41 @@ ud_utf82utf16(uint8_t *s_8, uint16_t *c_16, int32_t count)
 		c_32 = *s_8 & 0x7F;
 	} else if (extra_bytes == 1) {
 		if (((*s_8 & 0xE0) != 0xC0) ||
-			((*(s_8 + 1) & 0xC0) != 0x80)) {
+		    ((*(s_8 + 1) & 0xC0) != 0x80)) {
 			return (0);
 		}
 		c_32 = *s_8 & 0x1F;
 	} else if (extra_bytes == 2) {
 		if (((*s_8 & 0xF0) != 0xE0) ||
-			((*(s_8 + 1) & 0xC0) != 0x80) ||
-			((*(s_8 + 2) & 0xC0) != 0x80)) {
+		    ((*(s_8 + 1) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 2) & 0xC0) != 0x80)) {
 			return (0);
 		}
 		c_32 = *s_8 & 0x0F;
 	} else if (extra_bytes == 3) {
 		if (((*s_8 & 0xF8) != 0xF0) ||
-			((*(s_8 + 1) & 0xC0) != 0x80) ||
-			((*(s_8 + 2) & 0xC0) != 0x80) ||
-			((*(s_8 + 3) & 0xC0) != 0x80)) {
+		    ((*(s_8 + 1) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 2) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 3) & 0xC0) != 0x80)) {
 			return (0);
 		}
 		c_32 = *s_8 & 0x07;
 	} else if (extra_bytes == 4) {
 		if (((*s_8 & 0xFC) != 0xF8) ||
-			((*(s_8 + 1) & 0xC0) != 0x80) ||
-			((*(s_8 + 2) & 0xC0) != 0x80) ||
-			((*(s_8 + 3) & 0xC0) != 0x80) ||
-			((*(s_8 + 4) & 0xC0) != 0x80)) {
+		    ((*(s_8 + 1) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 2) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 3) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 4) & 0xC0) != 0x80)) {
 			return (0);
 		}
 		c_32 = *s_8 & 0x03;
 	} else if (extra_bytes == 5) {
 		if (((*s_8 & 0xFE) != 0xFC) ||
-			((*(s_8 + 1) & 0xC0) != 0x80) ||
-			((*(s_8 + 2) & 0xC0) != 0x80) ||
-			((*(s_8 + 3) & 0xC0) != 0x80) ||
-			((*(s_8 + 4) & 0xC0) != 0x80) ||
-			((*(s_8 + 5) & 0xC0) != 0x80)) {
+		    ((*(s_8 + 1) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 2) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 3) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 4) & 0xC0) != 0x80) ||
+		    ((*(s_8 + 5) & 0xC0) != 0x80)) {
 			return (0);
 		}
 		c_32 = *s_8 & 0x01;
@@ -1560,7 +1557,7 @@ ud_compress(int32_t in_len, int32_t *out_len,
 	comp_id = 8;
 	for (in_index = 0; in_index < in_len; in_index += c_tx_sz) {
 		if ((c_tx_sz = ud_utf82utf16(&in_str[in_index],
-			&w2_char, in_len - in_index)) == 0) {
+		    &w2_char, in_len - in_index)) == 0) {
 			error = EINVAL;
 			goto end;
 		}
@@ -1576,7 +1573,7 @@ ud_compress(int32_t in_len, int32_t *out_len,
 		w2_str[out_index++] = w2_char;
 	}
 	if (((comp_id == 0x10) && (out_index > ((out_str_len - 2)/2))) ||
-		((comp_id == 0x8) && (out_index > (out_str_len - 2)))) {
+	    ((comp_id == 0x8) && (out_index > (out_str_len - 2)))) {
 		error = ENAMETOOLONG;
 		goto end;
 	}
@@ -1669,9 +1666,9 @@ ud_utf162utf8(uint16_t c_16, uint8_t *s_8)
 }
 
 /*
- * Convert to a form that can be transfered to the user
+ * Convert to a form that can be transferred to the user
  * Assumption's
- * in_length < 256, out_str is atleast 255 bytes long
+ * in_length < 256, out_str is at least 255 bytes long
  * The converted byte stream length is returned in out_len
  */
 #define	MAX_ALLOWABLE_STRING 250
@@ -1703,16 +1700,16 @@ ud_uncompress(int32_t in_len, int32_t *out_len,
 	 */
 	if (comp_id == 8) {
 		if ((in_str[1] == DOT) &&
-			((in_len == 2) || ((in_len == 3) &&
-				(in_str[2] == DOT)))) {
+		    ((in_len == 2) || ((in_len == 3) &&
+		    (in_str[2] == DOT)))) {
 			out_str[k++] = UNDERBAR;
 			len_till_now = 1;
 			goto make_append_crc;
 		}
 	} else if (comp_id == 0x10) {
 		if (((in_str[1] << 8 | in_str[2]) == DOT) &&
-			((in_len == 3) || ((in_len == 5) &&
-				((in_str[3] << 8 | in_str[4]) == DOT)))) {
+		    ((in_len == 3) || ((in_len == 5) &&
+		    ((in_str[3] << 8 | in_str[4]) == DOT)))) {
 			out_str[k++] = UNDERBAR;
 			len_till_now = 1;
 			goto make_append_crc;
@@ -1746,12 +1743,12 @@ ud_uncompress(int32_t in_len, int32_t *out_len,
 		 * Get rid of invalid characters
 		 */
 		if ((w2_char == SLASH) ||
-			(w2_char == NULL)) {
+		    (w2_char == NULL)) {
 			make_crc = 1;
 			if (((comp_id == 8) &&
-				(lic != (index - 1))) ||
-				(comp_id == 0x10) &&
-				(lic != (index - 2))) {
+			    (lic != (index - 1))) ||
+			    (comp_id == 0x10) &&
+			    (lic != (index - 2))) {
 				w2_char = UNDERBAR;
 				lic = index;
 			} else {
@@ -1776,13 +1773,13 @@ ud_uncompress(int32_t in_len, int32_t *out_len,
 		 * the maximum allowed string length
 		 */
 		if ((crc_start_loc == 0) &&
-			((len_till_now + c_tx_sz) > MAX_ALLOWABLE_STRING)) {
+		    ((len_till_now + c_tx_sz) > MAX_ALLOWABLE_STRING)) {
 			crc_start_loc = len_till_now;
 		}
 
 		if ((len_till_now + c_tx_sz) < MAXNAMELEN) {
 			(void) strncpy((caddr_t)&out_str[len_till_now],
-				(caddr_t)utf8, c_tx_sz);
+			    (caddr_t)utf8, c_tx_sz);
 			len_till_now += c_tx_sz;
 		} else {
 			break;
@@ -1835,7 +1832,7 @@ begin:
 	bp = bread(dev, blkno, bsize);
 
 	if (((bp->b_flags & B_ERROR) == 0) &&
-		(bp->b_bcount != bsize)) {
+	    (bp->b_bcount != bsize)) {
 		/*
 		 * Buffer cache returned a
 		 * wrong number of bytes

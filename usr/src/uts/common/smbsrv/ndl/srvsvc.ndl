@@ -1,0 +1,1331 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_LANMAN_NDL_
+#define _MLSVC_LANMAN_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * LanMan RPC (WKSSVC and SRVSVC) interface definitions.
+ */
+
+#include "ndrtypes.ndl"
+
+/*
+ * WARNING: The cpp(1) macros in this file are not understood by
+ *          /usr/bin/cpp. Use /usr/libexec/cpp instead.
+ */
+
+/*
+ * TYPE CONSTRUCTOR MACROS FOR INFORMATION RESULTS
+ ****************************************************************
+ *
+ * This is an explanation of the macros that follow this comment.
+ *
+ * The LANMAN API's look something like this:
+ *
+ *	NetXXXGetInfo (
+ *		IN  char *  servername,
+ *		IN  char *  XXX_name,
+ *		IN  int     level,
+ *		OUT char ** bufptr);
+ *
+ * The bufptr is a pointer-to-pointer (**). The NetXXXGetInfo() function
+ * malloc()s memory, and sets *bufptr to the memory. The API's
+ * are undiscriminated about what bufptr really points to.
+ *
+ * However, for RPI (Remote Procedure Interface), this just won't fly.
+ * We have to know what the result data looks like in order to
+ * properly (un)marshall it.
+ *
+ * As best we can determine, the MSC developers use an RPI that looks
+ * like this (approximately in IDL):
+ *
+ *	RemoteNetXXXGetInfo (
+ *		IN  char *  servername,
+ *		IN  char *  XXX_name,
+ *		IN  int     level,
+ *		OUT union switch(level) {
+ * 			case(1): XXX_INFO_1 * info1;
+ *			case(2): XXX_INFO_2 * info2;
+ *		    }       bufptr);
+ *
+ * The level guides the (un)marshalling as it follows the pointer.
+ * DCE(MS) IDL will automatically form a structure for the union
+ * which looks about like this (much as Sun/RPC does):
+ *
+ *	struct {
+ *		int   _keyvalue_;
+ *		union {
+ *			XXX_INFO_1 *info1;
+ *			XXX_INFO_2 *info2;
+ *		}      _u_;
+ *	} bufptr;
+ *
+ * This struct is not made visible to the application. It is purely
+ * an internal (automagic) thing.  However, ndrgen does not do this.
+ * The ndrgen input MUST remain a valid C header file, and all
+ * struct and union declarations must be exact, and we (would) have
+ * to tediously code sequences like this (approximately NDL)):
+ *
+ *	union XXXGetInfo_result_u {
+ *	    [case(1)]
+ *		XXX_INFO_1 *	info1;
+ *	    [case(2)]
+ *		XXX_INFO_2 *	info2;
+ *	};
+ *
+ *	struct XXXGetInfo_result {
+ *		int	level;
+ *	   
+ *		union XXXGetInfo_result_u bufptr;
+ *	};
+ *
+ *	struct XXXGetInfo_param {	// still have to code this one
+ *	    [in]  char *	servername;
+ *	    [in]  ushort	level;
+ *	    [out] struct XXXGetInfo_result result;
+ *	};
+ *
+ * This is error prone and difficult to write, and more difficult
+ * and distracting to read. It is hard to pick through the
+ * necessary evils and see what's really going on. To mitigate
+ * the situation, we have a series of macros which generate
+ * the tedious code, and are easily recognized as supporting
+ * fluff rather than important structures:
+ *
+ *	INFO1RES_DEFINITION(XXXGetInfo,
+ *		INFO1RES_UNION_ENTRY(XXXGetInfo, 1)
+ *		INFO1RES_UNION_ENTRY(XXXGetInfo, 2))
+ *
+ *	structt XXXGetInfo_param {	// still have to code this one
+ *	    [in]  char *	servername;
+ *	    [in]  ushort	level;
+ *	    [out] struct XXXGetInfo_result result;
+ *	};
+ *
+ * The INFO1RES_DEFINITION macro defines two types:
+ *
+ *	union ...__ru {...}
+ *	struct ..._result { DWORD level; union ..._ru bufptr; }
+ *
+ * There is a similar macro, INFO1RESBUF_DEFINITION, which defines
+ * actual space rather than just pointers. It defines:
+ *
+ *	union ...._rb {...}
+ *	typedef union ..._rb ..._rb;
+ *
+ * Which is handy in functions because the initial coding sequence
+ * looks something like:
+ *
+ *	XXXGetInfoParam (struct XXXGetInfo_param *param) {
+ *		XXXGetInfo_rb	rb;
+ *
+ *		param->result.level = param->level;	// for marshalling
+ *		param->result.bufptr.nullptr = &rb;	// anything fits
+ *
+ * There are two flavors of Info results. The first is the
+ * single XXX_INFO_x result, which the foregoing example
+ * uses. The second flavor is when there are multiple entries
+ * possible. Again, for the sake of guiding the marshalling,
+ * the RPIs use something accommodating:
+ *
+ *	struct XXX_INFO_1_result {
+ *		unsigned	entriesread;
+ *	   [size_is(entriesread)]
+ *		XXX_INFO_1 *	table;
+ *	};
+ *
+ *	union { XXX_INFO_1_result *info1; ...}
+ *
+ * Notice this is using XXX_INFO_1_result rather than just XXX_INFO_1.
+ * The requirements from this point are much like before. Because of
+ * the variable-length value, there is no realistic way to do something
+ * like INFO1RESBUF_DEFINITION.
+ *
+ * There are two sets of macros here. INFO1RES_xxx are for the
+ * single result case, and INFONRES_xxx for the multiple entry case.
+ */
+
+/*
+ * INFO1RES_...
+ *	Type constructors for single-result case
+ */
+
+#define INFO1RES_DEFINITION(INFOPREF, ENTRIES) \
+	INFO1RES_UNION(INFOPREF, ENTRIES) \
+	INFO1RES_STRUCT(INFOPREF)
+
+#define INFO1RES_UNION(INFOPREF, ENTRIES) \
+	union INFOPREF##__ru { \
+		INFO1RES_UNION_NULLPTR \
+		ENTRIES \
+	};
+
+#define INFO1RES_UNION_NULLPTR \
+	DEFAULT char *			nullptr;
+
+#define INFO1RES_UNION_ENTRY(INFOPREF,NUM) \
+	CASE(NUM) struct INFOPREF##_##NUM * bufptr##NUM;
+
+#define INFO1RES_STRUCT(INFOPREF) \
+	struct INFOPREF##_result { \
+		DWORD	level; \
+	   SWITCH(level) \
+		union INFOPREF##__ru bufptr; \
+	};
+
+/*
+ * INFO1RESBUF_...
+ *	Type constructors for single-result buffering.
+ */
+
+
+#ifndef NDRGEN
+#define INFO1RESBUF_DEFINITION(INFOPREF, ENTRIES) \
+	typedef union INFOPREF##_rb { \
+		ENTRIES \
+	} INFOPREF##_rb;
+#define INFO1RESBUF_UNION_ENTRY(INFOPREF,NUM) \
+	CASE(NUM) struct INFOPREF##_##NUM   buf##NUM;
+#else
+#define INFO1RESBUF_DEFINITION(INFOPREF, ENTRIES)
+#define INFO1RESBUF_UNION_ENTRY(INFOPREF,NUM)
+#endif
+
+
+
+
+/*
+ * INFONRES_...
+ *	Type constructors for multiple-result case
+ */
+
+#define INFONRES_RESULT(INFOPREF,NUM) \
+	struct INFOPREF##_##NUM##_result { \
+		DWORD	entriesread; \
+	    SIZE_IS(entriesread) \
+		struct INFOPREF##_##NUM *entries; \
+	};
+
+#define INFONRES_DEFINITION(INFOPREF, ENTRIES) \
+	INFONRES_UNION(INFOPREF, ENTRIES) \
+	INFONRES_STRUCT(INFOPREF)
+
+#define INFONRES_UNION(INFOPREF, ENTRIES) \
+	union INFOPREF##__ru { \
+		INFONRES_UNION_NULLPTR \
+		INFONRES_UNION_INFONRES \
+		ENTRIES \
+	};
+
+#define INFONRES_UNION_NULLPTR \
+	DEFAULT char *			nullptr;
+
+#ifndef NDRGEN
+#define INFONRES_UNION_INFONRES \
+	struct mslm_infonres *		p;
+#else
+#define INFONRES_UNION_INFONRES
+#endif
+
+#define INFONRES_UNION_ENTRY(INFOPREF,NUM) \
+	CASE(NUM) struct INFOPREF##_##NUM##_result * bufptr##NUM;
+
+#define INFONRES_STRUCT(INFOPREF) \
+	struct INFOPREF##_result { \
+		DWORD	level; \
+	   SWITCH(level) \
+		union INFOPREF##__ru bufptr; \
+	};
+
+#ifndef NDRGEN
+/*
+ * This just makes things a little easier on the stub modules:
+ *
+ *	XXXGetInfoParam (struct XXXGetInfo_param *param) {
+ *		struct mslm_infonres	infonres;
+ *		
+ *		infonres.entriesread = 0;
+ *		infonres.entries = 0;
+ *		param->result.level = param->level;	// for marshalling
+ *		param->result.bufptr.p = &infonres;
+ */
+struct mslm_infonres {
+	DWORD		entriesread;
+	void *		entries;
+};
+#endif
+
+
+/*
+ * SERVER SERVICE (SRVSVC)
+ ****************************************************************
+ */
+
+
+#define SRVSVC_OPNUM_NetConnectEnum          0x08
+#define SRVSVC_OPNUM_NetFileEnum             0x09
+#define SRVSVC_OPNUM_NetFileClose            0x0b
+#define SRVSVC_OPNUM_NetSessionEnum          0x0c
+#define SRVSVC_OPNUM_NetSessionDel           0x0d
+#define SRVSVC_OPNUM_NetShareAdd             0x0e
+#define SRVSVC_OPNUM_NetShareEnum            0x0f
+#define SRVSVC_OPNUM_NetShareGetInfo         0x10
+#define SRVSVC_OPNUM_NetShareSetInfo         0x11
+#define SRVSVC_OPNUM_NetShareDel             0x12
+#define SRVSVC_OPNUM_NetServerGetInfo        0x15
+#define SRVSVC_OPNUM_NetServerSetInfo        0x16
+#define SRVSVC_OPNUM_NetRemoteTOD            0x1c
+#define SRVSVC_OPNUM_NetNameValidate         0x21
+#define SRVSVC_OPNUM_NetShareEnumSticky      0x24
+#define SRVSVC_OPNUM_NetGetFileSecurity      0x27
+#define SRVSVC_OPNUM_NetSetFileSecurity      0x28
+
+/*
+ ***********************************************************************
+ * NetConnectEnum: 
+ *
+ * Description:
+ * 
+ * Request for mslm_NetConnectEnum  returns
+ * info of resources in MLRPC server connected
+ * to network. Correctly level 0 and level 1 information 
+ * are supported.
+ *
+ ***********************************************************************
+ */
+
+/* 
+ * Level 0 connect information.
+ */
+struct mslm_NetConnectInfoBuf0 {
+        DWORD coni0_id;
+};
+
+struct mslm_NetConnectInfo0 {
+	DWORD entries_read;
+ SIZE_IS(entries_read)
+        struct mslm_NetConnectInfoBuf0 *ci0;
+};
+
+/* 
+ * Level 1 connect information.
+ */	
+struct mslm_NetConnectInfoBuf1 {
+	DWORD coni1_id;
+	DWORD coni1_type;
+	DWORD coni1_num_opens;
+	DWORD coni1_num_users;
+	DWORD coni1_time;
+	LPTSTR coni1_username;
+	LPTSTR coni1_netname; /* share name */
+};
+
+struct mslm_NetConnectInfo1 {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslm_NetConnectInfoBuf1 *ci1;
+};
+
+union mslm_NetConnectInfoResUnion {
+	CASE(0) struct mslm_NetConnectInfo0 *info0;
+	CASE(1) struct mslm_NetConnectInfo1 *info1;
+	DEFAULT	char *nullptr;
+};
+
+struct mslm_NetConnectInfo {
+	DWORD level;
+	DWORD switch_value;
+  SWITCH(switch_value)
+	union mslm_NetConnectInfoResUnion ru;
+};
+
+OPERATION(SRVSVC_OPNUM_NetConnectEnum)
+struct mslm_NetConnectEnum {
+	IN	LPTSTR servername;		
+	IN	LPTSTR qualifier; /* share name */
+	INOUT	struct mslm_NetConnectInfo info;
+	IN	DWORD pref_max_len;
+	OUT 	DWORD total_entries;
+	INOUT	DWORD *resume_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetFileEnum: under construction.
+ ***********************************************************************
+ */
+struct mslm_NetFileInfoBuf3 {
+	DWORD fi3_id;
+	DWORD fi3_permissions;
+	DWORD fi3_num_locks;
+	LPTSTR fi3_pathname;
+	LPTSTR fi3_username;
+};
+
+
+struct mslm_NetFileInfo3 {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslm_NetFileInfoBuf3 *fi3;
+};
+
+
+union mslm_NetFileInfoResUnion {
+	CASE(3)	struct mslm_NetFileInfo3 *info3;
+	DEFAULT	char *nullptr;
+};
+
+
+struct mslm_NetFileInfo {
+	DWORD level;
+	DWORD switch_value;
+  SWITCH(switch_value)
+	union mslm_NetFileInfoResUnion ru;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetFileEnum)
+struct mslm_NetFileEnum {
+	IN	LPTSTR servername;
+	IN	DWORD unknown1;
+	IN	DWORD unknown2;
+	INOUT	struct mslm_NetFileInfo info;
+	IN	DWORD pref_max_len;
+	OUT	DWORD total_entries;
+	INOUT	DWORD *resume_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetFileClose
+ *
+ * I think this definition is complete but as it doesn't do anything
+ * it probably isn't a big issue. It is used to close files reported
+ * via NetFileEnum (i.e. the file id).
+ ***********************************************************************
+ */
+OPERATION(SRVSVC_OPNUM_NetFileClose)
+struct mslm_NetFileClose {
+	IN	LPTSTR servername;
+	IN	DWORD file_id;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetShareGetInfo: netname is the name of a share.
+ ***********************************************************************
+ */
+struct mslm_NetShareGetInfo0 {
+	LPTSTR shi0_netname;
+};
+
+
+struct mslm_NetShareGetInfo1 {
+	LPTSTR shi1_netname;
+	DWORD shi1_type; /* type of resource such as IPC$ */
+	LPTSTR shi1_comment;
+};
+
+
+struct mslm_NetShareGetInfo2 {
+	LPTSTR shi2_netname;
+	DWORD shi2_type;
+	LPTSTR shi2_comment;
+	DWORD shi2_permissions;
+	DWORD shi2_max_uses;
+	DWORD shi2_current_uses;
+	LPTSTR shi2_path;
+	LPTSTR shi2_passwd;
+};
+
+struct mslm_NetShareGetInfo502 {
+	LPTSTR shi502_netname;
+	DWORD shi502_type;
+	LPTSTR shi502_comment;
+	DWORD shi502_permissions;
+	DWORD shi502_max_uses;
+	DWORD shi502_current_uses;
+	LPTSTR shi502_path;
+	LPTSTR shi502_passwd;
+	DWORD shi502_reserved;
+	DWORD shi502_security_descriptor;
+};
+
+struct mslm_NetShareGetInfo1005 {
+	DWORD shi1005_flags;
+};
+
+union mlsm_NetShareGetInfoResUnion {
+	CASE(0)		struct mslm_NetShareGetInfo0 *info0;
+	CASE(1)		struct mslm_NetShareGetInfo1 *info1;
+	CASE(2)		struct mslm_NetShareGetInfo2 *info2;
+	CASE(502)	struct mslm_NetShareGetInfo502 *info502;
+	CASE(1005)	struct mslm_NetShareGetInfo1005 *info1005;
+	DEFAULT	char *nullptr;
+};
+
+
+struct mlsm_NetShareGetInfoRes {
+	DWORD switch_value;
+  SWITCH(switch_value)
+	union mlsm_NetShareGetInfoResUnion ru;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetShareGetInfo)
+struct mlsm_NetShareGetInfo {
+	IN	LPTSTR servername;
+	IN REFERENCE	LPTSTR netname;
+	IN	DWORD level;
+	OUT	struct mlsm_NetShareGetInfoRes result;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetShareSetInfo: netname is the name of a share.
+ ***********************************************************************
+ */
+OPERATION(SRVSVC_OPNUM_NetShareSetInfo)
+struct mlsm_NetShareSetInfo {
+	IN	LPTSTR servername;
+	IN REFERENCE	LPTSTR netname;
+	IN	DWORD level;
+/*
+ * This should accept all the same levels as NetShareGetInfo
+ * but we always return ACCESS_DENIED for now. So there's no
+ * point in unmarshalling the share information.
+ *
+ *	IN	struct mlsm_NetShareGetInfoRes result;
+ */
+	OUT	DWORD parm_err_ptr;
+	OUT	DWORD parm_err;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetSessionEnum 
+ *
+ * The NetSessionEnum function provides information about sessions
+ * established on a server.
+ *
+ * Only members of the Administrators or Account Operators local groups
+ * can successfully execute the NetSessionEnum function at level 1 or
+ * level 2. No special group membership is required for level 0 or level
+ * 10 calls.
+ *
+ * Windows NT/2000/XP: The parameter order is as follows.
+ *
+ * NET_API_STATUS NetSessionEnum(LPWSTR servername,
+ *                               LPWSTR UncClientName,
+ *                               LPWSTR username,
+ *                               DWORD level,
+ *                               LPBYTE *bufptr,
+ *                               DWORD prefmaxlen,
+ *                               LPDWORD entriesread,
+ *                               LPDWORD totalentries,
+ *                               LPDWORD resume_handle);
+ *
+ * Windows 95/98/Me: The calling application must use the cbBuffer parameter
+ * to specify the size, in bytes, of the information buffer pointed to by the
+ * pbBuffer parameter. (The cbBuffer parameter replaces the prefmaxlen
+ * parameter.) Neither a user name parameter nor a resume handle parameter is
+ * available on this platform. Therefore, the parameter list is as follows.
+ *
+ * API_FUNCTION NetSessionEnum(const char FAR *pszServer,
+ *                             short sLevel,
+ *                             char FAR *pbBuffer,
+ *                             unsigned short cbBuffer,
+ *                             unsigned short FAR *pcEntriesRead,
+ *                             unsigned short FAR *pcTotalAvail);
+ *
+ * Parameters
+ *
+ * servername
+ * [in] Pointer to a string that specifies the DNS or NetBIOS name of the
+ * remote server on which the function is to execute. If this parameter is
+ * NULL, the local computer is used.
+ * Windows NT 4.0 and earlier: This string must begin with \\.
+ *
+ * UncClientName
+ * [in] Pointer to a string that specifies the name of the computer session
+ * for which information is to be returned. If this parameter is NULL,
+ * NetSessionEnum returns information for all computer sessions on the server.
+ *
+ * username
+ * [in] Pointer to a string that specifies the name of the user for which 
+ * information is to be returned. If this parameter is NULL, NetSessionEnum 
+ * returns information for all users.
+ *
+ * level
+ * [in] Specifies the information level of the data. This parameter can be
+ * one of the following values.
+ * Windows NT/2000/XP: The following levels are valid.
+ * Value    Meaning
+ * 0        Return the name of the computer that established the session.
+ *          The bufptr parameter points to an array of SESSION_INFO_0
+ *          structures.
+ * 1        Return the name of the computer, name of the user, and open files,
+ *          pipes, and devices on the computer. The bufptr parameter points to
+ *          an array of SESSION_INFO_1 structures.
+ * 2        In addition to the information indicated for level 1, return the
+ *          type of client and how the user established the session. The bufptr
+ *          parameter points to an array of SESSION_INFO_2 structures.
+ * 10       Return the name of the computer, name of the user, and active and
+ *          idle times for the session. The bufptr parameter points to an array
+ *          of SESSION_INFO_10 structures. 
+ * 502      Return the name of the computer; name of the user; open files, 
+ *          pipes, and devices on the computer; and the name of the transport 
+ *          the  client is using. The bufptr parameter points to an array of 
+ *          SESSION_INFO_502 structures. 
+ *
+ * Windows 95/98/Me: The following level is valid. 
+ * Value    Meaning 
+ * 50       Return the name of the computer, name of the user, open files on 
+ *          the computer, and the name of the transport protocol the client is 
+ *          using. The pbBuffer parameter points to an array of session_info_50 
+ *          structures. 
+ *
+ * bufptr 
+ * [out] Pointer to the buffer that receives the data. The format of this 
+ * data depends on the value of the level parameter. 
+ * Windows NT/2000/XP: This buffer is allocated by the system and must be 
+ * freed using the NetApiBufferFree function. Note that you must free the 
+ * buffer even if the function fails with ERROR_MORE_DATA. 
+ * Windows 95/98/Me: The caller must allocate and deallocate this buffer. 
+ *
+ * prefmaxlen 
+ * [in] Specifies the preferred maximum length of returned data, in bytes. 
+ * If you specify MAX_PREFERRED_LENGTH, the function allocates the amount 
+ * of memory required for the data. If you specify another value in this 
+ * parameter, it can restrict the number of bytes that the function returns. 
+ * If the buffer size is insufficient to hold all entries, the function 
+ * returns ERROR_MORE_DATA. For more information, see Network Management 
+ * Function Buffers and Network Management Function Buffer Lengths. 
+ *
+ * entriesread 
+ * [out] Pointer to a value that receives the count of elements actually 
+ * enumerated.
+ *
+ * totalentries 
+ * [out] Pointer to a value that receives the total number of entries that 
+ * could have been enumerated from the current resume position. 
+ *
+ * resume_handle 
+ * [in/out] Pointer to a value that contains a resume handle which is used 
+ * to continue an existing session search. The handle should be zero on the 
+ * first call and left unchanged for subsequent calls. If resume_handle is 
+ * NULL, no resume handle is stored. 
+ *
+ *
+ * SESSION_INFO_1
+ * ==============
+ * The SESSION_INFO_1 structure contains information about the session,
+ * including name of the computer; name of the user; and open files, pipes,
+ * and devices on the computer.
+ *
+ * Members
+ *
+ * sesi1_cname
+ * Pointer to a Unicode string specifying the name of the computer that
+ * established the session.
+ *
+ * sesi1_username
+ * Pointer to a Unicode string specifying the name of the user who established
+ * the session.
+ *
+ * sesi1_num_opens
+ * Specifies a DWORD value that contains the number of files, devices,
+ * and pipes opened during the session.
+ *
+ * sesi1_time
+ * Specifies a DWORD value that contains the number of seconds the session
+ * has been active.
+ * 
+ * sesi1_idle_time
+ * Specifies a DWORD value that contains the number of seconds the session
+ * has been idle.
+ *
+ * sesi1_user_flags
+ * Specifies a DWORD value that describes how the user established the
+ * session. This member can be one of the following values:
+ * SESS_GUEST           The user specified by the sesi1_username member
+ *                      established the session using a guest account.
+ * SESS_NOENCRYPTION    The user specified by the sesi1_username member
+ *                      established the session without using password
+ *                      encryption.
+ ***********************************************************************
+ */
+
+#define SESS_GUEST          0x00000001
+#define SESS_NOENCRYPTION   0x00000002
+
+struct mslm_SESSION_INFO_0 {
+	LPTSTR sesi0_cname;
+};
+INFONRES_RESULT(mslm_SESSION_INFO, 0)
+
+struct mslm_SESSION_INFO_1 {
+	LPTSTR sesi1_cname;
+	LPTSTR sesi1_uname;
+	DWORD  sesi1_nopens;
+	DWORD  sesi1_time;
+	DWORD  sesi1_itime;
+	DWORD  sesi1_uflags;
+};
+INFONRES_RESULT(mslm_SESSION_INFO, 1)
+
+INFONRES_DEFINITION(mslm_NetSessionEnum,
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 0)
+	INFONRES_UNION_ENTRY(mslm_SESSION_INFO, 1))
+
+OPERATION(SRVSVC_OPNUM_NetSessionEnum)
+struct mslm_NetSessionEnum {
+	IN		LPTSTR servername;
+	IN		DWORD unc_clientname; 
+	IN		DWORD username;
+	INOUT	DWORD level;
+	INOUT	struct mslm_NetSessionEnum_result result;
+	IN		DWORD pref_max_len;
+	OUT		DWORD total_entries;
+	INOUT	DWORD *resume_handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * NetSessionDel (Platform SDK: Network Management)
+ *
+ * The NetSessionDel function ends a network session between a server
+ * and a workstation.
+ *
+ * Security Requirements
+ * Only members of the Administrators or Account Operators local group
+ * can successfully execute the NetSessionDel function.
+ *
+ * Windows NT/2000/XP: The parameter order is as follows.
+ *
+ * NET_API_STATUS NetSessionDel(LPWSTR servername,
+ *                              LPWSTR UncClientName,
+ *                              LPWSTR username);
+ *
+ * Windows 95/98/Me: The sReserved parameter replaces the username
+ * parameter. For more information, see the following Remarks section.
+ * The parameter list is as follows.
+ *
+ * API_FUNCTION NetSessionDel(const char FAR *pszServer,
+ *                            const char FAR *pszClientName,
+ *                            short  sReserved);
+ *
+ * Parameters
+ * 
+ * servername
+ * [in] Pointer to a string that specifies the DNS or NetBIOS name
+ * of the remote server on which the function is to execute. If this
+ * parameter is NULL, the local computer is used.
+ * Windows NT 4.0 and earlier: This string must begin with \\.
+ *
+ * UncClientName
+ * [in] Pointer to a string that specifies the computer name of the
+ * client to disconnect. If UncClientName is NULL, then all the sessions
+ * of the user identified by the username parameter will be deleted on
+ * the server specified by servername. For more information, see
+ * NetSessionEnum.
+ *
+ * username
+ * [in] Pointer to a string that specifies the name of the user whose
+ * session is to be terminated. If this parameter is NULL, all users'
+ * sessions from the client specified by the UncClientName parameter
+ * are to be terminated.
+ *
+ * Remarks
+ * Windows 95/98/Me: You must specify the session key in the sReserved
+ * parameter when you call NetSessionDel. The session key is returned by
+ * the NetSessionEnum function or the NetSessionGetInfo function in the
+ * sesi50_key member of the session_info_50 structure.
+ ***********************************************************************
+ */
+
+OPERATION(SRVSVC_OPNUM_NetSessionDel)
+struct mslm_NetSessionDel {
+	IN	LPTSTR servername;
+	IN	LPTSTR unc_clientname;
+	IN	LPTSTR username;
+	OUT	DWORD status;
+};
+
+
+/*
+ * SRVSVC NetServerGetInfo (
+ *	IN LPTSTR	servername,
+ *	IN DWORD	level,
+ *	OUT union switch(level) {
+ *		case 100: _SERVER_INFO_100 *	p100;
+ *		case 101: _SERVER_INFO_101 *	p101;
+ *		case 102: _SERVER_INFO_102 *	p102;
+ *	    }		bufptr,
+ *	OUT DWORD	status
+ *      )
+ */
+
+/* for svX_platform */
+#define SV_PLATFORM_ID_OS2 400
+#define SV_PLATFORM_ID_NT  500
+
+/* Bit-mapped values for svX_type fields */
+#define SV_TYPE_WORKSTATION         0x00000001
+#define SV_TYPE_SERVER              0x00000002
+#define SV_TYPE_SQLSERVER           0x00000004
+#define SV_TYPE_DOMAIN_CTRL         0x00000008
+#define SV_TYPE_DOMAIN_BAKCTRL      0x00000010
+#define SV_TYPE_TIME_SOURCE         0x00000020
+#define SV_TYPE_AFP                 0x00000040
+#define SV_TYPE_NOVELL              0x00000080
+#define SV_TYPE_DOMAIN_MEMBER       0x00000100
+#define SV_TYPE_PRINTQ_SERVER       0x00000200
+#define SV_TYPE_DIALIN_SERVER       0x00000400
+#define SV_TYPE_XENIX_SERVER        0x00000800
+#define SV_TYPE_SERVER_UNIX         SV_TYPE_XENIX_SERVER
+#define SV_TYPE_NT                  0x00001000
+#define SV_TYPE_WFW                 0x00002000
+
+#define SV_TYPE_SERVER_MFPN         0x00004000
+#define SV_TYPE_SERVER_NT           0x00008000
+#define SV_TYPE_POTENTIAL_BROWSER   0x00010000
+#define SV_TYPE_BACKUP_BROWSER      0x00020000
+#define SV_TYPE_MASTER_BROWSER      0x00040000
+#define SV_TYPE_DOMAIN_MASTER       0x00080000
+#define SV_TYPE_SERVER_OSF          0x00100000
+#define SV_TYPE_SERVER_VMS          0x00200000
+#define SV_TYPE_WINDOWS             0x00400000  /* Windows95 and above */
+#define SV_TYPE_ALTERNATE_XPORT     0x20000000  /* return list for
+						 * alternate transport */
+#define SV_TYPE_LOCAL_LIST_ONLY     0x40000000  /* Return local list only */
+#define SV_TYPE_DOMAIN_ENUM         0x80000000
+#define SV_TYPE_ALL                 0xFFFFFFFF  /* handy for NetServerEnum2 */
+
+/* NT-Server 4.0 sends 0x0006_120B */
+#define SV_TYPE_SENT_BY_NT_4_0_SERVER \
+	(  SV_TYPE_WORKSTATION \
+	 | SV_TYPE_SERVER \
+	 | SV_TYPE_DOMAIN_CTRL \
+	 | SV_TYPE_NT \
+	 | SV_TYPE_BACKUP_BROWSER \
+	 | SV_TYPE_MASTER_BROWSER)
+/* NT-workstation 4.0 send 0x0004_1013 */
+#define SV_TYPE_SENT_BY_NT_4_0_WORKSTATION \
+	(  SV_TYPE_WORKSTATION \
+	 | SV_TYPE_SERVER \
+	 | SV_TYPE_DOMAIN_BAKCTRL \
+	 | SV_TYPE_NT \
+	 | SV_TYPE_MASTER_BROWSER)
+
+/* Special value for sv102_disc that specifies infinite disconnect time */
+#define SV_NODISC           (-1L)  /* No autodisconnect timeout enforced */
+
+/* Values of svX_security field */
+#define SV_USERSECURITY     1
+#define SV_SHARESECURITY    0
+
+/* Values of svX_hidden field */
+#define SV_HIDDEN       1
+#define SV_VISIBLE      0
+
+
+/* Let's get some info already */
+struct mslm_SERVER_INFO_100 {
+	DWORD		sv100_platform_id;
+	LPTSTR		sv100_name;
+};
+
+struct mslm_SERVER_INFO_101 {
+	DWORD		sv101_platform_id;
+	LPTSTR		sv101_name;
+	DWORD		sv101_version_major;
+	DWORD		sv101_version_minor;
+	DWORD		sv101_type;
+	LPTSTR		sv101_comment;
+};
+
+struct mslm_SERVER_INFO_102 {
+	DWORD		sv102_platform_id;
+	LPTSTR		sv102_name;
+	DWORD		sv102_version_major;
+	DWORD		sv102_version_minor;
+	DWORD		sv102_type;
+	LPTSTR		sv102_comment;
+	DWORD		sv102_users;
+	DWORD		sv102_disc;
+	DWORD		sv102_hidden;		/* BOOL */
+	DWORD		sv102_announce;
+	DWORD		sv102_anndelta;
+	DWORD		sv102_licenses;
+	LPTSTR		sv102_userpath;
+};
+
+union mslm_NetServerGetInfo_ru {
+	CASE(100)	struct mslm_SERVER_INFO_100 *bufptr100;
+	CASE(101)	struct mslm_SERVER_INFO_101 *bufptr101;
+	CASE(102)	struct mslm_SERVER_INFO_102 *bufptr102;
+	DEFAULT		char *nullptr;
+};
+
+struct mslm_NetServerGetInfo_result {
+	DWORD level;
+  SWITCH(level)
+	union mslm_NetServerGetInfo_ru bufptr;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetServerGetInfo)
+struct mslm_NetServerGetInfo {
+	IN  LPTSTR	servername;
+	IN  DWORD	level;
+	OUT struct mslm_NetServerGetInfo_result result;
+	OUT DWORD	status;
+};
+
+/*
+ * SRVSVC NetRemoteTOD (
+ *	IN LPTSTR	servername,
+ *	OUT _TIME_OF_DAY_INFO *bufptr,
+ *	OUT long	status
+ *      )
+ */
+
+struct mslm_TIME_OF_DAY_INFO {
+	DWORD		tod_elapsedt;
+	DWORD		tod_msecs;
+	DWORD		tod_hours;
+	DWORD		tod_mins;
+	DWORD		tod_secs;
+	DWORD		tod_hunds;
+	DWORD		tod_timezone;
+	DWORD		tod_tinterval;
+	DWORD		tod_day;
+	DWORD		tod_month;
+	DWORD		tod_year;
+	DWORD		tod_weekday;
+};
+
+OPERATION(SRVSVC_OPNUM_NetRemoteTOD)
+struct mslm_NetRemoteTOD {
+	IN  LPTSTR	servername;
+	OUT struct mslm_TIME_OF_DAY_INFO *bufptr;
+	OUT DWORD	status;
+};
+
+/*  
+ * SRVSVC_NetNameValidate (
+ *	IN  LPTSTR		servername;
+ *	IN  REFERENCE LPTSTR 	pathname;
+ * 	IN  DWORD		type;
+ * 	IN  DWORD		flags;
+ *	OUT DWORD		status;  
+ *	)
+ */
+OPERATION(SRVSVC_OPNUM_NetNameValidate)
+struct mslm_NetNameValidate {
+ 	IN  LPTSTR		servername;
+ 	IN  REFERENCE LPTSTR 	pathname;
+	IN  DWORD		type;
+	IN  DWORD		flags;
+	OUT DWORD		status;
+};
+
+/*
+ * SRVSVC NetShareEnum (
+ *	IN  LPTSTR	servername,
+ *	IN  DWORD	level;
+ *	OUT union switch(level) {
+ *		case 0: struct {
+ *				DWORD entriesread;
+ *			     [size_is(entriesread)]
+ *				_SHARE_INFO_0 *entries;
+ *			} *bufptr0;
+ *		case 1: struct {
+ *				DWORD entriesread;
+ *			     [size_is(entriesread)]
+ *				_SHARE_INFO_1 *entries;
+ *			} *bufptr1;
+ *		...
+ *	    }		bufptr,
+ *	IN  DWORD	prefmaxlen,
+ *	OUT DWORD	totalentries,
+ *	IN OUT DWORD ?*	resume_handle,
+ *	OUT DWORD	status
+ *      )
+ */
+
+/*
+ * Share types for shiX_type fields - duplicated from cifs.h
+ */
+#ifndef _SHARE_TYPES_DEFINED_
+#define _SHARE_TYPES_DEFINED_
+#define STYPE_DISKTREE          0x00000000
+#define STYPE_PRINTQ            0x00000001
+#define STYPE_DEVICE            0x00000002
+#define STYPE_IPC               0x00000003
+#define STYPE_MASK              0x0000000F
+#define STYPE_DFS               0x00000064
+#define STYPE_HIDDEN            0x80000000
+#define STYPE_SPECIAL           0x80000000
+#endif /* _SHARE_TYPES_DEFINED_ */
+
+/* Maximum uses for shiX_max_uses fields */
+#define SHI_USES_UNLIMITED      (DWORD)-1
+
+
+
+struct mslm_SHARE_INFO_0 {
+	LPTSTR		shi0_netname;
+};
+INFONRES_RESULT(mslm_SHARE_INFO,0)
+
+struct mslm_SHARE_INFO_1 {
+	LPTSTR		shi1_netname;
+	DWORD		shi1_type;
+	LPTSTR		shi1_remark;
+};
+INFONRES_RESULT(mslm_SHARE_INFO,1)
+
+struct mslm_SHARE_INFO_2 {
+	LPTSTR		shi2_netname;
+	DWORD		shi2_type;
+	LPTSTR		shi2_remark;
+	DWORD		shi2_permissions;
+	DWORD		shi2_max_uses;
+	DWORD		shi2_current_uses;
+	LPTSTR		shi2_path;
+	LPTSTR		shi2_passwd;
+};
+INFONRES_RESULT(mslm_SHARE_INFO,2)
+
+/*
+ * Note: shi502_security_descriptor should be a pointer to a
+ * security descriptor (W32SEC_SECURITY_DESCRIPTOR):
+ *	PSECURITY_DESCRIPTOR shi502_security_descriptor;
+ *
+ * For now we can just use a DWORD and set it to zero.
+ */
+struct mslm_SHARE_INFO_502 {
+	LPTSTR		shi502_netname;
+	DWORD		shi502_type;
+	LPTSTR		shi502_remark;
+	DWORD		shi502_permissions;
+	DWORD		shi502_max_uses;
+	DWORD		shi502_current_uses;
+	LPTSTR		shi502_path;
+	LPTSTR		shi502_passwd;
+	DWORD		shi502_reserved;
+	DWORD		shi502_security_descriptor;
+};
+INFONRES_RESULT(mslm_SHARE_INFO,502)
+
+union mslm_NetShareAddInfo_u {
+	CASE(2)     struct mslm_SHARE_INFO_2 *info2;
+	CASE(502)   struct mslm_SHARE_INFO_502 *info502;
+};
+
+struct mslm_NetShareAddInfo {
+	DWORD switch_value;
+  SWITCH(switch_value)
+	union mslm_NetShareAddInfo_u un;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetShareAdd)
+struct mslm_NetShareAdd {
+	IN	LPTSTR servername;
+	IN	DWORD level;
+	IN	struct mslm_NetShareAddInfo info;
+	INOUT	DWORD *parm_err;
+	OUT	DWORD status;
+};
+
+
+INFONRES_DEFINITION(mslm_NetShareEnum,
+	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,0)
+	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,1)
+	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,2)
+	INFONRES_UNION_ENTRY(mslm_SHARE_INFO,502))
+
+
+OPERATION(SRVSVC_OPNUM_NetShareEnum)
+struct mslm_NetShareEnum {
+	IN  		LPTSTR	servername;
+	INOUT  		DWORD	level;
+	OUT 		struct mslm_NetShareEnum_result result;
+	IN  		DWORD	prefmaxlen;
+	OUT 		DWORD	totalentries;
+	INOUT 		DWORD *	resume_handle;		/* not sure about ptr */
+	OUT 		DWORD	status;
+};
+
+
+/*
+ * Delete a share. The reserved field appears in netmon
+ * but I've left it out in case it's not always present.
+ * This won't affect RPC processing.
+ */
+OPERATION(SRVSVC_OPNUM_NetShareDel)
+struct mslm_NetShareDel {
+	IN	LPTSTR servername;
+	IN REFERENCE	LPTSTR netname;
+	/* IN	DWORD reserved; */
+	OUT	DWORD status;
+};
+
+
+/*
+ * NetShareEnumSticky is the same as NetShareEnum except that hidden
+ * shares are not returned. This call was apparently added due to a
+ * bug in the NT implementation of NetShareEnum - it didn't process
+ * the resume handle correctly so that attempts to enumerate large
+ * share lists resulted in an infinite loop.
+ */
+OPERATION(SRVSVC_OPNUM_NetShareEnumSticky)
+struct mslm_NetShareEnumSticky {
+	IN  		LPTSTR	servername;
+	INOUT  		DWORD	level;
+	OUT 		struct mslm_NetShareEnum_result result;
+	IN  		DWORD	prefmaxlen;
+	OUT 		DWORD	totalentries;
+	INOUT 		DWORD *	resume_handle;		/* not sure about ptr */
+	OUT 		DWORD	status;
+};
+
+/*
+ * When you install Windows NT Server Tools on a Win95 client,
+ * a security tab will be added to properties dialog box of files/folders.
+ * Within this security tab, when you try to get/set permissions on a
+ * file/folder the next two RPC calls are used.
+ */
+OPERATION(SRVSVC_OPNUM_NetGetFileSecurity)
+struct mslm_NetGetFileSecurity {
+	IN  		LPTSTR	servername;
+	IN			LPTSTR	sharename;
+	IN REFERENCE LPTSTR	filename;
+	IN			DWORD	securityinfo;	
+	
+	/*
+	 * Right now, we can't send back SD of the requested object
+	 * in MLRPC code, so we just reply with access denied error
+	 * code. Thus, this output declaration is only valid in this
+	 * case i.e., it's not complete.
+	 * It looks like:
+	 *
+	 *   A Pointer
+	 *   A Length
+	 *   
+	 *   A Pointer
+	 *   A Length (equal to the prev length)
+	 *   A buffer
+	 *
+	 *   return value
+	 */
+	OUT			DWORD	length;
+	OUT 		DWORD	status;
+};
+
+/*
+ * This is the request:
+ *
+ * R_SRVSVC: RPC Client call srvsvc:NetrpSetFileSecurity(..)
+ *	 R_SRVSVC: SRVSVC_HANDLE ServerName = \\WK76-177
+ *	 R_SRVSVC: LPWSTR ShareName = AFSHIN
+ *	 R_SRVSVC: LPWSTR lpFileName = \salek.txt
+ *	 R_SRVSVC: SECURITY_INFORMATION SecurityInformation = 4 (0x4)
+ *  -R_SRVSVC: PADT_SECURITY_DESCRIPTOR SecurityDescriptor {..}
+ *  R_SRVSVC: DWORD Length = 64 (0x40)
+ *  R_SRVSVC: LPBYTE Buffer = 4496048 (0x449AB0)
+ *  R_SRVSVC: LPBYTE Buffer [..] = 01 00 04 80 00 00 00 00 00 00 00 00 00 00 00
+ *  ...
+ *
+ *  000000A0        00 83 46 00 0B 00 00 00 00 00 00 00 0B 00   ..F...........
+ *  000000B0  00 00 5C 00 5C 00 57 00 4B 00 37 00 36 00 2D 00 ..\.\.W.K.7.6.-.
+ *  000000C0  31 00 37 00 37 00 00 00 08 00 16 83 46 00 07 00 1.7.7.......F...
+ *  000000D0  00 00 00 00 00 00 07 00 00 00 41 00 46 00 53 00 ..........A.F.S.
+ *  000000E0  48 00 49 00 4E 00 00 00 00 00 0B 00 00 00 00 00 H.I.N...........
+ *  000000F0  00 00 0B 00 00 00 5C 00 73 00 61 00 6C 00 65 00 ......\.s.a.l.e.
+ *  00000100  6B 00 2E 00 74 00 78 00 74 00 00 00 00 00 04 00 k...t.x.t.......
+ *  00000110  00 00 40 00 00 00 B0 9A 44 00 40 00 00 00 01 00 ..@.....D.@.....
+ *  00000120  04 80 00 00 00 00 00 00 00 00 00 00 00 00 14 00 ................
+ *  00000130  00 00 02 00 2C 00 01 00 00 00 00 00 24 00 00 00 ....,.......$...
+ *  00000140  00 A0 01 05 00 00 00 00 00 05 15 00 00 00 1A 24 ...............$
+ *  00000150  44 38 90 00 0F 02 65 3A BE 4C FF 03 00 00 00 00 D8....e:.L......
+ *  00000160  00 00 00 00 00 00 00 00 00 00                   ..........      
+ */
+OPERATION(SRVSVC_OPNUM_NetSetFileSecurity)
+struct mslm_NetSetFileSecurity {
+	IN  		LPTSTR	servername;
+	IN			LPTSTR	sharename;
+	IN REFERENCE LPTSTR	filename;
+	IN			DWORD	securityinfo;	
+	/*
+	 * IN Security Descriptor (looks like):
+	 * Length1
+	 * Pointer
+	 * Length2 (== Length1)
+	 * buffer itself
+	 */
+
+	OUT 		DWORD	status;
+};
+
+/*
+ * The SRVSVC already
+ */
+INTERFACE(0)
+union srvsvc_interface {
+    CASE(SRVSVC_OPNUM_NetConnectEnum)
+	struct mslm_NetConnectEnum	NetConnectEnum;
+    CASE(SRVSVC_OPNUM_NetFileEnum)
+	struct mslm_NetFileEnum		NetFileEnum;
+    CASE(SRVSVC_OPNUM_NetFileClose)
+	struct mslm_NetFileClose	NetFileClose;
+    CASE(SRVSVC_OPNUM_NetShareGetInfo)
+	struct mlsm_NetShareGetInfo	NetShareGetInfo;
+    CASE(SRVSVC_OPNUM_NetShareSetInfo)
+	struct mlsm_NetShareGetInfo	NetShareSetInfo;
+    CASE(SRVSVC_OPNUM_NetSessionDel)
+	struct mslm_NetSessionDel	NetSessionDel;
+    CASE(SRVSVC_OPNUM_NetSessionEnum)
+	struct mslm_NetSessionEnum	NetSessionEnum;
+    CASE(SRVSVC_OPNUM_NetServerGetInfo)
+	struct mslm_NetServerGetInfo	NetServerGetInfo;
+    CASE(SRVSVC_OPNUM_NetRemoteTOD)
+	struct mslm_NetRemoteTOD	NetRemoteTOD;
+    CASE(SRVSVC_OPNUM_NetNameValidate)
+	struct mslm_NetNameValidate	NetNameValidate;
+    CASE(SRVSVC_OPNUM_NetShareAdd)
+	struct mslm_NetShareAdd		NetShareAdd;
+    CASE(SRVSVC_OPNUM_NetShareDel)
+	struct mslm_NetShareDel		NetShareDel;
+    CASE(SRVSVC_OPNUM_NetShareEnum)
+	struct mslm_NetShareEnum	NetShareEnum;
+    CASE(SRVSVC_OPNUM_NetShareEnumSticky)
+	struct mslm_NetShareEnumSticky	NetShareEnumSticky;
+    CASE(SRVSVC_OPNUM_NetGetFileSecurity)
+	struct mslm_NetGetFileSecurity	NetGetFileSecurity;
+    CASE(SRVSVC_OPNUM_NetSetFileSecurity)
+	struct mslm_NetSetFileSecurity	NetSetFileSecurity;
+};
+typedef union srvsvc_interface	srvsvc_interface_t;
+EXTERNTYPEINFO(srvsvc_interface)
+
+
+
+/*
+ * WKSSVC -- Workstation Service
+ ****************************************************************
+ */
+
+#define WKSSVC_OPNUM_NetWkstaGetInfo	0x00
+
+
+/*
+ * NET_API_STATUS NET_API_FUNCTION
+ * NetWkstaGetInfo (
+ *     IN  LPTSTR  servername OPTIONAL,
+ *     IN  DWORD   level,
+ *     OUT LPBYTE  *bufptr
+ *     );
+ */
+
+struct mslm_WKSTA_INFO_100 {
+    DWORD   wki100_platform_id;
+    LPTSTR  wki100_computername;
+    LPTSTR  wki100_langroup;
+    DWORD   wki100_ver_major;
+    DWORD   wki100_ver_minor;
+};
+
+/* NetWkstaGetInfo only.  System information - user access */
+struct mslm_WKSTA_INFO_101 {
+    DWORD   wki101_platform_id;
+    LPTSTR  wki101_computername;
+    LPTSTR  wki101_langroup;
+    DWORD   wki101_ver_major;
+    DWORD   wki101_ver_minor;
+    LPTSTR  wki101_lanroot;
+};
+
+/* NetWkstaGetInfo only.  System information - admin or operator access */
+struct mslm_WKSTA_INFO_102 {
+    DWORD   wki102_platform_id;
+    LPTSTR  wki102_computername;
+    LPTSTR  wki102_langroup;
+    DWORD   wki102_ver_major;
+    DWORD   wki102_ver_minor;
+    LPTSTR  wki102_lanroot;
+    DWORD   wki102_logged_on_users;
+};
+
+INFO1RES_DEFINITION(mslm_NetWkstaGetInfo,
+	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,100)
+	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,101)
+	INFO1RES_UNION_ENTRY(mslm_WKSTA_INFO,102))
+
+INFO1RESBUF_DEFINITION(mslm_NetWkstaGetInfo,
+	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,100)
+	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,101)
+	INFO1RESBUF_UNION_ENTRY(mslm_WKSTA_INFO,102))
+
+
+OPERATION(WKSSVC_OPNUM_NetWkstaGetInfo)
+struct mslm_NetWkstaGetInfo {
+	IN  LPTSTR	servername;
+	IN  DWORD	level;
+	OUT struct mslm_NetWkstaGetInfo_result result;
+	OUT DWORD	status;
+};
+
+/*
+ * The WKSSVC already
+ */
+INTERFACE(0)
+union wkssvc_interface {
+    CASE(WKSSVC_OPNUM_NetWkstaGetInfo)
+	struct mslm_NetWkstaGetInfo	NetWkstaGetInfo;
+};
+typedef union wkssvc_interface	wkssvc_interface_t;
+EXTERNTYPEINFO(wkssvc_interface)
+
+
+#endif /* _MLSVC_LANMAN_NDL_ */

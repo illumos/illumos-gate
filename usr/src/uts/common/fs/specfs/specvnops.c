@@ -96,50 +96,59 @@
 #include <sys/contract/device_impl.h>
 
 
-static int spec_open(struct vnode **, int, struct cred *);
-static int spec_close(struct vnode *, int, int, offset_t, struct cred *);
+static int spec_open(struct vnode **, int, struct cred *, caller_context_t *);
+static int spec_close(struct vnode *, int, int, offset_t, struct cred *,
+	caller_context_t *);
 static int spec_read(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
+	caller_context_t *);
 static int spec_write(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
-static int spec_ioctl(struct vnode *, int, intptr_t, int, struct cred *, int *);
-static int spec_getattr(struct vnode *, struct vattr *, int, struct cred *);
+	caller_context_t *);
+static int spec_ioctl(struct vnode *, int, intptr_t, int, struct cred *, int *,
+	caller_context_t *);
+static int spec_getattr(struct vnode *, struct vattr *, int, struct cred *,
+	caller_context_t *);
 static int spec_setattr(struct vnode *, struct vattr *, int, struct cred *,
 	caller_context_t *);
-static int spec_access(struct vnode *, int, int, struct cred *);
-static int spec_create(struct vnode *, char *, vattr_t *, enum vcexcl,
-    int, struct vnode **, struct cred *, int);
-static int spec_fsync(struct vnode *, int, struct cred *);
-static void spec_inactive(struct vnode *, struct cred *);
-static int spec_fid(struct vnode *, struct fid *);
-static int spec_seek(struct vnode *, offset_t, offset_t *);
+static int spec_access(struct vnode *, int, int, struct cred *,
+	caller_context_t *);
+static int spec_create(struct vnode *, char *, vattr_t *, enum vcexcl, int,
+	struct vnode **, struct cred *, int, caller_context_t *, vsecattr_t *);
+static int spec_fsync(struct vnode *, int, struct cred *, caller_context_t *);
+static void spec_inactive(struct vnode *, struct cred *, caller_context_t *);
+static int spec_fid(struct vnode *, struct fid *, caller_context_t *);
+static int spec_seek(struct vnode *, offset_t, offset_t *, caller_context_t *);
 static int spec_frlock(struct vnode *, int, struct flock64 *, int, offset_t,
-    struct flk_callback *, struct cred *);
-static int spec_realvp(struct vnode *, struct vnode **);
+	struct flk_callback *, struct cred *, caller_context_t *);
+static int spec_realvp(struct vnode *, struct vnode **, caller_context_t *);
 
 static int spec_getpage(struct vnode *, offset_t, size_t, uint_t *, page_t **,
-    size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
+	size_t, struct seg *, caddr_t, enum seg_rw, struct cred *,
+	caller_context_t *);
 static int spec_putapage(struct vnode *, page_t *, u_offset_t *, size_t *, int,
 	struct cred *);
 static struct buf *spec_startio(struct vnode *, page_t *, u_offset_t, size_t,
 	int);
 static int spec_getapage(struct vnode *, u_offset_t, size_t, uint_t *,
-    page_t **, size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
+	page_t **, size_t, struct seg *, caddr_t, enum seg_rw, struct cred *);
 static int spec_map(struct vnode *, offset_t, struct as *, caddr_t *, size_t,
-    uchar_t, uchar_t, uint_t, struct cred *);
+	uchar_t, uchar_t, uint_t, struct cred *, caller_context_t *);
 static int spec_addmap(struct vnode *, offset_t, struct as *, caddr_t, size_t,
-    uchar_t, uchar_t, uint_t, struct cred *);
+	uchar_t, uchar_t, uint_t, struct cred *, caller_context_t *);
 static int spec_delmap(struct vnode *, offset_t, struct as *, caddr_t, size_t,
-    uint_t, uint_t, uint_t, struct cred *);
+	uint_t, uint_t, uint_t, struct cred *, caller_context_t *);
 
-static int spec_poll(struct vnode *, short, int, short *, struct pollhead **);
-static int spec_dump(struct vnode *, caddr_t, int, int);
+static int spec_poll(struct vnode *, short, int, short *, struct pollhead **,
+	caller_context_t *);
+static int spec_dump(struct vnode *, caddr_t, int, int, caller_context_t *);
 static int spec_pageio(struct vnode *, page_t *, u_offset_t, size_t, int,
-    cred_t *);
+    cred_t *, caller_context_t *);
 
-static int spec_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
-static int spec_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
-static int spec_pathconf(struct	vnode *, int, ulong_t *, struct cred *);
+static int spec_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
+	caller_context_t *);
+static int spec_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
+	caller_context_t *);
+static int spec_pathconf(struct	vnode *, int, ulong_t *, struct cred *,
+	caller_context_t *);
 
 #define	SN_HOLD(csp)	{ \
 	mutex_enter(&csp->s_lock); \
@@ -549,7 +558,7 @@ spec_clone(struct vnode **vpp, dev_t newdev, int vtype, struct stdata *stp)
 }
 
 static int
-spec_open(struct vnode **vpp, int flag, struct cred *cr)
+spec_open(struct vnode **vpp, int flag, struct cred *cr, caller_context_t *cc)
 {
 	major_t maj;
 	dev_t dev, newdev;
@@ -785,7 +794,7 @@ streams_open:
 		/* STREAM is of type S_IFCHR */
 		if (contract_device_open(newdev, S_IFCHR, &ct) != 0) {
 			UNLOCK_CSP(csp);
-			(void) spec_close(vp, flag, 1, 0, cr);
+			(void) spec_close(vp, flag, 1, 0, cr, cc);
 			return (EIO);
 		}
 	}
@@ -807,7 +816,7 @@ streams_open:
 			ASSERT(ttoproc(curthread));
 			(void) contract_abandon(ct, ttoproc(curthread), 0);
 		}
-		(void) spec_close(vp, flag, 1, 0, cr);
+		(void) spec_close(vp, flag, 1, 0, cr, cc);
 		return (EINTR);
 	}
 
@@ -826,7 +835,7 @@ streams_open:
 		mutex_exit(&stp->sd_lock);
 
 		UNLOCK_CSP(csp);
-		(void) spec_close(vp, flag, 1, 0, cr);
+		(void) spec_close(vp, flag, 1, 0, cr, cc);
 	} else {
 		UNLOCK_CSP(csp);
 		SN_RELE(csp);
@@ -842,7 +851,8 @@ spec_close(
 	int		flag,
 	int		count,
 	offset_t	offset,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct vnode *cvp;
 	struct snode *sp, *csp;
@@ -943,7 +953,7 @@ spec_read(
 	struct uio	*uiop,
 	int		ioflag,
 	struct cred	*cr,
-	struct caller_context *ct)
+	caller_context_t *ct)
 {
 	int error;
 	struct snode *sp = VTOS(vp);
@@ -1049,7 +1059,7 @@ spec_write(
 	struct uio *uiop,
 	int ioflag,
 	struct cred *cr,
-	struct caller_context *ct)
+	caller_context_t *ct)
 {
 	int error;
 	struct snode *sp = VTOS(vp);
@@ -1214,9 +1224,10 @@ spec_write(
 	return (error);
 }
 
+/*ARGSUSED6*/
 static int
 spec_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode, struct cred *cr,
-    int *rvalp)
+    int *rvalp, caller_context_t *ct)
 {
 	struct snode *sp;
 	dev_t dev;
@@ -1242,7 +1253,12 @@ spec_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode, struct cred *cr,
 }
 
 static int
-spec_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
+spec_getattr(
+	struct vnode *vp,
+	struct vattr *vap,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int error;
 	struct snode *sp;
@@ -1302,7 +1318,7 @@ spec_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 		 */
 		vap->va_nblocks = 0;
 	} else {
-		error = VOP_GETATTR(realvp, vap, flags, cr);
+		error = VOP_GETATTR(realvp, vap, flags, cr, ct);
 		if (error != 0)
 			return (error);
 	}
@@ -1331,7 +1347,7 @@ spec_setattr(
 	struct vattr *vap,
 	int flags,
 	struct cred *cr,
-	caller_context_t *ctp)
+	caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	struct vnode *realvp;
@@ -1353,7 +1369,7 @@ spec_setattr(
 	if ((realvp = sp->s_realvp) == NULL)
 		error = 0;	/* no real vnode to update */
 	else
-		error = VOP_SETATTR(realvp, vap, flags, cr, ctp);
+		error = VOP_SETATTR(realvp, vap, flags, cr, ct);
 	if (error == 0) {
 		/*
 		 * If times were changed, update snode.
@@ -1371,7 +1387,12 @@ spec_setattr(
 }
 
 static int
-spec_access(struct vnode *vp, int mode, int flags, struct cred *cr)
+spec_access(
+	struct vnode *vp,
+	int mode,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
@@ -1381,7 +1402,7 @@ spec_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 		return (ENXIO);
 
 	if ((realvp = sp->s_realvp) != NULL)
-		return (VOP_ACCESS(realvp, mode, flags, cr));
+		return (VOP_ACCESS(realvp, mode, flags, cr, ct));
 	else
 		return (0);	/* Allow all access. */
 }
@@ -1392,8 +1413,17 @@ spec_access(struct vnode *vp, int mode, int flags, struct cred *cr)
  */
 /*ARGSUSED*/
 static int
-spec_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
-    int mode, struct vnode **vpp, struct cred *cr, int flag)
+spec_create(
+	struct vnode *dvp,
+	char *name,
+	vattr_t *vap,
+	enum vcexcl excl,
+	int mode,
+	struct vnode **vpp,
+	struct cred *cr,
+	int flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 	struct snode *sp = VTOS(dvp);
@@ -1404,7 +1434,7 @@ spec_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
 
 	ASSERT(dvp && (dvp->v_flag & VROOT) && *name == '\0');
 	if (excl == NONEXCL) {
-		if (mode && (error = spec_access(dvp, mode, 0, cr)))
+		if (mode && (error = spec_access(dvp, mode, 0, cr, ct)))
 			return (error);
 		VN_HOLD(dvp);
 		return (0);
@@ -1418,7 +1448,11 @@ spec_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
  * already set in the vnode.
  */
 static int
-spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
+spec_fsync(
+	struct vnode *vp,
+	int syncflag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	struct vnode *realvp;
@@ -1440,7 +1474,7 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 
 	if (vp->v_type == VBLK && cvp != vp && vn_has_cached_data(cvp) &&
 	    (cvp->v_flag & VISSWAP) == 0)
-		(void) VOP_PUTPAGE(cvp, (offset_t)0, 0, 0, cr);
+		(void) VOP_PUTPAGE(cvp, (offset_t)0, 0, 0, cr, ct);
 
 	/*
 	 * For devices that support it, force write cache to stable storage.
@@ -1473,7 +1507,7 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 		return (0);
 
 	vatmp.va_mask = AT_ATIME|AT_MTIME;
-	if (VOP_GETATTR(realvp, &vatmp, 0, cr) == 0) {
+	if (VOP_GETATTR(realvp, &vatmp, 0, cr, ct) == 0) {
 
 		mutex_enter(&sp->s_lock);
 		if (vatmp.va_atime.tv_sec > sp->s_atime)
@@ -1491,15 +1525,15 @@ spec_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 		mutex_exit(&sp->s_lock);
 
 		va.va_mask = AT_ATIME|AT_MTIME;
-		(void) VOP_SETATTR(realvp, &va, 0, cr, NULL);
+		(void) VOP_SETATTR(realvp, &va, 0, cr, ct);
 	}
-	(void) VOP_FSYNC(realvp, syncflag, cr);
+	(void) VOP_FSYNC(realvp, syncflag, cr, ct);
 	return (0);
 }
 
 /*ARGSUSED*/
 static void
-spec_inactive(struct vnode *vp, struct cred *cr)
+spec_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	struct vnode *cvp;
@@ -1550,7 +1584,7 @@ spec_inactive(struct vnode *vp, struct cred *cr)
 			 * The user may not own the device, but we
 			 * want to update the attributes anyway.
 			 */
-			if (VOP_GETATTR(rvp, &vatmp, 0, kcred) == 0) {
+			if (VOP_GETATTR(rvp, &vatmp, 0, kcred, ct) == 0) {
 				if (vatmp.va_atime.tv_sec > sp->s_atime)
 					va.va_atime = vatmp.va_atime;
 				else {
@@ -1565,7 +1599,7 @@ spec_inactive(struct vnode *vp, struct cred *cr)
 				}
 
 				va.va_mask = AT_ATIME|AT_MTIME;
-				(void) VOP_SETATTR(rvp, &va, 0, kcred, NULL);
+				(void) VOP_SETATTR(rvp, &va, 0, kcred, ct);
 			}
 		}
 	}
@@ -1619,20 +1653,24 @@ spec_inactive(struct vnode *vp, struct cred *cr)
 }
 
 static int
-spec_fid(struct vnode *vp, struct fid *fidp)
+spec_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
 
 	if ((realvp = sp->s_realvp) != NULL)
-		return (VOP_FID(realvp, fidp));
+		return (VOP_FID(realvp, fidp, ct));
 	else
 		return (EINVAL);
 }
 
 /*ARGSUSED1*/
 static int
-spec_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+spec_seek(
+	struct vnode *vp,
+	offset_t ooff,
+	offset_t *noffp,
+	caller_context_t *ct)
 {
 	offset_t maxoff = spec_maxoffset(vp);
 
@@ -1650,7 +1688,8 @@ spec_frlock(
 	int		flag,
 	offset_t	offset,
 	struct flk_callback *flk_cbp,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	struct snode *csp;
@@ -1662,17 +1701,17 @@ spec_frlock(
 	if (csp->s_mapcnt > 0)
 		return (EAGAIN);
 
-	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr));
+	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 }
 
 static int
-spec_realvp(struct vnode *vp, struct vnode **vpp)
+spec_realvp(struct vnode *vp, struct vnode **vpp, caller_context_t *ct)
 {
 	struct vnode *rvp;
 
 	if ((rvp = VTOS(vp)->s_realvp) != NULL) {
 		vp = rvp;
-		if (VOP_REALVP(vp, &rvp) == 0)
+		if (VOP_REALVP(vp, &rvp, ct) == 0)
 			vp = rvp;
 	}
 
@@ -1684,6 +1723,7 @@ spec_realvp(struct vnode *vp, struct vnode **vpp)
  * Return all the pages from [off..off + len] in block
  * or character device.
  */
+/*ARGSUSED*/
 static int
 spec_getpage(
 	struct vnode	*vp,
@@ -1695,7 +1735,8 @@ spec_getpage(
 	struct seg	*seg,
 	caddr_t		addr,
 	enum seg_rw	rw,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	int err;
@@ -1942,13 +1983,15 @@ again:
  * len == MAXBSIZE (from segmap_release actions), and len == PAGESIZE
  * (from pageout).
  */
+/*ARGSUSED5*/
 int
 spec_putpage(
 	struct vnode *vp,
 	offset_t	off,
 	size_t		len,
 	int		flags,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct snode *sp = VTOS(vp);
 	struct vnode *cvp;
@@ -2142,13 +2185,14 @@ spec_poll(
 	short		events,
 	int		anyyet,
 	short		*reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	dev_t dev;
 	int error;
 
 	if (vp->v_type == VBLK)
-		error = fs_poll(vp, events, anyyet, reventsp, phpp);
+		error = fs_poll(vp, events, anyyet, reventsp, phpp, ct);
 	else {
 		ASSERT(vp->v_type == VCHR);
 		dev = vp->v_rdev;
@@ -2159,7 +2203,7 @@ spec_poll(
 		} else if (devopsp[getmajor(dev)]->devo_cb_ops->cb_chpoll) {
 			error = cdev_poll(dev, events, anyyet, reventsp, phpp);
 		} else {
-			error = fs_poll(vp, events, anyyet, reventsp, phpp);
+			error = fs_poll(vp, events, anyyet, reventsp, phpp, ct);
 		}
 	}
 	return (error);
@@ -2310,6 +2354,7 @@ spec_char_map(
 	    maxprot, flags, cred));
 }
 
+/*ARGSUSED9*/
 static int
 spec_map(
 	struct vnode *vp,
@@ -2320,7 +2365,8 @@ spec_map(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	int error = 0;
 	struct snode *sp = VTOS(vp);
@@ -2405,7 +2451,8 @@ spec_addmap(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	int error = 0;
 	struct snode *csp = VTOS(vp);
@@ -2443,7 +2490,8 @@ spec_delmap(
 	uint_t prot,
 	uint_t maxprot,
 	uint_t flags,
-	struct cred *cred)
+	struct cred *cred,
+	caller_context_t *ct)
 {
 	struct snode *csp = VTOS(vp);
 	ulong_t npages;
@@ -2498,8 +2546,14 @@ spec_delmap(
 	return (0);
 }
 
+/*ARGSUSED4*/
 static int
-spec_dump(struct vnode *vp, caddr_t addr, int bn, int count)
+spec_dump(
+	struct vnode *vp,
+	caddr_t addr,
+	int bn,
+	int count,
+	caller_context_t *ct)
 {
 	/* allow dump to succeed even if device fenced off */
 
@@ -2522,7 +2576,8 @@ spec_pageio(
 	u_offset_t io_off,
 	size_t	io_len,
 	int	flags,
-	cred_t	*cr)
+	cred_t	*cr,
+	caller_context_t *ct)
 {
 	struct buf *bp = NULL;
 	int err = 0;
@@ -2546,7 +2601,12 @@ spec_pageio(
  * Set ACL on underlying vnode if one exists, or return ENOSYS otherwise.
  */
 int
-spec_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
+spec_setsecattr(
+	struct vnode *vp,
+	vsecattr_t *vsap,
+	int flag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
@@ -2564,9 +2624,9 @@ spec_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
 	 * here privately to avoid serializing specfs reads and writes.
 	 */
 	if ((realvp = sp->s_realvp) != NULL) {
-		(void) VOP_RWLOCK(realvp, V_WRITELOCK_TRUE, NULL);
-		error = VOP_SETSECATTR(realvp, vsap, flag, cr);
-		(void) VOP_RWUNLOCK(realvp, V_WRITELOCK_TRUE, NULL);
+		(void) VOP_RWLOCK(realvp, V_WRITELOCK_TRUE, ct);
+		error = VOP_SETSECATTR(realvp, vsap, flag, cr, ct);
+		(void) VOP_RWUNLOCK(realvp, V_WRITELOCK_TRUE, ct);
 		return (error);
 	} else
 		return (fs_nosys());
@@ -2577,7 +2637,12 @@ spec_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
  * the permissions returned by spec_getattr() otherwise.
  */
 int
-spec_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
+spec_getsecattr(
+	struct vnode *vp,
+	vsecattr_t *vsap,
+	int flag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct vnode *realvp;
 	struct snode *sp = VTOS(vp);
@@ -2587,13 +2652,18 @@ spec_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
 		return (ENXIO);
 
 	if ((realvp = sp->s_realvp) != NULL)
-		return (VOP_GETSECATTR(realvp, vsap, flag, cr));
+		return (VOP_GETSECATTR(realvp, vsap, flag, cr, ct));
 	else
-		return (fs_fab_acl(vp, vsap, flag, cr));
+		return (fs_fab_acl(vp, vsap, flag, cr, ct));
 }
 
 int
-spec_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+spec_pathconf(
+	vnode_t *vp,
+	int cmd,
+	ulong_t *valp,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vnode_t *realvp;
 	struct snode *sp = VTOS(vp);
@@ -2603,7 +2673,7 @@ spec_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 		return (ENXIO);
 
 	if ((realvp = sp->s_realvp) != NULL)
-		return (VOP_PATHCONF(realvp, cmd, valp, cr));
+		return (VOP_PATHCONF(realvp, cmd, valp, cr, ct));
 	else
-		return (fs_pathconf(vp, cmd, valp, cr));
+		return (fs_pathconf(vp, cmd, valp, cr, ct));
 }

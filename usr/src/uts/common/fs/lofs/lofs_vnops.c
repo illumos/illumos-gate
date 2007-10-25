@@ -48,7 +48,7 @@
  */
 
 static int
-lo_open(vnode_t **vpp, int flag, struct cred *cr)
+lo_open(vnode_t **vpp, int flag, struct cred *cr, caller_context_t *ct)
 {
 	vnode_t *vp = *vpp;
 	vnode_t *rvp;
@@ -67,7 +67,7 @@ lo_open(vnode_t **vpp, int flag, struct cred *cr)
 	 * decide to release it.
 	 */
 	VN_HOLD(vp);
-	error = VOP_OPEN(&rvp, flag, cr);
+	error = VOP_OPEN(&rvp, flag, cr, ct);
 
 	if (!error && rvp != vp) {
 		/*
@@ -106,13 +106,14 @@ lo_close(
 	int flag,
 	int count,
 	offset_t offset,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_close vp %p realvp %p\n", vp, realvp(vp));
 #endif
 	vp = realvp(vp);
-	return (VOP_CLOSE(vp, flag, count, offset, cr));
+	return (VOP_CLOSE(vp, flag, count, offset, cr, ct));
 }
 
 static int
@@ -144,20 +145,21 @@ lo_ioctl(
 	intptr_t arg,
 	int flag,
 	struct cred *cr,
-	int *rvalp)
+	int *rvalp,
+	caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_ioctl vp %p realvp %p\n", vp, realvp(vp));
 #endif
 	vp = realvp(vp);
-	return (VOP_IOCTL(vp, cmd, arg, flag, cr, rvalp));
+	return (VOP_IOCTL(vp, cmd, arg, flag, cr, rvalp, ct));
 }
 
 static int
-lo_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
+lo_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr, caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_SETFL(vp, oflags, nflags, cr));
+	return (VOP_SETFL(vp, oflags, nflags, cr, ct));
 }
 
 static int
@@ -165,14 +167,15 @@ lo_getattr(
 	vnode_t *vp,
 	struct vattr *vap,
 	int flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int error;
 
 #ifdef LODEBUG
 	lo_dprint(4, "lo_getattr vp %p realvp %p\n", vp, realvp(vp));
 #endif
-	if (error = VOP_GETATTR(realvp(vp), vap, flags, cr))
+	if (error = VOP_GETATTR(realvp(vp), vap, flags, cr, ct))
 		return (error);
 
 	return (0);
@@ -194,7 +197,12 @@ lo_setattr(
 }
 
 static int
-lo_access(vnode_t *vp, int mode, int flags, struct cred *cr)
+lo_access(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_access vp %p realvp %p\n", vp, realvp(vp));
@@ -204,22 +212,22 @@ lo_access(vnode_t *vp, int mode, int flags, struct cred *cr)
 			return (EROFS);
 	}
 	vp = realvp(vp);
-	return (VOP_ACCESS(vp, mode, flags, cr));
+	return (VOP_ACCESS(vp, mode, flags, cr, ct));
 }
 
 static int
-lo_fsync(vnode_t *vp, int syncflag, struct cred *cr)
+lo_fsync(vnode_t *vp, int syncflag, struct cred *cr, caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_fsync vp %p realvp %p\n", vp, realvp(vp));
 #endif
 	vp = realvp(vp);
-	return (VOP_FSYNC(vp, syncflag, cr));
+	return (VOP_FSYNC(vp, syncflag, cr, ct));
 }
 
 /*ARGSUSED*/
 static void
-lo_inactive(vnode_t *vp, struct cred *cr)
+lo_inactive(vnode_t *vp, struct cred *cr, caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_inactive %p, realvp %p\n", vp, realvp(vp));
@@ -229,13 +237,13 @@ lo_inactive(vnode_t *vp, struct cred *cr)
 
 /* ARGSUSED */
 static int
-lo_fid(vnode_t *vp, struct fid *fidp)
+lo_fid(vnode_t *vp, struct fid *fidp, caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_fid %p, realvp %p\n", vp, realvp(vp));
 #endif
 	vp = realvp(vp);
-	return (VOP_FID(vp, fidp));
+	return (VOP_FID(vp, fidp, ct));
 }
 
 /*
@@ -288,7 +296,10 @@ lo_lookup(
 	struct pathname *pnp,
 	int flags,
 	vnode_t *rdir,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int *direntflags,
+	pathname_t *realpnp)
 {
 	vnode_t *vp = NULL, *tvp = NULL, *nonlovp;
 	int error, is_indirectloop;
@@ -327,7 +338,8 @@ lo_lookup(
 	/*
 	 * Do the normal lookup
 	 */
-	if (error = VOP_LOOKUP(realdvp, nm, &vp, pnp, flags, rdir, cr)) {
+	if (error = VOP_LOOKUP(realdvp, nm, &vp, pnp, flags, rdir, cr,
+	    ct, direntflags, realpnp)) {
 		vp = NULL;
 		goto out;
 	}
@@ -657,7 +669,9 @@ lo_create(
 	int mode,
 	vnode_t **vpp,
 	struct cred *cr,
-	int flag)
+	int flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *vp = NULL;
@@ -670,7 +684,8 @@ lo_create(
 		vp = realvp(*vpp);
 	}
 
-	error = VOP_CREATE(realvp(dvp), nm, va, exclusive, mode, &vp, cr, flag);
+	error = VOP_CREATE(realvp(dvp), nm, va, exclusive, mode, &vp, cr, flag,
+		ct, vsecp);
 	if (!error) {
 		*vpp = makelonode(vp, vtoli(dvp->v_vfsp), 0);
 		if (IS_DEVVP(*vpp)) {
@@ -688,17 +703,28 @@ lo_create(
 }
 
 static int
-lo_remove(vnode_t *dvp, char *nm, struct cred *cr)
+lo_remove(
+	vnode_t *dvp,
+	char *nm,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_remove vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
 	dvp = realvp(dvp);
-	return (VOP_REMOVE(dvp, nm, cr));
+	return (VOP_REMOVE(dvp, nm, cr, ct, flags));
 }
 
 static int
-lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
+lo_link(
+	vnode_t *tdvp,
+	vnode_t *vp,
+	char *tnm,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *realvp;
 
@@ -737,7 +763,7 @@ lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 	 *
 	 * We use VOP_REALVP here to continue the search.
 	 */
-	if (VOP_REALVP(vp, &realvp) == 0)
+	if (VOP_REALVP(vp, &realvp, ct) == 0)
 		vp = realvp;
 
 	while (vn_matchops(tdvp, lo_vnodeops)) {
@@ -745,7 +771,7 @@ lo_link(vnode_t *tdvp, vnode_t *vp, char *tnm, struct cred *cr)
 	}
 	if (vp->v_vfsp != tdvp->v_vfsp)
 		return (EXDEV);
-	return (VOP_LINK(tdvp, vp, tnm, cr));
+	return (VOP_LINK(tdvp, vp, tnm, cr, ct, flags));
 }
 
 static int
@@ -754,7 +780,9 @@ lo_rename(
 	char *onm,
 	vnode_t *ndvp,
 	char *nnm,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *tnvp;
 
@@ -789,7 +817,13 @@ lo_rename(
 	 */
 	if (vn_matchops(ndvp, lo_vnodeops))	/* Not our problem. */
 		goto rename;
-	if (VOP_LOOKUP(ndvp, nnm, &tnvp, NULL, 0, NULL, cr) != 0)
+
+	/*
+	 * XXXci - Once case-insensitive behavior is implemented, it should
+	 * be added here.
+	 */
+	if (VOP_LOOKUP(ndvp, nnm, &tnvp, NULL, 0, NULL, cr,
+	    ct, NULL, NULL) != 0)
 		goto rename;
 	if (tnvp->v_type != VDIR) {
 		VN_RELE(tnvp);
@@ -822,7 +856,7 @@ rename:
 		if (odvp->v_vfsp != ndvp->v_vfsp)
 			return (EXDEV);
 	}
-	return (VOP_RENAME(odvp, onm, ndvp, nnm, cr));
+	return (VOP_RENAME(odvp, onm, ndvp, nnm, cr, ct, flags));
 }
 
 static int
@@ -831,21 +865,24 @@ lo_mkdir(
 	char *nm,
 	struct vattr *va,
 	vnode_t **vpp,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)
 {
 	int error;
 
 #ifdef LODEBUG
 	lo_dprint(4, "lo_mkdir vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
-	error = VOP_MKDIR(realvp(dvp), nm, va, vpp, cr);
+	error = VOP_MKDIR(realvp(dvp), nm, va, vpp, cr, ct, flags, vsecp);
 	if (!error)
 		*vpp = makelonode(*vpp, vtoli(dvp->v_vfsp), 0);
 	return (error);
 }
 
 static int
-lo_realvp(vnode_t *vp, vnode_t **vpp)
+lo_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_realvp %p\n", vp);
@@ -853,7 +890,7 @@ lo_realvp(vnode_t *vp, vnode_t **vpp)
 	while (vn_matchops(vp, lo_vnodeops))
 		vp = realvp(vp);
 
-	if (VOP_REALVP(vp, vpp) != 0)
+	if (VOP_REALVP(vp, vpp, ct) != 0)
 		*vpp = vp;
 	return (0);
 }
@@ -863,7 +900,9 @@ lo_rmdir(
 	vnode_t *dvp,
 	char *nm,
 	vnode_t *cdir,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	vnode_t *rvp = cdir;
 
@@ -872,9 +911,9 @@ lo_rmdir(
 #endif
 	/* if cdir is lofs vnode ptr get its real vnode ptr */
 	if (vn_matchops(dvp, vn_getops(rvp)))
-		(void) lo_realvp(cdir, &rvp);
+		(void) lo_realvp(cdir, &rvp, ct);
 	dvp = realvp(dvp);
-	return (VOP_RMDIR(dvp, nm, rvp, cr));
+	return (VOP_RMDIR(dvp, nm, rvp, cr, ct, flags));
 }
 
 static int
@@ -883,30 +922,42 @@ lo_symlink(
 	char *lnm,
 	struct vattr *tva,
 	char *tnm,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_symlink vp %p realvp %p\n", dvp, realvp(dvp));
 #endif
 	dvp = realvp(dvp);
-	return (VOP_SYMLINK(dvp, lnm, tva, tnm, cr));
+	return (VOP_SYMLINK(dvp, lnm, tva, tnm, cr, ct, flags));
 }
 
 static int
-lo_readlink(vnode_t *vp, struct uio *uiop, struct cred *cr)
+lo_readlink(
+	vnode_t *vp,
+	struct uio *uiop,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_READLINK(vp, uiop, cr));
+	return (VOP_READLINK(vp, uiop, cr, ct));
 }
 
 static int
-lo_readdir(vnode_t *vp, struct uio *uiop, struct cred *cr, int *eofp)
+lo_readdir(
+	vnode_t *vp,
+	struct uio *uiop,
+	struct cred *cr,
+	int *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 #ifdef LODEBUG
 	lo_dprint(4, "lo_readdir vp %p realvp %p\n", vp, realvp(vp));
 #endif
 	vp = realvp(vp);
-	return (VOP_READDIR(vp, uiop, cr, eofp));
+	return (VOP_READDIR(vp, uiop, cr, eofp, ct, flags));
 }
 
 static int
@@ -924,20 +975,20 @@ lo_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ct)
 }
 
 static int
-lo_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+lo_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_SEEK(vp, ooff, noffp));
+	return (VOP_SEEK(vp, ooff, noffp, ct));
 }
 
 static int
-lo_cmp(vnode_t *vp1, vnode_t *vp2)
+lo_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
 	while (vn_matchops(vp1, lo_vnodeops))
 		vp1 = realvp(vp1);
 	while (vn_matchops(vp2, lo_vnodeops))
 		vp2 = realvp(vp2);
-	return (VOP_CMP(vp1, vp2));
+	return (VOP_CMP(vp1, vp2, ct));
 }
 
 static int
@@ -948,10 +999,11 @@ lo_frlock(
 	int flag,
 	offset_t offset,
 	struct flk_callback *flk_cbp,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_FRLOCK(vp, cmd, bfp, flag, offset, flk_cbp, cr));
+	return (VOP_FRLOCK(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 }
 
 static int
@@ -979,17 +1031,25 @@ lo_getpage(
 	struct seg *seg,
 	caddr_t addr,
 	enum seg_rw rw,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_GETPAGE(vp, off, len, prot, parr, psz, seg, addr, rw, cr));
+	return (VOP_GETPAGE(vp, off, len, prot, parr, psz, seg, addr, rw, cr,
+		ct));
 }
 
 static int
-lo_putpage(vnode_t *vp, offset_t off, size_t len, int flags, struct cred *cr)
+lo_putpage(
+	vnode_t *vp,
+	offset_t off,
+	size_t len,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_PUTPAGE(vp, off, len, flags, cr));
+	return (VOP_PUTPAGE(vp, off, len, flags, cr, ct));
 }
 
 static int
@@ -1002,10 +1062,11 @@ lo_map(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_MAP(vp, off, as, addrp, len, prot, maxprot, flags, cr));
+	return (VOP_MAP(vp, off, as, addrp, len, prot, maxprot, flags, cr, ct));
 }
 
 static int
@@ -1018,10 +1079,12 @@ lo_addmap(
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_ADDMAP(vp, off, as, addr, len, prot, maxprot, flags, cr));
+	return (VOP_ADDMAP(vp, off, as, addr, len, prot, maxprot, flags, cr,
+		ct));
 }
 
 static int
@@ -1034,10 +1097,12 @@ lo_delmap(
 	uint_t prot,
 	uint_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_DELMAP(vp, off, as, addr, len, prot, maxprot, flags, cr));
+	return (VOP_DELMAP(vp, off, as, addr, len, prot, maxprot, flags, cr,
+		ct));
 }
 
 static int
@@ -1046,24 +1111,30 @@ lo_poll(
 	short events,
 	int anyyet,
 	short *reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_POLL(vp, events, anyyet, reventsp, phpp));
+	return (VOP_POLL(vp, events, anyyet, reventsp, phpp, ct));
 }
 
 static int
-lo_dump(vnode_t *vp, caddr_t addr, int bn, int count)
+lo_dump(vnode_t *vp, caddr_t addr, int bn, int count, caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_DUMP(vp, addr, bn, count));
+	return (VOP_DUMP(vp, addr, bn, count, ct));
 }
 
 static int
-lo_pathconf(vnode_t *vp, int cmd, ulong_t *valp, struct cred *cr)
+lo_pathconf(
+	vnode_t *vp,
+	int cmd,
+	ulong_t *valp,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_PATHCONF(vp, cmd, valp, cr));
+	return (VOP_PATHCONF(vp, cmd, valp, cr, ct));
 }
 
 static int
@@ -1073,41 +1144,64 @@ lo_pageio(
 	u_offset_t io_off,
 	size_t io_len,
 	int flags,
-	cred_t *cr)
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_PAGEIO(vp, pp, io_off, io_len, flags, cr));
+	return (VOP_PAGEIO(vp, pp, io_off, io_len, flags, cr, ct));
 }
 
 static void
-lo_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
+lo_dispose(
+	vnode_t *vp,
+	page_t *pp,
+	int fl,
+	int dn,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
 	if (vp != NULL && !VN_ISKAS(vp))
-		VOP_DISPOSE(vp, pp, fl, dn, cr);
+		VOP_DISPOSE(vp, pp, fl, dn, cr, ct);
 }
 
 static int
-lo_setsecattr(vnode_t *vp, vsecattr_t *secattr, int flags, struct cred *cr)
+lo_setsecattr(
+	vnode_t *vp,
+	vsecattr_t *secattr,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	if (vn_is_readonly(vp))
 		return (EROFS);
 	vp = realvp(vp);
-	return (VOP_SETSECATTR(vp, secattr, flags, cr));
+	return (VOP_SETSECATTR(vp, secattr, flags, cr, ct));
 }
 
 static int
-lo_getsecattr(vnode_t *vp, vsecattr_t *secattr, int flags, struct cred *cr)
+lo_getsecattr(
+	vnode_t *vp,
+	vsecattr_t *secattr,
+	int flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_GETSECATTR(vp, secattr, flags, cr));
+	return (VOP_GETSECATTR(vp, secattr, flags, cr, ct));
 }
 
 static int
-lo_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
+lo_shrlock(
+	vnode_t *vp,
+	int cmd,
+	struct shrlock *shr,
+	int flag,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vp = realvp(vp);
-	return (VOP_SHRLOCK(vp, cmd, shr, flag, cr));
+	return (VOP_SHRLOCK(vp, cmd, shr, flag, cr, ct));
 }
 
 /*

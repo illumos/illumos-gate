@@ -189,7 +189,7 @@ cpr_get_config(void)
 	}
 
 	err = cpr_rdwr(UIO_READ, vp, cf, sizeof (*cf));
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 	if (err) {
 		cpr_err(CE_CONT, fmt, "read", config_path, err);
@@ -455,7 +455,7 @@ cpr_alloc_statefile(int alloc_retry)
 		if (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG7))
 			prom_printf(str);
 		if (C_VP->v_type != VBLK)
-			(void) VOP_DUMPCTL(C_VP, DUMP_FREE, NULL);
+			(void) VOP_DUMPCTL(C_VP, DUMP_FREE, NULL, NULL);
 	} else {
 		/*
 		 * Open an exiting file for writing, the state file needs to be
@@ -501,7 +501,7 @@ cpr_alloc_statefile(int alloc_retry)
 		 * Validate disk blocks allocation for the state file.
 		 * Ask the file system prepare itself for the dump operation.
 		 */
-		if (rc = VOP_DUMPCTL(C_VP, DUMP_ALLOC, NULL)) {
+		if (rc = VOP_DUMPCTL(C_VP, DUMP_ALLOC, NULL, NULL)) {
 			cpr_err(CE_CONT, "Error allocating "
 			    "blocks for cpr statefile.");
 			return (rc);
@@ -730,8 +730,8 @@ cpr_statef_close(void)
 {
 	if (C_VP) {
 		if (!cpr_reusable_mode)
-			(void) VOP_DUMPCTL(C_VP, DUMP_FREE, NULL);
-		(void) VOP_CLOSE(C_VP, FWRITE, 1, (offset_t)0, CRED());
+			(void) VOP_DUMPCTL(C_VP, DUMP_FREE, NULL, NULL);
+		(void) VOP_CLOSE(C_VP, FWRITE, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(C_VP);
 		C_VP = 0;
 	}
@@ -771,9 +771,9 @@ cpr_write_deffile(cdef_t *cdef)
 
 	if (rc = cpr_rdwr(UIO_WRITE, vp, cdef, sizeof (*cdef)))
 		str = "write";
-	else if (rc = VOP_FSYNC(vp, FSYNC, CRED()))
+	else if (rc = VOP_FSYNC(vp, FSYNC, CRED(), NULL))
 		str = "fsync";
-	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 
 	if (rc) {
@@ -799,7 +799,7 @@ cpr_clear_definfo(void)
 		return;
 	mini.magic = mini.reusable = 0;
 	(void) cpr_rdwr(UIO_WRITE, vp, &mini, sizeof (mini));
-	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FWRITE, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 }
 
@@ -818,7 +818,7 @@ cpr_get_reusable_mode(void)
 		return (0);
 
 	rc = cpr_rdwr(UIO_READ, vp, &mini, sizeof (mini));
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 	if (rc == 0 && mini.magic == CPR_DEFAULT_MAGIC)
 		return (mini.reusable);

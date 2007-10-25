@@ -622,6 +622,62 @@ strspn(const char *string, const char *charset)
 	return ((size_t)(q - string));
 }
 
+size_t
+strcspn(const char *string, const char *charset)
+{
+	const char *p, *q;
+
+	for (q = string; *q != '\0'; ++q) {
+		for (p = charset; *p != '\0' && *p != *q; ++p)
+			;
+		if (*p != '\0')
+			break;
+	}
+
+	/*LINTED E_PTRDIFF_OVERFLOW*/
+	return ((size_t)(q - string));
+}
+
+/*
+ * strsep
+ *
+ * The strsep() function locates, in the string referenced by *stringp, the
+ * first occurrence of any character in the string delim (or the terminating
+ * `\0' character) and replaces it with a `\0'.  The location of the next
+ * character after the delimiter character (or NULL, if the end of the
+ * string was reached) is stored in *stringp.  The original value of
+ * *stringp is returned.
+ *
+ * If *stringp is initially NULL, strsep() returns NULL.
+ */
+char *
+strsep(char **stringp, const char *delim)
+{
+	char *s;
+	const char *spanp;
+	int c, sc;
+	char *tok;
+
+	if ((s = *stringp) == NULL)
+		return (NULL);
+
+	for (tok = s; ; ) {
+		c = *s++;
+		spanp = delim;
+		do {
+			if ((sc = *spanp++) == c) {
+				if (c == 0)
+					s = NULL;
+				else
+					s[-1] = 0;
+				*stringp = s;
+				return (tok);
+			}
+		} while (sc != 0);
+	}
+	/* NOTREACHED */
+}
+
 /*
  * Unless mentioned otherwise, all of the routines below should be added to
  * the Solaris DDI as necessary.  For now, only provide them to standalone.

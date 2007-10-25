@@ -81,7 +81,12 @@ ctfs_create_symnode(vnode_t *pvp, contract_t *ct)
  */
 /* ARGSUSED */
 static int
-ctfs_sym_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_sym_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	ctfs_symnode_t *symnode = vp->v_data;
 
@@ -104,7 +109,7 @@ ctfs_sym_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 int
-ctfs_sym_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
+ctfs_sym_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 {
 	ctfs_symnode_t *symnode = vp->v_data;
 
@@ -117,7 +122,7 @@ ctfs_sym_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
  */
 /* ARGSUSED */
 static void
-ctfs_sym_inactive(vnode_t *vp, cred_t *cr)
+ctfs_sym_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	ctfs_symnode_t *symnode;
 

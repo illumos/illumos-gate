@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,8 @@ read(int fdes, void *cbuf, size_t count)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_READ, fp->f_offset, cnt, svmand)) {
+		if (nbl_conflict(vp, NBL_READ, fp->f_offset, cnt, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -138,7 +139,7 @@ read(int fdes, void *cbuf, size_t count)
 	if (fileoff >= OFFSET_MAX(fp) && (vp->v_type == VREG)) {
 		struct vattr va;
 		va.va_mask = AT_SIZE;
-		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred)))  {
+		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL)))  {
 			VOP_RWUNLOCK(vp, rwflag, NULL);
 			goto out;
 		}
@@ -250,7 +251,8 @@ write(int fdes, void *cbuf, size_t count)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fp->f_offset, cnt, svmand)) {
+		if (nbl_conflict(vp, NBL_WRITE, fp->f_offset, cnt, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -402,7 +404,8 @@ pread(int fdes, void *cbuf, size_t count, off_t offset)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_READ, fileoff, bcount, svmand)) {
+		if (nbl_conflict(vp, NBL_READ, fileoff, bcount, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -414,7 +417,7 @@ pread(int fdes, void *cbuf, size_t count, off_t offset)
 	if (vp->v_type == VREG && fileoff == (u_offset_t)maxoff) {
 		struct vattr va;
 		va.va_mask = AT_SIZE;
-		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred))) {
+		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL))) {
 			VOP_RWUNLOCK(vp, rwflag, NULL);
 			goto out;
 		}
@@ -555,7 +558,8 @@ pwrite(int fdes, void *cbuf, size_t count, off_t offset)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fileoff, bcount, svmand)) {
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, bcount, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -682,7 +686,8 @@ readv(int fdes, struct iovec *iovp, int iovcnt)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_READ, fp->f_offset, count, svmand)) {
+		if (nbl_conflict(vp, NBL_READ, fp->f_offset, count, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -698,7 +703,7 @@ readv(int fdes, struct iovec *iovp, int iovcnt)
 	if ((vp->v_type == VREG) && (fileoff >= OFFSET_MAX(fp))) {
 		struct vattr va;
 		va.va_mask = AT_SIZE;
-		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred)))  {
+		if ((error = VOP_GETATTR(vp, &va, 0, fp->f_cred, NULL)))  {
 			VOP_RWUNLOCK(vp, rwflag, NULL);
 			goto out;
 		}
@@ -839,7 +844,8 @@ writev(int fdes, struct iovec *iovp, int iovcnt)
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fp->f_offset, count, svmand)) {
+		if (nbl_conflict(vp, NBL_WRITE, fp->f_offset, count, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -980,7 +986,8 @@ pread64(int fdes, void *cbuf, size32_t count, uint32_t offset_1,
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_READ, fileoff, bcount, svmand)) {
+		if (nbl_conflict(vp, NBL_READ, fileoff, bcount, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -1112,7 +1119,8 @@ pwrite64(int fdes, void *cbuf, size32_t count, uint32_t offset_1,
 		error = nbl_svmand(vp, fp->f_cred, &svmand);
 		if (error != 0)
 			goto out;
-		if (nbl_conflict(vp, NBL_WRITE, fileoff, bcount, svmand)) {
+		if (nbl_conflict(vp, NBL_WRITE, fileoff, bcount, svmand,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}

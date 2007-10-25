@@ -92,6 +92,8 @@ typedef struct fsem    fsem_t;
 
 typedef int femop_t();
 
+typedef void (*fem_func_t)(void *);
+
 /*
  * The following enumerations specify the conditions
  * under which a monitor (operation/argument combination)
@@ -146,95 +148,119 @@ struct fem_head {
  * the fem structure (below) and the fs_func_p union (vfs_opreg.h).
  */
 #define	FEM_OPS								\
-	int (*femop_open)(femarg_t *vf, int mode, cred_t *cr);		\
+	int (*femop_open)(femarg_t *vf, int mode, cred_t *cr,		\
+			caller_context_t *ct);				\
 	int (*femop_close)(femarg_t *vf, int flag, int count,		\
-			offset_t offset, cred_t *cr);			\
+			offset_t offset, cred_t *cr,			\
+			caller_context_t *ct);				\
 	int (*femop_read)(femarg_t *vf, uio_t *uiop, int ioflag,	\
-			cred_t *cr, struct caller_context *ct);		\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_write)(femarg_t *vf, uio_t *uiop, int ioflag,	\
-			cred_t *cr, struct caller_context *ct);		\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_ioctl)(femarg_t *vf, int cmd, intptr_t arg,		\
-			int flag, cred_t *cr, int *rvalp);		\
+			int flag, cred_t *cr, int *rvalp,		\
+			caller_context_t *ct);				\
 	int (*femop_setfl)(femarg_t *vf, int oflags, int nflags,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_getattr)(femarg_t *vf, vattr_t *vap, int flags,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_setattr)(femarg_t *vf, vattr_t *vap, int flags,	\
 			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_access)(femarg_t *vf, int mode, int flags,		\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_lookup)(femarg_t *vf, char *nm, vnode_t **vpp,	\
 			pathname_t *pnp, int flags, vnode_t *rdir,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct,		\
+			int *direntflags, pathname_t *realpnp);		\
 	int (*femop_create)(femarg_t *vf, char *name, vattr_t *vap,	\
 			vcexcl_t excl, int mode, vnode_t **vpp,		\
-			cred_t *cr, int flag);				\
-	int (*femop_remove)(femarg_t *vf, char *nm, cred_t *cr);	\
+			cred_t *cr, int flag, caller_context_t *ct,	\
+			vsecattr_t *vsecp);				\
+	int (*femop_remove)(femarg_t *vf, char *nm, cred_t *cr,		\
+			caller_context_t *ct, int flags);		\
 	int (*femop_link)(femarg_t *vf, vnode_t *svp, char *tnm,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct, int flags);	\
 	int (*femop_rename)(femarg_t *vf, char *snm, vnode_t *tdvp,	\
-			char *tnm, cred_t *cr);				\
+			char *tnm, cred_t *cr, caller_context_t *ct,	\
+			int flags);					\
 	int (*femop_mkdir)(femarg_t *vf, char *dirname, vattr_t *vap,	\
-			vnode_t **vpp, cred_t *cr);			\
+			vnode_t **vpp, cred_t *cr,			\
+			caller_context_t *ct, int flags,		\
+			vsecattr_t *vsecp);				\
 	int (*femop_rmdir)(femarg_t *vf, char *nm, vnode_t *cdir,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct, int flags);	\
 	int (*femop_readdir)(femarg_t *vf, uio_t *uiop, cred_t *cr,	\
-			int *eofp);					\
+			int *eofp, caller_context_t *ct, int flags);	\
 	int (*femop_symlink)(femarg_t *vf, char *linkname,		\
-			vattr_t *vap, char *target, cred_t *cr);	\
-	int (*femop_readlink)(femarg_t *vf, uio_t *uiop, cred_t *cr);	\
-	int (*femop_fsync)(femarg_t *vf, int syncflag, cred_t *cr);	\
-	void (*femop_inactive)(femarg_t *vf, cred_t *cr);		\
-	int (*femop_fid)(femarg_t *vf, fid_t *fidp);			\
+			vattr_t *vap, char *target, cred_t *cr,		\
+			caller_context_t *ct, int flags);		\
+	int (*femop_readlink)(femarg_t *vf, uio_t *uiop, cred_t *cr,	\
+			caller_context_t *ct);				\
+	int (*femop_fsync)(femarg_t *vf, int syncflag, cred_t *cr,	\
+			caller_context_t *ct);				\
+	void (*femop_inactive)(femarg_t *vf, cred_t *cr,		\
+			caller_context_t *ct);				\
+	int (*femop_fid)(femarg_t *vf, fid_t *fidp,			\
+			caller_context_t *ct);				\
 	int (*femop_rwlock)(femarg_t *vf, int write_lock,		\
 			caller_context_t *ct);				\
 	void (*femop_rwunlock)(femarg_t *vf, int write_lock,		\
 			caller_context_t *ct);				\
 	int (*femop_seek)(femarg_t *vf, offset_t ooff,			\
-			offset_t *noffp);				\
-	int (*femop_cmp)(femarg_t *vf, vnode_t *vp2);			\
+			offset_t *noffp, caller_context_t *ct);		\
+	int (*femop_cmp)(femarg_t *vf, vnode_t *vp2,			\
+			caller_context_t *ct);				\
 	int (*femop_frlock)(femarg_t *vf, int cmd, struct flock64 *bfp,	\
 			int flag, offset_t offset,			\
-			struct flk_callback *flk_cbp, cred_t *cr);	\
+			struct flk_callback *flk_cbp, cred_t *cr,	\
+			caller_context_t *ct);				\
 	int (*femop_space)(femarg_t *vf, int cmd, struct flock64 *bfp,	\
 			int flag, offset_t offset, cred_t *cr,		\
 			caller_context_t *ct);				\
-	int (*femop_realvp)(femarg_t *vf, vnode_t **vpp);		\
+	int (*femop_realvp)(femarg_t *vf, vnode_t **vpp,		\
+			caller_context_t *ct);				\
 	int (*femop_getpage)(femarg_t *vf, offset_t off, size_t len,	\
 			uint_t *protp, struct page **plarr,		\
 			size_t plsz, struct seg *seg, caddr_t addr,	\
-			enum seg_rw rw,	cred_t *cr);			\
+			enum seg_rw rw,	cred_t *cr,			\
+			caller_context_t *ct);				\
 	int (*femop_putpage)(femarg_t *vf, offset_t off, size_t len,	\
-			int flags, cred_t *cr);				\
+			int flags, cred_t *cr, caller_context_t *ct);	\
 	int (*femop_map)(femarg_t *vf, offset_t off, struct as *as,	\
 			caddr_t *addrp, size_t len, uchar_t prot,	\
-			uchar_t maxprot, uint_t flags, cred_t *cr);	\
+			uchar_t maxprot, uint_t flags, cred_t *cr,	\
+			caller_context_t *ct);				\
 	int (*femop_addmap)(femarg_t *vf, offset_t off, struct as *as,	\
 			caddr_t addr, size_t len, uchar_t prot,		\
-			uchar_t maxprot, uint_t flags, cred_t *cr);	\
+			uchar_t maxprot, uint_t flags, cred_t *cr,	\
+			caller_context_t *ct);				\
 	int (*femop_delmap)(femarg_t *vf, offset_t off, struct as *as,	\
 			caddr_t addr, size_t len, uint_t prot,		\
-			uint_t maxprot, uint_t flags, cred_t *cr);	\
+			uint_t maxprot, uint_t flags, cred_t *cr,	\
+			caller_context_t *ct);				\
 	int (*femop_poll)(femarg_t *vf, short events, int anyyet,	\
-			short *reventsp, struct pollhead **phpp);	\
+			short *reventsp, struct pollhead **phpp,	\
+			caller_context_t *ct);				\
 	int (*femop_dump)(femarg_t *vf, caddr_t addr, int lbdn,		\
-			int dblks); 					\
+			int dblks, caller_context_t *ct);		\
 	int (*femop_pathconf)(femarg_t *vf, int cmd, ulong_t *valp,	\
-			cred_t *cr);					\
+			cred_t *cr, caller_context_t *ct);		\
 	int (*femop_pageio)(femarg_t *vf, struct page *pp,		\
 			u_offset_t io_off, size_t io_len, int flags,	\
-			cred_t *cr);					\
-	int (*femop_dumpctl)(femarg_t *vf, int action, int *blkp);	\
+			cred_t *cr, caller_context_t *ct);		\
+	int (*femop_dumpctl)(femarg_t *vf, int action, int *blkp,	\
+			caller_context_t *ct);				\
 	void (*femop_dispose)(femarg_t *vf, struct page *pp, int flag,	\
-			int dn, cred_t *cr);				\
+			int dn, cred_t *cr, caller_context_t *ct);	\
 	int (*femop_setsecattr)(femarg_t *vf, vsecattr_t *vsap,		\
-			int flag, cred_t *cr);				\
+			int flag, cred_t *cr, caller_context_t *ct);	\
 	int (*femop_getsecattr)(femarg_t *vf, vsecattr_t *vsap,		\
-			int flag, cred_t *cr);				\
+			int flag, cred_t *cr, caller_context_t *ct);	\
 	int (*femop_shrlock)(femarg_t *vf, int cmd,			\
-			struct shrlock *shr, int flag, cred_t *cr);	\
+			struct shrlock *shr, int flag, cred_t *cr,	\
+			caller_context_t *ct);				\
 	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent,		\
-			vnode_t *dvp, char *cname)
+			vnode_t *dvp, char *cname, caller_context_t *ct)
 	/* NB: No ";" */
 
 struct fem {
@@ -267,83 +293,105 @@ struct fsem {
 	FSEM_OPS;	/* Signatures of all FSEM operations (fsemops) */
 };
 
-extern int vnext_open(femarg_t *vf, int mode, cred_t *cr);
+extern int vnext_open(femarg_t *vf, int mode, cred_t *cr,
+		caller_context_t *ct);
 extern int vnext_close(femarg_t *vf, int flag, int count, offset_t offset,
-		cred_t *cr);
+		cred_t *cr, caller_context_t *ct);
 extern int vnext_read(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
-		struct caller_context *ct);
+		caller_context_t *ct);
 extern int vnext_write(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
-		struct caller_context *ct);
+		caller_context_t *ct);
 extern int vnext_ioctl(femarg_t *vf, int cmd, intptr_t arg, int flag,
-		cred_t *cr, int *rvalp);
-extern int vnext_setfl(femarg_t *vf, int oflags, int nflags, cred_t *cr);
-extern int vnext_getattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr);
+		cred_t *cr, int *rvalp, caller_context_t *ct);
+extern int vnext_setfl(femarg_t *vf, int oflags, int nflags, cred_t *cr,
+		caller_context_t *ct);
+extern int vnext_getattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
+		caller_context_t *ct);
 extern int vnext_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 		caller_context_t *ct);
-extern int vnext_access(femarg_t *vf, int mode, int flags, cred_t *cr);
+extern int vnext_access(femarg_t *vf, int mode, int flags, cred_t *cr,
+		caller_context_t *ct);
 extern int vnext_lookup(femarg_t *vf, char *nm, vnode_t **vpp,
 			pathname_t *pnp, int flags, vnode_t *rdir,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct,
+			int *direntflags, pathname_t *realpnp);
 extern int vnext_create(femarg_t *vf, char *name, vattr_t *vap,
 			vcexcl_t excl, int mode, vnode_t **vpp, cred_t *cr,
-			int flag);
-extern int vnext_remove(femarg_t *vf, char *nm, cred_t *cr);
-extern int vnext_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr);
+			int flag, caller_context_t *ct, vsecattr_t *vsecp);
+extern int vnext_remove(femarg_t *vf, char *nm, cred_t *cr,
+			caller_context_t *ct, int flags);
+extern int vnext_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr,
+			caller_context_t *ct, int flags);
 extern int vnext_rename(femarg_t *vf, char *snm, vnode_t *tdvp, char *tnm,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct, int flags);
 extern int vnext_mkdir(femarg_t *vf, char *dirname, vattr_t *vap,
-		vnode_t **vpp, cred_t *cr);
-extern int vnext_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr);
-extern int vnext_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp);
+			vnode_t **vpp, cred_t *cr, caller_context_t *ct,
+			int flags, vsecattr_t *vsecp);
+extern int vnext_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr,
+			caller_context_t *ct, int flags);
+extern int vnext_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp,
+			caller_context_t *ct, int flags);
 extern int vnext_symlink(femarg_t *vf, char *linkname, vattr_t *vap,
-			char *target, cred_t *cr);
-extern int vnext_readlink(femarg_t *vf, uio_t *uiop, cred_t *cr);
-extern int vnext_fsync(femarg_t *vf, int syncflag, cred_t *cr);
-extern void vnext_inactive(femarg_t *vf, cred_t *cr);
-extern int vnext_fid(femarg_t *vf, fid_t *fidp);
+			char *target, cred_t *cr, caller_context_t *ct,
+			int flags);
+extern int vnext_readlink(femarg_t *vf, uio_t *uiop, cred_t *cr,
+			caller_context_t *ct);
+extern int vnext_fsync(femarg_t *vf, int syncflag, cred_t *cr,
+			caller_context_t *ct);
+extern void vnext_inactive(femarg_t *vf, cred_t *cr, caller_context_t *ct);
+extern int vnext_fid(femarg_t *vf, fid_t *fidp, caller_context_t *ct);
 extern int vnext_rwlock(femarg_t *vf, int write_lock, caller_context_t *ct);
 extern void vnext_rwunlock(femarg_t *vf, int write_lock, caller_context_t *ct);
-extern int vnext_seek(femarg_t *vf, offset_t ooff, offset_t *noffp);
-extern int vnext_cmp(femarg_t *vf, vnode_t *vp2);
+extern int vnext_seek(femarg_t *vf, offset_t ooff, offset_t *noffp,
+			caller_context_t *ct);
+extern int vnext_cmp(femarg_t *vf, vnode_t *vp2, caller_context_t *ct);
 extern int vnext_frlock(femarg_t *vf, int cmd, struct flock64 *bfp,
 			int flag, offset_t offset,
-			struct flk_callback *flk_cbp, cred_t *cr);
+			struct flk_callback *flk_cbp, cred_t *cr,
+			caller_context_t *ct);
 extern int vnext_space(femarg_t *vf, int cmd, struct flock64 *bfp,
 			int flag, offset_t offset, cred_t *cr,
 			caller_context_t *ct);
-extern int vnext_realvp(femarg_t *vf, vnode_t **vpp);
+extern int vnext_realvp(femarg_t *vf, vnode_t **vpp, caller_context_t *ct);
 extern int vnext_getpage(femarg_t *vf, offset_t off, size_t len,
 			uint_t *protp, struct page **plarr, size_t plsz,
 			struct seg *seg, caddr_t addr, enum seg_rw rw,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct);
 extern int vnext_putpage(femarg_t *vf, offset_t off, size_t len, int flags,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct);
 extern int vnext_map(femarg_t *vf, offset_t off, struct as *as,
 		caddr_t *addrp, size_t len, uchar_t prot, uchar_t maxprot,
-		uint_t flags, cred_t *cr);
+		uint_t flags, cred_t *cr, caller_context_t *ct);
 extern int vnext_addmap(femarg_t *vf, offset_t off, struct as *as,
 			caddr_t addr, size_t len, uchar_t prot,
-			uchar_t maxprot, uint_t flags, cred_t *cr);
+			uchar_t maxprot, uint_t flags, cred_t *cr,
+			caller_context_t *ct);
 extern int vnext_delmap(femarg_t *vf, offset_t off, struct as *as,
 			caddr_t addr, size_t len, uint_t prot,
-			uint_t maxprot, uint_t flags, cred_t *cr);
+			uint_t maxprot, uint_t flags, cred_t *cr,
+			caller_context_t *ct);
 extern int vnext_poll(femarg_t *vf, short events, int anyyet,
-		short *reventsp, struct pollhead **phpp);
-extern int vnext_dump(femarg_t *vf, caddr_t addr, int lbdn, int dblks);
-extern int vnext_pathconf(femarg_t *vf, int cmd, ulong_t *valp, cred_t *cr);
+			short *reventsp, struct pollhead **phpp,
+			caller_context_t *ct);
+extern int vnext_dump(femarg_t *vf, caddr_t addr, int lbdn, int dblks,
+			caller_context_t *ct);
+extern int vnext_pathconf(femarg_t *vf, int cmd, ulong_t *valp, cred_t *cr,
+			caller_context_t *ct);
 extern int vnext_pageio(femarg_t *vf, struct page *pp, u_offset_t io_off,
-			size_t io_len, int flags, cred_t *cr);
-extern int vnext_dumpctl(femarg_t *vf, int action, int *blkp);
+			size_t io_len, int flags, cred_t *cr,
+			caller_context_t *ct);
+extern int vnext_dumpctl(femarg_t *vf, int action, int *blkp,
+			caller_context_t *ct);
 extern void vnext_dispose(femarg_t *vf, struct page *pp, int flag, int dn,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct);
 extern int vnext_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flag,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct);
 extern int vnext_getsecattr(femarg_t *vf, vsecattr_t *vsap, int flag,
-			cred_t *cr);
+			cred_t *cr, caller_context_t *ct);
 extern int vnext_shrlock(femarg_t *vf, int cmd, struct shrlock *shr,
-			int flag, cred_t *cr);
+			int flag, cred_t *cr, caller_context_t *ct);
 extern int vnext_vnevent(femarg_t *vf, vnevent_t vevent, vnode_t *dvp,
-			char *cname);
+			char *cname, caller_context_t *ct);
 
 extern int vfsnext_mount(fsemarg_t *vf, vnode_t *mvp, struct mounta *uap,
 			cred_t *cr);

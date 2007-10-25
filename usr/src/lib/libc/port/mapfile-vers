@@ -64,8 +64,11 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	err;
 	errx;
 	fdatasync;
+	fgetattr;
 	forkallx;
 	forkx;
+	fsetattr;
+	getattrat;
 	htonl;
 	htons;
 	lio_listio;
@@ -111,6 +114,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	sem_trywait;
 	sem_unlink;
 	sem_wait;
+	setattrat;
 	_sharefs;
 	shm_open;
 	shm_unlink;
@@ -1408,6 +1412,11 @@ SUNWprivate_1.1 {
 	_atomic_swap_uint =		NODYNSORT;
 	_atomic_swap_ulong =		NODYNSORT;
 	_atomic_swap_ushort =		NODYNSORT;
+	attr_count;
+	attr_to_data_type;
+	attr_to_name;
+	attr_to_option;
+	attr_to_xattr_view;	
 	_autofssys;
 	_brk;
 	__btowc_dense;
@@ -1762,6 +1771,7 @@ SUNWprivate_1.1 {
 	__mutex_trylock;
 	_mutex_unlock =			NODYNSORT;
 	__mutex_unlock;
+	name_to_attr;
 	_nanosleep;
 	__nan_read;
 	__nan_written;
@@ -1807,6 +1817,8 @@ SUNWprivate_1.1 {
 	__nsw_getconfig_v1;
 	__nthreads;
 	__numeric_init;
+	__openattrdirat;
+	option_to_attr;
 	_openlog;
 	_plock;
 	_port_alert;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.
  * All rights reserved.
  * Use is subject to license terms.
  */
@@ -217,7 +217,7 @@ syopen(dev_t *devp, int flag, int otyp, struct cred *cr)
 	 * The multi-open, single-clone means that no cloning
 	 * can happen via this open, hence the assertion.
 	 */
-	error = VOP_OPEN(&ttyvp, FNOCTTY | flag, cr);
+	error = VOP_OPEN(&ttyvp, FNOCTTY | flag, cr, NULL);
 	if (error == 0) {
 		struct snode *csp;
 
@@ -326,7 +326,7 @@ syioctl(dev_t dev, int cmd, intptr_t arg, int mode, struct cred *cr,
 		return (ENXIO);
 	}
 
-	error = VOP_IOCTL(sp->s_vp, cmd, arg, mode, cr, rvalp);
+	error = VOP_IOCTL(sp->s_vp, cmd, arg, mode, cr, rvalp, NULL);
 
 	tty_rele(sp);
 	return (error);
@@ -350,7 +350,7 @@ sypoll(dev_t dev, short events, int anyyet, short *reventsp,
 		return (ENXIO);
 	}
 
-	error = VOP_POLL(sp->s_vp, events, anyyet, reventsp, phpp);
+	error = VOP_POLL(sp->s_vp, events, anyyet, reventsp, phpp, NULL);
 
 	tty_rele(sp);
 	return (error);

@@ -71,7 +71,7 @@ int priv_debug = 0;
  * by privilege, there is quite a bit of duplication of
  * functions.
  *
- * The secpolicy functions must not make asssumptions about
+ * The secpolicy functions must not make assumptions about
  * locks held or not held as any lock can be held while they're
  * being called.
  *
@@ -485,16 +485,40 @@ secpolicy_setpriority(const cred_t *cr)
 int
 secpolicy_net_privaddr(const cred_t *cr, in_port_t port)
 {
-	/*
-	 * NFS ports, these are extra privileged ports, allow bind
-	 * only if the SYS_NFS privilege is present.
-	 */
-	if (port == 2049 || port == 4045)
-		return (PRIV_POLICY(cr, PRIV_SYS_NFS, B_FALSE, EACCES,
-		    "NFS port"));
-	else
-		return (PRIV_POLICY(cr, PRIV_NET_PRIVADDR, B_FALSE, EACCES,
-		    NULL));
+	char *reason;
+	int priv;
+
+	switch (port) {
+	case 137:
+	case 138:
+	case 139:
+	case 445:
+		/*
+		 * NBT and SMB ports, these are extra privileged ports,
+		 * allow bind only if the SYS_SMB privilege is present.
+		 */
+		priv = PRIV_SYS_SMB;
+		reason = "NBT or SMB port";
+		break;
+
+	case 2049:
+	case 4045:
+		/*
+		 * NFS ports, these are extra privileged ports, allow bind
+		 * only if the SYS_NFS privilege is present.
+		 */
+		priv = PRIV_SYS_NFS;
+		reason = "NFS port";
+		break;
+
+	default:
+		priv = PRIV_NET_PRIVADDR;
+		reason = NULL;
+		break;
+
+	}
+
+	return (PRIV_POLICY(cr, priv, B_FALSE, EACCES, reason));
 }
 
 /*
@@ -583,7 +607,7 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 		int err;
 
 		va.va_mask = AT_UID|AT_MODE;
-		err = VOP_GETATTR(mvp, &va, 0, cr);
+		err = VOP_GETATTR(mvp, &va, 0, cr, NULL);
 		if (err != 0)
 			return (err);
 
@@ -965,6 +989,70 @@ secpolicy_setid_setsticky_clear(vnode_t *vp, vattr_t *vap, const vattr_t *ovap,
 	return (0);
 }
 
+#define	ATTR_FLAG_PRIV(attr, value, cr)	\
+	PRIV_POLICY(cr, value ? PRIV_FILE_FLAG_SET : PRIV_ALL, \
+	B_FALSE, EPERM, NULL)
+
+/*
+ * Check privileges for setting xvattr attributes
+ */
+int
+secpolicy_xvattr(xvattr_t *xvap, uid_t owner, cred_t *cr, vtype_t vtype)
+{
+	xoptattr_t *xoap;
+	int error = 0;
+
+	if ((xoap = xva_getxoptattr(xvap)) == NULL)
+		return (EINVAL);
+
+	/*
+	 * First process the DOS bits
+	 */
+	if (XVA_ISSET_REQ(xvap, XAT_ARCHIVE) ||
+	    XVA_ISSET_REQ(xvap, XAT_HIDDEN) ||
+	    XVA_ISSET_REQ(xvap, XAT_READONLY) ||
+	    XVA_ISSET_REQ(xvap, XAT_SYSTEM) ||
+	    XVA_ISSET_REQ(xvap, XAT_CREATETIME)) {
+		if ((error = secpolicy_vnode_owner(cr, owner)) != 0)
+			return (error);
+	}
+
+	/*
+	 * Now handle special attributes
+	 */
+
+	if (XVA_ISSET_REQ(xvap, XAT_IMMUTABLE))
+		error = ATTR_FLAG_PRIV(XAT_IMMUTABLE,
+		    xoap->xoa_immutable, cr);
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_NOUNLINK))
+		error = ATTR_FLAG_PRIV(XAT_NOUNLINK,
+		    xoap->xoa_nounlink, cr);
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_APPENDONLY))
+		error = ATTR_FLAG_PRIV(XAT_APPENDONLY,
+		    xoap->xoa_appendonly, cr);
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_NODUMP))
+		error = ATTR_FLAG_PRIV(XAT_NODUMP,
+		    xoap->xoa_nodump, cr);
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_OPAQUE))
+		error = EPERM;
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED)) {
+		error = ATTR_FLAG_PRIV(XAT_AV_QUARANTINED,
+		    xoap->xoa_av_quarantined, cr);
+		if (error == 0 && vtype != VREG)
+			error = EINVAL;
+	}
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_AV_MODIFIED))
+		error = ATTR_FLAG_PRIV(XAT_AV_MODIFIED,
+		    xoap->xoa_av_modified, cr);
+	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP)) {
+		error = ATTR_FLAG_PRIV(XAT_AV_SCANSTAMP,
+		    xoap->xoa_av_scanstamp, cr);
+		if (error == 0 && vtype != VREG)
+			error = EINVAL;
+	}
+	return (error);
+}
+
 /*
  * This function checks the policy decisions surrounding the
  * vop setattr call.
@@ -1004,15 +1092,24 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 {
 	int mask = vap->va_mask;
 	int error = 0;
+	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 
 	if (mask & AT_SIZE) {
 		if (vp->v_type == VDIR) {
 			error = EISDIR;
 			goto out;
 		}
-		error = unlocked_access(node, VWRITE, cr);
-		if (error)
-			goto out;
+
+		/*
+		 * If ATTR_NOACLCHECK is set in the flags, then we don't
+		 * perform the secondary unlocked_access() call since the
+		 * ACL (if any) is being checked there.
+		 */
+		if (skipaclchk == B_FALSE) {
+			error = unlocked_access(node, VWRITE, cr);
+			if (error)
+				goto out;
+		}
 	}
 	if (mask & AT_MODE) {
 		/*
@@ -1092,7 +1189,7 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		if (cr->cr_uid != ovap->va_uid) {
 			if (flags & ATTR_UTIME)
 				error = secpolicy_vnode_utime_modify(cr);
-			else {
+			else if (skipaclchk == B_FALSE) {
 				error = unlocked_access(node, VWRITE, cr);
 				if (error == EACCES &&
 				    secpolicy_vnode_utime_modify(cr) == 0)
@@ -1102,6 +1199,13 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 				goto out;
 		}
 	}
+
+	/*
+	 * Check for optional attributes here by checking the following:
+	 */
+	if (mask & AT_XVATTR)
+		error = secpolicy_xvattr((xvattr_t *)vap, ovap->va_uid, cr,
+		    vp->v_type);
 out:
 	return (error);
 }
@@ -1956,4 +2060,21 @@ secpolicy_sadopen(const cred_t *credp)
 		priv_addset(&pset, PRIV_SYS_IP_CONFIG);
 
 	return (secpolicy_require_set(credp, &pset, "devpolicy"));
+}
+
+/*
+ * secpolicy_smb
+ *
+ * Determine if the cred_t has PRIV_SYS_SMB privilege, indicating
+ * that it has permission to access the smbsrv kernel driver.
+ * PRIV_POLICY checks the privilege and audits the check.
+ *
+ * Returns:
+ * 0       Driver access is allowed.
+ * EPERM   Driver access is NOT permitted.
+ */
+int
+secpolicy_smb(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_SYS_SMB, B_FALSE, EPERM, NULL));
 }

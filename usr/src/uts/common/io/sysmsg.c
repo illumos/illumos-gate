@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,7 +338,7 @@ bind_consadm_conf(char *path)
 	if (vn_open(path, UIO_SYSSPACE, FREAD, 0, &vp, 0, 0) != 0)
 		return;
 	vattr.va_mask = AT_SIZE;
-	if ((err = VOP_GETATTR(vp, &vattr, 0, kcred)) != 0) {
+	if ((err = VOP_GETATTR(vp, &vattr, 0, kcred, NULL)) != 0) {
 		cmn_err(CE_WARN, "sysmsg: getattr: '%s': error %d",
 			path, err);
 		goto closevp;
@@ -358,7 +357,7 @@ bind_consadm_conf(char *path)
 
 	kmem_free(buf, size);
 closevp:
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, kcred);
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, kcred, NULL);
 	VN_RELE(vp);
 }
 
@@ -446,7 +445,7 @@ sysmclose(dev_t dev, int flag, int state, cred_t *cred)
 		return (0);
 	}
 
-	(void) VOP_CLOSE(dcvp, FWRITE, 1, (offset_t)0, kcred);
+	(void) VOP_CLOSE(dcvp, FWRITE, 1, (offset_t)0, kcred, NULL);
 	VN_RELE(dcvp);
 	dcvp = NULL;
 	mutex_exit(&dcvp_mutex);
@@ -459,7 +458,7 @@ sysmclose(dev_t dev, int flag, int state, cred_t *cred)
 		rw_enter(&sysmcache[i].dca_lock, RW_WRITER);
 		if (sysmcache[i].dca_vp != NULL) {
 			(void) VOP_CLOSE(sysmcache[i].dca_vp, flag,
-				1, (offset_t)0, cred);
+				1, (offset_t)0, cred, NULL);
 			VN_RELE(sysmcache[i].dca_vp);
 			sysmcache[i].dca_vp = NULL;
 		}
@@ -565,7 +564,7 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 	}
 	default:
 		/* everything else is sent to the console device */
-		return (VOP_IOCTL(dcvp, cmd, arg, flag, cred, rvalp));
+		return (VOP_IOCTL(dcvp, cmd, arg, flag, cred, rvalp, NULL));
 	}
 
 	if ((rval = secpolicy_console(cred)) != 0)
@@ -694,7 +693,7 @@ static int
 sysmpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	struct pollhead **phpp)
 {
-	return (VOP_POLL(dcvp, events, anyyet, reventsp, phpp));
+	return (VOP_POLL(dcvp, events, anyyet, reventsp, phpp, NULL));
 }
 
 /* Sanity check that the device is good */

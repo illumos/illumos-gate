@@ -229,7 +229,7 @@ i_cpr_mp_setup(void)
 	/*
 	 * Do not allow setting page size codes in MMU primary context
 	 * register while using cif wrapper. This is needed to work
-	 * arround OBP incorrect handling of this MMU register.
+	 * around OBP incorrect handling of this MMU register.
 	 */
 	kcontextreg = 0;
 
@@ -1421,7 +1421,7 @@ i_cpr_reusefini(void)
 		}
 	}
 
-	(void) VOP_CLOSE(vp, FREAD|FWRITE, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD|FWRITE, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 	kmem_free(cdef, sizeof (*cdef));
 
@@ -1473,7 +1473,7 @@ i_cpr_check_cprinfo(void)
 	}
 
 	rc = cpr_rdwr(UIO_READ, vp, &mini, sizeof (mini));
-	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+	(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	VN_RELE(vp);
 
 	if (rc) {

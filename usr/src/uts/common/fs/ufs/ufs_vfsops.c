@@ -361,7 +361,7 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 		oflag = FREAD | FWRITE;
 		aflag = VREAD | VWRITE;
 	}
-	if ((error = VOP_ACCESS(bvp, aflag, 0, cr)) != 0 ||
+	if ((error = VOP_ACCESS(bvp, aflag, 0, cr, NULL)) != 0 ||
 	    (error = secpolicy_spec_open(cr, bvp, oflag)) != 0) {
 		pn_free(&dpn);
 		VN_RELE(bvp);
@@ -407,6 +407,8 @@ ufs_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 	if (error) {
 		VN_RELE(bvp);
 	}
+	if (error == 0)
+		vfs_set_feature(vfsp, VFSFT_XVATTR);
 	return (error);
 }
 /*
@@ -449,7 +451,8 @@ ufs_mountroot(struct vfs *vfsp, enum whymountroot why)
 		vp = ((struct ufsvfs *)vfsp->vfs_data)->vfs_devvp;
 		(void) dnlc_purge_vfsp(vfsp, 0);
 		vp = common_specvp(vp);
-		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_INVAL, CRED());
+		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_INVAL,
+		    CRED(), NULL);
 		(void) bfinval(vfsp->vfs_dev, 0);
 		fsp = getfs(vfsp);
 
@@ -484,7 +487,7 @@ ufs_mountroot(struct vfs *vfsp, enum whymountroot why)
 
 		vp = ((struct ufsvfs *)vfsp->vfs_data)->vfs_devvp;
 		(void) VOP_CLOSE(vp, FREAD|FWRITE, 1,
-		    (offset_t)0, CRED());
+		    (offset_t)0, CRED(), NULL);
 		return (0);
 	}
 	error = vfs_lock(vfsp);
@@ -496,10 +499,10 @@ ufs_mountroot(struct vfs *vfsp, enum whymountroot why)
 	/* If RO media, don't call clkset() (see below) */
 	doclkset = 1;
 	if (why == ROOT_INIT) {
-		error = VOP_OPEN(&devvp, FREAD|FWRITE, CRED());
+		error = VOP_OPEN(&devvp, FREAD|FWRITE, CRED(), NULL);
 		if (error == 0) {
 			(void) VOP_CLOSE(devvp, FREAD|FWRITE, 1,
-			    (offset_t)0, CRED());
+			    (offset_t)0, CRED(), NULL);
 		} else {
 			doclkset = 0;
 		}
@@ -788,7 +791,8 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 		 * operations.
 		 */
 		error = VOP_OPEN(&devvp,
-		    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE, cr);
+		    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE,
+		    cr, NULL);
 		if (error)
 			goto out;
 		needclose = 1;
@@ -822,7 +826,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 	 * they really should be using the raw device.
 	 */
 	(void) VOP_PUTPAGE(common_specvp(devvp), (offset_t)0,
-	    (size_t)0, B_INVAL, cr);
+	    (size_t)0, B_INVAL, cr, NULL);
 
 	/*
 	 * read in superblock
@@ -1321,7 +1325,7 @@ out:
 	}
 	if (needclose) {
 		(void) VOP_CLOSE(devvp, (vfsp->vfs_flag & VFS_RDONLY) ?
-		    FREAD : FREAD|FWRITE, 1, (offset_t)0, cr);
+		    FREAD : FREAD|FWRITE, 1, (offset_t)0, cr, NULL);
 		bflush(dev);
 		(void) bfinval(dev, 1);
 	}
@@ -1628,8 +1632,8 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 	brelse(bp);			/* free the superblock buf */
 
 	(void) VOP_PUTPAGE(common_specvp(bvp), (offset_t)0, (size_t)0,
-	    B_INVAL, cr);
-	(void) VOP_CLOSE(bvp, flag, 1, (offset_t)0, cr);
+	    B_INVAL, cr, NULL);
+	(void) VOP_CLOSE(bvp, flag, 1, (offset_t)0, cr, NULL);
 	bflush(dev);
 	(void) bfinval(dev, 1);
 	VN_RELE(bvp);
@@ -1696,7 +1700,7 @@ out:
 		ufs_trans_onerror();
 
 		/*
-		 * if we have a seperate /usr it will never unmount
+		 * if we have a separate /usr it will never unmount
 		 * when halting. In order to not re-read all the
 		 * cylinder group summary info on mounting after
 		 * reboot the logging of summary info is re-enabled
@@ -2099,7 +2103,7 @@ ufs_remountroot(struct vfs *vfsp)
 	new_rootvp = makespecvp(new_rootdev, VBLK);
 
 	error = VOP_OPEN(&new_rootvp,
-	    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE, CRED());
+	    (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE, CRED(), NULL);
 	if (error) {
 		cmn_err(CE_CONT,
 		    "Cannot open mirrored root device, error %d\n", error);
@@ -2245,7 +2249,7 @@ ufs_remountroot(struct vfs *vfsp)
 
 	vfs_unlock(vfsp);
 
-	error = VOP_CLOSE(old_rootvp, FREAD, 1, (offset_t)0, CRED());
+	error = VOP_CLOSE(old_rootvp, FREAD, 1, (offset_t)0, CRED(), NULL);
 	if (error) {
 		cmn_err(CE_CONT,
 		    "close of root device component failed, error %d\n",

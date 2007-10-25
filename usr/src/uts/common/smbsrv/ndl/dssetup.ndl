@@ -1,0 +1,168 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _DSSETUP_NDL_
+#define	_DSSETUP_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Active Directory Service Setup
+ */
+
+#include "ndrtypes.ndl"
+
+
+#define	DSSETUP_OPNUM_DsRoleGetPrimaryDomainInfo	0x00
+#define	DSSETUP_OPNUM_DsRoleDnsNameToFlatName		0x01
+#define	DSSETUP_OPNUM_DsRoleDcAsDc			0x02
+#define	DSSETUP_OPNUM_DsRoleDcAsReplica			0x03
+#define	DSSETUP_OPNUM_DsRoleDemoteDc			0x04
+#define	DSSETUP_OPNUM_DsRoleGetDcOperationProgress	0x05
+#define	DSSETUP_OPNUM_DsRoleGetDcOperationResults	0x06
+#define	DSSETUP_OPNUM_DsRoleCancel			0x07
+#define	DSSETUP_OPNUM_DsRoleServerSaveStateForUpgrade	0x08
+#define	DSSETUP_OPNUM_DsRoleUpgradeDownlevelServer	0x09
+#define	DSSETUP_OPNUM_DsRoleAbortDownlevelServerUpgrade	0x0a
+
+/*
+ * DS roles
+ */
+#define	DS_ROLE_STANDALONE_WORKSTATION	0
+#define	DS_ROLE_MEMBER_WORKSTATION	1
+#define	DS_ROLE_STANDALONE_SERVER	2
+#define	DS_ROLE_MEMBER_SERVER		3
+#define	DS_ROLE_BACKUP_DC		4
+#define	DS_ROLE_PRIMARY_DC		5
+
+/*
+ * DS role flags
+ */
+#define	DS_ROLE_PRIMARY_DS_RUNNING              0x00000001
+#define	DS_ROLE_PRIMARY_DS_MIXED_MODE           0x00000002
+#define	DS_ROLE_UPGRADE_IN_PROGRESS             0x00000004
+#define	DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT	0x01000000
+
+/*
+ * DS role upgrade
+ */
+#define	DS_ROLE_NOT_UPGRADING		0
+#define	DS_ROLE_UPGRADING		1
+
+/*
+ * DS role previous
+ */
+#define	DS_ROLE_PREVIOUS_UNKNOWN	0
+#define	DS_ROLE_PREVIOUS_PRIMARY	1
+#define	DS_ROLE_PREVIOUS_BACKUP		2
+
+/*
+ * DS role state
+ */
+#define	DS_ROLE_OP_IDLE			0
+#define	DS_ROLE_OP_ACTIVE		1
+#define	DS_ROLE_OP_NEEDS_REBOOT		2
+
+/*
+ * DS role information levels
+ */
+#define	DS_ROLE_BASIC_INFORMATION	1
+#define	DS_ROLE_UPGRADE_STATUS		2
+#define	DS_ROLE_OP_STATUS		3
+
+struct dssetup_uuid {
+	DWORD	data1;
+	WORD	data2;
+	WORD	data3;
+	BYTE	data4[8];
+};
+typedef struct dssetup_uuid dssetup_uuid_t;
+
+/*
+ * DS_ROLE_BASIC_INFORMATION
+ */
+struct dssetup_DsRolePrimaryDomInfo1 {
+	DWORD role;
+	DWORD flags;
+	LPTSTR nt_domain;
+	LPTSTR dns_domain;
+	LPTSTR forest;
+	dssetup_uuid_t domain_guid;
+};
+
+/*
+ * DS_ROLE_UPGRADE_STATUS
+ */
+struct dssetup_DsRolePrimaryDomInfo2 {
+	DWORD upgrade_state;
+	DWORD previous_role;
+};
+
+/*
+ * DS_ROLE_OP_STATUS
+ */
+struct dssetup_DsRolePrimaryDomInfo3 {
+	DWORD status;
+};
+
+union dssetup_GetPrimaryDomainInfo_ru {
+	UNION_INFO_ENT(1,dssetup_DsRolePrimaryDomInfo);
+	UNION_INFO_ENT(2,dssetup_DsRolePrimaryDomInfo);
+	UNION_INFO_ENT(3,dssetup_DsRolePrimaryDomInfo);
+	DEFAULT	char *nullptr;
+};
+
+struct dssetup_GetPrimaryDomainInfoRes {
+	DWORD address;
+	WORD switch_value;
+	SWITCH(switch_value)
+		union dssetup_GetPrimaryDomainInfo_ru ru;
+};
+
+OPERATION(DSSETUP_OPNUM_DsRoleGetPrimaryDomainInfo)
+struct dssetup_DsRoleGetPrimaryDomainInfo {
+	IN	WORD level;
+	OUT	DWORD address;
+	OUT	WORD switch_value;
+  SWITCH(level)
+	OUT	union dssetup_GetPrimaryDomainInfo_ru ru;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * DSSETUP interface definiton.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union dssetup_interface {
+	CASE(DSSETUP_OPNUM_DsRoleGetPrimaryDomainInfo)
+		struct dssetup_DsRoleGetPrimaryDomainInfo GetPrimaryDomainInfo;
+};
+typedef union dssetup_interface dssetup_interface_t;
+EXTERNTYPEINFO(dssetup_interface)
+
+#endif /* _DSSETUP_NDL_ */

@@ -297,7 +297,7 @@ dev_lopen(dev_t *devp, int flag, int otype, struct cred *cred)
 	struct vnode	*cvp;
 
 	vp = makespecvp(*devp, (otype == OTYP_BLK) ? VBLK : VCHR);
-	error = VOP_OPEN(&vp, flag | FKLYR, cred);
+	error = VOP_OPEN(&vp, flag | FKLYR, cred, NULL);
 	if (error == 0) {
 		/* Pick up the (possibly) new dev_t value. */
 		*devp = vp->v_rdev;
@@ -332,13 +332,13 @@ dev_lclose(dev_t dev, int flag, int otype, struct cred *cred)
 	ulong_t		offset;
 
 	vp = makespecvp(dev, (otype == OTYP_BLK) ? VBLK : VCHR);
-	error = VOP_CLOSE(vp, flag | FKLYR, 1, (offset_t)0, cred);
+	error = VOP_CLOSE(vp, flag | FKLYR, 1, (offset_t)0, cred, NULL);
 
 	/*
 	 * Release the extra dev_lopen hold on the common vnode. We inline a
 	 * VN_RELE(cvp) call so that we can detect more dev_lclose calls than
 	 * dev_lopen calls without panic. See vn_rele.  If our inline of
-	 * vn_rele called VOP_INACTIVE(cvp, CRED()) we would panic on the
+	 * vn_rele called VOP_INACTIVE(cvp, CRED(), ...) we would panic on the
 	 * "release the makespecvp vnode" VN_RELE(vp) that follows  - so
 	 * instead we diagnose this situation.  Note that the driver has
 	 * still seen a double close(9E), but that would have occurred with

@@ -272,6 +272,10 @@ $(COMOBJS:%=pics/%): $(SRC)/common/util/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/util/$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
+$(XATTROBJS:%=pics/%): $(SRC)/common/xattr/$$(@F:.o=.c)
+	$(COMPILE.c) -o $@ $(SRC)/common/xattr/$(@F:.o=.c)
+	$(POST_PROCESS_O)
+
 $(DTRACEOBJS:%=pics/%): $(SRC)/common/dtrace/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/dtrace/$(@F:.o=.c)
 	$(POST_PROCESS_O)

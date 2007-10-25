@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,31 +19,34 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 1989, 1995, 1997 by Sun Microsystems, Inc.
-# All Rights Reserved
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 ETCFILES= ioctl.syscon passwd shadow motd
 KVMFILES= README
+SMBFILES= smbpasswd
 
 include ../../Makefile.cmd
 
 ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
 ROOTUSRKVMFILES= $(KVMFILES:%=$(ROOTUSRKVM)/%)
+ROOTVARSMBFILES= $(SMBFILES:%=$(ROOTVARSMB)/%)
 
 FILEMODE= 0644
 OWNER= root
 GROUP= sys
 
 $(ROOTETC)/shadow :=	FILEMODE =	400
+$(ROOTVARSMB)/smbpasswd :=	FILEMODE =	0400
 
 .KEEP_STATE:
 
-all: $(ETCFILES) $(KVMFILES)
+all: $(ETCFILES) $(KVMFILES) $(SMBFILES)
 
-install: all $(ROOTETCFILES) $(ROOTUSRKVMFILES)
+install: all $(ROOTETCFILES) $(ROOTUSRKVMFILES) $(ROOTVARSMBFILES)
 
 clean:
 
@@ -59,11 +61,14 @@ motd:	FRC
 	@$(NOT_RELEASE_BUILD)-$(ECHO) $(DEV_CM) | sed -e "s/@(#)//" >> motd
 	@-$(CAT) release_info >> motd
 
+smbpasswd:
+	$(TOUCH) smbpasswd
+
 clean:
 
 lint:
 
 clobber:
-	$(RM) motd
+	$(RM) motd smbpasswd
 
 FRC:

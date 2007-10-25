@@ -85,6 +85,8 @@ FPASMOBJS=			\
 ATOMICOBJS=			\
 	atomic.o
 
+XATTROBJS=			\
+	xattr_common.o
 COMOBJS=			\
 	bcmp.o			\
 	bcopy.o			\
@@ -99,6 +101,7 @@ GENOBJS=			\
 	_getsp.o		\
 	abs.o			\
 	alloca.o		\
+	attrat.o		\
 	byteorder.o		\
 	cache.o			\
 	cuexit.o		\
@@ -849,6 +852,7 @@ MOSTOBJS=			\
 	$(I386FPOBJS)		\
 	$(FPASMOBJS)		\
 	$(ATOMICOBJS)		\
+	$(XATTROBJS)		\
 	$(COMOBJS)		\
 	$(GENOBJS)		\
 	$(PORTFP)		\
@@ -966,6 +970,7 @@ CLOBBERFILES +=	$(LIB_PIC)
 # list of C source for lint
 SRCS=							\
 	$(ATOMICOBJS:%.o=$(SRC)/common/atomic/%.c)	\
+	$(XATTROBJS:%.o=$(SRC)/common/xattr/%.c)	\
 	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
 	$(PORTFP:%.o=../port/fp/%.c)			\
 	$(PORTGEN:%.o=../port/gen/%.c)			\

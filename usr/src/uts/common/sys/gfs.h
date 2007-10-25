@@ -76,7 +76,8 @@ typedef struct gfs_file {
 
 typedef int (*gfs_readdir_cb)(vnode_t *, struct dirent64 *, int *, offset_t *,
     offset_t *, void *);
-typedef int (*gfs_lookup_cb)(vnode_t *, const char *, vnode_t **, ino64_t *);
+typedef int (*gfs_lookup_cb)(vnode_t *, const char *, vnode_t **, ino64_t *,
+    cred_t *);
 typedef ino64_t (*gfs_inode_cb)(vnode_t *, int);
 
 typedef struct gfs_dir {
@@ -103,8 +104,9 @@ extern vnode_t *gfs_root_create_file(size_t, struct vfs *, vnodeops_t *,
 extern void *gfs_file_inactive(vnode_t *);
 extern void *gfs_dir_inactive(vnode_t *);
 
-extern int gfs_dir_lookup(vnode_t *, const char *, vnode_t **);
-extern int gfs_dir_readdir(vnode_t *, uio_t *, int *, void *);
+extern int gfs_dir_lookup(vnode_t *, const char *, vnode_t **, cred_t *);
+extern int gfs_dir_readdir(vnode_t *, uio_t *, int *, void *, cred_t *,
+    caller_context_t *);
 
 #define	gfs_dir_lock(gd)	mutex_enter(&(gd)->gfsd_lock)
 #define	gfs_dir_unlock(gd)	mutex_exit(&(gd)->gfsd_lock)
@@ -137,14 +139,22 @@ extern int gfs_readdir_emitn(gfs_readdir_state_t *, uio_t *, offset_t, ino64_t,
 extern int gfs_readdir_pred(gfs_readdir_state_t *, uio_t *, offset_t *);
 extern int gfs_readdir_fini(gfs_readdir_state_t *, int, int *, int);
 
+/*
+ * Objects with real extended attributes will get their . and ..
+ * readdir entries from the real xattr directory. GFS_STATIC_ENTRY_OFFSET
+ * lets us skip right to the static entries in the GFS directory.
+ */
+#define	GFS_STATIC_ENTRY_OFFSET	((offset_t)2)
+
 extern int gfs_lookup_dot(vnode_t **, vnode_t *, vnode_t *, const char *);
 
 extern int gfs_vop_lookup(vnode_t *, char *, vnode_t **, pathname_t *,
-    int, vnode_t *, cred_t *);
-extern int gfs_vop_readdir(vnode_t *, uio_t *, cred_t *, int *);
+    int, vnode_t *, cred_t *, caller_context_t *, int *, pathname_t *);
+extern int gfs_vop_readdir(vnode_t *, uio_t *, cred_t *, int *,
+    caller_context_t *, int);
 extern int gfs_vop_map(vnode_t *, offset_t, struct as *, caddr_t *,
-    size_t, uchar_t, uchar_t, uint_t, cred_t *);
-extern void gfs_vop_inactive(vnode_t *, cred_t *);
+    size_t, uchar_t, uchar_t, uint_t, cred_t *, caller_context_t *);
+extern void gfs_vop_inactive(vnode_t *, cred_t *, caller_context_t *);
 
 
 #ifdef	__cplusplus

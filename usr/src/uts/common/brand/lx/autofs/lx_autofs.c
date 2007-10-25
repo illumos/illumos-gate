@@ -442,7 +442,7 @@ i_fifo_lookup(pid_t pgrp, int fd, file_t **fpp_wr, file_t **fpp_rd)
 	}
 
 	/*
-	 * We need to drop fi_lock before we can try to aquire f_tlock
+	 * We need to drop fi_lock before we can try to acquire f_tlock
 	 * the good news is that the file pointers are protected because
 	 * we're still holding uf_lock.
 	 */
@@ -707,7 +707,7 @@ i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 		iov.iov_len = dlen;
 
 		(void) VOP_RWLOCK(dvp, V_WRITELOCK_FALSE, NULL);
-		if (VOP_READDIR(dvp, &uio, kcred, &eof) != 0) {
+		if (VOP_READDIR(dvp, &uio, kcred, &eof, NULL, 0) != 0) {
 			VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 			kmem_free(dbuf, dlen);
 			return (-1);
@@ -727,8 +727,8 @@ i_bs_readdir(vnode_t *dvp, list_t *dir_stack, list_t *file_stack)
 			if (strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0)
 				continue;
 
-			if (VOP_LOOKUP(dvp,
-			    nm, &vp, NULL, 0, NULL, kcred) != 0) {
+			if (VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, kcred,
+			    NULL, NULL, NULL) != 0) {
 				kmem_free(dbuf, dlen);
 				return (-1);
 			}
@@ -763,7 +763,8 @@ i_bs_destroy(vnode_t *dvp, char *path)
 	char	*dpath, *fpath;
 	int	ret;
 
-	if (VOP_LOOKUP(dvp, path, &vp, NULL, 0, NULL, kcred) != 0) {
+	if (VOP_LOOKUP(dvp, path, &vp, NULL, 0, NULL, kcred,
+	    NULL, NULL, NULL) != 0) {
 		/* A directory entry with this name doesn't actually exist. */
 		return;
 	}
@@ -771,7 +772,7 @@ i_bs_destroy(vnode_t *dvp, char *path)
 	if ((vp->v_type & VDIR) == 0) {
 		/* Easy, the directory entry is a file so delete it. */
 		VN_RELE(vp);
-		(void) VOP_REMOVE(dvp, path, kcred);
+		(void) VOP_REMOVE(dvp, path, kcred, NULL, 0);
 		return;
 	}
 
@@ -796,7 +797,7 @@ i_bs_destroy(vnode_t *dvp, char *path)
 		if (i_bs_readdir(dvp, &search_stack, NULL) != 0)
 			goto exit;
 
-		/* Save the current directory a seperate stack. */
+		/* Save the current directory a separate stack. */
 		i_stack_push(&dir_stack, (caddr_t)pdvp, (caddr_t)dvp, dpath);
 	}
 
@@ -818,7 +819,7 @@ i_bs_destroy(vnode_t *dvp, char *path)
 		while (i_stack_pop(&file_stack,
 		    NULL, (caddr_t *)&vp, &fpath) == 0) {
 			VN_RELE(vp)
-			ret = VOP_REMOVE(dvp, fpath, kcred);
+			ret = VOP_REMOVE(dvp, fpath, kcred, NULL, 0);
 			i_strfree(fpath);
 			if (ret != 0) {
 				i_strfree(dpath);
@@ -828,7 +829,7 @@ i_bs_destroy(vnode_t *dvp, char *path)
 
 		/* Delete this directory. */
 		VN_RELE(dvp);
-		ret = VOP_RMDIR(pdvp, dpath, pdvp, kcred);
+		ret = VOP_RMDIR(pdvp, dpath, pdvp, kcred, NULL, 0);
 		i_strfree(dpath);
 		if (ret != 0)
 			goto exit;
@@ -862,7 +863,7 @@ i_bs_create(vnode_t *dvp, char *bs_name)
 	vattr.va_mode = 0755; /* u+rwx,og=rx */
 	vattr.va_mask = AT_TYPE|AT_MODE;
 
-	if (VOP_MKDIR(dvp, bs_name, &vattr, &vp, kcred) != 0)
+	if (VOP_MKDIR(dvp, bs_name, &vattr, &vp, kcred, NULL, 0, NULL) != 0)
 		return (NULL);
 	return (vp);
 }
@@ -1220,24 +1221,27 @@ static const fs_operation_def_t lx_autofs_vfstops[] = {
  * the underlying filesystem we're mounted on.
  */
 static int
-lx_autofs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+lx_autofs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+    caller_context_t *ctp)
 {
 	vnode_t *uvp = vp->v_data;
-	return (VOP_CLOSE(uvp, flag, count, offset, cr));
+	return (VOP_CLOSE(uvp, flag, count, offset, cr, ctp));
 }
 
 static int
-lx_autofs_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
+lx_autofs_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
+    caller_context_t *ctp, int flags)
 {
 	vnode_t *uvp = vp->v_data;
-	return (VOP_READDIR(uvp, uiop, cr, eofp));
+	return (VOP_READDIR(uvp, uiop, cr, eofp, ctp, flags));
 }
 
 static int
-lx_autofs_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+lx_autofs_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+    caller_context_t *ctp)
 {
 	vnode_t *uvp = vp->v_data;
-	return (VOP_ACCESS(uvp, mode, flags, cr));
+	return (VOP_ACCESS(uvp, mode, flags, cr, ctp));
 }
 
 static int
@@ -1256,7 +1260,8 @@ lx_autofs_rwunlock(struct vnode *vp, int write_lock, caller_context_t *ctp)
 
 /*ARGSUSED*/
 static int
-lx_autofs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
+lx_autofs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
+    caller_context_t *ctp, int flags)
 {
 	vnode_t *udvp = dvp->v_data;
 
@@ -1269,10 +1274,10 @@ lx_autofs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	 */
 	if (vn_matchops(cdir, lx_autofs_vn_ops)) {
 		vnode_t *ucdir = cdir->v_data;
-		return (VOP_RMDIR(udvp, nm, ucdir, cr));
+		return (VOP_RMDIR(udvp, nm, ucdir, cr, ctp, flags));
 	}
 
-	return (VOP_RMDIR(udvp, nm, cdir, cr));
+	return (VOP_RMDIR(udvp, nm, cdir, cr, ctp, flags));
 }
 
 /*
@@ -1280,17 +1285,17 @@ lx_autofs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
  *
  * For some VOP entry points we will first pass the request on to
  * the underlying filesystem we're mounted on.  If there's an error
- * then we immediatly return the error, but if the request succeedes
+ * then we immediately return the error, but if the request succeeds
  * we have to do some extra work before returning.
  */
 static int
-lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr)
+lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ctp)
 {
 	vnode_t		*ovp = *vpp;
 	vnode_t		*uvp = ovp->v_data;
 	int		error;
 
-	if ((error = VOP_OPEN(&uvp, flag, cr)) != 0)
+	if ((error = VOP_OPEN(&uvp, flag, cr, ctp)) != 0)
 		return (error);
 
 	/* Check for clone opens. */
@@ -1304,12 +1309,13 @@ lx_autofs_open(vnode_t **vpp, int flag, cred_t *cr)
 }
 
 static int
-lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ctp)
 {
 	vnode_t		*uvp = vp->v_data;
 	int		error;
 
-	if ((error = VOP_GETATTR(uvp, vap, flags, cr)) != 0)
+	if ((error = VOP_GETATTR(uvp, vap, flags, cr, ctp)) != 0)
 		return (error);
 
 	/* Update the attributes with our filesystem id. */
@@ -1319,13 +1325,14 @@ lx_autofs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 
 static int
 lx_autofs_mkdir(vnode_t *dvp, char *nm, struct vattr *vap, vnode_t **vpp,
-    cred_t *cr)
+    cred_t *cr, caller_context_t *ctp, int flags, vsecattr_t *vsecp)
 {
 	vnode_t		*udvp = dvp->v_data;
 	vnode_t		*uvp = NULL;
 	int		error;
 
-	if ((error = VOP_MKDIR(udvp, nm, vap, &uvp, cr)) != 0)
+	if ((error = VOP_MKDIR(udvp, nm, vap, &uvp, cr,
+	    ctp, flags, vsecp)) != 0)
 		return (error);
 
 	/* Update the attributes with our filesystem id. */
@@ -1341,7 +1348,7 @@ lx_autofs_mkdir(vnode_t *dvp, char *nm, struct vattr *vap, vnode_t **vpp,
  */
 /*ARGSUSED*/
 static void
-lx_autofs_inactive(struct vnode *vp, struct cred *cr)
+lx_autofs_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ctp)
 {
 	lx_autofs_vfs_t	*data = vp->v_vfsp->vfs_data;
 
@@ -1374,14 +1381,16 @@ lx_autofs_inactive(struct vnode *vp, struct cred *cr)
 
 static int
 lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-    int flags, vnode_t *rdir, cred_t *cr)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ctp,
+    int *direntflags, pathname_t *realpnp)
 {
 	vnode_t			*udvp = dvp->v_data;
 	vnode_t			*uvp = NULL;
 	int			error;
 
 	/* First try to lookup if this path component already exitst. */
-	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr)) == 0) {
+	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
+	    direntflags, realpnp)) == 0) {
 		*vpp = i_vn_alloc(dvp->v_vfsp, uvp);
 		return (0);
 	}
@@ -1395,7 +1404,8 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		return (error);
 
 	/* Retry the lookup operation. */
-	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr)) == 0) {
+	if ((error = VOP_LOOKUP(udvp, nm, &uvp, pnp, flags, rdir, cr, ctp,
+	    direntflags, realpnp)) == 0) {
 		*vpp = i_vn_alloc(dvp->v_vfsp, uvp);
 		return (0);
 	}
@@ -1405,7 +1415,7 @@ lx_autofs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 /*ARGSUSED*/
 static int
 lx_autofs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
-    int *rvalp)
+    int *rvalp, caller_context_t *ctp)
 {
 	vnode_t			*uvp = vp->v_data;
 
@@ -1421,7 +1431,7 @@ lx_autofs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 	}
 
 	/* Pass any remaining ioctl on. */
-	return (VOP_IOCTL(uvp, cmd, arg, mode, cr, rvalp));
+	return (VOP_IOCTL(uvp, cmd, arg, mode, cr, rvalp, ctp));
 }
 
 /*

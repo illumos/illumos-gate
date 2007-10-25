@@ -126,7 +126,8 @@ static int	nfs4mknod(vnode_t *, char *, struct vattr *, enum vcexcl,
 			int, vnode_t **, cred_t *);
 static int	nfs4open_otw(vnode_t *, char *, struct vattr *, vnode_t **,
 			cred_t *, int, int, enum createmode4, int);
-static int	nfs4rename(vnode_t *, char *, vnode_t *, char *, cred_t *);
+static int	nfs4rename(vnode_t *, char *, vnode_t *, char *, cred_t *,
+			caller_context_t *);
 static int	nfs4rename_persistent_fh(vnode_t *, char *, vnode_t *,
 			vnode_t *, char *, cred_t *, nfsstat4 *);
 static int	nfs4rename_volatile_fh(vnode_t *, char *, vnode_t *,
@@ -197,65 +198,82 @@ static void	nfs4args_write(nfs_argop4 *, stable_how4, rnode4_t *, cred_t *,
  * These are the vnode ops functions that implement the vnode interface to
  * the networked file system.  See more comments below at nfs4_vnodeops.
  */
-static int	nfs4_open(vnode_t **, int, cred_t *);
-static int	nfs4_close(vnode_t *, int, int, offset_t, cred_t *);
+static int	nfs4_open(vnode_t **, int, cred_t *, caller_context_t *);
+static int	nfs4_close(vnode_t *, int, int, offset_t, cred_t *,
+			caller_context_t *);
 static int	nfs4_read(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
 static int	nfs4_write(vnode_t *, struct uio *, int, cred_t *,
 			caller_context_t *);
-static int	nfs4_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
+static int	nfs4_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *,
+			caller_context_t *);
 static int	nfs4_setattr(vnode_t *, struct vattr *, int, cred_t *,
 			caller_context_t *);
-static int	nfs4_access(vnode_t *, int, int, cred_t *);
-static int	nfs4_readlink(vnode_t *, struct uio *, cred_t *);
-static int	nfs4_fsync(vnode_t *, int, cred_t *);
+static int	nfs4_access(vnode_t *, int, int, cred_t *, caller_context_t *);
+static int	nfs4_readlink(vnode_t *, struct uio *, cred_t *,
+			caller_context_t *);
+static int	nfs4_fsync(vnode_t *, int, cred_t *, caller_context_t *);
 static int	nfs4_create(vnode_t *, char *, struct vattr *, enum vcexcl,
-			int, vnode_t **, cred_t *, int);
-static int	nfs4_remove(vnode_t *, char *, cred_t *);
-static int	nfs4_link(vnode_t *, vnode_t *, char *, cred_t *);
-static int	nfs4_rename(vnode_t *, char *, vnode_t *, char *, cred_t *);
-static int	nfs4_mkdir(vnode_t *, char *, struct vattr *,
-			vnode_t **, cred_t *);
-static int	nfs4_rmdir(vnode_t *, char *, vnode_t *, cred_t *);
+			int, vnode_t **, cred_t *, int, caller_context_t *,
+			vsecattr_t *);
+static int	nfs4_remove(vnode_t *, char *, cred_t *, caller_context_t *,
+			int);
+static int	nfs4_link(vnode_t *, vnode_t *, char *, cred_t *,
+			caller_context_t *, int);
+static int	nfs4_rename(vnode_t *, char *, vnode_t *, char *, cred_t *,
+			caller_context_t *, int);
+static int	nfs4_mkdir(vnode_t *, char *, struct vattr *, vnode_t **,
+			cred_t *, caller_context_t *, int, vsecattr_t *);
+static int	nfs4_rmdir(vnode_t *, char *, vnode_t *, cred_t *,
+			caller_context_t *, int);
 static int	nfs4_symlink(vnode_t *, char *, struct vattr *, char *,
-			cred_t *);
-static int	nfs4_readdir(vnode_t *, struct uio *, cred_t *, int *);
-static int	nfs4_seek(vnode_t *, offset_t, offset_t *);
+			cred_t *, caller_context_t *, int);
+static int	nfs4_readdir(vnode_t *, struct uio *, cred_t *, int *,
+			caller_context_t *, int);
+static int	nfs4_seek(vnode_t *, offset_t, offset_t *, caller_context_t *);
 static int	nfs4_getpage(vnode_t *, offset_t, size_t, uint_t *,
 			page_t *[], size_t, struct seg *, caddr_t,
-			enum seg_rw, cred_t *);
-static int	nfs4_putpage(vnode_t *, offset_t, size_t, int, cred_t *);
-static int	nfs4_map(vnode_t *, offset_t, struct as *, caddr_t *,
-			size_t, uchar_t, uchar_t, uint_t, cred_t *);
-static int	nfs4_addmap(vnode_t *, offset_t, struct as *, caddr_t,
-			size_t, uchar_t, uchar_t, uint_t, cred_t *);
-static int	nfs4_cmp(vnode_t *, vnode_t *);
+			enum seg_rw, cred_t *, caller_context_t *);
+static int	nfs4_putpage(vnode_t *, offset_t, size_t, int, cred_t *,
+			caller_context_t *);
+static int	nfs4_map(vnode_t *, offset_t, struct as *, caddr_t *, size_t,
+			uchar_t, uchar_t, uint_t, cred_t *, caller_context_t *);
+static int	nfs4_addmap(vnode_t *, offset_t, struct as *, caddr_t, size_t,
+			uchar_t, uchar_t, uint_t, cred_t *, caller_context_t *);
+static int	nfs4_cmp(vnode_t *, vnode_t *, caller_context_t *);
 static int	nfs4_frlock(vnode_t *, int, struct flock64 *, int, offset_t,
-			struct flk_callback *, cred_t *);
+			struct flk_callback *, cred_t *, caller_context_t *);
 static int	nfs4_space(vnode_t *, int, struct flock64 *, int, offset_t,
 			cred_t *, caller_context_t *);
-static int	nfs4_delmap(vnode_t *, offset_t, struct as *, caddr_t,
-			size_t, uint_t, uint_t, uint_t, cred_t *);
+static int	nfs4_delmap(vnode_t *, offset_t, struct as *, caddr_t, size_t,
+			uint_t, uint_t, uint_t, cred_t *, caller_context_t *);
 static int	nfs4_pageio(vnode_t *, page_t *, u_offset_t, size_t, int,
-			cred_t *);
-static void	nfs4_dispose(vnode_t *, page_t *, int, int, cred_t *);
-static int	nfs4_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
-static int	nfs4_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *);
+			cred_t *, caller_context_t *);
+static void	nfs4_dispose(vnode_t *, page_t *, int, int, cred_t *,
+			caller_context_t *);
+static int	nfs4_setsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+			caller_context_t *);
 /*
  * These vnode ops are required to be called from outside this source file,
  * e.g. by ephemeral mount stub vnode ops, and so may not be declared
  * as static.
  */
-int	nfs4_getattr(vnode_t *, struct vattr *, int, cred_t *);
-void	nfs4_inactive(vnode_t *, cred_t *);
+int	nfs4_getattr(vnode_t *, struct vattr *, int, cred_t *,
+	    caller_context_t *);
+void	nfs4_inactive(vnode_t *, cred_t *, caller_context_t *);
 int	nfs4_lookup(vnode_t *, char *, vnode_t **,
-	    struct pathname *, int, vnode_t *, cred_t *);
-int	nfs4_fid(vnode_t *, fid_t *);
+	    struct pathname *, int, vnode_t *, cred_t *,
+	    caller_context_t *, int *, pathname_t *);
+int	nfs4_fid(vnode_t *, fid_t *, caller_context_t *);
 int	nfs4_rwlock(vnode_t *, int, caller_context_t *);
 void	nfs4_rwunlock(vnode_t *, int, caller_context_t *);
-int	nfs4_realvp(vnode_t *, vnode_t **);
-int	nfs4_pathconf(vnode_t *, int, ulong_t *, cred_t *);
-int	nfs4_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *);
+int	nfs4_realvp(vnode_t *, vnode_t **, caller_context_t *);
+int	nfs4_pathconf(vnode_t *, int, ulong_t *, cred_t *,
+	    caller_context_t *);
+int	nfs4_getsecattr(vnode_t *, vsecattr_t *, int, cred_t *,
+	    caller_context_t *);
+int	nfs4_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *,
+	    caller_context_t *);
 
 /*
  * Used for nfs4_commit_vp() to indicate if we should
@@ -580,11 +598,10 @@ nfs4_getvnodeops(void)
 
 /*
  * The OPEN operation opens a regular file.
- *
- * ARGSUSED
  */
+/*ARGSUSED3*/
 static int
-nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
+nfs4_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t *dvp = NULL;
 	rnode4_t *rp, *drp;
@@ -862,10 +879,10 @@ nfs4open_otw(vnode_t *dvp, char *file_name, struct vattr *in_va,
 		 */
 		if (VTOR4(vpi)->r_deleg_type != OPEN_DELEGATE_NONE) {
 			if (open_flag & FREAD &&
-			    nfs4_access(vpi, VREAD, 0, cr) == 0)
+			    nfs4_access(vpi, VREAD, 0, cr, NULL) == 0)
 				acc |= VREAD;
 			if (open_flag & FWRITE &&
-			    nfs4_access(vpi, VWRITE, 0, cr) == 0)
+			    nfs4_access(vpi, VWRITE, 0, cr, NULL) == 0)
 				acc |= VWRITE;
 		}
 	}
@@ -1538,7 +1555,7 @@ recov_retry:
 			    "nfs4open_otw: EXCLUSIVE4: error %d on SETATTR:"
 			    " remove file", e.error));
 			VN_RELE(vp);
-			(void) nfs4_remove(dvp, file_name, cr);
+			(void) nfs4_remove(dvp, file_name, cr, NULL, 0);
 			/*
 			 * Since we've reled the vnode and removed
 			 * the file we now need to return the error.
@@ -1635,7 +1652,7 @@ skip_update_dircaches:
  * - failed_reopen : same as above, except that the file has already been
  *   marked dead, so no need to do it again.
  * - bailout : reopen failed but we are able to recover and retry the reopen -
- *   either within this function immediatley or via the calling function.
+ *   either within this function immediately or via the calling function.
  */
 
 void
@@ -2210,8 +2227,10 @@ nfs4_open_non_reg_file(vnode_t **vpp, int flag, cred_t *cr)
 /*
  * CLOSE a file
  */
+/* ARGSUSED */
 static int
-nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+	caller_context_t *ct)
 {
 	rnode4_t	*rp;
 	int		 error = 0;
@@ -3513,7 +3532,8 @@ recov_retry:
 
 /* ARGSUSED */
 static int
-nfs4_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
+nfs4_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp,
+	caller_context_t *ct)
 {
 	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
@@ -3525,8 +3545,10 @@ nfs4_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	}
 }
 
+/* ARGSUSED */
 int
-nfs4_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
+nfs4_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp = VTOR4(vp);
@@ -3575,7 +3597,7 @@ nfs4_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 					mutex_exit(&rp->r_statelock);
 					error =
 					    nfs4_putpage(vp, (u_offset_t)0,
-					    0, 0, cr);
+								0, 0, cr, NULL);
 					mutex_enter(&rp->r_statelock);
 					if (error && (error == ENOSPC ||
 					    error == EDQUOT)) {
@@ -3696,7 +3718,7 @@ nfs4setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	    rp->r_count > 0 ||
 	    rp->r_mapcnt > 0)) {
 		ASSERT(vp->v_type != VCHR);
-		e.error = nfs4_putpage(vp, (offset_t)0, 0, 0, cr);
+		e.error = nfs4_putpage(vp, (offset_t)0, 0, 0, cr, NULL);
 		if (e.error && (e.error == ENOSPC || e.error == EDQUOT)) {
 			mutex_enter(&rp->r_statelock);
 			if (!rp->r_error)
@@ -4144,7 +4166,7 @@ recov_retry:
 
 /* ARGSUSED */
 static int
-nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -4358,8 +4380,9 @@ out:
 	return (e.error);
 }
 
+/* ARGSUSED */
 static int
-nfs4_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
+nfs4_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr, caller_context_t *ct)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res;
@@ -4521,8 +4544,9 @@ recov_retry:
  * metadata changes are not cached on the client before being
  * sent to the server.
  */
+/* ARGSUSED */
 static int
-nfs4_fsync(vnode_t *vp, int syncflag, cred_t *cr)
+nfs4_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 
@@ -4541,8 +4565,9 @@ nfs4_fsync(vnode_t *vp, int syncflag, cred_t *cr)
  * operation while it was open, it got renamed instead.  Here we
  * remove the renamed file.
  */
+/* ARGSUSED */
 void
-nfs4_inactive(vnode_t *vp, cred_t *cr)
+nfs4_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	rnode4_t *rp;
 
@@ -4709,7 +4734,7 @@ redo:
 	if (nfs4_has_pages(vp) &&
 	    ((rp->r_flags & R4DIRTY) || rp->r_count > 0)) {
 		ASSERT(vp->v_type != VCHR);
-		e.error = nfs4_putpage(vp, (u_offset_t)0, 0, 0, cr);
+		e.error = nfs4_putpage(vp, (u_offset_t)0, 0, 0, cr, NULL);
 		if (e.error) {
 			mutex_enter(&rp->r_statelock);
 			if (!rp->r_error)
@@ -4827,7 +4852,8 @@ recov_retry_remove:
 /* ARGSUSED3 */
 int
 nfs4_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
-    int flags, vnode_t *rdir, cred_t *cr)
+    int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+    int *direntflags, pathname_t *realpnp)
 {
 	int error;
 	vnode_t *vp, *avp = NULL;
@@ -4903,7 +4929,8 @@ nfs4lookup_xattr(vnode_t *dvp, char *nm, vnode_t **vpp, int flags, cred_t *cr)
 	mntinfo4_t *mi;
 
 	mi = VTOMI4(dvp);
-	if (!(mi->mi_vfsp->vfs_flag & VFS_XATTR))
+	if (!(mi->mi_vfsp->vfs_flag & VFS_XATTR) &&
+	    !vfs_has_feature(mi->mi_vfsp, VFSFT_XVATTR))
 		return (EINVAL);
 
 	drp = VTOR4(dvp);
@@ -4983,7 +5010,7 @@ nfs4lookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int skipdnlc)
 	 * just need to check access.
 	 */
 	if (nm[0] == '.' && nm[1] == '\0') {
-		error = nfs4_access(dvp, VEXEC, 0, cr);
+		error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 		if (error)
 			return (error);
 		VN_HOLD(dvp);
@@ -5046,7 +5073,7 @@ nfs4lookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int skipdnlc)
 				/*
 				 * The access cache should almost always hit
 				 */
-				error = nfs4_access(dvp, VEXEC, 0, cr);
+				error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 
 				if (error) {
 					VN_RELE(*vpp);
@@ -5346,7 +5373,7 @@ recov_retry:
 			 * Somehow we must not have asked for enough
 			 * so try a singleton ACCESS, should never happen.
 			 */
-			e.error = nfs4_access(dvp, VEXEC, 0, cr);
+			e.error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 			if (e.error) {
 				VN_RELE(*vpp);
 				*vpp = NULL;
@@ -5488,7 +5515,7 @@ recov_retry:
 		 * and dnlc entry, we may not have access.
 		 * This should almost always hit the cache.
 		 */
-		e.error = nfs4_access(dvp, VEXEC, 0, cr);
+		e.error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 		if (e.error) {
 			VN_RELE(*vpp);
 			*vpp = NULL;
@@ -5819,7 +5846,7 @@ recov_retry:
 			 * Somehow we must not have asked for enough
 			 * so try a singleton ACCESS should never happen
 			 */
-			e.error = nfs4_access(dvp, VEXEC, 0, cr);
+			e.error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 			if (e.error) {
 				sfh4_rele(&sfhp);
 				goto exit;
@@ -5855,7 +5882,7 @@ recov_retry:
 		 * we may not have access.
 		 * This should almost always hit the cache.
 		 */
-		e.error = nfs4_access(dvp, VEXEC, 0, cr);
+		e.error = nfs4_access(dvp, VEXEC, 0, cr, NULL);
 		if (e.error) {
 			sfh4_rele(&sfhp);
 			goto exit;
@@ -6375,7 +6402,8 @@ recov_retry:
 /* ARGSUSED */
 static int
 nfs4_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
-    int mode, vnode_t **vpp, cred_t *cr, int flags)
+	int mode, vnode_t **vpp, cred_t *cr, int flags, caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *vp = NULL;
@@ -6461,7 +6489,7 @@ top:
 			vp = specvp(vp, vp->v_rdev, vp->v_type, cr);
 			VN_RELE(tempvp);
 		}
-		if (!(error = VOP_ACCESS(vp, mode, 0, cr))) {
+		if (!(error = VOP_ACCESS(vp, mode, 0, cr, ct))) {
 			if ((vattr.va_mask & AT_SIZE) &&
 			    vp->v_type == VREG) {
 				rp = VTOR4(vp);
@@ -6500,7 +6528,8 @@ top:
 					    rp->r_count > 0 ||
 					    rp->r_mapcnt > 0)) {
 						error = nfs4_putpage(vp,
-						    (offset_t)0, 0, 0, cr);
+							(offset_t)0, 0, 0, cr,
+							ct);
 						if (error && (error == ENOSPC ||
 						    error == EDQUOT)) {
 							mutex_enter(
@@ -6537,7 +6566,7 @@ top:
 			if (IS_SHADOW(vp, trp))
 				tvp = RTOV4(trp);
 		}
-		vnevent_create(tvp);
+		vnevent_create(tvp, ct);
 		*vpp = vp;
 	}
 	return (error);
@@ -6642,7 +6671,7 @@ create_otw:
 		trp = VTOR4(tvp);
 		if (IS_SHADOW(tvp, trp))
 			tvp = RTOV4(trp);
-		vnevent_create(tvp);
+		vnevent_create(tvp, ct);
 	}
 	return (error);
 }
@@ -6695,7 +6724,7 @@ call_nfs4_create_req(vnode_t *dvp, char *nm, void *data, struct vattr *va,
 
 		va->va_mode &= ~VSGID;
 		dva.va_mask = AT_MODE | AT_GID;
-		if (VOP_GETATTR(dvp, &dva, 0, cr) == 0) {
+		if (VOP_GETATTR(dvp, &dva, 0, cr, NULL) == 0) {
 
 			/*
 			 * If the parent's directory has the setgid bit set
@@ -7073,8 +7102,9 @@ nfs4mknod(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
  * we rename it instead of removing it and nfs_inactive
  * will remove the new name.
  */
+/* ARGSUSED */
 static int
-nfs4_remove(vnode_t *dvp, char *nm, cred_t *cr)
+nfs4_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct, int flags)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res, *resp = NULL;
@@ -7152,7 +7182,7 @@ nfs4_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	    (rp->r_unldvp == NULL || strcmp(nm, rp->r_unlname) == 0)) {
 		mutex_exit(&rp->r_statelock);
 		tmpname = newname();
-		e.error = nfs4rename(dvp, nm, dvp, tmpname, cr);
+		e.error = nfs4rename(dvp, nm, dvp, tmpname, cr, ct);
 		if (e.error)
 			kmem_free(tmpname, MAXNAMELEN);
 		else {
@@ -7188,7 +7218,7 @@ nfs4_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	 */
 	if (nfs4_has_pages(vp) &&
 	    ((rp->r_flags & R4DIRTY) || rp->r_count > 0)) {
-		e.error = nfs4_putpage(vp, (u_offset_t)0, 0, 0, cr);
+		e.error = nfs4_putpage(vp, (u_offset_t)0, 0, 0, cr, ct);
 		if (e.error && (e.error == ENOSPC || e.error == EDQUOT)) {
 			mutex_enter(&rp->r_statelock);
 			if (!rp->r_error)
@@ -7293,7 +7323,7 @@ recov_retry:
 		tvp = vp;
 		if (IS_SHADOW(vp, trp))
 			tvp = RTOV4(trp);
-		vnevent_remove(tvp, dvp, nm);
+		vnevent_remove(tvp, dvp, nm, ct);
 	}
 	VN_RELE(vp);
 	return (e.error);
@@ -7306,8 +7336,10 @@ recov_retry:
  *	PUTFH(file), SAVEFH, PUTFH(targetdir), LINK, RESTOREFH,
  *	GETATTR(file)
  */
+/* ARGSUSED */
 static int
-nfs4_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
+nfs4_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	COMPOUND4args_clnt args;
 	COMPOUND4res_clnt res, *resp = NULL;
@@ -7332,7 +7364,7 @@ nfs4_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 
 	if (nfs_zone() != VTOMI4(tdvp)->mi_zone)
 		return (EPERM);
-	if (VOP_REALVP(svp, &realvp) == 0) {
+	if (VOP_REALVP(svp, &realvp, ct) == 0) {
 		svp = realvp;
 		ASSERT(nfs4_consistent_type(svp));
 	}
@@ -7514,7 +7546,7 @@ recov_retry:
 		tvp = svp;
 		if (IS_SHADOW(svp, trp))
 			tvp = RTOV4(trp);
-		vnevent_link(tvp);
+		vnevent_link(tvp, ct);
 	}
 out:
 	kmem_free(argop, argoplist_size);
@@ -7526,17 +7558,19 @@ out:
 	return (e.error);
 }
 
+/* ARGSUSED */
 static int
-nfs4_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
+nfs4_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	vnode_t *realvp;
 
 	if (nfs_zone() != VTOMI4(odvp)->mi_zone)
 		return (EPERM);
-	if (VOP_REALVP(ndvp, &realvp) == 0)
+	if (VOP_REALVP(ndvp, &realvp, ct) == 0)
 		ndvp = realvp;
 
-	return (nfs4rename(odvp, onm, ndvp, nnm, cr));
+	return (nfs4rename(odvp, onm, ndvp, nnm, cr, ct));
 }
 
 /*
@@ -7547,7 +7581,8 @@ nfs4_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
  * based on the likelihood of the filehandle to change during rename.
  */
 static int
-nfs4rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
+nfs4rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 	mntinfo4_t *mi;
@@ -7712,11 +7747,12 @@ link_call:
 			error = 0;
 
 			if (do_link) {
-				error = nfs4_link(ndvp, nvp, tmpname, cr);
+				error = nfs4_link(ndvp, nvp, tmpname, cr,
+					NULL, 0);
 			}
 			if (error == EOPNOTSUPP || !do_link) {
 				error = nfs4_rename(ndvp, nnm, ndvp, tmpname,
-				    cr);
+				    cr, NULL, 0);
 				did_link = 0;
 			} else {
 				did_link = 1;
@@ -7843,7 +7879,7 @@ link_call:
 		 */
 		VN_HOLD(nvp);
 
-		(void) nfs4_remove(ndvp, tmpname, cr);
+		(void) nfs4_remove(ndvp, tmpname, cr, NULL, 0);
 
 		/* Undo the unlinked file naming stuff we just did */
 		mutex_enter(&rp->r_statelock);
@@ -7924,7 +7960,7 @@ link_call:
 			tvp = nvp;
 			if (IS_SHADOW(nvp, trp))
 				tvp = RTOV4(trp);
-			vnevent_rename_dest(tvp, ndvp, nnm);
+			vnevent_rename_dest(tvp, ndvp, nnm, ct);
 		}
 
 		/*
@@ -7936,14 +7972,14 @@ link_call:
 			tvp = ndvp;
 			if (IS_SHADOW(ndvp, trp))
 				tvp = RTOV4(trp);
-			vnevent_rename_dest_dir(tvp);
+			vnevent_rename_dest_dir(tvp, ct);
 		}
 
 		trp = VTOR4(ovp);
 		tvp = ovp;
 		if (IS_SHADOW(ovp, trp))
 			tvp = RTOV4(trp);
-		vnevent_rename_src(tvp, odvp, onm);
+		vnevent_rename_src(tvp, odvp, onm, ct);
 	}
 
 	if (nvp) {
@@ -7967,7 +8003,7 @@ link_call:
  * The compound op structure for persistent fh rename is:
  *      PUTFH(sourcdir), SAVEFH, PUTFH(targetdir), RENAME
  * Rather than bother with the directory postop args, we'll simply
- * update that a change occured in the cache, so no post-op getattrs.
+ * update that a change occurred in the cache, so no post-op getattrs.
  */
 static int
 nfs4rename_persistent_fh(vnode_t *odvp, char *onm, vnode_t *renvp,
@@ -8432,8 +8468,10 @@ out:
 	return (e.error);
 }
 
+/* ARGSUSED */
 static int
-nfs4_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
+nfs4_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr,
+    caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int error;
 	vnode_t *vp;
@@ -8469,8 +8507,10 @@ nfs4_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
  * The compound op structure is:
  *      PUTFH(targetdir), REMOVE
  */
+/*ARGSUSED4*/
 static int
-nfs4_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
+nfs4_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int need_end_op = FALSE;
 	COMPOUND4args_clnt args;
@@ -8664,7 +8704,7 @@ recov_retry:
 		tvp = vp;
 		if (IS_SHADOW(vp, trp))
 			tvp = RTOV4(trp);
-		vnevent_rmdir(tvp, dvp, nm);
+		vnevent_rmdir(tvp, dvp, nm, ct);
 	}
 
 	VN_RELE(vp);
@@ -8672,8 +8712,10 @@ recov_retry:
 	return (e.error);
 }
 
+/* ARGSUSED */
 static int
-nfs4_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr)
+nfs4_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int error;
 	vnode_t *vp;
@@ -8726,8 +8768,10 @@ nfs4_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr)
  * may return only one block's worth of entries.  Entries may be compressed
  * on the server.
  */
+/* ARGSUSED */
 static int
-nfs4_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp)
+nfs4_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp,
+	caller_context_t *ct, int flags)
 {
 	int error;
 	uint_t count;
@@ -8809,7 +8853,7 @@ nfs4_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp)
 		nfs4readdir(vp, rdc, cr);
 
 		/*
-		 * Reaquire the lock, so that we can continue
+		 * Reacquire the lock, so that we can continue
 		 */
 		mutex_enter(&rp->r_statelock);
 		/*
@@ -9483,7 +9527,7 @@ write_again:
 
 /* ARGSUSED */
 int
-nfs4_fid(vnode_t *vp, fid_t *fidp)
+nfs4_fid(vnode_t *vp, fid_t *fidp, caller_context_t *ct)
 {
 	return (EREMOTE);
 }
@@ -9522,7 +9566,7 @@ nfs4_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ctp)
 
 /* ARGSUSED */
 static int
-nfs4_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+nfs4_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
@@ -9543,10 +9587,11 @@ nfs4_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
 /*
  * Return all the pages from [off..off+len) in file
  */
+/* ARGSUSED */
 static int
 nfs4_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
     page_t *pl[], size_t plsz, struct seg *seg, caddr_t addr,
-    enum seg_rw rw, cred_t *cr)
+	enum seg_rw rw, cred_t *cr, caller_context_t *ct)
 {
 	rnode4_t *rp;
 	int error;
@@ -10022,8 +10067,10 @@ nfs4_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
  * len == MAXBSIZE (from segmap_release actions), and len == PAGESIZE
  * (from pageout).
  */
+/* ARGSUSED */
 static int
-nfs4_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
+nfs4_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -10228,7 +10275,7 @@ nfs4_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		 */
 		if (!(flags & B_ASYNC)) {
 			error = nfs4_putpage(vp, io_off, io_len,
-			    B_INVAL | B_FORCE, cr);
+			    B_INVAL | B_FORCE, cr, NULL);
 		}
 	} else {
 		if (error)
@@ -10251,9 +10298,11 @@ nfs4_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 int nfs4_force_open_before_mmap = 0;
 #endif
 
+/* ARGSUSED */
 static int
 nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
-    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr)
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int error = 0;
@@ -10529,7 +10578,8 @@ open_and_get_osp(vnode_t *map_vp, cred_t *cr, nfs4_open_stream_t **ospp)
 /* ARGSUSED */
 static int
 nfs4_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr)
+    size_t len, uchar_t prot, uchar_t maxprot, uint_t flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	rnode4_t		*rp;
 	int			error = 0;
@@ -10633,16 +10683,19 @@ out:
 	return (error);
 }
 
+/* ARGSUSED */
 static int
-nfs4_cmp(vnode_t *vp1, vnode_t *vp2)
+nfs4_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
 
 	return (VTOR4(vp1) == VTOR4(vp2));
 }
 
+/* ARGSUSED */
 static int
 nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-    offset_t offset, struct flk_callback *flk_cbp, cred_t *cr)
+    offset_t offset, struct flk_callback *flk_cbp, cred_t *cr,
+    caller_context_t *ct)
 {
 	int rc;
 	u_offset_t start, end;
@@ -10698,7 +10751,7 @@ nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 			if (!nfs4_safelock(vp, bfp, cr))
 				return (EAGAIN);
 		}
-		return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr));
+		return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 	}
 
 	rp = VTOR4(vp);
@@ -10748,7 +10801,7 @@ nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		mutex_exit(&rp->r_statelock);
 		if (rc != 0)
 			goto done;
-		error = nfs4_putpage(vp, (offset_t)0, 0, B_INVAL, cr);
+		error = nfs4_putpage(vp, (offset_t)0, 0, B_INVAL, cr, ct);
 		if (error) {
 			if (error == ENOSPC || error == EDQUOT) {
 				mutex_enter(&rp->r_statelock);
@@ -10820,7 +10873,7 @@ nfs4_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 
 /* ARGSUSED */
 int
-nfs4_realvp(vnode_t *vp, vnode_t **vpp)
+nfs4_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	rnode4_t *rp;
 	rp = VTOR4(vp);
@@ -10845,7 +10898,8 @@ nfs4_realvp(vnode_t *vp, vnode_t **vpp)
 /* ARGSUSED */
 static int
 nfs4_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
-    size_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr)
+    size_t len, uint_t prot, uint_t maxprot, uint_t flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int			caller_found;
 	int			error;
@@ -11043,7 +11097,7 @@ nfs4_delmap_callback(struct as *as, void *arg, uint_t event)
 
 	if ((rp->r_flags & R4DIRECTIO) || (mi->mi_flags & MI4_DIRECTIO))
 		(void) nfs4_putpage(dmapp->vp, dmapp->off, dmapp->len,
-		    B_INVAL, dmapp->cr);
+		    B_INVAL, dmapp->cr, NULL);
 
 	if (e.error) {
 		e.stat = puterrno4(e.error);
@@ -11111,8 +11165,10 @@ fattr4_maxfilesize_to_bits(uint64_t ll)
 	return (l);
 }
 
+/* ARGSUSED */
 int
-nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	hrtime_t t;
@@ -11140,7 +11196,7 @@ nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 		 * going otw with GETATTR(FATTR4_NAMED_ATTR).  For now
 		 * just drive the OTW getattr.  This is required because
 		 * _PC_XATTR_EXISTS can only return true if attributes
-		 * exist -- simply checking for existance of the attrdir
+		 * exist -- simply checking for existence of the attrdir
 		 * is not sufficient.
 		 *
 		 * pc4_xattr_valid can be only be trusted when r_xattr_dir
@@ -11262,9 +11318,10 @@ nfs4_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	return (error);
 }
 
+/* ARGSUSED */
 static int
 nfs4_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-    int flags, cred_t *cr)
+	int flags, cred_t *cr, caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -11292,8 +11349,10 @@ nfs4_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	return (error);
 }
 
+/* ARGSUSED */
 static void
-nfs4_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
+nfs4_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 	rnode4_t *rp;
@@ -11899,7 +11958,7 @@ top:
 	write_verf = rp->r_writeverf;
 	mutex_exit(&rp->r_statelock);
 
-	error = nfs4_putpage(vp, poff, plen, B_ASYNC, cr);
+	error = nfs4_putpage(vp, poff, plen, B_ASYNC, cr, NULL);
 	if (error == EAGAIN)
 		error = 0;
 
@@ -11910,7 +11969,7 @@ top:
 	 * the asynchronous i/o's in that range are done as well.
 	 */
 	if (!error)
-		error = nfs4_putpage(vp, poff, plen, 0, cr);
+		error = nfs4_putpage(vp, poff, plen, 0, cr, NULL);
 
 	if (error)
 		return (error);
@@ -12067,7 +12126,8 @@ do_nfs4_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 
 /*ARGSUSED*/
 static int
-nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
+nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	int		error = 0;
 	mntinfo4_t	*mi;
@@ -12113,8 +12173,10 @@ nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 	return (ENOSYS);
 }
 
+/* ARGSUSED */
 int
-nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
+nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	int		error;
 	mntinfo4_t	*mi;
@@ -12167,7 +12229,7 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 		if (error) {
 			vs_ace4_destroy(&gar.n4g_vsa);
 			if (error == ENOTSUP || error == EOPNOTSUPP)
-				error = fs_fab_acl(vp, vsecattr, flag, cr);
+				error = fs_fab_acl(vp, vsecattr, flag, cr, ct);
 			return (error);
 		}
 
@@ -12177,7 +12239,7 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 			 * bitmap, neither was an acl.
 			 */
 			vs_ace4_destroy(&gar.n4g_vsa);
-			error = fs_fab_acl(vp, vsecattr, flag, cr);
+			error = fs_fab_acl(vp, vsecattr, flag, cr, ct);
 			return (error);
 		}
 
@@ -12193,11 +12255,11 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 		if ((error) && (vsecattr->vsa_mask &
 		    (VSA_ACL | VSA_ACLCNT | VSA_DFACL | VSA_DFACLCNT)) &&
 		    (error != EACCES)) {
-			error = fs_fab_acl(vp, vsecattr, flag, cr);
+			error = fs_fab_acl(vp, vsecattr, flag, cr, ct);
 		}
 		return (error);
 	}
-	error = fs_fab_acl(vp, vsecattr, flag, cr);
+	error = fs_fab_acl(vp, vsecattr, flag, cr, ct);
 	return (error);
 }
 
@@ -12322,8 +12384,10 @@ nfs4_create_getsecattr_return(vsecattr_t *filled_vsap, vsecattr_t *vsap,
 	return (0);
 }
 
-static int
-nfs4_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
+/* ARGSUSED */
+int
+nfs4_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr,
+    caller_context_t *ct)
 {
 	int error;
 
@@ -12348,7 +12412,7 @@ nfs4_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 	 * request off to the local share code.
 	 */
 	if (VTOMI4(vp)->mi_flags & MI4_LLOCK)
-		return (fs_shrlock(vp, cmd, shr, flag, cr));
+		return (fs_shrlock(vp, cmd, shr, flag, cr, ct));
 
 	switch (cmd) {
 	case F_SHARE:
@@ -13568,7 +13632,7 @@ nfs4frlock_recovery(int needrecov, nfs4_error_t *ep,
 }
 
 /*
- * Handles the succesful reply from the server for nfs4frlock.
+ * Handles the successful reply from the server for nfs4frlock.
  */
 static void
 nfs4frlock_results_ok(nfs4_lock_call_type_t ctype, int cmd, flock64_t *flk,
@@ -13855,7 +13919,7 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 			int error;
 
 			error = VOP_PUTPAGE(vp, (u_offset_t)0,
-			    0, B_INVAL, cred);
+						0, B_INVAL, cred, NULL);
 
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				rnode4_t *rp = VTOR4(vp);
@@ -14345,7 +14409,7 @@ nfs4_safelock(vnode_t *vp, const struct flock64 *bfp, cred_t *cr)
 
 	/* mandatory locking and mapping don't mix */
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error != 0) {
 		NFS4_DEBUG(nfs4_client_lock_debug, (CE_NOTE, "nfs4_safelock: "
 		    "getattr error %d", error));
@@ -14502,7 +14566,8 @@ nfs4_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 		ld.l_start = 0;
 		ld.l_len = 0;		/* do entire file */
 
-		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL, cr);
+		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL,
+			cr, NULL);
 
 		if (ret != 0) {
 			/*
@@ -15552,7 +15617,7 @@ locks_intersect(flock64_t *llfp, flock64_t *curfp)
 }
 
 /*
- * Determine what the interseting lock region is, and add that to the
+ * Determine what the intersecting lock region is, and add that to the
  * 'nl_llpp' locklist in increasing order (by l_start).
  */
 static void

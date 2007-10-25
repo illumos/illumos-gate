@@ -1,0 +1,1314 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_SAM_NDL_
+#define _MLSVC_SAM_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Security Accounts Manager RPC (SAMR) interface definition.
+ */
+
+#include "ndrtypes.ndl"
+
+
+#define SAMR_OPNUM_ConnectAnon			0x00
+#define SAMR_OPNUM_CloseHandle			0x01
+#define SAMR_OPNUM_QuerySecObject		0x03
+#define SAMR_OPNUM_LookupDomain			0x05
+#define SAMR_OPNUM_EnumLocalDomains		0x06
+#define SAMR_OPNUM_OpenDomain			0x07
+#define SAMR_OPNUM_QueryDomainInfo		0x08
+#define SAMR_OPNUM_CreateDomainGroup		0x0a
+#define SAMR_OPNUM_QueryDomainGroups		0x0b
+#define SAMR_OPNUM_EnumDomainUsers		0x0d
+#define SAMR_OPNUM_CreateDomainAlias		0x0e
+#define SAMR_OPNUM_EnumDomainAliases		0x0f
+#define SAMR_OPNUM_LookupIds			0x10
+#define SAMR_OPNUM_LookupNames			0x11
+#define SAMR_OPNUM_LookupDomainIds		0x12
+#define SAMR_OPNUM_OpenGroup			0x13
+#define SAMR_OPNUM_QueryGroupInfo		0x14
+#define SAMR_OPNUM_StoreGroupInfo		0x15
+#define SAMR_OPNUM_AddGroupMember		0x16
+#define SAMR_OPNUM_DeleteDomainGroup		0x17
+#define SAMR_OPNUM_DeleteGroupMember		0x18
+#define SAMR_OPNUM_ListGroupMembers		0x19
+#define SAMR_OPNUM_OpenAlias			0x1b
+#define SAMR_OPNUM_QueryAliasInfo		0x1c
+#define SAMR_OPNUM_SetAliasInfo			0x1d
+#define SAMR_OPNUM_DeleteDomainAlias		0x1e
+#define SAMR_OPNUM_AddAliasMember		0x1f
+#define SAMR_OPNUM_DeleteAliasMember		0x20
+#define SAMR_OPNUM_QueryAliasMember		0x21
+#define SAMR_OPNUM_OpenUser			0x22
+#define SAMR_OPNUM_DeleteUser			0x23
+#define SAMR_OPNUM_QueryUserInfo		0x24
+#define SAMR_OPNUM_QueryUserGroups		0x27
+#define SAMR_OPNUM_QueryDispInfo		0x28	/* QueryDispInfo1 */
+#define SAMR_OPNUM_GetUserPwInfo		0x2c
+#define SAMR_OPNUM_EnumDomainGroups		0x30	/* QueryDispInfo3 */
+#define SAMR_OPNUM_CreateUser			0x32
+#define SAMR_OPNUM_QueryDispInfo4		0x33
+#define SAMR_OPNUM_AddMultiAliasMember		0x34
+#define SAMR_OPNUM_ChangeUserPasswd		0x37
+#define SAMR_OPNUM_GetDomainPwInfo		0x38
+#define SAMR_OPNUM_Connect			0x39
+#define SAMR_OPNUM_SetUserInfo			0x3a
+#define SAMR_OPNUM_Connect3			0x3e
+#define SAMR_OPNUM_Connect4			0x40
+
+
+/*
+ * UNION_INFO_ENT is intended to simplify adding new entries to a union.
+ * If the entry structures are named using the form samr_QueryUserInfoX,
+ * where X is the sitch_value, you can just add a single line. Note
+ * that you must also update the fixup function in mlsvc_sam.c.
+ */
+#define UNION_INFO_ENT(N,NAME) CASE(N) struct NAME##N info##N
+
+
+/*
+ * Sam account flags used when creating an account. These flags seem
+ * to be very similar to the USER_INFO_X flags (UF_XXX) in lmaccess.h
+ * but the values are different.
+ */
+#define SAMR_AF_ACCOUNTDISABLE			0x0001
+#define SAMR_AF_HOMEDIR_REQUIRED		0x0002
+#define SAMR_AF_PASSWD_NOTREQD			0x0004
+#define SAMR_AF_TEMP_DUPLICATE_ACCOUNT		0x0008
+#define SAMR_AF_NORMAL_ACCOUNT			0x0010
+#define SAMR_AF_MNS_LOGON_ACCOUNT		0x0020
+#define SAMR_AF_INTERDOMAIN_TRUST_ACCOUNT	0x0040
+#define SAMR_AF_WORKSTATION_TRUST_ACCOUNT	0x0080
+#define SAMR_AF_SERVER_TRUST_ACCOUNT		0x0100
+#define SAMR_AF_DONT_EXPIRE_PASSWD		0x0200
+#define SAMR_AF_ACCOUNT_AUTOLOCK		0x0400
+
+
+#define SAMR_AF_MACHINE_ACCOUNT_MASK	( \
+				SAMR_AF_INTERDOMAIN_TRUST_ACCOUNT \
+				| SAMR_AF_WORKSTATION_TRUST_ACCOUNT \
+				| SAMR_AF_SERVER_TRUST_ACCOUNT)
+
+#define SAMR_AF_ACCOUNT_TYPE_MASK	( \
+				SAMR_AF_TEMP_DUPLICATE_ACCOUNT \
+				| SAMR_AF_NORMAL_ACCOUNT \
+				| SAMR_AF_INTERDOMAIN_TRUST_ACCOUNT \
+				| SAMR_AF_WORKSTATION_TRUST_ACCOUNT \
+				| SAMR_AF_SERVER_TRUST_ACCOUNT)
+
+
+/*
+ * specific access rights which can be used in OpenAlias.
+ * extracted from Ethereal network analyzer
+ */
+#define SAMR_ALIAS_ACCESS_SET_INFO		0x00000010
+#define SAMR_ALIAS_ACCESS_GET_INFO		0x00000008
+#define SAMR_ALIAS_ACCESS_GET_MEMBERS		0x00000004
+#define SAMR_ALIAS_ACCESS_DEL_MEMBER		0x00000002
+#define SAMR_ALIAS_ACCESS_ADD_MEMBER		0x00000001
+
+/*
+ * Definition for a SID. The ndl compiler does not allow a typedef of
+ * a structure containing variable size members.
+ */
+struct samr_sid {
+	BYTE		Revision;
+	BYTE		SubAuthCount;
+	BYTE		Authority[6];
+  SIZE_IS(SubAuthCount)
+	DWORD		SubAuthority[ANY_SIZE_ARRAY];
+};
+
+
+/*
+ * SAMR definition of a security_descriptor.
+ */
+struct samr_sec_desc {
+	BYTE Revision;
+	BYTE Sbz1;
+	WORD Control;
+	struct samr_sid *owner;
+	struct samr_sid *group;
+	struct samr_sid *sacl;
+	struct samr_sid *dacl;
+};
+
+
+/*
+ * Definition for a string. The length and allosize should be set to
+ * twice the string length (i.e. strlen(str) * 2). The runtime code
+ * will perform the appropriate string to a wide-char conversions,
+ * so str should point to a regular char * string.
+ */
+struct samr_string {
+	WORD		length;
+	WORD		allosize;
+	LPTSTR		str;
+};
+typedef struct samr_string samr_string_t;
+
+
+/*
+ * Alternative varying/conformant string definition - for
+ * non-null terminated strings. This definition must match
+ * mlrpc_vcbuf_t.
+ */
+struct samr_vcb {
+	/*
+	 * size_is (actually a copy of length_is) will
+	 * be inserted here by the marshalling library.
+	 */
+	DWORD vc_first_is;
+	DWORD vc_length_is;
+  SIZE_IS(vc_length_is)
+	WORD buffer[ANY_SIZE_ARRAY];
+};
+
+struct samr_vcbuf {
+	WORD wclen;
+	WORD wcsize;
+	struct samr_vcb *vcb;
+};
+typedef struct samr_vcbuf samr_vcbuf_t;
+
+
+/*
+ * Handles appear to be a 20 byte object with the top 4 bytes all zero.
+ * Handles may have some internal structure but this should work since
+ * we always treat it as an opaque handle. They do appear to contain a
+ * sequence number which is incremented when new handle is issued.
+*/
+
+struct samr_handle {
+	DWORD hand1;
+	DWORD hand2;
+	WORD  hand3[2];
+	BYTE  hand4[8];
+};
+typedef struct samr_handle samr_handle_t;
+
+/*
+ * A long long, i.e. 64-bit, value.
+ */
+struct samr_quad {
+	DWORD low;
+	DWORD high;
+};
+typedef struct samr_quad samr_quad_t;
+
+
+/*
+ ***********************************************************************
+ * ConnectAnon. It looks like the SAM handle is identical to an LSA
+ * handle. See Connect.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_ConnectAnon)
+struct samr_ConnectAnon {
+	IN	DWORD *servername;
+	IN	DWORD access_mask;
+	OUT	samr_handle_t handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Connect. I'm not sure what the difference is between Connect and 
+ * ConnectAnon but this call seems to work better than ConnectAnon.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_Connect)
+struct samr_Connect {
+	IN	LPTSTR servername;
+	IN	DWORD access_mask;
+	OUT	samr_handle_t handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * SamrConnect3. A new form of connect first seen with Windows 2000.
+ * A new field has been added to the input request. Value: 0x00000002.
+ * I haven't looked at the Win2K response yet to see if it differs
+ * from SAMR_OPNUM_Connect.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_Connect3)
+struct samr_Connect3 {
+	IN	LPTSTR servername;
+	IN	DWORD unknown_02;
+	IN	DWORD access_mask;
+	OUT	samr_handle_t handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * SamrConnect4. A new form of connect first seen with Windows XP.
+ * The server name is the fully qualified domain name, i.e.
+ *	\\server.procom.com.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_Connect4)
+struct samr_Connect4 {
+	IN		LPTSTR servername;
+	IN		DWORD access_mask;
+	INOUT	DWORD unknown2_00000001;
+	INOUT	DWORD unknown3_00000001;
+	INOUT	DWORD unknown4_00000003;
+	INOUT	DWORD unknown5_00000000;
+	OUT		samr_handle_t handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * CloseHandle closes an association with the SAM. Using the same
+ * structure as the LSA seems to work.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_CloseHandle)
+struct samr_CloseHandle {
+	IN	samr_handle_t handle;
+	OUT	samr_handle_t result_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LookupDomain: lookup up the domain SID.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_LookupDomain)
+struct samr_LookupDomain {
+	IN	samr_handle_t handle;
+	IN	samr_string_t domain_name;
+	OUT struct samr_sid *sid;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * EnumLocalDomain
+ *
+ * This looks like a request to get the local domains supported by a
+ * remote server. NT always seems to return 2 domains: the local
+ * domain (hostname) and the Builtin domain.
+ *
+ * The max_length field is set to 0x2000.
+ * Enum_context is set to 0 in the request and set to entries_read in
+ * the reply. Like most of these enums, total_entries is the same as
+ * entries_read.
+ ***********************************************************************
+ */
+struct samr_LocalDomainEntry {
+	DWORD unknown;
+	samr_string_t name;
+};
+
+struct samr_LocalDomainInfo {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct samr_LocalDomainEntry *entry;
+};
+
+
+OPERATION(SAMR_OPNUM_EnumLocalDomains)
+struct samr_EnumLocalDomain {
+	IN		samr_handle_t handle;
+	INOUT	DWORD enum_context;
+	IN		DWORD max_length;
+	OUT		struct samr_LocalDomainInfo *info;
+	OUT		DWORD total_entries;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * OpenDomain
+ * 
+ * Open a specific domain within the SAM. From this I assume that each
+ * SAM can handle multiple domains so you need to identify the one with
+ * which you want to work. Working with a domain handle does appear to
+ * offer the benefit that you can then use RIDs instead of full SIDs,
+ * which simplifies things a bit. The domain handle can be used to get
+ * user and group handles.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_OpenDomain)
+struct samr_OpenDomain {
+	IN	samr_handle_t handle;
+	IN	DWORD access_mask;
+	IN REFERENCE struct samr_sid *sid;
+	OUT	samr_handle_t domain_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryDomainInfo
+ *
+ * Windows 95 Server Manager sends requests for levels 6 and 7 when
+ * the services menu item is selected.
+ ***********************************************************************
+ */
+#define SAMR_QUERY_DOMAIN_INFO_2		2
+#define SAMR_QUERY_DOMAIN_INFO_6		6
+#define SAMR_QUERY_DOMAIN_INFO_7		7
+
+
+struct samr_QueryDomainInfo2 {
+	DWORD unknown1;			/* 00 00 00 00 */
+	DWORD unknown2;			/* 00 00 00 80 */
+	samr_string_t s1;
+	samr_string_t domain;
+	samr_string_t s2;
+	DWORD sequence_num;		/* 2B 00 00 00 */
+	DWORD unknown3;			/* 00 00 00 00 */
+	DWORD unknown4;			/* 01 00 00 00 */
+	DWORD unknown5;			/* 03 00 00 00 */
+	DWORD unknown6;			/* 01 */
+	DWORD num_users;
+	DWORD num_groups;
+	DWORD num_aliases;
+};
+
+
+struct samr_QueryDomainInfo6 {
+	DWORD unknown1;			/* 00 00 00 00 */
+	DWORD unknown2;			/* B0 7F 14 00 */
+	DWORD unknown3;			/* 00 00 00 00 */
+	DWORD unknown4;			/* 00 00 00 00 */
+	DWORD unknown5;			/* 00 00 00 00 */
+};
+
+
+struct samr_QueryDomainInfo7 {
+	DWORD unknown1;			/* 03 00 00 00 */
+};
+
+
+union samr_QueryDomainInfo_ru {
+	UNION_INFO_ENT(2,samr_QueryDomainInfo);
+	UNION_INFO_ENT(6,samr_QueryDomainInfo);
+	UNION_INFO_ENT(7,samr_QueryDomainInfo);
+	DEFAULT	char *nullptr;
+};
+
+
+/*
+ * This structure needs to be declared, even though it can't be used in
+ * samr_QueryDomainInfo, in order to calculate the correct fixup offsets.
+ * If ndrgen did the right thing, samr_QueryDomainInfoRes would be one of
+ * the out parameters. However, if we do it that way, the switch_value
+ * isn't known early enough to do the fixup calculation. So it all has
+ * to go in samr_QueryDomainInfo.
+ */
+struct samr_QueryDomainInfoRes {
+	DWORD address;
+	WORD switch_value;
+	SWITCH(switch_value)
+		union samr_QueryDomainInfo_ru ru;
+};
+
+
+OPERATION(SAMR_OPNUM_QueryDomainInfo)
+struct samr_QueryDomainInfo {
+	IN	samr_handle_t domain_handle;
+	IN	WORD info_level;
+	/*
+	 * Can't use the standard "OUT result" form because
+	 * we need to include members explicitly.
+	 * OUT	struct samr_QueryDomainInfoRes result;
+	 */
+	OUT	DWORD address;
+	OUT	WORD switch_value;
+  SWITCH(info_level)
+	OUT	union samr_QueryDomainInfo_ru ru;
+	OUT	DWORD status;
+};
+
+#define SAMR_QUERY_ALIAS_INFO_1			1
+#define SAMR_QUERY_ALIAS_INFO_3			3
+
+
+struct samr_QueryAliasInfo1 {
+	WORD level;
+	samr_string_t name;
+	DWORD unknown;
+	samr_string_t desc;
+};
+
+struct samr_QueryAliasInfo3 {
+	WORD level;
+	samr_string_t desc;
+};
+
+union samr_QueryAliasInfo_ru {
+	UNION_INFO_ENT(1,samr_QueryAliasInfo);
+	UNION_INFO_ENT(3,samr_QueryAliasInfo);
+	DEFAULT	char *nullptr;
+};
+
+struct samr_QueryAliasInfoRes {
+	DWORD address;
+	WORD switch_value;
+	SWITCH(switch_value)
+		union samr_QueryAliasInfo_ru ru;
+};
+
+OPERATION(SAMR_OPNUM_QueryAliasInfo)
+struct samr_QueryAliasInfo {
+	IN	samr_handle_t alias_handle;
+	IN	WORD level;
+	OUT DWORD address;
+  SWITCH (level)
+	OUT	union samr_QueryAliasInfo_ru ru;
+	OUT	DWORD status;
+};
+
+OPERATION(SAMR_OPNUM_CreateDomainAlias)
+struct samr_CreateDomainAlias {
+	IN	samr_handle_t domain_handle;
+	IN	samr_string_t alias_name;
+	IN	DWORD access_mask;
+	OUT samr_handle_t alias_handle;
+	OUT	DWORD rid;
+	OUT	DWORD status;
+};
+
+OPERATION(SAMR_OPNUM_SetAliasInfo)
+struct samr_SetAliasInfo {
+	IN	samr_handle_t alias_handle;
+	IN	WORD level;
+	/* TBD */
+	OUT	DWORD status;
+};
+
+OPERATION(SAMR_OPNUM_DeleteDomainAlias)
+struct samr_DeleteDomainAlias {
+	IN	samr_handle_t alias_handle;
+	OUT	DWORD status;
+};
+
+OPERATION(SAMR_OPNUM_OpenAlias)
+struct samr_OpenAlias {
+	IN	samr_handle_t domain_handle;
+	IN	DWORD access_mask;
+	IN	DWORD rid;
+	OUT samr_handle_t alias_handle;
+	OUT	DWORD status;
+};
+
+struct name_rid {
+	DWORD rid;
+	samr_string_t name;
+};
+
+struct aliases_info {
+	DWORD count;
+	DWORD address;
+	SIZE_IS(count)
+	struct name_rid info[ANY_SIZE_ARRAY];
+};
+
+OPERATION(SAMR_OPNUM_EnumDomainAliases)
+struct samr_EnumDomainAliases {
+	IN	samr_handle_t domain_handle;
+	IN	DWORD resume_handle;
+	IN	DWORD mask;
+	OUT	DWORD out_resume;
+	OUT struct aliases_info *aliases;
+	OUT DWORD entries;
+	OUT	DWORD status;
+};
+
+struct user_acct_info {
+	DWORD index;
+	DWORD rid;
+	DWORD ctrl;
+	samr_string_t name;
+	samr_string_t fullname;
+	samr_string_t desc;
+};
+
+struct user_disp_info {
+	DWORD count;
+	/* right now we just need two entries */
+	struct user_acct_info acct[2];
+};
+
+OPERATION(SAMR_OPNUM_QueryDispInfo)
+struct samr_QueryDispInfo {
+	IN	samr_handle_t domain_handle;
+	IN	WORD level;
+	IN	DWORD start_idx;
+	IN	DWORD max_entries;
+	IN	DWORD pref_maxsize;
+	OUT DWORD total_size;
+	OUT DWORD returned_size;
+	OUT WORD switch_value;
+	OUT DWORD count;
+	OUT struct user_disp_info *users;
+	OUT	DWORD status;
+};
+
+struct group_acct_info {
+	DWORD index;
+	DWORD rid;
+	DWORD ctrl;
+	samr_string_t name;
+	samr_string_t desc;
+};
+
+struct group_disp_info {
+	DWORD count;
+	/* right now we just need one entry */
+	struct group_acct_info acct[1];
+};
+
+OPERATION(SAMR_OPNUM_EnumDomainGroups)
+struct samr_EnumDomainGroups {
+	IN	samr_handle_t domain_handle;
+	IN	WORD level;
+	IN	DWORD start_idx;
+	IN	DWORD max_entries;
+	IN	DWORD pref_maxsize;
+	OUT DWORD total_size;
+	OUT DWORD returned_size;
+	OUT WORD switch_value;
+	OUT DWORD count;
+	OUT struct group_disp_info *groups;
+	OUT	DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * OpenUser
+ *
+ * Input must be a domain handle obtained via SAMR_OPNUM_OpenDomain,
+ * an access mask and the appropriate user rid. The output will be a
+ * handle for use with the specified user.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_OpenUser)
+struct samr_OpenUser {
+	IN	samr_handle_t handle;
+	IN	DWORD access_mask;
+	IN	DWORD rid;
+	OUT	samr_handle_t user_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * DeleteUser
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_DeleteUser)
+struct samr_DeleteUser {
+	INOUT	samr_handle_t user_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryUserInfo
+ *
+ * Provides various pieces of information on a specific user (see
+ * SAM_Q_QUERY_USERINFO and SAM_R_QUERY_USERINFO). The handle must
+ * be a valid SAM user handle.
+ *
+ * QueryUserInfo (
+ *	IN samr_handle_t user_handle,
+ *	IN WORD switch_value,
+ *	OUT union switch(switch_value) {
+ *		case 1: struct QueryUserInfo1 *info1;
+ *	} bufptr,
+ *	OUT DWORD status
+ * )
+ *
+ * The cases identified so far are:
+ *
+ * 1 = username, fullname, description and some other stuff.
+ * 2 = unknown
+ * 3 = large structure containing user rid, group rid, username
+ *     and fullname.
+ * 4 = unknown
+ * 5 = large structure (like 3) containing user rid, group rid,
+ *     username, fullname and description.
+ * 6 = username and fullname
+ * 7 = username
+ * 8 = fullname
+ * 9 = group rid
+ * 16 = used after creating a new account
+ *
+ * Due to an ndrgen bug, a function must be provided to to patch the
+ * offsets used by the unmarshalling code at runtime.  In order to
+ * simplify things it is useful to use a naming convention that
+ * indicates the switch value for each structure.
+ * 
+ ***********************************************************************
+ */
+
+
+#define SAMR_QUERY_USER_INFO_1			1
+#define SAMR_QUERY_USER_UNAME_AND_FNAME		6
+#define SAMR_QUERY_USER_USERNAME		7
+#define SAMR_QUERY_USER_FULLNAME		8
+#define SAMR_QUERY_USER_GROUPRID		9
+#define SAMR_QUERY_USER_UNKNOWN16		16
+
+
+struct samr_QueryUserInfo1 {
+	samr_string_t username;
+	samr_string_t fullname;
+	DWORD group_rid;
+	samr_string_t description;
+	samr_string_t unknown;
+};
+
+
+struct samr_QueryUserInfo6 {
+	samr_string_t username;
+	samr_string_t fullname;
+};
+
+struct samr_QueryUserInfo7 {
+	samr_string_t username;
+};
+
+
+struct samr_QueryUserInfo8 {
+	samr_string_t fullname;
+};
+
+
+struct samr_QueryUserInfo9 {
+	DWORD group_rid;
+};
+
+
+struct samr_QueryUserInfo16 {
+	DWORD unknown;
+};
+
+
+union QueryUserInfo_result_u {
+	UNION_INFO_ENT(1,samr_QueryUserInfo);
+	UNION_INFO_ENT(6,samr_QueryUserInfo);
+	UNION_INFO_ENT(7,samr_QueryUserInfo);
+	UNION_INFO_ENT(8,samr_QueryUserInfo);
+	UNION_INFO_ENT(9,samr_QueryUserInfo);
+	UNION_INFO_ENT(16,samr_QueryUserInfo);
+	DEFAULT	char *nullptr;
+};
+
+
+/*
+ * This structure needs to be declared, even though it can't be used in
+ * samr_QueryUserInfo, in order to get the appropriate size to calculate
+ * the correct fixup offsets.  If ndrgen did the right thing,
+ * QueryUserInfo_result would be one of the out parameters.  However, if
+ * we do it that way, the switch_value isn't known early enough to do
+ * the fixup calculation.  So it all has to go in samr_QueryUserInfo.
+ */
+struct QueryUserInfo_result {
+	DWORD address;
+	WORD switch_value;
+	SWITCH(switch_value)
+		union QueryUserInfo_result_u ru;
+};
+
+
+OPERATION(SAMR_OPNUM_QueryUserInfo)
+struct samr_QueryUserInfo {
+	IN	samr_handle_t user_handle;
+	IN	WORD switch_value;
+	/*
+	 * Can't use this form because we need to include members explicitly.
+	 * OUT	struct QueryUserInfo_result result;
+	 */
+	OUT	DWORD address;
+	OUT	WORD switch_index;
+  SWITCH(switch_value)
+	OUT	union QueryUserInfo_result_u ru;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryUserGroups
+ ***********************************************************************
+ */
+struct samr_UserGroups {
+	DWORD rid;
+	DWORD attr;
+};
+
+
+struct samr_UserGroupInfo {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	struct samr_UserGroups *groups;
+};
+
+
+OPERATION(SAMR_OPNUM_QueryUserGroups)
+struct samr_QueryUserGroups {
+	IN	samr_handle_t user_handle;
+	OUT struct samr_UserGroupInfo *info;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * LookupName
+ ***********************************************************************
+ */
+struct samr_LookupNameTable {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	samr_string_t names[ANY_SIZE_ARRAY];
+};
+
+
+struct samr_LookupRidTable {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	DWORD *rid;
+};
+
+struct samr_RidType {
+	DWORD n_entry;
+  SIZE_IS(n_entry)
+	DWORD *rid_type;
+};
+
+
+OPERATION(SAMR_OPNUM_LookupNames)
+struct samr_LookupNames {
+	IN	samr_handle_t handle;
+	IN	DWORD n_entry;
+	IN	DWORD max_n_entry;
+	IN	DWORD index;
+	IN	DWORD total;
+	IN	samr_string_t name;
+	OUT	struct samr_LookupRidTable rids;
+	OUT	struct samr_RidType rid_types;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * OpenGroup
+ *
+ * Input must be a domain handle obtained via SAMR_OPNUM_OpenDomain,
+ * an access mask and the appropriate group rid. The output will be a
+ * handle for use with the specified group.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_OpenGroup)
+struct samr_OpenGroup {
+	IN	samr_handle_t handle;
+	IN	DWORD access_mask;
+	IN	DWORD rid;
+	OUT	samr_handle_t group_handle;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryGroupInfo
+ *
+ * Input must be a group handle obtained via SAMR_OPNUM_OpenGroup,
+ * an access mask and the appropriate group rid. The output will
+ * be a handle for use with the specified group.
+ ***********************************************************************
+ */
+struct samr_QueryGroupInfo1 {
+	samr_string_t groupname;
+};
+
+
+union samr_QueryGroupInfo_result_u {
+	UNION_INFO_ENT(1,samr_QueryGroupInfo);
+	DEFAULT	char *nullptr;
+};
+
+
+struct samr_QueryGroupInfo_result {
+	DWORD address;
+	WORD switch_index;
+  SWITCH(switch_index)
+	union samr_QueryGroupInfo_result_u ru;
+};
+
+
+OPERATION(SAMR_OPNUM_QueryGroupInfo)
+struct samr_QueryGroupInfo {
+	IN	samr_handle_t group_handle;
+	IN	DWORD switch_value;
+	OUT	DWORD address;
+	OUT	WORD switch_index;
+  SWITCH(switch_index)
+	OUT	union samr_QueryGroupInfo_result_u ru;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * StoreGroupInfo
+ *
+ * This definition is mostly just a place holder in case this is useful
+ * in the future. Note that it may not be correct. The information is
+ * from a netmon trace captured when I added a group description. I
+ * haven't implemented it because we don't have to update anything on
+ * the PDC. The description should almost certainly be in a separate
+ * structure.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_StoreGroupInfo)
+struct samr_StoreGroupInfo {
+	IN	samr_handle_t group_handle;
+	IN	DWORD switch_value;
+	IN	samr_string_t group_description;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Request 0x2c is a user request. The only parameter is a user handle.
+ * The response is 12 bytes of the form:
+ *		unknown: 00 00 BB 01 (443)
+ *		unknown: 00 00 00 00
+ *		status:  00 00 00 00
+ * RPC book lists this as GetUsrDomPwInfo.
+ ***********************************************************************
+ */
+struct samr_UserPwInfo {
+	WORD	unknown1;
+	WORD	unknown2;
+	DWORD	unknown3;
+};
+
+
+OPERATION(SAMR_OPNUM_GetUserPwInfo)
+struct samr_GetUserPwInfo {
+	IN	samr_handle_t user_handle;
+	OUT struct samr_UserPwInfo pw_info;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * CreateUser
+ *
+ * Create a user in the domain specified by the domain handle. The
+ * domain handle is obtained obtained via SAMR_OPNUM_OpenDomain. There
+ * is an unknown value at the end of the request: 0xe00500b0.
+ * The output will be a handle for use with the specified user and the
+ * user's RID. I think the RID may be a pointer but the value came back
+ * as zero once so I've padded it out so that the marshalling doesn't
+ * get confused.
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_CreateUser)
+struct samr_CreateUser {
+	IN	samr_handle_t handle;
+	IN	samr_vcbuf_t username;
+	IN	DWORD account_flags;
+	IN	DWORD unknown_e00500b0;
+	OUT	samr_handle_t user_handle;
+	OUT	DWORD maybe_ptr;
+	OUT	DWORD rid;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * ChangeUserPasswd
+ ***********************************************************************
+ */
+struct samr_newpasswd {
+	BYTE data[516];
+};
+
+
+struct samr_oldpasswd {
+	BYTE data[16];
+};
+
+
+OPERATION(SAMR_OPNUM_ChangeUserPasswd)
+struct samr_ChangeUserPasswd {
+	IN	LPTSTR servername;
+	IN	LPTSTR username;
+	IN	struct samr_newpasswd *nt_newpasswd;
+	IN	struct samr_oldpasswd *nt_oldpasswd;
+	IN	struct samr_newpasswd *lm_newpasswd;
+	IN	struct samr_oldpasswd *lm_oldpasswd;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * GetDomainPwInfo
+ ***********************************************************************
+ */
+OPERATION(SAMR_OPNUM_GetDomainPwInfo)
+struct samr_GetDomainPwInfo {
+	IN	LPTSTR servername;
+	OUT	WORD unknown0;
+	OUT	WORD unknown1;
+	OUT	WORD unknown2;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * SetUserInfo
+ *
+ *	+++ 20 byte user handle and the union switch_value +++
+ *	00 00 00 00 77 F2 DD D5 66 48 D4 11 AD 5F D1 CD
+ *	18 43 7A DF 17 00 17 00
+ *
+ *	+++ 14 dwords (56 bytes) of zeros +++
+ *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ *	00 00 00 00 00 00 00 00
+ *
+ *	+++ 9 sets of something - 72 bytes +++
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *	00 00 02 00 D0 04 8A 77
+ *
+ *	+++ 9 DWORD zeros +++
+ *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ *	00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ *	00 00 00 00
+ *
+ *	+++ miscellaneous +++
+ *	01 02 00 00
+ *	80 00 00 00
+ *	FA 27 F8 09
+ *	A8 00 00 00 70 F1 14 00
+ *	00 00 00 00 00 00 00 00 00 00 00 00
+ *
+ *	+++ encrypted password buffer - 512 bytes +++
+ *	76 68 E8 AA 23 4F 62 C4 81 4E 30 B8 92 29 66 B9
+ *	12 FF 3A 84 82 3A 55 0F C7 18 EA 56 86 50 D7 C5
+ *	43 BA 9C F8 32 D4 E0 15 74 A1 6F E1 59 C2 F2 95
+ *	53 A9 F2 68 9F 7F 29 B9 88 4C 65 A5 C1 DC 0B 44
+ *	B8 3C ED 74 D1 6A F7 09 66 97 94 6B 2C 3A A5 88
+ *	39 34 C6 FE 24 59 30 2D CF 6D 7F D5 EC B1 9A 84
+ *	E6 57 96 29 40 32 FB 62 9D 93 E2 BE D8 A3 74 88
+ *	8B 85 BC A0 76 D6 C9 DB 8C AF 81 BD 8A F0 08 8D
+ *	23 B0 52 FD 69 DE EF A1 36 E5 30 19 BD DA 67 A3
+ *	81 BD 3F D0 2A A2 8F 60 62 B0 8D 34 9E A4 4F 20
+ *	4E 79 93 82 58 A8 E5 6F 7A DC 12 13 33 E6 74 02
+ *	4C 32 F9 FC 1A E1 C5 0D E2 CC 36 8D FC 72 87 DD
+ *	6C 44 E3 6F 4B FD 46 10 08 89 E5 64 B8 27 14 83
+ *	E7 08 DE CF 69 C7 E1 40 63 DF CB 67 95 73 03 1B
+ *	CA 99 E1 1B 53 2A 89 6B 30 39 CD 5C DF A0 8A 1C
+ *	4E 50 74 7C 6D 3D E7 EA E9 B2 97 DD 38 7B DA EC
+ *	1A AD DA CE C4 58 9B 29 F3 6D 30 70 4E 63 6D 84
+ *	DB DC 5B CD 9A 4E 57 9C E4 65 5D 4F 76 E3 C7 52
+ *	8B 3B 20 0A 3B 4C 4B B1 2E 5B 4D AB BA 2F 45 6A
+ *	CA 17 AD 9F C0 B2 07 FB 56 7F E4 3F 9F D4 C6 8C
+ *	A1 05 BF 53 42 1E 67 F4 57 54 E3 2C 38 CF E1 94
+ *	75 69 F7 4E 5C 74 CC B3 FD EF 73 3F D5 28 22 EC
+ *	9B 40 E1 1D 65 44 7C BB 69 88 57 10 05 3A C5 48
+ *	8E 4F 77 DB 1A 5C 49 9C D5 06 00 AC 79 BC 7E 89
+ *	B0 01 66 70 88 A2 E5 DF 96 DC 75 98 10 12 45 02
+ *	33 35 6C DF 74 8B 14 2F 26 C6 FD 7A B4 D0 A6 7D
+ *	DE 2B 13 44 EF 34 46 4D 9D 3E C3 75 BC 11 B4 41
+ *	27 58 25 1E AF AA F0 BB DA 27 7A 1E AE 81 1A 78
+ *	44 19 DE FC C4 7C 4E 32 44 F7 57 2A 41 A2 85 DC
+ *	C0 AD 5D 6B 58 FD 2E 75 25 B9 F2 B6 19 82 E5 0E
+ *	B6 69 0D C1 27 A9 B6 40 A6 50 49 E5 CB 17 98 65
+ *	88 18 CA E4 1D 2E 20 F7 DE 8E 7D F2 9D A5 6B CD
+ *
+ *	D6 79 45 71
+ *
+ *	+++ table of 9 things +++
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *	01 00 00 00 00 00 00 00 00 00 00 00
+ *
+ *	+++ miscellaneous +++
+ *	EC 04 00 00 00 00 00 00 15 00 00 00
+ *	FF FF FF FF FF FF FF FF FF FF FF FF
+ *	FF FF FF FF FF FF FF FF FF
+ *
+ ***********************************************************************
+ */
+
+#define SAMR_SET_USER_INFO_23		23
+#define SAMR_SET_USER_DATA_SZ		516
+
+#define SAMR_MINS_PER_WEEK		10080
+#define SAMR_HOURS_PER_WEEK		168
+
+#define SAMR_HOURS_MAX_SIZE		(SAMR_MINS_PER_WEEK / 8)
+#define SAMR_HOURS_SET_LEN(LEN)		((LEN) / 8)
+#define SAMR_SET_USER_HOURS_SZ		21
+
+
+struct samr_sd {
+	DWORD length;
+  SIZE_IS(length)
+	BYTE *data;
+};
+
+
+/*
+ * There is some sort of logon bitmap structure in here, which I
+ * think is a varying and conformant array, i.e.
+ *
+ *	struct samr_logon_hours {
+ *      DWORD size_is;		(0x04ec)
+ *      DWORD first_is;		(zero)
+ *      DWORD length_is;	(0xa8)
+ *      BYTE bitmap[21];
+ *  };
+ *
+ *	struct samr_logon_info {
+ *		DWORD length;
+ *	SIZE_IS(length / 8)
+ *		struct samr_logon_hours *hours;
+ *	};
+ *
+ * There are 10080 minutes/week => 10080/8 = 1260 (0x04EC).
+ * So size_is is set as some sort of maximum.
+ *
+ * There are 168 hours/week => 168/8 = 21 (0xA8). Since there are 21
+ * bytes (all set to 0xFF), this is is probably the default setting.
+ *
+ * ndrgen has a problem with complex [size_is] statements. For now,
+ * we can try to fake it using two separate components.
+ */
+struct samr_logon_hours {
+	DWORD size;
+	DWORD first;
+	DWORD length;
+	BYTE bitmap[SAMR_SET_USER_HOURS_SZ];
+};
+
+
+struct samr_logon_info {
+	DWORD units;
+	DWORD hours;
+};
+
+
+struct samr_oem_password {
+	BYTE password[512];
+	DWORD length;
+};
+
+
+struct samr_SetUserInfo23 {
+	samr_quad_t logon_time;			/* 00 00 00 00 00 00 00 00 */
+	samr_quad_t logoff_time;		/* 00 00 00 00 00 00 00 00 */
+	samr_quad_t kickoff_time;		/* 00 00 00 00 00 00 00 00 */
+	samr_quad_t passwd_last_set_time;	/* 00 00 00 00 00 00 00 00 */
+	samr_quad_t passwd_can_change_time;	/* 00 00 00 00 00 00 00 00 */
+	samr_quad_t passwd_must_change_time;	/* 00 00 00 00 00 00 00 00 */
+
+	samr_vcbuf_t user_name;			/* 00 00 00 00 00 00 00 00 */
+	samr_vcbuf_t full_name;			/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t home_dir;			/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t home_drive;		/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t logon_script;		/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t profile_path;		/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t acct_desc;			/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t workstations;		/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t unknown1;			/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t unknown2;			/* 00 00 02 00 D0 04 8A 77 */
+	samr_vcbuf_t lm_password;		/* 00 00 00 00 00 00 00 00 */
+	samr_vcbuf_t nt_password;		/* 00 00 00 00 00 00 00 00 */
+	samr_vcbuf_t unknown3;			/* 00 00 00 00 00 00 00 00 */
+
+	struct samr_sd sd;			/* 00 00 00 00 00 00 00 00 */
+	DWORD user_rid;				/* 00 00 00 00 */
+	DWORD group_rid;			/* 01 02 00 00 */
+	DWORD acct_info;			/* 80 00 00 00 */
+	DWORD flags;				/* FA 27 F8 09 */
+	struct samr_logon_info logon_info;  /* A8 00 00 00 70 F1 14 00->0xFF */
+	/*
+	 * The following 12 bytes are encoded in Ethereal as:
+	 *
+	 *	WORD bad_pwd_count;
+	 *	WORD logon_count;
+	 *
+	 *	WORD country;			(default 0)
+	 *	WORD codepage;
+	 *
+	 *	BYTE nt_pwd_set;
+	 *	BYTE lm_pwd_set;
+	 *	BYTE expired_flag;
+	 *	BYTE unknown_char;
+	 */
+	DWORD unknown4_zero;			/* 00 00 00 00 */
+	DWORD unknown5_zero;			/* 00 00 00 00 */
+	DWORD unknown6_zero;			/* 00 00 00 00 */
+	BYTE password[SAMR_SET_USER_DATA_SZ];
+};
+
+
+union samr_SetUserInfo_u {
+	UNION_INFO_ENT(23,samr_SetUserInfo);
+	DEFAULT	char *nullptr;
+};
+
+
+struct samr_SetUserInfo_s {
+	WORD index;
+	WORD switch_value;
+  SWITCH(switch_value)
+	union samr_SetUserInfo_u ru;
+};
+
+
+/*
+	IN	DWORD unknown_04EC;
+	IN	DWORD unknown_zero;
+	IN	DWORD logon_bitmap_size;
+	IN	BYTE logon_bitmap[SAMR_SET_USER_HOURS_SZ];
+*/
+OPERATION(SAMR_OPNUM_SetUserInfo)
+struct samr_SetUserInfo {
+	IN	samr_handle_t user_handle;
+	IN	struct samr_SetUserInfo_s info;
+	IN	struct samr_logon_hours logon_hours;
+	OUT	DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * The SAMR interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union samr_interface {
+	CASE(SAMR_OPNUM_ConnectAnon)
+		struct samr_ConnectAnon		ConnectAnon;
+	CASE(SAMR_OPNUM_CloseHandle)
+		struct samr_CloseHandle		CloseHandle;
+	CASE(SAMR_OPNUM_LookupDomain)
+		struct samr_LookupDomain	LookupDomain;
+	CASE(SAMR_OPNUM_EnumLocalDomains)
+		struct samr_EnumLocalDomain	EnumLocalDomain;
+	CASE(SAMR_OPNUM_OpenDomain)
+		struct samr_OpenDomain		OpenDomain;
+	CASE(SAMR_OPNUM_QueryDomainInfo)
+		struct samr_QueryDomainInfo	QueryDomainInfo;
+	CASE(SAMR_OPNUM_LookupNames)
+		struct samr_LookupNames		LookupNames;
+	CASE(SAMR_OPNUM_OpenUser)
+		struct samr_OpenUser		OpenUser;
+	CASE(SAMR_OPNUM_DeleteUser)
+		struct samr_DeleteUser		DeleteUser;
+	CASE(SAMR_OPNUM_QueryUserInfo)
+		struct samr_QueryUserInfo	QueryUserInfo;
+	CASE(SAMR_OPNUM_QueryUserGroups)
+		struct samr_QueryUserGroups	QueryUserGroups;
+	CASE(SAMR_OPNUM_OpenGroup)
+		struct samr_OpenGroup		OpenGroup;
+	CASE(SAMR_OPNUM_GetUserPwInfo)
+		struct samr_GetUserPwInfo	GetUserPwInfo;
+	CASE(SAMR_OPNUM_CreateUser)
+		struct samr_CreateUser		CreateUser;
+	CASE(SAMR_OPNUM_ChangeUserPasswd)
+		struct samr_ChangeUserPasswd	ChangeUserPasswd;
+	CASE(SAMR_OPNUM_GetDomainPwInfo)
+		struct samr_GetDomainPwInfo	GetDomainPwInfo;
+	CASE(SAMR_OPNUM_Connect)
+		struct samr_Connect		Connect;
+	CASE(SAMR_OPNUM_SetUserInfo)
+		struct samr_SetUserInfo		SetUserInfo;
+	CASE(SAMR_OPNUM_Connect3)
+		struct samr_Connect3		Connect3;
+	CASE(SAMR_OPNUM_Connect4)
+		struct samr_Connect4		Connect4;
+	CASE(SAMR_OPNUM_QueryDispInfo)
+		struct samr_QueryDispInfo	QueryDispInfo;
+	CASE(SAMR_OPNUM_OpenAlias)
+		struct samr_OpenAlias		OpenAlias;
+	CASE(SAMR_OPNUM_CreateDomainAlias)
+		struct samr_CreateDomainAlias	CreateDomainAlias;
+	CASE(SAMR_OPNUM_SetAliasInfo)
+		struct samr_SetAliasInfo	SetAliasInfo;
+	CASE(SAMR_OPNUM_QueryAliasInfo)
+		struct samr_QueryAliasInfo	QueryAliasInfo;
+	CASE(SAMR_OPNUM_DeleteDomainAlias)
+		struct samr_DeleteDomainAlias	DeleteDomainAlias;
+	CASE(SAMR_OPNUM_EnumDomainAliases)
+		struct samr_EnumDomainAliases	EnumDomainAliases;
+	CASE(SAMR_OPNUM_EnumDomainGroups)
+		struct samr_EnumDomainGroups	EnumDomainGroups;
+};
+typedef union samr_interface	samr_interface_t;
+EXTERNTYPEINFO(samr_interface)
+
+#endif /* _MLSVC_SAM_NDL_ */

@@ -943,6 +943,8 @@ usr/lib/libshare.so			sparc
 usr/lib/sparcv9/libshare.so		sparc
 usr/lib/fs/nfs/libshare_nfs.so		sparc
 usr/lib/fs/nfs/sparcv9/libshare_nfs.so	sparc
+usr/lib/fs/smb/libshare_smb.so		sparc
+usr/lib/fs/smb/sparcv9/libshare_smb.so	sparc
 usr/include/libshare_impl.h		sparc
 usr/include/scfutil.h			sparc
 usr/sbin/sparcv9/sharemgr		sparc
@@ -983,3 +985,108 @@ usr/include/sys/kiconv_latin1.h		sparc
 # ppm/srn modules # and should not be in any package
 #
 usr/include/sys/srn.h			sparc
+#
+# Private/Internal header files of smbsrv. Do not ship.
+#
+usr/include/smbsrv			sparc
+usr/include/smbsrv/alloc.h		sparc
+usr/include/smbsrv/cifs.h		sparc
+usr/include/smbsrv/codepage.h		sparc
+usr/include/smbsrv/cp_cyrillic.h	sparc
+usr/include/smbsrv/cp_latin1.h		sparc
+usr/include/smbsrv/cp_latin2.h		sparc
+usr/include/smbsrv/cp_latin3.h		sparc
+usr/include/smbsrv/cp_latin4.h		sparc
+usr/include/smbsrv/cp_latin5.h		sparc
+usr/include/smbsrv/cp_latin6.h		sparc
+usr/include/smbsrv/cp_unicode.h		sparc
+usr/include/smbsrv/cp_usascii.h		sparc
+usr/include/smbsrv/crypt.h		sparc
+usr/include/smbsrv/ctype.h		sparc
+usr/include/smbsrv/doserror.h		sparc
+usr/include/smbsrv/hash_table.h		sparc
+usr/include/smbsrv/libmlrpc.h		sparc
+usr/include/smbsrv/libmlsvc.h		sparc
+usr/include/smbsrv/libsmb.h		sparc
+usr/include/smbsrv/libsmbns.h		sparc
+usr/include/smbsrv/libsmbrdr.h		sparc
+usr/include/smbsrv/lm.h			sparc
+usr/include/smbsrv/lmdfs.h		sparc
+usr/include/smbsrv/lmerr.h		sparc
+usr/include/smbsrv/lmshare.h		sparc
+usr/include/smbsrv/lmshare_door.h	sparc
+usr/include/smbsrv/lsalib.h		sparc
+usr/include/smbsrv/mac_cifs.h		sparc
+usr/include/smbsrv/mailslot.h		sparc
+usr/include/smbsrv/mbuf.h		sparc
+usr/include/smbsrv/mlrpc.h		sparc
+usr/include/smbsrv/mlsvc.h		sparc
+usr/include/smbsrv/mlsvc_util.h		sparc
+usr/include/smbsrv/msgbuf.h		sparc
+usr/include/smbsrv/ndr.h		sparc
+usr/include/smbsrv/netbios.h		sparc
+usr/include/smbsrv/netrauth.h		sparc
+usr/include/smbsrv/nmpipes.h		sparc
+usr/include/smbsrv/ntaccess.h		sparc
+usr/include/smbsrv/nterror.h		sparc
+usr/include/smbsrv/ntifs.h		sparc
+usr/include/smbsrv/ntlocale.h		sparc
+usr/include/smbsrv/ntsid.h		sparc
+usr/include/smbsrv/ntstatus.h		sparc
+usr/include/smbsrv/oem.h		sparc
+usr/include/smbsrv/samlib.h		sparc
+usr/include/smbsrv/smb.h		sparc
+usr/include/smbsrv/smb_common_door.h	sparc
+usr/include/smbsrv/smb_door_svc.h	sparc
+usr/include/smbsrv/smb_fsd.h		sparc
+usr/include/smbsrv/smb_fsops.h		sparc
+usr/include/smbsrv/smb_i18n.h		sparc
+usr/include/smbsrv/smb_idmap.h		sparc
+usr/include/smbsrv/smb_incl.h		sparc
+usr/include/smbsrv/smb_ioctl.h		sparc
+usr/include/smbsrv/smb_kproto.h		sparc
+usr/include/smbsrv/smb_privilege.h	sparc
+usr/include/smbsrv/smb_secdesc.h	sparc
+usr/include/smbsrv/smb_svc_sm.h		sparc
+usr/include/smbsrv/smb_token.h		sparc
+usr/include/smbsrv/smb_vops.h		sparc
+usr/include/smbsrv/smb_winpipe.h	sparc
+usr/include/smbsrv/smb_xdr.h		sparc
+usr/include/smbsrv/smbfmt.h		sparc
+usr/include/smbsrv/smbinfo.h		sparc
+usr/include/smbsrv/smbtrans.h		sparc
+usr/include/smbsrv/smbvar.h		sparc
+usr/include/smbsrv/string.h		sparc
+usr/include/smbsrv/svrapi.h		sparc
+usr/include/smbsrv/winioctl.h		sparc
+usr/include/smbsrv/winsvc.h		sparc
+usr/include/smbsrv/wintypes.h		sparc
+#
+# Private/Internal ndl files of smbsrv. Do not ship.
+#
+usr/include/smbsrv/ndl			sparc
+usr/include/smbsrv/ndl/dssetup.ndl	sparc
+usr/include/smbsrv/ndl/eventlog.ndl	sparc
+usr/include/smbsrv/ndl/llsrpc.ndl	sparc
+usr/include/smbsrv/ndl/lsarpc.ndl	sparc
+usr/include/smbsrv/ndl/ndrtypes.ndl	sparc
+usr/include/smbsrv/ndl/netdfs.ndl	sparc
+usr/include/smbsrv/ndl/netlogon.ndl	sparc
+usr/include/smbsrv/ndl/rpcpdu.ndl	sparc
+usr/include/smbsrv/ndl/samrpc.ndl	sparc
+usr/include/smbsrv/ndl/spoolss.ndl	sparc
+usr/include/smbsrv/ndl/srvsvc.ndl	sparc
+usr/include/smbsrv/ndl/svcctl.ndl	sparc
+usr/include/smbsrv/ndl/winreg.ndl	sparc
+#
+# Private/Internal dtrace scripts of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/dtrace			sparc
+usr/lib/smbsrv/dtrace/msrpc.d		sparc
+usr/lib/smbsrv/dtrace/smbnode.d		sparc
+usr/lib/smbsrv/dtrace/smbvfs.d		sparc
+usr/lib/smbsrv/dtrace/stype.d		sparc
+#
+# Private dirent, extended to include flags, for use by SMB server
+# 
+usr/include/sys/extdirent.h		sparc

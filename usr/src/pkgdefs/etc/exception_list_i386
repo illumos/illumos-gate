@@ -867,6 +867,8 @@ usr/lib/libshare.so			i386
 usr/lib/amd64/libshare.so		i386
 usr/lib/fs/nfs/libshare_nfs.so		i386
 usr/lib/fs/nfs/amd64/libshare_nfs.so	i386
+usr/lib/fs/smb/libshare_smb.so		i386
+usr/lib/fs/smb/amd64/libshare_smb.so	i386
 usr/include/libshare_impl.h		i386
 usr/include/scfutil.h			i386
 usr/sbin/i86/sharemgr			i386
@@ -899,3 +901,108 @@ etc/flash/postdeployment/ttydefs.cleanup	i386
 # ppm/srn modules # and should not be in any package
 #
 usr/include/sys/srn.h			i386
+#
+# Private/Internal header files of smbsrv. Do not ship.
+#
+usr/include/smbsrv			i386
+usr/include/smbsrv/alloc.h		i386
+usr/include/smbsrv/cifs.h		i386
+usr/include/smbsrv/codepage.h		i386
+usr/include/smbsrv/cp_cyrillic.h	i386
+usr/include/smbsrv/cp_latin1.h		i386
+usr/include/smbsrv/cp_latin2.h		i386
+usr/include/smbsrv/cp_latin3.h		i386
+usr/include/smbsrv/cp_latin4.h		i386
+usr/include/smbsrv/cp_latin5.h		i386
+usr/include/smbsrv/cp_latin6.h		i386
+usr/include/smbsrv/cp_unicode.h		i386
+usr/include/smbsrv/cp_usascii.h		i386
+usr/include/smbsrv/crypt.h		i386
+usr/include/smbsrv/ctype.h		i386
+usr/include/smbsrv/doserror.h		i386
+usr/include/smbsrv/hash_table.h		i386
+usr/include/smbsrv/libmlrpc.h		i386
+usr/include/smbsrv/libmlsvc.h		i386
+usr/include/smbsrv/libsmb.h		i386
+usr/include/smbsrv/libsmbns.h		i386
+usr/include/smbsrv/libsmbrdr.h		i386
+usr/include/smbsrv/lm.h			i386
+usr/include/smbsrv/lmdfs.h		i386
+usr/include/smbsrv/lmerr.h		i386
+usr/include/smbsrv/lmshare.h		i386
+usr/include/smbsrv/lmshare_door.h	i386
+usr/include/smbsrv/lsalib.h		i386
+usr/include/smbsrv/mac_cifs.h		i386
+usr/include/smbsrv/mailslot.h		i386
+usr/include/smbsrv/mbuf.h		i386
+usr/include/smbsrv/mlrpc.h		i386
+usr/include/smbsrv/mlsvc.h		i386
+usr/include/smbsrv/mlsvc_util.h		i386
+usr/include/smbsrv/msgbuf.h		i386
+usr/include/smbsrv/ndr.h		i386
+usr/include/smbsrv/netbios.h		i386
+usr/include/smbsrv/netrauth.h		i386
+usr/include/smbsrv/nmpipes.h		i386
+usr/include/smbsrv/ntaccess.h		i386
+usr/include/smbsrv/nterror.h		i386
+usr/include/smbsrv/ntifs.h		i386
+usr/include/smbsrv/ntlocale.h		i386
+usr/include/smbsrv/ntsid.h		i386
+usr/include/smbsrv/ntstatus.h		i386
+usr/include/smbsrv/oem.h		i386
+usr/include/smbsrv/samlib.h		i386
+usr/include/smbsrv/smb.h		i386
+usr/include/smbsrv/smb_common_door.h	i386
+usr/include/smbsrv/smb_door_svc.h	i386
+usr/include/smbsrv/smb_fsd.h		i386
+usr/include/smbsrv/smb_fsops.h		i386
+usr/include/smbsrv/smb_i18n.h		i386
+usr/include/smbsrv/smb_idmap.h		i386
+usr/include/smbsrv/smb_incl.h		i386
+usr/include/smbsrv/smb_ioctl.h		i386
+usr/include/smbsrv/smb_kproto.h		i386
+usr/include/smbsrv/smb_privilege.h	i386
+usr/include/smbsrv/smb_secdesc.h	i386
+usr/include/smbsrv/smb_svc_sm.h		i386
+usr/include/smbsrv/smb_token.h		i386
+usr/include/smbsrv/smb_vops.h		i386
+usr/include/smbsrv/smb_winpipe.h	i386
+usr/include/smbsrv/smb_xdr.h		i386
+usr/include/smbsrv/smbfmt.h		i386
+usr/include/smbsrv/smbinfo.h		i386
+usr/include/smbsrv/smbtrans.h		i386
+usr/include/smbsrv/smbvar.h		i386
+usr/include/smbsrv/string.h		i386
+usr/include/smbsrv/svrapi.h		i386
+usr/include/smbsrv/winioctl.h		i386
+usr/include/smbsrv/winsvc.h		i386
+usr/include/smbsrv/wintypes.h		i386
+#
+# Private/Internal ndl files of smbsrv. Do not ship.
+#
+usr/include/smbsrv/ndl			i386
+usr/include/smbsrv/ndl/dssetup.ndl	i386
+usr/include/smbsrv/ndl/eventlog.ndl	i386
+usr/include/smbsrv/ndl/llsrpc.ndl	i386
+usr/include/smbsrv/ndl/lsarpc.ndl	i386
+usr/include/smbsrv/ndl/ndrtypes.ndl	i386
+usr/include/smbsrv/ndl/netdfs.ndl	i386
+usr/include/smbsrv/ndl/netlogon.ndl	i386
+usr/include/smbsrv/ndl/rpcpdu.ndl	i386
+usr/include/smbsrv/ndl/samrpc.ndl	i386
+usr/include/smbsrv/ndl/spoolss.ndl	i386
+usr/include/smbsrv/ndl/srvsvc.ndl	i386
+usr/include/smbsrv/ndl/svcctl.ndl	i386
+usr/include/smbsrv/ndl/winreg.ndl	i386
+#
+# Private/Internal dtrace scripts of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/dtrace			i386
+usr/lib/smbsrv/dtrace/msrpc.d		i386
+usr/lib/smbsrv/dtrace/smbnode.d		i386
+usr/lib/smbsrv/dtrace/smbvfs.d		i386
+usr/lib/smbsrv/dtrace/stype.d		i386
+#
+# Private dirent, extended to include flags, for use by SMB server
+# 
+usr/include/sys/extdirent.h		i386

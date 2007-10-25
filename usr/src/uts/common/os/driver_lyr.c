@@ -757,7 +757,7 @@ ldi_open_by_vp(vnode_t **vpp, int flag, cred_t *cr,
 		return (ENXIO);
 
 	/* open the device */
-	if ((err = VOP_OPEN(&vp, flag | FKLYR, cr)) != 0)
+	if ((err = VOP_OPEN(&vp, flag | FKLYR, cr, NULL)) != 0)
 		return (err);
 
 	/* possible clone open, make sure that we still have a spec node */
@@ -783,7 +783,7 @@ ldi_open_by_vp(vnode_t **vpp, int flag, cred_t *cr,
 		vnode_t	*cvp = common_specvp(nlhp->lh_vp);
 		dev_t	dev = cvp->v_rdev;
 
-		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred);
+		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred, NULL);
 		bflush(dev);
 	}
 
@@ -945,7 +945,7 @@ i_check_string(char *str, int prop_len)
 
 /*
  * i_pack_string_array takes a a string array property that is represented
- * as a concatination of strings (with the NULL character included for
+ * as a concatenation of strings (with the NULL character included for
  * each string) and converts it into a format that can be returned by
  * ldi_prop_lookup_string_array.
  */
@@ -1258,7 +1258,7 @@ ldi_mlink_lh(vnode_t *vp, int cmd, intptr_t arg, cred_t *crp, int *rvalp)
 }
 
 /*
- * ldi_mlink_fp() is invoked for all successfull streams linkages created
+ * ldi_mlink_fp() is invoked for all successful streams linkages created
  * via I_LINK and I_PLINK.  ldi_mlink_fp() records the linkage information
  * in its internal state so that the devinfo snapshot code has some
  * observability into streams device linkage information.
@@ -1693,7 +1693,7 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 		vnode_t	*cvp = common_specvp(handlep->lh_vp);
 		dev_t	dev = cvp->v_rdev;
 
-		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred);
+		(void) VOP_PUTPAGE(cvp, 0, 0, B_INVAL, kcred, NULL);
 		bflush(dev);
 	}
 
@@ -1727,7 +1727,7 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 #endif
 
 	/* do a layered close on the device */
-	err = VOP_CLOSE(handlep->lh_vp, flag | FKLYR, 1, (offset_t)0, cr);
+	err = VOP_CLOSE(handlep->lh_vp, flag | FKLYR, 1, (offset_t)0, cr, NULL);
 
 	LDI_OPENCLOSE((CE_WARN, "%s: lh=0x%p", "ldi close", (void *)lh));
 
@@ -2903,7 +2903,7 @@ ldi_remove_event_handler(ldi_handle_t lh, ldi_callback_id_t id)
  *
  * NDI events: These are events which are serviced by the NDI event subsystem.
  * LDI subsystem just provides a thin wrapper around the NDI event interfaces
- * These events are thereefore *not* native events.
+ * These events are therefore *not* native events.
  */
 
 static int

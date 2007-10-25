@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -824,23 +823,23 @@ disk_geometry(char *media_name, ulong_t *geometry)
 	geometry[0] = val32;
 	val32 = 0;
 
-	nvlist_lookup_uint32(attrs, DM_NHEADS, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_NHEADS, &val32);
 	geometry[1] = val32;
 	val32 = 0;
-	nvlist_lookup_uint32(attrs, DM_BLOCKSIZE, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_BLOCKSIZE, &val32);
 	geometry[2] = (geometry[1] * geometry[0]) * val32;
 	val32 = 0;
-	nvlist_lookup_uint32(attrs, DM_NPHYSCYLINDERS, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_NPHYSCYLINDERS, &val32);
 	geometry[3] = val32;
 	val32 = 0;
-	nvlist_lookup_uint32(attrs, DM_NCYLINDERS, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_NCYLINDERS, &val32);
 	geometry[4] = val32;
 	val32 = 0;
-	nvlist_lookup_uint32(attrs, DM_NALTCYLINDERS, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_NALTCYLINDERS, &val32);
 	geometry[5] = val32;
 	val32 = 0;
 	/* This one is probably there only in x86 machines. */
-	nvlist_lookup_uint32(attrs, DM_NACTUALCYLINDERS, &val32);
+	(void) nvlist_lookup_uint32(attrs, DM_NACTUALCYLINDERS, &val32);
 	geometry[6] = val32;
 
 	nvlist_free(attrs);

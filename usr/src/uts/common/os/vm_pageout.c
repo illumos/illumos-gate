@@ -634,7 +634,7 @@ int dopageout = 1;	/* must be non-zero to turn page stealing on */
  * Some filesystems may require resources for the VOP_PUTPAGE
  * operations (like memory) and hence can block the pageout
  * thread, but the scanner thread can still operate. There is still
- * no gaurentee that memory deadlocks cannot occur.
+ * no guarantee that memory deadlocks cannot occur.
  *
  * For now, this thing is in very rough form.
  */
@@ -709,7 +709,7 @@ pageout()
 
 		if (VOP_PUTPAGE(arg->a_vp, (offset_t)arg->a_off,
 			arg->a_len, arg->a_flags,
-			    arg->a_cred) == 0) {
+			    arg->a_cred, NULL) == 0) {
 			pushes++;
 		}
 

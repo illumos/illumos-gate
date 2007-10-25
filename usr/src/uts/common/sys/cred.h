@@ -170,6 +170,8 @@ extern void crsetsidlist(cred_t *, struct ksidlist *);
 extern struct ksid *crgetsid(const cred_t *, int);
 extern struct ksidlist *crgetsidlist(const cred_t *);
 
+extern int crsetpriv(cred_t *, ...);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

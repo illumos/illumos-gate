@@ -129,8 +129,10 @@ extern void pc_mark_irrecov(struct pcfs *);
 extern int pc_dirlook(struct pcnode *, char *, struct pcnode **);
 extern int pc_direnter(struct pcnode *, char *, struct vattr *,
 	struct pcnode **);
-extern int pc_dirremove(struct pcnode *, char *, struct vnode *, enum vtype);
-extern int pc_rename(struct pcnode *, struct pcnode *, char *, char *);
+extern int pc_dirremove(struct pcnode *, char *, struct vnode *, enum vtype,
+		caller_context_t *);
+extern int pc_rename(struct pcnode *, struct pcnode *, char *, char *,
+		caller_context_t *);
 extern int pc_blkatoff(struct pcnode *, offset_t, struct buf **,
 	struct pcdir **);
 extern int pc_truncate(struct pcnode *, uint_t);

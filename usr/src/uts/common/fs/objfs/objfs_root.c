@@ -38,7 +38,8 @@
 
 extern int last_module_id;
 
-static int objfs_root_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *);
+static int objfs_root_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
+    cred_t *);
 static int objfs_root_do_readdir(vnode_t *, struct dirent64 *, int *,
     offset_t *, offset_t *, void *);
 
@@ -54,7 +55,8 @@ objfs_create_root(vfs_t *vfsp)
 
 /* ARGSUSED */
 static int
-objfs_root_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+objfs_root_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	vap->va_type = VDIR;
 	vap->va_mode = 0555;
@@ -67,8 +69,10 @@ objfs_root_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	return (objfs_common_getattr(vp, vap));
 }
 
+/* ARGSUSED */
 static int
-objfs_root_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop)
+objfs_root_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
+    cred_t *cr)
 {
 	int result = ENOENT;
 	struct modctl *mp;
@@ -148,11 +152,12 @@ objfs_root_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 
 /* ARGSUSED */
 static int
-objfs_root_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
+objfs_root_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
+	caller_context_t *ct, int flags)
 {
 	struct modctl *mp = &modules;
 
-	return (gfs_dir_readdir(vp, uiop, eofp, &mp));
+	return (gfs_dir_readdir(vp, uiop, eofp, &mp, cr, ct));
 }
 
 const fs_operation_def_t objfs_tops_root[] = {

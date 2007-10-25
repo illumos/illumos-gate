@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /* ONC_PLUS EXTRACT START */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,7 +200,7 @@ static int level_one_path(lock_descriptor_t *, lock_descriptor_t *);
 static int level_two_path(lock_descriptor_t *, lock_descriptor_t *, int);
 #endif
 
-/*	proc_graph function definitons */
+/*	proc_graph function definitions */
 static int flk_check_deadlock(lock_descriptor_t *);
 static void flk_proc_graph_uncolor(void);
 static proc_vertex_t *flk_get_proc_vertex(lock_descriptor_t *);
@@ -684,7 +683,7 @@ flk_zone_fini(zoneid_t zoneid, void *data)
 }
 
 /*
- * Get a lock_descriptor structure with initialisation of edge lists.
+ * Get a lock_descriptor structure with initialization of edge lists.
  */
 
 static lock_descriptor_t *
@@ -727,14 +726,14 @@ flk_set_state(lock_descriptor_t *lock, int new_state)
 {
 	/*
 	 * Locks in the sleeping list may be woken up in a number of ways,
-	 * and more than once.  If a sleeping lock is signalled awake more
+	 * and more than once.  If a sleeping lock is signaled awake more
 	 * than once, then it may or may not change state depending on its
 	 * current state.
 	 * Also note that NLM locks that are sleeping could be moved to an
 	 * interrupted state more than once if the unlock request is
 	 * retransmitted by the NLM client - the second time around, this is
 	 * just a nop.
-	 * The ordering of being signalled awake is:
+	 * The ordering of being signaled awake is:
 	 * INTERRUPTED_STATE > CANCELLED_STATE > GRANTED_STATE.
 	 * The checks below implement this ordering.
 	 */
@@ -2671,7 +2670,7 @@ convoff(vp, lckdat, whence, offset)
 
 	if ((lckdat->l_whence == 2) || (whence == 2)) {
 		vattr.va_mask = AT_SIZE;
-		if (error = VOP_GETATTR(vp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
 			return (error);
 	}
 
@@ -3271,7 +3270,7 @@ flk_set_lockmgr_status(flk_lockmgr_status_t status)
  *
  * A list containing the vnode pointer and an flock structure
  * describing the lock is returned.  Each element in the list is
- * dynammically allocated and must be freed by the caller.  The
+ * dynamically allocated and must be freed by the caller.  The
  * last item in the list is denoted by a NULL value in the ll_next
  * field.
  *
@@ -3721,7 +3720,7 @@ wait_for_lock(lock_descriptor_t *request)
  * Create an flock structure from the existing lock information
  *
  * This routine is used to create flock structures for the lock manager
- * to use in a reclaim request.  Since the lock was orginated on this
+ * to use in a reclaim request.  Since the lock was originated on this
  * host, it must be conforming to UNIX semantics, so no checking is
  * done to make sure it falls within the lower half of the 32-bit range.
  */
@@ -3768,7 +3767,7 @@ flk_convert_lock_data(vnode_t *vp, flock64_t *flp,
 		break;
 	case 2:		/* SEEK_END */
 		vattr.va_mask = AT_SIZE;
-		if (error = VOP_GETATTR(vp, &vattr, 0, CRED()))
+		if (error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))
 			return (error);
 		*start = (u_offset_t)(flp->l_start + vattr.va_size);
 		break;
@@ -3914,11 +3913,21 @@ cl_flk_change_nlm_state_to_unknown(int nlmid)
 
 int
 nbl_lock_conflict(vnode_t *vp, nbl_op_t op, u_offset_t offset,
-		ssize_t length, int svmand)
+		ssize_t length, int svmand, caller_context_t *ct)
 {
 	int conflict = 0;
 	graph_t			*gp;
 	lock_descriptor_t	*lock;
+	pid_t pid;
+	int sysid;
+
+	if (ct == NULL) {
+		pid = curproc->p_pid;
+		sysid = 0;
+	} else {
+		pid = ct->cc_pid;
+		sysid = ct->cc_sysid;
+	}
 
 	mutex_enter(&flock_lock);
 	gp = lock_graph[HASH_INDEX(vp)];
@@ -3931,8 +3940,8 @@ nbl_lock_conflict(vnode_t *vp, nbl_op_t op, u_offset_t offset,
 
 	for (; lock && lock->l_vnode == vp; lock = lock->l_next) {
 		if ((svmand || (lock->l_state & NBMAND_LOCK)) &&
-		    lock->l_flock.l_sysid == 0 &&
-		    lock->l_flock.l_pid != curproc->p_pid &&
+		    (lock->l_flock.l_sysid != sysid ||
+		    lock->l_flock.l_pid != pid) &&
 		    lock_blocks_io(op, offset, length,
 				lock->l_type, lock->l_start, lock->l_end)) {
 			conflict = 1;

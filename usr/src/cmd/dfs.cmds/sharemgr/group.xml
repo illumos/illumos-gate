@@ -56,6 +56,17 @@
 	    type='service'>
 		<service_fmri value='svc:/milestone/network' />
 	</dependency>
+	<!--
+	  SMB is optional_all so that we don't have to have SMB
+	  enabled to work, but if it is, we want to run "after" the
+	  smb/service starts.
+	-->
+	<dependency name='smb'
+	    grouping='optional_all'
+	    restart_on='error'
+	    type='service'>
+		<service_fmri value='svc:/network/smb/server' />
+	</dependency>
 
 	<!--
 	  The start method will cause each share group to be

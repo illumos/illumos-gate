@@ -1,0 +1,493 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _NETDFS_NDL_
+#define	_NETDFS_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * NT Distributed File Service (NETDFS) RPC interface definition.
+ */
+
+#include "ndrtypes.ndl"
+
+
+#define	NETDFS_ABSTRACT_UUID		"4fc742e0-4a10-11cf-827300aa004ae673"
+#define	NETDFS_ABSTRACT_VERS		3
+
+#define	NETDFS_TRANSFER_UUID		"8a885d04-1ceb-11c9-9fe808002b104860"
+#define	NETDFS_TRANSFER_VERS		2
+
+#define	NETDFS_OPNUM_GETVER		0x00
+#define	NETDFS_OPNUM_ADD		0x01
+#define	NETDFS_OPNUM_REMOVE		0x02
+#define	NETDFS_OPNUM_SETINFO		0x03
+#define	NETDFS_OPNUM_GETINFO		0x04
+#define	NETDFS_OPNUM_ENUM		0x05
+#define	NETDFS_OPNUM_RENAME		0x06
+#define	NETDFS_OPNUM_MOVE		0x07
+#define	NETDFS_OPNUM_ADDSTDROOT		0x0c
+#define	NETDFS_OPNUM_REMSTDROOT		0x0d
+#define	NETDFS_OPNUM_ENUMEX		0x15
+
+#define	DFS_MANAGER_VERSION_NT4		0x01
+#define	DFS_MANAGER_VERSION_W2K		0x02
+#define	DFS_MANAGER_VERSION_W2K3	0x04
+
+
+#define	DFS_PROP_FLAG_INSITE_REFERRALS	0x01
+#define	DFS_PROP_FLAG_ROOT_SCALABILITY	0x02
+#define	DFS_PROP_FLAG_SITE_COSTING	0x04
+#define	DFS_PROP_FLAG_TARGET_FAILBACK	0x08
+#define	DFS_PROP_FLAG_CLUSTER_ENABLED	0x10
+
+
+#define	DFS_STORAGE_PRI_INVALID		-1
+#define	DFS_STORAGE_PRI_SITE_COST_NORM	0
+#define	DFS_STORAGE_PRI_GLOBAL_HIGH	1
+#define	DFS_STORAGE_PRI_SITE_COST_HIGH	2
+#define	DFS_STORAGE_PRI_SITE_COST_LOW	3
+#define	DFS_STORAGE_PRI_GLOBAL_LOW	4
+
+
+struct netdfs_storage_info {
+	DWORD state;
+	LPTSTR server;
+	LPTSTR share;
+};
+
+
+struct netdfs_storage_info2 {
+	DWORD state;
+	LPTSTR server;
+	LPTSTR share;
+	DWORD priority;
+	DWORD rank;
+};
+
+struct netdfs_info1 {
+	LPTSTR entry_path;
+};
+
+
+struct netdfs_info2 {
+	LPTSTR entry_path;
+	LPTSTR comment;
+	DWORD state;
+	DWORD n_store;
+};
+
+
+struct netdfs_info3 {
+	LPTSTR entry_path;
+	LPTSTR comment;
+	DWORD state;
+	DWORD n_store;
+  SIZE_IS(n_store)
+	struct netdfs_storage_info *si;
+};
+
+
+struct netdfs_info4 {
+	LPTSTR entry_path;
+	LPTSTR comment;
+	DWORD state;
+	DWORD timeout;
+	DWORD guuid[4];
+	DWORD n_store;
+  SIZE_IS(n_store)
+	struct netdfs_storage_info *si;
+};
+
+
+struct netdfs_info6 {
+	LPTSTR entry_path;
+	LPTSTR comment;
+	DWORD state;
+	DWORD timeout;
+	DWORD guuid[4];
+	DWORD flags;
+	DWORD pktsize;
+	DWORD n_store;
+  SIZE_IS(n_store)
+	struct netdfs_storage_info2 *si;
+};
+
+
+struct netdfs_info100 {
+	LPTSTR comment;
+};
+
+
+struct netdfs_info101 {
+	DWORD state;
+};
+
+
+struct netdfs_info102 {
+	DWORD timeout;
+};
+
+
+struct netdfs_info103 {
+	DWORD property_flags;
+};
+
+
+struct netdfs_info104 {
+	DWORD priority_class;
+	DWORD priority_rank;
+};
+
+
+struct netdfs_info105 {
+	LPTSTR comment;
+	DWORD volume_state;
+	DWORD timeout;
+	DWORD property_flag_mask;
+	DWORD property_flags;
+};
+
+
+struct netdfs_info106 {
+	DWORD storage_state;
+	DWORD priority_class;
+	DWORD priority_rank;
+};
+
+
+struct netdfs_info200 {
+	LPTSTR entry_path;
+};
+
+
+struct netdfs_info300 {
+	DWORD flavor;
+	LPTSTR entry_path;
+};
+
+
+union netdfs_info_u {
+        CASE(1) struct netdfs_info1 *info1;
+	CASE(2) struct netdfs_info2 *info2;
+	CASE(3) struct netdfs_info3 *info3;
+	CASE(4) struct netdfs_info4 *info4;
+	CASE(6) struct netdfs_info6 *info6;
+	CASE(100) struct netdfs_info100 *info100;
+	CASE(101) struct netdfs_info101 *info101;
+	CASE(102) struct netdfs_info102 *info102;
+	CASE(103) struct netdfs_info103 *info103;
+	CASE(104) struct netdfs_info104 *info104;
+	CASE(105) struct netdfs_info105 *info105;
+	CASE(106) struct netdfs_info106 *info106;
+	DEFAULT char *nullptr;
+};
+
+
+struct netdfs_info {
+	DWORD level;
+  SWITCH(level)
+	union netdfs_info_u iu;
+};
+
+
+struct netdfs_array1 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info1 *info1;
+};
+
+struct netdfs_array2 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info2 *info2;
+};
+
+struct netdfs_array3 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info3 *info3;
+};
+
+struct netdfs_array4 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info4 *info4;
+};
+
+struct netdfs_array6 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info6 *info6;
+};
+
+struct netdfs_array200 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info200 *info200;
+};
+
+struct netdfs_array300 {
+	DWORD count;
+  SIZE_IS(count)
+	struct netdfs_info300 *info300;
+};
+
+union netdfs_enum_info_u {
+	CASE(1) struct netdfs_array1 *info1;
+	CASE(2) struct netdfs_array2 *info2;
+	CASE(3) struct netdfs_array3 *info3;
+	CASE(4) struct netdfs_array4 *info4;
+	CASE(6) struct netdfs_array6 *info6;
+	CASE(200) struct netdfs_array200 *info200;
+	CASE(300) struct netdfs_array300 *info300;
+	DEFAULT char *nullptr;
+};
+
+
+struct netdfs_enum_info {
+	DWORD address;
+	DWORD level;
+  SWITCH(level)
+	union netdfs_enum_info_u iu;
+};
+
+
+/*
+ ***********************************************************************
+ * Return server version id
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_GETVER)
+struct netdfs_getver {
+	OUT		DWORD version;
+};
+
+
+/*
+ ***********************************************************************
+ * Add a new volume or additional storage for an existing volume at
+ * dfs_path.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_ADD)
+struct netdfs_add {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN REFERENCE	LPTSTR server;
+	IN		LPTSTR share;
+	IN		LPTSTR comment;
+	IN		DWORD flags;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Remove a volume or additional storage for volume from the DFS at
+ * dfs_path. When applied to the last storage in a volume, removes
+ * the volume from the DFS.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_REMOVE)
+struct netdfs_remove {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN		LPTSTR server;
+	IN		LPTSTR share;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Set information about the volume or storage. If the server and share
+ * are specified, the information set is specific to that server and
+ * share. Otherwise the information is specific to the volume as a whole.
+ *
+ * Valid levels are 100-102.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_SETINFO)
+struct netdfs_setinfo {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN		LPTSTR server;
+	IN		LPTSTR share;
+	IN		DWORD level;
+	IN		struct netdfs_info info;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Get information about the volume or storage. If the server and share
+ * are specified, the information returned is specific to that server
+ * and share. Otherwise the information is specific to the volume as a
+ * whole.
+ *
+ * Valid levels are 1-4, 100-102.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_GETINFO)
+struct netdfs_getinfo {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN		LPTSTR server;
+	IN		LPTSTR share;
+	IN		DWORD level;
+	OUT		struct netdfs_info info;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Get information about all of the volumes in the DFS. dfs_path is
+ * the "server" part of the UNC name used to refer to this particular
+ * DFS.
+ *
+ * Valid levels are 1-3.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_ENUM)
+struct netdfs_enum {
+	IN		DWORD level;
+	IN		DWORD pref_max_len;
+	INOUT		struct netdfs_enum_info *info;
+	INOUT		DWORD *resume_handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Rename the current Win32 path in a DFS to a new Win32 path in the
+ * same DFS.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_RENAME)
+struct netdfs_rename {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN REFERENCE	LPTSTR new_path;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Move a DFS volume and all subordinate volumes from one place in the
+ * DFS to another place in the DFS.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_MOVE)
+struct netdfs_move {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN REFERENCE	LPTSTR new_path;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Add a DFS root share.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_ADDSTDROOT)
+struct netdfs_addstdroot {
+	IN REFERENCE	LPTSTR server;
+	IN REFERENCE	LPTSTR share;
+	IN REFERENCE	LPTSTR comment;
+	IN		DWORD flags;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * Remove a DFS root share.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_REMSTDROOT)
+struct netdfs_remstdroot {
+	IN REFERENCE	LPTSTR server;
+	IN REFERENCE	LPTSTR share;
+	IN		DWORD flags;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * Get information about all of the volumes in the DFS. dfs_path is
+ * the "server" part of the UNC name used to refer to this particular
+ * DFS.
+ *
+ * Valid levels are 1-3.
+ ***********************************************************************
+ */
+OPERATION(NETDFS_OPNUM_ENUMEX)
+struct netdfs_enumex {
+	IN REFERENCE	LPTSTR dfs_path;
+	IN		DWORD level;
+	IN		DWORD pref_max_len;
+	INOUT		struct netdfs_enum_info *info;
+	INOUT		DWORD *resume_handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * The NETDFS interface definiton.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union netdfs_interface {
+	CASE(NETDFS_OPNUM_GETVER)
+		struct netdfs_getver		netdfs_getver;
+	CASE(NETDFS_OPNUM_ADD)
+		struct netdfs_add		netdfs_add;
+	CASE(NETDFS_OPNUM_REMOVE)
+		struct netdfs_remove		netdfs_remove;
+	CASE(NETDFS_OPNUM_SETINFO)
+		struct netdfs_setinfo		netdfs_setinfo;
+	CASE(NETDFS_OPNUM_GETINFO)
+		struct netdfs_getinfo		netdfs_getinfo;
+	CASE(NETDFS_OPNUM_ENUM)
+		struct netdfs_enum		netdfs_enum;
+	CASE(NETDFS_OPNUM_MOVE)
+		struct netdfs_move		netdfs_move;
+	CASE(NETDFS_OPNUM_RENAME)
+		struct netdfs_rename		netdfs_rename;
+	CASE(NETDFS_OPNUM_ADDSTDROOT)
+		struct netdfs_addstdroot	netdfs_addstdroot;
+	CASE(NETDFS_OPNUM_REMSTDROOT)
+		struct netdfs_remstdroot	netdfs_remstdroot;
+	CASE(NETDFS_OPNUM_ENUMEX)
+		struct netdfs_enumex		netdfs_enumex;
+};
+typedef union netdfs_interface	netdfs_interface_t;
+EXTERNTYPEINFO(netdfs_interface)
+
+
+#endif /* _NETDFS_NDL_ */

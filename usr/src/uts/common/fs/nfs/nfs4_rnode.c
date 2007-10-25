@@ -101,7 +101,7 @@
  * freelist and then trying to place them back on the freelist
  * when their reference is released.  This means that the when an
  * rnode is looked up in the hash queues, then either the rnode
- * is removed from the freelist and that reference is tranfered to
+ * is removed from the freelist and that reference is transferred to
  * the new reference or the vnode reference count must be incremented
  * accordingly.  The mutex for the freelist must be held in order to
  * accurately test to see if the rnode is on the freelist or not.
@@ -211,7 +211,7 @@ r4flushpages(rnode4_t *rp, cred_t *cr)
 	if (nfs4_has_pages(vp)) {
 		ASSERT(vp->v_type != VCHR);
 		if ((rp->r_flags & R4DIRTY) && !rp->r_error) {
-			error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, 0, cr);
+			error = VOP_PUTPAGE(vp, (u_offset_t)0, 0, 0, cr, NULL);
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				mutex_enter(&rp->r_statelock);
 				if (!rp->r_error)
@@ -1324,7 +1324,7 @@ toomany:
 	 */
 	while (cnt-- > 0) {
 		vp = vplist[cnt];
-		(void) VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_ASYNC, cr);
+		(void) VOP_PUTPAGE(vp, (u_offset_t)0, 0, B_ASYNC, cr, NULL);
 		VN_RELE(vp);
 	}
 

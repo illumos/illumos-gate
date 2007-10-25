@@ -81,7 +81,12 @@ ctfs_create_ctlnode(vnode_t *pvp)
  */
 /* ARGSUSED */
 static int
-ctfs_ctl_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_ctl_access(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *cct)
 {
 	ctfs_ctlnode_t *ctlnode = vp->v_data;
 	contract_t *ct = ctlnode->ctfs_ctl_contract;
@@ -108,17 +113,17 @@ ctfs_ctl_access(vnode_t *vp, int mode, int flags, cred_t *cr)
  * constraints imposed by ctfs_ctl_access are met.
  */
 static int
-ctfs_ctl_open(vnode_t **vpp, int flag, cred_t *cr)
+ctfs_ctl_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	if (flag != (FWRITE | FOFFMAX))
 		return (EINVAL);
 
-	return (ctfs_ctl_access(*vpp, VWRITE, 0, cr));
+	return (ctfs_ctl_access(*vpp, VWRITE, 0, cr, ct));
 }
 
 /*
  * ctfs_ctl_common_getattr
- * Implements fucntionality common to ctl and status ctfs VOP_GETATTR
+ * Implements functionality common to ctl and status ctfs VOP_GETATTR
  * entry points. It assumes vp->v_data is set
  */
 static int
@@ -144,7 +149,8 @@ ctfs_ctl_common_getattr(vnode_t *vp, vattr_t *vap)
  */
 /* ARGSUSED */
 static int
-ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags,
+    cred_t *cr, caller_context_t *ct)
 {
 	vap->va_mode = 0222;
 
@@ -156,7 +162,8 @@ ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_stat_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_stat_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	vap->va_mode = 0444;
 
@@ -170,8 +177,14 @@ ctfs_stat_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-ctfs_ctl_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
-    int *rvalp)
+ctfs_ctl_ioctl(
+	vnode_t *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *cct)
 {
 	ctfs_ctlnode_t	*ctlnode = vp->v_data;
 	contract_t	*ct = ctlnode->ctfs_ctl_contract;
@@ -257,8 +270,14 @@ ctfs_create_statnode(vnode_t *pvp)
  */
 /* ARGSUSED */
 static int
-ctfs_stat_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
-    int *rvalp)
+ctfs_stat_ioctl(
+	vnode_t *vp,
+	int cmd,
+	intptr_t arg,
+	int flag,
+	cred_t *cr,
+	int *rvalp,
+	caller_context_t *cct)
 {
 	ctfs_ctlnode_t	*statnode = vp->v_data;
 	contract_t	*ct = statnode->ctfs_ctl_contract;

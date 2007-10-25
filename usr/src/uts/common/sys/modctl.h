@@ -109,7 +109,7 @@ struct modlsys {
 struct modlfs {
 	struct mod_ops		*fs_modops;
 	char			*fs_linkinfo;
-	struct vfsdef_v3	*fs_vfsdef;	/* version may actually vary */
+	struct vfsdef_v4	*fs_vfsdef;	/* version may actually vary */
 };
 
 #if defined(__i386) || defined(__amd64)

@@ -1,0 +1,63 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+SUNWprivate {
+    global:
+	mlsvc_admin_logon;
+	mlsvc_anonymous_logon;
+	mlsvc_check_sessions;
+	mlsvc_close_pipe;
+	mlsvc_disconnect;
+	mlsvc_echo;
+	mlsvc_install_pdc_cb;
+	mlsvc_locate_domain_controller;
+	mlsvc_open_pipe;
+	mlsvc_session_native_values;
+	mlsvc_user_getauth;
+	mlsvc_user_logon;
+	smbrdr_dump_netuse;
+	smbrdr_dump_ofiles;
+	smbrdr_dump_sessions;
+	smbrdr_init;
+	smbrdr_ipc_get_mode;
+	smbrdr_ipc_commit;
+	smbrdr_ipc_get_flags;
+	smbrdr_ipc_get_user;
+	smbrdr_ipc_rollback;
+	smbrdr_ipc_set;
+	smbrdr_ipc_skip_lsa_query;
+	smbrdr_ipc_is_fallback;
+	smbrdr_ipc_is_valid;
+	smbrdr_ipc_get_passwd;
+	smbrdr_ipc_save_mode;
+	smbrdr_ipc_set_fallback;
+	smbrdr_ipc_unset_fallback;
+	smbrdr_rpc_readx;
+	smbrdr_rpc_transact;
+    local:
+	*;
+};

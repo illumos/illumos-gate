@@ -407,7 +407,7 @@ hsfs_unmount(
 	mutex_exit(&hs_mounttab_lock);
 
 	hsfs_fini_kstats(fsp);
-	(void) VOP_CLOSE(fsp->hsfs_devvp, FREAD, 1, (offset_t)0, cr);
+	(void) VOP_CLOSE(fsp->hsfs_devvp, FREAD, 1, (offset_t)0, cr, NULL);
 	VN_RELE(fsp->hsfs_devvp);
 	/* free path table space */
 	if (fsp->hsfs_ptbl != NULL)
@@ -626,7 +626,7 @@ hs_mountfs(
 	/*
 	 * Open the target device (file) for read only.
 	 */
-	if (error = VOP_OPEN(&devvp, FREAD, cr)) {
+	if (error = VOP_OPEN(&devvp, FREAD, cr, NULL)) {
 		VN_RELE(devvp);
 		return (error);
 	}
@@ -641,7 +641,7 @@ hs_mountfs(
 	}
 
 	vap.va_mask = AT_SIZE;
-	if ((error = VOP_GETATTR(devvp, &vap, ATTR_COMM, cr)) != 0) {
+	if ((error = VOP_GETATTR(devvp, &vap, ATTR_COMM, cr, NULL)) != 0) {
 		cmn_err(CE_NOTE, "Cannot get attributes of the CD-ROM driver");
 		goto cleanup;
 	}
@@ -937,7 +937,7 @@ hs_mountfs(
 	return (0);
 
 cleanup:
-	(void) VOP_CLOSE(devvp, FREAD, 1, (offset_t)0, cr);
+	(void) VOP_CLOSE(devvp, FREAD, 1, (offset_t)0, cr, NULL);
 	VN_RELE(devvp);
 	if (fsp)
 		kmem_free(fsp, sizeof (*fsp));
@@ -1365,14 +1365,14 @@ hs_getmdev(struct vfs *vfsp, char *fspec, int flags, dev_t *pdev, mode_t *mode,
 	/*
 	 * Can we read from the device?
 	 */
-	if ((error = VOP_ACCESS(vp, VREAD, 0, cr)) != 0 ||
+	if ((error = VOP_ACCESS(vp, VREAD, 0, cr, NULL)) != 0 ||
 	    (error = secpolicy_spec_open(cr, vp, FREAD)) != 0) {
 		VN_RELE(vp);
 		return (error);
 	}
 
 	vap.va_mask = AT_MODE;		/* get protection mode */
-	(void) VOP_GETATTR(vp, &vap, 0, CRED());
+	(void) VOP_GETATTR(vp, &vap, 0, CRED(), NULL);
 	*mode = vap.va_mode;
 
 	dev = *pdev = vp->v_rdev;
@@ -1507,7 +1507,7 @@ hsfs_mountroot(struct vfs *vfsp, enum whymountroot why)
  * multisession cd's.
  *
  * desc_sec is the same for high-sierra and iso 9660 formats, why
- * there are two differnt #defines used in the code for this is
+ * there are two different #defines used in the code for this is
  * beyond me.  These are standards, cast in concrete, right?
  * To be general, however, this function supports passing in different
  * values.

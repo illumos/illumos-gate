@@ -95,16 +95,17 @@
 
 #include <inet/kssl/ksslapi.h>
 
-static int socktpi_close(struct vnode *, int, int, offset_t, struct cred *);
+static int socktpi_close(struct vnode *, int, int, offset_t, struct cred *,
+    caller_context_t *);
 static int socktpi_read(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
+    caller_context_t *);
 static int socktpi_write(struct vnode *, struct uio *, int, struct cred *,
-	struct caller_context *);
+    caller_context_t *);
 static int socktpi_plumbioctl(struct vnode *, int, intptr_t, int, struct cred *,
     int32_t *);
-static void socktpi_inactive(struct vnode *, struct cred *);
+static void socktpi_inactive(struct vnode *, struct cred *, caller_context_t *);
 static int socktpi_poll(struct vnode *, short, int, short *,
-    struct pollhead **);
+    struct pollhead **, caller_context_t *);
 
 struct vnodeops *socktpi_vnodeops;
 
@@ -148,7 +149,8 @@ boolean_t socktpi_direct = B_TRUE;
  * open/closes for a given vnode which is probably not needed.
  */
 int
-socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
+socktpi_open(struct vnode **vpp, int flag, struct cred *cr,
+    caller_context_t *ct)
 {
 	major_t maj;
 	dev_t newdev;
@@ -196,7 +198,7 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 			 * this is a post SVR4 tty driver - a socket can not
 			 * be a controlling terminal. Fail the open.
 			 */
-			(void) socktpi_close(vp, flag, 1, (offset_t)0, cr);
+			(void) socktpi_close(vp, flag, 1, (offset_t)0, cr, ct);
 			return (ENOTTY);	/* XXX */
 		}
 
@@ -249,7 +251,7 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 					    _SIOCSOCKFALLBACK, 0, 0, K_TO_K,
 					    CRED(), &rval)) != 0) {
 						(void) socktpi_close(vp, flag,
-						    1, (offset_t)0, cr);
+						    1, (offset_t)0, cr, ct);
 						return (error);
 					}
 				}
@@ -273,7 +275,7 @@ socktpi_open(struct vnode **vpp, int flag, struct cred *cr)
 			so_unlock_single(so, SOLOCKED);
 			mutex_exit(&so->so_lock);
 			(void) socktpi_close(vp, flag, 1,
-			    (offset_t)0, cr);
+			    (offset_t)0, cr, ct);
 			return (error);
 			/*NOTREACHED*/
 		}
@@ -297,7 +299,8 @@ socktpi_close(
 	int		flag,
 	int		count,
 	offset_t	offset,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct sonode *so;
 	dev_t dev;
@@ -402,7 +405,7 @@ socktpi_read(
 	struct uio	*uiop,
 	int		ioflag,
 	struct cred	*cr,
-	struct caller_context *ct)
+	caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 	struct nmsghdr lmsg;
@@ -428,11 +431,11 @@ socktpi_read(
 /* ARGSUSED2 */
 static int
 socktpi_write(
-	struct vnode		*vp,
-	struct uio		*uiop,
-	int			ioflag,
-	struct cred		*cr,
-	struct caller_context	*ct)
+	struct vnode	*vp,
+	struct uio	*uiop,
+	int		ioflag,
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 	int so_state;
@@ -531,9 +534,10 @@ so_copyout(const void *from, void *to, size_t size, int tokernel)
 	return (xcopyout(from, to, size));
 }
 
+/*ARGSUSED6*/
 int
 socktpi_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
-    struct cred *cr, int32_t *rvalp)
+    struct cred *cr, int32_t *rvalp, caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 	int error = 0;
@@ -941,7 +945,8 @@ socktpi_plumbioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
  */
 /* ARGSUSED */
 int
-socktpi_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
+socktpi_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr,
+    caller_context_t *ct)
 {
 	struct sonode *so;
 	int error = 0;
@@ -1003,7 +1008,8 @@ socktpi_getattr(
 	struct vnode	*vp,
 	struct vattr	*vap,
 	int		flags,
-	struct cred	*cr)
+	struct cred	*cr,
+	caller_context_t *ct)
 {
 	dev_t	fsid;
 	struct sonode *so;
@@ -1081,7 +1087,7 @@ socktpi_setattr(
 	struct vattr	*vap,
 	int		flags,
 	struct cred	*cr,
-	caller_context_t	*ct)
+	caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 
@@ -1101,13 +1107,14 @@ socktpi_setattr(
 }
 
 int
-socktpi_access(struct vnode *vp, int mode, int flags, struct cred *cr)
+socktpi_access(struct vnode *vp, int mode, int flags, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct vnode *accessvp;
 	struct sonode *so = VTOSO(vp);
 
 	if ((accessvp = so->so_accessvp) != NULL)
-		return (VOP_ACCESS(accessvp, mode, flags, cr));
+		return (VOP_ACCESS(accessvp, mode, flags, cr, ct));
 	else
 		return (0);	/* Allow all access. */
 }
@@ -1120,14 +1127,15 @@ socktpi_access(struct vnode *vp, int mode, int flags, struct cred *cr)
  */
 /* ARGSUSED */
 int
-socktpi_fsync(struct vnode *vp, int syncflag, struct cred *cr)
+socktpi_fsync(struct vnode *vp, int syncflag, struct cred *cr,
+    caller_context_t *ct)
 {
 	return (EINVAL);
 }
 
 /* ARGSUSED */
 static void
-socktpi_inactive(struct vnode *vp, struct cred *cr)
+socktpi_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 
@@ -1156,7 +1164,7 @@ socktpi_inactive(struct vnode *vp, struct cred *cr)
 
 /* ARGSUSED */
 int
-socktpi_fid(struct vnode *vp, struct fid *fidp)
+socktpi_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	return (EINVAL);
 }
@@ -1167,7 +1175,8 @@ socktpi_fid(struct vnode *vp, struct fid *fidp)
  */
 /*ARGSUSED*/
 int
-socktpi_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+socktpi_seek(struct vnode *vp, offset_t ooff, offset_t *noffp,
+    caller_context_t *ct)
 {
 	return (ESPIPE);
 }
@@ -1202,13 +1211,15 @@ socktpi_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
  *	for SS_HASCONNIND and set appropriate events to ensure poll_common()
  *	will not sleep.
  */
+/*ARGSUSED5*/
 static int
 socktpi_poll(
 	struct vnode	*vp,
 	short		events,
 	int		anyyet,
 	short		*reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	short origevents = events;
 	struct sonode *so = VTOSO(vp);

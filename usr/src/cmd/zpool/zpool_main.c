@@ -731,7 +731,7 @@ zpool_do_create(int argc, char **argv)
 					    ZFS_PROP_MOUNTPOINT),
 					    mountpoint) == 0);
 				if (zfs_mount(pool, NULL, 0) == 0)
-					ret = zfs_share_nfs(pool);
+					ret = zfs_shareall(pool);
 				zfs_close(pool);
 			}
 		} else if (libzfs_errno(g_zfs) == EZFS_INVALIDNAME) {
@@ -3277,6 +3277,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 6   bootfs pool property\n"));
 		(void) printf(gettext(" 7   Separate intent log devices\n"));
 		(void) printf(gettext(" 8   Delegated administration\n"));
+		(void) printf(gettext(" 9   Case insensitive support and "
+		    "File system unique identifiers (FUID)\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

@@ -96,7 +96,7 @@ COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 	common/netinet common/nfs common/rpc common/sys common/vm \
 	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
 	common/inet/nca common/inet/ipf/netinet common/ipp common/idmap \
-	common/sharefs
+	common/sharefs common/smbsrv
 
 # These aren't the only headers in closed.  But the other directories
 # are simple enough that they can be driven from the src tree.

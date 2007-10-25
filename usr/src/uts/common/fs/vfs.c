@@ -83,6 +83,7 @@
 #include <sys/objfs.h>
 #include <sys/console.h>
 #include <sys/reboot.h>
+#include <sys/attr.h>
 
 #include <vm/page.h>
 
@@ -119,6 +120,8 @@ struct ipmnt {
 static kmutex_t		vfs_miplist_mutex;
 static struct ipmnt	*vfs_miplist = NULL;
 static struct ipmnt	*vfs_miplist_end = NULL;
+
+static kmem_cache_t *vfs_cache;	/* Pointer to VFS kmem cache */
 
 /*
  * VFS global data.
@@ -257,6 +260,21 @@ fsop_sync(vfs_t *vfsp, short flag, cred_t *cr)
 int
 fsop_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 {
+	/*
+	 * In order to handle system attribute fids in a manner
+	 * transparent to the underlying fs, we embed the fid for
+	 * the sysattr parent object in the sysattr fid and tack on
+	 * some extra bytes that only the sysattr layer knows about.
+	 *
+	 * This guarantees that sysattr fids are larger than other fids
+	 * for this vfs. If the vfs supports sysattrs (implied
+	 * by VFSFT_XVATTR support), we cannot have a size collision
+	 * with XATTR_FIDSZ.
+	 */
+	if (vfs_has_feature(vfsp, VFSFT_XVATTR) &&
+	    fidp->fid_len == XATTR_FIDSZ)
+		return (xattr_dir_vget(vfsp, vpp, fidp));
+
 	return (*(vfsp)->vfs_op->vfs_vget)(vfsp, vpp, fidp);
 }
 
@@ -442,7 +460,7 @@ vfs_setops(vfs_t *vfsp, vfsops_t *vfsops)
 
 	op = vfsp->vfs_op;
 	membar_consumer();
-	if ((vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) &&
+	if (vfsp->vfs_femhead == NULL &&
 	    casptr(&vfsp->vfs_op, op, vfsops) == op) {
 		return;
 	}
@@ -459,8 +477,7 @@ vfs_getops(vfs_t *vfsp)
 
 	op = vfsp->vfs_op;
 	membar_consumer();
-	if ((vfsp->vfs_implp == NULL || vfsp->vfs_femhead == NULL) &&
-	    op == vfsp->vfs_op) {
+	if (vfsp->vfs_femhead == NULL && op == vfsp->vfs_op) {
 		return (op);
 	} else {
 		return (fsem_getvfsops(vfsp));
@@ -494,25 +511,16 @@ vfs_can_sync(vfs_t *vfsp)
 void
 vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 {
+	/* Other initialization has been moved to vfs_alloc() */
 	vfsp->vfs_count = 0;
 	vfsp->vfs_next = vfsp;
 	vfsp->vfs_prev = vfsp;
 	vfsp->vfs_zone_next = vfsp;
 	vfsp->vfs_zone_prev = vfsp;
-	vfsp->vfs_flag = 0;
-	vfsp->vfs_data = (data);
-	vfsp->vfs_resource = NULL;
-	vfsp->vfs_mntpt = NULL;
-	vfsp->vfs_mntopts.mo_count = 0;
-	vfsp->vfs_mntopts.mo_list = NULL;
-	vfsp->vfs_implp = NULL;
-	vfsp->vfs_zone = NULL;
-	/*
-	 * Note: Don't initialize any member of the vfs_impl_t structure
-	 * here as it could be a problem for unbundled file systems.
-	 */
-	vfs_setops((vfsp), (op));
 	sema_init(&vfsp->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL);
+	vfsimpl_setup(vfsp);
+	vfsp->vfs_data = (data);
+	vfs_setops((vfsp), (op));
 }
 
 /*
@@ -522,11 +530,22 @@ vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 void
 vfsimpl_setup(vfs_t *vfsp)
 {
+	int i;
+
+	if (vfsp->vfs_implp != NULL) {
+		return;
+	}
+
 	vfsp->vfs_implp = kmem_alloc(sizeof (vfs_impl_t), KM_SLEEP);
-	/* Note that this are #define'd in vfs.h */
-	vfsp->vfs_femhead = NULL;
+	/* Note that these are #define'd in vfs.h */
 	vfsp->vfs_vskap = NULL;
 	vfsp->vfs_fstypevsp = NULL;
+
+	/* Set size of counted array, then zero the array */
+	vfsp->vfs_featureset[0] = VFS_FEATURE_MAXSZ - 1;
+	for (i = 1; i <  VFS_FEATURE_MAXSZ; i++) {
+		vfsp->vfs_featureset[i] = 0;
+	}
 }
 
 /*
@@ -541,13 +560,6 @@ vfsimpl_teardown(vfs_t *vfsp)
 
 	if (vip == NULL)
 		return;
-
-	if (vip->vi_femhead) {
-		ASSERT(vip->vi_femhead->femh_list == NULL);
-		mutex_destroy(&vip->vi_femhead->femh_lock);
-		kmem_free(vip->vi_femhead, sizeof (*(vip->vi_femhead)));
-		vip->vi_femhead = NULL;
-	}
 
 	kmem_free(vfsp->vfs_implp, sizeof (vfs_impl_t));
 	vfsp->vfs_implp = NULL;
@@ -1308,22 +1320,21 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			goto errout;
 		}
 		/*
-		 * Changing the NBMAND setting on remounts is permitted
-		 * but logged since it can lead to unexpected behavior.
-		 * We also counsel against using it for / and /usr.
+		 * Disallow changing the NBMAND disposition of the file
+		 * system on remounts.
 		 */
 		if ((nbmand && ((vp->v_vfsp->vfs_flag & VFS_NBMAND) == 0)) ||
 		    (!nbmand && (vp->v_vfsp->vfs_flag & VFS_NBMAND))) {
-			cmn_err(CE_WARN, "domount: nbmand turned %s via "
-			    "remounting %s", nbmand ? "on" : "off",
-			    refstr_value(vp->v_vfsp->vfs_mntpt));
+			vn_vfsunlock(vp);
+			error = EINVAL;
+			goto errout;
 		}
 		vfsp = vp->v_vfsp;
 		ovflags = vfsp->vfs_flag;
 		vfsp->vfs_flag |= VFS_REMOUNT;
 		vfsp->vfs_flag &= ~VFS_RDONLY;
 	} else {
-		vfsp = kmem_alloc(sizeof (vfs_t), KM_SLEEP);
+		vfsp = vfs_alloc(KM_SLEEP);
 		VFS_INIT(vfsp, vfsops, NULL);
 	}
 
@@ -1350,9 +1361,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			vfsp->vfs_flag = ovflags;
 			if (splice)
 				vn_vfsunlock(vp);
-			if (vfsp->vfs_implp)
-				vfsimpl_teardown(vfsp);
-			kmem_free(vfsp, sizeof (struct vfs));
+			vfs_free(vfsp);
 			goto errout;
 		}
 	} else {
@@ -1444,7 +1453,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	/*
 	 * going to mount on this vnode, so notify.
 	 */
-	vnevent_mountedover(vp);
+	vnevent_mountedover(vp, NULL);
 	error = VFS_MOUNT(vfsp, vp, uap, credp);
 
 	if (uap->flags & MS_RDONLY)
@@ -1472,9 +1481,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		} else {
 			vfs_unlock(vfsp);
 			vfs_freemnttab(vfsp);
-			if (vfsp->vfs_implp)
-				vfsimpl_teardown(vfsp);
-			kmem_free(vfsp, sizeof (struct vfs));
+			vfs_free(vfsp);
 		}
 	} else {
 		/*
@@ -2597,7 +2604,8 @@ vfs_mntdummywrite(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred,
  */
 /* ARGSUSED */
 static int
-vfs_mntdummygetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+vfs_mntdummygetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	bzero(vap, sizeof (vattr_t));
 	vap->va_type = VREG;
@@ -3996,12 +4004,14 @@ vfsinit(void)
 		NULL, NULL
 	};
 
-	/* Initialize the vnode cache (file systems may use it during init). */
+	/* Create vfs cache */
+	vfs_cache = kmem_cache_create("vfs_cache", sizeof (struct vfs),
+	    sizeof (uintptr_t), NULL, NULL, NULL, NULL, NULL, 0);
 
+	/* Initialize the vnode cache (file systems may use it during init). */
 	vn_create_cache();
 
 	/* Setup event monitor framework */
-
 	fem_init();
 
 	/* Initialize the dummy stray file system type. */
@@ -4044,6 +4054,52 @@ vfsinit(void)
 		EIO_vfs.vfs_vskap = NULL;
 		EIO_vfs.vfs_flag |= VFS_STATS;
 	}
+
+	xattr_init();
+}
+
+vfs_t *
+vfs_alloc(int kmflag)
+{
+	vfs_t *vfsp;
+
+	vfsp = kmem_cache_alloc(vfs_cache, kmflag);
+
+	/*
+	 * Do the simplest initialization here.
+	 * Everything else gets done in vfs_init()
+	 */
+	bzero(vfsp, sizeof (vfs_t));
+	return (vfsp);
+}
+
+void
+vfs_free(vfs_t *vfsp)
+{
+	/*
+	 * One would be tempted to assert that "vfsp->vfs_count == 0".
+	 * The problem is that this gets called out of domount() with
+	 * a partially initialized vfs and a vfs_count of 1.  This is
+	 * also called from vfs_rele() with a vfs_count of 0.  We can't
+	 * call VFS_RELE() from domount() if VFS_MOUNT() hasn't successfully
+	 * returned.  This is because VFS_MOUNT() fully initializes the
+	 * vfs structure and its associated data.  VFS_RELE() will call
+	 * VFS_FREEVFS() which may panic the system if the data structures
+	 * aren't fully initialized from a successful VFS_MOUNT()).
+	 */
+
+	/* If FEM was in use, make sure everything gets cleaned up */
+	if (vfsp->vfs_femhead) {
+		ASSERT(vfsp->vfs_femhead->femh_list == NULL);
+		mutex_destroy(&vfsp->vfs_femhead->femh_lock);
+		kmem_free(vfsp->vfs_femhead, sizeof (*(vfsp->vfs_femhead)));
+		vfsp->vfs_femhead = NULL;
+	}
+
+	if (vfsp->vfs_implp)
+		vfsimpl_teardown(vfsp);
+	sema_destroy(&vfsp->vfs_reflock);
+	kmem_cache_free(vfs_cache, vfsp);
 }
 
 /*
@@ -4070,10 +4126,7 @@ vfs_rele(vfs_t *vfsp)
 		if (vfsp->vfs_zone)
 			zone_rele(vfsp->vfs_zone);
 		vfs_freemnttab(vfsp);
-		if (vfsp->vfs_implp)
-			vfsimpl_teardown(vfsp);
-		sema_destroy(&vfsp->vfs_reflock);
-		kmem_free(vfsp, sizeof (*vfsp));
+		vfs_free(vfsp);
 	}
 }
 
@@ -4346,3 +4399,40 @@ getrootfs(char **fstypp, char **fsmodp)
 	*fsmodp = "nfs";
 }
 #endif
+
+/*
+ * VFS feature routines
+ */
+
+#define	VFTINDEX(feature)	(((feature) >> 32) & 0xFFFFFFFF)
+#define	VFTBITS(feature)	((feature) & 0xFFFFFFFFLL)
+
+/* Register a feature in the vfs */
+void
+vfs_set_feature(vfs_t *vfsp, vfs_feature_t feature)
+{
+	/* Note that vfs_featureset[] is found in *vfsp->vfs_implp */
+	if (vfsp->vfs_implp == NULL)
+		return;
+
+	vfsp->vfs_featureset[VFTINDEX(feature)] |= VFTBITS(feature);
+}
+
+/*
+ * Query a vfs for a feature.
+ * Returns 1 if feature is present, 0 if not
+ */
+int
+vfs_has_feature(vfs_t *vfsp, vfs_feature_t feature)
+{
+	int	ret = 0;
+
+	/* Note that vfs_featureset[] is found in *vfsp->vfs_implp */
+	if (vfsp->vfs_implp == NULL)
+		return (ret);
+
+	if (vfsp->vfs_featureset[VFTINDEX(feature)] & VFTBITS(feature))
+		ret = 1;
+
+	return (ret);
+}

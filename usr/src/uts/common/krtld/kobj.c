@@ -217,7 +217,7 @@ static kmutex_t kobj_lock;			/* protects mach memory list */
  * The following functions have been implemented by the kernel.
  * However, many 3rd party drivers provide their own implementations
  * of these functions.  When such drivers are loaded, messages
- * indicateing that these symbols have been mulply defined will be
+ * indicating that these symbols have been multiply defined will be
  * emitted to the console.  To avoid alarming customers for no good
  * reason, we simply suppress such warnings for the following set of
  * functions.
@@ -804,7 +804,7 @@ load_exec(val_t *bootaux, char *filename)
 				allocsize += MAXPATHLEN;
 			}
 			bcopy(libname, mp->depends_on + osize, lsize);
-			*(mp->depends_on + nsize) = ' '; /* seperate */
+			*(mp->depends_on + nsize) = ' '; /* separate */
 			nsize++;
 			osize = nsize;
 		}
@@ -1760,7 +1760,7 @@ process_dynamic(struct module *mp, char *dyndata, char *strdata)
 	 * finish up the depends string (if any)
 	 */
 	if (depstr != NULL) {
-		*(depstr + nsize - 1) = '\0'; /* overwrite seperator w/term */
+		*(depstr + nsize - 1) = '\0'; /* overwrite separator w/term */
 		if (path != NULL)
 			kobj_free(path, MAXPATHLEN);
 
@@ -3577,7 +3577,7 @@ kobj_open(char *filename)
 			cred_t *saved_cred = curthread->t_cred;
 			curthread->t_cred = kcred;
 			Errno = vn_openat(filename, UIO_SYSSPACE, FREAD, 0, &vp,
-			    0, 0, rootdir);
+			    0, 0, rootdir, -1);
 			curthread->t_cred = saved_cred;
 		}
 		kobjopen_free(ltp);
@@ -3704,7 +3704,7 @@ kobj_close(intptr_t descr)
 
 	if (_modrootloaded) {
 		struct vnode *vp = (struct vnode *)descr;
-		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED());
+		(void) VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL);
 		VN_RELE(vp);
 	} else
 		(void) kobj_boot_close((int)descr);
@@ -3719,7 +3719,7 @@ kobj_fstat(intptr_t descr, struct bootstat *buf)
 	if (_modrootloaded) {
 		vattr_t vattr;
 		struct vnode *vp = (struct vnode *)descr;
-		if (VOP_GETATTR(vp, &vattr, 0, kcred) != 0)
+		if (VOP_GETATTR(vp, &vattr, 0, kcred, NULL) != 0)
 			return (-1);
 
 		/*

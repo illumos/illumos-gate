@@ -84,70 +84,79 @@
 #include <sys/fs/udf_inode.h>
 
 static int32_t udf_open(struct vnode **,
-	int32_t, struct cred *);
+	int32_t, struct cred *, caller_context_t *);
 static int32_t udf_close(struct vnode *,
-	int32_t, int32_t, offset_t, struct cred *);
+	int32_t, int32_t, offset_t, struct cred *, caller_context_t *);
 static int32_t udf_read(struct vnode *,
-	struct uio *, int32_t, struct cred *, struct caller_context *);
+	struct uio *, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_write(struct vnode *,
-	struct uio *, int32_t, struct cred *, struct caller_context *);
+	struct uio *, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_ioctl(struct vnode *,
-	int32_t, intptr_t, int32_t, struct cred *, int32_t *);
+	int32_t, intptr_t, int32_t, struct cred *, int32_t *,
+	caller_context_t *);
 static int32_t udf_getattr(struct vnode *,
-	struct vattr *, int32_t, struct cred *);
+	struct vattr *, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_setattr(struct vnode *,
 	struct vattr *, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_access(struct vnode *,
-	int32_t, int32_t, struct cred *);
+	int32_t, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_lookup(struct vnode *,
 	char *, struct vnode **, struct pathname *,
-	int32_t, struct vnode *, struct cred *);
+	int32_t, struct vnode *, struct cred *,
+	caller_context_t *, int *, pathname_t *);
 static int32_t udf_create(struct vnode *,
 	char *, struct vattr *, enum vcexcl,
-	int32_t, struct vnode **, struct cred *, int32_t);
+	int32_t, struct vnode **, struct cred *, int32_t,
+	caller_context_t *, vsecattr_t *);
 static int32_t udf_remove(struct vnode *,
-	char *, struct cred *);
+	char *, struct cred *, caller_context_t *, int);
 static int32_t udf_link(struct vnode *,
-	struct vnode *, char *, struct cred *);
+	struct vnode *, char *, struct cred *, caller_context_t *, int);
 static int32_t udf_rename(struct vnode *,
-	char *, struct vnode *, char *, struct cred *);
+	char *, struct vnode *, char *, struct cred *, caller_context_t *, int);
 static int32_t udf_mkdir(struct vnode *,
-	char *, struct vattr *, struct vnode **, struct cred *);
+	char *, struct vattr *, struct vnode **, struct cred *,
+	caller_context_t *, int, vsecattr_t *);
 static int32_t udf_rmdir(struct vnode *,
-	char *, struct vnode *, struct cred *);
+	char *, struct vnode *, struct cred *, caller_context_t *, int);
 static int32_t udf_readdir(struct vnode *,
-	struct uio *, struct cred *, int32_t *);
+	struct uio *, struct cred *, int32_t *, caller_context_t *, int);
 static int32_t udf_symlink(struct vnode *,
-	char *, struct vattr *, char *, struct cred *);
+	char *, struct vattr *, char *, struct cred *, caller_context_t *, int);
 static int32_t udf_readlink(struct vnode *,
-	struct uio *, struct cred *);
+	struct uio *, struct cred *, caller_context_t *);
 static int32_t udf_fsync(struct vnode *,
-	int32_t, struct cred *);
+	int32_t, struct cred *, caller_context_t *);
 static void udf_inactive(struct vnode *,
-	struct cred *);
-static int32_t udf_fid(struct vnode *, struct fid *);
+	struct cred *, caller_context_t *);
+static int32_t udf_fid(struct vnode *, struct fid *, caller_context_t *);
 static int udf_rwlock(struct vnode *, int32_t, caller_context_t *);
 static void udf_rwunlock(struct vnode *, int32_t, caller_context_t *);
-static int32_t udf_seek(struct vnode *, offset_t, offset_t *);
+static int32_t udf_seek(struct vnode *, offset_t, offset_t *,
+	caller_context_t *);
 static int32_t udf_frlock(struct vnode *, int32_t,
-	struct flock64 *, int32_t, offset_t, struct flk_callback *, cred_t *);
+	struct flock64 *, int32_t, offset_t, struct flk_callback *, cred_t *,
+	caller_context_t *);
 static int32_t udf_space(struct vnode *, int32_t,
 	struct flock64 *, int32_t, offset_t, cred_t *, caller_context_t *);
 static int32_t udf_getpage(struct vnode *, offset_t,
 	size_t, uint32_t *, struct page **, size_t,
-	struct seg *, caddr_t, enum seg_rw, struct cred *);
+	struct seg *, caddr_t, enum seg_rw, struct cred *, caller_context_t *);
 static int32_t udf_putpage(struct vnode *, offset_t,
-	size_t, int32_t, struct cred *);
+	size_t, int32_t, struct cred *, caller_context_t *);
 static int32_t udf_map(struct vnode *, offset_t, struct as *,
-	caddr_t *, size_t, uint8_t, uint8_t, uint32_t, struct cred *);
+	caddr_t *, size_t, uint8_t, uint8_t, uint32_t, struct cred *,
+	caller_context_t *);
 static int32_t udf_addmap(struct vnode *, offset_t, struct as *,
-	caddr_t, size_t, uint8_t, uint8_t, uint32_t, struct cred *);
+	caddr_t, size_t, uint8_t, uint8_t, uint32_t, struct cred *,
+	caller_context_t *);
 static int32_t udf_delmap(struct vnode *, offset_t, struct as *,
-	caddr_t, size_t, uint32_t, uint32_t, uint32_t, struct cred *);
+	caddr_t, size_t, uint32_t, uint32_t, uint32_t, struct cred *,
+	caller_context_t *);
 static int32_t udf_l_pathconf(struct vnode *, int32_t,
-	ulong_t *, struct cred *);
+	ulong_t *, struct cred *, caller_context_t *);
 static int32_t udf_pageio(struct vnode *, struct page *,
-	u_offset_t, size_t, int32_t, struct cred *);
+	u_offset_t, size_t, int32_t, struct cred *, caller_context_t *);
 
 int32_t ud_getpage_miss(struct vnode *, u_offset_t,
 	size_t, struct seg *, caddr_t, page_t *pl[],
@@ -227,7 +236,11 @@ const fs_operation_def_t udf_vnodeops_template[] = {
 
 /* ARGSUSED */
 static int32_t
-udf_open(struct vnode **vpp, int32_t flag, struct cred *cr)
+udf_open(
+	struct vnode **vpp,
+	int32_t flag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	ud_printf("udf_open\n");
 
@@ -236,8 +249,13 @@ udf_open(struct vnode **vpp, int32_t flag, struct cred *cr)
 
 /* ARGSUSED */
 static int32_t
-udf_close(struct vnode *vp, int32_t flag,
-	int32_t count, offset_t offset, struct cred *cr)
+udf_close(
+	struct vnode *vp,
+	int32_t flag,
+	int32_t count,
+	offset_t offset,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -265,9 +283,14 @@ udf_close(struct vnode *vp, int32_t flag,
 	return (0);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_read(struct vnode *vp, struct uio *uiop,
-	int32_t ioflag, struct cred *cr, struct caller_context *ct)
+udf_read(
+	struct vnode *vp,
+	struct uio *uiop,
+	int32_t ioflag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 	int32_t error;
@@ -309,9 +332,14 @@ int32_t ud_HW = 96 * 1024;
 int32_t ud_LW = 64 * 1024;
 int32_t ud_throttles = 0;
 
+/* ARGSUSED */
 static int32_t
-udf_write(struct vnode *vp, struct uio *uiop,
-	int32_t ioflag, struct cred *cr, struct caller_context *ct)
+udf_write(
+	struct vnode *vp,
+	struct uio *uiop,
+	int32_t ioflag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 	int32_t error = 0;
@@ -369,16 +397,26 @@ end:
 
 /* ARGSUSED */
 static int32_t
-udf_ioctl(struct vnode *vp, int32_t cmd, intptr_t arg,
-	int32_t flag, struct cred *cr, int32_t *rvalp)
+udf_ioctl(
+	struct vnode *vp,
+	int32_t cmd,
+	intptr_t arg,
+	int32_t flag,
+	struct cred *cr,
+	int32_t *rvalp,
+	caller_context_t *ct)
 {
 	return (ENOTTY);
 }
 
 /* ARGSUSED */
 static int32_t
-udf_getattr(struct vnode *vp,
-	struct vattr *vap, int32_t flags, struct cred *cr)
+udf_getattr(
+	struct vnode *vp,
+	struct vattr *vap,
+	int32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -566,8 +604,12 @@ update_inode:
 
 /* ARGSUSED */
 static int32_t
-udf_access(struct vnode *vp,
-	int32_t mode, int32_t flags, struct cred *cr)
+udf_access(
+	struct vnode *vp,
+	int32_t mode,
+	int32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 	int32_t error;
@@ -587,9 +629,17 @@ int32_t udfs_stickyhack = 1;
 
 /* ARGSUSED */
 static int32_t
-udf_lookup(struct vnode *dvp,
-	char *nm, struct vnode **vpp, struct pathname *pnp,
-	int32_t flags, struct vnode *rdir, struct cred *cr)
+udf_lookup(
+	struct vnode *dvp,
+	char *nm,
+	struct vnode **vpp,
+	struct pathname *pnp,
+	int32_t flags,
+	struct vnode *rdir,
+	struct cred *cr,
+	caller_context_t *ct,
+	int *direntflags,
+	pathname_t *realpnp)
 {
 	int32_t error;
 	struct vnode *vp;
@@ -656,9 +706,17 @@ out:
 
 /* ARGSUSED */
 static int32_t
-udf_create(struct vnode *dvp,
-	char *name, struct vattr *vap, enum vcexcl excl,
-	int32_t mode, struct vnode **vpp, struct cred *cr, int32_t flag)
+udf_create(
+	struct vnode *dvp,
+	char *name,
+	struct vattr *vap,
+	enum vcexcl excl,
+	int32_t mode,
+	struct vnode **vpp,
+	struct cred *cr,
+	int32_t flag,
+	caller_context_t *ct,
+	vsecattr_t *vsecp)
 {
 	int32_t error;
 	struct ud_inode *ip = VTOI(dvp), *xip;
@@ -679,8 +737,8 @@ udf_create(struct vnode *dvp,
 		xip = NULL;
 		rw_enter(&ip->i_rwlock, RW_WRITER);
 		error = ud_direnter(ip, name, DE_CREATE,
-				(struct ud_inode *)0, (struct ud_inode *)0,
-				vap, &xip, cr);
+			(struct ud_inode *)0, (struct ud_inode *)0,
+			vap, &xip, cr, ct);
 		rw_exit(&ip->i_rwlock);
 		ITIMES(ip);
 		ip = xip;
@@ -732,7 +790,7 @@ udf_create(struct vnode *dvp,
 				(void) ud_itrunc(ip, 0, 0, cr);
 				rw_exit(&ip->i_rwlock);
 			}
-			vnevent_create(ITOV(ip));
+			vnevent_create(ITOV(ip), ct);
 		}
 	}
 
@@ -769,8 +827,14 @@ out:
 	return (error);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_remove(struct vnode *vp, char *nm, struct cred *cr)
+udf_remove(
+	struct vnode *vp,
+	char *nm,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int32_t error;
 	struct ud_inode *ip = VTOI(vp);
@@ -779,16 +843,22 @@ udf_remove(struct vnode *vp, char *nm, struct cred *cr)
 
 	rw_enter(&ip->i_rwlock, RW_WRITER);
 	error = ud_dirremove(ip, nm,
-		(struct ud_inode *)0, (struct vnode *)0, DR_REMOVE, cr);
+		(struct ud_inode *)0, (struct vnode *)0, DR_REMOVE, cr, ct);
 	rw_exit(&ip->i_rwlock);
 	ITIMES(ip);
 
 	return (error);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_link(struct vnode *tdvp,
-	struct vnode *svp, char *tnm, struct cred *cr)
+udf_link(
+	struct vnode *tdvp,
+	struct vnode *svp,
+	char *tnm,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int32_t error;
 	struct vnode *realvp;
@@ -796,7 +866,7 @@ udf_link(struct vnode *tdvp,
 	struct ud_inode *tdp;
 
 	ud_printf("udf_link\n");
-	if (VOP_REALVP(svp, &realvp) == 0) {
+	if (VOP_REALVP(svp, &realvp, ct) == 0) {
 		svp = realvp;
 	}
 
@@ -816,13 +886,13 @@ udf_link(struct vnode *tdvp,
 
 	rw_enter(&tdp->i_rwlock, RW_WRITER);
 	error = ud_direnter(tdp, tnm, DE_LINK, (struct ud_inode *)0,
-		sip, (struct vattr *)0, (struct ud_inode **)0, cr);
+		sip, (struct vattr *)0, (struct ud_inode **)0, cr, ct);
 	rw_exit(&tdp->i_rwlock);
 	ITIMES(sip);
 	ITIMES(tdp);
 
 	if (error == 0) {
-		vnevent_link(svp);
+		vnevent_link(svp, ct);
 	}
 
 	return (error);
@@ -830,9 +900,14 @@ udf_link(struct vnode *tdvp,
 
 /* ARGSUSED */
 static int32_t
-udf_rename(struct vnode *sdvp,
-	char *snm, struct vnode *tdvp,
-	char *tnm, struct cred *cr)
+udf_rename(
+	struct vnode *sdvp,
+	char *snm,
+	struct vnode *tdvp,
+	char *tnm,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int32_t error = 0;
 	struct udf_vfs *udf_vfsp;
@@ -842,7 +917,7 @@ udf_rename(struct vnode *sdvp,
 
 	ud_printf("udf_rename\n");
 
-	if (VOP_REALVP(tdvp, &realvp) == 0) {
+	if (VOP_REALVP(tdvp, &realvp, ct) == 0) {
 		tdvp = realvp;
 	}
 
@@ -906,7 +981,7 @@ udf_rename(struct vnode *sdvp,
 	 */
 	rw_enter(&tdp->i_rwlock, RW_WRITER);
 	if (error = ud_direnter(tdp, tnm, DE_RENAME, sdp, sip,
-			(struct vattr *)0, (struct ud_inode **)0, cr)) {
+	    (struct vattr *)0, (struct ud_inode **)0, cr, ct)) {
 		/*
 		 * ESAME isn't really an error; it indicates that the
 		 * operation should not be done because the source and target
@@ -918,7 +993,7 @@ udf_rename(struct vnode *sdvp,
 		rw_exit(&tdp->i_rwlock);
 		goto errout;
 	}
-	vnevent_rename_src(ITOV(sip), sdvp, snm);
+	vnevent_rename_src(ITOV(sip), sdvp, snm, ct);
 	rw_exit(&tdp->i_rwlock);
 
 	rw_enter(&sdp->i_rwlock, RW_WRITER);
@@ -930,7 +1005,7 @@ udf_rename(struct vnode *sdvp,
 	 * the source inode.
 	 */
 	if ((error = ud_dirremove(sdp, snm, sip, (struct vnode *)0,
-			DR_RENAME, cr)) == ENOENT) {
+	    DR_RENAME, cr, ct)) == ENOENT) {
 		error = 0;
 	}
 	rw_exit(&sdp->i_rwlock);
@@ -943,10 +1018,17 @@ errout:
 	return (error);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_mkdir(struct vnode *dvp,
-	char *dirname, struct vattr *vap,
-	struct vnode **vpp, struct cred *cr)
+udf_mkdir(
+	struct vnode *dvp,
+	char *dirname,
+	struct vattr *vap,
+	struct vnode **vpp,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags,
+	vsecattr_t *vsecp)
 {
 	int32_t error;
 	struct ud_inode *ip;
@@ -959,7 +1041,7 @@ udf_mkdir(struct vnode *dvp,
 	ip = VTOI(dvp);
 	rw_enter(&ip->i_rwlock, RW_WRITER);
 	error = ud_direnter(ip, dirname, DE_MKDIR,
-		(struct ud_inode *)0, (struct ud_inode *)0, vap, &xip, cr);
+		(struct ud_inode *)0, (struct ud_inode *)0, vap, &xip, cr, ct);
 	rw_exit(&ip->i_rwlock);
 	ITIMES(ip);
 	if (error == 0) {
@@ -974,9 +1056,15 @@ udf_mkdir(struct vnode *dvp,
 	return (error);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_rmdir(struct vnode *vp,
-	char *nm, struct vnode *cdir, struct cred *cr)
+udf_rmdir(
+	struct vnode *vp,
+	char *nm,
+	struct vnode *cdir,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int32_t error;
 	struct ud_inode *ip = VTOI(vp);
@@ -984,7 +1072,8 @@ udf_rmdir(struct vnode *vp,
 	ud_printf("udf_rmdir\n");
 
 	rw_enter(&ip->i_rwlock, RW_WRITER);
-	error = ud_dirremove(ip, nm, (struct ud_inode *)0, cdir, DR_RMDIR, cr);
+	error = ud_dirremove(ip, nm, (struct ud_inode *)0, cdir, DR_RMDIR,
+		cr, ct);
 	rw_exit(&ip->i_rwlock);
 	ITIMES(ip);
 
@@ -993,8 +1082,13 @@ udf_rmdir(struct vnode *vp,
 
 /* ARGSUSED */
 static int32_t
-udf_readdir(struct vnode *vp,
-	struct uio *uiop, struct cred *cr, int32_t *eofp)
+udf_readdir(
+	struct vnode *vp,
+	struct uio *uiop,
+	struct cred *cr,
+	int32_t *eofp,
+	caller_context_t *ct,
+	int flags)
 {
 	struct ud_inode *ip;
 	struct dirent64 *nd;
@@ -1142,9 +1236,14 @@ end:
 
 /* ARGSUSED */
 static int32_t
-udf_symlink(struct vnode *dvp,
-	char *linkname, struct vattr *vap,
-	char *target, struct cred *cr)
+udf_symlink(
+	struct vnode *dvp,
+	char *linkname,
+	struct vattr *vap,
+	char *target,
+	struct cred *cr,
+	caller_context_t *ct,
+	int flags)
 {
 	int32_t error = 0, outlen;
 	uint32_t ioflag = 0;
@@ -1161,7 +1260,7 @@ udf_symlink(struct vnode *dvp,
 
 	rw_enter(&dip->i_rwlock, RW_WRITER);
 	error = ud_direnter(dip, linkname, DE_CREATE,
-		(struct ud_inode *)0, (struct ud_inode *)0, vap, &ip, cr);
+		(struct ud_inode *)0, (struct ud_inode *)0, vap, &ip, cr, ct);
 	rw_exit(&dip->i_rwlock);
 	if (error == 0) {
 		dname = kmem_zalloc(1024, KM_SLEEP);
@@ -1246,7 +1345,7 @@ udf_symlink(struct vnode *dvp,
 			rw_exit(&ip->i_contents);
 			rw_enter(&dip->i_rwlock, RW_WRITER);
 			(void) ud_dirremove(dip, linkname, (struct ud_inode *)0,
-					(struct vnode *)0, DR_REMOVE, cr);
+				(struct vnode *)0, DR_REMOVE, cr, ct);
 			rw_exit(&dip->i_rwlock);
 			goto update_inode;
 		}
@@ -1271,8 +1370,11 @@ update_inode:
 
 /* ARGSUSED */
 static int32_t
-udf_readlink(struct vnode *vp,
-	struct uio *uiop, struct cred *cr)
+udf_readlink(
+	struct vnode *vp,
+	struct uio *uiop,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int32_t error = 0, off, id_len, size, len;
 	int8_t *dname = NULL, *uname = NULL;
@@ -1374,8 +1476,11 @@ end:
 
 /* ARGSUSED */
 static int32_t
-udf_fsync(struct vnode *vp,
-	int32_t syncflag, struct cred *cr)
+udf_fsync(
+	struct vnode *vp,
+	int32_t syncflag,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int32_t error = 0;
 	struct ud_inode *ip = VTOI(vp);
@@ -1397,15 +1502,16 @@ udf_fsync(struct vnode *vp,
 
 /* ARGSUSED */
 static void
-udf_inactive(struct vnode *vp, struct cred *cr)
+udf_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 {
 	ud_printf("udf_iinactive\n");
 
 	ud_iinactive(VTOI(vp), cr);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_fid(struct vnode *vp, struct fid *fidp)
+udf_fid(struct vnode *vp, struct fid *fidp, caller_context_t *ct)
 {
 	struct udf_fid *udfidp;
 	struct ud_inode *ip = VTOI(vp);
@@ -1466,15 +1572,21 @@ udf_rwunlock(struct vnode *vp, int32_t write_lock, caller_context_t *ctp)
 
 /* ARGSUSED */
 static int32_t
-udf_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
+udf_seek(struct vnode *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
 }
 
 static int32_t
-udf_frlock(struct vnode *vp, int32_t cmd, struct flock64 *bfp,
-	int32_t flag, offset_t offset, struct flk_callback *flk_cbp,
-	cred_t *cr)
+udf_frlock(
+	struct vnode *vp,
+	int32_t cmd,
+	struct flock64 *bfp,
+	int32_t flag,
+	offset_t offset,
+	struct flk_callback *flk_cbp,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -1492,7 +1604,7 @@ udf_frlock(struct vnode *vp, int32_t cmd, struct flock64 *bfp,
 		return (EAGAIN);
 	}
 
-	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr));
+	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 }
 
 /*ARGSUSED6*/
@@ -1521,10 +1633,18 @@ udf_space(
 
 /* ARGSUSED */
 static int32_t
-udf_getpage(struct vnode *vp, offset_t off,
-	size_t len, uint32_t *protp, struct page  **plarr,
-	size_t plsz, struct seg *seg, caddr_t addr,
-	enum seg_rw rw, struct cred *cr)
+udf_getpage(
+	struct vnode *vp,
+	offset_t off,
+	size_t len,
+	uint32_t *protp,
+	struct page **plarr,
+	size_t plsz,
+	struct seg *seg,
+	caddr_t addr,
+	enum seg_rw rw,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 	int32_t error, has_holes, beyond_eof, seqmode, dolock;
@@ -1798,8 +1918,13 @@ int32_t ud_delay = 1;
 
 /* ARGSUSED */
 static int32_t
-udf_putpage(struct vnode *vp, offset_t off,
-	size_t len, int32_t flags, struct cred *cr)
+udf_putpage(
+	struct vnode *vp,
+	offset_t off,
+	size_t len,
+	int32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip;
 	int32_t error = 0;
@@ -1879,11 +2004,19 @@ out:
 	return (error);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_map(struct vnode *vp, offset_t off,
-	struct as *as, caddr_t *addrp, size_t len,
-	uint8_t prot, uint8_t maxprot, uint32_t flags,
-	struct cred *cr)
+udf_map(
+	struct vnode *vp,
+	offset_t off,
+	struct as *as,
+	caddr_t *addrp,
+	size_t len,
+	uint8_t prot,
+	uint8_t maxprot,
+	uint32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct segvn_crargs vn_a;
 	int32_t error = 0;
@@ -1949,10 +2082,16 @@ end:
 
 /* ARGSUSED */
 static int32_t
-udf_addmap(struct vnode *vp, offset_t off,
-	struct as *as, caddr_t addr, size_t len,
-	uint8_t prot, uint8_t maxprot, uint32_t flags,
-	struct cred *cr)
+udf_addmap(struct vnode *vp,
+	offset_t off,
+	struct as *as,
+	caddr_t addr,
+	size_t len,
+	uint8_t prot,
+	uint8_t maxprot,
+	uint32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -1971,10 +2110,16 @@ udf_addmap(struct vnode *vp, offset_t off,
 
 /* ARGSUSED */
 static int32_t
-udf_delmap(struct vnode *vp, offset_t off,
-	struct as *as, caddr_t addr, size_t len,
-	uint32_t prot, uint32_t maxprot, uint32_t flags,
-	struct cred *cr)
+udf_delmap(
+	struct vnode *vp, offset_t off,
+	struct as *as,
+	caddr_t addr,
+	size_t len,
+	uint32_t prot,
+	uint32_t maxprot,
+	uint32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -1992,9 +2137,14 @@ udf_delmap(struct vnode *vp, offset_t off,
 	return (0);
 }
 
+/* ARGSUSED */
 static int32_t
-udf_l_pathconf(struct vnode *vp, int32_t cmd,
-	ulong_t *valp, struct cred *cr)
+udf_l_pathconf(
+	struct vnode *vp,
+	int32_t cmd,
+	ulong_t *valp,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	int32_t error = 0;
 
@@ -2010,7 +2160,7 @@ udf_l_pathconf(struct vnode *vp, int32_t cmd,
 		 */
 		*valp = 41;
 	} else {
-		error = fs_pathconf(vp, cmd, valp, cr);
+		error = fs_pathconf(vp, cmd, valp, cr, ct);
 	}
 
 	return (error);
@@ -2027,9 +2177,14 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing", ud_pageio_writes))
  */
 /* ARGSUSED */
 static int32_t
-udf_pageio(struct vnode *vp, struct page *pp,
-	u_offset_t io_off, size_t io_len,
-	int32_t flags, struct cred *cr)
+udf_pageio(
+	struct vnode *vp,
+	struct page *pp,
+	u_offset_t io_off,
+	size_t io_len,
+	int32_t flags,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	daddr_t bn;
 	struct buf *bp;

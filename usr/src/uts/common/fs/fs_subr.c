@@ -113,7 +113,8 @@ fs_nosys_map(struct vnode *vp,
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	return (ENOSYS);
 }
@@ -128,7 +129,8 @@ fs_nosys_addmap(struct vnode *vp,
 	uchar_t prot,
 	uchar_t maxprot,
 	uint_t flags,
-	struct cred *cr)
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	return (ENOSYS);
 }
@@ -139,7 +141,8 @@ fs_nosys_poll(vnode_t *vp,
 	register short events,
 	int anyyet,
 	register short *reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	return (ENOSYS);
 }
@@ -152,6 +155,38 @@ fs_nosys_poll(vnode_t *vp,
 /* ARGSUSED */
 int
 fs_sync(struct vfs *vfspp, short flag, cred_t *cr)
+{
+	return (0);
+}
+
+/*
+ * Does nothing but VOP_FSYNC must not fail.
+ */
+/* ARGSUSED */
+int
+fs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
+{
+	return (0);
+}
+
+/*
+ * Does nothing but VOP_PUTPAGE must not fail.
+ */
+/* ARGSUSED */
+int
+fs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr,
+	caller_context_t *ctp)
+{
+	return (0);
+}
+
+/*
+ * Does nothing but VOP_IOCTL must not fail.
+ */
+/* ARGSUSED */
+int
+fs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
+	int *rvalp)
 {
 	return (0);
 }
@@ -175,8 +210,9 @@ fs_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ctp)
 /*
  * Compare two vnodes.
  */
+/*ARGSUSED2*/
 int
-fs_cmp(vnode_t *vp1, vnode_t *vp2)
+fs_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
 	return (vp1 == vp2);
 }
@@ -186,7 +222,7 @@ fs_cmp(vnode_t *vp1, vnode_t *vp2)
  */
 /* ARGSUSED */
 int
-fs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+fs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	return ((*noffp < 0 || *noffp > MAXOFFSET_T) ? EINVAL : 0);
 }
@@ -197,13 +233,15 @@ fs_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
 /* ARGSUSED */
 int
 fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
-	offset_t offset, flk_callback_t *flk_cbp, cred_t *cr)
+	offset_t offset, flk_callback_t *flk_cbp, cred_t *cr,
+	caller_context_t *ct)
 {
 	int frcmd;
 	int nlmid;
 	int error = 0;
 	flk_callback_t serialize_callback;
 	int serialize = 0;
+	v_mode_t mode;
 
 	switch (cmd) {
 
@@ -211,15 +249,13 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	case F_O_GETLK:
 		if (flag & F_REMOTELOCK) {
 			frcmd = RCMDLCK;
-			break;
-		}
-		if (flag & F_PXFSLOCK) {
+		} else if (flag & F_PXFSLOCK) {
 			frcmd = PCMDLCK;
-			break;
+		} else {
+			frcmd = 0;
+			bfp->l_pid = ttoproc(curthread)->p_pid;
+			bfp->l_sysid = 0;
 		}
-		bfp->l_pid = ttoproc(curthread)->p_pid;
-		bfp->l_sysid = 0;
-		frcmd = 0;
 		break;
 
 	case F_SETLK_NBMAND:
@@ -238,6 +274,19 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		/*FALLTHROUGH*/
 
 	case F_SETLK:
+		if (flag & F_REMOTELOCK) {
+			frcmd = SETFLCK|RCMDLCK;
+		} else if (flag & F_PXFSLOCK) {
+			frcmd = SETFLCK|PCMDLCK;
+		} else {
+			frcmd = SETFLCK;
+			bfp->l_pid = ttoproc(curthread)->p_pid;
+			bfp->l_sysid = 0;
+		}
+		if (cmd == F_SETLK_NBMAND &&
+		    (bfp->l_type == F_RDLCK || bfp->l_type == F_WRLCK)) {
+			frcmd |= NBMLCK;
+		}
 		/*
 		 * Check whether there is an NBMAND share reservation that
 		 * conflicts with the lock request.
@@ -245,30 +294,31 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_WRITER);
 			serialize = 1;
+			if (frcmd & NBMLCK) {
+				mode = (bfp->l_type == F_RDLCK) ?
+				    V_READ : V_RDANDWR;
+				if (vn_is_mapped(vp, mode)) {
+					error = EAGAIN;
+					goto done;
+				}
+			}
 			if (share_blocks_lock(vp, bfp)) {
 				error = EAGAIN;
 				goto done;
 			}
 		}
-		if (flag & F_REMOTELOCK) {
-			frcmd = SETFLCK|RCMDLCK;
-			break;
-		}
-		if (flag & F_PXFSLOCK) {
-			frcmd = SETFLCK|PCMDLCK;
-			break;
-		}
-		bfp->l_pid = ttoproc(curthread)->p_pid;
-		bfp->l_sysid = 0;
-		frcmd = SETFLCK;
-		if (cmd == F_SETLK_NBMAND &&
-		    (bfp->l_type == F_RDLCK || bfp->l_type == F_WRLCK)) {
-			/* would check here for conflict with mapped region */
-			frcmd |= NBMLCK;
-		}
 		break;
 
 	case F_SETLKW:
+		if (flag & F_REMOTELOCK) {
+			frcmd = SETFLCK|SLPFLCK|RCMDLCK;
+		} else if (flag & F_PXFSLOCK) {
+			frcmd = SETFLCK|SLPFLCK|PCMDLCK;
+		} else {
+			frcmd = SETFLCK|SLPFLCK;
+			bfp->l_pid = ttoproc(curthread)->p_pid;
+			bfp->l_sysid = 0;
+		}
 		/*
 		 * If there is an NBMAND share reservation that conflicts
 		 * with the lock request, block until the conflicting share
@@ -283,24 +333,13 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 					goto done;
 			}
 		}
-		if (flag & F_REMOTELOCK) {
-			frcmd = SETFLCK|SLPFLCK|RCMDLCK;
-			break;
-		}
-		if (flag & F_PXFSLOCK) {
-			frcmd = SETFLCK|SLPFLCK|PCMDLCK;
-			break;
-		}
-		bfp->l_pid = ttoproc(curthread)->p_pid;
-		bfp->l_sysid = 0;
-		frcmd = SETFLCK|SLPFLCK;
 		break;
 
 	case F_HASREMOTELOCKS:
 		nlmid = GETNLMID(bfp->l_sysid);
 		if (nlmid != 0) {	/* booted as a cluster */
 			l_has_rmt(bfp) =
-				cl_flk_has_remote_locks_for_nlmid(vp, nlmid);
+			    cl_flk_has_remote_locks_for_nlmid(vp, nlmid);
 		} else {		/* not booted as a cluster */
 			l_has_rmt(bfp) = flk_has_remote_locks(vp);
 		}
@@ -320,7 +359,7 @@ fs_frlock(register vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 
 	if (serialize && (frcmd & SLPFLCK) != 0) {
 		flk_add_callback(&serialize_callback,
-				frlock_serialize_blocked, vp, flk_cbp);
+		    frlock_serialize_blocked, vp, flk_cbp);
 		flk_cbp = &serialize_callback;
 	}
 
@@ -358,7 +397,12 @@ frlock_serialize_blocked(flk_cb_when_t when, void *infop)
  */
 /* ARGSUSED */
 int
-fs_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
+fs_setfl(
+	vnode_t *vp,
+	int oflags,
+	int nflags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	return (0);
 }
@@ -375,7 +419,8 @@ fs_poll(vnode_t *vp,
 	register short events,
 	int anyyet,
 	register short *reventsp,
-	struct pollhead **phpp)
+	struct pollhead **phpp,
+	caller_context_t *ct)
 {
 	*reventsp = 0;
 	if (events & POLLIN)
@@ -397,7 +442,12 @@ fs_poll(vnode_t *vp,
  */
 /* ARGSUSED */
 int
-fs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+fs_pathconf(
+	vnode_t *vp,
+	int cmd,
+	ulong_t *valp,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	register ulong_t val;
 	register int error = 0;
@@ -467,6 +517,19 @@ fs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 		val = 0;
 		break;
 
+	case _PC_CASE_BEHAVIOR:
+		val = _CASE_SENSITIVE;
+		if (vfs_has_feature(vp->v_vfsp, VFSFT_CASEINSENSITIVE) == 1)
+			val |= _CASE_INSENSITIVE;
+		if (vfs_has_feature(vp->v_vfsp, VFSFT_NOCASESENSITIVE) == 1)
+			val &= ~_CASE_SENSITIVE;
+		break;
+
+	case _PC_SATTR_ENABLED:
+	case _PC_SATTR_EXISTS:
+		val = 0;
+		break;
+
 	default:
 		error = EINVAL;
 		break;
@@ -482,7 +545,13 @@ fs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
  */
 /* ARGSUSED */
 void
-fs_dispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr)
+fs_dispose(
+	struct vnode *vp,
+	page_t *pp,
+	int fl,
+	int dn,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 
 	ASSERT(fl == B_FREE || fl == B_INVAL);
@@ -495,7 +564,13 @@ fs_dispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr)
 
 /* ARGSUSED */
 void
-fs_nodispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr)
+fs_nodispose(
+	struct vnode *vp,
+	page_t *pp,
+	int fl,
+	int dn,
+	struct cred *cr,
+	caller_context_t *ct)
 {
 	cmn_err(CE_PANIC, "fs_nodispose invoked");
 }
@@ -505,30 +580,33 @@ fs_nodispose(struct vnode *vp, page_t *pp, int fl, int dn, struct cred *cr)
  */
 /* ARGSUSED */
 int
-fs_fab_acl(vp, vsecattr, flag, cr)
-vnode_t		*vp;
-vsecattr_t	*vsecattr;
-int		flag;
-cred_t		*cr;
+fs_fab_acl(
+	vnode_t *vp,
+	vsecattr_t *vsecattr,
+	int flag,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	aclent_t	*aclentp;
 	ace_t		*acep;
 	struct vattr	vattr;
 	int		error;
+	size_t		aclsize;
 
 	vsecattr->vsa_aclcnt	= 0;
+	vsecattr->vsa_aclentsz	= 0;
 	vsecattr->vsa_aclentp	= NULL;
 	vsecattr->vsa_dfaclcnt	= 0;	/* Default ACLs are not fabricated */
 	vsecattr->vsa_dfaclentp	= NULL;
 
 	vattr.va_mask = AT_MODE | AT_UID | AT_GID;
-	if (error = VOP_GETATTR(vp, &vattr, 0, cr))
+	if (error = VOP_GETATTR(vp, &vattr, 0, cr, ct))
 		return (error);
 
 	if (vsecattr->vsa_mask & (VSA_ACLCNT | VSA_ACL)) {
+		aclsize = 4 * sizeof (aclent_t);
 		vsecattr->vsa_aclcnt	= 4; /* USER, GROUP, OTHER, and CLASS */
-		vsecattr->vsa_aclentp = kmem_zalloc(4 * sizeof (aclent_t),
-		    KM_SLEEP);
+		vsecattr->vsa_aclentp = kmem_zalloc(aclsize, KM_SLEEP);
 		aclentp = vsecattr->vsa_aclentp;
 
 		aclentp->a_type = USER_OBJ;	/* Owner */
@@ -550,9 +628,10 @@ cred_t		*cr;
 		aclentp->a_perm = (ushort_t)(0007);
 		aclentp->a_id = (gid_t)-1;	/* Really undefined */
 	} else if (vsecattr->vsa_mask & (VSA_ACECNT | VSA_ACE)) {
+		aclsize = 6 * sizeof (ace_t);
 		vsecattr->vsa_aclcnt	= 6;
-		vsecattr->vsa_aclentp = kmem_zalloc(6 * sizeof (ace_t),
-		    KM_SLEEP);
+		vsecattr->vsa_aclentp = kmem_zalloc(aclsize, KM_SLEEP);
+		vsecattr->vsa_aclentsz = aclsize;
 		acep = vsecattr->vsa_aclentp;
 		(void) memcpy(acep, trivial_acl, sizeof (ace_t) * 6);
 		adjust_ace_pair(acep, (vattr.va_mode & 0700) >> 6);
@@ -568,7 +647,13 @@ cred_t		*cr;
  */
 /* ARGSUSED4 */
 int
-fs_shrlock(struct vnode *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
+fs_shrlock(
+	struct vnode *vp,
+	int cmd,
+	struct shrlock *shr,
+	int flag,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	int error;
 
@@ -581,13 +666,12 @@ fs_shrlock(struct vnode *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 		if (((shr->s_access & F_RDACC) && (flag & FREAD) == 0) ||
 		    ((shr->s_access & F_WRACC) && (flag & FWRITE) == 0))
 			return (EBADF);
-		if (shr->s_deny & F_MANDDNY)
+		if (shr->s_access & (F_RMACC | F_MDACC))
+			return (EINVAL);
+		if (shr->s_deny & (F_MANDDNY | F_RMDNY))
 			return (EINVAL);
 	}
 	if (cmd == F_SHARE_NBMAND) {
-		/* must have write permission to deny read access */
-		if ((shr->s_deny & F_RDDNY) && (flag & FWRITE) == 0)
-			return (EBADF);
 		/* make sure nbmand is allowed on the file */
 		if (!vp->v_vfsp ||
 		    !(vp->v_vfsp->vfs_flag & VFS_NBMAND)) {
@@ -633,7 +717,8 @@ fs_shrlock(struct vnode *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 
 /*ARGSUSED1*/
 int
-fs_vnevent_nosupport(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
+fs_vnevent_nosupport(vnode_t *vp, vnevent_t e, vnode_t *dvp, char *fnm,
+    caller_context_t *ct)
 {
 	ASSERT(vp != NULL);
 	return (ENOTSUP);
@@ -641,7 +726,8 @@ fs_vnevent_nosupport(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
 
 /*ARGSUSED1*/
 int
-fs_vnevent_support(vnode_t *vp, vnevent_t vnevent, vnode_t *dvp, char *cname)
+fs_vnevent_support(vnode_t *vp, vnevent_t e, vnode_t *dvp, char *fnm,
+    caller_context_t *ct)
 {
 	ASSERT(vp != NULL);
 	return (0);
@@ -667,7 +753,7 @@ fs_acl_nontrivial(vnode_t *vp, cred_t *cr)
 	int		isnontrivial;
 
 	/* determine the forms of ACLs maintained */
-	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &acl_styles, cr);
+	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &acl_styles, cr, NULL);
 
 	/* clear bits we don't understand and establish default acl_style */
 	acl_styles &= (_ACL_ACLENT_ENABLED | _ACL_ACE_ENABLED);
@@ -691,7 +777,7 @@ fs_acl_nontrivial(vnode_t *vp, cred_t *cr)
 		}
 
 		ASSERT(vsecattr.vsa_mask && acl_flavor);
-		error = VOP_GETSECATTR(vp, &vsecattr, 0, cr);
+		error = VOP_GETSECATTR(vp, &vsecattr, 0, cr, NULL);
 		if (error == 0)
 			break;
 
@@ -738,4 +824,31 @@ fs_need_estale_retry(int retry_count)
 		return (1);
 	else
 		return (0);
+}
+
+
+static int (*fs_av_scan)(vnode_t *, cred_t *, int) = NULL;
+
+/*
+ * Routine for anti-virus scanner to call to register its scanning routine.
+ */
+void
+fs_vscan_register(int (*av_scan)(vnode_t *, cred_t *, int))
+{
+	fs_av_scan = av_scan;
+}
+
+/*
+ * Routine for file systems to call to initiate anti-virus scanning.
+ * Scanning will only be done on REGular files (currently).
+ */
+int
+fs_vscan(vnode_t *vp, cred_t *cr, int async)
+{
+	int ret = 0;
+
+	if (fs_av_scan && vp->v_type == VREG)
+		ret = (*fs_av_scan)(vp, cr, async);
+
+	return (ret);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@ void	rfs4_init_compound_state(struct compound_state *);
 bitmap4 rfs4_supported_attrs;
 int MSG_PRT_DEBUG = FALSE;
 
-/* If building with DEBUG enabled, enable mandattr tuneable by default */
+/* If building with DEBUG enabled, enable mandattr tunable by default */
 #ifdef DEBUG
 #ifndef RFS4_SUPPORT_MANDATTR_ONLY
 #define	RFS4_SUPPORT_MANDATTR_ONLY
@@ -575,7 +575,7 @@ rfs4_fattr4_named_attr(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		 */
 		if (sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
 			error = VOP_PATHCONF(sarg->cs->vp, _PC_XATTR_EXISTS,
-					&val, sarg->cs->cr);
+					&val, sarg->cs->cr, NULL);
 			if (error)
 				break;
 		} else
@@ -592,7 +592,7 @@ rfs4_fattr4_named_attr(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->cs->vp != NULL);
 		if (sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
 			error = VOP_PATHCONF(sarg->cs->vp, _PC_XATTR_EXISTS,
-					&val, sarg->cs->cr);
+					&val, sarg->cs->cr, NULL);
 			if (error)
 				break;
 		} else
@@ -863,7 +863,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		/* see which ACLs fs supports */
 		error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl,
-		    sarg->cs->cr);
+		    sarg->cs->cr, NULL);
 		if (error != 0) {
 			/*
 			 * If we got an error, then the filesystem
@@ -902,7 +902,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		/* get the ACL, and translate it into nfsace4 style */
 		error = VOP_GETSECATTR(vp, &vs_native,
-		    0, sarg->cs->cr);
+		    0, sarg->cs->cr, NULL);
 		if (error != 0)
 			break;
 		if (whichacl & _ACL_ACE_ENABLED) {
@@ -942,7 +942,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		vs_ace4.vsa_mask = VSA_ACE | VSA_ACECNT;
 		vs_ace4.vsa_aclcnt = na->acl.fattr4_acl_len;
 		vs_ace4.vsa_aclentp = na->acl.fattr4_acl_val;
-
+		vs_ace4.vsa_aclentsz = vs_ace4.vsa_aclcnt * sizeof (ace_t);
 		/* make sure we have correct owner/group */
 		if ((vap->va_mask & (AT_UID | AT_GID)) !=
 		    (AT_UID | AT_GID)) {
@@ -956,7 +956,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		/* see which ACLs the fs supports */
 		error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &whichacl,
-		    sarg->cs->cr);
+		    sarg->cs->cr, NULL);
 		if (error != 0) {
 			/*
 			 * If we got an error, then the filesystem
@@ -991,7 +991,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 				break;
 			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			error = VOP_SETSECATTR(vp, &vs_native,
-			    0, sarg->cs->cr);
+			    0, sarg->cs->cr, NULL);
 			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			vs_acet_destroy(&vs_native);
 		} else if (whichacl & _ACL_ACLENT_ENABLED) {
@@ -1002,7 +1002,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 				break;
 			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			error = VOP_SETSECATTR(vp, &vs_native,
-			    0, sarg->cs->cr);
+			    0, sarg->cs->cr, NULL);
 			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 			vs_aent_destroy(&vs_native);
 		}
@@ -1097,7 +1097,7 @@ rfs4_fattr4_cansettime(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 /*
  * XXX - need VOP extension to ask file system (e.g. pcfs) if it supports
- * case insenstive.
+ * case insensitive.
  */
 /* ARGSUSED */
 static int
@@ -1191,7 +1191,7 @@ rfs4_fattr4_chown_restricted(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp,
-				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr);
+				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
 		if (error)
 			break;
 
@@ -1206,7 +1206,7 @@ rfs4_fattr4_chown_restricted(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp,
-				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr);
+				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (na->chown_restricted != (val == 1))
@@ -1559,7 +1559,7 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_FILESIZEBITS, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (val >= (sizeof (uint64_t) * 8))
@@ -1576,7 +1576,7 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_FILESIZEBITS, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (val >= (sizeof (uint64_t) * 8))
@@ -1615,7 +1615,7 @@ rfs4_fattr4_maxlink(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_LINK_MAX, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (error == 0) {
 			na->maxlink = val;
 		}
@@ -1629,7 +1629,7 @@ rfs4_fattr4_maxlink(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_LINK_MAX, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (!error && (na->maxlink != (uint32_t)val))
 			error = -1;	/* no match */
 		break;
@@ -1662,7 +1662,7 @@ rfs4_fattr4_maxname(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_NAME_MAX, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (error == 0) {
 			na->maxname = val;
 		}
@@ -1676,7 +1676,7 @@ rfs4_fattr4_maxname(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_NAME_MAX, &val,
-				sarg->cs->cr);
+				sarg->cs->cr, NULL);
 		if (!error && (na->maxname != val))
 			error = -1;	/* no match */
 		break;

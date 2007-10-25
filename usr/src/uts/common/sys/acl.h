@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/acl_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -62,7 +63,7 @@ typedef struct acl_info acl_t;
 #define	ACL_DEFAULT	(0x1000)	/* default flag */
 /* default object owner */
 #define	DEF_USER_OBJ	(ACL_DEFAULT | USER_OBJ)
-/* defalut additional users */
+/* default additional users */
 #define	DEF_USER	(ACL_DEFAULT | USER)
 /* default owning group */
 #define	DEF_GROUP_OBJ	(ACL_DEFAULT | GROUP_OBJ)
@@ -101,6 +102,7 @@ typedef struct acl_info acl_t;
 #define	ACE_SUCCESSFUL_ACCESS_ACE_FLAG	0x0010
 #define	ACE_FAILED_ACCESS_ACE_FLAG	0x0020
 #define	ACE_IDENTIFIER_GROUP		0x0040
+#define	ACE_INHERITED_ACE		0x0080
 #define	ACE_OWNER			0x1000
 #define	ACE_GROUP			0x2000
 #define	ACE_EVERYONE			0x4000
@@ -109,6 +111,44 @@ typedef struct acl_info acl_t;
 #define	ACE_ACCESS_DENIED_ACE_TYPE	0x0001
 #define	ACE_SYSTEM_AUDIT_ACE_TYPE	0x0002
 #define	ACE_SYSTEM_ALARM_ACE_TYPE	0x0003
+
+#define	ACL_AUTO_INHERIT		0x0001
+#define	ACL_PROTECTED			0x0002
+#define	ACL_DEFAULTED			0x0004
+#define	ACL_FLAGS_ALL			(ACL_AUTO_INHERIT|ACL_PROTECTED| \
+    ACL_DEFAULTED)
+
+#ifdef _KERNEL
+
+/*
+ * These are only applicable in a CIFS context.
+ */
+#define	ACE_ACCESS_ALLOWED_COMPOUND_ACE_TYPE		0x04
+#define	ACE_ACCESS_ALLOWED_OBJECT_ACE_TYPE		0x05
+#define	ACE_ACCESS_DENIED_OBJECT_ACE_TYPE		0x06
+#define	ACE_SYSTEM_AUDIT_OBJECT_ACE_TYPE		0x07
+#define	ACE_SYSTEM_ALARM_OBJECT_ACE_TYPE		0x08
+#define	ACE_ACCESS_ALLOWED_CALLBACK_ACE_TYPE		0x09
+#define	ACE_ACCESS_DENIED_CALLBACK_ACE_TYPE		0x0A
+#define	ACE_ACCESS_ALLOWED_CALLBACK_OBJECT_ACE_TYPE	0x0B
+#define	ACE_ACCESS_DENIED_CALLBACK_OBJECT_ACE_TYPE	0x0C
+#define	ACE_SYSTEM_AUDIT_CALLBACK_ACE_TYPE		0x0D
+#define	ACE_SYSTEM_ALARM_CALLBACK_ACE_TYPE		0x0E
+#define	ACE_SYSTEM_AUDIT_CALLBACK_OBJECT_ACE_TYPE	0x0F
+#define	ACE_SYSTEM_ALARM_CALLBACK_OBJECT_ACE_TYPE	0x10
+
+#define	ACE_ALL_TYPES	0x001F
+
+typedef struct ace_object {
+	uid_t		a_who;		/* uid or gid */
+	uint32_t	a_access_mask;	/* read,write,... */
+	uint16_t	a_flags;	/* see below */
+	uint16_t	a_type;		/* allow or deny */
+	uint8_t		a_obj_type[16];	/* obj type */
+	uint8_t		a_inherit_obj_type[16];  /* inherit obj */
+} ace_object_t;
+
+#endif
 
 #define	ACE_ALL_PERMS	(ACE_READ_DATA|ACE_LIST_DIRECTORY|ACE_WRITE_DATA| \
     ACE_ADD_FILE|ACE_APPEND_DATA|ACE_ADD_SUBDIRECTORY|ACE_READ_NAMED_ATTRS| \
@@ -125,7 +165,10 @@ typedef struct acl_info acl_t;
     ACE_INHERIT_ONLY_ACE | \
     ACE_IDENTIFIER_GROUP)
 
-#define	ACE_TYPE_FLAGS	(ACE_OWNER|ACE_GROUP|ACE_EVERYONE|ACE_IDENTIFIER_GROUP)
+#define	ACE_TYPE_FLAGS		(ACE_OWNER|ACE_GROUP|ACE_EVERYONE| \
+    ACE_IDENTIFIER_GROUP)
+#define	ACE_INHERIT_FLAGS	(ACE_FILE_INHERIT_ACE| \
+    ACE_DIRECTORY_INHERIT_ACE|ACE_NO_PROPAGATE_INHERIT_ACE|ACE_INHERIT_ONLY_ACE)
 
 /* cmd args to acl(2) for aclent_t  */
 #define	GETACL			1

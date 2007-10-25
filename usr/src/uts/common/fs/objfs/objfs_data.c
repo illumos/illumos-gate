@@ -455,7 +455,8 @@ objfs_create_data(vnode_t *pvp)
 
 /* ARGSUSED */
 static int
-objfs_data_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+objfs_data_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	struct module *mp;
 	timestruc_t now;
@@ -480,7 +481,8 @@ objfs_data_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 
 /* ARGSUSED */
 static int
-objfs_data_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+objfs_data_access(vnode_t *vp, int mode, int flags, cred_t *cr,
+	caller_context_t *ct)
 {
 	if (mode & (VWRITE|VEXEC))
 		return (EACCES);
@@ -490,7 +492,8 @@ objfs_data_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 
 /* ARGSUSED */
 int
-objfs_data_open(vnode_t **cpp, int flag, cred_t *cr)
+objfs_data_open(vnode_t **cpp, int flag, cred_t *cr,
+	caller_context_t *ct)
 {
 	if (flag & FWRITE)
 		return (EINVAL);
@@ -556,7 +559,7 @@ read_symtab(void *addr, size_t size, off_t offset, uio_t *uio)
 /* ARGSUSED */
 static int
 objfs_data_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr,
-    caller_context_t *ct)
+	caller_context_t *ct)
 {
 	int error = 0;
 	objfs_datanode_t *dnode = vp->v_data;
@@ -745,7 +748,8 @@ error:
 
 /* ARGSUSED */
 static int
-objfs_data_seek(vnode_t *vp, offset_t off, offset_t *offp)
+objfs_data_seek(vnode_t *vp, offset_t off, offset_t *offp,
+	caller_context_t *ct)
 {
 	return (0);
 }

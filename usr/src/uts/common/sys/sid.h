@@ -52,6 +52,8 @@ extern "C" {
 #define	SIDSYS_ID2SID	1
 
 #ifdef _KERNEL
+#define	KSIDLIST_MEM(n)	(sizeof (ksidlist_t) + ((n) - 1) * sizeof (ksid_t))
+
 /* Domains are stored in AVL trees so we can share them among SIDs */
 typedef struct ksiddomain {
 	uint_t		kd_ref;

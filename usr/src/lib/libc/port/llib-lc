@@ -31,6 +31,7 @@
 
 #include <aio.h>
 #include <alloca.h>
+#include <attr.h>
 #include <atomic.h>
 #include <ctype.h>
 #include <deflt.h>

@@ -142,7 +142,7 @@ specvp(
 	 * been required if the snode is in the cache.
 	 */
 	va.va_mask = AT_FSID | AT_TIMES;
-	rc = VOP_GETATTR(vp, &va, 0, cr);	/* XXX may block! */
+	rc = VOP_GETATTR(vp, &va, 0, cr, NULL);	/* XXX may block! */
 
 	mutex_enter(&stable_lock);
 	if ((sp = sfind(dev, type, vp)) == NULL) {
@@ -465,7 +465,7 @@ devi_stillreferenced(dev_info_t *dip)
 /*
  * Given an snode, returns the open count and the dip
  * associated with that snode
- * Assumes the caller holds the approriate locks
+ * Assumes the caller holds the appropriate locks
  * to prevent snode and/or dip from going away.
  * Returns:
  *	-1	No associated dip
@@ -862,7 +862,7 @@ device_close(struct vnode *vp, int flag, struct cred *cr)
 		 * can, for example, change floppy disks.
 		 */
 		(void) spec_putpage(cvp, (offset_t)0,
-		    (size_t)0, B_INVAL|B_FORCE, cr);
+		    (size_t)0, B_INVAL|B_FORCE, cr, NULL);
 		bflush(dev);
 		binval(dev);
 		error = dev_close(dev, flag, OTYP_BLK, cr);

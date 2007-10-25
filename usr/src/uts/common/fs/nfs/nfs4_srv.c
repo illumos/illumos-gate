@@ -922,7 +922,8 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 	/*
 	 * Get the vnode for the component "nm".
 	 */
-	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cs->cr);
+	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cs->cr,
+	    NULL, NULL, NULL);
 	if (error)
 		return (puterrno4(error));
 
@@ -1253,7 +1254,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * as well be reflected to the server during the open.
 	 */
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		return;
@@ -1283,7 +1284,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	if (args->access & ACCESS4_READ) {
-		error = VOP_ACCESS(vp, VREAD, 0, cr);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode) &&
 		    (!is_system_labeled() || admin_low_client ||
 		    bldominates(clabel, slabel)))
@@ -1291,7 +1292,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->supported |= ACCESS4_READ;
 	}
 	if ((args->access & ACCESS4_LOOKUP) && vp->v_type == VDIR) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (!error && (!is_system_labeled() || admin_low_client ||
 		    bldominates(clabel, slabel)))
 			resp->access |= ACCESS4_LOOKUP;
@@ -1299,7 +1300,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 	if (checkwriteperm &&
 	    (args->access & (ACCESS4_MODIFY|ACCESS4_EXTEND))) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode) &&
 		    (!is_system_labeled() || admin_low_client ||
 		    blequal(clabel, slabel)))
@@ -1310,14 +1311,14 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (checkwriteperm &&
 	    (args->access & ACCESS4_DELETE) && vp->v_type == VDIR) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (!error && (!is_system_labeled() || admin_low_client ||
 		    blequal(clabel, slabel)))
 			resp->access |= ACCESS4_DELETE;
 		resp->supported |= ACCESS4_DELETE;
 	}
 	if (args->access & ACCESS4_EXECUTE && vp->v_type != VDIR) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (!error && !MANDLOCK(vp, va.va_mode) &&
 		    (!is_system_labeled() || admin_low_client ||
 		    bldominates(clabel, slabel)))
@@ -1358,7 +1359,7 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	va.va_mask = AT_UID;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -1383,14 +1384,14 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	if (crgetuid(cr) != va.va_uid &&
-	    (error = VOP_ACCESS(vp, VWRITE, 0, cs->cr))) {
+	    (error = VOP_ACCESS(vp, VWRITE, 0, cs->cr, NULL))) {
 		*cs->statusp = resp->status = puterrno4(error);
 		return;
 	}
 
-	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr);
+	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
 	if (!error)
-		error = VOP_FSYNC(vp, FNODSYNC, cr);
+		error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -1455,7 +1456,7 @@ do_rfs4_op_mknod(CREATE4args *args, CREATE4res *resp, struct svc_req *req,
 
 	mode = 0;
 
-	error = VOP_CREATE(dvp, nm, vap, excl, mode, &vp, cr, 0);
+	error = VOP_CREATE(dvp, nm, vap, excl, mode, &vp, cr, 0, NULL, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		return (NULL);
@@ -1571,7 +1572,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	/* Get "before" change value */
 	bva.va_mask = AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(dvp, &bva, 0, cr);
+	error = VOP_GETATTR(dvp, &bva, 0, cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(nm, len);
@@ -1604,7 +1605,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			vap->va_mode = 0700;	/* default: owner rwx only */
 			vap->va_mask |= AT_MODE;
 		}
-		error = VOP_MKDIR(dvp, nm, vap, &vp, cr);
+		error = VOP_MKDIR(dvp, nm, vap, &vp, cr, NULL, 0, NULL);
 		if (error)
 			break;
 
@@ -1613,7 +1614,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		 * set to zero
 		 */
 		iva.va_mask = AT_SEQ;
-		if (VOP_GETATTR(dvp, &iva, 0, cs->cr))
+		if (VOP_GETATTR(dvp, &iva, 0, cs->cr, NULL))
 			iva.va_seq = 0;
 		break;
 	case NF4LNK:
@@ -1645,7 +1646,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			return;
 		}
 
-		error = VOP_SYMLINK(dvp, nm, vap, lnm, cr);
+		error = VOP_SYMLINK(dvp, nm, vap, lnm, cr, NULL, 0);
 		if (lnm != NULL)
 			kmem_free(lnm, llen);
 		if (error)
@@ -1656,10 +1657,11 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		 * set to zero
 		 */
 		iva.va_mask = AT_SEQ;
-		if (VOP_GETATTR(dvp, &iva, 0, cs->cr))
+		if (VOP_GETATTR(dvp, &iva, 0, cs->cr, NULL))
 			iva.va_seq = 0;
 
-		error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr);
+		error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr,
+		    NULL, NULL, NULL);
 		if (error)
 			break;
 
@@ -1668,7 +1670,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		 * if it has changed zero out iva to force atomic = FALSE.
 		 */
 		iva2.va_mask = AT_SEQ;
-		if (VOP_GETATTR(dvp, &iva2, 0, cs->cr) ||
+		if (VOP_GETATTR(dvp, &iva2, 0, cs->cr, NULL) ||
 		    iva2.va_seq != iva.va_seq)
 			iva.va_seq = 0;
 		break;
@@ -1698,7 +1700,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		 * set to zero
 		 */
 		iva.va_mask = AT_SEQ;
-		if (VOP_GETATTR(dvp, &iva, 0, cs->cr))
+		if (VOP_GETATTR(dvp, &iva, 0, cs->cr, NULL))
 			iva.va_seq = 0;
 
 		break;
@@ -1712,7 +1714,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	if (resp->status != NFS4_OK) {
 		if (vp != NULL)
@@ -1728,7 +1730,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * before value.
 	 */
 	ava.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(dvp, &ava, 0, cr)) {
+	if (VOP_GETATTR(dvp, &ava, 0, cr, NULL)) {
 		ava.va_ctime = bva.va_ctime;
 		ava.va_seq = 0;
 	}
@@ -1774,7 +1776,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	else
 		resp->cinfo.atomic = FALSE;
 
-	(void) VOP_FSYNC(vp, syncval, cr);
+	(void) VOP_FSYNC(vp, syncval, cr, NULL);
 
 	if (resp->status != NFS4_OK) {
 		VN_RELE(vp);
@@ -2357,7 +2359,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	/* Get "before" change value */
 	bdva.va_mask = AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(dvp, &bdva, 0, cs->cr);
+	error = VOP_GETATTR(dvp, &bdva, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(nm, len);
@@ -2366,7 +2368,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	NFS4_SET_FATTR4_CHANGE(resp->cinfo.before, bdva.va_ctime)
 
-	error = VOP_LINK(dvp, vp, nm, cs->cr);
+	error = VOP_LINK(dvp, vp, nm, cs->cr, NULL, 0);
 
 	kmem_free(nm, len);
 
@@ -2374,14 +2376,14 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Get the initial "after" sequence number, if it fails, set to zero
 	 */
 	idva.va_mask = AT_SEQ;
-	if (VOP_GETATTR(dvp, &idva, 0, cs->cr))
+	if (VOP_GETATTR(dvp, &idva, 0, cs->cr, NULL))
 		idva.va_seq = 0;
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cs->cr);
-	(void) VOP_FSYNC(dvp, 0, cs->cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cs->cr, NULL);
+	(void) VOP_FSYNC(dvp, 0, cs->cr, NULL);
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -2393,7 +2395,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * before value.
 	 */
 	adva.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(dvp, &adva, 0, cs->cr)) {
+	if (VOP_GETATTR(dvp, &adva, 0, cs->cr, NULL)) {
 		adva.va_ctime = bdva.va_ctime;
 		adva.va_seq = 0;
 	}
@@ -2484,7 +2486,8 @@ do_rfs4_op_lookup(char *nm, uint_t buflen, struct svc_req *req,
 		}
 	}
 
-	error = VOP_LOOKUP(cs->vp, nm, &vp, NULL, 0, NULL, cs->cr);
+	error = VOP_LOOKUP(cs->vp, nm, &vp, NULL, 0, NULL, cs->cr,
+	    NULL, NULL, NULL);
 	if (error)
 		return (puterrno4(error));
 
@@ -2806,14 +2809,15 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * checks from copen).
 	 */
 
-	if ((cs->vp->v_vfsp->vfs_flag & VFS_XATTR) == 0) {
+	if ((cs->vp->v_vfsp->vfs_flag & VFS_XATTR) == 0 &&
+	    !vfs_has_feature(cs->vp->v_vfsp, VFSFT_XVATTR)) {
 		error = ENOTSUP;
 		goto error_out;
 	}
 
-	if ((VOP_ACCESS(cs->vp, VREAD, 0, cs->cr) != 0) &&
-	    (VOP_ACCESS(cs->vp, VWRITE, 0, cs->cr) != 0) &&
-	    (VOP_ACCESS(cs->vp, VEXEC, 0, cs->cr) != 0)) {
+	if ((VOP_ACCESS(cs->vp, VREAD, 0, cs->cr, NULL) != 0) &&
+	    (VOP_ACCESS(cs->vp, VWRITE, 0, cs->cr, NULL) != 0) &&
+	    (VOP_ACCESS(cs->vp, VEXEC, 0, cs->cr, NULL) != 0)) {
 		error = EACCES;
 		goto error_out;
 	}
@@ -2835,7 +2839,8 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (args->createdir && ! (exp_ro = rdonly4(cs->exi, cs->vp, req)))
 		lookup_flags |= CREATE_XATTR_DIR;
 
-	error = VOP_LOOKUP(cs->vp, "", &avp, NULL, lookup_flags, NULL, cs->cr);
+	error = VOP_LOOKUP(cs->vp, "", &avp, NULL, lookup_flags, NULL, cs->cr,
+	    NULL, NULL, NULL);
 
 	if (error) {
 		if (error == ENOENT && args->createdir && exp_ro)
@@ -2873,12 +2878,12 @@ error_out:
 }
 
 static int
-do_io(int direction, vnode_t *vp, struct uio *uio, int ioflag, cred_t *cred)
+do_io(int direction, vnode_t *vp, struct uio *uio, int ioflag, cred_t *cred,
+    caller_context_t *ct)
 {
 	int error;
 	int i;
 	clock_t delaytime;
-	caller_context_t ct;
 
 	delaytime = MSEC_TO_TICK_ROUNDUP(rfs4_lock_delay);
 
@@ -2888,21 +2893,17 @@ do_io(int direction, vnode_t *vp, struct uio *uio, int ioflag, cred_t *cred)
 	 */
 	uio->uio_fmode = FNONBLOCK;
 
-	ct.cc_sysid = 0;
-	ct.cc_pid = 0;
-	ct.cc_caller_id = nfs4_srv_caller_id;
-
 	for (i = 0; i < rfs4_maxlock_tries; i++) {
 
 
 		if (direction == FREAD) {
-			(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &ct);
-			error = VOP_READ(vp, uio, ioflag, cred, &ct);
-			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
+			(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, ct);
+			error = VOP_READ(vp, uio, ioflag, cred, ct);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, ct);
 		} else {
-			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
-			error = VOP_WRITE(vp, uio, ioflag, cred, &ct);
-			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
+			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, ct);
+			error = VOP_WRITE(vp, uio, ioflag, cred, ct);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, ct);
 		}
 
 		if (error != EAGAIN)
@@ -2936,6 +2937,7 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int in_crit = 0;
 	mblk_t *mp;
 	int alloc_err = 0;
+	caller_context_t ct;
 
 	vp = cs->vp;
 	if (vp == NULL) {
@@ -2947,6 +2949,12 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		return;
 	}
 
+	if ((stat = rfs4_check_stateid(FREAD, vp, &args->stateid, FALSE,
+	    deleg, TRUE, &ct)) != NFS4_OK) {
+		*cs->statusp = resp->status = stat;
+		goto out;
+	}
+
 	/*
 	 * Enter the critical region before calling VOP_RWLOCK
 	 * to avoid a deadlock with write requests.
@@ -2954,20 +2962,21 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (nbl_need_check(vp)) {
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
-		if (nbl_conflict(vp, NBL_READ, args->offset, args->count, 0)) {
+		if (nbl_conflict(vp, NBL_READ, args->offset, args->count, 0,
+		    &ct)) {
 			*cs->statusp = resp->status = NFS4ERR_LOCKED;
 			goto out;
 		}
 	}
 
 	if ((stat = rfs4_check_stateid(FREAD, vp, &args->stateid, FALSE,
-	    deleg, TRUE)) != NFS4_OK) {
+	    deleg, TRUE, &ct)) != NFS4_OK) {
 		*cs->statusp = resp->status = stat;
 		goto out;
 	}
 
 	va.va_mask = AT_MODE|AT_SIZE|AT_UID;
-	verror = VOP_GETATTR(vp, &va, 0, cs->cr);
+	verror = VOP_GETATTR(vp, &va, 0, cs->cr, &ct);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -2985,8 +2994,8 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	if (crgetuid(cs->cr) != va.va_uid &&
-	    (error = VOP_ACCESS(vp, VREAD, 0, cs->cr)) &&
-	    (error = VOP_ACCESS(vp, VEXEC, 0, cs->cr))) {
+	    (error = VOP_ACCESS(vp, VREAD, 0, cs->cr, &ct)) &&
+	    (error = VOP_ACCESS(vp, VEXEC, 0, cs->cr, &ct))) {
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
@@ -3051,10 +3060,10 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uio.uio_loffset = args->offset;
 	uio.uio_resid = args->count;
 
-	error = do_io(FREAD, vp, &uio, 0, cs->cr);
+	error = do_io(FREAD, vp, &uio, 0, cs->cr, &ct);
 
 	va.va_mask = AT_SIZE;
-	verror = VOP_GETATTR(vp, &va, 0, cs->cr);
+	verror = VOP_GETATTR(vp, &va, 0, cs->cr, &ct);
 
 	if (error) {
 		freeb(mp);
@@ -3477,7 +3486,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cs->cr);
+	error = VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		return;
@@ -3499,7 +3508,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	uio.uio_loffset = 0;
 	uio.uio_resid = MAXPATHLEN;
 
-	error = VOP_READLINK(vp, &uio, cs->cr);
+	error = VOP_READLINK(vp, &uio, cs->cr, NULL);
 
 	if (error) {
 		kmem_free((caddr_t)data, (uint_t)MAXPATHLEN + 1);
@@ -3683,7 +3692,8 @@ rfs4_lookup_and_findfile(vnode_t *dvp, char *nm, vnode_t **vpp,
 	if (vpp)
 		*vpp = NULL;
 
-	if ((error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr)) == 0) {
+	if ((error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cr, NULL, NULL,
+	    NULL)) == 0) {
 		if (vp->v_type == VREG)
 			fp = rfs4_findfile(vp, NULL, &fcreate);
 		if (vpp)
@@ -3799,7 +3809,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (nbl_need_check(vp)) {
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
-		if (nbl_conflict(vp, NBL_REMOVE, 0, 0, 0)) {
+		if (nbl_conflict(vp, NBL_REMOVE, 0, 0, 0, NULL)) {
 			*cs->statusp = resp->status = NFS4ERR_FILE_OPEN;
 			kmem_free(nm, len);
 			nbl_end_crit(vp);
@@ -3837,7 +3847,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	/* Get dir "before" change value */
 	bdva.va_mask = AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(dvp, &bdva, 0, cs->cr);
+	error = VOP_GETATTR(dvp, &bdva, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(nm, len);
@@ -3860,12 +3870,12 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			 * NFS4ERR_EXIST to NFS4ERR_NOTEMPTY to
 			 * transmit over the wire.
 			 */
-			if ((error = VOP_RMDIR(dvp, nm, rootdir, cs->cr))
-			    == EEXIST)
+			if ((error = VOP_RMDIR(dvp, nm, rootdir, cs->cr,
+			    NULL, 0)) == EEXIST)
 				error = ENOTEMPTY;
 		}
 	} else {
-		if ((error = VOP_REMOVE(dvp, nm, cs->cr)) == 0 &&
+		if ((error = VOP_REMOVE(dvp, nm, cs->cr, NULL, 0)) == 0 &&
 		    fp != NULL) {
 			struct vattr va;
 			vnode_t *tvp;
@@ -3882,7 +3892,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 				 * manipulating dvp.
 				 */
 				va.va_mask = AT_NLINK;
-				if (!VOP_GETATTR(tvp, &va, 0, cs->cr) &&
+				if (!VOP_GETATTR(tvp, &va, 0, cs->cr, NULL) &&
 				    va.va_nlink == 0) {
 					/* Remove state on file remove */
 					if (in_crit) {
@@ -3915,20 +3925,20 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Get the initial "after" sequence number, if it fails, set to zero
 	 */
 	idva.va_mask = AT_SEQ;
-	if (VOP_GETATTR(dvp, &idva, 0, cs->cr))
+	if (VOP_GETATTR(dvp, &idva, 0, cs->cr, NULL))
 		idva.va_seq = 0;
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(dvp, 0, cs->cr);
+	(void) VOP_FSYNC(dvp, 0, cs->cr, NULL);
 
 	/*
 	 * Get "after" change value, if it fails, simply return the
 	 * before value.
 	 */
 	adva.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(dvp, &adva, 0, cs->cr)) {
+	if (VOP_GETATTR(dvp, &adva, 0, cs->cr, NULL)) {
 		adva.va_ctime = bdva.va_ctime;
 		adva.va_seq = 0;
 	}
@@ -4120,7 +4130,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (nbl_need_check(srcvp)) {
 		nbl_start_crit(srcvp, RW_READER);
 		in_crit_src = 1;
-		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0)) {
+		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0, NULL)) {
 			*cs->statusp = resp->status = NFS4ERR_FILE_OPEN;
 			goto err_out;
 		}
@@ -4129,7 +4139,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (targvp && nbl_need_check(targvp)) {
 		nbl_start_crit(targvp, RW_READER);
 		in_crit_targ = 1;
-		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0)) {
+		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0, NULL)) {
 			*cs->statusp = resp->status = NFS4ERR_FILE_OPEN;
 			goto err_out;
 		}
@@ -4137,10 +4147,10 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	/* Get source "before" change value */
 	obdva.va_mask = AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(odvp, &obdva, 0, cs->cr);
+	error = VOP_GETATTR(odvp, &obdva, 0, cs->cr, NULL);
 	if (!error) {
 		nbdva.va_mask = AT_CTIME|AT_SEQ;
-		error = VOP_GETATTR(ndvp, &nbdva, 0, cs->cr);
+		error = VOP_GETATTR(ndvp, &nbdva, 0, cs->cr, NULL);
 	}
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -4150,7 +4160,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	NFS4_SET_FATTR4_CHANGE(resp->source_cinfo.before, obdva.va_ctime)
 	NFS4_SET_FATTR4_CHANGE(resp->target_cinfo.before, nbdva.va_ctime)
 
-	if ((error = VOP_RENAME(odvp, onm, ndvp, nnm, cs->cr)) == 0 &&
+	if ((error = VOP_RENAME(odvp, onm, ndvp, nnm, cs->cr, NULL, 0)) == 0 &&
 	    fp != NULL) {
 		struct vattr va;
 		vnode_t *tvp;
@@ -4163,7 +4173,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 		if (tvp) {
 			va.va_mask = AT_NLINK;
-			if (!VOP_GETATTR(tvp, &va, 0, cs->cr) &&
+			if (!VOP_GETATTR(tvp, &va, 0, cs->cr, NULL) &&
 			    va.va_nlink == 0) {
 				/* The file is gone and so should the state */
 				if (in_crit_targ) {
@@ -4213,18 +4223,18 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * Get the initial "after" sequence number, if it fails, set to zero
 	 */
 	oidva.va_mask = AT_SEQ;
-	if (VOP_GETATTR(odvp, &oidva, 0, cs->cr))
+	if (VOP_GETATTR(odvp, &oidva, 0, cs->cr, NULL))
 		oidva.va_seq = 0;
 
 	nidva.va_mask = AT_SEQ;
-	if (VOP_GETATTR(ndvp, &nidva, 0, cs->cr))
+	if (VOP_GETATTR(ndvp, &nidva, 0, cs->cr, NULL))
 		nidva.va_seq = 0;
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(odvp, 0, cs->cr);
-	(void) VOP_FSYNC(ndvp, 0, cs->cr);
+	(void) VOP_FSYNC(odvp, 0, cs->cr, NULL);
+	(void) VOP_FSYNC(ndvp, 0, cs->cr, NULL);
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
@@ -4236,13 +4246,13 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 * before value.
 	 */
 	oadva.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(odvp, &oadva, 0, cs->cr)) {
+	if (VOP_GETATTR(odvp, &oadva, 0, cs->cr, NULL)) {
 		oadva.va_ctime = obdva.va_ctime;
 		oadva.va_seq = 0;
 	}
 
 	nadva.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(odvp, &nadva, 0, cs->cr)) {
+	if (VOP_GETATTR(odvp, &nadva, 0, cs->cr, NULL)) {
 		nadva.va_ctime = nbdva.va_ctime;
 		nadva.va_seq = 0;
 	}
@@ -4282,7 +4292,8 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		/*
 		 * Already know that nnm will be a valid string
 		 */
-		error = VOP_LOOKUP(ndvp, nnm, &vp, NULL, 0, NULL, cs->cr);
+		error = VOP_LOOKUP(ndvp, nnm, &vp, NULL, 0, NULL, cs->cr,
+		    NULL, NULL, NULL);
 		kmem_free(nnm, nlen);
 		if (!error) {
 			add_volrnm_fh(cs->exi, vp);
@@ -4435,7 +4446,7 @@ rfs4_verify_attr(struct nfs4_svgetit_arg *sargp,
 		 * on the incoming values.
 		 */
 		ret_error = VOP_GETATTR(sargp->cs->vp, sargp->vap, 0,
-		    sargp->cs->cr);
+		    sargp->cs->cr, NULL);
 		if (ret_error) {
 			if (resp == NULL)
 				return (ret_error);
@@ -4710,7 +4721,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		vattr_t va;
 
 		va.va_mask = AT_MODE;
-		error = VOP_GETATTR(vp, &va, 0, cs->cr);
+		error = VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 		if (error) {
 			status = puterrno4(error);
 			goto done;
@@ -4726,14 +4737,14 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 	if (sarg.vap->va_mask & AT_SIZE) {
 		trunc = (sarg.vap->va_size == 0);
 		status = rfs4_check_stateid(FWRITE, cs->vp, stateid,
-		    trunc, &cs->deleg, sarg.vap->va_mask & AT_SIZE);
+		    trunc, &cs->deleg, sarg.vap->va_mask & AT_SIZE, &ct);
 		if (status != NFS4_OK)
 			goto done;
+	} else {
+		ct.cc_sysid = 0;
+		ct.cc_pid = 0;
+		ct.cc_caller_id = nfs4_srv_caller_id;
 	}
-
-	ct.cc_sysid = 0;
-	ct.cc_pid = 0;
-	ct.cc_caller_id = nfs4_srv_caller_id;
 
 	/* XXX start of possible race with delegations */
 
@@ -4776,7 +4787,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		}
 
 		bva.va_mask = AT_UID|AT_SIZE;
-		if (error = VOP_GETATTR(vp, &bva, 0, cr)) {
+		if (error = VOP_GETATTR(vp, &bva, 0, cr, &ct)) {
 			status = puterrno4(error);
 			goto done;
 		}
@@ -4789,7 +4800,8 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 				offset = bva.va_size;
 				length = sarg.vap->va_size - bva.va_size;
 			}
-			if (nbl_conflict(vp, NBL_WRITE, offset, length, 0)) {
+			if (nbl_conflict(vp, NBL_WRITE, offset, length, 0,
+			    &ct)) {
 				status = NFS4ERR_LOCKED;
 				goto done;
 			}
@@ -4857,7 +4869,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		/*
 		 * Force modified metadata out to stable storage.
 		 */
-		(void) VOP_FSYNC(vp, FNODSYNC, cr);
+		(void) VOP_FSYNC(vp, FNODSYNC, cr, &ct);
 		/*
 		 * Set response bitmap
 		 */
@@ -5067,6 +5079,7 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	bool_t *deleg = &cs->deleg;
 	nfsstat4 stat;
 	int in_crit = 0;
+	caller_context_t ct;
 
 	vp = cs->vp;
 	if (vp == NULL) {
@@ -5080,6 +5093,12 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	cr = cs->cr;
 
+	if ((stat = rfs4_check_stateid(FWRITE, vp, &args->stateid, FALSE,
+	    deleg, TRUE, &ct)) != NFS4_OK) {
+		*cs->statusp = resp->status = stat;
+		goto out;
+	}
+
 	/*
 	 * We have to enter the critical region before calling VOP_RWLOCK
 	 * to avoid a deadlock with ufs.
@@ -5088,20 +5107,14 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
 		if (nbl_conflict(vp, NBL_WRITE,
-		    args->offset, args->data_len, 0)) {
+		    args->offset, args->data_len, 0, &ct)) {
 			*cs->statusp = resp->status = NFS4ERR_LOCKED;
 			goto out;
 		}
 	}
 
-	if ((stat = rfs4_check_stateid(FWRITE, vp, &args->stateid, FALSE,
-	    deleg, TRUE)) != NFS4_OK) {
-		*cs->statusp = resp->status = stat;
-		goto out;
-	}
-
 	bva.va_mask = AT_MODE | AT_UID;
-	error = VOP_GETATTR(vp, &bva, 0, cr);
+	error = VOP_GETATTR(vp, &bva, 0, cr, &ct);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -5124,7 +5137,7 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 
 	if (crgetuid(cr) != bva.va_uid &&
-	    (error = VOP_ACCESS(vp, VWRITE, 0, cr))) {
+	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, &ct))) {
 		*cs->statusp = resp->status = puterrno4(error);
 		goto out;
 	}
@@ -5210,7 +5223,7 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	savecred = curthread->t_cred;
 	curthread->t_cred = cr;
-	error = do_io(FWRITE, vp, &uio, ioflag, cr);
+	error = do_io(FWRITE, vp, &uio, ioflag, cr, &ct);
 	curthread->t_cred = savecred;
 
 	if (iovp != iov)
@@ -5478,6 +5491,8 @@ static void lock_print(char *str, int operation, struct flock64 *flk)
 		break;
 	case F_SETLK: op = "F_SETLK";
 		break;
+	case F_SETLK_NBMAND: op = "F_SETLK_NBMAND";
+		break;
 	default: op = "F_UNKNOWN";
 		break;
 	}
@@ -5562,7 +5577,7 @@ rfs4_lookupfile(component4 *component, struct svc_req *req,
 
 	/* Get "before" change value */
 	bva.va_mask = AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(dvp, &bva, 0, cs->cr);
+	error = VOP_GETATTR(dvp, &bva, 0, cs->cr, NULL);
 	if (error)
 		return (puterrno4(error));
 
@@ -5580,7 +5595,7 @@ rfs4_lookupfile(component4 *component, struct svc_req *req,
 	 * before value.
 	 */
 	ava.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(dvp, &ava, 0, cs->cr)) {
+	if (VOP_GETATTR(dvp, &ava, 0, cs->cr, NULL)) {
 		ava.va_ctime = bva.va_ctime;
 		ava.va_seq = 0;
 	}
@@ -5590,7 +5605,7 @@ rfs4_lookupfile(component4 *component, struct svc_req *req,
 	 * Validate the file is a file
 	 */
 	fva.va_mask = AT_TYPE|AT_MODE;
-	error = VOP_GETATTR(cs->vp, &fva, 0, cs->cr);
+	error = VOP_GETATTR(cs->vp, &fva, 0, cs->cr, NULL);
 	if (error)
 		return (puterrno4(error));
 
@@ -5638,7 +5653,7 @@ tryagain:
 	 */
 
 	*created = TRUE;
-	error = VOP_CREATE(dvp, nm, vap, EXCL, VWRITE, vpp, cr, 0);
+	error = VOP_CREATE(dvp, nm, vap, EXCL, VWRITE, vpp, cr, 0, NULL, NULL);
 
 	if (error) {
 		*created = FALSE;
@@ -5659,7 +5674,8 @@ tryagain:
 			status = puterrno4(error);
 			return (status);
 		}
-		error = VOP_LOOKUP(dvp, nm, vpp, NULL, 0, NULL, cr);
+		error = VOP_LOOKUP(dvp, nm, vpp, NULL, 0, NULL, cr,
+		    NULL, NULL, NULL);
 
 		if (error) {
 			/*
@@ -5693,7 +5709,7 @@ tryagain:
 		/* Check for duplicate request */
 		ASSERT(mtime != 0);
 		va.va_mask = AT_MTIME;
-		error = VOP_GETATTR(*vpp, &va, 0, cr);
+		error = VOP_GETATTR(*vpp, &va, 0, cr, NULL);
 		if (!error) {
 			/* We found the file */
 			if (va.va_mtime.tv_sec != mtime->tv_sec ||
@@ -5740,14 +5756,14 @@ check_open_access(uint32_t access,
 		return (NFS4ERR_ROFS);
 
 	if (access & OPEN4_SHARE_ACCESS_READ) {
-		if ((VOP_ACCESS(vp, VREAD, 0, cr) != 0) &&
-		    (VOP_ACCESS(vp, VEXEC, 0, cr) != 0)) {
+		if ((VOP_ACCESS(vp, VREAD, 0, cr, NULL) != 0) &&
+		    (VOP_ACCESS(vp, VEXEC, 0, cr, NULL) != 0)) {
 			return (NFS4ERR_ACCESS);
 		}
 	}
 
 	if (access & OPEN4_SHARE_ACCESS_WRITE) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (error)
 			return (NFS4ERR_ACCESS);
 	}
@@ -5821,7 +5837,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	}
 
 	bva.va_mask = AT_TYPE|AT_CTIME|AT_SEQ;
-	error = VOP_GETATTR(dvp, &bva, 0, cs->cr);
+	error = VOP_GETATTR(dvp, &bva, 0, cs->cr, NULL);
 	if (error) {
 		kmem_free(nm, buflen);
 		return (puterrno4(error));
@@ -5968,7 +5984,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	 * set to zero, time to before.
 	 */
 	iva.va_mask = AT_CTIME|AT_SEQ;
-	if (VOP_GETATTR(dvp, &iva, 0, cs->cr)) {
+	if (VOP_GETATTR(dvp, &iva, 0, cs->cr, NULL)) {
 		iva.va_seq = 0;
 		iva.va_ctime = bva.va_ctime;
 	}
@@ -5992,14 +6008,14 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 		 * The entry was created, we need to sync the
 		 * directory metadata.
 		 */
-		(void) VOP_FSYNC(dvp, 0, cs->cr);
+		(void) VOP_FSYNC(dvp, 0, cs->cr, NULL);
 
 		/*
 		 * Get "after" change value, if it fails, simply return the
 		 * before value.
 		 */
 		ava.va_mask = AT_CTIME|AT_SEQ;
-		if (VOP_GETATTR(dvp, &ava, 0, cs->cr)) {
+		if (VOP_GETATTR(dvp, &ava, 0, cs->cr, NULL)) {
 			ava.va_ctime = bva.va_ctime;
 			ava.va_seq = 0;
 		}
@@ -6027,7 +6043,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	/* Assume the worst */
 	cs->mandlock = TRUE;
 
-	if (VOP_GETATTR(vp, &cva, 0, cs->cr) == 0) {
+	if (VOP_GETATTR(vp, &cva, 0, cs->cr, NULL) == 0) {
 		cs->mandlock = MANDLOCK(cs->vp, cva.va_mode);
 
 		/*
@@ -6065,7 +6081,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 
 				nbl_start_crit(vp, RW_READER);
 				if (nbl_conflict(vp, NBL_WRITE, 0,
-				    cva.va_size, 0)) {
+				    cva.va_size, 0, NULL)) {
 					in_crit = 0;
 					nbl_end_crit(vp);
 					VN_RELE(vp);
@@ -6090,7 +6106,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cs->cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cs->cr, NULL);
 
 	if (error) {
 		VN_RELE(vp);
@@ -6127,7 +6143,7 @@ static void
 rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		rfs4_openowner_t *oo, delegreq_t deleg,
 		uint32_t access, uint32_t deny,
-		OPEN4res *resp)
+		OPEN4res *resp, int deleg_cur)
 {
 	/* XXX Currently not using req  */
 	rfs4_state_t *state;
@@ -6141,9 +6157,11 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	struct shr_locowner shr_loco;
 	sysid_t sysid;
 	nfsstat4 status;
+	caller_context_t ct;
 	int fflags = 0;
 	int recall = 0;
 	int err;
+	int cmd;
 
 	/* get the file struct and hold a lock on it during initial open */
 	file = rfs4_findfile_withlock(cs->vp, &cs->fh, &fcreate);
@@ -6175,6 +6193,12 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		return;
 	}
 
+	/* Calculate the fflags for this OPEN. */
+	if (access & OPEN4_SHARE_ACCESS_READ)
+		fflags |= FREAD;
+	if (access & OPEN4_SHARE_ACCESS_WRITE)
+		fflags |= FWRITE;
+
 	/*
 	 * Calculate the new deny and access mode that this open is adding to
 	 * the file for this open owner;
@@ -6203,13 +6227,8 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		shr.s_owner = (caddr_t)&shr_loco;
 		shr.s_own_len = sizeof (shr_loco);
 
-		fflags = 0;
-		if (access & OPEN4_SHARE_ACCESS_READ)
-			fflags |= FREAD;
-		if (access & OPEN4_SHARE_ACCESS_WRITE)
-			fflags |= FWRITE;
-
-		if ((err = vop_shrlock(cs->vp, F_SHARE, &shr, fflags)) != 0) {
+		cmd = nbl_need_check(cs->vp) ? F_SHARE_NBMAND : F_SHARE;
+		if ((err = vop_shrlock(cs->vp, cmd, &shr, fflags)) != 0) {
 
 			resp->status = err == EAGAIN ?
 			    NFS4ERR_SHARE_DENIED : puterrno4(err);
@@ -6243,12 +6262,6 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 			rfs4_dbe_unlock(state->dbe);
 			rfs4_file_rele(file);
 			rfs4_update_lease(state->owner->client);
-			/* recalculate flags to match what was added */
-			fflags = 0;
-			if (amodes & OPEN4_SHARE_ACCESS_READ)
-				fflags |= FREAD;
-			if (amodes & OPEN4_SHARE_ACCESS_WRITE)
-				fflags |= FWRITE;
 			(void) vop_shrlock(cs->vp, F_UNSHARE, &shr, fflags);
 			/* Not a fully formed open; "close" it */
 			if (screate == TRUE)
@@ -6257,6 +6270,49 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 			resp->status = NFS4ERR_DELAY;
 			return;
 		}
+	}
+	/*
+	 * the share check passed and any delegation conflict has been
+	 * taken care of, now call vop_open.
+	 * if this is the first open then call vop_open with fflags.
+	 * if not, call vn_open_upgrade with just the upgrade flags.
+	 *
+	 * if the file has been opened already, it will have the current
+	 * access mode in the state struct.  if it has no share access, then
+	 * this is a new open.
+	 *
+	 * However, if this is open with CLAIM_DLEGATE_CUR, then don't
+	 * call VOP_OPEN(), just do the open upgrade.
+	 */
+	if (((state->share_access & OPEN4_SHARE_ACCESS_BOTH) == 0) &&
+	    !deleg_cur) {
+		ct.cc_sysid = sysid;
+		ct.cc_pid = shr.s_pid;
+		ct.cc_caller_id = nfs4_srv_caller_id;
+		err = VOP_OPEN(&cs->vp, fflags, cs->cr, &ct);
+		if (err) {
+			rfs4_dbe_unlock(file->dbe);
+			rfs4_dbe_unlock(state->dbe);
+			rfs4_file_rele(file);
+			(void) vop_shrlock(cs->vp, F_UNSHARE, &shr, fflags);
+			/* Not a fully formed open; "close" it */
+			if (screate == TRUE)
+				rfs4_state_close(state, FALSE, FALSE, cs->cr);
+			rfs4_state_rele(state);
+			resp->status = NFS4ERR_SERVERFAULT;
+			return;
+		}
+	} else { /* open upgrade */
+		/*
+		 * calculate the fflags for the new mode that is being added
+		 * by this upgrade.
+		 */
+		fflags = 0;
+		if (amodes & OPEN4_SHARE_ACCESS_READ)
+			fflags |= FREAD;
+		if (amodes & OPEN4_SHARE_ACCESS_WRITE)
+			fflags |= FWRITE;
+		vn_open_upgrade(cs->vp, fflags);
 	}
 
 	if (dmodes & OPEN4_SHARE_DENY_READ)
@@ -6328,7 +6384,7 @@ rfs4_do_opennull(struct compound_state *cs, struct svc_req *req,
 		/* cs->vp cs->fh now reference the desired file */
 
 		rfs4_do_open(cs, req, oo, DELEG_ANY, args->share_access,
-		    args->share_deny, resp);
+		    args->share_deny, resp, 0);
 
 		/*
 		 * If rfs4_createfile set attrset, we must
@@ -6367,7 +6423,7 @@ rfs4_do_openprev(struct compound_state *cs, struct svc_req *req,
 	}
 
 	va.va_mask = AT_MODE|AT_UID;
-	error = VOP_GETATTR(cs->vp, &va, 0, cs->cr);
+	error = VOP_GETATTR(cs->vp, &va, 0, cs->cr, NULL);
 	if (error) {
 		resp->status = puterrno4(error);
 		return;
@@ -6398,7 +6454,7 @@ rfs4_do_openprev(struct compound_state *cs, struct svc_req *req,
 
 	rfs4_do_open(cs, req, oo,
 	    NFS4_DELEG4TYPE2REQTYPE(args->open_claim4_u.delegate_type),
-	    args->share_access, args->share_deny, resp);
+	    args->share_access, args->share_deny, resp, 0);
 }
 
 static void
@@ -6452,7 +6508,7 @@ rfs4_do_opendelcur(struct compound_state *cs, struct svc_req *req,
 	dsp->finfo->dinfo->time_lastwrite = gethrestime_sec();
 	rfs4_deleg_state_rele(dsp);
 	rfs4_do_open(cs, req, oo, DELEG_NONE,
-	    args->share_access, args->share_deny, resp);
+	    args->share_access, args->share_deny, resp, 1);
 }
 
 /*ARGSUSED*/
@@ -7043,6 +7099,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	nfsstat4 status;
 	rfs4_state_t *sp;
 	rfs4_file_t *fp;
+	int fflags = 0;
 
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
@@ -7121,7 +7178,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * Check that no invalid bits are set.
 	 */
 	if ((access & ~(OPEN4_SHARE_ACCESS_READ | OPEN4_SHARE_ACCESS_WRITE)) ||
-	    (deny & ~(OPEN4_SHARE_DENY_READ | OPEN4_SHARE_DENY_READ))) {
+	    (deny & ~(OPEN4_SHARE_DENY_READ | OPEN4_SHARE_DENY_WRITE))) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
 		rfs4_update_open_sequence(sp->owner);
 		rfs4_dbe_unlock(sp->dbe);
@@ -7193,26 +7250,30 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * If the current mode has access read and the new mode
 	 * does not, decrement the number of access read mode bits
 	 * and if it goes to zero turn off the access read bit
-	 * on the file.
+	 * on the file.  set fflags to FREAD for the call to
+	 * vn_open_downgrade().
 	 */
 	if ((sp->share_access & OPEN4_SHARE_ACCESS_READ) &&
 	    (access & OPEN4_SHARE_ACCESS_READ) == 0) {
 		fp->access_read--;
 		if (fp->access_read == 0)
 			fp->share_access &= ~OPEN4_SHARE_ACCESS_READ;
+		fflags |= FREAD;
 	}
 
 	/*
 	 * If the current mode has access write and the new mode
 	 * does not, decrement the number of access write mode bits
 	 * and if it goes to zero turn off the access write bit
-	 * on the file.
+	 * on the file.  set fflags to FWRITE for the call to
+	 * vn_open_downgrade().
 	 */
 	if ((sp->share_access & OPEN4_SHARE_ACCESS_WRITE) &&
 	    (access & OPEN4_SHARE_ACCESS_WRITE) == 0) {
 		fp->access_write--;
 		if (fp->access_write == 0)
 			fp->share_deny &= ~OPEN4_SHARE_ACCESS_WRITE;
+		fflags |= FWRITE;
 	}
 
 	/* Set the new access and deny modes */
@@ -7224,11 +7285,20 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_dbe_unlock(fp->dbe);
 
 	rfs4_dbe_unlock(sp->dbe);
+
 	if ((status = rfs4_share(sp)) != NFS4_OK) {
 		*cs->statusp = resp->status = NFS4ERR_SERVERFAULT;
 		rfs4_update_open_sequence(sp->owner);
 		goto end;
 	}
+
+	/*
+	 * we successfully downgraded the share lock, now we need to downgrade
+	 * the open.  it is possible that the downgrade was only for a deny
+	 * mode and we have nothing else to do.
+	 */
+	if ((fflags & (FREAD|FWRITE)) != 0)
+		vn_open_downgrade(cs->vp, fflags);
 
 	rfs4_dbe_lock(sp->dbe);
 
@@ -7719,7 +7789,7 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 				flk.l_pid = 0;
 				(void) VOP_FRLOCK(sp->finfo->vp, F_SETLK, &flk,
 				    F_REMOTELOCK | FREAD | FWRITE,
-				    (u_offset_t)0, NULL, CRED());
+				    (u_offset_t)0, NULL, CRED(), NULL);
 			}
 
 			sp->owner->client->unlksys_completed = TRUE;
@@ -7757,6 +7827,8 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 		shr.s_own_len = sizeof (shr_loco);
 		(void) vop_shrlock(sp->finfo->vp, F_UNSHARE, &shr, fflags);
 	}
+
+	(void) VOP_CLOSE(fp->vp, fflags, 1, (offset_t)0, cr, NULL);
 }
 
 /*
@@ -7819,14 +7891,16 @@ setlock(vnode_t *vp, struct flock64 *flock, int flag, cred_t *cred)
 	struct flock64 flk;
 	int i;
 	clock_t delaytime;
+	int cmd;
 
+	cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
 retry:
 	delaytime = MSEC_TO_TICK_ROUNDUP(rfs4_lock_delay);
 
 	for (i = 0; i < rfs4_maxlock_tries; i++) {
-		LOCK_PRINT(rfs4_debug, "setlock", F_SETLK, flock);
-		error = VOP_FRLOCK(vp, F_SETLK,
-		    flock, flag, (u_offset_t)0, NULL, cred);
+		LOCK_PRINT(rfs4_debug, "setlock", cmd, flock);
+		error = VOP_FRLOCK(vp, cmd,
+		    flock, flag, (u_offset_t)0, NULL, cred, NULL);
 
 		if (error != EAGAIN && error != EACCES)
 			break;
@@ -7841,8 +7915,8 @@ retry:
 		/* Get the owner of the lock */
 		flk = *flock;
 		LOCK_PRINT(rfs4_debug, "setlock", F_GETLK, &flk);
-		if (VOP_FRLOCK(vp, F_GETLK,
-		    &flk,  flag, (u_offset_t)0, NULL, cred) == 0) {
+		if (VOP_FRLOCK(vp, F_GETLK, &flk, flag,
+		    (u_offset_t)0, NULL, cred, NULL) == 0) {
 			if (flk.l_type == F_UNLCK) {
 				/* No longer locked, retry */
 				goto retry;
@@ -8618,7 +8692,7 @@ retry:
 		goto out;
 	}
 	error = VOP_FRLOCK(cs->vp, F_GETLK, &flk, flag, (u_offset_t)0,
-	    NULL, cs->cr);
+	    NULL, cs->cr, NULL);
 
 	/*
 	 * N.B. We map error values to nfsv4 errors. This is differrent
@@ -8661,11 +8735,11 @@ vop_shrlock(vnode_t *vp, int cmd, struct shrlock *sp, int fflags)
 	if (cmd == F_UNSHARE && sp->s_deny == 0 && sp->s_access == 0)
 		return (0);
 
-	err = VOP_SHRLOCK(vp, cmd, sp, fflags, CRED());
+	err = VOP_SHRLOCK(vp, cmd, sp, fflags, CRED(), NULL);
 
 	NFS4_DEBUG(rfs4_shrlock_debug,
 	    (CE_NOTE, "rfs4_shrlock %s vp=%p acc=%d dny=%d sysid=%d "
-	    "pid=%d err=%d\n", cmd == F_SHARE ? "SHARE" : "UNSHR",
+	    "pid=%d err=%d\n", cmd == F_UNSHARE ? "UNSHR" : "SHARE",
 	    (void *) vp, sp->s_access, sp->s_deny, sp->s_sysid, sp->s_pid,
 	    err));
 
@@ -8706,7 +8780,9 @@ rfs4_shrlock(rfs4_state_t *sp, int cmd)
 static int
 rfs4_share(rfs4_state_t *sp)
 {
-	return (rfs4_shrlock(sp, F_SHARE));
+	int cmd;
+	cmd = nbl_need_check(sp->finfo->vp) ? F_SHARE_NBMAND : F_SHARE;
+	return (rfs4_shrlock(sp, cmd));
 }
 
 void

@@ -33,6 +33,10 @@
 #include <sys/zio.h>
 #include <sys/dsl_deleg.h>
 
+#ifdef _KERNEL
+#include <sys/nvpair.h>
+#endif	/* _KERNEL */
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -151,6 +155,11 @@ typedef struct zfs_cmd {
 #define	ZFS_MIN_MINOR	(ZVOL_MAX_MINOR + 1)
 
 #ifdef _KERNEL
+
+typedef struct zfs_creat {
+	int		zct_norm;
+	nvlist_t	*zct_props;
+} zfs_creat_t;
 
 extern dev_info_t *zfs_dip;
 

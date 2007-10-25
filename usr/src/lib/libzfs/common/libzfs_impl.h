@@ -90,6 +90,23 @@ struct zpool_handle {
 	diskaddr_t zpool_start_block;
 };
 
+typedef  enum {
+	PROTO_NFS = 0,
+	PROTO_SMB = 1,
+	PROTO_END = 2
+} zfs_share_proto_t;
+
+/*
+ * The following can be used as a bitmask and any new values
+ * added must preserve that capability.
+ */
+typedef enum {
+	SHARED_NOT_SHARED = 0x0,
+	SHARED_ISCSI = 0x1,
+	SHARED_NFS = 0x2,
+	SHARED_SMB = 0x4
+} zfs_share_type_t;
+
 int zfs_error(libzfs_handle_t *, int, const char *);
 int zfs_error_fmt(libzfs_handle_t *, int, const char *, ...);
 void zfs_error_aux(libzfs_handle_t *, const char *, ...);
@@ -127,7 +144,7 @@ void changelist_rename(prop_changelist_t *, const char *, const char *);
 void changelist_remove(zfs_handle_t *, prop_changelist_t *);
 void changelist_free(prop_changelist_t *);
 prop_changelist_t *changelist_gather(zfs_handle_t *, zfs_prop_t, int);
-int changelist_unshare(prop_changelist_t *);
+int changelist_unshare(prop_changelist_t *, zfs_share_proto_t *);
 int changelist_haszonedchild(prop_changelist_t *);
 
 void remove_mountpoint(zfs_handle_t *);
@@ -148,8 +165,10 @@ void namespace_clear(libzfs_handle_t *);
 
 extern int zfs_init_libshare(libzfs_handle_t *, int);
 extern void zfs_uninit_libshare(libzfs_handle_t *);
-extern int zfs_parse_options(char *, char *);
+extern int zfs_parse_options(char *, zfs_share_proto_t);
 
+extern int zfs_unshare_proto(zfs_handle_t *zhp,
+    const char *, zfs_share_proto_t *);
 #ifdef	__cplusplus
 }
 #endif

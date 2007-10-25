@@ -35,6 +35,7 @@
 #include "libshare_impl.h"
 #include "scfutil.h"
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <uuid/uuid.h>
 #include <sys/param.h>
@@ -396,7 +397,8 @@ out:
 static char *share_attr[] = {
 	"path",
 	"id",
-	"resource",
+	"drive-letter",
+	"exclude",
 	NULL,
 };
 
@@ -409,6 +411,52 @@ is_share_attr(char *name)
 			return (1);
 	return (0);
 }
+
+/*
+ * _sa_make_resource(node, valuestr)
+ *
+ * Make a resource node on the share node. The valusestr will either
+ * be old format (SMF acceptable string) or new format (pretty much an
+ * arbitrary string with "nnn:" prefixing in order to persist
+ * mapping). The input valuestr will get modified in place. This is
+ * only used in SMF repository parsing. A possible third field will be
+ * a "description" string.
+ */
+
+static void
+_sa_make_resource(xmlNodePtr node, char *valuestr)
+{
+	char *idx;
+	char *name;
+	char *description = NULL;
+
+	idx = valuestr;
+	name = strchr(valuestr, ':');
+	if (name == NULL) {
+		/* this is old form so give an index of "0" */
+		idx = "0";
+		name = valuestr;
+	} else {
+		/* NUL the ':' and move past it */
+		*name++ = '\0';
+		/* There could also be a description string */
+		description = strchr(name, ':');
+		if (description != NULL)
+			*description++ = '\0';
+	}
+	node = xmlNewChild(node, NULL, (xmlChar *)"resource", NULL);
+	if (node != NULL) {
+		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)name);
+		xmlSetProp(node, (xmlChar *)"id", (xmlChar *)idx);
+		/* SMF values are always persistent */
+		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)"persist");
+		if (description != NULL && strlen(description) > 0) {
+			(void) xmlNewChild(node, NULL, (xmlChar *)"description",
+			    (xmlChar *)description);
+		}
+	}
+}
+
 
 /*
  * sa_share_from_pgroup
@@ -490,34 +538,70 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 				    vallen) >= 0) {
 					ret = SA_OK;
 				}
+			} else if (strcmp(name, "resource") == 0) {
+				ret = SA_OK;
 			}
 		}
-		if (ret == SA_OK) {
+		if (ret != SA_OK)
+			continue;
+		/*
+		 * Check that we have the "path" property in
+		 * name. The string in name will always be nul
+		 * terminated if scf_property_get_name()
+		 * succeeded.
+		 */
+		if (strcmp(name, "path") == 0)
+			have_path = 1;
+		if (is_share_attr(name)) {
 			/*
-			 * Check that we have the "path" property in
-			 * name. The string in name will always be nul
-			 * terminated if scf_property_get_name()
-			 * succeeded.
+			 * If a share attr, then simple -
+			 * usually path and id name
 			 */
-			if (strcmp(name, "path") == 0)
-				have_path = 1;
-			if (is_share_attr(name)) {
-				/*
-				 * If a share attr, then simple -
-				 * usually path and resource name
-				 */
-				xmlSetProp(node, (xmlChar *)name,
-				    (xmlChar *)valuestr);
-			} else {
-				if (strcmp(name, "description") == 0) {
-					/* We have a description node */
-					xmlNodePtr desc;
-					desc = xmlNewChild(node, NULL,
-					    (xmlChar *)"description", NULL);
-					if (desc != NULL)
-						xmlNodeSetContent(desc,
-						    (xmlChar *)valuestr);
+			xmlSetProp(node, (xmlChar *)name,
+			    (xmlChar *)valuestr);
+		} else if (strcmp(name, "resource") == 0) {
+			/*
+			 * Resource names handled differently since
+			 * there can be multiple on each share. The
+			 * "resource" id must be preserved since this
+			 * will be used by some protocols in mapping
+			 * "property spaces" to names and is always
+			 * used to create SMF property groups specific
+			 * to resources.  CIFS needs this.  The first
+			 * value is present so add and then loop for
+			 * any additional. Since this is new and
+			 * previous values may exist, handle
+			 * conversions.
+			 */
+			scf_iter_t *viter;
+			viter = scf_iter_create(handle->handle);
+			if (viter != NULL &&
+			    scf_iter_property_values(viter, prop) == 0) {
+				while (scf_iter_next_value(viter, value) > 0) {
+					/* Have a value so process it */
+					if (scf_value_get_ustring(value,
+					    valuestr, vallen) >= 0) {
+						/* have a ustring */
+						_sa_make_resource(node,
+						    valuestr);
+					} else if (scf_value_get_astring(value,
+					    valuestr, vallen) >= 0) {
+						/* have an astring */
+						_sa_make_resource(node,
+						    valuestr);
+					}
 				}
+				scf_iter_destroy(viter);
+			}
+		} else {
+			if (strcmp(name, "description") == 0) {
+				/* We have a description node */
+				xmlNodePtr desc;
+				desc = xmlNewChild(node, NULL,
+				    (xmlChar *)"description", NULL);
+				if (desc != NULL)
+					xmlNodeSetContent(desc,
+					    (xmlChar *)valuestr);
 			}
 		}
 	}
@@ -583,7 +667,34 @@ find_share_by_id(sa_handle_t handle, char *shareid)
 }
 
 /*
- * sa_share_props_from_pgroup(root, handle, pg, id)
+ * find_resource_by_index(share, index)
+ *
+ * Search the resource records on the share for the id index.
+ */
+static sa_resource_t
+find_resource_by_index(sa_share_t share, char *index)
+{
+	sa_resource_t resource;
+	sa_resource_t found = NULL;
+	char *id;
+
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL && found == NULL;
+	    resource = sa_get_next_resource(resource)) {
+		id = (char *)xmlGetProp((xmlNodePtr)resource, (xmlChar *)"id");
+		if (id != NULL) {
+			if (strcmp(id, index) == 0) {
+				/* found it so save in "found" */
+				found = resource;
+			}
+			sa_free_attr_string(id);
+		}
+	}
+	return (found);
+}
+
+/*
+ * sa_share_props_from_pgroup(root, handle, pg, id, sahandle)
  *
  * Extract share properties from the SMF property group. More sanity
  * checks are done and the share object is created. We ignore some
@@ -639,6 +750,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 			/* not a valid proto (null) */
 			return (ret);
 		}
+
 		sectype = strchr(proto, '_');
 		if (sectype != NULL)
 			*sectype++ = '\0';
@@ -664,10 +776,35 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 	if (sectype == NULL)
 		node = xmlNewChild(root, NULL, (xmlChar *)"optionset", NULL);
 	else {
-		node = xmlNewChild(root, NULL, (xmlChar *)"security", NULL);
-		if (node != NULL)
-			xmlSetProp(node, (xmlChar *)"sectype",
-			    (xmlChar *)sectype);
+		if (isdigit((int)*sectype)) {
+			sa_resource_t resource;
+			/*
+			 * If sectype[0] is a digit, then it is an index into
+			 * the resource names. We need to find a resource
+			 * record and then get the properties into an
+			 * optionset. The optionset becomes the "node" and the
+			 * rest is hung off of the share.
+			 */
+			resource = find_resource_by_index(share, sectype);
+			if (resource != NULL) {
+				node = xmlNewChild(resource, NULL,
+				    (xmlChar *)"optionset", NULL);
+			} else {
+				/* this shouldn't happen */
+				ret = SA_SYSTEM_ERR;
+			}
+		} else {
+			/*
+			 * If not a digit, then it is a security type
+			 * (alternate option space). Security types start with
+			 * an alphabetic.
+			 */
+			node = xmlNewChild(root, NULL, (xmlChar *)"security",
+			    NULL);
+			if (node != NULL)
+				xmlSetProp(node, (xmlChar *)"sectype",
+				    (xmlChar *)sectype);
+		}
 	}
 	if (node == NULL) {
 		ret = SA_NO_MEMORY;
@@ -685,7 +822,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 	if (iter == NULL || value == NULL || prop == NULL || name == NULL)
 		goto out;
 
-	/* Iterate over the share pg properties */
+	/* iterate over the share pg properties */
 	if (scf_iter_pg_properties(iter, pg) == 0) {
 		while (scf_iter_next_property(iter, prop) > 0) {
 			ret = SA_SYSTEM_ERR; /* assume the worst */
@@ -897,7 +1034,7 @@ out:
  * sa_extract_defaults(root, handle, instance)
  *
  * Local function to find the default properties that live in the
- * default instance's "operation" proprerty group.
+ * default instance's "operation" property group.
  */
 
 static void
@@ -946,7 +1083,7 @@ out:
 
 
 /*
- * sa_get_config(handle, root, doc, sahandlec)
+ * sa_get_config(handle, root, doc, sahandle)
  *
  * Walk the SMF repository for /network/shares/group and find all the
  * instances. These become group names.  Then add the XML structure
@@ -1276,6 +1413,147 @@ sa_set_property(scfutilhandle_t *handle, char *propname, char *valstr)
 }
 
 /*
+ * check_resource(share)
+ *
+ * Check to see if share has any persistent resources. We don't want
+ * to save if they are all transient.
+ */
+static int
+check_resource(sa_share_t share)
+{
+	sa_resource_t resource;
+	int ret = B_FALSE;
+
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL && ret == B_FALSE;
+	    resource = sa_get_next_resource(resource)) {
+		char *type;
+		type = sa_get_resource_attr(resource, "type");
+		if (type != NULL) {
+			if (strcmp(type, "transient") != 0) {
+				ret = B_TRUE;
+			}
+			sa_free_attr_string(type);
+		}
+	}
+	return (ret);
+}
+
+/*
+ * sa_set_resource_property(handle, prop, value)
+ *
+ * set a property transaction entry into the pending SMF
+ * transaction. We don't want to include any transient resources
+ */
+
+static int
+sa_set_resource_property(scfutilhandle_t *handle, sa_share_t share)
+{
+	int ret = SA_OK;
+	scf_value_t *value;
+	scf_transaction_entry_t *entry;
+	sa_resource_t resource;
+	char *valstr;
+	char *idstr;
+	char *description;
+	char *propstr = NULL;
+	size_t strsize;
+
+	/* don't bother if no persistent resources */
+	if (check_resource(share) == B_FALSE)
+		return (ret);
+
+	/*
+	 * properties must be set in transactions and don't take
+	 * effect until the transaction has been ended/committed.
+	 */
+	entry = scf_entry_create(handle->handle);
+	if (entry == NULL)
+		return (SA_SYSTEM_ERR);
+
+	if (scf_transaction_property_change(handle->trans, entry,
+	    "resource",	SCF_TYPE_ASTRING) != 0 &&
+	    scf_transaction_property_new(handle->trans, entry,
+	    "resource", SCF_TYPE_ASTRING) != 0) {
+		scf_entry_destroy(entry);
+		return (SA_SYSTEM_ERR);
+
+	}
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL;
+	    resource = sa_get_next_resource(resource)) {
+		value = scf_value_create(handle->handle);
+		if (value == NULL) {
+			ret = SA_NO_MEMORY;
+			break;
+		}
+			/* Get size of complete string */
+		valstr = sa_get_resource_attr(resource, "name");
+		idstr = sa_get_resource_attr(resource, "id");
+		description = sa_get_resource_description(resource);
+		strsize = (valstr != NULL) ? strlen(valstr) : 0;
+		strsize += (idstr != NULL) ? strlen(idstr) : 0;
+		strsize += (description != NULL) ? strlen(description) : 0;
+		if (strsize > 0) {
+			strsize += 3; /* add nul and ':' */
+			propstr = (char *)malloc(strsize);
+			if (propstr == NULL) {
+				scf_value_destroy(value);
+				ret = SA_NO_MEMORY;
+				goto err;
+			}
+			if (idstr == NULL)
+				(void) snprintf(propstr, strsize, "%s",
+				    valstr ? valstr : "");
+			else
+				(void) snprintf(propstr, strsize, "%s:%s:%s",
+				    idstr ? idstr : "", valstr ? valstr : "",
+				    description ? description : "");
+			if (scf_value_set_astring(value, propstr) != 0) {
+				ret = SA_SYSTEM_ERR;
+				free(propstr);
+				scf_value_destroy(value);
+				break;
+			}
+			if (scf_entry_add_value(entry, value) != 0) {
+				ret = SA_SYSTEM_ERR;
+				free(propstr);
+				scf_value_destroy(value);
+				break;
+			}
+			/* the value is in the transaction */
+			value = NULL;
+			free(propstr);
+		}
+err:
+		if (valstr != NULL)
+			sa_free_attr_string(valstr);
+		if (idstr != NULL)
+			sa_free_attr_string(idstr);
+		if (description != NULL)
+			sa_free_share_description(description);
+	}
+	/* the entry is in the transaction */
+	entry = NULL;
+
+	if (ret == SA_SYSTEM_ERR) {
+		switch (scf_error()) {
+		case SCF_ERROR_PERMISSION_DENIED:
+			ret = SA_NO_PERMISSION;
+			break;
+		}
+	}
+	/*
+	 * cleanup if there were any errors that didn't leave
+	 * these values where they would be cleaned up later.
+	 */
+	if (entry != NULL)
+		scf_entry_destroy(entry);
+
+	return (ret);
+}
+
+/*
  * sa_commit_share(handle, group, share)
  *
  *	Commit this share to the repository.
@@ -1288,7 +1566,6 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 	int ret = SA_OK;
 	char *groupname;
 	char *name;
-	char *resource;
 	char *description;
 	char *sharename;
 	ssize_t proplen;
@@ -1371,14 +1648,34 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 				}
 			}
 			if (ret == SA_OK) {
-				resource = sa_get_share_attr(share,
-				    "resource");
-				if (resource != NULL) {
+				name = sa_get_share_attr(share, "drive-letter");
+				if (name != NULL) {
+					/* A drive letter may exist for SMB */
 					ret = sa_set_property(handle,
-					    "resource", resource);
-					sa_free_attr_string(resource);
+					    "drive-letter", name);
+					sa_free_attr_string(name);
 				}
 			}
+			if (ret == SA_OK) {
+				name = sa_get_share_attr(share, "exclude");
+				if (name != NULL) {
+					/*
+					 * In special cases need to
+					 * exclude proto enable.
+					 */
+					ret = sa_set_property(handle,
+					    "exclude", name);
+					sa_free_attr_string(name);
+				}
+			}
+			if (ret == SA_OK) {
+				/*
+				 * If there are resource names, bundle them up
+				 * and save appropriately.
+				 */
+				ret = sa_set_resource_property(handle, share);
+			}
+
 			if (ret == SA_OK) {
 				description = sa_get_share_description(share);
 				if (description != NULL) {
@@ -1414,6 +1711,49 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 }
 
 /*
+ * remove_resources(handle, share, shareid)
+ *
+ * If the share has resources, remove all of them and their
+ * optionsets.
+ */
+static int
+remove_resources(scfutilhandle_t *handle, sa_share_t share, char *shareid)
+{
+	sa_resource_t resource;
+	sa_optionset_t opt;
+	char *proto;
+	char *id;
+	ssize_t proplen;
+	char *propstring;
+	int ret = SA_OK;
+
+	proplen = get_scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
+	propstring = malloc(proplen);
+	if (propstring == NULL)
+		return (SA_NO_MEMORY);
+
+	for (resource = sa_get_share_resource(share, NULL);
+	    resource != NULL; resource = sa_get_next_resource(resource)) {
+		id = sa_get_resource_attr(resource, "id");
+		if (id == NULL)
+			continue;
+		for (opt = sa_get_optionset(resource, NULL);
+		    opt != NULL; opt = sa_get_next_optionset(resource)) {
+			proto = sa_get_optionset_attr(opt, "type");
+			if (proto != NULL) {
+				(void) snprintf(propstring, proplen,
+				    "%s_%s_%s", shareid, proto, id);
+				ret = sa_delete_pgroup(handle, propstring);
+				sa_free_attr_string(proto);
+			}
+		}
+		sa_free_attr_string(id);
+	}
+	free(propstring);
+	return (ret);
+}
+
+/*
  * sa_delete_share(handle, group, share)
  *
  * Remove the specified share from the group (and service instance).
@@ -1444,6 +1784,8 @@ sa_delete_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 		}
 		ret = sa_get_instance(handle, groupname);
 		if (ret == SA_OK) {
+			/* If a share has resources, remove them */
+			ret = remove_resources(handle, share, shareid);
 			/* If a share has properties, remove them */
 			ret = sa_delete_pgroup(handle, shareid);
 			for (opt = sa_get_optionset(share, NULL);

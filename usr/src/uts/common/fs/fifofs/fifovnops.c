@@ -73,26 +73,33 @@
  */
 static int fifo_read(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
 static int fifo_write(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
-static int fifo_getattr(vnode_t *, vattr_t *, int, cred_t *);
+static int fifo_getattr(vnode_t *, vattr_t *, int, cred_t *,
+	caller_context_t *);
 static int fifo_setattr(vnode_t *, vattr_t *, int, cred_t *,
 	caller_context_t *);
-static int fifo_realvp(vnode_t *, vnode_t **);
-static int fifo_access(vnode_t *, int, int, cred_t *);
+static int fifo_realvp(vnode_t *, vnode_t **, caller_context_t *);
+static int fifo_access(vnode_t *, int, int, cred_t *, caller_context_t *);
 static int fifo_create(struct vnode *, char *, vattr_t *, enum vcexcl,
-    int, struct vnode **, struct cred *, int);
-static int fifo_fid(vnode_t *, fid_t *);
-static int fifo_fsync(vnode_t *, int, cred_t *);
-static int fifo_seek(vnode_t *, offset_t, offset_t *);
-static int fifo_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
+    int, struct vnode **, struct cred *, int, caller_context_t *,
+    vsecattr_t *);
+static int fifo_fid(vnode_t *, fid_t *, caller_context_t *);
+static int fifo_fsync(vnode_t *, int, cred_t *, caller_context_t *);
+static int fifo_seek(vnode_t *, offset_t, offset_t *, caller_context_t *);
+static int fifo_ioctl(vnode_t *, int, intptr_t, int, cred_t *, int *,
+	caller_context_t *);
 static int fifo_fastioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
 static int fifo_strioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
-static int fifo_poll(vnode_t *, short, int, short *, pollhead_t **);
-static int fifo_pathconf(vnode_t *, int, ulong_t *, cred_t *);
-static void fifo_inactive(vnode_t *, cred_t *);
+static int fifo_poll(vnode_t *, short, int, short *, pollhead_t **,
+	caller_context_t *);
+static int fifo_pathconf(vnode_t *, int, ulong_t *, cred_t *,
+	caller_context_t *);
+static void fifo_inactive(vnode_t *, cred_t *, caller_context_t *);
 static int fifo_rwlock(vnode_t *, int, caller_context_t *);
 static void fifo_rwunlock(vnode_t *, int, caller_context_t *);
-static int fifo_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
-static int fifo_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *);
+static int fifo_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
+	caller_context_t *);
+static int fifo_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
+	caller_context_t *);
 
 /* functions local to this file */
 static boolean_t fifo_stayfast_enter(fifonode_t *);
@@ -210,7 +217,7 @@ tsol_fifo_access(vnode_t *vp, int flag, cred_t *crp)
  * Note: namefs pipes come through this routine too.
  */
 int
-fifo_open(vnode_t **vpp, int flag, cred_t *crp)
+fifo_open(vnode_t **vpp, int flag, cred_t *crp, caller_context_t *ct)
 {
 	vnode_t		*vp		= *vpp;
 	fifonode_t	*fnp		= VTOF(vp);
@@ -280,7 +287,7 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 	 * If we are opening for read (or writer)
 	 *   indicate that the reader (or writer) is done with open
 	 *   if there is a writer (or reader) waiting for us, wake them up
-	 *	and indicate that at least 1 read (or write) open has occured
+	 *	and indicate that at least 1 read (or write) open has occurred
 	 *	this is need in the event the read (or write) side closes
 	 *	before the writer (or reader) has a chance to wake up
 	 *	i.e. it sees that a reader (or writer) was once there
@@ -289,7 +296,7 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 		fnp->fn_rsynccnt--;	/* reader done with open */
 		if (fnp->fn_flag & FIFOSYNC) {
 			/*
-			 * This indicates that a read open has occured
+			 * This indicates that a read open has occurred
 			 * Only need to set if writer is actually asleep
 			 * Flag will be consumed by writer.
 			 */
@@ -301,7 +308,7 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 		fnp->fn_wsynccnt--;	/* writer done with open */
 		if (fnp->fn_flag & FIFOSYNC) {
 			/*
-			 * This indicates that a write open has occured
+			 * This indicates that a write open has occurred
 			 * Only need to set if reader is actually asleep
 			 * Flag will be consumed by reader.
 			 */
@@ -347,20 +354,20 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 				/*
 				 * Last reader to wakeup clear writer
 				 * Clear both writer and reader open
-				 * occured flag incase other end is O_RDWR
+				 * occurred flag incase other end is O_RDWR
 				 */
 				if (--fnp->fn_insync == 0 &&
 				    fnp->fn_flag & FIFOWOCR) {
 					fnp->fn_flag &= ~(FIFOWOCR|FIFOROCR);
 				}
 				mutex_exit(&fnp->fn_lock->flk_lock);
-				(void) fifo_close(*vpp, flag, 1, 0, crp);
+				(void) fifo_close(*vpp, flag, 1, 0, crp, ct);
 				error = EINTR;
 				goto done;
 			}
 			/*
-			 * Last reader to wakeup clear writer open occured flag
-			 * Clear both writer and reader open occured flag
+			 * Last reader to wakeup clear writer open occurred flag
+			 * Clear both writer and reader open occurred flag
 			 * incase other end is O_RDWR
 			 */
 			if (--fnp->fn_insync == 0 &&
@@ -374,7 +381,7 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 		    fnp->fn_rcnt == fnp->fn_rsynccnt) {
 			if ((flag & (FNDELAY|FNONBLOCK)) && fnp->fn_rcnt == 0) {
 				mutex_exit(&fnp->fn_lock->flk_lock);
-				(void) fifo_close(*vpp, flag, 1, 0, crp);
+				(void) fifo_close(*vpp, flag, 1, 0, crp, ct);
 				error = ENXIO;
 				goto done;
 			}
@@ -385,21 +392,21 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp)
 				/*
 				 * Last writer to wakeup clear
 				 * Clear both writer and reader open
-				 * occured flag in case other end is O_RDWR
+				 * occurred flag in case other end is O_RDWR
 				 */
 				if (--fnp->fn_insync == 0 &&
 				    (fnp->fn_flag & FIFOROCR) != 0) {
 					fnp->fn_flag &= ~(FIFOWOCR|FIFOROCR);
 				}
 				mutex_exit(&fnp->fn_lock->flk_lock);
-				(void) fifo_close(*vpp, flag, 1, 0, crp);
+				(void) fifo_close(*vpp, flag, 1, 0, crp, ct);
 				error = EINTR;
 				goto done;
 			}
 			/*
-			 * Last writer to wakeup clear reader open occured flag
+			 * Last writer to wakeup clear reader open occurred flag
 			 * Clear both writer and reader open
-			 * occured flag in case other end is O_RDWR
+			 * occurred flag in case other end is O_RDWR
 			 */
 			if (--fnp->fn_insync == 0 &&
 			    (fnp->fn_flag & FIFOROCR) != 0) {
@@ -425,7 +432,8 @@ done:
  */
 /*ARGSUSED*/
 int
-fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp)
+fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
+	caller_context_t *ct)
 {
 	fifonode_t	*fnp		= VTOF(vp);
 	fifonode_t	*fn_dest	= fnp->fn_dest;
@@ -1079,7 +1087,7 @@ stream_mode:
 done:
 	/*
 	 * update vnode modification and change times
-	 * make sure there were no errors and some data was transfered
+	 * make sure there were no errors and some data was transferred
 	 */
 	if (error == 0 && write_size != uiop->uio_resid) {
 		time_t now = gethrestime_sec();
@@ -1105,9 +1113,10 @@ epipe:
 	return (error);
 }
 
+/*ARGSUSED6*/
 static int
 fifo_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
-	cred_t *cr, int *rvalp)
+	cred_t *cr, int *rvalp, caller_context_t *ct)
 {
 	/*
 	 * Just a quick check
@@ -1430,7 +1439,8 @@ fifo_strioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
  * the node information from the credentials structure.
  */
 int
-fifo_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp)
+fifo_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp,
+	caller_context_t *ct)
 {
 	int		error		= 0;
 	fifonode_t	*fnp		= VTOF(vp);
@@ -1442,7 +1452,7 @@ fifo_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *crp)
 		/*
 		 * for FIFOs or mounted pipes
 		 */
-		if (error = VOP_GETATTR(fnp->fn_realvp, vap, flags, crp))
+		if (error = VOP_GETATTR(fnp->fn_realvp, vap, flags, crp, ct))
 			return (error);
 		mutex_enter(&fn_lock->flk_lock);
 		/* set current times from fnode, even if older than vnode */
@@ -1537,10 +1547,10 @@ fifo_setattr(
  * Otherwise, return 0 (allow all access).
  */
 int
-fifo_access(vnode_t *vp, int mode, int flags, cred_t *crp)
+fifo_access(vnode_t *vp, int mode, int flags, cred_t *crp, caller_context_t *ct)
 {
 	if (VTOF(vp)->fn_realvp)
-		return (VOP_ACCESS(VTOF(vp)->fn_realvp, mode, flags, crp));
+		return (VOP_ACCESS(VTOF(vp)->fn_realvp, mode, flags, crp, ct));
 	else
 		return (0);
 }
@@ -1552,13 +1562,14 @@ fifo_access(vnode_t *vp, int mode, int flags, cred_t *crp)
 /*ARGSUSED*/
 static int
 fifo_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
-    int mode, struct vnode **vpp, struct cred *cr, int flag)
+    int mode, struct vnode **vpp, struct cred *cr, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int error;
 
 	ASSERT(dvp && (dvp->v_flag & VROOT) && *name == '\0');
 	if (excl == NONEXCL) {
-		if (mode && (error = fifo_access(dvp, mode, 0, cr)))
+		if (mode && (error = fifo_access(dvp, mode, 0, cr, ct)))
 			return (error);
 		VN_HOLD(dvp);
 		return (0);
@@ -1571,7 +1582,7 @@ fifo_create(struct vnode *dvp, char *name, vattr_t *vap, enum vcexcl excl,
  * Otherwise, return 0.
  */
 int
-fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp)
+fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp, caller_context_t *ct)
 {
 	fifonode_t	*fnp	= VTOF(vp);
 	vattr_t		va;
@@ -1581,7 +1592,7 @@ fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp)
 
 	bzero((caddr_t)&va, sizeof (va));
 	va.va_mask = AT_MTIME | AT_ATIME;
-	if (VOP_GETATTR(fnp->fn_realvp, &va, 0, crp) == 0) {
+	if (VOP_GETATTR(fnp->fn_realvp, &va, 0, crp, ct) == 0) {
 		va.va_mask = 0;
 		if (fnp->fn_mtime > va.va_mtime.tv_sec) {
 			va.va_mtime.tv_sec = fnp->fn_mtime;
@@ -1592,9 +1603,9 @@ fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp)
 			va.va_mask |= AT_ATIME;
 		}
 		if (va.va_mask != 0)
-			(void) VOP_SETATTR(fnp->fn_realvp, &va, 0, crp, NULL);
+			(void) VOP_SETATTR(fnp->fn_realvp, &va, 0, crp, ct);
 	}
-	return (VOP_FSYNC(fnp->fn_realvp, syncflag, crp));
+	return (VOP_FSYNC(fnp->fn_realvp, syncflag, crp, ct));
 }
 
 /*
@@ -1602,7 +1613,7 @@ fifo_fsync(vnode_t *vp, int syncflag, cred_t *crp)
  * vnode. Sync the file system and free the fifonode.
  */
 void
-fifo_inactive(vnode_t *vp, cred_t *crp)
+fifo_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 {
 	fifonode_t	*fnp;
 	fifolock_t	*fn_lock;
@@ -1630,7 +1641,7 @@ fifo_inactive(vnode_t *vp, cred_t *crp)
 	if (fnp->fn_realvp) {
 		(void) fiforemove(fnp);
 		mutex_exit(&ftable_lock);
-		(void) fifo_fsync(vp, FSYNC, crp);
+		(void) fifo_fsync(vp, FSYNC, crp, ct);
 		VN_RELE(fnp->fn_realvp);
 		vp->v_vfsp = NULL;
 	} else
@@ -1684,10 +1695,10 @@ fifo_inactive(vnode_t *vp, cred_t *crp)
  * Otherwise, return EINVAL.
  */
 int
-fifo_fid(vnode_t *vp, fid_t *fidfnp)
+fifo_fid(vnode_t *vp, fid_t *fidfnp, caller_context_t *ct)
 {
 	if (VTOF(vp)->fn_realvp)
-		return (VOP_FID(VTOF(vp)->fn_realvp, fidfnp));
+		return (VOP_FID(VTOF(vp)->fn_realvp, fidfnp, ct));
 	else
 		return (EINVAL);
 }
@@ -1716,7 +1727,7 @@ fifo_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ctp)
  */
 /*ARGSUSED*/
 int
-fifo_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
+fifo_seek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	return (ESPIPE);
 }
@@ -1725,13 +1736,13 @@ fifo_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
  * If there is a realvp associated with vp, return it.
  */
 int
-fifo_realvp(vnode_t *vp, vnode_t **vpp)
+fifo_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	vnode_t *rvp;
 
 	if ((rvp = VTOF(vp)->fn_realvp) != NULL) {
 		vp = rvp;
-		if (VOP_REALVP(vp, &rvp) == 0)
+		if (VOP_REALVP(vp, &rvp, ct) == 0)
 			vp = rvp;
 	}
 
@@ -1742,9 +1753,10 @@ fifo_realvp(vnode_t *vp, vnode_t **vpp)
 /*
  * Poll for interesting events on a stream pipe
  */
+/* ARGSUSED */
 int
 fifo_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
-	pollhead_t **phpp)
+	pollhead_t **phpp, caller_context_t *ct)
 {
 	fifonode_t	*fnp, *fn_dest;
 	fifolock_t	*fn_lock;
@@ -1854,7 +1866,8 @@ stream_mode:
  */
 /* ARGSUSED */
 int
-fifo_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
+fifo_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
+	caller_context_t *ct)
 {
 	ulong_t val;
 	int error = 0;
@@ -1911,7 +1924,7 @@ fifo_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 	default:
 		if (VTOF(vp)->fn_realvp)
 			error = VOP_PATHCONF(VTOF(vp)->fn_realvp, cmd,
-			    &val, cr);
+			    &val, cr, ct);
 		else
 			error = EINVAL;
 		break;
@@ -1927,7 +1940,8 @@ fifo_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
  * Otherwise, return NOSYS.
  */
 int
-fifo_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp)
+fifo_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp,
+	caller_context_t *ct)
 {
 	int error;
 
@@ -1937,9 +1951,10 @@ fifo_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp)
 	 * VOP_RWLOCK or VOP_RWUNLOCK, so we do it here instead.
 	 */
 	if (VTOF(vp)->fn_realvp) {
-		(void) VOP_RWLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, NULL);
-		error = VOP_SETSECATTR(VTOF(vp)->fn_realvp, vsap, flag, crp);
-		VOP_RWUNLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, NULL);
+		(void) VOP_RWLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, ct);
+		error = VOP_SETSECATTR(VTOF(vp)->fn_realvp, vsap, flag,
+				crp, ct);
+		VOP_RWUNLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, ct);
 		return (error);
 	} else
 		return (fs_nosys());
@@ -1950,12 +1965,14 @@ fifo_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp)
  * an ACL from the permission bits that fifo_getattr() makes up.
  */
 int
-fifo_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp)
+fifo_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp,
+	caller_context_t *ct)
 {
 	if (VTOF(vp)->fn_realvp)
-		return (VOP_GETSECATTR(VTOF(vp)->fn_realvp, vsap, flag, crp));
+		return (VOP_GETSECATTR(VTOF(vp)->fn_realvp, vsap, flag,
+			crp, ct));
 	else
-		return (fs_fab_acl(vp, vsap, flag, crp));
+		return (fs_fab_acl(vp, vsap, flag, crp, ct));
 }
 
 

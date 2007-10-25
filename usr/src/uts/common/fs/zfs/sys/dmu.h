@@ -92,7 +92,7 @@ typedef enum dmu_object_type {
 	DMU_OT_DSL_DATASET,		/* UINT64 */
 	/* zpl: */
 	DMU_OT_ZNODE,			/* ZNODE */
-	DMU_OT_ACL,			/* ACL */
+	DMU_OT_OLDACL,			/* Old ACL */
 	DMU_OT_PLAIN_FILE_CONTENTS,	/* UINT8 */
 	DMU_OT_DIRECTORY_CONTENTS,	/* ZAP */
 	DMU_OT_MASTER_NODE,		/* ZAP */
@@ -110,6 +110,10 @@ typedef enum dmu_object_type {
 	DMU_OT_SPA_HISTORY_OFFSETS,	/* spa_his_phys_t */
 	DMU_OT_POOL_PROPS,		/* ZAP */
 	DMU_OT_DSL_PERMS,		/* ZAP */
+	DMU_OT_ACL,			/* ACL */
+	DMU_OT_SYSACL,			/* SYSACL */
+	DMU_OT_FUID,			/* FUID table (Packed NVLIST UINT8) */
+	DMU_OT_FUID_SIZE,		/* FUID table size UINT64 */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -128,6 +132,7 @@ void byteswap_uint32_array(void *buf, size_t size);
 void byteswap_uint16_array(void *buf, size_t size);
 void byteswap_uint8_array(void *buf, size_t size);
 void zap_byteswap(void *buf, size_t size);
+void zfs_oldacl_byteswap(void *buf, size_t size);
 void zfs_acl_byteswap(void *buf, size_t size);
 void zfs_znode_byteswap(void *buf, size_t size);
 
@@ -545,7 +550,7 @@ uint64_t dmu_tx_get_txg(dmu_tx_t *tx);
  * Synchronous write.
  * If a parent zio is provided this function initiates a write on the
  * provided buffer as a child of the parent zio.
- * In the absense of a parent zio, the write is completed synchronously.
+ * In the absence of a parent zio, the write is completed synchronously.
  * At write completion, blk is filled with the bp of the written block.
  * Note that while the data covered by this function will be on stable
  * storage when the write completes this new data does not become a

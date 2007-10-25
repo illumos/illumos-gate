@@ -63,19 +63,21 @@
 /*
  * SDP sockfs vnode operations
  */
-static int socksdpv_open(struct vnode **, int, struct cred *);
+static int socksdpv_open(struct vnode **, int, struct cred *,
+    caller_context_t *);
 static int socksdpv_close(struct vnode *, int, int, offset_t,
-    struct cred *);
+    struct cred *, caller_context_t *);
 static int socksdpv_read(struct vnode *, struct uio *, int, struct cred *,
-    struct caller_context *);
+    caller_context_t *);
 static int socksdpv_write(struct vnode *, struct uio *, int, struct cred *,
-    struct caller_context *);
+    caller_context_t *);
 static int socksdpv_ioctl(struct vnode *, int, intptr_t, int,
-    struct cred *, int32_t *);
-static int socksdp_setfl(vnode_t *, int, int, cred_t *);
-static void socksdpv_inactive(struct vnode *, struct cred *);
+    struct cred *, int32_t *, caller_context_t *);
+static int socksdp_setfl(vnode_t *, int, int, cred_t *, caller_context_t *);
+static void socksdpv_inactive(struct vnode *, struct cred *,
+    caller_context_t *);
 static int socksdpv_poll(struct vnode *, short, int, short *,
-    struct pollhead **);
+    struct pollhead **, caller_context_t *);
 
 const fs_operation_def_t socksdp_vnodeops_template[] = {
 	VOPNAME_OPEN,		{ .vop_open = socksdpv_open },
@@ -97,8 +99,10 @@ const fs_operation_def_t socksdp_vnodeops_template[] = {
 };
 struct vnodeops *socksdp_vnodeops;
 
+/*ARGSUSED3*/
 static int
-socksdpv_open(struct vnode **vpp, int flag, struct cred *cr)
+socksdpv_open(struct vnode **vpp, int flag, struct cred *cr,
+    caller_context_t *ct)
 {
 	struct sonode *so;
 	struct sdp_sonode *ss;
@@ -149,7 +153,7 @@ socksdpv_open(struct vnode **vpp, int flag, struct cred *cr)
 /*ARGSUSED*/
 static int
 socksdpv_close(struct vnode *vp, int flag, int count, offset_t offset,
-    struct cred *cr)
+    struct cred *cr, caller_context_t *ct)
 {
 	int sendsig = 0;
 	int error = 0;
@@ -212,7 +216,7 @@ socksdpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 /*ARGSUSED2*/
 static int
 socksdpv_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
-    struct caller_context *ct)
+    caller_context_t *ct)
 {
 	struct sonode *so = VTOSO(vp);
 	struct nmsghdr lmsg;
@@ -235,7 +239,7 @@ socksdpv_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 /*ARGSUSED2*/
 static int
 socksdpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
-    struct caller_context *ct)
+    caller_context_t *ct)
 {
 	struct sonode *so;
 	ssize_t count;
@@ -281,7 +285,7 @@ socksdpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 /*ARGSUSED4*/
 static int
 socksdpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
-    struct cred *cr, int32_t *rvalp)
+    struct cred *cr, int32_t *rvalp, caller_context_t *ct)
 {
 	struct sonode *so;
 	struct sdp_sonode *ss;
@@ -400,7 +404,8 @@ socksdpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
  */
 /* ARGSUSED */
 static int
-socksdp_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
+socksdp_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr,
+    caller_context_t *ct)
 {
 	struct sonode *so;
 
@@ -421,7 +426,7 @@ socksdp_setfl(vnode_t *vp, int oflags, int nflags, cred_t *cr)
 
 /*ARGSUSED*/
 static void
-socksdpv_inactive(struct vnode *vp, struct cred *cr)
+socksdpv_inactive(struct vnode *vp, struct cred *cr, caller_context_t *ct)
 {
 	struct sonode *so;
 
@@ -457,9 +462,10 @@ socksdpv_inactive(struct vnode *vp, struct cred *cr)
 /*
  * Check socktpi_poll() on why so_lock is not held in this function.
  */
+/*ARGSUSED5*/
 static int
 socksdpv_poll(struct vnode *vp, short events, int anyyet, short *reventsp,
-    struct pollhead **phpp)
+    struct pollhead **phpp, caller_context_t *ct)
 {
 	struct sonode *so;
 	struct sdp_sonode *ss;

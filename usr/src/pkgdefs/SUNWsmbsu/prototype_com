@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+i pkginfo
+i copyright
+i depend
+i preremove
+#
+# SUNWsmbsu
+#
+d none usr 755 root sys
+d none usr/lib 755 root bin
+d none usr/lib/smbsrv 755 root bin
+f none usr/lib/smbsrv/libsmb.so.1 755 root bin
+s none usr/lib/smbsrv/libsmb.so=libsmb.so.1
+f none usr/lib/smbsrv/llib-lsmb 644 root bin
+f none usr/lib/smbsrv/llib-lsmb.ln 644 root bin
+f none usr/lib/smbsrv/libmlrpc.so.1 755 root bin
+s none usr/lib/smbsrv/libmlrpc.so=libmlrpc.so.1
+f none usr/lib/smbsrv/llib-lmlrpc 644 root bin
+f none usr/lib/smbsrv/llib-lmlrpc.ln 644 root bin
+f none usr/lib/smbsrv/libmlsvc.so.1 755 root bin
+s none usr/lib/smbsrv/libmlsvc.so=libmlsvc.so.1
+f none usr/lib/smbsrv/llib-lmlsvc 644 root bin
+f none usr/lib/smbsrv/llib-lmlsvc.ln 644 root bin
+f none usr/lib/smbsrv/libsmbns.so.1 755 root bin
+s none usr/lib/smbsrv/libsmbns.so=libsmbns.so.1
+f none usr/lib/smbsrv/llib-lsmbns 644 root bin
+f none usr/lib/smbsrv/llib-lsmbns.ln 644 root bin
+f none usr/lib/smbsrv/libsmbrdr.so.1 755 root bin
+s none usr/lib/smbsrv/libsmbrdr.so=libsmbrdr.so.1
+f none usr/lib/smbsrv/llib-lsmbrdr 644 root bin
+f none usr/lib/smbsrv/llib-lsmbrdr.ln 644 root bin
+f none usr/lib/smbsrv/smbd 555 root bin
+d none usr/sbin 755 root bin
+f none usr/sbin/smbadm 555 root bin
+f none usr/sbin/smbstat 555 root bin
+d none usr/lib/mdb 755 root sys
+d none usr/lib/mdb/kvm 755 root sys
+d none usr/lib/fs 755 root sys
+d none usr/lib/fs/smb 755 root sys
+f none usr/lib/fs/smb/libshare_smb.so.1 755 root bin
+s none usr/lib/fs/smb/libshare_smb.so=libshare_smb.so.1
+d none usr/lib/security 755 root bin
+f none usr/lib/security/pam_smb_passwd.so.1 755 root bin
+s none usr/lib/security/pam_smb_passwd.so=./pam_smb_passwd.so.1

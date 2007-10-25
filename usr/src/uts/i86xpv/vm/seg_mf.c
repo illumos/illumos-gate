@@ -105,7 +105,7 @@ segmf_create(struct seg *seg, void *args)
 		data->mfns[i] = MFN_INVALID;
 
 	error = VOP_ADDMAP(VTOCVP(data->vp), 0, as, seg->s_base, seg->s_size,
-	    data->prot, data->maxprot, MAP_SHARED, CRED());
+	    data->prot, data->maxprot, MAP_SHARED, CRED(), NULL);
 
 	if (error != 0)
 		hat_unload(as->a_hat,
@@ -136,7 +136,7 @@ segmf_dup(struct seg *seg, struct seg *newseg)
 
 	return (VOP_ADDMAP(VTOCVP(ndata->vp), 0, newseg->s_as,
 	    newseg->s_base, newseg->s_size, ndata->prot, ndata->maxprot,
-	    MAP_SHARED, CRED()));
+	    MAP_SHARED, CRED(), NULL));
 }
 
 /*
@@ -164,7 +164,7 @@ segmf_unmap(struct seg *seg, caddr_t addr, size_t len)
 	ASSERT(data->vp != NULL);
 
 	(void) VOP_DELMAP(VTOCVP(data->vp), off, seg->s_as, addr, len,
-	    data->prot, data->maxprot, MAP_SHARED, CRED());
+	    data->prot, data->maxprot, MAP_SHARED, CRED(), NULL);
 
 	seg_free(seg);
 	return (0);

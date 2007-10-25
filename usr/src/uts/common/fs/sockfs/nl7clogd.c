@@ -57,7 +57,7 @@ static void		logit_flush(void *);
  * in the "/var/nca" directory.
  *
  * NL7C reuses the NCA logging APIs defined in <inet/nca/ncalogd.h>, at
- * some future date (when NCA is depricated or improvements are needed)
+ * some future date (when NCA is deprecated or improvements are needed)
  * these need to be moved into NL7C.
  *
  * NL7C implements logging differently in 2 ways, 1st the initialization
@@ -278,7 +278,7 @@ next:
 	mutex_exit(lock);
 	/* Close current file */
 	ret = VOP_CLOSE(nca_fio_vp(&fio), FCREAT|FWRITE|FAPPEND|FTRUNC,
-			1, (offset_t)0, kcred);
+			1, (offset_t)0, kcred, NULL);
 	nca_fio_vp(&fio) = NULL;
 	if (ret) {
 		cmn_err(CE_WARN, "nl7c_logd: close of %s failed (error %d)",
@@ -319,13 +319,13 @@ next:
 
 	/* Turn on directio */
 	(void) VOP_IOCTL(nca_fio_vp(&fio), _FIODIRECTIO,
-			DIRECTIO_ON, 0, kcred, NULL);
+			DIRECTIO_ON, 0, kcred, NULL, NULL);
 
 	/* Start writing from the begining of the file */
 	nca_fio_offset(&fio) = 0;
 
 	/* Remove the current symlink */
-	(void) VOP_REMOVE(nca_fio_dvp(&fio), symlink, kcred);
+	(void) VOP_REMOVE(nca_fio_dvp(&fio), symlink, kcred, NULL, 0);
 
 	attr.va_mask = AT_MODE | AT_TYPE;
 	attr.va_mode = 0777;
@@ -333,7 +333,7 @@ next:
 
 	/* Create symlink to the new log file */
 	ret = VOP_SYMLINK(nca_fio_dvp(&fio), symlink,
-			&attr, nca_fio_name(&fio), kcred);
+			&attr, nca_fio_name(&fio), kcred, NULL, 0);
 	if (ret) {
 		cmn_err(CE_WARN, "nl7c_logd: symlink of %s to %s failed",
 			symlink, nca_fio_name(&fio));
@@ -469,9 +469,9 @@ nl7c_logd_init(int fsz, caddr_t *fnv)
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_loffset = 0;
 	uio.uio_fmode = 0;
-	ret = VOP_READLINK(svp, &uio, kcred);
+	ret = VOP_READLINK(svp, &uio, kcred, NULL);
 	if (ret) {
-		(void) VOP_REMOVE(dvp, symlink, kcred);
+		(void) VOP_REMOVE(dvp, symlink, kcred, NULL, 0);
 		goto fresh_start;
 	}
 
@@ -498,9 +498,9 @@ nl7c_logd_init(int fsz, caddr_t *fnv)
 		goto error;
 	}
 	nca_fio_vp(&fio) = vp;
-	(void) VOP_IOCTL(vp, _FIODIRECTIO, DIRECTIO_ON, 0, kcred, NULL);
+	(void) VOP_IOCTL(vp, _FIODIRECTIO, DIRECTIO_ON, 0, kcred, NULL, NULL);
 	attr.va_mask = AT_SIZE;
-	ret = VOP_GETATTR(nca_fio_vp(&fio), &attr, 0, 0);
+	ret = VOP_GETATTR(nca_fio_vp(&fio), &attr, 0, NULL, NULL);
 	if (ret) {
 		cmn_err(CE_WARN, "nl7c_logd_init: getattr of %s failed", *fnp);
 		goto error;
@@ -520,8 +520,9 @@ fresh_start:
 	attr.va_mask = AT_MODE | AT_TYPE;
 	attr.va_mode = 0777;
 	attr.va_type = VLNK;
-	(void) VOP_REMOVE(dvp, symlink, kcred);
-	ret = VOP_SYMLINK(dvp, symlink, &attr, nca_fio_name(&fio), kcred);
+	(void) VOP_REMOVE(dvp, symlink, kcred, NULL, 0);
+	ret = VOP_SYMLINK(dvp, symlink, &attr, nca_fio_name(&fio), kcred, NULL,
+	    0);
 	if (ret) {
 		cmn_err(CE_WARN, "nl7c_logd_init: symlink of %s to %s failed",
 		    symlink_path, nca_fio_name(&fio));
@@ -537,7 +538,7 @@ fresh_start:
 
 	/* Turn on directio */
 	(void) VOP_IOCTL(nca_fio_vp(&fio), _FIODIRECTIO,
-			DIRECTIO_ON, 0, kcred, NULL);
+			DIRECTIO_ON, 0, kcred, NULL, NULL);
 
 finish:
 	log_buf_kmc = kmem_cache_create("NL7C_log_buf_kmc", sizeof (log_buf_t),

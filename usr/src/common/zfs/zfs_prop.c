@@ -30,6 +30,7 @@
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_i18n.h>
 
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
@@ -100,6 +101,13 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t case_table[] = {
+		{ "sensitive",		ZFS_CASE_SENSITIVE },
+		{ "insensitive",	ZFS_CASE_INSENSITIVE },
+		{ "mixed",		ZFS_CASE_MIXED },
+		{ NULL }
+	};
+
 	static zprop_index_t copies_table[] = {
 		{ "1",		1 },
 		{ "2",		2 },
@@ -107,9 +115,19 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t normalize_table[] = {
+		{ "none",	ZFS_NORMALIZE_NONE },
+		{ "formD",	ZFS_NORMALIZE_D },
+		{ "formKC",	ZFS_NORMALIZE_KC },
+		{ "formC",	ZFS_NORMALIZE_C },
+		{ "formKD",	ZFS_NORMALIZE_KD },
+		{ NULL }
+	};
+
 	static zprop_index_t version_table[] = {
 		{ "1",		1 },
 		{ "2",		2 },
+		{ "3",		3 },
 		{ "current",	ZPL_VERSION },
 		{ NULL }
 	};
@@ -163,11 +181,17 @@ zfs_prop_init(void)
 	register_index(ZFS_PROP_XATTR, "xattr", 1, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "XATTR",
 	    boolean_table);
+	register_index(ZFS_PROP_VSCAN, "vscan", 0, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM, "on | off", "VSCAN",
+	    boolean_table);
+	register_index(ZFS_PROP_NBMAND, "nbmand", 0, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "NBMAND",
+	    boolean_table);
 
 	/* default index properties */
 	register_index(ZFS_PROP_VERSION, "version", 0, PROP_DEFAULT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
-	    "1 | 2 | current", "VERSION", version_table);
+	    "1 | 2 | 3 | current", "VERSION", version_table);
 
 	/* default index (boolean) properties */
 	register_index(ZFS_PROP_CANMOUNT, "canmount", 1, PROP_DEFAULT,
@@ -176,6 +200,20 @@ zfs_prop_init(void)
 	/* readonly index (boolean) properties */
 	register_index(ZFS_PROP_MOUNTED, "mounted", 0, PROP_READONLY,
 	    ZFS_TYPE_FILESYSTEM, "yes | no", "MOUNTED", boolean_table);
+
+	/* set once index properties */
+	register_index(ZFS_PROP_NORMALIZE, "normalization", ZFS_NORMALIZE_NONE,
+	    PROP_ONETIME, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    "none | formC | formD | formKC | formKD", "NORMALIZATION",
+	    normalize_table);
+	register_index(ZFS_PROP_CASE, "casesensitivity", ZFS_CASE_SENSITIVE,
+	    PROP_ONETIME, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    "sensitive | insensitive | mixed", "CASE", case_table);
+
+	/* set once index (boolean) properties */
+	register_index(ZFS_PROP_UTF8ONLY, "utf8only", 0, PROP_ONETIME,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
+	    "on | off", "UTF8ONLY", boolean_table);
 
 	/* string properties */
 	register_string(ZFS_PROP_ORIGIN, "origin", NULL, PROP_READONLY,
@@ -188,6 +226,8 @@ zfs_prop_init(void)
 	    ZFS_TYPE_DATASET, "on | off | type=<type>", "SHAREISCSI");
 	register_string(ZFS_PROP_TYPE, "type", NULL, PROP_READONLY,
 	    ZFS_TYPE_DATASET, "filesystem | volume | snapshot", "TYPE");
+	register_string(ZFS_PROP_SHARESMB, "sharesmb", "off", PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM, "on | off | sharemgr(1M) options", "SHARESMB");
 
 	/* readonly number properties */
 	register_number(ZFS_PROP_USED, "used", 0, PROP_READONLY,
@@ -200,8 +240,8 @@ zfs_prop_init(void)
 	    PROP_READONLY, ZFS_TYPE_DATASET,
 	    "<1.00x or higher if compressed>", "RATIO");
 	register_number(ZFS_PROP_VOLBLOCKSIZE, "volblocksize", 8192,
-	    PROP_READONLY, ZFS_TYPE_VOLUME,
-	    "512 to 128k, power of 2", "VOLBLOCK");
+	    PROP_ONETIME,
+	    ZFS_TYPE_VOLUME, "512 to 128k, power of 2",	"VOLBLOCK");
 
 	/* default number properties */
 	register_number(ZFS_PROP_QUOTA, "quota", 0, PROP_DEFAULT,
@@ -322,7 +362,17 @@ zfs_prop_get_type(zfs_prop_t prop)
 boolean_t
 zfs_prop_readonly(zfs_prop_t prop)
 {
-	return (zfs_prop_table[prop].pd_attr == PROP_READONLY);
+	return (zfs_prop_table[prop].pd_attr == PROP_READONLY ||
+	    zfs_prop_table[prop].pd_attr == PROP_ONETIME);
+}
+
+/*
+ * Returns TRUE if the property is only allowed to be set once.
+ */
+boolean_t
+zfs_prop_setonce(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_attr == PROP_ONETIME);
 }
 
 const char *
@@ -353,7 +403,8 @@ zfs_prop_to_name(zfs_prop_t prop)
 boolean_t
 zfs_prop_inheritable(zfs_prop_t prop)
 {
-	return (zfs_prop_table[prop].pd_attr == PROP_INHERIT);
+	return (zfs_prop_table[prop].pd_attr == PROP_INHERIT ||
+	    zfs_prop_table[prop].pd_attr == PROP_ONETIME);
 }
 
 #ifndef _KERNEL
@@ -399,4 +450,5 @@ zfs_prop_align_right(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_rightalign);
 }
+
 #endif

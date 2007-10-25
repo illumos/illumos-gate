@@ -387,7 +387,8 @@ pc_dirremove(
 	struct pcnode *dp,
 	char *namep,
 	struct vnode *cdir,
-	enum vtype type)
+	enum vtype type,
+	caller_context_t *ctp)
 {
 	struct pcslot slot;
 	struct pcnode *pcp;
@@ -467,9 +468,9 @@ pc_dirremove(
 
 	if (error == 0) {
 		if (type == VDIR) {
-			vnevent_rmdir(PCTOV(pcp), vp, namep);
+			vnevent_rmdir(PCTOV(pcp), vp, namep, ctp);
 		} else {
-			vnevent_remove(PCTOV(pcp), vp, namep);
+			vnevent_remove(PCTOV(pcp), vp, namep, ctp);
 		}
 	}
 
@@ -556,7 +557,8 @@ pc_rename(
 	struct pcnode *dp,		/* parent directory */
 	struct pcnode *tdp,		/* target directory */
 	char *snm,			/* source file name */
-	char *tnm)			/* target file name */
+	char *tnm,			/* target file name */
+	caller_context_t *ctp)
 {
 	struct pcnode *pcp;	/* pcnode we are trying to rename */
 	struct pcnode *tpcp;	/* pcnode that's in our way */
@@ -633,7 +635,7 @@ top:
 		newisdir = tpcp->pc_entry.pcd_attr & PCA_DIR;
 
 		brelse(slot.sl_bp);
-		vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm);
+		vnevent_rename_dest(PCTOV(tpcp), PCTOV(tdp), tnm, ctp);
 		VN_RELE(PCTOV(tpcp));
 
 		/*
@@ -648,7 +650,7 @@ top:
 			} else {
 				/* nondir/nondir, remove target */
 				error = pc_dirremove(tdp, tnm,
-				    (struct vnode *)NULL, VREG);
+				    (struct vnode *)NULL, VREG, ctp);
 				if (error == 0) {
 					VN_RELE(PCTOV(pcp));
 					goto top;
@@ -657,7 +659,7 @@ top:
 		} else if (oldisdir) {
 			/* dir/dir, remove target */
 			error = pc_dirremove(tdp, tnm,
-			    (struct vnode *)NULL, VDIR);
+			    (struct vnode *)NULL, VDIR, ctp);
 			if (error == 0) {
 				VN_RELE(PCTOV(pcp));
 				goto top;
@@ -815,9 +817,9 @@ top:
 		}
 	}
 out:
-	vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm);
+	vnevent_rename_src(PCTOV(pcp), PCTOV(dp), snm, ctp);
 	if (dp != tdp) {
-		vnevent_rename_dest_dir(PCTOV(tdp));
+		vnevent_rename_dest_dir(PCTOV(tdp), ctp);
 	}
 
 	VN_RELE(PCTOV(pcp));

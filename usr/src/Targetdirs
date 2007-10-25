@@ -153,6 +153,7 @@ ROOT.SYS= \
 	/var/sadm \
 	/var/opt \
 	/var/run \
+	/var/smb \
 	/var/svc \
 	/var/svc/log \
 	/var/svc/manifest \
@@ -282,6 +283,7 @@ ROOT.BIN= \
 	/usr/lib/sasl \
 	/usr/lib/secure \
 	/usr/lib/security \
+	/usr/lib/smbsrv \
 	/usr/lib/term \
 	/usr/lib/zones \
 	/usr/old \
@@ -363,6 +365,7 @@ ROOT.SYS2= \
 	/usr/lib/fs \
 	/usr/lib/fs/nfs \
 	/usr/lib/fs/proc \
+	/usr/lib/fs/smb \
 	/usr/lib/fs/zfs \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \
@@ -390,7 +393,8 @@ ROOT.SYS64.2 = \
 	$($(MACH64)_ROOT.SYS64.2) \
 	/usr/lib/mdb/kvm/$(MACH64) \
 	/usr/lib/mdb/proc/$(MACH64) \
-	/usr/lib/fs/nfs/$(MACH64)
+	/usr/lib/fs/nfs/$(MACH64) \
+	/usr/lib/fs/smb/$(MACH64)
 
 UUCP.UUCP= \
 	/var/spool/uucp \

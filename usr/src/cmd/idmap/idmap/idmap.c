@@ -166,10 +166,10 @@ static char *pnm_last_unixname;
  * idmap_api batch related variables:
  *
  * idmap can operate in two modes. It the batch mode, the idmap_api
- * batch is commited at the end of a batch of several
+ * batch is committed at the end of a batch of several
  * commands. At the end of input file, typically. This mode is used
  * for processing input from a file.
- *  In the non-batch mode, each command is commited immediately. This
+ *  In the non-batch mode, each command is committed immediately. This
  * mode is used for tty input.
  */
 

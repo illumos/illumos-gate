@@ -262,7 +262,8 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 				offset = bva.va_size;
 				length = ava.va_size - bva.va_size;
 			}
-			if (nbl_conflict(vp, NBL_WRITE, offset, length, 0)) {
+			if (nbl_conflict(vp, NBL_WRITE, offset, length, 0,
+			    NULL)) {
 				error = EACCES;
 				goto out;
 			}
@@ -298,7 +299,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 
 	if (error)
 		goto out;
@@ -369,11 +370,11 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		dva.va_mask = AT_ALL;
-		dvap = VOP_GETATTR(dvp, &dva, 0, cr) ? NULL : &dva;
+		dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
 	}
 #else
 	dva.va_mask = AT_ALL;
-	dvap = VOP_GETATTR(dvp, &dva, 0, cr) ? NULL : &dva;
+	dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
 #endif
 
 	if (args->what.name == nfs3nametoolong) {
@@ -438,7 +439,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		}
 	} else {
 		error = VOP_LOOKUP(dvp, args->what.name, &vp,
-				NULL, 0, NULL, cr);
+				NULL, 0, NULL, cr, NULL, NULL, NULL);
 	}
 
 	if (is_system_labeled() && error == 0) {
@@ -463,12 +464,12 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		dva.va_mask = AT_ALL;
-		dvap = VOP_GETATTR(dvp, &dva, 0, cr) ? NULL : &dva;
+		dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
 	} else
 		dvap = NULL;
 #else
 	dva.va_mask = AT_ALL;
-	dvap = VOP_GETATTR(dvp, &dva, 0, cr) ? NULL : &dva;
+	dvap = VOP_GETATTR(dvp, &dva, 0, cr, NULL) ? NULL : &dva;
 #endif
 
 	if (error)
@@ -585,7 +586,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	 * as well be reflected to the server during the open.
 	 */
 	va.va_mask = AT_MODE;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -618,7 +619,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	}
 
 	if (args->access & ACCESS3_READ) {
-		error = VOP_ACCESS(vp, VREAD, 0, cr);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
@@ -628,7 +629,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 			resp->resok.access |= ACCESS3_READ;
 	}
 	if ((args->access & ACCESS3_LOOKUP) && vp->v_type == VDIR) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
@@ -638,7 +639,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	}
 	if (checkwriteperm &&
 	    (args->access & (ACCESS3_MODIFY|ACCESS3_EXTEND))) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
@@ -650,7 +651,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 	}
 	if (checkwriteperm &&
 	    (args->access & ACCESS3_DELETE) && vp->v_type == VDIR) {
-		error = VOP_ACCESS(vp, VWRITE, 0, cr);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
@@ -659,7 +660,7 @@ rfs3_access(ACCESS3args *args, ACCESS3res *resp, struct exportinfo *exi,
 			resp->resok.access |= ACCESS3_DELETE;
 	}
 	if (args->access & ACCESS3_EXECUTE) {
-		error = VOP_ACCESS(vp, VEXEC, 0, cr);
+		error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
@@ -726,7 +727,7 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	}
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -773,17 +774,17 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	uio.uio_loffset = 0;
 	uio.uio_resid = MAXPATHLEN;
 
-	error = VOP_READLINK(vp, &uio, cr);
+	error = VOP_READLINK(vp, &uio, cr, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 #if 0 /* notyet */
@@ -795,7 +796,7 @@ rfs3_readlink(READLINK3args *args, READLINK3res *resp, struct exportinfo *exi,
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 #endif
 
 	if (error) {
@@ -895,7 +896,8 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	if (nbl_need_check(vp)) {
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
-		if (nbl_conflict(vp, NBL_READ, args->offset, args->count, 0)) {
+		if (nbl_conflict(vp, NBL_READ, args->offset, args->count, 0,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -905,7 +907,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	need_rwunlock = 1;
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -927,11 +929,11 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	}
 
 	if (crgetuid(cr) != va.va_uid) {
-		error = VOP_ACCESS(vp, VREAD, 0, cr);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-			error = VOP_ACCESS(vp, VEXEC, 0, cr);
+			error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
 			if (error)
 				goto out;
 		}
@@ -1008,7 +1010,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	}
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &va, 0, cr);
+	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -1036,7 +1038,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 #endif
 
 	if (in_crit)
@@ -1160,7 +1162,8 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	if (nbl_need_check(vp)) {
 		nbl_start_crit(vp, RW_READER);
 		in_crit = 1;
-		if (nbl_conflict(vp, NBL_WRITE, args->offset, args->count, 0)) {
+		if (nbl_conflict(vp, NBL_WRITE, args->offset, args->count, 0,
+		    NULL)) {
 			error = EACCES;
 			goto out;
 		}
@@ -1169,7 +1172,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	rwlock_ret = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
 	bva.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &bva, 0, cr);
+	error = VOP_GETATTR(vp, &bva, 0, cr, NULL);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -1201,7 +1204,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	}
 
 	if (crgetuid(cr) != bva.va_uid &&
-	    (error = VOP_ACCESS(vp, VWRITE, 0, cr)))
+	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL)))
 		goto out;
 
 	if (MANDLOCK(vp, bva.va_mode)) {
@@ -1282,7 +1285,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		kmem_free(iovp, sizeof (*iovp) * iovcnt);
 
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 
 #ifdef DEBUG
 	if (!rfs3_do_post_op_attr)
@@ -1375,12 +1378,12 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 	} else
 		dbvap = NULL;
 #else
 	dbva.va_mask = AT_ALL;
-	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 #endif
 	davap = dbvap;
 
@@ -1452,7 +1455,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 				 * Does file already exist?
 				 */
 				error = VOP_LOOKUP(dvp, args->where.name, &tvp,
-						NULL, 0, NULL, cr);
+					NULL, 0, NULL, cr, NULL, NULL, NULL);
 
 				/*
 				 * Check to see if the file has been delegated
@@ -1479,7 +1482,8 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 					in_crit = 1;
 
 					tva.va_mask = AT_SIZE;
-					error = VOP_GETATTR(tvp, &tva, 0, cr);
+					error = VOP_GETATTR(tvp, &tva, 0, cr,
+						NULL);
 					/*
 					 * Can't check for conflicts, so return
 					 * error.
@@ -1493,7 +1497,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 						va.va_size - tva.va_size :
 						tva.va_size - va.va_size;
 					if (nbl_conflict(tvp, NBL_WRITE,
-							offset, len, 0)) {
+							offset, len, 0, NULL)) {
 						error = EACCES;
 						goto out;
 					}
@@ -1530,17 +1534,17 @@ tryagain:
 	 * passed as part of the arguments.
 	 */
 	error = VOP_CREATE(dvp, args->where.name, &va, excl, VWRITE,
-	    &vp, cr, 0);
+	    &vp, cr, 0, NULL, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 	} else
 		davap = NULL;
 #else
 	dava.va_mask = AT_ALL;
-	davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 #endif
 
 	if (error) {
@@ -1561,7 +1565,7 @@ tryagain:
 		 * Lookup the file so that we can get a vnode for it.
 		 */
 		error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0,
-		    NULL, cr);
+		    NULL, cr, NULL, NULL, NULL);
 		if (error) {
 			/*
 			 * We couldn't find the file that we thought that
@@ -1586,7 +1590,7 @@ tryagain:
 		}
 
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 
 		mtime = (nfstime3 *)&args->how.createhow3_u.verf;
 		/* % with INT32_MAX to prevent overflows */
@@ -1615,7 +1619,7 @@ tryagain:
 		}
 
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 
 		/*
 		 * We need to check to make sure that the file got
@@ -1638,7 +1642,7 @@ tryagain:
 			va.va_size = reqsize;
 			(void) VOP_SETATTR(vp, &va, 0, cr, NULL);
 			va.va_mask = AT_ALL;
-			vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+			vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 		}
 	}
 
@@ -1664,8 +1668,8 @@ tryagain:
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	VN_RELE(vp);
 	VN_RELE(dvp);
@@ -1730,12 +1734,12 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 	} else
 		dbvap = NULL;
 #else
 	dbva.va_mask = AT_ALL;
-	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 #endif
 	davap = dbvap;
 
@@ -1781,23 +1785,23 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 	va.va_mask |= AT_TYPE;
 	va.va_type = VDIR;
 
-	error = VOP_MKDIR(dvp, args->where.name, &va, &vp, cr);
+	error = VOP_MKDIR(dvp, args->where.name, &va, &vp, cr, NULL, 0, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 	} else
 		davap = NULL;
 #else
 	dava.va_mask = AT_ALL;
-	davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	if (error)
 		goto out;
@@ -1821,18 +1825,18 @@ rfs3_mkdir(MKDIR3args *args, MKDIR3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, 0, cr);
+	(void) VOP_FSYNC(vp, 0, cr, NULL);
 
 	VN_RELE(vp);
 
@@ -1886,12 +1890,12 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 	} else
 		dbvap = NULL;
 #else
 	dbva.va_mask = AT_ALL;
-	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 #endif
 	davap = dbvap;
 
@@ -1943,28 +1947,29 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 	va.va_type = VLNK;
 
 	error = VOP_SYMLINK(dvp, args->where.name, &va,
-	    args->symlink.symlink_data, cr);
+	    args->symlink.symlink_data, cr, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 	} else
 		davap = NULL;
 #else
 	dava.va_mask = AT_ALL;
-	davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 #endif
 
 	if (error)
 		goto out;
 
-	error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0, NULL, cr);
+	error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0, NULL, cr,
+			NULL, NULL, NULL);
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	VN_RELE(dvp);
 
@@ -1993,18 +1998,18 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, 0, cr);
+	(void) VOP_FSYNC(vp, 0, cr, NULL);
 
 	VN_RELE(vp);
 
@@ -2059,12 +2064,12 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		dbva.va_mask = AT_ALL;
-		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+		dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 	} else
 		dbvap = NULL;
 #else
 	dbva.va_mask = AT_ALL;
-	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr) ? NULL : &dbva;
+	dbvap = VOP_GETATTR(dvp, &dbva, 0, cr, NULL) ? NULL : &dbva;
 #endif
 	davap = dbvap;
 
@@ -2152,23 +2157,23 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 	mode = 0;
 
 	error = VOP_CREATE(dvp, args->where.name, &va, excl, mode,
-	    &vp, cr, 0);
+	    &vp, cr, 0, NULL, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		dava.va_mask = AT_ALL;
-		davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+		davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 	} else
 		davap = NULL;
 #else
 	dava.va_mask = AT_ALL;
-	davap = VOP_GETATTR(dvp, &dava, 0, cr) ? NULL : &dava;
+	davap = VOP_GETATTR(dvp, &dava, 0, cr, NULL) ? NULL : &dava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	if (error)
 		goto out;
@@ -2194,18 +2199,18 @@ rfs3_mknod(MKNOD3args *args, MKNOD3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 
 	VN_RELE(vp);
 
@@ -2256,12 +2261,12 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(vp, &bva, 0, cr) ? NULL : &bva;
+		bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
 	} else
 		bvap = NULL;
 #else
 	bva.va_mask = AT_ALL;
-	bvap = VOP_GETATTR(vp, &bva, 0, cr) ? NULL : &bva;
+	bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
 #endif
 	avap = bvap;
 
@@ -2305,7 +2310,7 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	 * reservation and V4 delegations
 	 */
 	error = VOP_LOOKUP(vp, args->object.name, &targvp, NULL, 0,
-			NULL, cr);
+			NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto out;
 
@@ -2315,13 +2320,13 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	}
 
 	if (!nbl_need_check(targvp)) {
-		error = VOP_REMOVE(vp, args->object.name, cr);
+		error = VOP_REMOVE(vp, args->object.name, cr, NULL, 0);
 	} else {
 		nbl_start_crit(targvp, RW_READER);
-		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0)) {
+		if (nbl_conflict(targvp, NBL_REMOVE, 0, 0, 0, NULL)) {
 			error = EACCES;
 		} else {
-			error = VOP_REMOVE(vp, args->object.name, cr);
+			error = VOP_REMOVE(vp, args->object.name, cr, NULL, 0);
 		}
 		nbl_end_crit(targvp);
 	}
@@ -2331,18 +2336,18 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 	} else
 		avap = NULL;
 #else
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, 0, cr);
+	(void) VOP_FSYNC(vp, 0, cr, NULL);
 
 	if (error)
 		goto out;
@@ -2395,12 +2400,12 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(vp, &bva, 0, cr) ? NULL : &bva;
+		bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
 	} else
 		bvap = NULL;
 #else
 	bva.va_mask = AT_ALL;
-	bvap = VOP_GETATTR(vp, &bva, 0, cr) ? NULL : &bva;
+	bvap = VOP_GETATTR(vp, &bva, 0, cr, NULL) ? NULL : &bva;
 #endif
 	avap = bvap;
 
@@ -2439,23 +2444,23 @@ rfs3_rmdir(RMDIR3args *args, RMDIR3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	error = VOP_RMDIR(vp, args->object.name, rootdir, cr);
+	error = VOP_RMDIR(vp, args->object.name, rootdir, cr, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 	} else
 		avap = NULL;
 #else
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, 0, cr);
+	(void) VOP_FSYNC(vp, 0, cr, NULL);
 
 	if (error) {
 		/*
@@ -2544,12 +2549,12 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		fbva.va_mask = AT_ALL;
-		fbvap = VOP_GETATTR(fvp, &fbva, 0, cr) ? NULL : &fbva;
+		fbvap = VOP_GETATTR(fvp, &fbva, 0, cr, NULL) ? NULL : &fbva;
 	} else
 		fbvap = NULL;
 #else
 	fbva.va_mask = AT_ALL;
-	fbvap = VOP_GETATTR(fvp, &fbva, 0, cr) ? NULL : &fbva;
+	fbvap = VOP_GETATTR(fvp, &fbva, 0, cr, NULL) ? NULL : &fbva;
 #endif
 	favap = fbvap;
 
@@ -2575,12 +2580,12 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		tbva.va_mask = AT_ALL;
-		tbvap = VOP_GETATTR(tvp, &tbva, 0, cr) ? NULL : &tbva;
+		tbvap = VOP_GETATTR(tvp, &tbva, 0, cr, NULL) ? NULL : &tbva;
 	} else
 		tbvap = NULL;
 #else
 	tbva.va_mask = AT_ALL;
-	tbvap = VOP_GETATTR(tvp, &tbva, 0, cr) ? NULL : &tbva;
+	tbvap = VOP_GETATTR(tvp, &tbva, 0, cr, NULL) ? NULL : &tbva;
 #endif
 	tavap = tbvap;
 
@@ -2619,7 +2624,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	 * reservation or V4 delegations.
 	 */
 	error = VOP_LOOKUP(fvp, args->from.name, &srcvp, NULL, 0,
-			NULL, cr);
+			NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto out;
 
@@ -2638,7 +2643,8 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	 * first to avoid VOP_LOOKUP if possible.
 	 */
 	if (rfs4_deleg_policy != SRV_NEVER_DELEGATE &&
-	    VOP_LOOKUP(tvp, args->to.name, &targvp, NULL, 0, NULL, cr) == 0) {
+	    VOP_LOOKUP(tvp, args->to.name, &targvp, NULL, 0, NULL, cr,
+	    NULL, NULL, NULL) == 0) {
 
 		if (rfs4_check_delegated(FWRITE, targvp, TRUE)) {
 			VN_RELE(targvp);
@@ -2650,14 +2656,14 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 
 	if (!nbl_need_check(srcvp)) {
 		error = VOP_RENAME(fvp, args->from.name, tvp,
-				    args->to.name, cr);
+				    args->to.name, cr, NULL, 0);
 	} else {
 		nbl_start_crit(srcvp, RW_READER);
-		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0)) {
+		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0, NULL)) {
 			error = EACCES;
 		} else {
 			error = VOP_RENAME(fvp, args->from.name, tvp,
-				    args->to.name, cr);
+				    args->to.name, cr, NULL, 0);
 		}
 		nbl_end_crit(srcvp);
 	}
@@ -2680,25 +2686,25 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		fava.va_mask = AT_ALL;
-		favap = VOP_GETATTR(fvp, &fava, 0, cr) ? NULL : &fava;
+		favap = VOP_GETATTR(fvp, &fava, 0, cr, NULL) ? NULL : &fava;
 		tava.va_mask = AT_ALL;
-		tavap = VOP_GETATTR(tvp, &tava, 0, cr) ? NULL : &tava;
+		tavap = VOP_GETATTR(tvp, &tava, 0, cr, NULL) ? NULL : &tava;
 	} else {
 		favap = NULL;
 		tavap = NULL;
 	}
 #else
 	fava.va_mask = AT_ALL;
-	favap = VOP_GETATTR(fvp, &fava, 0, cr) ? NULL : &fava;
+	favap = VOP_GETATTR(fvp, &fava, 0, cr, NULL) ? NULL : &fava;
 	tava.va_mask = AT_ALL;
-	tavap = VOP_GETATTR(tvp, &tava, 0, cr) ? NULL : &tava;
+	tavap = VOP_GETATTR(tvp, &tava, 0, cr, NULL) ? NULL : &tava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(fvp, 0, cr);
-	(void) VOP_FSYNC(tvp, 0, cr);
+	(void) VOP_FSYNC(fvp, 0, cr, NULL);
+	(void) VOP_FSYNC(tvp, 0, cr, NULL);
 
 	if (error)
 		goto out;
@@ -2764,12 +2770,12 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	fh3 = &args->link.dir;
@@ -2809,12 +2815,12 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		bva.va_mask = AT_ALL;
-		bvap = VOP_GETATTR(dvp, &bva, 0, cr) ? NULL : &bva;
+		bvap = VOP_GETATTR(dvp, &bva, 0, cr, NULL) ? NULL : &bva;
 	} else
 		bvap = NULL;
 #else
 	bva.va_mask = AT_ALL;
-	bvap = VOP_GETATTR(dvp, &bva, 0, cr) ? NULL : &bva;
+	bvap = VOP_GETATTR(dvp, &bva, 0, cr, NULL) ? NULL : &bva;
 #endif
 
 	if (dvp->v_type != VDIR) {
@@ -2849,30 +2855,30 @@ rfs3_link(LINK3args *args, LINK3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	error = VOP_LINK(dvp, vp, args->link.name, cr);
+	error = VOP_LINK(dvp, vp, args->link.name, cr, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(dvp, &ava, 0, cr) ? NULL : &ava;
+		avap = VOP_GETATTR(dvp, &ava, 0, cr, NULL) ? NULL : &ava;
 	} else {
 		vap = NULL;
 		avap = NULL;
 	}
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(dvp, &ava, 0, cr) ? NULL : &ava;
+	avap = VOP_GETATTR(dvp, &ava, 0, cr, NULL) ? NULL : &ava;
 #endif
 
 	/*
 	 * Force modified data and metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
-	(void) VOP_FSYNC(dvp, 0, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	(void) VOP_FSYNC(dvp, 0, cr, NULL);
 
 	if (error)
 		goto out;
@@ -2925,7 +2931,7 @@ rfs3_link_getfh(LINK3args *args)
  * attributes  - NFS3_SIZEOF_FATTR3 * BYTES_PER_XDR_UNIT
  * boolean - 1 * BYTES_PER_XDR_UNIT
  * file id - 2 * BYTES_PER_XDR_UNIT
- * direcotory name length - 1 * BYTES_PER_XDR_UNIT
+ * directory name length - 1 * BYTES_PER_XDR_UNIT
  * cookie - 2 * BYTES_PER_XDR_UNIT
  * end of list - 1 * BYTES_PER_XDR_UNIT
  * end of file - 1 * BYTES_PER_XDR_UNIT
@@ -2981,12 +2987,12 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	if (vp->v_type != VDIR) {
@@ -2994,7 +3000,7 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 		goto out1;
 	}
 
-	error = VOP_ACCESS(vp, VREAD, 0, cr);
+	error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -3025,17 +3031,17 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 	uio.uio_loffset = (offset_t)args->cookie;
 	uio.uio_resid = count;
 
-	error = VOP_READDIR(vp, &uio, cr, &iseof);
+	error = VOP_READDIR(vp, &uio, cr, &iseof, NULL, 0);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	if (error) {
@@ -3108,7 +3114,7 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 #endif
 
 	VN_RELE(vp);
@@ -3173,7 +3179,7 @@ rfs3_readdir_free(READDIR3res *resp)
  * attributes - NFS3_SIZEOF_FATTR3 * BYTES_PER_XDR_UNIT
  * status byte for file handle - 1 *  BYTES_PER_XDR_UNIT
  * length of a file handle - 1 * BYTES_PER_XDR_UNIT
- * Maxmum length of a file handle (NFS3_MAXFHSIZE)
+ * Maximum length of a file handle (NFS3_MAXFHSIZE)
  * name length of the entry to the nearest bytes
  */
 #define	NFS3_READDIRPLUS_ENTRY(namelen)	\
@@ -3241,12 +3247,12 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 #ifdef DEBUG
 	if (rfs3_do_pre_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	if (vp->v_type != VDIR) {
@@ -3254,7 +3260,7 @@ rfs3_readdirplus(READDIRPLUS3args *args, READDIRPLUS3res *resp,
 		goto out;
 	}
 
-	error = VOP_ACCESS(vp, VREAD, 0, cr);
+	error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
 	if (error)
 		goto out;
 
@@ -3323,7 +3329,7 @@ getmoredents:
 	uio.uio_resid = rd_unit;
 	prev_len = rd_unit;
 
-	error = VOP_READDIR(vp, &uio, cr, &iseof);
+	error = VOP_READDIR(vp, &uio, cr, &iseof, NULL, 0);
 
 	if (error) {
 		kmem_free(data, args->dircount);
@@ -3412,12 +3418,12 @@ good:
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
@@ -3437,7 +3443,8 @@ good:
 
 		infop[i].namelen = namlen[i];
 
-		error = VOP_LOOKUP(vp, dp->d_name, &nvp, NULL, 0, NULL, cr);
+		error = VOP_LOOKUP(vp, dp->d_name, &nvp, NULL, 0, NULL, cr,
+			NULL, NULL, NULL);
 		if (error) {
 			infop[i].attr.attributes = FALSE;
 			infop[i].fh.handle_follows = FALSE;
@@ -3485,7 +3492,7 @@ good:
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 #endif
 
 	VN_RELE(vp);
@@ -3577,12 +3584,12 @@ rfs3_fsstat(FSSTAT3args *args, FSSTAT3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	VN_RELE(vp);
@@ -3673,12 +3680,12 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
 	resp->status = NFS3_OK;
@@ -3696,7 +3703,7 @@ rfs3_fsinfo(FSINFO3args *args, FSINFO3res *resp, struct exportinfo *exi,
 	 * Large file spec: want maxfilesize based on limit of
 	 * underlying filesystem.  We can guess 2^31-1 if need be.
 	 */
-	error = VOP_PATHCONF(vp, _PC_FILESIZEBITS, &l, cr);
+	error = VOP_PATHCONF(vp, _PC_FILESIZEBITS, &l, cr, NULL);
 
 	VN_RELE(vp);
 
@@ -3755,25 +3762,25 @@ rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		va.va_mask = AT_ALL;
-		vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+		vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 	} else
 		vap = NULL;
 #else
 	va.va_mask = AT_ALL;
-	vap = VOP_GETATTR(vp, &va, 0, cr) ? NULL : &va;
+	vap = VOP_GETATTR(vp, &va, 0, cr, NULL) ? NULL : &va;
 #endif
 
-	error = VOP_PATHCONF(vp, _PC_LINK_MAX, &val, cr);
+	error = VOP_PATHCONF(vp, _PC_LINK_MAX, &val, cr, NULL);
 	if (error)
 		goto out;
 	resp->resok.info.link_max = (uint32)val;
 
-	error = VOP_PATHCONF(vp, _PC_NAME_MAX, &val, cr);
+	error = VOP_PATHCONF(vp, _PC_NAME_MAX, &val, cr, NULL);
 	if (error)
 		goto out;
 	resp->resok.info.name_max = (uint32)val;
 
-	error = VOP_PATHCONF(vp, _PC_NO_TRUNC, &val, cr);
+	error = VOP_PATHCONF(vp, _PC_NO_TRUNC, &val, cr, NULL);
 	if (error)
 		goto out;
 	if (val == 1)
@@ -3781,7 +3788,7 @@ rfs3_pathconf(PATHCONF3args *args, PATHCONF3res *resp, struct exportinfo *exi,
 	else
 		resp->resok.info.no_trunc = FALSE;
 
-	error = VOP_PATHCONF(vp, _PC_CHOWN_RESTRICTED, &val, cr);
+	error = VOP_PATHCONF(vp, _PC_CHOWN_RESTRICTED, &val, cr, NULL);
 	if (error)
 		goto out;
 	if (val == 1)
@@ -3837,7 +3844,7 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 	}
 
 	bva.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &bva, 0, cr);
+	error = VOP_GETATTR(vp, &bva, 0, cr, NULL);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -3881,22 +3888,22 @@ rfs3_commit(COMMIT3args *args, COMMIT3res *resp, struct exportinfo *exi,
 	}
 
 	if (crgetuid(cr) != bva.va_uid &&
-	    (error = VOP_ACCESS(vp, VWRITE, 0, cr)))
+	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL)))
 		goto out;
 
-	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr);
+	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
 	if (!error)
-		error = VOP_FSYNC(vp, FNODSYNC, cr);
+		error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
 		ava.va_mask = AT_ALL;
-		avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+		avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 	} else
 		avap = NULL;
 #else
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(vp, &ava, 0, cr) ? NULL : &ava;
+	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
 #endif
 
 	if (error)

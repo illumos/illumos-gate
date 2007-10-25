@@ -100,7 +100,7 @@ fsf_stat_t fsf_total;	/* total of counts */
 ulong_t fsf_cycles;	/* number of runs refelected in fsf_total */
 
 /*
- * data used to determine when we can coalese consecutive free pages
+ * data used to determine when we can coalesce consecutive free pages
  * into larger pages.
  */
 #define	MAX_PAGESIZES	32
@@ -131,7 +131,7 @@ fsflush_do_pages()
 	u_offset_t	offset;
 	uint_t		szc;
 
-	page_t		*coal_page = NULL;  /* 1st page in group to coalese */
+	page_t		*coal_page = NULL;  /* 1st page in group to coalesce */
 	uint_t		coal_szc = 0;	    /* size code, coal_page->p_szc */
 	uint_t		coal_cnt = 0;	    /* count of pages seen */
 
@@ -288,7 +288,7 @@ fsflush_do_pages()
 			page_unlock(pp);
 
 			(void) VOP_PUTPAGE(vp, offset, PAGESIZE, B_ASYNC,
-			    kcred);
+			    kcred, NULL);
 
 			VN_RELE(vp);
 		} else {

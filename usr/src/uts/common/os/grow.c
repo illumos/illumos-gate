@@ -51,6 +51,7 @@
 #include <sys/vmparam.h>
 #include <sys/fcntl.h>
 #include <sys/lwpchan_impl.h>
+#include <sys/nbmlock.h>
 
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -560,6 +561,7 @@ smmap_common(caddr_t *addrp, size_t len,
 	struct as *as = curproc->p_as;
 	uint_t uprot, maxprot, type;
 	int error;
+	int in_crit = 0;
 
 	if ((flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | _MAP_NEW |
 	    _MAP_LOW32 | MAP_NORESERVE | MAP_ANON | MAP_ALIGN |
@@ -694,12 +696,36 @@ smmap_common(caddr_t *addrp, size_t len,
 		}
 	}
 
+	if ((prot & (PROT_READ | PROT_WRITE | PROT_EXEC)) &&
+	    nbl_need_check(vp)) {
+		int svmand;
+		nbl_op_t nop;
+
+		nbl_start_crit(vp, RW_READER);
+		in_crit = 1;
+		error = nbl_svmand(vp, fp->f_cred, &svmand);
+		if (error != 0)
+			goto done;
+		if ((prot & PROT_WRITE) && (type == MAP_SHARED)) {
+			if (prot & (PROT_READ | PROT_EXEC)) {
+				nop = NBL_READWRITE;
+			} else {
+				nop = NBL_WRITE;
+			}
+		} else {
+			nop = NBL_READ;
+		}
+		if (nbl_conflict(vp, nop, 0, LONG_MAX, svmand, NULL)) {
+			error = EACCES;
+			goto done;
+		}
+	}
 
 	/*
 	 * Ok, now let the vnode map routine do its thing to set things up.
 	 */
 	error = VOP_MAP(vp, pos, as,
-	    addrp, len, uprot, maxprot, flags, fp->f_cred);
+	    addrp, len, uprot, maxprot, flags, fp->f_cred, NULL);
 
 	if (error == 0) {
 		if (vp->v_type == VREG &&
@@ -713,6 +739,9 @@ smmap_common(caddr_t *addrp, size_t len,
 		}
 	}
 
+done:
+	if (in_crit)
+		nbl_end_crit(vp);
 	return (error);
 }
 

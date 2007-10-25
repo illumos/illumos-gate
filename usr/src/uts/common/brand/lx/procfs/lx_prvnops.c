@@ -32,7 +32,7 @@
  *
  * In order to preserve Solaris' security policy. This file system's
  * functionality does not override Solaris' security policies even if
- * that means breaking Linux compatability.
+ * that means breaking Linux compatibility.
  *
  * Linux has no concept of lwps so we only implement procs here as in the
  * old /proc interface.
@@ -75,19 +75,23 @@ extern time_t boot_time;
  */
 vnodeops_t *lxpr_vnodeops;
 
-static int lxpr_open(vnode_t **, int, cred_t *);
-static int lxpr_close(vnode_t *, int, int, offset_t, cred_t *);
+static int lxpr_open(vnode_t **, int, cred_t *, caller_context_t *);
+static int lxpr_close(vnode_t *, int, int, offset_t, cred_t *,
+    caller_context_t *);
 static int lxpr_read(vnode_t *, uio_t *, int, cred_t *, caller_context_t *);
-static int lxpr_getattr(vnode_t *, vattr_t *, int, cred_t *);
-static int lxpr_access(vnode_t *, int, int, cred_t *);
+static int lxpr_getattr(vnode_t *, vattr_t *, int, cred_t *,
+    caller_context_t *);
+static int lxpr_access(vnode_t *, int, int, cred_t *, caller_context_t *);
 static int lxpr_lookup(vnode_t *, char *, vnode_t **,
-    pathname_t *, int, vnode_t *, cred_t *);
-static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *);
-static int lxpr_readlink(vnode_t *, uio_t *, cred_t *);
-static int lxpr_cmp(vnode_t *, vnode_t *);
-static int lxpr_realvp(vnode_t *, vnode_t **);
+    pathname_t *, int, vnode_t *, cred_t *, caller_context_t *, int *,
+    pathname_t *);
+static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *,
+    caller_context_t *, int);
+static int lxpr_readlink(vnode_t *, uio_t *, cred_t *, caller_context_t *);
+static int lxpr_cmp(vnode_t *, vnode_t *, caller_context_t *);
+static int lxpr_realvp(vnode_t *, vnode_t **, caller_context_t *);
 static int lxpr_sync(void);
-static void lxpr_inactive(vnode_t *, cred_t *);
+static void lxpr_inactive(vnode_t *, cred_t *, caller_context_t *);
 
 static vnode_t *lxpr_lookup_procdir(vnode_t *, char *);
 static vnode_t *lxpr_lookup_piddir(vnode_t *, char *);
@@ -243,7 +247,7 @@ static lxpr_dirent_t netdir[] = {
  * lxpr_open(): Vnode operation for VOP_OPEN()
  */
 static int
-lxpr_open(vnode_t **vpp, int flag, cred_t *cr)
+lxpr_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t		*vp = *vpp;
 	lxpr_node_t	*lxpnp = VTOLXP(vp);
@@ -272,7 +276,7 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr)
 			 * Need to hold rvp since VOP_OPEN() may release it.
 			 */
 			VN_HOLD(rvp);
-			error = VOP_OPEN(&rvp, flag, cr);
+			error = VOP_OPEN(&rvp, flag, cr, ct);
 			if (error) {
 				VN_RELE(rvp);
 			} else {
@@ -317,7 +321,8 @@ lxpr_open(vnode_t **vpp, int flag, cred_t *cr)
  */
 /* ARGSUSED */
 static int
-lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
+lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
+    caller_context_t *ct)
 {
 	lxpr_node_t	*lxpr = VTOLXP(vp);
 	lxpr_nodetype_t	type = lxpr->lxpr_type;
@@ -705,7 +710,8 @@ lxpr_read_pid_maps(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		*buf = '\0';
 		if (pbuf->vp != NULL) {
 			vattr.va_mask = AT_FSID | AT_NODEID;
-			if (VOP_GETATTR(pbuf->vp, &vattr, 0, CRED()) == 0) {
+			if (VOP_GETATTR(pbuf->vp, &vattr, 0, CRED(),
+			    NULL) == 0) {
 				maj = getmajor(vattr.va_fsid);
 				min = getminor(vattr.va_fsid);
 				inode = vattr.va_nodeid;
@@ -2042,7 +2048,8 @@ lxpr_read_fd(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  * lxpr_getattr(): Vnode operation for VOP_GETATTR()
  */
 static int
-lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	register lxpr_node_t *lxpnp = VTOLXP(vp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -2060,14 +2067,14 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 		/*
 		 * withold attribute information to owner or root
 		 */
-		if ((error = VOP_ACCESS(rvp, 0, 0, cr)) != 0) {
+		if ((error = VOP_ACCESS(rvp, 0, 0, cr, ct)) != 0) {
 			return (error);
 		}
 
 		/*
 		 * now its attributes
 		 */
-		if ((error = VOP_GETATTR(rvp, vap, flags, cr)) != 0) {
+		if ((error = VOP_GETATTR(rvp, vap, flags, cr, ct)) != 0) {
 			return (error);
 		}
 
@@ -2122,7 +2129,7 @@ lxpr_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  * lxpr_access(): Vnode operation for VOP_ACCESS()
  */
 static int
-lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr, caller_context_t *ct)
 {
 	lxpr_node_t *lxpnp = VTOLXP(vp);
 	int shift = 0;
@@ -2162,7 +2169,7 @@ lxpr_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 		/*
 		 * For these we use the underlying vnode's accessibility.
 		 */
-		return (VOP_ACCESS(lxpnp->lxpr_realvp, mode, flags, cr));
+		return (VOP_ACCESS(lxpnp->lxpr_realvp, mode, flags, cr, ct));
 	}
 
 	/* If user is root allow access regardless of permission bits */
@@ -2207,7 +2214,8 @@ lxpr_lookup_not_a_dir(vnode_t *dp, char *comp)
 /* ARGSUSED */
 static int
 lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
-	int flags, vnode_t *rdir, cred_t *cr)
+	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
+	int *direntflags, pathname_t *realpnp)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -2227,7 +2235,7 @@ lxpr_lookup(vnode_t *dp, char *comp, vnode_t **vpp, pathname_t *pathp,
 	/*
 	 * restrict lookup permission to owner or root
 	 */
-	if ((error = lxpr_access(dp, VEXEC, 0, cr)) != 0) {
+	if ((error = lxpr_access(dp, VEXEC, 0, cr, ct)) != 0) {
 		return (error);
 	}
 
@@ -2477,7 +2485,8 @@ lxpr_lookup_procdir(vnode_t *dp, char *comp)
  */
 /* ARGSUSED */
 static int
-lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp)
+lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp,
+	caller_context_t *ct, int flags)
 {
 	lxpr_node_t *lxpnp = VTOLXP(dp);
 	lxpr_nodetype_t type = lxpnp->lxpr_type;
@@ -2499,7 +2508,7 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp)
 	/*
 	 * restrict readdir permission to owner or root
 	 */
-	if ((error = lxpr_access(dp, VREAD, 0, cr)) != 0)
+	if ((error = lxpr_access(dp, VREAD, 0, cr, ct)) != 0)
 		return (error);
 
 	uoffset = uiop->uio_offset;
@@ -2909,7 +2918,7 @@ out:
  */
 /* ARGSUSED */
 static int
-lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
+lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
 {
 	char bp[MAXPATHLEN + 1];
 	size_t buflen = sizeof (bp);
@@ -2924,7 +2933,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
 
 	/* Try to produce a symlink name for anything that has a realvp */
 	if (rvp != NULL) {
-		if ((error = lxpr_access(vp, VREAD, 0, CRED())) != 0)
+		if ((error = lxpr_access(vp, VREAD, 0, CRED(), ct)) != 0)
 			return (error);
 		if ((error = vnodetopath(NULL, rvp, bp, buflen, CRED())) != 0)
 			return (error);
@@ -2971,7 +2980,7 @@ lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
  */
 /* ARGSUSED */
 static void
-lxpr_inactive(vnode_t *vp, cred_t *cr)
+lxpr_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
 	lxpr_freenode(VTOLXP(vp));
 }
@@ -2995,7 +3004,7 @@ lxpr_sync()
  * lxpr_cmp(): Vnode operation for VOP_CMP()
  */
 static int
-lxpr_cmp(vnode_t *vp1, vnode_t *vp2)
+lxpr_cmp(vnode_t *vp1, vnode_t *vp2, caller_context_t *ct)
 {
 	vnode_t *rvp;
 
@@ -3007,7 +3016,7 @@ lxpr_cmp(vnode_t *vp1, vnode_t *vp2)
 		vp2 = rvp;
 	if (vn_matchops(vp1, lxpr_vnodeops) || vn_matchops(vp2, lxpr_vnodeops))
 		return (vp1 == vp2);
-	return (VOP_CMP(vp1, vp2));
+	return (VOP_CMP(vp1, vp2, ct));
 }
 
 
@@ -3015,13 +3024,13 @@ lxpr_cmp(vnode_t *vp1, vnode_t *vp2)
  * lxpr_realvp(): Vnode operation for VOP_REALVP()
  */
 static int
-lxpr_realvp(vnode_t *vp, vnode_t **vpp)
+lxpr_realvp(vnode_t *vp, vnode_t **vpp, caller_context_t *ct)
 {
 	vnode_t *rvp;
 
 	if ((rvp = VTOLXP(vp)->lxpr_realvp) != NULL) {
 		vp = rvp;
-		if (VOP_REALVP(vp, &rvp) == 0)
+		if (VOP_REALVP(vp, &rvp, ct) == 0)
 			vp = rvp;
 	}
 

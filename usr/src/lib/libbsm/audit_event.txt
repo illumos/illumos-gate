@@ -444,6 +444,8 @@
 6241:AUE_uadmin_remount:uadmin(1m) - remount:ss
 6242:AUE_uadmin_ftrace:uadmin(1m) - ftrace:ss
 6243:AUE_uadmin_swapctl:uadmin(1m) - swapctl:ss
+6237:AUE_smbd_session:smbd(1m) session setup:lo
+6238:AUE_smbd_logoff:smbd(1m) session logoff:lo
 #
 # Trusted Extensions events:
 #

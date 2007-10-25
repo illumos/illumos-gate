@@ -106,9 +106,28 @@ SUNWprivate {
 	sa_delete_legacy;
 	sa_free_derived_security;
 	sa_enable_share;
+	sa_enable_resource;
 	sa_create_group;
 	sa_valid_protocol;
 	sa_find_group_handle;
+	sa_add_resource;
+	sa_remove_resource;
+	sa_rename_resource;
+	sa_get_resource;
+	sa_get_next_resource;
+	sa_get_resource_attr;
+	sa_set_resource_attr;
+	sa_get_share_resource;
+	sa_get_resource_parent;
+	sa_find_resource;
+	sa_proto_change_notify;
+	sa_proto_notify_resource;
+	sa_disable_resource;
+	sa_proto_get_featureset;
+	sa_is_persistent;
+	sa_set_resource_description;
+	sa_get_resource_description;
+	sa_fix_resource_name;
     local:
 	*;
 };

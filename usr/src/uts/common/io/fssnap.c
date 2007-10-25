@@ -347,7 +347,7 @@ _fini(void)
  * together the frozen file system.  The data may either be on the master
  * device (no translation exists), in memory (a translation exists but has
  * not been flushed to the backing store), or in the backing store file.
- * The read request may require the snapshot driver to retreive data from
+ * The read request may require the snapshot driver to retrieve data from
  * several different places and piece it together to look like a single
  * contiguous read.
  *
@@ -1032,7 +1032,7 @@ int *rvalp)
 		releasef(fc.rootfiledesc);
 
 		/* pass ioctl request to file system */
-		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp);
+		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp, NULL);
 		VN_RELE(vp);
 		break;
 	}
@@ -1055,7 +1055,7 @@ int *rvalp)
 		releasef(fc.rootfiledesc);
 
 		/* pass ioctl request to file system */
-		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp);
+		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp, NULL);
 		VN_RELE(vp);
 		break;
 	}
@@ -1130,7 +1130,7 @@ int *rvalp)
 		 * to use as a locking semaphore across the IOCTL
 		 * for mount in progress cases...
 		 */
-		vfsp = kmem_alloc(sizeof (vfs_t), KM_SLEEP);
+		vfsp = vfs_alloc(KM_SLEEP);
 		VFS_INIT(vfsp, vfsops, NULL);
 		VFS_HOLD(vfsp);
 		vfs_addmip(dev, vfsp);
@@ -1146,7 +1146,7 @@ int *rvalp)
 		 * until IOCTL complete to prohibit a mount sneaking
 		 * in
 		 */
-		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp);
+		error = VOP_IOCTL(vp, cmd, arg, 0, credp, rvalp, NULL);
 		vfs_delmip(vfsp);
 		VFS_RELE(vfsp);
 		VN_RELE(vp);

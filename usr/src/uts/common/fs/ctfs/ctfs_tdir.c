@@ -58,7 +58,8 @@ static gfs_dirent_t ctfs_tdir_dirents[] = {
 
 static int ctfs_tdir_do_readdir(vnode_t *, struct dirent64 *, int *, offset_t *,
     offset_t *, void *);
-static int ctfs_tdir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *);
+static int ctfs_tdir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
+    cred_t *);
 static ino64_t ctfs_tdir_do_inode(vnode_t *, int);
 
 /*
@@ -77,7 +78,12 @@ ctfs_create_tdirnode(vnode_t *pvp)
  */
 /* ARGSUSED */
 static int
-ctfs_tdir_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_tdir_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vap->va_type = VDIR;
 	vap->va_mode = 0555;
@@ -124,8 +130,10 @@ ctfs_tdir_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-ctfs_tdir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop)
+ctfs_tdir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
+    cred_t *cr)
 {
 	int i;
 	contract_t *ct;

@@ -72,6 +72,13 @@ struct sa_plugin_ops {
 	char   *(*sa_space_alias)(char *);
 	int	(*sa_update_legacy)(sa_share_t);
 	int	(*sa_delete_legacy)(sa_share_t);
+	int	(*sa_change_notify)(sa_share_t);
+	int	(*sa_enable_resource)(sa_resource_t);
+	int	(*sa_disable_resource)(sa_resource_t);
+	uint64_t (*sa_features)(void);
+	int	(*sa_get_transient_shares)(sa_handle_t); /* add transients */
+	int	(*sa_notify_resource)(sa_resource_t);
+	int	(*sa_rename_resource)(sa_handle_t, sa_resource_t, char *);
 	int	(*sa_run_command)(int, int, char **); /* proto specific */
 	int	(*sa_command_help)();
 };
@@ -97,6 +104,8 @@ extern int sa_proto_unshare(sa_share_t, char *, char *);
 extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
 extern int sa_proto_security_prop(char *, char *);
 extern int sa_proto_legacy_opts(char *, sa_group_t, char *);
+extern int sa_proto_share_resource(char *, sa_resource_t);
+extern int sa_proto_unshare_resource(char *, sa_resource_t);
 
 /* internal utility functions */
 extern sa_optionset_t sa_get_derived_optionset(sa_group_t, char *, int);
@@ -121,7 +130,7 @@ extern void sa_emptyshare(struct share *sh);
 /* ZFS functions */
 extern int sa_get_zfs_shares(sa_handle_t, char *);
 extern int sa_zfs_update(sa_share_t);
-extern int sa_share_zfs(sa_share_t, char *, share_t *, void *, boolean_t);
+extern int sa_share_zfs(sa_share_t, char *, share_t *, void *, zfs_share_op_t);
 extern int sa_sharetab_fill_zfs(sa_share_t share, struct share *sh,
     char *proto);
 
@@ -131,6 +140,8 @@ extern void proto_plugin_fini();
 extern int sa_proto_set_property(char *, sa_property_t);
 extern int sa_proto_delete_legacy(char *, sa_share_t);
 extern int sa_proto_update_legacy(char *, sa_share_t);
+extern int sa_proto_rename_resource(sa_handle_t, char *,
+    sa_resource_t, char *);
 
 #define	PL_TYPE_PROPERTY	0
 #define	PL_TYPE_SECURITY	1

@@ -290,7 +290,7 @@ ibcm_arp_unlink_driver(queue_t **q, vnode_t **dev_vp)
 
 	setq(rq, &strdata, &stwdata, NULL, QMTSAFE, SQ_CI|SQ_CO, B_TRUE);
 
-	if ((rc = VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED())) != 0) {
+	if ((rc = VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL)) != 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_unlink_driver: VOP_CLOSE "
 		    "failed %d\n", rc);
 	}

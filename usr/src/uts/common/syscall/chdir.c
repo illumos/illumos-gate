@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ chdirec(vnode_t *vp, int ischroot, int do_traverse)
 		error = ENOTDIR;
 		goto bad;
 	}
-	if (error = VOP_ACCESS(vp, VEXEC, 0, CRED()))
+	if (error = VOP_ACCESS(vp, VEXEC, 0, CRED(), NULL))
 		goto bad;
 
 	/*
@@ -199,11 +199,11 @@ chdirec(vnode_t *vp, int ischroot, int do_traverse)
 		vnode_t *zonevp = curproc->p_zone->zone_rootvp;
 
 		tattr.va_mask = AT_FSID|AT_NODEID;
-		if (error = VOP_GETATTR(vp, &tattr, 0, CRED()))
+		if (error = VOP_GETATTR(vp, &tattr, 0, CRED(), NULL))
 			goto bad;
 
 		rattr.va_mask = AT_FSID|AT_NODEID;
-		if (error = VOP_GETATTR(zonevp, &rattr, 0, CRED()))
+		if (error = VOP_GETATTR(zonevp, &rattr, 0, CRED(), NULL))
 			goto bad;
 
 		if ((tattr.va_fsid != rattr.va_fsid ||

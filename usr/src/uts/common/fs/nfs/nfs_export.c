@@ -617,7 +617,7 @@ pseudo_secinfo_remove(exportinfo_t *ancexi, exp_visible_t *ancpseudo)
  *
  * If there is more than 1 export reference to an old flavor (i.e. some
  * of its children shared with this flavor), this flavor information
- * needs to be transfered to the new exportdata struct.  A flavor in
+ * needs to be transferred to the new exportdata struct.  A flavor in
  * the old exportdata has descendant refs when s_refcnt > 1.
  *
  * Transferring descendant flavor refcnts happens in 2 passes:
@@ -749,7 +749,7 @@ srv_secinfo_exp2exp(exportdata_t *curdata, secinfo_t *oldsecinfo, int ocnt)
  * When unsharing an old export node and the old node becomes a pseudo node,
  * if there is more than 1 export reference to an old flavor (i.e. some of
  * its children shared with this flavor), this flavor information needs to
- * be transfered to the new shared node.
+ * be transferred to the new shared node.
  *
  * This routine is used under the protection of exported_lock (RW_WRITER).
  */
@@ -928,7 +928,8 @@ srv_secinfo_treeclimb(exportinfo_t *exip, secinfo_t *sec, int seccnt, int isadd)
 		/*
 		 * Now, do a ".." to find parent dir of vp.
 		 */
-		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED());
+		error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, CRED(),
+		    NULL, NULL, NULL);
 
 		if (error == ENOTDIR && exportdir) {
 			dvp = exip->exi_dvp;
@@ -1039,8 +1040,8 @@ nfs_exportinit(void)
 }
 
 /*
- * Finalization routine for export routines. Called to cleanup previoulsy
- * initializtion work when the NFS server module could not be loaded correctly.
+ * Finalization routine for export routines. Called to cleanup previously
+ * initialization work when the NFS server module could not be loaded correctly.
  */
 void
 nfs_exportfini(void)
@@ -1243,7 +1244,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 * intended filesystem, so we can share the intended
 	 * filesystem instead of the AUTOFS filesystem.
 	 */
-	(void) VOP_ACCESS(vp, 0, 0, cr);
+	(void) VOP_ACCESS(vp, 0, 0, cr, NULL);
 
 	/*
 	 * We're interested in the top most filesystem.
@@ -1266,7 +1267,7 @@ exportfs(struct exportfs_args *args, model_t model, cred_t *cr)
 	 */
 	bzero(&fid, sizeof (fid));
 	fid.fid_len = MAXFIDSZ;
-	error = VOP_FID(vp, &fid);
+	error = VOP_FID(vp, &fid, NULL);
 	fsid = vp->v_vfsp->vfs_fsid;
 	if (error) {
 		VN_RELE(vp);
@@ -1914,7 +1915,7 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 	 * intended filesystem, so we can share the intended
 	 * filesystem instead of the AUTOFS filesystem.
 	 */
-	(void) VOP_ACCESS(vp, 0, 0, cr);
+	(void) VOP_ACCESS(vp, 0, 0, cr, NULL);
 
 	/*
 	 * We're interested in the top most filesystem.
@@ -1952,7 +1953,7 @@ nfs_getfh(struct nfs_getfh_args *args, model_t model, cred_t *cr)
 				i += sz;
 
 				/*
-				 * For backwards compatability, the
+				 * For backwards compatibility, the
 				 * fid length may be less than
 				 * NFS_FHMAXDATA, but it was always
 				 * encoded as NFS_FHMAXDATA bytes.
@@ -2091,7 +2092,8 @@ nfs_vptoexi(vnode_t *dvp, vnode_t *vp, cred_t *cr, int *walk,
 		 * otherwise, look it up.
 		 */
 		if (dvp == NULL) {
-			error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, cr);
+			error = VOP_LOOKUP(vp, "..", &dvp, NULL, 0, NULL, cr,
+			    NULL, NULL, NULL);
 			if (error)
 				break;
 		}
@@ -2141,7 +2143,7 @@ makefh(fhandle_t *fh, vnode_t *vp, exportinfo_t *exi)
 
 	*fh = exi->exi_fh;	/* struct copy */
 
-	error = VOP_FID(vp, (fid_t *)&fh->fh_len);
+	error = VOP_FID(vp, (fid_t *)&fh->fh_len, NULL);
 	if (error) {
 		/*
 		 * Should be something other than EREMOTE
@@ -2245,7 +2247,7 @@ makefh3(nfs_fh3 *fh, vnode_t *vp, struct exportinfo *exi)
 
 	bzero(&fid, sizeof (fid));
 	fid.fid_len = MAXFIDSZ;
-	error = VOP_FID(vp, &fid);
+	error = VOP_FID(vp, &fid, NULL);
 	if (error)
 		return (EREMOTE);
 

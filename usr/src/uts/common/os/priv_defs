@@ -149,6 +149,11 @@ privilege PRIV_FILE_UPGRADE_SL
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
+privilege PRIV_FILE_FLAG_SET
+
+	Allows a process to set immutable, nounlink or appendonly
+	file attributes.
+
 privilege PRIV_GRAPHICS_ACCESS
 
 	Allows a process to make privileged ioctls to graphics devices.
@@ -401,6 +406,13 @@ unsafe privilege PRIV_SYS_RESOURCE
 	processes.
 	Allows a process to extend or create files on a filesystem that
 	has less than minfree space in reserve.
+
+privilege PRIV_SYS_SMB
+
+	Allows a process to access the Sun private SMB kernel module.
+	Allows a process to bind to ports reserved by NetBIOS and SMB:
+	ports 137 (NBNS), 138 (NetBIOS Datagram Service), 139 (NetBIOS
+	Session Service and SMB-over-NBT) and 445 (SMB-over-TCP).
 
 privilege PRIV_SYS_SUSER_COMPAT
 

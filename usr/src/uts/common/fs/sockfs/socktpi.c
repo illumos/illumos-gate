@@ -287,14 +287,14 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 	so->so_kssl_ent = NULL;
 	so->so_kssl_ctx = NULL;
 
-	if (error = socktpi_open(&vp, flags, CRED())) {
+	if (error = socktpi_open(&vp, flags, CRED(), NULL)) {
 		VN_RELE(vp);
 		*errorp = error;
 		return (NULL);
 	}
 
 	if (error = so_strinit(so, tso)) {
-		(void) VOP_CLOSE(vp, 0, 1, 0, CRED());
+		(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
 		VN_RELE(vp);
 		*errorp = error;
 		return (NULL);
@@ -1753,7 +1753,7 @@ again:
 				 */
 				mutex_exit(&nso->so_lock);
 				(void) VOP_CLOSE(nvp, 0, 1, (offset_t)0,
-				    CRED());
+				    CRED(), NULL);
 				VN_RELE(nvp);
 				goto again;
 			}
@@ -1900,7 +1900,7 @@ e_disc_unl:
 pr_disc_vp_unl:
 	eprintsoline(so, error);
 disconnect_vp_unlocked:
-	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 	VN_RELE(nvp);
 disconnect_unlocked:
 	(void) sodisconnect(so, SEQ_number, 0);
@@ -1912,7 +1912,7 @@ disconnect_vp:
 	(void) sodisconnect(so, SEQ_number, _SODISCONNECT_LOCK_HELD);
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
-	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+	(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 	VN_RELE(nvp);
 	return (error);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -782,6 +782,7 @@ vs_aent_to_ace4(vsecattr_t *aclentacl, vsecattr_t *vs_ace4,
 	vs_ace4->vsa_aclcnt = 0;
 	vs_ace4->vsa_dfaclentp = NULL;
 	vs_ace4->vsa_dfaclcnt = 0;
+	vs_ace4->vsa_aclentsz = 0;
 
 	if (! (aclentacl->vsa_mask & (VSA_ACL | VSA_ACLCNT |
 	    VSA_DFACL | VSA_DFACLCNT))) {
@@ -1922,10 +1923,11 @@ vs_ace4_to_acet(vsecattr_t *vs_ace4, vsecattr_t *vs_acet,
 	if ((vs_ace4->vsa_aclcnt == 0) || (vs_ace4->vsa_aclentp == NULL))
 		return (0);
 
-	if (vs_ace4->vsa_aclcnt > 0)
+	if (vs_ace4->vsa_aclcnt > 0) {
 		vs_acet->vsa_aclentp = kmem_alloc(vs_ace4->vsa_aclcnt *
 		    sizeof (ace_t), KM_SLEEP);
-	else
+		vs_acet->vsa_aclentsz = vs_ace4->vsa_aclcnt * sizeof (ace_t);
+	} else
 		vs_acet->vsa_aclentp = NULL;
 	vs_acet->vsa_aclcnt = vs_ace4->vsa_aclcnt;
 	vs_acet->vsa_mask = VSA_ACE | VSA_ACECNT;

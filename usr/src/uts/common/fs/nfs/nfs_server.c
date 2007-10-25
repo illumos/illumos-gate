@@ -2555,7 +2555,7 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 			 * filesystem, so we can perform the lookup in the
 			 * intended filesystem.
 			 */
-			(void) VOP_ACCESS(*vpp, 0, 0, cr);
+			(void) VOP_ACCESS(*vpp, 0, 0, cr, NULL);
 
 			/*
 			 * If vnode is covered, get the
@@ -2569,7 +2569,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 				}
 			}
 
-			if (VOP_REALVP(*vpp, &realvp) == 0 && realvp != *vpp) {
+			if (VOP_REALVP(*vpp, &realvp, NULL) == 0 &&
+			    realvp != *vpp) {
 				/*
 				 * If realvp is different from *vpp
 				 * then release our reference on *vpp, so that
@@ -2603,7 +2604,8 @@ rfs_publicfh_mclookup(char *p, vnode_t *dvp, cred_t *cr, vnode_t **vpp,
 			}
 		}
 
-		if (VOP_REALVP(mc_dvp, &realvp) == 0 && realvp != mc_dvp) {
+		if (VOP_REALVP(mc_dvp, &realvp, NULL) == 0 &&
+		    realvp != mc_dvp) {
 			/*
 			 * *vpp is a file, obtain realvp of the parent
 			 * directory vnode.
@@ -2800,7 +2802,7 @@ MCLpath(char **path)
 			((c >= 'a' && c <= 'f') ? (c - 'a' + 10) : 0)))
 
 /*
- * The implementation of URLparse gaurantees that the final string will
+ * The implementation of URLparse guarantees that the final string will
  * fit in the original one. Replaces '%' occurrences followed by 2 characters
  * with its corresponding hexadecimal character.
  */

@@ -53,6 +53,7 @@ SUNWprivate_1.1 {
 	zfs_is_shared;
 	zfs_is_shared_iscsi;
 	zfs_is_shared_nfs;
+	zfs_is_shared_smb;
 	zfs_iter_children;
 	zfs_iter_dependents;
 	zfs_iter_filesystems;
@@ -92,7 +93,9 @@ SUNWprivate_1.1 {
 	zfs_rollback;
 	zfs_send;
 	zfs_share;
+	zfs_shareall;
 	zfs_share_nfs;
+	zfs_share_smb;
 	zfs_share_iscsi;
 	zfs_snapshot;
 	zfs_type_to_name;
@@ -101,7 +104,11 @@ SUNWprivate_1.1 {
 	zfs_unshare;
 	zfs_unshare_iscsi;
 	zfs_unshare_nfs;
+	zfs_unshare_smb;
+	zfs_unshareall;
+	zfs_unshareall_bypath;
 	zfs_unshareall_nfs;
+	zfs_unshareall_smb;
 	zpool_add;
 	zpool_clear;
 	zpool_close;

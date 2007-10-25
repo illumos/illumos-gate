@@ -1,0 +1,287 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _MLSVC_SVCCTL_NDL_
+#define _MLSVC_SVCCTL_NDL_
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * NT Service Control Services (SVCCTL) RPC interface definition.
+ * This interface provides remote access to add, remove, start and
+ * stop services.
+ */
+
+#include "ndrtypes.ndl"
+
+#define SVCCTL_OPNUM_Close			0x00
+#define SVCCTL_OPNUM_QueryServiceStatus		0x06
+#define SVCCTL_OPNUM_EnumServicesStatus		0x0E
+#define SVCCTL_OPNUM_OpenManager		0x0F
+#define SVCCTL_OPNUM_OpenService		0x10
+#define SVCCTL_OPNUM_QueryServiceConfig		0x11
+
+/*
+ * Standard opaque 20 byte RPC handle.
+ */
+
+
+struct svcctl_handle {
+	DWORD hand1;
+	DWORD hand2;
+	WORD  hand3[2];
+	BYTE  hand4[8];
+};
+
+typedef struct svcctl_handle svcctl_handle_t;
+
+/*
+ * The svc_status (SERVICE_STATUS) structure contains information about a
+ * service. The ControlService, EnumDependentServices, EnumServicesStatus,
+ * and QueryServiceStatus functions use this structure to return information
+ * about a service. A service uses this structure in the SetServiceStatus
+ * function to report its current status to the service control manager.
+ *
+ * service_type
+ *	The type of service. This member can be one of the following values.
+ *
+ *      SERVICE_FILE_SYSTEM_DRIVER
+ *      SERVICE_KERNEL_DRIVER
+ *      SERVICE_WIN32_OWN_PROCESS
+ *      SERVICE_WIN32_SHARE_PROCESS
+ *
+ * If the service type is either SERVICE_WIN32_OWN_PROCESS or
+ * SERVICE_WIN32_SHARE_PROCESS, and the service is running in
+ * the context of the LocalSystem account, the following type
+ * may also be specified to indicate that the service can
+ * interact with the desktop.
+ *
+ *      SERVICE_INTERACTIVE_PROCESS
+ *
+ * cur_state
+ *	The current state of the service. This member can be one of the
+ *	following values.
+ *
+ *      SERVICE_CONTINUE_PENDING
+ *      SERVICE_PAUSE_PENDING
+ *      SERVICE_PAUSED
+ *      SERVICE_RUNNING
+ *      SERVICE_START_PENDING
+ *      SERVICE_STOP_PENDING
+ *      SERVICE_STOPPED
+ *
+ * ctrl_accepted
+ *	The control codes that the service will accept and process in its
+ *	handler function (see Handler and HandlerEx). A user interface
+ *	process can control a service by specifying a control command in
+ *	the ControlService function. By default, all services accept the
+ *	SERVICE_CONTROL_INTERROGATE value. The following are the control
+ *	codes.
+ *
+ *      SERVICE_ACCEPT_STOP        
+ *      SERVICE_ACCEPT_PAUSE_CONTINUE
+ *      SERVICE_ACCEPT_SHUTDOWN     
+ *      SERVICE_ACCEPT_PARAMCHANGE 
+ *      SERVICE_ACCEPT_NETBINDCHANGE
+ *
+ * w32_exitcode
+ *  An error code that the service uses to report an error that occurs when
+ *  it is starting or stopping. To return an error code specific to the
+ *  service, the service must set this value to ERROR_SERVICE_SPECIFIC_ERROR
+ *  to indicate that the dwServiceSpecificExitCode member contains the error
+ *  code. The service should set this value to NO_ERROR when it is running
+ *  and on normal termination. 
+ *
+ * svc_specified_exitcode
+ *  A service-specific error code that the service returns when an error 
+ *  occurs while the service is starting or stopping. This value is ignored 
+ *  unless the w32_exitcode member is set to ERROR_SERVICE_SPECIFIC_ERROR. 
+ *
+ * check_point
+ *  A value that the service increments periodically to report its progress 
+ *  during a lengthy start, stop, pause, or continue operation. For example, 
+ *  the service should increment this value as it completes each step of its 
+ *  initialization when it is starting up. The user interface program that 
+ *  invoked the operation on the service uses this value to track the progress 
+ *  of the service during a lengthy operation. This value is not valid and 
+ *  should be zero when the service does not have a start, stop, pause, or 
+ *  continue operation pending. 
+ *
+ * wait_hint
+ *  An estimate of the amount of time, in milliseconds, that the service
+ *  expects a pending start, stop, pause, or continue operation to take
+ *  before the service makes its next call to the SetServiceStatus
+ *  function with either an incremented check_point value or a change in
+ *  dwCurrentState. If the amount of time specified by wait_hint passes,
+ *  and check_point has not been incremented, or cur_state has not changed,
+ *  the service control manager or service control program can assume that
+ *  an error has occurred and the service should be stopped. 
+ */
+struct svc_status {
+	DWORD service_type;
+	DWORD cur_state;
+	DWORD ctrl_accepted;
+	DWORD w32_exitcode;
+	DWORD svc_specified_exitcode;
+	DWORD check_point;
+	DWORD wait_hint;
+}; 
+typedef struct svc_status svc_status_t;
+
+struct svc_enum_status {
+	DWORD svc_name;		/* offset within response buffer */
+	DWORD display_name;	/* offset within response buffer */
+	svc_status_t svc_status;
+};
+typedef struct svc_enum_status svc_enum_status_t;
+
+struct svc_config { 
+	DWORD  service_type; 
+	DWORD  start_type; 
+	DWORD  error_control; 
+	LPTSTR binary_pathname; 
+	LPTSTR loadorder_group; 
+	DWORD  tag_id; 
+	LPTSTR dependencies; 
+	LPTSTR service_startname; 
+	LPTSTR display_name; 
+};
+typedef struct svc_config svc_config_t;
+
+
+/*
+ ***********************************************************************
+ * Close
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_Close)
+struct svcctl_Close {
+	IN		svcctl_handle_t handle;
+	OUT		svcctl_handle_t result_handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * OpenManager
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_OpenManager)
+struct svcctl_OpenManager {
+	IN		LPTSTR machine_name;
+	IN		LPTSTR database_name;
+	IN		DWORD desired_access;
+	OUT		svcctl_handle_t handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * OpenService
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_OpenService)
+struct svcctl_OpenService {
+	IN		svcctl_handle_t manager_handle;
+	IN REFERENCE	LPTSTR service_name;
+	IN		DWORD desired_access;
+	OUT		svcctl_handle_t service_handle;
+	OUT		DWORD status;
+};
+
+
+/*
+ ***********************************************************************
+ * QueryServiceStatus
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_QueryServiceStatus)
+struct svcctl_QueryServiceStatus {
+	IN		svcctl_handle_t service_handle;
+	OUT		svc_status_t service_status;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * EnumServicesStatus
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_EnumServicesStatus)
+struct svcctl_EnumServicesStatus {
+	IN		svcctl_handle_t manager_handle;
+	IN		DWORD svc_type;
+	IN		DWORD svc_state;
+	INOUT		DWORD buf_size;
+	IN		DWORD unknown;
+	OUT		BYTE services[1024];
+	OUT		DWORD bytes_needed;
+	OUT		DWORD svc_num;
+	OUT		DWORD resume_handle;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * QueryServiceConfig	
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_QueryServiceConfig)
+struct svcctl_QueryServiceConfig {
+	IN		svcctl_handle_t service_handle;
+	IN		DWORD buf_size;
+	OUT		svc_config_t service_cfg;
+	OUT		DWORD cfg_bytes;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * The SVCCTL interface definition.
+ ***********************************************************************
+ */
+INTERFACE(0)
+union svcctl_interface {
+	CASE(SVCCTL_OPNUM_Close)
+		struct svcctl_Close			SvcClose;
+	CASE(SVCCTL_OPNUM_OpenManager)
+		struct svcctl_OpenManager		SvcOpenManager;
+	CASE(SVCCTL_OPNUM_OpenService)
+		struct svcctl_OpenService		SvcOpenService;
+	CASE(SVCCTL_OPNUM_QueryServiceStatus)
+		struct svcctl_QueryServiceStatus	SvcQueryServiceStatus;
+	CASE(SVCCTL_OPNUM_EnumServicesStatus)
+		struct svcctl_EnumServicesStatus	SvcEnumServicesStatus;
+	CASE(SVCCTL_OPNUM_QueryServiceConfig)
+		struct svcctl_QueryServiceConfig	SvcQueryServiceConfig;
+};
+
+typedef union svcctl_interface	svcctl_interface_t;
+EXTERNTYPEINFO(svcctl_interface)
+
+
+#endif /* _MLSVC_SVCCTL_NDL_ */

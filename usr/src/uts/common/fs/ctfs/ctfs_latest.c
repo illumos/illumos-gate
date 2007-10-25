@@ -65,7 +65,7 @@ ctfs_create_latenode(vnode_t *pvp)
  * ctfs_latest_getattr to obtain that file.
  */
 static vnode_t *
-ctfs_latest_nested_open(vnode_t *vp)
+ctfs_latest_nested_open(vnode_t *vp, cred_t *cr)
 {
 	contract_t *ct = ttolwp(curthread)->lwp_ct_latest[
 	    gfs_file_index(gfs_file_parent(vp))];
@@ -77,7 +77,7 @@ ctfs_latest_nested_open(vnode_t *vp)
 
 		gfs_file_set_index(cvp, -1);
 
-		VERIFY(gfs_dir_lookup(cvp, "status", &svp) == 0);
+		VERIFY(gfs_dir_lookup(cvp, "status", &svp, cr) == 0);
 
 		VN_RELE(cvp);
 
@@ -94,14 +94,19 @@ ctfs_latest_nested_open(vnode_t *vp)
  */
 /* ARGSUSED */
 static int
-ctfs_latest_access(vnode_t *vp, int mode, int flags, cred_t *cr)
+ctfs_latest_access(
+	vnode_t *vp,
+	int mode,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vnode_t *nvp;
 
 	if (mode & (VEXEC | VWRITE))
 		return (EACCES);
 
-	if (nvp = ctfs_latest_nested_open(vp)) {
+	if (nvp = ctfs_latest_nested_open(vp, cr)) {
 		VN_RELE(nvp);
 		return (0);
 	}
@@ -116,17 +121,17 @@ ctfs_latest_access(vnode_t *vp, int mode, int flags, cred_t *cr)
  * the LWP's latest contract.
  */
 static int
-ctfs_latest_open(vnode_t **vpp, int flag, cred_t *cr)
+ctfs_latest_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t *nvp;
 
 	if (flag != (FREAD | FOFFMAX))
 		return (EINVAL);
 
-	if (nvp = ctfs_latest_nested_open(*vpp)) {
+	if (nvp = ctfs_latest_nested_open(*vpp, cr)) {
 		VN_RELE(*vpp);
 		*vpp = nvp;
-		return (VOP_OPEN(vpp, flag, cr));
+		return (VOP_OPEN(vpp, flag, cr, ct));
 	}
 
 	return (ESRCH);
@@ -139,12 +144,17 @@ ctfs_latest_open(vnode_t **vpp, int flag, cred_t *cr)
  * latest contract.  Otherwise it fakes up something bland.
  */
 static int
-ctfs_latest_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_latest_getattr(
+	vnode_t *vp,
+	vattr_t *vap,
+	int flags,
+	cred_t *cr,
+	caller_context_t *ct)
 {
 	vnode_t *nvp;
 
-	if (nvp = ctfs_latest_nested_open(vp)) {
-		int res = VOP_GETATTR(nvp, vap, flags, cr);
+	if (nvp = ctfs_latest_nested_open(vp, cr)) {
+		int res = VOP_GETATTR(nvp, vap, flags, cr, ct);
 		VN_RELE(nvp);
 		return (res);
 	}

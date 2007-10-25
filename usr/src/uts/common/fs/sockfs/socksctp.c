@@ -403,7 +403,7 @@ sosctp_create(vnode_t *accessvp, int domain, int type, int protocol,
 	 */
 	if ((cr = CRED()) == NULL)
 		cr = kcred;
-	if ((error = VOP_OPEN(&vp, soflags, cr)) != 0) {
+	if ((error = VOP_OPEN(&vp, soflags, cr, NULL)) != 0) {
 		VN_RELE(vp);
 		*errorp = error;
 		return (NULL);
@@ -457,7 +457,7 @@ sosctp_free(struct sonode *so)
 		mp->b_next = NULL;
 		nso = *(struct sonode **)mp->b_rptr;
 
-		(void) VOP_CLOSE(SOTOV(nso), 0, 1, 0, CRED());
+		(void) VOP_CLOSE(SOTOV(nso), 0, 1, 0, CRED(), NULL);
 		vn_invalid(SOTOV(nso));
 		VN_RELE(SOTOV(nso));
 
@@ -531,7 +531,7 @@ sosctp_accept(struct sonode *lso, int fflag, struct sonode **nsop)
 	if (error != 0) {
 		vnode_t *nvp;
 		nvp = SOTOV(nso);
-		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED());
+		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
 		VN_RELE(nvp);
 
 		/*
@@ -1104,7 +1104,7 @@ sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size, int wroff,
 		/*
 		 * As a message can be splitted up and sent in different
 		 * packets, each mblk will have the extra space before
-		 * data to accomodate what SCTP wants to put in there.
+		 * data to accommodate what SCTP wants to put in there.
 		 */
 		while ((mp = allocb_cred(size + wroff, cr)) == NULL) {
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||

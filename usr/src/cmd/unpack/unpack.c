@@ -23,11 +23,11 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.21	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Huffman decompressor
@@ -35,24 +35,16 @@
  *	or	unpack filename...
  */
 
-#include <stdio.h>
-#include <fcntl.h>
 #include <setjmp.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <locale.h>
 #include <utime.h>
-#include <stdlib.h>
-#include <limits.h>
 #include <sys/param.h>
-#include <dirent.h>
 #include <sys/acl.h>
 #include <aclutils.h>
+#include <libcmdutils.h>
 
 static struct utimbuf u_times;
-
 static jmp_buf env;
 static struct	stat status;
 static char	*argv0, *argvk;
@@ -91,7 +83,11 @@ static int decode();
 static int getwdsize();
 static int getch();
 static int getdict();
-static int mv_xattrs();
+
+/* Extended system attribute support */
+
+static int saflg = 0;
+
 
 /* read in the dictionary portion and build decoding structures */
 /* return 1 if successful, 0 otherwise */
@@ -113,7 +109,7 @@ getdict()
 	inleft = read(infile, &inbuff[0], BUFSIZ);
 	if (inleft < 0) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: read error: "), argv0, filename);
+		    "%s: %s: read error: "), argv0, filename);
 		perror("");
 		return (0);
 	}
@@ -135,7 +131,7 @@ getdict()
 	maxlev = *inp++ & 0377;
 	if (maxlev > 24) {
 goof:		(void) fprintf(stderr, gettext(
-			"%s: %s: not in packed format\n"), argv0, filename);
+		    "%s: %s: not in packed format\n"), argv0, filename);
 		return (0);
 	}
 	for (i = 1; i <= maxlev; i++)
@@ -185,16 +181,16 @@ decode()
 			inleft = read(infile, inp = &inbuff[0], BUFSIZ);
 			if (inleft < 0) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: read error: "),
-					argv0, filename);
+				    "%s: %s: read error: "),
+				    argv0, filename);
 				perror("");
 				return (0);
 			}
 		}
 		if (--inleft < 0) {
 uggh:			(void) fprintf(stderr, gettext(
-				"%s: %s: unpacking error\n"),
-				argv0, filename);
+			    "%s: %s: unpacking error\n"),
+			    argv0, filename);
 			return (0);
 		}
 		c = *inp++;
@@ -208,10 +204,12 @@ uggh:			(void) fprintf(stderr, gettext(
 				p = &tree[lev][j];
 				if (p == eof) {
 					c = outp - &outbuff[0];
-				    if (write(outfile, &outbuff[0], c) != c) {
-wrerr:						(void) fprintf(stderr, gettext(
-						"%s: %s: write error: "),
-							argv0, argvk);
+					if (write(outfile, &outbuff[0], c)
+					    != c) {
+wrerr:						(void) fprintf(stderr,
+						    gettext(
+						    "%s: %s: write error: "),
+						    argv0, argvk);
 						perror("");
 						return (0);
 					}
@@ -223,7 +221,7 @@ wrerr:						(void) fprintf(stderr, gettext(
 				*outp++ = *p;
 				if (outp == &outbuff[BUFSIZ]) {
 					if (write(outfile, outp = &outbuff[0],
-						    BUFSIZ) != BUFSIZ)
+					    BUFSIZ) != BUFSIZ)
 						goto wrerr;
 					origsize -= BUFSIZ;
 				}
@@ -248,25 +246,28 @@ main(int argc, char *argv[])
 	int max_name;
 	void onsig(int);
 	acl_t *aclp = NULL;
-
+	int c;
+	char *progname;
+	int sattr_exist = 0;
+	int xattr_exist = 0;
 
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
 #ifdef __STDC__
-		signal((int)SIGHUP, onsig);
+		(void) signal((int)SIGHUP, onsig);
 #else
-		signal((int)SIGHUP, onsig);
+		(void) signal((int)SIGHUP, onsig);
 #endif
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
 #ifdef __STDC__
-		signal((int)SIGINT, onsig);
+		(void) signal((int)SIGINT, onsig);
 #else
-		signal((int)SIGINT, onsig);
+		(void) signal((int)SIGINT, onsig);
 #endif
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
 #ifdef __STDC__
-		signal((int)SIGTERM, onsig);
+		(void) signal((int)SIGTERM, onsig);
 #else
-		signal(SIGTERM, onsig);
+		(void) signal(SIGTERM, onsig);
 #endif
 
 	(void) setlocale(LC_ALL, "");
@@ -275,16 +276,28 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
+	if (progname = strrchr(argv[0], '/'))
+		++progname;
+	else
+		progname = argv[0];
+
 	p1 = *argv;
-	while (*p1++);	/* Point p1 to end of argv[0] string */
+	while (*p1++) { };	/* Point p1 to end of argv[0] string */
 	while (--p1 >= *argv)
 		if (*p1 == '/')break;
 	*argv = p1 + 1;
 	argv0 = argv[0];
 	if (**argv == 'p')pcat++;	/* User entered pcat (or /xx/xx/pcat) */
 
-	while (getopt(argc, argv, "") != EOF)
-		++errflg;
+	while ((c = getopt(argc, argv, "/")) != EOF) {
+		if (c == '/') {
+			if (pcat)
+				++errflg;
+			else
+				saflg++;
+		} else
+			++errflg;
+	}
 	/*
 	 * Check for invalid option.  Also check for missing
 	 * file operand, ie: "unpack" or "pcat".
@@ -292,7 +305,13 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv = &argv[optind];
 	if (errflg || argc < 1) {
-		(void) fprintf(stderr, gettext("usage: %s file...\n"), argv0);
+		if (!pcat)
+			(void) fprintf(stderr,
+			    gettext("usage: %s [-/] file...\n"), argv0);
+		else
+			(void) fprintf(stderr, gettext("usage: %s file...\n"),
+			    argv0);
+
 		if (argc < 1) {
 			/*
 			 * return 1 for usage error when no file was specified
@@ -329,8 +348,8 @@ main(int argc, char *argv[])
 		*cp = '\0';
 		if ((infile = open(filename, O_RDONLY)) == -1) {
 			(void) fprintf(stderr, gettext(
-				"%s: %s: cannot open: "),
-				argv0, filename);
+			    "%s: %s: cannot open: "),
+			    argv0, filename);
 			perror("");
 			goto done;
 		}
@@ -342,7 +361,7 @@ main(int argc, char *argv[])
 			if (error != 0) {
 				(void) printf(gettext(
 				    "%s: %s: cannot retrieve ACL : %s\n"),
-				argv0, filename, acl_strerror(error));
+				    argv0, filename, acl_strerror(error));
 			}
 
 			max_name = pathconf(filename, _PC_NAME_MAX);
@@ -352,38 +371,69 @@ main(int argc, char *argv[])
 			}
 			if (i >= (MAXPATHLEN-1) || (i - sep - 1) > max_name) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: file name too long\n"),
-					argv0, argvk);
+				    "%s: %s: file name too long\n"),
+				    argv0, argvk);
 				goto done;
 			}
 			if (stat(argvk, &status) != -1) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: already exists\n"),
-					argv0, argvk);
+				    "%s: %s: already exists\n"),
+				    argv0, argvk);
 				goto done;
 			}
 			(void) fstat(infile, &status);
 			if (status.st_nlink != 1) {
 				(void) printf(gettext(
-					"%s: %s: Warning: file has links\n"),
-					argv0, filename);
+				    "%s: %s: Warning: file has links\n"),
+				    argv0, filename);
 			}
 			if ((outfile = creat(argvk, status.st_mode)) == -1) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: cannot create: "),
-					argv0, argvk);
+				    "%s: %s: cannot create: "),
+				    argv0, argvk);
 				perror("");
 				goto done;
 			}
 			rmflg = 1;
 		}
 
-		if (getdict() &&	/* unpack */
-		    (pcat ||
-			(pathconf(filename, _PC_XATTR_EXISTS) != 1) ||
-				(mv_xattrs(infile, outfile,
-					filename, 0) == 0))) {
+		if (getdict()) { 	/* unpack */
+			if (pathconf(filename, _PC_XATTR_EXISTS) == 1)
+				xattr_exist = 1;
+			if (saflg && sysattr_support(filename,
+			    _PC_SATTR_EXISTS) == 1)
+				sattr_exist = 1;
+			if (pcat || xattr_exist || sattr_exist) {
+				if (mv_xattrs(progname, filename, argv[k],
+				    sattr_exist, 0)
+				    != 0) {
+					/* Move attributes back ... */
+					xattr_exist = 0;
+					sattr_exist = 0;
+					if (pathconf(argvk, _PC_XATTR_EXISTS)
+					    == 1)
+						xattr_exist = 1;
+					if (saflg && sysattr_support(argvk,
+					    _PC_SATTR_EXISTS) == 1)
+						sattr_exist = 1;
+					if (!pcat && (xattr_exist ||
+					    sattr_exist)) {
+						(void) mv_xattrs(progname,
+						    argv[k], filename,
+						    sattr_exist, 1);
+						(void) unlink(argvk);
+						goto done;
+					}
+				} else {
+					if (!pcat)
+						(void) unlink(filename);
+				}
+			} else if (!pcat)
+				(void) unlink(filename);
+
 			if (!pcat) {
+				(void) printf(gettext("%s: %s: unpacked\n"),
+				    argv0, argvk);
 				/*
 				 * preserve acc & mod dates
 				 */
@@ -392,8 +442,8 @@ main(int argc, char *argv[])
 				if (utime(argvk, &u_times) != 0) {
 					errflg++;
 					(void) fprintf(stderr, gettext(
-					"%s: cannot change times on %s: "),
-						argv0, argvk);
+					    "%s: cannot change times on %s: "),
+					    argv0, argvk);
 					perror("");
 				}
 				if (chmod(argvk, status.st_mode) != 0) {
@@ -405,7 +455,7 @@ main(int argc, char *argv[])
 					perror("");
 				}
 				(void) chown(argvk,
-						status.st_uid, status.st_gid);
+				    status.st_uid, status.st_gid);
 				if (aclp && (facl_set(outfile, aclp) < 0)) {
 					(void) printf(gettext("%s: cannot "
 					    "set ACL on %s: "), argv0, argvk);
@@ -413,22 +463,10 @@ main(int argc, char *argv[])
 				}
 
 				rmflg = 0;
-				(void) printf(gettext("%s: %s: unpacked\n"),
-					argv0, argvk);
-				(void) unlink(filename);
-
 			}
 			if (!errflg)
 				fcount--; 	/* success after all */
 		}
-		else
-			if (!pcat) {
-				if (pathconf(argvk, _PC_XATTR_EXISTS) == 1) {
-					(void) mv_xattrs(outfile, infile,
-						argvk, 1);
-				}
-				(void) unlink(argvk);
-			}
 done:		(void) close(infile);
 		if (!pcat)
 			(void) close(outfile);
@@ -465,8 +503,8 @@ expand()
 	origsize += (unsigned)getwdsize();
 	if (origsize == 0 || is_eof) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: not in packed format\n"),
-			argv0, filename);
+		    "%s: %s: not in packed format\n"),
+		    argv0, filename);
 		return (0);
 	}
 	t = Tree;
@@ -479,8 +517,8 @@ expand()
 				 */
 			if (is_eof) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: not in packed format\n"),
-					argv0, filename);
+				    "%s: %s: not in packed format\n"),
+				    argv0, filename);
 				return (0);
 			}
 			*t++ = i & 0377;
@@ -491,8 +529,8 @@ expand()
 		 */
 	if (is_eof) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: not in packed format\n"),
-			argv0, filename);
+		    "%s: %s: not in packed format\n"),
+		    argv0, filename);
 		return (0);
 	}
 
@@ -506,8 +544,8 @@ expand()
 			 */
 			if (word == 0 && is_eof && origsize > 0) {
 				(void) fprintf(stderr, gettext(
-					"%s: %s: not in packed format\n"),
-					argv0, filename);
+				    "%s: %s: not in packed format\n"),
+				    argv0, filename);
 				return (0);
 			}
 			bit = 16;
@@ -533,8 +571,8 @@ getch()
 		inleft = read(infile, inp = inbuff, BUFSIZ);
 		if (inleft < 0) {
 			(void) fprintf(stderr, gettext(
-				"%s: %s: read error: "),
-				argv0, filename);
+			    "%s: %s: read error: "),
+			    argv0, filename);
 			perror("");
 			longjmp(env, 1);
 		} else {		/* reached EOF, report it */
@@ -572,7 +610,9 @@ onsig(int sig)
 				/* created by unpack and not yet done	*/
 	if (rmflg == 1)
 		(void) unlink(argvk);
-	exit(1);
+	/* To quiet lint noise */
+	if (sig == SIGTERM || sig == SIGHUP || sig == SIGINT)
+		exit(1);
 }
 
 void
@@ -585,79 +625,10 @@ putch(char c)
 		n = write(outfile, outp = outbuff, BUFSIZ);
 		if (n < BUFSIZ) {
 			(void) fprintf(stderr, gettext(
-				"%s: %s: write error: "),
-				argv0, argvk);
+			    "%s: %s: write error: "),
+			    argv0, argvk);
 			perror("");
 			longjmp(env, 2);
 		}
 	}
-}
-
-/*
- * mv_xattrs - move (via renameat) all of the extended attributes
- *	associated with the file referenced by infd to the file
- *	referenced by outfd.  The infile and silent arguments are
- *	provided for error message processing.  This function
- *	returns 0 on success and -1 on error.
- */
-static int
-mv_xattrs(int infd, int outfd, char *infile, int silent)
-{
-	int indfd, outdfd, tmpfd;
-	DIR *dirp = NULL;
-	struct dirent *dp = NULL;
-	int error = 0;
-	char *etext;
-
-	indfd = outdfd = tmpfd = -1;
-
-	if ((indfd = openat(infd, ".", O_RDONLY|O_XATTR)) == -1) {
-		etext = gettext("cannot open source");
-		error = -1;
-		goto out;
-	}
-
-	if ((outdfd = openat(outfd, ".", O_RDONLY|O_XATTR)) == -1) {
-		etext = gettext("cannot open target");
-		error = -1;
-		goto out;
-	}
-
-	if ((tmpfd = dup(indfd)) == -1) {
-		etext = gettext("cannot dup descriptor");
-		error = -1;
-		goto out;
-
-	}
-	if ((dirp = fdopendir(tmpfd)) == NULL) {
-		etext = gettext("cannot access source");
-		error = -1;
-		goto out;
-	}
-
-	while (dp = readdir(dirp)) {
-		if ((dp->d_name[0] == '.' && dp->d_name[1] == '\0') ||
-		    (dp->d_name[0] == '.' && dp->d_name[1] == '.' &&
-		    dp->d_name[2] == '\0'))
-			continue;
-		if ((renameat(indfd, dp->d_name, outdfd, dp->d_name)) == -1) {
-			etext = dp->d_name;
-			error = -1;
-			goto out;
-		}
-	}
-out:
-	if (error == -1 && silent == 0) {
-		fprintf(stderr, gettext(
-			"unpack: %s: cannot move extended attributes, "),
-			infile);
-		perror(etext);
-	}
-	if (dirp)
-		closedir(dirp);
-	if (indfd != -1)
-		close(indfd);
-	if (outdfd != -1)
-		close(outdfd);
-	return (error);
 }

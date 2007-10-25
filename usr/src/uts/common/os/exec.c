@@ -538,7 +538,7 @@ gexec(
 		goto bad;
 
 	/* need to open vnode for stateful file systems like rfs */
-	if ((error = VOP_OPEN(vpp, FREAD, CRED())) != 0)
+	if ((error = VOP_OPEN(vpp, FREAD, CRED(), NULL)) != 0)
 		goto bad;
 	vp = *vpp;
 
@@ -934,13 +934,13 @@ execpermissions(struct vnode *vp, struct vattr *vattrp, struct uarg *args)
 	proc_t *p = ttoproc(curthread);
 
 	vattrp->va_mask = AT_MODE | AT_UID | AT_GID | AT_SIZE;
-	if (error = VOP_GETATTR(vp, vattrp, ATTR_EXEC, p->p_cred))
+	if (error = VOP_GETATTR(vp, vattrp, ATTR_EXEC, p->p_cred, NULL))
 		return (error);
 	/*
 	 * Check the access mode.
 	 * If VPROC, ask /proc if the file is an object file.
 	 */
-	if ((error = VOP_ACCESS(vp, VEXEC, 0, p->p_cred)) != 0 ||
+	if ((error = VOP_ACCESS(vp, VEXEC, 0, p->p_cred, NULL)) != 0 ||
 	    !(vp->v_type == VREG || (vp->v_type == VPROC && pr_isobject(vp))) ||
 	    (vp->v_vfsp->vfs_flag & VFS_NOEXEC) != 0 ||
 	    (vattrp->va_mode & (VEXEC|(VEXEC>>3)|(VEXEC>>6))) == 0) {
@@ -950,7 +950,7 @@ execpermissions(struct vnode *vp, struct vattr *vattrp, struct uarg *args)
 	}
 
 	if ((p->p_plist || (p->p_proc_flag & (P_PR_PTRACE|P_PR_TRACE))) &&
-	    (error = VOP_ACCESS(vp, VREAD, 0, p->p_cred))) {
+	    (error = VOP_ACCESS(vp, VREAD, 0, p->p_cred, NULL))) {
 		/*
 		 * If process is under ptrace(2) compatibility,
 		 * fail the exec(2).
@@ -1011,7 +1011,7 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 			}
 			if (error = VOP_MAP(vp, (offset_t)offset,
 			    p->p_as, &addr, len, prot, PROT_ALL,
-			    mflag, CRED()))
+			    mflag, CRED(), NULL))
 				goto bad;
 
 			/*
@@ -1188,7 +1188,7 @@ execopen(struct vnode **vpp, int *fdp)
 		*fdp = -1;	/* just in case falloc changed value */
 		return (error);
 	}
-	if (error = VOP_OPEN(&vp, filemode, CRED())) {
+	if (error = VOP_OPEN(&vp, filemode, CRED(), NULL)) {
 		VN_RELE(vp);
 		setf(*fdp, NULL);
 		unfalloc(fp);

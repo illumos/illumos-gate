@@ -49,7 +49,8 @@ SUBDIRS = \
 	unix_auth	\
 	unix_account	\
 	unix_cred	\
-	unix_session
+	unix_session	\
+	smb
 
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/lib/pam_modules/smartcard

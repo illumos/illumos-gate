@@ -918,7 +918,7 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 		 * vnode. This check is not done in BSD but it is required
 		 * by X/Open.
 		 */
-		if (error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED())) {
+		if (error = VOP_ACCESS(vp, VREAD|VWRITE, 0, CRED(), NULL)) {
 			eprintsoline(so, error);
 			goto done2;
 		}

@@ -287,7 +287,7 @@ getflabel(vnode_t *vp)
 	/*
 	 * Traverse lofs mounts and fattach'es to get the real vnode
 	 */
-	if (VOP_REALVP(rvp, &rvp2) == 0)
+	if (VOP_REALVP(rvp, &rvp2, NULL) == 0)
 		rvp = rvp2;
 
 	rvfsp = rvp->v_vfsp;

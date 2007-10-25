@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,7 +202,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 
 	/* see if the log file exists */
 	error = VOP_LOOKUP(fscp->fs_fscdirvp, CACHEFS_DLOG_FILE,
-	    &fscp->fs_dlogfile, NULL, 0, NULL, kcred);
+	    &fscp->fs_dlogfile, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 	if (error && (createfile == 0))
 		goto out;
 
@@ -217,7 +216,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 		vattr.va_type = VREG;
 		vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
 		error = VOP_CREATE(fscp->fs_fscdirvp, CACHEFS_DLOG_FILE,
-		    &vattr, 0, 0666, &fscp->fs_dlogfile, kcred, 0);
+		    &vattr, 0, 0666, &fscp->fs_dlogfile, kcred, 0, NULL, NULL);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_DLOG)
@@ -246,7 +245,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 		vattr.va_type = VREG;
 		vattr.va_mask = AT_TYPE|AT_MODE|AT_UID|AT_GID;
 		error = VOP_CREATE(fscp->fs_fscdirvp, CACHEFS_DMAP_FILE,
-		    &vattr, 0, 0666, &fscp->fs_dmapfile, kcred, 0);
+		    &vattr, 0, 0666, &fscp->fs_dmapfile, kcred, 0, NULL, NULL);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_DLOG)
@@ -272,7 +271,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 
 		/* find the end of the log file */
 		vattr.va_mask = AT_ALL;
-		error = VOP_GETATTR(fscp->fs_dlogfile, &vattr, 0, kcred);
+		error = VOP_GETATTR(fscp->fs_dlogfile, &vattr, 0, kcred, NULL);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_DLOG)
@@ -328,7 +327,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 
 
 		error = VOP_LOOKUP(fscp->fs_fscdirvp, CACHEFS_DMAP_FILE,
-		    &fscp->fs_dmapfile, NULL, 0, NULL, kcred);
+		    &fscp->fs_dmapfile, NULL, 0, NULL, kcred, NULL, NULL, NULL);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_DLOG)
@@ -339,7 +338,7 @@ cachefs_dlog_setup(fscache_t *fscp, int createfile)
 		}
 
 		vattr.va_mask = AT_ALL;
-		error = VOP_GETATTR(fscp->fs_dmapfile, &vattr, 0, kcred);
+		error = VOP_GETATTR(fscp->fs_dmapfile, &vattr, 0, kcred, NULL);
 		if (error) {
 #ifdef CFSDEBUG
 			CFS_DEBUG(CFSDEBUG_DLOG)
@@ -359,13 +358,13 @@ out:
 				VN_RELE(fscp->fs_dlogfile);
 				fscp->fs_dlogfile = NULL;
 				(void) VOP_REMOVE(fscp->fs_fscdirvp,
-				    CACHEFS_DLOG_FILE, kcred);
+				    CACHEFS_DLOG_FILE, kcred, NULL, 0);
 			}
 			if (fscp->fs_dmapfile) {
 				VN_RELE(fscp->fs_dmapfile);
 				fscp->fs_dmapfile = NULL;
 				(void) VOP_REMOVE(fscp->fs_fscdirvp,
-				    CACHEFS_DMAP_FILE, kcred);
+				    CACHEFS_DMAP_FILE, kcred, NULL, 0);
 			}
 		}
 		if (lookupdone) {
@@ -528,7 +527,7 @@ out:
 }
 
 /*
- * Commmits a previously written dlog message.
+ * Commits a previously written dlog message.
  */
 int
 cachefs_dlog_commit(fscache_t *fscp, off_t offset, int error)

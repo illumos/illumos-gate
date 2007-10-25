@@ -57,7 +57,7 @@
  *   The time stamps collected by a stat(2) call are passed in fo_atime,
  *   fo_mtime, fo_ctime. At the time a file events watch is registered, the
  *   time stamps passed in are compared with the current time stamps of the
- *   file. If it has changed, relavant events are sent immediately. If the time
+ *   file. If it has changed, relevant events are sent immediately. If the time
  *   stamps are all '0', they will not be compared.
  *
  *
@@ -206,33 +206,40 @@ static void	port_close_fop(void *arg, int port, pid_t pid, int lastclose);
 /*
  * port fop functions that will be the fem hooks.
  */
-static int port_fop_open(femarg_t *vf, int mode, cred_t *cr);
+static int port_fop_open(femarg_t *vf, int mode, cred_t *cr,
+    caller_context_t *);
 static int port_fop_read(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
-		struct caller_context *ct);
+    struct caller_context *ct);
 static int port_fop_write(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
-		caller_context_t *ct);
+    caller_context_t *ct);
 static int port_fop_map(femarg_t *vf, offset_t off, struct as *as,
-		caddr_t *addrp, size_t len, uchar_t prot, uchar_t maxport,
-		uint_t flags, cred_t *cr);
+    caddr_t *addrp, size_t len, uchar_t prot, uchar_t maxport,
+    uint_t flags, cred_t *cr, caller_context_t *ct);
 static int port_fop_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
-		caller_context_t *ct);
+    caller_context_t *ct);
 static int port_fop_create(femarg_t *vf, char *name, vattr_t *vap,
-			vcexcl_t excl, int mode, vnode_t **vpp, cred_t *cr,
-			int flag);
-static int port_fop_remove(femarg_t *vf, char *nm, cred_t *cr);
-static int port_fop_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr);
+    vcexcl_t excl, int mode, vnode_t **vpp, cred_t *cr, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp);
+static int port_fop_remove(femarg_t *vf, char *nm, cred_t *cr,
+    caller_context_t *ct, int flags);
+static int port_fop_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags);
 static int port_fop_rename(femarg_t *vf, char *snm, vnode_t *tdvp, char *tnm,
-			cred_t *cr);
+    cred_t *cr, caller_context_t *ct, int flags);
 static int port_fop_mkdir(femarg_t *vf, char *dirname, vattr_t *vap,
-		vnode_t **vpp, cred_t *cr);
-static int port_fop_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr);
-static int port_fop_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp);
+    vnode_t **vpp, cred_t *cr, caller_context_t *ct, int flags,
+    vsecattr_t *vsecp);
+static int port_fop_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr,
+    caller_context_t *ct, int flags);
+static int port_fop_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp,
+    caller_context_t *ct, int flags);
 static int port_fop_symlink(femarg_t *vf, char *linkname, vattr_t *vap,
-			char *target, cred_t *cr);
+    char *target, cred_t *cr, caller_context_t *ct, int flags);
 static int port_fop_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flag,
-			cred_t *cr);
+    cred_t *cr, caller_context_t *ct);
+
 static int port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp,
-			char *cname);
+    char *cname, caller_context_t *ct);
 
 static int port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr);
 
@@ -812,7 +819,7 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 		if (fobj->fo_atime.tv_sec || fobj->fo_atime.tv_nsec ||
 		    fobj->fo_mtime.tv_sec || fobj->fo_mtime.tv_nsec ||
 		    fobj->fo_ctime.tv_sec || fobj->fo_ctime.tv_nsec) {
-			if (VOP_GETATTR(vp, &vatt, 0, CRED())) {
+			if (VOP_GETATTR(vp, &vatt, 0, CRED(), NULL)) {
 				return;
 			}
 		} else {
@@ -828,7 +835,7 @@ port_check_timestamp(vnode_t *vp, portfop_t *pfp, void *objptr)
 		if (fobj32->fo_atime.tv_sec || fobj32->fo_atime.tv_nsec ||
 		    fobj32->fo_mtime.tv_sec || fobj32->fo_mtime.tv_nsec ||
 		    fobj32->fo_ctime.tv_sec || fobj32->fo_ctime.tv_nsec) {
-			if (VOP_GETATTR(vp, &vatt, 0, CRED())) {
+			if (VOP_GETATTR(vp, &vatt, 0, CRED(), NULL)) {
 				return;
 			}
 		} else {
@@ -1182,7 +1189,7 @@ port_resolve_vp(vnode_t *vp)
 	 * This should take care of lofs mounted fs systems and nfs4
 	 * hardlinks.
 	 */
-	if ((VOP_REALVP(vp, &rvp) == 0) && vp != rvp) {
+	if ((VOP_REALVP(vp, &rvp, NULL) == 0) && vp != rvp) {
 		VN_HOLD(rvp);
 		VN_RELE(vp);
 		vp = rvp;
@@ -1263,7 +1270,7 @@ port_associate_fop(port_t *pp, int source, uintptr_t object, int events,
 	vp = port_resolve_vp(vp);
 
 
-	if (vp != NULL && vnevent_support(vp)) {
+	if (vp != NULL && vnevent_support(vp, NULL)) {
 		error = ENOTSUP;
 		goto errout;
 	}
@@ -1547,7 +1554,7 @@ port_close_fop(void *arg, int port, pid_t pid, int lastclose)
 /*
  * Given the list of associations(watches), it will send exception events,
  * if still active, and discard them. The exception events are handled
- * seperately because, the pfp needs to be removed from the port cache and
+ * separately because, the pfp needs to be removed from the port cache and
  * freed as the vnode's identity is changing or being removed. To remove
  * the pfp from the port's cache, we need to hold the cache lock (pfc_lock).
  * The lock order is pfc_lock -> pvp_mutex(vnode's) mutex and that is why
@@ -1809,7 +1816,7 @@ port_fop(vnode_t *vp, int op, int retval)
 		return;
 
 	/*
-	 * These events occuring on the watched file.
+	 * These events occurring on the watched file.
 	 */
 	if (op & FOP_MODIFIED_MASK) {
 		event  = FILE_MODIFIED;
@@ -1907,12 +1914,12 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
  * The O_TRUNC operation is caught with the VOP_SETATTR(AT_SIZE) call.
  */
 static int
-port_fop_open(femarg_t *vf, int mode, cred_t *cr)
+port_fop_open(femarg_t *vf, int mode, cred_t *cr, caller_context_t *ct)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_open(vf, mode, cr);
+	retval = vnext_open(vf, mode, cr, ct);
 	port_fop(vp, FOP_FILE_OPEN, retval);
 	return (retval);
 }
@@ -1931,12 +1938,14 @@ port_fop_write(femarg_t *vf, struct uio *uiop, int ioflag, struct cred *cr,
 
 static int
 port_fop_map(femarg_t *vf, offset_t off, struct as *as, caddr_t *addrp,
-    size_t len, uchar_t prot, uchar_t maxport, uint_t flags, cred_t *cr)
+    size_t len, uchar_t prot, uchar_t maxport, uint_t flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval =  vnext_map(vf, off, as, addrp, len, prot, maxport, flags, cr);
+	retval =  vnext_map(vf, off, as, addrp, len, prot, maxport,
+	    flags, cr, ct);
 	port_fop(vp, FOP_FILE_MAP, retval);
 	return (retval);
 }
@@ -1980,7 +1989,8 @@ port_fop_setattr(femarg_t *vf, vattr_t *vap, int flags, cred_t *cr,
 
 int
 port_fop_create(femarg_t *vf, char *name, vattr_t *vap, vcexcl_t excl,
-	int mode, vnode_t **vpp, cred_t *cr, int flag)
+    int mode, vnode_t **vpp, cred_t *cr, int flag,
+    caller_context_t *ct, vsecattr_t *vsecp)
 {
 	int		retval, got = 1;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
@@ -1993,13 +2003,14 @@ port_fop_create(femarg_t *vf, char *name, vattr_t *vap, vcexcl_t excl,
 	 * file was actually created.
 	 */
 	vatt.va_mask = AT_ATIME|AT_MTIME|AT_CTIME;
-	if (VOP_GETATTR(vp, &vatt, 0, CRED())) {
+	if (VOP_GETATTR(vp, &vatt, 0, CRED(), ct)) {
 		got = 0;
 	}
-	retval = vnext_create(vf, name, vap, excl, mode, vpp, cr, flag);
+	retval = vnext_create(vf, name, vap, excl, mode, vpp, cr,
+	    flag, ct, vsecp);
 
 	vatt1.va_mask = AT_ATIME|AT_MTIME|AT_CTIME;
-	if (got && !VOP_GETATTR(vp, &vatt1, 0, CRED())) {
+	if (got && !VOP_GETATTR(vp, &vatt1, 0, CRED(), ct)) {
 		if ((vatt1.va_mtime.tv_sec > vatt.va_mtime.tv_sec ||
 		    (vatt1.va_mtime.tv_sec = vatt.va_mtime.tv_sec &&
 		    vatt1.va_mtime.tv_nsec > vatt.va_mtime.tv_nsec))) {
@@ -2013,23 +2024,25 @@ port_fop_create(femarg_t *vf, char *name, vattr_t *vap, vcexcl_t excl,
 }
 
 int
-port_fop_remove(femarg_t *vf, char *nm, cred_t *cr)
+port_fop_remove(femarg_t *vf, char *nm, cred_t *cr, caller_context_t *ct,
+    int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_remove(vf, nm, cr);
+	retval = vnext_remove(vf, nm, cr, ct, flags);
 	port_fop(vp, FOP_FILE_REMOVE, retval);
 	return (retval);
 }
 
 int
-port_fop_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr)
+port_fop_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_link(vf, svp, tnm, cr);
+	retval = vnext_link(vf, svp, tnm, cr, ct, flags);
 	port_fop(vp, FOP_FILE_LINK, retval);
 	return (retval);
 }
@@ -2041,58 +2054,61 @@ port_fop_link(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr)
  * if the source dir != target dir.
  */
 int
-port_fop_rename(femarg_t *vf, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr)
+port_fop_rename(femarg_t *vf, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_rename(vf, snm, tdvp, tnm, cr);
+	retval = vnext_rename(vf, snm, tdvp, tnm, cr, ct, flags);
 	port_fop(vp, FOP_FILE_RENAMESRC, retval);
 	return (retval);
 }
 
 int
 port_fop_mkdir(femarg_t *vf, char *dirname, vattr_t *vap, vnode_t **vpp,
-	cred_t *cr)
+    cred_t *cr, caller_context_t *ct, int flags, vsecattr_t *vsecp)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_mkdir(vf, dirname, vap, vpp, cr);
+	retval = vnext_mkdir(vf, dirname, vap, vpp, cr, ct, flags, vsecp);
 	port_fop(vp, FOP_FILE_MKDIR, retval);
 	return (retval);
 }
 
 int
-port_fop_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr)
+port_fop_rmdir(femarg_t *vf, char *nm, vnode_t *cdir, cred_t *cr,
+    caller_context_t *ct, int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_rmdir(vf, nm, cdir, cr);
+	retval = vnext_rmdir(vf, nm, cdir, cr, ct, flags);
 	port_fop(vp, FOP_FILE_RMDIR, retval);
 	return (retval);
 }
 
 int
-port_fop_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp)
+port_fop_readdir(femarg_t *vf, uio_t *uiop, cred_t *cr, int *eofp,
+    caller_context_t *ct, int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_readdir(vf, uiop, cr, eofp);
+	retval = vnext_readdir(vf, uiop, cr, eofp, ct, flags);
 	port_fop(vp, FOP_FILE_READDIR, retval);
 	return (retval);
 }
 
 int
 port_fop_symlink(femarg_t *vf, char *linkname, vattr_t *vap, char *target,
-	cred_t *cr)
+    cred_t *cr, caller_context_t *ct, int flags)
 {
 	int		retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
 
-	retval = vnext_symlink(vf, linkname, vap, target, cr);
+	retval = vnext_symlink(vf, linkname, vap, target, cr, ct, flags);
 	port_fop(vp, FOP_FILE_SYMLINK, retval);
 	return (retval);
 }
@@ -2101,11 +2117,12 @@ port_fop_symlink(femarg_t *vf, char *linkname, vattr_t *vap, char *target,
  * acl, facl call this.
  */
 int
-port_fop_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flags, cred_t *cr)
+port_fop_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flags, cred_t *cr,
+    caller_context_t *ct)
 {
 	int	retval;
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
-	retval = vnext_setsecattr(vf, vsap, flags, cr);
+	retval = vnext_setsecattr(vf, vsap, flags, cr, ct);
 	port_fop(vp, FOP_FILE_SETSECATTR, retval);
 	return (retval);
 }
@@ -2114,10 +2131,10 @@ port_fop_setsecattr(femarg_t *vf, vsecattr_t *vsap, int flags, cred_t *cr)
  * these are events on the watched file/directory
  */
 int
-port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name)
+port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name,
+    caller_context_t *ct)
 {
 	vnode_t		*vp = (vnode_t *)vf->fa_fnode->fn_available;
-
 
 	switch (vnevent) {
 	case	VE_RENAME_SRC:
@@ -2151,5 +2168,5 @@ port_fop_vnevent(femarg_t *vf, vnevent_t vnevent, vnode_t *dvp, char *name)
 	default:
 		break;
 	}
-	return (vnext_vnevent(vf, vnevent, dvp, name));
+	return (vnext_vnevent(vf, vnevent, dvp, name, ct));
 }

@@ -715,7 +715,7 @@ sdev_getlink(struct vnode *linkvp, char **link)
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_llimit = MAXOFFSET_T;
 
-	err = VOP_READLINK(linkvp, &uio, kcred);
+	err = VOP_READLINK(linkvp, &uio, kcred, NULL);
 	if (err) {
 		cmn_err(CE_WARN, "readlink %s failed in dev\n", buf);
 		kmem_free(buf, MAXPATHLEN);
@@ -1155,7 +1155,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 	timestruc_t now;
 
 	vattr.va_mask = AT_MODE|AT_UID|AT_GID;
-	error = VOP_GETATTR(ovp, &vattr, 0, cred);
+	error = VOP_GETATTR(ovp, &vattr, 0, cred, NULL);
 	if (error)
 		return (error);
 
@@ -1227,7 +1227,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			(void) sdev_dirdelete(nddv, *ndvp);
 			*ndvp = NULL;
 			error = VOP_RMDIR(nddv->sdev_attrvp, nnm,
-				    nddv->sdev_attrvp, cred);
+				    nddv->sdev_attrvp, cred, NULL, 0);
 			if (error)
 				goto err_out;
 		} else {
@@ -1249,7 +1249,7 @@ sdev_rnmnode(struct sdev_node *oddv, struct sdev_node *odv,
 			*ndvp = NULL;
 			if (bkstore) {
 				error = VOP_REMOVE(nddv->sdev_attrvp,
-				    nnm, cred);
+				    nnm, cred, NULL, 0);
 				if (error)
 				    goto err_out;
 			}
@@ -1419,7 +1419,7 @@ devname_find_by_devpath(char *devpath, struct vattr *vattr)
 	}
 
 	if (vattr)
-		(void) VOP_GETATTR(vp, vattr, 0, kcred);
+		(void) VOP_GETATTR(vp, vattr, 0, kcred, NULL);
 	return (vp);
 }
 
@@ -1447,7 +1447,7 @@ devname_configure_by_path(char *physpath, struct vattr *vattr)
 	}
 
 	if (vattr)
-		(void) VOP_GETATTR(vp, vattr, 0, kcred);
+		(void) VOP_GETATTR(vp, vattr, 0, kcred, NULL);
 	return (vp);
 }
 
@@ -1462,7 +1462,8 @@ devname_backstore_lookup(struct sdev_node *ddv, char *nm, struct vnode **rvp)
 
 	ASSERT(rdvp);
 
-	rval = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, kcred);
+	rval = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, kcred, NULL, NULL,
+	    NULL);
 	return (rval);
 }
 
@@ -1507,7 +1508,7 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 		iov.iov_base = (char *)dbuf;
 		iov.iov_len = dlen;
 		(void) VOP_RWLOCK(dirvp, V_WRITELOCK_FALSE, NULL);
-		error = VOP_READDIR(dirvp, &uio, kcred, &eof);
+		error = VOP_READDIR(dirvp, &uio, kcred, &eof, NULL, 0);
 		VOP_RWUNLOCK(dirvp, V_WRITELOCK_FALSE, NULL);
 
 		dbuflen = dlen - uio.uio_resid;
@@ -1552,7 +1553,7 @@ sdev_filldir_from_store(struct sdev_node *ddv, int dlen, struct cred *cred)
 				continue;
 
 			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
-			error = VOP_GETATTR(vp, &vattr, 0, cred);
+			error = VOP_GETATTR(vp, &vattr, 0, cred, NULL);
 			if (error)
 				continue;
 
@@ -1644,9 +1645,10 @@ sdev_shadow_node(struct sdev_node *dv, struct cred *cred)
 
 lookup:
 	/* try to find it in the backing store */
-	error = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, cred);
+	error = VOP_LOOKUP(rdvp, nm, rvp, NULL, 0, NULL, cred, NULL, NULL,
+	    NULL);
 	if (error == 0) {
-		if (VOP_REALVP(*rvp, &rrvp) == 0) {
+		if (VOP_REALVP(*rvp, &rrvp, NULL) == 0) {
 			VN_HOLD(rrvp);
 			VN_RELE(*rvp);
 			*rvp = rrvp;
@@ -1665,7 +1667,7 @@ lookup:
 	vap->va_mask |= AT_TYPE|AT_MODE;
 	switch (vap->va_type) {
 	case VDIR:
-		error = VOP_MKDIR(rdvp, nm, vap, rvp, cred);
+		error = VOP_MKDIR(rdvp, nm, vap, rvp, cred, NULL, 0, NULL);
 		sdcmn_err9(("sdev_shadow_node: mkdir vp %p error %d\n",
 		    (void *)(*rvp), error));
 		break;
@@ -1674,7 +1676,7 @@ lookup:
 	case VREG:
 	case VDOOR:
 		error = VOP_CREATE(rdvp, nm, vap, NONEXCL, VREAD|VWRITE,
-		    rvp, cred, 0);
+		    rvp, cred, 0, NULL, NULL);
 		sdcmn_err9(("sdev_shadow_node: create vp %p, error %d\n",
 		    (void *)(*rvp), error));
 		if (!error)
@@ -1682,7 +1684,8 @@ lookup:
 		break;
 	case VLNK:
 		ASSERT(dv->sdev_symlink);
-		error = VOP_SYMLINK(rdvp, nm, vap, dv->sdev_symlink, cred);
+		error = VOP_SYMLINK(rdvp, nm, vap, dv->sdev_symlink, cred,
+		    NULL, 0);
 		sdcmn_err9(("sdev_shadow_node: create symlink error %d\n",
 		    error));
 		break;
@@ -1770,7 +1773,7 @@ sdev_cache_update(struct sdev_node *ddv, struct sdev_node **dv, char *nm,
 }
 
 /*
- * retrive the named entry from the directory cache
+ * retrieve the named entry from the directory cache
  */
 struct sdev_node *
 sdev_cache_lookup(struct sdev_node *ddv, char *nm)
@@ -2224,7 +2227,7 @@ tryagain:
 			    "found attrvp %p for %s\n", (void *)rvp, nm));
 
 			vattr.va_mask = AT_MODE|AT_UID|AT_GID;
-			error = VOP_GETATTR(rvp, &vattr, 0, cred);
+			error = VOP_GETATTR(rvp, &vattr, 0, cred, NULL);
 			if (error) {
 				rw_exit(&ddv->sdev_contents);
 				if (dv)
@@ -2583,10 +2586,10 @@ sdev_cleandir(struct sdev_node *ddv, char *expr, uint_t flags)
 
 			if (bkstore == 1) {
 				error = VOP_REMOVE(ddv->sdev_attrvp,
-				    bks_name, kcred);
+				    bks_name, kcred, NULL, 0);
 			} else if (bkstore == 2) {
 				error = VOP_RMDIR(ddv->sdev_attrvp,
-				    bks_name, ddv->sdev_attrvp, kcred);
+				    bks_name, ddv->sdev_attrvp, kcred, NULL, 0);
 			}
 
 			/* do not propagate the backing store errors */
@@ -2953,7 +2956,8 @@ sdev_modctl_lookup(const char *path, vnode_t **r_vp)
 	while (pn_pathleft(&pn)) {
 		ASSERT(vp->v_type == VDIR);
 		(void) pn_getcomponent(&pn, nm);
-		error = VOP_LOOKUP(vp, nm, &cvp, NULL, 0, NULL, kcred);
+		error = VOP_LOOKUP(vp, nm, &cvp, NULL, 0, NULL, kcred, NULL,
+		    NULL, NULL);
 		VN_RELE(vp);
 
 		if (error)
@@ -3065,7 +3069,7 @@ sdev_modctl_readdir(const char *dir, char ***dirlistp,
 		iov.iov_len = dlen;
 
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
-		error = VOP_READDIR(vp, &uio, kcred, &eof);
+		error = VOP_READDIR(vp, &uio, kcred, &eof, NULL, 0);
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
 		dbuflen = dlen - uio.uio_resid;
@@ -3659,8 +3663,8 @@ devname_setattr_func(struct vnode *vp, struct vattr *vap, int flags,
 	 * sdev_attr was allocated in sdev_mknode
 	 */
 	rw_enter(&dv->sdev_contents, RW_WRITER);
-	error = secpolicy_vnode_setattr(cred, vp, vap, dv->sdev_attr,
-	    flags, sdev_unlocked_access, dv);
+	error = secpolicy_vnode_setattr(cred, vp, vap,
+	    dv->sdev_attr, flags, sdev_unlocked_access, dv);
 	if (error) {
 		rw_exit(&dv->sdev_contents);
 		rw_exit(&parent->sdev_contents);

@@ -256,6 +256,7 @@ f none usr/lib/help/auths/locale/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSendmailStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
@@ -266,6 +267,8 @@ f none usr/lib/help/auths/locale/SmfValueMDNS.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNADD.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNWAM.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueSMB.html 444 root bin
+f none usr/lib/help/auths/locale/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
@@ -333,6 +336,7 @@ f none usr/lib/help/profiles/locale/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtProcManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSoftwareInstall.html 444 root bin
+f none usr/lib/help/profiles/locale/RtSMBMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSysEvMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtUserMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtUserSecurity.html 444 root bin
