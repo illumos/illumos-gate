@@ -2533,12 +2533,34 @@ arc_write_ready(zio_t *zio)
 {
 	arc_write_callback_t *callback = zio->io_private;
 	arc_buf_t *buf = callback->awcb_buf;
+	arc_buf_hdr_t *hdr = buf->b_hdr;
 
-	if (callback->awcb_ready) {
+	if (zio->io_error == 0 && callback->awcb_ready) {
 		ASSERT(!refcount_is_zero(&buf->b_hdr->b_refcnt));
 		callback->awcb_ready(zio, buf, callback->awcb_private);
 	}
+	/*
+	 * If the IO is already in progress, then this is a re-write
+	 * attempt, so we need to thaw and re-compute the cksum. It is
+	 * the responsibility of the callback to handle the freeing
+	 * and accounting for any re-write attempt. If we don't have a
+	 * callback registered then simply free the block here.
+	 */
+	if (HDR_IO_IN_PROGRESS(hdr)) {
+		if (!BP_IS_HOLE(&zio->io_bp_orig) &&
+		    callback->awcb_ready == NULL) {
+			zio_nowait(zio_free(zio, zio->io_spa, zio->io_txg,
+			    &zio->io_bp_orig, NULL, NULL));
+		}
+		mutex_enter(&hdr->b_freeze_lock);
+		if (hdr->b_freeze_cksum != NULL) {
+			kmem_free(hdr->b_freeze_cksum, sizeof (zio_cksum_t));
+			hdr->b_freeze_cksum = NULL;
+		}
+		mutex_exit(&hdr->b_freeze_lock);
+	}
 	arc_cksum_compute(buf);
+	hdr->b_flags |= ARC_IO_IN_PROGRESS;
 }
 
 static void
@@ -2635,7 +2657,6 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	callback->awcb_done = done;
 	callback->awcb_private = private;
 	callback->awcb_buf = buf;
-	hdr->b_flags |= ARC_IO_IN_PROGRESS;
 	zio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
 	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done, callback,
 	    priority, flags, zb);

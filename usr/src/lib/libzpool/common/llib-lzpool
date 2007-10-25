@@ -50,3 +50,4 @@
 
 extern uint64_t zio_gang_bang;
 extern uint16_t zio_zil_fail_shift;
+extern uint16_t zio_io_fail_shift;

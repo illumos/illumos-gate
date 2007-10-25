@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -734,10 +734,29 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 {
 	dmu_tx_hold_t *txh;
 	uint64_t lsize, asize, fsize, towrite, tofree, tooverwrite;
+	spa_t *spa = tx->tx_pool->dp_spa;
 
 	ASSERT3U(tx->tx_txg, ==, 0);
+
 	if (tx->tx_err)
 		return (tx->tx_err);
+
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE) {
+		/*
+		 * If the user has indicated a blocking failure mode
+		 * then return ERESTART which will block in dmu_tx_wait().
+		 * Otherwise, return EIO so that an error can get
+		 * propagated back to the VOP calls.
+		 *
+		 * Note that we always honor the txg_how flag regardless
+		 * of the failuremode setting.
+		 */
+		if (spa_get_failmode(spa) == ZIO_FAILURE_MODE_CONTINUE &&
+		    txg_how != TXG_WAIT)
+			return (EIO);
+
+		return (ERESTART);
+	}
 
 	tx->tx_txg = txg_hold_open(tx->tx_pool, &tx->tx_txgh);
 	tx->tx_needassign_txh = NULL;
@@ -885,10 +904,19 @@ dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how)
 void
 dmu_tx_wait(dmu_tx_t *tx)
 {
-	ASSERT(tx->tx_txg == 0);
-	ASSERT(tx->tx_lasttried_txg != 0);
+	spa_t *spa = tx->tx_pool->dp_spa;
 
-	if (tx->tx_needassign_txh) {
+	ASSERT(tx->tx_txg == 0);
+
+	/*
+	 * It's possible that the pool has become active after this thread
+	 * has tried to obtain a tx. If that's the case then his
+	 * tx_lasttried_txg would not have been assigned.
+	 */
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE ||
+	    tx->tx_lasttried_txg == 0) {
+		txg_wait_synced(tx->tx_pool, spa_last_synced_txg(spa) + 1);
+	} else if (tx->tx_needassign_txh) {
 		dnode_t *dn = tx->tx_needassign_txh->txh_dnode;
 
 		mutex_enter(&dn->dn_mtx);

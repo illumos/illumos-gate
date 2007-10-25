@@ -321,7 +321,7 @@ vdev_label_read_config(vdev_t *vd)
 	ASSERT(spa_config_held(spa, RW_READER) ||
 	    spa_config_held(spa, RW_WRITER));
 
-	if (vdev_is_dead(vd))
+	if (!vdev_readable(vd))
 		return (NULL);
 
 	vp = zio_buf_alloc(sizeof (vdev_phys_t));
@@ -902,7 +902,9 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
 	zio_t *zio;
-	int l, error;
+	int l, last_error = 0, error = 0;
+	uint64_t good_writes = 0;
+	boolean_t retry_avail = B_TRUE;
 
 	ASSERT(ub->ub_txg <= txg);
 
@@ -941,6 +943,7 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	}
 	(void) zio_wait(zio);
 
+retry:
 	/*
 	 * Sync out the even labels (L0, L2) for every dirty vdev.  If the
 	 * system dies in the middle of this process, that's OK: all of the
@@ -954,9 +957,27 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 			if (l & 1)
 				continue;
 			if ((error = vdev_sync_labels(vd, l, txg)) != 0)
-				return (error);
+				last_error = error;
+			else
+				good_writes++;
 		}
 	}
+
+	/*
+	 * If all the vdevs that are currently dirty have failed or the
+	 * spa_dirty_list is empty then we dirty all the vdevs and try again.
+	 * This is a last ditch effort to ensure that we get at least one
+	 * update before proceeding to the uberblock.
+	 */
+	if (good_writes == 0 && retry_avail) {
+		vdev_config_dirty(rvd);
+		retry_avail = B_FALSE;
+		last_error = 0;
+		goto retry;
+	}
+
+	if (good_writes == 0)
+		return (last_error);
 
 	/*
 	 * Flush the new labels to disk.  This ensures that all even-label
@@ -986,8 +1007,15 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	 *	will be the newest, and the even labels (which had all
 	 *	been successfully committed) will be valid with respect
 	 *	to the new uberblocks.
+	 *
+	 * NOTE: We retry to an uberblock update on the root if we were
+	 * failed our initial update attempt.
 	 */
-	if ((error = vdev_uberblock_sync_tree(spa, ub, uvd, txg)) != 0)
+	error = vdev_uberblock_sync_tree(spa, ub, uvd, txg);
+	if (error && uvd != rvd)
+		error = vdev_uberblock_sync_tree(spa, ub, rvd, txg);
+
+	if (error)
 		return (error);
 
 	/*
@@ -999,6 +1027,7 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	    NULL, NULL, ZIO_PRIORITY_NOW,
 	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
 
+	last_error = 0;
 	/*
 	 * Sync out odd labels for every dirty vdev.  If the system dies
 	 * in the middle of this process, the even labels and the new
@@ -1013,9 +1042,14 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 			if ((l & 1) == 0)
 				continue;
 			if ((error = vdev_sync_labels(vd, l, txg)) != 0)
-				return (error);
+				last_error = error;
+			else
+				good_writes++;
 		}
 	}
+
+	if (good_writes == 0)
+		return (last_error);
 
 	/*
 	 * Flush the new labels to disk.  This ensures that all odd-label

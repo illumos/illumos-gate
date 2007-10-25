@@ -125,6 +125,7 @@ static int zopt_init = 1;
 static char *zopt_dir = "/tmp";
 static uint64_t zopt_time = 300;	/* 5 minutes */
 static int zopt_maxfaults;
+static uint16_t zopt_write_fail_shift = 5;
 
 typedef struct ztest_args {
 	char		*za_pool;
@@ -234,8 +235,11 @@ static ztest_shared_t *ztest_shared;
 static int ztest_random_fd;
 static int ztest_dump_core = 1;
 
+static boolean_t ztest_exiting = B_FALSE;
+
 extern uint64_t zio_gang_bang;
 extern uint16_t zio_zil_fail_shift;
+extern uint16_t zio_io_fail_shift;
 
 #define	ZTEST_DIROBJ		1
 #define	ZTEST_MICROZAP_OBJ	2
@@ -376,25 +380,27 @@ usage(boolean_t requested)
 	    "\t[-T time] total run time (default: %llu sec)\n"
 	    "\t[-P passtime] time per pass (default: %llu sec)\n"
 	    "\t[-z zil failure rate (default: fail every 2^%llu allocs)]\n"
+	    "\t[-w write failure rate (default: fail every 2^%llu allocs)]\n"
 	    "\t[-h] (print help)\n"
 	    "",
 	    cmdname,
-	    (u_longlong_t)zopt_vdevs,		/* -v */
-	    nice_vdev_size,			/* -s */
-	    zopt_ashift,			/* -a */
-	    zopt_mirrors,			/* -m */
-	    zopt_raidz,				/* -r */
-	    zopt_raidz_parity,			/* -R */
-	    zopt_datasets,			/* -d */
-	    zopt_threads,			/* -t */
-	    nice_gang_bang,			/* -g */
-	    zopt_init,				/* -i */
-	    (u_longlong_t)zopt_killrate,	/* -k */
-	    zopt_pool,				/* -p */
-	    zopt_dir,				/* -f */
-	    (u_longlong_t)zopt_time,		/* -T */
-	    (u_longlong_t)zopt_passtime,	/* -P */
-	    (u_longlong_t)zio_zil_fail_shift);	/* -z */
+	    (u_longlong_t)zopt_vdevs,			/* -v */
+	    nice_vdev_size,				/* -s */
+	    zopt_ashift,				/* -a */
+	    zopt_mirrors,				/* -m */
+	    zopt_raidz,					/* -r */
+	    zopt_raidz_parity,				/* -R */
+	    zopt_datasets,				/* -d */
+	    zopt_threads,				/* -t */
+	    nice_gang_bang,				/* -g */
+	    zopt_init,					/* -i */
+	    (u_longlong_t)zopt_killrate,		/* -k */
+	    zopt_pool,					/* -p */
+	    zopt_dir,					/* -f */
+	    (u_longlong_t)zopt_time,			/* -T */
+	    (u_longlong_t)zopt_passtime,		/* -P */
+	    (u_longlong_t)zio_zil_fail_shift,		/* -z */
+	    (u_longlong_t)zopt_write_fail_shift);	/* -w */
 	exit(requested ? 0 : 1);
 }
 
@@ -432,7 +438,7 @@ process_options(int argc, char **argv)
 	zio_zil_fail_shift = 5;
 
 	while ((opt = getopt(argc, argv,
-	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:z:h")) != EOF) {
+	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:z:w:h")) != EOF) {
 		value = 0;
 		switch (opt) {
 		case 'v':
@@ -449,6 +455,7 @@ process_options(int argc, char **argv)
 		case 'T':
 		case 'P':
 		case 'z':
+		case 'w':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
@@ -505,6 +512,9 @@ process_options(int argc, char **argv)
 			break;
 		case 'z':
 			zio_zil_fail_shift = MIN(value, 16);
+			break;
+		case 'w':
+			zopt_write_fail_shift = MIN(value, 16);
 			break;
 		case 'h':
 			usage(B_TRUE);
@@ -2986,6 +2996,41 @@ ztest_spa_import_export(char *oldname, char *newname)
 	nvlist_free(config);
 }
 
+/* ARGSUSED */
+static void *
+ztest_suspend_monitor(void *arg)
+{
+	spa_t *spa;
+	int error;
+
+	error = spa_open(zopt_pool, &spa, FTAG);
+	if (error) {
+		(void) printf("Unable to monitor pool '%s'\n", zopt_pool);
+		return (NULL);
+	}
+
+	while (!ztest_exiting) {
+		mutex_enter(&spa->spa_zio_lock);
+		while (!ztest_exiting && list_is_empty(&spa->spa_zio_list))
+			cv_wait(&spa->spa_zio_cv, &spa->spa_zio_lock);
+		mutex_exit(&spa->spa_zio_lock);
+
+		(void) sleep(3);
+		/*
+		 * We don't hold the spa_config_lock since the pool is in
+		 * complete failure mode and there is no way for us to
+		 * change the vdev config when we're in this state.
+		 */
+		while ((error = zio_vdev_resume_io(spa)) != 0) {
+			(void) printf("I/O could not be resumed, %d\n", error);
+			(void) sleep(1);
+		}
+		vdev_clear(spa, NULL, B_TRUE);
+	}
+	spa_close(spa, FTAG);
+	return (NULL);
+}
+
 static void *
 ztest_thread(void *arg)
 {
@@ -3005,7 +3050,7 @@ ztest_thread(void *arg)
 
 			mutex_enter(&spa_namespace_lock);
 			tx = dmu_tx_create(za->za_os);
-			VERIFY(0 == dmu_tx_assign(tx, TXG_NOWAIT));
+			VERIFY(0 == dmu_tx_assign(tx, TXG_WAIT));
 			txg = dmu_tx_get_txg(tx);
 			dmu_tx_commit(tx);
 			zs->zs_txg = txg;
@@ -3076,6 +3121,7 @@ ztest_run(char *pool)
 	ztest_args_t *za;
 	spa_t *spa;
 	char name[100];
+	thread_t tid;
 
 	(void) _mutex_init(&zs->zs_vdev_lock, USYNC_THREAD, NULL);
 	(void) rwlock_init(&zs->zs_name_lock, USYNC_THREAD, NULL);
@@ -3133,6 +3179,18 @@ ztest_run(char *pool)
 	mutex_exit(&spa_namespace_lock);
 
 	/*
+	 * Create a thread to handling complete pool failures. This
+	 * thread will kickstart the I/Os when they suspend. We must
+	 * start the thread before setting the zio_io_fail_shift, which
+	 * will indicate our failure rate.
+	 */
+	error = thr_create(0, 0, ztest_suspend_monitor, NULL, THR_BOUND, &tid);
+	if (error) {
+		fatal(0, "can't create suspend monitor thread: error %d",
+		    t, error);
+	}
+
+	/*
 	 * Open our pool.
 	 */
 	error = spa_open(pool, &spa, FTAG);
@@ -3163,6 +3221,9 @@ ztest_run(char *pool)
 
 	if (zopt_verbose >= 4)
 		(void) printf("starting main threads...\n");
+
+	/* Let failures begin */
+	zio_io_fail_shift = zopt_write_fail_shift;
 
 	za[0].za_start = gethrtime();
 	za[0].za_stop = za[0].za_start + zopt_passtime * NANOSEC;
@@ -3270,6 +3331,16 @@ ztest_run(char *pool)
 		dmu_prefetch(spa->spa_meta_objset, t, 0, 1 << 15);
 
 	spa_close(spa, FTAG);
+
+	/* Shutdown the suspend monitor thread */
+	zio_io_fail_shift = 0;
+	ztest_exiting = B_TRUE;
+	mutex_enter(&spa->spa_zio_lock);
+	cv_broadcast(&spa->spa_zio_cv);
+	mutex_exit(&spa->spa_zio_lock);
+	error = thr_join(tid, NULL, NULL);
+	if (error)
+		fatal(0, "thr_join(%d) = %d", tid, error);
 
 	kernel_fini();
 }

@@ -2073,6 +2073,17 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
+	/*
+	 * Try to resume any I/Os which may have been suspended
+	 * as a result of a complete pool failure.
+	 */
+	if (!list_is_empty(&spa->spa_zio_list)) {
+		if (zio_vdev_resume_io(spa) != 0) {
+			spa_close(spa, FTAG);
+			return (EIO);
+		}
+	}
+
 	txg = spa_vdev_enter(spa);
 
 	if (zc->zc_guid == 0) {
@@ -2083,7 +2094,7 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 		return (ENODEV);
 	}
 
-	vdev_clear(spa, vd);
+	vdev_clear(spa, vd, B_TRUE);
 
 	(void) spa_vdev_exit(spa, NULL, txg, 0);
 

@@ -362,6 +362,27 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				dmu_objset_close(os);
 			}
 			break;
+		case ZPOOL_PROP_FAILUREMODE:
+			error = nvpair_value_uint64(elem, &intval);
+			if (!error && (intval < ZIO_FAILURE_MODE_WAIT ||
+			    intval > ZIO_FAILURE_MODE_PANIC))
+				error = EINVAL;
+
+			/*
+			 * This is a special case which only occurs when
+			 * the pool has completely failed. This allows
+			 * the user to change the in-core failmode property
+			 * without syncing it out to disk (I/Os might
+			 * currently be blocked). We do this by returning
+			 * EIO to the caller (spa_prop_set) to trick it
+			 * into thinking we encountered a property validation
+			 * error.
+			 */
+			if (!error && spa_state(spa) == POOL_STATE_IO_FAILURE) {
+				spa->spa_failmode = intval;
+				error = EIO;
+			}
+			break;
 		}
 
 		if (error)
@@ -477,6 +498,8 @@ spa_activate(spa_t *spa)
 
 	list_create(&spa->spa_dirty_list, sizeof (vdev_t),
 	    offsetof(vdev_t, vdev_dirty_node));
+	list_create(&spa->spa_zio_list, sizeof (zio_t),
+	    offsetof(zio_t, zio_link_node));
 
 	txg_list_create(&spa->spa_vdev_txg_list,
 	    offsetof(struct vdev, vdev_txg_node));
@@ -506,6 +529,7 @@ spa_deactivate(spa_t *spa)
 	txg_list_destroy(&spa->spa_vdev_txg_list);
 
 	list_destroy(&spa->spa_dirty_list);
+	list_destroy(&spa->spa_zio_list);
 
 	for (t = 0; t < ZIO_TYPES; t++) {
 		taskq_destroy(spa->spa_zio_issue_taskq[t]);
@@ -1077,6 +1101,10 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		    spa->spa_pool_props_object,
 		    zpool_prop_to_name(ZPOOL_PROP_DELEGATION),
 		    sizeof (uint64_t), 1, &spa->spa_delegation);
+		(void) zap_lookup(spa->spa_meta_objset,
+		    spa->spa_pool_props_object,
+		    zpool_prop_to_name(ZPOOL_PROP_FAILUREMODE),
+		    sizeof (uint64_t), 1, &spa->spa_failmode);
 	}
 
 	/*
@@ -1618,6 +1646,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_bootfs = zpool_prop_default_numeric(ZPOOL_PROP_BOOTFS);
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_temporary = zpool_prop_default_numeric(ZPOOL_PROP_TEMPORARY);
+	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	if (props)
 		spa_sync_props(spa, props, CRED(), tx);
 
@@ -3091,7 +3120,7 @@ spa_async_remove(spa_t *spa, vdev_t *vd)
 			tvd->vdev_remove_wanted = 0;
 			vdev_set_state(tvd, B_FALSE, VDEV_STATE_REMOVED,
 			    VDEV_AUX_NONE);
-			vdev_clear(spa, tvd);
+			vdev_clear(spa, tvd, B_TRUE);
 			vdev_config_dirty(tvd->vdev_top);
 		}
 		spa_async_remove(spa, tvd);
@@ -3122,8 +3151,14 @@ spa_async_thread(spa_t *spa)
 
 	/*
 	 * See if any devices need to be marked REMOVED.
+	 *
+	 * XXX - We avoid doing this when we are in
+	 * I/O failure state since spa_vdev_enter() grabs
+	 * the namespace lock and would not be able to obtain
+	 * the writer config lock.
 	 */
-	if (tasks & SPA_ASYNC_REMOVE) {
+	if (tasks & SPA_ASYNC_REMOVE &&
+	    spa_state(spa) != POOL_STATE_IO_FAILURE) {
 		txg = spa_vdev_enter(spa);
 		spa_async_remove(spa, spa->spa_root_vdev);
 		(void) spa_vdev_exit(spa, NULL, txg, 0);
@@ -3379,7 +3414,6 @@ spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			VERIFY(nvpair_value_uint64(elem, &intval) == 0);
 			spa->spa_temporary = intval;
 			break;
-
 		default:
 			/*
 			 * Set pool property values in the poolprops mos object.
@@ -3425,11 +3459,19 @@ spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 				ASSERT(0); /* not allowed */
 			}
 
-			if (prop ==  ZPOOL_PROP_DELEGATION)
+			switch (prop) {
+			case ZPOOL_PROP_DELEGATION:
 				spa->spa_delegation = intval;
-
-			if (prop == ZPOOL_PROP_BOOTFS)
+				break;
+			case ZPOOL_PROP_BOOTFS:
 				spa->spa_bootfs = intval;
+				break;
+			case ZPOOL_PROP_FAILUREMODE:
+				spa->spa_failmode = intval;
+				break;
+			default:
+				break;
+			}
 		}
 
 		/* log internal history if this is not a zpool create */

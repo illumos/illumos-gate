@@ -298,6 +298,7 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 	uint64_t *entry, *entry_map, *entry_map_end;
 	uint64_t bufsize, size, offset, end, space;
 	uint64_t mapstart = sm->sm_start;
+	int error = 0;
 
 	ASSERT(MUTEX_HELD(sm->sm_lock));
 
@@ -335,9 +336,10 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 		    smo->smo_object, offset, size);
 
 		mutex_exit(sm->sm_lock);
-		VERIFY3U(dmu_read(os, smo->smo_object, offset, size,
-		    entry_map), ==, 0);
+		error = dmu_read(os, smo->smo_object, offset, size, entry_map);
 		mutex_enter(sm->sm_lock);
+		if (error != 0)
+			goto out;
 
 		entry_map_end = entry_map + (size / sizeof (uint64_t));
 		for (entry = entry_map; entry < entry_map_end; entry++) {
@@ -354,18 +356,19 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 	}
 	VERIFY3U(sm->sm_space, ==, space);
 
+	sm->sm_loaded = B_TRUE;
+	sm->sm_ops = ops;
+out:
 	zio_buf_free(entry_map, bufsize);
 
 	sm->sm_loading = B_FALSE;
-	sm->sm_loaded = B_TRUE;
-	sm->sm_ops = ops;
 
 	cv_broadcast(&sm->sm_load_cv);
 
-	if (ops != NULL)
+	if (!error && ops != NULL)
 		ops->smop_load(sm);
 
-	return (0);
+	return (error);
 }
 
 void

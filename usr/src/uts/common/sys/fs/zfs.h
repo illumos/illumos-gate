@@ -115,6 +115,7 @@ typedef enum {
 	ZPOOL_PROP_DELEGATION,
 	ZPOOL_PROP_AUTOREPLACE,
 	ZPOOL_PROP_TEMPORARY,
+	ZPOOL_PROP_FAILUREMODE,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
@@ -365,6 +366,7 @@ typedef enum pool_state {
 	POOL_STATE_DESTROYED,		/* Explicitly destroyed		*/
 	POOL_STATE_SPARE,		/* Reserved for hot spare use	*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
+	POOL_STATE_IO_FAILURE,		/* Internal pool state		*/
 	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/
 	POOL_STATE_POTENTIALLY_ACTIVE	/* Internal libzfs state	*/
 } pool_state_t;

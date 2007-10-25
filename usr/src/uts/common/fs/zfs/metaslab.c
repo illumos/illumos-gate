@@ -773,6 +773,20 @@ top:
 	all_zero = B_TRUE;
 	do {
 		vd = mg->mg_vd;
+		/*
+		 * Dont allocate from faulted devices
+		 */
+		if (!vdev_writeable(vd))
+			goto next;
+		/*
+		 * Avoid writing single-copy data to a failing vdev
+		 */
+		if ((vd->vdev_stat.vs_write_errors > 0 ||
+		    vd->vdev_state < VDEV_STATE_HEALTHY) &&
+		    d == 0 && dshift == 3) {
+			all_zero = B_FALSE;
+			goto next;
+		}
 
 		ASSERT(mg->mg_class == mc);
 
@@ -828,6 +842,7 @@ top:
 
 			return (0);
 		}
+next:
 		mc->mc_rotor = mg->mg_next;
 		mc->mc_allocated = 0;
 	} while ((mg = mg->mg_next) != rotor);

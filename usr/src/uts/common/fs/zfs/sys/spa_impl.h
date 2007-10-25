@@ -141,6 +141,10 @@ struct spa {
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	boolean_t	spa_delegation;		/* delegation on/off */
 	boolean_t	spa_temporary;		/* temporary on/off */
+	list_t		spa_zio_list;		/* zio error list */
+	kcondvar_t	spa_zio_cv;		/* resume I/O pipeline */
+	kmutex_t	spa_zio_lock;		/* zio error lock */
+	uint8_t		spa_failmode;		/* failure mode for the pool */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

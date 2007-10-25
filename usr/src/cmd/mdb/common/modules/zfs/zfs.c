@@ -905,7 +905,7 @@ spa_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	spa_t spa;
 	char poolname[MAXNAMELEN];
 	const char *statetab[] = { "ACTIVE", "EXPORTED", "DESTROYED",
-		"UNINIT", "UNAVAIL" };
+		"SPARE", "UNINIT", "IOFAILURE", "UNAVAIL" };
 	const char *state;
 	int config = FALSE;
 	int vdevs = FALSE;

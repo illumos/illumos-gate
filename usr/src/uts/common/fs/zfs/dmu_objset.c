@@ -739,12 +739,26 @@ ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 	dnode_phys_t *dnp = &os->os_phys->os_meta_dnode;
 	int i;
 
+	ASSERT(bp == zio->io_bp);
+
 	/*
 	 * Update rootbp fill count.
 	 */
 	bp->blk_fill = 1;	/* count the meta-dnode */
 	for (i = 0; i < dnp->dn_nblkptr; i++)
 		bp->blk_fill += dnp->dn_blkptr[i].blk_fill;
+
+	BP_SET_TYPE(bp, DMU_OT_OBJSET);
+	BP_SET_LEVEL(bp, 0);
+
+	/* We must do this after we've set the bp's type and level */
+	if (!DVA_EQUAL(BP_IDENTITY(bp),
+	    BP_IDENTITY(&zio->io_bp_orig))) {
+		if (zio->io_bp_orig.blk_birth == os->os_synctx->tx_txg)
+			dsl_dataset_block_kill(os->os_dsl_dataset,
+			    &zio->io_bp_orig, NULL, os->os_synctx);
+		dsl_dataset_block_born(os->os_dsl_dataset, bp, os->os_synctx);
+	}
 }
 
 /* ARGSUSED */
@@ -754,18 +768,6 @@ killer(zio_t *zio, arc_buf_t *abuf, void *arg)
 	objset_impl_t *os = arg;
 
 	ASSERT3U(zio->io_error, ==, 0);
-
-	BP_SET_TYPE(zio->io_bp, DMU_OT_OBJSET);
-	BP_SET_LEVEL(zio->io_bp, 0);
-
-	if (!DVA_EQUAL(BP_IDENTITY(zio->io_bp),
-	    BP_IDENTITY(&zio->io_bp_orig))) {
-		if (zio->io_bp_orig.blk_birth == os->os_synctx->tx_txg)
-			dsl_dataset_block_kill(os->os_dsl_dataset,
-			    &zio->io_bp_orig, NULL, os->os_synctx);
-		dsl_dataset_block_born(os->os_dsl_dataset, zio->io_bp,
-		    os->os_synctx);
-	}
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
 }
 

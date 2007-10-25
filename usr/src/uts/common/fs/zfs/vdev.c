@@ -793,6 +793,21 @@ vdev_metaslab_fini(vdev_t *vd)
 	}
 }
 
+int
+vdev_probe(vdev_t *vd)
+{
+	if (vd == NULL)
+		return (EINVAL);
+
+	/*
+	 * Right now we only support status checks on the leaf vdevs.
+	 */
+	if (vd->vdev_ops->vdev_op_leaf)
+		return (vd->vdev_ops->vdev_op_probe(vd));
+
+	return (0);
+}
+
 /*
  * Prepare a virtual device for access.
  */
@@ -916,6 +931,17 @@ vdev_open(vdev_t *vd)
 		    asize > vd->vdev_asize) {
 			vd->vdev_asize = asize;
 		}
+	}
+
+	/*
+	 * Ensure we can issue some IO before declaring the
+	 * vdev open for business.
+	 */
+	error = vdev_probe(vd);
+	if (error) {
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_OPEN_FAILED);
+		return (error);
 	}
 
 	/*
@@ -1467,6 +1493,17 @@ vdev_fault(spa_t *spa, uint64_t guid)
 	vdev_t *rvd, *vd;
 	uint64_t txg;
 
+	/*
+	 * Disregard a vdev fault request if the pool has
+	 * experienced a complete failure.
+	 *
+	 * XXX - We do this here so that we don't hold the
+	 * spa_namespace_lock in the event that we can't get
+	 * the RW_WRITER spa_config_lock.
+	 */
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
+		return (EIO);
+
 	txg = spa_vdev_enter(spa);
 
 	rvd = spa->spa_root_vdev;
@@ -1499,7 +1536,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 		 */
 		vdev_reopen(vd);
 
-		if (!vdev_is_dead(vd)) {
+		if (vdev_readable(vd)) {
 			vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED,
 			    VDEV_AUX_ERR_EXCEEDED);
 		}
@@ -1522,6 +1559,17 @@ vdev_degrade(spa_t *spa, uint64_t guid)
 {
 	vdev_t *rvd, *vd;
 	uint64_t txg;
+
+	/*
+	 * Disregard a vdev fault request if the pool has
+	 * experienced a complete failure.
+	 *
+	 * XXX - We do this here so that we don't hold the
+	 * spa_namespace_lock in the event that we can't get
+	 * the RW_WRITER spa_config_lock.
+	 */
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
+		return (EIO);
 
 	txg = spa_vdev_enter(spa);
 
@@ -1563,6 +1611,17 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
 {
 	vdev_t *rvd, *vd;
 	uint64_t txg;
+
+	/*
+	 * Disregard a vdev fault request if the pool has
+	 * experienced a complete failure.
+	 *
+	 * XXX - We do this here so that we don't hold the
+	 * spa_namespace_lock in the event that we can't get
+	 * the RW_WRITER spa_config_lock.
+	 */
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
+		return (EIO);
 
 	txg = spa_vdev_enter(spa);
 
@@ -1611,6 +1670,17 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 {
 	vdev_t *rvd, *vd;
 	uint64_t txg;
+
+	/*
+	 * Disregard a vdev fault request if the pool has
+	 * experienced a complete failure.
+	 *
+	 * XXX - We do this here so that we don't hold the
+	 * spa_namespace_lock in the event that we can't get
+	 * the RW_WRITER spa_config_lock.
+	 */
+	if (spa_state(spa) == POOL_STATE_IO_FAILURE)
+		return (EIO);
 
 	txg = spa_vdev_enter(spa);
 
@@ -1662,9 +1732,11 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
  * Clear the error counts associated with this vdev.  Unlike vdev_online() and
  * vdev_offline(), we assume the spa config is locked.  We also clear all
  * children.  If 'vd' is NULL, then the user wants to clear all vdevs.
+ * If reopen is specified then attempt to reopen the vdev if the vdev is
+ * faulted or degraded.
  */
 void
-vdev_clear(spa_t *spa, vdev_t *vd)
+vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted)
 {
 	int c;
 
@@ -1674,16 +1746,17 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 	vd->vdev_stat.vs_read_errors = 0;
 	vd->vdev_stat.vs_write_errors = 0;
 	vd->vdev_stat.vs_checksum_errors = 0;
+	vd->vdev_is_failing = B_FALSE;
 
 	for (c = 0; c < vd->vdev_children; c++)
-		vdev_clear(spa, vd->vdev_child[c]);
+		vdev_clear(spa, vd->vdev_child[c], reopen_wanted);
 
 	/*
 	 * If we're in the FAULTED state, then clear the persistent state and
 	 * attempt to reopen the device.  We also mark the vdev config dirty, so
 	 * that the new faulted state is written out to disk.
 	 */
-	if (vd->vdev_faulted || vd->vdev_degraded) {
+	if (reopen_wanted && (vd->vdev_faulted || vd->vdev_degraded)) {
 		vd->vdev_faulted = vd->vdev_degraded = 0;
 		vdev_reopen(vd);
 		vdev_config_dirty(vd->vdev_top);
@@ -1693,6 +1766,20 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);
 	}
+}
+
+int
+vdev_readable(vdev_t *vd)
+{
+	/* XXPOLICY */
+	return (!vdev_is_dead(vd));
+}
+
+int
+vdev_writeable(vdev_t *vd)
+{
+	return (vd->vdev_ops->vdev_op_leaf ?
+	    !vd->vdev_is_failing : !vdev_is_dead(vd));
 }
 
 int
@@ -1800,7 +1887,7 @@ vdev_stat_update(zio_t *zio)
 	if (flags & ZIO_FLAG_SPECULATIVE)
 		return;
 
-	if (!vdev_is_dead(vd)) {
+	if (vdev_readable(vd)) {
 		mutex_enter(&vd->vdev_stat_lock);
 		if (type == ZIO_TYPE_READ) {
 			if (zio->io_error == ECKSUM)
@@ -1962,9 +2049,9 @@ vdev_propagate_state(vdev_t *vd)
 	if (vd->vdev_children > 0) {
 		for (c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
-			if (vdev_is_dead(child))
+			if (vdev_is_dead(child) && !vdev_readable(child))
 				faulted++;
-			else if (child->vdev_state == VDEV_STATE_DEGRADED)
+			else if (child->vdev_state <= VDEV_STATE_DEGRADED)
 				degraded++;
 
 			if (child->vdev_stat.vs_aux == VDEV_AUX_CORRUPT_DATA)
@@ -2020,7 +2107,7 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 	 * want here.  This is limited to leaf devices, because otherwise
 	 * closing the device will affect other children.
 	 */
-	if (vdev_is_dead(vd) && vd->vdev_ops->vdev_op_leaf)
+	if (!vdev_readable(vd) && vd->vdev_ops->vdev_op_leaf)
 		vd->vdev_ops->vdev_op_close(vd);
 
 	if (vd->vdev_removed &&

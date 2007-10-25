@@ -686,7 +686,7 @@ vdev_raidz_io_start(zio_t *zio)
 	for (c = rm->rm_cols - 1; c >= 0; c--) {
 		rc = &rm->rm_col[c];
 		cvd = vd->vdev_child[rc->rc_devidx];
-		if (vdev_is_dead(cvd)) {
+		if (!vdev_readable(cvd)) {
 			if (c >= rm->rm_firstdatacol)
 				rm->rm_missingdata++;
 			else
@@ -1228,6 +1228,7 @@ vdev_raidz_state_change(vdev_t *vd, int faulted, int degraded)
 vdev_ops_t vdev_raidz_ops = {
 	vdev_raidz_open,
 	vdev_raidz_close,
+	NULL,
 	vdev_raidz_asize,
 	vdev_raidz_io_start,
 	vdev_raidz_io_done,

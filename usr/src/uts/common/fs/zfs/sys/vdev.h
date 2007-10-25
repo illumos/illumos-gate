@@ -54,6 +54,7 @@ extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);
 extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
 extern int vdev_validate_spare(vdev_t *);
+extern int vdev_probe(vdev_t *);
 
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
 extern vdev_t *vdev_lookup_by_guid(vdev_t *vd, uint64_t guid);
@@ -89,10 +90,12 @@ extern int vdev_degrade(spa_t *spa, uint64_t guid);
 extern int vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
     vdev_state_t *);
 extern int vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags);
-extern void vdev_clear(spa_t *spa, vdev_t *vd);
+extern void vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted);
 
 extern int vdev_error_inject(vdev_t *vd, zio_t *zio);
 extern int vdev_is_dead(vdev_t *vd);
+extern int vdev_readable(vdev_t *vd);
+extern int vdev_writeable(vdev_t *vd);
 
 extern void vdev_cache_init(vdev_t *vd);
 extern void vdev_cache_fini(vdev_t *vd);

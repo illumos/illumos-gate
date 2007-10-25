@@ -62,6 +62,7 @@ extern "C" {
 #include <sys/zfs_debug.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
+#include <sys/fm/util.h>
 
 #define	CPU_SEQID	(CPU->cpu_seqid)
 

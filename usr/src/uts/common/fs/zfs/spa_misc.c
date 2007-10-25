@@ -277,6 +277,8 @@ spa_add(const char *name, const char *altroot)
 
 	avl_add(&spa_namespace_avl, spa);
 
+	mutex_init(&spa->spa_zio_lock, NULL, MUTEX_DEFAULT, NULL);
+
 	/*
 	 * Set the alternate root, if there is one.
 	 */
@@ -332,6 +334,7 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
 	mutex_destroy(&spa->spa_history_lock);
 	mutex_destroy(&spa->spa_props_lock);
+	mutex_destroy(&spa->spa_zio_lock);
 
 	kmem_free(spa, sizeof (spa_t));
 }
@@ -987,6 +990,16 @@ spa_get_asize(spa_t *spa, uint64_t lsize)
 	 * we have to multiply by a total of 6x.
 	 */
 	return (lsize * 6);
+}
+
+/*
+ * Return the failure mode that has been set to this pool. The default
+ * behavior will be to block all I/Os when a complete failure occurs.
+ */
+uint8_t
+spa_get_failmode(spa_t *spa)
+{
+	return (spa->spa_failmode);
 }
 
 uint64_t

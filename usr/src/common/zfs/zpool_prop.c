@@ -58,6 +58,13 @@ zpool_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t failuremode_table[] = {
+		{ "wait",	ZIO_FAILURE_MODE_WAIT },
+		{ "continue",	ZIO_FAILURE_MODE_CONTINUE },
+		{ "panic",	ZIO_FAILURE_MODE_PANIC },
+		{ NULL }
+	};
+
 	/* string properties */
 	register_string(ZPOOL_PROP_ALTROOT, "altroot", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<path>", "ALTROOT");
@@ -89,6 +96,11 @@ zpool_prop_init(void)
 	    ZFS_TYPE_POOL, "on | off", "REPLACE", boolean_table);
 	register_index(ZPOOL_PROP_TEMPORARY, "temporary", 0, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "on | off", "TEMP", boolean_table);
+
+	/* default index properties */
+	register_index(ZPOOL_PROP_FAILUREMODE, "failmode",
+	    ZIO_FAILURE_MODE_WAIT, PROP_DEFAULT, ZFS_TYPE_POOL,
+	    "wait | continue | panic", "FAILMODE", failuremode_table);
 
 	/* hidden properties */
 	register_hidden(ZPOOL_PROP_NAME, "name", PROP_TYPE_STRING,

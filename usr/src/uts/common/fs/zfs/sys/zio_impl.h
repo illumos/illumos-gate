@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,8 @@ typedef enum zio_stage {
 
 	ZIO_STAGE_READY,			/* RWFCI */
 
+	ZIO_STAGE_READ_INIT,			/* R---- */
+
 	ZIO_STAGE_VDEV_IO_START,		/* RW--I */
 	ZIO_STAGE_VDEV_IO_DONE,			/* RW--I */
 	ZIO_STAGE_VDEV_IO_ASSESS,		/* RW--I */
@@ -71,6 +73,7 @@ typedef enum zio_stage {
 	ZIO_STAGE_READ_GANG_MEMBERS,		/* R---- */
 	ZIO_STAGE_READ_DECOMPRESS,		/* R---- */
 
+	ZIO_STAGE_ASSESS,			/* RWFCI */
 	ZIO_STAGE_DONE				/* RWFCI */
 } zio_stage_t;
 
@@ -96,9 +99,14 @@ typedef enum zio_stage {
 	ZIO_VDEV_IO_PIPELINE |					\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
 	(1U << ZIO_STAGE_CHECKSUM_VERIFY) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
+#define	ZIO_READ_GANG_PIPELINE					\
+	ZIO_READ_PHYS_PIPELINE
+
 #define	ZIO_READ_PIPELINE					\
+	(1U << ZIO_STAGE_READ_INIT) |				\
 	ZIO_READ_PHYS_PIPELINE
 
 #define	ZIO_WRITE_PHYS_PIPELINE					\
@@ -108,6 +116,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_READY) |				\
 	ZIO_VDEV_IO_PIPELINE |					\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_WRITE_COMMON_PIPELINE				\
@@ -149,6 +158,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_DVA_FREE) |				\
 	(1U << ZIO_STAGE_READY) |				\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_CLAIM_PIPELINE					\
@@ -160,6 +170,7 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_DVA_CLAIM) |				\
 	(1U << ZIO_STAGE_READY) |				\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_IOCTL_PIPELINE					\
@@ -168,16 +179,19 @@ typedef enum zio_stage {
 	(1U << ZIO_STAGE_READY) |				\
 	ZIO_VDEV_IO_PIPELINE |					\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_WAIT_FOR_CHILDREN_PIPELINE				\
 	((1U << ZIO_STAGE_WAIT_CHILDREN_READY) |		\
 	(1U << ZIO_STAGE_READY) |				\
 	(1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_WAIT_FOR_CHILDREN_DONE_PIPELINE			\
 	((1U << ZIO_STAGE_WAIT_CHILDREN_DONE) |			\
+	(1U << ZIO_STAGE_ASSESS) |				\
 	(1U << ZIO_STAGE_DONE))
 
 #define	ZIO_VDEV_CHILD_PIPELINE					\
