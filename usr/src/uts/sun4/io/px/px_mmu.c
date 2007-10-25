@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@ px_mmu_attach(px_t *px_p)
 {
 	dev_info_t		*dip = px_p->px_dip;
 	px_mmu_t			*mmu_p;
-	uint32_t		base_pg_index, i = 0;
+	uint32_t		tsb_i = 0;
 	char			map_name[32];
 	px_dvma_range_prop_t	*dvma_prop;
 	int			dvma_prop_len;
@@ -114,16 +114,31 @@ px_mmu_attach(px_t *px_p)
 
 	mutex_init(&mmu_p->dvma_debug_lock, NULL, MUTEX_DRIVER, NULL);
 
-	base_pg_index = MMU_BTOP(mmu_p->mmu_dvma_end) - tsb_entries + 1;
-
-	for (i = 0; i < tsb_entries; i++) {
+	for (tsb_i = 0; tsb_i < tsb_entries; tsb_i++) {
 		r_addr_t ra = 0;
 		io_attributes_t attr;
 		caddr_t va;
 
-		if (px_lib_iommu_getmap(px_p->px_dip, PCI_TSBID(0, i),
-		    &attr, &ra) == DDI_SUCCESS) {
-			va = (caddr_t)(MMU_PTOB(base_pg_index + i));
+		if (px_lib_iommu_getmap(px_p->px_dip, PCI_TSBID(0, tsb_i),
+		    &attr, &ra) != DDI_SUCCESS)
+			continue;
+
+		va = (caddr_t)(MMU_PTOB(mmu_p->dvma_base_pg + tsb_i));
+
+		if (va <= (caddr_t)mmu_p->mmu_dvma_fast_end) {
+			uint32_t cache_i;
+
+			/*
+			 * the va is within the *fast* dvma range; therefore,
+			 * lock its fast dvma page cache cluster in order to
+			 * both preserve the TTE and prevent the use of this
+			 * fast dvma page cache cluster by px_dvma_map_fast().
+			 * the lock value 0xFF comes from ldstub().
+			 */
+			cache_i = tsb_i / px_dvma_page_cache_clustsz;
+			ASSERT(cache_i < px_dvma_page_cache_entries);
+			mmu_p->mmu_dvma_cache_locks[cache_i] = 0xFF;
+		} else {
 			(void) vmem_xalloc(mmu_p->mmu_dvma_map, MMU_PAGE_SIZE,
 			    MMU_PAGE_SIZE, 0, 0, va, va + MMU_PAGE_SIZE,
 			    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);

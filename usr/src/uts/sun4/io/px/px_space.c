@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,13 +139,6 @@ uint_t px_dvma_vmem_free = 0;			/* vmem free */
 #endif
 uint_t px_disable_fdvma = 0;
 uint_t px_mmu_ctx_lock_failure = 0;
-
-/*
- * This flag preserves prom MMU settings by copying prom TSB entries
- * to corresponding kernel TSB entry locations. It should be removed
- * after the interface properties from obp have become default.
- */
-uint_t px_preserve_mmu_tsb = 1;
 
 /*
  * memory callback list id callback list for kmem_alloc failure clients

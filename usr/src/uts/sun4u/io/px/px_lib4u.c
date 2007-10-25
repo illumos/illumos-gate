@@ -209,9 +209,9 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	px_dvma_range.dvma_len = (uint32_t)
 	    px_mmu_dvma_end - px_dvma_range.dvma_base + 1;
 
-	(void) ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-		"virtual-dma", (caddr_t)&px_dvma_range,
-		sizeof (px_dvma_range_prop_t));
+	(void) ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+	    "virtual-dma", (int *)&px_dvma_range,
+	    sizeof (px_dvma_range_prop_t) / sizeof (int));
 	/*
 	 * Initilize all fire hardware specific blocks.
 	 */
@@ -294,6 +294,7 @@ px_lib_dev_fini(dev_info_t *dip)
 	px_lib_unmap_regs((pxu_t *)px_p->px_plat_p);
 	kmem_free(px_p->px_plat_p, sizeof (pxu_t));
 	px_p->px_plat_p = NULL;
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "virtual-dma");
 
 	return (DDI_SUCCESS);
 }

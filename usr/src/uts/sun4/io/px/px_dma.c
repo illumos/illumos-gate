@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1506,9 +1506,14 @@ px_dvma_debug_fini(px_mmu_t *mmu_p)
 	uint64_t mask = ~(1ull << mmu_p->mmu_inst);
 	cmn_err(CE_NOTE, "PCI Express DVMA %p stat OFF", mmu_p);
 
-	kmem_free(mmu_p->dvma_alloc_rec, sz);
-	kmem_free(mmu_p->dvma_free_rec, sz);
-	mmu_p->dvma_alloc_rec = mmu_p->dvma_free_rec = NULL;
+	if (mmu_p->dvma_alloc_rec) {
+		kmem_free(mmu_p->dvma_alloc_rec, sz);
+		mmu_p->dvma_alloc_rec = NULL;
+	}
+	if (mmu_p->dvma_free_rec) {
+		kmem_free(mmu_p->dvma_free_rec, sz);
+		mmu_p->dvma_free_rec = NULL;
+	}
 
 	prev = mmu_p->dvma_active_list;
 	if (!prev)

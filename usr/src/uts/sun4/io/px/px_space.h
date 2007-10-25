@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,6 @@ extern uint_t px_dvma_vmem_xfree;
 extern uint_t px_disable_fdvma;
 
 extern uint_t px_iommu_ctx_lock_failure;
-extern uint_t px_preserve_iommu_tsb;
 extern uintptr_t px_kmem_clid;
 
 /* timeout length in micro seconds */
