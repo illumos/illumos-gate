@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,6 +153,10 @@ enum tagnum_t { TAG_INVALID = MAXTOKEN,
 	TAG_IP_LOCAL,			/* with tid token, type=ip */
 	TAG_IP_REMOTE,			/* with tid token, type=ip */
 	TAG_IP_ADR,			/* with tid token, type=ip */
+	TAG_ACEMASK,			/* with ace token */
+	TAG_ACEFLAGS,			/* with ace token */
+	TAG_ACETYPE,			/* with ace token */
+	TAG_ACEID,			/* with ace token */
 	MAXTAG
 };
 
@@ -197,6 +201,7 @@ extern int	zonename_token();
  */
 
 extern int	acl_token();
+extern int	ace_token();
 extern int	attribute_token();
 extern int	s5_IPC_perm_token();
 extern int	group_token();

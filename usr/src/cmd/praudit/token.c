@@ -462,7 +462,7 @@ arbitrary_data_token(pr_context_t *context)
 		case AUR_CHAR:
 			if (pr_adr_char(context, &c1, 1) == 0)
 				(void) convert_char_to_string(how_to_print,
-					c1, p);
+				    c1, p);
 			else {
 				free(p);
 				return (-1);
@@ -471,7 +471,7 @@ arbitrary_data_token(pr_context_t *context)
 		case AUR_SHORT:
 			if (pr_adr_short(context, &c2, 1) == 0)
 				(void) convert_short_to_string(how_to_print,
-					c2, p);
+				    c2, p);
 			else {
 				free(p);
 				return (-1);
@@ -480,7 +480,7 @@ arbitrary_data_token(pr_context_t *context)
 		case AUR_INT32:
 			if (pr_adr_int32(context, &c3, 1) == 0)
 				(void) convert_int32_to_string(how_to_print,
-					c3, p);
+				    c3, p);
 			else {
 				free(p);
 				return (-1);
@@ -489,7 +489,7 @@ arbitrary_data_token(pr_context_t *context)
 		case AUR_INT64:
 			if (pr_adr_int64(context, &c4, 1) == 0)
 				(void) convert_int64_to_string(how_to_print,
-					c4, p);
+				    c4, p);
 			else {
 				free(p);
 				return (-1);
@@ -716,7 +716,8 @@ collapse_path(char *s)
 			is += 1;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
@@ -725,11 +726,13 @@ collapse_path(char *s)
 			is += 2;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
-		while (is < ls && (s[id++] = s[is++]) != '/');
+		while (is < ls && (s[id++] = s[is++]) != '/')
+			;
 		is--;
 	}
 	return (s);
@@ -1708,6 +1711,26 @@ acl_token(pr_context_t *context)
 	returnstat = pa_pw_uid_gr_gid(context, 0, 0);
 
 	return (process_tag(context, TAG_MODE, returnstat, 1));
+}
+
+/*
+ * -----------------------------------------------------------------------
+ * ace_token()	: Process ZFS/NFSv4 access control list term
+ * return codes	: -1 - error
+ *		:  0 - successful
+ *
+ * Format of ace token:
+ *	token id	adr_char
+ *	term who	adr_u_int32 (uid/gid)
+ *	term mask	adr_u_int32
+ *	term flags	adr_u_int16
+ *	term type	adr_u_int16
+ * -----------------------------------------------------------------------
+ */
+int
+ace_token(pr_context_t *context)
+{
+	return (pa_ace(context, 0, 1));
 }
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,6 +208,7 @@ extern int	pa_adr_int64hex(pr_context_t *context, int status, int flag);
 extern int	pa_pw_uid(pr_context_t *context, int status, int flag);
 extern int	pa_gr_uid(pr_context_t *context, int status, int flag);
 extern int	pa_pw_uid_gr_gid(pr_context_t *context, int status, int flag);
+extern int	pa_ace(pr_context_t *context, int status, int flag);
 extern int	pa_hostname(pr_context_t *context, int status, int flag);
 extern int	pa_hostname_ex(pr_context_t *context, int status, int flag);
 extern int	pa_hostname_so(pr_context_t *context, int status, int flag);

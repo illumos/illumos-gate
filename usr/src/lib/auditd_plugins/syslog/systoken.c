@@ -533,10 +533,33 @@ argument64_token(parse_context_t *ctx)
 	return (0);
 }
 
+/*
+ * Format of acl token:
+ * 	acl token id		adr_char
+ *	type			adr_u_int32
+ *	value			adr_u_int32
+ *	mode			adr_u_int32
+ */
 int
 acl_token(parse_context_t *ctx)
 {
-	ctx->adr.adr_now += 3 * sizeof (int32_t);
+	ctx->adr.adr_now += 3 * sizeof (uint32_t);
+
+	return (0);
+}
+
+/*
+ * Format of ace token:
+ * 	ace token id		adr_char
+ *	id			adr_u_int32
+ *	access_mask		adr_u_int32
+ *	flags			adr_u_short
+ *	type			adr_u_short
+ */
+int
+ace_token(parse_context_t *ctx)
+{
+	ctx->adr.adr_now += 2 * sizeof (uint32_t) + 2 * sizeof (ushort_t);
 
 	return (0);
 }

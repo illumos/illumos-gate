@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -354,9 +354,19 @@
 <xsl:template match="acl">
 	<BR/>
 	<I>ACL </I>
-	<I> type: </I><xsl:value-of select="@type"/>
-	<I> value: </I><xsl:value-of select="@value"/>
-	<I> mode: </I><xsl:value-of select="@mode"/>
+	<xsl:choose>
+		<xsl:when test="@mode">	<!-- old ACL entry -->
+			<I> type: </I><xsl:value-of select="@type"/>
+			<I> value: </I><xsl:value-of select="@value"/>
+			<I> mode: </I><xsl:value-of select="@mode"/>
+		</xsl:when>
+		<xsl:otherwise>
+			<I> flags: </I><xsl:value-of select="@flags"/>
+			<I> id: </I><xsl:value-of select="@id"/>
+			<I> access_mask: </I><xsl:value-of select="@access_mask"/>
+			<I> type: </I><xsl:value-of select="@type"/>
+		</xsl:otherwise>
+	</xsl:choose>
 </xsl:template>
 
 <xsl:template match="tid">

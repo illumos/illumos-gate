@@ -895,6 +895,27 @@ au_to_acl(struct acl *aclp)
 	return (m);
 }
 
+token_t *
+au_to_ace(ace_t *acep)
+{
+	token_t *m;				/* local au_membuf */
+	adr_t adr;				/* adr memory stream header */
+	char data_header = AUT_ACE;		/* header for this token */
+
+	m = au_getclr();
+
+	adr_start(&adr, memtod(m, char *));
+	adr_char(&adr, &data_header, 1);
+
+	adr_uint32(&adr, &(acep->a_who), 1);
+	adr_uint32(&adr, &(acep->a_access_mask), 1);
+	adr_ushort(&adr, &(acep->a_flags), 1);
+	adr_ushort(&adr, &(acep->a_type), 1);
+
+	m->len = adr_count(&adr);
+	return (m);
+}
+
 /*
  * au_to_ipc_perm
  * returns:

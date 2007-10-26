@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -350,9 +350,12 @@ first token (which is the record token):
 <!-- acl token -->
 <!ELEMENT acl			EMPTY>
 <!ATTLIST acl
-		type		CDATA #REQUIRED
-		value		CDATA #REQUIRED
-		mode		CDATA #REQUIRED
+		type		CDATA #IMPLIED
+		value		CDATA #IMPLIED
+		mode		CDATA #IMPLIED
+		flags		CDATA #IMPLIED
+		id		CDATA #IMPLIED
+		access_mask	CDATA #IMPLIED
 >
 
 <!-- tid token -->

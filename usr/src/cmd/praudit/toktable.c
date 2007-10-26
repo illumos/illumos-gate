@@ -115,6 +115,7 @@ init_tokens(void)
 	 */
 
 	table_init(AUT_ACL, "acl", acl_token, T_ENCLOSED);
+	table_init(AUT_ACE, "acl", ace_token, T_ENCLOSED);
 	table_init(AUT_ATTR, "attribute", attribute_token, T_ENCLOSED);
 	table_init(AUT_IPC_PERM, "IPC_perm", s5_IPC_perm_token, T_ENCLOSED);
 	table_init(AUT_GROUPS, "group", group_token, T_ELEMENT);
@@ -281,6 +282,10 @@ init_tokens(void)
 
 	table_init(TAG_ACLTYPE, "type", NOFUNC, T_ATTRIBUTE);
 	table_init(TAG_ACLVAL, "value", NOFUNC, T_ATTRIBUTE);
+	table_init(TAG_ACEMASK, "access_mask", NOFUNC, T_ATTRIBUTE);
+	table_init(TAG_ACEFLAGS, "flags", NOFUNC, T_ATTRIBUTE);
+	table_init(TAG_ACETYPE, "type", NOFUNC, T_ATTRIBUTE);
+	table_init(TAG_ACEID, "id", NOFUNC, T_ATTRIBUTE);
 	table_init(TAG_SOCKTYPE, "type", pa_adr_shorthex, T_ATTRIBUTE);
 	table_init(TAG_SOCKPORT, "port", pa_adr_shorthex, T_ATTRIBUTE);
 	table_init(TAG_SOCKADDR, "addr", NOFUNC, T_ATTRIBUTE);

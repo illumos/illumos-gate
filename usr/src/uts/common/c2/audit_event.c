@@ -5031,10 +5031,15 @@ aui_acl(au_event_t e)
 
 	switch (uap->cmd) {
 	case SETACL:
-		/* ok, acl(SETACL, ...) and facl(SETACL, ...)  are expected. */
+	case ACE_SETACL:
+		/*
+		 * acl(SETACL/ACE_SETACL, ...) and facl(SETACL/ACE_SETACL, ...)
+		 * are expected.
+		 */
 		break;
 	case GETACL:
 	case GETACLCNT:
+	case ACE_GETACLCNT:
 		/* do nothing for these two values. */
 		e = AUE_NULL;
 		break;
@@ -5046,6 +5051,56 @@ aui_acl(au_event_t e)
 	return (e);
 }
 
+static void
+au_acl(int cmd, int nentries, caddr_t bufp)
+{
+	size_t		a_size;
+	aclent_t	*aclbufp;
+	ace_t		*acebufp;
+	int		i;
+
+	switch (cmd) {
+	case GETACL:
+	case GETACLCNT:
+		break;
+	case SETACL:
+		if (nentries < 3)
+			break;
+
+		a_size = nentries * sizeof (aclent_t);
+
+		if ((aclbufp = kmem_alloc(a_size, KM_SLEEP)) == NULL)
+			break;
+		if (copyin(bufp, aclbufp, a_size)) {
+			kmem_free(aclbufp, a_size);
+			break;
+		}
+		for (i = 0; i < nentries; i++) {
+			au_uwrite(au_to_acl(aclbufp + i));
+		}
+		kmem_free(aclbufp, a_size);
+		break;
+
+	case ACE_SETACL:
+		if (nentries < 1 || nentries > MAX_ACL_ENTRIES)
+			break;
+
+		a_size = nentries * sizeof (ace_t);
+		if ((acebufp = kmem_alloc(a_size, KM_SLEEP)) == NULL)
+			break;
+		if (copyin(bufp, acebufp, a_size)) {
+			kmem_free(acebufp, a_size);
+			break;
+		}
+		for (i = 0; i < nentries; i++) {
+			au_uwrite(au_to_ace(acebufp + i));
+		}
+		kmem_free(acebufp, a_size);
+		break;
+	default:
+		break;
+	}
+}
 
 /*ARGSUSED*/
 static void
@@ -5057,36 +5112,11 @@ aus_acl(struct t_audit_data *tad)
 		long	nentries;
 		long	aclbufp;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
-	struct acl *aclbufp;
 
 	au_uwrite(au_to_arg32(2, "cmd", (uint32_t)uap->cmd));
 	au_uwrite(au_to_arg32(3, "nentries", (uint32_t)uap->nentries));
 
-	switch (uap->cmd) {
-	case GETACL:
-	case GETACLCNT:
-		break;
-	case SETACL:
-		if (uap->nentries < 3)
-			break;
-		else {
-			size_t a_size = uap->nentries * sizeof (struct acl);
-			int i;
-
-			aclbufp = kmem_alloc(a_size, KM_SLEEP);
-			if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
-				kmem_free(aclbufp, a_size);
-				break;
-			}
-			for (i = 0; i < uap->nentries; i++) {
-				au_uwrite(au_to_acl(aclbufp + i));
-			}
-			kmem_free(aclbufp, a_size);
-			break;
-		}
-	default:
-		break;
-	}
+	au_acl(uap->cmd, uap->nentries, (caddr_t)uap->aclbufp);
 }
 
 /*ARGSUSED*/
@@ -5102,7 +5132,6 @@ aus_facl(struct t_audit_data *tad)
 	struct file  *fp;
 	struct vnode *vp;
 	struct f_audit_data *fad;
-	struct acl *aclbufp;
 	int fd;
 
 	au_uwrite(au_to_arg32(2, "cmd", (uint32_t)uap->cmd));
@@ -5127,31 +5156,7 @@ aus_facl(struct t_audit_data *tad)
 	/* decrement file descriptor reference count */
 	releasef(fd);
 
-	switch (uap->cmd) {
-	case GETACL:
-	case GETACLCNT:
-		break;
-	case SETACL:
-		if (uap->nentries < 3)
-			break;
-		else {
-			size_t a_size = uap->nentries * sizeof (struct acl);
-			int i;
-
-			aclbufp = kmem_alloc(a_size, KM_SLEEP);
-			if (copyin((caddr_t)(uap->aclbufp), aclbufp, a_size)) {
-				kmem_free(aclbufp, a_size);
-				break;
-			}
-			for (i = 0; i < uap->nentries; i++) {
-				au_uwrite(au_to_acl(aclbufp + i));
-			}
-			kmem_free(aclbufp, a_size);
-			break;
-		}
-	default:
-		break;
-	}
+	au_acl(uap->cmd, uap->nentries, (caddr_t)uap->aclbufp);
 }
 
 /*ARGSUSED*/

@@ -86,6 +86,20 @@ adrm_int32(adr_t *adr, int32_t *lp, int count)
 }
 
 void
+adrm_uid(adr_t *adr, uid_t *up, int count)
+{
+	int i;
+
+	for (; count-- > 0; up++) {
+		*up = 0;
+		for (i = 0; i < 4; i++) {
+			*up <<= 8;
+			*up += ((uid_t)*adr->adr_now++) & 0x000000ff;
+		}
+	}
+}
+
+void
 adrm_int64(adr_t *adr, int64_t *lp, int count)
 {
 	int i;
@@ -142,7 +156,7 @@ adrm_putint32(adr_t *adr, int32_t *lp, int count)
 	for (; count-- > 0; lp++) {
 		for (i = 0, l = *lp; i < 4; i++) {
 			*adr->adr_now++ = (char)((l & (int32_t)0xff000000) >>
-				(int)24);
+			    (int)24);
 			l <<= (int)8;
 		}
 	}

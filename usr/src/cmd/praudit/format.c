@@ -49,6 +49,7 @@
 #include <sys/inttypes.h>
 #include <sys/mkdev.h>
 #include <sys/types.h>
+#include <aclutils.h>
 
 #include "praudit.h"
 #include "toktable.h"
@@ -2017,31 +2018,15 @@ pa_mode(pr_context_t *context, int status, int flag)
 		return (status);
 }
 
-
-/*
- * -----------------------------------------------------------------------
- * pa_pw_uid()	: Issues pr_adr_u_int32 to reads uid from input stream
- *		pointed to by audit_adr, and displays it in either
- *		raw form or its ASCII representation, if status >= 0.
- * return codes : -1 - error
- * 		:  1 - warning, passwd entry not found
- *		:  0 - successful
- * -----------------------------------------------------------------------
- */
-int
-pa_pw_uid(pr_context_t *context, int status, int flag)
+static int
+pa_print_uid(pr_context_t *context, uid_t uid, int status, int flag)
 {
 	int	returnstat;
 	struct passwd *pw;
-	uint32_t uid;
 	uval_t	uval;
 
 	if (status < 0)
 		return (status);
-
-	if (pr_adr_u_int32(context, &uid, 1) != 0)
-		/* cannot retrieve uid */
-		return (-1);
 
 	if (!(context->format & PRF_RAWM)) {
 		/* get password file entry */
@@ -2066,28 +2051,38 @@ pa_pw_uid(pr_context_t *context, int status, int flag)
 
 /*
  * -----------------------------------------------------------------------
- * pa_gr_uid()	: Issues pr_adr_u_int32 to reads group uid from input stream
- *			pointed to by audit_adr, and displays it in either
- *			raw form or its ASCII representation, if status >= 0.
+ * pa_pw_uid()	: Issues pr_adr_u_int32 to reads uid from input stream
+ *		pointed to by audit_adr, and displays it in either
+ *		raw form or its ASCII representation, if status >= 0.
  * return codes : -1 - error
  * 		:  1 - warning, passwd entry not found
  *		:  0 - successful
  * -----------------------------------------------------------------------
  */
 int
-pa_gr_uid(pr_context_t *context, int status, int flag)
+pa_pw_uid(pr_context_t *context, int status, int flag)
 {
-	int	returnstat;
-	struct group *gr;
-	uint32_t gid;
-	uval_t	uval;
+	uint32_t uid;
 
 	if (status < 0)
 		return (status);
 
-	if (pr_adr_u_int32(context, &gid, 1) != 0)
-		/* cannot retrieve gid */
+	if (pr_adr_u_int32(context, &uid, 1) != 0)
+		/* cannot retrieve uid */
 		return (-1);
+
+	return (pa_print_uid(context, uid, status, flag));
+}
+
+static int
+pa_print_gid(pr_context_t *context, gid_t gid, int status, int flag)
+{
+	int	returnstat;
+	struct group *gr;
+	uval_t	uval;
+
+	if (status < 0)
+		return (status);
 
 	if (!(context->format & PRF_RAWM)) {
 		/* get group file entry */
@@ -2107,6 +2102,32 @@ pa_gr_uid(pr_context_t *context, int status, int flag)
 		returnstat = pa_print(context, &uval, flag);
 	}
 	return (returnstat);
+}
+
+
+/*
+ * -----------------------------------------------------------------------
+ * pa_gr_uid()	: Issues pr_adr_u_int32 to reads group uid from input stream
+ *			pointed to by audit_adr, and displays it in either
+ *			raw form or its ASCII representation, if status >= 0.
+ * return codes : -1 - error
+ * 		:  1 - warning, passwd entry not found
+ *		:  0 - successful
+ * -----------------------------------------------------------------------
+ */
+int
+pa_gr_uid(pr_context_t *context, int status, int flag)
+{
+	uint32_t gid;
+
+	if (status < 0)
+		return (status);
+
+	if (pr_adr_u_int32(context, &gid, 1) != 0)
+		/* cannot retrieve gid */
+		return (-1);
+
+	return (pa_print_gid(context, gid, status, flag));
 }
 
 
@@ -2944,4 +2965,323 @@ pa_xid(pr_context_t *context, int status, int flag)
 	}
 
 	return (returnstat);
+}
+
+static int
+pa_ace_flags(pr_context_t *context, ace_t *ace, int status, int flag)
+{
+	int	returnstat;
+	uval_t	uval;
+
+	if (status < 0)
+		return (status);
+
+	/*
+	 * TRANSLATION_NOTE
+	 * ace->a_flags refers to access flags of ZFS/NFSv4 ACL entry.
+	 */
+	if ((returnstat = open_tag(context, TAG_ACEFLAGS)) != 0)
+		return (returnstat);
+	if (!(context->format & PRF_RAWM)) {
+		uval.uvaltype = PRA_STRING;
+		switch (ace->a_flags & ACE_TYPE_FLAGS) {
+		case ACE_OWNER:
+			uval.string_val = gettext(OWNERAT_TXT);
+			break;
+		case ACE_GROUP | ACE_IDENTIFIER_GROUP:
+			uval.string_val = gettext(GROUPAT_TXT);
+			break;
+		case ACE_IDENTIFIER_GROUP:
+			uval.string_val = gettext(GROUP_TXT);
+			break;
+		case ACE_EVERYONE:
+			uval.string_val = gettext(EVERYONEAT_TXT);
+			break;
+		case 0:
+			uval.string_val = gettext(USER_TXT);
+			break;
+		default:
+			uval.uvaltype = PRA_USHORT;
+			uval.uint32_val = ace->a_flags;
+		}
+	} else {
+		uval.uvaltype = PRA_USHORT;
+		uval.uint32_val = ace->a_flags;
+	}
+	if ((returnstat = pa_print(context, &uval, flag)) != 0)
+		return (returnstat);
+	return (close_tag(context, TAG_ACEFLAGS));
+}
+
+static int
+pa_ace_who(pr_context_t *context, ace_t *ace, int status, int flag)
+{
+	int		returnstat;
+
+	if (status < 0)
+		return (status);
+
+	/*
+	 * TRANSLATION_NOTE
+	 * ace->a_who refers to user id or group id of ZFS/NFSv4 ACL entry.
+	 */
+	if ((returnstat = open_tag(context, TAG_ACEID)) != 0)
+		return (returnstat);
+	switch (ace->a_flags & ACE_TYPE_FLAGS) {
+	case ACE_IDENTIFIER_GROUP:	/* group id */
+		returnstat = pa_print_gid(context, ace->a_who, returnstat,
+		    flag);
+		break;
+	default:			/* user id */
+		returnstat = pa_print_uid(context, ace->a_who, returnstat,
+		    flag);
+		break;
+	}
+	if (returnstat < 0)
+		return (returnstat);
+	return (close_tag(context, TAG_ACEID));
+}
+
+/*
+ * Appends what to str, (re)allocating str if necessary.
+ */
+#define	INITIAL_ALLOC	256
+static int
+strappend(char **str, char *what, size_t *alloc)
+{
+	char	*s, *newstr;
+	size_t	needed;
+
+	s = *str;
+
+	if (s == NULL) {
+		s = malloc(INITIAL_ALLOC);
+		if (s == NULL) {
+			*alloc = 0;
+			return (-1);
+		}
+		*alloc = INITIAL_ALLOC;
+		s[0] = '\0';
+		*str = s;
+	}
+
+	needed = strlen(s) + strlen(what) + 1;
+	if (*alloc < needed) {
+		newstr = realloc(s, needed);
+		if (newstr == NULL)
+			return (-1);
+		s = newstr;
+		*alloc = needed;
+		*str = s;
+	}
+	(void) strlcat(s, what, *alloc);
+
+	return (0);
+}
+
+static int
+pa_ace_access_mask(pr_context_t *context, ace_t *ace, int status, int flag)
+{
+	int	returnstat, i;
+	uval_t	uval;
+	char	*permstr = NULL;
+	size_t	permstr_alloc = 0;
+
+	if (status < 0)
+		return (status);
+
+	/*
+	 * TRANSLATION_NOTE
+	 * ace->a_access_mask refers to access mask of ZFS/NFSv4 ACL entry.
+	 */
+	if ((returnstat = open_tag(context, TAG_ACEMASK)) != 0)
+		return (returnstat);
+	if (context->format & PRF_SHORTM &&
+	    ((permstr = malloc(15)) != NULL)) {
+		for (i = 0; i < 14; i++)
+			permstr[i] = '-';
+
+		if (ace->a_access_mask & ACE_READ_DATA)
+			permstr[0] = 'r';
+		if (ace->a_access_mask & ACE_WRITE_DATA)
+			permstr[1] = 'w';
+		if (ace->a_access_mask & ACE_EXECUTE)
+			permstr[2] = 'x';
+		if (ace->a_access_mask & ACE_APPEND_DATA)
+			permstr[3] = 'p';
+		if (ace->a_access_mask & ACE_DELETE)
+			permstr[4] = 'd';
+		if (ace->a_access_mask & ACE_DELETE_CHILD)
+			permstr[5] = 'D';
+		if (ace->a_access_mask & ACE_READ_ATTRIBUTES)
+			permstr[6] = 'a';
+		if (ace->a_access_mask & ACE_WRITE_ATTRIBUTES)
+			permstr[7] = 'A';
+		if (ace->a_access_mask & ACE_READ_NAMED_ATTRS)
+			permstr[8] = 'R';
+		if (ace->a_access_mask & ACE_WRITE_NAMED_ATTRS)
+			permstr[9] = 'W';
+		if (ace->a_access_mask & ACE_READ_ACL)
+			permstr[10] = 'c';
+		if (ace->a_access_mask & ACE_WRITE_ACL)
+			permstr[11] = 'C';
+		if (ace->a_access_mask & ACE_WRITE_OWNER)
+			permstr[12] = 'o';
+		if (ace->a_access_mask & ACE_SYNCHRONIZE)
+			permstr[13] = 's';
+		permstr[14] = '\0';
+		uval.uvaltype = PRA_STRING;
+		uval.string_val = permstr;
+	} else if (!(context->format & PRF_RAWM)) {
+
+		/*
+		 * Note this differs from acltext.c:ace_perm_txt()
+		 * because we don't know if the acl belongs to a file
+		 * or directory. ace mask value are the same
+		 * nonetheless, see sys/acl.h
+		 */
+		if (ace->a_access_mask & ACE_LIST_DIRECTORY) {
+			returnstat = strappend(&permstr, gettext(READ_DIR_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_ADD_FILE) {
+			returnstat = strappend(&permstr, gettext(ADD_FILE_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_ADD_SUBDIRECTORY) {
+			returnstat = strappend(&permstr, gettext(ADD_DIR_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_READ_NAMED_ATTRS) {
+			returnstat = strappend(&permstr,
+			    gettext(READ_XATTR_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_WRITE_NAMED_ATTRS) {
+			returnstat = strappend(&permstr,
+			    gettext(WRITE_XATTR_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_EXECUTE) {
+			returnstat = strappend(&permstr,
+			    gettext(EXECUTE_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_DELETE_CHILD) {
+			returnstat = strappend(&permstr,
+			    gettext(DELETE_CHILD_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_READ_ATTRIBUTES) {
+			returnstat = strappend(&permstr,
+			    gettext(READ_ATTRIBUTES_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_WRITE_ATTRIBUTES) {
+			returnstat = strappend(&permstr,
+			    gettext(WRITE_ATTRIBUTES_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_DELETE) {
+			returnstat = strappend(&permstr, gettext(DELETE_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_READ_ACL) {
+			returnstat = strappend(&permstr, gettext(READ_ACL_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_WRITE_ACL) {
+			returnstat = strappend(&permstr, gettext(WRITE_ACL_TXT),
+			    &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_WRITE_OWNER) {
+			returnstat = strappend(&permstr,
+			    gettext(WRITE_OWNER_TXT), &permstr_alloc);
+		}
+		if (ace->a_access_mask & ACE_SYNCHRONIZE) {
+			returnstat = strappend(&permstr,
+			    gettext(SYNCHRONIZE_TXT), &permstr_alloc);
+		}
+		if (permstr[strlen(permstr) - 1] == '/')
+			permstr[strlen(permstr) - 1] = '\0';
+		uval.uvaltype = PRA_STRING;
+		uval.string_val = permstr;
+	}
+	if ((permstr == NULL) || (returnstat != 0) ||
+	    (context->format & PRF_RAWM)) {
+		uval.uvaltype = PRA_UINT32;
+		uval.uint32_val = ace->a_access_mask;
+	}
+	returnstat = pa_print(context, &uval, flag);
+
+	if (permstr != NULL)
+		free(permstr);
+	if (returnstat != 0)
+		return (returnstat);
+	return (close_tag(context, TAG_ACEMASK));
+}
+
+static int
+pa_ace_type(pr_context_t *context, ace_t *ace, int status, int flag)
+{
+	int	returnstat;
+	uval_t	uval;
+
+	if (status < 0)
+		return (status);
+
+	/*
+	 * TRANSLATION_NOTE
+	 * ace->a_type refers to access type of ZFS/NFSv4 ACL entry.
+	 */
+	if ((returnstat = open_tag(context, TAG_ACETYPE)) != 0)
+		return (returnstat);
+	if (!(context->format & PRF_RAWM)) {
+		uval.uvaltype = PRA_STRING;
+		switch (ace->a_type) {
+		case ACE_ACCESS_ALLOWED_ACE_TYPE:
+			uval.string_val = gettext(ALLOW_TXT);
+			break;
+		case ACE_ACCESS_DENIED_ACE_TYPE:
+			uval.string_val = gettext(DENY_TXT);
+			break;
+		case ACE_SYSTEM_AUDIT_ACE_TYPE:
+			uval.string_val = gettext(AUDIT_TXT);
+			break;
+		case ACE_SYSTEM_ALARM_ACE_TYPE:
+			uval.string_val = gettext(ALARM_TXT);
+			break;
+		default:
+			uval.string_val = gettext(UNKNOWN_TXT);
+		}
+	} else {
+		uval.uvaltype = PRA_USHORT;
+		uval.uint32_val = ace->a_type;
+	}
+	if ((returnstat = pa_print(context, &uval, flag)) != 0)
+		return (returnstat);
+	return (close_tag(context, TAG_ACETYPE));
+}
+
+int
+pa_ace(pr_context_t *context, int status, int flag)
+{
+	int		returnstat;
+	ace_t		ace;
+
+	if (status < 0)
+		return (status);
+
+	if ((returnstat = pr_adr_u_int32(context, &ace.a_who, 1)) != 0)
+		return (returnstat);
+	if ((returnstat = pr_adr_u_int32(context, &ace.a_access_mask, 1)) != 0)
+		return (returnstat);
+	if ((returnstat = pr_adr_u_short(context, &ace.a_flags, 1)) != 0)
+		return (returnstat);
+	if ((returnstat = pr_adr_u_short(context, &ace.a_type, 1)) != 0)
+		return (returnstat);
+
+	if ((returnstat = pa_ace_flags(context, &ace, returnstat, 0)) != 0)
+		return (returnstat);
+	/* pa_ace_who can returns 1 if uid/gid is not found */
+	if ((returnstat = pa_ace_who(context, &ace, returnstat, 0)) < 0)
+		return (returnstat);
+	if ((returnstat = pa_ace_access_mask(context, &ace,
+	    returnstat, 0)) != 0)
+		return (returnstat);
+	return (pa_ace_type(context, &ace, returnstat, flag));
 }

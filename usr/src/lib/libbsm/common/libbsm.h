@@ -129,6 +129,7 @@ extern void	adrm_char(adr_t *, char *, int);
 extern void	adrm_short(adr_t *, short *, int);
 extern void	adrm_int64(adr_t *, int64_t *, int);
 extern void	adrm_int32(adr_t *, int32_t *, int);
+extern void	adrm_uid(adr_t *, uid_t *, int);
 extern void	adrm_u_int32(adr_t *, uint32_t *, int);
 extern void	adrm_u_char(adr_t *, uchar_t *, int);
 extern void	adrm_u_int64(adr_t *, uint64_t *, int);

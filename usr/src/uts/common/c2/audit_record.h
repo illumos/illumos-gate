@@ -110,8 +110,9 @@ extern "C" {
 #define	AUT_IPC_PERM		((char)0x32)
 #define	AUT_LABEL		((char)0x33)
 #define	AUT_GROUPS		((char)0x34)
+#define	AUT_ACE			((char)0x35)
 /*
- * 0x35, 0x36, 0x37 unused
+ * 0x36, 0x37 unused
  */
 #define	AUT_PRIV		((char)0x38)
 #define	AUT_UPRIV		((char)0x39)
@@ -265,6 +266,7 @@ void au_free_rec(au_buff_t *);
 #define	au_toss_token(tok)	(au_free_rec((au_buff_t *)(tok)))
 
 token_t *au_to_acl();
+token_t *au_to_ace();
 token_t *au_to_attr(struct vattr *);
 token_t *au_to_data(char, char, char, char *);
 token_t *au_to_header(int, au_event_t, au_emod_t);

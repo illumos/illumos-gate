@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,7 @@ trailer_token(adr_t *adr)
 	adrm_u_short(adr, (ushort_t *)&magic_number, 1);
 	if (magic_number != AUT_TRAILER_MAGIC) {
 		(void) fprintf(stderr, "%s\n",
-			gettext("auditreduce: Bad trailer token"));
+		    gettext("auditreduce: Bad trailer token"));
 		return (-2);
 	}
 	adrm_u_int32(adr, &bytes, 1);
@@ -265,9 +265,9 @@ return_value32_token(adr_t *adr)
 	adrm_char(adr, &errnum, 1);
 	adrm_u_int32(adr, &value, 1);
 	if ((flags & M_SORF) &&
-		((global_class & mask.am_success) && (errnum == 0)) ||
-		((global_class & mask.am_failure) && (errnum != 0))) {
-			checkflags |= M_SORF;
+	    ((global_class & mask.am_success) && (errnum == 0)) ||
+	    ((global_class & mask.am_failure) && (errnum != 0))) {
+		checkflags |= M_SORF;
 	}
 	return (-1);
 }
@@ -288,9 +288,9 @@ return_value64_token(adr_t *adr)
 	adrm_char(adr, &errnum, 1);
 	adrm_u_int64(adr, &value, 1);
 	if ((flags & M_SORF) &&
-		((global_class & mask.am_success) && (errnum == 0)) ||
-		((global_class & mask.am_failure) && (errnum != 0))) {
-			checkflags |= M_SORF;
+	    ((global_class & mask.am_success) && (errnum == 0)) ||
+	    ((global_class & mask.am_failure) && (errnum != 0))) {
+		checkflags |= M_SORF;
 	}
 	return (-1);
 }
@@ -515,6 +515,13 @@ argument64_token(adr_t *adr)
 	return (-1);
 }
 
+/*
+ * Format of acl token:
+ *	acl token id		adr_char
+ *	acl type		adr_u_int32
+ *	acl value		adr_u_int32 (depends on type)
+ *	file mode		adr_u_int (in octal)
+ */
 int
 acl_token(adr_t *adr)
 {
@@ -526,6 +533,29 @@ acl_token(adr_t *adr)
 	adrm_int32(adr, &type, 1);
 	adrm_int32(adr, &id, 1);
 	adrm_int32(adr, &mode, 1);
+
+	return (-1);
+}
+
+/*
+ * Format of ace token:
+ *	ace token id		adr_char
+ *	ace who			adr_u_int32 (uid/gid)
+ *	access mask		adr_u_int32
+ *	ace flags		adr_u_int16
+ *	ace type		adr_u_int16
+ */
+int
+ace_token(adr_t *adr)
+{
+	uid_t		who;
+	uint32_t	access_mask;
+	uint16_t	flags, type;
+
+	adrm_uid(adr, &who, 1);
+	adrm_u_int32(adr, &access_mask, 1);
+	adrm_u_short(adr, &flags, 1);
+	adrm_u_short(adr, &type, 1);
 
 	return (-1);
 }
@@ -1704,7 +1734,8 @@ collapse_path(char *s)
 			is += 1;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
@@ -1713,11 +1744,13 @@ collapse_path(char *s)
 			is += 2;
 			if (id > 0)
 				id--;
-			while (id > 0 && s[--id] != '/');
+			while (id > 0 && s[--id] != '/')
+				;
 			id++;
 			continue;
 		}
-		while (is < ls && (s[id++] = s[is++]) != '/');
+		while (is < ls && (s[id++] = s[is++]) != '/')
+			;
 		is--;
 	}
 	return (s);

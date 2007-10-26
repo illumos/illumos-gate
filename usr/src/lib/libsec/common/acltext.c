@@ -234,12 +234,6 @@ split_line(char *str, int cols)
 	}
 }
 
-#define	OWNERAT_TXT	"owner@"
-#define	GROUPAT_TXT	"group@"
-#define	EVERYONEAT_TXT	"everyone@"
-#define	GROUP_TXT	"group:"
-#define	USER_TXT	"user:"
-
 char *
 ace_type_txt(char *buf, char **endp, ace_t *acep, int flags)
 {
@@ -282,24 +276,6 @@ ace_type_txt(char *buf, char **endp, ace_t *acep, int flags)
 
 	return (buf);
 }
-
-#define	READ_DATA_TXT	"read_data/"
-#define	WRITE_DATA_TXT	"write_data/"
-#define	EXECUTE_TXT	"execute/"
-#define	READ_XATTR_TXT	"read_xattr/"
-#define	WRITE_XATTR_TXT	"write_xattr/"
-#define	READ_ATTRIBUTES_TXT "read_attributes/"
-#define	WRITE_ATTRIBUTES_TXT "write_attributes/"
-#define	DELETE_TXT	"delete/"
-#define	DELETE_CHILD_TXT "delete_child/"
-#define	WRITE_OWNER_TXT "write_owner/"
-#define	READ_ACL_TXT	"read_acl/"
-#define	WRITE_ACL_TXT	"write_acl/"
-#define	APPEND_DATA_TXT "append_data/"
-#define	READ_DIR_TXT	"list_directory/read_data/"
-#define	ADD_DIR_TXT	"add_subdirectory/append_data/"
-#define	ADD_FILE_TXT	"add_file/write_data/"
-#define	SYNCHRONIZE_TXT "synchronize"	/* not slash on this one */
 
 char *
 ace_perm_txt(char *buf, char **endp, uint32_t mask,
@@ -473,11 +449,6 @@ ace_perm_txt(char *buf, char **endp, uint32_t mask,
 	return (buf);
 }
 
-#define	ALLOW_TXT	"allow"
-#define	DENY_TXT	"deny"
-#define	ALARM_TXT	"alarm"
-#define	AUDIT_TXT	"audit"
-#define	UNKNOWN_TXT	"unknown"
 char *
 ace_access_txt(char *buf, char **endp, int type)
 {
