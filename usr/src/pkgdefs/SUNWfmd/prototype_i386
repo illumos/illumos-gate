@@ -84,4 +84,4 @@ d none usr/platform/i86pc/lib/fm/topo/maps 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4500-hc-topology.xml 444 root bin
-f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4550-hc-topology.xml 444 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4540-hc-topology.xml 444 root bin

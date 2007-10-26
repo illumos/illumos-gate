@@ -43,7 +43,7 @@ sparc_SUBDIRS =	sun4u \
 i386_SUBDIRS = i86pc \
 		i386 \
 		SUNW,Sun-Fire-X4500 \
-		SUNW,Sun-Fire-X4550
+		SUNW,Sun-Fire-X4540
 
 SUBDIRS = $($(MACH)_SUBDIRS)
 

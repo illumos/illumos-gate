@@ -29,7 +29,7 @@
 use Getopt::Std;
 
 
-my $sys_supported = {"name" => "Sun-Fire-X4550",
+my $sys_supported = {"name" => "Sun-Fire-X4540",
 		"prop_name" => "sfx4500",
 		"num_bays" => "48"};
 
@@ -121,7 +121,7 @@ sub calc_sfx_prop
 
 sub calc_nodes 
 {
-	my @pci0=(0, 0, 0, 39, 39, 39);
+	my @pci0=(0, 0, 0, 0x3c, 0x3c, 0x3c);
 	my @pci1=(0x377, 0x375, 0x376, 0x377, 0x375, 0x376);
 	my @pci2=(0xa, 0xb, 0xf, 0xa, 0xb, 0xf);
 
@@ -131,7 +131,7 @@ sub calc_nodes
 		$target = $bay % 8 ;
 		$sid = 90 + $bay;
 
-		$physdev = "/pci\@" . $pci0[$controller] .
+		$physdev = "/pci\@" . sprintf("%x", $pci0[$controller]) .
 		    ",0/pci10de," .  sprintf("%x", $pci1[$controller]) .
 		    "\@" . sprintf("%x", $pci2[$controller]) .
 		    "/pci1000,1000\@0";
