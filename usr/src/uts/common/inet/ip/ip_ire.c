@@ -144,13 +144,17 @@ struct kmem_cache *rt_entry_cache;
  *
  * We have a separate cache table and forwarding table for IPv4 and IPv6.
  * Cache table (ip_cache_table/ip_cache_table_v6) is a pointer to an
- * array of irb_t structure and forwarding table (ip_forwarding_table/
- * ip_forwarding_table_v6) is an array of pointers to array of irb_t
- * structure. ip_forwarding_table_v6 is allocated dynamically in
+ * array of irb_t structures. The IPv6 forwarding table
+ * (ip_forwarding_table_v6) is an array of pointers to arrays of irb_t
+ *  structure. ip_forwarding_table_v6 is allocated dynamically in
  * ire_add_v6. ire_ft_init_lock is used to serialize multiple threads
  * initializing the same bucket. Once a bucket is initialized, it is never
  * de-alloacted. This assumption enables us to access
  * ip_forwarding_table_v6[i] without any locks.
+ *
+ * The forwarding table for IPv4 is a radix tree whose leaves
+ * are rt_entry structures containing the irb_t for the rt_dst. The irb_t
+ * for IPv4 is dynamically allocated and freed.
  *
  * Each irb_t - ire bucket structure has a lock to protect
  * a bucket and the ires residing in the bucket have a back pointer to
@@ -161,7 +165,8 @@ struct kmem_cache *rt_entry_cache;
  * in this bucket that are marked with IRE_MARK_CONDEMNED and the
  * last thread to leave the bucket should delete the ires. Usually
  * this is done by the IRB_REFRELE macro which is used to decrement
- * the reference count on a bucket.
+ * the reference count on a bucket. See comments above irb_t structure
+ * definition in ip.h for further details.
  *
  * IRE_REFHOLD/IRE_REFRELE macros operate on the ire which increments/
  * decrements the reference count, ire_refcnt, atomically on the ire.

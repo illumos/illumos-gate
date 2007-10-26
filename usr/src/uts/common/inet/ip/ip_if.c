@@ -4254,7 +4254,8 @@ ill_find_by_name(char *name, boolean_t isv6, queue_t *q, mblk_t *mp,
 			ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
 			mutex_exit(&ipsq->ipsq_lock);
 			RELEASE_CONN_LOCK(q);
-			*error = EINPROGRESS;
+			if (error != NULL)
+				*error = EINPROGRESS;
 			return (NULL);
 		}
 		mutex_exit(&ill->ill_lock);
@@ -5234,7 +5235,8 @@ ill_lookup_on_ifindex(uint_t index, boolean_t isv6, queue_t *q, mblk_t *mp,
 				ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
 				mutex_exit(&ipsq->ipsq_lock);
 				RELEASE_CONN_LOCK(q);
-				*err = EINPROGRESS;
+				if (err != NULL)
+					*err = EINPROGRESS;
 				return (NULL);
 			}
 			RELEASE_CONN_LOCK(q);
@@ -6010,7 +6012,8 @@ ipif_lookup_interface(ipaddr_t if_addr, ipaddr_t dst, queue_t *q, mblk_t *mp,
 					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
-					*error = EINPROGRESS;
+					if (error != NULL)
+						*error = EINPROGRESS;
 					return (NULL);
 				}
 			}
@@ -6090,7 +6093,8 @@ repeat:
 					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
-					*error = EINPROGRESS;
+					if (error != NULL)
+						*error = EINPROGRESS;
 					return (NULL);
 				}
 			}
@@ -19172,8 +19176,11 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 		 * If alias has two or more digits and the first
 		 * is zero, fail.
 		 */
-		if (&cp[2] < endp && cp[1] == '0')
+		if (&cp[2] < endp && cp[1] == '0') {
+			if (error != NULL)
+				*error = EINVAL;
 			return (NULL);
+		}
 	}
 
 	if (cp <= name) {
@@ -19249,7 +19256,8 @@ ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
 				mutex_exit(&ipsq->ipsq_lock);
 				RELEASE_CONN_LOCK(q);
 				ill_refrele(ill);
-				*error = EINPROGRESS;
+				if (error != NULL)
+					*error = EINPROGRESS;
 				return (NULL);
 			}
 		}
@@ -21649,9 +21657,7 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
     queue_t *q, mblk_t *mp, ipsq_func_t func, int *err, ip_stack_t *ipst)
 {
 	ill_t	*ill;
-	ipsq_t  *ipsq;
-	phyint_t *phyi;
-	ipif_t	*ipif;
+	ipif_t	*ipif = NULL;
 
 	ASSERT((q == NULL && mp == NULL && func == NULL && err == NULL) ||
 	    (q != NULL && mp != NULL && func != NULL && err != NULL));
@@ -21659,56 +21665,24 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
 	if (err != NULL)
 		*err = 0;
 
-	/*
-	 * Indexes are stored in the phyint - a common structure
-	 * to both IPv4 and IPv6.
-	 */
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
-	    (void *) &index, NULL);
-	if (phyi != NULL) {
-		ill = isv6 ? phyi->phyint_illv6 : phyi->phyint_illv4;
-		if (ill == NULL) {
-			rw_exit(&ipst->ips_ill_g_lock);
-			if (err != NULL)
-				*err = ENXIO;
-			return (NULL);
-		}
-		GRAB_CONN_LOCK(q);
+	ill = ill_lookup_on_ifindex(index, isv6, q, mp, func, err, ipst);
+	if (ill != NULL) {
 		mutex_enter(&ill->ill_lock);
-		if (ILL_CAN_LOOKUP(ill)) {
-			for (ipif = ill->ill_ipif; ipif != NULL;
-			    ipif = ipif->ipif_next) {
-				if (IPIF_CAN_LOOKUP(ipif) &&
-				    (zoneid == ALL_ZONES ||
-				    zoneid == ipif->ipif_zoneid ||
-				    ipif->ipif_zoneid == ALL_ZONES)) {
-					ipif_refhold_locked(ipif);
-					mutex_exit(&ill->ill_lock);
-					RELEASE_CONN_LOCK(q);
-					rw_exit(&ipst->ips_ill_g_lock);
-					return (ipif);
-				}
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			if (IPIF_CAN_LOOKUP(ipif) && (zoneid == ALL_ZONES ||
+			    zoneid == ipif->ipif_zoneid ||
+			    ipif->ipif_zoneid == ALL_ZONES)) {
+				ipif_refhold_locked(ipif);
+				break;
 			}
-		} else if (ILL_CAN_WAIT(ill, q)) {
-			ipsq = ill->ill_phyint->phyint_ipsq;
-			mutex_enter(&ipsq->ipsq_lock);
-			rw_exit(&ipst->ips_ill_g_lock);
-			mutex_exit(&ill->ill_lock);
-			ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
-			mutex_exit(&ipsq->ipsq_lock);
-			RELEASE_CONN_LOCK(q);
-			*err = EINPROGRESS;
-			return (NULL);
 		}
 		mutex_exit(&ill->ill_lock);
-		RELEASE_CONN_LOCK(q);
+		ill_refrele(ill);
+		if (ipif == NULL && err != NULL)
+			*err = ENXIO;
 	}
-	rw_exit(&ipst->ips_ill_g_lock);
-	if (err != NULL)
-		*err = ENXIO;
-	return (NULL);
+	return (ipif);
 }
 
 typedef struct conn_change_s {

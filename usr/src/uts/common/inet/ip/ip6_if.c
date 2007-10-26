@@ -186,7 +186,8 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
 					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
-					*error = EINPROGRESS;
+					if (error != NULL)
+						*error = EINPROGRESS;
 					return (NULL);
 				}
 			}
@@ -264,7 +265,8 @@ repeat:
 					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
-					*error = EINPROGRESS;
+					if (error != NULL)
+						*error = EINPROGRESS;
 					return (NULL);
 				}
 			}
