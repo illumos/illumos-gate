@@ -83,7 +83,7 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zfs_acl_byteswap,	TRUE,	"ZFS ACL"		},
 	{	byteswap_uint8_array,	TRUE,	"ZFS SYSACL"		},
 	{	byteswap_uint8_array,	TRUE,	"FUID table"		},
-	{	byteswap_uint8_array,	TRUE,	"FUID table size"	},
+	{	byteswap_uint64_array,	TRUE,	"FUID table size"	},
 };
 
 int
