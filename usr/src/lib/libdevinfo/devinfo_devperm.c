@@ -446,20 +446,24 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 		finddev_close(handle);
 		return (-1);
 	}
-	match = (char *)calloc(MAXPATHLEN, 1);
+	match = (char *)calloc(MAXPATHLEN + 2, 1);
 	if (match == NULL) {
 		finddev_close(handle);
 		free(newpath);
 		return (-1);
 	}
 
-	if (p) {
-		(void) strncpy(match, left_to_do, p - left_to_do);
-	} else {
-		(void) strcpy(match, left_to_do);
+	/* transform pattern into ^pattern$ for exact match */
+	if (snprintf(match, MAXPATHLEN + 2, "^%.*s$",
+	    p ? (p - left_to_do) : strlen(left_to_do), left_to_do) >=
+	    MAXPATHLEN + 2) {
+		finddev_close(handle);
+		free(newpath);
+		free(match);
+		return (-1);
 	}
 
-	if (strcmp(match, "*") == 0) {
+	if (strcmp(match, "^*$") == 0) {
 		alwaysmatch = 1;
 	} else {
 		if (regcomp(&regex, match, REG_EXTENDED) != 0) {
