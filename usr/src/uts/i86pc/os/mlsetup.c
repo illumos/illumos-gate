@@ -173,14 +173,17 @@ mlsetup(struct regs *rp)
 	 * serialization in such cases. The following code needs to be
 	 * revisited if intel processors of family >= f retains the
 	 * instruction serialization nature of mfence instruction.
+	 * Note: tsc_read is not patched for x86 processors which do
+	 * not support "mfence". By default tsc_read will use cpuid for
+	 * serialization in such cases.
 	 */
 	if (x86_feature & X86_TSCP)
 		patch_tsc_read(X86_HAVE_TSCP);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
-	    cpuid_getfamily(CPU) <= 0xf)
+	    cpuid_getfamily(CPU) <= 0xf && (x86_feature & X86_SSE2) != 0)
 		patch_tsc_read(X86_TSC_MFENCE);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_Intel &&
-	    cpuid_getfamily(CPU) <= 6)
+	    cpuid_getfamily(CPU) <= 6 && (x86_feature & X86_SSE2) != 0)
 		patch_tsc_read(X86_TSC_MFENCE);
 
 #endif	/* !__xpv */

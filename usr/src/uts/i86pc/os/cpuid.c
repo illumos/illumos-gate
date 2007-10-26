@@ -3669,15 +3669,16 @@ patch_tsc_read(int flag)
 	switch (flag) {
 	case X86_NO_TSC:
 		cnt = &_no_rdtsc_end - &_no_rdtsc_start;
-		memcpy((void *)tsc_read, (void *)&_no_rdtsc_start, cnt);
+		(void) memcpy((void *)tsc_read, (void *)&_no_rdtsc_start, cnt);
 		break;
 	case X86_HAVE_TSCP:
 		cnt = &_tscp_end - &_tscp_start;
-		memcpy((void *)tsc_read, (void *)&_tscp_start, cnt);
+		(void) memcpy((void *)tsc_read, (void *)&_tscp_start, cnt);
 		break;
 	case X86_TSC_MFENCE:
 		cnt = &_tsc_mfence_end - &_tsc_mfence_start;
-		memcpy((void *)tsc_read, (void *)&_tsc_mfence_start, cnt);
+		(void) memcpy((void *)tsc_read,
+		    (void *)&_tsc_mfence_start, cnt);
 		break;
 	default:
 		break;
