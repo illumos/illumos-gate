@@ -54,14 +54,14 @@ valid_char(char c)
 	return ((c >= 'a' && c <= 'z') ||
 	    (c >= 'A' && c <= 'Z') ||
 	    (c >= '0' && c <= '9') ||
-	    c == '-' || c == '_' || c == '.' || c == ':' || c == '%');
+	    c == '-' || c == '_' || c == '.' || c == ':');
 }
 
 /*
  * Snapshot names must be made up of alphanumeric characters plus the following
  * characters:
  *
- * 	[-_.:%]
+ * 	[-_.:]
  */
 int
 snapshot_namecheck(const char *path, namecheck_err_t *why, char *what)
@@ -127,6 +127,9 @@ permset_namecheck(const char *path, namecheck_err_t *why, char *what)
  * characters:
  *
  * 	[-_.:%]
+ *
+ * We allow '%' here as we use that character internally to create unique
+ * names for temporary clones (for online recv).
  */
 int
 dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
@@ -196,7 +199,7 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 
 		/* Validate the contents of this component */
 		while (loc != end) {
-			if (!valid_char(*loc)) {
+			if (!valid_char(*loc) && *loc != '%') {
 				if (why) {
 					*why = NAME_ERR_INVALCHAR;
 					*what = *loc;
