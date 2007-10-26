@@ -55,7 +55,7 @@ write_image(void)
 	    EXIT_IF_CHECK_FAILED);
 	} else {
 		(void) check_device(target, CHECK_DEVICE_NOT_READY |
-		EXIT_IF_CHECK_FAILED);
+		    EXIT_IF_CHECK_FAILED);
 	}
 
 	/*
@@ -100,20 +100,21 @@ write_image(void)
 		exit(1);
 	}
 	if (no_size == 0) {
-		off_t cap;
+		uint32_t cap;
 		struct track_info *ti;
 		uint_t bsize;
 
 		ti = (struct track_info *)my_zalloc(sizeof (*ti));
 		if (write_mode == TAO_MODE)
-		    if (!build_track_info(target, -1, ti)) {
-			err_msg(
-			    gettext("Unable to find out writable address\n"));
-			exit(1);
+			if (!build_track_info(target, -1, ti)) {
+				err_msg(
+				    gettext("Unable to find out writable "
+				    "address\n"));
+				exit(1);
 			}
 		if (use_media_stated_capacity) {
 			cap = get_last_possible_lba(target);
-			if (cap <= 0) {
+			if (cap == 0) {
 				cap = read_format_capacity(target->d_fd,
 				    &bsize);
 			}

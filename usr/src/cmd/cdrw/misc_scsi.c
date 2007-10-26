@@ -705,21 +705,35 @@ finalize(cd_device *dev)
 /*
  * Find out media capacity.
  */
-int
+uint32_t
 get_last_possible_lba(cd_device *dev)
 {
 	uchar_t *di;
-	int cap;
+	uint32_t cap;
 
 	di = (uchar_t *)my_zalloc(DISC_INFO_BLOCK_SIZE);
 	if (!read_disc_info(dev->d_fd, di)) {
 		free(di);
 		return (0);
 	}
-	if ((di[21] != 0) && (di[21] != 0xff)) {
-		cap = ((di[21] * 60) + di[22]) * 75;
+
+	/*
+	 * If we have a DVD+R this field is an LBA. If the media is
+	 * a CD-R/W the field is MSF formatted. Otherwise this field
+	 * is not valid and will be zero.
+	 */
+	if (device_type == DVD_PLUS) {
+		if (read_scsi32(&di[20]) != 0xffffffff) {
+			cap = read_scsi32(&di[20]);
+		} else {
+			cap = 0;
+		}
 	} else {
-		cap = 0;
+		if ((di[21] != 0) && (di[21] != 0xff)) {
+			cap = ((di[21] * 60) + di[22]) * 75;
+		} else {
+			cap = 0;
+		}
 	}
 
 	free(di);

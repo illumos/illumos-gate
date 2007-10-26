@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +134,7 @@ read_data_track_failed:
 static void
 ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 {
-	off_t nblks_avail;
+	uint32_t nblks_avail;
 	uint_t bsize;
 	uint_t leadin_size = 0;
 
@@ -143,14 +143,14 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 	if (use_media_stated_capacity) {
 		nblks_avail = get_last_possible_lba(target);
 
-		if (nblks_avail <= 0) {
+		if (nblks_avail == 0) {
 
 			/* most newer drives use READ FORMAT CAPACITY */
 			nblks_avail = read_format_capacity(target->d_fd,
 			    &bsize);
 
 			/* if both methods fail no choice but to bail out */
-			if (nblks_avail <= 0) {
+			if (nblks_avail == 0) {
 
 				err_msg(gettext(
 				    "Cannot find out media capacity.\n"));
@@ -275,7 +275,7 @@ copy_cd(void)
 		    (ti->ti_flags & TI_DAMAGED_TRACK) ||
 		    (data_cd && audio_cd) || (ti->ti_data_mode == 2)) {
 
-		    err_msg(gettext("CD format is not supported\n"));
+			err_msg(gettext("CD format is not supported\n"));
 			exit(1);
 		}
 		if ((ti->ti_flags & TI_NWA_VALID) &&
@@ -375,7 +375,7 @@ copy_cd(void)
 			get_media_type(target->d_fd);
 	} while ((target == NULL) ||
 	    ((device_type == DVD_PLUS_W)? check_device(target, CHECK_NO_MEDIA):
-		check_device(target, CHECK_NO_MEDIA|CHECK_MEDIA_IS_NOT_BLANK)));
+	    check_device(target, CHECK_NO_MEDIA|CHECK_MEDIA_IS_NOT_BLANK)));
 
 	(void) printf("\n");
 	(void) setreuid(ruid, 0);

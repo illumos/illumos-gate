@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,7 @@ uchar_t get_data_mode(int fd, uint32_t lba);
 int prepare_for_write(cd_device *dev, int track_mode, int test_write,
     int keep_disc_open);
 int finalize(cd_device *dev);
-int get_last_possible_lba(cd_device *dev);
+uint32_t get_last_possible_lba(cd_device *dev);
 int read_audio_through_read_cd(cd_device *dev, uint_t start_lba, uint_t nblks,
     uchar_t *buf);
 int eject_media(cd_device *dev);
