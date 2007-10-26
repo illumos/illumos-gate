@@ -74,6 +74,12 @@ int opl_tsb_spares = (OPL_MAX_BOARDS) * (OPL_MAX_PCICH_UNITS_PER_BOARD) *
 
 pgcnt_t opl_startup_cage_size = 0;
 
+/*
+ * The length of the delay in seconds in communication with XSCF after
+ * which the warning message will be logged.
+ */
+uint_t	xscf_connect_delay = 60 * 15;
+
 static opl_model_info_t opl_models[] = {
 	{ "FF1", OPL_MAX_BOARDS_FF1, FF1, STD_DISPATCH_TABLE },
 	{ "FF2", OPL_MAX_BOARDS_FF2, FF2, STD_DISPATCH_TABLE },
@@ -89,6 +95,8 @@ static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
 static	opl_model_info_t *opl_cur_model = NULL;
 
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
+static void post_xscf_msg(char *, int);
+static void pass2xscf_thread();
 
 /*
  * Note FF/DC out-of-order instruction engine takes only a
@@ -831,7 +839,7 @@ int
 plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 {
 	int	ret = 0;
-	uint_t	sb;
+	int	sb;
 	int	plen;
 
 	sb = opl_get_physical_board(LSB_ID(cpuid));
@@ -880,53 +888,10 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 	return (ret);
 }
 
-#define	SCF_PUTINFO(f, s, p)	\
-	f(KEY_ESCF, 0x01, 0, s, p)
 void
 plat_nodename_set(void)
 {
-	void *datap;
-	static int (*scf_service_function)(uint32_t, uint8_t,
-	    uint32_t, uint32_t, void *);
-	int counter = 5;
-
-	/*
-	 * find the symbol for the SCF put routine in driver
-	 */
-	if (scf_service_function == NULL)
-		scf_service_function = (int (*)(uint32_t, uint8_t, uint32_t,
-		    uint32_t, void *)) modgetsymvalue("scf_service_putinfo", 0);
-
-	/*
-	 * If the symbol was found, call it.  Otherwise, log a note (but not to
-	 * the console).
-	 */
-
-	if (scf_service_function == NULL) {
-		cmn_err(CE_NOTE,
-		    "!plat_nodename_set: scf_service_putinfo not found\n");
-		return;
-	}
-
-	datap =
-	    (struct utsname *)kmem_zalloc(sizeof (struct utsname), KM_SLEEP);
-
-	if (datap == NULL) {
-		return;
-	}
-
-	bcopy((struct utsname *)&utsname,
-	    (struct utsname *)datap, sizeof (struct utsname));
-
-	while ((SCF_PUTINFO(scf_service_function,
-		sizeof (struct utsname), datap) == EBUSY) && (counter-- > 0)) {
-		delay(10 * drv_usectohz(1000000));
-	}
-	if (counter == 0)
-		cmn_err(CE_NOTE, "!plat_nodename_set: scf_service_putinfo not "
-		    "responding\n");
-
-	kmem_free(datap, sizeof (struct utsname));
+	post_xscf_msg((char *)&utsname, sizeof (struct utsname));
 }
 
 caddr_t	efcode_vaddr = NULL;
@@ -1101,4 +1066,224 @@ plat_lock_delay(int *backoff)
 			*backoff = OPL_BOFF_MAX;
 		}
 	}
+}
+
+/*
+ * The following code implements asynchronous call to XSCF to setup the
+ * domain node name.
+ */
+
+#define	FREE_MSG(m)		kmem_free((m), NM_LEN((m)->len))
+
+/*
+ * The following three macros define the all operations on the request
+ * list we are using here, and hide the details of the list
+ * implementation from the code.
+ */
+#define	PUSH(m) \
+	{ \
+		(m)->next = ctl_msg.head; \
+		(m)->prev = NULL; \
+		if ((m)->next != NULL) \
+			(m)->next->prev = (m); \
+		ctl_msg.head = (m); \
+	}
+
+#define	REMOVE(m) \
+	{ \
+		if ((m)->prev != NULL) \
+			(m)->prev->next = (m)->next; \
+		else \
+			ctl_msg.head = (m)->next; \
+		if ((m)->next != NULL) \
+			(m)->next->prev = (m)->prev; \
+	}
+
+#define	FREE_THE_TAIL(head) \
+	{ \
+		nm_msg_t *n_msg, *m; \
+		m = (head)->next; \
+		(head)->next = NULL; \
+		while (m != NULL) { \
+			n_msg = m->next; \
+			FREE_MSG(m); \
+			m = n_msg; \
+		} \
+	}
+
+#define	SCF_PUTINFO(f, s, p) \
+	f(KEY_ESCF, 0x01, 0, s, p)
+
+#define	PASS2XSCF(m, r)	((r = SCF_PUTINFO(ctl_msg.scf_service_function, \
+					    (m)->len, (m)->data)) == 0)
+
+/*
+ * The value of the following macro loosely depends on the
+ * value of the "device busy" timeout used in the SCF driver.
+ * (See pass2xscf_thread()).
+ */
+#define	SCF_DEVBUSY_DELAY	10
+
+/*
+ * The default number of attempts to contact the scf driver
+ * if we cannot fetch any information about the timeout value
+ * it uses.
+ */
+
+#define	REPEATS		4
+
+typedef struct nm_msg {
+	struct nm_msg *next;
+	struct nm_msg *prev;
+	int len;
+	char data[1];
+} nm_msg_t;
+
+#define	NM_LEN(len)		(sizeof (nm_msg_t) + (len) - 1)
+
+static struct ctlmsg {
+	nm_msg_t	*head;
+	nm_msg_t	*now_serving;
+	kmutex_t	nm_lock;
+	kthread_t	*nmt;
+	int		cnt;
+	int (*scf_service_function)(uint32_t, uint8_t,
+				    uint32_t, uint32_t, void *);
+} ctl_msg;
+
+static void
+post_xscf_msg(char *dp, int len)
+{
+	nm_msg_t *msg;
+
+	msg = (nm_msg_t *)kmem_zalloc(NM_LEN(len), KM_SLEEP);
+
+	bcopy(dp, msg->data, len);
+	msg->len = len;
+
+	mutex_enter(&ctl_msg.nm_lock);
+	if (ctl_msg.nmt == NULL) {
+		ctl_msg.nmt =  thread_create(NULL, 0, pass2xscf_thread,
+		    NULL, 0, &p0, TS_RUN, minclsyspri);
+	}
+
+	PUSH(msg);
+	ctl_msg.cnt++;
+	mutex_exit(&ctl_msg.nm_lock);
+}
+
+static void
+pass2xscf_thread()
+{
+	nm_msg_t *msg;
+	int ret;
+	uint_t i, msg_sent, xscf_driver_delay;
+	static uint_t repeat_cnt;
+	uint_t *scf_wait_cnt;
+
+	mutex_enter(&ctl_msg.nm_lock);
+
+	/*
+	 * Find the address of the SCF put routine if it's not done yet.
+	 */
+	if (ctl_msg.scf_service_function == NULL) {
+		if ((ctl_msg.scf_service_function =
+		    (int (*)(uint32_t, uint8_t, uint32_t, uint32_t, void *))
+		    modgetsymvalue("scf_service_putinfo", 0)) == NULL) {
+			cmn_err(CE_NOTE, "pass2xscf_thread: "
+			    "scf_service_putinfo not found\n");
+			ctl_msg.nmt = NULL;
+			mutex_exit(&ctl_msg.nm_lock);
+			return;
+		}
+	}
+
+	/*
+	 * Calculate the number of attempts to connect XSCF based on the
+	 * scf driver delay (which is
+	 * SCF_DEVBUSY_DELAY*scf_online_wait_rcnt seconds) and the value
+	 * of xscf_connect_delay (the total number of seconds to wait
+	 * till xscf get ready.)
+	 */
+	if (repeat_cnt == 0) {
+		if ((scf_wait_cnt =
+		    (uint_t *)
+		    modgetsymvalue("scf_online_wait_rcnt", 0)) == NULL) {
+			repeat_cnt = REPEATS;
+		} else {
+
+			xscf_driver_delay = *scf_wait_cnt *
+			    SCF_DEVBUSY_DELAY;
+			repeat_cnt = (xscf_connect_delay/xscf_driver_delay) + 1;
+		}
+	}
+
+	while (ctl_msg.cnt != 0) {
+
+		/*
+		 * Take the very last request from the queue,
+		 */
+		ctl_msg.now_serving = ctl_msg.head;
+		ASSERT(ctl_msg.now_serving != NULL);
+
+		/*
+		 * and discard all the others if any.
+		 */
+		FREE_THE_TAIL(ctl_msg.now_serving);
+		ctl_msg.cnt = 1;
+		mutex_exit(&ctl_msg.nm_lock);
+
+		/*
+		 * Pass the name to XSCF. Note please, we do not hold the
+		 * mutex while we are doing this.
+		 */
+		msg_sent = 0;
+		for (i = 0; i < repeat_cnt; i++) {
+			if (PASS2XSCF(ctl_msg.now_serving, ret)) {
+				msg_sent = 1;
+				break;
+			} else {
+				if (ret != EBUSY) {
+					cmn_err(CE_NOTE, "pass2xscf_thread:"
+					    " unexpected return code"
+					    " from scf_service_putinfo():"
+					    " %d\n", ret);
+				}
+			}
+		}
+
+		if (msg_sent) {
+
+			/*
+			 * Remove the request from the list
+			 */
+			mutex_enter(&ctl_msg.nm_lock);
+			msg = ctl_msg.now_serving;
+			ctl_msg.now_serving = NULL;
+			REMOVE(msg);
+			ctl_msg.cnt--;
+			mutex_exit(&ctl_msg.nm_lock);
+			FREE_MSG(msg);
+		} else {
+
+			/*
+			 * If while we have tried to communicate with
+			 * XSCF there were any other requests we are
+			 * going to drop this one and take the latest
+			 * one.  Otherwise we will try to pass this one
+			 * again.
+			 */
+			cmn_err(CE_NOTE,
+			    "pass2xscf_thread: "
+			    "scf_service_putinfo "
+			    "not responding\n");
+		}
+		mutex_enter(&ctl_msg.nm_lock);
+	}
+
+	/*
+	 * The request queue is empty, exit.
+	 */
+	ctl_msg.nmt = NULL;
+	mutex_exit(&ctl_msg.nm_lock);
 }
