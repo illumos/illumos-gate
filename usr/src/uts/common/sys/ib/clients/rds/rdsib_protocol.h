@@ -93,12 +93,11 @@ extern "C" {
  */
 #define	RDS_SERVICE_ID		0x1000144F00000001ULL
 
+/* Max number of nodes supported with the default configuration */
+#define	RDS_MAX_NODES	8
+
 /* packet size */
 #define	RDS_USER_DATA_BUFFER_SIZE	4096 /* 4K */
-
-/* Max memory that can be used for sending and receiving data pkts */
-/* per RDS */
-#define	RDS_MAX_RECV_MEMORY		96000 /* KB */
 
 /* per session */
 #define	RDS_MAX_DATA_RECV_BUFFERS	3000

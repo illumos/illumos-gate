@@ -32,7 +32,6 @@
 #include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <inet/ip.h>
-#include <sys/ib/ibtl/ibti.h>
 #include <sys/ib/clients/rds/rdsib_ib.h>
 #include <sys/ib/clients/rds/rdsib_buf.h>
 #include <sys/ib/clients/rds/rdsib_cm.h>
@@ -44,8 +43,9 @@
  * Global Configuration Variables
  * As defined in RDS proposal
  */
+uint_t		MaxNodes 		= RDS_MAX_NODES;
 uint_t		RdsPktSize;
-uint_t		MaxRecvMemory		= RDS_MAX_RECV_MEMORY;
+uint_t		NDataRX;
 uint_t		MaxDataSendBuffers	= RDS_MAX_DATA_SEND_BUFFERS;
 uint_t		MaxDataRecvBuffers	= RDS_MAX_DATA_RECV_BUFFERS;
 uint_t		MaxCtrlSendBuffers	= RDS_MAX_CTRL_SEND_BUFFERS;
@@ -250,7 +250,6 @@ static int
 rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int	ret;
-	uint_t	ndatarx;
 
 	RDS_DPRINTF4("rdsib_attach", "enter");
 
@@ -284,7 +283,7 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* Max number of receive buffers on the system */
-	ndatarx = (MaxRecvMemory * 1024)/UserBufferSize;
+	NDataRX = (MaxNodes - 1) * MaxDataRecvBuffers * 2;
 
 	/*
 	 * High water mark for the receive buffers in the system. If the
@@ -292,7 +291,7 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * would be stalled. The port quota for the sockets is set based
 	 * on this limit.
 	 */
-	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * ndatarx)/100;
+	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * NDataRX)/100;
 
 	RDS_DPRINTF4("rdsib_attach", "return");
 
@@ -351,11 +350,11 @@ rdsib_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static void
 rds_read_config_values(dev_info_t *dip)
 {
+	MaxNodes = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "MaxNodes", RDS_MAX_NODES);
+
 	UserBufferSize = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "UserBufferSize", RDS_USER_DATA_BUFFER_SIZE);
-
-	MaxRecvMemory = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "MaxRecvMemory", RDS_MAX_RECV_MEMORY);
 
 	MaxDataSendBuffers = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "MaxDataSendBuffers", RDS_MAX_DATA_SEND_BUFFERS);
@@ -390,17 +389,8 @@ rds_read_config_values(dev_info_t *dip)
 	rdsdbglvl = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "rdsdbglvl", RDS_LOG_L2);
 
-	if ((MaxRecvMemory * 1024) < (MaxDataRecvBuffers * UserBufferSize)) {
-		RDS_DPRINTF0("RDSIB",
-		    "rds.conf: MaxRecvMemory is not sufficient "
-		    "to accomodate MaxDataRecvBuffers. MaxRecvMemory (%d) < "
-		    "MaxDataRecvBuffers (%d) * UserBufferSize (%d). Setting "
-		    "these values to defaults.", MaxRecvMemory * 1024,
-		    MaxDataRecvBuffers, UserBufferSize);
-
-		MaxRecvMemory = RDS_MAX_RECV_MEMORY;
-		MaxDataRecvBuffers = RDS_MAX_DATA_RECV_BUFFERS;
-		MaxDataSendBuffers = RDS_MAX_DATA_SEND_BUFFERS;
-		UserBufferSize = RDS_USER_DATA_BUFFER_SIZE;
+	if (MaxNodes < 2) {
+		cmn_err(CE_WARN, "MaxNodes is set to less than 2");
+		MaxNodes = 2;
 	}
 }

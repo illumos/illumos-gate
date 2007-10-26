@@ -892,11 +892,12 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 		    "failed: %d", sp, ep, ret);
 		(void) ibt_flush_channel(hdl);
 		(void) ibt_free_channel(hdl);
+
 		/* cleanup stuff allocated in rds_ep_alloc_rc_channel */
-		(void) ibt_free_cq(ep->ep_recvcq);
-		ep->ep_recvcq = NULL;
-		(void) ibt_free_cq(ep->ep_sendcq);
-		ep->ep_sendcq = NULL;
+		mutex_enter(&ep->ep_lock);
+		rds_ep_free_rc_channel(ep);
+		mutex_exit(&ep->ep_lock);
+
 		return (-1);
 	}
 

@@ -83,7 +83,6 @@ extern "C" {
 
 #include <sys/types.h>
 #include <sys/ib/ibtl/ibti.h>
-#include <sys/ib/ibtl/ibtl_types.h>
 #include "rdsib_debug.h"
 #include "rdsib_protocol.h"
 
@@ -91,9 +90,10 @@ extern "C" {
  * Global Configuration Variables
  * As defined in RDS proposal
  */
+extern uint_t		MaxNodes;
 extern uint_t		UserBufferSize;
 extern uint_t		RdsPktSize;
-extern uint_t		MaxRecvMemory;
+extern uint_t		NDataRX;
 extern uint_t		MaxDataSendBuffers;
 extern uint_t		MaxDataRecvBuffers;
 extern uint_t		MaxCtrlSendBuffers;

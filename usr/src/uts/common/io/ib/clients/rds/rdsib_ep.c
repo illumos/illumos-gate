@@ -322,6 +322,28 @@ rds_session_lkup(rds_state_t *statep, ipaddr_t remoteip, ib_guid_t node_guid)
 	return (sp);
 }
 
+boolean_t
+rds_session_lkup_by_sp(rds_session_t *sp)
+{
+	rds_session_t *sessionp;
+
+	RDS_DPRINTF4("rds_session_lkup_by_sp", "Enter: 0x%p", sp);
+
+	rw_enter(&rdsib_statep->rds_sessionlock, RW_READER);
+	sessionp = rdsib_statep->rds_sessionlistp;
+	while (sessionp) {
+		if (sessionp == sp) {
+			rw_exit(&rdsib_statep->rds_sessionlock);
+			return (B_TRUE);
+		}
+
+		sessionp = sessionp->session_nextp;
+	}
+	rw_exit(&rdsib_statep->rds_sessionlock);
+
+	return (B_FALSE);
+}
+
 static void
 rds_ep_fini(rds_ep_t *ep)
 {
@@ -770,6 +792,13 @@ rds_failover_session(void *arg)
 	int		ret, cnt = 0;
 
 	RDS_DPRINTF2("rds_failover_session", "Enter: (%p)", sp);
+
+	/* Make sure the session is still alive */
+	if (rds_session_lkup_by_sp(sp) == B_FALSE) {
+		RDS_DPRINTF2("rds_failover_session",
+		    "Return: SP(%p) not ALIVE", sp);
+		return;
+	}
 
 	RDS_INCR_FAILOVERS();
 
@@ -2183,7 +2212,8 @@ rds_received_msg(rds_ep_t *ep, rds_buf_t *bp)
 	}
 
 	mutex_enter(&ep->ep_lock);
-	if (ep->ep_rdmacnt == 0) {
+	/* ep_chanhdl can be null if conn est hasn't come yet */
+	if ((ep->ep_rdmacnt == 0) && (ep->ep_chanhdl != NULL)) {
 		ep->ep_rdmacnt++;
 		*(uintptr_t *)(uintptr_t)ep->ep_ackds.ds_va = ep->ep_rbufid;
 		mutex_exit(&ep->ep_lock);

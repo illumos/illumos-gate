@@ -85,9 +85,9 @@
  */
 
 #define	DUMP_USER_PARAMS()	\
+	RDS_DPRINTF3(LABEL, "MaxNodes = %d", MaxNodes); \
 	RDS_DPRINTF3(LABEL, "UserBufferSize = %d", UserBufferSize); \
 	RDS_DPRINTF3(LABEL, "RdsPktSize = %d", RdsPktSize); \
-	RDS_DPRINTF3(LABEL, "MaxRecvMemory = %d", MaxRecvMemory); \
 	RDS_DPRINTF3(LABEL, "MaxDataSendBuffers = %d", MaxDataSendBuffers); \
 	RDS_DPRINTF3(LABEL, "MaxDataRecvBuffers = %d", MaxDataRecvBuffers); \
 	RDS_DPRINTF3(LABEL, "MaxCtrlSendBuffers = %d", MaxCtrlSendBuffers); \
@@ -175,7 +175,7 @@ rds_init_recv_caches(rds_state_t *statep)
 	rds_hca_t	*hcap;
 	uint32_t	nsessions;
 	uint_t		ix;
-	uint_t		ndatarx, nctrlrx;
+	uint_t		nctrlrx;
 	uint8_t		*memp;
 	uint_t		memsize, nbuf;
 	rds_buf_t	*bufmemp;
@@ -195,19 +195,16 @@ rds_init_recv_caches(rds_state_t *statep)
 		return (0);
 	}
 
-	/* Max number of receive buffers on the system */
-	ndatarx = (MaxRecvMemory * 1024)/UserBufferSize;
-
 	/*
 	 * High water mark for the receive buffers in the system. If the
 	 * number of buffers used crosses this mark then all sockets in
 	 * would be stalled. The port quota for the sockets is set based
 	 * on this limit.
 	 */
-	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * ndatarx)/100;
+	rds_rx_pkts_pending_hwm = (PendingRxPktsHWM * NDataRX)/100;
 
 	/* nsessions can never be less than 1 */
-	nsessions = ndatarx/MaxDataRecvBuffers;
+	nsessions = MaxNodes - 1;
 	nctrlrx = (nsessions + 1) * MaxCtrlRecvBuffers;
 
 	RDS_DPRINTF3(LABEL, "Number of Possible Sessions: %d", nsessions);
@@ -215,8 +212,8 @@ rds_init_recv_caches(rds_state_t *statep)
 	/* Add the hdr */
 	RdsPktSize = UserBufferSize + RDS_DATA_HDR_SZ;
 
-	memsize = (ndatarx * RdsPktSize) + (nctrlrx * RDS_CTRLPKT_SIZE);
-	nbuf = ndatarx + nctrlrx;
+	memsize = (NDataRX * RdsPktSize) + (nctrlrx * RDS_CTRLPKT_SIZE);
+	nbuf = NDataRX + nctrlrx;
 	RDS_DPRINTF3(LABEL, "RDS Buffer Pool Memory: %lld", memsize);
 	RDS_DPRINTF3(LABEL, "Total Buffers: %d", nbuf);
 
@@ -259,14 +256,14 @@ rds_init_recv_caches(rds_state_t *statep)
 	rds_dpool.pool_memp = memp;
 	rds_dpool.pool_memsize = memsize;
 	rds_dpool.pool_bufmemp = bufmemp;
-	rds_dpool.pool_nbuffers = ndatarx;
+	rds_dpool.pool_nbuffers = NDataRX;
 	rds_dpool.pool_nbusy = 0;
-	rds_dpool.pool_nfree = ndatarx;
+	rds_dpool.pool_nfree = NDataRX;
 
 	/* chain the buffers */
 	mp = memp;
 	bp = bufmemp;
-	for (ix = 0; ix < ndatarx; ix++) {
+	for (ix = 0; ix < NDataRX; ix++) {
 		bp[ix].buf_nextp = &bp[ix + 1];
 		bp[ix].buf_ds.ds_va = (ib_vaddr_t)(uintptr_t)mp;
 		bp[ix].buf_state = RDS_RCVBUF_FREE;
@@ -274,9 +271,9 @@ rds_init_recv_caches(rds_state_t *statep)
 		bp[ix].buf_frtn.free_arg = (char *)&bp[ix];
 		mp = mp + RdsPktSize;
 	}
-	bp[ndatarx - 1].buf_nextp = NULL;
+	bp[NDataRX - 1].buf_nextp = NULL;
 	rds_dpool.pool_headp = &bp[0];
-	rds_dpool.pool_tailp = &bp[ndatarx - 1];
+	rds_dpool.pool_tailp = &bp[NDataRX - 1];
 
 	/* Initialize ctrl pool */
 	rds_cpool.pool_nbuffers = nctrlrx;
@@ -284,14 +281,14 @@ rds_init_recv_caches(rds_state_t *statep)
 	rds_cpool.pool_nfree = nctrlrx;
 
 	/* chain the buffers */
-	for (ix = ndatarx; ix < nbuf - 1; ix++) {
+	for (ix = NDataRX; ix < nbuf - 1; ix++) {
 		bp[ix].buf_nextp = &bp[ix + 1];
 		bp[ix].buf_ds.ds_va = (ib_vaddr_t)(uintptr_t)mp;
 		mp = mp + RDS_CTRLPKT_SIZE;
 	}
 	bp[nbuf - 1].buf_ds.ds_va = (ib_vaddr_t)(uintptr_t)mp;
 	bp[nbuf - 1].buf_nextp = NULL;
-	rds_cpool.pool_headp = &bp[ndatarx];
+	rds_cpool.pool_headp = &bp[NDataRX];
 	rds_cpool.pool_tailp = &bp[nbuf - 1];
 
 	mutex_exit(&rds_dpool.pool_lock);

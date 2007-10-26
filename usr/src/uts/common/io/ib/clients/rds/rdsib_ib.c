@@ -77,8 +77,6 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/ib/ibtl/ibti.h>
-#include <sys/ib/ibtl/ibtl_types.h>
 #include <sys/ib/clients/rds/rdsib_cm.h>
 #include <sys/ib/clients/rds/rdsib_ib.h>
 #include <sys/ib/clients/rds/rdsib_buf.h>
@@ -163,13 +161,13 @@ rdsib_validate_chan_sizes(ibt_hca_attr_t *hattrp)
 	}
 
 	/* The MaxRecvMemory should be less than that supported by the HCA */
-	if ((MaxRecvMemory * 1024) > hattrp->hca_max_memr_len) {
+	if ((NDataRX * RdsPktSize) > hattrp->hca_max_memr_len) {
 		RDS_DPRINTF0("RDSIB", "MaxRecvMemory is greater than that "
 		    "supported by the HCA driver (%d > %d), lowering it to %d",
-		    MaxRecvMemory, hattrp->hca_max_memr_len,
+		    NDataRX * RdsPktSize, hattrp->hca_max_memr_len,
 		    hattrp->hca_max_memr_len);
 
-		MaxRecvMemory = hattrp->hca_max_memr_len;
+		NDataRX = hattrp->hca_max_memr_len/RdsPktSize;
 	}
 }
 
@@ -1125,6 +1123,7 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 		chanargs.rc_sizes.cs_rq_sgl = 1;
 	}
 
+	mutex_enter(&ep->ep_lock);
 	if (ep->ep_sendcq == NULL) {
 		/* returned size is always greater than the requested size */
 		ret = ibt_alloc_cq(hcap->hca_hdl, &scqattr,
@@ -1132,6 +1131,7 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 		if (ret != IBT_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "ibt_alloc_cq for sendCQ "
 			    "failed, size = %d: %d", scqattr.cq_size, ret);
+			mutex_exit(&ep->ep_lock);
 			return (NULL);
 		}
 
@@ -1146,6 +1146,7 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 				    "ibt_enable_cq_notify failed: %d", ret);
 				(void) ibt_free_cq(ep->ep_sendcq);
 				ep->ep_sendcq = NULL;
+				mutex_exit(&ep->ep_lock);
 				return (NULL);
 			}
 		}
@@ -1160,6 +1161,7 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 			    "failed, size = %d: %d", rcqattr.cq_size, ret);
 			(void) ibt_free_cq(ep->ep_sendcq);
 			ep->ep_sendcq = NULL;
+			mutex_exit(&ep->ep_lock);
 			return (NULL);
 		}
 
@@ -1174,6 +1176,7 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 			ep->ep_recvcq = NULL;
 			(void) ibt_free_cq(ep->ep_sendcq);
 			ep->ep_sendcq = NULL;
+			mutex_exit(&ep->ep_lock);
 			return (NULL);
 		}
 	}
@@ -1196,8 +1199,10 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 		ep->ep_recvcq = NULL;
 		(void) ibt_free_cq(ep->ep_sendcq);
 		ep->ep_sendcq = NULL;
+		mutex_exit(&ep->ep_lock);
 		return (NULL);
 	}
+	mutex_exit(&ep->ep_lock);
 
 	/* Chan private should contain the ep */
 	(void) ibt_set_chan_private(chanhdl, ep);
