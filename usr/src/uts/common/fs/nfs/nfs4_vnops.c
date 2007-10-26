@@ -3597,7 +3597,7 @@ nfs4_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 					mutex_exit(&rp->r_statelock);
 					error =
 					    nfs4_putpage(vp, (u_offset_t)0,
-								0, 0, cr, NULL);
+					    0, 0, cr, NULL);
 					mutex_enter(&rp->r_statelock);
 					if (error && (error == ENOSPC ||
 					    error == EDQUOT)) {
@@ -6528,8 +6528,7 @@ top:
 					    rp->r_count > 0 ||
 					    rp->r_mapcnt > 0)) {
 						error = nfs4_putpage(vp,
-							(offset_t)0, 0, 0, cr,
-							ct);
+						    (offset_t)0, 0, 0, cr, ct);
 						if (error && (error == ENOSPC ||
 						    error == EDQUOT)) {
 							mutex_enter(
@@ -7748,7 +7747,7 @@ link_call:
 
 			if (do_link) {
 				error = nfs4_link(ndvp, nvp, tmpname, cr,
-					NULL, 0);
+				    NULL, 0);
 			}
 			if (error == EOPNOTSUPP || !do_link) {
 				error = nfs4_rename(ndvp, nnm, ndvp, tmpname,
@@ -13919,7 +13918,7 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 			int error;
 
 			error = VOP_PUTPAGE(vp, (u_offset_t)0,
-						0, B_INVAL, cred, NULL);
+			    0, B_INVAL, cred, NULL);
 
 			if (error && (error == ENOSPC || error == EDQUOT)) {
 				rnode4_t *rp = VTOR4(vp);
@@ -14567,7 +14566,7 @@ nfs4_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 		ld.l_len = 0;		/* do entire file */
 
 		ret = VOP_FRLOCK(vp, F_SETLK, &ld, flag, offset, NULL,
-			cr, NULL);
+		    cr, NULL);
 
 		if (ret != 0) {
 			/*
