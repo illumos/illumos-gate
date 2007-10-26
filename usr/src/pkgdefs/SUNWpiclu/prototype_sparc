@@ -162,6 +162,12 @@ d none usr/platform/SUNW,T5140/lib/picl 755 root sys
 d none usr/platform/SUNW,T5140/lib/picl/plugins 755 root sys
 s none usr/platform/SUNW,T5140/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
 s none usr/platform/SUNW,T5140/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+d none usr/platform/SUNW,USBRDT-5240 755 root sys
+d none usr/platform/SUNW,USBRDT-5240/lib 755 root bin
+d none usr/platform/SUNW,USBRDT-5240/lib/picl 755 root sys
+d none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins 755 root sys
+s none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins/libpiclsbl.so=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
+s none usr/platform/SUNW,USBRDT-5240/lib/picl/plugins/libpiclsbl.so.1=../../../../SUNW,Sun-Fire-T200/lib/picl/plugins/libpiclsbl.so.1
 d none usr/platform/SUNW,Netra-T5220 755 root sys
 d none usr/platform/SUNW,Netra-T5220/lib 755 root bin
 d none usr/platform/SUNW,Netra-T5220/lib/picl 755 root sys
