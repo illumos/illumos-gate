@@ -48,11 +48,36 @@
 static kmem_cache_t *req_cache;		/* kmem cache for timeout request */
 
 /*
- * taskq for timer
+ * taskq parameters for cyclic_timer
+ *
+ * timer_taskq_num:
+ * timer_taskq_num represents the number of taskq threads.
+ * Currently 4 threads are pooled to handle periodic timeout requests.
+ * This number is chosen based on the fact that the callout (one-time
+ * timeout framework) uses 8 threads with TQ_NOSLEEP; the periodic timeout
+ * calls taskq_dispatch() with TQ_SLEEP instead, and in this case, 4 threads
+ * should be sufficient to handle periodic timeout requests. (see also
+ * timer_taskq_max_num below)
+ *
+ * timer_taskq_min_num:
+ * timer_taskq_min_num represents the number of pre-populated taskq_ent
+ * structures, and this variable holds the same value as timer_taskq_num does.
+ *
+ * timer_taskq_max_num:
+ * Since TQ_SLEEP is set when taskq_dispatch() is called, the framework waits
+ * for one second if more taskq_ent structures than timer_taskq_max_num are
+ * required. However, from the timeout point of view, one second is much longer
+ * than expected, and to prevent this occurrence, timer_taskq_max_num should
+ * hold a sufficiently-large value, which is 128 here. Note that since the size
+ * of taskq_ent_t is relatively small, this doesn't use up the resource so much.
+ * (Currently the size is less than 8k at most)
+ *
+ * About the detailed explanation of the taskq function arguments, please see
+ * usr/src/uts/common/os/taskq.c.
  */
-int timer_taskq_num = 1;		/* initial thread number */
-int timer_taskq_min_num = 4;		/* minimum taskq thread pool */
-int timer_taskq_max_num = 16;		/* maximum taskq thread pool */
+int timer_taskq_num = 4;		/* taskq thread number */
+int timer_taskq_min_num = 4;		/* min. number of taskq_ent structs */
+int timer_taskq_max_num = 128;		/* max. number of taskq_ent structs */
 static taskq_t *tm_taskq;		/* taskq thread pool */
 static kthread_t *tm_work_thread;	/* work thread invoking taskq */
 
