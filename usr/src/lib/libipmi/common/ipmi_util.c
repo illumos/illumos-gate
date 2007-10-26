@@ -139,6 +139,17 @@ ipmi_zalloc(ipmi_handle_t *ihp, size_t size)
 	return (ptr);
 }
 
+char *
+ipmi_strdup(ipmi_handle_t *ihp, const char *str)
+{
+	char *ptr;
+
+	if ((ptr = strdup(str)) == NULL)
+		(void) ipmi_set_error(ihp, EIPMI_NOMEM, NULL);
+
+	return (ptr);
+}
+
 /* ARGSUSED */
 void
 ipmi_free(ipmi_handle_t *ihp, void *ptr)

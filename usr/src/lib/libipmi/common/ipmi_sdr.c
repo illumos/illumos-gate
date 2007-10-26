@@ -126,6 +126,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 		    sizeof (ipmi_sdr_cache_ent_t))) == NULL) {
 			ipmi_free(ihp, gen_dst);
 			ipmi_free(ihp, fru_dst);
+			return (-1);
 		}
 
 		ent->isc_generic = gen_dst;

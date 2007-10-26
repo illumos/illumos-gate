@@ -63,6 +63,7 @@ struct ipmi_handle {
 	boolean_t		ih_deviceid_valid;
 	char			ih_errmsg[1024];
 	char			ih_errbuf[1024];
+	ipmi_user_t		*ih_users;
 };
 
 /*
@@ -77,6 +78,7 @@ extern void *ipmi_alloc(ipmi_handle_t *, size_t);
 extern void *ipmi_zalloc(ipmi_handle_t *, size_t);
 extern void ipmi_free(ipmi_handle_t *, void *);
 extern void *impi_realloc(ipmi_handle_t *, void *, size_t);
+extern char *ipmi_strdup(ipmi_handle_t *, const char *);
 
 /*
  * Supported transports
@@ -87,6 +89,7 @@ extern ipmi_transport_t ipmi_transport_bmc;
  * Miscellaneous routines
  */
 extern void ipmi_sdr_clear(ipmi_handle_t *);
+extern void ipmi_user_clear(ipmi_handle_t *);
 
 #ifdef	__cplusplus
 }

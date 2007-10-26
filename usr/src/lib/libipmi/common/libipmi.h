@@ -445,6 +445,35 @@ int ipmi_fru_parse_board(ipmi_handle_t *, char *, ipmi_fru_brd_info_t *);
 int ipmi_fru_parse_product(ipmi_handle_t *, char *, ipmi_fru_prod_info_t *);
 
 /*
+ * User management.  The raw functions are private to libipmi, and only the
+ * higher level abstraction (ipmi_user_t) is exported to consumers of the
+ * library.
+ */
+
+#define	IPMI_USER_PRIV_CALLBACK		0x1
+#define	IPMI_USER_PRIV_USER		0x2
+#define	IPMI_USER_PRIV_OPERATOR		0x3
+#define	IPMI_USER_PRIV_ADMIN		0x4
+#define	IPMI_USER_PRIV_OEM		0x5
+#define	IPMI_USER_PRIV_NONE		0xf
+
+typedef struct ipmi_user {
+	uint8_t		iu_uid;
+	char		*iu_name;
+	boolean_t	iu_enabled;
+	boolean_t	iu_ipmi_msg_enable;
+	boolean_t	iu_link_auth_enable;
+	uint8_t		iu_priv;
+	struct ipmi_user *iu_next;
+} ipmi_user_t;
+
+extern int ipmi_user_iter(ipmi_handle_t *,
+    int (*)(ipmi_user_t *, void *), void *);
+extern ipmi_user_t *ipmi_user_lookup_name(ipmi_handle_t *, const char *);
+extern ipmi_user_t *ipmi_user_lookup_id(ipmi_handle_t *, uint8_t);
+extern int ipmi_user_set_password(ipmi_handle_t *, uint8_t, const char *);
+
+/*
  * The remaining functions are private to the implementation of the Sun ILOM
  * service processor.  These function first check the manufacturer from the IPMI
  * device ID, and will return EIPMI_NOT_SUPPORTED if attempted for non-Sun

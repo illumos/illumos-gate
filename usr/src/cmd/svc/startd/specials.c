@@ -100,91 +100,87 @@ special_fsroot_post_online()
 }
 
 static void
-special_fsminimal_post_online()
+special_fsminimal_post_online(void)
 {
-	ulong_t rfsid, vfsid;
+	ulong_t rfsid, fsid;
 	pid_t init_pid;
+	int ret;
 
 	log_framework(LOG_DEBUG, "special_fsminimal_post_online hook "
 	    "executed\n");
 
 	/*
-	 * Are / and /var really writeable?
+	 * If /var is still read-only, and it is on a separate filesystem, then
+	 * attempt to mount it read-write now.
 	 */
-	switch (fs_is_read_only("/", &rfsid)) {
-	case 1:
-		return;		/* still read-only: install / ro root */
-	case 0:
-		break;
-	case -1:
-	default:
-		log_error(LOG_WARNING, gettext("couldn't check status of "
-		    "root filesystem: %s\n"), strerror(errno));
-		break;
-	}
+	if ((ret = fs_is_read_only("/var", &fsid)) == 1) {
+		(void) fs_is_read_only("/", &rfsid);
 
-	switch (fs_is_read_only("/var", &vfsid)) {
-	case 1:
-		if (vfsid != rfsid) {
+		if (rfsid != fsid) {
 			log_framework(LOG_WARNING, "/var filesystem "
 			    "read-only after system/filesystem/minimal\n");
 			if (fs_remount("/var"))
 				log_framework(LOG_WARNING, "/var "
 				    "filesystem remount failed\n");
 		}
-		break;
-	case 0:
-		break;
-	case -1:
-	default:
-		log_error(LOG_WARNING, gettext("couldn't check status of "
-		    "/var filesystem: %s\n"), strerror(errno));
-		break;
 	}
 
-	/*
-	 * Clear (dead) entries and record boot time.
-	 */
-	utmpx_clear_old();
-	utmpx_write_boottime();
+	if ((ret = fs_is_read_only("/var", &fsid)) != 1) {
+		if (ret != 0)
+			log_error(LOG_WARNING, gettext("couldn't check status "
+			    "of /var filesystem: %s\n"), strerror(errno));
 
-	/*
-	 * Reinitialize the logs to point to LOG_PREFIX_NORMAL.
-	 */
-	log_init();
+		/*
+		 * Clear (dead) entries and record boot time.
+		 */
+		utmpx_clear_old();
+		utmpx_write_boottime();
 
-	/*
-	 * Poke init so it will create /var/run/initpipe.
-	 */
-	if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
-	    sizeof (init_pid)) != sizeof (init_pid)) {
-		log_error(LOG_WARNING, "Could not get pid of init: %s.\n",
-		    strerror(errno));
-	} else {
-		if (kill(init_pid, SIGHUP) != 0) {
-			switch (errno) {
-			case EPERM:
-			case ESRCH:
-				log_error(LOG_WARNING,
-				    "Could not signal init: %s.\n",
-				    strerror(errno));
-				break;
+		/*
+		 * Reinitialize the logs to point to LOG_PREFIX_NORMAL.
+		 */
+		log_init();
 
-			case EINVAL:
-			default:
-				bad_error("kill", errno);
+		/*
+		 * Poke init so it will create /var/run/initpipe.
+		 */
+		if (zone_getattr(getzoneid(), ZONE_ATTR_INITPID, &init_pid,
+		    sizeof (init_pid)) != sizeof (init_pid)) {
+			log_error(LOG_WARNING, "Could not get pid of init: "
+			    "%s.\n", strerror(errno));
+		} else {
+			if (kill(init_pid, SIGHUP) != 0) {
+				switch (errno) {
+				case EPERM:
+				case ESRCH:
+					log_error(LOG_WARNING,
+					    "Could not signal init: %s.\n",
+					    strerror(errno));
+					break;
+
+				case EINVAL:
+				default:
+					bad_error("kill", errno);
+				}
 			}
 		}
 	}
 
-	/*
-	 * Take pending snapshots and create a svc.startd instance.
-	 */
-	(void) startd_thread_create(restarter_post_fsminimal_thread, NULL);
+	if ((ret = fs_is_read_only("/etc/svc", &fsid)) != 1) {
+		if (ret != 0)
+			log_error(LOG_WARNING, gettext("couldn't check status "
+			    "of /etc/svc filesystem: %s\n"), strerror(errno));
+
+		/*
+		 * Take pending snapshots and create a svc.startd instance.
+		 */
+		(void) startd_thread_create(restarter_post_fsminimal_thread,
+		    NULL);
+	}
 }
 
 static void
-special_single_post_online()
+special_single_post_online(void)
 {
 	int r;
 

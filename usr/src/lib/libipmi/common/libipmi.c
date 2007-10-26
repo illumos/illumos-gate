@@ -71,6 +71,7 @@ ipmi_close(ipmi_handle_t *ihp)
 	if (ihp->ih_transport && ihp->ih_tdata)
 		ihp->ih_transport->it_close(ihp->ih_tdata);
 	ipmi_sdr_clear(ihp);
+	ipmi_user_clear(ihp);
 	free(ihp);
 }
 

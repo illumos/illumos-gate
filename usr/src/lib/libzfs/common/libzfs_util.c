@@ -1063,6 +1063,7 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 	const char *propname;
 	char *value;
 	boolean_t isnone = B_FALSE;
+	boolean_t boolval;
 
 	if (type == ZFS_TYPE_POOL) {
 		proptype = zpool_prop_get_type(prop);
@@ -1122,13 +1123,24 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 		break;
 
 	case PROP_TYPE_INDEX:
-		if (datatype != DATA_TYPE_STRING) {
+		switch (datatype) {
+		case DATA_TYPE_STRING:
+			(void) nvpair_value_string(elem, &value);
+			break;
+
+		case DATA_TYPE_BOOLEAN_VALUE:
+			(void) nvpair_value_boolean_value(elem, &boolval);
+			if (boolval)
+				value = "on";
+			else
+				value = "off";
+			break;
+
+		default:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "'%s' must be a string"), nvpair_name(elem));
 			goto error;
 		}
-
-		(void) nvpair_value_string(elem, &value);
 
 		if (zprop_string_to_index(prop, value, ivalp, type) != 0) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,

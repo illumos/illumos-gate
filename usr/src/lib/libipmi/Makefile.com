@@ -33,6 +33,7 @@ OBJECTS=	ipmi_bmc.o	\
 		ipmi_sdr.o	\
 		ipmi_sensor.o	\
 		ipmi_sunoem.o	\
+		ipmi_user.o	\
 		ipmi_util.o	\
 		libipmi.o
 

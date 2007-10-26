@@ -44,6 +44,10 @@ SUNWprivate_1.1 {
 	ipmi_sunoem_led_set;
 	ipmi_sunoem_update_fru;
 	ipmi_sunoem_uptime;
+	ipmi_user_iter;
+	ipmi_user_lookup_id;
+	ipmi_user_lookup_name;
+	ipmi_user_set_password;
     local:
 	*;
 };
