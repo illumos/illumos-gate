@@ -30,18 +30,27 @@
 # provide appropriate choices. It must be run in the global
 # zone as root.
 
+NSCD_PER_LABEL=0
+NSCD_INDICATOR="/var/tsol/doors/nscd_per_label"
+export NSCD_PER_LABEL
+export NSCD_INDICATOR
+if [ -f $NSCD_INDICATOR ] ; then
+	NSCD_PER_LABEL=1
+fi
 PATH=/usr/bin:/usr/sbin:/usr/lib export PATH
 title="Labeled Zone Manager"
 maxlabel=`chk_encodings -X 2>/dev/null`
 if [[ ! -n $maxlabel ]]; then
 	maxlabel=0x000a-08-f8
 fi
+zonename=""
+export zonename
 config=/tmp/zfg.$$ ;
 
 consoleCheck() {
 	zconsole=`pgrep -f "zlogin -C $zonename"`
 	if [ $? != 0 ]; then
-		console="Zone Console...\n" 
+		console="Zone Console...\n"
 	fi
 }
 
@@ -114,6 +123,58 @@ selectLabel() {
 	fi
 }
 
+resolveXdisplay() {
+	export ZONE_PATH
+	export ZONE_ETC_DIR
+	export IPNODES
+	export LIST
+	ERRORLIST=""
+	export ERRORLIST
+	# if using nscd-per-label then we have to be sure the global zone's
+	# hostname resolves because it is used for DISPLAY in X
+	ghostname=`hostname`
+	export ghostname
+
+	if [[ -n "$1" ]] ; then
+		LIST=`zoneadm list -ip | grep ":$1:"`
+	else
+		LIST=`zoneadm list -ip | grep -v "global"`
+	fi
+
+	gipaddress=`getent hosts $ghostname|cut -f1`
+	for i in $LIST; do
+		ZONE_PATH=`echo "$i" |cut -d ":" -f4`
+		ZONE_ETC_DIR=$ZONE_PATH/root/etc
+		IPNODES=${ZONE_ETC_DIR}/inet/ipnodes
+
+		# Rather than toggle on and off with NSCD_PER_LABEL, put the
+		# information in there and a sysadmin can remove it if necessary
+		# $DISPLAY will not work in X without global hostname
+		ENTRY=`grep $ghostname $IPNODES`
+		case "$ENTRY" in
+			127.0.0.1* )
+				if [[ -z $ERRORLIST ]] ; then
+					ERRORLIST="$ghostname address 127.0.0.1 found in:\n"
+				fi
+				ERRORLIST="$ERRORLIST $IPNODES\n"
+				;;
+			"")
+				gipaddress=`getent hosts $ghostname|cut -f1`
+				echo "$gipaddress\t$ghostname" >>  $IPNODES
+				;;
+			*)
+				continue
+				;;
+
+		esac
+	done
+	if [[ -n "$ERRORLIST" ]] ; then
+		x=$(zenity --error \
+		    --title="$title" \
+		    --text="WARNING:\n\n\n$ERRORLIST\n\n")
+	fi
+}
+
 clone() {
 	image=`zfs list |grep snapshot|cut -d " " -f1| \
 	    zenity --list \
@@ -128,7 +189,12 @@ clone() {
 		/usr/sbin/zfs clone $image zone/$zonename
 		/usr/sbin/zoneadm -z $zonename attach -F
 		if [ ! -f /var/ldap/ldap_client_file ]; then
-			sharePasswd
+			if [ $NSCD_PER_LABEL = 0 ] ; then
+				sharePasswd
+			else
+				unsharePasswd
+				resolveXdisplay
+			fi
 		fi
 	fi
 }
@@ -142,11 +208,17 @@ copy() {
 
 	/usr/bin/gnome-terminal \
 	    --title="$title: Copying $image to $zonename zone" \
-	    --command "zoneadm -z $zonename clone -m copy $image" 
+	    --command "zoneadm -z $zonename clone -m copy $image" \
+	    --disable-factory \
 	    --hide-menubar
 
 	if [ ! -f /var/ldap/ldap_client_file ]; then
-		sharePasswd
+		if [ $NSCD_PER_LABEL = 0 ] ; then
+			sharePasswd
+		else
+			unsharePasswd
+			resolveXdisplay
+		fi
 	fi
 }
 
@@ -159,8 +231,14 @@ initialize() {
 	if [ $? != 0 ]; then
 		exit 1
 	fi
-	
-	ZONE_PATH=`zoneadm list -cp|grep ":${zonename}:"|cut -d ":" -f4`
+
+	ZONE_PATH=`zoneadm list -ip|grep ":${zonename}:"|cut -d ":" -f4`
+	if [ -z "$ZONE_PATH" ] ; then
+		x=$(zenity --error \
+		    --title="$title" \
+		    --text="$zonename is not an installed zone")
+		exit 1
+	fi
 	ZONE_ETC_DIR=$ZONE_PATH/root/etc
 	ipaddress=`getent hosts $hostname|cut -f1`
 	SYSIDCFG=${ZONE_ETC_DIR}/sysidcfg
@@ -186,7 +264,12 @@ initialize() {
 		cp /etc/nsswitch.conf $ZONE_ETC_DIR/nsswitch.ldap
 	else
 		echo "name_service=NONE" > ${SYSIDCFG}
-		sharePasswd
+		if [ $NSCD_PER_LABEL = 0 ] ; then
+			sharePasswd
+		else
+			# had to put resolveXdisplay lower down for this case
+			unsharePasswd
+		fi
 	fi
 
 	echo "security_policy=NONE" >> ${SYSIDCFG}
@@ -206,6 +289,9 @@ initialize() {
 	echo "ip_address=$ipaddress }" >> ${SYSIDCFG}
 	cp /etc/default/nfs ${ZONE_ETC_DIR}/default/nfs
 	touch ${ZONE_ETC_DIR}/.NFS4inst_state.domain
+	if [ $NSCD_PER_LABEL = 1 ] ; then
+		resolveXdisplay
+	fi
 }
 
 install() {
@@ -223,6 +309,7 @@ install() {
 	/usr/bin/gnome-terminal \
 	    --title="$title: Installing $zonename zone" \
 	    --command "zoneadm -z $zonename install" \
+	    --disable-factory \
 	    --hide-menubar
 
 	initialize
@@ -251,7 +338,7 @@ getNIC(){
 		if [ $? -eq 1 ]; then
 			continue
 		fi
-		i=${i%:} # Remove colon after interface name 
+		i=${i%:} # Remove colon after interface name
 		echo $i |grep ":" >/dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			continue
@@ -266,14 +353,14 @@ getNIC(){
 }
 
 getNetmask() {
-	
+
 	cidr=
 	nm=$(zenity --entry \
 	    --title="$title" \
 	    --text="$ipaddr: Enter netmask: " \
 	    --entry-text 255.255.255.0)
 	if [ $? != 0 ]; then
-	       return; 
+	       return;
 	fi
 
 	cidr=`perl -e 'use Socket; print unpack("%32b*",inet_aton($ARGV[0])), "\n";' $nm`
@@ -329,7 +416,7 @@ getAttrs() {
 		ipaddr="..."
 	fi
 }
-						
+
 updateTnrhdb() {
 	tnctl -h ${ipaddr}:$template
 	x=`grep "^${ipaddr}[^0-9]" /etc/security/tsol/tnrhdb`
@@ -346,20 +433,20 @@ getIPaddr() {
         hostname=$(zenity --entry \
             --title="$title" \
             --text="$nic: Enter hostname: ")
-	
+
         if [ $? != 0 ]; then
-               return; 
+               return;
 	fi
-	
+
 	ipaddr=`getent hosts $hostname|cut -f1`
         if [[ -z $ipaddr ]]; then
-	
+
 		ipaddr=$(zenity --entry \
 		    --title="$title" \
 		    --text="$nic: Enter IP address: " \
 		    --entry-text a.b.c.d)
 		if [ $? != 0 ]; then
-		       return; 
+		       return;
 		fi
 	fi
 
@@ -368,7 +455,7 @@ getIPaddr() {
 addHost() {
 	# Update hosts and ipnodes
         if [[ -z $ipaddr ]]; then
-               return; 
+               return;
 	fi
 	grep "^${ipaddr}[^0-9]" /etc/inet/hosts >/dev/null
 	if [ $? -eq 1 ]; then
@@ -399,7 +486,7 @@ getTemplate() {
 		    $templates)
 
 		if [ $? != 0 ]; then
-		       break; 
+		       break;
 		fi
 
 		t_label=$(tninfo -t $t_cmd | grep sl|zenity --list \
@@ -450,8 +537,18 @@ commit
 	zonecfg -z $zonename -f $config ;
 	rm $config
 }
-	
+
+unsharePasswd() {
+	for i in `zoneadm list -i | grep -v global`; do
+		zonecfg -z $i remove fs dir=/etc/passwd 2>&1 | grep -v such
+		zonecfg -z $i remove fs dir=/etc/shadow 2>&1 | grep -v such
+	done
+}
+
 sharePasswd() {
+	if [ $NSCD_PER_LABEL -ne 0 ] ; then
+		return
+	fi
 	passwd=`zonecfg -z $zonename info|grep /etc/passwd`
 	if [[ $? -eq 1 ]]; then
 		zcfg="
@@ -459,17 +556,44 @@ add fs
 set special=/etc/passwd
 set dir=/etc/passwd
 set type=lofs
+add options ro
 end
 add fs
 set special=/etc/shadow
 set dir=/etc/shadow
 set type=lofs
+add options ro
 end
 commit
 "
 		echo "$zcfg" > $config ;
 		zonecfg -z $zonename -f $config ;
 		rm $config
+	fi
+}
+
+# This routine is a toggle -- if we find it configured for global nscd,
+# change to nscd-per-label and vice-versa.
+#
+# The user was presented with only the choice to CHANGE the existing
+# configuration.
+
+manageNscd() {
+	if [ $NSCD_PER_LABEL -eq 0 ] ; then
+		# this MUST be a regular file for svc-nscd to detect
+		touch $NSCD_INDICATOR
+		NSCD_PER_LABEL=1
+		unsharePasswd
+		resolveXdisplay
+	else
+		export zonename
+		rm -f $NSCD_INDICATOR
+		NSCD_PER_LABEL=0
+		for i in `zoneadm list -i | grep -v global`; do
+			zonename=$i
+			sharePasswd
+		done
+		zonename=
 	fi
 }
 
@@ -482,7 +606,7 @@ manageNets() {
 			if [ $? -eq 1 ]; then
 				continue
 			fi
-			nic=${i%:} # Remove colon after interface name 
+			nic=${i%:} # Remove colon after interface name
 			getAttrs
 			attrs="$nic $zone $ipaddr $template Up $attrs"
 		done
@@ -493,7 +617,7 @@ manageNets() {
 			if [ $? -eq 1 ]; then
 				continue
 			fi
-			nic=${i%:} # Remove colon after interface name 
+			nic=${i%:} # Remove colon after interface name
 			getAttrs
 			attrs="$nic $zone $ipaddr $template Down $attrs"
 		done
@@ -541,7 +665,7 @@ manageNets() {
 				bringdown="Bring Down\n"
 			fi
 		fi
-		
+
 		if [ $ipaddr = "..." ]; then
 			setipaddr="Set IP address...\n";
 		else
@@ -586,6 +710,149 @@ manageNets() {
 	done
 }
 
+# Loop for single-zone menu
+singleZone() {
+
+	while [ "${command}" != Exit ]; do
+		if [[ ! -n $zonename ]]; then
+			x=$(zenity --error \
+			    --title="$title" \
+			    --text="zonename \"$zonename\" is not valid")
+			return
+		fi
+		# Clear list of commands
+
+		console=
+		label=
+		start=
+		reboot=
+		stop=
+		clone=
+		copy=
+		install=
+		ready=
+		uninstall=
+		delete=
+		snapshot=
+		addnet=
+		deletenet=
+		permitrelabel=
+
+		zonestate=`zoneadm -z $zonename list -p | cut -d ":" -f 3`
+
+		consoleCheck;
+		labelCheck;
+		delay=0
+
+		case $zonestate in
+			running) ready="Ready\n"; \
+			       reboot="Reboot\n"; \
+			       stop="Halt\n"; \
+			;;
+			ready) start="Boot\n"; \
+			       stop="Halt\n" \
+			;;
+			installed)
+				if [[ -z $label ]]; then \
+					ready="Ready\n"; \
+					start="Boot\n"; \
+				fi; \
+				uninstall="Uninstall\n"; \
+				snapshotCheck; \
+				relabelCheck;
+				addnet="Add Network...\n"
+			;;
+			configured) install="Install...\n"; \
+				copyCheck; \
+				delete="Delete\n"; \
+				console=; \
+			;;
+			incomplete) delete="Delete\n"; \
+			;;
+			*)
+			;;
+		esac
+
+		command=$(echo ""\
+		    $console \
+		    $label \
+		    $start \
+		    $reboot \
+		    $stop \
+		    $clone \
+		    $copy \
+		    $install \
+		    $ready \
+		    $uninstall \
+		    $delete \
+		    $snapshot \
+		    $addnet \
+		    $deletenet \
+		    $permitrelabel \
+		    "Return to Main Menu" \
+		    | zenity --list \
+		    --title="$title" \
+		    --height=300 \
+		    --column "$zonename: $zonestate" )
+
+		case $command in
+		    " Zone Console...")
+			delay=2; \
+			/usr/bin/gnome-terminal \
+			    --title="Zone Terminal Console: $zonename" \
+			    --command "/usr/sbin/zlogin -C $zonename" &;;
+
+		    " Select Label...")
+			selectLabel;;
+
+		    " Ready")
+			zoneadm -z $zonename ready ;;
+
+		    " Boot")
+			zoneadm -z $zonename boot ;;
+
+		    " Halt")
+			zoneadm -z $zonename halt ;;
+
+		    " Reboot")
+			zoneadm -z $zonename reboot ;;
+
+		    " Install...")
+			install;;
+
+		    " Clone")
+			clone ;;
+
+		    " Copy...")
+			copy ;;
+
+		    " Uninstall")
+			zoneadm -z $zonename uninstall -F;;
+
+		    " Delete")
+			delete
+			return ;;
+
+		    " Create Snapshot")
+			zfs snapshot zone/${zonename}@snapshot;;
+
+		    " Add Network...")
+			addNet ;;
+
+		    " Permit Relabeling")
+			setMacPrivs ;;
+
+		    " Deny Relabeling")
+			resetMacPrivs ;;
+
+		    *)
+			zonename=
+			return ;;
+		esac
+		sleep $delay;
+	done
+}
+
 # Main loop for top-level window
 #
 # Always display vni0 since it is useful for cross-zone networking
@@ -594,185 +861,73 @@ ifconfig vni0 > /dev/null 2>&1
 if [ $? != 0 ]; then
 	ifconfig vni0 plumb >/dev/null 2>&1
 fi
+export NSCD_OPT
 while [ "${command}" != Exit ]; do
-	if [[ ! -n $zonename ]]; then
-		zonelist=""
-		for p in `zoneadm list -cp|grep -v global:`; do
-			zonename=`echo $p|cut -d : -f2`
-			state=`echo $p|cut -d : -f3`
-			labelCheck
-			zonelist="$zonelist$zonename\n$state\n$curlabel\n"
-		done
+	zonelist=""
+	for p in `zoneadm list -cp |grep -v global:`; do
+		zonename=`echo $p|cut -d : -f2`
+		state=`echo $p|cut -d : -f3`
+		labelCheck
+		zonelist="$zonelist$zonename\n$state\n$curlabel\n"
+	done
 
-		zonelist="${zonelist}Create a new zone...\n\n\nManage Network Interfaces...\n\n"
-		zonename=$(echo $zonelist|zenity --list \
+	if [ $NSCD_PER_LABEL -eq 0 ]  ; then
+		NSCD_OPT="Configure per-zone name service"
+	else
+		NSCD_OPT="Unconfigure per-zone name service"
+	fi
+	zonelist=${zonelist}"Manage Network Interfaces...\n\n\nCreate a new zone...\n\n\n${NSCD_OPT}\n\n\nExit\n\n"
+
+	zonename=""
+	topcommand=$(echo $zonelist|zenity --list \
+	    --title="$title" \
+	    --height=300 \
+	    --width=500 \
+	    --column="Zone Name" \
+	    --column="Status" \
+	    --column="Sensitivity Label" \
+	    )
+
+	if [[ ! -n $topcommand ]]; then
+		command=Exit
+		exit
+	fi
+
+	if [ "$topcommand" = "$NSCD_OPT" ]; then
+		topcommand=
+		manageNscd
+		continue
+	elif [ "$topcommand" = "Manage Network Interfaces..." ]; then
+		topcommand=
+		manageNets
+		continue
+	elif [ "$topcommand" = "Exit" ]; then
+		command=Exit
+		exit
+	elif [ "$topcommand" = "Create a new zone..." ]; then
+		zonename=$(zenity --entry \
 		    --title="$title" \
-		    --height=300 \
-		    --width=500 \
-		    --column="Zone Name" \
-		    --column="Status" \
-		    --column="Sensitivity Label" \
-		    )
+		    --entry-text="" \
+		    --text="Enter Zone Name: ")
 
 		if [[ ! -n $zonename ]]; then
-			exit
+			continue
 		fi
 
-		if [ "$zonename" = "Manage Network Interfaces..." ]; then
-			zonename=
-			manageNets
-			continue
-		elif [ "$zonename" = "Create a new zone..." ]; then
-			zonename=$(zenity --entry \
-			    --title="$title" \
-			    --entry-text="" \
-			    --text="Enter Zone Name: ")
-
-			if [[ ! -n $zonename ]]; then
-				continue	
-			fi
-
-			zcfg="
+		zcfg="
 create -t SUNWtsoldef
 set zonepath=/zone/$zonename
 commit
 "
-			echo "$zcfg" > $config ;
-			zonecfg -z $zonename -f $config ;
-			rm $config
-		fi
+		echo "$zcfg" > $config ;
+		zonecfg -z $zonename -f $config ;
+		rm $config
+		# Now, go to the singleZone menu, using the global
+		# variable zonename, and continue with zone creation
+		singleZone
+		continue
 	fi
-
-	# Clear list of commands
-
-	console=
-	label=
-	start=
-	reboot=
-	stop=
-	clone=
-	copy=
-	install=
-	ready=
-	uninstall=
-	delete=
-	snapshot=
-	addnet=
-	deletenet=
-	permitrelabel=
-	    
-	zonestate=`zoneadm -z $zonename list -p | cut -d ":" -f 3`
-
-	consoleCheck;
-	labelCheck;
-	delay=0
-
-	case $zonestate in
-		running) ready="Ready\n"; \
-		       reboot="Reboot\n"; \
-		       stop="Halt\n"; \
-		;;
-		ready) start="Boot\n"; \
-		       stop="Halt\n" \
-		;;
-		installed)
-			if [[ -z $label ]]; then \
-				ready="Ready\n"; \
-				start="Boot\n"; \
-			fi; \
-			uninstall="Uninstall\n"; \
-			snapshotCheck; \
-			relabelCheck;
-			addnet="Add Network...\n"
-		;;
-		configured) install="Install...\n"; \
-			copyCheck; \
-			delete="Delete\n"; \
-			console=; \
-		;;
-		incomplete) delete="Delete\n"; \
-		;;
-		*) 
-		;;
-	esac
-
-	command=$(echo ""\
-	    $console \
-	    $label \
-	    $start \
-	    $reboot \
-	    $stop \
-	    $clone \
-	    $copy \
-	    $install \
-	    $ready \
-	    $uninstall \
-	    $delete \
-	    $snapshot \
-	    $addnet \
-	    $deletenet \
-	    $permitrelabel \
-	    "Select another zone...\n" \
-	    "Exit" \
-	    | zenity --list \
-	    --title="$title" \
-	    --height=300 \
-	    --column "$zonename: $zonestate" )
-
-	case $command in
-	    " Zone Console...")
-		delay=2; \
-		/usr/bin/gnome-terminal \
-		    --title="Zone Terminal Console: $zonename" \
-		    --command "/usr/sbin/zlogin -C $zonename" &;;
-
-	    " Select Label...")
-		selectLabel;;
-
-	    " Ready")
-		zoneadm -z $zonename ready ;;
-
-	    " Boot")
-		zoneadm -z $zonename boot ;;
-
-	    " Halt")
-		zoneadm -z $zonename halt ;;
-
-	    " Reboot")
-		zoneadm -z $zonename reboot ;;
-
-	    " Install...")
-		install;;
-
-	    " Clone")
-		clone ;;
-
-	    " Copy...")
-		copy ;;
-
-	    " Uninstall")
-		zoneadm -z $zonename uninstall -F;;
-
-	    " Delete")
-		delete ;;
-
-	    " Create Snapshot")
-		zfs snapshot zone/${zonename}@snapshot;;
-
-	    " Add Network...")
-		addNet ;;
-
-	    " Permit Relabeling")
-		setMacPrivs ;;
-
-	    " Deny Relabeling")
-		resetMacPrivs ;;
-
-	    " Select another zone...")
-		zonename= ;;
-
-	    *)
-		exit ;;
-	esac
-	sleep $delay;
+	# if the menu choice was a zonename, pop up zone menu
+	zonename=$topcommand
+	singleZone
 done
