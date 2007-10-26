@@ -1,8 +1,4 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -40,6 +36,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "includes.h"
@@ -2165,23 +2165,56 @@ channel_setup_fwd_listener(int type, const char *listen_addr, u_short listen_por
     const char *host_to_connect, u_short port_to_connect, int gateway_ports)
 {
 	Channel *c;
-	int success, sock, on = 1;
+	int sock, r, is_client, on = 1, wildcard = 0, success = 0;
 	struct addrinfo hints, *ai, *aitop;
-	const char *host;
+	const char *host, *addr;
 	char ntop[NI_MAXHOST], strport[NI_MAXSERV];
 
-	success = 0;
 	host = (type == SSH_CHANNEL_RPORT_LISTENER) ?
 	    listen_addr : host_to_connect;
+	is_client = (type == SSH_CHANNEL_PORT_LISTENER);
 
 	if (host == NULL) {
 		error("No forward host name.");
-		return success;
+		return 0;
 	}
 	if (strlen(host) > SSH_CHANNEL_PATH_LEN - 1) {
 		error("Forward host name too long.");
-		return success;
+		return 0;
 	}
+
+	/*
+	 * Determine whether or not a port forward listens to loopback,
+	 * specified address or wildcard. On the client, a specified bind
+	 * address will always override gateway_ports. On the server, a
+	 * gateway_ports of 1 (``yes'') will override the client's
+	 * specification and force a wildcard bind, whereas a value of 2
+	 * (``clientspecified'') will bind to whatever address the client
+	 * asked for.
+	 *
+	 * Special-case listen_addrs are:
+	 *
+	 * "0.0.0.0"               -> wildcard v4/v6 if SSH_OLD_FORWARD_ADDR
+	 * "" (empty string), "*"  -> wildcard v4/v6
+	 * "localhost"             -> loopback v4/v6
+	 */
+	addr = NULL;
+	if (listen_addr == NULL) {
+		/* No address specified: default to gateway_ports setting */
+		if (gateway_ports)
+			wildcard = 1;
+	} else if (gateway_ports || is_client) {
+		if (((datafellows & SSH_OLD_FORWARD_ADDR) &&
+		    strcmp(listen_addr, "0.0.0.0") == 0 && is_client == 0) ||
+		    *listen_addr == '\0' || strcmp(listen_addr, "*") == 0 ||
+		    (!is_client && gateway_ports == 1))
+			wildcard = 1;
+		else if (strcmp(listen_addr, "localhost") != 0)
+			addr = listen_addr;
+	}
+
+	debug3("channel_setup_fwd_listener: type %d wildcard %d addr %s",
+	    type, wildcard, (addr == NULL) ? "NULL" : addr);
 
 	/*
 	 * getaddrinfo returns a loopback address if the hostname is
@@ -2189,11 +2222,20 @@ channel_setup_fwd_listener(int type, const char *listen_addr, u_short listen_por
 	 */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = IPv4or6;
-	hints.ai_flags = gateway_ports ? AI_PASSIVE : 0;
+	hints.ai_flags = wildcard ? AI_PASSIVE : 0;
 	hints.ai_socktype = SOCK_STREAM;
 	snprintf(strport, sizeof strport, "%d", listen_port);
-	if (getaddrinfo(NULL, strport, &hints, &aitop) != 0)
-		packet_disconnect("getaddrinfo: fatal error");
+	if ((r = getaddrinfo(addr, strport, &hints, &aitop)) != 0) {
+		if (addr == NULL) {
+			/* This really shouldn't happen */
+			packet_disconnect("getaddrinfo: fatal error: %s",
+			    gai_strerror(r));
+		} else {
+			error("channel_setup_fwd_listener: "
+			    "getaddrinfo(%.64s): %s", addr, gai_strerror(r));
+		}
+		return 0;
+	}
 
 	for (ai = aitop; ai; ai = ai->ai_next) {
 		if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6)
@@ -2204,7 +2246,7 @@ channel_setup_fwd_listener(int type, const char *listen_addr, u_short listen_por
 			continue;
 		}
 		/* Create a port to listen for the host. */
-		sock = socket(ai->ai_family, SOCK_STREAM, 0);
+		sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 		if (sock < 0) {
 			/* this is no error since kernel may not support ipv6 */
 			verbose("socket: %.100s", strerror(errno));
@@ -2253,13 +2295,35 @@ channel_setup_fwd_listener(int type, const char *listen_addr, u_short listen_por
 	return success;
 }
 
+int
+channel_cancel_rport_listener(const char *host, u_short port)
+{
+	u_int i;
+	int found = 0;
+
+	for (i = 0; i < channels_alloc; i++) {
+		Channel *c = channels[i];
+
+		if (c != NULL && c->type == SSH_CHANNEL_RPORT_LISTENER &&
+		    strncmp(c->path, host, sizeof(c->path)) == 0 &&
+		    c->listening_port == port) {
+			debug2("%s: close channel %d", __func__, i);
+			channel_free(c);
+			found = 1;
+		}
+	}
+
+	return (found);
+}
+
 /* protocol local port fwd, used by ssh (and sshd in v1) */
 int
-channel_setup_local_fwd_listener(u_short listen_port,
+channel_setup_local_fwd_listener(const char *listen_host, u_short listen_port,
     const char *host_to_connect, u_short port_to_connect, int gateway_ports)
 {
 	return channel_setup_fwd_listener(SSH_CHANNEL_PORT_LISTENER,
-	    NULL, listen_port, host_to_connect, port_to_connect, gateway_ports);
+	    listen_host, listen_port, host_to_connect, port_to_connect,
+	    gateway_ports);
 }
 
 /* protocol v2 remote port fwd, used by sshd */
@@ -2276,8 +2340,8 @@ channel_setup_remote_fwd_listener(const char *listen_address,
  * the secure channel to host:port from local side.
  */
 
-void
-channel_request_remote_forwarding(u_short listen_port,
+int
+channel_request_remote_forwarding(const char *listen_host, u_short listen_port,
     const char *host_to_connect, u_short port_to_connect)
 {
 	int type, success = 0;
@@ -2286,9 +2350,29 @@ channel_request_remote_forwarding(u_short listen_port,
 	if (num_permitted_opens >= SSH_MAX_FORWARDS_PER_DIRECTION)
 		fatal("channel_request_remote_forwarding: too many forwards");
 
+	if (listen_host != NULL &&
+	    strlen(listen_host) > SSH_CHANNEL_PATH_LEN - 1) {
+		error("Binding address too long.");
+		return -1;
+	}
+
 	/* Send the forward request to the remote side. */
 	if (compat20) {
-		const char *address_to_bind = "0.0.0.0";
+		const char *address_to_bind;
+		if (listen_host == NULL) {
+			if (datafellows & SSH_BUG_RFWD_ADDR)
+				address_to_bind = "127.0.0.1";
+			else
+				address_to_bind = "localhost";
+		} else if (*listen_host == '\0' ||
+			   strcmp(listen_host, "*") == 0) {
+			if (datafellows & SSH_BUG_RFWD_ADDR)
+				address_to_bind = "0.0.0.0";
+			else
+				address_to_bind = "";
+		} else
+			address_to_bind = listen_host;
+
 		packet_start(SSH2_MSG_GLOBAL_REQUEST);
 		packet_put_cstring("tcpip-forward");
 		packet_put_char(1);			/* boolean: want reply */
@@ -2327,6 +2411,41 @@ channel_request_remote_forwarding(u_short listen_port,
 		permitted_opens[num_permitted_opens].listen_port = listen_port;
 		num_permitted_opens++;
 	}
+	return (success ? 0 : -1);
+}
+
+/*
+ * Request cancellation of remote forwarding of connection host:port from
+ * local side.
+ */
+void
+channel_request_rforward_cancel(const char *host, u_short port)
+{
+	int i;
+
+	if (!compat20)
+		return;
+
+	for (i = 0; i < num_permitted_opens; i++) {
+		if (permitted_opens[i].host_to_connect != NULL &&
+		    permitted_opens[i].listen_port == port)
+			break;
+	}
+	if (i >= num_permitted_opens) {
+		debug("%s: requested forward not found", __func__);
+		return;
+	}
+	packet_start(SSH2_MSG_GLOBAL_REQUEST);
+	packet_put_cstring("cancel-tcpip-forward");
+	packet_put_char(0);
+	packet_put_cstring(host == NULL ? "" : host);
+	packet_put_int(port);
+	packet_send();
+
+	permitted_opens[i].listen_port = 0;
+	permitted_opens[i].port_to_connect = 0;
+	xfree(permitted_opens[i].host_to_connect);
+	permitted_opens[i].host_to_connect = NULL;
 }
 
 /*
@@ -2356,7 +2475,8 @@ channel_input_port_forward_request(int is_root, int gateway_ports)
 				  port);
 #endif
 	/* Initiate forwarding */
-	channel_setup_local_fwd_listener(port, hostname, host_port, gateway_ports);
+	channel_setup_local_fwd_listener(NULL, port, hostname,
+	    host_port, gateway_ports);
 
 	/* Free the argument string. */
 	xfree(hostname);
@@ -2378,7 +2498,7 @@ void
 channel_add_permitted_opens(char *host, int port)
 {
 	if (num_permitted_opens >= SSH_MAX_FORWARDS_PER_DIRECTION)
-		fatal("channel_request_remote_forwarding: too many forwards");
+		fatal("channel_add_permitted_opens: too many forwards");
 	debug("allow port forwarding to host %s port %d", host, port);
 
 	permitted_opens[num_permitted_opens].host_to_connect = xstrdup(host);
@@ -2396,7 +2516,6 @@ channel_clear_permitted_opens(void)
 	for (i = 0; i < num_permitted_opens; i++)
 		xfree(permitted_opens[i].host_to_connect);
 	num_permitted_opens = 0;
-
 }
 
 

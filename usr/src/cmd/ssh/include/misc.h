@@ -32,6 +32,7 @@ void	 unset_nonblock(int);
 void	 set_nodelay(int);
 int	 a2port(const char *);
 char	*cleanhostname(char *);
+char	*hpdelim(char **);
 char	*colon(char *);
 long	 convtime(const char *);
 char	*tohex(const void *, size_t);

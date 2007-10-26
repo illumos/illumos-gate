@@ -9,7 +9,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -896,8 +896,17 @@ parse_flag:
 		goto parse_flag;
 
 	case sGatewayPorts:
-		intptr = &options->gateway_ports;
-		goto parse_flag;
+		arg = strdelim(&cp);
+		if (get_yes_no_flag(&options->gateway_ports, arg, filename,
+		    linenum, 1) == 1)
+			break;
+
+		if (strcmp(arg, "clientspecified") == 0)
+			options->gateway_ports = 2;
+		else
+			fatal("%.200s line %d: Bad yes/no/clientspecified "
+			    "argument.", filename, linenum);
+		break;
 
 	case sVerifyReverseMapping:
 		intptr = &options->verify_reverse_mapping;

@@ -38,9 +38,10 @@ extern "C" {
 /* Data structure for representing a forwarding request. */
 
 typedef struct {
-	u_short	  port;		/* Port to forward. */
-	char	 *host;		/* Host to connect. */
-	u_short	  host_port;	/* Port to connect on host. */
+	char	 *listen_host;		/* Host (address) to listen on. */
+	u_short	  listen_port;		/* Port to forward. */
+	char	 *connect_host;		/* Host to connect. */
+	u_short	  connect_port;		/* Port to connect on connect_host. */
 }       Forward;
 /* Data structure for representing option data. */
 
@@ -160,14 +161,15 @@ typedef struct {
 void     initialize_options(Options *);
 void     fill_default_options(Options *);
 int	 read_config_file(const char *, const char *, Options *);
+int	 parse_forward(int, Forward *, const char *);
 
 int
 process_config_line(Options *, const char *, char *, const char *, int, int *);
 
-void	 add_local_forward(Options *, u_short, const char *, u_short);
-void	 add_remote_forward(Options *, u_short, const char *, u_short);
+void	 add_local_forward(Options *, const Forward *);
+void	 add_remote_forward(Options *, const Forward *);
 
-void	 process_unknown_options(Options *options);
+void	 process_unknown_options(Options *);
 
 #ifdef __cplusplus
 }

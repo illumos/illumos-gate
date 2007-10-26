@@ -111,7 +111,7 @@ extern char *host;
 static volatile sig_atomic_t received_window_change_signal = 0;
 static volatile sig_atomic_t received_signal = 0;
 
-/* Flag indicating whether the user\'s terminal is in non-blocking mode. */
+/* Flag indicating whether the user's terminal is in non-blocking mode. */
 static int in_non_blocking_mode = 0;
 
 /* Common data for the client loop code. */
@@ -630,60 +630,96 @@ process_cmdline(void)
 {
 	void (*handler)(int);
 	char *s, *cmd;
-	u_short fwd_port, fwd_host_port;
-	char buf[1024], sfwd_port[6], sfwd_host_port[6];
+	int delete = 0;
 	int local = 0;
+	Forward fwd;
+
+	memset(&fwd, 0, sizeof(fwd));
 
 	leave_raw_mode();
 	handler = signal(SIGINT, SIG_IGN);
 	cmd = s = read_passphrase("\r\nssh> ", RP_ECHO);
 	if (s == NULL)
 		goto out;
-	while (*s && isspace(*s))
+	while (isspace(*s))
 		s++;
-	if (*s == 0)
+	if (*s == '-')
+		s++;	/* Skip cmdline '-', if any */
+	if (*s == '\0')
 		goto out;
-	if (strlen(s) < 2 || s[0] != '-' || !(s[1] == 'L' || s[1] == 'R')) {
+
+	if (*s == 'h' || *s == 'H' || *s == '?') {
+		log("Commands:");
+		log("      -L[bind_address:]port:host:hostport    "
+		    "Request local forward");
+		log("      -R[bind_address:]port:host:hostport    "
+		    "Request remote forward");
+		log("      -KR[bind_address:]port                 "
+		    "Cancel remote forward");
+		goto out;
+	}
+
+	if (*s == 'K') {
+		delete = 1;
+		s++;
+	}
+	if (*s != 'L' && *s != 'R') {
 		log("Invalid command.");
 		goto out;
 	}
-	if (s[1] == 'L')
+	if (*s == 'L')
 		local = 1;
-	if (!local && !compat20) {
+	if (local && delete) {
+		log("Not supported.");
+		goto out;
+	}
+	if ((!local || delete) && !compat20) {
 		log("Not supported for SSH protocol version 1.");
 		goto out;
 	}
-	s += 2;
-	while (*s && isspace(*s))
-		s++;
 
-	if (sscanf(s, "%5[0-9]:%255[^:]:%5[0-9]",
-	    sfwd_port, buf, sfwd_host_port) != 3 &&
-	    sscanf(s, "%5[0-9]/%255[^/]/%5[0-9]",
-	    sfwd_port, buf, sfwd_host_port) != 3) {
-		log("Bad forwarding specification.");
-		goto out;
-	}
-	if ((fwd_port = a2port(sfwd_port)) == 0 ||
-	    (fwd_host_port = a2port(sfwd_host_port)) == 0) {
-		log("Bad forwarding port(s).");
-		goto out;
-	}
-	if (local) {
-		if (channel_setup_local_fwd_listener(fwd_port, buf,
-		    fwd_host_port, options.gateway_ports) < 0) {
-			log("Port forwarding failed.");
+	while (isspace(*++s))
+		;
+
+	if (delete) {
+		if (parse_forward(0, &fwd, s) == 0) {
+			log("Bad forwarding close port");
 			goto out;
 		}
-	} else
-		channel_request_remote_forwarding(fwd_port, buf,
-		    fwd_host_port);
-	log("Forwarding port.");
+		channel_request_rforward_cancel(fwd.listen_host, fwd.listen_port);
+	} else {
+		if (parse_forward(1, &fwd, s) == 0) {
+			log("Bad forwarding specification.");
+			goto out;
+		}
+		if (local) {
+			if (channel_setup_local_fwd_listener(fwd.listen_host,
+			    fwd.listen_port, fwd.connect_host,
+			    fwd.connect_port, options.gateway_ports) < 0) {
+				log("Port forwarding failed.");
+				goto out;
+			}
+		} else {
+			if (channel_request_remote_forwarding(fwd.listen_host,
+			    fwd.listen_port, fwd.connect_host,
+			    fwd.connect_port) < 0) {
+				log("Port forwarding failed.");
+				goto out;
+			}
+		}
+
+		log("Forwarding port.");
+	}
+
 out:
 	signal(SIGINT, handler);
 	enter_raw_mode();
-	if (cmd)
+	if (cmd != NULL)
 		xfree(cmd);
+	if (fwd.listen_host != NULL)
+		xfree(fwd.listen_host);
+	if (fwd.connect_host != NULL)
+		xfree(fwd.connect_host);
 }
 
 /* process the characters one by one */

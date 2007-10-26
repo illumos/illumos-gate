@@ -34,7 +34,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1179,8 +1179,19 @@ server_input_global_request(int type, u_int32_t seq, void *ctxt)
 			    listen_address, listen_port, options.gateway_ports);
 		}
 		xfree(listen_address);
-	}
+	} else if (strcmp(rtype, "cancel-tcpip-forward") == 0) {
+		char *cancel_address;
+		u_short cancel_port;
 
+		cancel_address = packet_get_string(NULL);
+		cancel_port = (u_short)packet_get_int();
+		debug("%s: cancel-tcpip-forward addr %s port %d", __func__,
+		    cancel_address, cancel_port);
+
+		success = channel_cancel_rport_listener(cancel_address,
+		    cancel_port);
+		xfree(cancel_address);
+	}
 	if (want_reply) {
 		packet_start(success ?
 		    SSH2_MSG_REQUEST_SUCCESS : SSH2_MSG_REQUEST_FAILURE);
@@ -1189,6 +1200,7 @@ server_input_global_request(int type, u_int32_t seq, void *ctxt)
 	}
 	xfree(rtype);
 }
+
 static void
 server_input_channel_req(int type, u_int32_t seq, void *ctxt)
 {

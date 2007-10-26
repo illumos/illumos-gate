@@ -1,15 +1,3 @@
-/*	$OpenBSD: compat.h,v 1.33 2002/09/27 10:42:09 mickey Exp $	*/
-
-#ifndef	_COMPAT_H
-#define	_COMPAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Copyright (c) 1999, 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -38,6 +26,18 @@ extern "C" {
  * Use is subject to license terms.
  */
 
+#ifndef	_COMPAT_H
+#define	_COMPAT_H
+
+/*	$OpenBSD: compat.h,v 1.33 2002/09/27 10:42:09 mickey Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #define	SSH_PROTO_UNKNOWN 	0x00
 #define	SSH_PROTO_1		0x01
 #define	SSH_PROTO_1_PREFERRED	0x02
@@ -62,6 +62,7 @@ extern "C" {
 #define SSH_BUG_HBSERVICE	0x00010000
 #define SSH_BUG_OPENFAILURE	0x00020000
 #define SSH_BUG_DERIVEKEY	0x00040000
+/*#define this is free slot	0x00080000 */
 #define SSH_BUG_DUMMYCHAN	0x00100000
 #define SSH_BUG_EXTEOF		0x00200000
 #define SSH_BUG_K5USER		0x00400000
@@ -70,8 +71,10 @@ extern "C" {
 #define SSH_OLD_GSSAPI		0x02000000
 #define SSH_BUG_GSSAPI_BER	0x04000000
 #define SSH_BUG_FIRSTKEX	0x08000000
-
+#define SSH_BUG_RFWD_ADDR	0x10000000
 #define SSH_BUG_GSSKEX_HOSTKEY	0x20000000
+/* SSH_OLD_FORWARD_ADDR flag bumped up the SunSSH version to 1.2 */
+#define SSH_OLD_FORWARD_ADDR	0x40000000
 
 void     enable_compat13(void);
 void     enable_compat20(void);
