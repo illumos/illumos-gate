@@ -308,7 +308,12 @@ dls_close(dls_channel_t dc)
 	dip->di_dvp = NULL;
 	dip->di_txinfo = NULL;
 
-	ASSERT(dip->di_soft_ring_list == NULL);
+	if (dip->di_soft_ring_list != NULL) {
+		soft_ring_set_destroy(dip->di_soft_ring_list,
+		    dip->di_soft_ring_size);
+		dip->di_soft_ring_list = NULL;
+	}
+	dip->di_soft_ring_size = 0;
 
 	kmem_cache_free(i_dls_impl_cachep, dip);
 

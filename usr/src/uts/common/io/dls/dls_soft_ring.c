@@ -69,7 +69,7 @@
 static void soft_ring_fire(void *);
 static void soft_ring_drain(soft_ring_t *, clock_t);
 static void soft_ring_worker(soft_ring_t *);
-static void soft_ring_set_destroy(soft_ring_t **, int);
+static void soft_ring_stop_workers(soft_ring_t **, int);
 static void dls_taskq_stop_soft_ring(void *);
 
 typedef struct soft_ring_taskq {
@@ -198,6 +198,7 @@ soft_ring_set_create(char *name, processorid_t bind, clock_t wait,
 				break;
 		}
 		if (i != ring_size) {
+			soft_ring_stop_workers(ringp_list, ring_size);
 			soft_ring_set_destroy(ringp_list, ring_size);
 			ringp_list = NULL;
 		}
@@ -205,11 +206,10 @@ soft_ring_set_create(char *name, processorid_t bind, clock_t wait,
 	return (ringp_list);
 }
 
-void
-soft_ring_set_destroy(soft_ring_t **ringp_set, int ring_size)
+static void
+soft_ring_stop_workers(soft_ring_t **ringp_set, int ring_size)
 {
 	int 		i;
-	mblk_t		*mp;
 	soft_ring_t	*ringp;
 	timeout_id_t 	tid;
 	kt_did_t	t_did = 0;
@@ -245,6 +245,18 @@ soft_ring_set_destroy(soft_ring_t **ringp_set, int ring_size)
 		 */
 		if (t_did)
 			thread_join(t_did);
+	}
+}
+
+void
+soft_ring_set_destroy(soft_ring_t **ringp_set, int ring_size)
+{
+	int		i;
+	mblk_t		*mp;
+	soft_ring_t	*ringp;
+
+	for (i = 0; (i < ring_size) && (ringp_set[i] != NULL); i++) {
+		ringp = ringp_set[i];
 
 		mutex_enter(&ringp->s_ring_lock);
 
@@ -560,7 +572,7 @@ dls_soft_ring_disable(dls_channel_t dc)
 	rw_exit(&(dip->di_lock));
 
 	if (ringp_list != NULL)
-		soft_ring_set_destroy(ringp_list, ring_size);
+		soft_ring_stop_workers(ringp_list, ring_size);
 }
 
 static void
@@ -575,6 +587,7 @@ dls_taskq_stop_soft_ring(void *arg)
 	ring_size = ring_taskq->ring_size;
 	kmem_free(ring_taskq, sizeof (soft_ring_taskq_t));
 
+	soft_ring_stop_workers(ringp_list, ring_size);
 	soft_ring_set_destroy(ringp_list, ring_size);
 }
 
@@ -596,14 +609,14 @@ dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 	if (dip->di_soft_ring_list != NULL) {
 		/*
 		 * Both ds_lock and di_lock are held as writer.
-		 * As soft_ring_set_destroy() blocks for the
+		 * As soft_ring_stop_workers() blocks for the
 		 * worker thread(s) to complete, there is a possibility
 		 * that the worker thread(s) could be in the process
 		 * of draining the queue and is blocked waiting for
 		 * either ds_lock or di_lock. Moreover the NIC interrupt
 		 * thread could be blocked in dls_accept().
 		 * To avoid deadlock condition, taskq thread would be
-		 * created to handle soft_ring_set_destroy() and
+		 * created to handle soft_ring_stop_workers() and
 		 * blocking if required which would avoid holding
 		 * both ds_lock and di_lock.
 		 * NOTE: we cannot drop either locks here, due to
