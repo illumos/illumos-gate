@@ -419,6 +419,7 @@ extern "C" {
 #define	getopt_long		_getopt_long
 #define	getopt_long_only	_getopt_long_only
 #define	getpagesizes		_getpagesizes
+#define	getpagesizes2		_getpagesizes2
 #define	getpass			_getpass
 #define	getpassphrase		_getpassphrase
 #define	getpeerucred		_getpeerucred

@@ -2350,7 +2350,7 @@ trapstat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	tstat_devi = devi;
 
 	tstat_pgszs = page_num_pagesizes();
-	tstat_user_pgszs = page_num_user_pagesizes();
+	tstat_user_pgszs = page_num_user_pagesizes(0);
 	tstat_data_t_size = sizeof (tstat_data_t) +
 	    (tstat_pgszs - 1) * sizeof (tstat_pgszdata_t);
 	tstat_data_t_exported_size = sizeof (tstat_data_t) +

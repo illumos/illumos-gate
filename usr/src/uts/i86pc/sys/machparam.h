@@ -77,7 +77,7 @@ extern "C" {
  */
 
 /* supported page sizes */
-#define	MMU_PAGE_SIZES	2
+#define	MMU_PAGE_SIZES	3
 
 /*
  * MMU_PAGES* describes the physical page size used by the mapping hardware.

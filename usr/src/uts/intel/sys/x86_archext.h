@@ -147,7 +147,7 @@ extern "C" {
 #define	CPUID_AMD_EDX_MMX	0x00800000	/* MMX instructions */
 #define	CPUID_AMD_EDX_FXSR	0x01000000	/* fxsave and fxrstor */
 #define	CPUID_AMD_EDX_FFXSR	0x02000000	/* fast fxsave/fxrstor */
-				/* 0x04000000 - reserved */
+#define	CPUID_AMD_EDX_1GPG	0x04000000	/* 1GB page */
 #define	CPUID_AMD_EDX_TSCP	0x08000000	/* rdtscp instruction */
 				/* 0x10000000 - reserved */
 #define	CPUID_AMD_EDX_LM	0x20000000	/* AMD: long mode */
@@ -329,6 +329,7 @@ extern "C" {
 #define	X86_SSSE3	0x02000000
 #define	X86_SSE4_1	0x04000000
 #define	X86_SSE4_2	0x08000000
+#define	X86_1GPG	0x10000000
 
 /*
  * flags to patch tsc_read routine.

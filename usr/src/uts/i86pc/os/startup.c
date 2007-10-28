@@ -1823,6 +1823,8 @@ startup_vm(void)
 	/*
 	 * disable automatic large pages for small memory systems or
 	 * when the disable flag is set.
+	 *
+	 * Do not yet consider page sizes larger than 2m/4m.
 	 */
 	if (!auto_lpg_disable && mmu.max_page_level > 0) {
 		max_uheap_lpsize = LEVEL_SIZE(1);
@@ -1837,9 +1839,7 @@ startup_vm(void)
 		use_brk_lpg = 0;
 		use_stk_lpg = 0;
 	}
-	if (mmu.max_page_level > 0) {
-		mcntl0_lpsize = LEVEL_SIZE(1);
-	}
+	mcntl0_lpsize = LEVEL_SIZE(mmu.umax_page_level);
 
 	PRM_POINT("Calling hat_init_finish()...");
 	hat_init_finish();

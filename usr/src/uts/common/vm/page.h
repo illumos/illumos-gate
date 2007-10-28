@@ -834,7 +834,7 @@ extern uint_t		colorequiv;
 extern uchar_t		colorequivszc[];
 
 uint_t	page_num_pagesizes(void);
-uint_t	page_num_user_pagesizes(void);
+uint_t	page_num_user_pagesizes(int);
 size_t	page_get_pagesize(uint_t);
 size_t	page_get_user_pagesize(uint_t n);
 pgcnt_t	page_get_pagecnt(uint_t);

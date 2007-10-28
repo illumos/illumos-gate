@@ -143,6 +143,12 @@ extern "C" {
 #endif
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
 
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma redefine_extname	getpagesizes	getpagesizes2
+#else
+#define	getpagesizes	getpagesizes2
+#endif
+
 /*
  * Except for old binaries mmap() will return the resultant
  * address of mapping on success and (caddr_t)-1 on error.
@@ -174,6 +180,7 @@ extern int memcntl(caddr_t, size_t, int, caddr_t, int, int);
 extern int madvise(caddr_t, size_t, int);
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int getpagesizes(size_t *, int);
+extern int getpagesizes2(size_t *, int);
 /* guard visibility of uint64_t */
 #if defined(_INT64_TYPE)
 extern int meminfo(const uint64_t *, int, const uint_t *, int, uint64_t *,
@@ -205,6 +212,7 @@ extern int memcntl();
 extern int msync();
 extern int madvise();
 extern int getpagesizes();
+extern int getpagesizes2();
 extern int mlock();
 extern int mlockall();
 extern int munlock();

@@ -323,6 +323,12 @@ extern void	chk_lpg(page_t *, uchar_t);
  */
 extern uint_t mmu_page_sizes;
 extern uint_t mmu_exported_page_sizes;
+/*
+ * page sizes that legacy applications can see via getpagesizes(3c).
+ * Used to prevent legacy applications from inadvertantly using the
+ * 'new' large pagesizes (1g and above).
+ */
+extern uint_t mmu_legacy_page_sizes;
 
 /* For x86, userszc is the same as the kernel's szc */
 #define	USERSZC_2_SZC(userszc)	(userszc)

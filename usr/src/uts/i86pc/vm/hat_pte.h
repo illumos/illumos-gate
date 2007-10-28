@@ -139,7 +139,7 @@ extern "C" {
  *		...
  */
 #define	MAX_NUM_LEVEL		4
-#define	MAX_PAGE_LEVEL		1			/* for now.. sigh */
+#define	MAX_PAGE_LEVEL		2
 typedef	int8_t level_t;
 #define	LEVEL_SHIFT(l)	(mmu.level_shift[l])
 #define	LEVEL_SIZE(l)	(mmu.level_size[l])
@@ -173,6 +173,7 @@ struct hat_mmu_info {
 	uint_t num_level;	/* number of page table levels in use */
 	uint_t max_level;	/* just num_level - 1 */
 	uint_t max_page_level;	/* maximum level at which we can map a page */
+	uint_t umax_page_level; /* max user page map level */
 	uint_t ptes_per_table;	/* # of entries in lower level page tables */
 	uint_t top_level_count;	/* # of entries in top most level page table */
 

@@ -167,7 +167,7 @@ kbm_map(uintptr_t va, paddr_t pa, uint_t level, uint_t is_kernel)
 		panic("kbm_map() called too late");
 
 	pteval = pa_to_ma(pa) | PT_NOCONSIST | PT_VALID | PT_WRITABLE;
-	if (level == 1)
+	if (level >= 1)
 		pteval |= PT_PAGESIZE;
 	if (kbm_pge_support && is_kernel)
 		pteval |= PT_GLOBAL;

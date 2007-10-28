@@ -231,7 +231,6 @@ COMSYSOBJS=			\
 	gethrtime.o		\
 	getitimer.o		\
 	getmsg.o		\
-	getpagesizes.o		\
 	getpid.o		\
 	getpmsg.o		\
 	getppid.o		\
@@ -838,6 +837,7 @@ PORTSYS=			\
 	fsmisc.o		\
 	fstatat.o		\
 	fsync.o			\
+	getpagesizes.o		\
 	getpeerucred.o		\
 	inst_sync.o		\
 	issetugid.o		\

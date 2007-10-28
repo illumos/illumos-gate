@@ -419,10 +419,18 @@ page_szc_user_filtered(size_t pagesize)
  * Return how many page sizes are available for the user to use.  This is
  * what the hardware supports and not based upon how the OS implements the
  * support of different page sizes.
+ *
+ * If legacy is non-zero, return the number of pagesizes available to legacy
+ * applications. The number of legacy page sizes might be less than the
+ * exported user page sizes. This is to prevent legacy applications that
+ * use the largest page size returned from getpagesizes(3c) from inadvertantly
+ * using the 'new' large pagesizes.
  */
 uint_t
-page_num_user_pagesizes(void)
+page_num_user_pagesizes(int legacy)
 {
+	if (legacy)
+		return (mmu_legacy_page_sizes);
 	return (mmu_exported_page_sizes);
 }
 
@@ -3311,7 +3319,6 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
  * 'pfnflag' specifies the subset of the pfn range to search.
  */
 
-
 static page_t *
 page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
     pfn_t pfnlo, pfn_t pfnhi, pgcnt_t pfnflag)
@@ -3330,7 +3337,9 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 
 	ASSERT(szc != 0 || (flags & PGI_PGCPSZC0));
 
-	if ((pfnhi - pfnlo) + 1 < szcpgcnt)
+	pfnlo = P2ROUNDUP(pfnlo, szcpgcnt);
+
+	if ((pfnhi - pfnlo) + 1 < szcpgcnt || pfnlo >= pfnhi)
 		return (NULL);
 
 	ASSERT(szc < mmu_page_sizes);
@@ -3368,15 +3377,16 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		pgcnt_t	szcpages;
 		int	slotlen;
 
-		pfnlo = P2ROUNDUP(pfnlo, szcpgcnt);
-		pfnhi = pfnhi & ~(szcpgcnt - 1);
-
+		pfnhi = P2ALIGN((pfnhi + 1), szcpgcnt) - 1;
 		szcpages = ((pfnhi - pfnlo) + 1) / szcpgcnt;
 		slotlen = howmany(szcpages, slots);
+		/* skip if 'slotid' slot is empty */
+		if (slotid * slotlen >= szcpages)
+			return (NULL);
 		pfnlo = pfnlo + (((slotid * slotlen) % szcpages) * szcpgcnt);
 		ASSERT(pfnlo < pfnhi);
 		if (pfnhi > pfnlo + (slotlen * szcpgcnt))
-			pfnhi = pfnlo + (slotlen * szcpgcnt);
+			pfnhi = pfnlo + (slotlen * szcpgcnt) - 1;
 	}
 
 	memsegs_lock(0);
@@ -3406,8 +3416,9 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 
 		/* round to szcpgcnt boundaries */
 		lo = P2ROUNDUP(lo, szcpgcnt);
+
 		MEM_NODE_ITERATOR_INIT(lo, mnode, &it);
-		hi = hi & ~(szcpgcnt - 1);
+		hi = P2ALIGN((hi + 1), szcpgcnt) - 1;
 
 		if (hi <= lo)
 			continue;
@@ -3449,7 +3460,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		ASSERT(randpp->p_pagenum == randpfn);
 
 		pp = randpp;
-		endpp =  mseg->pages + (hi - mseg->pages_base);
+		endpp =  mseg->pages + (hi - mseg->pages_base) + 1;
 
 		ASSERT(randpp + szcpgcnt <= endpp);
 

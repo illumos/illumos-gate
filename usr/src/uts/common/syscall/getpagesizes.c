@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +34,9 @@
  * Return supported page sizes.
  */
 int
-getpagesizes(size_t *buf, int nelem)
+getpagesizes(int legacy, size_t *buf, int nelem)
 {
-	int i, pagesizes = page_num_user_pagesizes();
+	int i, pagesizes = page_num_user_pagesizes(legacy);
 	size_t *pgsza;
 
 	if (nelem < 0) {
@@ -74,9 +73,9 @@ getpagesizes(size_t *buf, int nelem)
  * a 32-bit address space.
  */
 int
-getpagesizes32(size32_t *buf, int nelem)
+getpagesizes32(int legacy, size32_t *buf, int nelem)
 {
-	int i, pagesizes = page_num_user_pagesizes();
+	int i, pagesizes = page_num_user_pagesizes(legacy);
 	size32_t *pgsza32;
 	size_t pgsz;
 	int rc;
@@ -116,7 +115,8 @@ getpagesizes32(size32_t *buf, int nelem)
 	}
 	rc = nelem;
 done:
-	kmem_free(pgsza32, sizeof (*pgsza32) * page_num_user_pagesizes());
+	kmem_free(pgsza32, sizeof (*pgsza32) *
+	    page_num_user_pagesizes(legacy));
 	return (rc);
 }
 #endif

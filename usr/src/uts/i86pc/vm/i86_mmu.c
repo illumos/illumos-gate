@@ -337,11 +337,13 @@ hat_kern_alloc(
 			paddr = pmem->address;
 			psize = pmem->size;
 			while (psize >= MMU_PAGESIZE) {
-				if ((paddr & LEVEL_OFFSET(lpagel)) == 0 &&
-				    psize > LEVEL_SIZE(lpagel))
-					l = lpagel;
-				else
-					l = 0;
+				/* find the largest page size */
+				for (l = lpagel; l > 0; l--) {
+					if ((paddr & LEVEL_OFFSET(l)) == 0 &&
+					    psize > LEVEL_SIZE(l))
+						break;
+				}
+
 #if defined(__xpv)
 				/*
 				 * Create read/only mappings to avoid
@@ -410,10 +412,12 @@ hat_kern_alloc(
 		 * increment table_cnt. We can stop at the 1st level where
 		 * they are in the same htable.
 		 */
-		if (size == MMU_PAGESIZE)
-			start_level = 0;
-		else
-			start_level = 1;
+		start_level = 0;
+		while (start_level <= mmu.max_page_level) {
+			if (size == LEVEL_SIZE(start_level))
+				break;
+			start_level++;
+		}
 
 		for (l = start_level; l < mmu.max_level; ++l) {
 			if (va >> LEVEL_SHIFT(l + 1) ==
@@ -422,7 +426,8 @@ hat_kern_alloc(
 			++table_cnt;
 		}
 		last_va = va;
-		va = (va & LEVEL_MASK(1)) + LEVEL_SIZE(1);
+		l = (start_level == 0) ? 1 : start_level;
+		va = (va & LEVEL_MASK(l)) + LEVEL_SIZE(l);
 	}
 
 	/*

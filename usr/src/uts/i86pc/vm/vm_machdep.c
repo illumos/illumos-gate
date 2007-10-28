@@ -283,6 +283,9 @@ uint_t mmu_page_sizes;
 /* How many page sizes the users can see */
 uint_t mmu_exported_page_sizes;
 
+/* page sizes that legacy applications can see */
+uint_t mmu_legacy_page_sizes;
+
 /*
  * Number of pages in 1 GB.  Don't enable automatic large pages if we have
  * fewer than this many pages.
@@ -383,7 +386,7 @@ map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int memcntl)
 		/*
 		 * use the pages size that best fits len
 		 */
-		for (l = mmu.max_page_level; l > 0; --l) {
+		for (l = mmu.umax_page_level; l > 0; --l) {
 			if (LEVEL_SIZE(l) > max_lpsize || len < LEVEL_SIZE(l)) {
 				continue;
 			} else {
@@ -399,13 +402,12 @@ map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len, int memcntl)
 		}
 		return (pgsz);
 
-	/*
-	 * for ISM use the 1st large page size.
-	 */
 	case MAPPGSZ_ISM:
-		if (mmu.max_page_level == 0)
-			return (MMU_PAGESIZE);
-		return (LEVEL_SIZE(1));
+		for (l = mmu.umax_page_level; l > 0; --l) {
+			if (len >= LEVEL_SIZE(l))
+				return (LEVEL_SIZE(l));
+		}
+		return (LEVEL_SIZE(0));
 	}
 	return (pgsz);
 }
@@ -425,7 +427,7 @@ map_szcvec(caddr_t addr, size_t size, uintptr_t off, size_t max_lpsize,
 		return (0);
 	}
 
-	for (i = mmu_page_sizes - 1; i > 0; i--) {
+	for (i = mmu_exported_page_sizes - 1; i > 0; i--) {
 		pgsz = page_get_pagesize(i);
 		if (pgsz > max_lpsize) {
 			continue;
@@ -719,7 +721,7 @@ map_addr_proc(
 		 */
 		align_amount = ELF_386_MAXPGSZ;
 	} else {
-		int l = mmu.max_page_level;
+		int l = mmu.umax_page_level;
 
 		while (l && len < LEVEL_SIZE(l))
 			--l;
@@ -1481,6 +1483,8 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 #endif /* !__xpv */
 	memranges += i;
 	nranges -= i;
+
+	ASSERT(mmu_page_sizes <= MMU_PAGE_SIZES);
 
 	ASSERT(ISP2(l2_sz));
 	ASSERT(ISP2(l2_linesz));

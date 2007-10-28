@@ -195,6 +195,11 @@ extern "C" {
 	 * 	wracct(...) :: exacct(2, ...)
 	 */
 #define	SYS_getpagesizes	73
+	/*
+	 * subcodes:
+	 *	getpagesizes2(...)	:: getpagesizes(0, ...)
+	 * 	getpagesizes(...)	:: getpagesizes(1, ...) legacy
+	 */
 #define	SYS_rctlsys	74
 	/*
 	 * subcodes:

@@ -789,6 +789,7 @@ extern uint_t mmu_exported_page_sizes;
 extern uint_t szc_2_userszc[];
 extern uint_t userszc_2_szc[];
 
+#define	mmu_legacy_page_sizes	mmu_exported_page_sizes
 #define	USERSZC_2_SZC(userszc)	(userszc_2_szc[userszc])
 #define	SZC_2_USERSZC(szc)	(szc_2_userszc[szc])
 

@@ -1025,6 +1025,12 @@ cpuid_pass1(cpu_t *cpu)
 			if (cp->cp_edx & CPUID_AMD_EDX_NX)
 				feature |= X86_NX;
 
+#if defined(__amd64)
+			/* 1 GB large page - enable only for 64 bit kernel */
+			if (cp->cp_edx & CPUID_AMD_EDX_1GPG)
+				feature |= X86_1GPG;
+#endif
+
 			if ((cpi->cpi_vendor == X86_VENDOR_AMD) &&
 			    (cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_FXSR) &&
 			    (cp->cp_ecx & CPUID_AMD_ECX_SSE4A))

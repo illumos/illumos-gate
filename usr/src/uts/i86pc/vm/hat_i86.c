@@ -130,6 +130,14 @@ static int num_kernel_ranges;
 uint_t use_boot_reserve = 1;	/* cleared after early boot process */
 uint_t can_steal_post_boot = 0;	/* set late in boot to enable stealing */
 
+/* export 1g page size to user applications if set */
+int	enable_1gpg;
+
+#ifdef DEBUG
+uint_t	map1gcnt;
+#endif
+
+
 /*
  * A cpuset for all cpus. This is used for kernel address cross calls, since
  * the kernel addresses apply to all cpus.
@@ -525,12 +533,25 @@ mmu_init(void)
 	 * Initialize parameters based on the 64 or 32 bit kernels and
 	 * for the 32 bit kernel decide if we should use PAE.
 	 */
-	if (kbm_largepage_support)
-		mmu.max_page_level = 1;
-	else
+	if (kbm_largepage_support) {
+		if (x86_feature & X86_1GPG) {
+			mmu.max_page_level = 2;
+			mmu.umax_page_level = (enable_1gpg) ? 2 : 1;
+		} else {
+			mmu.max_page_level = 1;
+			mmu.umax_page_level = 1;
+		}
+	} else {
 		mmu.max_page_level = 0;
+		mmu.umax_page_level = 0;
+	}
 	mmu_page_sizes = mmu.max_page_level + 1;
-	mmu_exported_page_sizes = mmu_page_sizes;
+	mmu_exported_page_sizes = mmu.umax_page_level + 1;
+
+	/* restrict legacy applications from using pagesizes 1g and above */
+	mmu_legacy_page_sizes =
+	    (mmu_exported_page_sizes > 2) ? 2 : mmu_exported_page_sizes;
+
 
 #if defined(__amd64)
 
@@ -1296,6 +1317,13 @@ hati_pte_map(
 		} else {
 			ASSERT(flags & HAT_LOAD_NOCONSIST);
 		}
+#if defined(__amd64)
+		if (ht->ht_flags & HTABLE_VLP) {
+			cpu_t *cpu = CPU;
+			x86pte_t *vlpptep = cpu->cpu_hat_info->hci_vlp_l2ptes;
+			VLP_COPY(hat->hat_vlp_ptes, vlpptep);
+		}
+#endif
 		HTABLE_INC(ht->ht_valid_cnt);
 		PGCNT_INC(hat, l);
 		return (rv);
@@ -1616,8 +1644,13 @@ hat_memload_array(
 					ASSERT(pages[pgindx] + i ==
 					    pages[pgindx + i]);
 				}
-				if (i == mmu_btop(pgsize))
+				if (i == mmu_btop(pgsize)) {
+#ifdef DEBUG
+					if (level == 2)
+						map1gcnt++;
+#endif
 					break;
+				}
 			}
 		}
 
@@ -1720,8 +1753,13 @@ hat_devload(
 				break;
 			if (IS_P2ALIGNED(va, pgsize) &&
 			    (eva - va) >= pgsize &&
-			    IS_P2ALIGNED(pfn, mmu_btop(pgsize)))
+			    IS_P2ALIGNED(pfn, mmu_btop(pgsize))) {
+#ifdef DEBUG
+				if (level == 2)
+					map1gcnt++;
+#endif
 				break;
+			}
 		}
 
 		/*

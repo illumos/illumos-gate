@@ -520,7 +520,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 70 */ SYSENT_CI("tasksys",		tasksys,	5),
 	/* 71 */ SYSENT_LOADABLE(),		/* acctctl */
 	/* 72 */ SYSENT_LOADABLE(),		/* exacct */
-	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes,	2),
+	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes,	3),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
 	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
 	/* 76 */ IF_LP64(
@@ -921,7 +921,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 70 */ SYSENT_CI("tasksys",		tasksys,	5),
 	/* 71 */ SYSENT_LOADABLE32(),		/* acctctl */
 	/* 72 */ SYSENT_LOADABLE32(),		/* exacct */
-	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes32,	2),
+	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes32,	3),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
 	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
 	/* 76 */ SYSENT_CI("fsat",		fsat32,		6),

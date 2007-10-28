@@ -1655,7 +1655,7 @@ htable_walk(
 	 * Find the level of the largest pagesize used by this HAT.
 	 */
 	if (hat->hat_ism_pgcnt > 0) {
-		max_mapped_level = mmu.max_page_level;
+		max_mapped_level = mmu.umax_page_level;
 	} else {
 		max_mapped_level = 0;
 		for (l = 1; l <= mmu.max_page_level; ++l)
@@ -2175,7 +2175,7 @@ x86pte_inval(
 	x86pte_t	found;
 
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	ASSERT(ht->ht_level != VLP_LEVEL);
+	ASSERT(ht->ht_level <= mmu.max_page_level);
 
 	if (pte_ptr != NULL)
 		ptep = pte_ptr;
@@ -2241,7 +2241,7 @@ x86pte_update(
 
 	ASSERT(new != 0);
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
-	ASSERT(ht->ht_level != VLP_LEVEL);
+	ASSERT(ht->ht_level <= mmu.max_page_level);
 
 	ptep = x86pte_access_pagetable(ht, entry);
 	XPV_ALLOW_PAGETABLE_UPDATES();

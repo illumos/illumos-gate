@@ -206,6 +206,8 @@ static char *outfile = NULL;
 static char *tmpname = NULL;
 static int dynsym;
 int debug_level = DEBUG_LEVEL;
+static size_t maxpgsize = 0x400000;
+
 
 void
 usage(void)
@@ -228,7 +230,7 @@ static void
 bigheap(void)
 {
 	size_t big, *size;
-	int sizes, i;
+	int sizes;
 	struct memcntl_mha mha;
 
 	/*
@@ -237,12 +239,16 @@ bigheap(void)
 	if ((sizes = getpagesizes(NULL, 0)) == -1)
 		return;
 
-	if ((size = alloca(sizeof (size_t) * sizes)) == NULL)
+	if (sizes == 1 || (size = alloca(sizeof (size_t) * sizes)) == NULL)
 		return;
 
-	if (getpagesizes(size, sizes) == -1 || sizes == 1)
+	if (getpagesizes(size, sizes) == -1)
 		return;
 
+	while (size[sizes - 1] > maxpgsize)
+		sizes--;
+
+	/* set big to the largest allowed page size */
 	big = size[sizes - 1];
 	if (big & (big - 1)) {
 		/*
@@ -259,21 +265,13 @@ bigheap(void)
 		return;
 
 	/*
-	 * Finally, set our heap to use the largest page size for which the
-	 * MC_HAT_ADVISE doesn't return EAGAIN.
+	 * set the preferred page size for the heap
 	 */
 	mha.mha_cmd = MHA_MAPSIZE_BSSBRK;
 	mha.mha_flags = 0;
+	mha.mha_pagesize = big;
 
-	for (i = sizes - 1; i >= 0; i--) {
-		mha.mha_pagesize = size[i];
-
-		if (memcntl(NULL, 0, MC_HAT_ADVISE, (caddr_t)&mha, 0, 0) != -1)
-			break;
-
-		if (errno != EAGAIN)
-			break;
-	}
+	(void) memcntl(NULL, 0, MC_HAT_ADVISE, (caddr_t)&mha, 0, 0);
 }
 
 static void
