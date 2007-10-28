@@ -403,8 +403,8 @@ static void
 srv_secinfo_remove(secinfo_t **pcursec, int *pcurcnt, secinfo_t *remsec,
     int remcnt)
 {
-	int ccnt, c;		/* sec count in current data - curdata */
-	int r;			/* sec count in removal data - remsecinfo */
+	int ccnt, c;		/* sec count in current data - cursec */
+	int r;			/* sec count in removal data - remsec */
 	int tcnt, mcnt;		/* total sec count after removing */
 	struct secinfo *msec;	/* final secinfo list after removing */
 	struct secinfo *cursec;
@@ -415,11 +415,14 @@ srv_secinfo_remove(secinfo_t **pcursec, int *pcurcnt, secinfo_t *remsec,
 
 	for (r = 0; r < remcnt; r++) {
 		/*
-		 * Remove a flavor only if the flavor was a shared flavor for
-		 * the remsecinfo exported node that's being unshared.
-		 * Otherwise, this flavor is for the children of remsecinfo,
-		 * need to keep it.
+		 * At unshare/reshare time, only explicitly shared flavor ref
+		 * counts are decremented and propagated to ancestors.
+		 * Implicit flavor refs came from shared descendants, and
+		 * they must be kept.
 		 */
+		if (! SEC_REF_EXPORTED(&remsec[r]))
+			continue;
+
 		for (c = 0; c < ccnt; c++) {
 			if (remsec[r].s_secinfo.sc_nfsnum ==
 			    cursec[c].s_secinfo.sc_nfsnum) {
