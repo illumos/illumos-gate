@@ -2123,7 +2123,26 @@ else
 fi
 
 #
-# Generate OpenSolaris deliverables if requested.
+# Generate the THIRDPARTYLICENSE files if needed.  This is done before
+# findunref to help identify license files that need to be added to
+# the list.
+#
+if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
+	echo "\n==== Generating THIRDPARTYLICENSE files ====\n" | \
+	    tee -a $mail_msg_file >> $LOGFILE
+
+	mktpl usr/src/tools/opensolaris/license-list >>$LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create THIRDPARTYLICENSE files" |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+fi
+
+#
+# If OpenSolaris deliverables were requested, do the open-only build
+# now, so that it happens at roughly the same point as the source
+# product builds.  This lets us take advantage of checks that come
+# later (e.g., the core file check).
 #
 if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	#
@@ -2162,79 +2181,6 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
 
 	normal_build -O
-
-	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
-
-	cd $CODEMGR_WS
-
-	echo "Generating THIRDPARTYLICENSE files..." >> $LOGFILE
-
-	mktpl usr/src/tools/opensolaris/license-list >>$LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Couldn't create THIRDPARTYLICENSE files" |
-		    tee -a $mail_msg_file >> $LOGFILE
-	fi
-
-	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
-	closed_basename=on-closed-bins
-	if [ "$D_FLAG" = y ]; then
-		bindrop "$ROOT" "$ROOT-open" "$closed_basename" \
-		    >>"$LOGFILE" 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Couldn't create DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		bindrop -n "$ROOT-nd" "$ROOT-open-nd" "$closed_basename-nd" \
-		    >>"$LOGFILE" 2>&1
-		if [ $? -ne 0 ]; then
-			echo "Couldn't create non-DEBUG closed binaries." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-
-	echo "Generating SUNWonbld tarball..." >> $LOGFILE
-	PKGARCHIVE=$PKGARCHIVE_ORIG
-	onblddrop >> $LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Couldn't create SUNWonbld tarball." |
-		    tee -a $mail_msg_file >> $LOGFILE
-	fi
-
-	echo "Generating README.opensolaris..." >> $LOGFILE
-	cat $SRC/tools/opensolaris/README.opensolaris.tmpl | \
-	    mkreadme_osol $CODEMGR_WS/README.opensolaris >> $LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Couldn't create README.opensolaris." |
-		    tee -a $mail_msg_file >> $LOGFILE
-	fi
-
-	echo "Generating source tarball..." >> $LOGFILE
-	sdrop >>$LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
-		echo "Couldn't create source tarball." |
-		    tee -a "$mail_msg_file" >> "$LOGFILE"
-	fi
-
-	echo "Generating BFU tarball(s)..." >> $LOGFILE
-	if [ "$D_FLAG" = y ]; then
-		makebfu_filt bfudrop "$ROOT-open" \
-		    "$closed_basename.$MACH.tar.bz2" nightly-osol
-		if [ $? -ne 0 ]; then
-			echo "Couldn't create DEBUG archives tarball." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
-	if [ "$F_FLAG" = n ]; then
-		makebfu_filt bfudrop -n "$ROOT-open-nd" \
-		    "$closed_basename-nd.$MACH.tar.bz2" nightly-osol-nd
-		if [ $? -ne 0 ]; then
-			echo "Couldn't create non-DEBUG archives tarball." |
-			    tee -a $mail_msg_file >> $LOGFILE
-		fi
-	fi
 
 	ON_CLOSED_BINS=$ORIG_ON_CLOSED_BINS
 	CLOSED_IS_PRESENT=$ORIG_CLOSED_IS_PRESENT
@@ -2683,6 +2629,84 @@ if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	fi
 
 	diff $SRC/unref-${MACH}.ref $SRC/unref-${MACH}.out >>$mail_msg_file
+fi
+
+#
+# Generate the OpenSolaris deliverables if requested.  Some of these
+# steps need to come after findunref and are commented below.
+#
+if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
+	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
+	    tee -a $mail_msg_file >> $LOGFILE
+
+	cd $CODEMGR_WS
+
+	#
+	# This step grovels through the pkgdefs proto* files, so it
+	# must come after findunref.
+	#
+	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
+	closed_basename=on-closed-bins
+	if [ "$D_FLAG" = y ]; then
+		bindrop "$ROOT" "$ROOT-open" "$closed_basename" \
+		    >>"$LOGFILE" 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		bindrop -n "$ROOT-nd" "$ROOT-open-nd" "$closed_basename-nd" \
+		    >>"$LOGFILE" 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create non-DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+
+	echo "Generating SUNWonbld tarball..." >> $LOGFILE
+	PKGARCHIVE=$PKGARCHIVE_ORIG
+	onblddrop >> $LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create SUNWonbld tarball." |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	echo "Generating README.opensolaris..." >> $LOGFILE
+	cat $SRC/tools/opensolaris/README.opensolaris.tmpl | \
+	    mkreadme_osol $CODEMGR_WS/README.opensolaris >> $LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create README.opensolaris." |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	# This step walks the source tree, so it must come after
+	# findunref.  It depends on README.opensolaris.
+	echo "Generating source tarball..." >> $LOGFILE
+	sdrop >>$LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create source tarball." |
+		    tee -a "$mail_msg_file" >> "$LOGFILE"
+	fi
+
+	# This step depends on the closed binaries tarballs.
+	echo "Generating BFU tarball(s)..." >> $LOGFILE
+	if [ "$D_FLAG" = y ]; then
+		makebfu_filt bfudrop "$ROOT-open" \
+		    "$closed_basename.$MACH.tar.bz2" nightly-osol
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create DEBUG archives tarball." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		makebfu_filt bfudrop -n "$ROOT-open-nd" \
+		    "$closed_basename-nd.$MACH.tar.bz2" nightly-osol-nd
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create non-DEBUG archives tarball." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
 fi
 
 # Verify that the usual lists of files, such as exception lists,
