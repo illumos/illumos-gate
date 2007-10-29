@@ -66,7 +66,7 @@ extern nsc_ctx_t *cache_ctx_p[];
 static void usage(char *);
 static void detachfromtty(void);
 
-static int	debug_level = 0;
+static char	debug_level[32] = { 0 };
 static char	logfile[128] = { 0 };
 static int	will_become_server;
 
@@ -235,6 +235,8 @@ main(int argc, char ** argv)
 		gettext("initialization of switch failed (rc = %d)\n"), rc);
 			exit(1);
 		}
+		_nscd_get_log_info(debug_level, sizeof (debug_level),
+		    logfile, sizeof (logfile));
 
 		/*
 		 * initialize cache store
@@ -298,16 +300,13 @@ main(int argc, char ** argv)
 
 		case 'l':
 			doset++;
-			(void) strlcpy(logfile, optarg, 128);
-			(void) _nscd_add_admin_mod(NULL, 'l', optarg,
-			    msg, sizeof (msg));
+			(void) strlcpy(logfile, optarg, sizeof (logfile));
 			break;
 
 		case 'd':
 			doset++;
-			debug_level = atoi(optarg);
-			(void) _nscd_add_admin_mod(NULL, 'd', optarg,
-			    msg, sizeof (msg));
+			(void) strlcpy(debug_level, optarg,
+			    sizeof (debug_level));
 			break;
 
 		case 'S':
@@ -401,16 +400,17 @@ gettext("%s already running.... no administration option specified\n"),
 		 * if a log file is not specified, set it to
 		 * "stderr" or "/dev/null" based on debug level
 		 */
-		if (_logfd < 0 && *logfile == '\0') {
-			if (debug_level != 0)
+		if (*logfile == '\0') {
+			if (*debug_level != '\0')
 				/* we're debugging... */
 				(void) strcpy(logfile, "stderr");
 			else
 				(void) strcpy(logfile, "/dev/null");
-
-			(void) _nscd_add_admin_mod(NULL, 'l', logfile,
-			    msg, sizeof (msg));
 		}
+		(void) _nscd_add_admin_mod(NULL, 'l', logfile,
+		    msg, sizeof (msg));
+		(void) _nscd_add_admin_mod(NULL, 'd', debug_level,
+		    msg, sizeof (msg));
 
 		/* activate command options */
 		if (_nscd_server_setadmin(NULL) != NSCD_SUCCESS) {
@@ -419,7 +419,7 @@ gettext("%s already running.... no administration option specified\n"),
 			exit(1);
 		}
 
-		if (debug_level) {
+		if (*debug_level != '\0') {
 			/* we're debugging, no forking of nscd */
 
 			/*

@@ -121,8 +121,7 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		nss_result = NSS_STR_PARSE_PARSE;
 		goto result_grp2str;
 	}
-	len = snprintf(buffer, buflen, "%s:%s:%s:",
-			gname[0], password, gid[0]);
+	len = snprintf(buffer, buflen, "%s:%s:%s:", gname[0], password, gid[0]);
 	TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 
 	members = __ns_ldap_getAttrStruct(result->entry, _G_MEM);
@@ -138,12 +137,12 @@ _nss_ldap_group2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		}
 		if (firstime) {
 			len = snprintf(buffer, buflen, "%s",
-					members->attrvalue[i]);
+			    members->attrvalue[i]);
 			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 			firstime = 0;
 		} else {
 			len = snprintf(buffer, buflen, ",%s",
-					members->attrvalue[i]);
+			    members->attrvalue[i]);
 			TEST_AND_ADJUST(len, buffer, buflen, result_grp2str);
 		}
 	}
@@ -173,8 +172,8 @@ getbynam(ldap_backend_ptr be, void *a)
 	char		groupname[SEARCHFILTERLEN];
 	int		ret;
 
-	if (_ldap_filter_name(groupname, argp->key.name, sizeof (groupname))
-			!= 0)
+	if (_ldap_filter_name(groupname, argp->key.name, sizeof (groupname)) !=
+	    0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	ret = snprintf(searchfilter, sizeof (searchfilter),
@@ -187,8 +186,7 @@ getbynam(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return ((nss_status_t)_nss_ldap_lookup(be, argp,
-		_GROUP, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+	    _GROUP, searchfilter, NULL, _merge_SSD_filter, userdata));
 }
 
 
@@ -219,8 +217,7 @@ getbygid(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	return ((nss_status_t)_nss_ldap_lookup(be, argp,
-		_GROUP, searchfilter, NULL,
-		_merge_SSD_filter, userdata));
+	    _GROUP, searchfilter, NULL, _merge_SSD_filter, userdata));
 
 }
 
@@ -247,8 +244,6 @@ getbymember(ldap_backend_ptr be, void *a)
 	int			gcnt = (int)0;
 	char			**groupvalue, **membervalue;
 	nss_status_t		lstat;
-	nss_XbyY_args_t		argb;
-	static nss_XbyY_buf_t	*gb;
 	struct nss_groupsbymem	*argp = (struct nss_groupsbymem *)a;
 	char			searchfilter[SEARCHFILTERLEN];
 	char			userdata[SEARCHFILTERLEN];
@@ -258,10 +253,6 @@ getbymember(ldap_backend_ptr be, void *a)
 	char			*username;
 	gid_t			gid;
 	int			ret;
-
-	/* LINTED E_EXPR_NULL_EFFECT */
-	NSS_XbyY_ALLOC(&gb, sizeof (struct group), NSS_BUFLEN_GROUP);
-	NSS_XbyY_INIT(&argb, gb->result, gb->buffer, gb->buflen, 0);
 
 	if (strcmp(argp->username, "") == 0 ||
 	    strcmp(argp->username, "root") == 0)
@@ -279,9 +270,8 @@ getbymember(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	gcnt = (int)argp->numgids;
-	lstat = (nss_status_t)_nss_ldap_nocb_lookup(be, &argb,
-		_GROUP, searchfilter, NULL,
-		_merge_SSD_filter, userdata);
+	lstat = (nss_status_t)_nss_ldap_nocb_lookup(be, NULL,
+	    _GROUP, searchfilter, NULL, _merge_SSD_filter, userdata);
 	if (lstat != (nss_status_t)NS_LDAP_SUCCESS)
 		return ((nss_status_t)lstat);
 	if (be->result == NULL)
@@ -295,17 +285,18 @@ getbymember(ldap_backend_ptr be, void *a)
 			for (j = 0; membervalue[j]; j++) {
 				if (strcmp(membervalue[j], username) == NULL) {
 					groupvalue = __ns_ldap_getAttr(curEntry,
-						"gidnumber");
+					    "gidnumber");
 					gid = (gid_t)strtol(groupvalue[0],
-						(char **)NULL, 10);
+					    (char **)NULL, 10);
 					if (argp->numgids < argp->maxgids) {
-					    for (k = 0; k < argp->numgids;
-							k++) {
-						if (argp->gid_array[k] == gid)
+						for (k = 0; k < argp->numgids;
+						    k++) {
+							if (argp->gid_array[k]
+							    == gid)
 						    /* already exists */
-						    break;
-					    }
-					    if (k == argp->numgids)
+						break;
+					}
+					if (k == argp->numgids)
 						argp->gid_array[argp->numgids++]
 						    = gid;
 					}
@@ -317,7 +308,6 @@ getbymember(ldap_backend_ptr be, void *a)
 	}
 
 	(void) __ns_ldap_freeResult((ns_ldap_result_t **)&be->result);
-	NSS_XbyY_FREE(&gb);
 	if (gcnt == argp->numgids)
 		return ((nss_status_t)NSS_NOTFOUND);
 
@@ -342,6 +332,6 @@ _nss_ldap_group_constr(const char *dummy1, const char *dummy2,
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(gr_ops,
-		sizeof (gr_ops)/sizeof (gr_ops[0]), _GROUP, gr_attrs,
-		_nss_ldap_group2str));
+	    sizeof (gr_ops)/sizeof (gr_ops[0]), _GROUP, gr_attrs,
+	    _nss_ldap_group2str));
 }

@@ -257,7 +257,8 @@ _nss_ldap_nocb_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
 	if ((rc = __ns_ldap_list(database, searchfilter, init_filter_cb,
 	    be->attrs, NULL, 0, &be->result, &error, NULL,
 	    userdata)) != NS_LDAP_SUCCESS) {
-		argp->returnval = 0;
+		if (argp != NULL)
+			argp->returnval = 0;
 		rc = switch_err(rc, error);
 		(void) __ns_ldap_freeError(&error);
 		return (rc);

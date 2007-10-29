@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,32 +41,37 @@ extern "C" {
  * components: select more than one by OR'ing
  */
 #define	NSCD_LOG_NONE		0x0000
-#define	NSCD_LOG_ACCESS_INFO	0x0001
-#define	NSCD_LOG_INT_ADDR	0x0002
-#define	NSCD_LOG_NSW_STATE	0x0004
-#define	NSCD_LOG_GETENT_CTX	0x0008
-#define	NSCD_LOG_SWITCH_ENGINE	0x0010
-#define	NSCD_LOG_CONFIG		0x0020
-#define	NSCD_LOG_FRONT_END	0x0040
-#define	NSCD_LOG_CACHE		0x0080
-#define	NSCD_LOG_SMF_MONITOR	0x0100
-#define	NSCD_LOG_ADMIN		0x0200
-#define	NSCD_LOG_SELF_CRED	0x0400
-#define	NSCD_LOG_ALL		0x07ff
+#define	NSCD_LOG_CACHE		0x0001
+#define	NSCD_LOG_SWITCH_ENGINE	0x0002
+#define	NSCD_LOG_FRONT_END	0x0004
+#define	NSCD_LOG_SELF_CRED	0x0008
+#define	NSCD_LOG_ADMIN		0x0010	/*   16 */
+#define	NSCD_LOG_CONFIG		0x0020  /*   32 */
+#define	NSCD_LOG_SMF_MONITOR	0x0040  /*   64 */
+#define	NSCD_LOG_NSW_STATE	0x0080  /*  128 */
+#define	NSCD_LOG_GETENT_CTX	0x0100  /*  256 */
+#define	NSCD_LOG_ACCESS_INFO	0x0200  /*  512 */
+#define	NSCD_LOG_INT_ADDR	0x0400  /* 1024 */
+#define	NSCD_LOG_ALL		0x07ff  /* 2047 */
 
 /*
  * debug level: select more than one by OR'ing
  */
 #define	NSCD_LOG_LEVEL_NONE		0x0000
-#define	NSCD_LOG_LEVEL_CANT_FOUND	0x0001
-#define	NSCD_LOG_LEVEL_ALERT		0x0002
-#define	NSCD_LOG_LEVEL_CRIT		0x0004
-#define	NSCD_LOG_LEVEL_ERROR		0x0008
-#define	NSCD_LOG_LEVEL_WARNING		0x0010
-#define	NSCD_LOG_LEVEL_NOTICE		0x0020
-#define	NSCD_LOG_LEVEL_INFO		0x0040
-#define	NSCD_LOG_LEVEL_DEBUG		0x0080
-#define	NSCD_LOG_LEVEL_ALL		0x00ff
+#define	NSCD_LOG_LEVEL_CANT_FIND	0x0001
+#define	NSCD_LOG_LEVEL_DEBUG		0x0100  /*   256 */
+#define	NSCD_LOG_LEVEL_ERROR		0x0200  /*   512 */
+#define	NSCD_LOG_LEVEL_WARNING		0x0400  /*  1024 */
+#define	NSCD_LOG_LEVEL_INFO		0x0800  /*  2048 */
+#define	NSCD_LOG_LEVEL_NOTICE		0x1000	/*  4096 */
+#define	NSCD_LOG_LEVEL_ALERT		0x2000  /*  8192 */
+#define	NSCD_LOG_LEVEL_CRIT		0x4000  /* 16384 */
+#define	NSCD_LOG_LEVEL_ALL		0x7fff  /* 32767 */
+
+/*
+ * debug level: for backward compatibility
+ */
+#define	NSCD_LOG_LEVEL_DEBUG_6 (NSCD_LOG_LEVEL_CANT_FIND | NSCD_LOG_LEVEL_ERROR)
 
 /*
  * _nscd_log_comp and _nscd_log_level defined in nscd_log.c
@@ -88,6 +93,7 @@ extern int _nscd_log_level;
 void		_nscd_logit(char *funcname, char *format, ...);
 nscd_rc_t	_nscd_set_debug_level(int level);
 nscd_rc_t	_nscd_set_log_file(char *name);
+void		_nscd_get_log_info(char *level, int llen, char *file, int flen);
 
 #ifdef	__cplusplus
 }

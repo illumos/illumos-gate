@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,8 +44,10 @@ strbreak(char *field[], int array_size, char *s, char *sep)
 	int	inquote;
 
 	qp = strchr(s, '"');
-	for (i = 0; i < array_size && (field[i] =
-		strtok_r((i?(char *)NULL:s), sep, &lasts)); i++);
+	for (i = 0; i < array_size && (field[i] = strtok_r((i?(char *)NULL:s),
+	    sep, &lasts)); i++) {
+		/* empty */
+	}
 
 	if (qp == NULL)
 		return (i);
@@ -106,11 +108,11 @@ _nscd_cfg_read_file(
 	if ((in = fopen(filename, "r")) == NULL) {
 
 		(void) snprintf(msg, sizeof (msg),
-	gettext("open of configuration file \"%s\" failed: %s"),
-			filename, strerror(errno));
+		    gettext("open of configuration file \"%s\" failed: %s"),
+		    filename, strerror(errno));
 		if (errorp != NULL)
 			*errorp = _nscd_cfg_make_error(
-				NSCD_CFG_FILE_OPEN_ERROR, msg);
+			    NSCD_CFG_FILE_OPEN_ERROR, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "%s\n", msg);
@@ -124,7 +126,7 @@ _nscd_cfg_read_file(
 
 		linecnt++;
 		if ((fieldcnt = strbreak(fields, 128, buffer, " \t\n")) ==
-				0 || *fields[0] == '#') {
+		    0 || *fields[0] == '#') {
 			/* skip blank or comment lines */
 			continue;
 		}
@@ -146,9 +148,9 @@ _nscd_cfg_read_file(
 			(void) strlcpy(u.data, fields[0], sizeof (u.data));
 			for (i = 1; i < fieldcnt; i++) {
 				(void) strlcat(u.data, " ",
-					sizeof (u.data));
+				    sizeof (u.data));
 				(void) strlcat(u.data, fields[i],
-					sizeof (u.data));
+				    sizeof (u.data));
 			}
 
 			(void) snprintf(msg, sizeof (msg),
@@ -156,7 +158,7 @@ _nscd_cfg_read_file(
 			"file: %s : \"%s\""), linecnt, filename, u.data);
 			if (errorp != NULL)
 				*errorp = _nscd_cfg_make_error(
-					NSCD_CFG_SYNTAX_ERROR, msg);
+				    NSCD_CFG_SYNTAX_ERROR, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "%s\n", msg);
@@ -176,7 +178,7 @@ _nscd_cfg_read_file(
 
 		/* convert string to data */
 		rc = _nscd_cfg_str_to_data(pdesc, str, &u.data,
-			&data_p, errorp);
+		    &data_p, errorp);
 		if (rc != NSCD_SUCCESS)
 			break;
 
@@ -241,11 +243,11 @@ _nscd_cfg_read_nsswitch_file(
 	if ((in = fopen(filename, "r")) == NULL) {
 
 		(void) snprintf(msg, sizeof (msg),
-	gettext("open of configuration file \"%s\" failed: %s"),
-			filename, strerror(errno));
+		    gettext("open of configuration file \"%s\" failed: %s"),
+		    filename, strerror(errno));
 		if (errorp != NULL)
 			*errorp = _nscd_cfg_make_error(
-				NSCD_CFG_FILE_OPEN_ERROR, msg);
+			    NSCD_CFG_FILE_OPEN_ERROR, msg);
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "%s\n", msg);
@@ -306,9 +308,10 @@ _nscd_cfg_read_nsswitch_file(
 				c2 = ce - 1;
 				while (cc <= c2 && isspace(*c2))
 					c2--;
-				if (c1 > c2)
-					syntax_err = 1;
-				else {
+				if (c1 > c2) {
+					/* no source specified, it's OK */
+					continue;
+				} else {
 					*dbe = '\0';
 					nsscfg = c1;
 					*(c2 + 1) = '\0';
@@ -323,7 +326,7 @@ _nscd_cfg_read_nsswitch_file(
 			"file: %s : \"%s\""), linecnt, filename, buffer);
 			if (errorp != NULL)
 				*errorp = _nscd_cfg_make_error(
-					NSCD_CFG_SYNTAX_ERROR, msg);
+				    NSCD_CFG_SYNTAX_ERROR, msg);
 
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "%s\n", msg);
@@ -348,7 +351,7 @@ _nscd_cfg_read_nsswitch_file(
 
 		/* convert string to data */
 		rc = _nscd_cfg_str_to_data(pdesc, nsscfg, &u.data,
-			&data_p, errorp);
+		    &data_p, errorp);
 		if (rc != NSCD_SUCCESS)
 			break;
 

@@ -836,11 +836,11 @@ _nscd_cfg_cache_notify(
 	/* group data */
 	if (_nscd_cfg_flag_is_set(dflag, NSCD_CFG_DFLAG_GROUP)) {
 		if (_nscd_cfg_flag_is_set(pdesc->pflag,
-				NSCD_CFG_PFLAG_GLOBAL)) {
+		    NSCD_CFG_PFLAG_GLOBAL)) {
 			/* global config */
 			global_cfg = *(nscd_cfg_global_cache_t *)data;
 		} else if (_nscd_cfg_flag_is_set(dflag,
-				NSCD_CFG_DFLAG_SET_ALL_DB)) {
+		    NSCD_CFG_DFLAG_SET_ALL_DB)) {
 			/* non-global config for all dbs */
 			for (i = 0; i < CACHE_CTX_COUNT; i++) {
 				ctx = cache_ctx_p[i];
@@ -855,8 +855,7 @@ _nscd_cfg_cache_notify(
 			/* non-global config for a specific db */
 
 			/* ignore non-caching databases */
-			if (get_cache_ctx(nswdb->name, &ctx) !=
-				NSCD_SUCCESS)
+			if (get_cache_ctx(nswdb->name, &ctx) != NSCD_SUCCESS)
 				return (NSCD_SUCCESS);
 			(void) rw_wrlock(&ctx->cfg_rwlp);
 			ctx->cfg = *(nscd_cfg_cache_t *)data;
@@ -867,13 +866,12 @@ _nscd_cfg_cache_notify(
 	}
 
 	/* individual data */
-	if (_nscd_cfg_flag_is_set(pdesc->pflag,
-				NSCD_CFG_PFLAG_GLOBAL)) {
+	if (_nscd_cfg_flag_is_set(pdesc->pflag, NSCD_CFG_PFLAG_GLOBAL)) {
 		/* global config */
 		dp = (char *)&global_cfg + pdesc->p_offset;
 		(void) memcpy(dp, data, pdesc->p_size);
 	} else if (_nscd_cfg_flag_is_set(dflag,
-			NSCD_CFG_DFLAG_SET_ALL_DB)) {
+	    NSCD_CFG_DFLAG_SET_ALL_DB)) {
 		/* non-global config for all dbs */
 		for (i = 0; i < CACHE_CTX_COUNT; i++) {
 			ctx = cache_ctx_p[i];
@@ -931,7 +929,7 @@ _nscd_cfg_cache_get_stat(
 				(void) mutex_lock(&cache_ctx_p[i]->stats_mutex);
 				stats = cache_ctx_p[i]->stats;
 				(void) mutex_unlock(
-					&cache_ctx_p[i]->stats_mutex);
+				    &cache_ctx_p[i]->stats_mutex);
 			}
 			statsp->pos_hits += stats.pos_hits;
 			statsp->neg_hits += stats.neg_hits;
@@ -941,7 +939,7 @@ _nscd_cfg_cache_get_stat(
 			statsp->drop_count += stats.drop_count;
 			statsp->wait_count += stats.wait_count;
 			statsp->invalidate_count +=
-				stats.invalidate_count;
+			    stats.invalidate_count;
 		}
 	} else {
 		if ((rc = get_cache_ctx(nswdb->name, &ctx)) != NSCD_SUCCESS) {
@@ -986,7 +984,7 @@ nsc_info(nsc_ctx_t *ctx, char *dbname, nscd_cfg_cache_t cfg[],
 		} else if (rc == NSCD_NO_MEMORY) {
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_WARNING)
 	(me, "%s: unable to create cache context - no memory\n",
-				dbname);
+	    dbname);
 			return;
 		}
 		ctx_info(ctx1);
@@ -1208,14 +1206,14 @@ copy_result(void *rbuf, void *cbuf)
 
 		dst = (char *)rphdr + rphdr->data_off;
 		(void) memcpy(dst, (char *)cphdr + cphdr->data_off,
-			cphdr->data_len);
+		    cphdr->data_len);
 		rphdr->data_len = cphdr->data_len;
 		/* some frontend code expects a terminating NULL char */
 		*(dst + rphdr->data_len) = '\0';
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "cache data (len = %lld): >>%s<<\n",
-		cphdr->data_len, (char *)cphdr + cphdr->data_off);
+		    cphdr->data_len, (char *)cphdr + cphdr->data_off);
 
 		return (NSS_SUCCESS);
 	}
@@ -1233,7 +1231,7 @@ get_dns_ttl(void *pbuf, char *dbname)
 		return (-1);
 
 	if (strcmp(dbname, NSS_DBNAM_HOSTS) != 0 &&
-		strcmp(dbname, NSS_DBNAM_IPNODES) != 0)
+	    strcmp(dbname, NSS_DBNAM_IPNODES) != 0)
 		return (-1);
 
 	ttl = *(nssuint_t *)((void *)((char *)pbuf + phdr->ext_off));
@@ -1264,7 +1262,7 @@ check_config(nsc_lookup_args_t *largs, nscd_cfg_cache_t *cfgp,
 		(void) rw_unlock(&ctx->cfg_rwlp);
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "config for context %s, database %s updated\n",
-			ctx->dbname, nscdb->name);
+		    ctx->dbname, nscdb->name);
 	}
 	*cfgp = nscdb->cfg;
 
@@ -1326,12 +1324,12 @@ check_db_file(nsc_ctx_t *ctx, nscd_cfg_cache_t cfg,
 			}
 			(void) mutex_unlock(&ctx->file_mutex);
 		} else if (ctx->file_mtime < buf.st_mtime ||
-				ctx->file_size != buf.st_size ||
-				ctx->file_ino != buf.st_ino) {
+		    ctx->file_size != buf.st_size ||
+		    ctx->file_ino != buf.st_ino) {
 			(void) mutex_lock(&ctx->file_mutex);
 			if (ctx->file_mtime < buf.st_mtime ||
-				ctx->file_size != buf.st_size ||
-				ctx->file_ino != buf.st_ino) {
+			    ctx->file_size != buf.st_size ||
+			    ctx->file_ino != buf.st_ino) {
 				file_modified = nscd_true;
 				ctx->file_mtime = buf.st_mtime;
 				ctx->file_size = buf.st_size;
@@ -1343,8 +1341,8 @@ check_db_file(nsc_ctx_t *ctx, nscd_cfg_cache_t cfg,
 
 	if (file_modified == nscd_true) {
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "%s: file %s has been modified - invalidating cache\n",
-		whoami, ctx->file_name);
+		(me, "%s: file %s has been modified - invalidating cache\n",
+		    whoami, ctx->file_name);
 		ctx_invalidate(ctx);
 	}
 }
@@ -1510,6 +1508,9 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 				(void) mutex_lock(&ctx->stats_mutex);
 				ctx->stats.drop_count++;
 				(void) mutex_unlock(&ctx->stats_mutex);
+				_NSCD_LOG(NSCD_LOG_CACHE,
+				    NSCD_LOG_LEVEL_DEBUG_6)
+				(me, "%s: throttling load\n", whoami);
 				NSC_LOOKUP_RETURN(NOSERVER, WARNING,
 				"%s: no clearance to wait\n");
 			}
@@ -1616,6 +1617,8 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			 * data not found in name service
 			 * update cache
 			 */
+			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG_6)
+			(me, "%s: name service lookup failed\n", whoami);
 
 			if (NSCD_GET_ERRNO(largs->buffer) == ERANGE) {
 				delete_entry(nscdb, ctx, this_entry);
@@ -1663,6 +1666,9 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 			/*
 			 * name service lookup failed
 			 */
+			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG_6)
+			(me, "%s: name service lookup failed\n", whoami);
+
 			errnum = NSCD_GET_ERRNO(largs->buffer);
 			if (delete == nscd_true)
 				delete_entry(nscdb, ctx, this_entry);
@@ -1804,7 +1810,7 @@ revalidate(nsc_ctx_t *ctx)
 			(void) sleep(slp*2/3);
 			for (i = 0; i < ctx->db_count; i++) {
 				getxy_keepalive(ctx, ctx->nsc_db[i],
-						count, interval);
+				    count, interval);
 			}
 		} else {
 			(void) sleep(slp);
@@ -1841,8 +1847,7 @@ getxy_keepalive(nsc_ctx_t *ctx, nsc_db_t *nscdb, int keep, int interval)
 		/* leave pending calls alone */
 		if (!(entry->stats.status & ST_PENDING)) {
 			/* do_revalidate */
-			(void) insertn(table, entry->stats.hits,
-					entry);
+			(void) insertn(table, entry->stats.hits, entry);
 		}
 		entry = entry->qnext;
 	}
@@ -1917,11 +1922,11 @@ launch_update(nsc_lookup_args_t *in)
 	int	errnum;
 
 	errnum = thr_create(NULL, NULL, (void *(*)(void*))do_update,
-			in, 0|THR_DETACHED, NULL);
+	    in, 0|THR_DETACHED, NULL);
 	if (errnum != 0) {
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
-			(me, "%s: thread creation failure (%d)\n",
-			in->nscdb->name, errnum);
+		(me, "%s: thread creation failure (%d)\n",
+		    in->nscdb->name, errnum);
 		return (-1);
 	}
 	return (0);

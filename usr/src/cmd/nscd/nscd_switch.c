@@ -334,7 +334,9 @@ trace_result(
 	char	*res_str;
 	char	*src = "?";
 	char	*db = "?";
-	char	*me = "nss_search";
+	char	*data_str = "<NOT STRING FORMAT>";
+	int	data_len = 0;
+	char	*me = "trace_result";
 
 	switch (res) {
 	case NSS_SUCCESS:
@@ -362,10 +364,15 @@ trace_result(
 	if (srci != -1)
 		src = NSCD_NSW_SRC_NAME(srci);
 
+	if (arg->buf.result == NULL) {
+		data_str = arg->buf.buffer;
+		data_len = arg->returnlen;
+	}
+
 	if (res == NSS_SUCCESS) {
 		_nscd_logit(me, "%s: database: %s, operation: %d, "
 		    "source: %s returned >>%s<<, length = %d\n",
-		    res_str, db, op, src, arg->buf.buffer, arg->returnlen);
+		    res_str, db, op, src, data_str, data_len);
 		return;
 	}
 
@@ -435,63 +442,82 @@ try_local2(
 	return (rc);
 }
 
-
 static nscd_rc_t
-get_gss_func(void **func_p)
+get_lib_func(void **handle, void **func, mutex_t *lock,
+	char *lib, char *name, void **func_p)
 {
-	char		*me = "get_gss_func";
-	static void	*handle = NULL;
-	static mutex_t	func_lock = DEFAULTMUTEX;
-	void		*sym;
-	char		*func_name = "gss_inquire_cred";
-	static void	*func = NULL;
+	char	*me = "get_lib_func";
+	void	*sym;
 
-	if (handle != NULL && func_p != NULL && func != NULL) {
-		(void) memcpy(func_p, &func, sizeof (void *));
+	if (func_p != NULL && *handle != NULL && *func != NULL) {
+		*func_p = *func;
 		return (NSCD_SUCCESS);
 	}
 
-	(void) mutex_lock(&func_lock);
+	(void) mutex_lock(lock);
 
 	/* close the handle if requested */
 	if (func_p == NULL) {
-		if (handle != NULL) {
-			(void) dlclose(handle);
-			func = NULL;
+		if (*handle != NULL) {
+			(void) dlclose(*handle);
+			*handle = NULL;
+			*func = NULL;
 		}
-		(void) mutex_unlock(&func_lock);
+		(void) mutex_unlock(lock);
 		return (NSCD_SUCCESS);
 	}
 
-	if (handle != NULL && func != NULL) {
-		(void) memcpy(func_p, &func, sizeof (void *));
-		(void) mutex_unlock(&func_lock);
+	if (*handle != NULL && *func != NULL) {
+		*func_p = *func;
+		(void) mutex_unlock(lock);
 		return (NSCD_SUCCESS);
 	}
 
-	if (handle == NULL) {
-		handle = dlopen("libgss.so.1", RTLD_LAZY);
-		if (handle == NULL) {
+	if (*handle == NULL) {
+		*handle = dlopen(lib, RTLD_LAZY);
+		if (*handle == NULL) {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to dlopen libgss.so.1\n");
-			(void) mutex_unlock(&func_lock);
+			(me, "unable to dlopen %s\n", lib);
+			(void) mutex_unlock(lock);
 			return (NSCD_CFG_DLOPEN_ERROR);
 		}
 	}
 
-	if ((sym = dlsym(handle, func_name)) == NULL) {
+	if ((sym = dlsym(*handle, name)) == NULL) {
 
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to find symbol %s\n", func_name);
-		(void) mutex_unlock(&func_lock);
+		(me, "unable to find symbol %s:%s\n", lib, name);
+		(void) mutex_unlock(lock);
 		return (NSCD_CFG_DLSYM_ERROR);
 	} else {
-		(void) memcpy(func_p, &sym, sizeof (void *));
-		(void) memcpy(&func, &sym, sizeof (void *));
+		*func_p = sym;
+		*func = sym;
 	}
 
-	(void) mutex_unlock(&func_lock);
+	(void) mutex_unlock(lock);
 	return (NSCD_SUCCESS);
+}
+
+static nscd_rc_t
+get_libc_nss_search(void **func_p)
+{
+	static void	*handle = NULL;
+	static void	*func = NULL;
+	static mutex_t	lock = DEFAULTMUTEX;
+
+	return (get_lib_func(&handle, &func, &lock,
+	    "libc.so", "nss_search", func_p));
+}
+
+static nscd_rc_t
+get_gss_func(void **func_p)
+{
+	static void	*handle = NULL;
+	static void	*func = NULL;
+	static mutex_t	lock = DEFAULTMUTEX;
+
+	return (get_lib_func(&handle, &func, &lock,
+	    "libgss.so", "gss_inquire_cred", func_p));
 }
 
 /*
@@ -506,11 +532,10 @@ get_gss_func(void **func_p)
 static nscd_rc_t
 get_dns_funcs(int dnsi, nss_status_t (**func_p)(), const char *srcname)
 {
-	char		*me = "get_dns_funcs";
 	int		si;
+	void		**funcpp;
 	static void	*handle[2] = { NULL, NULL };
 	static mutex_t	func_lock[2] = { DEFAULTMUTEX, DEFAULTMUTEX };
-	void		*sym[2];
 	static void 	*func[2][2] = {{NULL, NULL}, {NULL, NULL}};
 	static const char	*lib[2] = { "nss_dns.so.1", "nss_mdns.so.1" };
 	static const char 	*func_name[2][2] =
@@ -529,53 +554,17 @@ get_dns_funcs(int dnsi, nss_status_t (**func_p)(), const char *srcname)
 	 * [1,0] = mdns/hosts, [1,1] = mdns/ipnodes
 	 */
 
-	if (handle[si] != NULL && dnsi >= 0 && func[si][dnsi] != NULL) {
-		*func_p = (nss_status_t (*)()) func[si][dnsi];
-		return (NSCD_SUCCESS);
-	}
-
-	(void) mutex_lock(&func_lock[si]);
-
-	/* close the handle if requested */
-	if (dnsi < 0) {
-		if (handle[si] != NULL) {
-			(void) dlclose(handle[si]);
-			func[si][0] = NULL;
-			func[si][1] = NULL;
-		}
+	if (dnsi < 0) { /* close handle */
+		funcpp = NULL;
+		(void) mutex_lock(&func_lock[si]);
+		func[si][0] = NULL;
+		func[si][1] = NULL;
 		(void) mutex_unlock(&func_lock[si]);
-		return (NSCD_SUCCESS);
-	}
+	} else
+		funcpp = (void **)func_p;
 
-	if (handle[si] != NULL && func[si][dnsi] != NULL) {
-		*func_p = (nss_status_t (*)()) func[si][dnsi];
-		(void) mutex_unlock(&func_lock[si]);
-		return (NSCD_SUCCESS);
-	}
-
-	if (handle[si] == NULL) {
-		handle[si] = dlopen(lib[si], RTLD_LAZY);
-		if (handle[si] == NULL) {
-			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-			(me, "unable to dlopen %s\n", lib[si]);
-			(void) mutex_unlock(&func_lock[si]);
-			return (NSCD_CFG_DLOPEN_ERROR);
-		}
-	}
-
-	if ((sym[si] = dlsym(handle[si], func_name[si][dnsi])) == NULL) {
-
-		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to find symbol %s\n", func_name[si][dnsi]);
-		(void) mutex_unlock(&func_lock[si]);
-		return (NSCD_CFG_DLSYM_ERROR);
-	} else {
-		*func_p = (nss_status_t (*)()) sym[si];
-		func[si][dnsi] = sym[si];
-	}
-
-	(void) mutex_unlock(&func_lock[si]);
-	return (NSCD_SUCCESS);
+	return (get_lib_func(&handle[si], &func[si][dnsi], &func_lock[si],
+	    (char *)lib[si], (char *)func_name[si][dnsi], funcpp));
 }
 
 static nss_status_t
@@ -653,9 +642,19 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		 * if unsupported database and the request is from the
 		 * the door, tell the door client to try it locally
 		 */
-		if (initf == nscd_initf)
+		if (initf == nscd_initf) {
 			res = NSS_TRYLOCAL;
-		goto error_exit;
+			goto error_exit;
+		} else { /* otherwise, let libc:nss_search() handle it */
+			nss_status_t	(*func)();
+
+			if (get_libc_nss_search((void **)&func) ==
+			    NSCD_SUCCESS)
+				return ((func)(rootp, initf, search_fnum,
+				    search_args));
+			else
+				goto error_exit;
+		}
 	}
 	dbi = params.dbi;
 
@@ -669,10 +668,10 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	}
 
 	/*
-	 * for request that should be processed by the client,
+	 * for door request that should be processed by the client,
 	 * send it back with status NSS_TRYLOCAL
 	 */
-	if (try_local(dbi, search_args) == 1) {
+	if (initf == nscd_initf && try_local(dbi, search_args) == 1) {
 		res = NSS_TRYLOCAL;
 		goto error_exit;
 	}
@@ -734,8 +733,8 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 	    (*s->nsw_cfg_p)->nsw_cfg_str);
 
 	for (n_src = 0;  n_src < s->max_src;  n_src++) {
-		nss_backend_t		*be;
-		nss_backend_op_t	funcp;
+		nss_backend_t		*be = NULL;
+		nss_backend_op_t	funcp = NULL;
 		struct __nsw_lookup_v1	*lkp;
 		int			smf_state;
 		int			n_loop = 0;
@@ -773,8 +772,9 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		smf_state = _nscd_get_smf_state(srci, dbi, 0);
 
 		/* stop if the source is one that should be TRYLOCAL */
-		if (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC ||
-		    (params.privdb && try_local2(dbi, srci) == 1)) {
+		if (initf == nscd_initf &&
+		    (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC ||
+		    (params.privdb && try_local2(dbi, srci) == 1))) {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "returning TRYLOCAL ... \n");
 			res = NSS_TRYLOCAL;
@@ -804,9 +804,10 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		if (be != NULL)
 			funcp = NSS_LOOKUP_DBOP(be, search_fnum);
 
-		if ((params.dnsi >= 0 && be == 0) || (params.dnsi  < 0 &&
-		    (be == 0 || (smf_state != NSCD_SVC_STATE_UNINITED &&
-		    smf_state < SCF_STATE_ONLINE) || funcp == 0))) {
+		if (be == NULL || (params.dnsi < 0 && (funcp == NULL ||
+		    (smf_state != NSCD_SVC_STATE_UNINITED &&
+		    smf_state != NSCD_SVC_STATE_UNKNOWN_SRC &&
+		    smf_state < SCF_STATE_ONLINE)))) {
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
 			    NSCD_LOG_LEVEL_DEBUG)
