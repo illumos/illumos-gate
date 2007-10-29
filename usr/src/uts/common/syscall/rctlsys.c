@@ -946,11 +946,11 @@ rctlsys_projset(char *name, rctl_opaque_t *rblk, size_t size, int flags)
 			}
 		}
 
-		kmem_free(krblk, sizeof (rctl_opaque_t) * size);
 	} else {
 		error = EFAULT;
 	}
 
+	kmem_free(krblk, sizeof (rctl_opaque_t) * size);
 	kmem_free(kname, MAXPATHLEN);
 
 	if (error) {
