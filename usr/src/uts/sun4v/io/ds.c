@@ -977,6 +977,7 @@ ds_dispatch_event(void *arg)
 	(*ds_msg_handlers[hdr->msg_type])(port, event->buf, event->buflen);
 
 done:
+	kmem_free(event->buf, event->buflen);
 	kmem_free(event, sizeof (ds_event_t));
 }
 
@@ -1024,6 +1025,8 @@ ds_handle_init_req(ds_port_t *port, caddr_t buf, size_t len)
 	mutex_enter(&port->lock);
 	(void) ds_send_msg(port, msg, msglen);
 	mutex_exit(&port->lock);
+
+	kmem_free(msg, msglen);
 }
 
 static void
@@ -1211,6 +1214,8 @@ ds_handle_reg_req(ds_port_t *port, caddr_t buf, size_t len)
 	mutex_enter(&port->lock);
 	(void) ds_send_msg(port, msg, msglen);
 	mutex_exit(&port->lock);
+
+	kmem_free(msg, msglen);
 }
 
 static void
@@ -1431,6 +1436,8 @@ ds_handle_unreg_req(ds_port_t *port, caddr_t buf, size_t len)
 	(void) ds_send_msg(port, msg, msglen);
 	mutex_exit(&port->lock);
 
+	kmem_free(msg, msglen);
+
 done:
 	rw_exit(&ds_svcs.rwlock);
 }
@@ -1534,6 +1541,7 @@ ds_handle_data(ds_port_t *port, caddr_t buf, size_t len)
 		cmn_err(CE_NOTE, "ds@%lx: <data: invalid handle 0x%lx",
 		    port->id, data->svc_handle);
 		ds_send_data_nack(port, data->svc_handle);
+		rw_exit(&ds_svcs.rwlock);
 		return;
 	}
 
@@ -1629,7 +1637,7 @@ ds_send_init_req(ds_port_t *port)
 {
 	ds_hdr_t	*hdr;
 	ds_init_req_t	*init_req;
-	size_t		nbytes;
+	size_t		msglen;
 	ds_ver_t	*vers = &ds_vers[port->ver_idx];
 
 	ASSERT(MUTEX_HELD(&port->lock));
@@ -1643,8 +1651,8 @@ ds_send_init_req(ds_port_t *port)
 	DS_DBG("ds@%lx: init_req>: req=v%d.%d\n", port->id, vers->major,
 	    vers->minor);
 
-	nbytes = DS_HDR_SZ + sizeof (ds_init_req_t);
-	hdr = kmem_zalloc(nbytes, KM_SLEEP);
+	msglen = DS_HDR_SZ + sizeof (ds_init_req_t);
+	hdr = kmem_zalloc(msglen, KM_SLEEP);
 
 	hdr->msg_type = DS_INIT_REQ;
 	hdr->payload_len = sizeof (ds_init_req_t);
@@ -1654,20 +1662,22 @@ ds_send_init_req(ds_port_t *port)
 	init_req->minor_vers = vers->minor;
 
 	/* send the message */
-	if (ds_send_msg(port, (caddr_t)hdr, nbytes) == 0) {
+	if (ds_send_msg(port, (caddr_t)hdr, msglen) == 0) {
 		port->state = DS_PORT_INIT_REQ;
 	}
+
+	kmem_free(hdr, msglen);
 }
 
 static int
 ds_send_reg_req(ds_svc_t *svc)
 {
+	int		rv = 0;
 	ds_port_t	*port = svc->port;
 	ds_ver_t	*ver;
 	ds_hdr_t	*hdr;
 	caddr_t		msg;
 	size_t		msglen;
-	size_t		nbytes;
 	ds_reg_req_t	*req;
 	size_t		idlen;
 
@@ -1718,25 +1728,24 @@ ds_send_reg_req(ds_svc_t *svc)
 	DS_DBG("ds@%lx: reg_req>: id='%s', ver=%d.%d, hdl=0x%09lx\n", port->id,
 	    svc->cap.svc_id, ver->major, ver->minor, svc->hdl);
 
-	nbytes = msglen;
 	mutex_enter(&port->lock);
-	if (ds_send_msg(port, msg, nbytes) != 0) {
-		mutex_exit(&port->lock);
-		return (-1);
+	if (ds_send_msg(port, msg, msglen) != 0) {
+		rv = -1;
 	} else {
 		svc->state = DS_SVC_REG_PENDING;
 	}
 	mutex_exit(&port->lock);
 
-	return (0);
+	kmem_free(msg, msglen);
+	return (rv);
 }
 
 static int
 ds_send_unreg_req(ds_svc_t *svc)
 {
+	int		rv = 0;
 	caddr_t		msg;
 	size_t		msglen;
-	size_t		nbytes;
 	ds_hdr_t	*hdr;
 	ds_unreg_req_t	*req;
 	ds_port_t	*port = svc->port;
@@ -1784,15 +1793,15 @@ ds_send_unreg_req(ds_svc_t *svc)
 	DS_DBG("ds@%lx: unreg_req>: id='%s', hdl=0x%09lx\n", port->id,
 	    (svc->cap.svc_id) ? svc->cap.svc_id : "NULL", svc->hdl);
 
-	nbytes = msglen;
 	mutex_enter(&port->lock);
-	if (ds_send_msg(port, msg, nbytes) != 0) {
-		mutex_exit(&port->lock);
-		return (-1);
-	}
+
+	if (ds_send_msg(port, msg, msglen) != 0)
+		rv = -1;
+
 	mutex_exit(&port->lock);
 
-	return (0);
+	kmem_free(msg, msglen);
+	return (rv);
 }
 
 static void
@@ -1800,7 +1809,6 @@ ds_send_unreg_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 {
 	caddr_t		msg;
 	size_t		msglen;
-	size_t		nbytes;
 	ds_hdr_t	*hdr;
 	ds_unreg_nack_t	*nack;
 
@@ -1840,10 +1848,11 @@ ds_send_unreg_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 	/* send the message */
 	DS_DBG("ds@%lx: unreg_nack>: hdl=0x%09lx\n", port->id, bad_hdl);
 
-	nbytes = msglen;
 	mutex_enter(&port->lock);
-	(void) ds_send_msg(port, msg, nbytes);
+	(void) ds_send_msg(port, msg, msglen);
 	mutex_exit(&port->lock);
+
+	kmem_free(msg, msglen);
 }
 
 static void
@@ -1851,7 +1860,6 @@ ds_send_data_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 {
 	caddr_t		msg;
 	size_t		msglen;
-	size_t		nbytes;
 	ds_hdr_t	*hdr;
 	ds_data_nack_t	*nack;
 
@@ -1892,10 +1900,11 @@ ds_send_data_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
 	/* send the message */
 	DS_DBG("ds@%lx: data_nack>: hdl=0x%09lx\n", port->id, bad_hdl);
 
-	nbytes = msglen;
 	mutex_enter(&port->lock);
-	(void) ds_send_msg(port, msg, nbytes);
+	(void) ds_send_msg(port, msg, msglen);
 	mutex_exit(&port->lock);
+
+	kmem_free(msg, msglen);
 }
 
 #ifdef DEBUG
@@ -2528,7 +2537,7 @@ ds_log_remove(void)
  * adding the new entry.
  */
 static int
-ds_log_replace(uint8_t *msg, size_t sz)
+ds_log_replace(int32_t dest, uint8_t *msg, size_t sz)
 {
 	ds_log_entry_t	*head;
 
@@ -2543,8 +2552,11 @@ ds_log_replace(uint8_t *msg, size_t sz)
 	ds_log.size -= DS_LOG_ENTRY_SZ(head);
 
 	kmem_free(head->data, head->datasz);
+
 	head->data = msg;
 	head->datasz = sz;
+	head->timestamp = ddi_get_time();
+	head->dest = dest;
 
 	ds_log.size += DS_LOG_ENTRY_SZ(head);
 
@@ -2573,8 +2585,13 @@ static int
 ds_log_add_msg(int32_t dest, uint8_t *msg, size_t sz)
 {
 	int	rv = 0;
+	void	*data;
 
 	mutex_enter(&ds_log.lock);
+
+	/* allocate a local copy of the data */
+	data = kmem_alloc(sz, KM_SLEEP);
+	bcopy(msg, data, sz);
 
 	/* check if the log is larger than the soft limit */
 	if ((ds_log.nentry) && ((ds_log.size + sz) >= ds_log_sz)) {
@@ -2583,7 +2600,7 @@ ds_log_add_msg(int32_t dest, uint8_t *msg, size_t sz)
 		 * Swap the oldest entry for the newest.
 		 */
 		DS_DBG_LOG("ds_log: replacing oldest entry with new entry\n");
-		(void) ds_log_replace(msg, sz);
+		(void) ds_log_replace(dest, data, sz);
 	} else {
 		/*
 		 * Still have headroom under the soft limit.
@@ -2594,7 +2611,7 @@ ds_log_add_msg(int32_t dest, uint8_t *msg, size_t sz)
 		new = ds_log_entry_alloc();
 
 		/* fill in message data */
-		new->data = msg;
+		new->data = data;
 		new->datasz = sz;
 		new->timestamp = ddi_get_time();
 		new->dest = dest;
@@ -2612,7 +2629,7 @@ ds_log_add_msg(int32_t dest, uint8_t *msg, size_t sz)
 		DS_DBG_LOG("ds_log: log exceeded %d bytes, scheduling a "
 		    "purge...\n", DS_LOG_LIMIT);
 
-		if (DS_DISPATCH(ds_log_purge, (void *)msg) == NULL) {
+		if (DS_DISPATCH(ds_log_purge, NULL) == NULL) {
 			cmn_err(CE_NOTE, "ds_log: purge thread failed to "
 			    "start");
 		}
@@ -2836,6 +2853,8 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 	if ((rv = ds_send_msg(port, msg, msglen)) != 0) {
 		rv = (rv == EIO) ? ECONNRESET : rv;
 	}
+
+	kmem_free(msg, msglen);
 
 	mutex_exit(&port->lock);
 	rw_exit(&ds_svcs.rwlock);

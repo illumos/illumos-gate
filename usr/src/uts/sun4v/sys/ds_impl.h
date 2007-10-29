@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ typedef struct ds_hdr {
  * DS Fixed Message Types
  */
 #define	DS_INIT_REQ		0x0	/* initiate DS connection */
-#define	DS_INIT_ACK		0x1	/* initiation acknowledgement */
+#define	DS_INIT_ACK		0x1	/* initiation acknowledgment */
 #define	DS_INIT_NACK		0x2	/* initiation negative acknowledgment */
 
 /*
@@ -79,10 +79,10 @@ typedef struct ds_init_nack {
  * DS Message Types for Version 1.0
  */
 #define	DS_REG_REQ		0x3	/* register a service */
-#define	DS_REG_ACK		0x4	/* register acknowledgement */
+#define	DS_REG_ACK		0x4	/* register acknowledgment */
 #define	DS_REG_NACK		0x5	/* register failed */
 #define	DS_UNREG		0x6	/* unregister a service */
-#define	DS_UNREG_ACK		0x7	/* unregister acknowledgement */
+#define	DS_UNREG_ACK		0x7	/* unregister acknowledgment */
 #define	DS_UNREG_NACK		0x8	/* unregister failed */
 #define	DS_DATA			0x9	/* data message */
 #define	DS_NACK			0xa	/* data error */
@@ -298,7 +298,7 @@ typedef struct ds_log_entry {
  * Once this limit is exceeded, a thread is scheduled to delete old
  * messages until the size of the log is below the soft limit.
  */
-#define	DS_LOG_DEFAULT_SZ	(128 * 1024)	/* 128 KB */
+#define	DS_LOG_DEFAULT_SZ	(4 * 1024 * 1024)	/* 4 MB */
 
 #define	DS_LOG_LIMIT		(ds_log_sz + (ds_log_sz >> 5))
 
