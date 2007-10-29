@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +41,10 @@
 #define	SCSI_INQUIRY_VID_POS			9
 #define	SCSI_INQUIRY_VID_SUN			"SUN"
 #define	SCSI_INQUIRY_VID_SUN_LEN		3
+#define	SCSI_INQUIRY_VID_HITACHI		"HITACHI"
+#define	SCSI_INQUIRY_VID_HITACHI_LEN		7
+#define	SCSI_INQUIRY_PID_HITACHI_OPEN		"OPEN-"
+#define	SCSI_INQUIRY_PID_HITACHI_OPEN_LEN	5
 #define	SCSI_INQUIRY_VID_EMC			"EMC     "
 #define	SCSI_INQUIRY_VID_EMC_LEN		8
 #define	SCSI_INQUIRY_PID_EMC_SYMMETRIX		"SYMMETRIX       "
@@ -193,25 +196,36 @@ devid_scsi_encode(
 				encode_scsi3_page83_emc(version, inq83,
 				    inq83_len, &id, &id_len, &id_type);
 			}
-
 #ifdef	_KERNEL
 			/*
-			 * report the page 0x83 standards violation.
+			 * invalid page 83 data. Special hack for HDS
+			 * specific device, to suppress the warning msg.
 			 */
-			msg = kmem_alloc(MSG_NOT_STANDARDS_COMPLIANT_SIZE,
-			    KM_SLEEP);
-			(void) strcpy(msg, MSG_NOT_STANDARDS_COMPLIANT);
-			(void) strncat(msg, inq_std->inq_vid,
-			    sizeof (inq_std->inq_vid));
-			(void) strcat(msg, " ");
-			(void) strncat(msg, inq_std->inq_pid,
-			    sizeof (inq_std->inq_pid));
-			(void) strcat(msg, " ");
-			(void) strncat(msg, inq_std->inq_revision,
-			    sizeof (inq_std->inq_revision));
-			(void) strcat(msg, "\n");
-			cmn_err(CE_WARN, msg);
-			kmem_free(msg, MSG_NOT_STANDARDS_COMPLIANT_SIZE);
+			if ((bcmp(inq_std->inq_vid, SCSI_INQUIRY_VID_HITACHI,
+			    SCSI_INQUIRY_VID_HITACHI_LEN) != 0) ||
+			    (bcmp(inq_std->inq_pid,
+			    SCSI_INQUIRY_PID_HITACHI_OPEN,
+			    SCSI_INQUIRY_PID_HITACHI_OPEN_LEN) != 0)) {
+				/*
+				 * report the page 0x83 standards violation.
+				 */
+				msg = kmem_alloc(
+				    MSG_NOT_STANDARDS_COMPLIANT_SIZE,
+				    KM_SLEEP);
+				(void) strcpy(msg, MSG_NOT_STANDARDS_COMPLIANT);
+				(void) strncat(msg, inq_std->inq_vid,
+				    sizeof (inq_std->inq_vid));
+				(void) strcat(msg, " ");
+				(void) strncat(msg, inq_std->inq_pid,
+				    sizeof (inq_std->inq_pid));
+				(void) strcat(msg, " ");
+				(void) strncat(msg, inq_std->inq_revision,
+				    sizeof (inq_std->inq_revision));
+				(void) strcat(msg, "\n");
+				cmn_err(CE_WARN, msg);
+				kmem_free(msg,
+				    MSG_NOT_STANDARDS_COMPLIANT_SIZE);
+			}
 #endif	/* _KERNEL */
 		}
 
@@ -685,7 +699,7 @@ encode_scsi3_page83(int version, uchar_t *inq83, size_t inq83_len,
 	while ((descriptor_bytes_left > 0) && (offset_id_type[3] == 0) &&
 	    (offset + SCMD_INQUIRY_PAGE83_IDENT_DESC_HDR_SIZE <= inq83_len) &&
 	    (offset + SCMD_INQUIRY_PAGE83_IDENT_DESC_HDR_SIZE +
-		(size_t)inq83[offset + 3] <= inq83_len)) {
+	    (size_t)inq83[offset + 3] <= inq83_len)) {
 		/*
 		 * Inspect the Identification descriptor list. Store the
 		 * offsets in the devid page separately for 0x03, 0x01 and
