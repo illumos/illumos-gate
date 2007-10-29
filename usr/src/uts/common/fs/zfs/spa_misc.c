@@ -313,6 +313,11 @@ spa_remove(spa_t *spa)
 	if (spa->spa_name)
 		spa_strfree(spa->spa_name);
 
+	if (spa->spa_config_dir)
+		spa_strfree(spa->spa_config_dir);
+	if (spa->spa_config_file)
+		spa_strfree(spa->spa_config_file);
+
 	spa_config_set(spa, NULL);
 
 	refcount_destroy(&spa->spa_refcount);

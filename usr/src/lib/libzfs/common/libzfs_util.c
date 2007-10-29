@@ -199,6 +199,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_PERMRDONLY:
 		return (dgettext(TEXT_DOMAIN, "snapshot permissions cannot be"
 		    " modified"));
+	case EZFS_BADCACHE:
+		return (dgettext(TEXT_DOMAIN, "invalid or missing cache file"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

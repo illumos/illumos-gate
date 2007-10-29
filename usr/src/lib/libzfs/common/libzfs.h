@@ -112,6 +112,7 @@ enum {
 	EZFS_PERMRDONLY,	/* pemissions are readonly */
 	EZFS_UNSHARESMBFAILED,	/* failed to unshare over smb */
 	EZFS_SHARESMBFAILED,	/* failed to share over smb */
+	EZFS_BADCACHE,		/* bad cache file */
 	EZFS_UNKNOWN
 };
 
@@ -290,6 +291,7 @@ extern int zpool_import_props(libzfs_handle_t *, nvlist_t *, const char *,
  * Search for pools to import
  */
 extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **);
+extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *);
 
 /*
  * Miscellaneous pool functions

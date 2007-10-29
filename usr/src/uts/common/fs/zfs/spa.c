@@ -114,6 +114,8 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 	uint64_t cap, version;
 	zprop_source_t src = ZPROP_SRC_NONE;
 	int err;
+	char *cachefile;
+	size_t len;
 
 	/*
 	 * readonly properties
@@ -163,14 +165,24 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 			return (err);
 	}
 
-	if (spa->spa_temporary ==
-	    zpool_prop_default_numeric(ZPOOL_PROP_TEMPORARY))
-		src = ZPROP_SRC_DEFAULT;
-	else
-		src = ZPROP_SRC_LOCAL;
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_TEMPORARY, NULL,
-	    spa->spa_temporary, src))
-		return (err);
+	if (spa->spa_config_dir != NULL) {
+		if (strcmp(spa->spa_config_dir, "none") == 0) {
+			err = spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
+			    spa->spa_config_dir, 0, ZPROP_SRC_LOCAL);
+		} else {
+			len = strlen(spa->spa_config_dir) +
+			    strlen(spa->spa_config_file) + 2;
+			cachefile = kmem_alloc(len, KM_SLEEP);
+			(void) snprintf(cachefile, len, "%s/%s",
+			    spa->spa_config_dir, spa->spa_config_file);
+			err = spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
+			    cachefile, 0, ZPROP_SRC_LOCAL);
+			kmem_free(cachefile, len);
+		}
+
+		if (err)
+			return (err);
+	}
 
 	return (0);
 }
@@ -303,6 +315,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		vdev_t *rvdev;
 		char *vdev_type;
 		objset_t *os;
+		char *slash;
 
 		propname = nvpair_name(elem);
 
@@ -382,6 +395,29 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				spa->spa_failmode = intval;
 				error = EIO;
 			}
+			break;
+
+		case ZPOOL_PROP_CACHEFILE:
+			if ((error = nvpair_value_string(elem, &strval)) != 0)
+				break;
+
+			if (strval[0] == '\0')
+				break;
+
+			if (strcmp(strval, "none") == 0)
+				break;
+
+			if (strval[0] != '/') {
+				error = EINVAL;
+				break;
+			}
+
+			slash = strrchr(strval, '/');
+			ASSERT(slash != NULL);
+
+			if (slash[1] == '\0' || strcmp(slash, "/.") == 0 ||
+			    strcmp(slash, "/..") == 0)
+				error = EINVAL;
 			break;
 		}
 
@@ -1645,7 +1681,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 */
 	spa->spa_bootfs = zpool_prop_default_numeric(ZPOOL_PROP_BOOTFS);
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
-	spa->spa_temporary = zpool_prop_default_numeric(ZPOOL_PROP_TEMPORARY);
 	spa->spa_failmode = zpool_prop_default_numeric(ZPOOL_PROP_FAILUREMODE);
 	if (props)
 		spa_sync_props(spa, props, CRED(), tx);
@@ -1924,6 +1959,8 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig)
 		VERIFY(nvlist_dup(spa->spa_config, oldconfig, 0) == 0);
 
 	if (new_state != POOL_STATE_UNINITIALIZED) {
+		spa_config_check(spa->spa_config_dir,
+		    spa->spa_config_file);
 		spa_remove(spa);
 		spa_config_sync();
 	}
@@ -3375,7 +3412,7 @@ spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	nvlist_t *nvp = arg2;
 	nvpair_t *elem;
 	uint64_t intval;
-	char *strval;
+	char *strval, *slash;
 	zpool_prop_t prop;
 	const char *propname;
 	zprop_type_t proptype;
@@ -3407,12 +3444,32 @@ spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			ASSERT(spa->spa_root != NULL);
 			break;
 
-		case ZPOOL_PROP_TEMPORARY:
+		case ZPOOL_PROP_CACHEFILE:
 			/*
-			 * 'temporary' is a non-persistant property.
+			 * 'cachefile' is a non-persistent property, but note
+			 * an async request that the config cache needs to be
+			 * udpated.
 			 */
-			VERIFY(nvpair_value_uint64(elem, &intval) == 0);
-			spa->spa_temporary = intval;
+			VERIFY(nvpair_value_string(elem, &strval) == 0);
+			if (spa->spa_config_dir)
+				spa_strfree(spa->spa_config_dir);
+			if (spa->spa_config_file)
+				spa_strfree(spa->spa_config_file);
+
+			if (strval[0] == '\0') {
+				spa->spa_config_dir = NULL;
+				spa->spa_config_file = NULL;
+			} else if (strcmp(strval, "none") == 0) {
+				spa->spa_config_dir = spa_strdup(strval);
+				spa->spa_config_file = NULL;
+			} else {
+				slash = strrchr(strval, '/');
+				ASSERT(slash != NULL);
+				*slash = '\0';
+				spa->spa_config_dir = spa_strdup(strval);
+				spa->spa_config_file = spa_strdup(slash + 1);
+			}
+			spa_async_request(spa, SPA_ASYNC_CONFIG_UPDATE);
 			break;
 		default:
 			/*

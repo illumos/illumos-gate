@@ -297,8 +297,8 @@ zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
 	zpool_prop_t prop;
 	char *strval;
 	uint64_t intval;
-	int temp = -1;
-	boolean_t has_altroot = B_FALSE;
+	char *slash;
+	struct stat64 statbuf;
 
 	if (nvlist_alloc(&retprops, NV_UNIQUE_NAME, 0) != 0) {
 		(void) no_memory(hdl);
@@ -374,17 +374,6 @@ zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
 			}
 			break;
 
-		case ZPOOL_PROP_TEMPORARY:
-			if (!create_or_import) {
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "property '%s' can only be set during pool "
-				    "creation or import"), propname);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
-			}
-			temp = intval;
-			break;
-
 		case ZPOOL_PROP_ALTROOT:
 			if (!create_or_import) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
@@ -400,25 +389,46 @@ zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
 				(void) zfs_error(hdl, EZFS_BADPATH, errbuf);
 				goto error;
 			}
-
-			has_altroot = B_TRUE;
 			break;
-		}
-	}
 
-	if (has_altroot) {
-		if (temp == 0) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "temporary property must be set to 'on' when "
-			    "altroot is set"));
-			(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-			goto error;
+		case ZPOOL_PROP_CACHEFILE:
+			if (strval[0] == '\0')
+				break;
 
-		} else if (temp == -1 &&
-		    nvlist_add_uint64(retprops,
-		    zpool_prop_to_name(ZPOOL_PROP_TEMPORARY), 1) != 0) {
-			(void) no_memory(hdl);
-			goto error;
+			if (strcmp(strval, "none") == 0)
+				break;
+
+			if (strval[0] != '/') {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "property '%s' must be empty, an "
+				    "absolute path, or 'none'"), propname);
+				(void) zfs_error(hdl, EZFS_BADPATH, errbuf);
+				goto error;
+			}
+
+			slash = strrchr(strval, '/');
+
+			if (slash[1] == '\0' || strcmp(slash, "/.") == 0 ||
+			    strcmp(slash, "/..") == 0) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "'%s' is not a valid file"), strval);
+				(void) zfs_error(hdl, EZFS_BADPATH, errbuf);
+				goto error;
+			}
+
+			*slash = '\0';
+
+			if (stat64(strval, &statbuf) != 0 ||
+			    !S_ISDIR(statbuf.st_mode)) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "'%s' is not a valid directory"),
+				    strval);
+				(void) zfs_error(hdl, EZFS_BADPATH, errbuf);
+				goto error;
+			}
+
+			*slash = '/';
+			break;
 		}
 	}
 

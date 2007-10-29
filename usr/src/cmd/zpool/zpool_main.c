@@ -194,10 +194,11 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\thistory [-il] [<pool>] ...\n"));
 	case HELP_IMPORT:
 		return (gettext("\timport [-d dir] [-D]\n"
-		    "\timport [-o mntopts] [-o property=value] ... [-d dir]\n"
-		    "\t    [-D] [-f] [-R root] -a\n"
-		    "\timport [-o mntopts] [-o property=value] ... [-d dir]\n"
-		    "\t    [-D] [-f] [-R root] <pool | id> [newpool]\n"));
+		    "\timport [-o mntopts] [-o property=value] ... \n"
+		    "\t    [-d dir | -c cachefile] [-D] [-f] [-R root] -a\n"
+		    "\timport [-o mntopts] [-o property=value] ... \n"
+		    "\t    [-d dir | -c cachefile] [-D] [-f] [-R root] "
+		    "<pool | id> [newpool]\n"));
 	case HELP_IOSTAT:
 		return (gettext("\tiostat [-v] [pool] ... [interval "
 		    "[count]]\n"));
@@ -369,7 +370,7 @@ add_prop_list(const char *propname, char *propval, nvlist_t **props)
 
 	/* Use normalized property name for nvlist operations */
 	if (nvlist_lookup_string(proplist, zpool_prop_to_name(prop),
-	    &strval) == 0) {
+	    &strval) == 0 && prop != ZPOOL_PROP_CACHEFILE) {
 		(void) fprintf(stderr, gettext("property '%s' "
 		    "specified multiple times\n"), propname);
 		return (2);
@@ -559,7 +560,7 @@ zpool_do_create(int argc, char **argv)
 	nvlist_t **child;
 	uint_t children;
 	nvlist_t *props = NULL;
-	char *propval = NULL;
+	char *propval;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":fnR:m:o:")) != -1) {
@@ -575,8 +576,12 @@ zpool_do_create(int argc, char **argv)
 			if (add_prop_list(zpool_prop_to_name(
 			    ZPOOL_PROP_ALTROOT), optarg, &props))
 				goto errout;
+			if (nvlist_lookup_string(props,
+			    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE),
+			    &propval) == 0)
+				break;
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_TEMPORARY), "on", &props))
+			    ZPOOL_PROP_CACHEFILE), "none", &props))
 				goto errout;
 			break;
 		case 'm':
@@ -741,10 +746,8 @@ zpool_do_create(int argc, char **argv)
 	}
 
 errout:
-	if (nvroot)
-		nvlist_free(nvroot);
-	if (props)
-		nvlist_free(props);
+	nvlist_free(nvroot);
+	nvlist_free(props);
 	return (ret);
 badusage:
 	nvlist_free(props);
@@ -1257,9 +1260,13 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 /*
  * zpool import [-d dir] [-D]
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-d dir] [-f] -a
- *       import [-o mntopts] [-o prop=value] ... [-R root] [-D] [-d dir] [-f]
- *		<pool | id> [newpool]
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *              [-d dir | -c cachefile] [-f] -a
+ *       import [-o mntopts] [-o prop=value] ... [-R root] [-D]
+ *              [-d dir | -c cachefile] [-f] <pool | id> [newpool]
+ *
+ *	 -c	Read pool information from a cachefile instead of searching
+ *		devices.
  *
  *       -d	Scan in a specific directory, other than /dev/dsk.  More than
  *		one directory can be specified using multiple '-d' options.
@@ -1287,7 +1294,7 @@ zpool_do_import(int argc, char **argv)
 	int nsearch = 0;
 	int c;
 	int err;
-	nvlist_t *pools;
+	nvlist_t *pools = NULL;
 	boolean_t do_all = B_FALSE;
 	boolean_t do_destroyed = B_FALSE;
 	char *mntopts = NULL;
@@ -1301,12 +1308,16 @@ zpool_do_import(int argc, char **argv)
 	nvlist_t *props = NULL;
 	boolean_t first;
 	uint64_t pool_state;
+	char *cachefile = NULL;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":Dfd:R:ao:p:")) != -1) {
+	while ((c = getopt(argc, argv, ":afc:d:Do:p:R:")) != -1) {
 		switch (c) {
 		case 'a':
 			do_all = B_TRUE;
+			break;
+		case 'c':
+			cachefile = optarg;
 			break;
 		case 'd':
 			if (searchdirs == NULL) {
@@ -1341,8 +1352,12 @@ zpool_do_import(int argc, char **argv)
 			if (add_prop_list(zpool_prop_to_name(
 			    ZPOOL_PROP_ALTROOT), optarg, &props))
 				goto error;
+			if (nvlist_lookup_string(props,
+			    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE),
+			    &propval) == 0)
+				break;
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_TEMPORARY), "on", &props))
+			    ZPOOL_PROP_CACHEFILE), "none", &props))
 				goto error;
 			break;
 		case ':':
@@ -1359,6 +1374,11 @@ zpool_do_import(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+
+	if (cachefile && nsearch != 0) {
+		(void) fprintf(stderr, gettext("-c is incompatible with -d\n"));
+		usage(B_FALSE);
+	}
 
 	if (searchdirs == NULL) {
 		searchdirs = safe_malloc(sizeof (char *));
@@ -1391,7 +1411,12 @@ zpool_do_import(int argc, char **argv)
 		}
 	}
 
-	if ((pools = zpool_find_import(g_zfs, nsearch, searchdirs)) == NULL) {
+	if (cachefile)
+		pools = zpool_find_import_cached(g_zfs, cachefile);
+	else
+		pools = zpool_find_import(g_zfs, nsearch, searchdirs);
+
+	if (pools == NULL) {
 		free(searchdirs);
 		return (1);
 	}
@@ -1505,8 +1530,7 @@ zpool_do_import(int argc, char **argv)
 		    gettext("no pools available to import\n"));
 
 error:
-	if (props)
-		nvlist_free(props);
+	nvlist_free(props);
 	nvlist_free(pools);
 	free(searchdirs);
 

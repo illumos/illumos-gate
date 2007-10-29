@@ -140,7 +140,8 @@ struct spa {
 	uint64_t	spa_pool_props_object;	/* object for properties */
 	uint64_t	spa_bootfs;		/* default boot filesystem */
 	boolean_t	spa_delegation;		/* delegation on/off */
-	boolean_t	spa_temporary;		/* temporary on/off */
+	char		*spa_config_dir;	/* cache file directory */
+	char		*spa_config_file;	/* cache file name */
 	list_t		spa_zio_list;		/* zio error list */
 	kcondvar_t	spa_zio_cv;		/* resume I/O pipeline */
 	kmutex_t	spa_zio_lock;		/* zio error lock */

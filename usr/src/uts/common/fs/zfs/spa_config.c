@@ -43,16 +43,18 @@
 /*
  * Pool configuration repository.
  *
- * The configuration for all pools, in addition to being stored on disk, is
- * stored in /etc/zfs/zpool.cache as a packed nvlist.  The kernel maintains
- * this list as pools are created, destroyed, or modified.
+ * Pool configuration is stored as a packed nvlist on the filesystem.  By
+ * default, all pools are stored in /etc/zfs/zpool.cache and loaded on boot
+ * (when the ZFS module is loaded).  Pools can also have the 'cachefile'
+ * property set that allows them to be stored in an alternate location until
+ * the control of external software.
  *
- * We have a single nvlist which holds all the configuration information.  When
- * the module loads, we read this information from the cache and populate the
- * SPA namespace.  This namespace is maintained independently in spa.c.
- * Whenever the namespace is modified, or the configuration of a pool is
- * changed, we call spa_config_sync(), which walks through all the active pools
- * and writes the configuration to disk.
+ * For each cache file, we have a single nvlist which holds all the
+ * configuration information.  When the module loads, we read this information
+ * from /etc/zfs/zpool.cache and populate the SPA namespace.  This namespace is
+ * maintained independently in spa.c.  Whenever the namespace is modified, or
+ * the configuration of a pool is changed, we call spa_config_sync(), which
+ * walks through all the active pools and writes the configuration to disk.
  */
 
 static uint64_t spa_config_generation = 1;
@@ -141,38 +143,110 @@ out:
 }
 
 /*
- * Synchronize all pools to disk.  This must be called with the namespace lock
- * held.
+ * This function is called when destroying or exporting a pool.  It walks the
+ * list of active pools, and searches for any that match the given cache file.
+ * If there is only one cachefile, then the file is removed immediately,
+ * because we won't see the pool when iterating in spa_config_sync().
  */
 void
-spa_config_sync(void)
+spa_config_check(const char *dir, const char *file)
 {
-	spa_t *spa = NULL;
-	nvlist_t *config;
+	size_t count = 0;
+	char pathname[128];
+	spa_t *spa;
+
+	if (dir != NULL && strcmp(dir, "none") == 0)
+		return;
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+	spa = NULL;
+	while ((spa = spa_next(spa)) != NULL) {
+		if (dir == NULL) {
+			if (spa->spa_config_dir == NULL)
+				count++;
+		} else {
+			if (spa->spa_config_dir &&
+			    strcmp(spa->spa_config_dir, dir) == 0 &&
+			    strcmp(spa->spa_config_file, file) == 0)
+				count++;
+		}
+	}
+
+	if (count == 1) {
+		if (dir == NULL) {
+			dir = spa_config_dir;
+			file = ZPOOL_CACHE_FILE;
+		}
+
+		(void) snprintf(pathname, sizeof (pathname),
+		    "%s/%s", dir, file);
+		(void) vn_remove(pathname, UIO_SYSSPACE, RMFILE);
+	}
+}
+
+typedef struct spa_config_entry {
+	list_t		sc_link;
+	const char	*sc_dir;
+	const char	*sc_file;
+	nvlist_t	*sc_nvl;
+} spa_config_entry_t;
+
+static void
+spa_config_entry_add(list_t *listp, spa_t *spa)
+{
+	spa_config_entry_t *entry;
+	const char *dir, *file;
+
+	mutex_enter(&spa->spa_config_cache_lock);
+	if (!spa->spa_config || !spa->spa_name) {
+		mutex_exit(&spa->spa_config_cache_lock);
+		return;
+	}
+
+	if (spa->spa_config_dir) {
+		dir = spa->spa_config_dir;
+		file = spa->spa_config_file;
+	} else {
+		dir = spa_config_dir;
+		file = ZPOOL_CACHE_FILE;
+	}
+
+	if (strcmp(dir, "none") == 0) {
+		mutex_exit(&spa->spa_config_cache_lock);
+		return;
+	}
+
+	for (entry = list_head(listp); entry != NULL;
+	    entry = list_next(listp, entry)) {
+		if (strcmp(entry->sc_dir, dir) == 0 &&
+		    strcmp(entry->sc_file, file) == 0)
+			break;
+	}
+
+	if (entry == NULL) {
+		entry = kmem_alloc(sizeof (spa_config_entry_t), KM_SLEEP);
+		entry->sc_dir = dir;
+		entry->sc_file = file;
+		VERIFY(nvlist_alloc(&entry->sc_nvl, NV_UNIQUE_NAME,
+		    KM_SLEEP) == 0);
+		list_insert_tail(listp, entry);
+	}
+
+	VERIFY(nvlist_add_nvlist(entry->sc_nvl, spa->spa_name,
+	    spa->spa_config) == 0);
+	mutex_exit(&spa->spa_config_cache_lock);
+}
+
+static void
+spa_config_entry_write(spa_config_entry_t *entry)
+{
+	nvlist_t *config = entry->sc_nvl;
 	size_t buflen;
 	char *buf;
 	vnode_t *vp;
 	int oflags = FWRITE | FTRUNC | FCREAT | FOFFMAX;
 	char pathname[128];
 	char pathname2[128];
-
-	ASSERT(MUTEX_HELD(&spa_namespace_lock));
-
-	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-
-	/*
-	 * Add all known pools to the configuration list, ignoring those with
-	 * alternate root paths.
-	 */
-	spa = NULL;
-	while ((spa = spa_next(spa)) != NULL) {
-		mutex_enter(&spa->spa_config_cache_lock);
-		if (spa->spa_config && spa->spa_name && !spa->spa_temporary) {
-			VERIFY(nvlist_add_nvlist(config, spa->spa_name,
-			    spa->spa_config) == 0);
-		}
-		mutex_exit(&spa->spa_config_cache_lock);
-	}
 
 	/*
 	 * Pack the configuration into a buffer.
@@ -189,8 +263,8 @@ spa_config_sync(void)
 	 * 'write to temporary file, sync, move over original' to make sure we
 	 * always have a consistent view of the data.
 	 */
-	(void) snprintf(pathname, sizeof (pathname), "%s/%s", spa_config_dir,
-	    ZPOOL_CACHE_TMP);
+	(void) snprintf(pathname, sizeof (pathname), "%s/.%s", entry->sc_dir,
+	    entry->sc_file);
 
 	if (vn_open(pathname, UIO_SYSSPACE, oflags, 0644, &vp, CRCREAT, 0) != 0)
 		goto out;
@@ -199,7 +273,7 @@ spa_config_sync(void)
 	    0, RLIM64_INFINITY, kcred, NULL) == 0 &&
 	    VOP_FSYNC(vp, FSYNC, kcred, NULL) == 0) {
 		(void) snprintf(pathname2, sizeof (pathname2), "%s/%s",
-		    spa_config_dir, ZPOOL_CACHE_FILE);
+		    entry->sc_dir, entry->sc_file);
 		(void) vn_rename(pathname, pathname2, UIO_SYSSPACE);
 	}
 
@@ -208,10 +282,41 @@ spa_config_sync(void)
 
 out:
 	(void) vn_remove(pathname, UIO_SYSSPACE, RMFILE);
-	spa_config_generation++;
-
 	kmem_free(buf, buflen);
-	nvlist_free(config);
+}
+
+/*
+ * Synchronize all pools to disk.  This must be called with the namespace lock
+ * held.
+ */
+void
+spa_config_sync(void)
+{
+	spa_t *spa = NULL;
+	list_t files = { 0 };
+	spa_config_entry_t *entry;
+
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
+
+	list_create(&files, sizeof (spa_config_entry_t),
+	    offsetof(spa_config_entry_t, sc_link));
+
+	/*
+	 * Add all known pools to the configuration list, ignoring those with
+	 * alternate root paths.
+	 */
+	spa = NULL;
+	while ((spa = spa_next(spa)) != NULL)
+		spa_config_entry_add(&files, spa);
+
+	while ((entry = list_head(&files)) != NULL) {
+		spa_config_entry_write(entry);
+		list_remove(&files, entry);
+		nvlist_free(entry->sc_nvl);
+		kmem_free(entry, sizeof (spa_config_entry_t));
+	}
+
+	spa_config_generation++;
 }
 
 /*

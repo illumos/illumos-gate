@@ -374,6 +374,7 @@ extern void spa_sync_allpools(void);
 #define	SPA_CONFIG_UPDATE_VDEVS	1
 
 extern void spa_config_sync(void);
+extern void spa_config_check(const char *, const char *);
 extern void spa_config_load(void);
 extern nvlist_t *spa_all_configs(uint64_t *);
 extern void spa_config_set(spa_t *spa, nvlist_t *config);
