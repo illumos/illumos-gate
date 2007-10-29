@@ -7566,9 +7566,13 @@ clr_qfull(queue_t *q)
 	 */
 	mutex_enter(QLOCK(q));
 	/*
-	 * If both q_count and q_mblkcnt are less than the hiwat mark
+	 * If queue is empty i.e q_mblkcnt is zero, queue can not be full.
+	 * Hence clear the QFULL.
+	 * If both q_count and q_mblkcnt are less than the hiwat mark,
+	 * clear the QFULL.
 	 */
-	if ((q->q_count < q->q_hiwat) && (q->q_mblkcnt < q->q_hiwat)) {
+	if (q->q_mblkcnt == 0 || ((q->q_count < q->q_hiwat) &&
+	    (q->q_mblkcnt < q->q_hiwat))) {
 		q->q_flag &= ~QFULL;
 		/*
 		 * A little more confusing, how about this way:

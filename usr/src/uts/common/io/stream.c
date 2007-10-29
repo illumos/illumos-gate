@@ -1739,8 +1739,8 @@ getq_noenab(queue_t *q)
 		if (bp->b_band == 0) {
 			q->q_count -= bytecnt;
 			q->q_mblkcnt -= mblkcnt;
-			if ((q->q_count < q->q_hiwat) &&
-			    (q->q_mblkcnt < q->q_hiwat)) {
+			if (q->q_mblkcnt == 0 || ((q->q_count < q->q_hiwat) &&
+			    (q->q_mblkcnt < q->q_hiwat))) {
 				q->q_flag &= ~QFULL;
 			}
 		} else {
@@ -1761,8 +1761,9 @@ getq_noenab(queue_t *q)
 			}
 			qbp->qb_count -= bytecnt;
 			qbp->qb_mblkcnt -= mblkcnt;
-			if ((qbp->qb_count < qbp->qb_hiwat) &&
-			    (qbp->qb_mblkcnt < qbp->qb_hiwat)) {
+			if (qbp->qb_mblkcnt == 0 ||
+			    ((qbp->qb_count < qbp->qb_hiwat) &&
+			    (qbp->qb_mblkcnt < qbp->qb_hiwat))) {
 				qbp->qb_flag &= ~QB_FULL;
 			}
 		}
@@ -1959,15 +1960,15 @@ rmvq_noenab(queue_t *q, mblk_t *mp)
 	if (mp->b_band == 0) {		/* Perform q_count accounting */
 		q->q_count -= bytecnt;
 		q->q_mblkcnt -= mblkcnt;
-		if ((q->q_count < q->q_hiwat) &&
-		    (q->q_mblkcnt < q->q_hiwat)) {
+		if (q->q_mblkcnt == 0 || ((q->q_count < q->q_hiwat) &&
+		    (q->q_mblkcnt < q->q_hiwat))) {
 			q->q_flag &= ~QFULL;
 		}
 	} else {			/* Perform qb_count accounting */
 		qbp->qb_count -= bytecnt;
 		qbp->qb_mblkcnt -= mblkcnt;
-		if ((qbp->qb_count < qbp->qb_hiwat) &&
-		    (qbp->qb_mblkcnt < qbp->qb_hiwat)) {
+		if (qbp->qb_mblkcnt == 0 || ((qbp->qb_count < qbp->qb_hiwat) &&
+		    (qbp->qb_mblkcnt < qbp->qb_hiwat))) {
 			qbp->qb_flag &= ~QB_FULL;
 		}
 	}
