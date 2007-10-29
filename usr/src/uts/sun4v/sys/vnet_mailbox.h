@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,10 @@ extern "C" {
  * tag.submsgtype = VIO_SUBTYPE_{INFO|ACK|NACK}
  * tag.subtype_env == VIO_ATTR_INFO
  */
+
+/* Value for 'addr_type' in vnet attribute message */
+#define	ADDR_TYPE_MAC		0x1
+
 typedef struct vnet_attr_msg {
 	/* Common tag */
 	vio_msg_tag_t		tag;

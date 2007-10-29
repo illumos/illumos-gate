@@ -37,6 +37,7 @@
 #include <sys/ddi.h>
 #include <sys/dkio.h>
 #include <sys/file.h>
+#include <sys/fs/hsfs_isospec.h>
 #include <sys/mdeg.h>
 #include <sys/modhash.h>
 #include <sys/note.h>
@@ -46,6 +47,7 @@
 #include <sys/sunldi.h>
 #include <sys/sysmacros.h>
 #include <sys/vio_common.h>
+#include <sys/vio_util.h>
 #include <sys/vdsk_mailbox.h>
 #include <sys/vdsk_common.h>
 #include <sys/vtoc.h>
@@ -325,6 +327,8 @@ typedef struct vd_task {
  */
 typedef struct vd {
 	uint_t			initialized;	/* vdisk initialization flags */
+	uint64_t		operations;	/* bitmask of VD_OPs exported */
+	vio_ver_t		version;	/* ver negotiated with client */
 	vds_t			*vds;		/* server for this vdisk */
 	ddi_taskq_t		*startq;	/* queue for I/O start tasks */
 	ddi_taskq_t		*completionq;	/* queue for completion tasks */
@@ -334,16 +338,21 @@ typedef struct vd {
 	int			open_flags;	/* open flags */
 	uint_t			nslices;	/* number of slices */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
+	size_t			vdisk_block_size; /* size of each vdisk block */
 	vd_disk_type_t		vdisk_type;	/* slice or entire disk */
 	vd_disk_label_t		vdisk_label;	/* EFI or VTOC label */
+	vd_media_t		vdisk_media;	/* media type of backing dev. */
+	boolean_t		is_atapi_dev;	/* Is this an IDE CD-ROM dev? */
 	ushort_t		max_xfer_sz;	/* max xfer size in DEV_BSIZE */
+	size_t			block_size;	/* blk size of actual device */
 	boolean_t		pseudo;		/* underlying pseudo dev */
-	boolean_t		file;		/* underlying file */
+	boolean_t		file;		/* is vDisk backed by a file? */
 	vnode_t			*file_vnode;	/* file vnode */
 	size_t			file_size;	/* file size */
 	ddi_devid_t		file_devid;	/* devid for disk image */
 	struct dk_efi		dk_efi;		/* synthetic for slice type */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
+	struct dk_minfo		dk_minfo;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
 	ldc_status_t		ldc_state;	/* LDC connection state */
 	ldc_handle_t		ldc_handle;	/* handle for LDC comm */
@@ -398,7 +407,6 @@ static int	vds_ldc_delay = VDS_LDC_DELAY;
 static int	vds_dev_retries = VDS_RETRIES;
 static int	vds_dev_delay = VDS_DEV_DELAY;
 static void	*vds_state;
-static uint64_t	vds_operations;	/* see vds_operation[] definition below */
 
 static uint_t	vd_file_write_flags = VD_FILE_WRITE_FLAGS;
 
@@ -411,7 +419,7 @@ static short	vd_scsi_rdwr_timeout = VD_SCSI_RDWR_TIMEOUT;
  * with) its highest supported minor version number (as the protocol requires
  * supporting all lower minor version numbers as well)
  */
-static const vio_ver_t	vds_version[] = {{1, 0}};
+static const vio_ver_t	vds_version[] = {{1, 1}};
 static const size_t	vds_num_versions =
     sizeof (vds_version)/sizeof (vds_version[0]);
 
@@ -421,6 +429,8 @@ static int vd_setup_single_slice_disk(vd_t *vd);
 static boolean_t vd_enabled(vd_t *vd);
 static ushort_t vd_lbl2cksum(struct dk_label *label);
 static int vd_file_validate_geometry(vd_t *vd);
+static boolean_t vd_file_is_iso_image(vd_t *vd);
+static void vd_set_exported_operations(vd_t *vd);
 
 /*
  * Function:
@@ -469,7 +479,14 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	} else {
 		ASSERT(slice >= 0 && slice < V_NUMPAR);
 
+		/*
+		 * v1.0 vDisk clients depended on the server not verifying
+		 * the label of a unformatted disk.  This "feature" is
+		 * maintained for backward compatibility but all versions
+		 * from v1.1 onwards must do the right thing.
+		 */
 		if (vd->vdisk_label == VD_DISK_LABEL_UNK &&
+		    vio_ver_is_supported(vd->version, 1, 1) &&
 		    vd_file_validate_geometry(vd) != 0) {
 			PR0("Unknown disk label, can't do I/O from slice %d",
 			    slice);
@@ -562,7 +579,7 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
  * Description:
  *	Return a default label for the given disk. This is used when the disk
  *	does not have a valid VTOC so that the user can get a valid default
- *	configuration. The default label have all slices size set to 0 (except
+ *	configuration. The default label has all slice sizes set to 0 (except
  *	slice 2 which is the entire disk) to force the user to write a valid
  *	label onto the disk image.
  *
@@ -938,7 +955,7 @@ vd_file_write_devid(vd_t *vd, ddi_devid_t devid)
 
 /*
  * Function:
- *	vd_scsi_rdwr
+ *	vd_do_scsi_rdwr
  *
  * Description:
  * 	Read or write to a SCSI disk using an absolute disk offset.
@@ -956,7 +973,7 @@ vd_file_write_devid(vd_t *vd, ddi_devid_t devid)
  *	n != 0		- error.
  */
 static int
-vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
+vd_do_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 {
 	struct uscsi_cmd ucmd;
 	union scsi_cdb cdb;
@@ -965,11 +982,12 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 	int status, rval;
 
 	ASSERT(!vd->file);
+	ASSERT(vd->vdisk_block_size > 0);
 
 	max_sectors = vd->max_xfer_sz;
-	nblk = (len / DEV_BSIZE);
+	nblk = (len / vd->vdisk_block_size);
 
-	if (len % DEV_BSIZE != 0)
+	if (len % vd->vdisk_block_size != 0)
 		return (EINVAL);
 
 	/*
@@ -984,7 +1002,13 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 
 		nsectors = (max_sectors < nblk) ? max_sectors : nblk;
 
-		if (blk < (2 << 20) && nsectors <= 0xff) {
+		/*
+		 * Some of the optical drives on sun4v machines are ATAPI
+		 * devices which use Group 1 Read/Write commands so we need
+		 * to explicitly check a flag which is set when a domain
+		 * is bound.
+		 */
+		if (blk < (2 << 20) && nsectors <= 0xff && !vd->is_atapi_dev) {
 			FORMG0ADDR(&cdb, blk);
 			FORMG0COUNT(&cdb, nsectors);
 			ucmd.uscsi_cdblen = CDB_GROUP0;
@@ -999,10 +1023,9 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 			ucmd.uscsi_cdblen = CDB_GROUP1;
 			cdb.scc_cmd |= SCMD_GROUP1;
 		}
-
 		ucmd.uscsi_cdb = (caddr_t)&cdb;
 		ucmd.uscsi_bufaddr = data;
-		ucmd.uscsi_buflen = nsectors * DEV_BSIZE;
+		ucmd.uscsi_buflen = nsectors * vd->block_size;
 		ucmd.uscsi_timeout = vd_scsi_rdwr_timeout;
 		/*
 		 * Set flags so that the command is isolated from normal
@@ -1047,10 +1070,105 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
 
 		blk += nsectors;
 		nblk -= nsectors;
-		data += nsectors * DEV_BSIZE; /* SECSIZE */
+		data += nsectors * vd->vdisk_block_size; /* SECSIZE */
 	}
 
 	return (status);
+}
+
+/*
+ * Function:
+ *	vd_scsi_rdwr
+ *
+ * Description:
+ * 	Wrapper function to read or write to a SCSI disk using an absolute
+ *	disk offset. It checks the blocksize of the underlying device and,
+ *	if necessary, adjusts the buffers accordingly before calling
+ *	vd_do_scsi_rdwr() to do the actual read or write.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	operation	- operation to execute: read (VD_OP_BREAD) or
+ *			  write (VD_OP_BWRITE).
+ *	data		- buffer where data are read to or written from.
+ *	blk		- starting block for the operation.
+ *	len		- number of bytes to read or write.
+ *
+ * Return Code:
+ *	0		- success
+ *	n != 0		- error.
+ */
+static int
+vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
+{
+	int	rv;
+
+	size_t	pblk;	/* physical device block number of data on device */
+	size_t	delta;	/* relative offset between pblk and vblk */
+	size_t	pnblk;	/* number of physical blocks to be read from device */
+	size_t	plen;	/* length of data to be read from physical device */
+	char	*buf;	/* buffer area to fit physical device's block size */
+
+	/*
+	 * If the vdisk block size and the block size of the underlying device
+	 * match we can skip straight to vd_do_scsi_rdwr(), otherwise we need
+	 * to create a buffer large enough to handle the device's block size
+	 * and adjust the block to be read from and the amount of data to
+	 * read to correspond with the device's block size.
+	 */
+	if (vd->vdisk_block_size == vd->block_size)
+		return (vd_do_scsi_rdwr(vd, operation, data, vblk, vlen));
+
+	if (vd->vdisk_block_size > vd->block_size)
+		return (EINVAL);
+
+	/*
+	 * Writing of physical block sizes larger than the virtual block size
+	 * is not supported. This would be added if/when support for guests
+	 * writing to DVDs is implemented.
+	 */
+	if (operation == VD_OP_BWRITE)
+		return (ENOTSUP);
+
+	/* BEGIN CSTYLED */
+	/*
+	 * Below is a diagram showing the relationship between the physical
+	 * and virtual blocks. If the virtual blocks marked by 'X' below are
+	 * requested, then the physical blocks denoted by 'Y' are read.
+	 *
+	 *           vblk
+	 *             |      vlen
+	 *             |<--------------->|
+	 *             v                 v
+	 *  --+--+--+--+--+--+--+--+--+--+--+--+--+--+--+-   virtual disk:
+	 *    |  |  |  |XX|XX|XX|XX|XX|XX|  |  |  |  |  |  } block size is
+	 *  --+--+--+--+--+--+--+--+--+--+--+--+--+--+--+-  vd->vdisk_block_size
+	 *          :  :                 :  :
+	 *         >:==:< delta          :  :
+	 *          :  :                 :  :
+	 *  --+-----+-----+-----+-----+-----+-----+-----+--   physical disk:
+	 *    |     |YY:YY|YYYYY|YYYYY|YY:YY|     |     |   } block size is
+	 *  --+-----+-----+-----+-----+-----+-----+-----+--   vd->block_size
+	 *          ^                       ^
+	 *          |<--------------------->|
+	 *          |         plen
+	 *         pblk 
+	 */
+	/* END CSTYLED */
+	pblk = (vblk * vd->vdisk_block_size) / vd->block_size;
+	delta = (vblk * vd->vdisk_block_size) - (pblk * vd->block_size);
+	pnblk = ((delta + vlen - 1) / vd->block_size) + 1;
+	plen = pnblk * vd->block_size;
+
+	PR2("vblk %lx:pblk %lx: vlen %ld:plen %ld", vblk, pblk, vlen, plen);
+
+	buf = kmem_zalloc(sizeof (caddr_t) * plen, KM_SLEEP);
+	rv = vd_do_scsi_rdwr(vd, operation, (caddr_t)buf, pblk, plen);
+	bcopy(buf + delta, data, vlen);
+
+	kmem_free(buf, sizeof (caddr_t) * plen);
+
+	return (rv);
 }
 
 /*
@@ -1145,7 +1263,7 @@ vd_start_bio(vd_task_t *task)
 			 *
 			 * In the future if we have non-SCSI disks we would need
 			 * to invoke the appropriate function to do I/O using an
-			 * absolute disk offset (for example using DKIOCTL_RWCMD
+			 * absolute disk offset (for example using DIOCTL_RWCMD
 			 * for IDE disks).
 			 */
 			rv = vd_scsi_rdwr(vd, request->operation, bufaddr,
@@ -2337,9 +2455,18 @@ vd_do_process_task(vd_task_t *task)
 			break;
 		}
 	}
-	if (i == vds_noperations) {
+
+	/*
+	 * We need to check that the requested operation is permitted
+	 * for the particular client that sent it or that the loop above
+	 * did not complete without finding the operation type (indicating
+	 * that the requested operation is unknown/unimplemented)
+	 */
+	if ((VD_OP_SUPPORTED(vd->operations, request->operation) == B_FALSE) ||
+	    (i == vds_noperations)) {
 		PR0("Unsupported operation %u", request->operation);
-		return (ENOTSUP);
+		request->status = ENOTSUP;
+		return (0);
 	}
 
 	/* Range-check slice */
@@ -2546,21 +2673,49 @@ vd_process_ver_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vd->initialized |= VD_SID;
 
 	/*
-	 * When multiple versions are supported, this function should store
-	 * the negotiated major and minor version values in the "vd" data
-	 * structure to govern further communication; in particular, note that
-	 * the client might have specified a lower minor version for the
-	 * agreed major version than specified in the vds_version[] array.  The
-	 * following assertions should help remind future maintainers to make
-	 * the appropriate changes to support multiple versions.
+	 * Store the negotiated major and minor version values in the "vd" data
+	 * structure so that we can check if certain operations are supported
+	 * by the client.
 	 */
-	ASSERT(vds_num_versions == 1);
-	ASSERT(ver_msg->ver_major == vds_version[0].major);
-	ASSERT(ver_msg->ver_minor == vds_version[0].minor);
+	vd->version.major = ver_msg->ver_major;
+	vd->version.minor = ver_msg->ver_minor;
 
 	PR0("Using major version %u, minor version %u",
 	    ver_msg->ver_major, ver_msg->ver_minor);
 	return (0);
+}
+
+static void
+vd_set_exported_operations(vd_t *vd)
+{
+	vd->operations = 0;	/* clear field */
+
+	/*
+	 * We need to check from the highest version supported to the
+	 * lowest because versions with a higher minor number implicitly
+	 * support versions with a lower minor number.
+	 */
+	if (vio_ver_is_supported(vd->version, 1, 1)) {
+		ASSERT(vd->open_flags & FREAD);
+		vd->operations |= VD_OP_MASK_READ;
+
+		if (vd->open_flags & FWRITE)
+			vd->operations |= VD_OP_MASK_WRITE;
+
+		if (vd->file && vd_file_is_iso_image(vd)) {
+			/*
+			 * can't write to ISO images, make sure that write
+			 * support is not set in case administrator did not
+			 * use "options=ro" when doing an ldm add-vdsdev
+			 */
+			vd->operations &= ~VD_OP_MASK_WRITE;
+		}
+	} else if (vio_ver_is_supported(vd->version, 1, 0)) {
+		vd->operations = VD_OP_MASK_READ | VD_OP_MASK_WRITE;
+	}
+
+	/* we should have already agreed on a version */
+	ASSERT(vd->operations != 0);
 }
 
 static int
@@ -2669,11 +2824,17 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 	/* Return the device's block size and max transfer size to the client */
 	attr_msg->vdisk_block_size	= DEV_BSIZE;
+	attr_msg->vdisk_block_size	= vd->block_size;
 	attr_msg->max_xfer_sz		= vd->max_xfer_sz;
 
 	attr_msg->vdisk_size = vd->vdisk_size;
 	attr_msg->vdisk_type = vd->vdisk_type;
-	attr_msg->operations = vds_operations;
+	attr_msg->vdisk_media = vd->vdisk_media;
+
+	/* Discover and save the list of supported VD_OP_XXX operations */
+	vd_set_exported_operations(vd);
+	attr_msg->operations = vd->operations;
+
 	PR0("%s", VD_CLIENT(vd));
 
 	ASSERT(vd->dring_task == NULL);
@@ -3553,6 +3714,97 @@ is_pseudo_device(dev_info_t *dip)
 	return (B_FALSE);
 }
 
+/*
+ * Description:
+ *	This function checks to see if the file being used as a
+ *	virtual disk is an ISO image. An ISO image is a special
+ *	case which can be booted/installed from like a CD/DVD
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *
+ * Return Code:
+ *	B_TRUE		- The file is an ISO 9660 compliant image
+ *	B_FALSE		- just a regular disk image file
+ */
+static boolean_t
+vd_file_is_iso_image(vd_t *vd)
+{
+	char	iso_buf[ISO_SECTOR_SIZE];
+	int	i, rv;
+	uint_t	sec;
+
+	ASSERT(vd->file);
+
+	/*
+	 * If we have already discovered and saved this info we can
+	 * short-circuit the check and avoid reading the file.
+	 */
+	if (vd->vdisk_media == VD_MEDIA_DVD || vd->vdisk_media == VD_MEDIA_CD)
+		return (B_TRUE);
+
+	/*
+	 * We wish to read the sector that should contain the 2nd ISO volume
+	 * descriptor. The second field in this descriptor is called the
+	 * Standard Identifier and is set to CD001 for a CD-ROM compliant
+	 * to the ISO 9660 standard.
+	 */
+	sec = (ISO_VOLDESC_SEC * ISO_SECTOR_SIZE) / vd->vdisk_block_size;
+	rv = vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BREAD, (caddr_t)iso_buf,
+	    sec, ISO_SECTOR_SIZE);
+
+	if (rv < 0)
+		return (B_FALSE);
+
+	for (i = 0; i < ISO_ID_STRLEN; i++) {
+		if (ISO_STD_ID(iso_buf)[i] != ISO_ID_STRING[i])
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Description:
+ *	This function checks to see if the virtual device is an ATAPI
+ *	device. ATAPI devices use Group 1 Read/Write commands, so
+ *	any USCSI calls vds makes need to take this into account.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *
+ * Return Code:
+ *	B_TRUE		- The virtual disk is backed by an ATAPI device
+ *	B_FALSE		- not an ATAPI device (presumably SCSI)
+ */
+static boolean_t
+vd_is_atapi_device(vd_t *vd)
+{
+	boolean_t	is_atapi = B_FALSE;
+	char		*variantp;
+	int		rv;
+
+	ASSERT(vd->ldi_handle[0] != NULL);
+	ASSERT(!vd->file);
+
+	rv = ldi_prop_lookup_string(vd->ldi_handle[0],
+	    (LDI_DEV_T_ANY | DDI_PROP_DONTPASS), "variant", &variantp);
+	if (rv == DDI_PROP_SUCCESS) {
+		PR0("'variant' property exists for %s", vd->device_path);
+		if (strcmp(variantp, "atapi") == 0)
+			is_atapi = B_TRUE;
+		ddi_prop_free(variantp);
+	}
+
+	rv = ldi_prop_exists(vd->ldi_handle[0], LDI_DEV_T_ANY, "atapi");
+	if (rv) {
+		PR0("'atapi' property exists for %s", vd->device_path);
+		is_atapi = B_TRUE;
+	}
+
+	return (is_atapi);
+}
+
 static int
 vd_setup_full_disk(vd_t *vd)
 {
@@ -3577,6 +3829,9 @@ vd_setup_full_disk(vd_t *vd)
 		return (status);
 	}
 	vd->vdisk_size = dk_minfo.dki_capacity;
+	vd->block_size = dk_minfo.dki_lbsize;
+	vd->vdisk_media = DK_MEDIATYPE2VD_MEDIATYPE(dk_minfo.dki_media_type);
+	vd->vdisk_block_size = DEV_BSIZE;
 
 	/* Move dev number and LDI handle to entire-disk-slice array elements */
 	vd->dev[VD_ENTIRE_DISK_SLICE]		= vd->dev[0];
@@ -3783,13 +4038,30 @@ vd_setup_backend_vnode(vd_t *vd)
 	 */
 	status = vd_file_validate_geometry(vd);
 	if (status != 0 && status != EINVAL) {
-		PRN("Fail to read label from %s", file_path);
+		PRN("Failed to read label from %s", file_path);
 		return (EIO);
 	}
 
 	/* sector size = block size = DEV_BSIZE */
+	vd->block_size = DEV_BSIZE;
+	vd->vdisk_block_size = DEV_BSIZE;
 	vd->vdisk_size = vd->file_size / DEV_BSIZE;
 	vd->max_xfer_sz = maxphys / DEV_BSIZE; /* default transfer size */
+
+	if (vd_file_is_iso_image(vd)) {
+		/*
+		 * Indicate whether to call this a CD or DVD from the size
+		 * of the ISO image (images for both drive types are stored
+		 * in the ISO-9600 format). CDs can store up to just under 1Gb
+		 */
+		if ((vd->vdisk_size * vd->vdisk_block_size) >
+		    (1024 * 1024 * 1024))
+			vd->vdisk_media = VD_MEDIA_DVD;
+		else
+			vd->vdisk_media = VD_MEDIA_CD;
+	} else {
+		vd->vdisk_media = VD_MEDIA_FIXED;
+	}
 
 	/*
 	 * Get max_xfer_sz from the device where the file is or from the device
@@ -3890,6 +4162,112 @@ vd_setup_backend_vnode(vd_t *vd)
 	return (0);
 }
 
+
+/*
+ * Description:
+ *	Open a device using its device path (supplied by ldm(1m))
+ *
+ * Parameters:
+ *	vd 	- pointer to structure containing the vDisk info
+ *
+ * Return Value
+ *	0	- success
+ *	EIO	- Invalid number of partitions
+ *	!= 0	- some other non-zero return value from ldi(9F) functions
+ */
+static int
+vd_open_using_ldi_by_name(vd_t *vd)
+{
+	int		rval, status, open_flags;
+	struct dk_cinfo	dk_cinfo;
+	char		*device_path = vd->device_path;
+
+	/*
+	 * Try to open the device. If the flags indicate that the device should
+	 * be opened write-enabled, we first we try to open it "read-only"
+	 * to see if we have an optical device such as a CD-ROM which, for
+	 * now, we do not permit writes to and thus should not export write
+	 * operations to the client.
+	 *
+	 * Future: if/when we implement support for guest domains writing to
+	 * optical devices we will need to do further checking of the media type
+	 * to distinguish between read-only and writable discs.
+	 */
+	if (vd->open_flags & FWRITE) {
+		open_flags = vd->open_flags & ~FWRITE;
+		status = ldi_open_by_name(device_path, open_flags, kcred,
+		    &vd->ldi_handle[0], vd->vds->ldi_ident);
+
+		if (status == 0) {
+			/* Verify backing device supports dk_cinfo */
+			status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
+			    (intptr_t)&dk_cinfo, (open_flags | FKIOCTL),
+			    kcred, &rval);
+			if (status != 0) {
+				PRN("ldi_ioctl(DKIOCINFO) returned errno %d for"
+				    " %s opened as RO", status, device_path);
+				return (status);
+			}
+
+			if (dk_cinfo.dki_partition >= V_NUMPAR) {
+				PRN("slice %u >= maximum slice %u for %s",
+				    dk_cinfo.dki_partition, V_NUMPAR,
+				    device_path);
+				return (EIO);
+			}
+
+			/*
+			 * If this is an optical device then we disable
+			 * write access and return, otherwise we close
+			 * the device and try again with writes enabled.
+			 */
+			if (dk_cinfo.dki_ctype == DKC_CDROM) {
+				vd->open_flags = open_flags;
+				return (0);
+			} else {
+				(void) ldi_close(vd->ldi_handle[0],
+				    open_flags, kcred);
+			}
+		}
+	}
+
+	/* Attempt to (re)open device */
+	status = ldi_open_by_name(device_path, open_flags, kcred,
+	    &vd->ldi_handle[0], vd->vds->ldi_ident);
+
+	/*
+	 * The open can fail for example if we are opening an empty slice.
+	 * In case of a failure, we try the open again but this time with
+	 * the FNDELAY flag.
+	 */
+	if (status != 0)
+		status = ldi_open_by_name(device_path, vd->open_flags | FNDELAY,
+		    kcred, &vd->ldi_handle[0], vd->vds->ldi_ident);
+
+	if (status != 0) {
+		PR0("ldi_open_by_name(%s) = errno %d", device_path, status);
+		vd->ldi_handle[0] = NULL;
+		return (status);
+	}
+
+	/* Verify backing device supports dk_cinfo */
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
+	    (intptr_t)&dk_cinfo, (vd->open_flags | FKIOCTL), kcred,
+	    &rval)) != 0) {
+		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
+		    status, device_path);
+		return (status);
+	}
+	if (dk_cinfo.dki_partition >= V_NUMPAR) {
+		PRN("slice %u >= maximum slice %u for %s",
+		    dk_cinfo.dki_partition, V_NUMPAR, device_path);
+		return (EIO);
+	}
+
+	return (0);
+}
+
+
 /*
  * Setup for a virtual disk which backend is a device (a physical disk,
  * slice or pseudo device) that is directly exported either as a full disk
@@ -3903,21 +4281,9 @@ vd_setup_backend_ldi(vd_t *vd)
 	struct dk_cinfo	dk_cinfo;
 	char		*device_path = vd->device_path;
 
-	/*
-	 * Try to open the device. This can fail for example if we are opening
-	 * an empty slice. So in case of a failure, we try the open again but
-	 * this time with the FNDELAY flag.
-	 */
-	status = ldi_open_by_name(device_path, vd->open_flags, kcred,
-	    &vd->ldi_handle[0], vd->vds->ldi_ident);
-
-	if (status != 0)
-		status = ldi_open_by_name(device_path, vd->open_flags | FNDELAY,
-		    kcred, &vd->ldi_handle[0], vd->vds->ldi_ident);
-
+	status = vd_open_using_ldi_by_name(vd);
 	if (status != 0) {
-		PR0("ldi_open_by_name(%s) = errno %d", device_path, status);
-		vd->ldi_handle[0] = NULL;
+		PR0("Failed to open (%s) = errno %d", device_path, status);
 		return (status);
 	}
 
@@ -3950,17 +4316,26 @@ vd_setup_backend_ldi(vd_t *vd)
 	vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
 
 	/*
+	 * We need to work out if it's an ATAPI (IDE CD-ROM) or SCSI device so
+	 * that we can use the correct CDB group when sending USCSI commands.
+	 */
+	vd->is_atapi_dev = vd_is_atapi_device(vd);
+
+	/*
 	 * Export a full disk.
 	 *
 	 * When we use the LDI interface, we export a device as a full disk
 	 * if we have an entire disk slice (slice 2) and if this slice is
 	 * exported as a full disk and not as a single slice disk.
+	 * Similarly, we want to use LDI if we are accessing a CD or DVD
+	 * device (even if it isn't s2)
 	 *
 	 * Note that pseudo devices are exported as full disks using the vnode
 	 * interface, not the LDI interface.
 	 */
-	if (dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE &&
-	    vd->vdisk_type == VD_DISK_TYPE_DISK) {
+	if ((dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE &&
+	    vd->vdisk_type == VD_DISK_TYPE_DISK) ||
+	    dk_cinfo.dki_ctype == DKC_CDROM) {
 		ASSERT(!vd->pseudo);
 		return (vd_setup_full_disk(vd));
 	}
@@ -3991,6 +4366,9 @@ vd_setup_single_slice_disk(vd_t *vd)
 		return (EIO);
 	}
 	vd->vdisk_size = lbtodb(vd->vdisk_size);	/* convert to blocks */
+	vd->block_size = DEV_BSIZE;
+	vd->vdisk_block_size = DEV_BSIZE;
+	vd->vdisk_media = VD_MEDIA_FIXED;
 
 	if (vd->pseudo) {
 
@@ -4234,7 +4612,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t options,
 	ldc_attr.mode		= LDC_MODE_UNRELIABLE;
 	ldc_attr.mtu		= VD_LDC_MTU;
 	if ((status = ldc_init(ldc_id, &ldc_attr, &vd->ldc_handle)) != 0) {
-		PRN("Could not initialize LDC channel %lu, "
+		PRN("Could not initialize LDC channel %lx, "
 		    "init failed with error %d", ldc_id, status);
 		return (status);
 	}
@@ -4554,6 +4932,8 @@ vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 
 	if (vds_init_vd(vds, id, device_path, options, ldc_id) != 0) {
 		PRN("Failed to add vdisk ID %lu", id);
+		if (mod_hash_destroy(vds->vd_table, (mod_hash_key_t)id) != 0)
+			PRN("No vDisk entry found for vdisk ID %lu", id);
 		return;
 	}
 }
@@ -4816,19 +5196,15 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int		i, status;
-
+	int		status;
 
 	if ((status = ddi_soft_state_init(&vds_state, sizeof (vds_t), 1)) != 0)
 		return (status);
+
 	if ((status = mod_install(&modlinkage)) != 0) {
 		ddi_soft_state_fini(&vds_state);
 		return (status);
 	}
-
-	/* Fill in the bit-mask of server-supported operations */
-	for (i = 0; i < vds_noperations; i++)
-		vds_operations |= 1 << (vds_operation[i].operation - 1);
 
 	return (0);
 }
@@ -4843,7 +5219,6 @@ int
 _fini(void)
 {
 	int	status;
-
 
 	if ((status = mod_remove(&modlinkage)) != 0)
 		return (status);

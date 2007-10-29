@@ -108,6 +108,33 @@ extern "C" {
 #define	VD_OP_COUNT		13	/* Number of operations */
 
 /*
+ * This is a mask of all the basic operations supported by all
+ * disk types (v1.0).
+ */
+#define	VD_OP_MASK_READ			\
+	((1 << VD_OP_BREAD) |			\
+	(1 << VD_OP_GET_WCE) |			\
+	(1 << VD_OP_GET_VTOC) |			\
+	(1 << VD_OP_GET_DISKGEOM) |		\
+	(1 << VD_OP_GET_DEVID) |		\
+	(1 << VD_OP_GET_EFI))
+
+#define	VD_OP_MASK_WRITE			\
+	((1 << VD_OP_BWRITE) |			\
+	(1 << VD_OP_FLUSH) |			\
+	(1 << VD_OP_SET_WCE) |			\
+	(1 << VD_OP_SET_VTOC) |			\
+	(1 << VD_OP_SET_DISKGEOM) |		\
+	(1 << VD_OP_SET_EFI))
+
+
+/*
+ * macro to check if the operation 'op' is supported by checking the list
+ * of operations supported which is exported by the vDisk server.
+ */
+#define	VD_OP_SUPPORTED(ops_bitmask, op)	((ops_bitmask) & (1 << (op)))
+
+/*
  * Slice for absolute disk transaction.
  */
 #define	VD_SLICE_NONE		0xFF
@@ -340,6 +367,29 @@ typedef struct vd_devid {
 	(vd_efi)->length	= (dk_efi)->dki_length;			\
 	bcopy((dk_efi)->dki_data, (vd_efi)->data, (vd_efi)->length);	\
 }
+
+#define	VD_MEDIATYPE2DK_MEDIATYPE(mt)					\
+	((mt) == VD_MEDIA_FIXED ? DK_FIXED_DISK :			\
+	    (mt) == VD_MEDIA_CD ? DK_CDROM :				\
+	    (mt) == VD_MEDIA_DVD ? DK_DVDROM :				\
+	    DK_UNKNOWN)
+
+#define	DK_MEDIATYPE2VD_MEDIATYPE(mt)					\
+	((mt) == DK_REMOVABLE_DISK ? VD_MEDIA_FIXED :			\
+	    (mt) == DK_MO_ERASABLE ? VD_MEDIA_FIXED :			\
+	    (mt) == DK_MO_WRITEONCE ? VD_MEDIA_FIXED :			\
+	    (mt) == DK_AS_MO ? VD_MEDIA_FIXED :				\
+	    (mt) == DK_CDROM ? VD_MEDIA_CD :				\
+	    (mt) == DK_CDR ? VD_MEDIA_CD :				\
+	    (mt) == DK_CDRW ? VD_MEDIA_CD :				\
+	    (mt) == DK_DVDROM ? VD_MEDIA_DVD :				\
+	    (mt) == DK_DVDR ? VD_MEDIA_DVD :				\
+	    (mt) == DK_DVDRAM ? VD_MEDIA_DVD :				\
+	    (mt) == DK_FIXED_DISK ? VD_MEDIA_FIXED :			\
+	    (mt) == DK_FLOPPY ? VD_MEDIA_FIXED :			\
+	    (mt) == DK_ZIP ? VD_MEDIA_FIXED :				\
+	    (mt) == DK_JAZ ? VD_MEDIA_FIXED :				\
+	    VD_MEDIA_FIXED)
 
 /*
  * Hooks for EFI support

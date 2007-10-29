@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sun4v/vdc/Makefile
@@ -71,25 +71,6 @@ CFLAGS	+= $(CCVERBOSE)
 CFLAGS	+= -errwarn=%all
 
 LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc
-
-#
-# Re-enable C99 compilation to use stack allocation of variable-sized arrays.
-# According to usr/src/uts/Makefile.uts, C99 is disabled until a problem seen
-# on x86 machines can be fully diagnosed; presumably a sun4v (i.e., SPARC)
-# module should be "safe".  Furthermore, only the variable-sized array
-# extension is needed/used.
-#
-C99MODE = $(C99_ENABLE)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 #	Default build targets.

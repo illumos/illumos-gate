@@ -140,16 +140,17 @@ extern "C" {
 #define	VDC_GET_NEXT_REQ_ID(vdc)	((vdc)->req_id++)
 
 #define	VDC_GET_DRING_ENTRY_PTR(vdc, idx)	\
-		(vd_dring_entry_t *)((vdc)->dring_mem_info.vaddr +	\
+		(vd_dring_entry_t *)(uintptr_t)((vdc)->dring_mem_info.vaddr + \
 			(idx * (vdc)->dring_entry_size))
 
 #define	VDC_MARK_DRING_ENTRY_FREE(vdc, idx)			\
 	{ \
 		vd_dring_entry_t *dep = NULL;				\
 		ASSERT(vdc != NULL);					\
-		ASSERT((idx >= 0) && (idx < vdc->dring_len));		\
+		ASSERT(idx < vdc->dring_len);		\
 		ASSERT(vdc->dring_mem_info.vaddr != NULL);		\
-		dep = (vd_dring_entry_t *)(vdc->dring_mem_info.vaddr +	\
+		dep = (vd_dring_entry_t *)(uintptr_t)			\
+			(vdc->dring_mem_info.vaddr +	\
 			(idx * vdc->dring_entry_size));			\
 		ASSERT(dep != NULL);					\
 		dep->hdr.dstate = VIO_DESC_FREE;			\
@@ -279,9 +280,11 @@ typedef struct vdc {
 
 	vio_ver_t	ver;		/* version number agreed with server */
 	vd_disk_type_t	vdisk_type;	/* type of device/disk being imported */
+	uint32_t	vdisk_media;	/* physical media type of vDisk */
 	uint64_t	vdisk_size;	/* device size in blocks */
 	uint64_t	max_xfer_sz;	/* maximum block size of a descriptor */
 	uint64_t	block_size;	/* device block size used */
+	uint64_t	operations;	/* bitmask of ops. server supports */
 	struct dk_cinfo	*cinfo;		/* structure to store DKIOCINFO data */
 	struct dk_minfo	*minfo;		/* structure for DKIOCGMEDIAINFO data */
 	ddi_devid_t	devid;		/* device id */

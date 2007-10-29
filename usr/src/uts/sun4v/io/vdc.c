@@ -89,6 +89,7 @@
 #include <sys/ldc.h>
 #include <sys/vio_common.h>
 #include <sys/vio_mailbox.h>
+#include <sys/vio_util.h>
 #include <sys/vdsk_common.h>
 #include <sys/vdsk_mailbox.h>
 #include <sys/vdc.h>
@@ -154,7 +155,6 @@ static int	vdc_recv(vdc_t *vdc, vio_msg_t *msgp, size_t *nbytesp);
 
 static uint_t	vdc_handle_cb(uint64_t event, caddr_t arg);
 static int	vdc_process_data_msg(vdc_t *vdc, vio_msg_t *msg);
-static int	vdc_process_err_msg(vdc_t *vdc, vio_msg_t msg);
 static int	vdc_handle_ver_msg(vdc_t *vdc, vio_ver_msg_t *ver_msg);
 static int	vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg);
 static int	vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *msg);
@@ -195,8 +195,6 @@ static int	vdc_get_geom_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_set_geom_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
-static int	vdc_uscsicmd_convert(vdc_t *vdc, void *from, void *to,
-		    int mode, int dir);
 static int	vdc_get_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
@@ -210,14 +208,9 @@ static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
  * Tunable variables to control how long vdc waits before timing out on
  * various operations
  */
-static int	vdc_retries = 10;
 static int	vdc_hshake_retries = 3;
 
 static int	vdc_timeout = 0; /* units: seconds */
-
-/* calculated from 'vdc_usec_timeout' during attach */
-static uint64_t	vdc_hz_timeout;				/* units: Hz */
-static uint64_t	vdc_usec_timeout = 30 * MICROSEC;	/* 30s units: ns */
 
 static uint64_t vdc_hz_min_ldc_delay;
 static uint64_t vdc_min_timeout_ldc = 1 * MILLISEC;
@@ -252,7 +245,7 @@ uint64_t	vdc_matchinst = 0ull;
  *
  * The first array entry is the latest and preferred version.
  */
-static const vio_ver_t	vdc_version[] = {{1, 0}};
+static const vio_ver_t	vdc_version[] = {{1, 1}};
 
 static struct cb_ops vdc_cb_ops = {
 	vdc_open,	/* cb_open */
@@ -530,8 +523,6 @@ vdc_do_attach(dev_info_t *dip)
 	 */
 	vdc->initialized = VDC_SOFT_STATE;
 
-	vdc_hz_timeout = drv_usectohz(vdc_usec_timeout);
-
 	vdc_hz_min_ldc_delay = drv_usectohz(vdc_min_timeout_ldc);
 	vdc_hz_max_ldc_delay = drv_usectohz(vdc_max_timeout_ldc);
 
@@ -545,6 +536,16 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->session_id = 0;
 	vdc->block_size = DEV_BSIZE;
 	vdc->max_xfer_sz = maxphys / DEV_BSIZE;
+
+	/*
+	 * We assume, for now, that the vDisk server will export 'read'
+	 * operations to us at a minimum (this is needed because of checks
+	 * in vdc for supported operations early in the handshake process).
+	 * The vDisk server will return ENOTSUP if this is not the case.
+	 * The value will be overwritten during the attribute exchange with
+	 * the bitmask of operations exported by server.
+	 */
+	vdc->operations = VD_OP_MASK_READ;
 
 	vdc->vtoc = NULL;
 	vdc->geom = NULL;
@@ -615,6 +616,7 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
 	vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
 	vdc->geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
+	vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
 
 	mutex_enter(&vdc->lock);
 	(void) vdc_validate_geometry(vdc);
@@ -1542,6 +1544,7 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	pkt.xfer_mode = VIO_DRING_MODE;
 	pkt.operations = 0;	/* server will set bits of valid operations */
 	pkt.vdisk_type = 0;	/* server will set to valid device type */
+	pkt.vdisk_media = 0;	/* server will set to valid media type */
 	pkt.vdisk_size = 0;	/* server will set to valid size */
 
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
@@ -1827,7 +1830,7 @@ vdc_recv(vdc_t *vdc, vio_msg_t *msgp, size_t *nbytesp)
 {
 	int		status;
 	boolean_t	q_has_pkts = B_FALSE;
-	int		delay_time;
+	uint64_t	delay_time;
 	size_t		len;
 
 	mutex_enter(&vdc->read_lock);
@@ -1866,7 +1869,7 @@ loop:
 
 	case 0:
 		if (len == 0) {
-			DMSG(vdc, 0, "[%d] ldc_read returned 0 bytes with "
+			DMSG(vdc, 1, "[%d] ldc_read returned 0 bytes with "
 			    "no error!\n", vdc->instance);
 			goto loop;
 		}
@@ -1946,8 +1949,7 @@ vdc_decode_tag(vdc_t *vdcp, vio_msg_t *msg)
  * Description:
  *	The function encapsulates the call to write a message using LDC.
  *	If LDC indicates that the call failed due to the queue being full,
- *	we retry the ldc_write() [ up to 'vdc_retries' time ], otherwise
- *	we return the error returned by LDC.
+ *	we retry the ldc_write(), otherwise we return the error returned by LDC.
  *
  * Arguments:
  *	ldc_handle	- LDC handle for the channel this instance of vdc uses
@@ -1975,7 +1977,7 @@ vdc_send(vdc_t *vdc, caddr_t pkt, size_t *msglen)
 	ASSERT(*msglen != 0);
 
 #ifdef DEBUG
-	vdc_decode_tag(vdc, (vio_msg_t *)pkt);
+	vdc_decode_tag(vdc, (vio_msg_t *)(uintptr_t)pkt);
 #endif
 	/*
 	 * Wait indefinitely to send if channel
@@ -2673,9 +2675,8 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
  * Return Codes:
  *	0
  *	EAGAIN
- *		EFAULT
- *		ENXIO
- *		EIO
+ *	ECONNRESET
+ *	ENXIO
  */
 static int
 vdc_populate_descriptor(vdc_t *vdcp, int operation, caddr_t addr,
@@ -3257,7 +3258,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 	}
 
 	if (event & LDC_EVT_READ) {
-		DMSG(vdc, 0, "[%d] Received LDC_EVT_READ\n", vdc->instance);
+		DMSG(vdc, 1, "[%d] Received LDC_EVT_READ\n", vdc->instance);
 		mutex_enter(&vdc->read_lock);
 		cv_signal(&vdc->read_cv);
 		vdc->read_state = VDC_READ_PENDING;
@@ -4119,23 +4120,6 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	return (0);
 }
 
-/*
- * Function:
- *	vdc_process_err_msg()
- *
- * NOTE: No error messages are used as part of the vDisk protocol
- */
-static int
-vdc_process_err_msg(vdc_t *vdc, vio_msg_t msg)
-{
-	_NOTE(ARGUNUSED(vdc))
-	_NOTE(ARGUNUSED(msg))
-
-	ASSERT(msg.tag.vio_msgtype == VIO_TYPE_ERR);
-	DMSG(vdc, 1, "[%d] Got an ERR msg", vdc->instance);
-
-	return (ENOTSUP);
-}
 
 /*
  * Function:
@@ -4283,6 +4267,11 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 
 		vdc->vdisk_size = attr_msg->vdisk_size;
 		vdc->vdisk_type = attr_msg->vdisk_type;
+		vdc->operations = attr_msg->operations;
+		if (vio_ver_is_supported(vdc->ver, 1, 1))
+			vdc->vdisk_media = attr_msg->vdisk_media;
+		else
+			vdc->vdisk_media = 0;
 
 		DMSG(vdc, 0, "[%d] max_xfer_sz: sent %lx acked %lx\n",
 		    vdc->instance, vdc->max_xfer_sz, attr_msg->max_xfer_sz);
@@ -4292,7 +4281,7 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 
 		/*
 		 * We don't know at compile time what the vDisk server will
-		 * think are good values but we apply an large (arbitrary)
+		 * think are good values but we apply a large (arbitrary)
 		 * upper bound to prevent memory exhaustion in vdc if it was
 		 * allocating a DRing based of huge values sent by the server.
 		 * We probably will never exceed this except if the message
@@ -4309,6 +4298,7 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 
 		if ((attr_msg->xfer_mode != VIO_DRING_MODE) ||
 		    (attr_msg->vdisk_size > INT64_MAX) ||
+		    (attr_msg->operations == 0) ||
 		    (attr_msg->vdisk_type > VD_DISK_TYPE_DISK)) {
 			DMSG(vdc, 0, "[%d] Invalid attributes from vds",
 			    vdc->instance);
@@ -4928,7 +4918,8 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	case DKIOCFLUSHWRITECACHE:
 		{
-			struct dk_callback *dkc = (struct dk_callback *)arg;
+			struct dk_callback *dkc =
+			    (struct dk_callback *)(uintptr_t)arg;
 			vdc_dk_arg_t	*dkarg = NULL;
 
 			DMSG(vdc, 1, "[%d] Flush W$: mode %x\n",
@@ -4987,12 +4978,18 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	/* catch programming error in vdc - should be a VD_OP_XXX ioctl */
 	ASSERT(iop->op != 0);
 
+	/* check if the vDisk server handles the operation for this vDisk */
+	if (VD_OP_SUPPORTED(vdc->operations, iop->op) == B_FALSE) {
+		DMSG(vdc, 0, "[%d] Unsupported VD_OP operation (0x%x)\n",
+		    vdc->instance, iop->op);
+		return (ENOTSUP);
+	}
+
 	/* LDC requires that the memory being mapped is 8-byte aligned */
 	alloc_len = P2ROUNDUP(len, sizeof (uint64_t));
 	DMSG(vdc, 1, "[%d] struct size %ld alloc %ld\n",
 	    instance, len, alloc_len);
 
-	ASSERT(alloc_len >= 0); /* sanity check */
 	if (alloc_len > 0)
 		mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
 
@@ -5168,6 +5165,7 @@ vdc_get_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	}
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		/* LINTED E_ASSIGN_NARROW_CONV */
 		vtoctovtoc32(vt, vt32);
 		tmp_memp = &vt32;
 	} else {
@@ -5418,16 +5416,19 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	return (0);
 }
 
+
+/* -------------------------------------------------------------------------- */
+
 /*
  * Function:
  *	vdc_create_fake_geometry()
  *
  * Description:
- *	This routine fakes up the disk info needed for some DKIO ioctls.
- *		- DKIOCINFO
- *		- DKIOCGMEDIAINFO
+ *	This routine fakes up the disk info needed for some DKIO ioctls such
+ *	as DKIOCINFO and DKIOCGMEDIAINFO [just like lofi(7D) and ramdisk(7D) do]
  *
- *	[ just like lofi(7D) and ramdisk(7D) ]
+ *	Note: This function must not be called until the vDisk attributes have
+ *	been exchanged as part of the handshake with the vDisk server.
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
@@ -5456,8 +5457,22 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	 * We currently set the controller type to DKC_DIRECT for any disk.
 	 * When SCSI support is implemented, we will eventually change this
 	 * type to DKC_SCSI_CCS for disks supporting the SCSI protocol.
+	 * If the virtual disk is backed by a physical CD/DVD device or
+	 * an ISO image, modify the controller type to indicate this
 	 */
-	vdc->cinfo->dki_ctype = DKC_DIRECT;
+	switch (vdc->vdisk_media) {
+	case VD_MEDIA_CD:
+	case VD_MEDIA_DVD:
+		vdc->cinfo->dki_ctype = DKC_CDROM;
+		break;
+	case VD_MEDIA_FIXED:
+		vdc->cinfo->dki_ctype = DKC_DIRECT;
+		break;
+	default:
+		/* in the case of v1.0 we default to a fixed disk */
+		vdc->cinfo->dki_ctype = DKC_DIRECT;
+		break;
+	}
 	vdc->cinfo->dki_flags = DKI_FMTVOL;
 	vdc->cinfo->dki_cnum = 0;
 	vdc->cinfo->dki_addr = 0;
@@ -5477,9 +5492,16 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	 */
 	if (vdc->minfo == NULL)
 		vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
-	vdc->minfo->dki_media_type = DK_FIXED_DISK;
+
+	if (vio_ver_is_supported(vdc->ver, 1, 1)) {
+		vdc->minfo->dki_media_type =
+		    VD_MEDIATYPE2DK_MEDIATYPE(vdc->vdisk_media);
+	} else {
+		vdc->minfo->dki_media_type = DK_FIXED_DISK;
+	}
+
 	vdc->minfo->dki_capacity = vdc->vdisk_size;
-	vdc->minfo->dki_lbsize = DEV_BSIZE;
+	vdc->minfo->dki_lbsize = vdc->block_size;
 }
 
 static ushort_t
@@ -5623,7 +5645,7 @@ vdc_validate_geometry(vdc_t *vdc)
 	buf->b_un.b_addr = (caddr_t)&label;
 	buf->b_bcount = DK_LABEL_SIZE;
 	buf->b_flags = B_BUSY | B_READ;
-	buf->b_dev = dev;
+	buf->b_dev = cmpdev(dev);
 	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)&label,
 	    DK_LABEL_SIZE, VD_SLICE_NONE, 0, CB_STRATEGY, buf, VIO_read_dir);
 	if (rv) {

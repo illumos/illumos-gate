@@ -340,3 +340,34 @@ vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size)
 	}
 	return (mp);
 }
+
+/*
+ * -----------------------------------------------------------------------------
+ * LDoms versioning functions
+ *
+ * Future work: the version negotiating code in the various VIO drivers
+ * could be made common and placed here.
+ */
+
+/*
+ * Description:
+ *	This function checks to see if the supplied version tuple (major,minor)
+ *	is supported by the version 'ver', negotiated during the handshake
+ *	between the client and the server (ver).
+ *
+ * Assumption:
+ *	This function assumes that backward compatability is not broken in
+ *	newer minor versions of the protocol (e.g. v1.5 & v1.1 support v1.0)
+ *
+ * Return Value:
+ *	B_TRUE		- The (major,minor) version is supported
+ *	B_FALSE		- not supported
+ */
+boolean_t
+vio_ver_is_supported(vio_ver_t ver, uint16_t major, uint16_t minor)
+{
+	if ((ver.major == major) && (ver.minor >= minor))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,17 @@ typedef enum vd_state {
 #define	VD_VER_MINOR		0x0
 
 /*
+ * Definition of the various types of media that can be exported by
+ * the vDisk server. If we cannot work out what the media type is
+ * we default to calling it VD_MEDIA_FIXED.
+ */
+typedef enum vd_media {
+	VD_MEDIA_FIXED = 1,		/* default */
+	VD_MEDIA_CD,
+	VD_MEDIA_DVD
+} vd_media_t;
+
+/*
  * vDisk device attributes information message.
  *
  * tag.msgtype == VIO_TYPE_CTRL
@@ -72,7 +83,8 @@ typedef struct vd_attr_msg {
 	/* vdisk-attribute-specific payload */
 	uint8_t		xfer_mode;	/* data exchange method. */
 	uint8_t		vdisk_type;	/* disk, slice, read-only, etc. */
-	uint16_t	resv;		/* padding */
+	uint8_t		vdisk_media;	/* info about physical media */
+	uint8_t		resv1;		/* padding */
 	uint32_t	vdisk_block_size;	/* bytes per disk block */
 	uint64_t	operations;	/* bit-field of server supported ops */
 	uint64_t	vdisk_size;	/* size for Nblocks property. */

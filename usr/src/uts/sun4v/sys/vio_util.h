@@ -30,10 +30,18 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stream.h>
+#include <sys/vio_mailbox.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+/*
+ * Helper routines for the Logical Domains (LDoms) drivers
+ *
+ * Note: The contents of this file are private to the implementation of the
+ * LDoms drivers and are subject to change at any time without notice.
+ */
 
 /*
  * A message is composed of three structures. A message block (mblk_t), a
@@ -133,6 +141,12 @@ void vio_freeb(void *arg);
 int vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...);
 void vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp);
 mblk_t *vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size);
+
+/* VIO versioning helpers */
+#define	VIO_VER_IS_NEGOTIATED(ver, maj, min)		\
+	((ver.major == (maj)) && (ver.minor == (min)))
+
+boolean_t	vio_ver_is_supported(vio_ver_t ver, uint16_t maj, uint16_t min);
 
 #ifdef	__cplusplus
 }

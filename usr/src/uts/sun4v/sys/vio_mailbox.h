@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,9 +94,6 @@ extern "C" {
 #define	VDEV_NETWORK_SWITCH	0x2
 #define	VDEV_DISK		0x3
 #define	VDEV_DISK_SERVER	0x4
-
-/* addr_type */
-#define	ADDR_TYPE_MAC	0x1	/* XXX move to vnet_mailbox.h ? */
 
 /*
  * VIO data transfer mode
@@ -320,21 +317,6 @@ typedef struct vio_raw_data_msg {
 #define	VIO_DESC_ACCEPTED	0x3
 #define	VIO_DESC_DONE		0x4
 #define	VIO_DESC_MASK		0xf
-
-/* Macro to check that the state in variable supplied is a valid DRing state */
-#define	VIO_IS_VALID_DESC_STATE(flag)					\
-	(((flag | VIO_DESC_MASK) == VIO_DESC_FREE) ||			\
-		((flag | VIO_DESC_MASK) == VIO_DESC_READY) ||		\
-		((flag | VIO_DESC_MASK) == VIO_DESC_ACCEPTED) ||	\
-		((flag | VIO_DESC_MASK) == VIO_DESC_READY))
-
-#define	VIO_SET_DESC_STATE(flag, state)					\
-	{								\
-		flag &= (flag | ~VIO_DESC_MASK);			\
-		flag |= (state & VIO_DESC_MASK);			\
-	}
-
-#define	VIO_GET_DESC_STATE(flag)	((flag) & VIO_DESC_MASK)
 
 /* Macro to populate the generic fields of the DRing data msg */
 #define	VIO_INIT_DRING_DATA_TAG(dmsg)	\
