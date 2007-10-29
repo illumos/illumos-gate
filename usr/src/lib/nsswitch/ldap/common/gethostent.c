@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,103 +129,105 @@ _nss_ldap_hosts2str_int(int af, ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	buf2 = other_hosts;
 	first_entry = 1;
 	for (entry = result->entry; entry != NULL; entry = entry->next) {
-	    if (firstimedn) {
-		    dns =  __ns_ldap_getAttr(entry, _H_DN);
-		    if (dns == NULL || dns[0] == NULL || strlen(dns[0]) < 1) {
+		if (firstimedn) {
+			dns =  __ns_ldap_getAttr(entry, _H_DN);
+			if (dns == NULL || dns[0] == NULL || strlen(dns[0])
+			    < 1) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_host2str;
+			}
+			/* get domain name associated with this dn */
+			be->toglue = _get_domain_name(dns[0]);
+			firstimedn = 0;
+		}
+
+		/* Get IP */
+		ips = __ns_ldap_getAttr(entry, _H_ADDR);
+		if (ips == NULL || ips[0] == NULL || strlen(ips[0]) < 1) {
 			nss_result = NSS_STR_PARSE_PARSE;
 			goto result_host2str;
-		    }
-		    /* get domain name associated with this dn */
-		    be->toglue = _get_domain_name(dns[0]);
-		    firstimedn = 0;
-	    }
-
-	    /* Get IP */
-	    ips = __ns_ldap_getAttr(entry, _H_ADDR);
-	    if (ips == NULL || ips[0] == NULL || strlen(ips[0]) < 1) {
-		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_host2str;
-	    }
-	    /* Skip IPV6 address in AF_INET mode */
-	    if (af == AF_INET &&
-		(inet_addr(_strip_quotes(ips[0])) == (in_addr_t)-1))
-		    continue;
-
-	    /* A valid address for either af mode */
-	    validaddress++;
-
-	    if (first_entry) {
-		len = snprintf(buf1, buflen1, "%s", ips[0]);
-		TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
-	    } else {
-		len = snprintf(buf2, buflen2, "\n%s ", ips[0]);
-		TEST_AND_ADJUST(len, buf2, buflen2, result_host2str);
-	    }
-
-	    /* Get host names */
-	    names = __ns_ldap_getAttrStruct(entry, _H_NAME);
-	    if (names == NULL || names->attrvalue == NULL) {
-		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_host2str;
-	    }
-
-	    /* Get canonical name of each entry */
-	    cname = __s_api_get_canonical_name(entry,
-			names, 1);
-	    if (cname == NULL || strlen(cname) < 1) {
-		nss_result = NSS_STR_PARSE_PARSE;
-		goto result_host2str;
-	    }
-
-	    /* Filter cname that's identical to h_name */
-	    if (first_entry) {
-		    h_name = cname;
-		    first_entry = 0;
-		    copy_cname = 1;
-	    } else if (strcasecmp(cname, h_name) != 0) {
-		    copy_cname = 1;
-	    } else
-		    copy_cname = 0;
-
-	    if (copy_cname) {
-		/* Use the canonical name as the host name */
-		if (DOTTEDSUBDOMAIN(cname))
-			len = snprintf(buf1, buflen1, " %s", cname);
-		else
-			/* append domain name */
-			len = snprintf(buf1, buflen1, " %s.%s", cname,
-					be->toglue);
-
-		TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
-	    }
-
-	    /* Append aliases */
-	    for (i = 0; i < names->value_count; i++) {
-		name = names->attrvalue[i];
-		if (name == NULL) {
-		    nss_result = NSS_STR_PARSE_PARSE;
-		    goto result_host2str;
 		}
-		/* Skip the canonical name and h_name */
-		if (strcasecmp(name, cname) != 0 &&
-				strcasecmp(name, h_name) != 0) {
-		    if (DOTTEDSUBDOMAIN(name))
-			len = snprintf(buf1, buflen1, " %s", name);
-		    else
-			/* append domain name */
-			len = snprintf(buf1, buflen1, " %s.%s",
+		/* Skip IPV6 address in AF_INET mode */
+		if (af == AF_INET &&
+		    (inet_addr(_strip_quotes(ips[0])) == (in_addr_t)-1))
+			continue;
+
+		/* A valid address for either af mode */
+		validaddress++;
+
+		if (first_entry) {
+			len = snprintf(buf1, buflen1, "%s", ips[0]);
+			TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
+		} else {
+			len = snprintf(buf2, buflen2, "\n%s ", ips[0]);
+			TEST_AND_ADJUST(len, buf2, buflen2, result_host2str);
+		}
+
+		/* Get host names */
+		names = __ns_ldap_getAttrStruct(entry, _H_NAME);
+		if (names == NULL || names->attrvalue == NULL) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_host2str;
+		}
+
+		/* Get canonical name of each entry */
+		cname = __s_api_get_canonical_name(entry, names, 1);
+		if (cname == NULL || strlen(cname) < 1) {
+			nss_result = NSS_STR_PARSE_PARSE;
+			goto result_host2str;
+		}
+
+		/* Filter cname that's identical to h_name */
+		if (first_entry) {
+			h_name = cname;
+			first_entry = 0;
+			copy_cname = 1;
+		} else if (strcasecmp(cname, h_name) != 0) {
+			copy_cname = 1;
+		} else
+			copy_cname = 0;
+
+		if (copy_cname) {
+			/* Use the canonical name as the host name */
+			if (be->toglue == NULL || DOTTEDSUBDOMAIN(cname))
+				len = snprintf(buf1, buflen1, " %s", cname);
+			else
+				/* append domain name */
+				len = snprintf(buf1, buflen1, " %s.%s", cname,
+				    be->toglue);
+
+			TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
+		}
+
+		/* Append aliases */
+		for (i = 0; i < names->value_count; i++) {
+			name = names->attrvalue[i];
+			if (name == NULL) {
+				nss_result = NSS_STR_PARSE_PARSE;
+				goto result_host2str;
+			}
+			/* Skip the canonical name and h_name */
+			if (strcasecmp(name, cname) != 0 &&
+			    strcasecmp(name, h_name) != 0) {
+				if (be->toglue == NULL || DOTTEDSUBDOMAIN(name))
+					len = snprintf(buf1, buflen1, " %s",
+					    name);
+				else
+					/* append domain name */
+					len = snprintf(buf1, buflen1, " %s.%s",
 					    name, be->toglue);
-		    TEST_AND_ADJUST(len, buf1, buflen1, result_host2str);
+				TEST_AND_ADJUST(len, buf1, buflen1,
+				    result_host2str);
+			}
 		}
-	    }
 	}
 
 	if (validaddress == 0) {
 	/*
 	 * For AF_INET mode, it found an IPv6 address and skipped it.
 	 */
-	    nss_result = NSS_STR_PARSE_NO_ADDR;
-	    goto result_host2str;
+		nss_result = NSS_STR_PARSE_NO_ADDR;
+		goto result_host2str;
 	}
 	/* Combine 2 strings */
 	len = snprintf(buffer, buflen, "%s%s", first_host, other_hosts);
@@ -347,9 +349,8 @@ getbyname(ldap_backend_ptr be, void *a)
 		if (rc >= sizeof (userdata) || rc < 0)
 			return ((nss_status_t)NSS_NOTFOUND);
 	}
-	lstat = (nss_status_t)_nss_ldap_lookup(be, argp, _HOSTS,
-		searchfilter, NULL, _merge_SSD_filter,
-		userdata);
+	lstat = (nss_status_t)_nss_ldap_lookup(be, argp, _HOSTS, searchfilter,
+	    NULL, _merge_SSD_filter, userdata);
 	if (lstat == (nss_status_t)NS_LDAP_SUCCESS)
 		return ((nss_status_t)NSS_SUCCESS);
 
@@ -398,8 +399,8 @@ getbyaddr(ldap_backend_ptr be, void *a)
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
-	lstat = (nss_status_t)_nss_ldap_lookup(be, argp,
-		_HOSTS, searchfilter, NULL, _merge_SSD_filter, userdata);
+	lstat = (nss_status_t)_nss_ldap_lookup(be, argp, _HOSTS, searchfilter,
+	    NULL, _merge_SSD_filter, userdata);
 	if (lstat == (nss_status_t)NS_LDAP_SUCCESS)
 		return ((nss_status_t)NSS_SUCCESS);
 
@@ -430,6 +431,6 @@ _nss_ldap_hosts_constr(const char *dummy1, const char *dummy2,
 {
 
 	return ((nss_backend_t *)_nss_ldap_constr(hosts_ops,
-		sizeof (hosts_ops)/sizeof (hosts_ops[0]), _HOSTS,
-		hosts_attrs, _nss_ldap_hosts2str));
+	    sizeof (hosts_ops)/sizeof (hosts_ops[0]), _HOSTS,
+	    hosts_attrs, _nss_ldap_hosts2str));
 }
