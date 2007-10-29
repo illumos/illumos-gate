@@ -25,10 +25,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(lint)
 #include <sys/asm_linkage.h>
 
 #if defined(_KERNEL)
+#if !defined(lint)
 	/*
 	 * Legacy kernel interfaces; they will go away (eventually).
 	 */
@@ -40,12 +40,13 @@
 	ANSI_PRAGMA_WEAK2(atomic_and_long,atomic_and_ulong,function)
 	ANSI_PRAGMA_WEAK2(atomic_or_long,atomic_or_ulong,function)
 	ANSI_PRAGMA_WEAK2(swapl,atomic_swap_32,function)
-#else
+#endif	/* lint */
+#else	/* _KERNEL */
 	/*
 	 * Include the definitions for the libc weak aliases.
 	 */
 #include "../atomic_asm_weak.h"
-#endif
+#endif	/* _KERNEL */
 
 #ifdef N2_ERRATUM_181_WORKAROUND
 #define	BACKOFF_INIT_VALUE	1
@@ -71,16 +72,16 @@ label/**/_1:			; \
 	nop			; \
 	ba,pt	%xcc, retlabel	; \
 	nop
-#else
+#else	/* N2_ERRATUM_181_WORKAROUND */
 #define	ATOMIC_BACKOFF_INIT(val)
 	
 #define	ATOMIC_BACKOFF_BRANCH(cr, backoff, loop) \
 	bne,a,pn cr, loop
 	
 #define	ATOMIC_BACKOFF_BACKOFF(val, limit, label, retlabel)
-#endif
+#endif	/* N2_ERRATUM_181_WORKAROUND */
 
-
+#if !defined(lint)
 	ENTRY(atomic_inc_8)
 	ALTENTRY(atomic_inc_8_nv)
 	ALTENTRY(atomic_inc_uchar)

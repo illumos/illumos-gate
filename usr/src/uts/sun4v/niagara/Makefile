@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ UTSBASE	= ../..
 #
 MODULE		= SUNW,UltraSPARC-T1
 OBJECTS		= $(NIAGARACPU_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(NIAGARACPU:%.o=$(LINTS_DIR)/%.ln)
+LINTS		= $(NIAGARACPU_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_CPU_DIR)/$(MODULE)
 
 CPU_DIR		= .

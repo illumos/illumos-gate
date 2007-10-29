@@ -644,7 +644,7 @@ page_coloring_init_cpu()
 
 	(void) plat_mem_node_iterator_init(0, 0, &it, 1);
 	for (i = 0; i < mmu_page_sizes; i++) {
-		memset(&m, 0, sizeof (m));
+		(void) memset(&m, 0, sizeof (m));
 		id = it.mi_mnode_pfn_mask >> 15;	/* node id mask */
 		id &= idmask[i];
 		lo = lowbit(id);

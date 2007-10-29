@@ -207,7 +207,7 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 {
 	struct tsbe *tsbaddr;
 
-	for (tsbaddr = (struct tsbe *)tsb_base;
+	for (tsbaddr = (struct tsbe *)(uintptr_t)tsb_base;
 	    (uintptr_t)tsbaddr < (uintptr_t)(tsb_base + tsb_bytes);
 	    tsbaddr++) {
 		tsbaddr->tte_tag.tag_inthi = TSBTAG_INVALID;
@@ -230,14 +230,13 @@ vis1_partial_support(struct regs *rp, k_siginfo_t *siginfo, uint_t *fault)
 	char *badaddr;
 	int instr;
 	uint_t	optype, op3, asi;
-	uint_t	rd, ignor;
+	uint_t	ignor;
 
 	if (!USERMODE(rp->r_tstate))
 		return (-1);
 
 	instr = fetch_user_instr((caddr_t)rp->r_pc);
 
-	rd = (instr >> 25) & 0x1f;
 	optype = (instr >> 30) & 0x3;
 	op3 = (instr >> 19) & 0x3f;
 	ignor = (instr >> 5) & 0xff;

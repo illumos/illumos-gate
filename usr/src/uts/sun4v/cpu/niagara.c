@@ -231,6 +231,7 @@ cpu_uninit_private(struct cpu *cp)
  * synchronized wrt the i$, regardless of address or ASI.  In fact,
  * the address is ignored, so we always flush address 0.
  */
+/*ARGSUSED*/
 void
 dtrace_flush_sec(uintptr_t addr)
 {
@@ -249,14 +250,13 @@ vis1_partial_support(struct regs *rp, k_siginfo_t *siginfo, uint_t *fault)
 	char *badaddr;
 	int instr;
 	uint_t	optype, op3, asi;
-	uint_t	rd, ignor;
+	uint_t	ignor;
 
 	if (!USERMODE(rp->r_tstate))
 		return (-1);
 
 	instr = fetch_user_instr((caddr_t)rp->r_pc);
 
-	rd = (instr >> 25) & 0x1f;
 	optype = (instr >> 30) & 0x3;
 	op3 = (instr >> 19) & 0x3f;
 	ignor = (instr >> 5) & 0xff;
@@ -385,7 +385,7 @@ cpu_trapstat_data(void *buf, uint_t tstat_pgszs)
 {
 	niagara_mmustat_t	*mmustatp;
 	tstat_pgszdata_t	*tstatp = (tstat_pgszdata_t *)buf;
-	int	i, pgcnt;
+	int	i;
 
 	if (cpu_tstat_va == NULL)
 		return;

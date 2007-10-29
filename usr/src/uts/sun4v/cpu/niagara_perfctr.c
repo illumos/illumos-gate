@@ -281,8 +281,9 @@ niagara_kstat_init()
 {
 	int i;
 	ni_ksinfo_t *ksinfop;
-	uint64_t pcr;
-	uint64_t stat;
+#ifdef VFALLS_IMPL
+	uint64_t stat, pcr;
+#endif
 
 #ifdef DEBUG
 	if (ni_perf_debug)
