@@ -3387,17 +3387,36 @@ daemon_call(const char *root, struct dca_off *dcp)
 	struct stat	sb;
 	char		*prefix;
 	int		rofd;
+	int		rdonly;
 
 	/*
-	 * If /etc/dev missing and readonly root, assume we are in install.
-	 * Don't use statvfs() since it doesn't always report the truth.
+	 * If root is readonly, there are two possibilities:
+	 *	- we are in some sort of install scenario
+	 *	- we are early in boot
+	 * If the latter we don't want daemon_call()  to succeed.
+	 * else we want to use /tmp/etc/dev
+	 *
+	 * Both of these requrements are fulfilled if we check for
+	 * for a root owned door file in /tmp/etc/dev. If we are
+	 * early in boot, the door file won't exist, so this call
+	 * will fail.
+	 *
+	 * If we are in install, the door file will be present.
+	 *
+	 * If root is read-only, try only once, since libdevinfo
+	 * isn't capable of starting devfsadmd correctly in that
+	 * situation.
+	 *
+	 * Don't use statvfs() to check for readonly roots since it
+	 * doesn't always report the truth.
 	 */
 	rofd = -1;
-	if (stat("/etc/dev", &sb) == -1 &&
-	    (rofd = open(DEVNAME_CHECK_FILE,
-	    O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1 && errno == EROFS)
+	rdonly = 0;
+	if ((rofd = open(DEVNAME_CHECK_FILE, O_WRONLY|O_CREAT|O_TRUNC, 0644))
+	    == -1 && errno == EROFS) {
+		rdonly = 1;
 		prefix = "/tmp";
-	else {
+	} else {
 		if (rofd != -1) {
 			(void) close(rofd);
 			(void) unlink(DEVNAME_CHECK_FILE);
@@ -3407,6 +3426,19 @@ daemon_call(const char *root, struct dca_off *dcp)
 
 	(void) snprintf(synch_door, sizeof (synch_door),
 	    "%s/etc/dev/%s", prefix, DEVFSADM_SYNCH_DOOR);
+
+	/*
+	 * Return ENOTSUP to prevent retries if root is readonly
+	 */
+	if (stat(synch_door, &sb) == -1 || sb.st_uid != 0) {
+		if (rdonly)
+			dcp->dca_error = ENOTSUP;
+		else
+			dcp->dca_error = ENOENT;
+		dprintf(DBG_ERR, "stat failed: %s: no file or not root owned\n",
+		    synch_door);
+		return;
+	}
 
 	if ((fd = open(synch_door, O_RDONLY)) == -1) {
 		dcp->dca_error = errno;
