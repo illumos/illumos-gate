@@ -3571,7 +3571,9 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 			ret = raid_dev_config(CFGA_CMD_CONFIGURE,
 			    controller_attr->controller_id,
 			    disk_ids[i], 0);
-			if (ret < SUCCESS) {
+			if (ret == ERR_ARRAY_CONFIG)
+				ret = SUCCESS;
+			else if (ret < SUCCESS) {
 				free(disk_ids);
 				return (ret);
 			}
