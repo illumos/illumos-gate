@@ -233,6 +233,8 @@ uint64_t memlist_sz;
 
 char tbr_wr_addr_inited = 0;
 
+caddr_t	mpo_heap32_buf = NULL;
+size_t	mpo_heap32_bufsz = 0;
 
 /*
  * Static Routines:
@@ -1678,8 +1680,8 @@ kmem64_alloced:
 	bp_init(shm_alignment, HAT_STRICTORDER);
 
 	/*
-	 * Reserve space for panicbuf, intr_vec_table and reserved interrupt
-	 * vector data structures from the 32-bit heap.
+	 * Reserve space for panicbuf, intr_vec_table, reserved interrupt
+	 * vector data structures and MPO mblock structs from the 32-bit heap.
 	 */
 	(void) vmem_xalloc(heap32_arena, PANICBUFSIZE, PAGESIZE, 0, 0,
 	    panicbuf, panicbuf + PANICBUFSIZE,
@@ -1689,6 +1691,12 @@ kmem64_alloced:
 	    intr_vec_table, (caddr_t)intr_vec_table + IVSIZE,
 	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
+	if (mpo_heap32_bufsz > (size_t)0) {
+		(void) vmem_xalloc(heap32_arena, mpo_heap32_bufsz,
+		    PAGESIZE, 0, 0, mpo_heap32_buf,
+		    mpo_heap32_buf + mpo_heap32_bufsz,
+		    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
+	}
 	mem_config_init();
 }
 

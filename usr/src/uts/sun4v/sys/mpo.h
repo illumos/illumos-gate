@@ -34,12 +34,12 @@
 extern "C" {
 #endif
 
+#include <sys/lgrp.h>
+
 /*
  * mpo.h -  Sun4v MPO common header file
  *
  */
-#define	MPO_MAX_MBLOCKS		16
-#define	MAX_MEM_STRIPES	(MAX_MEM_NODES * MPO_MAX_MBLOCKS)
 
 #define	PROP_LG_CPU_ID	"id"
 #define	PROP_LG_MASK	"address-mask"
@@ -87,6 +87,7 @@ struct mblock_md {
 	mde_cookie_t	node;
 	pfn_t		base_pfn;
 	pfn_t		end_pfn;
+	mnodeset_t	mnode_mask;
 };
 
 /* Structure for memnode information for use by plat_pfn_to_mem_node */
@@ -104,6 +105,9 @@ typedef struct {
 	int exists;	/* set to 1 if mblock has memory in this mnode stripe */
 } mem_stripe_t;
 
+/* These are used when MPO requires preallocated kvseg32 space */
+extern	caddr_t	mpo_heap32_buf;
+extern	size_t	mpo_heap32_bufsz;
 
 #ifdef	__cplusplus
 }

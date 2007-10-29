@@ -255,6 +255,14 @@ extern "C" {
 	(HEAPTEXT_SIZE / (HEAPTEXT_MAPPED + HEAPTEXT_UNMAPPED) + 2)
 
 /*
+ * Establish the space for the MPO support to store its data
+ * structures at startup
+ */
+
+#define	MPOBUF_SIZE	(2 * 1024 * 1024)
+#define	MPOBUF_BASE	(HEAPTEXT_BASE - MPOBUF_SIZE)
+
+/*
  * Preallocate an area for setting up the user stack during
  * the exec(). This way we have a faster allocator and also
  * make sure the stack is always VAC aligned correctly. see

@@ -38,6 +38,7 @@
 #include <sys/mpo.h>
 #include <vm/vm_dep.h>
 #include <vm/hat_sfmmu.h>
+#include <sys/promif.h>
 
 /*
  * MPO and the sun4v memory representation
@@ -107,11 +108,15 @@ static	int	n_locality_groups = 0;
 static	int	max_locality_groups = 0;
 
 /* Save mblocks from the MD */
-static 	struct	mblock_md mpo_mblock[MPO_MAX_MBLOCKS];
+#define	SMALL_MBLOCKS_COUNT	8
+static 	struct	mblock_md *mpo_mblock;
+static	struct 	mblock_md small_mpo_mblocks[SMALL_MBLOCKS_COUNT];
 static	int	n_mblocks = 0;
 
 /* Save mem_node stripes calculate from mblocks and lgroups. */
-static mem_stripe_t mem_stripes[MAX_MEM_STRIPES];
+static mem_stripe_t *mem_stripes;
+static	mem_stripe_t small_mem_stripes[SMALL_MBLOCKS_COUNT * MAX_MEM_NODES];
+static	int 	mstripesz = 0;
 static	int	n_mem_stripes = 0;
 static	pfn_t	mnode_stride;	/* distance between stripes, start to start */
 static	int	stripe_shift;	/* stride/stripes expressed as a shift */
@@ -199,6 +204,8 @@ lgrp_traverse(md_t *md)
 	int result = 0;
 	int n_cpunodes = 0;
 	int sub_page_fix;
+	int mblocksz = 0;
+	size_t allocsz;
 
 	n_nodes = md_node_count(md);
 
@@ -225,16 +232,52 @@ lgrp_traverse(md_t *md)
 	n_mblocks = md_alloc_scan_dag(md, root, PROP_LG_MBLOCK,
 	    "fwd", &mblocknodes);
 
-	if (n_mblocks <= 0 || n_mblocks > MPO_MAX_MBLOCKS) {
+	if (n_mblocks <= 0) {
 		MPO_STATUS("lgrp_traverse: No mblock "
 		    "nodes detected in Machine Descriptor\n");
 		n_mblocks = 0;
 		ret_val = -1;
 		goto fail;
 	}
+	/*
+	 * If we have a small number of mblocks we will use the space
+	 * that we preallocated. Otherwise, we will dynamically
+	 * allocate the space
+	 */
+	mblocksz = n_mblocks * sizeof (struct mblock_md);
+	mstripesz = MAX_MEM_NODES * n_mblocks * sizeof (mem_stripe_t);
+
+	if (n_mblocks <= SMALL_MBLOCKS_COUNT) {
+		mpo_mblock = &small_mpo_mblocks[0];
+		mem_stripes = &small_mem_stripes[0];
+	} else {
+		allocsz = mmu_ptob(mmu_btopr(mblocksz + mstripesz));
+		/* Ensure that we dont request more space than reserved */
+		if (allocsz > MPOBUF_SIZE) {
+			MPO_STATUS("lgrp_traverse: Insufficient space "
+			    "for mblock structures \n");
+			ret_val = -1;
+			n_mblocks = 0;
+			goto fail;
+		}
+		mpo_mblock = (struct mblock_md *)
+		    prom_alloc((caddr_t)MPOBUF_BASE, allocsz, PAGESIZE);
+		if (mpo_mblock != (struct mblock_md *)MPOBUF_BASE) {
+			MPO_STATUS("lgrp_traverse: Cannot allocate space "
+			    "for mblocks \n");
+			ret_val = -1;
+			n_mblocks = 0;
+			goto fail;
+		}
+		mpo_heap32_buf = (caddr_t)MPOBUF_BASE;
+		mpo_heap32_bufsz = MPOBUF_SIZE;
+
+		mem_stripes = (mem_stripe_t *)(mpo_mblock + n_mblocks);
+	}
 
 	for (i = 0; i < n_mblocks; i++) {
 		mpo_mblock[i].node = mblocknodes[i];
+		mpo_mblock[i].mnode_mask = (mnodeset_t)0;
 
 		/* Without a base or size value we will fail */
 		result = get_int(md, mblocknodes[i], PROP_LG_BASE,
@@ -749,7 +792,7 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 			return;
 	}
 
-	bzero(mem_stripes, sizeof (mem_stripes));
+	bzero(mem_stripes, mstripesz);
 	stripe = ptob(mnode_pages);
 	stride = max_locality_groups * stripe;
 
@@ -787,6 +830,7 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 
 			mnode = lgrphand;
 			ASSERT(mnode < max_mem_nodes);
+			mpo_mblock[i].mnode_mask |= (mnodeset_t)1 << mnode;
 
 			/*
 			 * Calculate the size of the fragment that does not
@@ -992,7 +1036,8 @@ plat_mem_node_iterator_init(pfn_t pfn, int mnode,
 		return ((pfn_t)-1);
 
 	for (; i < n_mblocks; i++) {
-		if (pfn <= mpo_mblock[i].end_pfn)
+		if ((mpo_mblock[i].mnode_mask & ((mnodeset_t)1 << mnode)) &&
+		    (pfn <= mpo_mblock[i].end_pfn))
 			break;
 	}
 	if (i == n_mblocks) {
