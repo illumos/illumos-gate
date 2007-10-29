@@ -69,6 +69,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	forkx;
 	fsetattr;
 	getattrat;
+	_getpagesizes;
 	getpagesizes2;
 	_getpagesizes2;
 	htonl;
@@ -517,7 +518,6 @@ SUNW_1.21 {		# SunOS 5.9 (Solaris 9)
 	gethomelgroup;
 	_gethomelgroup =		NODYNSORT;
 	getpagesizes;
-	_getpagesizes;
 	getrctl;
 	_getrctl;
 	issetugid;
