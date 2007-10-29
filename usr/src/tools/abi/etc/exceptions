@@ -438,7 +438,12 @@ PSARC 2007/035: RULE W3: usr/lib/sparcv9/libpp.so.1
 PSARC 2006/277: RULE W3: usr/lib/krb5/db2.so.1
 PSARC 2006/277: RULE W3: usr/lib/krb5/kldap.so.1
 PSARC 2006/277: RULE W3: usr/lib/krb5/libkdb_ldap.so.1
- 
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/libmlrpc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/libmlsvc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmb.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmbns.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmbrdr.so.1
+
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 
 # exempts libraries with no versions found

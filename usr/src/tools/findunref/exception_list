@@ -207,6 +207,18 @@
 #
 ./src/cmd/syslogd/sparcv9/Makefile
 ./src/uts/sparc/uhci/Makefile
+./src/lib/pam_modules/smb/amd64/Makefile
+./src/lib/pam_modules/smb/sparcv9/Makefile
+./src/lib/smbsrv/libmlrpc/amd64/Makefile
+./src/lib/smbsrv/libmlrpc/sparcv9/Makefile
+./src/lib/smbsrv/libmlsvc/amd64/Makefile
+./src/lib/smbsrv/libmlsvc/sparcv9/Makefile
+./src/lib/smbsrv/libsmb/amd64/Makefile
+./src/lib/smbsrv/libsmb/sparcv9/Makefile
+./src/lib/smbsrv/libsmbns/amd64/Makefile
+./src/lib/smbsrv/libsmbns/sparcv9/Makefile
+./src/lib/smbsrv/libsmbrdr/amd64/Makefile
+./src/lib/smbsrv/libsmbrdr/sparcv9/Makefile
 
 #
 # Ignore files only used by lint.  Eventually, linting in these areas should

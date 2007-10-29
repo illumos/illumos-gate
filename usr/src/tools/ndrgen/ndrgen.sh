@@ -68,8 +68,8 @@ if [[ $CC_FLAG = "y" ]] ; then
 		CC=$1
 		shift $(($OPTIND - 1))
 
-		# Check for cw being invoked with -_cc
-		if [[ $1 = "-_cc" ]] ; then
+		# Check for cw being invoked with -_cc or -_gcc
+		if [[ $1 = "-_cc" || $1 = "-_gcc" ]] ; then
 			CC_ARG=$1
 			shift $(($OPTIND - 1))
 		fi

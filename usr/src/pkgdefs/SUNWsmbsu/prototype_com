@@ -64,7 +64,6 @@ d none usr/lib/mdb/kvm 755 root sys
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/smb 755 root sys
 f none usr/lib/fs/smb/libshare_smb.so.1 755 root bin
-s none usr/lib/fs/smb/libshare_smb.so=libshare_smb.so.1
 d none usr/lib/security 755 root bin
 f none usr/lib/security/pam_smb_passwd.so.1 755 root bin
 s none usr/lib/security/pam_smb_passwd.so=./pam_smb_passwd.so.1

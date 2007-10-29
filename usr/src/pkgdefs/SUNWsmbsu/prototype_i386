@@ -30,4 +30,3 @@ d none usr/lib/mdb/kvm/amd64 755 root sys
 f none usr/lib/mdb/kvm/amd64/smbsrv.so 555 root sys
 d none usr/lib/fs/smb/amd64 755 root sys
 f none usr/lib/fs/smb/amd64/libshare_smb.so.1 755 root bin
-s none usr/lib/fs/smb/amd64/libshare_smb.so=libshare_smb.so.1
