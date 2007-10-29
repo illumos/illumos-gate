@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1322,7 +1322,7 @@ worker_thread(void *arg)
 				 * If the child messes with the breakpoints and
 				 * this is vfork(), we have to set them again.
 				 */
-				if (Dynpat != NULL && is_vfork_child)
+				if (Dynpat != NULL && is_vfork_child && !fflag)
 					reset_traps = TRUE;
 				is_vfork_child = FALSE;
 			}
