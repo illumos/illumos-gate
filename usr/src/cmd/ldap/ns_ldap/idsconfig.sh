@@ -4104,7 +4104,7 @@ modify_top_aci()
 dn: ${LDAP_BASEDN}
 changetype: modify
 add: aci
-aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
+aci: (targetattr = "cn||uid||uidNumber||gidNumber||homeDirectory||shadowLastChange||shadowMin||shadowMax||shadowWarning||shadowInactive||shadowExpire||shadowFlag||memberUid||SolarisAuditAlways||SolarisAuditNever||SolarisAttrKeyValue||SolarisAttrReserved1||SolarisAttrReserved2||SolarisUserQualifier")(version 3.0; acl ${ACI_NAME}; deny (write) userdn = "ldap:///self";)
 -
 EOF
 ) > ${TMPDIR}/top_aci
