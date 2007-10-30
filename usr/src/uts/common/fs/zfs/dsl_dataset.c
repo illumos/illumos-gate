@@ -2340,6 +2340,9 @@ dsl_dataset_clone_swap_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	struct cloneswaparg *csa = arg1;
 
+	if (csa->ohds->ds_reserved != 0)
+		return (EINVAL);
+
 	/* they should both be heads */
 	if (dsl_dataset_is_snapshot(csa->cds) ||
 	    dsl_dataset_is_snapshot(csa->ohds))
@@ -2374,9 +2377,6 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	blkptr_t bp;
 	uint64_t unique = 0;
 	int err;
-
-	if (csa->ohds->ds_reserved)
-		panic("refreservation and clone swap are incompatible");
 
 	dmu_buf_will_dirty(csa->cds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->ohds->ds_dbuf, tx);
