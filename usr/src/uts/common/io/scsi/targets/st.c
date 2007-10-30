@@ -1077,6 +1077,15 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	mutex_enter(ST_MUTEX);
+
+	/*
+	 * Clear error entry stack
+	 */
+	st_empty_error_stack(un);
+
+	mutex_exit(ST_MUTEX);
+
 	switch (cmd) {
 
 	case DDI_DETACH:
@@ -9164,6 +9173,15 @@ st_empty_error_stack(struct scsi_tape *un)
 		linkp = un->un_error_entry_stk;
 		un->un_error_entry_stk =
 		    un->un_error_entry_stk->mtees_nextp;
+
+		if (linkp->mtees_entry.mtee_cdb_buf != NULL)
+			kmem_free(linkp->mtees_entry.mtee_cdb_buf,
+			    linkp->mtees_entry.mtee_cdb_len);
+
+		if (linkp->mtees_entry.mtee_arq_status != NULL)
+			kmem_free(linkp->mtees_entry.mtee_arq_status,
+			    linkp->mtees_entry.mtee_arq_status_len);
+
 		kmem_free(linkp, MTERROR_LINK_ENTRY_SIZE);
 		linkp = NULL;
 	}
