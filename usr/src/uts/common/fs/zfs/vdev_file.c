@@ -149,6 +149,11 @@ vdev_file_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
 	return (0);
 }
 
+/*
+ * Determine if the underlying device is accessible by reading and writing
+ * to a known location. We must be able to do this during syncing context
+ * and thus we cannot set the vdev state directly.
+ */
 static int
 vdev_file_probe(vdev_t *vd)
 {
@@ -184,13 +189,11 @@ vdev_file_probe(vdev_t *vd)
 		nvd = kmem_zalloc(sizeof (vdev_t), KM_SLEEP);
 		if (vd->vdev_path)
 			nvd->vdev_path = spa_strdup(vd->vdev_path);
-		error = vdev_file_open_common(nvd);
-		if (error) {
-			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
-			    nvd->vdev_stat.vs_aux);
-			break;
-		}
 		retries++;
+
+		error = vdev_file_open_common(nvd);
+		if (error)
+			break;
 	}
 
 	if ((spa_mode & FWRITE) && !error) {
@@ -288,8 +291,8 @@ vdev_file_io_done(zio_t *zio)
 		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);
 
 	/*
-	 * If this device is truely gone, then attempt to remove it
-	 * from the configuration.
+	 * If an error has been encountered then attempt to probe the device
+	 * to determine if it's still accessible.
 	 */
 	if (zio->io_error == EIO) {
 		vdev_t *vd = zio->io_vd;

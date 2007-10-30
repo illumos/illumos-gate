@@ -296,6 +296,11 @@ vdev_disk_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
 	return (error);
 }
 
+/*
+ * Determine if the underlying device is accessible by reading and writing
+ * to a known location. We must be able to do this during syncing context
+ * and thus we cannot set the vdev state directly.
+ */
 static int
 vdev_disk_probe(vdev_t *vd)
 {
@@ -341,11 +346,8 @@ vdev_disk_probe(vdev_t *vd)
 		retries++;
 
 		error = vdev_disk_open_common(nvd);
-		if (error) {
-			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
-			    nvd->vdev_stat.vs_aux);
+		if (error)
 			break;
-		}
 	}
 
 	if (!error) {
@@ -523,7 +525,7 @@ vdev_disk_io_done(zio_t *zio)
 	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if
 	 * the device has been removed.  If this is the case, then we trigger an
 	 * asynchronous removal of the device. Otherwise, probe the device and
-	 * make sure it's still functional.
+	 * make sure it's still accessible.
 	 */
 	if (zio->io_error == EIO) {
 		vdev_t *vd = zio->io_vd;

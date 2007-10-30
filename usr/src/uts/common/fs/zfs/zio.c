@@ -1137,13 +1137,14 @@ zio_assess(zio_t *zio)
 		}
 
 		/*
-		 * If we are an allocating I/O then we retry on another
-		 * vdev unless the pool is out of space.  We handle this
-		 * condition based on the spa's failmode property.
+		 * If we are an allocating I/O or have been told to retry
+		 * then attempt to reissue the I/O on another vdev unless
+		 * the pool is out of space.  We handle this condition
+		 * based on the spa's failmode property.
 		 */
 		if (zio_write_retry && zio->io_error != ENOSPC &&
-		    IO_IS_ALLOCATING(zio) &&
-		    zio->io_flags & ZIO_FLAG_WRITE_RETRY) {
+		    (IO_IS_ALLOCATING(zio) ||
+		    zio->io_flags & ZIO_FLAG_WRITE_RETRY)) {
 			zio_vdev_retry_io(zio);
 			return;
 		}

@@ -1778,8 +1778,7 @@ vdev_readable(vdev_t *vd)
 int
 vdev_writeable(vdev_t *vd)
 {
-	return (vd->vdev_ops->vdev_op_leaf ?
-	    !vd->vdev_is_failing : !vdev_is_dead(vd));
+	return (!vdev_is_dead(vd) && !vd->vdev_is_failing);
 }
 
 int

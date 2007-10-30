@@ -30,7 +30,7 @@
 #define	ZFS_ROOT_OBJ		"ROOT"
 #define	ZPL_VERSION_STR		"VERSION"
 
-#define	ZPL_VERSION		2ULL
+#define	ZPL_VERSION		3ULL
 
 #define	ZFS_DIRENT_OBJ(de) BF64_GET(de, 0, 48)
 
