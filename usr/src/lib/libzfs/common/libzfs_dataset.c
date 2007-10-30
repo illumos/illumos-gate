@@ -480,6 +480,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	char *strval;
 	zfs_prop_t prop;
 	nvlist_t *ret;
+	int chosen_sense = -1;
 	int chosen_normal = -1;
 	int chosen_utf = -1;
 
@@ -747,6 +748,9 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 
 			break;
+		case ZFS_PROP_CASE:
+			chosen_sense = (int)intval;
+			break;
 		case ZFS_PROP_UTF8ONLY:
 			chosen_utf = (int)intval;
 			break;
@@ -802,6 +806,19 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				break;
 			}
 		}
+	}
+
+	/*
+	 * Temporarily disallow any non-default settings for
+	 * casesensitivity, normalization, and/or utf8only.
+	 */
+	if (chosen_sense > ZFS_CASE_SENSITIVE || chosen_utf > 0 ||
+	    chosen_normal > ZFS_NORMALIZE_NONE) {
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "Non-default values for casesensitivity, utf8only, and "
+		    "normalization are (temporarily) disabled"));
+		(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+		goto error;
 	}
 
 	/*

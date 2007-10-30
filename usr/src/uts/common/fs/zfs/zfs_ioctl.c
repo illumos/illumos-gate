@@ -157,6 +157,11 @@ history_str_get(zfs_cmd_t *zc)
 	return (buf);
 }
 
+/*
+ * zfs_check_version
+ *
+ *	Return non-zero if the spa version is less than requested version.
+ */
 static int
 zfs_check_version(const char *name, int version)
 {
@@ -1829,6 +1834,12 @@ zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
 	if (cp != NULL)
 		cp[0] = '\0';
 
+	/*
+	 * Make sure pool is of new enough vintage to support normalization.
+	 */
+	if (zfs_check_version(poolname, SPA_VERSION_NORMALIZATION))
+		return (0);
+
 	error = zfs_prop_lookup(parentname, ZFS_PROP_UTF8ONLY,
 	    proplist, &value, update);
 	if (error != 0)
@@ -1886,9 +1897,14 @@ zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
 		}
 	}
 
+	/*
+	 * At the moment we are disabling non-default values for these
+	 * properties because they cannot be preserved properly with a
+	 * zfs send.
+	 */
 	if (check == 1)
-		if (zfs_check_version(poolname, SPA_VERSION_NORMALIZATION))
-			return (ENOTSUP);
+		return (ENOTSUP);
+
 	return (0);
 }
 
