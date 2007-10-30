@@ -212,7 +212,7 @@ main(int argc, char *argv[])
 				atflg = 0;
 				saflg = 0;
 #else
-				if ((atflg == 0) && (saflg == 0))
+				if (atflg == 0)
 					attrsilent = 1;
 #endif
 				break;
@@ -507,6 +507,7 @@ cpymve(char *source, char *target)
 	int attret = 0;
 	int sattret = 0;
 	int errno_save;
+	int error = 0;
 
 	switch (chkfiles(source, &target)) {
 		case 1: return (1);
@@ -815,13 +816,13 @@ copy:
 					if (s1acl != NULL) {
 						if ((acl_set(target,
 						    s1acl)) < 0) {
-							if (pflg || mve) {
-								(void) fprintf(
-								    stderr,
-					"%s: failed to set acl entries on %s\n",
-								    cmd,
-								    target);
-							}
+							error++;
+							(void) fprintf(stderr,
+							    gettext("%s: "
+							    "Failed to set "
+							    "acl entries "
+							    "on %s\n"), cmd,
+							    target);
 							acl_free(s1acl);
 							s1acl = NULL;
 							/*
@@ -867,23 +868,14 @@ copy:
 					    " %s\n"), cmd, source);
 				}
 				/* Copy extended system attributes */
-				if (pflg || mve || saflg) {
+				if (pflg || mve || saflg)
 					sattret = copy_sysattr(source, target);
-					if (sattret != 0 && !attrsilent) {
-						(void) fprintf(stderr, gettext(
-						    "%s: Failed to preserve "
-						    "extended system "
-						    "attributes of file "
-						    "%s\n"), cmd, source);
-					}
-				}
 				if (mve && attret != 0) {
 					(void) unlink(target);
 					return (1);
 				}
 				if (attrsilent) {
 					attret = 0;
-					sattret = 0;
 				}
 			}
 
@@ -901,13 +893,11 @@ copy:
 				 */
 				if (s1acl != NULL) {
 					if ((acl_set(target, s1acl)) < 0) {
-						if (pflg || mve) {
-							(void) fprintf(
-							    stderr,
-					"%s: failed to set acl entries on %s\n",
-							    cmd,
-							    target);
-						}
+						error++;
+						(void) fprintf(stderr,
+						    gettext("%s: Failed to "
+						    "set acl entries "
+						    "on %s\n"), cmd, target);
 						/*
 						 * else: silent and
 						 * continue
@@ -918,7 +908,7 @@ copy:
 					return (1);
 			}
 			if (cpy) {
-				if (attret != 0)
+				if (error != 0 || attret != 0 || sattret != 0)
 					return (1);
 				return (0);
 			}
@@ -938,8 +928,8 @@ cleanup:
 			perror("");
 			return (1);
 		}
-		if (attret != 0)
-			return (attret);
+		if (error != 0 || attret != 0 || sattret != 0)
+			return (1);
 		return (ret);
 	}
 	/*NOTREACHED*/
@@ -1445,10 +1435,12 @@ static int
 copydir(char *source, char *target)
 {
 	int ret, attret = 0;
+	int sattret = 0;
 	int pret = 0;		/* need separate flag if -p is specified */
 	mode_t	fixmode = (mode_t)0;	/* cleanup mode after copy */
 	struct stat s1save;
 	acl_t  *s1acl_save;
+	int error = 0;
 
 	s1acl_save = NULL;
 
@@ -1522,6 +1514,7 @@ copydir(char *source, char *target)
 		ret += pret;
 		if (s1acl_save != NULL) {
 			if (acl_set(target, s1acl_save) < 0) {
+				error++;
 #ifdef XPG4
 				if (pflg || mve) {
 #else
@@ -1558,19 +1551,17 @@ copydir(char *source, char *target)
 		}
 		/* Copy extended system attributes */
 		if (pflg || mve || saflg) {
-			attret = copy_sysattr(source, target);
-			if (attret != 0 && !attrsilent) {
+			sattret = copy_sysattr(source, target);
+			if (sattret != 0) {
 				(void) fprintf(stderr, gettext(
 				    "%s: Failed to preserve "
 				    "extended system attributes "
 				    "of directory %s\n"), cmd, source);
-			} else {
-				attret = 0;
 			}
 		}
 	}
-	if (attret != 0)
-		return (attret);
+	if (attret != 0 || sattret != 0 || error != 0)
+		return (1);
 	return (ret);
 }
 
@@ -1885,13 +1876,11 @@ copy_sysattr(char *source, char *target)
 
 	if (response != NULL &&
 	    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext(
-			    "%s: cannot preserve extended system "
-			    "attribute, operation not supported on file"
-			    " %s\n"), cmd, target);
-		}
+		(void) fprintf(stderr,
+		    gettext(
+		    "%s: cannot preserve extended system "
+		    "attribute, operation not supported on file"
+		    " %s\n"), cmd, target);
 		error++;
 		goto out;
 	}
@@ -1931,13 +1920,11 @@ copy_sysattr(char *source, char *target)
 
 			if (!chk_support &&
 			    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
-				if (!attrsilent) {
-					(void) fprintf(stderr,
-					    gettext(
-					    "%s: cannot preserve extended "
-					    "system attribute, operation not "
-					    " %s\n"), cmd, target);
-				}
+				(void) fprintf(stderr,
+				    gettext(
+				    "%s: cannot preserve extended "
+				    "system attribute, operation not "
+				    " %s\n"), cmd, target);
 				error++;
 				sa_support = 0;
 			} else {
@@ -1951,13 +1938,11 @@ copy_sysattr(char *source, char *target)
 			if (sa_support && fsetattr(targattrfd,
 			    XATTR_VIEW_READWRITE, res) != 0) {
 				++error;
-				if (!attrsilent) {
-					(void) fprintf(stderr, gettext("%s: "
-					    "Failed to copy extended system "
-					    "attributes from attribute file "
-					    "%s of %s to %s\n"), cmd,
-					    dp->d_name, source, target);
-				}
+				(void) fprintf(stderr, gettext("%s: "
+				    "Failed to copy extended system "
+				    "attributes from attribute file "
+				    "%s of %s to %s\n"), cmd,
+				    dp->d_name, source, target);
 			}
 		}
 next:
@@ -1974,11 +1959,9 @@ next:
 	if ((response != NULL) &&
 	    (fsetattr(targfd, XATTR_VIEW_READWRITE, response)) != 0) {
 		++error;
-		if (!attrsilent) {
-			(void) fprintf(stderr, gettext("%s: Failed to "
-			    "copy extended system attributes from "
-			    "%s to %s\n"), cmd, source, target);
-		}
+		(void) fprintf(stderr, gettext("%s: Failed to "
+		    "copy extended system attributes from "
+		    "%s to %s\n"), cmd, source, target);
 	}
 out:
 	if (response != NULL)
