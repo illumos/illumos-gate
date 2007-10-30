@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,36 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
+
+static inline int
+find_first_zero_bit(volatile void *p, int max)
+{
+	int b;
+	volatile int *ptr = (volatile int *)p;
+
+	for (b = 0; b < max; b += 32) {
+		if (ptr[b >> 5] != ~0) {
+			for (;;) {
+				if ((ptr[b >> 5] & (1 << (b & 0x1f))) == 0)
+					return (b);
+				b++;
+			}
+		}
+	}
+	return (max);
+}
+
+static inline atomic_t
+test_and_set_bit(int b, volatile void *p)
+{
+	int s = splhigh();
+	unsigned int m = 1<<b;
+	unsigned int r = *(volatile int *)p & m;
+	*(volatile int *)p |= m;
+	splx(s);
+	return ((atomic_t)r);
+}
+
 
 /*
  * Context bitmap support
@@ -84,11 +114,11 @@ drm_ctxbitmap_next(drm_device_t *dev)
 		if (dev->context_sareas != NULL) {
 			drm_local_map_t **ctx_sareas;
 			ctx_sareas = drm_realloc(dev->context_sareas,
-					(dev->max_context - 1) *
-					sizeof (*dev->context_sareas),
-					dev->max_context *
-					sizeof (*dev->context_sareas),
-					DRM_MEM_MAPS);
+			    (dev->max_context - 1) *
+			    sizeof (*dev->context_sareas),
+			    dev->max_context *
+			    sizeof (*dev->context_sareas),
+			    DRM_MEM_MAPS);
 			if (ctx_sareas == NULL) {
 				clear_bit(bit, dev->ctx_bitmap);
 				DRM_UNLOCK();
@@ -99,7 +129,7 @@ drm_ctxbitmap_next(drm_device_t *dev)
 		} else {
 			/* max_context == 1 at this point */
 			dev->context_sareas = drm_alloc(dev->max_context *
-				    sizeof (*dev->context_sareas), KM_NOSLEEP);
+			    sizeof (*dev->context_sareas), KM_NOSLEEP);
 			if (dev->context_sareas == NULL) {
 				clear_bit(bit, dev->ctx_bitmap);
 				DRM_UNLOCK();
@@ -142,9 +172,9 @@ drm_ctxbitmap_cleanup(drm_device_t *dev)
 	DRM_LOCK();
 	if (dev->context_sareas != NULL)
 		drm_free(dev->context_sareas,
-			sizeof (*dev->context_sareas) *
-			dev->max_context,
-			DRM_MEM_MAPS);
+		    sizeof (*dev->context_sareas) *
+		    dev->max_context,
+		    DRM_MEM_MAPS);
 	drm_free(dev->ctx_bitmap, DRM_PAGE_SIZE, DRM_MEM_CTXBITMAP);
 	DRM_UNLOCK();
 }
@@ -163,13 +193,13 @@ drm_getsareactx(DRM_IOCTL_ARGS)
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		drm_ctx_priv_map32_t request32;
 		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_ctx_priv_map32_t *)data,
-			sizeof (drm_ctx_priv_map32_t));
+		    (drm_ctx_priv_map32_t *)data,
+		    sizeof (drm_ctx_priv_map32_t));
 		request.ctx_id = request32.ctx_id;
 		request.handle = (void *)(uintptr_t)request32.handle;
 	} else
 		DRM_COPY_FROM_USER_IOCTL(request, (drm_ctx_priv_map_t *)data,
-			sizeof (request));
+		    sizeof (request));
 
 	DRM_LOCK();
 	if (dev->max_context < 0 || request.ctx_id >= (unsigned)
@@ -188,11 +218,10 @@ drm_getsareactx(DRM_IOCTL_ARGS)
 		request32.ctx_id = request.ctx_id;
 		request32.handle = (caddr32_t)(uintptr_t)request.handle;
 		DRM_COPY_TO_USER_IOCTL((drm_ctx_priv_map32_t *)data,
-			request32,
-			sizeof (drm_ctx_priv_map32_t));
+		    request32, sizeof (drm_ctx_priv_map32_t));
 	} else
 		DRM_COPY_TO_USER_IOCTL((drm_ctx_priv_map_t *)data, request,
-			sizeof (request));
+		    sizeof (request));
 
 	return (0);
 }
@@ -209,13 +238,13 @@ drm_setsareactx(DRM_IOCTL_ARGS)
 		drm_ctx_priv_map32_t request32;
 
 		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_ctx_priv_map32_t *)data,
-			sizeof (drm_ctx_priv_map32_t));
+		    (drm_ctx_priv_map32_t *)data,
+		    sizeof (drm_ctx_priv_map32_t));
 		request.ctx_id = request32.ctx_id;
 		request.handle = (void *)(uintptr_t)request32.handle;
 	} else
 		DRM_COPY_FROM_USER_IOCTL(request, (drm_ctx_priv_map_t *)data,
-			sizeof (request));
+		    sizeof (request));
 
 	DRM_LOCK();
 	TAILQ_FOREACH(map, &dev->maplist, link) {
@@ -287,14 +316,14 @@ drm_resctx(DRM_IOCTL_ARGS)
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		drm_ctx_res32_t res32;
 		DRM_COPY_FROM_USER_IOCTL(res32,
-			(drm_ctx_res32_t *)data,
-			sizeof (drm_ctx_res32_t));
+		    (drm_ctx_res32_t *)data,
+		    sizeof (drm_ctx_res32_t));
 		res.count = res32.count;
 		res.contexts = (drm_ctx_t __user *)(uintptr_t)res32.contexts;
 	} else
 		DRM_COPY_FROM_USER_IOCTL(res,
-			(drm_ctx_res_t *)data,
-			sizeof (res));
+		    (drm_ctx_res_t *)data,
+		    sizeof (res));
 
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		bzero(&ctx, sizeof (ctx));
@@ -313,10 +342,10 @@ drm_resctx(DRM_IOCTL_ARGS)
 		res32.contexts = (caddr32_t)(uintptr_t)res.contexts;
 
 		DRM_COPY_TO_USER_IOCTL((drm_ctx_res32_t *)data,
-			res32, sizeof (drm_ctx_res32_t));
+		    res32, sizeof (drm_ctx_res32_t));
 	} else
 		DRM_COPY_TO_USER_IOCTL((drm_ctx_res_t *)data,
-			res, sizeof (res));
+		    res, sizeof (res));
 
 	return (0);
 }

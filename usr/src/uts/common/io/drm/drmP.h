@@ -54,11 +54,12 @@
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
 #include <sys/atomic.h>
-
+#include "drm_atomic.h"
 #include "drm.h"
 #include "queue.h"
 #include "drm_linux_list.h"
 #include <sys/agpgart.h>
+
 
 #ifdef NOPID
 #undef NOPID
@@ -130,8 +131,6 @@
 #define	DRM_DEV_UID	0
 #define	DRM_DEV_GID	0
 
-typedef uint32_t	atomic_t;
-
 #define	wait_queue_head_t kcondvar_t
 #define	DRM_WAKEUP(w)	cv_broadcast(w)
 #define	DRM_WAKEUP_INT(w)
@@ -148,7 +147,6 @@ typedef uint32_t	atomic_t;
 #define	spin_unlock_irqrestore(u, flag)	mutex_exit(u)
 #define	spin_lock(l)		mutex_enter(l)
 #define	spin_unlock(u)		mutex_exit(u)
-#define	atomic_inc		atomic_inc_32
 
 #define	DRM_UDELAY(sec)  delay(drv_usectohz(sec * 1000))
 #define	DRM_MEMORYBARRIER()
@@ -156,9 +154,6 @@ typedef uint32_t	atomic_t;
 #define	drm_device drm_softstate
 typedef struct drm_softstate drm_device_t;
 typedef struct drm_softstate drm_softstate_t;
-
-#define	atomic_read(p)	(*(p))
-#define	atomic_set(p, v)   (*(p) = (v))
 
 #define	DRM_IOCTL_ARGS	dev_t kdev, drm_softstate_t *dev1, intptr_t data, \
 	int mode, cred_t *credp, int *rvalp, DRMFILE filp
@@ -811,14 +806,6 @@ extern int pci_get_vendor(drm_softstate_t *);
 extern int pci_get_device(drm_softstate_t *);
 
 void drm_set_ioctl_desc(int, drm_ioctl_t *, int, int, char *);
-
-extern void set_bit(int, volatile void *);
-extern void clear_bit(int, volatile void *);
-extern int test_and_set_bit(int, volatile void *);
-extern int test_and_clear_bit(int, volatile void *);
-extern int find_first_zero_bit(void *, unsigned);
-extern int atomic_cmpset_int(volatile unsigned int *, unsigned int,
-	unsigned int);
 
 extern drm_drawable_info_t *drm_get_drawable_info(drm_device_t *,
 			drm_drawable_t);

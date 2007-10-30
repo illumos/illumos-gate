@@ -224,19 +224,10 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 #define I915_READ16(reg) 	DRM_READ16(dev_priv->mmio_map, (reg))
 #define I915_WRITE16(reg,val)	DRM_WRITE16(dev_priv->mmio_map, (reg), (val))
 
-/* to make it LINT clean */
-static int i915_verbose = 0;
-#ifndef I915_VERBOSE
-#define I915_VERBOSE i915_verbose
-#endif
-
 #define RING_LOCALS	unsigned int outring, ringmask, outcount; \
                         volatile unsigned char *virt;
 
 #define BEGIN_LP_RING(n) do {				\
-	if (I915_VERBOSE)				\
-		DRM_DEBUG("BEGIN_LP_RING(%d) in %s\n",	\
-			  (n), __FUNCTION__);		\
 	if (dev_priv->ring.space < (n)*4)			\
 		(void) i915_wait_ring(dev, (n)*4, __FUNCTION__);		\
 	outcount = 0;					\
@@ -246,7 +237,6 @@ static int i915_verbose = 0;
 } while (*"\0")
 
 #define OUT_RING(n) do {					\
-	if (I915_VERBOSE) DRM_DEBUG("   OUT_RING %x\n", (int)(n));	\
 	*(volatile unsigned int *)(virt + outring) = (n);		\
         outcount++;						\
 	outring += 4;						\
@@ -254,7 +244,6 @@ static int i915_verbose = 0;
 } while (*"\0")
 
 #define ADVANCE_LP_RING() do {						\
-	if (I915_VERBOSE) DRM_DEBUG("ADVANCE_LP_RING %x\n", outring);	\
 	dev_priv->ring.tail = outring;					\
 	dev_priv->ring.space -= outcount * 4;				\
 	I915_WRITE(LP_RING + RING_TAIL, outring);			\

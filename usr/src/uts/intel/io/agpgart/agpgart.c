@@ -14,7 +14,7 @@
  * This driver is primary targeted at providing memory support for INTEL
  * AGP device, INTEL memory less video card, and AMD64 cpu GART devices.
  * So there are four main architectures, ARC_IGD810, ARC_IGD830, ARC_INTELAGP,
- * ARC_AMD64AGP, ARC_AMD64NOAGP to agpgart driver. However, the memory
+ * ARC_AMD64AGP to agpgart driver. However, the memory
  * interfaces are the same for these architectures. The difference is how to
  * manage the hardware GART table for them.
  *
@@ -640,31 +640,16 @@ lyr_init(agp_registered_dev_t *agp_regdev, ldi_ident_t agpgart_li)
 	/*
 	 * AMD64 cpu gart device exsits, continue detection
 	 */
-
 	if (agp_master_regis_byname(master_hdlp, agpgart_li)) {
-		AGPDB_PRINT1((CE_NOTE,
-		    "lyr_init: register master device unsuccessful"));
-
-		agp_regdev->agprd_arctype = ARC_AMD64NOAGP;
-		AGPDB_PRINT1((CE_NOTE,
-		    "lyr_init: no AGP master, but supports IOMMU in amd64"));
-		return (0); /* Finished successfully */
+		AGPDB_PRINT1((CE_NOTE, "lyr_init: no AGP master in amd64"));
+		goto err1;
 	}
 
 	if (agp_target_regis_byname(target_hdlp, agpgart_li)) {
 		AGPDB_PRINT1((CE_NOTE,
-		    "lyr_init: register target device unsuccessful"));
-
-		agp_regdev->agprd_arctype = ARC_AMD64NOAGP;
-
-		AGPDB_PRINT1((CE_NOTE,
-		    "lyr_init: no AGP bridge, but supports IOMMU in amd64"));
-
-		agp_master_unregister(&agp_regdev->agprd_masterhdl);
-		return (0); /* Finished successfully */
-
+		    "lyr_init: no AGP bridge"));
+		goto err2;
 	}
-
 
 	AGPDB_PRINT1((CE_NOTE,
 	    "lyr_init: the system is AMD64 AGP architecture"));
@@ -701,10 +686,6 @@ lyr_end(agp_registered_dev_t *agp_regdev)
 		amd64_gart_unregister(&agp_regdev->agprd_cpugarts);
 
 		return;
-	case ARC_AMD64NOAGP:
-		amd64_gart_unregister(&agp_regdev->agprd_cpugarts);
-
-		return;
 	default:
 		ASSERT(0);
 		return;
@@ -717,10 +698,8 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 	ldi_handle_t hdl;
 	igd_info_t value1;
 	i_agp_info_t value2;
-	amdgart_info_t value3;
 	size_t prealloc_size;
 	int err;
-	amd64_gart_dev_list_t	*gart_head;
 
 	ASSERT(info);
 	ASSERT(agp_regdev);
@@ -805,16 +784,6 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 		info->agpki_tstatus = value2.iagp_mode;
 		info->agpki_aperbase = value2.iagp_aperbase;
 		info->agpki_apersize = value2.iagp_apersize;
-		break;
-	case ARC_AMD64NOAGP:
-		/* Meaningful for IOMMU support only */
-		gart_head = agp_regdev->agprd_cpugarts.gart_dev_list_head;
-		err = ldi_ioctl(gart_head->gart_devhdl, AMD64_GET_INFO,
-		    (intptr_t)&value3, FKIOCTL, kcred, 0);
-		if (err)
-			return (-1);
-		info->agpki_aperbase = value3.cgart_aperbase;
-		info->agpki_apersize = value3.cgart_apersize;
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN,
@@ -976,7 +945,6 @@ lyr_set_gart_addr(uint64_t phy_base, agp_registered_dev_t *agp_regdev)
 		    (intptr_t)&addr, FKIOCTL, kcred, 0);
 		break;
 	}
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 	{
 		uint32_t addr;
@@ -1046,7 +1014,6 @@ lyr_config_devices(agp_registered_dev_t *agp_regdev)
 		    0, FKIOCTL, kcred, 0);
 		break;
 	}
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 	{
 		/*
@@ -1102,7 +1069,6 @@ lyr_unconfig_devices(agp_registered_dev_t *agp_regdev)
 		    0, FKIOCTL, kcred, 0);
 		break;
 	}
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 	{
 		for (gart_list = agp_regdev->agprd_cpugarts.gart_dev_list_head;
@@ -1143,8 +1109,7 @@ lyr_flush_gart_cache(agp_registered_dev_t *agp_regdev)
 	ldi_handle_t		hdl;
 
 	ASSERT(agp_regdev);
-	if ((agp_regdev->agprd_arctype == ARC_AMD64AGP) ||
-	    (agp_regdev->agprd_arctype == ARC_AMD64NOAGP)) {
+	if (agp_regdev->agprd_arctype == ARC_AMD64AGP) {
 		for (gart_list = agp_regdev->agprd_cpugarts.gart_dev_list_head;
 		    gart_list; gart_list = gart_list->next) {
 			hdl = gart_list->gart_devhdl;
@@ -1439,7 +1404,6 @@ agp_unbind_key(agpgart_softstate_t *softstate, keytable_ent_t *entryp)
 		}
 		break;
 	case ARC_INTELAGP:
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 		agp_remove_from_gart(entryp->kte_pgoff,
 		    entryp->kte_pages,
@@ -1648,7 +1612,6 @@ pfn2gartentry(agp_arc_type_t arc_type, pfn_t pfn, uint32_t *itemv)
 
 		break;
 	}
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 	{
 		uint32_t value1, value2;
@@ -1772,8 +1735,6 @@ copyinfo(agpgart_softstate_t *softstate, agp_info_t *info)
 		info->agpi_version = softstate->asoft_info.agpki_tver;
 		info->agpi_devid = softstate->asoft_info.agpki_tdevid;
 		info->agpi_mode = softstate->asoft_info.agpki_tstatus;
-		break;
-	case ARC_AMD64NOAGP:
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN, "copyinfo: UNKNOW ARC"));
@@ -2325,8 +2286,7 @@ alloc_gart_table(agpgart_softstate_t *st)
 	/*
 	 * Only AMD64 can put gart table above 4G, 40 bits at maximum
 	 */
-	if ((st->asoft_devreg.agprd_arctype == ARC_AMD64AGP) ||
-	    (st->asoft_devreg.agprd_arctype == ARC_AMD64NOAGP))
+	if (st->asoft_devreg.agprd_arctype == ARC_AMD64AGP)
 		garttable_dma_attr.dma_attr_addr_hi = 0xffffffffffLL;
 	else
 		garttable_dma_attr.dma_attr_addr_hi = 0xffffffffU;
@@ -2489,7 +2449,6 @@ agp_bind_key(agpgart_softstate_t *softstate,
 			return (EIO);
 		break;
 	case ARC_INTELAGP:
-	case ARC_AMD64NOAGP:
 	case ARC_AMD64AGP:
 		ret =  agp_add_to_gart(
 		    softstate->asoft_devreg.agprd_arctype,
@@ -3348,7 +3307,7 @@ static struct dev_ops agpgart_ops = {
 
 static	struct modldrv modldrv = {
 	&mod_driverops,
-	"AGP driver v%I%",
+	"AGP driver v1.9",
 	&agpgart_ops,
 };
 

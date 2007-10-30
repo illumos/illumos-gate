@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@ enum agp_arc_type {
 	ARC_IGD830 = 1,
 	ARC_INTELAGP = 2,
 	ARC_AMD64AGP = 3,
-	ARC_AMD64NOAGP = 4, /* AMD64 cpu without agp bridge */
 	ARC_UNKNOWN = 5
 };
 typedef enum agp_arc_type agp_arc_type_t;

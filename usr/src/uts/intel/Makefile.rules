@@ -165,9 +165,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/drm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/drm/%.s
-	$(COMPILE.s) -o $@ $<
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hotplug/pcicfg/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -362,9 +359,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/amr/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/drm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/drm/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/hotplug/pcicfg/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
