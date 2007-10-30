@@ -166,8 +166,7 @@ ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 		char		*str;
 		Sym_desc	*sdp;
 
-		if (((sifdata->si_flags & SYMINFO_FLG_NOEXTDIRECT) == 0) ||
-		    (sifdata->si_boundto < SYMINFO_BT_LOWRESERVE))
+		if ((sifdata->si_flags & SYMINFO_FLG_NOEXTDIRECT) == 0)
 			continue;
 
 		sym = (Sym *)(symdata + _cnt);

@@ -54,7 +54,7 @@ SUNW_2.1 {		# SunOS 5.6 (Solaris 2.6)
 	__fp_query;
 	_getlong;
 	_getshort;
-	h_errno = FILTER libnsl.so.1;
+	h_errno = NODIRECT FILTER libnsl.so.1;
 	__hostalias;
 	hstrerror;
 	__p_cdname;

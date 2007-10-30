@@ -1294,3 +1294,5 @@ Bugid   Risk Synopsis
 6614968 elfedit needs string table module (D)
 6620533 HWCAP filtering can leave uninitialized data behind - results in
 	"rejected: Invalid argument"
+6617855 nodirect tag can be ignored when other syminfo tags are available
+	(link-editor components only)

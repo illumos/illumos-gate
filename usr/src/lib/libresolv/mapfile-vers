@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ SUNW_0.7 {
 	fp_query;
 	_getlong;
 	_getshort;
-	h_errno = FILTER libnsl.so.1;
+	h_errno = NODIRECT FILTER libnsl.so.1;
 	hostalias;
 	p_cdname;
 	p_class;

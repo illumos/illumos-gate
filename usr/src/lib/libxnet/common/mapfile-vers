@@ -118,7 +118,7 @@ SUNW_1.1 {
 	getservent =		FUNCTION FILTER libsocket.so.1;
 	getsockname = 		FUNCTION FILTER libsocket.so.1;
 	getsockopt = 		FUNCTION FILTER libsocket.so.1;
-	h_errno =		FILTER libnsl.so.1;
+	h_errno =		NODIRECT FILTER libnsl.so.1;
 	htonl =			FUNCTION FILTER libc.so.1;
 	htons =			FUNCTION FILTER libc.so.1;
 	inet_addr =		FUNCTION FILTER libnsl.so.1;

@@ -411,14 +411,17 @@ check_flags(Ofl_desc * ofl, int argc)
 
 		} else {
 			/*
-			 * Dynamic relocatable object
-			 */
-			/*
-			 * By default we print relocation errors for
-			 * executables but *not* for a shared object
+			 * Dynamic relocatable object.
 			 */
 			if (ztflag == 0)
 				ofl->ofl_flags1 |= FLG_OF1_TEXTOFF;
+
+			if (ofl->ofl_interp) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_ARG_INCOMP),
+				    MSG_ORIG(MSG_ARG_R), MSG_ORIG(MSG_ARG_CI));
+				ofl->ofl_flags |= FLG_OF_FATAL;
+			}
 		}
 	} else {
 		ofl->ofl_flags |= FLG_OF_STATIC;
@@ -487,7 +490,7 @@ check_flags(Ofl_desc * ofl, int argc)
 		if (rflag) {
 			/*
 			 * We can only strip the symbol table and string table
-			 * if no output relocations will refer to them
+			 * if no output relocations will refer to them.
 			 */
 			if (sflag) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,

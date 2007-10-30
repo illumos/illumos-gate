@@ -33,7 +33,7 @@
 use vars  qw($Prog $DestDir $ObjRef $ObjFlag $ObjSize $ObjVis $TmpDir);
 use vars  qw($LddArgs $SymFlag);
 use vars  qw($Glob $Intp $Dirc $Cpyr $Prot $Extn $Self $Gfte $Plta $User $Func);
-use vars  qw($Sfte $Afte $Objt $Nodi $Osft $Oaft $Ssft $Saft $Msft);
+use vars  qw($Rejt $Sfte $Afte $Objt $Nodi $Osft $Oaft $Ssft $Saft $Msft);
 use vars  qw($Rtld $GlobWeak $MultSyms $CrtSyms $Platform $DbgSeed %opt);
 
 # Global arrays that must be cleared for multi input file use.
@@ -97,6 +97,7 @@ $Cpyr = 0x00040;	# symbol bound to copy-relocation reference
 $Prot = 0x00080;	# symbol is protected (symbolic)
 $Extn = 0x00100;	# symbol has been bound to from an external reference
 $Self = 0x00200;	# symbol has been bound to from the same object
+$Rejt = 0x00400;	# symbol binding was (at some point) rejected
 $Plta = 0x00800;	# symbol bound to executables plt address
 $User = 0x01000;	# symbol binding originates from user (dlsym) request
 $Func = 0x02000;	# symbol is of type function
@@ -550,7 +551,7 @@ sub ProcBindings {
 			# and walk each field until we find what we need.
 			@Fields = split(' ', $Line);
 
-			# The referencing file, "... binding file=".*".
+			# The referencing file, "... binding file=.* ".
 			while ($Fields[$Offset]) {
 				if ($Fields[$Offset] =~ /^file=(.*)/) {
 					$RefFile = $1;
@@ -572,10 +573,14 @@ sub ProcBindings {
 				$Detail = 1;
 				$Offset++;
 			}
-			# The destination file, "... to file=".*".
+			# The destination file, "... to file=.* ".  Note, in the
+			# case of a rejection message, the file is terminated
+			# with a colon, "... to file=.*: ", which must be
+			# removed
 			while ($Fields[$Offset]) {
 				if ($Fields[$Offset] =~ /^file=(.*)/) {
 					$DstFile = $1;
+					$DstFile =~ s/:$//;
 					$Offset++;
 					last;
 				}
@@ -590,10 +595,12 @@ sub ProcBindings {
 				}
 				$Offset++;
 			}
-			# Possible trailing binding info, "... (direct,.*)$".
+			# Possible trailing binding info, "... (direct,...", or
+			# a rejection, "... (rejected - ...".
 			while ($Fields[$Offset]) {
-				if ($Fields[$Offset] =~ /^\((.*)\)$/) {
+				if ($Fields[$Offset] =~ /^\((.*)/) {
 					$BndInfo = $1;
+					$Detail = 1;
 					$Offset++;
 					last;
 				}
@@ -651,6 +658,10 @@ sub ProcBindings {
 			if ($BndInfo =~ /plt-addr/) {
 				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $Plta;
 				$Objects{$DstFile}{$SymName} |= $Plta;
+			}
+			if ($BndInfo =~ /rejected/) {
+				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $Rejt;
+				$Objects{$DstFile}{$SymName} |= $Rejt;
 			}
 			if ($Dlsym) {
 				$Symbols{$SymName}{$DstFile}[$ObjFlag] |= $User;
@@ -893,10 +904,10 @@ sub ProcBindings {
 				my ($DisVis) = "";
 
 				# Do we just want overhead symbols.  Consider
-				# copy-relocations, and plt address binding,
-				# as overhead too.
+				# copy-relocations, rejections, and plt address
+				# binding, as overhead too.
 				if ($opt{o} && (($Flag &
-				    ($Extn | $Cpyr | $Plta)) == $Extn)) {
+				    ($Rejt | $Extn | $Cpyr | $Plta)) == $Extn)) {
 					next;
 				}
 
@@ -912,12 +923,14 @@ sub ProcBindings {
 				# bound to, as the number of reserved symbols
 				# can be quite excessive.  Also, remove any
 				# standard filters, as nothing can bind to these
-				# symbols anyway.
+				# symbols anyway, provided they have not
+				# contributed to a rejected binding.
 				if (!$opt{a} && ((($SymName =~ $MultSyms) &&
 				    (($Flag & ($Extn | $Self)) == 0)) ||
 				    (($SymName =~ $CrtSyms) && (($Flag &
 				    ($Extn | $Self | $Prot)) == 0)) ||
-				    ($Flag & ($Ssft | $Osft)))) {
+				    (($Flag & ($Ssft | $Osft)) &&
+				    (($Flag & $Rejt) == 0)))) {
 					next;
 				}
 
@@ -985,6 +998,11 @@ sub ProcBindings {
 				if ($Flag & $Nodi) {
 					$Str = $Str . 'N';
 				}
+				# Was a binding to this definition rejected at
+				# some point.
+				if ($Flag & $Rejt) {
+					$Str = $Str . 'r';
+				}
 
 				# Determine whether this is a function or a data
 				# object.  For the latter, display the symbol
@@ -1041,14 +1059,14 @@ sub Interesting
 {
 	my ($SymName) = @_;
 	my ($ObjCnt, $GFlags, $BndCnt, $FltCnt, $NodiCnt, $RdirCnt, $ExRef);
-	my ($TotCnt);
+	my ($RejCnt, $TotCnt);
 
 	# Scan all definitions of this symbol, thus determining the definition
 	# count, the number of filters, redirections, executable references
 	# (copy-relocations, or plt addresses), no-direct bindings, and the
 	# number of definitions that have been bound to.
 	$ObjCnt = $GFlags = $BndCnt = $FltCnt =
-	    $NodiCnt = $RdirCnt = $ExRef = $TotCnt = 0;
+	    $NodiCnt = $RdirCnt = $ExRef = $RejCnt = $TotCnt = 0;
 	foreach my $Obj (keys(%{$Symbols{$SymName}})) {
 		my ($Flag) = $Symbols{$SymName}{$Obj}[$ObjFlag];
 
@@ -1079,6 +1097,9 @@ sub Interesting
 		if ($Flag & $Msft) {
 			$RdirCnt++;
 		}
+		if ($Flag & $Rejt) {
+			$RejCnt++;
+		}
 
 		# Ignore bindings to undefined .plts, and copy-relocation
 		# references.  These are implementation details, rather than
@@ -1099,6 +1120,11 @@ sub Interesting
 	# If we want all symbols, return the count.  If we want all bound
 	# symbols, return the count provided it is non-zero.
 	if ($opt{a} && (!$opt{b} || ($BndCnt > 0))) {
+		return $TotCnt;
+	}
+
+	# Any rejected symbol is interesting
+	if ($RejCnt) {
 		return $TotCnt;
 	}
 

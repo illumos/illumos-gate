@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,12 +52,12 @@ SUNW_1.3 {
 
 SUNW_1.2 {
     global:
-	close = FUNCTION;
+	close = NODIRECT FUNCTION;
 } SUNW_1.1;
 
 SUNW_1.1 {
     global:
-	fork = FUNCTION;
+	fork = NODIRECT FUNCTION;
 } SUNW_0.7;
 
 SUNW_0.7 {

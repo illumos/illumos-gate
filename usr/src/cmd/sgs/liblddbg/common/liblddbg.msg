@@ -303,7 +303,10 @@
 @ MSG_BND_WEAK_2	"binding file=%s (%#llx:%#llx) to 0x0 \
 			 (undefined weak): symbol `%s'"
 
-@ MSG_BND_REJECT	"binding file=%s to file=%s: symbol `%s': rejected: %s"
+# NOTE: the rejected message is used by lari(1), use care when changing.  This
+# message is formatted to conform to the pattern used by the MSG_BINFO messages.
+@ MSG_BND_REJECT	"binding file=%s to file=%s: symbol `%s'  \
+			 (rejected: %s)"
 @ MSG_BNDREJ_NODIR	"attempt to directly bind to a NODIRECT definition"
 @ MSG_BNDREJ_SINGLE	"attempt to bind to a SINGLETON definition without \
 			 following default search model"

@@ -47,11 +47,11 @@ SUNW_1.1 {
 #Externally defined symbols
 {
     global:
-	ps_pauxv = PARENT;
-	ps_pdmodel = PARENT;
-	ps_pglobal_lookup = PARENT;
-	ps_pglobal_sym = PARENT;
-	ps_plog = PARENT;
-	ps_pread = PARENT;
-	ps_pwrite = PARENT;
+	ps_pauxv =		NODIRECT PARENT;
+	ps_pdmodel =		NODIRECT PARENT;
+	ps_pglobal_lookup =	NODIRECT PARENT;
+	ps_pglobal_sym =	NODIRECT PARENT;
+	ps_plog =		NODIRECT PARENT;
+	ps_pread =		NODIRECT PARENT;
+	ps_pwrite =		NODIRECT PARENT;
 };
