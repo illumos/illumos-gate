@@ -46,3 +46,4 @@ for file in `ls ${PKG_INSTALL_ROOT}/etc/inet/ike/crls/* \
 	    chmod 644 $file
 	fi
 done
+exit 0
