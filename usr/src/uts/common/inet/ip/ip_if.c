@@ -23352,6 +23352,7 @@ ip_cgtp_bcast_delete(ire_t *ire, ip_stack_t *ipst)
 				ipif_remove_ire(bcast_ire->ire_ipif,
 				    bcast_ire);
 				ire_delete(bcast_ire);
+				ire_refrele(bcast_ire);
 			}
 			ire_refrele(ire_prim);
 		}
