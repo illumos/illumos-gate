@@ -250,6 +250,11 @@ zfs_prop_init(void)
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size> | none", "RESERV");
 	register_number(ZFS_PROP_VOLSIZE, "volsize", 0, PROP_DEFAULT,
 	    ZFS_TYPE_VOLUME, "<size>", "VOLSIZE");
+	register_number(ZFS_PROP_REFQUOTA, "refquota", 0, PROP_DEFAULT,
+	    ZFS_TYPE_FILESYSTEM, "<size> | none", "REFQUOTA");
+	register_number(ZFS_PROP_REFRESERVATION, "refreservation", 0,
+	    PROP_DEFAULT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    "<size> | none", "REFRESERV");
 
 	/* inherit number properties */
 	register_number(ZFS_PROP_RECORDSIZE, "recordsize", SPA_MAXBLOCKSIZE,

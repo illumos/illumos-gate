@@ -158,7 +158,7 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 	 * Check for sufficient space.
 	 */
 	dstg->dstg_err = dsl_dir_tempreserve_space(dstg->dstg_pool->dp_mos_dir,
-	    dstg->dstg_space, dstg->dstg_space * 3, 0, &tr_cookie, tx);
+	    dstg->dstg_space, dstg->dstg_space * 3, 0, 0, &tr_cookie, tx);
 	/* don't bother trying again */
 	if (dstg->dstg_err == ERESTART)
 		dstg->dstg_err = EAGAIN;

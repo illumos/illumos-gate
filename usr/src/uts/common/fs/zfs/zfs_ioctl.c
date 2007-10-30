@@ -1411,9 +1411,22 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				return (error);
 			break;
 
+		case ZFS_PROP_REFQUOTA:
+			if ((error = nvpair_value_uint64(elem, &intval)) != 0 ||
+			    (error = dsl_dataset_set_quota(name, intval)) != 0)
+				return (error);
+			break;
+
 		case ZFS_PROP_RESERVATION:
 			if ((error = nvpair_value_uint64(elem, &intval)) != 0 ||
 			    (error = dsl_dir_set_reservation(name,
+			    intval)) != 0)
+				return (error);
+			break;
+
+		case ZFS_PROP_REFRESERVATION:
+			if ((error = nvpair_value_uint64(elem, &intval)) != 0 ||
+			    (error = dsl_dataset_set_reservation(name,
 			    intval)) != 0)
 				return (error);
 			break;

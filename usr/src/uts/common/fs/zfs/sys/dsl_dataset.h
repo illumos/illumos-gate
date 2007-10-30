@@ -55,6 +55,13 @@ typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
  */
 #define	DS_FLAG_NOPROMOTE	(1ULL<<1)
 
+/*
+ * DS_FLAG_UNIQUE_ACCURATE is set if ds_unique_bytes has been correctly
+ * calculated for head datasets (starting with SPA_VERSION_UNIQUE_ACCURATE,
+ * refquota/refreservations).
+ */
+#define	DS_FLAG_UNIQUE_ACCURATE	(1ULL<<2)
+
 typedef struct dsl_dataset_phys {
 	uint64_t ds_dir_obj;
 	uint64_t ds_prev_snap_obj;
@@ -114,12 +121,18 @@ typedef struct dsl_dataset {
 	/* for objset_open() */
 	kmutex_t ds_opening_lock;
 
+	uint64_t ds_reserved;	/* cached refreservation */
+	uint64_t ds_quota;	/* cached refquota */
+
 	/* Protected by ds_lock; keep at end of struct for better locality */
 	char ds_snapname[MAXNAMELEN];
 } dsl_dataset_t;
 
 #define	dsl_dataset_is_snapshot(ds)	\
 	((ds)->ds_phys->ds_num_children != 0)
+
+#define	DS_UNIQUE_IS_ACCURATE(ds)	\
+	(((ds)->ds_phys->ds_flags & DS_FLAG_UNIQUE_ACCURATE) != 0)
 
 int dsl_dataset_open_spa(spa_t *spa, const char *name, int mode,
     void *tag, dsl_dataset_t **dsp);
@@ -178,6 +191,13 @@ void dsl_dataset_create_root(struct dsl_pool *dp, uint64_t *ddobjp,
     dmu_tx_t *tx);
 
 int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
+
+int dsl_dataset_check_quota(dsl_dataset_t *ds, boolean_t check_quota,
+    uint64_t asize, uint64_t inflight, uint64_t *used);
+int dsl_dataset_set_quota(const char *dsname, uint64_t quota);
+void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
+    dmu_tx_t *tx);
+int dsl_dataset_set_reservation(const char *dsname, uint64_t reservation);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \

@@ -45,6 +45,7 @@ static dsl_checkfunc_t dsl_dataset_destroy_begin_check;
 static dsl_syncfunc_t dsl_dataset_destroy_begin_sync;
 static dsl_checkfunc_t dsl_dataset_rollback_check;
 static dsl_syncfunc_t dsl_dataset_rollback_sync;
+static dsl_syncfunc_t dsl_dataset_set_reservation_sync;
 
 #define	DS_REF_MAX	(1ULL << 62)
 
@@ -67,6 +68,25 @@ static uint64_t ds_refcnt_weight[DS_MODE_LEVELS] = {
 	DS_REF_MAX		/* DS_MODE_EXCLUSIVE - no other opens	*/
 };
 
+/*
+ * Figure out how much of this delta should be propogated to the dsl_dir
+ * layer.  If there's a refreservation, that space has already been
+ * partially accounted for in our ancestors.
+ */
+static int64_t
+parent_delta(dsl_dataset_t *ds, int64_t delta)
+{
+	uint64_t old_bytes, new_bytes;
+
+	if (ds->ds_reserved == 0)
+		return (delta);
+
+	old_bytes = MAX(ds->ds_phys->ds_unique_bytes, ds->ds_reserved);
+	new_bytes = MAX(ds->ds_phys->ds_unique_bytes + delta, ds->ds_reserved);
+
+	ASSERT3U(ABS((int64_t)(new_bytes - old_bytes)), <=, ABS(delta));
+	return (new_bytes - old_bytes);
+}
 
 void
 dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
@@ -74,6 +94,7 @@ dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
 	int used = bp_get_dasize(tx->tx_pool->dp_spa, bp);
 	int compressed = BP_GET_PSIZE(bp);
 	int uncompressed = BP_GET_UCSIZE(bp);
+	int64_t delta;
 
 	dprintf_bp(bp, "born, ds=%p\n", ds);
 
@@ -96,13 +117,13 @@ dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
 	}
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	mutex_enter(&ds->ds_lock);
+	delta = parent_delta(ds, used);
 	ds->ds_phys->ds_used_bytes += used;
 	ds->ds_phys->ds_compressed_bytes += compressed;
 	ds->ds_phys->ds_uncompressed_bytes += uncompressed;
 	ds->ds_phys->ds_unique_bytes += used;
 	mutex_exit(&ds->ds_lock);
-	dsl_dir_diduse_space(ds->ds_dir,
-	    used, compressed, uncompressed, tx);
+	dsl_dir_diduse_space(ds->ds_dir, delta, compressed, uncompressed, tx);
 }
 
 void
@@ -140,6 +161,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 
 	if (bp->blk_birth > ds->ds_phys->ds_prev_snap_txg) {
 		int err;
+		int64_t delta;
 
 		dprintf_bp(bp, "freeing: %s", "");
 		err = arc_free(pio, tx->tx_pool->dp_spa,
@@ -147,12 +169,13 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 		ASSERT(err == 0);
 
 		mutex_enter(&ds->ds_lock);
-		/* XXX unique_bytes is not accurate for head datasets */
-		/* ASSERT3U(ds->ds_phys->ds_unique_bytes, >=, used); */
+		ASSERT(ds->ds_phys->ds_unique_bytes >= used ||
+		    !DS_UNIQUE_IS_ACCURATE(ds));
+		delta = parent_delta(ds, -used);
 		ds->ds_phys->ds_unique_bytes -= used;
 		mutex_exit(&ds->ds_lock);
 		dsl_dir_diduse_space(ds->ds_dir,
-		    -used, -compressed, -uncompressed, tx);
+		    delta, -compressed, -uncompressed, tx);
 	} else {
 		dprintf_bp(bp, "putting on dead list: %s", "");
 		VERIFY(0 == bplist_enqueue(&ds->ds_deadlist, bp, tx));
@@ -375,6 +398,24 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			ds->ds_fsid_guid =
 			    unique_insert(ds->ds_phys->ds_fsid_guid);
 		}
+
+		if (!dsl_dataset_is_snapshot(ds)) {
+			boolean_t need_lock =
+			    !RW_LOCK_HELD(&dp->dp_config_rwlock);
+
+			if (need_lock)
+				rw_enter(&dp->dp_config_rwlock, RW_READER);
+			VERIFY(0 == dsl_prop_get_ds_locked(ds->ds_dir,
+			    "refreservation", sizeof (uint64_t), 1,
+			    &ds->ds_reserved, NULL));
+			VERIFY(0 == dsl_prop_get_ds_locked(ds->ds_dir,
+			    "refquota", sizeof (uint64_t), 1, &ds->ds_quota,
+			    NULL));
+			if (need_lock)
+				rw_exit(&dp->dp_config_rwlock);
+		} else {
+			ds->ds_reserved = ds->ds_quota = 0;
+		}
 	}
 	ASSERT3P(ds->ds_dbuf, ==, dbuf);
 	ASSERT3P(ds->ds_phys, ==, dbuf->db_data);
@@ -591,6 +632,8 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
 	    bplist_create(mos, DSL_DEADLIST_BLOCKSIZE, tx);
+	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
+		dsphys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
 	dmu_buf_rele(dbuf, FTAG);
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
@@ -633,6 +676,9 @@ dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin, dmu_tx_t *tx)
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
 	    bplist_create(mos, DSL_DEADLIST_BLOCKSIZE, tx);
+	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
+		dsphys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
+
 	if (origin) {
 		dsphys->ds_prev_snap_obj = origin->ds_object;
 		dsphys->ds_prev_snap_txg =
@@ -943,10 +989,53 @@ dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx)
 	}
 }
 
+/*
+ * The unique space in the head dataset can be calculated by subtracting
+ * the space used in the most recent snapshot, that is still being used
+ * in this file system, from the space currently in use.  To figure out
+ * the space in the most recent snapshot still in use, we need to take
+ * the total space used in the snapshot and subtract out the space that
+ * has been freed up since the snapshot was taken.
+ */
+static void
+dsl_dataset_recalc_head_uniq(dsl_dataset_t *ds)
+{
+	uint64_t mrs_used;
+	uint64_t dlused, dlcomp, dluncomp;
+
+	ASSERT(ds->ds_object == ds->ds_dir->dd_phys->dd_head_dataset_obj);
+
+	if (ds->ds_phys->ds_prev_snap_obj != 0)
+		mrs_used = ds->ds_prev->ds_phys->ds_used_bytes;
+	else
+		mrs_used = 0;
+
+	VERIFY(0 == bplist_space(&ds->ds_deadlist, &dlused, &dlcomp,
+	    &dluncomp));
+
+	ASSERT3U(dlused, <=, mrs_used);
+	ds->ds_phys->ds_unique_bytes =
+	    ds->ds_phys->ds_used_bytes - (mrs_used - dlused);
+
+	if (!DS_UNIQUE_IS_ACCURATE(ds) &&
+	    spa_version(ds->ds_dir->dd_pool->dp_spa) >=
+	    SPA_VERSION_UNIQUE_ACCURATE)
+		ds->ds_phys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
+}
+
+static uint64_t
+dsl_dataset_unique(dsl_dataset_t *ds)
+{
+	if (!DS_UNIQUE_IS_ACCURATE(ds) && !dsl_dataset_is_snapshot(ds))
+		dsl_dataset_recalc_head_uniq(ds);
+
+	return (ds->ds_phys->ds_unique_bytes);
+}
+
 struct killarg {
-	uint64_t *usedp;
-	uint64_t *compressedp;
-	uint64_t *uncompressedp;
+	int64_t *usedp;
+	int64_t *compressedp;
+	int64_t *uncompressedp;
 	zio_t *zio;
 	dmu_tx_t *tx;
 };
@@ -1042,7 +1131,7 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	{
 		/* Free blkptrs that we gave birth to */
 		zio_t *zio;
-		uint64_t used = 0, compressed = 0, uncompressed = 0;
+		int64_t used = 0, compressed = 0, uncompressed = 0;
 		struct killarg ka;
 
 		zio = zio_root(tx->tx_pool->dp_spa, NULL, NULL,
@@ -1175,7 +1264,7 @@ void
 dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	uint64_t used = 0, compressed = 0, uncompressed = 0;
+	int64_t used = 0, compressed = 0, uncompressed = 0;
 	zio_t *zio;
 	int err;
 	int after_branch_point = FALSE;
@@ -1189,6 +1278,13 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 	ASSERT(ds->ds_prev == NULL ||
 	    ds->ds_prev->ds_phys->ds_next_snap_obj != ds->ds_object);
 	ASSERT3U(ds->ds_phys->ds_bp.blk_birth, <=, tx->tx_txg);
+
+	/* Remove our reservation */
+	if (ds->ds_reserved != 0) {
+		uint64_t val = 0;
+		dsl_dataset_set_reservation_sync(ds, &val, cr, tx);
+		ASSERT3U(ds->ds_reserved, ==, 0);
+	}
 
 	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
 
@@ -1223,6 +1319,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		blkptr_t bp;
 		dsl_dataset_t *ds_next;
 		uint64_t itor = 0;
+		uint64_t old_unique;
 
 		spa_scrub_restart(dp->dp_spa, tx->tx_txg);
 
@@ -1230,6 +1327,8 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		    ds->ds_phys->ds_next_snap_obj, NULL,
 		    DS_MODE_NONE, FTAG, &ds_next));
 		ASSERT3U(ds_next->ds_phys->ds_prev_snap_obj, ==, obj);
+
+		old_unique = dsl_dataset_unique(ds_next);
 
 		dmu_buf_will_dirty(ds_next->ds_dbuf, tx);
 		ds_next->ds_phys->ds_prev_snap_obj =
@@ -1312,13 +1411,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 			dsl_dataset_close(ds_after_next, DS_MODE_NONE, FTAG);
 			ASSERT3P(ds_next->ds_prev, ==, NULL);
 		} else {
-			/*
-			 * It would be nice to update the head dataset's
-			 * unique.  To do so we would have to traverse
-			 * it for blocks born after ds_prev, which is
-			 * pretty expensive just to maintain something
-			 * for debugging purposes.
-			 */
 			ASSERT3P(ds_next->ds_prev, ==, ds);
 			dsl_dataset_close(ds_next->ds_prev, DS_MODE_NONE,
 			    ds_next);
@@ -1329,13 +1421,32 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 			} else {
 				ds_next->ds_prev = NULL;
 			}
+
+			dsl_dataset_recalc_head_uniq(ds_next);
+
+			/*
+			 * Reduce the amount of our unconsmed refreservation
+			 * being charged to our parent by the amount of
+			 * new unique data we have gained.
+			 */
+			if (old_unique < ds_next->ds_reserved) {
+				int64_t mrsdelta;
+				uint64_t new_unique =
+				    ds_next->ds_phys->ds_unique_bytes;
+
+				ASSERT(old_unique <= new_unique);
+				mrsdelta = MIN(new_unique - old_unique,
+				    ds_next->ds_reserved - old_unique);
+				dsl_dir_diduse_space(ds->ds_dir, -mrsdelta,
+				    0, 0, tx);
+			}
 		}
 		dsl_dataset_close(ds_next, DS_MODE_NONE, FTAG);
 
 		/*
-		 * NB: unique_bytes is not accurate for head objsets
-		 * because we don't update it when we delete the most
-		 * recent snapshot -- see above comment.
+		 * NB: unique_bytes might not be accurate for the head objset.
+		 * Before SPA_VERSION 9, we didn't update its value when we
+		 * deleted the most recent snapshot.
 		 */
 		ASSERT3U(used, ==, ds->ds_phys->ds_unique_bytes);
 	} else {
@@ -1366,6 +1477,9 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		err = traverse_dsl_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
 		    ADVANCE_POST, kill_blkptr, &ka);
 		ASSERT3U(err, ==, 0);
+		ASSERT(spa_version(dp->dp_spa) <
+		    SPA_VERSION_UNIQUE_ACCURATE ||
+		    used == ds->ds_phys->ds_unique_bytes);
 	}
 
 	err = zio_wait(zio);
@@ -1421,6 +1535,33 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 
 }
 
+static int
+dsl_dataset_snapshot_reserve_space(dsl_dataset_t *ds, dmu_tx_t *tx)
+{
+	uint64_t asize;
+
+	if (!dmu_tx_is_syncing(tx))
+		return (0);
+
+	/*
+	 * If there's an fs-only reservation, any blocks that might become
+	 * owned by the snapshot dataset must be accommodated by space
+	 * outside of the reservation.
+	 */
+	asize = MIN(dsl_dataset_unique(ds), ds->ds_reserved);
+	if (asize > dsl_dir_space_available(ds->ds_dir, NULL, 0, FALSE))
+		return (ENOSPC);
+
+	/*
+	 * Propogate any reserved space for this snapshot to other
+	 * snapshot checks in this sync group.
+	 */
+	if (asize > 0)
+		dsl_dir_willuse_space(ds->ds_dir, asize, tx);
+
+	return (0);
+}
+
 /* ARGSUSED */
 int
 dsl_dataset_snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
@@ -1454,6 +1595,10 @@ dsl_dataset_snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	 */
 	if (dsl_dataset_namelen(ds) + 1 + strlen(snapname) >= MAXNAMELEN)
 		return (ENAMETOOLONG);
+
+	err = dsl_dataset_snapshot_reserve_space(ds, tx);
+	if (err)
+		return (err);
 
 	ds->ds_trysnap_txg = tx->tx_txg;
 	return (0);
@@ -1510,12 +1655,24 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		}
 	}
 
+	/*
+	 * If we have a reference-reservation on this dataset, we will
+	 * need to increase the amount of refreservation being charged
+	 * since our unique space is going to zero.
+	 */
+	if (ds->ds_reserved) {
+		int64_t add = MIN(dsl_dataset_unique(ds), ds->ds_reserved);
+		dsl_dir_diduse_space(ds->ds_dir, add, 0, 0, tx);
+	}
+
 	bplist_close(&ds->ds_deadlist);
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ASSERT3U(ds->ds_phys->ds_prev_snap_txg, <, dsphys->ds_creation_txg);
 	ds->ds_phys->ds_prev_snap_obj = dsobj;
 	ds->ds_phys->ds_prev_snap_txg = dsphys->ds_creation_txg;
 	ds->ds_phys->ds_unique_bytes = 0;
+	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
+		ds->ds_phys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;
 	ds->ds_phys->ds_deadlist_obj =
 	    bplist_create(mos, DSL_DEADLIST_BLOCKSIZE, tx);
 	VERIFY(0 == bplist_open(&ds->ds_deadlist, mos,
@@ -1557,14 +1714,22 @@ dsl_dataset_sync(dsl_dataset_t *ds, zio_t *zio, dmu_tx_t *tx)
 void
 dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 {
+	uint64_t refd, avail, uobjs, aobjs;
+
 	dsl_dir_stats(ds->ds_dir, nv);
+
+	dsl_dataset_space(ds, &refd, &avail, &uobjs, &aobjs);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_AVAILABLE, avail);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFERENCED, refd);
 
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_CREATION,
 	    ds->ds_phys->ds_creation_time);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_CREATETXG,
 	    ds->ds_phys->ds_creation_txg);
-	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFERENCED,
-	    ds->ds_phys->ds_used_bytes);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFQUOTA,
+	    ds->ds_quota);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_REFRESERVATION,
+	    ds->ds_reserved);
 
 	if (ds->ds_phys->ds_next_snap_obj) {
 		/*
@@ -1618,6 +1783,18 @@ dsl_dataset_space(dsl_dataset_t *ds,
 {
 	*refdbytesp = ds->ds_phys->ds_used_bytes;
 	*availbytesp = dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE);
+	if (ds->ds_reserved > ds->ds_phys->ds_unique_bytes)
+		*availbytesp += ds->ds_reserved - ds->ds_phys->ds_unique_bytes;
+	if (ds->ds_quota != 0) {
+		/*
+		 * Adjust available bytes according to refquota
+		 */
+		if (*refdbytesp < ds->ds_quota)
+			*availbytesp = MIN(*availbytesp,
+			    ds->ds_quota - *refdbytesp);
+		else
+			*availbytesp = 0;
+	}
 	*usedobjsp = ds->ds_phys->ds_bp.blk_fill;
 	*availobjsp = DN_MAX_OBJECT - *usedobjsp;
 }
@@ -2198,6 +2375,9 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	uint64_t unique = 0;
 	int err;
 
+	if (csa->ohds->ds_reserved)
+		panic("refreservation and clone swap are incompatible");
+
 	dmu_buf_will_dirty(csa->cds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->ohds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->cds->ds_prev->ds_dbuf, tx);
@@ -2220,6 +2400,13 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			unique += bp_get_dasize(dp->dp_spa, &bp);
 	}
 	VERIFY(err == ENOENT);
+
+	/* undo any accounting due to a refreservation */
+	if (csa->ohds->ds_reserved > csa->ohds->ds_phys->ds_unique_bytes) {
+		dsl_dir_diduse_space(csa->ohds->ds_dir,
+		    csa->ohds->ds_phys->ds_unique_bytes -
+		    csa->ohds->ds_reserved, 0, 0, tx);
+	}
 
 	/* reset origin's unique bytes */
 	csa->cds->ds_prev->ds_phys->ds_unique_bytes = unique;
@@ -2263,6 +2450,13 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		(y) = __tmp; \
 	}
 
+	/* redo any accounting due to a refreservation */
+	if (csa->ohds->ds_reserved > csa->ohds->ds_phys->ds_unique_bytes) {
+		dsl_dir_diduse_space(csa->ohds->ds_dir,
+		    csa->ohds->ds_reserved -
+		    csa->ohds->ds_phys->ds_unique_bytes, 0, 0, tx);
+	}
+
 	/* swap ds_*_bytes */
 	SWITCH64(csa->ohds->ds_phys->ds_used_bytes,
 	    csa->cds->ds_phys->ds_used_bytes);
@@ -2280,6 +2474,9 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    csa->cds->ds_phys->ds_deadlist_obj));
 	VERIFY(0 == bplist_open(&csa->ohds->ds_deadlist, dp->dp_meta_objset,
 	    csa->ohds->ds_phys->ds_deadlist_obj));
+	/* fix up clone's unique */
+	dsl_dataset_recalc_head_uniq(csa->cds);
+
 }
 
 /*
@@ -2330,4 +2527,196 @@ dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf)
 	spa_close(spa, FTAG);
 
 	return (0);
+}
+
+int
+dsl_dataset_check_quota(dsl_dataset_t *ds, boolean_t check_quota,
+    uint64_t asize, uint64_t inflight, uint64_t *used)
+{
+	int error = 0;
+
+	ASSERT3S(asize, >, 0);
+
+	mutex_enter(&ds->ds_lock);
+	/*
+	 * Make a space adjustment for reserved bytes.
+	 */
+	if (ds->ds_reserved > ds->ds_phys->ds_unique_bytes) {
+		ASSERT3U(*used, >=,
+		    ds->ds_reserved - ds->ds_phys->ds_unique_bytes);
+		*used -= (ds->ds_reserved - ds->ds_phys->ds_unique_bytes);
+	}
+
+	if (!check_quota || ds->ds_quota == 0) {
+		mutex_exit(&ds->ds_lock);
+		return (0);
+	}
+	/*
+	 * If they are requesting more space, and our current estimate
+	 * is over quota, they get to try again unless the actual
+	 * on-disk is over quota and there are no pending changes (which
+	 * may free up space for us).
+	 */
+	if (ds->ds_phys->ds_used_bytes + inflight >= ds->ds_quota) {
+		if (inflight > 0 || ds->ds_phys->ds_used_bytes < ds->ds_quota)
+			error = ERESTART;
+		else
+			error = EDQUOT;
+	}
+	mutex_exit(&ds->ds_lock);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+dsl_dataset_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	uint64_t *quotap = arg2;
+	uint64_t new_quota = *quotap;
+
+	if (spa_version(ds->ds_dir->dd_pool->dp_spa) < SPA_VERSION_REFQUOTA)
+		return (ENOTSUP);
+
+	if (new_quota == 0)
+		return (0);
+
+	if (new_quota < ds->ds_phys->ds_used_bytes ||
+	    new_quota < ds->ds_reserved)
+		return (ENOSPC);
+
+	return (0);
+}
+
+/* ARGSUSED */
+void
+dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	uint64_t *quotap = arg2;
+	uint64_t new_quota = *quotap;
+
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+
+	mutex_enter(&ds->ds_lock);
+	ds->ds_quota = new_quota;
+	mutex_exit(&ds->ds_lock);
+
+	dsl_prop_set_uint64_sync(ds->ds_dir, "refquota", new_quota, cr, tx);
+
+	spa_history_internal_log(LOG_DS_REFQUOTA, ds->ds_dir->dd_pool->dp_spa,
+	    tx, cr, "%lld dataset = %llu ",
+	    (longlong_t)new_quota, ds->ds_dir->dd_phys->dd_head_dataset_obj);
+}
+
+int
+dsl_dataset_set_quota(const char *dsname, uint64_t quota)
+{
+	dsl_dataset_t *ds;
+	int err;
+
+	err = dsl_dataset_open(dsname, DS_MODE_STANDARD, FTAG, &ds);
+	if (err)
+		return (err);
+
+	/*
+	 * If someone removes a file, then tries to set the quota, we
+	 * want to make sure the file freeing takes effect.
+	 */
+	txg_wait_open(ds->ds_dir->dd_pool, 0);
+
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool, dsl_dataset_set_quota_check,
+	    dsl_dataset_set_quota_sync, ds, &quota, 0);
+	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
+	return (err);
+}
+
+static int
+dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	uint64_t *reservationp = arg2;
+	uint64_t new_reservation = *reservationp;
+	int64_t delta;
+	uint64_t unique;
+
+	if (new_reservation > INT64_MAX)
+		return (EOVERFLOW);
+
+	if (spa_version(ds->ds_dir->dd_pool->dp_spa) <
+	    SPA_VERSION_REFRESERVATION)
+		return (ENOTSUP);
+
+	if (dsl_dataset_is_snapshot(ds))
+		return (EINVAL);
+
+	/*
+	 * If we are doing the preliminary check in open context, the
+	 * space estimates may be inaccurate.
+	 */
+	if (!dmu_tx_is_syncing(tx))
+		return (0);
+
+	mutex_enter(&ds->ds_lock);
+	unique = dsl_dataset_unique(ds);
+	delta = MAX(unique, new_reservation) - MAX(unique, ds->ds_reserved);
+	mutex_exit(&ds->ds_lock);
+
+	if (delta > 0 &&
+	    delta > dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE))
+		return (ENOSPC);
+	if (delta > 0 && ds->ds_quota > 0 &&
+	    new_reservation > ds->ds_quota)
+		return (ENOSPC);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static void
+dsl_dataset_set_reservation_sync(void *arg1, void *arg2, cred_t *cr,
+    dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	uint64_t *reservationp = arg2;
+	uint64_t new_reservation = *reservationp;
+	uint64_t unique;
+	int64_t delta;
+
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+
+	mutex_enter(&ds->ds_lock);
+	unique = dsl_dataset_unique(ds);
+	delta = MAX(0, (int64_t)(new_reservation - unique)) -
+	    MAX(0, (int64_t)(ds->ds_reserved - unique));
+	ds->ds_reserved = new_reservation;
+	mutex_exit(&ds->ds_lock);
+
+	dsl_prop_set_uint64_sync(ds->ds_dir, "refreservation",
+	    new_reservation, cr, tx);
+
+	dsl_dir_diduse_space(ds->ds_dir, delta, 0, 0, tx);
+
+	spa_history_internal_log(LOG_DS_REFRESERV,
+	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu",
+	    (longlong_t)new_reservation,
+	    ds->ds_dir->dd_phys->dd_head_dataset_obj);
+}
+
+int
+dsl_dataset_set_reservation(const char *dsname, uint64_t reservation)
+{
+	dsl_dataset_t *ds;
+	int err;
+
+	err = dsl_dataset_open(dsname, DS_MODE_STANDARD, FTAG, &ds);
+	if (err)
+		return (err);
+
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    dsl_dataset_set_reservation_check,
+	    dsl_dataset_set_reservation_sync, ds, &reservation, 0);
+	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
+	return (err);
 }

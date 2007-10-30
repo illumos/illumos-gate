@@ -772,6 +772,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 
 			switch (prop) {
 			case ZFS_PROP_RESERVATION:
+			case ZFS_PROP_REFRESERVATION:
 				if (intval > volsize) {
 					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 					    "'%s' is greater than current "
@@ -1627,6 +1628,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 			 */
 			switch (prop) {
 			case ZFS_PROP_QUOTA:
+			case ZFS_PROP_REFQUOTA:
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "size is less than current used or "
 				    "reserved space"));
@@ -1634,6 +1636,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 				break;
 
 			case ZFS_PROP_RESERVATION:
+			case ZFS_PROP_REFRESERVATION:
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "size is greater than available space"));
 				(void) zfs_error(hdl, EZFS_PROPSPACE, errbuf);
@@ -1953,7 +1956,9 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		break;
 
 	case ZFS_PROP_QUOTA:
+	case ZFS_PROP_REFQUOTA:
 	case ZFS_PROP_RESERVATION:
+	case ZFS_PROP_REFRESERVATION:
 		*val = getprop_uint64(zhp, prop, source);
 		if (*val == 0)
 			*source = "";	/* default */
@@ -2122,7 +2127,10 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	case ZFS_PROP_QUOTA:
+	case ZFS_PROP_REFQUOTA:
 	case ZFS_PROP_RESERVATION:
+	case ZFS_PROP_REFRESERVATION:
+
 		if (get_numeric_property(zhp, prop, src, &source, &val) != 0)
 			return (-1);
 

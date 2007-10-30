@@ -1224,55 +1224,60 @@ static void
 adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
     uint64_t blocksize)
 {
-	zfs_handle_t	*zhp;
 	char *dataset, *slash;
-	uint64_t quota;
+	boolean_t first = TRUE;
+	uint64_t quota = 0;
 
-	if (strcmp(DFR_FSTYPE(dfrp), MNTTYPE_ZFS) != 0 ||
-	    !load_libzfs())
+	if (strcmp(DFR_FSTYPE(dfrp), MNTTYPE_ZFS) != 0 || !load_libzfs())
 		return;
 
 	/*
 	 * We want to get the total size for this filesystem as bounded by any
 	 * quotas. In order to do this, we start at the current filesystem and
-	 * work upwards until we find a dataset with a quota.  If we reach the
-	 * pool itself, then the total space is the amount used plus the amount
+	 * work upwards looking for the smallest quota.  When we reach the
+	 * pool itself, the quota is the amount used plus the amount
 	 * available.
 	 */
 	if ((dataset = strdup(DFR_SPECIAL(dfrp))) == NULL)
 		return;
 
 	slash = dataset + strlen(dataset);
-	do {
+	while (slash != NULL) {
+		zfs_handle_t *zhp;
+		uint64_t this_quota;
+
 		*slash = '\0';
 
-		if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET))
-		    == NULL) {
-			free(dataset);
-			return;
+		zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET);
+		if (zhp == NULL)
+			break;
+
+		/* true at first iteration of loop */
+		if (first) {
+			quota = _zfs_prop_get_int(zhp, ZFS_PROP_REFQUOTA);
+			if (quota == 0)
+				quota = UINT64_MAX;
+			first = FALSE;
 		}
 
-		if ((quota = _zfs_prop_get_int(zhp, ZFS_PROP_QUOTA)) != 0) {
-			*total = quota / blocksize;
-			_zfs_close(zhp);
-			free(dataset);
-			return;
+		this_quota = _zfs_prop_get_int(zhp, ZFS_PROP_QUOTA);
+		if (this_quota && this_quota < quota)
+			quota = this_quota;
+
+		/* true at last iteration of loop */
+		if ((slash = strrchr(dataset, '/')) == NULL) {
+			uint64_t size;
+
+			size = _zfs_prop_get_int(zhp, ZFS_PROP_USED) +
+			    _zfs_prop_get_int(zhp, ZFS_PROP_AVAILABLE);
+			if (size < quota)
+				quota = size;
 		}
 
 		_zfs_close(zhp);
-
-	} while ((slash = strrchr(dataset, '/')) != NULL);
-
-
-	if ((zhp = _zfs_open(g_zfs, dataset, ZFS_TYPE_DATASET)) == NULL) {
-		free(dataset);
-		return;
 	}
 
-	*total = (_zfs_prop_get_int(zhp, ZFS_PROP_USED) +
-	    _zfs_prop_get_int(zhp, ZFS_PROP_AVAILABLE)) / blocksize;
-
-	_zfs_close(zhp);
+	*total = quota / blocksize;
 	free(dataset);
 }
 

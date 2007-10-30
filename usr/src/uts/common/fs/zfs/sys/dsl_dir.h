@@ -110,7 +110,8 @@ uint64_t dsl_dir_space_available(dsl_dir_t *dd,
 void dsl_dir_dirty(dsl_dir_t *dd, dmu_tx_t *tx);
 void dsl_dir_sync(dsl_dir_t *dd, dmu_tx_t *tx);
 int dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t mem,
-    uint64_t asize, uint64_t fsize, void **tr_cookiep, dmu_tx_t *tx);
+    uint64_t asize, uint64_t fsize, uint64_t usize, void **tr_cookiep,
+    dmu_tx_t *tx);
 void dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx);
 void dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx);
 void dsl_dir_diduse_space(dsl_dir_t *dd,
@@ -119,6 +120,7 @@ int dsl_dir_set_quota(const char *ddname, uint64_t quota);
 int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
 int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
 int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
+int dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx);
 
 /* internal reserved dir name */
 #define	MOS_DIR_NAME "$MOS"

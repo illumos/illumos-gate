@@ -281,7 +281,7 @@ usage_prop_cb(int prop, void *cb)
 {
 	FILE *fp = cb;
 
-	(void) fprintf(fp, "\t%-13s  ", zfs_prop_to_name(prop));
+	(void) fprintf(fp, "\t%-14s ", zfs_prop_to_name(prop));
 
 	if (prop == ZFS_PROP_CASE)
 		(void) fprintf(fp, "NO    ");
@@ -348,7 +348,7 @@ usage(boolean_t requested)
 		(void) fprintf(fp,
 		    gettext("\nThe following properties are supported:\n"));
 
-		(void) fprintf(fp, "\n\t%-13s  %s  %s   %s\n\n",
+		(void) fprintf(fp, "\n\t%-14s %s  %s   %s\n\n",
 		    "PROPERTY", "EDIT", "INHERIT", "VALUES");
 
 		/* Iterate over all properties */
@@ -1270,7 +1270,9 @@ zfs_do_inherit(int argc, char **argv)
 			(void) fprintf(stderr, gettext("'%s' property cannot "
 			    "be inherited\n"), propname);
 			if (prop == ZFS_PROP_QUOTA ||
-			    prop == ZFS_PROP_RESERVATION)
+			    prop == ZFS_PROP_RESERVATION ||
+			    prop == ZFS_PROP_REFQUOTA ||
+			    prop == ZFS_PROP_REFRESERVATION)
 				(void) fprintf(stderr, gettext("use 'zfs set "
 				    "%s=none' to clear\n"), propname);
 			return (1);

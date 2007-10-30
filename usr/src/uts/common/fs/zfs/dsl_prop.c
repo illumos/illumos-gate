@@ -375,6 +375,24 @@ dsl_prop_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    dd->dd_phys->dd_head_dataset_obj);
 }
 
+void
+dsl_prop_set_uint64_sync(dsl_dir_t *dd, const char *name, uint64_t val,
+    cred_t *cr, dmu_tx_t *tx)
+{
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
+	uint64_t zapobj = dd->dd_phys->dd_props_zapobj;
+
+	ASSERT(dmu_tx_is_syncing(tx));
+
+	VERIFY(0 == zap_update(mos, zapobj, name, sizeof (val), 1, &val, tx));
+
+	dsl_prop_changed_notify(dd->dd_pool, dd->dd_object, name, val, TRUE);
+
+	spa_history_internal_log(LOG_DS_PROPSET, dd->dd_pool->dp_spa, tx, cr,
+	    "%s=%llu dataset = %llu", name, (u_longlong_t)val,
+	    dd->dd_phys->dd_head_dataset_obj);
+}
+
 int
 dsl_prop_set_dd(dsl_dir_t *dd, const char *propname,
     int intsz, int numints, const void *buf)

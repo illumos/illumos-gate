@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dmu.h>
+#include <sys/dmu_objset.h>
 #include <sys/dmu_tx.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
@@ -39,7 +40,7 @@
 #include <sys/sunddi.h>
 #include "zfs_namecheck.h"
 
-static uint64_t dsl_dir_estimated_space(dsl_dir_t *dd);
+static uint64_t dsl_dir_space_towrite(dsl_dir_t *dd);
 static void dsl_dir_set_reservation_sync(void *arg1, void *arg2,
     cred_t *cr, dmu_tx_t *tx);
 
@@ -518,13 +519,9 @@ dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx)
 void
 dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 {
-	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_AVAILABLE,
-	    dsl_dir_space_available(dd, NULL, 0, TRUE));
-
 	mutex_enter(&dd->dd_lock);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USED, dd->dd_used_bytes);
-	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_QUOTA,
-	    dd->dd_phys->dd_quota);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_QUOTA, dd->dd_phys->dd_quota);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_RESERVATION,
 	    dd->dd_phys->dd_reserved);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_COMPRESSRATIO,
@@ -590,15 +587,13 @@ dsl_dir_sync(dsl_dir_t *dd, dmu_tx_t *tx)
 }
 
 static uint64_t
-dsl_dir_estimated_space(dsl_dir_t *dd)
+dsl_dir_space_towrite(dsl_dir_t *dd)
 {
-	int64_t space;
+	uint64_t space = 0;
 	int i;
 
 	ASSERT(MUTEX_HELD(&dd->dd_lock));
 
-	space = dd->dd_phys->dd_used_bytes;
-	ASSERT(space >= 0);
 	for (i = 0; i < TXG_SIZE; i++) {
 		space += dd->dd_space_towrite[i&TXG_MASK];
 		ASSERT3U(dd->dd_space_towrite[i&TXG_MASK], >=, 0);
@@ -632,11 +627,9 @@ dsl_dir_space_available(dsl_dir_t *dd,
 	mutex_enter(&dd->dd_lock);
 	if (dd->dd_phys->dd_quota != 0)
 		quota = dd->dd_phys->dd_quota;
-	if (ondiskonly) {
-		used = dd->dd_used_bytes;
-	} else {
-		used = dsl_dir_estimated_space(dd);
-	}
+	used = dd->dd_used_bytes;
+	if (!ondiskonly)
+		used += dsl_dir_space_towrite(dd);
 	if (dd == ancestor)
 		used += delta;
 
@@ -684,40 +677,50 @@ struct tempreserve {
 	uint64_t tr_size;
 };
 
-/*
- * Reserve space in this dsl_dir, to be used in this tx's txg.
- * After the space has been dirtied (and thus
- * dsl_dir_willuse_space() has been called), the reservation should
- * be canceled, using dsl_dir_tempreserve_clear().
- */
 static int
-dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize,
-    boolean_t netfree, boolean_t noquota, list_t *tr_list, dmu_tx_t *tx)
+dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
+    boolean_t ignorequota, boolean_t checkrefquota, list_t *tr_list,
+    dmu_tx_t *tx)
 {
 	uint64_t txg = tx->tx_txg;
-	uint64_t est_used, quota, parent_rsrv;
-	int edquot = EDQUOT;
+	uint64_t est_inflight, used_on_disk, quota, parent_rsrv;
+	struct tempreserve *tr;
+	int error = EDQUOT;
 	int txgidx = txg & TXG_MASK;
 	int i;
-	struct tempreserve *tr;
 
 	ASSERT3U(txg, !=, 0);
-	ASSERT3S(asize, >=, 0);
+	ASSERT3S(asize, >, 0);
 
 	mutex_enter(&dd->dd_lock);
+
 	/*
 	 * Check against the dsl_dir's quota.  We don't add in the delta
 	 * when checking for over-quota because they get one free hit.
 	 */
-	est_used = dsl_dir_estimated_space(dd);
+	est_inflight = dsl_dir_space_towrite(dd);
 	for (i = 0; i < TXG_SIZE; i++)
-		est_used += dd->dd_tempreserved[i];
+		est_inflight += dd->dd_tempreserved[i];
+	used_on_disk = dd->dd_used_bytes;
 
 	/*
-	 * If this transaction will result in a net free of space, we want
-	 * to let it through.
+	 * Check for dataset reference quota on first iteration.
 	 */
-	if (netfree || noquota || dd->dd_phys->dd_quota == 0)
+	if (list_head(tr_list) == NULL && tx->tx_objset) {
+		dsl_dataset_t *ds = tx->tx_objset->os->os_dsl_dataset;
+		error = dsl_dataset_check_quota(ds, checkrefquota,
+		    asize, est_inflight, &used_on_disk);
+		if (error) {
+			mutex_exit(&dd->dd_lock);
+			return (error);
+		}
+	}
+
+	/*
+	 * If this transaction will result in a net free of space,
+	 * we want to let it through.
+	 */
+	if (ignorequota || netfree || dd->dd_phys->dd_quota == 0)
 		quota = UINT64_MAX;
 	else
 		quota = dd->dd_phys->dd_quota;
@@ -735,34 +738,31 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize,
 		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, netfree);
 		if (poolsize < quota) {
 			quota = poolsize;
-			edquot = ENOSPC;
+			error = ENOSPC;
 		}
 	}
 
 	/*
 	 * If they are requesting more space, and our current estimate
-	 * is over quota.  They get to try again unless the actual
+	 * is over quota, they get to try again unless the actual
 	 * on-disk is over quota and there are no pending changes (which
 	 * may free up space for us).
 	 */
-	if (asize > 0 && est_used > quota) {
-		if (dd->dd_space_towrite[txg & TXG_MASK] != 0 ||
-		    dd->dd_space_towrite[(txg-1) & TXG_MASK] != 0 ||
-		    dd->dd_space_towrite[(txg-2) & TXG_MASK] != 0 ||
-		    dd->dd_used_bytes < quota)
-			edquot = ERESTART;
-		dprintf_dd(dd, "failing: used=%lluK est_used = %lluK "
+	if (used_on_disk + est_inflight > quota) {
+		if (est_inflight > 0 || used_on_disk < quota)
+			error = ERESTART;
+		dprintf_dd(dd, "failing: used=%lluK inflight = %lluK "
 		    "quota=%lluK tr=%lluK err=%d\n",
-		    dd->dd_used_bytes>>10, est_used>>10,
-		    quota>>10, asize>>10, edquot);
+		    used_on_disk>>10, est_inflight>>10,
+		    quota>>10, asize>>10, error);
 		mutex_exit(&dd->dd_lock);
-		return (edquot);
+		return (error);
 	}
 
 	/* We need to up our estimated delta before dropping dd_lock */
 	dd->dd_tempreserved[txgidx] += asize;
 
-	parent_rsrv = parent_delta(dd, est_used, asize);
+	parent_rsrv = parent_delta(dd, used_on_disk + est_inflight, asize);
 	mutex_exit(&dd->dd_lock);
 
 	tr = kmem_alloc(sizeof (struct tempreserve), KM_SLEEP);
@@ -775,7 +775,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize,
 		boolean_t ismos = (dd->dd_phys->dd_head_dataset_obj == 0);
 
 		return (dsl_dir_tempreserve_impl(dd->dd_parent,
-		    parent_rsrv, netfree, ismos, tr_list, tx));
+		    parent_rsrv, netfree, ismos, TRUE, tr_list, tx));
 	} else {
 		return (0);
 	}
@@ -783,25 +783,30 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize,
 
 /*
  * Reserve space in this dsl_dir, to be used in this tx's txg.
- * After the space has been dirtied (and thus
- * dsl_dir_willuse_space() has been called), the reservation should
- * be canceled, using dsl_dir_tempreserve_clear().
+ * After the space has been dirtied (and dsl_dir_willuse_space()
+ * has been called), the reservation should be canceled, using
+ * dsl_dir_tempreserve_clear().
  */
 int
-dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize,
-    uint64_t asize, uint64_t fsize, void **tr_cookiep, dmu_tx_t *tx)
+dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t lsize, uint64_t asize,
+    uint64_t fsize, uint64_t usize, void **tr_cookiep, dmu_tx_t *tx)
 {
 	int err = 0;
 	list_t *tr_list;
 
+	if (asize == 0) {
+		*tr_cookiep = NULL;
+		return (0);
+	}
+
 	tr_list = kmem_alloc(sizeof (list_t), KM_SLEEP);
 	list_create(tr_list, sizeof (struct tempreserve),
 	    offsetof(struct tempreserve, tr_node));
-	ASSERT3S(asize, >=, 0);
+	ASSERT3S(asize, >, 0);
 	ASSERT3S(fsize, >=, 0);
 
 	err = dsl_dir_tempreserve_impl(dd, asize, fsize >= asize, FALSE,
-	    tr_list, tx);
+	    asize > usize, tr_list, tx);
 
 	if (err == 0) {
 		struct tempreserve *tr;
@@ -835,6 +840,9 @@ dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx)
 
 	ASSERT3U(tx->tx_txg, !=, 0);
 
+	if (tr_cookie == NULL)
+		return;
+
 	while (tr = list_head(tr_list)) {
 		if (tr->tr_ds == NULL) {
 			arc_tempreserve_clear(tr->tr_size);
@@ -867,7 +875,7 @@ dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
 	if (space > 0)
 		dd->dd_space_towrite[tx->tx_txg & TXG_MASK] += space;
 
-	est_used = dsl_dir_estimated_space(dd);
+	est_used = dsl_dir_space_towrite(dd) + dd->dd_used_bytes;
 	parent_space = parent_delta(dd, est_used, space);
 	mutex_exit(&dd->dd_lock);
 
@@ -924,14 +932,13 @@ dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	/*
 	 * If we are doing the preliminary check in open context, and
 	 * there are pending changes, then don't fail it, since the
-	 * pending changes could under-estimat the amount of space to be
+	 * pending changes could under-estimate the amount of space to be
 	 * freed up.
 	 */
-	towrite = dd->dd_space_towrite[0] + dd->dd_space_towrite[1] +
-	    dd->dd_space_towrite[2] + dd->dd_space_towrite[3];
+	towrite = dsl_dir_space_towrite(dd);
 	if ((dmu_tx_is_syncing(tx) || towrite == 0) &&
 	    (new_quota < dd->dd_phys->dd_reserved ||
-	    new_quota < dsl_dir_estimated_space(dd))) {
+	    new_quota < dd->dd_used_bytes + towrite)) {
 		err = ENOSPC;
 	}
 	mutex_exit(&dd->dd_lock);
@@ -978,7 +985,7 @@ dsl_dir_set_quota(const char *ddname, uint64_t quota)
 	return (err);
 }
 
-static int
+int
 dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
@@ -1028,14 +1035,14 @@ dsl_dir_set_reservation_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	uint64_t used;
 	int64_t delta;
 
+	dmu_buf_will_dirty(dd->dd_dbuf, tx);
+
 	mutex_enter(&dd->dd_lock);
 	used = dd->dd_used_bytes;
 	delta = MAX(used, new_reservation) -
 	    MAX(used, dd->dd_phys->dd_reserved);
-	mutex_exit(&dd->dd_lock);
-
-	dmu_buf_will_dirty(dd->dd_dbuf, tx);
 	dd->dd_phys->dd_reserved = new_reservation;
+	mutex_exit(&dd->dd_lock);
 
 	if (dd->dd_parent != NULL) {
 		/* Roll up this additional usage into our ancestors */

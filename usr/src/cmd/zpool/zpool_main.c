@@ -3301,8 +3301,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 6   bootfs pool property\n"));
 		(void) printf(gettext(" 7   Separate intent log devices\n"));
 		(void) printf(gettext(" 8   Delegated administration\n"));
-		(void) printf(gettext(" 9   Case insensitive support and "
-		    "File system unique identifiers (FUID)\n"));
+		(void) printf(gettext(" 9  refquota and refreservation "
+		    "properties\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
@@ -3385,6 +3385,8 @@ char *hist_event_table[LOG_END] = {
 	"rollback",
 	"snapshot",
 	"filesystem version upgrade",
+	"refquota set",
+	"refreservation set",
 };
 
 /*

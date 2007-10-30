@@ -67,6 +67,8 @@ int dsl_prop_set(const char *ddname, const char *propname,
     int intsz, int numints, const void *buf);
 int dsl_prop_set_dd(dsl_dir_t *dd, const char *propname,
     int intsz, int numints, const void *buf);
+void dsl_prop_set_uint64_sync(dsl_dir_t *dd, const char *name, uint64_t val,
+    cred_t *cr, dmu_tx_t *tx);
 
 void dsl_prop_nvlist_add_uint64(nvlist_t *nv, zfs_prop_t prop, uint64_t value);
 void dsl_prop_nvlist_add_string(nvlist_t *nv,

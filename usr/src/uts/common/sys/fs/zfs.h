@@ -98,6 +98,8 @@ typedef enum {
 	ZFS_PROP_VSCAN,
 	ZFS_PROP_NBMAND,
 	ZFS_PROP_SHARESMB,
+	ZFS_PROP_REFQUOTA,
+	ZFS_PROP_REFRESERVATION,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -251,6 +253,9 @@ typedef enum zfs_share_op {
 #define	SPA_VERSION_DELEGATED_PERMS	SPA_VERSION_8
 #define	SPA_VERSION_FUID		SPA_VERSION_9
 #define	SPA_VERSION_NORMALIZATION	SPA_VERSION_9
+#define	SPA_VERSION_REFRESERVATION	SPA_VERSION_9
+#define	SPA_VERSION_REFQUOTA		SPA_VERSION_9
+#define	SPA_VERSION_UNIQUE_ACCURATE	SPA_VERSION_9
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -619,6 +624,8 @@ typedef enum history_internal_events {
 	LOG_DS_ROLLBACK,
 	LOG_DS_SNAPSHOT,
 	LOG_DS_UPGRADE,
+	LOG_DS_REFQUOTA,
+	LOG_DS_REFRESERV,
 	LOG_END
 } history_internal_events_t;
 

@@ -498,6 +498,10 @@ recv_online_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	VERIFY(0 == dsl_dataset_open_obj(dp, dsobj, NULL,
 	    DS_MODE_EXCLUSIVE, dmu_recv_tag, &cds));
 
+	/* copy the refquota from the target fs to the clone */
+	if (ohds->ds_quota > 0)
+		dsl_dataset_set_quota_sync(cds, &ohds->ds_quota, cr, tx);
+
 	dmu_buf_will_dirty(cds->ds_dbuf, tx);
 	cds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
@@ -513,6 +517,7 @@ static void
 recv_offline_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
+
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
 
