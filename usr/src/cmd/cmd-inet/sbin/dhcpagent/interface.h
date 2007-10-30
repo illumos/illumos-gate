@@ -47,7 +47,6 @@ extern "C" {
 #include <netinet/dhcp.h>
 #include <dhcpagent_ipc.h>
 #include <libinetutil.h>
-#include <libdlpi.h>
 
 #include "common.h"
 #include "util.h"
@@ -65,14 +64,7 @@ struct dhcp_pif_s {
 	uchar_t		pif_hwtype;	/* type of link-layer */
 	boolean_t	pif_isv6;
 	boolean_t	pif_running;	/* interface is running */
-	dlpi_handle_t 	pif_dlpi_hd;	/* dlpi handle */
-	int		pif_dlpi_count;
-	iu_event_id_t	pif_dlpi_id;	/* event id for ack/nak/offer */
 	uint_t		pif_hold_count;	/* reference count */
-
-	uchar_t		*pif_daddr;	/* our L2 destination address */
-	uchar_t		pif_dlen;	/* our L2 destination address len */
-
 	char		pif_name[LIFNAMSIZ];
 };
 
@@ -84,7 +76,7 @@ struct dhcp_lif_s {
 	dhcp_lease_t	*lif_lease;	/* backpointer to lease holding LIF */
 	uint64_t	lif_flags;	/* Interface flags (IFF_*) */
 	int		lif_sock_ip_fd;	/* Bound to addr.BOOTPC for src addr */
-	iu_event_id_t	lif_acknak_id;	/* event acknak id */
+	iu_event_id_t	lif_packet_id;	/* event packet id */
 	uint_t		lif_max;	/* maximum IP message size */
 	uint_t		lif_hold_count;	/* reference count */
 	boolean_t	lif_dad_wait;	/* waiting for DAD resolution */
@@ -177,8 +169,6 @@ void		release_pif(dhcp_pif_t *);
 dhcp_pif_t	*lookup_pif_by_index(uint_t, boolean_t);
 dhcp_pif_t	*lookup_pif_by_uindex(uint16_t, dhcp_pif_t *, boolean_t);
 dhcp_pif_t	*lookup_pif_by_name(const char *, boolean_t);
-boolean_t	open_dlpi_pif(dhcp_pif_t *);
-void		close_dlpi_pif(dhcp_pif_t *);
 void		pif_status(dhcp_pif_t *, boolean_t);
 
 dhcp_lif_t	*insert_lif(dhcp_pif_t *, const char *, int *);
@@ -193,7 +183,7 @@ dhcp_lif_t	*attach_lif(const char *, boolean_t, int *);
 int		set_lif_dhcp(dhcp_lif_t *, boolean_t);
 void		set_lif_deprecated(dhcp_lif_t *);
 boolean_t	clear_lif_deprecated(dhcp_lif_t *);
-boolean_t	open_ip_lif(dhcp_lif_t *);
+boolean_t	open_ip_lif(dhcp_lif_t *, in_addr_t);
 void		close_ip_lif(dhcp_lif_t *);
 void		lif_mark_decline(dhcp_lif_t *, const char *);
 boolean_t	schedule_lif_timer(dhcp_lif_t *, dhcp_timer_t *,

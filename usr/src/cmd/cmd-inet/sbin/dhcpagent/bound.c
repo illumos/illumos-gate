@@ -337,7 +337,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	 */
 	if (dsmp->dsm_isv6) {
 		(void) set_smach_state(dsmp, BOUND);
-		dhcpmsg(MSG_DEBUG, "configure_bound: bound %s",
+		dhcpmsg(MSG_DEBUG, "dhcp_bound_complete: bound %s",
 		    dsmp->dsm_name);
 		(void) script_start(dsmp, EVENT_BOUND6, bound_event_cb, NULL,
 		    NULL);
@@ -363,7 +363,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 		dsmp->dsm_nrouters = router_list->len / sizeof (ipaddr_t);
 		dsmp->dsm_routers  = malloc(router_list->len);
 		if (dsmp->dsm_routers == NULL) {
-			dhcpmsg(MSG_ERR, "configure_bound: cannot allocate "
+			dhcpmsg(MSG_ERR, "dhcp_bound_complete: cannot allocate "
 			    "default router list, ignoring default routers");
 			dsmp->dsm_nrouters = 0;
 		}
@@ -376,8 +376,8 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 
 			if (!add_default_route(lif->lif_pif->pif_index,
 			    &dsmp->dsm_routers[i])) {
-				dhcpmsg(MSG_ERR, "configure_bound: cannot add "
-				    "default router %s on %s", inet_ntoa(
+				dhcpmsg(MSG_ERR, "dhcp_bound_complete: cannot "
+				    "add default router %s on %s", inet_ntoa(
 				    dsmp->dsm_routers[i]), dsmp->dsm_name);
 				dsmp->dsm_routers[i].s_addr = htonl(INADDR_ANY);
 				continue;
@@ -391,12 +391,12 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	oldstate = dsmp->dsm_state;
 	if (!set_smach_state(dsmp, BOUND)) {
 		dhcpmsg(MSG_ERR,
-		    "configure_bound: cannot set bound state on %s",
+		    "dhcp_bound_complete: cannot set bound state on %s",
 		    dsmp->dsm_name);
 		return;
 	}
 
-	dhcpmsg(MSG_DEBUG, "configure_bound: bound %s", dsmp->dsm_name);
+	dhcpmsg(MSG_DEBUG, "dhcp_bound_complete: bound %s", dsmp->dsm_name);
 
 	/*
 	 * We're now committed to this binding, so if it came from BOOTP, set

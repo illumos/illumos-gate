@@ -149,18 +149,16 @@ insert_smach(dhcp_lif_t *lif, int *error)
 		    &dsmp->dsm_server);
 
 		/*
-		 * With IPv4 DHCP, we start off doing our I/O via DLPI, so open
-		 * that up now.
+		 * With IPv4 DHCP, we use a socket per lif.
 		 */
-		if (!open_dlpi_pif(lif->lif_pif)) {
-			dhcpmsg(MSG_ERR, "unable to open DLPI for %s",
+		if (!open_ip_lif(lif, INADDR_ANY)) {
+			dhcpmsg(MSG_ERR, "unable to open socket for %s",
 			    lif->lif_name);
 			/* This will also dispose of the LIF */
 			release_smach(dsmp);
 			*error = DHCP_IPC_E_SOCKET;
 			return (NULL);
 		}
-		dsmp->dsm_using_dlpi = B_TRUE;
 	}
 	dsmp->dsm_retrans_timer		= -1;
 	dsmp->dsm_offer_timer		= -1;
@@ -657,6 +655,20 @@ finished_smach(dhcp_smach_t *dsmp, int error)
 }
 
 /*
+ * is_bound_state(): checks if a state indicates the client is bound
+ *
+ *   input: DHCPSTATE: the state to check
+ *  output: boolean_t: B_TRUE if the state is bound, B_FALSE if not
+ */
+
+boolean_t
+is_bound_state(DHCPSTATE state)
+{
+	return (state == BOUND || state == REBINDING || state == INFORMATION ||
+	    state == RELEASING || state == INFORM_SENT || state == RENEWING);
+}
+
+/*
  * set_smach_state(): changes state and updates I/O
  *
  *   input: dhcp_smach_t *: the state machine to change
@@ -667,35 +679,33 @@ finished_smach(dhcp_smach_t *dsmp, int error)
 boolean_t
 set_smach_state(dhcp_smach_t *dsmp, DHCPSTATE state)
 {
-	if (dsmp->dsm_state != state) {
-		boolean_t is_bound;
+	dhcp_lif_t *lif = dsmp->dsm_lif;
 
+	if (dsmp->dsm_state != state) {
 		dhcpmsg(MSG_DEBUG,
 		    "set_smach_state: changing from %s to %s on %s",
 		    dhcp_state_to_string(dsmp->dsm_state),
 		    dhcp_state_to_string(state), dsmp->dsm_name);
 
+		/*
+		 * For IPv4, when we're in a bound state our socket must be
+		 * bound to our address.  Otherwise, our socket must be bound
+		 * to INADDR_ANY.  For IPv6, no such change is necessary.
+		 */
 		if (!dsmp->dsm_isv6) {
-			/*
-			 * When we're in a bound state for IPv4, we receive our
-			 * packets through our LIF.  Otherwise, we receive them
-			 * through DLPI.  Make sure the right one is connected.
-			 * For IPv6, no such change is necessary.
-			 */
-			is_bound = (state == BOUND || state == REBINDING ||
-			    state == RENEWING || state == RELEASING ||
-			    state == INFORM_SENT || state == INFORMATION);
-			if (dsmp->dsm_using_dlpi && is_bound) {
-				if (!open_ip_lif(dsmp->dsm_lif))
-					return (B_FALSE);
-				dsmp->dsm_using_dlpi = B_FALSE;
-				close_dlpi_pif(dsmp->dsm_lif->lif_pif);
-			}
-			if (!dsmp->dsm_using_dlpi && !is_bound) {
-				if (!open_dlpi_pif(dsmp->dsm_lif->lif_pif))
-					return (B_FALSE);
-				dsmp->dsm_using_dlpi = B_TRUE;
-				close_ip_lif(dsmp->dsm_lif);
+			if (is_bound_state(dsmp->dsm_state)) {
+				if (!is_bound_state(state)) {
+					close_ip_lif(lif);
+					if (!open_ip_lif(lif, INADDR_ANY))
+						return (B_FALSE);
+				}
+			} else {
+				if (is_bound_state(state)) {
+					close_ip_lif(lif);
+					if (!open_ip_lif(lif,
+					    ntohl(lif->lif_addr)))
+						return (B_FALSE);
+				}
 			}
 		}
 

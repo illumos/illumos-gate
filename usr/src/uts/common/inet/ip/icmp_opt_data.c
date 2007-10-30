@@ -140,9 +140,6 @@ opdes_t	icmp_opt_arr[] = {
 { IP_BOUND_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
 	sizeof (int),	0 /* no ifindex */ },
 
-{ IP_XMIT_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
-	sizeof (int),	0 /* no ifindex */ },
-
 { IP_DONTFAILOVER_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
 	sizeof (struct in_addr), 0 /* not initialized */ },
 

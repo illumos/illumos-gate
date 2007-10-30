@@ -130,7 +130,7 @@ void		*add_pkt_prl(dhcp_pkt_t *, dhcp_smach_t *);
 boolean_t	add_pkt_lif(dhcp_pkt_t *, dhcp_lif_t *, int, const char *);
 void		stop_pkt_retransmission(dhcp_smach_t *);
 void		retransmit_now(dhcp_smach_t *);
-PKT_LIST	*recv_pkt(int, int, boolean_t, boolean_t, dhcp_pif_t *);
+PKT_LIST	*recv_pkt(int, int, boolean_t);
 boolean_t	pkt_v4_match(uchar_t, dhcp_message_type_t);
 void		pkt_smach_enqueue(dhcp_smach_t *, PKT_LIST *);
 boolean_t	send_pkt(dhcp_smach_t *, dhcp_pkt_t *, in_addr_t,

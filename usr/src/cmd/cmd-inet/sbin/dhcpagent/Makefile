@@ -29,26 +29,21 @@ PROG    = dhcpagent
 ROOTFS_PROG = $(PROG)
 DEFAULTFILES = dhcpagent.dfl
 
-LOCOBJS = adopt.o agent.o async.o bound.o class_id.o defaults.o   \
-	  dlpi_io.o inform.o init_reboot.o interface.o ipc_action.o \
-	  packet.o release.o renew.o request.o script_handler.o select.o \
-	  states.o util.o
-COMDIR  = $(SRC)/common/net/dhcp
-COMOBJS = ipv4_sum.o udp_sum.o
+OBJS =	adopt.o agent.o async.o bound.o class_id.o defaults.o inform.o \
+	init_reboot.o interface.o ipc_action.o packet.o release.o renew.o \
+	request.o script_handler.o select.o states.o util.o
 
 include ../../../Makefile.cmd
 
-OBJS    = $(COMOBJS) $(LOCOBJS)
-SRCS    = $(COMOBJS:%.o=$(COMDIR)/%.c) $(LOCOBJS:%.o=%.c)
-
-POFILES = $(LOCOBJS:%.o=%.po)
+SRCS    = $(OBJS:%.o=%.c)
+POFILES = $(OBJS:%.o=%.po)
 XGETFLAGS += -a -x dhcpagent.xcl
 
 #
 # to compile a debug version, do a `make COPTFLAG="-g -XO0"'
 #
 
-CPPFLAGS  += -I$(COMDIR) -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+CPPFLAGS  += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 LDLIBS    += -lxnet -lnvpair -ldhcpagent -ldhcputil -linetutil -ldevinfo -ldlpi
 
 # Disable warnings that affect all XPG applications.
@@ -63,10 +58,6 @@ install:	all $(ROOTSBINPROG) $(ROOTETCDEFAULTFILES)
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
-
-%.o:		$(COMDIR)/%.c
-		$(COMPILE.c) $(OUTPUT_OPTION) $<
-		$(POST_PROCESS_O)
 
 $(POFILE):	$(POFILES)
 		$(RM) $@; $(CAT) $(POFILES) > $@; $(RM) $(POFILES)

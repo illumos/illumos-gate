@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -40,6 +40,7 @@
 
 #include "defs.h"
 #include <md5.h>
+#include <alloca.h>
 
 uint_t update_seqno;
 
@@ -109,7 +110,6 @@ output(enum output_type type,
 	int res;
 	int ifindex;
 	struct in_addr addr;
-	static int rip_sock_ifindex;
 
 	sin = *dst;
 	if (sin.sin_port == 0)
@@ -148,22 +148,12 @@ output(enum output_type type,
 	}
 
 	/*
-	 * Note that we intentionally reset IP_XMIT_IF to zero if
-	 * we're doing multicast.  The kernel ignores IP_MULTICAST_IF
-	 * if IP_XMIT_IF is set, and we can't deal with alias source
-	 * addresses without it.
+	 * IP_PKTINFO overrides IP_MULTICAST_IF, so we don't set ifindex
+	 * for multicast traffic.
 	 */
 	ifindex = (type != OUT_MULTICAST && type != OUT_QUERY &&
 	    ifp != NULL && ifp->int_phys != NULL) ?
 	    ifp->int_phys->phyi_index : 0;
-	if (rip_sock_ifindex != ifindex) {
-		if (setsockopt(rip_sock, IPPROTO_IP, IP_XMIT_IF, &ifindex,
-		    sizeof (ifindex)) == -1) {
-			LOGERR("setsockopt(rip_sock, IP_XMIT_IF)");
-			return (-1);
-		}
-		rip_sock_ifindex = ifindex;
-	}
 
 	if (rip_sock_interface != ifp) {
 		/*
@@ -186,10 +176,8 @@ output(enum output_type type,
 
 	trace_rip(msg, "to", &sin, ifp, buf, size);
 
-	res = sendto(rip_sock, buf, size, flags,
-	    (struct sockaddr *)&sin, sizeof (sin));
-	if (res < 0 &&
-	    (ifp == NULL || !(ifp->int_state & IS_BROKE))) {
+	res = sendtoif(rip_sock, buf, size, flags, &sin, ifindex);
+	if (res < 0 && (ifp == NULL || !(ifp->int_state & IS_BROKE))) {
 		writelog(LOG_WARNING, "%s sendto(%s%s%s.%d): %s", msg,
 		    ifp != NULL ? ifp->int_name : "",
 		    ifp != NULL ? ", " : "",
@@ -201,6 +189,55 @@ output(enum output_type type,
 	return (res);
 }
 
+/*
+ * Semantically identical to sendto(), but sends the message through a
+ * specific interface (if ifindex is non-zero) using IP_PKTINFO.
+ */
+int
+sendtoif(int fd, const void *buf, uint_t bufsize, uint_t flags,
+    struct sockaddr_in *sinp, uint_t ifindex)
+{
+	struct iovec iov;
+	struct msghdr msg;
+	struct cmsghdr *cmsgp;
+	struct in_pktinfo *ipip;
+
+	iov.iov_base = (void *)buf;
+	iov.iov_len = bufsize;
+
+	(void) memset(&msg, 0, sizeof (struct msghdr));
+	msg.msg_name = (struct sockaddr *)sinp;
+	msg.msg_namelen = sizeof (struct sockaddr_in);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	if (ifindex != 0) {
+		/*
+		 * We can't precisely predict the alignment padding we'll
+		 * need, so we allocate the maximum alignment and then
+		 * use CMSG_NXTHDR() to fix it up at the end.
+		 */
+		msg.msg_controllen = sizeof (*cmsgp) + _MAX_ALIGNMENT +
+		    sizeof (*ipip) + _MAX_ALIGNMENT + sizeof (*cmsgp);
+		msg.msg_control = alloca(msg.msg_controllen);
+
+		cmsgp = CMSG_FIRSTHDR(&msg);
+		ipip = (void *)CMSG_DATA(cmsgp);
+		(void) memset(ipip, 0, sizeof (struct in_pktinfo));
+		ipip->ipi_ifindex = ifindex;
+		cmsgp->cmsg_len = (caddr_t)(ipip + 1) - (caddr_t)cmsgp;
+		cmsgp->cmsg_type = IP_PKTINFO;
+		cmsgp->cmsg_level = IPPROTO_IP;
+
+		/*
+		 * Correct the control message length.
+		 */
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+		msg.msg_controllen = (caddr_t)cmsgp - (caddr_t)msg.msg_control;
+	}
+
+	return (sendmsg(fd, &msg, flags));
+}
 
 /*
  * Find the first key for a packet to send.

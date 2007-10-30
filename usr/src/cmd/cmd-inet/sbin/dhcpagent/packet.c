@@ -46,7 +46,6 @@
 #include "agent.h"
 #include "packet.h"
 #include "util.h"
-#include "dlpi_io.h"
 
 int v6_sock_fd = -1;
 int v4_sock_fd = -1;
@@ -157,19 +156,18 @@ pkt_get_xid(const PKT *pkt, boolean_t isv6)
 dhcp_pkt_t *
 init_pkt(dhcp_smach_t *dsmp, uchar_t type)
 {
-	uint_t		mtu;
 	dhcp_pkt_t	*dpkt = &dsmp->dsm_send_pkt;
 	dhcp_lif_t	*lif = dsmp->dsm_lif;
 	dhcp_pif_t	*pif = lif->lif_pif;
+	uint_t		mtu = lif->lif_max;
 	uint32_t	xid;
 	boolean_t	isv6;
 
-	mtu = dsmp->dsm_using_dlpi ? pif->pif_max : lif->lif_max;
 	dpkt->pkt_isv6 = isv6 = pif->pif_isv6;
 
 	/*
-	 * since multiple dhcp leases may be maintained over the same dlpi
-	 * device (e.g. "hme0" and "hme0:1"), make sure the xid is unique.
+	 * Since multiple dhcp leases may be maintained over the same pif
+	 * (e.g. "hme0" and "hme0:1"), make sure the xid is unique.
 	 *
 	 * Note that transaction ID zero is intentionally never assigned.
 	 * That's used to represent "no ID."  Also note that transaction IDs
@@ -250,14 +248,12 @@ init_pkt(dhcp_smach_t *dsmp, uchar_t type)
 			 * thus server can not unicast the reply. Per
 			 * RFC 2131 4.4.1, client can set this bit in
 			 * DISCOVER/REQUEST. If the client is already
-			 * in BOUND/REBINDING/RENEWING state, do not set
-			 * this bit, as it can respond to unicast responses
-			 * from server using the 'ciaddr' address.
+			 * in a bound state, do not set this bit, as it
+			 * can respond to unicast responses from server
+			 * using the 'ciaddr' address.
 			 */
-			if (type == DISCOVER ||
-			    (type == REQUEST && dsmp->dsm_state != RENEWING &&
-			    dsmp->dsm_state != REBINDING &&
-			    dsmp->dsm_state != BOUND))
+			if (type == DISCOVER || (type == REQUEST &&
+			    !is_bound_state(dsmp->dsm_state)))
 				v4->flags = htons(BCAST_MASK);
 		}
 
@@ -804,7 +800,6 @@ send_pkt_internal(dhcp_smach_t *dsmp)
 {
 	ssize_t		n_bytes;
 	dhcp_lif_t	*lif = dsmp->dsm_lif;
-	dhcp_pif_t	*pif = lif->lif_pif;
 	dhcp_pkt_t	*dpkt = &dsmp->dsm_send_pkt;
 	uchar_t		ptype = pkt_send_type(dpkt);
 	const char	*pkt_name;
@@ -813,6 +808,7 @@ send_pkt_internal(dhcp_smach_t *dsmp)
 	struct cmsghdr	*cmsg;
 	struct in6_pktinfo *ipi6;
 	boolean_t	ismcast;
+	int		msgtype;
 
 	/*
 	 * Timer should not be running at the point we go to send a packet.
@@ -985,27 +981,19 @@ send_pkt_internal(dhcp_smach_t *dsmp)
 
 		n_bytes = sendmsg(v6_sock_fd, &msg, 0);
 	} else {
-		if (dsmp->dsm_using_dlpi) {
-			n_bytes = dlpi_sendto(pif->pif_dlpi_hd, dpkt->pkt,
-			    dpkt->pkt_cur_len, &dsmp->dsm_send_dest.v4,
-			    pif->pif_daddr, pif->pif_dlen);
-			/* dlpi_sendto calls putmsg */
-			if (n_bytes == 0)
-				n_bytes = dpkt->pkt_cur_len;
-		} else {
-			n_bytes = sendto(lif->lif_sock_ip_fd, dpkt->pkt,
-			    dpkt->pkt_cur_len, 0,
-			    (struct sockaddr *)&dsmp->dsm_send_dest.v4,
-			    sizeof (struct sockaddr_in));
-		}
+		n_bytes = sendto(lif->lif_sock_ip_fd, dpkt->pkt,
+		    dpkt->pkt_cur_len, 0,
+		    (struct sockaddr *)&dsmp->dsm_send_dest.v4,
+		    sizeof (struct sockaddr_in));
 	}
 
 	if (n_bytes != dpkt->pkt_cur_len) {
+		msgtype = (n_bytes == -1) ? MSG_ERR : MSG_WARNING;
 		if (dsmp->dsm_retrans_timer == -1)
-			dhcpmsg(MSG_WARNING, "send_pkt_internal: cannot send "
+			dhcpmsg(msgtype, "send_pkt_internal: cannot send "
 			    "%s packet to server", pkt_name);
 		else
-			dhcpmsg(MSG_WARNING, "send_pkt_internal: cannot send "
+			dhcpmsg(msgtype, "send_pkt_internal: cannot send "
 			    "%s packet to server (will retry in %u seconds)",
 			    pkt_name, dsmp->dsm_send_timeout / MILLISEC);
 		return (B_FALSE);
@@ -1319,16 +1307,14 @@ sock_recvpkt(int fd, PKT_LIST *plp)
 /*
  * recv_pkt(): receives a single DHCP packet on a given file descriptor.
  *
- *   input: int: if not using dlpi, the file descriptor to receive the packet
+ *   input: int: the file descriptor to receive the packet from
  *	    int: the maximum packet size to allow
  *	    boolean_t: B_TRUE for IPv6
- *	    boolean_t: B_TRUE if using DLPI
- *	    void *: if using DLPI, structure that has DLPI handle
  *  output: PKT_LIST *: the received packet
  */
 
 PKT_LIST *
-recv_pkt(int fd, int mtu, boolean_t isv6, boolean_t isdlpi, dhcp_pif_t *arg)
+recv_pkt(int fd, int mtu, boolean_t isv6)
 {
 	PKT_LIST	*plp;
 	ssize_t		retval;
@@ -1339,41 +1325,21 @@ recv_pkt(int fd, int mtu, boolean_t isv6, boolean_t isdlpi, dhcp_pif_t *arg)
 		return (NULL);
 	}
 
+	retval = sock_recvpkt(fd, plp);
+	if (retval == -1) {
+		dhcpmsg(MSG_ERR, "recv_pkt: recvfrom v%d failed, dropped",
+		    isv6 ? 6 : 4);
+		goto failure;
+	}
+
+	plp->len = retval;
+
 	if (isv6) {
-		retval = sock_recvpkt(fd, plp);
-
-		if (retval == -1) {
-			dhcpmsg(MSG_ERR,
-			    "recv_pkt: recvfrom v6 failed, dropped");
-			goto failure;
-		}
-
-		plp->len = retval;
-
 		if (retval < sizeof (dhcpv6_message_t)) {
 			dhcpmsg(MSG_WARNING, "recv_pkt: runt message");
 			goto failure;
 		}
 	} else {
-		if (isdlpi) {
-			dhcp_pif_t	*pif = arg;
-
-			retval = dlpi_recvfrom(pif->pif_dlpi_hd, plp->pkt, mtu,
-			    (struct sockaddr_in *)&plp->pktfrom,
-			    (struct sockaddr_in *)&plp->pktto);
-		} else {
-			retval = sock_recvpkt(fd, plp);
-		}
-
-		if (retval == -1) {
-			dhcpmsg(MSG_ERR,
-			    "recv_pkt: %srecvfrom v4 failed, dropped",
-			    isdlpi ? "dlpi_" : "");
-			goto failure;
-		}
-
-		plp->len = retval;
-
 		switch (dhcp_options_scan(plp, B_TRUE)) {
 
 		case DHCP_WRONG_MSG_TYPE:
@@ -1576,7 +1542,7 @@ dhcp_ip_default(void)
 		return (B_FALSE);
 	}
 
-	if (iu_register_event(eh, v4_sock_fd, POLLIN, dhcp_acknak_common,
+	if (iu_register_event(eh, v4_sock_fd, POLLIN, dhcp_acknak_global,
 	    NULL) == -1) {
 		dhcpmsg(MSG_WARNING, "dhcp_ip_default: cannot register to "
 		    "receive IPv4 broadcasts");
@@ -1603,7 +1569,7 @@ dhcp_ip_default(void)
 		return (B_FALSE);
 	}
 
-	if (iu_register_event(eh, v6_sock_fd, POLLIN, dhcp_acknak_common,
+	if (iu_register_event(eh, v6_sock_fd, POLLIN, dhcp_acknak_global,
 	    NULL) == -1) {
 		dhcpmsg(MSG_WARNING, "dhcp_ip_default: cannot register to "
 		    "receive IPv6 packets");

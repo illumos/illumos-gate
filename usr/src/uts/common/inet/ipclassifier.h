@@ -226,8 +226,8 @@ struct conn_s {
 
 		conn_lso_ok : 1;		/* LSO is usable */
 
-	ill_t		*conn_xmit_if_ill;	/* Outbound ill */
 	ill_t		*conn_nofailover_ill;	/* Failover ill */
+	ill_t		*conn_dhcpinit_ill;	/* IP_DHCPINIT_IF */
 	ipsec_latch_t	*conn_latch;		/* latched state */
 	ill_t		*conn_outgoing_ill;	/* IP{,V6}_BOUND_IF */
 	edesc_spf	conn_send;		/* Pointer to send routine */
@@ -285,7 +285,6 @@ struct conn_s {
 	int		conn_orig_bound_ifindex; /* BOUND_IF before MOVE */
 	int		conn_orig_multicast_ifindex;
 						/* IPv6 MC IF before MOVE */
-	int		conn_orig_xmit_ifindex; /* IP_XMIT_IF before move */
 	struct conn_s 	*conn_drain_next;	/* Next conn in drain list */
 	struct conn_s	*conn_drain_prev;	/* Prev conn in drain list */
 	idl_t		*conn_idl;		/* Ptr to the drain list head */

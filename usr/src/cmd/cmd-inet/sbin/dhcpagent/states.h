@@ -72,8 +72,6 @@ struct dhcp_smach_s {
 	uint_t		dsm_lif_wait;	/* LIFs waiting on DAD */
 	uint_t		dsm_lif_down;	/* LIFs failed */
 
-	boolean_t	dsm_using_dlpi;
-
 	/*
 	 * each state machine can have at most one pending asynchronous
 	 * action, which is represented in a `struct async_action'.
@@ -258,9 +256,8 @@ struct dhcp_lease_s {
 };
 
 /* The IU event callback functions */
-iu_eh_callback_t	dhcp_acknak_common;
-iu_eh_callback_t	dhcp_acknak_lif;
-iu_eh_callback_t	dhcp_collect_dlpi;
+iu_eh_callback_t	dhcp_acknak_global;
+iu_eh_callback_t	dhcp_packet_lif;
 
 /* Common state-machine related routines throughout dhcpagent */
 boolean_t	dhcp_adopt(void);
@@ -311,6 +308,7 @@ boolean_t	schedule_smach_timer(dhcp_smach_t *, int, uint32_t,
 void		cancel_offer_timer(dhcp_smach_t *);
 void		discard_default_routes(dhcp_smach_t *);
 void		remove_default_routes(dhcp_smach_t *);
+boolean_t	is_bound_state(DHCPSTATE);
 
 /* Lease-related support functions in states.c */
 dhcp_lease_t	*insert_lease(dhcp_smach_t *);

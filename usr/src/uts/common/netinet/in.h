@@ -910,13 +910,9 @@ typedef struct ipsec_req {
  * SunOS private (potentially not portable) IP_ option names
  */
 #define	IP_BOUND_IF		0x41	/* bind socket to an ifindex	   */
-#define	IP_UNSPEC_SRC		0x42	/* use unspecified source address   */
-/*
- * IP_XMIT_IF is used to send unicast/multicast packets through the specified
- * interface without looking at the routing table entries.
- * This is a Sun private interface.
- */
-#define	IP_XMIT_IF		0x43	/* use specified outgoing interface */
+#define	IP_UNSPEC_SRC		0x42	/* use unspecified source address  */
+/*	UNUSED			0x43	   was IP_XMIT_IF -- can be reused */
+
 /*
  * IP_DONTFAILOVER_IF option is used to indicate that outbound unicast and
  * multicast packets go through the specified interface, no load spreading,
@@ -924,6 +920,8 @@ typedef struct ipsec_req {
  * This is a Sun private interface.
  */
 #define	IP_DONTFAILOVER_IF	0x44
+
+#define	IP_DHCPINIT_IF		0x45	/* accept all unicast DHCP traffic */
 
 /*
  * Option values and names (when !_XPG5) shared with <xti_inet.h>

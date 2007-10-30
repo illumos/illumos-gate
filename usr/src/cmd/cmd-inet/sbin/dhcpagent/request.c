@@ -372,7 +372,7 @@ compute_points_v6(const PKT_LIST *pkt, const dhcp_smach_t *dsmp)
 	/*
 	 * Look through the packet contents.  Valid packets must have our
 	 * client ID and a server ID, which has already been checked by
-	 * dhcp_acknak_lif.  Bonus points for each option.
+	 * dhcp_packet_lif.  Bonus points for each option.
 	 */
 
 	/* One point for having a valid message. */
@@ -959,7 +959,7 @@ accept_v6_message(dhcp_smach_t *dsmp, PKT_LIST *plp, const char *pname,
 }
 
 /*
- * dhcp_acknak_common(): Processes reception of an ACK or NAK packet on the
+ * dhcp_acknak_global(): Processes reception of an ACK or NAK packet on the
  *			 global socket -- broadcast packets for IPv4, all
  *			 packets for DHCPv6.
  *
@@ -973,7 +973,7 @@ accept_v6_message(dhcp_smach_t *dsmp, PKT_LIST *plp, const char *pname,
 
 /* ARGSUSED */
 void
-dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
+dhcp_acknak_global(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
     void *arg)
 {
 	PKT_LIST	*plp;
@@ -983,14 +983,18 @@ dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	uint_t		xid;
 	dhcp_smach_t	*dsmp;
 	boolean_t	isv6 = (fd == v6_sock_fd);
+	struct sockaddr_in sin;
+	const char	*reason;
+	size_t		sinlen = sizeof (sin);
+	int		sock;
 
-	plp = recv_pkt(fd, get_max_mtu(isv6), isv6, B_FALSE, NULL);
+	plp = recv_pkt(fd, get_max_mtu(isv6), isv6);
 	if (plp == NULL)
 		return;
 
 	pif = lookup_pif_by_index(plp->ifindex, isv6);
 	if (pif == NULL) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_common: ignored packet "
+		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_global: ignored packet "
 		    "received on v%d ifIndex %d", isv6 ? 6 : 4, plp->ifindex);
 		free_pkt_entry(plp);
 		return;
@@ -998,33 +1002,45 @@ dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 
 	recv_type = pkt_recv_type(plp);
 	pname = pkt_type_to_string(recv_type, isv6);
-	if (!isv6 && !pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_common: ignored %s packet "
-		    "received via broadcast on %s", pname, pif->pif_name);
-		free_pkt_entry(plp);
-		return;
-	}
 
 	/*
-	 * Find the corresponding state machine not using DLPI.
+	 * Find the corresponding state machine.
 	 *
 	 * Note that DHCPv6 Reconfigure would be special: it's not the reply to
 	 * any transaction, and thus we would need to search on transaction ID
-	 * zero (all state machines) to find the match.  However, Reconfigure
+	 * zero (all state machines) to find the match.	 However, Reconfigure
 	 * is not yet supported.
 	 */
 	xid = pkt_get_xid(plp->pkt, isv6);
+	if (!isv6 && !pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
+		reason = "not ACK or NAK";
+		goto drop;
+	}
+
 	for (dsmp = lookup_smach_by_xid(xid, NULL, isv6); dsmp != NULL;
 	    dsmp = lookup_smach_by_xid(xid, dsmp, isv6)) {
 		if (dsmp->dsm_lif->lif_pif == pif)
 			break;
 	}
-	if (dsmp == NULL || dsmp->dsm_using_dlpi) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_common: ignored %s packet "
-		    "received via broadcast %s; %s", pname, pif->pif_name,
-		    dsmp == NULL ? "unknown state machine" : "not using DLPI");
-		free_pkt_entry(plp);
-		return;
+
+	if (dsmp == NULL) {
+		reason = "unknown state machine";
+		goto drop;
+	}
+
+	/*
+	 * For IPv4, most packets will be handled by dhcp_packet_lif().  The
+	 * only exceptions are broadcast packets sent when lif_sock_ip_fd has
+	 * bound to something other than INADDR_ANY.
+	 */
+	if (!isv6) {
+		sock = dsmp->dsm_lif->lif_sock_ip_fd;
+
+		if (getsockname(sock, (struct sockaddr *)&sin, &sinlen) != -1 &&
+		    sin.sin_addr.s_addr == INADDR_ANY) {
+			reason = "handled by lif_sock_ip_fd";
+			goto drop;
+		}
 	}
 
 	/*
@@ -1035,6 +1051,12 @@ dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 		accept_v6_message(dsmp, plp, pname, recv_type);
 	else
 		accept_v4_acknak(dsmp, plp);
+	return;
+drop:
+	dhcpmsg(MSG_VERBOSE, "dhcp_acknak_global: ignored v%d %s packet for %s "
+	    "received on global socket: %s", isv6 ? 6 : 4, pname, pif->pif_name,
+	    reason);
+	free_pkt_entry(plp);
 }
 
 /*
@@ -1062,11 +1084,11 @@ request_failed(dhcp_smach_t *dsmp)
 }
 
 /*
- * dhcp_acknak_lif(): Processes reception of an ACK or NAK packet on a given
- *		      logical interface for IPv4 (only).
+ * dhcp_packet_lif(): Processes reception of an ACK, NAK, or OFFER packet on
+ *		      a given logical interface for IPv4 (only).
  *
  *   input: iu_eh_t *: unused
- *	    int: the global file descriptor the ACK/NAK arrived on
+ *	    int: the file descriptor the packet arrived on
  *	    short: unused
  *	    iu_event_id_t: the id of this event callback with the handler
  *	    void *: pointer to logical interface receiving message
@@ -1075,7 +1097,7 @@ request_failed(dhcp_smach_t *dsmp)
 
 /* ARGSUSED */
 void
-dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
+dhcp_packet_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
     void *arg)
 {
 	dhcp_lif_t	*lif = arg;
@@ -1085,21 +1107,22 @@ dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	uint_t		xid;
 	dhcp_smach_t	*dsmp;
 
-	if ((plp = recv_pkt(fd, lif->lif_max, B_FALSE, B_FALSE, NULL)) == NULL)
+	if ((plp = recv_pkt(fd, lif->lif_max, B_FALSE)) == NULL)
 		return;
 
 	recv_type = pkt_recv_type(plp);
 	pname = pkt_type_to_string(recv_type, B_FALSE);
 
-	if (!pkt_v4_match(recv_type, DHCP_PACK | DHCP_PNAK)) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_lif: ignored v4 %s packet "
+	if (!pkt_v4_match(recv_type,
+	    DHCP_PACK | DHCP_PNAK | DHCP_PUNTYPED | DHCP_POFFER)) {
+		dhcpmsg(MSG_VERBOSE, "dhcp_packet_lif: ignored v4 %s packet "
 		    "received via LIF %s", pname, lif->lif_name);
 		free_pkt_entry(plp);
 		return;
 	}
 
 	/*
-	 * Find the corresponding state machine not using DLPI.
+	 * Find the corresponding state machine.
 	 */
 	xid = pkt_get_xid(plp->pkt, B_FALSE);
 	for (dsmp = lookup_smach_by_xid(xid, NULL, B_FALSE); dsmp != NULL;
@@ -1107,19 +1130,31 @@ dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 		if (dsmp->dsm_lif == lif)
 			break;
 	}
-	if (dsmp == NULL || dsmp->dsm_using_dlpi) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_lif: ignored %s packet xid "
-		    "%x received via LIF %s; %s", pname, xid, lif->lif_name,
-		    dsmp == NULL ? "unknown state machine" : "not using DLPI");
-		free_pkt_entry(plp);
-		return;
-	}
 
-	/*
-	 * We've got a packet; make sure it's acceptable and cancel the REQUEST
-	 * retransmissions.
-	 */
-	accept_v4_acknak(dsmp, plp);
+	if (dsmp == NULL)
+		goto drop;
+
+	if (pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
+		/*
+		 * We've got an ACK/NAK; make sure it's acceptable and cancel
+		 * the REQUEST retransmissions.
+		 */
+		accept_v4_acknak(dsmp, plp);
+	} else {
+		if (is_bound_state(dsmp->dsm_state))
+			goto drop;
+		/*
+		 * Must be an OFFER or a BOOTP message: enqueue it for later
+		 * processing by select_best().
+		 */
+		pkt_smach_enqueue(dsmp, plp);
+	}
+	return;
+drop:
+	dhcpmsg(MSG_VERBOSE, "dhcp_packet_lif: ignored %s packet xid "
+	    "%x received via LIF %s; %s", pname, xid, lif->lif_name,
+	    dsmp == NULL ? "unknown state machine" : "bound");
+	free_pkt_entry(plp);
 }
 
 /*

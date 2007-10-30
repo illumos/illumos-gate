@@ -1526,8 +1526,11 @@ conn_cleanup_ill(conn_t *connp, caddr_t arg)
 		connp->conn_outgoing_pill = NULL;
 	if (connp->conn_nofailover_ill == ill)
 		connp->conn_nofailover_ill = NULL;
-	if (connp->conn_xmit_if_ill == ill)
-		connp->conn_xmit_if_ill = NULL;
+	if (connp->conn_dhcpinit_ill == ill) {
+		connp->conn_dhcpinit_ill = NULL;
+		ASSERT(ill->ill_dhcpinit != 0);
+		atomic_dec_32(&ill->ill_dhcpinit);
+	}
 	if (connp->conn_ire_cache != NULL) {
 		ire = connp->conn_ire_cache;
 		/*
@@ -16610,11 +16613,6 @@ conn_move(conn_t *connp, caddr_t arg)
 		connp->conn_multicast_ill = connm->cm_to_ill;
 	}
 
-	/* Change IP_XMIT_IF associations */
-	if ((connp->conn_xmit_if_ill == from_ill) &&
-	    (ifindex == 0 || connp->conn_orig_xmit_ifindex == ifindex)) {
-		connp->conn_xmit_if_ill = to_ill;
-	}
 	/*
 	 * Change the ilg_ill to point to the new one. This assumes
 	 * ilm_move_v6 has moved the ilms to new_ill and the driver
@@ -20216,8 +20214,7 @@ ipif_up_done(ipif_t *ipif)
 	/*
 	 * Create any necessary broadcast IREs.
 	 */
-	if ((ipif->ipif_subnet != INADDR_ANY) &&
-	    (ipif->ipif_flags & IPIF_BROADCAST))
+	if (ipif->ipif_flags & IPIF_BROADCAST)
 		irep = ipif_create_bcast_ires(ipif, irep);
 
 	ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
@@ -21711,9 +21708,6 @@ conn_change_ifindex(conn_t *connp, caddr_t arg)
 
 	if (connp->conn_orig_multicast_ifindex == old_ifindex)
 		connp->conn_orig_multicast_ifindex = new_ifindex;
-
-	if (connp->conn_orig_xmit_ifindex == old_ifindex)
-		connp->conn_orig_xmit_ifindex = new_ifindex;
 
 	for (i = connp->conn_ilg_inuse - 1; i >= 0; i--) {
 		ilg = &connp->conn_ilg[i];

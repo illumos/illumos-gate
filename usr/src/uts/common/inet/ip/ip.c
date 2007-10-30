@@ -1294,7 +1294,9 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* 181 */ { SIOCSIPMSFILTER, sizeof (struct ip_msfilter), IPI_WR,
 			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 182 */ { SIOCSIPMPFAILBACK, sizeof (int), IPI_PRIV, MISC_CMD,
-			ip_sioctl_set_ipmpfailback, NULL }
+			ip_sioctl_set_ipmpfailback, NULL },
+	/* SIOCSENABLESDP is handled by SDP */
+	/* 183 */ { IPI_DONTCARE /* SIOCSENABLESDP */, 0, 0, 0, NULL, NULL },
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
@@ -5526,6 +5528,11 @@ ip_quiesce_conn(conn_t *connp)
 		drain_cleanup_reqd = B_TRUE;
 	if (connp->conn_oper_pending_ill != NULL)
 		conn_ioctl_cleanup_reqd = B_TRUE;
+	if (connp->conn_dhcpinit_ill != NULL) {
+		ASSERT(connp->conn_dhcpinit_ill->ill_dhcpinit != 0);
+		atomic_dec_32(&connp->conn_dhcpinit_ill->ill_dhcpinit);
+		connp->conn_dhcpinit_ill = NULL;
+	}
 	if (connp->conn_ilg_inuse != 0)
 		ilg_cleanup_reqd = B_TRUE;
 	mutex_exit(&connp->conn_lock);
@@ -7792,6 +7799,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 	    MULTIRT_CACHEGW | MULTIRT_USESTAMP | MULTIRT_SETSTAMP;
 	boolean_t multirt_is_resolvable;
 	boolean_t multirt_resolve_next;
+	boolean_t unspec_src;
 	boolean_t do_attach_ill = B_FALSE;
 	boolean_t ip_nexthop = B_FALSE;
 	tsol_ire_gw_secattr_t *attrp = NULL;
@@ -8200,7 +8208,11 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 			src_ipif = ipif_lookup_addr(sire->ire_src_addr, NULL,
 			    zoneid, NULL, NULL, NULL, NULL, ipst);
 		}
-		if (src_ipif == NULL) {
+
+		unspec_src = (connp != NULL && connp->conn_unspec_src);
+
+		if (src_ipif == NULL &&
+		    (!unspec_src || ipha->ipha_src != INADDR_ANY)) {
 			ire_marks |= IRE_MARK_USESRC_CHECK;
 			if ((dst_ill->ill_group != NULL) ||
 			    (ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
@@ -8257,10 +8269,9 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 		 * NOTE : ip_newroute_v6 does not have this piece of code as
 		 *	  it uses ip6i to store this information.
 		 */
-		if (ipha->ipha_src == INADDR_ANY &&
-		    (connp == NULL || !connp->conn_unspec_src)) {
+		if (ipha->ipha_src == INADDR_ANY && !unspec_src)
 			ipha->ipha_src = src_ipif->ipif_src_addr;
-		}
+
 		if (ip_debug > 3) {
 			/* ip2dbg */
 			pr_addr_dbg("ip_newroute: first hop %s\n",
@@ -8963,7 +8974,7 @@ ip_opt_info_t zero_info;
  * ip_rput_forward_multicast whenever we need to send
  * out a packet to a destination address for which we do not have specific
  * routing information. It is used when the packet will be sent out
- * on a specific interface. It is also called by ip_wput() when IP_XMIT_IF
+ * on a specific interface. It is also called by ip_wput() when IP_BOUND_IF
  * socket option is set or icmp error message wants to go out on a particular
  * interface for a unicast packet.
  *
@@ -9005,6 +9016,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 	ire_t   *fire = NULL;
 	mblk_t  *copy_mp = NULL;
 	boolean_t multirt_resolve_next;
+	boolean_t unspec_src;
 	ipaddr_t ipha_dst;
 	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
 
@@ -9105,14 +9117,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			ASSERT(dst_ill == attach_ill);
 		} else {
 			/*
-			 * If this is set by IP_XMIT_IF, then make sure that
-			 * ipif is pointing to the same ill as the IP_XMIT_IF
-			 * specified ill.
-			 */
-			ASSERT((connp == NULL) ||
-			    (connp->conn_xmit_if_ill == NULL) ||
-			    (connp->conn_xmit_if_ill == ipif->ipif_ill));
-			/*
 			 * If the interface belongs to an interface group,
 			 * make sure the next possible interface in the group
 			 * is used.  This encourages load spreading among
@@ -9163,10 +9167,15 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			src_ipif = ipif_lookup_addr(fire->ire_src_addr, NULL,
 			    zoneid, NULL, NULL, NULL, NULL, ipst);
 		}
-		if (((ipif->ipif_flags & IPIF_DEPRECATED) ||
+
+		unspec_src = (connp != NULL && connp->conn_unspec_src);
+
+		if (((!ipif->ipif_isv6 && ipif->ipif_lcl_addr == INADDR_ANY) ||
+		    (ipif->ipif_flags & (IPIF_DEPRECATED|IPIF_UP)) != IPIF_UP ||
 		    (connp != NULL && ipif->ipif_zoneid != zoneid &&
 		    ipif->ipif_zoneid != ALL_ZONES)) &&
-		    (src_ipif == NULL)) {
+		    (src_ipif == NULL) &&
+		    (!unspec_src || ipha->ipha_src != INADDR_ANY)) {
 			src_ipif = ipif_select_source(dst_ill, dst, zoneid);
 			if (src_ipif == NULL) {
 				if (ip_debug > 2) {
@@ -9192,19 +9201,17 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		 * Assign a source address while we have the conn.
 		 * We can't have ip_wput_ire pick a source address when the
 		 * packet returns from arp since conn_unspec_src might be set
-		 * and we loose the conn when going through arp.
+		 * and we lose the conn when going through arp.
 		 */
-		if (ipha->ipha_src == INADDR_ANY &&
-		    (connp == NULL || !connp->conn_unspec_src)) {
+		if (ipha->ipha_src == INADDR_ANY && !unspec_src)
 			ipha->ipha_src = src_ipif->ipif_src_addr;
-		}
 
 		/*
-		 * In the case of IP_XMIT_IF, it is possible that the
-		 * outgoing interface does not have an interface ire.
+		 * In the case of IP_BOUND_IF and IP_PKTINFO, it is possible
+		 * that the outgoing interface does not have an interface ire.
 		 */
 		if (CLASSD(ipha_dst) && (connp == NULL ||
-		    connp->conn_xmit_if_ill == NULL) &&
+		    connp->conn_outgoing_ill == NULL) &&
 		    infop->ip_opt_ill_index == 0) {
 			/* ipif_to_ire returns an held ire */
 			ire = ipif_to_ire(ipif);
@@ -9250,12 +9257,12 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			}
 		} else {
 			ASSERT((connp == NULL) ||
-			    (connp->conn_xmit_if_ill != NULL) ||
+			    (connp->conn_outgoing_ill != NULL) ||
 			    (connp->conn_dontroute) ||
 			    infop->ip_opt_ill_index != 0);
 			/*
 			 * The only ways we can come here are:
-			 * 1) IP_XMIT_IF socket option is set
+			 * 1) IP_BOUND_IF socket option is set
 			 * 2) SO_DONTROUTE socket option is set
 			 * 3) IP_PKTINFO option is passed in as ancillary data.
 			 * In all cases, the new ire will not be added
@@ -10493,19 +10500,6 @@ setit:
 			    0 : ifindex;
 			break;
 
-		case IP_XMIT_IF:
-			/*
-			 * Similar to IP_BOUND_IF, but this only
-			 * determines the outgoing interface for
-			 * unicast packets. Also no IRE_CACHE entry
-			 * is added for the destination of the
-			 * outgoing packets.
-			 */
-			connp->conn_xmit_if_ill = ill;
-			connp->conn_orig_xmit_ifindex = (ill == NULL) ?
-			    0 : ifindex;
-			break;
-
 		case IP_MULTICAST_IF:
 			/*
 			 * This option is an internal special. The socket
@@ -10528,6 +10522,26 @@ setit:
 				} else {
 					connp->conn_multicast_ipif = ipif;
 				}
+			}
+			break;
+
+		case IP_DHCPINIT_IF:
+			if (connp->conn_dhcpinit_ill != NULL) {
+				/*
+				 * We've locked the conn so conn_cleanup_ill()
+				 * cannot clear conn_dhcpinit_ill -- so it's
+				 * safe to access the ill.
+				 */
+				ill_t *oill = connp->conn_dhcpinit_ill;
+
+				ASSERT(oill->ill_dhcpinit != 0);
+				atomic_dec_32(&oill->ill_dhcpinit);
+				connp->conn_dhcpinit_ill = NULL;
+			}
+
+			if (ill != NULL) {
+				connp->conn_dhcpinit_ill = ill;
+				atomic_inc_32(&ill->ill_dhcpinit);
 			}
 			break;
 		}
@@ -11048,7 +11062,7 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			*outlenp = inlen;
 			return (0);
 		case IP_BOUND_IF:
-		case IP_XMIT_IF:
+		case IP_DHCPINIT_IF:
 			error = ip_opt_set_ill(connp, *i1, B_FALSE, checkonly,
 			    level, name, first_mp);
 			if (error != 0)
@@ -15003,11 +15017,12 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 *	o no options in the packet
 		 *	o not a RSVP packet
 		 * 	o not a multicast packet
+		 *	o ill not in IP_DHCPINIT_IF mode
 		 */
 		if (!is_system_labeled() &&
 		    !ipst->ips_ip_cgtp_filter && ipp_action_count == 0 &&
 		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
-		    !ll_multicast && !CLASSD(dst)) {
+		    !ll_multicast && !CLASSD(dst) && ill->ill_dhcpinit == 0) {
 			if (ire == NULL)
 				ire = ire_cache_lookup(dst, ALL_ZONES, NULL,
 				    ipst);
@@ -15029,6 +15044,31 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		if (ire != NULL) {
 			ire_refrele(ire);
 			ire = NULL;
+		}
+
+		/*
+		 * Brutal hack for DHCPv4 unicast: RFC2131 allows a DHCP
+		 * server to unicast DHCP packets to a DHCP client using the
+		 * IP address it is offering to the client.  This can be
+		 * disabled through the "broadcast bit", but not all DHCP
+		 * servers honor that bit.  Therefore, to interoperate with as
+		 * many DHCP servers as possible, the DHCP client allows the
+		 * server to unicast, but we treat those packets as broadcast
+		 * here.  Note that we don't rewrite the packet itself since
+		 * (a) that would mess up the checksums and (b) the DHCP
+		 * client conn is bound to INADDR_ANY so ip_fanout_udp() will
+		 * hand it the packet regardless.
+		 */
+		if (ill->ill_dhcpinit != 0 &&
+		    IS_SIMPLE_IPH(ipha) && ipha->ipha_protocol == IPPROTO_UDP &&
+		    MBLKL(mp) > sizeof (ipha_t) + sizeof (udpha_t)) {
+			udpha_t *udpha = (udpha_t *)&ipha[1];
+
+			if (ntohs(udpha->uha_dst_port) == IPPORT_BOOTPC) {
+				DTRACE_PROBE2(ip4__dhcpinit__pkt, ill_t *, ill,
+				    mblk_t *, mp);
+				dst = INADDR_BROADCAST;
+			}
 		}
 
 		/* Full-blown slow path */
@@ -19988,7 +20028,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	int		match_flags;
 	ill_t		*attach_ill = NULL;
 					/* Bind to IPIF_NOFAILOVER ill etc. */
-	ill_t		*xmit_ill = NULL;	/* IP_XMIT_IF etc. */
+	ill_t		*xmit_ill = NULL;	/* IP_PKTINFO etc. */
 	ipif_t		*dst_ipif;
 	boolean_t	multirt_need_resolve = B_FALSE;
 	mblk_t		*copy_mp = NULL;
@@ -20109,11 +20149,11 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	}
 
 	/*
-	 * IP_DONTFAILOVER_IF and IP_XMIT_IF have precedence over
-	 * ill index passed in IP_PKTINFO.
+	 * IP_DONTFAILOVER_IF and IP_BOUND_IF have precedence over ill index
+	 * passed in IP_PKTINFO.
 	 */
 	if (infop->ip_opt_ill_index != 0 &&
-	    connp->conn_xmit_if_ill == NULL &&
+	    connp->conn_outgoing_ill == NULL &&
 	    connp->conn_nofailover_ill == NULL) {
 
 		xmit_ill = ill_lookup_on_ifindex(
@@ -20178,6 +20218,15 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 		}
 	}
 
+	/* If IP_BOUND_IF has been set, use that ill. */
+	if (connp->conn_outgoing_ill != NULL) {
+		xmit_ill = conn_get_held_ill(connp,
+		    &connp->conn_outgoing_ill, &err);
+		if (err == ILL_LOOKUP_FAILED)
+			goto drop_pkt;
+
+		goto send_from_ill;
+	}
 
 	/* is packet multicast? */
 	if (CLASSD(dst))
@@ -20187,74 +20236,39 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	 * If xmit_ill is set above due to index passed in ip_pkt_info. It
 	 * takes precedence over conn_dontroute and conn_nexthop_set
 	 */
-	if (xmit_ill != NULL) {
+	if (xmit_ill != NULL)
 		goto send_from_ill;
-	}
 
-	if ((connp->conn_dontroute) || (connp->conn_xmit_if_ill != NULL) ||
-	    (connp->conn_nexthop_set)) {
+	if (connp->conn_dontroute || connp->conn_nexthop_set) {
 		/*
-		 * If the destination is a broadcast or a loopback
-		 * address, SO_DONTROUTE, IP_XMIT_IF and IP_NEXTHOP go
-		 * through the standard path. But in the case of local
-		 * destination only SO_DONTROUTE and IP_NEXTHOP go through
-		 * the standard path not IP_XMIT_IF.
+		 * If the destination is a broadcast, local, or loopback
+		 * address, SO_DONTROUTE and IP_NEXTHOP go through the
+		 * standard path.
 		 */
 		ire = ire_cache_lookup(dst, zoneid, MBLK_GETLABEL(mp), ipst);
-		if ((ire == NULL) || ((ire->ire_type != IRE_BROADCAST) &&
-		    (ire->ire_type != IRE_LOOPBACK))) {
-			if ((connp->conn_dontroute ||
-			    connp->conn_nexthop_set) && (ire != NULL) &&
-			    (ire->ire_type == IRE_LOCAL))
-				goto standard_path;
-
+		if ((ire == NULL) || (ire->ire_type &
+		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK)) == 0) {
 			if (ire != NULL) {
 				ire_refrele(ire);
 				/* No more access to ire */
 				ire = NULL;
 			}
 			/*
-			 * bypass routing checks and go directly to
-			 * interface.
+			 * bypass routing checks and go directly to interface.
 			 */
-			if (connp->conn_dontroute) {
+			if (connp->conn_dontroute)
 				goto dontroute;
-			} else if (connp->conn_nexthop_set) {
-				ip_nexthop = B_TRUE;
-				nexthop_addr = connp->conn_nexthop_v4;
-				goto send_from_ill;
-			}
 
-			/*
-			 * If IP_XMIT_IF socket option is set,
-			 * then we allow unicast and multicast
-			 * packets to go through the ill. It is
-			 * quite possible that the destination
-			 * is not in the ire cache table and we
-			 * do not want to go to ip_newroute()
-			 * instead we call ip_newroute_ipif.
-			 */
-			xmit_ill = conn_get_held_ill(connp,
-			    &connp->conn_xmit_if_ill, &err);
-			if (err == ILL_LOOKUP_FAILED) {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutDiscards);
-				if (attach_ill != NULL)
-					ill_refrele(attach_ill);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				freemsg(first_mp);
-				return;
-			}
+			ASSERT(connp->conn_nexthop_set);
+			ip_nexthop = B_TRUE;
+			nexthop_addr = connp->conn_nexthop_v4;
 			goto send_from_ill;
 		}
-standard_path:
+
 		/* Must be a broadcast, a loopback or a local ire */
-		if (ire != NULL) {
-			ire_refrele(ire);
-			/* No more access to ire */
-			ire = NULL;
-		}
+		ire_refrele(ire);
+		/* No more access to ire */
+		ire = NULL;
 	}
 
 	if (attach_ill != NULL)
@@ -20819,17 +20833,16 @@ multicast:
 			    ntohl(dst), ill->ill_name));
 		} else {
 			/*
-			 * The order of precedence is IP_XMIT_IF, IP_PKTINFO
-			 * and IP_MULTICAST_IF.
-			 * Block comment above this function explains the
-			 * locking mechanism used here
+			 * The order of precedence is IP_BOUND_IF, IP_PKTINFO
+			 * and IP_MULTICAST_IF.  The block comment above this
+			 * function explains the locking mechanism used here.
 			 */
 			if (xmit_ill == NULL) {
 				xmit_ill = conn_get_held_ill(connp,
-				    &connp->conn_xmit_if_ill, &err);
+				    &connp->conn_outgoing_ill, &err);
 				if (err == ILL_LOOKUP_FAILED) {
 					ip1dbg(("ip_wput: No ill for "
-					    "IP_XMIT_IF\n"));
+					    "IP_BOUND_IF\n"));
 					BUMP_MIB(&ipst->ips_ip_mib,
 					    ipIfStatsOutNoRoutes);
 					goto drop_pkt;
@@ -20851,7 +20864,7 @@ multicast:
 				ipif = ipif_get_next_ipif(NULL, xmit_ill);
 				if (ipif == NULL) {
 					ip1dbg(("ip_wput: No ipif for "
-					    "IP_XMIT_IF\n"));
+					    "xmit_ill\n"));
 					BUMP_MIB(&ipst->ips_ip_mib,
 					    ipIfStatsOutNoRoutes);
 					goto drop_pkt;
@@ -20994,7 +21007,7 @@ multicast:
 			dst = ipif->ipif_lcl_addr;
 
 		/*
-		 * If IP_XMIT_IF is set, we branch out to ip_newroute_ipif.
+		 * If xmit_ill is set, we branch out to ip_newroute_ipif.
 		 * We don't need to lookup ire in ctable as the packet
 		 * needs to be sent to the destination through the specified
 		 * ill irrespective of ires in the cache table.
@@ -21095,54 +21108,39 @@ dontroute:
 			 * connectivity.
 			 */
 			ipha->ipha_ttl = 1;
-			/*
-			 * If IP_XMIT_IF is also set (conn_xmit_if_ill != NULL)
-			 * along with SO_DONTROUTE, higher precedence is
-			 * given to IP_XMIT_IF and the IP_XMIT_IF ipif is used.
-			 */
-			if (connp->conn_xmit_if_ill == NULL) {
-				/* If suitable ipif not found, drop packet */
-				dst_ipif = ipif_lookup_onlink_addr(dst, zoneid,
-				    ipst);
-				if (dst_ipif == NULL) {
-					ip1dbg(("ip_wput: no route for "
-					    "dst using SO_DONTROUTE\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					mp->b_prev = mp->b_next = NULL;
-					if (first_mp == NULL)
-						first_mp = mp;
-					goto drop_pkt;
-				} else {
-					/*
-					 * If suitable ipif has been found, set
-					 * xmit_ill to the corresponding
-					 * ipif_ill because we'll be following
-					 * the IP_XMIT_IF logic.
-					 */
-					ASSERT(xmit_ill == NULL);
-					xmit_ill = dst_ipif->ipif_ill;
-					mutex_enter(&xmit_ill->ill_lock);
-					if (!ILL_CAN_LOOKUP(xmit_ill)) {
-						mutex_exit(&xmit_ill->ill_lock);
-						xmit_ill = NULL;
-						ipif_refrele(dst_ipif);
-						ip1dbg(("ip_wput: no route for"
-						    " dst using"
-						    " SO_DONTROUTE\n"));
-						BUMP_MIB(&ipst->ips_ip_mib,
-						    ipIfStatsOutNoRoutes);
-						mp->b_prev = mp->b_next = NULL;
-						if (first_mp == NULL)
-							first_mp = mp;
-						goto drop_pkt;
-					}
-					ill_refhold_locked(xmit_ill);
-					mutex_exit(&xmit_ill->ill_lock);
-					ipif_refrele(dst_ipif);
-				}
-			}
 
+			/* If suitable ipif not found, drop packet */
+			dst_ipif = ipif_lookup_onlink_addr(dst, zoneid, ipst);
+			if (dst_ipif == NULL) {
+noroute:
+				ip1dbg(("ip_wput: no route for dst using"
+				    " SO_DONTROUTE\n"));
+				BUMP_MIB(&ipst->ips_ip_mib,
+				    ipIfStatsOutNoRoutes);
+				mp->b_prev = mp->b_next = NULL;
+				if (first_mp == NULL)
+					first_mp = mp;
+				goto drop_pkt;
+			} else {
+				/*
+				 * If suitable ipif has been found, set
+				 * xmit_ill to the corresponding
+				 * ipif_ill because we'll be using the
+				 * send_from_ill logic below.
+				 */
+				ASSERT(xmit_ill == NULL);
+				xmit_ill = dst_ipif->ipif_ill;
+				mutex_enter(&xmit_ill->ill_lock);
+				if (!ILL_CAN_LOOKUP(xmit_ill)) {
+					mutex_exit(&xmit_ill->ill_lock);
+					xmit_ill = NULL;
+					ipif_refrele(dst_ipif);
+					goto noroute;
+				}
+				ill_refhold_locked(xmit_ill);
+				mutex_exit(&xmit_ill->ill_lock);
+				ipif_refrele(dst_ipif);
+			}
 		}
 		/*
 		 * If we are bound to IPIF_NOFAILOVER address, look for
@@ -21170,84 +21168,64 @@ send_from_ill:
 			ire = ire_ctable_lookup(dst, 0, 0, attach_ipif,
 			    zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
 			ipif_refrele(attach_ipif);
-		} else if (xmit_ill != NULL || (connp != NULL &&
-		    connp->conn_xmit_if_ill != NULL)) {
+		} else if (xmit_ill != NULL) {
+			ipif_t *ipif;
+
 			/*
 			 * Mark this packet as originated locally
 			 */
 			mp->b_prev = mp->b_next = NULL;
-			/*
-			 * xmit_ill could be NULL if SO_DONTROUTE
-			 * is also set.
-			 */
-			if (xmit_ill == NULL) {
-				xmit_ill = conn_get_held_ill(connp,
-				    &connp->conn_xmit_if_ill, &err);
-				if (err == ILL_LOOKUP_FAILED) {
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutDiscards);
-					if (need_decref)
-						CONN_DEC_REF(connp);
-					freemsg(first_mp);
-					return;
-				}
-				if (xmit_ill == NULL) {
-					if (connp->conn_dontroute)
-						goto dontroute;
-					goto send_from_ill;
-				}
-			}
+
 			/*
 			 * Could be SO_DONTROUTE case also.
-			 * check at least one interface is UP as
-			 * specified by this ILL
+			 * Verify that at least one ipif is up on the ill.
 			 */
-			if (xmit_ill->ill_ipif_up_count > 0) {
-				ipif_t *ipif;
-
-				ipif = ipif_get_next_ipif(NULL, xmit_ill);
-				if (ipif == NULL) {
-					ip1dbg(("ip_output: "
-					    "xmit_ill NULL ipif\n"));
-					goto drop_pkt;
-				}
-				/*
-				 * Look for a ire that is part of the group,
-				 * if found use it else call ip_newroute_ipif.
-				 * IPCL_ZONEID is not used for matching because
-				 * IP_ALLZONES option is valid only when the
-				 * ill is accessible from all zones i.e has a
-				 * valid ipif in all zones.
-				 */
-				match_flags = MATCH_IRE_ILL_GROUP |
-				    MATCH_IRE_SECATTR;
-				ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
-				    MBLK_GETLABEL(mp), match_flags, ipst);
-				/*
-				 * If an ire exists use it or else create
-				 * an ire but don't add it to the cache.
-				 * Adding an ire may cause issues with
-				 * asymmetric routing.
-				 * In case of multiroute always act as if
-				 * ire does not exist.
-				 */
-				if (ire == NULL ||
-				    ire->ire_flags & RTF_MULTIRT) {
-					if (ire != NULL)
-						ire_refrele(ire);
-					ip_newroute_ipif(q, first_mp, ipif,
-					    dst, connp, 0, zoneid, infop);
-					ipif_refrele(ipif);
-					ip1dbg(("ip_wput: ip_unicast_if\n"));
-					ill_refrele(xmit_ill);
-					if (need_decref)
-						CONN_DEC_REF(connp);
-					return;
-				}
-				ipif_refrele(ipif);
-			} else {
+			if (xmit_ill->ill_ipif_up_count == 0) {
+				ip1dbg(("ip_output: xmit_ill %s is down\n",
+				    xmit_ill->ill_name));
 				goto drop_pkt;
 			}
+
+			ipif = ipif_get_next_ipif(NULL, xmit_ill);
+			if (ipif == NULL) {
+				ip1dbg(("ip_output: xmit_ill %s NULL ipif\n",
+				    xmit_ill->ill_name));
+				goto drop_pkt;
+			}
+
+			/*
+			 * Look for a ire that is part of the group,
+			 * if found use it else call ip_newroute_ipif.
+			 * IPCL_ZONEID is not used for matching because
+			 * IP_ALLZONES option is valid only when the
+			 * ill is accessible from all zones i.e has a
+			 * valid ipif in all zones.
+			 */
+			match_flags = MATCH_IRE_ILL_GROUP | MATCH_IRE_SECATTR;
+			ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
+			    MBLK_GETLABEL(mp), match_flags, ipst);
+			/*
+			 * If an ire exists use it or else create
+			 * an ire but don't add it to the cache.
+			 * Adding an ire may cause issues with
+			 * asymmetric routing.
+			 * In case of multiroute always act as if
+			 * ire does not exist.
+			 */
+			if (ire == NULL || ire->ire_flags & RTF_MULTIRT) {
+				if (ire != NULL)
+					ire_refrele(ire);
+				ip_newroute_ipif(q, first_mp, ipif,
+				    dst, connp, 0, zoneid, infop);
+				ipif_refrele(ipif);
+				ip1dbg(("ip_output: xmit_ill via %s\n",
+				    xmit_ill->ill_name));
+				ill_refrele(xmit_ill);
+				if (need_decref)
+					CONN_DEC_REF(connp);
+				return;
+			}
+			ipif_refrele(ipif);
 		} else if (ip_nexthop || (connp != NULL &&
 		    (connp->conn_nexthop_set)) && !ignore_nexthop) {
 			if (!ip_nexthop) {
@@ -21458,7 +21436,7 @@ ip_wput(queue_t *q, mblk_t *mp)
  *
  * The following rules must be observed when accessing any ipif or ill
  * that has been cached in the conn. Typically conn_nofailover_ill,
- * conn_xmit_if_ill, conn_multicast_ipif and conn_multicast_ill.
+ * conn_outgoing_ill, conn_multicast_ipif and conn_multicast_ill.
  *
  * Access: The ipif or ill pointed to from the conn can be accessed under
  * the protection of the conn_lock or after it has been refheld under the
@@ -22020,11 +21998,10 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 	}
 
 	/*
-	 * conn_outgoing_ill is used only in the broadcast loop.
+	 * conn_outgoing_ill variable is used only in the broadcast loop.
 	 * for performance we don't grab the mutexs in the fastpath
 	 */
 	if ((connp != NULL) &&
-	    (connp->conn_xmit_if_ill == NULL) &&
 	    (ire->ire_type == IRE_BROADCAST) &&
 	    ((connp->conn_nofailover_ill != NULL) ||
 	    (connp->conn_outgoing_ill != NULL))) {
@@ -22611,8 +22588,8 @@ broadcast:
 				rw_exit(&ire->ire_bucket->irb_lock);
 				/* Did not find a matching ill */
 				ip1dbg(("ip_wput_ire: broadcast with no "
-				    "matching IP_BOUND_IF ill %s\n",
-				    conn_outgoing_ill->ill_name));
+				    "matching IP_BOUND_IF ill %s dst %x\n",
+				    conn_outgoing_ill->ill_name, dst));
 				freemsg(first_mp);
 				if (ire != NULL)
 					ire_refrele(ire);

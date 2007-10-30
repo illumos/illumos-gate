@@ -81,8 +81,8 @@ up into three groups:
 	  difference between this and the first group is that the
 	  interfaces exported from these files do not operate on
 	  an "object", but rather perform a specific task.  Examples
-	  include "dlpi_io.c", which provides a useful interface
-	  to DLPI-related i/o operations.
+	  include "defaults.c", which provides a useful interface
+	  to /etc/default/dhcpagent file operations.
 
 OVERVIEW
 ========
@@ -306,9 +306,7 @@ init_pkt(), the add_pkt_opt*() functions are used to add options to
 the DHCP packet.  Finally, send_pkt() and send_pkt_v6() can be used to
 transmit the packet to a given IP address.
 
-The send_pkt() function is actually quite complicated; for one, it
-must internally use either DLPI or sockets depending on the machine
-state; for another, it handles the details of packet timeout and
+The send_pkt() function handles the details of packet timeout and
 retransmission.  The last argument to send_pkt() is a pointer to a
 "stop function."  If this argument is passed as NULL, then the packet
 will only be sent once (it won't be retransmitted).  Otherwise, before
@@ -325,24 +323,20 @@ action.
 
 The recv_pkt() function is simpler but still complicated by the fact
 that one may want to receive several different types of packets at
-once and in different ways (DLPI or sockets).  The caller registers an
-event handler on the file descriptor, and then calls recv_pkt() to
-read in the packet along with meta information about the message (the
-sender and interface identifier).
-
+once.  The caller registers an event handler on the file descriptor,
+and then calls recv_pkt() to read in the packet along with meta
+information about the message (the sender and interface identifier).
+				
 For IPv6, packet reception is done with a single socket, using
 IPV6_PKTINFO to determine the actual destination address and receiving
 interface.  Packets are then matched against the state machines on the
 given interface through the transaction ID.
 
-The same facility exists for inbound IPv4 packets, but because there's
-no IP_PKTINFO processing on output yet in Solaris, and because IPv4
-still relies on DLPI, DHCP packets are handled on a per-LIF (when
-bound) and per-PIF (when unbound) basis.  Eventually, when IP_PKTINFO
-is available for IPv4, the per-LIF sockets can go away.  If it ever
-becomes possible to send and receive IP packets without having an IP
-address configured on an interface, then the DLPI streams can go as
-well.
+For IPv4, due to oddities in the DHCP specification (discussed in
+PSARC/2007/571), a special IP_DHCPINIT_IF socket option must be used
+to allow unicast DHCP traffic to be received on an interface during
+lease acquisition.  Since the IP_DHCPINIT_IF socket option can only
+enable one interface at a time, one socket must be used per interface.
 
 Time
 ----

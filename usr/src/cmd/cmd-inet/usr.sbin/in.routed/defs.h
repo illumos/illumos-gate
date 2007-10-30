@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -801,6 +801,8 @@ extern void end_md5_auth(struct ws_buf *, struct auth *);
 extern void rip_mcast_on(struct interface *);
 extern void rip_mcast_off(struct interface *);
 extern void trace_dump();
+extern int sendtoif(int, const void *, uint_t, uint_t, struct sockaddr_in *,
+    uint_t);
 
 #ifdef	__cplusplus
 }

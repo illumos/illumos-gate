@@ -131,11 +131,12 @@ opdes_t	udp_opt_arr[] = {
 
 { IP_BOUND_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
 	sizeof (int),	0 /* no ifindex */ },
-{ IP_XMIT_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
-	sizeof (int), 0 /* no ifindex */ },
 
 { IP_DONTFAILOVER_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
 	sizeof (struct in_addr),	0 /* not initialized */ },
+
+{ IP_DHCPINIT_IF, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT,
+	sizeof (int), 0 },
 
 { IP_UNSPEC_SRC, IPPROTO_IP, OA_R, OA_RW, OP_RAW, OP_PASSNEXT,
 	sizeof (int), 0 },

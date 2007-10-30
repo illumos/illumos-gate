@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1995
@@ -663,9 +663,9 @@ rdisc_sort(void)
 		    new_drp->dr_life > drp->dr_life))))) ||
 		    ((new_st & IS_SICK) &&
 		    !(drp->dr_ifp->int_state & IS_SICK))) {
-			    new_drp = drp;
-			    new_st = drp->dr_ifp->int_state;
-			    new_pref = drp->dr_pref;
+			new_drp = drp;
+			new_st = drp->dr_ifp->int_state;
+			new_pref = drp->dr_pref;
 		}
 	}
 
@@ -1010,7 +1010,7 @@ send_rdisc(union ad_u *p,
 	struct sockaddr_in sin;
 	int flags = 0;
 	const char *msg;
-	int ifindex;
+	int ifindex = 0;
 	struct in_addr addr;
 
 	/*
@@ -1052,15 +1052,11 @@ send_rdisc(union ad_u *p,
 	if (rdisc_sock < 0)
 		get_rdisc_sock();
 
+	/* select the right interface. */
+	ifindex = (type != mcast && ifp->int_phys != NULL) ?
+	    ifp->int_phys->phyi_index : 0;
+
 	if (rdisc_sock_interface != ifp) {
-		/* select the right interface. */
-		ifindex = (type != mcast && ifp->int_phys != NULL) ?
-		    ifp->int_phys->phyi_index : 0;
-		if (setsockopt(rdisc_sock, IPPROTO_IP, IP_XMIT_IF, &ifindex,
-		    sizeof (ifindex)) == -1) {
-			LOGERR("setsockopt(rdisc_sock, IP_XMIT_IF)");
-			return;
-		}
 		/*
 		 * For multicast, we have to choose the source
 		 * address.  This is either the local address
@@ -1070,7 +1066,7 @@ send_rdisc(union ad_u *p,
 		    ifp->int_dstaddr : ifp->int_addr;
 		if (type == mcast &&
 		    setsockopt(rdisc_sock, IPPROTO_IP, IP_MULTICAST_IF, &addr,
-			sizeof (addr)) == -1) {
+		    sizeof (addr)) == -1) {
 			LOGERR("setsockopt(rdisc_sock, IP_MULTICAST_IF)");
 			return;
 		}
@@ -1079,8 +1075,7 @@ send_rdisc(union ad_u *p,
 
 	trace_rdisc(msg, ifp->int_addr, sin.sin_addr.s_addr, ifp, p, p_size);
 
-	if (0 > sendto(rdisc_sock, p, p_size, flags,
-	    (struct sockaddr *)&sin, sizeof (sin))) {
+	if (0 > sendtoif(rdisc_sock, p, p_size, flags, &sin, ifindex)) {
 		if (!(ifp->int_state & IS_BROKE))
 			writelog(LOG_WARNING, "sendto(%s%s%s): %s",
 			    ifp->int_name, ", ",
@@ -1294,7 +1289,7 @@ read_d(void)
 		cc = recvmsg(rdisc_sock, &msg, 0);
 		if (cc <= 0) {
 			if (cc < 0 && errno != EWOULDBLOCK)
-			    LOGERR("recvmsg(rdisc_sock)");
+				LOGERR("recvmsg(rdisc_sock)");
 			break;
 		}
 

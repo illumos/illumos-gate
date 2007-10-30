@@ -95,7 +95,6 @@ typedef	struct icmp_s {
 	uint8_t		icmp_multicast_ttl;	/* IP*_MULTICAST_TTL/HOPS */
 	ipaddr_t	icmp_multicast_if_addr; /* IP_MULTICAST_IF option */
 	uint_t		icmp_multicast_if_index; /* IPV6_MULTICAST_IF option */
-	int		icmp_xmit_if;		/* IP_XMIT_IF option */
 	int		icmp_bound_if;		/* IP*_BOUND_IF option */
 
 	/* Written to only once at the time of opening the endpoint */

@@ -622,9 +622,9 @@ typedef struct ip_m_s {
 #define	IRE_MARK_HIDDEN		0x0004	/* Typically Used by in.mpathd */
 
 /*
- * ire with IRE_MARK_NOADD is created in ip_newroute_ipif, when outgoing
- * interface is specified by IP_XMIT_IF socket option. This ire is not
- * added in IRE_CACHE.
+ * An IRE with IRE_MARK_NOADD is created in ip_newroute_ipif when the outgoing
+ * interface is specified by e.g. IP_PKTINFO.  The IRE is not added to the IRE
+ * cache table.
  */
 #define	IRE_MARK_NOADD		0x0008	/* Mark not to add ire in cache */
 
@@ -1031,7 +1031,6 @@ typedef struct conn_s conn_t;
  * ipc_acking_unbind 		conn_acking_unbind
  * ipc_pad_to_bit_31 		conn_pad_to_bit_31
  *
- * ipc_xmit_if_ill		conn_xmit_if_ill
  * ipc_nofailover_ill		conn_nofailover_ill
  *
  * ipc_proto			conn_proto
@@ -1048,7 +1047,6 @@ typedef struct conn_s conn_t;
  * ipc_multicast_ill		conn_multicast_ill
  * ipc_orig_bound_ifindex	conn_orig_bound_ifindex
  * ipc_orig_multicast_ifindex	conn_orig_multicast_ifindex
- * ipc_orig_xmit_ifindex	conn_orig_xmit_ifindex
  * ipc_drain_next		conn_drain_next
  * ipc_drain_prev		conn_drain_prev
  * ipc_idl			conn_idl
@@ -1842,7 +1840,7 @@ typedef struct ill_s {
 		ill_arp_closing : 1,
 
 		ill_arp_bringup_pending : 1,
-		ill_mtu_userspecified : 1, /* SIOCSLNKINFO has set the mtu */
+		ill_mtu_userspecified : 1, /* SIOCSLIFLNKINFO has set the mtu */
 		ill_arp_extend : 1,	/* ARP has DAD extensions */
 		ill_pad_bit_31 : 25;
 
@@ -1962,6 +1960,7 @@ typedef struct ill_s {
 	boolean_t	ill_trace_disable;	/* True when alloc fails */
 	zoneid_t	ill_zoneid;
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
+	uint32_t	ill_dhcpinit;	/* IP_DHCPINIT_IFs for ill */
 } ill_t;
 
 /*
@@ -2063,6 +2062,7 @@ typedef struct ill_s {
  * ill_nce_cnt			ill_lock		ill_lock
  * ill_trace			ill_lock		ill_lock
  * ill_usesrc_grp_next		ill_g_usesrc_lock	ill_g_usesrc_lock
+ * ill_dhcpinit			atomics			atomics
  */
 
 /*

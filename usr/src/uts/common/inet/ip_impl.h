@@ -395,7 +395,6 @@ typedef struct ip_lso_info_s {
 	((connp)->conn_dontroute == 0 &&	/* SO_DONTROUTE */	\
 	!((connp)->conn_nexthop_set) &&		/* IP_NEXTHOP */	\
 	(connp)->conn_nofailover_ill == NULL &&	/* IPIF_NOFAILOVER */	\
-	(connp)->conn_xmit_if_ill == NULL &&	/* IP_XMIT_IF */	\
 	(connp)->conn_outgoing_pill == NULL &&	/* IP{V6}_BOUND_PIF */	\
 	(connp)->conn_outgoing_ill == NULL)	/* IP{V6}_BOUND_IF */
 

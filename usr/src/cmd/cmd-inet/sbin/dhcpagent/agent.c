@@ -1163,6 +1163,7 @@ check_lif(dhcp_lif_t *lif, const struct ifa_msghdr *ifam, int msglen)
 		    lif->lif_name);
 		lif_mark_decline(lif, "duplicate address");
 		close_ip_lif(lif);
+		(void) open_ip_lif(lif, INADDR_ANY);
 	}
 
 	dad_wait = lif->lif_dad_wait;
@@ -1404,20 +1405,8 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 		 * remove them from the list.  Any leases that become empty are
 		 * also removed as part of the decline-generation process.
 		 */
-		if (dsmp->dsm_lif_down != 0) {
-			/*
-			 * We need to switch back to PRE_BOUND state so that
-			 * send_pkt_internal() uses DLPI instead of sockets.
-			 * Our logical interface has already been torn down by
-			 * the kernel, and thus we can't send DHCPDECLINE by
-			 * way of regular IP.  (Unless we're adopting -- allow
-			 * the grandparent to be handled as expected.)
-			 */
-			if (oldstate != ADOPTING) {
-				(void) set_smach_state(dsmp, PRE_BOUND);
-			}
+		if (dsmp->dsm_lif_down != 0)
 			send_declines(dsmp);
-		}
 
 		if (dsmp->dsm_leases == NULL) {
 			dsmp->dsm_bad_offers++;

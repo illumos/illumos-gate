@@ -22,6 +22,15 @@ Use is subject to license terms.
 
 ident	"%Z%%M%	%I%	%E% SMI"
 
+
+**  PLEASE NOTE:
+**
+**  This document discusses aspects of the DHCPv4 client design that have
+**  since changed (e.g., DLPI is no longer used).  However, since those
+**  aspects affected the DHCPv6 design, the discussion has been left for
+**  historical record.
+
+
 DHCPv6 Client Low-Level Design
 
 Introduction

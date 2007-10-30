@@ -296,7 +296,6 @@ typedef	struct udp_s {
 	ipaddr_t	udp_multicast_if_addr;  /* IP_MULTICAST_IF option */
 	uint_t		udp_multicast_if_index;	/* IPV6_MULTICAST_IF option */
 	int		udp_bound_if;		/* IP*_BOUND_IF option */
-	int		udp_xmit_if;		/* IP_XMIT_IF option */
 
 	/* Written to only once at the time of opening the endpoint */
 	conn_t		*udp_connp;

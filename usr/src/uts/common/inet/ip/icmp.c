@@ -1766,9 +1766,6 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		case IP_UNSPEC_SRC:
 			*ptr = icmp->icmp_unspec_source;
 			break;	/* goto sizeof (int) option return */
-		case IP_XMIT_IF:
-			*i1 = icmp->icmp_xmit_if;
-			break;	/* goto sizeof (int) option return */
 		case IP_RECVIF:
 			*ptr = icmp->icmp_recvif;
 			break;	/* goto sizeof (int) option return */
@@ -1956,8 +1953,7 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 				return (0);
 
 			return (ip_fill_mtuinfo(&icmp->icmp_v6dst, 0,
-			    (struct ip6_mtuinfo *)ptr,
-			    is->is_netstack));
+			    (struct ip6_mtuinfo *)ptr, is->is_netstack));
 		case IPV6_TCLASS:
 			if (ipp->ipp_fields & IPPF_TCLASS)
 				*i1 = ipp->ipp_tclass;
@@ -2316,10 +2312,6 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 		case IP_UNSPEC_SRC:
 			if (!checkonly)
 				icmp->icmp_unspec_source = onoff;
-			break;
-		case IP_XMIT_IF:
-			if (!checkonly)
-				icmp->icmp_xmit_if = *i1;
 			break;
 		case IP_RECVIF:
 			if (!checkonly)
@@ -5539,8 +5531,7 @@ icmp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 void
 icmp_ddi_init(void)
 {
-	icmp_max_optsize =
-	    optcom_max_optsize(icmp_opt_obj.odb_opt_des_arr,
+	icmp_max_optsize = optcom_max_optsize(icmp_opt_obj.odb_opt_des_arr,
 	    icmp_opt_obj.odb_opt_arr_cnt);
 
 	/*

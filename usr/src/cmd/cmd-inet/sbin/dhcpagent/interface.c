@@ -41,12 +41,10 @@
 #include <arpa/inet.h>
 #include <dhcpmsg.h>
 #include <dhcp_inittab.h>
-#include <stropts.h>
 
 #include "agent.h"
 #include "interface.h"
 #include "util.h"
-#include "dlpi_io.h"
 #include "packet.h"
 #include "states.h"
 
@@ -80,6 +78,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 {
 	dhcp_pif_t *pif;
 	struct lifreq lifr;
+	dlpi_handle_t dh = NULL;
 
 	if ((pif = calloc(1, sizeof (*pif))) == NULL) {
 		dhcpmsg(MSG_ERR, "insert_pif: cannot allocate pif entry for "
@@ -89,8 +88,6 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	}
 
 	pif->pif_isv6 = isv6;
-	pif->pif_dlpi_hd = NULL;
-	pif->pif_dlpi_id = -1;
 	pif->pif_hold_count = 1;
 	pif->pif_running = B_TRUE;
 
@@ -104,17 +101,14 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	/* We do not use DLPI with DHCPv6 */
 	if (!isv6) {
 		int			rc;
-		dlpi_handle_t		dh;
 		dlpi_info_t		dlinfo;
 
 		/*
 		 * Do the allocations necessary for IPv4 DHCP.
 		 *
 		 *  1. open the interface using DLPI
-		 *  2. get the interface max SDU
-		 *  3. get the interface hardware type and hardware length
-		 *  4. get the interface hardware address
-		 *  5. get the interface hardware broadcast address
+		 *  2. get the interface hardware type and hardware length
+		 *  3. get the interface hardware address
 		 */
 
 		/* step 1 */
@@ -124,7 +118,6 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 			*error = DHCP_IPC_E_INVIF;
 			goto failure;
 		}
-		pif->pif_dlpi_hd = dh;
 
 		if ((rc = dlpi_bind(dh, ETHERTYPE_IP, NULL)) != DLPI_SUCCESS) {
 			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_bind: %s",
@@ -134,7 +127,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		}
 
 		/* step 2 */
-		rc = dlpi_info(pif->pif_dlpi_hd, &dlinfo, 0);
+		rc = dlpi_info(dh, &dlinfo, 0);
 		if (rc != DLPI_SUCCESS) {
 			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_info: %s",
 			    dlpi_strerror(rc));
@@ -142,25 +135,13 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 			goto failure;
 		}
 
-		pif->pif_max = dlinfo.di_max_sdu;
-		if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
-			dhcpmsg(MSG_ERROR, "insert_pif: %s does not have a "
-			    "large enough maximum SDU to support DHCP "
-			    "(%u < %u)", pname, pif->pif_max,
-			    DHCP_DEF_MAX_SIZE);
-			*error = DHCP_IPC_E_INVIF;
-			goto failure;
-		}
-
-		/* step 3 */
 		pif->pif_hwtype = dlpi_arptype(dlinfo.di_mactype);
 		pif->pif_hwlen  = dlinfo.di_physaddrlen;
 
-		dhcpmsg(MSG_DEBUG, "insert_pif: %s: sdumax %u, hwtype %d, "
-		    "hwlen %d", pname, pif->pif_max, pif->pif_hwtype,
-		    pif->pif_hwlen);
+		dhcpmsg(MSG_DEBUG, "insert_pif: %s: hwtype %d, hwlen %d",
+		    pname, pif->pif_hwtype, pif->pif_hwlen);
 
-		/* step 4 */
+		/* step 3 */
 		if (pif->pif_hwlen > 0) {
 			pif->pif_hwaddr = malloc(pif->pif_hwlen);
 			if (pif->pif_hwaddr == NULL) {
@@ -169,29 +150,12 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 				*error = DHCP_IPC_E_MEMORY;
 				goto failure;
 			}
+			(void) memcpy(pif->pif_hwaddr, dlinfo.di_physaddr,
+			    pif->pif_hwlen);
 		}
 
-		(void) memcpy(pif->pif_hwaddr, dlinfo.di_physaddr,
-		    pif->pif_hwlen);
-
-		/*
-		 * step 5
-		 * Some media types has no broadcast address.
-		 */
-		if ((pif->pif_dlen = dlinfo.di_bcastaddrlen) != 0) {
-			pif->pif_daddr = malloc(pif->pif_dlen);
-			if (pif->pif_daddr == NULL) {
-				dhcpmsg(MSG_ERR, "insert_pif: cannot allocate "
-				    "pif_daddr for %s", pname);
-				*error = DHCP_IPC_E_MEMORY;
-				goto failure;
-			}
-		}
-		(void) memcpy(pif->pif_daddr, dlinfo.di_bcastaddr,
-		    pif->pif_dlen);
-
-		/* Close the DLPI stream until actually needed */
-		close_dlpi_pif(pif);
+		dlpi_close(dh);
+		dh = NULL;
 	}
 
 	/*
@@ -202,20 +166,34 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	(void) strlcpy(lifr.lifr_name, pname, LIFNAMSIZ);
 
 	if (ioctl(isv6 ? v6_sock_fd : v4_sock_fd, SIOCGLIFINDEX, &lifr) == -1) {
-		if (errno == ENXIO)
-			*error = DHCP_IPC_E_INVIF;
-		else
-			*error = DHCP_IPC_E_INT;
+		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
 		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFINDEX for %s", pname);
 		goto failure;
 	}
 	pif->pif_index = lifr.lifr_index;
+
+	if (ioctl(isv6 ? v6_sock_fd : v4_sock_fd, SIOCGLIFMTU, &lifr) == -1) {
+		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFMTU for %s", pname);
+		goto failure;
+	}
+	pif->pif_max = lifr.lifr_mtu;
+
+	if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
+		dhcpmsg(MSG_ERROR, "insert_pif: MTU of %s is too small to "
+		    "support DHCP (%u < %u)", pname, pif->pif_max,
+		    DHCP_DEF_MAX_SIZE);
+		*error = DHCP_IPC_E_INVIF;
+		goto failure;
+	}
 
 	insque(pif, isv6 ? &v6root : &v4root);
 
 	return (pif);
 
 failure:
+	if (dh != NULL)
+		dlpi_close(dh);
 	release_pif(pif);
 	return (NULL);
 }
@@ -256,10 +234,7 @@ release_pif(dhcp_pif_t *pif)
 		    pif->pif_name);
 
 		remque(pif);
-		pif->pif_dlpi_count = 1;
-		close_dlpi_pif(pif);
 		free(pif->pif_hwaddr);
-		free(pif->pif_daddr);
 		free(pif);
 	} else {
 		dhcpmsg(MSG_DEBUG2, "release_pif: hold count on %s: %u",
@@ -343,80 +318,9 @@ lookup_pif_by_name(const char *pname, boolean_t isv6)
 }
 
 /*
- * open_dlpi_pif(): register the use of DLPI I/O by a LIF on a PIF, opening
- *		    the connection if necessary.
- *
- *   input: dhcp_pif_t *: the physical interface on which to use DLPI
- *  output: boolean_t: B_TRUE on success, B_FALSE on failure.
- */
-
-boolean_t
-open_dlpi_pif(dhcp_pif_t *pif)
-{
-	int		rc;
-	dlpi_handle_t	dh;
-
-	if (pif->pif_dlpi_hd == NULL) {
-		if ((rc = dlpi_open(pif->pif_name, &dh, 0)) != DLPI_SUCCESS) {
-			dhcpmsg(MSG_ERROR, "open_dlpi_pif: dlpi_open: %s",
-			    dlpi_strerror(rc));
-			return (B_FALSE);
-		}
-
-		if ((rc = dlpi_bind(dh, ETHERTYPE_IP, NULL)) != DLPI_SUCCESS) {
-			dhcpmsg(MSG_ERROR, "open_dlpi_pif: dlpi_bind: %s",
-			    dlpi_strerror(rc));
-			dlpi_close(dh);
-			return (B_FALSE);
-		}
-
-		if (!(set_packet_filter(dh, dhcp_filter, NULL, "DHCP"))) {
-			dlpi_close(dh);
-			return (B_FALSE);
-		}
-		pif->pif_dlpi_id = iu_register_event(eh, dlpi_fd(dh), POLLIN,
-		    dhcp_collect_dlpi, pif);
-		if (pif->pif_dlpi_id == -1) {
-			dlpi_close(dh);
-			return (B_FALSE);
-		}
-
-		pif->pif_dlpi_hd = dh;
-	}
-	pif->pif_dlpi_count++;
-	return (B_TRUE);
-}
-
-/*
- * close_dlpi_pif(): unregister the use of DLPI I/O by a LIF on a PIF, closing
- *		     the connection if this was the last user.
- *
- *   input: dhcp_pif_t *: the physical interface on which we're using DLPI
- *  output: none
- */
-
-void
-close_dlpi_pif(dhcp_pif_t *pif)
-{
-	if (pif->pif_dlpi_count > 1) {
-		pif->pif_dlpi_count--;
-		return;
-	}
-	pif->pif_dlpi_count = 0;
-	if (pif->pif_dlpi_id != -1) {
-		(void) iu_unregister_event(eh, pif->pif_dlpi_id, NULL);
-		pif->pif_dlpi_id = -1;
-	}
-	if (pif->pif_dlpi_hd != NULL) {
-		dlpi_close(pif->pif_dlpi_hd);
-		pif->pif_dlpi_hd = NULL;
-	}
-}
-
-/*
  * pif_status(): update the physical interface up/down status.
  *
- *   input: dhcp_pif_t *: the physical interface on which we're using DLPI
+ *   input: dhcp_pif_t *: the physical interface to be updated
  *	    boolean_t: B_TRUE if the interface is going up
  *  output: none
  */
@@ -478,7 +382,7 @@ insert_lif(dhcp_pif_t *pif, const char *lname, int *error)
 	}
 
 	lif->lif_sock_ip_fd = -1;
-	lif->lif_acknak_id = -1;
+	lif->lif_packet_id = -1;
 	lif->lif_iaid_id = -1;
 	lif->lif_hold_count = 1;
 	lif->lif_pif = pif;
@@ -729,6 +633,8 @@ checkaddr(const dhcp_lif_t *lif, int ioccmd, const in6_addr_t *addr,
 	boolean_t isv6;
 	int fd;
 	struct lifreq lifr;
+	char abuf1[INET6_ADDRSTRLEN];
+	char abuf2[INET6_ADDRSTRLEN];
 
 	(void) memset(&lifr, 0, sizeof (struct lifreq));
 	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
@@ -748,32 +654,27 @@ checkaddr(const dhcp_lif_t *lif, int ioccmd, const in6_addr_t *addr,
 	} else if (isv6) {
 		struct sockaddr_in6 *sin6 =
 		    (struct sockaddr_in6 *)&lifr.lifr_addr;
-		char abuf1[INET6_ADDRSTRLEN];
-		char abuf2[INET6_ADDRSTRLEN];
 
 		if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, addr)) {
 			dhcpmsg(MSG_WARNING,
-			    "checkaddr: expected %s %s on %s, have %s",
-			    aname, inet_ntop(AF_INET6, &sin6->sin6_addr, abuf1,
-			    sizeof (abuf1)),  lif->lif_name,
-			    inet_ntop(AF_INET6, addr, abuf2, sizeof (abuf2)));
+			    "checkaddr: expected %s %s on %s, have %s", aname,
+			    inet_ntop(AF_INET6, addr, abuf1, sizeof (abuf1)),
+			    lif->lif_name, inet_ntop(AF_INET6, &sin6->sin6_addr,
+			    abuf2, sizeof (abuf2)));
 			return (B_FALSE);
 		}
 	} else {
 		struct sockaddr_in *sinp =
 		    (struct sockaddr_in *)&lifr.lifr_addr;
 		ipaddr_t v4addr;
-		char abuf1[INET_ADDRSTRLEN];
-		char abuf2[INET_ADDRSTRLEN];
 
 		IN6_V4MAPPED_TO_IPADDR(addr, v4addr);
 		if (sinp->sin_addr.s_addr != v4addr) {
 			dhcpmsg(MSG_WARNING,
-			    "checkaddr: expected %s %s on %s, have %s",
-			    aname, inet_ntop(AF_INET, &sinp->sin_addr, abuf1,
-			    sizeof (abuf1)),  lif->lif_name,
-			    inet_ntop(AF_INET, &v4addr, abuf2,
-			    sizeof (abuf2)));
+			    "checkaddr: expected %s %s on %s, have %s", aname,
+			    inet_ntop(AF_INET, &v4addr, abuf1, sizeof (abuf1)),
+			    lif->lif_name, inet_ntop(AF_INET, &sinp->sin_addr,
+			    abuf2, sizeof (abuf2)));
 			return (B_FALSE);
 		}
 	}
@@ -896,11 +797,12 @@ verify_lif(const dhcp_lif_t *lif)
  *		   unplumb_lif().
  *
  *   input: dhcp_lif_t *: the interface to canonize
+ *	    boolean_t: only canonize lif if it's under DHCP control
  *  output: none
  */
 
 static void
-canonize_lif(dhcp_lif_t *lif)
+canonize_lif(dhcp_lif_t *lif, boolean_t dhcponly)
 {
 	boolean_t isv6;
 	int fd;
@@ -934,8 +836,7 @@ canonize_lif(dhcp_lif_t *lif)
 		return;
 	}
 
-	/* Should not happen */
-	if (!(lifr.lifr_flags & IFF_DHCPRUNNING)) {
+	if (dhcponly && !(lifr.lifr_flags & IFF_DHCPRUNNING)) {
 		dhcpmsg(MSG_INFO,
 		    "canonize_lif: cannot clear %s; flags are %llx",
 		    lif->lif_name, lifr.lifr_flags);
@@ -1117,7 +1018,7 @@ unplumb_lif(dhcp_lif_t *lif)
 	 * just canonize it and remove it from the lease.
 	 */
 	if ((dlp = lif->lif_lease) != NULL && dlp->dl_smach->dsm_lif == lif) {
-		canonize_lif(lif);
+		canonize_lif(lif, B_TRUE);
 		cancel_lif_timers(lif);
 		if (lif->lif_declined != NULL) {
 			dlp->dl_smach->dsm_lif_down--;
@@ -1349,12 +1250,17 @@ clear_lif_deprecated(dhcp_lif_t *lif)
  * open_ip_lif(): open up an IP socket for I/O on a given LIF (v4 only).
  *
  *   input: dhcp_lif_t *: the logical interface to operate on
+ *	    in_addr_t: the address the socket will be bound to (in hbo)
  *  output: boolean_t: B_TRUE if the socket was opened successfully.
  */
 
 boolean_t
-open_ip_lif(dhcp_lif_t *lif)
+open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 {
+	const char *errmsg;
+	struct lifreq lifr;
+	int on = 1;
+
 	if (lif->lif_sock_ip_fd != -1) {
 		dhcpmsg(MSG_WARNING, "open_ip_lif: socket already open on %s",
 		    lif->lif_name);
@@ -1363,27 +1269,90 @@ open_ip_lif(dhcp_lif_t *lif)
 
 	lif->lif_sock_ip_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (lif->lif_sock_ip_fd == -1) {
-		dhcpmsg(MSG_ERR, "open_ip_lif: cannot create v4 socket on %s",
-		    lif->lif_name);
-		return (B_FALSE);
+		errmsg = "cannot create v4 socket";
+		goto failure;
 	}
 
-	if (!bind_sock(lif->lif_sock_ip_fd, IPPORT_BOOTPC,
-	    ntohl(lif->lif_addr))) {
-		dhcpmsg(MSG_ERR, "open_ip_lif: cannot bind v4 socket on %s",
-		    lif->lif_name);
-		return (B_FALSE);
+	if (!bind_sock(lif->lif_sock_ip_fd, IPPORT_BOOTPC, addr_hbo)) {
+		errmsg = "cannot bind v4 socket";
+		goto failure;
 	}
 
-	lif->lif_acknak_id = iu_register_event(eh, lif->lif_sock_ip_fd, POLLIN,
-	    dhcp_acknak_lif, lif);
-	if (lif->lif_acknak_id == -1) {
-		dhcpmsg(MSG_WARNING, "open_ip_lif: cannot register to "
-		    "receive IP unicast");
-		close_ip_lif(lif);
-		return (B_FALSE);
+	/*
+	 * If we bound to INADDR_ANY, we have no IFF_UP source address to use.
+	 * Thus, enable IP_UNSPEC_SRC so that we can send packets with an
+	 * unspecified (0.0.0.0) address.  Also, enable IP_DHCPINIT_IF so that
+	 * the IP module will accept unicast DHCP traffic regardless of the IP
+	 * address it's sent to.  (We'll then figure out which packets are
+	 * ours based on the xid.)
+	 */
+	if (addr_hbo == INADDR_ANY) {
+		if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_UNSPEC_SRC,
+		    &on, sizeof (int)) == -1) {
+			errmsg = "cannot set IP_UNSPEC_SRC";
+			goto failure;
+		}
+
+		if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_DHCPINIT_IF,
+		    &lif->lif_pif->pif_index, sizeof (int)) == -1) {
+			errmsg = "cannot set IP_DHCPINIT_IF";
+			goto failure;
+		}
 	}
+
+	if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_BOUND_IF,
+	    &lif->lif_pif->pif_index, sizeof (int)) == -1) {
+		errmsg = "cannot set IP_BOUND_IF";
+		goto failure;
+	}
+
+	/*
+	 * Make sure at least one lif on the interface we used in IP_BOUND_IF
+	 * is IFF_UP so that we can send and receive IP packets.
+	 */
+	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
+	if (ioctl(v4_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
+		errmsg = "cannot get interface flags";
+		goto failure;
+	}
+
+	if (!(lifr.lifr_flags & IFF_UP)) {
+		/*
+		 * Start from a clean slate.
+		 */
+		canonize_lif(lif, B_FALSE);
+
+		lifr.lifr_flags |= IFF_UP;
+		if (ioctl(v4_sock_fd, SIOCSLIFFLAGS, &lifr) == -1) {
+			errmsg = "cannot bring up";
+			goto failure;
+		}
+
+		/*
+		 * When bringing 0.0.0.0 IFF_UP, the kernel changes the
+		 * netmask to 255.0.0.0, so re-fetch our expected netmask.
+		 */
+		if (ioctl(v4_sock_fd, SIOCGLIFNETMASK, &lifr) == -1) {
+			errmsg = "cannot get netmask";
+			goto failure;
+		}
+
+		lif->lif_netmask =
+		    ((struct sockaddr_in *)&lifr.lifr_addr)->sin_addr.s_addr;
+	}
+
+	lif->lif_packet_id = iu_register_event(eh, lif->lif_sock_ip_fd, POLLIN,
+	    dhcp_packet_lif, lif);
+	if (lif->lif_packet_id == -1) {
+		errmsg = "cannot register to receive DHCP packets";
+		goto failure;
+	}
+
 	return (B_TRUE);
+failure:
+	dhcpmsg(MSG_ERR, "open_ip_lif: %s: %s", lif->lif_name, errmsg);
+	close_ip_lif(lif);
+	return (B_FALSE);
 }
 
 /*
@@ -1396,9 +1365,9 @@ open_ip_lif(dhcp_lif_t *lif)
 void
 close_ip_lif(dhcp_lif_t *lif)
 {
-	if (lif->lif_acknak_id != -1) {
-		(void) iu_unregister_event(eh, lif->lif_acknak_id, NULL);
-		lif->lif_acknak_id = -1;
+	if (lif->lif_packet_id != -1) {
+		(void) iu_unregister_event(eh, lif->lif_packet_id, NULL);
+		lif->lif_packet_id = -1;
 	}
 	if (lif->lif_sock_ip_fd != -1) {
 		(void) close(lif->lif_sock_ip_fd);

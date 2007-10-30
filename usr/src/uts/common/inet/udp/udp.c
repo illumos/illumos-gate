@@ -2666,6 +2666,8 @@ udp_opt_get_locked(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case IP_TTL:
 			*i1 = (int)udp->udp_ttl;
 			break;	/* goto sizeof (int) option return */
+		case IP_DHCPINIT_IF:
+			return (-EINVAL);
 		case IP_NEXTHOP:
 		case IP_RECVPKTINFO:
 			/*
@@ -2725,9 +2727,6 @@ udp_opt_get_locked(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case IP_UNSPEC_SRC:
 			*i1 = udp->udp_unspec_source;
 			break;	/* goto sizeof (int) option return */
-		case IP_XMIT_IF:
-			*i1 = udp->udp_xmit_if;
-			break; /* goto sizeof (int) option return */
 		default:
 			return (-1);
 		}
@@ -3259,6 +3258,7 @@ udp_opt_set_locked(queue_t *q, uint_t optset_context, int level,
 		case MCAST_LEAVE_SOURCE_GROUP:
 		case IP_SEC_OPT:
 		case IP_NEXTHOP:
+		case IP_DHCPINIT_IF:
 			/*
 			 * "soft" error (negative)
 			 * option not handled at this level
@@ -3272,10 +3272,6 @@ udp_opt_set_locked(queue_t *q, uint_t optset_context, int level,
 		case IP_UNSPEC_SRC:
 			if (!checkonly)
 				udp->udp_unspec_source = onoff;
-			break;
-		case IP_XMIT_IF:
-			if (!checkonly)
-				udp->udp_xmit_if = *i1;
 			break;
 		default:
 			*outlenp = 0;
@@ -5994,7 +5990,7 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 
 	if ((connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
 	    CONN_OUTBOUND_POLICY_PRESENT(connp, ipss) ||
-	    connp->conn_dontroute || connp->conn_xmit_if_ill != NULL ||
+	    connp->conn_dontroute ||
 	    connp->conn_nofailover_ill != NULL ||
 	    connp->conn_outgoing_ill != NULL || optinfo.ip_opt_flags != 0 ||
 	    optinfo.ip_opt_ill_index != 0 ||

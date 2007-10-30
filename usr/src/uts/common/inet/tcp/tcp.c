@@ -18622,7 +18622,7 @@ tcp_zcopy_check(tcp_t *tcp)
 	    (connp->conn_flags & IPCL_CHECK_POLICY) == 0 &&
 	    connp->conn_dontroute == 0 &&
 	    !connp->conn_nexthop_set &&
-	    connp->conn_xmit_if_ill == NULL &&
+	    connp->conn_outgoing_ill == NULL &&
 	    connp->conn_nofailover_ill == NULL &&
 	    do_tcpzcopy == 1) {
 		/*
