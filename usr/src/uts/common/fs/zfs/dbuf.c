@@ -919,20 +919,20 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	drp = &db->db_last_dirty;
 	ASSERT(*drp == NULL || (*drp)->dr_txg <= tx->tx_txg ||
 	    db->db.db_object == DMU_META_DNODE_OBJECT);
-	while (*drp && (*drp)->dr_txg > tx->tx_txg)
-		drp = &(*drp)->dr_next;
-	if (*drp && (*drp)->dr_txg == tx->tx_txg) {
+	while ((dr = *drp) != NULL && dr->dr_txg > tx->tx_txg)
+		drp = &dr->dr_next;
+	if (dr && dr->dr_txg == tx->tx_txg) {
 		if (db->db_level == 0 && db->db_blkid != DB_BONUS_BLKID) {
 			/*
 			 * If this buffer has already been written out,
 			 * we now need to reset its state.
 			 */
-			dbuf_unoverride(*drp);
+			dbuf_unoverride(dr);
 			if (db->db.db_object != DMU_META_DNODE_OBJECT)
 				arc_buf_thaw(db->db_buf);
 		}
 		mutex_exit(&db->db_mtx);
-		return (*drp);
+		return (dr);
 	}
 
 	/*
