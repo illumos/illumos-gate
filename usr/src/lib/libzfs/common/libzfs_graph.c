@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,8 +396,8 @@ iterate_children(libzfs_handle_t *hdl, zfs_graph_t *zgp, const char *dataset)
 	 */
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 	if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0 &&
-	    zc.zc_objset_stats.dds_clone_of[0] != '\0') {
-		if (zfs_graph_add(hdl, zgp, zc.zc_objset_stats.dds_clone_of,
+	    zc.zc_objset_stats.dds_origin[0] != '\0') {
+		if (zfs_graph_add(hdl, zgp, zc.zc_objset_stats.dds_origin,
 		    zc.zc_name, zc.zc_objset_stats.dds_creation_txg) != 0)
 			return (-1);
 	}

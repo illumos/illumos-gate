@@ -1892,7 +1892,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",
-	"\t[-O objset_t*] [-n objset_name | \"mos\"] [-o object | \"mdn\"] \n"
+	"\t[-O objset_impl_t*] [-n objset_name | \"mos\"] "
+	"[-o object | \"mdn\"] \n"
 	"\t[-l level] [-b blkid | \"bonus\"]",
 	"find dmu_buf_impl_t's that match specified criteria", dbufs },
 	{ "abuf_find", "dva_word[0] dva_word[1]",

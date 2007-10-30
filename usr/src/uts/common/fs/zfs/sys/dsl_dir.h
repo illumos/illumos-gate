@@ -44,7 +44,7 @@ typedef struct dsl_dir_phys {
 	uint64_t dd_creation_time; /* not actually used */
 	uint64_t dd_head_dataset_obj;
 	uint64_t dd_parent_obj;
-	uint64_t dd_clone_parent_obj;
+	uint64_t dd_origin_obj;
 	uint64_t dd_child_dir_zapobj;
 	/*
 	 * how much space our children are accounting for; for leaf

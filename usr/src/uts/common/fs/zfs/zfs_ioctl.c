@@ -345,7 +345,7 @@ zfs_secpolicy_share(zfs_cmd_t *zc, cred_t *cr)
 	if (!INGLOBALZONE(curproc))
 		return (EPERM);
 
-	if (secpolicy_nfs(CRED()) == 0) {
+	if (secpolicy_nfs(cr) == 0) {
 		return (0);
 	} else {
 		vnode_t *vp;
@@ -477,7 +477,7 @@ zfs_secpolicy_promote(zfs_cmd_t *zc, cred_t *cr)
 
 		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 		error = dsl_dataset_open_obj(dd->dd_pool,
-		    dd->dd_phys->dd_clone_parent_obj, NULL,
+		    dd->dd_phys->dd_origin_obj, NULL,
 		    DS_MODE_NONE, FTAG, &pclone);
 		rw_exit(&dd->dd_pool->dp_config_rwlock);
 		if (error) {
@@ -1083,6 +1083,17 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_nvlist_dst_size	size of buffer for property nvlist
+ *
+ * outputs:
+ * zc_objset_stats	stats
+ * zc_nvlist_dst	property nvlist
+ * zc_nvlist_dst_size	size of property nvlist
+ * zc_value		alternate root
+ */
 static int
 zfs_ioc_objset_stats(zfs_cmd_t *zc)
 {
@@ -1133,6 +1144,19 @@ retry:
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_cookie		zap cursor
+ * zc_nvlist_dst_size	size of buffer for property nvlist
+ *
+ * outputs:
+ * zc_name		name of next filesystem
+ * zc_objset_stats	stats
+ * zc_nvlist_dst	property nvlist
+ * zc_nvlist_dst_size	size of property nvlist
+ * zc_value		alternate root
+ */
 static int
 zfs_ioc_objset_version(zfs_cmd_t *zc)
 {
@@ -1226,6 +1250,19 @@ retry:
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_cookie		zap cursor
+ * zc_nvlist_dst_size	size of buffer for property nvlist
+ *
+ * outputs:
+ * zc_name		name of next snapshot
+ * zc_objset_stats	stats
+ * zc_nvlist_dst	property nvlist
+ * zc_nvlist_dst_size	size of property nvlist
+ * zc_value		alternate root
+ */
 static int
 zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 {
@@ -1269,6 +1306,10 @@ retry:
 
 	if (error == 0)
 		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
+
+	/* if we failed, undo the @ that we tacked on to zc_name */
+	if (error != 0)
+		*strchr(zc->zc_name, '@') = '\0';
 
 	dmu_objset_close(os);
 	return (error);
@@ -1435,6 +1476,14 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 	return (0);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_value		name of property to inherit
+ * zc_nvlist_src{_size}	nvlist of properties to apply
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_set_prop(zfs_cmd_t *zc)
 {
@@ -1451,6 +1500,13 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_value		name of property to inherit
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_inherit_prop(zfs_cmd_t *zc)
 {
@@ -1553,6 +1609,14 @@ zfs_ioc_iscsi_perm_check(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_nvlist_src{_size}	nvlist of delegated permissions
+ * zc_perm_action	allow/unallow flag
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_set_fsacl(zfs_cmd_t *zc)
 {
@@ -1595,6 +1659,13 @@ zfs_ioc_set_fsacl(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ *
+ * outputs:
+ * zc_nvlist_src{_size}	nvlist of delegated permissions
+ */
 static int
 zfs_ioc_get_fsacl(zfs_cmd_t *zc)
 {
@@ -1609,12 +1680,24 @@ zfs_ioc_get_fsacl(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name		name of volume
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_create_minor(zfs_cmd_t *zc)
 {
 	return (zvol_create_minor(zc->zc_name, ddi_driver_major(zfs_dip)));
 }
 
+/*
+ * inputs:
+ * zc_name		name of volume
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_remove_minor(zfs_cmd_t *zc)
 {
@@ -1809,6 +1892,15 @@ zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
 	return (0);
 }
 
+/*
+ * inputs:
+ * zc_objset_type	type of objset to create (fs vs zvol)
+ * zc_name		name of new objset
+ * zc_value		name of snapshot to clone from (may be empty)
+ * zc_nvlist_src{_size}	nvlist of properties to apply
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_create(zfs_cmd_t *zc)
 {
@@ -1973,6 +2065,14 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name	name of filesystem
+ * zc_value	short name of snapshot
+ * zc_cookie	recursive flag
+ *
+ * outputs:	none
+ */
 static int
 zfs_ioc_snapshot(zfs_cmd_t *zc)
 {
@@ -2022,6 +2122,13 @@ zfs_unmount_snap(char *name, void *arg)
 	return (0);
 }
 
+/*
+ * inputs:
+ * zc_name	name of filesystem
+ * zc_value	short name of snapshot
+ *
+ * outputs:	none
+ */
 static int
 zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 {
@@ -2036,6 +2143,13 @@ zfs_ioc_destroy_snaps(zfs_cmd_t *zc)
 	return (dmu_snapshots_destroy(zc->zc_name, zc->zc_value));
 }
 
+/*
+ * inputs:
+ * zc_name		name of dataset to destroy
+ * zc_objset_type	type of objset
+ *
+ * outputs:		none
+ */
 static int
 zfs_ioc_destroy(zfs_cmd_t *zc)
 {
@@ -2048,12 +2162,26 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 	return (dmu_objset_destroy(zc->zc_name));
 }
 
+/*
+ * inputs:
+ * zc_name	name of snapshot to roll back to
+ *
+ * outputs:	none
+ */
 static int
 zfs_ioc_rollback(zfs_cmd_t *zc)
 {
 	return (dmu_objset_rollback(zc->zc_name));
 }
 
+/*
+ * inputs:
+ * zc_name	old name of dataset
+ * zc_value	new name of dataset
+ * zc_cookie	recursive flag (only valid for snapshots)
+ *
+ * outputs:	none
+ */
 static int
 zfs_ioc_rename(zfs_cmd_t *zc)
 {
@@ -2079,38 +2207,64 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	return (dmu_objset_rename(zc->zc_name, zc->zc_value, recursive));
 }
 
+/*
+ * inputs:
+ * zc_name		name of containing filesystem
+ * zc_nvlist_src{_size}	nvlist of properties to apply
+ * zc_value		name of snapshot to create
+ * zc_string		name of clone origin (if DRR_FLAG_CLONE)
+ * zc_cookie		file descriptor to recv from
+ * zc_begin_record	the BEGIN record of the stream (not byteswapped)
+ * zc_guid		force flag
+ *
+ * outputs:
+ * zc_cookie		number of bytes read
+ */
 static int
-zfs_ioc_recvbackup(zfs_cmd_t *zc)
+zfs_ioc_recv(zfs_cmd_t *zc)
 {
 	file_t *fp;
-	offset_t new_off;
 	objset_t *os;
+	dmu_recv_cookie_t drc;
 	zfsvfs_t *zfsvfs = NULL;
-	char *cp;
-	char cosname[MAXNAMELEN];
 	boolean_t force = (boolean_t)zc->zc_guid;
 	int error, fd;
+	offset_t off;
+	nvlist_t *props = NULL;
+	objset_t *origin = NULL;
+	char *tosnap;
+	char tofs[ZFS_MAXNAMELEN];
 
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0 ||
 	    strchr(zc->zc_value, '@') == NULL ||
 	    strchr(zc->zc_value, '%'))
 		return (EINVAL);
 
+	(void) strcpy(tofs, zc->zc_value);
+	tosnap = strchr(tofs, '@');
+	*tosnap = '\0';
+	tosnap++;
+
+	if (zc->zc_nvlist_src != NULL &&
+	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &props)) != 0)
+		return (error);
+
 	fd = zc->zc_cookie;
 	fp = getf(fd);
-	if (fp == NULL)
+	if (fp == NULL) {
+		nvlist_free(props);
 		return (EBADF);
+	}
 
 	/*
 	 * Get the zfsvfs for the receiving objset. There
 	 * won't be one if we're operating on a zvol, if the
 	 * objset doesn't exist yet, or is not mounted.
 	 */
-	cp = strchr(zc->zc_value, '@');
-	*cp = '\0';
-	error = dmu_objset_open(zc->zc_value, DMU_OST_ANY,
+
+	error = dmu_objset_open(tofs, DMU_OST_ANY,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	*cp = '@';
 	if (!error) {
 		if (dmu_objset_type(os) == DMU_OST_ZFS) {
 			mutex_enter(&os->os->os_user_ptr_lock);
@@ -2122,60 +2276,111 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 		dmu_objset_close(os);
 	}
 
-	error = dmu_recvbackup(zc->zc_value, &zc->zc_begin_record,
-	    &zc->zc_cookie, force, zfsvfs != NULL, fp->f_vnode,
-	    fp->f_offset, cosname);
+	if (zc->zc_string[0]) {
+		error = dmu_objset_open(zc->zc_string, DMU_OST_ANY,
+		    DS_MODE_STANDARD | DS_MODE_READONLY, &origin);
+		if (error) {
+			if (zfsvfs != NULL)
+				VFS_RELE(zfsvfs->z_vfs);
+			nvlist_free(props);
+			releasef(fd);
+			return (error);
+		}
+	}
+
+	error = dmu_recv_begin(tofs, tosnap, &zc->zc_begin_record,
+	    force, origin, zfsvfs != NULL, &drc);
+	if (origin)
+		dmu_objset_close(origin);
+	if (error) {
+		if (zfsvfs != NULL)
+			VFS_RELE(zfsvfs->z_vfs);
+		nvlist_free(props);
+		releasef(fd);
+		return (error);
+	}
 
 	/*
-	 * For incremental snapshots where we created a
-	 * temporary clone, we now swap zfsvfs::z_os with
-	 * the newly created and received "cosname".
+	 * If properties are supplied, they are to completely replace
+	 * the existing ones; "inherit" any existing properties.
 	 */
-	if (!error && zfsvfs != NULL) {
-		char osname[MAXNAMELEN];
-		int mode;
+	if (props) {
+		objset_t *os;
+		nvlist_t *nv = NULL;
 
-		error = zfs_suspend_fs(zfsvfs, osname, &mode);
-		if (!error) {
-			int swap_err;
-			int snap_err = 0;
-
-			swap_err = dsl_dataset_clone_swap(cosname, force);
-			if (!swap_err) {
-				char *cp = strrchr(zc->zc_value, '@');
-
-				*cp = '\0';
-				snap_err = dmu_replay_end_snapshot(zc->zc_value,
-				    &zc->zc_begin_record);
-				*cp = '@';
-			}
-			error = zfs_resume_fs(zfsvfs, osname, mode);
-			if (!error)
-				error = swap_err;
-			if (!error)
-				error = snap_err;
+		error = dmu_objset_open(tofs, DMU_OST_ANY,
+		    DS_MODE_STANDARD | DS_MODE_READONLY | DS_MODE_INCONSISTENT,
+		    &os);
+		if (error == 0) {
+			error = dsl_prop_get_all(os, &nv);
+			dmu_objset_close(os);
 		}
+		if (error == 0) {
+			nvpair_t *elem;
+			zfs_cmd_t zc2 = { 0 };
 
-		/* destroy the clone we created */
-		(void) dmu_objset_destroy(cosname);
+			(void) strcpy(zc2.zc_name, tofs);
+			for (elem = nvlist_next_nvpair(nv, NULL); elem;
+			    elem = nvlist_next_nvpair(nv, elem)) {
+				(void) strcpy(zc2.zc_value, nvpair_name(elem));
+				if (zfs_secpolicy_inherit(&zc2, CRED()) == 0)
+					(void) zfs_ioc_inherit_prop(&zc2);
+			}
+		}
+		if (nv)
+			nvlist_free(nv);
+	}
+
+	/*
+	 * Set properties.  Note, we ignore errors.  Would be better to
+	 * do best-effort in zfs_set_prop_nvlist, too.
+	 */
+	(void) zfs_set_prop_nvlist(tofs, props);
+	nvlist_free(props);
+
+	off = fp->f_offset;
+	error = dmu_recv_stream(&drc, fp->f_vnode, &off);
+
+	if (error == 0) {
+		if (zfsvfs != NULL) {
+			char osname[MAXNAMELEN];
+			int mode;
+
+			(void) zfs_suspend_fs(zfsvfs, osname, &mode);
+			error = dmu_recv_end(&drc);
+			error |= zfs_resume_fs(zfsvfs, osname, mode);
+		} else {
+			error = dmu_recv_end(&drc);
+		}
 	}
 	if (zfsvfs != NULL)
 		VFS_RELE(zfsvfs->z_vfs);
-	new_off = fp->f_offset + zc->zc_cookie;
-	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &new_off, NULL) == 0)
-		fp->f_offset = new_off;
+
+	zc->zc_cookie = off - fp->f_offset;
+	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
+		fp->f_offset = off;
 
 	releasef(fd);
 	return (error);
 }
 
+/*
+ * inputs:
+ * zc_name	name of snapshot to send
+ * zc_value	short name of incremental fromsnap (may be empty)
+ * zc_cookie	file descriptor to send stream to
+ * zc_obj	fromorigin flag (mutually exclusive with zc_value)
+ *
+ * outputs: none
+ */
 static int
-zfs_ioc_sendbackup(zfs_cmd_t *zc)
+zfs_ioc_send(zfs_cmd_t *zc)
 {
 	objset_t *fromsnap = NULL;
 	objset_t *tosnap;
 	file_t *fp;
 	int error;
+	offset_t off;
 
 	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &tosnap);
@@ -2207,8 +2412,11 @@ zfs_ioc_sendbackup(zfs_cmd_t *zc)
 		return (EBADF);
 	}
 
-	error = dmu_sendbackup(tosnap, fromsnap, fp->f_vnode);
+	off = fp->f_offset;
+	error = dmu_sendbackup(tosnap, fromsnap, zc->zc_obj, fp->f_vnode, &off);
 
+	if (VOP_SEEK(fp->f_vnode, fp->f_offset, &off, NULL) == 0)
+		fp->f_offset = off;
 	releasef(zc->zc_cookie);
 	if (fromsnap)
 		dmu_objset_close(fromsnap);
@@ -2313,6 +2521,13 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	return (0);
 }
 
+/*
+ * inputs:
+ * zc_name	name of filesystem
+ * zc_value	name of origin snapshot
+ *
+ * outputs:	none
+ */
 static int
 zfs_ioc_promote(zfs_cmd_t *zc)
 {
@@ -2500,8 +2715,8 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_destroy, zfs_secpolicy_destroy, DATASET_NAME, B_TRUE },
 	{ zfs_ioc_rollback, zfs_secpolicy_rollback, DATASET_NAME, B_TRUE },
 	{ zfs_ioc_rename, zfs_secpolicy_rename,	DATASET_NAME, B_TRUE },
-	{ zfs_ioc_recvbackup, zfs_secpolicy_receive, DATASET_NAME, B_TRUE },
-	{ zfs_ioc_sendbackup, zfs_secpolicy_send, DATASET_NAME, B_TRUE },
+	{ zfs_ioc_recv, zfs_secpolicy_receive, DATASET_NAME, B_TRUE },
+	{ zfs_ioc_send, zfs_secpolicy_send, DATASET_NAME, B_TRUE },
 	{ zfs_ioc_inject_fault,	zfs_secpolicy_inject, NO_NAME, B_FALSE },
 	{ zfs_ioc_clear_fault, zfs_secpolicy_inject, NO_NAME, B_FALSE },
 	{ zfs_ioc_inject_list_next, zfs_secpolicy_inject, NO_NAME, B_FALSE },

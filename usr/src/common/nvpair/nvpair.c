@@ -1126,13 +1126,15 @@ nvlist_next_nvpair(nvlist_t *nvl, nvpair_t *nvp)
 	curr = NVPAIR2I_NVP(nvp);
 
 	/*
-	 * Ensure that nvp is an valid pointer.
+	 * Ensure that nvp is a valid nvpair on this nvlist.
+	 * NB: nvp_curr is used only as a hint so that we don't always
+	 * have to walk the list to determine if nvp is still on the list.
 	 */
 	if (nvp == NULL)
 		curr = priv->nvp_list;
-	else if (priv->nvp_curr == curr)
+	else if (priv->nvp_curr == curr || nvlist_contains_nvp(nvl, nvp))
 		curr = curr->nvi_next;
-	else if (nvlist_contains_nvp(nvl, nvp) == 0)
+	else
 		curr = NULL;
 
 	priv->nvp_curr = curr;

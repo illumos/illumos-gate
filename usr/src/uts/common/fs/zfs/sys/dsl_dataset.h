@@ -129,16 +129,23 @@ int dsl_dataset_open_obj(struct dsl_pool *dp, uint64_t dsobj,
     const char *tail, int mode, void *tag, dsl_dataset_t **);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 void dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag);
+void dsl_dataset_downgrade(dsl_dataset_t *ds, int oldmode, int newmode);
+boolean_t dsl_dataset_tryupgrade(dsl_dataset_t *ds, int oldmode, int newmode);
+uint64_t dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
+    dmu_tx_t *tx);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds,
-    const char *lastname, dsl_dataset_t *clone_parent, dmu_tx_t *tx);
-int dsl_dataset_destroy(const char *name);
+    const char *lastname, dsl_dataset_t *origin, cred_t *, dmu_tx_t *);
+int dsl_dataset_destroy(dsl_dataset_t *ds, void *tag);
 int dsl_snapshots_destroy(char *fsname, char *snapname);
+dsl_checkfunc_t dsl_dataset_destroy_check;
+dsl_syncfunc_t dsl_dataset_destroy_sync;
 dsl_checkfunc_t dsl_dataset_snapshot_check;
 dsl_syncfunc_t dsl_dataset_snapshot_sync;
-int dsl_dataset_rollback(dsl_dataset_t *ds);
+int dsl_dataset_rollback(dsl_dataset_t *ds, dmu_objset_type_t ost);
 int dsl_dataset_rename(char *name, const char *newname, boolean_t recursive);
 int dsl_dataset_promote(const char *name);
-int dsl_dataset_clone_swap(const char *name, boolean_t force);
+int dsl_dataset_clone_swap(dsl_dataset_t *clone, dsl_dataset_t *origin_head,
+    boolean_t force);
 
 void *dsl_dataset_set_user_ptr(dsl_dataset_t *ds,
     void *p, dsl_dataset_evict_func_t func);

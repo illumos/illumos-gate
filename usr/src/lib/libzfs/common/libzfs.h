@@ -417,10 +417,21 @@ extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
 extern int zfs_rename(zfs_handle_t *, const char *, boolean_t);
-extern int zfs_send(zfs_handle_t *, const char *, int);
-extern int zfs_receive(libzfs_handle_t *, const char *, int, int, int,
-    boolean_t, int);
+extern int zfs_send(zfs_handle_t *, const char *, const char *,
+    boolean_t, boolean_t, boolean_t, boolean_t, int);
 extern int zfs_promote(zfs_handle_t *);
+
+typedef struct recvflags {
+	boolean_t verbose : 1;
+	boolean_t isprefix : 1;
+	boolean_t dryrun : 1;
+	boolean_t force : 1;
+	boolean_t canmountoff : 1;
+	boolean_t byteswap : 1;
+} recvflags_t;
+
+extern int zfs_receive(libzfs_handle_t *, const char *, recvflags_t,
+    int, avl_tree_t *);
 
 /*
  * Miscellaneous functions.

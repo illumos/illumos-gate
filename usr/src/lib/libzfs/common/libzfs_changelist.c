@@ -350,14 +350,14 @@ changelist_haszonedchild(prop_changelist_t *clp)
  * Remove a node from a gathered list.
  */
 void
-changelist_remove(zfs_handle_t *zhp, prop_changelist_t *clp)
+changelist_remove(prop_changelist_t *clp, const char *name)
 {
 	prop_changenode_t *cn;
 
 	for (cn = uu_list_first(clp->cl_list); cn != NULL;
 	    cn = uu_list_next(clp->cl_list, cn)) {
 
-		if (strcmp(cn->cn_handle->zfs_name, zhp->zfs_name) == 0) {
+		if (strcmp(cn->cn_handle->zfs_name, name) == 0) {
 			uu_list_remove(clp->cl_list, cn);
 			zfs_close(cn->cn_handle);
 			free(cn);

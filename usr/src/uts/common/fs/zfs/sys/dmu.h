@@ -161,6 +161,8 @@ void zfs_znode_byteswap(void *buf, size_t size);
  */
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
+int dmu_objset_open_ds(struct dsl_dataset *ds, dmu_objset_type_t type,
+    objset_t **osp);
 void dmu_objset_close(objset_t *os);
 int dmu_objset_evict_dbufs(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
@@ -486,10 +488,11 @@ void dmu_object_size_from_db(dmu_buf_t *db, uint32_t *blksize,
 typedef struct dmu_objset_stats {
 	uint64_t dds_num_clones; /* number of clones of this */
 	uint64_t dds_creation_txg;
+	uint64_t dds_guid;
 	dmu_objset_type_t dds_type;
 	uint8_t dds_is_snapshot;
 	uint8_t dds_inconsistent;
-	char dds_clone_of[MAXNAMELEN];
+	char dds_origin[MAXNAMELEN];
 } dmu_objset_stats_t;
 
 /*
@@ -578,11 +581,29 @@ typedef void (*dmu_traverse_cb_t)(objset_t *os, void *arg, struct blkptr *bp,
 void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
     dmu_traverse_cb_t cb, void *arg);
 
-int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, struct vnode *vp);
-int dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
-    boolean_t force, boolean_t online, struct vnode *vp, uint64_t voffset,
-    char *cosname);
-int dmu_replay_end_snapshot(char *name, struct drr_begin *drrb);
+int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
+    struct vnode *vp, offset_t *off);
+
+typedef struct dmu_recv_cookie {
+	/*
+	 * This structure is opaque!
+	 *
+	 * If logical and real are different, we are recving the stream
+	 * into the "real" temporary clone, and then switching it with
+	 * the "logical" target.
+	 */
+	struct dsl_dataset *drc_logical_ds;
+	struct dsl_dataset *drc_real_ds;
+	struct drr_begin *drc_drrb;
+	char *drc_tosnap;
+	boolean_t drc_newfs;
+	boolean_t drc_force;
+} dmu_recv_cookie_t;
+
+int dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *,
+    boolean_t force, objset_t *origin, boolean_t online, dmu_recv_cookie_t *);
+int dmu_recv_stream(dmu_recv_cookie_t *drc, struct vnode *vp, offset_t *voffp);
+int dmu_recv_end(dmu_recv_cookie_t *drc);
 
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */

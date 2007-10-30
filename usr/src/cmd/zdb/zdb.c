@@ -734,8 +734,8 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)dd->dd_head_dataset_obj);
 	(void) printf("\t\tparent_dir_obj = %llu\n",
 	    (u_longlong_t)dd->dd_parent_obj);
-	(void) printf("\t\tclone_parent_obj = %llu\n",
-	    (u_longlong_t)dd->dd_clone_parent_obj);
+	(void) printf("\t\torigin_obj = %llu\n",
+	    (u_longlong_t)dd->dd_origin_obj);
 	(void) printf("\t\tchild_dir_zapobj = %llu\n",
 	    (u_longlong_t)dd->dd_child_dir_zapobj);
 	(void) printf("\t\tused_bytes = %s\n", used);

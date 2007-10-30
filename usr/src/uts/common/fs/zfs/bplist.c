@@ -278,9 +278,7 @@ bplist_vacate(bplist_t *bpl, dmu_tx_t *tx)
 int
 bplist_space(bplist_t *bpl, uint64_t *usedp, uint64_t *compp, uint64_t *uncompp)
 {
-	uint64_t itor = 0, comp = 0, uncomp = 0;
 	int err;
-	blkptr_t bp;
 
 	mutex_enter(&bpl->bpl_lock);
 
@@ -298,6 +296,9 @@ bplist_space(bplist_t *bpl, uint64_t *usedp, uint64_t *compp, uint64_t *uncompp)
 	mutex_exit(&bpl->bpl_lock);
 
 	if (!bpl->bpl_havecomp) {
+		uint64_t itor = 0, comp = 0, uncomp = 0;
+		blkptr_t bp;
+
 		while ((err = bplist_iterate(bpl, &itor, &bp)) == 0) {
 			comp += BP_GET_PSIZE(&bp);
 			uncomp += BP_GET_UCSIZE(&bp);

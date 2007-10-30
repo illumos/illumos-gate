@@ -543,7 +543,6 @@ static int (*_sa_parse_legacy_options)(sa_group_t, char *, char *);
  * values to be used later. This is triggered by the runtime loader.
  * Make sure the correct ISA version is loaded.
  */
-
 #pragma init(_zfs_init_libshare)
 static void
 _zfs_init_libshare(void)
@@ -596,7 +595,6 @@ _zfs_init_libshare(void)
  * service value is which part(s) of the API to initialize and is a
  * direct map to the libshare sa_init(service) interface.
  */
-
 int
 zfs_init_libshare(libzfs_handle_t *zhandle, int service)
 {
@@ -620,11 +618,9 @@ zfs_init_libshare(libzfs_handle_t *zhandle, int service)
  * Uninitialize the libshare API if it hasn't already been
  * uninitialized. It is OK to call multiple times.
  */
-
 void
 zfs_uninit_libshare(libzfs_handle_t *zhandle)
 {
-
 	if (zhandle != NULL && zhandle->libzfs_sharehdl != NULL) {
 		if (_sa_fini != NULL)
 			_sa_fini(zhandle->libzfs_sharehdl);
@@ -638,18 +634,14 @@ zfs_uninit_libshare(libzfs_handle_t *zhandle)
  * Call the legacy parse interface to get the protocol specific
  * options using the NULL arg to indicate that this is a "parse" only.
  */
-
 int
 zfs_parse_options(char *options, zfs_share_proto_t proto)
 {
-	int ret;
-
-	if (_sa_parse_legacy_options != NULL)
-		ret = _sa_parse_legacy_options(NULL, options,
-		    proto_table[proto].p_name);
-	else
-		ret = SA_CONFIG_ERR;
-	return (ret);
+	if (_sa_parse_legacy_options != NULL) {
+		return (_sa_parse_legacy_options(NULL, options,
+		    proto_table[proto].p_name));
+	}
+	return (SA_CONFIG_ERR);
 }
 
 /*
@@ -658,7 +650,6 @@ zfs_parse_options(char *options, zfs_share_proto_t proto)
  * wrapper around sa_find_share to find a share path in the
  * configuration.
  */
-
 static sa_share_t
 zfs_sa_find_share(sa_handle_t handle, char *path)
 {
@@ -673,7 +664,6 @@ zfs_sa_find_share(sa_handle_t handle, char *path)
  * Wrapper for sa_enable_share which enables a share for a specified
  * protocol.
  */
-
 static int
 zfs_sa_enable_share(sa_share_t share, char *proto)
 {
@@ -688,7 +678,6 @@ zfs_sa_enable_share(sa_share_t share, char *proto)
  * Wrapper for sa_enable_share which disables a share for a specified
  * protocol.
  */
-
 static int
 zfs_sa_disable_share(sa_share_t share, char *proto)
 {
@@ -702,7 +691,6 @@ zfs_sa_disable_share(sa_share_t share, char *proto)
  * protocol specific properties (sharenfs, sharesmb).  We rely
  * on "libshare" to the dirty work for us.
  */
-
 static int
 zfs_share_proto(zfs_handle_t *zhp, zfs_share_proto_t *proto)
 {

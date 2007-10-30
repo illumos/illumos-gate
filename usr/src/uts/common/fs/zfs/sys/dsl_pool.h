@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ typedef struct dsl_pool {
 
 	/* No lock needed - sync context only */
 	blkptr_t dp_meta_rootbp;
-	list_t dp_synced_objsets;
+	list_t dp_synced_datasets;
 
 	/* Has its own locking */
 	tx_state_t dp_tx;

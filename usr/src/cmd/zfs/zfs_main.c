@@ -216,7 +216,7 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-i snapshot] <snapshot>\n"));
+		return (gettext("\tsend [-R] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume> ...\n"));
@@ -490,6 +490,7 @@ zfs_do_create(int argc, char **argv)
 	uint64_t volsize;
 	int c;
 	boolean_t noreserve = B_FALSE;
+	boolean_t bflag = B_FALSE;
 	boolean_t parents = B_FALSE;
 	int ret = 1;
 	nvlist_t *props = NULL;
@@ -529,6 +530,7 @@ zfs_do_create(int argc, char **argv)
 			parents = B_TRUE;
 			break;
 		case 'b':
+			bflag = B_TRUE;
 			if (zfs_nicestrtonum(g_zfs, optarg, &intval) != 0) {
 				(void) fprintf(stderr, gettext("bad volume "
 				    "block size '%s': %s\n"), optarg,
@@ -580,9 +582,9 @@ zfs_do_create(int argc, char **argv)
 		}
 	}
 
-	if (noreserve && type != ZFS_TYPE_VOLUME) {
-		(void) fprintf(stderr, gettext("'-s' can only be used when "
-		    "creating a volume\n"));
+	if ((bflag || noreserve) && type != ZFS_TYPE_VOLUME) {
+		(void) fprintf(stderr, gettext("'-s' and '-b' can only be "
+		    "used when creating a volume\n"));
 		goto badusage;
 	}
 
@@ -1316,7 +1318,7 @@ upgrade_list_callback(zfs_handle_t *zhp, void *data)
 
 	/* list if it's old/new */
 	if ((!cb->cb_newer && version < ZPL_VERSION) ||
-	    (cb->cb_newer && version > SPA_VERSION)) {
+	    (cb->cb_newer && version > ZPL_VERSION)) {
 		char *str;
 		if (cb->cb_newer) {
 			str = gettext("The following filesystems are "
@@ -2196,7 +2198,8 @@ zfs_do_snapshot(int argc, char **argv)
 }
 
 /*
- * zfs send [-i <@snap>] <fs@snap>
+ * zfs send [-v] -R [-i|-I <@snap>] <fs@snap>
+ * zfs send [-v] [-i|-I <@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
@@ -2204,17 +2207,34 @@ static int
 zfs_do_send(int argc, char **argv)
 {
 	char *fromname = NULL;
+	char *toname = NULL;
 	char *cp;
 	zfs_handle_t *zhp;
+	boolean_t doall = B_FALSE;
+	boolean_t replicate = B_FALSE;
+	boolean_t fromorigin = B_FALSE;
+	boolean_t verbose = B_FALSE;
 	int c, err;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:Rv")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
 				usage(B_FALSE);
 			fromname = optarg;
+			break;
+		case 'I':
+			if (fromname)
+				usage(B_FALSE);
+			fromname = optarg;
+			doall = B_TRUE;
+			break;
+		case 'R':
+			replicate = B_TRUE;
+			break;
+		case 'v':
+			verbose = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -2248,37 +2268,62 @@ zfs_do_send(int argc, char **argv)
 		return (1);
 	}
 
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
+	cp = strchr(argv[0], '@');
+	if (cp == NULL) {
+		(void) fprintf(stderr,
+		    gettext("argument must be a snapshot\n"));
+		usage(B_FALSE);
+	}
+	*cp = '\0';
+	toname = cp + 1;
+	zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
+	if (zhp == NULL)
 		return (1);
 
 	/*
 	 * If they specified the full path to the snapshot, chop off
-	 * everything except the short name of the snapshot.
+	 * everything except the short name of the snapshot, but special
+	 * case if they specify the origin.
 	 */
 	if (fromname && (cp = strchr(fromname, '@')) != NULL) {
-		if (cp != fromname &&
-		    strncmp(argv[0], fromname, cp - fromname + 1)) {
-			(void) fprintf(stderr,
-			    gettext("incremental source must be "
-			    "in same filesystem\n"));
-			usage(B_FALSE);
-		}
-		fromname = cp + 1;
-		if (strchr(fromname, '@') || strchr(fromname, '/')) {
-			(void) fprintf(stderr,
-			    gettext("invalid incremental source\n"));
-			usage(B_FALSE);
+		char origin[ZFS_MAXNAMELEN];
+		zprop_source_t src;
+
+		(void) zfs_prop_get(zhp, ZFS_PROP_ORIGIN,
+		    origin, sizeof (origin), &src, NULL, 0, B_FALSE);
+
+		if (strcmp(origin, fromname) == 0) {
+			fromname = NULL;
+			fromorigin = B_TRUE;
+		} else {
+			*cp = '\0';
+			if (cp != fromname && strcmp(argv[0], fromname)) {
+				(void) fprintf(stderr,
+				    gettext("incremental source must be "
+				    "in same filesystem\n"));
+				usage(B_FALSE);
+			}
+			fromname = cp + 1;
+			if (strchr(fromname, '@') || strchr(fromname, '/')) {
+				(void) fprintf(stderr,
+				    gettext("invalid incremental source\n"));
+				usage(B_FALSE);
+			}
 		}
 	}
 
-	err = zfs_send(zhp, fromname, STDOUT_FILENO);
+	if (replicate && fromname == NULL)
+		doall = B_TRUE;
+
+	err = zfs_send(zhp, fromname, toname, replicate, doall, fromorigin,
+	    verbose, STDOUT_FILENO);
 	zfs_close(zhp);
 
 	return (err != 0);
 }
 
 /*
- * zfs receive <fs@snap>
+ * zfs receive [-dnvF] <fs@snap>
  *
  * Restore a backup stream from stdin.
  */
@@ -2286,25 +2331,23 @@ static int
 zfs_do_receive(int argc, char **argv)
 {
 	int c, err;
-	boolean_t isprefix = B_FALSE;
-	boolean_t dryrun = B_FALSE;
-	boolean_t verbose = B_FALSE;
-	boolean_t force = B_FALSE;
+	recvflags_t flags;
 
+	bzero(&flags, sizeof (recvflags_t));
 	/* check options */
 	while ((c = getopt(argc, argv, ":dnvF")) != -1) {
 		switch (c) {
 		case 'd':
-			isprefix = B_TRUE;
+			flags.isprefix = B_TRUE;
 			break;
 		case 'n':
-			dryrun = B_TRUE;
+			flags.dryrun = B_TRUE;
 			break;
 		case 'v':
-			verbose = B_TRUE;
+			flags.verbose = B_TRUE;
 			break;
 		case 'F':
-			force = B_TRUE;
+			flags.force = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -2339,8 +2382,7 @@ zfs_do_receive(int argc, char **argv)
 		return (1);
 	}
 
-	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun, force,
-	    STDIN_FILENO);
+	err = zfs_receive(g_zfs, argv[0], flags, STDIN_FILENO, NULL);
 
 	return (err != 0);
 }
@@ -2939,9 +2981,8 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, char *protocol,
 
 			(void) fprintf(stderr, gettext("cannot %s '%s': "
 			    "legacy mountpoint\n"), cmdname, zfs_get_name(zhp));
-			(void) fprintf(stderr, gettext("use %s to "
-			    "%s this filesystem\n"), op == OP_SHARE ?
-			    "share(1M)" : "mount(1M)", cmdname);
+			(void) fprintf(stderr, gettext("use %s(1M) to "
+			    "%s this filesystem\n"), cmdname, cmdname);
 			return (1);
 		}
 
@@ -3093,8 +3134,10 @@ report_mount_progress(int current, int total)
 	if (current == 1) {
 		(void) printf(gettext("Mounting ZFS filesystems: "));
 		len = 0;
-	} else if (current != total && last_progress_time + MOUNT_TIME >= now)
-		return;		/* too soon to report again */
+	} else if (current != total && last_progress_time + MOUNT_TIME >= now) {
+		/* too soon to report again */
+		return;
+	}
 
 	last_progress_time = now;
 

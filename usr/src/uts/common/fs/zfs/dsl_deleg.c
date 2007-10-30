@@ -151,36 +151,69 @@ dsl_deleg_can_unallow(char *ddname, nvlist_t *nvp, cred_t *cr)
 	return (0);
 }
 
-typedef struct {
-	nvlist_t *p_nvp;
-	boolean_t p_unset;
-} perm_args_t;
-
 static void
 dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
-	perm_args_t *pa = arg2;
+	nvlist_t *nvp = arg2;
 	objset_t *mos = dd->dd_pool->dp_meta_objset;
 	nvpair_t *whopair = NULL;
 	uint64_t zapobj = dd->dd_phys->dd_deleg_zapobj;
 
 	if (zapobj == 0) {
-		if (pa->p_unset)
-			return;
 		dmu_buf_will_dirty(dd->dd_dbuf, tx);
 		zapobj = dd->dd_phys->dd_deleg_zapobj = zap_create(mos,
 		    DMU_OT_DSL_PERMS, DMU_OT_NONE, 0, tx);
 	}
 
-	while (whopair = nvlist_next_nvpair(pa->p_nvp, whopair)) {
+	while (whopair = nvlist_next_nvpair(nvp, whopair)) {
+		const char *whokey = nvpair_name(whopair);
+		nvlist_t *perms;
+		nvpair_t *permpair = NULL;
+		uint64_t jumpobj;
+
+		VERIFY(nvpair_value_nvlist(whopair, &perms) == 0);
+
+		if (zap_lookup(mos, zapobj, whokey, 8, 1, &jumpobj) != 0) {
+			jumpobj = zap_create(mos, DMU_OT_DSL_PERMS,
+			    DMU_OT_NONE, 0, tx);
+			VERIFY(zap_update(mos, zapobj,
+			    whokey, 8, 1, &jumpobj, tx) == 0);
+		}
+
+		while (permpair = nvlist_next_nvpair(perms, permpair)) {
+			const char *perm = nvpair_name(permpair);
+			uint64_t n = 0;
+
+			VERIFY(zap_update(mos, jumpobj,
+			    perm, 8, 1, &n, tx) == 0);
+			spa_history_internal_log(LOG_DS_PERM_UPDATE,
+			    dd->dd_pool->dp_spa, tx, cr,
+			    "%s %s dataset = %llu", whokey, perm,
+			    dd->dd_phys->dd_head_dataset_obj);
+		}
+	}
+}
+
+static void
+dsl_deleg_unset_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	dsl_dir_t *dd = arg1;
+	nvlist_t *nvp = arg2;
+	objset_t *mos = dd->dd_pool->dp_meta_objset;
+	nvpair_t *whopair = NULL;
+	uint64_t zapobj = dd->dd_phys->dd_deleg_zapobj;
+
+	if (zapobj == 0)
+		return;
+
+	while (whopair = nvlist_next_nvpair(nvp, whopair)) {
 		const char *whokey = nvpair_name(whopair);
 		nvlist_t *perms;
 		nvpair_t *permpair = NULL;
 		uint64_t jumpobj;
 
 		if (nvpair_value_nvlist(whopair, &perms) != 0) {
-			ASSERT(pa->p_unset);
 			if (zap_lookup(mos, zapobj, whokey, 8,
 			    1, &jumpobj) == 0) {
 				(void) zap_remove(mos, zapobj, whokey, tx);
@@ -193,37 +226,21 @@ dsl_deleg_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			continue;
 		}
 
-		if (zap_lookup(mos, zapobj, whokey, 8, 1, &jumpobj) != 0) {
-			/*
-			 * If object doesn't exist and we are removing
-			 * it, then just continue to next item in nvlist
-			 */
-			if (pa->p_unset)
-				continue;
-			jumpobj = zap_create(mos, DMU_OT_DSL_PERMS,
-			    DMU_OT_NONE, 0, tx);
-			VERIFY(zap_update(mos, zapobj,
-			    whokey, 8, 1, &jumpobj, tx) == 0);
-		}
+		if (zap_lookup(mos, zapobj, whokey, 8, 1, &jumpobj) != 0)
+			continue;
 
 		while (permpair = nvlist_next_nvpair(perms, permpair)) {
 			const char *perm = nvpair_name(permpair);
 			uint64_t n = 0;
 
-			if (pa->p_unset) {
-				(void) zap_remove(mos, jumpobj, perm, tx);
-				if (zap_count(mos, jumpobj, &n) == 0 && !n) {
-					(void) zap_remove(mos, zapobj,
-					    whokey, tx);
-					VERIFY(0 == zap_destroy(mos,
-					    jumpobj, tx));
-				}
-			} else {
-				VERIFY(zap_update(mos, jumpobj,
-				    perm, 8, 1, &n, tx) == 0);
+			(void) zap_remove(mos, jumpobj, perm, tx);
+			if (zap_count(mos, jumpobj, &n) == 0 && n == 0) {
+				(void) zap_remove(mos, zapobj,
+				    whokey, tx);
+				VERIFY(0 == zap_destroy(mos,
+				    jumpobj, tx));
 			}
-			spa_history_internal_log((pa->p_unset == B_FALSE) ?
-			    LOG_DS_PERM_UPDATE : LOG_DS_PERM_REMOVE,
+			spa_history_internal_log(LOG_DS_PERM_REMOVE,
 			    dd->dd_pool->dp_spa, tx, cr,
 			    "%s %s dataset = %llu", whokey, perm,
 			    dd->dd_phys->dd_head_dataset_obj);
@@ -236,7 +253,6 @@ dsl_deleg_set(const char *ddname, nvlist_t *nvp, boolean_t unset)
 {
 	dsl_dir_t *dd;
 	int error;
-	perm_args_t pa;
 	nvpair_t *whopair = NULL;
 	int blocks_modified = 0;
 
@@ -253,11 +269,9 @@ dsl_deleg_set(const char *ddname, nvlist_t *nvp, boolean_t unset)
 	while (whopair = nvlist_next_nvpair(nvp, whopair))
 		blocks_modified++;
 
-	pa.p_nvp = nvp;
-	pa.p_unset = unset;
-
-	error = dsl_sync_task_do(dd->dd_pool, NULL, dsl_deleg_set_sync,
-	    dd, &pa, blocks_modified);
+	error = dsl_sync_task_do(dd->dd_pool, NULL,
+	    unset ? dsl_deleg_unset_sync : dsl_deleg_set_sync,
+	    dd, nvp, blocks_modified);
 	dsl_dir_close(dd, FTAG);
 
 	return (error);

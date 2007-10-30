@@ -70,7 +70,7 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	    offsetof(dsl_dir_t, dd_dirty_link));
 	txg_list_create(&dp->dp_sync_tasks,
 	    offsetof(dsl_sync_task_group_t, dstg_node));
-	list_create(&dp->dp_synced_objsets, sizeof (dsl_dataset_t),
+	list_create(&dp->dp_synced_datasets, sizeof (dsl_dataset_t),
 	    offsetof(dsl_dataset_t, ds_synced_link));
 
 	return (dp);
@@ -129,7 +129,7 @@ dsl_pool_close(dsl_pool_t *dp)
 
 	txg_list_destroy(&dp->dp_dirty_datasets);
 	txg_list_destroy(&dp->dp_dirty_dirs);
-	list_destroy(&dp->dp_synced_objsets);
+	list_destroy(&dp->dp_synced_datasets);
 
 	arc_flush();
 	txg_fini(dp);
@@ -181,7 +181,7 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
 		if (!list_link_active(&ds->ds_synced_link))
-			list_insert_tail(&dp->dp_synced_objsets, ds);
+			list_insert_tail(&dp->dp_synced_datasets, ds);
 		else
 			dmu_buf_rele(ds->ds_dbuf, ds);
 		dsl_dataset_sync(ds, zio, tx);
@@ -212,8 +212,8 @@ dsl_pool_zil_clean(dsl_pool_t *dp)
 {
 	dsl_dataset_t *ds;
 
-	while (ds = list_head(&dp->dp_synced_objsets)) {
-		list_remove(&dp->dp_synced_objsets, ds);
+	while (ds = list_head(&dp->dp_synced_datasets)) {
+		list_remove(&dp->dp_synced_datasets, ds);
 		ASSERT(ds->ds_user_ptr != NULL);
 		zil_clean(((objset_impl_t *)ds->ds_user_ptr)->os_zil);
 		dmu_buf_rele(ds->ds_dbuf, ds);

@@ -68,7 +68,7 @@ uu_avl_pool_t *avl_pool;
  * Called for each dataset.  If the object the object is of an appropriate type,
  * add it to the avl tree and recurse over any children as necessary.
  */
-int
+static int
 zfs_callback(zfs_handle_t *zhp, void *data)
 {
 	callback_data_t *cb = data;
@@ -100,10 +100,13 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 	/*
 	 * Recurse if necessary.
 	 */
-	if (cb->cb_recurse && (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM ||
-	    (zfs_get_type(zhp) == ZFS_TYPE_VOLUME && (cb->cb_types &
-	    ZFS_TYPE_SNAPSHOT))))
-		(void) zfs_iter_children(zhp, zfs_callback, data);
+	if (cb->cb_recurse) {
+		if (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM)
+			(void) zfs_iter_filesystems(zhp, zfs_callback, data);
+		if (zfs_get_type(zhp) != ZFS_TYPE_SNAPSHOT &&
+		    (cb->cb_types & ZFS_TYPE_SNAPSHOT))
+			(void) zfs_iter_snapshots(zhp, zfs_callback, data);
+	}
 
 	if (!dontclose)
 		zfs_close(zhp);

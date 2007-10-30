@@ -236,7 +236,7 @@ typedef struct znode {
 /*
  * ZFS_ENTER() is called on entry to each ZFS vnode and vfs operation.
  * ZFS_EXIT() must be called before exitting the vop.
- * ZFS_ENTER_VERIFY_ZP() does ZFS_ENTER plus verifies the znode is valid.
+ * ZFS_VERIFY_ZP() verifies the znode is valid.
  */
 #define	ZFS_ENTER(zfsvfs) \
 	{ \
@@ -249,14 +249,11 @@ typedef struct znode {
 
 #define	ZFS_EXIT(zfsvfs) rrw_exit(&(zfsvfs)->z_teardown_lock, FTAG)
 
-#define	ZFS_ENTER_VERIFY_ZP(zfsvfs, zp) \
-	{ \
-		ZFS_ENTER((zfsvfs)); \
-		if (!(zp)->z_dbuf_held) { \
-			ZFS_EXIT(zfsvfs); \
-			return (EIO); \
-		} \
-	}
+#define	ZFS_VERIFY_ZP(zp) \
+	if (!(zp)->z_dbuf_held) { \
+		ZFS_EXIT((zp)->z_zfsvfs); \
+		return (EIO); \
+	} \
 
 /*
  * Macros for dealing with dmu_buf_hold

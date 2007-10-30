@@ -31,7 +31,7 @@ VERS= .1
 OBJS_SHARED= zfs_namecheck.o zprop_common.o zfs_prop.o zpool_prop.o zfs_deleg.o
 OBJS_COMMON= libzfs_dataset.o libzfs_util.o libzfs_graph.o libzfs_mount.o \
 	libzfs_pool.o libzfs_changelist.o libzfs_config.o libzfs_import.o \
-	libzfs_status.o
+	libzfs_status.o libzfs_sendrecv.o
 OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 
 include ../../Makefile.lib

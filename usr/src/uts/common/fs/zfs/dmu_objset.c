@@ -261,6 +261,45 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	return (0);
 }
 
+static int
+dmu_objset_open_ds_os(dsl_dataset_t *ds, objset_t *os, dmu_objset_type_t type)
+{
+	objset_impl_t *osi;
+	int err;
+
+	mutex_enter(&ds->ds_opening_lock);
+	osi = dsl_dataset_get_user_ptr(ds);
+	if (osi == NULL) {
+		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
+		    ds, &ds->ds_phys->ds_bp, &osi);
+		if (err)
+			return (err);
+	}
+	mutex_exit(&ds->ds_opening_lock);
+
+	os->os = osi;
+	os->os_mode = DS_MODE_NONE;
+
+	if (type != DMU_OST_ANY && type != os->os->os_phys->os_type)
+		return (EINVAL);
+	return (0);
+}
+
+int
+dmu_objset_open_ds(dsl_dataset_t *ds, dmu_objset_type_t type, objset_t **osp)
+{
+	objset_t *os;
+	int err;
+
+	os = kmem_alloc(sizeof (objset_t), KM_SLEEP);
+	err = dmu_objset_open_ds_os(ds, os, type);
+	if (err)
+		kmem_free(os, sizeof (objset_t));
+	else
+		*osp = os;
+	return (err);
+}
+
 /* called from zpl */
 int
 dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
@@ -268,8 +307,9 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 {
 	objset_t *os;
 	dsl_dataset_t *ds;
-	objset_impl_t *osi;
 	int err;
+
+	ASSERT(mode != DS_MODE_NONE);
 
 	os = kmem_alloc(sizeof (objset_t), KM_SLEEP);
 	err = dsl_dataset_open(name, mode, os, &ds);
@@ -278,34 +318,22 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 		return (err);
 	}
 
-	mutex_enter(&ds->ds_opening_lock);
-	osi = dsl_dataset_get_user_ptr(ds);
-	if (osi == NULL) {
-		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
-		    ds, &ds->ds_phys->ds_bp, &osi);
-		if (err) {
-			dsl_dataset_close(ds, mode, os);
-			kmem_free(os, sizeof (objset_t));
-			return (err);
-		}
-	}
-	mutex_exit(&ds->ds_opening_lock);
-
-	os->os = osi;
+	err = dmu_objset_open_ds_os(ds, os, type);
 	os->os_mode = mode;
-
-	if (type != DMU_OST_ANY && type != os->os->os_phys->os_type) {
-		dmu_objset_close(os);
-		return (EINVAL);
+	if (err) {
+		kmem_free(os, sizeof (objset_t));
+		dsl_dataset_close(ds, mode, os);
+	} else {
+		*osp = os;
 	}
-	*osp = os;
-	return (0);
+	return (err);
 }
 
 void
 dmu_objset_close(objset_t *os)
 {
-	dsl_dataset_close(os->os->os_dsl_dataset, os->os_mode, os);
+	if (os->os_mode != DS_MODE_NONE)
+		dsl_dataset_close(os->os->os_dsl_dataset, os->os_mode, os);
 	kmem_free(os, sizeof (objset_t));
 }
 
@@ -499,7 +527,7 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 
 	dsobj = dsl_dataset_create_sync(dd, oa->lastname,
-	    oa->clone_parent, tx);
+	    oa->clone_parent, cr, tx);
 
 	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds));
@@ -514,11 +542,6 @@ dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		if (oa->userfunc)
 			oa->userfunc(&osi->os, oa->userarg, cr, tx);
 	}
-
-	/*
-	 * Create create time permission if any?
-	 */
-	dsl_deleg_set_create_perms(ds->ds_dir, tx, cr);
 
 	spa_history_internal_log(LOG_DS_CREATE, dd->dd_pool->dp_spa,
 	    tx, cr, "dataset = %llu", dsobj);
@@ -580,13 +603,21 @@ dmu_objset_destroy(const char *name)
 	 * It would be nicer to do this in dsl_dataset_destroy_sync(),
 	 * but the replay log objset is modified in open context.
 	 */
-	error = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_EXCLUSIVE, &os);
+	error = dmu_objset_open(name, DMU_OST_ANY,
+	    DS_MODE_EXCLUSIVE|DS_MODE_READONLY, &os);
 	if (error == 0) {
+		dsl_dataset_t *ds = os->os->os_dsl_dataset;
 		zil_destroy(dmu_objset_zil(os), B_FALSE);
-		dmu_objset_close(os);
+
+		/*
+		 * dsl_dataset_destroy() closes the ds.
+		 * os is just used as the tag after it's freed.
+		 */
+		kmem_free(os, sizeof (objset_t));
+		error = dsl_dataset_destroy(ds, os);
 	}
 
-	return (dsl_dataset_destroy(name));
+	return (error);
 }
 
 int
@@ -594,16 +625,23 @@ dmu_objset_rollback(const char *name)
 {
 	int err;
 	objset_t *os;
+	dsl_dataset_t *ds;
 
 	err = dmu_objset_open(name, DMU_OST_ANY,
 	    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT, &os);
 	if (err)
 		return (err);
 
-	/* XXX uncache everything? */
-	err = dsl_dataset_rollback(os->os->os_dsl_dataset);
+	ds = os->os->os_dsl_dataset;
+	err = dsl_dataset_rollback(ds, os->os->os_phys->os_type);
 
-	dmu_objset_close(os);
+	/*
+	 * NB: we close the objset manually because the rollback
+	 * actually implicitly called dmu_objset_evict(), thus freeing
+	 * the objset_impl_t.
+	 */
+	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, os);
+	kmem_free(os, sizeof (objset_t));
 	return (err);
 }
 
@@ -612,6 +650,12 @@ struct snaparg {
 	char *snapname;
 	char failed[MAXPATHLEN];
 	boolean_t checkperms;
+	list_t objsets;
+};
+
+struct osnode {
+	list_node_t node;
+	objset_t *os;
 };
 
 static int
@@ -653,8 +697,13 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	 */
 	err = zil_suspend(dmu_objset_zil(os));
 	if (err == 0) {
+		struct osnode *osn;
 		dsl_sync_task_create(sn->dstg, dsl_dataset_snapshot_check,
-		    dsl_dataset_snapshot_sync, os, sn->snapname, 3);
+		    dsl_dataset_snapshot_sync, os->os->os_dsl_dataset,
+		    sn->snapname, 3);
+		osn = kmem_alloc(sizeof (struct osnode), KM_SLEEP);
+		osn->os = os;
+		list_insert_tail(&sn->objsets, osn);
 	} else {
 		dmu_objset_close(os);
 	}
@@ -666,6 +715,7 @@ int
 dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 {
 	dsl_sync_task_t *dst;
+	struct osnode *osn;
 	struct snaparg sn = { 0 };
 	spa_t *spa;
 	int err;
@@ -678,6 +728,8 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 
 	sn.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
 	sn.snapname = snapname;
+	list_create(&sn.objsets, sizeof (struct osnode),
+	    offsetof(struct osnode, node));
 
 	if (recursive) {
 		sn.checkperms = B_TRUE;
@@ -695,12 +747,18 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 
 	for (dst = list_head(&sn.dstg->dstg_tasks); dst;
 	    dst = list_next(&sn.dstg->dstg_tasks, dst)) {
-		objset_t *os = dst->dst_arg1;
+		dsl_dataset_t *ds = dst->dst_arg1;
 		if (dst->dst_err)
-			dmu_objset_name(os, sn.failed);
-		zil_resume(dmu_objset_zil(os));
-		dmu_objset_close(os);
+			dsl_dataset_name(ds, sn.failed);
 	}
+
+	while (osn = list_head(&sn.objsets)) {
+		list_remove(&sn.objsets, osn);
+		zil_resume(dmu_objset_zil(osn->os));
+		dmu_objset_close(osn->os);
+		kmem_free(osn, sizeof (struct osnode));
+	}
+	list_destroy(&sn.objsets);
 out:
 	if (err)
 		(void) strcpy(fsname, sn.failed);
