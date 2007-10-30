@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <sys/vgen_stats.h>
+
 #define	VGEN_SUCCESS		(0)	/* successful return */
 #define	VGEN_FAILURE		(-1)	/* unsuccessful return */
 
@@ -156,81 +158,6 @@ typedef struct vgen_ver {
 			ver_minor:16;
 } vgen_ver_t;
 
-typedef struct vgen_stats {
-
-	/* Link Input/Output stats */
-	uint64_t	ipackets;	/* # rx packets */
-	uint64_t	ierrors;	/* # rx error */
-	uint64_t	opackets;	/* # tx packets */
-	uint64_t	oerrors;	/* # tx error */
-
-	/* MIB II variables */
-	uint64_t	rbytes;		/* # bytes received */
-	uint64_t	obytes;		/* # bytes transmitted */
-	uint32_t	multircv;	/* # multicast packets received */
-	uint32_t	multixmt;	/* # multicast packets for xmit */
-	uint32_t	brdcstrcv;	/* # broadcast packets received */
-	uint32_t	brdcstxmt;	/* # broadcast packets for xmit */
-	uint32_t	norcvbuf;	/* # rcv packets discarded */
-	uint32_t	noxmtbuf;	/* # xmit packets discarded */
-
-	/* Tx Statistics */
-	uint32_t	tx_no_desc;	/* # out of transmit descriptors */
-
-	/* Rx Statistics */
-	uint32_t	rx_allocb_fail;	/* # rx buf allocb() failures */
-	uint32_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
-	uint32_t	rx_lost_pkts;	/* # rx lost packets */
-
-	/* Callback statistics */
-	uint32_t	callbacks;		/* # callbacks */
-	uint32_t	dring_data_acks;	/* # dring data acks recvd  */
-	uint32_t	dring_stopped_acks;	/* # dring stopped acks recvd */
-	uint32_t	dring_data_msgs;	/* # dring data msgs sent */
-
-} vgen_stats_t;
-
-typedef struct vgen_kstats {
-	/*
-	 * Link Input/Output stats
-	 */
-	kstat_named_t	ipackets;
-	kstat_named_t	ipackets64;
-	kstat_named_t	ierrors;
-	kstat_named_t	opackets;
-	kstat_named_t	opackets64;
-	kstat_named_t	oerrors;
-
-	/*
-	 * required by kstat for MIB II objects(RFC 1213)
-	 */
-	kstat_named_t	rbytes; 	/* MIB - ifInOctets */
-	kstat_named_t	rbytes64;
-	kstat_named_t	obytes; 	/* MIB - ifOutOctets */
-	kstat_named_t	obytes64;
-	kstat_named_t	multircv; 	/* MIB - ifInNUcastPkts */
-	kstat_named_t	multixmt; 	/* MIB - ifOutNUcastPkts */
-	kstat_named_t	brdcstrcv;	/* MIB - ifInNUcastPkts */
-	kstat_named_t	brdcstxmt;	/* MIB - ifOutNUcastPkts */
-	kstat_named_t	norcvbuf; 	/* MIB - ifInDiscards */
-	kstat_named_t	noxmtbuf; 	/* MIB - ifOutDiscards */
-
-	/* Tx Statistics */
-	kstat_named_t	tx_no_desc;	/* # out of transmit descriptors */
-
-	/* Rx Statistics */
-	kstat_named_t	rx_allocb_fail;	/* # rx buf allocb failures */
-	kstat_named_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
-	kstat_named_t	rx_lost_pkts;	/* # rx lost packets */
-
-	/* Callback statistics */
-	kstat_named_t	callbacks;		/* # callbacks */
-	kstat_named_t	dring_data_acks;	/* # dring data acks recvd  */
-	kstat_named_t	dring_stopped_acks;	/* # dring stopped acks recvd */
-	kstat_named_t	dring_data_msgs;	/* # dring data msgs sent */
-
-} vgen_kstats_t;
-
 /* Channel information associated with a vgen-port */
 typedef struct vgen_ldc {
 
@@ -309,7 +236,7 @@ typedef struct vgen_ldc {
 	kmutex_t		soft_lock;	/* lock for soft intr handler */
 
 	/* channel statistics */
-	vgen_stats_t		*statsp;	/* channel statistics */
+	vgen_stats_t		stats;		/* channel statistics */
 	kstat_t			*ksp;		/* channel kstats */
 
 } vgen_ldc_t;

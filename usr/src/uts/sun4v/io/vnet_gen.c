@@ -138,9 +138,6 @@ static int vgen_num_txpending(vgen_ldc_t *ldcp);
 static int vgen_tx_dring_full(vgen_ldc_t *ldcp);
 static int vgen_ldc_txtimeout(vgen_ldc_t *ldcp);
 static void vgen_ldc_watchdog(void *arg);
-static int vgen_setup_kstats(vgen_ldc_t *ldcp);
-static void vgen_destroy_kstats(vgen_ldc_t *ldcp);
-static int vgen_kstat_update(kstat_t *ksp, int rw);
 
 /* vgen handshake functions */
 static vgen_ldc_t *vh_nextphase(vgen_ldc_t *ldcp);
@@ -393,7 +390,7 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 
 	instance = ddi_get_instance(vnetdip);
 
-	DBG1(NULL, NULL, "vnet(%d):%s: enter\n", instance);
+	DBG1(NULL, NULL, "vnet(%d): enter\n", instance);
 
 	vgenp = kmem_zalloc(sizeof (vgen_t), KM_SLEEP);
 
@@ -435,7 +432,7 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	/* register macp of this vgen_t with vnet */
 	*vgenmacp = vgenp->macp;
 
-	DBG1(NULL, NULL, "vnet(%d):%s: exit\n", instance);
+	DBG1(NULL, NULL, "vnet(%d): exit\n", instance);
 	return (DDI_SUCCESS);
 }
 
@@ -611,7 +608,7 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	ldc_status_t	istatus;
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 
-	statsp = ldcp->statsp;
+	statsp = &ldcp->stats;
 	size = msgsize(mp);
 
 	DBG1(vgenp, ldcp, "enter\n");
@@ -1556,6 +1553,8 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	ldc_attr_t 	attr;
 	int 		status;
 	ldc_status_t	istatus;
+	char		kname[MAXNAMELEN];
+	int		instance;
 	enum	{AST_init = 0x0, AST_ldc_alloc = 0x1,
 		AST_mutex_init = 0x2, AST_ldc_init = 0x4,
 		AST_ldc_reg_cb = 0x8, AST_alloc_tx_ring = 0x10,
@@ -1657,8 +1656,10 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	attach_state |= AST_create_rxmblks;
 
 	/* Setup kstats for the channel */
-	status = vgen_setup_kstats(ldcp);
-	if (status != VGEN_SUCCESS) {
+	instance = ddi_get_instance(vgenp->vnetdip);
+	(void) sprintf(kname, "vnetldc0x%lx", ldcp->ldc_id);
+	ldcp->ksp = vgen_setup_kstats("vnet", instance, kname, &ldcp->stats);
+	if (ldcp->ksp == NULL) {
 		goto ldc_attach_failed;
 	}
 
@@ -1764,7 +1765,9 @@ vgen_ldc_detach(vgen_ldc_t *ldcp)
 			ldcp->rcv_mhead = NULL;
 		}
 
-		vgen_destroy_kstats(ldcp);
+		vgen_destroy_kstats(ldcp->ksp);
+		ldcp->ksp = NULL;
+
 		/*
 		 * if we cannot reclaim all mblks, put this
 		 * on the list of pools(vgenp->rmp) to be reclaimed when the
@@ -2294,7 +2297,7 @@ vgen_ldc_stat(vgen_ldc_t *ldcp, uint_t stat)
 	uint64_t val;
 
 	val = 0;
-	statsp = ldcp->statsp;
+	statsp = &ldcp->stats;
 	switch (stat) {
 
 	case MAC_STAT_MULTIRCV:
@@ -2509,7 +2512,7 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 
 	ldcp = (vgen_ldc_t *)arg;
 	vgenp = LDC_TO_VGEN(ldcp);
-	statsp = ldcp->statsp;
+	statsp = &ldcp->stats;
 
 	DBG1(vgenp, ldcp, "enter\n");
 
@@ -3005,6 +3008,7 @@ vgen_send_dring_data(vgen_ldc_t *ldcp, uint32_t start, int32_t end)
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 	vio_dring_msg_t	dringmsg, *msgp = &dringmsg;
 	vio_msg_tag_t	*tagp = &msgp->tag;
+	vgen_stats_t	*statsp = &ldcp->stats;
 	int		rv;
 
 	bzero(msgp, sizeof (*msgp));
@@ -3026,7 +3030,7 @@ vgen_send_dring_data(vgen_ldc_t *ldcp, uint32_t start, int32_t end)
 	}
 
 	ldcp->next_txseq++;
-	ldcp->statsp->dring_data_msgs++;
+	statsp->dring_data_msgs++;
 
 	DBG2(vgenp, ldcp, "DRING_DATA_SENT \n");
 
@@ -4161,7 +4165,7 @@ vgen_handle_dring_data_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	vio_dring_msg_t *dringmsg = (vio_dring_msg_t *)tagp;
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 #ifdef VGEN_HANDLE_LOST_PKTS
-	vgen_stats_t *statsp = ldcp->statsp;
+	vgen_stats_t *statsp = &ldcp->stats;
 	uint32_t rxi;
 	int n;
 #endif
@@ -4346,7 +4350,7 @@ vgen_process_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 	DBG1(vgenp, ldcp, "enter\n");
 
-	statsp = ldcp->statsp;
+	statsp = &ldcp->stats;
 	start = dringmsg->start_idx;
 
 	/*
@@ -4643,7 +4647,7 @@ vgen_handle_dring_data_ack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	DBG1(vgenp, ldcp, "enter\n");
 	start = dringmsg->start_idx;
 	end = dringmsg->end_idx;
-	statsp = ldcp->statsp;
+	statsp = &ldcp->stats;
 
 	/*
 	 * received an ack corresponding to a specific descriptor for
@@ -4767,7 +4771,7 @@ vgen_handle_dring_data_nack(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 	vio_dring_msg_t *dringmsg = (vio_dring_msg_t *)tagp;
 #ifdef VGEN_REXMIT
-	vgen_stats_t *statsp = ldcp->statsp;
+	vgen_stats_t *statsp = &ldcp->stats;
 #endif
 
 	DBG1(vgenp, ldcp, "enter\n");
@@ -4982,184 +4986,6 @@ vgen_ldc_watchdog(void *arg)
 
 	ldcp->wd_tid = timeout(vgen_ldc_watchdog, (caddr_t)ldcp,
 	    drv_usectohz(vnet_ldcwd_interval * 1000));
-}
-
-static int
-vgen_setup_kstats(vgen_ldc_t *ldcp)
-{
-	vgen_t *vgenp;
-	struct kstat *ksp;
-	vgen_stats_t *statsp;
-	vgen_kstats_t *ldckp;
-	int instance;
-	size_t size;
-	char name[MAXNAMELEN];
-
-	vgenp = LDC_TO_VGEN(ldcp);
-	instance = ddi_get_instance(vgenp->vnetdip);
-	(void) sprintf(name, "vnetldc0x%lx", ldcp->ldc_id);
-	statsp = kmem_zalloc(sizeof (vgen_stats_t), KM_SLEEP);
-	if (statsp == NULL) {
-		return (VGEN_FAILURE);
-	}
-	size = sizeof (vgen_kstats_t) / sizeof (kstat_named_t);
-	ksp = kstat_create("vnet", instance, name, "net", KSTAT_TYPE_NAMED,
-	    size, 0);
-	if (ksp == NULL) {
-		KMEM_FREE(statsp);
-		return (VGEN_FAILURE);
-	}
-
-	ldckp = (vgen_kstats_t *)ksp->ks_data;
-	kstat_named_init(&ldckp->ipackets,		"ipackets",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->ipackets64,		"ipackets64",
-	    KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ldckp->ierrors,		"ierrors",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->opackets,		"opackets",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->opackets64,		"opackets64",
-	    KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ldckp->oerrors,		"oerrors",
-	    KSTAT_DATA_ULONG);
-
-
-	/* MIB II kstat variables */
-	kstat_named_init(&ldckp->rbytes,		"rbytes",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->rbytes64,		"rbytes64",
-	    KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ldckp->obytes,		"obytes",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->obytes64,		"obytes64",
-	    KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&ldckp->multircv,		"multircv",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->multixmt,		"multixmt",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->brdcstrcv,		"brdcstrcv",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->brdcstxmt,		"brdcstxmt",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->norcvbuf,		"norcvbuf",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->noxmtbuf,		"noxmtbuf",
-	    KSTAT_DATA_ULONG);
-
-	/* Tx stats */
-	kstat_named_init(&ldckp->tx_no_desc,		"tx_no_desc",
-	    KSTAT_DATA_ULONG);
-
-	/* Rx stats */
-	kstat_named_init(&ldckp->rx_allocb_fail,	"rx_allocb_fail",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->rx_vio_allocb_fail,	"rx_vio_allocb_fail",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->rx_lost_pkts,		"rx_lost_pkts",
-	    KSTAT_DATA_ULONG);
-
-	/* Interrupt stats */
-	kstat_named_init(&ldckp->callbacks,		"callbacks",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_data_acks,	"dring_data_acks",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_stopped_acks,	"dring_stopped_acks",
-	    KSTAT_DATA_ULONG);
-	kstat_named_init(&ldckp->dring_data_msgs,	"dring_data_msgs",
-	    KSTAT_DATA_ULONG);
-
-	ksp->ks_update = vgen_kstat_update;
-	ksp->ks_private = (void *)ldcp;
-	kstat_install(ksp);
-
-	ldcp->ksp = ksp;
-	ldcp->statsp = statsp;
-	return (VGEN_SUCCESS);
-}
-
-static void
-vgen_destroy_kstats(vgen_ldc_t *ldcp)
-{
-	if (ldcp->ksp)
-		kstat_delete(ldcp->ksp);
-	KMEM_FREE(ldcp->statsp);
-}
-
-static int
-vgen_kstat_update(kstat_t *ksp, int rw)
-{
-	vgen_ldc_t *ldcp;
-	vgen_stats_t *statsp;
-	vgen_kstats_t *ldckp;
-
-	ldcp = (vgen_ldc_t *)ksp->ks_private;
-	statsp = ldcp->statsp;
-	ldckp = (vgen_kstats_t *)ksp->ks_data;
-
-	if (rw == KSTAT_READ) {
-		ldckp->ipackets.value.ul	= (uint32_t)statsp->ipackets;
-		ldckp->ipackets64.value.ull	= statsp->ipackets;
-		ldckp->ierrors.value.ul		= statsp->ierrors;
-		ldckp->opackets.value.ul	= (uint32_t)statsp->opackets;
-		ldckp->opackets64.value.ull	= statsp->opackets;
-		ldckp->oerrors.value.ul		= statsp->oerrors;
-
-		/*
-		 * MIB II kstat variables
-		 */
-		ldckp->rbytes.value.ul		= (uint32_t)statsp->rbytes;
-		ldckp->rbytes64.value.ull	= statsp->rbytes;
-		ldckp->obytes.value.ul		= (uint32_t)statsp->obytes;
-		ldckp->obytes64.value.ull	= statsp->obytes;
-		ldckp->multircv.value.ul	= statsp->multircv;
-		ldckp->multixmt.value.ul	= statsp->multixmt;
-		ldckp->brdcstrcv.value.ul	= statsp->brdcstrcv;
-		ldckp->brdcstxmt.value.ul	= statsp->brdcstxmt;
-		ldckp->norcvbuf.value.ul	= statsp->norcvbuf;
-		ldckp->noxmtbuf.value.ul	= statsp->noxmtbuf;
-
-		ldckp->tx_no_desc.value.ul	= statsp->tx_no_desc;
-
-		ldckp->rx_allocb_fail.value.ul	= statsp->rx_allocb_fail;
-		ldckp->rx_vio_allocb_fail.value.ul = statsp->rx_vio_allocb_fail;
-		ldckp->rx_lost_pkts.value.ul	= statsp->rx_lost_pkts;
-
-		ldckp->callbacks.value.ul	= statsp->callbacks;
-		ldckp->dring_data_acks.value.ul	= statsp->dring_data_acks;
-		ldckp->dring_stopped_acks.value.ul = statsp->dring_stopped_acks;
-		ldckp->dring_data_msgs.value.ul	= statsp->dring_data_msgs;
-	} else {
-		statsp->ipackets	= ldckp->ipackets64.value.ull;
-		statsp->ierrors		= ldckp->ierrors.value.ul;
-		statsp->opackets	= ldckp->opackets64.value.ull;
-		statsp->oerrors		= ldckp->oerrors.value.ul;
-
-		/*
-		 * MIB II kstat variables
-		 */
-		statsp->rbytes		= ldckp->rbytes64.value.ull;
-		statsp->obytes		= ldckp->obytes64.value.ull;
-		statsp->multircv	= ldckp->multircv.value.ul;
-		statsp->multixmt	= ldckp->multixmt.value.ul;
-		statsp->brdcstrcv	= ldckp->brdcstrcv.value.ul;
-		statsp->brdcstxmt	= ldckp->brdcstxmt.value.ul;
-		statsp->norcvbuf	= ldckp->norcvbuf.value.ul;
-		statsp->noxmtbuf	= ldckp->noxmtbuf.value.ul;
-
-		statsp->tx_no_desc	= ldckp->tx_no_desc.value.ul;
-
-		statsp->rx_allocb_fail	= ldckp->rx_allocb_fail.value.ul;
-		statsp->rx_vio_allocb_fail = ldckp->rx_vio_allocb_fail.value.ul;
-		statsp->rx_lost_pkts	= ldckp->rx_lost_pkts.value.ul;
-
-		statsp->callbacks	= ldckp->callbacks.value.ul;
-		statsp->dring_data_acks	= ldckp->dring_data_acks.value.ul;
-		statsp->dring_stopped_acks = ldckp->dring_stopped_acks.value.ul;
-		statsp->dring_data_msgs	= ldckp->dring_data_msgs.value.ul;
-	}
-
-	return (VGEN_SUCCESS);
 }
 
 /* handler for error messages received from the peer ldc end-point */
