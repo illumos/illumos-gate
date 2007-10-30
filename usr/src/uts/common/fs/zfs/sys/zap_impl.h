@@ -182,7 +182,7 @@ typedef struct zap_name {
 
 boolean_t zap_match(zap_name_t *zn, const char *matchname);
 int zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
-    krw_t lti, int fatreader, zap_t **zapp);
+    krw_t lti, boolean_t fatreader, boolean_t adding, zap_t **zapp);
 void zap_unlockdir(zap_t *zap);
 void zap_evict(dmu_buf_t *db, void *vmzap);
 zap_name_t *zap_name_alloc(zap_t *zap, const char *name, matchtype_t mt);

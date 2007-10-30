@@ -602,7 +602,8 @@ zap_expand_leaf(zap_t *zap, zap_leaf_t *l, uint64_t hash, dmu_tx_t *tx,
 
 		zap_put_leaf(l);
 		zap_unlockdir(zap);
-		err = zap_lockdir(os, object, tx, RW_WRITER, FALSE, &zap);
+		err = zap_lockdir(os, object, tx, RW_WRITER,
+		    FALSE, FALSE, &zap);
 		if (err)
 			return (err);
 		ASSERT(!zap->zap_ismicro);
@@ -685,7 +686,7 @@ zap_put_leaf_maybe_grow_ptrtbl(zap_t *zap, zap_leaf_t *l, dmu_tx_t *tx)
 
 			zap_unlockdir(zap);
 			err = zap_lockdir(os, zapobj, tx,
-			    RW_WRITER, FALSE, &zap);
+			    RW_WRITER, FALSE, FALSE, &zap);
 			if (err)
 				return;
 		}
