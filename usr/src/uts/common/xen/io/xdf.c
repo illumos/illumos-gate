@@ -617,7 +617,9 @@ xdf_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	ulong_t parbit;
 	diskaddr_t p_blkct = 0;
 	boolean_t firstopen;
+	boolean_t nodelay;
 
+	nodelay = (flag & (FNDELAY | FNONBLOCK));
 	minor = getminor(*devp);
 	if ((vdp = ddi_get_soft_state(vbd_ss, XDF_INST(minor))) == NULL)
 		return (ENXIO);
@@ -626,7 +628,7 @@ xdf_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 
 	/* do cv_wait until connected or failed */
 	mutex_enter(&vdp->xdf_dev_lk);
-	if (xdf_connect(vdp, B_TRUE) != XD_READY) {
+	if (!nodelay && (xdf_connect(vdp, B_TRUE) != XD_READY)) {
 		mutex_exit(&vdp->xdf_dev_lk);
 		return (ENXIO);
 	}
@@ -669,7 +671,7 @@ xdf_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	 * check size
 	 * ignore CD/DVD which contains a zero-sized s0
 	 */
-	if (!(flag & (FNDELAY | FNONBLOCK)) && !XD_IS_CD(vdp) &&
+	if (!nodelay && !XD_IS_CD(vdp) &&
 	    ((cmlb_partinfo(vdp->xdf_vd_lbl, part, &p_blkct,
 	    NULL, NULL, NULL, NULL) != 0) || (p_blkct == 0))) {
 		(void) xdf_close(*devp, flag, otyp, credp);
@@ -1252,9 +1254,9 @@ xdf_iostart(xdf_t *vdp)
 	 * loop until there is no buf to transfer or no free slot
 	 * available in I/O ring
 	 */
-	for (;;) {
-		mutex_enter(&vdp->xdf_dev_lk);
+	mutex_enter(&vdp->xdf_dev_lk);
 
+	for (;;) {
 		if (vdp->xdf_status != XD_READY)
 			break;
 
@@ -1283,8 +1285,6 @@ xdf_iostart(xdf_t *vdp)
 			vdp->xdf_f_act = bp->av_forw;
 			bp->av_forw = NULL;
 		}
-
-		mutex_exit(&vdp->xdf_dev_lk);
 	}
 
 	/*
@@ -2174,6 +2174,9 @@ vreq_free(xdf_t *vdp, v_req_t *vreq)
 
 	list_remove(&vdp->xdf_vreq_act, (void *)vreq);
 
+	if (vreq->v_flush_diskcache == FLUSH_DISKCACHE)
+		goto done;
+
 	switch (vreq->v_status) {
 	case VREQ_DMAWIN_DONE:
 	case VREQ_GS_ALLOCED:
@@ -2199,6 +2202,7 @@ vreq_free(xdf_t *vdp, v_req_t *vreq)
 	default:
 		break;
 	}
+done:
 	vreq->v_buf->av_back = NULL;
 	kmem_cache_free(xdf_vreq_cache, vreq);
 }
@@ -2238,6 +2242,7 @@ vreq_setup(xdf_t *vdp, v_req_t *vreq)
 			vreq->v_nslots = 1;
 			vreq->v_gs = gs;
 			vreq->v_flush_diskcache = FLUSH_DISKCACHE;
+			vreq->v_status = VREQ_GS_ALLOCED;
 			gs->vreq = vreq;
 			return (DDI_SUCCESS);
 		}
