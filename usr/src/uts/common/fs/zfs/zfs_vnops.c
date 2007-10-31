@@ -2352,14 +2352,20 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	if (zfsvfs->z_use_fuids == B_FALSE &&
 	    (((mask & AT_UID) && IS_EPHEMERAL(vap->va_uid)) ||
 	    ((mask & AT_GID) && IS_EPHEMERAL(vap->va_gid)) ||
-	    (mask & AT_XVATTR)))
+	    (mask & AT_XVATTR))) {
+		ZFS_EXIT(zfsvfs);
 		return (EINVAL);
+	}
 
-	if (mask & AT_SIZE && vp->v_type == VDIR)
+	if (mask & AT_SIZE && vp->v_type == VDIR) {
+		ZFS_EXIT(zfsvfs);
 		return (EISDIR);
+	}
 
-	if (mask & AT_SIZE && vp->v_type != VREG && vp->v_type != VFIFO)
+	if (mask & AT_SIZE && vp->v_type != VREG && vp->v_type != VFIFO) {
+		ZFS_EXIT(zfsvfs);
 		return (EINVAL);
+	}
 
 	/*
 	 * If this is an xvattr_t, then get a pointer to the structure of
@@ -2372,11 +2378,15 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 */
 	if ((pzp->zp_flags & ZFS_IMMUTABLE) &&
 	    ((mask & (AT_SIZE|AT_UID|AT_GID|AT_MTIME|AT_MODE)) ||
-	    ((mask & AT_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME))))
+	    ((mask & AT_XVATTR) && XVA_ISSET_REQ(xvap, XAT_CREATETIME)))) {
+		ZFS_EXIT(zfsvfs);
 		return (EPERM);
+	}
 
-	if ((mask & AT_SIZE) && (pzp->zp_flags & ZFS_READONLY))
+	if ((mask & AT_SIZE) && (pzp->zp_flags & ZFS_READONLY)) {
+		ZFS_EXIT(zfsvfs);
 		return (EPERM);
+	}
 
 top:
 	attrzp = NULL;
