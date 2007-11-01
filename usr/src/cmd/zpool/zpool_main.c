@@ -3301,7 +3301,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 6   bootfs pool property\n"));
 		(void) printf(gettext(" 7   Separate intent log devices\n"));
 		(void) printf(gettext(" 8   Delegated administration\n"));
-		(void) printf(gettext(" 9  refquota and refreservation "
+		(void) printf(gettext(" 9   refquota and refreservation "
 		    "properties\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
