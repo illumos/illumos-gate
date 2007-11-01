@@ -4876,8 +4876,14 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		irb_t *irb = dst_ire->ire_bucket;
 
 		rw_enter(&irb->irb_lock, RW_WRITER);
-		dst_ire->ire_marks &= ~IRE_MARK_TEMPORARY;
-		irb->irb_tmp_ire_cnt--;
+		/*
+		 * We need to recheck for IRE_MARK_TEMPORARY after acquiring
+		 * the lock to guarantee irb_tmp_ire_cnt.
+		 */
+		if (dst_ire->ire_marks & IRE_MARK_TEMPORARY) {
+			dst_ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+			irb->irb_tmp_ire_cnt--;
+		}
 		rw_exit(&irb->irb_lock);
 	}
 

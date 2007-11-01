@@ -308,6 +308,7 @@ static ire_t	ire_null;
  */
 uint32_t ip_ire_max_bucket_cnt = 10;	/* Setable in /etc/system */
 uint32_t ip6_ire_max_bucket_cnt = 10;
+uint32_t ip_ire_cleanup_cnt = 2;
 
 /*
  * The minimum of the temporary IRE bucket count.  We do not want
@@ -357,7 +358,8 @@ static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
     zoneid_t zoneid, ip_stack_t *);
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
     pfv_t func, void *arg, uchar_t vers, ill_t *ill);
-static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt);
+static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold,
+    ire_t *ref_ire);
 static	void	ip_nce_clookup_and_delete(nce_t *nce, void *arg);
 #ifdef DEBUG
 static void	ire_trace_cleanup(const ire_t *);
@@ -1245,15 +1247,17 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
  * This can cause lock up because ire_cache_lookup()
  * may take "forever" to finish.
  *
- * We just remove cnt IREs each time.  This means that
- * the bucket length will stay approximately constant,
+ * We only remove a maximum of cnt IREs each time.  This
+ * should keep the bucket length approximately constant,
  * depending on cnt.  This should be enough to defend
  * against DoS attack based on creating temporary IREs
  * (for forwarding and non-TCP traffic).
  *
- * Note that new IRE is normally added at the tail of the
+ * We also pass in the address of the newly created IRE
+ * as we do not want to remove this straight after adding
+ * it. New IREs are normally added at the tail of the
  * bucket.  This means that we are removing the "oldest"
- * temporary IRE added.  Only if there are IREs with
+ * temporary IREs added.  Only if there are IREs with
  * the same ire_addr, do we not add it at the tail.  Refer
  * to ire_add_v*().  It should be OK for our purpose.
  *
@@ -1285,54 +1289,52 @@ ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
 uint32_t ire_idle_cutoff_interval = 60000;
 
 static void
-ire_cache_cleanup(irb_t *irb, uint32_t threshold, int cnt)
+ire_cache_cleanup(irb_t *irb, uint32_t threshold, ire_t *ref_ire)
 {
 	ire_t *ire;
-	int tmp_cnt = cnt;
 	clock_t cut_off = drv_usectohz(ire_idle_cutoff_interval * 1000);
+	int cnt = ip_ire_cleanup_cnt;
 
 	/*
-	 * irb is NULL if the IRE is not added to the hash.  This
-	 * happens when IRE_MARK_NOADD is set in ire_add_then_send().
+	 * Try to remove cnt temporary IREs first.
 	 */
-	if (irb == NULL)
-		return;
-
-	IRB_REFHOLD(irb);
-	if (irb->irb_tmp_ire_cnt > threshold) {
-		for (ire = irb->irb_ire; ire != NULL && tmp_cnt > 0;
-		    ire = ire->ire_next) {
-			if (ire->ire_marks & IRE_MARK_CONDEMNED)
-				continue;
-			if (ire->ire_marks & IRE_MARK_TEMPORARY) {
-				ASSERT(ire->ire_type == IRE_CACHE);
-				ire_delete(ire);
-				tmp_cnt--;
-			}
+	for (ire = irb->irb_ire; cnt > 0 && ire != NULL; ire = ire->ire_next) {
+		if (ire == ref_ire)
+			continue;
+		if (ire->ire_marks & IRE_MARK_CONDEMNED)
+			continue;
+		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+			ASSERT(ire->ire_type == IRE_CACHE);
+			ire_delete(ire);
+			cnt--;
 		}
 	}
-	if (irb->irb_ire_cnt - irb->irb_tmp_ire_cnt > threshold) {
-		for (ire = irb->irb_ire; ire != NULL && cnt > 0;
+	if (cnt == 0)
+		return;
+
+	/*
+	 * If we didn't satisfy our removal target from temporary IREs
+	 * we see how many non-temporary IREs are currently in the bucket.
+	 * If this quantity is above the threshold then we see if there are any
+	 * candidates for removal. We are still limited to removing a maximum
+	 * of cnt IREs.
+	 */
+	if ((irb->irb_ire_cnt - irb->irb_tmp_ire_cnt) > threshold) {
+		for (ire = irb->irb_ire; cnt > 0 && ire != NULL;
 		    ire = ire->ire_next) {
+			if (ire == ref_ire)
+				continue;
+			if (ire->ire_type != IRE_CACHE)
+				continue;
 			if (ire->ire_marks & IRE_MARK_CONDEMNED)
 				continue;
-			if (ire->ire_ipversion == IPV4_VERSION) {
-				if (ire->ire_gateway_addr == 0)
-					continue;
-			} else {
-				if (IN6_IS_ADDR_UNSPECIFIED(
-				    &ire->ire_gateway_addr_v6))
-					continue;
-			}
-			if ((ire->ire_type == IRE_CACHE) &&
-			    (lbolt - ire->ire_last_used_time > cut_off) &&
-			    (ire->ire_refcnt == 1)) {
+			if ((ire->ire_refcnt == 1) &&
+			    (lbolt - ire->ire_last_used_time > cut_off)) {
 				ire_delete(ire);
 				cnt--;
 			}
 		}
 	}
-	IRB_REFRELE(irb);
 }
 
 /*
@@ -1364,6 +1366,7 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 	ipha_t *ipha;
 	ip6_t *ip6h;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	int		ire_limit;
 
 	if (mp != NULL) {
 		/*
@@ -1489,17 +1492,24 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 	 * the ire so we cannot reference it after that.
 	 */
 	irb = ire->ire_bucket;
-	if (ire->ire_ipversion == IPV6_VERSION) {
-		ire_send_v6(q, mp, ire);
-		/*
-		 * Clean up more than 1 IRE so that the clean up does not
-		 * need to be done every time when a new IRE is added and
-		 * the threshold is reached.
-		 */
-		ire_cache_cleanup(irb, ip6_ire_max_bucket_cnt, 2);
-	} else {
+	if (ire->ire_ipversion == IPV4_VERSION) {
 		ire_send(q, mp, ire);
-		ire_cache_cleanup(irb, ip_ire_max_bucket_cnt, 2);
+		ire_limit = ip_ire_max_bucket_cnt;
+	} else {
+		ire_send_v6(q, mp, ire);
+		ire_limit = ip6_ire_max_bucket_cnt;
+	}
+
+	/*
+	 * irb is NULL if the IRE was not added to the hash. This happens
+	 * when IRE_MARK_NOADD is set and when IREs are returned from
+	 * ire_update_srcif_v4().
+	 */
+	if (irb != NULL) {
+		IRB_REFHOLD(irb);
+		if (irb->irb_ire_cnt > ire_limit)
+			ire_cache_cleanup(irb, ire_limit, ire);
+		IRB_REFRELE(irb);
 	}
 }
 
@@ -3556,17 +3566,20 @@ ire_delete(ire_t *ire)
 		return;
 	}
 
+	if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
+		irb->irb_ire_cnt--;
+		ire->ire_marks |= IRE_MARK_CONDEMNED;
+		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+			irb->irb_tmp_ire_cnt--;
+			ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+		}
+	}
+
 	if (irb->irb_refcnt != 0) {
 		/*
 		 * The last thread to leave this bucket will
 		 * delete this ire.
 		 */
-		if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-			irb->irb_ire_cnt--;
-			if (ire->ire_marks & IRE_MARK_TEMPORARY)
-				irb->irb_tmp_ire_cnt--;
-			ire->ire_marks |= IRE_MARK_CONDEMNED;
-		}
 		irb->irb_marks |= IRB_MARK_CONDEMNED;
 		rw_exit(&irb->irb_lock);
 		return;
@@ -3598,7 +3611,6 @@ ire_delete(ire_t *ire)
 	 * ip_wput/ip_wput_v6 checks this flag to see whether
 	 * it should still use the cached ire or not.
 	 */
-	ire->ire_marks |= IRE_MARK_CONDEMNED;
 	if (ire->ire_type == IRE_DEFAULT) {
 		/*
 		 * IRE is out of the list. We need to adjust the
@@ -3609,10 +3621,6 @@ ire_delete(ire_t *ire)
 			ipst->ips_ipv6_ire_default_count--;
 		}
 	}
-	irb->irb_ire_cnt--;
-
-	if (ire->ire_marks & IRE_MARK_TEMPORARY)
-		irb->irb_tmp_ire_cnt--;
 	rw_exit(&irb->irb_lock);
 
 	if (ire->ire_ipversion == IPV6_VERSION) {

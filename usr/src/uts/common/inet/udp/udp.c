@@ -6101,13 +6101,33 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		IRE_REFHOLD_NOTR(ire);
 
 		mutex_enter(&connp->conn_lock);
-		if (CONN_CACHE_IRE(connp) && connp->conn_ire_cache == NULL) {
-			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-				connp->conn_ire_cache = ire;
-				cached = B_TRUE;
+		if (CONN_CACHE_IRE(connp) && connp->conn_ire_cache == NULL &&
+		    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
+			irb_t		*irb = ire->ire_bucket;
+
+			/*
+			 * IRE's created for non-connection oriented transports
+			 * are normally initialized with IRE_MARK_TEMPORARY set
+			 * in the ire_marks. These IRE's are preferentially
+			 * reaped when the hash chain length in the cache
+			 * bucket exceeds the maximum value specified in
+			 * ip[6]_ire_max_bucket_cnt. This can severely affect
+			 * UDP performance if IRE cache entries that we need
+			 * to reuse are continually removed. To remedy this,
+			 * when we cache the IRE in the conn_t, we remove the
+			 * IRE_MARK_TEMPORARY bit from the ire_marks if it was
+			 * set.
+			 */
+			if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+				rw_enter(&irb->irb_lock, RW_WRITER);
+				if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+					ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+					irb->irb_tmp_ire_cnt--;
+				}
+				rw_exit(&irb->irb_lock);
 			}
-			rw_exit(&ire->ire_bucket->irb_lock);
+			connp->conn_ire_cache = ire;
+			cached = B_TRUE;
 		}
 		mutex_exit(&connp->conn_lock);
 

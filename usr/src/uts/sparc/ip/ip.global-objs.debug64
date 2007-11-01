@@ -105,6 +105,7 @@ ip_debug
 ip_g_all_ones
 ip_input_proc
 ip_ioctl_ftbl
+ip_ire_cleanup_cnt
 ip_ire_cpu_ratio
 ip_ire_max_bucket_cnt
 ip_ire_mem_ratio

@@ -878,8 +878,15 @@ ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
 		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
 			irb_t *irb = ire->ire_bucket;
 			rw_enter(&irb->irb_lock, RW_WRITER);
-			ire->ire_marks &= ~IRE_MARK_TEMPORARY;
-			irb->irb_tmp_ire_cnt--;
+			/*
+			 * We need to recheck for IRE_MARK_TEMPORARY after
+			 * acquiring the lock in order to guarantee
+			 * irb_tmp_ire_cnt
+			 */
+			if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+				ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+				irb->irb_tmp_ire_cnt--;
+			}
 			rw_exit(&irb->irb_lock);
 		}
 
