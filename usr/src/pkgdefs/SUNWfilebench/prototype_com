@@ -39,7 +39,7 @@ d none usr/benchmarks 755 root bin
 d none usr/benchmarks/filebench 755 root bin
 d none usr/benchmarks/filebench/bin 755 root bin
 f none usr/benchmarks/filebench/bin/filebench 555 root bin
-l none usr/benchmarks/filebench/bin/go_filebench=../../../../../usr/lib/isaexec
+l none usr/benchmarks/filebench/bin/go_filebench=../../../../usr/lib/isaexec
 d none usr/benchmarks/filebench/config 755 root bin
 f none usr/benchmarks/filebench/config/fileio.prof 444 root bin
 f none usr/benchmarks/filebench/config/filemacro.prof 444 root bin
