@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,27 +23,29 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mail.h"
+#include <sys/param.h>
 /*
-	 Send mail - High level sending routine
+ * Send mail - High level sending routine
  */
-void sendmail(argc, argv)
+void
+sendmail(argc, argv)
 char **argv;
 {
 	char		**args;
 	char		*tp, *zp;
-	char		buf[2048],last1c;
+	char		buf[2048], last1c;
 	FILE		*input;
-	struct stat 	sbuf;
+	struct stat64 	sbuf;
 	int		aret;
 	int		i, n;
-	int		oldn = 1;	
+	int		oldn = 1;
 	int		ttyf = 0;
 	int		pushrest = 0;
 	int		hdrtyp = 0;
@@ -59,49 +60,52 @@ char **argv;
 	Dout(pn, 0, "entered\n");
 	new_reciplist(&list);
 	for (i = 1; i < argc; ++i) {
-	        if (argv[i][0] == '-') {
-		        if (argv[i][1] == '\0') {
-				errmsg(E_SYNTAX,"Hyphens MAY NOT be followed by spaces");
+		if (argv[i][0] == '-') {
+			if (argv[i][1] == '\0') {
+				errmsg(E_SYNTAX,
+				    "Hyphens MAY NOT be followed by spaces");
 			}
-		        if (i > 1) {
-				errmsg(E_SYNTAX,"Options MUST PRECEDE persons");
+			if (i > 1) {
+				errmsg(E_SYNTAX,
+				    "Options MUST PRECEDE persons");
 			}
-		        done(0);
-	        }
-		/*
-			Ensure no NULL names in list
-		*/
-	        if (argv[i][0] == '\0' || argv[i][strlen(argv[i])-1] == '!') {
-			errmsg(E_SYNTAX,"Null names are not allowed");
-	  	       	done(0);
+			done(0);
 		}
-		add_recip(&list, argv[i], FALSE); /* Don't check for duplication */
+		/*
+		 *	Ensure no NULL names in list
+		 */
+		if (argv[i][0] == '\0' || argv[i][strlen(argv[i])-1] == '!') {
+			errmsg(E_SYNTAX, "Null names are not allowed");
+			done(0);
+		}
+		/* Don't check for duplication */
+		add_recip(&list, argv[i], FALSE);
 	}
 
 	mktmp();
 	/*
-		Format time
-	*/
+	 *	Format time
+	 */
 	time(&iop);
 	bp = localtime(&iop);
 	tp = asctime(bp);
 	zp = tzname[bp->tm_isdst];
 	sprintf(datestring, "%.16s %.3s %.5s", tp, zp, tp+20);
-	trimnl (datestring);
+	trimnl(datestring);
 	/* asctime: Fri Sep 30 00:00:00 1986\n */
-	/*          0123456789012345678901234  */
+	/* 	0123456789012345678901234  */
 	/* RFCtime: Fri, 28 Jul 89 10:30 EDT   */
 	sprintf(RFC822datestring, "%.3s, %.2s %.3s %.4s %.5s %.3s",
 		tp, tp+8, tp+4, tp+20, tp+11, zp);
 
 	/*
-		Write out the from line header for the letter
-	*/
+	 * Write out the from line header for the letter
+	 */
 	if (fromflag && deliverflag && from_user[0] != '\0') {
-		(void) snprintf(buf, sizeof (buf), "%s%s %s\n", 
+		(void) snprintf(buf, sizeof (buf), "%s%s %s\n",
 			header[H_FROM].tag, from_user, datestring);
 	} else {
-		(void) snprintf(buf, sizeof (buf), "%s%s %s\n", 
+		(void) snprintf(buf, sizeof (buf), "%s%s %s\n",
 			header[H_FROM].tag, my_name, datestring);
 	}
 	if (!wtmpf(buf, strlen(buf))) {
@@ -110,13 +114,14 @@ char **argv;
 	savehdrs(buf, H_FROM);
 
 	/*
-		Copy to list in mail entry?
-	*/
+	 * Copy to list in mail entry?
+	 */
 	if (flgt == 1 && argc > 1) {
 		aret = argc;
 		args = argv;
 		while (--aret > 0) {
-			(void) snprintf(buf, sizeof (buf), "%s %s\n", header[H_TO].tag, *++args);
+			(void) snprintf(buf, sizeof (buf),
+			    "%s %s\n", header[H_TO].tag, *++args);
 			if (!wtmpf(buf, strlen(buf))) {
 				done(0);
 			}
@@ -126,12 +131,12 @@ char **argv;
 
 	flgf = 1;	/* reset when first read of message body succeeds */
 	/*
-		Read mail message, allowing for lines of infinite 
-		length. This is tricky, have to watch for newlines.
-	*/
+	 * Read mail message, allowing for lines of infinite
+	 * length. This is tricky, have to watch for newlines.
+	 */
 	saveint = setsig(SIGINT, savdead);
 	last1c = ' ';	/* anything other than newline */
-	ttyf = isatty (fileno(stdin));
+	ttyf = isatty(fileno(stdin));
 	pushrest = 0;
 
 	/*
@@ -140,17 +145,25 @@ char **argv;
 	(void) strlcpy(fromU, my_name, sizeof (fromU));
 	fromS[0] = 0;	/* set up for >From scan */
 	input = stdin;
-	if (fstat(fileno(input), &sbuf) < 0) {
-		if (errno == EOVERFLOW) {
-			perror("stdin");
+	/*
+	 * Fifofs cannot handle if the inode number crosses
+	 * 32-bit limit. This results in overflow, if the
+	 * input steam is a pipe. Using 64-bit interface to
+	 * take care of that.
+	 */
+	if (fstat64(fileno(input), &sbuf) == 0) {
+		/* Also care if we could not handle large mail. */
+		if ((sbuf.st_size > MAXOFF_T) || (sbuf.st_blocks > LONG_MAX)) {
+			fprintf(stderr, "%s: stdin: %s\n", program,
+			    strerror(EOVERFLOW));
 			exit(1);
 		}
 	}
 
-	while ((n = getline (line, sizeof line, stdin)) > 0) {
+	while ((n = getline(line, sizeof (line), stdin)) > 0) {
 		last1c = line[n-1];
 		if (pushrest) {
-			if (!wtmpf(line,n)) {
+			if (!wtmpf(line, n)) {
 				done(0);
 			}
 			pushrest = (last1c != '\n');
@@ -158,7 +171,7 @@ char **argv;
 		}
 		pushrest = (last1c != '\n');
 
-		if ((hdrtyp = isheader (line, &ctf)) == FALSE) {
+		if ((hdrtyp = isheader(line, &ctf)) == FALSE) {
 			break;
 		}
 		flgf = 0;
@@ -179,7 +192,7 @@ char **argv;
 			if (substr(line, "forwarded by") > -1) {
 				break;
 			}
-			pickFrom (line);
+			pickFrom(line);
 			if (Rpath[0] != '\0') {
 				strcat(Rpath, "!");
 			}
@@ -194,7 +207,8 @@ char **argv;
 			break;
 		case H_TCOPY:
 			/* Write out placeholder for later */
-			(void) snprintf(buf, sizeof (buf), "%s \n", header[H_TCOPY].tag);
+			(void) snprintf(buf, sizeof (buf), "%s \n",
+			    header[H_TCOPY].tag);
 			if (!wtmpf(buf, strlen(buf))) {
 				done(0);
 			}
@@ -214,7 +228,7 @@ char **argv;
 			break;
 		}
 		oldn = n;	/* remember if this line was suppressed */
-		if (n && !wtmpf(line,n)) {
+		if (n && !wtmpf(line, n)) {
 			done(0);
 		}
 		if (!n) savehdrs(line, hdrtyp);
@@ -226,14 +240,15 @@ char **argv;
 
 	/* push out message type if so requested */
 	if (flgm) {	/* message-type */
-		snprintf(buf, sizeof(buf), "%s%s\n", header[H_MTYPE].tag, msgtype);
+		snprintf(buf, sizeof (buf), "%s%s\n",
+		    header[H_MTYPE].tag, msgtype);
 		if (!wtmpf(buf, strlen(buf))) {
 			done(0);
 		}
 	}
 
-	memcpy (buf, line, n);
-	if (n == 0 || (ttyf && !strncmp (buf, ".\n", 2)) ) {
+	memcpy(buf, line, n);
+	if (n == 0 || (ttyf && !strncmp(buf, ".\n", 2))) {
 		if (flgf) {
 			/* no input */
 			return;
@@ -245,21 +260,24 @@ char **argv;
 			 */
 			if ((hptr = hdrlines[H_MIMEVERS].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_MIMEVERS].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_MIMEVERS].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
 			}
 			if ((hptr = hdrlines[H_CTYPE].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_CTYPE].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_CTYPE].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
 			}
 			if ((hptr = hdrlines[H_CLEN].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_CLEN].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_CLEN].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
@@ -269,8 +287,8 @@ char **argv;
 	}
 
 	if (n == 1 && last1c == '\n') {	/* blank line -- suppress */
-		n = getline (buf, sizeof buf, stdin);
-		if (n == 0 || (ttyf && !strncmp (buf, ".\n", 2)) ) {
+		n = getline(buf, sizeof (buf), stdin);
+		if (n == 0 || (ttyf && !strncmp(buf, ".\n", 2))) {
 			/*
 			 * no content: put mime-version, content-type
 			 * and -length only if explicitly present.
@@ -278,21 +296,24 @@ char **argv;
 			 */
 			if ((hptr = hdrlines[H_MIMEVERS].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_MIMEVERS].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_MIMEVERS].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
 			}
 			if ((hptr = hdrlines[H_CTYPE].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_CTYPE].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_CTYPE].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
 			}
 			if ((hptr = hdrlines[H_CLEN].head) !=
 						    (struct hdrs *)NULL) {
-				(void) snprintf(line, sizeof (line), "%s \n", header[H_CLEN].tag);
+				(void) snprintf(line, sizeof (line), "%s \n",
+				    header[H_CLEN].tag);
 				if (!wtmpf(line, strlen(line))) {
 					done(0);
 				}
@@ -303,11 +324,12 @@ char **argv;
 
 	if (debug > 0) {
 		buf[n] = '\0';
-		Dout(pn, 0, "header scan complete, readahead %d = \"%s\"\n", n, buf);
+		Dout(pn, 0, "header scan complete, readahead %d = \"%s\"\n",
+		    n, buf);
 	}
 
-	/* 
-	 * Write out H_MIMEVERS, H_CTYPE & H_CLEN lines. These are used only as 
+	/*
+	 * Write out H_MIMEVERS, H_CTYPE & H_CLEN lines. These are used only as
 	 * placeholders in the tmp file. When the 'real' message is sent,
 	 * the proper values will be put out by copylet().
 	 */
@@ -323,14 +345,14 @@ char **argv;
 		done(0);
 	}
 	if (hdrlines[H_CTYPE].head == (struct hdrs *)NULL) {
-		savehdrs(line,H_CTYPE);
+		savehdrs(line, H_CTYPE);
 	}
 	(void) snprintf(line, sizeof (line), "%s \n", header[H_CLEN].tag);
 	if (!wtmpf(line, strlen(line))) {
 		done(0);
 	}
 	if (hdrlines[H_CLEN].head == (struct hdrs *)NULL) {
-		savehdrs(line,H_CLEN);
+		savehdrs(line, H_CLEN);
 	}
 	/* and a blank line */
 	if (!wtmpf("\n", 1)) {
@@ -345,17 +367,17 @@ char **argv;
 	 *	(SVR3.1 or SVR3.0) rmail? If so, we won't return THIS on failure
 	 *	[This line should occur as the FIRST non-blank non-header line]
 	 */
-	if (!strncmp("***** UNDELIVERABLE MAIL sent to",buf,32)) {
-	     dflag = 9; /* 9 says do not return on failure */
-	     Dout(pn, 0, "found old-style UNDELIVERABLE line. dflag = 9\n");
+	if (!strncmp("***** UNDELIVERABLE MAIL sent to", buf, 32)) {
+		dflag = 9; /* 9 says do not return on failure */
+		Dout(pn, 0, "found old-style UNDELIVERABLE line. dflag = 9\n");
 	}
 
 	/* scan body of message */
 	while (n > 0) {
-		if (ttyf && !strcmp (buf, ".\n"))
+		if (ttyf && !strcmp(buf, ".\n"))
 			break;
 		if (!binflg) {
-			binflg = !istext ((unsigned char *)buf, n);
+			binflg = !istext((unsigned char *)buf, n);
 		}
 
 		if (!wtmpf(buf, n)) {
@@ -363,8 +385,8 @@ char **argv;
 		}
 		count += n;
 		n = ttyf
-			? getline (buf, sizeof buf, stdin)
-			: fread (buf, 1, sizeof buf, stdin);
+			? getline(buf, sizeof (buf), stdin)
+			: fread(buf, 1, sizeof (buf), stdin);
 	}
 	setsig(SIGINT, saveint);
 
@@ -409,7 +431,7 @@ wrapsend:
 		done(0);
 	}
 
-	tmpf = doopen(lettmp,"r+",E_TMP);
+	tmpf = doopen(lettmp, "r+", E_TMP);
 
 	/* Do not send mail on SIGINT */
 	if (dflag == 2) {
