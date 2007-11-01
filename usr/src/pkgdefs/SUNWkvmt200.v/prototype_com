@@ -159,10 +159,6 @@ s none usr/platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
 #
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1
 
-# add glendale links to individual components
-#
-s none usr/platform/SUNW,Sun-Blade-T6320/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1
-
 # add Montoya links to individual components
 #
 d none usr/platform/SUNW,Netra-CP3060/sbin 0755 root bin

@@ -28,7 +28,7 @@
 
 UTSBASE   = ../../../../uts
 
-PLATFORM_OBJECTS= ontario.o erie.o pelton.o stpaul.o huron.o glendale.o
+PLATFORM_OBJECTS= ontario.o erie.o pelton.o stpaul.o huron.o
 
 include ../Makefile.com
 
@@ -36,7 +36,6 @@ include ../Makefile.com
 # links in /usr/platform
 #
 LINKED_PLATFORMS	= SUNW,Sun-Blade-T6300 
-LINKED_PLATFORMS	+= SUNW,Sun-Blade-T6320
 
 LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)

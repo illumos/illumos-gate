@@ -56,7 +56,6 @@
 #include "pelton.h"
 #include "stpaul.h"
 #include "huron.h"
-#include "glendale_common.h"
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -360,12 +359,6 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 			    "niu", huron_pci_callback);
 			(void) picl_walk_tree_by_class(plafh, "pciex",
 			    "pciex", huron_pci_callback);
-	} else if ((strncmp(platbuf, GLENDALE_PLATFORM,
-	    strlen(GLENDALE_PLATFORM))) == 0) {
-		(void) picl_walk_tree_by_class(plafh, "sun4v",
-		    "niu", glendale_pci_callback);
-		(void) picl_walk_tree_by_class(plafh, "pciex",
-		    "pciex", glendale_pci_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_pci_callback);
@@ -588,20 +581,6 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 		    "network", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
 		    huron_hw_rev_callback);
-	} else if ((strncmp(platbuf, GLENDALE_PLATFORM,
-	    strlen(GLENDALE_PLATFORM))) == 0) {
-		(void) picl_walk_tree_by_class(plafh, "pciex",
-		    "pciex", glendale_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "sun4v",
-		    "niu", glendale_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "pci",
-		    "pci", glendale_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "sun4v",
-		    "pci", glendale_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "network",
-		    "network", glendale_hw_rev_callback);
-		(void) picl_walk_tree_by_class(plafh, "scsi-2",
-		    "scsi-2", glendale_hw_rev_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_hw_rev_callback);
