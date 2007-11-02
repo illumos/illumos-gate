@@ -107,14 +107,6 @@ if [ "$interface_names" != "/etc/hostname.*[0-9]" ]; then
 	IFS="$ORIGIFS"
 	while [ $# -ge 2 ]; do
 		shift
-		if [ "$1" = "xx0" ]; then
-			#
-			# For some unknown historical reason the xx0
-			# ifname is ignored.
-			#
-			shift
-			continue
-		fi
 		if [ $# -gt 1 -a "$2" != "/etc/hostname" ]; then
 			while [ $# -gt 1 -a "$1" != "/etc/hostname" ]; do
 				shift

@@ -1007,6 +1007,7 @@ aggr_grp_delete(uint32_t key)
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port, *cport;
 	mod_hash_val_t val;
+	int err;
 
 	rw_enter(&aggr_grp_lock, RW_WRITER);
 
@@ -1026,12 +1027,12 @@ aggr_grp_delete(uint32_t key)
 	 * fail if a client hasn't closed the MAC port, we gracefully
 	 * fail the operation.
 	 */
-	if (mac_unregister(grp->lg_mh)) {
+	if ((err = mac_disable(grp->lg_mh)) != 0) {
 		grp->lg_closing = B_FALSE;
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
 		rw_exit(&aggr_grp_lock);
-		return (EBUSY);
+		return (err);
 	}
 
 	/* detach and free MAC ports associated with group */
@@ -1046,6 +1047,8 @@ aggr_grp_delete(uint32_t key)
 		aggr_port_delete(port);
 		port = cport;
 	}
+
+	VERIFY(mac_unregister(grp->lg_mh) == 0);
 
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
