@@ -12,7 +12,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: milter.c,v 8.267 2007/02/27 22:21:12 ca Exp $")
+SM_RCSID("@(#)$Id: milter.c,v 8.269 2007/06/06 17:26:12 ca Exp $")
 
 #if MILTER
 # include <sm/sendmail.h>
@@ -53,7 +53,8 @@ static void	milter_quit_filter __P((struct milter *, ENVELOPE *));
 static void	milter_abort_filter __P((struct milter *, ENVELOPE *));
 static void	milter_send_macros __P((struct milter *, char **, int,
 			ENVELOPE *));
-static int	milter_negotiate __P((struct milter *, ENVELOPE *));
+static int	milter_negotiate __P((struct milter *, ENVELOPE *,
+			milters_T *));
 static void	milter_per_connection_check __P((ENVELOPE *));
 static char	*milter_headers __P((struct milter *, ENVELOPE *, char *));
 static void	milter_addheader __P((struct milter *, char *, ssize_t,
@@ -1793,41 +1794,6 @@ milter_reset_df(e)
 }
 
 /*
-**  MILTER_CAN_DELRCPTS -- can any milter filters delete recipients?
-**
-**	Parameters:
-**		none
-**
-**	Returns:
-**		true if any filter deletes recipients, false otherwise
-*/
-
-bool
-milter_can_delrcpts()
-{
-	bool can = false;
-	int i;
-
-	if (tTd(64, 10))
-		sm_dprintf("milter_can_delrcpts:");
-
-	for (i = 0; InputFilters[i] != NULL; i++)
-	{
-		struct milter *m = InputFilters[i];
-
-		if (bitset(SMFIF_DELRCPT, m->mf_fflags))
-		{
-			can = true;
-			break;
-		}
-	}
-	if (tTd(64, 10))
-		sm_dprintf("%s\n", can ? "true" : "false");
-
-	return can;
-}
-
-/*
 **  MILTER_QUIT_FILTER -- close down a single filter
 **
 **	Parameters:
@@ -2408,15 +2374,17 @@ milter_getsymlist(m, buf, rlen, offset)
 **	Parameters:
 **		m -- milter filter structure.
 **		e -- current envelope.
+**		milters -- milters structure.
 **
 **	Returns:
 **		0 on success, -1 otherwise
 */
 
 static int
-milter_negotiate(m, e)
+milter_negotiate(m, e, milters)
 	struct milter *m;
 	ENVELOPE *e;
+	milters_T *milters;
 {
 	char rcmd;
 	mi_int32 fvers, fflags, pflags;
@@ -2584,6 +2552,12 @@ milter_negotiate(m, e)
 	{
 		milter_getsymlist(m, response, rlen, MILTER_OPTLEN);
 	}
+
+	if (bitset(SMFIF_DELRCPT, m->mf_fflags))
+		milters->mis_flags |= MIS_FL_DEL_RCPT;
+	if (!bitset(SMFIP_NORCPT, m->mf_pflags) &&
+	    !bitset(SMFIP_NR_RCPT, m->mf_pflags))
+		milters->mis_flags |= MIS_FL_REJ_RCPT;
 
 	if (tTd(64, 5))
 		sm_dprintf("milter_negotiate(%s): received: version %u, fflags 0x%x, pflags 0x%x\n",
@@ -3786,6 +3760,7 @@ milter_replbody(response, rlen, newfilter, e)
 **	Parameters:
 **		e -- current envelope.
 **		state -- return state from response.
+**		milters -- milters structure.
 **
 **	Returns:
 **		true iff at least one filter is active
@@ -3793,15 +3768,17 @@ milter_replbody(response, rlen, newfilter, e)
 
 /* ARGSUSED */
 bool
-milter_init(e, state)
+milter_init(e, state, milters)
 	ENVELOPE *e;
 	char *state;
+	milters_T *milters;
 {
 	int i;
 
 	if (tTd(64, 10))
 		sm_dprintf("milter_init\n");
 
+	memset(milters, '\0', sizeof(*milters));
 	*state = SMFIR_CONTINUE;
 	if (InputFilters[0] == NULL)
 	{
@@ -3823,7 +3800,7 @@ milter_init(e, state)
 		}
 
 		if (m->mf_sock < 0 ||
-		    milter_negotiate(m, e) < 0 ||
+		    milter_negotiate(m, e, milters) < 0 ||
 		    m->mf_state == SMFS_ERROR)
 		{
 			if (tTd(64, 5))

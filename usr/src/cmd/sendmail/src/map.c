@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2007 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1992, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1992, 1993
@@ -12,7 +12,7 @@
  */
 
 /*
- * Copyright 1996-2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1996-2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -20,7 +20,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: map.c,v 8.696 2007/04/03 21:33:14 ca Exp $")
+SM_RCSID("@(#)$Id: map.c,v 8.699 2007/10/10 00:06:45 ca Exp $")
 SM_IDSTR(i2, "%W% (Sun) %G%")
 
 #if LDAPMAP
@@ -3575,10 +3575,17 @@ ldapmap_lookup(map, name, av, statp)
 	if (VendorCode == VENDOR_SUN &&
 	    strcmp(map->map_mname, "aliases.ldap") == 0)
 	{
-		char answer[MAXNAME + 1];
 		int rc;
+#if defined(GETLDAPALIASBYNAME_VERSION) && (GETLDAPALIASBYNAME_VERSION >= 2)
+		extern char *__getldapaliasbyname();
+		char *answer;
+
+		answer = __getldapaliasbyname(name, &rc);
+#else
+		char answer[MAXNAME + 1];
 
 		rc = __getldapaliasbyname(name, answer, sizeof(answer));
+#endif
 		if (rc != 0)
 		{
 			if (tTd(38, 20))
@@ -3595,6 +3602,9 @@ ldapmap_lookup(map, name, av, statp)
 			result = map_rewrite(map, name, strlen(name), NULL);
 		else
 			result = map_rewrite(map, answer, strlen(answer), av);
+#if defined(GETLDAPALIASBYNAME_VERSION) && (GETLDAPALIASBYNAME_VERSION >= 2)
+		free(answer);
+#endif
 		return result;
 	}
 #endif /* defined(SUN_EXTENSIONS) && defined(SUN_SIMPLIFIED_LDAP) && ... */
@@ -3973,6 +3983,26 @@ ldapmap_parseargs(map, args)
 			break;
 		switch (*++p)
 		{
+		  case 'A':
+			map->map_mflags |= MF_APPEND;
+			break;
+
+		  case 'a':
+			map->map_app = ++p;
+			break;
+
+		  case 'D':
+			map->map_mflags |= MF_DEFER;
+			break;
+
+		  case 'f':
+			map->map_mflags |= MF_NOFOLDCASE;
+			break;
+
+		  case 'm':
+			map->map_mflags |= MF_MATCHONLY;
+			break;
+
 		  case 'N':
 			map->map_mflags |= MF_INCLNULL;
 			map->map_mflags &= ~MF_TRY0NULL;
@@ -3986,24 +4016,12 @@ ldapmap_parseargs(map, args)
 			map->map_mflags |= MF_OPTIONAL;
 			break;
 
-		  case 'f':
-			map->map_mflags |= MF_NOFOLDCASE;
-			break;
-
-		  case 'm':
-			map->map_mflags |= MF_MATCHONLY;
-			break;
-
-		  case 'A':
-			map->map_mflags |= MF_APPEND;
-			break;
-
 		  case 'q':
 			map->map_mflags |= MF_KEEPQUOTES;
 			break;
 
-		  case 'a':
-			map->map_app = ++p;
+		  case 'S':
+			map->map_spacesub = *++p;
 			break;
 
 		  case 'T':
@@ -4012,14 +4030,6 @@ ldapmap_parseargs(map, args)
 
 		  case 't':
 			map->map_mflags |= MF_NODEFER;
-			break;
-
-		  case 'S':
-			map->map_spacesub = *++p;
-			break;
-
-		  case 'D':
-			map->map_mflags |= MF_DEFER;
 			break;
 
 		  case 'z':
@@ -4044,40 +4054,6 @@ ldapmap_parseargs(map, args)
 			break;
 
 			/* Start of ldapmap specific args */
-		  case 'V':
-			if (*++p != '\\')
-				lmap->ldap_attrsep = *p;
-			else
-			{
-				switch (*++p)
-				{
-				  case 'n':
-					lmap->ldap_attrsep = '\n';
-					break;
-
-				  case 't':
-					lmap->ldap_attrsep = '\t';
-					break;
-
-				  default:
-					lmap->ldap_attrsep = '\\';
-				}
-			}
-			break;
-
-		  case 'k':		/* search field */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_filter = p;
-			break;
-
-		  case 'v':		/* attr to return */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_attr[0] = p;
-			lmap->ldap_attr[1] = NULL;
-			break;
-
 		  case '1':
 			map->map_mflags |= MF_SINGLEMATCH;
 			break;
@@ -4088,6 +4064,130 @@ ldapmap_parseargs(map, args)
 			break;
 # endif /* _FFR_LDAP_SINGLEDN */
 
+		  case 'b':		/* search base */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_base = p;
+			break;
+
+# if _FFR_LDAP_NETWORK_TIMEOUT
+		  case 'c':		/* network (connect) timeout */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_networktmo.tv_sec = atoi(p);
+			break;
+# endif /* _FFR_LDAP_NETWORK_TIMEOUT */
+
+		  case 'd':		/* Dn to bind to server as */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_binddn = p;
+			break;
+
+		  case 'H':		/* Use LDAP URI */
+#  if !USE_LDAP_INIT
+			syserr("Must compile with -DUSE_LDAP_INIT to use LDAP URIs (-H) in map %s",
+			       map->map_mname);
+			return false;
+#   else /* !USE_LDAP_INIT */
+			if (lmap->ldap_host != NULL)
+			{
+				syserr("Can not specify both an LDAP host and an LDAP URI in map %s",
+				       map->map_mname);
+				return false;
+			}
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_uri = p;
+			break;
+#  endif /* !USE_LDAP_INIT */
+
+		  case 'h':		/* ldap host */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			if (lmap->ldap_uri != NULL)
+			{
+				syserr("Can not specify both an LDAP host and an LDAP URI in map %s",
+				       map->map_mname);
+				return false;
+			}
+			lmap->ldap_host = p;
+			break;
+
+		  case 'K':
+			lmap->ldap_multi_args = true;
+			break;
+
+		  case 'k':		/* search field */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_filter = p;
+			break;
+
+		  case 'l':		/* time limit */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_timelimit = atoi(p);
+			lmap->ldap_timeout.tv_sec = lmap->ldap_timelimit;
+			break;
+
+		  case 'M':		/* Method for binding */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+
+			if (sm_strncasecmp(p, "LDAP_AUTH_", 10) == 0)
+				p += 10;
+
+			for (lam = LDAPAuthMethods;
+			     lam != NULL && lam->lam_name != NULL; lam++)
+			{
+				if (sm_strncasecmp(p, lam->lam_name,
+						   strlen(lam->lam_name)) == 0)
+					break;
+			}
+			if (lam->lam_name != NULL)
+				lmap->ldap_method = lam->lam_code;
+			else
+			{
+				/* bad config line */
+				if (!bitset(MCF_OPTFILE,
+					    map->map_class->map_cflags))
+				{
+					char *ptr;
+
+					if ((ptr = strchr(p, ' ')) != NULL)
+						*ptr = '\0';
+					syserr("Method for binding must be [none|simple|krbv4] (not %s) in map %s",
+						p, map->map_mname);
+					if (ptr != NULL)
+						*ptr = ' ';
+					return false;
+				}
+			}
+			break;
+
+		  case 'n':		/* retrieve attribute names only */
+			lmap->ldap_attrsonly = LDAPMAP_TRUE;
+			break;
+
+			/*
+			**  This is a string that is dependent on the
+			**  method used defined by 'M'.
+			*/
+
+		  case 'P':		/* Secret password for binding */
+			 while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_secret = p;
+			secretread = false;
+			break;
+
+		  case 'p':		/* ldap port */
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_port = atoi(p);
+			break;
+
 			/* args stolen from ldapsearch.c */
 		  case 'R':		/* don't auto chase referrals */
 # ifdef LDAP_REFERRALS
@@ -4095,10 +4195,6 @@ ldapmap_parseargs(map, args)
 # else /* LDAP_REFERRALS */
 			syserr("compile with -DLDAP_REFERRALS for referral support");
 # endif /* LDAP_REFERRALS */
-			break;
-
-		  case 'n':		/* retrieve attribute names only */
-			lmap->ldap_attrsonly = LDAPMAP_TRUE;
 			break;
 
 		  case 'r':		/* alias dereferencing */
@@ -4171,114 +4267,33 @@ ldapmap_parseargs(map, args)
 			}
 			break;
 
-		  case 'h':		/* ldap host */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			if (lmap->ldap_uri != NULL)
-			{
-				syserr("Can not specify both an LDAP host and an LDAP URI in map %s",
-				       map->map_mname);
-				return false;
-			}
-			lmap->ldap_host = p;
-			break;
-
-		  case 'b':		/* search base */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_base = p;
-			break;
-
-		  case 'p':		/* ldap port */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_port = atoi(p);
-			break;
-
-		  case 'l':		/* time limit */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_timelimit = atoi(p);
-			lmap->ldap_timeout.tv_sec = lmap->ldap_timelimit;
-			break;
-
-		  case 'Z':
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_sizelimit = atoi(p);
-			break;
-
-		  case 'd':		/* Dn to bind to server as */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_binddn = p;
-			break;
-
-		  case 'M':		/* Method for binding */
-			while (isascii(*++p) && isspace(*p))
-				continue;
-
-			if (sm_strncasecmp(p, "LDAP_AUTH_", 10) == 0)
-				p += 10;
-
-			for (lam = LDAPAuthMethods;
-			     lam != NULL && lam->lam_name != NULL; lam++)
-			{
-				if (sm_strncasecmp(p, lam->lam_name,
-						   strlen(lam->lam_name)) == 0)
-					break;
-			}
-			if (lam->lam_name != NULL)
-				lmap->ldap_method = lam->lam_code;
+		  case 'V':
+			if (*++p != '\\')
+				lmap->ldap_attrsep = *p;
 			else
 			{
-				/* bad config line */
-				if (!bitset(MCF_OPTFILE,
-					    map->map_class->map_cflags))
+				switch (*++p)
 				{
-					char *ptr;
+				  case 'n':
+					lmap->ldap_attrsep = '\n';
+					break;
 
-					if ((ptr = strchr(p, ' ')) != NULL)
-						*ptr = '\0';
-					syserr("Method for binding must be [none|simple|krbv4] (not %s) in map %s",
-						p, map->map_mname);
-					if (ptr != NULL)
-						*ptr = ' ';
-					return false;
+				  case 't':
+					lmap->ldap_attrsep = '\t';
+					break;
+
+				  default:
+					lmap->ldap_attrsep = '\\';
 				}
 			}
-
 			break;
 
-			/*
-			**  This is a string that is dependent on the
-			**  method used defined above.
-			*/
-
-		  case 'P':		/* Secret password for binding */
-			 while (isascii(*++p) && isspace(*p))
-				continue;
-			lmap->ldap_secret = p;
-			secretread = false;
-			break;
-
-		  case 'H':		/* Use LDAP URI */
-#  if !USE_LDAP_INIT
-			syserr("Must compile with -DUSE_LDAP_INIT to use LDAP URIs (-H) in map %s",
-			       map->map_mname);
-			return false;
-#   else /* !USE_LDAP_INIT */
-			if (lmap->ldap_host != NULL)
-			{
-				syserr("Can not specify both an LDAP host and an LDAP URI in map %s",
-				       map->map_mname);
-				return false;
-			}
+		  case 'v':		/* attr to return */
 			while (isascii(*++p) && isspace(*p))
 				continue;
-			lmap->ldap_uri = p;
+			lmap->ldap_attr[0] = p;
+			lmap->ldap_attr[1] = NULL;
 			break;
-#  endif /* !USE_LDAP_INIT */
 
 		  case 'w':
 			/* -w should be for passwd, -P should be for version */
@@ -4305,8 +4320,10 @@ ldapmap_parseargs(map, args)
 # endif /* LDAP_VERSION_MIN */
 			break;
 
-		  case 'K':
-			lmap->ldap_multi_args = true;
+		  case 'Z':
+			while (isascii(*++p) && isspace(*p))
+				continue;
+			lmap->ldap_sizelimit = atoi(p);
 			break;
 
 		  default:

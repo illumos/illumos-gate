@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998-2006 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 1998-2007 Sendmail, Inc. and its suppliers.
  *	All rights reserved.
  * Copyright (c) 1983, 1995-1997 Eric P. Allman.  All rights reserved.
  * Copyright (c) 1988, 1993
@@ -15,7 +15,7 @@
 
 #include <sendmail.h>
 
-SM_RCSID("@(#)$Id: util.c,v 8.410 2006/12/18 18:36:44 ca Exp $")
+SM_RCSID("@(#)$Id: util.c,v 8.413 2007/09/26 23:29:11 ca Exp $")
 
 #include <sm/sendmail.h>
 #include <sysexits.h>
@@ -1156,7 +1156,8 @@ putxline(l, len, mci, pxflags)
 
 		/* output last part */
 		if (l[0] == '.' && slop == 0 &&
-		    bitnset(M_XDOT, mci->mci_mailer->m_flags))
+		    bitnset(M_XDOT, mci->mci_mailer->m_flags) &&
+		    !bitset(MCIF_INLONGLINE, mci->mci_flags))
 		{
 			if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT, '.') ==
 			    SM_IO_EOF)
@@ -1171,7 +1172,8 @@ putxline(l, len, mci, pxflags)
 		else if (l[0] == 'F' && slop == 0 &&
 			 bitset(PXLF_MAPFROM, pxflags) &&
 			 strncmp(l, "From ", 5) == 0 &&
-			 bitnset(M_ESCFROM, mci->mci_mailer->m_flags))
+			 bitnset(M_ESCFROM, mci->mci_mailer->m_flags) &&
+			 !bitset(MCIF_INLONGLINE, mci->mci_flags))
 		{
 			if (sm_io_putc(mci->mci_out, SM_TIME_DEFAULT, '>') ==
 			    SM_IO_EOF)
@@ -1190,13 +1192,19 @@ putxline(l, len, mci, pxflags)
 		if (TrafficLogFile != NULL)
 			(void) sm_io_putc(TrafficLogFile, SM_TIME_DEFAULT,
 					  '\n');
-		if ((!bitset(PXLF_NOADDEOL, pxflags) || !noeol) &&
-		    sm_io_fputs(mci->mci_out, SM_TIME_DEFAULT,
-				mci->mci_mailer->m_eol) == SM_IO_EOF)
+		if ((!bitset(PXLF_NOADDEOL, pxflags) || !noeol))
 		{
-			dead = true;
-			break;
+			mci->mci_flags &= ~MCIF_INLONGLINE;
+			if (sm_io_fputs(mci->mci_out, SM_TIME_DEFAULT,
+					mci->mci_mailer->m_eol) == SM_IO_EOF)
+			{
+				dead = true;
+				break;
+			}
 		}
+		else
+			mci->mci_flags |= MCIF_INLONGLINE;
+
 		if (l < end && *l == '\n')
 		{
 			if (*++l != ' ' && *l != '\t' && *l != '\0' &&
@@ -2815,7 +2823,14 @@ count_open_connections(hostaddr)
 
 	if (hostaddr == NULL)
 		return 0;
-	n = 0;
+
+	/*
+	**  Initialize to 1 instead of 0 because this code gets called
+	**  before proc_list_add() gets called, so we (the daemon child
+	**  for this connection) don't count ourselves.
+	*/
+
+	n = 1;
 	for (i = 0; i < ProcListSize; i++)
 	{
 		if (ProcListVec[i].proc_pid == NO_PID)

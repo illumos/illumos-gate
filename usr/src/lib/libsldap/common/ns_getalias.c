@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,8 +93,8 @@ __s_api_merge_SSD_filter(const ns_ldap_search_desc_t *desc,
 
 	return (NS_LDAP_SUCCESS);
 }
-int
-__getldapaliasbyname(char *alias, char *answer, size_t ans_len)
+char *
+__getldapaliasbyname(char *alias, int *retval)
 {
 	char		*service = "aliases";
 	char		filter[BUFSIZE];
@@ -105,25 +105,36 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 	int		rc, i, j, len, comma;
 	ns_ldap_entry_t	*entry = NULL;
 	char		**attr_value = NULL;
+	char		*answer, *new_answer;
+	size_t		ans_size = BUFSIZE;
 
-	if (!alias || !*alias || !answer || ans_len == 0) {
+	if (!alias || !*alias) {
 		errno = EINVAL;
-		return (-1);
+		*retval = -1;
+		return (NULL);
 	}
 
+	answer = malloc(ans_size);
+	if (answer == NULL) {
+		errno = ENOMEM;
+		*retval = -1;
+		return (NULL);
+	}
 	answer[0] = '\0';
 
 	/* get the aliases */
 	if (snprintf(filter, sizeof (filter), ALIAS_FILTER, alias, alias) < 0) {
 		errno = EINVAL;
-		return (-1);
+		*retval = -1;
+		return (NULL);
 	}
 
 	/* get the userdata for __ns_ldap_list filter call back */
 	if (snprintf(userdata, sizeof (userdata), ALIAS_FILTER_SSD,
 	    alias, alias) < 0) {
 		errno = EINVAL;
-		return (-1);
+		*retval = -1;
+		return (NULL);
 	}
 
 	attribute[0] = MAIL_MEMBER;
@@ -137,7 +148,8 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 
 	if (rc == NS_LDAP_NOTFOUND) {
 		errno = ENOENT;
-		return (1);
+		*retval = 1;
+		return (NULL);
 	} else if (rc != NS_LDAP_SUCCESS) {
 #ifdef DEBUG
 		char *p;
@@ -150,7 +162,8 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 			(void) fprintf(stderr, "%s\n", p);
 #endif /* DEBUG */
 		(void) __ns_ldap_freeError(&errorp);
-		return (-1);
+		*retval = -1;
+		return (NULL);
 	}
 
 	/* build the return value */
@@ -162,7 +175,8 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 		attr_value = __ns_ldap_getAttr(entry, MAIL_MEMBER);
 		if (attr_value == NULL) {
 			errno = ENOENT;
-			return (-1);
+			*retval = -1;
+			return (NULL);
 		}
 		for (j = 0; attr_value[j]; j++) {
 			char	*tmp, *newhead;
@@ -177,10 +191,17 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 				*tmp-- = '\0';
 			}
 			len = len + comma + strlen(newhead);
-			if ((len + 1) > ans_len) {
-				(void) __ns_ldap_freeResult(&result);
-				errno = EOVERFLOW;
-				return (-1);
+			if ((len + 1) > ans_size) {
+				ans_size += BUFSIZE;
+				new_answer = realloc(answer, ans_size);
+				if (new_answer == NULL) {
+					(void) __ns_ldap_freeResult(&result);
+					errno = ENOMEM;
+					*retval = -1;
+					free(answer);
+					return (NULL);
+				}
+				answer = new_answer;
 			}
 			if (comma)
 				(void) strcat(answer, ",");
@@ -192,5 +213,6 @@ __getldapaliasbyname(char *alias, char *answer, size_t ans_len)
 
 	(void) __ns_ldap_freeResult(&result);
 	errno = 0;
-	return (0);
+	*retval = 0;
+	return (answer);
 }

@@ -15,6 +15,6 @@
 
 #include <sm/gen.h>
 
-SM_RCSID("@(#)$Id: version.c,v 8.191 2007/04/03 21:21:18 ca Exp $")
+SM_RCSID("@(#)$Id: version.c,v 8.199 2007/10/31 16:04:12 ca Exp $")
 
-char	Version[] = "8.14.1+Sun";
+char	Version[] = "8.14.2+Sun";
