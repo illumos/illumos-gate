@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +48,9 @@ OBJS=	cachemgr.o cachemgr_getldap.o cachemgr_parse.o
 SRCS=	${OBJS:%.o=%.c} 
 
 CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS \
-		-I../../lib/libsldap/common -I../../lib/libldap5/include/ldap
+		-I$(SRC)/lib/libsldap/common \
+		-I$(SRC)/lib/libldap5/include/ldap \
+		-I$(SRC)/lib/libc/port/gen
 
 # Message files
 POFILE=		ldap_cachemgr.po

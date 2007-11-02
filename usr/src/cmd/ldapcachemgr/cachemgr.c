@@ -56,6 +56,7 @@
 #include <alloca.h>
 #include <ucontext.h>
 
+#include "getxby_door.h"
 #include "cachemgr.h"
 
 static void	detachfromtty();
@@ -70,6 +71,8 @@ static int client_getadmin(admin_t *ptr);
 static int setadmin(ldap_call_t *ptr);
 static  int client_setadmin(admin_t *ptr);
 static int client_showstats(admin_t *ptr);
+static int is_root(int free_uc, char *dc_str, ucred_t **uc);
+static int is_nscd(pid_t pid);
 
 #ifdef SLP
 int			use_slp = 0;
@@ -657,10 +660,9 @@ switcher(void *cookie, char *argp, size_t arg_size,
 {
 #define	GETSIZE 1000
 #define	ALLOCATE 1001
-#define	PREPARE  1002
 
 	ldap_call_t	*ptr = (ldap_call_t *)argp;
-	door_cred_t	dc;
+	ucred_t		*uc = NULL;
 
 	LineBuf		configInfo;
 	dataunion	*buf = NULL;
@@ -670,7 +672,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	 * a bigger buffer in a few cases.
 	 */
 	size_t		configSize = sizeof (ldap_return_t);
-	int		ldapErrno = 0, state, leave = 0;
+	int		ldapErrno = 0, state, callnumber;
 	struct {
 		void	*begin;
 		size_t	size;
@@ -695,29 +697,9 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	 * We presume that sizeof (ldap_return_t) bytes are always available
 	 * on the stack
 	 */
-	state = ptr->ldap_callnumber;
+	callnumber = ptr->ldap_callnumber;
 
-	/*
-	 * The common behavior of the state machine below is as follows:
-	 *
-	 * Each incoming request is processed in several steps.
-	 *
-	 * First stage is specific for a particular request. It can be
-	 * an error check or gathering data or empty. See the actual comments
-	 * for the requests. For the GETLDAPCONFIG, GETLDAPSERVER, GETCACHESTAT,
-	 * and GETCACHE there is an additional substage calculating the size of
-	 * the data being passed to a door client.
-	 * The next step is obligatory. It allocates a buffer which will be
-	 * passed down to the door_return() routine.
-	 * The last (also obligatory) step sets the return code and, if a data
-	 * is available for the transfer and no errors have occurred, copies
-	 * the data to the buffer.
-	 *
-	 * After the state machine has finished, the door_return() function
-	 * is called unconditionally
-	 */
-	while (!leave) {
-		switch (state) {
+	switch (callnumber) {
 		case NULLCALL:
 			/*
 			 * Just a 'ping'. Use the default size
@@ -774,49 +756,27 @@ switcher(void *cookie, char *argp, size_t arg_size,
 				dataSource.size = sizeof (current_admin);
 				dataSource.destroy = 0;
 			}
-
 			break;
-		case SETADMIN:
 		case KILLSERVER:
 			/*
 			 * Process the request and proceed with the default
 			 * buffer allocation.
 			 */
-			if (door_cred(&dc) == 0) {
-				switch (ptr->ldap_callnumber) {
-				case KILLSERVER:
-					logit("ldap_cachemgr received "
-					    "KILLSERVER cmd from pid %ld, "
-					    "uid %ld, euid %ld\n",
-					    dc.dc_pid, dc.dc_ruid, dc.dc_euid);
-					exit(0);
-					break;
-				case SETADMIN:
-					if (dc.dc_euid != 0) {
-						logit("SETADMIN call failed "
-						    "(cred): "
-						    "caller pid %ld, uid %ld, "
-						    "euid %ld\n",
-						    dc.dc_pid,
-						    dc.dc_ruid,
-						    dc.dc_euid);
-						ldapErrno = -1;
-						break;
-					}
-					/* Yes, if a client's effective uid */
-					/* is noty defined, continue */
-					/* with setadmin() */
-				default:
-					ldapErrno = setadmin(ptr);
-					break;
-				}
-			} else {
-				logit("door_cred() call failed\n");
-				syslog(LOG_ERR, gettext("ldap_cachemgr: "
-				    "door_cred() call failed"));
-				perror("door_cred");
+			if (is_root(1, "KILLSERVER", &uc))
+				exit(0);
+
+			ldapErrno = -1;
+			state = ALLOCATE;
+			break;
+		case SETADMIN:
+			/*
+			 * Process the request and proceed with the default
+			 * buffer allocation.
+			 */
+			if (is_root(1, "SETADMIN", &uc))
+				ldapErrno = setadmin(ptr);
+			else
 				ldapErrno = -1;
-			}
 
 			state = ALLOCATE;
 			break;
@@ -836,10 +796,15 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			 * Process the request and proceed with the default
 			 * buffer allocation.
 			 */
-			ldapErrno = getldap_set_cacheData(ptr);
+			if (is_root(0, "SETCACHE", &uc) &&
+			    is_nscd(ucred_getpid(uc))) {
+				ldapErrno = getldap_set_cacheData(ptr);
+				current_admin.ldap_stat.ldap_numbercalls++;
+			} else
+				ldapErrno = -1;
 
-			current_admin.ldap_stat.ldap_numbercalls++;
-
+			if (uc != NULL)
+				ucred_free(uc);
 			state = ALLOCATE;
 			break;
 		default:
@@ -853,6 +818,9 @@ switcher(void *cookie, char *argp, size_t arg_size,
 
 			state = ALLOCATE;
 			break;
+	}
+
+	switch (state) {
 		case GETSIZE:
 			/*
 			 * This stage calculates how much data will be
@@ -876,9 +844,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			}
 
 			current_admin.ldap_stat.ldap_numbercalls++;
-
-			state = ALLOCATE;
-			break;
+			/* FALLTHRU */
 		case ALLOCATE:
 			/*
 			 * Allocate a buffer of the calculated (or default) size
@@ -886,9 +852,6 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			 */
 			buf = (dataunion *) alloca(configSize);
 
-			state = PREPARE;
-			break;
-		case PREPARE:
 			/*
 			 * Set a return code and, if a data source is specified,
 			 * copy data from the source to the buffer.
@@ -906,22 +869,13 @@ switcher(void *cookie, char *argp, size_t arg_size,
 				}
 			}
 
-			/*
-			 * Leave the state machine and send the data
-			 * to the client.
-			 */
-			leave = 1;
-			break;
-		}
 	}
-
 	(void) door_return((char *)&buf->data,
 	    buf->data.ldap_ret.ldap_bufferbytesused,
 	    NULL,
 	    0);
 #undef	GETSIZE
 #undef	ALLOCATE
-#undef	PREPARE
 }
 
 static void
@@ -1308,4 +1262,141 @@ detachfromtty(char *pgm)
 		(void) dup(0);
 		(void) dup(0);
 	}
+}
+
+/*
+ * Check if the door client's euid is 0
+ *
+ * We could check for some privilege or re-design the interfaces that
+ * lead to is_root() being called so that we rely on SMF and RBAC, but
+ * we need this check only for dealing with undocumented-but-possibly-
+ * used interfaces.  Anything beyond checking for euid == 0 here would
+ * be overkill considering that those are undocumented interfaces.
+ *
+ * If free_uc is 0, the caller is responsible for freeing *ucp.
+ *
+ * return - 0 euid != 0
+ *          1 euid == 0
+ */
+static int
+is_root(int free_uc, char *dc_str, ucred_t **ucp)
+{
+	int	rc;
+
+	if (door_ucred(ucp) != 0) {
+		rc = errno;
+		logit("door_ucred() call failed %s\n", strerror(rc));
+		syslog(LOG_ERR, gettext("ldap_cachemgr: door_ucred() call %s "
+		    "failed %s"), strerror(rc));
+		return (0);
+	}
+
+
+	if (ucred_geteuid(*ucp) != 0) {
+
+		if (current_admin.debug_level >= DBG_CANT_FIND)
+			logit("%s call failed(cred): caller pid %ld, uid %u, "
+			    "euid %u\n", dc_str, ucred_getpid(*ucp),
+			    ucred_getruid(*ucp), ucred_geteuid(*ucp));
+
+		rc = 0;
+	} else {
+
+		if (current_admin.debug_level >= DBG_ALL)
+			logit("ldap_cachemgr received %s call from pid %ld, "
+			    "uid %u, euid %u\n", dc_str, ucred_getpid(*ucp),
+			    ucred_getruid(*ucp), ucred_geteuid(*ucp));
+		rc = 1;
+	}
+
+	if (free_uc)
+		ucred_free(*ucp);
+
+	return (rc);
+}
+
+/*
+ * Check if pid is nscd
+ *
+ * Input: pid - process id of the door client that calls ldap_cachemgr
+ *
+ * Return: 0 - No
+ *         1 - Yes
+ */
+
+static int
+is_nscd(pid_t pid)
+
+{
+	static mutex_t	_door_lock = DEFAULTMUTEX;
+	static	int	doorfd = -1;
+	int		match;
+	door_info_t 	my_door;
+
+	/*
+	 * the first time in we try and open and validate the door.
+	 * the validations are that the door must have been
+	 * created with the door cookie and
+	 * that the file attached to the door is owned by root
+	 * and readonly by user, group and other.  If any of these
+	 * validations fail we refuse to use the door.
+	 */
+
+	(void) mutex_lock(&_door_lock);
+
+try_again:
+
+	if (doorfd == -1) {
+
+		if ((doorfd = open(NAME_SERVICE_DOOR, O_RDONLY, 0))
+		    == -1) {
+			(void) mutex_unlock(&_door_lock);
+			return (0);
+		}
+
+		if (door_info(doorfd, &my_door) == -1 ||
+		    (my_door.di_attributes & DOOR_REVOKED) ||
+		    my_door.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
+			/*
+			 * we should close doorfd because we just opened it
+			 */
+			(void) close(doorfd);
+			doorfd = -1;
+			(void) mutex_unlock(&_door_lock);
+			return (0);
+		}
+	} else {
+		/*
+		 * doorfd is cached. Double check just in case
+		 * the door server is restarted or is down.
+		 */
+		if (door_info(doorfd, &my_door) == -1 ||
+		    my_door.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
+			/*
+			 * don't close it -
+			 * someone else has clobbered fd
+			 */
+			doorfd = -1;
+			goto try_again;
+		}
+
+		if (my_door.di_attributes & DOOR_REVOKED) {
+			(void) close(doorfd);
+			doorfd = -1;	/* try and restart connection */
+			goto try_again;
+		}
+	}
+
+	/*
+	 * door descriptor exists and is valid
+	 */
+	if (pid == my_door.di_target)
+		match = 1;
+	else
+		match = 0;
+
+	(void) mutex_unlock(&_door_lock);
+
+	return (match);
+
 }

@@ -3445,15 +3445,17 @@ __ns_ldap_dn2domain(const char *dn,
 			i--;
 		}
 		if (rc == NS_LDAP_SUCCESS) {
-			/*
-			 * ask cache manager to save the
-			 * dn to domain mapping(s)
-			 */
-			for (j = 0; j <= i; j++) {
-				(void) __s_api_set_cachemgr_data(
-				    NS_CACHE_DN2DOMAIN,
-				    dns[j],
-				    *domain);
+			if (__s_api_nscd_proc()) {
+				/*
+				 * If it's nscd, ask cache manager to save the
+				 * dn to domain mapping(s)
+				 */
+				for (j = 0; j <= i; j++) {
+					(void) __s_api_set_cachemgr_data(
+					    NS_CACHE_DN2DOMAIN,
+					    dns[j],
+					    *domain);
+				}
 			}
 			break;
 		}

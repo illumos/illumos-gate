@@ -732,6 +732,7 @@ void	__s_api_free2dArray(char **);
 int	__s_api_isCtrlSupported(Connection *, char *);
 ns_config_t *__ns_ldap_make_config(ns_ldap_result_t *result);
 ns_auth_t  *__s_api_AuthEnumtoStruct(const EnumAuthType_t i);
+int	__s_api_nscd_proc(void);
 char	*dvalue(char *);
 char	*evalue(char *);
 

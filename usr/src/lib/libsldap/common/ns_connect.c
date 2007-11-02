@@ -345,8 +345,8 @@ ns_setup_mt_conn_and_tsd(LDAP *ld) {
  * A more complete solution is to develop true connection pooling.
  * However, this is much better than a new connection for every request.
  */
-static int
-nscd_proc()
+int
+__s_api_nscd_proc(void)
 {
 	pid_t		my_pid;
 	psinfo_t	pinfo;
@@ -1631,7 +1631,7 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 	if (!fini &&
 	    ((flag & NS_LDAP_NEW_CONN) == 0) && !cp->notAvail &&
 	    ((flag & NS_LDAP_KEEP_CONN) ||
-	    (MTperConn == 0 && nscd_proc()) ||
+	    (MTperConn == 0 && __s_api_nscd_proc()) ||
 	    MTperConn)) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "tid= %d: keep alive (fini = %d "
