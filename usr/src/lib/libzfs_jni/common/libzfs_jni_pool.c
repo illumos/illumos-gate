@@ -71,8 +71,6 @@ typedef struct FileVirtualDeviceBean {
 
 typedef struct RAIDVirtualDeviceBean {
 	VirtualDeviceBean_t super;
-
-	jmethodID method_setParity;
 } RAIDVirtualDeviceBean_t;
 
 typedef struct MirrorVirtualDeviceBean {
@@ -198,7 +196,7 @@ new_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-		    ZFSJNI_PACKAGE_DATA "ImportablePoolBean");
+			ZFSJNI_PACKAGE_DATA "ImportablePoolBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -225,7 +223,7 @@ new_VirtualDevice(JNIEnv *env, VirtualDeviceBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-		    ZFSJNI_PACKAGE_DATA "VirtualDeviceBean");
+			ZFSJNI_PACKAGE_DATA "VirtualDeviceBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -255,7 +253,7 @@ new_LeafVirtualDevice(JNIEnv *env, LeafVirtualDeviceBean_t *bean)
 	if (object->object == NULL) {
 		object->class =
 		    (*env)->FindClass(env,
-		    ZFSJNI_PACKAGE_DATA "LeafVirtualDeviceBean");
+			ZFSJNI_PACKAGE_DATA "LeafVirtualDeviceBean");
 
 		object->constructor =
 		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
@@ -349,9 +347,6 @@ new_RAIDVirtualDeviceBean(JNIEnv *env, RAIDVirtualDeviceBean_t *bean)
 	}
 
 	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
-
-	bean->method_setParity = (*env)->GetMethodID(
-	    env, object->class, "setParity", "(J)V");
 }
 
 /* Create a MirrorVirtualDeviceBean */
@@ -507,7 +502,7 @@ populate_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 		}
 
 		if (pathUTF == NULL) {
-			pathUTF = (*env)->NewStringUTF(env, path);
+		    pathUTF = (*env)->NewStringUTF(env, path);
 		}
 
 		(*env)->CallVoidMethod(env, ((zjni_Object_t *)bean)->object,
@@ -679,7 +674,6 @@ create_RAIDVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
     nvlist_t *vdev, uint64_t *p_vdev_id)
 {
 	int result;
-	uint64_t parity;
 	RAIDVirtualDeviceBean_t bean_obj = {0};
 	RAIDVirtualDeviceBean_t *bean = &bean_obj;
 
@@ -687,19 +681,6 @@ create_RAIDVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 
 	/* Construct RAIDVirtualDeviceBean */
 	new_RAIDVirtualDeviceBean(env, bean);
-
-	/* Set parity bit */
-	result = nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_NPARITY,
-	    &parity);
-	if (result) {
-		/* Default to RAID-Z1 in case of error */
-		parity = 1;
-	}
-
-	(*env)->CallVoidMethod(
-	    env, ((zjni_Object_t *)bean)->object, bean->method_setParity,
-	    (jlong)parity);
-
 
 	result = populate_RAIDVirtualDeviceBean(
 	    env, zhp, vdev, p_vdev_id, bean);
@@ -995,7 +976,7 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 				/* Create a Java object from this vdev */
 				jobject obj =
 				    zjni_get_VirtualDevice_from_vdev(env,
-				    zhp, child, p_vdev_id);
+					zhp, child, p_vdev_id);
 
 				if ((*env)->ExceptionOccurred(env) != NULL) {
 					/*
@@ -1007,11 +988,10 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 
 				if (obj != NULL) {
 				    /* Add child to child vdev list */
-					(*env)->CallBooleanMethod(env,
-					    ((zjni_Object_t *)
-					    list_class_p)->object,
-					    ((zjni_Collection_t *)
-					    list_class_p)->method_add, obj);
+				    (*env)->CallBooleanMethod(env,
+					((zjni_Object_t *)list_class_p)->object,
+					((zjni_Collection_t *)list_class_p)->
+					method_add, obj);
 				}
 			}
 		}
