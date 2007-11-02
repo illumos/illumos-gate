@@ -1636,7 +1636,6 @@ int
 pa_adr_string(pr_context_t *context, int status, int flag)
 {
 	char	*c;
-	char	*p;
 	short	length;
 	int	returnstat;
 	uval_t	uval;
@@ -1652,21 +1651,15 @@ pa_adr_string(pr_context_t *context, int status, int flag)
 		return (returnstat);
 	if ((c = (char *)malloc(length + 1)) == NULL)
 		return (-1);
-	if ((p = (char *)malloc((length * 2) + 1)) == NULL) {
-		free(c);
-		return (-1);
-	}
 	if ((returnstat = pr_adr_char(context, c, length)) != 0) {
 		free(c);
-		free(p);
 		return (returnstat);
 	}
-	convertascii(p, c, length - 1);
+
 	uval.uvaltype = PRA_STRING;
-	uval.string_val = p;
+	uval.string_val = c;
 	returnstat = pa_print(context, &uval, flag);
 	free(c);
-	free(p);
 	return (returnstat);
 }
 
@@ -1698,7 +1691,7 @@ pa_file_string(pr_context_t *context, int status, int flag)
 		return (returnstat);
 	if ((c = (char *)malloc(length + 1)) == NULL)
 		return (-1);
-	if ((p = (char *)malloc((length * 2) + 1)) == NULL) {
+	if ((p = (char *)malloc((length * 4) + 1)) == NULL) {
 		free(c);
 		return (-1);
 	}
@@ -2832,30 +2825,32 @@ static int cntrl_map_entries = sizeof (cntrl_map)
 void
 convertascii(char *p, char *c, int size)
 {
-	register int	i;
-	register int	j, match;
+	int	i, j, uc;
 
 	for (i = 0; i < size; i++) {
-		*(c + i) = (char)toascii(*(c + i));
-		if ((int)iscntrl(*(c + i))) {
-			for (j = match = 0; j < cntrl_map_entries; j++)
-				if (cntrl_map[j].from == *(c + i)) {
-					*p++ = '\\';
-					*p++ = cntrl_map[j].to;
-					match = 1;
+		uc = (unsigned char)*(c + i);
+		if (isascii(uc)) {
+			if (iscntrl(uc)) {
+				for (j = 0; j < cntrl_map_entries; j++) {
+					if (cntrl_map[j].from == uc) {
+						*p++ = '\\';
+						*p++ = cntrl_map[j].to;
+						break;
+					}
 				}
-			if (!match) {
-				*p++ = '^';
-				*p++ = (char)(*(c + i) + 0x40);
+				if (j == cntrl_map_entries) {
+					*p++ = '^';
+					*p++ = (char)(uc ^ 0100);
+				}
+			} else {
+				*p++ = (char)uc;
 			}
-		} else
-			*p++ = *(c + i);
+		} else {
+			p += sprintf(p, "\\%03o", uc);
+		}
 	}
-
 	*p = '\0';
-
 }
-
 
 /*
  * -----------------------------------------------------------------------
