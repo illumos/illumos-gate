@@ -76,6 +76,7 @@ static int cpu_sync_log_err(void *flt);
 static void cpu_payload_add_aflt(struct async_flt *, nvlist_t *, nvlist_t *);
 static void opl_cpu_sync_error(struct regs *, ulong_t, ulong_t, uint_t, uint_t);
 static int  cpu_flt_in_memory(opl_async_flt_t *, uint64_t);
+static int prom_SPARC64VII_support_enabled(void);
 
 /*
  * Error counters resetting interval.
@@ -276,6 +277,14 @@ cpu_fiximp(pnode_t dnode)
 void
 cpu_fix_alljupiter(void)
 {
+	if (!prom_SPARC64VII_support_enabled()) {
+		/*
+		 * Do not enable all-Jupiter features and do not turn on
+		 * the cpu_alljupiter flag.
+		 */
+		return;
+	}
+
 	cpu_alljupiter = 1;
 
 	/*
@@ -2294,4 +2303,24 @@ flt_to_error_type(struct async_flt *aflt)
 {
 	ASSERT(0);
 	return (NULL);
+}
+
+#define	PROM_SPARC64VII_MODE_PROPNAME	"SPARC64-VII-mode"
+
+/*
+ * Check for existence of OPL OBP property that indicates
+ * SPARC64-VII support. By default, only enable Jupiter
+ * features if the property is present.   It will be
+ * present in all-Jupiter domains by OBP if the domain has
+ * been selected by the user on the system controller to
+ * run in Jupiter mode.  Basically, this OBP property must
+ * be present to turn on the cpu_alljupiter flag.
+ */
+static int
+prom_SPARC64VII_support_enabled(void)
+{
+	int val;
+
+	return ((prom_getprop(prom_rootnode(), PROM_SPARC64VII_MODE_PROPNAME,
+	    (caddr_t)&val) == 0) ? 1 : 0);
 }

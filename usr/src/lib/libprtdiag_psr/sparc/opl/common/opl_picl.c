@@ -878,3 +878,35 @@ do_walk(picl_nodehdl_t rooth, const char *classname,
 		return (PICL_WALK_CONTINUE);
 	return (err);
 }
+
+int
+get_proc_mode(void)
+{
+	picl_nodehdl_t nodeh;
+	picl_prophdl_t  proph;
+	picl_errno_t err;
+
+	err = picl_initialize();
+	if (err != PICL_SUCCESS) {
+		(void) log_printf("picl_initialize failed: %s\n",
+		    picl_strerror(err));
+		return (err);
+	}
+
+	err = picl_get_node_by_path("/platform",  &nodeh);
+	if (err != PICL_SUCCESS) {
+		(void) log_printf("Getting plat node failed: %s\n",
+		    picl_strerror(err));
+		return (err);
+	}
+
+	err = picl_get_prop_by_name(nodeh, "SPARC64-VII-mode",  &proph);
+	if (err != PICL_SUCCESS) {
+		/* Do not display error message */
+		return (err);
+	}
+
+	(void) picl_shutdown();
+
+	return (err);
+}

@@ -99,6 +99,7 @@ void	display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
     struct system_kstat_data *kstats);
 Prop 	*find_prop(Prom_node *pnode, char *name);
 int	do_piclinfo(int);
+int	get_proc_mode(void);
 
 /* Local functions */
 static	void opl_disp_environ(void);
@@ -789,6 +790,7 @@ opl_disp_hw_revisions(Sys_tree *tree, Prom_node *root)
 {
 	char		*version;
 	Prom_node	*pnode;
+	int		value;
 
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -822,6 +824,26 @@ opl_disp_hw_revisions(Sys_tree *tree, Prom_node *root)
 	log_printf("\n\n", 0);
 
 	opl_disp_environ();
+
+	/*
+	 * PICL interface needs to be used for system processor mode display.
+	 * Check existence of OBP property "SPARC64-VII-mode".
+	 * No display if property does not exist.
+	 * If property exists then system is in (Jupiter) SPARC64-VII-mode.
+	 */
+	value = get_proc_mode();
+
+	if (value == 0) {
+		/* Print the header */
+		log_printf("\n", 0);
+		log_printf("===================", 0);
+		log_printf(gettext(" System Processor Mode "), 0);
+		log_printf("===================", 0);
+		log_printf("\n\n", 0);
+
+		/* Jupiter mode */
+		log_printf("%s\n\n", "SPARC64-VII mode");
+	}
 }
 
 /*
