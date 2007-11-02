@@ -819,7 +819,6 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	0,	"ip_respond_to_timestamp_broadcast"},
 	{  0,	1,	1,	"ip_send_redirects"},
 	{  0,	1,	0,	"ip_forward_directed_broadcasts"},
-	{  0,	10,	0,	"ip_debug"},
 	{  0,	10,	0,	"ip_mrtdebug"},
 	{  5000, 999999999,	60000, "ip_ire_timer_interval" },
 	{  60000, 999999999,	1200000, "ip_ire_arp_interval" },
@@ -928,6 +927,8 @@ static ipndp_t	lcl_ndp_arr[] = {
 #define	IPNDP_IPMP_HOOK_OFFSET	16
 	{  ip_param_generic_get, ipmp_hook_emulation_set, NULL,
 	    "ipmp_hook_emulation" },
+	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,
+	    "ip_debug" },
 };
 
 /*
@@ -29036,6 +29037,10 @@ ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
 	return (0);
 }
 
+/*
+ * Handle ndd set of variables which require PRIV_SYS_NET_CONFIG such as
+ * ip_debug.
+ */
 /* ARGSUSED */
 static int
 ip_int_set(queue_t *q, mblk_t *mp, char *value,

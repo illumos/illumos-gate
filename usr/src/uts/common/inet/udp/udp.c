@@ -4386,7 +4386,6 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 			UDP_STAT(us, udp_in_recvucred);
 		}
 
-		/* XXX FIXME: apply to AF_INET6 as well */
 		/*
 		 * If SO_TIMESTAMP is set allocate the appropriate sized
 		 * buffer. Since gethrestime() expects a pointer aligned
@@ -4662,6 +4661,18 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 			UDP_STAT(us, udp_in_recvucred);
 		}
 
+		/*
+		 * If SO_TIMESTAMP is set allocate the appropriate sized
+		 * buffer. Since gethrestime() expects a pointer aligned
+		 * argument, we allocate space necessary for extra
+		 * alignment (even though it might not be used).
+		 */
+		if (udp_bits.udpb_timestamp) {
+			udi_size += sizeof (struct T_opthdr) +
+			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+			UDP_STAT(us, udp_in_timestamp);
+		}
+
 		if (udp_bits.udpb_ipv6_recvhoplimit) {
 			udi_size += sizeof (struct T_opthdr) + sizeof (int);
 			UDP_STAT(us, udp_in_recvhoplimit);
@@ -4857,6 +4868,24 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 				dstopt += toh->len;
 				udi_size -= toh->len;
 			}
+			if (udp_bits.udpb_timestamp) {
+				struct	T_opthdr *toh;
+
+				toh = (struct T_opthdr *)dstopt;
+				toh->level = SOL_SOCKET;
+				toh->name = SCM_TIMESTAMP;
+				toh->len = sizeof (struct T_opthdr) +
+				    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+				toh->status = 0;
+				dstopt += sizeof (struct T_opthdr);
+				/* Align for gethrestime() */
+				dstopt = (uchar_t *)P2ROUNDUP((intptr_t)dstopt,
+				    sizeof (intptr_t));
+				gethrestime((timestruc_t *)dstopt);
+				dstopt = (uchar_t *)toh + toh->len;
+				udi_size -= toh->len;
+			}
+
 			/* Consumed all of allocated space */
 			ASSERT(udi_size == 0);
 		}

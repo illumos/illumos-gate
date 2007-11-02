@@ -903,8 +903,8 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		up = (uint16_t *)((uchar_t *)ip6h + hdr_length);
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
-		ip_fanout_sctp(mp, ill, (ipha_t *)ip6h, ports, 0, mctl_present,
-		    IP6_NO_IPPOLICY, zoneid);
+		ip_fanout_sctp(first_mp, ill, (ipha_t *)ip6h, ports, 0,
+		    mctl_present, IP6_NO_IPPOLICY, zoneid);
 		return;
 	case IPPROTO_ESP:
 	case IPPROTO_AH: {
@@ -10567,7 +10567,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 		case IPPROTO_SCTP:
 		{
 			ports = *(uint32_t *)(mp->b_rptr + hdr_length);
-			ip_fanout_sctp(mp, ill, (ipha_t *)ip6h, ports,
+			ip_fanout_sctp(first_mp, ill, (ipha_t *)ip6h, ports,
 			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO,
 			    mctl_present, IP6_NO_IPPOLICY, ire->ire_zoneid);
 			return;

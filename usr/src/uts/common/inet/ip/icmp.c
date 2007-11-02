@@ -3603,6 +3603,17 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	if (icmp->icmp_ipv6_recvtclass)
 		udi_size += sizeof (struct T_opthdr) + sizeof (int);
 
+	/*
+	 * If SO_TIMESTAMP is set allocate the appropriate sized
+	 * buffer. Since gethrestime() expects a pointer aligned
+	 * argument, we allocate space necessary for extra
+	 * alignment (even though it might not be used).
+	 */
+	if (icmp->icmp_timestamp) {
+		udi_size += sizeof (struct T_opthdr) +
+		    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+	}
+
 	mp1 = allocb(udi_size, BPRI_MED);
 	if (mp1 == NULL) {
 		freemsg(mp);
@@ -3684,6 +3695,23 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			dstopt += sizeof (struct T_opthdr);
 			*(uint_t *)dstopt = IPV6_FLOW_TCLASS(ip6h->ip6_flow);
 			dstopt += sizeof (uint_t);
+			udi_size -= toh->len;
+		}
+		if (icmp->icmp_timestamp) {
+			struct	T_opthdr *toh;
+
+			toh = (struct T_opthdr *)dstopt;
+			toh->level = SOL_SOCKET;
+			toh->name = SCM_TIMESTAMP;
+			toh->len = sizeof (struct T_opthdr) +
+			    sizeof (timestruc_t) + _POINTER_ALIGNMENT;
+			toh->status = 0;
+			dstopt += sizeof (struct T_opthdr);
+			/* Align for gethrestime() */
+			dstopt = (uchar_t *)P2ROUNDUP((intptr_t)dstopt,
+			    sizeof (intptr_t));
+			gethrestime((timestruc_t *)dstopt);
+			dstopt = (uchar_t *)toh + toh->len;
 			udi_size -= toh->len;
 		}
 		if (icmp_opt & IPPF_HOPOPTS) {
