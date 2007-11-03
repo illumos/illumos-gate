@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,7 +287,7 @@ propertyname(char *name, char *prefix)
 
 	/*
 	 * Make sure the first character is alphabetic, if not insert prefix.
-	 * Can't use isalpha() here as its locale dependent but the property
+	 * Can't use isalpha() here as it's locale dependent but the property
 	 * name regular expression isn't.
 	 */
 	c = name[0];
@@ -297,7 +296,7 @@ propertyname(char *name, char *prefix)
 	}
 	(void) strlcat(buf, name, len);
 
-	/* convert any dissallowed characters into '_' */
+	/* convert any disallowed characters into '_' */
 	for (cp = buf; *cp != '\0'; cp++) {
 		if ((*cp < 'A' || *cp > 'Z') && (*cp < 'a' || *cp > 'z') &&
 		    (*cp < '0' || *cp > '9') && (*cp != '.') && (*cp != '-'))
@@ -311,7 +310,7 @@ servicename(struct inetconfent *iconf)
 {
 	static char *buf;
 	size_t len;
-	char *proto;
+	char *cp, *proto;
 
 	/* free any memory allocated by a previous call */
 	free(buf);
@@ -332,6 +331,17 @@ servicename(struct inetconfent *iconf)
 	proto = iconf->protocol;
 	if (iconf->isrpc && (strcmp(iconf->protocol, "rpc/*") == 0))
 		proto = "rpc/visible";
+
+	/*
+	 * SMF service names may not contain '.', but IANA services do
+	 * allow its use, and property names can contain '.' as returned
+	 * by propertyname().  So if the resultant SMF service name
+	 * would contain a '.' we fix it here.
+	 */
+	for (cp = buf; *cp != '\0'; cp++) {
+		if (*cp == '.')
+			*cp = '_';
+	}
 	(void) strlcat(buf, propertyname(proto, "p-"), len);
 	return (buf);
 }
