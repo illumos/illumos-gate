@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <bsm/adt.h>
 #include <door.h>
 #include <pthread.h>
 #include <string.h>
@@ -62,6 +62,7 @@ extern "C" {
  *
  *	leaf locks:  (no other locks may be aquired while holding one)
  *		rc_pg_notify_lock
+ *		rc_annotate_lock
  */
 
 /*
@@ -251,6 +252,7 @@ struct rc_node {
 	rc_node_t	*rn_parent;		/* set if on child list */
 	rc_node_t	*rn_former;		/* next former node */
 	rc_node_t	*rn_parent_ref;		/* reference count target */
+	const char	*rn_fmri;
 
 	/*
 	 * external state (protected by hash chain lock)
@@ -307,9 +309,30 @@ struct rc_node {
 	(RC_NODE_DYING_FLAGS | RC_NODE_USING_PARENT)
 
 
+typedef enum rc_auth_state {
+	RC_AUTH_UNKNOWN = 0,		/* No checks done yet. */
+	RC_AUTH_FAILED,			/* Authorization checked & failed. */
+	RC_AUTH_PASSED			/* Authorization succeeded. */
+} rc_auth_state_t;
+
+/*
+ * Some authorization checks are performed in rc_node_setup_tx() in
+ * response to the REP_PROTOCOL_PROPERTYGRP_TX_START message.  Other checks
+ * must wait until the actual transaction operations are received in the
+ * REP_PROTOCOL_PROPERTYGRP_TX_COMMIT message.  This second set of checks
+ * is performed in rc_tx_commit().  rnp_auth_string and rnp_authorized in
+ * the following structure are used to hold the results of the
+ * authorization checking done in rc_node_setup_tx() for later use by
+ * rc_tx_commit().
+ *
+ * In client.c transactions are represented by rc_node_ptr structures which
+ * point to a property group rc_node_t.  Thus, this is an appropriate place
+ * to hold authorization state.
+ */
 typedef struct rc_node_ptr {
 	rc_node_t	*rnp_node;
-	char		rnp_authorized;		/* transaction pre-authed */
+	const char	*rnp_auth_string;	/* authorization string */
+	rc_auth_state_t	rnp_authorized;		/* transaction pre-auth rslt. */
 	char		rnp_deleted;		/* object was deleted */
 } rc_node_ptr_t;
 
@@ -351,6 +374,14 @@ typedef struct cache_bucket {
 	char		cb_pad[64 - sizeof (pthread_mutex_t) -
 			    2 * sizeof (rc_node_t *)];
 } cache_bucket_t;
+
+/*
+ * tx_commit_data_tx is an opaque structure which is defined in object.c.
+ * It contains the data of the transaction that is to be committed.
+ * Accessor functions in object.c allow other modules to retrieve
+ * information.
+ */
+typedef struct tx_commit_data tx_commit_data_t;
 
 /*
  * Snapshots
@@ -436,6 +467,21 @@ typedef struct repcache_client {
 	int		rc_doorfd;	/* our door's FD */
 
 	/*
+	 * Constants used for security auditing
+	 *
+	 * rc_adt_session points to the audit session data that is used for
+	 * the life of the client.  rc_adt_sessionid is the session ID that
+	 * is initially assigned when the audit session is started.  See
+	 * start_audit_session() in client.c.  This session id is used for
+	 * audit events except when we are processing a set of annotated
+	 * events.  Annotated events use a separate session id so that they
+	 * can be grouped.  See set_annotation() in client.c.
+	 */
+	adt_session_data_t *rc_adt_session;	/* Session data. */
+	au_asid_t	rc_adt_sessionid;	/* Main session ID for */
+						/* auditing */
+
+	/*
 	 * client list linkage, protected by hash chain lock
 	 */
 	uu_list_node_t	rc_link;
@@ -461,13 +507,26 @@ typedef struct repcache_client {
 	 * Variables, protected by rc_lock
 	 */
 	int		rc_refcnt;	/* in-progress door calls */
-	int		rc_flags;	/* state */
+	int		rc_flags;	/* see RC_CLIENT_* symbols below */
 	uint32_t	rc_changeid;	/* used to make backups idempotent */
 	pthread_t	rc_insert_thr;	/* single thread trying to insert */
 	pthread_t	rc_notify_thr;	/* single thread waiting for notify */
 	pthread_cond_t	rc_cv;
 	pthread_mutex_t	rc_lock;
+
+	/*
+	 * Per-client audit information.  These fields must be protected by
+	 * rc_annotate_lock separately from rc_lock because they may need
+	 * to be accessed from rc_node.c with an entity or iterator lock
+	 * held, and those must be taken after rc_lock.
+	 */
+	int		rc_annotate;	/* generate annotation event if set */
+	const char	*rc_operation;	/* operation for audit annotation */
+	const char	*rc_file;	/* file name for audit annotation */
+	pthread_mutex_t	rc_annotate_lock;
 } repcache_client_t;
+
+/* Bit definitions for rc_flags. */
 #define	RC_CLIENT_DEAD			0x00000001
 
 typedef struct client_bucket {
@@ -559,6 +618,8 @@ void thread_newstate(thread_info_t *, thread_state_t);
 ucred_t *get_ucred(void);
 int ucred_is_privileged(ucred_t *);
 
+adt_session_data_t *get_audit_session(void);
+
 void configd_critical(const char *, ...);
 void configd_vcritical(const char *, va_list);
 
@@ -573,6 +634,8 @@ int setup_main_door(const char *);
 /*
  * client.c
  */
+int client_annotation_needed(char *, size_t, char *, size_t);
+void client_annotation_finished(void);
 int create_client(pid_t, uint32_t, int, int *);
 int client_init(void);
 int client_is_privileged(void);
@@ -584,6 +647,7 @@ void log_enter(request_log_entry_t *);
 int rc_node_init();
 int rc_check_type_name(uint32_t, const char *);
 
+void rc_node_ptr_free_mem(rc_node_ptr_t *);
 void rc_node_rele(rc_node_t *);
 rc_node_t *rc_node_setup(rc_node_t *, rc_node_lookup_t *,
     const char *, rc_node_t *);
@@ -669,7 +733,18 @@ int object_snapshot_attach(rc_node_lookup_t *, uint32_t *, int);
 /*
  * object.c
  */
-int object_tx_commit(rc_node_lookup_t *, const void *, size_t, uint32_t *);
+int object_tx_commit(rc_node_lookup_t *, tx_commit_data_t *, uint32_t *);
+
+/* Functions to access transaction commands. */
+int tx_cmd_action(tx_commit_data_t *, size_t,
+    enum rep_protocol_transaction_action *);
+size_t tx_cmd_count(tx_commit_data_t *);
+int tx_cmd_nvalues(tx_commit_data_t *, size_t, uint32_t *);
+int tx_cmd_prop(tx_commit_data_t *, size_t, const char **);
+int tx_cmd_prop_type(tx_commit_data_t *, size_t, uint32_t *);
+int tx_cmd_value(tx_commit_data_t *, size_t, uint32_t, const char **);
+void tx_commit_data_free(tx_commit_data_t *);
+int tx_commit_data_new(const void *, size_t, tx_commit_data_t **);
 
 /*
  * snapshot.c

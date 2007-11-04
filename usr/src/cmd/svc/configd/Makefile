@@ -53,7 +53,7 @@ ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 MYCPPFLAGS = -I. -I../common -I../../../common/svc -I$(ROOT)/usr/include/sqlite -D_REENTRANT
 CPPFLAGS += $(MYCPPFLAGS)
 CFLAGS	+= -v
-MYLDLIBS = -lumem -luutil
+MYLDLIBS = -lumem -luutil -lbsm
 LDLIBS	+= -lsecdb $(MYLDLIBS)
 LINTFLAGS += -errtags -erroff=E_BAD_FORMAT_ARG_TYPE2
 

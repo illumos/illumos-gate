@@ -257,6 +257,7 @@ lookup:
 					goto out;
 
 				case SCF_ERROR_HANDLE_MISMATCH:
+				case SCF_ERROR_INTERNAL:
 				case SCF_ERROR_INVALID_ARGUMENT:
 				case SCF_ERROR_NOT_SET:
 					bad_error("_scf_snapshot_take_new",

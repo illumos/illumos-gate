@@ -192,8 +192,8 @@ adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
  * see a need to put a lock around it.
  */
 
-static au_id_t
-adt_get_unique_id(uid_t uid)
+au_id_t
+adt_get_unique_id(au_id_t uid)
 {
 	char		hostname[MAXHOSTNAMELEN];
 	union {
@@ -480,10 +480,10 @@ adt_set_termid(const adt_session_data_t *session_data,
 		    ADT_VALID);
 
 		((adt_internal_state_t *)session_data)->as_info.ai_termid =
-			*termid;
+		    *termid;
 
 		((adt_internal_state_t *)session_data)->as_have_user_data |=
-			ADT_HAVE_TID;
+		    ADT_HAVE_TID;
 	}
 }
 
@@ -649,7 +649,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 		case AF_INET6:
 			/* LINTED */
 			p = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
-			(void) memcpy(p_term->at_addr, p,
+			    (void) memcpy(p_term->at_addr, p,
 			    sizeof (((struct sockaddr_in6 *)NULL)->sin6_addr));
 			p_term->at_type = AU_IPv6;
 			break;
@@ -1515,9 +1515,9 @@ adt_changeuser(adt_internal_state_t *state, uid_t ruid)
 		state->as_info.ai_mask.am_failure |= mask.am_failure;
 	}
 	DPRINTF(("changed mask to %08X/%08X for ruid=%d\n",
-		state->as_info.ai_mask.am_success,
-		state->as_info.ai_mask.am_failure,
-		ruid));
+	    state->as_info.ai_mask.am_success,
+	    state->as_info.ai_mask.am_failure,
+	    ruid));
 	return (0);
 }
 
