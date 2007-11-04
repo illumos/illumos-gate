@@ -855,13 +855,17 @@ hsfs_getpage_ra(
 	extension += hp->hs_ra_bytes;
 
 	/*
-	 * Some cd writers don't write sectors that aren't used.  Also,
-	 * there's no point in reading sectors we'll never look at.  So,
-	 * if we're asked to go beyond the end of a file, truncate to the
-	 * length of that file.
+	 * Some CD writers (e.g. Kodak Photo CD writers)
+	 * create CDs in TAO mode and reserve tracks that
+	 * are not completely written. Some sectors remain
+	 * unreadable for this reason and give I/O errors.
+	 * Also, there's no point in reading sectors
+	 * we'll never look at.  So, if we're asked to go
+	 * beyond the end of a file, truncate to the length
+	 * of that file.
 	 *
-	 * Additionally, this behaviour is required by section 6.4.5 of
-	 * ISO 9660:1988(E).
+	 * Additionally, this behaviour is required by section
+	 * 6.4.5 of ISO 9660:1988(E).
 	 */
 	len = MIN(extension ? extension : PAGESIZE, filsiz - off);
 
@@ -2075,6 +2079,13 @@ void
 hsched_fini(struct hsfs_queue *hqueue)
 {
 	if (hqueue != NULL) {
+		/*
+		 * Remove the sentinel if there was one.
+		 */
+		if (hqueue->next != NULL) {
+			avl_remove(&hqueue->read_tree, hqueue->next);
+			kmem_cache_free(hio_cache, hqueue->next);
+		}
 		avl_destroy(&(hqueue->read_tree));
 		avl_destroy(&(hqueue->deadline_tree));
 		mutex_destroy(&(hqueue->hsfs_queue_lock));
@@ -2085,9 +2096,6 @@ hsched_fini(struct hsfs_queue *hqueue)
 		 * taskq_destroy will wait for them to finish.
 		 */
 		taskq_destroy(hqueue->ra_task);
-		if (hqueue->next != NULL) {
-			kmem_cache_free(hio_cache, hqueue->next);
-		}
 		kmem_free(hqueue->nbuf, sizeof (struct buf));
 	}
 }

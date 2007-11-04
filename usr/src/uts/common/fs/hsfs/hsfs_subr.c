@@ -392,14 +392,15 @@ hsfs_kstats_update(kstat_t *ksp, int flag)
  */
 static kstat_t *
 hsfs_setup_named_kstats(struct hsfs *fsp, int fsid, char *name,
-    const hsfs_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
+    const hsfs_ksindex_t *ksip, int (*update)(kstat_t *, int))
 {
 	kstat_t *ksp;
 	kstat_named_t *knp;
 	char *np;
 	char *mntpt = fsp->hsfs_fsmnt;
+	size_t size;
 
-	size /= sizeof (hsfs_ksindex_t);
+	size = (sizeof (hsfs_kstats)) / (sizeof (hsfs_ksindex_t));
 	ksp = kstat_create("hsfs_fs", fsid, name, "hsfs",
 	    KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_VIRTUAL);
 	if (ksp == NULL)
@@ -427,7 +428,7 @@ void
 hsfs_init_kstats(struct hsfs *fsp, int fsid)
 {
 	fsp->hsfs_kstats = hsfs_setup_named_kstats(fsp, fsid, "hsfs_read_stats",
-	    hsfs_kstats, sizeof (hsfs_kstats), hsfs_kstats_update);
+	    hsfs_kstats, hsfs_kstats_update);
 }
 
 void
@@ -438,8 +439,8 @@ hsfs_fini_kstats(struct hsfs *fsp)
 	if (fsp->hsfs_kstats != NULL) {
 		data = fsp->hsfs_kstats->ks_data;
 		kstat_delete(fsp->hsfs_kstats);
-		kmem_free(data, (sizeof (hsfs_kstats)) / \
-		    (sizeof (hsfs_ksindex_t)));
+		kmem_free(data, sizeof (kstat_named_t) *
+		    (sizeof (hsfs_kstats)) / (sizeof (hsfs_ksindex_t)));
 	}
 	fsp->hsfs_kstats = NULL;
 }
