@@ -40,9 +40,8 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lmd5 -lc
 
-CFLAGS +=	-v -DOS='"solaris"' -D__OS_solaris -DNDEBUG
-
-CFLAGS64 +=	-v -DOS='"solaris"' -D__OS_solaris -DNDEBUG
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-DOS='"solaris"' -D__OS_solaris -DNDEBUG
 
 .KEEP_STATE:
 
