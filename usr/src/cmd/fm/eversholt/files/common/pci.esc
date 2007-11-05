@@ -1110,8 +1110,8 @@ event ereport.io.device.inval_state@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.no_response@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.stall@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.badint_limit@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.device.corr@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.device.uncorr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.intern_corr@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.device.intern_uncorr@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.nf-device@pcibus/pcidev/pcifn;
 
 prop error.io.service.restored@pcibus/pcidev/pcifn { IS_LEAF } (1)->
@@ -1126,8 +1126,8 @@ prop error.io.device.f-device@pcibus/pcidev/pcifn { IS_LEAF } (1)->
     ereport.io.device.no_response@pcibus/pcidev/pcifn,
     ereport.io.device.stall@pcibus/pcidev/pcifn,
     ereport.io.device.badint_limit@pcibus/pcidev/pcifn,
-    ereport.io.device.corr@pcibus/pcidev/pcifn,
-    ereport.io.device.uncorr@pcibus/pcidev/pcifn;
+    ereport.io.device.intern_corr@pcibus/pcidev/pcifn,
+    ereport.io.device.intern_uncorr@pcibus/pcidev/pcifn;
 
 prop error.io.device.f-device@pcibus/pcidev/pcifn { IS_LEAF } (1)->
     ereport.io.service.lost@pcibus/pcidev/pcifn,
@@ -1148,8 +1148,8 @@ prop error.io.device.nf-device@pcibus/pcidev/pcifn { IS_LEAF } (0)->
     ereport.io.device.no_response@pcibus/pcidev/pcifn,
     ereport.io.device.stall@pcibus/pcidev/pcifn,
     ereport.io.device.badint_limit@pcibus/pcidev/pcifn,
-    ereport.io.device.corr@pcibus/pcidev/pcifn,
-    ereport.io.device.uncorr@pcibus/pcidev/pcifn,
+    ereport.io.device.intern_corr@pcibus/pcidev/pcifn,
+    ereport.io.device.intern_uncorr@pcibus/pcidev/pcifn,
     ereport.io.service.unaffected@pcibus/pcidev/pcifn,
     error.io.service.restored@pcibus/pcidev/pcifn;
 
@@ -1158,8 +1158,8 @@ prop upset.io.device.nonfatal@pcibus/pcidev/pcifn { IS_LEAF } (1)->
     ereport.io.device.no_response@pcibus/pcidev/pcifn,
     ereport.io.device.stall@pcibus/pcidev/pcifn,
     ereport.io.device.badint_limit@pcibus/pcidev/pcifn,
-    ereport.io.device.corr@pcibus/pcidev/pcifn,
-    ereport.io.device.uncorr@pcibus/pcidev/pcifn;
+    ereport.io.device.intern_corr@pcibus/pcidev/pcifn,
+    ereport.io.device.intern_uncorr@pcibus/pcidev/pcifn;
 
 prop upset.io.device.nonfatal@pcibus/pcidev/pcifn { IS_LEAF } (1)->
     ereport.io.service.unaffected@pcibus/pcidev/pcifn,

@@ -157,8 +157,8 @@ event ereport.io.device.inval_state@niu/niufn{within(5s)};
 event ereport.io.device.no_response@niu/niufn{within(5s)};
 event ereport.io.device.stall@niu/niufn{within(5s)};
 event ereport.io.device.badint_limit@niu/niufn{within(5s)};
-event ereport.io.device.corr@niu/niufn{within(5s)};
-event ereport.io.device.uncorr@niu/niufn{within(5s)};
+event ereport.io.device.intern_corr@niu/niufn{within(5s)};
+event ereport.io.device.intern_uncorr@niu/niufn{within(5s)};
 event ereport.io.device.nf-device@niu/niufn;
 
 
@@ -280,8 +280,8 @@ prop error.io.device.f-device@niu/niufn (1)->
     ereport.io.device.no_response@niu/niufn,
     ereport.io.device.stall@niu/niufn,
     ereport.io.device.badint_limit@niu/niufn,
-    ereport.io.device.corr@niu/niufn,
-    ereport.io.device.uncorr@niu/niufn;
+    ereport.io.device.intern_corr@niu/niufn,
+    ereport.io.device.intern_uncorr@niu/niufn;
 
 prop error.io.device.f-device@niu/niufn (1)->
     ereport.io.service.lost@niu/niufn,
@@ -302,8 +302,8 @@ prop error.io.device.nf-device@niu/niufn (0)->
     ereport.io.device.no_response@niu/niufn,
     ereport.io.device.stall@niu/niufn,
     ereport.io.device.badint_limit@niu/niufn,
-    ereport.io.device.corr@niu/niufn,
-    ereport.io.device.uncorr@niu/niufn,
+    ereport.io.device.intern_corr@niu/niufn,
+    ereport.io.device.intern_uncorr@niu/niufn,
     ereport.io.service.unaffected@niu/niufn,
     error.io.service.restored@niu/niufn;
 
@@ -312,8 +312,8 @@ prop upset.io.device.nonfatal@niu/niufn (1)->
     ereport.io.device.no_response@niu/niufn,
     ereport.io.device.stall@niu/niufn,
     ereport.io.device.badint_limit@niu/niufn,
-    ereport.io.device.corr@niu/niufn,
-    ereport.io.device.uncorr@niu/niufn;
+    ereport.io.device.intern_corr@niu/niufn,
+    ereport.io.device.intern_uncorr@niu/niufn;
 
 prop upset.io.device.nonfatal@niu/niufn (1)->
     ereport.io.service.unaffected@niu/niufn,

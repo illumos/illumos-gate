@@ -196,8 +196,8 @@ event ereport.io.device.inval_state@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.device.no_response@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.device.stall@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.corr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.uncorr@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.lost@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.degraded@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn{within(5s)};
@@ -213,8 +213,8 @@ prop error.io.device.f-device@pciexbus/pciexdev/pciexfn (1)->
     ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
     ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
     ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.uncorr@pciexbus/pciexdev/pciexfn;
+    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
+    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn;
 
 prop error.io.device.f-device@pciexbus/pciexdev/pciexfn (1)->
     ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
@@ -235,8 +235,8 @@ prop error.io.device.nf-device@pciexbus/pciexdev/pciexfn (0)->
     ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
     ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
     ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.uncorr@pciexbus/pciexdev/pciexfn,
+    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
+    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn,
     ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn,
     error.io.service.restored@pciexbus/pciexdev/pciexfn;
 
@@ -245,8 +245,8 @@ prop upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn (1)->
     ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
     ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
     ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.uncorr@pciexbus/pciexdev/pciexfn;
+    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
+    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn;
 
 prop upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn (1)->
     ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn,
