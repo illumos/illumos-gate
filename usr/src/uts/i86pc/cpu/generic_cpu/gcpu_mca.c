@@ -51,9 +51,12 @@
 #include "gcpu.h"
 
 /*
- * Set to suppress logging of telemetry found at initialization.
+ * Clear to log telemetry found at initialization.  While processor docs
+ * say you should process this telemetry on all but Intel family 0x6
+ * there are way too many exceptions and we want to avoid bogus
+ * diagnoses.
  */
-int gcpu_suppress_log_on_init = 0;
+int gcpu_suppress_log_on_init = 1;
 
 /*
  * gcpu_mca_stack_flag is a debug assist option to capture a stack trace at
