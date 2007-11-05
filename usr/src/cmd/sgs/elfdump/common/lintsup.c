@@ -44,15 +44,17 @@ foo()
 }
 
 #if	defined(_ELF64)
-void
-regular32(const char *file, int fd, Elf *elf, uint32_t flags, int wfd)
+int
+regular32(const char *file, int fd, Elf *elf, uint_t flags,
+    const char *wname, int wfd)
 {
-	regular64(file, fd, elf, flags, wfd);
+	return (regular64(file, fd, elf, flags, wname, wfd));
 }
 #else
-void
-regular64(const char *file, int fd, Elf *elf, uint32_t flags, int wfd)
+int
+regular64(const char *file, int fd, Elf *elf, uint_t flags,
+    const char *wname, int wfd)
 {
-	regular32(file, fd, elf, flags, wfd);
+	return (regular32(file, fd, elf, flags, wname, wfd));
 }
 #endif

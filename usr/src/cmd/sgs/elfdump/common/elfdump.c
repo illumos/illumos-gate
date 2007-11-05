@@ -195,7 +195,7 @@ relsymname(Cache *cache, Cache *csec, Cache *strsec, Word symndx, Word symnum,
 	 * string.
 	 */
 	if ((ELF_ST_TYPE(sym->st_info) == STT_SECTION) && (sym->st_name == 0)) {
-		if (flags & FLG_LONGNAME)
+		if (flags & FLG_CTL_LONGNAME)
 			(void) snprintf(secstr, secsz,
 			    MSG_INTL(MSG_STR_L_SECTION),
 			    cache[sym->st_shndx].c_name);
@@ -355,7 +355,7 @@ sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr)
 			    file, secname, EC_WORD(shdr->sh_type));
 		}
 
-		if (!match(0, secname, seccnt))
+		if (!match(MATCH_F_ALL, secname, seccnt, shdr->sh_type))
 			continue;
 
 		/*
@@ -466,7 +466,7 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		    MSG_SCN_FRMHDR_SIZE) != 0))
 			continue;
 
-		if (!match(0, _cache->c_name, cnt))
+		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
 			continue;
 
 		if (_cache->c_data == NULL)
@@ -1271,7 +1271,7 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
 		}
 	}
 
-	if ((flags & FLG_VERSIONS) == 0) {
+	if ((flags & FLG_SHOW_VERSIONS) == 0) {
 		/*
 		 * If GNU versioning applies to this object, and there
 		 * is a Verneed section, then examine it to determine
@@ -1480,7 +1480,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word info, Word disp_symndx,
 
 	if (state->ehdr->e_type == ET_CORE) {
 		sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
-	} else if (state->flags & FLG_FAKESHDR) {
+	} else if (state->flags & FLG_CTL_FAKESHDR) {
 		/*
 		 * If we are using fake section headers derived from
 		 * the program headers, then the section indexes
@@ -1671,7 +1671,7 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 		    (shdr->sh_type != SHT_DYNSYM) &&
 		    (shdr->sh_type != SHT_SUNW_LDYNSYM))
 			continue;
-		if (!match(0, _cache->c_name, secndx))
+		if (!match(MATCH_F_ALL, _cache->c_name, secndx, shdr->sh_type))
 			continue;
 
 		if (!init_symtbl_state(&state, cache, shnum, secndx, ehdr,
@@ -1716,7 +1716,8 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 		if ((sortshdr->sh_type != SHT_SUNW_symsort) &&
 		    (sortshdr->sh_type != SHT_SUNW_tlssort))
 			continue;
-		if (!match(0, sortcache->c_name, sortsecndx))
+		if (!match(MATCH_F_ALL, sortcache->c_name, sortsecndx,
+		    sortshdr->sh_type))
 			continue;
 
 		/*
@@ -1790,7 +1791,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 			 */
 			if (((ldynsym_state.sym + ldynsym_state.symn)
 			    != dynsym_state.sym) &&
-			    ((flags & FLG_FAKESHDR) == 0))
+			    ((flags & FLG_CTL_FAKESHDR) == 0))
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_LDYNNOTADJ), file,
 				    ldynsym_state.secname,
@@ -1849,7 +1850,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
 		if (((type = shdr->sh_type) != SHT_RELA) &&
 		    (type != SHT_REL))
 			continue;
-		if (!match(0, relname, cnt))
+		if (!match(MATCH_F_ALL, relname, cnt, type))
 			continue;
 
 		/*
@@ -2544,7 +2545,7 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 
 		if (shdr->sh_type != SHT_SUNW_move)
 			continue;
-		if (!match(0, _cache->c_name, cnt))
+		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
 			continue;
 
 		/*
@@ -2798,7 +2799,7 @@ note(Cache *cache, Word shnum, const char *file)
 
 		if (shdr->sh_type != SHT_NOTE)
 			continue;
-		if (!match(0, _cache->c_name, cnt))
+		if (!match(MATCH_F_ALL, _cache->c_name, cnt, shdr->sh_type))
 			continue;
 
 		/*
@@ -3031,7 +3032,7 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 
 		if (shdr->sh_type != SHT_GROUP)
 			continue;
-		if (!match(0, _cache->c_name, scnt))
+		if (!match(MATCH_F_ALL, _cache->c_name, scnt, shdr->sh_type))
 			continue;
 		if ((_cache->c_data == NULL) ||
 		    ((grpdata = (Word *)_cache->c_data->d_buf) == NULL))
@@ -3616,8 +3617,9 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 
 
 
-void
-regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
+int
+regular(const char *file, int fd, Elf *elf, uint_t flags,
+    const char *wname, int wfd)
 {
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
@@ -3625,34 +3627,36 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	Shdr		*shdr;
 	Cache		*cache;
 	VERSYM_STATE	versym;
+	int		ret = 0;
+	int		addr_align;
 
 	if ((ehdr = elf_getehdr(elf)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETEHDR));
-		return;
+		return (ret);
 	}
 
 	if (elf_getshnum(elf, &shnum) == 0) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSHNUM));
-		return;
+		return (ret);
 	}
 
 	if (elf_getshstrndx(elf, &shstrndx) == 0) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSHSTRNDX));
-		return;
+		return (ret);
 	}
 
 	if (elf_getphnum(elf, &phnum) == 0) {
 		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
-		return;
+		return (ret);
 	}
 	/*
 	 * If the user requested section headers derived from the
 	 * program headers (-P option) and this file doesn't have
 	 * any program headers (i.e. ET_REL), then we can't do it.
 	 */
-	if ((phnum == 0) && (flags & FLG_FAKESHDR)) {
+	if ((phnum == 0) && (flags & FLG_CTL_FAKESHDR)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_PNEEDSPH), file);
-		return;
+		return (ret);
 	}
 
 
@@ -3660,7 +3664,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 		if ((shdr = elf_getshdr(scn)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN), 0);
-			return;
+			return (ret);
 		}
 	} else
 		shdr = 0;
@@ -3668,7 +3672,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	/*
 	 * Print the elf header.
 	 */
-	if (flags & FLG_EHDR)
+	if (flags & FLG_SHOW_EHDR)
 		Elf_ehdr(0, ehdr, shdr);
 
 	/*
@@ -3676,27 +3680,35 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	 * alignment for the class of object, print a warning. libelf
 	 * can handle such files, but programs that use them can crash
 	 * when they dereference unaligned items.
+	 *
+	 * Note that the AMD64 ABI, although it is a 64-bit architecture,
+	 * allows access to data types smaller than 128-bits to be on
+	 * word alignment.
 	 */
-	if (ehdr->e_phoff & (sizeof (Addr) - 1))
+	if (ehdr->e_machine == EM_AMD64)
+		addr_align = sizeof (Word);
+	else
+		addr_align = sizeof (Addr);
+
+	if (ehdr->e_phoff & (addr_align - 1))
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADPHDRALIGN), file);
-	if (ehdr->e_shoff & (sizeof (Addr) - 1))
+	if (ehdr->e_shoff & (addr_align - 1))
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHDRALIGN), file);
 
 	/*
 	 * Print the program headers.
 	 */
-	if ((flags & FLG_PHDR) && (phnum != 0)) {
-		Conv_inv_buf_t	inv_buf;
-		Phdr		*phdr;
+	if ((flags & FLG_SHOW_PHDR) && (phnum != 0)) {
+		Phdr	*phdr;
 
 		if ((phdr = elf_getphdr(elf)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
-			return;
+			return (ret);
 		}
 
 		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
-			if (!match(0, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALT_FILE, &inv_buf), ndx))
+			if (!match(MATCH_F_PHDR| MATCH_F_NDX | MATCH_F_TYPE,
+			    NULL, ndx, phdr->p_type))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
@@ -3706,29 +3718,23 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	}
 
 	/*
-	 * Decide how to proceed if there are no sections, if there's just
-	 * one section (the first section can act as an extension of the
-	 * ELF header), or if only program header information was requested.
+	 * If we have flag bits set that explicitly require a show or calc
+	 * operation, but none of them require the section headers, then
+	 * we are done and can return now.
 	 */
-	if ((shnum <= 1) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
-		/* If a core file, display the note and return */
-		if ((ehdr->e_type == ET_CORE) && (flags & FLG_NOTE)) {
-			note(0, shnum, file);
-			return;
-		}
+	if (((flags & (FLG_MASK_SHOW | FLG_MASK_CALC)) != 0) &&
+	    ((flags & (FLG_MASK_SHOW_SHDR | FLG_MASK_CALC_SHDR)) == 0))
+		return (ret);
 
-		/* If only program header info was requested, we're done */
-		if (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)
-			return;
-
-		/*
-		 * Section headers are missing. Resort to synthesizing
-		 * section headers from the program headers.
-		 */
-		if ((flags & FLG_FAKESHDR) == 0) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHDR), file);
-			flags |= FLG_FAKESHDR;
-		}
+	/*
+	 * If there are no section headers, then resort to synthesizing
+	 * section headers from the program headers. This is normally
+	 * only done by explicit request, but in this case there's no
+	 * reason not to go ahead, since the alternative is simply to quit.
+	 */
+	if ((shnum <= 1) && ((flags & FLG_CTL_FAKESHDR) == 0)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHDR), file);
+		flags |= FLG_CTL_FAKESHDR;
 	}
 
 	/*
@@ -3739,13 +3745,20 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	 * Otherwise, we use the real section headers contained in the file.
 	 */
 
-	if (flags & FLG_FAKESHDR) {
+	if (flags & FLG_CTL_FAKESHDR) {
 		if (fake_shdr_cache(file, fd, elf, ehdr, &cache, &shnum) == 0)
-			return;
+			return (ret);
 	} else {
 		if (shdr_cache(file, elf, ehdr, shstrndx, shnum, &cache) == 0)
-			return;
+			return (ret);
 	}
+
+	/*
+	 * Everything from this point on requires section headers.
+	 * If we have no section headers, there is no reason to continue.
+	 */
+	if (shnum <= 1)
+		goto done;
 
 	/*
 	 * If -w was specified, find and write out the section(s) data.
@@ -3754,64 +3767,176 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 		for (ndx = 1; ndx < shnum; ndx++) {
 			Cache	*_cache = &cache[ndx];
 
-			if (match(1, _cache->c_name, ndx) && _cache->c_data) {
-				(void) write(wfd, _cache->c_data->d_buf,
-				    _cache->c_data->d_size);
+			if (match(MATCH_F_STRICT | MATCH_F_ALL, _cache->c_name,
+			    ndx, _cache->c_shdr->sh_type) &&
+			    _cache->c_data && _cache->c_data->d_buf) {
+				if (write(wfd, _cache->c_data->d_buf,
+				    _cache->c_data->d_size) !=
+				    _cache->c_data->d_size) {
+					int err = errno;
+					(void) fprintf(stderr,
+					    MSG_INTL(MSG_ERR_WRITE), wname,
+					    strerror(err));
+					/*
+					 * Return an exit status of 1, because
+					 * the failure is not related to the
+					 * ELF file, but by system resources.
+					 */
+					ret = 1;
+					goto done;
+				}
 			}
 		}
 	}
 
-	if (flags & FLG_SHDR)
+	/*
+	 * If we have no flag bits set that explicitly require a show or calc
+	 * operation, but match options (-I, -N, -T) were used, then run
+	 * through the section headers and see if we can't deduce show flags
+	 * from the match options given.
+	 *
+	 * We don't do this if -w was specified, because (-I, -N, -T) used
+	 * with -w in lieu of some other option is supposed to be quiet.
+	 */
+	if ((wfd == 0) && (flags & FLG_CTL_MATCH) &&
+	    ((flags & (FLG_MASK_SHOW | FLG_MASK_CALC)) == 0)) {
+		for (ndx = 1; ndx < shnum; ndx++) {
+			Cache	*_cache = &cache[ndx];
+
+			if (!match(MATCH_F_STRICT | MATCH_F_ALL, _cache->c_name,
+			    ndx, _cache->c_shdr->sh_type))
+				continue;
+
+			switch (_cache->c_shdr->sh_type) {
+			case SHT_PROGBITS:
+				/*
+				 * Heuristic time: It is usually bad form
+				 * to assume that specific section names
+				 * have a given meaning. However, the
+				 * ELF ABI does specify a few such names. Try
+				 * to match them:
+				 */
+				if (strcmp(_cache->c_name,
+				    MSG_ORIG(MSG_ELF_INTERP)) == 0)
+					flags |= FLG_SHOW_INTERP;
+				else if (strcmp(_cache->c_name,
+				    MSG_ORIG(MSG_ELF_GOT)) == 0)
+					flags |= FLG_SHOW_GOT;
+				break;
+
+			case SHT_SYMTAB:
+			case SHT_DYNSYM:
+			case SHT_SUNW_LDYNSYM:
+			case SHT_SUNW_versym:
+			case SHT_SYMTAB_SHNDX:
+				flags |= FLG_SHOW_SYMBOLS;
+				break;
+
+			case SHT_RELA:
+			case SHT_REL:
+				flags |= FLG_SHOW_RELOC;
+				break;
+
+			case SHT_HASH:
+				flags |= FLG_SHOW_HASH;
+				break;
+
+			case SHT_DYNAMIC:
+				flags |= FLG_SHOW_DYNAMIC;
+				break;
+
+			case SHT_NOTE:
+				flags |= FLG_SHOW_NOTE;
+				break;
+
+			case SHT_GROUP:
+				flags |= FLG_SHOW_GROUP;
+				break;
+
+			case SHT_SUNW_symsort:
+			case SHT_SUNW_tlssort:
+				flags |= FLG_SHOW_SORT;
+				break;
+
+			case SHT_SUNW_cap:
+				flags |= FLG_SHOW_CAP;
+				break;
+
+			case SHT_SUNW_move:
+				flags |= FLG_SHOW_MOVE;
+				break;
+
+			case SHT_SUNW_syminfo:
+				flags |= FLG_SHOW_SYMINFO;
+				break;
+
+			case SHT_SUNW_verdef:
+			case SHT_SUNW_verneed:
+				flags |= FLG_SHOW_VERSIONS;
+				break;
+
+			case SHT_AMD64_UNWIND:
+				flags |= FLG_SHOW_UNWIND;
+				break;
+			}
+		}
+	}
+
+
+	if (flags & FLG_SHOW_SHDR)
 		sections(file, cache, shnum, ehdr);
 
-	if (flags & FLG_INTERP)
+	if (flags & FLG_SHOW_INTERP)
 		interp(file, cache, shnum, phnum, elf);
 
 	versions(cache, shnum, file, flags, &versym);
 
-	if (flags & FLG_SYMBOLS)
+	if (flags & FLG_SHOW_SYMBOLS)
 		symbols(cache, shnum, ehdr, &versym, file, flags);
 
-	if (flags & FLG_SORT)
+	if (flags & FLG_SHOW_SORT)
 		sunw_sort(cache, shnum, ehdr, &versym, file, flags);
 
-	if (flags & FLG_HASH)
+	if (flags & FLG_SHOW_HASH)
 		hash(cache, shnum, file, flags);
 
-	if (flags & FLG_GOT)
+	if (flags & FLG_SHOW_GOT)
 		got(cache, shnum, ehdr, file, flags);
 
-	if (flags & FLG_GROUP)
+	if (flags & FLG_SHOW_GROUP)
 		group(cache, shnum, file, flags);
 
-	if (flags & FLG_SYMINFO)
+	if (flags & FLG_SHOW_SYMINFO)
 		syminfo(cache, shnum, file);
 
-	if (flags & FLG_RELOC)
+	if (flags & FLG_SHOW_RELOC)
 		reloc(cache, shnum, ehdr, file, flags);
 
-	if (flags & FLG_DYNAMIC)
+	if (flags & FLG_SHOW_DYNAMIC)
 		dynamic(cache, shnum, ehdr, file);
 
-	if (flags & FLG_NOTE)
+	if (flags & FLG_SHOW_NOTE)
 		note(cache, shnum, file);
 
-	if (flags & FLG_MOVE)
+	if (flags & FLG_SHOW_MOVE)
 		move(cache, shnum, file, flags);
 
-	if (flags & FLG_CHECKSUM)
+	if (flags & FLG_CALC_CHECKSUM)
 		checksum(elf);
 
-	if (flags & FLG_CAP)
+	if (flags & FLG_SHOW_CAP)
 		cap(file, cache, shnum, phnum, ehdr, elf);
 
-	if (flags & FLG_UNWIND)
+	if (flags & FLG_SHOW_UNWIND)
 		unwind(cache, shnum, phnum, ehdr, file, elf);
 
 
 	/* Release the memory used to cache section headers */
-	if (flags & FLG_FAKESHDR)
+done:
+	if (flags & FLG_CTL_FAKESHDR)
 		fake_shdr_cache_free(cache, shnum);
 	else
 		free(cache);
+
+	return (ret);
 }

@@ -39,29 +39,67 @@
 extern "C" {
 #endif
 
-#define	FLG_DYNAMIC	0x00000001
-#define	FLG_EHDR	0x00000002
-#define	FLG_INTERP	0x00000004
-#define	FLG_SHDR	0x00000008
-#define	FLG_NOTE	0x00000010
-#define	FLG_PHDR	0x00000020
-#define	FLG_RELOC	0x00000040
-#define	FLG_SYMBOLS	0x00000080
-#define	FLG_VERSIONS	0x00000100
-#define	FLG_HASH	0x00000200
-#define	FLG_GOT		0x00000400
-#define	FLG_SYMINFO	0x00000800
-#define	FLG_MOVE	0x00001000
-#define	FLG_GROUP	0x00002000
-#define	FLG_CAP		0x00004000
-#define	FLG_UNWIND	0x00008000
-#define	FLG_SORT	0x00010000
-#define	FLG_LONGNAME	0x00100000	/* not done by default */
-#define	FLG_CHECKSUM	0x00200000	/* not done by default */
-#define	FLG_DEMANGLE	0x00400000	/* not done by default */
-#define	FLG_FAKESHDR	0x00800000	/* not done by default */
-#define	FLG_EVERYTHING	0x000fffff
+/*
+ * flags: This is a bitmask that controls elfdump's operations. There
+ * are three categories of flag:
+ *
+ *	SHOW - Specify categories of things in the ELF object to display.
+ *	CALC - Compute something based on the contents of the ELF object.
+ *	CTL - Control options specify general options that are not
+ *		specific to any specific part of the ELF object, but
+ *		which apply at a higher level.
+ *
+ * To simplify masking these categories, they are assigned bit ranges
+ * as follows:
+ *	SHOW: Bottom 24-bits
+ *	CALC: Upper nibble of most significant byte
+ *	CTL: Lower nibble of most significant byte
+ */
+#define	FLG_SHOW_DYNAMIC	0x00000001
+#define	FLG_SHOW_EHDR		0x00000002
+#define	FLG_SHOW_INTERP		0x00000004
+#define	FLG_SHOW_SHDR		0x00000008
+#define	FLG_SHOW_NOTE		0x00000010
+#define	FLG_SHOW_PHDR		0x00000020
+#define	FLG_SHOW_RELOC		0x00000040
+#define	FLG_SHOW_SYMBOLS	0x00000080
+#define	FLG_SHOW_VERSIONS	0x00000100
+#define	FLG_SHOW_HASH		0x00000200
+#define	FLG_SHOW_GOT		0x00000400
+#define	FLG_SHOW_SYMINFO	0x00000800
+#define	FLG_SHOW_MOVE		0x00001000
+#define	FLG_SHOW_GROUP		0x00002000
+#define	FLG_SHOW_CAP		0x00004000
+#define	FLG_SHOW_UNWIND		0x00008000
+#define	FLG_SHOW_SORT		0x00010000
 
+#define	FLG_CTL_LONGNAME	0x01000000
+#define	FLG_CTL_DEMANGLE	0x02000000
+#define	FLG_CTL_FAKESHDR	0x04000000
+#define	FLG_CTL_MATCH		0x08000000
+
+#define	FLG_CALC_CHECKSUM	0x10000000
+
+/* Bitmasks that isolate the parts of a flag value */
+#define	FLG_MASK_SHOW		0x00ffffff
+#define	FLG_MASK_CTL		0x0f000000
+#define	FLG_MASK_CALC		0xf0000000
+
+/*
+ * Mask that selects the show flags that do not require the ELF
+ * object to have a section header array.
+ */
+#define	FLG_MASK_SHOW_NOSHDR	(FLG_SHOW_EHDR | FLG_SHOW_PHDR)
+
+/*
+ * Masks to select the flags that require the ELF object to
+ * have a section header array, within each flag type.
+ */
+#define	FLG_MASK_SHOW_SHDR	(FLG_MASK_SHOW & ~FLG_MASK_SHOW_NOSHDR)
+#define	FLG_MASK_CALC_SHDR	FLG_CALC_CHECKSUM
+
+
+/* Size of buffer used for formatting an index into textual representation */
 #define	MAXNDXSIZE	10
 
 typedef struct cache {
@@ -83,7 +121,42 @@ extern	const Cache	 cache_init;
 
 extern	void		failure(const char *, const char *);
 extern	const char	*demangle(const char *, uint_t);
-extern int		match(int, const char *, int);
+
+
+/*
+ * Flags for the match() function:
+ *	MATCH_F_STRICT
+ *		A strict match requires an explicit match to
+ *		a user specified match (-I, -N, -T) option. A
+ *		non-strict match also succeeds if the match
+ *		list is empty.
+ *
+ *	MATCH_F_PHDR
+ *		The match item is a program header. If this
+ *		flag is not set, the match item is a section
+ *		header.
+ *
+ *	MATCH_F_NAME
+ *		The name parameter contains valid information.
+ *
+ *	MATCH_F_NDX
+ *		The ndx argument contains valid information
+ *
+ *	MATCH_F_TYPE
+ *		The type argument contains valid information
+ */
+typedef enum {
+	MATCH_F_STRICT =	1,
+	MATCH_F_PHDR =		2,
+	MATCH_F_NAME =		4,
+	MATCH_F_NDX =		8,
+	MATCH_F_TYPE =		16
+} match_flags_t;
+
+/* It is common for calls to match() to specify all three arguments */
+#define	MATCH_F_ALL	(MATCH_F_NAME | MATCH_F_NDX | MATCH_F_TYPE)
+
+extern int	match(match_flags_t, const char *, uint_t, uint_t);
 
 /*
  * Define various elfdump() functions into their 32-bit and 64-bit variants.
@@ -146,8 +219,8 @@ extern	int	fake_shdr_cache64(const char *, int, Elf *, Elf64_Ehdr *,
 extern	void	fake_shdr_cache_free32(Cache *, size_t);
 extern	void	fake_shdr_cache_free64(Cache *, size_t);
 
-extern	void	regular32(const char *, int, Elf *, uint_t, int);
-extern	void	regular64(const char *, int, Elf *, uint_t, int);
+extern	int	regular32(const char *, int, Elf *, uint_t, const char *, int);
+extern	int	regular64(const char *, int, Elf *, uint_t, const char *, int);
 
 #ifdef	__cplusplus
 }

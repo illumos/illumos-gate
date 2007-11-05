@@ -1296,3 +1296,5 @@ Bugid   Risk Synopsis
 	"rejected: Invalid argument"
 6617855 nodirect tag can be ignored when other syminfo tags are available
 	(link-editor components only)
+6621066 Reduce need for new elfdump options with every section type (D)
+	PSARC/2007/620 elfdump -T, and simplified matching

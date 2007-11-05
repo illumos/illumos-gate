@@ -46,32 +46,228 @@
 #include	<conv.h>
 #include	<msg.h>
 #include	<_elfdump.h>
+#include	<sys/elf_SPARC.h>
+#include	<sys/elf_amd64.h>
+
 
 const Cache	cache_init = {NULL, NULL, NULL, NULL, 0};
 
 
 
-/* MATCH is  used to retain information about -N and -I options */
+/*
+ * The -I, -N, and -T options are called "match options", because
+ * they allow selecting the items to be displayed based on matching
+ * their index, name, or type.
+ *
+ * The ELF information to which -I, -N, or -T are applied in
+ * the current invocation is called the "match item".
+ */
 typedef enum {
-	MATCH_T_NAME,		/* Record contains a name */
-	MATCH_T_NDX,		/* Record contains a single index */
-	MATCH_T_RANGE		/* Record contains an index range */
-} MATCH_T;
+	MATCH_ITEM_PT,		/* Program header (PT_) */
+	MATCH_ITEM_SHT		/* Section header (SHT_) */
+} match_item_t;
+
+/* match_opt_t is  used to note which match option was used */
+typedef enum {
+	MATCH_OPT_NAME,		/* Record contains a name */
+	MATCH_OPT_NDX,		/* Record contains a single index */
+	MATCH_OPT_RANGE,	/* Record contains an index range */
+	MATCH_OPT_TYPE,		/* Record contains a type (shdr or phdr) */
+} match_opt_t;
 
 typedef struct _match {
 	struct _match	*next;		/* Pointer to next item in list */
-	MATCH_T		type;
+	match_opt_t	opt_type;
 	union {
-		const char	*name;	/* MATCH_T_NAME */
-		struct {		/* MATCH_T_NDX and MATCH_T_RANGE */
+		const char	*name;	/* MATCH_OPT_NAME */
+		struct {		/* MATCH_OPT_NDX and MATCH_OPT_RANGE */
 			int	start;
-			int	end;	/* Only for MATCH_T_RANGE */
+			int	end;	/* Only for MATCH_OPT_RANGE */
 		} ndx;
+		uint32_t	type;	/* MATCH_OPT_TYPE */
 	} value;
-} MATCH;
+} match_rec_t;
 
-/* List of MATCH records used by match() to implement -N and -I options */
-static MATCH *match_list = NULL;
+static struct {
+	match_item_t	item_type;	/* Type of item being matched */
+	match_rec_t	*list;		/* Records for (-I, -N, -T) options */
+} match_state;
+
+
+
+/* Map names to their integer value */
+typedef struct {
+	const char	*sym_name;
+	uint32_t	sym_value;
+} atoui_sym_t;
+
+/*
+ * ELF section types.
+ */
+static atoui_sym_t sym_sht[] = {
+	{ MSG_ORIG(MSG_SHT_NULL),		SHT_NULL },
+	{ MSG_ORIG(MSG_SHT_NULL_ALT1),		SHT_NULL },
+
+	{ MSG_ORIG(MSG_SHT_PROGBITS),		SHT_PROGBITS },
+	{ MSG_ORIG(MSG_SHT_PROGBITS_ALT1),	SHT_PROGBITS },
+
+	{ MSG_ORIG(MSG_SHT_SYMTAB),		SHT_SYMTAB },
+	{ MSG_ORIG(MSG_SHT_SYMTAB_ALT1),	SHT_SYMTAB },
+
+	{ MSG_ORIG(MSG_SHT_STRTAB),		SHT_STRTAB },
+	{ MSG_ORIG(MSG_SHT_STRTAB_ALT1),	SHT_STRTAB },
+
+	{ MSG_ORIG(MSG_SHT_RELA),		SHT_RELA },
+	{ MSG_ORIG(MSG_SHT_RELA_ALT1),		SHT_RELA },
+
+	{ MSG_ORIG(MSG_SHT_HASH),		SHT_HASH },
+	{ MSG_ORIG(MSG_SHT_HASH_ALT1),		SHT_HASH },
+
+	{ MSG_ORIG(MSG_SHT_DYNAMIC),		SHT_DYNAMIC },
+	{ MSG_ORIG(MSG_SHT_DYNAMIC_ALT1),	SHT_DYNAMIC },
+
+	{ MSG_ORIG(MSG_SHT_NOTE),		SHT_NOTE },
+	{ MSG_ORIG(MSG_SHT_NOTE_ALT1),		SHT_NOTE },
+
+	{ MSG_ORIG(MSG_SHT_NOBITS),		SHT_NOBITS },
+	{ MSG_ORIG(MSG_SHT_NOBITS_ALT1),	SHT_NOBITS },
+
+	{ MSG_ORIG(MSG_SHT_REL),		SHT_REL },
+	{ MSG_ORIG(MSG_SHT_REL_ALT1),		SHT_REL },
+
+	{ MSG_ORIG(MSG_SHT_SHLIB),		SHT_SHLIB },
+	{ MSG_ORIG(MSG_SHT_SHLIB_ALT1),		SHT_SHLIB },
+
+	{ MSG_ORIG(MSG_SHT_DYNSYM),		SHT_DYNSYM },
+	{ MSG_ORIG(MSG_SHT_DYNSYM_ALT1),	SHT_DYNSYM },
+
+	{ MSG_ORIG(MSG_SHT_INIT_ARRAY),		SHT_INIT_ARRAY },
+	{ MSG_ORIG(MSG_SHT_INIT_ARRAY_ALT1),	SHT_INIT_ARRAY },
+
+	{ MSG_ORIG(MSG_SHT_FINI_ARRAY),		SHT_FINI_ARRAY },
+	{ MSG_ORIG(MSG_SHT_FINI_ARRAY_ALT1),	SHT_FINI_ARRAY },
+
+	{ MSG_ORIG(MSG_SHT_PREINIT_ARRAY),	SHT_PREINIT_ARRAY },
+	{ MSG_ORIG(MSG_SHT_PREINIT_ARRAY_ALT1),	SHT_PREINIT_ARRAY },
+
+	{ MSG_ORIG(MSG_SHT_GROUP),		SHT_GROUP },
+	{ MSG_ORIG(MSG_SHT_GROUP_ALT1),		SHT_GROUP },
+
+	{ MSG_ORIG(MSG_SHT_SYMTAB_SHNDX),	SHT_SYMTAB_SHNDX },
+	{ MSG_ORIG(MSG_SHT_SYMTAB_SHNDX_ALT1),	SHT_SYMTAB_SHNDX },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_SYMSORT),	SHT_SUNW_symsort },
+	{ MSG_ORIG(MSG_SHT_SUNW_SYMSORT_ALT1),	SHT_SUNW_symsort },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_TLSSORT),	SHT_SUNW_tlssort },
+	{ MSG_ORIG(MSG_SHT_SUNW_TLSSORT_ALT1),	SHT_SUNW_tlssort },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_LDYNSYM),	SHT_SUNW_LDYNSYM },
+	{ MSG_ORIG(MSG_SHT_SUNW_LDYNSYM_ALT1),	SHT_SUNW_LDYNSYM },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_DOF),		SHT_SUNW_dof },
+	{ MSG_ORIG(MSG_SHT_SUNW_DOF_ALT1),	SHT_SUNW_dof },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_CAP),		SHT_SUNW_cap },
+	{ MSG_ORIG(MSG_SHT_SUNW_CAP_ALT1),	SHT_SUNW_cap },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_SIGNATURE),	SHT_SUNW_SIGNATURE },
+	{ MSG_ORIG(MSG_SHT_SUNW_SIGNATURE_ALT1), SHT_SUNW_SIGNATURE },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_ANNOTATE),	SHT_SUNW_ANNOTATE },
+	{ MSG_ORIG(MSG_SHT_SUNW_ANNOTATE_ALT1),	SHT_SUNW_ANNOTATE },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_DEBUGSTR),	SHT_SUNW_DEBUGSTR },
+	{ MSG_ORIG(MSG_SHT_SUNW_DEBUGSTR_ALT1),	SHT_SUNW_DEBUGSTR },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_DEBUG),		SHT_SUNW_DEBUG },
+	{ MSG_ORIG(MSG_SHT_SUNW_DEBUG_ALT1),	SHT_SUNW_DEBUG },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_MOVE),		SHT_SUNW_move },
+	{ MSG_ORIG(MSG_SHT_SUNW_MOVE_ALT1),	SHT_SUNW_move },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_COMDAT),	SHT_SUNW_COMDAT },
+	{ MSG_ORIG(MSG_SHT_SUNW_COMDAT_ALT1),	SHT_SUNW_COMDAT },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_SYMINFO),	SHT_SUNW_syminfo },
+	{ MSG_ORIG(MSG_SHT_SUNW_SYMINFO_ALT1),	SHT_SUNW_syminfo },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_VERDEF),	SHT_SUNW_verdef },
+	{ MSG_ORIG(MSG_SHT_SUNW_VERDEF_ALT1),	SHT_SUNW_verdef },
+
+	{ MSG_ORIG(MSG_SHT_GNU_VERDEF),		SHT_GNU_verdef },
+	{ MSG_ORIG(MSG_SHT_GNU_VERDEF_ALT1),	SHT_GNU_verdef },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_VERNEED),	SHT_SUNW_verneed },
+	{ MSG_ORIG(MSG_SHT_SUNW_VERNEED_ALT1),	SHT_SUNW_verneed },
+
+	{ MSG_ORIG(MSG_SHT_GNU_VERNEED),	SHT_GNU_verneed },
+	{ MSG_ORIG(MSG_SHT_GNU_VERNEED_ALT1),	SHT_GNU_verneed },
+
+	{ MSG_ORIG(MSG_SHT_SUNW_VERSYM),	SHT_SUNW_versym },
+	{ MSG_ORIG(MSG_SHT_SUNW_VERSYM_ALT1),	SHT_SUNW_versym },
+
+	{ MSG_ORIG(MSG_SHT_GNU_VERSYM),		SHT_GNU_versym },
+	{ MSG_ORIG(MSG_SHT_GNU_VERSYM_ALT1),	SHT_GNU_versym },
+
+	{ MSG_ORIG(MSG_SHT_SPARC_GOTDATA),	SHT_SPARC_GOTDATA },
+	{ MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT1),	SHT_SPARC_GOTDATA },
+
+	{ MSG_ORIG(MSG_SHT_AMD64_UNWIND),	SHT_AMD64_UNWIND },
+	{ MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT1),	SHT_AMD64_UNWIND },
+
+	{ NULL }
+};
+
+/*
+ * Program header PT_* type values
+ */
+static atoui_sym_t sym_pt[] = {
+	{ MSG_ORIG(MSG_PT_NULL),		PT_NULL },
+	{ MSG_ORIG(MSG_PT_NULL_ALT1),		PT_NULL },
+
+	{ MSG_ORIG(MSG_PT_LOAD),		PT_LOAD },
+	{ MSG_ORIG(MSG_PT_LOAD_ALT1),		PT_LOAD },
+
+	{ MSG_ORIG(MSG_PT_DYNAMIC),		PT_DYNAMIC },
+	{ MSG_ORIG(MSG_PT_DYNAMIC_ALT1),	PT_DYNAMIC },
+
+	{ MSG_ORIG(MSG_PT_INTERP),		PT_INTERP },
+	{ MSG_ORIG(MSG_PT_INTERP_ALT1),		PT_INTERP },
+
+	{ MSG_ORIG(MSG_PT_NOTE),		PT_NOTE },
+	{ MSG_ORIG(MSG_PT_NOTE_ALT1),		PT_NOTE },
+
+	{ MSG_ORIG(MSG_PT_SHLIB),		PT_SHLIB },
+	{ MSG_ORIG(MSG_PT_SHLIB_ALT1),		PT_SHLIB },
+
+	{ MSG_ORIG(MSG_PT_PHDR),		PT_PHDR },
+	{ MSG_ORIG(MSG_PT_PHDR_ALT1),		PT_PHDR },
+
+	{ MSG_ORIG(MSG_PT_TLS),			PT_TLS },
+	{ MSG_ORIG(MSG_PT_TLS_ALT1),		PT_TLS },
+
+	{ MSG_ORIG(MSG_PT_SUNW_UNWIND),		PT_SUNW_UNWIND },
+	{ MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT1),	PT_SUNW_UNWIND },
+
+	{ MSG_ORIG(MSG_PT_SUNWBSS),		PT_SUNWBSS },
+	{ MSG_ORIG(MSG_PT_SUNWBSS_ALT1),	PT_SUNWBSS },
+
+	{ MSG_ORIG(MSG_PT_SUNWSTACK),		PT_SUNWSTACK },
+	{ MSG_ORIG(MSG_PT_SUNWSTACK_ALT1),	PT_SUNWSTACK },
+
+	{ MSG_ORIG(MSG_PT_SUNWDTRACE),		PT_SUNWDTRACE },
+	{ MSG_ORIG(MSG_PT_SUNWDTRACE_ALT1),	PT_SUNWDTRACE },
+
+	{ MSG_ORIG(MSG_PT_SUNWCAP),		PT_SUNWCAP },
+	{ MSG_ORIG(MSG_PT_SUNWCAP_ALT1),	PT_SUNWCAP },
+
+	{ NULL }
+};
+
+
+
+
 
 const char *
 _elfdump_msg(Msg mid)
@@ -85,7 +281,7 @@ _elfdump_msg(Msg mid)
 const char *
 demangle(const char *name, uint_t flags)
 {
-	if (flags & FLG_DEMANGLE)
+	if (flags & FLG_CTL_DEMANGLE)
 		return (Elf_demangle_name(name));
 	else
 		return ((char *)name);
@@ -131,6 +327,7 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL22));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL23));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL24));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL25));
 }
 
 /*
@@ -143,12 +340,12 @@ detail_usage()
  *		any values equal to or greater than the first will match.
  *
  * exit:
- *	On success, *rec is filled in with a MATCH_T_NDX or MATCH_T_RANGE
+ *	On success, *rec is filled in with a MATCH_OPT_NDX or MATCH_OPT_RANGE
  *	value, and this function returns (1). On failure, the contents
  *	of *rec are undefined, and (0) is returned.
  */
 int
-process_index_opt(const char *str, MATCH *rec)
+process_index_opt(const char *str, match_rec_t *rec)
 {
 #define	SKIP_BLANK for (; *str && isspace(*str); str++)
 
@@ -162,10 +359,10 @@ process_index_opt(const char *str, MATCH *rec)
 
 	SKIP_BLANK;
 	if (*str != ':') {
-		rec->type = MATCH_T_NDX;
+		rec->opt_type = MATCH_OPT_NDX;
 	} else {
 		str++;					/* Skip the ':' */
-		rec->type = MATCH_T_RANGE;
+		rec->opt_type = MATCH_OPT_RANGE;
 		SKIP_BLANK;
 		if (*str == '\0') {
 			rec->value.ndx.end = -1;	/* Indicates "to end" */
@@ -188,52 +385,218 @@ process_index_opt(const char *str, MATCH *rec)
 }
 
 /*
+ * Process the symbolic name to value mappings passed to the
+ * atoui() function.
+ *
+ * entry:
+ *	sym - NULL terminated array of name->value mappings.
+ *	value - Address of variable to receive corresponding value.
+ *
+ * exit:
+ *	If a mapping is found, *value is set to it, and True is returned.
+ *	Otherwise False is returned.
+ */
+static int
+atoui_sym_process(const char *str, const atoui_sym_t *sym, uint32_t *value)
+{
+	size_t		cmp_len;
+	const char	*tail;
+
+	while (isspace(*str))
+		str++;
+
+	tail = str + strlen(str);
+	while ((tail > str) && isspace(*(tail - 1)))
+		tail--;
+
+	cmp_len = tail - str;
+
+	for (; sym->sym_name != NULL; sym++) {
+		if ((strlen(sym->sym_name) == cmp_len) &&
+		    (strncasecmp(sym->sym_name, str, cmp_len) == 0)) {
+			*value = sym->sym_value;
+			return (1);
+		}
+	}
+
+	/* No symbolic mapping was found */
+	return (0);
+}
+
+
+/*
+ * Convert a string to a numeric value. Strings starting with '0'
+ * are taken to be octal, those staring with '0x' are hex, and all
+ * others are decimal.
+ *
+ * entry:
+ *	str - String to be converted
+ *	sym - NULL, or NULL terminated array of name/value pairs.
+ *	v - Address of variable to receive resulting value.
+ *
+ * exit:
+ *	On success, returns True (1) and *v is set to the value.
+ *	On failure, returns False (0) and *v is undefined.
+ */
+static int
+atoui(const char *str, const atoui_sym_t *sym, uint32_t *v)
+{
+	char		*endptr;
+
+	if (sym && atoui_sym_process(str, sym, v))
+		return (1);
+
+	*v = strtoull(str, &endptr, 0);
+
+	/* If the left over part contains anything but whitespace, fail */
+	for (; *endptr; endptr++)
+		if (!isspace(*endptr))
+			return (0);
+	return (1);
+}
+
+/*
+ * Called after getopt() processing is finished if there is a non-empty
+ * match list. Prepares the matching code for use.
+ *
+ * exit:
+ *	Returns True (1) if no errors are encountered. Writes an
+ *	error string to stderr and returns False (0) otherwise.
+ */
+static int
+match_prepare(char *argv0, uint_t flags)
+{
+	atoui_sym_t	*sym;
+	match_rec_t	*list;
+	const char	*str;
+	int		minus_p = (flags & FLG_SHOW_PHDR) != 0;
+
+	/*
+	 * Flag ambiguous attempt to use match option with both -p and
+	 * and one or more section SHOW options. In this case, we
+	 * can't tell what type of item we're supposed to match against.
+	 */
+	if (minus_p && (flags & FLG_MASK_SHOW_SHDR)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_AMBIG_MATCH),
+		    basename(argv0));
+		return (0);
+	}
+
+	/* Set the match type, based on the presence of the -p option */
+	if (minus_p) {
+		match_state.item_type = MATCH_ITEM_PT;
+		sym = sym_pt;
+	} else {
+		match_state.item_type = MATCH_ITEM_SHT;
+		sym = sym_sht;
+	}
+
+	/*
+	 * Scan match list and perform any necessary fixups:
+	 *
+	 * MATCH_OPT_NAME: If -p is specified, convert MATCH_OPT_NAME (-N)
+	 *	requests into MATCH_OPT_TYPE (-T).
+	 *
+	 * MATCH_OPT_TYPE: Now that we know item type we are matching
+	 *	against, we can convert the string saved in the name
+	 *	field during getopt() processing into an integer and
+	 *	write it into the type field.
+	 */
+	for (list = match_state.list; list; list = list->next) {
+		if ((list->opt_type == MATCH_OPT_NAME) && minus_p)
+			list->opt_type = MATCH_OPT_TYPE;
+
+		if (list->opt_type != MATCH_OPT_TYPE)
+			continue;
+
+		str = list->value.name;
+		if (atoui(str, sym, &list->value.type) == 0) {
+			const char *fmt = minus_p ?
+			    MSG_INTL(MSG_ERR_BAD_T_PT) :
+			    MSG_INTL(MSG_ERR_BAD_T_SHT);
+
+			(void) fprintf(stderr, fmt, basename(argv0), str);
+			return (0);
+		}
+	}
+
+	return (1);
+}
+
+
+/*
  * Returns True (1) if the item with the given name or index should
  * be displayed, and False (0) if it should not be.
  *
  * entry:
- *	strict - A strict match requires an explicit match to
- *		a user specified -I or -N option. A non-strict match
- *		succeeds if the match list is empty.
- *	name - Name of item under consideration, or NULL if the name
+ *	match_flags - Bitmask specifying matching options, as described
+ *		in _elfdump.h.
+ *	name - If MATCH_F_NAME flag is set, name of item under
+ *		consideration. Otherwise ignored.
  *		should not be considered.
- *	ndx - if (ndx >= 0) index of item under consideration.
- *		A negative value indicates that the item has no index.
+ *	ndx - If MATCH_F_NDX flag is set, index of item under consideration.
+ *	type - If MATCH_F_TYPE is set, type of item under consideration.
+ *		If MATCH_F_PHDR is set, this would be a program
+ *		header type (PT_). Otherwise, a section header type (SHT_).
  *
  * exit:
  *	True will be returned if the given name/index matches those given
- *	by one of the -N or -I command line options, or if no such option
- *	was used in the command invocation.
+ *	by one of the (-I, -N -T) command line options, or if no such option
+ *	was used in the command invocation and MATCH_F_STRICT is not
+ *	set.
  */
 int
-match(int strict, const char *name, int ndx)
+match(match_flags_t match_flags, const char *name, uint_t ndx, uint_t type)
 {
-	MATCH *list;
+	match_item_t item_type = (match_flags & MATCH_F_PHDR) ?
+	    MATCH_ITEM_PT  : MATCH_ITEM_SHT;
+	match_rec_t *list;
 
-	/* If no match options were specified, allow everything */
-	if (!strict && (match_list == NULL))
+	/*
+	 * If there is no match list, then we use the MATCH_F_STRICT
+	 * flag to decide what to return. In the strict case, we return
+	 * False (0), in the normal case, True (1).
+	 */
+	if (match_state.list == NULL)
+		return ((match_flags & MATCH_F_STRICT) == 0);
+
+	/*
+	 * If item being checked is not the current match type,
+	 * then allow it.
+	 */
+	if (item_type != match_state.item_type)
 		return (1);
 
 	/* Run through the match records and check for a hit */
-	for (list = match_list; list; list = list->next) {
-		switch (list->type) {
-		case MATCH_T_NAME:
-			if ((name != NULL) &&
-			    (strcmp(list->value.name, name) == 0))
+	for (list = match_state.list; list; list = list->next) {
+		switch (list->opt_type) {
+		case MATCH_OPT_NAME:
+			if (((match_flags & MATCH_F_NAME) == 0) ||
+			    (name == NULL))
+				break;
+			if (strcmp(list->value.name, name) == 0)
 				return (1);
 			break;
-		case MATCH_T_NDX:
-			if (ndx == list->value.ndx.start)
+		case MATCH_OPT_NDX:
+			if ((match_flags & MATCH_F_NDX) &&
+			    (ndx == list->value.ndx.start))
 				return (1);
 			break;
-		case MATCH_T_RANGE:
+		case MATCH_OPT_RANGE:
 			/*
 			 * A range end value less than 0 means that any value
 			 * above the start is acceptible.
 			 */
-			if ((ndx >= list->value.ndx.start) &&
+			if ((match_flags & MATCH_F_NDX) &&
+			    (ndx >= list->value.ndx.start) &&
 			    ((list->value.ndx.end < 0) ||
 			    (ndx <= list->value.ndx.end)))
+				return (1);
+			break;
+
+		case MATCH_OPT_TYPE:
+			if ((match_flags & MATCH_F_TYPE) &&
+			    (type == list->value.type))
 				return (1);
 			break;
 		}
@@ -244,16 +607,18 @@ match(int strict, const char *name, int ndx)
 }
 
 /*
- * Add an entry to match_list for use by match().
+ * Add an entry to match_state.list for use by match(). This routine is for
+ * use during getopt() processing. It should not be called once
+ * match_prepare() has been called.
  *
  * Return True (1) for success. On failure, an error is written
  * to stderr, and False (0) is returned.
  */
 static int
-add_match_record(char *argv0, MATCH *data)
+add_match_record(char *argv0, match_rec_t *data)
 {
-	MATCH *rec;
-	MATCH *list;
+	match_rec_t	*rec;
+	match_rec_t	*list;
 
 	if ((rec = malloc(sizeof (*rec))) == NULL) {
 		int err = errno;
@@ -264,11 +629,12 @@ add_match_record(char *argv0, MATCH *data)
 
 	*rec = *data;
 
-	/* Insert at end of match_list */
-	if (match_list == NULL) {
-		match_list = rec;
+	/* Insert at end of match_state.list */
+	if (match_state.list == NULL) {
+		match_state.list = rec;
 	} else {
-		for (list = match_list; list->next != NULL; list = list->next)
+		for (list = match_state.list; list->next != NULL;
+		    list = list->next)
 			;
 		list->next = rec;
 	}
@@ -277,17 +643,23 @@ add_match_record(char *argv0, MATCH *data)
 	return (1);
 }
 
-static void
-decide(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
+static int
+decide(const char *file, int fd, Elf *elf, uint_t flags,
+    const char *wname, int wfd)
 {
+	int r;
+
 	if (gelf_getclass(elf) == ELFCLASS64)
-		regular64(file, fd, elf, flags, wfd);
+		r = regular64(file, fd, elf, flags, wname, wfd);
 	else
-		regular32(file, fd, elf, flags, wfd);
+		r = regular32(file, fd, elf, flags, wname, wfd);
+
+	return (r);
 }
 
-static void
-archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
+static int
+archive(const char *file, int fd, Elf *elf, uint_t flags,
+    const char *wname, int wfd)
 {
 	Elf_Cmd		cmd = ELF_C_READ;
 	Elf_Arhdr	*arhdr;
@@ -298,7 +670,8 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	/*
 	 * Determine if the archive symbol table itself is required.
 	 */
-	if ((flags & FLG_SYMBOLS) && match(0, MSG_ORIG(MSG_ELF_ARSYM), -1)) {
+	if ((flags & FLG_SHOW_SYMBOLS) &&
+	    match(MATCH_F_NAME, MSG_ORIG(MSG_ELF_ARSYM), 0, 0)) {
 		/*
 		 * Get the archive symbol table.
 		 */
@@ -309,7 +682,7 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 			 * real error from elf_getarsym().
 			 */
 			failure(file, MSG_ORIG(MSG_ELF_GETARSYM));
-			return;
+			return (0);
 		}
 	}
 
@@ -381,9 +754,10 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 		/*
 		 * If we only need the archive symbol table return.
 		 */
-		if ((flags & FLG_SYMBOLS) &&
-		    match(1, MSG_ORIG(MSG_ELF_ARSYM), -1))
-			return;
+		if ((flags & FLG_SHOW_SYMBOLS) &&
+		    match(MATCH_F_STRICT | MATCH_F_NAME,
+		    MSG_ORIG(MSG_ELF_ARSYM), -1, -1))
+			return (0);
 
 		/*
 		 * Reset elf descriptor in preparation for processing each
@@ -401,7 +775,7 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 
 		if ((arhdr = elf_getarhdr(_elf)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETARHDR));
-			return;
+			return (0);
 		}
 		if (*arhdr->ar_name != '/') {
 			(void) snprintf(name, MAXPATHLEN,
@@ -410,10 +784,14 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 
 			switch (elf_kind(_elf)) {
 			case ELF_K_AR:
-				archive(name, fd, _elf, flags, wfd);
+				if (archive(name, fd, _elf, flags,
+				    wname, wfd) == 1)
+					return (1);
 				break;
 			case ELF_K_ELF:
-				decide(name, fd, _elf, flags, wfd);
+				if (decide(name, fd, _elf, flags,
+				    wname, wfd) == 1)
+					return (1);
 				break;
 			default:
 				(void) fprintf(stderr,
@@ -425,6 +803,8 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 		cmd = elf_next(_elf);
 		(void) elf_end(_elf);
 	}
+
+	return (0);
 }
 
 int
@@ -432,9 +812,10 @@ main(int argc, char **argv, char **envp)
 {
 	Elf		*elf;
 	int		var, fd, wfd = 0;
-	char		*wname = 0;
+	char		*wname = NULL;
 	uint_t		flags = 0;
-	MATCH		match_data;
+	match_rec_t	match_data;
+	int		ret;
 
 	/*
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
@@ -455,86 +836,99 @@ main(int argc, char **argv, char **envp)
 	while ((var = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != EOF) {
 		switch (var) {
 		case 'C':
-			flags |= FLG_DEMANGLE;
+			flags |= FLG_CTL_DEMANGLE;
 			break;
 		case 'c':
-			flags |= FLG_SHDR;
+			flags |= FLG_SHOW_SHDR;
 			break;
 		case 'd':
-			flags |= FLG_DYNAMIC;
+			flags |= FLG_SHOW_DYNAMIC;
 			break;
 		case 'e':
-			flags |= FLG_EHDR;
+			flags |= FLG_SHOW_EHDR;
 			break;
 		case 'G':
-			flags |= FLG_GOT;
+			flags |= FLG_SHOW_GOT;
 			break;
 		case 'g':
-			flags |= FLG_GROUP;
+			flags |= FLG_SHOW_GROUP;
 			break;
 		case 'H':
-			flags |= FLG_CAP;
+			flags |= FLG_SHOW_CAP;
 			break;
 		case 'h':
-			flags |= FLG_HASH;
+			flags |= FLG_SHOW_HASH;
 			break;
 		case 'I':
-			if (!process_index_opt(optarg, &match_data)) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_USAGE_BRIEF),
-				    basename(argv[0]));
-				return (1);
-			}
+			if (!process_index_opt(optarg, &match_data))
+				goto usage_brief;
 			if (!add_match_record(argv[0], &match_data))
 				return (1);
+			flags |= FLG_CTL_MATCH;
 			break;
 		case 'i':
-			flags |= FLG_INTERP;
+			flags |= FLG_SHOW_INTERP;
 			break;
 		case 'k':
-			flags |= FLG_CHECKSUM;
+			flags |= FLG_CALC_CHECKSUM;
 			break;
 		case 'l':
-			flags |= FLG_LONGNAME;
+			flags |= FLG_CTL_LONGNAME;
 			break;
 		case 'm':
-			flags |= FLG_MOVE;
+			flags |= FLG_SHOW_MOVE;
 			break;
 		case 'N':
-			match_data.type = MATCH_T_NAME;
+			match_data.opt_type = MATCH_OPT_NAME;
 			match_data.value.name = optarg;
 			if (!add_match_record(argv[0], &match_data))
 				return (1);
+			flags |= FLG_CTL_MATCH;
 			break;
 		case 'n':
-			flags |= FLG_NOTE;
+			flags |= FLG_SHOW_NOTE;
 			break;
 		case 'P':
-			flags |= FLG_FAKESHDR;
+			flags |= FLG_CTL_FAKESHDR;
 			break;
 		case 'p':
-			flags |= FLG_PHDR;
+			flags |= FLG_SHOW_PHDR;
 			break;
 		case 'r':
-			flags |= FLG_RELOC;
+			flags |= FLG_SHOW_RELOC;
 			break;
 		case 'S':
-			flags |= FLG_SORT;
+			flags |= FLG_SHOW_SORT;
 			break;
 		case 's':
-			flags |= FLG_SYMBOLS;
+			flags |= FLG_SHOW_SYMBOLS;
+			break;
+		case 'T':
+			/*
+			 * We can't evaluate the value yet, because
+			 * we need to know if -p is used or not in
+			 * order to tell if we're seeing section header
+			 * or program header types. So, we save the
+			 * string in the name field, and then convert
+			 * it to a type integer in a following pass.
+			 */
+			match_data.opt_type = MATCH_OPT_TYPE;
+			match_data.value.name = optarg;
+			if (!add_match_record(argv[0], &match_data))
+				return (1);
+			flags |= FLG_CTL_MATCH;
 			break;
 		case 'u':
-			flags |= FLG_UNWIND;
+			flags |= FLG_SHOW_UNWIND;
 			break;
 		case 'v':
-			flags |= FLG_VERSIONS;
+			flags |= FLG_SHOW_VERSIONS;
 			break;
 		case 'w':
 			wname = optarg;
 			break;
 		case 'y':
-			flags |= FLG_SYMINFO;
+			flags |= FLG_SHOW_SYMINFO;
 			break;
 		case '?':
 			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
@@ -546,37 +940,59 @@ main(int argc, char **argv, char **envp)
 		}
 	}
 
+	/* -p and -w are mutually exclusive. -w only works with sections */
+	if (((flags & FLG_SHOW_PHDR) != 0) && (wname != NULL))
+		goto usage_brief;
+
+	/* If a match argument is present, prepare the match state */
+	if ((match_state.list != NULL) && (match_prepare(argv[0], flags) == 0))
+		return (1);
+
 	/*
-	 * Validate any arguments.
+	 * Decide what to do if no options specifying something to
+	 * show or do are present.
+	 *
+	 * If there is no -w and no match options, then we will set all
+	 * the show flags, causing a full display of everything in the
+	 * file that we know how to handle.
+	 *
+	 * Otherwise, if there is no match list, we generate a usage
+	 * error and quit.
+	 *
+	 * In the case where there is a match list, we go ahead and call
+	 * regular() anyway, leaving it to decide what to do. If -w is
+	 * present, regular() will use the match list to handle it.
+	 * In addition, in the absence of explicit show/calc flags, regular()
+	 * will compare the section headers to the match list and use
+	 * that to generate the FLG_ bits that will display the information
+	 * specified by the match list.
 	 */
-	if ((flags & ~(FLG_DEMANGLE | FLG_LONGNAME| FLG_FAKESHDR)) == 0) {
-		if (!wname && (match_list == NULL)) {
-			flags |= FLG_EVERYTHING;
-		} else if (!wname || (match_list == NULL)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
-			    basename(argv[0]));
-			return (1);
-		}
+	if ((flags & ~FLG_MASK_CTL) == 0) {
+		if (!wname && (match_state.list == NULL))
+			flags |= FLG_MASK_SHOW;
+		else if (match_state.list == NULL)
+			goto usage_brief;
 	}
 
-	if ((var = argc - optind) == 0) {
-		(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
-		    basename(argv[0]));
-		return (1);
-	}
+	/* There needs to be at least 1 filename left following the options */
+	if ((var = argc - optind) == 0)
+		goto usage_brief;
 
 	/*
 	 * If the -l/-C option is specified, set up the liblddbg.so.
 	 */
-	if (flags & FLG_LONGNAME)
+	if (flags & FLG_CTL_LONGNAME)
 		dbg_desc->d_extra |= DBG_E_LONG;
-	if (flags & FLG_DEMANGLE)
+	if (flags & FLG_CTL_DEMANGLE)
 		dbg_desc->d_extra |= DBG_E_DEMANGLE;
 
 	/*
 	 * If the -w option has indicated an output file open it.  It's
 	 * arguable whether this option has much use when multiple files are
 	 * being processed.
+	 *
+	 * If wname is non-NULL, we know that -p was not specified, due
+	 * to the test above.
 	 */
 	if (wname) {
 		if ((wfd = open(wname, (O_RDWR | O_CREAT | O_TRUNC),
@@ -584,14 +1000,16 @@ main(int argc, char **argv, char **envp)
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_OPEN),
 			    wname, strerror(err));
-			wfd = 0;
+			return (1);
 		}
 	}
 
 	/*
-	 * Open the input file and initialize the elf interface.
+	 * Open the input file, initialize the elf interface, and
+	 * process it.
 	 */
-	for (; optind < argc; optind++) {
+	ret = 0;
+	for (; (optind < argc) && (ret == 0); optind++) {
 		const char	*file = argv[optind];
 
 		if ((fd = open(argv[optind], O_RDONLY)) == -1) {
@@ -612,10 +1030,10 @@ main(int argc, char **argv, char **envp)
 
 		switch (elf_kind(elf)) {
 		case ELF_K_AR:
-			archive(file, fd, elf, flags, wfd);
+			ret = archive(file, fd, elf, flags, wname, wfd);
 			break;
 		case ELF_K_ELF:
-			decide(file, fd, elf, flags, wfd);
+			ret = decide(file, fd, elf, flags, wname, wfd);
 			break;
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADFILE), file);
@@ -628,5 +1046,12 @@ main(int argc, char **argv, char **envp)
 
 	if (wfd)
 		(void) close(wfd);
-	return (0);
+	return (ret);
+
+usage_brief:
+	/* Control comes here for a simple usage message and exit */
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
+	    basename(argv[0]));
+	return (1);
+
 }

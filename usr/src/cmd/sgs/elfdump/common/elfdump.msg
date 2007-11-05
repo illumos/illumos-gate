@@ -34,8 +34,8 @@
 
 # Usage Messages
 
-@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprSsuvy] [-I index] \
-			 [-N name] [-w file] file(s)\n"
+@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnrSsuvy] [-I index] \
+			 [-N name] [-T type] [-p | -w outfile] file...\n"
 @ MSG_USAGE_DETAIL1	"\t[-c]\t\tdump section header information\n"
 @ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle C++ symbol names\n"
 @ MSG_USAGE_DETAIL3	"\t[-d]\t\tdump the contents of the .dynamic section\n"
@@ -62,12 +62,14 @@
 			 sections\n"
 @ MSG_USAGE_DETAIL20	"\t[-s]\t\tdump the contents of the symbol table \
 			 sections\n"
-@ MSG_USAGE_DETAIL21	"\t[-u]\t\tdump the contents of a frame unwind \
+@ MSG_USAGE_DETAIL21	"\t[-T type]\tqualify an option with a section or \
+			 program header type\n"
+@ MSG_USAGE_DETAIL22	"\t[-u]\t\tdump the contents of a frame unwind \
 			 section\n"
-@ MSG_USAGE_DETAIL22	"\t[-v]\t\tdump the contents of the version sections\n"
-@ MSG_USAGE_DETAIL23	"\t[-w file]\twrite the contents of specified section \
+@ MSG_USAGE_DETAIL23	"\t[-v]\t\tdump the contents of the version sections\n"
+@ MSG_USAGE_DETAIL24	"\t[-w file]\twrite the contents of specified section \
 			 to `file'\n"
-@ MSG_USAGE_DETAIL24	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
+@ MSG_USAGE_DETAIL25	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
 			 section\n"
 
 # Errors
@@ -208,6 +210,11 @@
 @ MSG_ERR_MALLOC	"%s: malloc: %s\n"
 @ MSG_ERR_OPEN		"%s: open: %s\n"
 @ MSG_ERR_READ		"%s: read: %s\n"
+@ MSG_ERR_WRITE		"%s: write: %s\n"
+@ MSG_ERR_BAD_T_SHT	"%s: unrecognized section header type: %s\n"
+@ MSG_ERR_BAD_T_PT	"%s: unrecognized program header type: %s\n"
+@ MSG_ERR_AMBIG_MATCH	"%s: ambiguous use of -I, -N, or -T. Remove \
+			 -p option or section selection option(s)\n"
 
 #
 # SHT_MOVE messages
@@ -249,6 +256,7 @@
 @ MSG_ELF_GOT		".got"
 @ MSG_ELF_INIT		".init"
 @ MSG_ELF_FINI		".fini"
+@ MSG_ELF_INTERP	".interp"
 
 @ MSG_ELF_GETEHDR	"elf_getehdr"
 @ MSG_ELF_GETPHDR	"elf_getphdr"
@@ -267,7 +275,7 @@
 
 @ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
 
-@ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nPprSsuvw:y"
+@ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nPprSsT:uvw:y"
 
 @ MSG_STR_EMPTY		""
 
@@ -351,3 +359,110 @@
 @ MSG_PHDRNAM_UNWIND		".eh_frame_hdr(phdr)"
 @ MSG_PHDRNAM_VER		".SUNW_version(phdr)"
 
+
+# Names of sh_type SHT_* type constants
+
+@ MSG_SHT_NULL			"SHT_NULL"		# 0
+@ MSG_SHT_NULL_ALT1		"null"
+@ MSG_SHT_PROGBITS		"SHT_PROGBITS"		# 1
+@ MSG_SHT_PROGBITS_ALT1		"progbits"
+@ MSG_SHT_SYMTAB		"SHT_SYMTAB"		# 2
+@ MSG_SHT_SYMTAB_ALT1		"symtab"
+@ MSG_SHT_STRTAB		"SHT_STRTAB"		# 3
+@ MSG_SHT_STRTAB_ALT1		"strtab"
+@ MSG_SHT_RELA			"SHT_RELA"		# 4
+@ MSG_SHT_RELA_ALT1		"rela"
+@ MSG_SHT_HASH			"SHT_HASH"		# 5
+@ MSG_SHT_HASH_ALT1		"hash"
+@ MSG_SHT_DYNAMIC		"SHT_DYNAMIC"		# 6
+@ MSG_SHT_DYNAMIC_ALT1		"dynamic"
+@ MSG_SHT_NOTE			"SHT_NOTE"		# 7
+@ MSG_SHT_NOTE_ALT1		"note"
+@ MSG_SHT_NOBITS		"SHT_NOBITS"		# 8
+@ MSG_SHT_NOBITS_ALT1		"nobits"
+@ MSG_SHT_REL			"SHT_REL"		# 9
+@ MSG_SHT_REL_ALT1		"rel"
+@ MSG_SHT_SHLIB			"SHT_SHLIB"		# 10
+@ MSG_SHT_SHLIB_ALT1		"shlib"
+@ MSG_SHT_DYNSYM		"SHT_DYNSYM"		# 11
+@ MSG_SHT_DYNSYM_ALT1		"dynsym"
+@ MSG_SHT_INIT_ARRAY		"SHT_INIT_ARRAY"	# 14
+@ MSG_SHT_INIT_ARRAY_ALT1	"init_array"
+@ MSG_SHT_FINI_ARRAY		"SHT_FINI_ARRAY"	# 15
+@ MSG_SHT_FINI_ARRAY_ALT1	"fini_array"
+@ MSG_SHT_PREINIT_ARRAY		"SHT_PREINIT_ARRAY"	# 16
+@ MSG_SHT_PREINIT_ARRAY_ALT1	"preinit_ARRAY"
+@ MSG_SHT_GROUP			"SHT_GROUP"		# 17
+@ MSG_SHT_GROUP_ALT1		"group"
+@ MSG_SHT_SYMTAB_SHNDX		"SHT_SYMTAB_SHNDX"	# 18
+@ MSG_SHT_SYMTAB_SHNDX_ALT1	"symtab_shndx"
+@ MSG_SHT_SUNW_SYMSORT		"SHT_SUNW_symsort"	# 0x6ffffff1
+@ MSG_SHT_SUNW_SYMSORT_ALT1	"sunw_symsort"
+@ MSG_SHT_SUNW_TLSSORT		"SHT_SUNW_tlssort"	# 0x6ffffff2
+@ MSG_SHT_SUNW_TLSSORT_ALT1	"sunw_tlssort"
+@ MSG_SHT_SUNW_LDYNSYM		"SHT_SUNW_LDYNSYM"	# 0x6ffffff3
+@ MSG_SHT_SUNW_LDYNSYM_ALT1	"sunw_ldynsym"
+@ MSG_SHT_SUNW_DOF		"SHT_SUNW_dof"		# 0x6ffffff4
+@ MSG_SHT_SUNW_DOF_ALT1		"sunw_dof"
+@ MSG_SHT_SUNW_CAP		"SHT_SUNW_cap"		# 0x6ffffff5
+@ MSG_SHT_SUNW_CAP_ALT1		"sunw_cap"
+@ MSG_SHT_SUNW_SIGNATURE	"SHT_SUNW_SIGNATURE"	# 0x6ffffff6
+@ MSG_SHT_SUNW_SIGNATURE_ALT1	"sunw_signature"
+@ MSG_SHT_SUNW_ANNOTATE		"SHT_SUNW_ANNOTATE"	# 0x6ffffff7
+@ MSG_SHT_SUNW_ANNOTATE_ALT1	"sunw_annotate"
+@ MSG_SHT_SUNW_DEBUGSTR		"SHT_SUNW_DEBUGSTR"	# 0x6ffffff8
+@ MSG_SHT_SUNW_DEBUGSTR_ALT1	"sunw_debugstr"
+@ MSG_SHT_SUNW_DEBUG		"SHT_SUNW_DEBUG"	# 0x6ffffff9
+@ MSG_SHT_SUNW_DEBUG_ALT1	"sunw_debug"
+@ MSG_SHT_SUNW_MOVE		"SHT_SUNW_move"		# 0x6ffffffa
+@ MSG_SHT_SUNW_MOVE_ALT1	"sunw_move"
+@ MSG_SHT_SUNW_COMDAT		"SHT_SUNW_COMDAT"	# 0x6ffffffb
+@ MSG_SHT_SUNW_COMDAT_ALT1	"sunw_comdat"
+@ MSG_SHT_SUNW_SYMINFO		"SHT_SUNW_syminfo"	# 0x6ffffffc
+@ MSG_SHT_SUNW_SYMINFO_ALT1	"sunw_syminfo"
+@ MSG_SHT_SUNW_VERDEF		"SHT_SUNW_verdef"	# 0x6ffffffd
+@ MSG_SHT_SUNW_VERDEF_ALT1	"sunw_verdef"
+@ MSG_SHT_GNU_VERDEF		"SHT_GNU_verdef"	# 0x6ffffffd
+@ MSG_SHT_GNU_VERDEF_ALT1	"gnu_verdef"
+@ MSG_SHT_SUNW_VERNEED		"SHT_SUNW_verneed"	# 0x6ffffffe
+@ MSG_SHT_SUNW_VERNEED_ALT1	"sunw_verneed"
+@ MSG_SHT_GNU_VERNEED		"SHT_GNU_verneed"	# 0x6ffffffe
+@ MSG_SHT_GNU_VERNEED_ALT1	"gnu_verneed"
+@ MSG_SHT_SUNW_VERSYM		"SHT_SUNW_versym"	# 0x6fffffff
+@ MSG_SHT_SUNW_VERSYM_ALT1	"sunw_versym"
+@ MSG_SHT_GNU_VERSYM		"SHT_GNU_versym"	# 0x6fffffff
+@ MSG_SHT_GNU_VERSYM_ALT1	"gnu_versym"
+@ MSG_SHT_SPARC_GOTDATA		"SHT_SPARC_GOTDATA"	# 0x7000000
+@ MSG_SHT_SPARC_GOTDATA_ALT1	"sparc_gotdata"
+@ MSG_SHT_AMD64_UNWIND		"SHT_AMD64_UNWIND"	# 0x7000000
+@ MSG_SHT_AMD64_UNWIND_ALT1	"amd64_unwind"
+
+
+# Program header PT_ segment types
+
+@ MSG_PT_NULL			"PT_NULL"		# 0
+@ MSG_PT_NULL_ALT1		"null"
+@ MSG_PT_LOAD			"PT_LOAD"		# 1
+@ MSG_PT_LOAD_ALT1		"load"
+@ MSG_PT_DYNAMIC		"PT_DYNAMIC"		# 2
+@ MSG_PT_DYNAMIC_ALT1		"dynamic"
+@ MSG_PT_INTERP			"PT_INTERP"		# 3
+@ MSG_PT_INTERP_ALT1		"interp"
+@ MSG_PT_NOTE			"PT_NOTE"		# 4
+@ MSG_PT_NOTE_ALT1		"note"
+@ MSG_PT_SHLIB			"PT_SHLIB"		# 5
+@ MSG_PT_SHLIB_ALT1		"shlib"
+@ MSG_PT_PHDR			"PT_PHDR"		# 6
+@ MSG_PT_PHDR_ALT1		"phdr"
+@ MSG_PT_TLS			"PT_TLS"		# 7
+@ MSG_PT_TLS_ALT1		"tls"
+@ MSG_PT_SUNW_UNWIND		"PT_SUNW_UNWIND"	# 0x6464e550
+@ MSG_PT_SUNW_UNWIND_ALT1	"sunw_unwind"
+@ MSG_PT_SUNWBSS		"PT_SUNWBSS"		# 0x6ffffffa
+@ MSG_PT_SUNWBSS_ALT1		"sunwbss"
+@ MSG_PT_SUNWSTACK		"PT_SUNWSTACK"		# 0x6ffffffb
+@ MSG_PT_SUNWSTACK_ALT1		"sunwstack"
+@ MSG_PT_SUNWDTRACE		"PT_SUNWDTRACE"		# 0x6ffffffc
+@ MSG_PT_SUNWDTRACE_ALT1	"sunwdtrace"
+@ MSG_PT_SUNWCAP		"PT_SUNWCAP"		# 0x6ffffffd
+@ MSG_PT_SUNWCAP_ALT1		"sunwcap"
