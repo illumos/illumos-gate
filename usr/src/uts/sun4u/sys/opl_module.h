@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,13 @@ extern "C" {
 #define	OPL_SET_TRAP(ttentry, ttlabel)					\
 		bcopy((const void *)&ttlabel, &ttentry, 32);		\
 		flush_instr_mem((caddr_t)&ttentry, 32);
+
+/*
+ * The same thing as above, but to patch 7 instructions.
+ */
+#define	OPL_PATCH_28(ttentry, ttlabel)					\
+		bcopy((const void *)&ttlabel, &ttentry, 28);		\
+		flush_instr_mem((caddr_t)&ttentry, 28);
 
 /*
  * Define for max size of "reason" string in panic flows.  Since this is on
@@ -137,8 +144,14 @@ extern uint32_t tt1_dae;
 extern uint32_t tt0_asdat;
 extern uint32_t tt1_asdat;
 
+extern uint32_t tt0_flushw;
+extern uint32_t opl_cleanw_patch;
+
 extern void opl_serr_instr(void);
 extern void opl_ugerr_instr(void);
+
+extern void opl_ta3_instr(void);
+extern void opl_ta4_instr(void);
 
 /*
  * D$ and I$ global parameters.

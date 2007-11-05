@@ -1618,6 +1618,111 @@ opl_uger_panic_cmn:
 #endif	/* lint */
 
 #if defined(lint)
+void
+opl_ta3_trap(void)
+{}
+void
+opl_cleanw_subr(void)
+{}
+#else	/* lint */
+/*
+ * OPL ta3 support (note please, that win_reg
+ * area size for each cpu is 2^7 bytes)
+ */
+
+#define	RESTORE_WREGS(tmp1, tmp2)		\
+	CPU_INDEX(tmp1, tmp2)			;\
+	sethi	%hi(opl_ta3_save), tmp2		;\
+	ldx	[tmp2 +%lo(opl_ta3_save)], tmp2	;\
+	sllx	tmp1, 7, tmp1			;\
+	add	tmp2, tmp1, tmp2		;\
+	ldx	[tmp2 + 0], %l0			;\
+	ldx	[tmp2 + 8], %l1			;\
+	ldx	[tmp2 + 16], %l2		;\
+	ldx	[tmp2 + 24], %l3		;\
+	ldx	[tmp2 + 32], %l4		;\
+	ldx	[tmp2 + 40], %l5		;\
+	ldx	[tmp2 + 48], %l6		;\
+	ldx	[tmp2 + 56], %l7		;\
+	ldx	[tmp2 + 64], %i0		;\
+	ldx	[tmp2 + 72], %i1		;\
+	ldx	[tmp2 + 80], %i2		;\
+	ldx	[tmp2 + 88], %i3		;\
+	ldx	[tmp2 + 96], %i4		;\
+	ldx	[tmp2 + 104], %i5		;\
+	ldx	[tmp2 + 112], %i6		;\
+	ldx	[tmp2 + 120], %i7
+
+#define	SAVE_WREGS(tmp1, tmp2)			\
+	CPU_INDEX(tmp1, tmp2)			;\
+	sethi	%hi(opl_ta3_save), tmp2		;\
+	ldx	[tmp2 +%lo(opl_ta3_save)], tmp2	;\
+	sllx	tmp1, 7, tmp1			;\
+	add	tmp2, tmp1, tmp2		;\
+	stx	%l0, [tmp2 + 0] 		;\
+	stx	%l1, [tmp2 + 8] 		;\
+	stx	%l2, [tmp2 + 16] 		;\
+	stx	%l3, [tmp2 + 24]		;\
+	stx	%l4, [tmp2 + 32]		;\
+	stx	%l5, [tmp2 + 40]		;\
+	stx	%l6, [tmp2 + 48] 		;\
+	stx	%l7, [tmp2 + 56]		;\
+	stx	%i0, [tmp2 + 64]		;\
+	stx	%i1, [tmp2 + 72]		;\
+	stx	%i2, [tmp2 + 80]		;\
+	stx	%i3, [tmp2 + 88]		;\
+	stx	%i4, [tmp2 + 96]		;\
+	stx	%i5, [tmp2 + 104]		;\
+	stx	%i6, [tmp2 + 112]		;\
+	stx	%i7, [tmp2 + 120] 
+
+
+/*
+ * The purpose of this function is to make sure that the restore 
+ * instruction after the flushw does not cause a fill trap. The sun4u 
+ * fill trap handler can not handle a tlb fault of an unmapped stack 
+ * except at the restore instruction at user_rtt. On OPL systems the 
+ * stack can get unmapped between the flushw and restore instructions 
+ * since multiple strands share the tlb.
+ */
+	ENTRY_NP(opl_ta3_trap)
+	set	trap, %g1
+	mov	T_FLUSHW, %g3
+	sub	%g0, 1, %g4
+	rdpr	%cwp, %g5
+	SAVE_WREGS(%g2, %g6)
+	save
+	flushw
+	rdpr	%cwp, %g6
+	wrpr	%g5, %cwp
+	RESTORE_WREGS(%g2, %g5)
+	wrpr	%g6, %cwp
+	restored
+	restore
+
+	ba,a    fast_trap_done
+	SET_SIZE(opl_ta3_trap)
+
+	ENTRY_NP(opl_cleanw_subr)
+	set	trap, %g1
+	mov	T_FLUSHW, %g3
+	sub	%g0, 1, %g4
+	rdpr	%cwp, %g5
+	SAVE_WREGS(%g2, %g6)
+	save
+	flushw
+	rdpr	%cwp, %g6
+	wrpr	%g5, %cwp
+	RESTORE_WREGS(%g2, %g5)
+	wrpr	%g6, %cwp
+	restored
+	restore
+	jmp	%g7
+	  nop
+	SET_SIZE(opl_cleanw_subr)
+#endif	/* lint */
+
+#if defined(lint)
 
 void
 opl_serr_instr(void)
@@ -1653,6 +1758,47 @@ opl_ugerr_instr(void)
 	 nop
 	.align  32
 	SET_SIZE(opl_ugerr_instr)
+
+#endif	/* lint */
+
+#if defined(lint)
+
+void
+opl_ta3_instr(void)
+{}
+
+#else	/* lint */
+/*
+ * The actual trap handler for tt=0x103 (flushw)
+ */
+	ENTRY_NP(opl_ta3_instr)
+	sethi   %hi(opl_ta3_trap), %g3
+	jmp	%g3 + %lo(opl_ta3_trap)
+	 nop
+	.align  32
+	SET_SIZE(opl_ta3_instr)
+
+#endif	/* lint */
+
+#if defined(lint)
+
+void
+opl_ta4_instr(void)
+{}
+
+#else	/* lint */
+/*
+ * The patch for the .clean_windows code
+ */
+	ENTRY_NP(opl_ta4_instr)
+	sethi   %hi(opl_cleanw_subr), %g3
+	add	%g3, %lo(opl_cleanw_subr), %g3
+	jmpl	%g3, %g7
+	  add	%g7, 8, %g7
+	nop
+	nop
+	nop
+	SET_SIZE(opl_ta4_instr)
 
 #endif	/* lint */
 

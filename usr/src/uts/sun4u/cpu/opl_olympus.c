@@ -77,6 +77,7 @@ static void cpu_payload_add_aflt(struct async_flt *, nvlist_t *, nvlist_t *);
 static void opl_cpu_sync_error(struct regs *, ulong_t, ulong_t, uint_t, uint_t);
 static int  cpu_flt_in_memory(opl_async_flt_t *, uint64_t);
 static int prom_SPARC64VII_support_enabled(void);
+static void opl_ta3();
 
 /*
  * Error counters resetting interval.
@@ -111,6 +112,11 @@ static uint_t priv_hcl_8;
  * Olympus error log
  */
 static opl_errlog_t	*opl_err_log;
+
+/*
+ * OPL ta 3 save area.
+ */
+char	*opl_ta3_save;
 
 /*
  * UE is classified into four classes (MEM, CHANNEL, CPU, PATH).
@@ -200,7 +206,8 @@ int (*p2get_mem_info)(int synd_code, uint64_t paddr,
 
 
 /*
- * Setup trap handlers for 0xA, 0x32, 0x40 trap types.
+ * Setup trap handlers for 0xA, 0x32, 0x40 trap types
+ * and "ta 3" and "ta 4".
  */
 void
 cpu_init_trap(void)
@@ -211,6 +218,8 @@ cpu_init_trap(void)
 	OPL_SET_TRAP(tt1_dae, opl_serr_instr);
 	OPL_SET_TRAP(tt0_asdat, opl_ugerr_instr);
 	OPL_SET_TRAP(tt1_asdat, opl_ugerr_instr);
+	OPL_SET_TRAP(tt0_flushw, opl_ta3_instr);
+	OPL_PATCH_28(opl_cleanw_patch, opl_ta4_instr);
 }
 
 static int
@@ -1710,8 +1719,13 @@ opl_cpu_reg_init()
 	/*
 	 * We do not need to re-initialize cpu0 registers.
 	 */
-	if (cpu[getprocessorid()] == &cpu0)
+	if (cpu[getprocessorid()] == &cpu0) {
+		/*
+		 * Support for "ta 3"
+		 */
+		opl_ta3();
 		return;
+	}
 
 	/*
 	 * Initialize Error log Scratch register for error handling.
@@ -2168,6 +2182,21 @@ mmu_get_kernel_lpsize(size_t lpsize)
 	}
 
 	return (TTEBYTES(TTE8K));
+}
+
+/*
+ * Support for ta 3.
+ * We allocate here a buffer for each cpu
+ * for saving the current register window.
+ */
+typedef struct win_regs {
+	uint64_t l[8];
+	uint64_t i[8];
+} win_regs_t;
+static void
+opl_ta3(void)
+{
+	opl_ta3_save = (char *)kmem_alloc(NCPU * sizeof (win_regs_t), KM_SLEEP);
 }
 
 /*

@@ -195,7 +195,9 @@
 	ALTENTRY(syscall_trap_patch_point)	\
 	SYSCALL_NOTT(syscall_trap)
 
-#define	FLUSHW()			\
+#define	FLUSHW(h_name)			\
+	.global h_name			;\
+h_name:					;\
 	set	trap, %g1		;\
 	mov	T_FLUSHW, %g3		;\
 	sub	%g0, 1, %g4		;\
@@ -1451,7 +1453,7 @@ trap_table0:
 	GOTO(syscall_trap_4x);		/* 100	old system call */
 	TRAP(T_BREAKPOINT);		/* 101	user breakpoint */
 	TRAP(T_DIV0);			/* 102	user divide by zero */
-	FLUSHW();			/* 103	flush windows */
+	FLUSHW(tt0_flushw);		/* 103	flush windows */
 	GOTO(.clean_windows);		/* 104	clean windows */
 	BAD;				/* 105	range check ?? */
 	GOTO(.fix_alignment);		/* 106	do unaligned references */
@@ -2094,6 +2096,8 @@ _fitos_fdtos_done:
 	ba,pt	%xcc, sys_trap
 	sub	%g0, 1, %g4
 
+	.global opl_cleanw_patch
+opl_cleanw_patch:
 .clean_windows:
 	set	trap, %g1
 	mov	T_FLUSH_PCB, %g3
