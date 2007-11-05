@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +100,8 @@ forthdebug_init(void)
 	struct _buf *file;
 
 	if (!forthdebug_supported) {
-		(void) modload("misc", "obpsym");
+		if (obpdebug)
+			(void) modload("misc", "obpsym");
 		return;
 	}
 
@@ -117,7 +117,7 @@ forthdebug_init(void)
 	i = BOP_FSTAT(bootops, file->_fd, &bstat);
 	if (i || !bstat.st_size) {
 		cmn_err(CE_CONT, "Can't stat %s stat=%x sz=%llx\n",
-			FDEBUGFILE, i, (long long)bstat.st_size);
+		    FDEBUGFILE, i, (long long)bstat.st_size);
 		goto err_stat;
 	}
 
@@ -153,7 +153,7 @@ forthdebug_init(void)
 		*buf_p = '\0';
 #ifdef DEBUG
 		cmn_err(CE_CONT, "symbol lookup service (%ld bytes)\n",
-			(long)(buf_p - fth_buf));
+		    (long)(buf_p - fth_buf));
 #endif /* DEBUG */
 		prom_interpret(fth_buf, 0, 0, 0, 0, 0);
 		goto done;
