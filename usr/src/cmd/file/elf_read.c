@@ -32,7 +32,39 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
+ * ELF files can exceed 2GB in size. A standard 32-bit program
+ * like 'file' cannot read past 2GB, and will be unable to see
+ * the ELF section headers that typically are at the end of the
+ * object. The simplest solution to this problem would be to make
+ * the 'file' command a 64-bit application. However, as a matter of
+ * policy, we do not want to require this. A simple command like
+ * 'file' should not carry such a requirement, especially as we
+ * support 32-bit only hardware.
+ *
+ * An alternative solution is to build this code as 32-bit
+ * large file aware. The usual way to do this is to define a pair
+ * of preprocessor definitions:
+ *
+ *	_LARGEFILE64_SOURCE
+ *		Map standard I/O routines to their largefile aware versions.
+ *
+ *	_FILE_OFFSET_BITS=64
+ *		Map off_t to off64_t
+ *
+ * The problem with this solution is that libelf is not large file capable,
+ * and the libelf header file will prevent compilation if
+ * _FILE_OFFSET_BITS is set to 64.
+ *
+ * So, the solution used in this code is to define _LARGEFILE64_SOURCE
+ * to get access to the 64-bit APIs, not to define _FILE_OFFSET_BITS, and to
+ * use our own types in place of off_t, and size_t. We read all the file
+ * data directly using pread64(), and avoid the use of libelf for anything
+ * other than the xlate functionality.
+ */
 #define	_LARGEFILE64_SOURCE
+#define	FILE_ELF_OFF_T	off64_t
+#define	FILE_ELF_SIZE_T	uint64_t
 
 #include <ctype.h>
 #include <unistd.h>
@@ -153,8 +185,8 @@ xlatetom_nhdr(Elf_Nhdr *nhdr)
 int
 elf_read(int fd, Elf_Info *EI)
 {
-	size_t size;
-	int ret = 1;
+	FILE_ELF_SIZE_T	size;
+	int		ret = 1;
 
 	Elf_Ehdr *ehdr = &EI_Ehdr;
 
@@ -217,14 +249,14 @@ elf_read(int fd, Elf_Info *EI)
 static int
 get_phdr(Elf_Info *EI, int inx)
 {
-	off_t off = 0;
-	size_t size;
+	FILE_ELF_OFF_T	off = 0;
+	FILE_ELF_SIZE_T	size;
 
 	if (inx >= EI_Ehdr_phnum)
 		return (ELF_READ_FAIL);
 
 	size = sizeof (Elf_Phdr);
-	off = (off_t)EI_Ehdr.e_phoff + (inx * size);
+	off = (FILE_ELF_OFF_T)EI_Ehdr.e_phoff + (inx * size);
 	if (pread64(EI->elffd, (void *)&EI_Phdr, size, off) != size)
 		return (ELF_READ_FAIL);
 
@@ -240,8 +272,8 @@ get_phdr(Elf_Info *EI, int inx)
 static int
 get_shdr(Elf_Info *EI, int inx)
 {
-	off_t off = 0;
-	size_t size;
+	FILE_ELF_OFF_T	off = 0;
+	FILE_ELF_SIZE_T	size;
 
 	/*
 	 * Prevent access to non-existent section headers.
@@ -256,7 +288,7 @@ get_shdr(Elf_Info *EI, int inx)
 		return (ELF_READ_FAIL);
 
 	size = sizeof (Elf_Shdr);
-	off = (off_t)EI_Ehdr.e_shoff + (inx * size);
+	off = (FILE_ELF_OFF_T)EI_Ehdr.e_shoff + (inx * size);
 
 	if (pread64(EI->elffd, (void *)&EI_Shdr, size, off) != size)
 		return (ELF_READ_FAIL);
@@ -278,14 +310,14 @@ process_phdr(Elf_Info *EI)
 {
 	register int inx;
 
-	Elf_Nhdr Nhdr, *nhdr;	/* note header just read */
+	Elf_Nhdr	Nhdr, *nhdr;	/* note header just read */
 	Elf_Phdr	*phdr = &EI_Phdr;
 
-	int class;
-	int ntype;
-	size_t nsz, nmsz, dsz;
-	off_t offset;
-	char *psinfo, *fname;
+	FILE_ELF_SIZE_T	nsz, nmsz, dsz;
+	FILE_ELF_OFF_T	offset;
+	int	class;
+	int	ntype;
+	char	*psinfo, *fname;
 
 	nsz = sizeof (Elf_Nhdr);
 	nhdr = &Nhdr;
@@ -387,8 +419,8 @@ process_shdr(Elf_Info *EI)
 {
 	int 		capn, mac;
 	int 		i, j, idx;
-	off_t		cap_off;
-	size_t		csize;
+	FILE_ELF_OFF_T	cap_off;
+	FILE_ELF_SIZE_T	csize;
 	char		*section_name;
 	Elf_Cap 	Chdr;
 	Elf_Shdr	*shdr = &EI_Shdr;
