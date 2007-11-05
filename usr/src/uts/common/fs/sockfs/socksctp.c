@@ -1985,7 +1985,10 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 		 * associations. Like with anything of this sort, the
 		 * problem is what to do if the operation fails.
 		 * Just try to apply the setting to everyone, but store
-		 * error number if someone returns such.
+		 * error number if someone returns such.  And since we are
+		 * looping through all possible aids, some of them can be
+		 * invalid.  We just ignore this kind (sosctp_assoc()) of
+		 * errors.
 		 */
 		sctp_assoc_t aid;
 
@@ -1994,10 +1997,8 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 		    optlen);
 		mutex_enter(&so->so_lock);
 		for (aid = 1; aid < ss->ss_maxassoc; aid++) {
-			if ((error = sosctp_assoc(ss, aid, &ssa)) != 0) {
-				error = 0;
+			if (sosctp_assoc(ss, aid, &ssa) != 0)
 				continue;
-			}
 			mutex_exit(&so->so_lock);
 			rc = sctp_set_opt(ssa->ssa_conn, level, option_name,
 			    optval, optlen);

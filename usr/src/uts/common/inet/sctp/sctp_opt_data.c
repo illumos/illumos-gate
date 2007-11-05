@@ -1437,12 +1437,6 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			}
 			break;
 		/* IP level options */
-		case IP_RECVIF:
-			connp->conn_recvif = onoff;
-			break;
-		case IP_RECVSLLA:
-			connp->conn_recvslla = onoff;
-			break;
 		case IP_UNSPEC_SRC:
 			connp->conn_unspec_src = onoff;
 			break;
