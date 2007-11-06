@@ -129,6 +129,8 @@ extern "C" {
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 #define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
 
+#define	ATH_DEF_CACHE_BYTES	32	/* default cache line size */
+
 /* driver-specific node state */
 struct ath_node {
 	struct ieee80211_node an_node;	/* base class */

@@ -307,7 +307,7 @@ ath_alloc_dma_mem(dev_info_t *devinfo, size_t memsize,
 	 * Allocate handle
 	 */
 	err = ddi_dma_alloc_handle(devinfo, &dma_attr,
-		DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
+	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -324,8 +324,8 @@ ath_alloc_dma_mem(dev_info_t *devinfo, size_t memsize,
 	 * Bind the two together
 	 */
 	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
-		dma_p->mem_va, dma_p->alength, bind_flags,
-		DDI_DMA_SLEEP, NULL, &dma_p->cookie, &dma_p->ncookies);
+	    dma_p->mem_va, dma_p->alength, bind_flags,
+	    DDI_DMA_SLEEP, NULL, &dma_p->cookie, &dma_p->ncookies);
 	if (err != DDI_DMA_MAPPED)
 		return (DDI_FAILURE);
 
@@ -1826,7 +1826,21 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail0;
 	}
 
+	/*
+	 * Cache line size is used to size and align various
+	 * structures used to communicate with the hardware.
+	 */
 	csz = pci_config_get8(asc->asc_cfg_handle, PCI_CONF_CACHE_LINESZ);
+	if (csz == 0) {
+		/*
+		 * We must have this setup properly for rx buffer
+		 * DMA to work so force a reasonable value here if it
+		 * comes up zero.
+		 */
+		csz = ATH_DEF_CACHE_BYTES / sizeof (uint32_t);
+		pci_config_put8(asc->asc_cfg_handle, PCI_CONF_CACHE_LINESZ,
+		    csz);
+	}
 	asc->asc_cachelsz = csz << 2;
 	vendor_id = pci_config_get16(asc->asc_cfg_handle, PCI_CONF_VENID);
 	device_id = pci_config_get16(asc->asc_cfg_handle, PCI_CONF_DEVID);
@@ -2018,8 +2032,8 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	/* different instance has different WPA door */
 	(void) snprintf(ic->ic_wpadoor, MAX_IEEE80211STR, "%s_%s%d", WPA_DOOR,
-		ddi_driver_name(devinfo),
-		ddi_get_instance(devinfo));
+	    ddi_driver_name(devinfo),
+	    ddi_get_instance(devinfo));
 
 	/* Override 80211 default routines */
 	ic->ic_reset = ath_reset;
