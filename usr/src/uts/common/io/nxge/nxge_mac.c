@@ -3895,7 +3895,7 @@ nxge_check_10g_link(p_nxge_t nxgep)
 {
 	uint8_t		portn;
 	nxge_status_t	status = NXGE_OK;
-	boolean_t	link_up, xpcs_up, xmac_up;
+	boolean_t	link_up;
 	uint32_t	val;
 	npi_status_t	rs;
 
@@ -3920,41 +3920,20 @@ nxge_check_10g_link(p_nxge_t nxgep)
 		break;
 	case PORT_10G_SERDES:
 		rs = npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-		    XPCS_REG_STATUS1, &val);
+		    XPCS_REG_STATUS, &val);
 		if (rs != 0)
 			goto fail;
 
 		link_up = B_FALSE;
-		xmac_up = B_FALSE;
-		xpcs_up = B_FALSE;
-		if (val & XPCS_STATUS1_RX_LINK_STATUS_UP) {
-			xpcs_up = B_TRUE;
-		}
-
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		    "==> nxge_check_10g_link port<%d> "
-		    "XPCS_REG_STATUS1 0x%x xpcs_up %d",
-		    portn, val, xpcs_up));
-		/*
-		 * Read the xMAC internal signal 2 register.
-		 * This register should be the superset of the XPCS when wanting
-		 * to get the link status. If this register read is proved to be
-		 * reliable, there is no need to read the XPCS register.
-		 */
-		xmac_up = B_TRUE;
-		XMAC_REG_RD(nxgep->npi_handle, portn, XMAC_INTERN2_REG, &val);
-		if (val & XMAC_IS2_LOCAL_FLT_OC_SYNC) { /* link is down */
-			xmac_up = B_FALSE;
-		}
-
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		    "==> nxge_check_10g_link port<%d> "
-		    "XMAC_INTERN2_REG 0x%x xmac_up %d",
-		    portn, val, xmac_up));
-
-		if (xpcs_up && xmac_up) {
+		if (val & XPCS_STATUS_LANE_ALIGN) {
 			link_up = B_TRUE;
 		}
+
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_check_10g_link port<%d> "
+		    "XPCS_REG_STATUS2 0x%x link_up %d",
+		    portn, val, link_up));
+
 		break;
 	}
 
