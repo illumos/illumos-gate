@@ -1316,7 +1316,7 @@ sbc_read_capacity16(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		return;
 	}
 	io->da_data		= (char *)cap16;
-	io->da_data_len		= sizeof (*cap16);
+	io->da_data_len		= rep_size;
 	io->da_data_alloc	= True;
 	io->da_clear_overlap	= False;
 
