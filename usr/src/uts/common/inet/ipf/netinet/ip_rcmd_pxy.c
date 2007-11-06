@@ -229,7 +229,7 @@ ifs_rcmdpxy_t *ifsrcmd;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
+				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;

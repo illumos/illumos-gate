@@ -3773,60 +3773,21 @@ ipftq_t *tqp;
 /* Function:    fr_statederef                                               */
 /* Returns:     Nil                                                         */
 /* Parameters:  isp(I) - pointer to pointer to state table entry            */
+/*              ifs - ipf stack instance                                    */
 /*                                                                          */
 /* Decrement the reference counter for this state table entry and free it   */
 /* if there are no more things using it.                                    */
 /*                                                                          */
-/* When operating in userland (ipftest), we have no timers to clear a state */
-/* entry.  Therefore, we make a few simple tests before deleting an entry   */
-/* outright.  We compare states on each side looking for a combination of   */
-/* TIME_WAIT (should really be FIN_WAIT_2?) and LAST_ACK.  Then we factor   */
-/* in packet direction with the interface list to make sure we don't        */
-/* prematurely delete an entry on a final inbound packet that's we're also  */
-/* supposed to route elsewhere.                                             */
-/*                                                                          */
 /* Internal parameters:                                                     */
 /*    state[0] = state of source (host that initiated connection)           */
 /*    state[1] = state of dest   (host that accepted the connection)        */
-/*                                                                          */
-/*    dir == 0 : a packet from source to dest                               */
-/*    dir == 1 : a packet from dest to source                               */
 /* ------------------------------------------------------------------------ */
-void fr_statederef(fin, isp, ifs)
-fr_info_t *fin;
+void fr_statederef(isp, ifs)
 ipstate_t **isp;
 ipf_stack_t *ifs;
 {
-	ipstate_t *is = *isp;
-#if 0
-	int nstate, ostate, dir, eol;
+	ipstate_t *is;
 
-	eol = 0; /* End-of-the-line flag. */
-	dir = fin->fin_rev;
-	ostate = is->is_state[1 - dir];
-	nstate = is->is_state[dir];
-	/*
-	 * Determine whether this packet is local or routed.  State entries
-	 * with us as the destination will have an interface list of
-	 * int1,-,-,int1.  Entries with us as the origin run as -,int1,int1,-.
-	 */
-	if ((fin->fin_p == IPPROTO_TCP) && (fin->fin_out == 0)) {
-		if ((strcmp(is->is_ifname[0], is->is_ifname[3]) == 0) &&
-		    (strcmp(is->is_ifname[1], is->is_ifname[2]) == 0)) {
-			if ((dir == 0) &&
-			    (strcmp(is->is_ifname[1], "-") == 0) &&
-			    (strcmp(is->is_ifname[0], "-") != 0)) {
-				eol = 1;
-			} else if ((dir == 1) &&
-				   (strcmp(is->is_ifname[0], "-") == 0) &&
-				   (strcmp(is->is_ifname[1], "-") != 0)) {
-				eol = 1;
-			}
-		}
-	}
-#endif
-
-	fin = fin;	/* LINT */
 	is = *isp;
 	*isp = NULL;
 
@@ -3935,10 +3896,14 @@ ipfgeniter_t *itp;
 ipf_stack_t *ifs;
 {
 	ipstate_t *is, *next, zero;
-	int error;
+	int error, count;
+	char *dst;
 
 	if (itp->igi_data == NULL)
 		return EFAULT;
+
+	if (itp->igi_nitems == 0)
+		return EINVAL;
 
 	if (itp->igi_type != IPFGENITER_STATE)
 		return EINVAL;
@@ -3949,6 +3914,9 @@ ipf_stack_t *ifs;
 		return ESRCH;
 	}
 
+	error = 0;
+	dst = itp->igi_data;
+
 	READ_ENTER(&ifs->ifs_ipf_state);
 	if (is == NULL) {
 		next = ifs->ifs_ips_list;
@@ -3956,37 +3924,47 @@ ipf_stack_t *ifs;
 		next = is->is_next;
 	}
 
-	if (next != NULL) {
+	for (count = itp->igi_nitems; count > 0; count--) {
+		if (next != NULL) {
+			/*
+			 * If we find a state entry to use, bump its
+			 * reference count so that it can be used for
+			 * is_next when we come back.
+			 */
+			MUTEX_ENTER(&next->is_lock);
+			next->is_ref++;
+			MUTEX_EXIT(&next->is_lock);
+			token->ipt_data = next;
+		} else {
+			bzero(&zero, sizeof(zero));
+			next = &zero;
+			token->ipt_data = (void *)-1;
+			count = 1;
+		}
+		RWLOCK_EXIT(&ifs->ifs_ipf_state);
+
 		/*
-		 * If we find a state entry to use, bump its reference count
-		 * so that it can be used for is_next when we come back.
+		 * If we had a prior pointer to a state entry, release it.
 		 */
-		MUTEX_ENTER(&next->is_lock);
-		next->is_ref++;
-		MUTEX_EXIT(&next->is_lock);
-		token->ipt_data = next;
-	} else {
-		bzero(&zero, sizeof(zero));
-		next = &zero;
-		token->ipt_data = (void *)-1;
-	}
-	RWLOCK_EXIT(&ifs->ifs_ipf_state);
+		if (is != NULL) {
+			fr_statederef(&is, ifs);
+		}
 
-	/*
-	 * If we had a prior pointer to a state entry, release it.
-	 */
-	if (is != NULL) {
-		fr_statederef(NULL, &is, ifs);
-	}
+		/*
+		 * This should arguably be via fr_outobj() so that the state
+		 * structure can (if required) be massaged going out.
+		 */
+		error = COPYOUT(next, dst, sizeof(*next));
+		if (error != 0)
+			error = EFAULT;
+		if ((count == 1) || (error != 0))
+			break;
 
-	/*
-	 * This should arguably be via fr_outobj() so that the state
-	 * structure can (if required) be massaged going out.
-	 */
-	error = COPYOUT(next, itp->igi_data, sizeof(*next));
-	if (error != 0)
-		error = EFAULT;
+		dst += sizeof(*next);
+		READ_ENTER(&ifs->ifs_ipf_state);
+		is = next;
+		next = is->is_next;
+	}
 
 	return error;
 }
-

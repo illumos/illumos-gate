@@ -157,7 +157,6 @@ static	INLINE	int nat_newrdr __P((fr_info_t *, nat_t *, natinfo_t *));
 static	hostmap_t *nat_hostmap __P((ipnat_t *, struct in_addr,
 				    struct in_addr, struct in_addr, u_32_t, 
 				    ipf_stack_t *));
-static	void	nat_hostmapdel __P((struct hostmap *));
 static	INLINE	int nat_icmpquerytype4 __P((int));
 static	int	nat_siocaddnat __P((ipnat_t *, ipnat_t **, int,
 				    ipf_stack_t *));
@@ -483,17 +482,22 @@ ipf_stack_t *ifs;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    nat_hostmapdel                                              */
+/* Function:    fr_hostmapdel                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  hm(I) - pointer to hostmap structure                        */
+/* Parameters:  hmp(I) - pointer to pointer to hostmap structure            */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
 /* Decrement the references to this hostmap structure by one.  If this      */
 /* reaches zero then remove it and free it.                                 */
 /* ------------------------------------------------------------------------ */
-static void nat_hostmapdel(hm)
-struct hostmap *hm;
+void fr_hostmapdel(hmp)
+struct hostmap **hmp;
 {
+	struct hostmap *hm;
+
+	hm = *hmp;
+	*hmp = NULL;
+
 	hm->hm_ref--;
 	if (hm->hm_ref == 0) {
 		if (hm->hm_next)
@@ -504,18 +508,6 @@ struct hostmap *hm;
 		*hm->hm_phnext = hm->hm_hnext;
 		KFREE(hm);
 	}
-}
-
-void fr_hostmapderef(hmp)
-struct hostmap **hmp;
-{
-	struct hostmap *hm;
-
-	hm = *hmp;
-	*hmp = NULL;
-	hm->hm_ref--;
-	if (hm->hm_ref == 0)
-		nat_hostmapdel(hm);
 }
 
 
@@ -1649,7 +1641,7 @@ ipf_stack_t *ifs;
 		(void)fr_derefrule(&nat->nat_fr, ifs);
 
 	if (nat->nat_hm != NULL)
-		nat_hostmapdel(nat->nat_hm);
+		fr_hostmapdel(&nat->nat_hm);
 
 	/*
 	 * If there is an active reference from the nat entry to its parent
@@ -1822,8 +1814,7 @@ natinfo_t *ni;
 			if (hm != NULL)
 				in.s_addr = hm->hm_mapip.s_addr;
 		} else if ((l == 1) && (hm != NULL)) {
-			nat_hostmapdel(hm);
-			hm = NULL;
+			fr_hostmapdel(&hm);
 		}
 		in.s_addr = ntohl(in.s_addr);
 
@@ -2391,7 +2382,7 @@ int direction;
 badnat:
 	ifs->ifs_nat_stats.ns_badnat++;
 	if ((hm = nat->nat_hm) != NULL)
-		nat_hostmapdel(hm);
+		fr_hostmapdel(&hm);
 	KFREE(nat);
 	nat = NULL;
 done:
@@ -5045,17 +5036,16 @@ ipf_stack_t *ifs;
 	return;
 }
 
+/* ------------------------------------------------------------------------ */
 /* Function:    nat_getnext                                                 */
 /* Returns:     int - 0 == ok, else error                                   */
 /* Parameters:  t(I)   - pointer to ipftoken structure                      */
 /*              itp(I) - pointer to ipfgeniter_t structure                  */
+/*              ifs - ipf stack instance                                    */
 /*                                                                          */
-/* Fetch the next nat/ipnat structure pointer from the linked list and      */
-/* copy it out to the storage space pointed to by itp_data.  The next item  */
+/* Fetch the next nat/ipnat/hostmap structure pointer from the linked list  */
+/* and copy it out to the storage space pointed to by itp.  The next item   */
 /* in the list to look at is put back in the ipftoken struture.             */
-/* If we call ipf_freetoken, the accompanying pointer is set to NULL because*/
-/* ipf_freetoken will call a deref function for us and we dont want to call */
-/* that twice (second time would be in the second switch statement below.   */
 /* ------------------------------------------------------------------------ */
 static int nat_getnext(t, itp, ifs)
 ipftoken_t *t;
@@ -5065,9 +5055,14 @@ ipf_stack_t *ifs;
 	hostmap_t *hm, *nexthm = NULL, zerohm;
 	ipnat_t *ipn, *nextipnat = NULL, zeroipn;
 	nat_t *nat, *nextnat = NULL, zeronat;
-	int error = 0;
+	int error = 0, count;
+	char *dst;
+
+	if (itp->igi_nitems == 0)
+		return EINVAL;
 
 	READ_ENTER(&ifs->ifs_ipf_nat);
+
 	switch (itp->igi_type)
 	{
 	case IPFGENITER_HOSTMAP :
@@ -5075,23 +5070,7 @@ ipf_stack_t *ifs;
 		if (hm == NULL) {
 			nexthm = ifs->ifs_ipf_hm_maplist;
 		} else {
-			nexthm = hm->hm_hnext;
-		}
-		if (nexthm != NULL) {
-			if (nexthm->hm_hnext == NULL) {
-				t->ipt_alive = 0;
-				ipf_unlinktoken(t, ifs);
-				KFREE(t);
-			} else {
-				/*MUTEX_ENTER(&nexthm->hm_lock);*/
-				nexthm->hm_ref++;
-				/*MUTEX_EXIT(&nextipnat->hm_lock);*/
-			}
-				
-		} else {
-			bzero(&zerohm, sizeof(zerohm));
-			nexthm = &zerohm;
-			ipf_freetoken(t, ifs);
+			nexthm = hm->hm_next;
 		}
 		break;
 
@@ -5102,21 +5081,6 @@ ipf_stack_t *ifs;
 		} else {
 			nextipnat = ipn->in_next;
 		}
-		if (nextipnat != NULL) {
-			if (nextipnat->in_next == NULL) {
-				t->ipt_alive = 0;
-				ipf_unlinktoken(t, ifs);
-				KFREE(t);
-			} else {
-				/* MUTEX_ENTER(&nextipnat->in_lock); */
-				nextipnat->in_use++;
-				/* MUTEX_EXIT(&nextipnat->in_lock); */
-			}
-		} else {
-			bzero(&zeroipn, sizeof(zeroipn));
-			nextipnat = &zeroipn;
-			ipf_freetoken(t, ifs);
-		}
 		break;
 
 	case IPFGENITER_NAT :
@@ -5126,60 +5090,113 @@ ipf_stack_t *ifs;
 		} else {
 			nextnat = nat->nat_next;
 		}
-		if (nextnat != NULL) {
-			if (nextnat->nat_next == NULL) {
-				t->ipt_alive = 0;
-				ipf_unlinktoken(t, ifs);
-				KFREE(t);
+		break;
+	default :
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+		return EINVAL;
+	}
+ 
+	dst = itp->igi_data;
+	for (count = itp->igi_nitems; count > 0; count--) {
+		switch (itp->igi_type)
+		{
+		case IPFGENITER_HOSTMAP :
+			if (nexthm != NULL) {
+				ATOMIC_INC32(nexthm->hm_ref);
+				t->ipt_data = nexthm;
 			} else {
+				bzero(&zerohm, sizeof(zerohm));
+				nexthm = &zerohm;
+				count = 1;
+				t->ipt_data = NULL;
+			}
+			break;
+		case IPFGENITER_IPNAT :
+			if (nextipnat != NULL) {
+				ATOMIC_INC32(nextipnat->in_use);
+				t->ipt_data = nextipnat;
+			} else {
+				bzero(&zeroipn, sizeof(zeroipn));
+				nextipnat = &zeroipn;
+				count = 1;
+				t->ipt_data = NULL;
+			}
+			break;
+		case IPFGENITER_NAT :
+			if (nextnat != NULL) {
 				MUTEX_ENTER(&nextnat->nat_lock);
 				nextnat->nat_ref++;
 				MUTEX_EXIT(&nextnat->nat_lock);
+				t->ipt_data = nextnat;
+			} else {
+				bzero(&zeronat, sizeof(zeronat));
+				nextnat = &zeronat;
+				count = 1;
+				t->ipt_data = NULL;
 			}
-		} else {
-			bzero(&zeronat, sizeof(zeronat));
-			nextnat = &zeronat;
-			ipf_freetoken(t, ifs);
+			break;
+		default :
+			break;
 		}
-		break;
-	}
 
-	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+		/*
+		 * We can safely release our hold on ipf_nat.
+		 */
+		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
-	switch (itp->igi_type)
-	{
-	case IPFGENITER_HOSTMAP :
-		if (hm != NULL) {
-			WRITE_ENTER(&ifs->ifs_ipf_nat);
-			fr_hostmapderef(&hm);
-			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+		switch (itp->igi_type)
+		{
+		case IPFGENITER_HOSTMAP :
+			if (hm != NULL) {
+				WRITE_ENTER(&ifs->ifs_ipf_nat);
+				fr_hostmapdel(&hm);
+				RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			}
+			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
+			if (error != 0) {
+				error = EFAULT;
+			} else {
+				dst += sizeof(*nexthm);
+				hm = nexthm;
+				nexthm = nexthm->hm_next;
+			}
+			break;
+		case IPFGENITER_IPNAT :
+			if (ipn != NULL) {
+				WRITE_ENTER(&ifs->ifs_ipf_nat);
+				fr_ipnatderef(&ipn, ifs);
+				RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			}
+			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
+			if (error != 0) {
+				error = EFAULT;
+			} else {
+				dst += sizeof(*nextipnat);
+				ipn = nextipnat;
+				nextipnat = nextipnat->in_next;
+			}
+			break;
+		case IPFGENITER_NAT :
+			if (nat != NULL) {
+				fr_natderef(&nat, ifs);
+			}
+			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
+			if (error != 0) {
+				error = EFAULT;
+			} else {
+				dst += sizeof(*nextnat);
+				nat = nextnat;
+				nextnat = nextnat->nat_next;
+			}
+			break;
+		default :
+			break;
 		}
-		if (nexthm->hm_hnext != NULL) 
-			t->ipt_data = nexthm;
-		error = COPYOUT(nexthm, itp->igi_data, sizeof(*nexthm));
-		if (error != 0)
-			error = EFAULT;
-		break;
-
-	case IPFGENITER_IPNAT :
-		if (ipn != NULL)
-			fr_ipnatderef(&ipn, ifs);
-		if (nextipnat->in_next != NULL) 
-			t->ipt_data = nextipnat;
-		error = COPYOUT(nextipnat, itp->igi_data, sizeof(*nextipnat));
-		if (error != 0)
-			error = EFAULT;
-		break;
-
-	case IPFGENITER_NAT :
-		if (nat != NULL)
-			fr_natderef(&nat, ifs);
-		if (nextnat->nat_next != NULL) 
-			t->ipt_data = nextnat;
-		error = COPYOUT(nextnat, itp->igi_data, sizeof(*nextnat));
-		if (error != 0)
-			error = EFAULT;
-		break;
+ 
+		if ((count == 1) || (error != 0))
+			break;
+ 
+		READ_ENTER(&ifs->ifs_ipf_nat);
 	}
 
 	return error;

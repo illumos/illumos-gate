@@ -89,10 +89,6 @@ extern	int	opterr;
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
-#define	F_IN	0
-#define	F_OUT	1
-#define	F_ACIN	2
-#define	F_ACOUT	3
 static	char	*filters[4] = { "ipfilter(in)", "ipfilter(out)",
 				"ipacct(in)", "ipacct(out)" };
 static	int	state_logging = -1;
@@ -786,7 +782,7 @@ char *group, *comment;
 {
 	frgroup_t *grtop, *grtail, *g;
 	struct	frentry	fb, *fg;
-	int	n;
+	int type, n;
 	ipfruleiter_t rule;
 	ipfobj_t obj;
 
@@ -798,6 +794,7 @@ char *group, *comment;
 	rule.iri_ver = use_inet6? AF_INET6 : AF_INET;
 	rule.iri_inout = out;
 	rule.iri_active = set;
+	rule.iri_nrules = 1;
 	rule.iri_rule = &fb;
 	if (group != NULL)
 		strncpy(rule.iri_group, group, FR_GROUPLEN);
@@ -818,6 +815,8 @@ char *group, *comment;
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			perror("ioctl(SIOCIPFITER)");
+			type = IPFGENITER_IPF;
+			(void) ioctl(ipf_fd, SIOCIPFDELTOK, &type);
 			return;
 		}
 		if (fp->fr_data != NULL)
@@ -863,6 +862,9 @@ char *group, *comment;
 			}
 		}
 	} while (fp->fr_next != NULL);
+
+	type = IPFGENITER_IPF;
+	(void) ioctl(ipf_fd, SIOCIPFDELTOK, &type);
 
 	while ((g = grtop) != NULL) {
 		printlivelist(out, set, NULL, g->fg_name, comment);

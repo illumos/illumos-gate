@@ -434,6 +434,7 @@ int fd, opts;
 	obj.ipfo_ptr = &iter;
 
 	iter.igi_type = IPFGENITER_IPNAT;
+	iter.igi_nitems = 1;
 	iter.igi_data = &ipn;
 
 	/*
@@ -452,6 +453,7 @@ int fd, opts;
 	printf("\nList of active sessions:\n");
 
 	iter.igi_type = IPFGENITER_NAT;
+	iter.igi_nitems = 1;
 	iter.igi_data = &nat;
 
 	while (nsp->ns_instances != NULL) {
@@ -462,6 +464,8 @@ int fd, opts;
 			printaps(nat.nat_aps, opts);
 		nsp->ns_instances = nat.nat_next;
 	}
+
+	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
 
 	if (opts & OPT_VERBOSE)
 		showhostmap_live(fd, nsp);

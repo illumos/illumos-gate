@@ -2541,7 +2541,7 @@ ipf_stack_t *ifs;
 #endif
 
 	if (fin->fin_state != NULL)
-		fr_statederef(fin, (ipstate_t **)&fin->fin_state, ifs);
+		fr_statederef((ipstate_t **)&fin->fin_state, ifs);
 
 	if (fin->fin_nat != NULL)
 		fr_natderef((nat_t **)&fin->fin_nat, ifs);
@@ -6668,6 +6668,15 @@ ipf_stack_t *ifs;
 	return nic;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_expiretokens                                            */
+/* Returns:     None.                                                       */
+/* Parameters:  ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function is run every ipf tick to see if there are any tokens that  */
+/* have been held for too long and need to be freed up.                     */
+/* ------------------------------------------------------------------------ */
 void ipf_expiretokens(ifs)
 ipf_stack_t *ifs;
 {
@@ -6684,6 +6693,18 @@ ipf_stack_t *ifs;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_deltoken                                                */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  type(I) - the token type to match                           */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function looks for a a token in the current list that matches up    */
+/* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
+/* call ipf_freetoken() to remove it from the list.                         */
+/* ------------------------------------------------------------------------ */
 int ipf_deltoken(type, uid, ptr, ifs)
 int type, uid;
 void *ptr;
@@ -6705,6 +6726,17 @@ ipf_stack_t *ifs;
 	return error;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_unlinktoken                                             */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function unlinks a token structure from the linked list of tokens   */
+/* that it belongs to.  The head pointer never needs to be explicitly       */
+/* adjusted, but the tail does due to the linked list implementation.       */
+/* ------------------------------------------------------------------------ */
 void ipf_unlinktoken(token, ifs)
 ipftoken_t *token;
 ipf_stack_t *ifs;
@@ -6719,7 +6751,22 @@ ipf_stack_t *ifs;
 }
 
 
-
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_findtoken                                               */
+/* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
+/* Parameters:  type(I) - the token type to match                           */
+/*              uid(I) - uid owning the token                               */
+/*              ptr(I) - context pointer for the token                      */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function looks for a live token in the list of current tokens that  */
+/* matches the tuple (type, uid, ptr).  If one cannot be found then one is  */
+/* allocated.  If one is found then it is moved to the top of the list of   */
+/* currently active tokens.                                                 */
+/*                                                                          */
+/* NOTE: It is by design that this function returns holding a read lock on  */
+/*       ipf_tokens.  Callers must make sure they release it!               */
+/* ------------------------------------------------------------------------ */
 ipftoken_t *ipf_findtoken(type, uid, ptr, ifs)
 int type, uid;
 void *ptr;
@@ -6762,7 +6809,6 @@ ipf_stack_t *ifs;
 	ifs->ifs_ipftokentail = &it->ipt_next;
 	it->ipt_next = NULL;
 
-	/* XXX: more needed */
 	it->ipt_die = ifs->ifs_fr_ticks + 2;
 
 	MUTEX_DOWNGRADE(&ifs->ifs_ipf_tokens);
@@ -6771,41 +6817,56 @@ ipf_stack_t *ifs;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_freetoken                                               */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function unlinks a token from the linked list and on the path to    */
+/* free'ing the data, it calls the dereference function that is associated  */
+/* with the type of data pointed to by the token as it is considered to     */
+/* hold a reference to it.                                                  */
+/* ------------------------------------------------------------------------ */
 void ipf_freetoken(token, ifs)
 ipftoken_t *token;
 ipf_stack_t *ifs;
 {
-	void *data;
+	void *data, **datap;
 
 	ipf_unlinktoken(token, ifs);
 
 	data = token->ipt_data;
+	datap = &data;
 
 	if ((data != NULL) && (data != (void *)-1)) {
 		switch (token->ipt_type)
 		{
 		case IPFGENITER_IPF :
-			(void)fr_derefrule((frentry_t **)&data, ifs);
+			(void)fr_derefrule((frentry_t **)datap, ifs);
 			break;
 		case IPFGENITER_IPNAT :
 			WRITE_ENTER(&ifs->ifs_ipf_nat);
-			fr_ipnatderef((ipnat_t **)&data, ifs);
+			fr_ipnatderef((ipnat_t **)datap, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 			break;
 		case IPFGENITER_NAT :
-			fr_natderef((nat_t **)&data, ifs);
+			fr_natderef((nat_t **)datap, ifs);
 			break;
 		case IPFGENITER_STATE :
-			fr_statederef(NULL, (ipstate_t **)&data, ifs);
+			fr_statederef((ipstate_t **)datap, ifs);
 			break;
 		case IPFGENITER_FRAG :
-			fr_fragderef((ipfr_t **)&data, &ifs->ifs_ipf_frag, ifs);
+			fr_fragderef((ipfr_t **)datap, &ifs->ifs_ipf_frag, ifs);
 			break;
 		case IPFGENITER_NATFRAG :
- 			fr_fragderef((ipfr_t **)&data, &ifs->ifs_ipf_natfrag, ifs);
+ 			fr_fragderef((ipfr_t **)datap,
+				     &ifs->ifs_ipf_natfrag, ifs);
 			break;
 		case IPFGENITER_HOSTMAP :
-			fr_hostmapderef((hostmap_t **)&data);
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			fr_hostmapdel((hostmap_t **)datap);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 			break;
 		default :
 			(void) ip_lookup_iterderef(token->ipt_type, data, ifs);
@@ -6816,12 +6877,32 @@ ipf_stack_t *ifs;
 	KFREE(token);
 }
 
-int ipf_getnextrule(ipftoken_t *t, void *ptr, ipf_stack_t *ifs)
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_getnextrule                                             */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  t(I)   - pointer to destination information to resolve      */
+/*              ptr(I) - pointer to ipfobj_t to copyin from user space      */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function's first job is to bring in the ipfruleiter_t structure via */
+/* the ipfobj_t structure to determine what should be the next rule to      */
+/* return. Once the ipfruleiter_t has been brought in, it then tries to     */
+/* find the 'next rule'.  This may include searching rule group lists or    */
+/* just be as simple as looking at the 'next' field in the rule structure.  */
+/* When we have found the rule to return, increase its reference count and  */
+/* if we used an existing rule to get here, decrease its reference count.   */
+/* ------------------------------------------------------------------------ */
+int ipf_getnextrule(t, ptr, ifs)
+ipftoken_t *t;
+void *ptr;
+ipf_stack_t *ifs;
 {
 	frentry_t *fr, *next, zero;
+	int error, out, count;
 	ipfruleiter_t it;
 	frgroup_t *fg;
-	int error;
+	char *dst;
 
 	if (t == NULL || ptr == NULL)
 		return EFAULT;
@@ -6830,23 +6911,45 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr, ipf_stack_t *ifs)
 		return error;
 	if ((it.iri_ver != AF_INET) && (it.iri_ver != AF_INET6))
 		return EINVAL;
-	if ((it.iri_inout != 0) && (it.iri_inout != 1))
+	if ((it.iri_inout < 0) || (it.iri_inout > 3))
+		return EINVAL;
+	if (it.iri_nrules == 0)
 		return EINVAL;
 	if ((it.iri_active != 0) && (it.iri_active != 1))
 		return EINVAL;
 	if (it.iri_rule == NULL)
 		return EFAULT;
 
+	/*
+	 * Use bitmask on it.iri_inout to determine direction.
+	 * F_OUT (1) and F_ACOUT (3) mask to out = 1, while
+	 * F_IN (0) and F_ACIN (2) mask to out = 0.
+	 */
+	out = it.iri_inout & F_OUT;
 	fr = t->ipt_data;
 	READ_ENTER(&ifs->ifs_ipf_mutex);
 	if (fr == NULL) {
 		if (*it.iri_group == '\0') {
-			if (it.iri_ver == AF_INET)
-				next = ifs->ifs_ipfilter
-				    [it.iri_inout][it.iri_active];
-			else
-				next = ifs->ifs_ipfilter6
-				    [it.iri_inout][it.iri_active];
+			/*
+			 * Use bitmask again to determine accounting or not.
+			 * F_ACIN will mask to accounting cases F_ACIN (2)
+			 * or F_ACOUT (3), but not F_IN or F_OUT.
+			 */
+			if ((it.iri_inout & F_ACIN) != 0) {
+				if (it.iri_ver == AF_INET)
+					next = ifs->ifs_ipacct
+					    [out][it.iri_active];
+				else
+					next = ifs->ifs_ipacct6
+					    [out][it.iri_active];
+			} else {
+				if (it.iri_ver == AF_INET)
+					next = ifs->ifs_ipfilter
+					    [out][it.iri_active];
+				else
+					next = ifs->ifs_ipfilter6
+					    [out][it.iri_active];
+			}
 		} else {
 			fg = fr_findgroup(it.iri_group, IPL_LOGIPF,
 					  it.iri_active, NULL, ifs);
@@ -6859,45 +6962,66 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr, ipf_stack_t *ifs)
 		next = fr->fr_next;
 	}
 
-	if (next != NULL) {
-		if (next->fr_next == NULL) {
-			t->ipt_alive = 0;
-			ipf_unlinktoken(t, ifs);
-			KFREE(t);	
-		} else {
+	dst = (char *)it.iri_rule;
+	/*
+	 * The ipfruleiter may ask for more than 1 rule at a time to be
+	 * copied out, so long as that many exist in the list to start with!
+	 */
+	for (count = it.iri_nrules; count > 0; count--) {
+		if (next != NULL) {
 			MUTEX_ENTER(&next->fr_lock);
 			next->fr_ref++;
 			MUTEX_EXIT(&next->fr_lock);
 			t->ipt_data = next;
+		} else {
+			bzero(&zero, sizeof(zero));
+			next = &zero;
+			count = 1;
+			t->ipt_data = NULL;
 		}
-	} else {
-		bzero(&zero, sizeof(zero));
-		next = &zero;
-		ipf_freetoken(t, ifs);
-		fr = NULL;
-	}
-	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+		RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+ 
+		if (fr != NULL) {
+			(void) fr_derefrule(&fr, ifs);
+		}
 
-	if (fr != NULL) {
-		(void)fr_derefrule(&fr, ifs);
-	}
-
-	error = COPYOUT(next, it.iri_rule, sizeof(*next));
-	if (error != 0)
-		return EFAULT;
-
-	if (next->fr_data != NULL) {
-		error = COPYOUT(next->fr_data,
-				(char *)it.iri_rule + sizeof(*next),
-				next->fr_dsize);
+		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
-			error = EFAULT;
-	}
+			return EFAULT;
+ 
+		if (next->fr_data != NULL) {
+			dst += sizeof(*next);
+			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
+			if (error != 0)
+				error = EFAULT;
+			else
+				dst += next->fr_dsize;
+		}
+ 
+		if ((count == 1) || (error != 0))
+			break;
 
+		READ_ENTER(&ifs->ifs_ipf_mutex);
+		fr = next;
+		next = fr->fr_next;
+	}
+ 
 	return error;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_frruleiter                                               */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  data(I) - the token type to match                           */
+/*              uid(I) - uid owning the token                               */
+/*              ptr(I) - context pointer for the token                      */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function serves as a stepping stone between fr_ipf_ioctl and        */
+/* ipf_getnextrule.  It's role is to find the right token in the kernel for */
+/* the process doing the ioctl and use that to ask for the next rule.       */
+/* ------------------------------------------------------------------------ */
 int ipf_frruleiter(data, uid, ctx, ifs)
 void *data, *ctx;
 int uid;
@@ -6917,6 +7041,16 @@ ipf_stack_t *ifs;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_geniter                                                 */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/*              itp(I) - pointer to ipfgeniter structure                    */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* Generic iterator called from ipf_genericiter.  Currently only used for   */
+/* walking through list of fragments.                                       */
+/* ------------------------------------------------------------------------ */
 int ipf_geniter(token, itp, ifs)
 ipftoken_t *token;
 ipfgeniter_t *itp;
@@ -6928,7 +7062,8 @@ ipf_stack_t *ifs;
 	{
 	case IPFGENITER_FRAG :
 		error = fr_nextfrag(token, itp, &ifs->ifs_ipfr_list,
-				    &ifs->ifs_ipfr_tail, &ifs->ifs_ipf_frag, ifs);
+				    &ifs->ifs_ipfr_tail, &ifs->ifs_ipf_frag,
+				    ifs);
 		break;
 	default :
 		error = EINVAL;
@@ -6939,6 +7074,19 @@ ipf_stack_t *ifs;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_genericiter                                             */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  data(I) - the token type to match                           */
+/*              uid(I) - uid owning the token                               */
+/*              ptr(I) - context pointer for the token                      */
+/*              ifs - ipf stack instance                                    */
+/*                                                                          */
+/* This function serves as a stepping stone between fr_ipf_ioctl and        */
+/* ipf_geniter when handling SIOCGENITER.  It's role is to find the right   */
+/* token in the kernel for the process using the ioctl, and to use that     */
+/* token when calling ipf_geniter.                                          */
+/* ------------------------------------------------------------------------ */
 int ipf_genericiter(data, uid, ctx, ifs)
 void *data, *ctx;
 int uid;

@@ -1305,7 +1305,7 @@ ippr_rpcb_getnat(fin, nat, proto, port, ifsrpcb)
 			return(-1);
 		}
 		if (fi.fin_state != NULL)
-			fr_statederef(&fi, (ipstate_t **)&fi.fin_state, ifs);
+			fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 	}
 
 	return(0);

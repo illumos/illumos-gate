@@ -1169,17 +1169,31 @@ typedef	struct	ipftune	{
 #define	ipft_vshort	ipft_un.ipftu_short
 #define	ipft_vchar	ipft_un.ipftu_char
 
-
+/*
+ * ipfruleiter is iterator structure used for filter rules.
+ */
 typedef	struct	ipfruleiter {
 	int		iri_ver;
 	int		iri_inout;
 	char		iri_group[FR_GROUPLEN];
 	int		iri_active;
+	int		iri_nrules;
 	frentry_t	*iri_rule;
 } ipfruleiter_t;
 
+/* Values for iri_inout  */
+#define	F_IN	0
+#define	F_OUT	1
+#define	F_ACIN	2
+#define	F_ACOUT	3
+
+/*
+ * ipfgeniter is generic iterator structure used for nat rules,
+ * hostmap entries and nat table entries.
+ */
 typedef	struct	ipfgeniter {
-	int	igi_type;
+	int	igi_type;	/* type of data we're looking at */
+	int	igi_nitems;
 	void	*igi_data;
 } ipfgeniter_t;
 

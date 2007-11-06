@@ -472,6 +472,6 @@ extern	void	fr_natderef __P((nat_t **, ipf_stack_t *));
 extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
 extern	void	fr_setnatqueue __P((nat_t *, int, ipf_stack_t *));
-extern  void    fr_hostmapderef __P((hostmap_t **));
+extern  void    fr_hostmapdel __P((hostmap_t **));
 
 #endif /* __IP_NAT_H__ */
