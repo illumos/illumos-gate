@@ -35,6 +35,7 @@
 #include "main.h"
 #include "partition.h"
 #include "ctlr_scsi.h"
+#include "checkdev.h"
 #include <string.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -276,6 +277,18 @@ write_label()
 #if defined(_SUNOS_VTOC_8)
 	int i;
 #endif		/* defined(_SUNOS_VTOC_8) */
+
+	/*
+	 * Check to see if any partitions used for svm, vxvm or live upgrade
+	 * are on the disk. If so, refuse to label the disk, but only
+	 * if we are trying to shrink a partition in use.
+	 */
+	if (checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 1)) {
+		err_print("Cannot label disk when "
+		    "partitions are in use as described.\n");
+		return (-1);
+	}
 
 	/*
 	 * If EFI label, then write it out to disk

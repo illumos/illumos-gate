@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +109,7 @@ p_modify()
 "Cannot modify disk partitions while it has mounted partitions.\n\n");
 		return (-1);
 	}
+
 	/*
 	 * If the disk has partitions currently being used for
 	 * swapping, cannot modify
@@ -120,6 +120,18 @@ p_modify()
 currently being used for swapping.\n");
 		return (-1);
 	}
+
+	/*
+	 * Check to see if any partitions used for svm, vxvm, ZFS zpool
+	 * or live upgrade are on the disk.
+	 */
+	if (checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 0)) {
+		err_print("Cannot modify disk partition when "
+		    "partitions are in use as described.\n");
+		return (-1);
+	}
+
 	/*
 	 * prompt user for a partition table base
 	 */

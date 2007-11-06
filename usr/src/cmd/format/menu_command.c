@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2218,6 +2218,7 @@ c_volname()
 "Please select a partition map for the disk first.\n");
 	return (-1);
 	}
+
 	/*
 	 * Check to see if there are any mounted file systems anywhere
 	 * on the current disk.  If so, refuse to label the disk, but
@@ -2232,6 +2233,7 @@ c_volname()
 			return (-1);
 		}
 	}
+
 	/*
 	 * Check to see if there are partitions being used for swapping
 	 * on the current disk.  If so, refuse to label the disk, but
@@ -2247,6 +2249,20 @@ being used for swapping.\n\n");
 			return (-1);
 		}
 	}
+
+	/*
+	 * Check to see if any partitions used for svm, vxvm, ZFS zpool
+	 * or live upgrade are on the disk. If so, refuse to label the
+	 * disk, but only if we are trying to shrink a partition in
+	 * use.
+	 */
+	if (checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 1)) {
+		err_print("Cannot label disk while its partitions "
+		    "are in use as described.\n");
+		return (-1);
+	}
+
 	/*
 	 * Prompt for the disk volume name.
 	 */
