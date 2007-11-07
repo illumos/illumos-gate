@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,5 +42,5 @@ syscall::mmap*:entry
 tick-1s
 /i++ == 3/
 {
-	exit(0);
+	exit(1);
 }

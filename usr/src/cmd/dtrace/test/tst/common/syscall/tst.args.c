@@ -20,20 +20,21 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/mman.h>
+#include <stdio.h>
+#include <sys/syscall.h>
 
 /*ARGSUSED*/
 int
 main(int argc, char **argv)
 {
 	for (;;) {
-		(void) mmap(NULL, 1, 2, 3, -1, 0x12345678);
+		(void) syscall(SYS_mmap, NULL, 1, 2, 3, -1, 0x12345678);
 	}
 
 	return (0);
