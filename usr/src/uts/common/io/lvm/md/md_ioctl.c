@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,6 +117,32 @@ md_mn_clear_commd_present()
 	md_mn_commd_present = 0;
 }
 
+/*
+ * It is possible to pass in a minor number via the ioctl interface
+ * and this minor number is used to reference elements in arrays.
+ * Therefore we need to make sure that the value passed in is
+ * correct within the array sizes, and array dereference. Not
+ * doing so allows for incorrect values which may result in panics.
+ */
+static int
+verify_minor(minor_t mnum)
+{
+	set_t	setno = MD_MIN2SET(mnum);
+
+	/*
+	 * Check the bounds.
+	 */
+	if (setno >= md_nsets || (MD_MIN2UNIT(mnum) >= md_nunits)) {
+		return (EINVAL);
+	}
+
+	/* has the set been initialised ? */
+	if ((md_get_setstatus(setno) & MD_SET_SNARFED) == 0)
+		return (ENODEV);
+
+	return (0);
+}
+
 static int
 get_lb_inittime_ioctl(
 	mddb_config_t	*cp
@@ -125,6 +151,9 @@ get_lb_inittime_ioctl(
 	set_t		setno = cp->c_setno;
 	int		err;
 	mddb_set_t	*s;
+
+	if (setno >= md_nsets)
+		return (-1);
 
 	if ((s = mddb_setenter(setno, MDDB_MUSTEXIST, &err)) == NULL)
 		return (-1);
@@ -169,12 +198,12 @@ setnm_ioctl(mdnm_params_t *nm, int mode)
 
 	if (md_get_setstatus(nm->setno) & MD_SET_STALE)
 		return (mdmddberror(&nm->mde, MDE_DB_STALE, NODEV32,
-					nm->setno));
+		    nm->setno));
 
 	name = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 	err = ddi_copyin((caddr_t)(uintptr_t)nm->devname, name,
-		(size_t)nm->devname_len, mode);
+	    (size_t)nm->devname_len, mode);
 	if (err) {
 		err = EFAULT;
 		goto out;
@@ -287,10 +316,10 @@ getnm_ioctl(
 	if (nm->drvnm[0] != '\0') {
 		if (MD_UPGRADE)
 			dev = md_makedevice(md_targ_name_to_major(nm->drvnm),
-				nm->mnum);
+			    nm->mnum);
 		else
 			dev = md_makedevice(ddi_name_to_major(nm->drvnm),
-				nm->mnum);
+			    nm->mnum);
 	}
 
 	/*
@@ -318,6 +347,7 @@ getnm_ioctl(
 		}
 	} else {
 		if ((nm->key != MD_KEYWILD) ||
+		    (md_set[MD_MIN2SET(nm->mnum)].s_un == NULL) ||
 		    (MD_UNIT(nm->mnum) == NULL)) {
 			err = ENOENT;
 			goto out;
@@ -602,8 +632,10 @@ update_namespace_did_ioctl(
 
 	if ((md_get_setstatus(nm->setno) & MD_SET_STALE))
 		return (0);
+
 	if ((md_get_setstatus(nm->setno) & MD_SET_SNARFED) == 0)
 		return (ENODEV);
+
 	if (nm->side == -1)
 		side = mddb_getsidenum(nm->setno);
 	else
@@ -611,6 +643,7 @@ update_namespace_did_ioctl(
 
 	return (md_update_namespace_did(nm->setno, side, nm->key, &nm->mde));
 }
+
 /*ARGSUSED*/
 static int
 update_namespace_ioctl(
@@ -710,13 +743,6 @@ getdrvnm_ioctl(md_dev64_t dev, md_i_driverinfo_t *di, int mode)
 
 	if (md_snarf_db_set(MD_LOCAL_SET, &di->mde) != 0)
 		return (0);
-
-	if ((setno >= md_nsets) || (MD_MIN2UNIT(mnum) >= md_nunits)) {
-		return (mdmderror(&di->mde, MDE_INVAL_UNIT, mnum));
-	}
-
-	if ((md_get_setstatus(setno) & MD_SET_SNARFED) == 0)
-		return (ENODEV);
 
 	ui = MDI_UNIT(mnum);
 	if (ui == NULL) {
@@ -841,24 +867,24 @@ getnum_ioctl(void *d, int mode)
 	next = md_ops[modindex]->md_head;
 	count = 0;
 	while (next) {
-	    if (next->ln_setno == setno) {
-		    if ((minor_array_length > 0) &&
-				(count < minor_array_length)) {
-			*m_ptr = next->ln_id;
-			m_ptr++;
-		    }
-		    count++;
-	    }
-	    next = next->ln_next;
+		if (next->ln_setno == setno) {
+			if ((minor_array_length > 0) &&
+			    (count < minor_array_length)) {
+				*m_ptr = next->ln_id;
+				m_ptr++;
+			}
+			count++;
+		}
+		next = next->ln_next;
 	}
 	rw_exit(&md_ops[modindex]->md_link_rw.lock);
 
 	gn->size = count;
 	/* now copy the array back */
 	if (minor_array_length > 0) {
-	    err = ddi_copyout(minors,
-		(caddr_t)(uintptr_t)gn->minors, sz, mode);
-	    kmem_free(minors, sz);
+		err = ddi_copyout(minors,
+		    (caddr_t)(uintptr_t)gn->minors, sz, mode);
+		kmem_free(minors, sz);
 	}
 
 	return (err);
@@ -1017,11 +1043,11 @@ setdid_ioctl(
 	if (md_snarf_db_set(MD_LOCAL_SET, &nm->mde) != 0)
 		return (0);
 
-	if (MD_MNSET_SETNO(nm->setno))
-		return (0);
-
 	if (nm->setno >= md_nsets)
 		return (EINVAL);
+
+	if (MD_MNSET_SETNO(nm->setno))
+		return (0);
 
 	if ((md_get_setstatus(nm->setno) & MD_SET_SNARFED) == 0)
 		return (ENODEV);
@@ -1049,6 +1075,9 @@ getdidmin_ioctl(
 
 	if (md_snarf_db_set(MD_LOCAL_SET, &nm->mde) != 0)
 		return (0);
+
+	if (nm->setno >= md_nsets)
+		return (EINVAL);
 
 	if (MD_MNSET_SETNO(nm->setno))
 		return (0);
@@ -1308,9 +1337,6 @@ setuserflags(
 
 	mdclrerror(&msu->mde);
 
-	if ((setno >= md_nsets) || (MD_MIN2UNIT(mnum) >= md_nunits))
-		return (ENXIO);
-
 	if (md_get_setstatus(setno) & MD_SET_STALE)
 		return (mdmddberror(&msu->mde, MDE_DB_STALE, mnum, setno));
 
@@ -1457,9 +1483,9 @@ mddb_config_from_user(
 	if (d1->c_locator.l_devid_flags & MDDB_DEVID_SPACE) {
 		sz2 = d1->c_locator.l_devid_sz;
 		if (d1->c_locator.l_devid_sz <= 0 ||
-			d1->c_locator.l_devid_sz > MAXPATHLEN) {
-				kmem_free((void *)d1, sz1);
-				return (EINVAL);
+		    d1->c_locator.l_devid_sz > MAXPATHLEN) {
+			kmem_free((void *)d1, sz1);
+			return (EINVAL);
 		}
 		d2 = kmem_zalloc(sz2, KM_SLEEP);
 		if (ddi_copyin((caddr_t)(uintptr_t)d1->c_locator.l_devid,
@@ -1577,18 +1603,13 @@ mddb_config_to_user(
 static int
 get_tstate(md_i_get_tstate_t *gu, IOLOCK *lock)
 {
-	set_t	setno = MD_MIN2SET(gu->id);
-	unit_t	unit = MD_MIN2UNIT(gu->id);
 	mdi_unit_t	*ui;
 
-	if (setno >= md_nsets || unit >= md_nunits) {
-		(void) mdmderror(&gu->mde, MDE_INVAL_UNIT, unit);
+	ui = MDI_UNIT(gu->id);
+	if (ui == (mdi_unit_t *)NULL) {
+		(void) mdmderror(&gu->mde, MDE_UNIT_NOT_SETUP, gu->id);
 		return (EINVAL);
 	}
-
-	ui = MDI_UNIT(gu->id);
-	if (ui == (mdi_unit_t *)NULL)
-		return (EINVAL);
 
 	(void) md_ioctl_readerlock(lock, ui);
 	gu->tstate = ui->ui_tstate;
@@ -1623,6 +1644,7 @@ md_clu_ioctl(md_clu_open_t *clu)
 	if ((ui = MDI_UNIT(mnum)) == NULL) {
 		return (mdmderror(&clu->clu_mde, MDE_UNIT_NOT_SETUP, mnum));
 	}
+
 	switch (clu->clu_cmd) {
 	case MD_MN_LCU_CHECK:
 		/* No lock here, just checking */
@@ -1661,6 +1683,12 @@ mkdev_ioctl(md_mkdev_params_t *p)
 
 	mdclrerror(&p->mde);
 
+	/* Validate arguments passed in to ioctl */
+	if (setno >= MD_MAXSETS) {
+		(void) mderror(&p->mde, MDE_NO_SET);
+		return (EINVAL);
+	}
+
 	/*
 	 * Get the next available unit number in this set
 	 */
@@ -1668,12 +1696,6 @@ mkdev_ioctl(md_mkdev_params_t *p)
 	if (un == MD_UNITBAD) {
 		(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, un);
 		return (ENODEV);
-	}
-
-	/* Validate arguments passed in to ioctl */
-	if (setno >= MD_MAXSETS) {
-		(void) mderror(&p->mde, MDE_NO_SET);
-		return (EINVAL);
 	}
 
 	/* Create the device node */
@@ -2144,6 +2166,8 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 
 	case MD_IOCGET_TSTATE:
 	{
+		md_i_get_tstate_t	*p;
+
 		if (! (mode & FREAD))
 			return (EACCES);
 
@@ -2155,12 +2179,23 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			break;
 		}
 
-		err = get_tstate((md_i_get_tstate_t *)d, lockp);
+		p = (md_i_get_tstate_t *)d;
+
+		if ((err = verify_minor(p->id)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT,
+				    p->id);
+			break;
+		}
+
+		err = get_tstate(p, lockp);
 		break;
 	}
 
 	case MD_IOCGET_DRVNM:
 	{
+		md_i_driverinfo_t	*p;
+
 		if (! (mode & FREAD))
 			return (EACCES);
 
@@ -2172,18 +2207,22 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			break;
 		}
 
+		p = (md_i_driverinfo_t *)d;
+
 		/* check data integrity */
-		if (((md_i_driverinfo_t *)d)->md_driver.md_drivername == NULL) {
+		if (p->md_driver.md_drivername == NULL) {
 			err = EINVAL;
 			break;
 		}
 
-		if (MD_MIN2SET(((md_i_driverinfo_t *)d)->mnum) >= md_nsets) {
-			err = EINVAL;
+		if ((err = verify_minor(p->mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT,
+				    p->mnum);
 			break;
 		}
 
-		err = getdrvnm_ioctl(dev, (md_i_driverinfo_t *)d, mode);
+		err = getdrvnm_ioctl(dev, p, mode);
 		break;
 	}
 
@@ -2311,6 +2350,8 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 
 	case MD_IOCSET_FLAGS:
 	{
+		md_set_userflags_t	*p;
+
 		if (! (mode & FWRITE))
 			return (EACCES);
 
@@ -2322,18 +2363,23 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			break;
 		}
 
-		/* check data integrity */
-		if (MD_MIN2SET(((md_set_userflags_t *)d)->mnum) >= md_nsets) {
-			err = EINVAL;
+		p = (md_set_userflags_t *)d;
+
+		if ((err = verify_minor(p->mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT,
+				    p->mnum);
 			break;
 		}
 
-		err = setuserflags((md_set_userflags_t *)d, lockp);
+		err = setuserflags(p, lockp);
 		break;
 	}
 
 	case MD_IOCRENAME:
 	{
+		md_rename_t	*p;
+
 		if (! (mode & FWRITE)) {
 			return (EACCES);
 		}
@@ -2346,7 +2392,23 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			break;
 		}
 
-		err = md_rename((md_rename_t *)d, lockp);
+		p = (md_rename_t *)d;
+
+		if ((err = verify_minor(p->to.mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT,
+				    p->to.mnum);
+			break;
+		}
+
+		if ((err = verify_minor(p->from.mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT,
+				    p->from.mnum);
+			break;
+		}
+
+		err = md_rename(p, lockp);
 		break;
 	}
 
@@ -2374,8 +2436,16 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 
 		mnum = md_getminor(p->dev);
+
+		if ((err = verify_minor(mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->mde, MDE_INVAL_UNIT, mnum);
+			break;
+		}
+
 		if ((ui = MDI_UNIT(mnum)) == NULL) {
-			err = mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, mnum);
+			(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, mnum);
+			err = EINVAL;
 			break;
 		}
 
@@ -2960,6 +3030,9 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 
 	case MD_MN_OPEN_TEST:
 	{
+		md_clu_open_t	*p;
+		minor_t		mnum;
+
 		sz = sizeof (md_clu_open_t);
 		d = kmem_alloc(sz, KM_SLEEP);
 
@@ -2967,7 +3040,17 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			err = EFAULT;
 			break;
 		}
-		err = md_clu_ioctl((md_clu_open_t *)d);
+
+		p = (md_clu_open_t *)d;
+		mnum = md_getminor(p->clu_dev);
+
+		if ((err = verify_minor(mnum)) != 0) {
+			if (err == EINVAL)
+				(void) mdmderror(&p->clu_mde, MDE_INVAL_UNIT,
+				    mnum);
+			break;
+		}
+		err = md_clu_ioctl(p);
 		break;
 	}
 
@@ -3251,7 +3334,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 
 		msg = (char *)kmem_zalloc(cmp->size + 1, KM_SLEEP);
 		if (ddi_copyin((caddr_t)(uintptr_t)cmp->md_message, msg,
-			cmp->size, mode) != 0) {
+		    cmp->size, mode) != 0) {
 			kmem_free(msg, cmp->size + 1);
 			err = EFAULT;
 			break;
@@ -3302,7 +3385,10 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		 * In this case, reclaim the dispatched un slot
 		 */
 		setno = MD_MIN2SET(*(minor_t *)d);
-		if (md_set[setno].s_un_next <= 0) {
+		if (setno >= md_nsets) {
+			err = EINVAL;
+			break;
+		} else if (md_set[setno].s_un_next <= 0) {
 			err = EFAULT;
 			break;
 		} else {
@@ -3445,7 +3531,7 @@ md_admin_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 	 * dispatch to subdriver
 	 */
 	return ((*md_ops[modindex]->md_ioctl)(md_dev64_to_dev(dev), cmd, data,
-						mode, lockp));
+	    mode, lockp));
 }
 
 void
@@ -3596,7 +3682,7 @@ md_set_vtoc(md_unit_t *un, struct vtoc *vtoc)
 	}
 
 	recid = mddb_createrec(sizeof (struct vtoc), MDDB_VTOC, 0,
-		    MD_CRO_32BIT, MD_UN2SET(un));
+	    MD_CRO_32BIT, MD_UN2SET(un));
 
 	if (recid < 0) {
 		return (ENOSPC);
@@ -3697,7 +3783,7 @@ md_get_efi(md_unit_t *un, char *buf)
 		if (status == MDDB_OK) {
 			v = mddb_getrecaddr(un->c.un_vtoc_id);
 			bcopy(v, (caddr_t)&(efi_part->efi_gpe_PartitionName),
-				MD_EFI_PARTNAME_BYTES);
+			    MD_EFI_PARTNAME_BYTES);
 			return;
 		}
 		un->c.un_vtoc_id = 0;
@@ -3790,7 +3876,7 @@ md_set_efi(md_unit_t *un, char *buf)
 			    (un->c.un_flag & MD_EFILABEL))  {
 				v = mddb_getrecaddr(recid);
 				bcopy((caddr_t)&efi_part->efi_gpe_PartitionName,
-					v, MD_EFI_PARTNAME_BYTES);
+				    v, MD_EFI_PARTNAME_BYTES);
 				mddb_commitrec_wrapper(recid);
 				return (0);
 			}
@@ -3802,7 +3888,7 @@ md_set_efi(md_unit_t *un, char *buf)
 	}
 
 	recid = mddb_createrec(MD_EFI_PARTNAME_BYTES, MDDB_EFILABEL, 0,
-		    MD_CRO_32BIT, MD_UN2SET(un));
+	    MD_CRO_32BIT, MD_UN2SET(un));
 
 	if (recid < 0) {
 		return (ENOSPC);
@@ -3813,7 +3899,7 @@ md_set_efi(md_unit_t *un, char *buf)
 	recids[2] = 0;
 	v = mddb_getrecaddr(recid);
 	bcopy((caddr_t)&efi_part->efi_gpe_PartitionName, v,
-		MD_EFI_PARTNAME_BYTES);
+	    MD_EFI_PARTNAME_BYTES);
 
 	un->c.un_vtoc_id = recid;
 	un->c.un_flag |= MD_EFILABEL;
@@ -3982,10 +4068,10 @@ md_remove_minor_node(minor_t mnum)
 	 * Attempt release of its minor node
 	 */
 	(void) snprintf(name, sizeof (name), "%d,%d,blk", MD_MIN2SET(mnum),
-		MD_MIN2UNIT(mnum));
+	    MD_MIN2UNIT(mnum));
 	ddi_remove_minor_node(md_devinfo, name);
 
 	(void) snprintf(name, sizeof (name), "%d,%d,raw", MD_MIN2SET(mnum),
-		MD_MIN2UNIT(mnum));
+	    MD_MIN2UNIT(mnum));
 	ddi_remove_minor_node(md_devinfo, name);
 }
