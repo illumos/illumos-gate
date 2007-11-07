@@ -67,6 +67,13 @@ physnm_t t5140_pnms[] = {
 	{   1, "MB/RISER1/XAUI1" }
 };
 
+/* T5440 xaui slot numbers */
+physnm_t t5440_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/XAUI0" },
+	{   1, "MB/XAUI1" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "SPARC-Enterprise-T5120",
 	sizeof (t5120_pnms) / sizeof (physnm_t),
@@ -79,7 +86,10 @@ pphysnm_t plat_pnames[] = {
 	t5140_pnms },
 	{ "T5240",
 	sizeof (t5140_pnms) / sizeof (physnm_t),
-	t5140_pnms }
+	t5140_pnms },
+	{ "T5440",
+	sizeof (t5440_pnms) / sizeof (physnm_t),
+	t5440_pnms }
 };
 
 physlot_names_t PhyxauiNMs = {

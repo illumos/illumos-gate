@@ -25,7 +25,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip hostbridge pcibus motherboard niu platform-cpu xaui
+SUBDIRS = chip cpuboard hostbridge pcibus motherboard niu platform-cpu \
+	xaui zambezi
 
 
 include ../../../Makefile.subdirs

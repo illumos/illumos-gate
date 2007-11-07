@@ -98,6 +98,16 @@ static const bank_dimm_t bank_dimm[] = {
 	{ "%n%nMB/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n",
 	    "MB/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n" },
 	{ "%n%nMB/CMP%*d/BR%*d/CH%*d/D%*d%n", "MB/CMP%*d/BR%*d/CH%*d/D%*d%n" },
+	{ "MB/CPU%*d/CMP%*d/BR%*d%n:%n%n",	" CH%*d/D%*d/J%*4d%n", "/"},
+	{ "MB/MEM%*d/CMP%*d/BR%*d%n:%n%n",	" CH%*d/D%*d/J%*4d%n", "/"},
+	{ "%n%nMB/MEM%*d/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n",
+	    "MB/MEM%*d/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n" },
+	{ "%n%nMB/CPU%*d/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n",
+	    "MB/CPU%*d/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n" },
+	{ "%n%nMB/MEM%*d/CMP%*d/BR%*d/CH%*d/D%*d%n",
+	    "MB/MEM%*d/CMP%*d/BR%*d/CH%*d/D%*d%n"  },
+	{ "%n%nMB/CPU%*d/CMP%*d/BR%*d/CH%*d/D%*d%n",
+	    "MB/CPU%*d/CMP%*d/BR%*d/CH%*d/D%*d%n"  },
 	{ NULL }
 };
 

@@ -121,6 +121,7 @@ f none usr/platform/sun4v/lib/fm/eft/n2niu_xaui.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/n2niu_xfp.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/n2piu.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/vfncx.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/zambezi.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
@@ -134,12 +135,14 @@ d none usr/platform/sun4v/lib/fm/topo/maps 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/maps/sun4v-hc-topology.xml 444 root bin
 d none usr/platform/sun4v/lib/fm/topo/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/chip.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/cpuboard.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/platform-cpu.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/motherboard.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/niu.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/xaui.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/zambezi.so 555 root bin
 d none usr/platform/SUNW,SPARC-Enterprise 755 root sys
 d none usr/platform/SUNW,SPARC-Enterprise/lib 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise/lib/fm 755 root bin
@@ -201,6 +204,7 @@ d none usr/platform/SUNW,T5140/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,T5140/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5140-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5240-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5440-hc-topology.xml 444 root bin
 d none usr/platform/SUNW,Netra-CP3260 755 root sys
 d none usr/platform/SUNW,Netra-CP3260/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3260/lib/fm 755 root bin

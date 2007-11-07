@@ -91,6 +91,18 @@ physnm_t netra_t5440_pnms[] = {
 	{   9, "MB/PCI_MEZZ/PCIE9" }
 };
 
+physnm_t t5440_pnms[] = {
+	/* Slot #, Label */
+	{   0, "MB/PCIE0" },
+	{   1, "MB/PCIE1" },
+	{   2, "MB/PCIE2" },
+	{   3, "MB/PCIE3" },
+	{   4, "MB/PCIE4" },
+	{   5, "MB/PCIE5" },
+	{   6, "MB/PCIE6" },
+	{   7, "MB/PCIE7" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
@@ -111,6 +123,9 @@ pphysnm_t plat_pnames[] = {
 	{ "T5240",
 	    sizeof (t5220_pnms) / sizeof (physnm_t),
 	    t5220_pnms },
+	{ "T5440",
+	    sizeof (t5440_pnms) / sizeof (physnm_t),
+	    t5440_pnms },
 	{ "USBRDT-5240",
 	    sizeof (usbrdt5240_pnms) / sizeof (physnm_t),
 	    usbrdt5240_pnms },
@@ -147,6 +162,9 @@ pdevlabs_t plats_missing[] = {
 	    0,
 	    NULL },
 	{ "T5240",
+	    0,
+	    NULL },
+	{ "T5440",
 	    0,
 	    NULL },
 	{ "Netra-T5220",

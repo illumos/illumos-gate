@@ -1189,11 +1189,12 @@ mem_expand_opt(nvlist_t *nvl, char *unum, char **serids)
 		}
 	}
 
-	if ((nvlist_lookup_string_array(nvl, FM_FMRI_HC_PART,
-	    &parts, &nparts) < 0) &&
-	    (mem_get_parts_by_unum(unum, &parts, &nparts) == 0)) {
-		(void) nvlist_add_string_array(nvl,
-		    FM_FMRI_HC_PART, parts, nparts);
-		mem_strarray_free(parts, nparts);
+	if (nvlist_lookup_string_array(nvl, FM_FMRI_HC_PART,
+	    &parts, &nparts) != 0) {
+		if (mem_get_parts_by_unum(unum, &parts, &nparts) == 0) {
+			(void) nvlist_add_string_array(nvl,
+			    FM_FMRI_HC_PART, parts, nparts);
+			mem_strarray_free(parts, nparts);
+		}
 	}
 }

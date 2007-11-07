@@ -89,6 +89,8 @@ extern "C" {
 #define	CPU_FRU_FMRI		FM_FMRI_SCHEME_HC":///" \
     FM_FMRI_LEGACY_HC"="
 
+#define	BK_LFUFAULT_CERT	50
+
 typedef struct cmd_cpu cmd_cpu_t;
 
 typedef enum cmd_cpu_type {
@@ -702,7 +704,7 @@ extern char *cmd_cpu_getfrustr(fmd_hdl_t *, cmd_cpu_t *);
 extern char *cmd_cpu_getpartstr(fmd_hdl_t *, cmd_cpu_t *);
 
 extern char *cmd_cpu_getserialstr(fmd_hdl_t *, cmd_cpu_t *);
-extern nvlist_t *cmd_cpu_mkfru(char *, char *, char *);
+extern nvlist_t *cmd_cpu_mkfru(fmd_hdl_t *, char *, char *, char *);
 
 extern cmd_cpu_t *cmd_cpu_lookup(fmd_hdl_t *, nvlist_t *, const char *,
     uint8_t);

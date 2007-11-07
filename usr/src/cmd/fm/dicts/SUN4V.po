@@ -889,3 +889,195 @@ msgid "SUN4V-8001-PQ.impact"
 msgstr "The system's integrity is seriously compromised.\n"
 msgid "SUN4V-8001-PQ.action"
 msgstr "Do not rely on this system for mission-critical tasks.\nSchedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-QC
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.opu-u
+#
+msgid "SUN4V-8001-QC.type"
+msgstr "Fault"
+msgid "SUN4V-8001-QC.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-QC.description"
+msgstr "The ultraSPARC-T2plus Coherency Interconnect has detected a fatal\ninternal problem.\n  Refer to %s for more information."
+msgid "SUN4V-8001-QC.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-QC.impact"
+msgstr "The system's integrity is compromised.\n"
+msgid "SUN4V-8001-QC.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-R3
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.opu-c
+#
+msgid "SUN4V-8001-R3.type"
+msgstr "Fault"
+msgid "SUN4V-8001-R3.severity"
+msgstr "Major"
+msgid "SUN4V-8001-R3.description"
+msgstr "The ultraSPARC-T2plus Coherency Interconnect has detected an internal problem.\n  Refer to %s for more information."
+msgid "SUN4V-8001-R3.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-R3.impact"
+msgstr "The system's integrity is compromised.\n"
+msgid "SUN4V-8001-R3.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-SY
+# keys: fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-SY.type"
+msgstr "Fault"
+msgid "SUN4V-8001-SY.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-SY.description"
+msgstr "An ultraSPARC-T2plus Interconnect has detected a fatal communication\nproblem with a CPU.\n  Refer to %s for more information."
+msgid "SUN4V-8001-SY.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-SY.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8001-SY.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-TD
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.lfu-c fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-TD.type"
+msgstr "Fault"
+msgid "SUN4V-8001-TD.severity"
+msgstr "Minor"
+msgid "SUN4V-8001-TD.description"
+msgstr "The number of CRC errors between an ultraSPARC-T2plus\nCoherency Interconnect and a CPU has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-TD.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-TD.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8001-TD.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-UH
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.lfu-f fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-UH.type"
+msgstr "Fault"
+msgid "SUN4V-8001-UH.severity"
+msgstr "Major"
+msgid "SUN4V-8001-UH.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a single-lane\nfailure communicating with a CPU.\n  Refer to %s for more information."
+msgid "SUN4V-8001-UH.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-UH.impact"
+msgstr "The system's performance may be impacted.\n"
+msgid "SUN4V-8001-UH.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-VA
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.lfu-u fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-VA.type"
+msgstr "Fault"
+msgid "SUN4V-8001-VA.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-VA.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a fatal\nfault commnicating with a CPU.\n  Refer to %s for more information."
+msgid "SUN4V-8001-VA.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-VA.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8001-VA.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-WP
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.lfu-u
+#
+msgid "SUN4V-8001-WP.type"
+msgstr "Fault"
+msgid "SUN4V-8001-WP.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-WP.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a fatal internal\nfault and has automatically reset.\n  Refer to %s for more information."
+msgid "SUN4V-8001-WP.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-WP.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8001-WP.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-X5
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.gpd-u fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-X5.type"
+msgstr "Fault"
+msgid "SUN4V-8001-X5.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-X5.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a fatal communication\nfault with a CPU.\n  Refer to %s for more information."
+msgid "SUN4V-8001-X5.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-X5.impact"
+msgstr "The system's performance may be compromised.\n"
+msgid "SUN4V-8001-X5.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-YS
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.gpd-c fault.cpu.ultraSPARC-T2plus.chip
+#
+msgid "SUN4V-8001-YS.type"
+msgstr "Fault"
+msgid "SUN4V-8001-YS.severity"
+msgstr "Major"
+msgid "SUN4V-8001-YS.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a fault\ncommunicating with a CPU.\n  Refer to %s for more information."
+msgid "SUN4V-8001-YS.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8001-YS.impact"
+msgstr "The system's integrity may be seriously compromised.\n"
+msgid "SUN4V-8001-YS.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8002-0C
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.gpd-c
+#
+msgid "SUN4V-8002-0C.type"
+msgstr "Fault"
+msgid "SUN4V-8002-0C.severity"
+msgstr "Major"
+msgid "SUN4V-8002-0C.description"
+msgstr "The ultraSPARC-T2plus Interconnect has detected a fault communicating\nwith the service processor.\n  Refer to %s for more information."
+msgid "SUN4V-8002-0C.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8002-0C.impact"
+msgstr "The system's performance may be impacted.\n"
+msgid "SUN4V-8002-0C.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8002-1Q
+# keys: fault.asic.fpga fault.asic.ultraSPARC-T2plus.interconnect.gpd-c
+#
+msgid "SUN4V-8002-1Q.type"
+msgstr "Fault"
+msgid "SUN4V-8002-1Q.severity"
+msgstr "Major"
+msgid "SUN4V-8002-1Q.description"
+msgstr "ultraSPARC-T2plus Coherency Interconnect detected a fault on the LPC bus.\n  Refer to %s for more information."
+msgid "SUN4V-8002-1Q.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8002-1Q.impact"
+msgstr "The system's performance may be impacted.\n"
+msgid "SUN4V-8002-1Q.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8002-24
+# keys: fault.asic.ultraSPARC-T2plus.interconnect.asu
+#
+msgid "SUN4V-8002-24.type"
+msgstr "Fault"
+msgid "SUN4V-8002-24.severity"
+msgstr "Critical"
+msgid "SUN4V-8002-24.description"
+msgstr "An ultraSPARC-T2plus Coherency Interconnect has detected a fatal fault.\n  Refer to %s for more information."
+msgid "SUN4V-8002-24.response"
+msgstr "No automated reponse.\n"
+msgid "SUN4V-8002-24.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8002-24.action"
+msgstr "Schedule a repair procedure to replace the affected component, the identity\nof which can be determined by using fmdump -v -u <EVENT_ID>.\n"

@@ -56,8 +56,8 @@ extern "C" {
 #define	MD_STR_BLANK		""
 
 typedef struct md_cpumap {
-	uint32_t cpumap_id;		/* virtual cpuid */
-	uint32_t cpumap_pid;		/* physical cpuid */
+	uint32_t cpumap_id;		/* virtual cpuid/strandid */
+	uint32_t cpumap_pid;		/* physical cpuid/strandid */
 	uint64_t cpumap_serialno;	/* cpu serial number */
 	int cpumap_chipidx;		/* chip idx */
 } md_cpumap_t;
@@ -70,6 +70,7 @@ typedef struct md_fru {
 } md_fru_t;
 
 typedef struct md_proc {
+	int32_t id;			/* physiscal id of the CMP processor */
 	uint64_t serialno;		/* processor serial number */
 	md_fru_t *fru;			/* FRU info */
 } md_proc_t;
@@ -88,6 +89,7 @@ extern void cpu_mdesc_fini(topo_mod_t *mod, md_info_t *chip);
 extern int cpu_get_serialid_mdesc(md_info_t *chip, uint32_t cpuid,
 					uint64_t *serialno);
 extern md_cpumap_t *cpu_find_cpumap(md_info_t *chip, uint32_t cpuid);
+extern md_proc_t *cpu_find_proc(md_info_t *chip, uint32_t procid);
 
 #ifdef __cplusplus
 }

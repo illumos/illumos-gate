@@ -42,6 +42,35 @@
 #include <sys/nvpair.h>
 
 #define	BUF_SIZE	120
+#define	LEN_CMP		6
+
+
+int
+is_t5440_unum(const char *unum)
+{
+	if ((strncmp(unum, "MB/CPU", LEN_CMP) == 0) ||
+	    (strncmp(unum, "MB/MEM", LEN_CMP) == 0))
+		return (1);
+	return (0);
+}
+
+int
+is_dimm_on_memboard(cmd_branch_t *branch)
+{
+	cmd_dimm_t *dimm;
+	cmd_branch_memb_t *bm;
+
+	if (is_t5440_unum(branch->branch_unum)) {
+		for (bm = cmd_list_next(&branch->branch_dimms); bm != NULL;
+		    bm = cmd_list_next(bm)) {
+			dimm = bm->dimm;
+			if (strstr(dimm->dimm_unum, "MEM") != NULL) {
+				return (1);
+			}
+		}
+	}
+	return (0);
+}
 
 void
 cmd_branch_add_dimm(fmd_hdl_t *hdl, cmd_branch_t *branch, cmd_dimm_t *dimm)
@@ -116,40 +145,117 @@ branch_dimmlist_create(fmd_hdl_t *hdl, cmd_branch_t *branch)
 	char dimm_unum[BUF_SIZE];
 	cmd_dimm_t *dimm;
 	int dimm_count = 0;
+	int bn, cmp, br;
 
-	for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
-		for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
+	if (is_t5440_unum(branch->branch_unum) == 0) {
+		for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
+			for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
+				(void) snprintf(dimm_unum, BUF_SIZE,
+				    "%s/CH%1d/D%1d", branch->branch_unum,
+				    channel, d);
+				dimm = branch_dimm_create(hdl, dimm_unum);
+				if (dimm != NULL) {
+					cmd_branch_add_dimm(hdl, branch, dimm);
+					dimm_count++;
+				}
+			}
+		}
+	} else {
+		(void) sscanf(branch->branch_unum, "%*6s%d%*4s%d%*3s%d",
+		    &bn, &cmp, &br);
+		/*
+		 * check dimm present for all possible branch dimms
+		 * on cpuboard
+		 */
+		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
 			(void) snprintf(dimm_unum, BUF_SIZE,
-			    "%s/CH%1d/D%1d", branch->branch_unum, channel, d);
+			    "MB/CPU%1d/CMP%1d/BR%1d/CH%1d/D0", bn, cmp,
+			    br, channel);
 			dimm = branch_dimm_create(hdl, dimm_unum);
 			if (dimm != NULL) {
 				cmd_branch_add_dimm(hdl, branch, dimm);
 				dimm_count++;
 			}
 		}
+		/*
+		 * check dimm present for all possible branch dimms on
+		 * memory-board.
+		 */
+		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
+			for (d = 1; d < MAX_DIMMS_IN_CHANNEL; d++) {
+				(void) snprintf(dimm_unum, BUF_SIZE,
+				    "MB/MEM%1d/CMP%1d/BR%1d/CH%1d/D%1d",
+				    bn, cmp, br, channel, d);
+				dimm = branch_dimm_create(hdl, dimm_unum);
+				if (dimm != NULL) {
+					cmd_branch_add_dimm(hdl, branch, dimm);
+					dimm_count++;
+				}
+			}
+		}
 	}
+
 	return (dimm_count);
 }
 
+
+/*
+ * For t5440, the memory channel goes like this:
+ * VF -> cpuboard -> D0 -> motherboard -> memboard -> D[1..3]
+ * If there is a dimm on the memory board, the memory board,
+ * motherboard, cpuboard, and dimms are in the suspect list.
+ * If there is no dimm on the memory board, the cpu board and
+ * the dimms are in the suspect list
+ * memory board fault does not supported in this pharse of
+ * the project.
+ * The board certainty = total board certainty / number of
+ * the faulty boards in the suspect list.
+ */
 void
 cmd_branch_create_fault(fmd_hdl_t *hdl, cmd_branch_t *branch,
     const char *fltnm, nvlist_t *asru)
 {
-	nvlist_t *flt;
+	nvlist_t *flt, *mbnvl;
 	cmd_branch_memb_t *bm;
 	cmd_dimm_t *dimm;
-	int dimm_count;
+	int dimm_count = 0;
 	uint_t cert = 0;
+	uint_t board_cert = 0;
+	char *fruloc = NULL;
+	int count_board_fault = 1;
+	int memb_flag = 0;
 
 	/* attach the dimms to the branch */
 	dimm_count = branch_dimmlist_create(hdl, branch);
 
-	if (dimm_count != 0)
-		cert = (100 - CMD_MBFAULT_CERT) / dimm_count;
+	if (is_dimm_on_memboard(branch)) {
+		mbnvl = init_mb(hdl);
+		if (mbnvl != NULL)
+			count_board_fault++;
+		memb_flag = 1;
+	}
 
-	/* create motherboard fault */
-	flt = cmd_motherboard_create_fault(hdl, asru, fltnm, CMD_MBFAULT_CERT);
-	fmd_case_add_suspect(hdl, branch->branch_case.cc_cp, flt);
+	board_cert = CMD_BOARDS_CERT / count_board_fault;
+
+	/* add the motherboard fault */
+	if ((memb_flag) && (mbnvl != NULL)) {
+		fmd_hdl_debug(hdl,
+		    "cmd_branch_create_fault: create motherboard fault");
+		flt = cmd_boardfru_create_fault(hdl, mbnvl, fltnm,
+		    board_cert, "MB");
+		if (flt != NULL)
+			fmd_case_add_suspect(hdl, branch->branch_case.cc_cp,
+			    flt);
+		nvlist_free(mbnvl);
+	}
+
+	fruloc = cmd_getfru_loc(hdl, asru);
+	flt = cmd_boardfru_create_fault(hdl, asru, fltnm, board_cert, fruloc);
+	if (flt != NULL)
+		fmd_case_add_suspect(hdl, branch->branch_case.cc_cp, flt);
+
+	if (dimm_count != 0)
+		cert = (100 - CMD_BOARDS_CERT) / dimm_count;
 
 	/* create dimm faults */
 	for (bm = cmd_list_next(&branch->branch_dimms); bm != NULL;
@@ -163,6 +269,8 @@ cmd_branch_create_fault(fmd_hdl_t *hdl, cmd_branch_t *branch,
 			    flt);
 		}
 	}
+	if (fruloc != NULL)
+		fmd_hdl_strfree(hdl, fruloc);
 }
 
 cmd_branch_t *
@@ -211,7 +319,7 @@ cmd_branch_lookup_by_unum(fmd_hdl_t *hdl, const char *unum)
 
 	for (branch = cmd_list_next(&cmd.cmd_branches); branch != NULL;
 	    branch = cmd_list_next(branch)) {
-		if (strncmp(branch->branch_unum, unum, BRANCH_UNUM_LEN) == 0)
+		if (strcmp(branch->branch_unum, unum) == 0)
 			return (branch);
 	}
 
@@ -232,7 +340,7 @@ cmd_branch_lookup(fmd_hdl_t *hdl, nvlist_t *asru)
 
 	for (branch = cmd_list_next(&cmd.cmd_branches); branch != NULL;
 	    branch = cmd_list_next(branch)) {
-		if (strncmp(branch->branch_unum, unum, BRANCH_UNUM_LEN) == 0)
+		if (strcmp(branch->branch_unum, unum) == 0)
 			return (branch);
 	}
 
@@ -392,12 +500,33 @@ branch_exist(fmd_hdl_t *hdl, cmd_branch_t *branch)
 	char dimm_unum[BUF_SIZE];
 	int channel, d;
 	nvlist_t *fmri;
+	int bn, cmp, br;
 
 	fmd_hdl_debug(hdl, "branch_exist");
-	for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
-		for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
-			(void) snprintf(dimm_unum, BUF_SIZE, "%s/CH%1d/D%1d",
-			    branch->branch_unum, channel, d);
+
+	if (is_t5440_unum(branch->branch_unum) == 0) {
+		for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
+			for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
+				(void) snprintf(dimm_unum, BUF_SIZE,
+				    "%s/CH%1d/D%1d", branch->branch_unum,
+				    channel, d);
+				fmri = cmd_mem_fmri_create(dimm_unum);
+				if (fmri != NULL &&
+				    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
+					nvlist_free(fmri);
+					return (1);
+				}
+				nvlist_free(fmri);
+			}
+		}
+	} else {
+		(void) sscanf(branch->branch_unum, "%*6s%d%*4s%d%*3s%d",
+		    &bn, &cmp, &br);
+
+		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
+			(void) snprintf(dimm_unum, BUF_SIZE,
+			    "MB/CPU%1d/CMP%1d/BR%1d/CH%1d/D0", bn, cmp,
+			    br, channel);
 			fmri = cmd_mem_fmri_create(dimm_unum);
 			if (fmri != NULL &&
 			    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
@@ -405,6 +534,21 @@ branch_exist(fmd_hdl_t *hdl, cmd_branch_t *branch)
 				return (1);
 			}
 			nvlist_free(fmri);
+		}
+
+		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
+			for (d = 1; d < MAX_DIMMS_IN_CHANNEL; d++) {
+				(void) snprintf(dimm_unum, BUF_SIZE,
+				    "MB/MEM%1d/CMP%1d/BR%1d/CH%1d/D%1d",
+				    bn, cmp, br, channel, d);
+				fmri = cmd_mem_fmri_create(dimm_unum);
+				if (fmri != NULL &&
+				    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
+					nvlist_free(fmri);
+					return (1);
+				}
+				nvlist_free(fmri);
+			}
 		}
 	}
 	fmd_hdl_debug(hdl, "branch %s does not exist\n", branch->branch_unum);

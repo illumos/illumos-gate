@@ -26,8 +26,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <cmd.h>
+#include <string.h>
+#include <cmd_hc_sun4v.h>
+
+nvlist_t *mb_nvl;
 
 nvlist_t *
 cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
@@ -41,59 +46,271 @@ cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
 	return (flt);
 }
 
-nvlist_t *
-cmd_motherboard_fru_create(fmd_hdl_t *hdl, nvlist_t *asru)
+typedef struct tr_ent {
+	const char *nac_component;
+	const char *hc_component;
+} tr_ent_t;
+
+static tr_ent_t tr_tbl[] = {
+	{ "MB",		"motherboard" },
+	{ "CPU",	"cpuboard" },
+	{ "MEM",	"memboard" },
+	{ "CMP",	"chip" },
+	{ "BR",		"branch" },
+	{ "CH",		"dram-channel" },
+	{ "R",		"rank" },
+	{ "D",		"dimm" }
+};
+
+#define	tr_tbl_n	sizeof (tr_tbl) / sizeof (tr_ent_t)
+
+int
+map_name(const char *p) {
+	int i;
+
+	for (i = 0; i < tr_tbl_n; i++) {
+		if (strncmp(p, tr_tbl[i].nac_component,
+		    strlen(tr_tbl[i].nac_component)) == 0)
+			return (i);
+	}
+	return (-1);
+}
+
+int
+cmd_count_components(const char *str, char sep)
 {
-	nvlist_t *fru, *hcelem;
+	int num = 0;
+	const char *cptr = str;
+
+	if (*cptr == sep) cptr++;		/* skip initial sep */
+	if (strlen(cptr) > 0) num = 1;
+	while ((cptr = strchr(cptr, sep)) != NULL) {
+		cptr++;
+		if (cptr == NULL || strcmp(cptr, "") == 0) break;
+		if (map_name(cptr) >= 0) num++;
+	}
+	return (num);
+}
+
+/*
+ * This version of breakup_components assumes that all component names which
+ * it sees are of the form:  <nonnumeric piece><numeric piece>
+ * i.e. no embedded numerals in component name which have to be spelled out.
+ */
+
+int
+cmd_breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
+{
+	char namebuf[64], instbuf[64];
+	char *token, *tokbuf;
+	int i, j, namelen, instlen;
+
+	i = 0;
+	for (token = strtok_r(str, sep, &tokbuf);
+	    token != NULL;
+	    token = strtok_r(NULL, sep, &tokbuf)) {
+		namelen = strcspn(token, "0123456789");
+		instlen = strspn(token+namelen, "0123456789");
+		(void) strncpy(namebuf, token, namelen);
+		namebuf[namelen] = '\0';
+
+		if ((j = map_name(namebuf)) < 0)
+			continue; /* skip names that don't map */
+
+		if (instlen == 0) {
+			(void) strncpy(instbuf, "0", 2);
+		} else {
+			(void) strncpy(instbuf, token+namelen, instlen);
+			instbuf[instlen] = '\0';
+		}
+		if (nvlist_add_string(hc_nvl[i], FM_FMRI_HC_NAME,
+		    tr_tbl[j].hc_component) != 0 ||
+		    nvlist_add_string(hc_nvl[i], FM_FMRI_HC_ID, instbuf) != 0)
+			return (-1);
+		i++;
+	}
+	return (1);
+}
+
+char *
+cmd_getfru_loc(fmd_hdl_t *hdl, nvlist_t *asru) {
+
+	char *fru_loc, *cpufru;
+	if (nvlist_lookup_string(asru, FM_FMRI_CPU_CPUFRU, &cpufru) == 0) {
+		fru_loc = strstr(cpufru, "MB");
+		if (fru_loc != NULL) {
+			fmd_hdl_debug(hdl, "cmd_getfru_loc: fruloc=%s\n",
+			    fru_loc);
+			return (fmd_hdl_strdup(hdl, fru_loc, FMD_SLEEP));
+		}
+	}
+	fmd_hdl_debug(hdl, "cmd_getfru_loc: Default fruloc=empty string\n");
+	return (fmd_hdl_strdup(hdl, EMPTY_STR, FMD_SLEEP));
+}
+
+nvlist_t *
+cmd_mkboard_fru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr) {
+
+	char *nac, *nac_name;
+	int n, i, len;
+	nvlist_t *fru, **hc_list;
+
+	if (frustr == NULL)
+		return (NULL);
+
+	if ((nac_name = strstr(frustr, "MB")) == NULL)
+		return (NULL);
+
+	len = strlen(nac_name) + 1;
+
+	nac = fmd_hdl_zalloc(hdl, len, FMD_SLEEP);
+	(void) strcpy(nac, nac_name);
+
+	n = cmd_count_components(nac, '/');
+
+	fmd_hdl_debug(hdl, "cmd_mkboard_fru: nac=%s components=%d\n", nac, n);
+
+	hc_list = fmd_hdl_zalloc(hdl, sizeof (nvlist_t *)*n, FMD_SLEEP);
+
+	for (i = 0; i < n; i++) {
+		(void) nvlist_alloc(&hc_list[i],
+		    NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
+	}
+
+	if (cmd_breakup_components(nac, "/", hc_list) < 0) {
+		for (i = 0; i < n; i++) {
+			if (hc_list[i] != NULL)
+			    nvlist_free(hc_list[i]);
+		}
+		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+		fmd_hdl_free(hdl, nac, len);
+		return (NULL);
+	}
+
+	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
+		for (i = 0; i < n; i++) {
+			if (hc_list[i] != NULL)
+			    nvlist_free(hc_list[i]);
+		}
+		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+		fmd_hdl_free(hdl, nac, len);
+		return (NULL);
+	}
+
+	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "") != 0 ||
+	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, n) != 0 ||
+	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, hc_list, n) != 0) {
+		for (i = 0; i < n; i++) {
+			if (hc_list[i] != NULL)
+			    nvlist_free(hc_list[i]);
+		}
+		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+		fmd_hdl_free(hdl, nac, len);
+		nvlist_free(fru);
+		return (NULL);
+	}
+
+	for (i = 0; i < n; i++) {
+		if (hc_list[i] != NULL)
+		    nvlist_free(hc_list[i]);
+	}
+	fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
+	fmd_hdl_free(hdl, nac, len);
+
+	if ((serialstr != NULL &&
+	    nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID, serialstr) != 0) ||
+	    (partstr != NULL &&
+	    nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0)) {
+		nvlist_free(fru);
+		return (NULL);
+	}
+
+	return (fru);
+}
+
+nvlist_t *
+cmd_boardfru_create_fault(fmd_hdl_t *hdl, nvlist_t *asru, const char *fltnm,
+    uint_t cert, char *loc)
+{
+	nvlist_t *flt, *nvlfru;
 	char *serialstr, *partstr;
+
+	if ((loc == NULL) || (strcmp(loc, EMPTY_STR) == 0))
+		return (NULL);
 
 	if (nvlist_lookup_string(asru, FM_FMRI_HC_SERIAL_ID, &serialstr) != 0)
 		serialstr = NULL;
 	if (nvlist_lookup_string(asru, FM_FMRI_HC_PART, &partstr) != 0)
 		partstr = NULL;
 
-	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0)
+	nvlfru = cmd_mkboard_fru(hdl, loc, serialstr, partstr);
+	if (nvlfru == NULL)
 		return (NULL);
 
-	if (nvlist_add_string(hcelem, FM_FMRI_HC_NAME, "motherboard") != 0 ||
-	    nvlist_add_string(hcelem, FM_FMRI_HC_ID, "0") != 0) {
-		nvlist_free(hcelem);
-		return (NULL);
-	}
-
-	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
-		fmd_hdl_debug(hdl, "Failed to allocate memory");
-		nvlist_free(hcelem);
-		return (NULL);
-	}
-
-	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
-	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
-	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "/") != 0 ||
-	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
-	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0 ||
-	    (serialstr != NULL &&
-	    nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID, serialstr) != 0) ||
-	    (partstr != NULL &&
-	    nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0)) {
-		nvlist_free(hcelem);
-		nvlist_free(fru);
-		return (NULL);
-	}
-	nvlist_free(hcelem);
-	return (fru);
+	flt = cmd_nvl_create_fault(hdl, fltnm, cert, nvlfru, nvlfru, NULL);
+	flt = cmd_fault_add_location(hdl, flt, loc);
+	if (nvlfru != NULL)
+		nvlist_free(nvlfru);
+	return (flt);
 }
 
-nvlist_t *
-cmd_motherboard_create_fault(fmd_hdl_t *hdl, nvlist_t *asru, const char *fltnm,
-    uint_t cert)
-{
-	nvlist_t *mb_fru, *flt;
+/* find_mb -- find hardware platform motherboard within libtopo */
 
-	mb_fru = cmd_motherboard_fru_create(hdl, asru);
-	flt = cmd_nvl_create_fault(hdl, fltnm, cert, mb_fru, mb_fru, NULL);
-	flt = cmd_fault_add_location(hdl, flt, "MB");
-	if (mb_fru != NULL)
-		nvlist_free(mb_fru);
-	return (flt);
+/* ARGSUSED */
+static int
+find_mb(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *rsrc, **hcl;
+	char *name;
+	uint_t n;
+
+	if (topo_node_resource(node, &rsrc, &err) < 0) {
+		return (TOPO_WALK_NEXT);	/* no resource, try next */
+	}
+
+	if (nvlist_lookup_nvlist_array(rsrc, FM_FMRI_HC_LIST, &hcl, &n) < 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (nvlist_lookup_string(hcl[0], FM_FMRI_HC_NAME, &name) != 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (strcmp(name, "motherboard") != 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT); /* not MB hc list, try next */
+	}
+
+	(void) nvlist_dup(rsrc, &mb_nvl, NV_UNIQUE_NAME);
+
+	nvlist_free(rsrc);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+/* init_mb -- read hardware platform motherboard from libtopo */
+
+nvlist_t *
+init_mb(fmd_hdl_t *hdl)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (NULL);
+	if ((twp = topo_walk_init(thp,
+	    FM_FMRI_SCHEME_HC, find_mb, NULL, &err))
+	    == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return (NULL);
+	}
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+	return (mb_nvl);
 }

@@ -37,6 +37,7 @@
 #include <cmd_branch.h>
 #include <cmd_state.h>
 #include <cmd.h>
+#include <cmd_hc_sun4v.h>
 
 #include <assert.h>
 #include <strings.h>
@@ -155,6 +156,7 @@ cmd_c2c(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 
 	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det);
 	if (nvlist_lookup_uint32(det, FM_FMRI_CPU_ID, &cpuid) == 0) {
+
 		/*
 		 * If the c2c bit is set, the sending cache of the
 		 * cpu must be faulted instead of the memory.
@@ -561,90 +563,6 @@ cmd_upos2dram(uint16_t upos) {
 
 }
 
-typedef struct tr_ent {
-	const char *nac_component;
-	const char *hc_component;
-} tr_ent_t;
-
-static tr_ent_t tr_tbl[] = {
-	{ "MB",		"motherboard" },
-	{ "CMP",	"chip" },
-	{ "BR",		"branch" },
-	{ "CH",		"dram-channel" },
-	{ "R",		"rank" },
-	{ "D",		"dimm" }
-};
-
-#define	tr_tbl_n	sizeof (tr_tbl) / sizeof (tr_ent_t)
-
-static int
-map_name(const char *p) {
-	int i;
-
-	for (i = 0; i < tr_tbl_n; i++) {
-		if (strncmp(p, tr_tbl[i].nac_component,
-		    strlen(tr_tbl[i].nac_component)) == 0)
-			return (i);
-	}
-	return (-1);
-}
-
-static int
-count_components(const char *str, char sep)
-{
-	int num = 0;
-	const char *cptr = str;
-
-	if (*cptr == sep) cptr++;		/* skip initial sep */
-	if (strlen(cptr) > 0) num = 1;
-	while ((cptr = strchr(cptr, sep)) != NULL) {
-		cptr++;
-		if (cptr == NULL || strcmp(cptr, "") == 0) break;
-		if (map_name(cptr) >= 0) num++;
-	}
-	return (num);
-}
-
-/*
- * This version of breakup_components assumes that all component names which
- * it sees are of the form:  <nonnumeric piece><numeric piece>
- * i.e. no embedded numerals in component name which have to be spelled out.
- */
-
-static int
-breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
-{
-	char namebuf[64], instbuf[64];
-	char *token, *tokbuf;
-	int i, j, namelen, instlen;
-
-	i = 0;
-	for (token = strtok_r(str, sep, &tokbuf);
-	    token != NULL;
-	    token = strtok_r(NULL, sep, &tokbuf)) {
-		namelen = strcspn(token, "0123456789");
-		instlen = strspn(token+namelen, "0123456789");
-		(void) strncpy(namebuf, token, namelen);
-		namebuf[namelen] = '\0';
-
-		if ((j = map_name(namebuf)) < 0)
-			continue; /* skip names that don't map */
-
-		if (instlen == 0) {
-			(void) strncpy(instbuf, "0", 2);
-		} else {
-			(void) strncpy(instbuf, token+namelen, instlen);
-			instbuf[instlen] = '\0';
-		}
-		if (nvlist_add_string(hc_nvl[i], FM_FMRI_HC_NAME,
-		    tr_tbl[j].hc_component) != 0 ||
-		    nvlist_add_string(hc_nvl[i], FM_FMRI_HC_ID, instbuf) != 0)
-			return (-1);
-		i++;
-	}
-	return (1);
-}
-
 nvlist_t *
 cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 
@@ -663,7 +581,7 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 		(void) strcpy(nac_name, unum);
 	}
 
-	n = count_components(nac_name, '/');
+	n = cmd_count_components(nac_name, '/');
 	hc_list = fmd_hdl_zalloc(hdl, sizeof (nvlist_t *)*n, FMD_SLEEP);
 
 	for (i = 0; i < n; i++) {
@@ -671,7 +589,7 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 		    NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
 	}
 
-	if (breakup_components(nac_name, "/", hc_list) < 0) {
+	if (cmd_breakup_components(nac_name, "/", hc_list) < 0) {
 		fmd_hdl_error(hdl, "cannot allocate components for hc-list\n");
 		for (i = 0; i < n; i++) {
 			if (hc_list[i] != NULL)

@@ -18,17 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../sun4/Makefile.sun4
+MODULE = zambezi
+ARCH = sun4v
+CLASS = arch
+ZAMBEZISRCS = zambezi.c
 
-EFT_PLAT= sun4v
-SUN4VEFTFILES= n2piu.eft vfncx.eft n2niu_xaui.eft n2niu_xfp.eft zambezi.eft
-EFT_PLAT_FILES= $(SUN4VEFTFILES) $(SUN4EFTFILES)
+MODULESRCS = $(ZAMBEZISRCS)
 
-include ../../Makefile.com
+include ../../Makefile.plugin
+

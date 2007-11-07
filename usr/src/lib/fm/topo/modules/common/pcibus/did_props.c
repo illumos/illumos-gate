@@ -443,6 +443,59 @@ FRU_fmri_set(topo_mod_t *mp, tnode_t *tn)
 	return (0);
 }
 
+static tnode_t *
+find_predecessor(tnode_t *tn, char *mod_name)
+{
+	tnode_t *pnode = topo_node_parent(tn);
+
+	while (pnode && (strcmp(topo_node_name(pnode), mod_name) != 0)) {
+		pnode = topo_node_parent(pnode);
+	}
+	return (pnode);
+}
+
+static int
+use_predecessor_fru(tnode_t *tn, char *mod_name)
+{
+	tnode_t *pnode = NULL;
+	nvlist_t *fru = NULL;
+	int err = 0;
+
+	if ((pnode = find_predecessor(tn, mod_name)) == NULL)
+		return (-1);
+	if ((pnode = topo_node_parent(pnode)) == NULL)
+		return (-1);
+	if (topo_node_fru(pnode, &fru, NULL, &err) != 0)
+		return (-1);
+
+	(void) topo_node_fru_set(tn, fru, 0, &err);
+	nvlist_free(fru);
+
+	return (0);
+}
+
+static int
+use_predecessor_label(topo_mod_t *mod, tnode_t *tn, char *mod_name)
+{
+	tnode_t *pnode = NULL;
+	int err = 0;
+	char *plabel = NULL;
+
+	if ((pnode = find_predecessor(tn, mod_name)) == NULL)
+		return (-1);
+	if ((pnode = topo_node_parent(pnode)) == NULL)
+		return (-1);
+	if (topo_node_label(pnode, &plabel, &err) != 0 || plabel == NULL)
+		return (-1);
+
+	(void) topo_node_label_set(tn, plabel, &err);
+
+	topo_mod_strfree(mod, plabel);
+
+	return (0);
+}
+
+
 /*ARGSUSED*/
 static int
 FRU_set(tnode_t *tn, did_t *pd,
@@ -454,6 +507,18 @@ FRU_set(tnode_t *tn, did_t *pd,
 
 	nm = topo_node_name(tn);
 	mp = did_mod(pd);
+
+	/*
+	 * If this is a PCIEX_BUS and its parent is a PCIEX_ROOT,
+	 * check for a CPUBOARD predecessor.  If found, inherit its
+	 * parent's FRU.  Otherwise, continue with FRU set.
+	 */
+	if ((strcmp(nm, PCIEX_BUS) == 0) &&
+	    (strcmp(topo_node_name(topo_node_parent(tn)), PCIEX_ROOT) == 0)) {
+
+		if (use_predecessor_fru(tn, CPUBOARD) == 0)
+			return (0);
+	}
 	/*
 	 * If this topology node represents something other than an
 	 * ioboard or a device that implements a slot, inherit the
@@ -511,6 +576,17 @@ label_set(tnode_t *tn, did_t *pd,
 	int err;
 
 	mp = did_mod(pd);
+	/*
+	 * If this is a PCIEX_BUS and its parent is a PCIEX_ROOT,
+	 * check for a CPUBOARD predecessor.  If found, inherit its
+	 * parent's Label.  Otherwise, continue with label set.
+	 */
+	if ((strcmp(topo_node_name(tn), PCIEX_BUS) == 0) &&
+	    (strcmp(topo_node_name(topo_node_parent(tn)), PCIEX_ROOT) == 0)) {
+
+		if (use_predecessor_label(mp, tn, CPUBOARD) == 0)
+			return (0);
+	}
 	if (topo_mod_nvalloc(mp, &in, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
 	if (nvlist_add_uint64(in, TOPO_METH_LABEL_ARG_NVL, (uintptr_t)pd) !=

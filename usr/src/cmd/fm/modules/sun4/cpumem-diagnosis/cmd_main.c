@@ -243,7 +243,6 @@ static cmd_subscriber_t cmd_subscribers[] = {
 
 
 	{ "ereport.cpu.*.mamu",		cmd_mau,	CMD_CPU_LEVEL_CORE },
-	{ "ereport.cpu.*.mrau",		cmd_mau,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.ittm",		cmd_itlb,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.ittp",		cmd_itlb,	CMD_CPU_LEVEL_CORE },
 	{ "ereport.cpu.*.itdp",		cmd_itlb,	CMD_CPU_LEVEL_CORE },
@@ -328,6 +327,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.sbdio",	cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.sbapp",	cmd_miscregs_ue,
+	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.mrau",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.scac",		cmd_miscregs_train,
 	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },

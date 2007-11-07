@@ -63,8 +63,8 @@ extern "C" {
 
 #define	MAX_CHANNELS_ON_CHIP	4
 #define	MAX_DIMMS_IN_CHANNEL	4
-#define	BRANCH_UNUM_LEN		11
-#define	CMD_MBFAULT_CERT	30
+#define	BTK_MAX_CHANNEL		2
+#define	CMD_BOARDS_CERT		30
 
 typedef struct cmd_branch_memb {
 	cmd_list_t bm_list;

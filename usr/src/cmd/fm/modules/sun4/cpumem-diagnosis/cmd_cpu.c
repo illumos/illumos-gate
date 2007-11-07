@@ -1431,12 +1431,36 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 	char fltnm[64];
 	uint32_t cpuinit, cpufinal, cpustep, i;
 	nvlist_t *flt;
+#ifdef sun4v
+	char *loc;
+	nvlist_t *mb_rsrc;
+#endif
 
 	(void) snprintf(fltnm, sizeof (fltnm), "fault.cpu.%s.%s",
 	    cpu_type2name(hdl, cpu->cpu_type), type);
 
 	cpu->cpu_faulting = FMD_B_TRUE;
 	cpu_buf_write(hdl, cpu);
+#ifdef sun4v
+
+	loc = cmd_getfru_loc(hdl, cpu->cpu_asru_nvl);
+
+	/*
+	 * Add motherboard fault to t5440 lfu suspect.list.
+	 */
+	if ((strstr(loc, CPUBOARD) != NULL) && (strstr(fltnm, "lfu") != NULL)) {
+		/* get mb fmri from libtopo */
+		mb_rsrc = init_mb(hdl);
+		if (mb_rsrc != NULL) {
+			fmd_hdl_debug(hdl, "cmd_cpu: create MB fault\n");
+			cert = BK_LFUFAULT_CERT;
+			flt = cmd_boardfru_create_fault(hdl, mb_rsrc, fltnm,
+			    cert, "MB");
+			fmd_case_add_suspect(hdl, casep, flt);
+			nvlist_free(mb_rsrc);
+		}
+	}
+#endif
 
 	if (cpu->cpu_level > CMD_CPU_LEVEL_THREAD) {
 		core2cpus(cpu->cpu_cpuid, cpu->cpu_type, cpu->cpu_level,
@@ -1467,7 +1491,7 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 			flt = cmd_nvl_create_fault(hdl, fltnm, cert,
 			    cpui->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
 #ifdef sun4v
-			flt = cmd_fault_add_location(hdl, flt, "MB");
+			flt = cmd_fault_add_location(hdl, flt, loc);
 #endif /* sun4v */
 			fmd_case_add_suspect(hdl, casep, flt);
 		}
@@ -1475,10 +1499,15 @@ cmd_cpu_create_faultlist(fmd_hdl_t *hdl, fmd_case_t *casep, cmd_cpu_t *cpu,
 		flt = cmd_nvl_create_fault(hdl, fltnm, cert,
 		    cpu->cpu_asru_nvl, cpu->cpu_fru_nvl, rsrc);
 #ifdef sun4v
-		flt = cmd_fault_add_location(hdl, flt, "MB");
+		flt = cmd_fault_add_location(hdl, flt, loc);
+
 #endif /* sun4v */
 		fmd_case_add_suspect(hdl, casep, flt);
 	}
+#ifdef sun4v
+	if (loc != NULL)
+		fmd_hdl_strfree(hdl, loc);
+#endif
 }
 
 static void
@@ -1547,7 +1576,7 @@ cpu_getfru(fmd_hdl_t *hdl, cmd_cpu_t *cp)
 	}
 	partstr = cmd_cpu_getpartstr(hdl, cp);
 	serialstr = cmd_cpu_getserialstr(hdl, cp);
-	nvlp = cmd_cpu_mkfru(frustr, serialstr, partstr);
+	nvlp = cmd_cpu_mkfru(hdl, frustr, serialstr, partstr);
 	fmd_hdl_strfree(hdl, frustr);
 	fmd_hdl_strfree(hdl, partstr);
 	fmd_hdl_strfree(hdl, serialstr);

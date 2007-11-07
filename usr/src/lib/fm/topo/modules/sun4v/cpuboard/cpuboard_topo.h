@@ -18,38 +18,53 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _CMD_HC_SUN4V_H
-#define	_CMD_HC_SUN4V_H
+#ifndef _CPUBOARD_TOPO_H
+#define	_CPUBOARD_TOPO_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <fm/fmd_api.h>
-#include <sys/nvpair.h>
-#include <cmd_cpu.h>
+#include <fm/topo_hc.h>
+#include <fm/topo_mod.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	CPUBOARD	"MB/CPU"
-#define	EMPTY_STR	"-"
+#define	PCI_BUS_VERS    1
 
-extern nvlist_t *cmd_fault_add_location(fmd_hdl_t *, nvlist_t *, const char *);
-extern nvlist_t *cmd_boardfru_create_fault(fmd_hdl_t *, nvlist_t *,
-    const char *, uint_t, char *);
-extern nvlist_t *init_mb(fmd_hdl_t *);
-extern char *cmd_getfru_loc(fmd_hdl_t *, nvlist_t *);
-extern int cmd_count_components(const char *, char sep);
-extern int cmd_breakup_components(char *, char *, nvlist_t **);
-extern nvlist_t *cmd_mkboard_fru(fmd_hdl_t *, char *, char *, char *);
+#define	CPUBOARD_PX_DEVTYPE	"pciex"		/* T5440 is PCI-Ex devtype */
+#define	CPUBOARD_PX_DRV  	"px"
+
+#define	CPUBOARD_MAX		4		/* Max 4 cpuboards */
+#define	CHIP_MAX		CPUBOARD_MAX	/* Max 4 chips */
+#define	HOSTBRIDGE_MAX		CPUBOARD_MAX	/* Max 4 hostbridges */
+
+#define	CPUBOARD_PX_BDF		"0x200"		/* BDF is always 2/0/0 */
+
+/* cpuboard info */
+typedef struct {
+	int present;		/* cpuboard present */
+	char *sn;		/* cpuboard serial # */
+	char *pn;		/* cpuboard part # + dash # */
+} cpuboard_contents_t;
+
+/* Shared device tree root node */
+int cpuboard_hb_enum(topo_mod_t *mp, di_node_t dnode, tnode_t *cpubn, int brd);
+
+/* Until future PRI changes, make connection between cpuboard id and RC */
+#define	CPUBOARD0_RC	"/pci@400"
+#define	CPUBOARD1_RC	"/pci@500"
+#define	CPUBOARD2_RC	"/pci@600"
+#define	CPUBOARD3_RC	"/pci@700"
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _CMD_HC_SUN4V_H */
+#endif /* _CPUBOARD_TOPO_H */

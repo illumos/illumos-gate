@@ -189,7 +189,7 @@ cpu_expand(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	uint8_t version;
 	uint32_t cpuid;
 	uint64_t nvlserid;
-	md_cpumap_t *mcmp;
+	md_cpumap_t *mcmp = NULL;
 	md_info_t *chip = (md_info_t *)topo_mod_getspecific(mod);
 
 	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
@@ -198,21 +198,25 @@ cpu_expand(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
+	/* Find the cpuid entry */
+	if ((mcmp = cpu_find_cpumap(chip, cpuid)) == NULL)
+		return (-1);
+
 	if ((rc = nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID,
-	    &nvlserid)) != 0) {
-		if (rc != ENOENT) {
-			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-		}
-		/* Find the cpuid entry */
-		if ((mcmp = cpu_find_cpumap(chip, cpuid)) == NULL) {
+	    &nvlserid)) == 0) {
+		if (nvlserid != mcmp->cpumap_serialno)
 			return (-1);
-		}
+	} else if (rc != ENOENT)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	else {
 		if ((rc = nvlist_add_uint64(in, FM_FMRI_CPU_SERIAL_ID,
 		    mcmp->cpumap_serialno)) != 0) {
 			return (topo_mod_seterrno(mod, rc));
 		}
 	}
+
 	topo_mod_dprintf(mod, "nvlserid=%llX\n", nvlserid);
+
 	if (mcmp != NULL &&
 	    mcmp->cpumap_chipidx >= 0 &&
 	    mcmp->cpumap_chipidx < chip->nprocs &&

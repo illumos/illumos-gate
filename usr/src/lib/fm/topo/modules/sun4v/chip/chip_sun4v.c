@@ -216,7 +216,7 @@ cpu_fmri_create(topo_mod_t *mod, uint32_t cpuid, char *serial, uint8_t cpumask)
 /*ARGSUSED*/
 static int
 cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
-		int chipidx)
+    uint64_t serial)
 {
 	int i;
 	int min = -1;
@@ -228,38 +228,39 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 	tnode_t *cnode;
 	nvlist_t *asru;
 	md_cpumap_t *mcmp;
-	md_proc_t *procp;
 
 	topo_mod_dprintf(mod, "enumerating cpus\n");
 
 	/*
 	 * find the min/max id of cpus per this cmp and create a cpu range
 	 */
-	procp = chip->procs + chipidx;
 	for (i = 0, mcmp = chip->cpus; i < chip->ncpus; i++, mcmp++) {
-		if (mcmp->cpumap_serialno != procp->serialno)
+		if (mcmp->cpumap_serialno != serial)
 			continue;
 		if ((min < 0) || (mcmp->cpumap_pid < min))
 			min = mcmp->cpumap_pid;
 		if ((max < 0) || (mcmp->cpumap_pid > max))
 			max = mcmp->cpumap_pid;
 	}
-	if (min < 0 || max < 0)
+	if (min < 0 || max < 0) {
+		topo_mod_dprintf(mod, "Invalid cpu range(%d,%d)\n", min, max);
 		return (-1);
+	}
 	if (topo_node_range_create(mod, rnode, name, 0, max+1) < 0) {
 		topo_mod_dprintf(mod, "failed to create cpu range[0,%d]: %s\n",
 		    max, topo_mod_errmsg(mod));
 		return (-1);
 	}
 
-	(void) snprintf(sbuf, sizeof (sbuf), "%llx", procp->serialno);
+	(void) snprintf(sbuf, sizeof (sbuf), "%llx", serial);
 
 	/*
-	 * Create the cpu[i] nodes of a given cmp chipidx
+	 * Create the cpu[i] nodes of a given cmp i
 	 */
 	for (i = 0, mcmp = chip->cpus; i < chip->ncpus; i++, mcmp++) {
 
-		if (mcmp->cpumap_serialno != procp->serialno) {
+		if (mcmp->cpumap_serialno == 0 ||
+		    mcmp->cpumap_serialno != serial) {
 			continue;
 		}
 
@@ -296,7 +297,7 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 {
 	int nerr = 0;
 	int err;
-	int chipidx;
+	int i;
 	char sbuf[32];
 	tnode_t *cnode;
 	nvlist_t *fru = NULL;
@@ -304,33 +305,30 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 	md_proc_t *procp;
 
 	topo_mod_dprintf(mod, "enumerating cmp chip\n");
+	if (min < 0 || max < 0 || min > max) {
+		topo_mod_dprintf(mod, "Invalid chip range(%d,%d)\n", min, max);
+		return (-1);
+	}
 
 	/*
 	 * Create the chip[i] nodes, one for each CMP chip uniquely identified
 	 * by the serial number.
 	 */
-	for (chipidx = 0, procp = chip->procs; chipidx < chip->nprocs;
-	    chipidx++, procp++) {
+	for (i = min; i <= max; i++) {
+
+		/* Skip the processors with no serial number */
+		if ((procp = cpu_find_proc(chip, i)) == NULL) {
+			continue;
+		}
 		if (procp->serialno == 0) {
 			continue;
 		}
 
-		if (chipidx > max) {
-			/*
-			 * Step out the allocated range (min, max) specified in
-			 * the xml file. End enumerating the chips
-			 */
-			topo_mod_dprintf(mod,
-			    "chip[%d] is out of the allocated range (%d, %d)\n",
-			    chipidx, min, max);
-			break;
-		}
-
 		(void) snprintf(sbuf, sizeof (sbuf), "%llx", procp->serialno);
-		topo_mod_dprintf(mod, "node chip[%d], sn=%s\n", chipidx, sbuf);
+		topo_mod_dprintf(mod, "node chip[%d], sn=%s\n", i, sbuf);
 
-		cnode = chip_tnode_create(mod, rnode, name,
-		    (topo_instance_t)chipidx, sbuf, fru, label, NULL);
+		cnode = chip_tnode_create(mod, rnode, name, (topo_instance_t)i,
+		    sbuf, fru, label, NULL);
 		if (cnode == NULL) {
 			topo_mod_dprintf(mod, "failed to create a chip node: "
 			    "%s\n", topo_mod_errmsg(mod));
@@ -339,7 +337,8 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		}
 
 		/* Enumerate all cpu strands of this CMP chip */
-		err = cpu_create(mod, cnode, CPU_NODE_NAME, chip, chipidx);
+		err = cpu_create(mod, cnode, CPU_NODE_NAME, chip,
+		    procp->serialno);
 		if (err != 0) {
 			nerr++;
 		}
