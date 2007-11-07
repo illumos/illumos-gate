@@ -348,6 +348,7 @@ enum mtio_state { MTIO_NONE, MTIO_EJECTED, MTIO_INSERTED };
 #define	MT_BSD		(1 <<6)		/* BSD behavior on close */
 #define	MT_DENSITY(dev) ((getminor(dev) & MT_DENSITY_MASK) >> 3)
 
+#define	MT_TEM_DEV(inst)   (((inst) & 0x3) | (((inst) & 0xfc) << 5))
 
 #ifdef	__cplusplus
 }

@@ -567,6 +567,106 @@ struct seq_mode {
 };
 
 /*
+ * One_command parameter data for REPORT SUPPORTED OPERATION CODES.
+ */
+struct one_com_des {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t reserved0;
+	uchar_t support:	3,	/* support value */
+		reserved1:	4,
+		ctdp:		1;	/* cmd timeouts descriptor present */
+	ushort_t cdb_size;		/* cdb size */
+	uchar_t usage[CDB_GROUP4];	/* 16 bytes, the largest CDB group */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t reserved0;
+	uchar_t ctdp:		1,	/* cmd timeouts descriptor present */
+		reserved1:	4,
+		support:	3;	/* support value */
+	ushort_t cdb_size;		/* cdb size */
+	uchar_t usage[CDB_GROUP4];	/* 16 bytes, the largest CDB group */
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif /* _BIT_FIELDS_LTOH */
+};
+
+/*
+ * Command timeouts descriptor
+ */
+struct com_timeout_des {
+	ushort_t des_len;	/* descriptor length */
+	uchar_t reserved;
+	uchar_t com_spe;	/* command specific */
+	uint_t nom_timeout;	/* nominal command processing timeout */
+	uint_t rec_timeout;	/* recommended command timeout */
+};
+
+/*
+ * Reporting options
+ */
+#define	ALL_COMMAND_DATA_FORMAT			0
+#define	ONE_COMMAND_NO_SERVICE_DATA_FORMAT	1
+#define	ONE_COMMAND_DATA_FORMAT			2
+
+/*
+ * Support values in One_command parameter data
+ */
+#define	SUPPORT_VALUES_NOT_AVAILABLE		0
+#define	SUPPORT_VALUES_NOT_SUPPORT		1
+#define	SUPPORT_VALUES_SUPPORT_SCSI		3
+#define	SUPPORT_VALUES_SUPPORT_VENDOR		5
+
+/*
+ * Parameter data for REPORT DENSITY SUPPORT command
+ */
+struct report_density_header {
+	ushort_t ava_dens_len;		/* available density support length */
+	uchar_t reserved0;
+	uchar_t reserved1;
+};
+
+struct report_density_desc {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t pri_den;		/* primary density code */
+	uchar_t sec_den;		/* secondary density code */
+	uchar_t dlv:1;			/* descriptor length valid */
+	uchar_t reserved:4;
+	uchar_t deflt:1;		/* is default density */
+	uchar_t dup:1;			/* pri density has one descriptor */
+	uchar_t wrtok:1;		/* support writing to media */
+	uchar_t desc_len_hi;		/* descriptor length high */
+	uchar_t desc_len_low;		/* descriptor length low */
+	uchar_t bits_per_mm[3];		/* bits per mm */
+	uchar_t media_width_hi;		/* media width high */
+	uchar_t media_width_low;	/* media width low */
+	ushort_t tracks;		/* tracks */
+	uint_t capacity;		/* capacity */
+	uchar_t ass_org[8];		/* assigning organization */
+	uchar_t den_name[8];		/* density name */
+	uchar_t description[20];	/* description */
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t pri_den;		/* primary density code */
+	uchar_t sec_den;		/* secondary density code */
+	uchar_t wrtok:1;		/* support writing to media */
+	uchar_t dup:1;			/* pri density has one descriptor */
+	uchar_t deflt:1;		/* is default density */
+	uchar_t reserved:4;
+	uchar_t dlv:1;			/* descriptor length valid */
+	uchar_t desc_len_hi;		/* descriptor length high */
+	uchar_t desc_len_low;		/* descriptor length low */
+	uchar_t bits_per_mm[3];		/* bits per mm */
+	uchar_t media_width_hi;		/* media width high */
+	uchar_t media_width_low;	/* media width low */
+	ushort_t tracks;		/* tracks */
+	uint_t capacity;		/* capacity */
+	uchar_t ass_org[8];		/* assigning organization */
+	uchar_t den_name[8];		/* density name */
+	uchar_t description[20];	/* description */
+#else
+#error  One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif  /* _BIT_FIELDS_LTOH */
+};
+
+/*
  * Data returned from the READ BLOCK LIMITS command.
  */
 

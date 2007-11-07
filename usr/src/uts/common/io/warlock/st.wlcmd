@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +39,7 @@ add scsi_watch_request::swr_callback targets st_media_watch_cb
 add st.c:st_known_tape_type/config_funct targets \
         st_get_conf_from_st_dot_conf \
         st_get_conf_from_st_conf_dot_c \
+	st_get_conf_from_tape_drive \
         st_get_default_conf  
 
 root    scsi_hba_bus_power

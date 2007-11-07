@@ -43,6 +43,7 @@
 #include <sys/ddidmareq.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/byteorder.h>
 
 #define	IOSP	KSTAT_IO_PTR(un->un_stats)
 /*
@@ -237,6 +238,16 @@ volatile int st_debug = 0;
 #endif
 
 #define	ST_MT02_NAME	"Emulex  MT02 QIC-11/24  "
+
+static const struct vid_drivetype {
+	char	*vid;
+	char	type;
+} st_vid_dt[] = {
+	{"LTO-CVE ",	MT_LTO},
+	{"QUANTUM ",    MT_ISDLT},
+	{"SONY    ",    MT_ISAIT},
+	{"STK     ",	MT_ISSTK9840}
+};
 
 static const struct driver_minor_data {
 	char	*name;
@@ -433,6 +444,14 @@ static int st_get_conf_from_st_dot_conf(struct scsi_tape *, char *,
     struct st_drivetype *);
 static int st_get_conf_from_st_conf_dot_c(struct scsi_tape *, char *,
     struct st_drivetype *);
+static int st_get_conf_from_tape_drive(struct scsi_tape *, char *,
+    struct st_drivetype *);
+static int st_get_densities_from_tape_drive(struct scsi_tape *,
+    struct st_drivetype *);
+static int st_get_timeout_values_from_tape_drive(struct scsi_tape *,
+    struct st_drivetype *);
+static int st_get_timeouts_value(struct scsi_tape *, uchar_t, ushort_t *,
+    ushort_t);
 static int st_get_default_conf(struct scsi_tape *, char *,
     struct st_drivetype *);
 static int st_rw(dev_t dev, struct uio *uio, int flag);
@@ -491,6 +510,12 @@ static int st_gen_mode_sense(struct scsi_tape *un, int page,
 static int st_change_block_size(dev_t dev, uint32_t nblksz);
 static int st_gen_mode_select(struct scsi_tape *un, struct seq_mode *page_data,
     int page_size);
+static int st_read_block_limits(struct scsi_tape *un,
+    struct read_blklim *read_blk);
+static int st_report_density_support(struct scsi_tape *un,
+    uchar_t *density_data, size_t buflen);
+static int st_report_supported_operation(struct scsi_tape *un,
+    uchar_t *oper_data, uchar_t option_code, ushort_t service_action);
 static int st_tape_init(dev_t dev);
 static void st_flush(struct scsi_tape *un);
 static void st_set_pe_errno(struct scsi_tape *un);
@@ -856,61 +881,6 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    "st_attach: instance=%x\n", instance);
 
 	/*
-	 * find the drive type for this target
-	 */
-	st_known_tape_type(un);
-
-	for (node_ix = 0; node_ix < ST_NUM_MEMBERS(st_minor_data); node_ix++) {
-		int minor;
-		char *name;
-
-		name  = st_minor_data[node_ix].name;
-		minor = st_minor_data[node_ix].minor;
-
-		/*
-		 * For default devices set the density to the
-		 * preferred default density for this device.
-		 */
-		if (node_ix <= DEF_BSD_NR) {
-			minor |= un->un_dp->default_density;
-		}
-		minor |= MTMINOR(instance);
-
-		if (ddi_create_minor_node(devi, name, S_IFCHR, minor,
-		    DDI_NT_TAPE, NULL) == DDI_SUCCESS) {
-			continue;
-		}
-
-		ddi_remove_minor_node(devi, NULL);
-		if (un) {
-			cv_destroy(&un->un_clscv);
-			cv_destroy(&un->un_sbuf_cv);
-			cv_destroy(&un->un_queue_cv);
-			cv_destroy(&un->un_state_cv);
-			cv_destroy(&un->un_suspend_cv);
-			cv_destroy(&un->un_tape_busy_cv);
-
-			if (un->un_sbufp) {
-				freerbuf(un->un_sbufp);
-			}
-			if (un->un_uscsi_rqs_buf) {
-				kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
-			}
-			if (un->un_mspl) {
-				i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
-			}
-			scsi_destroy_pkt(un->un_rqs);
-			scsi_free_consistent_buf(un->un_rqs_bp);
-			ddi_soft_state_free(st_state, instance);
-			devp->sd_private = NULL;
-			devp->sd_sense = NULL;
-
-		}
-		ddi_prop_remove_all(devi);
-		return (DDI_FAILURE);
-	}
-
-	/*
 	 * Add a zero-length attribute to tell the world we support
 	 * kernel ioctls (for layered drivers)
 	 */
@@ -1043,6 +1013,74 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		kstat_install(un->un_stats);
 	}
 	(void) st_create_errstats(un, instance);
+
+	/*
+	 * find the drive type for this target
+	 */
+	mutex_enter(ST_MUTEX);
+	un->un_dev = MT_TEM_DEV(instance);
+	st_known_tape_type(un);
+	un->un_dev = 0;
+	mutex_exit(ST_MUTEX);
+
+	for (node_ix = 0; node_ix < ST_NUM_MEMBERS(st_minor_data); node_ix++) {
+		int minor;
+		char *name;
+
+		name  = st_minor_data[node_ix].name;
+		minor = st_minor_data[node_ix].minor;
+
+		/*
+		 * For default devices set the density to the
+		 * preferred default density for this device.
+		 */
+		if (node_ix <= DEF_BSD_NR) {
+			minor |= un->un_dp->default_density;
+		}
+		minor |= MTMINOR(instance);
+
+		if (ddi_create_minor_node(devi, name, S_IFCHR, minor,
+		    DDI_NT_TAPE, NULL) == DDI_SUCCESS) {
+			continue;
+		}
+
+		ddi_remove_minor_node(devi, NULL);
+
+		cv_destroy(&un->un_clscv);
+		cv_destroy(&un->un_sbuf_cv);
+		cv_destroy(&un->un_queue_cv);
+		cv_destroy(&un->un_state_cv);
+		cv_destroy(&un->un_suspend_cv);
+		cv_destroy(&un->un_tape_busy_cv);
+
+		if (un->un_sbufp) {
+			freerbuf(un->un_sbufp);
+		}
+		if (un->un_uscsi_rqs_buf) {
+			kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
+		}
+		if (un->un_mspl) {
+			i_ddi_mem_free((caddr_t)un->un_mspl, NULL);
+		}
+		if (un->un_dp_size) {
+			kmem_free(un->un_dp, un->un_dp_size);
+		}
+		if (un->un_state) {
+			kstat_delete(un->un_stats);
+		}
+		if (un->un_errstats) {
+			kstat_delete(un->un_errstats);
+		}
+
+		scsi_destroy_pkt(un->un_rqs);
+		scsi_free_consistent_buf(un->un_rqs_bp);
+		ddi_soft_state_free(st_state, instance);
+		devp->sd_private = NULL;
+		devp->sd_sense = NULL;
+
+		ddi_prop_remove_all(devi);
+		return (DDI_FAILURE);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -1637,6 +1675,7 @@ typedef int
 static cfg_functp config_functs[] = {
 	st_get_conf_from_st_dot_conf,
 	st_get_conf_from_st_conf_dot_c,
+	st_get_conf_from_tape_drive,
 	st_get_default_conf
 };
 
@@ -1665,6 +1704,7 @@ st_known_tape_type(struct scsi_tape *un)
 	dp = kmem_zalloc((size_t)un->un_dp_size, KM_SLEEP);
 	un->un_dp = dp;
 
+	un->un_dp->non_motion_timeout = st_io_time;
 	/*
 	 * Loop through the configuration methods till one works.
 	 */
@@ -2026,6 +2066,416 @@ st_get_conf_from_st_conf_dot_c(struct scsi_tape *un, char *vidpid,
 }
 
 static int
+st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
+    struct st_drivetype *dp)
+{
+	int bsize;
+	ulong_t maxbsize;
+	caddr_t buf;
+	struct st_drivetype *tem_dp;
+	struct read_blklim *blklim;
+	int rval;
+	int i;
+
+	ST_FUNC(ST_DEVINFO, st_get_conf_from_type_drive);
+
+	/*
+	 * Determine the type of tape controller. Type is determined by
+	 * sending SCSI commands to tape drive and deriving the type from
+	 * the returned data.
+	 */
+	ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+	    "st_get_conf_from_tape_drive(): asking tape drive\n");
+
+	tem_dp = kmem_zalloc(sizeof (struct st_drivetype), KM_SLEEP);
+
+	/*
+	 * Make up a name
+	 */
+	bcopy(vidpid, tem_dp->name, VIDPIDLEN);
+	tem_dp->name[VIDPIDLEN] = '\0';
+	tem_dp->length = min(strlen(ST_INQUIRY->inq_vid), (VIDPIDLEN - 1));
+	(void) strncpy(tem_dp->vid, ST_INQUIRY->inq_vid, tem_dp->length);
+	/*
+	 * 'clean' vendor and product strings of non-printing chars
+	 */
+	for (i = 0; i < VIDPIDLEN - 1; i ++) {
+		if (tem_dp->name[i] < ' ' || tem_dp->name[i] > '~') {
+			tem_dp->name[i] = '.';
+		}
+	}
+
+	/*
+	 * MODE SENSE to determine block size.
+	 */
+	un->un_dp->options |= ST_MODE_SEL_COMP;
+	if (st_modesense(un)) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_conf_from_tape_drive(): fail to mode sense\n");
+		un->un_dp->options &= ~ST_MODE_SEL_COMP;
+		kmem_free(tem_dp, sizeof (struct st_drivetype));
+		return (0);
+	}
+
+	/* Can mode sense page 0x10 or 0xf */
+	tem_dp->options |= ST_MODE_SEL_COMP;
+	bsize = (un->un_mspl->high_bl << 16)	|
+	    (un->un_mspl->mid_bl << 8)		|
+	    (un->un_mspl->low_bl);
+
+	if (bsize == 0) {
+		tem_dp->options |= ST_VARIABLE;
+		tem_dp->bsize = 0;
+	} else if (bsize > ST_MAXRECSIZE_FIXED) {
+		if (st_change_block_size(un->un_dev, 0) != 0) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_conf_from_tape_drive(): "
+			    "Fixed record size is too large and"
+			    "cannot switch to variable record size");
+			kmem_free(tem_dp, sizeof (struct st_drivetype));
+			return (0);
+		}
+		tem_dp->options |= ST_VARIABLE;
+	} else if (st_change_block_size(un->un_dev, 0) == 0) {
+		tem_dp->options |= ST_VARIABLE;
+		tem_dp->bsize = 0;
+	} else {
+		tem_dp->bsize = bsize;
+	}
+
+	/*
+	 * If READ BLOCk LIMITS works and upper block size limit is
+	 * more than 64K, ST_NO_RECSIZE_LIMIT is supported.
+	 */
+	blklim = kmem_zalloc(sizeof (struct read_blklim), KM_SLEEP);
+	if (st_read_block_limits(un, blklim) != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_conf_from_tape_drive(): "
+		    "fail to read block limits.\n");
+		kmem_free(blklim, sizeof (struct read_blklim));
+		kmem_free(tem_dp, sizeof (struct st_drivetype));
+		return (0);
+	}
+	maxbsize = (blklim->max_hi << 16) +
+	    (blklim->max_mid << 8) + blklim->max_lo;
+	if (maxbsize > ST_MAXRECSIZE_VARIABLE) {
+		tem_dp->options |= ST_NO_RECSIZE_LIMIT;
+	}
+	kmem_free(blklim, sizeof (struct read_blklim));
+
+	/*
+	 * Inquiry VPD page 0xb0 to see if the tape drive supports WORM
+	 */
+	buf = kmem_zalloc(6, KM_SLEEP);
+	rval = st_get_special_inquiry(un, 6, buf, 0xb0);
+	if (rval != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_conf_from_tape_drive(): "
+		    "fail to read vitial inquiry.\n");
+		kmem_free(buf, 6);
+		kmem_free(tem_dp, sizeof (struct st_drivetype));
+		return (0);
+	}
+	if (buf[4] & 1) {
+		tem_dp->options |= ST_WORMABLE;
+	}
+	kmem_free(buf, 6);
+
+	/* Assume BSD BSR KNOWS_EOD */
+	tem_dp->options |= ST_BSF | ST_BSR | ST_KNOWS_EOD | ST_UNLOADABLE;
+	tem_dp->max_rretries = -1;
+	tem_dp->max_wretries = -1;
+
+	/*
+	 * Decide the densities supported by tape drive by sending
+	 * REPORT DENSITY SUPPORT command.
+	 */
+	if (st_get_densities_from_tape_drive(un, tem_dp) == 0) {
+		kmem_free(tem_dp, sizeof (struct st_drivetype));
+		return (0);
+	}
+
+	/*
+	 * Decide the timeout values for several commands by sending
+	 * REPORT SUPPORTED OPERATION CODES command.
+	 */
+	if (st_get_timeout_values_from_tape_drive(un, tem_dp) == 0) {
+		kmem_free(tem_dp, sizeof (struct st_drivetype));
+		return (0);
+	}
+
+	bcopy(tem_dp, dp, sizeof (struct st_drivetype));
+	kmem_free(tem_dp, sizeof (struct st_drivetype));
+	return (1);
+}
+
+static int
+st_get_densities_from_tape_drive(struct scsi_tape *un,
+    struct st_drivetype *dp)
+{
+	int i, p;
+	size_t buflen;
+	ushort_t des_len;
+	uchar_t *den_header;
+	uchar_t num_den;
+	uchar_t den[NDENSITIES];
+	uchar_t deflt[NDENSITIES];
+	struct report_density_desc *den_desc;
+
+	ST_FUNC(ST_DEVINFO, st_get_densities_from_type_drive);
+
+	/*
+	 * Since we have no idea how many densitiy support entries
+	 * will be returned, we send the command firstly assuming
+	 * there is only one. Then we can decide the number of
+	 * entries by available density support length. If multiple
+	 * entries exist, we will resend the command with enough
+	 * buffer size.
+	 */
+	buflen = sizeof (struct report_density_header) +
+	    sizeof (struct report_density_desc);
+	den_header = kmem_zalloc(buflen, KM_SLEEP);
+	if (st_report_density_support(un, den_header, buflen) != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_conf_from_tape_drive(): fail to report density.\n");
+		kmem_free(den_header, buflen);
+		return (0);
+	}
+	des_len =
+	    BE_16(((struct report_density_header *)den_header)->ava_dens_len);
+	num_den = (des_len - 2) / sizeof (struct report_density_desc);
+
+	if (num_den > 1) {
+		kmem_free(den_header, buflen);
+		buflen = sizeof (struct report_density_header) +
+		    sizeof (struct report_density_desc) * num_den;
+		den_header = kmem_zalloc(buflen, KM_SLEEP);
+		if (st_report_density_support(un, den_header, buflen) != 0) {
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "st_get_conf_from_tape_drive(): "
+			    "fail to report density.\n");
+			kmem_free(den_header, buflen);
+			return (0);
+		}
+	}
+
+	den_desc = (struct report_density_desc *)(den_header
+	    + sizeof (struct report_density_header));
+
+	/*
+	 * Decide the drive type by assigning organization
+	 */
+	for (i = 0; i < ST_NUM_MEMBERS(st_vid_dt); i ++) {
+		if (strncmp(st_vid_dt[i].vid, (char *)(den_desc->ass_org),
+		    8) == 0) {
+			dp->type = st_vid_dt[i].type;
+			break;
+		}
+	}
+	if (i == ST_NUM_MEMBERS(st_vid_dt)) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_conf_from_tape_drive(): "
+		    "can't find match of assigned ort.\n");
+		kmem_free(den_header, buflen);
+		return (0);
+	}
+
+	/*
+	 * The tape drive may support many tape formats, but the st driver
+	 * supports only the four highest densities. Since density code
+	 * values are returned by ascending sequence, we start from the
+	 * last entry of density support data block descriptor.
+	 */
+	p = 0;
+	den_desc += num_den - 1;
+	for (i = 0; i < num_den && p < NDENSITIES; i ++, den_desc --) {
+		if ((den_desc->pri_den != 0) && (den_desc->wrtok)) {
+			if (p != 0) {
+				if (den_desc->pri_den >= den[p - 1]) {
+					continue;
+				}
+			}
+			den[p] = den_desc->pri_den;
+			deflt[p] = den_desc->deflt;
+			p ++;
+		}
+	}
+
+	switch (p) {
+	case 0:
+		bzero(dp->densities, NDENSITIES);
+		dp->options |= ST_AUTODEN_OVERRIDE;
+		dp->default_density = MT_DENSITY4;
+		break;
+
+	case 1:
+		(void) memset(dp->densities, den[0], NDENSITIES);
+		dp->options |= ST_AUTODEN_OVERRIDE;
+		dp->default_density = MT_DENSITY4;
+		break;
+
+	case 2:
+		dp->densities[0] = den[1];
+		dp->densities[1] = den[1];
+		dp->densities[2] = den[0];
+		dp->densities[3] = den[0];
+		if (deflt[0]) {
+			dp->default_density = MT_DENSITY4;
+		} else {
+			dp->default_density = MT_DENSITY2;
+		}
+		break;
+
+	case 3:
+		dp->densities[0] = den[2];
+		dp->densities[1] = den[1];
+		dp->densities[2] = den[0];
+		dp->densities[3] = den[0];
+		if (deflt[0]) {
+			dp->default_density = MT_DENSITY4;
+		} else if (deflt[1]) {
+			dp->default_density = MT_DENSITY2;
+		} else {
+			dp->default_density = MT_DENSITY1;
+		}
+		break;
+
+	default:
+		for (i = p; i > p - NDENSITIES; i --) {
+			dp->densities[i - 1] = den[p - i];
+		}
+		if (deflt[0]) {
+			dp->default_density = MT_DENSITY4;
+		} else if (deflt[1]) {
+			dp->default_density = MT_DENSITY3;
+		} else if (deflt[2]) {
+			dp->default_density = MT_DENSITY2;
+		} else {
+			dp->default_density = MT_DENSITY1;
+		}
+		break;
+	}
+
+	bzero(dp->mediatype, NDENSITIES);
+
+	kmem_free(den_header, buflen);
+	return (1);
+}
+
+static int
+st_get_timeout_values_from_tape_drive(struct scsi_tape *un,
+    struct st_drivetype *dp)
+{
+	ushort_t timeout;
+
+	ST_FUNC(ST_DEVINFO, st_get_timeout_values_from_type_drive);
+
+	if (st_get_timeouts_value(un, SCMD_ERASE, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->erase_timeout = timeout;
+
+	if (st_get_timeouts_value(un, SCMD_READ, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->io_timeout = timeout;
+
+	if (st_get_timeouts_value(un, SCMD_WRITE, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->io_timeout = max(dp->io_timeout, timeout);
+
+	if (st_get_timeouts_value(un, SCMD_SPACE, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->space_timeout = timeout;
+
+	if (st_get_timeouts_value(un, SCMD_LOAD, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->load_timeout = timeout;
+	dp->unload_timeout = timeout;
+
+	if (st_get_timeouts_value(un, SCMD_REWIND, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->rewind_timeout = timeout;
+
+	if (st_get_timeouts_value(un, SCMD_INQUIRY, &timeout, 0) != 0) {
+		return (0);
+	}
+	dp->non_motion_timeout = timeout;
+
+	return (1);
+}
+
+static int
+st_get_timeouts_value(struct scsi_tape *un, uchar_t option_code,
+    ushort_t *timeout_value, ushort_t service_action)
+{
+	uchar_t *timeouts;
+	uchar_t *oper;
+	uchar_t support;
+	uchar_t cdbsize;
+	uchar_t ctdp;
+	size_t buflen;
+	int rval;
+
+	ST_FUNC(ST_DEVINFO, st_get_timeouts_value);
+
+	buflen = sizeof (struct one_com_des) +
+	    sizeof (struct com_timeout_des);
+	oper = kmem_zalloc(buflen, KM_SLEEP);
+	rval = st_report_supported_operation(un, oper, option_code,
+	    service_action);
+
+	if (rval != 0) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_timeouts_value(): "
+		    "fail to timeouts value for command %d.\n", option_code);
+		kmem_free(oper, buflen);
+		return (rval);
+	}
+
+	support = ((struct one_com_des *)oper)->support;
+	if ((support != SUPPORT_VALUES_SUPPORT_SCSI) &&
+	    (support != SUPPORT_VALUES_SUPPORT_VENDOR)) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_timeouts_value(): "
+		    "command %d is not supported.\n", option_code);
+		kmem_free(oper, buflen);
+		return (-1);
+	}
+
+	ctdp = ((struct one_com_des *)oper)->ctdp;
+	if (!ctdp) {
+		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+		    "st_get_timeouts_value(): "
+		    "command timeout is not included.\n");
+		kmem_free(oper, buflen);
+		return (-1);
+	}
+
+	cdbsize = BE_16(((struct one_com_des *)oper)->cdb_size);
+	timeouts = (uchar_t *)(oper + cdbsize + 4);
+
+	/*
+	 * Timeout value in seconds is 4 bytes, but we only support the lower 2
+	 * bytes. If the higher 2 bytes are not zero, the timeout value is set
+	 * to 0xFFFF.
+	 */
+	if (*(timeouts + 8) != 0 || *(timeouts + 9) != 0) {
+		*timeout_value = USHRT_MAX;
+	} else {
+		*timeout_value = ((*(timeouts + 10)) << 8) |
+		    (*(timeouts + 11));
+	}
+
+	kmem_free(oper, buflen);
+	return (0);
+}
+
+static int
 st_get_default_conf(struct scsi_tape *un, char *vidpid, struct st_drivetype *dp)
 {
 	int i;
@@ -2034,7 +2484,6 @@ st_get_default_conf(struct scsi_tape *un, char *vidpid, struct st_drivetype *dp)
 
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_get_default_conf(): making drivetype from INQ cmd\n");
-
 
 	/*
 	 * Make up a name
@@ -7412,6 +7861,117 @@ st_gen_mode_select(struct scsi_tape *un, struct seq_mode *page_data,
 
 	kmem_free(com, sizeof (*com));
 	return (r);
+}
+
+static int
+st_read_block_limits(struct scsi_tape *un, struct read_blklim *read_blk)
+{
+	int rval;
+	char cdb[CDB_GROUP0];
+	struct uscsi_cmd *com;
+
+	ST_FUNC(ST_DEVINFO, st_read_block_limits);
+
+	com = kmem_zalloc(sizeof (*com), KM_SLEEP);
+
+	bzero(cdb, CDB_GROUP0);
+	cdb[0] = SCMD_READ_BLKLIM;
+
+	com->uscsi_cdb = cdb;
+	com->uscsi_cdblen = CDB_GROUP0;
+	com->uscsi_bufaddr = (caddr_t)read_blk;
+	com->uscsi_buflen = sizeof (struct read_blklim);
+	com->uscsi_timeout = un->un_dp->non_motion_timeout;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+
+	rval = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
+	if (com->uscsi_status || com->uscsi_resid) {
+		rval = -1;
+	}
+
+	kmem_free(com, sizeof (*com));
+	return (rval);
+}
+
+static int
+st_report_density_support(struct scsi_tape *un, uchar_t *density_data,
+    size_t buflen)
+{
+	int rval;
+	char cdb[CDB_GROUP1];
+	struct uscsi_cmd *com;
+
+	ST_FUNC(ST_DEVINFO, st_report_density_support);
+
+	com = kmem_zalloc(sizeof (*com), KM_SLEEP);
+
+	bzero(cdb, CDB_GROUP1);
+	cdb[0] = SCMD_REPORT_DENSITIES;
+	cdb[7] = (buflen & 0xff00) >> 8;
+	cdb[8] = buflen & 0xff;
+
+	com->uscsi_cdb = cdb;
+	com->uscsi_cdblen = CDB_GROUP1;
+	com->uscsi_bufaddr = (caddr_t)density_data;
+	com->uscsi_buflen = buflen;
+	com->uscsi_timeout = un->un_dp->non_motion_timeout;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+
+	rval = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
+	if (com->uscsi_status || com->uscsi_resid) {
+		rval = -1;
+	}
+
+	kmem_free(com, sizeof (*com));
+	return (rval);
+}
+
+static int
+st_report_supported_operation(struct scsi_tape *un, uchar_t *oper_data,
+    uchar_t option_code, ushort_t service_action)
+{
+	int rval;
+	char cdb[CDB_GROUP5];
+	struct uscsi_cmd *com;
+	uint32_t allo_length;
+
+	ST_FUNC(ST_DEVINFO, st_report_supported_operation);
+
+	allo_length = sizeof (struct one_com_des) +
+	    sizeof (struct com_timeout_des);
+	com = kmem_zalloc(sizeof (*com), KM_SLEEP);
+
+	bzero(cdb, CDB_GROUP5);
+	cdb[0] = (char)SCMD_REPORT_TARGET_PORT_GROUPS;
+	cdb[1] = 0x0c; /* service action */
+	if (service_action) {
+		cdb[2] = (char)(ONE_COMMAND_DATA_FORMAT | 0x80); /* RCTD */
+		cdb[4] = (service_action & 0xff00) >> 8;
+		cdb[5] = service_action & 0xff;
+	} else {
+		cdb[2] = (char)(ONE_COMMAND_NO_SERVICE_DATA_FORMAT |
+		    0x80); /* RCTD */
+	}
+	cdb[3] = option_code;
+	cdb[6] = (allo_length & 0xff000000) >> 24;
+	cdb[7] = (allo_length & 0xff0000) >> 16;
+	cdb[8] = (allo_length & 0xff00) >> 8;
+	cdb[9] = allo_length & 0xff;
+
+	com->uscsi_cdb = cdb;
+	com->uscsi_cdblen = CDB_GROUP5;
+	com->uscsi_bufaddr = (caddr_t)oper_data;
+	com->uscsi_buflen = allo_length;
+	com->uscsi_timeout = un->un_dp->non_motion_timeout;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+
+	rval = st_ioctl_cmd(un->un_dev, com, FKIOCTL);
+	if (com->uscsi_status) {
+		rval = -1;
+	}
+
+	kmem_free(com, sizeof (*com));
+	return (rval);
 }
 
 /*

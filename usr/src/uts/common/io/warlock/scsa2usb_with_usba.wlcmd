@@ -229,6 +229,7 @@ add     __ddi_xbuf_attr::xa_strategy targets sd_xbuf_strategy
 add st.c:st_known_tape_type/config_funct targets \
         st_get_conf_from_st_dot_conf \
         st_get_conf_from_st_conf_dot_c \
+	st_get_conf_from_tape_drive \
         st_get_default_conf
 
 

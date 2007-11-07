@@ -2226,46 +2226,6 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
-   * STC 3490 1/2" cartridge
-   *
-   *     NOTES
-   *     -----
-   *  o This is an unsupported drive.
-   *
-   *  o This is the generic StorageTek (STK) entry. Any special or drive 
-   *    specific entries must be placed ahead of this entry in the file, to
-   *    ensure that the driver will "see" and use them; otherwise this entry
-   *    will be used as the default.
-   *
-   * [1] The STC 3490 uses 0 or "default" for the desnity code.
-   * [2] The STC 3490 has only one speed (if the driver ever cares).
-   * [3] max_rretries and max_wretries are driver anachronisms.
-   */
-  {                           /* Structure member Description                 */
-                              /* ---------------- -----------                 */
-    "STK 1/2\" Cartridge",    /* .name            Display ("pretty") name     */
-    3,                        /* .length          Length of next item...      */
-    "STK",                    /* .vid             Vendor-product ID string    */
-    ST_TYPE_STC3490,          /* .type            Numeric type (cf. mtio.h)   */
-    0,                        /* .bsize           Block size (0 = variable)   */
-    ST_VARIABLE         |     /*    00001           Supports variable length  */
-    ST_REEL             |     /*    00004           1/2-inch reel tape device */
-    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
-    ST_BSR              |     /*    00010           Supports SPACE block rev  */
-    ST_LONG_ERASE       |     /*    00020           Needs extra time to erase */
-    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
-    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
-    ST_MODE_SEL_COMP,         /*    10000           [Note 1]                  */
-                              /*    -----                                     */
-                              /*    1843D                                     */
-    400,                      /* .max_rretries    [Note 3]                    */
-    400,                      /* .max_wretries    [Note 3]                    */
-    {0x00, 0x00, 0x00, 0x00}, /* .densities       Density codes [Note 1]      */
-    MT_DENSITY1,              /* .default_density (.densities[x])             */
-    {0, 0, 0, 0}              /* .speeds          Speed codes [Note 2]        */
-  },
-
-  /*
    * Sony SAIT
    *
    * Only looking at part of the product ID so it will match SDZ-100 and
