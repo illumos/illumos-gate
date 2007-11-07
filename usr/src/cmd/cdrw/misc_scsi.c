@@ -730,7 +730,7 @@ get_last_possible_lba(cd_device *dev)
 		}
 	} else {
 		if ((di[21] != 0) && (di[21] != 0xff)) {
-			cap = ((di[21] * 60) + di[22]) * 75;
+			cap = MSF2LBA(di[21], di[22], di[23]);
 		} else {
 			cap = 0;
 		}
