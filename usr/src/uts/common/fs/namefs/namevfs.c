@@ -476,7 +476,6 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	newvp->v_type = filevp->v_type;
 	newvp->v_rdev = filevp->v_rdev;
 	newvp->v_data = (caddr_t)nodep;
-	VFS_HOLD(vfsp);
 	vn_exists(newvp);
 
 	/*
@@ -584,11 +583,11 @@ nm_unmount(vfs_t *vfsp, int flag, cred_t *crp)
 		mutex_exit(&thisvp->v_lock);
 		vn_invalid(thisvp);
 		vn_free(thisvp);
-		VFS_RELE(vfsp);
 		namenodeno_free(nodep->nm_vattr.va_nodeid);
 		kmem_free(nodep, sizeof (struct namenode));
 	} else {
 		thisvp->v_flag &= ~VROOT;
+		thisvp->v_vfsp = &namevfs;
 		mutex_exit(&thisvp->v_lock);
 	}
 	if (namefind(vp, NULLVP) == NULL && vp->v_stream) {
