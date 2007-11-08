@@ -1851,7 +1851,11 @@ ufs_ioctl(
 				return (EFAULT);
 			}
 			error = ufs_snap_create(vp, fcp, cr);
-			if (!error && copyout(fcp, (void *)arg, fcm_size))
+			/*
+			 * Do copyout even if there is an error because
+			 * the details of error is stored in fcp.
+			 */
+			if (copyout(fcp, (void *)arg, fcm_size))
 				error = EFAULT;
 			kmem_free(fcp, fcm_size);
 			return (error);
