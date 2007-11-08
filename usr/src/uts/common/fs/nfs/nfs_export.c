@@ -331,7 +331,7 @@ srv_secinfo_add(secinfo_t **pcursec, int *pcurcnt, secinfo_t *newsec,
 		for (c = 0; c < ccnt; c++) {
 			if (newsec[n].s_secinfo.sc_nfsnum ==
 			    cursec[c].s_secinfo.sc_nfsnum) {
-				cursec[c].s_refcnt++;
+				cursec[c].s_refcnt += newsec[n].s_refcnt;
 				SECREF_TRACE(cursec, "add_ref",
 				    cursec[c].s_secinfo.sc_nfsnum,
 				    cursec[c].s_refcnt);
