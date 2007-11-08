@@ -613,16 +613,14 @@ periodic_wireless_scan(void *arg)
 					continue;
 				}
 				/*
-				 * Clear the IF_DHCPFAILED and IF_DHCPSTARTED
-				 * flags on this interface; this is a "fresh
-				 * start" for the interface, so we should
-				 * retry dhcp.
+				 * Clear the DHCP flags on this interface;
+				 * this is a "fresh start" for the interface,
+				 * so we should retry dhcp.
 				 */
 				ifp = get_interface(cur_llp->llp_lname);
-				if (ifp != NULL) {
-					ifp->if_lflags &= ~IF_DHCPFAILED;
-					ifp->if_lflags &= ~IF_DHCPSTARTED;
-				}
+				if (ifp != NULL)
+					ifp->if_lflags &= ~IF_DHCPFLAGS;
+
 				/*
 				 * Deactivate the original llp.
 				 * If we reached this point, we either were

@@ -113,6 +113,12 @@ struct interface {
  * invocations of dhcp.
  */
 #define	IF_DHCPSTARTED	0x02
+/*
+ * IF_DHCPACQUIRED: indicates that dhcp successfully acquired a lease.
+ */
+#define	IF_DHCPACQUIRED	0x04
+
+#define	IF_DHCPFLAGS	(IF_DHCPFAILED | IF_DHCPSTARTED | IF_DHCPACQUIRED)
 
 /*
  * visited_wlans are stored on visited_wlan_list of type visisted_wlans_list.

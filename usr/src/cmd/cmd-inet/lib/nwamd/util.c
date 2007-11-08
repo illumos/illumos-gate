@@ -67,6 +67,7 @@
 extern char **environ;
 boolean_t debug = B_FALSE;
 
+/* PRINTFLIKE1 */
 void
 dprintf(const char *fmt, ...)
 {
@@ -322,4 +323,79 @@ lookup_zonename(char *zonename, size_t zonesize)
 		return;
 	syslog(LOG_ERR, "could not determine zone name");
 	(void) strlcpy(zonename, GLOBAL_ZONENAME, zonesize);
+}
+
+/* return B_TRUE if sin_family and sin_addr are the same, B_FALSE if not */
+boolean_t
+cmpsockaddr(const struct sockaddr *addr1, const struct sockaddr *addr2)
+{
+	struct sockaddr_in *sina, *sinb;
+	struct sockaddr_in6 *sin6a, *sin6b;
+
+	if (addr1 == addr2)
+		return (B_TRUE);
+
+	if (addr1 == NULL || addr2 == NULL)
+		return (B_FALSE);
+
+	if (addr1->sa_family != addr2->sa_family)
+		return (B_FALSE);
+
+	switch (addr1->sa_family) {
+	case AF_INET:
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sina = (struct sockaddr_in *)addr1;
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sinb = (struct sockaddr_in *)addr2;
+		return (sina->sin_addr.s_addr == sinb->sin_addr.s_addr);
+	case AF_INET6:
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin6a = (struct sockaddr_in6 *)addr1;
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		sin6b = (struct sockaddr_in6 *)addr2;
+		return
+		    (IN6_ARE_ADDR_EQUAL(&sin6a->sin6_addr, &sin6b->sin6_addr));
+	default:
+		dprintf("cmpsockaddr: unsupported af (%d)", addr1->sa_family);
+		return (B_FALSE);
+	}
+}
+
+/*
+ * Duplicate a sockaddr. Caller will be responsible for freeing memory when it
+ * is no longer needed. Currently only supports AF_INET and AF_INET6
+ * (returns NULL otherwise).
+ */
+struct sockaddr *
+dupsockaddr(const struct sockaddr *addr)
+{
+	struct sockaddr_in *t1, *ret1;
+	struct sockaddr_in6 *t2, *ret2;
+
+	switch (addr->sa_family) {
+	case AF_INET:
+		if ((ret1 = calloc(1, sizeof (struct sockaddr_in))) == NULL) {
+			syslog(LOG_ERR, "dupsockaddr: calloc failed");
+			return (NULL);
+		}
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		t1 = (struct sockaddr_in *)addr;
+		ret1->sin_family = t1->sin_family;
+		ret1->sin_addr.s_addr = t1->sin_addr.s_addr;
+		return ((struct sockaddr *)ret1);
+	case AF_INET6:
+		if ((ret2 = calloc(1, sizeof (struct sockaddr_in6))) == NULL) {
+			syslog(LOG_ERR, "dupsockaddr: calloc failed");
+			return (NULL);
+		}
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
+		t2 = (struct sockaddr_in6 *)addr;
+		ret2->sin6_family = t2->sin6_family;
+		(void) memcpy((void *)&ret2->sin6_addr,
+		    (const void *)&t2->sin6_addr, sizeof (struct in6_addr));
+		return ((struct sockaddr *)ret2);
+	default:
+		dprintf("dupsockaddr: unsupported af (%d)", addr->sa_family);
+		return (NULL);
+	}
 }

@@ -112,7 +112,6 @@ static char upper_layer_profile[MAXHOSTNAMELEN];
 static void print_interface_list();
 static struct interface *get_next_interface(struct interface *);
 
-#define	IPFILTER_FMRI	"svc:/network/ipfilter:default"
 #define	LOOPBACK_IF	"lo0"
 
 void
@@ -577,15 +576,13 @@ bringupinterface(const char *ifname, const char *host, const char *ipv6addr,
 }
 
 void
-takedowninterface(const char *ifname, boolean_t dhcp, boolean_t popup,
-    boolean_t v6onlink)
+takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
 {
 	uint64_t flags;
 	struct interface *ifp;
 
-	dprintf("takedowninterface(%s, %s, %s, %s)", ifname,
-	    BOOLEAN_TO_STRING(dhcp), BOOLEAN_TO_STRING(popup),
-	    BOOLEAN_TO_STRING(v6onlink));
+	dprintf("takedowninterface(%s, %s, %s)", ifname,
+	    BOOLEAN_TO_STRING(popup), BOOLEAN_TO_STRING(v6onlink));
 
 	if ((ifp = get_interface(ifname)) == NULL) {
 		dprintf("takedowninterface: can't find interface struct for %s",
@@ -604,24 +601,19 @@ takedowninterface(const char *ifname, boolean_t dhcp, boolean_t popup,
 	}
 
 	flags = get_ifflags(ifname, AF_INET);
-
-	if (dhcp) {
-		if ((flags & IFF_DHCPRUNNING) != 0) {
-			/*
-			 * We generally prefer doing a release, as that
-			 * tells the server that it can relinquish the
-			 * lease, whereas drop is just a client-side
-			 * operation.  But if we never came up, release
-			 * will fail, because dhcpagent does not allow
-			 * an interface which is selecting to release,
-			 * so we have to drop in that circumstance.  So
-			 * try release first, then fall back to drop.
-			 */
-			if (start_child(IFCONFIG, ifname, "dhcp", "release",
-			    NULL) != 0) {
-				(void) start_child(IFCONFIG, ifname, "dhcp",
-				    "drop", NULL);
-			}
+	if ((flags & IFF_DHCPRUNNING) != 0) {
+		/*
+		 * We generally prefer doing a release, as that tells the
+		 * server that it can relinquish the lease, whereas drop is
+		 * just a client-side operation.  But if we never came up,
+		 * release will fail, because dhcpagent does not allow an
+		 * interface without a lease to release, so we have to drop in
+		 * that case.  So try release first, then fall back to drop.
+		 */
+		if (start_child(IFCONFIG, ifname, "dhcp", "release", NULL)
+		    != 0) {
+			(void) start_child(IFCONFIG, ifname, "dhcp", "drop",
+			    NULL);
 		}
 	} else {
 		if ((flags & IFF_UP) != 0)
@@ -674,8 +666,7 @@ take_down_all_ifs(const char *ignore_if)
 			continue;
 		flags = get_ifflags(ifp->if_name, ifp->if_family);
 		if ((flags & IFF_UP) != 0) {
-			takedowninterface(ifp->if_name,
-			    flags & IFF_DHCPRUNNING, B_FALSE,
+			takedowninterface(ifp->if_name, B_FALSE,
 			    ifp->if_family == AF_INET6);
 		}
 	}
@@ -1118,10 +1109,9 @@ start_if_info_collect(struct interface *ifp, void *arg)
 		return;
 
 	/*
-	 * This is a "fresh start" for the interface; if dhcp
-	 * previously failed, the flag can now be cleared.
+	 * This is a "fresh start" for the interface, so clear old DHCP flags.
 	 */
-	ifp->if_lflags &= ~IF_DHCPFAILED;
+	ifp->if_lflags &= ~IF_DHCPFLAGS;
 
 	(void) pthread_attr_init(&attr);
 	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);

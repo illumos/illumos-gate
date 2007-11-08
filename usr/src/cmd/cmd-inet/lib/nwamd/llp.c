@@ -244,8 +244,7 @@ llp_deactivate(void)
 	if (link_layer_profile == NULL)
 		return;
 
-	takedowninterface(link_layer_profile->llp_lname,
-	    link_layer_profile->llp_ipv4src == IPV4SRC_DHCP, B_TRUE,
+	takedowninterface(link_layer_profile->llp_lname, B_TRUE,
 	    link_layer_profile->llp_ipv6onlink);
 
 	dprintf("llp_deactivate: setting link_layer_profile(%p) to NULL",

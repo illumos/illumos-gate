@@ -49,7 +49,7 @@ extern boolean_t interface_is_active(const struct interface *);
 extern void show_if_status(const char *);
 extern boolean_t bringupinterface(const char *, const char *, const char *,
     boolean_t);
-extern void takedowninterface(const char *, boolean_t, boolean_t, boolean_t);
+extern void takedowninterface(const char *, boolean_t, boolean_t);
 extern void take_down_all_ifs(const char *);
 extern void check_interface_timer(struct interface *, void *);
 extern void start_if_info_collect(struct interface *, void *);
@@ -63,8 +63,8 @@ extern int lookup_count_property(const char *, const char *, uint64_t *);
 /* wireless.c: wifi link handling */
 extern void init_mutexes(void);
 extern boolean_t connect_chosen_lan(struct wireless_lan *, const char *);
-struct wireless_lan *prompt_for_visited(void);
-boolean_t handle_wireless_lan(const char *);
+extern struct wireless_lan *prompt_for_visited(void);
+extern boolean_t handle_wireless_lan(const char *);
 extern boolean_t scan_wireless_nets(struct interface *);
 extern void create_known_wifi_nets_file(void);
 extern void update_known_wifi_nets_file(const char *, const char *);
@@ -85,15 +85,15 @@ extern void state_machine(struct np_event *);
 extern void cleanup(void);
 
 /* util.c: utility & ipc functions */
-/* PRINTFLIKE1 */
-extern void dprintf(const char *fmt, ...);
-extern uint32_t getcurrenttime(void);
+extern void dprintf(const char *, ...);
 extern uint64_t get_ifflags(const char *, sa_family_t);
 extern boolean_t is_plugged_in(struct interface *);
-extern int start_childv(const char *command, char const * const *argv);
-extern int start_child(const char *command, ...);
+extern int start_childv(const char *, char const * const *);
+extern int start_child(const char *, ...);
 extern void start_timer(uint32_t,  uint32_t);
 extern boolean_t valid_graphical_user(boolean_t);
-extern void lookup_zonename(char *zonename, size_t zonesize);
+extern void lookup_zonename(char *, size_t);
+extern struct sockaddr *dupsockaddr(const struct sockaddr *);
+extern boolean_t cmpsockaddr(const struct sockaddr *, const struct sockaddr *);
 
 #endif /* _FUNCTIONS_H */

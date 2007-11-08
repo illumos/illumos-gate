@@ -1086,20 +1086,6 @@ configure_v4_lease(dhcp_smach_t *dsmp)
 		return (B_FALSE);
 	}
 
-	if (ioctl(v4_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "configure_v4_lease: cannot get interface "
-		    "flags for %s", lif->lif_name);
-		return (B_FALSE);
-	}
-
-	lifr.lifr_flags |= IFF_UP;
-	if (ioctl(v4_sock_fd, SIOCSLIFFLAGS, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "configure_v4_lease: cannot set interface "
-		    "flags for %s", lif->lif_name);
-		return (B_FALSE);
-	}
-	lif->lif_flags = lifr.lifr_flags;
-
 	lif->lif_dad_wait = B_TRUE;
 	dsmp->dsm_lif_wait++;
 

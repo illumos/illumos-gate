@@ -77,8 +77,6 @@ pthread_t routing, scan;
 
 static void printaddrs(int mask, void *address);
 static char *printaddr(void **address);
-static struct sockaddr *dupsockaddr(struct sockaddr *);
-static boolean_t cmpsockaddr(struct sockaddr *, struct sockaddr *);
 static void *getaddr(int addrid, int mask, void *address);
 
 union rtm_buf
@@ -405,14 +403,12 @@ routing_events(void *arg)
 			}
 
 			/*
-			 * Check for toggling of the IFF_RUNNING
-			 * flag.
+			 * Check for toggling of the IFF_RUNNING flag.
 			 *
-			 * On any change in the flag value, we
-			 * turn off the DHCPFAILED and DHCPSTARTED
-			 * flags; the change in the RUNNING state
-			 * indicates a "fresh start" for the
-			 * interface, so we should try dhcp again.
+			 * On any change in the flag value, we turn off the
+			 * DHCP flags; the change in the RUNNING state
+			 * indicates a "fresh start" for the interface, so we
+			 * should try dhcp again.
 			 *
 			 * Ignore specific IFF_RUNNING changes for
 			 * wireless interfaces; their semantics are
@@ -432,13 +428,11 @@ routing_events(void *arg)
 			 */
 			if ((ifp->if_flags & IFF_RUNNING) !=
 			    (ifm->ifm_flags & IFF_RUNNING)) {
-				ifp->if_lflags &= ~IF_DHCPFAILED;
-				ifp->if_lflags &= ~IF_DHCPSTARTED;
+				ifp->if_lflags &= ~IF_DHCPFLAGS;
 			}
 			if (ifp->if_type == IF_WIRELESS)
 				break;
-			plugged_in =
-			    ((ifp->if_flags & IFF_RUNNING) != 0);
+			plugged_in = ((ifp->if_flags & IFF_RUNNING) != 0);
 			ifp->if_flags = ifm->ifm_flags;
 			if (!plugged_in &&
 			    (ifm->ifm_flags & IFF_RUNNING)) {
@@ -460,75 +454,6 @@ routing_events(void *arg)
 	return (NULL);
 }
 
-/* return B_TRUE if sin_family and sin_addr are the same, B_FALSE if not */
-static boolean_t
-cmpsockaddr(struct sockaddr *addr1, struct sockaddr *addr2)
-{
-	struct sockaddr_in *sina, *sinb;
-	struct sockaddr_in6 *sin6a, *sin6b;
-
-	if (addr1->sa_family != addr2->sa_family)
-		return (B_FALSE);
-
-	switch (addr1->sa_family) {
-	case AF_INET:
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		sina = (struct sockaddr_in *)addr1;
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		sinb = (struct sockaddr_in *)addr2;
-		return (sina->sin_addr.s_addr == sinb->sin_addr.s_addr);
-	case AF_INET6:
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		sin6a = (struct sockaddr_in6 *)addr1;
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		sin6b = (struct sockaddr_in6 *)addr2;
-		return
-		    (IN6_ARE_ADDR_EQUAL(&sin6a->sin6_addr, &sin6b->sin6_addr));
-	default:
-		dprintf("cmpsockaddr: unsupported af (%d)", addr1->sa_family);
-		return (B_FALSE);
-	}
-}
-
-/*
- * Duplicate a sockaddr. Caller will be responsible for freeing memory when it
- * is no longer needed. Currently only supports AF_INET and AF_INET6
- * (returns NULL otherwise).
- */
-static struct sockaddr *
-dupsockaddr(struct sockaddr *addr)
-{
-	struct sockaddr_in *t1, *ret1;
-	struct sockaddr_in6 *t2, *ret2;
-
-	switch (addr->sa_family) {
-	case AF_INET:
-		if ((ret1 = calloc(1, sizeof (struct sockaddr_in))) == NULL) {
-			syslog(LOG_ERR, "dupsockaddr: calloc failed");
-			return (NULL);
-		}
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		t1 = (struct sockaddr_in *)addr;
-		ret1->sin_family = t1->sin_family;
-		ret1->sin_addr.s_addr = t1->sin_addr.s_addr;
-		return ((struct sockaddr *)ret1);
-	case AF_INET6:
-		if ((ret2 = calloc(1, sizeof (struct sockaddr_in6))) == NULL) {
-			syslog(LOG_ERR, "dupsockaddr: calloc failed");
-			return (NULL);
-		}
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		t2 = (struct sockaddr_in6 *)addr;
-		ret2->sin6_family = t2->sin6_family;
-		(void) memcpy((void *)&ret2->sin6_addr,
-		    (const void *)&t2->sin6_addr, sizeof (struct in6_addr));
-		return ((struct sockaddr *)ret2);
-	default:
-		dprintf("dupsockaddr: unsupported af (%d)", addr->sa_family);
-		return (NULL);
-	}
-}
-
 static char *
 printaddr(void **address)
 {
@@ -539,37 +464,37 @@ printaddr(void **address)
 	struct sockaddr_dl *dl = *address;
 
 	switch (family) {
-		case AF_UNSPEC:
-			(void) inet_ntop(AF_UNSPEC, &s4->sin_addr, buffer,
-			    sizeof (buffer));
-			*address = (char *)*address + sizeof (*s4);
-			break;
-		case AF_INET:
-			(void) inet_ntop(AF_INET, &s4->sin_addr, buffer,
-			    sizeof (buffer));
-			*address = (char *)*address + sizeof (*s4);
-			break;
-		case AF_INET6:
-			(void) inet_ntop(AF_INET6, &s6->sin6_addr, buffer,
-			    sizeof (buffer));
-			*address = (char *)*address + sizeof (*s6);
-			break;
-		case AF_LINK:
-			(void) snprintf(buffer, sizeof (buffer), "link %.*s",
-			    dl->sdl_nlen, dl->sdl_data);
-			*address = (char *)*address + sizeof (*dl);
-			break;
-		default:
-			/*
-			 * We can't reliably update the size of this thing
-			 * because we don't know what its type is.  So bump
-			 * it by a sockaddr_in and see what happens.  The
-			 * caller should really make sure this never happens.
-			 */
-			*address = (char *)*address + sizeof (*s4);
-			(void) snprintf(buffer, sizeof (buffer),
-			    "unknown address family %d", family);
-			break;
+	case AF_UNSPEC:
+		(void) inet_ntop(AF_UNSPEC, &s4->sin_addr, buffer,
+		    sizeof (buffer));
+		*address = (char *)*address + sizeof (*s4);
+		break;
+	case AF_INET:
+		(void) inet_ntop(AF_INET, &s4->sin_addr, buffer,
+		    sizeof (buffer));
+		*address = (char *)*address + sizeof (*s4);
+		break;
+	case AF_INET6:
+		(void) inet_ntop(AF_INET6, &s6->sin6_addr, buffer,
+		    sizeof (buffer));
+		*address = (char *)*address + sizeof (*s6);
+		break;
+	case AF_LINK:
+		(void) snprintf(buffer, sizeof (buffer), "link %.*s",
+		    dl->sdl_nlen, dl->sdl_data);
+		*address = (char *)*address + sizeof (*dl);
+		break;
+	default:
+		/*
+		 * We can't reliably update the size of this thing
+		 * because we don't know what its type is.  So bump
+		 * it by a sockaddr_in and see what happens.  The
+		 * caller should really make sure this never happens.
+		 */
+		*address = (char *)*address + sizeof (*s4);
+		(void) snprintf(buffer, sizeof (buffer),
+		    "unknown address family %d", family);
+		break;
 	}
 	return (buffer);
 }

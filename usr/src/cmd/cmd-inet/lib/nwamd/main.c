@@ -132,7 +132,7 @@ daemonize(void)
 	}
 	if (pid != 0) {
 		(void) wait(NULL);
-		dprintf("child %d exited, daemonizing", pid);
+		dprintf("child %ld exited, daemonizing", pid);
 		_exit(0);
 	}
 	if (setsid() == (pid_t)-1) {

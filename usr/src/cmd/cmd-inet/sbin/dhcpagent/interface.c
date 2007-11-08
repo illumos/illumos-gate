@@ -1327,6 +1327,7 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 			errmsg = "cannot bring up";
 			goto failure;
 		}
+		lif->lif_flags = lifr.lifr_flags;
 
 		/*
 		 * When bringing 0.0.0.0 IFF_UP, the kernel changes the

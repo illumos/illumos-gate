@@ -67,11 +67,13 @@
 #include "functions.h"
 #include "variables.h"
 
+static struct sockaddr sinzero = { AF_INET, 0 };
+
 void
 state_machine(struct np_event *e)
 {
 	struct interface *evif;
-	llp_t *evllp, *prefllp = NULL;
+	llp_t *evllp, *prefllp;
 	uint64_t flags;
 	boolean_t dhcp_restored = B_FALSE;
 
@@ -86,10 +88,11 @@ state_machine(struct np_event *e)
 			break;
 		}
 		flags = get_ifflags(evif->if_name, evif->if_family);
-		if ((flags & IFF_DHCPRUNNING) == 0 || (flags & IFF_UP) != 0) {
+		if ((flags & IFF_DHCPRUNNING) == 0 || ((flags & IFF_UP) &&
+		    !cmpsockaddr(evif->if_ipaddr, &sinzero))) {
 			/*
-			 * dhcp did come up successfully, or we're no
-			 * longer trying to do dhcp in this interface;
+			 * Either DHCP came up successfully, or we're no
+			 * longer trying to do DHCP on this interface;
 			 * so no need to worry about the timer expiring.
 			 */
 			dprintf("timer popped for %s, but dhcp state is okay "
@@ -104,10 +107,8 @@ state_machine(struct np_event *e)
 		dprintf("giving up on dhcp on %s (ifflags 0x%llx)",
 		    evif->if_name, flags);
 		evif->if_lflags |= IF_DHCPFAILED;
-		if (interface_is_active(evif)) {
-			prefllp = llp_best_avail();
-			llp_swap(prefllp);
-		}
+		if (interface_is_active(evif))
+			llp_swap(llp_best_avail());
 
 		break;
 
@@ -138,10 +139,29 @@ state_machine(struct np_event *e)
 			    (void *)evif, (void *)evllp, STRING(e->npe_name));
 			break;
 		}
-		flags = get_ifflags(evif->if_name, evif->if_family);
-		if (!(flags & IFF_DHCPRUNNING) && !(flags & IFF_UP) &&
-		    evllp->llp_ipv4src == IPV4SRC_DHCP) {
+		if (evllp->llp_ipv4src == IPV4SRC_DHCP) {
+			flags = get_ifflags(evif->if_name, evif->if_family);
+			if (!(flags & IFF_DHCPRUNNING) || !(flags & IFF_UP) ||
+			    cmpsockaddr(evif->if_ipaddr, &sinzero)) {
+				/*
+				 * We don't have a DHCP lease.  If we used to
+				 * have one, then switch to another profile.
+				 */
+				if ((evif->if_lflags & IF_DHCPACQUIRED) != 0) {
+					evif->if_lflags &= ~IF_DHCPACQUIRED;
+					evif->if_lflags |= IF_DHCPFAILED;
+					if (interface_is_active(evif))
+						llp_swap(llp_best_avail());
+				}
+				break;
+			}
+
+			/*
+			 * We have a DHCP lease.  If we'd previously failed
+			 * to get one, record that DHCP has been restored.
+			 */
 			evif->if_timer_expire = 0;
+			evif->if_lflags |= IF_DHCPACQUIRED;
 			if ((evif->if_lflags & IF_DHCPFAILED) != 0) {
 				evif->if_lflags &= ~IF_DHCPFAILED;
 				dhcp_restored = B_TRUE;
@@ -160,8 +180,7 @@ state_machine(struct np_event *e)
 				    "taking down %s", evllp->llp_lname,
 				    llp_prnm(link_layer_profile),
 				    evllp->llp_lname);
-				takedowninterface(evllp->llp_lname,
-				    evllp->llp_ipv4src == IPV4SRC_DHCP, B_FALSE,
+				takedowninterface(evllp->llp_lname, B_FALSE,
 				    evllp->llp_ipv6onlink);
 				break;
 			}
@@ -200,8 +219,7 @@ cleanup(void)
 {
 	if (link_layer_profile != NULL) {
 		deactivate_upper_layer_profile();
-		takedowninterface(link_layer_profile->llp_lname,
-		    link_layer_profile->llp_ipv4src == IPV4SRC_DHCP, B_FALSE,
+		takedowninterface(link_layer_profile->llp_lname, B_FALSE,
 		    link_layer_profile->llp_ipv6onlink);
 	}
 	/*
