@@ -217,6 +217,16 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 	fuid_domain_t searchnode, *findnode;
 	avl_index_t loc;
 
+	/*
+	 * If the dummy "nobody" domain then return an index of 0
+	 * to cause the created FUID to be a standard POSIX id
+	 * for the user nobody.
+	 */
+	if (domain[0] == '\0') {
+		*retdomain = "";
+		return (0);
+	}
+
 	searchnode.f_ksid = ksid_lookupdomain(domain);
 	if (retdomain) {
 		*retdomain = searchnode.f_ksid->kd_name;
@@ -482,13 +492,7 @@ zfs_fuid_node_add(zfs_fuid_info_t **fuidpp, const char *domain, uint32_t rid,
 }
 
 /*
- * Create a file system FUID
- *
- * During a replay operation the id will be incorrect and
- * will be ignored.  In this case replay must be true and the
- * cred will have a ksid_t attached to it.
- *
- * A mapped uid/gid would have a ksid_t attached to the cred.
+ * Create a file system FUID, based on information in the users cred
  */
 uint64_t
 zfs_fuid_create_cred(zfsvfs_t *zfsvfs, uint64_t id,
@@ -525,6 +529,10 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, uint64_t id,
  * we can't find the domain + rid information in the
  * cred.  Instead we have to query Winchester for the
  * domain and rid.
+ *
+ * During replay operations the domain+rid information is
+ * found in the zfs_fuid_info_t that the replay code has
+ * attached to the zfsvfs of the file system.
  */
 uint64_t
 zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id,
@@ -582,8 +590,15 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id,
 		else
 			status = kidmap_getsidbygid(id, &domain, &rid);
 
-		if (status != 0)
-			return (UID_NOBODY);
+		if (status != 0) {
+			/*
+			 * When returning nobody we will need to
+			 * make a dummy fuid table entry for logging
+			 * purposes.
+			 */
+			rid = UID_NOBODY;
+			domain = "";
+		}
 
 	}
 
@@ -719,6 +734,5 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	 * Not found in ksidlist, check posix groups
 	 */
 	zfs_fuid_map_id(zfsvfs, id, ZFS_GROUP, &gid);
-
 	return (groupmember(gid, cr));
 }

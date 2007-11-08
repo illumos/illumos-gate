@@ -255,7 +255,7 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 		aclsize = (vsecp) ? vsecp->vsa_aclentsz : 0;
 		txsize =
 		    sizeof (lr_acl_create_t) + namesize + fuidsz +
-		    aclsize + xvatsize;
+		    ZIL_ACE_LENGTH(aclsize) + xvatsize;
 		lrsize = sizeof (lr_acl_create_t);
 	}
 
@@ -304,7 +304,7 @@ zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, uint64_t txtype,
 			lracl->lr_acl_flags = 0;
 
 		bcopy(vsecp->vsa_aclentp, end, aclsize);
-		end = (caddr_t)end + aclsize;
+		end = (caddr_t)end + ZIL_ACE_LENGTH(aclsize);
 	}
 
 	/* drop in FUID info */
@@ -648,7 +648,9 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, znode_t *zp,
 	if (zilog == NULL || zp->z_unlinked)
 		return;
 
-	txsize = lrsize + aclbytes + (fuidp ? fuidp->z_domain_str_sz : 0) +
+	txsize = lrsize +
+	    ((txtype == TX_ACL) ? ZIL_ACE_LENGTH(aclbytes) : aclbytes) +
+	    (fuidp ? fuidp->z_domain_str_sz : 0) +
 	    sizeof (uint64) * (fuidp ? fuidp->z_fuid_cnt : 0);
 
 	itx = zil_itx_create(txtype, txsize);
@@ -674,7 +676,7 @@ zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, znode_t *zp,
 
 		bcopy(vsecp->vsa_aclentp, start, aclbytes);
 
-		start = (caddr_t)start + aclbytes;
+		start = (caddr_t)start + ZIL_ACE_LENGTH(aclbytes);
 
 		if (fuidp) {
 			start = zfs_log_fuid_ids(fuidp, start);

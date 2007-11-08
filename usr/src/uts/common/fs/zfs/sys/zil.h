@@ -105,6 +105,14 @@ typedef enum zil_create {
 #define	ZIL_XVAT_SIZE(mapsize) \
 	sizeof (lr_attr_t) + (sizeof (uint32_t) * (mapsize - 1)) + \
 	(sizeof (uint64_t) * 7)
+
+/*
+ * Size of ACL in log.  The ACE data is padded out to properly align
+ * on 8 byte boundary.
+ */
+
+#define	ZIL_ACE_LENGTH(x)	(roundup(x, sizeof (uint64_t)))
+
 /*
  * Intent log transaction types and record structures
  */

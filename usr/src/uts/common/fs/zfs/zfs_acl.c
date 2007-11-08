@@ -1365,7 +1365,7 @@ static void
 zfs_acl_split_ace(zfs_acl_t *aclp, zfs_ace_hdr_t *acep)
 {
 	zfs_acl_node_t *aclnode;
-	zfs_acl_node_t *currnode = zfs_acl_curr_node(aclp);
+	zfs_acl_node_t *currnode;
 	void  *newacep;
 	uint16_t type, flags;
 	uint32_t mask;
@@ -1387,6 +1387,8 @@ zfs_acl_split_ace(zfs_acl_t *aclp, zfs_ace_hdr_t *acep)
 	aclp->z_next_ace = acep;
 	flags &= ~ALL_INHERIT;
 	aclp->z_ops.ace_flags_set(acep, flags);
+	currnode = zfs_acl_curr_node(aclp);
+	ASSERT(currnode->z_ace_idx >= 1);
 	currnode->z_ace_idx -= 1;
 }
 
