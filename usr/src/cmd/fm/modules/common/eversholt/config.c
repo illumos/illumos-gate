@@ -53,21 +53,9 @@
 #include "ptree.h"
 #include "eval.h"
 #include "config.h"
+#include "config_impl.h"
 #include "fme.h"
 #include "platform.h"
-
-/*
- * private data structure for storing config.  all access to
- * to this information happens using the config.h interfaces.
- */
-struct config {
-	struct config *next;
-	struct config *child;
-	struct config *parent;
-	const char *s;
-	int num;
-	struct lut *props;
-};
 
 static const char *config_lastcomp;
 

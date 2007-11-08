@@ -27,6 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
+#include <limits.h>
 
 #include <fmd_trace.h>
 #include <fmd_module.h>
@@ -60,6 +61,9 @@ typedef struct hashwalk_data {
 	size_t hw_size;
 	size_t hw_next;
 } hashwalk_data_t;
+
+static int fmd_stat(uintptr_t, uint_t, int, const mdb_arg_t *);
+static int fmd_ustat(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 static int
 trwalk_init(mdb_walk_state_t *wsp)
@@ -402,11 +406,42 @@ ustat_walk_step(mdb_walk_state_t *wsp)
 	    (uintptr_t)ue.use_stat, &s, wsp->walk_cbdata));
 }
 
+struct fmd_cmd_data {
+	int argc;
+	const mdb_arg_t *argv;
+};
+
+/* ARGSUSED */
+static int
+module_ustat(uintptr_t addr, const void *data, void *wsp)
+{
+	fmd_module_t *modp = (fmd_module_t *)data;
+	char name[PATH_MAX];
+	const struct fmd_cmd_data *udp = wsp;
+
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)modp->mod_name) <= 0)
+		(void) mdb_snprintf(name, sizeof (name), "<%p>",
+		    modp->mod_name);
+	mdb_printf("%s\n", name);
+	(void) fmd_ustat((uintptr_t)modp->mod_ustat,
+	    DCMD_ADDRSPEC | DCMD_LOOPFIRST, udp->argc, udp->argv);
+	return (WALK_NEXT);
+}
+
 static int
 fmd_ustat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	if (!(flags & DCMD_ADDRSPEC))
-		return (DCMD_USAGE);
+	if (!(flags & DCMD_ADDRSPEC)) {
+		struct fmd_cmd_data ud;
+
+		ud.argc = argc;
+		ud.argv = argv;
+		if (mdb_walk("fmd_module", module_ustat, &ud) == -1) {
+			mdb_warn("failed to walk 'fmd_module'");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
 
 	if (mdb_pwalk_dcmd("fmd_ustat", "fmd_stat", argc, argv, addr) != 0) {
 		mdb_warn("failed to walk fmd_ustat at %p", addr);
@@ -416,6 +451,66 @@ fmd_ustat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/* ARGSUSED */
+static int
+module_stat(uintptr_t addr, const void *data, void *wsp)
+{
+	fmd_module_t *modp = (fmd_module_t *)data;
+	char name[PATH_MAX];
+	const struct fmd_cmd_data *udp = wsp;
+	fmd_modstat_t *mod_stats;
+
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)modp->mod_name) <= 0) {
+		(void) mdb_snprintf(name, sizeof (name), "<%p>",
+		    modp->mod_name);
+	}
+	mdb_printf("%s\n", name);
+	mod_stats = modp->mod_stats;
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_loadtime,
+	    DCMD_ADDRSPEC | DCMD_LOOPFIRST, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_snaptime,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_accepted,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_debugdrop,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_memtotal,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_memlimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_buftotal,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_buflimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_thrtotal,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_thrlimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_caseopen,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_casesolved,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_caseclosed,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_ckpt_save,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_ckpt_restore,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_ckpt_zeroed,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_ckpt_cnt,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_ckpt_time,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_xprtopen,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_xprtlimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	(void) fmd_stat((uintptr_t)&mod_stats->ms_xprtqlimit,
+	    DCMD_ADDRSPEC | DCMD_LOOP, udp->argc, udp->argv);
+	return (WALK_NEXT);
+}
+
 /*ARGSUSED*/
 static int
 fmd_stat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -423,12 +518,25 @@ fmd_stat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char buf[512];
 	fmd_stat_t s;
 
-	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
+	if (argc != 0)
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags))
 		mdb_printf("%<u>%-11s %-4s %-32s %s%</u>\n",
 		    "ADDR", "TYPE", "NAME", "VALUE");
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		struct fmd_cmd_data ud;
+
+		ud.argc = argc;
+		ud.argv = argv;
+
+		if (mdb_walk("fmd_module", module_stat, &ud) == -1) {
+			mdb_warn("failed to walk 'fmd_module'");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
 
 	if (mdb_vread(&s, sizeof (s), addr) != sizeof (s)) {
 		mdb_warn("failed to read statistic at %p", addr);
@@ -646,7 +754,7 @@ static int
 fmd_module(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	fmd_module_t mod;
-	char name[256];
+	char name[PATH_MAX];
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (mdb_walk_dcmd("fmd_module", "fmd_module", argc, argv));
@@ -800,7 +908,7 @@ buf_walk_init(mdb_walk_state_t *wsp)
 static int
 fmd_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	char name[256];
+	char name[PATH_MAX];
 	fmd_buf_t b;
 
 	if (argc != 0 || !(flags & DCMD_ADDRSPEC))
@@ -840,15 +948,36 @@ serd_walk_init(mdb_walk_state_t *wsp)
 	    OFFSETOF(fmd_serd_eng_t, sg_next)));
 }
 
+/* ARGSUSED */
+static int
+module_serd(uintptr_t addr, const void *data, void *wsp)
+{
+	fmd_module_t *modp = (fmd_module_t *)data;
+
+	if (modp->mod_serds.sh_count != 0) {
+		modp = (fmd_module_t *)addr;
+		(void) mdb_pwalk_dcmd("fmd_serd", "fmd_serd", 0, 0,
+		    (uintptr_t)&modp->mod_serds);
+	}
+	return (WALK_NEXT);
+}
+
 /*ARGSUSED*/
 static int
 fmd_serd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	char name[256];
+	char name[PATH_MAX];
 	fmd_serd_eng_t sg;
 
-	if (argc != 0 || !(flags & DCMD_ADDRSPEC))
+	if (argc != 0)
 		return (DCMD_USAGE);
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk("fmd_module", module_serd, 0) == -1) {
+			mdb_warn("failed to walk 'fmd_module'");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
 
 	if (mdb_vread(&sg, sizeof (sg), addr) != sizeof (sg)) {
 		mdb_warn("failed to read fmd_serd_eng at %p", addr);
@@ -896,7 +1025,7 @@ asru_walk_init(mdb_walk_state_t *wsp)
 static int
 fmd_asru(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	char uuid[48], name[256];
+	char uuid[48], name[PATH_MAX];
 	fmd_asru_t a;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
@@ -1384,14 +1513,14 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "fcf_sec", ":", "print a FCF section header", fcf_sec },
 	{ "fcf_serd", "?", "print a FCF serd engine", fcf_serd },
 	{ "fmd_trace", "?[-cs]", "display thread trace buffer(s)", fmd_trace },
-	{ "fmd_ustat", ":", "display statistics collection", fmd_ustat },
-	{ "fmd_stat", ":", "display statistic structure", fmd_stat },
+	{ "fmd_ustat", "[:]", "display statistics collection", fmd_ustat },
+	{ "fmd_stat", "[:]", "display statistic structure", fmd_stat },
 	{ "fmd_event", NULL, "display event structure", fmd_event },
 	{ "fmd_thread", "?", "display thread or list of threads", fmd_thread },
 	{ "fmd_module", "?", "display module or list of modules", fmd_module },
 	{ "fmd_case", ":", "display case file structure", fmd_case },
 	{ "fmd_buf", ":", "display buffer structure", fmd_buf },
-	{ "fmd_serd", ":", "display serd engine structure", fmd_serd },
+	{ "fmd_serd", "[:]", "display serd engine structure", fmd_serd },
 	{ "fmd_asru", "?", "display asru resource structure", fmd_asru },
 	{ "fmd_timer", "?", "display pending timer(s)", fmd_timer },
 	{ "fmd_xprt", "?[-lrsu]", "display event transport(s)", fmd_xprt },

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * stats.c -- simple stats tracking table module
@@ -36,22 +35,10 @@
 #include "stats.h"
 #include "alloc.h"
 #include "out.h"
+#include "stats_impl.h"
 #include <fm/fmd_api.h>
 
 extern fmd_hdl_t *Hdl;		/* handle from eft.c */
-
-struct stats {
-	fmd_stat_t fmd_stats;
-	enum stats_type {
-		STATS_COUNTER = 3000,
-		STATS_ELAPSE,
-		STATS_STRING
-	} t;
-
-	/* used for STATS_ELAPSE */
-	hrtime_t start;
-	hrtime_t stop;
-};
 
 static int Ext;			/* true if extended stats are enabled */
 

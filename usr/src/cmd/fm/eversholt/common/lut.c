@@ -38,16 +38,8 @@
 #include "out.h"
 #include "stats.h"
 #include "lut.h"
+#include "lut_impl.h"
 #include "tree.h"
-
-/* info created by lut_add(), private to this module */
-struct lut {
-	struct lut *lut_left;
-	struct lut *lut_right;
-	struct lut *lut_parent;
-	void *lut_lhs;		/* search key */
-	void *lut_rhs;		/* the datum */
-};
 
 static struct stats *Addtotal;
 static struct stats *Lookuptotal;

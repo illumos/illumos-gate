@@ -39,18 +39,13 @@
 #include "ptree.h"
 #include "itree.h"
 #include "ipath.h"
+#include "ipath_impl.h"
 #include "stats.h"
 #include "eval.h"
 #include "config.h"
 
 static struct stats *Nipath;
 static struct stats *Nbytes;
-
-/* an ipath cache entry is an array of these, with s==NULL at the end */
-struct ipath {
-	const char *s;	/* component name (in stable) */
-	int i;		/* instance number */
-};
 
 static struct lut *Ipaths;	/* the ipath cache itself */
 

@@ -256,14 +256,14 @@ extern "C" {
 	EMASK_FBD_M11|EMASK_FBD_M10|EMASK_FBD_M9|EMASK_FBD_M8|EMASK_FBD_M7| \
 	EMASK_FBD_M6|EMASK_FBD_M5|EMASK_FBD_M4)
 
-#define	ERR_FAT_INT_B8	0x10	/* B8Msk SF Coherency Error for BIL */
+#define	ERR_FAT_INT_B7	0x10	/* B7Msk Multiple ECC error in any of */
+					/* the ways during SF lookup */
 #define	ERR_FAT_INT_B4	0x08	/* B4Msk Virtual pin port error */
 #define	ERR_FAT_INT_B3	0x04	/* B3Msk Coherency violation error for EWB */
 #define	ERR_FAT_INT_B2	0x02	/* B2Msk Multi-tag hit SF */
 #define	ERR_FAT_INT_B1	0x01	/* B1Msk DM parity error */
 
-#define	ERR_NF_INT_B7	0x04	/* B7Msk Multiple ECC error in any of */
-					/* the ways during SF lookup */
+#define	ERR_NF_INT_B8	0x04	/* B8Msk SF Coherency Error for BIL */
 #define	ERR_NF_INT_B6	0x02	/* B6Msk Single ECC error on SF lookup */
 #define	ERR_NF_INT_B5	0x01	/* B5Msk Address Map error */
 
@@ -360,10 +360,14 @@ extern "C" {
 	-1)
 
 #define	GE_NERR_TO_FERR_FSB(nerr) \
-	(((nerr) & GE_NERR_FSB3_FATAL) ? GE_FERR_FSB3_FATAL : 0 | \
-	((nerr) & GE_NERR_FSB2_FATAL) ? GE_FERR_FSB2_FATAL : 0  | \
-	((nerr) & GE_NERR_FSB3_NF) ? GE_FERR_FBD3_NF : 0  | \
-	((nerr) & GE_NERR_FSB2_NF) ? GE_FERR_FBD2_NF : 0)
+	((((nerr) & GE_NERR_FSB3_FATAL) ? GE_FERR_FSB3_FATAL : 0) | \
+	(((nerr) & GE_NERR_FSB2_FATAL) ? GE_FERR_FSB2_FATAL : 0) | \
+	(((nerr) & GE_FSB1_FATAL) ? GE_FSB1_FATAL : 0) | \
+	(((nerr) & GE_FSB0_FATAL) ? GE_FSB0_FATAL : 0) | \
+	(((nerr) & GE_NERR_FSB3_NF) ? GE_FERR_FSB3_NF : 0) | \
+	(((nerr) & GE_NERR_FSB2_NF) ? GE_FERR_FSB2_NF : 0) | \
+	(((nerr) & GE_FSB1_NF) ? GE_FSB1_NF : 0) | \
+	(((nerr) & GE_FSB0_NF) ? GE_FSB0_NF : 0))
 
 #define	GE_ERR_PEX(ferr) ( \
 	((ferr) & (GE_ESI_FATAL|GE_ESI_NF)) ? 0 : \
@@ -408,10 +412,10 @@ extern "C" {
 	(GE_FSB0_FATAL|GE_FSB1_FATAL))
 #define	GE_FERR_FSB_NF	((nb_chipset == INTEL_NB_7300) ? \
 	(GE_FSB0_NF|GE_FSB1_NF|GE_FERR_FSB2_NF|GE_FERR_FSB3_NF) : \
-	(GE_FSB0_NF|GE_FSB1_NF|GE_FERR_FSB2_NF|GE_FERR_FSB3_NF))
+	(GE_FSB0_NF|GE_FSB1_NF))
 #define	GE_NERR_FSB_NF	((nb_chipset == INTEL_NB_7300) ? \
 	(GE_FSB0_NF|GE_FSB1_NF|GE_NERR_FSB2_NF|GE_NERR_FSB3_NF) : \
-	(GE_FSB0_NF|GE_FSB1_NF|GE_NERR_FSB2_NF|GE_NERR_FSB3_NF))
+	(GE_FSB0_NF|GE_FSB1_NF))
 
 #define	FERR_FBD_CHANNEL(reg)	((reg)>>28 & 3)
 
@@ -592,7 +596,7 @@ extern "C" {
 #define	MCERR_FBD_WR(val)	nb_pci_putl(0, 16, 1, 0xb8, val)
 
 #define	NRECMEMA_RD()	nb_pci_getw(0, 16, 1, 0xbe, 0)
-#define	NRECMEMB_RD()	nb_pci_getw(0, 16, 1, 0xc0, 0)
+#define	NRECMEMB_RD()	nb_pci_getl(0, 16, 1, 0xc0, 0)
 #define	NRECFGLOG_RD()	nb_pci_getl(0, 16, 1, 0xc4, 0)
 #define	NRECFBDA_RD()	nb_pci_getl(0, 16, 1, 0xc8, 0)
 #define	NRECFBDB_RD()	nb_pci_getl(0, 16, 1, 0xcc, 0)
@@ -609,7 +613,7 @@ extern "C" {
 #define	RECFBDD_RD()	nb_pci_getl(0, 16, 1, 0xf8, 0)
 #define	RECFBDE_RD()	nb_pci_getl(0, 16, 1, 0xfc, 0)
 #define	NRECMEMA_WR()	nb_pci_putw(0, 16, 1, 0xbe, 0)
-#define	NRECMEMB_WR()	nb_pci_putw(0, 16, 1, 0xc0, 0)
+#define	NRECMEMB_WR()	nb_pci_putl(0, 16, 1, 0xc0, 0)
 #define	NRECFGLOG_WR()	nb_pci_putl(0, 16, 1, 0xc4, 0)
 #define	NRECFBDA_WR()	nb_pci_putl(0, 16, 1, 0xc8, 0)
 #define	NRECFBDB_WR()	nb_pci_putl(0, 16, 1, 0xcc, 0)

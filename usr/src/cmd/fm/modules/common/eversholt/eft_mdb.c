@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,16 +30,13 @@
 
 #include <lut.h>
 #include <itree.h>
+#include "ipath_impl.h"
+#include "lut_impl.h"
+#include "config_impl.h"
+#include "stats_impl.h"
 
 #define	LUT_SIZE_INIT	300
 #define	LUT_SIZE_INCR	100
-
-struct lut {
-	struct lut *lut_left;
-	struct lut *lut_right;
-	uintptr_t lut_lhs;		/* search key */
-	uintptr_t lut_rhs;		/* the datum */
-};
 
 struct lut_cp {
 	uintptr_t lutcp_addr;
@@ -168,6 +165,56 @@ lut_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata));
 }
 
+static int
+ipath_walk_init(mdb_walk_state_t *wsp)
+{
+	struct ipath *ipath;
+
+	ipath = mdb_alloc(sizeof (struct ipath), UM_SLEEP);
+
+	if (mdb_vread((void *)ipath, sizeof (struct ipath),
+	    wsp->walk_addr) != sizeof (struct ipath)) {
+		mdb_warn("failed to read struct ipath at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	wsp->walk_data = (void *)ipath;
+
+	if (ipath->s == NULL)
+		return (WALK_DONE);
+	else
+		return (WALK_NEXT);
+}
+
+static void
+ipath_walk_fini(mdb_walk_state_t *wsp)
+{
+	mdb_free(wsp->walk_data, sizeof (struct ipath));
+}
+
+static int
+ipath_walk_step(mdb_walk_state_t *wsp)
+{
+	int status;
+	struct ipath *ipath = (struct ipath *)wsp->walk_data;
+	struct ipath *ip = (struct ipath *)wsp->walk_addr;
+
+	if (ip == NULL || ipath->s == NULL)
+		return (WALK_DONE);
+
+	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
+	    wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)(ip + 1);
+
+	if (mdb_vread(wsp->walk_data, sizeof (struct ipath),
+	    wsp->walk_addr) != sizeof (struct ipath)) {
+		mdb_warn("failed to read struct ipath at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (status);
+}
+
 static void
 lut_walk_fini(mdb_walk_state_t *wsp)
 {
@@ -177,13 +224,603 @@ lut_walk_fini(mdb_walk_state_t *wsp)
 	mdb_free(lddp, sizeof (struct lut_dump_desc));
 }
 
+/*ARGSUSED*/
+static int
+ipath_node(uintptr_t addr, const void *data, void *arg)
+{
+	struct ipath *ipath = (struct ipath *)data;
+	char buf[128];
+
+	mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)ipath->s);
+	buf[sizeof (buf) - 1] = 0;
+	mdb_printf("/%s=%d", buf, ipath->i);
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+ipath(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	if (argc)
+		return (DCMD_USAGE);
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = mdb_get_dot();
+	if (mdb_pwalk("eft_ipath", ipath_node, NULL, addr) != 0)
+		return (DCMD_ERR);
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+eft_count(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct lut lut;
+	struct istat_entry istat_entry;
+	struct stats count;
+	GElf_Sym sym;
+	char buf[128];
+
+	if (argc)
+		return (DCMD_USAGE);
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_lookup_by_obj(MDB_OBJ_EVERY, "Istats", &sym) == -1 ||
+		    sym.st_size != sizeof (addr))
+			return (DCMD_ERR);
+		if (mdb_vread(&addr, sizeof (addr),
+		    (uintptr_t)sym.st_value) != sizeof (addr))
+			return (DCMD_ERR);
+		if (addr == NULL)
+			return (DCMD_OK);
+		if (mdb_pwalk_dcmd("lut", "eft_count", argc, argv, addr) != 0)
+			return (DCMD_ERR);
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&lut, sizeof (struct lut), addr) != sizeof (struct lut)) {
+		mdb_warn("failed to read struct lut at %p", addr);
+		return (DCMD_ERR);
+	}
+	if (mdb_vread(&istat_entry, sizeof (struct istat_entry),
+	    (uintptr_t)lut.lut_lhs) != sizeof (struct istat_entry)) {
+		mdb_warn("failed to read struct istat_entry at %p", addr);
+		return (DCMD_ERR);
+	}
+	if (mdb_vread(&count, sizeof (struct stats),
+	    (uintptr_t)lut.lut_rhs) != sizeof (struct stats)) {
+		mdb_warn("failed to read struct stats at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)istat_entry.ename);
+	buf[sizeof (buf) - 1] = 0;
+	mdb_printf("%s@", buf);
+	(void) ipath((uintptr_t)istat_entry.ipath, DCMD_ADDRSPEC, 0, NULL);
+	mdb_printf(" %d\n", count.fmd_stats.fmds_value.i32);
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+eft_time(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	unsigned long long val;
+	unsigned long long ull;
+	int opt_p = 0;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = mdb_get_dot();
+	ull = addr;
+	if (argc) {
+		if (mdb_getopts(argc, argv,
+		    'l', MDB_OPT_UINT64, &ull,
+		    'p', MDB_OPT_SETBITS, TRUE, &opt_p,
+		    MDB_OPT_UINT64) != argc) {
+			return (DCMD_USAGE);
+		}
+	}
+	if (opt_p) {
+		if (mdb_vread(&ull, sizeof (ull), addr) != sizeof (ull)) {
+			mdb_warn("failed to read timeval at %p", addr);
+			return (DCMD_ERR);
+		}
+	}
+#define	NOREMAINDER(den, num, val) (((val) = ((den) / (num))) * (num) == (den))
+	if (ull == 0)
+		mdb_printf("0us");
+	else if (ull >= TIMEVAL_EVENTUALLY)
+		mdb_printf("infinity");
+	else if (NOREMAINDER(ull, 1000000000ULL*60*60*24*365, val))
+		mdb_printf("%lluyear%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL*60*60*24*30, val))
+		mdb_printf("%llumonth%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL*60*60*24*7, val))
+		mdb_printf("%lluweek%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL*60*60*24, val))
+		mdb_printf("%lluday%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL*60*60, val))
+		mdb_printf("%lluhour%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL*60, val))
+		mdb_printf("%lluminute%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000000ULL, val))
+		mdb_printf("%llusecond%s", val, (val == 1) ? "" : "s");
+	else if (NOREMAINDER(ull, 1000000ULL, val))
+		mdb_printf("%llums", val);
+	else if (NOREMAINDER(ull, 1000ULL, val))
+		mdb_printf("%lluus", val);
+	else
+		mdb_printf("%lluns", ull);
+
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+static int
+eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct node node;
+	int opt_v = 0;
+	char buf[128];
+
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = mdb_get_dot();
+	if (argc) {
+		if (mdb_getopts(argc, argv,
+		    'v', MDB_OPT_SETBITS, TRUE, &opt_v,
+		    NULL) != argc) {
+			return (DCMD_USAGE);
+		}
+	}
+	if (addr == NULL)
+		return (DCMD_OK);
+	if (mdb_vread(&node, sizeof (node), addr) != sizeof (node)) {
+		mdb_warn("failed to read struct node at %p", addr);
+		return (DCMD_ERR);
+	}
+	if (opt_v) {
+		mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)node.file);
+		buf[sizeof (buf) - 1] = 0;
+		mdb_printf("%s len %d\n", buf, node.line);
+	}
+	switch (node.t) {
+	case T_NOTHING:			/* used to keep going on error cases */
+		mdb_printf("nothing");
+		break;
+	case T_NAME:			/* identifiers, sometimes chained */
+		mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.name.s);
+		buf[sizeof (buf) - 1] = 0;
+		mdb_printf("%s", buf);
+		if (node.u.name.cp) {
+			struct config cp;
+			if (mdb_vread(&cp, sizeof (cp),
+			    (uintptr_t)node.u.name.cp) != sizeof (cp)) {
+				mdb_warn("failed to read struct config at %p",
+				    node.u.name.cp);
+				return (DCMD_ERR);
+			}
+			mdb_printf("%d", cp.num);
+		} else if (node.u.name.it == IT_HORIZONTAL) {
+			if (node.u.name.child && !node.u.name.childgen) {
+				mdb_printf("<");
+				(void) eft_node((uintptr_t)node.u.name.child,
+				    DCMD_ADDRSPEC, 0, NULL);
+				mdb_printf(">");
+			} else {
+				mdb_printf("<> ");
+			}
+		} else if (node.u.name.child) {
+			mdb_printf("[");
+			(void) eft_node((uintptr_t)node.u.name.child,
+			    DCMD_ADDRSPEC, 0, NULL);
+			mdb_printf("]");
+		}
+		if (node.u.name.next) {
+			if (node.u.name.it == IT_ENAME)
+				mdb_printf(".");
+			else
+				mdb_printf("/");
+			(void) eft_node((uintptr_t)node.u.name.next,
+			    DCMD_ADDRSPEC, 0, NULL);
+		}
+		break;
+	case T_GLOBID:			/* globals (e.g. $a) */
+		mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.globid.s);
+		buf[sizeof (buf) - 1] = 0;
+		mdb_printf("$%s", buf);
+		break;
+	case T_EVENT:			/* class@path{expr} */
+		(void) eft_node((uintptr_t)node.u.event.ename, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf("@");
+		(void) eft_node((uintptr_t)node.u.event.epname, DCMD_ADDRSPEC,
+		    0, NULL);
+		if (node.u.event.eexprlist) {
+			mdb_printf(" { ");
+			(void) eft_node((uintptr_t)node.u.event.eexprlist,
+			    DCMD_ADDRSPEC, 0, NULL);
+			mdb_printf(" }");
+		}
+		break;
+	case T_ENGINE:			/* upset threshold engine (e.g. SERD) */
+		mdb_printf("engine ");
+		(void) eft_node((uintptr_t)node.u.event.ename, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_ASRU:			/* ASRU declaration */
+		mdb_printf("asru ");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_FRU:			/* FRU declaration */
+		mdb_printf("fru ");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_TIMEVAL:			/* num w/time suffix (ns internally) */
+		{
+			mdb_arg_t mdb_arg[2];
+			mdb_arg[0].a_type = MDB_TYPE_STRING;
+			mdb_arg[0].a_un.a_str = "-l";
+			mdb_arg[1].a_type = MDB_TYPE_IMMEDIATE;
+			mdb_arg[1].a_un.a_val = node.u.ull;
+			(void) eft_time((uintptr_t)0, 0, 2, mdb_arg);
+			break;
+		}
+	case T_NUM:			/* num (ull internally) */
+		mdb_printf("%llu", node.u.ull);
+		break;
+	case T_QUOTE:			/* quoted string */
+		mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.quote.s);
+		buf[sizeof (buf) - 1] = 0;
+		mdb_printf("\"%s\"", buf);
+		break;
+	case T_FUNC:			/* func(arglist) */
+		mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.func.s);
+		buf[sizeof (buf) - 1] = 0;
+		mdb_printf("%s(", buf);
+		(void) eft_node((uintptr_t)node.u.func.arglist, DCMD_ADDRSPEC,
+		    0, NULL);
+		mdb_printf(")");
+		break;
+	case T_NVPAIR:			/* name=value pair in decl */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" = ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_ASSIGN:			/* assignment statement */
+		mdb_printf("(");
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" = ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(")");
+		break;
+	case T_CONDIF:			/* a and T_CONDELSE in (a ? b : c ) */
+		mdb_printf("(");
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" ? ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(")");
+		break;
+	case T_CONDELSE:		/* lists b and c in (a ? b : c ) */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" : ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_NOT:			/* boolean ! operator */
+		mdb_printf("!");
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_AND:			/* boolean && operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" && ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_OR:			/* boolean || operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" || ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_EQ:			/* boolean == operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" == ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_NE:			/* boolean != operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" != ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_SUB:			/* integer - operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" - ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_ADD:			/* integer + operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" + ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_MUL:			/* integer * operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" * ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_DIV:			/* integer / operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" / ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_MOD:			/* integer % operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" % ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_LT:			/* boolean < operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" < ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_LE:			/* boolean <= operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" <= ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_GT:			/* boolean > operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" > ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_GE:			/* boolean >= operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" >= ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_BITAND:			/* bitwise & operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" & ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_BITOR:			/* bitwise | operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" | ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_BITXOR:			/* bitwise ^ operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" ^ ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_BITNOT:			/* bitwise ~ operator */
+		mdb_printf(" ~");
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_LSHIFT:			/* bitwise << operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" << ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_RSHIFT:			/* bitwise >> operator */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(" >> ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_ARROW:			/* lhs (N)->(K) rhs */
+		(void) eft_node((uintptr_t)node.u.arrow.lhs, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.arrow.nnp) {
+			mdb_printf("(");
+			(void) eft_node((uintptr_t)node.u.arrow.nnp,
+			    DCMD_ADDRSPEC, 0, NULL);
+			mdb_printf(")");
+		}
+		mdb_printf("->");
+		if (node.u.arrow.knp) {
+			mdb_printf("(");
+			(void) eft_node((uintptr_t)node.u.arrow.knp,
+			    DCMD_ADDRSPEC, 0, NULL);
+			mdb_printf(")");
+		}
+		(void) eft_node((uintptr_t)node.u.arrow.rhs, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_LIST:			/* comma-separated list */
+		(void) eft_node((uintptr_t)node.u.expr.left, DCMD_ADDRSPEC, 0,
+		    NULL);
+		mdb_printf(", ");
+		(void) eft_node((uintptr_t)node.u.expr.right, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_FAULT:			/* fault declaration */
+		mdb_printf("fault.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_UPSET:			/* upset declaration */
+		mdb_printf("upset.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_DEFECT:			/* defect declaration */
+		mdb_printf("defect.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_ERROR:			/* error declaration */
+		mdb_printf("error.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_EREPORT:			/* ereport declaration */
+		mdb_printf("ereport.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	case T_SERD:			/* SERD engine declaration */
+		mdb_printf("serd.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		} else if (node.u.stmt.lutp) {
+			if (mdb_pwalk_dcmd("lut", "eft_node", 0, NULL,
+			    (uintptr_t)node.u.stmt.lutp) != 0)
+				return (DCMD_ERR);
+		}
+		break;
+	case T_STAT:			/* STAT engine declaration */
+		mdb_printf("stat.");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		} else if (node.u.stmt.lutp) {
+			if (mdb_pwalk_dcmd("lut", "eft_node", 0, NULL,
+			    (uintptr_t)node.u.stmt.lutp) != 0)
+				return (DCMD_ERR);
+		}
+		break;
+	case T_PROP:			/* prop statement */
+		mdb_printf("prop ");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_MASK:			/* mask statement */
+		mdb_printf("mask ");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		break;
+	case T_CONFIG:			/* config statement */
+		mdb_printf("config ");
+		(void) eft_node((uintptr_t)node.u.stmt.np, DCMD_ADDRSPEC, 0,
+		    NULL);
+		if (node.u.stmt.nvpairs) {
+			mdb_printf(" ");
+			(void) eft_node((uintptr_t)node.u.stmt.nvpairs,
+			    DCMD_ADDRSPEC, 0, NULL);
+
+		}
+		break;
+	default:
+		mdb_printf("not a eversholt node\n");
+		break;
+	}
+	return (DCMD_OK);
+}
+
 static const mdb_walker_t walkers[] = {
 	{ "lut", "walk a lookup table", lut_walk_init, lut_walk_step,
 	    lut_walk_fini, NULL },
+	{ "eft_ipath", "walk ipath", ipath_walk_init, ipath_walk_step,
+	    ipath_walk_fini, NULL },
 	{ NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-static const mdb_modinfo_t modinfo = { MDB_API_VERSION, NULL, walkers };
+static const mdb_dcmd_t dcmds[] = {
+	{ "eft_ipath", "?", "print an ipath", ipath },
+	{ "eft_count", "?", "print eversholt stats", eft_count },
+	{ "eft_node", "?[-v]", "print eversholt node", eft_node },
+	{ "eft_time", "?[-p][-l time]", "print eversholt timeval", eft_time },
+	{ NULL }
+};
+
+static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 
 const mdb_modinfo_t *
 _mdb_init(void)
