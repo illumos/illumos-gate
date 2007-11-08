@@ -61,7 +61,7 @@
 #include <openssl/objects.h>
 #include "ssl_locl.h"
 
-const char *dtls1_version_str="DTLSv1" OPENSSL_VERSION_PTEXT;
+const char dtls1_version_str[]="DTLSv1" OPENSSL_VERSION_PTEXT;
 
 SSL3_ENC_METHOD DTLSv1_enc_data={
     dtls1_enc,
@@ -187,4 +187,24 @@ void dtls1_clear(SSL *s)
 	{
 	ssl3_clear(s);
 	s->version=DTLS1_VERSION;
+	}
+
+/*
+ * As it's impossible to use stream ciphers in "datagram" mode, this
+ * simple filter is designed to disengage them in DTLS. Unfortunately
+ * there is no universal way to identify stream SSL_CIPHER, so we have
+ * to explicitly list their SSL_* codes. Currently RC4 is the only one
+ * available, but if new ones emerge, they will have to be added...
+ */
+SSL_CIPHER *dtls1_get_cipher(unsigned int u)
+	{
+	SSL_CIPHER *ciph = ssl3_get_cipher(u);
+
+	if (ciph != NULL)
+		{
+		if ((ciph->algorithms&SSL_ENC_MASK) == SSL_RC4)
+			return NULL;
+		}
+
+	return ciph;
 	}
