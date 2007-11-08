@@ -216,7 +216,6 @@ static int add_volatile_prop(picl_nodehdl_t nodeh, char *name,
     int (*wrfunc)(ptree_warg_t *, const void *), picl_prophdl_t *propp);
 static int add_string_prop(picl_nodehdl_t node, char *propname, char *propval);
 static int add_void_prop(picl_nodehdl_t node, char *propname);
-static int add_int_prop(picl_nodehdl_t node, char *propname, int val);
 static void add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
     int row, sp_propid_t pp, int *snmp_syserr_p);
 
@@ -319,7 +318,7 @@ snmpplugin_fini(void)
 	(void) mutex_lock(&rebuild_tree_lock);
 	rebuild_tree = B_TRUE;
 	tree_builder_thr_exit = B_TRUE;
-	cond_signal(&rebuild_tree_cv);
+	(void) cond_signal(&rebuild_tree_cv);
 	(void) mutex_unlock(&rebuild_tree_lock);
 
 	/* reap the thread */
@@ -1388,30 +1387,6 @@ add_void_prop(picl_nodehdl_t node, char *propname)
 	return (PICL_SUCCESS);
 }
 
-static int
-add_int_prop(picl_nodehdl_t node, char *propname, int val)
-{
-	ptree_propinfo_t	propinfo;
-	int			propval = val;
-	int			err;
-
-	err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
-	    PICL_PTYPE_INT, PICL_READ, sizeof (int),
-	    propname, NULL, NULL);
-	if (err != PICL_SUCCESS) {
-		log_msg(LOG_ERR, SNMPP_CANT_INIT_INT_PROPINFO, err);
-		return (err);
-	}
-
-	err = ptree_create_and_add_prop(node, &propinfo, &propval, NULL);
-	if (err != PICL_SUCCESS) {
-		log_msg(LOG_ERR, SNMPP_CANT_ADD_INT_PROP, err, node);
-		return (err);
-	}
-
-	return (PICL_SUCCESS);
-}
-
 static void
 add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
     int row, sp_propid_t pp, int *snmp_syserr_p)
@@ -1548,6 +1523,16 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		}
 		break;
 
+	case PP_EXPONENT:
+		ret = add_volatile_prop(nodeh, PICL_PROP_EXPONENT,
+		    PICL_PTYPE_INT, PICL_READ, sizeof (int), read_volprop,
+		    NULL, php);
+		if (ret == PICL_SUCCESS) {
+			save_volprop(*php, OID_sunPlatNumericSensorExponent,
+			    row, VPT_NUMSENSOR);
+		}
+		break;
+
 	case PP_REPLACEABLE:
 		ret = snmp_get_int(hdl, OID_sunPlatCircuitPackReplaceable,
 		    row, &val, snmp_syserr_p);
@@ -1650,14 +1635,6 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_RATE_UNITS, sensor_rateunits[val]);
 		}
-		break;
-
-	case PP_EXPONENT:
-		ret = snmp_get_int(hdl, OID_sunPlatNumericSensorExponent,
-		    row, &val, snmp_syserr_p);
-		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if (ret == 0)
-			(void) add_int_prop(nodeh, PICL_PROP_EXPONENT, val);
 		break;
 	}
 }

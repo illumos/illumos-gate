@@ -231,6 +231,7 @@ io_dev_addlabel(md_t *mdp)
 			}
 		}
 	}
+	free(components);
 }
 
 /*

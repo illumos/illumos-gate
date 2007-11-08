@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <alloca.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <string.h>
@@ -69,6 +70,7 @@
 #define	OBP_PROP_COMPATIBLE		"compatible"
 #define	OBP_PROP_MODEL			"model"
 #define	OBP_PROP_SLOT_NAMES		"slot-names"
+#define	OBP_PROP_VERSION		"version"
 
 #define	PICL_NODE_PHYSICAL_PLATFORM	"physical-platform"
 #define	PICL_NODE_CHASSIS		"chassis"
@@ -112,6 +114,8 @@ static void sun4v_env_print_LEDs();
 static void sun4v_print_fru_status();
 static void sun4v_print_fw_rev();
 static void sun4v_print_chassis_serial_no();
+static int openprom_callback(picl_nodehdl_t openpromh, void *arg);
+static void sun4v_print_openprom_rev();
 
 int
 sun4v_display(Sys_tree *tree, Prom_node *root, int log,
@@ -205,15 +209,28 @@ get_slot_label(picl_nodehdl_t nodeh, struct io_card *card)
 {
 	char val[PICL_PROPNAMELEN_MAX];
 	picl_errno_t err;
+	picl_nodehdl_t pnodeh;
 
+	/*
+	 * Look for a Label first in the node corresponding to the IO
+	 * device.  If there's no Label then we might be on the downstream
+	 * side of a bridge (i.e. the IO device/card has a bridge on it).
+	 * So look at the parent and see if it has a Label.
+	 */
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
 	    sizeof (val));
-	if (err != PICL_SUCCESS)
-		return (err);
+	if (err == PICL_PROPNOTFOUND) {
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
+		    sizeof (pnodeh)) == PICL_SUCCESS)
+			err = picl_get_propval_by_name(pnodeh, PICL_PROP_LABEL,
+			    val, sizeof (val));
+	}
 
-	(void) strlcpy(card->slot_str, val, sizeof (card->slot_str));
+	if (err == PICL_SUCCESS)
+		(void) strlcpy(card->slot_str, val, sizeof (card->slot_str));
+
 	card->slot = -1;
-	return (PICL_SUCCESS);
+	return (err);
 }
 
 static void
@@ -377,16 +394,8 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 		else if (err != PICL_SUCCESS)
 			return (err);
 
-		/* Figure NAC name */
-		if (pci_card.slot != -1)
-			(void) snprintf(pci_card.status,
-			    sizeof (pci_card.status),
-			    "%s%d", pci_card.slot_str,
-			    pci_card.slot);
-		else
-			(void) snprintf(pci_card.status,
-			    sizeof (pci_card.status),
-			    "%s", pci_card.slot_str);
+		(void) snprintf(pci_card.status, sizeof (pci_card.status),
+		    "%s", pci_card.slot_str);
 
 		/*
 		 * Get the name of this card. If binding_name is found,
@@ -926,6 +935,9 @@ sun4v_disp_env_status()
 	class_node_found = 0;
 	sun4v_print_fw_rev();
 
+	class_node_found = 0;
+	sun4v_print_openprom_rev();
+
 	sun4v_print_chassis_serial_no();
 }
 
@@ -941,8 +953,8 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 	int i;
 	char *prop;
 	picl_errno_t err;
-	int32_t lo_warning, lo_shutdown;
-	int32_t hi_warning, hi_shutdown;
+	int32_t lo_warning, lo_shutdown, lo_poweroff;
+	int32_t hi_warning, hi_shutdown, hi_poweroff;
 	int32_t current_val;
 	int32_t exponent;
 	double display_val;
@@ -975,32 +987,50 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		if (picl_get_propval_by_name(nodeh, prop, &current_val,
 		    sizeof (current_val)) != PICL_SUCCESS) {
 			sensor_status = SENSOR_UNKNOWN;
-		}
-		if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_WARNING,
-		    &lo_warning, sizeof (lo_warning)) != PICL_SUCCESS)
-			lo_warning = INVALID_THRESHOLD;
-		if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_SHUTDOWN,
-		    &lo_shutdown, sizeof (lo_shutdown)) != PICL_SUCCESS)
-			lo_shutdown = INVALID_THRESHOLD;
-		if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_WARNING,
-		    &hi_warning, sizeof (hi_warning)) != PICL_SUCCESS)
-			hi_warning = INVALID_THRESHOLD;
-		if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_SHUTDOWN,
-		    &hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
-			hi_shutdown = INVALID_THRESHOLD;
-
-		if ((lo_shutdown != INVALID_THRESHOLD &&
-		    current_val <= lo_shutdown) ||
-		    (hi_shutdown != INVALID_THRESHOLD &&
-		    current_val >= hi_shutdown)) {
-			sensor_status = SENSOR_FAILED;
-		} else if ((lo_warning != INVALID_THRESHOLD &&
-		    current_val <= lo_warning) ||
-		    (hi_warning != INVALID_THRESHOLD &&
-		    current_val >= hi_warning)) {
-			sensor_status = SENSOR_WARN;
 		} else {
-			sensor_status = SENSOR_OK;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_LOW_WARNING,
+			    &lo_warning, sizeof (lo_warning)) != PICL_SUCCESS)
+				lo_warning = INVALID_THRESHOLD;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_LOW_SHUTDOWN,
+			    &lo_shutdown, sizeof (lo_shutdown)) != PICL_SUCCESS)
+				lo_shutdown = INVALID_THRESHOLD;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_LOW_POWER_OFF,
+			    &lo_poweroff, sizeof (lo_poweroff)) != PICL_SUCCESS)
+				lo_poweroff = INVALID_THRESHOLD;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_HIGH_WARNING,
+			    &hi_warning, sizeof (hi_warning)) != PICL_SUCCESS)
+				hi_warning = INVALID_THRESHOLD;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_HIGH_SHUTDOWN,
+			    &hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
+				hi_shutdown = INVALID_THRESHOLD;
+			if (picl_get_propval_by_name(nodeh,
+			    PICL_PROP_HIGH_POWER_OFF,
+			    &hi_poweroff, sizeof (hi_poweroff)) != PICL_SUCCESS)
+				hi_poweroff = INVALID_THRESHOLD;
+
+			if ((lo_poweroff != INVALID_THRESHOLD &&
+			    current_val <= lo_poweroff) ||
+			    (hi_poweroff != INVALID_THRESHOLD &&
+			    current_val >= hi_poweroff)) {
+				sensor_status = SENSOR_FAILED;
+			} else if ((lo_shutdown != INVALID_THRESHOLD &&
+			    current_val <= lo_shutdown) ||
+			    (hi_shutdown != INVALID_THRESHOLD &&
+			    current_val >= hi_shutdown)) {
+				sensor_status = SENSOR_FAILED;
+			} else if ((lo_warning != INVALID_THRESHOLD &&
+			    current_val <= lo_warning) ||
+			    (hi_warning != INVALID_THRESHOLD &&
+			    current_val >= hi_warning)) {
+				sensor_status = SENSOR_WARN;
+			} else {
+				sensor_status = SENSOR_OK;
+			}
 		}
 	}
 
@@ -1087,9 +1117,23 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		exponent = 0;
 	if (exponent == 0)
 		display_val = (double)current_val;
-	else
+	else {
 		display_val = (double)current_val *
 		    pow((double)10, (double)exponent);
+
+		/*
+		 * Sometimes ILOM will scale a sensor reading but
+		 * there will be nothing to the right of the decimal
+		 * once that value is normalized.  Setting the
+		 * exponent to zero will prevent the printf below
+		 * from printing extraneous zeros.  Otherwise a
+		 * negative exponent is used to set the precision
+		 * for the printf.
+		 */
+		if ((int)display_val == display_val || exponent > 0)
+			exponent = 0;
+	}
+
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_BASE_UNITS,
 	    base_units, sizeof (base_units));
 	if (err != PICL_SUCCESS)
@@ -1614,10 +1658,12 @@ static void
 sun4v_print_fru_status()
 {
 	char *fmt = "%-34s %-9s %-8s\n";
+
 	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fru_status_callback);
 	if (!class_node_found)
 		return;
+
 	log_printf("\n");
 	log_printf("============================");
 	log_printf(" FRU Status ");
@@ -1643,7 +1689,6 @@ sun4v_print_fru_status()
 static int
 sun4v_print_fw_rev_callback(picl_nodehdl_t nodeh, void *args)
 {
-	char label[PICL_PROPNAMELEN_MAX];
 	char rev[PICL_PROPNAMELEN_MAX];
 	picl_errno_t err;
 
@@ -1651,18 +1696,14 @@ sun4v_print_fw_rev_callback(picl_nodehdl_t nodeh, void *args)
 		class_node_found = 1;
 		return (PICL_WALK_TERMINATE);
 	}
-	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, label,
-	    sizeof (label));
-	if (err != PICL_SUCCESS)
-		return (PICL_WALK_CONTINUE);
+
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_FW_REVISION, rev,
 	    sizeof (rev));
 	if (err != PICL_SUCCESS)
 		return (PICL_WALK_CONTINUE);
 	if (strlen(rev) == 0)
 		return (PICL_WALK_CONTINUE);
-	log_printf("%-21s", label);
-	log_printf("%-35s", rev);
+	log_printf("%s", rev);
 	log_printf("\n");
 	return (PICL_WALK_CONTINUE);
 }
@@ -1670,23 +1711,133 @@ sun4v_print_fw_rev_callback(picl_nodehdl_t nodeh, void *args)
 static void
 sun4v_print_fw_rev()
 {
-	char *fmt = "%-20s %-10s\n";
 	if (syserrlog == 0)
 		return;
+
 	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fw_rev_callback);
 	if (!class_node_found)
 		return;
+
 	log_printf("\n");
 	log_printf("============================");
 	log_printf(" FW Version ");
 	log_printf("============================");
 	log_printf("\n");
-	log_printf(fmt, "Name", "Version", 0);
+	log_printf("Version\n");
 	log_printf("-------------------------------------------------"
 	    "-----------\n");
 	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
 	    sun4v_print_fw_rev_callback);
+}
+
+static void
+sun4v_print_openprom_rev()
+{
+	if (syserrlog == 0)
+		return;
+
+	(void) picl_walk_tree_by_class(rooth, "openprom", NULL,
+	    openprom_callback);
+	if (!class_node_found)
+		return;
+
+	log_printf("\n");
+	log_printf("======================");
+	log_printf(" System PROM revisions ");
+	log_printf("=======================");
+	log_printf("\n");
+	log_printf("Version\n");
+	log_printf("-------------------------------------------------"
+	    "-----------\n");
+	(void) picl_walk_tree_by_class(rooth, "openprom", NULL,
+	    openprom_callback);
+}
+
+/*
+ * display the OBP and POST prom revisions (if present)
+ */
+/* ARGSUSED */
+static int
+openprom_callback(picl_nodehdl_t openpromh, void *arg)
+{
+	picl_prophdl_t	proph;
+	picl_prophdl_t	tblh;
+	picl_prophdl_t	rowproph;
+	picl_propinfo_t	pinfo;
+	char		*prom_version = NULL;
+	char		*obp_version = NULL;
+	int		err;
+
+	if (!class_node_found) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+
+	err = picl_get_propinfo_by_name(openpromh, OBP_PROP_VERSION,
+	    &pinfo, &proph);
+	if (err == PICL_PROPNOTFOUND)
+		return (PICL_WALK_TERMINATE);
+	else if (err != PICL_SUCCESS)
+		return (err);
+
+	/*
+	 * If it's a table prop, the first element is OBP revision
+	 * The second one is POST revision.
+	 * If it's a charstring prop, the value will be only OBP revision
+	 */
+	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
+		prom_version = (char *)alloca(pinfo.size);
+		if (prom_version == NULL)
+			return (PICL_FAILURE);
+		err = picl_get_propval(proph, prom_version, pinfo.size);
+		if (err != PICL_SUCCESS)
+			return (err);
+		log_printf("%s\n", prom_version);
+	}
+
+	if (pinfo.type != PICL_PTYPE_TABLE)	/* not supported type */
+		return (PICL_WALK_TERMINATE);
+
+	err = picl_get_propval(proph, &tblh, pinfo.size);
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	err = picl_get_next_by_row(tblh, &rowproph);
+	if (err == PICL_SUCCESS) {
+		/* get first row */
+		err = picl_get_propinfo(rowproph, &pinfo);
+		if (err != PICL_SUCCESS)
+			return (err);
+
+		prom_version = (char *)alloca(pinfo.size);
+		if (prom_version == NULL)
+			return (PICL_FAILURE);
+
+		err = picl_get_propval(rowproph, prom_version, pinfo.size);
+		if (err != PICL_SUCCESS)
+			return (err);
+		log_printf("%s\n", prom_version);
+
+		/* get second row */
+		err = picl_get_next_by_col(rowproph, &rowproph);
+		if (err == PICL_SUCCESS) {
+			err = picl_get_propinfo(rowproph, &pinfo);
+			if (err != PICL_SUCCESS)
+				return (err);
+
+			obp_version = (char *)alloca(pinfo.size);
+			if (obp_version == NULL)
+				return (PICL_FAILURE);
+			err = picl_get_propval(rowproph, obp_version,
+			    pinfo.size);
+			if (err != PICL_SUCCESS)
+				return (err);
+			log_printf("%s\n", obp_version);
+		}
+	}
+
+	return (PICL_WALK_TERMINATE);
 }
 
 static void
