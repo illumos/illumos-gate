@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -350,6 +350,7 @@ ehci_alloc_qh(
 		return (NULL);
 	} else {
 		qh = &ehcip->ehci_qh_pool_addr[i];
+		bzero((void *)qh, sizeof (ehci_qh_t));
 
 		USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 		    "ehci_alloc_qh: Allocated address 0x%p", (void *)qh);
@@ -365,7 +366,6 @@ ehci_alloc_qh(
 			if ((ehci_initialize_dummy(ehcip,
 			    qh)) == USB_NO_RESOURCES) {
 
-				bzero((void *)qh, sizeof (ehci_qh_t));
 				Set_QH(qh->qh_state, EHCI_QH_FREE);
 
 				return (NULL);
@@ -633,7 +633,7 @@ ehci_insert_async_qh(
 
 			USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 			    "ehci_insert_async_qh: ASYNCLISTADDR "
-				"write failed, retry=%d", retry);
+			    "write failed, retry=%d", retry);
 		}
 	} else {
 		ASSERT(Get_QH(async_head_qh->qh_ctrl) &
@@ -759,7 +759,7 @@ ehci_modify_qh_status_bit(
 	while (pp->pp_halt_state & EHCI_HALT_STATE_HALTING) {
 
 		cv_wait(&pp->pp_halt_cmpl_cv,
-			    &ehcip->ehci_int_mutex);
+		    &ehcip->ehci_int_mutex);
 	}
 
 	/* Sync the QH QTD pool to get up to date information */
@@ -869,7 +869,7 @@ ehci_halt_hs_qh(
 	/* Modify the status bit and halt this QH. */
 	Set_QH(qh->qh_status,
 	    ((Get_QH(qh->qh_status) &
-		~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
+	    ~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
 
 	/* Insert this QH back into the HCD's view */
 	ehci_insert_qh(ehcip, ph);
@@ -909,7 +909,7 @@ ehci_halt_fls_ctrl_and_bulk_qh(
 	/* Modify the status bit and halt this QH. */
 	Set_QH(qh->qh_status,
 	    ((Get_QH(qh->qh_status) &
-		~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
+	    ~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
 
 	/* Check to see if the QH was in the middle of a transaction */
 	status = Get_QH(qh->qh_status);
@@ -1082,8 +1082,8 @@ ehci_halt_fls_intr_qh(
 
 	for (i = 0; i < EHCI_NUM_INTR_QH_LISTS; i++) {
 		Set_QH(qh->qh_status,
-			((Get_QH(qh->qh_status) &
-			~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
+		    ((Get_QH(qh->qh_status) &
+		    ~(EHCI_QH_STS_ACTIVE)) | EHCI_QH_STS_HALTED));
 
 		Sync_QH_QTD_Pool(ehcip);
 
@@ -1347,7 +1347,6 @@ ehci_deallocate_qh(
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_deallocate_qh: Deallocated 0x%p", (void *)old_qh);
 
-	bzero((void *)old_qh, sizeof (ehci_qh_t));
 	Set_QH(old_qh->qh_state, EHCI_QH_FREE);
 }
 
@@ -1589,10 +1588,10 @@ ehci_insert_ctrl_req(
 
 			/* Copy the data into the message */
 			bcopy(data->b_rptr, tw->tw_buf + EHCI_MAX_QTD_BUF_SIZE,
-				wLength);
+			    wLength);
 
 			Sync_IO_Buffer_for_device(tw->tw_dmahandle,
-				wLength + EHCI_MAX_QTD_BUF_SIZE);
+			    wLength + EHCI_MAX_QTD_BUF_SIZE);
 		}
 
 		ctrl = (EHCI_QTD_CTRL_DATA_TOGGLE_1 | tw->tw_direction);
@@ -1673,7 +1672,7 @@ ehci_allocate_bulk_resources(
 	/* Get the required bulk packet size */
 	qtd_count = bulk_reqp->bulk_len / EHCI_MAX_QTD_XFER_SIZE;
 	if (bulk_reqp->bulk_len % EHCI_MAX_QTD_XFER_SIZE ||
-		bulk_reqp->bulk_len == 0) {
+	    bulk_reqp->bulk_len == 0) {
 		qtd_count += 1;
 	}
 
@@ -1746,10 +1745,10 @@ ehci_insert_bulk_req(
 			ASSERT(bulk_reqp->bulk_data != NULL);
 
 			bcopy(bulk_reqp->bulk_data->b_rptr, tw->tw_buf,
-				bulk_reqp->bulk_len);
+			    bulk_reqp->bulk_len);
 
 			Sync_IO_Buffer_for_device(tw->tw_dmahandle,
-				bulk_reqp->bulk_len);
+			    bulk_reqp->bulk_len);
 		}
 	}
 
@@ -1959,7 +1958,7 @@ ehci_start_intr_polling(
 			while (tw != NULL) {
 				tw_list = tw->tw_next;
 				ehci_deallocate_intr_in_resource(
-					ehcip, pp, tw);
+				    ehcip, pp, tw);
 				ehci_deallocate_tw(ehcip, pp, tw);
 				tw = tw_list;
 			}
@@ -2029,7 +2028,7 @@ ehci_set_periodic_pipe_polling(
 	if (((ep_attr & USB_EP_ATTR_MASK) == USB_EP_ATTR_INTR) &&
 	    (pp->pp_client_periodic_in_reqp)) {
 		usb_intr_req_t *intr_reqp = (usb_intr_req_t *)
-					pp->pp_client_periodic_in_reqp;
+		    pp->pp_client_periodic_in_reqp;
 
 		if (intr_reqp->intr_attributes &
 		    USB_ATTRS_ONE_XFER) {
@@ -2048,7 +2047,7 @@ ehci_set_periodic_pipe_polling(
 	 * done. Here we are getting only the periodic interval.
 	 */
 	interval = ehci_adjust_polling_interval(ehcip, endpoint,
-		ph->p_usba_device->usb_port_status);
+	    ph->p_usba_device->usb_port_status);
 
 	mutex_exit(&ph->p_usba_device->usb_mutex);
 
@@ -2638,7 +2637,7 @@ ehci_remove_qtd_from_active_qtd_list(
 	} else {
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_remove_qtd_from_active_qtd_list: "
-			"Unable to find QTD in active_qtd_list");
+		    "Unable to find QTD in active_qtd_list");
 	}
 }
 
@@ -2722,8 +2721,8 @@ ehci_deallocate_qtd(
 	 */
 	if (Get_QTD(old_qtd->qtd_state) != EHCI_QTD_DUMMY) {
 		tw = (ehci_trans_wrapper_t *)
-		EHCI_LOOKUP_ID((uint32_t)
-		Get_QTD(old_qtd->qtd_trans_wrapper));
+		    EHCI_LOOKUP_ID((uint32_t)
+		    Get_QTD(old_qtd->qtd_trans_wrapper));
 
 		ASSERT(tw != NULL);
 	}
@@ -2739,7 +2738,7 @@ ehci_deallocate_qtd(
 
 		if (old_qtd != qtd) {
 			next_qtd = ehci_qtd_iommu_to_cpu(
-				    ehcip, Get_QTD(qtd->qtd_tw_next_qtd));
+			    ehcip, Get_QTD(qtd->qtd_tw_next_qtd));
 
 			while (next_qtd != old_qtd) {
 				qtd = next_qtd;
@@ -3227,7 +3226,7 @@ ehci_xfer_timeout_handler(void *arg)
 {
 	usba_pipe_handle_data_t	*ph = (usba_pipe_handle_data_t *)arg;
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	ehci_trans_wrapper_t	*tw, *next;
 	ehci_trans_wrapper_t	*expire_xfer_list = NULL;
@@ -3270,7 +3269,7 @@ ehci_xfer_timeout_handler(void *arg)
 			qtd = tw->tw_qtd_head;
 			while (qtd) {
 				ehci_remove_qtd_from_active_qtd_list(
-					ehcip, qtd);
+				    ehcip, qtd);
 
 				/* Get the next QTD from the wrapper */
 				qtd = ehci_qtd_iommu_to_cpu(ehcip,
@@ -3357,7 +3356,7 @@ ehci_remove_tw_from_timeout_list(
 
 			if (next == tw) {
 				prev->tw_timeout_next =
-					next->tw_timeout_next;
+				    next->tw_timeout_next;
 				tw->tw_timeout_next = NULL;
 			}
 		}
@@ -4099,7 +4098,7 @@ ehci_hcdi_callback(
 	usb_cr_t		completion_reason)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	usb_opaque_t		curr_xfer_reqp;
 	uint_t			pipe_state = 0;
