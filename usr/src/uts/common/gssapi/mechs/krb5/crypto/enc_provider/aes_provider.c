@@ -96,21 +96,16 @@ krb5int_aes_encrypt(krb5_context context,
 			local_iv.data = local_iv_data;
 			local_iv.length = sizeof (local_iv_data);
 		}
-		/*
-		 * XXX due to a bug in the previous version of this function,
-		 * input data that was 1 block long was decrypted instead of
-		 * encypted.  The fix for that is in another CR so until then
-		 * we'll continue the tradition for interop's sake.
-		 */
+
+		/* Note using TRUE here because encryption is desired */
 		ret = k5_ef_crypto((const char *)input->data,
-			(char *)output->data,
-			input->length, (krb5_keyblock *)key,
-			&local_iv, (nblocks == 1 ? FALSE : TRUE));
+		    (char *)output->data,
+		    input->length, (krb5_keyblock *)key,
+		    &local_iv, TRUE);
 
 		if (ret != 0) {
 			KRB5_LOG(KRB5_ERR,
-				"k5_ef_crypto: error: ret = 0x%08x",
-				ret);
+			    "k5_ef_crypto: error: ret = 0x%08x", ret);
 			goto cleanup;
 		}
 
@@ -225,13 +220,13 @@ krb5int_aes_encrypt(krb5_context context,
 
 		/* encrypt using AES CBC */
 		ret = crypto_encrypt(&mech, &pt, (crypto_key_t *)&key->kef_key,
-					key->key_tmpl, &ct, NULL);
+		    key->key_tmpl, &ct, NULL);
 
 		if (ret != CRYPTO_SUCCESS) {
-		    KRB5_LOG(KRB5_ERR,
+			KRB5_LOG(KRB5_ERR,
 			    "crypto_encrypt: error: ret = 0x%08x",
 			    ret);
-		    goto cleanup;
+			goto cleanup;
 		}
 
 		/*
@@ -363,10 +358,10 @@ krb5int_aes_encrypt(krb5_context context,
 		outlen = output->length;
 
 		rv = C_Encrypt(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)input->data,
-			    input->length,
-			    (CK_BYTE_PTR)output->data,
-			    &outlen);
+		    (CK_BYTE_PTR)input->data,
+		    input->length,
+		    (CK_BYTE_PTR)output->data,
+		    &outlen);
 
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_Encrypt failed in "
@@ -383,9 +378,9 @@ krb5int_aes_encrypt(krb5_context context,
 			char tmp[BLOCK_SIZE];
 
 			nlobp = (char *)(output->data +
-				((nblocks - 2) * BLOCK_SIZE));
+			    ((nblocks - 2) * BLOCK_SIZE));
 			lobp = (char *)(output->data +
-				((nblocks - 1) * BLOCK_SIZE));
+			    ((nblocks - 1) * BLOCK_SIZE));
 
 			bcopy(nlobp, tmp, BLOCK_SIZE);
 			bcopy(lobp, nlobp, BLOCK_SIZE);
@@ -410,10 +405,10 @@ krb5int_aes_encrypt(krb5_context context,
 		outlen = input->length - partialamount;
 
 		rv = C_EncryptUpdate(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)input->data,
-			    input->length - partialamount,
-			    (CK_BYTE_PTR)output->data,
-			    &outlen);
+		    (CK_BYTE_PTR)input->data,
+		    input->length - partialamount,
+		    (CK_BYTE_PTR)output->data,
+		    &outlen);
 
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_EncryptUpdate failed in "
@@ -431,10 +426,10 @@ krb5int_aes_encrypt(krb5_context context,
 		outlen = sizeof (tmp_ct);
 
 		rv = C_EncryptUpdate(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)tmp_pt,
-			    BLOCK_SIZE,
-			    (CK_BYTE_PTR)tmp_ct,
-			    &outlen);
+		    (CK_BYTE_PTR)tmp_pt,
+		    BLOCK_SIZE,
+		    (CK_BYTE_PTR)tmp_ct,
+		    &outlen);
 
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_Encrypt failed in "
@@ -452,7 +447,7 @@ krb5int_aes_encrypt(krb5_context context,
 
 		/* Close the crypto session, ignore the output */
 		rv = C_EncryptFinal(krb_ctx_hSession(context),
-			(CK_BYTE_PTR)tmp_ct, &outlen);
+		    (CK_BYTE_PTR)tmp_ct, &outlen);
 
 		if (rv != CKR_OK)
 			goto cleanup;
@@ -571,9 +566,9 @@ krb5int_aes_decrypt(krb5_context context,
 		}
 
 		ret = k5_ef_crypto((const char *)input->data,
-			(char *)output->data,
-			input->length, (krb5_keyblock *)key,
-			&local_iv, FALSE);
+		    (char *)output->data,
+		    input->length, (krb5_keyblock *)key,
+		    &local_iv, FALSE);
 
 		if (nblocks > 1) {
 			/* restore orig input data */
@@ -581,16 +576,16 @@ krb5int_aes_decrypt(krb5_context context,
 		}
 
 		if (ret != 0) {
-		    KRB5_LOG(KRB5_ERR,
+			KRB5_LOG(KRB5_ERR,
 			    "k5_ef_crypto returned error: ret = 0x%08x",
 			    ret);
-		    goto cleanup;
+			goto cleanup;
 		}
 
 	} else {
 		krb5_data tmp_ivec;
 		char tmp_ivec_data[BLOCK_SIZE], tmp_input_data[BLOCK_SIZE],
-			tmp_output_data[BLOCK_SIZE];
+		    tmp_output_data[BLOCK_SIZE];
 		/* pointers to Cn, Cn-1, Cn-2 CipherText */
 		char *Cn, *Cn_1, *Cn_2;
 		long length;
@@ -618,14 +613,14 @@ krb5int_aes_decrypt(krb5_context context,
 			 * ivec.
 			 */
 			ret = k5_ef_crypto((const char *)input->data,
-				output->data, length, (krb5_keyblock *)key,
-				&local_iv, FALSE);
+			    output->data, length, (krb5_keyblock *)key,
+			    &local_iv, FALSE);
 
 			if (ret != 0) {
-			    KRB5_LOG(KRB5_ERR,
+				KRB5_LOG(KRB5_ERR,
 				    "k5_ef_crypto: error: ret = 0x%08x",
 				    ret);
-			    goto cleanup;
+				goto cleanup;
 			}
 		}
 		/*
@@ -649,10 +644,10 @@ krb5int_aes_decrypt(krb5_context context,
 		    (krb5_keyblock *)key, &tmp_ivec, FALSE);
 
 		if (ret != 0) {
-		    KRB5_LOG(KRB5_ERR,
+			KRB5_LOG(KRB5_ERR,
 			    "k5_ef_crypto: error: ret = 0x%08x",
 			    ret);
-		    goto cleanup;
+			goto cleanup;
 		}
 		/*
 		 * tmp input data should hold Cn with C'
@@ -683,16 +678,15 @@ krb5int_aes_decrypt(krb5_context context,
 		 * (set above), Pn-1 output.
 		 */
 		ret = k5_ef_crypto((const char *)tmp_input_data,
-			(char *)output->data +
-				(input->length - (BLOCK_SIZE + partialamount)),
-			length, (krb5_keyblock *)key,
-			&tmp_ivec, FALSE);
+		    (char *)output->data +
+		    (input->length - (BLOCK_SIZE + partialamount)),
+		    length, (krb5_keyblock *)key,
+		    &tmp_ivec, FALSE);
 
 		if (ret != 0) {
-		    KRB5_LOG(KRB5_ERR,
-			    "k5_ef_crypto: error: ret = 0x%08x",
-			    ret);
-		    goto cleanup;
+			KRB5_LOG(KRB5_ERR,
+			    "k5_ef_crypto: error: ret = 0x%08x", ret);
+			goto cleanup;
 		}
 
 	} /* end partial block processing */
@@ -705,8 +699,8 @@ krb5int_aes_decrypt(krb5_context context,
 	 */
 	if (nblocks > 1 && ivec) {
 		(void) memcpy(ivec->data,
-			input->data + ((nblocks - 2) * BLOCK_SIZE),
-			BLOCK_SIZE);
+		    input->data + ((nblocks - 2) * BLOCK_SIZE),
+		    BLOCK_SIZE);
 	}
 
 cleanup:
@@ -827,7 +821,7 @@ krb5int_aes_decrypt(krb5_context context,
 		 * C_DecryptInit set the IV in this function.
 		 */
 		rv = C_DecryptInit(krb_ctx_hSession(context), &mechanism,
-				key->hKey);
+		    key->hKey);
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_DecryptInit failed in "
 			    "krb5int_aes_decrypt: rv = 0x%x", rv);
@@ -841,10 +835,10 @@ krb5int_aes_decrypt(krb5_context context,
 		outlen = output->length;
 
 		rv = C_Decrypt(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)input->data,
-			    input->length,
-			    (CK_BYTE_PTR)output->data,
-			    &outlen);
+		    (CK_BYTE_PTR)input->data,
+		    input->length,
+		    (CK_BYTE_PTR)output->data,
+		    &outlen);
 
 		if (nblocks > 1) {
 			/* restore orig input data */
@@ -852,7 +846,7 @@ krb5int_aes_decrypt(krb5_context context,
 		}
 	} else {
 		char tmp_ivec_data[BLOCK_SIZE], tmp_input_data[BLOCK_SIZE],
-			tmp_output_data[BLOCK_SIZE];
+		    tmp_output_data[BLOCK_SIZE];
 		/* pointers to Cn, Cn-1, Cn-2 CipherText */
 		char *Cn, *Cn_1, *Cn_2;
 		CK_ULONG length;
@@ -873,7 +867,7 @@ krb5int_aes_decrypt(krb5_context context,
 
 		if (nblocks > 2) {
 			rv = C_DecryptInit(krb_ctx_hSession(context),
-				&mechanism, key->hKey);
+			    &mechanism, key->hKey);
 			if (rv != CKR_OK) {
 				KRB5_LOG(KRB5_ERR, "C_DecryptInit failed in "
 				    "krb5int_aes_decrypt: rv = 0x%x", rv);
@@ -887,10 +881,10 @@ krb5int_aes_decrypt(krb5_context context,
 			 * ivec.
 			 */
 			rv = C_Decrypt(krb_ctx_hSession(context),
-				    (CK_BYTE_PTR)input->data,
-				    length,
-				    (CK_BYTE_PTR)output->data,
-				    &outlen);
+			    (CK_BYTE_PTR)input->data,
+			    length,
+			    (CK_BYTE_PTR)output->data,
+			    &outlen);
 			if (rv != CKR_OK)
 				goto cleanup;
 		}
@@ -911,7 +905,7 @@ krb5int_aes_decrypt(krb5_context context,
 		mechanism.ulParameterLen = sizeof (tmp_ivec_data);
 
 		rv = C_DecryptInit(krb_ctx_hSession(context), &mechanism,
-			    key->hKey);
+		    key->hKey);
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_DecryptInit failed in "
 			    "krb5int_aes_decrypt: rv = 0x%x", rv);
@@ -923,10 +917,10 @@ krb5int_aes_decrypt(krb5_context context,
 		 * C' output
 		 */
 		rv = C_Decrypt(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)Cn_1,
-			    length,
-			    (CK_BYTE_PTR)tmp_output_data,
-			    &outlen);
+		    (CK_BYTE_PTR)Cn_1,
+		    length,
+		    (CK_BYTE_PTR)tmp_output_data,
+		    &outlen);
 
 		if (rv != CKR_OK)
 			goto cleanup;
@@ -967,7 +961,7 @@ krb5int_aes_decrypt(krb5_context context,
 		}
 
 		rv = C_DecryptInit(krb_ctx_hSession(context), &mechanism,
-			    key->hKey);
+		    key->hKey);
 		if (rv != CKR_OK) {
 			KRB5_LOG(KRB5_ERR, "C_DecryptInit failed in "
 			    "krb5int_aes_decrypt: rv = 0x%x", rv);
@@ -979,11 +973,11 @@ krb5int_aes_decrypt(krb5_context context,
 		 * ivec or 0 for ivec (set above), Pn-1 output.
 		 */
 		rv = C_Decrypt(krb_ctx_hSession(context),
-			    (CK_BYTE_PTR)tmp_input_data,
-			    length,
-			    (CK_BYTE_PTR)output->data + (input->length -
-				(BLOCK_SIZE + partialamount)),
-			    &outlen);
+		    (CK_BYTE_PTR)tmp_input_data,
+		    length,
+		    (CK_BYTE_PTR)output->data + (input->length -
+		    (BLOCK_SIZE + partialamount)),
+		    &outlen);
 		if (rv != CKR_OK)
 			goto cleanup;
 	} /* end partial block processing */
@@ -995,8 +989,8 @@ krb5int_aes_decrypt(krb5_context context,
 	 */
 	if (nblocks > 1 && ivec) {
 		(void) memcpy(ivec->data,
-			input->data + ((nblocks - 2) * BLOCK_SIZE),
-			BLOCK_SIZE);
+		    input->data + ((nblocks - 2) * BLOCK_SIZE),
+		    BLOCK_SIZE);
 	}
 
 cleanup:
