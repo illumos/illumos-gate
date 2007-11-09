@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,8 +170,16 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 			if ((SENSE_KEY(rqbuf) == 2) && (ASC(rqbuf) == 4) &&
 			    (ASCQ(rqbuf) == 8)) {
 				total_retries++;
+				/*
+				 * In Simulation write mode, we use the
+				 * READ_INFO_CMD to check if all the previous
+				 * writes completed. Sleeping 500 ms will not
+				 * be sufficient in all cases for DVDs.
+				 */
 				if ((device_type != CD_RW) &&
-				    (scmd->uscsi_cdb[0] == CLOSE_TRACK_CMD))
+				    ((scmd->uscsi_cdb[0] == CLOSE_TRACK_CMD) ||
+				    ((scmd->uscsi_cdb[0] == READ_INFO_CMD) &&
+				    simulation)))
 					(void) sleep(3);
 				else
 					ms_delay(500);
