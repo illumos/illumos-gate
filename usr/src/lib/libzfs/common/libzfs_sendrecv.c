@@ -1896,6 +1896,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
 	/* the kernel needs the non-byteswapped begin record */
 	drr_noswap = drr;
 
+	flags.byteswap = B_FALSE;
 	if (drrb->drr_magic == BSWAP_64(DMU_BACKUP_MAGIC)) {
 		/*
 		 * We computed the checksum in the wrong byteorder in

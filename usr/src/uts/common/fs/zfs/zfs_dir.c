@@ -801,7 +801,6 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	znode_t *xzp;
 	dmu_tx_t *tx;
-	uint64_t xoid;
 	int error;
 	zfs_fuid_info_t *fuidp = NULL;
 
@@ -828,11 +827,10 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 		dmu_tx_abort(tx);
 		return (error);
 	}
-	zfs_mknode(zp, vap, &xoid, tx, cr, IS_XATTR, &xzp, 0, NULL, &fuidp);
-	ASSERT(xzp->z_id == xoid);
+	zfs_mknode(zp, vap, tx, cr, IS_XATTR, &xzp, 0, NULL, &fuidp);
 	ASSERT(xzp->z_phys->zp_parent == zp->z_id);
 	dmu_buf_will_dirty(zp->z_dbuf, tx);
-	zp->z_phys->zp_xattr = xoid;
+	zp->z_phys->zp_xattr = xzp->z_id;
 
 	(void) zfs_log_create(zfsvfs->z_log, tx, TX_MKXATTR, zp,
 	    xzp, "", NULL, fuidp, vap);

@@ -530,20 +530,19 @@ dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 	    dd->dd_phys->dd_compressed_bytes));
 	mutex_exit(&dd->dd_lock);
 
+	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 	if (dd->dd_phys->dd_origin_obj) {
 		dsl_dataset_t *ds;
 		char buf[MAXNAMELEN];
 
-		rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 		VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool,
 		    dd->dd_phys->dd_origin_obj,
 		    NULL, DS_MODE_NONE, FTAG, &ds));
 		dsl_dataset_name(ds, buf);
 		dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
-		rw_exit(&dd->dd_pool->dp_config_rwlock);
-
 		dsl_prop_nvlist_add_string(nv, ZFS_PROP_ORIGIN, buf);
 	}
+	rw_exit(&dd->dd_pool->dp_config_rwlock);
 }
 
 void

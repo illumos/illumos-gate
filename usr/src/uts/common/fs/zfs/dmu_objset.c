@@ -620,19 +620,22 @@ dmu_objset_destroy(const char *name)
 	return (error);
 }
 
+/*
+ * This will close the objset.
+ */
 int
-dmu_objset_rollback(const char *name)
+dmu_objset_rollback(objset_t *os)
 {
 	int err;
-	objset_t *os;
 	dsl_dataset_t *ds;
 
-	err = dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_EXCLUSIVE | DS_MODE_INCONSISTENT, &os);
-	if (err)
-		return (err);
-
 	ds = os->os->os_dsl_dataset;
+
+	if (!dsl_dataset_tryupgrade(ds, DS_MODE_STANDARD, DS_MODE_EXCLUSIVE)) {
+		dmu_objset_close(os);
+		return (EBUSY);
+	}
+
 	err = dsl_dataset_rollback(ds, os->os->os_phys->os_type);
 
 	/*

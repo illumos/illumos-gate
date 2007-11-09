@@ -1121,7 +1121,6 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	zfs_dirlock_t	*dl;
 	dmu_tx_t	*tx;
 	int		error;
-	uint64_t	zoid;
 	zfs_acl_t	*aclp = NULL;
 	zfs_fuid_info_t *fuidp = NULL;
 
@@ -1194,7 +1193,6 @@ top:
 			return (error);
 		}
 	}
-	zoid = zp ? zp->z_id : -1ULL;
 
 	if (zp == NULL) {
 		uint64_t txtype;
@@ -1250,8 +1248,7 @@ top:
 				zfs_acl_free(aclp);
 			return (error);
 		}
-		zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, 0, aclp, &fuidp);
-		ASSERT(zp->z_id == zoid);
+		zfs_mknode(dzp, vap, tx, cr, 0, &zp, 0, aclp, &fuidp);
 		(void) zfs_link_create(dl, zp, tx, ZNEW);
 		txtype = zfs_log_create_txtype(Z_FILE, vsecp, vap);
 		if (flag & FIGNORECASE)
@@ -1564,7 +1561,6 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
 	zfs_dirlock_t	*dl;
-	uint64_t	zoid = 0;
 	uint64_t	txtype;
 	dmu_tx_t	*tx;
 	int		error;
@@ -1671,7 +1667,7 @@ top:
 	/*
 	 * Create new node.
 	 */
-	zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, 0, aclp, &fuidp);
+	zfs_mknode(dzp, vap, tx, cr, 0, &zp, 0, aclp, &fuidp);
 
 	if (aclp)
 		zfs_acl_free(aclp);
@@ -3123,7 +3119,6 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr,
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
-	uint64_t	zoid;
 	int		len = strlen(link);
 	int		error;
 	int		zflg = ZNEW;
@@ -3198,22 +3193,22 @@ top:
 	 * Put the link content into bonus buffer if it will fit;
 	 * otherwise, store it just like any other file data.
 	 */
-	zoid = 0;
 	if (sizeof (znode_phys_t) + len <= dmu_bonus_max()) {
-		zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, len, NULL, &fuidp);
+		zfs_mknode(dzp, vap, tx, cr, 0, &zp, len, NULL, &fuidp);
 		if (len != 0)
 			bcopy(link, zp->z_phys + 1, len);
 	} else {
 		dmu_buf_t *dbp;
 
-		zfs_mknode(dzp, vap, &zoid, tx, cr, 0, &zp, 0, NULL, &fuidp);
+		zfs_mknode(dzp, vap, tx, cr, 0, &zp, 0, NULL, &fuidp);
 		/*
 		 * Nothing can access the znode yet so no locking needed
 		 * for growing the znode's blocksize.
 		 */
 		zfs_grow_blocksize(zp, len, tx);
 
-		VERIFY(0 == dmu_buf_hold(zfsvfs->z_os, zoid, 0, FTAG, &dbp));
+		VERIFY(0 == dmu_buf_hold(zfsvfs->z_os,
+		    zp->z_id, 0, FTAG, &dbp));
 		dmu_buf_will_dirty(dbp, tx);
 
 		ASSERT3U(len, <=, dbp->db_size);
@@ -3653,7 +3648,11 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	int error;
 
 	rw_enter(&zfsvfs->z_teardown_inactive_lock, RW_READER);
-	if (zp->z_dbuf_held == 0) {
+	if (zp->z_dbuf == NULL) {
+		/*
+		 * This fs has been unmounted, or we did
+		 * zfs_suspend/resume and it no longer exists.
+		 */
 		if (vn_has_cached_data(vp)) {
 			(void) pvn_vplist_dirty(vp, 0, zfs_null_putapage,
 			    B_INVAL, cr);
@@ -3661,12 +3660,8 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 		mutex_enter(&zp->z_lock);
 		vp->v_count = 0; /* count arrives as 1 */
-		if (zp->z_dbuf == NULL) {
-			mutex_exit(&zp->z_lock);
-			zfs_znode_free(zp);
-		} else {
-			mutex_exit(&zp->z_lock);
-		}
+		mutex_exit(&zp->z_lock);
+		zfs_znode_free(zp);
 		rw_exit(&zfsvfs->z_teardown_inactive_lock);
 		VFS_RELE(zfsvfs->z_vfs);
 		return;

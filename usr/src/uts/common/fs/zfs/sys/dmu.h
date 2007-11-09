@@ -170,7 +170,7 @@ int dmu_objset_create(const char *name, dmu_objset_type_t type,
     void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg);
 int dmu_objset_destroy(const char *name);
 int dmu_snapshots_destroy(char *fsname, char *snapname);
-int dmu_objset_rollback(const char *name);
+int dmu_objset_rollback(objset_t *os);
 int dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive);
 int dmu_objset_rename(const char *name, const char *newname,
     boolean_t recursive);

@@ -3274,7 +3274,6 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 typedef struct rollback_data {
 	const char	*cb_target;		/* the snapshot */
 	uint64_t	cb_create;		/* creation time reference */
-	prop_changelist_t *cb_clp;		/* changelist pointer */
 	int		cb_error;
 	boolean_t	cb_dependent;
 } rollback_data_t;
@@ -3292,24 +3291,17 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 			char *logstr;
 
 			cbp->cb_dependent = B_TRUE;
-			if (zfs_iter_dependents(zhp, B_FALSE, rollback_destroy,
-			    cbp) != 0)
-				cbp->cb_error = 1;
+			cbp->cb_error |= zfs_iter_dependents(zhp, B_FALSE,
+			    rollback_destroy, cbp);
 			cbp->cb_dependent = B_FALSE;
 
 			logstr = zhp->zfs_hdl->libzfs_log_str;
 			zhp->zfs_hdl->libzfs_log_str = NULL;
-			if (zfs_destroy(zhp) != 0)
-				cbp->cb_error = 1;
-			else
-				changelist_remove(cbp->cb_clp, zhp->zfs_name);
+			cbp->cb_error |= zfs_destroy(zhp);
 			zhp->zfs_hdl->libzfs_log_str = logstr;
 		}
 	} else {
-		if (zfs_destroy(zhp) != 0)
-			cbp->cb_error = 1;
-		else
-			changelist_remove(cbp->cb_clp, zhp->zfs_name);
+		cbp->cb_error |= zfs_destroy(zhp);
 	}
 
 	zfs_close(zhp);
@@ -3317,16 +3309,36 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 }
 
 /*
- * Rollback the dataset to its latest snapshot.
+ * Given a dataset, rollback to a specific snapshot, discarding any
+ * data changes since then and making it the active dataset.
+ *
+ * Any snapshots more recent than the target are destroyed, along with
+ * their dependents.
  */
-static int
-do_rollback(zfs_handle_t *zhp)
+int
+zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 {
-	int ret;
+	rollback_data_t cb = { 0 };
+	int err;
 	zfs_cmd_t zc = { 0 };
 
 	assert(zhp->zfs_type == ZFS_TYPE_FILESYSTEM ||
 	    zhp->zfs_type == ZFS_TYPE_VOLUME);
+
+	/*
+	 * Destroy all recent snapshots and its dependends.
+	 */
+	cb.cb_target = snap->zfs_name;
+	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
+	(void) zfs_iter_children(zhp, rollback_destroy, &cb);
+
+	if (cb.cb_error != 0)
+		return (cb.cb_error);
+
+	/*
+	 * Now that we have verified that the snapshot is the latest,
+	 * rollback to the given snapshot.
+	 */
 
 	if (zhp->zfs_type == ZFS_TYPE_VOLUME &&
 	    zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name) != 0)
@@ -3340,81 +3352,21 @@ do_rollback(zfs_handle_t *zhp)
 		zc.zc_objset_type = DMU_OST_ZFS;
 
 	/*
-	 * We rely on the consumer to verify that there are no newer snapshots
-	 * for the given dataset.  Given these constraints, we can simply pass
-	 * the name on to the ioctl() call.  There is still an unlikely race
-	 * condition where the user has taken a snapshot since we verified that
-	 * this was the most recent.
+	 * We rely on zfs_iter_children() to verify that there are no
+	 * newer snapshots for the given dataset.  Therefore, we can
+	 * simply pass the name on to the ioctl() call.  There is still
+	 * an unlikely race condition where the user has taken a
+	 * snapshot since we verified that this was the most recent.
 	 */
-	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_ROLLBACK, &zc)) != 0) {
+	if ((err = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_ROLLBACK, &zc)) != 0) {
 		(void) zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot rollback '%s'"),
 		    zhp->zfs_name);
 	} else if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
-		ret = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+		err = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
 	}
 
-	return (ret);
-}
-
-/*
- * Given a dataset, rollback to a specific snapshot, discarding any
- * data changes since then and making it the active dataset.
- *
- * Any snapshots more recent than the target are destroyed, along with
- * their dependents.
- */
-int
-zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap, int flag)
-{
-	int ret;
-	rollback_data_t cb = { 0 };
-	prop_changelist_t *clp;
-
-	/*
-	 * Unmount all dependendents of the dataset and the dataset itself.
-	 * The list we need to gather is the same as for doing rename
-	 */
-	clp = changelist_gather(zhp, ZFS_PROP_NAME, flag ? MS_FORCE: 0);
-	if (clp == NULL)
-		return (-1);
-
-	if ((ret = changelist_prefix(clp)) != 0)
-		goto out;
-
-	/*
-	 * Destroy all recent snapshots and its dependends.
-	 */
-	cb.cb_target = snap->zfs_name;
-	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
-	cb.cb_clp = clp;
-	(void) zfs_iter_children(zhp, rollback_destroy, &cb);
-
-	if ((ret = cb.cb_error) != 0) {
-		(void) changelist_postfix(clp);
-		goto out;
-	}
-
-	/*
-	 * Now that we have verified that the snapshot is the latest,
-	 * rollback to the given snapshot.
-	 */
-	ret = do_rollback(zhp);
-
-	if (ret != 0) {
-		(void) changelist_postfix(clp);
-		goto out;
-	}
-
-	/*
-	 * We only want to re-mount the filesystem if it was mounted in the
-	 * first place.
-	 */
-	ret = changelist_postfix(clp);
-
-out:
-	changelist_free(clp);
-	return (ret);
+	return (err);
 }
 
 /*

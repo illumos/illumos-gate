@@ -214,7 +214,7 @@ get_usage(zfs_help_t idx)
 		    "\trename -p <filesystem|volume> <filesystem|volume>\n"
 		    "\trename -r <snapshot> <snapshot>"));
 	case HELP_ROLLBACK:
-		return (gettext("\trollback [-rRf] <snapshot>\n"));
+		return (gettext("\trollback [-rR] <snapshot>\n"));
 	case HELP_SEND:
 		return (gettext("\tsend [-R] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
@@ -1903,11 +1903,10 @@ zfs_do_promote(int argc, char **argv)
 }
 
 /*
- * zfs rollback [-rfR] <snapshot>
+ * zfs rollback [-rR] <snapshot>
  *
  * 	-r	Delete any intervening snapshots before doing rollback
  * 	-R	Delete any snapshots and their clones
- * 	-f	Force unmount filesystems, even if they are in use.
  *
  * Given a filesystem, rollback to a specific snapshot, discarding any changes
  * since then and making it the active dataset.  If more recent snapshots exist,
@@ -1998,14 +1997,10 @@ zfs_do_rollback(int argc, char **argv)
 	zfs_handle_t *zhp, *snap;
 	char parentname[ZFS_MAXNAMELEN];
 	char *delim;
-	int force = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "rfR")) != -1) {
+	while ((c = getopt(argc, argv, "rR")) != -1) {
 		switch (c) {
-		case 'f':
-			force = 1;
-			break;
 		case 'r':
 			cb.cb_recurse = 1;
 			break;
@@ -2063,7 +2058,7 @@ zfs_do_rollback(int argc, char **argv)
 	/*
 	 * Rollback parent to the given snapshot.
 	 */
-	ret = zfs_rollback(zhp, snap, force);
+	ret = zfs_rollback(zhp, snap);
 
 out:
 	zfs_close(snap);

@@ -2193,14 +2193,51 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 
 /*
  * inputs:
- * zc_name	name of snapshot to roll back to
+ * zc_name	name of dataset to rollback (to most recent snapshot)
  *
  * outputs:	none
  */
 static int
 zfs_ioc_rollback(zfs_cmd_t *zc)
 {
-	return (dmu_objset_rollback(zc->zc_name));
+	objset_t *os;
+	int error;
+	zfsvfs_t *zfsvfs = NULL;
+
+	/*
+	 * Get the zfsvfs for the receiving objset. There
+	 * won't be one if we're operating on a zvol, if the
+	 * objset doesn't exist yet, or is not mounted.
+	 */
+	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
+	    DS_MODE_STANDARD, &os);
+	if (error)
+		return (error);
+
+	if (dmu_objset_type(os) == DMU_OST_ZFS) {
+		mutex_enter(&os->os->os_user_ptr_lock);
+		zfsvfs = dmu_objset_get_user(os);
+		if (zfsvfs != NULL)
+			VFS_HOLD(zfsvfs->z_vfs);
+		mutex_exit(&os->os->os_user_ptr_lock);
+	}
+
+	if (zfsvfs != NULL) {
+		char osname[MAXNAMELEN];
+		int mode;
+
+		VERIFY3U(0, ==, zfs_suspend_fs(zfsvfs, osname, &mode));
+		ASSERT(strcmp(osname, zc->zc_name) == 0);
+		error = dmu_objset_rollback(os);
+		VERIFY3U(0, ==, zfs_resume_fs(zfsvfs, osname, mode));
+
+		VFS_RELE(zfsvfs->z_vfs);
+	} else {
+		error = dmu_objset_rollback(os);
+	}
+	/* Note, the dmu_objset_rollback() closes the objset for us. */
+
+	return (error);
 }
 
 /*
@@ -2292,16 +2329,14 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 	 * objset doesn't exist yet, or is not mounted.
 	 */
 
-	error = dmu_objset_open(tofs, DMU_OST_ANY,
+	error = dmu_objset_open(tofs, DMU_OST_ZFS,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
 	if (!error) {
-		if (dmu_objset_type(os) == DMU_OST_ZFS) {
-			mutex_enter(&os->os->os_user_ptr_lock);
-			zfsvfs = dmu_objset_get_user(os);
-			if (zfsvfs != NULL)
-				VFS_HOLD(zfsvfs->z_vfs);
-			mutex_exit(&os->os->os_user_ptr_lock);
-		}
+		mutex_enter(&os->os->os_user_ptr_lock);
+		zfsvfs = dmu_objset_get_user(os);
+		if (zfsvfs != NULL)
+			VFS_HOLD(zfsvfs->z_vfs);
+		mutex_exit(&os->os->os_user_ptr_lock);
 		dmu_objset_close(os);
 	}
 
@@ -2346,15 +2381,17 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 		}
 		if (error == 0) {
 			nvpair_t *elem;
-			zfs_cmd_t zc2 = { 0 };
+			zfs_cmd_t *zc2;
+			zc2 = kmem_alloc(sizeof (zfs_cmd_t), KM_SLEEP);
 
-			(void) strcpy(zc2.zc_name, tofs);
+			(void) strcpy(zc2->zc_name, tofs);
 			for (elem = nvlist_next_nvpair(nv, NULL); elem;
 			    elem = nvlist_next_nvpair(nv, elem)) {
-				(void) strcpy(zc2.zc_value, nvpair_name(elem));
-				if (zfs_secpolicy_inherit(&zc2, CRED()) == 0)
-					(void) zfs_ioc_inherit_prop(&zc2);
+				(void) strcpy(zc2->zc_value, nvpair_name(elem));
+				if (zfs_secpolicy_inherit(zc2, CRED()) == 0)
+					(void) zfs_ioc_inherit_prop(zc2);
 			}
+			kmem_free(zc2, sizeof (zfs_cmd_t));
 		}
 		if (nv)
 			nvlist_free(nv);
