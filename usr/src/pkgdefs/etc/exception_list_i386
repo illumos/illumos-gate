@@ -1006,3 +1006,13 @@ usr/lib/smbsrv/dtrace/stype.d		i386
 # Private dirent, extended to include flags, for use by SMB server
 # 
 usr/include/sys/extdirent.h		i386
+#
+# Private header files for vscan service
+#
+usr/include/sys/vscan.h	i386
+usr/include/libvscan.h	i386
+#
+# libvscan is private
+#
+usr/lib/vscan/llib-lvscan	i386
+usr/lib/vscan/llib-lvscan.ln	i386

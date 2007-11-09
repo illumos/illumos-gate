@@ -65,6 +65,7 @@ submission	587/tcp				# Mail Message Submission
 submission	587/udp				#    see RFC 2476
 ldaps		636/tcp				# LDAP protocol over TLS/SSL (was sldap)
 ldaps		636/udp				# LDAP protocol over TLS/SSL (was sldap)
+icap		1344/tcp			# Internet Content Adaptation Protocol
 #
 # Host specific functions
 #

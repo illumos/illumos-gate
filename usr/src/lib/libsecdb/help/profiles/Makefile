@@ -76,7 +76,8 @@ HTMLENTS = \
 	RtOutsideAccred.html \
 	RtDefault.html \
 	RtIdmapMngmnt.html \
-	RtIdmapNameRulesMngmnt.html
+	RtIdmapNameRulesMngmnt.html \
+	RtVscanMngmnt.html
 
 
 HELPDIR =	$(ROOT)/usr/lib/help

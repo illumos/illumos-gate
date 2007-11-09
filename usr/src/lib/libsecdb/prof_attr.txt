@@ -42,7 +42,7 @@ Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
-File System Management:::Manage, mount, share file systems:profiles=SMB Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
+File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
@@ -81,6 +81,7 @@ ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMn
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
 IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
 Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html
+VSCAN Management:::Manage the VSCAN service:auths=solaris.smf.manage.vscan,solaris.smf.value.vscan,solaris.smf.modify.application;help=RtVscanMngmnt.html
 #
 # Trusted Extensions profiles:
 #

@@ -319,6 +319,7 @@ DRV_KMODS	+= ucode
 DRV_KMODS	+= vgatext
 DRV_KMODS	+= vni
 DRV_KMODS	+= vnic
+DRV_KMODS	+= vscan
 DRV_KMODS	+= wc
 DRV_KMODS	+= winlock
 DRV_KMODS	+= wpi

@@ -96,6 +96,8 @@ HTMLENTS = \
 	SmfValueSMB.html \
 	AuthReadSMB.html \
 	SmfSMBStates.html \
+	SmfValueVscan.html \
+	SmfVscanStates.html \
 	SmfWpaStates.html \
 	NetworkHeader.html \
 	WifiConfig.html \

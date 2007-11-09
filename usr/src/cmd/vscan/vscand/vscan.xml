@@ -1,0 +1,126 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+
+	CDDL HEADER START
+
+	The contents of this file are subject to the terms of the
+	Common Development and Distribution License (the "License").
+	You may not use this file except in compliance with the License.
+
+	You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+	or http://www.opensolaris.org/os/licensing.
+	See the License for the specific language governing permissions
+	and limitations under the License.
+
+	When distributing Covered Code, include this CDDL HEADER in each
+	file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+	If applicable, add the following below this CDDL HEADER, with the
+	fields enclosed by brackets "[]" replaced with your own identifying
+	information: Portions Copyright [yyyy] [name of copyright owner]
+
+	CDDL HEADER END
+
+	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+	Use is subject to license terms.
+
+	ident	"%Z%%M%	%I%	%E% SMI"
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different file.
+-->
+
+<service_bundle type='manifest' name='SUNWvscanr:vscan'>
+
+<!-- Name the service to 'system/filesystem/vscan'  -->
+<service
+	name='system/filesystem/vscan'
+	type='service'
+	version='1'>
+
+	<!-- Service has single instance  -->
+	<single_instance/>
+
+	<!-- Identify dependencies.  -->
+	<dependency
+		name='milestone'
+		grouping='require_any'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
+	<property_group name='general' type='framework'>
+		<!-- To Start/Stop/Refresh the service -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.vscan' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.vscan' />
+	</property_group>
+
+	<!-- Create default service instance.  -->
+	<instance name='icap' enabled='false'>
+
+	<!-- Identify start/stop/refresh methods -->
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/vscan/vscand'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential
+				user='root'
+				group='sys'
+				privileges='basic,proc_setid,proc_audit,file_chown_self,file_dac_search,file_dac_read,file_flag_set'
+				limit_privileges='basic,proc_setid,proc_audit,file_chown_self,file_dac_search,file_dac_read,file_flag_set'/>
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<!-- vscan service-specific general configuration defaults -->
+	<property_group name='vs_general' type='application'>
+		<stability value='Evolving' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.vscan' />
+		<propval name='maxsize' type='astring'
+			value='1GB' override='true'/>
+		<propval name='maxsize_action' type='boolean'
+			value='true' override='true'/>
+		<propval name='types' type='astring'
+			value='+*' override='true'/>
+		<propval name='viruslog' type='astring'
+			value='' override='true'/>
+	</property_group>
+
+	<!-- Create Service Template information -->
+	<template>
+		<common_name>
+			<loctext xml:lang='C'> VSCAN Service daemon</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='vscand' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+	</instance>
+
+	<stability value='Evolving' />
+
+</service>
+
+</service_bundle>

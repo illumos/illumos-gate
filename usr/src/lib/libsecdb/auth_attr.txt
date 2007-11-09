@@ -130,6 +130,7 @@ solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.h
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
 solaris.smf.manage.tnctl:::Manage Refresh of Trusted Network Parameters::help=TNctl.html
 solaris.smf.manage.tnd:::Manage Trusted Network Daemon::help=TNDaemon.html
+solaris.smf.manage.vscan:::Manage VSCAN Service States::help=SmfVscanStates.html
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
 solaris.smf.value.discover.printers.snmp:::Manage Network Attached Device Discovery Service Properties::help=SmfValueNADD.html
@@ -142,6 +143,7 @@ solaris.smf.value.smb:::Change Values of SMB Service Properties::help=SmfValueSM
 solaris.smf.read.smb:::Read permission for protected SMF SMB Service Properties::help=AuthReadSMB.html
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
 solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::help=ValueTND.html
+solaris.smf.value.vscan:::Change Values of VSCAN Properties::help=SmfValueVscan.html
 #
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html

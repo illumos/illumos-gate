@@ -515,6 +515,8 @@ f none usr/lib/help/auths/locale/C/LinkSecurity.html 444 root bin
 f none usr/lib/help/auths/locale/C/IdmapRules.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfIdmapStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueIdmap.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfValueVscan.html 0444 root bin
+f none usr/lib/help/auths/locale/C/SmfVscanStates.html 0444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 d none usr/lib/help/profiles/locale/C 755 root bin
@@ -563,6 +565,7 @@ f none usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtZoneMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIdmapMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIdmapNameRulesMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtVscanMngmnt.html 444 root bin
 d none usr/lib/iconv 755 root bin
 f none usr/lib/iconv/646da.8859.t 444 root bin
 f none usr/lib/iconv/646de.8859.t 444 root bin

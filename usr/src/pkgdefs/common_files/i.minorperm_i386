@@ -316,6 +316,7 @@ asy:*,cu
 ucode:*
 battery:*
 smbsrv:*
+vscan:*
 EOF
 }
 

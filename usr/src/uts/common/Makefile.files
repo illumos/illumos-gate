@@ -1027,6 +1027,7 @@ UFS_OBJS +=	ufs_alloc.o	ufs_bmap.o	ufs_dir.o 	ufs_xattr.o \
 		ufs_acl.o	ufs_panic.o	ufs_directio.o	ufs_log.o \
 		ufs_extvnops.o	ufs_snap.o	lufs.o		lufs_thread.o \
 		lufs_log.o	lufs_map.o	lufs_top.o	lufs_debug.o
+VSCAN_OBJS +=	vscan_drv.o	vscan_svc.o vscan_door.o
 
 #
 #			LVM modules

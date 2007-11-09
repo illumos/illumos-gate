@@ -2078,3 +2078,29 @@ secpolicy_smb(const cred_t *cr)
 {
 	return (PRIV_POLICY(cr, PRIV_SYS_SMB, B_FALSE, EPERM, NULL));
 }
+
+/*
+ * secpolicy_vscan
+ *
+ * Determine if cred_t has the necessary privileges to access a file
+ * for virus scanning and update its extended system attributes.
+ * PRIV_FILE_DAC_SEARCH, PRIV_FILE_DAC_READ - file access
+ * PRIV_FILE_FLAG_SET - set extended system attributes
+ *
+ * PRIV_POLICY checks the privilege and audits the check.
+ *
+ * Returns:
+ * 0      file access for virus scanning allowed.
+ * EPERM  file access for virus scanning is NOT permitted.
+ */
+int
+secpolicy_vscan(const cred_t *cr)
+{
+	if ((PRIV_POLICY(cr, PRIV_FILE_DAC_SEARCH, B_FALSE, EPERM, NULL)) ||
+	    (PRIV_POLICY(cr, PRIV_FILE_DAC_READ, B_FALSE, EPERM, NULL)) ||
+	    (PRIV_POLICY(cr, PRIV_FILE_FLAG_SET, B_FALSE, EPERM, NULL))) {
+		return (EPERM);
+	}
+
+	return (0);
+}

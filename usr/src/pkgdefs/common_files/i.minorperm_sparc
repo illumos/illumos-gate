@@ -333,6 +333,7 @@ sdt:sdt
 systrace:systrace
 physmem:*
 smbsrv:*
+vscan:*
 EOF
 }
 

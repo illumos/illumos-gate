@@ -164,3 +164,4 @@ ucode:* 0644 root sys
 dmfe:* 0666 root sys
 afe:* 0666 root sys
 mxfe:* 0666 root sys
+vscan:* 0640 root sys

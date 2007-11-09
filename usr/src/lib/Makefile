@@ -234,6 +234,7 @@ SUBDIRS += \
 	libidmap	\
 	libipmi		\
 	libexacct/demo	\
+	libvscan	\
 	smbsrv		\
 	$($(MACH)_SUBDIRS)
 
@@ -305,6 +306,7 @@ MSGSUBDIRS=		\
 	libsmedia	\
 	libtsol		\
 	libuutil	\
+	libvscan	\
 	libwanboot	\
 	libwanbootutil	\
 	libzfs		\
@@ -422,6 +424,7 @@ HDRSUBDIRS=		\
 	libkrb5		\
 	libshare	\
 	libidmap	\
+	libvscan	\
 	smbsrv		\
 	$($(MACH)_HDRSUBDIRS)
 
@@ -549,6 +552,7 @@ libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
 		libshare libidmap pkcs11
+libvscan:	libscf
 
 #
 # The reason this rule checks for the existence of the

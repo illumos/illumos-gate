@@ -578,6 +578,7 @@ CHKHDRS=			\
 	vnic.h			\
 	vnic_impl.h		\
 	vnode.h			\
+	vscan.h			\
 	vtoc.h			\
 	vtrace.h		\
 	vuid_event.h		\

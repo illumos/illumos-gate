@@ -411,6 +411,7 @@ COMMON_SUBDIRS=		\
 	vna		\
 	volcheck	\
 	volrmmount	\
+	vscan		\
 	w		\
 	wall		\
 	wbem		\

@@ -446,6 +446,7 @@
 6243:AUE_uadmin_swapctl:uadmin(1m) - swapctl:ss
 6244:AUE_smbd_session:smbd(1m) session setup:lo
 6245:AUE_smbd_logoff:smbd(1m) session logoff:lo
+6246:AUE_vscan_quarantine:vscand(1m) quarantine infected file:na
 #
 # SMF(5) svc.configd events (svcadm(1M) related)
 #

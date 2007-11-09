@@ -1654,8 +1654,34 @@ Use is subject to license terms.
 	<see>svccfg(1M)</see>
     </event>
 
+<!-- vscan service event; infected file detected -->
+    <event id="AUE_vscan_quarantine" header="0" idNo="88" omit="JNI">
+    	<title>VSCAN: quarantine infected file</title>
+	<program>/usr/lib/vscan/vscand</program>
+	<see>vscand(1M), ICAP RFC 3507 (Extensions)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="file">
+	    <internal token="path"/>
+	    <external opt="required" type="char*"/>
+	    <comment>infected file</comment>
+	</entry>
+	<entry id="violations,nviolations">
+	    <internal token="text"/>
+	    <external opt="optional" type="char**,int"/>
+	    <comment>ID - threat description</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 87, so next is 88, then fix this comment -->
+<!-- Highest idNo is 88, so next is 89, then fix this comment -->
 <!-- end of C Only events -->
 
 
