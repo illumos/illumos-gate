@@ -57,6 +57,7 @@
 #include <sys/ddi.h>
 #include <sys/vtrace.h>
 #include <sys/callb.h>
+#include <sys/strsun.h>
 
 #include <sys/strlog.h>
 #include <rpc/rpc_com.h>
@@ -1399,22 +1400,14 @@ mir_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
  * the message to either the client or server.
  */
 static void
-mir_do_rput(queue_t *q, mblk_t *mp, int srv)
+mir_rput(queue_t *q, mblk_t *mp)
 {
-	mblk_t	*cont_mp;
 	int	excess;
-	int32_t	frag_len;
-	int32_t	frag_header;
-	mblk_t	*head_mp;
-	int	len;
-	mir_t	*mir;
-	mblk_t	*mp1;
-	unsigned char	*rptr;
-	mblk_t	*tail_mp;
-	unsigned char	*wptr;
-	boolean_t	stop_timer = B_FALSE;
+	int32_t	frag_len, frag_header;
+	mblk_t	*cont_mp, *head_mp, *tail_mp, *mp1;
+	mir_t	*mir = q->q_ptr;
+	boolean_t stop_timer = B_FALSE;
 
-	mir = (mir_t *)q->q_ptr;
 	ASSERT(mir != NULL);
 
 	/*
@@ -1436,14 +1429,13 @@ mir_do_rput(queue_t *q, mblk_t *mp, int srv)
 		break;
 	case M_PROTO:
 	case M_PCPROTO:
-		rptr = mp->b_rptr;
-		if (mp->b_wptr - rptr < sizeof (uint32_t)) {
+		if (MBLKL(mp) < sizeof (t_scalar_t)) {
 			RPCLOG(1, "mir_rput: runt TPI message (%d bytes)\n",
-			    (int)(mp->b_wptr - rptr));
+			    (int)MBLKL(mp));
 			freemsg(mp);
 			return;
 		}
-		if (((union T_primitives *)rptr)->type != T_DATA_IND) {
+		if (((union T_primitives *)mp->b_rptr)->type != T_DATA_IND) {
 			mir_rput_proto(q, mp);
 			return;
 		}
@@ -1460,7 +1452,7 @@ mir_do_rput(queue_t *q, mblk_t *mp, int srv)
 		 * value.  We are the "stream head" for all inbound
 		 * data messages since messages are passed directly to KRPC.
 		 */
-		if ((mp->b_wptr - mp->b_rptr) >= sizeof (struct stroptions)) {
+		if (MBLKL(mp) >= sizeof (struct stroptions)) {
 			struct stroptions	*stropts;
 
 			stropts = (struct stroptions *)mp->b_rptr;
@@ -1472,10 +1464,8 @@ mir_do_rput(queue_t *q, mblk_t *mp, int srv)
 		putnext(q, mp);
 		return;
 	case M_FLUSH:
-		RPCLOG(32, "mir_do_rput: ignoring M_FLUSH on q 0x%p. ",
-		    (void *)q);
-		RPCLOG(32, "M_FLUSH is %x\n", (uint_t)*mp->b_rptr);
-
+		RPCLOG(32, "mir_rput: ignoring M_FLUSH %x ", *mp->b_rptr);
+		RPCLOG(32, "on q 0x%p\n", (void *)q);
 		putnext(q, mp);
 		return;
 	default:
@@ -1503,344 +1493,111 @@ mir_do_rput(queue_t *q, mblk_t *mp, int srv)
 
 	/* Loop, processing each message block in the mp chain separately. */
 	do {
-		/*
-		 * cont_mp is used in the do/while condition below to
-		 * walk to the next block in the STREAMS message.
-		 * mp->b_cont may be nil'ed during processing so we
-		 * can't rely on it to find the next block.
-		 */
 		cont_mp = mp->b_cont;
+		mp->b_cont = NULL;
 
 		/*
-		 * Get local copies of rptr and wptr for our processing.
-		 * These always point into "mp" (the current block being
-		 * processed), but rptr is updated as we consume any
-		 * record header in this message, and wptr is updated to
-		 * point to the end of the data for the current fragment,
-		 * if it ends in this block.  The main point is that
-		 * they are not always the same as b_rptr and b_wptr.
-		 * b_rptr and b_wptr will be updated when appropriate.
+		 * If frag_len is negative, we're still in the process of
+		 * building frag_header -- try to complete it with this mblk.
 		 */
-		rptr = mp->b_rptr;
-		wptr = mp->b_wptr;
-same_mblk:;
-		len = (int)(wptr - rptr);
-		if (len <= 0) {
-			/*
-			 * If we have processed all of the data in the message
-			 * or the block is empty to begin with, then we're
-			 * done with this block and can go on to cont_mp,
-			 * if there is one.
-			 *
-			 * First, we check to see if the current block is
-			 * now zero-length and, if so, we free it.
-			 * This happens when either the block was empty
-			 * to begin with or we consumed all of the data
-			 * for the record marking header.
-			 */
-			if (rptr <= mp->b_rptr) {
-				/*
-				 * If head_mp is non-NULL, add cont_mp to the
-				 * mblk list. XXX But there is a possibility
-				 * that tail_mp = mp or even head_mp = mp XXX
-				 */
-				if (head_mp) {
-					if (head_mp == mp)
-						head_mp = NULL;
-					else if (tail_mp != mp) {
-		ASSERT((tail_mp->b_cont == NULL) || (tail_mp->b_cont == mp));
-						tail_mp->b_cont = cont_mp;
-						/*
-						 * It's possible that, because
-						 * of a very short mblk (0-3
-						 * bytes), we've ended up here
-						 * and that cont_mp could be
-						 * NULL (if we're at the end
-						 * of an mblk chain). If so,
-						 * don't set tail_mp to
-						 * cont_mp, because the next
-						 * time we access it, we'll
-						 * dereference a NULL pointer
-						 * and crash. Just leave
-						 * tail_mp pointing at the
-						 * current end of chain.
-						 */
-						if (cont_mp)
-							tail_mp = cont_mp;
-					} else {
-						mblk_t *smp = head_mp;
+		while (frag_len < 0 && mp->b_rptr < mp->b_wptr) {
+			frag_len++;
+			frag_header <<= 8;
+			frag_header += *mp->b_rptr++;
+		}
 
-						while ((smp->b_cont != NULL) &&
-						    (smp->b_cont != mp))
-							smp = smp->b_cont;
-						smp->b_cont = cont_mp;
-						/*
-						 * Don't set tail_mp to cont_mp
-						 * if it's NULL. Instead, set
-						 * tail_mp to smp, which is the
-						 * end of the chain starting
-						 * at head_mp.
-						 */
-						if (cont_mp)
-							tail_mp = cont_mp;
-						else
-							tail_mp = smp;
-					}
-				}
-				freeb(mp);
-			}
+		if (MBLKL(mp) == 0) {
+			/*
+			 * This was either a zero-length mblk or we consumed
+			 * it while trying to complete the fragment header.
+			 * In either case, free it and move on.
+			 */
+			freeb(mp);
 			continue;
 		}
 
-		/*
-		 * frag_len starts at -4 and is incremented past the record
-		 * marking header to 0, and then becomes positive as real data
-		 * bytes are received for the message.  While frag_len is less
-		 * than zero, we need more bytes for the record marking
-		 * header.
-		 */
-		if (frag_len < 0) {
-			uchar_t	*up = rptr;
-			/*
-			 * Collect as many bytes as we need for the record
-			 * marking header and that are available in this block.
-			 */
-			do {
-				--len;
-				frag_len++;
-				frag_header <<= 8;
-				frag_header += (*up++ & 0xFF);
-			} while (len > 0 && frag_len < 0);
-
-			if (rptr == mp->b_rptr) {
-				/*
-				 * The record header is located at the
-				 * beginning of the block, so just walk
-				 * b_rptr past it.
-				 */
-				mp->b_rptr = rptr = up;
-			} else {
-				/*
-				 * The record header is located in the middle
-				 * of a block, so copy any remaining data up.
-				 * This happens when an RPC message is
-				 * fragmented into multiple pieces and
-				 * a middle (or end) fragment immediately
-				 * follows a previous fragment in the same
-				 * message block.
-				 */
-				wptr = &rptr[len];
-				mp->b_wptr = wptr;
-				if (len) {
-					RPCLOG(32, "mir_do_rput: copying %d "
-					    "bytes of data up", len);
-					RPCLOG(32, " db_ref %d\n",
-					    (uint_t)mp->b_datap->db_ref);
-					bcopy(up, rptr, len);
-				}
-			}
-
-			/*
-			 * If we haven't received the complete record header
-			 * yet, then loop around to get the next block in the
-			 * STREAMS message. The logic at same_mblk label will
-			 * free the current block if it has become empty.
-			 */
-			if (frag_len < 0) {
-				RPCLOG(32, "mir_do_rput: frag_len is still < 0 "
-				"(%d)", len);
-				goto same_mblk;
-			}
-
-#ifdef	RPCDEBUG
-			if ((frag_header & MIR_LASTFRAG) == 0) {
-				RPCLOG0(32, "mir_do_rput: multi-fragment "
-				    "record\n");
-			}
-			{
-				uint_t l = frag_header & ~MIR_LASTFRAG;
-
-				if (l != 0 && mir->mir_max_msg_sizep &&
-				    l >= *mir->mir_max_msg_sizep) {
-					RPCLOG(32, "mir_do_rput: fragment size"
-					    " (%d) > maximum", l);
-					RPCLOG(32, " (%u)\n",
-					    *mir->mir_max_msg_sizep);
-				}
-			}
-#endif
-			/*
-			 * At this point we have retrieved the complete record
-			 * header for this fragment.  If the current block is
-			 * empty, then we need to free it and walk to the next
-			 * block.
-			 */
-			if (mp->b_rptr >= wptr) {
-				/*
-				 * If this is not the last fragment or if we
-				 * have not received all the data for this
-				 * RPC message, then loop around to the next
-				 * block.
-				 */
-				if (!(frag_header & MIR_LASTFRAG) ||
-				    (frag_len -
-				    (frag_header & ~MIR_LASTFRAG)) ||
-				    !head_mp)
-					goto same_mblk;
-
-				/*
-				 * Quick walk to next block in the
-				 * STREAMS message.
-				 */
-				freeb(mp);
-				continue;
-			}
-		}
+		ASSERT(frag_len >= 0);
 
 		/*
-		 * We've collected the complete record header.  The data
-		 * in the current block is added to the end of the RPC
-		 * message.  Note that tail_mp is the same as mp after
-		 * this linkage.
+		 * Now frag_header has the number of bytes in this fragment
+		 * and we're just waiting to collect them all.  Chain our
+		 * latest mblk onto the list and see if we now have enough
+		 * bytes to complete the fragment.
 		 */
-		if (!head_mp)
-			head_mp = mp;
-		else if (tail_mp != mp) {
-			ASSERT((tail_mp->b_cont == NULL) ||
-			    (tail_mp->b_cont == mp));
+		if (head_mp == NULL) {
+			ASSERT(tail_mp == NULL);
+			head_mp = tail_mp = mp;
+		} else {
 			tail_mp->b_cont = mp;
+			tail_mp = mp;
 		}
-		tail_mp = mp;
 
-		/*
-		 * Add the length of this block to the accumulated
-		 * fragment length.
-		 */
-		frag_len += len;
+		frag_len += MBLKL(mp);
 		excess = frag_len - (frag_header & ~MIR_LASTFRAG);
-		/*
-		 * If we have not received all the data for this fragment,
-		 * then walk to the next block.
-		 */
-		if (excess < 0)
+		if (excess < 0) {
+			/*
+			 * We still haven't received enough data to complete
+			 * the fragment, so continue on to the next mblk.
+			 */
 			continue;
-
-		/*
-		 * We've received a complete fragment, so reset frag_len
-		 * for the next one.
-		 */
-		frag_len = -(int32_t)sizeof (uint32_t);
-
-		/*
-		 * Update rptr to point to the beginning of the next
-		 * fragment in this block.  If there are no more bytes
-		 * in the block (excess is 0), then rptr will be equal
-		 * to wptr.
-		 */
-		rptr = wptr - excess;
-
-		/*
-		 * Now we check to see if this fragment is the last one in
-		 * the RPC message.
-		 */
-		if (!(frag_header & MIR_LASTFRAG)) {
-			/*
-			 * This isn't the last one, so start processing the
-			 * next fragment.
-			 */
-			frag_header = 0;
-
-			/*
-			 * If excess is 0, the next fragment
-			 * starts at the beginning of the next block --
-			 * we "continue" to the end of the while loop and
-			 * walk to cont_mp.
-			 */
-			if (excess == 0)
-				continue;
-			RPCLOG0(32, "mir_do_rput: multi-fragment message with "
-			    "two or more fragments in one mblk\n");
-
-			/*
-			 * If excess is non-0, then the next fragment starts
-			 * in this block.  rptr points to the beginning
-			 * of the next fragment and we "goto same_mblk"
-			 * to continue processing.
-			 */
-			goto same_mblk;
 		}
 
 		/*
-		 * We've got a complete RPC message.  Before passing it
-		 * upstream, check to see if there is extra data in this
-		 * message block. If so, then we separate the excess
-		 * from the complete message. The excess data is processed
-		 * after the current message goes upstream.
+		 * We've got a complete fragment.  If there are excess bytes,
+		 * then they're part of the next fragment's header (of either
+		 * this RPC message or the next RPC message).  Split that part
+		 * into its own mblk so that we can safely freeb() it when
+		 * building frag_header above.
 		 */
 		if (excess > 0) {
-			RPCLOG(32, "mir_do_rput: end of record, but excess "
-			    "data (%d bytes) in this mblk. dupb/copyb "
-			    "needed\n", excess);
-
-			/* Duplicate only the overlapping block. */
-			mp1 = dupb(tail_mp);
-
-			/*
-			 * dupb() might have failed due to ref count wrap around
-			 * so try a copyb().
-			 */
-			if (mp1 == NULL)
-				mp1 = copyb(tail_mp);
-
-			/*
-			 * Do not use bufcall() to schedule a "buffer
-			 * availability event."  The reason is that
-			 * bufcall() has problems.  For example, if memory
-			 * runs out, bufcall() itself will fail since it
-			 * needs to allocate memory.  The most appropriate
-			 * action right now is to disconnect this connection
-			 * as the system is under stress.  We should try to
-			 * free up resources.
-			 */
-			if (mp1 == NULL) {
+			if ((mp1 = dupb(mp)) == NULL &&
+			    (mp1 = copyb(mp)) == NULL) {
 				freemsg(head_mp);
-				RPCLOG0(1, "mir_do_rput: dupb/copyb failed\n");
+				freemsg(cont_mp);
+				RPCLOG0(1, "mir_rput: dupb/copyb failed\n");
 				mir->mir_frag_header = 0;
-				mir->mir_frag_len = -(int)sizeof (uint32_t);
+				mir->mir_frag_len = -(int32_t)sizeof (uint32_t);
 				mir->mir_head_mp = NULL;
 				mir->mir_tail_mp = NULL;
-
-				mir_disconnect(q, mir);
+				mir_disconnect(q, mir);	/* drops mir_mutex */
 				return;
 			}
 
 			/*
-			 * The new message block is linked with the
-			 * continuation block in cont_mp.  We then point
-			 * cont_mp to the new block so that we will
-			 * process it next.
+			 * Relink the message chain so that the next mblk is
+			 * the next fragment header, followed by the rest of
+			 * the message chain.
 			 */
 			mp1->b_cont = cont_mp;
 			cont_mp = mp1;
+
 			/*
-			 * Data in the new block begins at the
-			 * next fragment (rptr).
+			 * Data in the new mblk begins at the next fragment,
+			 * and data in the old mblk ends at the next fragment.
 			 */
-			cont_mp->b_rptr += (rptr - tail_mp->b_rptr);
-			ASSERT(cont_mp->b_rptr >= cont_mp->b_datap->db_base);
-			ASSERT(cont_mp->b_rptr <= cont_mp->b_wptr);
-
-			/* Data in the current fragment ends at rptr. */
-			tail_mp->b_wptr = rptr;
-			ASSERT(tail_mp->b_wptr <= tail_mp->b_datap->db_lim);
-			ASSERT(tail_mp->b_wptr >= tail_mp->b_rptr);
-
+			mp1->b_rptr = mp1->b_wptr - excess;
+			mp->b_wptr -= excess;
 		}
 
-		/* tail_mp is the last block with data for this RPC message. */
-		tail_mp->b_cont = NULL;
+		/*
+		 * Reset frag_len and frag_header for the next fragment.
+		 */
+		frag_len = -(int32_t)sizeof (uint32_t);
+		if (!(frag_header & MIR_LASTFRAG)) {
+			/*
+			 * The current fragment is complete, but more
+			 * fragments need to be processed before we can
+			 * pass along the RPC message headed at head_mp.
+			 */
+			frag_header = 0;
+			continue;
+		}
+		frag_header = 0;
 
-		/* Pass the RPC message to the current consumer. */
+		/*
+		 * We've got a complete RPC message; pass it to the
+		 * appropriate consumer.
+		 */
 		switch (mir->mir_type) {
 		case RPC_CLIENT:
 			if (clnt_dispatch_notify(head_mp, mir->mir_zoneid)) {
@@ -1848,11 +1605,11 @@ same_mblk:;
 				 * Mark this stream as active.  This marker
 				 * is used in mir_timer().
 				 */
-
 				mir->mir_clntreq = 1;
 				mir->mir_use_timestamp = lbolt;
-			} else
+			} else {
 				freemsg(head_mp);
+			}
 			break;
 
 		case RPC_SERVER:
@@ -1860,7 +1617,6 @@ same_mblk:;
 			 * Check for flow control before passing the
 			 * message to KRPC.
 			 */
-
 			if (!mir->mir_hold_inbound) {
 				if (mir->mir_krpc_cell) {
 					/*
@@ -1885,7 +1641,6 @@ same_mblk:;
 					mir_krpc_cell_null++;
 					freemsg(head_mp);
 				}
-
 			} else {
 				/*
 				 * If the outbound side of the stream is
@@ -1893,10 +1648,7 @@ same_mblk:;
 				 * until client catches up. mir_hold_inbound
 				 * is set in mir_wput and cleared in mir_wsrv.
 				 */
-				if (srv)
-					(void) putbq(q, head_mp);
-				else
-					(void) putq(q, head_mp);
+				(void) putq(q, head_mp);
 				mir->mir_inrservice = B_TRUE;
 			}
 			break;
@@ -1908,17 +1660,14 @@ same_mblk:;
 		}
 
 		/*
-		 * Reset head_mp and frag_header since we're starting on a
-		 * new RPC fragment and message.
+		 * Reset the chain since we're starting on a new RPC message.
 		 */
-		head_mp = NULL;
-		tail_mp = NULL;
-		frag_header = 0;
+		head_mp = tail_mp = NULL;
 	} while ((mp = cont_mp) != NULL);
 
 	/*
-	 * Do a sanity check on the message length.  If this message is
-	 * getting excessively large, shut down the connection.
+	 * Sanity check the message length; if it's too large mir_check_len()
+	 * will shutdown the connection, drop mir_mutex, and return non-zero.
 	 */
 	if (head_mp != NULL && mir->mir_setup_complete &&
 	    mir_check_len(q, frag_len, head_mp))
@@ -1939,20 +1688,14 @@ same_mblk:;
 	 *
 	 * Note that if the timer fires before we stop it, it will not
 	 * do any harm as MIR_SVC_QUIESCED() is false and mir_timer()
-	 * will just return;
+	 * will just return.
 	 */
 	if (stop_timer) {
-		RPCLOG(16, "mir_do_rput stopping idle timer on 0x%p because "
-		    "ref cnt going to non zero\n", (void *) WR(q));
+		RPCLOG(16, "mir_rput: stopping idle timer on 0x%p because "
+		    "ref cnt going to non zero\n", (void *)WR(q));
 		mir_svc_idle_stop(WR(q), mir);
 	}
 	mutex_exit(&mir->mir_mutex);
-}
-
-static void
-mir_rput(queue_t *q, mblk_t *mp)
-{
-	mir_do_rput(q, mp, 0);
 }
 
 static void
@@ -1971,7 +1714,7 @@ mir_rput_proto(queue_t *q, mblk_t *mp)
 		case T_DISCON_IND:
 			reason = ((struct T_discon_ind *)
 			    (mp->b_rptr))->DISCON_reason;
-		    /*FALLTHROUGH*/
+			/*FALLTHROUGH*/
 		case T_ORDREL_IND:
 			mutex_enter(&mir->mir_mutex);
 			if (mir->mir_head_mp) {
@@ -3153,38 +2896,33 @@ mir_disconnect(queue_t *q, mir_t *mir)
 }
 
 /*
- * do a sanity check on the length of the fragment.
- * returns 1 if bad else 0.
+ * Sanity check the message length, and if it's too large, shutdown the
+ * connection.  Returns 1 if the connection is shutdown; 0 otherwise.
  */
 static int
-mir_check_len(queue_t *q, int32_t frag_len,
-    mblk_t *head_mp)
+mir_check_len(queue_t *q, int32_t frag_len, mblk_t *head_mp)
 {
-	mir_t   *mir;
+	mir_t *mir = q->q_ptr;
+	uint_t maxsize = 0;
 
-	mir = (mir_t *)q->q_ptr;
+	if (mir->mir_max_msg_sizep != NULL)
+		maxsize = *mir->mir_max_msg_sizep;
 
-	/*
-	 * Do a sanity check on the message length.  If this message is
-	 * getting excessively large, shut down the connection.
-	 */
-
-	if ((frag_len <= 0) || (mir->mir_max_msg_sizep == NULL) ||
-	    (frag_len <= *mir->mir_max_msg_sizep)) {
+	if (maxsize == 0 || frag_len <= (int)maxsize)
 		return (0);
-	}
 
 	freemsg(head_mp);
-	mir->mir_head_mp = (mblk_t *)0;
-	mir->mir_frag_len = -(int)sizeof (uint32_t);
+	mir->mir_head_mp = NULL;
+	mir->mir_tail_mp = NULL;
+	mir->mir_frag_header = 0;
+	mir->mir_frag_len = -(int32_t)sizeof (uint32_t);
 	if (mir->mir_type != RPC_SERVER || mir->mir_setup_complete) {
 		cmn_err(CE_NOTE,
 		    "KRPC: record fragment from %s of size(%d) exceeds "
 		    "maximum (%u). Disconnecting",
 		    (mir->mir_type == RPC_CLIENT) ? "server" :
 		    (mir->mir_type == RPC_SERVER) ? "client" :
-		    "test tool",
-		    frag_len, *mir->mir_max_msg_sizep);
+		    "test tool", frag_len, maxsize);
 	}
 
 	mir_disconnect(q, mir);
