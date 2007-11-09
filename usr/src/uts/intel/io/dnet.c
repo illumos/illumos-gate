@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -677,8 +677,8 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Get the BNC/TP indicator from the conf file for 21040
 	 */
 	dnetp->bnc_indicator =
-		ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
-				"bncaui", -1);
+	    ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
+	    "bncaui", -1);
 
 	/*
 	 * For 21140 check the data rate set in the conf file. Default is
@@ -686,11 +686,11 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * with what's in the conf file
 	 */
 	dnetp->speed =
-		ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
-				speed_propname, 0);
+	    ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
+	    speed_propname, 0);
 	dnetp->full_duplex =
-		ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
-				duplex_propname, -1);
+	    ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
+	    duplex_propname, -1);
 
 	if (dnetp->speed == 100) {
 		dnetp->disallowed_media |= (1UL<<MEDIA_TP) | (1UL<<MEDIA_TP_FD);
@@ -731,10 +731,10 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	dnetp->sr.netaddr[ETHERADDRL-1] += secondary;	/* unique ether addr */
 
 	BCOPY((caddr_t)dnetp->sr.netaddr,
-		(caddr_t)dnetp->vendor_addr, ETHERADDRL);
+	    (caddr_t)dnetp->vendor_addr, ETHERADDRL);
 
 	BCOPY((caddr_t)dnetp->sr.netaddr,
-		(caddr_t)dnetp->curr_macaddr, ETHERADDRL);
+	    (caddr_t)dnetp->curr_macaddr, ETHERADDRL);
 
 
 	/*
@@ -746,8 +746,8 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    (dnetp->board_type == DEVICE_ID_21143 && revid <= 0x30)) ? 1 : 0;
 
 	dnetp->overrun_workaround =
-		ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
-				ofloprob_propname, dnetp->overrun_workaround);
+	    ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
+	    ofloprob_propname, dnetp->overrun_workaround);
 
 	/*
 	 * Add the interrupt handler if dnet_hack_interrupts() returns 0.
@@ -755,7 +755,7 @@ dnetattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	if (!dnet_hack_interrupts(macinfo, secondary)) {
 		(void) ddi_add_intr(devinfo, 0, NULL,
-				    NULL, gld_intr, (caddr_t)macinfo);
+		    NULL, gld_intr, (caddr_t)macinfo);
 	}
 
 	dnetp->max_tx_desc = max_tx_desc;
@@ -904,9 +904,9 @@ dnetdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 */
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, devinfo, "DNET_HACK");
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, ddi_get_parent(devinfo),
-		"DNET_SROM");
+	    "DNET_SROM");
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, ddi_get_parent(devinfo),
-		"DNET_DEVNUM");
+	    "DNET_DEVNUM");
 #endif
 
 	return (DDI_SUCCESS);
@@ -923,7 +923,7 @@ static int
 dnet_reset(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
 		cmn_err(CE_NOTE, "dnet_reset(0x%p)", (void *) macinfo);
@@ -959,7 +959,7 @@ static void
 dnet_reset_board(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	uint32_t	val;
 
 	/*
@@ -967,17 +967,16 @@ dnet_reset_board(gld_mac_info_t *macinfo)
 	 */
 	/* XXX function return value ignored */
 	/* (void) dnet_stop_board(macinfo); */
-	val = ddi_get32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, OPN_MODE_REG));
+	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
-		    val & ~(START_TRANSMIT | START_RECEIVE));
+	    val & ~(START_TRANSMIT | START_RECEIVE));
 
 	/*
 	 * Reset the chip
 	 */
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG), 0);
 	ddi_put32(dnetp->io_handle,
-		REG32(dnetp->io_reg, BUS_MODE_REG), SW_RESET);
+	    REG32(dnetp->io_reg, BUS_MODE_REG), SW_RESET);
 	drv_usecwait(5);
 }
 
@@ -1004,10 +1003,10 @@ static void
 dnet_chip_init(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-					(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, BUS_MODE_REG),
-		    CACHE_ALIGN | BURST_SIZE);		/* CSR0 */
+	    CACHE_ALIGN | BURST_SIZE);		/* CSR0 */
 
 	/*
 	 * Initialize the TX and RX descriptors/buffers
@@ -1024,7 +1023,7 @@ dnet_chip_init(gld_mac_info_t *macinfo)
 	 * Set the base address of the Tx descrptor list in CSR4
 	 */
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_BASE_ADDR_REG),
-		    (uint32_t)(dnetp->tx_desc_paddr));
+	    (uint32_t)(dnetp->tx_desc_paddr));
 
 	dnetp->tx_current_desc = dnetp->rx_current_desc = 0;
 	dnetp->transmitted_desc = 0;
@@ -1040,8 +1039,8 @@ static int
 dnet_start(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
-	uint32_t 		val;
+	    (struct dnetinstance *)macinfo->gldm_private;
+	uint32_t		val;
 
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
@@ -1052,15 +1051,13 @@ dnet_start(gld_mac_info_t *macinfo)
 	/*
 	 * start the board and enable receiving
 	 */
-	val = ddi_get32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, OPN_MODE_REG));
+	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
-		    val | START_TRANSMIT);
+	    val | START_TRANSMIT);
 	(void) dnet_set_addr(macinfo, dnetp->curr_macaddr);
-	val = ddi_get32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, OPN_MODE_REG));
+	val = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
-		    val | START_RECEIVE);
+	    val | START_RECEIVE);
 	enable_interrupts(dnetp, 1);
 	return (0);
 }
@@ -1072,7 +1069,7 @@ static int
 dnet_start_board(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
@@ -1095,8 +1092,8 @@ static int
 dnet_stop_board(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
-	uint32_t 		val;
+	    (struct dnetinstance *)macinfo->gldm_private;
+	uint32_t		val;
 
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
@@ -1107,9 +1104,9 @@ dnet_stop_board(gld_mac_info_t *macinfo)
 	 */
 	mutex_enter(&dnetp->intrlock);
 	val = ddi_get32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, OPN_MODE_REG));
+	    REG32(dnetp->io_reg, OPN_MODE_REG));
 	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
-		    val & ~(START_TRANSMIT | START_RECEIVE));
+	    val & ~(START_TRANSMIT | START_RECEIVE));
 	mutex_exit(&dnetp->intrlock);
 	return (0);
 }
@@ -1122,7 +1119,7 @@ static int
 dnet_set_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type *desc;
 	int 		current_desc;
 	uint32_t	index;
@@ -1136,7 +1133,7 @@ dnet_set_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 #endif
 	bcopy(macaddr, dnetp->curr_macaddr, ETHERADDRL);
 	val = ddi_get32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, OPN_MODE_REG));
+	    REG32(dnetp->io_reg, OPN_MODE_REG));
 	if (!(val & START_TRANSMIT))
 		return (0);
 
@@ -1195,7 +1192,7 @@ dnet_set_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 
 	desc->desc0.own = 1;
 	ddi_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
-		    TX_POLL_DEMAND);
+	    TX_POLL_DEMAND);
 	return (0);
 }
 
@@ -1206,7 +1203,7 @@ static int
 dnet_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
@@ -1228,7 +1225,7 @@ static int
 dnet_set_multicast(gld_mac_info_t *macinfo, uchar_t *mcast, int op)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	uint32_t	index;
 	uint32_t	*hashp;
 	uint32_t	retval;
@@ -1288,10 +1285,8 @@ hashindex(uchar_t *address)
 		}
 	}
 
-	for (index = 0, bit = 23, shift = 8;
-		shift >= 0;
-		bit++, shift--) {
-			index |= (((crc >> bit) & 1) << shift);
+	for (index = 0, bit = 23, shift = 8; shift >= 0; bit++, shift--) {
+		index |= (((crc >> bit) & 1) << shift);
 	}
 	return (index);
 }
@@ -1324,15 +1319,13 @@ dnet_set_promiscuous(gld_mac_info_t *macinfo, int on)
 	dnetp->promisc = on;
 
 	val = ddi_get32(dnetp->io_handle,
-			REG32(dnetp->io_reg, OPN_MODE_REG));
+	    REG32(dnetp->io_reg, OPN_MODE_REG));
 	if (on != GLD_MAC_PROMISC_NONE)
-		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, OPN_MODE_REG),
-			val | PROM_MODE);
+		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+		    val | PROM_MODE);
 	else
-		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, OPN_MODE_REG),
-			val & (~PROM_MODE));
+		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+		    val & (~PROM_MODE));
 	mutex_exit(&dnetp->intrlock);
 	return (DDI_SUCCESS);
 }
@@ -1350,7 +1343,7 @@ static int
 dnet_get_stats(gld_mac_info_t *macinfo, struct gld_stats *sp)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-			(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
 		cmn_err(CE_NOTE, "dnet_get_stats(0x%p)", (void *) macinfo);
@@ -1396,7 +1389,7 @@ static int
 dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 {
 	struct dnetinstance *dnetp =		/* Our private device info */
-			(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type	*ring = dnetp->tx_desc;
 	int		mblen, totlen;
 	int		index, end_index, start_index;
@@ -1411,7 +1404,7 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETSEND)
 		cmn_err(CE_NOTE, "dnet_send(0x%p, 0x%p)",
-			(void *) macinfo, (void *) mp);
+		    (void *) macinfo, (void *) mp);
 #endif
 	mutex_enter(&dnetp->txlock);
 	if (dnetp->need_saddr) {
@@ -1445,9 +1438,10 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 			(void) pullupmsg(bp, -1);
 #else
 			if (pullupmsg(bp, -1))
-			    cmn_err(CE_NOTE, "DNET: pulled up send msg");
+				cmn_err(CE_NOTE, "DNET: pulled up send msg");
 			else
-			    cmn_err(CE_NOTE, "DNET: couldn't pullup send msg");
+				cmn_err(CE_NOTE,
+				    "DNET: couldn't pullup send msg");
 #endif
 		}
 
@@ -1493,30 +1487,30 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 		while (ncookies) {
 			end_index = index;
 			if (bufn % 2) {
-			    ring[index].buffer2 =
-				(uint32_t)dma_cookie.dmac_address;
-			    ring[index].desc1.buffer_size2 =
-				dma_cookie.dmac_size;
-			    index = NextTXIndex(index); /* goto next desc */
+				ring[index].buffer2 =
+				    (uint32_t)dma_cookie.dmac_address;
+				ring[index].desc1.buffer_size2 =
+				    dma_cookie.dmac_size;
+				index = NextTXIndex(index); /* goto next desc */
 			} else {
-			    /* initialize the descriptor */
-			    ASSERT(ring[index].desc0.own == 0);
-			    *(uint32_t *)&ring[index].desc0 = 0;
-			    *(uint32_t *)&ring[index].desc1 &=
-				DNET_END_OF_RING;
-			    ring[index].buffer1 =
-				(uint32_t)dma_cookie.dmac_address;
-			    ring[index].desc1.buffer_size1 =
-				dma_cookie.dmac_size;
-			    ring[index].buffer2 = (uint32_t)(0);
-			    dnetp->free_desc--;
-			    ASSERT(dnetp->free_desc >= 0);
+				/* initialize the descriptor */
+				ASSERT(ring[index].desc0.own == 0);
+				*(uint32_t *)&ring[index].desc0 = 0;
+				*(uint32_t *)&ring[index].desc1 &=
+				    DNET_END_OF_RING;
+				ring[index].buffer1 =
+				    (uint32_t)dma_cookie.dmac_address;
+				ring[index].desc1.buffer_size1 =
+				    dma_cookie.dmac_size;
+				ring[index].buffer2 = (uint32_t)(0);
+				dnetp->free_desc--;
+				ASSERT(dnetp->free_desc >= 0);
 			}
 			totlen += dma_cookie.dmac_size;
 			bufn++;
 			if (--ncookies)
-			    ddi_dma_nextcookie(dnetp->dma_handle_tx,
-				&dma_cookie);
+				ddi_dma_nextcookie(dnetp->dma_handle_tx,
+				    &dma_cookie);
 		}
 		(void) ddi_dma_unbind_handle(dnetp->dma_handle_tx);
 		bp = bp->b_cont;
@@ -1578,7 +1572,7 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 		tx_interrupt_mask = TX_INTERRUPT_MASK;
 	else
 		tx_interrupt_mask = (macinfo->gldm_GLD_flags & GLD_INTR_WAIT) ?
-					TX_INTERRUPT_MASK : 0;
+		    TX_INTERRUPT_MASK : 0;
 #else
 	tx_interrupt_mask = TX_INTERRUPT_MASK;
 #endif
@@ -1606,7 +1600,7 @@ static uint_t
 dnetintr(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =	/* Our private device info */
-				(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	uint32_t		int_status;
 	uint32_t		tx_interrupt_mask;
 
@@ -1616,7 +1610,7 @@ dnetintr(gld_mac_info_t *macinfo)
 		cmn_err(CE_NOTE, "dnetintr(0x%p)", (void *)macinfo);
 #endif
 	int_status = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg,
-			STATUS_REG));
+	    STATUS_REG));
 
 	/*
 	 * If interrupt was not from this board
@@ -1630,7 +1624,7 @@ dnetintr(gld_mac_info_t *macinfo)
 
 	if (int_status & GPTIMER_INTR) {
 		ddi_put32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, STATUS_REG), GPTIMER_INTR);
+		    REG32(dnetp->io_reg, STATUS_REG), GPTIMER_INTR);
 		if (dnetp->timer.cb)
 			dnetp->timer.cb(dnetp);
 		else
@@ -1639,7 +1633,7 @@ dnetintr(gld_mac_info_t *macinfo)
 
 	if (int_status & TX_INTR) {
 		ddi_put32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, STATUS_REG), TX_INTR);
+		    REG32(dnetp->io_reg, STATUS_REG), TX_INTR);
 		mutex_enter(&dnetp->txlock);
 		if (dnetp->need_gld_sched) {
 			mutex_exit(&dnetp->txlock);
@@ -1657,9 +1651,10 @@ dnetintr(gld_mac_info_t *macinfo)
 	/*
 	 * Check if receive interrupt bit is set
 	 */
-	if (int_status & RX_INTR) {
+	if (int_status & (RX_INTR | RX_UNAVAIL_INTR)) {
 		ddi_put32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, STATUS_REG), RX_INTR);
+		    REG32(dnetp->io_reg, STATUS_REG),
+		    int_status & (RX_INTR | RX_UNAVAIL_INTR));
 		dnet_getp(macinfo);
 	}
 
@@ -1708,7 +1703,7 @@ dnetintr(gld_mac_info_t *macinfo)
 		tx_interrupt_mask = TX_INTERRUPT_MASK;
 	else
 		tx_interrupt_mask = (macinfo->gldm_GLD_flags & GLD_INTR_WAIT) ?
-					TX_INTERRUPT_MASK : 0;
+		    TX_INTERRUPT_MASK : 0;
 #else
 	tx_interrupt_mask = TX_INTERRUPT_MASK;
 #endif
@@ -1721,7 +1716,7 @@ static void
 dnet_getp(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance *dnetp =
-			(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	int packet_length, index;
 	mblk_t	*mp;
 	caddr_t 	virtual_address;
@@ -1876,17 +1871,19 @@ dnet_getp(gld_mac_info_t *macinfo)
 				newbuf = rp->rbuf_vaddr;
 				frp = kmem_zalloc(sizeof (*frp), KM_NOSLEEP);
 				if (frp != NULL) {
-				    frp->free_rtn.free_func = dnet_freemsg_buf;
-				    frp->free_rtn.free_arg = (char *)frp;
-				    frp->buf = virtual_address;
-				    mp = desballoc((uchar_t *)virtual_address,
-					packet_length, 0, &frp->free_rtn);
-				    if (mp == NULL) {
-					kmem_free(frp, sizeof (*frp));
-					dnet_rbuf_free((caddr_t)newbuf);
-					frp = NULL;
-					newbuf = NULL;
-				    }
+					frp->free_rtn.free_func =
+					    dnet_freemsg_buf;
+					frp->free_rtn.free_arg = (char *)frp;
+					frp->buf = virtual_address;
+					mp = desballoc(
+					    (uchar_t *)virtual_address,
+					    packet_length, 0, &frp->free_rtn);
+					if (mp == NULL) {
+						kmem_free(frp, sizeof (*frp));
+						dnet_rbuf_free((caddr_t)newbuf);
+						frp = NULL;
+						newbuf = NULL;
+					}
 				}
 			}
 			if (mp == NULL) {
@@ -1936,9 +1933,9 @@ dnet_getp(gld_mac_info_t *macinfo)
 				    rx_buf_size-desc[index].desc1.buffer_size2;
 			}
 		} else {
-		    /* couldn't allocate another buffer; copy the data */
-		    BCOPY((caddr_t)virtual_address, (caddr_t)mp->b_wptr,
-			packet_length);
+			/* couldn't allocate another buffer; copy the data */
+			BCOPY((caddr_t)virtual_address, (caddr_t)mp->b_wptr,
+			    packet_length);
 		}
 
 		mp->b_wptr += packet_length;
@@ -1950,11 +1947,11 @@ dnet_getp(gld_mac_info_t *macinfo)
 		 * next packet
 		 */
 		dnetp->rx_current_desc =
-			(dnetp->rx_current_desc+1) % dnetp->max_rx_desc;
+		    (dnetp->rx_current_desc+1) % dnetp->max_rx_desc;
 
 		/* Demand polling by chip */
 		ddi_put32(dnetp->io_handle,
-			    REG32(dnetp->io_reg, RX_POLL_REG), RX_POLL_DEMAND);
+		    REG32(dnetp->io_reg, RX_POLL_REG), RX_POLL_DEMAND);
 
 		/* send the packet upstream */
 		mutex_exit(&dnetp->intrlock);
@@ -1969,7 +1966,7 @@ static void
 update_rx_stats(gld_mac_info_t *macinfo, int index)
 {
 	struct	dnetinstance	*dnetp =
-			(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	struct rx_desc_type *descp = &(dnetp->rx_desc[index]);
 
 	/*
@@ -2017,7 +2014,7 @@ static void
 update_tx_stats(gld_mac_info_t *macinfo, int index)
 {
 	struct	dnetinstance	*dnetp =
-			(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type *descp = &(dnetp->tx_desc[index]);
 	int	fd;
 	media_block_t	*block = dnetp->selected_media_block;
@@ -2031,14 +2028,12 @@ update_tx_stats(gld_mac_info_t *macinfo, int index)
 		fd = dnetp->mii_duplex;
 	} else {
 		/* Rely on media code */
-		fd =
-			block->media_code == MEDIA_TP_FD ||
-			block->media_code == MEDIA_SYM_SCR_FD;
+		fd = block->media_code == MEDIA_TP_FD ||
+		    block->media_code == MEDIA_SYM_SCR_FD;
 	}
 
 	if (descp->desc0.collision_count && !fd) {
-		dnetp->stat_collisions +=
-			descp->desc0.collision_count;
+		dnetp->stat_collisions += descp->desc0.collision_count;
 	}
 
 	if (descp->desc0.late_collision && !fd) {
@@ -2088,15 +2083,13 @@ write_gpr(struct dnetinstance *dnetp, uint32_t val)
 		/* Write to upper half of CSR15 */
 		dnetp->gprsia = (dnetp->gprsia & 0xffff) | (val << 16);
 		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, SIA_GENERAL_REG),
-			dnetp->gprsia);
+		    REG32(dnetp->io_reg, SIA_GENERAL_REG), dnetp->gprsia);
 		break;
 	default:
 		/* Set the correct bit for a control write */
 		if (val & GPR_CONTROL_WRITE)
 			val |= CWE_21140, val &= ~GPR_CONTROL_WRITE;
-		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, GP_REG),
-			val);
+		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, GP_REG), val);
 		break;
 	}
 }
@@ -2108,10 +2101,10 @@ read_gpr(struct dnetinstance *dnetp)
 	case DEVICE_ID_21143:
 		/* Read upper half of CSR15 */
 		return (ddi_get32(dnetp->io_handle,
-			REG32(dnetp->io_reg, SIA_GENERAL_REG)) >> 16);
+		    REG32(dnetp->io_reg, SIA_GENERAL_REG)) >> 16);
 	default:
 		return (ddi_get32(dnetp->io_handle,
-				REG32(dnetp->io_reg, GP_REG)));
+		    REG32(dnetp->io_reg, GP_REG)));
 	}
 }
 
@@ -2121,7 +2114,7 @@ set_gpr(gld_mac_info_t *macinfo)
 	uint32_t *sequence;
 	int len;
 	struct dnetinstance *dnetp = (struct dnetinstance *)
-					macinfo->gldm_private;
+	    macinfo->gldm_private;
 	LEAF_FORMAT *leaf = &dnetp->sr.leaf[dnetp->leaf];
 	media_block_t *block = dnetp->selected_media_block;
 	int i;
@@ -2169,7 +2162,7 @@ set_opr(gld_mac_info_t *macinfo)
 	uint32_t fd, mb1, sf;
 
 	struct dnetinstance *dnetp =
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	int 		opnmode_len;
 	uint32_t val;
 	media_block_t *block = dnetp->selected_media_block;
@@ -2195,10 +2188,10 @@ set_opr(gld_mac_info_t *macinfo)
 
 	if (opnmode_len) {
 		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, OPN_MODE_REG), val);
+		    REG32(dnetp->io_reg, OPN_MODE_REG), val);
 		dnet_reset_board(macinfo);
 		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, OPN_MODE_REG), val);
+		    REG32(dnetp->io_reg, OPN_MODE_REG), val);
 		return;
 	}
 
@@ -2214,15 +2207,14 @@ set_opr(gld_mac_info_t *macinfo)
 
 	/* Scrambler for SYM style media */
 	val |= ((block->command & CMD_SCR) && !dnetp->disable_scrambler) ?
-		SCRAMBLER_MODE : 0;
+	    SCRAMBLER_MODE : 0;
 
 	/* Full duplex */
 	if (dnetp->mii_up) {
 		fd = dnetp->mii_duplex;
 	} else {
 		/* Rely on media code */
-		fd =
-		    block->media_code == MEDIA_TP_FD ||
+		fd = block->media_code == MEDIA_TP_FD ||
 		    block->media_code == MEDIA_SYM_SCR_FD;
 	}
 
@@ -2264,10 +2256,9 @@ set_sia(gld_mac_info_t *macinfo)
 		    DDI_PROP_DONTPASS, "sia-delay", 10000);
 
 		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, SIA_CONNECT_REG), 0);
+		    REG32(dnetp->io_reg, SIA_CONNECT_REG), 0);
 
-		ddi_put32(dnetp->io_handle,
-			REG32(dnetp->io_reg, SIA_TXRX_REG),
+		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, SIA_TXRX_REG),
 		    block->un.sia.csr14);
 
 		/*
@@ -2307,7 +2298,7 @@ static int
 dnet_alloc_bufs(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-						(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	int i;
 	size_t len;
 	int page_size;
@@ -2401,7 +2392,7 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 
 		dnetp->tx_msgbufp =
 		    kmem_zalloc(dnetp->max_tx_desc * sizeof (mblk_t **),
-			KM_SLEEP);
+		    KM_SLEEP);
 	}
 
 	/* allocate receive descriptor array of size dnetp->max_rx_desc */
@@ -2429,10 +2420,10 @@ dnet_alloc_bufs(gld_mac_info_t *macinfo)
 
 		dnetp->rx_buf_vaddr =
 		    kmem_zalloc(dnetp->max_rx_desc * sizeof (caddr_t),
-			KM_SLEEP);
+		    KM_SLEEP);
 		dnetp->rx_buf_paddr =
 		    kmem_zalloc(dnetp->max_rx_desc * sizeof (caddr_t),
-			KM_SLEEP);
+		    KM_SLEEP);
 		/*
 		 * Allocate or add to the pool of receive buffers.  The pool
 		 * is shared among all instances of dnet.
@@ -2479,22 +2470,22 @@ dnet_free_bufs(gld_mac_info_t *macinfo)
 {
 	int i;
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-						(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	/* free up any xmit descriptors/buffers */
 	if (dnetp->tx_desc != NULL) {
 		ddi_dma_mem_free(&dnetp->tx_desc_acchdl);
 		dnetp->tx_desc = NULL;
 		/* we use streams buffers for DMA in xmit process */
 		if (dnetp->tx_msgbufp != NULL) {
-		    /* free up any streams message buffers unclaimed */
-		    for (i = 0; i < dnetp->nxmit_desc; i++) {
-			if (dnetp->tx_msgbufp[i] != NULL) {
-				freemsg(dnetp->tx_msgbufp[i]);
+			/* free up any streams message buffers unclaimed */
+			for (i = 0; i < dnetp->nxmit_desc; i++) {
+				if (dnetp->tx_msgbufp[i] != NULL) {
+					freemsg(dnetp->tx_msgbufp[i]);
+				}
 			}
-		    }
-		    kmem_free(dnetp->tx_msgbufp,
-			dnetp->nxmit_desc * sizeof (mblk_t **));
-		    dnetp->tx_msgbufp = NULL;
+			kmem_free(dnetp->tx_msgbufp,
+			    dnetp->nxmit_desc * sizeof (mblk_t **));
+			dnetp->tx_msgbufp = NULL;
 		}
 		dnetp->nxmit_desc = 0;
 	}
@@ -2506,15 +2497,16 @@ dnet_free_bufs(gld_mac_info_t *macinfo)
 		if (dnetp->rx_buf_vaddr != NULL) {
 			/* free up the attached rbufs if any */
 			for (i = 0; i < dnetp->nrecv_desc; i++) {
-			    if (dnetp->rx_buf_vaddr[i])
-				dnet_rbuf_free((caddr_t)dnetp->rx_buf_vaddr[i]);
+				if (dnetp->rx_buf_vaddr[i])
+					dnet_rbuf_free(
+					    (caddr_t)dnetp->rx_buf_vaddr[i]);
 			}
-		    kmem_free(dnetp->rx_buf_vaddr,
-			dnetp->nrecv_desc * sizeof (caddr_t));
-		    kmem_free(dnetp->rx_buf_paddr,
-			dnetp->nrecv_desc * sizeof (caddr_t));
-		    dnetp->rx_buf_vaddr = NULL;
-		    dnetp->rx_buf_paddr = NULL;
+			kmem_free(dnetp->rx_buf_vaddr,
+			    dnetp->nrecv_desc * sizeof (caddr_t));
+			kmem_free(dnetp->rx_buf_paddr,
+			    dnetp->nrecv_desc * sizeof (caddr_t));
+			dnetp->rx_buf_vaddr = NULL;
+			dnetp->rx_buf_paddr = NULL;
 		}
 		dnetp->nrecv_desc = 0;
 	}
@@ -2558,7 +2550,7 @@ dnet_init_txrx_bufs(gld_mac_info_t *macinfo)
 {
 	int		i;
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-						(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 
 	/*
 	 * Initilize all the Tx descriptors
@@ -2588,11 +2580,9 @@ dnet_init_txrx_bufs(gld_mac_info_t *macinfo)
 		*(uint32_t *)&dnetp->rx_desc[i].desc1 = 0;
 		dnetp->rx_desc[i].desc0.own = 1;
 		dnetp->rx_desc[i].desc1.buffer_size1 = rx_buf_size;
-		dnetp->rx_desc[i].buffer1 =
-			(uint32_t)dnetp->rx_buf_paddr[i];
+		dnetp->rx_desc[i].buffer1 = (uint32_t)dnetp->rx_buf_paddr[i];
 		dnetp->rx_desc[i].buffer2 = (uint32_t)(0);
-		end_paddr =
-			(uint32_t)dnetp->rx_buf_paddr[i]+rx_buf_size-1;
+		end_paddr = (uint32_t)dnetp->rx_buf_paddr[i]+rx_buf_size-1;
 
 		if ((dnetp->rx_desc[i].buffer1 & ~dnetp->pgmask) !=
 		    (end_paddr & ~dnetp->pgmask)) {
@@ -2612,7 +2602,7 @@ alloc_descriptor(gld_mac_info_t *macinfo)
 {
 	int index;
 	struct dnetinstance *dnetp =	/* Our private device info */
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	struct tx_desc_type    *ring = dnetp->tx_desc;
 
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
@@ -2637,7 +2627,7 @@ alloctop:
 #ifdef DNETDEBUG
 		if (dnetdebug & DNETRECV)
 			cmn_err(CE_WARN,
-				"dnet: next descriptor is not free for use");
+			    "dnet: next descriptor is not free for use");
 #endif
 		mutex_exit(&dnetp->txlock);
 		return (FAILURE);
@@ -2674,7 +2664,7 @@ static void
 dnet_reclaim_Tx_desc(gld_mac_info_t *macinfo)
 {
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-						(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	struct tx_desc_type	*desc = dnetp->tx_desc;
 	int index;
 
@@ -2682,7 +2672,7 @@ dnet_reclaim_Tx_desc(gld_mac_info_t *macinfo)
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETTRACE)
 		cmn_err(CE_NOTE, "dnet_reclaim_Tx_desc(0x%p)",
-			(void *) macinfo);
+		    (void *) macinfo);
 #endif
 
 	index = dnetp->transmitted_desc;
@@ -2759,7 +2749,7 @@ dnet_rbuf_init(dev_info_t *dip, int nbufs)
 		/* allocate rbuf_list element */
 		rp = kmem_zalloc(sizeof (struct rbuf_list), KM_SLEEP);
 		if (ddi_dma_alloc_handle(dip, &dma_attr_rb, DDI_DMA_SLEEP,
-				0, &rp->rbuf_dmahdl) != DDI_SUCCESS)
+		    0, &rp->rbuf_dmahdl) != DDI_SUCCESS)
 			goto fail_kfree;
 
 		/* allocate dma memory for the buffer */
@@ -2857,7 +2847,7 @@ dnet_rbuf_alloc(dev_info_t *dip, int cansleep)
 		/* allocate rbuf_list element */
 		rp = kmem_zalloc(sizeof (struct rbuf_list), KM_SLEEP);
 		if (ddi_dma_alloc_handle(dip, &dma_attr_rb, DDI_DMA_SLEEP,
-				0, &rp->rbuf_dmahdl) != DDI_SUCCESS)
+		    0, &rp->rbuf_dmahdl) != DDI_SUCCESS)
 			goto fail_kfree;
 
 		/* allocate dma memory for the buffer */
@@ -2937,7 +2927,7 @@ dnet_rbuf_free(caddr_t vaddr)
 
 	if (rp == NULL) {
 		cmn_err(CE_WARN, "DNET: rbuf_free: bad addr 0x%p",
-			(void *)vaddr);
+		    (void *)vaddr);
 		mutex_exit(&dnet_rbuf_lock);
 		return;
 	}
@@ -2997,7 +2987,7 @@ dnet_read_srom(dev_info_t *devinfo, int board_type, ddi_acc_handle_t io_handle,
 	 * the contents of the SROM to the console
 	 */
 	if (ddi_getprop(DDI_DEV_T_ANY, devinfo, DDI_PROP_DONTPASS,
-				"dumpsrom", 0))
+	    "dumpsrom", 0))
 		dnet_dumpbin("SROM", vi, 1, maxlen);
 
 	for (zerocheck = i = 0, all_ones = 0xff; i < maxlen; i++) {
@@ -3033,7 +3023,7 @@ dnet_read21040addr(dev_info_t *dip, ddi_acc_handle_t io_handle, int io_reg,
 	for (i = 0; i < *len; i++) {
 		do {
 			val = ddi_get32(io_handle,
-				REG32(io_reg, ETHER_ROM_REG));
+			    REG32(io_reg, ETHER_ROM_REG));
 		} while (val & 0x80000000);
 		addr[i] = val & 0xFF;
 	}
@@ -3058,42 +3048,42 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 	rom_addr = 0;
 	for (i = 0; i <	maxlen; i += 2) {
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM);
+		    READ_OP | SEL_ROM);
 		drv_nsecwait(30);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP);
+		    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(50);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
+		    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 		drv_nsecwait(250);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP);
+		    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(100);
 
 		/* command */
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
+		    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(150);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
+		    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
 		drv_nsecwait(250);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
+		    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(250);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
+		    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
 		drv_nsecwait(250);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
+		    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(100);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP);
+		    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(150);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
+		    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 		drv_nsecwait(250);
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM | SEL_CHIP);
+		    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(100);
 
 		/* Address */
@@ -3115,23 +3105,23 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 		word = 0;
 		for (j = 0x8000; j >= 1; j >>= 1) {
 			ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-				    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
+			    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 			drv_nsecwait(100);
 			dout = ddi_get32(io_handle,
-					    REG32(io_reg, ETHER_ROM_REG));
+			    REG32(io_reg, ETHER_ROM_REG));
 			drv_nsecwait(150);
 			if (dout & DATA_OUT)
 				word |= j;
 			ddi_put32(io_handle,
-				    REG32(io_reg, ETHER_ROM_REG),
-				    READ_OP | SEL_ROM | SEL_CHIP);
+			    REG32(io_reg, ETHER_ROM_REG),
+			    READ_OP | SEL_ROM | SEL_CHIP);
 			drv_nsecwait(250);
 		}
 		addr[i] = (word & 0x0000FF);
 		addr[i + 1] = (word >> 8);
 		rom_addr++;
 		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
-			    READ_OP | SEL_ROM);
+		    READ_OP | SEL_ROM);
 		drv_nsecwait(100);
 	}
 }
@@ -3270,24 +3260,24 @@ check_srom_valid(uchar_t *vi)
 	case 1:
 	    /* fallthru */
 	case 3:
-	    return (
-		vi[SROM_MBZ] == 0 &&	/* must be zero */
-		vi[SROM_MBZ2] == 0 &&	/* must be zero */
-		vi[SROM_MBZ3] == 0);	/* must be zero */
+		return (vi[SROM_MBZ] == 0 &&	/* must be zero */
+		    vi[SROM_MBZ2] == 0 &&	/* must be zero */
+		    vi[SROM_MBZ3] == 0);	/* must be zero */
 
 	case 4:
-	    wvi = (uint16_t *)vi;
-	    crc = 0xff;
-	    for (word = 0; word < 9; word++)
-		for (bit = 15; bit >= 0; bit--) {
-		    if (word == 8 && bit == 7)
-			return (crc == vi[16]);
-		    bitval = ((wvi[word] >> bit) & 1) ^ ((crc >> 7) & 1);
-		    crc <<= 1;
-		    if (bitval == 1) {
-			crc ^= 7;
-		    }
-		}
+		wvi = (uint16_t *)vi;
+		crc = 0xff;
+		for (word = 0; word < 9; word++)
+			for (bit = 15; bit >= 0; bit--) {
+				if (word == 8 && bit == 7)
+					return (crc == vi[16]);
+				bitval =
+				    ((wvi[word] >> bit) & 1) ^ ((crc >> 7) & 1);
+				crc <<= 1;
+				if (bitval == 1) {
+					crc ^= 7;
+				}
+			}
 
 	default:
 		return (0);
@@ -3342,7 +3332,7 @@ find_active_media(gld_mac_info_t *macinfo)
 	media_block_t *hd_found = NULL;
 	media_block_t *fd_found = NULL;
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-					(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	LEAF_FORMAT *leaf = &dnetp->sr.leaf[dnetp->leaf];
 	uint32_t checked = 0, links_up = 0;
 
@@ -3399,8 +3389,8 @@ find_active_media(gld_mac_info_t *macinfo)
 			best_allowed = block;
 #ifdef DEBUG
 		if (dnetdebug & DNETSENSE)
-		    cmn_err(CE_NOTE, "Testing %s medium (block type %d)",
-			media_str[media], block->type);
+			cmn_err(CE_NOTE, "Testing %s medium (block type %d)",
+			    media_str[media], block->type);
 #endif
 
 		dnetp->selected_media_block = block;
@@ -3482,9 +3472,9 @@ find_active_media(gld_mac_info_t *macinfo)
 				if (mii_linkup(dnetp->mii, dnetp->phyaddr)) {
 					/* XXX function return value ignored */
 					(void) mii_getspeed(dnetp->mii,
-						dnetp->phyaddr,
-						&dnetp->mii_speed,
-						&dnetp->mii_duplex);
+					    dnetp->phyaddr,
+					    &dnetp->mii_speed,
+					    &dnetp->mii_duplex);
 					dnetp->mii_up = 1;
 					leaf->mii_block = block;
 					return;
@@ -3534,7 +3524,7 @@ dnet_link_sense(gld_mac_info_t *macinfo)
 	 * spec. Section 4.3.2.1, and 4.5.2.1.3
 	 */
 	struct dnetinstance *dnetp = (struct dnetinstance *)
-					(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	media_block_t *block = dnetp->selected_media_block;
 	uint32_t link, status, mask, polarity;
 	int settletime, stabletime, waittime, upsamples;
@@ -3601,7 +3591,7 @@ send_test_packet(gld_mac_info_t *macinfo)
 {
 	int packet_delay;
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
-					(macinfo->gldm_private);
+	    (macinfo->gldm_private);
 	struct tx_desc_type *desc;
 	int bufindex;
 	int media_code = dnetp->selected_media_block->media_code;
@@ -3644,9 +3634,9 @@ send_test_packet(gld_mac_info_t *macinfo)
 	ASSERT(dnetp->setup_buf_vaddr != NULL);
 	/* Put something decent in dest address so we don't annoy other cards */
 	BCOPY((caddr_t)dnetp->curr_macaddr,
-		(caddr_t)dnetp->setup_buf_vaddr, ETHERADDRL);
+	    (caddr_t)dnetp->setup_buf_vaddr, ETHERADDRL);
 	BCOPY((caddr_t)dnetp->curr_macaddr,
-		(caddr_t)dnetp->setup_buf_vaddr+ETHERADDRL, ETHERADDRL);
+	    (caddr_t)dnetp->setup_buf_vaddr+ETHERADDRL, ETHERADDRL);
 
 	desc[bufindex].buffer1 = (uint32_t)(dnetp->setup_buf_paddr);
 	desc[bufindex].desc1.buffer_size1 = SETUPBUF_SIZE;
@@ -3657,7 +3647,7 @@ send_test_packet(gld_mac_info_t *macinfo)
 	desc[bufindex].desc0.own = 1;
 
 	ddi_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
-		    TX_POLL_DEMAND);
+	    TX_POLL_DEMAND);
 
 	/*
 	 * Give enough time for the chip to transmit the packet
@@ -3677,15 +3667,15 @@ send_test_packet(gld_mac_info_t *macinfo)
 #ifdef DNETDEBUG
 	if (dnetdebug & DNETSENSE)
 		cmn_err(CE_NOTE, "desc0 bits = %u, %u, %u, %u, %u, %u",
-			desc[bufindex].desc0.own,
-			desc[bufindex].desc0.err_summary,
-			desc[bufindex].desc0.carrier_loss,
-			desc[bufindex].desc0.no_carrier,
-			desc[bufindex].desc0.late_collision,
-			desc[bufindex].desc0.link_fail);
+		    desc[bufindex].desc0.own,
+		    desc[bufindex].desc0.err_summary,
+		    desc[bufindex].desc0.carrier_loss,
+		    desc[bufindex].desc0.no_carrier,
+		    desc[bufindex].desc0.late_collision,
+		    desc[bufindex].desc0.link_fail);
 #endif
 	if (desc[bufindex].desc0.own) /* it shouldn't take this long, error */
-	    return (0);
+		return (0);
 
 	return (!desc[bufindex].desc0.err_summary);
 }
@@ -3732,7 +3722,7 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 	int i;
 	struct hackintr_inf *hackintr_inf;
 	struct dnetinstance *dnetp =
-		(struct dnetinstance *)macinfo->gldm_private;
+	    (struct dnetinstance *)macinfo->gldm_private;
 	dev_info_t *devinfo = dnetp->devinfo;
 	uint32_t oui = 0;	/* Organizationally Unique ID */
 
@@ -3784,7 +3774,7 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 #ifdef DNETDEBUG
 		if (dnetdebug & DNETTRACE)
 			cmn_err(CE_NOTE, "dnet: Implementing hardware "
-				"interrupt flaw workaround");
+			    "interrupt flaw workaround");
 #endif
 		dnetp->hackintr_inf = hackintr_inf =
 		    kmem_zalloc(sizeof (struct hackintr_inf), KM_SLEEP);
@@ -3812,8 +3802,8 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 		    (caddr_t)hackintr_inf) != DDI_SUCCESS) {
 			/* XXX function return value ignored */
 			(void) ddi_prop_remove(DDI_DEV_T_NONE,
-				ddi_get_parent(devinfo),
-				hackintr_propname);
+			    ddi_get_parent(devinfo),
+			    hackintr_propname);
 			goto fail;
 		}
 
@@ -3832,7 +3822,7 @@ dnet_hack_interrupts(gld_mac_info_t *macinfo, int secondary)
 
 		hackintr_inf = (struct hackintr_inf *)(uintptr_t)
 		    ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(devinfo),
-			DDI_PROP_DONTPASS, hackintr_propname, 0);
+		    DDI_PROP_DONTPASS, hackintr_propname, 0);
 
 		if (hackintr_inf == NULL)
 			goto fail;
@@ -3936,10 +3926,10 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 	for (i = 0; i < MAX_INST; i++) {
 		if ((mac = hackintr_inf->macinfos[i]) != NULL) {
 			struct dnetinstance *altdnetp =
-				(struct dnetinstance *)mac->gldm_private;
+			    (struct dnetinstance *)mac->gldm_private;
 			altdnetp->interrupts_disabled = 1;
 			ddi_put32(altdnetp->io_handle,
-				REG32(altdnetp->io_reg, INT_MASK_REG), 0);
+			    REG32(altdnetp->io_reg, INT_MASK_REG), 0);
 		}
 	}
 
@@ -3991,7 +3981,7 @@ do_phy(gld_mac_info_t *macinfo)
 	 * allow the phy to be read/written if it is present
 	 */
 	dnetp->selected_media_block = leaf->mii_block ?
-		leaf->mii_block : leaf->default_block;
+	    leaf->mii_block : leaf->default_block;
 
 	setup_block(macinfo);
 	/* XXX function return value ignored */
@@ -4002,11 +3992,11 @@ do_phy(gld_mac_info_t *macinfo)
 	 */
 	for (phy = 1; phy < 33; phy++)
 		if (mii_probe_phy(dnetp->mii, phy % 32) == MII_SUCCESS &&
-			mii_init_phy(dnetp->mii, phy % 32) == MII_SUCCESS) {
+		    mii_init_phy(dnetp->mii, phy % 32) == MII_SUCCESS) {
 #ifdef DNETDEBUG
 			if (dnetdebug & DNETSENSE)
 				cmn_err(CE_NOTE, "dnet: "
-				"PHY at address %d", phy % 32);
+				    "PHY at address %d", phy % 32);
 #endif
 			dnetp->phyaddr = phy % 32;
 			if (!leaf->mii_block) {
@@ -4051,8 +4041,7 @@ dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 	mii_tristate(dnetp);
 
 	/* Check that the PHY generated a zero bit the 2nd clock */
-	tmp = ddi_get32(dnetp->io_handle,
-		REG32(dnetp->io_reg, ETHER_ROM_REG));
+	tmp = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg, ETHER_ROM_REG));
 
 	turned_around = (tmp & MII_DATA_IN) ? 0 : 1;
 
@@ -4167,8 +4156,8 @@ dnet_mii_link_cb(dev_info_t *dip, int phy, enum mii_phy_state state)
 		dnetp->mii_up = 1;
 		/* XXX function return value ignored */
 		(void) mii_getspeed(dnetp->mii,
-			dnetp->phyaddr, &dnetp->mii_speed,
-			&dnetp->mii_duplex);
+		    dnetp->phyaddr, &dnetp->mii_speed,
+		    &dnetp->mii_duplex);
 		dnetp->selected_media_block = leaf->mii_block;
 		setup_block(macinfo);
 	} else {
@@ -4705,9 +4694,9 @@ dnet_print_srom(SROM_FORMAT *sr)
 	int i;
 	uchar_t *a = sr->netaddr;
 	cmn_err(CE_NOTE, "SROM Dump: %d. ver %d, Num adapters %d,"
-		"Addr:%x:%x:%x:%x:%x:%x",
-		sr->init_from_srom, sr->version, sr->adapters,
-		a[0], a[1], a[2], a[3], a[4], a[5]);
+	    "Addr:%x:%x:%x:%x:%x:%x",
+	    sr->init_from_srom, sr->version, sr->adapters,
+	    a[0], a[1], a[2], a[3], a[4], a[5]);
 
 	for (i = 0; i < sr->adapters; i++)
 		dnet_dump_leaf(sr->leaf+i);
@@ -4718,7 +4707,7 @@ dnet_dump_leaf(LEAF_FORMAT *leaf)
 {
 	int i;
 	cmn_err(CE_NOTE, "Leaf: Device %d, block_count %d, gpr: %x",
-		leaf->device_number, leaf->block_count, leaf->gpr);
+	    leaf->device_number, leaf->block_count, leaf->gpr);
 	for (i = 0; i < leaf->block_count; i++)
 		dnet_dump_block(leaf->block+i);
 }
@@ -4736,15 +4725,15 @@ dnet_dump_block(media_block_t *block)
 	switch (block->type) {
 	case 1: case 3:
 		cmn_err(CE_NOTE, "\tMII Info: phy %d, nway %x, fdx"
-			"%x, ttm %x, mediacap %x",
-			block->un.mii.phy_num, block->un.mii.nwayadvert,
-			block->un.mii.fdxmask, block->un.mii.ttmmask,
-			block->un.mii.mediacaps);
+		    "%x, ttm %x, mediacap %x",
+		    block->un.mii.phy_num, block->un.mii.nwayadvert,
+		    block->un.mii.fdxmask, block->un.mii.ttmmask,
+		    block->un.mii.mediacaps);
 		break;
 	case 2:
 		cmn_err(CE_NOTE, "\tSIA Regs: CSR13:%x, CSR14:%x, CSR15:%x",
-			block->un.sia.csr13, block->un.sia.csr14,
-			block->un.sia.csr15);
+		    block->un.sia.csr13, block->un.sia.csr14,
+		    block->un.sia.csr15);
 		break;
 	}
 }
@@ -4789,7 +4778,7 @@ dnet_dumpbin(char *msg, unsigned char *data, int size, int len)
 	}
 	if (p != hex) {
 		while ((p - hex) < 8*3)
-		    *p++ = ' ';
+			*p++ = ' ';
 		*p = *q = 0;
 		cmn_err(CE_NOTE, "%s: %s\t%s", msg, hex, ascii);
 	}
@@ -4804,7 +4793,7 @@ dnet_usectimeout(struct dnetinstance *dnetp, uint32_t usecs, int contin,
 	dnetp->timer.start_ticks = (usecs * 100) / 8192;
 	dnetp->timer.cb = cback;
 	outl(dnetp->io_reg + GP_TIMER_REG, dnetp->timer.start_ticks |
-		(contin ? GPTIMER_CONT : 0));
+	    (contin ? GPTIMER_CONT : 0));
 	if (dnetp->timer.cb)
 		enable_interrupts(dnetp, 1);
 	mutex_exit(&dnetp->intrlock);
