@@ -54,11 +54,11 @@
  */
 
 /* Attribute names and filter format strings */
-#define	OBJECTSID	"objectSid"
-#define	OBJECTSIDFILTER	"(objectSid=%s)"
-#define	SAMACCOUNTNAME	"sAMAccountName"
+#define	SAN		"sAMAccountName"
+#define	OBJSID		"objectSid"
+#define	OBJCLASS	"objectClass"
 #define	SANFILTER	"(sAMAccountName=%.*s)"
-#define	OBJECTCLASS	"objectClass"
+#define	OBJSIDFILTER	"(objectSid=%s)"
 
 /*
  * This should really be in some <sys/sid.h> file or so; we have a
@@ -103,7 +103,6 @@ typedef struct ad_host {
 /* A set of DSs for a given AD partition; ad_t typedef comes from  adutil.h */
 struct ad {
 	char			*dflt_w2k_dom;	/* used to qualify bare names */
-	char			*basedn;	/* derived from dflt domain */
 	pthread_mutex_t		lock;
 	uint32_t		ref;
 	ad_host_t		*last_adh;
@@ -117,23 +116,20 @@ struct ad {
  * (idmap_query_state, see below).
  */
 typedef struct idmap_q {
+	/*
+	 * data used for validating search result entries for name->SID
+	 * loopups
+	 */
+	char			*n2s_cname;	/* expected canon name@domain */
+	/* results */
 	char			**result;	/* name or stringified SID */
 	char			**domain;	/* name of domain of object */
 	rid_t			*rid;		/* for n2s, if not NULL */
 	int			*sid_type;	/* if not NULL */
 	idmap_retcode		*rc;
+
+	/* lookup state */
 	int			msgid;		/* LDAP message ID */
-	/*
-	 * Bitfield containing state needed to know when we're done
-	 * processing search results related to this query's LDAP
-	 * searches.  Mostly self-explanatory.
-	 */
-	uint16_t		n2s : 1;	/* name->SID or SID->name? */
-	uint16_t		got_reply : 1;
-	uint16_t		got_results : 1;
-	uint16_t		got_objectSid : 1;
-	uint16_t		got_objectClass : 1;
-	uint16_t		got_samAcctName : 1;
 } idmap_q_t;
 
 /* Batch context structure; typedef is in header file */
@@ -189,20 +185,10 @@ idmap_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts) {
 	return (LDAP_SUCCESS);
 }
 
-/* Turn "foo.bar.com" into "dc=foo,dc=bar,dc=com" */
-static
-char *
-dns2dn(const char *dns)
-{
-	int nameparts;
-
-	/* Sigh, ldap_dns_to_dn()'s first arg should be a const char * */
-	return (ldap_dns_to_dn((char *)dns, &nameparts));
-}
 
 /*
  * Turn "dc=foo,dc=bar,dc=com" into "foo.bar.com"; ignores any other
- * attributes (CN, etc...)
+ * attributes (CN, etc...).  We don't need the reverse, for now.
  */
 static
 char *
@@ -319,6 +305,26 @@ done:
 }
 
 /*
+ * Check whether a given object's DN matches the given domain name.
+ *
+ * Used for validating search result entries for name->SID lookups.
+ */
+static
+int
+dn_matches(const char *dn, const char *dname)
+{
+	char *dn_dname;
+	int match = 0;
+
+	dn_dname = dn2dns(dn);
+
+	match = (strcmp(dn_dname, dname) == 0) ? 1 : 0;
+
+	free(dn_dname);
+	return (match);
+}
+
+/*
  * Keep connection management simple for now, extend or replace later
  * with updated libsldap code.
  */
@@ -399,14 +405,6 @@ idmap_ad_alloc(ad_t **new_ad, const char *default_domain,
 	if ((ad->dflt_w2k_dom = strdup(default_domain)) == NULL)
 		goto err;
 
-	/* If default_domain is empty, deal; see above */
-	if (*default_domain == '\0') {
-		if ((ad->basedn = strdup("")) == NULL)
-			goto err;
-	} else if ((ad->basedn = dns2dn(default_domain)) == NULL) {
-		goto err;
-	}
-
 	if (pthread_mutex_init(&ad->lock, NULL) != 0)
 		goto err;
 
@@ -416,8 +414,6 @@ idmap_ad_alloc(ad_t **new_ad, const char *default_domain,
 err:
 	if (ad->dflt_w2k_dom != NULL)
 		free(ad->dflt_w2k_dom);
-	if (ad->basedn != NULL)
-		free(ad->basedn);
 	free(ad);
 	return (-1);
 }
@@ -458,11 +454,10 @@ idmap_ad_free(ad_t **ad)
 	}
 	(void) pthread_mutex_unlock(&adhostlock);
 
-	free((*ad)->basedn);
-
 	(void) pthread_mutex_unlock(&(*ad)->lock);
 	(void) pthread_mutex_destroy(&(*ad)->lock);
 
+	free((*ad)->dflt_w2k_dom);
 	free(*ad);
 
 	*ad = NULL;
@@ -1079,35 +1074,62 @@ idmap_msgid2query(ad_host_t *adh, int msgid,
  * Handle an objectSid attr from a result
  */
 static
-void
+int
 idmap_bv_objsid2sidstr(BerValue **bvalues, idmap_q_t *q)
 {
 	if (bvalues == NULL)
-		return;
+		return (0);
 	/* objectSid is single valued */
-	*(q->result) = convert_bval2sid(bvalues[0], q->rid);
-	q->got_objectSid = 1;
+	if ((*(q->result) = convert_bval2sid(bvalues[0], q->rid)) == NULL)
+		return (0);
+	return (1);
 }
 
 /*
  * Handle a sAMAccountName attr from a result
  */
 static
-void
+int
 idmap_bv_samaccountname2name(BerValue **bvalues, idmap_q_t *q, const char *dn)
 {
-	char *result, *domain;
+	char *result, *domain, *s;
 	int len;
-
-	if (bvalues == NULL)
-		return;
-
-	if ((domain = dn2dns(dn)) == NULL)
-		return;
 
 	if (bvalues == NULL || bvalues[0] == NULL ||
 	    bvalues[0]->bv_val == NULL)
-		return;
+		return (0);
+
+	/*
+	 * In the name->SID case we check that the SAN and DN of any
+	 * result entry match the the lookup we were doing.
+	 */
+	if (q->n2s_cname != NULL) {
+		/* get the domain part of the winname we were looking up */
+		s = strchr(q->n2s_cname, '@');
+		assert(s != NULL);
+		/* get the length of the user/group name part */
+		len = s - q->n2s_cname;
+		/* eat the '@' */
+		s++;
+
+		/* Compare the username part */
+		if (len != bvalues[0]->bv_len ||
+		    strncmp(q->n2s_cname, bvalues[0]->bv_val, len) != 0)
+			return (0);
+
+		/* Compare the domain name part to the DN */
+		if (!dn_matches(dn, s))
+			return (0);
+
+		return (1);
+	}
+
+	/* SID->name */
+	assert(*q->result == NULL);
+	assert(q->domain == NULL || *q->domain == NULL);
+
+	if ((domain = dn2dns(dn)) == NULL)
+		return (0);
 
 	len = bvalues[0]->bv_len + 1;
 
@@ -1120,7 +1142,7 @@ idmap_bv_samaccountname2name(BerValue **bvalues, idmap_q_t *q, const char *dn)
 		if (q->domain != NULL)
 			*(q->domain) = NULL;
 		free(domain);
-		return;
+		return (0);
 	}
 
 	(void) memcpy(result, bvalues[0]->bv_val, (size_t)bvalues[0]->bv_len);
@@ -1133,7 +1155,7 @@ idmap_bv_samaccountname2name(BerValue **bvalues, idmap_q_t *q, const char *dn)
 	}
 
 	*(q->result) = result;
-	q->got_samAcctName = 1;
+	return (1);
 }
 
 
@@ -1145,13 +1167,13 @@ idmap_bv_samaccountname2name(BerValue **bvalues, idmap_q_t *q, const char *dn)
  * Handle an objectClass attr from a result
  */
 static
-void
+int
 idmap_bv_objclass2sidtype(BerValue **bvalues, idmap_q_t *q)
 {
 	BerValue	**cbval;
 
 	if (bvalues == NULL)
-		return;
+		return (0);
 
 	for (cbval = bvalues; *cbval != NULL; cbval++) {
 		/* don't clobber sid_type */
@@ -1162,15 +1184,16 @@ idmap_bv_objclass2sidtype(BerValue **bvalues, idmap_q_t *q)
 
 		if (BVAL_CASEEQ(cbval, "Computer")) {
 			*(q->sid_type) = _IDMAP_T_COMPUTER;
-			return;
+			return (0);
 		} else if (BVAL_CASEEQ(cbval, "Group")) {
 			*(q->sid_type) = _IDMAP_T_GROUP;
 		} else if (BVAL_CASEEQ(cbval, "USER")) {
 			*(q->sid_type) = _IDMAP_T_USER;
 		} else
 			*(q->sid_type) = _IDMAP_T_OTHER;
-		q->got_objectClass = 1;
 	}
+
+	return (1);
 }
 
 /*
@@ -1186,75 +1209,73 @@ idmap_extract_object(idmap_query_state_t *state, int qid, LDAPMessage *res)
 	ad_host_t		*adh;
 	idmap_q_t		*q;
 	idmap_retcode		orc;
+	int			has_class, has_san, has_sid;
 
 	adh = state->qadh;
 
 	(void) pthread_mutex_lock(&adh->lock);
 
-	if (adh->dead || (dn = ldap_get_dn(adh->ld, res)) == NULL) {
+	q = &(state->queries[qid]);
+
+	if (*q->rc == IDMAP_SUCCESS || adh->dead ||
+	    (dn = ldap_get_dn(adh->ld, res)) == NULL) {
 		(void) pthread_mutex_unlock(&adh->lock);
 		return;
 	}
 
-	q = &(state->queries[qid]);
+	assert(*q->result == NULL);
+	assert(q->domain == NULL || *q->domain == NULL);
 
+	orc = *q->rc;
+
+	has_class = has_san = has_sid = 0;
 	for (attr = ldap_first_attribute(adh->ld, res, &ber); attr != NULL;
 	    attr = ldap_next_attribute(adh->ld, res, ber)) {
-		orc = *q->rc;
 		bvalues = NULL;	/* for memory management below */
 
 		/*
 		 * If this is an attribute we are looking for and
 		 * haven't seen it yet, parse it
 		 */
-		if (orc != IDMAP_SUCCESS && q->n2s && !q->got_objectSid &&
-		    strcasecmp(attr, OBJECTSID) == 0) {
+		if (q->n2s_cname != NULL && !has_sid &&
+		    strcasecmp(attr, OBJSID) == 0) {
 			bvalues = ldap_get_values_len(adh->ld, res, attr);
-			idmap_bv_objsid2sidstr(bvalues, q);
-		} else if (orc != IDMAP_SUCCESS && !q->n2s &&
-		    !q->got_samAcctName &&
-		    strcasecmp(attr, SAMACCOUNTNAME) == 0) {
+			has_sid = idmap_bv_objsid2sidstr(bvalues, q);
+		} else if (!has_san && strcasecmp(attr, SAN) == 0) {
 			bvalues = ldap_get_values_len(adh->ld, res, attr);
-			idmap_bv_samaccountname2name(bvalues, q, dn);
-		} else if (orc != IDMAP_SUCCESS && !q->got_objectClass &&
-		    strcasecmp(attr, OBJECTCLASS) == 0) {
+			has_san = idmap_bv_samaccountname2name(bvalues, q, dn);
+		} else if (!has_class && strcasecmp(attr, OBJCLASS) == 0) {
 			bvalues = ldap_get_values_len(adh->ld, res, attr);
-			idmap_bv_objclass2sidtype(bvalues, q);
+			has_class = idmap_bv_objclass2sidtype(bvalues, q);
 		}
 
 		if (bvalues != NULL)
 			ldap_value_free_len(bvalues);
 		ldap_memfree(attr);
 
-		if (q->n2s)
-			*q->rc = (q->got_objectSid &&
-			    q->got_objectClass) ?
-			    IDMAP_SUCCESS : IDMAP_ERR_NORESULT;
-		else
-			*q->rc = (q->got_samAcctName &&
-			    q->got_objectClass) ?
-			    IDMAP_SUCCESS : IDMAP_ERR_NORESULT;
+		orc = (has_class && has_san &&
+		    (!q->n2s_cname != NULL || has_sid)) ?  IDMAP_SUCCESS : orc;
 
-		if (*q->rc == IDMAP_SUCCESS && *q->result == NULL)
-			*q->rc = IDMAP_ERR_NORESULT;
+		if (orc == IDMAP_SUCCESS)
+			break;
 	}
-	(void) pthread_mutex_unlock(&adh->lock);
 
-	/*
-	 * If there should be multiple partial results for different
-	 * entities (there should not be, but, if it should happen) then
-	 * it's possible that they could get mixed up here and we could
-	 * get bogus results.  We just mark the query's results as
-	 * toxic (IDMAP_ERR_INTERNAL).
-	 *
-	 * Between this and ignoring results when we've already filled
-	 * out a query's results we should be OK.  The first full reply
-	 * wins.  In practice we should never get multiple results.
-	 */
-	if (orc == IDMAP_ERR_INTERNAL)
-		*q->rc = IDMAP_ERR_INTERNAL;
-	else if (*q->rc != IDMAP_SUCCESS)
-		*q->rc = IDMAP_ERR_INTERNAL;
+	if (orc != IDMAP_SUCCESS) {
+		/*
+		 * Failure (e.g., SAN & DN did not match n2s query); clean up
+		 * results.
+		 */
+		free(*q->result);
+		q->result = NULL;
+		if (q->domain != NULL)
+			free(*q->domain);
+		q->domain = NULL;
+	}
+
+	if (orc == IDMAP_SUCCESS)
+		*q->rc = IDMAP_SUCCESS;
+
+	(void) pthread_mutex_unlock(&adh->lock);
 
 	if (ber != NULL)
 		ber_free(ber, 0);
@@ -1300,8 +1321,10 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 		    &query_state, &qid)) {
 			/* ...so we can decrement qinflight */
 			atomic_dec_32(&query_state->qinflight);
-			/* we saw at least one reply */
-			query_state->queries[qid].got_reply = 1;
+			/* We've seen all the result entries we'll see */
+			if (*query_state->queries[qid].rc != IDMAP_SUCCESS)
+				*query_state->queries[qid].rc =
+				    IDMAP_ERR_NOTFOUND;
 			idmap_lookup_unlock_batch(&query_state);
 		}
 		(void) ldap_msgfree(res);
@@ -1324,8 +1347,6 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 		    &query_state, &qid)) {
 			idmap_extract_object(query_state, qid, res);
 			/* we saw at least one result */
-			query_state->queries[qid].got_reply = 1;
-			query_state->queries[qid].got_results = 1;
 			idmap_lookup_unlock_batch(&query_state);
 		}
 		(void) ldap_msgfree(res);
@@ -1361,6 +1382,19 @@ idmap_lookup_unlock_batch(idmap_query_state_t **state)
 	*state = NULL;
 }
 
+static
+void
+idmap_cleanup_batch(idmap_query_state_t *batch)
+{
+	int i;
+
+	for (i = 0; i < batch->qcount; i++) {
+		if (batch->queries[i].n2s_cname != NULL)
+			free(batch->queries[i].n2s_cname);
+		batch->queries[i].n2s_cname = NULL;
+	}
+}
+
 /*
  * This routine frees the idmap_query_state_t structure
  * If the reference count is greater than 1 it waits
@@ -1388,6 +1422,9 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 			break;
 		}
 	}
+
+	idmap_cleanup_batch(*state);
+
 	(void) pthread_mutex_unlock(&qstatelock);
 
 	(void) pthread_cond_destroy(&(*state)->cv);
@@ -1402,8 +1439,6 @@ idmap_retcode
 idmap_lookup_batch_end(idmap_query_state_t **state,
 	struct timeval *timeout)
 {
-	idmap_q_t	    *q;
-	int		    i;
 	int		    rc = LDAP_SUCCESS;
 	idmap_retcode	    retcode = IDMAP_SUCCESS;
 
@@ -1423,16 +1458,6 @@ idmap_lookup_batch_end(idmap_query_state_t **state,
 		(*state)->qadh->dead = 1;
 	}
 
-	for (i = 0; i < (*state)->qcount; i++) {
-		q = &((*state)->queries[i]);
-		if (q->got_reply && !q->got_results) {
-			if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-				*q->rc = IDMAP_ERR_RETRIABLE_NET_ERR;
-			else
-				*q->rc = IDMAP_ERR_NOTFOUND;
-		}
-	}
-
 	idmap_lookup_release_batch(state);
 
 	return (retcode);
@@ -1444,8 +1469,8 @@ idmap_lookup_batch_end(idmap_query_state_t **state,
  */
 static
 idmap_retcode
-idmap_batch_add1(idmap_query_state_t *state, int n2s,
-	const char *filter, const char *basedn,
+idmap_batch_add1(idmap_query_state_t *state,
+	const char *filter, char *canonname,
 	char **result, char **dname, rid_t *rid, int *sid_type,
 	idmap_retcode *rc)
 {
@@ -1455,7 +1480,7 @@ idmap_batch_add1(idmap_query_state_t *state, int n2s,
 	idmap_q_t	*q;
 
 	if (state->qdead) {
-		*rc = IDMAP_ERR_NORESULT;
+		*rc = IDMAP_ERR_RETRIABLE_NET_ERR;
 		return (IDMAP_ERR_RETRIABLE_NET_ERR);
 	}
 
@@ -1463,20 +1488,26 @@ idmap_batch_add1(idmap_query_state_t *state, int n2s,
 
 	q = &(state->queries[qid]);
 
+	/* Remember the canonname so we can check the results agains it */
+	q->n2s_cname = canonname;
+
 	/* Remember where to put the results */
 	q->result = result;
 	q->domain = dname;
 	q->rid = rid;
 	q->sid_type = sid_type;
 	q->rc = rc;
-	q->n2s = n2s ? 1 : 0;
-	q->got_objectSid = 0;
-	q->got_objectClass = 0;
-	q->got_samAcctName = 0;
 
 	/*
 	 * Provide sane defaults for the results in case we never hear
 	 * back from the DS before closing the connection.
+	 *
+	 * In particular we default the result to indicate a retriable
+	 * error.  The first complete matching result entry will cause
+	 * this to be set to IDMAP_SUCCESS, and the end of the results
+	 * for this search will cause this to indicate "not found" if no
+	 * result entries arrived or no complete ones matched the lookup
+	 * we were doing.
 	 */
 	*rc = IDMAP_ERR_RETRIABLE_NET_ERR;
 	*sid_type = _IDMAP_T_OTHER;
@@ -1491,7 +1522,7 @@ idmap_batch_add1(idmap_query_state_t *state, int n2s,
 
 	if (!state->qadh->dead) {
 		state->qadh->idletime = time(NULL);
-		lrc = ldap_search_ext(state->qadh->ld, basedn,
+		lrc = ldap_search_ext(state->qadh->ld, "",
 		    LDAP_SCOPE_SUBTREE, filter, NULL, 0, NULL, NULL,
 		    NULL, -1, &q->msgid);
 		if (lrc == LDAP_BUSY || lrc == LDAP_UNAVAILABLE ||
@@ -1530,54 +1561,69 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 	char **sid, rid_t *rid, int *sid_type, idmap_retcode *rc)
 {
 	idmap_retcode	retcode;
-	int		flen, samAcctNameLen;
+	int		len, samAcctNameLen;
 	char		*filter = NULL;
-	char		*basedn = NULL;
-	char		*cp;
+	char		*canonname = NULL;
 
 	/*
-	 * Strategy: search [the global catalog] for user/group by
-	 * sAMAccountName = user/groupname with base DN derived from the
-	 * domain name.  The objectSid and objectClass of the result are
-	 * all we need to figure out the SID of the user/group and
-	 * whether it is a user or a group.
+	 * Strategy: search the global catalog for user/group by
+	 * sAMAccountName = user/groupname with "" as the base DN and by
+	 * userPrincipalName = user/groupname@domain.  The result
+	 * entries will be checked to conform to the name and domain
+	 * name given here.  The DN, sAMAccountName, userPrincipalName,
+	 * objectSid and objectClass of the result entries are all we
+	 * need to figure out which entries match the lookup, the SID of
+	 * the user/group and whether it is a user or a group.
 	 */
 
 	/*
-	 * Handle optional domain parameter and default domain
-	 * semantics.  The get a basedn from the domainname.
+	 * We need the name and the domain name separately and as
+	 * name@domain.  We also allow the domain to be provided
+	 * separately.
 	 */
 	samAcctNameLen = strlen(name);
+
 	if (dname == NULL || *dname == '\0') {
-		/* domain name not given separately */
-		if ((cp = strchr(name, '@')) == NULL) {
-			/* nor is the name qualified */
-			dname = state->qadh->owner->dflt_w2k_dom;
-			basedn = state->qadh->owner->basedn;
+		if (strchr(name, '@') != NULL) {
+			/* 'name' is qualified with a domain name */
+			if ((canonname = strdup(name)) == NULL)
+				return (IDMAP_ERR_MEMORY);
 		} else {
-			/* the name is qualified */
-			samAcctNameLen -= strlen(cp);
-			dname = cp + 1;
+			/* 'name' not qualified and dname not given */
+			dname = state->qadh->owner->dflt_w2k_dom;
 		}
 	}
 
-	if (basedn == NULL)
-		basedn = dns2dn(dname);
+	if (dname == NULL || *dname == '\0') {
+		/* No default domain and domain not given */
+		if (canonname != NULL)
+			free(canonname);
+		return (IDMAP_ERR_DOMAIN);
+	}
+
+	if (canonname == NULL) {
+		/*
+		 * We need name@domain in the query record to match
+		 * replies to; see elsewhere
+		 */
+		len = snprintf(NULL, 0, "%s@%s", name, dname) + 1;
+		if ((canonname = malloc(len)) == NULL)
+			return (IDMAP_ERR_MEMORY);
+		(void) snprintf(canonname, samAcctNameLen + strlen(dname) + 2,
+		    "%s@%s", name, dname);
+	}
 
 	/* Assemble filter */
-	flen = snprintf(NULL, 0, SANFILTER, samAcctNameLen, name) + 1;
-	if ((filter = (char *)malloc(flen)) == NULL) {
-		if (basedn != state->qadh->owner->basedn)
-			free(basedn);
+	len = snprintf(NULL, 0, SANFILTER, samAcctNameLen, name) + 1;
+	if ((filter = (char *)malloc(len)) == NULL) {
+		free(canonname);
 		return (IDMAP_ERR_MEMORY);
 	}
-	(void) snprintf(filter, flen, SANFILTER, samAcctNameLen, name);
+	(void) snprintf(filter, len, SANFILTER, samAcctNameLen, name);
 
-	retcode = idmap_batch_add1(state, 1, filter, basedn,
+	retcode = idmap_batch_add1(state, filter, canonname,
 	    sid, NULL, rid, sid_type, rc);
 
-	if (basedn != state->qadh->owner->basedn)
-		free(basedn);
 	free(filter);
 
 	return (retcode);
@@ -1606,12 +1652,12 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 		return (IDMAP_ERR_SID);
 
 	/* Assemble filter */
-	flen = snprintf(NULL, 0, OBJECTSIDFILTER, cbinsid) + 1;
+	flen = snprintf(NULL, 0, OBJSIDFILTER, cbinsid) + 1;
 	if ((filter = (char *)malloc(flen)) == NULL)
 		return (IDMAP_ERR_MEMORY);
-	(void) snprintf(filter, flen, OBJECTSIDFILTER, cbinsid);
+	(void) snprintf(filter, flen, OBJSIDFILTER, cbinsid);
 
-	retcode = idmap_batch_add1(state, 0, filter, NULL, name, dname,
+	retcode = idmap_batch_add1(state, filter, NULL, name, dname,
 	    NULL, sid_type, rc);
 
 	free(filter);

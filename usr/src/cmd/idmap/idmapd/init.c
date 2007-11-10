@@ -70,6 +70,7 @@ fini_mapping_system() {
 
 int
 load_config() {
+	int rc;
 	idmap_pg_config_t *pgcfg;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
 		idmapdlog(LOG_ERR, "%s: failed to initialize config", me);
@@ -78,32 +79,31 @@ load_config() {
 	}
 	pgcfg = &_idmapdstate.cfg->pgcfg;
 
-	if (idmap_cfg_load(&_idmapdstate.cfg->handles,
-	    &_idmapdstate.cfg->pgcfg) < 0) {
+	rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
+	    &_idmapdstate.cfg->pgcfg, 0);
+	if (rc < -1) {
+		/* Total failure */
 		degrade_svc();
-		idmapdlog(LOG_ERR, "%s: failed to load config", me);
+		idmapdlog(LOG_ERR, "%s: Fatal error while loading "
+		    "configuration", me);
 		return (-1);
 	}
 
-	if (pgcfg->default_domain == NULL ||
-	    pgcfg->default_domain[0] == '\0') {
-		idmapdlog(LOG_ERR, "%s: Default domain not configured; "
-		    "AD lookup disabled", me);
-		degrade_svc();
-	}
-	if (pgcfg->domain_name == NULL ||
-	    pgcfg->domain_name[0] == '\0') {
-		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "%s: AD joined domain is not configured; "
-		    "AD lookup disabled", me);
-	}
+	if (rc != 0)
+		/* Partial failure */
+		idmapdlog(LOG_ERR, "%s: Various errors occurred while loading "
+			"the configuration; check the logs", me);
+
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
 		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "%s: Global catalog server is not configured; "
-		    "AD lookup disabled", me);
+		idmapdlog(LOG_INFO,
+		    "%s: Global catalog server is not configured; AD lookup "
+		    "will fail until one or more global catalog server names "
+		    "are configured or discovered; auto-discovery will begin "
+		    "shortly", me);
+	} else {
+		restore_svc();
 	}
 
 	(void) reload_ad();
@@ -111,6 +111,9 @@ load_config() {
 	if (idmap_cfg_start_updates(_idmapdstate.cfg) < 0)
 		idmapdlog(LOG_ERR, "%s: could not start config updater",
 			me);
+
+	idmapdlog(LOG_DEBUG, "%s: initial configuration loaded", me);
+
 	return (0);
 }
 

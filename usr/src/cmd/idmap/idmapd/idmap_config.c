@@ -190,9 +190,9 @@ get_val_ds(idmap_cfg_handles_t *handles, const char *name, int defport,
 	scf_value_t *value;
 	scf_iter_t *iter;
 	char *host, *portstr;
-	int len;
+	int len, i;
 	int count = 0;
-	int rc = 0;
+	int rc = -1;
 
 	*val = NULL;
 
@@ -201,15 +201,16 @@ restart:
 	value = scf_value_create(handles->main);
 	iter = scf_iter_create(handles->main);
 
-	if (scf_pg_get_property(handles->config_pg, name, scf_prop) < 0)
+	if (scf_pg_get_property(handles->config_pg, name, scf_prop) < 0) {
 		/* this is OK: the property is just undefined */
+		rc = 0;
 		goto destruction;
+	}
 
 	if (scf_iter_property_values(iter, scf_prop) < 0) {
 		idmapdlog(LOG_ERR,
 		    "%s: scf_iter_property_values(%s) failed: %s",
 		    me, name, scf_strerror(scf_error()));
-		rc = -1;
 		goto destruction;
 	}
 
@@ -218,9 +219,11 @@ restart:
 		while (scf_iter_next_value(iter, value) > 0)
 			count++;
 
-		if (count == 0)
+		if (count == 0) {
 			/* no values */
+			rc = 0;
 			goto destruction;
+		}
 
 		scf_value_destroy(value);
 		scf_iter_destroy(iter);
@@ -233,33 +236,34 @@ restart:
 		goto destruction;
 	}
 
-	count = 0;
-	while (scf_iter_next_value(iter, value) > 0) {
-		servers[count].priority = 0;
-		servers[count].weight = 100;
-		servers[count].port = defport;
+	i = 0;
+	while (i < count && scf_iter_next_value(iter, value) > 0) {
+		servers[i].priority = 0;
+		servers[i].weight = 100;
+		servers[i].port = defport;
 		if ((host = scf_value2string(value)) == NULL) {
-			rc = -1;
 			goto destruction;
 		}
 		if ((portstr = strchr(host, ':')) != NULL) {
 			*portstr++ = '\0';
-			servers[count].port = strtol(portstr,
+			servers[i].port = strtol(portstr,
 			    (char **)NULL, 10);
-			if (servers[count].port == 0)
-				servers[count].port = defport;
+			if (servers[i].port == 0)
+				servers[i].port = defport;
 		}
-		len = strlcpy(servers[count].host, host,
+		len = strlcpy(servers[i].host, host,
 		    sizeof (servers->host));
 
 		free(host);
 
 		/* Ignore this server if the hostname is too long */
 		if (len < sizeof (servers->host))
-			count++;
+			i++;
 	}
 
 	*val = servers;
+
+	rc = 0;
 
 destruction:
 	scf_value_destroy(value);
@@ -318,7 +322,9 @@ destruction:
 static int
 set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 {
-	int			rc = 0, i;
+	int			rc = -1;
+	int			ret = -2;
+	int			i;
 	scf_property_t		*scf_prop = NULL;
 	scf_value_t		*value = NULL;
 	scf_transaction_t	*tx = NULL;
@@ -330,22 +336,19 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 	    (ent = scf_entry_create(handles->main)) == NULL) {
 		idmapdlog(LOG_ERR, "%s: Unable to set property %s: %s",
 		    me, name, scf_strerror(scf_error()));
-		rc = -1;
 		goto destruction;
 	}
 
-	for (i = 0; i < MAX_TRIES && rc == 0; i++) {
+	for (i = 0; i < MAX_TRIES && (ret == -2 || ret == 0); i++) {
 		if (scf_transaction_start(tx, handles->config_pg) == -1) {
 			idmapdlog(LOG_ERR,
 			    "%s: scf_transaction_start(%s) failed: %s",
 			    me, name, scf_strerror(scf_error()));
-			rc = -1;
 			goto destruction;
 		}
 
-		rc = scf_transaction_property_new(tx, ent, name,
-		    SCF_TYPE_ASTRING);
-		if (rc == -1) {
+		if (scf_transaction_property_new(tx, ent, name,
+		    SCF_TYPE_ASTRING) < 0) {
 			idmapdlog(LOG_ERR,
 			    "%s: scf_transaction_property_new() failed: %s",
 			    me, scf_strerror(scf_error()));
@@ -356,7 +359,6 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 			idmapdlog(LOG_ERR,
 			    "%s: scf_value_set_astring() failed: %s",
 			    me, scf_strerror(scf_error()));
-			rc = -1;
 			goto destruction;
 		}
 
@@ -364,12 +366,13 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 			idmapdlog(LOG_ERR,
 			    "%s: scf_entry_add_value() failed: %s",
 			    me, scf_strerror(scf_error()));
-			rc = -1;
 			goto destruction;
 		}
 
-		rc = scf_transaction_commit(tx);
-		if (rc == 0 && i < MAX_TRIES - 1) {
+		if ((ret = scf_transaction_commit(tx)) == 1)
+			break;
+
+		if (ret == 0 && i < MAX_TRIES - 1) {
 			/*
 			 * Property group set in scf_transaction_start()
 			 * is not the most recent. Update pg, reset tx and
@@ -382,20 +385,19 @@ set_val_astring(idmap_cfg_handles_t *handles, char *name, const char *val)
 				idmapdlog(LOG_ERR,
 				    "%s: scf_pg_update() failed: %s",
 				    me, scf_strerror(scf_error()));
-				rc = -1;
 				goto destruction;
 			}
 			scf_transaction_reset(tx);
 		}
 	}
 
-	/* Log failure message if all retries failed */
-	if (rc == 0) {
+
+	if (ret == 1)
+		rc = 0;
+	else if (ret != -2)
 		idmapdlog(LOG_ERR,
 		    "%s: scf_transaction_commit(%s) failed: %s",
 		    me, name, scf_strerror(scf_error()));
-		rc = -1;
-	}
 
 destruction:
 	scf_value_destroy(value);
@@ -526,15 +528,28 @@ retry:
 	 */
 
 	if (hupped) {
+		int rc;
+
 		hupped = 0;
-		/* Got SIGHUP, re-read SMF config */
+		/*
+		 * Blow away the ccache, we might have re-joined the
+		 * domain or joined a new one
+		 */
+		(void) unlink(IDMAP_CACHEDIR "/ccache");
+		/* HUP is the refresh method, so re-read SMF config */
 		(void) idmapdlog(LOG_INFO, "idmapd: SMF refresh");
 		WRLOCK_CONFIG();
 		(void) idmap_cfg_unload(&_idmapdstate.cfg->pgcfg);
-		if (idmap_cfg_load(&_idmapdstate.cfg->handles,
-		    &_idmapdstate.cfg->pgcfg) < 0)
-			(void) idmapdlog(LOG_NOTICE,
-			    "idmapd: Failed to reload config");
+		rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
+		    &_idmapdstate.cfg->pgcfg, 1);
+		if (rc == -2)
+			(void) idmapdlog(LOG_ERR,
+			    "idmapd: Various errors re-loading configuration "
+			    "will cause AD lookups to fail");
+		if (rc == -1)
+			(void) idmapdlog(LOG_WARNING,
+			    "idmapd: Various errors re-loading configuration "
+			    "may cause AD lookups to fail");
 		UNLOCK_CONFIG();
 		return (1);
 	}
@@ -547,18 +562,25 @@ idmap_cfg_update_thread(void *arg)
 {
 
 	idmap_pg_config_t	new_cfg;
-	int			ttl;
+	int			ttl, changed;
 	idmap_cfg_handles_t	*handles = &_idmapdstate.cfg->handles;
 	idmap_pg_config_t	*live_cfg = &_idmapdstate.cfg->pgcfg;
 	ad_disc_t		ad_ctx = handles->ad_ctx;
 	struct timespec		delay;
-	int			changed;
+	int			first = 1;
 
 	(void) memset(&new_cfg, 0, sizeof (new_cfg));
 
 	for (;;) {
 		changed = FALSE;
-		ttl = ad_disc_get_TTL(ad_ctx);
+
+		if (first) {
+			ttl = 1;
+			first = 0;
+		} else {
+			ttl = ad_disc_get_TTL(ad_ctx);
+		}
+
 		if (ttl > MAX_CHECK_TIME)
 			ttl = MAX_CHECK_TIME;
 		while (ttl > 0 || ttl == -1) {
@@ -734,9 +756,11 @@ idmap_cfg_start_updates(idmap_cfg_t *cfg)
 
 
 int
-idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
+idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
+	int discover)
 {
-	int rc = 0;
+	int rc;
+	int errors = 0;
 	char *str = NULL;
 	ad_disc_t ad_ctx = handles->ad_ctx;
 
@@ -756,44 +780,46 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 	if (scf_pg_update(handles->config_pg) < 0) {
 		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
 		    me, scf_strerror(scf_error()));
-		rc = -1;
+		rc = -2;
 		goto exit;
 	}
 
 	if (scf_pg_update(handles->general_pg) < 0) {
 		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
 		    me, scf_strerror(scf_error()));
-		rc = -1;
+		rc = -2;
 		goto exit;
 	}
 
 	rc = get_val_int(handles, "list_size_limit",
 	    &pgcfg->list_size_limit, SCF_TYPE_COUNT);
 	if (rc != 0) {
-		rc = -1;
-		goto exit;
+		pgcfg->list_size_limit = 0;
+		errors++;
 	}
 
 	rc = get_val_astring(handles, "domain_name",
 	    &pgcfg->domain_name);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
-	(void) ad_disc_set_DomainName(ad_ctx, pgcfg->domain_name);
+	if (rc != 0)
+		errors++;
+	else
+		(void) ad_disc_set_DomainName(ad_ctx, pgcfg->domain_name);
 
 	rc = get_val_astring(handles, "default_domain",
 	    &pgcfg->default_domain);
 	if (rc != 0) {
-		rc = -1;
+		/*
+		 * SCF failures fetching config/default_domain we treat
+		 * as fatal as they may leave ID mapping rules that
+		 * match unqualified winnames flapping in the wind.
+		 */
+		rc = -2;
 		goto exit;
 	}
 
 	rc = get_val_astring(handles, "mapping_domain", &str);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
+	if (rc != 0)
+		errors++;
 
 	/*
 	 * We treat default_domain as having been specified in SMF IFF
@@ -829,58 +855,52 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 		free(str);
 
 	rc = get_val_astring(handles, "machine_sid", &pgcfg->machine_sid);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
+	if (rc != 0)
+		errors++;
 	if (pgcfg->machine_sid == NULL) {
 		/* If machine_sid not configured, generate one */
 		if (generate_machine_sid(&pgcfg->machine_sid) < 0) {
-			rc =  -1;
+			rc =  -2;
 			goto exit;
 		}
 		rc = set_val_astring(handles, "machine_sid",
 		    pgcfg->machine_sid);
-		if (rc < 0) {
-			free(pgcfg->machine_sid);
-			pgcfg->machine_sid = NULL;
-			rc = -1;
-			goto exit;
-		}
+		if (rc != 0)
+			errors++;
 	}
 
 	str = NULL;
 	rc = get_val_ds(handles, "domain_controller", 389,
 	    &pgcfg->domain_controller);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
-	(void) ad_disc_set_DomainController(ad_ctx, pgcfg->domain_controller);
+	if (rc != 0)
+		errors++;
+	else
+		(void) ad_disc_set_DomainController(ad_ctx,
+		    pgcfg->domain_controller);
 
 	rc = get_val_astring(handles, "forest_name", &pgcfg->forest_name);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
-	(void) ad_disc_set_ForestName(ad_ctx, pgcfg->forest_name);
+	if (rc != 0)
+		errors++;
+	else
+		(void) ad_disc_set_ForestName(ad_ctx, pgcfg->forest_name);
 
 	rc = get_val_astring(handles, "site_name", &pgcfg->site_name);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
-	(void) ad_disc_set_SiteName(ad_ctx, pgcfg->site_name);
+	if (rc != 0)
+		errors++;
+	else
+		(void) ad_disc_set_SiteName(ad_ctx, pgcfg->site_name);
 
 	str = NULL;
 	rc = get_val_ds(handles, "global_catalog", 3268,
 	    &pgcfg->global_catalog);
-	if (rc != 0) {
-		rc = -1;
-		goto exit;
-	}
-	(void) ad_disc_set_GlobalCatalog(ad_ctx, pgcfg->global_catalog);
+	if (rc != 0)
+		errors++;
+	else
+		(void) ad_disc_set_GlobalCatalog(ad_ctx, pgcfg->global_catalog);
 
+
+	if (!discover)
+		goto exit;
 
 	/*
 	 * Auto Discover the rest
@@ -934,10 +954,14 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			    "%s: unable to discover Global Catalog", me);
 		}
 	}
+
 exit:
 	pthread_mutex_unlock(&handles->mutex);
 
-	return (rc);
+	if (rc == -2)
+		return (rc);
+
+	return ((errors == 0) ? 0 : -1);
 }
 
 /*

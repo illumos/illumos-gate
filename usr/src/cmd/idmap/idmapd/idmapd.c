@@ -269,8 +269,10 @@ init_idmapd() {
 
 	/*
 	 * Set KRB5CCNAME in the environment.  See app_krb5_user_uid()
-	 * for more details.
+	 * for more details.  We blow away the existing one, if there is
+	 * one.
 	 */
+	(void) unlink(IDMAP_CACHEDIR "/ccache");
 	putenv("KRB5CCNAME=" IDMAP_CACHEDIR "/ccache");
 
 	memset(&_idmapdstate, 0, sizeof (_idmapdstate));
