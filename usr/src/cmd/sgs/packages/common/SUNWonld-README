@@ -1183,8 +1183,8 @@ All the above changes are incorporated in the following patches:
 	Solaris/Nvidia only
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T127111-XX
-    Solaris/SunOS 5.10_x86	patch T127112-XX
+    Solaris/SunOS 5.10_sparc	patch T127111-04
+    Solaris/SunOS 5.10_x86	patch T127112-04
 --------------------------------------------------------------------------------
 6479848 Enhancements to the linker support interface needed. (D)
 	PSARC/2006/595 link-editor support library interface - ld_open()
@@ -1298,3 +1298,4 @@ Bugid   Risk Synopsis
 	(link-editor components only)
 6621066 Reduce need for new elfdump options with every section type (D)
 	PSARC/2007/620 elfdump -T, and simplified matching
+6627765 soffice failure after integration of 6603313 - dangling GROUP pointer.

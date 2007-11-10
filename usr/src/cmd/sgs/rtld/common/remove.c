@@ -639,13 +639,21 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 			continue;
 
 		/*
-		 * If this object hasn't yet been relocated take this as a sign
-		 * that it's loading failed, thus we're here to cleanup.  Or,
-		 * if this object isn't obviously non-deletable, determine
-		 * whether it provides any filtees.  Add these groups to the
-		 * group collection.
+		 * If this object is a candidate for deletion, determine if the
+		 * object provides any filtees.  If so, the filter groups are
+		 * added to the group collection.
+		 *
+		 * An object is a candidate for deletion if:
+		 *
+		 *  .	the object hasn't yet been relocated, in which case
+		 *	we're here to clean up a failed load, or
+		 *  .	the object doesn't reside on the base link-map control
+		 *	list, in which case a group of objects, typically
+		 *	lazily loaded, or filtees, need cleaning up, or
+		 *  .   the object isn't tagged as non-deletable.
 		 */
 		if ((((FLAGS(lmp) & FLG_RT_RELOCED) == 0) ||
+		    (CNTL(lmp) != ALO_DATA) ||
 		    ((MODE(lmp) & RTLD_NODELETE) == 0)) &&
 		    (FLAGS1(lmp) & MSK_RT_FILTER)) {
 			Dyninfo	*dip = DYNINFO(lmp);
@@ -820,13 +828,17 @@ free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
 		 * reason, clear the promotion flag.
 		 */
 		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
-			if (gdp->gd_depend != clmp)
+			Rt_map	*lmp = gdp->gd_depend;
+
+			if (lmp != clmp)
 				continue;
 
-			if (gdp->gd_flags == cdflags)
+			if (gdp->gd_flags == cdflags) {
 				(void) alist_delete(ghp->gh_depends, 0, &off);
-			else
+				(void) alist_delete(GROUPS(lmp), &ghp, 0);
+			} else {
 				gdp->gd_flags &= ~cdflags;
+			}
 			return;
 		}
 	}
