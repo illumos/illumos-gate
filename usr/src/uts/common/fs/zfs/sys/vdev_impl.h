@@ -168,6 +168,7 @@ struct vdev {
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
 	uint64_t	vdev_isspare;	/* was a hot spare		*/
+	uint64_t	vdev_isl2cache;	/* was a l2cache device		*/
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
 	uint64_t	vdev_not_present; /* not present during import	*/
@@ -249,6 +250,7 @@ typedef struct vdev_label {
 #define	VDEV_ALLOC_LOAD		0
 #define	VDEV_ALLOC_ADD		1
 #define	VDEV_ALLOC_SPARE	2
+#define	VDEV_ALLOC_L2CACHE	3
 
 /*
  * Allocate or free a vdev

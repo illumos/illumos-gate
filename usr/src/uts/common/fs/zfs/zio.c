@@ -675,7 +675,7 @@ zio_ioctl(zio_t *pio, spa_t *spa, vdev_t *vd, int cmd,
 
 static void
 zio_phys_bp_init(vdev_t *vd, blkptr_t *bp, uint64_t offset, uint64_t size,
-    int checksum)
+    int checksum, boolean_t labels)
 {
 	ASSERT(vd->vdev_children == 0);
 
@@ -683,8 +683,12 @@ zio_phys_bp_init(vdev_t *vd, blkptr_t *bp, uint64_t offset, uint64_t size,
 	ASSERT(P2PHASE(size, SPA_MINBLOCKSIZE) == 0);
 	ASSERT(P2PHASE(offset, SPA_MINBLOCKSIZE) == 0);
 
-	ASSERT(offset + size <= VDEV_LABEL_START_SIZE ||
-	    offset >= vd->vdev_psize - VDEV_LABEL_END_SIZE);
+#ifdef ZFS_DEBUG
+	if (labels) {
+		ASSERT(offset + size <= VDEV_LABEL_START_SIZE ||
+		    offset >= vd->vdev_psize - VDEV_LABEL_END_SIZE);
+	}
+#endif
 	ASSERT3U(offset + size, <=, vd->vdev_psize);
 
 	BP_ZERO(bp);
@@ -703,14 +707,14 @@ zio_phys_bp_init(vdev_t *vd, blkptr_t *bp, uint64_t offset, uint64_t size,
 zio_t *
 zio_read_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
     void *data, int checksum, zio_done_func_t *done, void *private,
-    int priority, int flags)
+    int priority, int flags, boolean_t labels)
 {
 	zio_t *zio;
 	blkptr_t blk;
 
 	ZIO_ENTER(vd->vdev_spa);
 
-	zio_phys_bp_init(vd, &blk, offset, size, checksum);
+	zio_phys_bp_init(vd, &blk, offset, size, checksum, labels);
 
 	zio = zio_create(pio, vd->vdev_spa, 0, &blk, data, size, done, private,
 	    ZIO_TYPE_READ, priority, flags | ZIO_FLAG_PHYSICAL,
@@ -730,7 +734,7 @@ zio_read_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
 zio_t *
 zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
     void *data, int checksum, zio_done_func_t *done, void *private,
-    int priority, int flags)
+    int priority, int flags, boolean_t labels)
 {
 	zio_block_tail_t *zbt;
 	void *wbuf;
@@ -739,7 +743,7 @@ zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset, uint64_t size,
 
 	ZIO_ENTER(vd->vdev_spa);
 
-	zio_phys_bp_init(vd, &blk, offset, size, checksum);
+	zio_phys_bp_init(vd, &blk, offset, size, checksum, labels);
 
 	zio = zio_create(pio, vd->vdev_spa, 0, &blk, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_PHYSICAL,

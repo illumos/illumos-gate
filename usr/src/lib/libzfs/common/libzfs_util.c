@@ -201,6 +201,8 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    " modified"));
 	case EZFS_BADCACHE:
 		return (dgettext(TEXT_DOMAIN, "invalid or missing cache file"));
+	case EZFS_ISL2CACHE:
+		return (dgettext(TEXT_DOMAIN, "device is in use as a cache"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

@@ -1118,6 +1118,10 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is reserved as a hot spare for ZFS pool %s.  Please "
 		    "see zpool(1M).\n");
+	} else if (strcmp(what, DM_USE_L2CACHE_ZPOOL) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is in use as a cache device for ZFS pool %s.  "
+		    "Please see zpool(1M).\n");
 	}
 }
 void

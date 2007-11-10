@@ -363,6 +363,9 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	} else if (alloctype == VDEV_ALLOC_SPARE) {
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
 			return (EINVAL);
+	} else if (alloctype == VDEV_ALLOC_L2CACHE) {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) != 0)
+			return (EINVAL);
 	}
 
 	/*
@@ -550,6 +553,8 @@ vdev_free(vdev_t *vd)
 
 	if (vd->vdev_isspare)
 		spa_spare_remove(vd);
+	if (vd->vdev_isl2cache)
+		spa_l2cache_remove(vd);
 
 	txg_list_destroy(&vd->vdev_ms_list);
 	txg_list_destroy(&vd->vdev_dtl_list);
@@ -1367,14 +1372,14 @@ vdev_load(vdev_t *vd)
 }
 
 /*
- * This special case of vdev_spare() is used for hot spares.  It's sole purpose
- * it to set the vdev state for the associated vdev.  To do this, we make sure
- * that we can open the underlying device, then try to read the label, and make
- * sure that the label is sane and that it hasn't been repurposed to another
- * pool.
+ * The special vdev case is used for hot spares and l2cache devices.  Its
+ * sole purpose it to set the vdev state for the associated vdev.  To do this,
+ * we make sure that we can open the underlying device, then try to read the
+ * label, and make sure that the label is sane and that it hasn't been
+ * repurposed to another pool.
  */
 int
-vdev_validate_spare(vdev_t *vd)
+vdev_validate_aux(vdev_t *vd)
 {
 	nvlist_t *label;
 	uint64_t guid, version;
@@ -1396,8 +1401,6 @@ vdev_validate_spare(vdev_t *vd)
 		nvlist_free(label);
 		return (-1);
 	}
-
-	spa_spare_add(vd);
 
 	/*
 	 * We don't actually check the pool state here.  If it's in fact in
@@ -1855,6 +1858,16 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 }
 
 void
+vdev_clear_stats(vdev_t *vd)
+{
+	mutex_enter(&vd->vdev_stat_lock);
+	vd->vdev_stat.vs_space = 0;
+	vd->vdev_stat.vs_dspace = 0;
+	vd->vdev_stat.vs_alloc = 0;
+	mutex_exit(&vd->vdev_stat_lock);
+}
+
+void
 vdev_stat_update(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
@@ -1952,15 +1965,14 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
  * Update the in-core space usage stats for this vdev and the root vdev.
  */
 void
-vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta)
+vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
+    boolean_t update_root)
 {
 	int64_t dspace_delta = space_delta;
 	spa_t *spa = vd->vdev_spa;
 	vdev_t *rvd = spa->spa_root_vdev;
 
 	ASSERT(vd == vd->vdev_top);
-	ASSERT(rvd == vd->vdev_parent);
-	ASSERT(vd->vdev_ms_count != 0);
 
 	/*
 	 * Apply the inverse of the psize-to-asize (ie. RAID-Z) space-expansion
@@ -1978,18 +1990,23 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta)
 	vd->vdev_stat.vs_dspace += dspace_delta;
 	mutex_exit(&vd->vdev_stat_lock);
 
-	/*
-	 * Don't count non-normal (e.g. intent log) space as part of
-	 * the pool's capacity.
-	 */
-	if (vd->vdev_mg->mg_class != spa->spa_normal_class)
-		return;
+	if (update_root) {
+		ASSERT(rvd == vd->vdev_parent);
+		ASSERT(vd->vdev_ms_count != 0);
 
-	mutex_enter(&rvd->vdev_stat_lock);
-	rvd->vdev_stat.vs_space += space_delta;
-	rvd->vdev_stat.vs_alloc += alloc_delta;
-	rvd->vdev_stat.vs_dspace += dspace_delta;
-	mutex_exit(&rvd->vdev_stat_lock);
+		/*
+		 * Don't count non-normal (e.g. intent log) space as part of
+		 * the pool's capacity.
+		 */
+		if (vd->vdev_mg->mg_class != spa->spa_normal_class)
+			return;
+
+		mutex_enter(&rvd->vdev_stat_lock);
+		rvd->vdev_stat.vs_space += space_delta;
+		rvd->vdev_stat.vs_alloc += alloc_delta;
+		rvd->vdev_stat.vs_dspace += dspace_delta;
+		mutex_exit(&rvd->vdev_stat_lock);
+	}
 }
 
 /*

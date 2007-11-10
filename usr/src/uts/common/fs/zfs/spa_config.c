@@ -422,7 +422,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 		vd = vd->vdev_top;		/* label contains top config */
 	}
 
-	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE);
+	nvroot = vdev_config_generate(spa, vd, getstats, B_FALSE, B_FALSE);
 	VERIFY(nvlist_add_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, nvroot) == 0);
 	nvlist_free(nvroot);
 

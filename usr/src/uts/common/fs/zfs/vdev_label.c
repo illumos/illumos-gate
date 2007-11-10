@@ -169,7 +169,8 @@ vdev_label_read(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
 	    vdev_label_offset(vd->vdev_psize, l, offset),
 	    size, buf, ZIO_CHECKSUM_LABEL, done, private,
 	    ZIO_PRIORITY_SYNC_READ,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE));
+	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
+	    B_TRUE));
 }
 
 static void
@@ -181,7 +182,8 @@ vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
 	zio_nowait(zio_write_phys(zio, vd,
 	    vdev_label_offset(vd->vdev_psize, l, offset),
 	    size, buf, ZIO_CHECKSUM_LABEL, done, private,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL));
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL,
+	    B_TRUE));
 }
 
 /*
@@ -189,7 +191,7 @@ vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
  */
 nvlist_t *
 vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
-    boolean_t isspare)
+    boolean_t isspare, boolean_t isl2cache)
 {
 	nvlist_t *nv = NULL;
 
@@ -197,7 +199,7 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 
 	VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 	    vd->vdev_ops->vdev_op_type) == 0);
-	if (!isspare)
+	if (!isspare && !isl2cache)
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_ID, vd->vdev_id)
 		    == 0);
 	VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_GUID, vd->vdev_guid) == 0);
@@ -245,7 +247,7 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 	if (vd->vdev_isspare)
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_SPARE, 1) == 0);
 
-	if (!isspare && vd == vd->vdev_top) {
+	if (!isspare && !isl2cache && vd == vd->vdev_top) {
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_ARRAY,
 		    vd->vdev_ms_array) == 0);
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_SHIFT,
@@ -278,7 +280,7 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 
 		for (c = 0; c < vd->vdev_children; c++)
 			child[c] = vdev_config_generate(spa, vd->vdev_child[c],
-			    getstats, isspare);
+			    getstats, isspare, isl2cache);
 
 		VERIFY(nvlist_add_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 		    child, vd->vdev_children) == 0);
@@ -357,7 +359,7 @@ vdev_label_read_config(vdev_t *vd)
  */
 static boolean_t
 vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
-    uint64_t *spare_guid)
+    uint64_t *spare_guid, uint64_t *l2cache_guid)
 {
 	spa_t *spa = vd->vdev_spa;
 	uint64_t state, pool_guid, device_guid, txg, spare_pool;
@@ -366,6 +368,8 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 
 	if (spare_guid)
 		*spare_guid = 0ULL;
+	if (l2cache_guid)
+		*l2cache_guid = 0ULL;
 
 	/*
 	 * Read the label, if any, and perform some basic sanity checks.
@@ -384,7 +388,7 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 		return (B_FALSE);
 	}
 
-	if (state != POOL_STATE_SPARE &&
+	if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
 	    (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
 	    &pool_guid) != 0 ||
 	    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_TXG,
@@ -400,9 +404,10 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 	 * be a part of.  The only way this is allowed is if the device is a hot
 	 * spare (which we check for later on).
 	 */
-	if (state != POOL_STATE_SPARE &&
+	if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
 	    !spa_guid_exists(pool_guid, device_guid) &&
-	    !spa_spare_exists(device_guid, NULL))
+	    !spa_spare_exists(device_guid, NULL) &&
+	    !spa_l2cache_exists(device_guid, NULL))
 		return (B_FALSE);
 
 	/*
@@ -412,13 +417,14 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 	 * user has attempted to add the same vdev multiple times in the same
 	 * transaction.
 	 */
-	if (state != POOL_STATE_SPARE && txg == 0 && vdtxg == crtxg)
+	if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
+	    txg == 0 && vdtxg == crtxg)
 		return (B_TRUE);
 
 	/*
 	 * Check to see if this is a spare device.  We do an explicit check for
 	 * spa_has_spare() here because it may be on our pending list of spares
-	 * to add.
+	 * to add.  We also check if it is an l2cache device.
 	 */
 	if (spa_spare_exists(device_guid, &spare_pool) ||
 	    spa_has_spare(spa, device_guid)) {
@@ -427,6 +433,7 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 
 		switch (reason) {
 		case VDEV_LABEL_CREATE:
+		case VDEV_LABEL_L2CACHE:
 			return (B_TRUE);
 
 		case VDEV_LABEL_REPLACE:
@@ -437,6 +444,12 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 			return (spa_has_spare(spa, device_guid));
 		}
 	}
+
+	/*
+	 * Check to see if this is an l2cache device.
+	 */
+	if (spa_l2cache_exists(device_guid, NULL))
+		return (B_TRUE);
 
 	/*
 	 * If the device is marked ACTIVE, then this device is in use by another
@@ -466,7 +479,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	char *buf;
 	size_t buflen;
 	int error;
-	uint64_t spare_guid;
+	uint64_t spare_guid, l2cache_guid;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
 
@@ -488,19 +501,20 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	 * Determine if the vdev is in use.
 	 */
 	if (reason != VDEV_LABEL_REMOVE &&
-	    vdev_inuse(vd, crtxg, reason, &spare_guid))
+	    vdev_inuse(vd, crtxg, reason, &spare_guid, &l2cache_guid))
 		return (EBUSY);
 
 	ASSERT(reason != VDEV_LABEL_REMOVE ||
-	    vdev_inuse(vd, crtxg, reason, NULL));
+	    vdev_inuse(vd, crtxg, reason, NULL, NULL));
 
 	/*
-	 * If this is a request to add or replace a spare that is in use
-	 * elsewhere on the system, then we must update the guid (which was
-	 * initialized to a random value) to reflect the actual GUID (which is
-	 * shared between multiple pools).
+	 * If this is a request to add or replace a spare or l2cache device
+	 * that is in use elsewhere on the system, then we must update the
+	 * guid (which was initialized to a random value) to reflect the
+	 * actual GUID (which is shared between multiple pools).
 	 */
-	if (reason != VDEV_LABEL_REMOVE && spare_guid != 0ULL) {
+	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_L2CACHE &&
+	    spare_guid != 0ULL) {
 		vdev_t *pvd = vd->vdev_parent;
 
 		for (; pvd != NULL; pvd = pvd->vdev_parent) {
@@ -516,6 +530,27 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		 * labeled appropriately and we can just return.
 		 */
 		if (reason == VDEV_LABEL_SPARE)
+			return (0);
+		ASSERT(reason == VDEV_LABEL_REPLACE);
+	}
+
+	if (reason != VDEV_LABEL_REMOVE && reason != VDEV_LABEL_SPARE &&
+	    l2cache_guid != 0ULL) {
+		vdev_t *pvd = vd->vdev_parent;
+
+		for (; pvd != NULL; pvd = pvd->vdev_parent) {
+			pvd->vdev_guid_sum -= vd->vdev_guid;
+			pvd->vdev_guid_sum += l2cache_guid;
+		}
+
+		vd->vdev_guid = vd->vdev_guid_sum = l2cache_guid;
+
+		/*
+		 * If this is a replacement, then we want to fallthrough to the
+		 * rest of the code.  If we're adding an l2cache, then it's
+		 * already labeled appropriately and we can just return.
+		 */
+		if (reason == VDEV_LABEL_L2CACHE)
 			return (0);
 		ASSERT(reason == VDEV_LABEL_REPLACE);
 	}
@@ -547,6 +582,19 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		    spa_version(spa)) == 0);
 		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_POOL_STATE,
 		    POOL_STATE_SPARE) == 0);
+		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_GUID,
+		    vd->vdev_guid) == 0);
+	} else if (reason == VDEV_LABEL_L2CACHE ||
+	    (reason == VDEV_LABEL_REMOVE && vd->vdev_isl2cache)) {
+		/*
+		 * For level 2 ARC devices, add a special label.
+		 */
+		VERIFY(nvlist_alloc(&label, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_VERSION,
+		    spa_version(spa)) == 0);
+		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_POOL_STATE,
+		    POOL_STATE_L2CACHE) == 0);
 		VERIFY(nvlist_add_uint64(label, ZPOOL_CONFIG_GUID,
 		    vd->vdev_guid) == 0);
 	} else {
@@ -623,12 +671,18 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	/*
 	 * If this vdev hasn't been previously identified as a spare, then we
 	 * mark it as such only if a) we are labeling it as a spare, or b) it
-	 * exists as a spare elsewhere in the system.
+	 * exists as a spare elsewhere in the system.  Do the same for
+	 * level 2 ARC devices.
 	 */
 	if (error == 0 && !vd->vdev_isspare &&
 	    (reason == VDEV_LABEL_SPARE ||
 	    spa_spare_exists(vd->vdev_guid, NULL)))
 		spa_spare_add(vd);
+
+	if (error == 0 && !vd->vdev_isl2cache &&
+	    (reason == VDEV_LABEL_L2CACHE ||
+	    spa_l2cache_exists(vd->vdev_guid, NULL)))
+		spa_l2cache_add(vd);
 
 	return (error);
 }

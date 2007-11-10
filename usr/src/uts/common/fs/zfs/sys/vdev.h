@@ -53,7 +53,7 @@ extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg, boolean_t isreplace);
 extern void vdev_init(vdev_t *, uint64_t txg);
 extern void vdev_reopen(vdev_t *);
-extern int vdev_validate_spare(vdev_t *);
+extern int vdev_validate_aux(vdev_t *vd);
 extern int vdev_probe(vdev_t *);
 
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
@@ -69,6 +69,7 @@ extern int vdev_metaslab_init(vdev_t *vd, uint64_t txg);
 extern void vdev_metaslab_fini(vdev_t *vd);
 
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
+extern void vdev_clear_stats(vdev_t *vd);
 extern void vdev_stat_update(zio_t *zio);
 extern void vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type,
     boolean_t complete);
@@ -78,7 +79,7 @@ extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
     vdev_aux_t aux);
 
 extern void vdev_space_update(vdev_t *vd, int64_t space_delta,
-    int64_t alloc_delta);
+    int64_t alloc_delta, boolean_t update_root);
 
 extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
 
@@ -113,7 +114,7 @@ extern void vdev_config_clean(vdev_t *vd);
 extern int vdev_config_sync(vdev_t *vd, uint64_t txg);
 
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
-    boolean_t getstats, boolean_t isspare);
+    boolean_t getstats, boolean_t isspare, boolean_t isl2cache);
 
 /*
  * Label routines
@@ -127,7 +128,8 @@ typedef enum {
 	VDEV_LABEL_CREATE,	/* create/add a new device */
 	VDEV_LABEL_REPLACE,	/* replace an existing device */
 	VDEV_LABEL_SPARE,	/* add a new hot spare */
-	VDEV_LABEL_REMOVE	/* remove an existing device */
+	VDEV_LABEL_REMOVE,	/* remove an existing device */
+	VDEV_LABEL_L2CACHE	/* add an L2ARC cache device */
 } vdev_labeltype_t;
 
 extern int vdev_label_init(vdev_t *vd, uint64_t txg, vdev_labeltype_t reason);

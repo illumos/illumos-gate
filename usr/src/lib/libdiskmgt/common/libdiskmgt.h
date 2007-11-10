@@ -216,6 +216,7 @@ typedef enum {
 #define	DM_USE_EXPORTED_ZPOOL	"exported_zpool"
 #define	DM_USE_ACTIVE_ZPOOL	"active_zpool"
 #define	DM_USE_SPARE_ZPOOL	"spare_zpool"
+#define	DM_USE_L2CACHE_ZPOOL	"l2cache_zpool"
 
 /* event */
 #define	DM_EV_NAME		"name"

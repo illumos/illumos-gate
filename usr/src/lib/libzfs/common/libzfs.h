@@ -113,6 +113,7 @@ enum {
 	EZFS_UNSHARESMBFAILED,	/* failed to unshare over smb */
 	EZFS_SHARESMBFAILED,	/* failed to share over smb */
 	EZFS_BADCACHE,		/* bad cache file */
+	EZFS_ISL2CACHE,		/* device is for the level 2 ARC */
 	EZFS_UNKNOWN
 };
 
@@ -216,7 +217,8 @@ extern int zpool_vdev_fault(zpool_handle_t *, uint64_t);
 extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t);
 extern int zpool_vdev_clear(zpool_handle_t *, uint64_t);
 
-extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *);
+extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *,
+    boolean_t *);
 extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 
 /*

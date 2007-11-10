@@ -213,7 +213,7 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\treplace [-f] <pool> <device> "
 		    "[new-device]\n"));
 	case HELP_REMOVE:
-		return (gettext("\tremove <pool> <device>\n"));
+		return (gettext("\tremove <pool> <device> ...\n"));
 	case HELP_SCRUB:
 		return (gettext("\tscrub [-s] <pool> ...\n"));
 	case HELP_STATUS:
@@ -493,17 +493,17 @@ zpool_do_add(int argc, char **argv)
 }
 
 /*
- * zpool remove <pool> <vdev>
+ * zpool remove <pool> <vdev> ...
  *
  * Removes the given vdev from the pool.  Currently, this only supports removing
- * spares from the pool.  Eventually, we'll want to support removing leaf vdevs
- * (as an alias for 'detach') as well as toplevel vdevs.
+ * spares and cache devices from the pool.  Eventually, we'll want to support
+ * removing leaf vdevs (as an alias for 'detach') as well as toplevel vdevs.
  */
 int
 zpool_do_remove(int argc, char **argv)
 {
 	char *poolname;
-	int ret;
+	int i, ret = 0;
 	zpool_handle_t *zhp;
 
 	argc--;
@@ -524,7 +524,10 @@ zpool_do_remove(int argc, char **argv)
 	if ((zhp = zpool_open(g_zfs, poolname)) == NULL)
 		return (1);
 
-	ret = (zpool_vdev_remove(zhp, argv[1]) != 0);
+	for (i = 1; i < argc; i++) {
+		if (zpool_vdev_remove(zhp, argv[i]) != 0)
+			ret = 1;
+	}
 
 	return (ret);
 }
@@ -910,6 +913,14 @@ max_width(zpool_handle_t *zhp, nvlist_t *nv, int depth, int max)
 				max = ret;
 	}
 
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++)
+			if ((ret = max_width(zhp, child[c], depth + 2,
+			    max)) > max)
+				max = ret;
+	}
+
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++)
@@ -995,15 +1006,24 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth,
 		free(vname);
 	}
 
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
-	    &child, &children) != 0)
-		return;
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
+	    &child, &children) == 0) {
+		(void) printf(gettext("\tcache\n"));
+		for (c = 0; c < children; c++) {
+			vname = zpool_vdev_name(g_zfs, NULL, child[c]);
+			(void) printf("\t  %s\n", vname);
+			free(vname);
+		}
+	}
 
-	(void) printf(gettext("\tspares\n"));
-	for (c = 0; c < children; c++) {
-		vname = zpool_vdev_name(g_zfs, NULL, child[c]);
-		(void) printf("\t  %s\n", vname);
-		free(vname);
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
+	    &child, &children) == 0) {
+		(void) printf(gettext("\tspares\n"));
+		for (c = 0; c < children; c++) {
+			vname = zpool_vdev_name(g_zfs, NULL, child[c]);
+			(void) printf("\t  %s\n", vname);
+			free(vname);
+		}
 	}
 }
 
@@ -1654,6 +1674,28 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 		print_vdev_stats(zhp, vname, oldnv ? oldchild[c] : NULL,
 		    newchild[c], cb, depth + 2);
 		free(vname);
+	}
+
+	/*
+	 * Include level 2 ARC devices in iostat output
+	 */
+	if (nvlist_lookup_nvlist_array(newnv, ZPOOL_CONFIG_L2CACHE,
+	    &newchild, &children) != 0)
+		return;
+
+	if (oldnv && nvlist_lookup_nvlist_array(oldnv, ZPOOL_CONFIG_L2CACHE,
+	    &oldchild, &c) != 0)
+		return;
+
+	if (children > 0) {
+		(void) printf("%-*s      -      -      -      -      -      "
+		    "-\n", cb->cb_namewidth, "cache");
+		for (c = 0; c < children; c++) {
+			vname = zpool_vdev_name(g_zfs, zhp, newchild[c]);
+			print_vdev_stats(zhp, vname, oldnv ? oldchild[c] : NULL,
+			    newchild[c], cb, depth + 2);
+			free(vname);
+		}
 	}
 }
 
@@ -2805,6 +2847,26 @@ print_spares(zpool_handle_t *zhp, nvlist_t **spares, uint_t nspares,
 	}
 }
 
+static void
+print_l2cache(zpool_handle_t *zhp, nvlist_t **l2cache, uint_t nl2cache,
+    int namewidth)
+{
+	uint_t i;
+	char *name;
+
+	if (nl2cache == 0)
+		return;
+
+	(void) printf(gettext("\tcache\n"));
+
+	for (i = 0; i < nl2cache; i++) {
+		name = zpool_vdev_name(g_zfs, zhp, l2cache[i]);
+		print_status_config(zhp, name, l2cache[i],
+		    namewidth, 2, B_FALSE, B_FALSE);
+		free(name);
+	}
+}
+
 /*
  * Display a summary of pool status.  Displays a summary such as:
  *
@@ -2996,8 +3058,8 @@ status_callback(zpool_handle_t *zhp, void *data)
 	if (config != NULL) {
 		int namewidth;
 		uint64_t nerr;
-		nvlist_t **spares;
-		uint_t nspares;
+		nvlist_t **spares, **l2cache;
+		uint_t nspares, nl2cache;
 
 
 		(void) printf(gettext(" scrub: "));
@@ -3015,6 +3077,10 @@ status_callback(zpool_handle_t *zhp, void *data)
 		if (num_logs(nvroot) > 0)
 			print_status_config(zhp, "logs", nvroot, namewidth, 0,
 			    B_FALSE, B_TRUE);
+
+		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
+		    &l2cache, &nl2cache) == 0)
+			print_l2cache(zhp, l2cache, nl2cache, namewidth);
 
 		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 		    &spares, &nspares) == 0)
@@ -3303,6 +3369,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 8   Delegated administration\n"));
 		(void) printf(gettext(" 9   refquota and refreservation "
 		    "properties\n"));
+		(void) printf(gettext(" 10  Cache devices\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

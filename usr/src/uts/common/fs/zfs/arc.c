@@ -47,13 +47,13 @@
  * There are times when it is not possible to evict the requested
  * space.  In these circumstances we are unable to adjust the cache
  * size.  To prevent the cache growing unbounded at these times we
- * implement a "cache throttle" that slowes the flow of new data
- * into the cache until we can make space avaiable.
+ * implement a "cache throttle" that slows the flow of new data
+ * into the cache until we can make space available.
  *
  * 2. The Megiddo and Modha model assumes a fixed cache size.
  * Pages are evicted when the cache is full and there is a cache
  * miss.  Our model has a variable sized cache.  It grows with
- * high use, but also tries to react to memory preasure from the
+ * high use, but also tries to react to memory pressure from the
  * operating system: decreasing its size when system memory is
  * tight.
  *
@@ -75,7 +75,7 @@
  *
  * A new reference to a cache buffer can be obtained in two
  * ways: 1) via a hash table lookup using the DVA as a key,
- * or 2) via one of the ARC lists.  The arc_read() inerface
+ * or 2) via one of the ARC lists.  The arc_read() interface
  * uses method 1, while the internal arc algorithms for
  * adjusting the cache use method 2.  We therefor provide two
  * types of locks: 1) the hash table lock array, and 2) the
@@ -109,6 +109,14 @@
  *
  * Note that the majority of the performance stats are manipulated
  * with atomic operations.
+ *
+ * The L2ARC uses the l2arc_buflist_mtx global mutex for the following:
+ *
+ *	- L2ARC buflist creation
+ *	- L2ARC buflist eviction
+ *	- L2ARC write completion, which walks L2ARC buflists
+ *	- ARC header destruction, as it removes from L2ARC buflists
+ *	- ARC header release, as it removes from L2ARC buflists
  */
 
 #include <sys/spa.h>
@@ -157,19 +165,20 @@ uint64_t zfs_arc_min;
 uint64_t zfs_arc_meta_limit = 0;
 
 /*
- * Note that buffers can be in one of 5 states:
+ * Note that buffers can be in one of 6 states:
  *	ARC_anon	- anonymous (discussed below)
  *	ARC_mru		- recently used, currently cached
  *	ARC_mru_ghost	- recentely used, no longer in cache
  *	ARC_mfu		- frequently used, currently cached
  *	ARC_mfu_ghost	- frequently used, no longer in cache
+ *	ARC_l2c_only	- exists in L2ARC but not other states
  * When there are no active references to the buffer, they are
  * are linked onto a list in one of these arc states.  These are
  * the only buffers that can be evicted or deleted.  Within each
  * state there are multiple lists, one for meta-data and one for
  * non-meta-data.  Meta-data (indirect blocks, blocks of dnodes,
  * etc.) is tracked separately so that it can be managed more
- * explicitly: favored over data, limited explicitely.
+ * explicitly: favored over data, limited explicitly.
  *
  * Anonymous buffers are buffers that are not associated with
  * a DVA.  These are buffers that hold dirty block copies
@@ -177,6 +186,14 @@ uint64_t zfs_arc_meta_limit = 0;
  * they are "ref'd" and are considered part of arc_mru
  * that cannot be freed.  Generally, they will aquire a DVA
  * as they are written and migrate onto the arc_mru list.
+ *
+ * The ARC_l2c_only state is for buffers that are in the second
+ * level ARC but no longer in any of the ARC_m* lists.  The second
+ * level ARC itself may also contain buffers that are in any of
+ * the ARC_m* states - meaning that a buffer can exist in two
+ * places.  The reason for the ARC_l2c_only state is to keep the
+ * buffer header in the hash table, so that reads that hit the
+ * second level ARC benefit from these fast lookups.
  */
 
 typedef struct arc_state {
@@ -186,12 +203,13 @@ typedef struct arc_state {
 	kmutex_t arcs_mtx;
 } arc_state_t;
 
-/* The 5 states: */
+/* The 6 states: */
 static arc_state_t ARC_anon;
 static arc_state_t ARC_mru;
 static arc_state_t ARC_mru_ghost;
 static arc_state_t ARC_mfu;
 static arc_state_t ARC_mfu_ghost;
+static arc_state_t ARC_l2c_only;
 
 typedef struct arc_stats {
 	kstat_named_t arcstat_hits;
@@ -222,6 +240,23 @@ typedef struct arc_stats {
 	kstat_named_t arcstat_c_min;
 	kstat_named_t arcstat_c_max;
 	kstat_named_t arcstat_size;
+	kstat_named_t arcstat_hdr_size;
+	kstat_named_t arcstat_l2_hits;
+	kstat_named_t arcstat_l2_misses;
+	kstat_named_t arcstat_l2_feeds;
+	kstat_named_t arcstat_l2_rw_clash;
+	kstat_named_t arcstat_l2_writes_sent;
+	kstat_named_t arcstat_l2_writes_done;
+	kstat_named_t arcstat_l2_writes_error;
+	kstat_named_t arcstat_l2_writes_hdr_miss;
+	kstat_named_t arcstat_l2_evict_lock_retry;
+	kstat_named_t arcstat_l2_evict_reading;
+	kstat_named_t arcstat_l2_free_on_write;
+	kstat_named_t arcstat_l2_abort_lowmem;
+	kstat_named_t arcstat_l2_cksum_bad;
+	kstat_named_t arcstat_l2_io_error;
+	kstat_named_t arcstat_l2_size;
+	kstat_named_t arcstat_l2_hdr_size;
 } arc_stats_t;
 
 static arc_stats_t arc_stats = {
@@ -252,7 +287,24 @@ static arc_stats_t arc_stats = {
 	{ "c",				KSTAT_DATA_UINT64 },
 	{ "c_min",			KSTAT_DATA_UINT64 },
 	{ "c_max",			KSTAT_DATA_UINT64 },
-	{ "size",			KSTAT_DATA_UINT64 }
+	{ "size",			KSTAT_DATA_UINT64 },
+	{ "hdr_size",			KSTAT_DATA_UINT64 },
+	{ "l2_hits",			KSTAT_DATA_UINT64 },
+	{ "l2_misses",			KSTAT_DATA_UINT64 },
+	{ "l2_feeds",			KSTAT_DATA_UINT64 },
+	{ "l2_rw_clash",		KSTAT_DATA_UINT64 },
+	{ "l2_writes_sent",		KSTAT_DATA_UINT64 },
+	{ "l2_writes_done",		KSTAT_DATA_UINT64 },
+	{ "l2_writes_error",		KSTAT_DATA_UINT64 },
+	{ "l2_writes_hdr_miss",		KSTAT_DATA_UINT64 },
+	{ "l2_evict_lock_retry",	KSTAT_DATA_UINT64 },
+	{ "l2_evict_reading",		KSTAT_DATA_UINT64 },
+	{ "l2_free_on_write",		KSTAT_DATA_UINT64 },
+	{ "l2_abort_lowmem",		KSTAT_DATA_UINT64 },
+	{ "l2_cksum_bad",		KSTAT_DATA_UINT64 },
+	{ "l2_io_error",		KSTAT_DATA_UINT64 },
+	{ "l2_size",			KSTAT_DATA_UINT64 },
+	{ "l2_hdr_size",		KSTAT_DATA_UINT64 }
 };
 
 #define	ARCSTAT(stat)	(arc_stats.stat.value.ui64)
@@ -299,6 +351,7 @@ static arc_state_t	*arc_mru;
 static arc_state_t	*arc_mru_ghost;
 static arc_state_t	*arc_mfu;
 static arc_state_t	*arc_mfu_ghost;
+static arc_state_t	*arc_l2c_only;
 
 /*
  * There are several ARC variables that are critical to export as kstats --
@@ -319,6 +372,8 @@ static uint64_t		arc_tempreserve;
 static uint64_t		arc_meta_used;
 static uint64_t		arc_meta_limit;
 static uint64_t		arc_meta_max = 0;
+
+typedef struct l2arc_buf_hdr l2arc_buf_hdr_t;
 
 typedef struct arc_callback arc_callback_t;
 
@@ -371,6 +426,9 @@ struct arc_buf_hdr {
 
 	/* self protecting */
 	refcount_t		b_refcnt;
+
+	l2arc_buf_hdr_t		*b_l2hdr;
+	list_node_t		b_l2node;
 };
 
 static arc_buf_t *arc_eviction_list;
@@ -382,7 +440,8 @@ static int arc_evict_needed(arc_buf_contents_t type);
 static void arc_evict_ghost(arc_state_t *state, int64_t bytes);
 
 #define	GHOST_STATE(state)	\
-	((state) == arc_mru_ghost || (state) == arc_mfu_ghost)
+	((state) == arc_mru_ghost || (state) == arc_mfu_ghost ||	\
+	(state) == arc_l2c_only)
 
 /*
  * Private ARC flags.  These flags are private ARC only flags that will show up
@@ -398,12 +457,24 @@ static void arc_evict_ghost(arc_state_t *state, int64_t bytes);
 #define	ARC_FREED_IN_READ	(1 << 12)	/* buf freed while in read */
 #define	ARC_BUF_AVAILABLE	(1 << 13)	/* block not in active use */
 #define	ARC_INDIRECT		(1 << 14)	/* this is an indirect block */
+#define	ARC_FREE_IN_PROGRESS	(1 << 15)	/* hdr about to be freed */
+#define	ARC_DONT_L2CACHE	(1 << 16)	/* originated by prefetch */
+#define	ARC_L2_READING		(1 << 17)	/* L2ARC read in progress */
+#define	ARC_L2_WRITING		(1 << 18)	/* L2ARC write in progress */
+#define	ARC_L2_EVICTED		(1 << 19)	/* evicted during I/O */
+#define	ARC_L2_WRITE_HEAD	(1 << 20)	/* head of write list */
 
 #define	HDR_IN_HASH_TABLE(hdr)	((hdr)->b_flags & ARC_IN_HASH_TABLE)
 #define	HDR_IO_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_IO_IN_PROGRESS)
 #define	HDR_IO_ERROR(hdr)	((hdr)->b_flags & ARC_IO_ERROR)
 #define	HDR_FREED_IN_READ(hdr)	((hdr)->b_flags & ARC_FREED_IN_READ)
 #define	HDR_BUF_AVAILABLE(hdr)	((hdr)->b_flags & ARC_BUF_AVAILABLE)
+#define	HDR_FREE_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_FREE_IN_PROGRESS)
+#define	HDR_DONT_L2CACHE(hdr)	((hdr)->b_flags & ARC_DONT_L2CACHE)
+#define	HDR_L2_READING(hdr)	((hdr)->b_flags & ARC_L2_READING)
+#define	HDR_L2_WRITING(hdr)	((hdr)->b_flags & ARC_L2_WRITING)
+#define	HDR_L2_EVICTED(hdr)	((hdr)->b_flags & ARC_L2_EVICTED)
+#define	HDR_L2_WRITE_HEAD(hdr)	((hdr)->b_flags & ARC_L2_WRITE_HEAD)
 
 /*
  * Hash table routines
@@ -435,6 +506,87 @@ static buf_hash_table_t buf_hash_table;
 	(BUF_HASH_LOCK(BUF_HASH_INDEX(buf->b_spa, &buf->b_dva, buf->b_birth)))
 
 uint64_t zfs_crc64_table[256];
+
+/*
+ * Level 2 ARC
+ */
+
+#define	L2ARC_WRITE_SIZE	(8 * 1024 * 1024)	/* initial write max */
+#define	L2ARC_HEADROOM		4		/* num of writes */
+#define	L2ARC_FEED_DELAY	180		/* starting grace */
+#define	L2ARC_FEED_SECS		1		/* caching interval */
+
+#define	l2arc_writes_sent	ARCSTAT(arcstat_l2_writes_sent)
+#define	l2arc_writes_done	ARCSTAT(arcstat_l2_writes_done)
+
+/*
+ * L2ARC Performance Tunables
+ */
+uint64_t l2arc_write_max = L2ARC_WRITE_SIZE;	/* default max write size */
+uint64_t l2arc_headroom = L2ARC_HEADROOM;	/* number of dev writes */
+uint64_t l2arc_feed_secs = L2ARC_FEED_SECS;	/* interval seconds */
+boolean_t l2arc_noprefetch = B_TRUE;		/* don't cache prefetch bufs */
+
+/*
+ * L2ARC Internals
+ */
+typedef struct l2arc_dev {
+	vdev_t			*l2ad_vdev;	/* vdev */
+	spa_t			*l2ad_spa;	/* spa */
+	uint64_t		l2ad_hand;	/* next write location */
+	uint64_t		l2ad_write;	/* desired write size, bytes */
+	uint64_t		l2ad_start;	/* first addr on device */
+	uint64_t		l2ad_end;	/* last addr on device */
+	uint64_t		l2ad_evict;	/* last addr eviction reached */
+	boolean_t		l2ad_first;	/* first sweep through */
+	list_t			*l2ad_buflist;	/* buffer list */
+	list_node_t		l2ad_node;	/* device list node */
+} l2arc_dev_t;
+
+static list_t L2ARC_dev_list;			/* device list */
+static list_t *l2arc_dev_list;			/* device list pointer */
+static kmutex_t l2arc_dev_mtx;			/* device list mutex */
+static l2arc_dev_t *l2arc_dev_last;		/* last device used */
+static kmutex_t l2arc_buflist_mtx;		/* mutex for all buflists */
+static list_t L2ARC_free_on_write;		/* free after write buf list */
+static list_t *l2arc_free_on_write;		/* free after write list ptr */
+static kmutex_t l2arc_free_on_write_mtx;	/* mutex for list */
+static uint64_t l2arc_ndev;			/* number of devices */
+
+typedef struct l2arc_read_callback {
+	arc_buf_t	*l2rcb_buf;		/* read buffer */
+	spa_t		*l2rcb_spa;		/* spa */
+	blkptr_t	l2rcb_bp;		/* original blkptr */
+	zbookmark_t	l2rcb_zb;		/* original bookmark */
+	int		l2rcb_flags;		/* original flags */
+} l2arc_read_callback_t;
+
+typedef struct l2arc_write_callback {
+	l2arc_dev_t	*l2wcb_dev;		/* device info */
+	arc_buf_hdr_t	*l2wcb_head;		/* head of write buflist */
+} l2arc_write_callback_t;
+
+struct l2arc_buf_hdr {
+	/* protected by arc_buf_hdr  mutex */
+	l2arc_dev_t	*b_dev;			/* L2ARC device */
+	daddr_t		b_daddr;		/* disk address, offset byte */
+};
+
+typedef struct l2arc_data_free {
+	/* protected by l2arc_free_on_write_mtx */
+	void		*l2df_data;
+	size_t		l2df_size;
+	void		(*l2df_func)(void *, size_t);
+	list_node_t	l2df_list_node;
+} l2arc_data_free_t;
+
+static kmutex_t l2arc_feed_thr_lock;
+static kcondvar_t l2arc_feed_thr_cv;
+static uint8_t l2arc_thread_exit;
+
+static void l2arc_read_done(zio_t *zio);
+static void l2arc_hdr_stat_add(void);
+static void l2arc_hdr_stat_remove(void);
 
 static uint64_t
 buf_hash(spa_t *spa, dva_t *dva, uint64_t birth)
@@ -585,6 +737,8 @@ hdr_cons(void *vbuf, void *unused, int kmflag)
 	refcount_create(&buf->b_refcnt);
 	cv_init(&buf->b_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&buf->b_freeze_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	ARCSTAT_INCR(arcstat_hdr_size, sizeof (arc_buf_hdr_t));
 	return (0);
 }
 
@@ -601,6 +755,8 @@ hdr_dest(void *vbuf, void *unused)
 	refcount_destroy(&buf->b_refcnt);
 	cv_destroy(&buf->b_cv);
 	mutex_destroy(&buf->b_freeze_lock);
+
+	ARCSTAT_INCR(arcstat_hdr_size, -sizeof (arc_buf_hdr_t));
 }
 
 /*
@@ -680,10 +836,24 @@ arc_cksum_verify(arc_buf_t *buf)
 	mutex_exit(&buf->b_hdr->b_freeze_lock);
 }
 
-static void
-arc_cksum_compute(arc_buf_t *buf)
+static int
+arc_cksum_equal(arc_buf_t *buf)
 {
-	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
+	zio_cksum_t zc;
+	int equal;
+
+	mutex_enter(&buf->b_hdr->b_freeze_lock);
+	fletcher_2_native(buf->b_data, buf->b_hdr->b_size, &zc);
+	equal = ZIO_CHECKSUM_EQUAL(*buf->b_hdr->b_freeze_cksum, zc);
+	mutex_exit(&buf->b_hdr->b_freeze_lock);
+
+	return (equal);
+}
+
+static void
+arc_cksum_compute(arc_buf_t *buf, boolean_t force)
+{
+	if (!force && !(zfs_flags & ZFS_DEBUG_MODIFY))
 		return;
 
 	mutex_enter(&buf->b_hdr->b_freeze_lock);
@@ -700,14 +870,14 @@ arc_cksum_compute(arc_buf_t *buf)
 void
 arc_buf_thaw(arc_buf_t *buf)
 {
-	if (!(zfs_flags & ZFS_DEBUG_MODIFY))
-		return;
+	if (zfs_flags & ZFS_DEBUG_MODIFY) {
+		if (buf->b_hdr->b_state != arc_anon)
+			panic("modifying non-anon buffer!");
+		if (buf->b_hdr->b_flags & ARC_IO_IN_PROGRESS)
+			panic("modifying buffer while i/o in progress!");
+		arc_cksum_verify(buf);
+	}
 
-	if (buf->b_hdr->b_state != arc_anon)
-		panic("modifying non-anon buffer!");
-	if (buf->b_hdr->b_flags & ARC_IO_IN_PROGRESS)
-		panic("modifying buffer while i/o in progress!");
-	arc_cksum_verify(buf);
 	mutex_enter(&buf->b_hdr->b_freeze_lock);
 	if (buf->b_hdr->b_freeze_cksum != NULL) {
 		kmem_free(buf->b_hdr->b_freeze_cksum, sizeof (zio_cksum_t));
@@ -724,7 +894,7 @@ arc_buf_freeze(arc_buf_t *buf)
 
 	ASSERT(buf->b_hdr->b_freeze_cksum != NULL ||
 	    buf->b_hdr->b_state == arc_anon);
-	arc_cksum_compute(buf);
+	arc_cksum_compute(buf, B_FALSE);
 }
 
 static void
@@ -852,7 +1022,7 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 	}
 
 	ASSERT(!BUF_EMPTY(ab));
-	if (new_state == arc_anon && old_state != arc_anon) {
+	if (new_state == arc_anon) {
 		buf_hash_remove(ab);
 	}
 
@@ -864,6 +1034,12 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 		atomic_add_64(&old_state->arcs_size, -from_delta);
 	}
 	ab->b_state = new_state;
+
+	/* adjust l2arc hdr stats */
+	if (new_state == arc_l2c_only)
+		l2arc_hdr_stat_add();
+	else if (old_state == arc_l2c_only)
+		l2arc_hdr_stat_remove();
 }
 
 void
@@ -990,6 +1166,29 @@ arc_buf_add_ref(arc_buf_t *buf, void* tag)
 	    data, metadata, hits);
 }
 
+/*
+ * Free the arc data buffer.  If it is an l2arc write in progress,
+ * the buffer is placed on l2arc_free_on_write to be freed later.
+ */
+static void
+arc_buf_data_free(arc_buf_hdr_t *hdr, void (*free_func)(void *, size_t),
+    void *data, size_t size)
+{
+	if (HDR_L2_WRITING(hdr)) {
+		l2arc_data_free_t *df;
+		df = kmem_alloc(sizeof (l2arc_data_free_t), KM_SLEEP);
+		df->l2df_data = data;
+		df->l2df_size = size;
+		df->l2df_func = free_func;
+		mutex_enter(&l2arc_free_on_write_mtx);
+		list_insert_head(l2arc_free_on_write, df);
+		mutex_exit(&l2arc_free_on_write_mtx);
+		ARCSTAT_BUMP(arcstat_l2_free_on_write);
+	} else {
+		free_func(data, size);
+	}
+}
+
 static void
 arc_buf_destroy(arc_buf_t *buf, boolean_t recycle, boolean_t all)
 {
@@ -1004,11 +1203,13 @@ arc_buf_destroy(arc_buf_t *buf, boolean_t recycle, boolean_t all)
 		arc_cksum_verify(buf);
 		if (!recycle) {
 			if (type == ARC_BUFC_METADATA) {
-				zio_buf_free(buf->b_data, size);
+				arc_buf_data_free(buf->b_hdr, zio_buf_free,
+				    buf->b_data, size);
 				arc_space_return(size);
 			} else {
 				ASSERT(type == ARC_BUFC_DATA);
-				zio_data_buf_free(buf->b_data, size);
+				arc_buf_data_free(buf->b_hdr,
+				    zio_data_buf_free, buf->b_data, size);
 				atomic_add_64(&arc_size, -size);
 			}
 		}
@@ -1050,6 +1251,30 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 	ASSERT(refcount_is_zero(&hdr->b_refcnt));
 	ASSERT3P(hdr->b_state, ==, arc_anon);
 	ASSERT(!HDR_IO_IN_PROGRESS(hdr));
+
+	if (hdr->b_l2hdr != NULL) {
+		if (!MUTEX_HELD(&l2arc_buflist_mtx)) {
+			/*
+			 * To prevent arc_free() and l2arc_evict() from
+			 * attempting to free the same buffer at the same time,
+			 * a FREE_IN_PROGRESS flag is given to arc_free() to
+			 * give it priority.  l2arc_evict() can't destroy this
+			 * header while we are waiting on l2arc_buflist_mtx.
+			 */
+			mutex_enter(&l2arc_buflist_mtx);
+			ASSERT(hdr->b_l2hdr != NULL);
+
+			list_remove(hdr->b_l2hdr->b_dev->l2ad_buflist, hdr);
+			mutex_exit(&l2arc_buflist_mtx);
+		} else {
+			list_remove(hdr->b_l2hdr->b_dev->l2ad_buflist, hdr);
+		}
+		ARCSTAT_INCR(arcstat_l2_size, -hdr->b_size);
+		kmem_free(hdr->b_l2hdr, sizeof (l2arc_buf_hdr_t));
+		if (hdr->b_state == arc_l2c_only)
+			l2arc_hdr_stat_remove();
+		hdr->b_l2hdr = NULL;
+	}
 
 	if (!BUF_EMPTY(hdr)) {
 		ASSERT(!HDR_IN_HASH_TABLE(hdr));
@@ -1214,7 +1439,8 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
 				if (buf->b_data) {
 					bytes_evicted += ab->b_size;
 					if (recycle && ab->b_type == type &&
-					    ab->b_size == bytes) {
+					    ab->b_size == bytes &&
+					    !HDR_L2_WRITING(ab)) {
 						stolen = buf->b_data;
 						recycle = FALSE;
 					}
@@ -1236,7 +1462,8 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
 			ASSERT(ab->b_datacnt == 0);
 			arc_change_state(evicted_state, ab, hash_lock);
 			ASSERT(HDR_IN_HASH_TABLE(ab));
-			ab->b_flags = ARC_IN_HASH_TABLE;
+			ab->b_flags |= ARC_IN_HASH_TABLE;
+			ab->b_flags &= ~ARC_BUF_AVAILABLE;
 			DTRACE_PROBE1(arc__evict, arc_buf_hdr_t *, ab);
 			if (!have_lock)
 				mutex_exit(hash_lock);
@@ -1306,11 +1533,22 @@ top:
 		if (mutex_tryenter(hash_lock)) {
 			ASSERT(!HDR_IO_IN_PROGRESS(ab));
 			ASSERT(ab->b_buf == NULL);
-			arc_change_state(arc_anon, ab, hash_lock);
-			mutex_exit(hash_lock);
 			ARCSTAT_BUMP(arcstat_deleted);
 			bytes_deleted += ab->b_size;
-			arc_hdr_destroy(ab);
+
+			if (ab->b_l2hdr != NULL) {
+				/*
+				 * This buffer is cached on the 2nd Level ARC;
+				 * don't destroy the header.
+				 */
+				arc_change_state(arc_l2c_only, ab, hash_lock);
+				mutex_exit(hash_lock);
+			} else {
+				arc_change_state(arc_anon, ab, hash_lock);
+				mutex_exit(hash_lock);
+				arc_hdr_destroy(ab);
+			}
+
 			DTRACE_PROBE1(arc__delete, arc_buf_hdr_t *, ab);
 			if (bytes >= 0 && bytes_deleted >= bytes)
 				break;
@@ -1506,7 +1744,7 @@ arc_reclaim_needed(void)
 
 	/*
 	 * check to make sure that swapfs has enough space so that anon
-	 * reservations can still succeeed. anon_resvmem() checks that the
+	 * reservations can still succeed. anon_resvmem() checks that the
 	 * availrmem is greater than swapfs_minfree, and the number of reserved
 	 * swap pages.  We also add a bit of extra here just to prevent
 	 * circumstances from getting really dire.
@@ -1523,7 +1761,7 @@ arc_reclaim_needed(void)
 	 * can have in the system.  However, this is generally fixed at 25 pages
 	 * which is so low that it's useless.  In this comparison, we seek to
 	 * calculate the total heap-size, and reclaim if more than 3/4ths of the
-	 * heap is allocated.  (Or, in the caclulation, if less than 1/4th is
+	 * heap is allocated.  (Or, in the calculation, if less than 1/4th is
 	 * free)
 	 */
 	if (btop(vmem_size(heap_arena, VMEM_FREE)) <
@@ -1564,7 +1802,7 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 #endif
 
 	/*
-	 * An agressive reclamation will shrink the cache size as well as
+	 * An aggressive reclamation will shrink the cache size as well as
 	 * reap free buffers from the arc kmem caches.
 	 */
 	if (strat == ARC_RECLAIM_AGGR)
@@ -1647,6 +1885,9 @@ static void
 arc_adapt(int bytes, arc_state_t *state)
 {
 	int mult;
+
+	if (state == arc_l2c_only)
+		return;
 
 	ASSERT(bytes > 0);
 	/*
@@ -1944,6 +2185,14 @@ arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock)
 		arc_change_state(new_state, buf, hash_lock);
 
 		ARCSTAT_BUMP(arcstat_mfu_ghost_hits);
+	} else if (buf->b_state == arc_l2c_only) {
+		/*
+		 * This buffer is on the 2nd Level ARC.
+		 */
+
+		buf->b_arc_access = lbolt;
+		DTRACE_PROBE1(new_state__mfu, arc_buf_hdr_t *, buf);
+		arc_change_state(arc_mfu, buf, hash_lock);
 	} else {
 		ASSERT(!"invalid arc state");
 	}
@@ -1996,7 +2245,12 @@ arc_read_done(zio_t *zio)
 	    &hash_lock);
 
 	ASSERT((found == NULL && HDR_FREED_IN_READ(hdr) && hash_lock == NULL) ||
-	    (found == hdr && DVA_EQUAL(&hdr->b_dva, BP_IDENTITY(zio->io_bp))));
+	    (found == hdr && DVA_EQUAL(&hdr->b_dva, BP_IDENTITY(zio->io_bp))) ||
+	    (found == hdr && HDR_L2_READING(hdr)));
+
+	hdr->b_flags &= ~(ARC_L2_READING|ARC_L2_EVICTED);
+	if (l2arc_noprefetch && (hdr->b_flags & ARC_PREFETCH))
+		hdr->b_flags |= ARC_DONT_L2CACHE;
 
 	/* byteswap if necessary */
 	callback_list = hdr->b_acb;
@@ -2004,7 +2258,7 @@ arc_read_done(zio_t *zio)
 	if (BP_SHOULD_BYTESWAP(zio->io_bp) && callback_list->acb_byteswap)
 		callback_list->acb_byteswap(buf->b_data, hdr->b_size);
 
-	arc_cksum_compute(buf);
+	arc_cksum_compute(buf, B_FALSE);
 
 	/* create copies of the data buffer for the callers */
 	abuf = buf;
@@ -2108,7 +2362,7 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
 	arc_buf_hdr_t *hdr;
 	arc_buf_t *buf;
 	kmutex_t *hash_lock;
-	zio_t	*rzio;
+	zio_t *rzio;
 
 top:
 	hdr = buf_hash_find(spa, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
@@ -2255,7 +2509,6 @@ top:
 
 		if (GHOST_STATE(hdr->b_state))
 			arc_access(hdr, hash_lock);
-		mutex_exit(hash_lock);
 
 		ASSERT3U(hdr->b_size, ==, size);
 		DTRACE_PROBE3(arc__miss, blkptr_t *, bp, uint64_t, size,
@@ -2264,6 +2517,57 @@ top:
 		ARCSTAT_CONDSTAT(!(hdr->b_flags & ARC_PREFETCH),
 		    demand, prefetch, hdr->b_type != ARC_BUFC_METADATA,
 		    data, metadata, misses);
+
+		if (l2arc_ndev != 0) {
+			/*
+			 * Read from the L2ARC if the following are true:
+			 * 1. This buffer has L2ARC metadata.
+			 * 2. This buffer isn't currently writing to the L2ARC.
+			 */
+			if (hdr->b_l2hdr != NULL && !HDR_L2_WRITING(hdr)) {
+				vdev_t *vd = hdr->b_l2hdr->b_dev->l2ad_vdev;
+				daddr_t addr = hdr->b_l2hdr->b_daddr;
+				l2arc_read_callback_t *cb;
+
+				DTRACE_PROBE1(l2arc__hit, arc_buf_hdr_t *, hdr);
+				ARCSTAT_BUMP(arcstat_l2_hits);
+
+				hdr->b_flags |= ARC_L2_READING;
+				mutex_exit(hash_lock);
+
+				cb = kmem_zalloc(sizeof (l2arc_read_callback_t),
+				    KM_SLEEP);
+				cb->l2rcb_buf = buf;
+				cb->l2rcb_spa = spa;
+				cb->l2rcb_bp = *bp;
+				cb->l2rcb_zb = *zb;
+				cb->l2rcb_flags = flags;
+
+				/*
+				 * l2arc read.
+				 */
+				rzio = zio_read_phys(pio, vd, addr, size,
+				    buf->b_data, ZIO_CHECKSUM_OFF,
+				    l2arc_read_done, cb, priority,
+				    flags | ZIO_FLAG_DONT_CACHE, B_FALSE);
+				DTRACE_PROBE2(l2arc__read, vdev_t *, vd,
+				    zio_t *, rzio);
+
+				if (*arc_flags & ARC_WAIT)
+					return (zio_wait(rzio));
+
+				ASSERT(*arc_flags & ARC_NOWAIT);
+				zio_nowait(rzio);
+				return (0);
+			} else {
+				DTRACE_PROBE1(l2arc__miss,
+				    arc_buf_hdr_t *, hdr);
+				ARCSTAT_BUMP(arcstat_l2_misses);
+				if (HDR_L2_WRITING(hdr))
+					ARCSTAT_BUMP(arcstat_l2_rw_clash);
+			}
+		}
+		mutex_exit(hash_lock);
 
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
 		    arc_read_done, buf, priority, flags, zb);
@@ -2402,7 +2706,8 @@ arc_buf_evict(arc_buf_t *buf)
 
 		arc_change_state(evicted_state, hdr, hash_lock);
 		ASSERT(HDR_IN_HASH_TABLE(hdr));
-		hdr->b_flags = ARC_IN_HASH_TABLE;
+		hdr->b_flags |= ARC_IN_HASH_TABLE;
+		hdr->b_flags &= ~ARC_BUF_AVAILABLE;
 
 		mutex_exit(&evicted_state->arcs_mtx);
 		mutex_exit(&old_state->arcs_mtx);
@@ -2428,6 +2733,8 @@ arc_release(arc_buf_t *buf, void *tag)
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 	kmutex_t *hash_lock = HDR_LOCK(hdr);
+	l2arc_buf_hdr_t *l2hdr = NULL;
+	uint64_t buf_size;
 
 	/* this buffer is not on any list */
 	ASSERT(refcount_count(&hdr->b_refcnt) > 0);
@@ -2452,6 +2759,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		uint64_t blksz = hdr->b_size;
 		spa_t *spa = hdr->b_spa;
 		arc_buf_contents_t type = hdr->b_type;
+		uint32_t flags = hdr->b_flags;
 
 		ASSERT(hdr->b_datacnt > 1);
 		/*
@@ -2473,6 +2781,12 @@ arc_release(arc_buf_t *buf, void *tag)
 			atomic_add_64(size, -hdr->b_size);
 		}
 		hdr->b_datacnt -= 1;
+		if (hdr->b_l2hdr != NULL) {
+			mutex_enter(&l2arc_buflist_mtx);
+			l2hdr = hdr->b_l2hdr;
+			hdr->b_l2hdr = NULL;
+			buf_size = hdr->b_size;
+		}
 		arc_cksum_verify(buf);
 
 		mutex_exit(hash_lock);
@@ -2484,21 +2798,27 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_buf = buf;
 		nhdr->b_state = arc_anon;
 		nhdr->b_arc_access = 0;
-		nhdr->b_flags = 0;
+		nhdr->b_flags = flags & ARC_L2_WRITING;
+		nhdr->b_l2hdr = NULL;
 		nhdr->b_datacnt = 1;
 		nhdr->b_freeze_cksum = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
 		buf->b_hdr = nhdr;
 		atomic_add_64(&arc_anon->arcs_size, blksz);
-
-		hdr = nhdr;
 	} else {
 		ASSERT(refcount_count(&hdr->b_refcnt) == 1);
 		ASSERT(!list_link_active(&hdr->b_arc_node));
 		ASSERT(!HDR_IO_IN_PROGRESS(hdr));
 		arc_change_state(arc_anon, hdr, hash_lock);
 		hdr->b_arc_access = 0;
+		if (hdr->b_l2hdr != NULL) {
+			mutex_enter(&l2arc_buflist_mtx);
+			l2hdr = hdr->b_l2hdr;
+			hdr->b_l2hdr = NULL;
+			buf_size = hdr->b_size;
+		}
 		mutex_exit(hash_lock);
+
 		bzero(&hdr->b_dva, sizeof (dva_t));
 		hdr->b_birth = 0;
 		hdr->b_cksum0 = 0;
@@ -2506,6 +2826,14 @@ arc_release(arc_buf_t *buf, void *tag)
 	}
 	buf->b_efunc = NULL;
 	buf->b_private = NULL;
+
+	if (l2hdr) {
+		list_remove(l2hdr->b_dev->l2ad_buflist, hdr);
+		kmem_free(l2hdr, sizeof (l2arc_buf_hdr_t));
+		ARCSTAT_INCR(arcstat_l2_size, -buf_size);
+	}
+	if (MUTEX_HELD(&l2arc_buflist_mtx))
+		mutex_exit(&l2arc_buflist_mtx);
 }
 
 int
@@ -2559,7 +2887,7 @@ arc_write_ready(zio_t *zio)
 		}
 		mutex_exit(&hdr->b_freeze_lock);
 	}
-	arc_cksum_compute(buf);
+	arc_cksum_compute(buf, B_FALSE);
 	hdr->b_flags |= ARC_IO_IN_PROGRESS;
 }
 
@@ -2704,6 +3032,7 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 			ab->b_buf->b_private = NULL;
 			mutex_exit(hash_lock);
 		} else if (refcount_is_zero(&ab->b_refcnt)) {
+			ab->b_flags |= ARC_FREE_IN_PROGRESS;
 			mutex_exit(hash_lock);
 			arc_hdr_destroy(ab);
 			ARCSTAT_BUMP(arcstat_deleted);
@@ -2847,6 +3176,7 @@ arc_init(void)
 	arc_mru_ghost = &ARC_mru_ghost;
 	arc_mfu = &ARC_mfu;
 	arc_mfu_ghost = &ARC_mfu_ghost;
+	arc_l2c_only = &ARC_l2c_only;
 	arc_size = 0;
 
 	mutex_init(&arc_anon->arcs_mtx, NULL, MUTEX_DEFAULT, NULL);
@@ -2854,6 +3184,7 @@ arc_init(void)
 	mutex_init(&arc_mru_ghost->arcs_mtx, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&arc_mfu->arcs_mtx, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&arc_mfu_ghost->arcs_mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&arc_l2c_only->arcs_mtx, NULL, MUTEX_DEFAULT, NULL);
 
 	list_create(&arc_mru->arcs_list[ARC_BUFC_METADATA],
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
@@ -2870,6 +3201,10 @@ arc_init(void)
 	list_create(&arc_mfu_ghost->arcs_list[ARC_BUFC_METADATA],
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 	list_create(&arc_mfu_ghost->arcs_list[ARC_BUFC_DATA],
+	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
+	list_create(&arc_l2c_only->arcs_list[ARC_BUFC_METADATA],
+	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
+	list_create(&arc_l2c_only->arcs_list[ARC_BUFC_DATA],
 	    sizeof (arc_buf_hdr_t), offsetof(arc_buf_hdr_t, b_arc_node));
 
 	buf_init();
@@ -2931,4 +3266,869 @@ arc_fini(void)
 	mutex_destroy(&arc_mfu_ghost->arcs_mtx);
 
 	buf_fini();
+}
+
+/*
+ * Level 2 ARC
+ *
+ * The level 2 ARC (L2ARC) is a cache layer in-between main memory and disk.
+ * It uses dedicated storage devices to hold cached data, which are populated
+ * using large infrequent writes.  The main role of this cache is to boost
+ * the performance of random read workloads.  The intended L2ARC devices
+ * include short-stroked disks, solid state disks, and other media with
+ * substantially faster read latency than disk.
+ *
+ *                 +-----------------------+
+ *                 |         ARC           |
+ *                 +-----------------------+
+ *                    |         ^     ^
+ *                    |         |     |
+ *      l2arc_feed_thread()    arc_read()
+ *                    |         |     |
+ *                    |  l2arc read   |
+ *                    V         |     |
+ *               +---------------+    |
+ *               |     L2ARC     |    |
+ *               +---------------+    |
+ *                   |    ^           |
+ *          l2arc_write() |           |
+ *                   |    |           |
+ *                   V    |           |
+ *                 +-------+      +-------+
+ *                 | vdev  |      | vdev  |
+ *                 | cache |      | cache |
+ *                 +-------+      +-------+
+ *                 +=========+     .-----.
+ *                 :  L2ARC  :    |-_____-|
+ *                 : devices :    | Disks |
+ *                 +=========+    `-_____-'
+ *
+ * Read requests are satisfied from the following sources, in order:
+ *
+ *	1) ARC
+ *	2) vdev cache of L2ARC devices
+ *	3) L2ARC devices
+ *	4) vdev cache of disks
+ *	5) disks
+ *
+ * Some L2ARC device types exhibit extremely slow write performance.
+ * To accommodate for this there are some significant differences between
+ * the L2ARC and traditional cache design:
+ *
+ * 1. There is no eviction path from the ARC to the L2ARC.  Evictions from
+ * the ARC behave as usual, freeing buffers and placing headers on ghost
+ * lists.  The ARC does not send buffers to the L2ARC during eviction as
+ * this would add inflated write latencies for all ARC memory pressure.
+ *
+ * 2. The L2ARC attempts to cache data from the ARC before it is evicted.
+ * It does this by periodically scanning buffers from the eviction-end of
+ * the MFU and MRU ARC lists, copying them to the L2ARC devices if they are
+ * not already there.  It scans until a headroom of buffers is satisfied,
+ * which itself is a buffer for ARC eviction.  The thread that does this is
+ * l2arc_feed_thread(), illustrated below; example sizes are included to
+ * provide a better sense of ratio than this diagram:
+ *
+ *	       head -->                        tail
+ *	        +---------------------+----------+
+ *	ARC_mfu |:::::#:::::::::::::::|o#o###o###|-->.   # already on L2ARC
+ *	        +---------------------+----------+   |   o L2ARC eligible
+ *	ARC_mru |:#:::::::::::::::::::|#o#ooo####|-->|   : ARC buffer
+ *	        +---------------------+----------+   |
+ *	             15.9 Gbytes      ^ 32 Mbytes    |
+ *	                           headroom          |
+ *	                                      l2arc_feed_thread()
+ *	                                             |
+ *	                 l2arc write hand <--[oooo]--'
+ *	                         |           8 Mbyte
+ *	                         |          write max
+ *	                         V
+ *		  +==============================+
+ *	L2ARC dev |####|#|###|###|    |####| ... |
+ *	          +==============================+
+ *	                     32 Gbytes
+ *
+ * 3. If an ARC buffer is copied to the L2ARC but then hit instead of
+ * evicted, then the L2ARC has cached a buffer much sooner than it probably
+ * needed to, potentially wasting L2ARC device bandwidth and storage.  It is
+ * safe to say that this is an uncommon case, since buffers at the end of
+ * the ARC lists have moved there due to inactivity.
+ *
+ * 4. If the ARC evicts faster than the L2ARC can maintain a headroom,
+ * then the L2ARC simply misses copying some buffers.  This serves as a
+ * pressure valve to prevent heavy read workloads from both stalling the ARC
+ * with waits and clogging the L2ARC with writes.  This also helps prevent
+ * the potential for the L2ARC to churn if it attempts to cache content too
+ * quickly, such as during backups of the entire pool.
+ *
+ * 5. Writes to the L2ARC devices are grouped and sent in-sequence, so that
+ * the vdev queue can aggregate them into larger and fewer writes.  Each
+ * device is written to in a rotor fashion, sweeping writes through
+ * available space then repeating.
+ *
+ * 6. The L2ARC does not store dirty content.  It never needs to flush
+ * write buffers back to disk based storage.
+ *
+ * 7. If an ARC buffer is written (and dirtied) which also exists in the
+ * L2ARC, the now stale L2ARC buffer is immediately dropped.
+ *
+ * The performance of the L2ARC can be tweaked by a number of tunables, which
+ * may be necessary for different workloads:
+ *
+ *	l2arc_write_max		max write bytes per interval
+ *	l2arc_noprefetch	skip caching prefetched buffers
+ *	l2arc_headroom		number of max device writes to precache
+ *	l2arc_feed_secs		seconds between L2ARC writing
+ *
+ * Tunables may be removed or added as future performance improvements are
+ * integrated, and also may become zpool properties.
+ */
+
+static void
+l2arc_hdr_stat_add(void)
+{
+	ARCSTAT_INCR(arcstat_l2_hdr_size, sizeof (arc_buf_hdr_t) +
+	    sizeof (l2arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_hdr_size, -sizeof (arc_buf_hdr_t));
+}
+
+static void
+l2arc_hdr_stat_remove(void)
+{
+	ARCSTAT_INCR(arcstat_l2_hdr_size, -sizeof (arc_buf_hdr_t) -
+	    sizeof (l2arc_buf_hdr_t));
+	ARCSTAT_INCR(arcstat_hdr_size, sizeof (arc_buf_hdr_t));
+}
+
+/*
+ * Cycle through L2ARC devices.  This is how L2ARC load balances.
+ * This is called with l2arc_dev_mtx held, which also locks out spa removal.
+ */
+static l2arc_dev_t *
+l2arc_dev_get_next(void)
+{
+	l2arc_dev_t *next;
+
+	if (l2arc_dev_last == NULL) {
+		next = list_head(l2arc_dev_list);
+	} else {
+		next = list_next(l2arc_dev_list, l2arc_dev_last);
+		if (next == NULL)
+			next = list_head(l2arc_dev_list);
+	}
+
+	l2arc_dev_last = next;
+
+	return (next);
+}
+
+/*
+ * A write to a cache device has completed.  Update all headers to allow
+ * reads from these buffers to begin.
+ */
+static void
+l2arc_write_done(zio_t *zio)
+{
+	l2arc_write_callback_t *cb;
+	l2arc_dev_t *dev;
+	list_t *buflist;
+	l2arc_data_free_t *df, *df_prev;
+	arc_buf_hdr_t *head, *ab, *ab_prev;
+	kmutex_t *hash_lock;
+
+	cb = zio->io_private;
+	ASSERT(cb != NULL);
+	dev = cb->l2wcb_dev;
+	ASSERT(dev != NULL);
+	head = cb->l2wcb_head;
+	ASSERT(head != NULL);
+	buflist = dev->l2ad_buflist;
+	ASSERT(buflist != NULL);
+	DTRACE_PROBE2(l2arc__iodone, zio_t *, zio,
+	    l2arc_write_callback_t *, cb);
+
+	if (zio->io_error != 0)
+		ARCSTAT_BUMP(arcstat_l2_writes_error);
+
+	mutex_enter(&l2arc_buflist_mtx);
+
+	/*
+	 * All writes completed, or an error was hit.
+	 */
+	for (ab = list_prev(buflist, head); ab; ab = ab_prev) {
+		ab_prev = list_prev(buflist, ab);
+
+		hash_lock = HDR_LOCK(ab);
+		if (!mutex_tryenter(hash_lock)) {
+			/*
+			 * This buffer misses out.  It may be in a stage
+			 * of eviction.  Its ARC_L2_WRITING flag will be
+			 * left set, denying reads to this buffer.
+			 */
+			ARCSTAT_BUMP(arcstat_l2_writes_hdr_miss);
+			continue;
+		}
+
+		if (zio->io_error != 0) {
+			/*
+			 * Error - invalidate L2ARC entry.
+			 */
+			ab->b_l2hdr = NULL;
+		}
+
+		/*
+		 * Allow ARC to begin reads to this L2ARC entry.
+		 */
+		ab->b_flags &= ~ARC_L2_WRITING;
+
+		mutex_exit(hash_lock);
+	}
+
+	atomic_inc_64(&l2arc_writes_done);
+	list_remove(buflist, head);
+	kmem_cache_free(hdr_cache, head);
+	mutex_exit(&l2arc_buflist_mtx);
+
+	/*
+	 * Free buffers that were tagged for destruction.
+	 */
+	mutex_enter(&l2arc_free_on_write_mtx);
+	buflist = l2arc_free_on_write;
+	for (df = list_tail(buflist); df; df = df_prev) {
+		df_prev = list_prev(buflist, df);
+		ASSERT(df->l2df_data != NULL);
+		ASSERT(df->l2df_func != NULL);
+		df->l2df_func(df->l2df_data, df->l2df_size);
+		list_remove(buflist, df);
+		kmem_free(df, sizeof (l2arc_data_free_t));
+	}
+	mutex_exit(&l2arc_free_on_write_mtx);
+
+	kmem_free(cb, sizeof (l2arc_write_callback_t));
+}
+
+/*
+ * A read to a cache device completed.  Validate buffer contents before
+ * handing over to the regular ARC routines.
+ */
+static void
+l2arc_read_done(zio_t *zio)
+{
+	l2arc_read_callback_t *cb;
+	arc_buf_hdr_t *hdr;
+	arc_buf_t *buf;
+	zio_t *rzio;
+	kmutex_t *hash_lock;
+	int equal, err = 0;
+
+	cb = zio->io_private;
+	ASSERT(cb != NULL);
+	buf = cb->l2rcb_buf;
+	ASSERT(buf != NULL);
+	hdr = buf->b_hdr;
+	ASSERT(hdr != NULL);
+
+	hash_lock = HDR_LOCK(hdr);
+	mutex_enter(hash_lock);
+
+	/*
+	 * Check this survived the L2ARC journey.
+	 */
+	equal = arc_cksum_equal(buf);
+	if (equal && zio->io_error == 0 && !HDR_L2_EVICTED(hdr)) {
+		mutex_exit(hash_lock);
+		zio->io_private = buf;
+		arc_read_done(zio);
+	} else {
+		mutex_exit(hash_lock);
+		/*
+		 * Buffer didn't survive caching.  Increment stats and
+		 * reissue to the original storage device.
+		 */
+		if (zio->io_error != 0)
+			ARCSTAT_BUMP(arcstat_l2_io_error);
+		if (!equal)
+			ARCSTAT_BUMP(arcstat_l2_cksum_bad);
+
+		zio->io_flags &= ~ZIO_FLAG_DONT_CACHE;
+		rzio = zio_read(NULL, cb->l2rcb_spa, &cb->l2rcb_bp,
+		    buf->b_data, zio->io_size, arc_read_done, buf,
+		    zio->io_priority, cb->l2rcb_flags, &cb->l2rcb_zb);
+
+		/*
+		 * Since this is a seperate thread, we can wait on this
+		 * I/O whether there is an io_waiter or not.
+		 */
+		err = zio_wait(rzio);
+
+		/*
+		 * Let the resent I/O call arc_read_done() instead.
+		 * io_error is set to the reissued I/O error status.
+		 */
+		zio->io_done = NULL;
+		zio->io_waiter = NULL;
+		zio->io_error = err;
+	}
+
+	kmem_free(cb, sizeof (l2arc_read_callback_t));
+}
+
+/*
+ * This is the list priority from which the L2ARC will search for pages to
+ * cache.  This is used within loops (0..3) to cycle through lists in the
+ * desired order.  This order can have a significant effect on cache
+ * performance.
+ *
+ * Currently the metadata lists are hit first, MFU then MRU, followed by
+ * the data lists.  This function returns a locked list, and also returns
+ * the lock pointer.
+ */
+static list_t *
+l2arc_list_locked(int list_num, kmutex_t **lock)
+{
+	list_t *list;
+
+	ASSERT(list_num >= 0 && list_num <= 3);
+
+	switch (list_num) {
+	case 0:
+		list = &arc_mfu->arcs_list[ARC_BUFC_METADATA];
+		*lock = &arc_mfu->arcs_mtx;
+		break;
+	case 1:
+		list = &arc_mru->arcs_list[ARC_BUFC_METADATA];
+		*lock = &arc_mru->arcs_mtx;
+		break;
+	case 2:
+		list = &arc_mfu->arcs_list[ARC_BUFC_DATA];
+		*lock = &arc_mfu->arcs_mtx;
+		break;
+	case 3:
+		list = &arc_mru->arcs_list[ARC_BUFC_DATA];
+		*lock = &arc_mru->arcs_mtx;
+		break;
+	}
+
+	ASSERT(!(MUTEX_HELD(*lock)));
+	mutex_enter(*lock);
+	return (list);
+}
+
+/*
+ * Evict buffers from the device write hand to the distance specified in
+ * bytes.  This distance may span populated buffers, it may span nothing.
+ * This is clearing a region on the L2ARC device ready for writing.
+ * If the 'all' boolean is set, every buffer is evicted.
+ */
+static void
+l2arc_evict(l2arc_dev_t *dev, uint64_t distance, boolean_t all)
+{
+	list_t *buflist;
+	l2arc_buf_hdr_t *abl2;
+	arc_buf_hdr_t *ab, *ab_prev;
+	kmutex_t *hash_lock;
+	uint64_t taddr;
+
+	ASSERT(MUTEX_HELD(&l2arc_dev_mtx));
+
+	buflist = dev->l2ad_buflist;
+
+	if (buflist == NULL)
+		return;
+
+	if (!all && dev->l2ad_first) {
+		/*
+		 * This is the first sweep through the device.  There is
+		 * nothing to evict.
+		 */
+		return;
+	}
+
+	if (dev->l2ad_hand >= (dev->l2ad_end - (2 * dev->l2ad_write))) {
+		/*
+		 * When nearing the end of the device, evict to the end
+		 * before the device write hand jumps to the start.
+		 */
+		taddr = dev->l2ad_end;
+	} else {
+		taddr = dev->l2ad_hand + distance;
+	}
+	DTRACE_PROBE4(l2arc__evict, l2arc_dev_t *, dev, list_t *, buflist,
+	    uint64_t, taddr, boolean_t, all);
+
+top:
+	mutex_enter(&l2arc_buflist_mtx);
+	for (ab = list_tail(buflist); ab; ab = ab_prev) {
+		ab_prev = list_prev(buflist, ab);
+
+		hash_lock = HDR_LOCK(ab);
+		if (!mutex_tryenter(hash_lock)) {
+			/*
+			 * Missed the hash lock.  Retry.
+			 */
+			ARCSTAT_BUMP(arcstat_l2_evict_lock_retry);
+			mutex_exit(&l2arc_buflist_mtx);
+			mutex_enter(hash_lock);
+			mutex_exit(hash_lock);
+			goto top;
+		}
+
+		if (HDR_L2_WRITE_HEAD(ab)) {
+			/*
+			 * We hit a write head node.  Leave it for
+			 * l2arc_write_done().
+			 */
+			list_remove(buflist, ab);
+			mutex_exit(hash_lock);
+			continue;
+		}
+
+		if (!all && ab->b_l2hdr != NULL &&
+		    (ab->b_l2hdr->b_daddr > taddr ||
+		    ab->b_l2hdr->b_daddr < dev->l2ad_hand)) {
+			/*
+			 * We've evicted to the target address,
+			 * or the end of the device.
+			 */
+			mutex_exit(hash_lock);
+			break;
+		}
+
+		if (HDR_FREE_IN_PROGRESS(ab)) {
+			/*
+			 * Already on the path to destruction.
+			 */
+			mutex_exit(hash_lock);
+			continue;
+		}
+
+		if (ab->b_state == arc_l2c_only) {
+			ASSERT(!HDR_L2_READING(ab));
+			/*
+			 * This doesn't exist in the ARC.  Destroy.
+			 * arc_hdr_destroy() will call list_remove()
+			 * and decrement arcstat_l2_size.
+			 */
+			arc_change_state(arc_anon, ab, hash_lock);
+			arc_hdr_destroy(ab);
+		} else {
+			/*
+			 * Tell ARC this no longer exists in L2ARC.
+			 */
+			if (ab->b_l2hdr != NULL) {
+				abl2 = ab->b_l2hdr;
+				ab->b_l2hdr = NULL;
+				kmem_free(abl2, sizeof (l2arc_buf_hdr_t));
+				ARCSTAT_INCR(arcstat_l2_size, -ab->b_size);
+			}
+			list_remove(buflist, ab);
+
+			/*
+			 * This may have been leftover after a
+			 * failed write.
+			 */
+			ab->b_flags &= ~ARC_L2_WRITING;
+
+			/*
+			 * Invalidate issued or about to be issued
+			 * reads, since we may be about to write
+			 * over this location.
+			 */
+			if (HDR_L2_READING(ab)) {
+				ARCSTAT_BUMP(arcstat_l2_evict_reading);
+				ab->b_flags |= ARC_L2_EVICTED;
+			}
+		}
+		mutex_exit(hash_lock);
+	}
+	mutex_exit(&l2arc_buflist_mtx);
+
+	spa_l2cache_space_update(dev->l2ad_vdev, 0, -(taddr - dev->l2ad_evict));
+	dev->l2ad_evict = taddr;
+}
+
+/*
+ * Find and write ARC buffers to the L2ARC device.
+ *
+ * An ARC_L2_WRITING flag is set so that the L2ARC buffers are not valid
+ * for reading until they have completed writing.
+ */
+static void
+l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev)
+{
+	arc_buf_hdr_t *ab, *ab_prev, *head;
+	l2arc_buf_hdr_t *hdrl2;
+	list_t *list;
+	uint64_t passed_sz, write_sz, buf_sz;
+	uint64_t target_sz = dev->l2ad_write;
+	uint64_t headroom = dev->l2ad_write * l2arc_headroom;
+	void *buf_data;
+	kmutex_t *hash_lock, *list_lock;
+	boolean_t have_lock, full;
+	l2arc_write_callback_t *cb;
+	zio_t *pio, *wzio;
+
+	ASSERT(MUTEX_HELD(&l2arc_dev_mtx));
+	ASSERT(dev->l2ad_vdev != NULL);
+
+	pio = NULL;
+	write_sz = 0;
+	full = B_FALSE;
+	head = kmem_cache_alloc(hdr_cache, KM_SLEEP);
+	head->b_flags |= ARC_L2_WRITE_HEAD;
+
+	/*
+	 * Copy buffers for L2ARC writing.
+	 */
+	mutex_enter(&l2arc_buflist_mtx);
+	for (int try = 0; try <= 3; try++) {
+		list = l2arc_list_locked(try, &list_lock);
+		passed_sz = 0;
+
+		for (ab = list_tail(list); ab; ab = ab_prev) {
+			ab_prev = list_prev(list, ab);
+
+			hash_lock = HDR_LOCK(ab);
+			have_lock = MUTEX_HELD(hash_lock);
+			if (!have_lock && !mutex_tryenter(hash_lock)) {
+				/*
+				 * Skip this buffer rather than waiting.
+				 */
+				continue;
+			}
+
+			passed_sz += ab->b_size;
+			if (passed_sz > headroom) {
+				/*
+				 * Searched too far.
+				 */
+				mutex_exit(hash_lock);
+				break;
+			}
+
+			if (ab->b_spa != spa) {
+				mutex_exit(hash_lock);
+				continue;
+			}
+
+			if (ab->b_l2hdr != NULL) {
+				/*
+				 * Already in L2ARC.
+				 */
+				mutex_exit(hash_lock);
+				continue;
+			}
+
+			if (HDR_IO_IN_PROGRESS(ab) || HDR_DONT_L2CACHE(ab)) {
+				mutex_exit(hash_lock);
+				continue;
+			}
+
+			if ((write_sz + ab->b_size) > target_sz) {
+				full = B_TRUE;
+				mutex_exit(hash_lock);
+				break;
+			}
+
+			if (ab->b_buf == NULL) {
+				DTRACE_PROBE1(l2arc__buf__null, void *, ab);
+				mutex_exit(hash_lock);
+				continue;
+			}
+
+			if (pio == NULL) {
+				/*
+				 * Insert a dummy header on the buflist so
+				 * l2arc_write_done() can find where the
+				 * write buffers begin without searching.
+				 */
+				list_insert_head(dev->l2ad_buflist, head);
+
+				cb = kmem_alloc(
+				    sizeof (l2arc_write_callback_t), KM_SLEEP);
+				cb->l2wcb_dev = dev;
+				cb->l2wcb_head = head;
+				pio = zio_root(spa, l2arc_write_done, cb,
+				    ZIO_FLAG_CANFAIL);
+			}
+
+			/*
+			 * Create and add a new L2ARC header.
+			 */
+			hdrl2 = kmem_zalloc(sizeof (l2arc_buf_hdr_t), KM_SLEEP);
+			hdrl2->b_dev = dev;
+			hdrl2->b_daddr = dev->l2ad_hand;
+
+			ab->b_flags |= ARC_L2_WRITING;
+			ab->b_l2hdr = hdrl2;
+			list_insert_head(dev->l2ad_buflist, ab);
+			buf_data = ab->b_buf->b_data;
+			buf_sz = ab->b_size;
+
+			/*
+			 * Compute and store the buffer cksum before
+			 * writing.  On debug the cksum is verified first.
+			 */
+			arc_cksum_verify(ab->b_buf);
+			arc_cksum_compute(ab->b_buf, B_TRUE);
+
+			mutex_exit(hash_lock);
+
+			wzio = zio_write_phys(pio, dev->l2ad_vdev,
+			    dev->l2ad_hand, buf_sz, buf_data, ZIO_CHECKSUM_OFF,
+			    NULL, NULL, ZIO_PRIORITY_ASYNC_WRITE,
+			    ZIO_FLAG_CANFAIL, B_FALSE);
+
+			DTRACE_PROBE2(l2arc__write, vdev_t *, dev->l2ad_vdev,
+			    zio_t *, wzio);
+			(void) zio_nowait(wzio);
+
+			write_sz += buf_sz;
+			dev->l2ad_hand += buf_sz;
+		}
+
+		mutex_exit(list_lock);
+
+		if (full == B_TRUE)
+			break;
+	}
+	mutex_exit(&l2arc_buflist_mtx);
+
+	if (pio == NULL) {
+		ASSERT3U(write_sz, ==, 0);
+		kmem_cache_free(hdr_cache, head);
+		return;
+	}
+
+	ASSERT3U(write_sz, <=, target_sz);
+	ARCSTAT_BUMP(arcstat_l2_writes_sent);
+	ARCSTAT_INCR(arcstat_l2_size, write_sz);
+	spa_l2cache_space_update(dev->l2ad_vdev, 0, write_sz);
+
+	/*
+	 * Bump device hand to the device start if it is approaching the end.
+	 * l2arc_evict() will already have evicted ahead for this case.
+	 */
+	if (dev->l2ad_hand >= (dev->l2ad_end - dev->l2ad_write)) {
+		spa_l2cache_space_update(dev->l2ad_vdev, 0,
+		    dev->l2ad_end - dev->l2ad_hand);
+		dev->l2ad_hand = dev->l2ad_start;
+		dev->l2ad_evict = dev->l2ad_start;
+		dev->l2ad_first = B_FALSE;
+	}
+
+	(void) zio_wait(pio);
+}
+
+/*
+ * This thread feeds the L2ARC at regular intervals.  This is the beating
+ * heart of the L2ARC.
+ */
+static void
+l2arc_feed_thread(void)
+{
+	callb_cpr_t cpr;
+	l2arc_dev_t *dev;
+	spa_t *spa;
+	int interval;
+	boolean_t startup = B_TRUE;
+
+	CALLB_CPR_INIT(&cpr, &l2arc_feed_thr_lock, callb_generic_cpr, FTAG);
+
+	mutex_enter(&l2arc_feed_thr_lock);
+
+	while (l2arc_thread_exit == 0) {
+		/*
+		 * Initially pause for L2ARC_FEED_DELAY seconds as a grace
+		 * interval during boot, followed by l2arc_feed_secs seconds
+		 * thereafter.
+		 */
+		CALLB_CPR_SAFE_BEGIN(&cpr);
+		if (startup) {
+			interval = L2ARC_FEED_DELAY;
+			startup = B_FALSE;
+		} else {
+			interval = l2arc_feed_secs;
+		}
+		(void) cv_timedwait(&l2arc_feed_thr_cv, &l2arc_feed_thr_lock,
+		    lbolt + (hz * interval));
+		CALLB_CPR_SAFE_END(&cpr, &l2arc_feed_thr_lock);
+
+		/*
+		 * Do nothing until L2ARC devices exist.
+		 */
+		mutex_enter(&l2arc_dev_mtx);
+		if (l2arc_ndev == 0) {
+			mutex_exit(&l2arc_dev_mtx);
+			continue;
+		}
+
+		/*
+		 * Avoid contributing to memory pressure.
+		 */
+		if (arc_reclaim_needed()) {
+			ARCSTAT_BUMP(arcstat_l2_abort_lowmem);
+			mutex_exit(&l2arc_dev_mtx);
+			continue;
+		}
+
+		/*
+		 * This selects the next l2arc device to write to, and in
+		 * doing so the next spa to feed from: dev->l2ad_spa.
+		 */
+		if ((dev = l2arc_dev_get_next()) == NULL) {
+			mutex_exit(&l2arc_dev_mtx);
+			continue;
+		}
+		spa = dev->l2ad_spa;
+		ASSERT(spa != NULL);
+		ARCSTAT_BUMP(arcstat_l2_feeds);
+
+		/*
+		 * Evict L2ARC buffers that will be overwritten.
+		 */
+		l2arc_evict(dev, dev->l2ad_write, B_FALSE);
+
+		/*
+		 * Write ARC buffers.
+		 */
+		l2arc_write_buffers(spa, dev);
+		mutex_exit(&l2arc_dev_mtx);
+	}
+
+	l2arc_thread_exit = 0;
+	cv_broadcast(&l2arc_feed_thr_cv);
+	CALLB_CPR_EXIT(&cpr);		/* drops l2arc_feed_thr_lock */
+	thread_exit();
+}
+
+/*
+ * Add a vdev for use by the L2ARC.  By this point the spa has already
+ * validated the vdev and opened it.
+ */
+void
+l2arc_add_vdev(spa_t *spa, vdev_t *vd, uint64_t start, uint64_t end)
+{
+	l2arc_dev_t *adddev;
+
+	/*
+	 * Create a new l2arc device entry.
+	 */
+	adddev = kmem_zalloc(sizeof (l2arc_dev_t), KM_SLEEP);
+	adddev->l2ad_spa = spa;
+	adddev->l2ad_vdev = vd;
+	adddev->l2ad_write = l2arc_write_max;
+	adddev->l2ad_start = start;
+	adddev->l2ad_end = end;
+	adddev->l2ad_hand = adddev->l2ad_start;
+	adddev->l2ad_evict = adddev->l2ad_start;
+	adddev->l2ad_first = B_TRUE;
+	ASSERT3U(adddev->l2ad_write, >, 0);
+
+	/*
+	 * This is a list of all ARC buffers that are still valid on the
+	 * device.
+	 */
+	adddev->l2ad_buflist = kmem_zalloc(sizeof (list_t), KM_SLEEP);
+	list_create(adddev->l2ad_buflist, sizeof (arc_buf_hdr_t),
+	    offsetof(arc_buf_hdr_t, b_l2node));
+
+	spa_l2cache_space_update(vd, adddev->l2ad_end - adddev->l2ad_hand, 0);
+
+	/*
+	 * Add device to global list
+	 */
+	mutex_enter(&l2arc_dev_mtx);
+	list_insert_head(l2arc_dev_list, adddev);
+	atomic_inc_64(&l2arc_ndev);
+	mutex_exit(&l2arc_dev_mtx);
+}
+
+/*
+ * Remove a vdev from the L2ARC.
+ */
+void
+l2arc_remove_vdev(vdev_t *vd)
+{
+	l2arc_dev_t *dev, *nextdev, *remdev = NULL;
+
+	/*
+	 * We can only grab the spa config lock when cache device writes
+	 * complete.
+	 */
+	ASSERT3U(l2arc_writes_sent, ==, l2arc_writes_done);
+
+	/*
+	 * Find the device by vdev
+	 */
+	mutex_enter(&l2arc_dev_mtx);
+	for (dev = list_head(l2arc_dev_list); dev; dev = nextdev) {
+		nextdev = list_next(l2arc_dev_list, dev);
+		if (vd == dev->l2ad_vdev) {
+			remdev = dev;
+			break;
+		}
+	}
+	ASSERT(remdev != NULL);
+
+	/*
+	 * Remove device from global list
+	 */
+	list_remove(l2arc_dev_list, remdev);
+	l2arc_dev_last = NULL;		/* may have been invalidated */
+
+	/*
+	 * Clear all buflists and ARC references.  L2ARC device flush.
+	 */
+	l2arc_evict(remdev, 0, B_TRUE);
+	list_destroy(remdev->l2ad_buflist);
+	kmem_free(remdev->l2ad_buflist, sizeof (list_t));
+	kmem_free(remdev, sizeof (l2arc_dev_t));
+
+	atomic_dec_64(&l2arc_ndev);
+	mutex_exit(&l2arc_dev_mtx);
+}
+
+void
+l2arc_init()
+{
+	l2arc_thread_exit = 0;
+	l2arc_ndev = 0;
+	l2arc_writes_sent = 0;
+	l2arc_writes_done = 0;
+
+	mutex_init(&l2arc_feed_thr_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&l2arc_feed_thr_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&l2arc_dev_mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&l2arc_buflist_mtx, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&l2arc_free_on_write_mtx, NULL, MUTEX_DEFAULT, NULL);
+
+	l2arc_dev_list = &L2ARC_dev_list;
+	l2arc_free_on_write = &L2ARC_free_on_write;
+	list_create(l2arc_dev_list, sizeof (l2arc_dev_t),
+	    offsetof(l2arc_dev_t, l2ad_node));
+	list_create(l2arc_free_on_write, sizeof (l2arc_data_free_t),
+	    offsetof(l2arc_data_free_t, l2df_list_node));
+
+	(void) thread_create(NULL, 0, l2arc_feed_thread, NULL, 0, &p0,
+	    TS_RUN, minclsyspri);
+}
+
+void
+l2arc_fini()
+{
+	mutex_enter(&l2arc_feed_thr_lock);
+	cv_signal(&l2arc_feed_thr_cv);	/* kick thread out of startup */
+	l2arc_thread_exit = 1;
+	while (l2arc_thread_exit != 0)
+		cv_wait(&l2arc_feed_thr_cv, &l2arc_feed_thr_lock);
+	mutex_exit(&l2arc_feed_thr_lock);
+
+	mutex_destroy(&l2arc_feed_thr_lock);
+	cv_destroy(&l2arc_feed_thr_cv);
+	mutex_destroy(&l2arc_dev_mtx);
+	mutex_destroy(&l2arc_buflist_mtx);
+	mutex_destroy(&l2arc_free_on_write_mtx);
+
+	list_destroy(l2arc_dev_list);
+	list_destroy(l2arc_free_on_write);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,9 @@ inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 				} else if (state == POOL_STATE_SPARE) {
 					found = 1;
 					type = DM_USE_SPARE_ZPOOL;
+				} else if (state == POOL_STATE_L2CACHE) {
+					found = 1;
+					type = DM_USE_L2CACHE_ZPOOL;
 				}
 			} else {
 				found = 1;

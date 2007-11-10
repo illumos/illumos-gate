@@ -304,11 +304,13 @@ extern zio_t *zio_ioctl(zio_t *pio, spa_t *spa, vdev_t *vd, int cmd,
 
 extern zio_t *zio_read_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     uint64_t size, void *data, int checksum,
-    zio_done_func_t *done, void *private, int priority, int flags);
+    zio_done_func_t *done, void *private, int priority, int flags,
+    boolean_t labels);
 
 extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     uint64_t size, void *data, int checksum,
-    zio_done_func_t *done, void *private, int priority, int flags);
+    zio_done_func_t *done, void *private, int priority, int flags,
+    boolean_t labels);
 
 extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp,
     blkptr_t *old_bp, uint64_t txg);

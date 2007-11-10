@@ -200,6 +200,7 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_DEFLATE		"deflate"
 #define	DMU_POOL_HISTORY		"history"
 #define	DMU_POOL_PROPS			"pool_props"
+#define	DMU_POOL_L2CACHE		"l2cache"
 
 /*
  * Allocate an object from this objset.  The range of object numbers

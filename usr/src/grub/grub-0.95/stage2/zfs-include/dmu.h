@@ -102,5 +102,6 @@ typedef enum dmu_objset_type {
 #define	DMU_POOL_DEFLATE		"deflate"
 #define	DMU_POOL_HISTORY		"history"
 #define	DMU_POOL_PROPS			"pool_props"
+#define	DMU_POOL_L2CACHE		"l2cache"
 
 #endif	/* _SYS_DMU_H */

@@ -963,23 +963,30 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
-	nvlist_t *config;
+	nvlist_t *config, **l2cache;
+	uint_t nl2cache;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
 		return (error);
 
+	error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
+	    &config);
+	(void) nvlist_lookup_nvlist_array(config, ZPOOL_CONFIG_L2CACHE,
+	    &l2cache, &nl2cache);
+
 	/*
 	 * A root pool with concatenated devices is not supported.
 	 * Thus, can not add a device to a root pool with one device.
+	 * Allow for l2cache devices to be added.
 	 */
-	if (spa->spa_root_vdev->vdev_children == 1 && spa->spa_bootfs != 0) {
+	if (spa->spa_root_vdev->vdev_children == 1 && spa->spa_bootfs != 0 &&
+	    nl2cache == 0) {
 		spa_close(spa, FTAG);
 		return (EDOM);
 	}
 
-	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
-	    &config)) == 0) {
+	if (error == 0) {
 		error = spa_vdev_add(spa, config);
 		nvlist_free(config);
 	}
@@ -2573,9 +2580,26 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	if (zc->zc_guid == 0) {
 		vd = NULL;
 	} else if ((vd = spa_lookup_by_guid(spa, zc->zc_guid)) == NULL) {
-		(void) spa_vdev_exit(spa, NULL, txg, ENODEV);
-		spa_close(spa, FTAG);
-		return (ENODEV);
+		spa_aux_vdev_t *sav;
+		int i;
+
+		/*
+		 * Check if this is an l2cache device.
+		 */
+		ASSERT(spa != NULL);
+		sav = &spa->spa_l2cache;
+		for (i = 0; i < sav->sav_count; i++) {
+			if (sav->sav_vdevs[i]->vdev_guid == zc->zc_guid) {
+				vd = sav->sav_vdevs[i];
+				break;
+			}
+		}
+
+		if (vd == NULL) {
+			(void) spa_vdev_exit(spa, NULL, txg, ENODEV);
+			spa_close(spa, FTAG);
+			return (ENODEV);
+		}
 	}
 
 	vdev_clear(spa, vd, B_TRUE);

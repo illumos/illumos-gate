@@ -219,14 +219,15 @@ typedef enum zfs_share_op {
 #define	SPA_VERSION_7			7ULL
 #define	SPA_VERSION_8			8ULL
 #define	SPA_VERSION_9			9ULL
+#define	SPA_VERSION_10			10ULL
 
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understand the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
-#define	SPA_VERSION			SPA_VERSION_9
-#define	SPA_VERSION_STRING		"9"
+#define	SPA_VERSION			SPA_VERSION_10
+#define	SPA_VERSION_STRING		"10"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -256,6 +257,7 @@ typedef enum zfs_share_op {
 #define	SPA_VERSION_REFRESERVATION	SPA_VERSION_9
 #define	SPA_VERSION_REFQUOTA		SPA_VERSION_9
 #define	SPA_VERSION_UNIQUE_ACCURATE	SPA_VERSION_9
+#define	SPA_VERSION_L2CACHE		SPA_VERSION_10
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -312,6 +314,7 @@ typedef enum zfs_share_op {
 #define	ZPOOL_CONFIG_UNSPARE		"unspare"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
 #define	ZPOOL_CONFIG_IS_LOG		"is_log"
+#define	ZPOOL_CONFIG_L2CACHE		"l2cache"
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -331,6 +334,7 @@ typedef enum zfs_share_op {
 #define	VDEV_TYPE_MISSING		"missing"
 #define	VDEV_TYPE_SPARE			"spare"
 #define	VDEV_TYPE_LOG			"log"
+#define	VDEV_TYPE_L2CACHE		"l2cache"
 
 /*
  * This is needed in userland to report the minimum necessary device size.
@@ -384,14 +388,16 @@ typedef enum vdev_aux {
 
 /*
  * pool state.  The following states are written to disk as part of the normal
- * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED, SPARE.  The remaining states are
- * software abstractions used at various levels to communicate pool state.
+ * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED, SPARE, L2CACHE.  The remaining
+ * states are software abstractions used at various levels to communicate
+ * pool state.
  */
 typedef enum pool_state {
 	POOL_STATE_ACTIVE = 0,		/* In active use		*/
 	POOL_STATE_EXPORTED,		/* Explicitly exported		*/
 	POOL_STATE_DESTROYED,		/* Explicitly destroyed		*/
 	POOL_STATE_SPARE,		/* Reserved for hot spare use	*/
+	POOL_STATE_L2CACHE,		/* Level 2 ARC device		*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
 	POOL_STATE_IO_FAILURE,		/* Internal pool state		*/
 	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/

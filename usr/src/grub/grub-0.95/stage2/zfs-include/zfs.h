@@ -38,7 +38,8 @@
 #define	SPA_VERSION_7			7ULL
 #define	SPA_VERSION_8			8ULL
 #define	SPA_VERSION_9			9ULL
-#define	SPA_VERSION			SPA_VERSION_9
+#define	SPA_VERSION_10			10ULL
+#define	SPA_VERSION			SPA_VERSION_10
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -71,6 +72,7 @@
 #define	ZPOOL_CONFIG_SPARES		"spares"
 #define	ZPOOL_CONFIG_IS_SPARE		"is_spare"
 #define	ZPOOL_CONFIG_NPARITY		"nparity"
+#define	ZPOOL_CONFIG_L2CACHE		"l2cache"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -80,17 +82,20 @@
 #define	VDEV_TYPE_FILE			"file"
 #define	VDEV_TYPE_MISSING		"missing"
 #define	VDEV_TYPE_SPARE			"spare"
+#define	VDEV_TYPE_L2CACHE		"l2cache"
 
 /*
  * pool state.  The following states are written to disk as part of the normal
- * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED, SPARE.  The remaining states are
- * software abstractions used at various levels to communicate pool state.
+ * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED, SPARE, L2CACHE.  The remaining
+ * states are software abstractions used at various levels to communicate pool
+ * state.
  */
 typedef enum pool_state {
 	POOL_STATE_ACTIVE = 0,		/* In active use		*/
 	POOL_STATE_EXPORTED,		/* Explicitly exported		*/
 	POOL_STATE_DESTROYED,		/* Explicitly destroyed		*/
 	POOL_STATE_SPARE,		/* Reserved for hot spare use	*/
+	POOL_STATE_L2CACHE,		/* Level 2 ARC device		*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
 	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/
 	POOL_STATE_POTENTIALLY_ACTIVE	/* Internal libzfs state	*/

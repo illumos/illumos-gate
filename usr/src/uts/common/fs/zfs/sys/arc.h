@@ -36,6 +36,7 @@ extern "C" {
 
 #include <sys/zio.h>
 #include <sys/dmu.h>
+#include <sys/spa.h>
 
 typedef struct arc_buf_hdr arc_buf_hdr_t;
 typedef struct arc_buf arc_buf_t;
@@ -105,6 +106,15 @@ int arc_tempreserve_space(uint64_t tempreserve);
 
 void arc_init(void);
 void arc_fini(void);
+
+/*
+ * Level 2 ARC
+ */
+
+void l2arc_add_vdev(spa_t *spa, vdev_t *vd, uint64_t start, uint64_t end);
+void l2arc_remove_vdev(vdev_t *vd);
+void l2arc_init(void);
+void l2arc_fini(void);
 
 #ifdef	__cplusplus
 }

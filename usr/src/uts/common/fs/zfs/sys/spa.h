@@ -47,6 +47,7 @@ typedef struct vdev vdev_t;
 typedef struct metaslab metaslab_t;
 typedef struct zilog zilog_t;
 typedef struct traverse_handle traverse_handle_t;
+typedef struct spa_aux_vdev spa_aux_vdev_t;
 struct dsl_pool;
 
 /*
@@ -355,6 +356,14 @@ extern void spa_spare_add(vdev_t *vd);
 extern void spa_spare_remove(vdev_t *vd);
 extern boolean_t spa_spare_exists(uint64_t guid, uint64_t *pool);
 extern void spa_spare_activate(vdev_t *vd);
+
+/* L2ARC state (which is global across all pools) */
+extern void spa_l2cache_add(vdev_t *vd);
+extern void spa_l2cache_remove(vdev_t *vd);
+extern boolean_t spa_l2cache_exists(uint64_t guid, uint64_t *pool);
+extern void spa_l2cache_activate(vdev_t *vd);
+extern void spa_l2cache_drop(spa_t *spa);
+extern void spa_l2cache_space_update(vdev_t *vd, int64_t space, int64_t alloc);
 
 /* scrubbing */
 extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);

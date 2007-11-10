@@ -56,6 +56,7 @@
 #include <sys/dsl_prop.h>
 #include <sys/dsl_synctask.h>
 #include <sys/fs/zfs.h>
+#include <sys/arc.h>
 #include <sys/callb.h>
 #include <sys/systeminfo.h>
 #include <sys/sunddi.h>
@@ -662,6 +663,11 @@ spa_unload(spa_t *spa)
 	spa_config_exit(spa, FTAG);
 
 	/*
+	 * Drop and purge level 2 cache
+	 */
+	spa_l2cache_drop(spa);
+
+	/*
 	 * Close the dsl pool.
 	 */
 	if (spa->spa_dsl_pool) {
@@ -676,15 +682,28 @@ spa_unload(spa_t *spa)
 		vdev_free(spa->spa_root_vdev);
 	ASSERT(spa->spa_root_vdev == NULL);
 
-	for (i = 0; i < spa->spa_nspares; i++)
-		vdev_free(spa->spa_spares[i]);
-	if (spa->spa_spares) {
-		kmem_free(spa->spa_spares, spa->spa_nspares * sizeof (void *));
-		spa->spa_spares = NULL;
+	for (i = 0; i < spa->spa_spares.sav_count; i++)
+		vdev_free(spa->spa_spares.sav_vdevs[i]);
+	if (spa->spa_spares.sav_vdevs) {
+		kmem_free(spa->spa_spares.sav_vdevs,
+		    spa->spa_spares.sav_count * sizeof (void *));
+		spa->spa_spares.sav_vdevs = NULL;
 	}
-	if (spa->spa_sparelist) {
-		nvlist_free(spa->spa_sparelist);
-		spa->spa_sparelist = NULL;
+	if (spa->spa_spares.sav_config) {
+		nvlist_free(spa->spa_spares.sav_config);
+		spa->spa_spares.sav_config = NULL;
+	}
+
+	for (i = 0; i < spa->spa_l2cache.sav_count; i++)
+		vdev_free(spa->spa_l2cache.sav_vdevs[i]);
+	if (spa->spa_l2cache.sav_vdevs) {
+		kmem_free(spa->spa_l2cache.sav_vdevs,
+		    spa->spa_l2cache.sav_count * sizeof (void *));
+		spa->spa_l2cache.sav_vdevs = NULL;
+	}
+	if (spa->spa_l2cache.sav_config) {
+		nvlist_free(spa->spa_l2cache.sav_config);
+		spa->spa_l2cache.sav_config = NULL;
 	}
 
 	spa->spa_async_suspended = 0;
@@ -693,8 +712,8 @@ spa_unload(spa_t *spa)
 /*
  * Load (or re-load) the current list of vdevs describing the active spares for
  * this pool.  When this is called, we have some form of basic information in
- * 'spa_sparelist'.  We parse this into vdevs, try to open them, and then
- * re-generate a more complete list including status information.
+ * 'spa_spares.sav_config'.  We parse this into vdevs, try to open them, and
+ * then re-generate a more complete list including status information.
  */
 static void
 spa_load_spares(spa_t *spa)
@@ -707,8 +726,8 @@ spa_load_spares(spa_t *spa)
 	/*
 	 * First, close and free any existing spare vdevs.
 	 */
-	for (i = 0; i < spa->spa_nspares; i++) {
-		vd = spa->spa_spares[i];
+	for (i = 0; i < spa->spa_spares.sav_count; i++) {
+		vd = spa->spa_spares.sav_vdevs[i];
 
 		/* Undo the call to spa_activate() below */
 		if ((tvd = spa_lookup_by_guid(spa, vd->vdev_guid)) != NULL &&
@@ -718,17 +737,18 @@ spa_load_spares(spa_t *spa)
 		vdev_free(vd);
 	}
 
-	if (spa->spa_spares)
-		kmem_free(spa->spa_spares, spa->spa_nspares * sizeof (void *));
+	if (spa->spa_spares.sav_vdevs)
+		kmem_free(spa->spa_spares.sav_vdevs,
+		    spa->spa_spares.sav_count * sizeof (void *));
 
-	if (spa->spa_sparelist == NULL)
+	if (spa->spa_spares.sav_config == NULL)
 		nspares = 0;
 	else
-		VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+		VERIFY(nvlist_lookup_nvlist_array(spa->spa_spares.sav_config,
 		    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
 
-	spa->spa_nspares = (int)nspares;
-	spa->spa_spares = NULL;
+	spa->spa_spares.sav_count = (int)nspares;
+	spa->spa_spares.sav_vdevs = NULL;
 
 	if (nspares == 0)
 		return;
@@ -742,13 +762,14 @@ spa_load_spares(spa_t *spa)
 	 * validate each vdev on the spare list.  If the vdev also exists in the
 	 * active configuration, then we also mark this vdev as an active spare.
 	 */
-	spa->spa_spares = kmem_alloc(nspares * sizeof (void *), KM_SLEEP);
-	for (i = 0; i < spa->spa_nspares; i++) {
+	spa->spa_spares.sav_vdevs = kmem_alloc(nspares * sizeof (void *),
+	    KM_SLEEP);
+	for (i = 0; i < spa->spa_spares.sav_count; i++) {
 		VERIFY(spa_config_parse(spa, &vd, spares[i], NULL, 0,
 		    VDEV_ALLOC_SPARE) == 0);
 		ASSERT(vd != NULL);
 
-		spa->spa_spares[i] = vd;
+		spa->spa_spares.sav_vdevs[i] = vd;
 
 		if ((tvd = spa_lookup_by_guid(spa, vd->vdev_guid)) != NULL) {
 			if (!tvd->vdev_isspare)
@@ -775,25 +796,160 @@ spa_load_spares(spa_t *spa)
 			continue;
 
 		vd->vdev_top = vd;
-		(void) vdev_validate_spare(vd);
+		if (vdev_validate_aux(vd) == 0)
+			spa_spare_add(vd);
 	}
 
 	/*
 	 * Recompute the stashed list of spares, with status information
 	 * this time.
 	 */
-	VERIFY(nvlist_remove(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	VERIFY(nvlist_remove(spa->spa_spares.sav_config, ZPOOL_CONFIG_SPARES,
 	    DATA_TYPE_NVLIST_ARRAY) == 0);
 
-	spares = kmem_alloc(spa->spa_nspares * sizeof (void *), KM_SLEEP);
-	for (i = 0; i < spa->spa_nspares; i++)
-		spares[i] = vdev_config_generate(spa, spa->spa_spares[i],
-		    B_TRUE, B_TRUE);
-	VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
-	    spares, spa->spa_nspares) == 0);
-	for (i = 0; i < spa->spa_nspares; i++)
+	spares = kmem_alloc(spa->spa_spares.sav_count * sizeof (void *),
+	    KM_SLEEP);
+	for (i = 0; i < spa->spa_spares.sav_count; i++)
+		spares[i] = vdev_config_generate(spa,
+		    spa->spa_spares.sav_vdevs[i], B_TRUE, B_TRUE, B_FALSE);
+	VERIFY(nvlist_add_nvlist_array(spa->spa_spares.sav_config,
+	    ZPOOL_CONFIG_SPARES, spares, spa->spa_spares.sav_count) == 0);
+	for (i = 0; i < spa->spa_spares.sav_count; i++)
 		nvlist_free(spares[i]);
-	kmem_free(spares, spa->spa_nspares * sizeof (void *));
+	kmem_free(spares, spa->spa_spares.sav_count * sizeof (void *));
+}
+
+/*
+ * Load (or re-load) the current list of vdevs describing the active l2cache for
+ * this pool.  When this is called, we have some form of basic information in
+ * 'spa_l2cache.sav_config'.  We parse this into vdevs, try to open them, and
+ * then re-generate a more complete list including status information.
+ * Devices which are already active have their details maintained, and are
+ * not re-opened.
+ */
+static void
+spa_load_l2cache(spa_t *spa)
+{
+	nvlist_t **l2cache;
+	uint_t nl2cache;
+	int i, j, oldnvdevs;
+	uint64_t guid;
+	vdev_t *vd, **oldvdevs, **newvdevs;
+	spa_aux_vdev_t *sav = &spa->spa_l2cache;
+
+	if (sav->sav_config != NULL) {
+		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config,
+		    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0);
+		newvdevs = kmem_alloc(nl2cache * sizeof (void *), KM_SLEEP);
+	} else {
+		nl2cache = 0;
+	}
+
+	oldvdevs = sav->sav_vdevs;
+	oldnvdevs = sav->sav_count;
+	sav->sav_vdevs = NULL;
+	sav->sav_count = 0;
+
+	/*
+	 * Process new nvlist of vdevs.
+	 */
+	for (i = 0; i < nl2cache; i++) {
+		VERIFY(nvlist_lookup_uint64(l2cache[i], ZPOOL_CONFIG_GUID,
+		    &guid) == 0);
+
+		newvdevs[i] = NULL;
+		for (j = 0; j < oldnvdevs; j++) {
+			vd = oldvdevs[j];
+			if (vd != NULL && guid == vd->vdev_guid) {
+				/*
+				 * Retain previous vdev for add/remove ops.
+				 */
+				newvdevs[i] = vd;
+				oldvdevs[j] = NULL;
+				break;
+			}
+		}
+
+		if (newvdevs[i] == NULL) {
+			/*
+			 * Create new vdev
+			 */
+			VERIFY(spa_config_parse(spa, &vd, l2cache[i], NULL, 0,
+			    VDEV_ALLOC_L2CACHE) == 0);
+			ASSERT(vd != NULL);
+			newvdevs[i] = vd;
+
+			/*
+			 * Commit this vdev as an l2cache device,
+			 * even if it fails to open.
+			 */
+			spa_l2cache_add(vd);
+
+			if (vdev_open(vd) != 0)
+				continue;
+
+			vd->vdev_top = vd;
+			(void) vdev_validate_aux(vd);
+
+			if (!vdev_is_dead(vd)) {
+				uint64_t size;
+				size = vdev_get_rsize(vd);
+				ASSERT3U(size, >, 0);
+				if (spa_mode & FWRITE) {
+					l2arc_add_vdev(spa, vd,
+					    VDEV_LABEL_START_SIZE,
+					    size - VDEV_LABEL_START_SIZE);
+				}
+				spa_l2cache_activate(vd);
+			}
+		}
+	}
+
+	/*
+	 * Purge vdevs that were dropped
+	 */
+	for (i = 0; i < oldnvdevs; i++) {
+		uint64_t pool;
+
+		vd = oldvdevs[i];
+		if (vd != NULL) {
+			if (spa_mode & FWRITE &&
+			    spa_l2cache_exists(vd->vdev_guid, &pool) &&
+			    pool != 0ULL) {
+				l2arc_remove_vdev(vd);
+			}
+			(void) vdev_close(vd);
+			spa_l2cache_remove(vd);
+		}
+	}
+
+	if (oldvdevs)
+		kmem_free(oldvdevs, oldnvdevs * sizeof (void *));
+
+	if (sav->sav_config == NULL)
+		goto out;
+
+	sav->sav_vdevs = newvdevs;
+	sav->sav_count = (int)nl2cache;
+
+	/*
+	 * Recompute the stashed list of l2cache devices, with status
+	 * information this time.
+	 */
+	VERIFY(nvlist_remove(sav->sav_config, ZPOOL_CONFIG_L2CACHE,
+	    DATA_TYPE_NVLIST_ARRAY) == 0);
+
+	l2cache = kmem_alloc(sav->sav_count * sizeof (void *), KM_SLEEP);
+	for (i = 0; i < sav->sav_count; i++)
+		l2cache[i] = vdev_config_generate(spa,
+		    sav->sav_vdevs[i], B_TRUE, B_FALSE, B_TRUE);
+	VERIFY(nvlist_add_nvlist_array(sav->sav_config,
+	    ZPOOL_CONFIG_L2CACHE, l2cache, sav->sav_count) == 0);
+out:
+	for (i = 0; i < sav->sav_count; i++)
+		nvlist_free(l2cache[i]);
+	if (sav->sav_count)
+		kmem_free(l2cache, sav->sav_count * sizeof (void *));
 }
 
 static int
@@ -1090,7 +1246,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * Load any hot spares for this pool.
 	 */
 	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
-	    DMU_POOL_SPARES, sizeof (uint64_t), 1, &spa->spa_spares_object);
+	    DMU_POOL_SPARES, sizeof (uint64_t), 1, &spa->spa_spares.sav_object);
 	if (error != 0 && error != ENOENT) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
@@ -1099,8 +1255,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	}
 	if (error == 0) {
 		ASSERT(spa_version(spa) >= SPA_VERSION_SPARES);
-		if (load_nvlist(spa, spa->spa_spares_object,
-		    &spa->spa_sparelist) != 0) {
+		if (load_nvlist(spa, spa->spa_spares.sav_object,
+		    &spa->spa_spares.sav_config) != 0) {
 			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			error = EIO;
@@ -1109,6 +1265,34 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 
 		spa_config_enter(spa, RW_WRITER, FTAG);
 		spa_load_spares(spa);
+		spa_config_exit(spa, FTAG);
+	}
+
+	/*
+	 * Load any level 2 ARC devices for this pool.
+	 */
+	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_L2CACHE, sizeof (uint64_t), 1,
+	    &spa->spa_l2cache.sav_object);
+	if (error != 0 && error != ENOENT) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+	if (error == 0) {
+		ASSERT(spa_version(spa) >= SPA_VERSION_L2CACHE);
+		if (load_nvlist(spa, spa->spa_l2cache.sav_object,
+		    &spa->spa_l2cache.sav_config) != 0) {
+			vdev_set_state(rvd, B_TRUE,
+			    VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			error = EIO;
+			goto out;
+		}
+
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_l2cache(spa);
 		spa_config_exit(spa, FTAG);
 	}
 
@@ -1372,6 +1556,9 @@ spa_inject_delref(spa_t *spa)
 	mutex_exit(&spa_namespace_lock);
 }
 
+/*
+ * Add spares device information to the nvlist.
+ */
 static void
 spa_add_spares(spa_t *spa, nvlist_t *config)
 {
@@ -1383,12 +1570,12 @@ spa_add_spares(spa_t *spa, nvlist_t *config)
 	uint_t vsc;
 	uint64_t pool;
 
-	if (spa->spa_nspares == 0)
+	if (spa->spa_spares.sav_count == 0)
 		return;
 
 	VERIFY(nvlist_lookup_nvlist(config,
 	    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
-	VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
+	VERIFY(nvlist_lookup_nvlist_array(spa->spa_spares.sav_config,
 	    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
 	if (nspares != 0) {
 		VERIFY(nvlist_add_nvlist_array(nvroot,
@@ -1415,6 +1602,62 @@ spa_add_spares(spa_t *spa, nvlist_t *config)
 	}
 }
 
+/*
+ * Add l2cache device information to the nvlist, including vdev stats.
+ */
+static void
+spa_add_l2cache(spa_t *spa, nvlist_t *config)
+{
+	nvlist_t **l2cache;
+	uint_t i, j, nl2cache;
+	nvlist_t *nvroot;
+	uint64_t guid;
+	vdev_t *vd;
+	vdev_stat_t *vs;
+	uint_t vsc;
+
+	if (spa->spa_l2cache.sav_count == 0)
+		return;
+
+	spa_config_enter(spa, RW_READER, FTAG);
+
+	VERIFY(nvlist_lookup_nvlist(config,
+	    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+	VERIFY(nvlist_lookup_nvlist_array(spa->spa_l2cache.sav_config,
+	    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0);
+	if (nl2cache != 0) {
+		VERIFY(nvlist_add_nvlist_array(nvroot,
+		    ZPOOL_CONFIG_L2CACHE, l2cache, nl2cache) == 0);
+		VERIFY(nvlist_lookup_nvlist_array(nvroot,
+		    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0);
+
+		/*
+		 * Update level 2 cache device stats.
+		 */
+
+		for (i = 0; i < nl2cache; i++) {
+			VERIFY(nvlist_lookup_uint64(l2cache[i],
+			    ZPOOL_CONFIG_GUID, &guid) == 0);
+
+			vd = NULL;
+			for (j = 0; j < spa->spa_l2cache.sav_count; j++) {
+				if (guid ==
+				    spa->spa_l2cache.sav_vdevs[j]->vdev_guid) {
+					vd = spa->spa_l2cache.sav_vdevs[j];
+					break;
+				}
+			}
+			ASSERT(vd != NULL);
+
+			VERIFY(nvlist_lookup_uint64_array(l2cache[i],
+			    ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &vsc) == 0);
+			vdev_get_stats(vd, vs);
+		}
+	}
+
+	spa_config_exit(spa, FTAG);
+}
+
 int
 spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 {
@@ -1429,6 +1672,7 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 		    spa_get_errlog_size(spa)) == 0);
 
 		spa_add_spares(spa, *config);
+		spa_add_l2cache(spa, *config);
 	}
 
 	/*
@@ -1457,45 +1701,46 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 }
 
 /*
- * Validate that the 'spares' array is well formed.  We must have an array of
- * nvlists, each which describes a valid leaf vdev.  If this is an import (mode
- * is VDEV_ALLOC_SPARE), then we allow corrupted spares to be specified, as long
- * as they are well-formed.
+ * Validate that the auxiliary device array is well formed.  We must have an
+ * array of nvlists, each which describes a valid leaf vdev.  If this is an
+ * import (mode is VDEV_ALLOC_SPARE), then we allow corrupted spares to be
+ * specified, as long as they are well-formed.
  */
 static int
-spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
+spa_validate_aux_devs(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode,
+    spa_aux_vdev_t *sav, const char *config, uint64_t version,
+    vdev_labeltype_t label)
 {
-	nvlist_t **spares;
-	uint_t i, nspares;
+	nvlist_t **dev;
+	uint_t i, ndev;
 	vdev_t *vd;
 	int error;
 
 	/*
-	 * It's acceptable to have no spares specified.
+	 * It's acceptable to have no devs specified.
 	 */
-	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
-	    &spares, &nspares) != 0)
+	if (nvlist_lookup_nvlist_array(nvroot, config, &dev, &ndev) != 0)
 		return (0);
 
-	if (nspares == 0)
+	if (ndev == 0)
 		return (EINVAL);
 
 	/*
-	 * Make sure the pool is formatted with a version that supports hot
-	 * spares.
+	 * Make sure the pool is formatted with a version that supports this
+	 * device type.
 	 */
-	if (spa_version(spa) < SPA_VERSION_SPARES)
+	if (spa_version(spa) < version)
 		return (ENOTSUP);
 
 	/*
-	 * Set the pending spare list so we correctly handle device in-use
+	 * Set the pending device list so we correctly handle device in-use
 	 * checking.
 	 */
-	spa->spa_pending_spares = spares;
-	spa->spa_pending_nspares = nspares;
+	sav->sav_pending = dev;
+	sav->sav_npending = ndev;
 
-	for (i = 0; i < nspares; i++) {
-		if ((error = spa_config_parse(spa, &vd, spares[i], NULL, 0,
+	for (i = 0; i < ndev; i++) {
+		if ((error = spa_config_parse(spa, &vd, dev[i], NULL, 0,
 		    mode)) != 0)
 			goto out;
 
@@ -1505,27 +1750,125 @@ spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
 			goto out;
 		}
 
+		/*
+		 * The L2ARC currently only supports disk devices.
+		 */
+		if ((strcmp(config, ZPOOL_CONFIG_L2CACHE) == 0) &&
+		    strcmp(vd->vdev_ops->vdev_op_type, VDEV_TYPE_DISK) != 0) {
+			error = ENOTBLK;
+			goto out;
+		}
+
 		vd->vdev_top = vd;
 
 		if ((error = vdev_open(vd)) == 0 &&
-		    (error = vdev_label_init(vd, crtxg,
-		    VDEV_LABEL_SPARE)) == 0) {
-			VERIFY(nvlist_add_uint64(spares[i], ZPOOL_CONFIG_GUID,
+		    (error = vdev_label_init(vd, crtxg, label)) == 0) {
+			VERIFY(nvlist_add_uint64(dev[i], ZPOOL_CONFIG_GUID,
 			    vd->vdev_guid) == 0);
 		}
 
 		vdev_free(vd);
 
-		if (error && mode != VDEV_ALLOC_SPARE)
+		if (error &&
+		    (mode != VDEV_ALLOC_SPARE && mode != VDEV_ALLOC_L2CACHE))
 			goto out;
 		else
 			error = 0;
 	}
 
 out:
-	spa->spa_pending_spares = NULL;
-	spa->spa_pending_nspares = 0;
+	sav->sav_pending = NULL;
+	sav->sav_npending = 0;
 	return (error);
+}
+
+static int
+spa_validate_aux(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
+{
+	int error;
+
+	if ((error = spa_validate_aux_devs(spa, nvroot, crtxg, mode,
+	    &spa->spa_spares, ZPOOL_CONFIG_SPARES, SPA_VERSION_SPARES,
+	    VDEV_LABEL_SPARE)) != 0) {
+		return (error);
+	}
+
+	return (spa_validate_aux_devs(spa, nvroot, crtxg, mode,
+	    &spa->spa_l2cache, ZPOOL_CONFIG_L2CACHE, SPA_VERSION_L2CACHE,
+	    VDEV_LABEL_L2CACHE));
+}
+
+static void
+spa_set_aux_vdevs(spa_aux_vdev_t *sav, nvlist_t **devs, int ndevs,
+    const char *config)
+{
+	int i;
+
+	if (sav->sav_config != NULL) {
+		nvlist_t **olddevs;
+		uint_t oldndevs;
+		nvlist_t **newdevs;
+
+		/*
+		 * Generate new dev list by concatentating with the
+		 * current dev list.
+		 */
+		VERIFY(nvlist_lookup_nvlist_array(sav->sav_config, config,
+		    &olddevs, &oldndevs) == 0);
+
+		newdevs = kmem_alloc(sizeof (void *) *
+		    (ndevs + oldndevs), KM_SLEEP);
+		for (i = 0; i < oldndevs; i++)
+			VERIFY(nvlist_dup(olddevs[i], &newdevs[i],
+			    KM_SLEEP) == 0);
+		for (i = 0; i < ndevs; i++)
+			VERIFY(nvlist_dup(devs[i], &newdevs[i + oldndevs],
+			    KM_SLEEP) == 0);
+
+		VERIFY(nvlist_remove(sav->sav_config, config,
+		    DATA_TYPE_NVLIST_ARRAY) == 0);
+
+		VERIFY(nvlist_add_nvlist_array(sav->sav_config,
+		    config, newdevs, ndevs + oldndevs) == 0);
+		for (i = 0; i < oldndevs + ndevs; i++)
+			nvlist_free(newdevs[i]);
+		kmem_free(newdevs, (oldndevs + ndevs) * sizeof (void *));
+	} else {
+		/*
+		 * Generate a new dev list.
+		 */
+		VERIFY(nvlist_alloc(&sav->sav_config, NV_UNIQUE_NAME,
+		    KM_SLEEP) == 0);
+		VERIFY(nvlist_add_nvlist_array(sav->sav_config, config,
+		    devs, ndevs) == 0);
+	}
+}
+
+/*
+ * Stop and drop level 2 ARC devices
+ */
+void
+spa_l2cache_drop(spa_t *spa)
+{
+	vdev_t *vd;
+	int i;
+	spa_aux_vdev_t *sav = &spa->spa_l2cache;
+
+	for (i = 0; i < sav->sav_count; i++) {
+		uint64_t pool;
+
+		vd = sav->sav_vdevs[i];
+		ASSERT(vd != NULL);
+
+		if (spa_mode & FWRITE &&
+		    spa_l2cache_exists(vd->vdev_guid, &pool) && pool != 0ULL) {
+			l2arc_remove_vdev(vd);
+		}
+		if (vd->vdev_isl2cache)
+			spa_l2cache_remove(vd);
+		vdev_clear_stats(vd);
+		(void) vdev_close(vd);
+	}
 }
 
 /*
@@ -1542,8 +1885,8 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	dmu_tx_t *tx;
 	int c, error = 0;
 	uint64_t txg = TXG_INITIAL;
-	nvlist_t **spares;
-	uint_t nspares;
+	nvlist_t **spares, **l2cache;
+	uint_t nspares, nl2cache;
 	uint64_t version;
 
 	/*
@@ -1594,7 +1937,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 
 	if (error == 0 &&
 	    (error = vdev_create(rvd, txg, B_FALSE)) == 0 &&
-	    (error = spa_validate_spares(spa, nvroot, txg,
+	    (error = spa_validate_aux(spa, nvroot, txg,
 	    VDEV_ALLOC_ADD)) == 0) {
 		for (c = 0; c < rvd->vdev_children; c++)
 			vdev_init(rvd->vdev_child[c], txg);
@@ -1616,14 +1959,29 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 */
 	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 	    &spares, &nspares) == 0) {
-		VERIFY(nvlist_alloc(&spa->spa_sparelist, NV_UNIQUE_NAME,
+		VERIFY(nvlist_alloc(&spa->spa_spares.sav_config, NV_UNIQUE_NAME,
 		    KM_SLEEP) == 0);
-		VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+		VERIFY(nvlist_add_nvlist_array(spa->spa_spares.sav_config,
 		    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
 		spa_config_enter(spa, RW_WRITER, FTAG);
 		spa_load_spares(spa);
 		spa_config_exit(spa, FTAG);
-		spa->spa_sync_spares = B_TRUE;
+		spa->spa_spares.sav_sync = B_TRUE;
+	}
+
+	/*
+	 * Get the list of level 2 cache devices, if specified.
+	 */
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
+	    &l2cache, &nl2cache) == 0) {
+		VERIFY(nvlist_alloc(&spa->spa_l2cache.sav_config,
+		    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY(nvlist_add_nvlist_array(spa->spa_l2cache.sav_config,
+		    ZPOOL_CONFIG_L2CACHE, l2cache, nl2cache) == 0);
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_l2cache(spa);
+		spa_config_exit(spa, FTAG);
+		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
 	spa->spa_dsl_pool = dp = dsl_pool_create(spa, txg);
@@ -1717,8 +2075,8 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 	char *altroot = NULL;
 	int error;
 	nvlist_t *nvroot;
-	nvlist_t **spares;
-	uint_t nspares;
+	nvlist_t **spares, **l2cache;
+	uint_t nspares, nl2cache;
 
 	/*
 	 * If a pool with this name exists, return failure.
@@ -1749,18 +2107,24 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 	 * Toss any existing sparelist, as it doesn't have any validity anymore,
 	 * and conflicts with spa_has_spare().
 	 */
-	if (spa->spa_sparelist) {
-		nvlist_free(spa->spa_sparelist);
-		spa->spa_sparelist = NULL;
+	if (spa->spa_spares.sav_config) {
+		nvlist_free(spa->spa_spares.sav_config);
+		spa->spa_spares.sav_config = NULL;
 		spa_load_spares(spa);
+	}
+	if (spa->spa_l2cache.sav_config) {
+		nvlist_free(spa->spa_l2cache.sav_config);
+		spa->spa_l2cache.sav_config = NULL;
+		spa_load_l2cache(spa);
 	}
 
 	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
-	if (error == 0) {
-		error = spa_validate_spares(spa, nvroot, -1ULL,
-		    VDEV_ALLOC_SPARE);
-	}
+	if (error == 0)
+		error = spa_validate_aux(spa, nvroot, -1ULL, VDEV_ALLOC_SPARE);
+	if (error == 0)
+		error = spa_validate_aux(spa, nvroot, -1ULL,
+		    VDEV_ALLOC_L2CACHE);
 	spa_config_exit(spa, FTAG);
 
 	if (error != 0 || (props && (error = spa_prop_set(spa, props)))) {
@@ -1772,23 +2136,38 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 	}
 
 	/*
-	 * Override any spares as specified by the user, as these may have
-	 * correct device names/devids, etc.
+	 * Override any spares and level 2 cache devices as specified by
+	 * the user, as these may have correct device names/devids, etc.
 	 */
 	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 	    &spares, &nspares) == 0) {
-		if (spa->spa_sparelist)
-			VERIFY(nvlist_remove(spa->spa_sparelist,
+		if (spa->spa_spares.sav_config)
+			VERIFY(nvlist_remove(spa->spa_spares.sav_config,
 			    ZPOOL_CONFIG_SPARES, DATA_TYPE_NVLIST_ARRAY) == 0);
 		else
-			VERIFY(nvlist_alloc(&spa->spa_sparelist,
+			VERIFY(nvlist_alloc(&spa->spa_spares.sav_config,
 			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
-		VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
+		VERIFY(nvlist_add_nvlist_array(spa->spa_spares.sav_config,
 		    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
 		spa_config_enter(spa, RW_WRITER, FTAG);
 		spa_load_spares(spa);
 		spa_config_exit(spa, FTAG);
-		spa->spa_sync_spares = B_TRUE;
+		spa->spa_spares.sav_sync = B_TRUE;
+	}
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE,
+	    &l2cache, &nl2cache) == 0) {
+		if (spa->spa_l2cache.sav_config)
+			VERIFY(nvlist_remove(spa->spa_l2cache.sav_config,
+			    ZPOOL_CONFIG_L2CACHE, DATA_TYPE_NVLIST_ARRAY) == 0);
+		else
+			VERIFY(nvlist_alloc(&spa->spa_l2cache.sav_config,
+			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY(nvlist_add_nvlist_array(spa->spa_l2cache.sav_config,
+		    ZPOOL_CONFIG_L2CACHE, l2cache, nl2cache) == 0);
+		spa_config_enter(spa, RW_WRITER, FTAG);
+		spa_load_l2cache(spa);
+		spa_config_exit(spa, FTAG);
+		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
 	/*
@@ -1857,9 +2236,10 @@ spa_tryimport(nvlist_t *tryconfig)
 		    spa->spa_uberblock.ub_timestamp) == 0);
 
 		/*
-		 * Add the list of hot spares.
+		 * Add the list of hot spares and level 2 cache devices.
 		 */
 		spa_add_spares(spa, config);
+		spa_add_l2cache(spa, config);
 	}
 
 	spa_unload(spa);
@@ -2014,8 +2394,8 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	int c, error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd, *tvd;
-	nvlist_t **spares;
-	uint_t i, nspares;
+	nvlist_t **spares, **l2cache;
+	uint_t nspares, nl2cache;
 
 	txg = spa_vdev_enter(spa);
 
@@ -2025,11 +2405,15 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 
 	spa->spa_pending_vdev = vd;
 
-	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
-	    &spares, &nspares) != 0)
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES, &spares,
+	    &nspares) != 0)
 		nspares = 0;
 
-	if (vd->vdev_children == 0 && nspares == 0) {
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_L2CACHE, &l2cache,
+	    &nl2cache) != 0)
+		nl2cache = 0;
+
+	if (vd->vdev_children == 0 && nspares == 0 && nl2cache == 0) {
 		spa->spa_pending_vdev = NULL;
 		return (spa_vdev_exit(spa, vd, txg, EINVAL));
 	}
@@ -2042,11 +2426,10 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	}
 
 	/*
-	 * We must validate the spares after checking the children.  Otherwise,
-	 * vdev_inuse() will blindly overwrite the spare.
+	 * We must validate the spares and l2cache devices after checking the
+	 * children.  Otherwise, vdev_inuse() will blindly overwrite the spare.
 	 */
-	if ((error = spa_validate_spares(spa, nvroot, txg,
-	    VDEV_ALLOC_ADD)) != 0) {
+	if ((error = spa_validate_aux(spa, nvroot, txg, VDEV_ALLOC_ADD)) != 0) {
 		spa->spa_pending_vdev = NULL;
 		return (spa_vdev_exit(spa, vd, txg, error));
 	}
@@ -2065,43 +2448,17 @@ spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
 	}
 
 	if (nspares != 0) {
-		if (spa->spa_sparelist != NULL) {
-			nvlist_t **oldspares;
-			uint_t oldnspares;
-			nvlist_t **newspares;
-
-			VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
-			    ZPOOL_CONFIG_SPARES, &oldspares, &oldnspares) == 0);
-
-			newspares = kmem_alloc(sizeof (void *) *
-			    (nspares + oldnspares), KM_SLEEP);
-			for (i = 0; i < oldnspares; i++)
-				VERIFY(nvlist_dup(oldspares[i],
-				    &newspares[i], KM_SLEEP) == 0);
-			for (i = 0; i < nspares; i++)
-				VERIFY(nvlist_dup(spares[i],
-				    &newspares[i + oldnspares],
-				    KM_SLEEP) == 0);
-
-			VERIFY(nvlist_remove(spa->spa_sparelist,
-			    ZPOOL_CONFIG_SPARES, DATA_TYPE_NVLIST_ARRAY) == 0);
-
-			VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
-			    ZPOOL_CONFIG_SPARES, newspares,
-			    nspares + oldnspares) == 0);
-			for (i = 0; i < oldnspares + nspares; i++)
-				nvlist_free(newspares[i]);
-			kmem_free(newspares, (oldnspares + nspares) *
-			    sizeof (void *));
-		} else {
-			VERIFY(nvlist_alloc(&spa->spa_sparelist,
-			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
-			VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist,
-			    ZPOOL_CONFIG_SPARES, spares, nspares) == 0);
-		}
-
+		spa_set_aux_vdevs(&spa->spa_spares, spares, nspares,
+		    ZPOOL_CONFIG_SPARES);
 		spa_load_spares(spa);
-		spa->spa_sync_spares = B_TRUE;
+		spa->spa_spares.sav_sync = B_TRUE;
+	}
+
+	if (nl2cache != 0) {
+		spa_set_aux_vdevs(&spa->spa_l2cache, l2cache, nl2cache,
+		    ZPOOL_CONFIG_L2CACHE);
+		spa_load_l2cache(spa);
+		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
 	/*
@@ -2511,55 +2868,38 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 }
 
 /*
- * Remove a device from the pool.  Currently, this supports removing only hot
- * spares.
+ * Remove a spares vdev from the nvlist config.
  */
-int
-spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
+static int
+spa_remove_spares(spa_aux_vdev_t *sav, uint64_t guid, boolean_t unspare,
+    nvlist_t **spares, int nspares, vdev_t *vd)
 {
-	vdev_t *vd;
-	nvlist_t **spares, *nv, **newspares;
-	uint_t i, j, nspares;
-	int ret = 0;
-
-	spa_config_enter(spa, RW_WRITER, FTAG);
-
-	vd = spa_lookup_by_guid(spa, guid);
+	nvlist_t *nv, **newspares;
+	int i, j;
 
 	nv = NULL;
-	if (spa->spa_spares != NULL &&
-	    nvlist_lookup_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
-	    &spares, &nspares) == 0) {
-		for (i = 0; i < nspares; i++) {
-			uint64_t theguid;
+	for (i = 0; i < nspares; i++) {
+		uint64_t theguid;
 
-			VERIFY(nvlist_lookup_uint64(spares[i],
-			    ZPOOL_CONFIG_GUID, &theguid) == 0);
-			if (theguid == guid) {
-				nv = spares[i];
-				break;
-			}
+		VERIFY(nvlist_lookup_uint64(spares[i],
+		    ZPOOL_CONFIG_GUID, &theguid) == 0);
+		if (theguid == guid) {
+			nv = spares[i];
+			break;
 		}
 	}
 
 	/*
-	 * We only support removing a hot spare, and only if it's not currently
-	 * in use in this pool.
+	 * Only remove the hot spare if it's not currently in use in this pool.
 	 */
-	if (nv == NULL && vd == NULL) {
-		ret = ENOENT;
-		goto out;
-	}
+	if (nv == NULL && vd == NULL)
+		return (ENOENT);
 
-	if (nv == NULL && vd != NULL) {
-		ret = ENOTSUP;
-		goto out;
-	}
+	if (nv == NULL && vd != NULL)
+		return (ENOTSUP);
 
-	if (!unspare && nv != NULL && vd != NULL) {
-		ret = EBUSY;
-		goto out;
-	}
+	if (!unspare && nv != NULL && vd != NULL)
+		return (EBUSY);
 
 	if (nspares == 1) {
 		newspares = NULL;
@@ -2573,20 +2913,119 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		}
 	}
 
-	VERIFY(nvlist_remove(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
+	VERIFY(nvlist_remove(sav->sav_config, ZPOOL_CONFIG_SPARES,
 	    DATA_TYPE_NVLIST_ARRAY) == 0);
-	VERIFY(nvlist_add_nvlist_array(spa->spa_sparelist, ZPOOL_CONFIG_SPARES,
-	    newspares, nspares - 1) == 0);
+	VERIFY(nvlist_add_nvlist_array(sav->sav_config,
+	    ZPOOL_CONFIG_SPARES, newspares, nspares - 1) == 0);
 	for (i = 0; i < nspares - 1; i++)
 		nvlist_free(newspares[i]);
 	kmem_free(newspares, (nspares - 1) * sizeof (void *));
-	spa_load_spares(spa);
-	spa->spa_sync_spares = B_TRUE;
+
+	return (0);
+}
+
+/*
+ * Remove an l2cache vdev from the nvlist config.
+ */
+static int
+spa_remove_l2cache(spa_aux_vdev_t *sav, uint64_t guid, nvlist_t **l2cache,
+    int nl2cache, vdev_t *vd)
+{
+	nvlist_t *nv, **newl2cache;
+	int i, j;
+
+	nv = NULL;
+	for (i = 0; i < nl2cache; i++) {
+		uint64_t theguid;
+
+		VERIFY(nvlist_lookup_uint64(l2cache[i],
+		    ZPOOL_CONFIG_GUID, &theguid) == 0);
+		if (theguid == guid) {
+			nv = l2cache[i];
+			break;
+		}
+	}
+
+	if (vd == NULL) {
+		for (i = 0; i < nl2cache; i++) {
+			if (sav->sav_vdevs[i]->vdev_guid == guid) {
+				vd = sav->sav_vdevs[i];
+				break;
+			}
+		}
+	}
+
+	if (nv == NULL && vd == NULL)
+		return (ENOENT);
+
+	if (nv == NULL && vd != NULL)
+		return (ENOTSUP);
+
+	if (nl2cache == 1) {
+		newl2cache = NULL;
+	} else {
+		newl2cache = kmem_alloc((nl2cache - 1) * sizeof (void *),
+		    KM_SLEEP);
+		for (i = 0, j = 0; i < nl2cache; i++) {
+			if (l2cache[i] != nv)
+				VERIFY(nvlist_dup(l2cache[i],
+				    &newl2cache[j++], KM_SLEEP) == 0);
+		}
+	}
+
+	VERIFY(nvlist_remove(sav->sav_config, ZPOOL_CONFIG_L2CACHE,
+	    DATA_TYPE_NVLIST_ARRAY) == 0);
+	VERIFY(nvlist_add_nvlist_array(sav->sav_config,
+	    ZPOOL_CONFIG_L2CACHE, newl2cache, nl2cache - 1) == 0);
+	for (i = 0; i < nl2cache - 1; i++)
+		nvlist_free(newl2cache[i]);
+	kmem_free(newl2cache, (nl2cache - 1) * sizeof (void *));
+
+	return (0);
+}
+
+/*
+ * Remove a device from the pool.  Currently, this supports removing only hot
+ * spares and level 2 ARC devices.
+ */
+int
+spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
+{
+	vdev_t *vd;
+	nvlist_t **spares, **l2cache;
+	uint_t nspares, nl2cache;
+	int error = 0;
+
+	spa_config_enter(spa, RW_WRITER, FTAG);
+
+	vd = spa_lookup_by_guid(spa, guid);
+
+	if (spa->spa_spares.sav_vdevs != NULL &&
+	    spa_spare_exists(guid, NULL) &&
+	    nvlist_lookup_nvlist_array(spa->spa_spares.sav_config,
+	    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0) {
+		if ((error = spa_remove_spares(&spa->spa_spares, guid, unspare,
+		    spares, nspares, vd)) != 0)
+			goto out;
+		spa_load_spares(spa);
+		spa->spa_spares.sav_sync = B_TRUE;
+		goto out;
+	}
+
+	if (spa->spa_l2cache.sav_vdevs != NULL &&
+	    spa_l2cache_exists(guid, NULL) &&
+	    nvlist_lookup_nvlist_array(spa->spa_l2cache.sav_config,
+	    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0) {
+		if ((error = spa_remove_l2cache(&spa->spa_l2cache, guid,
+		    l2cache, nl2cache, vd)) != 0)
+			goto out;
+		spa_load_l2cache(spa);
+		spa->spa_l2cache.sav_sync = B_TRUE;
+	}
 
 out:
 	spa_config_exit(spa, FTAG);
-
-	return (ret);
+	return (error);
 }
 
 /*
@@ -2693,33 +3132,52 @@ spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
 
 	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL) {
 		/*
-		 * Determine if this is a reference to a hot spare.  In that
-		 * case, update the path as stored in the spare list.
+		 * Determine if this is a reference to a hot spare or l2cache
+		 * device.  If it is, update the path as stored in their
+		 * device list.
 		 */
-		nvlist_t **spares;
-		uint_t i, nspares;
-		if (spa->spa_sparelist != NULL) {
-			VERIFY(nvlist_lookup_nvlist_array(spa->spa_sparelist,
-			    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0);
+		nvlist_t **spares, **l2cache;
+		uint_t i, nspares, nl2cache;
+
+		if (spa->spa_spares.sav_config != NULL) {
+			VERIFY(nvlist_lookup_nvlist_array(
+			    spa->spa_spares.sav_config, ZPOOL_CONFIG_SPARES,
+			    &spares, &nspares) == 0);
 			for (i = 0; i < nspares; i++) {
 				uint64_t theguid;
 				VERIFY(nvlist_lookup_uint64(spares[i],
 				    ZPOOL_CONFIG_GUID, &theguid) == 0);
-				if (theguid == guid)
-					break;
+				if (theguid == guid) {
+					VERIFY(nvlist_add_string(spares[i],
+					    ZPOOL_CONFIG_PATH, newpath) == 0);
+					spa_load_spares(spa);
+					spa->spa_spares.sav_sync = B_TRUE;
+					return (spa_vdev_exit(spa, NULL, txg,
+					    0));
+				}
 			}
-
-			if (i == nspares)
-				return (spa_vdev_exit(spa, NULL, txg, ENOENT));
-
-			VERIFY(nvlist_add_string(spares[i],
-			    ZPOOL_CONFIG_PATH, newpath) == 0);
-			spa_load_spares(spa);
-			spa->spa_sync_spares = B_TRUE;
-			return (spa_vdev_exit(spa, NULL, txg, 0));
-		} else {
-			return (spa_vdev_exit(spa, NULL, txg, ENOENT));
 		}
+
+		if (spa->spa_l2cache.sav_config != NULL) {
+			VERIFY(nvlist_lookup_nvlist_array(
+			    spa->spa_l2cache.sav_config, ZPOOL_CONFIG_L2CACHE,
+			    &l2cache, &nl2cache) == 0);
+			for (i = 0; i < nl2cache; i++) {
+				uint64_t theguid;
+				VERIFY(nvlist_lookup_uint64(l2cache[i],
+				    ZPOOL_CONFIG_GUID, &theguid) == 0);
+				if (theguid == guid) {
+					VERIFY(nvlist_add_string(l2cache[i],
+					    ZPOOL_CONFIG_PATH, newpath) == 0);
+					spa_load_l2cache(spa);
+					spa->spa_l2cache.sav_sync = B_TRUE;
+					return (spa_vdev_exit(spa, NULL, txg,
+					    0));
+				}
+			}
+		}
+
+		return (spa_vdev_exit(spa, NULL, txg, ENOENT));
 	}
 
 	if (!vd->vdev_ops->vdev_op_leaf)
@@ -3338,50 +3796,49 @@ spa_sync_nvlist(spa_t *spa, uint64_t obj, nvlist_t *nv, dmu_tx_t *tx)
 }
 
 static void
-spa_sync_spares(spa_t *spa, dmu_tx_t *tx)
+spa_sync_aux_dev(spa_t *spa, spa_aux_vdev_t *sav, dmu_tx_t *tx,
+    const char *config, const char *entry)
 {
 	nvlist_t *nvroot;
-	nvlist_t **spares;
+	nvlist_t **list;
 	int i;
 
-	if (!spa->spa_sync_spares)
+	if (!sav->sav_sync)
 		return;
 
 	/*
-	 * Update the MOS nvlist describing the list of available spares.
-	 * spa_validate_spares() will have already made sure this nvlist is
+	 * Update the MOS nvlist describing the list of available devices.
+	 * spa_validate_aux() will have already made sure this nvlist is
 	 * valid and the vdevs are labeled appropriately.
 	 */
-	if (spa->spa_spares_object == 0) {
-		spa->spa_spares_object = dmu_object_alloc(spa->spa_meta_objset,
-		    DMU_OT_PACKED_NVLIST, 1 << 14,
-		    DMU_OT_PACKED_NVLIST_SIZE, sizeof (uint64_t), tx);
+	if (sav->sav_object == 0) {
+		sav->sav_object = dmu_object_alloc(spa->spa_meta_objset,
+		    DMU_OT_PACKED_NVLIST, 1 << 14, DMU_OT_PACKED_NVLIST_SIZE,
+		    sizeof (uint64_t), tx);
 		VERIFY(zap_update(spa->spa_meta_objset,
-		    DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_SPARES,
-		    sizeof (uint64_t), 1, &spa->spa_spares_object, tx) == 0);
+		    DMU_POOL_DIRECTORY_OBJECT, entry, sizeof (uint64_t), 1,
+		    &sav->sav_object, tx) == 0);
 	}
 
 	VERIFY(nvlist_alloc(&nvroot, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-	if (spa->spa_nspares == 0) {
-		VERIFY(nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
-		    NULL, 0) == 0);
+	if (sav->sav_count == 0) {
+		VERIFY(nvlist_add_nvlist_array(nvroot, config, NULL, 0) == 0);
 	} else {
-		spares = kmem_alloc(spa->spa_nspares * sizeof (void *),
-		    KM_SLEEP);
-		for (i = 0; i < spa->spa_nspares; i++)
-			spares[i] = vdev_config_generate(spa,
-			    spa->spa_spares[i], B_FALSE, B_TRUE);
-		VERIFY(nvlist_add_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
-		    spares, spa->spa_nspares) == 0);
-		for (i = 0; i < spa->spa_nspares; i++)
-			nvlist_free(spares[i]);
-		kmem_free(spares, spa->spa_nspares * sizeof (void *));
+		list = kmem_alloc(sav->sav_count * sizeof (void *), KM_SLEEP);
+		for (i = 0; i < sav->sav_count; i++)
+			list[i] = vdev_config_generate(spa, sav->sav_vdevs[i],
+			    B_FALSE, B_FALSE, B_TRUE);
+		VERIFY(nvlist_add_nvlist_array(nvroot, config, list,
+		    sav->sav_count) == 0);
+		for (i = 0; i < sav->sav_count; i++)
+			nvlist_free(list[i]);
+		kmem_free(list, sav->sav_count * sizeof (void *));
 	}
 
-	spa_sync_nvlist(spa, spa->spa_spares_object, nvroot, tx);
+	spa_sync_nvlist(spa, sav->sav_object, nvroot, tx);
 	nvlist_free(nvroot);
 
-	spa->spa_sync_spares = B_FALSE;
+	sav->sav_sync = B_FALSE;
 }
 
 static void
@@ -3606,7 +4063,10 @@ spa_sync(spa_t *spa, uint64_t txg)
 		spa->spa_sync_pass++;
 
 		spa_sync_config_object(spa, tx);
-		spa_sync_spares(spa, tx);
+		spa_sync_aux_dev(spa, &spa->spa_spares, tx,
+		    ZPOOL_CONFIG_SPARES, DMU_POOL_SPARES);
+		spa_sync_aux_dev(spa, &spa->spa_l2cache, tx,
+		    ZPOOL_CONFIG_L2CACHE, DMU_POOL_L2CACHE);
 		spa_errlog_sync(spa, txg);
 		dsl_pool_sync(dp, txg);
 
@@ -3806,15 +4266,15 @@ spa_has_spare(spa_t *spa, uint64_t guid)
 {
 	int i;
 	uint64_t spareguid;
+	spa_aux_vdev_t *sav = &spa->spa_spares;
 
-	for (i = 0; i < spa->spa_nspares; i++)
-		if (spa->spa_spares[i]->vdev_guid == guid)
+	for (i = 0; i < sav->sav_count; i++)
+		if (sav->sav_vdevs[i]->vdev_guid == guid)
 			return (B_TRUE);
 
-	for (i = 0; i < spa->spa_pending_nspares; i++) {
-		if (nvlist_lookup_uint64(spa->spa_pending_spares[i],
-		    ZPOOL_CONFIG_GUID, &spareguid) == 0 &&
-		    spareguid == guid)
+	for (i = 0; i < sav->sav_npending; i++) {
+		if (nvlist_lookup_uint64(sav->sav_pending[i], ZPOOL_CONFIG_GUID,
+		    &spareguid) == 0 && spareguid == guid)
 			return (B_TRUE);
 	}
 
