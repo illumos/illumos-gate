@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
 #include "assym.h"
@@ -53,25 +53,8 @@
  * caller may depend on these to remain unchanged across the macro.
  */
 
-#ifdef	N2_ERRATUM_49
-/*
- * Niagara2 does not continuously compare STICK_CMPR and STICK, but it does
- * so periodically (at least once every 128 cycles).  For this reason,
- * Niagara2 implementations > 1.0 will always returns bits 6:0 of reads of
- * STICK as 0x7f.  This ensures that if software writes a value to
- * STICK_CMPR that is greater than the value subsequently read from STICK
- * that a match will occur in the future.
- *
- * For Niagara2 1.0, we ensure bits 6:0 return 0x7f here.
- */
-#define	GET_NATIVE_TIME(out, scr1, scr2) \
-	rd	STICK, out	;\
-	or	out, 0x7f, out
-
-#else	/* N2_ERRATUM_49 */
 #define	GET_NATIVE_TIME(out, scr1, scr2) \
 	rd	STICK, out
-#endif	/* N2_ERRATUM_49 */
 
 #define	RD_TICKCMPR(out, scr)		\
 	rd	STICK_COMPARE, out

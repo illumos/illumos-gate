@@ -68,9 +68,6 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 #
 CFLAGS += $(CCVERBOSE) -DNIAGARA2_IMPL
 
-# The following is required to support Niagara2 1.0
-WORKAROUND_DEFS	+= -DN2_ERRATUM_49	# %stick_compare{6:0} ignored
-
 #
 # cpu-module-specific flags
 #

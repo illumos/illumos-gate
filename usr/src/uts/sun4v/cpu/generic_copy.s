@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -1231,8 +1231,8 @@ int use_hw_bzero = 1;
 
 /*
  * hwblkclr - clears block-aligned, block-multiple-sized regions that are
- * longer than 256 bytes in length using load/stores. For the generic
- * module, we will return 1 to ensure that the pages in cache should be
+ * longer than 256 bytes in length. For the generic module we will simply
+ * call bzero and return 1 to ensure that the pages in cache should be
  * flushed to ensure integrity.
  * Caller is responsible for ensuring use_hw_bzero is true and that
  * kpreempt_disable() has been called.
@@ -1251,96 +1251,13 @@ hwblkclr(void *addr, size_t len)
 	ENTRY(hwblkclr)
 	save	%sp, -SA(MINFRAME), %sp
 
-	! Must be block-aligned
-	andcc	%i0, 0x3f, %g0
-	bnz,pn	%ncc, 1f
-	  nop
-
-	! ... and must be 256 bytes or more
-	cmp	%i1, 0x100
-	blu,pn	%ncc, 1f
-	  nop
-
-	! ... and length must be a multiple of 64
-	andcc	%i1, 0x3f, %g0
-	bz,pn	%ncc, .pz_doblock
-	nop
-
-1:	! punt, call bzero but notify the caller that bzero was used
+	! Simply call bzero and notify the caller that bzero was used
 	mov	%i0, %o0
 	call	bzero
 	  mov	%i1, %o1
 	ret
 	restore	%g0, 1, %o0	! return (1) - did not use block operations
 
-	! Already verified that there are at least 256 bytes to set
-.pz_doblock:
-	stx	%g0, [%i0+0x0]
-	stx	%g0, [%i0+0x40]
-	stx	%g0, [%i0+0x80]
-	stx	%g0, [%i0+0xc0]
-
-	stx	%g0, [%i0+0x8]
-	stx	%g0, [%i0+0x10]
-	stx	%g0, [%i0+0x18]
-	stx	%g0, [%i0+0x20]
-	stx	%g0, [%i0+0x28]
-	stx	%g0, [%i0+0x30]
-	stx	%g0, [%i0+0x38]
-
-	stx	%g0, [%i0+0x48]
-	stx	%g0, [%i0+0x50]
-	stx	%g0, [%i0+0x58]
-	stx	%g0, [%i0+0x60]
-	stx	%g0, [%i0+0x68]
-	stx	%g0, [%i0+0x70]
-	stx	%g0, [%i0+0x78]
-
-	stx	%g0, [%i0+0x88]
-	stx	%g0, [%i0+0x90]
-	stx	%g0, [%i0+0x98]
-	stx	%g0, [%i0+0xa0]
-	stx	%g0, [%i0+0xa8]
-	stx	%g0, [%i0+0xb0]
-	stx	%g0, [%i0+0xb8]
-
-	stx	%g0, [%i0+0xc8]
-	stx	%g0, [%i0+0xd0]
-	stx	%g0, [%i0+0xd8]
-	stx	%g0, [%i0+0xe0]
-	stx	%g0, [%i0+0xe8]
-	stx	%g0, [%i0+0xf0]
-	stx	%g0, [%i0+0xf8]
-
-	sub	%i1, 0x100, %i1
-	cmp	%i1, 0x100
-	bgu,pt	%ncc, .pz_doblock
-	add	%i0, 0x100, %i0
-
-2:
-	! Check if more than 64 bytes to set
-	cmp	%i1,0x40
-	blu	%ncc, .pz_finish
-	nop
-
-3:
-	stx	%g0, [%i0+0x0]
-	stx	%g0, [%i0+0x8]
-	stx	%g0, [%i0+0x10]
-	stx	%g0, [%i0+0x18]
-	stx	%g0, [%i0+0x20]
-	stx	%g0, [%i0+0x28]
-	stx	%g0, [%i0+0x30]
-	stx	%g0, [%i0+0x38]
-
-	subcc	%i1, 0x40, %i1
-	bgu,pt	%ncc, 3b
-	add	%i0, 0x40, %i0
-
-.pz_finish:
-	membar	#Sync
-	ret
-	restore	%g0, 1, %o0	! return (1) - did not use block operations	
 	SET_SIZE(hwblkclr)
 #endif	/* lint */
 
