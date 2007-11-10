@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +176,7 @@ intpexec(
 	struct pathname intppn;
 	struct pathname resolvepn;
 	char *opath;
-	char devfd[14];
+	char devfd[19]; /* 32-bit int fits in 10 digits + 8 for "/dev/fd/" */
 	int fd = -1;
 
 	if (level) {		/* Can't recurse */
