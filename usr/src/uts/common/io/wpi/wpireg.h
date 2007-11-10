@@ -179,6 +179,7 @@ extern "C" {
  */
 #define	WPI_ALIVE_INTR	(1 << 0)
 #define	WPI_WAKEUP_INTR	(1 << 1)
+#define	WPI_RX_SWINT	(1 << 3)
 #define	WPI_SW_ERROR	(1 << 25)
 #define	WPI_TX_INTR	(1 << 27)
 #define	WPI_HW_ERROR	(1 << 29)

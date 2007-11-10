@@ -1187,22 +1187,30 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 {
 	wpi_sc_t *sc = (wpi_sc_t *)ic;
 	ieee80211_node_t *in = ic->ic_bss;
+	enum ieee80211_state ostate;
 	int i, err = WPI_SUCCESS;
 
 	mutex_enter(&sc->sc_glock);
 	switch (nstate) {
 	case IEEE80211_S_SCAN:
-		/* ieee80211_node_table_reset(&ic->ic_scan); */
-		ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
-		/* make the link LED blink while we're scanning */
-		wpi_set_led(sc, WPI_LED_LINK, 20, 2);
+		ostate = ic->ic_state;
+		switch (ostate) {
+		default:
+			break;
+		case IEEE80211_S_INIT:
+			/* make the link LED blink while we're scanning */
+			wpi_set_led(sc, WPI_LED_LINK, 20, 2);
 
-		if ((err = wpi_scan(sc)) != 0) {
-			WPI_DBG((WPI_DEBUG_80211, "could not initiate scan\n"));
-			ic->ic_flags &= ~(IEEE80211_F_SCAN |
-			    IEEE80211_F_ASCAN);
-			mutex_exit(&sc->sc_glock);
-			return (err);
+			ic->ic_flags |= IEEE80211_F_SCAN | IEEE80211_F_ASCAN;
+			if ((err = wpi_scan(sc)) != 0) {
+				WPI_DBG((WPI_DEBUG_80211,
+				    "could not initiate scan\n"));
+				ic->ic_flags &= ~(IEEE80211_F_SCAN |
+				    IEEE80211_F_ASCAN);
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
+			break;
 		}
 		ic->ic_state = nstate;
 		sc->sc_clk = 0;
@@ -1811,7 +1819,7 @@ static uint_t
 wpi_intr(caddr_t arg)
 {
 	wpi_sc_t *sc = (wpi_sc_t *)arg;
-	uint32_t r;
+	uint32_t r, rfh;
 
 	mutex_enter(&sc->sc_glock);
 	r = WPI_READ(sc, WPI_INTR);
@@ -1822,10 +1830,12 @@ wpi_intr(caddr_t arg)
 
 	WPI_DBG((WPI_DEBUG_INTR, "interrupt reg %x\n", r));
 
+	rfh = WPI_READ(sc, WPI_INTR_STATUS);
 	/* disable interrupts */
 	WPI_WRITE(sc, WPI_MASK, 0);
 	/* ack interrupts */
 	WPI_WRITE(sc, WPI_INTR, r);
+	WPI_WRITE(sc, WPI_INTR_STATUS, rfh);
 
 	if (sc->sc_notif_softint_id == NULL) {
 		mutex_exit(&sc->sc_glock);
@@ -1842,7 +1852,8 @@ wpi_intr(caddr_t arg)
 		return (DDI_INTR_CLAIMED);
 	}
 
-	if (r & WPI_RX_INTR) {
+	if ((r & (WPI_RX_INTR | WPI_RX_SWINT)) ||
+	    (rfh & 0x40070000)) {
 		sc->sc_notif_softint_pending = 1;
 		ddi_trigger_softintr(sc->sc_notif_softint_id);
 	}
@@ -2313,7 +2324,7 @@ wpi_thread(wpi_sc_t *sc)
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(2000000));
 			if (sc->sc_ostate != IEEE80211_S_INIT)
-				ieee80211_begin_scan(ic, 0);
+				ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
@@ -2515,7 +2526,7 @@ wpi_auth(wpi_sc_t *sc)
 		sc->sc_config.ofdm_mask = 0x15;
 	} else {	/* assume 802.11b/g */
 		sc->sc_config.cck_mask  = 0x0f;
-		sc->sc_config.ofdm_mask = 0x15;
+		sc->sc_config.ofdm_mask = 0xff;
 	}
 
 	WPI_DBG((WPI_DEBUG_80211, "config chan %d flags %x cck %x ofdm %x"
@@ -2736,8 +2747,7 @@ wpi_config(wpi_sc_t *sc)
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
 		sc->sc_config.mode = WPI_MODE_STA;
-		sc->sc_config.filter |= LE_32(WPI_FILTER_MULTICAST |
-		    WPI_FILTER_NODECRYPTUNI | WPI_FILTER_NODECRYPTMUL);
+		sc->sc_config.filter |= LE_32(WPI_FILTER_MULTICAST);
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
