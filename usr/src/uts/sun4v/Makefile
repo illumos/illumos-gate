@@ -319,7 +319,7 @@ CLOSED_XRDIRS	= $(SHARED_XRDIRS:../%=../% ../../../closed/uts/%)
 XRDIRS		= $(SHARED_XRDIRS)
 $(CLOSED_BUILD)XRDIRS	= $(CLOSED_XRDIRS:../../../closed/uts/sfmmu=)
 
-XRPRUNE = i86pc
+XRPRUNE = i86pc sun4u intel
 
 cscope.out tags: FRC
 	$(XREF) -x $@
