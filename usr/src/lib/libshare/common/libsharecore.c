@@ -1887,11 +1887,13 @@ sa_get_derived_security(void *object, char *sectype, char *proto, int hier)
 			/* Replace the value with the new value */
 			if (newprop != NULL) {
 				/*
-				 * Only set if value is non NULL, old value ok
-				 * if it is NULL.
+				 * Only set if value is non NULL, old
+				 * value ok if it is NULL. The value
+				 * must be associated with the "value"
+				 * tag within XML.
 				 */
 				if (value != NULL)
-					set_node_attr(newprop, name, value);
+					set_node_attr(newprop, "value", value);
 			} else {
 				/* An entirely new property */
 				if (value != NULL) {

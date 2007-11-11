@@ -592,14 +592,17 @@ zfs_inherited(sa_handle_t handle, sa_share_t share, char *sourcestr,
 }
 
 /*
- * zfs_notinherited()
+ * zfs_notinherited(group, share, mountpoint, shareopts, proto, dataset,
+ *     grouperr)
  *
  * handle case where this is the top of a sub-group in ZFS. Pulled out
- * of sa_get_zfs_shares for readability.
+ * of sa_get_zfs_shares for readability. We need the grouperr from the
+ * creation of the subgroup to know whether to add the public
+ * property, etc. to the specific share.
  */
 static int
 zfs_notinherited(sa_group_t group, sa_share_t share, char *mountpoint,
-    char *shareopts, char *proto, char *dataset)
+    char *shareopts, char *proto, char *dataset, int grouperr)
 {
 	int err = SA_OK;
 	sa_resource_t resource;
@@ -614,17 +617,11 @@ zfs_notinherited(sa_group_t group, sa_share_t share, char *mountpoint,
 			shareopts = "";
 		if (shareopts != NULL) {
 			char *options;
-			options = strdup(shareopts);
-			if (options != NULL) {
-				err = sa_parse_legacy_options(group, options,
-				    proto);
-				free(options);
-			}
-			if (err == SA_PROP_SHARE_ONLY) {
+			if (grouperr == SA_PROP_SHARE_ONLY) {
 				/*
-				 * Same as above, some properties may
-				 * only be on shares, but due to the
-				 * ZFS sub-groups being artificial, we
+				 * Some properties may only be on
+				 * shares, but due to the ZFS
+				 * sub-groups being artificial, we
 				 * sometimes get this and have to deal
 				 * with it. We do it by attempting to
 				 * put it on the share.
@@ -695,21 +692,21 @@ zfs_process_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
 		group = find_or_create_zfs_subgroup(handle, dataset, proto,
 		    shareopts, &err);
 		if (group == NULL) {
-			static int err = 0;
+			static boolean_t reported_error = B_FALSE;
 			/*
-			 * there is a problem, but we can't do
+			 * There is a problem, but we can't do
 			 * anything about it at this point so we issue
-			 * a warning an move on.
+			 * a warning and move on.
 			 */
-			zfs_grp_error(err);
-			err = 1;
+			zfs_grp_error(reported_error);
+			reported_error = B_TRUE;
 		}
 		set_node_attr(group, "zfs", "true");
 		/*
 		 * Add share with local opts via zfs_notinherited.
 		 */
 		err = zfs_notinherited(group, share, mountpoint, shareopts,
-		    proto, dataset);
+		    proto, dataset, err);
 	}
 	return (err);
 }

@@ -965,8 +965,11 @@ smb_load_proto_properties()
 	for (index = 0; smb_proto_options[index].name != NULL; index++) {
 		value = smb_config_getenv(smb_proto_options[index].smb_index);
 		prop = sa_create_property(
-		    smb_proto_options[index].name, value);
-		(void) sa_add_protocol_property(protoset, prop);
+		    smb_proto_options[index].name, value != NULL ? value : "");
+		if (value != NULL)
+			free(value);
+		if (prop != NULL)
+			(void) sa_add_protocol_property(protoset, prop);
 	}
 	return (SA_OK);
 }

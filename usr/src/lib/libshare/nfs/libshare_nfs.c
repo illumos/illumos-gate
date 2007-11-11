@@ -427,7 +427,8 @@ add_security_prop(struct securities *sec, char *name, char *value,
 				if (strcmp(oldvalue, "*") == 0) {
 					/* Replace old value with new value. */
 					newvalue = strdup(value);
-				} else if (strcmp(value, "*") == 0) {
+				} else if (strcmp(value, "*") == 0 ||
+				    strcmp(oldvalue, value) == 0) {
 					/*
 					 * Keep old value and ignore
 					 * the new value.
