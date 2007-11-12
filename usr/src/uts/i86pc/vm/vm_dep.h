@@ -506,6 +506,8 @@ struct vmm_vmstats_str {
 	ulong_t	restrict4gcnt;
 	ulong_t	unrestrict16mcnt;	/* non-DMA 16m allocs allowed */
 	ulong_t	pgpanicalloc;		/* PG_PANIC allocation */
+	ulong_t	pcf_deny[MMU_PAGE_SIZES];	/* page_chk_freelist */
+	ulong_t	pcf_allow[MMU_PAGE_SIZES];
 };
 extern struct vmm_vmstats_str vmm_vmstats;
 #endif	/* VM_STATS */

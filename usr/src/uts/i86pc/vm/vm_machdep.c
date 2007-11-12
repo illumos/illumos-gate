@@ -144,8 +144,8 @@ typedef struct {
 	int	mnr_memrange;		/* index into memranges[] */
 	/* maintain page list stats */
 	pgcnt_t	mnr_mt_clpgcnt;		/* cache list cnt */
-	pgcnt_t	mnr_mt_flpgcnt;		/* free list cnt - small pages */
-	pgcnt_t	mnr_mt_lgpgcnt;		/* free list cnt - large pages */
+	pgcnt_t	mnr_mt_flpgcnt[MMU_PAGE_SIZES];	/* free list cnt per szc */
+	pgcnt_t	mnr_mt_totcnt;		/* sum of cache and free lists */
 #ifdef DEBUG
 	struct mnr_mts {		/* mnode/mtype szc stats */
 		pgcnt_t	mnr_mts_pgcnt;
@@ -159,10 +159,7 @@ typedef struct {
 	((mtype > 0) ? memranges[mtype - 1] - 1: physmax)
 #define	MEMRANGELO(mtype)	(memranges[mtype])
 
-#define	MTYPE_FREEMEM(mt)						\
-	(mnoderanges[mt].mnr_mt_clpgcnt +				\
-	    mnoderanges[mt].mnr_mt_flpgcnt +				\
-	    mnoderanges[mt].mnr_mt_lgpgcnt)
+#define	MTYPE_FREEMEM(mt)	(mnoderanges[mt].mnr_mt_totcnt)
 
 /*
  * As the PC architecture evolved memory up was clumped into several
@@ -1425,10 +1422,9 @@ plcnt_inc_dec(page_t *pp, int mtype, int szc, long cnt, int flags)
 		atomic_add_long(&freemem4g, cnt);
 	if (flags & PG_CACHE_LIST)
 		atomic_add_long(&mnoderanges[mtype].mnr_mt_clpgcnt, cnt);
-	else if (szc)
-		atomic_add_long(&mnoderanges[mtype].mnr_mt_lgpgcnt, cnt);
 	else
-		atomic_add_long(&mnoderanges[mtype].mnr_mt_flpgcnt, cnt);
+		atomic_add_long(&mnoderanges[mtype].mnr_mt_flpgcnt[szc], cnt);
+	atomic_add_long(&mnoderanges[mtype].mnr_mt_totcnt, cnt);
 }
 
 /*

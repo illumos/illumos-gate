@@ -52,6 +52,7 @@
 #include <vm/page.h>
 #include <vm/seg_kmem.h>
 #include <vm/seg_vn.h>
+#include <sys/vmsystm.h>
 #include <sys/memnode.h>
 #include <vm/vm_dep.h>
 #include <sys/lgrp.h>
@@ -3272,9 +3273,8 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 			if (kcagepfn >= mseg->pages_base &&
 			    kcagepfn < mseg->pages_end) {
 				ASSERT(decr == 0);
-				*lo = kcagepfn;
-				*hi = MIN(pfnhi,
-				    (mseg->pages_end - 1));
+				*lo = MAX(kcagepfn, pfnlo);
+				*hi = MIN(pfnhi, (mseg->pages_end - 1));
 				rc = 1;
 			}
 		}
@@ -3289,7 +3289,7 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 			if (kcagepfn >= mseg->pages_base &&
 			    kcagepfn < mseg->pages_end) {
 				ASSERT(decr);
-				*hi = kcagepfn;
+				*hi = MIN(kcagepfn, pfnhi);
 				*lo = MAX(pfnlo, mseg->pages_base);
 				rc = 1;
 			}
@@ -3405,9 +3405,14 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 			/* mseg too small */
 			continue;
 
-		/* trim off kernel cage pages from pfn range */
+		/*
+		 * trim off kernel cage pages from pfn range and check for
+		 * a trimmed pfn range returned that does not span the
+		 * desired large page size.
+		 */
 		if (kcage_on) {
-			if (trimkcage(mseg, &lo, &hi, pfnlo, pfnhi) == 0)
+			if (trimkcage(mseg, &lo, &hi, pfnlo, pfnhi) == 0 ||
+			    ((hi - lo) + 1) < szcpgcnt)
 				continue;
 		} else {
 			lo = MAX(pfnlo, mseg->pages_base);
@@ -3576,6 +3581,32 @@ page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
 	return (NULL);
 }
 
+#if defined(__i386) || defined(__amd64)
+/*
+ * Determine the likelihood of finding/coalescing a szc page.
+ * Return 0 if the likelihood is small otherwise return 1.
+ *
+ * For now, be conservative and check only 1g pages and return 0
+ * if there had been previous coalescing failures and the szc pages
+ * needed to satisfy request would exhaust most of freemem.
+ */
+int
+page_chk_freelist(uint_t szc)
+{
+	pgcnt_t		pgcnt;
+
+	if (szc <= 1)
+		return (1);
+
+	pgcnt = page_get_pagecnt(szc);
+	if (pgcpfailcnt[szc] && pgcnt + throttlefree >= freemem) {
+		VM_STAT_ADD(vmm_vmstats.pcf_deny[szc]);
+		return (0);
+	}
+	VM_STAT_ADD(vmm_vmstats.pcf_allow[szc]);
+	return (1);
+}
+#endif
 
 /*
  * Find the `best' page on the freelist for this (vp,off) (as,vaddr) pair.

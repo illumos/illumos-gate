@@ -268,7 +268,7 @@ uint_t	page_exists_forreal_cnt;
 uint_t	page_lookup_dev_cnt;
 uint_t	get_cachelist_cnt;
 uint_t	page_create_cnt[10];
-uint_t	alloc_pages[8];
+uint_t	alloc_pages[9];
 uint_t	page_exphcontg[19];
 uint_t  page_create_large_cnt[10];
 
@@ -1445,16 +1445,20 @@ page_create_throttle(pgcnt_t npages, int flags)
 
 	cv_signal(&proc_pageout->p_cv);
 
-	while (freemem < npages + tf) {
+	for (;;) {
+		fm = 0;
 		pcf_acquire_all();
 		mutex_enter(&new_freemem_lock);
-		fm = 0;
 		for (i = 0; i < PCF_FANOUT; i++) {
 			fm += pcf[i].pcf_count;
 			pcf[i].pcf_wait++;
 			mutex_exit(&pcf[i].pcf_lock);
 		}
 		freemem = fm;
+		if (freemem >= npages + tf) {
+			mutex_exit(&new_freemem_lock);
+			break;
+		}
 		needfree += npages;
 		freemem_wait++;
 		cv_wait(&freemem_cv, &new_freemem_lock);
@@ -1985,16 +1989,25 @@ page_alloc_pages(struct vnode *vp, struct seg *seg, caddr_t addr,
 	}
 #endif
 
-	pgsz = page_get_pagesize(szc);
-	totpgs = curnpgs = npgs = pgsz >> PAGESHIFT;
-
-	ASSERT(((uintptr_t)addr & (pgsz - 1)) == 0);
 	/*
 	 * One must be NULL but not both.
 	 * And one must be non NULL but not both.
 	 */
 	ASSERT(basepp != NULL || ppa != NULL);
 	ASSERT(basepp == NULL || ppa == NULL);
+
+#if defined(__i386) || defined(__amd64)
+	while (page_chk_freelist(szc) == 0) {
+		VM_STAT_ADD(alloc_pages[8]);
+		if (anypgsz == 0 || --szc == 0)
+			return (ENOMEM);
+	}
+#endif
+
+	pgsz = page_get_pagesize(szc);
+	totpgs = curnpgs = npgs = pgsz >> PAGESHIFT;
+
+	ASSERT(((uintptr_t)addr & (pgsz - 1)) == 0);
 
 	(void) page_create_wait(npgs, PG_WAIT);
 

@@ -193,18 +193,18 @@ anon_init(void)
 
 	for (i = 0; i < ANON_LOCKSIZE; i++) {
 		mutex_init(&anon_array_lock[i].pad_mutex, NULL,
-			MUTEX_DEFAULT, NULL);
+		    MUTEX_DEFAULT, NULL);
 		cv_init(&anon_array_cv[i], NULL, CV_DEFAULT, NULL);
 	}
 
 	anon_hash = (struct anon **)
-		kmem_zalloc(sizeof (struct anon *) * anon_hash_size, KM_SLEEP);
+	    kmem_zalloc(sizeof (struct anon *) * anon_hash_size, KM_SLEEP);
 	anon_cache = kmem_cache_create("anon_cache", sizeof (struct anon),
-		AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, 0);
+	    AN_CACHE_ALIGN, NULL, NULL, NULL, NULL, NULL, 0);
 	anonmap_cache = kmem_cache_create("anonmap_cache",
-		sizeof (struct anon_map), 0,
-		anonmap_cache_constructor, anonmap_cache_destructor, NULL,
-		NULL, NULL, 0);
+	    sizeof (struct anon_map), 0,
+	    anonmap_cache_constructor, anonmap_cache_destructor, NULL,
+	    NULL, NULL, 0);
 	swap_maxcontig = (1024 * 1024) >> PAGESHIFT;	/* 1MB of pages */
 
 	anon_vp = vn_alloc(KM_SLEEP);
@@ -354,7 +354,7 @@ anon_get_ptr(struct anon_hdr *ahp, ulong_t an_idx)
 	 */
 	if ((ahp->size <= ANON_CHUNK_SIZE) || (ahp->flags & ANON_ALLOC_FORCE)) {
 		return ((struct anon *)
-			((uintptr_t)ahp->array_chunk[an_idx] & ANON_PTRMASK));
+		    ((uintptr_t)ahp->array_chunk[an_idx] & ANON_PTRMASK));
 	} else {
 
 		/*
@@ -363,8 +363,8 @@ anon_get_ptr(struct anon_hdr *ahp, ulong_t an_idx)
 		app = ahp->array_chunk[an_idx >> ANON_CHUNK_SHIFT];
 		if (app) {
 			return ((struct anon *)
-				((uintptr_t)app[an_idx & ANON_CHUNK_OFF] &
-					ANON_PTRMASK));
+			    ((uintptr_t)app[an_idx & ANON_CHUNK_OFF] &
+			    ANON_PTRMASK));
 		} else {
 			return (NULL);
 		}
@@ -396,7 +396,7 @@ anon_get_next_ptr(struct anon_hdr *ahp, ulong_t *index)
 		 */
 		while (i < size) {
 			ap = (struct anon *)
-				((uintptr_t)ahp->array_chunk[i] & ANON_PTRMASK);
+			    ((uintptr_t)ahp->array_chunk[i] & ANON_PTRMASK);
 			if (ap) {
 				*index = i;
 				return (ap);
@@ -413,8 +413,7 @@ anon_get_next_ptr(struct anon_hdr *ahp, ulong_t *index)
 			if (app)
 				for (j = chunkoff; j < ANON_CHUNK_SIZE; j++) {
 					ap = (struct anon *)
-						((uintptr_t)app[j] &
-							ANON_PTRMASK);
+					    ((uintptr_t)app[j] & ANON_PTRMASK);
 					if (ap) {
 						*index = i + (j - chunkoff);
 						return (ap);
@@ -524,7 +523,7 @@ anon_copy_ptr(struct anon_hdr *sahp, ulong_t s_idx,
 			sapp = &sahp->array_chunk[s_idx >> ANON_CHUNK_SHIFT];
 			if ((sap = *sapp) != NULL) {
 				dapp = &dahp->array_chunk[d_idx
-							>> ANON_CHUNK_SHIFT];
+				    >> ANON_CHUNK_SHIFT];
 				if ((dap = *dapp) == NULL) {
 					*dapp = kmem_zalloc(PAGESIZE,
 					    kmemflags);
@@ -812,8 +811,8 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 
 	mutex_enter(&freemem_lock);
 	if (availrmem > (swapfs_minfree + swapfs_reserve + mswap_pages) ||
-		(availrmem > (swapfs_minfree + mswap_pages) &&
-		secpolicy_resource(CRED()) == 0)) {
+	    (availrmem > (swapfs_minfree + mswap_pages) &&
+	    secpolicy_resource(CRED()) == 0)) {
 
 		if (takemem) {
 			/*
@@ -824,8 +823,8 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 			k_anoninfo.ani_mem_resv += mswap_pages;
 			ANI_ADD(mswap_pages);
 			ANON_PRINT((A_RESV | A_MRESV),
-				("anon_resvmem: took %ld pages of availrmem\n",
-				mswap_pages));
+			    ("anon_resvmem: took %ld pages of availrmem\n",
+			    mswap_pages));
 		} else {
 			mutex_exit(&freemem_lock);
 		}
@@ -846,7 +845,7 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 		mutex_exit(&freemem_lock);
 		mutex_exit(&anoninfo_lock);
 		ANON_PRINT(A_RESV,
-			("anon_resvmem: not enough space from swapfs\n"));
+		    ("anon_resvmem: not enough space from swapfs\n"));
 		if (zone != NULL && takemem)
 			rctl_decr_swap(zone, ptob(npages));
 		return (0);
@@ -899,7 +898,7 @@ anon_unresvmem(size_t size, zone_t *zone)
 	phys_free_slots = npages - mem_free_pages;
 
 	if (phys_free_slots) {
-	    k_anoninfo.ani_phys_resv -= phys_free_slots;
+		k_anoninfo.ani_phys_resv -= phys_free_slots;
 	}
 
 #ifdef	ANON_DEBUG
@@ -1004,6 +1003,42 @@ anon_decref(struct anon *ap)
 	}
 }
 
+
+/*
+ * check an_refcnt of the root anon slot (anon_index argument is aligned at
+ * seg->s_szc level) to determine whether COW processing is required.
+ * anonpages_hash_lock[] held on the root ap ensures that if root's
+ * refcnt is 1 all other refcnt's are 1 as well (and they can't increase
+ * later since this process can't fork while its AS lock is held).
+ *
+ * returns 1 if the root anon slot has a refcnt > 1 otherwise returns 0.
+ */
+int
+anon_szcshare(struct anon_hdr *ahp, ulong_t anon_index)
+{
+	struct anon	*ap;
+	kmutex_t	*ahmpages = NULL;
+
+	ap = anon_get_ptr(ahp, anon_index);
+	if (ap == NULL)
+		return (0);
+
+	ahmpages = &anonpages_hash_lock[AH_LOCK(ap->an_vp, ap->an_off)];
+	mutex_enter(ahmpages);
+	ASSERT(ap->an_refcnt >= 1);
+	if (ap->an_refcnt == 1) {
+		mutex_exit(ahmpages);
+		return (0);
+	}
+	mutex_exit(ahmpages);
+	return (1);
+}
+/*
+ * Check 'nslots' anon slots for refcnt > 1.
+ *
+ * returns 1 if any of the 'nslots' anon slots has a refcnt > 1 otherwise
+ * returns 0.
+ */
 static int
 anon_share(struct anon_hdr *ahp, ulong_t anon_index, pgcnt_t nslots)
 {
@@ -1136,8 +1171,8 @@ anon_decref_pages(
 					ppa[j - i] = pp;
 					if (ap->an_pvp != NULL &&
 					    !vn_matchopval(ap->an_pvp,
-						VOPNAME_DISPOSE,
-						(fs_generic_func_p)fs_dispose))
+					    VOPNAME_DISPOSE,
+					    (fs_generic_func_p)fs_dispose))
 						dispose = 1;
 				}
 				if (!dispose) {
@@ -1172,7 +1207,7 @@ anon_decref_pages(
 					anon_rmhash(ap);
 					if (ap->an_pvp)
 						swap_phys_free(ap->an_pvp,
-							ap->an_poff, PAGESIZE);
+						    ap->an_poff, PAGESIZE);
 					mutex_exit(ahm);
 					kmem_cache_free(anon_cache, ap);
 					ANI_ADD(1);
@@ -1429,7 +1464,7 @@ anon_fill_cow_holes(
 					    LOCK_PAGE : 0;
 				}
 				pp = anon_private(&ap, seg, addr, prot, pl[0],
-					pageflags, cred);
+				    pageflags, cred);
 				if (pp == NULL) {
 					err = ENOMEM;
 					break;
@@ -1767,8 +1802,8 @@ anon_getpage(
 	 */
 
 	TRACE_3(TR_FAC_VM, TR_ANON_GETPAGE,
-		"anon_getpage:seg %x addr %x vp %x",
-		seg, addr, vp);
+	    "anon_getpage:seg %x addr %x vp %x",
+	    seg, addr, vp);
 
 	err = VOP_GETPAGE(vp, (u_offset_t)off, PAGESIZE, protp, pl, plsz,
 	    seg, addr, rw, cred, NULL);
@@ -1905,8 +1940,8 @@ top:
 		if (page_alloc_pages(anon_vp, seg, addr, NULL, ppa,
 		    szc, 0, pgflags) != 0) {
 			VM_STAT_ADD(anonvmstats.getpages[7]);
-			if (brkcow == 0 ||
-			    !anon_share(amp->ahp, start_idx, pgcnt)) {
+			if (brkcow == 0 || szc < seg->s_szc ||
+			    !anon_szcshare(amp->ahp, start_idx)) {
 				/*
 				 * If the refcnt's of all anon slots are <= 1
 				 * they can't increase since we are holding
@@ -2063,7 +2098,7 @@ top:
 			ASSERT(pg_idx + npgs <= pgcnt);
 			if ((*protp & PROT_WRITE) &&
 			    anon_share(amp->ahp, an_idx, npgs)) {
-			    *protp &= ~PROT_WRITE;
+				*protp &= ~PROT_WRITE;
 			}
 			pg_idx += npgs;
 			an_idx += npgs;
@@ -2197,7 +2232,8 @@ io_err:
 	 * we are here because we failed to relocate.
 	 */
 	ASSERT(prealloc);
-	if (brkcow == 0 || !anon_share(amp->ahp, start_idx, pgcnt)) {
+	if (brkcow == 0 || szc < seg->s_szc ||
+	    !anon_szcshare(amp->ahp, start_idx)) {
 		VM_STAT_ADD(anonvmstats.getpages[28]);
 		return (-1);
 	}
@@ -2255,8 +2291,8 @@ anon_private(
 		page_rename(opp, vp, (u_offset_t)off);
 		pp = opp;
 		TRACE_5(TR_FAC_VM, TR_ANON_PRIVATE,
-			"anon_private:seg %p addr %x pp %p vp %p off %lx",
-			seg, addr, pp, vp, off);
+		    "anon_private:seg %p addr %x pp %p vp %p off %lx",
+		    seg, addr, pp, vp, off);
 		hat_setmod(pp);
 
 		/* bug 4026339 */
@@ -2529,8 +2565,8 @@ anon_map_privatepages(
 		}
 
 		err = swap_getconpage(vp, (u_offset_t)off, PAGESIZE, NULL, pl,
-			PAGESIZE, conpp, NULL, &nreloc, seg, vaddr,
-			S_CREATE, cred);
+		    PAGESIZE, conpp, NULL, &nreloc, seg, vaddr,
+		    S_CREATE, cred);
 
 		/*
 		 * Impossible to fail this is S_CREATE.
@@ -2738,7 +2774,7 @@ anon_map_createpages(
 			if (ap->an_pvp != NULL) {
 				page_io_lock(pp);
 				ahm = &anonhash_lock[AH_LOCK(ap->an_vp,
-					ap->an_off)];
+				    ap->an_off)];
 				mutex_enter(ahm);
 				if (ap->an_pvp != NULL) {
 					swap_phys_free(ap->an_pvp,
@@ -2778,7 +2814,7 @@ anon_map_createpages(
 			pgsz	= page_get_pagesize(szc);
 			pg_cnt	= pgsz >> PAGESHIFT;
 			if (IS_P2ALIGNED(addr, pgsz) && pg_cnt <= npgs &&
-				anon_pages(amp->ahp, index, pg_cnt) == 0) {
+			    anon_pages(amp->ahp, index, pg_cnt) == 0) {
 				/*
 				 * XXX
 				 * Since we are faking page_create()
@@ -2952,10 +2988,10 @@ anon_try_demote_pages(
 				panic("anon_try_demote_pages: an_refcnt != 1");
 			}
 			pp = ppa[i] = page_lookup(ap->an_vp, ap->an_off,
-				SE_EXCL);
+			    SE_EXCL);
 			if (pp != NULL) {
 				(void) hat_pageunload(pp,
-					HAT_FORCE_PGUNLOAD);
+				    HAT_FORCE_PGUNLOAD);
 			}
 		} else {
 			ppa[i] = NULL;
@@ -2968,22 +3004,21 @@ anon_try_demote_pages(
 				VM_STAT_ADD(anonvmstats.demotepages[3]);
 				if (curnpgs != 0)
 					panic("anon_try_demote_pages: "
-						"bad large page");
+					    "bad large page");
 
 				root = 1;
 				curnpgs = npgs =
-					page_get_pagecnt(pp->p_szc);
+				    page_get_pagecnt(pp->p_szc);
 
 				ASSERT(npgs <= pgcnt);
 				ASSERT(IS_P2ALIGNED(npgs, npgs));
-				ASSERT(!(page_pptonum(pp) &
-					(npgs - 1)));
+				ASSERT(!(page_pptonum(pp) & (npgs - 1)));
 			} else {
 				ASSERT(i > 0);
 				ASSERT(page_pptonum(pp) - 1 ==
-					page_pptonum(ppa[i - 1]));
+				    page_pptonum(ppa[i - 1]));
 				if ((page_pptonum(pp) & (npgs - 1)) ==
-					npgs - 1)
+				    npgs - 1)
 					root = 0;
 			}
 			ASSERT(PAGE_EXCL(pp));
@@ -3286,7 +3321,7 @@ anon_swap_adjust(pgcnt_t npages)
 	ASSERT(k_anoninfo.ani_max >= k_anoninfo.ani_phys_resv);
 
 	unlocked_mem_swap = k_anoninfo.ani_mem_resv
-					- k_anoninfo.ani_locked_swap;
+	    - k_anoninfo.ani_locked_swap;
 	if (npages > unlocked_mem_swap) {
 		spgcnt_t adjusted_swap = npages - unlocked_mem_swap;
 

@@ -131,7 +131,7 @@ uint_t use_boot_reserve = 1;	/* cleared after early boot process */
 uint_t can_steal_post_boot = 0;	/* set late in boot to enable stealing */
 
 /* export 1g page size to user applications if set */
-int	enable_1gpg;
+int	enable_1gpg = 1;
 
 #ifdef DEBUG
 uint_t	map1gcnt;

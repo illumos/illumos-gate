@@ -699,6 +699,9 @@ page_t	*page_get_freelist(struct vnode *, u_offset_t, struct seg *,
 
 page_t	*page_get_cachelist(struct vnode *, u_offset_t, struct seg *,
 		caddr_t, uint_t, struct lgrp *);
+#if defined(__i386) || defined(__amd64)
+int	page_chk_freelist(uint_t);
+#endif
 void	page_list_add(page_t *, int);
 void	page_boot_demote(page_t *);
 void	page_promote_size(page_t *, uint_t);

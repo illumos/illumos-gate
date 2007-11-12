@@ -202,6 +202,7 @@ static int segvn_slock_anonpages(page_t *, int);
 static void segvn_sunlock_anonpages(page_t *, int);
 
 static struct kmem_cache *segvn_cache;
+static struct kmem_cache **segvn_szc_cache;
 
 #ifdef VM_STATS
 static struct segvnvmstats_str {
@@ -386,9 +387,9 @@ segvn_init(void)
 	size_t pgsz;
 
 	segvn_cache = kmem_cache_create("segvn_cache",
-		sizeof (struct segvn_data), 0,
-		segvn_cache_constructor, segvn_cache_destructor, NULL,
-		NULL, NULL, 0);
+	    sizeof (struct segvn_data), 0,
+	    segvn_cache_constructor, segvn_cache_destructor, NULL,
+	    NULL, NULL, 0);
 
 	if (segvn_lpg_disable == 0) {
 		szc = maxszc = page_num_pagesizes() - 1;
@@ -410,6 +411,22 @@ segvn_init(void)
 		if (segvn_maxpgszc == 0 || segvn_maxpgszc > maxszc)
 			segvn_maxpgszc = maxszc;
 	}
+
+	if (segvn_maxpgszc) {
+		segvn_szc_cache = (struct kmem_cache **)kmem_alloc(
+		    (segvn_maxpgszc + 1) * sizeof (struct kmem_cache *),
+		    KM_SLEEP);
+	}
+
+	for (szc = 1; szc <= segvn_maxpgszc; szc++) {
+		char	str[32];
+
+		(void) sprintf(str, "segvn_szc_cache%d", szc);
+		segvn_szc_cache[szc] = kmem_cache_create(str,
+		    page_get_pagecnt(szc) * sizeof (page_t *), 0,
+		    NULL, NULL, NULL, NULL, NULL, KMC_NODEBUG);
+	}
+
 
 	if (segvn_use_regions && !hat_supported(HAT_SHARED_REGIONS, NULL))
 		segvn_use_regions = 0;
@@ -570,7 +587,7 @@ segvn_create(struct seg *seg, void *argsp)
 			return (EAGAIN);
 		swresv = seg->s_size;
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
-			seg, swresv, 1);
+		    seg, swresv, 1);
 	}
 
 	/*
@@ -599,8 +616,7 @@ segvn_create(struct seg *seg, void *argsp)
 			if (swresv != 0) {
 				anon_unresv(swresv);
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-					"anon proc:%p %lu %u",
-					seg, swresv, 0);
+				    "anon proc:%p %lu %u", seg, swresv, 0);
 			}
 			crfree(cred);
 			if (!use_rgn) {
@@ -614,7 +630,7 @@ segvn_create(struct seg *seg, void *argsp)
 		 */
 		trok = ((a->flags & MAP_TEXT) &&
 		    (seg->s_size > textrepl_size_thresh ||
-			(a->flags & _MAP_TEXTREPL)) &&
+		    (a->flags & _MAP_TEXTREPL)) &&
 		    lgrp_optimizations() && svntr_hashtab != NULL &&
 		    a->type == MAP_PRIVATE && swresv == 0 &&
 		    !(a->flags & MAP_NORESERVE) &&
@@ -901,7 +917,7 @@ segvn_create(struct seg *seg, void *argsp)
 
 				ASSERT(use_rgn == 0);
 				hat_memload(seg->s_as->a_hat, addr, pp,
-					svd->prot & ~PROT_WRITE, hat_flag);
+				    svd->prot & ~PROT_WRITE, hat_flag);
 
 				page_unlock(pp);
 			}
@@ -1349,7 +1365,7 @@ segvn_extend_next(
 		struct vpage *vp, *evp;
 		new_vpage =
 		    kmem_zalloc(vpgtob(seg_pages(seg1) + seg_pages(seg2)),
-			KM_NOSLEEP);
+		    KM_NOSLEEP);
 		if (new_vpage == NULL) {
 			/* Not merging segments so adjust anon_index back */
 			if (amp2)
@@ -1407,7 +1423,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 			return (ENOMEM);
 
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
-			seg, len, 0);
+		    seg, len, 0);
 	}
 
 	newsvd = kmem_cache_alloc(segvn_cache, KM_SLEEP);
@@ -1769,9 +1785,9 @@ retry:
 		int error;
 
 		error = VOP_DELMAP(svd->vp,
-			(offset_t)svd->offset + (uintptr_t)(addr - seg->s_base),
-			seg->s_as, addr, len, svd->prot, svd->maxprot,
-			svd->type, svd->cred, NULL);
+		    (offset_t)svd->offset + (uintptr_t)(addr - seg->s_base),
+		    seg->s_as, addr, len, svd->prot, svd->maxprot,
+		    svd->type, svd->cred, NULL);
 
 		if (error == EAGAIN)
 			return (error);
@@ -1905,7 +1921,7 @@ retry:
 				svd->swresv -= len;
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
-				seg, len, 0);
+			    seg, len, 0);
 		}
 
 		seg->s_base += len;
@@ -1972,14 +1988,14 @@ retry:
 				ASSERT(amp);
 				oswresv = svd->swresv;
 				svd->swresv = ptob(anon_pages(amp->ahp,
-					svd->anon_index, npages));
+				    svd->anon_index, npages));
 				anon_unresv(oswresv - svd->swresv);
 			} else {
 				anon_unresv(len);
 				svd->swresv -= len;
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-				"anon proc:%p %lu %u", seg, len, 0);
+			    "anon proc:%p %lu %u", seg, len, 0);
 		}
 
 		seg->s_size -= len;
@@ -2113,9 +2129,9 @@ retry:
 			ASSERT(amp);
 			oswresv = svd->swresv;
 			svd->swresv = ptob(anon_pages(amp->ahp,
-				svd->anon_index, btop(seg->s_size)));
+			    svd->anon_index, btop(seg->s_size)));
 			nsvd->swresv = ptob(anon_pages(nsvd->amp->ahp,
-				nsvd->anon_index, btop(nseg->s_size)));
+			    nsvd->anon_index, btop(nseg->s_size)));
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
 			anon_unresv(oswresv - (svd->swresv + nsvd->swresv));
 		} else {
@@ -2129,7 +2145,7 @@ retry:
 			nsvd->swresv = nseg->s_size;
 		}
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
-			seg, len, 0);
+		    seg, len, 0);
 	}
 
 	return (0);			/* I'm glad that's all over with! */
@@ -2203,8 +2219,7 @@ segvn_free(struct seg *seg)
 				if ((len = amp->swresv) != 0) {
 					anon_unresv(len);
 					TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-						"anon proc:%p %lu %u",
-						seg, len, 0);
+					    "anon proc:%p %lu %u", seg, len, 0);
 				}
 			}
 			svd->amp = NULL;
@@ -2235,7 +2250,7 @@ segvn_free(struct seg *seg)
 	if ((len = svd->swresv) != 0) {
 		anon_unresv(svd->swresv);
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
-			seg, len, 0);
+		    seg, len, 0);
 		svd->swresv = 0;
 	}
 	/*
@@ -2434,7 +2449,7 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 		if (amp != NULL) {
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 			if ((ap = anon_get_ptr(amp->ahp, anon_index++))
-								!= NULL) {
+			    != NULL) {
 				swap_xlate(ap, &vp, &offset);
 			} else {
 				vp = svd->vp;
@@ -2471,7 +2486,7 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 				hat_setstat(seg->s_as, adr, PAGESIZE, P_REF);
 		}
 		TRACE_3(TR_FAC_VM, TR_SEGVN_FAULT,
-			"segvn_fault:pp %p vp %p offset %llx", pp, vp, offset);
+		    "segvn_fault:pp %p vp %p offset %llx", pp, vp, offset);
 		if (svd->vp == NULL) {
 			segvn_sunlock_anonpages(pp, adr == addr);
 		}
@@ -2670,7 +2685,7 @@ segvn_faultpage(
 			 * initialize the anon array entry.
 			 */
 			(void) anon_set_ptr(amp->ahp, anon_index, ap,
-				ANON_SLEEP);
+			    ANON_SLEEP);
 
 			ASSERT(pp->p_szc == 0);
 
@@ -2816,8 +2831,7 @@ segvn_faultpage(
 	ASSERT(PAGE_LOCKED(opp));
 
 	TRACE_3(TR_FAC_VM, TR_SEGVN_FAULT,
-		"segvn_fault:pp %p vp %p offset %llx",
-		opp, NULL, 0);
+	    "segvn_fault:pp %p vp %p offset %llx", opp, NULL, 0);
 
 	/*
 	 * The fault is treated as a copy-on-write fault if a
@@ -2857,7 +2871,7 @@ segvn_faultpage(
 
 			ASSERT(opp->p_szc == 0 ||
 			    (svd->type == MAP_SHARED &&
-				amp != NULL && amp->a_szc != 0));
+			    amp != NULL && amp->a_szc != 0));
 
 			if (!segvn_slock_anonpages(opp, first)) {
 				page_unlock(opp);
@@ -2930,7 +2944,7 @@ segvn_faultpage(
 		if (hat_page_is_mapped(opp)) {
 			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_unload(seg->s_as->a_hat, addr, PAGESIZE,
-				HAT_UNLOAD);
+			    HAT_UNLOAD);
 		}
 
 		/*
@@ -3844,8 +3858,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					    seg->s_szc;
 					ppgsz = page_get_pagesize(tszc);
 					if (!IS_P2ALIGNED(a, ppgsz) ||
-					    ((alloc_failed >> tszc) &
-						0x1)) {
+					    ((alloc_failed >> tszc) & 0x1)) {
 						break;
 					}
 					SEGVN_VMSTAT_FLTVNPAGES(4);
@@ -3923,7 +3936,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			ppa[0] = NULL;
 			if (!brkcow && !tron && szc &&
 			    !page_exists_physcontig(vp, off, szc,
-				segtype == MAP_PRIVATE ? ppa : NULL)) {
+			    segtype == MAP_PRIVATE ? ppa : NULL)) {
 				SEGVN_VMSTAT_FLTVNPAGES(9);
 				if (page_alloc_pages(vp, seg, a, &pplist, NULL,
 				    szc, 0, 0) && type != F_SOFTLOCK) {
@@ -4264,7 +4277,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			    !IS_P2ALIGNED(pfn, pages)) ||
 			    (pszc < szc &&
 			    !segvn_full_szcpages(ppa, szc, &upgrdfail,
-				&pszc))) {
+			    &pszc))) {
 
 				if (upgrdfail && type != F_SOFTLOCK) {
 					/*
@@ -4391,7 +4404,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			 */
 			if (pplist == NULL &&
 			    page_alloc_pages(vp, seg, a, &pplist, NULL,
-				szc, 0, 0) && type != F_SOFTLOCK) {
+			    szc, 0, 0) && type != F_SOFTLOCK) {
 				SEGVN_VMSTAT_FLTVNPAGES(38);
 				for (i = 0; i < pages; i++) {
 					page_unlock(ppa[i]);
@@ -4584,7 +4597,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	size_t pgsz = page_get_pagesize(szc);
 	size_t maxpgsz = pgsz;
 	pgcnt_t pages = btop(pgsz);
-	size_t ppasize = pages * sizeof (page_t *);
+	uint_t ppaszc = szc;
 	caddr_t a = lpgaddr;
 	ulong_t aindx = svd->anon_index + seg_page(seg, a);
 	struct vpage *vpage = (svd->vpage != NULL) ?
@@ -4642,7 +4655,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 		/* caller has already done segment level protection check. */
 	}
 
-	ppa = kmem_alloc(ppasize, KM_SLEEP);
+	ppa = kmem_cache_alloc(segvn_szc_cache[ppaszc], KM_SLEEP);
 	ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 	for (;;) {
 		adjszc_chk = 0;
@@ -4683,8 +4696,8 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			anon_array_enter(amp, aindx, &cookie);
 			ppa_szc = (uint_t)-1;
 			ierr = anon_map_getpages(amp, aindx, szc, seg, a,
-				prot, &vpprot, ppa, &ppa_szc, vpage, rw, brkcow,
-				segvn_anypgsz, pgflags, svd->cred);
+			    prot, &vpprot, ppa, &ppa_szc, vpage, rw, brkcow,
+			    segvn_anypgsz, pgflags, svd->cred);
 			if (ierr != 0) {
 				anon_array_exit(&cookie);
 				VM_STAT_ADD(segvnvmstats.fltanpages[4]);
@@ -4730,9 +4743,8 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 						ulong_t j;
 						for (j = 0; j < i; j++) {
 							segvn_sunlock_anonpages(
-								ppa[j],
-								j == 0 &&
-								first);
+							    ppa[j], j == 0 &&
+							    first);
 							page_unlock(ppa[j]);
 						}
 						for (j = i; j < pages; j++) {
@@ -4886,12 +4898,12 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	}
 	VM_STAT_ADD(segvnvmstats.fltanpages[13]);
 	ANON_LOCK_EXIT(&amp->a_rwlock);
-	kmem_free(ppa, ppasize);
+	kmem_cache_free(segvn_szc_cache[ppaszc], ppa);
 	return (0);
 error:
 	VM_STAT_ADD(segvnvmstats.fltanpages[14]);
 	ANON_LOCK_EXIT(&amp->a_rwlock);
-	kmem_free(ppa, ppasize);
+	kmem_cache_free(segvn_szc_cache[ppaszc], ppa);
 	if (type == F_SOFTLOCK && a > lpgaddr) {
 		VM_STAT_ADD(segvnvmstats.fltanpages[15]);
 		segvn_softunlock(seg, lpgaddr, a - lpgaddr, S_OTHER);
@@ -5170,7 +5182,7 @@ top:
 			    lpgeaddr, type, rw, addr, addr + len, brkcow);
 		} else {
 			err = segvn_fault_vnodepages(hat, seg, lpgaddr,
-				lpgeaddr, type, rw, addr, addr + len, brkcow);
+			    lpgeaddr, type, rw, addr, addr + len, brkcow);
 			if (err == IE_RETRY) {
 				ASSERT(seg->s_szc == 0);
 				ASSERT(SEGVN_READ_HELD(seg->s_as, &svd->lock));
@@ -5264,9 +5276,9 @@ slow:
 				fap = NULL;
 				if (amp != NULL) {
 					ANON_LOCK_ENTER(&amp->a_rwlock,
-						RW_READER);
+					    RW_READER);
 					anon_array_enter(amp, fanon_index,
-						&cookie);
+					    &cookie);
 					fap = anon_get_ptr(amp->ahp,
 					    fanon_index);
 					if (fap != NULL) {
@@ -5401,7 +5413,7 @@ slow:
 				 * within the segment.
 				 */
 				plsz = MIN((size_t)PVN_GETPAGE_SZ, (size_t)
-					((seg->s_base + seg->s_size) - addr));
+				    ((seg->s_base + seg->s_size) - addr));
 				ASSERT((addr + plsz) <=
 				    (seg->s_base + seg->s_size));
 			}
@@ -5425,8 +5437,8 @@ slow:
 			}
 			vp = svd->vp;
 			TRACE_3(TR_FAC_VM, TR_SEGVN_GETPAGE,
-				"segvn_getpage:seg %p addr %p vp %p",
-				seg, addr, vp);
+			    "segvn_getpage:seg %p addr %p vp %p",
+			    seg, addr, vp);
 			err = VOP_GETPAGE(vp, (offset_t)vp_off, vp_len,
 			    &vpprot, plp, plsz, seg, addr + (vp_off - off), arw,
 			    svd->cred, NULL);
@@ -5636,7 +5648,7 @@ segvn_faulta(struct seg *seg, caddr_t addr)
 		 */
 		ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 		if ((ap = anon_get_ptr(amp->ahp,
-			svd->anon_index + seg_page(seg, addr))) != NULL) {
+		    svd->anon_index + seg_page(seg, addr))) != NULL) {
 
 			err = anon_getpage(&ap, NULL, NULL,
 			    0, seg, addr, S_READ, svd->cred);
@@ -5657,7 +5669,7 @@ segvn_faulta(struct seg *seg, caddr_t addr)
 
 	vp = svd->vp;
 	TRACE_3(TR_FAC_VM, TR_SEGVN_GETPAGE,
-		"segvn_getpage:seg %p addr %p vp %p", seg, addr, vp);
+	    "segvn_getpage:seg %p addr %p vp %p", seg, addr, vp);
 	err = VOP_GETPAGE(vp,
 	    (offset_t)(svd->offset + (uintptr_t)(addr - seg->s_base)),
 	    PAGESIZE, NULL, NULL, 0, seg, addr,
@@ -5787,8 +5799,8 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 				}
 				sz = svd->swresv = seg->s_size;
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-					"anon proc:%p %lu %u",
-					seg, sz, 1);
+				    "anon proc:%p %lu %u",
+				    seg, sz, 1);
 			}
 		} else {
 			/*
@@ -5804,8 +5816,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 				    seg->s_as->a_proc->p_zone);
 				svd->swresv = 0;
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
-					"anon proc:%p %lu %u",
-					seg, 0, 0);
+				    "anon proc:%p %lu %u", seg, 0, 0);
 			}
 		}
 	}
@@ -5857,7 +5868,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 				}
 				if (IS_P2ALIGNED(anon_idx, pgcnt) &&
 				    !segvn_claim_pages(seg, svp, offset,
-					anon_idx, prot)) {
+				    anon_idx, prot)) {
 					if (amp != NULL) {
 						anon_array_exit(&cookie);
 					}
@@ -5870,7 +5881,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			} else {
 				if (amp != NULL) {
 					anon_array_enter(amp, anon_idx,
-						&cookie);
+					    &cookie);
 					ap = anon_get_ptr(amp->ahp, anon_idx++);
 				}
 
@@ -6011,7 +6022,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 	 */
 	if (!IS_P2ALIGNED(addr, pgsz) ||
 	    (!IS_P2ALIGNED(eaddr, pgsz) &&
-		eaddr != seg->s_base + seg->s_size)) {
+	    eaddr != seg->s_base + seg->s_size)) {
 
 		segvn_setpgsz_align_err++;
 		return (EINVAL);
@@ -6034,7 +6045,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 	/* paranoid check */
 	if (svd->vp != NULL &&
 	    (IS_SWAPFSVP(svd->vp) || VN_ISKAS(svd->vp))) {
-		    return (EINVAL);
+		return (EINVAL);
 	}
 
 	if (seg->s_szc == 0 && svd->vp != NULL &&
@@ -6190,7 +6201,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 				return (IE_NOMEM);
 			}
 			if (anon_copy_ptr(amp->ahp, svd->anon_index,
-				nahp, 0, btop(seg->s_size), ANON_NOSLEEP)) {
+			    nahp, 0, btop(seg->s_size), ANON_NOSLEEP)) {
 				anon_release(nahp, btop(amp->size));
 				ANON_LOCK_EXIT(&amp->a_rwlock);
 				return (IE_NOMEM);
@@ -6569,9 +6580,9 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 			ASSERT(svd->amp);
 			oswresv = svd->swresv;
 			svd->swresv = ptob(anon_pages(svd->amp->ahp,
-				svd->anon_index, btop(seg->s_size)));
+			    svd->anon_index, btop(seg->s_size)));
 			nsvd->swresv = ptob(anon_pages(nsvd->amp->ahp,
-				nsvd->anon_index, btop(nseg->s_size)));
+			    nsvd->anon_index, btop(nseg->s_size)));
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
 		} else {
 			ASSERT(svd->swresv == seg->s_size + nseg->s_size);
@@ -6981,7 +6992,7 @@ segvn_swapout(struct seg *seg)
 		if (amp != NULL) {
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
 			if (anon_array_try_enter(amp, anon_index + page,
-						&cookie)) {
+			    &cookie)) {
 				ANON_LOCK_EXIT(&amp->a_rwlock);
 				continue;
 			}
@@ -7264,7 +7275,7 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 						 */
 						(void) page_try_demote_pages(
 						    pp);
-				    }
+					}
 				}
 				page_unlock(pp);
 			}
@@ -7665,11 +7676,11 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 			    ((svd->flags & MAP_NORESERVE) == 0) &&
 			    amp != NULL &&
 			    ((ap = anon_get_ptr(amp->ahp, anon_index))
-								== NULL)) {
+			    == NULL)) {
 				anon_array_enter(amp, anon_index, &cookie);
 
 				if ((ap = anon_get_ptr(amp->ahp,
-						anon_index)) == NULL) {
+				    anon_index)) == NULL) {
 					pp = anon_zero(seg, addr, &ap,
 					    svd->cred);
 					if (pp == NULL) {
@@ -7679,9 +7690,9 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 						goto out;
 					}
 					ASSERT(anon_get_ptr(amp->ahp,
-						anon_index) == NULL);
+					    anon_index) == NULL);
 					(void) anon_set_ptr(amp->ahp,
-						anon_index, ap, ANON_SLEEP);
+					    anon_index, ap, ANON_SLEEP);
 					page_unlock(pp);
 				}
 				anon_array_exit(&cookie);
@@ -7791,7 +7802,7 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 			 * See 4140683 for details
 			 */
 			claim = ((VPP_PROT(vpp) & PROT_WRITE) &&
-				(svd->type == MAP_PRIVATE));
+			    (svd->type == MAP_PRIVATE));
 
 			/*
 			 * Perform page-level operation appropriate to
@@ -8086,7 +8097,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 			ASSERT(seg->s_szc == 0);
 			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_unload(seg->s_as->a_hat, addr, len,
-				HAT_UNLOAD);
+			    HAT_UNLOAD);
 			/* FALLTHROUGH */
 		case MADV_NORMAL:
 		case MADV_RANDOM:
@@ -8446,7 +8457,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 	pgcnt_t szc0_npages = 0;
 
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_START,
-		"segvn_pagelock: start seg %p addr %p", seg, addr);
+	    "segvn_pagelock: start seg %p addr %p", seg, addr);
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 	if (seg->s_szc != 0 && (type == L_PAGELOCK || type == L_PAGEUNLOCK)) {
@@ -8529,7 +8540,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_UNLOCK_END,
-			"segvn_pagelock: unlock seg %p addr %p", seg, addr);
+		    "segvn_pagelock: unlock seg %p addr %p", seg, addr);
 		return (0);
 	} else if (type == L_PAGERECLAIM) {
 		VM_STAT_COND_ADD(seg->s_szc != 0, segvnvmstats.pagelock[1]);
@@ -8537,7 +8548,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		(void) segvn_reclaim(seg, addr, len, *ppp, rw);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_UNLOCK_END,
-			"segvn_pagelock: reclaim seg %p addr %p", seg, addr);
+		    "segvn_pagelock: reclaim seg %p addr %p", seg, addr);
 		return (0);
 	}
 
@@ -8588,7 +8599,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		*ppp = pplist + adjustpages;
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_HIT_END,
-			"segvn_pagelock: cache hit seg %p addr %p", seg, addr);
+		    "segvn_pagelock: cache hit seg %p addr %p", seg, addr);
 		return (0);
 	}
 
@@ -8704,7 +8715,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 		segvn_pages_locked += npages;
 		mutex_exit(&freemem_lock);
 		(void) seg_pinsert(seg, addr, len, pl, rw, SEGP_ASYNC_FLUSH,
-			segvn_reclaim);
+		    segvn_reclaim);
 		mutex_exit(&svd->segp_slock);
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 		TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_FILL_END,
@@ -8735,7 +8746,7 @@ out:
 	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 	*ppp = NULL;
 	TRACE_2(TR_FAC_PHYSIO, TR_PHYSIO_SEGVN_MISS_END,
-		"segvn_pagelock: cache miss seg %p addr %p", seg, addr);
+	    "segvn_pagelock: cache miss seg %p addr %p", seg, addr);
 	return (error);
 }
 
@@ -8861,7 +8872,7 @@ segvn_getmemid(struct seg *seg, caddr_t addr, memid_t *memidp)
 					return (ENOMEM);
 				}
 				ASSERT(anon_get_ptr(amp->ahp, anon_index)
-								== NULL);
+				    == NULL);
 				(void) anon_set_ptr(amp->ahp, anon_index,
 				    ap, ANON_SLEEP);
 				page_unlock(pp);
