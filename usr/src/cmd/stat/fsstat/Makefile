@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,9 +27,14 @@
 
 PROG = fsstat
 OBJS = fsstat.o
-SRCS =$(OBJS:%.o=%.c)
+SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/stat/Makefile.stat
+
+# Only want one object
+COMMON_OBJS = common.o
+COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 
 LDLIBS += -lkstat
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
@@ -44,12 +49,16 @@ all: $(PROG)
 
 install: all $(ROOTPROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+$(PROG): $(OBJS) $(COMMON_OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-	
+
+%.o : $(STATCOMMONDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 clean:
-	-$(RM) $(OBJS)
+	-$(RM) $(OBJS) $(COMMON_OBJS)
 
 lint: lint_SRCS
 

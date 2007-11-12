@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * rewritten from UCB 4.13 83/09/25
@@ -92,7 +92,8 @@ enum show_disk_mode {
 
 enum show_disk_mode show_disk_mode = SHOW_ALL;
 
-char cmdname[] = "iostat";
+char *cmdname = "iostat";
+int caught_cont = 0;
 
 static char one_blank[] = " ";
 static char two_blanks[] = "  ";
@@ -190,8 +191,6 @@ static void printxhdr(void);
 static void usage(void);
 static void do_args(int, char **);
 static void do_format(void);
-static void set_timer(int);
-static void handle_sig(int);
 static void show_all_disks(void);
 static void show_first_disk(void);
 static void show_other_disks(void);
@@ -207,6 +206,8 @@ main(int argc, char **argv)
 	kstat_ctl_t *kc;
 	long hz;
 	int iiter;
+	hrtime_t start_n;
+	hrtime_t period_n;
 
 	do_args(argc, argv);
 
@@ -257,9 +258,11 @@ main(int argc, char **argv)
 		(void) signal(SIGCONT, printhdr);
 
 	if (interval)
-		set_timer(interval);
+		period_n = (hrtime_t)interval * NANOSEC;
 
 	kc = open_kstat();
+	if (interval)
+		start_n = gethrtime();
 	newss = acquire_snapshot(kc, types, &df);
 
 	/* compute width of "device" field */
@@ -301,7 +304,9 @@ main(int argc, char **argv)
 			continue;
 
 		if (interval > 0 && iter != 1)
-			(void) pause();
+			/* Have a kip */
+			sleep_until(&start_n, period_n, iiter == 0,
+			    &caught_cont);
 
 		free_snapshot(oldss);
 		oldss = newss;
@@ -430,6 +435,8 @@ printhdr(int sig)
 	 */
 	if (sig)
 		(void) signal(SIGCONT, printhdr);
+	if (sig == SIGCONT)
+		caught_cont = 1;
 	/*
 	 * Horizontal mode headers
 	 *
@@ -1719,59 +1726,6 @@ u32_delta(uint_t old, uint_t new)
 		return (new - old);
 	else
 		return ((UINT32_MAX - old) + new + 1);
-}
-
-/*
- * Create and arm the timer. Used only when an interval has been specified.
- * Used in lieu of poll to ensure that we provide info for exactly the
- * desired period.
- */
-void
-set_timer(int interval)
-{
-	timer_t t_id;
-	itimerspec_t time_struct;
-	struct sigevent sig_struct;
-	struct sigaction act;
-	sigset_t sig_set;
-
-	bzero(&sig_struct, sizeof (struct sigevent));
-	bzero(&act, sizeof (struct sigaction));
-
-	/* Ensure that our signal is unblocked. */
-	(void) sigemptyset(&sig_set);
-	(void) sigaddset(&sig_set, SIGUSR1);
-	(void) sigprocmask(SIG_UNBLOCK, &sig_set, NULL);
-
-	/* Create timer */
-	sig_struct.sigev_notify = SIGEV_SIGNAL;
-	sig_struct.sigev_signo = SIGUSR1;
-	sig_struct.sigev_value.sival_int = 0;
-
-	if (timer_create(CLOCK_REALTIME, &sig_struct, &t_id) != 0) {
-		fail(1, "Timer creation failed");
-	}
-
-	act.sa_handler = handle_sig;
-
-	if (sigaction(SIGUSR1, &act, NULL) != 0) {
-		fail(1, "Could not set up signal handler");
-	}
-
-	time_struct.it_value.tv_sec = interval;
-	time_struct.it_value.tv_nsec = 0;
-	time_struct.it_interval.tv_sec = interval;
-	time_struct.it_interval.tv_nsec = 0;
-
-	/* Arm timer */
-	if ((timer_settime(t_id, 0, &time_struct, NULL)) != 0) {
-		fail(1, "Setting timer failed");
-	}
-}
-/* ARGSUSED */
-void
-handle_sig(int x)
-{
 }
 
 /*

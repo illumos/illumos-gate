@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common routines for acquiring snapshots of kstats for
@@ -308,6 +308,13 @@ int acquire_iodevs(struct snapshot *ss, kstat_ctl_t *kc,
 
 /* strcmp-style I/O device comparator */
 int iodev_cmp(struct iodev_snapshot *io1, struct iodev_snapshot *io2);
+
+/* sleep until *wakeup + interval, keeping cadence where desired */
+void sleep_until(hrtime_t *wakeup, hrtime_t interval, int forever,
+    int *caught_cont);
+
+/* signal handler - so we can be aware of SIGCONT */
+void cont_handler(int sig_number);
 
 #ifdef __cplusplus
 }

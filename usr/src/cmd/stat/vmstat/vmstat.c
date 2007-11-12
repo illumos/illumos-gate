@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,8 @@
 
 #include "statcommon.h"
 
-char cmdname[] = "vmstat";
+char *cmdname = "vmstat";
+int caught_cont = 0;
 
 static	int	hz;
 static	int	pagesize;
@@ -38,7 +39,7 @@ static	int	lines = 1;
 static	int	swflag = 0, cflag = 0, pflag = 0;
 static	int	suppress_state;
 static	long	iter = 0;
-static	int	poll_interval = 0;
+static	hrtime_t period_n = 0;
 static  struct	snapshot *ss;
 
 struct iodev_filter df;
@@ -51,7 +52,7 @@ static	void	dovmstats(struct snapshot *old, struct snapshot *new);
 static	void	printhdr(int);
 static	void	dosum(struct sys_snapshot *ss);
 static	void	dointr(struct snapshot *ss);
-static	void	docachestats(kstat_ctl_t *kc);
+static	void	docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever);
 static	void	usage(void);
 
 int
@@ -62,6 +63,8 @@ main(int argc, char **argv)
 	int summary = 0;
 	int intr = 0;
 	kstat_ctl_t *kc;
+	int forever = 0;
+	hrtime_t start_n;
 
 	pagesize = sysconf(_SC_PAGESIZE);
 	hz = sysconf(_SC_CLK_TCK);
@@ -123,6 +126,8 @@ main(int argc, char **argv)
 
 	kc = open_kstat();
 
+	start_n = gethrtime();
+
 	ss = acquire_snapshot(kc, types, &df);
 
 	/* time, in seconds, since boot */
@@ -149,22 +154,23 @@ main(int argc, char **argv)
 		if (errno > 0 || *endptr != '\0' || interval <= 0 ||
 		    interval > MAXINT)
 			usage();
-		poll_interval = 1000 * interval;
-		if (poll_interval <= 0)
+		period_n = (hrtime_t)interval * NANOSEC;
+		if (period_n <= 0)
 			usage();
 		iter = MAXLONG;
 		if (argc > 1) {
 			iter = strtol(argv[1], NULL, 10);
 			if (errno > 0 || *endptr != '\0' || iter <= 0)
 				usage();
-		}
+		} else
+			forever = 1;
 		if (argc > 2)
 			usage();
 	}
 
 	if (cflag) {
 		free_snapshot(ss);
-		docachestats(kc);
+		docachestats(kc, period_n, forever);
 		exit(0);
 	}
 
@@ -172,8 +178,12 @@ main(int argc, char **argv)
 
 	printhdr(0);
 	dovmstats(old, ss);
-	while (--iter > 0) {
-		(void) poll(NULL, 0, poll_interval);
+	while (forever || --iter > 0) {
+		/* (void) poll(NULL, 0, poll_interval); */
+
+		/* Have a kip */
+		sleep_until(&start_n, period_n, forever, &caught_cont);
+
 		free_snapshot(old);
 		old = ss;
 		ss = acquire_snapshot(kc, types, &df);
@@ -355,6 +365,9 @@ printhdr(int sig)
 {
 	int i = df.if_max_iodevs - ss->s_nr_iodevs;
 
+	if (sig == SIGCONT)
+		caught_cont = 1;
+
 	if (pflag) {
 		(void) printf("     memory           page          ");
 		(void) printf("executable      anonymous      filesystem \n");
@@ -477,12 +490,14 @@ dointr(struct snapshot *ss)
 }
 
 static void
-docachestats(kstat_ctl_t *kc)
+docachestats(kstat_ctl_t *kc, hrtime_t interval, int forever)
 {
 	struct snapshot *old;
 	struct snapshot *new;
 	int i;
+	hrtime_t start;
 
+	start = gethrtime();
 	old = acquire_snapshot(kc, SNAP_FLUSHES, NULL);
 
 	if (iter == 0) {
@@ -502,7 +517,9 @@ docachestats(kstat_ctl_t *kc)
 			(void) printf("%8s%8s%8s%8s%8s%8s\n",
 			    "usr", "ctx", "rgn", "seg", "pag", "par");
 
-		(void) poll(NULL, 0, poll_interval);
+		/* Have a kip */
+		sleep_until(&start, interval, forever, &caught_cont);
+
 		new = acquire_snapshot(kc, SNAP_FLUSHES, NULL);
 
 		(void) printf(" %7d %7d %7d %7d %7d %7d\n",

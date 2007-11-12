@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <errno.h>
 #include <kstat.h>
 #include <poll.h>
+#include <signal.h>
 
 #include "statcommon.h"
 
@@ -50,7 +51,8 @@
 
 #define	REPRINT		20
 
-char cmdname[] = "mpstat";
+char *cmdname = "mpstat";
+int caught_cont = 0;
 
 static int hz;
 static int display_pset = -1;
@@ -68,13 +70,14 @@ main(int argc, char **argv)
 	int display_agg = 0;
 	int iter = 1;
 	int interval = 0;
-	int poll_interval = 0;
 	char *endptr;
 	int infinite_cycles = 0;
 	kstat_ctl_t *kc;
 	struct snapshot *old = NULL;
 	struct snapshot *new = NULL;
 	enum snapshot_types types = SNAP_CPUS;
+	hrtime_t start_n;
+	hrtime_t period_n;
 
 	while ((c = getopt(argc, argv, "apP:q")) != (int)EOF)
 		switch (c) {
@@ -123,7 +126,7 @@ main(int argc, char **argv)
 		interval = (int)strtol(argv[optind], &endptr, 10);
 		if (*endptr != NULL)
 			usage();
-		poll_interval = 1000 * interval;
+		period_n = (hrtime_t)interval * NANOSEC;
 		if (argc > optind + 1) {
 			iter = (unsigned int)strtoul
 			    (argv[optind + 1], &endptr, 10);
@@ -140,6 +143,12 @@ main(int argc, char **argv)
 		types |= SNAP_PSETS;
 
 	kc = open_kstat();
+
+	/* Set up handler for SIGCONT */
+	if (signal(SIGCONT, cont_handler) == SIG_ERR)
+		fail(1, "signal failed");
+
+	start_n = gethrtime();
 
 	while (infinite_cycles || iter > 0) {
 		free_snapshot(old);
@@ -160,7 +169,8 @@ main(int argc, char **argv)
 		if (!infinite_cycles && --iter < 1)
 			break;
 
-		(void) poll(NULL, 0, poll_interval);
+		/* Have a kip */
+		sleep_until(&start_n, period_n, infinite_cycles, &caught_cont);
 	}
 	(void) kstat_close(kc);
 

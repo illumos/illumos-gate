@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,9 @@
 #include <ctype.h>
 #include <libintl.h>
 #include <locale.h>
+#include <signal.h>
+
+#include "statcommon.h"
 
 /*
  * For now, parsable output is turned off.  Once we gather feedback and
@@ -114,7 +117,8 @@ typedef struct entity {
 /* If more sub-one units are added, make sure to adjust ONE_INDEX above */
 static char units[] = "num KMGTPE";
 
-static char	*cmdname;	/* name of this command */
+char		*cmdname;	/* name of this command */
+int		caught_cont = 0;	/* have caught a SIGCONT */
 
 static int	vs_i = 0;	/* Index of current vs[] slot */
 
@@ -881,6 +885,7 @@ main(int argc, char *argv[])
 	int		dispflag = 0;	/* Flags for display control */
 	int		timestamp = NODATE;	/* Default: no time stamp */
 	long		count = 0;	/* Number of iterations for display */
+	int		forever; 	/* Run forever */
 	long		interval = 0;
 	boolean_t	fstypes_only = B_FALSE;	/* Display fstypes only */
 	char		**fstypes;	/* Array of names of all fstypes */
@@ -888,6 +893,8 @@ main(int argc, char *argv[])
 	entity_t	*entities;	/* Array of stat-able entities */
 	kstat_ctl_t	*kc;
 	void (*dfunc)(char *, vopstats_t *, vopstats_t *, int) = dflt_display;
+	hrtime_t	start_n;	/* Start time */
+	hrtime_t	period_n;	/* Interval in nanoseconds */
 
 	extern int	optind;
 
@@ -972,6 +979,8 @@ main(int argc, char *argv[])
 
 	nentities = parse_operands(
 	    argc, argv, optind, &interval, &count, &entities);
+	forever = count == MAXLONG;
+	period_n = (hrtime_t)interval * NANOSEC;
 
 	if (nentities == -1)	/* Set of operands didn't parse properly  */
 		usage();
@@ -1014,6 +1023,9 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	/* Set start time */
+	start_n = gethrtime();
+
 	/*
 	 * The following loop walks through the entities[] list to "prime
 	 * the pump"
@@ -1048,8 +1060,15 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (count > 1)
+		/* Set up signal handler for SIGCONT */
+		if (signal(SIGCONT, cont_handler) == SIG_ERR)
+			fail(1, "signal failed");
+
+
 	BUMP_INDEX();	/* Swap the previous/current indices */
-	for (i = 1; i <= count; i++) {
+	i = 1;
+	while (forever || i++ <= count) {
 		/*
 		 * No telling how many lines will be printed in any interval.
 		 * There should be a minimum of HEADERLINES between any
@@ -1059,7 +1078,8 @@ main(int argc, char *argv[])
 			linesout = 0;
 			printhdr = 1;
 		}
-		(void) poll(NULL, 0, interval*1000);
+		/* Have a kip */
+		sleep_until(&start_n, period_n, forever, &caught_cont);
 
 		if (timestamp) {
 			print_time(timestamp);

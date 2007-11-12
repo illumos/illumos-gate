@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,6 @@
 #include "dsr.h"
 
 #include <stdlib.h>
-#include <stdarg.h>
 #include <unistd.h>
 #include <strings.h>
 #include <errno.h>
@@ -50,8 +49,6 @@ static char *cpu_states[] = {
 	"cpu_ticks_kernel",
 	"cpu_ticks_wait"
 };
-
-extern char cmdname[];
 
 static kstat_t *
 kstat_lookup_read(kstat_ctl_t *kc, char *module,
@@ -415,23 +412,6 @@ open_kstat(void)
 	}
 
 	return (kc);
-}
-
-/*PRINTFLIKE2*/
-void
-fail(int do_perror, char *message, ...)
-{
-	va_list args;
-	int save_errno = errno;
-
-	va_start(args, message);
-	(void) fprintf(stderr, "%s: ", cmdname);
-	(void) vfprintf(stderr, message, args);
-	va_end(args);
-	if (do_perror)
-		(void) fprintf(stderr, ": %s", strerror(save_errno));
-	(void) fprintf(stderr, "\n");
-	exit(2);
 }
 
 void *
