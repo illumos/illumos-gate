@@ -1260,6 +1260,7 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 	const char *errmsg;
 	struct lifreq lifr;
 	int on = 1;
+	uchar_t ttl = 255;
 
 	if (lif->lif_sock_ip_fd != -1) {
 		dhcpmsg(MSG_WARNING, "open_ip_lif: socket already open on %s",
@@ -1298,6 +1299,18 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 			errmsg = "cannot set IP_DHCPINIT_IF";
 			goto failure;
 		}
+	}
+
+	/*
+	 * Unfortunately, some hardware (such as the Linksys WRT54GC)
+	 * decrements the TTL *prior* to accepting DHCP traffic destined
+	 * for it.  To workaround this, tell IP to use a TTL of 255 for
+	 * broadcast packets sent from this socket.
+	 */
+	if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_BROADCAST_TTL, &ttl,
+	    sizeof (uchar_t)) == -1) {
+		errmsg = "cannot set IP_BROADCAST_TTL";
+		goto failure;
 	}
 
 	if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_BOUND_IF,

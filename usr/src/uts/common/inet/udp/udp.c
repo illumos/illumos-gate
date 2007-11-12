@@ -2727,6 +2727,9 @@ udp_opt_get_locked(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case IP_UNSPEC_SRC:
 			*i1 = udp->udp_unspec_source;
 			break;	/* goto sizeof (int) option return */
+		case IP_BROADCAST_TTL:
+			*(uchar_t *)ptr = connp->conn_broadcast_ttl;
+			return (sizeof (uchar_t));
 		default:
 			return (-1);
 		}
@@ -3272,6 +3275,10 @@ udp_opt_set_locked(queue_t *q, uint_t optset_context, int level,
 		case IP_UNSPEC_SRC:
 			if (!checkonly)
 				udp->udp_unspec_source = onoff;
+			break;
+		case IP_BROADCAST_TTL:
+			if (!checkonly)
+				connp->conn_broadcast_ttl = *invalp;
 			break;
 		default:
 			*outlenp = 0;

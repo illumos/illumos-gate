@@ -294,6 +294,7 @@ struct conn_s {
 	struct ip6_mtuinfo mtuinfo;
 	zoneid_t	conn_zoneid;		/* zone connection is in */
 	in6_addr_t	conn_nexthop_v6;	/* nexthop IP address */
+	uchar_t		conn_broadcast_ttl; 	/* IP_BROADCAST_TTL */
 #define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
 	cred_t		*conn_peercred;		/* Peer credentials, if any */
 
@@ -305,7 +306,6 @@ struct conn_s {
 		conn_anon_port : 1,		/* user bound anonymously */
 		conn_mac_exempt : 1,		/* unlabeled with loose MAC */
 		conn_spare : 26;
-
 	netstack_t	*conn_netstack;	/* Corresponds to a netstack_hold */
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10

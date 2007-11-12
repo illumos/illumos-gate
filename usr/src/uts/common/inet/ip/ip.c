@@ -15068,8 +15068,14 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 */
 		if (ill->ill_dhcpinit != 0 &&
 		    IS_SIMPLE_IPH(ipha) && ipha->ipha_protocol == IPPROTO_UDP &&
-		    MBLKL(mp) > sizeof (ipha_t) + sizeof (udpha_t)) {
-			udpha_t *udpha = (udpha_t *)&ipha[1];
+		    pullupmsg(mp, sizeof (ipha_t) + sizeof (udpha_t)) == 1) {
+			udpha_t *udpha;
+
+			/*
+			 * Reload ipha since pullupmsg() can change b_rptr.
+			 */
+			ipha = (ipha_t *)mp->b_rptr;
+			udpha = (udpha_t *)&ipha[1];
 
 			if (ntohs(udpha->uha_dst_port) == IPPORT_BOOTPC) {
 				DTRACE_PROBE2(ip4__dhcpinit__pkt, ill_t *, ill,
@@ -22560,17 +22566,22 @@ release_ire_and_ill:
 broadcast:
 	{
 		/*
-		 * Avoid broadcast storms by setting the ttl to 1
-		 * for broadcasts. This parameter can be set
-		 * via ndd, so make sure that for the SO_DONTROUTE
-		 * case that ipha_ttl is always set to 1.
-		 * In the event that we are replying to incoming
-		 * ICMP packets, conn could be NULL.
+		 * To avoid broadcast storms, we usually set the TTL to 1 for
+		 * broadcasts.  However, if SO_DONTROUTE isn't set, this value
+		 * can be overridden stack-wide through the ip_broadcast_ttl
+		 * ndd tunable, or on a per-connection basis through the
+		 * IP_BROADCAST_TTL socket option.
+		 *
+		 * In the event that we are replying to incoming ICMP packets,
+		 * connp could be NULL.
 		 */
-		if ((connp != NULL) && connp->conn_dontroute)
-			ipha->ipha_ttl = 1;
-		else
-			ipha->ipha_ttl = ipst->ips_ip_broadcast_ttl;
+		ipha->ipha_ttl = ipst->ips_ip_broadcast_ttl;
+		if (connp != NULL) {
+			if (connp->conn_dontroute)
+				ipha->ipha_ttl = 1;
+			else if (connp->conn_broadcast_ttl != 0)
+				ipha->ipha_ttl = connp->conn_broadcast_ttl;
+		}
 
 		/*
 		 * Note that we are not doing a IRB_REFHOLD here.

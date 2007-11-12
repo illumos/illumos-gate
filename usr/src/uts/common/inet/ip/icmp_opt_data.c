@@ -146,6 +146,9 @@ opdes_t	icmp_opt_arr[] = {
 { IP_UNSPEC_SRC, IPPROTO_IP, OA_R, OA_RW, OP_RAW, OP_PASSNEXT,
 	sizeof (int), 0 },
 
+{ IP_BROADCAST_TTL, IPPROTO_IP, OA_R, OA_RW, OP_RAW, 0, sizeof (uchar_t),
+	0 /* disabled */ },
+
 { IP_RECVIF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
 { IP_PKTINFO, IPPROTO_IP, OA_RW, OA_RW, OP_NP,

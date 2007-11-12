@@ -1766,6 +1766,9 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		case IP_UNSPEC_SRC:
 			*ptr = icmp->icmp_unspec_source;
 			break;	/* goto sizeof (int) option return */
+		case IP_BROADCAST_TTL:
+			*(uchar_t *)ptr = connp->conn_broadcast_ttl;
+			return (sizeof (uchar_t));
 		case IP_RECVIF:
 			*ptr = icmp->icmp_recvif;
 			break;	/* goto sizeof (int) option return */
@@ -2312,6 +2315,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 		case IP_UNSPEC_SRC:
 			if (!checkonly)
 				icmp->icmp_unspec_source = onoff;
+			break;
+		case IP_BROADCAST_TTL:
+			if (!checkonly)
+				connp->conn_broadcast_ttl = *invalp;
 			break;
 		case IP_RECVIF:
 			if (!checkonly)

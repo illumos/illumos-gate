@@ -911,7 +911,7 @@ typedef struct ipsec_req {
  */
 #define	IP_BOUND_IF		0x41	/* bind socket to an ifindex	   */
 #define	IP_UNSPEC_SRC		0x42	/* use unspecified source address  */
-/*	UNUSED			0x43	   was IP_XMIT_IF -- can be reused */
+#define	IP_BROADCAST_TTL	0x43	/* use specific TTL for broadcast  */
 
 /*
  * IP_DONTFAILOVER_IF option is used to indicate that outbound unicast and
