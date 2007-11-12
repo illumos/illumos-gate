@@ -787,7 +787,7 @@ extern "C" {
 #define	BANK_MASK	7
 
 #define	DMIR_RANKS(dimms_per_channel, dmir, rank0, rank1, rank2, rank3) \
-	if ((dimms_per_channel) == 4) { \
+	if ((dimms_per_channel) <= 4) { \
 		rank0 = (dmir) & 3; \
 		rank1 = ((dmir) >> 3) & 3; \
 		rank2 = ((dmir) >> 6) & 3; \

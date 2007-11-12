@@ -52,6 +52,7 @@ dimm_getphys(int branch, int rank, int bank, int ras, int cas)
 	struct rank_base *rp;
 	struct rank_geometry *rgp;
 
+	ASSERT(rank < nb_dimms_per_channel * 2);
 	rp = &rank_base[(branch * nb_dimms_per_channel * 2) + rank];
 	rgp = (struct rank_geometry *)rp->rank_geometry;
 	if (rgp == NULL)
@@ -107,6 +108,7 @@ dimm_getoffset(int branch, int rank, int bank, int ras, int cas)
 	uint64_t pa;
 	uint64_t cal_pa;
 
+	ASSERT(rank < nb_dimms_per_channel * 2);
 	rp = &rank_base[(branch * nb_dimms_per_channel * 2) + rank];
 	dgp = dimm_geometry[(branch * nb_dimms_per_channel) + rank/2];
 	if (dgp == NULL)
