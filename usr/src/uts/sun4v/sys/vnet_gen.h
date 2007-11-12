@@ -132,8 +132,8 @@ typedef struct vgen_priv_desc {
  */
 typedef struct vgen_handshake_params {
 	/* version specific params */
-	uint32_t	ver_major:16,
-			ver_minor:16;		/* major, minor version */
+	uint16_t	ver_major;		/* major version number */
+	uint16_t	ver_minor;		/* minor version number */
 	uint8_t		dev_class;		/* device class */
 
 	/* attributes specific params */
@@ -149,13 +149,13 @@ typedef struct vgen_handshake_params {
 	ldc_mem_cookie_t	dring_cookie;	/* desc ring cookie */
 	uint32_t		num_dcookies;	/* # of dring cookies */
 	uint64_t		dring_ident;	/* ident=0 for INFO msg */
-	boolean_t		dring_ready;   /* dring ready flag */
+	boolean_t		dring_ready;	/* dring ready flag */
 } vgen_hparams_t;
 
 /* version info */
 typedef struct vgen_ver {
-	uint32_t	ver_major:16,
-			ver_minor:16;
+	uint16_t	ver_major;		/* major version number */
+	uint16_t	ver_minor;		/* minor version number */
 } vgen_ver_t;
 
 /* Channel information associated with a vgen-port */

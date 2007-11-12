@@ -162,8 +162,8 @@ typedef struct vio_ver_msg {
 	vio_msg_tag_t		tag;
 
 	/* version specific payload */
-	uint32_t		ver_major:16,	/* major version number */
-				ver_minor:16;	/* minor version number */
+	uint16_t		ver_major;	/* major version number */
+	uint16_t		ver_minor;	/* minor version number */
 
 	uint8_t			dev_class;	/* type of device */
 

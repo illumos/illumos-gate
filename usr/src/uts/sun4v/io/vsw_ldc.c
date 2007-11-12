@@ -4101,7 +4101,7 @@ vsw_send_attr(vsw_ldc_t *ldcp)
 	attr_msg.ack_freq = lp->xfer_mode;
 
 	READ_ENTER(&vswp->if_lockrw);
-	bcopy(&(vswp->if_addr), &(attr_msg.addr), ETHERADDRL);
+	attr_msg.addr = vnet_macaddr_strtoul((vswp->if_addr).ether_addr_octet);
 	RW_EXIT(&vswp->if_lockrw);
 
 	ldcp->lane_out.lstate |= VSW_ATTR_INFO_SENT;
@@ -4735,7 +4735,8 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
 static int
 vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 {
-	int	ret = 0;
+	int			ret = 0;
+	struct ether_addr	ea;
 
 	D1(NULL, "vsw_check_attr enter\n");
 
@@ -4761,7 +4762,8 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 * in the vsw-port OBP node. Need to decide what to do if they
 	 * don't match, for the moment just warn but don't fail.
 	 */
-	if (bcmp(&pkt->addr, &port->p_macaddr, ETHERADDRL) != 0) {
+	vnet_macaddr_ultostr(pkt->addr, ea.ether_addr_octet);
+	if (ether_cmp(&ea, &port->p_macaddr) != 0) {
 		DERR(NULL, "vsw_check_attr: device supplied address "
 		    "0x%llx doesn't match node address 0x%llx\n",
 		    pkt->addr, port->p_macaddr);

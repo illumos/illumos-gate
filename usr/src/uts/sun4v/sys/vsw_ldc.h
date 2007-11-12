@@ -91,8 +91,8 @@ typedef struct def_msg {
 #define	VSW_NUM_VER	1
 
 typedef struct ver_sup {
-	uint32_t	ver_major:16,
-			ver_minor:16;
+	uint16_t	ver_major;	/* major version number */
+	uint16_t	ver_minor;	/* minor version number */
 } ver_sup_t;
 
 /*
@@ -263,8 +263,8 @@ typedef struct dring_info {
  */
 typedef struct lane {
 	uint64_t	lstate;		/* Lane state */
-	uint32_t	ver_major:16,	/* Version major number */
-			ver_minor:16;	/* Version minor number */
+	uint16_t	ver_major;	/* Version major number */
+	uint16_t	ver_minor;	/* Version minor number */
 	uint64_t	seq_num;	/* Sequence number */
 	uint64_t	mtu;		/* ETHERMTU */
 	uint64_t	addr;		/* Unique physical address */

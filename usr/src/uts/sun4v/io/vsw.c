@@ -820,9 +820,16 @@ vsw_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 static int
 vsw_get_md_physname(vsw_t *vswp, md_t *mdp, mde_cookie_t node, char *name)
 {
-	int	len = 0;
-	char	*physname = NULL;
-	char	*dev;
+	int		len = 0;
+	int		instance;
+	char		*physname = NULL;
+	char		*dev;
+	const char	*dev_name;
+	char		myname[MAXNAMELEN];
+
+	dev_name = ddi_driver_name(vswp->dip);
+	instance = ddi_get_instance(vswp->dip);
+	(void) snprintf(myname, MAXNAMELEN, "%s%d", dev_name, instance);
 
 	if (md_get_prop_data(mdp, node, physdev_propname,
 	    (uint8_t **)(&physname), &len) != 0) {
@@ -831,6 +838,14 @@ vsw_get_md_physname(vsw_t *vswp, md_t *mdp, mde_cookie_t node, char *name)
 		return (1);
 	} else if ((strlen(physname) + 1) > LIFNAMSIZ) {
 		cmn_err(CE_WARN, "!vsw%d: %s is too long a device name",
+		    vswp->instance, physname);
+		return (1);
+	} else if (strcmp(myname, physname) == 0) {
+		/*
+		 * Prevent the vswitch from opening itself as the
+		 * network device.
+		 */
+		cmn_err(CE_WARN, "!vsw%d: %s is an invalid device name",
 		    vswp->instance, physname);
 		return (1);
 	} else {

@@ -177,8 +177,6 @@ static void vgen_handle_errmsg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 static void vgen_handle_evt_up(vgen_ldc_t *ldcp, boolean_t flag);
 static void vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag);
 static int vgen_check_sid(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
-static uint64_t	vgen_macaddr_strtoul(const uint8_t *macaddr);
-static int vgen_macaddr_ultostr(uint64_t value, uint8_t *macaddr);
 static caddr_t vgen_print_ethaddr(uint8_t *a, char *ebuf);
 static void vgen_hwatchdog(void *arg);
 static void vgen_print_attr_info(vgen_ldc_t *ldcp, int endpoint);
@@ -3206,7 +3204,7 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 	/* set attr_info params */
 	ldcp->local_hparams.mtu = ETHERMAX;
 	ldcp->local_hparams.addr =
-	    vgen_macaddr_strtoul(vgenp->macaddr);
+	    vnet_macaddr_strtoul(vgenp->macaddr);
 	ldcp->local_hparams.addr_type = ADDR_TYPE_MAC;
 	ldcp->local_hparams.xfer_mode = VIO_DRING_MODE;
 	ldcp->local_hparams.ack_freq = 0;	/* don't need acks */
@@ -5010,36 +5008,6 @@ vgen_check_sid(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		return (VGEN_SUCCESS);
 }
 
-/* convert mac address from string to uint64_t */
-static uint64_t
-vgen_macaddr_strtoul(const uint8_t *macaddr)
-{
-	uint64_t val = 0;
-	int i;
-
-	for (i = 0; i < ETHERADDRL; i++) {
-		val <<= 8;
-		val |= macaddr[i];
-	}
-
-	return (val);
-}
-
-/* convert mac address from uint64_t to string */
-static int
-vgen_macaddr_ultostr(uint64_t val, uint8_t *macaddr)
-{
-	int i;
-	uint64_t value;
-
-	value = val;
-	for (i = ETHERADDRL - 1; i >= 0; i--) {
-		macaddr[i] = value & 0xFF;
-		value >>= 8;
-	}
-	return (VGEN_SUCCESS);
-}
-
 static caddr_t
 vgen_print_ethaddr(uint8_t *a, char *ebuf)
 {
@@ -5083,7 +5051,7 @@ vgen_print_hparams(vgen_hparams_t *hp)
 	    "\tver_major: %d, ver_minor: %d, dev_class: %d\n",
 	    hp->ver_major, hp->ver_minor, hp->dev_class);
 
-	(void) vgen_macaddr_ultostr(hp->addr, addr);
+	vnet_macaddr_ultostr(hp->addr, addr);
 	cmn_err(CE_CONT, "attr_info:\n");
 	cmn_err(CE_CONT, "\tMTU: %lx, addr: %s\n", hp->mtu,
 	    vgen_print_ethaddr(addr, ea));

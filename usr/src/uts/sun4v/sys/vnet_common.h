@@ -73,6 +73,10 @@ typedef struct vnet_ibnd_desc {
 	ldc_mem_cookie_t		memcookie[MAX_COOKIES];
 } vnet_ibnd_desc_t;
 
+/* exported functions */
+uint64_t vnet_macaddr_strtoul(const uint8_t *macaddr);
+void vnet_macaddr_ultostr(uint64_t value, uint8_t *macaddr);
+
 #ifdef __cplusplus
 }
 #endif
