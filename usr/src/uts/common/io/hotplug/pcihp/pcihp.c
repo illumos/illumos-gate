@@ -2099,6 +2099,18 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 			/* tell HPC driver that the occupant is configured */
 			(void) hpc_nexus_control(slotinfop->slot_hdl,
 			    HPC_CTRL_DEV_CONFIGURED, NULL);
+
+			/*
+			 * Tell sysevent listeners that slot has
+			 * changed state.  At minimum, this is useful
+			 * when a PCI-E Chassis (containing Occupants) is
+			 * hotplugged.  In this case, the following will
+			 * announce that the Occupant in the Receptacle
+			 * in the Chassis had a state-change.
+			 */
+			pcihp_gen_sysevent(slotinfop->name,
+			    PCIHP_DR_AP_STATE_CHANGE, SE_NO_HINT,
+			    pcihp_p->dip, KM_SLEEP);
 		} else {
 			struct pcihp_config_ctrl ctrl;
 			int circular_count;
@@ -2189,20 +2201,30 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 					 * ONLINE'd. How is this to be
 					 * reported?
 					 */
-					cmn_err(CE_WARN, "pcihp (%s%d): failed "
-					    "to attach one or more drivers for "
-					    "the card in the slot %s",
+					cmn_err(CE_WARN,
+					    "pcihp (%s%d): failed to attach"
+					    " one or more drivers for the"
+					    " card in the slot %s",
 					    ddi_driver_name(dip),
 					    ddi_get_instance(dip),
 					    slotinfop->name);
 				}
 
-				/*
-				 * tell HPC driver about the configured
-				 * occupant
-				 */
+				/* tell HPC driver the Occupant is Configured */
 				(void) hpc_nexus_control(slotinfop->slot_hdl,
 				    HPC_CTRL_DEV_CONFIGURED, NULL);
+
+				/*
+				 * Tell sysevent listeners that slot has
+				 * changed state.  At minimum, this is useful
+				 * when a PCI-E Chassis (containing Occupants)
+				 * is hotplugged.  In this case, the following
+				 * will announce that the Occupant in the
+				 * Receptacle in the Chassis had a state-change.
+				 */
+				pcihp_gen_sysevent(slotinfop->name,
+				    PCIHP_DR_AP_STATE_CHANGE, SE_NO_HINT,
+				    pcihp_p->dip, KM_SLEEP);
 			}
 		}
 
