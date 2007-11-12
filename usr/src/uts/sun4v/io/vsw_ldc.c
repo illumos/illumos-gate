@@ -2327,10 +2327,12 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (ldcp->lane_in.xfer_mode == VIO_DRING_MODE) {
 			D2(vswp, "%s: mode = VIO_DRING_MODE", __func__);
 			port->transmit = vsw_dringsend;
+			ldcp->lane_out.xfer_mode = VIO_DRING_MODE;
 		} else if (ldcp->lane_in.xfer_mode == VIO_DESC_MODE) {
 			D2(vswp, "%s: mode = VIO_DESC_MODE", __func__);
 			vsw_create_privring(ldcp);
 			port->transmit = vsw_descrsend;
+			ldcp->lane_out.xfer_mode = VIO_DESC_MODE;
 		}
 		mutex_exit(&port->tx_lock);
 
@@ -3554,7 +3556,6 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 			D2(vswp, "%s: (%lld) freeing descp at %lld", __func__,
 			    ldcp->ldc_id, idx);
 			/* release resources associated with sent msg */
-			bzero(priv_addr->datap, priv_addr->datalen);
 			priv_addr->datalen = 0;
 			priv_addr->dstate = VIO_DESC_FREE;
 			mutex_exit(&priv_addr->dstate_lock);
@@ -3596,7 +3597,6 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		/* release resources associated with sent msg */
 		mutex_enter(&priv_addr->dstate_lock);
-		bzero(priv_addr->datap, priv_addr->datalen);
 		priv_addr->datalen = 0;
 		priv_addr->dstate = VIO_DESC_FREE;
 		mutex_exit(&priv_addr->dstate_lock);
@@ -3745,11 +3745,17 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, int retries)
 			break;
 		}
 		READ_ENTER(&ldcp->lane_out.dlistrw);
-		if ((dp = ldcp->lane_out.dringp) == NULL) {
+		if (((dp = ldcp->lane_out.dringp) != NULL) &&
+		    (ldcp->lane_out.xfer_mode == VIO_DRING_MODE)) {
+			rc = vsw_reclaim_dring(dp, dp->end_idx);
+		} else {
+			/*
+			 * If there is no dring or the xfer_mode is
+			 * set to DESC_MODE(ie., OBP), then simply break here.
+			 */
 			RW_EXIT(&ldcp->lane_out.dlistrw);
 			break;
 		}
-		rc = vsw_reclaim_dring(dp, dp->end_idx);
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 
 		/*
@@ -5194,7 +5200,6 @@ vsw_reclaim_dring(dring_info_t *dp, int start)
 		mutex_enter(&priv_addr->dstate_lock);
 		if (pub_addr->hdr.dstate != VIO_DESC_DONE) {
 			mutex_exit(&priv_addr->dstate_lock);
-			DTRACE_PROBE1(vsw_reclaimed, int, j);
 			break;
 		}
 		pub_addr->hdr.dstate = VIO_DESC_FREE;
