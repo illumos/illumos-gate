@@ -2274,7 +2274,6 @@ hsched_invoke_strategy(struct hsfs *fsp)
 		nbuf->b_file = fvp;
 		nbuf->b_bcount = bsize;
 		nbuf->b_bufsize = bsize;
-		nbuf->b_resid = bsize;
 
 		DTRACE_PROBE3(hsfs_coalesced_io_start, struct hio *, fio, int,
 		    bufcount, size_t, bsize);
