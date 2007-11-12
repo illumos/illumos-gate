@@ -450,6 +450,8 @@ int fd, opts;
 		nsp->ns_list = ipn.in_next;
 	}
 
+	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
+
 	printf("\nList of active sessions:\n");
 
 	iter.igi_type = IPFGENITER_NAT;
@@ -489,6 +491,7 @@ natstat_t *nsp;
 	obj.ipfo_ptr = &iter;
 
 	iter.igi_type = IPFGENITER_HOSTMAP;
+	iter.igi_nitems = 1;
 	iter.igi_data = &hm;
 
 	printf("\nList of active host mappings:\n");
@@ -499,6 +502,6 @@ natstat_t *nsp;
 		printhostmap(&hm, 0);
 		nsp->ns_maplist = hm.hm_next;
 	}
+
+	(void) ioctl(fd, SIOCIPFDELTOK, &iter.igi_type);
 }
-
-
