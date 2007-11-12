@@ -647,8 +647,7 @@ void init_boot_gdt(user_desc_t *);
 
 #ifndef	_ASM
 
-#pragma	align	16(idt0)
-extern	gate_desc_t	idt0[NIDT];
+extern	gate_desc_t	*idt0;
 extern	desctbr_t	idt0_default_reg;
 extern	user_desc_t	*gdt0;
 
@@ -666,11 +665,10 @@ extern user_desc_t	ucs32_on;
 extern user_desc_t	ucs32_off;
 #endif  /* __amd64 */
 
-#pragma	align	16(ktss0)
-extern struct tss ktss0;
+extern struct tss *ktss0;
 
 #if defined(__i386)
-extern struct tss dftss0;
+extern struct tss *dftss0;
 #endif	/* __i386 */
 
 extern void div0trap(), dbgtrap(), nmiint(), brktrap(), ovflotrap();

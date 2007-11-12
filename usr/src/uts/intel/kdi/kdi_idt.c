@@ -377,7 +377,7 @@ kdi_idt_switch(kdi_cpusave_t *cpusave)
 	if (cpusave == NULL)
 		kdi_idtr_set(kdi_idt, sizeof (kdi_idt) - 1);
 	else
-		kdi_idtr_set(cpusave->krs_idt, sizeof (idt0) - 1);
+		kdi_idtr_set(cpusave->krs_idt, (sizeof (*idt0) * NIDT) - 1);
 }
 
 /*

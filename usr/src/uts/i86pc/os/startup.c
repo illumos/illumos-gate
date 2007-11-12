@@ -1160,8 +1160,7 @@ startup_memlist(void)
 	 * initial allocation pages from the kernel free page lists.
 	 */
 	boot_mapin((caddr_t)valloc_base, valloc_sz);
-	boot_mapin((caddr_t)GDT_VA, MMU_PAGESIZE);
-	boot_mapin((caddr_t)DEBUG_INFO_VA, MMU_PAGESIZE);
+	boot_mapin((caddr_t)MISC_VA_BASE, MISC_VA_SIZE);
 	PRM_POINT("startup_memlist() done");
 
 	PRM_DEBUG(valloc_sz);
@@ -1788,21 +1787,20 @@ startup_vm(void)
 	if (x86_type == X86_TYPE_P5) {
 		desctbr_t idtr;
 		gate_desc_t *newidt;
-		struct machcpu *mcpu = &CPU->cpu_m;
 
 		if ((newidt = kmem_zalloc(MMU_PAGESIZE, KM_NOSLEEP)) == NULL)
 			panic("failed to install pentium_pftrap");
 
-		bcopy(idt0, newidt, sizeof (idt0));
+		bcopy(idt0, newidt, NIDT * sizeof (*idt0));
 		set_gatesegd(&newidt[T_PGFLT], &pentium_pftrap,
 		    KCS_SEL, SDT_SYSIGT, TRP_KPL);
 
 		(void) as_setprot(&kas, (caddr_t)newidt, MMU_PAGESIZE,
-		    PROT_READ|PROT_EXEC);
+		    PROT_READ | PROT_EXEC);
 
-		mcpu->mcpu_idt = newidt;
-		idtr.dtr_base = (uintptr_t)mcpu->mcpu_idt;
-		idtr.dtr_limit = sizeof (idt0) - 1;
+		CPU->cpu_idt = newidt;
+		idtr.dtr_base = (uintptr_t)CPU->cpu_idt;
+		idtr.dtr_limit = (NIDT * sizeof (*idt0)) - 1;
 		wr_idtr(&idtr);
 	}
 #endif	/* !__amd64 */

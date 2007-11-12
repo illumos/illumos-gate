@@ -245,6 +245,13 @@ longmode:
 	ret
 	SET_SIZE(have_cpuid)
 
+	/*
+	 * We want the GDT to be on its own page for better performance
+	 * running under hypervisors.
+	 */
+	.skip 4096
 #include "../boot/boot_gdt.s"
+	.skip 4096
+	.long	0
 
 #endif /* __lint */

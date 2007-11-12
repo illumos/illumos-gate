@@ -105,11 +105,12 @@ mach_cpucontext_alloc(struct cpu *cp)
 	struct tss *ntss;
 
 	/*
-	 * Allocate space for page directory, stack, tss, gdt and idt.
-	 * The page directory has to be page aligned
+	 * Allocate space for stack, tss, gdt and idt. We round the size
+	 * alloated for cpu_tables up, so that the TSS is on a unique page.
+	 * This is more efficient when running in virtual machines.
 	 */
-	ct = kmem_zalloc(sizeof (*ct), KM_SLEEP);
-	if ((uintptr_t)ct & ~MMU_STD_PAGEMASK)
+	ct = kmem_zalloc(P2ROUNDUP(sizeof (*ct), PAGESIZE), KM_SLEEP);
+	if ((uintptr_t)ct & PAGEOFFSET)
 		panic("mp_startup_init: cpu%d misaligned tables", cp->cpu_id);
 
 	ntss = cp->cpu_tss = &ct->ct_tss;
@@ -148,7 +149,7 @@ mach_cpucontext_alloc(struct cpu *cp)
 	 * Setup kernel tss.
 	 */
 	set_syssegd((system_desc_t *)&cp->cpu_gdt[GDT_KTSS], cp->cpu_tss,
-	    sizeof (*cp->cpu_tss) -1, SDT_SYSTSS, SEL_KPL);
+	    sizeof (*cp->cpu_tss) - 1, SDT_SYSTSS, SEL_KPL);
 
 	/*
 	 * Now copy all that we've set up onto the real mode platter
@@ -156,9 +157,9 @@ mach_cpucontext_alloc(struct cpu *cp)
 	 */
 
 	rm->rm_idt_base = cp->cpu_idt;
-	rm->rm_idt_lim = sizeof (idt0) - 1;
+	rm->rm_idt_lim = sizeof (*cp->cpu_idt) * NIDT - 1;
 	rm->rm_gdt_base = cp->cpu_gdt;
-	rm->rm_gdt_lim = ((sizeof (*cp->cpu_gdt) * NGDT)) -1;
+	rm->rm_gdt_lim = sizeof (*cp->cpu_gdt) * NGDT - 1;
 
 	rm->rm_pdbr = getcr3();
 	rm->rm_cpu = cp->cpu_id;
@@ -209,7 +210,6 @@ rmp_gdt_init(rm_platter_t *rm)
 	rm->rm_longmode64_addr = rm_platter_pa +
 	    ((uint32_t)long_mode_64 - (uint32_t)real_mode_start);
 #endif	/* __amd64 */
-
 }
 
 /*ARGSUSED*/
@@ -234,7 +234,7 @@ mach_cpucontext_free(struct cpu *cp, void *arg, int err)
 		/*
 		 * Some other, passive, error occurred.
 		 */
-		kmem_free(ct, sizeof (*ct));
+		kmem_free(ct, P2ROUNDUP(sizeof (*ct), PAGESIZE));
 		cp->cpu_tss = NULL;
 		break;
 	}

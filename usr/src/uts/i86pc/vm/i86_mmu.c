@@ -500,7 +500,7 @@ hat_kern_setup(void)
 	/* END CSTYLED */
 
 #if defined(__i386) && !defined(__xpv)
-	CPU->cpu_tss->tss_cr3 = dftss0.tss_cr3 = getcr3();
+	CPU->cpu_tss->tss_cr3 = dftss0->tss_cr3 = getcr3();
 #endif /* __i386 */
 
 #if defined(__xpv) && defined(__amd64)

@@ -352,9 +352,8 @@ mp_startup_init(int cpun)
 #if !defined(__lint)
 	ASSERT((sizeof (*cp->cpu_gdt) * NGDT) <= PAGESIZE);
 #endif
-	cp->cpu_m.mcpu_gdt = kmem_zalloc(PAGESIZE, KM_SLEEP);
-	bcopy(CPU->cpu_m.mcpu_gdt, cp->cpu_m.mcpu_gdt,
-	    (sizeof (*cp->cpu_m.mcpu_gdt) * NGDT));
+	cp->cpu_gdt = kmem_zalloc(PAGESIZE, KM_SLEEP);
+	bcopy(CPU->cpu_gdt, cp->cpu_gdt, (sizeof (*cp->cpu_gdt) * NGDT));
 
 #if defined(__i386)
 	/*
@@ -371,12 +370,13 @@ mp_startup_init(int cpun)
 	 * cmpxchgl register bug
 	 */
 	if (system_hardware.hd_nodes && x86_type != X86_TYPE_P5) {
-		struct machcpu *mcpu = &cp->cpu_m;
-
-		mcpu->mcpu_idt = kmem_alloc(sizeof (idt0), KM_SLEEP);
-		bcopy(idt0, mcpu->mcpu_idt, sizeof (idt0));
+#if !defined(__lint)
+		ASSERT((sizeof (*CPU->cpu_idt) * NIDT) <= PAGESIZE);
+#endif
+		cp->cpu_idt = kmem_zalloc(PAGESIZE, KM_SLEEP);
+		bcopy(CPU->cpu_idt, cp->cpu_idt, PAGESIZE);
 	} else {
-		cp->cpu_m.mcpu_idt = CPU->cpu_m.mcpu_idt;
+		cp->cpu_idt = CPU->cpu_idt;
 	}
 
 	/*
@@ -489,12 +489,12 @@ mp_startup_fini(struct cpu *cp, int error)
 	ucode_free_space(cp);
 #endif
 
-	if (cp->cpu_m.mcpu_idt != CPU->cpu_m.mcpu_idt)
-		kmem_free(cp->cpu_m.mcpu_idt, sizeof (idt0));
-	cp->cpu_m.mcpu_idt = NULL;
+	if (cp->cpu_idt != CPU->cpu_idt)
+		kmem_free(cp->cpu_idt, PAGESIZE);
+	cp->cpu_idt = NULL;
 
-	kmem_free(cp->cpu_m.mcpu_gdt, PAGESIZE);
-	cp->cpu_m.mcpu_gdt = NULL;
+	kmem_free(cp->cpu_gdt, PAGESIZE);
+	cp->cpu_gdt = NULL;
 
 	teardown_vaddr_for_ppcopy(cp);
 

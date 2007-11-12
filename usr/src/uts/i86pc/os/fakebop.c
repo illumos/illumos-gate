@@ -1489,7 +1489,7 @@ bop_trap(struct trapframe *tf)
 
 extern void bop_trap_handler(void);
 
-static gate_desc_t bop_idt[NIDT];
+static gate_desc_t *bop_idt;
 
 static desctbr_t bop_idt_info;
 
@@ -1498,16 +1498,18 @@ bop_idt_init(void)
 {
 	int t;
 
-	bzero(&bop_idt, sizeof (bop_idt));
+	bop_idt = (gate_desc_t *)
+	    do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);
+	bzero(bop_idt, MMU_PAGESIZE);
 	for (t = 0; t < NIDT; ++t) {
 		set_gatesegd(&bop_idt[t], &bop_trap_handler, bcode_sel,
 		    SDT_SYSIGT, TRP_KPL);
 	}
-	bop_idt_info.dtr_limit = sizeof (bop_idt) - 1;
-	bop_idt_info.dtr_base = (uintptr_t)&bop_idt;
+	bop_idt_info.dtr_limit = (NIDT * sizeof (gate_desc_t)) - 1;
+	bop_idt_info.dtr_base = (uintptr_t)bop_idt;
 	wr_idtr(&bop_idt_info);
 }
-#endif
+#endif	/* !defined(__xpv) */
 
 /*
  * This is where we enter the kernel. It dummies up the boot_ops and
@@ -1539,14 +1541,6 @@ _start(struct xboot_info *xbp)
 	DBG_MSG("\n\n*** Entered Solaris in _start() cmdline is: ");
 	DBG_MSG((char *)xbootp->bi_cmdline);
 	DBG_MSG("\n\n\n");
-
-#ifndef __xpv
-	/*
-	 * Install an IDT to catch early pagefaults (shouldn't have any).
-	 * Also needed for kmdb.
-	 */
-	bop_idt_init();
-#endif
 
 	/*
 	 * physavail is no longer used by startup
@@ -1605,8 +1599,16 @@ _start(struct xboot_info *xbp)
 		relocate_boot_archive();
 #endif
 
+#ifndef __xpv
 	/*
-	 *
+	 * Install an IDT to catch early pagefaults (shouldn't have any).
+	 * Also needed for kmdb.
+	 */
+	bop_idt_init();
+#endif
+
+	/*
+	 * Start building the boot properties from the command line
 	 */
 	DBG_MSG("Initializing boot properties:\n");
 	build_boot_properties();

@@ -27,8 +27,20 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(__lint)
-
-int global_descriptor_table[0x10];
+#pragma pack(1)
+struct {
+	uint16_t limit_low;
+	uint16_t base_low;
+	uint8_t base_middle;
+	uint8_t attr;
+	uint8_t attr_and_limit;
+	uint8_t base_high;
+} global_descriptor_table[8];
+struct {
+	uint16_t limit;	/* sizeof (global_descriptor_table) - 1 */
+	void     *base;	/* &global_descriptor_table */
+} gdt_info;
+#pragma pack()
 
 #else	/* __lint */
 

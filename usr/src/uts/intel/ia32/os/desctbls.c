@@ -101,18 +101,15 @@ user_desc_t	*gdt0;
 desctbr_t	gdt0_default_r;
 #endif
 
-#pragma	align	16(idt0)
-gate_desc_t	idt0[NIDT]; 		/* interrupt descriptor table */
+gate_desc_t	*idt0; 		/* interrupt descriptor table */
 #if defined(__i386)
 desctbr_t	idt0_default_r;		/* describes idt0 in IDTR format */
 #endif
 
-#pragma align	16(ktss0)
-struct tss	ktss0;			/* kernel task state structure */
+struct tss	*ktss0;			/* kernel task state structure */
 
 #if defined(__i386)
-#pragma align	16(dftss0)
-struct tss	dftss0;			/* #DF double-fault exception */
+struct tss	*dftss0;		/* #DF double-fault exception */
 #endif	/* __i386 */
 
 user_desc_t	zero_udesc;		/* base zero user desc native procs */
@@ -537,8 +534,8 @@ init_gdt_common(user_desc_t *gdt)
 	/*
 	 * Kernel TSS
 	 */
-	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], &ktss0,
-	    sizeof (ktss0) - 1, SDT_SYSTSS, SEL_KPL);
+	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], ktss0,
+	    sizeof (*ktss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 #endif	/* !__xpv */
 
@@ -588,8 +585,6 @@ init_gdt(void)
 #endif
 	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
 	    PAGESIZE, PAGESIZE);
-	if (gdt0 == NULL)
-		panic("init_gdt: BOP_ALLOC failed");
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
@@ -660,8 +655,6 @@ init_gdt(void)
 #endif
 	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
 	    PAGESIZE, PAGESIZE);
-	if (gdt0 == NULL)
-		panic("init_gdt: BOP_ALLOC failed");
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
@@ -756,14 +749,14 @@ init_gdt_common(user_desc_t *gdt)
 	/*
 	 * TSS for T_DBLFLT (double fault) handler
 	 */
-	set_syssegd((system_desc_t *)&gdt[GDT_DBFLT], &dftss0,
-	    sizeof (dftss0) - 1, SDT_SYSTSS, SEL_KPL);
+	set_syssegd((system_desc_t *)&gdt[GDT_DBFLT], dftss0,
+	    sizeof (*dftss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 	/*
 	 * TSS for kernel
 	 */
-	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], &ktss0,
-	    sizeof (ktss0) - 1, SDT_SYSTSS, SEL_KPL);
+	set_syssegd((system_desc_t *)&gdt[GDT_KTSS], ktss0,
+	    sizeof (*ktss0) - 1, SDT_SYSTSS, SEL_KPL);
 
 #endif	/* !__xpv */
 
@@ -815,8 +808,6 @@ init_gdt(void)
 #endif
 	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
 	    PAGESIZE, PAGESIZE);
-	if (gdt0 == NULL)
-		panic("init_gdt: BOP_ALLOC failed");
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
@@ -869,8 +860,6 @@ init_gdt(void)
 	 */
 	gdt0 = (user_desc_t *)BOP_ALLOC(bootops, (caddr_t)GDT_VA,
 	    PAGESIZE, PAGESIZE);
-	if (gdt0 == NULL)
-		panic("init_gdt: BOP_ALLOC failed");
 	bzero(gdt0, PAGESIZE);
 
 	init_gdt_common(gdt0);
@@ -1107,7 +1096,7 @@ init_tss(void)
 	 * All exceptions but #DF will run on the thread stack.
 	 * Set up the double fault stack here.
 	 */
-	ktss0.tss_ist1 =
+	ktss0->tss_ist1 =
 	    (uint64_t)&dblfault_stack0[sizeof (dblfault_stack0)];
 
 	/*
@@ -1115,7 +1104,7 @@ init_tss(void)
 	 * for no I/O permission map. This will force all user I/O
 	 * instructions to generate #gp fault.
 	 */
-	ktss0.tss_bitmapbase = sizeof (ktss0);
+	ktss0->tss_bitmapbase = sizeof (*ktss0);
 
 	/*
 	 * Point %tr to descriptor for ktss0 in gdt.
@@ -1129,42 +1118,42 @@ static void
 init_tss(void)
 {
 	/*
-	 * ktss0.tss_esp dynamically filled in by resume() on each
+	 * ktss0->tss_esp dynamically filled in by resume() on each
 	 * context switch.
 	 */
-	ktss0.tss_ss0	= KDS_SEL;
-	ktss0.tss_eip	= (uint32_t)_start;
-	ktss0.tss_ds	= ktss0.tss_es = ktss0.tss_ss = KDS_SEL;
-	ktss0.tss_cs	= KCS_SEL;
-	ktss0.tss_fs	= KFS_SEL;
-	ktss0.tss_gs	= KGS_SEL;
-	ktss0.tss_ldt	= ULDT_SEL;
+	ktss0->tss_ss0	= KDS_SEL;
+	ktss0->tss_eip	= (uint32_t)_start;
+	ktss0->tss_ds	= ktss0->tss_es = ktss0->tss_ss = KDS_SEL;
+	ktss0->tss_cs	= KCS_SEL;
+	ktss0->tss_fs	= KFS_SEL;
+	ktss0->tss_gs	= KGS_SEL;
+	ktss0->tss_ldt	= ULDT_SEL;
 
 	/*
 	 * Initialize double fault tss.
 	 */
-	dftss0.tss_esp0	= (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
-	dftss0.tss_ss0	= KDS_SEL;
+	dftss0->tss_esp0 = (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
+	dftss0->tss_ss0	= KDS_SEL;
 
 	/*
 	 * tss_cr3 will get initialized in hat_kern_setup() once our page
 	 * tables have been setup.
 	 */
-	dftss0.tss_eip	= (uint32_t)syserrtrap;
-	dftss0.tss_esp	= (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
-	dftss0.tss_cs	= KCS_SEL;
-	dftss0.tss_ds	= KDS_SEL;
-	dftss0.tss_es	= KDS_SEL;
-	dftss0.tss_ss	= KDS_SEL;
-	dftss0.tss_fs	= KFS_SEL;
-	dftss0.tss_gs	= KGS_SEL;
+	dftss0->tss_eip	= (uint32_t)syserrtrap;
+	dftss0->tss_esp	= (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
+	dftss0->tss_cs	= KCS_SEL;
+	dftss0->tss_ds	= KDS_SEL;
+	dftss0->tss_es	= KDS_SEL;
+	dftss0->tss_ss	= KDS_SEL;
+	dftss0->tss_fs	= KFS_SEL;
+	dftss0->tss_gs	= KGS_SEL;
 
 	/*
 	 * Set I/O bit map offset equal to size of TSS segment limit
 	 * for no I/O permission map. This will force all user I/O
 	 * instructions to generate #gp fault.
 	 */
-	ktss0.tss_bitmapbase = sizeof (ktss0);
+	ktss0->tss_bitmapbase = sizeof (*ktss0);
 
 	/*
 	 * Point %tr to descriptor for ktss0 in gdt.
@@ -1193,17 +1182,22 @@ init_desctbls(void)
 	 * on lwp context switches.
 	 */
 	ASSERT(IS_P2ALIGNED((uintptr_t)gdt, PAGESIZE));
-	CPU->cpu_m.mcpu_gdt = gdt;
+	CPU->cpu_gdt = gdt;
 	CPU->cpu_m.mcpu_gdtpa = pfn_to_pa(va_to_pfn(gdt));
 
 	/*
 	 * Setup and install our IDT.
 	 */
-	init_idt(&idt0[0]);
+#if !defined(__lint)
+	ASSERT(NIDT * sizeof (*idt0) <= PAGESIZE);
+#endif
+	idt0 = (gate_desc_t *)BOP_ALLOC(bootops, (caddr_t)IDT_VA,
+	    PAGESIZE, PAGESIZE);
+	init_idt(idt0);
 	for (vec = 0; vec < NIDT; vec++)
 		xen_idt_write(&idt0[vec], vec);
 
-	CPU->cpu_m.mcpu_idt = idt0;
+	CPU->cpu_idt = idt0;
 
 	/*
 	 * set default kernel stack
@@ -1225,21 +1219,44 @@ init_desctbls(void)
 	desctbr_t idtr;
 
 	/*
+	 * Allocate IDT and TSS structures on unique pages for better
+	 * performance in virtual machines.
+	 */
+#if !defined(__lint)
+	ASSERT(NIDT * sizeof (*idt0) <= PAGESIZE);
+#endif
+	idt0 = (gate_desc_t *)BOP_ALLOC(bootops, (caddr_t)IDT_VA,
+	    PAGESIZE, PAGESIZE);
+#if !defined(__lint)
+	ASSERT(sizeof (*ktss0) <= PAGESIZE);
+#endif
+	ktss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)KTSS_VA,
+	    PAGESIZE, PAGESIZE);
+
+#if defined(__i386)
+#if !defined(__lint)
+	ASSERT(sizeof (*dftss0) <= PAGESIZE);
+#endif
+	dftss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)DFTSS_VA,
+	    PAGESIZE, PAGESIZE);
+#endif
+
+	/*
 	 * Setup and install our GDT.
 	 */
 	gdt = init_gdt();
 	ASSERT(IS_P2ALIGNED((uintptr_t)gdt, PAGESIZE));
-	CPU->cpu_m.mcpu_gdt = gdt;
+	CPU->cpu_gdt = gdt;
 
 	/*
 	 * Setup and install our IDT.
 	 */
-	init_idt(&idt0[0]);
+	init_idt(idt0);
 
 	idtr.dtr_base = (uintptr_t)idt0;
-	idtr.dtr_limit = sizeof (idt0) - 1;
+	idtr.dtr_limit = (NIDT * sizeof (*idt0)) - 1;
 	wr_idtr(&idtr);
-	CPU->cpu_m.mcpu_idt = idt0;
+	CPU->cpu_idt = idt0;
 
 #if defined(__i386)
 	/*
@@ -1250,7 +1267,7 @@ init_desctbls(void)
 #endif	/* __i386 */
 
 	init_tss();
-	CPU->cpu_tss = &ktss0;
+	CPU->cpu_tss = ktss0;
 	init_ldt();
 }
 

@@ -286,12 +286,16 @@ extern "C" {
 #endif	/* __i386 */
 
 /*
- * Reserve two pages just below KERNEL_TEXT for the GDT and debug info page.
+ * Reserve pages just below KERNEL_TEXT for the GDT, IDT, TSS and debug info.
  */
 #if !defined(_ASM)
-#define	MISC_VA_BASE (KERNEL_TEXT - MMU_PAGESIZE * 2)
-#define	GDT_VA	(MISC_VA_BASE)
-#define	DEBUG_INFO_VA (MISC_VA_BASE + MMU_PAGESIZE)
+#define	GDT_VA		(KERNEL_TEXT - MMU_PAGESIZE)
+#define	IDT_VA		(GDT_VA - MMU_PAGESIZE)
+#define	KTSS_VA		(IDT_VA - MMU_PAGESIZE)
+#define	DFTSS_VA	(KTSS_VA - MMU_PAGESIZE)
+#define	DEBUG_INFO_VA	(DFTSS_VA - MMU_PAGESIZE)
+#define	MISC_VA_BASE	(DEBUG_INFO_VA)
+#define	MISC_VA_SIZE	(KERNEL_TEXT - MISC_VA_BASE)
 #endif /* !_ASM */
 
 #if !defined(_ASM) && !defined(_KMDB)

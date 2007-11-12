@@ -354,6 +354,8 @@ boot_mapin(caddr_t addr, size_t size)
 
 	for (eaddr = addr + size; addr < eaddr; addr += PAGESIZE) {
 		pfnum = va_to_pfn(addr);
+		if (pfnum == PFN_INVALID)
+			continue;
 		if ((pp = page_numtopp_nolock(pfnum)) == NULL)
 			panic("boot_mapin(): No pp for pfnum = %lx", pfnum);
 
