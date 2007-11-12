@@ -40,13 +40,14 @@
 # ...
 #
 
-P SUNWcar	Core Architecture, (Root)
-P SUNWcakr	Core Solaris Kernel Architecture (Root)
-P SUNWkvm	Core Architecture, (Kvm)
-P SUNWcsr	Core Solaris, (Root)
-P SUNWckr	Core Solaris Kernel (Root)
-P SUNWcnetr	Core Solaris Network Infrastructure (Root)
-P SUNWcsu	Core Solaris, (Usr)
-P SUNWcsd	Core Solaris Devices
-P SUNWcsl	Core Solaris Libraries
-P SUNWtecla	Tecla command-line editing library
+P SUNWcar		Core Architecture, (Root)
+P SUNWcakr		Core Solaris Kernel Architecture (Root)
+P SUNWkvm		Core Architecture, (Kvm)
+P SUNWcsr		Core Solaris, (Root)
+P SUNWckr		Core Solaris Kernel (Root)
+P SUNWcnetr		Core Solaris Network Infrastructure (Root)
+P SUNWcsu		Core Solaris, (Usr)
+P SUNWcsd		Core Solaris Devices
+P SUNWcsl		Core Solaris Libraries
+P SUNWtecla		Tecla command-line editing library
+P SUNWperl584core	Perl 5.8.4 (core)
