@@ -221,6 +221,11 @@
 ./src/lib/smbsrv/libsmbrdr/sparcv9/Makefile
 
 #
+# Ignore dtrace scripts only used by developers
+#
+./src/cmd/vscan/vscand/vscan.d
+
+#
 # Ignore files only used by lint.  Eventually, linting in these areas should
 # be tied into nightly, at which point these exceptions should be removed.
 #
