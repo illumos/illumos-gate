@@ -1862,8 +1862,10 @@ devfs_parse_binding_file(const char *binding_file,
 
 	if ((devpath = calloc(1, MAXPATHLEN)) == NULL)
 		return (ENOMEM);
-	if ((bindname = calloc(1, MAX_TOKEN_SIZE)) == NULL)
+	if ((bindname = calloc(1, MAX_TOKEN_SIZE)) == NULL) {
+		free(devpath);
 		return (ENOMEM);
+	}
 
 	if ((file.fp = fopen(binding_file, "r")) == NULL) {
 		free(devpath);
