@@ -337,7 +337,7 @@ fifo_open(vnode_t **vpp, int flag, cred_t *crp, caller_context_t *ct)
 	 * end has made it to close, we don't block forever in open)
 	 * fn_wnct == fn_wsynccnt (or fn_rcnt == fn_rsynccnt) indicates
 	 * that no writer (or reader) has yet made it through open
-	 * This has the side benifit of that the first
+	 * This has the side benefit of that the first
 	 * reader (or writer) will wait until the other end finishes open
 	 */
 	if (flag & FREAD) {
@@ -619,7 +619,7 @@ fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
 #if DEBUG
 		fn_dest_vp = FTOV(fn_dest);
 		if (fn_dest_vp->v_stream)
-		    ASSERT((fn_dest_vp->v_stream->sd_flag & STRMOUNT) == 0);
+			ASSERT((fn_dest_vp->v_stream->sd_flag & STRMOUNT) == 0);
 #endif
 		if (vp->v_stream != NULL) {
 			mutex_exit(&fn_lock->flk_lock);
@@ -643,7 +643,7 @@ fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
  *    (4) no data and FNDELAY flag is set.
  * Otherwise return
  *	EAGAIN if FNONBLOCK is set and no data to read
- *	EINTR if signal recieved while waiting for data
+ *	EINTR if signal received while waiting for data
  *
  * While there is no data to read....
  *   -  if the NDELAY/NONBLOCK flag is set, return 0/EAGAIN.
@@ -668,8 +668,7 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 
 	mutex_enter(&fn_lock->flk_lock);
 
-	TRACE_2(TR_FAC_FIFO,
-		TR_FIFOREAD_IN, "fifo_read in:%p fnp %p", vp, fnp);
+	TRACE_2(TR_FAC_FIFO, TR_FIFOREAD_IN, "fifo_read in:%p fnp %p", vp, fnp);
 
 	if (! (fnp->fn_flag & FIFOFAST))
 		goto stream_mode;
@@ -710,8 +709,7 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 		 */
 		fnp->fn_flag |= FIFOWANTR;
 
-		TRACE_1(TR_FAC_FIFO, TR_FIFOREAD_WAIT,
-			"fiforead wait: %p", vp);
+		TRACE_1(TR_FAC_FIFO, TR_FIFOREAD_WAIT, "fiforead wait: %p", vp);
 
 		if (!cv_wait_sig_swap(&fnp->fn_wait_cv,
 		    &fn_lock->flk_lock)) {
@@ -720,7 +718,7 @@ fifo_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *crp,
 		}
 
 		TRACE_1(TR_FAC_FIFO, TR_FIFOREAD_WAKE,
-			"fiforead awake: %p", vp);
+		    "fiforead awake: %p", vp);
 
 		/*
 		 * check to make sure we are still in fast mode
@@ -802,7 +800,7 @@ stream_mode:
 
 	mutex_exit(&fn_lock->flk_lock);
 	TRACE_1(TR_FAC_FIFO,
-		TR_FIFOREAD_STREAM, "fifo_read stream_mode:%p", vp);
+	    TR_FIFOREAD_STREAM, "fifo_read stream_mode:%p", vp);
 
 	error = strread(vp, uiop, crp);
 
@@ -819,9 +817,8 @@ done:
 			fnp->fn_dest->fn_atime = now;
 		fnp->fn_atime = now;
 	}
-	TRACE_2(TR_FAC_FIFO,
-		TR_FIFOREAD_OUT, "fifo_read out:%p error %d",
-		vp, error);
+	TRACE_2(TR_FAC_FIFO, TR_FIFOREAD_OUT,
+	    "fifo_read out:%p error %d", vp, error);
 	mutex_exit(&fn_lock->flk_lock);
 	return (error);
 }
@@ -879,9 +876,8 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 
 	mutex_enter(&fn_lock->flk_lock);
 
-	TRACE_3(TR_FAC_FIFO,
-		TR_FIFOWRITE_IN, "fifo_write in:%p fnp %p size %d",
-		vp, fnp, write_size);
+	TRACE_3(TR_FAC_FIFO, TR_FIFOWRITE_IN,
+	    "fifo_write in:%p fnp %p size %d", vp, fnp, write_size);
 
 	/*
 	 * oops, no readers, error
@@ -932,7 +928,7 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 			fnp->fn_flag |= FIFOWANTW;
 			fnp->fn_wwaitcnt++;
 			TRACE_1(TR_FAC_FIFO, TR_FIFOWRITE_WAIT,
-				"fifo_write wait: %p", vp);
+			    "fifo_write wait: %p", vp);
 			if (!cv_wait_sig_swap(&fnp->fn_wait_cv,
 			    &fn_lock->flk_lock)) {
 				error = EINTR;
@@ -943,7 +939,7 @@ fifo_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *crp,
 			fnp->fn_wwaitcnt--;
 
 			TRACE_1(TR_FAC_FIFO, TR_FIFOWRITE_WAKE,
-				"fifo_write wake: %p", vp);
+			    "fifo_write wake: %p", vp);
 
 			/*
 			 * check to make sure we're still in fast mode
@@ -1078,7 +1074,7 @@ stream_mode:
 
 	mutex_exit(&fn_lock->flk_lock);
 	TRACE_1(TR_FAC_FIFO,
-		TR_FIFOWRITE_STREAM, "fifo_write stream_mode:%p", vp);
+	    TR_FIFOWRITE_STREAM, "fifo_write stream_mode:%p", vp);
 
 	error = strwrite(vp, uiop, crp);
 
@@ -1100,14 +1096,13 @@ done:
 		goto epipe;
 	}
 	TRACE_3(TR_FAC_FIFO, TR_FIFOWRITE_OUT,
-		"fifo_write out: vp %p error %d fnp %p", vp, error, fnp);
+	    "fifo_write out: vp %p error %d fnp %p", vp, error, fnp);
 	mutex_exit(&fn_lock->flk_lock);
 	return (error);
 epipe:
 	error = EPIPE;
 	TRACE_3(TR_FAC_FIFO, TR_FIFOWRITE_OUT,
-		"fifo_write out: vp %p error %d fnp %p",
-		vp, error, fnp);
+	    "fifo_write out: vp %p error %d fnp %p", vp, error, fnp);
 	mutex_exit(&fn_lock->flk_lock);
 	tsignal(curthread, SIGPIPE);
 	return (error);
@@ -1125,8 +1120,8 @@ fifo_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
 	 * associated with acquiring the lock
 	 */
 	return ((VTOF(vp)->fn_flag & FIFOFAST) ?
-		fifo_fastioctl(vp, cmd, arg, mode, cr, rvalp) :
-		fifo_strioctl(vp, cmd, arg, mode, cr, rvalp));
+	    fifo_fastioctl(vp, cmd, arg, mode, cr, rvalp) :
+	    fifo_strioctl(vp, cmd, arg, mode, cr, rvalp));
 }
 
 static int
@@ -1211,7 +1206,7 @@ fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
 		 * probably use getmsg() anyway). but it doesn't hurt
 		 */
 		error = copyout((caddr_t)&fnp->fn_count, (caddr_t)arg,
-			sizeof (cnt));
+		    sizeof (cnt));
 		if (error == 0) {
 			*rvalp = (fnp->fn_count == 0) ? 0 : 1;
 		}
@@ -1222,12 +1217,13 @@ fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
 		break;
 
 	case I_PEEK:
-	    {
+	{
 		STRUCT_DECL(strpeek, strpeek);
 		struct uio	uio;
 		struct iovec	iov;
 		int		count;
 		mblk_t		*bp;
+		int		len;
 
 		STRUCT_INIT(strpeek, mode);
 
@@ -1249,46 +1245,49 @@ fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		iov.iov_base = STRUCT_FGETP(strpeek, databuf.buf);
-		iov.iov_len = STRUCT_FGET(strpeek, databuf.maxlen);
-		uio.uio_iov = &iov;
-		uio.uio_iovcnt = 1;
-		uio.uio_loffset = 0;
-		uio.uio_segflg = UIO_USERSPACE;
-		uio.uio_fmode = 0;
-		/* For pipes copy should not bypass cache */
-		uio.uio_extflg = UIO_COPY_CACHED;
-		uio.uio_resid = iov.iov_len;
-		count = fnp->fn_count;
-		bp = fnp->fn_mp;
-		while (count > 0 && uio.uio_resid) {
-			cnt = MIN(uio.uio_resid, bp->b_wptr - bp->b_rptr);
-			if ((error = uiomove((char *)bp->b_rptr, cnt,
-			    UIO_READ, &uio)) != 0) {
-				break;
+		len = STRUCT_FGET(strpeek, databuf.maxlen);
+		if (len <= 0) {
+			STRUCT_FSET(strpeek, databuf.len, len);
+		} else {
+			iov.iov_base = STRUCT_FGETP(strpeek, databuf.buf);
+			iov.iov_len = len;
+			uio.uio_iov = &iov;
+			uio.uio_iovcnt = 1;
+			uio.uio_loffset = 0;
+			uio.uio_segflg = UIO_USERSPACE;
+			uio.uio_fmode = 0;
+			/* For pipes copy should not bypass cache */
+			uio.uio_extflg = UIO_COPY_CACHED;
+			uio.uio_resid = iov.iov_len;
+			count = fnp->fn_count;
+			bp = fnp->fn_mp;
+			while (count > 0 && uio.uio_resid) {
+				cnt = MIN(uio.uio_resid, MBLKL(bp));
+				if ((error = uiomove((char *)bp->b_rptr, cnt,
+				    UIO_READ, &uio)) != 0) {
+					break;
+				}
+				count -= cnt;
+				bp = bp->b_cont;
 			}
-			count -= cnt;
-			bp = bp->b_cont;
+			STRUCT_FSET(strpeek, databuf.len, len - uio.uio_resid);
 		}
-		STRUCT_FSET(strpeek, databuf.len,
-		    STRUCT_FGET(strpeek, databuf.maxlen) - uio.uio_resid);
 		STRUCT_FSET(strpeek, flags, 0);
-		STRUCT_FSET(strpeek, ctlbuf.len,
-		    STRUCT_FGET(strpeek, ctlbuf.maxlen));
+		STRUCT_FSET(strpeek, ctlbuf.len, -1);
 
 		error = copyout(STRUCT_BUF(strpeek), (caddr_t)arg,
 		    STRUCT_SIZE(strpeek));
-		if (error == 0)
+		if (error == 0 && len >= 0)
 			*rvalp = 1;
 		break;
-	    }
+	}
 
 	case FIONREAD:
 		/*
 		 * let user know total number of bytes in message queue
 		 */
 		error = copyout((caddr_t)&fnp->fn_count, (caddr_t)arg,
-			sizeof (fnp->fn_count));
+		    sizeof (fnp->fn_count));
 		if (error == 0)
 			*rvalp = 0;
 		break;
@@ -1410,7 +1409,7 @@ fifo_strioctl(vnode_t *vp, int cmd, intptr_t arg, int mode,
 	 * The FIFOSEND flag is set to inform other processes that a file
 	 * descriptor is pending at the stream head of this pipe.
 	 * The flag is cleared and the sending process is awoken when
-	 * this process has completed recieving the file descriptor.
+	 * this process has completed receiving the file descriptor.
 	 * XXX This could become out of sync if the process does I_SENDFDs
 	 * and opens on connld attached to the same pipe.
 	 */
@@ -1953,7 +1952,7 @@ fifo_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp,
 	if (VTOF(vp)->fn_realvp) {
 		(void) VOP_RWLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, ct);
 		error = VOP_SETSECATTR(VTOF(vp)->fn_realvp, vsap, flag,
-				crp, ct);
+		    crp, ct);
 		VOP_RWUNLOCK(VTOF(vp)->fn_realvp, V_WRITELOCK_TRUE, ct);
 		return (error);
 	} else
@@ -1970,7 +1969,7 @@ fifo_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *crp,
 {
 	if (VTOF(vp)->fn_realvp)
 		return (VOP_GETSECATTR(VTOF(vp)->fn_realvp, vsap, flag,
-			crp, ct));
+		    crp, ct));
 	else
 		return (fs_fab_acl(vp, vsap, flag, crp, ct));
 }
