@@ -812,14 +812,14 @@ ibnex_ibtl_callback(ibtl_ibnex_cb_args_t *cb_args)
 		 * and put IB nexus default busops vector in its place.
 		 */
 		hca_dev_ops = ((struct modldrv *)
-			(cb_args->cb_modlp->ml_linkage[0]))->drv_dev_ops;
+		    (cb_args->cb_modlp->ml_linkage[0]))->drv_dev_ops;
 		ASSERT((hca_dev_ops) && (hca_dev_ops->devo_bus_ops == NULL));
 		hca_dev_ops->devo_bus_ops = &ibnex_ci_busops;
 		break;
 
 	case IBTL_IBNEX_IBC_FINI:
 		hca_dev_ops = ((struct modldrv *)
-			(cb_args->cb_modlp->ml_linkage[0]))->drv_dev_ops;
+		    (cb_args->cb_modlp->ml_linkage[0]))->drv_dev_ops;
 		hca_dev_ops->devo_bus_ops = NULL;
 		break;
 
@@ -1454,13 +1454,15 @@ ibnex_config_all_children(dev_info_t *parent)
 	ndi_devi_enter(parent, &circ);
 	hca_guid = ibtl_ibnex_hcadip2guid(parent);
 	wait_time = ibdm_ibnex_get_waittime(
-		hca_guid, &ibnex_port_settling_time);
+	    hca_guid, &ibnex_port_settling_time);
 	if (wait_time) {
 		delay(drv_usectohz(wait_time * 1000000));
 	}
 	hca_list = ibdm_ibnex_get_hca_info_by_guid(hca_guid);
-	if (hca_list == NULL)
+	if (hca_list == NULL) {
+		ndi_devi_exit(parent, circ);
 		return;
+	}
 	ibnex_create_hcasvc_nodes(parent, hca_list->hl_hca_port_attr);
 	for (ii = 0; ii < hca_list->hl_nports; ii++) {
 		ibnex_create_port_nodes(
@@ -1481,7 +1483,7 @@ ibnex_config_all_children(dev_info_t *parent)
 
 	/* Enumerate all the IOC's */
 	wait_time = ibdm_ibnex_get_waittime(
-		0, &ibnex_port_settling_time);
+	    0, &ibnex_port_settling_time);
 	if (wait_time)
 		delay(drv_usectohz(wait_time * 1000000));
 
@@ -1570,8 +1572,8 @@ ibnex_create_vppa_nodes(dev_info_t *parent, ibdm_port_attr_t *port_attr)
 			    port_attr->pa_port_guid, idx, pkey, &dip);
 			if (rval != IBNEX_SUCCESS) {
 				(void) ibnex_commsvc_initnode(parent, port_attr,
-					idx, IBNEX_VPPA_COMMSVC_NODE,
-					pkey, &rval, IBNEX_CFGADM_ENUMERATE);
+				    idx, IBNEX_VPPA_COMMSVC_NODE,
+				    pkey, &rval, IBNEX_CFGADM_ENUMERATE);
 				IBTF_DPRINTF_L5("ibnex", "\tcreate_vppa_nodes: "
 				    "commsvc_initnode failed rval %x", rval);
 			}
@@ -1704,7 +1706,7 @@ ibnex_config_port_node(dev_info_t *parent, char *devname)
 
 		if (port_attr->pa_state != IBT_PORT_ACTIVE) {
 			wait_time = ibdm_ibnex_get_waittime(
-				hca_guid, &ibnex_port_settling_time);
+			    hca_guid, &ibnex_port_settling_time);
 			if (wait_time) {
 				delay(drv_usectohz(wait_time * 1000000));
 			}
@@ -1821,7 +1823,7 @@ ibnex_config_obp_args(dev_info_t *parent, char *devname)
 	}
 	for (index = 0; index < ibnex.ibnex_nvppa_comm_svcs; index++) {
 		if (strcmp(ibnex.ibnex_vppa_comm_svc_names[index],
-			"ipib") == 0) {
+		    "ipib") == 0) {
 			break;
 		}
 	}
@@ -1923,7 +1925,7 @@ ibnex_get_pkey_commsvc_index_portnum(char *device_name, int *index,
 	int  	ii, ncommsvcs, ret;
 
 	if (ibnex_devname_to_portnum(device_name, port_num) !=
-		IBNEX_SUCCESS) {
+	    IBNEX_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tget_pkey_commsvc_index_portnum: Invalid PortGuid");
 		return (NULL);
@@ -2376,10 +2378,10 @@ ibnex_ioc_create_pi(ibdm_ioc_info_t *ioc_info, ibnex_node_data_t *node_data,
 	IBTF_DPRINTF_L4("ibnex", "\tibnex_ioc_create_pi Begin");
 
 	(void) snprintf(ioc_guid, 33, "%llX",
-		(longlong_t)ioc_info->ioc_profile.ioc_guid);
+	    (longlong_t)ioc_info->ioc_profile.ioc_guid);
 	(void) snprintf(phci_guid, 66, "%llX,%llX",
-		(longlong_t)ioc_info->ioc_profile.ioc_guid,
-		(longlong_t)ioc_info->ioc_iou_guid);
+	    (longlong_t)ioc_info->ioc_profile.ioc_guid,
+	    (longlong_t)ioc_info->ioc_iou_guid);
 
 	hca_list = ioc_info->ioc_hca_list;
 
@@ -2505,7 +2507,7 @@ ibnex_create_ioc_node_prop(ibdm_ioc_info_t *ioc_info, dev_info_t *cdip)
 
 	capabilities = (ioc_profile->ioc_ctrl_opcap_mask << 8);
 	if (ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
-		"capabilities", capabilities) != DDI_PROP_SUCCESS) {
+	    "capabilities", capabilities) != DDI_PROP_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tcreate_ioc_node_prop: capabilities create failed");
 		return (IBNEX_FAILURE);
@@ -3220,14 +3222,14 @@ ibnex_create_port_node_prop(ibdm_port_attr_t *port_attr,
 	 */
 	if (port_attr->pa_port_num != 0) {
 		if (ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"port-number", port_attr->pa_port_num) !=
+		    "port-number", port_attr->pa_port_num) !=
 		    DDI_PROP_SUCCESS) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "\tcreate_port_node_prop: port-num update failed");
 			return (IBNEX_FAILURE);
 		}
 		if (ndi_prop_update_int64(DDI_DEV_T_NONE, child_dip,
-			"port-guid", port_attr->pa_port_guid) !=
+		    "port-guid", port_attr->pa_port_guid) !=
 		    DDI_PROP_SUCCESS) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "\tcreate_port_node_prop: port-guid update failed");
@@ -3283,7 +3285,7 @@ ibnex_create_port_node_prop(ibdm_port_attr_t *port_attr,
 		}
 
 		if (ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-			"num-ports", hca_list->hl_nports) != DDI_PROP_SUCCESS) {
+		    "num-ports", hca_list->hl_nports) != DDI_PROP_SUCCESS) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "\tcreate_port_node_prop: num-ports update failed");
 			ibdm_ibnex_free_hca_list(hca_list);
@@ -3293,19 +3295,19 @@ ibnex_create_port_node_prop(ibdm_port_attr_t *port_attr,
 	}
 
 	if (ndi_prop_update_int64(DDI_DEV_T_NONE, child_dip,
-		"hca-guid", port_attr->pa_hca_guid) != DDI_PROP_SUCCESS) {
+	    "hca-guid", port_attr->pa_hca_guid) != DDI_PROP_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tcreate_port_node_prop: hca-guid update failed");
 		return (IBNEX_FAILURE);
 	}
 	if (ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-		"product-id", port_attr->pa_productid) != DDI_PROP_SUCCESS) {
+	    "product-id", port_attr->pa_productid) != DDI_PROP_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tcreate_port_node_prop: product-id update failed");
 		return (IBNEX_FAILURE);
 	}
 	if (ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
-		"vendor-id", port_attr->pa_vendorid) != DDI_PROP_SUCCESS) {
+	    "vendor-id", port_attr->pa_vendorid) != DDI_PROP_SUCCESS) {
 		IBTF_DPRINTF_L2("ibnex",
 		    "\tcreate_port_node_prop: vendor-id update failed");
 		return (IBNEX_FAILURE);
@@ -3921,7 +3923,7 @@ ibnex_update_prop(ibnex_node_data_t *node_data, ibdm_ioc_info_t *ioc_info)
 	    (node_data->node_reprobe_state &
 	    IBNEX_NODE_REPROBE_NOTIFY_ALWAYS)) &&
 	    ((node_data->node_state == IBNEX_CFGADM_CONFIGURED) &&
-		    (evt_cookie != NULL))) {
+	    (evt_cookie != NULL))) {
 			mutex_exit(&ibnex.ibnex_mutex);
 
 			if (ndi_post_event(ibnex.ibnex_dip, dip,
