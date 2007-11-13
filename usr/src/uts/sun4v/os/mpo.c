@@ -184,6 +184,172 @@ mblock_sort(struct mblock_md *mblocks, int n)
 	qsort(mblocks, n, sizeof (mblocks[0]), mblock_cmp);
 }
 
+static void
+mpo_update_tunables(void)
+{
+	int i, ncpu_min;
+
+	/*
+	 * lgrp_expand_proc_thresh is the minimum load on the lgroups
+	 * this process is currently running on before considering
+	 *  expanding threads to another lgroup.
+	 *
+	 * lgrp_expand_proc_diff determines how much less the remote lgroup
+	 *  must be loaded before expanding to it.
+	 *
+	 * On sun4v CMT processors, threads share a core pipeline, and
+	 * at less than 100% utilization, best throughput is obtained by
+	 * spreading threads across more cores, even if some are in a
+	 * different lgroup.  Spread threads to a new lgroup if the
+	 * current group is more than 50% loaded.  Because of virtualization,
+	 * lgroups may have different numbers of CPUs, but the tunables
+	 * apply to all lgroups, so find the smallest lgroup and compute
+	 * 50% loading.
+	 */
+
+	ncpu_min = NCPU;
+	for (i = 0; i < n_lgrpnodes; i++) {
+		int ncpu = mpo_lgroup[i].ncpu;
+		if (ncpu != 0 && ncpu < ncpu_min)
+			ncpu_min = ncpu;
+	}
+	lgrp_expand_proc_thresh = ncpu_min * lgrp_loadavg_max_effect / 2;
+
+	/* new home may only be half as loaded as the existing home to use it */
+	lgrp_expand_proc_diff = lgrp_expand_proc_thresh / 2;
+
+	lgrp_loadavg_tolerance = lgrp_loadavg_max_effect;
+}
+
+static mde_cookie_t
+cpuid_to_cpunode(md_t *md, int cpuid)
+{
+	mde_cookie_t    rootnode, foundnode, *cpunodes;
+	uint64_t	cpuid_prop;
+	int 	n_cpunodes, i;
+
+	if (md == NULL)
+		return (MDE_INVAL_ELEM_COOKIE);
+
+	rootnode = md_root_node(md);
+	if (rootnode == MDE_INVAL_ELEM_COOKIE)
+		return (MDE_INVAL_ELEM_COOKIE);
+
+	n_cpunodes = md_alloc_scan_dag(md, rootnode, PROP_LG_CPU,
+	    "fwd", &cpunodes);
+	if (n_cpunodes <= 0 || n_cpunodes > NCPU)
+		goto cpuid_fail;
+
+	for (i = 0; i < n_cpunodes; i++) {
+		if (md_get_prop_val(md, cpunodes[i], PROP_LG_CPU_ID,
+		    &cpuid_prop))
+			break;
+		if (cpuid_prop == (uint64_t)cpuid) {
+			foundnode = cpunodes[i];
+			md_free_scan_dag(md, &cpunodes);
+			return (foundnode);
+		}
+	}
+cpuid_fail:
+	if (n_cpunodes > 0)
+		md_free_scan_dag(md, &cpunodes);
+	return (MDE_INVAL_ELEM_COOKIE);
+}
+
+static int
+mpo_cpu_to_lgroup(md_t *md, mde_cookie_t cpunode)
+{
+	mde_cookie_t *nodes;
+	uint64_t latency, lowest_latency;
+	uint64_t address_match, lowest_address_match;
+	int n_lgroups, j, result = 0;
+
+	/* Find lgroup nodes reachable from this cpu */
+	n_lgroups = md_alloc_scan_dag(md, cpunode, PROP_LG_MEM_LG,
+	    "fwd", &nodes);
+
+	lowest_latency = ~(0UL);
+
+	/* Find the lgroup node with the smallest latency */
+	for (j = 0; j < n_lgroups; j++) {
+		result = get_int(md, nodes[j], PROP_LG_LATENCY,
+		    &latency);
+		result |= get_int(md, nodes[j], PROP_LG_MATCH,
+		    &address_match);
+		if (result != 0) {
+			j = -1;
+			goto to_lgrp_done;
+		}
+		if (latency < lowest_latency) {
+			lowest_latency = latency;
+			lowest_address_match = address_match;
+		}
+	}
+	for (j = 0; j < n_lgrpnodes; j++) {
+		if ((mpo_lgroup[j].latency == lowest_latency) &&
+		    (mpo_lgroup[j].addr_match == lowest_address_match))
+			break;
+	}
+	if (j == n_lgrpnodes)
+		j = -1;
+
+to_lgrp_done:
+	if (n_lgroups > 0)
+		md_free_scan_dag(md, &nodes);
+	return (j);
+}
+
+/* Called when DR'ing in a CPU */
+void
+mpo_cpu_add(int cpuid)
+{
+	md_t *md;
+	mde_cookie_t cpunode;
+
+	int i;
+
+	if (n_lgrpnodes <= 0)
+		return;
+
+	md = md_get_handle();
+
+	if (md == NULL)
+		goto add_fail;
+
+	cpunode = cpuid_to_cpunode(md, cpuid);
+	if (cpunode == MDE_INVAL_ELEM_COOKIE)
+		goto add_fail;
+
+	i = mpo_cpu_to_lgroup(md, cpunode);
+	if (i == -1)
+		goto add_fail;
+
+	mpo_cpu[cpuid].lgrp_index = i;
+	mpo_cpu[cpuid].home = mpo_lgroup[i].addr_match >> home_mask_shift;
+	mpo_lgroup[i].ncpu++;
+	mpo_update_tunables();
+	(void) md_fini_handle(md);
+	return;
+add_fail:
+	panic("mpo_cpu_add: Cannot read MD");
+}
+
+/* Called when DR'ing out a CPU */
+void
+mpo_cpu_remove(int cpuid)
+{
+	int i;
+
+	if (n_lgrpnodes <= 0)
+		return;
+
+	i = mpo_cpu[cpuid].lgrp_index;
+	mpo_lgroup[i].ncpu--;
+	mpo_cpu[cpuid].home = 0;
+	mpo_cpu[cpuid].lgrp_index = -1;
+	mpo_update_tunables();
+}
+
 /*
  *
  * Traverse the MD to determine:
@@ -198,7 +364,6 @@ lgrp_traverse(md_t *md)
 {
 	mde_cookie_t root, *cpunodes, *lgrpnodes, *nodes, *mblocknodes;
 	uint64_t i, j, k, o, n_nodes;
-	uint64_t n_lgroups = 0;
 	uint64_t mem_lg_homeset = 0;
 	int ret_val = 0;
 	int result = 0;
@@ -252,7 +417,7 @@ lgrp_traverse(md_t *md)
 		mem_stripes = &small_mem_stripes[0];
 	} else {
 		allocsz = mmu_ptob(mmu_btopr(mblocksz + mstripesz));
-		/* Ensure that we dont request more space than reserved */
+	/* Ensure that we dont request more space than reserved */
 		if (allocsz > MPOBUF_SIZE) {
 			MPO_STATUS("lgrp_traverse: Insufficient space "
 			    "for mblock structures \n");
@@ -274,10 +439,8 @@ lgrp_traverse(md_t *md)
 
 		mem_stripes = (mem_stripe_t *)(mpo_mblock + n_mblocks);
 	}
-
 	for (i = 0; i < n_mblocks; i++) {
 		mpo_mblock[i].node = mblocknodes[i];
-		mpo_mblock[i].mnode_mask = (mnodeset_t)0;
 
 		/* Without a base or size value we will fail */
 		result = get_int(md, mblocknodes[i], PROP_LG_BASE,
@@ -500,14 +663,13 @@ lgrp_traverse(md_t *md)
 
 	for (i = 0; i < NCPU; i++) {
 		mpo_cpu[i].home = 0;
-		mpo_cpu[i].latency = (uint_t)(-1);
+		mpo_cpu[i].lgrp_index = -1;
 	}
 
 	/* Build the CPU nodes */
 	for (i = 0; i < n_cpunodes; i++) {
 
 		/* Read in the lgroup nodes */
-
 		result = get_int(md, cpunodes[i], PROP_LG_CPU_ID, &k);
 		if (result < 0) {
 			MPO_STATUS("lgrp_traverse: PROP_LG_CPU_ID missing\n");
@@ -515,38 +677,15 @@ lgrp_traverse(md_t *md)
 			goto fail;
 		}
 
-		n_lgroups = md_alloc_scan_dag(md, cpunodes[i], PROP_LG_MEM_LG,
-		    "fwd", &nodes);
-		if (n_lgroups <= 0) {
-			MPO_STATUS("lgrp_traverse: PROP_LG_MEM_LG missing");
+		o = mpo_cpu_to_lgroup(md, cpunodes[i]);
+		if (o == -1) {
 			ret_val = -1;
 			goto fail;
 		}
-
-		/*
-		 * Find the lgroup this cpu belongs to with the lowest latency.
-		 * Check all the lgrp nodes connected to this CPU to determine
-		 * which has the smallest latency.
-		 */
-
-		for (j = 0; j < n_lgroups; j++) {
-			for (o = 0; o < n_lgrpnodes; o++) {
-				if (nodes[j] == mpo_lgroup[o].node) {
-					if (mpo_lgroup[o].latency <
-					    mpo_cpu[k].latency) {
-						mpo_cpu[k].home =
-						    mpo_lgroup[o].addr_match
-						    >> home_mask_shift;
-						mpo_cpu[k].latency =
-						    mpo_lgroup[o].latency;
-						mpo_lgroup[o].ncpu++;
-					}
-				}
-			}
-		}
-		md_free_scan_dag(md, &nodes);
+		mpo_cpu[k].lgrp_index = o;
+		mpo_cpu[k].home = mpo_lgroup[o].addr_match >> home_mask_shift;
+		mpo_lgroup[o].ncpu++;
 	}
-
 	/* Validate that no large pages cross mnode boundaries. */
 	if (valid_pages(md, cpunodes[0]) == 0) {
 		ret_val = -1;
@@ -613,7 +752,7 @@ void
 plat_lgrp_init(void)
 {
 	md_t *md;
-	int i, rc, ncpu_min;
+	int rc;
 
 	/* Get the Machine Descriptor handle */
 
@@ -648,37 +787,6 @@ plat_lgrp_init(void)
 	/* Use lgroup-aware TSB allocations */
 	tsb_lgrp_affinity = 1;
 
-	/*
-	 * lgrp_expand_proc_thresh is the minimum load on the lgroups
-	 * this process is currently running on before considering
-	 * expanding threads to another lgroup.
-	 *
-	 * lgrp_expand_proc_diff determines how much less the remote lgroup
-	 * must be loaded before expanding to it.
-	 *
-	 * On sun4v CMT processors, threads share a core pipeline, and
-	 * at less than 100% utilization, best throughput is obtained by
-	 * spreading threads across more cores, even if some are in a
-	 * different lgroup.  Spread threads to a new lgroup if the
-	 * current group is more than 50% loaded.  Because of virtualization,
-	 * lgroups may have different numbers of CPUs, but the tunables
-	 * apply to all lgroups, so find the smallest lgroup and compute
-	 * 50% loading.
-	 */
-
-	ncpu_min = NCPU;
-	for (i = 0; i < n_lgrpnodes; i++) {
-		int ncpu = mpo_lgroup[i].ncpu;
-		if (ncpu != 0 && ncpu < ncpu_min)
-			ncpu_min = ncpu;
-	}
-	lgrp_expand_proc_thresh = ncpu_min * lgrp_loadavg_max_effect / 2;
-
-	/* new home may only be half as loaded as the existing home to use it */
-	lgrp_expand_proc_diff = lgrp_expand_proc_thresh / 2;
-
-	lgrp_loadavg_tolerance = lgrp_loadavg_max_effect;
-
 	/* Require that a home lgroup have some memory to be chosen */
 	lgrp_mem_free_thresh = 1;
 
@@ -687,6 +795,8 @@ plat_lgrp_init(void)
 
 	/* Disable option to choose root lgroup if all leaf lgroups are busy */
 	lgrp_load_thresh = UINT32_MAX;
+
+	mpo_update_tunables();
 }
 
 /*
@@ -802,7 +912,7 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	stripe_shift = highbit(max_locality_groups) - 1;
 
 	for (i = 0; i < n_mblocks; i++) {
-
+		mpo_mblock[i].mnode_mask = (mnodeset_t)0;
 		base = mpo_mblock[i].base;
 		end = mpo_mblock[i].base + mpo_mblock[i].size;
 		ra_to_pa = mpo_mblock[i].ra_to_pa;

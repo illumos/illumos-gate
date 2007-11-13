@@ -64,7 +64,7 @@ extern "C" {
 
 struct cpu_md {
 	uint_t 	home;
-	uint64_t  latency;
+	int	lgrp_index;
 };
 
 /* Structure to store mem-lg information from the MD */
@@ -108,6 +108,8 @@ typedef struct {
 /* These are used when MPO requires preallocated kvseg32 space */
 extern	caddr_t	mpo_heap32_buf;
 extern	size_t	mpo_heap32_bufsz;
+extern void mpo_cpu_add(int cpuid);
+extern void mpo_cpu_remove(int cpuid);
 
 #ifdef	__cplusplus
 }

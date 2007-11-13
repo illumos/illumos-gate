@@ -34,6 +34,7 @@
 #include <sys/ldoms.h>
 #include <sys/hypervisor_api.h>
 #include <sys/soft_state.h>
+#include <sys/mpo.h>
 
 /*
  * Useful for disabling MP bring-up for an MP capable kernel
@@ -122,6 +123,8 @@ mp_cpu_unconfigure(int cpuid)
 	retval = cleanup_cpu_common(cpuid);
 
 	empty_cpu(cpuid);
+
+	mpo_cpu_remove(cpuid);
 
 	return (retval);
 }
@@ -218,6 +221,8 @@ mp_cpu_configure(int cpuid)
 		return (ENODEV);
 
 	kmem_free(listp, listsz);
+
+	mpo_cpu_add(cpuid);
 
 	/*
 	 * Note: uses cpu_lock to protect cpunodes
