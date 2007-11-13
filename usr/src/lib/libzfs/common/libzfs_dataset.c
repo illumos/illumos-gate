@@ -1975,6 +1975,8 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		break;
 
 	case ZFS_PROP_VERSION:
+		if (!zfs_prop_valid_for_type(prop, zhp->zfs_head_type))
+			return (-1);
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_OBJSET_VERSION, &zc) ||
 		    (zc.zc_cookie == 0)) {

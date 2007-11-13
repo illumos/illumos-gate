@@ -150,7 +150,7 @@ changelist_postfix(prop_changelist_t *clp)
 {
 	prop_changenode_t *cn;
 	char shareopts[ZFS_MAXPROPLEN];
-	int ret = 0;
+	int errors = 0;
 	libzfs_handle_t *hdl;
 
 	/*
@@ -180,7 +180,8 @@ changelist_postfix(prop_changelist_t *clp)
 
 	/*
 	 * We walk the datasets in reverse, because we want to mount any parent
-	 * datasets before mounting the children.
+	 * datasets before mounting the children.  We walk all datasets even if
+	 * there are errors.
 	 */
 	for (cn = uu_list_last(clp->cl_list); cn != NULL;
 	    cn = uu_list_prev(clp->cl_list, cn)) {
@@ -205,7 +206,7 @@ changelist_postfix(prop_changelist_t *clp)
 			if (clp->cl_realprop == ZFS_PROP_NAME &&
 			    zvol_create_link(cn->cn_handle->zfs_hdl,
 			    cn->cn_handle->zfs_name) != 0) {
-				ret = -1;
+				errors++;
 			} else if (cn->cn_shared ||
 			    clp->cl_prop == ZFS_PROP_SHAREISCSI) {
 				if (zfs_prop_get(cn->cn_handle,
@@ -213,9 +214,11 @@ changelist_postfix(prop_changelist_t *clp)
 				    sizeof (shareopts), NULL, NULL, 0,
 				    B_FALSE) == 0 &&
 				    strcmp(shareopts, "off") == 0) {
-					ret = zfs_unshare_iscsi(cn->cn_handle);
+					errors +=
+					    zfs_unshare_iscsi(cn->cn_handle);
 				} else {
-					ret = zfs_share_iscsi(cn->cn_handle);
+					errors +=
+					    zfs_share_iscsi(cn->cn_handle);
 				}
 			}
 
@@ -237,26 +240,23 @@ changelist_postfix(prop_changelist_t *clp)
 		if ((cn->cn_mounted || clp->cl_waslegacy || sharenfs ||
 		    sharesmb) && !zfs_is_mounted(cn->cn_handle, NULL) &&
 		    zfs_mount(cn->cn_handle, NULL, 0) != 0)
-			ret = -1;
+			errors++;
 
 		/*
 		 * We always re-share even if the filesystem is currently
 		 * shared, so that we can adopt any new options.
 		 */
-		if (cn->cn_shared || clp->cl_waslegacy ||
-		    sharenfs || sharesmb) {
-			if (sharenfs)
-				ret = zfs_share_nfs(cn->cn_handle);
-			else
-				ret = zfs_unshare_nfs(cn->cn_handle, NULL);
-			if (sharesmb)
-				ret = zfs_share_smb(cn->cn_handle);
-			else
-				ret = zfs_unshare_smb(cn->cn_handle, NULL);
-		}
+		if (sharenfs)
+			errors += zfs_share_nfs(cn->cn_handle);
+		else if (cn->cn_shared || clp->cl_waslegacy)
+			errors += zfs_unshare_nfs(cn->cn_handle, NULL);
+		if (sharesmb)
+			errors += zfs_share_smb(cn->cn_handle);
+		else if (cn->cn_shared || clp->cl_waslegacy)
+			errors += zfs_unshare_smb(cn->cn_handle, NULL);
 	}
 
-	return (ret);
+	return (errors ? -1 : 0);
 }
 
 /*
