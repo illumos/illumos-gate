@@ -95,6 +95,23 @@ idmap_null_1_svc(void *result, struct svc_req *rqstp) {
 #define	IS_REQUEST_GID(request)\
 	request.id1.idtype == IDMAP_GID
 
+/*
+ * RPC layer allocates empty strings to replace NULL char *.
+ * This utility function frees these empty strings.
+ */
+static void
+sanitize_mapping_request(idmap_mapping *req)
+{
+	free(req->id1name);
+	req->id1name = NULL;
+	free(req->id1domain);
+	req->id1domain = NULL;
+	free(req->id2name);
+	req->id2name = NULL;
+	free(req->id2domain);
+	req->id2domain = NULL;
+}
+
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
@@ -154,6 +171,8 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	/* First stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
 		state.curpos = i;
+		(void) sanitize_mapping_request(
+		    &batch.idmap_mapping_batch_val[i]);
 		if (IS_BATCH_SID(batch, i)) {
 			retcode = sid2pid_first_pass(
 				&state,
