@@ -179,8 +179,14 @@ _nscd_restart_if_cfgfile_changed()
 	static timestruc_t	last_nsswitch_check = { 0 };
 	static timestruc_t	last_nsswitch_modified = { 0 };
 	static timestruc_t	last_resolv_modified = { 0 };
+	static mutex_t		restarting_lock = DEFAULTMUTEX;
+	static int 		restarting = 0;
+	int			restart = 0;
 	time_t			now = time(NULL);
 	char			*me = "_nscd_restart_if_cfgfile_changed";
+
+	if (restarting == 1)
+		return;
 
 	if (now - last_nsswitch_check.tv_sec < _NSC_FILE_CHECK_TIME)
 		return;
@@ -228,7 +234,17 @@ _nscd_restart_if_cfgfile_changed()
 		    (last_resolv_modified.tv_sec == res_buf.st_mtim.tv_sec &&
 		    last_resolv_modified.tv_nsec < res_buf.st_mtim.tv_nsec)))) {
 
-			static mutex_t exit_lock = DEFAULTMUTEX;
+			if (restarting == 0) {
+				(void) mutex_lock(&restarting_lock);
+					if (restarting == 0) {
+						restarting = 1;
+						restart = 1;
+					}
+				(void) mutex_unlock(&restarting_lock);
+			}
+		}
+
+		if (restart == 1) {
 			char *fmri;
 
 			/*
@@ -254,9 +270,6 @@ _nscd_restart_if_cfgfile_changed()
 				(void) execv(main_execname, main_argv);
 				exit(1); /* just in case */
 			}
-
-			/* prevent multiple restarts */
-			(void) mutex_lock(&exit_lock);
 
 			if (smf_restart_instance(fmri) == 0)
 				(void) sleep(10); /* wait a bit */
