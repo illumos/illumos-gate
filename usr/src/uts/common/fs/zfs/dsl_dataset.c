@@ -374,6 +374,28 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 			}
 		}
 
+		if (!dsl_dataset_is_snapshot(ds)) {
+			boolean_t need_lock =
+			    !RW_LOCK_HELD(&dp->dp_config_rwlock);
+
+			if (need_lock)
+				rw_enter(&dp->dp_config_rwlock, RW_READER);
+
+			err = dsl_prop_get_ds_locked(ds->ds_dir,
+			    "refreservation", sizeof (uint64_t), 1,
+			    &ds->ds_reserved, NULL);
+			if (err == 0) {
+				err = dsl_prop_get_ds_locked(ds->ds_dir,
+				    "refquota", sizeof (uint64_t), 1,
+				    &ds->ds_quota, NULL);
+			}
+
+			if (need_lock)
+				rw_exit(&dp->dp_config_rwlock);
+		} else {
+			ds->ds_reserved = ds->ds_quota = 0;
+		}
+
 		if (err == 0) {
 			winner = dmu_buf_set_user_ie(dbuf, ds, &ds->ds_phys,
 			    dsl_dataset_evict);
@@ -397,24 +419,6 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 		} else {
 			ds->ds_fsid_guid =
 			    unique_insert(ds->ds_phys->ds_fsid_guid);
-		}
-
-		if (!dsl_dataset_is_snapshot(ds)) {
-			boolean_t need_lock =
-			    !RW_LOCK_HELD(&dp->dp_config_rwlock);
-
-			if (need_lock)
-				rw_enter(&dp->dp_config_rwlock, RW_READER);
-			VERIFY(0 == dsl_prop_get_ds_locked(ds->ds_dir,
-			    "refreservation", sizeof (uint64_t), 1,
-			    &ds->ds_reserved, NULL));
-			VERIFY(0 == dsl_prop_get_ds_locked(ds->ds_dir,
-			    "refquota", sizeof (uint64_t), 1, &ds->ds_quota,
-			    NULL));
-			if (need_lock)
-				rw_exit(&dp->dp_config_rwlock);
-		} else {
-			ds->ds_reserved = ds->ds_quota = 0;
 		}
 	}
 	ASSERT3P(ds->ds_dbuf, ==, dbuf);
