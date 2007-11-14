@@ -5285,6 +5285,7 @@ ufs_putapage(
 	daddr_t bn;
 	int err;
 	int contig;
+	int dotrans;
 
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
@@ -5411,6 +5412,31 @@ ufs_putapage(
 	bp->b_un.b_addr = (caddr_t)0;
 	bp->b_file = ip->i_vnode;
 
+	/*
+	 * File contents of shadow or quota inodes are metadata, and updates
+	 * to these need to be put into a logging transaction. All direct
+	 * callers in UFS do that, but fsflush can come here _before_ the
+	 * normal codepath. An example would be updating ACL information, for
+	 * which the normal codepath would be:
+	 *	ufs_si_store()
+	 *	ufs_rdwri()
+	 *	wrip()
+	 *	segmap_release()
+	 *	VOP_PUTPAGE()
+	 * Here, fsflush can pick up the dirty page before segmap_release()
+	 * forces it out. If that happens, there's no transaction.
+	 * We therefore need to test whether a transaction exists, and if not
+	 * create one - for fsflush.
+	 */
+	dotrans =
+	    (((ip->i_mode & IFMT) == IFSHAD || ufsvfsp->vfs_qinod == ip) &&
+	    ((curthread->t_flag & T_DONTBLOCK) == 0) &&
+	    (TRANS_ISTRANS(ufsvfsp)));
+
+	if (dotrans) {
+		curthread->t_flag |= T_DONTBLOCK;
+		TRANS_BEGIN_ASYNC(ufsvfsp, TOP_PUTPAGE, TOP_PUTPAGE_SIZE(ip));
+	}
 	if (TRANS_ISTRANS(ufsvfsp)) {
 		if ((ip->i_mode & IFMT) == IFSHAD) {
 			TRANS_BUF(ufsvfsp, 0, io_len, bp, DT_SHAD);
@@ -5418,6 +5444,10 @@ ufs_putapage(
 			TRANS_DELTA(ufsvfsp, ldbtob(bn), bp->b_bcount, DT_QR,
 			    0, 0);
 		}
+	}
+	if (dotrans) {
+		TRANS_END_ASYNC(ufsvfsp, TOP_PUTPAGE, TOP_PUTPAGE_SIZE(ip));
+		curthread->t_flag &= ~T_DONTBLOCK;
 	}
 
 	/* write throttle */
