@@ -100,7 +100,7 @@ write_image(void)
 		exit(1);
 	}
 	if (no_size == 0) {
-		uint32_t cap;
+		off_t cap;
 		struct track_info *ti;
 		uint_t bsize;
 
@@ -114,7 +114,7 @@ write_image(void)
 			}
 		if (use_media_stated_capacity) {
 			cap = get_last_possible_lba(target);
-			if (cap == 0) {
+			if (cap <= 0) {
 				cap = read_format_capacity(target->d_fd,
 				    &bsize);
 			}
