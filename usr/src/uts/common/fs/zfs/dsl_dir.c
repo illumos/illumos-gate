@@ -974,14 +974,17 @@ dsl_dir_set_quota(const char *ddname, uint64_t quota)
 	err = dsl_dir_open(ddname, FTAG, &dd, NULL);
 	if (err)
 		return (err);
-	/*
-	 * If someone removes a file, then tries to set the quota, we
-	 * want to make sure the file freeing takes effect.
-	 */
-	txg_wait_open(dd->dd_pool, 0);
 
-	err = dsl_sync_task_do(dd->dd_pool, dsl_dir_set_quota_check,
-	    dsl_dir_set_quota_sync, dd, &quota, 0);
+	if (quota != dd->dd_phys->dd_quota) {
+		/*
+		 * If someone removes a file, then tries to set the quota, we
+		 * want to make sure the file freeing takes effect.
+		 */
+		txg_wait_open(dd->dd_pool, 0);
+
+		err = dsl_sync_task_do(dd->dd_pool, dsl_dir_set_quota_check,
+		    dsl_dir_set_quota_sync, dd, &quota, 0);
+	}
 	dsl_dir_close(dd, FTAG);
 	return (err);
 }

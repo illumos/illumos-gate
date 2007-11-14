@@ -478,7 +478,8 @@ zfs_do_clone(int argc, char **argv)
  *
  * The '-s' flag applies only to volumes, and indicates that we should not try
  * to set the reservation for this volume.  By default we set a reservation
- * equal to the size for any volume.
+ * equal to the size for any volume.  For pools with SPA_VERSION >=
+ * SPA_VERSION_REFRESERVATION, we set a refreservation instead.
  *
  * The '-p' flag creates all the non-existing ancestors of the target first.
  */
@@ -602,16 +603,36 @@ zfs_do_create(int argc, char **argv)
 		goto badusage;
 	}
 
-	if (type == ZFS_TYPE_VOLUME && !noreserve &&
-	    nvlist_lookup_string(props, zfs_prop_to_name(ZFS_PROP_RESERVATION),
-	    &strval) != 0) {
-		if (nvlist_add_uint64(props,
-		    zfs_prop_to_name(ZFS_PROP_RESERVATION),
-		    volsize) != 0) {
-			(void) fprintf(stderr, gettext("internal "
-			    "error: out of memory\n"));
-			nvlist_free(props);
-			return (1);
+	if (type == ZFS_TYPE_VOLUME && !noreserve) {
+		zpool_handle_t *zpool_handle;
+		uint64_t spa_version;
+		char *p;
+		zfs_prop_t resv_prop;
+
+		if (p = strchr(argv[0], '/'))
+			*p = '\0';
+		zpool_handle = zpool_open(g_zfs, argv[0]);
+		if (p != NULL)
+			*p = '/';
+		if (zpool_handle == NULL)
+			goto error;
+		spa_version = zpool_get_prop_int(zpool_handle,
+		    ZPOOL_PROP_VERSION, NULL);
+		zpool_close(zpool_handle);
+		if (spa_version >= SPA_VERSION_REFRESERVATION)
+			resv_prop = ZFS_PROP_REFRESERVATION;
+		else
+			resv_prop = ZFS_PROP_RESERVATION;
+
+		if (nvlist_lookup_string(props, zfs_prop_to_name(resv_prop),
+		    &strval) != 0) {
+			if (nvlist_add_uint64(props,
+			    zfs_prop_to_name(resv_prop), volsize) != 0) {
+				(void) fprintf(stderr, gettext("internal "
+				    "error: out of memory\n"));
+				nvlist_free(props);
+				return (1);
+			}
 		}
 	}
 

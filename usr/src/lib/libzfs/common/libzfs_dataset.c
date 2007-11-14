@@ -852,17 +852,43 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	    &intval) == 0) {
 		uint64_t old_volsize = zfs_prop_get_int(zhp,
 		    ZFS_PROP_VOLSIZE);
-		uint64_t old_reservation = zfs_prop_get_int(zhp,
-		    ZFS_PROP_RESERVATION);
+		uint64_t old_reservation;
 		uint64_t new_reservation;
+		char *pool_name;
+		zpool_handle_t *zpool_handle;
+		char *p;
+		zfs_prop_t resv_prop;
+		uint64_t spa_version;
+
+		pool_name = zfs_alloc(zhp->zfs_hdl, MAXPATHLEN);
+		if (zfs_prop_get(zhp, ZFS_PROP_NAME, pool_name,
+		    MAXPATHLEN, NULL, NULL, 0, B_FALSE) != 0) {
+			free(pool_name);
+			goto error;
+		}
+
+		if (p = strchr(pool_name, '/'))
+			*p = '\0';
+		zpool_handle = zpool_open(hdl, pool_name);
+		free(pool_name);
+		if (zpool_handle == NULL)
+			goto error;
+
+		spa_version = zpool_get_prop_int(zpool_handle,
+		    ZPOOL_PROP_VERSION, NULL);
+		zpool_close(zpool_handle);
+		if (spa_version >= SPA_VERSION_REFRESERVATION)
+			resv_prop = ZFS_PROP_REFRESERVATION;
+		else
+			resv_prop = ZFS_PROP_RESERVATION;
+
+		old_reservation = zfs_prop_get_int(zhp, resv_prop);
 
 		if (old_volsize == old_reservation &&
-		    nvlist_lookup_uint64(ret,
-		    zfs_prop_to_name(ZFS_PROP_RESERVATION),
+		    nvlist_lookup_uint64(ret, zfs_prop_to_name(resv_prop),
 		    &new_reservation) != 0) {
 			if (nvlist_add_uint64(ret,
-			    zfs_prop_to_name(ZFS_PROP_RESERVATION),
-			    intval) != 0) {
+			    zfs_prop_to_name(resv_prop), intval) != 0) {
 				(void) no_memory(hdl);
 				goto error;
 			}
