@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,19 +50,21 @@ static void unput(int);
 
 /*
  * We first define a set of labeled states for use in the D lexer and then a
- * set of regular expressions to simplify things below.  The lexer states are:
+ * set of regular expressions to simplify things below. The lexer states are:
  *
  * S0 - D program clause and expression lexing
  * S1 - D comments (i.e. skip everything until end of comment)
  * S2 - D program outer scope (probe specifiers and declarations)
  * S3 - D control line parsing (i.e. after ^# is seen but before \n)
+ * S4 - D control line scan (locate control directives only and invoke S3)
  */
 %}
 
-%e 1400		/* maximum nodes */
+%e 1500		/* maximum nodes */
 %p 3700		/* maximum positions */
+%n 600		/* maximum states */
 
-%s S0 S1 S2 S3
+%s S0 S1 S2 S3 S4
 
 RGX_AGG		"@"[a-zA-Z_][0-9a-zA-Z_]*
 RGX_PSPEC	[-$:a-zA-Z_.?*\\\[\]!][-$:0-9a-zA-Z_.`?*\\\[\]!]*
@@ -425,14 +426,18 @@ if (yypcb->pcb_token != 0) {
 		}
 
 <S0>{RGX_INTERP} |
-<S2>{RGX_INTERP}	; /* discard any #! lines */
+<S2>{RGX_INTERP} ;	/* discard any #! lines */
 
 <S0>{RGX_CTL}	|
-<S2>{RGX_CTL}	{
+<S2>{RGX_CTL}	|
+<S4>{RGX_CTL}	{
 			assert(yypragma == NULL);
 			yypcb->pcb_cstate = (YYSTATE);
 			BEGIN(S3);
 		}
+
+<S4>.		;	/* discard */
+<S4>"\n"	;	/* discard */
 
 <S0>"/"		{
 			int c, tok;
@@ -658,8 +663,8 @@ yybegin(yystate_t state)
 		return; /* nothing to do if we're in the state already */
 
 	if (yypcb->pcb_yystate == YYS_DEFINE) {
-        	yypcb->pcb_list = yypcb->pcb_hold;
-        	yypcb->pcb_hold = NULL;
+		yypcb->pcb_list = yypcb->pcb_hold;
+		yypcb->pcb_hold = NULL;
 	}
 
 	switch (state) {
@@ -675,6 +680,9 @@ yybegin(yystate_t state)
 		BEGIN(S0);
 		break;
 	case YYS_DONE:
+		break;
+	case YYS_CONTROL:
+		BEGIN(S4);
 		break;
 	default:
 		xyerror(D_UNKNOWN, "internal error -- bad yystate %d\n", state);

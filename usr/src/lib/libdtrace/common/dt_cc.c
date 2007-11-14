@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +114,10 @@ static const dtrace_diftype_t dt_void_rtype = {
 static const dtrace_diftype_t dt_int_rtype = {
 	DIF_TYPE_CTF, CTF_K_INTEGER, 0, 0, sizeof (uint64_t)
 };
+
+static void *dt_compile(dtrace_hdl_t *, int, dtrace_probespec_t, void *,
+    uint_t, int, char *const[], FILE *, const char *);
+
 
 /*ARGSUSED*/
 static int
@@ -1428,18 +1431,26 @@ dt_setcontext(dtrace_hdl_t *dtp, dtrace_probedesc_t *pdp)
 {
 	const dtrace_pattr_t *pap;
 	dt_probe_t *prp;
+	dt_provider_t *pvp;
 	dt_ident_t *idp;
 	char attrstr[8];
 	int err;
 
 	/*
-	 * If the provider name ends with what could be interpreted as a
-	 * number, we assume that it's a pid and that we may need to
-	 * dynamically create those probes for that process. On an error,
-	 * dt_pid_create_probes() will set the error message and tag --
-	 * we just have to longjmp() out of here.
+	 * Both kernel and pid based providers are allowed to have names
+	 * ending with what could be interpreted as a number. We assume it's
+	 * a pid and that we may need to dynamically create probes for
+	 * that process if:
+	 *
+	 * (1) The provider doesn't exist, or,
+	 * (2) The provider exists and has DTRACE_PRIV_PROC privilege.
+	 *
+	 * On an error, dt_pid_create_probes() will set the error message
+	 * and tag -- we just have to longjmp() out of here.
 	 */
 	if (isdigit(pdp->dtpd_provider[strlen(pdp->dtpd_provider) - 1]) &&
+	    ((pvp = dt_provider_lookup(dtp, pdp->dtpd_provider)) == NULL ||
+	    pvp->pv_desc.dtvd_priv.dtpp_flags & DTRACE_PRIV_PROC) &&
 	    dt_pid_create_probes(pdp, dtp, yypcb) != 0) {
 		longjmp(yypcb->pcb_jmpbuf, EDT_COMPILER);
 	}
@@ -1700,21 +1711,220 @@ err:
 	return (NULL);
 }
 
+static void
+dt_lib_depend_error(dtrace_hdl_t *dtp, const char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	dt_set_errmsg(dtp, NULL, NULL, NULL, 0, format, ap);
+	va_end(ap);
+}
+
+int
+dt_lib_depend_add(dtrace_hdl_t *dtp, dt_list_t *dlp, const char *arg)
+{
+	dt_lib_depend_t *dld;
+	const char *end;
+
+	assert(arg != NULL);
+
+	if ((end = strrchr(arg, '/')) == NULL)
+		return (dt_set_errno(dtp, EINVAL));
+
+	if ((dld = dt_zalloc(dtp, sizeof (dt_lib_depend_t))) == NULL)
+		return (-1);
+
+	if ((dld->dtld_libpath = dt_alloc(dtp, MAXPATHLEN)) == NULL) {
+		dt_free(dtp, dld);
+		return (-1);
+	}
+
+	(void) strlcpy(dld->dtld_libpath, arg, end - arg + 2);
+	if ((dld->dtld_library = strdup(arg)) == NULL) {
+		dt_free(dtp, dld->dtld_libpath);
+		dt_free(dtp, dld);
+		return (dt_set_errno(dtp, EDT_NOMEM));
+	}
+
+	dt_list_append(dlp, dld);
+	return (0);
+}
+
+dt_lib_depend_t *
+dt_lib_depend_lookup(dt_list_t *dld, const char *arg)
+{
+	dt_lib_depend_t *dldn;
+
+	for (dldn = dt_list_next(dld); dldn != NULL;
+	    dldn = dt_list_next(dldn)) {
+		if (strcmp(dldn->dtld_library, arg) == 0)
+			return (dldn);
+	}
+
+	return (NULL);
+}
+
 /*
- * Open all of the .d library files found in the specified directory and try to
- * compile each one in order to cache its inlines and translators, etc.  We
- * silently ignore any missing directories and other files found therein.
- * We only fail (and thereby fail dt_load_libs()) if we fail to compile a
- * library and the error is something other than #pragma D depends_on.
+ * Go through all the library files, and, if any library dependencies exist for
+ * that file, add it to that node's list of dependents. The result of this
+ * will be a graph which can then be topologically sorted to produce a
+ * compilation order.
+ */
+static int
+dt_lib_build_graph(dtrace_hdl_t *dtp)
+{
+	dt_lib_depend_t *dld, *dpld;
+
+	for (dld = dt_list_next(&dtp->dt_lib_dep); dld != NULL;
+	    dld = dt_list_next(dld)) {
+		char *library = dld->dtld_library;
+
+		for (dpld = dt_list_next(&dld->dtld_dependencies); dpld != NULL;
+		    dpld = dt_list_next(dpld)) {
+			dt_lib_depend_t *dlda;
+
+			if ((dlda = dt_lib_depend_lookup(&dtp->dt_lib_dep,
+			    dpld->dtld_library)) == NULL) {
+				dt_lib_depend_error(dtp,
+				    "Invalid library dependency in %s: %s\n",
+				    dld->dtld_library, dpld->dtld_library);
+
+				return (dt_set_errno(dtp, EDT_COMPILER));
+			}
+
+			if ((dt_lib_depend_add(dtp, &dlda->dtld_dependents,
+			    library)) != 0) {
+				return (-1); /* preserve dt_errno */
+			}
+		}
+	}
+	return (0);
+}
+
+static int
+dt_topo_sort(dtrace_hdl_t *dtp, dt_lib_depend_t *dld, int *count)
+{
+	dt_lib_depend_t *dpld, *dlda, *new;
+
+	dld->dtld_start = ++(*count);
+
+	for (dpld = dt_list_next(&dld->dtld_dependents); dpld != NULL;
+	    dpld = dt_list_next(dpld)) {
+		dlda = dt_lib_depend_lookup(&dtp->dt_lib_dep,
+		    dpld->dtld_library);
+		assert(dlda != NULL);
+
+		if (dlda->dtld_start == 0 &&
+		    dt_topo_sort(dtp, dlda, count) == -1)
+			return (-1);
+	}
+
+	if ((new = dt_zalloc(dtp, sizeof (dt_lib_depend_t))) == NULL)
+		return (-1);
+
+	if ((new->dtld_library = strdup(dld->dtld_library)) == NULL) {
+		dt_free(dtp, new);
+		return (dt_set_errno(dtp, EDT_NOMEM));
+	}
+
+	new->dtld_start = dld->dtld_start;
+	new->dtld_finish = dld->dtld_finish = ++(*count);
+	dt_list_prepend(&dtp->dt_lib_dep_sorted, new);
+
+	dt_dprintf("library %s sorted (%d/%d)\n", new->dtld_library,
+	    new->dtld_start, new->dtld_finish);
+
+	return (0);
+}
+
+static int
+dt_lib_depend_sort(dtrace_hdl_t *dtp)
+{
+	dt_lib_depend_t *dld, *dpld, *dlda;
+	int count = 0;
+
+	if (dt_lib_build_graph(dtp) == -1)
+		return (-1); /* preserve dt_errno */
+
+	/*
+	 * Perform a topological sort of the graph that hangs off
+	 * dtp->dt_lib_dep. The result of this process will be a
+	 * dependency ordered list located at dtp->dt_lib_dep_sorted.
+	 */
+	for (dld = dt_list_next(&dtp->dt_lib_dep); dld != NULL;
+	    dld = dt_list_next(dld)) {
+		if (dld->dtld_start == 0 &&
+		    dt_topo_sort(dtp, dld, &count) == -1)
+			return (-1); /* preserve dt_errno */;
+	}
+
+	/*
+	 * Check the graph for cycles. If an ancestor's finishing time is
+	 * less than any of its dependent's finishing times then a back edge
+	 * exists in the graph and this is a cycle.
+	 */
+	for (dld = dt_list_next(&dtp->dt_lib_dep); dld != NULL;
+	    dld = dt_list_next(dld)) {
+		for (dpld = dt_list_next(&dld->dtld_dependents); dpld != NULL;
+		    dpld = dt_list_next(dpld)) {
+			dlda = dt_lib_depend_lookup(&dtp->dt_lib_dep_sorted,
+			    dpld->dtld_library);
+			assert(dlda != NULL);
+
+			if (dlda->dtld_finish > dld->dtld_finish) {
+				dt_lib_depend_error(dtp,
+				    "Cyclic dependency detected: %s => %s\n",
+				    dld->dtld_library, dpld->dtld_library);
+
+				return (dt_set_errno(dtp, EDT_COMPILER));
+			}
+		}
+	}
+
+	return (0);
+}
+
+static void
+dt_lib_depend_free(dtrace_hdl_t *dtp)
+{
+	dt_lib_depend_t *dld, *dlda;
+
+	while ((dld = dt_list_next(&dtp->dt_lib_dep)) != NULL) {
+		while ((dlda = dt_list_next(&dld->dtld_dependencies)) != NULL) {
+			dt_list_delete(&dld->dtld_dependencies, dlda);
+			dt_free(dtp, dlda->dtld_library);
+			dt_free(dtp, dlda->dtld_libpath);
+			dt_free(dtp, dlda);
+		}
+		while ((dlda = dt_list_next(&dld->dtld_dependents)) != NULL) {
+			dt_list_delete(&dld->dtld_dependents, dlda);
+			dt_free(dtp, dlda->dtld_library);
+			dt_free(dtp, dlda->dtld_libpath);
+			dt_free(dtp, dlda);
+		}
+		dt_list_delete(&dtp->dt_lib_dep, dld);
+		dt_free(dtp, dld->dtld_library);
+		dt_free(dtp, dld->dtld_libpath);
+		dt_free(dtp, dld);
+	}
+
+	while ((dld = dt_list_next(&dtp->dt_lib_dep_sorted)) != NULL) {
+		dt_list_delete(&dtp->dt_lib_dep_sorted, dld);
+		dt_free(dtp, dld->dtld_library);
+		dt_free(dtp, dld);
+	}
+}
+
+
+/*
+ * Open all of the .d library files found in the specified directory and
+ * compile each one in topological order to cache its inlines and translators,
+ * etc.  We silently ignore any missing directories and other files found
+ * therein. We only fail (and thereby fail dt_load_libs()) if we fail to
+ * compile a library and the error is something other than #pragma D depends_on.
  * Dependency errors are silently ignored to permit a library directory to
  * contain libraries which may not be accessible depending on our privileges.
- *
- * Note that at present, no ordering is defined between library files found in
- * the same directory: if cross-library dependencies are eventually required,
- * we will need to extend the #pragma D depends_on directive with an additional
- * class for libraries, and this function will need to create a graph of the
- * various library pathnames and then perform a topological ordering using the
- * dependency information before we attempt to compile any of them.
  */
 static int
 dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
@@ -1726,12 +1936,15 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 	char fname[PATH_MAX];
 	dtrace_prog_t *pgp;
 	FILE *fp;
+	void *rv;
+	dt_lib_depend_t *dld;
 
 	if ((dirp = opendir(path)) == NULL) {
 		dt_dprintf("skipping lib dir %s: %s\n", path, strerror(errno));
 		return (0);
 	}
 
+	/* First, parse each file for library dependencies. */
 	while ((dp = readdir(dirp)) != NULL) {
 		if ((p = strrchr(dp->d_name, '.')) == NULL || strcmp(p, ".d"))
 			continue; /* skip any filename not ending in .d */
@@ -1746,25 +1959,67 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 		}
 
 		dtp->dt_filetag = fname;
+		if (dt_lib_depend_add(dtp, &dtp->dt_lib_dep, fname) != 0)
+			goto err;
+
+		rv = dt_compile(dtp, DT_CTX_DPROG,
+		    DTRACE_PROBESPEC_NAME, NULL,
+		    DTRACE_C_EMPTY | DTRACE_C_CTL, 0, NULL, fp, NULL);
+
+		if (rv != NULL && dtp->dt_errno &&
+		    (dtp->dt_errno != EDT_COMPILER ||
+		    dtp->dt_errtag != dt_errtag(D_PRAGMA_DEPEND)))
+			goto err;
+
+		if (dtp->dt_errno)
+			dt_dprintf("error parsing library %s: %s\n",
+			    fname, dtrace_errmsg(dtp, dtrace_errno(dtp)));
+
+		(void) fclose(fp);
+		dtp->dt_filetag = NULL;
+	}
+
+	(void) closedir(dirp);
+	/*
+	 * Finish building the graph containing the library dependencies
+	 * and perform a topological sort to generate an ordered list
+	 * for compilation.
+	 */
+	if (dt_lib_depend_sort(dtp) == -1)
+		goto err;
+
+	for (dld = dt_list_next(&dtp->dt_lib_dep_sorted); dld != NULL;
+	    dld = dt_list_next(dld)) {
+
+		if ((fp = fopen(dld->dtld_library, "r")) == NULL) {
+			dt_dprintf("skipping library %s: %s\n",
+			    dld->dtld_library, strerror(errno));
+			continue;
+		}
+
+		dtp->dt_filetag = dld->dtld_library;
 		pgp = dtrace_program_fcompile(dtp, fp, DTRACE_C_EMPTY, 0, NULL);
 		(void) fclose(fp);
 		dtp->dt_filetag = NULL;
 
 		if (pgp == NULL && (dtp->dt_errno != EDT_COMPILER ||
-		    dtp->dt_errtag != dt_errtag(D_PRAGMA_DEPEND))) {
-			(void) closedir(dirp);
-			return (-1); /* preserve dt_errno */
-		}
+		    dtp->dt_errtag != dt_errtag(D_PRAGMA_DEPEND)))
+			goto err;
 
 		if (pgp == NULL) {
-			dt_dprintf("skipping library: %s\n",
+			dt_dprintf("skipping library %s: %s\n",
+			    dld->dtld_library,
 			    dtrace_errmsg(dtp, dtrace_errno(dtp)));
 		} else
 			dt_program_destroy(dtp, pgp);
 	}
 
-	(void) closedir(dirp);
+	dt_lib_depend_free(dtp);
 	return (0);
+
+err:
+	dt_lib_depend_free(dtp);
+	return (-1); /* preserve dt_errno */
 }
 
 /*
@@ -1837,10 +2092,12 @@ dt_compile(dtrace_hdl_t *dtp, int context, dtrace_probespec_t pspec, void *arg,
 	pcb.pcb_context = context;
 	pcb.pcb_token = context;
 
-	if (context == DT_CTX_DPROG)
-		yybegin(YYS_CLAUSE);
-	else
+	if (context != DT_CTX_DPROG)
 		yybegin(YYS_EXPR);
+	else if (cflags & DTRACE_C_CTL)
+		yybegin(YYS_CONTROL);
+	else
+		yybegin(YYS_CLAUSE);
 
 	if ((err = setjmp(yypcb->pcb_jmpbuf)) != 0)
 		goto out;
@@ -1865,6 +2122,9 @@ dt_compile(dtrace_hdl_t *dtp, int context, dtrace_probespec_t pspec, void *arg,
 		xyerror(D_EMPTY, "empty D program translation unit\n");
 
 	yybegin(YYS_DONE);
+
+	if (cflags & DTRACE_C_CTL)
+		goto out;
 
 	if (context != DT_CTX_DTYPE && DT_TREEDUMP_PASS(dtp, 1))
 		dt_node_printr(yypcb->pcb_root, stderr, 0);

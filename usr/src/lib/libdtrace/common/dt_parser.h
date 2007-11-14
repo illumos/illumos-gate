@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,7 +256,8 @@ typedef enum {
 	YYS_CLAUSE,	/* lex/yacc state for finding program clauses */
 	YYS_DEFINE,	/* lex/yacc state for parsing persistent definitions */
 	YYS_EXPR,	/* lex/yacc state for parsing D expressions */
-	YYS_DONE	/* lex/yacc state for indicating parse tree is done */
+	YYS_DONE,	/* lex/yacc state for indicating parse tree is done */
+	YYS_CONTROL	/* lex/yacc state for parsing control lines */
 } yystate_t;
 
 extern void dnerror(const dt_node_t *, dt_errtag_t, const char *, ...);

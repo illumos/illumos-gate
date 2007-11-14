@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,6 +177,16 @@ typedef struct dt_dirpath {
 	char *dir_path;			/* directory pathname */
 } dt_dirpath_t;
 
+typedef struct dt_lib_depend {
+	dt_list_t dtld_deplist;		/* linked-list forward/back pointers */
+	char *dtld_library;		/* library name */
+	char *dtld_libpath;		/* library pathname */
+	uint_t dtld_finish;		/* completion time in tsort for lib */
+	uint_t dtld_start;		/* starting time in tsort for lib */
+	dt_list_t dtld_dependencies;	/* linked-list of lib dependencies */
+	dt_list_t dtld_dependents;	/* linked-list of lib dependents */
+} dt_lib_depend_t;
+
 typedef uint32_t dt_version_t;		/* encoded version (see below) */
 
 struct dtrace_hdl {
@@ -285,6 +295,8 @@ struct dtrace_hdl {
 	void *dt_bufarg;	/* buffered handler argument */
 	dt_dof_t dt_dof;	/* DOF generation buffers (see dt_dof.c) */
 	struct utsname dt_uts;	/* uname(2) information for system */
+	dt_list_t dt_lib_dep;	/* scratch linked-list of lib dependencies */
+	dt_list_t dt_lib_dep_sorted;	/* dependency sorted library list */
 };
 
 /*
@@ -603,6 +615,9 @@ extern int dt_handle_cpudrop(dtrace_hdl_t *, processorid_t,
 extern int dt_handle_status(dtrace_hdl_t *,
     dtrace_status_t *, dtrace_status_t *);
 extern int dt_handle_setopt(dtrace_hdl_t *, dtrace_setoptdata_t *);
+
+extern int dt_lib_depend_add(dtrace_hdl_t *, dt_list_t *, const char *);
+extern dt_lib_depend_t *dt_lib_depend_lookup(dt_list_t *, const char *);
 
 extern dt_pcb_t *yypcb;		/* pointer to current parser control block */
 extern char yyintprefix;	/* int token prefix for macros (+/-) */

@@ -678,6 +678,7 @@ f none SUNWdtrt/tst/common/pid/tst.gcc.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.main.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.manypids.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.probemod.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pid/tst.addprobes.ksh 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret1.d 0444 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret1.exe 0555 root bin
 f none SUNWdtrt/tst/common/pid/tst.ret2.d 0444 root bin
@@ -731,6 +732,10 @@ f none SUNWdtrt/tst/common/pragma/err.D_PRAGERR.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_INVAL.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_MALFORM.d 0444 root bin
 f none SUNWdtrt/tst/common/pragma/err.D_PRAGMA_UNUSED.UnusedPragma.d 0444 root bin
+f none SUNWdtrt/tst/common/pragma/tst.libdep.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pragma/err.circlibdep.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pragma/err.invalidlibdep.ksh 0444 root bin
+f none SUNWdtrt/tst/common/pragma/tst.libdepfullyconnected.ksh 0444 root bin
 d none SUNWdtrt/tst/common/predicates 0755 root bin
 f none SUNWdtrt/tst/common/predicates/err.D_PRED_SCALAR.NonScalarPred.d 0444 root bin
 f none SUNWdtrt/tst/common/predicates/err.D_SYNTAX.invalid.d 0444 root bin
