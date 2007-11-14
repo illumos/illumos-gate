@@ -65,7 +65,7 @@ _nss_XbyY_buf_alloc(int struct_size, int buffer_size)
 
 	/* Use one malloc for dbargs, result struct and buffer */
 	b = (nss_XbyY_buf_t *)
-		malloc(ALIGN(sizeof (*b)) + struct_size + buffer_size);
+	    malloc(ALIGN(sizeof (*b)) + struct_size + buffer_size);
 	if (b == 0) {
 		return (0);
 	}
@@ -115,7 +115,7 @@ _nss_XbyY_fgets(FILE *f, nss_XbyY_args_t *b)
 		len++;
 	}
 	parsestat = (*b->str2ent)(buf, (len - 1), b->buf.result, b->buf.buffer,
-		b->buf.buflen);
+	    b->buf.buflen);
 	if (parsestat == NSS_STR_PARSE_ERANGE) {
 		b->returnval = 0;
 		b->erange    = 1;
@@ -449,7 +449,7 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 			    (nssuint_t)arg->key.hostaddr.type;
 			buffer = (void *)((char *)buffer + sizeof (nssuint_t));
 			(void) memcpy(buffer, arg->key.hostaddr.addr,
-				    arg->key.hostaddr.len);
+			    arg->key.hostaddr.len);
 			*rlen = len2;
 			break;
 		case 'i':
@@ -491,7 +491,7 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 			buffer = (void *)((char *)buffer + len);
 			if (len2 > 1)
 				(void) strlcpy(buffer, arg->key.serv.proto,
-						len2);
+				    len2);
 			else
 				*(char *)buffer = '\0';
 			*rlen = len3;
@@ -507,7 +507,7 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 			*uptr++ = (nssuint_t)arg->key.serv.serv.port;
 			if (len2) {
 				(void) strlcpy((char *)uptr,
-						arg->key.serv.proto, len2);
+				    arg->key.serv.proto, len2);
 			}
 			*rlen = len;
 			break;
@@ -519,7 +519,7 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 			if (len >= length)
 				return (NSS_ERROR);
 			*(struct ether_addr *)buffer =
-					*(struct ether_addr *)arg->key.ether;
+			    *(struct ether_addr *)arg->key.ether;
 			*rlen = len;
 			break;
 		case 'k':
@@ -625,9 +625,9 @@ nss_pack_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 			ing = (struct nss_innetgr_args *)arg;
 			len = sizeof (nss_pnetgr_t);
 			len2 = ing->arg[NSS_NETGR_MACHINE].argc +
-				ing->arg[NSS_NETGR_USER].argc +
-				ing->arg[NSS_NETGR_DOMAIN].argc +
-				ing->groups.argc;
+			    ing->arg[NSS_NETGR_USER].argc +
+			    ing->arg[NSS_NETGR_DOMAIN].argc +
+			    ing->groups.argc;
 			len2 *= sizeof (nssuint_t);
 			len3 = 0;
 			for (j = 0; j < NSS_NETGR_N; j++) {
@@ -758,7 +758,7 @@ nss_default_key2str(void *buffer, size_t length, nss_XbyY_args_t *arg,
 		return (NSS_TRYLOCAL);
 
 	return (nss_pack_key2str(buffer, length, arg, dbname,
-				dbop, rlen, getXbyY_to_dbop[index].tostr));
+	    dbop, rlen, getXbyY_to_dbop[index].tostr));
 }
 
 /*ARGSUSED*/
@@ -776,12 +776,12 @@ nss_packed_set_status(void *buffer, size_t length, nss_status_t status,
 	if (pbuf->nss_dbop == NSS_DBOP_GROUP_BYMEMBER) {
 		if (strcmp(dbn, NSS_DBNAM_GROUP) == 0) {
 			struct nss_groupsbymem *in =
-				(struct nss_groupsbymem *)arg;
+			    (struct nss_groupsbymem *)arg;
 
 			if (in->numgids >= 0) {
 				pbuf->p_status = NSS_SUCCESS;
 				pbuf->data_len = in->numgids *
-					sizeof (gid_t);
+				    sizeof (gid_t);
 				pbuf->p_herrno = 0;
 			} else {
 				pbuf->p_status = status;
@@ -795,10 +795,16 @@ nss_packed_set_status(void *buffer, size_t length, nss_status_t status,
 	if (pbuf->nss_dbop == NSS_DBOP_NETGROUP_IN) {
 		if (strcmp(dbn, NSS_DBNAM_NETGROUP) == 0) {
 			struct nss_innetgr_args *in =
-				(struct nss_innetgr_args *)arg;
+			    (struct nss_innetgr_args *)arg;
 
 			/* tell nss_unpack() operation is successful */
 			pbuf->data_len = 1;
+
+			if (status != NSS_SUCCESS && status != NSS_NOTFOUND) {
+				pbuf->p_status = status;
+				pbuf->p_errno = errno;
+				return;
+			}
 
 			if (in->status == NSS_NETGR_FOUND) {
 				pbuf->p_status = NSS_SUCCESS;
@@ -982,7 +988,7 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 		case 'I':
 			gbm = (struct nss_groupsbymem *)arg;
 			gbm->gid_array = (gid_t *)
-				((void *)((char *)pbuf + pbuf->data_off));
+			    ((void *)((char *)pbuf + pbuf->data_off));
 			gbm->force_slow_way = (int)(*uptr++);
 			gbm->maxgids = (int)(*uptr++);
 			gbm->numgids = (int)(*uptr++);
@@ -1005,15 +1011,15 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 			 * Start of argv pointer storage
 			 */
 			off = ing->arg[NSS_NETGR_MACHINE].argc +
-				ing->arg[NSS_NETGR_USER].argc +
-				ing->arg[NSS_NETGR_DOMAIN].argc +
-				ing->groups.argc;
+			    ing->arg[NSS_NETGR_USER].argc +
+			    ing->arg[NSS_NETGR_DOMAIN].argc +
+			    ing->groups.argc;
 			off *= sizeof (nssuint_t);
 			off += sizeof (nss_pnetgr_t);
 
 			cv = (char **)((void *)(bptr + off));
 			uptr = (nssuint_t *)
-				((void *)(bptr + sizeof (nss_pnetgr_t)));
+			    ((void *)(bptr + sizeof (nss_pnetgr_t)));
 			for (j = 0; j < NSS_NETGR_N; j++) {
 				ing->arg[j].argv = cv;
 				for (i = 0; i < ing->arg[j].argc; i++) {
@@ -1121,7 +1127,7 @@ nss_packed_getkey(void *buffer, size_t length, char **dbname,
 	int		index;
 
 	if (buffer == NULL || length == 0 || dbop == NULL ||
-			arg == NULL || dbname == NULL)
+	    arg == NULL || dbname == NULL)
 		return (NSS_ERROR);
 
 	*dbop = pbuf->nss_dbop;
@@ -1129,7 +1135,7 @@ nss_packed_getkey(void *buffer, size_t length, char **dbname,
 	pdbd = (nss_dbd_t *)((void *)((char *)buffer + off));
 	dbdsize = pbuf->key_off - pbuf->dbd_off;
 	if (pdbd->o_name >= dbdsize || pdbd->o_config_name >= dbdsize ||
-			pdbd->o_default_config >= dbdsize)
+	    pdbd->o_default_config >= dbdsize)
 		return (NSS_ERROR);
 	*dbname = (char *)buffer + off + pdbd->o_name;
 	if ((index = nss_dbop_search(*dbname, (uint32_t)*dbop)) < 0)
@@ -1186,7 +1192,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 	int			index;
 
 	if (buffer == NULL || length == 0 ||
-			dbop == NULL || arg == NULL)
+	    dbop == NULL || arg == NULL)
 		return (NSS_ERROR);
 
 	/* init dbop */
@@ -1195,7 +1201,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 	pdbd = (nss_dbd_t *)((void *)((char *)buffer + off));
 	dbdsize = pbuf->key_off - pbuf->dbd_off;
 	if (pdbd->o_name >= dbdsize || pdbd->o_config_name >= dbdsize ||
-			pdbd->o_default_config >= dbdsize)
+	    pdbd->o_default_config >= dbdsize)
 		return (NSS_ERROR);
 	dbname = (char *)buffer + off + pdbd->o_name;
 	if ((index = nss_dbop_search(dbname, (uint32_t)*dbop)) < 0)
@@ -1206,7 +1212,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 
 	/* init key information - (and get dbname dbop etc...) */
 	if (nss_upack_key2arg(buffer, length, &dbname,
-				dbop, arg, index) != NSS_SUCCESS)
+	    dbop, arg, index) != NSS_SUCCESS)
 		return (NSS_ERROR);
 
 	/* possible audituser init */
@@ -1227,7 +1233,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 		return (NSS_SUCCESS);
 	}
 	if (pbuf->nss_dbop == NSS_DBOP_NETGROUP_IN &&
-		strcmp(dbname, NSS_DBNAM_NETGROUP) == 0) {
+	    strcmp(dbname, NSS_DBNAM_NETGROUP) == 0) {
 		return (NSS_SUCCESS);
 	}
 
