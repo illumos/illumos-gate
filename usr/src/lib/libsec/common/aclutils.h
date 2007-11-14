@@ -62,7 +62,6 @@ struct acl_perm_type {
 	uint32_t	perm_val;	/* numeric value being returned */
 };
 
-
 /*
  * Textual representation of ace_t's access mask
  */
@@ -126,6 +125,7 @@ extern void acl_error(const char *, ...);
 extern int acl_parse(const char *, acl_t **);
 extern int yyparse(void);
 extern void yyreset(void);
+extern void yycleanup(void);
 extern acl_t *acl_to_aclp(enum acl_type, void *, int);
 
 #ifdef	__cplusplus

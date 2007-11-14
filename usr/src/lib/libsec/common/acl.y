@@ -32,7 +32,6 @@ extern int yyinteractive;
 extern acl_t *yyacl;
 %}
 
-
 %union {
 	char *str;
 	int val;
@@ -84,8 +83,10 @@ acl_entry: ace
 
 		if (yyacl == NULL) {
 			yyacl = acl_alloc(ACE_T);
-			if (yyacl == NULL) 
+			if (yyacl == NULL) {
+				yycleanup();
 				return (EACL_MEM_ERROR);
+			}
 		} 
 
 		$$ = yyacl;
@@ -95,6 +96,7 @@ acl_entry: ace
 			    " with NFSv4/ZFS ACL entries.\n"));
 			acl_free(yyacl);
 			yyacl = NULL;
+			yycleanup();
 			return (EACL_DIFF_TYPE);
 		}
 			
@@ -102,11 +104,13 @@ acl_entry: ace
 		    ($$->acl_entry_size * ($$->acl_cnt + 1)));
 		if ($$->acl_aclp == NULL) {
 			free (yyacl);
+			yycleanup();
 			return (EACL_MEM_ERROR);	
 		}
 		acep = $$->acl_aclp;
 		acep[$$->acl_cnt] = $1;
 		$$->acl_cnt++;
+		yycleanup();
 	}
 	| aclent
 	{
@@ -114,8 +118,10 @@ acl_entry: ace
 
 		if (yyacl == NULL) {
 			yyacl = acl_alloc(ACLENT_T);
-			if (yyacl == NULL) 
+			if (yyacl == NULL) {
+				yycleanup();
 				return (EACL_MEM_ERROR);
+			}
 		} 
 
 		$$ = yyacl;
@@ -125,6 +131,7 @@ acl_entry: ace
 			    " with POSIX draft ACL entries.\n"));
 			acl_free(yyacl);
 			yyacl = NULL;
+			yycleanup();
 			return (EACL_DIFF_TYPE);
 		}
 
@@ -132,11 +139,13 @@ acl_entry: ace
 		    ($$->acl_entry_size  * ($$->acl_cnt +1)));
 		if ($$->acl_aclp == NULL) {
 			free (yyacl);
+			yycleanup();
 			return (EACL_MEM_ERROR);	
 		}
 		aclent = $$->acl_aclp;
 		aclent[$$->acl_cnt] = $1;
 		$$->acl_cnt++;
+		yycleanup();
 	}
 
 ace:	entry_type idname ace_perms access_type
@@ -149,16 +158,17 @@ ace:	entry_type idname ace_perms access_type
 		if (error) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid user %s specified.\n"), $2);
-			free($2);
+			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
 			
 		$$.a_who = id;
 		$$.a_flags = ace_entry_type($1);
-		free($2);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
-		if (error)
+		if (error) {
+			yycleanup();
 			return (error);
+		}
 		$$.a_type = $4;
 
 	}
@@ -171,6 +181,7 @@ ace:	entry_type idname ace_perms access_type
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of "
 			    "ACL specification.\n"));
+			yycleanup();
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = get_id($1, $2, &id);
@@ -180,10 +191,11 @@ ace:	entry_type idname ace_perms access_type
 			$$.a_who = id;
 		}
 		$$.a_flags = ace_entry_type($1);
-		free($2);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
-		if (error)
+		if (error) {
+			yycleanup();
 			return (error);
+		}
 		$$.a_type = $4;
 	}
 	| entry_type idname ace_perms iflags access_type 
@@ -195,16 +207,17 @@ ace:	entry_type idname ace_perms access_type
 		if (error) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid user %s specified.\n"), $2);
-			free($2);
+			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
 		
 		$$.a_who = id;
 		$$.a_flags = ace_entry_type($1);
-		free($2);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
-		if (error)
+		if (error) {
+			yycleanup();
 			return (error);
+		}
 		$$.a_type = $5;
 		$$.a_flags |= $4;
 	}
@@ -217,6 +230,7 @@ ace:	entry_type idname ace_perms access_type
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of "
 			    "ACL specification.\n"));
+			yycleanup();
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = get_id($1, $2, &id);
@@ -227,10 +241,11 @@ ace:	entry_type idname ace_perms access_type
 		}
 
 		$$.a_flags = ace_entry_type($1);
-		free($2);
 		error = ace_perm_mask(&$3, &$$.a_access_mask);
-		if (error)
+		if (error) {
+			yycleanup();
 			return (error);
+		}
 
 		$$.a_type = $5;
 		$$.a_flags |= $4;
@@ -243,12 +258,14 @@ ace:	entry_type idname ace_perms access_type
 		$$.a_flags = ace_entry_type($1);
 		error = ace_perm_mask(&$2, &$$.a_access_mask);
 		if (error) {
+			yycleanup();
 			return (error);
 		}
 		$$.a_type = $3;
 	} 
 	| entry_type ace_perms access_type COLON id
 	{
+		yycleanup();
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of "
@@ -265,14 +282,17 @@ ace:	entry_type idname ace_perms access_type
 		$$.a_who = -1;
 		$$.a_flags = ace_entry_type($1);
 		error = ace_perm_mask(&$2, &$$.a_access_mask);
-		if (error)
+		if (error) {
+			yycleanup();
 			return (error);
+		}
 		$$.a_type = $4;
 		$$.a_flags |= $3;
 
 	}
 	| entry_type ace_perms iflags access_type COLON id
 	{
+		yycleanup();
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of "
@@ -291,25 +311,25 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		if (error) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid user '%s' specified.\n"), $2);
-			free($2);
+			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
 
 		error = compute_aclent_perms($3.perm_str, &$$.a_perm);
 		if (error) {
-			free($2);
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
+			yycleanup();
 			return (error);
 		}
 		$$.a_id = id;
 		error = aclent_entry_type($1, 0, &$$.a_type);
-		free($2);
 		if (error) {
 			acl_error(
 			    dgettext(TEXT_DOMAIN,
 			    "Invalid ACL entry type '%s' specified.\n"), $1);
+			yycleanup();
 			return (error);
 		}
 	}
@@ -322,6 +342,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
+			yycleanup();
 			return (error);
 		}
 		$$.a_id = -1;
@@ -330,11 +351,13 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			acl_error(
 			    dgettext(TEXT_DOMAIN,
 			    "Invalid ACL entry type '%s' specified.\n"), $1);
+			yycleanup();
 			return (error);
 		}
 	}
 	| entry_type COLON aclent_perm COLON id
 	{ 
+		yycleanup();
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of ACL specification.\n"));
@@ -350,14 +373,15 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of ACL specification.\n"));
+			yycleanup();
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = compute_aclent_perms($3.perm_str, &$$.a_perm);
 		if (error) {
-			free($2);
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
+			yycleanup();
 			return (error);
 		}
 		error = get_id($1, $2, &id);
@@ -367,11 +391,11 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			$$.a_id = id;
 
 		error = aclent_entry_type($1, 0, &$$.a_type);
-		free($2);
 		if (error) {
 			acl_error(
 			    dgettext(TEXT_DOMAIN,
 			    "Invalid ACL entry type '%s' specified.\n"), $1);
+			yycleanup();
 			return (error);
 		}
 	}
@@ -384,6 +408,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid permission(s) '%s' specified.\n"),
 			    $2.perm_str);
+			yycleanup();
 			return (error);
 		}
 		$$.a_id = -1;
@@ -393,11 +418,13 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			    dgettext(TEXT_DOMAIN,
 			    "Invalid ACL entry type specified %d.\n"),
 			    error);
+			yycleanup();
 			return (error);
 		}
 	}
 	| entry_type aclent_perm COLON id
 	{
+		yycleanup();
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Extra fields on the end of ACL specification.\n"));
@@ -419,7 +446,7 @@ compact_iflag : INHERIT_TOK
 		if (error) {
 			acl_error(dgettext(TEXT_DOMAIN,
 			    "Invalid inheritance flags '%s' specified.\n"), $1);
-			free($1);
+			yycleanup();
 			return (error);
 		}
 		$$ = iflags;
@@ -429,6 +456,7 @@ compact_iflag : INHERIT_TOK
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Can't mix compact inherit flags with"
 		    " verbose inheritance flags.\n"));
+		yycleanup();
 		return (EACL_INHERIT_ERROR);
 	}
 
@@ -439,15 +467,21 @@ verbose_iflag: ACE_INHERIT	{$$ |= $1;}
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Can't mix verbose inherit flags with"
 		    " compact inheritance flags.\n"));
+		yycleanup();
 		return (EACL_INHERIT_ERROR);
 	}
 	| ACE_INHERIT SLASH ACCESS_TYPE
 	{
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Inheritance flags can't be mixed with access type.\n"));
+		yycleanup();
 		return (EACL_INHERIT_ERROR);
 	}
-	| ACE_INHERIT SLASH ERROR {return ($3);}
+	| ACE_INHERIT SLASH ERROR
+	{
+		yycleanup();
+		return ($3);
+	}
 	
 aclent_perm: PERM_TOK
 	{
@@ -459,11 +493,16 @@ aclent_perm: PERM_TOK
 	{
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "ACL entry permissions are incorrectly specified.\n"));
+		yycleanup();
 		return ($2);
 	}
 
 access_type: ACCESS_TYPE {$$ = $1;}	
-	| ERROR {return ($1);}
+	| ERROR
+	{
+		yycleanup();
+		return ($1);
+	}
 
 id: ID {$$ = $1;}
   	| COLON
@@ -471,13 +510,22 @@ id: ID {$$ = $1;}
 		acl_error(dgettext(TEXT_DOMAIN,
 		    "Invalid uid/gid specified.\nThe field"
 		    " should be a numeric value.\n")); 
+		yycleanup();
 		return (EACL_UNKNOWN_DATA);
 	}
-	| ERROR {return ($1);}
+	| ERROR
+	{
+		yycleanup();
+		return ($1);
+	}
 
 ace_perms: perm {$$ = $1;}
 	| aclent_perm COLON {$$ = $1;}
-	| ERROR {return ($1);}
+	| ERROR
+	{
+		yycleanup();
+		return ($1);
+	}
 
 perm: perms COLON {$$ = $1;}
     	| COLON {$$.perm_style = PERM_TYPE_EMPTY;}
@@ -498,13 +546,22 @@ perms: ACE_PERM
 		acl_error(dgettext(TEXT_DOMAIN,
 		   "Can't mix verbose permissions with"
 		    " compact permission.\n"));
+		yycleanup();
 		return (EACL_PERM_MASK_ERROR);
 
 	}
-	| ACE_PERM SLASH ERROR {return ($3);}
+	| ACE_PERM SLASH ERROR
+	{
+		yycleanup();
+		return ($3);
+	}
 		
 
 idname: IDNAME {$$ = $1;}
 
 entry_type: ENTRY_TYPE {$$ = $1;}
-	| ERROR {return ($1);}
+	| ERROR
+	{
+		yycleanup();
+		return ($1);
+	}

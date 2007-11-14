@@ -57,6 +57,15 @@ yywrap(void)
 extern char *yybuf;
 int yybufpos;
 
+/*
+ * Used for tracking allocated strings while walking through an ACL.
+ */
+struct yystrings {
+	char *y_logname;	/* user/group name from LOGNAME */
+	char *y_perms;		/* permssions from PERM_TOK */
+	char *y_iflags;		/* iflags from INHERIT_TOK */
+} yystrings;
+
 %}
 
 %e 1500
@@ -202,6 +211,7 @@ INHERIT_STR [fdinFSI-]+
 					return (ERROR);
 				}
 				yylval.str[strlen(yylval.str) -1] = '\0';
+				yystrings.y_logname = yylval.str;
 				BEGIN PS;
 				return (IDNAME);
 			}
@@ -309,6 +319,7 @@ INHERIT_STR [fdinFSI-]+
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
+				yystrings.y_perms = yylval.str;
 
 				/*
 				 * aclent are done after permissions.
@@ -555,6 +566,7 @@ INHERIT_STR [fdinFSI-]+
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
+				yystrings.y_iflags = yylval.str;
 				return (INHERIT_TOK);
 			}
 <AIS>:			{
@@ -902,6 +914,20 @@ void
 yyreset()
 {
 	yybufpos = 0;
+	memset(&yystrings, 0, sizeof (yystrings));
 	BEGIN TS;
 }
 
+void
+yycleanup()
+{
+	if (yystrings.y_logname)
+		free(yystrings.y_logname);
+	if (yystrings.y_perms)
+		free(yystrings.y_perms);
+	if (yystrings.y_iflags)
+		free(yystrings.y_iflags);
+	yystrings.y_logname = NULL;
+	yystrings.y_perms = NULL;
+	yystrings.y_iflags = NULL;
+}
