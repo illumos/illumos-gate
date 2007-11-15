@@ -1356,7 +1356,8 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 				dsym.st_name = istr;
 				dsym.st_info = GELF_ST_INFO(STB_GLOBAL,
 				    STT_FUNC);
-				dsym.st_other = ELF64_ST_VISIBILITY(STV_HIDDEN);
+				dsym.st_other =
+				    ELF64_ST_VISIBILITY(STV_ELIMINATE);
 				(void) gelf_update_sym(data_sym, isym, &dsym);
 
 				r = (char *)data_str->d_buf + istr;
