@@ -454,6 +454,7 @@ static void flushtape(void);
 static void getdir(void);
 static void *getmem(size_t);
 static void longt(struct stat *st, char aclchar);
+static void load_info_from_xtarhdr(u_longlong_t flag, struct xtar_hdr *xhdrp);
 static int makeDir(char *name);
 static void mterr(char *operation, int i, int exitcode);
 static void newvol(void);
@@ -464,6 +465,7 @@ static int putfile(char *longname, char *shortname, char *parent,
 static void readtape(char *buffer);
 static void seekdisk(blkcnt_t blocks);
 static void setPathTimes(int dirfd, char *path, timestruc_t modTime);
+static void setbytes_to_skip(struct stat *st, int err);
 static void splitfile(char *longname, int ifd, char *name,
 	char *prefix, int filetype);
 static void tomodes(struct stat *sp);
@@ -640,6 +642,9 @@ static	u_longlong_t	xhdr_flgs;	/* Bits set determine which items */
 #define	_X_ATIME	0x200
 #define	_X_CTIME	0x400
 #define	_X_MTIME	0x800
+#define	_X_XHDR		0x1000	/* Bit flag that determines whether 'X' */
+				/* typeflag was followed by 'A' or non 'A' */
+				/* typeflag. */
 #define	_X_LAST		0x40000000
 
 #define	PID_MAX_DIGITS		(10 * sizeof (pid_t) / 4)
@@ -1146,6 +1151,7 @@ dorep(char *argv[])
 	FILE *fp = (FILE *)NULL;
 	FILE *ff = (FILE *)NULL;
 	int archtype;
+	int ret;
 
 
 	if (!cflag) {
@@ -1155,7 +1161,7 @@ dorep(char *argv[])
 			if (!Eflag)
 				fatal(gettext("Archive contains extended"
 				    " header.  -E flag required.\n"));
-			(void) get_xdata();	/* Get extended header items */
+			ret = get_xdata();	/* Get extended header items */
 						/*   and regular header */
 		} else {
 			if (Eflag)
@@ -1163,13 +1169,22 @@ dorep(char *argv[])
 				    " header.  -E flag not allowed.\n"));
 		}
 		while (!endtape()) {		/* changed from a do while */
+			setbytes_to_skip(&stbuf, ret);
 			passtape();		/* skip the file data */
 			if (term)
 				done(Errflg);	/* received signal to stop */
 			xhdr_flgs = 0;
 			getdir();
 			if (Xhdrflag > 0)
-				(void) get_xdata();
+				ret = get_xdata();
+		}
+		if (ret == 0) {
+			if ((dblock.dbuf.typeflag != 'A') &&
+			    (xhdr_flgs != 0)) {
+				load_info_from_xtarhdr(xhdr_flgs,
+				    &Xtarhdr);
+				xhdr_flgs |= _X_XHDR;
+			}
 		}
 		backtape();			/* was called by endtape */
 		if (tfile != NULL) {
@@ -3879,6 +3894,10 @@ tryagain:
 		getdir();
 		if (Xhdrflag > 0)
 			(void) get_xdata();	/* Get x-header & regular hdr */
+		if ((dblock.dbuf.typeflag != 'A') && (xhdr_flgs != 0)) {
+			load_info_from_xtarhdr(xhdr_flgs, &Xtarhdr);
+			xhdr_flgs |= _X_XHDR;
+		}
 		if (endtape()) {	/* seemingly empty volume */
 			(void) fprintf(stderr, gettext(
 			    "tar: first record is null\n"));
@@ -5601,15 +5620,31 @@ wantit(char *argv[], char **namep, char **dirp, char **component,
 {
 	char **cp;
 	int gotit;		/* true if we've found a match */
+	int ret;
 
 top:
-	xhdr_flgs = 0;
+	if (xhdr_flgs & _X_XHDR) {
+		xhdr_flgs = 0;
+	}
 	getdir();
 	if (Xhdrflag > 0) {
-		if (get_xdata() != 0) {	/* Xhdr items and regular header */
+		ret = get_xdata();
+		if (ret != 0) {	/* Xhdr items and regular header */
+			setbytes_to_skip(&stbuf, ret);
 			passtape();
 			return (0);	/* Error--don't want to extract  */
 		}
+	}
+
+	/*
+	 * If typeflag is not 'A' and xhdr_flgs is set, then processing
+	 * of ancillary file is either over or ancillary file
+	 * processing is not required, load info from Xtarhdr and set
+	 * _X_XHDR bit in xhdr_flgs.
+	 */
+	if ((dblock.dbuf.typeflag != 'A') && (xhdr_flgs != 0)) {
+		load_info_from_xtarhdr(xhdr_flgs, &Xtarhdr);
+		xhdr_flgs |= _X_XHDR;
 	}
 
 #if defined(O_XATTR)
@@ -5684,6 +5719,30 @@ top:
 	}
 
 	return (1);
+}
+
+
+static void
+setbytes_to_skip(struct stat *st, int err)
+{
+	/*
+	 * In a scenario where a typeflag 'X' was followed by
+	 * a typeflag 'A' and typeflag 'O', then the number of
+	 * bytes to skip should be the size of ancillary file,
+	 * plus the dblock for regular file, and the size
+	 * from Xtarhdr. However, if the typeflag was just 'X'
+	 * followed by typeflag 'O', then the number of bytes
+	 * to skip should be the size from Xtarhdr.
+	 */
+	if ((err != 0) && (dblock.dbuf.typeflag == 'A') &&
+	    (Xhdrflag != 0)) {
+		stbuf.st_size += TBLOCK + Xtarhdr.x_filesz;
+		xhdr_flgs |= _X_XHDR;
+	} else if ((dblock.dbuf.typeflag != 'A') &&
+	    (Xhdrflag != 0)) {
+		stbuf.st_size = Xtarhdr.x_filesz;
+		xhdr_flgs |= _X_XHDR;
+	}
 }
 
 static int
@@ -6499,17 +6558,7 @@ get_xdata(void)
 	struct stat	*sp = &stbuf;
 	int		errors;
 
-	Xtarhdr.x_uid = 0;
-	Xtarhdr.x_gid = 0;
-	Xtarhdr.x_devmajor = 0;
-	Xtarhdr.x_devminor = 0;
-	Xtarhdr.x_filesz = 0;
-	Xtarhdr.x_uname = NULL;
-	Xtarhdr.x_gname = NULL;
-	Xtarhdr.x_linkpath = NULL;
-	Xtarhdr.x_path = NULL;
-	Xtarhdr.x_mtime.tv_sec = 0;
-	Xtarhdr.x_mtime.tv_nsec = 0;
+	(void) memset(&Xtarhdr, 0, sizeof (Xtarhdr));
 	xhdr_count++;
 	errors = 0;
 
@@ -6638,37 +6687,49 @@ get_xdata(void)
 	}
 
 	getdir();	/* get regular header */
-
-	if (xhdr_flgs & _X_DEVMAJOR) {
-		Gen.g_devmajor = Xtarhdr.x_devmajor;
-	}
-	if (xhdr_flgs & _X_DEVMINOR) {
-		Gen.g_devminor = Xtarhdr.x_devminor;
-	}
-	if (xhdr_flgs & _X_GID) {
-		Gen.g_gid = Xtarhdr.x_gid;
-		sp->st_gid = Gen.g_gid;
-	}
-	if (xhdr_flgs & _X_UID) {
-		Gen.g_uid = Xtarhdr.x_uid;
-		sp->st_uid = Gen.g_uid;
-	}
-	if (xhdr_flgs & _X_SIZE) {
-		Gen.g_filesz = Xtarhdr.x_filesz;
-		sp->st_size = Gen.g_filesz;
-	}
-	if (xhdr_flgs & _X_MTIME) {
-		Gen.g_mtime = Xtarhdr.x_mtime.tv_sec;
-		sp->st_mtim.tv_sec = Gen.g_mtime;
-		sp->st_mtim.tv_nsec = Xtarhdr.x_mtime.tv_nsec;
-	}
-
 	if (errors && errflag)
 		done(1);
 	else
 		if (errors)
 			Errflg = 1;
 	return (errors);
+}
+
+/*
+ * load_info_from_xtarhdr - sets Gen and stbuf variables from
+ *	extended header
+ *	load_info_from_xtarhdr(flag, xhdrp);
+ *	u_longlong_t flag;	xhdr_flgs
+ *	struct xtar_hdr *xhdrp; pointer to extended header
+ *	NOTE:	called when typeflag is not 'A' and xhdr_flgs
+ *		is set.
+ */
+static void
+load_info_from_xtarhdr(u_longlong_t flag, struct xtar_hdr *xhdrp)
+{
+	if (flag & _X_DEVMAJOR) {
+		Gen.g_devmajor = xhdrp->x_devmajor;
+	}
+	if (flag & _X_DEVMINOR) {
+		Gen.g_devminor = xhdrp->x_devminor;
+	}
+	if (flag & _X_GID) {
+		Gen.g_gid = xhdrp->x_gid;
+		stbuf.st_gid = xhdrp->x_gid;
+	}
+	if (flag & _X_UID) {
+		Gen.g_uid = xhdrp->x_uid;
+		stbuf.st_uid  = xhdrp->x_uid;
+	}
+	if (flag & _X_SIZE) {
+		Gen.g_filesz = xhdrp->x_filesz;
+		stbuf.st_size = xhdrp->x_filesz;
+	}
+	if (flag & _X_MTIME) {
+		Gen.g_mtime = xhdrp->x_mtime.tv_sec;
+		stbuf.st_mtim.tv_sec = xhdrp->x_mtime.tv_sec;
+		stbuf.st_mtim.tv_nsec = xhdrp->x_mtime.tv_nsec;
+	}
 }
 
 /*
