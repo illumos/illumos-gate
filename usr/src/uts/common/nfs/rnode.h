@@ -304,6 +304,7 @@ typedef struct rnode {
 #define	RWRITEATTR	0x1000	/* attributes came from WRITE */
 #define	RINDNLCPURGE	0x2000	/* in the process of purging DNLC references */
 #define	RDELMAPLIST	0x4000	/* delmap callers tracking for as callback */
+#define	RINCACHEPURGE	0x8000	/* purging caches due to file size change */
 
 /*
  * Convert between vnode and rnode

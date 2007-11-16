@@ -352,6 +352,7 @@ typedef struct rnode4 {
 #define	R4ISXATTR	0x20000	/* rnode is a named attribute */
 #define	R4DELMAPLIST	0x40000	/* delmap callers tracked for as callback */
 #define	R4PGFLUSH	0x80000	/* page flush thread active */
+#define	R4INCACHEPURGE	0x100000 /* purging caches due to file size change */
 #define	R4LOOKUP	0x200000 /* a lookup has been done in the directory */
 /*
  * Convert between vnode and rnode

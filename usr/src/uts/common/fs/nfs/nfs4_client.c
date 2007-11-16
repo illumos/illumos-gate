@@ -448,12 +448,15 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
     change_info4 *cinfo)
 {
 	rnode4_t *rp;
-	int mtime_changed;
-	int ctime_changed;
+	int mtime_changed = 0;
+	int ctime_changed = 0;
 	vsecattr_t *vsp;
 	int was_serial, set_time_cache_inval, recov;
 	vattr_t *vap = &garp->n4g_va;
 	mntinfo4_t *mi = VTOMI4(vp);
+	len_t preattr_rsize;
+	boolean_t writemodify_set = B_FALSE;
+	boolean_t cachepurge_set = B_FALSE;
 
 	ASSERT(mi->mi_vfsp->vfs_dev == garp->n4g_va.va_fsid);
 
@@ -548,9 +551,6 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 			 */
 			if (! cinfo->atomic)
 				set_time_cache_inval = 1;
-
-			mtime_changed = 0;
-			ctime_changed = 0;
 		} else {
 
 			/*
@@ -570,25 +570,53 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 			rp->r_time_cache_inval = 0;
 		}
 	} else {
+		/*
+		 * Write thread after writing data to file on remote server,
+		 * will always set R4WRITEMODIFIED to indicate that file on
+		 * remote server was modified with a WRITE operation and would
+		 * have marked attribute cache as timed out. If R4WRITEMODIFIED
+		 * is set, then do not check for mtime and ctime change.
+		 */
 		if (!(rp->r_flags & R4WRITEMODIFIED)) {
 			if (!CACHE4_VALID(rp, vap->va_mtime, vap->va_size))
 				mtime_changed = 1;
-			else
-				mtime_changed = 0;
+
 			if (rp->r_attr.va_ctime.tv_sec !=
 			    vap->va_ctime.tv_sec ||
 			    rp->r_attr.va_ctime.tv_nsec !=
 			    vap->va_ctime.tv_nsec)
 				ctime_changed = 1;
-			else
-				ctime_changed = 0;
 		} else {
-			mtime_changed = 0;
-			ctime_changed = 0;
+			writemodify_set = B_TRUE;
 		}
 	}
 
+	preattr_rsize = rp->r_size;
+
 	nfs4_attrcache_va(vp, garp, set_time_cache_inval);
+
+	/*
+	 * If we have updated filesize in nfs4_attrcache_va, as soon as we
+	 * drop statelock we will be in transition of purging all
+	 * our caches and updating them. It is possible for another
+	 * thread to pick this new file size and read in zeroed data.
+	 * stall other threads till cache purge is complete.
+	 */
+	if ((!cinfo) && (rp->r_size != preattr_rsize)) {
+		/*
+		 * If R4WRITEMODIFIED was set and we have updated the file
+		 * size, Server's returned file size need not necessarily
+		 * be because of this Client's WRITE. We need to purge
+		 * all caches.
+		 */
+		if (writemodify_set)
+			mtime_changed = 1;
+
+		if (mtime_changed && !(rp->r_flags & R4INCACHEPURGE)) {
+			rp->r_flags |= R4INCACHEPURGE;
+			cachepurge_set = B_TRUE;
+		}
+	}
 
 	if (!mtime_changed && !ctime_changed) {
 		mutex_exit(&rp->r_statelock);
@@ -605,6 +633,14 @@ nfs4_attr_cache(vnode_t *vp, nfs4_ga_res_t *garp,
 	 */
 	if (mtime_changed)
 		nfs4_purge_caches(vp, NFS4_NOPURGE_DNLC, cr, recov ? 1 : async);
+
+	if ((rp->r_flags & R4INCACHEPURGE) && cachepurge_set) {
+		mutex_enter(&rp->r_statelock);
+		rp->r_flags &= ~R4INCACHEPURGE;
+		cv_broadcast(&rp->r_cv);
+		mutex_exit(&rp->r_statelock);
+		cachepurge_set = B_FALSE;
+	}
 
 	if (ctime_changed) {
 		(void) nfs4_access_purge_rp(rp);

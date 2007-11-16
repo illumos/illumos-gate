@@ -583,6 +583,12 @@ nfs3_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			break;
 
 		mutex_enter(&rp->r_statelock);
+		while (rp->r_flags & RINCACHEPURGE) {
+			if (!cv_wait_sig(&rp->r_cv, &rp->r_statelock)) {
+				mutex_exit(&rp->r_statelock);
+				return (EINTR);
+			}
+		}
 		diff = rp->r_size - uiop->uio_loffset;
 		mutex_exit(&rp->r_statelock);
 		if (diff <= 0)

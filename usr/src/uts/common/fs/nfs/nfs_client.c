@@ -477,10 +477,13 @@ void
 nfs_attr_cache(vnode_t *vp, vattr_t *vap, hrtime_t t, cred_t *cr)
 {
 	rnode_t *rp;
-	int mtime_changed;
-	int ctime_changed;
+	int mtime_changed = 0;
+	int ctime_changed = 0;
 	vsecattr_t *vsp;
 	int was_serial;
+	len_t preattr_rsize;
+	boolean_t writeattr_set = B_FALSE;
+	boolean_t cachepurge_set = B_FALSE;
 
 	rp = VTOR(vp);
 
@@ -512,27 +515,50 @@ nfs_attr_cache(vnode_t *vp, vattr_t *vap, hrtime_t t, cred_t *cr)
 		return;
 	}
 
+	/*
+	 * Write thread after writing data to file on remote server,
+	 * will always set RWRITEATTR to indicate that file on remote
+	 * server was modified with a WRITE operation and would have
+	 * marked attribute cache as timed out. If RWRITEATTR
+	 * is set, then do not check for mtime and ctime change.
+	 */
 	if (!(rp->r_flags & RWRITEATTR)) {
 		if (!CACHE_VALID(rp, vap->va_mtime, vap->va_size))
 			mtime_changed = 1;
-		else
-			mtime_changed = 0;
+
 		if (rp->r_attr.va_ctime.tv_sec != vap->va_ctime.tv_sec ||
 		    rp->r_attr.va_ctime.tv_nsec != vap->va_ctime.tv_nsec)
 			ctime_changed = 1;
-		else
-			ctime_changed = 0;
-	} else if (rp->r_size != vap->va_size &&
-		    (!vn_has_cached_data(vp) ||
-		    (!(rp->r_flags & RDIRTY) && rp->r_count == 0))) {
-		mtime_changed = 1;
-		ctime_changed = 0;
 	} else {
-		mtime_changed = 0;
-		ctime_changed = 0;
+		writeattr_set = B_TRUE;
 	}
 
+	preattr_rsize = rp->r_size;
+
 	nfs_attrcache_va(vp, vap);
+
+	/*
+	 * If we have updated filesize in nfs_attrcache_va, as soon as we
+	 * drop statelock we will be in transition of purging all
+	 * our caches and updating them. It is possible for another
+	 * thread to pick this new file size and read in zeroed data.
+	 * stall other threads till cache purge is complete.
+	 */
+	if ((vp->v_type == VREG) && (rp->r_size != preattr_rsize)) {
+		/*
+		 * If RWRITEATTR was set and we have updated the file
+		 * size, Server's returned file size need not necessarily
+		 * be because of this Client's WRITE. We need to purge
+		 * all caches.
+		 */
+		if (writeattr_set)
+			mtime_changed = 1;
+
+		if (mtime_changed && !(rp->r_flags & RINCACHEPURGE)) {
+			rp->r_flags |= RINCACHEPURGE;
+			cachepurge_set = B_TRUE;
+		}
+	}
 
 	if (!mtime_changed && !ctime_changed) {
 		mutex_exit(&rp->r_statelock);
@@ -545,6 +571,14 @@ nfs_attr_cache(vnode_t *vp, vattr_t *vap, hrtime_t t, cred_t *cr)
 
 	if (mtime_changed)
 		nfs_purge_caches(vp, NFS_NOPURGE_DNLC, cr);
+
+	if ((rp->r_flags & RINCACHEPURGE) && cachepurge_set) {
+		mutex_enter(&rp->r_statelock);
+		rp->r_flags &= ~RINCACHEPURGE;
+		cv_broadcast(&rp->r_cv);
+		mutex_exit(&rp->r_statelock);
+		cachepurge_set = B_FALSE;
+	}
 
 	if (ctime_changed) {
 		(void) nfs_access_purge_rp(rp);
@@ -586,10 +620,13 @@ nfs3_attr_cache(vnode_t *vp, vattr_t *bvap, vattr_t *avap, hrtime_t t,
     cred_t *cr)
 {
 	rnode_t *rp;
-	int mtime_changed;
-	int ctime_changed;
+	int mtime_changed = 0;
+	int ctime_changed = 0;
 	vsecattr_t *vsp;
 	int was_serial;
+	len_t preattr_rsize;
+	boolean_t writeattr_set = B_FALSE;
+	boolean_t cachepurge_set = B_FALSE;
 
 	rp = VTOR(vp);
 
@@ -621,22 +658,50 @@ nfs3_attr_cache(vnode_t *vp, vattr_t *bvap, vattr_t *avap, hrtime_t t,
 		return;
 	}
 
+	/*
+	 * Write thread after writing data to file on remote server,
+	 * will always set RWRITEATTR to indicate that file on remote
+	 * server was modified with a WRITE operation and would have
+	 * marked attribute cache as timed out. If RWRITEATTR
+	 * is set, then do not check for mtime and ctime change.
+	 */
 	if (!(rp->r_flags & RWRITEATTR)) {
 		if (!CACHE_VALID(rp, bvap->va_mtime, bvap->va_size))
 			mtime_changed = 1;
-		else
-			mtime_changed = 0;
+
 		if (rp->r_attr.va_ctime.tv_sec != bvap->va_ctime.tv_sec ||
 		    rp->r_attr.va_ctime.tv_nsec != bvap->va_ctime.tv_nsec)
 			ctime_changed = 1;
-		else
-			ctime_changed = 0;
 	} else {
-		mtime_changed = 0;
-		ctime_changed = 0;
+		writeattr_set = B_TRUE;
 	}
 
+	preattr_rsize = rp->r_size;
+
 	nfs_attrcache_va(vp, avap);
+
+	/*
+	 * If we have updated filesize in nfs_attrcache_va, as soon as we
+	 * drop statelock we will be in transition of purging all
+	 * our caches and updating them. It is possible for another
+	 * thread to pick this new file size and read in zeroed data.
+	 * stall other threads till cache purge is complete.
+	 */
+	if ((vp->v_type == VREG) && (rp->r_size != preattr_rsize)) {
+		/*
+		 * If RWRITEATTR was set and we have updated the file
+		 * size, Server's returned file size need not necessarily
+		 * be because of this Client's WRITE. We need to purge
+		 * all caches.
+		 */
+		if (writeattr_set)
+			mtime_changed = 1;
+
+		if (mtime_changed && !(rp->r_flags & RINCACHEPURGE)) {
+			rp->r_flags |= RINCACHEPURGE;
+			cachepurge_set = B_TRUE;
+		}
+	}
 
 	if (!mtime_changed && !ctime_changed) {
 		mutex_exit(&rp->r_statelock);
@@ -649,6 +714,14 @@ nfs3_attr_cache(vnode_t *vp, vattr_t *bvap, vattr_t *avap, hrtime_t t,
 
 	if (mtime_changed)
 		nfs_purge_caches(vp, NFS_NOPURGE_DNLC, cr);
+
+	if ((rp->r_flags & RINCACHEPURGE) && cachepurge_set) {
+		mutex_enter(&rp->r_statelock);
+		rp->r_flags &= ~RINCACHEPURGE;
+		cv_broadcast(&rp->r_cv);
+		mutex_exit(&rp->r_statelock);
+		cachepurge_set = B_FALSE;
+	}
 
 	if (ctime_changed) {
 		(void) nfs_access_purge_rp(rp);
