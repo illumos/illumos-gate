@@ -744,14 +744,21 @@ idt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int i;
 
 	if (!(flags & DCMD_ADDRSPEC)) {
-		GElf_Sym idt;
+		GElf_Sym idt0_va;
+		gate_desc_t *idt0;
 
-		if (mdb_lookup_by_name("idt0", &idt) < 0) {
-			mdb_warn("failed to find idt0");
+		if (mdb_lookup_by_name("idt0", &idt0_va) < 0) {
+			mdb_warn("failed to find VA of idt0");
 			return (DCMD_ERR);
 		}
 
-		addr = idt.st_value;
+		addr = idt0_va.st_value;
+		if (mdb_vread(&idt0, sizeof (idt0), addr) != sizeof (idt0)) {
+			mdb_warn("failed to read idt0 at %p\n", addr);
+			return (DCMD_ERR);
+		}
+
+		addr = (uintptr_t)idt0;
 	}
 
 	for (i = 0; i < NIDT; i++, addr += sizeof (gate_desc_t)) {
