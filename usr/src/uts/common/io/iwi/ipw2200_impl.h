@@ -114,6 +114,7 @@ struct ipw2200_softc {
 #define	IPW2200_FLAG_TX_SCHED		(1 << 4)
 #define	IPW2200_FLAG_SCANNING		(1 << 5)
 #define	IPW2200_FLAG_HW_ERR_RECOVER	(1 << 6)
+#define	IPW2200_FLAG_ASSOCIATED		(1 << 7)
 #define	IPW2200_FLAG_HAS_RADIO_SWITCH	(1 << 16)
 	/* firmware download */
 	int			sc_fw_ok;
@@ -156,6 +157,9 @@ struct ipw2200_softc {
 
 	/* firmware */
 	struct ipw2200_firmware	sc_fw;
+
+	/* reschedule lock */
+	kmutex_t		sc_resched_lock;
 
 	/* mfthread related, mfthread is used to handle asynchronous task */
 	kthread_t		*sc_mf_thread;

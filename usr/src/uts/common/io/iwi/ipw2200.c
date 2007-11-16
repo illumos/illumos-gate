@@ -56,10 +56,18 @@
 #include <sys/pci.h>
 #include <sys/policy.h>
 #include <sys/random.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/api.h>
 
 #include "ipw2200.h"
 #include "ipw2200_impl.h"
 #include <inet/wifi_ioctl.h>
+
+/*
+ * for net80211 kernel usage
+ */
+#include <sys/net80211.h>
+#include <sys/net80211_proto.h>
 
 /*
  * minimal size reserved in tx-ring
@@ -179,6 +187,15 @@ static int	ipw2200_getset(struct ipw2200_softc *sc,
 static int	iwi_wificfg_radio(struct ipw2200_softc *sc,
     uint32_t cmd,  wldp_t *outfp);
 static int	iwi_wificfg_desrates(wldp_t *outfp);
+
+/*
+ * net80211 functions
+ */
+extern uint8_t	ieee80211_crypto_getciphertype(ieee80211com_t *ic);
+extern void	ieee80211_notify_node_join(ieee80211com_t *ic,
+    ieee80211_node_t *in);
+extern void	ieee80211_notify_node_leave(ieee80211com_t *ic,
+    ieee80211_node_t *in);
 
 /*
  * Mac Call Back entries
@@ -371,6 +388,12 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    (void *) sc->sc_iblk);
 
 	/*
+	 * rescheduled lock
+	 */
+	mutex_init(&sc->sc_resched_lock, "reschedule-lock", MUTEX_DRIVER,
+	    (void *) sc->sc_iblk);
+
+	/*
 	 * multi-function lock, may acquire this during interrupt
 	 */
 	mutex_init(&sc->sc_mflock, "function-lock", MUTEX_DRIVER,
@@ -380,17 +403,18 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	sc->sc_mfthread_switch = 0;
 
 	/*
-	 * Initialize the WiFi part, which will be used by generic layer
-	 * Need support more features in the furture, such as
-	 * IEEE80211_C_IBSS
+	 * Initialize the WiFi part
 	 */
 	ic = &sc->sc_ic;
 	ic->ic_phytype  = IEEE80211_T_OFDM;
 	ic->ic_opmode   = IEEE80211_M_STA;
 	ic->ic_state    = IEEE80211_S_INIT;
 	ic->ic_maxrssi  = 100; /* experimental number */
-	ic->ic_caps = IEEE80211_C_SHPREAMBLE | IEEE80211_C_TXPMGT
-	    | IEEE80211_C_PMGT | IEEE80211_C_WEP;
+	ic->ic_caps =
+	    IEEE80211_C_SHPREAMBLE |
+	    IEEE80211_C_TXPMGT |
+	    IEEE80211_C_PMGT |
+	    IEEE80211_C_WPA;
 
 	/*
 	 * set mac addr
@@ -447,6 +471,11 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ieee80211_attach(ic);
 
 	/*
+	 * different instance has different WPA door
+	 */
+	ieee80211_register_door(ic, ddi_driver_name(dip), instance);
+
+	/*
 	 * Override 80211 default routines
 	 */
 	ieee80211_media_init(ic); /* initial the node table and bss */
@@ -471,7 +500,7 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	wd.wd_secalloc = WIFI_SEC_NONE;
 	wd.wd_opmode = ic->ic_opmode;
-	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_macaddr);
+	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
 
 	macp = mac_alloc(MAC_VERSION);
 	if (err != 0) {
@@ -542,6 +571,7 @@ fail5:
 	mutex_destroy(&sc->sc_cmd_lock);
 	mutex_destroy(&sc->sc_tx_lock);
 	mutex_destroy(&sc->sc_mflock);
+	mutex_destroy(&sc->sc_resched_lock);
 	cv_destroy(&sc->sc_fw_cond);
 	cv_destroy(&sc->sc_cmd_status_cond);
 	cv_destroy(&sc->sc_cmd_cond);
@@ -594,6 +624,7 @@ ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_destroy(&sc->sc_cmd_lock);
 	mutex_destroy(&sc->sc_tx_lock);
 	mutex_destroy(&sc->sc_mflock);
+	mutex_destroy(&sc->sc_resched_lock);
 	cv_destroy(&sc->sc_fw_cond);
 	cv_destroy(&sc->sc_cmd_status_cond);
 	cv_destroy(&sc->sc_cmd_cond);
@@ -645,6 +676,7 @@ ipw2200_stop(struct ipw2200_softc *sc)
 
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	sc->sc_flags &= ~IPW2200_FLAG_SCANNING;
+	sc->sc_flags &= ~IPW2200_FLAG_ASSOCIATED;
 
 	IPW2200_DBG(IPW2200_DBG_HWCAP, (sc->sc_dip, CE_CONT,
 	    "ipw2200_stop(): exit\n"));
@@ -708,6 +740,8 @@ ipw2200_config(struct ipw2200_softc *sc)
 	cfg.multicast_enabled		 = 1;
 	cfg.answer_pbreq		 = 1;
 	cfg.noise_reported		 = 1;
+	cfg.disable_multicast_decryption = 1; /* WPA */
+	cfg.disable_unicast_decryption   = 1; /* WPA */
 
 	IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
 	    "ipw2200_config(): Configuring adapter\n"));
@@ -1492,6 +1526,12 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 	struct ipw2200_associate	assoc;
 	uint32_t			data;
 	int				err;
+	uint8_t				*wpa_level;
+
+	if (sc->sc_flags & IPW2200_FLAG_ASSOCIATED) {
+		/* already associated */
+		return (-1);
+	}
 
 	/*
 	 * set the confiuration
@@ -1504,6 +1544,8 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 		cfg.use_protection	  = 1;
 		cfg.answer_pbreq	  = 1;
 		cfg.noise_reported	  = 1;
+		cfg.disable_multicast_decryption = 1; /* WPA */
+		cfg.disable_unicast_decryption   = 1; /* WPA */
 		err = ipw2200_cmd(sc, IPW2200_CMD_SET_CONFIG,
 		    &cfg, sizeof (cfg), 1);
 		if (err != DDI_SUCCESS)
@@ -1537,10 +1579,52 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 	IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
 	    "ipw2200_auth_and_assoc(): "
 	    "setting negotiated rates to(nrates = %u)\n", rs.nrates));
-
 	err = ipw2200_cmd(sc, IPW2200_CMD_SET_RATES, &rs, sizeof (rs), 1);
 	if (err != DDI_SUCCESS)
 		return (err);
+
+	/*
+	 * invoke command associate
+	 */
+	(void) memset(&assoc, 0, sizeof (assoc));
+
+	/*
+	 * set opt_ie to h/w if associated is WPA, opt_ie has been verified
+	 * by net80211 kernel module.
+	 */
+	if (ic->ic_opt_ie != NULL) {
+
+		wpa_level = (uint8_t *)ic->ic_opt_ie;
+
+		IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
+		    "ipw2200_auth_and_assoc(): "
+		    "set wpa_ie and wpa_ie_len to h/w. "
+		    "length is %d\n"
+		    "opt_ie[0] = %02X - element vendor\n"
+		    "opt_ie[1] = %02X - length\n"
+		    "opt_ie[2,3,4] = %02X %02X %02X - oui\n"
+		    "opt_ie[5] = %02X - oui type\n"
+		    "opt_ie[6,7] = %02X %02X - spec version \n"
+		    "opt_ie[8,9,10,11] = %02X %02X %02X %02X - gk cipher\n"
+		    "opt_ie[12,13] = %02X %02X - pairwise key cipher(1)\n"
+		    "opt_ie[14,15,16,17] = %02X %02X %02X %02X - ciphers\n"
+		    "opt_ie[18,19] = %02X %02X - authselcont(1) \n"
+		    "opt_ie[20,21,22,23] = %02X %02X %02X %02X - authsels\n",
+		    wpa_level[1], wpa_level[0], wpa_level[1],
+		    wpa_level[2], wpa_level[3], wpa_level[4],
+		    wpa_level[5], wpa_level[6], wpa_level[7],
+		    wpa_level[8], wpa_level[9], wpa_level[10],
+		    wpa_level[11], wpa_level[12], wpa_level[13],
+		    wpa_level[14], wpa_level[15], wpa_level[16],
+		    wpa_level[17], wpa_level[18], wpa_level[19],
+		    wpa_level[20], wpa_level[21], wpa_level[22],
+		    wpa_level[23]));
+
+		err = ipw2200_cmd(sc, IPW2200_CMD_SET_OPTIE,
+		    ic->ic_opt_ie, ic->ic_opt_ie_len, 1);
+		if (err != DDI_SUCCESS)
+			return (err);
+	}
 
 	/*
 	 * set the sensitive
@@ -1555,12 +1639,12 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 		return (err);
 
 	/*
-	 * invoke command associate
+	 * set mode and channel for assocation command
 	 */
-	(void) memset(&assoc, 0, sizeof (assoc));
 	assoc.mode = IEEE80211_IS_CHAN_5GHZ(in->in_chan) ?
 	    IPW2200_MODE_11A : IPW2200_MODE_11G;
 	assoc.chan = ieee80211_chan2ieee(ic, in->in_chan);
+
 	/*
 	 * use the value set to ic_bss to retraive current sharedmode
 	 */
@@ -1570,6 +1654,9 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 		    "ipw2200_auth_and_assoc(): "
 		    "associate to shared key mode, set thru. ioctl"));
 	}
+
+	if (ic->ic_flags & IEEE80211_F_WPA)
+		assoc.policy = LE_16(IPW2200_POLICY_WPA); /* RSN/WPA active */
 	(void) memcpy(assoc.tstamp, in->in_tstamp.data, 8);
 	assoc.capinfo = LE_16(in->in_capinfo);
 	assoc.lintval = LE_16(ic->ic_lintval);
@@ -1591,6 +1678,20 @@ ipw2200_auth_and_assoc(struct ipw2200_softc *sc)
 	    &assoc, sizeof (assoc), 1));
 }
 
+/*
+ * Send the dis-association command to h/w, will receive notification to claim
+ * the connection is dis-associated. So, it's not marked as disassociated this
+ * moment.
+ */
+static int
+ipw2200_disassoc(struct ipw2200_softc *sc)
+{
+	struct ipw2200_associate assoc;
+	assoc.type = 2;
+	return (ipw2200_cmd(sc, IPW2200_CMD_ASSOCIATE, &assoc,
+	    sizeof (assoc), 1));
+}
+
 /* ARGSUSED */
 static int
 ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
@@ -1606,19 +1707,20 @@ ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 		}
 		break;
 	case IEEE80211_S_AUTH:
+		/*
+		 * The firmware will fail if we are already associated
+		 */
+		if (sc->sc_flags & IPW2200_FLAG_ASSOCIATED)
+			(void) ipw2200_disassoc(sc);
 		(void) ipw2200_auth_and_assoc(sc);
 		break;
 	case IEEE80211_S_RUN:
 		/*
 		 * We can send data now; update the fastpath with our
 		 * current associated BSSID and other relevant settings.
-		 *
-		 * Hardware to ahndle the wep encryption. Set the encryption
-		 * as false.
-		 * wd.wd_wep    = ic->ic_flags & IEEE80211_F_WEPON;
 		 */
-		wd.wd_secalloc	= WIFI_SEC_NONE;
-		wd.wd_opmode	= ic->ic_opmode;
+		wd.wd_secalloc = ieee80211_crypto_getciphertype(ic);
+		wd.wd_opmode = ic->ic_opmode;
 		IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
 		(void) mac_pdata_update(ic->ic_mach, &wd, sizeof (wd));
 		break;
@@ -1628,13 +1730,13 @@ ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 	}
 
 	/*
-	 * notify to update the link
+	 * notify to update the link, and WPA
 	 */
 	if ((ic->ic_state != IEEE80211_S_RUN) && (state == IEEE80211_S_RUN)) {
-		mac_link_update(ic->ic_mach, LINK_STATE_UP);
+		ieee80211_notify_node_join(ic, ic->ic_bss);
 	} else if ((ic->ic_state == IEEE80211_S_RUN) &&
 	    (state != IEEE80211_S_RUN)) {
-		mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
+		ieee80211_notify_node_leave(ic, ic->ic_bss);
 	}
 
 	IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
@@ -1645,7 +1747,6 @@ ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 	ic->ic_state = state;
 	return (DDI_SUCCESS);
 }
-
 /*
  * GLD operations
  */
@@ -1764,11 +1865,12 @@ ipw2200_thread(struct ipw2200_softc *sc)
 			    "try to recover fatal hw error\n"));
 
 			sc->sc_flags &= ~IPW2200_FLAG_HW_ERR_RECOVER;
-
 			mutex_exit(&sc->sc_mflock);
 
+			/* stop again */
 			ostate = ic->ic_state;
 			(void) ipw2200_init(sc); /* Force state machine */
+
 			/*
 			 * workround. Delay for a while after init especially
 			 * when something wrong happened already.
@@ -1820,12 +1922,18 @@ ipw2200_m_start(void *arg)
 	 * initialize ipw2200 hardware, everything ok will start scan
 	 */
 	(void) ipw2200_init(sc);
+
 	/*
 	 * set the state machine to INIT
 	 */
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
 	sc->sc_flags |= IPW2200_FLAG_RUNNING;
+
+	/*
+	 * fix KCF bug. - workaround, need to fix it in net80211
+	 */
+	(void) crypto_mech2id(SUN_CKM_RC4);
 
 	return (DDI_SUCCESS);
 }
@@ -1920,7 +2028,7 @@ ipw2200_m_tx(void *arg, mblk_t *mp)
 		next = mp->b_next;
 		mp->b_next = NULL;
 		if (ipw2200_send(ic, mp, IEEE80211_FC0_TYPE_DATA) ==
-		    DDI_FAILURE) {
+		    ENOMEM) {
 			mp->b_next = next;
 			break;
 		}
@@ -1929,29 +2037,28 @@ ipw2200_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
-/* ARGSUSED */
+/*
+ * ipw2200_send(): send data. softway to handle crypto_encap.
+ */
 static int
 ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 {
 	struct ipw2200_softc	*sc = (struct ipw2200_softc *)ic;
 	struct ieee80211_node	*in;
 	struct ieee80211_frame	*wh;
-	mblk_t			*m0;
+	struct ieee80211_key	*k;
+	mblk_t			*m0, *m;
 	size_t			cnt, off;
 	struct ipw2200_tx_desc	*txdsc;
 	struct dma_region	*dr;
 	uint32_t		idx;
-	int			err;
+	int			err = DDI_SUCCESS;
 	/* tmp pointer, used to pack header and payload */
 	uint8_t			*p;
 
 	ASSERT(mp->b_next == NULL);
-
 	IPW2200_DBG(IPW2200_DBG_GLD, (sc->sc_dip, CE_CONT,
 	    "ipw2200_send(): enter\n"));
-
-	m0 = NULL;
-	err = DDI_SUCCESS;
 
 	if ((type & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) {
 		/*
@@ -1959,7 +2066,7 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		 * management frames. Therefore, drop this package.
 		 */
 		freemsg(mp);
-		err = DDI_SUCCESS;
+		err = DDI_FAILURE;
 		goto fail0;
 	}
 
@@ -1969,74 +2076,93 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 * need 1 empty descriptor
 	 */
 	if (sc->sc_tx_free <= IPW2200_TX_RING_MIN) {
+		mutex_enter(&sc->sc_resched_lock);
 		IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip, CE_WARN,
 		    "ipw2200_send(): no enough descriptors(%d)\n",
 		    sc->sc_tx_free));
 		ic->ic_stats.is_tx_nobuf++; /* no enough buffer */
 		sc->sc_flags |= IPW2200_FLAG_TX_SCHED;
-		err = DDI_FAILURE;
+		err = ENOMEM;
+		mutex_exit(&sc->sc_resched_lock);
 		goto fail1;
 	}
 	IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip, CE_CONT,
 	    "ipw2200_send():  tx-free=%d,tx-curr=%d\n",
 	    sc->sc_tx_free, sc->sc_tx_cur));
 
-	wh = (struct ieee80211_frame *)mp->b_rptr;
+	/*
+	 * put the mp into one blk, and use it to do the crypto_encap
+	 * if necessaary.
+	 */
+	m = allocb(msgdsize(mp) + 32, BPRI_MED);
+	if (m == NULL) { /* can not alloc buf, drop this package */
+		IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
+		    "ipw2200_send(): msg allocation failed\n"));
+		freemsg(mp);
+		err = DDI_FAILURE;
+		goto fail1;
+	}
+	for (off = 0, m0 = mp; m0 != NULL; m0 = m0->b_cont) {
+		cnt = MBLKL(m0);
+		(void) memcpy(m->b_rptr + off, m0->b_rptr, cnt);
+		off += cnt;
+	}
+	m->b_wptr += off;
+
+	/*
+	 * find tx_node, and encapsulate the data
+	 */
+	wh = (struct ieee80211_frame *)m->b_rptr;
 	in = ieee80211_find_txnode(ic, wh->i_addr1);
 	if (in == NULL) { /* can not find the tx node, drop the package */
 		ic->ic_stats.is_tx_failed++;
 		freemsg(mp);
-		err = DDI_SUCCESS;
-		goto fail1;
+		err = DDI_FAILURE;
+		goto fail2;
 	}
 	in->in_inact = 0;
-	(void) ieee80211_encap(ic, mp, in);
+
+	(void) ieee80211_encap(ic, m, in);
 	ieee80211_free_node(in);
 
+	if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+		k = ieee80211_crypto_encap(ic, m);
+		if (k == NULL) { /* can not get the key, drop packages */
+			IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
+			    "ipw2200_send(): "
+			    "Encrypting 802.11 frame failed\n"));
+			freemsg(mp);
+			err = DDI_FAILURE;
+			goto fail2;
+		}
+		wh = (struct ieee80211_frame *)m->b_rptr;
+	}
+
 	/*
-	 * get txdsc and wh
+	 * get txdsc
 	 */
 	idx	= sc->sc_tx_cur;
 	txdsc	= &sc->sc_txdsc[idx];
 	(void) memset(txdsc, 0, sizeof (*txdsc));
-	wh	= (struct ieee80211_frame *)&txdsc->wh;
-
 	/*
 	 * extract header from message
 	 */
 	p	= (uint8_t *)&txdsc->wh;
-	off	= 0;
-	m0	= mp;
-	while (off < sizeof (struct ieee80211_frame)) {
-		cnt = MBLKL(m0);
-		if (cnt > (sizeof (struct ieee80211_frame) - off))
-			cnt = sizeof (struct ieee80211_frame) - off;
-		if (cnt) {
-			(void) memcpy(p + off, m0->b_rptr, cnt);
-			off += cnt;
-			m0->b_rptr += cnt;
-		} else
-			m0 = m0->b_cont;
-	}
-
+	off	= sizeof (struct ieee80211_frame);
+	(void) memcpy(p, m->b_rptr, off);
 	/*
 	 * extract payload from message
 	 */
 	dr	= &sc->sc_dma_txbufs[idx];
 	p	= sc->sc_txbufs[idx];
-	off	= 0;
-	while (m0) {
-		cnt = MBLKL(m0);
-		if (cnt)
-			(void) memcpy(p + off, m0->b_rptr, cnt);
-		off += cnt;
-		m0 = m0->b_cont;
-	}
+	cnt	= MBLKL(m);
+	(void) memcpy(p, m->b_rptr + off, cnt - off);
+	cnt    -= off;
 
 	txdsc->hdr.type   = IPW2200_HDR_TYPE_DATA;
 	txdsc->hdr.flags  = IPW2200_HDR_FLAG_IRQ;
 	txdsc->cmd	  = IPW2200_DATA_CMD_TX;
-	txdsc->len	  = LE_16(off);
+	txdsc->len	  = LE_16(cnt);
 	txdsc->flags	  = 0;
 
 	if (ic->ic_opmode == IEEE80211_M_IBSS) {
@@ -2045,19 +2171,15 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	} else if (!IEEE80211_IS_MULTICAST(wh->i_addr3))
 		txdsc->flags |= IPW2200_DATA_FLAG_NEED_ACK;
 
-	if (ic->ic_flags & IEEE80211_F_PRIVACY) {
-		wh->i_fc[1] |= IEEE80211_FC1_WEP;
-		txdsc->wep_txkey = ic->ic_def_txkey;
-	}
-	else
-		txdsc->flags |= IPW2200_DATA_FLAG_NO_WEP;
+	/* always set it to none wep, because it's handled by software */
+	txdsc->flags |= IPW2200_DATA_FLAG_NO_WEP;
 
 	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 		txdsc->flags |= IPW2200_DATA_FLAG_SHPREAMBLE;
 
 	txdsc->nseg	    = LE_32(1);
 	txdsc->seg_addr[0]  = LE_32(dr->dr_pbase);
-	txdsc->seg_len[0]   = LE_32(off);
+	txdsc->seg_len[0]   = LE_32(cnt);
 
 	/*
 	 * DMA sync: buffer and desc
@@ -2081,7 +2203,9 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	 */
 	if (mp)
 		freemsg(mp);
-
+fail2:
+	if (m)
+		freemsg(m);
 fail1:
 	mutex_exit(&sc->sc_tx_lock);
 fail0:
@@ -2347,15 +2471,8 @@ ipw2200_rcv_frame(struct ipw2200_softc *sc, struct ipw2200_frame *frame)
 	struct ieee80211_frame	*wh;
 	struct ieee80211_node	*in;
 	mblk_t			*m;
-	int			i;
 
 	len = LE_16(frame->len);
-
-	/*
-	 * Skip the frame header, get the real data from the input
-	 */
-	data += sizeof (struct ipw2200_frame);
-
 	if ((len < sizeof (struct ieee80211_frame_min)) ||
 	    (len > IPW2200_RXBUF_SIZE)) {
 		IPW2200_DBG(IPW2200_DBG_RX, (sc->sc_dip, CE_CONT,
@@ -2363,40 +2480,34 @@ ipw2200_rcv_frame(struct ipw2200_softc *sc, struct ipw2200_frame *frame)
 		    LE_16(frame->len)));
 		return;
 	}
-
 	IPW2200_DBG(IPW2200_DBG_RX, (sc->sc_dip, CE_CONT,
 	    "ipw2200_rcv_frame(): chan = %d, length = %d\n", frame->chan, len));
+
+	/*
+	 * Skip the frame header, get the real data from the input
+	 */
+	data += sizeof (struct ipw2200_frame);
 
 	m = allocb(len, BPRI_MED);
 	if (m) {
 		(void) memcpy(m->b_wptr, data, len);
 		m->b_wptr += len;
 
-		wh = (struct ieee80211_frame *)m->b_rptr;
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
-			/*
-			 * h/w decyption leaves the WEP bit, iv and CRC fields
-			 */
-			wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
-			for (i = sizeof (struct ieee80211_frame) - 1;
-			    i >= 0; i--)
-				*(m->b_rptr + IEEE80211_WEP_IVLEN +
-				    IEEE80211_WEP_KIDLEN + i) =
-				    *(m->b_rptr + i);
-			m->b_rptr += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
-			m->b_wptr -= IEEE80211_WEP_CRCLEN;
-			wh = (struct ieee80211_frame *)m->b_rptr;
-		}
-
 		if (ic->ic_state == IEEE80211_S_SCAN) {
 			ic->ic_ibss_chan = &ic->ic_sup_channels[frame->chan];
 			ipw2200_fix_channel(ic, m);
 		}
+		wh = (struct ieee80211_frame *)m->b_rptr;
 
 		in = ieee80211_find_rxnode(ic, wh);
+
 		IPW2200_DBG(IPW2200_DBG_RX, (sc->sc_dip, CE_CONT,
 		    "ipw2200_rcv_frame(): "
+		    "type = %x, subtype = %x, i_fc[1] = %x, "
 		    "ni_esslen:%d, ni_essid[0-5]:%c%c%c%c%c%c\n",
+		    wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK,
+		    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK,
+		    wh->i_fc[1] & IEEE80211_FC1_WEP,
 		    in->in_esslen,
 		    in->in_essid[0], in->in_essid[1], in->in_essid[2],
 		    in->in_essid[3], in->in_essid[4], in->in_essid[5]));
@@ -2434,10 +2545,12 @@ ipw2200_rcv_notif(struct ipw2200_softc *sc, struct ipw2200_notif *notif)
 
 		switch (assoc->state) {
 		case IPW2200_ASSOC_SUCCESS:
+			sc->sc_flags |= IPW2200_FLAG_ASSOCIATED;
 			ieee80211_new_state(ic, IEEE80211_S_RUN, -1);
 			break;
 		case IPW2200_ASSOC_FAIL:
-			ieee80211_begin_scan(ic, 1); /* reset */
+			sc->sc_flags &= ~IPW2200_FLAG_ASSOCIATED;
+			ieee80211_begin_scan(ic, 1);
 			break;
 		default:
 			break;
@@ -2455,6 +2568,7 @@ ipw2200_rcv_notif(struct ipw2200_softc *sc, struct ipw2200_notif *notif)
 			ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
 			break;
 		case IPW2200_AUTH_FAIL:
+			sc->sc_flags &= ~IPW2200_FLAG_ASSOCIATED;
 			break;
 		default:
 			IPW2200_DBG(IPW2200_DBG_NOTIF, (sc->sc_dip, CE_CONT,
@@ -2507,7 +2621,6 @@ ipw2200_intr(caddr_t arg)
 	uint8_t			*p, *rxbuf;
 	struct dma_region	*dr;
 	struct ipw2200_hdr	*hdr;
-	int			need_sched;
 	uint32_t		widx;
 
 	ireg = ipw2200_csr_get32(sc, IPW2200_CSR_INTR);
@@ -2544,12 +2657,19 @@ ipw2200_intr(caddr_t arg)
 		mutex_exit(&sc->sc_mflock);
 
 	} else {
+		/*
+		 * FW intr
+		 */
 		if (ireg & IPW2200_INTR_FW_INITED) {
 			mutex_enter(&sc->sc_ilock);
 			sc->sc_fw_ok = 1;
 			cv_signal(&sc->sc_fw_cond);
 			mutex_exit(&sc->sc_ilock);
 		}
+
+		/*
+		 * Radio OFF
+		 */
 		if (ireg & IPW2200_INTR_RADIO_OFF) {
 			IPW2200_REPORT((sc->sc_dip, CE_CONT,
 			    "ipw2200_intr(): radio is OFF\n"));
@@ -2558,6 +2678,10 @@ ipw2200_intr(caddr_t arg)
 			 */
 			ipw2200_stop(sc);
 		}
+
+		/*
+		 * CMD intr
+		 */
 		if (ireg & IPW2200_INTR_CMD_TRANSFER) {
 			mutex_enter(&sc->sc_cmd_lock);
 			ridx = ipw2200_csr_get32(sc,
@@ -2583,6 +2707,10 @@ ipw2200_intr(caddr_t arg)
 			cv_signal(&sc->sc_cmd_status_cond);
 			mutex_exit(&sc->sc_ilock);
 		}
+
+		/*
+		 * RX intr
+		 */
 		if (ireg & IPW2200_INTR_RX_TRANSFER) {
 			ridx = ipw2200_csr_get32(sc,
 			    IPW2200_CSR_RX_READ_INDEX);
@@ -2643,6 +2771,10 @@ ipw2200_intr(caddr_t arg)
 			    RING_BACKWARD(sc->sc_rx_cur, 1,
 			    IPW2200_RX_RING_SIZE));
 		}
+
+		/*
+		 * TX intr
+		 */
 		if (ireg & IPW2200_INTR_TX1_TRANSFER) {
 			mutex_enter(&sc->sc_tx_lock);
 			ridx = ipw2200_csr_get32(sc,
@@ -2650,24 +2782,22 @@ ipw2200_intr(caddr_t arg)
 			len  = RING_FLEN(RING_FORWARD(sc->sc_tx_cur,
 			    sc->sc_tx_free, IPW2200_TX_RING_SIZE),
 			    ridx, IPW2200_TX_RING_SIZE);
+			sc->sc_tx_free += len;
 			IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip, CE_CONT,
 			    "ipw2200_intr(): tx-ring,ridx=%u,len=%u\n",
 			    ridx, len));
-			sc->sc_tx_free += len;
+			mutex_exit(&sc->sc_tx_lock);
 
-			need_sched = 0;
+			mutex_enter(&sc->sc_resched_lock);
 			if ((sc->sc_tx_free > IPW2200_TX_RING_MIN) &&
 			    (sc->sc_flags & IPW2200_FLAG_TX_SCHED)) {
 				IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip,
 				    CE_CONT,
 				    "ipw2200_intr(): Need Reschedule!"));
-				need_sched = 1;
 				sc->sc_flags &= ~IPW2200_FLAG_TX_SCHED;
-			}
-			mutex_exit(&sc->sc_tx_lock);
-
-			if (need_sched)
 				mac_tx_update(ic->ic_mach);
+			}
+			mutex_exit(&sc->sc_resched_lock);
 		}
 	}
 

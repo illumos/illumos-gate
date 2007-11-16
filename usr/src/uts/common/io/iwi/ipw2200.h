@@ -49,7 +49,7 @@ extern "C" {
 
 #define	IPW2200_DRV_NAME  "iwi"
 #define	IPW2200_DRV_DESC  "Intel Wireless 2200/2915"
-#define	IPW2200_DRV_REV   "V1.00"
+#define	IPW2200_DRV_REV   "V1.01"
 
 /*
  * Debug functionalities
