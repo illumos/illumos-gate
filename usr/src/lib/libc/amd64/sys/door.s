@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +99,7 @@
 door_restart:
 	movq	$DOOR_RETURN, %r9	/* subcode */
 	SYSTRAP_RVAL1(door)
-	jb	2f			/* errno is set */
+	jb	3f			/* errno is set */
 	/*
 	 * On return, we're serving a door_call.  Our stack looks like this:
 	 *
@@ -127,16 +126,19 @@ door_restart:
 	movq	DOOR_DESC_SIZE(%rsp), %r8
 	movq	DOOR_PC(%rsp), %rax
 	call	*%rax
+2:
 	/* Exit the thread if we return here */
 	movq	$0, %rdi
 	call	_thr_terminate
 	/* NOTREACHED */
-2:
+3:
 	/*
 	 * Error during door_return call.  Repark the thread in the kernel if
 	 * the error code is EINTR (or ERESTART) and this lwp is still part
 	 * of the same process.
 	 */
+	cmpl	$EEXIST, %eax		/* exit if EEXIST is returned */
+	je	2b
 	cmpl	$ERESTART, %eax		/* ERESTART is same as EINTR */
 	jne	3f
 	movl	$EINTR, %eax

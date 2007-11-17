@@ -90,6 +90,12 @@ size_t	door_max_upcall_reply = 1024 * 1024;
 uint_t door_max_desc = 1024;
 
 /*
+ * The maximum time door server thread waits before exiting if there
+ * is no request from client. This is expressed in seconds.
+ */
+int door_srv_timeout = 5;
+
+/*
  * Definition of a door handle, used by other kernel subsystems when
  * calling door functions.  This is really a file structure but we
  * want to hide that fact.
@@ -341,7 +347,7 @@ static int door_overflow(kthread_t *, caddr_t, size_t, door_desc_t *, uint_t);
 static int door_args(kthread_t *, int);
 static int door_results(kthread_t *, caddr_t, size_t, door_desc_t *, uint_t);
 static int door_copy(struct as *, caddr_t, caddr_t, uint_t);
-static void	door_server_exit(proc_t *, kthread_t *);
+static int	door_server_exit(proc_t *, kthread_t *);
 static void	door_release_server(door_node_t *, kthread_t *);
 static kthread_t	*door_get_server(door_node_t *);
 static door_node_t	*door_lookup(int, file_t **);
@@ -1322,6 +1328,13 @@ door_return(caddr_t data_ptr, size_t data_size,
 	door_node_t	*dp;
 	door_server_t	*st;		/* curthread door_data */
 	door_client_t	*ct;		/* caller door_data */
+	clock_t timeleft = 0;
+	timeout_id_t id = NULL;
+
+	if (door_srv_timeout > 0)
+		timeleft = door_srv_timeout * (hz/100) * 100;
+	else
+		timeleft = -1;
 
 	st = door_my_server(1);
 
@@ -1387,6 +1400,13 @@ out:
 	/* Put ourselves on the available server thread list */
 	door_release_server(st->d_pool, curthread);
 
+	if (timeleft > 0) {
+		id = realtime_timeout((void (*)(void *))setrun,
+		    curthread, timeleft);
+	} else {
+		id = NULL;
+	}
+
 	/*
 	 * Make sure the caller is still waiting to be resumed
 	 */
@@ -1415,6 +1435,8 @@ out:
 			 */
 			thread_onproc(caller, cp);
 			disp_lock_exit_high(tlp);
+
+			/* when server returns results to client */
 			shuttle_resume(caller, &door_knob);
 		} else {
 			/* May have been setrun or in stop state */
@@ -1422,7 +1444,14 @@ out:
 			shuttle_swtch(&door_knob);
 		}
 	} else {
+		/* no client */
 		shuttle_swtch(&door_knob);
+	}
+
+
+	if (id != NULL) {
+		timeleft = untimeout(id);
+		id = NULL;
 	}
 
 	/*
@@ -1457,24 +1486,52 @@ out:
 				ct = DOOR_CLIENT(caller->t_door);
 			else
 				ct = NULL;
+
+			/*
+			 * Recalculate timeout since there was a
+			 * door invocation.
+			 */
+			if (door_srv_timeout > 0) {
+				timeleft = door_srv_timeout *
+				    (hz/100) * 100;
+			} else {
+				timeleft = -1;
+			}
+
 			goto out;
 		}
 		mutex_exit(&door_knob);
 		return (0);
 	} else {
+		int empty;
+
 		/*
 		 * We are not involved in a door_invocation.
 		 * Check for /proc related activity...
 		 */
 		st->d_caller = NULL;
-		door_server_exit(curproc, curthread);
+		empty = door_server_exit(curproc, curthread);
 		mutex_exit(&door_knob);
+
+		/*
+		 * We return EEXIST, which terminates this thread,
+		 * if there was no door invocation for past
+		 * door_srv_timeout seconds. But if all the
+		 * servers threads are busy, then this server
+		 * thread should not exit.
+		 */
+		if (door_srv_timeout > 0 && timeleft <= 0 &&
+		    empty == 0) {
+			return (set_errno(EEXIST));
+		}
+
 		if (ISSIG(curthread, FORREAL) ||
 		    lwp->lwp_sysabort || MUSTRETURN(curproc, curthread)) {
 			lwp->lwp_asleep = 0;
 			lwp->lwp_sysabort = 0;
 			return (set_errno(EINTR));
 		}
+
 		/* Go back and wait for another request */
 		lwp->lwp_asleep = 0;
 		mutex_enter(&door_knob);
@@ -1864,12 +1921,13 @@ door_release_server(door_node_t *dp, kthread_t *t)
 /*
  * Remove a server thread from the pool if present.
  */
-static void
+static int
 door_server_exit(proc_t *p, kthread_t *t)
 {
 	door_pool_t *pool;
 	kthread_t **next;
 	door_server_t *st = DOOR_SERVER(t->t_door);
+	int empty = 1;	/* assume door server list is empty */
 
 	ASSERT(MUTEX_HELD(&door_knob));
 	if (st->d_pool != NULL) {
@@ -1883,10 +1941,27 @@ door_server_exit(proc_t *p, kthread_t *t)
 	while (*next != NULL) {
 		if (*next == t) {
 			*next = DOOR_SERVER(t->t_door)->d_servers;
-			return;
+			if (empty && *next != NULL) {
+				/* door server list is not empty */
+				empty = 0;
+			}
+
+			return (empty);
 		}
 		next = &(DOOR_SERVER((*next)->t_door)->d_servers);
+
+		/* door server list is not empty */
+		empty = 0;
 	}
+
+	/*
+	 * If empty is set to 1, it means that there are no available
+	 * door server threads hence caller should not let the last
+	 * server thread go away. If empty is 0, then it means that
+	 * there is at least one available door server thread in the
+	 * pool.
+	 */
+	return (empty);
 }
 
 /*
