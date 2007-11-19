@@ -54,16 +54,20 @@ static const char *progname;
 static void
 warncore(FILE *fp, const char *fmt, va_list args)
 {
+	const char *execname;
+
 	flockfile(fp);
 	if (progname == NULL) {
-		progname = strrchr(getexecname(), '/');
-		if (progname == NULL)
-			progname = getexecname();
-		else
+		execname = getexecname();
+		if ((execname != NULL) &&
+		    ((progname = strrchr(execname, '/')) != NULL))
 			progname++;
+		else
+			progname = execname;
 	}
 
-	(void) fprintf(fp, "%s: ", progname);
+	if (progname != NULL)
+		(void) fprintf(fp, "%s: ", progname);
 
 	if (fmt != NULL) {
 		(void) vfprintf(fp, fmt, args);
