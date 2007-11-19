@@ -640,6 +640,7 @@ fetch_algorithms()
 		 * to fail with a KGE_LEN error. This is not an error
 		 * condition, so we return nicely.
 		 */
+		(void) close(sfd);
 		return;
 	} else if (retval != 0) {
 		if (strlen(spdsock_diag_buf) != 0)
@@ -3113,9 +3114,10 @@ nuke_adds()
 	policy_fp = fopen(POLICY_CONF_FILE, "a");
 	if (policy_fp == NULL) {
 		warn(gettext("%s cannot be opened"), POLICY_CONF_FILE);
+	} else {
+		(void) fprintf(policy_fp, "\n\n");
+		(void) fflush(policy_fp);
 	}
-	(void) fprintf(policy_fp, "\n\n");
-	(void) fflush(policy_fp);
 
 	while (temp != NULL) {
 		(void) ipsec_conf_del(temp->index, B_TRUE);
