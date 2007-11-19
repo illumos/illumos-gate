@@ -100,8 +100,7 @@ forthdebug_init(void)
 	struct _buf *file;
 
 	if (!forthdebug_supported) {
-		if (obpdebug)
-			(void) modload("misc", "obpsym");
+		(void) modload("misc", "obpsym");
 		return;
 	}
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,8 @@
  * may be the firmware names and *not* the kernel names.
  *
  * The module locks the symbol tables in memory, when it's installed,
- * and unlocks them when it is removed.  To install the module, you
- * may either add "set obpdebug=1" to /etc/system or just modload it.
+ * and unlocks them when it is removed.  The module is loaded automatically
+ * on cobp systems and is replaced by forthdebug on all other systems.
  *
  * This file contains the actual code the does the lookups, and interfaces
  * with the kernel kobj stuff.  The transfer of data and control to/from
@@ -64,7 +63,6 @@ int obpsym_debug = 0;
 #define	DXPRINTF		if (obpsym_debug > 1) prom_printf
 
 int obpheld = 1;		/* Prevents unloading when set */
-extern int obpdebug;
 
 /*
  * name_to_value - translate a string into an address
@@ -180,8 +178,6 @@ _init(void)
 	if (install_callbacks() != 0)
 		return (ENXIO);
 
-	obpdebug = 1;
-
 	if (boothowto & RB_HALT)
 		debug_enter("obpsym: halt flag (-h) is set.\n");
 
@@ -193,7 +189,6 @@ _init(void)
 	if (retval) {
 		printf("obpsym: Error %d installing OBP syms module\n", retval);
 		remove_callbacks();
-		obpdebug = 0;
 	}
 	else
 		(void) callb_add(reset_callbacks, 0, CB_CL_CPR_OBP, "obpsym");
@@ -217,7 +212,6 @@ _fini(void)
 	 */
 	if (retval == 0) {
 		remove_callbacks();
-		obpdebug = 0;
 	}
 	return (retval);
 }
