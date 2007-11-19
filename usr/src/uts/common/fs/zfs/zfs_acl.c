@@ -374,8 +374,8 @@ zfs_acl_node_free(zfs_acl_node_t *aclnode)
 	kmem_free(aclnode, sizeof (zfs_acl_node_t));
 }
 
-void
-zfs_acl_free(zfs_acl_t *aclp)
+static void
+zfs_acl_release_nodes(zfs_acl_t *aclp)
 {
 	zfs_acl_node_t *aclnode;
 
@@ -383,7 +383,14 @@ zfs_acl_free(zfs_acl_t *aclp)
 		list_remove(&aclp->z_acl, aclnode);
 		zfs_acl_node_free(aclnode);
 	}
+	aclp->z_acl_count = 0;
+	aclp->z_acl_bytes = 0;
+}
 
+void
+zfs_acl_free(zfs_acl_t *aclp)
+{
+	zfs_acl_release_nodes(aclp);
 	list_destroy(&aclp->z_acl);
 	kmem_free(aclp, sizeof (zfs_acl_t));
 }
@@ -668,7 +675,7 @@ zfs_acl_xform(znode_t *zp, zfs_acl_t *aclp)
 	uint32_t access_mask;
 	uint64_t who;
 	void *cookie = NULL;
-	zfs_acl_node_t *aclnode, *newaclnode;
+	zfs_acl_node_t *newaclnode;
 
 	ASSERT(aclp->z_version == ZFS_ACL_VERSION_INITIAL);
 	/*
@@ -695,7 +702,6 @@ zfs_acl_xform(znode_t *zp, zfs_acl_t *aclp)
 	VERIFY(zfs_copy_ace_2_fuid(ZTOV(zp)->v_type, aclp, oldaclp,
 	    newaclnode->z_acldata, aclp->z_acl_count,
 	    &newaclnode->z_size) == 0);
-	aclp->z_acl_bytes = newaclnode->z_size;
 	newaclnode->z_ace_count = aclp->z_acl_count;
 	aclp->z_version = ZFS_ACL_VERSION;
 	kmem_free(oldaclp, aclp->z_acl_count * sizeof (zfs_oldace_t));
@@ -704,13 +710,13 @@ zfs_acl_xform(znode_t *zp, zfs_acl_t *aclp)
 	 * Release all previous ACL nodes
 	 */
 
-	while (aclnode = list_head(&aclp->z_acl)) {
-		list_remove(&aclp->z_acl, aclnode);
-		if (aclnode->z_allocsize)
-			kmem_free(aclnode->z_allocdata, aclnode->z_allocsize);
-		kmem_free(aclnode, sizeof (zfs_acl_node_t));
-	}
+	zfs_acl_release_nodes(aclp);
+
 	list_insert_head(&aclp->z_acl, newaclnode);
+
+	aclp->z_acl_bytes = newaclnode->z_size;
+	aclp->z_acl_count = newaclnode->z_ace_count;
+
 }
 
 /*
@@ -1100,39 +1106,6 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
 }
 
 /*
- * Remove ACE from aclp
- */
-static void
-zfs_ace_remove(zfs_acl_t *aclp, void *acep)
-{
-	zfs_acl_node_t 	*currnode = zfs_acl_curr_node(aclp);
-	size_t		length;
-
-	/*
-	 * If first entry then just alter acldata ptr
-	 *
-	 * Otherwise split node in two
-	 */
-	if (currnode->z_ace_count > 1) {
-		length = currnode->z_size - ((caddr_t)aclp->z_next_ace -
-		    (caddr_t)currnode->z_acldata);
-		(void) memmove(acep, aclp->z_next_ace, length);
-		currnode->z_size = currnode->z_size -
-		    aclp->z_ops.ace_size(acep);
-		aclp->z_next_ace = acep;
-		aclp->z_acl_bytes -= ((caddr_t)aclp->z_next_ace -
-		    (caddr_t)currnode->z_acldata);
-	} else {
-		list_remove(&aclp->z_acl, currnode);
-		aclp->z_next_ace = NULL;
-		aclp->z_acl_bytes = 0;
-	}
-	currnode->z_ace_count--;
-	currnode->z_ace_idx--;
-	aclp->z_acl_count--;
-}
-
-/*
  * Update access mask for prepended ACE
  *
  * This applies the "groupmask" value for aclmode property.
@@ -1494,6 +1467,17 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 	ASSERT(MUTEX_HELD(&zp->z_lock));
 
 	aclp->z_hints = (zp->z_phys->zp_flags & V4_ACL_WIDE_FLAGS);
+
+	/*
+	 * If discard then just discard all ACL nodes which
+	 * represent the ACEs.
+	 *
+	 * New owner@/group@/everone@ ACEs will be added
+	 * later.
+	 */
+	if (zfsvfs->z_acl_mode == ZFS_ACL_DISCARD)
+		zfs_acl_release_nodes(aclp);
+
 	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
 	    &iflags, &type)) {
 
@@ -1515,10 +1499,6 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 			goto nextace;
 		}
 
-		if (zfsvfs->z_acl_mode == ZFS_ACL_DISCARD) {
-			zfs_ace_remove(aclp, acep);
-			goto nextace;
-		}
 		/*
 		 * Need to split ace into two?
 		 */

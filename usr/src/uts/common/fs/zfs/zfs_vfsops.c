@@ -1066,11 +1066,9 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 				goto out;
 			}
 
-			if (error = secpolicy_vnode_owner(cr, vattr.va_uid)) {
-				goto out;
-			}
-
-			if (error = VOP_ACCESS(mvp, VWRITE, 0, cr, NULL)) {
+			if (secpolicy_vnode_owner(cr, vattr.va_uid) != 0 &&
+			    VOP_ACCESS(mvp, VWRITE, 0, cr, NULL) != 0) {
+				error = EPERM;
 				goto out;
 			}
 
