@@ -1517,8 +1517,14 @@ libdevinfo_init(picl_nodehdl_t rooth)
 	picl_nodehdl_t	obph;
 	int		err;
 
-
-	if ((di_root = di_init("/", DINFOCPYALL)) == DI_NODE_NIL)
+	/*
+	 * Use DINFOCACHE so that we obtain all attributes for all
+	 * device instances (without necessarily doing a load/attach
+	 * of all drivers).  Once the (on-disk) cache file is built, it
+	 * exists over a reboot and can be read into memory at a very
+	 * low cost.
+	 */
+	if ((di_root = di_init("/", DINFOCACHE)) == DI_NODE_NIL)
 		return (PICL_FAILURE);
 
 	if ((ph = di_prom_init()) == NULL)

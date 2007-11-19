@@ -48,6 +48,7 @@
 		grouping='require_all'
 		restart_on='none'>
 		<service_fmri value='svc:/system/filesystem/minimal' />
+		<service_fmri value='svc:/system/sysevent' />
 	</dependency>
 
 	<dependency
