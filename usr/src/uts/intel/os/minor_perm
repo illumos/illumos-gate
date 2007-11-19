@@ -132,6 +132,7 @@ clone:rtls 0666 root sys
 clone:ath 0666 root sys
 clone:ipw 0666 root sys
 clone:iwi 0666 root sys
+clone:iwk 0666 root sys
 clone:pcwl 0666 root sys
 clone:pcan 0666 root sys
 clone:ral 0666 root sys
@@ -152,6 +153,7 @@ ath:* 0666 root sys
 vnic:* 0666 root sys
 ipw:* 0666 root sys
 iwi:* 0666 root sys
+iwk:* 0666 root sys
 pcwl:* 0666 root sys
 pcan:* 0666 root sys
 ral:* 0666 root sys
