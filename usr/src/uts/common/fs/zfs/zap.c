@@ -580,9 +580,10 @@ zap_deref_leaf(zap_t *zap, uint64_t h, dmu_tx_t *tx, krw_t lt, zap_leaf_t **lp)
 }
 
 static int
-zap_expand_leaf(zap_t *zap, zap_leaf_t *l, uint64_t hash, dmu_tx_t *tx,
-    zap_leaf_t **lp)
+zap_expand_leaf(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx, zap_leaf_t **lp)
 {
+	zap_t *zap = zn->zn_zap;
+	uint64_t hash = zn->zn_hash;
 	zap_leaf_t *nl;
 	int prefix_diff, i, err;
 	uint64_t sibling;
@@ -603,7 +604,8 @@ zap_expand_leaf(zap_t *zap, zap_leaf_t *l, uint64_t hash, dmu_tx_t *tx,
 		zap_put_leaf(l);
 		zap_unlockdir(zap);
 		err = zap_lockdir(os, object, tx, RW_WRITER,
-		    FALSE, FALSE, &zap);
+		    FALSE, FALSE, &zn->zn_zap);
+		zap = zn->zn_zap;
 		if (err)
 			return (err);
 		ASSERT(!zap->zap_ismicro);
@@ -665,8 +667,9 @@ zap_expand_leaf(zap_t *zap, zap_leaf_t *l, uint64_t hash, dmu_tx_t *tx,
 }
 
 static void
-zap_put_leaf_maybe_grow_ptrtbl(zap_t *zap, zap_leaf_t *l, dmu_tx_t *tx)
+zap_put_leaf_maybe_grow_ptrtbl(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx)
 {
+	zap_t *zap = zn->zn_zap;
 	int shift = zap->zap_f.zap_phys->zap_ptrtbl.zt_shift;
 	int leaffull = (l->l_phys->l_hdr.lh_prefix_len == shift &&
 	    l->l_phys->l_hdr.lh_nfree < ZAP_LEAF_LOW_WATER);
@@ -686,7 +689,8 @@ zap_put_leaf_maybe_grow_ptrtbl(zap_t *zap, zap_leaf_t *l, dmu_tx_t *tx)
 
 			zap_unlockdir(zap);
 			err = zap_lockdir(os, zapobj, tx,
-			    RW_WRITER, FALSE, FALSE, &zap);
+			    RW_WRITER, FALSE, FALSE, &zn->zn_zap);
+			zap = zn->zn_zap;
 			if (err)
 				return;
 		}
@@ -787,13 +791,15 @@ retry:
 	if (err == 0) {
 		zap_increment_num_entries(zap, 1, tx);
 	} else if (err == EAGAIN) {
-		err = zap_expand_leaf(zap, l, zn->zn_hash, tx, &l);
+		err = zap_expand_leaf(zn, l, tx, &l);
+		zap = zn->zn_zap;	/* zap_expand_leaf() may change zap */
 		if (err == 0)
 			goto retry;
 	}
 
 out:
-	zap_put_leaf_maybe_grow_ptrtbl(zap, l, tx);
+	if (zap != NULL)
+		zap_put_leaf_maybe_grow_ptrtbl(zn, l, tx);
 	return (err);
 }
 
@@ -842,12 +848,14 @@ retry:
 	}
 
 	if (err == EAGAIN) {
-		err = zap_expand_leaf(zap, l, zn->zn_hash, tx, &l);
+		err = zap_expand_leaf(zn, l, tx, &l);
+		zap = zn->zn_zap;	/* zap_expand_leaf() may change zap */
 		if (err == 0)
 			goto retry;
 	}
 
-	zap_put_leaf_maybe_grow_ptrtbl(zap, l, tx);
+	if (zap != NULL)
+		zap_put_leaf_maybe_grow_ptrtbl(zn, l, tx);
 	return (err);
 }
 
