@@ -629,7 +629,7 @@ engine_apply(const char *file)
 		return (-1);
 	}
 
-	if (lscf_bundle_apply(b, file) != 0) {
+	if (lscf_bundle_apply(b) != 0) {
 		internal_bundle_free(b);
 		return (-1);
 	}

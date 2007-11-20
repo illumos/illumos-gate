@@ -216,7 +216,6 @@ SUNWprivate_1.1 {
 	scf_parse_svc_fmri;
 	_scf_pg_wait;
 	_scf_request_backup;
-	_scf_set_annotation;
 	_scf_snapshot_attach;
 	_scf_snapshot_delete;
 	_scf_snapshot_take_attach;

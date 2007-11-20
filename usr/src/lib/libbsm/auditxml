@@ -534,7 +534,6 @@ extern	void	adt_set_termid(const adt_session_data_t *,
 
 extern	void	adt_get_asid(const adt_session_data_t *, au_asid_t *);
 extern	void	adt_set_asid(const adt_session_data_t *, const au_asid_t);
-extern	au_id_t	adt_get_unique_id(au_id_t);
 
 #endif
 

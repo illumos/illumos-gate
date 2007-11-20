@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,9 +19,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ struct tx_commit_data {
 static int
 tx_check_genid(void *data_arg, int columns, char **vals, char **names)
 {
-	tx_commit_data_t *data = data_arg;
+	struct tx_commit_data *data = data_arg;
 	assert(columns == 1);
 	if (atoi(vals[0]) != data->txc_oldgen)
 		data->txc_result = REP_PROTOCOL_FAIL_NOT_LATEST;
@@ -104,7 +104,7 @@ tx_check_genid(void *data_arg, int columns, char **vals, char **names)
 static int
 tx_process_property(void *data_arg, int columns, char **vals, char **names)
 {
-	tx_commit_data_t *data = data_arg;
+	struct tx_commit_data *data = data_arg;
 	struct tx_cmd *elem;
 
 	const char *prop_name = vals[0];
@@ -183,7 +183,7 @@ tx_process_property(void *data_arg, int columns, char **vals, char **names)
  * Finally, we check all of the commands, and fail if anything was marked bad.
  */
 static int
-tx_process_cmds(tx_commit_data_t *data)
+tx_process_cmds(struct tx_commit_data *data)
 {
 	int idx;
 	int r;
@@ -194,7 +194,6 @@ tx_process_cmds(tx_commit_data_t *data)
 
 	backend_query_t *q;
 	int do_delete;
-	uint32_t nvalues;
 
 	/*
 	 * For persistent pgs, we use backend_fail_if_seen to abort the
@@ -299,9 +298,8 @@ tx_process_cmds(tx_commit_data_t *data)
 
 			v = elem->tx_values;
 
-			nvalues = elem->tx_nvalues;
 			while (r == REP_PROTOCOL_SUCCESS &&
-			    nvalues--) {
+			    elem->tx_nvalues--) {
 				str = (const char *)&v[1];
 
 				r = backend_tx_run_update(data->txc_tx,
@@ -339,7 +337,7 @@ check_string(uintptr_t loc, uint32_t len, uint32_t sz)
 }
 
 static int
-tx_check_and_setup(tx_commit_data_t *data, const void *cmds_arg,
+tx_check_and_setup(struct tx_commit_data *data, const void *cmds_arg,
     uint32_t count)
 {
 	const struct rep_protocol_transaction_cmd *cmds;
@@ -411,45 +409,25 @@ tx_check_and_setup(tx_commit_data_t *data, const void *cmds_arg,
 	return (REP_PROTOCOL_SUCCESS);
 }
 
-/*
- * Free the memory associated with a tx_commit_data structure.
- */
-void
-tx_commit_data_free(tx_commit_data_t *tx_data)
-{
-	uu_free(tx_data);
-}
-
-/*
- * Parse the data of a REP_PROTOCOL_PROPERTYGRP_TX_COMMIT message into a
- * more useful form.  The data in the message will be represented by a
- * tx_commit_data_t structure which is allocated by this function.  The
- * address of the allocated structure is returned to *tx_data and must be
- * freed by calling tx_commit_data_free().
- *
- * Parameters:
- *	cmds_arg	Address of the commands in the
- *			REP_PROTOCOL_PROPERTYGRP_TX_COMMIT message.
- *
- *	cmds_sz		Number of message bytes at cmds_arg.
- *
- *	tx_data		Points to the place to receive the address of the
- *			allocated memory.
- *
- * Fails with
- *	_BAD_REQUEST
- *	_NO_RESOURCES
- */
 int
-tx_commit_data_new(const void *cmds_arg, size_t cmds_sz,
-    tx_commit_data_t **tx_data)
+object_tx_commit(rc_node_lookup_t *lp, const void *cmds_arg, size_t cmds_sz,
+    uint32_t *gen)
 {
 	const struct rep_protocol_transaction_cmd *cmds;
-	tx_commit_data_t *data;
 	uintptr_t loc;
-	uint32_t count;
-	uint32_t sz;
+
+	struct tx_commit_data *data;
+	uint32_t count, sz;
+	uint32_t new_gen;
+
 	int ret;
+
+	rep_protocol_responseid_t r;
+
+	backend_tx_t *tx;
+	backend_query_t *q;
+
+	int backend = lp->rl_backend;
 
 	/*
 	 * First, verify that the reported sizes make sense, and count
@@ -477,175 +455,16 @@ tx_commit_data_new(const void *cmds_arg, size_t cmds_sz,
 		count++;
 	}
 
-	data = uu_zalloc(TX_COMMIT_DATA_SIZE(count));
-	if (data == NULL)
-		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+	data = alloca(TX_COMMIT_DATA_SIZE(count));
+	(void) memset(data, 0, TX_COMMIT_DATA_SIZE(count));
 
 	/*
 	 * verify that everything looks okay, and set up our command
 	 * datastructures.
 	 */
-	data->txc_count = count;
 	ret = tx_check_and_setup(data, cmds_arg, count);
-	if (ret == REP_PROTOCOL_SUCCESS) {
-		*tx_data = data;
-	} else {
-		*tx_data = NULL;
-		uu_free(data);
-	}
-	return (ret);
-}
-
-/*
- * The following are a set of accessor functions to retrieve data from a
- * tx_commit_data_t that has been allocated by tx_commit_data_new().
- */
-
-/*
- * Return the action of the transaction command whose command number is
- * cmd_no.  The action is placed at *action.
- *
- * Returns:
- *	_FAIL_BAD_REQUEST	cmd_no is out of range.
- */
-int
-tx_cmd_action(tx_commit_data_t *tx_data, size_t cmd_no,
-    enum rep_protocol_transaction_action *action)
-{
-	struct tx_cmd *cur;
-
-	assert(cmd_no < tx_data->txc_count);
-	if (cmd_no >= tx_data->txc_count)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	cur = &tx_data->txc_cmds[cmd_no];
-	*action = cur->tx_cmd->rptc_action;
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-/*
- * Return the number of transaction commands held in tx_data.
- */
-size_t
-tx_cmd_count(tx_commit_data_t *tx_data)
-{
-	return (tx_data->txc_count);
-}
-
-/*
- * Return the number of property values that are associated with the
- * transaction command whose number is cmd_no.  The number of values is
- * returned to *nvalues.
- *
- * Returns:
- *	_FAIL_BAD_REQUEST	cmd_no is out of range.
- */
-int
-tx_cmd_nvalues(tx_commit_data_t *tx_data, size_t cmd_no, uint32_t *nvalues)
-{
-	struct tx_cmd *cur;
-
-	assert(cmd_no < tx_data->txc_count);
-	if (cmd_no >= tx_data->txc_count)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	cur = &tx_data->txc_cmds[cmd_no];
-	*nvalues = cur->tx_nvalues;
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-/*
- * Return a pointer to the property name of the command whose number is
- * cmd_no.  The property name pointer is returned to *pname.
- *
- * Returns:
- *	_FAIL_BAD_REQUEST	cmd_no is out of range.
- */
-int
-tx_cmd_prop(tx_commit_data_t *tx_data, size_t cmd_no, const char **pname)
-{
-	struct tx_cmd *cur;
-
-	assert(cmd_no < tx_data->txc_count);
-	if (cmd_no >= tx_data->txc_count)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	cur = &tx_data->txc_cmds[cmd_no];
-	*pname = cur->tx_prop;
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-/*
- * Return the property type of the property whose command number is
- * cmd_no.  The property type is returned to *ptype.
- *
- * Returns:
- *	_FAIL_BAD_REQUEST	cmd_no is out of range.
- */
-int
-tx_cmd_prop_type(tx_commit_data_t *tx_data, size_t cmd_no, uint32_t *ptype)
-{
-	struct tx_cmd *cur;
-
-	assert(cmd_no < tx_data->txc_count);
-	if (cmd_no >= tx_data->txc_count)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	cur = &tx_data->txc_cmds[cmd_no];
-	*ptype = cur->tx_cmd->rptc_type;
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-/*
- * This function is used to retrieve a property value from the transaction
- * data.  val_no specifies which value is to be retrieved from the
- * transaction command whose number is cmd_no.  A pointer to the specified
- * value is placed in *val.
- *
- * Returns:
- *	_FAIL_BAD_REQUEST	cmd_no or val_no is out of range.
- */
-int
-tx_cmd_value(tx_commit_data_t *tx_data, size_t cmd_no, uint32_t val_no,
-    const char **val)
-{
-	const char *bp;
-	struct tx_cmd *cur;
-	uint32_t i;
-	uint32_t value_len;
-
-	assert(cmd_no < tx_data->txc_count);
-	if (cmd_no >= tx_data->txc_count)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	cur = &tx_data->txc_cmds[cmd_no];
-	assert(val_no < cur->tx_nvalues);
-	if (val_no >= cur->tx_nvalues)
-		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
-
-	/* Find the correct value */
-	bp = (char *)cur->tx_values;
-	for (i = 0; i < val_no; i++) {
-		/* LINTED alignment */
-		value_len = *(uint32_t *)bp;
-		bp += sizeof (uint32_t) + TX_SIZE(value_len);
-	}
-
-	/* Bypass the count & return pointer to value. */
-	bp += sizeof (uint32_t);
-	*val = bp;
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-int
-object_tx_commit(rc_node_lookup_t *lp, tx_commit_data_t *data, uint32_t *gen)
-{
-	uint32_t new_gen;
-	int ret;
-	rep_protocol_responseid_t r;
-	backend_tx_t *tx;
-	backend_query_t *q;
-	int backend = lp->rl_backend;
+	if (ret != REP_PROTOCOL_SUCCESS)
+		return (ret);
 
 	ret = backend_tx_begin(backend, &tx);
 	if (ret != REP_PROTOCOL_SUCCESS)
@@ -669,7 +488,7 @@ object_tx_commit(rc_node_lookup_t *lp, tx_commit_data_t *data, uint32_t *gen)
 	}
 
 	/* If the transaction is empty, cut out early. */
-	if (data->txc_count == 0) {
+	if (count == 0) {
 		backend_tx_rollback(tx);
 		r = REP_PROTOCOL_DONE;
 		goto end;
@@ -684,6 +503,7 @@ object_tx_commit(rc_node_lookup_t *lp, tx_commit_data_t *data, uint32_t *gen)
 	data->txc_pg_id = lp->rl_main_id;
 	data->txc_gen = new_gen;
 	data->txc_tx = tx;
+	data->txc_count = count;
 
 	r = backend_tx_run_update(tx,
 	    "UPDATE pg_tbl SET pg_gen_id = %d "

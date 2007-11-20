@@ -128,11 +128,6 @@
  * current door call client possesses any of them (perm_granted()).
  *
  * At some point, a generic version of this should move to libsecdb.
- *
- * While entering the enabling strings into the hash table, we keep track
- * of which is the most specific for use in generating auditing events.
- * See the "Collecting the Authorization String" section of the "SMF Audit
- * Events" block comment below.
  */
 
 /*
@@ -164,187 +159,9 @@
  * iterator carries an index into rn_cchain[].  Thus most of the magic ends up
  * int the rc_iter_*() code.
  */
-/*
- * SMF Audit Events:
- * ================
- *
- * To maintain security, SMF generates audit events whenever
- * privileged operations are attempted.  See the System Administration
- * Guide:Security Services answerbook for a discussion of the Solaris
- * audit system.
- *
- * The SMF audit event codes are defined in adt_event.h by symbols
- * starting with ADT_smf_ and are described in audit_event.txt.  The
- * audit record structures are defined in the SMF section of adt.xml.
- * adt.xml is used to automatically generate adt_event.h which
- * contains the definitions that we code to in this file.  For the
- * most part the audit events map closely to actions that you would
- * perform with svcadm or svccfg, but there are some special cases
- * which we'll discuss later.
- *
- * The software associated with SMF audit events falls into three
- * categories:
- * 	- collecting information to be written to the audit
- *	  records
- *	- using the adt_* functions in
- *	  usr/src/lib/libbsm/common/adt.c to generate the audit
- *	  records.
- * 	- handling special cases
- *
- * Collecting Information:
- * ----------------------
- *
- * Most all of the audit events require the FMRI of the affected
- * object and the authorization string that was used.  The one
- * exception is ADT_smf_annotation which we'll talk about later.
- *
- * Collecting the FMRI:
- *
- * The rc_node structure has a member called rn_fmri which points to
- * its FMRI.  This is initialized by a call to rc_node_build_fmri()
- * when the node's parent is established.  The reason for doing it
- * at this time is that a node's FMRI is basically the concatenation
- * of the parent's FMRI and the node's name with the appropriate
- * decoration.  rc_node_build_fmri() does this concatenation and
- * decorating.  It is called from rc_node_link_child() and
- * rc_node_relink_child() where a node is linked to its parent.
- *
- * rc_node_get_fmri_or_fragment() is called to retrieve a node's FMRI
- * when it is needed.  It returns rn_fmri if it is set.  If the node
- * is at the top level, however, rn_fmri won't be set because it was
- * never linked to a parent.  In this case,
- * rc_node_get_fmri_or_fragment() constructs an FMRI fragment based on
- * its node type and its name, rn_name.
- *
- * Collecting the Authorization String:
- *
- * Naturally, the authorization string is captured during the
- * authorization checking process.  Acceptable authorization strings
- * are added to a permcheck_t hash table as noted in the section on
- * permission checking above.  Once all entries have been added to the
- * hash table, perm_granted() is called.  If the client is authorized,
- * perm_granted() returns with pc_auth_string of the permcheck_t
- * structure pointing to the authorization string.
- *
- * This works fine if the client is authorized, but what happens if
- * the client is not authorized?  We need to report the required
- * authorization string.  This is the authorization that would have
- * been used if permission had been granted.  perm_granted() will
- * find no match, so it needs to decide which string in the hash
- * table to use as the required authorization string.  It needs to do
- * this, because configd is still going to generate an event.  A
- * design decision was made to use the most specific authorization
- * in the hash table.  The pc_auth_type enum designates the
- * specificity of an authorization string.  For example, an
- * authorization string that is declared in an instance PG is more
- * specific than one that is declared in a service PG.
- *
- * The pc_add() function keeps track of the most specific
- * authorization in the hash table.  It does this using the
- * pc_specific and pc_specific_type members of the permcheck
- * structure.  pc_add() updates these members whenever a more
- * specific authorization string is added to the hash table.  Thus, if
- * an authorization match is not found, perm_granted() will return
- * with pc_auth_string in the permcheck_t pointing to the string that
- * is referenced by pc_specific.
- *
- * Generating the Audit Events:
- * ===========================
- *
- * As the functions in this file process requests for clients of
- * configd, they gather the information that is required for an audit
- * event.  Eventually, the request processing gets to the point where
- * the authorization is rejected or to the point where the requested
- * action was attempted.  At these two points smf_audit_event() is
- * called.
- *
- * smf_audit_event() takes 4 parameters:
- * 	- the event ID which is one of the ADT_smf_* symbols from
- *	  adt_event.h.
- * 	- status to pass to adt_put_event()
- * 	- return value to pass to adt_put_event()
- * 	- the event data (see audit_event_data structure)
- *
- * All interactions with the auditing software require an audit
- * session.  We use one audit session per configd client.  We keep
- * track of the audit session in the repcache_client structure.
- * smf_audit_event() calls get_audit_session() to get the session
- * pointer.
- *
- * smf_audit_event() then calls adt_alloc_event() to allocate an
- * adt_event_data union which is defined in adt_event.h, copies the
- * data into the appropriate members of the union and calls
- * adt_put_event() to generate the event.
- *
- * Special Cases:
- * =============
- *
- * There are three major types of special cases:
- *
- * 	- gathering event information for each action in a
- *	  transaction
- * 	- Higher level events represented by special property
- *	  group/property name combinations.  Many of these are
- *	  restarter actions.
- * 	- ADT_smf_annotation event
- *
- * Processing Transaction Actions:
- * ------------------------------
- *
- * A transaction can contain multiple actions to modify, create or
- * delete one or more properties.  We need to capture information so
- * that we can generate an event for each property action.  The
- * transaction information is stored in a tx_commmit_data_t, and
- * object.c provides accessor functions to retrieve data from this
- * structure.  rc_tx_commit() obtains a tx_commit_data_t by calling
- * tx_commit_data_new() and passes this to object_tx_commit() to
- * commit the transaction.  Then we call generate_property_events() to
- * generate an audit event for each property action.
- *
- * Special Properties:
- * ------------------
- *
- * There are combinations of property group/property name that are special.
- * They are special because they have specific meaning to startd.  startd
- * interprets them in a service-independent fashion.
- * restarter_actions/refresh and general/enabled are two examples of these.
- * A special event is generated for these properties in addition to the
- * regular property event described in the previous section.  The special
- * properties are declared as an array of audit_special_prop_item
- * structures at special_props_list in rc_node.c.
- *
- * In the previous section, we mentioned the
- * generate_property_event() function that generates an event for
- * every property action.  Before generating the event,
- * generate_property_event() calls special_property_event().
- * special_property_event() checks to see if the action involves a
- * special property.  If it does, it generates a special audit
- * event.
- *
- * ADT_smf_annotation event:
- * ------------------------
- *
- * This is a special event unlike any other.  It allows the svccfg
- * program to store an annotation in the event log before a series
- * of transactions is processed.  It is used with the import and
- * apply svccfg commands.  svccfg uses the rep_protocol_annotation
- * message to pass the operation (import or apply) and the file name
- * to configd.  The set_annotation() function in client.c stores
- * these away in the a repcache_client structure.  The address of
- * this structure is saved in the thread_info structure.
- *
- * Before it generates any events, smf_audit_event() calls
- * smf_annotation_event().  smf_annotation_event() calls
- * client_annotation_needed() which is defined in client.c.  If an
- * annotation is needed client_annotation_needed() returns the
- * operation and filename strings that were saved from the
- * rep_protocol_annotation message.  smf_annotation_event() then
- * generates the ADT_smf_annotation event.
- */
 
 #include <assert.h>
 #include <atomic.h>
-#include <bsm/adt_event.h>
 #include <errno.h>
 #include <libuutil.h>
 #include <libscf.h>
@@ -355,7 +172,6 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <sys/types.h>
-#include <syslog.h>
 #include <unistd.h>
 #include <user_attr.h>
 
@@ -380,17 +196,6 @@
 #define	RBAC_AUTH_SEP		","
 
 #define	MAX_VALID_CHILDREN 3
-
-/*
- * The ADT_smf_* symbols may not be defined on the build machine.  Because
- * of this, we do not want to compile the _smf_aud_event() function when
- * doing native builds.
- */
-#ifdef	NATIVE_BUILD
-#define	smf_audit_event(i, s, r, d)
-#else
-#define	smf_audit_event(i, s, r, d)	_smf_audit_event(i, s, r, d)
-#endif	/* NATIVE_BUILD */
 
 typedef struct rc_type_info {
 	uint32_t	rt_type;		/* matches array index */
@@ -428,57 +233,12 @@ struct pc_elt {
 	char		pce_auth[1];
 };
 
-/*
- * If an authorization fails, we must decide which of the elements in the
- * permcheck hash table to use in the audit event.  That is to say of all
- * the strings in the hash table, we must choose one and use it in the audit
- * event.  It is desirable to use the most specific string in the audit
- * event.
- *
- * The pc_auth_type specifies the types (sources) of authorization
- * strings.  The enum is ordered in increasing specificity.
- */
-typedef enum pc_auth_type {
-	PC_AUTH_NONE = 0,	/* no auth string available. */
-	PC_AUTH_SMF,		/* strings coded into SMF. */
-	PC_AUTH_SVC,		/* strings specified in PG of a service. */
-	PC_AUTH_INST		/* strings specified in PG of an instance. */
-} pc_auth_type_t;
-
 /* An authorization set hash table. */
 typedef struct {
 	struct pc_elt	**pc_buckets;
 	uint_t		pc_bnum;		/* number of buckets */
 	uint_t		pc_enum;		/* number of elements */
-	struct pc_elt	*pc_specific;		/* most specific element */
-	pc_auth_type_t	pc_specific_type;	/* type of pc_specific */
-	char		*pc_auth_string;	/* authorization string */
-						/* for audit events */
 } permcheck_t;
-
-/*
- * Structure for holding audit event data.  Not all events use all members
- * of the structure.
- */
-typedef struct audit_event_data {
-	char		*ed_auth;	/* authorization string. */
-	char		*ed_fmri;	/* affected FMRI. */
-	char		*ed_snapname;	/* name of snapshot. */
-	char		*ed_old_fmri;	/* old fmri in attach case. */
-	char		*ed_old_name;	/* old snapshot in attach case. */
-	char		*ed_type;	/* prop. group or prop. type. */
-	char		*ed_prop_value;	/* property value. */
-} audit_event_data_t;
-
-/*
- * Pointer to function to do special processing to get audit event ID.
- * Audit event IDs are defined in /usr/include/bsm/adt_event.h.  Function
- * returns 0 if ID successfully retrieved.  Otherwise it returns -1.
- */
-typedef int (*spc_getid_fn_t)(tx_commit_data_t *, size_t, const char *,
-    au_event_t *);
-static int general_enable_id(tx_commit_data_t *, size_t, const char *,
-    au_event_t *);
 
 static uu_list_pool_t *rc_children_pool;
 static uu_list_pool_t *rc_pg_notify_pool;
@@ -492,61 +252,6 @@ static pthread_cond_t	rc_pg_notify_cv = PTHREAD_COND_INITIALIZER;
 static uint_t		rc_notify_in_use;	/* blocks removals */
 
 static pthread_mutex_t	perm_lock = PTHREAD_MUTEX_INITIALIZER;
-
-/*
- * Some combinations of property group/property name require a special
- * audit event to be generated when there is a change.
- * audit_special_prop_item_t is used to specify these special cases.  The
- * special_props_list array defines a list of these special properties.
- */
-typedef struct audit_special_prop_item {
-	const char	*api_pg_name;	/* property group name. */
-	const char	*api_prop_name;	/* property name. */
-	au_event_t	api_event_id;	/* event id or 0. */
-	spc_getid_fn_t	api_event_func; /* function to get event id. */
-} audit_special_prop_item_t;
-
-/*
- * Native builds are done using the build machine's standard include
- * files.  These files may not yet have the definitions for the ADT_smf_*
- * symbols.  Thus, we do not compile this table when doing native builds.
- */
-#ifndef	NATIVE_BUILD
-/*
- * The following special_props_list array specifies property group/property
- * name combinations that have specific meaning to startd.  A special event
- * is generated for these combinations in addition to the regular property
- * event.
- *
- * At run time this array gets sorted.  See the call to qsort(3C) in
- * rc_node_init().  The array is sorted, so that bsearch(3C) can be used
- * to do lookups.
- */
-static audit_special_prop_item_t special_props_list[] = {
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_DEGRADED, ADT_smf_degrade,
-	    NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_DEGRADE_IMMEDIATE,
-	    ADT_smf_immediate_degrade, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_MAINT_OFF, ADT_smf_clear, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_MAINT_ON,
-	    ADT_smf_maintenance, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_MAINT_ON_IMMEDIATE,
-	    ADT_smf_immediate_maintenance, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_MAINT_ON_IMMTEMP,
-	    ADT_smf_immtmp_maintenance, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_MAINT_ON_TEMPORARY,
-	    ADT_smf_tmp_maintenance, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_REFRESH, ADT_smf_refresh, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_RESTART, ADT_smf_restart, NULL},
-	{SCF_PG_RESTARTER_ACTIONS, SCF_PROPERTY_RESTORE, ADT_smf_clear, NULL},
-	{SCF_PG_OPTIONS, SCF_PROPERTY_MILESTONE, ADT_smf_milestone, NULL},
-	{SCF_PG_OPTIONS_OVR, SCF_PROPERTY_MILESTONE, ADT_smf_milestone, NULL},
-	{SCF_PG_GENERAL, SCF_PROPERTY_ENABLED, 0, general_enable_id},
-	{SCF_PG_GENERAL_OVR, SCF_PROPERTY_ENABLED, 0, general_enable_id}
-};
-#define	SPECIAL_PROP_COUNT	(sizeof (special_props_list) /\
-	sizeof (audit_special_prop_item_t))
-#endif	/* NATIVE_BUILD */
 
 static void rc_node_unrefed(rc_node_t *np);
 
@@ -883,233 +588,6 @@ rc_check_pgtype_name(const char *name)
 	return (REP_PROTOCOL_SUCCESS);
 }
 
-/*
- * rc_node_free_fmri should be called whenever a node loses its parent.
- * The reason is that the node's fmri string is built up by concatenating
- * its name to the parent's fmri.  Thus, when the node no longer has a
- * parent, its fmri is no longer valid.
- */
-static void
-rc_node_free_fmri(rc_node_t *np)
-{
-	if (np->rn_fmri != NULL) {
-		free((void *)np->rn_fmri);
-		np->rn_fmri = NULL;
-	}
-}
-
-/*
- * Concatenate the appropriate separator and the FMRI element to the base
- * FMRI string at fmri.
- *
- * Fails with
- *	_TRUNCATED	Not enough room in buffer at fmri.
- */
-static int
-rc_concat_fmri_element(
-	char *fmri,			/* base fmri */
-	size_t bufsize,			/* size of buf at fmri */
-	size_t *sz_out,			/* receives result size. */
-	const char *element,		/* element name to concat */
-	rep_protocol_entity_t type)	/* type of element */
-{
-	size_t actual;
-	const char *name = element;
-	int rc;
-	const char *separator;
-
-	if (bufsize > 0)
-		*sz_out = strlen(fmri);
-	else
-		*sz_out = 0;
-
-	switch (type) {
-	case REP_PROTOCOL_ENTITY_SCOPE:
-		if (strcmp(element, SCF_FMRI_LOCAL_SCOPE) == 0) {
-			/*
-			 * No need to display scope information if we are
-			 * in the local scope.
-			 */
-			separator = SCF_FMRI_SVC_PREFIX;
-			name = NULL;
-		} else {
-			/*
-			 * Need to display scope information, because it is
-			 * not the local scope.
-			 */
-			separator = SCF_FMRI_SVC_PREFIX SCF_FMRI_SCOPE_PREFIX;
-		}
-		break;
-	case REP_PROTOCOL_ENTITY_SERVICE:
-		separator = SCF_FMRI_SERVICE_PREFIX;
-		break;
-	case REP_PROTOCOL_ENTITY_INSTANCE:
-		separator = SCF_FMRI_INSTANCE_PREFIX;
-		break;
-	case REP_PROTOCOL_ENTITY_PROPERTYGRP:
-	case REP_PROTOCOL_ENTITY_CPROPERTYGRP:
-		separator = SCF_FMRI_PROPERTYGRP_PREFIX;
-		break;
-	case REP_PROTOCOL_ENTITY_PROPERTY:
-		separator = SCF_FMRI_PROPERTY_PREFIX;
-		break;
-	case REP_PROTOCOL_ENTITY_VALUE:
-		/*
-		 * A value does not have a separate FMRI from its property,
-		 * so there is nothing to concat.
-		 */
-		return (REP_PROTOCOL_SUCCESS);
-	case REP_PROTOCOL_ENTITY_SNAPSHOT:
-	case REP_PROTOCOL_ENTITY_SNAPLEVEL:
-		/* Snapshots do not have FMRIs, so there is nothing to do. */
-		return (REP_PROTOCOL_SUCCESS);
-	default:
-		(void) fprintf(stderr, "%s:%d: Unknown protocol type %d.\n",
-		    __FILE__, __LINE__, type);
-		abort();	/* Missing a case in switch if we get here. */
-	}
-
-	/* Concatenate separator and element to the fmri buffer. */
-
-	actual = strlcat(fmri, separator, bufsize);
-	if (name != NULL) {
-		if (actual < bufsize) {
-			actual = strlcat(fmri, name, bufsize);
-		} else {
-			actual += strlen(name);
-		}
-	}
-	if (actual < bufsize) {
-		rc = REP_PROTOCOL_SUCCESS;
-	} else {
-		rc = REP_PROTOCOL_FAIL_TRUNCATED;
-	}
-	*sz_out = actual;
-	return (rc);
-}
-
-/*
- * Get the FMRI for the node at np.  The fmri will be placed in buf.  On
- * success sz_out will be set to the size of the fmri in buf.  If
- * REP_PROTOCOL_FAIL_TRUNCATED is returned, sz_out will be set to the size
- * of the buffer that would be required to avoid truncation.
- *
- * Fails with
- *	_TRUNCATED	not enough room in buf for the FMRI.
- */
-static int
-rc_node_get_fmri_or_fragment(rc_node_t *np, char *buf, size_t bufsize,
-    size_t *sz_out)
-{
-	size_t fmri_len = 0;
-	int r;
-
-	if (bufsize > 0)
-		*buf = 0;
-	*sz_out = 0;
-
-	if (np->rn_fmri == NULL) {
-		/*
-		 * A NULL rn_fmri implies that this is a top level scope.
-		 * Child nodes will always have an rn_fmri established
-		 * because both rc_node_link_child() and
-		 * rc_node_relink_child() call rc_node_build_fmri().  In
-		 * this case, we'll just return our name preceded by the
-		 * appropriate FMRI decorations.
-		 */
-		assert(np->rn_parent == NULL);
-		r = rc_concat_fmri_element(buf, bufsize, &fmri_len, np->rn_name,
-		    np->rn_id.rl_type);
-		if (r != REP_PROTOCOL_SUCCESS)
-			return (r);
-	} else {
-		/* We have an fmri, so return it. */
-		fmri_len = strlcpy(buf, np->rn_fmri, bufsize);
-	}
-
-	*sz_out = fmri_len;
-
-	if (fmri_len >= bufsize)
-		return (REP_PROTOCOL_FAIL_TRUNCATED);
-
-	return (REP_PROTOCOL_SUCCESS);
-}
-
-/*
- * Build an FMRI string for this node and save it in rn_fmri.
- *
- * The basic strategy here is to get the fmri of our parent and then
- * concatenate the appropriate separator followed by our name.  If our name
- * is null, the resulting fmri will just be a copy of the parent fmri.
- * rc_node_build_fmri() should be called with the RC_NODE_USING_PARENT flag
- * set.  Also the rn_lock for this node should be held.
- *
- * Fails with
- *	_NO_RESOURCES	Could not allocate memory.
- */
-static int
-rc_node_build_fmri(rc_node_t *np)
-{
-	size_t actual;
-	char fmri[REP_PROTOCOL_FMRI_LEN];
-	int rc;
-	size_t	sz = REP_PROTOCOL_FMRI_LEN;
-
-	assert(MUTEX_HELD(&np->rn_lock));
-	assert(np->rn_flags & RC_NODE_USING_PARENT);
-
-	rc_node_free_fmri(np);
-
-	rc = rc_node_get_fmri_or_fragment(np->rn_parent, fmri, sz, &actual);
-	assert(rc == REP_PROTOCOL_SUCCESS);
-
-	if (np->rn_name != NULL) {
-		rc = rc_concat_fmri_element(fmri, sz, &actual, np->rn_name,
-		    np->rn_id.rl_type);
-		assert(rc == REP_PROTOCOL_SUCCESS);
-		np->rn_fmri = strdup(fmri);
-	} else {
-		np->rn_fmri = strdup(fmri);
-	}
-	if (np->rn_fmri == NULL) {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-	} else {
-		rc = REP_PROTOCOL_SUCCESS;
-	}
-
-	return (rc);
-}
-
-/*
- * Get the FMRI of the node at np placing the result in fmri.  Then
- * concatenate the additional element to fmri.  The type variable indicates
- * the type of element, so that the appropriate separator can be
- * generated.  size is the number of bytes in the buffer at fmri, and
- * sz_out receives the size of the generated string.  If the result is
- * truncated, sz_out will receive the size of the buffer that would be
- * required to avoid truncation.
- *
- * Fails with
- *	_TRUNCATED	Not enough room in buffer at fmri.
- */
-static int
-rc_get_fmri_and_concat(rc_node_t *np, char *fmri, size_t size, size_t *sz_out,
-    const char *element, rep_protocol_entity_t type)
-{
-	int rc;
-
-	if ((rc = rc_node_get_fmri_or_fragment(np, fmri, size, sz_out)) !=
-	    REP_PROTOCOL_SUCCESS) {
-		return (rc);
-	}
-	if ((rc = rc_concat_fmri_element(fmri, size, sz_out, element, type)) !=
-	    REP_PROTOCOL_SUCCESS) {
-		return (rc);
-	}
-
-	return (REP_PROTOCOL_SUCCESS);
-}
-
 static int
 rc_notify_info_interested(rc_notify_info_t *rnip, rc_notify_t *np)
 {
@@ -1296,7 +774,7 @@ pc_hash(const char *auth)
 }
 
 static int
-pc_exists(permcheck_t *pcp, const char *auth)
+pc_exists(const permcheck_t *pcp, const char *auth)
 {
 	uint32_t h;
 	struct pc_elt *ep;
@@ -1305,27 +783,23 @@ pc_exists(permcheck_t *pcp, const char *auth)
 	for (ep = pcp->pc_buckets[h & (pcp->pc_bnum - 1)];
 	    ep != NULL;
 	    ep = ep->pce_next) {
-		if (strcmp(auth, ep->pce_auth) == 0) {
-			pcp->pc_auth_string = ep->pce_auth;
+		if (strcmp(auth, ep->pce_auth) == 0)
 			return (1);
-		}
 	}
 
 	return (0);
 }
 
 static int
-pc_match(permcheck_t *pcp, const char *pattern)
+pc_match(const permcheck_t *pcp, const char *pattern)
 {
 	uint_t i;
 	struct pc_elt *ep;
 
 	for (i = 0; i < pcp->pc_bnum; ++i) {
 		for (ep = pcp->pc_buckets[i]; ep != NULL; ep = ep->pce_next) {
-			if (_auth_match(pattern, ep->pce_auth)) {
-				pcp->pc_auth_string = ep->pce_auth;
+			if (_auth_match(pattern, ep->pce_auth))
 				return (1);
-			}
 		}
 	}
 
@@ -1365,7 +839,7 @@ pc_grow(permcheck_t *pcp)
 }
 
 static int
-pc_add(permcheck_t *pcp, const char *auth, pc_auth_type_t auth_type)
+pc_add(permcheck_t *pcp, const char *auth)
 {
 	struct pc_elt *ep;
 	uint_t i;
@@ -1384,11 +858,6 @@ pc_add(permcheck_t *pcp, const char *auth, pc_auth_type_t auth_type)
 	i = pc_hash(auth) & (pcp->pc_bnum - 1);
 	ep->pce_next = pcp->pc_buckets[i];
 	pcp->pc_buckets[i] = ep;
-
-	if (auth_type > pcp->pc_specific_type) {
-		pcp->pc_specific_type = auth_type;
-		pcp->pc_specific = ep;
-	}
 
 	++pcp->pc_enum;
 
@@ -1419,21 +888,10 @@ perm_auth_for_pgtype(const char *pgtype)
  *   _NO_RESOURCES - out of memory
  */
 static int
-perm_add_enabling_type(permcheck_t *pcp, const char *auth,
-    pc_auth_type_t auth_type)
-{
-	return (pc_add(pcp, auth, auth_type) == 0 ? REP_PROTOCOL_SUCCESS :
-	    REP_PROTOCOL_FAIL_NO_RESOURCES);
-}
-
-/*
- * Fails with
- *   _NO_RESOURCES - out of memory
- */
-static int
 perm_add_enabling(permcheck_t *pcp, const char *auth)
 {
-	return (perm_add_enabling_type(pcp, auth, PC_AUTH_SMF));
+	return (pc_add(pcp, auth) == 0 ? REP_PROTOCOL_SUCCESS :
+	    REP_PROTOCOL_FAIL_NO_RESOURCES);
 }
 
 /* Note that perm_add_enabling_values() is defined below. */
@@ -1446,7 +904,7 @@ perm_add_enabling(permcheck_t *pcp, const char *auth)
  * authorizations granted to an RBAC_AUTH_SEP-separated list of profiles.
  */
 static int
-check_auth_list(permcheck_t *pcp, char *authlist)
+check_auth_list(const permcheck_t *pcp, char *authlist)
 {
 	char *auth, *lasts;
 	int ret;
@@ -1463,18 +921,11 @@ check_auth_list(permcheck_t *pcp, char *authlist)
 			return (ret);
 	}
 
-	/*
-	 * If we failed, choose the most specific auth string for use in
-	 * the audit event.
-	 */
-	assert(pcp->pc_specific != NULL);
-	pcp->pc_auth_string = pcp->pc_specific->pce_auth;
-
 	return (0);
 }
 
 static int
-check_prof_list(permcheck_t *pcp, char *proflist)
+check_prof_list(const permcheck_t *pcp, char *proflist)
 {
 	char *prof, *lasts, *authlist, *subproflist;
 	profattr_t *pap;
@@ -1494,7 +945,7 @@ check_prof_list(permcheck_t *pcp, char *proflist)
 		if (!ret) {
 			subproflist = kva_match(pap->attr, PROFATTR_PROFS_KW);
 			if (subproflist != NULL)
-				/* depth check to avoid infinite recursion? */
+				/* depth check to avoid invinite recursion? */
 				ret = check_prof_list(pcp, subproflist);
 		}
 
@@ -1507,7 +958,7 @@ check_prof_list(permcheck_t *pcp, char *proflist)
 }
 
 static int
-perm_granted(permcheck_t *pcp)
+perm_granted(const permcheck_t *pcp)
 {
 	ucred_t *uc;
 
@@ -1573,9 +1024,8 @@ perm_granted(permcheck_t *pcp)
 	if (uap != NULL) {
 		/* Get the authorizations from user_attr. */
 		userattr_authlist = kva_match(uap->attr, USERATTR_AUTHS_KW);
-		if (userattr_authlist != NULL) {
+		if (userattr_authlist != NULL)
 			ret = check_auth_list(pcp, userattr_authlist);
-		}
 	}
 
 	if (!ret && def_prof != NULL) {
@@ -1750,7 +1200,6 @@ rc_node_destroy(rc_node_t *np)
 		object_free_values(np->rn_values, np->rn_valtype,
 		    np->rn_values_count, np->rn_values_size);
 	np->rn_values = NULL;
-	rc_node_free_fmri(np);
 
 	if (np->rn_snaplevel != NULL)
 		rc_snaplevel_rele(np->rn_snaplevel);
@@ -1796,7 +1245,6 @@ rc_node_link_child(rc_node_t *np, rc_node_t *cp)
 	cp->rn_parent = np;
 	cp->rn_flags |= RC_NODE_IN_PARENT;
 	(void) uu_list_insert_before(np->rn_children, NULL, cp);
-	(void) rc_node_build_fmri(cp);
 
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
@@ -1890,7 +1338,6 @@ rc_node_relink_child(rc_node_t *pp, rc_node_t *np, rc_node_t *newp)
 	 * keeps iterators on the list from missing us.
 	 */
 	(void) uu_list_insert_after(pp->rn_children, np, newp);
-	(void) rc_node_build_fmri(newp);
 	(void) uu_list_remove(pp->rn_children, np);
 
 	/*
@@ -2260,92 +1707,6 @@ rc_node_create_property(rc_node_t *pp, rc_node_lookup_t *nip,
 	return (REP_PROTOCOL_SUCCESS);
 }
 
-/*
- * This function implements a decision table to determine the event ID for
- * changes to the enabled (SCF_PROPERTY_ENABLED) property.  The event ID is
- * determined by the value of the first property in the command specified
- * by cmd_no and the name of the property group.  Here is the decision
- * table:
- *
- *				Property Group Name
- *	Property	------------------------------------------
- *	Value		SCF_PG_GENERAL		SCF_PG_GENERAL_OVR
- *	--------	--------------		------------------
- *	"0"		ADT_smf_disable		ADT_smf_tmp_disable
- *	"1"		ADT_smf_enable		ADT_smf_tmp_enable
- *
- * This function is called by special_property_event through a function
- * pointer in the special_props_list array.
- *
- * Since the ADT_smf_* symbols may not be defined in the build machine's
- * include files, this function is not compiled when doing native builds.
- */
-#ifndef NATIVE_BUILD
-static int
-general_enable_id(tx_commit_data_t *tx_data, size_t cmd_no, const char *pg,
-    au_event_t *event_id)
-{
-	const char *value;
-	uint32_t nvalues;
-	int enable;
-
-	/*
-	 * First, check property value.
-	 */
-	if (tx_cmd_nvalues(tx_data, cmd_no, &nvalues) != REP_PROTOCOL_SUCCESS)
-		return (-1);
-	if (nvalues == 0)
-		return (-1);
-	if (tx_cmd_value(tx_data, cmd_no, 0, &value) != REP_PROTOCOL_SUCCESS)
-		return (-1);
-	if (strcmp(value, "0") == 0) {
-		enable = 0;
-	} else if (strcmp(value, "1") == 0) {
-		enable = 1;
-	} else {
-		return (-1);
-	}
-
-	/*
-	 * Now check property group name.
-	 */
-	if (strcmp(pg, SCF_PG_GENERAL) == 0) {
-		*event_id = enable ? ADT_smf_enable : ADT_smf_disable;
-		return (0);
-	} else if (strcmp(pg, SCF_PG_GENERAL_OVR) == 0) {
-		*event_id = enable ? ADT_smf_tmp_enable : ADT_smf_tmp_disable;
-		return (0);
-	}
-	return (-1);
-}
-#endif	/* NATIVE_BUILD */
-
-/*
- * This function compares two audit_special_prop_item_t structures
- * represented by item1 and item2.  It returns an integer greater than 0 if
- * item1 is greater than item2.  It returns 0 if they are equal and an
- * integer less than 0 if item1 is less than item2.  api_prop_name and
- * api_pg_name are the key fields for sorting.
- *
- * This function is suitable for calls to bsearch(3C) and qsort(3C).
- */
-static int
-special_prop_compare(const void *item1, const void *item2)
-{
-	const audit_special_prop_item_t *a = (audit_special_prop_item_t *)item1;
-	const audit_special_prop_item_t *b = (audit_special_prop_item_t *)item2;
-	int r;
-
-	r = strcmp(a->api_prop_name, b->api_prop_name);
-	if (r == 0) {
-		/*
-		 * Primary keys are the same, so check the secondary key.
-		 */
-		r = strcmp(a->api_pg_name, b->api_pg_name);
-	}
-	return (r);
-}
-
 int
 rc_node_init(void)
 {
@@ -2382,19 +1743,6 @@ rc_node_init(void)
 
 	if (rc_notify_list == NULL || rc_notify_info_list == NULL)
 		uu_die("out of memory");
-
-	/*
-	 * Sort the special_props_list array so that it can be searched
-	 * with bsearch(3C).
-	 *
-	 * The special_props_list array is not compiled into the native
-	 * build code, so there is no need to call qsort if NATIVE_BUILD is
-	 * defined.
-	 */
-#ifndef	NATIVE_BUILD
-	qsort(special_props_list, SPECIAL_PROP_COUNT,
-	    sizeof (special_props_list[0]), special_prop_compare);
-#endif	/* NATIVE_BUILD */
 
 	if ((np = rc_node_alloc()) == NULL)
 		uu_die("out of memory");
@@ -2576,9 +1924,7 @@ perm_add_pg_prop_values(permcheck_t *pcp, rc_node_t *pg, const char *propname)
 	for (count = prop->rn_values_count, cp = prop->rn_values;
 	    count > 0;
 	    --count) {
-		result = perm_add_enabling_type(pcp, cp,
-		    (pg->rn_id.rl_ids[ID_INSTANCE]) ? PC_AUTH_INST :
-		    PC_AUTH_SVC);
+		result = perm_add_enabling(pcp, cp);
 		if (result != REP_PROTOCOL_SUCCESS)
 			break;
 
@@ -2742,18 +2088,8 @@ void
 rc_node_ptr_init(rc_node_ptr_t *out)
 {
 	out->rnp_node = NULL;
-	out->rnp_auth_string = NULL;
-	out->rnp_authorized = RC_AUTH_UNKNOWN;
+	out->rnp_authorized = 0;
 	out->rnp_deleted = 0;
-}
-
-void
-rc_node_ptr_free_mem(rc_node_ptr_t *npp)
-{
-	if (npp->rnp_auth_string != NULL) {
-		free((void *)npp->rnp_auth_string);
-		npp->rnp_auth_string = NULL;
-	}
 }
 
 static void
@@ -2765,8 +2101,7 @@ rc_node_assign(rc_node_ptr_t *out, rc_node_t *val)
 	out->rnp_node = val;
 	if (cur != NULL)
 		rc_node_rele(cur);
-	out->rnp_authorized = RC_AUTH_UNKNOWN;
-	rc_node_ptr_free_mem(out);
+	out->rnp_authorized = 0;
 	out->rnp_deleted = 0;
 }
 
@@ -2884,19 +2219,6 @@ rc_node_ptr_check_and_lock(rc_node_ptr_t *npp, int *res)
 		(void) pthread_mutex_unlock(&(np)->rn_lock);		\
 		assert((np) == (npp)->rnp_node);			\
 		rc_node_clear(npp, 1);					\
-		return (REP_PROTOCOL_FAIL_DELETED);			\
-	}								\
-}
-
-#define	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, flag, mem) {		\
-	assert(MUTEX_HELD(&(np)->rn_lock));				\
-	assert(!((np)->rn_flags & RC_NODE_DEAD));			\
-	if (!rc_node_hold_flag((np), flag)) {				\
-		(void) pthread_mutex_unlock(&(np)->rn_lock);		\
-		assert((np) == (npp)->rnp_node);			\
-		rc_node_clear(npp, 1);					\
-		if ((mem) != NULL)					\
-			free((mem));					\
 		return (REP_PROTOCOL_FAIL_DELETED);			\
 	}								\
 }
@@ -3316,534 +2638,39 @@ rc_node_update(rc_node_ptr_t *npp)
 /*
  * does a generic modification check, for creation, deletion, and snapshot
  * management only.  Property group transactions have different checks.
- *
- * The string returned to *match_auth must be freed.
  */
 int
-rc_node_modify_permission_check(char **match_auth)
+rc_node_modify_permission_check(void)
 {
 	int rc = REP_PROTOCOL_SUCCESS;
 	permcheck_t *pcp;
 	int granted;
 
-	*match_auth = NULL;
-#ifdef NATIVE_BUILD
 	if (!client_is_privileged()) {
+#ifdef NATIVE_BUILD
 		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-	}
-	return (rc);
 #else
-	if (is_main_repository == 0)
-		return (REP_PROTOCOL_SUCCESS);
-	pcp = pc_create();
-	if (pcp != NULL) {
-		rc = perm_add_enabling(pcp, AUTH_MODIFY);
+		pcp = pc_create();
+		if (pcp != NULL) {
+			rc = perm_add_enabling(pcp, AUTH_MODIFY);
 
-		if (rc == REP_PROTOCOL_SUCCESS) {
-			granted = perm_granted(pcp);
+			if (rc == REP_PROTOCOL_SUCCESS) {
+				granted = perm_granted(pcp);
 
-			if (granted < 0) {
-				rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-			} else {
-				/*
-				 * Copy off the authorization
-				 * string before freeing pcp.
-				 */
-				*match_auth =
-				    strdup(pcp->pc_auth_string);
-				if (*match_auth == NULL)
+				if (granted < 0)
 					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
 			}
+
+			pc_free(pcp);
+		} else {
+			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
 		}
 
-		pc_free(pcp);
-	} else {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		if (rc == REP_PROTOCOL_SUCCESS && !granted)
+			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+#endif /* NATIVE_BUILD */
 	}
-
-	if (rc == REP_PROTOCOL_SUCCESS && !granted)
-		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-
 	return (rc);
-#endif /* NATIVE_BUILD */
-}
-
-/*
- * Native builds are done to create svc.configd-native.  This program runs
- * only on the Solaris build machines to create the seed repository, and it
- * is compiled against the build machine's header files.  The ADT_smf_*
- * symbols may not be defined in these header files.  For this reason
- * smf_annotation_event(), _smf_audit_event() and special_property_event()
- * are not compiled for native builds.
- */
-#ifndef	NATIVE_BUILD
-
-/*
- * This function generates an annotation audit event if one has been setup.
- * Annotation events should only be generated immediately before the audit
- * record from the first attempt to modify the repository from a client
- * which has requested an annotation.
- */
-static void
-smf_annotation_event(int status, int return_val)
-{
-	adt_session_data_t *session;
-	adt_event_data_t *event = NULL;
-	char file[MAXPATHLEN];
-	char operation[REP_PROTOCOL_NAME_LEN];
-
-	/* Don't audit if we're using an alternate repository. */
-	if (is_main_repository == 0)
-		return;
-
-	if (client_annotation_needed(operation, sizeof (operation), file,
-	    sizeof (file)) == 0) {
-		return;
-	}
-	if (file[0] == 0) {
-		(void) strlcpy(file, "NO FILE", sizeof (file));
-	}
-	if (operation[0] == 0) {
-		(void) strlcpy(operation, "NO OPERATION",
-		    sizeof (operation));
-	}
-	if ((session = get_audit_session()) == NULL)
-		return;
-	if ((event = adt_alloc_event(session, ADT_smf_annotation)) == NULL) {
-		uu_warn("smf_annotation_event cannot allocate event "
-		    "data.  %s\n", strerror(errno));
-		return;
-	}
-	event->adt_smf_annotation.operation = operation;
-	event->adt_smf_annotation.file = file;
-	if (adt_put_event(event, status, return_val) == 0) {
-		client_annotation_finished();
-	} else {
-		uu_warn("smf_annotation_event failed to put event.  "
-		    "%s\n", strerror(errno));
-	}
-	adt_free_event(event);
-}
-
-/*
- * _smf_audit_event interacts with the security auditing system to generate
- * an audit event structure.  It establishes an audit session and allocates
- * an audit event.  The event is filled in from the audit data, and
- * adt_put_event is called to generate the event.
- */
-static void
-_smf_audit_event(au_event_t event_id, int status, int return_val,
-    audit_event_data_t *data)
-{
-	char *auth_used;
-	char *fmri;
-	char *prop_value;
-	adt_session_data_t *session;
-	adt_event_data_t *event = NULL;
-
-	/* Don't audit if we're using an alternate repository */
-	if (is_main_repository == 0)
-		return;
-
-	smf_annotation_event(status, return_val);
-	if ((session = get_audit_session()) == NULL)
-		return;
-	if ((event = adt_alloc_event(session, event_id)) == NULL) {
-		uu_warn("_smf_audit_event cannot allocate event "
-		    "data.  %s\n", strerror(errno));
-		return;
-	}
-
-	/*
-	 * Handle possibility of NULL authorization strings, FMRIs and
-	 * property values.
-	 */
-	if (data->ed_auth == NULL) {
-		auth_used = "PRIVILEGED";
-	} else {
-		auth_used = data->ed_auth;
-	}
-	if (data->ed_fmri == NULL) {
-		syslog(LOG_WARNING, "_smf_audit_event called with "
-		    "empty FMRI string");
-		fmri = "UNKNOWN FMRI";
-	} else {
-		fmri = data->ed_fmri;
-	}
-	if (data->ed_prop_value == NULL) {
-		prop_value = "";
-	} else {
-		prop_value = data->ed_prop_value;
-	}
-
-	/* Fill in the event data. */
-	switch (event_id) {
-	case ADT_smf_attach_snap:
-		event->adt_smf_attach_snap.auth_used = auth_used;
-		event->adt_smf_attach_snap.old_fmri = data->ed_old_fmri;
-		event->adt_smf_attach_snap.old_name = data->ed_old_name;
-		event->adt_smf_attach_snap.new_fmri = fmri;
-		event->adt_smf_attach_snap.new_name = data->ed_snapname;
-		break;
-	case ADT_smf_change_prop:
-		event->adt_smf_change_prop.auth_used = auth_used;
-		event->adt_smf_change_prop.fmri = fmri;
-		event->adt_smf_change_prop.type = data->ed_type;
-		event->adt_smf_change_prop.value = prop_value;
-		break;
-	case ADT_smf_clear:
-		event->adt_smf_clear.auth_used = auth_used;
-		event->adt_smf_clear.fmri = fmri;
-		break;
-	case ADT_smf_create:
-		event->adt_smf_create.fmri = fmri;
-		event->adt_smf_create.auth_used = auth_used;
-		break;
-	case ADT_smf_create_npg:
-		event->adt_smf_create_npg.auth_used = auth_used;
-		event->adt_smf_create_npg.fmri = fmri;
-		event->adt_smf_create_npg.type = data->ed_type;
-		break;
-	case ADT_smf_create_pg:
-		event->adt_smf_create_pg.auth_used = auth_used;
-		event->adt_smf_create_pg.fmri = fmri;
-		event->adt_smf_create_pg.type = data->ed_type;
-		break;
-	case ADT_smf_create_prop:
-		event->adt_smf_create_prop.auth_used = auth_used;
-		event->adt_smf_create_prop.fmri = fmri;
-		event->adt_smf_create_prop.type = data->ed_type;
-		event->adt_smf_create_prop.value = prop_value;
-		break;
-	case ADT_smf_create_snap:
-		event->adt_smf_create_snap.auth_used = auth_used;
-		event->adt_smf_create_snap.fmri = fmri;
-		event->adt_smf_create_snap.name = data->ed_snapname;
-		break;
-	case ADT_smf_degrade:
-		event->adt_smf_degrade.auth_used = auth_used;
-		event->adt_smf_degrade.fmri = fmri;
-		break;
-	case ADT_smf_delete:
-		event->adt_smf_delete.fmri = fmri;
-		event->adt_smf_delete.auth_used = auth_used;
-		break;
-	case ADT_smf_delete_npg:
-		event->adt_smf_delete_npg.auth_used = auth_used;
-		event->adt_smf_delete_npg.fmri = fmri;
-		event->adt_smf_delete_npg.type = data->ed_type;
-		break;
-	case ADT_smf_delete_pg:
-		event->adt_smf_delete_pg.auth_used = auth_used;
-		event->adt_smf_delete_pg.fmri = fmri;
-		event->adt_smf_delete_pg.type = data->ed_type;
-		break;
-	case ADT_smf_delete_prop:
-		event->adt_smf_delete_prop.auth_used = auth_used;
-		event->adt_smf_delete_prop.fmri = fmri;
-		break;
-	case ADT_smf_delete_snap:
-		event->adt_smf_delete_snap.auth_used = auth_used;
-		event->adt_smf_delete_snap.fmri = fmri;
-		event->adt_smf_delete_snap.name = data->ed_snapname;
-		break;
-	case ADT_smf_disable:
-		event->adt_smf_disable.auth_used = auth_used;
-		event->adt_smf_disable.fmri = fmri;
-		break;
-	case ADT_smf_enable:
-		event->adt_smf_enable.auth_used = auth_used;
-		event->adt_smf_enable.fmri = fmri;
-		break;
-	case ADT_smf_immediate_degrade:
-		event->adt_smf_immediate_degrade.auth_used = auth_used;
-		event->adt_smf_immediate_degrade.fmri = fmri;
-		break;
-	case ADT_smf_immediate_maintenance:
-		event->adt_smf_immediate_maintenance.auth_used = auth_used;
-		event->adt_smf_immediate_maintenance.fmri = fmri;
-		break;
-	case ADT_smf_immtmp_maintenance:
-		event->adt_smf_immtmp_maintenance.auth_used = auth_used;
-		event->adt_smf_immtmp_maintenance.fmri = fmri;
-		break;
-	case ADT_smf_maintenance:
-		event->adt_smf_maintenance.auth_used = auth_used;
-		event->adt_smf_maintenance.fmri = fmri;
-		break;
-	case ADT_smf_milestone:
-		event->adt_smf_milestone.auth_used = auth_used;
-		event->adt_smf_milestone.fmri = fmri;
-		break;
-	case ADT_smf_read_prop:
-		event->adt_smf_read_prop.auth_used = auth_used;
-		event->adt_smf_read_prop.fmri = fmri;
-		break;
-	case ADT_smf_refresh:
-		event->adt_smf_refresh.auth_used = auth_used;
-		event->adt_smf_refresh.fmri = fmri;
-		break;
-	case ADT_smf_restart:
-		event->adt_smf_restart.auth_used = auth_used;
-		event->adt_smf_restart.fmri = fmri;
-		break;
-	case ADT_smf_tmp_disable:
-		event->adt_smf_tmp_disable.auth_used = auth_used;
-		event->adt_smf_tmp_disable.fmri = fmri;
-		break;
-	case ADT_smf_tmp_enable:
-		event->adt_smf_tmp_enable.auth_used = auth_used;
-		event->adt_smf_tmp_enable.fmri = fmri;
-		break;
-	case ADT_smf_tmp_maintenance:
-		event->adt_smf_tmp_maintenance.auth_used = auth_used;
-		event->adt_smf_tmp_maintenance.fmri = fmri;
-		break;
-	default:
-		abort();	/* Need to cover all SMF event IDs */
-	}
-
-	if (adt_put_event(event, status, return_val) != 0) {
-		uu_warn("_smf_audit_event failed to put event.  %s\n",
-		    strerror(errno));
-	}
-	adt_free_event(event);
-}
-
-/*
- * Determine if the combination of the property group at pg_name and the
- * property at prop_name are in the set of special startd properties.  If
- * they are, a special audit event will be generated.
- */
-static void
-special_property_event(audit_event_data_t *evdp, const char *prop_name,
-    char *pg_name, int status, int return_val, tx_commit_data_t *tx_data,
-    size_t cmd_no)
-{
-	au_event_t event_id;
-	audit_special_prop_item_t search_key;
-	audit_special_prop_item_t *found;
-
-	/* Use bsearch to find the special property information. */
-	search_key.api_prop_name = prop_name;
-	search_key.api_pg_name = pg_name;
-	found = (audit_special_prop_item_t *)bsearch(&search_key,
-	    special_props_list, SPECIAL_PROP_COUNT,
-	    sizeof (special_props_list[0]), special_prop_compare);
-	if (found == NULL) {
-		/* Not a special property. */
-		return;
-	}
-
-	/* Get the event id */
-	if (found->api_event_func == NULL) {
-		event_id = found->api_event_id;
-	} else {
-		if ((*found->api_event_func)(tx_data, cmd_no,
-		    found->api_pg_name, &event_id) < 0)
-			return;
-	}
-
-	/* Generate the event. */
-	smf_audit_event(event_id, status, return_val, evdp);
-}
-#endif	/* NATIVE_BUILD */
-
-/*
- * Return a pointer to a string containing all the values of the command
- * specified by cmd_no with each value enclosed in quotes.  It is up to the
- * caller to free the memory at the returned pointer.
- */
-static char *
-generate_value_list(tx_commit_data_t *tx_data, size_t cmd_no)
-{
-	const char *cp;
-	const char *cur_value;
-	size_t byte_count = 0;
-	uint32_t i;
-	uint32_t nvalues;
-	size_t str_size = 0;
-	char *values = NULL;
-	char *vp;
-
-	if (tx_cmd_nvalues(tx_data, cmd_no, &nvalues) != REP_PROTOCOL_SUCCESS)
-		return (NULL);
-	/*
-	 * First determine the size of the buffer that we will need.  We
-	 * will represent each property value surrounded by quotes with a
-	 * space separating the values.  Thus, we need to find the total
-	 * size of all the value strings and add 3 for each value.
-	 *
-	 * There is one catch, though.  We need to escape any internal
-	 * quote marks in the values.  So for each quote in the value we
-	 * need to add another byte to the buffer size.
-	 */
-	for (i = 0; i < nvalues; i++) {
-		if (tx_cmd_value(tx_data, cmd_no, i, &cur_value) !=
-		    REP_PROTOCOL_SUCCESS)
-			return (NULL);
-		for (cp = cur_value; *cp != 0; cp++) {
-			byte_count += (*cp == '"') ? 2 : 1;
-		}
-		byte_count += 3;	/* surrounding quotes & space */
-	}
-	byte_count++;		/* nul terminator */
-	values = malloc(byte_count);
-	if (values == NULL)
-		return (NULL);
-	*values = 0;
-
-	/* Now build up the string of values. */
-	for (i = 0; i < nvalues; i++) {
-		if (tx_cmd_value(tx_data, cmd_no, i, &cur_value) !=
-		    REP_PROTOCOL_SUCCESS) {
-			free(values);
-			return (NULL);
-		}
-		(void) strlcat(values, "\"", byte_count);
-		for (cp = cur_value, vp = values + strlen(values);
-		    *cp != 0; cp++) {
-			if (*cp == '"') {
-				*vp++ = '\\';
-				*vp++ = '"';
-			} else {
-				*vp++ = *cp;
-			}
-		}
-		*vp = 0;
-		str_size = strlcat(values, "\" ", byte_count);
-		assert(str_size < byte_count);
-	}
-	if (str_size > 0)
-		values[str_size - 1] = 0;	/* get rid of trailing space */
-	return (values);
-}
-
-/*
- * generate_property_events takes the transaction commit data at tx_data
- * and generates an audit event for each command.
- *
- * Native builds are done to create svc.configd-native.  This program runs
- * only on the Solaris build machines to create the seed repository.  Thus,
- * no audit events should be generated when running svc.configd-native.
- */
-static void
-generate_property_events(
-	tx_commit_data_t *tx_data,
-	char *pg_fmri,		/* FMRI of property group */
-	char *auth_string,
-	int auth_status,
-	int auth_ret_value)
-{
-#ifndef	NATIVE_BUILD
-	enum rep_protocol_transaction_action action;
-	audit_event_data_t audit_data;
-	size_t count;
-	size_t cmd_no;
-	char *cp;
-	au_event_t event_id;
-	char fmri[REP_PROTOCOL_FMRI_LEN];
-	char pg_name[REP_PROTOCOL_NAME_LEN];
-	char *pg_end;		/* End of prop. group fmri */
-	const char *prop_name;
-	uint32_t ptype;
-	char prop_type[3];
-	enum rep_protocol_responseid rc;
-	size_t sz_out;
-
-	/* Make sure we have something to do. */
-	if (tx_data == NULL)
-		return;
-	if ((count = tx_cmd_count(tx_data)) == 0)
-		return;
-
-	/* Copy the property group fmri */
-	pg_end = fmri;
-	pg_end += strlcpy(fmri, pg_fmri, sizeof (fmri));
-
-	/*
-	 * Get the property group name.  It is the first component after
-	 * the last occurance of SCF_FMRI_PROPERTYGRP_PREFIX in the fmri.
-	 */
-	cp = strstr(pg_fmri, SCF_FMRI_PROPERTYGRP_PREFIX);
-	if (cp == NULL) {
-		pg_name[0] = 0;
-	} else {
-		cp += strlen(SCF_FMRI_PROPERTYGRP_PREFIX);
-		(void) strlcpy(pg_name, cp, sizeof (pg_name));
-	}
-
-	audit_data.ed_auth = auth_string;
-	audit_data.ed_fmri = fmri;
-	audit_data.ed_type = prop_type;
-
-	/*
-	 * Property type is two characters (see
-	 * rep_protocol_value_type_t), so terminate the string.
-	 */
-	prop_type[2] = 0;
-
-	for (cmd_no = 0; cmd_no < count; cmd_no++) {
-		/* Construct FMRI of the property */
-		*pg_end = 0;
-		if (tx_cmd_prop(tx_data, cmd_no, &prop_name) !=
-		    REP_PROTOCOL_SUCCESS) {
-			continue;
-		}
-		rc = rc_concat_fmri_element(fmri, sizeof (fmri), &sz_out,
-		    prop_name, REP_PROTOCOL_ENTITY_PROPERTY);
-		if (rc != REP_PROTOCOL_SUCCESS) {
-			/*
-			 * If we can't get the FMRI, we'll abandon this
-			 * command
-			 */
-			continue;
-		}
-
-		/* Generate special property event if necessary. */
-		special_property_event(&audit_data, prop_name, pg_name,
-		    auth_status, auth_ret_value, tx_data, cmd_no);
-
-		/* Capture rest of audit data. */
-		if (tx_cmd_prop_type(tx_data, cmd_no, &ptype) !=
-		    REP_PROTOCOL_SUCCESS) {
-			continue;
-		}
-		prop_type[0] = REP_PROTOCOL_BASE_TYPE(ptype);
-		prop_type[1] = REP_PROTOCOL_SUBTYPE(ptype);
-		audit_data.ed_prop_value = generate_value_list(tx_data, cmd_no);
-
-		/* Determine the event type. */
-		if (tx_cmd_action(tx_data, cmd_no, &action) !=
-		    REP_PROTOCOL_SUCCESS) {
-			free(audit_data.ed_prop_value);
-			continue;
-		}
-		switch (action) {
-		case REP_PROTOCOL_TX_ENTRY_NEW:
-			event_id = ADT_smf_create_prop;
-			break;
-		case REP_PROTOCOL_TX_ENTRY_CLEAR:
-			event_id = ADT_smf_change_prop;
-			break;
-		case REP_PROTOCOL_TX_ENTRY_REPLACE:
-			event_id = ADT_smf_change_prop;
-			break;
-		case REP_PROTOCOL_TX_ENTRY_DELETE:
-			event_id = ADT_smf_delete_prop;
-			break;
-		default:
-			assert(0);	/* Missing a case */
-			free(audit_data.ed_prop_value);
-			continue;
-		}
-
-		/* Generate the event. */
-		smf_audit_event(event_id, auth_status, auth_ret_value,
-		    &audit_data);
-		free(audit_data.ed_prop_value);
-	}
-#endif /* NATIVE_BUILD */
 }
 
 /*
@@ -3860,7 +2687,6 @@ generate_property_events(
  *   _BACKEND_ACCESS
  *   _BACKEND_READONLY
  *   _EXISTS - child already exists
- *   _TRUNCATED - truncated FMRI for the audit record
  */
 int
 rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
@@ -3868,26 +2694,19 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 {
 	rc_node_t *np;
 	rc_node_t *cp = NULL;
-	int rc,  perm_rc;
-	size_t sz_out;
-	char fmri[REP_PROTOCOL_FMRI_LEN];
-	audit_event_data_t audit_data;
+	int rc, perm_rc;
 
 	rc_node_clear(cpp, 0);
 
-	perm_rc = rc_node_modify_permission_check(&audit_data.ed_auth);
+	perm_rc = rc_node_modify_permission_check();
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
-
-	audit_data.ed_fmri = fmri;
-	audit_data.ed_auth = NULL;
 
 	/*
 	 * there is a separate interface for creating property groups
 	 */
 	if (type == REP_PROTOCOL_ENTITY_PROPERTYGRP) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (REP_PROTOCOL_FAIL_NOT_APPLICABLE);
 	}
 
@@ -3900,31 +2719,19 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	if ((rc = rc_check_parent_child(np->rn_id.rl_type, type)) !=
 	    REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (rc);
 	}
 	if ((rc = rc_check_type_name(type, name)) != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (rc);
 	}
 
-	if ((rc = rc_get_fmri_and_concat(np, fmri, sizeof (fmri), &sz_out,
-	    name, type)) != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
-		return (rc);
-	}
 	if (perm_rc != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		smf_audit_event(ADT_smf_create, ADT_FAILURE,
-		    ADT_FAIL_VALUE_AUTH, &audit_data);
-		free(audit_data.ed_auth);
 		return (perm_rc);
 	}
 
-	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, RC_NODE_CREATING_CHILD,
-	    audit_data.ed_auth);
+	HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
 	rc = object_create(np, type, name, &cp);
@@ -3939,13 +2746,6 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	rc_node_rele_flag(np, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
-	if (rc == REP_PROTOCOL_SUCCESS) {
-		smf_audit_event(ADT_smf_create, ADT_SUCCESS, ADT_SUCCESS,
-		    &audit_data);
-	}
-
-	free(audit_data.ed_auth);
-
 	return (rc);
 }
 
@@ -3958,14 +2758,6 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	int rc;
 	permcheck_t *pcp;
 	int granted;
-	char fmri[REP_PROTOCOL_FMRI_LEN];
-	audit_event_data_t audit_data;
-	au_event_t event_id;
-	size_t sz_out;
-
-	audit_data.ed_auth = NULL;
-	audit_data.ed_fmri = fmri;
-	audit_data.ed_type = (char *)pgtype;
 
 	rc_node_clear(cpp, 0);
 
@@ -3991,23 +2783,10 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 		return (rc);
 	}
 
-#ifdef NATIVE_BUILD
 	if (!client_is_privileged()) {
+#ifdef NATIVE_BUILD
 		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-	}
 #else
-	if (flags & SCF_PG_FLAG_NONPERSISTENT) {
-		event_id = ADT_smf_create_npg;
-	} else {
-		event_id = ADT_smf_create_pg;
-	}
-	if ((rc = rc_get_fmri_and_concat(np, fmri, sizeof (fmri), &sz_out,
-	    name, REP_PROTOCOL_ENTITY_PROPERTYGRP)) != REP_PROTOCOL_SUCCESS) {
-		rc_node_rele(np);
-		return (rc);
-	}
-
-	if (is_main_repository) {
 		/* Must have .smf.modify or smf.modify.<type> authorization */
 		pcp = pc_create();
 		if (pcp != NULL) {
@@ -4041,28 +2820,8 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 			if (rc == REP_PROTOCOL_SUCCESS) {
 				granted = perm_granted(pcp);
 
-				if (granted < 0) {
+				if (granted < 0)
 					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-				} else {
-					/*
-					 * Copy out the authorization
-					 * string before freeing pcp.
-					 */
-					audit_data.ed_auth =
-					    strdup(pcp->pc_auth_string);
-					if (audit_data.ed_auth == NULL) {
-						/*
-						 * Following code line
-						 * cannot meet both the
-						 * indentation and the line
-						 * length requirements of
-						 * cstyle.  Indendation has
-						 * been sacrificed.
-						 */
-						/* CSTYLED */
-					    rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-					}
-				}
 			}
 
 			pc_free(pcp);
@@ -4072,23 +2831,16 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 
 		if (rc == REP_PROTOCOL_SUCCESS && !granted)
 			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-	} else {
-		rc = REP_PROTOCOL_SUCCESS;
-	}
 #endif /* NATIVE_BUILD */
 
-	if (rc != REP_PROTOCOL_SUCCESS) {
-		rc_node_rele(np);
-		smf_audit_event(event_id, ADT_FAILURE,
-		    ADT_FAIL_VALUE_AUTH, &audit_data);
-		if (audit_data.ed_auth != NULL)
-			free(audit_data.ed_auth);
-		return (rc);
+		if (rc != REP_PROTOCOL_SUCCESS) {
+			rc_node_rele(np);
+			return (rc);
+		}
 	}
 
 	(void) pthread_mutex_lock(&np->rn_lock);
-	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, RC_NODE_CREATING_CHILD,
-	    audit_data.ed_auth);
+	HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
 	rc = object_create_pg(np, type, name, pgtype, flags, &cp);
@@ -4101,13 +2853,6 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	(void) pthread_mutex_lock(&np->rn_lock);
 	rc_node_rele_flag(np, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
-
-	if (rc == REP_PROTOCOL_SUCCESS) {
-		smf_audit_event(event_id, ADT_SUCCESS, ADT_SUCCESS,
-		    &audit_data);
-	}
-	if (audit_data.ed_auth != NULL)
-		free(audit_data.ed_auth);
 
 	return (rc);
 }
@@ -4287,7 +3032,6 @@ rc_node_finish_delete(rc_node_t *cp)
 		}
 		cp->rn_flags &= ~RC_NODE_IN_PARENT;
 		cp->rn_parent = NULL;
-		rc_node_free_fmri(cp);
 	}
 
 	cp->rn_flags |= RC_NODE_DEAD;
@@ -4501,35 +3245,6 @@ died:
 		rc_node_destroy(np);
 }
 
-static au_event_t
-get_delete_event_id(rep_protocol_entity_t entity, uint32_t pgflags)
-{
-	au_event_t	id = 0;
-
-#ifndef NATIVE_BUILD
-	switch (entity) {
-	case REP_PROTOCOL_ENTITY_SERVICE:
-	case REP_PROTOCOL_ENTITY_INSTANCE:
-		id = ADT_smf_delete;
-		break;
-	case REP_PROTOCOL_ENTITY_SNAPSHOT:
-		id = ADT_smf_delete_snap;
-		break;
-	case REP_PROTOCOL_ENTITY_PROPERTYGRP:
-	case REP_PROTOCOL_ENTITY_CPROPERTYGRP:
-		if (pgflags & SCF_PG_FLAG_NONPERSISTENT) {
-			id = ADT_smf_delete_npg;
-		} else {
-			id = ADT_smf_delete_pg;
-		}
-		break;
-	default:
-		abort();
-	}
-#endif	/* NATIVE_BUILD */
-	return (id);
-}
-
 /*
  * Fails with
  *   _NOT_SET
@@ -4537,7 +3252,6 @@ get_delete_event_id(rep_protocol_entity_t entity, uint32_t pgflags)
  *   _BAD_REQUEST
  *   _PERMISSION_DENIED
  *   _NO_RESOURCES
- *   _TRUNCATED
  * and whatever object_delete() fails with.
  */
 int
@@ -4551,35 +3265,13 @@ rc_node_delete(rc_node_ptr_t *npp)
 	rc_notify_delete_t *ndp;
 	permcheck_t *pcp;
 	int granted;
-	au_event_t event_id = 0;
-	size_t sz_out;
-	audit_event_data_t audit_data;
-	int audit_failure = 0;
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 
-	audit_data.ed_fmri = NULL;
-	audit_data.ed_auth = NULL;
-	audit_data.ed_snapname = NULL;
-	audit_data.ed_type = NULL;
-
 	switch (np->rn_id.rl_type) {
 	case REP_PROTOCOL_ENTITY_SERVICE:
-		event_id = get_delete_event_id(REP_PROTOCOL_ENTITY_SERVICE,
-		    np->rn_pgflags);
-		break;
 	case REP_PROTOCOL_ENTITY_INSTANCE:
-		event_id = get_delete_event_id(REP_PROTOCOL_ENTITY_INSTANCE,
-		    np->rn_pgflags);
-		break;
 	case REP_PROTOCOL_ENTITY_SNAPSHOT:
-		event_id = get_delete_event_id(REP_PROTOCOL_ENTITY_SNAPSHOT,
-		    np->rn_pgflags);
-		audit_data.ed_snapname = strdup(np->rn_name);
-		if (audit_data.ed_snapname == NULL) {
-			(void) pthread_mutex_unlock(&np->rn_lock);
-			return (REP_PROTOCOL_FAIL_NO_RESOURCES);
-		}
 		break;			/* deletable */
 
 	case REP_PROTOCOL_ENTITY_SCOPE:
@@ -4592,22 +3284,11 @@ rc_node_delete(rc_node_ptr_t *npp)
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		np = np->rn_cchain[0];
 		RC_NODE_CHECK_AND_LOCK(np);
-		event_id = get_delete_event_id(REP_PROTOCOL_ENTITY_CPROPERTYGRP,
-		    np->rn_pgflags);
 		break;
 
 	case REP_PROTOCOL_ENTITY_PROPERTYGRP:
-		if (np->rn_id.rl_ids[ID_SNAPSHOT] == 0) {
-			event_id =
-			    get_delete_event_id(REP_PROTOCOL_ENTITY_PROPERTYGRP,
-			    np->rn_pgflags);
-			audit_data.ed_type = strdup(np->rn_type);
-			if (audit_data.ed_type == NULL) {
-				(void) pthread_mutex_unlock(&np->rn_lock);
-				return (REP_PROTOCOL_FAIL_NO_RESOURCES);
-			}
+		if (np->rn_id.rl_ids[ID_SNAPSHOT] == 0)
 			break;
-		}
 
 		/* Snapshot property groups are indelible. */
 		(void) pthread_mutex_unlock(&np->rn_lock);
@@ -4623,11 +3304,6 @@ rc_node_delete(rc_node_ptr_t *npp)
 		break;
 	}
 
-	audit_data.ed_fmri = malloc(REP_PROTOCOL_FMRI_LEN);
-	if (audit_data.ed_fmri == NULL) {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-		goto cleanout;
-	}
 	np_orig = np;
 	rc_node_hold_locked(np);	/* simplifies rest of the code */
 
@@ -4642,8 +3318,7 @@ again:
 		if (!rc_node_wait_flag(np,
 		    RC_NODE_IN_TX | RC_NODE_USING_PARENT)) {
 			rc_node_rele_locked(np);
-			rc = REP_PROTOCOL_FAIL_DELETED;
-			goto cleanout;
+			return (REP_PROTOCOL_FAIL_DELETED);
 		}
 
 		if (np->rn_flags & RC_NODE_OLD) {
@@ -4662,7 +3337,7 @@ again:
 		if (!rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
 			rc_node_rele_locked(np);
 			rc_node_clear(npp, 1);
-			rc = REP_PROTOCOL_FAIL_DELETED;
+			return (REP_PROTOCOL_FAIL_DELETED);
 		}
 
 		/*
@@ -4676,8 +3351,7 @@ again:
 			rc_node_rele(np);
 
 			rc_node_clear(npp, 1);
-			rc = REP_PROTOCOL_FAIL_DELETED;
-			goto cleanout;
+			return (REP_PROTOCOL_FAIL_DELETED);
 		}
 
 		rc_node_hold_locked(pp);		/* hold for later */
@@ -4708,21 +3382,13 @@ again:
 
 	assert(!(np->rn_flags & RC_NODE_OLD));
 
-	if ((rc = rc_node_get_fmri_or_fragment(np, audit_data.ed_fmri,
-	    REP_PROTOCOL_FMRI_LEN, &sz_out)) != REP_PROTOCOL_SUCCESS) {
-		rc_node_rele_flag(np, RC_NODE_DYING_FLAGS);
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		goto fail;
-	}
-
-#ifdef NATIVE_BUILD
 	if (!client_is_privileged()) {
-		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-	}
-#else
-	if (is_main_repository) {
 		/* permission check */
 		(void) pthread_mutex_unlock(&np->rn_lock);
+
+#ifdef NATIVE_BUILD
+		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+#else
 		pcp = pc_create();
 		if (pcp != NULL) {
 			rc = perm_add_enabling(pcp, AUTH_MODIFY);
@@ -4740,28 +3406,8 @@ again:
 			if (rc == REP_PROTOCOL_SUCCESS) {
 				granted = perm_granted(pcp);
 
-				if (granted < 0) {
+				if (granted < 0)
 					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-				} else {
-					/*
-					 * Copy out the authorization
-					 * string before freeing pcp.
-					 */
-					audit_data.ed_auth =
-					    strdup(pcp->pc_auth_string);
-					if (audit_data.ed_auth == NULL) {
-						/*
-						 * Following code line
-						 * cannot meet both the
-						 * indentation and the line
-						 * length requirements of
-						 * cstyle.  Indendation has
-						 * been sacrificed.
-						 */
-						/* CSTYLED */
-					    rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-					}
-				}
 			}
 
 			pc_free(pcp);
@@ -4769,20 +3415,18 @@ again:
 			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
 		}
 
-		if (rc == REP_PROTOCOL_SUCCESS && !granted) {
+		if (rc == REP_PROTOCOL_SUCCESS && !granted)
 			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-			audit_failure = 1;
-		}
-		(void) pthread_mutex_lock(&np->rn_lock);
-	} else {
-		rc = REP_PROTOCOL_SUCCESS;
-	}
 #endif /* NATIVE_BUILD */
 
-	if (rc != REP_PROTOCOL_SUCCESS) {
-		rc_node_rele_flag(np, RC_NODE_DYING_FLAGS);
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		goto fail;
+		if (rc != REP_PROTOCOL_SUCCESS) {
+			(void) pthread_mutex_lock(&np->rn_lock);
+			rc_node_rele_flag(np, RC_NODE_DYING_FLAGS);
+			(void) pthread_mutex_unlock(&np->rn_lock);
+			goto fail;
+		}
+
+		(void) pthread_mutex_lock(&np->rn_lock);
 	}
 
 	ndp = uu_zalloc(sizeof (*ndp));
@@ -4847,12 +3491,6 @@ again:
 
 	rc_node_rele(np);
 
-	smf_audit_event(event_id, ADT_SUCCESS, ADT_SUCCESS,
-	    &audit_data);
-	free(audit_data.ed_auth);
-	free(audit_data.ed_snapname);
-	free(audit_data.ed_type);
-	free(audit_data.ed_fmri);
 	return (rc);
 
 fail:
@@ -4864,15 +3502,6 @@ fail:
 		rc_node_rele_flag(pp, RC_NODE_CHILDREN_CHANGING);
 		rc_node_rele_locked(pp);	/* drop ref and lock */
 	}
-	if (audit_failure) {
-		smf_audit_event(event_id, ADT_FAILURE,
-		    ADT_FAIL_VALUE_AUTH, &audit_data);
-	}
-cleanout:
-	free(audit_data.ed_auth);
-	free(audit_data.ed_snapname);
-	free(audit_data.ed_type);
-	free(audit_data.ed_fmri);
 	return (rc);
 }
 
@@ -4965,107 +3594,26 @@ rc_node_next_snaplevel(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
  * represent the new snapid, and np is replaced with the new rc_node_t on
  * np's parent's child list. np is placed on the new node's rn_former list,
  * and replaces np in cache_hash (so rc_node_update() will find the new one).
- *
- * old_fmri and old_name point to the original snap shot's FMRI and name.
- * These values are used when generating audit events.
- *
- * Fails with
- *	_BAD_REQUEST
- *	_BACKEND_READONLY
- *	_DELETED
- *	_NO_RESOURCES
- *	_TRUNCATED
- *	_TYPE_MISMATCH
  */
 static int
-rc_attach_snapshot(
-	rc_node_t *np,
-	uint32_t snapid,
-	rc_node_t *parentp,
-	char *old_fmri,
-	char *old_name)
+rc_attach_snapshot(rc_node_t *np, uint32_t snapid, rc_node_t *parentp)
 {
 	rc_node_t *np_orig;
 	rc_node_t *nnp, *prev;
 	rc_node_t *pp;
 	int rc;
-	size_t sz_out;
-	au_event_t event_id;
-	audit_event_data_t audit_data;
 
-	if (parentp == NULL) {
-		assert(old_fmri != NULL);
-	} else {
+	if (parentp != NULL)
 		assert(snapid == 0);
-	}
+
 	assert(MUTEX_HELD(&np->rn_lock));
-
-	/* Gather the audit data. */
-	/*
-	 * ADT_smf_* symbols may not be defined in the /usr/include header
-	 * files on the build machine.  Thus, the following if-else will
-	 * not be compiled when doing native builds.
-	 */
-#ifndef	NATIVE_BUILD
-	if (parentp == NULL) {
-		event_id = ADT_smf_attach_snap;
-	} else {
-		event_id = ADT_smf_create_snap;
-	}
-#endif	/* NATIVE_BUILD */
-	audit_data.ed_fmri = malloc(REP_PROTOCOL_FMRI_LEN);
-	audit_data.ed_snapname = malloc(REP_PROTOCOL_NAME_LEN);
-	if ((audit_data.ed_fmri == NULL) || (audit_data.ed_snapname == NULL)) {
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_fmri);
-		free(audit_data.ed_snapname);
-		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
-	}
-	audit_data.ed_auth = NULL;
-	if (strlcpy(audit_data.ed_snapname, np->rn_name,
-	    REP_PROTOCOL_NAME_LEN) >= REP_PROTOCOL_NAME_LEN) {
-		abort();
-	}
-	audit_data.ed_old_fmri = old_fmri;
-	audit_data.ed_old_name = old_name ? old_name : "NO NAME";
-
-	if (parentp == NULL) {
-		/*
-		 * In the attach case, get the instance FMRIs of the
-		 * snapshots.
-		 */
-		if ((rc = rc_node_get_fmri_or_fragment(np, audit_data.ed_fmri,
-		    REP_PROTOCOL_FMRI_LEN, &sz_out)) != REP_PROTOCOL_SUCCESS) {
-			(void) pthread_mutex_unlock(&np->rn_lock);
-			free(audit_data.ed_fmri);
-			free(audit_data.ed_snapname);
-			return (rc);
-		}
-	} else {
-		/*
-		 * Capture the FMRI of the parent if we're actually going
-		 * to take the snapshot.
-		 */
-		if ((rc = rc_node_get_fmri_or_fragment(parentp,
-		    audit_data.ed_fmri, REP_PROTOCOL_FMRI_LEN, &sz_out)) !=
-		    REP_PROTOCOL_SUCCESS) {
-			(void) pthread_mutex_unlock(&np->rn_lock);
-			free(audit_data.ed_fmri);
-			free(audit_data.ed_snapname);
-			return (rc);
-		}
-	}
 
 	np_orig = np;
 	rc_node_hold_locked(np);		/* simplifies the remainder */
 
 	(void) pthread_mutex_unlock(&np->rn_lock);
-	if ((rc = rc_node_modify_permission_check(&audit_data.ed_auth)) !=
-	    REP_PROTOCOL_SUCCESS) {
-		smf_audit_event(event_id, ADT_FAILURE, ADT_FAIL_VALUE_AUTH,
-		    &audit_data);
-		goto cleanout;
-	}
+	if ((rc = rc_node_modify_permission_check()) != REP_PROTOCOL_SUCCESS)
+		return (rc);
 	(void) pthread_mutex_lock(&np->rn_lock);
 
 	/*
@@ -5105,10 +3653,8 @@ again:
 		rc_node_rele_locked(np);
 		np = cache_lookup(&np_orig->rn_id);
 
-		if (np == NULL) {
-			rc = REP_PROTOCOL_FAIL_DELETED;
-			goto cleanout;
-		}
+		if (np == NULL)
+			return (REP_PROTOCOL_FAIL_DELETED);
 
 		(void) pthread_mutex_lock(&np->rn_lock);
 	}
@@ -5130,8 +3676,7 @@ again:
 			(void) pthread_mutex_lock(&pp->rn_lock);
 			rc_node_rele_flag(pp, RC_NODE_CHILDREN_CHANGING);
 			(void) pthread_mutex_unlock(&pp->rn_lock);
-			rc = REP_PROTOCOL_SUCCESS;	/* nothing to do */
-			goto cleanout;
+			return (REP_PROTOCOL_SUCCESS);	/* nothing to do */
 		}
 
 		prev = np;
@@ -5196,14 +3741,8 @@ again:
 	rc_node_relink_child(pp, np, nnp);
 
 	rc_node_rele(np);
-	smf_audit_event(event_id, ADT_SUCCESS, ADT_SUCCESS, &audit_data);
-	rc = REP_PROTOCOL_SUCCESS;
 
-cleanout:
-	free(audit_data.ed_auth);
-	free(audit_data.ed_fmri);
-	free(audit_data.ed_snapname);
-	return (rc);
+	return (REP_PROTOCOL_SUCCESS);
 
 fail:
 	rc_node_rele_flag(np, RC_NODE_IN_TX);
@@ -5219,9 +3758,6 @@ fail:
 			rc_node_rele(nnp);
 	}
 
-	free(audit_data.ed_auth);
-	free(audit_data.ed_fmri);
-	free(audit_data.ed_snapname);
 	return (rc);
 }
 
@@ -5232,25 +3768,20 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 	rc_node_t *np;
 	rc_node_t *outp = NULL;
 	int rc, perm_rc;
-	char fmri[REP_PROTOCOL_FMRI_LEN];
-	audit_event_data_t audit_data;
-	size_t sz_out;
 
 	rc_node_clear(outpp, 0);
 
-	perm_rc = rc_node_modify_permission_check(&audit_data.ed_auth);
+	perm_rc = rc_node_modify_permission_check();
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_INSTANCE) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (REP_PROTOCOL_FAIL_TYPE_MISMATCH);
 	}
 
 	rc = rc_check_type_name(REP_PROTOCOL_ENTITY_SNAPSHOT, name);
 	if (rc != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (rc);
 	}
 
@@ -5258,7 +3789,6 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 	    rc_check_type_name(REP_PROTOCOL_ENTITY_SERVICE, svcname)) !=
 	    REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (rc);
 	}
 
@@ -5266,30 +3796,15 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 	    rc_check_type_name(REP_PROTOCOL_ENTITY_INSTANCE, instname)) !=
 	    REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
 		return (rc);
 	}
 
-	audit_data.ed_auth = NULL;
-	audit_data.ed_fmri = fmri;
-	audit_data.ed_snapname = (char *)name;
-
-	if ((rc = rc_node_get_fmri_or_fragment(np, fmri, sizeof (fmri),
-	    &sz_out)) != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&np->rn_lock);
-		free(audit_data.ed_auth);
-		return (rc);
-	}
 	if (perm_rc != REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		smf_audit_event(ADT_smf_create_snap, ADT_FAILURE,
-		    ADT_FAIL_VALUE_AUTH, &audit_data);
-		free(audit_data.ed_auth);
 		return (perm_rc);
 	}
 
-	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, RC_NODE_CREATING_CHILD,
-	    audit_data.ed_auth);
+	HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
 	rc = object_snapshot_take_new(np, svcname, instname, name, &outp);
@@ -5303,12 +3818,6 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 	rc_node_rele_flag(np, RC_NODE_CREATING_CHILD);
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
-	if (rc == REP_PROTOCOL_SUCCESS) {
-		smf_audit_event(ADT_smf_create_snap, ADT_SUCCESS, ADT_SUCCESS,
-		    &audit_data);
-	}
-	if (audit_data.ed_auth != NULL)
-		free(audit_data.ed_auth);
 	return (rc);
 }
 
@@ -5328,8 +3837,7 @@ rc_snapshot_take_attach(rc_node_ptr_t *npp, rc_node_ptr_t *outpp)
 		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
 	}
 
-	return (rc_attach_snapshot(outp, 0, np, NULL,
-	    NULL));					/* drops outp's lock */
+	return (rc_attach_snapshot(outp, 0, np));	/* drops outp's lock */
 }
 
 int
@@ -5338,10 +3846,6 @@ rc_snapshot_attach(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
 	rc_node_t *np;
 	rc_node_t *cp;
 	uint32_t snapid;
-	char old_name[REP_PROTOCOL_NAME_LEN];
-	int rc;
-	size_t sz_out;
-	char old_fmri[REP_PROTOCOL_FMRI_LEN];
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
 	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_SNAPSHOT) {
@@ -5349,17 +3853,7 @@ rc_snapshot_attach(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
 		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
 	}
 	snapid = np->rn_snapshot_id;
-	rc = rc_node_get_fmri_or_fragment(np, old_fmri, sizeof (old_fmri),
-	    &sz_out);
 	(void) pthread_mutex_unlock(&np->rn_lock);
-	if (rc != REP_PROTOCOL_SUCCESS)
-		return (rc);
-	if (np->rn_name != NULL) {
-		if (strlcpy(old_name, np->rn_name, sizeof (old_name)) >=
-		    sizeof (old_name)) {
-			return (REP_PROTOCOL_FAIL_TRUNCATED);
-		}
-	}
 
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(cp, cpp);
 	if (cp->rn_id.rl_type != REP_PROTOCOL_ENTITY_SNAPSHOT) {
@@ -5367,9 +3861,7 @@ rc_snapshot_attach(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
 		return (REP_PROTOCOL_FAIL_BAD_REQUEST);
 	}
 
-	rc = rc_attach_snapshot(cp, snapid, NULL,
-	    old_fmri, old_name);			/* drops cp's lock */
-	return (rc);
+	return (rc_attach_snapshot(cp, snapid, NULL));	/* drops cp's lock */
 }
 
 /*
@@ -5598,8 +4090,6 @@ rc_node_property_may_read(rc_node_t *np)
 	int ret, granted = 0;
 	rc_node_t *pgp;
 	permcheck_t *pcp;
-	audit_event_data_t audit_data;
-	size_t sz_out;
 
 	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_PROPERTY)
 		return (REP_PROTOCOL_FAIL_TYPE_MISMATCH);
@@ -5672,31 +4162,6 @@ rc_node_property_may_read(rc_node_t *np)
 		if (granted < 0)
 			ret = REP_PROTOCOL_FAIL_NO_RESOURCES;
 	}
-	if (ret == REP_PROTOCOL_SUCCESS) {
-		/* Generate a read_prop audit event. */
-		audit_data.ed_fmri = malloc(REP_PROTOCOL_FMRI_LEN);
-		if (audit_data.ed_fmri == NULL)
-			ret = REP_PROTOCOL_FAIL_NO_RESOURCES;
-	}
-	ret = rc_node_get_fmri_or_fragment(np, audit_data.ed_fmri,
-	    REP_PROTOCOL_FMRI_LEN, &sz_out);
-	assert(ret == REP_PROTOCOL_SUCCESS);
-	if (ret == REP_PROTOCOL_SUCCESS) {
-		int status;
-		int ret_value;
-
-		if (granted == 0) {
-			status = ADT_FAILURE;
-			ret_value = ADT_FAIL_VALUE_AUTH;
-		} else {
-			status = ADT_SUCCESS;
-			ret_value = ADT_SUCCESS;
-		}
-		audit_data.ed_auth = pcp->pc_auth_string;
-		smf_audit_event(ADT_smf_read_prop,
-		    status, ret_value, &audit_data);
-	}
-	free(audit_data.ed_fmri);
 
 	pc_free(pcp);
 
@@ -6433,8 +4898,7 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 	rc_node_t *np;
 	permcheck_t *pcp;
 	int ret;
-	rc_auth_state_t authorized = RC_AUTH_UNKNOWN;
-	char *auth_string = NULL;
+	int authorized = 0;
 
 	RC_NODE_PTR_GET_CHECK_AND_HOLD(np, npp);
 
@@ -6454,15 +4918,13 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
 	}
 
-#ifdef NATIVE_BUILD
 	if (client_is_privileged())
 		goto skip_checks;
+
+#ifdef NATIVE_BUILD
 	rc_node_rele(np);
 	return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
 #else
-	if (is_main_repository == 0)
-		goto skip_checks;
-
 	/* permission check */
 	pcp = pc_create();
 	if (pcp == NULL) {
@@ -6514,7 +4976,7 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 		}
 
 		if (strcmp(np->rn_name, AUTH_PG_ACTIONS) == 0)
-			authorized = RC_AUTH_PASSED; /* No check on commit. */
+			authorized = 1;		/* Don't check on commit. */
 	} else {
 		ret = perm_add_enabling(pcp, AUTH_MODIFY);
 
@@ -6551,45 +5013,21 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 	}
 
 	ret = perm_granted(pcp);
-	/*
-	 * Copy out the authorization string before freeing pcp.
-	 */
-	if (ret >= 0) {
-		auth_string = strdup(pcp->pc_auth_string);
-	}
-	pc_free(pcp);
-	if ((auth_string == NULL) || (ret < 0)) {
+	if (ret != 1) {
+		pc_free(pcp);
 		rc_node_rele(np);
-		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+		return (ret == 0 ? REP_PROTOCOL_FAIL_PERMISSION_DENIED :
+		    REP_PROTOCOL_FAIL_NO_RESOURCES);
 	}
 
-	if (ret == 0) {
-		/*
-		 * If we get here, the authorization failed.
-		 * Unfortunately, we don't have enough information at this
-		 * point to generate the security audit events.  We'll only
-		 * get that information when the client tries to commit the
-		 * event.  Thus, we'll remember the failed authorization,
-		 * so that we can generate the audit events later.
-		 */
-		authorized = RC_AUTH_FAILED;
-	}
+	pc_free(pcp);
 #endif /* NATIVE_BUILD */
 
 skip_checks:
 	rc_node_assign(txp, np);
 	txp->rnp_authorized = authorized;
-	if (authorized != RC_AUTH_UNKNOWN) {
-		/* Save the authorization string. */
-		if (txp->rnp_auth_string != NULL)
-			free((void *)txp->rnp_auth_string);
-		txp->rnp_auth_string = auth_string;
-		auth_string = NULL;	/* Don't free until done with txp. */
-	}
 
 	rc_node_rele(np);
-	if (auth_string != NULL)
-		free(auth_string);
 	return (REP_PROTOCOL_SUCCESS);
 }
 
@@ -6749,29 +5187,12 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 	int rc;
 	permcheck_t *pcp;
 	int granted, normal;
-	char *pg_fmri = NULL;
-	char *auth_string = NULL;
-	int auth_status = ADT_SUCCESS;
-	int auth_ret_value = ADT_SUCCESS;
-	size_t sz_out;
-	int tx_flag = 1;
-	tx_commit_data_t *tx_data = NULL;
 
 	RC_NODE_CHECK(np);
 
-	if ((txp->rnp_authorized != RC_AUTH_UNKNOWN) &&
-	    (txp->rnp_auth_string != NULL)) {
-		auth_string = strdup(txp->rnp_auth_string);
-		if (auth_string == NULL)
-			return (REP_PROTOCOL_FAIL_NO_RESOURCES);
-	}
-
-	if ((txp->rnp_authorized == RC_AUTH_UNKNOWN) &&
-	    is_main_repository) {
+	if (!client_is_privileged() && !txp->rnp_authorized) {
 #ifdef NATIVE_BUILD
-		if (!client_is_privileged()) {
-			return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
-		}
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
 #else
 		/* permission check: depends on contents of transaction */
 		pcp = pc_create();
@@ -6870,67 +5291,23 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 
 		if (rc == REP_PROTOCOL_SUCCESS) {
 			granted = perm_granted(pcp);
-			if (granted < 0) {
+			if (granted < 0)
 				rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-			} else {
-				/*
-				 * Copy out the authorization string before
-				 * freeing pcp.
-				 */
-				auth_string = strdup(pcp->pc_auth_string);
-				if (auth_string == NULL)
-					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-			}
 		}
 
 		pc_free(pcp);
 
 		if (rc != REP_PROTOCOL_SUCCESS)
-			goto cleanout;
+			return (rc);
 
-		if (!granted) {
-			auth_status = ADT_FAILURE;
-			auth_ret_value = ADT_FAIL_VALUE_AUTH;
-			tx_flag = 0;
-		}
+		if (!granted)
+			return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
 #endif /* NATIVE_BUILD */
-	} else if (txp->rnp_authorized == RC_AUTH_FAILED) {
-		auth_status = ADT_FAILURE;
-		auth_ret_value = ADT_FAIL_VALUE_AUTH;
-		tx_flag = 0;
-	}
-
-	pg_fmri = malloc(REP_PROTOCOL_FMRI_LEN);
-	if (pg_fmri == NULL) {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-		goto cleanout;
-	}
-	if ((rc = rc_node_get_fmri_or_fragment(np, pg_fmri,
-	    REP_PROTOCOL_FMRI_LEN, &sz_out)) != REP_PROTOCOL_SUCCESS) {
-		goto cleanout;
-	}
-
-	/*
-	 * Parse the transaction commands into a useful form.
-	 */
-	if ((rc = tx_commit_data_new(cmds, cmds_sz, &tx_data)) !=
-	    REP_PROTOCOL_SUCCESS) {
-		goto cleanout;
-	}
-
-	if (tx_flag == 0) {
-		/* Authorization failed.  Generate audit events. */
-		generate_property_events(tx_data, pg_fmri, auth_string,
-		    auth_status, auth_ret_value);
-		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-		goto cleanout;
 	}
 
 	nnp = rc_node_alloc();
-	if (nnp == NULL) {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-		goto cleanout;
-	}
+	if (nnp == NULL)
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
 
 	nnp->rn_id = np->rn_id;			/* structure assignment */
 	nnp->rn_hash = np->rn_hash;
@@ -6942,12 +5319,10 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 
 	if (nnp->rn_name == NULL || nnp->rn_type == NULL) {
 		rc_node_destroy(nnp);
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-		goto cleanout;
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
 	}
 
 	(void) pthread_mutex_lock(&np->rn_lock);
-
 	/*
 	 * We must have all of the old properties in the cache, or the
 	 * database deletions could cause inconsistencies.
@@ -6956,22 +5331,20 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 	    REP_PROTOCOL_SUCCESS) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		rc_node_destroy(nnp);
-		goto cleanout;
+		return (rc);
 	}
 
 	if (!rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		rc_node_destroy(nnp);
-		rc = REP_PROTOCOL_FAIL_DELETED;
-		goto cleanout;
+		return (REP_PROTOCOL_FAIL_DELETED);
 	}
 
 	if (np->rn_flags & RC_NODE_OLD) {
 		rc_node_rele_flag(np, RC_NODE_USING_PARENT);
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		rc_node_destroy(nnp);
-		rc = REP_PROTOCOL_FAIL_NOT_LATEST;
-		goto cleanout;
+		return (REP_PROTOCOL_FAIL_NOT_LATEST);
 	}
 
 	pp = rc_node_hold_parent_flag(np, RC_NODE_CHILDREN_CHANGING);
@@ -6981,12 +5354,10 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 		(void) pthread_mutex_lock(&np->rn_lock);
 		if (np->rn_flags & RC_NODE_OLD) {
 			(void) pthread_mutex_unlock(&np->rn_lock);
-			rc = REP_PROTOCOL_FAIL_NOT_LATEST;
-			goto cleanout;
+			return (REP_PROTOCOL_FAIL_NOT_LATEST);
 		}
 		(void) pthread_mutex_unlock(&np->rn_lock);
-		rc = REP_PROTOCOL_FAIL_DELETED;
-		goto cleanout;
+		return (REP_PROTOCOL_FAIL_DELETED);
 	}
 	(void) pthread_mutex_unlock(&pp->rn_lock);
 
@@ -7000,14 +5371,13 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 		rc_node_rele_flag(pp, RC_NODE_CHILDREN_CHANGING);
 		(void) pthread_mutex_unlock(&pp->rn_lock);
 		rc_node_destroy(nnp);
-		rc = REP_PROTOCOL_FAIL_DELETED;
-		goto cleanout;
+		return (REP_PROTOCOL_FAIL_DELETED);
 	}
 	nnp->rn_gen_id = np->rn_gen_id;
 	(void) pthread_mutex_unlock(&np->rn_lock);
 
 	/* Sets nnp->rn_gen_id on success. */
-	rc = object_tx_commit(&np->rn_id, tx_data, &nnp->rn_gen_id);
+	rc = object_tx_commit(&np->rn_id, cmds, cmds_sz, &nnp->rn_gen_id);
 
 	(void) pthread_mutex_lock(&np->rn_lock);
 	if (rc != REP_PROTOCOL_SUCCESS) {
@@ -7020,7 +5390,7 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 		rc_node_clear(txp, 0);
 		if (rc == REP_PROTOCOL_DONE)
 			rc = REP_PROTOCOL_SUCCESS; /* successful empty tx */
-		goto cleanout;
+		return (rc);
 	}
 
 	/*
@@ -7045,16 +5415,8 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 	 * all done -- clear the transaction.
 	 */
 	rc_node_clear(txp, 0);
-	generate_property_events(tx_data, pg_fmri, auth_string,
-	    auth_status, auth_ret_value);
 
-	rc = REP_PROTOCOL_SUCCESS;
-
-cleanout:
-	free(auth_string);
-	free(pg_fmri);
-	tx_commit_data_free(tx_data);
-	return (rc);
+	return (REP_PROTOCOL_SUCCESS);
 }
 
 void

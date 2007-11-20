@@ -56,14 +56,6 @@
  * all libscf state associated with that handle, so functions which do this
  * should communicate the event to their callers (usually by returning
  * ECONNRESET) so they may reset their state appropriately.
- *
- * External references
- *
- * svc.configd generates special security audit events for changes to some
- * restarter related properties.  See the special_props_list array in
- * usr/src/cmd/svc/configd/rc_node.c for the properties that cause these audit
- * events.  If you change the semantics of these propereties within startd, you
- * will probably need to update rc_node.c
  */
 
 #include <stdio.h>
