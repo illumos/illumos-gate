@@ -27,10 +27,10 @@
 
 #include <sys/zio.h>
 #include <sys/spa.h>
+#include <sys/u8_textprep.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_znode.h>
-#include <sys/zfs_i18n.h>
 
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
@@ -115,12 +115,17 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	/*
+	 * Use the unique flags we have to send to u8_strcmp() and/or
+	 * u8_textprep() to represent the various normalization property
+	 * values.
+	 */
 	static zprop_index_t normalize_table[] = {
-		{ "none",	ZFS_NORMALIZE_NONE },
-		{ "formD",	ZFS_NORMALIZE_D },
-		{ "formKC",	ZFS_NORMALIZE_KC },
-		{ "formC",	ZFS_NORMALIZE_C },
-		{ "formKD",	ZFS_NORMALIZE_KD },
+		{ "none",	0 },
+		{ "formD",	U8_TEXTPREP_NFD },
+		{ "formKC",	U8_TEXTPREP_NFKC },
+		{ "formC",	U8_TEXTPREP_NFC },
+		{ "formKD",	U8_TEXTPREP_NFKD },
 		{ NULL }
 	};
 
@@ -202,7 +207,7 @@ zfs_prop_init(void)
 	    ZFS_TYPE_FILESYSTEM, "yes | no", "MOUNTED", boolean_table);
 
 	/* set once index properties */
-	register_index(ZFS_PROP_NORMALIZE, "normalization", ZFS_NORMALIZE_NONE,
+	register_index(ZFS_PROP_NORMALIZE, "normalization", 0,
 	    PROP_ONETIME, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
 	    "none | formC | formD | formKC | formKD", "NORMALIZATION",
 	    normalize_table);

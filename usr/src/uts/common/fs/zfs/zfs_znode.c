@@ -36,6 +36,7 @@
 #include <sys/resource.h>
 #include <sys/mntent.h>
 #include <sys/mkdev.h>
+#include <sys/u8_textprep.h>
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
@@ -52,7 +53,6 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_rlock.h>
 #include <sys/zfs_fuid.h>
-#include <sys/zfs_i18n.h>
 #include <sys/fs/zfs.h>
 #include <sys/kidmap.h>
 #endif /* _KERNEL */
@@ -62,6 +62,8 @@
 #include <sys/stat.h>
 #include <sys/zap.h>
 #include <sys/zfs_znode.h>
+
+#include "zfs_prop.h"
 
 /*
  * Functions needed for userland (ie: libzpool) are not put under
@@ -255,6 +257,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	int		i, error;
 	dmu_object_info_t doi;
 	uint64_t fsid_guid;
+	uint64_t zval;
 
 	*zpp = NULL;
 
@@ -265,6 +268,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	if (dmu_object_info(os, MASTER_NODE_OBJ, &doi) == ENOENT) {
 		dmu_tx_t *tx = dmu_tx_create(os);
 		uint64_t zpl_version;
+		nvlist_t *zprops;
 
 		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* master */
 		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* del queue */
@@ -275,12 +279,16 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 			zpl_version = ZPL_VERSION;
 		else
 			zpl_version = ZPL_VERSION_FUID - 1;
-		zfs_create_fs(os, cr, zpl_version, 0, tx);
+
+		VERIFY(nvlist_alloc(&zprops, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		VERIFY(nvlist_add_uint64(zprops,
+		    zfs_prop_to_name(ZFS_PROP_VERSION), zpl_version) == 0);
+		zfs_create_fs(os, cr, zprops, tx);
+		nvlist_free(zprops);
 		dmu_tx_commit(tx);
 	}
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1,
-	    &zfsvfs->z_version);
+	error = zfs_get_zplprop(os, ZFS_PROP_VERSION, &zfsvfs->z_version);
 	if (error) {
 		return (error);
 	} else if (zfsvfs->z_version > ZPL_VERSION) {
@@ -290,6 +298,23 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		    (u_longlong_t)zfsvfs->z_version, ZPL_VERSION);
 		return (ENOTSUP);
 	}
+
+	if ((error = zfs_get_zplprop(os, ZFS_PROP_NORMALIZE, &zval)) != 0)
+		return (error);
+	zfsvfs->z_norm = (int)zval;
+	if ((error = zfs_get_zplprop(os, ZFS_PROP_UTF8ONLY, &zval)) != 0)
+		return (error);
+	zfsvfs->z_utf8 = (zval != 0);
+	if ((error = zfs_get_zplprop(os, ZFS_PROP_CASE, &zval)) != 0)
+		return (error);
+	zfsvfs->z_case = (uint_t)zval;
+	/*
+	 * Fold case on file systems that are always or sometimes case
+	 * insensitive.
+	 */
+	if (zfsvfs->z_case == ZFS_CASE_INSENSITIVE ||
+	    zfsvfs->z_case == ZFS_CASE_MIXED)
+		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
 
 	/*
 	 * The fsid is 64 bits, composed of an 8-bit fs type, which
@@ -1170,11 +1195,14 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 }
 
 void
-zfs_create_fs(objset_t *os, cred_t *cr, uint64_t version,
-    int norm, dmu_tx_t *tx)
+zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 {
 	zfsvfs_t	zfsvfs;
 	uint64_t	moid, doid;
+	uint64_t	version = 0;
+	uint64_t	sense = ZFS_CASE_SENSITIVE;
+	uint64_t	norm = 0;
+	nvpair_t	*elem;
 	int		error;
 	znode_t		*rootzp = NULL;
 	vnode_t		*vp;
@@ -1196,9 +1224,29 @@ zfs_create_fs(objset_t *os, cred_t *cr, uint64_t version,
 	/*
 	 * Set starting attributes.
 	 */
+	elem = NULL;
+	while ((elem = nvlist_next_nvpair(zplprops, elem)) != NULL) {
+		/* For the moment we expect all zpl props to be uint64_ts */
+		uint64_t val;
+		char *name;
 
-	error = zap_update(os, moid, ZPL_VERSION_STR, 8, 1, &version, tx);
-	ASSERT(error == 0);
+		ASSERT(nvpair_type(elem) == DATA_TYPE_UINT64);
+		ASSERT(nvpair_value_uint64(elem, &val) == 0);
+		name = nvpair_name(elem);
+		if (strcmp(name, zfs_prop_to_name(ZFS_PROP_VERSION)) == 0) {
+			version = val;
+			error = zap_update(os, moid, ZPL_VERSION_STR,
+			    8, 1, &version, tx);
+		} else {
+			error = zap_update(os, moid, name, 8, 1, &val, tx);
+		}
+		ASSERT(error == 0);
+		if (strcmp(name, zfs_prop_to_name(ZFS_PROP_NORMALIZE)) == 0)
+			norm = val;
+		else if (strcmp(name, zfs_prop_to_name(ZFS_PROP_CASE)) == 0)
+			sense = val;
+	}
+	ASSERT(version != 0);
 
 	/*
 	 * Create a delete queue.
@@ -1235,6 +1283,12 @@ zfs_create_fs(objset_t *os, cred_t *cr, uint64_t version,
 	zfsvfs.z_version = version;
 	zfsvfs.z_use_fuids = USE_FUIDS(version, os);
 	zfsvfs.z_norm = norm;
+	/*
+	 * Fold case on file systems that are always or sometimes case
+	 * insensitive.
+	 */
+	if (sense == ZFS_CASE_INSENSITIVE || sense == ZFS_CASE_MIXED)
+		zfsvfs.z_norm |= U8_TEXTPREP_TOUPPER;
 
 	mutex_init(&zfsvfs.z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs.z_all_znodes, sizeof (znode_t),

@@ -38,7 +38,6 @@
 #include <sys/cmn_err.h>
 #include <sys/stat.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/zfs_i18n.h>
 #include <sys/zfs_znode.h>
 #include <sys/zap.h>
 #include <sys/spa.h>
@@ -65,8 +64,6 @@
 #include <sys/zfs_dir.h>
 #include <sys/zvol.h>
 #include <sharefs/share.h>
-#include <sys/zfs_znode.h>
-#include <sys/zfs_vfsops.h>
 #include <sys/dmu_objset.h>
 
 #include "zfs_namecheck.h"
@@ -1095,6 +1092,30 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 	return (error);
 }
 
+static int
+zfs_os_open_retry(char *name, objset_t **os)
+{
+	int error;
+
+retry:
+	error = dmu_objset_open(name, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, os);
+	if (error != 0) {
+		/*
+		 * This is ugly: dmu_objset_open() can return EBUSY if
+		 * the objset is held exclusively. Fortunately this hold is
+		 * only for a short while, so we retry here.
+		 * This avoids user code having to handle EBUSY,
+		 * for example for a "zfs list".
+		 */
+		if (error == EBUSY) {
+			delay(1);
+			goto retry;
+		}
+	}
+	return (error);
+}
+
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -1113,23 +1134,8 @@ zfs_ioc_objset_stats(zfs_cmd_t *zc)
 	int error;
 	nvlist_t *nv;
 
-retry:
-	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	if (error != 0) {
-		/*
-		 * This is ugly: dmu_objset_open() can return EBUSY if
-		 * the objset is held exclusively. Fortunately this hold is
-		 * only for a short while, so we retry here.
-		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list".
-		 */
-		if (error == EBUSY) {
-			delay(1);
-			goto retry;
-		}
+	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0)
 		return (error);
-	}
 
 	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
 
@@ -1156,6 +1162,66 @@ retry:
 	return (error);
 }
 
+static int
+nvl_add_zplprop(objset_t *os, nvlist_t *props, zfs_prop_t prop)
+{
+	uint64_t value;
+	int error;
+
+	/*
+	 * zfs_get_zplprop() will either find a value or give us
+	 * the default value (if there is one).
+	 */
+	if ((error = zfs_get_zplprop(os, prop, &value)) != 0)
+		return (error);
+	VERIFY(nvlist_add_uint64(props, zfs_prop_to_name(prop), value) == 0);
+	return (0);
+}
+
+/*
+ * inputs:
+ * zc_name		name of filesystem
+ * zc_nvlist_dst_size	size of buffer for zpl property nvlist
+ *
+ * outputs:
+ * zc_nvlist_dst	zpl property nvlist
+ * zc_nvlist_dst_size	size of zpl property nvlist
+ */
+static int
+zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
+{
+	objset_t *os;
+	int err;
+
+	if ((err = zfs_os_open_retry(zc->zc_name, &os)) != 0)
+		return (err);
+
+	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
+
+	/*
+	 * NB: nvl_add_zplprop() will read the objset contents,
+	 * which we aren't supposed to do with a DS_MODE_STANDARD
+	 * open, because it could be inconsistent.
+	 */
+	if (zc->zc_nvlist_dst != NULL &&
+	    !zc->zc_objset_stats.dds_inconsistent &&
+	    dmu_objset_type(os) == DMU_OST_ZFS) {
+		nvlist_t *nv;
+
+		VERIFY(nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		if ((err = nvl_add_zplprop(os, nv, ZFS_PROP_VERSION)) == 0 &&
+		    (err = nvl_add_zplprop(os, nv, ZFS_PROP_NORMALIZE)) == 0 &&
+		    (err = nvl_add_zplprop(os, nv, ZFS_PROP_UTF8ONLY)) == 0 &&
+		    (err = nvl_add_zplprop(os, nv, ZFS_PROP_CASE)) == 0)
+			err = put_nvlist(zc, nv);
+		nvlist_free(nv);
+	} else {
+		err = ENOENT;
+	}
+	dmu_objset_close(os);
+	return (err);
+}
+
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -1170,68 +1236,13 @@ retry:
  * zc_value		alternate root
  */
 static int
-zfs_ioc_objset_version(zfs_cmd_t *zc)
-{
-	objset_t *os = NULL;
-	int error;
-
-retry:
-	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	if (error != 0) {
-		/*
-		 * This is ugly: dmu_objset_open() can return EBUSY if
-		 * the objset is held exclusively. Fortunately this hold is
-		 * only for a short while, so we retry here.
-		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list".
-		 */
-		if (error == EBUSY) {
-			delay(1);
-			goto retry;
-		}
-		return (error);
-	}
-
-	dmu_objset_fast_stat(os, &zc->zc_objset_stats);
-
-	/*
-	 * NB: zfs_get_version() will read the objset contents,
-	 * which we aren't supposed to do with a
-	 * DS_MODE_STANDARD open, because it could be
-	 * inconsistent.  So this is a bit of a workaround...
-	 */
-	zc->zc_cookie = 0;
-	if (!zc->zc_objset_stats.dds_inconsistent)
-		if (dmu_objset_type(os) == DMU_OST_ZFS)
-			(void) zfs_get_version(os, &zc->zc_cookie);
-
-	dmu_objset_close(os);
-	return (0);
-}
-
-static int
 zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 {
 	objset_t *os;
 	int error;
 	char *p;
 
-retry:
-	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	if (error != 0) {
-		/*
-		 * This is ugly: dmu_objset_open() can return EBUSY if
-		 * the objset is held exclusively. Fortunately this hold is
-		 * only for a short while, so we retry here.
-		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list".
-		 */
-		if (error == EBUSY) {
-			delay(1);
-			goto retry;
-		}
+	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0) {
 		if (error == ENOENT)
 			error = ESRCH;
 		return (error);
@@ -1281,21 +1292,7 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	objset_t *os;
 	int error;
 
-retry:
-	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
-	if (error != 0) {
-		/*
-		 * This is ugly: dmu_objset_open() can return EBUSY if
-		 * the objset is held exclusively. Fortunately this hold is
-		 * only for a short while, so we retry here.
-		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list".
-		 */
-		if (error == EBUSY) {
-			delay(1);
-			goto retry;
-		}
+	if ((error = zfs_os_open_retry(zc->zc_name, &os)) != 0) {
 		if (error == ENOENT)
 			error = ESRCH;
 		return (error);
@@ -1385,12 +1382,6 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 			if (zfs_check_version(name, SPA_VERSION_DITTO_BLOCKS))
 				return (ENOTSUP);
 			break;
-		case ZFS_PROP_NORMALIZE:
-		case ZFS_PROP_UTF8ONLY:
-		case ZFS_PROP_CASE:
-			if (zfs_check_version(name, SPA_VERSION_NORMALIZATION))
-				return (ENOTSUP);
-
 		}
 		if ((error = zfs_secpolicy_setprop(name, prop, CRED())) != 0)
 			return (error);
@@ -1759,172 +1750,112 @@ static void
 zfs_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 {
 	zfs_creat_t *zct = arg;
-	uint64_t version;
 
-	if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
-		version = ZPL_VERSION;
-	else
-		version = ZPL_VERSION_FUID - 1;
-
-	(void) nvlist_lookup_uint64(zct->zct_props,
-	    zfs_prop_to_name(ZFS_PROP_VERSION), &version);
-
-	zfs_create_fs(os, cr, version, zct->zct_norm, tx);
+	zfs_create_fs(os, cr, zct->zct_zplprops, tx);
 }
 
-/*
- * zfs_prop_lookup()
- *
- * Look for the property first in the existing property nvlist.  If
- * it's already present, you're done.  If it's not there, attempt to
- * find the property value from a parent dataset.  If that fails, fall
- * back to the property's default value.  In either of these two
- * cases, if update is TRUE, add a value for the property to the
- * property nvlist.
- *
- * If the rval pointer is non-NULL, copy the discovered value to rval.
- *
- * If we get any unexpected errors, bail and return the error number
- * to the caller.
- *
- * If we succeed, return 0.
- */
-static int
-zfs_prop_lookup(const char *parentname, zfs_prop_t propnum,
-    nvlist_t *proplist, uint64_t *rval, boolean_t update)
-{
-	const char *propname;
-	uint64_t value;
-	int error = ENOENT;
-
-	propname = zfs_prop_to_name(propnum);
-	if (proplist != NULL)
-		error = nvlist_lookup_uint64(proplist, propname, &value);
-	if (error == ENOENT) {
-		error = dsl_prop_get_integer(parentname, propname,
-		    &value, NULL);
-		if (error == ENOENT)
-			value = zfs_prop_default_numeric(propnum);
-		else if (error != 0)
-			return (error);
-		if (update) {
-			ASSERT(proplist != NULL);
-			error = nvlist_add_uint64(proplist, propname, value);
-		}
-	}
-	if (error == 0 && rval)
-		*rval = value;
-	return (error);
-}
+#define	ZFS_PROP_UNDEFINED	((uint64_t)-1)
 
 /*
- * zfs_normalization_get
+ * inputs:
+ * createprops	list of properties requested by creator
+ * dataset	name of dataset we are creating
  *
- * Get the normalization flag value.  If the properties have
- * non-default values, make sure the pool version is recent enough to
- * support these choices.
+ * outputs:
+ * zplprops	values for the zplprops we attach to the master node object
+ *
+ * Determine the settings for utf8only, normalization and
+ * casesensitivity.  Specific values may have been requested by the
+ * creator and/or we can inherit values from the parent dataset.  If
+ * the file system is of too early a vintage, a creator can not
+ * request settings for these properties, even if the requested
+ * setting is the default value.  We don't actually want to create dsl
+ * properties for these, so remove them from the source nvlist after
+ * processing.
  */
 static int
-zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
-    boolean_t update)
+zfs_fill_zplprops(const char *dataset, nvlist_t *createprops,
+    nvlist_t *zplprops, uint64_t zplver)
 {
+	objset_t *os;
 	char parentname[MAXNAMELEN];
-	char poolname[MAXNAMELEN];
 	char *cp;
-	uint64_t value;
-	int check = 0;
-	int error;
+	uint64_t sense = ZFS_PROP_UNDEFINED;
+	uint64_t norm = ZFS_PROP_UNDEFINED;
+	uint64_t u8 = ZFS_PROP_UNDEFINED;
+	int error = 0;
 
-	ASSERT(norm != NULL);
-	*norm = 0;
+	ASSERT(zplprops != NULL);
 
-	(void) strncpy(parentname, dataset, sizeof (parentname));
-	cp = strrchr(parentname, '@');
-	if (cp != NULL) {
-		cp[0] = '\0';
-	} else {
-		cp = strrchr(parentname, '/');
-		if (cp == NULL)
-			return (ENOENT);
-		cp[0] = '\0';
-	}
-
-	(void) strncpy(poolname, dataset, sizeof (poolname));
-	cp = strchr(poolname, '/');
-	if (cp != NULL)
-		cp[0] = '\0';
+	(void) strlcpy(parentname, dataset, sizeof (parentname));
+	cp = strrchr(parentname, '/');
+	ASSERT(cp != NULL);
+	cp[0] = '\0';
 
 	/*
-	 * Make sure pool is of new enough vintage to support normalization.
+	 * Pull out creator prop choices, if any.
 	 */
-	if (zfs_check_version(poolname, SPA_VERSION_NORMALIZATION))
-		return (0);
-
-	error = zfs_prop_lookup(parentname, ZFS_PROP_UTF8ONLY,
-	    proplist, &value, update);
-	if (error != 0)
-		return (error);
-	if (value != zfs_prop_default_numeric(ZFS_PROP_UTF8ONLY))
-		check = 1;
-
-	error = zfs_prop_lookup(parentname, ZFS_PROP_NORMALIZE,
-	    proplist, &value, update);
-	if (error != 0)
-		return (error);
-	if (value != zfs_prop_default_numeric(ZFS_PROP_NORMALIZE)) {
-		check = 1;
-		switch ((int)value) {
-		case ZFS_NORMALIZE_NONE:
-			break;
-		case ZFS_NORMALIZE_C:
-			*norm |= U8_TEXTPREP_NFC;
-			break;
-		case ZFS_NORMALIZE_D:
-			*norm |= U8_TEXTPREP_NFD;
-			break;
-		case ZFS_NORMALIZE_KC:
-			*norm |= U8_TEXTPREP_NFKC;
-			break;
-		case ZFS_NORMALIZE_KD:
-			*norm |= U8_TEXTPREP_NFKD;
-			break;
-		default:
-			ASSERT((int)value >= ZFS_NORMALIZE_NONE);
-			ASSERT((int)value <= ZFS_NORMALIZE_KD);
-			break;
-		}
-	}
-
-	error = zfs_prop_lookup(parentname, ZFS_PROP_CASE,
-	    proplist, &value, update);
-	if (error != 0)
-		return (error);
-	if (value != zfs_prop_default_numeric(ZFS_PROP_CASE)) {
-		check = 1;
-		switch ((int)value) {
-		case ZFS_CASE_SENSITIVE:
-			break;
-		case ZFS_CASE_INSENSITIVE:
-			*norm |= U8_TEXTPREP_TOUPPER;
-			break;
-		case ZFS_CASE_MIXED:
-			*norm |= U8_TEXTPREP_TOUPPER;
-			break;
-		default:
-			ASSERT((int)value >= ZFS_CASE_SENSITIVE);
-			ASSERT((int)value <= ZFS_CASE_MIXED);
-			break;
-		}
+	if (createprops) {
+		(void) nvlist_lookup_uint64(createprops,
+		    zfs_prop_to_name(ZFS_PROP_NORMALIZE), &norm);
+		(void) nvlist_remove_all(createprops,
+		    zfs_prop_to_name(ZFS_PROP_NORMALIZE));
+		(void) nvlist_lookup_uint64(createprops,
+		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), &u8);
+		(void) nvlist_remove_all(createprops,
+		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY));
+		(void) nvlist_lookup_uint64(createprops,
+		    zfs_prop_to_name(ZFS_PROP_CASE), &sense);
+		(void) nvlist_remove_all(createprops,
+		    zfs_prop_to_name(ZFS_PROP_CASE));
 	}
 
 	/*
-	 * At the moment we are disabling non-default values for these
-	 * properties because they cannot be preserved properly with a
-	 * zfs send.
+	 * If the file system or pool is version is too "young" to
+	 * support normalization and the creator tried to set a value
+	 * for one of the props, error out.  We only need check the
+	 * ZPL version because we've already checked by now that the
+	 * SPA version is compatible with the selected ZPL version.
 	 */
-	if (check == 1)
+	if (zplver < ZPL_VERSION_NORMALIZATION &&
+	    (norm != ZFS_PROP_UNDEFINED || u8 != ZFS_PROP_UNDEFINED ||
+	    sense != ZFS_PROP_UNDEFINED))
 		return (ENOTSUP);
 
+	/*
+	 * Put the version in the zplprops
+	 */
+	VERIFY(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_VERSION), zplver) == 0);
+
+	/*
+	 * Open parent object set so we can inherit zplprop values if
+	 * necessary.
+	 */
+	if ((error = zfs_os_open_retry(parentname, &os)) != 0)
+		return (error);
+
+	if (norm == ZFS_PROP_UNDEFINED)
+		VERIFY(zfs_get_zplprop(os, ZFS_PROP_NORMALIZE, &norm) == 0);
+	VERIFY(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_NORMALIZE), norm) == 0);
+
+	/*
+	 * If we're normalizing, names must always be valid UTF-8 strings.
+	 */
+	if (norm)
+		u8 = 1;
+	if (u8 == ZFS_PROP_UNDEFINED)
+		VERIFY(zfs_get_zplprop(os, ZFS_PROP_UTF8ONLY, &u8) == 0);
+	VERIFY(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), u8) == 0);
+
+	if (sense == ZFS_PROP_UNDEFINED)
+		VERIFY(zfs_get_zplprop(os, ZFS_PROP_CASE, &sense) == 0);
+	VERIFY(nvlist_add_uint64(zplprops,
+	    zfs_prop_to_name(ZFS_PROP_CASE), sense) == 0);
+
+	dmu_objset_close(os);
 	return (0);
 }
 
@@ -1935,7 +1866,7 @@ zfs_normalization_get(const char *dataset, nvlist_t *proplist, int *norm,
  * zc_value		name of snapshot to clone from (may be empty)
  * zc_nvlist_src{_size}	nvlist of properties to apply
  *
- * outputs:		none
+ * outputs: none
  */
 static int
 zfs_ioc_create(zfs_cmd_t *zc)
@@ -1969,7 +1900,7 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	    &nvprops)) != 0)
 		return (error);
 
-	zct.zct_norm = 0;
+	zct.zct_zplprops = NULL;
 	zct.zct_props = nvprops;
 
 	if (zc->zc_value[0] != '\0') {
@@ -1990,29 +1921,6 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		}
 		error = dmu_objset_create(zc->zc_name, type, clone, NULL, NULL);
 		if (error) {
-			dmu_objset_close(clone);
-			nvlist_free(nvprops);
-			return (error);
-		}
-		/*
-		 * If caller did not provide any properties, allocate
-		 * an nvlist for properties, as we will be adding our set-once
-		 * properties to it.  This carries the choices made on the
-		 * original file system into the clone.
-		 */
-		if (nvprops == NULL)
-			VERIFY(nvlist_alloc(&nvprops,
-			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
-
-		/*
-		 * We have to have normalization and case-folding
-		 * flags correct when we do the file system creation,
-		 * so go figure them out now.  All we really care about
-		 * here is getting these values into the property list.
-		 */
-		error = zfs_normalization_get(zc->zc_value, nvprops,
-		    &zct.zct_norm, B_TRUE);
-		if (error != 0) {
 			dmu_objset_close(clone);
 			nvlist_free(nvprops);
 			return (error);
@@ -2057,15 +1965,29 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			uint64_t version;
 			int error;
 
-			error = nvlist_lookup_uint64(nvprops,
+			/*
+			 * Default ZPL version to non-FUID capable if the
+			 * pool is not upgraded to support FUIDs.
+			 */
+			if (zfs_check_version(zc->zc_name, SPA_VERSION_FUID))
+				version = ZPL_VERSION_FUID - 1;
+			else
+				version = ZPL_VERSION;
+
+			/*
+			 * Potentially override default ZPL version based
+			 * on creator's request.
+			 */
+			(void) nvlist_lookup_uint64(nvprops,
 			    zfs_prop_to_name(ZFS_PROP_VERSION), &version);
 
-			if (error == 0 && (version < ZPL_VERSION_INITIAL ||
-			    version > ZPL_VERSION)) {
-				nvlist_free(nvprops);
-				return (ENOTSUP);
-			} else if (error == 0 && version >= ZPL_VERSION_FUID &&
-			    zfs_check_version(zc->zc_name, SPA_VERSION_FUID)) {
+			/*
+			 * Make sure version we ended up with is kosher
+			 */
+			if ((version < ZPL_VERSION_INITIAL ||
+			    version > ZPL_VERSION) ||
+			    (version >= ZPL_VERSION_FUID &&
+			    zfs_check_version(zc->zc_name, SPA_VERSION_FUID))) {
 				nvlist_free(nvprops);
 				return (ENOTSUP);
 			}
@@ -2074,19 +1996,21 @@ zfs_ioc_create(zfs_cmd_t *zc)
 			 * We have to have normalization and
 			 * case-folding flags correct when we do the
 			 * file system creation, so go figure them out
-			 * now.  The final argument to zfs_normalization_get()
-			 * tells that routine not to update the nvprops
-			 * list.
+			 * now.
 			 */
-			error = zfs_normalization_get(zc->zc_name, nvprops,
-			    &zct.zct_norm, B_FALSE);
+			VERIFY(nvlist_alloc(&zct.zct_zplprops,
+			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
+			error = zfs_fill_zplprops(zc->zc_name, nvprops,
+			    zct.zct_zplprops, version);
 			if (error != 0) {
 				nvlist_free(nvprops);
+				nvlist_free(zct.zct_zplprops);
 				return (error);
 			}
 		}
 		error = dmu_objset_create(zc->zc_name, type, NULL, cbfunc,
 		    &zct);
+		nvlist_free(zct.zct_zplprops);
 	}
 
 	/*
@@ -2793,7 +2717,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_vdev_detach, zfs_secpolicy_config, POOL_NAME, B_TRUE },
 	{ zfs_ioc_vdev_setpath,	zfs_secpolicy_config, POOL_NAME, B_FALSE },
 	{ zfs_ioc_objset_stats,	zfs_secpolicy_read, DATASET_NAME, B_FALSE },
-	{ zfs_ioc_objset_version, zfs_secpolicy_read, DATASET_NAME, B_FALSE },
+	{ zfs_ioc_objset_zplprops, zfs_secpolicy_read, DATASET_NAME, B_FALSE },
 	{ zfs_ioc_dataset_list_next, zfs_secpolicy_read,
 	    DATASET_NAME, B_FALSE },
 	{ zfs_ioc_snapshot_list_next, zfs_secpolicy_read,

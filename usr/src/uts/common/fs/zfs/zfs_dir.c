@@ -42,6 +42,7 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/unistd.h>
+#include <sys/sunddi.h>
 #include <sys/random.h>
 #include <sys/policy.h>
 #include <sys/zfs_dir.h>
@@ -55,7 +56,6 @@
 #include <sys/zfs_fuid.h>
 #include <sys/dnlc.h>
 #include <sys/extdirent.h>
-#include <sys/zfs_i18n.h>
 
 /*
  * zfs_match_find() is used by zfs_dirent_lock() to peform zap lookups
@@ -177,8 +177,9 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 * a zap lookup on file systems supporting case-insensitive
 	 * access.
 	 */
-	exact = ((zfsvfs->z_case & ZFS_CI_ONLY) && (flag & ZCIEXACT)) ||
-	    ((zfsvfs->z_case & ZFS_CI_MIXD) && !(flag & ZCILOOK));
+	exact =
+	    ((zfsvfs->z_case == ZFS_CASE_INSENSITIVE) && (flag & ZCIEXACT)) ||
+	    ((zfsvfs->z_case == ZFS_CASE_MIXED) && !(flag & ZCILOOK));
 
 	/*
 	 * Only look in or update the DNLC if we are looking for the
@@ -191,7 +192,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 * case for performance improvement?
 	 */
 	update = !zfsvfs->z_norm ||
-	    ((zfsvfs->z_case & ZFS_CI_MIXD) &&
+	    ((zfsvfs->z_case == ZFS_CASE_MIXED) &&
 	    !(zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) && !(flag & ZCILOOK));
 
 	/*
@@ -761,9 +762,9 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	mutex_exit(&dzp->z_lock);
 
 	if (zp->z_zfsvfs->z_norm) {
-		if (((zp->z_zfsvfs->z_case & ZFS_CI_ONLY) &&
+		if (((zp->z_zfsvfs->z_case == ZFS_CASE_INSENSITIVE) &&
 		    (flag & ZCIEXACT)) ||
-		    ((zp->z_zfsvfs->z_case & ZFS_CI_MIXD) &&
+		    ((zp->z_zfsvfs->z_case == ZFS_CASE_MIXED) &&
 		    !(flag & ZCILOOK)))
 			error = zap_remove_norm(zp->z_zfsvfs->z_os,
 			    dzp->z_id, dl->dl_name, MT_EXACT, tx);

@@ -73,6 +73,7 @@ extern "C" {
 #include <sys/zfs_debug.h>
 #include <sys/sdt.h>
 #include <sys/kstat.h>
+#include <sys/u8_textprep.h>
 #include <sys/sysevent/eventdefs.h>
 
 /*
@@ -519,25 +520,6 @@ extern int zfs_secpolicy_rename_perms(const char *from, const char *to,
     cred_t *cr);
 extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
 extern zoneid_t getzoneid(void);
-
-/*
- * UTF-8 text preparation functions and their macros.
- * (sunddi.h)
- */
-#define	U8_STRCMP_CS			0x00000001
-#define	U8_STRCMP_CI_UPPER		0x00000002
-#define	U8_STRCMP_CI_LOWER		0x00000004
-
-#define	U8_TEXTPREP_TOUPPER		U8_STRCMP_CI_UPPER
-#define	U8_TEXTPREP_TOLOWER		U8_STRCMP_CI_LOWER
-#define	U8_TEXTPREP_IGNORE_NULL		0x00010000
-
-#define	U8_UNICODE_320			(0)
-#define	U8_UNICODE_500			(1)
-#define	U8_UNICODE_LATEST		U8_UNICODE_500
-
-extern size_t u8_textprep_str(char *, size_t *, char *, size_t *, int, size_t,
-	int *);
 
 #ifdef	__cplusplus
 }

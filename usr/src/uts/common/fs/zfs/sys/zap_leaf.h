@@ -232,9 +232,9 @@ extern boolean_t zap_entry_normalization_conflict(zap_entry_handle_t *zeh,
  * Other stuff.
  */
 
-extern void zap_leaf_init(zap_leaf_t *l, int version);
+extern void zap_leaf_init(zap_leaf_t *l, boolean_t sort);
 extern void zap_leaf_byteswap(zap_leaf_phys_t *buf, int len);
-extern void zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl, int version);
+extern void zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl, boolean_t sort);
 extern void zap_leaf_stats(zap_t *zap, zap_leaf_t *l, zap_stats_t *zs);
 
 #ifdef	__cplusplus

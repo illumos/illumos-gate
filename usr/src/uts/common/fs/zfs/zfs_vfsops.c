@@ -40,7 +40,6 @@
 #include "fs/fs_subr.h"
 #include <sys/zfs_znode.h>
 #include <sys/zfs_dir.h>
-#include <sys/zfs_i18n.h>
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
@@ -385,73 +384,6 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 }
 
 static int
-zfs_normalization_set(char *osname, zfsvfs_t *zfsvfs)
-{
-	uint64_t pval;
-	int error;
-
-	if (zfsvfs->z_version < ZPL_VERSION_FUID)
-		return (0);
-
-	error = dsl_prop_get_integer(osname, "normalization", &pval, NULL);
-	if (error)
-		goto normquit;
-	switch ((int)pval) {
-	case ZFS_NORMALIZE_NONE:
-		break;
-	case ZFS_NORMALIZE_C:
-		zfsvfs->z_norm |= U8_TEXTPREP_NFC;
-		break;
-	case ZFS_NORMALIZE_KC:
-		zfsvfs->z_norm |= U8_TEXTPREP_NFKC;
-		break;
-	case ZFS_NORMALIZE_D:
-		zfsvfs->z_norm |= U8_TEXTPREP_NFD;
-		break;
-	case ZFS_NORMALIZE_KD:
-		zfsvfs->z_norm |= U8_TEXTPREP_NFKD;
-		break;
-	default:
-		ASSERT(pval <= ZFS_NORMALIZE_KD);
-		break;
-	}
-
-	error = dsl_prop_get_integer(osname, "utf8only", &pval, NULL);
-	if (error)
-		goto normquit;
-	if (pval)
-		zfsvfs->z_case |= ZFS_UTF8_ONLY;
-	else
-		zfsvfs->z_case &= ~ZFS_UTF8_ONLY;
-
-	error = dsl_prop_get_integer(osname, "casesensitivity", &pval, NULL);
-	if (error)
-		goto normquit;
-	vfs_set_feature(zfsvfs->z_vfs, VFSFT_DIRENTFLAGS);
-	switch ((int)pval) {
-	case ZFS_CASE_SENSITIVE:
-		break;
-	case ZFS_CASE_INSENSITIVE:
-		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
-		zfsvfs->z_case |= ZFS_CI_ONLY;
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_CASEINSENSITIVE);
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_NOCASESENSITIVE);
-		break;
-	case ZFS_CASE_MIXED:
-		zfsvfs->z_norm |= U8_TEXTPREP_TOUPPER;
-		zfsvfs->z_case |= ZFS_CI_MIXD;
-		vfs_set_feature(zfsvfs->z_vfs, VFSFT_CASEINSENSITIVE);
-		break;
-	default:
-		ASSERT(pval <= ZFS_CASE_MIXED);
-		break;
-	}
-
-normquit:
-	return (error);
-}
-
-static int
 zfs_register_callbacks(vfs_t *vfsp)
 {
 	struct dsl_dataset *ds = NULL;
@@ -722,6 +654,7 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	    offsetof(znode_t, z_link_node));
 	rrw_init(&zfsvfs->z_teardown_lock);
 	rw_init(&zfsvfs->z_teardown_inactive_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zfsvfs->z_fuid_lock, NULL, RW_DEFAULT, NULL);
 
 	/* Initialize the generic filesystem structure. */
 	vfsp->vfs_bcount = 0;
@@ -776,15 +709,14 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		vfs_set_feature(vfsp, VFSFT_ACEMASKONACCESS);
 		vfs_set_feature(vfsp, VFSFT_ACLONCREATE);
 	}
-
-	/*
-	 * Set normalization regardless of whether or not the object
-	 * set is a snapshot.  Snapshots and clones need to have
-	 * identical normalization as did the file system they
-	 * originated from.
-	 */
-	if ((error = zfs_normalization_set(osname, zfsvfs)) != 0)
-		goto out;
+	if (zfsvfs->z_case == ZFS_CASE_INSENSITIVE) {
+		vfs_set_feature(vfsp, VFSFT_DIRENTFLAGS);
+		vfs_set_feature(vfsp, VFSFT_CASEINSENSITIVE);
+		vfs_set_feature(vfsp, VFSFT_NOCASESENSITIVE);
+	} else if (zfsvfs->z_case == ZFS_CASE_MIXED) {
+		vfs_set_feature(vfsp, VFSFT_DIRENTFLAGS);
+		vfs_set_feature(vfsp, VFSFT_CASEINSENSITIVE);
+	}
 
 	if (dmu_objset_is_snapshot(zfsvfs->z_os)) {
 		uint64_t pval;
@@ -810,6 +742,7 @@ out:
 		list_destroy(&zfsvfs->z_all_znodes);
 		rrw_destroy(&zfsvfs->z_teardown_lock);
 		rw_destroy(&zfsvfs->z_teardown_inactive_lock);
+		rw_destroy(&zfsvfs->z_fuid_lock);
 		kmem_free(zfsvfs, sizeof (zfsvfs_t));
 	} else {
 		atomic_add_32(&zfs_active_fs_count, 1);
@@ -1562,6 +1495,7 @@ zfs_freevfs(vfs_t *vfsp)
 	rrw_destroy(&zfsvfs->z_teardown_lock);
 	rw_destroy(&zfsvfs->z_teardown_inactive_lock);
 	zfs_fuid_destroy(zfsvfs);
+	rw_destroy(&zfsvfs->z_fuid_lock);
 	kmem_free(zfsvfs, sizeof (zfsvfs_t));
 
 	atomic_add_32(&zfs_active_fs_count, -1);
@@ -1637,15 +1571,6 @@ zfs_busy(void)
 }
 
 int
-zfs_get_version(objset_t *os, uint64_t *version)
-{
-	int error;
-
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1, version);
-	return (error);
-}
-
-int
 zfs_set_version(const char *name, uint64_t newvers)
 {
 	int error;
@@ -1694,6 +1619,49 @@ zfs_set_version(const char *name, uint64_t newvers)
 out:
 	dmu_objset_close(os);
 	return (error);
+}
+
+/*
+ * Read a property stored within the master node.
+ */
+int
+zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
+{
+	const char *pname;
+	int error;
+
+	/*
+	 * Look up the file system's value for the property.  For the
+	 * version property, we look up a slightly different string.
+	 * Also, there is no default VERSION value, so if we don't
+	 * find it, return the error.
+	 */
+	if (prop == ZFS_PROP_VERSION)
+		pname = ZPL_VERSION_STR;
+	else
+		pname = zfs_prop_to_name(prop);
+
+	error = zap_lookup(os, MASTER_NODE_OBJ, pname, 8, 1, value);
+
+	if (!error) {
+		return (0);
+	} else if (prop == ZFS_PROP_VERSION || error != ENOENT) {
+		return (error);
+	} else {
+		/* No value set, use the default value */
+		switch (prop) {
+		case ZFS_PROP_NORMALIZE:
+		case ZFS_PROP_UTF8ONLY:
+			*value = 0;
+			break;
+		case ZFS_PROP_CASE:
+			*value = ZFS_CASE_SENSITIVE;
+			break;
+		default:
+			return (ENOENT);
+		}
+	}
+	return (0);
 }
 
 static vfsdef_t vfw = {

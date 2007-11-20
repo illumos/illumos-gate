@@ -52,11 +52,9 @@
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
 #include <sys/unistd.h>
-#include <sys/zfs_vfsops.h>
 #include <sys/zfs_dir.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/zfs_i18n.h>
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
 #include <sys/spa.h>
@@ -1056,7 +1054,7 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		return (error);
 	}
 
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(nm, strlen(nm),
+	if (zfsvfs->z_utf8 && u8_validate(nm, strlen(nm),
 	    NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -1139,7 +1137,7 @@ zfs_create(vnode_t *dvp, char *name, vattr_t *vap, vcexcl_t excl,
 	os = zfsvfs->z_os;
 	zilog = zfsvfs->z_log;
 
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(name, strlen(name),
+	if (zfsvfs->z_utf8 && u8_validate(name, strlen(name),
 	    NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -1589,7 +1587,7 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr,
 		return (EINVAL);
 	}
 
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(dirname,
+	if (zfsvfs->z_utf8 && u8_validate(dirname,
 	    strlen(dirname), NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -2849,7 +2847,7 @@ zfs_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm, cred_t *cr,
 
 	tdzp = VTOZ(tdvp);
 	ZFS_VERIFY_ZP(tdzp);
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(tnm,
+	if (zfsvfs->z_utf8 && u8_validate(tnm,
 	    strlen(tnm), NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -2892,7 +2890,7 @@ top:
 		int nofold = (zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER);
 
 		cmp = u8_strcmp(snm, tnm, 0, nofold, U8_UNICODE_LATEST, &error);
-		ASSERT(error == 0 || !(zfsvfs->z_case & ZFS_UTF8_ONLY));
+		ASSERT(error == 0 || !zfsvfs->z_utf8);
 		if (cmp == 0) {
 			/*
 			 * POSIX: "If the old argument and the new argument
@@ -2921,8 +2919,9 @@ top:
 		 * is an exact match, we will allow this to proceed as
 		 * a name-change request.
 		 */
-		if ((zfsvfs->z_case & ZFS_CI_ONLY ||
-		    (zfsvfs->z_case & ZFS_CI_MIXD && flags & FIGNORECASE)) &&
+		if ((zfsvfs->z_case == ZFS_CASE_INSENSITIVE ||
+		    (zfsvfs->z_case == ZFS_CASE_MIXED &&
+		    flags & FIGNORECASE)) &&
 		    u8_strcmp(snm, tnm, 0, zfsvfs->z_norm, U8_UNICODE_LATEST,
 		    &error) == 0) {
 			/*
@@ -3130,7 +3129,7 @@ zfs_symlink(vnode_t *dvp, char *name, vattr_t *vap, char *link, cred_t *cr,
 	ZFS_VERIFY_ZP(dzp);
 	zilog = zfsvfs->z_log;
 
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(name, strlen(name),
+	if (zfsvfs->z_utf8 && u8_validate(name, strlen(name),
 	    NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -3339,7 +3338,7 @@ zfs_link(vnode_t *tdvp, vnode_t *svp, char *name, cred_t *cr,
 	szp = VTOZ(svp);
 	ZFS_VERIFY_ZP(szp);
 
-	if (zfsvfs->z_case & ZFS_UTF8_ONLY && u8_validate(name,
+	if (zfsvfs->z_utf8 && u8_validate(name,
 	    strlen(name), NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		ZFS_EXIT(zfsvfs);
 		return (EILSEQ);
@@ -4288,7 +4287,6 @@ zfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 
 	case _PC_SATTR_ENABLED:
 	case _PC_SATTR_EXISTS:
-		zp = VTOZ(vp);
 		*valp = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
 		    (vp->v_type == VREG || vp->v_type == VDIR);
 		return (0);

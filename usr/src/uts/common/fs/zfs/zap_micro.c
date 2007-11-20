@@ -33,7 +33,10 @@
 #include <sys/zap_impl.h>
 #include <sys/zap_leaf.h>
 #include <sys/avl.h>
-#include <sys/zfs_i18n.h>
+
+#ifdef _KERNEL
+#include <sys/sunddi.h>
+#endif
 
 static int mzap_upgrade(zap_t **zapp, dmu_tx_t *tx);
 
@@ -492,8 +495,6 @@ mzap_create_impl(objset_t *os, uint64_t obj, int normflags, dmu_tx_t *tx)
 	dmu_buf_t *db;
 	mzap_phys_t *zp;
 
-	ASSERT(normflags == 0 ||
-	    spa_version(dmu_objset_spa(os)) >= SPA_VERSION_NORMALIZATION);
 	VERIFY(0 == dmu_buf_hold(os, obj, 0, FTAG, &db));
 
 #ifdef ZFS_DEBUG

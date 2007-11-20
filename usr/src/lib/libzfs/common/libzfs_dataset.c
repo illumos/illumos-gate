@@ -51,7 +51,6 @@
 
 #include <sys/spa.h>
 #include <sys/zap.h>
-#include <sys/zfs_i18n.h>
 #include <libzfs.h>
 
 #include "zfs_namecheck.h"
@@ -480,7 +479,6 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	char *strval;
 	zfs_prop_t prop;
 	nvlist_t *ret;
-	int chosen_sense = -1;
 	int chosen_normal = -1;
 	int chosen_utf = -1;
 
@@ -748,9 +746,6 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 
 			break;
-		case ZFS_PROP_CASE:
-			chosen_sense = (int)intval;
-			break;
 		case ZFS_PROP_UTF8ONLY:
 			chosen_utf = (int)intval;
 			break;
@@ -810,32 +805,19 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	}
 
 	/*
-	 * Temporarily disallow any non-default settings for
-	 * casesensitivity, normalization, and/or utf8only.
-	 */
-	if (chosen_sense > ZFS_CASE_SENSITIVE || chosen_utf > 0 ||
-	    chosen_normal > ZFS_NORMALIZE_NONE) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "Non-default values for casesensitivity, utf8only, and "
-		    "normalization are (temporarily) disabled"));
-		(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-		goto error;
-	}
-
-	/*
 	 * If normalization was chosen, but no UTF8 choice was made,
 	 * enforce rejection of non-UTF8 names.
 	 *
 	 * If normalization was chosen, but rejecting non-UTF8 names
 	 * was explicitly not chosen, it is an error.
 	 */
-	if (chosen_normal > ZFS_NORMALIZE_NONE && chosen_utf < 0) {
+	if (chosen_normal > 0 && chosen_utf < 0) {
 		if (nvlist_add_uint64(ret,
 		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY), 1) != 0) {
 			(void) no_memory(hdl);
 			goto error;
 		}
-	} else if (chosen_normal > ZFS_NORMALIZE_NONE && chosen_utf == 0) {
+	} else if (chosen_normal > 0 && chosen_utf == 0) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "'%s' must be set 'on' if normalization chosen"),
 		    zfs_prop_to_name(ZFS_PROP_UTF8ONLY));
@@ -1880,6 +1862,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
     char **source, uint64_t *val)
 {
 	zfs_cmd_t zc = { 0 };
+	nvlist_t *zplprops;
 	struct mnttab mnt;
 	char *mntopt_on = NULL;
 	char *mntopt_off = NULL;
@@ -2001,17 +1984,32 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		break;
 
 	case ZFS_PROP_VERSION:
-		if (!zfs_prop_valid_for_type(prop, zhp->zfs_head_type))
+	case ZFS_PROP_NORMALIZE:
+	case ZFS_PROP_UTF8ONLY:
+	case ZFS_PROP_CASE:
+		if (!zfs_prop_valid_for_type(prop, zhp->zfs_head_type) ||
+		    zcmd_alloc_dst_nvlist(zhp->zfs_hdl, &zc, 0) != 0)
 			return (-1);
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_OBJSET_VERSION, &zc) ||
-		    (zc.zc_cookie == 0)) {
+		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_OBJSET_ZPLPROPS, &zc)) {
+			zcmd_free_nvlists(&zc);
 			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
-			    "unable to get version property"));
+			    "unable to get %s property"),
+			    zfs_prop_to_name(prop));
 			return (zfs_error(zhp->zfs_hdl, EZFS_BADVERSION,
 			    dgettext(TEXT_DOMAIN, "internal error")));
 		}
-		*val = zc.zc_cookie;
+		if (zcmd_read_dst_nvlist(zhp->zfs_hdl, &zc, &zplprops) != 0 ||
+		    nvlist_lookup_uint64(zplprops, zfs_prop_to_name(prop),
+		    val) != 0) {
+			zcmd_free_nvlists(&zc);
+			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
+			    "unable to get %s property"),
+			    zfs_prop_to_name(prop));
+			return (zfs_error(zhp->zfs_hdl, EZFS_NOMEM,
+			    dgettext(TEXT_DOMAIN, "internal error")));
+		}
+		zcmd_free_nvlists(&zc);
 		break;
 
 	default:

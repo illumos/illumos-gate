@@ -102,7 +102,6 @@ extern "C" {
 #define	ZPL_VERSION_STR		"VERSION"
 #define	ZFS_FUID_TABLES		"FUID"
 
-
 #define	ZFS_MAX_BLOCKSIZE	(SPA_MAXBLOCKSIZE)
 
 /* Path component length */
@@ -293,7 +292,7 @@ typedef struct znode {
 
 extern int	zfs_init_fs(zfsvfs_t *, znode_t **, cred_t *);
 extern void	zfs_set_dataprop(objset_t *);
-extern void	zfs_create_fs(objset_t *os, cred_t *cr, uint64_t, int,
+extern void	zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *,
     dmu_tx_t *tx);
 extern void	zfs_time_stamper(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_time_stamper_locked(znode_t *, uint_t, dmu_tx_t *);
@@ -310,7 +309,7 @@ extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);
 extern dev_t	zfs_cmpldev(uint64_t);
-extern int	zfs_get_version(objset_t *os, uint64_t *version);
+extern int	zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value);
 extern int	zfs_set_version(const char *name, uint64_t newvers);
 extern int	zfs_get_stats(objset_t *os, nvlist_t *nv);
 

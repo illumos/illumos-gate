@@ -44,6 +44,7 @@
 #include <sys/spa.h>
 #include <sys/dmu.h>
 #include <sys/zfs_context.h>
+#include <sys/zfs_znode.h>
 #include <sys/zap.h>
 #include <sys/refcount.h>
 #include <sys/zap_impl.h>
@@ -119,7 +120,7 @@ fzap_upgrade(zap_t *zap, dmu_tx_t *tx)
 	l->l_dbuf = db;
 	l->l_phys = db->db_data;
 
-	zap_leaf_init(l, spa_version(dmu_objset_spa(zap->zap_objset)));
+	zap_leaf_init(l, zp->zap_normflags != 0);
 
 	kmem_free(l, sizeof (zap_leaf_t));
 	dmu_buf_rele(db, FTAG);
@@ -399,7 +400,7 @@ zap_create_leaf(zap_t *zap, dmu_tx_t *tx)
 	ASSERT(winner == NULL);
 	dmu_buf_will_dirty(l->l_dbuf, tx);
 
-	zap_leaf_init(l, spa_version(dmu_objset_spa(zap->zap_objset)));
+	zap_leaf_init(l, zap->zap_normflags != 0);
 
 	zap->zap_f.zap_phys->zap_num_leafs++;
 
@@ -646,7 +647,7 @@ zap_expand_leaf(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx, zap_leaf_t **lp)
 	}
 
 	nl = zap_create_leaf(zap, tx);
-	zap_leaf_split(l, nl, spa_version(dmu_objset_spa(zap->zap_objset)));
+	zap_leaf_split(l, nl, zap->zap_normflags != 0);
 
 	/* set sibling pointers */
 	for (i = 0; i < (1ULL<<prefix_diff); i++) {

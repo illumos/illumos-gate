@@ -152,7 +152,7 @@ zap_leaf_byteswap(zap_leaf_phys_t *buf, int size)
 }
 
 void
-zap_leaf_init(zap_leaf_t *l, int version)
+zap_leaf_init(zap_leaf_t *l, boolean_t sort)
 {
 	int i;
 
@@ -167,7 +167,7 @@ zap_leaf_init(zap_leaf_t *l, int version)
 	l->l_phys->l_hdr.lh_block_type = ZBT_LEAF;
 	l->l_phys->l_hdr.lh_magic = ZAP_LEAF_MAGIC;
 	l->l_phys->l_hdr.lh_nfree = ZAP_LEAF_NUMCHUNKS(l);
-	if (version >= SPA_VERSION_NORMALIZATION)
+	if (sort)
 		l->l_phys->l_hdr.lh_flags |= ZLF_ENTRIES_CDSORTED;
 }
 
@@ -769,7 +769,7 @@ zap_leaf_transfer_entry(zap_leaf_t *l, int entry, zap_leaf_t *nl)
  * Transfer the entries whose hash prefix ends in 1 to the new leaf.
  */
 void
-zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl, int version)
+zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl, boolean_t sort)
 {
 	int i;
 	int bit = 64 - 1 - l->l_phys->l_hdr.lh_prefix_len;
@@ -783,7 +783,7 @@ zap_leaf_split(zap_leaf_t *l, zap_leaf_t *nl, int version)
 	/* break existing hash chains */
 	zap_memset(l->l_phys->l_hash, CHAIN_END, 2*ZAP_LEAF_HASH_NUMENTRIES(l));
 
-	if (version >= SPA_VERSION_NORMALIZATION)
+	if (sort)
 		l->l_phys->l_hdr.lh_flags |= ZLF_ENTRIES_CDSORTED;
 
 	/*
@@ -838,7 +838,7 @@ zap_leaf_stats(zap_t *zap, zap_leaf_t *l, zap_stats_t *zs)
 
 			n = 1 + ZAP_LEAF_ARRAY_NCHUNKS(le->le_name_length) +
 			    ZAP_LEAF_ARRAY_NCHUNKS(le->le_value_length *
-				le->le_int_size);
+			    le->le_int_size);
 			n = MIN(n, ZAP_HISTOGRAM_SIZE-1);
 			zs->zs_entries_using_n_chunks[n]++;
 

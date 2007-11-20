@@ -34,6 +34,7 @@
 #include <sys/vfs.h>
 #include <sys/zil.h>
 #include <sys/rrwlock.h>
+#include <sys/zfs_ioctl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,7 +59,8 @@ struct zfsvfs {
 	zilog_t		*z_log;		/* intent log pointer */
 	uint_t		z_acl_mode;	/* acl chmod/mode behavior */
 	uint_t		z_acl_inherit;	/* acl inheritance behavior */
-	uint_t		z_case;		/* case-insensitive behavior */
+	zfs_case_t	z_case;		/* case-sense */
+	boolean_t	z_utf8;		/* utf8-only */
 	int		z_norm;		/* normalization flags */
 	boolean_t	z_atime;	/* enable atimes mount option */
 	boolean_t	z_unmounted;	/* unmounted */

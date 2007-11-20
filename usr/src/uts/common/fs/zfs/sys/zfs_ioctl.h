@@ -131,6 +131,18 @@ typedef struct zfs_share {
 	uint64_t	z_sharemax;  /* max length of share string */
 } zfs_share_t;
 
+/*
+ * ZFS file systems may behave the usual, POSIX-compliant way, where
+ * name lookups are case-sensitive.  They may also be set up so that
+ * all the name lookups are case-insensitive, or so that only some
+ * lookups, the ones that set an FIGNORECASE flag, are case-insensitive.
+ */
+typedef enum zfs_case {
+	ZFS_CASE_SENSITIVE,
+	ZFS_CASE_INSENSITIVE,
+	ZFS_CASE_MIXED
+} zfs_case_t;
+
 typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];
 	char		zc_value[MAXPATHLEN * 2];
@@ -161,7 +173,7 @@ typedef struct zfs_cmd {
 #ifdef _KERNEL
 
 typedef struct zfs_creat {
-	int		zct_norm;
+	nvlist_t	*zct_zplprops;
 	nvlist_t	*zct_props;
 } zfs_creat_t;
 
