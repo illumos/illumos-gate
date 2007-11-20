@@ -2166,23 +2166,33 @@ traverse_attrfile(struct dirent *dp, char *source, char *target, int  first)
 
 	if (first) {
 		(void) unlinkat(targetdirfd, dp->d_name, 0);
-		targattrfd = openat(targetdirfd, dp->d_name,
-		    O_RDWR|O_CREAT|O_TRUNC, s3.st_mode & MODEBITS);
+		if ((targattrfd = openat(targetdirfd, dp->d_name,
+		    O_RDWR|O_CREAT|O_TRUNC, s3.st_mode & MODEBITS)) == -1) {
+			if (!attrsilent) {
+				(void) fprintf(stderr,
+				    gettext("%s: could not create attribute"
+				    " %s on file %s: "), cmd, dp->d_name,
+				    target);
+				perror("");
+				++error;
+			}
+			goto out;
+		}
 	} else {
-		targattrfd = openat(targetdirfd, dp->d_name, O_RDWR);
+		if ((targattrfd = openat(targetdirfd, dp->d_name,
+		    O_RDONLY)) == -1) {
+			if (!attrsilent) {
+				(void) fprintf(stderr,
+				    gettext("%s: could not open attribute"
+				    " %s on file %s: "), cmd, dp->d_name,
+				    target);
+				perror("");
+				++error;
+			}
+			goto out;
+		}
 	}
 
-	if (targattrfd == -1) {
-		if (!attrsilent) {
-			(void) fprintf(stderr,
-			    gettext("%s: could not create attribute"
-			    " %s on file %s: "), cmd, dp->d_name,
-			    target);
-			perror("");
-			++error;
-		}
-		goto out;
-	}
 
 	if (fstat(targattrfd, &s4) < 0) {
 		if (!attrsilent) {
