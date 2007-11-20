@@ -40,21 +40,26 @@
 extern "C" {
 #endif
 
-enum	cache_state { 	CACHE_CREATED,
-			CACHE_PURGING,
-			CACHE_DESTROYING };
 
 typedef struct idmap_avl_cache {
 	avl_tree_t		tree;
-	krwlock_t		lock;
 	kmutex_t		mutex;
-	enum cache_state	state;
 	time_t			purge_time;
 } idmap_avl_cache_t;
 
+
+/*
+ * There is a cache for every mapping request because a group SID
+ * on Windows can be set in a file owner field and versa-visa.
+ * To stop this causing problems on Solaris a SID can map to
+ * both a UID and a GID.
+ */
 typedef struct idmap_cache {
-	idmap_avl_cache_t	sid;
-	idmap_avl_cache_t	pid;
+	idmap_avl_cache_t	uidbysid;
+	idmap_avl_cache_t	gidbysid;
+	idmap_avl_cache_t	pidbysid;
+	idmap_avl_cache_t	sidbyuid;
+	idmap_avl_cache_t	sidbygid;
 } idmap_cache_t;
 
 
@@ -64,21 +69,49 @@ kidmap_cache_create(idmap_cache_t *cache);
 void
 kidmap_cache_delete(idmap_cache_t *cache);
 
-int
-kidmap_cache_lookupbypid(idmap_cache_t *cache, const char **sid_prefix,
-			uint32_t *rid, uid_t pid, int is_user);
+void
+kidmap_cache_purge(idmap_cache_t *cache);
 
 int
-kidmap_cache_lookupbysid(idmap_cache_t *cache, const char *sid_prefix,
+kidmap_cache_lookup_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t *uid);
+
+int
+kidmap_cache_lookup_gidbysid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, gid_t *gid);
+
+int
+kidmap_cache_lookup_pidbysid(idmap_cache_t *cache, const char *sid_prefix,
 			uint32_t rid, uid_t *pid, int *is_user);
 
-void
-kidmap_cache_addbypid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, uid_t pid, int is_user, time_t ttl);
+int
+kidmap_cache_lookup_sidbyuid(idmap_cache_t *cache, const char **sid_prefix,
+			uint32_t *rid, uid_t uid);
+
+int
+kidmap_cache_lookup_sidbygid(idmap_cache_t *cache, const char **sid_prefix,
+			uint32_t *rid, gid_t gid);
+
 
 void
-kidmap_cache_addbysid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, uid_t pid, int is_user, time_t ttl);
+kidmap_cache_add_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t uid);
+
+void
+kidmap_cache_add_gidbysid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, gid_t gid);
+
+void
+kidmap_cache_add_pidbysid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t pid, int is_user);
+
+void
+kidmap_cache_add_sidbyuid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t uid);
+
+void
+kidmap_cache_add_sidbygid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, gid_t gid);
 
 int
 kidmap_start(void);
