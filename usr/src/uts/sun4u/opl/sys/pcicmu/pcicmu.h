@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -306,6 +306,10 @@ typedef struct u2u_ittrans_data {
 	u2u_ittrans_id_t u2u_ittrans_id[U2U_DATA_NUM];
 } u2u_ittrans_data_t;
 
+/*
+ * Driver binding name for OPL DC system
+ */
+#define	PCICMU_OPL_DC_BINDING_NAME		"pci10cf,1390"
 
 /*
  * Offsets of registers in the interrupt block:

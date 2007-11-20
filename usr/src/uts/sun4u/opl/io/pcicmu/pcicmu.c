@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1021,12 +1021,20 @@ pcmu_obj_setup(pcmu_t *pcmu_p)
 	if ((ret = pcmu_intr_setup(pcmu_p)) != DDI_SUCCESS)
 		goto done;
 
-	pcmu_kstat_create(pcmu_p);
+	/*
+	 * Due to a hardware bug, do not create kstat for DC systems
+	 * with PCI hw revision less than 5.
+	 */
+	if ((strncmp(ddi_binding_name(pcmu_p->pcmu_dip),
+	    PCICMU_OPL_DC_BINDING_NAME, strlen(PCICMU_OPL_DC_BINDING_NAME))
+	    != 0) || (pcmu_p->pcmu_rev > 4)) {
+		pcmu_kstat_create(pcmu_p);
+	}
 done:
 	mutex_exit(&pcmu_global_mutex);
 	if (ret != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "Interrupt register failure, returning 0x%x\n",
-			ret);
+		    ret);
 	}
 	return (ret);
 }
@@ -1097,7 +1105,7 @@ pcmu_intr_setup(pcmu_t *pcmu_p)
 	    "interrupts", (caddr_t)&pcmu_p->pcmu_inos,
 	    &pcmu_p->pcmu_inos_len) != DDI_SUCCESS) {
 		cmn_err(CE_PANIC, "%s%d: no interrupts property\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 	}
 
 	/*
@@ -1178,7 +1186,7 @@ map_pcmu_registers(pcmu_t *pcmu_p, dev_info_t *dip)
 	 * We still use pcmu_address[2]
 	 */
 	if (ddi_regs_map_setup(dip, 2, &pcmu_p->pcmu_address[2], 0, 0,
-		&attr, &pcmu_p->pcmu_ac[2]) != DDI_SUCCESS) {
+	    &attr, &pcmu_p->pcmu_ac[2]) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: unable to map reg entry 2\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 		ddi_regs_map_free(&pcmu_p->pcmu_ac[0]);
@@ -1285,7 +1293,7 @@ pcmu_ib_setup(pcmu_ib_t *pib_p)
 	pib_p->pib_max_ino = PCMU_MAX_INO;
 	pib_p->pib_obio_intr_map_regs = a + PCMU_IB_OBIO_INTR_MAP_REG_OFFSET;
 	pib_p->pib_obio_clear_intr_regs =
-		a + PCMU_IB_OBIO_CLEAR_INTR_REG_OFFSET;
+	    a + PCMU_IB_OBIO_CLEAR_INTR_REG_OFFSET;
 	return (a);
 }
 
@@ -1474,7 +1482,7 @@ pcmu_pbm_configure(pcmu_pbm_t *pcbm_p)
 	    pcbm_p->pcbm_config_header->ch_status_reg);
 
 	(void) ndi_prop_update_int(DDI_DEV_T_ANY, dip, "latency-timer",
-		(int)pcbm_p->pcbm_config_header->ch_latency_timer_reg);
+	    (int)pcbm_p->pcbm_config_header->ch_latency_timer_reg);
 #undef	pbm_err
 #undef	csr_err
 }
@@ -1560,7 +1568,7 @@ pcmu_pbm_setup(pcmu_pbm_t *pcbm_p)
 	 * This should be mapped little-endian.
 	 */
 	pcbm_p->pcbm_config_header =
-		(config_header_t *)get_config_reg_base(pcmu_p);
+	    (config_header_t *)get_config_reg_base(pcmu_p);
 
 	/*
 	 * Get the virtual addresses for control, error and diag
@@ -1584,7 +1592,7 @@ int
 pcmu_get_numproxy(dev_info_t *dip)
 {
 	return (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"#upa-interrupt-proxies", 1));
+	    "#upa-interrupt-proxies", 1));
 }
 
 int
@@ -1612,17 +1620,17 @@ void
 pcmu_kstat_init()
 {
 	pcmu_name_kstat = (pcmu_ksinfo_t *)kmem_alloc(sizeof (pcmu_ksinfo_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 
 	if (pcmu_name_kstat == NULL) {
 		cmn_err(CE_WARN, "pcicmu : no space for kstat\n");
 	} else {
 		pcmu_name_kstat->pic_no_evs =
-			sizeof (pcicmu_pcmu_events) / sizeof (pcmu_kev_mask_t);
+		    sizeof (pcicmu_pcmu_events) / sizeof (pcmu_kev_mask_t);
 		pcmu_name_kstat->pic_shift[0] = PCMU_SHIFT_PIC0;
 		pcmu_name_kstat->pic_shift[1] = PCMU_SHIFT_PIC1;
 		pcmu_create_name_kstat("pcmup",
-			pcmu_name_kstat, pcicmu_pcmu_events);
+		    pcmu_name_kstat, pcicmu_pcmu_events);
 	}
 }
 
@@ -1651,7 +1659,7 @@ pcmu_add_upstream_kstat(pcmu_t *pcmu_p)
 	cntr_pa_p->pcr_pa = regbase + PCMU_PERF_PCR_OFFSET;
 	cntr_pa_p->pic_pa = regbase + PCMU_PERF_PIC_OFFSET;
 	pcmu_p->pcmu_uksp = pcmu_create_cntr_kstat(pcmu_p, "pcmup",
-		NUM_OF_PICS, pcmu_cntr_kstat_pa_update, cntr_pa_p);
+	    NUM_OF_PICS, pcmu_cntr_kstat_pa_update, cntr_pa_p);
 }
 
 /*
@@ -1796,7 +1804,7 @@ u2u_translate_tgtid(pcmu_t *pcmu_p, uint_t cpu_id,
 	u2u_ittrans_data_t *ittrans_cookie;
 
 	ittrans_cookie =
-		(u2u_ittrans_data_t *)(pcmu_p->pcmu_cb_p->pcb_ittrans_cookie);
+	    (u2u_ittrans_data_t *)(pcmu_p->pcmu_cb_p->pcb_ittrans_cookie);
 
 	if (ittrans_cookie == NULL) {
 		return (cpu_id);
@@ -1820,7 +1828,7 @@ u2u_translate_tgtid(pcmu_t *pcmu_p, uint_t cpu_id,
 			break;
 		}
 		if (index == -1 &&
-			ittrans_id_p->u2u_ino_map_reg == NULL) {
+		    ittrans_id_p->u2u_ino_map_reg == NULL) {
 			index = ix;
 		}
 	}
@@ -1832,7 +1840,7 @@ u2u_translate_tgtid(pcmu_t *pcmu_p, uint_t cpu_id,
 			err_level = CE_PANIC;
 		}
 		cmn_err(err_level, "u2u%d:No more U2U-Data regs!!",
-			ittrans_cookie->u2u_board);
+		    ittrans_cookie->u2u_board);
 		return (cpu_id);
 	}
 
@@ -1844,8 +1852,8 @@ u2u_translate_tgtid(pcmu_t *pcmu_p, uint_t cpu_id,
 	 */
 
 	data_reg_addr = ittrans_cookie->u2u_regs_base
-			+ U2U_DATA_REGISTER_OFFSET
-			+ (index * sizeof (uint64_t));
+	    + U2U_DATA_REGISTER_OFFSET
+	    + (index * sizeof (uint64_t));
 
 	/*
 	 * Set cpu_id into U2U Data register[index]
@@ -1918,7 +1926,7 @@ pcmu_ecc_classify(uint64_t err, pcmu_ecc_errstate_t *ecc_err_p)
 	 * Get the parent bus id that caused the error.
 	 */
 	ecc_err_p->ecc_dev_id = (ecc_err_p->ecc_afsr & PCMU_ECC_UE_AFSR_ID)
-			>> PCMU_ECC_UE_AFSR_ID_SHIFT;
+	    >> PCMU_ECC_UE_AFSR_ID_SHIFT;
 	/*
 	 * Determine the doubleword offset of the error.
 	 */
@@ -1985,7 +1993,7 @@ pcmu_clear_error(pcmu_t *pcmu_p, pcmu_pbm_errstate_t *pbm_err_p)
 	*pcbm_p->pcbm_ctrl_reg = pbm_err_p->pbm_ctl_stat;
 	*pcbm_p->pcbm_async_flt_status_reg = pbm_err_p->pbm_afsr;
 	pcbm_p->pcbm_config_header->ch_status_reg =
-		pbm_err_p->pcbm_pci.pcmu_cfg_stat;
+	    pbm_err_p->pcbm_pci.pcmu_cfg_stat;
 }
 
 /*ARGSUSED*/
@@ -2081,9 +2089,9 @@ pcmu_check_error(pcmu_t *pcmu_p)
 	pbm_afsr = *pcbm_p->pcbm_async_flt_status_reg;
 
 	if ((pcmu_cfg_stat & (PCI_STAT_S_PERROR | PCI_STAT_S_TARG_AB |
-				PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
-				PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
-			(PBM_AFSR_TO_PRIERR(pbm_afsr))) {
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
+	    PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
+	    (PBM_AFSR_TO_PRIERR(pbm_afsr))) {
 		return (1);
 	}
 	return (0);
@@ -2146,10 +2154,10 @@ pcmu_err_create(pcmu_t *pcmu_p)
 	 */
 	if (pcmu_ecc_queue == NULL) {
 		pcmu_ecc_queue = errorq_create("pcmu_ecc_queue",
-				(errorq_func_t)pcmu_ecc_err_drain,
-				(void *)NULL,
-				ECC_MAX_ERRS, sizeof (pcmu_ecc_errstate_t),
-				PIL_2, ERRORQ_VITAL);
+		    (errorq_func_t)pcmu_ecc_err_drain,
+		    (void *)NULL,
+		    ECC_MAX_ERRS, sizeof (pcmu_ecc_errstate_t),
+		    PIL_2, ERRORQ_VITAL);
 		if (pcmu_ecc_queue == NULL)
 			panic("failed to create required system error queue");
 	}
@@ -2158,7 +2166,7 @@ pcmu_err_create(pcmu_t *pcmu_p)
 	 * Initialize error handling mutex.
 	 */
 	mutex_init(&pcmu_p->pcmu_err_mutex, NULL, MUTEX_DRIVER,
-			(void *)pcmu_p->pcmu_fm_ibc);
+	    (void *)pcmu_p->pcmu_fm_ibc);
 }
 
 void
@@ -2191,11 +2199,11 @@ pcmu_pbm_ereport_post(dev_info_t *dip, uint64_t ena,
 	else
 		aux_msg = "";
 	cmn_err(CE_WARN, "%s %s: %s %s=0x%lx, %s=0x%lx, %s=0x%lx %s=0x%x",
-		(pcmu_p->pcmu_pcbm_p)->pcbm_nameinst_str,
-		(pcmu_p->pcmu_pcbm_p)->pcbm_nameaddr_str,
-		aux_msg,
-		PCI_PBM_AFAR, pbm_err->pbm_afar,
-		PCI_PBM_AFSR, pbm_err->pbm_afsr,
-		PCI_PBM_CSR, pbm_err->pbm_ctl_stat,
-		"portid", pcmu_p->pcmu_id);
+	    (pcmu_p->pcmu_pcbm_p)->pcbm_nameinst_str,
+	    (pcmu_p->pcmu_pcbm_p)->pcbm_nameaddr_str,
+	    aux_msg,
+	    PCI_PBM_AFAR, pbm_err->pbm_afar,
+	    PCI_PBM_AFSR, pbm_err->pbm_afsr,
+	    PCI_PBM_CSR, pbm_err->pbm_ctl_stat,
+	    "portid", pcmu_p->pcmu_id);
 }
