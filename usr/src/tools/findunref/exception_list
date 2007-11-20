@@ -270,7 +270,6 @@
 ./src/lib/libresolv2/common/irs/nis_p.h
 ./src/lib/libresolv2/common/resolv/res_mkupdate.h
 ./src/lib/libresolv2/include/err.h
-./src/lib/libresolv2/common/inet/inet_addr.c
 
 #
 # Ignore ufs unix version of the boot block, useful for testing.
