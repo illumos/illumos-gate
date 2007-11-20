@@ -577,6 +577,7 @@ topo_node_walk_init(topo_hdl_t *thp, topo_mod_t *mod, tnode_t *node,
 			*errp = ETOPO_WALK_EMPTY;
 			topo_node_unlock(node);
 			topo_node_rele(node);
+			topo_hdl_free(thp, wp, sizeof (topo_walk_t));
 			return (NULL);
 		}
 		topo_node_unlock(node);

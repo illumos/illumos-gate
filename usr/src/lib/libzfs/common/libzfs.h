@@ -425,22 +425,22 @@ extern int zfs_promote(zfs_handle_t *);
 
 typedef struct recvflags {
 	/* print informational messages (ie, -v was specified) */
-	boolean_t verbose : 1;
+	int verbose : 1;
 
 	/* the destination is a prefix, not the exact fs (ie, -d) */
-	boolean_t isprefix : 1;
+	int isprefix : 1;
 
 	/* do not actually do the recv, just check if it would work (ie, -n) */
-	boolean_t dryrun : 1;
+	int dryrun : 1;
 
 	/* rollback/destroy filesystems as necessary (eg, -F) */
-	boolean_t force : 1;
+	int force : 1;
 
 	/* set "canmount=off" on all modified filesystems */
-	boolean_t canmountoff : 1;
+	int canmountoff : 1;
 
 	/* byteswap flag is used internally; callers need not specify */
-	boolean_t byteswap : 1;
+	int byteswap : 1;
 } recvflags_t;
 
 extern int zfs_receive(libzfs_handle_t *, const char *, recvflags_t,

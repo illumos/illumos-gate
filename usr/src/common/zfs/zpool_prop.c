@@ -71,7 +71,7 @@ zpool_prop_init(void)
 	register_string(ZPOOL_PROP_BOOTFS, "bootfs", NULL, PROP_DEFAULT,
 	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS");
 	register_string(ZPOOL_PROP_CACHEFILE, "cachefile", NULL, PROP_DEFAULT,
-	    ZFS_TYPE_POOL, "<file>", "CACHEFILE");
+	    ZFS_TYPE_POOL, "<file> | none", "CACHEFILE");
 
 	/* readonly number properties */
 	register_number(ZPOOL_PROP_SIZE, "size", 0, PROP_READONLY,

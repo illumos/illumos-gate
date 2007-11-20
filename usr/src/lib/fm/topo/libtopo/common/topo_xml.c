@@ -123,8 +123,10 @@ xmlattr_to_fmri(topo_mod_t *mp,
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "attribute to int\n");
 	if ((str = xmlGetProp(xn, (xmlChar *)propname)) == NULL)
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
-	if (topo_mod_str2nvl(mp, (const char *)str, rnvl) < 0)
+	if (topo_mod_str2nvl(mp, (const char *)str, rnvl) < 0) {
+		xmlFree(str);
 		return (-1);
+	}
 	xmlFree(str);
 	return (0);
 }

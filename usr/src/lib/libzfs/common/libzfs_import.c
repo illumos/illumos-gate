@@ -1193,6 +1193,8 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 
 	if (ret) {
 		if ((*namestr = zfs_strdup(hdl, name)) == NULL) {
+			if (cb.cb_zhp)
+				zpool_close(cb.cb_zhp);
 			nvlist_free(config);
 			return (-1);
 		}
