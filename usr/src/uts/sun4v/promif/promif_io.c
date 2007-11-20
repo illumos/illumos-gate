@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +195,13 @@ promif_instance_to_path(void *p)
 		if ((rlen = prom_getproplen(node, OBP_REG)) == -1)
 			return (-1);
 
+		/*
+		 * Make sure we don't get dispatched onto a different
+		 * cpu if we happen to sleep.  See kern_postprom().
+		 */
+		thread_affinity_set(curthread, CPU_CURRENT);
 		regval = kmem_zalloc(rlen, KM_SLEEP);
+		thread_affinity_clear(curthread);
 
 		(void) prom_getprop(node, OBP_REG, regval);
 
