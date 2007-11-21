@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1531,14 +1531,14 @@ light_disk_ok2remove_leds(psvc_opaque_t hdlp, boolean_t *disk_present)
 
 		min_node = di_minor_next(node, DI_MINOR_NIL);
 		disk_online = (min_node != DI_MINOR_NIL);
-		if (! disk_online && prev_online[target]) {
+		if ((disk_online == 0) && (prev_online[target] == 1)) {
 			/* Light Led */
 			bit_val = 0;
 			rv = pcf8574_write_bit(hdlp, "DISK_PORT",
 				bit_nums[target], bit_val, DISKBP_MUST_BE_1);
 			if (rv != PSVC_SUCCESS)
 				goto done;
-		} else if (!prev_online[target] && disk_online) {
+		} else if ((prev_online[target] == 0) && (disk_online == 1)) {
 			/* Unlight Led */
 			bit_val = 1;
 			rv = pcf8574_write_bit(hdlp, "DISK_PORT",
