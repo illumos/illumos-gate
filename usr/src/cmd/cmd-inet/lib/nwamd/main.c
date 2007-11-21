@@ -257,25 +257,26 @@ change_user_set_privs(void)
 		dprintf("started with privs %s", p != NULL ? p : "Unknown");
 		free(p);
 	}
+	priv_freeset(priv_set);
 
-	priv_emptyset(priv_set);
-	(void) priv_addset(priv_set, "basic");
-	(void) priv_addset(priv_set, "file_chown_self");
-	(void) priv_addset(priv_set, "file_dac_read");
-	(void) priv_addset(priv_set, "file_dac_write");
-	(void) priv_addset(priv_set, "net_privaddr");
-	(void) priv_addset(priv_set, "net_rawaccess");
-	(void) priv_addset(priv_set, "proc_exec");
-	(void) priv_addset(priv_set, "proc_fork");
-	(void) priv_addset(priv_set, "proc_info");
-	(void) priv_addset(priv_set, "proc_owner");
-	(void) priv_addset(priv_set, "proc_session");
-	(void) priv_addset(priv_set, "proc_setid");
-	(void) priv_addset(priv_set, "sys_ip_config");
-	(void) priv_addset(priv_set, "sys_ipc_config");
-	(void) priv_addset(priv_set, "sys_net_config");
-	(void) priv_addset(priv_set, "sys_res_config");
-	(void) priv_addset(priv_set, "sys_resource");
+	/* always start with the basic set */
+	priv_set = priv_str_to_set("basic", ",", NULL);
+	if (priv_set == NULL) {
+		syslog(LOG_ERR, "converting basic privilege set: %m");
+		exit(EXIT_FAILURE);
+	}
+	(void) priv_addset(priv_set, PRIV_FILE_CHOWN_SELF);
+	(void) priv_addset(priv_set, PRIV_FILE_DAC_READ);
+	(void) priv_addset(priv_set, PRIV_FILE_DAC_WRITE);
+	(void) priv_addset(priv_set, PRIV_NET_PRIVADDR);
+	(void) priv_addset(priv_set, PRIV_NET_RAWACCESS);
+	(void) priv_addset(priv_set, PRIV_PROC_OWNER);
+	(void) priv_addset(priv_set, PRIV_PROC_SETID);
+	(void) priv_addset(priv_set, PRIV_SYS_IP_CONFIG);
+	(void) priv_addset(priv_set, PRIV_SYS_IPC_CONFIG);
+	(void) priv_addset(priv_set, PRIV_SYS_NET_CONFIG);
+	(void) priv_addset(priv_set, PRIV_SYS_RES_CONFIG);
+	(void) priv_addset(priv_set, PRIV_SYS_RESOURCE);
 
 	if (setppriv(PRIV_SET, PRIV_INHERITABLE, priv_set) == -1) {
 		syslog(LOG_ERR, "setppriv inheritable: %m");
