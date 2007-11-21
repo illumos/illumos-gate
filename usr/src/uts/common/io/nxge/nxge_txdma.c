@@ -273,6 +273,7 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	size_t 			hdrs_size;
 	uint8_t			hdrs_buf[sizeof (struct ether_header) +
 					64 + sizeof (uint32_t)];
+	uint8_t			*cursor;
 	uint8_t 		*ip_buf;
 	uint16_t		eth_type;
 	uint8_t			ipproto;
@@ -303,12 +304,25 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	 * Neptune transmit header).
 	 */
 	nmp = mp;
-	mblk_len = (size_t)nmp->b_wptr - (size_t)nmp->b_rptr;
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_fill_tx_hdr: "
 		"mp $%p b_rptr $%p len %d",
-		mp, nmp->b_rptr, mblk_len));
+		mp, nmp->b_rptr, MBLKL(nmp)));
+	/* copy ether_header from mblk to hdrs_buf */
+	cursor = &hdrs_buf[0];
+	tmp = sizeof (struct ether_vlan_header);
+	while ((nmp != NULL) && (tmp > 0)) {
+		size_t buflen;
+		mblk_len = MBLKL(nmp);
+		buflen = min(tmp, mblk_len);
+		bcopy(nmp->b_rptr, cursor, buflen);
+		cursor += buflen;
+		tmp -= buflen;
+		nmp = nmp->b_cont;
+	}
+
+	nmp = mp;
+	mblk_len = MBLKL(nmp);
 	ip_buf = NULL;
-	bcopy(nmp->b_rptr, &hdrs_buf[0], sizeof (struct ether_vlan_header));
 	eth_type = ntohs(((p_ether_header_t)hdrs_buf)->ether_type);
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> : nxge_fill_tx_hdr: (value 0x%llx) "
 		"ether type 0x%x", eth_type, hdrp->value));
