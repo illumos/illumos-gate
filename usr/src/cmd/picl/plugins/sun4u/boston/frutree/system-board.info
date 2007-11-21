@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,9 +210,6 @@ name:/platform/SUNW,UltraSPARC-IIIi@3,0
 /************************************
  * CPU Board 0 Processor 0
  ************************************/
-name:/frutree/chassis/MB/system-board/C0/cpu-module/P0
-	REFNODE cpu location WITH name:/platform/i2c@1f,520000/temperature?UnitAddress=0,10
-
 name:/platform/i2c@1f,520000/temperature?UnitAddress=0,10
 	REFPROP _location_parent /frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu
 
@@ -236,9 +233,6 @@ name:/frutree/chassis/MB/system-board/C0/cpu-module/P0/cpu/B1/bank
 /************************************
  * CPU Board 1 Processor 0
  ************************************/
-name:/frutree/chassis/MB/system-board/C1/cpu-module/P0
-	REFNODE cpu location WITH name:/platform/i2c@1f,520000/temperature?UnitAddress=0,30
-
 name:/platform/i2c@1f,520000/temperature?UnitAddress=0,30
 	REFPROP _location_parent /frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu
 
@@ -262,9 +256,6 @@ name:/frutree/chassis/MB/system-board/C1/cpu-module/P0/cpu/B1/bank
 /************************************
  * CPU Board 2 Processor 0
  ************************************/
-name:/frutree/chassis/MB/system-board/C2/cpu-module/P0
-	REFNODE cpu location WITH name:/platform/i2c@1f,520000/temperature?UnitAddress=0,50
-
 name:/platform/i2c@1f,520000/temperature?UnitAddress=0,50
 	REFPROP _location_parent /frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu
 
@@ -288,9 +279,6 @@ name:/frutree/chassis/MB/system-board/C2/cpu-module/P0/cpu/B1/bank
 /************************************
  * CPU Board 3 Processor 0
  ************************************/
-name:/frutree/chassis/MB/system-board/C3/cpu-module/P0
-	REFNODE cpu location WITH name:/platform/i2c@1f,520000/temperature?UnitAddress=0,70
-
 name:/platform/i2c@1f,520000/temperature?UnitAddress=0,70
 	REFPROP _location_parent /frutree/chassis/MB/system-board/C3/cpu-module/P0/cpu
 
