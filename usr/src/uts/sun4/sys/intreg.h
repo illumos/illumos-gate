@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,21 @@ extern "C" {
 #define	INR_SIZE	(IGN_SIZE + INO_SIZE)	/* Interrupt Number bit size */
 #define	MAX_IGN		(1 << IGN_SIZE) /* Max Interrupt Group Number size */
 #define	MAX_INO		(1 << INO_SIZE) /* Max Interrupt Number per group */
-#define	MAXIVNUM	(MAX_IGN * MAX_INO) /* Max hardware intrs allowed */
+#define	MAXDEVINTRS	(MAX_IGN * MAX_INO) /* Max hardware intrs allowed */
+
+/*
+ * A platform may require use of the system interrupt table beyond
+ * the maximum hardware interrupts specified above for virtual device
+ * interrupts. If the platform does not specify MAXVINTRS we default to 0.
+ */
+#ifndef MAXVINTRS
+#define	MAXVINTRS	0
+#endif
+
+/*
+ * maximum system interrupts allowed
+ */
+#define	MAXIVNUM	(MAXDEVINTRS + MAXVINTRS)
 
 /*
  * Interrupt State Machine

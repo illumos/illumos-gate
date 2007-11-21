@@ -47,6 +47,7 @@
 #include <sys/systm.h>
 #include <sys/mkdev.h>
 #include <sys/machsystm.h>
+#include <sys/intreg.h>
 #include <sys/intr.h>
 #include <sys/ddi_intr_impl.h>
 #include <sys/ivintr.h>
@@ -621,11 +622,19 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 
 	iinfo->cldcp = cldcp;
 
+	iinfo->icookie = MINVINTR_COOKIE + iinfo->ino;
+
 	/*
-	 * FIXME - generate the interrupt cookie
-	 * using the interrupt registry
+	 * Verify that the ino does not generate a cookie which
+	 * is outside the (MINVINTR_COOKIE, MAXIVNUM) range of the
+	 * system interrupt table.
 	 */
-	iinfo->icookie = cnex_ssp->cfghdl | iinfo->ino;
+	if (iinfo->icookie >= MAXIVNUM || iinfo->icookie < MINVINTR_COOKIE) {
+		DWARN("cnex_add_intr: invalid cookie %x ino %x\n",
+		    iinfo->icookie, iinfo->ino);
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
 
 	D1("cnex_add_intr: add hdlr, cfghdl=0x%llx, ino=0x%llx, "
 	    "cookie=0x%llx\n", cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
@@ -639,8 +648,13 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	}
 
 	/* add interrupt to solaris ivec table */
-	VERIFY(add_ivintr(iinfo->icookie, pil, (intrfunc)cnex_intr_wrapper,
-	    (caddr_t)iinfo, NULL, NULL) == 0);
+	if (add_ivintr(iinfo->icookie, pil, (intrfunc)cnex_intr_wrapper,
+	    (caddr_t)iinfo, NULL, NULL) != 0) {
+		DWARN("cnex_add_intr: add_ivintr fail cookie %x ino %x\n",
+		    iinfo->icookie, iinfo->ino);
+		mutex_exit(&cldcp->lock);
+		return (EINVAL);
+	}
 
 	/* set the cookie in the HV */
 	rv = hvldc_intr_setcookie(cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
