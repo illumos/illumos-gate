@@ -4006,7 +4006,6 @@ tcp_close(queue_t *q, int flags)
 	tcp_t		*tcp = connp->conn_tcp;
 	mblk_t 		*mp = &tcp->tcp_closemp;
 	boolean_t	conn_ioctl_cleanup_reqd = B_FALSE;
-	boolean_t	linger_interrupted = B_FALSE;
 	mblk_t		*bp;
 
 	ASSERT(WR(q)->q_next == NULL);
@@ -4049,14 +4048,21 @@ tcp_close(queue_t *q, int flags)
 	while (!tcp->tcp_closed) {
 		if (!cv_wait_sig(&tcp->tcp_closecv, &tcp->tcp_closelock)) {
 			/*
-			 * We got interrupted. Check if we are lingering,
-			 * if yes, post a message to stop and wait until
-			 * tcp_closed is set. If we aren't lingering,
-			 * just go back around.
+			 * The cv_wait_sig() was interrupted. We now do the
+			 * following:
+			 *
+			 * 1) If the endpoint was lingering, we allow this
+			 * to be interrupted by cancelling the linger timeout
+			 * and closing normally.
+			 *
+			 * 2) Revert to calling cv_wait()
+			 *
+			 * We revert to using cv_wait() to avoid an
+			 * infinite loop which can occur if the calling
+			 * thread is higher priority than the squeue worker
+			 * thread and is bound to the same cpu.
 			 */
-			if (tcp->tcp_linger &&
-			    tcp->tcp_lingertime > 0 &&
-			    !linger_interrupted) {
+			if (tcp->tcp_linger && tcp->tcp_lingertime > 0) {
 				mutex_exit(&tcp->tcp_closelock);
 				/* Entering squeue, bump ref count. */
 				CONN_INC_REF(connp);
@@ -4064,11 +4070,13 @@ tcp_close(queue_t *q, int flags)
 				squeue_enter(connp->conn_sqp, bp,
 				    tcp_linger_interrupted, connp,
 				    SQTAG_IP_TCP_CLOSE);
-				linger_interrupted = B_TRUE;
 				mutex_enter(&tcp->tcp_closelock);
 			}
+			break;
 		}
 	}
+	while (!tcp->tcp_closed)
+		cv_wait(&tcp->tcp_closecv, &tcp->tcp_closelock);
 	mutex_exit(&tcp->tcp_closelock);
 
 	/*
