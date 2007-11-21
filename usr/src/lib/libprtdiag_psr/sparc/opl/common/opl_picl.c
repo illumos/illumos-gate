@@ -676,11 +676,13 @@ get_lane_width
 	cap_ptr = read_byte(fd, bus, dev, func, PCI_CONF_CAP_PTR, &ret);
 	if (ret != 0) {
 		/* ioctl failure */
+		close(fd);
 		return (PICL_FAILURE);
 	}
 	cap_reg = read_word(fd, bus, dev, func, cap_ptr, &ret);
 	if (ret != 0) {
 		/* ioctl failure */
+		close(fd);
 		return (PICL_FAILURE);
 	}
 	capid = cap_reg & PCI_CAP_MASK;
@@ -690,11 +692,13 @@ get_lane_width
 			link_cap = read_long(fd, bus, dev, func, cap_ptr +
 			    PCIE_LINKCAP, &ret);
 			if (ret != 0) {
+				close(fd);
 				return (PICL_FAILURE);
 			}
 			link_status = read_word(fd, bus, dev, func,
 			    cap_ptr + PCIE_LINKSTS, &ret);
 			if (ret != 0) {
+				close(fd);
 				return (PICL_FAILURE);
 			}
 			*actual = ((link_status >> PCI_LINK_SHIFT) &
@@ -712,6 +716,7 @@ get_lane_width
 			    (fd, bus, dev, func, PCI_CONF_HEADER, &ret);
 			if (ret != 0) {
 				/* ioctl failure */
+				close(fd);
 				return (PICL_FAILURE);
 			}
 			if ((hdr_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
@@ -721,6 +726,7 @@ get_lane_width
 				    cap_ptr + PCI_PCIX_SEC_STATUS, &ret);
 				if (ret != 0) {
 					/* ioctl failure */
+					close(fd);
 					return (PICL_FAILURE);
 				}
 				if (sec_status & PCI_SEC_133)
@@ -749,6 +755,7 @@ get_lane_width
 				    cap_ptr + PCI_PCIX_STATUS, &ret);
 				if (ret != 0) {
 					/* ioctl failure */
+					close(fd);
 					return (PICL_FAILURE);
 				}
 				if (pcix_status &
@@ -768,9 +775,14 @@ get_lane_width
 		cap_reg = read_word(fd, bus, dev, func, cap_ptr, &ret);
 		if (ret != 0) {
 			/* ioctl failure */
+			close(fd);
 			return (PICL_FAILURE);
 		}
 		capid = cap_reg & PCI_CAP_MASK;
+	}
+
+	if (close(fd) == -1) {
+		return (PICL_FAILURE);
 	}
 
 	return (PICL_SUCCESS);
