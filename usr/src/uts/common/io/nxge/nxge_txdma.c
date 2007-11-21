@@ -313,7 +313,7 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	while ((nmp != NULL) && (tmp > 0)) {
 		size_t buflen;
 		mblk_len = MBLKL(nmp);
-		buflen = min(tmp, mblk_len);
+		buflen = min((size_t)tmp, mblk_len);
 		bcopy(nmp->b_rptr, cursor, buflen);
 		cursor += buflen;
 		tmp -= buflen;
