@@ -89,8 +89,9 @@ static uint16_t lacp_system_priority = 0x1000;
  */
 typedef struct lacp_sel_ports {
 	uint16_t sp_key;
-	char sp_devname[MAXNAMELEN + 1];
+	/* Note: sp_partner_system must be 2-byte aligned */
 	struct ether_addr sp_partner_system;
+	char sp_devname[MAXNAMELEN + 1];
 	uint32_t sp_partner_key;
 	struct lacp_sel_ports *sp_next;
 } lacp_sel_ports_t;
