@@ -1139,7 +1139,7 @@ spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun)
 		buf[0] = SCSI_REPORTLUNS_ADDRESS_PERIPHERAL;
 		buf[1] = lun;
 
-	} else if (lun < 0x3fff) {
+	} else if (lun <= T10_MAX_LUNS) {
 
 		/*
 		 * SAM-3 revision 14, Section 4.9.7.
