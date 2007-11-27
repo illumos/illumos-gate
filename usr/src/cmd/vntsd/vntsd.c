@@ -41,6 +41,7 @@
  */
 
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>
@@ -329,6 +330,7 @@ main(int argc, char ** argv)
 	char	    *path;
 	struct	    pollfd poll_drv[1];
 	struct	    sigaction act;
+	struct	    rlimit rlim;
 	char	    *listen_addr = NULL;
 	pid_t	    pid;
 	int	    i;
@@ -344,6 +346,18 @@ main(int argc, char ** argv)
 
 	/* initialization */
 	bzero(&act, sizeof (act));
+
+	/*
+	 * ensure that we can obtain sufficient file descriptors for all
+	 * the accept() calls when a machine contains many domains.
+	 */
+	(void) getrlimit(RLIMIT_NOFILE, &rlim);
+	if (rlim.rlim_cur < rlim.rlim_max)
+		rlim.rlim_cur = rlim.rlim_max;
+	if (setrlimit(RLIMIT_NOFILE, &rlim) < 0)
+		vntsd_log(VNTSD_STATUS_CONTINUE, "Unable to increase file "
+		    "descriptor limit.");
+	(void) enable_extended_FILE_stdio(-1, -1);
 
 	vntsdp = calloc(sizeof (vntsd_t), 1);
 	if (vntsdp == NULL) {

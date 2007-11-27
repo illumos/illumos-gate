@@ -21,7 +21,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,9 +60,6 @@ write_vcc(vntsd_client_t *clientp, char c)
 	assert(clientp);
 	assert(clientp->cons);
 
-	if (c == 0) {
-		return (VNTSD_SUCCESS);
-	}
 	n = write(clientp->cons->vcc_fd, &c, 1);
 
 	if (n < 0) {
