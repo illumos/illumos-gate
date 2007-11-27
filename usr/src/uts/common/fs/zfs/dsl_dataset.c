@@ -1137,6 +1137,7 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		zio_t *zio;
 		int64_t used = 0, compressed = 0, uncompressed = 0;
 		struct killarg ka;
+		int64_t delta;
 
 		zio = zio_root(tx->tx_pool->dp_spa, NULL, NULL,
 		    ZIO_FLAG_MUSTSUCCEED);
@@ -1149,8 +1150,10 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    ADVANCE_POST, kill_blkptr, &ka);
 		(void) zio_wait(zio);
 
+		/* only deduct space beyond any refreservation */
+		delta = parent_delta(ds, -used);
 		dsl_dir_diduse_space(ds->ds_dir,
-		    -used, -compressed, -uncompressed, tx);
+		    delta, -compressed, -uncompressed, tx);
 	}
 
 	if (ds->ds_prev) {
