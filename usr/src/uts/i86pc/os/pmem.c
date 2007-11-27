@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,12 +339,15 @@ devmap_pmem_alloc(size_t size, uint_t flags, devmap_pmem_cookie_t *cookiep)
 		goto alloc_fail;
 	reserved = 1;
 
-	/* Try to allocate large pages first to decrease fragmentation. */
-	i = (rpages + (pmem_pgcnt - 1)) / pmem_pgcnt;
-	if (lpp_create(&lpp, i, &lpages, &plp, pcp->dp_vnp, &pmem_off,
-	    kflags) == DDI_FAILURE)
-		goto alloc_fail;
-	ASSERT(lpages == 0 ? lpp == NULL : 1);
+	/* If we have large pages */
+	if (pmem_lpgsize > PAGESIZE) {
+		/* Try to alloc large pages first to decrease fragmentation. */
+		i = (rpages + (pmem_pgcnt - 1)) / pmem_pgcnt;
+		if (lpp_create(&lpp, i, &lpages, &plp, pcp->dp_vnp, &pmem_off,
+		    kflags) == DDI_FAILURE)
+			goto alloc_fail;
+		ASSERT(lpages == 0 ? lpp == NULL : 1);
+	}
 
 	/*
 	 * Pages in large pages is more than the request, put the residual
@@ -510,7 +513,8 @@ devmap_pmem_getpfns(devmap_pmem_cookie_t cookie, uint_t start, pgcnt_t npages,
 		return (DDI_FAILURE);
 
 	for (i = start; i < start + npages; i++)
-		pfnarray[i - start] = pcp->dp_pparray[i]->p_pagenum;
+		pfnarray[i - start] = pfn_to_mfn(pcp->dp_pparray[i]->p_pagenum);
+
 	return (DDI_SUCCESS);
 }
 
