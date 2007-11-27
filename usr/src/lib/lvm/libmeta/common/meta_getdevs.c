@@ -522,15 +522,18 @@ meta_get_names(
 
 			/*
 			 * np can be NULL if the /dev/md namespace entries
-			 * do not exist. This could happen on a metaset
-			 * take due to devfsadmd not having created them.
-			 * Therefore, with disksets and a null np, assume
-			 * devfsadmd has not run and so tell it to run
-			 * for the specific device that is missing.
-			 * The call to meta_update_devtree does not return
-			 * until the /dev/md links have been created.
+			 * do not exist. This could have happened due to
+			 * devfsadmd not having created them.
+			 * Therefore assume devfsadmd has not run and tell
+			 * it to run for the specific device that is missing.
+			 * Ignore any error return from meta_update_devtree
+			 * as a failure to create the device nodes will be
+			 * picked up in the metamnumname() call. Note that
+			 * the call to meta_update_devtree should not return
+			 * until the /dev/md links have been created or if
+			 * there has been a failure of some sort.
 			 */
-			if (np == NULL && !metaislocalset(sp)) {
+			if (np == NULL) {
 				(void) meta_update_devtree(*m_ptr);
 				np = metamnumname(&sp, *m_ptr,
 				    ((options & PRINT_FAST) ? 1 : 0), ep);
