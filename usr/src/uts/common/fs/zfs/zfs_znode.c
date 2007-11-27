@@ -293,7 +293,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		return (error);
 	} else if (zfsvfs->z_version > ZPL_VERSION) {
 		(void) printf("Mismatched versions:  File system "
-		    "is version %lld on-disk format, which is "
+		    "is version %llu on-disk format, which is "
 		    "incompatible with this software version %lld!",
 		    (u_longlong_t)zfsvfs->z_version, ZPL_VERSION);
 		return (ENOTSUP);
@@ -1231,7 +1231,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 		char *name;
 
 		ASSERT(nvpair_type(elem) == DATA_TYPE_UINT64);
-		ASSERT(nvpair_value_uint64(elem, &val) == 0);
+		VERIFY(nvpair_value_uint64(elem, &val) == 0);
 		name = nvpair_name(elem);
 		if (strcmp(name, zfs_prop_to_name(ZFS_PROP_VERSION)) == 0) {
 			version = val;
