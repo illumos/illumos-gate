@@ -1689,8 +1689,13 @@ st_known_tape_type(struct scsi_tape *un)
 {
 	struct st_drivetype *dp;
 	cfg_functp *config_funct;
+	uchar_t reserved;
 
 	ST_FUNC(ST_DEVINFO, st_known_tape_type);
+
+	reserved = (un->un_rsvd_status & ST_RESERVE) ? ST_RESERVE
+	    : ST_RELEASE;
+
 	/*
 	 * XXX:  Emulex MT-02 (and emulators) predates SCSI-1 and has
 	 *	 no vid & pid inquiry data.  So, we provide one.
@@ -1700,9 +1705,13 @@ st_known_tape_type(struct scsi_tape *un)
 		(void) strcpy((char *)ST_INQUIRY->inq_vid, ST_MT02_NAME);
 	}
 
-	un->un_dp_size = sizeof (struct st_drivetype);
-	dp = kmem_zalloc((size_t)un->un_dp_size, KM_SLEEP);
-	un->un_dp = dp;
+	if (un->un_dp_size == 0) {
+		un->un_dp_size = sizeof (struct st_drivetype);
+		dp = kmem_zalloc((size_t)un->un_dp_size, KM_SLEEP);
+		un->un_dp = dp;
+	} else {
+		dp = un->un_dp;
+	}
 
 	un->un_dp->non_motion_timeout = st_io_time;
 	/*
@@ -1747,6 +1756,11 @@ st_known_tape_type(struct scsi_tape *un)
 	/* make sure if we are supposed to be variable, make it variable */
 	if (dp->options & ST_VARIABLE) {
 		dp->bsize = 0;
+	}
+
+	if (reserved != ((un->un_rsvd_status & ST_RESERVE) ? ST_RESERVE
+	    : ST_RELEASE)) {
+		(void) st_reserve_release(un, reserved);
 	}
 
 	scsi_log(ST_DEVINFO, st_label, CE_NOTE, "?<%s>\n", dp->name);
@@ -2109,12 +2123,18 @@ st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
 	 * MODE SENSE to determine block size.
 	 */
 	un->un_dp->options |= ST_MODE_SEL_COMP;
-	if (st_modesense(un)) {
+	rval = st_modesense(un);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			rval = 1;
+		} else {
+			un->un_dp->options &= ~ST_MODE_SEL_COMP;
+			rval = 0;
+		}
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 		    "st_get_conf_from_tape_drive(): fail to mode sense\n");
-		un->un_dp->options &= ~ST_MODE_SEL_COMP;
-		kmem_free(tem_dp, sizeof (struct st_drivetype));
-		return (0);
+		goto exit;
 	}
 
 	/* Can mode sense page 0x10 or 0xf */
@@ -2127,20 +2147,33 @@ st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
 		tem_dp->options |= ST_VARIABLE;
 		tem_dp->bsize = 0;
 	} else if (bsize > ST_MAXRECSIZE_FIXED) {
-		if (st_change_block_size(un->un_dev, 0) != 0) {
-			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "st_get_conf_from_tape_drive(): "
-			    "Fixed record size is too large and"
-			    "cannot switch to variable record size");
-			kmem_free(tem_dp, sizeof (struct st_drivetype));
-			return (0);
+		rval = st_change_block_size(un->un_dev, 0);
+		if (rval) {
+			if (rval == EACCES) {
+				un->un_dp->type = ST_TYPE_INVALID;
+				rval = 1;
+			} else {
+				rval = 0;
+				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+				    "st_get_conf_from_tape_drive(): "
+				    "Fixed record size is too large and"
+				    "cannot switch to variable record size");
+			}
+			goto exit;
 		}
 		tem_dp->options |= ST_VARIABLE;
-	} else if (st_change_block_size(un->un_dev, 0) == 0) {
-		tem_dp->options |= ST_VARIABLE;
-		tem_dp->bsize = 0;
 	} else {
-		tem_dp->bsize = bsize;
+		rval = st_change_block_size(un->un_dev, 0);
+		if (rval == 0) {
+			tem_dp->options |= ST_VARIABLE;
+			tem_dp->bsize = 0;
+		} else if (rval != EACCES) {
+			tem_dp->bsize = bsize;
+		} else {
+			un->un_dp->type = ST_TYPE_INVALID;
+			rval = 1;
+			goto exit;
+		}
 	}
 
 	/*
@@ -2148,13 +2181,14 @@ st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
 	 * more than 64K, ST_NO_RECSIZE_LIMIT is supported.
 	 */
 	blklim = kmem_zalloc(sizeof (struct read_blklim), KM_SLEEP);
-	if (st_read_block_limits(un, blklim) != 0) {
+	rval = st_read_block_limits(un, blklim);
+	if (rval) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 		    "st_get_conf_from_tape_drive(): "
 		    "fail to read block limits.\n");
+		rval = 0;
 		kmem_free(blklim, sizeof (struct read_blklim));
-		kmem_free(tem_dp, sizeof (struct st_drivetype));
-		return (0);
+		goto exit;
 	}
 	maxbsize = (blklim->max_hi << 16) +
 	    (blklim->max_mid << 8) + blklim->max_lo;
@@ -2168,13 +2202,13 @@ st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
 	 */
 	buf = kmem_zalloc(6, KM_SLEEP);
 	rval = st_get_special_inquiry(un, 6, buf, 0xb0);
-	if (rval != 0) {
+	if (rval) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 		    "st_get_conf_from_tape_drive(): "
 		    "fail to read vitial inquiry.\n");
+		rval = 0;
 		kmem_free(buf, 6);
-		kmem_free(tem_dp, sizeof (struct st_drivetype));
-		return (0);
+		goto exit;
 	}
 	if (buf[4] & 1) {
 		tem_dp->options |= ST_WORMABLE;
@@ -2191,22 +2225,25 @@ st_get_conf_from_tape_drive(struct scsi_tape *un, char *vidpid,
 	 * REPORT DENSITY SUPPORT command.
 	 */
 	if (st_get_densities_from_tape_drive(un, tem_dp) == 0) {
-		kmem_free(tem_dp, sizeof (struct st_drivetype));
-		return (0);
+		goto exit;
 	}
 
 	/*
 	 * Decide the timeout values for several commands by sending
 	 * REPORT SUPPORTED OPERATION CODES command.
 	 */
-	if (st_get_timeout_values_from_tape_drive(un, tem_dp) == 0) {
-		kmem_free(tem_dp, sizeof (struct st_drivetype));
-		return (0);
+	rval = st_get_timeout_values_from_tape_drive(un, tem_dp);
+	if (rval == 0 || ((rval == 1) && (tem_dp->type == ST_TYPE_INVALID))) {
+		goto exit;
 	}
 
 	bcopy(tem_dp, dp, sizeof (struct st_drivetype));
+	rval = 1;
+
+exit:
+	un->un_status = KEY_NO_SENSE;
 	kmem_free(tem_dp, sizeof (struct st_drivetype));
-	return (1);
+	return (rval);
 }
 
 static int
@@ -2367,41 +2404,84 @@ st_get_timeout_values_from_tape_drive(struct scsi_tape *un,
     struct st_drivetype *dp)
 {
 	ushort_t timeout;
+	int rval;
 
 	ST_FUNC(ST_DEVINFO, st_get_timeout_values_from_type_drive);
 
-	if (st_get_timeouts_value(un, SCMD_ERASE, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_ERASE, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->erase_timeout = timeout;
 
-	if (st_get_timeouts_value(un, SCMD_READ, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_READ, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->io_timeout = timeout;
 
-	if (st_get_timeouts_value(un, SCMD_WRITE, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_WRITE, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->io_timeout = max(dp->io_timeout, timeout);
 
-	if (st_get_timeouts_value(un, SCMD_SPACE, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_SPACE, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->space_timeout = timeout;
 
-	if (st_get_timeouts_value(un, SCMD_LOAD, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_LOAD, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->load_timeout = timeout;
 	dp->unload_timeout = timeout;
 
-	if (st_get_timeouts_value(un, SCMD_REWIND, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_REWIND, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->rewind_timeout = timeout;
 
-	if (st_get_timeouts_value(un, SCMD_INQUIRY, &timeout, 0) != 0) {
+	rval = st_get_timeouts_value(un, SCMD_INQUIRY, &timeout, 0);
+	if (rval) {
+		if (rval == EACCES) {
+			un->un_dp->type = ST_TYPE_INVALID;
+			dp->type = ST_TYPE_INVALID;
+			return (1);
+		}
 		return (0);
 	}
 	dp->non_motion_timeout = timeout;
@@ -2429,7 +2509,7 @@ st_get_timeouts_value(struct scsi_tape *un, uchar_t option_code,
 	rval = st_report_supported_operation(un, oper, option_code,
 	    service_action);
 
-	if (rval != 0) {
+	if (rval) {
 		ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 		    "st_get_timeouts_value(): "
 		    "fail to timeouts value for command %d.\n", option_code);
@@ -2444,7 +2524,7 @@ st_get_timeouts_value(struct scsi_tape *un, uchar_t option_code,
 		    "st_get_timeouts_value(): "
 		    "command %d is not supported.\n", option_code);
 		kmem_free(oper, buflen);
-		return (-1);
+		return (ENOTSUP);
 	}
 
 	ctdp = ((struct one_com_des *)oper)->ctdp;
@@ -2453,7 +2533,7 @@ st_get_timeouts_value(struct scsi_tape *un, uchar_t option_code,
 		    "st_get_timeouts_value(): "
 		    "command timeout is not included.\n");
 		kmem_free(oper, buflen);
-		return (-1);
+		return (ENOTSUP);
 	}
 
 	cdbsize = BE_16(((struct one_com_des *)oper)->cdb_size);
@@ -2730,8 +2810,18 @@ st_tape_init(dev_t dev)
 	}
 
 	/*
-	 * See whether this is a generic device that we haven't figured
-	 * anything out about yet.
+	 * Tape self identification could fail if the tape drive is used by
+	 * another host during attach time. We try to get the tape type
+	 * again. This is also applied to any posponed configuration methods.
+	 */
+	if (un->un_dp->type == ST_TYPE_INVALID) {
+		un->un_comp_page = ST_DEV_DATACOMP_PAGE | ST_DEV_CONFIG_PAGE;
+		st_known_tape_type(un);
+	}
+
+	/*
+	 * If the tape type is still invalid, try to determine the generic
+	 * configuration.
 	 */
 	if (un->un_dp->type == ST_TYPE_INVALID) {
 		rval = st_determine_generic(dev);
