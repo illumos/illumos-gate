@@ -39,40 +39,15 @@
 extern "C" {
 #endif
 
-#define	SMBRDR_IPC_MODE_ENV	  "smbrdr.ipc.mode"
-#define	SMBRDR_IPC_USER_ENV	  "smbrdr.ipc.user"
-#define	SMBRDR_IPC_PASSWD_ENV	  "smbrdr.ipc.passwd"
-
-#define	IPC_MODE_STRLEN		  4
-#define	IPC_MODE_ANON		  "anon"
-#define	IPC_MODE_AUTH		  "auth"
-#define	IPC_MODE_FALLBACK_ANON	  "fallback,anon"
-
-#define	IPC_FLG_FALLBACK_ANON	  0x00000001
-#define	IPC_FLG_NEED_VERIFY	  0x00000002
-
 /*
  * smbrdr_ipc_t
  *
- * This structure contains information regarding the IPC configuration,
- * as well as, the authentication info needed for connecting to the
- * IPC$ share if the IPC connection is configured to be authenticated.
- *
- * IPC connection to the Primary Domain Controller [PDC] can be
- * configured to be either anonymous or authenticated. Therefore,
- * the IPC mode will be set to either one of the following values:
- *  MLSVC_IPC_ANON
- *  MLSVC_IPC_ADMIN
- *
- * The IPC_FLG_FALLBACK_ANON can be set in flags field to indicate whether
- * a fallback from authenticated IPC to anonymous IPC has occurred. This
- * flag will be unset once the join domain operation succeeds.
+ * This structure contains credentials for establishing authenticated
+ * IPC connection.
  */
 typedef struct {
-	int  mode;
 	char user[MLSVC_ACCOUNT_NAME_MAX];
-	char passwd[SMBAUTH_HASH_SZ];
-	unsigned flags;
+	unsigned char passwd[SMBAUTH_HASH_SZ];
 } smbrdr_ipc_t;
 
 

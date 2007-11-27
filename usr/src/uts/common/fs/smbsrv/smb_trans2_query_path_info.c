@@ -329,7 +329,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	char			*path, *alt_nm_ptr;
 	int			rc;
-	off_t			dsize, dused;
+	u_offset_t		dsize, dused;
 	unsigned short		infolev, dattr;
 	smb_attr_t		*ap, ret_attr;
 	struct smb_node		*dir_node;
@@ -415,10 +415,10 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 
 	switch (infolev) {
 	case SMB_INFO_STANDARD:
-		if (dsize > 0xffffffff)
-			dsize = 0xffffffff;
-		if (dused > 0xffffffff)
-			dused = 0xffffffff;
+		if (dsize > UINT_MAX)
+			dsize = UINT_MAX;
+		if (dused > UINT_MAX)
+			dused = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -433,10 +433,10 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
-		if (dsize > 0xffffffff)
-			dsize = 0xffffffff;
-		if (dused > 0xffffffff)
-			dused = 0xffffffff;
+		if (dsize > UINT_MAX)
+			dsize = UINT_MAX;
+		if (dused > UINT_MAX)
+			dused = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,

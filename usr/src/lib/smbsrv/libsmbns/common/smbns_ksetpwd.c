@@ -34,14 +34,18 @@
 #include <ctype.h>
 #include <errno.h>
 #include <syslog.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <kerberosv5/krb5.h>
+#include <kerberosv5/com_err.h>
+#include <smbns_krb.h>
 
+static int smb_krb5_open_wrfile(krb5_context ctx, char *fname,
+    krb5_keytab *kt);
 static int smb_krb5_ktadd(krb5_context ctx, krb5_keytab kt,
     const krb5_principal princ, krb5_enctype enctype, krb5_kvno kvno,
     const char *pw);
+static krb5_error_code smb_krb5_ktremove(krb5_context ctx, krb5_keytab kt,
+    const krb5_principal princ);
+
 
 /*
  * smb_krb5_ctx_init
@@ -122,29 +126,18 @@ smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd)
 }
 
 /*
- * smb_krb5_write_keytab
+ * smb_krb5_open_wrfile
  *
- * Write all the Kerberos keys to the keytab file.
- * Returns 0 on success.  Otherwise, returns -1.
+ * Open the keytab file for writing.
+ * The keytab should be closed by calling krb5_kt_close().
  */
-int
-smb_krb5_write_keytab(krb5_context ctx, krb5_principal princ, char *fname,
-    krb5_kvno kvno, char *passwd, krb5_enctype *enctypes, int enctype_count)
+static int
+smb_krb5_open_wrfile(krb5_context ctx, char *fname, krb5_keytab *kt)
 {
-	krb5_keytab kt = NULL;
 	char *ktname;
-	int i, len;
-	int rc = 0;
-	struct stat fstat;
+	int len;
 
-	if (stat(fname, &fstat) == 0) {
-		if (remove(fname) != 0) {
-			syslog(LOG_ERR, "smb_krb5_write_keytab: cannot remove"
-			    " existing keytab");
-			return (-1);
-		}
-	}
-
+	*kt = NULL;
 	len = snprintf(NULL, 0, "WRFILE:%s", fname) + 1;
 	if ((ktname = malloc(len)) == NULL) {
 		syslog(LOG_ERR, "smb_krb5_write_keytab: resource shortage");
@@ -153,7 +146,7 @@ smb_krb5_write_keytab(krb5_context ctx, krb5_principal princ, char *fname,
 
 	(void) snprintf(ktname, len, "WRFILE:%s", fname);
 
-	if (krb5_kt_resolve(ctx, ktname, &kt) != 0) {
+	if (krb5_kt_resolve(ctx, ktname, kt) != 0) {
 		syslog(LOG_ERR, "smb_krb5_write_keytab: failed to open/create "
 		    "keytab %s\n", fname);
 		free(ktname);
@@ -161,6 +154,59 @@ smb_krb5_write_keytab(krb5_context ctx, krb5_principal princ, char *fname,
 	}
 
 	free(ktname);
+	return (0);
+}
+
+/*
+ * smb_krb5_remove_keytab_entries
+ *
+ * Remove the keys from the keytab for the specified principal.
+ */
+int
+smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal princ,
+    char *fname)
+{
+	krb5_keytab kt = NULL;
+	int rc = 0;
+	krb5_error_code code;
+
+	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
+		return (-1);
+
+	if ((code = smb_krb5_ktremove(ctx, kt, princ)) != 0) {
+		syslog(LOG_ERR, "smb_krb5_remove_keytab_entries: %s",
+		    error_message(code));
+		rc = -1;
+	}
+
+	krb5_kt_close(ctx, kt);
+	return (rc);
+}
+
+/*
+ * smb_krb5_update_keytab_entries
+ *
+ * Update the keys for the specified principal in the keytab.
+ * Returns 0 on success.  Otherwise, returns -1.
+ */
+int
+smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal princ,
+    char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
+    int enctype_count)
+{
+	krb5_keytab kt = NULL;
+	int rc = 0, i;
+	krb5_error_code code;
+
+	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
+		return (-1);
+
+	if ((code = smb_krb5_ktremove(ctx, kt, princ)) != 0) {
+		syslog(LOG_ERR, "smb_krb5_update_keytab_entries: %s",
+		    error_message(code));
+		krb5_kt_close(ctx, kt);
+		return (-1);
+	}
 
 	for (i = 0; i < enctype_count; i++) {
 		if (smb_krb5_ktadd(ctx, kt, princ, enctypes[i], kvno, passwd)
@@ -171,10 +217,71 @@ smb_krb5_write_keytab(krb5_context ctx, krb5_principal princ, char *fname,
 
 	}
 
-	if (kt != NULL)
-		krb5_kt_close(ctx, kt);
-
+	krb5_kt_close(ctx, kt);
 	return (rc);
+}
+
+/*
+ * smb_krb5_ktremove
+ *
+ * Removes the old entries for the specified principal from the keytab.
+ *
+ * Returns 0 upon success. Otherwise, returns KRB5 error code.
+ */
+static krb5_error_code
+smb_krb5_ktremove(krb5_context ctx, krb5_keytab kt, const krb5_principal princ)
+{
+	krb5_keytab_entry entry;
+	krb5_kt_cursor cursor;
+	int code;
+
+	code = krb5_kt_get_entry(ctx, kt, princ, 0, 0, &entry);
+	if (code != 0) {
+		if (code == ENOENT || code == KRB5_KT_NOTFOUND)
+			return (0);
+
+		return (code);
+	}
+
+	krb5_kt_free_entry(ctx, &entry);
+
+	if ((code = krb5_kt_start_seq_get(ctx, kt, &cursor)) != 0)
+		return (code);
+
+	while ((code = krb5_kt_next_entry(ctx, kt, &entry, &cursor)) == 0) {
+		if (krb5_principal_compare(ctx, princ, entry.principal)) {
+
+			code = krb5_kt_end_seq_get(ctx, kt, &cursor);
+			if (code != 0) {
+				krb5_kt_free_entry(ctx, &entry);
+				return (code);
+			}
+
+			code = krb5_kt_remove_entry(ctx, kt, &entry);
+			if (code != 0) {
+				krb5_kt_free_entry(ctx, &entry);
+				return (code);
+			}
+
+			code = krb5_kt_start_seq_get(ctx, kt, &cursor);
+			if (code != 0) {
+				krb5_kt_free_entry(ctx, &entry);
+				return (code);
+			}
+
+		}
+		krb5_kt_free_entry(ctx, &entry);
+	}
+
+	if (code && code != KRB5_KT_END) {
+		(void) krb5_kt_end_seq_get(ctx, kt, &cursor);
+		return (code);
+	}
+
+	if ((code = krb5_kt_end_seq_get(ctx, kt, &cursor)))
+		return (code);
+
+	return (0);
 }
 
 /*

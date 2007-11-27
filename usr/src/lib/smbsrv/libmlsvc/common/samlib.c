@@ -35,6 +35,7 @@
 #include <alloca.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
@@ -68,7 +69,7 @@ static int get_user_group_info(mlsvc_handle_t *, smb_userinfo_t *);
  */
 int
 sam_lookup_user_info(char *server, char *domain_name,
-    char *account_name, char *password, smb_userinfo_t *user_info)
+    char *account_name, smb_userinfo_t *user_info)
 {
 	mlsvc_handle_t samr_handle;
 	mlsvc_handle_t domain_handle;
@@ -86,35 +87,30 @@ sam_lookup_user_info(char *server, char *domain_name,
 		return (-1);
 	}
 
-	rc = samr_open(MLSVC_IPC_USER, server, domain_name, account_name,
-	    password, SAM_LOOKUP_INFORMATION, &samr_handle);
+	rc = samr_open(server, domain_name, account_name,
+	    SAM_LOOKUP_INFORMATION, &samr_handle);
 	if (rc != 0)
 		return (-1);
-#if 0
-	rc = samr_lookup_domain(&samr_handle, domain_name, user_info);
-	if (rc != 0)
-		return (-1);
-#endif
 	sid = (struct samr_sid *)user_info->domain_sid;
 
 	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION,
 	    sid, &domain_handle);
 	if (status == 0) {
-#if 0
-		(void) samr_lookup_domain_names(&domain_handle, account_name,
-		    user_info);
-#endif
 		access_mask = STANDARD_RIGHTS_EXECUTE | SAM_ACCESS_USER_READ;
 
-		rc = samr_open_user(&domain_handle, access_mask,
+		status = samr_open_user(&domain_handle, access_mask,
 		    user_info->rid, &user_handle);
 
-		if (rc == 0) {
+		if (status == NT_STATUS_SUCCESS) {
 			(void) get_user_group_info(&user_handle, user_info);
 			(void) samr_close_handle(&user_handle);
+		} else {
+			rc = -1;
 		}
 
 		(void) samr_close_handle(&domain_handle);
+	} else {
+		rc = -1;
 	}
 
 	(void) samr_close_handle(&samr_handle);
@@ -182,6 +178,18 @@ sam_create_trust_account(char *server, char *domain, smb_auth_info_t *auth)
 	    auth, SAMR_AF_WORKSTATION_TRUST_ACCOUNT, user_info);
 
 	mlsvc_free_user_info(user_info);
+
+
+	/*
+	 * Based on network traces, a Windows 2000 client will
+	 * always try to create the computer account first.
+	 * If it existed, then check the user permission to join
+	 * the domain.
+	 */
+
+	if (status == NT_STATUS_USER_EXISTS)
+		status = sam_check_user(server, domain, account_name);
+
 	return (status);
 }
 
@@ -211,9 +219,10 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 	DWORD rid;
 	DWORD status;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = samr_open(MLSVC_IPC_ADMIN, server, domain_name, 0, 0,
-	    SAM_CONNECT_CREATE_ACCOUNT, &samr_handle);
+	rc = samr_open(server, domain_name, user, SAM_CONNECT_CREATE_ACCOUNT,
+	    &samr_handle);
 
 	if (rc != 0) {
 		status = NT_STATUS_OPEN_FAILED;
@@ -272,7 +281,6 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 			    user_info);
 			if (rc == 0)
 				rid = user_info->rid;
-			status = 0;
 		} else {
 			smb_tracef("SamCreateAccount[%s]: %s",
 			    account_name, xlate_nt_status(status));
@@ -332,12 +340,13 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 	DWORD access_mask;
 	DWORD status;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
 	if ((user_info = mlsvc_alloc_user_info()) == 0)
 		return (NT_STATUS_NO_MEMORY);
 
-	rc = samr_open(MLSVC_IPC_ADMIN, server, domain_name, 0, 0,
-	    SAM_LOOKUP_INFORMATION, &samr_handle);
+	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
+	    &samr_handle);
 
 	if (rc != 0) {
 		mlsvc_free_user_info(user_info);
@@ -379,12 +388,100 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 			rid = user_info->rid;
 			access_mask = STANDARD_RIGHTS_EXECUTE | DELETE;
 
-			rc = samr_open_user(&domain_handle, access_mask,
+			status = samr_open_user(&domain_handle, access_mask,
 			    rid, &user_handle);
-			if (rc == 0) {
+			if (status == NT_STATUS_SUCCESS) {
 				if (samr_delete_user(&user_handle) != 0)
 					(void) samr_close_handle(&user_handle);
 			}
+		}
+
+		(void) samr_close_handle(&domain_handle);
+	}
+
+	(void) samr_close_handle(&samr_handle);
+	mlsvc_free_user_info(user_info);
+	return (status);
+}
+
+/*
+ * sam_check_user
+ *
+ * Check to see if user have permission to access computer account.
+ * The user being checked is the specified user for joining the Solaris
+ * host to the domain.
+ */
+DWORD
+sam_check_user(char *server, char *domain_name, char *account_name)
+{
+	mlsvc_handle_t samr_handle;
+	mlsvc_handle_t domain_handle;
+	mlsvc_handle_t user_handle;
+	smb_userinfo_t *user_info;
+	struct samr_sid *sid;
+	DWORD rid;
+	DWORD access_mask;
+	DWORD status;
+	int rc;
+	char *user = smbrdr_ipc_get_user();
+
+	if ((user_info = mlsvc_alloc_user_info()) == 0)
+		return (NT_STATUS_NO_MEMORY);
+
+	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
+	    &samr_handle);
+
+	if (rc != 0) {
+		mlsvc_free_user_info(user_info);
+		return (NT_STATUS_OPEN_FAILED);
+	}
+
+	if (samr_handle.context->server_os == NATIVE_OS_WIN2000) {
+		nt_domain_t *ntdp;
+
+		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
+			(void) lsa_query_account_domain_info();
+			if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
+				(void) samr_close_handle(&samr_handle);
+				return (NT_STATUS_NO_SUCH_DOMAIN);
+			}
+		}
+
+		sid = (struct samr_sid *)ntdp->sid;
+	} else {
+		if (samr_lookup_domain(&samr_handle, domain_name, user_info)
+		    != 0) {
+			(void) samr_close_handle(&samr_handle);
+			mlsvc_free_user_info(user_info);
+			return (NT_STATUS_NO_SUCH_DOMAIN);
+		}
+
+		sid = (struct samr_sid *)user_info->domain_sid;
+	}
+
+	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION, sid,
+	    &domain_handle);
+	if (status == 0) {
+		mlsvc_release_user_info(user_info);
+		status = samr_lookup_domain_names(&domain_handle, account_name,
+		    user_info);
+
+		if (status == 0) {
+			rid = user_info->rid;
+
+			/*
+			 * Win2000 client uses this access mask.  The
+			 * following SAMR user specific rights bits are
+			 * set: set password, set attributes, and get
+			 * attributes.
+			 */
+
+			access_mask = 0xb0;
+
+			status = samr_open_user(&domain_handle,
+			    access_mask, rid, &user_handle);
+			if (status == NT_STATUS_SUCCESS)
+				(void) samr_close_handle(&user_handle);
 		}
 
 		(void) samr_close_handle(&domain_handle);
@@ -413,14 +510,15 @@ sam_lookup_name(char *server, char *domain_name, char *account_name,
 	struct samr_sid *domain_sid;
 	int rc;
 	DWORD status;
+	char *user = smbrdr_ipc_get_user();
 
 	*rid_ret = 0;
 
 	if ((user_info = mlsvc_alloc_user_info()) == 0)
 		return (NT_STATUS_NO_MEMORY);
 
-	rc = samr_open(MLSVC_IPC_ANON, server, domain_name, 0, 0,
-	    SAM_LOOKUP_INFORMATION, &samr_handle);
+	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
+	    &samr_handle);
 
 	if (rc != 0) {
 		mlsvc_free_user_info(user_info);
@@ -469,9 +567,10 @@ sam_get_local_domains(char *server, char *domain_name)
 	mlsvc_handle_t samr_handle;
 	DWORD status;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = samr_open(MLSVC_IPC_ANON, server, domain_name, 0, 0,
-	    SAM_ENUM_LOCAL_DOMAIN, &samr_handle);
+	rc = samr_open(server, domain_name, user, SAM_ENUM_LOCAL_DOMAIN,
+	    &samr_handle);
 	if (rc != 0)
 		return (NT_STATUS_OPEN_FAILED);
 

@@ -75,7 +75,7 @@ smb_com_unlock_byte_range(struct smb_request *sr)
 	}
 
 	result = smb_unlock_range(sr, sr->fid_ofile->f_node,
-	    (off_t)Offset, (uint64_t)Length);
+	    (u_offset_t)Offset, (uint64_t)Length);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_unlock_range_raise_error(sr, result);
 		/* NOT REACHED */

@@ -47,13 +47,11 @@
 #include <net/if.h>
 
 #include <smbns_dyndns.h>
-#include <smbns_krb.h>
 
 /* internal use, in dyndns_add_entry */
 #define	DEL_NONE		2
 /* Maximum retires if not authoritative */
 #define	MAX_AUTH_RETRIES 3
-
 
 static int
 dyndns_enabled(void)
@@ -63,8 +61,7 @@ dyndns_enabled(void)
 	smb_config_rdlock();
 	enabled = smb_config_getyorn(SMB_CI_DYNDNS_ENABLE);
 	smb_config_unlock();
-
-	return ((enabled) ? 1 : 0);
+	return (enabled);
 }
 
 /*
@@ -620,55 +617,6 @@ dyndns_open_init_socket(int sock_type, unsigned long dest_addr, int port)
 }
 
 /*
- * dyndns_acquire_cred
- * This routine is used to acquire a GSS credential handle to a user's Kerberos
- * ticket-granting ticket (TGT) stored locally on the system.  If getting a
- * handle fails, then a new TGT will be obtained again before trying to get a
- * handle once more.
- * The user's password is taken from the environment variable
- * lookup.dns.dynamic.passwd and is encrypted.
- * Paramaters:
- *   kinit_retry: if 0 then a new TGT can be obtained before second attempt to
- *                get a handle to TGT if first attempt fails
- * Returns:
- * user_name  : name of user to get credential handle from
- * credHandle : handle to user's credential (TGT)
- * oid        : contains Kerberos 5 object identifier
- * kinit_retry: 1 if a new TGT has been acquired in this routine, otherwise 0
- *   -1         : error
- */
-static int
-dyndns_acquire_cred(gss_cred_id_t *credHandle, char *user_name,
-	gss_OID *oid, int *kinit_retry)
-{
-	char *p, pwd[100];
-
-	smb_config_rdlock();
-	p = smb_config_getstr(SMB_CI_ADS_USER);
-	if (p == NULL || *p == 0) {
-		syslog(LOG_ERR, "No user configured for "
-		    "secure dynamic DNS update.\n");
-		smb_config_unlock();
-		return (-1);
-	}
-	(void) strcpy(user_name, p);
-
-	p = smb_config_getstr(SMB_CI_ADS_PASSWD);
-	if (p == NULL || *p == 0) {
-		syslog(LOG_ERR, "No password configured for "
-		    "secure dynamic DNS update.\n");
-		smb_config_unlock();
-		return (-1);
-	}
-	smb_config_unlock();
-
-	(void) strcpy(pwd, p);
-
-	return krb5_acquire_cred_kinit(user_name, pwd, credHandle,
-	    oid, kinit_retry, "dyndns");
-}
-
-/*
  * dyndns_build_tkey_msg
  * This routine is used to build the TKEY message to transmit GSS tokens
  * during GSS security context establishment for secure DNS update.  The
@@ -741,30 +689,18 @@ dyndns_build_tkey_msg(char *buf, char *key_name, uint16_t *id,
  * processes the new token and then generates a new token to be sent to the
  * GSS server.  This cycle is continued until the security establishment is
  * done.  TCP is used to send and receive TKEY messages.
- * If gss_init_sec_context fails then a new TGT will be acquired so that
- * security establishment can be retry once more by the caller after getting
- * a handle to the new TGT (credential).
  * Parameters:
- *   credHandle  : handle to credential
+ *   cred_handle  : handle to credential
  *   s           : socket descriptor to DNS server
  *   key_name    : TKEY key name
  *   dns_hostname: fully qualified DNS hostname
  *   oid         : contains Kerberos 5 object identifier
- *   user_name   : name of user to perform DNS update
- *   kinit_retry : if 0 and gss_init_sec_context fails then get new TGT so
- *                 the caller can restart doing security context establishment
  * Returns:
  *   gss_context    : handle to security context
- *   kinit_retry    : 1 if a new TGT has been acquired in this routine,
- *                    otherwise 0
- *   do_acquire_cred: if 1 then caller will restart security context
- *                    establishment
- *   -1             : error
  */
 static int
-dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
-    int s, char *key_name, char *dns_hostname, gss_OID oid, char *user_name,
-    int *kinit_retry, int *do_acquire_cred)
+dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t cred_handle,
+    int s, char *key_name, char *dns_hostname, gss_OID oid)
 {
 	uint16_t id, rid, rsz;
 	char buf[MAX_TCP_SIZE], buf2[MAX_TCP_SIZE];
@@ -778,34 +714,19 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 	int gss_flags;
 	OM_uint32 ret_flags;
 	int buf_sz;
-	char *p, pwd[100];
-
-	smb_config_rdlock();
-	p = smb_config_getstr(SMB_CI_ADS_PASSWD);
-	if (p == NULL || *p == 0) {
-		syslog(LOG_ERR, "No password configured for "
-		    "secure dynamic DNS update.\n");
-		smb_config_unlock();
-		return (-1);
-	}
-	smb_config_unlock();
-	(void) strcpy(pwd, p);
 
 	service_sz = strlen(dns_hostname) + 5;
 	service_name = (char *)malloc(sizeof (char) * service_sz);
 	if (service_name == NULL) {
 		syslog(LOG_ERR, "Malloc failed for %d bytes ", service_sz);
-		smb_config_unlock();
 		return (-1);
 	}
 	(void) snprintf(service_name, service_sz, "DNS@%s", dns_hostname);
 	service_buf.value = service_name;
 	service_buf.length = strlen(service_name)+1;
 	if ((maj = gss_import_name(&min, &service_buf,
-	    (gss_OID) gss_nt_service_name,
-	    &target_name)) != GSS_S_COMPLETE) {
+	    GSS_C_NT_HOSTBASED_SERVICE, &target_name)) != GSS_S_COMPLETE) {
 		display_stat(maj, min);
-		(void) gss_release_oid(&min, &oid);
 		(void) free(service_name);
 		return (-1);
 	}
@@ -816,11 +737,17 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 	gss_flags = GSS_C_MUTUAL_FLAG | GSS_C_DELEG_FLAG | GSS_C_REPLAY_FLAG |
 	    GSS_C_SEQUENCE_FLAG | GSS_C_CONF_FLAG | GSS_C_INTEG_FLAG;
 	do {
-		if (krb5_establish_sec_ctx_kinit(user_name, pwd, credHandle,
-		    gss_context, target_name, oid, gss_flags, inputptr,
-		    &out_tok, &ret_flags, &time_rec, kinit_retry,
-		    do_acquire_cred, &maj, "dyndns") == -1) {
-			(void) gss_release_oid(&min, &oid);
+		maj = gss_init_sec_context(&min, cred_handle, gss_context,
+		    target_name, oid, gss_flags, 0, NULL, inputptr, NULL,
+		    &out_tok, &ret_flags, &time_rec);
+
+		if (maj != GSS_S_COMPLETE && maj != GSS_S_CONTINUE_NEEDED) {
+			assert(gss_context);
+			if (*gss_context != GSS_C_NO_CONTEXT)
+				(void) gss_delete_sec_context(&min,
+				    gss_context, NULL);
+
+			display_stat(maj, min);
 			(void) gss_release_name(&min, &target_name);
 			return (-1);
 		}
@@ -830,7 +757,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 			syslog(LOG_ERR, "dyndns: No GSS_C_REPLAY_FLAG\n");
 			if (out_tok.length > 0)
 				(void) gss_release_buffer(&min, &out_tok);
-			(void) gss_release_oid(&min, &oid);
 			(void) gss_release_name(&min, &target_name);
 			return (-1);
 		}
@@ -840,7 +766,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 			syslog(LOG_ERR, "dyndns: No GSS_C_MUTUAL_FLAG\n");
 			if (out_tok.length > 0)
 				(void) gss_release_buffer(&min, &out_tok);
-			(void) gss_release_oid(&min, &oid);
 			(void) gss_release_name(&min, &target_name);
 			return (-1);
 		}
@@ -849,7 +774,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 			if ((buf_sz = dyndns_build_tkey_msg(buf, key_name,
 			    &id, &out_tok)) <= 0) {
 				(void) gss_release_buffer(&min, &out_tok);
-				(void) gss_release_oid(&min, &oid);
 				(void) gss_release_name(&min, &target_name);
 				return (-1);
 			}
@@ -858,7 +782,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 
 			if (send(s, buf, buf_sz, 0) == -1) {
 				syslog(LOG_ERR, "dyndns: TKEY send error\n");
-				(void) gss_release_oid(&min, &oid);
 				(void) gss_release_name(&min, &target_name);
 				return (-1);
 			}
@@ -867,7 +790,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 			if (recv(s, buf2, MAX_TCP_SIZE, 0) == -1) {
 				syslog(LOG_ERR, "dyndns: TKEY "
 				    "reply recv error\n");
-				(void) gss_release_oid(&min, &oid);
 				(void) gss_release_name(&min, &target_name);
 				return (-1);
 			}
@@ -877,7 +799,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 				syslog(LOG_ERR, "dyndns: Error in "
 				    "TKEY reply: %d: ", ret);
 				dyndns_msg_err(ret);
-				(void) gss_release_oid(&min, &oid);
 				(void) gss_release_name(&min, &target_name);
 				return (-1);
 			}
@@ -885,7 +806,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 			tmpptr = &buf2[2];
 			(void) dyndns_get_nshort(tmpptr, &rid);
 			if (id != rid) {
-				(void) gss_release_oid(&min, &oid);
 				(void) gss_release_name(&min, &target_name);
 				return (-1);
 			}
@@ -901,7 +821,6 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 
 	} while (maj != GSS_S_COMPLETE);
 
-	(void) gss_release_oid(&min, &oid);
 	(void) gss_release_name(&min, &target_name);
 
 	return (0);
@@ -910,13 +829,8 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t credHandle,
 /*
  * dyndns_get_sec_context
  * Get security context for secure dynamic DNS update.  This routine opens
- * a TCP socket to the DNS server and calls routines to get a handle to a
- * locally cached user's credential and establish a security context with
- * the DNS server to perform secure dynamic DNS update.  If getting security
- * context fails then a retry may be done after reobtaining new credential and
- * getting a new credential handle.  If obtaining new credential has been
- * done earlier during getting a handle to credential then there is no need to
- * do a retry for security context.
+ * a TCP socket to the DNS server and establishes a security context with
+ * the DNS server using host principal to perform secure dynamic DNS update.
  * Parameters:
  *   hostname: fully qualified hostname
  *   dns_ip  : ip address of hostname in network byte order
@@ -930,14 +844,14 @@ static gss_ctx_id_t
 dyndns_get_sec_context(const char *hostname, int dns_ip)
 {
 	int s;
-	gss_cred_id_t credHandle;
+	gss_cred_id_t cred_handle;
 	gss_ctx_id_t gss_context;
 	gss_OID oid;
-	OM_uint32 min;
 	struct hostent *hentry;
-	int kinit_retry, do_acquire_cred;
-	char *key_name, dns_hostname[255], user_name[50];
+	char *key_name, dns_hostname[MAXHOSTNAMELEN];
 
+	cred_handle = GSS_C_NO_CREDENTIAL;
+	oid = GSS_C_NO_OID;
 	key_name = (char *)hostname;
 
 	hentry = gethostbyaddr((char *)&dns_ip, 4, AF_INET);
@@ -952,29 +866,11 @@ dyndns_get_sec_context(const char *hostname, int dns_ip)
 		return (NULL);
 	}
 
-	kinit_retry = 0;
-	do_acquire_cred = 0;
-	acquire_cred:
-
-	if (dyndns_acquire_cred(&credHandle, user_name, &oid, &kinit_retry)) {
-		(void) close(s);
-		return (NULL);
-	}
-
-	if (dyndns_establish_sec_ctx(&gss_context, credHandle, s, key_name,
-	    dns_hostname, oid, user_name, &kinit_retry, &do_acquire_cred)) {
-		(void) gss_release_cred(&min, &credHandle);
-		if (do_acquire_cred) {
-			do_acquire_cred = 0;
-			goto acquire_cred;
-		}
-		(void) close(s);
-		return (NULL);
-	}
+	if (dyndns_establish_sec_ctx(&gss_context, cred_handle, s, key_name,
+	    dns_hostname, oid))
+		gss_context = NULL;
 
 	(void) close(s);
-
-	(void) gss_release_cred(&min, &credHandle);
 	return (gss_context);
 }
 
@@ -1367,7 +1263,8 @@ sec_retry_higher:
 	key_name = (char *)hostname;
 
 	if ((s2 = dyndns_open_init_socket(SOCK_DGRAM, dns_ip, 53)) < 0) {
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
+		if (gss_context != GSS_C_NO_CONTEXT)
+			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
 	}
 
@@ -1376,7 +1273,8 @@ sec_retry_higher:
 	    ip_addr, life_time, update_type, del_type,
 	    key_name, &id, level)) <= 0) {
 		(void) close(s2);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
+		if (gss_context != GSS_C_NO_CONTEXT)
+			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
 	}
 
@@ -1388,7 +1286,8 @@ sec_retry_higher:
 	    GSS_S_COMPLETE) {
 		display_stat(maj, min);
 		(void) close(s2);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
+		if (gss_context != GSS_C_NO_CONTEXT)
+			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
 	}
 
@@ -1397,7 +1296,8 @@ sec_retry_higher:
 	    &out_mic, level)) <= 0) {
 		(void) close(s2);
 		(void) gss_release_buffer(&min, &out_mic);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
+		if (gss_context != GSS_C_NO_CONTEXT)
+			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
 	}
 
@@ -1405,13 +1305,15 @@ sec_retry_higher:
 
 	if (dyndns_udp_send_recv(s2, buf, buf_sz, buf2)) {
 		(void) close(s2);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
+		if (gss_context != GSS_C_NO_CONTEXT)
+			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
 	}
 
 	(void) close(s2);
 
-	(void) gss_delete_sec_context(&min, &gss_context, NULL);
+	if (gss_context != GSS_C_NO_CONTEXT)
+		(void) gss_delete_sec_context(&min, &gss_context, NULL);
 
 	ret = buf2[3] & 0xf;	/* error field in UDP */
 
@@ -1498,7 +1400,8 @@ dyndns_search_entry(int update_zone, const char *hostname, const char *ip_addr,
 
 /*
  * dyndns_add_remove_entry
- * Perform non-secure dynamic DNS update.  If fail then tries secure update.
+ * Perform non-secure dynamic DNS update.  If it fails and the system is in
+ * domain mode, secure update will be performed.
  * This routine opens a UDP socket to the DNS sever, build the update request
  * message, and sends the message to the DNS server.  The response is received
  * and check for error.  If there is no error then the local NSS cached is
@@ -1603,8 +1506,9 @@ retry_higher:
 		return (-1);
 	}
 
-	ret = dyndns_sec_add_remove_entry(update_zone, hostname,
-	    ip_addr, life_time, update_type, del_type, dns_str);
+	if (smb_get_security_mode() == SMB_SECMODE_DOMAIN)
+		ret = dyndns_sec_add_remove_entry(update_zone, hostname,
+		    ip_addr, life_time, update_type, del_type, dns_str);
 
 	return (ret);
 }

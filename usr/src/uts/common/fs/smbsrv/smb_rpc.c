@@ -171,9 +171,6 @@ smb_rpc_open(struct smb_request *sr)
 	char *pipe_name;
 	int status;
 
-	if (smb_winpipe_open() != 0)
-		return (NT_STATUS_INTERNAL_ERROR);
-
 	op = &sr->arg.open;
 
 	if ((pipe_name = smb_rpc_lookup(op->fqi.path)) != 0) {
@@ -278,7 +275,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 	streamin = &pipe_info->input;
 	streamin->uio.uio_iov = uio->uio_iov;
 	streamin->uio.uio_iovcnt = uio->uio_iovcnt;
-	streamin->uio.uio_offset = 0;
+	streamin->uio.uio_loffset = 0;
 	streamin->uio.uio_resid = uio->uio_resid;
 	streamin->uio.uio_segflg = UIO_SYSSPACE;
 
@@ -446,7 +443,7 @@ smb_rpc_write(struct smb_request *sr, struct uio *uio)
 	streamin = &pipe_info->input;
 	streamin->uio.uio_iov = uio->uio_iov;
 	streamin->uio.uio_iovcnt = uio->uio_iovcnt;
-	streamin->uio.uio_offset = 0;
+	streamin->uio.uio_loffset = 0;
 	streamin->uio.uio_resid = uio->uio_resid;
 	streamin->uio.uio_segflg = UIO_SYSSPACE;
 	mdrcnt = (uint32_t)uio->uio_resid;

@@ -523,7 +523,8 @@ samr_set_user_logon_hours(struct samr_SetUserInfo *sui)
 	(void) memset(sui->logon_hours.bitmap, 0xFF, SAMR_SET_USER_HOURS_SZ);
 
 	sui->info.ru.info23.logon_info.units = SAMR_HOURS_PER_WEEK;
-	sui->info.ru.info23.logon_info.hours = (DWORD)sui->logon_hours.bitmap;
+	sui->info.ru.info23.logon_info.hours =
+	    (DWORD)(uintptr_t)sui->logon_hours.bitmap;
 }
 
 /*

@@ -444,6 +444,16 @@ PSARC 2006/715: RULE W3: usr/lib/smbsrv/libmlsvc.so.1
 PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmb.so.1
 PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmbns.so.1
 PSARC 2006/715: RULE W3: usr/lib/smbsrv/libsmbrdr.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/amd64/libmlrpc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/amd64/libmlsvc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/amd64/libsmb.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/amd64/libsmbns.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/amd64/libsmbrdr.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libmlrpc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libmlsvc.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libsmb.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libsmbns.so.1
+PSARC 2006/715: RULE W3: usr/lib/smbsrv/sparcv9/libsmbrdr.so.1
 
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 

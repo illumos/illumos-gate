@@ -108,6 +108,7 @@ SUNWprivate {
 	oemstounicodes;
 	rand_hash;
 	randomize;
+	smb_ads_domain_change_notify;
 	smb_auth_DES;
 	smb_auth_gen_session_key;
 	smb_auth_ntlm_hash;
@@ -125,12 +126,12 @@ SUNWprivate {
 	smb_config_getyorn;
 	smb_config_load;
 	smb_config_rdlock;
+	smb_config_refresh;
 	smb_config_refresh_idmap;
 	smb_config_secmode_fromstr;
 	smb_config_secmode_tostr;
 	smb_config_set;
 	smb_config_set_idmap_domain;
-	smb_config_set_idmap_gc;
 	smb_config_set_secmode;
 	smb_config_setenv;
 	smb_config_setnum;
@@ -259,6 +260,7 @@ SUNWprivate {
 	smb_pwd_setcntl;
 	smb_pwd_setpasswd;
 	smb_set_domain_member;
+	smb_set_machine_pwd;
 	smb_setdomaininfo;
 	smb_smf_create_instance_pgroup;
 	smb_smf_create_service_pgroup;

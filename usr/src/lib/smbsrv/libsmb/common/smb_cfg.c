@@ -65,8 +65,7 @@ typedef struct smb_cfg_param {
 /* idmap SMF fmri and Property Group */
 #define	IDMAP_FMRI_PREFIX		"system/idmap"
 #define	MACHINE_SID			"machine_sid"
-#define	MAPPING_DOMAIN			"mapping_domain"
-#define	GLOBAL_CATALOG			"global_catalog"
+#define	IDMAP_DOMAIN			"domain_name"
 #define	IDMAP_PG_NAME			"config"
 
 #define	SMB_SECMODE_WORKGRP_STR 	"workgroup"
@@ -1014,25 +1013,13 @@ smb_config_get_localsid(void)
 /*
  * smb_config_set_idmap_domain
  *
- * Set the "config/mapping_domain" parameter from IDMAP SMF repository.
+ * Set the "config/domain_name" parameter from IDMAP SMF repository.
  */
 int
 smb_config_set_idmap_domain(char *value)
 {
 	return (smb_config_setenv_generic(IDMAP_FMRI_PREFIX, IDMAP_PG_NAME,
-	    MAPPING_DOMAIN, value));
-}
-
-/*
- * smb_config_set_idmap_gc
- *
- * Set the "config/global_catalog" parameter from IDMAP SMF repository.
- */
-int
-smb_config_set_idmap_gc(char *value)
-{
-	return (smb_config_setenv_generic(IDMAP_FMRI_PREFIX, IDMAP_PG_NAME,
-	    GLOBAL_CATALOG, value));
+	    IDMAP_DOMAIN, value));
 }
 
 /*
@@ -1048,6 +1035,17 @@ smb_config_refresh_idmap(void)
 	(void) snprintf(instance, sizeof (instance), "%s:default",
 	    IDMAP_FMRI_PREFIX);
 	return (smf_refresh_instance(instance));
+}
+
+/*
+ * smb_config_refresh
+ *
+ * Refresh SMB SMF service.
+ */
+int
+smb_config_refresh(void)
+{
+	return (smf_refresh_instance(SMBD_DEFAULT_INSTANCE_FMRI));
 }
 
 int

@@ -38,26 +38,46 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr_ipc_util.h>
 #include <smbrdr.h>
 
-#define	SMBRDR_PWD_NULL   0
-#define	SMBRDR_PWD_USER   1
-#define	SMBRDR_PWD_HASH   2
-
+static int mlsvc_anonymous_logon(char *domain_controller, char *domain_name);
+static int mlsvc_auth_logon(char *domain_controller, char *domain_name,
+    char *username, unsigned char *pwd_hash);
 static int smbrdr_smb_session_setupandx(struct sdb_logon *logon);
 static boolean_t smbrdr_logon_validate(char *server, char *username);
 static struct sdb_logon *smbrdr_logon_init(struct sdb_session *session,
-    char *username, char *pwd, int pwd_type);
-static int smbrdr_logon_user(char *server, char *username, char *pwd,
-    int pwd_type);
+    char *username, unsigned char *pwd);
+static int smbrdr_logon_user(char *server, char *username, unsigned char *pwd);
 static int smbrdr_authenticate(char *primary_domain, char *account_name,
-    char *pwd, int pwd_type);
+    unsigned char *pwd);
+
+/*
+ * mlsvc_logon
+ *
+ * If the username is NULL, an anonymous session will be established.
+ * Otherwise, an authenticated session will be established based on the
+ * specified credentials.
+ */
+int
+mlsvc_logon(char *domain_controller, char *domain, char *username)
+{
+	int rc;
+	unsigned char *pwd_hash = NULL;
+
+	if (username) {
+		pwd_hash = smbrdr_ipc_get_passwd();
+		rc = mlsvc_auth_logon(domain_controller, domain, username,
+		    pwd_hash);
+	} else {
+		rc = mlsvc_anonymous_logon(domain_controller, domain);
+	}
+
+	return (rc);
+}
 
 /*
  * mlsvc_anonymous_logon
@@ -66,38 +86,10 @@ static int smbrdr_authenticate(char *primary_domain, char *account_name,
  * controller appears to be okay we shouldn't need to do anything here.
  * Otherwise we clean up the stale session and create a new one.
  */
-int
-mlsvc_anonymous_logon(char *domain_controller, char *domain_name,
-    char **username)
+static int
+mlsvc_anonymous_logon(char *domain_controller, char *domain_name)
 {
 	int rc = 0;
-
-	if (username == NULL) {
-		syslog(LOG_ERR, "smbrdr: (anon logon) %s",
-		    xlate_nt_status(NT_STATUS_INVALID_PARAMETER));
-		return (-1);
-	}
-
-	/*
-	 * if the system is configured to establish Authenticated IPC
-	 * connection to PDC
-	 */
-	if (smbrdr_ipc_get_mode() == MLSVC_IPC_ADMIN) {
-		rc = mlsvc_admin_logon(domain_controller, domain_name);
-		/*
-		 * it is possible for the system to fallback to use
-		 * anonymous IPC
-		 */
-		if (smbrdr_ipc_get_mode() != MLSVC_IPC_ADMIN)
-			*username = MLSVC_ANON_USER;
-		else
-			*username = smbrdr_ipc_get_user();
-
-		syslog(LOG_DEBUG, "smbrdr: (admin logon) %s", *username);
-		return (rc);
-	}
-
-	*username = MLSVC_ANON_USER;
 
 	if (smbrdr_logon_validate(domain_controller, MLSVC_ANON_USER))
 		/* session & user are good use them */
@@ -110,8 +102,7 @@ mlsvc_anonymous_logon(char *domain_controller, char *domain_name,
 		return (-1);
 	}
 
-	if (smbrdr_logon_user(domain_controller, MLSVC_ANON_USER, 0,
-	    SMBRDR_PWD_NULL) < 0) {
+	if (smbrdr_logon_user(domain_controller, MLSVC_ANON_USER, 0) < 0) {
 		syslog(LOG_ERR, "smbrdr: (anon logon) logon failed");
 		rc = -1;
 	}
@@ -140,7 +131,7 @@ mlsvc_user_getauth(char *domain_controller, char *username,
 }
 
 /*
- * mlsvc_user_logon
+ * mlsvc_auth_logon
  *
  * Set up a user session. If the session to the resource domain controller
  * appears to be okay we shouldn't need to do anything here. Otherwise we
@@ -148,44 +139,19 @@ mlsvc_user_getauth(char *domain_controller, char *username,
  * established, we leave it intact. It should only need to be set up again
  * due to an inactivity timeout or a domain controller reset.
  */
-int
-mlsvc_user_logon(char *domain_controller, char *domain_name, char *username,
-    char *password)
+static int
+mlsvc_auth_logon(char *domain_controller, char *domain_name, char *username,
+    unsigned char *pwd_hash)
 {
 	int erc;
 
-	if (smbrdr_logon_validate(domain_controller, username))
-		return (0);
-
-	if (smbrdr_negotiate(domain_name) != 0) {
-		syslog(LOG_ERR, "smbrdr: (user logon) negotiate failed");
+	if (username == NULL || *username == 0) {
+		syslog(LOG_ERR, "smbrdr: auth logon (no username)");
 		return (-1);
 	}
 
-	erc = smbrdr_authenticate(domain_name, username, password,
-	    SMBRDR_PWD_USER);
-
-	return ((erc == AUTH_USER_GRANT) ? 0 : -1);
-}
-
-/*
- * mlsvc_admin_logon
- *
- * Unlike mlsvc_user_logon, mlsvc_admin_logon doesn't take
- * any username or password as function arguments.
- */
-int
-mlsvc_admin_logon(char *domain_controller, char *domain_name)
-{
-	char password[PASS_LEN + 1];
-	int erc;
-	char *username, *dummy;
-
-	username = smbrdr_ipc_get_user();
-	(void) memcpy(password, smbrdr_ipc_get_passwd(), SMBAUTH_HASH_SZ);
-
-	if (*username == 0) {
-		syslog(LOG_ERR, "smbrdr: admin logon (no admin user)");
+	if (!pwd_hash || *pwd_hash == 0) {
+		syslog(LOG_ERR, "smbrdr: auth logon (no password)");
 		return (-1);
 	}
 
@@ -197,24 +163,7 @@ mlsvc_admin_logon(char *domain_controller, char *domain_name)
 		return (-1);
 	}
 
-	erc = smbrdr_authenticate(domain_name, username, password,
-	    SMBRDR_PWD_HASH);
-
-	/*
-	 * Fallback to anonmyous IPC logon if the IPC password hash is no
-	 * longer valid. It happens when the administrator password has
-	 * been reset from the Domain Controller.
-	 */
-	if (erc < 0 && smbrdr_ipc_is_valid()) {
-		if (!smbrdr_ipc_is_fallback())
-			syslog(LOG_DEBUG, "smbrdr: admin logon "
-			    "(fallback to anonymous IPC)");
-		smbrdr_ipc_set_fallback();
-		smbrdr_ipc_save_mode(IPC_MODE_FALLBACK_ANON);
-		erc = mlsvc_anonymous_logon(domain_controller, domain_name,
-		    &dummy);
-	}
-
+	erc = smbrdr_authenticate(domain_name, username, pwd_hash);
 	return ((erc == AUTH_USER_GRANT) ? 0 : -1);
 }
 
@@ -231,7 +180,7 @@ mlsvc_admin_logon(char *domain_controller, char *domain_name)
  */
 static int
 smbrdr_authenticate(char *primary_domain, char *account_name,
-    char *pwd, int pwd_type)
+    unsigned char *pwd)
 {
 	smb_ntdomain_t *di;
 
@@ -267,7 +216,7 @@ smbrdr_authenticate(char *primary_domain, char *account_name,
 		return (-2);
 	}
 
-	return (smbrdr_logon_user(di->server, account_name, pwd, pwd_type));
+	return (smbrdr_logon_user(di->server, account_name, pwd));
 }
 
 /*
@@ -284,14 +233,14 @@ smbrdr_authenticate(char *primary_domain, char *account_name,
  * pointer will be returned.
  */
 static int
-smbrdr_logon_user(char *server, char *username, char *pwd, int pwd_type)
+smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 {
 	struct sdb_session *session;
 	struct sdb_logon *logon;
 	struct sdb_logon old_logon;
 
-	if (server == 0 || username == 0 ||
-	    ((pwd == 0) && (pwd_type != SMBRDR_PWD_NULL))) {
+	if ((server == NULL) || (username == NULL) ||
+	    ((strcmp(username, MLSVC_ANON_USER) != 0) && (pwd == NULL))) {
 		return (-1);
 	}
 
@@ -316,7 +265,7 @@ smbrdr_logon_user(char *server, char *username, char *pwd, int pwd_type)
 		old_logon = *logon;
 	}
 
-	logon = smbrdr_logon_init(session, username, pwd, pwd_type);
+	logon = smbrdr_logon_init(session, username, pwd);
 
 	if (logon == 0) {
 		syslog(LOG_ERR, "smbrdr: (logon[%s]) resource shortage",
@@ -618,10 +567,10 @@ smbrdr_smb_logoff(struct sdb_logon *logon)
  */
 static struct sdb_logon *
 smbrdr_logon_init(struct sdb_session *session, char *username,
-    char *pwd, int pwd_type)
+    unsigned char *pwd)
 {
 	struct sdb_logon *logon;
-	int smbrdr_lmcomplvl;
+	int smbrdr_lmcompl;
 	int rc;
 
 	logon = (struct sdb_logon *)malloc(sizeof (sdb_logon_t));
@@ -631,52 +580,28 @@ smbrdr_logon_init(struct sdb_session *session, char *username,
 	bzero(logon, sizeof (struct sdb_logon));
 	logon->session = session;
 
-	if (strcmp(username, "IPC$") == 0)
-		logon->type = SDB_LOGON_ANONYMOUS;
-	else
-		logon->type = SDB_LOGON_USER;
-
-	(void) strlcpy(logon->username, username, MAX_ACCOUNT_NAME);
-
 	smb_config_rdlock();
-	smbrdr_lmcomplvl = smb_config_getnum(SMB_CI_LM_LEVEL);
+	smbrdr_lmcompl = smb_config_getnum(SMB_CI_LM_LEVEL);
 	smb_config_unlock();
 
-	switch (pwd_type) {
-	case SMBRDR_PWD_USER:
-		rc = smb_auth_set_info(username, pwd, 0, session->di.domain,
-		    session->challenge_key, session->challenge_len,
-		    smbrdr_lmcomplvl, &logon->auth);
-
-		if (rc != 0) {
-			free(logon);
-			return (0);
-		}
-		break;
-
-	case SMBRDR_PWD_HASH:
-		rc = smb_auth_set_info(username, 0, (unsigned char *)pwd,
-		    session->di.domain, session->challenge_key,
-		    session->challenge_len, smbrdr_lmcomplvl, &logon->auth);
-
-		if (rc != 0) {
-			free(logon);
-			return (0);
-		}
-		break;
-
-	case SMBRDR_PWD_NULL:
+	if (strcmp(username, "IPC$") == 0) {
+		logon->type = SDB_LOGON_ANONYMOUS;
 		logon->auth.ci_len = 1;
 		*(logon->auth.ci) = 0;
 		logon->auth.cs_len = 0;
-		break;
+	} else {
+		logon->type = SDB_LOGON_USER;
+		rc = smb_auth_set_info(username, 0, pwd,
+		    session->di.domain, session->challenge_key,
+		    session->challenge_len, smbrdr_lmcompl, &logon->auth);
 
-	default:
-		/* Unknown password type */
-		free(logon);
-		return (0);
+		if (rc != 0) {
+			free(logon);
+			return (0);
+		}
 	}
 
+	(void) strlcpy(logon->username, username, MAX_ACCOUNT_NAME);
 	logon->state = SDB_LSTATE_INIT;
 	return (logon);
 }

@@ -445,11 +445,7 @@ netr_setup_authenticator(netr_info_t *netr_info,
 {
 	bzero(auth, sizeof (struct netr_authenticator));
 
-#ifdef _BIG_ENDIAN
-	netr_info->timestamp = 0;
-#else
-	netr_info->timestamp = time(0) << 8;
-#endif
+	netr_info->timestamp = time(0);
 	auth->timestamp = netr_info->timestamp;
 
 	if (netr_gen_credentials(netr_info->session_key,

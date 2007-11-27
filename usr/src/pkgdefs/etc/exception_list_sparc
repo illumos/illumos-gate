@@ -1047,7 +1047,6 @@ usr/include/smbsrv/smb_incl.h		sparc
 usr/include/smbsrv/smb_ioctl.h		sparc
 usr/include/smbsrv/smb_kproto.h		sparc
 usr/include/smbsrv/smb_privilege.h	sparc
-usr/include/smbsrv/smb_secdesc.h	sparc
 usr/include/smbsrv/smb_svc_sm.h		sparc
 usr/include/smbsrv/smb_token.h		sparc
 usr/include/smbsrv/smb_vops.h		sparc
@@ -1087,6 +1086,25 @@ usr/lib/smbsrv/dtrace/msrpc.d		sparc
 usr/lib/smbsrv/dtrace/smbnode.d		sparc
 usr/lib/smbsrv/dtrace/smbvfs.d		sparc
 usr/lib/smbsrv/dtrace/stype.d		sparc
+#
+# Private/Internal 64 bit libraries of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/sparcv9			sparc
+usr/lib/smbsrv/sparcv9/libsmb.so.1	sparc
+usr/lib/smbsrv/sparcv9/libsmb.so	sparc
+usr/lib/smbsrv/sparcv9/llib-lsmb.ln	sparc
+usr/lib/smbsrv/sparcv9/libmlrpc.so.1	sparc
+usr/lib/smbsrv/sparcv9/libmlrpc.so	sparc
+usr/lib/smbsrv/sparcv9/llib-lmlrpc.ln	sparc
+usr/lib/smbsrv/sparcv9/libmlsvc.so.1	sparc
+usr/lib/smbsrv/sparcv9/libmlsvc.so	sparc
+usr/lib/smbsrv/sparcv9/llib-lmlsvc.ln	sparc
+usr/lib/smbsrv/sparcv9/libsmbns.so.1	sparc
+usr/lib/smbsrv/sparcv9/libsmbns.so	sparc
+usr/lib/smbsrv/sparcv9/llib-lsmbns.ln	sparc
+usr/lib/smbsrv/sparcv9/libsmbrdr.so.1	sparc
+usr/lib/smbsrv/sparcv9/libsmbrdr.so	sparc
+usr/lib/smbsrv/sparcv9/llib-lsmbrdr.ln	sparc
 #
 # Private dirent, extended to include flags, for use by SMB server
 # 

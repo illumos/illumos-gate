@@ -36,6 +36,7 @@ SUNWprivate {
         mlrpc_c_bind;
         mlrpc_c_call;
         mlrpc_c_free_heap;
+	mlrpc_generic_call_stub;
         mlrpc_heap_avail;
         mlrpc_heap_create;
         mlrpc_heap_destroy;
@@ -43,10 +44,12 @@ SUNWprivate {
         mlrpc_heap_mkvcs;
         mlrpc_heap_strsave;
         mlrpc_heap_used;
+        mlrpc_lookup;
+        mlrpc_process;
         mlrpc_register_service;
-        mlsvc_lookup_context;
-        mlsvc_rpc_process;
-        mlsvc_rpc_release;
+        mlrpc_release;
+	ndr_mbstowcs;
+	ndr_mbtowc;
         ndt__char;
         ndt_s_wchar;
         ndt__uchar;

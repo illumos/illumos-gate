@@ -36,6 +36,7 @@
 #include <grp.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/lsarpc.ndl>
@@ -52,6 +53,8 @@ struct local_group_table {
 	char *sid;
 	char *name;
 };
+
+static int lsarpc_call_stub(struct mlrpc_xaction *mxa);
 
 static int lsarpc_s_CloseHandle(void *arg, struct mlrpc_xaction *);
 static int lsarpc_s_QuerySecurityObject(void *arg, struct mlrpc_xaction *);
@@ -117,9 +120,9 @@ static mlrpc_service_t lsarpc_service = {
 	"12345778-1234-abcd-ef000123456789ab", 0,	/* abstract */
 	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
 	0,				/* no bind_instance_size */
-	0,				/* no bind_req() */
-	0,				/* no unbind_and_close() */
-	0,				/* use generic_call_stub() */
+	NULL,				/* no bind_req() */
+	NULL,				/* no unbind_and_close() */
+	lsarpc_call_stub,		/* call_stub() */
 	&TYPEINFO(lsarpc_interface),	/* interface ti */
 	lsarpc_stub_table		/* stub_table */
 };
@@ -135,9 +138,9 @@ static mlrpc_service_t lsarpc_w2k_service = {
 	"3919286a-b10c-11d0-9ba800c04fd92ef5", 0,	/* abstract */
 	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
 	0,				/* no bind_instance_size */
-	0,				/* no bind_req() */
-	0,				/* no unbind_and_close() */
-	0,				/* use generic_call_stub() */
+	NULL,				/* no bind_req() */
+	NULL,				/* no unbind_and_close() */
+	lsarpc_call_stub,		/* call_stub() */
 	&TYPEINFO(lsarpc_interface),	/* interface ti */
 	lsarpc_stub_table		/* stub_table */
 };
@@ -156,6 +159,18 @@ lsarpc_initialize(void)
 
 	if (lsarpc_w2k_enable)
 		(void) mlrpc_register_service(&lsarpc_w2k_service);
+}
+
+/*
+ * Custom call_stub to set the stream string policy.
+ */
+static int
+lsarpc_call_stub(struct mlrpc_xaction *mxa)
+{
+	MLNDS_SETF(&mxa->send_mlnds, MLNDS_F_NOTERM);
+	MLNDS_SETF(&mxa->recv_mlnds, MLNDS_F_NOTERM);
+
+	return (mlrpc_generic_call_stub(mxa));
 }
 
 /*

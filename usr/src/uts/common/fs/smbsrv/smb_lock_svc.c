@@ -571,7 +571,7 @@ smb_lock_create(
 	 * in cv_timedwait.
 	 */
 	lock->l_end_time = lbolt + MSEC_TO_TICK(timeout);
-	if (timeout == 0xffffffff) {
+	if (timeout == UINT_MAX) {
 		lock->l_flags |= SMB_LOCK_FLAG_INDEFINITE;
 	}
 	mutex_init(&lock->l_mutex, NULL, MUTEX_DEFAULT, NULL);

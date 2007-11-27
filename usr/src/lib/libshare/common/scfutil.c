@@ -790,8 +790,9 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 				node = xmlNewChild(resource, NULL,
 				    (xmlChar *)"optionset", NULL);
 			} else {
-				/* this shouldn't happen */
+				/* This shouldn't happen. */
 				ret = SA_SYSTEM_ERR;
+				goto out;
 			}
 		} else {
 			/*

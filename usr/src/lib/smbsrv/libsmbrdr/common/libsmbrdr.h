@@ -37,7 +37,7 @@ extern "C" {
 /*
  * Redirector IPC functions
  *
- * The following functions are required by the mlsvc_validate_user to
+ * The following functions are required by the mlsvc_join to
  * apply new authentication information for the authenticated IPC, rollback
  * or commit the changes to the original authentication information.
  */
@@ -45,25 +45,12 @@ extern void smbrdr_ipc_set(char *, unsigned char *);
 extern void smbrdr_ipc_commit(void);
 extern void smbrdr_ipc_rollback(void);
 extern int smbrdr_ipc_skip_lsa_query(void);
-extern int smbrdr_ipc_get_mode(void);
-extern void smbrdr_ipc_save_mode(char *val);
-extern unsigned smbrdr_ipc_get_flags(void);
-extern void smbrdr_ipc_set_fallback(void);
-extern void smbrdr_ipc_unset_fallback(void);
-extern int smbrdr_ipc_is_fallback(void);
-
-/*
- * Functions for obtaining the resource domain administrator credentials.
- */
 extern char *smbrdr_ipc_get_user(void);
-extern char *smbrdr_ipc_get_passwd(void);
-extern int smbrdr_ipc_is_valid(void);
+extern unsigned char *smbrdr_ipc_get_passwd(void);
 
 
-/* Redirector LOGON functions */
-extern int mlsvc_anonymous_logon(char *, char *, char **);
-extern int mlsvc_user_logon(char *, char *, char *, char *);
-extern int mlsvc_admin_logon(char *, char *);
+/* Redirector LOGON function */
+extern int mlsvc_logon(char *, char *, char *);
 
 extern int smbrdr_rpc_readx(int, char *, int);
 

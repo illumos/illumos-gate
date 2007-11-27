@@ -53,3 +53,6 @@ P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWsmbskr	SMB Kernel (Root)
 P SUNWsmbsr	SMB Server (Root)
+P SUNWlxml	The XML library
+P SUNWgss	GSSAPI V2
+P SUNWkrbu	Kerberos version 5 support (Usr)

@@ -46,7 +46,7 @@ $(ROOTMANIFEST):= FILEMODE = 0444
 
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lbsm -lnsl -lsocket
+LDLIBS += -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb -lbsm -lnsl -lsocket
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv
 ROOTSMBDFILE = $(PROG:%=$(ROOTSMBDDIR)/%)

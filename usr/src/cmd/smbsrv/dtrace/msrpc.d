@@ -32,6 +32,57 @@
  * On multi-processor systems, it may be easier to follow the output
  * if run on a single processor: see psradm.  For example, to disable
  * the second processor on a dual-processor system:	psradm -f 1
+ *
+ * This script can be used to trace NDR operations and MSRPC requests.
+ * In order to put these operations in context, SMB session and tree
+ * requests are also traced.
+ *
+ * Output formatting is as follows:
+ *
+ *      UI 03 ... rpc_vers           get 1@0   =    5 {05}
+ *      UI 03 ... rpc_vers_minor     get 1@1   =    0 {00}
+ *
+ *      U       Marshalling flag (M=marshal, U=unmarshal)
+ *      I       Direction flag (I=in, O=out)
+ *      ...     Field name
+ *      get     PDU operation (get or put)
+ *      1@0     Bytes @ offset (i.e. 1 byte at offset 0)
+ *      {05}    Value
+ *
+ * The value formatting is limited to 10 bytes, after which an ellipsis
+ * will be inserted before the closing brace.  If the value is 1 or 2
+ * bytes, an attempt will be made to present an ASCII value but this may
+ * or may not be relevent.
+ *
+ * The following example shows the header from a bind response:
+ *
+ *  trace:entry MO 03 ... rpc_vers         put 1@0   =    5 {05}
+ *  trace:entry MO 03 ... rpc_vers_minor   put 1@1   =    0 {00}
+ *  trace:entry MO 03 ... ptype            put 1@2   =   12 {0c}
+ *  trace:entry MO 03 ... pfc_flags        put 1@3   =    3 {03}
+ *  trace:entry MO 04 .... intg_char_rep   put 1@4   =   16 {10}
+ *  trace:entry MO 04 .... float_rep       put 1@5   =    0 {00}
+ *  trace:entry MO 04 .... _spare[0]       put 1@6   =    0 {00}
+ *  trace:entry MO 04 .... _spare[1]       put 1@7   =    0 {00}
+ *  trace:entry MO 03 ... frag_length      put 2@8   =   68 {44 00} D
+ *  trace:entry MO 03 ... auth_length      put 2@10  =    0 {00 00}
+ *  trace:entry MO 03 ... call_id          put 4@12  =    1 {01 00 00 00}
+ *  trace:entry MO 02 .. max_xmit_frag     put 2@16  = 4280 {b8 10}
+ *  trace:entry MO 02 .. max_recv_frag     put 2@18  = 4280 {b8 10}
+ *  trace:entry MO 02 .. assoc_group_id    put 4@20  = 1192620711 {a7 f2 15 47}
+ *  trace:entry MO 02 .. sec_addr.length   put 2@24  =   12 {0c 00}
+ *  trace:entry MO 02 .. sec_addr.port_spec[0]  put 1@26  =   92 {5c} \
+ *  trace:entry MO 02 .. sec_addr.port_spec[1]  put 1@27  =   80 {50} P
+ *  trace:entry MO 02 .. sec_addr.port_spec[2]  put 1@28  =   73 {49} I
+ *  trace:entry MO 02 .. sec_addr.port_spec[3]  put 1@29  =   80 {50} P
+ *  trace:entry MO 02 .. sec_addr.port_spec[4]  put 1@30  =   69 {45} E
+ *  trace:entry MO 02 .. sec_addr.port_spec[5]  put 1@31  =   92 {5c} \
+ *  trace:entry MO 02 .. sec_addr.port_spec[6]  put 1@32  =  108 {6c} l
+ *  trace:entry MO 02 .. sec_addr.port_spec[7]  put 1@33  =  115 {73} s
+ *  trace:entry MO 02 .. sec_addr.port_spec[8]  put 1@34  =   97 {61} a
+ *  trace:entry MO 02 .. sec_addr.port_spec[9]  put 1@35  =  115 {73} s
+ *  trace:entry MO 02 .. sec_addr.port_spec[10]  put 1@36  = 115 {73} s
+ *  trace:entry MO 02 .. sec_addr.port_spec[11]  put 1@37  =   0 {00}
  */
 
 /*
@@ -128,7 +179,6 @@ pid$target::lsarpc_s_EnumPrivsAccount:entry,
 pid$target::lsarpc_s_LookupPrivValue:entry,
 pid$target::lsarpc_s_LookupPrivName:entry,
 pid$target::lsarpc_s_LookupPrivDisplayName:entry,
-pid$target::lsarpc_s_Discovery:entry,
 pid$target::lsarpc_s_QueryInfoPolicy:entry,
 pid$target::lsarpc_s_OpenDomainHandle:entry,
 pid$target::lsarpc_s_OpenDomainHandle:entry,
@@ -149,7 +199,6 @@ pid$target::lsarpc_s_EnumPrivsAccount:return,
 pid$target::lsarpc_s_LookupPrivValue:return,
 pid$target::lsarpc_s_LookupPrivName:return,
 pid$target::lsarpc_s_LookupPrivDisplayName:return,
-pid$target::lsarpc_s_Discovery:return,
 pid$target::lsarpc_s_QueryInfoPolicy:return,
 pid$target::lsarpc_s_OpenDomainHandle:return,
 pid$target::lsarpc_s_OpenDomainHandle:return,
@@ -297,4 +346,40 @@ pid$target::winreg_s_*:return
 pid$target::wkssvc_s_*:entry,
 pid$target::wkssvc_s_*:return
 {
+}
+
+/*
+ * SMBRDR
+ */
+pid$target::smbrdr_*:entry,
+pid$target::smbrdr_*:return
+{
+}
+
+pid$target::mlsvc_tree_connect:entry
+{
+	printf("%s %s %s",
+	    copyinstr(arg0),
+	    copyinstr(arg1),
+	    copyinstr(arg2));
+}
+
+pid$target::mlsvc_open_pipe:entry
+{
+	printf("%s %s %s %s",
+	    copyinstr(arg0),
+	    copyinstr(arg1),
+	    copyinstr(arg2),
+	    copyinstr(arg3));
+}
+
+pid$target::mlsvc_close_pipe:entry
+{
+}
+
+pid$target::mlsvc_tree_connect:return,
+pid$target::mlsvc_open_pipe:return,
+pid$target::mlsvc_close_pipe:return
+{
+	printf("%d", arg1);
 }

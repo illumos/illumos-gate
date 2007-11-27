@@ -34,6 +34,6 @@ OBJS=	$(SRCS:%.c=%.o)
 
 include ../Makefile.smbsrv.defs
 
-LDLIBS = -lumem -lkstat
+LDLIBS += -lkstat
 include ../Makefile.smbsrv.targ
 include ../../Makefile.targ

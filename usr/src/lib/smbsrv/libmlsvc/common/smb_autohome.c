@@ -370,6 +370,7 @@ smb_autohome_keysub(const char *name, char *buf, int buflen)
 	char key[SMB_AUTOHOME_KEYSIZ];
 	char *ampersand;
 	char *tmp;
+	int bufsize = buflen;
 
 	(void) strlcpy(key, buf, SMB_AUTOHOME_KEYSIZ);
 
@@ -377,6 +378,12 @@ smb_autohome_keysub(const char *name, char *buf, int buflen)
 		return (NULL);
 
 	*tmp = '\0';
+
+	/*
+	 * Substitution characters are not allowed in the key.
+	 */
+	if (strpbrk(key, "?&") != NULL)
+		return (NULL);
 
 	if (strcmp(key, "*") == 0 && name != NULL)
 		(void) strlcpy(key, name, SMB_AUTOHOME_KEYSIZ);
@@ -387,8 +394,9 @@ smb_autohome_keysub(const char *name, char *buf, int buflen)
 		if ((tmp = strdup(ampersand + 1)) == NULL)
 			return (0);
 
-		(void) strlcpy(ampersand, key, buflen);
-		(void) strlcat(ampersand, tmp, buflen);
+		bufsize = buflen - (ampersand - buf);
+		(void) strlcpy(ampersand, key, bufsize);
+		(void) strlcat(ampersand, tmp, bufsize);
 		free(tmp);
 	}
 

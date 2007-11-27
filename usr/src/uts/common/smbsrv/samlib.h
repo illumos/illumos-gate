@@ -49,7 +49,7 @@ extern "C" {
  * samlib.c
  */
 int sam_lookup_user_info(char *server, char *domain_name, char *username,
-    char *password, smb_userinfo_t *user_info);
+    smb_userinfo_t *user_info);
 
 DWORD sam_create_trust_account(char *server, char *domain,
     smb_auth_info_t *auth);
@@ -65,12 +65,13 @@ DWORD sam_lookup_name(char *server, char *domain_name, char *account_name,
     DWORD *rid_ret);
 
 DWORD sam_get_local_domains(char *server, char *domain_name);
+DWORD sam_check_user(char *server, char *domain_name, char *account_name);
 
 /*
  * samr_open.c
  */
-int samr_open(int ipc_mode, char *server, char *domain, char *username,
-    char *password, DWORD access_mask, mlsvc_handle_t *samr_handle);
+int samr_open(char *server, char *domain, char *username,
+    DWORD access_mask, mlsvc_handle_t *samr_handle);
 
 int samr_connect(char *server, char *domain, char *username,
     DWORD access_mask, mlsvc_handle_t *samr_handle);
@@ -80,7 +81,7 @@ int samr_close_handle(mlsvc_handle_t *handle);
 DWORD samr_open_domain(mlsvc_handle_t *samr_handle, DWORD access_mask,
     struct samr_sid *sid, mlsvc_handle_t *domain_handle);
 
-int samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask,
+DWORD samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask,
     DWORD rid, mlsvc_handle_t *user_handle);
 
 DWORD samr_delete_user(mlsvc_handle_t *user_handle);

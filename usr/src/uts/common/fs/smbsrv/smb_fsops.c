@@ -26,28 +26,18 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sid.h>
-#include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smbvar.h>
+#include <smbsrv/ntstatus.h>
+#include <smbsrv/ntaccess.h>
 #include <acl/acl_common.h>
 
 u_longlong_t smb_caller_id;
 
 static int smb_fsop_amask_to_omode(uint32_t granted_access);
-
-extern uint32_t smb_sd_tofs(smb_sdbuf_t *sr_sd, smb_fssd_t *fs_sd);
-
-extern uint32_t smb_sd_write(smb_request_t *sr, smb_sdbuf_t *sr_sd,
-    uint32_t secinfo);
-
-extern int smb_vop_acl_to_vsa(acl_t *acl_info, vsecattr_t *vsecattr,
-    int *aclbsize);
-
 static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
     smb_fssd_t *fs_sd);
-
-static void smb_fsop_aclsplit(acl_t *zacl, acl_t **dacl, acl_t **sacl,
-    int which_acl);
-static acl_t *smb_fsop_aclmerge(acl_t *dacl, acl_t *sacl);
 
 /*
  * The smb_fsop_* functions have knowledge of CIFS semantics.
@@ -161,6 +151,7 @@ smb_fsop_create_with_sd(
 	int flags = 0;
 	int is_dir;
 	int rc;
+	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(fs_sd);
 
@@ -178,14 +169,14 @@ smb_fsop_create_with_sd(
 			sacl = fs_sd->sd_zsacl;
 			ASSERT(dacl || sacl);
 			if (dacl && sacl) {
-				acl = smb_fsop_aclmerge(dacl, sacl);
+				acl = smb_fsacl_merge(dacl, sacl);
 			} else if (dacl) {
 				acl = dacl;
 			} else {
 				acl = sacl;
 			}
 
-			rc = smb_vop_acl_to_vsa(acl, &vsecattr, &aclbsize);
+			rc = smb_fsacl_to_vsa(acl, &vsecattr, &aclbsize);
 
 			if (dacl && sacl)
 				acl_free(acl);
@@ -231,8 +222,11 @@ smb_fsop_create_with_sd(
 		}
 
 		if (set_attr.sa_mask) {
+			if (sr && sr->tid_tree)
+				if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
+					no_xvattr = B_TRUE;
 			rc = smb_vop_setattr(snode->vp, NULL, &set_attr,
-			    0, kcred, &ct);
+			    0, kcred, no_xvattr, &ct);
 		}
 
 	} else {
@@ -253,7 +247,10 @@ smb_fsop_create_with_sd(
 			    cr, &ct, NULL);
 		}
 
-		if (rc == 0)
+		if (rc != 0)
+			return (rc);
+
+		if ((sr->tid_tree->t_flags & SMB_TREE_FLAG_NFS_MOUNTED) == 0)
 			rc = smb_fsop_sdwrite(sr, kcred, snode, fs_sd, 1);
 	}
 
@@ -264,6 +261,14 @@ smb_fsop_create_with_sd(
 		if (*ret_snode == NULL) {
 			VN_RELE(vp);
 			rc = ENOMEM;
+		}
+	}
+
+	if (rc != 0) {
+		if (is_dir) {
+			(void) smb_vop_rmdir(snode->vp, name, flags, cr, &ct);
+		} else {
+			(void) smb_vop_remove(snode->vp, name, flags, cr, &ct);
 		}
 	}
 
@@ -417,36 +422,36 @@ smb_fsop_create(
 			return (ENOMEM);
 		}
 	} else {
-		if (op->sd_buf) {
+		if (op->sd) {
 			/*
 			 * SD sent by client in Windows format. Needs to be
 			 * converted to FS format. No inheritance.
 			 */
-			secinfo = smb_sd_get_secinfo((smb_sdbuf_t *)op->sd_buf);
-			smb_fsop_sdinit(&fs_sd, secinfo, 0);
+			secinfo = smb_sd_get_secinfo(op->sd);
+			smb_fssd_init(&fs_sd, secinfo, 0);
 
-			status = smb_sd_tofs(op->sd_buf, &fs_sd);
+			status = smb_sd_tofs(op->sd, &fs_sd);
 			if (status == NT_STATUS_SUCCESS) {
 				rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
 				    name, attr, ret_snode, ret_attr, &fs_sd);
 			}
 			else
 				rc = EINVAL;
-			smb_fsop_sdterm(&fs_sd);
+			smb_fssd_term(&fs_sd);
 		} else if (sr->tid_tree->t_acltype == ACE_T) {
 			/*
 			 * No incoming SD and filesystem is ZFS
 			 * Server applies Windows inheritance rules,
 			 * see smb_fsop_sdinherit() comments as to why.
 			 */
-			smb_fsop_sdinit(&fs_sd, SMB_ACL_SECINFO, 0);
+			smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, 0);
 			rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
 			if (rc == 0) {
 				rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
 				    name, attr, ret_snode, ret_attr, &fs_sd);
 			}
 
-			smb_fsop_sdterm(&fs_sd);
+			smb_fssd_term(&fs_sd);
 		} else {
 			/*
 			 * No incoming SD and filesystem is not ZFS
@@ -554,36 +559,36 @@ smb_fsop_mkdir(
 
 	smb_get_caller_context(sr, &ct);
 
-	if (op->sd_buf) {
+	if (op->sd) {
 		/*
 		 * SD sent by client in Windows format. Needs to be
 		 * converted to FS format. No inheritance.
 		 */
-		secinfo = smb_sd_get_secinfo((smb_sdbuf_t *)op->sd_buf);
-		smb_fsop_sdinit(&fs_sd, secinfo, SMB_FSSD_FLAGS_DIR);
+		secinfo = smb_sd_get_secinfo(op->sd);
+		smb_fssd_init(&fs_sd, secinfo, SMB_FSSD_FLAGS_DIR);
 
-		status = smb_sd_tofs(op->sd_buf, &fs_sd);
+		status = smb_sd_tofs(op->sd, &fs_sd);
 		if (status == NT_STATUS_SUCCESS) {
 			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		}
 		else
 			rc = EINVAL;
-		smb_fsop_sdterm(&fs_sd);
+		smb_fssd_term(&fs_sd);
 	} else if (sr->tid_tree->t_acltype == ACE_T) {
 		/*
 		 * No incoming SD and filesystem is ZFS
 		 * Server applies Windows inheritance rules,
 		 * see smb_fsop_sdinherit() comments as to why.
 		 */
-		smb_fsop_sdinit(&fs_sd, SMB_ACL_SECINFO, SMB_FSSD_FLAGS_DIR);
+		smb_fssd_init(&fs_sd, SMB_ACL_SECINFO, SMB_FSSD_FLAGS_DIR);
 		rc = smb_fsop_sdinherit(sr, dir_snode, &fs_sd);
 		if (rc == 0) {
 			rc = smb_fsop_create_with_sd(sr, cr, dir_snode,
 			    name, attr, ret_snode, ret_attr, &fs_sd);
 		}
 
-		smb_fsop_sdterm(&fs_sd);
+		smb_fssd_term(&fs_sd);
 
 	} else {
 		rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp, flags, cr,
@@ -1242,6 +1247,7 @@ smb_fsop_setattr(
 	uint32_t access = 0;
 	int rc = 0;
 	int flags = 0;
+	boolean_t no_xvattr = B_FALSE;
 
 	ASSERT(cr);
 	ASSERT(snode);
@@ -1281,8 +1287,12 @@ smb_fsop_setattr(
 		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
 		unnamed_vp = unnamed_node->vp;
 	}
+	if (sr && sr->tid_tree)
+		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
+			no_xvattr = B_TRUE;
 
-	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr, &ct);
+	rc = smb_vop_setattr(snode->vp, unnamed_vp,
+	    set_attr, flags, cr, no_xvattr, &ct);
 
 	if ((rc == 0) && ret_attr) {
 		/*
@@ -1930,34 +1940,6 @@ smb_fsop_commit(smb_request_t *sr, cred_t *cr, smb_node_t *snode)
 }
 
 /*
- * smb_fsop_sdinit
- *
- * Initializes the given FS SD structure.
- */
-void
-smb_fsop_sdinit(smb_fssd_t *fs_sd, uint32_t secinfo, uint32_t flags)
-{
-	bzero(fs_sd, sizeof (smb_fssd_t));
-	fs_sd->sd_secinfo = secinfo;
-	fs_sd->sd_flags = flags;
-}
-
-/*
- * smb_fsop_sdterm
- *
- * Frees allocated memory for acl fields.
- */
-void
-smb_fsop_sdterm(smb_fssd_t *fs_sd)
-{
-	ASSERT(fs_sd);
-
-	smb_fsop_aclfree(fs_sd->sd_zdacl);
-	smb_fsop_aclfree(fs_sd->sd_zsacl);
-	bzero(fs_sd, sizeof (smb_fssd_t));
-}
-
-/*
  * smb_fsop_aclread
  *
  * Retrieve filesystem ACL. Depends on requested ACLs in
@@ -1969,7 +1951,7 @@ smb_fsop_sdterm(smb_fssd_t *fs_sd)
  *
  * Returned ACL is always in ACE_T (aka ZFS) format.
  * If successful the allocated memory for the ACL should be freed
- * using smb_fsop_aclfree() or smb_fsop_sdterm()
+ * using smb_fsacl_free() or smb_fssd_term()
  */
 int
 smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
@@ -2022,7 +2004,7 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	    (snode->vp->v_type == VDIR), fs_sd->sd_uid, fs_sd->sd_gid);
 
 	if (error == 0) {
-		smb_fsop_aclsplit(acl, &fs_sd->sd_zdacl, &fs_sd->sd_zsacl,
+		smb_fsacl_split(acl, &fs_sd->sd_zdacl, &fs_sd->sd_zsacl,
 		    fs_sd->sd_secinfo);
 	}
 
@@ -2097,7 +2079,7 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		return (EINVAL);
 
 	if (dacl && sacl)
-		acl = smb_fsop_aclmerge(dacl, sacl);
+		acl = smb_fsacl_merge(dacl, sacl);
 	else if (dacl)
 		acl = dacl;
 	else
@@ -2117,102 +2099,6 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		acl_free(acl);
 
 	return (error);
-}
-
-acl_t *
-smb_fsop_aclalloc(int acenum, int flags)
-{
-	acl_t *acl;
-
-	acl = acl_alloc(ACE_T);
-	acl->acl_cnt = acenum;
-	acl->acl_aclp = kmem_zalloc(acl->acl_entry_size * acenum, KM_SLEEP);
-	acl->acl_flags = flags;
-	return (acl);
-}
-
-void
-smb_fsop_aclfree(acl_t *acl)
-{
-	if (acl)
-		acl_free(acl);
-}
-
-/*
- * smb_fsop_aclmerge
- *
- * smb_fsop_aclread/write routines which interact with filesystem
- * work with single ACL. This routine merges given DACL and SACL
- * which might have been created during CIFS to FS conversion into
- * one single ACL.
- */
-static acl_t *
-smb_fsop_aclmerge(acl_t *dacl, acl_t *sacl)
-{
-	acl_t *acl;
-	int dacl_size;
-
-	ASSERT(dacl);
-	ASSERT(sacl);
-
-	acl = smb_fsop_aclalloc(dacl->acl_cnt + sacl->acl_cnt, dacl->acl_flags);
-	dacl_size = dacl->acl_cnt * dacl->acl_entry_size;
-	bcopy(dacl->acl_aclp, acl->acl_aclp, dacl_size);
-	bcopy(sacl->acl_aclp, (char *)acl->acl_aclp + dacl_size,
-	    sacl->acl_cnt * sacl->acl_entry_size);
-
-	return (acl);
-}
-
-/*
- * smb_fsop_aclsplit
- *
- * splits the given ACE_T ACL (zacl) to one or two ACLs (DACL/SACL) based on
- * the 'which_acl' parameter. Note that output dacl/sacl parameters could be
- * NULL even if they're specified in 'which_acl', which means the target
- * doesn't have any access and/or audit ACEs.
- */
-static void
-smb_fsop_aclsplit(acl_t *zacl, acl_t **dacl, acl_t **sacl, int which_acl)
-{
-	ace_t *zace;
-	ace_t *access_ace;
-	ace_t *audit_ace;
-	int naccess, naudit;
-	int get_dacl, get_sacl;
-	int i;
-
-	*dacl = *sacl = NULL;
-	naccess = naudit = 0;
-	get_dacl = (which_acl & SMB_DACL_SECINFO);
-	get_sacl = (which_acl & SMB_SACL_SECINFO);
-
-	for (i = 0, zace = zacl->acl_aclp; i < zacl->acl_cnt; zace++, i++) {
-		if (get_dacl && smb_ace_is_access(zace->a_type))
-			naccess++;
-		else if (get_sacl && smb_ace_is_audit(zace->a_type))
-			naudit++;
-	}
-
-	if (naccess) {
-		*dacl = smb_fsop_aclalloc(naccess, zacl->acl_flags);
-		access_ace = (*dacl)->acl_aclp;
-	}
-
-	if (naudit) {
-		*sacl = smb_fsop_aclalloc(naudit, zacl->acl_flags);
-		audit_ace = (*sacl)->acl_aclp;
-	}
-
-	for (i = 0, zace = zacl->acl_aclp; i < zacl->acl_cnt; zace++, i++) {
-		if (get_dacl && smb_ace_is_access(zace->a_type)) {
-			*access_ace = *zace;
-			access_ace++;
-		} else if (get_sacl && smb_ace_is_audit(zace->a_type)) {
-			*audit_ace = *zace;
-			audit_ace++;
-		}
-	}
 }
 
 acl_type_t
@@ -2328,7 +2214,7 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 			/*
 			 * Don't overwrite existing audit entries
 			 */
-			smb_fsop_sdinit(&cur_sd, SMB_SACL_SECINFO,
+			smb_fssd_init(&cur_sd, SMB_SACL_SECINFO,
 			    fs_sd->sd_flags);
 
 			error = smb_fsop_sdread(sr, kcred, snode, &cur_sd);
@@ -2343,7 +2229,7 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 			/*
 			 * Don't overwrite existing access entries
 			 */
-			smb_fsop_sdinit(&cur_sd, SMB_DACL_SECINFO,
+			smb_fssd_init(&cur_sd, SMB_DACL_SECINFO,
 			    fs_sd->sd_flags);
 
 			error = smb_fsop_sdread(sr, kcred, snode, &cur_sd);
@@ -2357,7 +2243,7 @@ smb_fsop_sdmerge(smb_request_t *sr, smb_node_t *snode, smb_fssd_t *fs_sd)
 		}
 
 		if (error)
-			smb_fsop_sdterm(&cur_sd);
+			smb_fssd_term(&cur_sd);
 	}
 
 	return (error);
@@ -2460,15 +2346,6 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	return (error);
 }
 
-/*ARGSUSED*/
-void
-smb_get_caller_context(smb_request_t *sr, caller_context_t *ct)
-{
-	ct->cc_caller_id = smb_caller_id;
-	ct->cc_pid = 0;			/* TBD */
-	ct->cc_sysid = 0;		/* TBD */
-}
-
 /*
  * smb_fsop_sdinherit
  *
@@ -2498,8 +2375,8 @@ static int
 smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 {
 	int is_dir;
-	acl_t *dacl;
-	acl_t *sacl;
+	acl_t *dacl = NULL;
+	acl_t *sacl = NULL;
 	ksid_t *owner_sid;
 	int error;
 
@@ -2523,13 +2400,16 @@ smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode, smb_fssd_t *fs_sd)
 	is_dir = (fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR);
 	owner_sid = crgetsid(sr->user_cr, KSID_OWNER);
 	ASSERT(owner_sid);
-	dacl = smb_acl_inherit(fs_sd->sd_zdacl, is_dir, SMB_DACL_SECINFO,
+	dacl = smb_fsacl_inherit(fs_sd->sd_zdacl, is_dir, SMB_DACL_SECINFO,
 	    owner_sid->ks_id);
-	sacl = smb_acl_inherit(fs_sd->sd_zsacl, is_dir, SMB_SACL_SECINFO,
+	sacl = smb_fsacl_inherit(fs_sd->sd_zsacl, is_dir, SMB_SACL_SECINFO,
 	    (uid_t)-1);
 
-	smb_fsop_aclfree(fs_sd->sd_zdacl);
-	smb_fsop_aclfree(fs_sd->sd_zsacl);
+	if (sacl == NULL)
+		fs_sd->sd_secinfo &= ~SMB_SACL_SECINFO;
+
+	smb_fsacl_free(fs_sd->sd_zdacl);
+	smb_fsacl_free(fs_sd->sd_zsacl);
 
 	fs_sd->sd_zdacl = dacl;
 	fs_sd->sd_zsacl = sacl;
@@ -2592,4 +2472,13 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (access & VWRITE)
 		*eaccess |= FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES |
 		    FILE_WRITE_EA | FILE_APPEND_DATA | FILE_DELETE_CHILD;
+}
+
+/*ARGSUSED*/
+void
+smb_get_caller_context(smb_request_t *sr, caller_context_t *ct)
+{
+	ct->cc_caller_id = smb_caller_id;
+	ct->cc_pid = 0;			/* TBD */
+	ct->cc_sysid = 0;		/* TBD */
 }

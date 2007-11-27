@@ -356,7 +356,7 @@ winreg_s_QueryValue(void *arg, struct mlrpc_xaction *mxa)
 	pv->vc_first_is = 0;
 	pv->vc_length_is = slen;
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	(void) mts_mbstowcs((mts_wchar_t *)pv->value, value, slen);
+	(void) ndr_mbstowcs(NULL, (mts_wchar_t *)pv->value, value, slen);
 
 	*param->type = 1;
 	*param->value_size = slen;

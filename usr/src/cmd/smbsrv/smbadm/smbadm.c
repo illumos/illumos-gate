@@ -1358,14 +1358,12 @@ smbadm_pwd_strerror(int error)
  * Enable libumem debugging by default on DEBUG builds.
  */
 #ifdef DEBUG
-/* LINTED - external libumem symbol */
 const char *
 _umem_debug_init(void)
 {
 	return ("default,verbose"); /* $UMEM_DEBUG setting */
 }
 
-/* LINTED - external libumem symbol */
 const char *
 _umem_logging_init(void)
 {

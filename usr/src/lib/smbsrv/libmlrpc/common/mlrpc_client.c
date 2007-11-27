@@ -240,13 +240,12 @@ fault_exit:
 	return (rc);
 }
 
-int
+void
 mlrpc_c_free_heap(struct mlrpc_binding *mbind, mlrpc_heapref_t *heapref)
 {
 	struct mlrpc_client *mcli = mbind->context;
 
 	(*mcli->xa_release)(mcli, heapref);
-	return (0);
 }
 
 static void

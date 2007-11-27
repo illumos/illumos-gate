@@ -44,6 +44,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
+#include <smbsrv/smb_i18n.h>
 #endif
 
 #ifdef __cplusplus
@@ -259,6 +260,7 @@ struct mlndr_stream {
 	unsigned char		m_op;
 	unsigned char		dir;
 	unsigned char		swap;		/* native/net endian swap */
+	unsigned char		flags;
 	short			error;
 	short			error_ref;
 
@@ -289,6 +291,10 @@ struct mlndr_stream {
 #define	NDR_MODE_MATCH(MLNDS, MODE) \
 	(NDR_M_OP_AND_DIR_TO_MODE((MLNDS)->m_op, (MLNDS)->dir) == (MODE))
 
+#define	MLNDS_F_NONE		0x00
+#define	MLNDS_F_NOTERM		0x01	/* strings are not null terminated */
+#define	MLNDS_SETF(S, F)	((S)->flags |= (F))
+#define	MLNDS_CLEARF(S, F)	((S)->flags &= ~(F))
 
 #define	NDR_ERR_MALLOC_FAILED		-1
 #define	NDR_ERR_M_OP_INVALID		-2
@@ -459,6 +465,10 @@ int mlndr_inner(struct ndr_reference *);
 int mlndr_inner_pointer(struct ndr_reference *);
 int mlndr_inner_reference(struct ndr_reference *);
 int mlndr_inner_array(struct ndr_reference *);
+
+size_t ndr_mbstowcs(struct mlndr_stream *, mts_wchar_t *, const char *, size_t);
+int ndr_mbtowc(struct mlndr_stream *, mts_wchar_t *, const char *, size_t);
+
 void mlnds_bswap(void *src, void *dst, size_t len);
 
 #ifdef __cplusplus

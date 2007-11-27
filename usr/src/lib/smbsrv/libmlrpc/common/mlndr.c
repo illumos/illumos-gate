@@ -31,6 +31,7 @@
  * complicated trees of data constructs between an RPC client and server.
  */
 
+#include <sys/byteorder.h>
 #include <strings.h>
 #include <assert.h>
 #include <string.h>
@@ -1220,7 +1221,11 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 		}
 
 		first_is = 0;
-		length_is = size_is;
+
+		if (mlnds->flags & MLNDS_F_NOTERM)
+			length_is = size_is - 1;
+		else
+			length_is = size_is;
 
 		if (!mlndr_outer_poke_sizing(outer_ref, 0, &size_is) ||
 		    !mlndr_outer_poke_sizing(outer_ref, 4, &first_is) ||
@@ -1929,12 +1934,9 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
 				return (0);
 			} else if (count == 0) {
 				/*
-				 * If the input char is 0, mts_mbtowc
+				 * If the input char is 0, mbtowc
 				 * returns 0 without setting wide_char.
-				 * I'm not sure if this is the correct
-				 * behaviour for mts_mbtowc but for
-				 * now we need to set wide_char to 0
-				 * and assume a count of 1.
+				 * Set wide_char to 0 and a count of 1.
 				 */
 				wide_char = *valp;
 				count = 1;
@@ -1962,4 +1964,62 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
 	}
 
 	return (1);
+}
+
+/*
+ * Converts a multibyte character string to a little-endian, wide-char
+ * string.  No more than nwchars wide characters are stored.
+ * A terminating null wide character is appended if there is room.
+ *
+ * Returns the number of wide characters converted, not counting
+ * any terminating null wide character.  Returns -1 if an invalid
+ * multibyte character is encountered.
+ */
+size_t
+ndr_mbstowcs(struct mlndr_stream *mlnds, mts_wchar_t *wcs, const char *mbs,
+    size_t nwchars)
+{
+	mts_wchar_t *start = wcs;
+	int nbytes;
+
+	while (nwchars--) {
+		nbytes = ndr_mbtowc(mlnds, wcs, mbs, MTS_MB_CHAR_MAX);
+		if (nbytes < 0) {
+			*wcs = 0;
+			return ((size_t)-1);
+		}
+
+		if (*mbs == 0)
+			break;
+
+		++wcs;
+		mbs += nbytes;
+	}
+
+	return (wcs - start);
+}
+
+/*
+ * Converts a multibyte character to a little-endian, wide-char, which
+ * is stored in wcharp.  Up to nbytes bytes are examined.
+ *
+ * If mbchar is valid, returns the number of bytes processed in mbchar.
+ * If mbchar is invalid, returns -1.  See also mts_mbtowc().
+ */
+/*ARGSUSED*/
+int
+ndr_mbtowc(struct mlndr_stream *mlnds, mts_wchar_t *wcharp,
+    const char *mbchar, size_t nbytes)
+{
+	int rc;
+
+	if ((rc = mts_mbtowc(wcharp, mbchar, nbytes)) < 0)
+		return (rc);
+
+#ifdef _BIG_ENDIAN
+	if (mlnds == NULL || NDR_MODE_MATCH(mlnds, NDR_MODE_RETURN_SEND))
+		*wcharp = BSWAP_16(*wcharp);
+#endif
+
+	return (rc);
 }

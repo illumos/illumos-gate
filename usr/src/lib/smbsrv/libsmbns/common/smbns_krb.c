@@ -53,6 +53,7 @@
  */
 #include <kerberosv5/krb5.h>
 #include <kerberosv5/com_err.h>
+#include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
@@ -299,6 +300,9 @@ smb_kinit(char *user, char *passwd)
 	struct k5_data k5;
 	int authed_k5 = 0;
 
+	assert(user);
+	assert(passwd);
+
 	(void) memset(&opts, 0, sizeof (opts));
 	opts.action = INIT_PW;
 	opts.principal_name = strdup(user);
@@ -374,10 +378,18 @@ krb5_acquire_cred_kinit(char *user, char *pwd, gss_cred_id_t *cred_handle,
 /*
  * krb5_acquire_cred_kinit_main
  *
- * This routine is called both by ADS and Dyn DNS modules to get a handle to
- * administrative user's credential stored locally on the system.  The
- * credential is the TGT.  If the attempt at getting handle fails then a second
- * attempt will be made after getting a new TGT.
+ * This routine is called by ADS module to get a handle to administrative
+ * user's credential stored locally on the system.  The credential is the TGT.
+ * If the attempt at getting handle fails then a second attempt will be made
+ * after getting a new TGT.
+ *
+ * If there's no username then we must be using host credentials and we don't
+ * bother trying to acquire a credential for GSS_C_NO_NAME (which should be
+ * equivalent to using GSS_C_NO_CREDENTIAL, but it isn't in a very subtle way
+ * because mech_krb5 isn't so smart).  Specifically mech_krb5 will try hard
+ * to get a non-expired TGT using the keytab if we're running as root (or fake
+ * it, using the special app_krb5_user_uid() function), but only when we use
+ * the default credential, as opposed to a credential for the default principal.
  *
  * Paramters:
  *   user       : username to retrieve a handle to its credential
@@ -399,12 +411,15 @@ krb5_acquire_cred_kinit_main(char *user, char *pwd, gss_cred_id_t *cred_handle,
 	gss_OID *oid, int *kinit_retry, char *caller_mod)
 {
 	OM_uint32 maj, min;
-	gss_name_t desired_name;
+	gss_name_t desired_name = GSS_C_NO_NAME;
 	gss_OID_set desired_mechs;
 	gss_buffer_desc oidstr, name_buf;
 	char str[50], user_name[50];
 
-	acquire_cred:
+	*cred_handle = GSS_C_NO_CREDENTIAL;
+	*oid = GSS_C_NO_OID;
+	if (user == NULL || *user == '\0')
+		return (0);
 
 	/* Object Identifier for Kerberos 5 */
 	(void) strcpy(str, "{ 1 2 840 113554 1 2 2 }");
@@ -439,12 +454,10 @@ krb5_acquire_cred_kinit_main(char *user, char *pwd, gss_cred_id_t *cred_handle,
 		return (-1);
 	}
 
+acquire_cred:
 	if ((maj = gss_acquire_cred(&min, desired_name, 0, desired_mechs,
 	    GSS_C_INITIATE, cred_handle, NULL, NULL)) != GSS_S_COMPLETE) {
-		if (!*kinit_retry) {
-			(void) gss_release_oid(&min, oid);
-			(void) gss_release_oid_set(&min, &desired_mechs);
-			(void) gss_release_name(&min, &desired_name);
+		if (!*kinit_retry && pwd != NULL && *pwd != '\0') {
 			syslog(LOG_ERR, "%s: Retry kinit to "
 			    "acquire credential.\n", caller_mod);
 			(void) smb_kinit(user, pwd);
@@ -455,9 +468,15 @@ krb5_acquire_cred_kinit_main(char *user, char *pwd, gss_cred_id_t *cred_handle,
 			(void) gss_release_oid(&min, oid);
 			(void) gss_release_oid_set(&min, &desired_mechs);
 			(void) gss_release_name(&min, &desired_name);
+			if (pwd == NULL || *pwd == '\0') {
+				/* See above */
+				*cred_handle = GSS_C_NO_CREDENTIAL;
+				return (0);
+			}
 			return (-1);
 		}
 	}
+
 	(void) gss_release_oid_set(&min, &desired_mechs);
 	(void) gss_release_name(&min, &desired_name);
 
@@ -467,11 +486,11 @@ krb5_acquire_cred_kinit_main(char *user, char *pwd, gss_cred_id_t *cred_handle,
 /*
  * krb5_establish_sec_ctx_kinit
  *
- * This routine is called by both the ADS and Dyn DNS modules to establish a
- * security context before ADS or Dyn DNS updates are allowed.  If establishing
- * a security context fails for any reason, a second attempt will be made after
- * a new TGT is obtained.  This routine is called many time as needed until
- * a security context is established.
+ * This routine is called by the ADS module to establish a security
+ * context before ADS updates are allowed.  If establishing a security context
+ * fails for any reason, a second attempt will be made after a new TGT is
+ * obtained.  This routine is called many time as needed until a security
+ * context is established.
  *
  * The resources use for the security context must be released if security
  * context establishment process fails.
@@ -527,7 +546,7 @@ krb5_establish_sec_ctx_kinit(char *user, char *pwd,
 		if (*gss_context != NULL)
 			(void) gss_delete_sec_context(&min, gss_context, NULL);
 
-		if (!*kinit_retry) {
+		if ((user != NULL) && (pwd != NULL) && !*kinit_retry) {
 			syslog(LOG_ERR, "%s: Retry kinit to establish "
 			    "security context.\n", caller_mod);
 			(void) smb_kinit(user, pwd);

@@ -112,6 +112,22 @@ smb_set_domain_member(int set)
 }
 
 /*
+ * smb_set_machine_pwd
+ *
+ * Returns 0 upon success.  Otherwise, returns 1.
+ */
+int
+smb_set_machine_pwd(char *pwd)
+{
+	int rc;
+
+	smb_config_wrlock();
+	rc = smb_config_set(SMB_CI_MACHINE_PASSWD, pwd);
+	smb_config_unlock();
+	return (rc);
+}
+
+/*
  * smb_getdomaininfo
  *
  * Returns a pointer to the cached domain data. The caller can specify

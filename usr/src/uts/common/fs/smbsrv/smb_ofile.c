@@ -498,7 +498,7 @@ smb_ofile_seek(
     int32_t		off,
     uint32_t		*retoff)
 {
-	off_t		newoff = 0;
+	u_offset_t	newoff = 0;
 	int		rc = 0;
 
 	ASSERT(of);
@@ -511,21 +511,22 @@ smb_ofile_seek(
 		if (off < 0)
 			newoff = 0;
 		else
-			newoff = (off_t)off;
+			newoff = (u_offset_t)off;
 		break;
 
 	case SMB_SEEK_CUR:
 		if (off < 0 && (-off) > of->f_seek_pos)
 			newoff = 0;
 		else
-			newoff = of->f_seek_pos + (off_t)off;
+			newoff = of->f_seek_pos + (u_offset_t)off;
 		break;
 
 	case SMB_SEEK_END:
 		if (off < 0 && (-off) > of->f_node->attr.sa_vattr.va_size)
 			newoff = 0;
 		else
-			newoff = of->f_node->attr.sa_vattr.va_size + (off_t)off;
+			newoff = of->f_node->attr.sa_vattr.va_size +
+			    (u_offset_t)off;
 		break;
 
 	default:
@@ -533,7 +534,12 @@ smb_ofile_seek(
 		return (EINVAL);
 	}
 
-	if (newoff > ULONG_MAX) {
+	/*
+	 * See comments at the beginning of smb_seek.c.
+	 * If the offset is greater than UINT_MAX, we will return an error.
+	 */
+
+	if (newoff > UINT_MAX) {
 		rc = EOVERFLOW;
 	} else {
 		of->f_seek_pos = newoff;

@@ -77,6 +77,7 @@ include ../../Makefile.lib
 
 INCS += -I$(SRC)/common/smbsrv
 
+LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lnsl -lc
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)        	\

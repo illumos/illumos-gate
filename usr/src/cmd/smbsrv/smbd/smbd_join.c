@@ -151,7 +151,7 @@ smbd_join(smb_joininfo_t *info)
 		 * the workstation trust account.
 		 */
 		(void) sleep(2);
-		status = mlsvc_validate_user(pi->server, pi->domain,
+		status = mlsvc_join(pi->server, pi->domain,
 		    plain_user, plain_passwd);
 
 		if (status == NT_STATUS_SUCCESS) {

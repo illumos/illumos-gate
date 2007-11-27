@@ -40,8 +40,8 @@ extern "C" {
 
 extern int smb_nicmon_start(void);
 extern void smb_nicmon_stop(void);
-extern int smb_mlsvc_srv_start(void);
-extern void smb_mlsvc_srv_stop(void);
+extern int smb_winpipe_doorsvc_start(void);
+extern void smb_winpipe_doorsvc_stop(void);
 extern int smb_lmshrd_srv_start(void);
 extern void smb_lmshrd_srv_stop(void);
 

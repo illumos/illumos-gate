@@ -62,7 +62,8 @@
 #include "smbd.h"
 
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
-#define	SMB_CACHEDIR "/var/run/smb"
+#define	SMB_VARRUN_DIR "/var/run/smb"
+#define	SMB_CCACHE SMB_VARRUN_DIR "/ccache"
 #define	SMB_DBDIR "/var/smb"
 
 extern void smb_netbios_name_reconfig();
@@ -75,6 +76,7 @@ static int smbd_kernel_bind(void);
 static void smbd_kernel_unbind(void);
 static int smbd_already_running(void);
 
+static void smbd_remove_ccache(void);
 static int smbd_service_init(void);
 static void smbd_service_fini(void);
 
@@ -326,9 +328,10 @@ smbd_service_init(void)
 {
 	static char *dir[] = {
 		SMB_DBDIR,		/* smbpasswd */
-		SMB_CACHEDIR		/* KRB credential cache */
+		SMB_VARRUN_DIR		/* KRB credential cache */
 	};
 
+	int door_id;
 	int rc;
 	int ddns_enabled;
 	uint32_t mode;
@@ -349,7 +352,7 @@ smbd_service_init(void)
 	/*
 	 * Set KRB5CCNAME (for the SMB credential cache) in the environment.
 	 */
-	if (putenv("KRB5CCNAME=" SMB_CACHEDIR "/ccache") != 0) {
+	if (putenv("KRB5CCNAME=" SMB_CCACHE) != 0) {
 		smbd_report("unable to set KRB5CCNAME");
 		return (1);
 	}
@@ -420,11 +423,6 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	if (rc = smb_mlsvc_srv_start()) {
-		smbd_report("msrpc door initialization failed: %d", rc);
-		return (rc);
-	}
-
 	if (smb_lmshrd_srv_start() != 0) {
 		smbd_report("share initialization failed");
 	}
@@ -450,7 +448,23 @@ smbd_service_init(void)
 
 	(void) smbd_localtime_init();
 
+	if ((door_id = smb_winpipe_doorsvc_start()) == -1) {
+		smbd_report("winpipe initialization failed %s",
+		    strerror(errno));
+		return (rc);
+	} else {
+		if (ioctl(smbd.s_drv_fd, SMB_IOC_WINPIPE, &door_id) < 0)
+			smbd_report("winpipe ioctl: %s", strerror(errno));
+	}
+
 	return (lmshare_start());
+}
+
+static void
+smbd_remove_ccache(void)
+{
+	if ((remove(SMB_CCACHE) < 0) && (errno != ENOENT))
+		smbd_report("failed to remove SMB ccache");
 }
 
 /*
@@ -461,6 +475,7 @@ smbd_service_init(void)
 static void
 smbd_service_fini(void)
 {
+	smb_winpipe_doorsvc_stop();
 	nt_builtin_fini();
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
@@ -468,10 +483,11 @@ smbd_service_fini(void)
 	smb_doorsrv_stop();
 	smb_lmshrd_srv_stop();
 	lmshare_stop();
-	smb_mlsvc_srv_stop();
 	smb_nicmon_stop();
 	smb_resolver_close();
 	smb_idmap_stop();
+	smbd_remove_ccache();
+
 }
 
 /*
@@ -539,7 +555,8 @@ smbd_refresh_monitor(void *arg)
 		smb_nic_build_info();
 		(void) smb_netbios_name_reconfig();
 		(void) smb_browser_config();
-		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG_REFRESH, &dummy) < 0) {
+		smbd_remove_ccache();
+		if (ioctl(smbd.s_drv_fd, SMB_IOC_CONFIG, &dummy) < 0) {
 			smbd_report("configuration update ioctl: %s",
 			    strerror(errno));
 		}
@@ -742,14 +759,12 @@ smbd_report(const char *fmt, ...)
  * Enable libumem debugging by default on DEBUG builds.
  */
 #ifdef DEBUG
-/* LINTED - external libumem symbol */
 const char *
 _umem_debug_init(void)
 {
 	return ("default,verbose"); /* $UMEM_DEBUG setting */
 }
 
-/* LINTED - external libumem symbol */
 const char *
 _umem_logging_init(void)
 {

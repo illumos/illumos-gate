@@ -377,32 +377,15 @@ mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
 int
 mlsvc_string_save(ms_string_t *ms, char *str, struct mlrpc_xaction *mxa)
 {
-	int length;
-	char *p;
-
-	if (ms == NULL || str == NULL || mxa == NULL)
+	if (str == NULL)
 		return (0);
 
-	/*
-	 * Windows NT expects the name length to exclude the
-	 * terminating wchar null but doesn't care whether or
-	 * not the allosize includes it. Windows 2000 insists
-	 * that both the length and the allosize include the
-	 * wchar null.
-	 */
-	length = mts_wcequiv_strlen(str);
-	ms->allosize = length + sizeof (mts_wchar_t);
+	ms->length = mts_wcequiv_strlen(str);
+	ms->allosize = ms->length + sizeof (mts_wchar_t);
 
-	if (mxa->context->user_ctx->du_native_os == NATIVE_OS_WIN2000)
-		ms->length = ms->allosize;
-	else
-		ms->length = length;
-
-	if ((p = MLRPC_HEAP_STRSAVE(mxa, str)) == NULL) {
+	if ((ms->str = MLRPC_HEAP_STRSAVE(mxa, str)) == NULL)
 		return (0);
-	}
 
-	ms->str = (LPTSTR)p;
 	return (1);
 }
 
@@ -451,13 +434,12 @@ mlsvc_is_null_handle(mlsvc_handle_t *handle)
 }
 
 /*
- * mlsvc_validate_user
+ * mlsvc_join
  *
  * Returns NT status codes.
  */
 DWORD
-mlsvc_validate_user(char *server, char *domain, char *plain_user,
-    char *plain_text)
+mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 {
 	smb_auth_info_t auth;
 	smb_ntdomain_t *di;
@@ -487,7 +469,7 @@ mlsvc_validate_user(char *server, char *domain, char *plain_user,
 		return (status);
 	}
 
-	erc = mlsvc_user_logon(server, domain, plain_user, plain_text);
+	erc = mlsvc_logon(server, domain, plain_user);
 
 	if (erc == AUTH_USER_GRANT) {
 		int isenabled;
@@ -496,20 +478,12 @@ mlsvc_validate_user(char *server, char *domain, char *plain_user,
 		isenabled = smb_config_getyorn(SMB_CI_ADS_ENABLE);
 		smb_config_unlock();
 		if (isenabled) {
-			if (adjoin(machine_passwd,
-			    sizeof (machine_passwd)) == ADJOIN_SUCCESS) {
+			if (ads_join(plain_user, plain_text, machine_passwd,
+			    sizeof (machine_passwd)) == ADJOIN_SUCCESS)
 				status = NT_STATUS_SUCCESS;
-			} else {
+			else
 				status = NT_STATUS_UNSUCCESSFUL;
-			}
 		} else {
-			/*
-			 * Ensure that we don't have an old account in
-			 * this domain. There's no need to check the
-			 * return status.
-			 */
-			(void) sam_remove_trust_account(server, domain);
-
 			if (mlsvc_user_getauth(server, plain_user, &auth)
 			    != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
@@ -526,13 +500,8 @@ mlsvc_validate_user(char *server, char *domain, char *plain_user,
 		}
 
 		if (status == NT_STATUS_SUCCESS) {
-			smb_config_wrlock();
-			if (smb_config_set(SMB_CI_MACHINE_PASSWD,
-			    machine_passwd) != 0) {
-				smb_config_unlock();
+			if (smb_set_machine_pwd(machine_passwd) != 0)
 				return (NT_STATUS_UNSUCCESSFUL);
-			}
-			smb_config_unlock();
 
 			/*
 			 * If we successfully create a trust account, we mark

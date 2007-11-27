@@ -164,6 +164,7 @@
  *       being queued in that list is NOT registered by incrementing the
  *       reference count.
  */
+#include <sys/fsid.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
@@ -243,17 +244,21 @@ smb_tree_connect(
 
 		tree->t_acltype = smb_fsop_acltype(snode);
 
-		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_ACLONCREATE)) {
+		if (strncasecmp(tree->t_typename, NFS, sizeof (NFS)) == 0)
+			tree->t_flags |= SMB_TREE_FLAG_NFS_MOUNTED;
+
+		if (strncasecmp(tree->t_typename, "UFS", sizeof ("UFS")) == 0)
+			tree->t_flags |= SMB_TREE_FLAG_UFS;
+
+		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_ACLONCREATE))
 			tree->t_flags |= SMB_TREE_FLAG_ACLONCREATE;
-		}
 
-		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_ACEMASKONACCESS)) {
+		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_ACEMASKONACCESS))
 			tree->t_flags |= SMB_TREE_FLAG_ACEMASKONACCESS;
-		}
 
-		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_CASEINSENSITIVE)) {
+		if (vfs_has_feature(snode->vp->v_vfsp, VFSFT_CASEINSENSITIVE))
 			tree->t_flags |= SMB_TREE_FLAG_IGNORE_CASE;
-		}
+
 		break;
 
 	case STYPE_IPC:

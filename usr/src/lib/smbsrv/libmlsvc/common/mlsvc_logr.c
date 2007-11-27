@@ -200,7 +200,6 @@ static mts_wchar_t wcs_hostname[MAXHOSTNAMELEN];
 static int hostname_len = 0;
 static mts_wchar_t wcs_srcname[MAX_SRCNAME_LEN];
 static int srcname_len = 0;
-static int str_offs, sh_len;
 
 /*
  * logr_initialize
@@ -214,6 +213,7 @@ logr_initialize(void)
 {
 	struct utsname name;
 	char *sysname;
+	int len;
 
 	if (uname(&name) < 0)
 		sysname = "Solaris";
@@ -221,6 +221,10 @@ logr_initialize(void)
 		sysname = name.sysname;
 
 	(void) strlcpy(logr_sysname, sysname, SYS_NMLN);
+	len = strlen(logr_sysname) + 1;
+	(void) mts_mbstowcs(wcs_srcname, logr_sysname, len);
+	srcname_len = len * sizeof (mts_wchar_t);
+
 	(void) mlrpc_register_service(&logr_service);
 }
 
@@ -244,7 +248,7 @@ logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	data = (read_data_t *)(desc->discrim);
+	data = (read_data_t *)(uintptr_t)(desc->discrim);
 	free(data);
 	(void) mlsvc_put_handle((ms_handle_t *)&param->handle);
 
@@ -267,12 +271,16 @@ logr_s_EventLogOpen(void *arg, struct mlrpc_xaction *mxa)
 	struct logr_EventLogOpen *param = arg;
 	ms_handle_t *handle;
 	int log_enable = 0;
+	int len;
+	int rc;
 
 	smb_config_rdlock();
 	log_enable = smb_config_getyorn(SMB_CI_LOGR_ENABLE);
 	smb_config_unlock();
 
-	if (log_enable == 0) {
+	rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+
+	if (log_enable == 0 || rc != 0) {
 		bzero(&param->handle, sizeof (logr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 		return (MLRPC_DRC_OK);
@@ -281,20 +289,9 @@ logr_s_EventLogOpen(void *arg, struct mlrpc_xaction *mxa)
 	handle = mlsvc_get_handle(MLSVC_IFSPEC_LOGR, LOGR_KEY, 0);
 	bcopy(handle, &param->handle, sizeof (logr_handle_t));
 
-	if (hostname_len == 0) {
-		if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0) {
-			bzero(&param->handle, sizeof (logr_handle_t));
-			param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-			return (MLRPC_DRC_OK);
-		}
-
-		hostname_len = (strlen(hostname) + 1) * 2;
-		(void) mts_mbstowcs(wcs_hostname, hostname, hostname_len / 2);
-		srcname_len = (strlen(logr_sysname) + 1) * 2;
-		(void) mts_mbstowcs(wcs_srcname, logr_sysname, srcname_len / 2);
-		sh_len = srcname_len + hostname_len;
-		str_offs = 12 * sizeof (DWORD) + 4 * sizeof (WORD) + sh_len;
-	}
+	len = strlen(hostname) + 1;
+	(void) mts_mbstowcs(wcs_hostname, hostname, len);
+	hostname_len = len * sizeof (mts_wchar_t);
 
 	param->status = NT_STATUS_SUCCESS;
 	return (MLRPC_DRC_OK);
@@ -337,7 +334,7 @@ logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	desc->discrim = (DWORD)data;
+	desc->discrim = (DWORD)(uintptr_t)data;
 	param->rec_num = data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
 	return (MLRPC_DRC_OK);
@@ -362,7 +359,7 @@ logr_s_EventLogGetOldestRec(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	data = (read_data_t *)desc->discrim;
+	data = (read_data_t *)(uintptr_t)desc->discrim;
 	param->oldest_rec = data->log.ix - data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
 	return (MLRPC_DRC_OK);
@@ -413,7 +410,12 @@ log_get_entry(struct log_info *linfo, int entno)
 static void
 set_logrec(log_entry_t *le, DWORD recno, logr_record_t *rec)
 {
+	int str_offs;
+	int sh_len;
 	int len;
+
+	sh_len = srcname_len + hostname_len;
+	str_offs = 12 * sizeof (DWORD) + 4 * sizeof (WORD) + sh_len;
 
 	rec->Length1 = sizeof (logr_record_t);
 	rec->Reserved = 0x654C664C;
@@ -469,14 +471,14 @@ logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	rdata = (read_data_t *)(desc->discrim);
+	rdata = (read_data_t *)(uintptr_t)(desc->discrim);
 	if (rdata == 0) {
 		if ((rdata = logr_get_snapshot()) == NULL) {
 			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 			return (MLRPC_DRC_OK);
 		}
 
-		desc->discrim = (DWORD)rdata;
+		desc->discrim = (DWORD)(uintptr_t)rdata;
 	}
 
 	dir = (param->read_flags & EVENTLOG_FORWARDS_READ) ? FWD : REW;

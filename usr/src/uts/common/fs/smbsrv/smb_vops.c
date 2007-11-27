@@ -34,13 +34,15 @@
 #include <sys/pathname.h>
 #include <sys/cred.h>
 #include <sys/extdirent.h>
-#include <acl/acl_common.h>
+
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/string.h>
-#include <smbsrv/lmshare.h>
+
 #include <smbsrv/smbtrans.h>
-#include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb_incl.h>
+
 
 static int
 smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
@@ -324,7 +326,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 
 int
 smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
-    int flags, cred_t *cr, caller_context_t *ct)
+    int flags, cred_t *cr, boolean_t no_xvattr, caller_context_t *ct)
 {
 	int error = 0;
 	int at_size = 0;
@@ -350,7 +352,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 
 	set_attr->sa_vattr.va_mask = 0;
 
-	if (vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
+	if ((no_xvattr == B_FALSE) &&
+	    vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
 		/*
 		 * Initialize xvattr, including bzero
 		 */
@@ -361,8 +364,8 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 
 		/*
 		 * Copy caller-specified classic attributes to tmp_xvattr.
-		 * First save tmp_xvattr's mask (set in xva_init()).
-		 * This is |'d in later.
+		 * First save tmp_xvattr's mask (set in xva_init()), which
+		 * contains AT_XVATTR.  This is |'d in later if needed.
 		 */
 
 		xva_mask = tmp_xvattr.xva_vattr.va_mask;
@@ -372,12 +375,20 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 		    &tmp_xvattr.xva_vattr.va_mask);
 
 		/*
-		 * "|" in the original xva_mask.
+		 * Do not set ctime (only the file system can do it)
 		 */
 
-		tmp_xvattr.xva_vattr.va_mask |= xva_mask;
+		tmp_xvattr.xva_vattr.va_mask &= ~AT_CTIME;
 
 		if (set_attr->sa_mask & SMB_AT_DOSATTR) {
+
+			/*
+			 * "|" in the original xva_mask, which contains
+			 * AT_XVATTR
+			 */
+
+			tmp_xvattr.xva_vattr.va_mask |= xva_mask;
+
 			XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
 			XVA_SET_REQ(&tmp_xvattr, XAT_SYSTEM);
 			XVA_SET_REQ(&tmp_xvattr, XAT_READONLY);
@@ -404,6 +415,12 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 		}
 
 		if (set_attr->sa_mask & SMB_AT_CRTIME) {
+			/*
+			 * "|" in the original xva_mask, which contains
+			 * AT_XVATTR
+			 */
+
+			tmp_xvattr.xva_vattr.va_mask |= xva_mask;
 			XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 			xoap->xoa_createtime = set_attr->sa_crtime;
 		}
@@ -431,16 +448,12 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 			error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags,
 			    cr, ct);
 		}
-
 		return (error);
 	}
-
 	/*
-	 * Support for file systems without VFSFT_XVATTR
+	 * Support for file systems without VFSFT_XVATTR or no_xvattr == B_TRUE
 	 */
-
 	smb_sa_to_va_mask(set_attr->sa_mask, &set_attr->sa_vattr.va_mask);
-
 	/*
 	 * set_attr->sa_vattr already contains new values
 	 * as set by the caller
@@ -463,7 +476,6 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 		set_attr->sa_vattr.va_mask = AT_SIZE;
 		error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags, cr, ct);
 	}
-
 	return (error);
 }
 
@@ -1538,181 +1550,6 @@ smb_vop_statfs(vnode_t *vp, struct statvfs64 *statp, cred_t *cr)
 }
 
 /*
- * smb_vop_acl_from_vsa
- *
- * Converts given vsecattr_t structure to a acl_t structure.
- *
- * The allocated memory for retuned acl_t should be freed by
- * calling acl_free().
- */
-static acl_t *
-smb_vop_acl_from_vsa(vsecattr_t *vsecattr, acl_type_t acl_type)
-{
-	int		aclbsize = 0;	/* size of acl list in bytes */
-	int		dfaclbsize = 0;	/* size of default acl list in bytes */
-	int		numacls;
-	acl_t		*acl_info;
-
-	ASSERT(vsecattr);
-
-	acl_info = acl_alloc(acl_type);
-	if (acl_info == NULL)
-		return (NULL);
-
-	acl_info->acl_flags = 0;
-
-	switch (acl_type) {
-
-	case ACLENT_T:
-		numacls = vsecattr->vsa_aclcnt + vsecattr->vsa_dfaclcnt;
-		aclbsize = vsecattr->vsa_aclcnt * sizeof (aclent_t);
-		dfaclbsize = vsecattr->vsa_dfaclcnt * sizeof (aclent_t);
-
-		acl_info->acl_cnt = numacls;
-		acl_info->acl_aclp = kmem_alloc(aclbsize + dfaclbsize,
-		    KM_SLEEP);
-		(void) memcpy(acl_info->acl_aclp, vsecattr->vsa_aclentp,
-		    aclbsize);
-		(void) memcpy((char *)acl_info->acl_aclp + aclbsize,
-		    vsecattr->vsa_dfaclentp, dfaclbsize);
-
-		if (acl_info->acl_cnt <= MIN_ACL_ENTRIES)
-			acl_info->acl_flags |= ACL_IS_TRIVIAL;
-
-		break;
-
-	case ACE_T:
-		aclbsize = vsecattr->vsa_aclcnt * sizeof (ace_t);
-		acl_info->acl_cnt = vsecattr->vsa_aclcnt;
-		acl_info->acl_flags = vsecattr->vsa_aclflags;
-		acl_info->acl_aclp = kmem_alloc(aclbsize, KM_SLEEP);
-		(void) memcpy(acl_info->acl_aclp, vsecattr->vsa_aclentp,
-		    aclbsize);
-		if (ace_trivial(acl_info->acl_aclp, acl_info->acl_cnt) == 0)
-			acl_info->acl_flags |= ACL_IS_TRIVIAL;
-
-		break;
-
-	default:
-		acl_free(acl_info);
-		return (NULL);
-	}
-
-	if (aclbsize && vsecattr->vsa_aclentp)
-		kmem_free(vsecattr->vsa_aclentp, aclbsize);
-	if (dfaclbsize && vsecattr->vsa_dfaclentp)
-		kmem_free(vsecattr->vsa_dfaclentp, dfaclbsize);
-
-	return (acl_info);
-}
-
-/*
- * smb_vop_acl_to_vsa
- *
- * Converts given acl_t structure to a vsecattr_t structure.
- *
- * IMPORTANT:
- * Upon successful return the memory allocated for vsa_aclentp
- * should be freed by calling kmem_free(). The size is returned
- * in aclbsize.
- */
-int
-smb_vop_acl_to_vsa(acl_t *acl_info, vsecattr_t *vsecattr, int *aclbsize)
-{
-	int		error = 0;
-	int		numacls;
-	aclent_t	*aclp;
-
-	ASSERT(acl_info);
-	ASSERT(vsecattr);
-	ASSERT(aclbsize);
-
-	bzero(vsecattr, sizeof (vsecattr_t));
-	*aclbsize = 0;
-
-	switch (acl_info->acl_type) {
-	case ACLENT_T:
-		numacls = acl_info->acl_cnt;
-		/*
-		 * Minimum ACL size is three entries so might as well
-		 * bail out here.  Also limit request size to prevent user
-		 * from allocating too much kernel memory.  Maximum size
-		 * is MAX_ACL_ENTRIES for the ACL part and MAX_ACL_ENTRIES
-		 * for the default ACL part.
-		 */
-		if (numacls < 3 || numacls > (MAX_ACL_ENTRIES * 2)) {
-			error = EINVAL;
-			break;
-		}
-
-		vsecattr->vsa_mask = VSA_ACL;
-
-		vsecattr->vsa_aclcnt = numacls;
-		*aclbsize = numacls * sizeof (aclent_t);
-		vsecattr->vsa_aclentp = kmem_alloc(*aclbsize, KM_SLEEP);
-		(void) memcpy(vsecattr->vsa_aclentp, acl_info->acl_aclp,
-		    *aclbsize);
-
-		/* Sort the acl list */
-		ksort((caddr_t)vsecattr->vsa_aclentp,
-		    vsecattr->vsa_aclcnt, sizeof (aclent_t), cmp2acls);
-
-		/* Break into acl and default acl lists */
-		for (numacls = 0, aclp = vsecattr->vsa_aclentp;
-		    numacls < vsecattr->vsa_aclcnt;
-		    aclp++, numacls++) {
-			if (aclp->a_type & ACL_DEFAULT)
-				break;
-		}
-
-		/* Find where defaults start (if any) */
-		if (numacls < vsecattr->vsa_aclcnt) {
-			vsecattr->vsa_mask |= VSA_DFACL;
-			vsecattr->vsa_dfaclcnt = vsecattr->vsa_aclcnt - numacls;
-			vsecattr->vsa_dfaclentp = aclp;
-			vsecattr->vsa_aclcnt = numacls;
-		}
-
-		/* Adjust if they're all defaults */
-		if (vsecattr->vsa_aclcnt == 0) {
-			vsecattr->vsa_mask &= ~VSA_ACL;
-			vsecattr->vsa_aclentp = NULL;
-		}
-
-		/* Only directories can have defaults */
-		if (vsecattr->vsa_dfaclcnt &&
-		    (acl_info->acl_flags & ACL_IS_DIR)) {
-			error = ENOTDIR;
-		}
-
-		break;
-
-	case ACE_T:
-		if (acl_info->acl_cnt < 1 ||
-		    acl_info->acl_cnt > MAX_ACL_ENTRIES) {
-			error = EINVAL;
-			break;
-		}
-
-		vsecattr->vsa_mask = VSA_ACE | VSA_ACE_ACLFLAGS;
-		vsecattr->vsa_aclcnt = acl_info->acl_cnt;
-		vsecattr->vsa_aclflags = acl_info->acl_flags & ACL_FLAGS_ALL;
-		*aclbsize = vsecattr->vsa_aclcnt * sizeof (ace_t);
-		vsecattr->vsa_aclentsz = *aclbsize;
-		vsecattr->vsa_aclentp = kmem_alloc(*aclbsize, KM_SLEEP);
-		(void) memcpy(vsecattr->vsa_aclentp, acl_info->acl_aclp,
-		    *aclbsize);
-
-		break;
-
-	default:
-		error = EINVAL;
-	}
-
-	return (error);
-}
-
-/*
  * smb_vop_acl_read
  *
  * Reads the ACL of the specified file into 'aclp'.
@@ -1751,7 +1588,7 @@ smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
 	if (error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, ct))
 		return (error);
 
-	*aclp = smb_vop_acl_from_vsa(&vsecattr, acl_type);
+	*aclp = smb_fsacl_from_vsa(&vsecattr, acl_type);
 	if (vp->v_type == VDIR)
 		(*aclp)->acl_flags |= ACL_IS_DIR;
 
@@ -1774,7 +1611,7 @@ smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr,
 	ASSERT(vp);
 	ASSERT(aclp);
 
-	error = smb_vop_acl_to_vsa(aclp, &vsecattr, &aclbsize);
+	error = smb_fsacl_to_vsa(aclp, &vsecattr, &aclbsize);
 
 	if (error == 0) {
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);

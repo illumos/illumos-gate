@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+
 #include <smbsrv/libsmbns.h>
 #include <smbns_ads.h>
 #include <smbns_dyndns.h>
@@ -56,6 +57,8 @@
 #define	ADS_MAXMSGLEN 512
 #define	ADS_HOST_PREFIX "host/"
 #define	ADS_COMPUTERS_CN "Computers"
+#define	ADS_COMPUTER_NUM_ATTR 7
+#define	ADS_SHARE_NUM_ATTR 3
 
 /* current ADS server to communicate with */
 ADS_HOST_INFO *ads_host_info = NULL;
@@ -72,19 +75,20 @@ static char *adjoin_errmsg[] = {
 	"ADJOIN failed to get handle.",
 	"ADJOIN failed to generate machine password.",
 	"ADJOIN failed to add workstation trust account.",
+	"ADJOIN failed to modify workstation trust account.",
 	"ADJOIN failed to get list of encryption types.",
 	"ADJOIN failed to get host principal.",
 	"ADJOIN failed to initialize kerberos context.",
-	"ADJOIN failed to get kerberos principal.",
+	"ADJOIN failed to get Kerberos principal.",
 	"ADJOIN failed to set machine account password on AD.",
-	"ADJOIN failed to modify workstation trust account.",
-	"ADJOIN failed to write Keberos keytab file.",
-	"ADJOIN failed to configure idmap(mapping domain).",
-	"ADJOIN failed to configure idmap(global catalog).",
+	"ADJOIN failed to modify CONTROL attribute of the account.",
+	"ADJOIN failed to write Kerberos keytab file.",
+	"ADJOIN failed to configure domain_name property for idmapd.",
 	"ADJOIN failed to refresh idmap service."
-	"ADJOIN failed to remove idmap ccache."
+	"ADJOIN failed to refresh SMB service."
 };
 
+static ADS_HANDLE *ads_open_main(char *user, char *password);
 static int ads_bind(ADS_HANDLE *);
 static void ads_get_computer_dn(ADS_HANDLE *, char *, size_t);
 static char *ads_get_host_principal(char *fqhost);
@@ -92,13 +96,15 @@ static char *ads_get_host_principal_w_realm(char *princ, char *domain);
 static int ads_get_host_principals(char *fqhost, char *domain,
     char **princ, char **princ_r);
 static int ads_add_computer(ADS_HANDLE *ah);
+static int ads_modify_computer(ADS_HANDLE *ah);
 static void ads_del_computer(ADS_HANDLE *ah);
+static int ads_computer_op(ADS_HANDLE *ah, int op);
 static int ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val);
-static int ads_modify_computer(ADS_HANDLE *ah, int des_only);
+static int ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only);
 static krb5_kvno ads_lookup_computer_attr_kvno(ADS_HANDLE *ah);
 static int ads_gen_machine_passwd(char *machine_passwd, int bufsz);
-static void ads_set_host_info(ADS_HOST_INFO *host);
 static ADS_HOST_INFO *ads_get_host_info(void);
+static void ads_set_host_info(ADS_HOST_INFO *host);
 
 /*
  * ads_build_unc_name
@@ -728,8 +734,27 @@ ads_free_host_info(void)
 
 /*
  * ads_open
+ * Open a LDAP connection to an ADS server if the system is in domain mode.
+ * Acquire both Kerberos TGT and LDAP service tickets for the host principal.
+ *
+ * This function should only be called after the system is successfully joined
+ * to a domain.
+ */
+ADS_HANDLE *
+ads_open(void)
+{
+	uint32_t mode = smb_get_security_mode();
+
+	if (mode != SMB_SECMODE_DOMAIN)
+		return (NULL);
+
+	return (ads_open_main(NULL, NULL));
+}
+
+/*
+ * ads_open_main
  * Open a LDAP connection to an ADS server.
- * If ADS is enabled and the administrative username, password, container, and
+ * If ADS is enabled and the administrative username, password, and
  * ADS domain are defined then query DNS to find an ADS server if this is the
  * very first call to this routine.  After an ADS server is found then this
  * server will be used everytime this routine is called until the system is
@@ -751,12 +776,11 @@ ads_free_host_info(void)
  *   ADS_HANDLE* : handle to ADS server
  */
 ADS_HANDLE *
-ads_open(void)
+ads_open_main(char *user, char *password)
 {
 	ADS_HANDLE *ah;
 	LDAP *ld;
 	int version = 3, ads_port, find_ads_retry;
-	char *adminUser, *password, *container;
 	char domain[MAXHOSTNAMELEN];
 	int enable;
 	ADS_HOST_INFO *ads_host = NULL;
@@ -775,26 +799,9 @@ ads_open(void)
 		smb_config_unlock();
 		return (NULL);
 	}
-	adminUser = smb_config_getstr(SMB_CI_ADS_USER);
-	if (adminUser == NULL || *adminUser == 0) {
-		syslog(LOG_ERR, "smb_ads: admin user is not set");
-		smb_config_unlock();
-		return (NULL);
-	}
-	password = smb_config_getstr(SMB_CI_ADS_PASSWD);
-	if (password == NULL || *password == 0) {
-		syslog(LOG_ERR, "smb_ads: admin user password is not set");
-		smb_config_unlock();
-		return (NULL);
-	}
-	container = smb_config_getstr(SMB_CI_ADS_USER_CONTAINER);
-	if (container == NULL || *container == 0)
-		container = "cn=Users";
 
 	site = smb_config_getstr(SMB_CI_ADS_SITE);
 	smb_config_unlock();
-
-
 
 	find_ads_retry = 0;
 find_ads_host:
@@ -898,13 +905,11 @@ find_ads_host:
 	}
 
 	ah->ld = ld;
-	ah->user = strdup(adminUser);
-	ah->pwd = strdup(password);
-	ah->container = strdup(container);
+	ah->user = (user) ? strdup(user) : NULL;
+	ah->pwd = (password) ? strdup(password) : NULL;
 	ah->domain = strdup(domain);
 
-	if ((ah->user == NULL) || (ah->pwd == NULL) ||
-	    (ah->container == NULL) || (ah->domain == NULL)) {
+	if (ah->domain == NULL) {
 		ads_close(ah);
 		return (NULL);
 	}
@@ -966,7 +971,6 @@ ads_close(ADS_HANDLE *ah)
 			bzero(ah->pwd, len);
 		free(ah->pwd);
 	}
-	free(ah->container);
 	free(ah->domain);
 	free(ah->domain_dn);
 	free(ah->hostname);
@@ -1001,16 +1005,16 @@ ads_display_stat(OM_uint32 maj, OM_uint32 min)
  * free_attr
  * Free memory allocated when publishing a share.
  * Parameters:
- *   addattrs: an array of LDAPMod pointers
+ *   attrs: an array of LDAPMod pointers
  * Returns:
  *   None
  */
 static void
-free_attr(LDAPMod *addattrs[])
+free_attr(LDAPMod *attrs[])
 {
 	int i;
-	for (i = 0; addattrs[i]; i++) {
-		free(addattrs[i]);
+	for (i = 0; attrs[i]; i++) {
+		free(attrs[i]);
 	}
 }
 
@@ -1075,27 +1079,15 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
     int *kinit_retry, int *do_acquire_cred)
 {
 	OM_uint32 maj, min, time_rec;
-	char service_name[ADS_MAXBUFLEN], *user_dn;
+	char service_name[ADS_MAXBUFLEN];
 	gss_buffer_desc send_tok, service_buf;
 	gss_name_t target_name;
 	gss_buffer_desc input;
 	gss_buffer_desc *inputptr;
 	struct berval cred;
 	OM_uint32 ret_flags;
-	int stat, len;
+	int stat;
 	int gss_flags;
-
-	/*
-	 * 6 additional bytes for the "cn=,, " and the null terminator
-	 */
-	len =  strlen(ah->user) + strlen(ah->container) +
-	    strlen(ah->domain_dn) + 6;
-
-	if ((user_dn = (char *)malloc(len)) == NULL)
-		return (-1);
-
-	(void) snprintf(user_dn, len, "cn=%s,%s,%s", ah->user, ah->container,
-	    ah->domain_dn);
 
 	(void) snprintf(service_name, ADS_MAXBUFLEN, "ldap@%s", ah->hostname);
 	service_buf.value = service_name;
@@ -1104,8 +1096,8 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 	    (gss_OID) gss_nt_service_name,
 	    &target_name)) != GSS_S_COMPLETE) {
 		ads_display_stat(maj, min);
-		(void) gss_release_oid(&min, &oid);
-		free(user_dn);
+		if (oid != GSS_C_NO_OID)
+			(void) gss_release_oid(&min, &oid);
 		return (-1);
 	}
 
@@ -1119,9 +1111,9 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 		    gss_flags, inputptr, &send_tok,
 		    &ret_flags, &time_rec, kinit_retry,
 		    do_acquire_cred, &maj, "ads") == -1) {
-			(void) gss_release_oid(&min, &oid);
+			if (oid != GSS_C_NO_OID)
+				(void) gss_release_oid(&min, &oid);
 			(void) gss_release_name(&min, &target_name);
-			free(user_dn);
 			return (-1);
 		}
 
@@ -1131,16 +1123,16 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 			ber_bvfree(*sercred);
 			*sercred = NULL;
 		}
-		stat = ldap_sasl_bind_s(ah->ld, user_dn, "GSSAPI",
+		stat = ldap_sasl_bind_s(ah->ld, NULL, "GSSAPI",
 		    &cred, NULL, NULL, sercred);
 		if (stat != LDAP_SUCCESS &&
 		    stat != LDAP_SASL_BIND_IN_PROGRESS) {
 			/* LINTED - E_SEC_PRINTF_VAR_FMT */
 			syslog(LOG_ERR, ldap_err2string(stat));
-			(void) gss_release_oid(&min, &oid);
+			if (oid != GSS_C_NO_OID)
+				(void) gss_release_oid(&min, &oid);
 			(void) gss_release_name(&min, &target_name);
 			(void) gss_release_buffer(&min, &send_tok);
-			free(user_dn);
 			return (-1);
 		}
 		input.value = (*sercred)->bv_val;
@@ -1150,9 +1142,9 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 			(void) gss_release_buffer(&min, &send_tok);
 	} while (maj != GSS_S_COMPLETE);
 
-	(void) gss_release_oid(&min, &oid);
+	if (oid != GSS_C_NO_OID)
+		(void) gss_release_oid(&min, &oid);
 	(void) gss_release_name(&min, &target_name);
-	free(user_dn);
 
 	return (0);
 }
@@ -1279,14 +1271,15 @@ ads_bind(ADS_HANDLE *ah)
 	OM_uint32 min;
 	gss_cred_id_t cred_handle;
 	gss_ctx_id_t gss_context;
-	OM_uint32 maj;
 	gss_OID oid;
 	struct berval *sercred;
 	int kinit_retry, do_acquire_cred;
+	int rc = 0;
 
 	kinit_retry = 0;
 	do_acquire_cred = 0;
-	acquire_cred:
+
+acquire_cred:
 
 	if (ads_acquire_cred(ah, &cred_handle, &oid, &kinit_retry))
 		return (-1);
@@ -1300,29 +1293,13 @@ ads_bind(ADS_HANDLE *ah)
 		}
 		return (-1);
 	}
+	rc = ads_negotiate_sec_layer(ah, gss_context, sercred);
 
-	if (ads_negotiate_sec_layer(ah, gss_context, sercred)) {
+	if (cred_handle != GSS_C_NO_CREDENTIAL)
 		(void) gss_release_cred(&min, &cred_handle);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
-		return (-1);
-	}
+	(void) gss_delete_sec_context(&min, &gss_context, NULL);
 
-	if ((maj = gss_release_cred(&min, &cred_handle))
-	    != GSS_S_COMPLETE) {
-		syslog(LOG_ERR, "smb_ads: Can't release credential handle\n");
-		ads_display_stat(maj, min);
-		(void) gss_delete_sec_context(&min, &gss_context, NULL);
-		return (-1);
-	}
-
-	if ((maj = gss_delete_sec_context(&min, &gss_context, NULL))
-	    != GSS_S_COMPLETE) {
-		syslog(LOG_ERR, "smb_ads: Can't delete security context\n");
-		ads_display_stat(maj, min);
-		return (-1);
-	}
-
-	return (0);
+	return ((rc) ? -1 : 0);
 }
 
 /*
@@ -1347,12 +1324,11 @@ int
 ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
     const char *unc_name, const char *adsContainer)
 {
-	LDAPMod *addattrs[3];
+	LDAPMod *attrs[ADS_SHARE_NUM_ATTR];
 	char *tmp1[5], *tmp2[5];
-	int j = -1;
+	int j = 0;
 	char *share_dn;
 	char buf[ADS_MAXMSGLEN];
-
 	int len, ret;
 
 	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
@@ -1365,37 +1341,44 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
 	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
 	    adsContainer, ah->domain_dn);
 
-	addattrs[++j] = (LDAPMod *)malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "objectClass";
+	for (j = 0; j < (ADS_SHARE_NUM_ATTR - 1); j++) {
+		attrs[j] = (LDAPMod *)malloc(sizeof (LDAPMod));
+		if (attrs[j] == NULL) {
+			free_attr(attrs);
+			free(share_dn);
+			return (-1);
+		}
+	}
+
+	j = 0;
+	attrs[j]->mod_op = LDAP_MOD_ADD;
+	attrs[j]->mod_type = "objectClass";
 	tmp1[0] = "top";
 	tmp1[1] = "leaf";
 	tmp1[2] = "connectionPoint";
 	tmp1[3] = "volume";
 	tmp1[4] = 0;
-	addattrs[j]->mod_values = tmp1;
+	attrs[j]->mod_values = tmp1;
 
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "uNCName";
-
+	attrs[++j]->mod_op = LDAP_MOD_ADD;
+	attrs[j]->mod_type = "uNCName";
 	tmp2[0] = (char *)unc_name;
 	tmp2[1] = 0;
-	addattrs[j]->mod_values = tmp2;
+	attrs[j]->mod_values = tmp2;
 
-	addattrs[++j] = 0;
+	attrs[++j] = 0;
 
-	if ((ret = ldap_add_s(ah->ld, share_dn, addattrs)) != LDAP_SUCCESS) {
+	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
 		(void) snprintf(buf, ADS_MAXMSGLEN,
 		    "ads_add_share: %s:", share_dn);
 		/* LINTED - E_SEC_PRINTF_VAR_FMT */
 		syslog(LOG_ERR, ldap_err2string(ret));
-		free_attr(addattrs);
+		free_attr(attrs);
 		free(share_dn);
 		return (ret);
 	}
 	free(share_dn);
-	free_attr(addattrs);
+	free_attr(attrs);
 
 	(void) snprintf(buf, ADS_MAXMSGLEN,
 	    "Share %s has been added to ADS container: %s.\n", adsShareName,
@@ -1787,15 +1770,21 @@ ads_get_host_principal_w_realm(char *princ, char *domain)
  * ads_get_host_principals
  *
  * If fqhost is NULL, this function will attempt to obtain fully qualified
- * hostname prior to generating the host principals.
+ * hostname prior to generating the host principals. If caller is not
+ * interested in getting the principal name without the Kerberos realm
+ * info, princ can be set to NULL.
  */
 static int
 ads_get_host_principals(char *fqhost, char *domain, char **princ,
     char **princ_r)
 {
 	char hostname[MAXHOSTNAMELEN];
+	char *p;
 
-	*princ = *princ_r = NULL;
+	if (princ != NULL)
+		*princ = NULL;
+
+	*princ_r = NULL;
 
 	if (fqhost) {
 		(void) strlcpy(hostname, fqhost, MAXHOSTNAMELEN);
@@ -1804,15 +1793,18 @@ ads_get_host_principals(char *fqhost, char *domain, char **princ,
 			return (-1);
 	}
 
-	if ((*princ = ads_get_host_principal(hostname)) == NULL) {
+	if ((p = ads_get_host_principal(hostname)) == NULL) {
 		return (-1);
 	}
 
-	*princ_r = ads_get_host_principal_w_realm(*princ, domain);
+	*princ_r = ads_get_host_principal_w_realm(p, domain);
 	if (*princ_r == NULL) {
-		free(*princ);
+		free(p);
 		return (-1);
 	}
+
+	if (princ != NULL)
+		*princ = p;
 
 	return (0);
 }
@@ -1825,16 +1817,34 @@ ads_get_host_principals(char *fqhost, char *domain, char **princ,
 static int
 ads_add_computer(ADS_HANDLE *ah)
 {
-	LDAPMod *addattrs[7];
+	return (ads_computer_op(ah, LDAP_MOD_ADD));
+}
+
+/*
+ * ads_modify_computer
+ *
+ * Returns 0 upon success. Otherwise, returns -1.
+ */
+static int
+ads_modify_computer(ADS_HANDLE *ah)
+{
+	return (ads_computer_op(ah, LDAP_MOD_REPLACE));
+}
+
+static int
+ads_computer_op(ADS_HANDLE *ah, int op)
+{
+	LDAPMod *attrs[ADS_COMPUTER_NUM_ATTR];
 	char *oc_vals[6], *sam_val[2], *usr_val[2];
 	char *svc_val[2], *ctl_val[2], *fqh_val[2];
-	int j = -1;
+	int j = 0;
 	int ret, usrctl_flags = 0;
 	char sam_acct[MAXHOSTNAMELEN + 1];
 	char fqhost[MAXHOSTNAMELEN];
 	char dn[ADS_DN_MAX];
 	char *user_principal, *svc_principal;
 	char usrctl_buf[16];
+	int max;
 
 	if (smb_getfqhostname(fqhost, MAXHOSTNAMELEN) != 0)
 		return (-1);
@@ -1847,75 +1857,96 @@ ads_add_computer(ADS_HANDLE *ah)
 	if (ads_get_host_principals(fqhost, ah->domain, &svc_principal,
 	    &user_principal) == -1) {
 		syslog(LOG_ERR,
-		    "ads_add_computer: unable to get host principal");
+		    "ads_computer_op: unable to get host principal");
 		return (-1);
 	}
 
 	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
 
-	addattrs[++j] = (LDAPMod *)malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "objectClass";
-	oc_vals[0] = "top";
-	oc_vals[1] = "person";
-	oc_vals[2] = "organizationalPerson";
-	oc_vals[3] = "user";
-	oc_vals[4] = "computer";
-	oc_vals[5] = 0;
-	addattrs[j]->mod_values = oc_vals;
+	max = (ADS_COMPUTER_NUM_ATTR - ((op != LDAP_MOD_ADD) ? 1 : 0));
+	for (j = 0; j < (max - 1); j++) {
+		attrs[j] = (LDAPMod *)malloc(sizeof (LDAPMod));
+		if (attrs[j] == NULL) {
+			free_attr(attrs);
+			free(user_principal);
+			free(svc_principal);
+			return (-1);
+		}
+	}
 
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "sAMAccountName";
+	j = -1;
+	/* objectClass attribute is not modifiable. */
+	if (op == LDAP_MOD_ADD) {
+		attrs[++j]->mod_op = op;
+		attrs[j]->mod_type = "objectClass";
+		oc_vals[0] = "top";
+		oc_vals[1] = "person";
+		oc_vals[2] = "organizationalPerson";
+		oc_vals[3] = "user";
+		oc_vals[4] = "computer";
+		oc_vals[5] = 0;
+		attrs[j]->mod_values = oc_vals;
+	}
 
+	attrs[++j]->mod_op = op;
+	attrs[j]->mod_type = "sAMAccountName";
 	sam_val[0] = sam_acct;
 	sam_val[1] = 0;
-	addattrs[j]->mod_values = sam_val;
+	attrs[j]->mod_values = sam_val;
 
-
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "userPrincipalName";
-
+	attrs[++j]->mod_op = op;
+	attrs[j]->mod_type = "userPrincipalName";
 	usr_val[0] = user_principal;
 	usr_val[1] = 0;
-	addattrs[j]->mod_values = usr_val;
+	attrs[j]->mod_values = usr_val;
 
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "servicePrincipalName";
-
+	attrs[++j]->mod_op = op;
+	attrs[j]->mod_type = "servicePrincipalName";
 	svc_val[0] = svc_principal;
 	svc_val[1] = 0;
-	addattrs[j]->mod_values = svc_val;
+	attrs[j]->mod_values = svc_val;
 
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "userAccountControl";
-
+	attrs[++j]->mod_op = op;
+	attrs[j]->mod_type = "userAccountControl";
 	usrctl_flags |= (ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
 	    ADS_USER_ACCT_CTL_PASSWD_NOTREQD |
 	    ADS_USER_ACCT_CTL_ACCOUNTDISABLE);
-
 	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
 	ctl_val[0] = usrctl_buf;
 	ctl_val[1] = 0;
-	addattrs[j]->mod_values = ctl_val;
-	addattrs[++j] = (LDAPMod *) malloc(sizeof (LDAPMod));
-	addattrs[j]->mod_op = LDAP_MOD_ADD;
-	addattrs[j]->mod_type = "dNSHostName";
+	attrs[j]->mod_values = ctl_val;
 
+	attrs[++j]->mod_op = op;
+	attrs[j]->mod_type = "dNSHostName";
 	fqh_val[0] = fqhost;
 	fqh_val[1] = 0;
-	addattrs[j]->mod_values = fqh_val;
-	addattrs[++j] = 0;
+	attrs[j]->mod_values = fqh_val;
 
-	if ((ret = ldap_add_s(ah->ld, dn, addattrs)) != LDAP_SUCCESS) {
-		syslog(LOG_ERR, "ads_add_computer: %s", ldap_err2string(ret));
+	attrs[++j] = 0;
+
+	switch (op) {
+	case LDAP_MOD_ADD:
+		if ((ret = ldap_add_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
+			syslog(LOG_ERR, "ads_add_computer: %s",
+			    ldap_err2string(ret));
+			ret = -1;
+		}
+		break;
+
+	case LDAP_MOD_REPLACE:
+		if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
+			syslog(LOG_ERR, "ads_modify_computer: %s",
+			    ldap_err2string(ret));
+			ret = -1;
+		}
+		break;
+
+	default:
 		ret = -1;
+
 	}
 
-	free_attr(addattrs);
+	free_attr(attrs);
 	free(user_principal);
 	free(svc_principal);
 
@@ -1978,8 +2009,7 @@ ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val)
 		return (-1);
 	}
 
-	(void) snprintf(filter, sizeof (filter),
-	    "(&(objectClass=computer)(sAMAccountName=%s))",
+	(void) snprintf(filter, sizeof (filter), "objectClass=computer",
 	    tmpbuf);
 
 	if (ldap_search_s(ah->ld, dn, LDAP_SCOPE_BASE, filter, attrs, 0,
@@ -2031,7 +2061,7 @@ ads_find_computer(ADS_HANDLE *ah)
 }
 
 /*
- * ads_modify_computer
+ * ads_update_computer_cntrl_attr
  *
  * Modify the user account control attribute of an existing computer
  * object on AD.
@@ -2039,7 +2069,7 @@ ads_find_computer(ADS_HANDLE *ah)
  * Returns 0 on success. Otherwise, returns -1.
  */
 static int
-ads_modify_computer(ADS_HANDLE *ah, int des_only)
+ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
 {
 	LDAPMod *attrs[6];
 	char *ctl_val[2];
@@ -2090,7 +2120,7 @@ ads_lookup_computer_attr_kvno(ADS_HANDLE *ah)
 	char *val = NULL;
 	int kvno = 1;
 
-	if (ads_lookup_computer_n_attr(ah, "ms-DS-KeyVersionNumber",
+	if (ads_lookup_computer_n_attr(ah, "msDS-KeyVersionNumber",
 	    &val) == 1) {
 		if (val) {
 			kvno = atoi(val);
@@ -2135,11 +2165,49 @@ ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 }
 
 /*
- * adjoin
+ * ads_domain_change_notify_handler
+ *
+ * Clear the host info cache and remove the old keys from the keytab
+ * as the ads_domain property has changed.
+ *
+ * domain - is the old ADS domain name.
+ */
+int
+ads_domain_change_notify_handler(char *domain)
+{
+	char *princ_r;
+	krb5_context ctx = NULL;
+	krb5_principal krb5princ;
+	int rc;
+
+	if (ads_get_host_principals(NULL, domain, NULL, &princ_r) == -1)
+		return (-1);
+
+	if (smb_krb5_ctx_init(&ctx) != 0) {
+		free(princ_r);
+		return (-1);
+	}
+
+	if (smb_krb5_get_principal(ctx, princ_r, &krb5princ) != 0) {
+		free(princ_r);
+		smb_krb5_ctx_fini(ctx);
+		return (-1);
+
+	}
+
+	rc = smb_krb5_remove_keytab_entries(ctx, krb5princ, SMBNS_KRB5_KEYTAB);
+	free(princ_r);
+	smb_krb5_ctx_fini(ctx);
+	ads_free_host_info();
+	return (rc);
+}
+
+/*
+ * ads_join
  *
  * Besides the NT-4 style domain join (using MS-RPC), CIFS server also
  * provides the domain join using Kerberos Authentication, Keberos
- * Change & Set password, and LDAP protocols. Basically, adjoin
+ * Change & Set password, and LDAP protocols. Basically, AD join
  * operation would require the following tickets to be acquired for the
  * the user account that is provided for the domain join.
  *
@@ -2160,36 +2228,16 @@ ads_gen_machine_passwd(char *machine_passwd, int bufsz)
  * principal after the domain join operation.
  */
 adjoin_status_t
-adjoin(char *machine_passwd, int len)
+ads_join(char *user, char *usr_passwd, char *machine_passwd, int len)
 {
 	ADS_HANDLE *ah = NULL;
-	krb5_enctype enctypes[10];
 	krb5_context ctx = NULL;
 	krb5_principal krb5princ;
 	krb5_kvno kvno;
-	char *princ, *princ_r;
-	int des_only, delete = 1, fini_krbctx = 1;
+	char *princ_r;
+	boolean_t des_only, delete = B_TRUE, fini_krbctx = B_TRUE;
 	adjoin_status_t rc = ADJOIN_SUCCESS;
-	struct stat fstat;
-
-	char *idmap_ccache = "/var/run/idmap/ccache";
-
-	if ((ah = ads_open()) == NULL)
-		return (ADJOIN_ERR_GET_HANDLE);
-
-	if (ads_gen_machine_passwd(machine_passwd, len) != 0) {
-		ads_close(ah);
-		return (ADJOIN_ERR_GEN_PASSWD);
-	}
-
-	if (ads_find_computer(ah))
-		ads_del_computer(ah);
-
-	if (ads_add_computer(ah) != 0) {
-		ads_close(ah);
-		return (ADJOIN_ERR_ADD_TRUST_ACCT);
-	}
-
+	boolean_t new_acct;
 	/*
 	 * Call library functions that can be used to get
 	 * the list of encryption algorithms available on the system.
@@ -2199,12 +2247,37 @@ adjoin(char *machine_passwd, int len)
 	 * list of algorithms available on any system running Nevada
 	 * by default.
 	 */
-	enctypes[0] = ENCTYPE_DES_CBC_CRC;
-	enctypes[1] = ENCTYPE_DES_CBC_MD5;
-	enctypes[2] = ENCTYPE_ARCFOUR_HMAC;
-	enctypes[3] = ENCTYPE_AES128_CTS_HMAC_SHA1_96;
+	krb5_enctype enctypes[] = {ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
+	    ENCTYPE_ARCFOUR_HMAC, ENCTYPE_AES128_CTS_HMAC_SHA1_96};
 
-	des_only = 0;
+	if ((ah = ads_open_main(user, usr_passwd)) == NULL) {
+		(void) smb_config_refresh();
+		return (ADJOIN_ERR_GET_HANDLE);
+	}
+
+	if (ads_gen_machine_passwd(machine_passwd, len) != 0) {
+		ads_close(ah);
+		(void) smb_config_refresh();
+		return (ADJOIN_ERR_GEN_PASSWD);
+	}
+
+	if (ads_find_computer(ah)) {
+		new_acct = B_FALSE;
+		if (ads_modify_computer(ah) != 0) {
+			ads_close(ah);
+			(void) smb_config_refresh();
+			return (ADJOIN_ERR_MOD_TRUST_ACCT);
+		}
+	} else {
+		new_acct = B_TRUE;
+		if (ads_add_computer(ah) != 0) {
+			ads_close(ah);
+			(void) smb_config_refresh();
+			return (ADJOIN_ERR_ADD_TRUST_ACCT);
+		}
+	}
+
+	des_only = B_FALSE;
 
 	/*
 	 * If we are talking to a Longhorn server, we need to set up
@@ -2216,14 +2289,16 @@ adjoin(char *machine_passwd, int len)
 	 * SmbSessionSetup request sent by SMB redirector.
 	 */
 
-	if (ads_get_host_principals(NULL, ah->domain, &princ, &princ_r) == -1) {
-		ads_del_computer(ah);
+	if (ads_get_host_principals(NULL, ah->domain, NULL, &princ_r) == -1) {
+		if (new_acct)
+			ads_del_computer(ah);
 		ads_close(ah);
+		(void) smb_config_refresh();
 		return (ADJOIN_ERR_GET_HOST_PRINC);
 	}
 
 	if (smb_krb5_ctx_init(&ctx) != 0) {
-		fini_krbctx = 0;
+		fini_krbctx = B_FALSE;
 		rc = ADJOIN_ERR_INIT_KRB_CTX;
 		goto adjoin_cleanup;
 	}
@@ -2239,12 +2314,15 @@ adjoin(char *machine_passwd, int len)
 	}
 
 	kvno = ads_lookup_computer_attr_kvno(ah);
-	if (ads_modify_computer(ah, des_only) != 0) {
-		rc = ADJOIN_ERR_MOD_TRUST_ACCT;
+
+	if (ads_update_computer_cntrl_attr(ah, des_only) != 0) {
+		rc = ADJOIN_ERR_UPDATE_CNTRL_ATTR;
 		goto adjoin_cleanup;
 	}
-	if (smb_krb5_write_keytab(ctx, krb5princ, "/etc/krb5/krb5.keytab", kvno,
-	    machine_passwd, enctypes, 4) != 0) {
+
+	if (smb_krb5_update_keytab_entries(ctx, krb5princ, SMBNS_KRB5_KEYTAB,
+	    kvno, machine_passwd, enctypes,
+	    (sizeof (enctypes) / sizeof (krb5_enctype))) != 0) {
 		rc = ADJOIN_ERR_WRITE_KEYTAB;
 		goto adjoin_cleanup;
 	}
@@ -2255,36 +2333,29 @@ adjoin(char *machine_passwd, int len)
 		goto adjoin_cleanup;
 	}
 
-	if (smb_config_set_idmap_gc(ah->hostname) != 0) {
-		rc = ADJOIN_ERR_IDMAP_SET_GC;
-		goto adjoin_cleanup;
-	}
-
 	/* Refresh IDMAP service */
 	if (smb_config_refresh_idmap() != 0) {
 		rc = ADJOIN_ERR_IDMAP_REFRESH;
 		goto adjoin_cleanup;
 	}
 
-	/* Remove the idmap ccache */
-	if (stat(idmap_ccache, &fstat) == 0) {
-		if (remove(idmap_ccache) != 0) {
-			rc = ADJOIN_ERR_IDMAP_CCACHE;
-			goto adjoin_cleanup;
-		}
-	}
-
-	delete = 0;
+	delete = B_FALSE;
 adjoin_cleanup:
-	if (delete)
+	if (new_acct && delete)
 		ads_del_computer(ah);
 
 	if (fini_krbctx)
 		smb_krb5_ctx_fini(ctx);
 
 	ads_close(ah);
-	free(princ);
 	free(princ_r);
+
+	/*
+	 * Don't mask other failure.  Only reports SMF refresh
+	 * failure if no other domain join failure.
+	 */
+	if ((smb_config_refresh() != 0) && (rc == ADJOIN_SUCCESS))
+		rc = ADJOIN_ERR_SMB_REFRESH;
 
 	return (rc);
 }

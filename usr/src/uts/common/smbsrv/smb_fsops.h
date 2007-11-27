@@ -35,6 +35,7 @@
 #include <smbsrv/smb_i18n.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_vops.h>
+#include <smbsrv/smbvar.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -111,21 +112,12 @@ int smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr,
     smb_node_t *fnode, uint32_t *cookiep, struct fs_stream_info *stream_info,
     smb_node_t **ret_snode, smb_attr_t *ret_attr);
 
-void smb_fsop_aclfree(acl_t *acl);
-acl_t *smb_fsop_aclalloc(int acenum, int flags);
-int smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_fssd_t *fssd);
-int smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_fssd_t *fs_sd);
-acl_type_t smb_fsop_acltype(smb_node_t *snode);
-
-void smb_fsop_sdinit(smb_fssd_t *fs_sd, uint32_t secinfo, uint32_t sd_flags);
-void smb_fsop_sdterm(smb_fssd_t *fssd);
-int smb_fsop_sdread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_fssd_t *fssd);
-int smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_fssd_t *fs_sd, int overwrite);
-
+int smb_fsop_aclread(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);
+int smb_fsop_aclwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);
+acl_type_t smb_fsop_acltype(smb_node_t *);
+int smb_fsop_sdread(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);
+int smb_fsop_sdwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *,
+    int);
 
 void smb_get_caller_context(smb_request_t *sr, caller_context_t *ct);
 

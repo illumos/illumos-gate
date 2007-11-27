@@ -28,12 +28,14 @@
 # Common Makefile definitions for smbsrv.
 #
 
-# We reset the Makefile.lib macros ROOTLIBDIR to refer to usr/lib/smbsrv
-# We also install the userland library header files under /usr/include/smbsrv
+# We reset the Makefile.lib macros ROOTLIBDIR to refer to usr/lib/smbsrv.
+# For 64 bit, we reset ROOTLIBDIR64 to refer to usr/lib/smbsrv/$(MACH64).
+# We also install the userland library header files under /usr/include/smbsrv.
 ROOTSMBHDRDIR=	$(ROOTHDRDIR)/smbsrv
 ROOTSMBHDRS=	$(HDRS:%=$(ROOTSMBHDRDIR)/%)
 
 ROOTLIBDIR =	$(ROOT)/usr/lib/smbsrv
+ROOTLIBDIR64 =	$(ROOT)/usr/lib/smbsrv/$(MACH64)
 
 SRCDIR=		../common
 NDLDIR=		$(ROOT)/usr/include/smbsrv/ndl
@@ -41,8 +43,6 @@ LIBS=		$(DYNLIB) $(LINTLIB)
 C99MODE =       -xc99=%all
 C99LMODE =      -Xc99=%all
 CPPFLAGS +=	-I$(SRCDIR) -I.
-DYNFLAGS +=	-R/usr/lib/smbsrv
-DYNFLAGS64 +=	-R/usr/lib/smbsrv/$(MACH64)
 LDLIBS32 +=	-L$(ROOT)/usr/lib/smbsrv
 LDLIBS64 +=	-L$(ROOT)/usr/lib/smbsrv/$(MACH64)
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)

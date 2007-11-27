@@ -27,35 +27,26 @@
 
 SUNWprivate {
     global:
-	mlsvc_admin_logon;
-	mlsvc_anonymous_logon;
 	mlsvc_check_sessions;
 	mlsvc_close_pipe;
 	mlsvc_disconnect;
 	mlsvc_echo;
 	mlsvc_install_pdc_cb;
 	mlsvc_locate_domain_controller;
+	mlsvc_logon;
 	mlsvc_open_pipe;
 	mlsvc_session_native_values;
 	mlsvc_user_getauth;
-	mlsvc_user_logon;
 	smbrdr_dump_netuse;
 	smbrdr_dump_ofiles;
 	smbrdr_dump_sessions;
 	smbrdr_init;
-	smbrdr_ipc_get_mode;
 	smbrdr_ipc_commit;
-	smbrdr_ipc_get_flags;
 	smbrdr_ipc_get_user;
 	smbrdr_ipc_rollback;
 	smbrdr_ipc_set;
 	smbrdr_ipc_skip_lsa_query;
-	smbrdr_ipc_is_fallback;
-	smbrdr_ipc_is_valid;
 	smbrdr_ipc_get_passwd;
-	smbrdr_ipc_save_mode;
-	smbrdr_ipc_set_fallback;
-	smbrdr_ipc_unset_fallback;
 	smbrdr_rpc_readx;
 	smbrdr_rpc_transact;
     local:

@@ -329,7 +329,8 @@ extern int smb_vop_write(vnode_t *vp, uio_t *uiop, unsigned int *flag,
 extern int smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp,
     smb_attr_t *ret_attr, int flags, cred_t *cr, caller_context_t *ct);
 extern int smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp,
-    smb_attr_t *set_attr, int flags, cred_t *cr, caller_context_t *ct);
+    smb_attr_t *set_attr, int flags, cred_t *cr, boolean_t no_xvattr,
+    caller_context_t *ct);
 extern int smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp,
     cred_t *cr);
 extern void smb_vop_eaccess(vnode_t *vp, int *mode, int flags, vnode_t *dir_vp,

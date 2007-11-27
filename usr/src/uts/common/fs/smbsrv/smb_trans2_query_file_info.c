@@ -78,7 +78,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 {
 	static smb_attr_t pipe_attr;
 	unsigned short	infolev, dattr = 0;
-	off_t		dsize = 0, dused = 0;
+	u_offset_t	dsize = 0, dused = 0;
 	smb_attr_t	*ap = NULL;
 	char		*namep = NULL;
 	char		*filename = NULL, *alt_nm_ptr = NULL;
@@ -194,10 +194,10 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_INFO_STANDARD:
-		if (dsize > 0xffffffff)
-			dsize = 0xffffffff;
-		if (dused > 0xffffffff)
-			dused = 0xffffffff;
+		if (dsize > UINT_MAX)
+			dsize = UINT_MAX;
+		if (dused > UINT_MAX)
+			dused = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -212,10 +212,10 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
-		if (dsize > 0xffffffff)
-			dsize = 0xffffffff;
-		if (dused > 0xffffffff)
-			dused = 0xffffffff;
+		if (dsize > UINT_MAX)
+			dsize = UINT_MAX;
+		if (dused > UINT_MAX)
+			dused = UINT_MAX;
 
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
 		(void) smb_encode_mbc(&xa->rep_data_mb,
@@ -449,7 +449,7 @@ smb_encode_stream_info(
 	uint32_t next_offset;
 	uint32_t stream_nlen;
 	uint32_t pad;
-	off_t dsize;
+	u_offset_t dsize;
 	int is_dir;
 	uint32_t cookie = 0;
 	struct fs_stream_info *stream_info;

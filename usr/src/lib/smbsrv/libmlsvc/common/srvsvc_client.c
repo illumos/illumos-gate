@@ -58,48 +58,31 @@ static int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
  * Ensure that an appropriate session and logon exists for the srvsvc
  * client calls. Open and bind the RPC interface.
  *
+ * If username argument is NULL, an anonymous connection will be established.
+ * Otherwise, an authenticated connection will be established.
+ *
  * On success 0 is returned. Otherwise a -ve error code.
  */
-int
-srvsvc_open(int ipc_mode, char *server, char *domain, char *username,
-    char *password, mlsvc_handle_t *handle, mlrpc_heapref_t *heapref)
+static int
+srvsvc_open(char *server, char *domain, char *username,
+    mlsvc_handle_t *handle, mlrpc_heapref_t *heapref)
 {
 	smb_ntdomain_t *di;
 	int fid;
 	int rc;
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
-		return (-1);
-
 	if (server == NULL || domain == NULL) {
+		if ((di = smb_getdomaininfo(0)) == NULL)
+			return (-1);
+
 		server = di->server;
 		domain = di->domain;
 	}
 
-	switch (ipc_mode) {
-	case MLSVC_IPC_USER:
-		/*
-		 * Use the supplied credentials.
-		 */
-		rc = mlsvc_user_logon(server, domain, username, password);
-		break;
+	if (username == NULL)
+		username = MLSVC_ANON_USER;
 
-	case MLSVC_IPC_ADMIN:
-		/*
-		 * Use the resource domain administrator credentials.
-		 */
-		server = di->server;
-		domain = di->domain;
-		username = smbrdr_ipc_get_user();
-
-		rc = mlsvc_admin_logon(server, domain);
-		break;
-
-	case MLSVC_IPC_ANON:
-	default:
-		rc = mlsvc_anonymous_logon(server, domain, &username);
-		break;
-	}
+	rc = mlsvc_logon(server, domain, username);
 
 	if (rc != 0)
 		return (-1);
@@ -145,18 +128,16 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 	struct mslm_NetShareGetInfo0 *info0;
 	struct mslm_NetShareGetInfo1 *info1;
 	struct mslm_NetShareGetInfo2 *info2;
-	int ipc_mode;
 	int len;
+	char *user = NULL;
 
 	if (netname == NULL)
 		return (-1);
 
 	if (srvsvc_info_level == 2)
-		ipc_mode = MLSVC_IPC_ADMIN;
-	else
-		ipc_mode = MLSVC_IPC_ANON;
+		user = smbrdr_ipc_get_user();
 
-	rc = srvsvc_open(ipc_mode, server, domain, 0, 0, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle, &heap);
 	if (rc != 0)
 		return (-1);
 
@@ -240,11 +221,12 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	struct mslm_infonres infonres;
 	struct mslm_SESSION_INFO_1 *nsi1;
 	int len;
+	char *user = smbrdr_ipc_get_user();
 
 	if (netname == NULL)
 		return (-1);
 
-	rc = srvsvc_open(MLSVC_IPC_ADMIN, server, domain, 0, 0, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle, &heap);
 	if (rc != 0)
 		return (-1);
 
@@ -305,11 +287,12 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	struct mslm_NetConnectInfo0 info0;
 	struct mslm_NetConnectInfoBuf1 *cib1;
 	int len;
+	char *user = smbrdr_ipc_get_user();
 
 	if (netname == NULL)
 		return (-1);
 
-	rc = srvsvc_open(MLSVC_IPC_ADMIN, server, domain, 0, 0, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle, &heap);
 	if (rc != 0)
 		return (-1);
 
@@ -476,8 +459,9 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	int rc;
 	int opnum;
 	int len;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = srvsvc_open(MLSVC_IPC_ANON, server, domain, 0, 0, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle, &heap);
 	if (rc != 0)
 		return (-1);
 

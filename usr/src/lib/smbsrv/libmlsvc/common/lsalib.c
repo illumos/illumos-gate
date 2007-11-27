@@ -36,6 +36,7 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/lsalib.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
@@ -60,8 +61,9 @@ lsa_query_primary_domain_info(void)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
+	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle)) != 0)
+	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	status = lsar_query_info_policy(&domain_handle,
@@ -87,8 +89,9 @@ lsa_query_account_domain_info(void)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
+	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle)) != 0)
+	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	status = lsar_query_info_policy(&domain_handle,
@@ -114,8 +117,9 @@ lsa_enum_trusted_domains(void)
 	mlsvc_handle_t domain_handle;
 	DWORD enum_context;
 	DWORD status;
+	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle)) != 0)
+	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	enum_context = 0;
@@ -318,8 +322,9 @@ int lsa_lookup_name(char *server, char *domain, char *account_name,
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, server, domain, 0, 0, &domain_handle);
+	rc = lsar_open(server, domain, user, &domain_handle);
 	if (rc != 0)
 		return (-1);
 
@@ -340,8 +345,9 @@ DWORD lsa_lookup_name2(char *server, char *domain, char *account_name,
 	mlsvc_handle_t domain_handle;
 	DWORD status;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, server, domain, 0, 0, &domain_handle);
+	rc = lsar_open(server, domain, user, &domain_handle);
 	if (rc != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
@@ -378,8 +384,9 @@ lsa_lookup_sid(nt_sid_t *sid, smb_userinfo_t *user_info)
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle);
+	rc = lsar_open(NULL, NULL, user, &domain_handle);
 	if (rc != 0)
 		return (-1);
 
@@ -401,8 +408,9 @@ lsa_lookup_sid2(nt_sid_t *sid, smb_userinfo_t *user_info)
 	mlsvc_handle_t domain_handle;
 	DWORD status;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle);
+	rc = lsar_open(NULL, NULL, user, &domain_handle);
 	if (rc != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
@@ -479,30 +487,12 @@ lsa_lookup_privs(char *server, char *account_name, char *target_name,
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
-#if 0
-	mlsvc_handle_t account_handle;
-	struct mslsa_sid *sid;
+	char *user = smbrdr_ipc_get_user();
 
-	lsa_lookup_name(0, 0, target_name, user_info);
-
-	sid = (struct mslsa_sid *)
-	    nt_sid_splice(user_info->domain_sid, user_info->rid);
-
-	lsa_lookup_sid(server, account_name, (nt_sid_t *)sid, user_info);
-#endif
-	if ((lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle)) != 0)
+	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
 		return (-1);
 
 	rc = lsa_list_accounts(&domain_handle);
-#if 0
-	rc = lsar_open_account(&domain_handle, sid, &account_handle);
-	if (rc == 0) {
-		(void) lsar_enum_privs_account(&account_handle, user_info);
-		(void) lsar_close(&account_handle);
-	}
-
-	free(sid);
-#endif
 	(void) lsar_close(&domain_handle);
 	return (rc);
 }
@@ -523,8 +513,9 @@ lsa_list_privs(char *server, char *domain)
 	mlsvc_handle_t domain_handle;
 	int rc;
 	int i;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, server, domain, 0, 0, &domain_handle);
+	rc = lsar_open(server, domain, user, &domain_handle);
 	if (rc != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
@@ -557,8 +548,9 @@ lsa_test(char *server, char *account_name)
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
+	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(MLSVC_IPC_ANON, 0, 0, 0, 0, &domain_handle);
+	rc = lsar_open(NULL, NULL, user, &domain_handle);
 	if (rc != 0)
 		return (-1);
 

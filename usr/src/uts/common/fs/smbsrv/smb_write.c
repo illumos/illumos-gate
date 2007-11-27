@@ -84,7 +84,7 @@ smb_com_write(struct smb_request *sr)
 	}
 
 	param->w_offset = (uint64_t)off;
-	param->w_vdb.uio.uio_offset = param->w_offset;
+	param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
 
 	if (param->w_count == 0) {
 		rc = smb_write_truncate(sr, param);
@@ -97,7 +97,7 @@ smb_com_write(struct smb_request *sr)
 			/* NOTREACHED */
 		}
 
-		param->w_vdb.uio.uio_offset = param->w_offset;
+		param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
 
 		rc = smb_write_common(sr, param);
 	}
@@ -173,7 +173,7 @@ smb_com_write_and_close(struct smb_request *sr)
 			/* NOTREACHED */
 		}
 
-		param->w_vdb.uio.uio_offset = param->w_offset;
+		param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
 
 		rc = smb_write_common(sr, param);
 	}
@@ -255,7 +255,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	}
 
 	param->w_offset = (uint64_t)off;
-	param->w_vdb.uio.uio_offset = (off_t)param->w_offset;
+	param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
 
 	if ((rc = smb_write_common(sr, param)) != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
@@ -344,7 +344,7 @@ smb_com_write_andx(struct smb_request *sr)
 		/* NOTREACHED */
 	}
 
-	param->w_vdb.uio.uio_offset = param->w_offset;
+	param->w_vdb.uio.uio_loffset = (offset_t)param->w_offset;
 
 	if (param->w_count != 0) {
 		if ((rc = smb_write_common(sr, param)) != 0) {

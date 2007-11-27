@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+#define	SMBNS_KRB5_KEYTAB "/etc/krb5/krb5.keytab"
+
 extern gss_OID gss_nt_user_name;
 extern gss_OID gss_nt_machine_uid_name;
 extern gss_OID gss_nt_string_uid_name;
@@ -53,7 +55,9 @@ void smb_krb5_ctx_fini(krb5_context ctx);
 int smb_krb5_get_principal(krb5_context ctx, char *princ_str,
     krb5_principal *princ);
 int smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd);
-int smb_krb5_write_keytab(krb5_context ctx, krb5_principal princ,
+int smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal princ,
+    char *fname);
+int smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal princ,
     char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
     int enctype_count);
 

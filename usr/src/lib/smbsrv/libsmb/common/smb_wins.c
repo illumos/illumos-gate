@@ -89,8 +89,7 @@ smb_wins_iplist(char *list, uint32_t iplist[], int max_naddr)
  * Returns 1 if it's excluded, 0 if it's not.
  */
 boolean_t
-smb_wins_is_excluded(in_addr_t ipaddr,
-    unsigned long *exclude_list, int nexclude)
+smb_wins_is_excluded(in_addr_t ipaddr, ipaddr_t *exclude_list, int nexclude)
 {
 	int i;
 

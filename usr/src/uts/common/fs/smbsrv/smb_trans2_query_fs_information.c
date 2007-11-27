@@ -294,7 +294,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 			/* NOTREACHED */
 		}
 
-		max_int = 0xffffffffLL;
+		max_int = (uint64_t)UINT_MAX;
 
 		if (df.f_blocks > max_int)
 			df.f_blocks = max_int;

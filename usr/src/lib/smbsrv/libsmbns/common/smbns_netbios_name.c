@@ -2134,6 +2134,7 @@ smb_send_node_status_response(struct addr_entry *addr,
 	unsigned char 		*scan_end;
 	unsigned char		data[MAX_NETBIOS_REPLY_DATA_SIZE];
 	net_cfg_t cfg;
+	boolean_t scan_done = B_FALSE;
 
 	bzero(&packet, sizeof (struct name_packet));
 	bzero(&answer, sizeof (struct resource_record));
@@ -2168,7 +2169,7 @@ smb_send_node_status_response(struct addr_entry *addr,
 	smb_config_rdlock();
 	max_connections = smb_config_getnum(SMB_CI_MAX_CONNECTIONS);
 	smb_config_unlock();
-	for (;;) {
+	while (!scan_done) {
 		if ((scan + 6) >= scan_end) {
 			packet.info |= NAME_NM_FLAGS_TC;
 			break;
@@ -2256,8 +2257,7 @@ smb_send_node_status_response(struct addr_entry *addr,
 
 		BE_OUT16(scan, 0); scan += 2;
 
-		break;
-		/*NOTREACHED*/
+		scan_done = B_TRUE;
 	}
 	answer.rdlength = scan - data;
 	return (smb_send_name_service_packet(addr, &packet));
@@ -4488,6 +4488,10 @@ static void
 smb_netbios_wins_config(char *ip)
 {
 	uint32_t ipaddr;
+
+	/* Return if ip == NULL since this is the same as "" */
+	if (ip == NULL)
+		return;
 
 	ipaddr = inet_addr(ip);
 	if (ipaddr != INADDR_NONE) {

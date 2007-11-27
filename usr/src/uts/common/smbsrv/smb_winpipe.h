@@ -48,7 +48,6 @@ extern "C" {
 #define	SMB_MAX_PIPENAMELEN 32
 
 #define	SMB_WINPIPE_DOOR_DOWN_PATH "/var/run/winpipe_doordown"
-#define	SMB_WINPIPE_DOOR_UP_PATH "/var/run/winpipe_doorup"
 
 #define	SMB_DOWNCALLINFO_MAGIC	0x19121969
 #define	SMB_MLSVC_DOOR_VERSION 1

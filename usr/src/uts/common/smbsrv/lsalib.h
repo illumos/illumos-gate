@@ -87,11 +87,9 @@ int lsa_test(char *server, char *account_name);
 /*
  * lsar_open.c
  */
-int lsar_open(int ipc_mode,
-    char *server,
+int lsar_open(char *server,
     char *domain,
     char *username,
-    char *password,
     mlsvc_handle_t *domain_handle);
 
 int lsar_open_policy2(char *server,

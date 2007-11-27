@@ -34,6 +34,8 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/ndr.h>
+#include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc_util.h>
 
 static int mlsvc_xa_init(struct mlrpc_client *, struct mlrpc_xaction *,

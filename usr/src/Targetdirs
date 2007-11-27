@@ -354,6 +354,7 @@ ROOT.BIN64= \
 	/usr/lib/sasl/$(MACH64) \
 	/usr/lib/secure/$(MACH64) \
 	/usr/lib/security/$(MACH64) \
+	/usr/lib/smbsrv/$(MACH64) \
 	/usr/lib/abi/$(MACH64) \
 	/usr/sbin/$(MACH64) \
 	/usr/ucb/$(MACH64) \

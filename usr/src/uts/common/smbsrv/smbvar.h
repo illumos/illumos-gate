@@ -49,13 +49,14 @@ extern "C" {
 #include <smbsrv/lmshare.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/mbuf.h>
-#include <smbsrv/smb_secdesc.h>
+
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsd.h>
 #include <smbsrv/mlsvc.h>
 
 typedef struct smb_session smb_session_t;
 typedef struct smb_request smb_request_t;
+typedef struct smb_sd smb_sd_t;
 
 #include <smbsrv/smb_svc_sm.h>
 
@@ -401,7 +402,7 @@ typedef struct smb_node {
 	volatile int		waiting_event; /* # of clients requesting FCN */
 	smb_attr_t		attr;
 	unsigned int		what;
-	off_t			n_size;
+	u_offset_t		n_size;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*dir_snode; /* Directory of node */
 	struct smb_node		*unnamed_stream_node; /* set in stream nodes */
@@ -756,6 +757,8 @@ typedef struct smb_tree {
 #define	SMB_TREE_FLAG_ACLONCREATE	0x0004
 #define	SMB_TREE_FLAG_ACEMASKONACCESS	0x0008
 #define	SMB_TREE_FLAG_IGNORE_CASE	0x0010
+#define	SMB_TREE_FLAG_NFS_MOUNTED	0x0020
+#define	SMB_TREE_FLAG_UFS		0x0040
 #define	SMB_TREE_CLOSED(tree) ((tree)->t_flags & SMB_TREE_FLAG_CLOSE)
 
 /*
@@ -1183,7 +1186,7 @@ struct smb_request {
 		uint32_t	action_taken;
 		uint64_t	fileid;
 		/* This is only set by NTTransactCreate */
-		smb_sdbuf_t	*sd_buf;
+		smb_sd_t	*sd;
 	    } open;
 
 	    struct {
@@ -1394,6 +1397,317 @@ typedef struct smb_dispatch_table {
 	krw_t			sdt_slock_mode;
 	kstat_named_t		sdt_dispatch_stats; /* invocations */
 } smb_dispatch_table_t;
+
+/*
+ * Discretionary Access Control List (DACL)
+ *
+ * A Discretionary Access Control List (DACL), often abbreviated to
+ * ACL, is a list of access controls which either allow or deny access
+ * for users or groups to a resource. There is a list header followed
+ * by a list of access control entries (ACE). Each ACE specifies the
+ * access allowed or denied to a single user or group (identified by
+ * a SID).
+ *
+ * There is another access control list object called a System Access
+ * Control List (SACL), which is used to control auditing, but no
+ * support is provideed for SACLs at this time.
+ *
+ * ACL header format:
+ *
+ *    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ *    1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *   +-------------------------------+---------------+---------------+
+ *   |            AclSize            |      Sbz1     |  AclRevision  |
+ *   +-------------------------------+---------------+---------------+
+ *   |              Sbz2             |           AceCount            |
+ *   +-------------------------------+-------------------------------+
+ *
+ * AclRevision specifies the revision level of the ACL. This value should
+ * be ACL_REVISION, unless the ACL contains an object-specific ACE, in which
+ * case this value must be ACL_REVISION_DS. All ACEs in an ACL must be at the
+ * same revision level.
+ *
+ * ACE header format:
+ *
+ *    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ *    1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *   +---------------+-------+-------+---------------+---------------+
+ *   |            AceSize            |    AceFlags   |     AceType   |
+ *   +---------------+-------+-------+---------------+---------------+
+ *
+ * Access mask format:
+ *
+ *    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ *    1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *   +---------------+---------------+-------------------------------+
+ *   |G|G|G|G|Res'd|A| StandardRights|         SpecificRights        |
+ *   |R|W|E|A|     |S|               |                               |
+ *   +-+-------------+---------------+-------------------------------+
+ *
+ *   typedef struct ACCESS_MASK {
+ *       WORD SpecificRights;
+ *       BYTE StandardRights;
+ *       BYTE AccessSystemAcl : 1;
+ *       BYTE Reserved : 3;
+ *       BYTE GenericAll : 1;
+ *       BYTE GenericExecute : 1;
+ *       BYTE GenericWrite : 1;
+ *       BYTE GenericRead : 1;
+ *   } ACCESS_MASK;
+ *
+ */
+
+#define	ACL_REVISION1			1
+#define	ACL_REVISION2			2
+#define	MIN_ACL_REVISION2		ACL_REVISION2
+#define	ACL_REVISION3			3
+#define	ACL_REVISION4			4
+#define	MAX_ACL_REVISION		ACL_REVISION4
+
+/*
+ * Current ACE and ACL revision Levels
+ */
+#define	ACE_REVISION			1
+#define	ACL_REVISION			ACL_REVISION2
+#define	ACL_REVISION_DS			ACL_REVISION4
+
+
+#define	ACCESS_ALLOWED_ACE_TYPE		0
+#define	ACCESS_DENIED_ACE_TYPE		1
+#define	SYSTEM_AUDIT_ACE_TYPE		2
+#define	SYSTEM_ALARM_ACE_TYPE		3
+
+/*
+ *  se_flags
+ * ----------
+ * Specifies a set of ACE type-specific control flags. This member can be a
+ * combination of the following values.
+ *
+ * CONTAINER_INHERIT_ACE: Child objects that are containers, such as
+ *		directories, inherit the ACE as an effective ACE. The inherited
+ *		ACE is inheritable unless the NO_PROPAGATE_INHERIT_ACE bit flag
+ *		is also set.
+ *
+ * INHERIT_ONLY_ACE: Indicates an inherit-only ACE which does not control
+ *		access to the object to which it is attached.
+ *		If this flag is not set,
+ *		the ACE is an effective ACE which controls access to the object
+ *		to which it is attached.
+ * 		Both effective and inherit-only ACEs can be inherited
+ *		depending on the state of the other inheritance flags.
+ *
+ * INHERITED_ACE: Windows 2000/XP: Indicates that the ACE was inherited.
+ *		The system sets this bit when it propagates an
+ *		inherited ACE to a child object.
+ *
+ * NO_PROPAGATE_INHERIT_ACE: If the ACE is inherited by a child object, the
+ *		system clears the OBJECT_INHERIT_ACE and CONTAINER_INHERIT_ACE
+ *		flags in the inherited ACE.
+ *		This prevents the ACE from being inherited by
+ *		subsequent generations of objects.
+ *
+ * OBJECT_INHERIT_ACE: Noncontainer child objects inherit the ACE as an
+ *		effective ACE.  For child objects that are containers,
+ *		the ACE is inherited as an inherit-only ACE unless the
+ *		NO_PROPAGATE_INHERIT_ACE bit flag is also set.
+ */
+#define	OBJECT_INHERIT_ACE		0x01
+#define	CONTAINER_INHERIT_ACE		0x02
+#define	NO_PROPOGATE_INHERIT_ACE	0x04
+#define	INHERIT_ONLY_ACE		0x08
+#define	INHERITED_ACE			0x10
+#define	INHERIT_MASK_ACE		0x1F
+
+
+/*
+ * These flags are only used in system audit or alarm ACEs to
+ * indicate when an audit message should be generated, i.e.
+ * on successful access or on unsuccessful access.
+ */
+#define	SUCCESSFUL_ACCESS_ACE_FLAG	0x40
+#define	FAILED_ACCESS_ACE_FLAG		0x80
+
+/*
+ * se_bsize is the size, in bytes, of ACE as it appears on the wire.
+ * se_sln is used to sort the ACL when it's required.
+ */
+typedef struct smb_acehdr {
+	uint8_t		se_type;
+	uint8_t		se_flags;
+	uint16_t	se_bsize;
+} smb_acehdr_t;
+
+typedef struct smb_ace {
+	smb_acehdr_t	se_hdr;
+	uint32_t	se_mask;
+	list_node_t	se_sln;
+	nt_sid_t	*se_sid;
+} smb_ace_t;
+
+/*
+ * sl_bsize is the size of ACL in bytes as it appears on the wire.
+ */
+typedef struct smb_acl {
+	uint8_t		sl_revision;
+	uint16_t	sl_bsize;
+	uint16_t	sl_acecnt;
+	smb_ace_t	*sl_aces;
+	list_t		sl_sorted;
+} smb_acl_t;
+
+/*
+ * ACE/ACL header size, in byte, as it appears on the wire
+ */
+#define	SMB_ACE_HDRSIZE		4
+#define	SMB_ACL_HDRSIZE		8
+
+/*
+ * Security Descriptor (SD)
+ *
+ * Security descriptors provide protection for objects, for example
+ * files and directories. It identifies the owner and primary group
+ * (SIDs) and contains an access control list. When a user tries to
+ * access an object his SID is compared to the permissions in the
+ * DACL to determine if access should be allowed or denied. Note that
+ * this is a simplification because there are other factors, such as
+ * default behavior and privileges to be taken into account (see also
+ * access tokens).
+ *
+ * The boolean flags have the following meanings when set:
+ *
+ * SE_OWNER_DEFAULTED indicates that the SID pointed to by the Owner
+ * field was provided by a defaulting mechanism rather than explicitly
+ * provided by the original provider of the security descriptor. This
+ * may affect the treatment of the SID with respect to inheritance of
+ * an owner.
+ *
+ * SE_GROUP_DEFAULTED indicates that the SID in the Group field was
+ * provided by a defaulting mechanism rather than explicitly provided
+ * by the original provider of the security descriptor.  This may
+ * affect the treatment of the SID with respect to inheritance of a
+ * primary group.
+ *
+ * SE_DACL_PRESENT indicates that the security descriptor contains a
+ * discretionary ACL. If this flag is set and the Dacl field of the
+ * SECURITY_DESCRIPTOR is null, then a null ACL is explicitly being
+ * specified.
+ *
+ * SE_DACL_DEFAULTED indicates that the ACL pointed to by the Dacl
+ * field was provided by a defaulting mechanism rather than explicitly
+ * provided by the original provider of the security descriptor. This
+ * may affect the treatment of the ACL with respect to inheritance of
+ * an ACL. This flag is ignored if the DaclPresent flag is not set.
+ *
+ * SE_SACL_PRESENT indicates that the security descriptor contains a
+ * system ACL pointed to by the Sacl field. If this flag is set and
+ * the Sacl field of the SECURITY_DESCRIPTOR is null, then an empty
+ * (but present) ACL is being specified.
+ *
+ * SE_SACL_DEFAULTED indicates that the ACL pointed to by the Sacl
+ * field was provided by a defaulting mechanism rather than explicitly
+ * provided by the original provider of the security descriptor. This
+ * may affect the treatment of the ACL with respect to inheritance of
+ * an ACL. This flag is ignored if the SaclPresent flag is not set.
+ *
+ * SE_DACL_PROTECTED Prevents ACEs set on the DACL of the parent container
+ * (and any objects above the parent container in the directory hierarchy)
+ * from being applied to the object's DACL.
+ *
+ * SE_SACL_PROTECTED Prevents ACEs set on the SACL of the parent container
+ * (and any objects above the parent container in the directory hierarchy)
+ * from being applied to the object's SACL.
+ *
+ * Note that the SE_DACL_PRESENT flag needs to be present to set
+ * SE_DACL_PROTECTED and SE_SACL_PRESENT needs to be present to set
+ * SE_SACL_PROTECTED.
+ *
+ * SE_SELF_RELATIVE indicates that the security descriptor is in self-
+ * relative form. In this form, all fields of the security descriptor
+ * are contiguous in memory and all pointer fields are expressed as
+ * offsets from the beginning of the security descriptor.
+ *
+ *    3 3 2 2 2 2 2 2 2 2 2 2 1 1 1 1 1 1 1 1 1 1
+ *    1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+ *   +---------------------------------------------------------------+
+ *   |            Control            |Reserved1 (SBZ)|   Revision    |
+ *   +---------------------------------------------------------------+
+ *   |                            Owner                              |
+ *   +---------------------------------------------------------------+
+ *   |                            Group                              |
+ *   +---------------------------------------------------------------+
+ *   |                            Sacl                               |
+ *   +---------------------------------------------------------------+
+ *   |                            Dacl                               |
+ *   +---------------------------------------------------------------+
+ *
+ */
+
+#define	SMB_OWNER_SECINFO	0x0001
+#define	SMB_GROUP_SECINFO	0x0002
+#define	SMB_DACL_SECINFO	0x0004
+#define	SMB_SACL_SECINFO	0x0008
+#define	SMB_ALL_SECINFO		0x000F
+#define	SMB_ACL_SECINFO		(SMB_DACL_SECINFO | SMB_SACL_SECINFO)
+
+#define	SECURITY_DESCRIPTOR_REVISION	1
+
+
+#define	SE_OWNER_DEFAULTED		0x0001
+#define	SE_GROUP_DEFAULTED		0x0002
+#define	SE_DACL_PRESENT			0x0004
+#define	SE_DACL_DEFAULTED		0x0008
+#define	SE_SACL_PRESENT			0x0010
+#define	SE_SACL_DEFAULTED		0x0020
+#define	SE_DACL_AUTO_INHERIT_REQ	0x0100
+#define	SE_SACL_AUTO_INHERIT_REQ	0x0200
+#define	SE_DACL_AUTO_INHERITED		0x0400
+#define	SE_SACL_AUTO_INHERITED		0x0800
+#define	SE_DACL_PROTECTED		0x1000
+#define	SE_SACL_PROTECTED		0x2000
+#define	SE_SELF_RELATIVE		0x8000
+
+#define	SE_DACL_INHERITANCE_MASK	0x1500
+#define	SE_SACL_INHERITANCE_MASK	0x2A00
+
+/*
+ * Security descriptor structures:
+ *
+ * smb_sd_t     SD in SMB pointer form
+ * smb_fssd_t   SD in filesystem form
+ *
+ * Filesystems (e.g. ZFS/UFS) don't have something equivalent
+ * to SD. The items comprising a SMB SD are kept separately in
+ * filesystem. smb_fssd_t is introduced as a helper to provide
+ * the required abstraction for CIFS code.
+ */
+
+struct smb_sd {
+	uint8_t		sd_revision;
+	uint16_t	sd_control;
+	nt_sid_t 	*sd_owner;	/* SID file owner */
+	nt_sid_t 	*sd_group;	/* SID group (for POSIX) */
+	smb_acl_t 	*sd_sacl;	/* ACL System (audits) */
+	smb_acl_t 	*sd_dacl;	/* ACL Discretionary (perm) */
+};
+
+/*
+ * SD header size as it appears on the wire
+ */
+#define	SMB_SD_HDRSIZE	20
+
+/*
+ * values for smb_fssd.sd_flags
+ */
+#define	SMB_FSSD_FLAGS_DIR	0x01
+
+typedef struct smb_fssd {
+	uint32_t	sd_secinfo;
+	uint32_t	sd_flags;
+	uid_t		sd_uid;
+	gid_t		sd_gid;
+	acl_t		*sd_zdacl;
+	acl_t		*sd_zsacl;
+} smb_fssd_t;
 
 #ifdef	__cplusplus
 }

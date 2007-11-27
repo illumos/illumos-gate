@@ -280,7 +280,7 @@ smb_com_open(struct smb_request *sr)
 		    ~(SMB_FLAGS_OPLOCK | SMB_FLAGS_OPLOCK_NOTIFY_ANY);
 	}
 
-	if (op->dsize > 0xffffffff)
+	if (op->dsize > UINT_MAX)
 		smbsr_raise_error(sr, ERRDOS, ERRbadfunc);
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
@@ -350,7 +350,7 @@ smb_com_open_andx(struct smb_request *sr)
 	else if (flags & 4)
 		op->my_flags = MYF_BATCH_OPLOCK;
 
-	if ((CreationTime != 0) && (CreationTime != 0xffffffff))
+	if ((CreationTime != 0) && (CreationTime != UINT_MAX))
 		op->utime.tv_sec = smb_local_time_to_gmt(CreationTime);
 	op->utime.tv_nsec = 0;
 
@@ -385,7 +385,7 @@ smb_com_open_andx(struct smb_request *sr)
 		/* NOTREACHED */
 	}
 
-	if (op->dsize > 0xffffffff)
+	if (op->dsize > UINT_MAX)
 		smbsr_raise_error(sr, ERRDOS, ERRbadfunc);
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) != MYF_OPLOCK_NONE) {

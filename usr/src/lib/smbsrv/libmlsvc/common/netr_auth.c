@@ -40,6 +40,7 @@
 #include <ctype.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/ntstatus.h>
@@ -74,7 +75,7 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 {
 	netr_info_t *netr_info;
 	int rc;
-	DWORD random_challenge[2];
+	DWORD leout_rc[2];
 
 	netr_info = &netr_global_info;
 	bzero(netr_info, sizeof (netr_info_t));
@@ -88,10 +89,9 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 	(void) snprintf(netr_info->server, sizeof (netr_info->server),
 	    "\\\\%s", server);
 
-	random_challenge[0] = random();
-	random_challenge[1] = random();
-
-	(void) memcpy(&netr_info->client_challenge, random_challenge,
+	LE_OUT32(&leout_rc[0], random());
+	LE_OUT32(&leout_rc[1], random());
+	(void) memcpy(&netr_info->client_challenge, leout_rc,
 	    sizeof (struct netr_credential));
 
 	if ((rc = netr_server_req_challenge(netr_handle, netr_info)) == 0) {
@@ -118,12 +118,12 @@ netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 	int remote_os = 0;
 	int remote_lm = 0;
 	int server_pdc;
-	char *username;
+	char *user = smbrdr_ipc_get_user();
 
-	if (mlsvc_anonymous_logon(server, domain, &username) != 0)
+	if (mlsvc_logon(server, domain, user) != 0)
 		return (-1);
 
-	fid = mlsvc_open_pipe(server, domain, username, "\\NETLOGON");
+	fid = mlsvc_open_pipe(server, domain, user, "\\NETLOGON");
 	if (fid < 0)
 		return (-1);
 
@@ -293,7 +293,7 @@ netr_gen_session_key(netr_info_t *netr_info)
 	DWORD *server_challenge;
 	int rc;
 	char *machine_passwd;
-	DWORD new_data[2];
+	DWORD le_data[2];
 
 	client_challenge = (DWORD *)(uintptr_t)&netr_info->client_challenge;
 	server_challenge = (DWORD *)(uintptr_t)&netr_info->server_challenge;
@@ -324,10 +324,10 @@ netr_gen_session_key(netr_info_t *netr_info)
 
 	data[0] = LE_IN32(&client_challenge[0]) + LE_IN32(&server_challenge[0]);
 	data[1] = LE_IN32(&client_challenge[1]) + LE_IN32(&server_challenge[1]);
-	LE_OUT32(&new_data[0], data[0]);
-	LE_OUT32(&new_data[1], data[1]);
+	LE_OUT32(&le_data[0], data[0]);
+	LE_OUT32(&le_data[1], data[1]);
 
-	rc = smb_auth_DES(buffer, 8, md4hash, 8, (unsigned char *)new_data, 8);
+	rc = smb_auth_DES(buffer, 8, md4hash, 8, (unsigned char *)le_data, 8);
 	if (rc != SMBAUTH_SUCCESS)
 		return (rc);
 
@@ -369,15 +369,19 @@ netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
 	unsigned char buffer[8];
 	unsigned char partial_key[8];
 	DWORD data[2];
+	DWORD le_data[2];
 	DWORD *p;
 	int rc;
 
 	p = (DWORD *)(uintptr_t)challenge;
-	data[0] = p[0] + LE_IN32(&timestamp);
-	data[1] = p[1];
+	data[0] = LE_IN32(&p[0]) + timestamp;
+	data[1] = LE_IN32(&p[1]);
+
+	LE_OUT32(&le_data[0], data[0]);
+	LE_OUT32(&le_data[1], data[1]);
 
 	if (smb_auth_DES(buffer, 8, session_key, 8,
-	    (unsigned char *)data, 8) != SMBAUTH_SUCCESS)
+	    (unsigned char *)le_data, 8) != SMBAUTH_SUCCESS)
 		return (SMBAUTH_FAILURE);
 
 	bzero(partial_key, 8);

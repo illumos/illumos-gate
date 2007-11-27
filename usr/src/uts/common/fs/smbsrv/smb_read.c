@@ -145,7 +145,7 @@ smb_com_lock_and_read(struct smb_request *sr)
 	}
 
 	result = smb_lock_range(sr, sr->fid_ofile, param.r_offset,
-	    (uint64_t)param.r_count, 0xffffffff, SMB_LOCK_TYPE_READWRITE);
+	    (uint64_t)param.r_count, UINT_MAX, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_raise_error(sr, result);
 	}
@@ -370,7 +370,7 @@ smb_common_read(struct smb_request *sr, smb_read_param_t *param)
 	vdb->uio.uio_iov = &vdb->iovec[0];
 	vdb->uio.uio_iovcnt = MAX_IOVEC;
 	vdb->uio.uio_resid = param->r_count;
-	vdb->uio.uio_offset = param->r_offset;
+	vdb->uio.uio_loffset = (offset_t)param->r_offset;
 	vdb->uio.uio_segflg = UIO_SYSSPACE;
 
 	switch (sr->tid_tree->t_res_type & STYPE_MASK) {

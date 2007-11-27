@@ -292,19 +292,27 @@ smb_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
     int *retval)
 {
 	int gmtoff;
+	int door_id;
 
 	switch (cmd) {
-
 	case SMB_IOC_GMTOFF:
 		if (ddi_copyin((int *)argp, &gmtoff, sizeof (int), flag))
 			return (EFAULT);
 		(void) smb_set_gmtoff((uint32_t)gmtoff);
 		break;
 
-	case SMB_IOC_CONFIG_REFRESH:
+	case SMB_IOC_CONFIG:
 #if 0
 		smb_svcstate_event(SMB_SVCEVT_CONFIG, NULL);
 #endif
+		break;
+
+	case SMB_IOC_WINPIPE:
+		if (ddi_copyin((int *)argp, &door_id, sizeof (int), flag))
+			return (EFAULT);
+
+		if (smb_winpipe_open(door_id) != 0)
+			return (EPIPE);
 		break;
 
 	default:

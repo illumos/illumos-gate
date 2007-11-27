@@ -36,6 +36,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/wintypes.h>
@@ -53,6 +54,7 @@ static char *smbd_desc[] = {
 	"SmbdGetParam",
 	"SmbdSetParam",
 	"SmbdNetbiosReconfig",
+	"SmbdAdsDomainChanged",
 	0
 };
 
@@ -407,5 +409,97 @@ smbd_get_security_mode(int *mode)
 	buf[0] = '\0';
 	rc = smbd_get_param(SMB_CI_SECURITY, buf);
 	*mode = smb_config_secmode_fromstr(buf);
+	return (rc);
+}
+
+/*
+ * smb_ads_domain_change_notify
+ *
+ * When ADS domain has changed, this function is called to clear the
+ * ADS_HOST_INFO cache and remove the old keys from the Kerberos keytab.
+ */
+int
+smb_ads_domain_change_notify(char *dom)
+{
+	door_arg_t arg;
+	char *buf;
+	uint32_t used;
+	smb_dr_ctx_t *dec_ctx;
+	smb_dr_ctx_t *enc_ctx;
+	int status;
+	int rc;
+	int opcode = SMBD_DOOR_ADS_DOMAIN_CHANGED;
+
+	if (smbd_door_open(opcode) == -1) {
+		syslog(LOG_ERR, "%s: cannot open the door", smbd_desc[opcode]);
+		return (1);
+	}
+
+	buf = MEM_MALLOC("smb_door_client", SMBD_DOOR_SIZE);
+	if (!buf) {
+		syslog(LOG_ERR, "%s: resource shortage", smbd_desc[opcode]);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+
+	enc_ctx = smb_dr_encode_start(buf, SMBD_DOOR_SIZE);
+	if (enc_ctx == 0) {
+		syslog(LOG_ERR, "%s: encode start failed", smbd_desc[opcode]);
+		MEM_FREE("smb_door_client", buf);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+
+	smb_dr_put_uint32(enc_ctx, opcode);
+	smb_dr_put_string(enc_ctx, dom);
+
+	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
+		syslog(LOG_ERR, "%s: Encode error %s",
+		    smbd_desc[opcode], strerror(status));
+		MEM_FREE("smb_door_client", buf);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+
+	arg.data_ptr = buf;
+	arg.data_size = used;
+	arg.desc_ptr = NULL;
+	arg.desc_num = 0;
+	arg.rbuf = buf;
+	arg.rsize = SMBD_DOOR_SIZE;
+
+	if (door_call(smb_door_fildes, &arg) < 0) {
+		syslog(LOG_ERR, "%s: Door call failed %s", smbd_desc[opcode],
+		    strerror(errno));
+		MEM_FREE("smb_door_client", buf);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+
+	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
+	if (smbd_door_check_srv_status(opcode, dec_ctx) != 0) {
+		MEM_FREE("smb_door_client", buf);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+	rc = smb_dr_get_uint32(dec_ctx);
+
+	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
+		syslog(LOG_ERR, "%s: Decode error %s",
+		    smbd_desc[opcode], strerror(status));
+		MEM_FREE("smb_door_client", buf);
+		(void) close(smb_door_fildes);
+		smb_door_fildes = -1;
+		return (1);
+	}
+	MEM_FREE("smb_door_client", buf);
+	(void) close(smb_door_fildes);
+	smb_door_fildes = -1;
+
 	return (rc);
 }

@@ -391,19 +391,17 @@ smb_pathname(
 	rootvp = (vnode_t *)root_node->vp;
 
 	/*
-	 * Instead of passing the FOLLOW flag to lookuppnvp(), process links in
-	 * this routine.  This allows smb_nodes to be created for each component
-	 * of a link.
-	 */
-	local_flags = flags & FIGNORECASE;
-
-	/*
 	 * Path components are processed one at a time so that smb_nodes
 	 * can be created for each component.  This allows the dir_snode
 	 * field in the smb_node to be properly populated.
 	 *
-	 * Mangle checking is also done on each component.
+	 * Because of the above, links are also processed in this routine
+	 * (i.e., we do not pass the FOLLOW flag to lookuppnvp()).  This
+	 * will allow smb_nodes to be created for each component of a link.
+	 *
+	 * Mangle checking is per component.
 	 */
+
 	while ((pathleft = pn_pathleft(&upn)) != 0) {
 		if (fnode) {
 			smb_node_release(dnode);
@@ -419,10 +417,24 @@ smb_pathname(
 			    component, real_name, MAXNAMELEN, 0, 0,
 			    1)) != 0)
 				break;
+			/*
+			 * Do not pass FIGNORECASE to lookuppnvp().
+			 * This is because we would like to do a lookup
+			 * on the real name just obtained (which
+			 * corresponds to the mangled name).
+			 */
 
 			namep = real_name;
+			local_flags = 0;
 		} else {
+			/*
+			 * Pass FIGNORECASE to lookuppnvp().
+			 * This will cause the file system to
+			 * return "first match" in the event of
+			 * a case collision.
+			 */
 			namep = component;
+			local_flags = flags & FIGNORECASE;
 		}
 
 		if ((err = pn_set(&pn, namep)) != 0)

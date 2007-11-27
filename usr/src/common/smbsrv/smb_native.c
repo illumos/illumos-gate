@@ -90,6 +90,13 @@ smbnative_os_value(char *native_os)
 		return (NATIVE_OS_UNKNOWN);
 	}
 
+	if (*native_os == '\0') {
+		/*
+		 * Windows Vista sends an empty native OS string.
+		 */
+		return (NATIVE_OS_WIN2000);
+	}
+
 	for (i = 0; i < sizeof (os_table)/sizeof (os_table[0]); ++i) {
 		os_name = os_table[i].os_name;
 		len = strlen(os_name);
@@ -154,6 +161,13 @@ smbnative_lm_value(char *native_lm)
 
 	if (native_lm == NULL) {
 		return (NATIVE_LM_NONE);
+	}
+
+	if (*native_lm == '\0') {
+		/*
+		 * Windows Vista sends an empty native LM string.
+		 */
+		return (NATIVE_LM_WIN2000);
 	}
 
 	for (i = 0; i < sizeof (lm_table)/sizeof (lm_table[0]); ++i) {

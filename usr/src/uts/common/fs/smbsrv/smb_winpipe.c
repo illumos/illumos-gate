@@ -26,8 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * This file contain routines to initialize the doors interfaces for
- * CIFS winpipe calls.
+ * Winpipe door interface to MSRPC services.
  */
 
 #define	START_UPDOOR_SIZE 16384
@@ -46,7 +45,8 @@
 #include <sys/uio.h>
 
 
-static door_handle_t *smb_winpipe_dh = NULL;
+static door_handle_t smb_winpipe_dh = NULL;
+static int smb_winpipe_door_id = -1;
 static uint64_t smb_winpipe_ncall = 0;
 static kmutex_t smb_winpipe_mutex;
 static kcondvar_t smb_winpipe_cv;
@@ -74,43 +74,41 @@ smb_winpipe_fini(void)
 	mutex_destroy(&smb_winpipe_mutex);
 }
 
+/*
+ * Open the winpipe (user space) door.  If the door is already
+ * open, close it because the door-id has probably changed.
+ * Returns 0 on success.  Otherwise -1 to indicate a lookup failure.
+ */
 int
-smb_winpipe_open(void)
+smb_winpipe_open(int door_id)
 {
-	door_handle_t *dh;
-	int rc;
+	smb_winpipe_close();
 
 	mutex_enter(&smb_winpipe_mutex);
+	smb_winpipe_ncall = 0;
 
 	if (smb_winpipe_dh == NULL) {
-		dh = kmem_zalloc(sizeof (door_handle_t), KM_SLEEP);
-
-		rc = door_ki_open(SMB_WINPIPE_DOOR_UP_PATH, dh);
-		if (rc) {
-			kmem_free(dh, sizeof (door_handle_t));
-			mutex_exit(&smb_winpipe_mutex);
-			cmn_err(CE_WARN, "smb_winpipe_open: rc=%d", rc);
-			return (-1);
-		}
-
-		smb_winpipe_ncall = 0;
-		smb_winpipe_dh = dh;
+		smb_winpipe_door_id = door_id;
+		smb_winpipe_dh = door_ki_lookup(door_id);
 	}
 
 	mutex_exit(&smb_winpipe_mutex);
-	return (0);
+	return ((smb_winpipe_dh == NULL)  ? -1 : 0);
 }
 
+/*
+ * Close the winpipe (user space) door.
+ */
 void
 smb_winpipe_close(void)
 {
 	mutex_enter(&smb_winpipe_mutex);
 
-	while (smb_winpipe_ncall > 0)
-		cv_wait(&smb_winpipe_cv, &smb_winpipe_mutex);
+	if (smb_winpipe_dh != NULL) {
+		while (smb_winpipe_ncall > 0)
+			cv_wait(&smb_winpipe_cv, &smb_winpipe_mutex);
 
-	if (smb_winpipe_dh) {
-		kmem_free(smb_winpipe_dh, sizeof (door_handle_t));
+		door_ki_rele(smb_winpipe_dh);
 		smb_winpipe_dh = NULL;
 	}
 
@@ -140,7 +138,9 @@ smb_winpipe_call(struct smb_request *sr,
 
 	if (smb_winpipe_dh == NULL) {
 		mutex_exit(&smb_winpipe_mutex);
-		return (-1);
+
+		if (smb_winpipe_open(smb_winpipe_door_id) != 0)
+			return (-1);
 	}
 
 	++smb_winpipe_ncall;
@@ -284,7 +284,7 @@ smb_winpipe_upcall(mlsvc_pipe_t *pipe_info,
 	da.rbuf = (char *)lbuf;
 	da.rsize = START_UPDOOR_SIZE;
 
-	if (door_ki_upcall(*smb_winpipe_dh, &da) != 0) {
+	if (door_ki_upcall(smb_winpipe_dh, &da) != 0) {
 		return (-1);
 	}
 	/* RPC_WRITE just queues the data and returns */

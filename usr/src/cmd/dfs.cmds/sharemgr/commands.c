@@ -123,6 +123,7 @@ static char *
 conv_to_utf8(char *input)
 {
 	iconv_t cd;
+	char *inval = input;
 	char *output = input;
 	char *outleft;
 	char *curlocale;
@@ -142,12 +143,16 @@ conv_to_utf8(char *input)
 		output = calloc(bytesleft, 1);
 		if (output != NULL) {
 			outleft = output;
-			osize = iconv(cd, (const char **)&input, &size,
+			/* inval can be modified on return */
+			osize = iconv(cd, (const char **)&inval, &size,
 			    &outleft, &bytesleft);
 			if (osize == (size_t)-1 || size != 0) {
 				free(output);
 				output = input;
 			}
+		} else {
+			/* Need to return something. */
+			output = input;
 		}
 		(void) iconv_close(cd);
 	} else {
@@ -173,6 +178,7 @@ conv_from_utf8(char *input)
 {
 	iconv_t cd;
 	char *output = input;
+	char *inval = input;
 	char *outleft;
 	char *curlocale;
 	size_t bytesleft;
@@ -191,12 +197,13 @@ conv_from_utf8(char *input)
 		output = calloc(bytesleft, 1);
 		if (output != NULL) {
 			outleft = output;
-			osize = iconv(cd, (const char **)&input, &size,
+			osize = iconv(cd, (const char **)&inval, &size,
 			    &outleft, &bytesleft);
-			if (osize == (size_t)-1 || size != 0) {
-				free(output);
+			if (osize == (size_t)-1 || size != 0)
 				output = input;
-			}
+		} else {
+			/* Need to return something. */
+			output = input;
 		}
 		(void) iconv_close(cd);
 	} else {

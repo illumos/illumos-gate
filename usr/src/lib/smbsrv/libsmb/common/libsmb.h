@@ -279,6 +279,7 @@ extern int smb_config_set_secmode(int secmode);
 extern int smb_config_set_idmap_domain(char *value);
 extern int smb_config_set_idmap_gc(char *value);
 extern int smb_config_refresh_idmap(void);
+extern int smb_config_refresh(void);
 
 /* smb_door_client.c */
 typedef struct smb_joininfo {
@@ -292,8 +293,10 @@ typedef struct smb_joininfo {
 extern int smbd_set_param(smb_cfg_id_t, char *);
 extern int smbd_get_param(smb_cfg_id_t, char *);
 extern int smbd_get_security_mode(int *);
+extern int smb_set_machine_pwd(char *);
 extern int smbd_netbios_reconfig(void);
 extern uint32_t smb_join(smb_joininfo_t *info);
+extern int smb_ads_domain_change_notify(char *);
 
 
 #define	SMB_DOMAIN_NOMACHINE_SID	-1
@@ -305,7 +308,7 @@ extern int nt_domain_init(char *resource_domain, uint32_t secmode);
 extern int smb_wins_allow_list(char *config_list, char *allow_list);
 extern int smb_wins_exclude_list(char *config_list, char *exclude_list);
 extern boolean_t smb_wins_is_excluded(in_addr_t ipaddr,
-    unsigned long *exclude_list, int nexclude);
+    ipaddr_t *exclude_list, int nexclude);
 extern void smb_wins_build_list(char *buf, uint32_t iplist[], int max_naddr);
 extern int smb_wins_iplist(char *list, uint32_t iplist[], int max_naddr);
 

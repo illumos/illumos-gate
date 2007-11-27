@@ -44,6 +44,7 @@ extern "C" {
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
+#include <smbsrv/smbvar.h>
 
 /*
  * Definitions that should be elsewhere...
@@ -202,6 +203,8 @@ int smb_component_match(struct smb_request *sr, ino64_t fileid,
 
 int smb_lock_range_access(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t, uint32_t desired_access);
+
+uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 
 /*
  * Socket functions
@@ -481,7 +484,7 @@ int smb_handle_write_raw(smb_session_t *session, smb_request_t *sr);
 
 void smb_winpipe_init(void);
 void smb_winpipe_fini(void);
-int smb_winpipe_open(void);
+int smb_winpipe_open(int door_id);
 void smb_winpipe_close(void);
 int smb_winpipe_call(smb_request_t *, mlsvc_pipe_t *, mlsvc_stream_t *,
     uint16_t, uint32_t *);
@@ -594,6 +597,37 @@ void    smb_audit_buf_node_destroy(smb_node_t *node);
 
 /* 100's of ns between 1/1/1970 and 1/1/1601 */
 #define	NT_TIME_BIAS	(134774LL * 24LL * 60LL * 60LL * 10000000LL)
+
+void smb_sd_init(smb_sd_t *, uint8_t);
+void smb_sd_term(smb_sd_t *);
+uint32_t smb_sd_get_secinfo(smb_sd_t *);
+uint32_t smb_sd_len(smb_sd_t *, uint32_t);
+uint32_t smb_sd_tofs(smb_sd_t *, smb_fssd_t *);
+uint32_t smb_sd_read(smb_request_t *, smb_sd_t *, uint32_t);
+uint32_t smb_sd_write(smb_request_t *, smb_sd_t *, uint32_t);
+
+void smb_fssd_init(smb_fssd_t *, uint32_t, uint32_t);
+void smb_fssd_term(smb_fssd_t *);
+
+void smb_acl_sort(smb_acl_t *);
+void smb_acl_free(smb_acl_t *);
+smb_acl_t *smb_acl_alloc(uint8_t, uint16_t, uint16_t);
+smb_acl_t *smb_acl_from_zfs(acl_t *, uid_t, gid_t);
+uint32_t smb_acl_to_zfs(smb_acl_t *, uint32_t, int, acl_t **);
+uint16_t smb_acl_len(smb_acl_t *);
+boolean_t smb_acl_isvalid(smb_acl_t *, int);
+
+void smb_fsacl_free(acl_t *);
+acl_t *smb_fsacl_alloc(int, int);
+acl_t *smb_fsacl_inherit(acl_t *, int, int, uid_t);
+acl_t *smb_fsacl_merge(acl_t *, acl_t *);
+void smb_fsacl_split(acl_t *, acl_t **, acl_t **, int);
+acl_t *smb_fsacl_from_vsa(vsecattr_t *, acl_type_t);
+int smb_fsacl_to_vsa(acl_t *, vsecattr_t *, int *);
+
+boolean_t smb_ace_is_generic(int);
+boolean_t smb_ace_is_access(int);
+boolean_t smb_ace_is_audit(int);
 
 #ifdef	__cplusplus
 }

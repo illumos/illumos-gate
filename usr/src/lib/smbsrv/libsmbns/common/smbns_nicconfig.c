@@ -638,7 +638,7 @@ smb_nic_get_list(struct if_list **list)
 int
 smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 {
-	char ** names = NULL;
+	char **names = NULL;
 	int res, numnics = 0;
 	int num_aliases = 0;
 	uint32_t uip;
@@ -680,14 +680,16 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 			if (num_aliases == -1) {
 				(void) smb_nic_clear_name_list(names, numnics);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 
-			(*nc)->aliases = (char **)malloc(
-			    (sizeof (char) * IP_ABITS) * num_aliases);
+			(*nc)->aliases = (char **)calloc(num_aliases,
+			    (sizeof (char) * IP_ABITS));
 			if ((*nc)->aliases == NULL) {
 				(void) smb_nic_clear_name_list(names, numnics);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			(void) strncpy((*nc)->ifname, names[i],
@@ -699,17 +701,19 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			(*nc)->ip = uip;
-			if (smb_wins_is_excluded(uip, (ulong_t *)exclude,
-			    nexclude))
+			if (smb_wins_is_excluded(uip,
+			    (ipaddr_t *)exclude, nexclude))
 				(*nc)->exclude = B_TRUE;
 			res = smb_nic_get_netmask((*nc)->ifname, &uip);
 			if (res == -1) { /* error retrieving netmask address */
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			(*nc)->mask = uip;
@@ -718,6 +722,7 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			(*nc)->broadcast = uip;
@@ -727,6 +732,7 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			res = smb_nic_flags((*nc)->ifname, &flags);
@@ -734,6 +740,7 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 			(*nc)->flags = flags;
@@ -747,6 +754,7 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 				(void) smb_nic_clear_name_list(names, numnics);
 				free ((*nc)->aliases);
 				free (*nc);
+				*nc = NULL;
 				return (-1);
 			}
 
@@ -761,16 +769,16 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 					    (char *)(list->next);
 					j++;
 					list = list->next;
+				}
 			}
+			k++;
+			*number = k; /* needed if we have to cleanup on fail */
+			j = 1;
+			(*nc)++; /* increment pointer */
 		}
-		k++;
-		j = 1;
-		(*nc)++; /* increment pointer */
-	}
 	} /* end for */
 
 	*nc = nc_array;
-	*number = k;
 	(void) smb_nic_clear_name_list(names, numnics);
 	return (0);
 }
@@ -958,9 +966,11 @@ smb_nic_clear_niclist(net_cfg_t *niclist, int amount)
 	for (i = 0; i < amount; i++) {
 		while (niclist[i].aliases[j] != NULL) {
 			free(niclist[i].aliases[j]);
+			niclist[i].aliases[j] = NULL;
 			j++;
 		}
 		free(niclist[i].aliases);
+		niclist[i].aliases = NULL;
 		j = 0;
 	}
 	free(niclist);
@@ -971,8 +981,13 @@ smb_nic_clear_niclist(net_cfg_t *niclist, int amount)
 int
 smb_nic_free_niclist(net_cfg_list_t *niclist)
 {
-	return (smb_nic_clear_niclist(niclist->net_cfg_list,
-	    niclist->net_cfg_cnt));
+	int ret;
+
+	ret = smb_nic_clear_niclist(niclist->net_cfg_list,
+	    niclist->net_cfg_cnt);
+	niclist->net_cfg_list = NULL;
+	niclist->net_cfg_cnt = 0;
+	return (ret);
 }
 
 /*
@@ -1048,10 +1063,15 @@ smb_nic_unlock(void)
 int
 smb_nic_init()
 {
+	int ret;
+
 	smb_nic_lock();
 	smb_nic_list.net_cfg_cnt = 0;
-	(void) smb_nic_build_network_structures(&smb_nic_list.net_cfg_list,
+	smb_nic_list.net_cfg_list = NULL;
+	ret = smb_nic_build_network_structures(&smb_nic_list.net_cfg_list,
 	    &smb_nic_list.net_cfg_cnt);
+	if (ret != 0)
+		(void) smb_nic_free_niclist(&smb_nic_list);
 	smb_nic_unlock();
 	return (0);
 }
@@ -1062,18 +1082,21 @@ smb_nic_init()
 void
 smb_nic_build_info(void)
 {
+	int ret;
+
 	smb_nic_lock();
 	if (smb_nic_list.net_cfg_list) {
 		(void) smb_nic_free_niclist(&smb_nic_list);
-		smb_nic_list.net_cfg_list = NULL;
 	}
 	smb_nic_list.net_cfg_cnt = 0;
-	(void) smb_nic_build_network_structures(&smb_nic_list.net_cfg_list,
+	ret = smb_nic_build_network_structures(&smb_nic_list.net_cfg_list,
 	    &smb_nic_list.net_cfg_cnt);
-	if (smb_nic_list.net_cfg_cnt == 0) {
+	if (ret != 0)
+		(void) smb_nic_free_niclist(&smb_nic_list);
+	if (smb_nic_list.net_cfg_cnt == 0)
 		syslog(LOG_ERR, "smb: No network interfaces are configured "
 		    "smb server may not function properly");
-	}
+
 	smb_nic_unlock();
 }
 

@@ -512,7 +512,8 @@ srvsvc_s_NetShareSetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mlsm_NetShareSetInfo *param = arg;
 
 	(void) memset(param, 0, sizeof (struct mlsm_NetShareSetInfo));
-	param->parm_err_ptr = (DWORD)MLRPC_HEAP_MALLOC(mxa, sizeof (DWORD));
+	param->parm_err_ptr = (DWORD)(uintptr_t)MLRPC_HEAP_MALLOC(mxa,
+	    sizeof (DWORD));
 	param->parm_err = 0;
 
 	smb_config_rdlock();

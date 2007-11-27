@@ -879,7 +879,7 @@ smb_open_subr(struct smb_request *sr)
 			op->dattr &= ~SMB_FA_READONLY;
 		}
 		smb_node_set_dosattr(node, op->dattr | SMB_FA_ARCHIVE);
-		if (op->utime.tv_sec == 0 || op->utime.tv_sec == 0xffffffff)
+		if (op->utime.tv_sec == 0 || op->utime.tv_sec == UINT_MAX)
 			(void) microtime(&op->utime);
 		smb_node_set_time(node, NULL, &op->utime, 0, 0, SMB_AT_MTIME);
 		(void) smb_sync_fsattr(sr, sr->user_cr, node);

@@ -262,6 +262,20 @@ smb_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		smb_dr_put_int32(enc_ctx, rc);
 		break;
 
+	case SMBD_DOOR_ADS_DOMAIN_CHANGED:
+		domain = smb_dr_get_string(dec_ctx);
+		dec_status = smb_dr_decode_finish(dec_ctx);
+		if (dec_status != 0) {
+			smb_dr_free_string(domain);
+			goto decode_error;
+		}
+
+		rc = ads_domain_change_notify_handler(domain);
+		smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_SUCCESS);
+		smb_dr_put_int32(enc_ctx, rc);
+		smb_dr_free_string(domain);
+		break;
+
 	default:
 		goto decode_error;
 	}

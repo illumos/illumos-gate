@@ -176,7 +176,7 @@ smb_com_create_temporary(struct smb_request *sr)
 		break;
 	}
 
-	smbsr_encode_result(sr, 1, 0, "bwwwbs", 1, sr->smb_fid, bcc, 4, name);
+	smbsr_encode_result(sr, 1, 0, "bwwbs", 1, sr->smb_fid, bcc, 4, name);
 	return (SDRC_NORMAL_REPLY);
 }
 

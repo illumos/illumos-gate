@@ -378,7 +378,7 @@ void mlnds_destruct(struct mlndr_stream *);
 /* mlrpc_client.c */
 int mlrpc_c_bind(struct mlrpc_client *, char *, struct mlrpc_binding **);
 int mlrpc_c_call(struct mlrpc_binding *, int, void *, mlrpc_heapref_t *);
-int mlrpc_c_free_heap(struct mlrpc_binding *, mlrpc_heapref_t *);
+void mlrpc_c_free_heap(struct mlrpc_binding *, mlrpc_heapref_t *);
 
 /* mlrpc_encdec.c */
 int mlrpc_encode_decode_common(struct mlrpc_xaction *, int, unsigned,
@@ -391,6 +391,9 @@ int mlrpc_decode_pdu_hdr(struct mlrpc_xaction *);
 int mlrpc_encode_pdu_hdr(struct mlrpc_xaction *);
 void mlrpc_decode_frag_hdr(struct mlndr_stream *, mlrpcconn_common_header_t *);
 unsigned mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *);
+
+/* mlrpc_server.c */
+int mlrpc_generic_call_stub(struct mlrpc_xaction *);
 
 /* mlrpc_svc.c */
 struct mlrpc_stub_table *mlrpc_find_stub_in_svc(struct mlrpc_service *, int);

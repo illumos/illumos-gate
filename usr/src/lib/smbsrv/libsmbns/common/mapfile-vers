@@ -27,11 +27,12 @@
 
 SUNWprivate {
     global:
-	adjoin;
 	adjoin_report_err;
 	ads_add_share;
 	ads_build_unc_name;
 	ads_close;
+	ads_domain_change_notify_handler;
+	ads_join;
 	ads_lookup_share;
 	ads_open;
 	ads_publish_share;

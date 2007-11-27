@@ -62,8 +62,6 @@
 #include <smbsrv/smb_i18n.h>
 #include <smbsrv/string.h>
 
-int mbtowc_verbose = 0;
-int mbtowc_announce = 0;
 
 /*
  * mbstowcs
@@ -109,8 +107,14 @@ mts_mbstowcs(mts_wchar_t *wcstring, const char *mbstring, size_t nwchars)
  * by wcharp. Up to nbytes bytes are examined.
  *
  * If mbchar is NULL, mbtowc() returns zero to indicate that shift
- * states are not supported. If mbchar is valid, returns the number
- * of bytes processed in mbchar. If mbchar is invalid, returns -1.
+ * states are not supported.  Shift states are used to switch between
+ * representation modes using reserved bytes to signal shifting
+ * without them being interpreted as characters.  If mbchar is null
+ * mbtowc should return non-zero if the current locale requires shift
+ * states.  Otherwise it should be return 0.
+ *
+ * If mbchar is non-null, returns the number of bytes processed in
+ * mbchar.  If mbchar is invalid, returns -1.
  */
 int /*ARGSUSED*/
 mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
@@ -120,8 +124,8 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 	int count;
 	int bytes_left;
 
-	if (mbchar == 0)
-		return (0); /* shift states not supported */
+	if (mbchar == NULL)
+		return (0); /* no shift states */
 
 	/* 0xxxxxxx -> 1 byte ASCII encoding */
 	if (((mbyte = *mbchar++) & 0x80) == 0) {
@@ -132,12 +136,8 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 	}
 
 	/* 10xxxxxx -> invalid first byte */
-	if ((mbyte & 0x40) == 0) {
-		if (mbtowc_verbose || mbtowc_announce == 0) {
-			mbtowc_announce = 1;
-		}
+	if ((mbyte & 0x40) == 0)
 		return (-1);
-	}
 
 	wide_char = mbyte;
 	if ((mbyte & 0x20) == 0) {
@@ -147,20 +147,13 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 		wide_char &= 0x0f;
 		bytes_left = 2;
 	} else {
-		if (mbtowc_verbose || mbtowc_announce == 0) {
-			mbtowc_announce = 1;
-		}
 		return (-1);
 	}
 
 	count = 1;
 	while (bytes_left--) {
-		if (((mbyte = *mbchar++) & 0xc0) != 0x80) {
-			if (mbtowc_verbose || mbtowc_announce == 0) {
-				mbtowc_announce = 1;
-			}
+		if (((mbyte = *mbchar++) & 0xc0) != 0x80)
 			return (-1);
-		}
 
 		count++;
 		wide_char = (wide_char << 6) | (mbyte & 0x3f);
@@ -185,10 +178,6 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 int
 mts_wctomb(char *mbchar, mts_wchar_t wchar)
 {
-#ifdef UTF8_DEBUG
-	char *start = mbchar;
-#endif
-
 	if ((wchar & ~0x7f) == 0) {
 		*mbchar = (char)wchar;
 		return (1);
@@ -228,7 +217,7 @@ mts_wcstombs(char *mbstring, const mts_wchar_t *wcstring, size_t nbytes)
 	char buf[4];
 	size_t len;
 
-	if ((mbstring == 0) || (wcstring == 0))
+	if ((mbstring == NULL) || (wcstring == NULL))
 		return (0);
 
 	while (nbytes > MTS_MB_CHAR_MAX) {
@@ -388,7 +377,7 @@ mts_mbstos(char *string, const char *mbstring)
 	unsigned char *start = (unsigned char *)string;
 	int len;
 
-	if (string == 0 || mbstring == 0)
+	if (string == NULL || mbstring == NULL)
 		return (-1);
 
 	while (*mbstring) {

@@ -35,9 +35,15 @@
  * support them at this time.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smbvar.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/smb_vops.h>
+#include <smbsrv/ntstatus.h>
+#include <smbsrv/ntaccess.h>
+#include <smbsrv/nterror.h>
+#include <smbsrv/ntifs.h>
+#include <smbsrv/cifs.h>
+#include <smbsrv/doserror.h>
 
 /*
  * smb_nt_transact_create
@@ -68,6 +74,7 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 	uint32_t		NameLength;
 	smb_attr_t		new_attr;
 	smb_node_t		*node;
+	smb_sd_t		sd;
 	DWORD status;
 	int rc;
 
@@ -112,18 +119,15 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 		/* NOTREACHED */
 	}
 
-	if (sd_len >= sizeof (smb_sdbuf_t)) {
-		/* ignore security setting for files on Unix volumes */
-		op->sd_buf = kmem_alloc(sd_len, KM_SLEEP);
-
-		if ((smb_decode_mbc(&xa->req_data_mb, "#c", sd_len,
-		    (char *)op->sd_buf)) != 0) {
-			kmem_free(op->sd_buf, sd_len);
-			smbsr_raise_nt_error(sr, NT_STATUS_BUFFER_TOO_SMALL);
+	if (sd_len) {
+		status = smb_decode_sd(xa, &sd);
+		if (status != NT_STATUS_SUCCESS) {
+			smbsr_raise_nt_error(sr, status);
 			/* NOTREACHED */
 		}
+		op->sd = &sd;
 	} else {
-		op->sd_buf = 0;
+		op->sd = NULL;
 	}
 
 	op->fqi.srch_attr = 0;
@@ -168,8 +172,8 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	status = smb_open_subr(sr);
-	if (op->sd_buf)
-		kmem_free(op->sd_buf, sd_len);
+	if (op->sd)
+		smb_sd_term(op->sd);
 
 	if (status != NT_STATUS_SUCCESS) {
 		if (status == NT_STATUS_SHARING_VIOLATION)

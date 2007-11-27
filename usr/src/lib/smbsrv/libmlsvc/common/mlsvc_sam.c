@@ -36,6 +36,7 @@
 #include <grp.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntsid.h>
 #include <smbsrv/smbinfo.h>
@@ -66,6 +67,8 @@
 #define	SAMR_BUILTIN_DOMAIN	0x80000003
 #define	SAMR_PRIMARY_DOMAIN	0x80000004
 
+static int samr_call_stub(struct mlrpc_xaction *mxa);
+
 static DWORD samr_s_enum_local_domains(struct samr_EnumLocalDomain *,
     struct mlrpc_xaction *);
 
@@ -79,9 +82,9 @@ static mlrpc_service_t samr_service = {
 	"12345778-1234-abcd-ef000123456789ac", 1,	/* abstract */
 	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
 	0,				/* no bind_instance_size */
-	0,				/* no bind_req() */
-	0,				/* no unbind_and_close() */
-	0,				/* use generic_call_stub() */
+	NULL,				/* no bind_req() */
+	NULL,				/* no unbind_and_close() */
+	samr_call_stub,			/* call_stub() */
 	&TYPEINFO(samr_interface),	/* interface ti */
 	samr_stub_table			/* stub_table */
 };
@@ -97,6 +100,18 @@ void
 samr_initialize(void)
 {
 	(void) mlrpc_register_service(&samr_service);
+}
+
+/*
+ * Custom call_stub to set the stream string policy.
+ */
+static int
+samr_call_stub(struct mlrpc_xaction *mxa)
+{
+	MLNDS_SETF(&mxa->send_mlnds, MLNDS_F_NOTERM);
+	MLNDS_SETF(&mxa->recv_mlnds, MLNDS_F_NOTERM);
+
+	return (mlrpc_generic_call_stub(mxa));
 }
 
 /*
@@ -435,7 +450,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_FAULT_REQUEST_OPNUM_INVALID);
 	};
 
-	param->address = (DWORD)&param->ru;
+	param->address = (DWORD)(uintptr_t)&param->ru;
 	param->switch_value = param->info_level;
 	return (MLRPC_DRC_OK);
 }
@@ -1140,7 +1155,7 @@ samr_s_QueryAliasInfo(void *arg, struct mlrpc_xaction *mxa)
 		goto query_alias_err;
 	};
 
-	param->address = (DWORD)&param->ru;
+	param->address = (DWORD)(uintptr_t)&param->ru;
 	param->status = 0;
 	return (MLRPC_DRC_OK);
 

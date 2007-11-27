@@ -637,7 +637,7 @@ int smb_trans2_find_get_dents(
 	ihdr->uio.uio_iovcnt = maxcount;
 	ihdr->uio.uio_resid = dent_buf_size;
 	ihdr->uio.uio_iov = ihdr->iov;
-	ihdr->uio.uio_offset = 0;
+	ihdr->uio.uio_loffset = 0;
 
 	rc = smb_get_dents(sr, cookie, dir_snode, wildcards, ihdr, more);
 	if (rc != 0) {
@@ -839,9 +839,9 @@ smb_gather_dents_info(
 	 * Each entry needs to be properly aligned or we may get an alignment
 	 * fault on sparc.
 	 */
-	ihdr->uio.uio_offset = (off_t)PTRALIGN(ihdr->uio.uio_offset);
+	ihdr->uio.uio_loffset = (offset_t)PTRALIGN(ihdr->uio.uio_loffset);
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	ient = (smb_dent_info_t *)&ihdr->iov->iov_base[ihdr->uio.uio_offset];
+	ient = (smb_dent_info_t *)&ihdr->iov->iov_base[ihdr->uio.uio_loffset];
 
 	ient->cookie = cookie;
 	ient->attr = *attr;
@@ -856,7 +856,7 @@ smb_gather_dents_info(
 	ihdr->uio.uio_iov++;
 	ihdr->uio.uio_iovcnt--;
 	ihdr->uio.uio_resid -= reclen;
-	ihdr->uio.uio_offset += reclen;
+	ihdr->uio.uio_loffset += reclen;
 
 	kmem_free(v5_name, MAXNAMELEN-1);
 	return (0);

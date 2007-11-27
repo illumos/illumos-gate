@@ -43,7 +43,6 @@ extern "C" {
 typedef struct ads_handle_s {
 	char *user;		/* admin user to create share in ADS */
 	char *pwd;		/* user password */
-	char *container;	/* user container in ADS */
 	char *domain;		/* ADS domain */
 	char *domain_dn;	/* domain in Distinquish Name format */
 	char *ip_addr;		/* ip addr in string format */
@@ -60,18 +59,17 @@ typedef enum adjoin_status {
 	ADJOIN_ERR_GET_HANDLE,
 	ADJOIN_ERR_GEN_PASSWD,
 	ADJOIN_ERR_ADD_TRUST_ACCT,
+	ADJOIN_ERR_MOD_TRUST_ACCT,
 	ADJOIN_ERR_GET_ENCTYPES,
 	ADJOIN_ERR_GET_HOST_PRINC,
 	ADJOIN_ERR_INIT_KRB_CTX,
 	ADJOIN_ERR_GET_KRB_PRINC,
 	ADJOIN_ERR_KSETPWD,
-	ADJOIN_ERR_MOD_TRUST_ACCT,
+	ADJOIN_ERR_UPDATE_CNTRL_ATTR,
 	ADJOIN_ERR_WRITE_KEYTAB,
 	ADJOIN_ERR_IDMAP_SET_DOMAIN,
-	ADJOIN_ERR_IDMAP_SET_GC,
 	ADJOIN_ERR_IDMAP_REFRESH,
-	ADJOIN_ERR_IDMAP_CCACHE,
-
+	ADJOIN_ERR_SMB_REFRESH,
 	ADJOIN_NUM_STATUS
 } adjoin_status_t;
 
@@ -86,8 +84,8 @@ extern int ads_build_unc_name(char *, int, const char *, const char *);
 extern int ads_lookup_share(ADS_HANDLE *, const char *, const char *, char *);
 extern int ads_add_share(ADS_HANDLE *, const char *, const char *,
     const char *);
-
-extern adjoin_status_t adjoin(char *, int);
+extern int ads_domain_change_notify_handler(char *);
+extern adjoin_status_t ads_join(char *, char *, char *, int);
 extern char *adjoin_report_err(adjoin_status_t status);
 
 /* DYNDNS functions */

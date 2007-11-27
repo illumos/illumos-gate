@@ -46,6 +46,7 @@ include ../../Makefile.lib
 
 INCS += -I$(SRC)/common/smbsrv
 
+LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lsmb -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT

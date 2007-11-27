@@ -962,7 +962,6 @@ usr/include/smbsrv/smb_incl.h		i386
 usr/include/smbsrv/smb_ioctl.h		i386
 usr/include/smbsrv/smb_kproto.h		i386
 usr/include/smbsrv/smb_privilege.h	i386
-usr/include/smbsrv/smb_secdesc.h	i386
 usr/include/smbsrv/smb_svc_sm.h		i386
 usr/include/smbsrv/smb_token.h		i386
 usr/include/smbsrv/smb_vops.h		i386
@@ -1002,6 +1001,25 @@ usr/lib/smbsrv/dtrace/msrpc.d		i386
 usr/lib/smbsrv/dtrace/smbnode.d		i386
 usr/lib/smbsrv/dtrace/smbvfs.d		i386
 usr/lib/smbsrv/dtrace/stype.d		i386
+#
+# Private/Internal 64-bit libraries of smbsrv. Do not ship.
+#
+usr/lib/smbsrv/amd64			i386
+usr/lib/smbsrv/amd64/libsmb.so.1	i386
+usr/lib/smbsrv/amd64/libsmb.so		i386
+usr/lib/smbsrv/amd64/llib-lsmb.ln	i386
+usr/lib/smbsrv/amd64/libmlrpc.so.1	i386
+usr/lib/smbsrv/amd64/libmlrpc.so	i386
+usr/lib/smbsrv/amd64/llib-lmlrpc.ln	i386
+usr/lib/smbsrv/amd64/libmlsvc.so.1	i386
+usr/lib/smbsrv/amd64/libmlsvc.so	i386
+usr/lib/smbsrv/amd64/llib-lmlsvc.ln	i386
+usr/lib/smbsrv/amd64/libsmbns.so.1	i386
+usr/lib/smbsrv/amd64/libsmbns.so	i386
+usr/lib/smbsrv/amd64/llib-lsmbns.ln	i386
+usr/lib/smbsrv/amd64/libsmbrdr.so.1	i386
+usr/lib/smbsrv/amd64/libsmbrdr.so	i386
+usr/lib/smbsrv/amd64/llib-lsmbrdr.ln	i386
 #
 # Private dirent, extended to include flags, for use by SMB server
 # 

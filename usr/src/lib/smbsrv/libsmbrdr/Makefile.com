@@ -44,6 +44,7 @@ OBJECTS=	$(OBJS_COMMON) $(OBJS_SHARED)
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
+LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lsmb -lnsl -lsocket -lc
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

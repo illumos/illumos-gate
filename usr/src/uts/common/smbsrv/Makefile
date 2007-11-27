@@ -78,7 +78,6 @@ HDRS=	alloc.h			\
 	smb_ioctl.h		\
 	smb_kproto.h		\
 	smb_privilege.h		\
-	smb_secdesc.h		\
 	smb_svc_sm.h		\
 	smb_token.h		\
 	smb_vops.h		\

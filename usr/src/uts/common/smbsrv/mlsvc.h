@@ -138,14 +138,6 @@ typedef struct mlsvc_string {
  */
 #define	MLSVC_NO_MORE_DATA		0x1A
 
-/*
- * IPC connection types, used to indicate the type of session
- * required for a subsequent series of requests.
- */
-#define	MLSVC_IPC_ANON			0x00
-#define	MLSVC_IPC_USER			0x01
-#define	MLSVC_IPC_ADMIN			0x02
-
 #define	MLSVC_ANON_USER			"IPC$"
 
 char *mlsvc_ipc_name(int ipc_type, char *username);
@@ -160,11 +152,8 @@ char *mlsvc_ipc_name(int ipc_type, char *username);
  * the encrypted passwords.
  */
 
-int mlsvc_anonymous_logon(char *domain_controller, char *domain_name,
-    char **username);
-int mlsvc_user_logon(char *domain_controller, char *domain_name,
-    char *username, char *password);
-int mlsvc_admin_logon(char *domain_controller, char *domain_name);
+int mlsvc_logon(char *domain_controller, char *domain_name,
+    char *username);
 int mlsvc_echo(char *server);
 int mlsvc_open_pipe(char *hostname, char *domain, char *username,
     char *pipename);
@@ -172,8 +161,7 @@ int mlsvc_close_pipe(int fid);
 void mlsvc_nt_password_hash(char *result, char *password);
 int mlsvc_encrypt_nt_password(char *password, char *key, int keylen, char *out,
     int outmax);
-DWORD mlsvc_validate_user(char *server, char *domain, char *username,
-    char *password);
+DWORD mlsvc_join(char *server, char *domain, char *username, char *password);
 int mlsvc_locate_domain_controller(char *domain);
 
 /*
@@ -207,14 +195,9 @@ typedef struct mlsvc_pipe {
 	int32_t outlen;
 } mlsvc_pipe_t;
 
-int mlsvc_rpc_process(
-	smb_pipe_t		*inpipe,
-	smb_pipe_t		**outpipe,
-	smb_dr_user_ctx_t	*user_ctx);
-
-struct mlsvc_rpc_context *mlsvc_lookup_context(int fid);
-
-void mlsvc_rpc_release(int fid);
+struct mlsvc_rpc_context *mlrpc_process(int, smb_dr_user_ctx_t *);
+struct mlsvc_rpc_context *mlrpc_lookup(int fid);
+void mlrpc_release(int);
 int mlsvc_session_native_values(int fid, int *remote_os, int *remote_lm,
     int *pdc_type);
 void mlsvc_rpc_report_status(int opnum, DWORD status);

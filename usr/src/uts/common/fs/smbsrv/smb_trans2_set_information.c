@@ -197,7 +197,7 @@ smb_set_standard_info(
 
 	if (DataSize != 0) {
 		node->flags |= NODE_FLAGS_SET_SIZE;
-		node->n_size = DataSize;
+		node->n_size = (u_offset_t)DataSize;
 	}
 
 	/*
@@ -331,7 +331,7 @@ smb_set_alloc_info(
 
 	if (node->attr.sa_vattr.va_size != DataSize) {
 		node->flags |= NODE_FLAGS_SET_SIZE;
-		node->n_size = (off_t)DataSize;
+		node->n_size = (u_offset_t)DataSize;
 
 		/*
 		 * Ensure that the FS is consistent with the node cache

@@ -66,49 +66,31 @@ static DWORD samr_connect4(char *, char *, char *, DWORD, mlsvc_handle_t *);
  * name.  We store the remote server's native OS type - we may need it
  * due to differences between platforms like NT and Windows 2000.
  *
+ * If username argument is NULL, an anonymous connection will be established.
+ * Otherwise, an authenticated connection will be established.
+ *
  * On success 0 is returned. Otherwise a -ve error code.
  */
 int
-samr_open(int ipc_mode, char *server, char *domain, char *username,
-    char *password, DWORD access_mask, mlsvc_handle_t *samr_handle)
+samr_open(char *server, char *domain, char *username, DWORD access_mask,
+    mlsvc_handle_t *samr_handle)
 {
 	smb_ntdomain_t *di;
 	int remote_os;
 	int remote_lm;
 	int rc;
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
-		return (-1);
-
 	if (server == NULL || domain == NULL) {
+		if ((di = smb_getdomaininfo(0)) == NULL)
+			return (-1);
+
 		server = di->server;
 		domain = di->domain;
 	}
 
-	switch (ipc_mode) {
-	case MLSVC_IPC_USER:
-		/*
-		 * Use the supplied credentials.
-		 */
-		rc = mlsvc_user_logon(server, domain, username, password);
-		break;
-
-	case MLSVC_IPC_ADMIN:
-		/*
-		 * Use the resource domain administrator credentials.
-		 */
-		server = di->server;
-		domain = di->domain;
-		username = smbrdr_ipc_get_user();
-
-		rc = mlsvc_admin_logon(server, domain);
-		break;
-
-	case MLSVC_IPC_ANON:
-	default:
-		rc = mlsvc_anonymous_logon(server, domain, &username);
-		break;
-	}
+	if (username == NULL)
+		username = MLSVC_ANON_USER;
+	rc = mlsvc_logon(server, domain, username);
 
 	if (rc != 0)
 		return (-1);
@@ -483,18 +465,18 @@ samr_open_domain(mlsvc_handle_t *samr_handle, DWORD access_mask,
  * Once you have a user handle it should be possible to query the SAM
  * for information on that user.
  */
-int
+DWORD
 samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask, DWORD rid,
     mlsvc_handle_t *user_handle)
 {
 	struct samr_OpenUser arg;
 	struct mlsvc_rpc_context *context;
 	mlrpc_heapref_t heap;
-	int opnum;
-	int rc;
+	int opnum, rc;
+	DWORD status = NT_STATUS_SUCCESS;
 
 	if (mlsvc_is_null_handle(domain_handle) || user_handle == NULL)
-		return (-1);
+		return (NT_STATUS_INVALID_PARAMETER);
 
 	context = domain_handle->context;
 	opnum = SAMR_OPNUM_OpenUser;
@@ -506,22 +488,22 @@ samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask, DWORD rid,
 
 	(void) mlsvc_rpc_init(&heap);
 	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
-			mlsvc_rpc_report_status(opnum, arg.status);
-			rc = -1;
-		} else {
-			(void) memcpy(&user_handle->handle, &arg.user_handle,
-			    sizeof (ms_handle_t));
-			user_handle->context = context;
+	if (rc != 0) {
+		status = NT_STATUS_UNSUCCESSFUL;
+	} else if (arg.status != 0) {
+		mlsvc_rpc_report_status(opnum, arg.status);
+		status = NT_SC_VALUE(arg.status);
+	} else {
+		(void) memcpy(&user_handle->handle, &arg.user_handle,
+		    sizeof (ms_handle_t));
+		user_handle->context = context;
 
-			if (mlsvc_is_null_handle(user_handle))
-				rc = -1;
-		}
+		if (mlsvc_is_null_handle(user_handle))
+			status = NT_STATUS_INVALID_HANDLE;
 	}
 
 	mlsvc_rpc_free(context, &heap);
-	return (rc);
+	return (status);
 }
 
 /*

@@ -29,6 +29,7 @@
  * Server side RPC handler.
  */
 
+#include <sys/byteorder.h>
 #include <thread.h>
 #include <synch.h>
 #include <stdlib.h>
@@ -37,6 +38,7 @@
 #include <time.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
@@ -53,14 +55,14 @@ static unsigned long mlrpc_frag_size = MLRPC_FRAG_SZ;
 /*
  * Context table.
  */
+#define	CTXT_PIPE_SZ		65536
 #define	CTXT_TABLE_ENTRIES	128
 static struct mlsvc_rpc_context context_table[CTXT_TABLE_ENTRIES];
-static mutex_t mlsvc_context_lock;
+static mutex_t mlrpc_context_lock;
 
 static int mlrpc_s_process(struct mlrpc_xaction *);
 static int mlrpc_s_bind(struct mlrpc_xaction *);
 static int mlrpc_s_request(struct mlrpc_xaction *);
-static int mlrpc_generic_call_stub(struct mlrpc_xaction *);
 static void mlrpc_reply_prepare_hdr(struct mlrpc_xaction *);
 static int mlrpc_s_alter_context(struct mlrpc_xaction *);
 static void mlrpc_reply_bind_ack(struct mlrpc_xaction *);
@@ -73,29 +75,27 @@ static int mlrpc_build_reply(struct mlrpc_xaction *);
  * structure as the client side but we don't need to set up the client
  * side info.
  */
-int
-mlsvc_rpc_process(smb_pipe_t *inpipe, smb_pipe_t **outpipe,
-    smb_dr_user_ctx_t *user_ctx)
+struct mlsvc_rpc_context *
+mlrpc_process(int fid, smb_dr_user_ctx_t *user_ctx)
 {
 	struct mlsvc_rpc_context	*context;
 	struct mlrpc_xaction		*mxa;
 	struct mlndr_stream		*recv_mlnds;
 	struct mlndr_stream		*send_mlnds;
 	unsigned char			*pdu_base_addr;
+	char				*data;
 	int				datalen;
 
-	if (inpipe == NULL || user_ctx == NULL)
-		return (-1);
-
-	context = mlsvc_lookup_context(inpipe->sp_pipeid);
-	if (context == NULL)
-		return (-1);
+	if ((context = mlrpc_lookup(fid)) == NULL)
+		return (NULL);
 
 	context->user_ctx = user_ctx;
+	data = context->inpipe->sp_data;
+	datalen = context->inpipe->sp_datalen;
 
 	mxa = (struct mlrpc_xaction *)malloc(sizeof (struct mlrpc_xaction));
 	if (mxa == NULL)
-		return (-1);
+		return (NULL);
 
 	bzero(mxa, sizeof (struct mlrpc_xaction));
 	mxa->context = context;
@@ -103,28 +103,19 @@ mlsvc_rpc_process(smb_pipe_t *inpipe, smb_pipe_t **outpipe,
 
 	if ((mxa->heap = mlrpc_heap_create()) == NULL) {
 		free(mxa);
-		return (-1);
+		return (NULL);
 	}
 
 	recv_mlnds = &mxa->recv_mlnds;
+	(void) mlnds_initialize(recv_mlnds, datalen, NDR_MODE_CALL_RECV,
+	    mxa->heap);
 
-	(void) mlnds_initialize(recv_mlnds, inpipe->sp_datalen,
-	    NDR_MODE_CALL_RECV, mxa->heap);
-
-	bcopy(inpipe->sp_data, recv_mlnds->pdu_base_addr, inpipe->sp_datalen);
+	bcopy(data, recv_mlnds->pdu_base_addr, datalen);
 
 	send_mlnds = &mxa->send_mlnds;
-	(void) mlnds_initialize(send_mlnds, 0,
-	    NDR_MODE_RETURN_SEND, mxa->heap);
+	(void) mlnds_initialize(send_mlnds, 0, NDR_MODE_RETURN_SEND, mxa->heap);
 
 	(void) mlrpc_s_process(mxa);
-
-	/*
-	 * copy into outpipe
-	 */
-	datalen = send_mlnds->pdu_size_with_rpc_hdrs;
-	*outpipe = calloc(1, sizeof (smb_pipe_t) + datalen);
-	(*outpipe)->sp_datalen =  datalen;
 
 	/*
 	 * Different pointers for single frag vs multi frag responses.
@@ -134,12 +125,15 @@ mlsvc_rpc_process(smb_pipe_t *inpipe, smb_pipe_t **outpipe,
 	else
 		pdu_base_addr = send_mlnds->pdu_base_addr;
 
-	bcopy((char *)pdu_base_addr, (*outpipe)->sp_data, datalen);
+	datalen = send_mlnds->pdu_size_with_rpc_hdrs;
+	context->outpipe->sp_datalen = datalen;
+	bcopy(pdu_base_addr, context->outpipe->sp_data, datalen);
+
 	mlnds_destruct(&mxa->recv_mlnds);
 	mlnds_destruct(&mxa->send_mlnds);
 	mlrpc_heap_destroy(mxa->heap);
 	free(mxa);
-	return (datalen);
+	return (context);
 }
 
 /*
@@ -148,13 +142,13 @@ mlsvc_rpc_process(smb_pipe_t *inpipe, smb_pipe_t **outpipe,
  * context table is full, return a null pointer.
  */
 struct mlsvc_rpc_context *
-mlsvc_lookup_context(int fid)
+mlrpc_lookup(int fid)
 {
 	struct mlsvc_rpc_context *context;
 	struct mlsvc_rpc_context *available = NULL;
 	int i;
 
-	(void) mutex_lock(&mlsvc_context_lock);
+	(void) mutex_lock(&mlrpc_context_lock);
 
 	for (i = 0; i < CTXT_TABLE_ENTRIES; ++i) {
 		context = &context_table[i];
@@ -165,20 +159,33 @@ mlsvc_lookup_context(int fid)
 		}
 
 		if (context->fid == fid) {
-			(void) mutex_unlock(&mlsvc_context_lock);
+			(void) mutex_unlock(&mlrpc_context_lock);
 			return (context);
 		}
 	}
 
 	if (available) {
 		bzero(available, sizeof (struct mlsvc_rpc_context));
+		available->inpipe = malloc(CTXT_PIPE_SZ);
+		available->outpipe = malloc(CTXT_PIPE_SZ);
+
+		if (available->inpipe == NULL || available->outpipe == NULL) {
+			free(available->inpipe);
+			free(available->outpipe);
+			bzero(available, sizeof (struct mlsvc_rpc_context));
+			(void) mutex_unlock(&mlrpc_context_lock);
+			return (NULL);
+		}
+
 		available->fid = fid;
+		available->inpipe->sp_pipeid = fid;
+		available->outpipe->sp_pipeid = fid;
 
 		mlrpc_binding_pool_initialize(&available->binding,
 		    available->binding_pool, CTXT_N_BINDING_POOL);
 	}
 
-	(void) mutex_unlock(&mlsvc_context_lock);
+	(void) mutex_unlock(&mlrpc_context_lock);
 	return (available);
 }
 
@@ -187,23 +194,25 @@ mlsvc_lookup_context(int fid)
  * with a fid when the client performs a close file.
  */
 void
-mlsvc_rpc_release(int fid)
+mlrpc_release(int fid)
 {
 	struct mlsvc_rpc_context *context;
 	int i;
 
-	(void) mutex_lock(&mlsvc_context_lock);
+	(void) mutex_lock(&mlrpc_context_lock);
 
 	for (i = 0; i < CTXT_TABLE_ENTRIES; ++i) {
 		context = &context_table[i];
 
 		if (context->fid == fid) {
+			free(context->inpipe);
+			free(context->outpipe);
 			bzero(context, sizeof (struct mlsvc_rpc_context));
 			break;
 		}
 	}
 
-	(void) mutex_unlock(&mlsvc_context_lock);
+	(void) mutex_unlock(&mlrpc_context_lock);
 }
 
 /*
@@ -509,7 +518,7 @@ mlrpc_s_request(struct mlrpc_xaction *mxa)
  * should already exist at this point.  The heap will also be available
  * to the stub.
  */
-static int
+int
 mlrpc_generic_call_stub(struct mlrpc_xaction *mxa)
 {
 	struct mlrpc_binding 	*mbind = mxa->binding;
@@ -775,11 +784,11 @@ mlrpc_build_reply(struct mlrpc_xaction *mxa)
 	frag_data_size = frag_size - MLRPC_RSP_HDR_SIZE;
 
 	num_ext_frags = pdu_data_size / frag_data_size;
+
 	/*
-	 * if the outpipe is bigger than a frag_size, we need
-	 * to stretch the pipe and insert an RPC header at each
-	 * frag boundary.  This outpipe gets chunked out in xdrlen
-	 * sizes for each trans request
+	 * We may need to stretch the pipe and insert an RPC header
+	 * at each frag boundary.  The response will get chunked into
+	 * xdrlen sizes for each trans request.
 	 */
 	mlnds->pdu_base_addr_with_rpc_hdrs
 	    = malloc(pdu_size + (num_ext_frags * MLRPC_RSP_HDR_SIZE));

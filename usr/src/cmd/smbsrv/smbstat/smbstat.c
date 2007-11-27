@@ -267,14 +267,12 @@ smbstat_kstat_read(kstat_ctl_t *kc, kstat_t *ksp, void *data)
  * Enable libumem debugging by default on DEBUG builds.
  */
 #ifdef DEBUG
-/* LINTED - external libumem symbol */
 const char *
 _umem_debug_init(void)
 {
 	return ("default,verbose"); /* $UMEM_DEBUG setting */
 }
 
-/* LINTED - external libumem symbol */
 const char *
 _umem_logging_init(void)
 {

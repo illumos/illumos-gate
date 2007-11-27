@@ -49,48 +49,31 @@
  * domain information if the caller didn't supply a server name and a
  * domain name.
  *
+ * If username argument is NULL, an anonymous connection will be established.
+ * Otherwise, an authenticated connection will be established.
+ *
  * On success 0 is returned. Otherwise a -ve error code.
  */
-int lsar_open(int ipc_mode, char *server, char *domain, char *username,
-    char *password, mlsvc_handle_t *domain_handle)
+int lsar_open(char *server, char *domain, char *username,
+    mlsvc_handle_t *domain_handle)
 {
 	smb_ntdomain_t *di;
 	int remote_os;
 	int remote_lm;
 	int rc;
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
-		return (-1);
-
 	if (server == NULL || domain == NULL) {
+		if ((di = smb_getdomaininfo(0)) == NULL)
+			return (-1);
+
 		server = di->server;
 		domain = di->domain;
 	}
 
-	switch (ipc_mode) {
-	case MLSVC_IPC_USER:
-		/*
-		 * Use the supplied credentials.
-		 */
-		rc = mlsvc_user_logon(server, domain, username, password);
-		break;
+	if (username == NULL)
+		username = MLSVC_ANON_USER;
 
-	case MLSVC_IPC_ADMIN:
-		/*
-		 * Use the resource domain administrator credentials.
-		 */
-		server = di->server;
-		domain = di->domain;
-		username = smbrdr_ipc_get_user();
-
-		rc = mlsvc_admin_logon(server, domain);
-		break;
-
-	case MLSVC_IPC_ANON:
-	default:
-		rc = mlsvc_anonymous_logon(server, domain, &username);
-		break;
-	}
+	rc = mlsvc_logon(server, domain, username);
 
 	if (rc != 0)
 		return (-1);

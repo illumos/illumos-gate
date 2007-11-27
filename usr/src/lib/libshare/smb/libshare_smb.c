@@ -84,6 +84,7 @@ static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
 static uint64_t smb_share_features(void);
 static int smb_list_transient(sa_handle_t);
+static int smb_domain_change_event(char *new_domain);
 
 /* size of basic format allocation */
 #define	OPT_CHUNK	1024
@@ -1037,6 +1038,7 @@ smb_enable_service(void)
 			(void) fprintf(stderr,
 			    dgettext(TEXT_DOMAIN,
 			    "%s failed to restart: %s\n"),
+			    SMBD_DEFAULT_INSTANCE_FMRI,
 			    scf_strerror(scf_error()));
 			return (SA_CONFIG_ERR);
 		}
@@ -1077,6 +1079,45 @@ smb_validate_proto_prop(int index, char *name, char *value)
 }
 
 /*
+ * smb_domain_change_event
+ *
+ * This function is called whenever ads_domain is changed via sharectl.
+ * It will make a door call to trigger the ADS domain change event.
+ */
+static int
+smb_domain_change_event(char *new_domain)
+{
+	char *orig_domain;
+	int rc = SA_OK;
+
+	orig_domain = smb_config_getenv(SMB_CI_ADS_DOMAIN);
+	if (orig_domain == NULL)
+		return (rc);
+
+	if (strcasecmp(orig_domain, new_domain) == 0) {
+		free(orig_domain);
+		return (rc);
+	}
+
+	if (!smb_isonline()) {
+		free(orig_domain);
+		return (SA_NO_SERVICE);
+	}
+
+	/*
+	 * Clear the ADS_HOST_INFO cache
+	 * and remove old keys from the
+	 * Kerberos keytab.
+	 */
+	if (smb_ads_domain_change_notify(orig_domain) != 0)
+		rc = SA_KRB_KEYTAB_ERR;
+
+	free(orig_domain);
+	return (rc);
+}
+
+
+/*
  * smb_set_proto_prop(prop)
  *
  * check that prop is valid.
@@ -1089,6 +1130,7 @@ smb_set_proto_prop(sa_property_t prop)
 	char *name;
 	char *value;
 	int index = -1;
+	struct smb_proto_option_defs *opt;
 
 	name = sa_get_property_attr(prop, "type");
 	value = sa_get_property_attr(prop, "value");
@@ -1098,25 +1140,29 @@ smb_set_proto_prop(sa_property_t prop)
 			/* should test for valid value */
 			ret = smb_validate_proto_prop(index, name, value);
 			if (ret == SA_OK) {
+				opt = &smb_proto_options[index];
+				if ((opt->smb_index == SMB_CI_ADS_DOMAIN) &&
+				    (ret = smb_domain_change_event(value))
+				    != SA_OK)
+						goto cleanup;
+
 				/* Save to SMF */
-				smb_config_setenv(
-				    smb_proto_options[index].smb_index, value);
+				smb_config_setenv(opt->smb_index, value);
 				/*
 				 * Specialized refresh mechanisms can
 				 * be flagged in the proto_options and
 				 * processed here.
 				 */
-				if (smb_proto_options[index].refresh &
-				    SMB_REFRESH_REFRESH)
-					(void) smf_refresh_instance(
-					    SMBD_DEFAULT_INSTANCE_FMRI);
-				else if (smb_proto_options[index].refresh &
-				    SMB_REFRESH_RESTART)
+				if (opt->refresh & SMB_REFRESH_REFRESH)
+					(void) smb_config_refresh();
+				else if (opt->refresh & SMB_REFRESH_RESTART)
 					(void) smf_restart_instance(
 					    SMBD_DEFAULT_INSTANCE_FMRI);
 			}
 		}
 	}
+
+cleanup:
 	if (name != NULL)
 		sa_free_attr_string(name);
 	if (value != NULL)

@@ -173,6 +173,7 @@ int smbnative_pdc_value(char *native_lm);
 #define	SMBD_DOOR_PARAM_GET			2
 #define	SMBD_DOOR_PARAM_SET			3
 #define	SMBD_DOOR_NETBIOS_RECONFIG		4
+#define	SMBD_DOOR_ADS_DOMAIN_CHANGED		5
 
 #ifdef __cplusplus
 }
