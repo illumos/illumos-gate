@@ -1129,7 +1129,7 @@ xdf_intr(caddr_t arg)
 	xdf_t *vdp = (xdf_t *)arg;
 	xendev_ring_t *xbr;
 	blkif_response_t *resp;
-	int bioerr = 0;
+	int bioerr;
 	uint64_t id;
 	extern int do_polled_io;
 	uint8_t op;
@@ -1163,6 +1163,8 @@ xdf_intr(caddr_t arg)
 			    ddi_get_name_addr(vdp->xdf_dip),
 			    (op == BLKIF_OP_READ) ? "reading" : "writing"));
 			bioerr = EIO;
+		} else {
+			bioerr = 0;
 		}
 
 		xdf_iofini(vdp, id, bioerr);
