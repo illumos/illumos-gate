@@ -663,6 +663,10 @@ err3:
 err2:
 	agp_master_unregister(&agp_regdev->agprd_masterhdl);
 err1:
+	/* AMD64 CPU gart registered ? */
+	if (ret == 0) {
+		amd64_gart_unregister(garts_dev);
+	}
 	agp_regdev->agprd_arctype = ARC_UNKNOWN;
 	return (-1);
 }
