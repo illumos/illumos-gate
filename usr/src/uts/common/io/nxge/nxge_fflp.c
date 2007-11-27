@@ -510,7 +510,7 @@ nxge_alt_mcast_mac_assign_rdc_table(p_nxge_t nxgep)
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"failed Assign RDC table (invalid funcion #)"));
+			"failed Assign RDC table (invalid function #)"));
 		return (NXGE_ERROR);
 	}
 
@@ -1882,7 +1882,7 @@ nxge_fflp_update_hw(p_nxge_t nxgep)
 	}
 
 	/* Config Hash values */
-	/* config classess */
+	/* config classes */
 	status = nxge_fflp_ip_class_config_all(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -2052,6 +2052,7 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 		if (fcram1_err.bits.ldw.mult_bit) {
 			multi_bit_str = "multiple bits";
 		}
+		statsp->hash_lookup_err++;
 		NXGE_ERROR_MSG((nxgep, FFLP_CTL,
 			" FCRAM %s lookup %s ECC error on port %d"
 			" H1: 0x%x Subarea: 0x%x Syndrome: 0x%x",

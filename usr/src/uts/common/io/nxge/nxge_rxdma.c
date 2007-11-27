@@ -2365,13 +2365,15 @@ nxge_receive_packet(p_nxge_t nxgep,
 			rdc_stats->errlog.compl_err_type = error_type;
 
 			switch (error_type) {
+			/*
+			 * Do not send FMA ereport for RCR_L2_ERROR and
+			 * RCR_L4_CSUM_ERROR because most likely they indicate
+			 * back pressure rather than HW failures.
+			 */
 			case RCR_L2_ERROR:
 				rdc_stats->l2_err++;
 				if (rdc_stats->l2_err <
 				    error_disp_cnt) {
-					NXGE_FM_REPORT_ERROR(nxgep,
-					    nxgep->mac.portnum, NULL,
-					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    " nxge_receive_packet:"
 					    " channel %d RCR L2_ERROR",
@@ -2383,23 +2385,23 @@ nxge_receive_packet(p_nxge_t nxgep,
 				rdc_stats->l4_cksum_err++;
 				if (rdc_stats->l4_cksum_err <
 				    error_disp_cnt) {
-					NXGE_FM_REPORT_ERROR(nxgep,
-					    nxgep->mac.portnum, NULL,
-					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    " nxge_receive_packet:"
 					    " channel %d"
 					    " RCR L4_CSUM_ERROR", channel));
 				}
 				break;
+			/*
+			 * Do not send FMA ereport for RCR_FFLP_SOFT_ERROR and
+			 * RCR_ZCP_SOFT_ERROR because they reflect the same
+			 * FFLP and ZCP errors that have been reported by
+			 * nxge_fflp.c and nxge_zcp.c.
+			 */
 			case RCR_FFLP_SOFT_ERROR:
 				error_send_up = B_TRUE;
 				rdc_stats->fflp_soft_err++;
 				if (rdc_stats->fflp_soft_err <
 				    error_disp_cnt) {
-					NXGE_FM_REPORT_ERROR(nxgep,
-					    nxgep->mac.portnum, NULL,
-					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep,
 					    NXGE_ERR_CTL,
 					    " nxge_receive_packet:"
@@ -2412,9 +2414,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 				rdc_stats->fflp_soft_err++;
 				if (rdc_stats->zcp_soft_err <
 				    error_disp_cnt)
-					NXGE_FM_REPORT_ERROR(nxgep,
-					    nxgep->mac.portnum, NULL,
-					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    " nxge_receive_packet: Channel %d"
 					    " RCR ZCP_SOFT_ERROR", channel));
@@ -2423,9 +2422,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 				rdc_stats->rcr_unknown_err++;
 				if (rdc_stats->rcr_unknown_err
 				    < error_disp_cnt) {
-					NXGE_FM_REPORT_ERROR(nxgep,
-					    nxgep->mac.portnum, NULL,
-					    NXGE_FM_EREPORT_RDMC_RCR_ERR);
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    " nxge_receive_packet: Channel %d"
 					    " RCR entry 0x%llx error 0x%x",

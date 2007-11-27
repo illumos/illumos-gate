@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@ extern "C" {
 /* IPP Registers */
 #define	IPP_CONFIG_REG				0x000
 #define	IPP_DISCARD_PKT_CNT_REG			0x020
-#define	IPP_TCP_CKSUM_ERR_CNT_REG		0x028
+#define	IPP_BAD_CKSUM_ERR_CNT_REG		0x028
 #define	IPP_ECC_ERR_COUNTER_REG			0x030
 #define	IPP_INT_STATUS_REG			0x040
 #define	IPP_INT_MASK_REG			0x048

@@ -290,14 +290,14 @@ nxge_check_xaui_xfp(p_nxge_t nxgep)
 		    "XAUI is bad or absent on port<%d>\n", portn));
 	} else if (nxgep->mac.portmode == PORT_10G_FIBER) {
 		/*
-		 * 0x03FC = 0000 0011 1111 1100
-		 * 0x639C = 0110 0011 1001 1100
+		 * 0x03FC = 0000 0011 1111 1100 (XFP is normal)
+		 * 0x639C = 0110 0011 1001 1100 (XFP has problem)
 		 * bit14 = 1: PDM loss-of-light indicator
 		 * bit13 = 1: PDM Rx loss-of-signal
 		 * bit6  = 0: Light is NOT ok
 		 * bit5  = 0: PMD Rx signal is NOT ok
 		 */
-		if (val != 0x3FC && val == 0x639C) {
+		if (val == 0x639C) {
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 			    NXGE_FM_EREPORT_XFP_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -370,7 +370,7 @@ nxge_syserr_intr(void *arg1, void *arg2)
 		(void) nxge_ipp_handle_sys_errors(nxgep);
 	} else if (estat.bits.ldw.zcp) {
 		/* ZCP */
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
 			"==> nxge_syserr_intr: device error - ZCP"));
 		(void) nxge_zcp_handle_sys_errors(nxgep);
 	} else if (estat.bits.ldw.tdmc) {

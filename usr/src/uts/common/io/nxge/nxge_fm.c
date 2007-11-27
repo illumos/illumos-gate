@@ -524,8 +524,7 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 	ena = fm_ena_generate(0, FM_ENA_FMT1);
 	statsp = nxgep->statsp;
 
-	if (DDI_FM_EREPORT_CAP(nxgep->fm_capabilities)) {
-		switch (ereport->index) {
+	switch (ereport->index) {
 		case NXGE_FM_EREPORT_XPCS_LINK_DOWN:
 		case NXGE_FM_EREPORT_XPCS_TX_LINK_FAULT:
 		case NXGE_FM_EREPORT_XPCS_RX_LINK_FAULT:
@@ -878,8 +877,6 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			    ERNAME_ERR_PORTN, DATA_TYPE_UINT8, err_portn,
 			    NULL);
 			break;
-		}
-
 	}
 }
 
@@ -890,7 +887,8 @@ nxge_fm_report_error(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 	nxge_fm_ereport_attr_t		*fm_ereport_attr;
 
 	fm_ereport_attr = nxge_fm_get_ereport_attr(fm_ereport_id);
-	if (fm_ereport_attr != NULL) {
+	if (fm_ereport_attr != NULL &&
+	    (DDI_FM_EREPORT_CAP(nxgep->fm_capabilities))) {
 		nxge_fm_ereport(nxgep, err_portn, err_chan, fm_ereport_attr);
 		ddi_fm_service_impact(nxgep->dip, fm_ereport_attr->impact);
 	}

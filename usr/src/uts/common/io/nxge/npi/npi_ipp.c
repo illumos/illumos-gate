@@ -30,7 +30,7 @@
 uint64_t ipp_fzc_offset[] = {
 		IPP_CONFIG_REG,
 		IPP_DISCARD_PKT_CNT_REG,
-		IPP_TCP_CKSUM_ERR_CNT_REG,
+		IPP_BAD_CKSUM_ERR_CNT_REG,
 		IPP_ECC_ERR_COUNTER_REG,
 		IPP_INT_STATUS_REG,
 		IPP_INT_MASK_REG,
@@ -70,7 +70,7 @@ uint64_t ipp_fzc_offset[] = {
 const char *ipp_fzc_name[] = {
 		"IPP_CONFIG_REG",
 		"IPP_DISCARD_PKT_CNT_REG",
-		"IPP_TCP_CKSUM_ERR_CNT_REG",
+		"IPP_BAD_CKSUM_ERR_CNT_REG",
 		"IPP_ECC_ERR_COUNTER_REG",
 		"IPP_INT_STATUS_REG",
 		"IPP_INT_MASK_REG",
@@ -567,7 +567,7 @@ npi_ipp_get_cs_err_count(npi_handle_t handle, uint8_t portn, uint16_t *err_cnt)
 {
 	ASSERT(IS_PORT_NUM_VALID(portn));
 
-	IPP_REG_RD(handle, portn, IPP_TCP_CKSUM_ERR_CNT_REG, err_cnt);
+	IPP_REG_RD(handle, portn, IPP_BAD_CKSUM_ERR_CNT_REG, err_cnt);
 
 	return (NPI_SUCCESS);
 }

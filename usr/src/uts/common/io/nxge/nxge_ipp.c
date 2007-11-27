@@ -86,7 +86,7 @@ nxge_ipp_init(p_nxge_t nxgep)
 
 	/* Clean up ECC counter */
 	IPP_REG_RD(nxgep->npi_handle, portn, IPP_ECC_ERR_COUNTER_REG, &val);
-	IPP_REG_RD(nxgep->npi_handle, portn, IPP_TCP_CKSUM_ERR_CNT_REG, &val);
+	IPP_REG_RD(nxgep->npi_handle, portn, IPP_BAD_CKSUM_ERR_CNT_REG, &val);
 	IPP_REG_RD(nxgep->npi_handle, portn, IPP_DISCARD_PKT_CNT_REG, &val);
 
 	if ((rs = npi_ipp_get_status(handle, portn, &istatus)) != NPI_SUCCESS)
@@ -397,8 +397,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		 */
 		(void) npi_ipp_get_cs_err_count(handle, portn, &cnt16);
 		statsp->bad_cs_cnt += IPP_BAD_CS_CNT_MASK;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_BAD_CS_MX);
+		/*
+		 * Do not send FMA ereport because this error does not
+		 * indicate a HW failure
+		 */
 		if (statsp->bad_cs_cnt < (IPP_MAX_ERR_SHOW *
 				IPP_BAD_CS_CNT_MASK))
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -411,8 +413,10 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		 */
 		(void) npi_ipp_get_pkt_dis_count(handle, portn, &cnt16);
 		statsp->pkt_dis_cnt += IPP_PKT_DIS_CNT_MASK;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_PKT_DIS_MX);
+		/*
+		 * Do not send FMA ereport because this error does not
+		 * indicate a HW failure
+		 */
 		if (statsp->pkt_dis_cnt < (IPP_MAX_ERR_SHOW *
 				IPP_PKT_DIS_CNT_MASK))
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -425,12 +429,22 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		 */
 		(void) npi_ipp_get_ecc_err_count(handle, portn, &cnt8);
 		statsp->ecc_err_cnt += IPP_ECC_CNT_MASK;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_ECC_ERR_MAX);
-		if (statsp->ecc_err_cnt < (IPP_MAX_ERR_SHOW *
-				IPP_ECC_CNT_MASK))
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: pkt_ecc_err_max\n"));
+		/*
+		 * A defect in Neptune port2's IPP module could generate
+		 * many fake but harmless ECC errors under stress and cause
+		 * the ecc-error-counter register IPP_ECC to reach its
+		 * maximum value in a few seconds. To avoid false alarm, do
+		 * not report the error if it is port2.
+		 */
+		if (portn != 2) {
+			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			    NXGE_FM_EREPORT_IPP_ECC_ERR_MAX);
+			if (statsp->ecc_err_cnt < (IPP_MAX_ERR_SHOW *
+			    IPP_ECC_CNT_MASK)) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_ipp_err_evnts: pkt_ecc_err_max\n"));
+			}
+		}
 	}
 	/*
 	 * Making sure that error source is cleared if this is an injected
@@ -522,7 +536,7 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			 * IPP_INT_STAT and trigger an FMA ereport.
 			 */
 			IPP_REG_WR(nxgep->npi_handle, portn,
-			    IPP_TCP_CKSUM_ERR_CNT_REG, IPP_BAD_CS_CNT_MASK);
+			    IPP_BAD_CKSUM_ERR_CNT_REG, IPP_BAD_CS_CNT_MASK);
 		} else if (err_id == NXGE_FM_EREPORT_IPP_PKT_DIS_MX) {
 			/*
 			 * Fill IPP_PKT_DIS with max packet-discard-counter

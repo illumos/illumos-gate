@@ -4298,8 +4298,10 @@ nxge_mac_intr(void *arg1, void *arg2)
 			}
 			if (status & ICFG_XMAC_TX_MAX_PACKET_ERR) {
 				statsp->xmac_stats.tx_maxpktsize_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR);
+				/*
+				 * Do not send FMA ereport because this
+				 * error does not indicate HW failure.
+				 */
 			}
 			if (status & ICFG_XMAC_TX_OVERFLOW) {
 				statsp->xmac_stats.tx_overflow_err++;
@@ -4333,23 +4335,21 @@ nxge_mac_intr(void *arg1, void *arg2)
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 					NXGE_FM_EREPORT_RXMAC_UNDERFLOW);
 			}
+			/*
+			 * Do not send FMA ereport for the following 3 errors
+			 * because they do not indicate HW failures.
+			 */
 			if (status & ICFG_XMAC_RX_CRC_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_crc_err_cnt +=
 							XRXMAC_CRC_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_LEN_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_len_err_cnt +=
 							MAC_LEN_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-				NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_VIOL_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_viol_err_cnt +=
 							XRXMAC_CD_VIO_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_OCT_CNT_EXP) {
 				statsp->xmac_stats.rx_byte_cnt +=
@@ -4387,23 +4387,21 @@ nxge_mac_intr(void *arg1, void *arg2)
 				statsp->xmac_stats.rx_mult_cnt +=
 							XRXMAC_MC_FRM_CNT_MASK;
 			}
+			/*
+			 * Do not send FMA ereport for the following 3 errors
+			 * because they do not indicate HW failures.
+			 */
 			if (status & ICFG_XMAC_RX_FRAG_CNT_EXP) {
 				statsp->xmac_stats.rx_frag_cnt +=
 							XRXMAC_FRAG_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_RXFRAG_CNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_ALIGNERR_CNT_EXP) {
 				statsp->xmac_stats.rx_frame_align_err_cnt +=
 							XRXMAC_AL_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_LINK_FLT_CNT_EXP) {
 				statsp->xmac_stats.rx_linkfault_err_cnt +=
 							XMAC_LINK_FLT_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-				NXGE_FM_EREPORT_RXMAC_LINKFAULT_CNT_EXP);
 			}
 			if (status & ICFG_XMAC_RX_REMOTE_FLT_DET) {
 				statsp->xmac_stats.rx_remotefault_err++;
