@@ -1099,12 +1099,13 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (vdp->xdf_flush_supported) {
 			rc = xdf_lb_rdwr(vdp->xdf_dip, TG_WRITE,
 			    NULL, 0, 0, (void *)dev);
-		} else {
-			if (xdf_barrier_flush_disable)
-				return (ENOTTY);
+		} else if (vdp->xdf_feature_barrier &&
+		    !xdf_barrier_flush_disable) {
 			rc = xdf_lb_rdwr(vdp->xdf_dip, TG_WRITE,
 			    vdp->xdf_cache_flush_block, xdf_flush_block,
 			    DEV_BSIZE, (void *)dev);
+		} else {
+			return (ENOTTY);
 		}
 		if ((mode & FKIOCTL) && (dkc != NULL) &&
 		    (dkc->dkc_callback != NULL)) {
