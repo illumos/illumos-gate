@@ -716,21 +716,21 @@ static void *
 evch_evq_evzalloc(size_t paylsize, int flag)
 {
 	evch_gevent_t	*evp;
-	size_t		rsize, evsize;
+	size_t		rsize, evsize, ge_size;
 
 	rsize = offsetof(evch_gevent_t, ge_payload) + paylsize;
 	if (flag & EVCH_TRYHARD) {
 		evp = kmem_alloc_tryhard(rsize, &evsize, KM_NOSLEEP);
-		bzero(evp, rsize);
-		evp->ge_size = evsize;
+		ge_size = evsize;
 	} else {
 		evp = kmem_alloc(rsize, flag & EVCH_NOSLEEP ? KM_NOSLEEP :
 		    KM_SLEEP);
-		bzero(evp, rsize);
-		evp->ge_size = rsize;
+		ge_size = rsize;
 	}
 
 	if (evp) {
+		bzero(evp, rsize);
+		evp->ge_size = ge_size;
 		return (&evp->ge_payload);
 	}
 	return (evp);
