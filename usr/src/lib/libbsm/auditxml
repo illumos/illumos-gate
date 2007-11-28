@@ -555,28 +555,32 @@ sub generateTableC {
     my $omit = shift;
 
     my %tokenType = (
-		  'acl'			=> 'AUT_ACL',
-		  'arbitrary'		=> 'AUT_ARBITRARY',
-		  'arg'			=> 'AUT_ARG',
-		  'attr'		=> 'AUT_ATTR',
+	#
+	#	tokenTypes are the ones that are actually defined
+	#	for use in adt.xml audit records
+	#
+
+	#	  'acl'			=> 'AUT_ACL',		# not defined
+	#	  'arbitrary'		=> 'AUT_ARBITRARY',	# not defined
+	#	  'arg'			=> 'AUT_ARG',		# not defined
+	#	  'attr'		=> 'AUT_ATTR',
 		  'command'		=> 'AUT_CMD',
 		  'command_1'		=> 'ADT_CMD_ALT',	# dummy token id
-		  'date'		=> 'AUT_TEXT',
-		  'exec_args'   	=> 'AUT_EXEC_ARGS',
-		  'exec_env'    	=> 'AUT_EXEC_ENV',
-		  'exit'        	=> 'AUT_EXIT',
-		  'file'        	=> 'AUT_FILE',
+	#	  'date'		=> 'AUT_TEXT',		# not used
+	#	  'exec_args'   	=> 'AUT_EXEC_ARGS',	# not defined
+	#	  'exec_env'    	=> 'AUT_EXEC_ENV',	# not defined
+	#	  'exit'        	=> 'AUT_EXIT',		# not defined
 		  'fmri'        	=> 'AUT_FMRI',
-		  'groups'      	=> 'AUT_GROUPS',
-	#	  'header'      	=> 'AUT_HEADER',	# not used
-		  'in_addr'     	=> 'AUT_IN_ADDR',
+	#	  'groups'      	=> 'AUT_GROUPS',	# not defined
+	#	  'header'      	=> 'AUT_HEADER',	# not defined
+		  'in_peer'     	=> 'ADT_IN_PEER',	# dummy token id
 		  'tid'          	=> 'AUT_TID',
-		  'ipc'         	=> 'AUT_IPC',
-		  'ipc_perm'    	=> 'AUT_IPC_PERM',
-		  'iport'		=> 'AUT_IPORT',
+	#	  'ipc'         	=> 'AUT_IPC',		# not defined
+	#	  'ipc_perm'    	=> 'AUT_IPC_PERM',	# not defined
+	#	  'iport'		=> 'AUT_IPORT',		# not defined
 		  'label'		=> 'AUT_LABEL',
 		  'newgroups'   	=> 'AUT_NEWGROUPS',
-		  'opaque'      	=> 'AUT_OPAQUE',
+	#	  'opaque'      	=> 'AUT_OPAQUE',	# not defined
 		  'path'        	=> 'AUT_PATH',
 		  'path_list'		=> '-AUT_PATH',		# dummy token id
 		  'process'     	=> 'AUT_PROCESS',
@@ -584,12 +588,12 @@ sub generateTableC {
 		  'priv_limit'		=> 'ADT_AUT_PRIV_L', 	# dummy token id
 		  'priv_inherit'	=> 'ADT_AUT_PRIV_I',	# dummy token id
 		  'return'      	=> 'AUT_RETURN',
-		  'seq'         	=> 'AUT_SEQ',
-		  'socket'      	=> 'AUT_SOCKET',
-		  'socket-inet' 	=> 'AUT_SOCKET_INET',
+	#	  'seq'         	=> 'AUT_SEQ',		# not defined
+	#	  'socket'      	=> 'AUT_SOCKET',	# not defined
+	#	  'socket-inet' 	=> 'AUT_SOCKET_INET',
 		  'subject'     	=> 'AUT_SUBJECT',
 		  'text'        	=> 'AUT_TEXT',
-	#	  'trailer'     	=> 'AUT_TRAILER',	# not used
+	#	  'trailer'     	=> 'AUT_TRAILER',	# not defined
 		  'uauth'		=> 'AUT_UAUTH',
 		  'zonename'		=> 'AUT_ZONENAME'
 		 );

@@ -31,6 +31,7 @@
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 #include <bsm/audit.h>
+
 #include <adt_xlate.h>
 #include <assert.h>
 #include <netdb.h>
@@ -38,12 +39,15 @@
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
-#include <sys/priv_names.h>
-#include <sys/types.h>
-#include <sys/vnode.h>
-#include <tsol/label.h>
 #include <time.h>
 #include <unistd.h>
+
+#include <sys/priv_names.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/vnode.h>
+
+#include <tsol/label.h>
 
 #ifdef	C2_DEBUG
 #define	DPRINTF(x) {printf x; }
@@ -96,9 +100,9 @@ adt_token_open(struct adt_event_state *event)
 			adt_write_syslog("au_open failed", ENOMEM);
 			have_syslogged = 1;
 		}
-	}
-	else
+	} else {
 		have_syslogged = 0;
+	}
 }
 
 /*
@@ -203,10 +207,11 @@ adt_to_cmd1(datadef *def, void *p_data, int required,
 	string = ((union convert *)p_data)->tcharstar;
 
 	if (string == NULL) {
-		if (required)
+		if (required) {
 			string = empty;
-		else
+		} else {
 			return;
+		}
 	}
 	/* argc is hardcoded as 1 */
 	(void) au_write(event->ae_event_handle, au_to_cmd(1, &string,
@@ -281,10 +286,11 @@ adt_to_frmi(datadef *def, void *p_data, int required,
 	fmri = ((union convert *)p_data)->tcharstar;
 
 	if (fmri == NULL) {
-		if (required)
+		if (required) {
 			fmri = empty;
-		else
+		} else {
 			return;
+		}
 	}
 	DPRINTF(("  fmri=%s\n", fmri));
 	(void) au_write(event->ae_event_handle, au_to_fmri(fmri));
@@ -333,8 +339,9 @@ adt_to_newgroups(datadef *def, void *p_data, int required,
 	if (n < 1) {
 		if (required) {
 			n = 0;  /* in case negative n was passed */
-		} else
+		} else {
 			return;
+		}
 	}
 	p_data = adt_adjust_address(p_data, sizeof (int), sizeof (int32_t *));
 
@@ -357,9 +364,10 @@ adt_to_path(datadef *def, void *p_data, int required,
 		(void) au_write(event->ae_event_handle, au_to_path(path));
 	} else {
 		DPRINTF(("  Null path\n"));
-		if (required)
+		if (required) {
 			(void) au_write(event->ae_event_handle,
 			    au_to_path(empty));
+		}
 	}
 }
 
@@ -383,9 +391,10 @@ adt_to_pathlist(datadef *def, void *p_data, int required,
 		working_buf = strdup(pathlist);
 		if (working_buf == NULL) {
 			adt_write_syslog("audit failure", errno);
-			if (required)
+			if (required) {
 				(void) au_write(event->ae_event_handle,
 				    au_to_path(empty));
+			}
 			return;
 		}
 		for (path = strtok_r(working_buf, " ", &last_str);
@@ -464,10 +473,11 @@ getCharacteristics(struct auditpinfo_addr *info, pid_t *pid)
 {
 	int	rc;
 
-	if (*pid == 0)			/* getpinfo for this pid */
+	if (*pid == 0) {		/* getpinfo for this pid */
 		info->ap_pid = getpid();
-	else
+	} else {
 		info->ap_pid = *pid;
+	}
 
 	rc = auditon(A_GETPINFO_ADDR, (caddr_t)info,
 	    sizeof (struct auditpinfo_addr));
@@ -614,9 +624,9 @@ adt_write_text(int handle, char *main_text, const char *format)
 {
 	char	buffer[TEXT_LENGTH * 2 + 1];
 
-	if (format == NULL)
+	if (format == NULL) {
 		(void) au_write(handle, au_to_text(main_text));
-	else {
+	} else {
 		(void) snprintf(buffer, TEXT_LENGTH * 2, format, main_text);
 		(void) au_write(handle, au_to_text(buffer));
 	}
@@ -652,11 +662,12 @@ adt_to_text(datadef *def, void *p_data, int required,
 		date = ((union convert *)p_data)->tlong;
 		if (strftime(buffer, sizeof (buffer), "%x",
 		    localtime_r(&date, &tm)) > TEXT_LENGTH) {
-			if (required)
+			if (required) {
 				(void) strncpy(buffer, "invalid date",
 				    TEXT_LENGTH);
-			else
+			} else {
 				break;
+			}
 		}
 		DPRINTF(("  text=%s\n", buffer));
 		adt_write_text(event->ae_event_handle, buffer, format);
@@ -671,17 +682,19 @@ adt_to_text(datadef *def, void *p_data, int required,
 		list_index = ((union convert *)p_data)->msg_selector;
 
 		if ((list_index + list->ml_offset < list->ml_min_index) ||
-		    (list_index + list->ml_offset > list->ml_max_index))
+		    (list_index + list->ml_offset > list->ml_max_index)) {
 			string = "Invalid message index";
-		else
+		} else {
 			string = list->ml_msg_list[list_index +
 			    list->ml_offset];
+		}
 
 		if (string == NULL) {	/* null is valid; means skip */
 			if (required) {
 				string = empty;
-			} else
+			} else {
 				break;
+			}
 		}
 		DPRINTF(("  text=%s\n", string));
 		adt_write_text(event->ae_event_handle, string, format);
@@ -734,10 +747,11 @@ adt_to_text(datadef *def, void *p_data, int required,
 				string += written;
 				available -= written;
 			}
-		} else if (required)
+		} else if (required) {
 			string = empty;
-		else
+		} else {
 			break;
+		}
 
 		adt_write_text(event->ae_event_handle, buffer, format);
 		break;
@@ -759,10 +773,11 @@ adt_to_text(datadef *def, void *p_data, int required,
 		string = ((union convert *)p_data)->tcharstar;
 
 		if (string == NULL) {
-			if (required)
+			if (required) {
 				string = empty;
-			else
+			} else {
 				break;
+			}
 		}
 		DPRINTF(("  text=%s\n", string));
 		adt_write_text(event->ae_event_handle, string, format);
@@ -783,10 +798,11 @@ adt_to_text(datadef *def, void *p_data, int required,
 					adt_write_text(event->ae_event_handle,
 					    string, format);
 			}
-		} else if (required)
+		} else if (required) {
 			adt_write_text(event->ae_event_handle, empty, format);
-		else
+		} else {
 			break;
+		}
 		break;
 	default:
 		if (!have_syslogged) { /* don't flood the log */
@@ -798,6 +814,10 @@ adt_to_text(datadef *def, void *p_data, int required,
 	}
 	DFLUSH
 }
+
+/*
+ * AUT_UAUTH
+ */
 
 /* ARGSUSED */
 static void
@@ -811,14 +831,19 @@ adt_to_uauth(datadef *def, void *p_data, int required,
 	string = ((union convert *)p_data)->tcharstar;
 
 	if (string == NULL) {
-		if (required)
+		if (required) {
 			string = empty;
-		else
+		} else {
 			return;
+		}
 	}
 	DPRINTF(("  text=%s\n", string));
 	(void) au_write(event->ae_event_handle, au_to_uauth(string));
 }
+
+/*
+ * AUT_ZONENAME
+ */
 
 /* ARGSUSED */
 static void
@@ -834,33 +859,77 @@ adt_to_zonename(datadef *def, void *p_data, int required,
 		(void) au_write(event->ae_event_handle, au_to_zonename(name));
 	} else {
 		DPRINTF(("  Null name\n"));
-		if (required)
+		if (required) {
 			(void) au_write(event->ae_event_handle,
 			    au_to_zonename(empty));
+		}
+	}
+}
+
+/*
+ * ADT_IN_PEER dummy token
+ */
+
+/* ARGSUSED */
+static void
+adt_to_in_peer(datadef *def, void *p_data, int required,
+    struct adt_event_state *event, char *notUsed)
+{
+	int	sock;
+	struct sockaddr_in6 peer;
+	int	peerlen = sizeof (peer);
+
+	DPRINTF(("    adt_to_in_peer dd_datatype=%d\n", def->dd_datatype));
+
+	sock = ((union convert *)p_data)->tint;
+
+	if (sock < 0) {
+		DPRINTF(("  Socket fd %d\n", sock));
+		return;
+	}
+	if (getpeername(sock, (struct sockaddr *)&peer, (socklen_t *)&peerlen)
+	    < 0) {
+
+		adt_write_syslog("adt_to_in_addr getpeername", errno);
+	}
+	if (peer.sin6_family == AF_INET6) {
+		(void) au_write(event->ae_event_handle,
+		    au_to_in_addr_ex(&(peer.sin6_addr)));
+		(void) au_write(event->ae_event_handle,
+		    au_to_iport((ushort_t)peer.sin6_port));
+	} else {
+		(void) au_write(event->ae_event_handle,
+		    au_to_in_addr(&(((struct sockaddr_in *)&peer)->sin_addr)));
+		(void) au_write(event->ae_event_handle,
+		    au_to_iport(
+		    (ushort_t)(((struct sockaddr_in *)&peer)->sin_port)));
 	}
 }
 
 
 /*
- * no function for header -- the header is generated by au_close()
- *
- * no function for trailer -- the trailer is generated by au_close()
+ *	This is a compact table that defines only the tokens that are
+ * actually generated in the adt.xml file.  It can't be a  pure
+ * indexed table because the adt.xml language defines internal extension
+ * tokens for some processing.  VIZ. ADT_CMD_ALT, ADT_AUT_PRIV_* (see
+ * adt_xlate.h), and the -AUT_PATH value.
  */
 
-#define	MAX_TOKEN_JMP 17
+#define	MAX_TOKEN_JMP 18
 
 static struct token_jmp token_table[MAX_TOKEN_JMP] =
 {
 	{AUT_CMD, adt_to_cmd},
 	{ADT_CMD_ALT, adt_to_cmd1},
+	{AUT_FMRI, adt_to_frmi},
+	{ADT_IN_PEER, adt_to_in_peer},
+	{AUT_LABEL, adt_to_label},
+	{AUT_NEWGROUPS, adt_to_newgroups},
+	{AUT_PATH, adt_to_path},
+	{-AUT_PATH, adt_to_pathlist},	/* private extension of token values */
 	{ADT_AUT_PRIV_L, adt_to_priv_limit},
 	{ADT_AUT_PRIV_I, adt_to_priv_inherit},
 	{ADT_AUT_PRIV_E, adt_to_priv_effective},
-	{AUT_NEWGROUPS, adt_to_newgroups},
-	{AUT_FMRI, adt_to_frmi},
-	{AUT_LABEL, adt_to_label},
-	{AUT_PATH, adt_to_path},
-	{-AUT_PATH, adt_to_pathlist},	/* private extension of token values */
 	{AUT_PROCESS, adt_to_process},
 	{AUT_RETURN, adt_to_return},
 	{AUT_SUBJECT, adt_to_subject},
@@ -869,26 +938,34 @@ static struct token_jmp token_table[MAX_TOKEN_JMP] =
 	{AUT_UAUTH, adt_to_uauth},
 	{AUT_ZONENAME, adt_to_zonename}
 };
+
 /*
- * {AUT_ARG, adt_to_arg},		   not used
- * {AUT_ACL, adt_to_acl},                  not used
- * {AUT_ARBITRARY, adt_to_arbitrary},      AUT_ARBITRARY is undefined
- * {AUT_ATTR, adt_to_attr},		   not used in mountd
- * {AUT_EXEC_ARGS, adt_to_exec_args},      not used
- * {AUT_EXEC_ENV, adt_to_exec_env},        not used
- * {AUT_EXIT, adt_to_exit},		   obsolete
- * {AUT_FILE, adt_to_file},                AUT_FILE is undefined
- * {AUT_GROUPS, adt_to_groups},            obsolete
- * {AUT_HEADER, adt_to_header}             not used
- * {AUT_IN_ADDR, adt_to_in_addr},	   not used
- * {AUT_IP, adt_to_ip},			   not used
- * {AUT_IPC, adt_to_ipc},                  not used
- * {AUT_IPC_PERM, adt_to_ipc_perm},        not used
- * {AUT_OPAQUE, adt_to_opaque},            not used
- * {AUT_SEQ, adt_to_seq},                  not used
- * {AUT_SOCKET, adt_to_socket},            not used
- * {AUT_SOCKET_INET, adt_to_socket_inet},  AUT_SOCKET_INET is undefined
- * {AUT_TRAILER, adt_to_trailer}           not used
+ *	{AUT_ACL, adt_to_acl},			not used
+ *	{AUT_ARBITRARY, adt_to_arbitrary},	AUT_ARBITRARY is undefined
+ *	{AUT_ARG, adt_to_arg},			not used
+ *	{AUT_ATTR, adt_to_attr},		not used in mountd
+ *	{AUT_XATOM, adt_to_atom},		not used
+ *	{AUT_EXEC_ARGS, adt_to_exec_args},	not used
+ *	{AUT_EXEC_ENV, adt_to_exec_env},	not used
+ *	{AUT_EXIT, adt_to_exit},		obsolete
+ *	{AUT_FILE, adt_to_file},		AUT_FILE is undefined
+ *	{AUT_XCOLORMAP, adt_to_colormap},	not used
+ *	{AUT_XCURSOR, adt_to_cursor},		not used
+ *	{AUT_XFONT, adt_to_font},		not used
+ *	{AUT_XGC, adt_to_gc},			not used
+ *	{AUT_GROUPS, adt_to_groups},		obsolete
+ *	{AUT_HEADER, adt_to_header},		generated by au_close
+ *	{AUT_IP, adt_to_ip},			not used
+ *	{AUT_IPC, adt_to_ipc},			not used
+ *	{AUT_IPC_PERM, adt_to_ipc_perm},	not used
+ *	{AUT_OPAQUE, adt_to_opaque},		not used
+ *	{AUT_XPIXMAP, adt_to_pixmap},		not used
+ *	{AUT_XPROPERTY, adt_to_property},	not used
+ *	{AUT_SEQ, adt_to_seq},			not used
+ *	{AUT_SOCKET, adt_to_socket},		not used
+ *	{AUT_SOCKET_INET, adt_to_socket_inet},  AUT_SOCKET_INET is undefined
+ *	{AUT_TRAILER, adt_to_trailer},		generated by au_close
+ *	{AUT_XCLIENT, adt_to_xclient}		not used
  */
 
 /* find function to generate token */

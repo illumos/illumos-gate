@@ -907,7 +907,7 @@ au_to_opaque(char *opaque, short bytes)
 /*
  * au_to_in_addr
  * return s:
- *	pointer to a internet address token
+ *	pointer to an internet address token
  */
 token_t *
 au_to_in_addr(struct in_addr *internet_addr)
@@ -916,12 +916,36 @@ au_to_in_addr(struct in_addr *internet_addr)
 	adr_t adr;			/* adr memory stream header */
 	char data_header = AUT_IN_ADDR;	/* header for this token */
 
-	token = get_token(sizeof (char) + sizeof (uint32_t));
+	token = get_token(sizeof (char) + sizeof (struct in_addr));
 	if (token == NULL)
 		return (NULL);
 	adr_start(&adr, token->tt_data);
 	adr_char(&adr, &data_header, 1);
-	adr_int32(&adr, (int32_t *)internet_addr, 1);
+	adr_char(&adr, (char *)internet_addr, sizeof (struct in_addr));
+
+	return (token);
+}
+
+/*
+ * au_to_in_addr_ex
+ * return s:
+ *	pointer to an internet extended token
+ */
+token_t *
+au_to_in_addr_ex(struct in6_addr *addr)
+{
+	token_t *token;
+	adr_t adr;
+	char data_header = AUT_IN_ADDR_EX;
+
+	if ((token = get_token(sizeof (char) + sizeof (struct in6_addr)))
+	    == NULL) {
+		return (NULL);
+	}
+
+	adr_start(&adr, token->tt_data);
+	adr_char(&adr, &data_header, 1);
+	adr_char(&adr, (char *)addr, sizeof (struct in6_addr));
 
 	return (token);
 }

@@ -254,6 +254,7 @@ SUNWprivate_1.1 {
 	au_to_fmri;
 	au_to_header;
 	au_to_header_ex;
+	au_to_in_addr_ex;
 	au_to_label;
 	au_to_mylabel;
 	au_to_privset;

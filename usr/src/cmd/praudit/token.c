@@ -717,7 +717,7 @@ collapse_path(char *s)
 			if (id > 0)
 				id--;
 			while (id > 0 && s[--id] != '/')
-				;
+				continue;
 			id++;
 			continue;
 		}
@@ -727,12 +727,12 @@ collapse_path(char *s)
 			if (id > 0)
 				id--;
 			while (id > 0 && s[--id] != '/')
-				;
+				continue;
 			id++;
 			continue;
 		}
 		while (is < ls && (s[id++] = s[is++]) != '/')
-			;
+			continue;
 		is--;
 	}
 	return (s);
@@ -1072,7 +1072,7 @@ return_value32_token(pr_context_t *context)
 			    context, &value, 1)) != 0)
 				return (returnstat);
 
-			pa_retval(value, pb, sizeof (pb));
+			pa_retval(number, value, pb, sizeof (pb));
 		} else {
 			uval.uvaltype = PRA_INT32;
 			if ((char)number == -1)
@@ -1177,7 +1177,7 @@ return_value64_token(pr_context_t *context)
 			if ((returnstat = pr_adr_int64(context,
 			    &rval.r_vals, 1)) != 0)
 				return (returnstat);
-			pa_retval(rval.r_val1, pb, sizeof (pb));
+			pa_retval(number, rval.r_val1, pb, sizeof (pb));
 		} else {
 			uval.uvaltype = PRA_INT32;
 			if ((char)number == -1)
@@ -1596,13 +1596,13 @@ ip_token(pr_context_t *context)
  *
  * Format of ip port token:
  *	ip port address token id	adr_char
- *	port address			adr_short (in hex)
+ *	port address			adr_short (in_port_t == uint16_t)
  * -----------------------------------------------------------------------
  */
 int
 iport_token(pr_context_t *context)
 {
-	return (pa_adr_shorthex(context, 0, 1));
+	return (pa_adr_u_short(context, 0, 1));
 }
 
 /*
@@ -1888,7 +1888,7 @@ string_token_common(pr_context_t *context, int tag)
 	}
 
 	if (num == 0)
-		return (0);
+		return (do_newline(context, 1));
 
 	for (; num > 1; num--) {
 		if ((returnstat = (process_tag(context, tag,

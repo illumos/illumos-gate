@@ -227,7 +227,7 @@ extern int	pa_liaison(pr_context_t *context, int status, int flag);
 extern int	pa_xgeneric(pr_context_t *context);
 extern int	pa_xid(pr_context_t *context, int status, int flag);
 extern void	pa_error(const uchar_t err, char *buf, size_t buflen);
-extern void	pa_retval(const int32_t value, char *buf, size_t buflen);
+extern void	pa_retval(const uchar_t, const int32_t, char *, size_t);
 extern int	pa_ip_addr(pr_context_t *context, int status, int flag);
 extern int	pr_adr_char(pr_context_t *context, char *cp, int count);
 extern int	pr_adr_short(pr_context_t *context, short *sp, int count);

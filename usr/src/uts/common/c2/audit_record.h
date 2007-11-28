@@ -719,7 +719,7 @@ extern token_t *au_to_newgroups(int, gid_t *);
 extern token_t *au_to_header(au_event_t, au_emod_t);
 extern token_t *au_to_header_ex(au_event_t, au_emod_t);
 extern token_t *au_to_in_addr(struct in_addr *);
-extern token_t *au_to_in_addr_ex(int32_t *);
+extern token_t *au_to_in_addr_ex(struct in6_addr *);
 extern token_t *au_to_ipc(char, int);
 extern token_t *au_to_ipc_perm(struct ipc_perm *);
 extern token_t *au_to_iport(ushort_t);

@@ -70,6 +70,7 @@ extern "C" {
 #define	ADT_AUT_PRIV_E	-102	/* effective set */
 /* dummy token type for alternate command */
 #define	ADT_CMD_ALT	-103
+#define	ADT_IN_PEER	-104	/* peer address in_addr and in_port */
 
 enum adt_generic {ADT_GENERIC}; /* base for text enums */
 

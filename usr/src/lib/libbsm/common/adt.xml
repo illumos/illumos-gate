@@ -1347,7 +1347,8 @@ Use is subject to license terms.
     </token>
     <token id="groups">
     </token>
-    <token id="in_addr">
+    <!-- pseudo token; in_addr and in_port of peer -->
+    <token id="in_peer">
     </token>
     <token id="ipc">
     </token>

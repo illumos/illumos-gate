@@ -2610,9 +2610,9 @@ do_mtime64(pr_context_t *context, int status, int flag, uint64_t scale)
 void
 pa_error(const uchar_t err, char *buf, size_t buflen)
 {
-	if (err == 0) {
+	if (err == ADT_SUCCESS) {
 		(void) strlcpy(buf, gettext("success"), buflen);
-	} else if ((char)err == -1) {
+	} else if ((char)err == ADT_FAILURE) {
 		(void) strlcpy(buf, gettext("failure"), buflen);
 	} else {
 		char *emsg = strerror(err);
@@ -2636,7 +2636,7 @@ pa_error(const uchar_t err, char *buf, size_t buflen)
  * -----------------------------------------------------------------------
  */
 void
-pa_retval(const int32_t retval, char *buf, size_t buflen)
+pa_retval(const uchar_t err, const int32_t retval, char *buf, size_t buflen)
 {
 	struct msg_text	*msglist = &adt_msg_text[ADT_LIST_FAIL_VALUE];
 
@@ -2647,11 +2647,20 @@ pa_retval(const int32_t retval, char *buf, size_t buflen)
 		    gettext(msglist->ml_msg_list[retval + msglist->ml_offset]),
 		    buflen);
 	} else if ((retval >= ADT_FAIL_PAM) &&
-	    (retval < ADT_FAIL_PAM + PAM_TOTAL_ERRNUM))
+	    (retval < ADT_FAIL_PAM + PAM_TOTAL_ERRNUM)) {
 		(void) strlcpy(buf, pam_strerror(NULL, retval - ADT_FAIL_PAM),
 		    buflen);
-	else
+	} else if ((char)err == ADT_FAILURE) {
+		char *emsg = strerror(retval);
+
+		if (emsg != NULL) {
+			(void) strlcpy(buf, emsg, buflen);
+		} else {
+			(void) snprintf(buf, buflen, "%d", retval);
+		}
+	} else {
 		(void) snprintf(buf, buflen, "%d", retval);
+	}
 }
 
 
