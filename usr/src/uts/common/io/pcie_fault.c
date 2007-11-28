@@ -67,12 +67,12 @@ uint_t pf_dq_size = 32;
 #define	PF_DATA_NOT_FOUND -1
 
 #define	HAS_AER_LOGS(pf_data_p, bit)	\
-	(pf_data_p->aer_off && (bit & (pf_data_p->aer_control & \
-	PCIE_AER_CTL_FST_ERR_PTR_MASK)))
+	(pf_data_p->aer_off && (bit & (1 << (pf_data_p->aer_control & \
+	PCIE_AER_CTL_FST_ERR_PTR_MASK))))
 
 #define	HAS_SAER_LOGS(pf_data_p, bit)	\
-	(pf_data_p->aer_off && (bit & (pf_data_p->s_aer_control & \
-	PCIE_AER_SCTL_FST_ERR_PTR_MASK)))
+	(pf_data_p->aer_off && (bit & (1 << (pf_data_p->s_aer_control & \
+	PCIE_AER_SCTL_FST_ERR_PTR_MASK))))
 
 #define	GET_SAER_CMD(pf_data_p)	\
 	(pf_data_p->s_aer_h1 >> PCIE_AER_SUCE_HDR_CMD_LWR_SHIFT) & \
