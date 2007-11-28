@@ -344,7 +344,7 @@ _aiorw(int fd, caddr_t buf, int bufsz, offset_t offset, int whence,
 	aio_req_t *reqp;
 	aio_args_t *ap;
 	offset_t loffset;
-	struct stat stat;
+	struct stat64 stat64;
 	int error = 0;
 	int kerr;
 	int umode;
@@ -361,10 +361,10 @@ _aiorw(int fd, caddr_t buf, int bufsz, offset_t offset, int whence,
 			loffset += offset;
 		break;
 	case SEEK_END:
-		if (fstat(fd, &stat) == -1)
+		if (fstat64(fd, &stat64) == -1)
 			error = -1;
 		else
-			loffset = offset + stat.st_size;
+			loffset = offset + stat64.st_size;
 		break;
 	default:
 		errno = EINVAL;
@@ -396,13 +396,14 @@ _aiorw(int fd, caddr_t buf, int bufsz, offset_t offset, int whence,
 		resultp->aio_errno = 0;
 		sig_mutex_lock(&__aio_mutex);
 		_kaio_outstand_cnt++;
+		sig_mutex_unlock(&__aio_mutex);
 		kerr = (int)_kaio(((resultp->aio_return == AIO_INPROGRESS) ?
 		    (umode | AIO_POLL_BIT) : umode),
 		    fd, buf, bufsz, loffset, resultp);
 		if (kerr == 0) {
-			sig_mutex_unlock(&__aio_mutex);
 			return (0);
 		}
+		sig_mutex_lock(&__aio_mutex);
 		_kaio_outstand_cnt--;
 		sig_mutex_unlock(&__aio_mutex);
 		if (errno != ENOTSUP && errno != EBADFD)
