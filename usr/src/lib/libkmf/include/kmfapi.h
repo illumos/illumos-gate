@@ -245,7 +245,7 @@ extern KMF_RETURN kmf_build_pk12(KMF_HANDLE_T, int, KMF_X509_DER_CERT *,
 	int, KMF_KEY_HANDLE *, KMF_CREDENTIAL *, char *);
 
 extern KMF_RETURN kmf_import_objects(KMF_HANDLE_T, char *, KMF_CREDENTIAL *,
-	KMF_DATA **, int *, KMF_RAW_KEY_DATA **, int *);
+	KMF_X509_DER_CERT **, int *, KMF_RAW_KEY_DATA **, int *);
 
 /*
  * OCSP operations

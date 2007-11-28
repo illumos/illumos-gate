@@ -89,7 +89,8 @@ usage_create(boolean_t do_print)
  */
 static kssl_params_t *
 kmf_to_kssl(int nxkey, KMF_RAW_KEY_DATA *rsa, int ncerts,
-	KMF_DATA *certs, int *paramsize, char *token_label, KMF_DATA *idstr,
+	KMF_X509_DER_CERT *certs, int *paramsize,
+	char *token_label, KMF_DATA *idstr,
 	KMF_CREDENTIAL *creds)
 {
 	int i, tcsize;
@@ -128,7 +129,7 @@ kmf_to_kssl(int nxkey, KMF_RAW_KEY_DATA *rsa, int ncerts,
 	}
 	tcsize = 0;
 	for (i = 0; i < ncerts; i++)
-		tcsize += certs[i].Length;
+		tcsize += certs[i].certificate.Length;
 
 	bufsize = sizeof (kssl_params_t);
 	bufsize += (tcsize + (MAX_CHAIN_LENGTH * sizeof (uint32_t)));
@@ -271,7 +272,7 @@ kmf_to_kssl(int nxkey, KMF_RAW_KEY_DATA *rsa, int ncerts,
 
 	/* First, an array of certificate sizes */
 	for (i = 0; i < ncerts; i++) {
-		uint32_t certsz = (uint32_t)certs[i].Length;
+		uint32_t certsz = (uint32_t)certs[i].certificate.Length;
 		char *p = buf + (i * sizeof (uint32_t));
 		bcopy(&certsz, p, sizeof (uint32_t));
 	}
@@ -283,8 +284,9 @@ kmf_to_kssl(int nxkey, KMF_RAW_KEY_DATA *rsa, int ncerts,
 
 	/* Now add the certificate data (ASN.1 DER encoded) */
 	for (i = 0; i < ncerts; i++) {
-		bcopy(certs[i].Data, buf, certs[i].Length);
-		buf += certs[i].Length;
+		bcopy(certs[i].certificate.Data, buf,
+		    certs[i].certificate.Length);
+		buf += certs[i].certificate.Length;
 	}
 
 	*paramsize = bufsize;
@@ -571,11 +573,11 @@ out:
 }
 
 static kssl_params_t *
-load_from_pkcs11(const char *token_label, const char *password_file,
+load_from_pkcs11(KMF_HANDLE_T kmfh,
+    const char *token_label, const char *password_file,
     const char *certname, int *bufsize)
 {
 	KMF_RETURN rv;
-	KMF_HANDLE_T kmfh;
 	KMF_X509_DER_CERT cert;
 	KMF_KEY_HANDLE key, rawkey;
 	KMF_CREDENTIAL creds;
@@ -593,11 +595,6 @@ load_from_pkcs11(const char *token_label, const char *password_file,
 	boolean_t false = B_FALSE;
 	boolean_t true = B_TRUE;
 
-	rv = kmf_initialize(&kmfh, NULL, NULL);
-	if (rv != KMF_OK) {
-		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
-		return (0);
-	}
 	if (get_passphrase(password_file, password_buf,
 	    sizeof (password_buf)) <= 0) {
 		perror("Unable to read passphrase");
@@ -745,8 +742,7 @@ load_from_pkcs11(const char *token_label, const char *password_file,
 
 	if (rv == KMF_OK)
 		kssl_params = kmf_to_kssl(nxkey, (KMF_RAW_KEY_DATA *)key.keyp,
-		    1, &cert.certificate, bufsize,
-		    (char *)token_label, &iddata, &creds);
+		    1, &cert, bufsize, (char *)token_label, &iddata, &creds);
 done:
 	if (ncerts != 0)
 		kmf_free_kmf_cert(kmfh, &cert);
@@ -754,9 +750,6 @@ done:
 		kmf_free_kmf_key(kmfh, &key);
 	if (idstr)
 		free(idstr);
-
-	if (kmfh != NULL)
-		(void) kmf_finalize(kmfh);
 
 	return (kssl_params);
 }
@@ -767,7 +760,8 @@ done:
  * Load a chain of certificates from a PEM file.
  */
 static kssl_params_t *
-add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
+add_cacerts(KMF_HANDLE_T kmfh,
+	kssl_params_t *old_params, const char *cacert_chain_file)
 {
 	int i, newlen;
 	uint32_t certlen = 0, ncerts;
@@ -775,7 +769,6 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
 	KMF_RETURN rv;
 	KMF_X509_DER_CERT *certs = NULL;
 	kssl_params_t *kssl_params;
-	KMF_HANDLE_T kmfh;
 	char *err = NULL;
 	int numattr = 0;
 	KMF_ATTRIBUTE attrlist[16];
@@ -783,11 +776,6 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
 
 	kstype = KMF_KEYSTORE_OPENSSL;
 
-	rv = kmf_initialize(&kmfh, NULL, NULL);
-	if (rv != KMF_OK) {
-		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
-		return (0);
-	}
 	ncerts = 0;
 	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYSTORE_TYPE_ATTR,
 	    &kstype, sizeof (KMF_KEYSTORE_TYPE));
@@ -804,14 +792,12 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
 	rv = kmf_find_cert(kmfh, numattr, attrlist);
 	if (rv != KMF_OK) {
 		REPORT_KMF_ERROR(rv, "Error finding CA certificates", err);
-		(void) KMF_Finalize(kmfh);
 		return (0);
 	}
 	certs = (KMF_X509_DER_CERT *)malloc(ncerts *
 	    sizeof (KMF_X509_DER_CERT));
 	if (certs == NULL) {
 		(void) fprintf(stderr, "memory allocation error.\n");
-		(void) KMF_Finalize(kmfh);
 		return (NULL);
 	}
 	bzero(certs, ncerts * sizeof (KMF_X509_DER_CERT));
@@ -821,8 +807,6 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
 	    certs, (ncerts * sizeof (KMF_X509_DER_CERT)));
 	numattr++;
 	rv = kmf_find_cert(kmfh, numattr, attrlist);
-
-	(void) kmf_finalize(kmfh);
 
 	if (rv != KMF_OK || ncerts == 0) {
 		bzero(old_params, old_params->kssl_params_size);
@@ -881,15 +865,16 @@ add_cacerts(kssl_params_t *old_params, const char *cacert_chain_file)
  * Find a key and certificate(s) from a single PEM file.
  */
 static kssl_params_t *
-load_from_pem(const char *filename, const char *password_file, int *paramsize)
+load_from_pem(KMF_HANDLE_T kmfh, const char *filename,
+	const char *password_file, int *paramsize)
 {
 	int ncerts = 0, i;
 	kssl_params_t *kssl_params;
 	KMF_RAW_KEY_DATA *rsa = NULL;
-	KMF_DATA *certs = NULL;
+	KMF_X509_DER_CERT *certs = NULL;
 
-	ncerts = PEM_get_rsa_key_certs(filename, (char *)password_file,
-	    &rsa, &certs);
+	ncerts = PEM_get_rsa_key_certs(kmfh,
+	    filename, (char *)password_file, &rsa, &certs);
 	if (rsa == NULL || certs == NULL || ncerts == 0) {
 		return (NULL);
 	}
@@ -901,7 +886,7 @@ load_from_pem(const char *filename, const char *password_file, int *paramsize)
 	    NULL, NULL);
 
 	for (i = 0; i < ncerts; i++)
-		kmf_free_data(&certs[i]);
+		kmf_free_kmf_cert(kmfh, &certs[i]);
 	free(certs);
 	kmf_free_raw_key(rsa);
 
@@ -912,15 +897,15 @@ load_from_pem(const char *filename, const char *password_file, int *paramsize)
  * Load a raw key and certificate(s) from a PKCS#12 file.
  */
 static kssl_params_t *
-load_from_pkcs12(const char *filename, const char *password_file,
-    int *paramsize)
+load_from_pkcs12(KMF_HANDLE_T kmfh, const char *filename,
+    const char *password_file, int *paramsize)
 {
 	KMF_RAW_KEY_DATA *rsa = NULL;
 	kssl_params_t *kssl_params;
-	KMF_DATA *certs = NULL;
+	KMF_X509_DER_CERT *certs = NULL;
 	int ncerts = 0, i;
 
-	ncerts = PKCS12_get_rsa_key_certs(filename,
+	ncerts = PKCS12_get_rsa_key_certs(kmfh, filename,
 	    password_file, &rsa, &certs);
 
 	if (certs == NULL || ncerts == 0) {
@@ -936,7 +921,7 @@ load_from_pkcs12(const char *filename, const char *password_file,
 	    NULL, NULL);
 
 	for (i = 0; i < ncerts; i++)
-		kmf_free_data(&certs[i]);
+		kmf_free_kmf_cert(kmfh, &certs[i]);
 	free(certs);
 
 	kmf_free_raw_key(rsa);
@@ -1057,6 +1042,9 @@ do_create(int argc, char *argv[])
 	int pcnt;
 	kssl_params_t *kssl_params;
 	int bufsize;
+	KMF_HANDLE_T kmfh = NULL;
+	KMF_RETURN rv = KMF_OK;
+	char *err = NULL;
 
 	argc -= 1;
 	argv += 1;
@@ -1135,6 +1123,12 @@ do_create(int argc, char *argv[])
 		goto err;
 	}
 
+	rv = kmf_initialize(&kmfh, NULL, NULL);
+	if (rv != KMF_OK) {
+		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
+		return (0);
+	}
+
 	if (strcmp(format, "pkcs11") == 0) {
 		if (token_label == NULL || certname == NULL) {
 			goto err;
@@ -1147,19 +1141,19 @@ do_create(int argc, char *argv[])
 				    getenv("SOFTTOKEN_DIR"));
 			}
 		}
-		kssl_params = load_from_pkcs11(
+		kssl_params = load_from_pkcs11(kmfh,
 		    token_label, password_file, certname, &bufsize);
 	} else if (strcmp(format, "pkcs12") == 0) {
 		if (cert_key_file == NULL) {
 			goto err;
 		}
-		kssl_params = load_from_pkcs12(
+		kssl_params = load_from_pkcs12(kmfh,
 		    cert_key_file, password_file, &bufsize);
 	} else if (strcmp(format, "pem") == 0) {
 		if (cert_key_file == NULL) {
 			goto err;
 		}
-		kssl_params = load_from_pem(
+		kssl_params = load_from_pem(kmfh,
 		    cert_key_file, password_file, &bufsize);
 	} else {
 		(void) fprintf(stderr, "Unsupported cert format: %s\n", format);
@@ -1167,6 +1161,7 @@ do_create(int argc, char *argv[])
 	}
 
 	if (kssl_params == NULL) {
+		(void) kmf_finalize(kmfh);
 		return (FAILURE);
 	}
 
@@ -1182,8 +1177,11 @@ do_create(int argc, char *argv[])
 	kssl_params->kssl_session_cache_size = scache_size;
 
 	if (cacert_chain_file != NULL) {
-		kssl_params = add_cacerts(kssl_params, cacert_chain_file);
+		kssl_params = add_cacerts(kmfh, kssl_params, cacert_chain_file);
 		if (kssl_params == NULL) {
+			bzero(kssl_params, bufsize);
+			free(kssl_params);
+			(void) kmf_finalize(kmfh);
 			return (FAILURE);
 		}
 	}
@@ -1195,6 +1193,9 @@ do_create(int argc, char *argv[])
 			err = kssl_params->kssl_token.ck_rv;
 		(void) fprintf(stderr,
 		    "Error loading cert and key: 0x%x\n", err);
+		bzero(kssl_params, bufsize);
+		free(kssl_params);
+		(void) kmf_finalize(kmfh);
 		return (FAILURE);
 	}
 
@@ -1203,9 +1204,11 @@ do_create(int argc, char *argv[])
 
 	bzero(kssl_params, bufsize);
 	free(kssl_params);
+	(void) kmf_finalize(kmfh);
 	return (SUCCESS);
 
 err:
 	usage_create(B_TRUE);
+	(void) kmf_finalize(kmfh);
 	return (SMF_EXIT_ERR_CONFIG);
 }

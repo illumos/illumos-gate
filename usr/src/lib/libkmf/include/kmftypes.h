@@ -201,8 +201,9 @@ typedef struct {
 		KMF_RAW_DSA_KEY	dsa;
 		KMF_RAW_SYM_KEY	sym;
 	}rawdata;
+	char *label;
+	KMF_DATA id;
 } KMF_RAW_KEY_DATA;
-
 
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;

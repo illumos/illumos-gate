@@ -2680,13 +2680,13 @@ kmf_build_pk12(KMF_HANDLE_T handle, int numcerts,
 KMF_RETURN
 kmf_import_objects(KMF_HANDLE_T handle, char *filename,
 	KMF_CREDENTIAL *cred,
-	KMF_DATA **certs, int *ncerts,
+	KMF_X509_DER_CERT **certs, int *ncerts,
 	KMF_RAW_KEY_DATA **rawkeys, int *nkeys)
 {
 	KMF_RETURN rv;
 	KMF_PLUGIN *plugin;
 	KMF_RETURN (*import_objects)(KMF_HANDLE *, char *, KMF_CREDENTIAL *,
-	    KMF_DATA **, int *, KMF_RAW_KEY_DATA **, int *);
+	    KMF_X509_DER_CERT **, int *, KMF_RAW_KEY_DATA **, int *);
 
 	CLEAR_ERROR(handle, rv);
 	if (rv != KMF_OK)

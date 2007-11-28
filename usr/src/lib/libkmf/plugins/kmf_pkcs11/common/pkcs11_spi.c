@@ -2889,6 +2889,13 @@ store_raw_key(KMF_HANDLE_T handle,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	keylabel = kmf_get_attr_ptr(KMF_KEYLABEL_ATTR, attrlist, numattr);
+	/*
+	 * If the caller did not specify a label, see if the raw key
+	 * came with one (possible if it came from a PKCS#12 file).
+	 */
+	if (keylabel == NULL) {
+		keylabel = rawkey->label;
+	}
 
 	i = 0;
 	SETATTR(templ, i, CKA_CLASS, &oClass, sizeof (CK_OBJECT_CLASS)); i++;
@@ -2923,12 +2930,14 @@ store_raw_key(KMF_HANDLE_T handle,
 			goto cleanup;
 		}
 		start = convertDate(notbefore);
+		free(notbefore);
 
 		rv = kmf_get_cert_end_date_str(handle, cert, &notafter);
 		if (rv != KMF_OK) {
 			goto cleanup;
 		}
 		end = convertDate(notafter);
+		free(notafter);
 		if (id.Data != NULL && id.Data != NULL && id.Length > 0) {
 			SETATTR(templ, i, CKA_ID, id.Data, id.Length);
 			i++;
@@ -2988,6 +2997,11 @@ store_raw_key(KMF_HANDLE_T handle,
 
 	if (keylabel != NULL) {
 		SETATTR(templ, i, CKA_LABEL, keylabel, strlen(keylabel));
+		i++;
+	}
+	if (id.Data == NULL && rawkey->id.Data != NULL) {
+		SETATTR(templ, i, CKA_ID, rawkey->id.Data,
+		    rawkey->id.Length);
 		i++;
 	}
 	if (keytype == CKK_RSA) {
@@ -3070,6 +3084,10 @@ store_raw_key(KMF_HANDLE_T handle,
 			rv = KMF_ERR_INTERNAL;
 	}
 cleanup:
+	if (start != NULL)
+		free(start);
+	if (end != NULL)
+		free(end);
 	kmf_free_data(&id);
 	kmf_free_data(&subject);
 	kmf_free_signed_cert(x509);

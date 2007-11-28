@@ -39,23 +39,17 @@
  * in plaintext in the given "password_file" parameter.
  */
 int
-PKCS12_get_rsa_key_certs(const char *filename, const char *password_file,
-    KMF_RAW_KEY_DATA **rsa, KMF_DATA **certs)
+PKCS12_get_rsa_key_certs(KMF_HANDLE_T kmfh,
+    const char *filename, const char *password_file,
+    KMF_RAW_KEY_DATA **rsa, KMF_X509_DER_CERT **certs)
 {
 	char password_buf[1024];
-	KMF_HANDLE_T kmfh;
 	KMF_RETURN rv = KMF_OK;
 	KMF_CREDENTIAL pk12cred;
-	KMF_DATA *tcerts;
+	KMF_X509_DER_CERT *tcerts;
 	KMF_RAW_KEY_DATA *keys;
 	int ncerts, nkeys;
 	char *err = NULL;
-
-	rv = kmf_initialize(&kmfh, NULL, NULL);
-	if (rv != KMF_OK) {
-		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
-		return (0);
-	}
 
 	tcerts = NULL;
 	keys = NULL;
@@ -81,7 +75,7 @@ done:
 		int i;
 		if (tcerts != NULL) {
 			for (i = 0; i < ncerts; i++)
-				kmf_free_data(&tcerts[i]);
+				kmf_free_kmf_cert(kmfh, &tcerts[i]);
 			free(tcerts);
 		}
 		tcerts = NULL;
@@ -96,8 +90,6 @@ done:
 	*certs = tcerts;
 	*rsa = keys;
 
-	(void) kmf_finalize(kmfh);
-
 	return (ncerts);
 }
 
@@ -107,23 +99,17 @@ done:
  * be present in the file.
  */
 int
-PEM_get_rsa_key_certs(const char *filename, char *password_file,
-    KMF_RAW_KEY_DATA **rsa, KMF_DATA **certs)
+PEM_get_rsa_key_certs(KMF_HANDLE_T kmfh,
+    const char *filename, char *password_file,
+    KMF_RAW_KEY_DATA **rsa, KMF_X509_DER_CERT **certs)
 {
-	KMF_HANDLE_T kmfh;
 	KMF_RETURN rv = KMF_OK;
 	KMF_CREDENTIAL creds;
-	KMF_DATA *tcerts;
+	KMF_X509_DER_CERT *tcerts;
 	KMF_RAW_KEY_DATA *keys;
 	int ncerts, nkeys;
 	char *err = NULL;
 	char password_buf[1024];
-
-	rv = kmf_initialize(&kmfh, NULL, NULL);
-	if (rv != KMF_OK) {
-		REPORT_KMF_ERROR(rv, "Error initializing KMF", err);
-		return (0);
-	}
 
 	tcerts = NULL;
 	keys = NULL;
@@ -149,7 +135,7 @@ done:
 		int i;
 		if (tcerts != NULL) {
 			for (i = 0; i < ncerts; i++)
-				kmf_free_data(&tcerts[i]);
+				kmf_free_kmf_cert(kmfh, &tcerts[i]);
 			free(tcerts);
 		}
 		tcerts = NULL;
@@ -165,8 +151,6 @@ done:
 		*certs = tcerts;
 	if (rsa != NULL)
 		*rsa = keys;
-
-	(void) kmf_finalize(kmfh);
 
 	return (ncerts);
 }

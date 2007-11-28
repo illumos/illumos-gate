@@ -1225,6 +1225,11 @@ kmf_free_raw_key(KMF_RAW_KEY_DATA *key)
 		free_raw_sym(&key->rawdata.sym);
 		break;
 	}
+	if (key->label) {
+		free(key->label);
+		key->label = NULL;
+	}
+	kmf_free_data(&key->id);
 }
 
 void

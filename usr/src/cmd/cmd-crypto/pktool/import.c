@@ -45,19 +45,29 @@
 
 #include <kmfapi.h>
 
+#define	NEW_ATTRLIST(a, n) \
+{ \
+	a = (KMF_ATTRIBUTE *)malloc(n * sizeof (KMF_ATTRIBUTE)); \
+	if (a == NULL) { \
+		rv = KMF_ERR_MEMORY; \
+		goto end; \
+	} \
+	(void) memset(a, 0, n * sizeof (KMF_ATTRIBUTE));  \
+}
+
 static KMF_RETURN
 pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 	char *outfile, char *certfile, char *keyfile,
 	char *dir, char *keydir, KMF_ENCODE_FORMAT outformat)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DATA *certs = NULL;
+	KMF_X509_DER_CERT *certs = NULL;
 	KMF_RAW_KEY_DATA *keys = NULL;
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
-	KMF_ATTRIBUTE attrlist[16];
+	KMF_ATTRIBUTE *attrlist = NULL;
 	int numattr = 0;
 
 	rv = kmf_import_objects(kmfhandle, outfile, cred,
@@ -70,6 +80,8 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 
 	if (rv == KMF_OK && ncerts > 0) {
 		char newcertfile[MAXPATHLEN];
+
+		NEW_ATTRLIST(attrlist,  (3 + (3 * ncerts)));
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
@@ -108,16 +120,25 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 				num++;
 			}
 
+			if (certs[i].kmf_private.label != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR,
+				    certs[i].kmf_private.label,
+				    strlen(certs[i].kmf_private.label));
+				num++;
+			}
 			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			    KMF_CERT_DATA_ATTR, &certs[i].certificate,
+			    sizeof (KMF_DATA));
 			num++;
 			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
+		free(attrlist);
 	}
 	if (rv == KMF_OK && nkeys > 0) {
 		char newkeyfile[MAXPATHLEN];
-
 		numattr = 0;
+		NEW_ATTRLIST(attrlist, (4 + (4 * nkeys)));
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
@@ -162,10 +183,12 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 				num++;
 			}
 
-			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i],
-			    sizeof (KMF_DATA));
-			num++;
+			if (i < ncerts) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_DATA_ATTR, &certs[i],
+				    sizeof (KMF_CERT_DATA_ATTR));
+				num++;
+			}
 
 			kmf_set_attr_at_index(attrlist, num,
 			    KMF_RAW_KEY_ATTR, &keys[i],
@@ -174,13 +197,15 @@ pk_import_pk12_files(KMF_HANDLE_T kmfhandle, KMF_CREDENTIAL *cred,
 
 			rv = kmf_store_key(kmfhandle, num, attrlist);
 		}
+		free(attrlist);
 	}
+end:
 	/*
 	 * Cleanup memory.
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			kmf_free_data(&certs[i]);
+			kmf_free_kmf_cert(kmfhandle, &certs[i]);
 		free(certs);
 	}
 	if (keys) {
@@ -202,13 +227,13 @@ pk_import_pk12_nss(
 	char *nickname, char *trustflags, char *filename)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DATA *certs = NULL;
+	KMF_X509_DER_CERT *certs = NULL;
 	KMF_RAW_KEY_DATA *keys = NULL;
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_NSS;
-	KMF_ATTRIBUTE attrlist[16];
+	KMF_ATTRIBUTE *attrlist = NULL;
 	int numattr = 0;
 
 	rv = configure_nss(kmfhandle, dir, prefix);
@@ -223,6 +248,8 @@ pk_import_pk12_nss(
 		    "key(s) in %s\n"), ncerts, nkeys, filename);
 
 	if (rv == KMF_OK) {
+		NEW_ATTRLIST(attrlist, (3 + (2 * ncerts)));
+
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
 		numattr++;
@@ -244,7 +271,13 @@ pk_import_pk12_nss(
 		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
 			int num = numattr;
 
-			if (i == 0 && nickname != NULL) {
+			if (certs[i].kmf_private.label != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR,
+				    certs[i].kmf_private.label,
+				    strlen(certs[i].kmf_private.label));
+				num++;
+			} else if (i == 0 && nickname != NULL) {
 				kmf_set_attr_at_index(attrlist, num,
 				    KMF_CERT_LABEL_ATTR, nickname,
 				    strlen(nickname));
@@ -252,10 +285,13 @@ pk_import_pk12_nss(
 			}
 
 			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			    KMF_CERT_DATA_ATTR,
+			    &certs[i].certificate, sizeof (KMF_DATA));
 			num++;
 			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
+		free(attrlist);
+		attrlist = NULL;
 		if (rv != KMF_OK) {
 			display_error(kmfhandle, rv,
 			    gettext("Error storing certificate in NSS token"));
@@ -264,6 +300,7 @@ pk_import_pk12_nss(
 
 	if (rv == KMF_OK) {
 		numattr = 0;
+		NEW_ATTRLIST(attrlist, (4 + (2 * nkeys)));
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
@@ -295,10 +332,12 @@ pk_import_pk12_nss(
 		for (i = 0; i < nkeys; i++) {
 			int num = numattr;
 
-			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i],
-			    sizeof (KMF_DATA));
-			num++;
+			if (i < ncerts) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_DATA_ATTR, &certs[i],
+				    sizeof (KMF_DATA));
+				num++;
+			}
 
 			kmf_set_attr_at_index(attrlist, num,
 			    KMF_RAW_KEY_ATTR, &keys[i],
@@ -307,14 +346,16 @@ pk_import_pk12_nss(
 
 			rv = kmf_store_key(kmfhandle, num, attrlist);
 		}
+		free(attrlist);
 	}
 
+end:
 	/*
 	 * Cleanup memory.
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			kmf_free_data(&certs[i]);
+			kmf_free_kmf_cert(kmfhandle, &certs[i]);
 		free(certs);
 	}
 	if (keys) {
@@ -455,13 +496,13 @@ pk_import_pk12_pk11(
 	char *filename)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DATA *certs = NULL;
+	KMF_X509_DER_CERT *certs = NULL;
 	KMF_RAW_KEY_DATA *keys = NULL;
 	int ncerts = 0;
 	int nkeys = 0;
 	int i;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
-	KMF_ATTRIBUTE attrlist[16];
+	KMF_ATTRIBUTE *attrlist = NULL;
 	int numattr = 0;
 
 	rv = select_token(kmfhandle, token_spec, FALSE);
@@ -474,6 +515,7 @@ pk_import_pk12_pk11(
 	    &certs, &ncerts, &keys, &nkeys);
 
 	if (rv == KMF_OK) {
+		NEW_ATTRLIST(attrlist, (3 + (2 * nkeys)));
 
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype,
@@ -498,10 +540,12 @@ pk_import_pk12_pk11(
 		for (i = 0; i < nkeys; i++) {
 			int num = numattr;
 
-			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i],
-			    sizeof (KMF_DATA));
-			num++;
+			if (i < ncerts) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_DATA_ATTR, &certs[i].certificate,
+				    sizeof (KMF_DATA));
+				num++;
+			}
 
 			kmf_set_attr_at_index(attrlist, num,
 			    KMF_RAW_KEY_ATTR, &keys[i],
@@ -511,40 +555,51 @@ pk_import_pk12_pk11(
 			rv = kmf_store_key(kmfhandle, num, attrlist);
 
 		}
+		free(attrlist);
 	}
 
 	if (rv == KMF_OK) {
+		numattr = 0;
+		NEW_ATTRLIST(attrlist, (1 + (2 * ncerts)));
 
 		(void) printf(gettext("Found %d certificate(s) and %d "
 		    "key(s) in %s\n"), ncerts, nkeys, filename);
-		numattr = 0;
+
 		kmf_set_attr_at_index(attrlist, numattr,
 		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
 		numattr++;
 
 		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
 			int num = numattr;
-
-			if (i == 0 && label != NULL) {
+			if (certs[i].kmf_private.label != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR,
+				    certs[i].kmf_private.label,
+				    strlen(certs[i].kmf_private.label));
+				num++;
+			} else if (i == 0 && label != NULL) {
 				kmf_set_attr_at_index(attrlist, num,
 				    KMF_CERT_LABEL_ATTR, label, strlen(label));
 				num++;
 			}
 
 			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR, &certs[i], sizeof (KMF_DATA));
+			    KMF_CERT_DATA_ATTR, &certs[i].certificate,
+			    sizeof (KMF_DATA));
 			num++;
 
 			rv = kmf_store_cert(kmfhandle, num, attrlist);
 		}
+		free(attrlist);
 	}
 
+end:
 	/*
 	 * Cleanup memory.
 	 */
 	if (certs) {
 		for (i = 0; i < ncerts; i++)
-			kmf_free_data(&certs[i]);
+			kmf_free_kmf_cert(kmfhandle, &certs[i]);
 		free(certs);
 	}
 	if (keys) {

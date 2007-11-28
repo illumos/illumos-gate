@@ -132,12 +132,35 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
 
 #define	SET_SYS_ERROR(h, c) h->lasterr.kstype = -1; h->lasterr.errcode = c;
 
+/*
+ * Declare some new macros for managing stacks of EVP_PKEYS, similar to
+ * what wanboot did.
+ */
+DECLARE_STACK_OF(EVP_PKEY)
+
+#define	sk_EVP_PKEY_new_null() SKM_sk_new_null(EVP_PKEY)
+#define	sk_EVP_PKEY_free(st) SKM_sk_free(EVP_PKEY, (st))
+#define	sk_EVP_PKEY_num(st) SKM_sk_num(EVP_PKEY, (st))
+#define	sk_EVP_PKEY_value(st, i) SKM_sk_value(EVP_PKEY, (st), (i))
+#define	sk_EVP_PKEY_push(st, val) SKM_sk_push(EVP_PKEY, (st), (val))
+#define	sk_EVP_PKEY_pop_free(st, free_func) SKM_sk_pop_free(EVP_PKEY, (st), \
+	(free_func))
+
 mutex_t init_lock = DEFAULTMUTEX;
 static int ssl_initialized = 0;
 static BIO *bio_err = NULL;
 
 static int
 test_for_file(char *, mode_t);
+static KMF_RETURN
+openssl_parse_bag(PKCS12_SAFEBAG *, char *, int,
+    STACK_OF(EVP_PKEY) *, STACK_OF(X509) *);
+
+static KMF_RETURN
+local_export_pk12(KMF_HANDLE_T, KMF_CREDENTIAL *, int, KMF_X509_DER_CERT *,
+    int, KMF_KEY_HANDLE *, char *);
+
+static KMF_RETURN set_pkey_attrib(EVP_PKEY *, ASN1_TYPE *, int);
 
 static KMF_RETURN
 extract_pem(KMF_HANDLE *, char *, char *, KMF_BIGINT *, char *,
@@ -1389,6 +1412,9 @@ ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
 	RSA *rsa;
 	DSA *dsa;
 
+	if (pkey == NULL || out == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	switch (format) {
 		case KMF_FORMAT_ASN1:
 			if (pkey->type == EVP_PKEY_RSA) {
@@ -1865,8 +1891,10 @@ OpenSSL_DeleteKey(KMF_HANDLE_T handle,
 		/* If the file exists, make sure it is a proper key. */
 		pkey = openssl_load_key(handle, key->keylabel);
 		if (pkey == NULL) {
-			free(key->keylabel);
-			key->keylabel = NULL;
+			if (key->keylabel != NULL) {
+				free(key->keylabel);
+				key->keylabel = NULL;
+			}
 			return (KMF_ERR_KEY_NOT_FOUND);
 		}
 		EVP_PKEY_free(pkey);
@@ -2418,6 +2446,7 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_RESPID *id)
 	for (i = 0; i < sk_X509_num(certs); i++) {
 		/*LINTED*/
 		X509 *x = sk_X509_value(certs, i);
+		/* Use pubkey_digest to get the key ID value */
 		(void) X509_pubkey_digest(x, EVP_sha1(), tmphash, NULL);
 		if (!memcmp(keyhash, tmphash, SHA_DIGEST_LENGTH))
 			return (x);
@@ -2749,7 +2778,11 @@ fetch_key(KMF_HANDLE_T handle, char *path,
 			key->keyclass = keyclass;
 			key->keyp = (void *)pkey;
 			key->israw = FALSE;
-			key->keylabel = path;
+			if (path != NULL &&
+			    ((key->keylabel = strdup(path)) == NULL)) {
+				EVP_PKEY_free(pkey);
+				return (KMF_ERR_MEMORY);
+			}
 		} else {
 			EVP_PKEY_free(pkey);
 			pkey = NULL;
@@ -2792,8 +2825,11 @@ fetch_key(KMF_HANDLE_T handle, char *path,
 			key->kstype = KMF_KEYSTORE_OPENSSL;
 			key->keyclass = keyclass;
 			key->israw = TRUE;
-			key->keylabel = path;
 			key->keyp = (void *)rkey;
+			if (path != NULL &&
+			    ((key->keylabel = strdup(path)) == NULL)) {
+				rv = KMF_ERR_MEMORY;
+			}
 		}
 	}
 out:
@@ -2927,225 +2963,110 @@ OpenSSL_FindKey(KMF_HANDLE_T handle,
 	goto out; \
 }
 
-static KMF_RETURN
-write_pkcs12(KMF_HANDLE *kmfh,
-	BIO *bio,
-	KMF_CREDENTIAL *cred,
-	EVP_PKEY *pkey,
-	X509 *sslcert)
+static int
+add_alias_to_bag(PKCS12_SAFEBAG *bag, X509 *xcert)
 {
-	KMF_RETURN rv = KMF_OK;
-	STACK_OF(PKCS12_SAFEBAG)	*bag_stack = NULL;
-	PKCS12_SAFEBAG			*bag = NULL;
-	PKCS7				*cert_authsafe = NULL;
-	PKCS8_PRIV_KEY_INFO		*p8 = NULL;
-	PKCS7				*key_authsafe = NULL;
-	STACK_OF(PKCS7)			*authsafe_stack = NULL;
-	PKCS12				*p12_elem = NULL;
-	char				*lab = NULL;
-	int				lab_len = 0;
-	unsigned char keyid[EVP_MAX_MD_SIZE];
-	unsigned int keyidlen = 0;
-
-	/* Must have at least a cert OR a key */
-	if (sslcert == NULL && pkey == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	(void) memset(keyid, 0, sizeof (keyid));
-	/*
-	 * Section 1:
-	 *
-	 * The first PKCS#12 container (safebag) will hold the certificates
-	 * associated with this key.  The result of this section is a
-	 * PIN-encrypted PKCS#7 container (authsafe).  If there are no
-	 * certificates, there is no point in creating the "safebag" or the
-	 * "authsafe" so we go to the next section.
-	 */
-	if (sslcert != NULL && pkey != NULL) {
-		if (X509_check_private_key(sslcert, pkey)) {
-			(void) X509_digest(sslcert, EVP_sha1(), keyid,
-			    &keyidlen);
-		} else {
-			/* The key doesn't match the cert */
-			HANDLE_PK12_ERROR
-		}
+	if (xcert != NULL && xcert->aux != NULL &&
+	    xcert->aux->alias != NULL) {
+		if (PKCS12_add_friendlyname_asc(bag,
+		    (const char *)xcert->aux->alias->data,
+		    xcert->aux->alias->length) == 0)
+			return (0);
 	}
+	return (1);
+}
+
+static PKCS7 *
+add_cert_to_safe(X509 *sslcert, KMF_CREDENTIAL *cred,
+	uchar_t *keyid, unsigned int keyidlen)
+{
+	PKCS12_SAFEBAG *bag = NULL;
+	PKCS7 *cert_authsafe = NULL;
+	STACK_OF(PKCS12_SAFEBAG) *bag_stack;
 
 	bag_stack = sk_PKCS12_SAFEBAG_new_null();
 	if (bag_stack == NULL)
-		return (KMF_ERR_MEMORY);
+		return (NULL);
 
-	if (sslcert != NULL) {
-		/* Convert cert from X509 struct to PKCS#12 bag */
-		bag = PKCS12_x5092certbag(sslcert);
-		if (bag == NULL) {
-			HANDLE_PK12_ERROR
-		}
-
-		/* Add the key id to the certificate bag. */
-		if (keyidlen > 0 &&
-		    !PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
-			HANDLE_PK12_ERROR
-		}
-
-		/* Pile it on the bag_stack. */
-		if (!sk_PKCS12_SAFEBAG_push(bag_stack, bag)) {
-			HANDLE_PK12_ERROR
-		}
-#if 0
-		/* No support for CA certs yet */
-		if (cacerts != NULL && ncacerts > 0) {
-			int i;
-			for (i = 0; i < ncacerts; i++) {
-				KMF_X509_DER_CERT *c = &cacerts[i];
-				X509 *ca = NULL;
-
-				uchar_t *p = (uchar_t *)c->certificate.Data;
-				ca = d2i_X509(NULL, &p, c->certificate.Length);
-				if (ca == NULL) {
-					HANDLE_PK12_ERROR
-				}
-				/* Convert CA cert to PKCS#12 bag. */
-				bag = PKCS12_x5092certbag(ca);
-				if (bag == NULL) {
-					sk_PKCS12_SAFEBAG_pop_free(bag_stack,
-					    PKCS12_SAFEBAG_free);
-					HANDLE_PK12_ERROR
-				}
-				/* Pile it onto the bag_stack. */
-				if (!sk_PKCS12_SAFEBAG_push(bag_stack, bag)) {
-					HANDLE_PK12_ERROR
-				}
-			}
-		}
-#endif
-		/* Turn bag_stack of certs into encrypted authsafe. */
-		cert_authsafe = PKCS12_pack_p7encdata(
-		    NID_pbe_WithSHA1And40BitRC2_CBC,
-		    cred->cred, cred->credlen, NULL, 0,
-		    PKCS12_DEFAULT_ITER, bag_stack);
-
-		/* Clear away this bag_stack, we're done with it. */
-		sk_PKCS12_SAFEBAG_pop_free(bag_stack, PKCS12_SAFEBAG_free);
-		bag_stack = NULL;
-
-		if (cert_authsafe == NULL) {
-			HANDLE_PK12_ERROR
-		}
-	}
-	/*
-	 * Section 2:
-	 *
-	 * The second PKCS#12 container (safebag) will hold the private key
-	 * that goes with the certificates above.  The results of this section
-	 * is an unencrypted PKCS#7 container (authsafe).  If there is no
-	 * private key, there is no point in creating the "safebag" or the
-	 * "authsafe" so we go to the next section.
-	 */
-	if (pkey != NULL) {
-		p8 = EVP_PKEY2PKCS8(pkey);
-		if (p8 == NULL) {
-			HANDLE_PK12_ERROR
-		}
-		/* Put the shrouded key into a PKCS#12 bag. */
-		bag = PKCS12_MAKE_SHKEYBAG(
-		    NID_pbe_WithSHA1And3_Key_TripleDES_CBC,
-		    cred->cred, cred->credlen,
-		    NULL, 0, PKCS12_DEFAULT_ITER, p8);
-
-		/* Clean up the PKCS#8 shrouded key, don't need it now. */
-		PKCS8_PRIV_KEY_INFO_free(p8);
-		p8 = NULL;
-
-		if (bag == NULL) {
-			HANDLE_PK12_ERROR
-		}
-		if (keyidlen &&
-		    !PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
-			HANDLE_PK12_ERROR
-		}
-		if (lab != NULL) {
-			if (!PKCS12_add_friendlyname(bag,
-			    (char *)lab, lab_len)) {
-				HANDLE_PK12_ERROR
-			}
-		}
-		/* Start a PKCS#12 safebag container for the private key. */
-		bag_stack = sk_PKCS12_SAFEBAG_new_null();
-		if (bag_stack == NULL) {
-			HANDLE_PK12_ERROR
-		}
-
-		/* Pile on the private key on the bag_stack. */
-		if (!sk_PKCS12_SAFEBAG_push(bag_stack, bag)) {
-			HANDLE_PK12_ERROR
-		}
-		key_authsafe = PKCS12_pack_p7data(bag_stack);
-
-		/* Clear away this bag_stack, we're done with it. */
-		sk_PKCS12_SAFEBAG_pop_free(bag_stack, PKCS12_SAFEBAG_free);
-		bag_stack = NULL;
-
-		if (key_authsafe == NULL) {
-			HANDLE_PK12_ERROR
-		}
-	}
-	/*
-	 * Section 3:
-	 *
-	 * This is where the two PKCS#7 containers, one for the certificates
-	 * and one for the private key, are put together into a PKCS#12
-	 * element.  This final PKCS#12 element is written to the export file.
-	 */
-
-	/* Start a PKCS#7 stack. */
-	authsafe_stack = sk_PKCS7_new_null();
-	if (authsafe_stack == NULL) {
-		HANDLE_PK12_ERROR
-	}
-	if (key_authsafe != NULL) {
-		if (!sk_PKCS7_push(authsafe_stack, key_authsafe)) {
-			HANDLE_PK12_ERROR
-		}
-	}
-	if (cert_authsafe != NULL) {
-		if (!sk_PKCS7_push(authsafe_stack, cert_authsafe)) {
-			HANDLE_PK12_ERROR
-		}
-	}
-	p12_elem = PKCS12_init(NID_pkcs7_data);
-	if (p12_elem == NULL) {
-		sk_PKCS7_pop_free(authsafe_stack, PKCS7_free);
-		HANDLE_PK12_ERROR
+	/* Convert cert from X509 struct to PKCS#12 bag */
+	bag = PKCS12_x5092certbag(sslcert);
+	if (bag == NULL) {
+		goto out;
 	}
 
-	/* Put the PKCS#7 stack into the PKCS#12 element. */
-	if (!PKCS12_pack_authsafes(p12_elem, authsafe_stack)) {
-		HANDLE_PK12_ERROR
-	}
-	/* Clear away the PKCS#7 stack, we're done with it. */
-	sk_PKCS7_pop_free(authsafe_stack, PKCS7_free);
-	authsafe_stack = NULL;
-
-	/* Set the integrity MAC on the PKCS#12 element. */
-	if (!PKCS12_set_mac(p12_elem, cred->cred, cred->credlen,
-	    NULL, 0, PKCS12_DEFAULT_ITER, NULL)) {
-		HANDLE_PK12_ERROR
+	/* Add the key id to the certificate bag. */
+	if (keyidlen > 0 && !PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
+		goto out;
 	}
 
-	/* Write the PKCS#12 element to the export file. */
-	if (!i2d_PKCS12_bio(bio, p12_elem)) {
-		HANDLE_PK12_ERROR
-	}
+	if (!add_alias_to_bag(bag, sslcert))
+		goto out;
 
-	PKCS12_free(p12_elem);
+	/* Pile it on the bag_stack. */
+	if (!sk_PKCS12_SAFEBAG_push(bag_stack, bag)) {
+		goto out;
+	}
+	/* Turn bag_stack of certs into encrypted authsafe. */
+	cert_authsafe = PKCS12_pack_p7encdata(
+	    NID_pbe_WithSHA1And40BitRC2_CBC,
+	    cred->cred, cred->credlen, NULL, 0,
+	    PKCS12_DEFAULT_ITER, bag_stack);
+
 out:
-	if (rv != KMF_OK) {
-		/* Clear away this bag_stack, we're done with it. */
+	if (bag_stack != NULL)
 		sk_PKCS12_SAFEBAG_pop_free(bag_stack, PKCS12_SAFEBAG_free);
-		sk_PKCS7_pop_free(authsafe_stack, PKCS7_free);
+
+	return (cert_authsafe);
+}
+
+static PKCS7 *
+add_key_to_safe(EVP_PKEY *pkey, KMF_CREDENTIAL *cred,
+	uchar_t *keyid,  unsigned int keyidlen,
+	char *label, int label_len)
+{
+	PKCS8_PRIV_KEY_INFO *p8 = NULL;
+	STACK_OF(PKCS12_SAFEBAG) *bag_stack = NULL;
+	PKCS12_SAFEBAG *bag = NULL;
+	PKCS7 *key_authsafe = NULL;
+
+	p8 = EVP_PKEY2PKCS8(pkey);
+	if (p8 == NULL) {
+		return (NULL);
 	}
-	return (rv);
+	/* Put the shrouded key into a PKCS#12 bag. */
+	bag = PKCS12_MAKE_SHKEYBAG(
+	    NID_pbe_WithSHA1And3_Key_TripleDES_CBC,
+	    cred->cred, cred->credlen,
+	    NULL, 0, PKCS12_DEFAULT_ITER, p8);
+
+	/* Clean up the PKCS#8 shrouded key, don't need it now. */
+	PKCS8_PRIV_KEY_INFO_free(p8);
+	p8 = NULL;
+
+	if (bag == NULL) {
+		return (NULL);
+	}
+	if (keyidlen && !PKCS12_add_localkeyid(bag, keyid, keyidlen))
+		goto out;
+	if (label != NULL && !PKCS12_add_friendlyname(bag, label, label_len))
+		goto out;
+
+	/* Start a PKCS#12 safebag container for the private key. */
+	bag_stack = sk_PKCS12_SAFEBAG_new_null();
+	if (bag_stack == NULL)
+		goto out;
+
+	/* Pile on the private key on the bag_stack. */
+	if (!sk_PKCS12_SAFEBAG_push(bag_stack, bag))
+		goto out;
+
+	key_authsafe = PKCS12_pack_p7data(bag_stack);
+
+out:
+	if (bag_stack != NULL)
+		sk_PKCS12_SAFEBAG_pop_free(bag_stack, PKCS12_SAFEBAG_free);
+	bag_stack = NULL;
+	return (key_authsafe);
 }
 
 static EVP_PKEY *
@@ -3246,8 +3167,95 @@ ImportRawDSAKey(KMF_RAW_DSA_KEY *key)
 	return (newkey);
 }
 
+static EVP_PKEY *
+raw_key_to_pkey(KMF_KEY_HANDLE *key)
+{
+	EVP_PKEY *pkey = NULL;
+	KMF_RAW_KEY_DATA *rawkey;
+	ASN1_TYPE *attr = NULL;
+	KMF_RETURN ret;
+
+	if (key == NULL || !key->israw)
+		return (NULL);
+
+	rawkey = (KMF_RAW_KEY_DATA *)key->keyp;
+	if (rawkey->keytype == KMF_RSA) {
+		pkey = ImportRawRSAKey(&rawkey->rawdata.rsa);
+	} else if (rawkey->keytype == KMF_DSA) {
+		pkey = ImportRawDSAKey(&rawkey->rawdata.dsa);
+	} else {
+		/* wrong kind of key */
+		return (NULL);
+	}
+
+	if (rawkey->label != NULL) {
+		if ((attr = ASN1_TYPE_new()) == NULL) {
+			EVP_PKEY_free(pkey);
+			return (NULL);
+		}
+		attr->value.bmpstring = ASN1_STRING_type_new(V_ASN1_BMPSTRING);
+		(void) ASN1_STRING_set(attr->value.bmpstring, rawkey->label,
+		    strlen(rawkey->label));
+		attr->type = V_ASN1_BMPSTRING;
+		attr->value.ptr = (char *)attr->value.bmpstring;
+		ret = set_pkey_attrib(pkey, attr, NID_friendlyName);
+		if (ret != KMF_OK) {
+			EVP_PKEY_free(pkey);
+			ASN1_TYPE_free(attr);
+			return (NULL);
+		}
+	}
+	if (rawkey->id.Data != NULL) {
+		if ((attr = ASN1_TYPE_new()) == NULL) {
+			EVP_PKEY_free(pkey);
+			return (NULL);
+		}
+		attr->value.octet_string =
+		    ASN1_STRING_type_new(V_ASN1_OCTET_STRING);
+		attr->type = V_ASN1_OCTET_STRING;
+		(void) ASN1_STRING_set(attr->value.octet_string,
+		    rawkey->id.Data, rawkey->id.Length);
+		attr->value.ptr = (char *)attr->value.octet_string;
+		ret = set_pkey_attrib(pkey, attr, NID_localKeyID);
+		if (ret != KMF_OK) {
+			EVP_PKEY_free(pkey);
+			ASN1_TYPE_free(attr);
+			return (NULL);
+		}
+	}
+	return (pkey);
+}
+
+/*
+ * Search a list of private keys to find one that goes with the certificate.
+ */
+static EVP_PKEY *
+find_matching_key(X509 *xcert, int numkeys, KMF_KEY_HANDLE *keylist)
+{
+	int i;
+	EVP_PKEY *pkey = NULL;
+
+	if (numkeys == 0 || keylist == NULL || xcert == NULL)
+		return (NULL);
+	for (i = 0; i < numkeys; i++) {
+		if (keylist[i].israw)
+			pkey = raw_key_to_pkey(&keylist[i]);
+		else
+			pkey = (EVP_PKEY *)keylist[i].keyp;
+		if (pkey != NULL) {
+			if (X509_check_private_key(xcert, pkey)) {
+				return (pkey);
+			} else {
+				EVP_PKEY_free(pkey);
+				pkey = NULL;
+			}
+		}
+	}
+	return (pkey);
+}
+
 static KMF_RETURN
-ExportPK12FromRawData(KMF_HANDLE_T handle,
+local_export_pk12(KMF_HANDLE_T handle,
 	KMF_CREDENTIAL *cred,
 	int numcerts, KMF_X509_DER_CERT *certlist,
 	int numkeys, KMF_KEY_HANDLE *keylist,
@@ -3256,9 +3264,14 @@ ExportPK12FromRawData(KMF_HANDLE_T handle,
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	BIO *bio = NULL;
-	X509 *xcert = NULL;
-	EVP_PKEY *pkey = NULL;
+	PKCS7 *cert_authsafe = NULL;
+	PKCS7 *key_authsafe = NULL;
+	STACK_OF(PKCS7) *authsafe_stack = NULL;
+	PKCS12 *p12_elem = NULL;
 	int i;
+
+	if (numcerts == 0 && numkeys == 0)
+		return (KMF_ERR_BAD_PARAMETER);
 
 	/*
 	 * Open the output file.
@@ -3269,48 +3282,140 @@ ExportPK12FromRawData(KMF_HANDLE_T handle,
 		goto cleanup;
 	}
 
-	if (numcerts > 0 && numkeys > 0) {
+	/* Start a PKCS#7 stack. */
+	authsafe_stack = sk_PKCS7_new_null();
+	if (authsafe_stack == NULL) {
+		rv = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+	if (numcerts > 0) {
 		for (i = 0; rv == KMF_OK && i < numcerts; i++) {
-			KMF_RAW_KEY_DATA *key = NULL;
 			const uchar_t *p = certlist[i].certificate.Data;
 			long len = certlist[i].certificate.Length;
-
-			if (i < numkeys) {
-				key = (KMF_RAW_KEY_DATA *)keylist[i].keyp;
-
-				if (key->keytype == KMF_RSA) {
-					pkey = ImportRawRSAKey(
-					    &key->rawdata.rsa);
-				} else if (key->keytype == KMF_DSA) {
-					pkey = ImportRawDSAKey(
-					    &key->rawdata.dsa);
-				} else {
-					rv = KMF_ERR_BAD_PARAMETER;
-				}
-			}
+			X509 *xcert = NULL;
+			EVP_PKEY *pkey = NULL;
+			unsigned char keyid[EVP_MAX_MD_SIZE];
+			unsigned int keyidlen = 0;
 
 			xcert = d2i_X509(NULL, &p, len);
 			if (xcert == NULL) {
 				SET_ERROR(kmfh, ERR_get_error());
 				rv = KMF_ERR_ENCODING;
 			}
-			/* Stick the key and the cert into a PKCS#12 file */
-			rv = write_pkcs12(kmfh, bio, cred, pkey, xcert);
-			if (xcert)
+			if (certlist[i].kmf_private.label != NULL) {
+				/* Set alias attribute */
+				(void) X509_alias_set1(xcert,
+				    (uchar_t *)certlist[i].kmf_private.label,
+				    strlen(certlist[i].kmf_private.label));
+			}
+			/* Check if there is a key corresponding to this cert */
+			pkey = find_matching_key(xcert, numkeys, keylist);
+
+			/*
+			 * If key is found, get fingerprint and create a
+			 * safebag.
+			 */
+			if (pkey != NULL) {
+				(void) X509_digest(xcert, EVP_sha1(),
+				    keyid, &keyidlen);
+				key_authsafe = add_key_to_safe(pkey, cred,
+				    keyid, keyidlen,
+				    certlist[i].kmf_private.label,
+				    (certlist[i].kmf_private.label ?
+				    strlen(certlist[i].kmf_private.label) : 0));
+
+				if (key_authsafe == NULL) {
+					X509_free(xcert);
+					EVP_PKEY_free(pkey);
+					goto cleanup;
+				}
+				/* Put the key safe into the Auth Safe */
+				if (!sk_PKCS7_push(authsafe_stack,
+				    key_authsafe)) {
+					X509_free(xcert);
+					EVP_PKEY_free(pkey);
+					goto cleanup;
+				}
+			}
+
+			/* create a certificate safebag */
+			cert_authsafe = add_cert_to_safe(xcert, cred, keyid,
+			    keyidlen);
+			if (cert_authsafe == NULL) {
 				X509_free(xcert);
+				EVP_PKEY_free(pkey);
+				goto cleanup;
+			}
+			if (!sk_PKCS7_push(authsafe_stack, cert_authsafe)) {
+				X509_free(xcert);
+				EVP_PKEY_free(pkey);
+				goto cleanup;
+			}
+
+			X509_free(xcert);
 			if (pkey)
 				EVP_PKEY_free(pkey);
 		}
+	} else if (numcerts == 0 && numkeys > 0) {
+		/*
+		 * If only adding keys to the file.
+		 */
+		for (i = 0; i < numkeys; i++) {
+			EVP_PKEY *pkey = NULL;
+
+			if (keylist[i].israw)
+				pkey = raw_key_to_pkey(&keylist[i]);
+			else
+				pkey = (EVP_PKEY *)keylist[i].keyp;
+
+			if (pkey == NULL)
+				continue;
+
+			key_authsafe = add_key_to_safe(pkey, cred,
+			    NULL, 0, NULL, 0);
+
+			if (key_authsafe == NULL) {
+				EVP_PKEY_free(pkey);
+				goto cleanup;
+			}
+			if (!sk_PKCS7_push(authsafe_stack, key_authsafe)) {
+				EVP_PKEY_free(pkey);
+				goto cleanup;
+			}
+		}
+	}
+	p12_elem = PKCS12_init(NID_pkcs7_data);
+	if (p12_elem == NULL) {
+		goto cleanup;
 	}
 
+	/* Put the PKCS#7 stack into the PKCS#12 element. */
+	if (!PKCS12_pack_authsafes(p12_elem, authsafe_stack)) {
+		goto cleanup;
+	}
+
+	/* Set the integrity MAC on the PKCS#12 element. */
+	if (!PKCS12_set_mac(p12_elem, cred->cred, cred->credlen,
+	    NULL, 0, PKCS12_DEFAULT_ITER, NULL)) {
+		goto cleanup;
+	}
+
+	/* Write the PKCS#12 element to the export file. */
+	if (!i2d_PKCS12_bio(bio, p12_elem)) {
+		goto cleanup;
+	}
+	PKCS12_free(p12_elem);
+
 cleanup:
+	/* Clear away the PKCS#7 stack, we're done with it. */
+	if (authsafe_stack)
+		sk_PKCS7_pop_free(authsafe_stack, PKCS7_free);
 
 	if (bio != NULL)
 		(void) BIO_free_all(bio);
 
 	return (rv);
 }
-
 
 KMF_RETURN
 openssl_build_pk12(KMF_HANDLE_T handle, int numcerts,
@@ -3322,27 +3427,27 @@ openssl_build_pk12(KMF_HANDLE_T handle, int numcerts,
 	if (certlist == NULL && keylist == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	rv = ExportPK12FromRawData(handle, p12cred, numcerts, certlist,
+	rv = local_export_pk12(handle, p12cred, numcerts, certlist,
 	    numkeys, keylist, filename);
 
 	return (rv);
 }
-
 
 KMF_RETURN
 OpenSSL_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 {
 	KMF_RETURN rv;
 	KMF_HANDLE *kmfh = (KMF_HANDLE  *)handle;
-	BIO *bio = NULL;
-	X509 *xcert = NULL;
 	char *fullpath = NULL;
-	EVP_PKEY *pkey = NULL;
 	char *dirpath = NULL;
 	char *certfile = NULL;
 	char *keyfile = NULL;
 	char *filename = NULL;
 	KMF_CREDENTIAL *p12cred = NULL;
+	KMF_X509_DER_CERT certdata;
+	KMF_KEY_HANDLE key;
+	int gotkey = 0;
+	int gotcert = 0;
 
 	if (handle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -3362,10 +3467,14 @@ OpenSSL_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			return (KMF_ERR_AMBIGUOUS_PATHNAME);
 		}
 
-		rv = load_X509cert(kmfh, NULL, NULL, NULL, fullpath, &xcert);
+		(void) memset(&certdata, 0, sizeof (certdata));
+		rv = kmf_load_cert(kmfh, NULL, NULL, NULL, NULL,
+		    fullpath, &certdata.certificate);
 		if (rv != KMF_OK)
 			goto end;
 
+		gotcert++;
+		certdata.kmf_private.keystore_type = KMF_KEYSTORE_OPENSSL;
 		free(fullpath);
 	}
 
@@ -3383,11 +3492,11 @@ OpenSSL_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 			return (KMF_ERR_AMBIGUOUS_PATHNAME);
 		}
 
-		pkey = openssl_load_key(handle, fullpath);
-		if (pkey == NULL) {
-			rv = KMF_ERR_KEY_NOT_FOUND;
+		(void) memset(&key, 0, sizeof (KMF_KEY_HANDLE));
+		rv = fetch_key(handle, fullpath, KMF_ASYM_PRI, &key);
+		if (rv != KMF_OK)
 			goto end;
-		}
+		gotkey++;
 	}
 
 	/*
@@ -3400,12 +3509,6 @@ OpenSSL_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		goto end;
 	}
 
-	if ((bio = BIO_new_file(filename, "wb")) == NULL) {
-		SET_ERROR(kmfh, ERR_get_error());
-		rv = KMF_ERR_OPEN_FILE;
-		goto end;
-	}
-
 	/* Stick the key and the cert into a PKCS#12 file */
 	p12cred = kmf_get_attr_ptr(KMF_PK12CRED_ATTR, attrlist, numattr);
 	if (p12cred == NULL) {
@@ -3413,23 +3516,20 @@ OpenSSL_ExportPK12(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 		goto end;
 	}
 
-	rv = write_pkcs12(kmfh, bio, p12cred, pkey, xcert);
+	rv = local_export_pk12(handle, p12cred, 1, &certdata,
+	    1, &key, filename);
 
 end:
 	if (fullpath)
 		free(fullpath);
-	if (xcert)
-		X509_free(xcert);
-	if (pkey)
-		EVP_PKEY_free(pkey);
-	if (bio)
-		(void) BIO_free(bio);
 
+	if (gotcert)
+		kmf_free_kmf_cert(handle, &certdata);
+	if (gotkey)
+		kmf_free_kmf_key(handle, &key);
 	return (rv);
 }
 
-
-#define	MAX_CHAIN_LENGTH 100
 /*
  * Helper function to extract keys and certificates from
  * a single PEM file.  Typically the file should contain a
@@ -3451,7 +3551,7 @@ extract_pem(KMF_HANDLE *kmfh,
 	EVP_PKEY *pkey = NULL;
 	X509_INFO *info;
 	X509 *x;
-	X509_INFO *cert_infos[MAX_CHAIN_LENGTH];
+	X509_INFO **cert_infos = NULL;
 	KMF_DATA *certlist = NULL;
 
 	if (priv_key)
@@ -3459,19 +3559,23 @@ extract_pem(KMF_HANDLE *kmfh,
 	if (certs)
 		*certs = NULL;
 	fp = fopen(filename, "r");
-	if (fp == NULL) {
+	if (fp == NULL)
 		return (KMF_ERR_OPEN_FILE);
-	}
+
 	x509_info_stack = PEM_X509_INFO_read(fp, NULL, NULL, pin);
 	if (x509_info_stack == NULL) {
 		(void) fclose(fp);
 		return (KMF_ERR_ENCODING);
 	}
+	cert_infos = (X509_INFO **)malloc(sk_X509_INFO_num(x509_info_stack) *
+	    sizeof (X509_INFO *));
+	if (cert_infos == NULL) {
+		(void) fclose(fp);
+		rv = KMF_ERR_MEMORY;
+		goto err;
+	}
 
-
-	for (i = 0;
-	    i < sk_X509_INFO_num(x509_info_stack) && i < MAX_CHAIN_LENGTH;
-	    i++) {
+	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
 		/* LINTED */
 		cert_infos[ncerts] = sk_X509_INFO_value(x509_info_stack, i);
 		ncerts++;
@@ -3551,7 +3655,260 @@ err:
 	if (x509_info_stack)
 		sk_X509_INFO_free(x509_info_stack);
 
+	if (cert_infos != NULL)
+		free(cert_infos);
+
 	return (rv);
+}
+
+static KMF_RETURN
+openssl_parse_bags(STACK_OF(PKCS12_SAFEBAG) *bags, char *pin,
+	STACK_OF(EVP_PKEY) *keys, STACK_OF(X509) *certs)
+{
+	KMF_RETURN ret;
+	int i;
+
+	for (i = 0; i < sk_PKCS12_SAFEBAG_num(bags); i++) {
+		/*LINTED*/
+		PKCS12_SAFEBAG *bag = sk_PKCS12_SAFEBAG_value(bags, i);
+		ret = openssl_parse_bag(bag, pin, (pin ? strlen(pin) : 0),
+		    keys, certs);
+
+		if (ret != KMF_OK)
+			return (ret);
+	}
+
+	return (ret);
+}
+
+static KMF_RETURN
+set_pkey_attrib(EVP_PKEY *pkey, ASN1_TYPE *attrib, int nid)
+{
+	X509_ATTRIBUTE *attr = NULL;
+
+	if (pkey == NULL || attrib == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (pkey->attributes == NULL) {
+		pkey->attributes = sk_X509_ATTRIBUTE_new_null();
+		if (pkey->attributes == NULL)
+			return (KMF_ERR_MEMORY);
+	}
+	attr = X509_ATTRIBUTE_create(nid, attrib->type, attrib->value.ptr);
+	if (attr != NULL) {
+		int i;
+		X509_ATTRIBUTE *a;
+		for (i = 0;
+		    i < sk_X509_ATTRIBUTE_num(pkey->attributes); i++) {
+			/*LINTED*/
+			a = sk_X509_ATTRIBUTE_value(pkey->attributes, i);
+			if (OBJ_obj2nid(a->object) == nid) {
+				X509_ATTRIBUTE_free(a);
+				/*LINTED*/
+				sk_X509_ATTRIBUTE_set(pkey->attributes,
+				    i, attr);
+				return (KMF_OK);
+			}
+		}
+		if (sk_X509_ATTRIBUTE_push(pkey->attributes, attr) == NULL) {
+			X509_ATTRIBUTE_free(attr);
+			return (KMF_ERR_MEMORY);
+		}
+	} else {
+		return (KMF_ERR_MEMORY);
+	}
+
+	return (KMF_OK);
+}
+
+static KMF_RETURN
+openssl_parse_bag(PKCS12_SAFEBAG *bag, char *pass, int passlen,
+	STACK_OF(EVP_PKEY) *keylist, STACK_OF(X509) *certlist)
+{
+	KMF_RETURN ret = KMF_OK;
+	PKCS8_PRIV_KEY_INFO *p8 = NULL;
+	EVP_PKEY *pkey = NULL;
+	X509 *xcert = NULL;
+	ASN1_TYPE *keyid = NULL;
+	ASN1_TYPE *fname = NULL;
+	uchar_t *data = NULL;
+
+	keyid = PKCS12_get_attr(bag, NID_localKeyID);
+	fname = PKCS12_get_attr(bag, NID_friendlyName);
+
+	switch (M_PKCS12_bag_type(bag)) {
+		case NID_keyBag:
+			if (keylist == NULL)
+				goto end;
+			pkey = EVP_PKCS82PKEY(bag->value.keybag);
+			if (pkey == NULL)
+				ret = KMF_ERR_PKCS12_FORMAT;
+
+			break;
+		case NID_pkcs8ShroudedKeyBag:
+			if (keylist == NULL)
+				goto end;
+			p8 = M_PKCS12_decrypt_skey(bag, pass, passlen);
+			if (p8 == NULL)
+				return (KMF_ERR_AUTH_FAILED);
+			pkey = EVP_PKCS82PKEY(p8);
+			PKCS8_PRIV_KEY_INFO_free(p8);
+			if (pkey == NULL)
+				ret = KMF_ERR_PKCS12_FORMAT;
+			break;
+		case NID_certBag:
+			if (certlist == NULL)
+				goto end;
+			if (M_PKCS12_cert_bag_type(bag) != NID_x509Certificate)
+				return (KMF_ERR_PKCS12_FORMAT);
+			xcert = M_PKCS12_certbag2x509(bag);
+			if (xcert == NULL) {
+				ret = KMF_ERR_PKCS12_FORMAT;
+				goto end;
+			}
+			if (keyid != NULL) {
+				if (X509_keyid_set1(xcert,
+				    keyid->value.octet_string->data,
+				    keyid->value.octet_string->length) == 0) {
+					ret = KMF_ERR_PKCS12_FORMAT;
+					goto end;
+				}
+			}
+			if (fname != NULL) {
+				int len, r;
+				len = ASN1_STRING_to_UTF8(&data,
+				    fname->value.asn1_string);
+				if (len > 0 && data != NULL) {
+					r = X509_alias_set1(xcert, data, len);
+					if (r == NULL) {
+						ret = KMF_ERR_PKCS12_FORMAT;
+						goto end;
+					}
+				} else {
+					ret = KMF_ERR_PKCS12_FORMAT;
+					goto end;
+				}
+			}
+			if (sk_X509_push(certlist, xcert) == 0)
+				ret = KMF_ERR_MEMORY;
+			else
+				xcert = NULL;
+			break;
+		case NID_safeContentsBag:
+			return (openssl_parse_bags(bag->value.safes, pass,
+			    keylist, certlist));
+		default:
+			ret = KMF_ERR_PKCS12_FORMAT;
+			break;
+	}
+
+	/*
+	 * Set the ID and/or FriendlyName attributes on the key.
+	 * If converting to PKCS11 objects, these can translate to CKA_ID
+	 * and CKA_LABEL values.
+	 */
+	if (pkey != NULL && ret == KMF_OK) {
+		ASN1_TYPE *attr = NULL;
+		if (keyid != NULL && keyid->type == V_ASN1_OCTET_STRING) {
+			if ((attr = ASN1_TYPE_new()) == NULL)
+				return (KMF_ERR_MEMORY);
+			attr->value.octet_string =
+			    ASN1_STRING_dup(keyid->value.octet_string);
+			attr->type = V_ASN1_OCTET_STRING;
+			attr->value.ptr = (char *)attr->value.octet_string;
+			ret = set_pkey_attrib(pkey, attr, NID_localKeyID);
+			OPENSSL_free(attr);
+		}
+
+		if (ret == KMF_OK && fname != NULL &&
+		    fname->type == V_ASN1_BMPSTRING) {
+			if ((attr = ASN1_TYPE_new()) == NULL)
+				return (KMF_ERR_MEMORY);
+			attr->value.bmpstring =
+			    ASN1_STRING_dup(fname->value.bmpstring);
+			attr->type = V_ASN1_BMPSTRING;
+			attr->value.ptr = (char *)attr->value.bmpstring;
+			ret = set_pkey_attrib(pkey, attr, NID_friendlyName);
+			OPENSSL_free(attr);
+		}
+
+		if (ret == KMF_OK && keylist != NULL &&
+		    sk_EVP_PKEY_push(keylist, pkey) == 0)
+			ret = KMF_ERR_MEMORY;
+	}
+	if (ret == KMF_OK && keylist != NULL)
+		pkey = NULL;
+end:
+	if (pkey != NULL)
+		EVP_PKEY_free(pkey);
+	if (xcert != NULL)
+		X509_free(xcert);
+	if (data != NULL)
+		OPENSSL_free(data);
+
+	return (ret);
+}
+
+static KMF_RETURN
+openssl_pkcs12_parse(PKCS12 *p12, char *pin,
+	STACK_OF(EVP_PKEY) *keys,
+	STACK_OF(X509) *certs,
+	STACK_OF(X509) *ca)
+/*ARGSUSED*/
+{
+	KMF_RETURN ret = KMF_OK;
+	STACK_OF(PKCS7) *asafes = NULL;
+	STACK_OF(PKCS12_SAFEBAG) *bags = NULL;
+	int i, bagnid;
+	PKCS7 *p7;
+
+	if (p12 == NULL || (keys == NULL && certs == NULL))
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (pin == NULL || *pin == NULL) {
+		if (PKCS12_verify_mac(p12, NULL, 0)) {
+			pin = NULL;
+		} else if (PKCS12_verify_mac(p12, "", 0)) {
+			pin = "";
+		} else {
+			return (KMF_ERR_AUTH_FAILED);
+		}
+	} else if (!PKCS12_verify_mac(p12, pin, -1)) {
+		return (KMF_ERR_AUTH_FAILED);
+	}
+
+	if ((asafes = PKCS12_unpack_authsafes(p12)) == NULL)
+		return (KMF_ERR_PKCS12_FORMAT);
+
+	for (i = 0; ret == KMF_OK && i < sk_PKCS7_num(asafes); i++) {
+		bags = NULL;
+		/*LINTED*/
+		p7 = sk_PKCS7_value(asafes, i);
+		bagnid = OBJ_obj2nid(p7->type);
+
+		if (bagnid == NID_pkcs7_data) {
+			bags = PKCS12_unpack_p7data(p7);
+		} else if (bagnid == NID_pkcs7_encrypted) {
+			bags = PKCS12_unpack_p7encdata(p7, pin,
+			    (pin ? strlen(pin) : 0));
+		} else {
+			continue;
+		}
+		if (bags == NULL) {
+			ret = KMF_ERR_PKCS12_FORMAT;
+			goto out;
+		}
+
+		if (openssl_parse_bags(bags, pin, keys, certs) != KMF_OK)
+			ret = KMF_ERR_PKCS12_FORMAT;
+
+		sk_PKCS12_SAFEBAG_pop_free(bags, PKCS12_SAFEBAG_free);
+	}
+out:
+	if (asafes != NULL)
+		sk_PKCS7_pop_free(asafes, PKCS7_free);
+
+	return (ret);
 }
 
 /*
@@ -3559,13 +3916,14 @@ err:
  */
 static KMF_RETURN
 extract_pkcs12(BIO *fbio, CK_UTF8CHAR *pin, CK_ULONG pinlen,
-	EVP_PKEY **priv_key, X509 **cert, STACK_OF(X509) **ca)
+	STACK_OF(EVP_PKEY) **priv_key, STACK_OF(X509) **certs,
+	STACK_OF(X509) **ca)
 /* ARGSUSED */
 {
-	PKCS12		*pk12, *pk12_tmp;
-	EVP_PKEY	*temp_pkey = NULL;
-	X509		*temp_cert = NULL;
-	STACK_OF(X509)	*temp_ca = NULL;
+	PKCS12			*pk12, *pk12_tmp;
+	STACK_OF(EVP_PKEY)	*pkeylist = NULL;
+	STACK_OF(X509)		*xcertlist = NULL;
+	STACK_OF(X509)		*cacertlist = NULL;
 
 	if ((pk12 = PKCS12_new()) == NULL) {
 		return (KMF_ERR_MEMORY);
@@ -3582,17 +3940,40 @@ extract_pkcs12(BIO *fbio, CK_UTF8CHAR *pin, CK_ULONG pinlen,
 	}
 	pk12 = pk12_tmp;
 
-	if (PKCS12_parse(pk12, (char *)pin, &temp_pkey, &temp_cert,
-	    &temp_ca) <= 0) {
+	xcertlist = sk_X509_new_null();
+	if (xcertlist == NULL) {
+		PKCS12_free(pk12);
+		return (KMF_ERR_MEMORY);
+	}
+	pkeylist = sk_EVP_PKEY_new_null();
+	if (pkeylist == NULL) {
+		sk_X509_pop_free(xcertlist, X509_free);
+		PKCS12_free(pk12);
+		return (KMF_ERR_MEMORY);
+	}
+
+	if (openssl_pkcs12_parse(pk12, (char *)pin, pkeylist, xcertlist,
+	    cacertlist) != KMF_OK) {
+		sk_X509_pop_free(xcertlist, X509_free);
+		sk_EVP_PKEY_pop_free(pkeylist, EVP_PKEY_free);
 		PKCS12_free(pk12);
 		return (KMF_ERR_PKCS12_FORMAT);
 	}
 
-end_extract_pkcs12:
+	if (priv_key && pkeylist)
+		*priv_key = pkeylist;
+	else if (pkeylist)
+		sk_EVP_PKEY_pop_free(pkeylist, EVP_PKEY_free);
+	if (certs && xcertlist)
+		*certs = xcertlist;
+	else if (xcertlist)
+		sk_X509_pop_free(xcertlist, X509_free);
+	if (ca && cacertlist)
+		*ca = cacertlist;
+	else if (cacertlist)
+		sk_X509_pop_free(cacertlist, X509_free);
 
-	*priv_key = temp_pkey;
-	*cert = temp_cert;
-	*ca = temp_ca;
+end_extract_pkcs12:
 
 	PKCS12_free(pk12);
 	return (KMF_OK);
@@ -3706,24 +4087,33 @@ cleanup:
 
 static KMF_RETURN
 add_cert_to_list(KMF_HANDLE *kmfh, X509 *sslcert,
-	KMF_DATA **certlist, int *ncerts)
+	KMF_X509_DER_CERT **certlist, int *ncerts)
 {
 	KMF_RETURN rv = KMF_OK;
-	KMF_DATA *list = (*certlist);
-	KMF_DATA cert;
+	KMF_X509_DER_CERT *list = (*certlist);
+	KMF_X509_DER_CERT cert;
 	int n = (*ncerts);
 
 	if (list == NULL) {
-		list = (KMF_DATA *)malloc(sizeof (KMF_DATA));
+		list = (KMF_X509_DER_CERT *)malloc(sizeof (KMF_X509_DER_CERT));
 	} else {
-		list = (KMF_DATA *)realloc(list, sizeof (KMF_DATA) * (n + 1));
+		list = (KMF_X509_DER_CERT *)realloc(list,
+		    sizeof (KMF_X509_DER_CERT) * (n + 1));
 	}
 
 	if (list == NULL)
 		return (KMF_ERR_MEMORY);
 
-	rv = ssl_cert2KMFDATA(kmfh, sslcert, &cert);
+	(void) memset(&cert, 0, sizeof (cert));
+	rv = ssl_cert2KMFDATA(kmfh, sslcert, &cert.certificate);
 	if (rv == KMF_OK) {
+		int len = 0;
+		/* Get the alias name for the cert if there is one */
+		char *a = (char *)X509_alias_get0(sslcert, &len);
+		if (a != NULL)
+			cert.kmf_private.label = strdup(a);
+		cert.kmf_private.keystore_type = KMF_KEYSTORE_OPENSSL;
+
 		list[n] = cert;
 		(*ncerts) = n + 1;
 
@@ -3760,10 +4150,29 @@ add_key_to_list(KMF_RAW_KEY_DATA **keylist,
 	return (KMF_OK);
 }
 
+static X509_ATTRIBUTE *
+find_attr(STACK_OF(X509_ATTRIBUTE) *attrs, int nid)
+{
+	X509_ATTRIBUTE *a;
+	int i;
+
+	if (attrs == NULL)
+		return (NULL);
+
+	for (i = 0; i < sk_X509_ATTRIBUTE_num(attrs); i++) {
+		/*LINTED*/
+		a = sk_X509_ATTRIBUTE_value(attrs, i);
+		if (OBJ_obj2nid(a->object) == nid)
+			return (a);
+	}
+	return (NULL);
+}
+
 static KMF_RETURN
 convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 {
 	KMF_RETURN rv = KMF_OK;
+	X509_ATTRIBUTE *attr;
 
 	if (pkey == NULL || key == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -3784,6 +4193,46 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 		default:
 			return (KMF_ERR_BAD_PARAMETER);
 	}
+	/*
+	 * If friendlyName, add it to record.
+	 */
+	attr = find_attr(pkey->attributes, NID_friendlyName);
+	if (attr != NULL) {
+		ASN1_TYPE *ty = NULL;
+		int numattr = sk_ASN1_TYPE_num(attr->value.set);
+		if (attr->single == 0 && numattr > 0) {
+			/*LINTED*/
+			ty = sk_ASN1_TYPE_value(attr->value.set, 0);
+		}
+		if (ty != NULL) {
+			key->label = uni2asc(ty->value.bmpstring->data,
+			    ty->value.bmpstring->length);
+		}
+	} else {
+		key->label = NULL;
+	}
+
+	/*
+	 * If KeyID, add it to record as a KMF_DATA object.
+	 */
+	attr = find_attr(pkey->attributes, NID_localKeyID);
+	if (attr != NULL) {
+		ASN1_TYPE *ty = NULL;
+		int numattr = sk_ASN1_TYPE_num(attr->value.set);
+		if (attr->single == 0 && numattr > 0) {
+			/*LINTED*/
+			ty = sk_ASN1_TYPE_value(attr->value.set, 0);
+		}
+		key->id.Data = (uchar_t *)malloc(
+		    ty->value.octet_string->length);
+		if (key->id.Data == NULL)
+			return (KMF_ERR_MEMORY);
+		(void) memcpy(key->id.Data, ty->value.octet_string->data,
+		    ty->value.octet_string->length);
+		key->id.Length = ty->value.octet_string->length;
+	} else {
+		(void) memset(&key->id, 0, sizeof (KMF_DATA));
+	}
 
 	return (rv);
 }
@@ -3791,16 +4240,20 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 static KMF_RETURN
 convertPK12Objects(
 	KMF_HANDLE *kmfh,
-	EVP_PKEY *sslkey, X509 *sslcert, STACK_OF(X509) *sslcacerts,
+	STACK_OF(EVP_PKEY) *sslkeys,
+	STACK_OF(X509) *sslcert,
+	STACK_OF(X509) *sslcacerts,
 	KMF_RAW_KEY_DATA **keylist, int *nkeys,
-	KMF_DATA **certlist, int *ncerts)
+	KMF_X509_DER_CERT **certlist, int *ncerts)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_RAW_KEY_DATA key;
 	int i;
 
-	if (sslkey != NULL) {
-		rv = convertToRawKey(sslkey, &key);
+	for (i = 0; sslkeys != NULL && i < sk_EVP_PKEY_num(sslkeys); i++) {
+		/*LINTED*/
+		EVP_PKEY *pkey = sk_EVP_PKEY_value(sslkeys, i);
+		rv = convertToRawKey(pkey, &key);
 		if (rv == KMF_OK)
 			rv = add_key_to_list(keylist, &key, nkeys);
 
@@ -3809,8 +4262,10 @@ convertPK12Objects(
 	}
 
 	/* Now add the certificate to the certlist */
-	if (sslcert != NULL) {
-		rv = add_cert_to_list(kmfh, sslcert, certlist, ncerts);
+	for (i = 0; sslcert != NULL && i < sk_X509_num(sslcert); i++) {
+		/*LINTED*/
+		X509 *cert = sk_X509_value(sslcert, i);
+		rv = add_cert_to_list(kmfh, cert, certlist, ncerts);
 		if (rv != KMF_OK)
 			return (rv);
 	}
@@ -3838,15 +4293,15 @@ convertPK12Objects(
 KMF_RETURN
 openssl_import_objects(KMF_HANDLE *kmfh,
 	char *filename, KMF_CREDENTIAL *cred,
-	KMF_DATA **certlist, int *ncerts,
+	KMF_X509_DER_CERT **certlist, int *ncerts,
 	KMF_RAW_KEY_DATA **keylist, int *nkeys)
 {
 	KMF_RETURN	rv = KMF_OK;
-	EVP_PKEY	*privkey = NULL;
 	KMF_ENCODE_FORMAT format;
 	BIO		*bio = NULL;
-	X509		*cert = NULL;
-	STACK_OF(X509)	*cacerts = NULL;
+	STACK_OF(EVP_PKEY)	*privkeys = NULL;
+	STACK_OF(X509)		*certs = NULL;
+	STACK_OF(X509)		*cacerts = NULL;
 
 	/*
 	 * auto-detect the file format, regardless of what
@@ -3877,37 +4332,64 @@ openssl_import_objects(KMF_HANDLE *kmfh,
 		}
 
 		rv = extract_pkcs12(bio, (uchar_t *)cred->cred,
-		    (uint32_t)cred->credlen, &privkey, &cert, &cacerts);
+		    (uint32_t)cred->credlen, &privkeys, &certs, &cacerts);
 
 		if (rv  == KMF_OK)
 			/* Convert keys and certs to exportable format */
-			rv = convertPK12Objects(kmfh, privkey, cert, cacerts,
+			rv = convertPK12Objects(kmfh, privkeys, certs, cacerts,
 			    keylist, nkeys, certlist, ncerts);
-
 	} else {
+		EVP_PKEY *pkey;
+		KMF_DATA *certdata = NULL;
+		KMF_X509_DER_CERT *kmfcerts = NULL;
+		int i;
 		rv = extract_pem(kmfh, NULL, NULL, NULL, filename,
 		    (uchar_t *)cred->cred, (uint32_t)cred->credlen,
-		    &privkey, certlist, ncerts);
+		    &pkey, &certdata, ncerts);
 
 		/* Reached end of import file? */
-		if (rv == KMF_OK)
-			/* Convert keys and certs to exportable format */
-			rv = convertPK12Objects(kmfh, privkey, NULL, NULL,
+		if (rv == KMF_OK && pkey != NULL) {
+			privkeys = sk_EVP_PKEY_new_null();
+			if (privkeys == NULL) {
+				rv = KMF_ERR_MEMORY;
+				goto end;
+			}
+			(void) sk_EVP_PKEY_push(privkeys, pkey);
+			/* convert the certificate list here */
+			if (*ncerts > 0 && certlist != NULL) {
+				kmfcerts = (KMF_X509_DER_CERT *)malloc(*ncerts *
+				    sizeof (KMF_X509_DER_CERT));
+				if (kmfcerts == NULL) {
+					rv = KMF_ERR_MEMORY;
+					goto end;
+				}
+				(void) memset(kmfcerts, 0, *ncerts *
+				    sizeof (KMF_X509_DER_CERT));
+				for (i = 0; i < *ncerts; i++) {
+					kmfcerts[i].certificate = certdata[i];
+					kmfcerts[i].kmf_private.keystore_type =
+					    KMF_KEYSTORE_OPENSSL;
+				}
+				*certlist = kmfcerts;
+			}
+			/*
+			 * Convert keys to exportable format, the certs
+			 * are already OK.
+			 */
+			rv = convertPK12Objects(kmfh, privkeys, NULL, NULL,
 			    keylist, nkeys, NULL, NULL);
+		}
 	}
-
 end:
-	if (privkey)
-		EVP_PKEY_free(privkey);
-
 	if (bio != NULL)
 		(void) BIO_free(bio);
 
-	if (cert)
-		X509_free(cert);
-
+	if (privkeys)
+		sk_EVP_PKEY_pop_free(privkeys, EVP_PKEY_free);
+	if (certs)
+		sk_X509_pop_free(certs, X509_free);
 	if (cacerts)
-		sk_X509_free(cacerts);
+		sk_X509_pop_free(cacerts, X509_free);
 
 	return (rv);
 }
@@ -4659,13 +5141,18 @@ OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
 		} else {
 			rv = KMF_ERR_BAD_PARAMETER;
 		}
-		rv = ssl_write_key(kmfh, format, out, &cred, pkey, TRUE);
+		if (pkey != NULL) {
+			rv = ssl_write_key(kmfh, format, out,
+			    &cred, pkey, TRUE);
+			EVP_PKEY_free(pkey);
+		}
 	}
 
 end:
 
 	if (out)
 		(void) BIO_free(out);
+
 
 	if (rv == KMF_OK)
 		(void) chmod(fullpath, 0400);
@@ -5239,30 +5726,27 @@ OpenSSL_CheckCRLDate(KMF_HANDLE_T handle, char *crlname)
 		return (ret);
 
 	bcrl = BIO_new_file(crlname, "rb");
-	if (bcrl == NULL)	{
+	if (bcrl == NULL) {
 		SET_ERROR(kmfh, ERR_get_error());
 		ret = KMF_ERR_OPEN_FILE;
 		goto cleanup;
 	}
 
-	if (crl_format == KMF_FORMAT_ASN1) {
+	if (crl_format == KMF_FORMAT_ASN1)
 		xcrl = d2i_X509_CRL_bio(bcrl, NULL);
-	} else if (crl_format == KMF_FORMAT_PEM) {
+	else if (crl_format == KMF_FORMAT_PEM)
 		xcrl = PEM_read_bio_X509_CRL(bcrl, NULL, NULL, NULL);
-	}
 
 	if (xcrl == NULL) {
 		SET_ERROR(kmfh, ERR_get_error());
 		ret = KMF_ERR_BAD_CRLFILE;
 		goto cleanup;
 	}
-
 	i = X509_cmp_time(X509_CRL_get_lastUpdate(xcrl), NULL);
 	if (i >= 0) {
 		ret = KMF_ERR_VALIDITY_PERIOD;
 		goto cleanup;
 	}
-
 	if (X509_CRL_get_nextUpdate(xcrl)) {
 		i = X509_cmp_time(X509_CRL_get_nextUpdate(xcrl), NULL);
 

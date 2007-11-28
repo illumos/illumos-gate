@@ -61,11 +61,11 @@ extern int do_delete(int argc, char *argv[]);
 extern void usage_create(boolean_t do_print);
 extern void usage_delete(boolean_t do_print);
 
-extern int PEM_get_rsa_key_certs(const char *,
-    char *, KMF_RAW_KEY_DATA **, KMF_DATA **);
+extern int PEM_get_rsa_key_certs(KMF_HANDLE_T, const char *,
+    char *, KMF_RAW_KEY_DATA **, KMF_X509_DER_CERT **);
 
-extern int PKCS12_get_rsa_key_certs(const char *,
-    const char *, KMF_RAW_KEY_DATA **, KMF_DATA **);
+extern int PKCS12_get_rsa_key_certs(KMF_HANDLE_T, const char *,
+    const char *, KMF_RAW_KEY_DATA **, KMF_X509_DER_CERT **);
 
 extern int get_passphrase(const char *password_file, char *buf, int buf_size);
 extern int kssl_send_command(char *buf, int cmd);

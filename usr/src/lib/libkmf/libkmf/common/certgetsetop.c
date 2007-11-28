@@ -139,8 +139,9 @@ kmf_get_cert_extn(const KMF_DATA *certdata,
 	if (ret != KMF_OK)
 		return (ret);
 
-	if (cert->certificate.extensions.numberOfExtensions == 0)
-		return (KMF_ERR_EXTENSION_NOT_FOUND);
+	if (cert->certificate.extensions.numberOfExtensions == 0) {
+		goto end;
+	}
 
 	(void) memset((void *)extdata, 0, sizeof (KMF_X509_EXTENSION));
 	for (i = 0; !found &&
@@ -152,6 +153,7 @@ kmf_get_cert_extn(const KMF_DATA *certdata,
 			found++;
 		}
 	}
+end:
 	if (!found)
 		ret = KMF_ERR_EXTENSION_NOT_FOUND;
 
