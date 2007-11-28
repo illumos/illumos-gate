@@ -635,8 +635,10 @@ takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
 		(void) dladm_wlan_disconnect(ifname);
 
 	dprintf("takedown interface, free cached ip address");
-	free(ifp->if_ipaddr);
-	ifp->if_ipaddr = NULL;
+	if (ifp != NULL) {
+		free(ifp->if_ipaddr);
+		ifp->if_ipaddr = NULL;
+	}
 	if (popup) {
 		char msg[64]; /* enough to hold this string */
 
