@@ -538,7 +538,7 @@ ec_bind_vcpu(int evtchn, int cpu)
  * Set up a physical device irq to be associated with an event channel.
  */
 void
-ec_setup_pirq(int irq, int ipl, cpuset_t cpus)
+ec_setup_pirq(int irq, int ipl, cpuset_t *cpusp)
 {
 	int evtchn;
 	irq_info_t *irqp = &irq_info[irq];
@@ -559,7 +559,7 @@ ec_setup_pirq(int irq, int ipl, cpuset_t cpus)
 
 		evtchn_to_irq[evtchn] = irq;
 		irqp->ii_u2.ipl = ipl;
-		ec_set_irq_affinity(irq, cpus);
+		ec_set_irq_affinity(irq, *cpusp);
 		ec_enable_irq(irq);
 		pirq_unmask_notify(IRQ_TO_PIRQ(irq));
 	} else {
@@ -567,6 +567,7 @@ ec_setup_pirq(int irq, int ipl, cpuset_t cpus)
 		cmn_err(CE_NOTE, "IRQ%d is shared", irq);
 		if (ipl > irqp->ii_u2.ipl)
 			irqp->ii_u2.ipl = ipl;
+		*cpusp = evtchn_cpus[irqp->ii_u.evtchn];
 	}
 }
 
@@ -617,13 +618,6 @@ ec_unbind_irq(int irq)
 		mutex_exit(&ec_lock);
 }
 
-/*ARGSUSED*/
-static int
-do_nothing_function(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
-{
-	return (0);
-}
-
 /*
  * Rebind an event channel for delivery to a CPU.
  */
@@ -660,11 +654,11 @@ ec_set_irq_affinity(int irq, cpuset_t dest)
 	mutex_exit(&ec_lock);
 
 	/*
-	 * Now send the new target processor a NOP IPI. When this returns,
-	 * it will check for any pending interrupts, and so service any that
+	 * Now send the new target processor a NOP IPI.
+	 * It will check for any pending interrupts, and so service any that
 	 * got delivered to the wrong processor by mistake.
 	 */
-	xc_call(NULL, NULL, NULL, X_CALL_HIPRI, dest, do_nothing_function);
+	poke_cpu(tcpu);
 }
 
 int

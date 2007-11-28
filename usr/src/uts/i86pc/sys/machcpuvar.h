@@ -42,6 +42,19 @@ extern "C" {
 
 #ifndef	_ASM
 /*
+ * On a virtualized platform a virtual cpu may not be actually
+ * on a physical cpu, especially in situations where a configuration has
+ * more vcpus than pcpus.  This function tells us (if it's able) if the
+ * specified vcpu is currently running on a pcpu.  Note if it is not
+ * known or not able to determine, it will return the unknown state.
+ */
+#define	VCPU_STATE_UNKNOWN	0
+#define	VCPU_ON_PCPU		1
+#define	VCPU_NOT_ON_PCPU	2
+
+extern int vcpu_on_pcpu(processorid_t);
+
+/*
  * Machine specific fields of the cpu struct
  * defined in common/sys/cpuvar.h.
  *

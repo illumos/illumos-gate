@@ -153,7 +153,7 @@ extern void ec_resume(void);
 extern void ec_wait_on_evtchn(int, int (*)(void *), void *);
 extern void ec_wait_on_ipi(int, int (*)(void *), void *);
 
-extern void ec_setup_pirq(int, int, cpuset_t);
+extern void ec_setup_pirq(int, int, cpuset_t *);
 extern int ec_probe_pirq(int);
 extern void ec_set_irq_affinity(int, cpuset_t);
 extern int ec_set_irq_priority(int, int);

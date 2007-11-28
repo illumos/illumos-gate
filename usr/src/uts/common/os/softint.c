@@ -138,6 +138,13 @@ static softcall_t *softcalls;
 static softcall_t *softhead, *softtail, *softfree;
 static uint_t	softcall_state;
 static clock_t softcall_tick;
+static clock_t softcall_countstart, softcall_lastpoke;
+static uint_t softcall_pokecount;
+
+/*
+ * Max number of pokes per second before increasing softcall_delay
+ */
+uint_t softcall_pokemax = 10;
 
 /*
  * This ensures that softcall entries don't get stuck for long. It's expressed
@@ -145,7 +152,7 @@ static clock_t softcall_tick;
  * is used, softcall_init() ensures that it's still expressed as 1 =  10 milli
  * seconds.
  */
-static int softcall_delay = 1;
+unsigned int softcall_delay = 1;
 
 /*
  * The last CPU which will drain softcall queue.
@@ -170,6 +177,7 @@ extern void siron_poke_cpu(cpuset_t);
 extern void siron(void);
 extern void kdi_siron(void);
 
+
 void
 softcall_init(void)
 {
@@ -185,9 +193,6 @@ softcall_init(void)
 	    (void *)ipltospl(SPL8));
 	softcall_state = SOFT_IDLE;
 	softcall_tick = lbolt;
-
-	if (softcall_delay < 0)
-		softcall_delay = 1;
 
 	/*
 	 * Since softcall_delay is expressed as 1 = 10 milliseconds.
@@ -231,6 +236,17 @@ softcall_choose_cpu()
 		    (cp->cpu_flags & CPU_ENABLE) == 0 ||
 		    (cp == cpu_inmotion))
 			continue;
+#if defined(__x86)
+		/*
+		 * Don't select this CPU if a hypervisor indicates it
+		 * isn't currently scheduled onto a physical cpu.  We are
+		 * looking for a cpu that can respond quickly and the time
+		 * to get the virtual cpu scheduled and switched to running
+		 * state is likely to be relatively lengthy.
+		 */
+		if (vcpu_on_pcpu(cp->cpu_id) == VCPU_NOT_ON_PCPU)
+			continue;
+#endif	/* __x86 */
 
 		/* if CPU is not busy */
 		if (cp->cpu_intrload == 0) {
@@ -290,6 +306,7 @@ softcall_choose_cpu()
 	return (1);
 }
 
+
 /*
  * Call function func with argument arg
  * at some later time at software interrupt priority
@@ -298,7 +315,7 @@ void
 softcall(void (*func)(void *), void *arg)
 {
 	softcall_t *sc;
-	clock_t w;
+	clock_t w, now;
 
 	/*
 	 * protect against cross-calls
@@ -332,12 +349,37 @@ intr:
 		mutex_exit(&softcall_lock);
 		siron();
 	} else if (softcall_state & (SOFT_DRAIN|SOFT_PEND)) {
-		w = lbolt - softcall_tick;
+		now = lbolt;
+		w = now - softcall_tick;
 		if (w <= softcall_delay || ncpus == 1) {
 			mutex_exit(&softcall_lock);
 			return;
 		}
-
+		/*
+		 * Did we poke less than a second ago?
+		 */
+		if (now - softcall_lastpoke < hz) {
+			/*
+			 * We did, increment the poke count and
+			 * see if we are poking too often
+			 */
+			if (softcall_pokecount++ == 0)
+				softcall_countstart = now;
+			if (softcall_pokecount > softcall_pokemax) {
+				/*
+				 * If poking too much increase the delay
+				 */
+				if (now - softcall_countstart <= hz)
+					softcall_delay++;
+				softcall_pokecount = 0;
+			}
+		} else {
+			/*
+			 * poke rate has dropped off, reset the poke monitor
+			 */
+			softcall_pokecount = 0;
+		}
+		softcall_lastpoke = lbolt;
 		if (!(softcall_state & SOFT_STEAL)) {
 			softcall_state |= SOFT_STEAL;
 

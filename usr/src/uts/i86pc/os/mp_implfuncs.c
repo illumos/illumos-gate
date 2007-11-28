@@ -393,19 +393,26 @@ psm_modload(void)
 	close_mach_list();
 }
 
+#if defined(__xpv)
+#define	NOTSUP_MSG "This version of Solaris xVM does not support this hardware"
+#else
+#define	NOTSUP_MSG "This version of Solaris does not support this hardware"
+#endif	/* __xpv */
+
 void
 psm_install(void)
 {
 	struct psm_sw *swp, *cswp;
 	struct psm_ops *opsp;
 	char machstring[15];
-	int err;
+	int err, psmcnt = 0;
 
 	mutex_enter(&psmsw_lock);
 	for (swp = psmsw->psw_forw; swp != psmsw; ) {
 		opsp = swp->psw_infop->p_ops;
 		if (opsp->psm_probe) {
 			if ((*opsp->psm_probe)() == PSM_SUCCESS) {
+				psmcnt++;
 				swp->psw_flag |= PSM_MOD_IDENTIFY;
 				swp = swp->psw_forw;
 				continue;
@@ -424,6 +431,8 @@ psm_install(void)
 		mutex_enter(&psmsw_lock);
 	}
 	mutex_exit(&psmsw_lock);
+	if (psmcnt == 0)
+		halt(NOTSUP_MSG);
 	(*psminitf)();
 }
 

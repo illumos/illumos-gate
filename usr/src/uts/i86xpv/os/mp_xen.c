@@ -135,6 +135,43 @@ static void vcpu_config_event(struct xenbus_watch *, const char **, uint_t);
 static int xen_vcpu_initialize(processorid_t, vcpu_guest_context_t *);
 
 /*
+ * Return whether or not the vcpu is actually running on a pcpu
+ */
+int
+vcpu_on_pcpu(processorid_t cpu)
+{
+	struct vcpu_runstate_info runstate;
+	int	ret = VCPU_STATE_UNKNOWN;
+
+	ASSERT(cpu < NCPU);
+	/*
+	 * Don't bother with hypercall if we are asking about ourself
+	 */
+	if (cpu == CPU->cpu_id)
+		return (VCPU_ON_PCPU);
+	if (HYPERVISOR_vcpu_op(VCPUOP_get_runstate_info, cpu, &runstate) != 0)
+		goto out;
+
+	switch (runstate.state) {
+	case RUNSTATE_running:
+		ret = VCPU_ON_PCPU;
+		break;
+
+	case RUNSTATE_runnable:
+	case RUNSTATE_offline:
+	case RUNSTATE_blocked:
+		ret = VCPU_NOT_ON_PCPU;
+		break;
+
+	default:
+		break;
+	}
+
+out:
+	return (ret);
+}
+
+/*
  * These routines allocate any global state that might be needed
  * while starting cpus.  For virtual cpus, there is no such state.
  */

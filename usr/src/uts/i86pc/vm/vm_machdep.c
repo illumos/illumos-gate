@@ -97,6 +97,7 @@
  * distinct lists, ordered by increasing mfn.
  */
 static kmutex_t io_pool_lock;
+static kmutex_t contig_list_lock;
 static page_t *io_pool_4g;	/* pool for 32 bit dma limited devices */
 static page_t *io_pool_16m;	/* pool for 24 bit dma limited legacy devices */
 static long io_pool_cnt;
@@ -118,6 +119,7 @@ static int create_contig_pfnlist(uint_t);
 #define	DEFAULT_IO_POOL_PCT	2
 static long io_pool_physmem_pct = DEFAULT_IO_POOL_PCT;
 static void page_io_pool_sub(page_t **, page_t *, page_t *);
+int ioalloc_dbg = 0;
 
 #endif /* __xpv */
 
@@ -1828,7 +1830,6 @@ int contig_pfn_cnt;	/* no of pfns in the contig pfn list */
 int contig_pfn_max;	/* capacity of the contig pfn list */
 int next_alloc_pfn;	/* next position in list to start a contig search */
 int contig_pfnlist_updates;	/* pfn list update count */
-int contig_pfnlist_locked;	/* contig pfn list locked against use */
 int contig_pfnlist_builds;	/* how many times have we (re)built list */
 int contig_pfnlist_buildfailed;	/* how many times has list build failed */
 int create_contig_pending;	/* nonzero means taskq creating contig list */
@@ -1889,10 +1890,7 @@ compact_contig_pfn_list(void)
 static void
 call_create_contiglist(void *arg)
 {
-	mutex_enter(&io_pool_lock);
 	(void) create_contig_pfnlist(PG_WAIT);
-	create_contig_pending = 0;
-	mutex_exit(&io_pool_lock);
 }
 
 /*
@@ -1905,10 +1903,11 @@ create_contig_pfnlist(uint_t flags)
 {
 	pfn_t pfn;
 	page_t *pp;
+	int ret = 1;
 
+	mutex_enter(&contig_list_lock);
 	if (contig_pfn_list != NULL)
-		return (1);
-	ASSERT(!contig_pfnlist_locked);
+		goto out;
 	contig_pfn_max = freemem + (freemem / 10);
 	contig_pfn_list = kmem_zalloc(contig_pfn_max * sizeof (pfn_t),
 	    (flags & PG_WAIT) ? KM_SLEEP : KM_NOSLEEP);
@@ -1924,8 +1923,10 @@ create_contig_pfnlist(uint_t flags)
 				create_contig_pending = 1;
 		}
 		contig_pfnlist_buildfailed++;	/* count list build failures */
-		return (0);
+		ret = 0;
+		goto out;
 	}
+	create_contig_pending = 0;
 	ASSERT(contig_pfn_cnt == 0);
 	for (pfn = 0; pfn < mfn_count; pfn++) {
 		pp = page_numtopp_nolock(pfn);
@@ -1943,7 +1944,9 @@ create_contig_pfnlist(uint_t flags)
 	 */
 	next_alloc_pfn = 0;
 	contig_pfnlist_builds++;	/* count list builds */
-	return (1);
+out:
+	mutex_exit(&contig_list_lock);
+	return (ret);
 }
 
 
@@ -1958,16 +1961,13 @@ clear_and_lock_contig_pfnlist()
 	pfn_t *listp = NULL;
 	size_t listsize;
 
-	mutex_enter(&io_pool_lock);
-	ASSERT(!contig_pfnlist_locked);
+	mutex_enter(&contig_list_lock);
 	if (contig_pfn_list != NULL) {
 		listp = contig_pfn_list;
 		listsize = contig_pfn_max * sizeof (pfn_t);
 		contig_pfn_list = NULL;
 		contig_pfn_max = contig_pfn_cnt = 0;
 	}
-	contig_pfnlist_locked = 1;
-	mutex_exit(&io_pool_lock);
 	if (listp != NULL)
 		kmem_free(listp, listsize);
 }
@@ -1979,10 +1979,7 @@ clear_and_lock_contig_pfnlist()
 void
 unlock_contig_pfnlist()
 {
-	mutex_enter(&io_pool_lock);
-	ASSERT(contig_pfnlist_locked);
-	contig_pfnlist_locked = 0;
-	mutex_exit(&io_pool_lock);
+	mutex_exit(&contig_list_lock);
 }
 
 /*
@@ -1994,10 +1991,14 @@ update_contig_pfnlist(pfn_t pfn, mfn_t oldmfn, mfn_t newmfn)
 	int probe_hi, probe_lo, probe_pos, insert_after, insert_point;
 	pfn_t probe_pfn;
 	mfn_t probe_mfn;
+	int drop_lock = 0;
 
+	if (mutex_owner(&contig_list_lock) != curthread) {
+		drop_lock = 1;
+		mutex_enter(&contig_list_lock);
+	}
 	if (contig_pfn_list == NULL)
-		return;
-	mutex_enter(&io_pool_lock);
+		goto done;
 	contig_pfnlist_updates++;
 	/*
 	 * Find the pfn in the current list.  Use a binary chop to locate it.
@@ -2057,7 +2058,8 @@ update_contig_pfnlist(pfn_t pfn, mfn_t oldmfn, mfn_t newmfn)
 		contig_pfn_cnt++;
 	}
 done:
-	mutex_exit(&io_pool_lock);
+	if (drop_lock)
+		mutex_exit(&contig_list_lock);
 }
 
 /*
@@ -2168,13 +2170,14 @@ find_contig_free(uint_t bytes, uint_t flags)
 	/*
 	 * create the contig pfn list if not already done
 	 */
+retry:
+	mutex_enter(&contig_list_lock);
 	if (contig_pfn_list == NULL) {
-		if (contig_pfnlist_locked) {
+		mutex_exit(&contig_list_lock);
+		if (!create_contig_pfnlist(flags)) {
 			return (NULL);
-		} else {
-			if (!create_contig_pfnlist(flags))
-				return (NULL);
 		}
+		goto retry;
 	}
 	contig_searches++;
 	/*
@@ -2211,6 +2214,7 @@ find_contig_free(uint_t bytes, uint_t flags)
 		if (next_alloc_pfn == search_start)
 			break; /* all pfns searched */
 	}
+	mutex_exit(&contig_list_lock);
 	if (pages_needed) {
 		contig_search_failed++;
 		/*
@@ -2298,9 +2302,7 @@ try_again:
 		/*
 		 * Look for free contig pages to satisfy the request.
 		 */
-		mutex_enter(&io_pool_lock);
 		pp_first = find_contig_free(bytes, flags);
-		mutex_exit(&io_pool_lock);
 		if (pp_first != NULL)
 			goto done;
 	}
@@ -2474,8 +2476,13 @@ skip:
 		nbits = highbit(mattr->dma_attr_addr_hi);
 		extents = contig ? 1 : npages;
 		if (balloon_replace_pages(extents, pplist, nbits, order,
-		    mfnlist) != extents)
+		    mfnlist) != extents) {
+			if (ioalloc_dbg)
+				cmn_err(CE_NOTE, "request to hypervisor for"
+				    " %d pages, maxaddr %" PRIx64 " failed",
+				    extpages, mattr->dma_attr_addr_hi);
 			goto balloon_fail;
+		}
 
 		kmem_free(pplist, extpages * sizeof (page_t *));
 		kmem_free(mfnlist, extpages * sizeof (mfn_t));

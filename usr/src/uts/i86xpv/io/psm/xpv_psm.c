@@ -174,7 +174,7 @@ xen_psm_softinit(void)
 {
 	/* LINTED logical expression always true: op "||" */
 	ASSERT((1 << EVTCHN_SHIFT) == NBBY * sizeof (ulong_t));
-	CPUSET_ADD(xen_psm_cpus_online, 0);
+	CPUSET_ATOMIC_ADD(xen_psm_cpus_online, 0);
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
 		apic_init_common();
 	}
@@ -281,6 +281,8 @@ xen_psm_picinit()
 				CPUSET_ONLY(cpus, cpu & ~IRQ_USER_BOUND);
 			}
 			ec_set_irq_affinity(irqno, cpus);
+			apic_irq_table[irqno]->airq_temp_cpu =
+			    (uchar_t)(cpu & ~IRQ_USER_BOUND);
 			ec_enable_irq(irqno);
 		}
 	}
@@ -289,8 +291,8 @@ xen_psm_picinit()
 	LOCK_INIT_CLEAR(&xen_psm_nmi_lock);
 
 	if (!psm_add_nmintr(0, (avfunc) xen_psm_nmi_intr,
-	    "xen_psm NMI handler", (caddr_t)NULL))
-		cmn_err(CE_WARN, "xen_psm: Unable to add nmi handler");
+	    "xVM_psm NMI handler", (caddr_t)NULL))
+		cmn_err(CE_WARN, "xVM_psm: Unable to add nmi handler");
 }
 
 
@@ -394,19 +396,6 @@ xen_psm_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 	return (err);
 }
 
-static int
-xen_psm_post_cpu_start()
-{
-	int cpun;
-
-	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		cpun = psm_get_cpu_id();
-		apic_cpus[cpun].aci_status =
-		    APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
-	}
-	return (PSM_SUCCESS);
-}
-
 static processorid_t
 xen_psm_get_next_processorid(processorid_t id)
 {
@@ -448,7 +437,7 @@ xen_psm_cpu_start(processorid_t id, caddr_t arg)
 	int ret;
 
 	ASSERT(id > 0);
-	CPUSET_ADD(xen_psm_cpus_online, id);
+	CPUSET_ATOMIC_ADD(xen_psm_cpus_online, id);
 	ec_bind_cpu_ipis(id);
 	(void) ec_bind_virq_to_irq(VIRQ_TIMER, id);
 	if ((ret = xen_vcpu_up(id)) == 0)
@@ -776,6 +765,7 @@ xen_psm_rebind_irq(int irq)
 {
 	cpuset_t ncpu;
 	processorid_t newcpu;
+	apic_irq_t *irqptr;
 
 	newcpu = xen_psm_bind_intr(irq);
 	if (newcpu == IRQ_UNBOUND) {
@@ -785,6 +775,9 @@ xen_psm_rebind_irq(int irq)
 		CPUSET_ONLY(ncpu, newcpu & ~IRQ_USER_BOUND);
 	}
 	ec_set_irq_affinity(irq, ncpu);
+	irqptr = apic_irq_table[irq];
+	ASSERT(irqptr != NULL);
+	irqptr->airq_temp_cpu = (uchar_t)newcpu;
 }
 
 /*
@@ -804,7 +797,7 @@ xen_psm_disable_intr(processorid_t cpun)
 	if (cpun == 0)
 		return (PSM_FAILURE);
 
-	CPUSET_DEL(xen_psm_cpus_online, cpun);
+	CPUSET_ATOMIC_DEL(xen_psm_cpus_online, cpun);
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		if (!ec_irq_needs_rebind(irq, cpun))
 			continue;
@@ -821,7 +814,7 @@ xen_psm_enable_intr(processorid_t cpun)
 	if (cpun == 0)
 		return;
 
-	CPUSET_ADD(xen_psm_cpus_online, cpun);
+	CPUSET_ATOMIC_ADD(xen_psm_cpus_online, cpun);
 
 	/*
 	 * Rebalance device interrupts among online processors
@@ -831,6 +824,23 @@ xen_psm_enable_intr(processorid_t cpun)
 			continue;
 		xen_psm_rebind_irq(irq);
 	}
+}
+
+static int
+xen_psm_post_cpu_start()
+{
+	processorid_t cpun;
+
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		cpun = psm_get_cpu_id();
+		apic_cpus[cpun].aci_status =
+		    APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
+	}
+	/*
+	 * Re-distribute interrupts to include the newly added cpu.
+	 */
+	xen_psm_enable_intr(cpun);
+	return (PSM_SUCCESS);
 }
 
 /*
@@ -1128,8 +1138,11 @@ apic_setup_io_intr(void *p, int irq, boolean_t deferred)
 	/*
 	 * If rebind successful bind the irq to an event channel
 	 */
-	if (rv == 0)
-		ec_setup_pirq(irq, irqptr->airq_ipl, cpus);
+	if (rv == 0) {
+		ec_setup_pirq(irq, irqptr->airq_ipl, &cpus);
+		CPUSET_FIND(cpus, cpu);
+		apic_irq_table[irq]->airq_temp_cpu = cpu & ~IRQ_USER_BOUND;
+	}
 	return (rv);
 }
 
@@ -1192,7 +1205,7 @@ static struct psm_info xen_psm_info = {
 	PSM_INFO_VER01_5,	/* version				*/
 	PSM_OWN_SYS_DEFAULT,	/* ownership				*/
 	&xen_psm_ops,		/* operation				*/
-	"xen_psm",		/* machine name				*/
+	"xVM_psm",		/* machine name				*/
 	"platform module %I%"	/* machine descriptions			*/
 };
 
