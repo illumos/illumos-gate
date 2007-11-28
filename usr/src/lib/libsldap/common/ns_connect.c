@@ -803,8 +803,13 @@ findConnectionById(int flags, const ns_cred_t *auth, ConnectionID cID,
 	if ((conp == NULL) || (auth == NULL) || cID < CONID_OFFSET)
 		return (-1);
 
-	/* if a new connection is requested, no need to continue */
-	if (flags & NS_LDAP_NEW_CONN)
+	/*
+	 * If a new connection is requested, no need to continue.
+	 * If the process is not nscd and is not requesting keep connections
+	 * alive, no need to continue.
+	 */
+	if ((flags & NS_LDAP_NEW_CONN) || (!__s_api_nscd_proc() &&
+	    !(flags & NS_LDAP_KEEP_CONN)))
 		return (-1);
 
 	*conp = NULL;
@@ -1630,9 +1635,7 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 
 	if (!fini &&
 	    ((flag & NS_LDAP_NEW_CONN) == 0) && !cp->notAvail &&
-	    ((flag & NS_LDAP_KEEP_CONN) ||
-	    (MTperConn == 0 && __s_api_nscd_proc()) ||
-	    MTperConn)) {
+	    ((flag & NS_LDAP_KEEP_CONN) || __s_api_nscd_proc())) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "tid= %d: keep alive (fini = %d "
 		    "shared = %d)\n", t, fini, cp->shared);
