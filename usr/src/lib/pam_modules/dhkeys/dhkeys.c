@@ -175,12 +175,13 @@ get_and_set_seckey(
  * pam_setcred, we have to be somewhat careful:
  *
  *      - if called from pam_sm_authenticate:
- *		1. if we don't need creds (no NIS+ or not tight), we don't
- *		   set them (they will be set by pam_sm_setcred()) and return
- *		   PAM_IGNORE.
- *              2. if we do need to set them (passwd == "*NP*"), we try to
- *		   do so. Not having credentials in this case results in
- *		   PAM_AUTH_ERR.
+ *		1. if we don't need creds (no NIS+), we don't set them
+ *		   and return PAM_IGNORE.
+ *              2. else, we always try to establish credentials;
+ *                 if (passwd == "*NP*"), not having credentials results
+ *                 in PAM_AUTH_ERR.
+ *                 if (passwd != "*NP*"), any failure to set credentials
+ *                 results in PAM_IGNORE
  *
  *	- if called from pam_sm_setcred:
  *		If we are root (uid == 0), we do nothing and return PAM_IGNORE.
@@ -216,6 +217,12 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	int	scratchlen;
 
 	int	need_cred;	/* is not having credentials set a failure? */
+	int	auth_cred_flags;
+				/*
+				 * no_warn if creds not needed and
+				 * authenticating
+				 */
+	int	auth_path = (codepath == CODEPATH_PAM_SM_AUTHENTICATE);
 	char *repository_name = NULL;	/* which repository are we using */
 	char *repository_pass = NULL;	/* user's password from that rep */
 	pwu_repository_t *pwu_rep;
@@ -303,16 +310,17 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	repository_name = attr_pw[1].data.val_s;
 	repository_pass = attr_pw[0].data.val_s;
 
-	need_cred = (strcmp(repository_name, "nisplus") == 0 &&
-	    strcmp(repository_pass, "*NP*") == 0);
-
-	if (codepath == CODEPATH_PAM_SM_AUTHENTICATE && need_cred == 0) {
-		/*
-		 * No need to set credentials right now.
-		 * Will do so later through pam_sm_setcred()
-		 */
+	if (auth_path && (strcmp(repository_name, "nisplus") != 0)) {
 		result = PAM_IGNORE;
 		goto out;
+	}
+
+	need_cred = (strcmp(repository_pass, "*NP*") == 0);
+	if (auth_path) {
+		auth_cred_flags =
+		    (need_cred ? flags : flags | PAM_SILENT);
+	} else {
+		auth_cred_flags = flags;
 	}
 
 	if (uid == 0)		/* "root", need to create a host-netname */
@@ -358,7 +366,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 			if (!get_and_set_seckey(pamh, netname, mp->keylen,
 			    mp->algtype, short_passp, uid, gid,
 			    &get_seckey_cnt, &good_pw_cnt, &set_seckey_cnt,
-			    flags, debug)) {
+			    auth_cred_flags, debug)) {
 				result = PAM_BUF_ERR;
 				goto out;
 			}
@@ -382,7 +390,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	 */
 	if (!get_and_set_seckey(pamh, netname, AUTH_DES_KEYLEN,
 	    AUTH_DES_ALGTYPE, short_passp, uid, gid, &get_seckey_cnt,
-	    &good_pw_cnt, &set_seckey_cnt, flags, debug)) {
+	    &good_pw_cnt, &set_seckey_cnt, auth_cred_flags, debug)) {
 		result = PAM_BUF_ERR;
 		goto out;
 	}
@@ -405,12 +413,20 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	}
 
 	if (good_pw_cnt == 0) {			/* wrong password */
-		result = PAM_AUTH_ERR;
+		if (auth_path) {
+			result = need_cred ? PAM_AUTH_ERR : PAM_IGNORE;
+		} else {
+			result = PAM_AUTH_ERR;
+		}
 		goto out;
 	}
 
 	if (set_seckey_cnt == 0) {
-		result = PAM_SYSTEM_ERR;
+		if (auth_path) {
+			result = need_cred ? PAM_SYSTEM_ERR : PAM_IGNORE;
+		} else {
+			result = PAM_SYSTEM_ERR;
+		}
 		goto out;
 	}
 
