@@ -144,16 +144,9 @@
  *				zero.  Must be called with spa_namespace_lock
  *				held.
  *
- * The spa_config_lock is manipulated using the following functions:
- *
- *	spa_config_enter()	Acquire the config lock as RW_READER or
- *				RW_WRITER.  At least one reference on the spa_t
- *				must exist.
- *
- *	spa_config_exit()	Release the config lock.
- *
- *	spa_config_held()	Returns true if the config lock is currently
- *				held in the given state.
+ * The spa_config_lock is a form of rwlock.  It must be held as RW_READER
+ * to perform I/O to the pool, and as RW_WRITER to change the vdev config.
+ * The spa_config_lock is manipulated with spa_config_{enter,exit,held}().
  *
  * The vdev configuration is protected by spa_vdev_enter() / spa_vdev_exit().
  *
@@ -199,6 +192,80 @@ int zfs_flags = 0;
 int zfs_recover = 0;
 
 #define	SPA_MINREF	5	/* spa_refcnt for an open-but-idle pool */
+
+/*
+ * ==========================================================================
+ * SPA config locking
+ * ==========================================================================
+ */
+static void
+spa_config_lock_init(spa_config_lock_t *scl)
+{
+	mutex_init(&scl->scl_lock, NULL, MUTEX_DEFAULT, NULL);
+	scl->scl_writer = NULL;
+	cv_init(&scl->scl_cv, NULL, CV_DEFAULT, NULL);
+	refcount_create(&scl->scl_count);
+}
+
+static void
+spa_config_lock_destroy(spa_config_lock_t *scl)
+{
+	mutex_destroy(&scl->scl_lock);
+	ASSERT(scl->scl_writer == NULL);
+	cv_destroy(&scl->scl_cv);
+	refcount_destroy(&scl->scl_count);
+}
+
+void
+spa_config_enter(spa_t *spa, krw_t rw, void *tag)
+{
+	spa_config_lock_t *scl = &spa->spa_config_lock;
+
+	mutex_enter(&scl->scl_lock);
+
+	if (rw == RW_READER) {
+		while (scl->scl_writer != NULL && scl->scl_writer != curthread)
+			cv_wait(&scl->scl_cv, &scl->scl_lock);
+	} else {
+		while (!refcount_is_zero(&scl->scl_count) &&
+		    scl->scl_writer != curthread)
+			cv_wait(&scl->scl_cv, &scl->scl_lock);
+		scl->scl_writer = curthread;
+	}
+
+	(void) refcount_add(&scl->scl_count, tag);
+
+	mutex_exit(&scl->scl_lock);
+}
+
+void
+spa_config_exit(spa_t *spa, void *tag)
+{
+	spa_config_lock_t *scl = &spa->spa_config_lock;
+
+	mutex_enter(&scl->scl_lock);
+
+	ASSERT(!refcount_is_zero(&scl->scl_count));
+
+	if (refcount_remove(&scl->scl_count, tag) == 0) {
+		cv_broadcast(&scl->scl_cv);
+		ASSERT(scl->scl_writer == NULL || scl->scl_writer == curthread);
+		scl->scl_writer = NULL;  /* OK in either case */
+	}
+
+	mutex_exit(&scl->scl_lock);
+}
+
+boolean_t
+spa_config_held(spa_t *spa, krw_t rw)
+{
+	spa_config_lock_t *scl = &spa->spa_config_lock;
+
+	if (rw == RW_READER)
+		return (!refcount_is_zero(&scl->scl_count));
+	else
+		return (scl->scl_writer == curthread);
+}
 
 /*
  * ==========================================================================
@@ -275,7 +342,7 @@ spa_add(const char *name, const char *altroot)
 	spa->spa_final_txg = UINT64_MAX;
 
 	refcount_create(&spa->spa_refcount);
-	rprw_init(&spa->spa_config_lock);
+	spa_config_lock_init(&spa->spa_config_lock);
 
 	avl_add(&spa_namespace_avl, spa);
 
@@ -324,7 +391,7 @@ spa_remove(spa_t *spa)
 
 	refcount_destroy(&spa->spa_refcount);
 
-	rprw_destroy(&spa->spa_config_lock);
+	spa_config_lock_destroy(&spa->spa_config_lock);
 
 	rw_destroy(&spa->spa_traverse_lock);
 
@@ -635,29 +702,6 @@ void
 spa_l2cache_space_update(vdev_t *vd, int64_t space, int64_t alloc)
 {
 	vdev_space_update(vd, space, alloc, B_FALSE);
-}
-
-/*
- * ==========================================================================
- * SPA config locking
- * ==========================================================================
- */
-void
-spa_config_enter(spa_t *spa, krw_t rw, void *tag)
-{
-	rprw_enter(&spa->spa_config_lock, rw, tag);
-}
-
-void
-spa_config_exit(spa_t *spa, void *tag)
-{
-	rprw_exit(&spa->spa_config_lock, tag);
-}
-
-boolean_t
-spa_config_held(spa_t *spa, krw_t rw)
-{
-	return (rprw_held(&spa->spa_config_lock, rw));
 }
 
 /*
@@ -1003,7 +1047,7 @@ spa_name(spa_t *spa)
 	 * config lock, both of which are required to do a rename.
 	 */
 	ASSERT(MUTEX_HELD(&spa_namespace_lock) ||
-	    spa_config_held(spa, RW_READER) || spa_config_held(spa, RW_WRITER));
+	    spa_config_held(spa, RW_READER));
 
 	return (spa->spa_name);
 }

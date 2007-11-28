@@ -153,6 +153,7 @@ enum zio_compress {
 	(ZIO_FLAG_CANFAIL |		\
 	ZIO_FLAG_FAILFAST |		\
 	ZIO_FLAG_CONFIG_HELD |		\
+	ZIO_FLAG_DONT_CACHE |		\
 	ZIO_FLAG_DONT_RETRY |		\
 	ZIO_FLAG_IO_REPAIR |		\
 	ZIO_FLAG_SPECULATIVE |		\
@@ -164,8 +165,10 @@ enum zio_compress {
 
 #define	ZIO_FLAG_VDEV_INHERIT		\
 	(ZIO_FLAG_GANG_INHERIT |	\
-	ZIO_FLAG_DONT_CACHE |		\
 	ZIO_FLAG_PHYSICAL)
+
+#define	ZIO_PIPELINE_CONTINUE		0x100
+#define	ZIO_PIPELINE_STOP		0x101
 
 /*
  * We'll take the unused errno 'EBADE' (from the Convergent graveyard)
@@ -262,7 +265,6 @@ struct zio {
 	uint32_t	io_numerrors;
 	uint32_t	io_pipeline;
 	uint32_t	io_orig_pipeline;
-	uint32_t	io_async_stages;
 	uint64_t	io_children_notready;
 	uint64_t	io_children_notdone;
 	void		*io_waiter;
@@ -319,21 +321,18 @@ extern void zio_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio);
 
 extern int zio_wait(zio_t *zio);
 extern void zio_nowait(zio_t *zio);
+extern void zio_execute(zio_t *zio);
+extern void zio_interrupt(zio_t *zio);
+
+extern int zio_wait_for_children_ready(zio_t *zio);
+extern int zio_wait_for_children_done(zio_t *zio);
 
 extern void *zio_buf_alloc(size_t size);
 extern void zio_buf_free(void *buf, size_t size);
 extern void *zio_data_buf_alloc(size_t size);
 extern void zio_data_buf_free(void *buf, size_t size);
 
-/*
- * Move an I/O to the next stage of the pipeline and execute that stage.
- * There's no locking on io_stage because there's no legitimate way for
- * multiple threads to be attempting to process the same I/O.
- */
-extern void zio_next_stage(zio_t *zio);
-extern void zio_next_stage_async(zio_t *zio);
 extern void zio_resubmit_stage_async(void *);
-extern void zio_wait_children_done(zio_t *zio);
 
 /*
  * Delegate I/O to a child vdev.

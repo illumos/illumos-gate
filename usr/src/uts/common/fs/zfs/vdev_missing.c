@@ -62,18 +62,18 @@ vdev_missing_close(vdev_t *vd)
 }
 
 /* ARGSUSED */
-static void
+static int
 vdev_missing_io_start(zio_t *zio)
 {
 	zio->io_error = ENOTSUP;
-	zio_next_stage_async(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 /* ARGSUSED */
-static void
+static int
 vdev_missing_io_done(zio_t *zio)
 {
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 /* ARGSUSED */

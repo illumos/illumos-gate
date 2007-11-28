@@ -61,9 +61,6 @@ uint8_t zio_priority_table[ZIO_PRIORITY_TABLE_SIZE] = {
 char *zio_type_name[ZIO_TYPES] = {
 	"null", "read", "write", "free", "claim", "ioctl" };
 
-/* At or above this size, force gang blocking - for testing */
-uint64_t zio_gang_bang = SPA_MAXBLOCKSIZE + 1;
-
 /* Force an allocation failure when non-zero */
 uint16_t zio_zil_fail_shift = 0;
 uint16_t zio_io_fail_shift = 0;
@@ -170,8 +167,6 @@ zio_init(void)
 			    align, NULL, NULL, NULL, NULL, data_alloc_arena,
 			    KMC_NODEBUG);
 
-			dprintf("creating cache for size %5lx align %5lx\n",
-			    size, align);
 		}
 	}
 
@@ -356,9 +351,6 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		zio->io_bp = bp;
 		zio->io_bp_copy = *bp;
 		zio->io_bp_orig = *bp;
-		if (dmu_ot[BP_GET_TYPE(bp)].ot_metadata ||
-		    BP_GET_LEVEL(bp) != 0)
-			zio->io_flags |= ZIO_FLAG_METADATA;
 	}
 	zio->io_done = done;
 	zio->io_private = private;
@@ -366,10 +358,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_priority = priority;
 	zio->io_stage = stage;
 	zio->io_pipeline = pipeline;
-	zio->io_async_stages = ZIO_ASYNC_PIPELINE_STAGES;
 	zio->io_timestamp = lbolt64;
-	if (pio != NULL)
-		zio->io_flags |= (pio->io_flags & ZIO_FLAG_METADATA);
 	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&zio->io_cv, NULL, CV_DEFAULT, NULL);
 	zio_push_transform(zio, data, size, size);
@@ -395,7 +384,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	if (pio == NULL) {
 		if (type != ZIO_TYPE_NULL &&
 		    !(flags & ZIO_FLAG_CONFIG_HELD)) {
-			spa_config_enter(zio->io_spa, RW_READER, zio);
+			spa_config_enter(spa, RW_READER, zio);
 			zio->io_flags |= ZIO_FLAG_CONFIG_GRABBED;
 		}
 		zio->io_root = zio;
@@ -409,7 +398,7 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 		    !(pio->io_flags & ZIO_FLAG_CONFIG_GRABBED) &&
 		    !(pio->io_flags & ZIO_FLAG_CONFIG_HELD)) {
 			pio->io_flags |= ZIO_FLAG_CONFIG_GRABBED;
-			spa_config_enter(zio->io_spa, RW_READER, pio);
+			spa_config_enter(spa, RW_READER, pio);
 		}
 		if (stage < ZIO_STAGE_READY)
 			pio->io_children_notready++;
@@ -524,9 +513,6 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	zio->io_compress = compress;
 	zio->io_ndvas = ncopies;
 
-	if (compress != ZIO_COMPRESS_OFF)
-		zio->io_async_stages |= 1U << ZIO_STAGE_WRITE_COMPRESS;
-
 	if (bp->blk_birth != txg) {
 		/* XXX the bp usually (always?) gets re-zeroed later */
 		BP_ZERO(bp);
@@ -551,7 +537,7 @@ zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
 
 	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_USER,
-	    ZIO_STAGE_OPEN, ZIO_REWRITE_PIPELINE);
+	    ZIO_STAGE_OPEN, ZIO_REWRITE_PIPELINE(bp));
 
 	zio->io_bookmark = *zb;
 	zio->io_checksum = checksum;
@@ -612,7 +598,7 @@ zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 
 	zio = zio_create(pio, spa, txg, bp, NULL, 0, done, private,
 	    ZIO_TYPE_FREE, ZIO_PRIORITY_FREE, ZIO_FLAG_USER,
-	    ZIO_STAGE_OPEN, ZIO_FREE_PIPELINE);
+	    ZIO_STAGE_OPEN, ZIO_FREE_PIPELINE(bp));
 
 	zio->io_bp = &zio->io_bp_copy;
 
@@ -641,7 +627,7 @@ zio_claim(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 
 	zio = zio_create(pio, spa, txg, bp, NULL, 0, done, private,
 	    ZIO_TYPE_CLAIM, ZIO_PRIORITY_NOW, 0,
-	    ZIO_STAGE_OPEN, ZIO_CLAIM_PIPELINE);
+	    ZIO_STAGE_OPEN, ZIO_CLAIM_PIPELINE(bp));
 
 	zio->io_bp = &zio->io_bp_copy;
 
@@ -820,7 +806,7 @@ zio_wait(zio_t *zio)
 
 	zio->io_waiter = curthread;
 
-	zio_next_stage_async(zio);
+	zio_execute(zio);
 
 	mutex_enter(&zio->io_lock);
 	while (zio->io_stalled != ZIO_STAGE_DONE)
@@ -838,7 +824,23 @@ zio_wait(zio_t *zio)
 void
 zio_nowait(zio_t *zio)
 {
-	zio_next_stage_async(zio);
+	zio_execute(zio);
+}
+
+void
+zio_interrupt(zio_t *zio)
+{
+	(void) taskq_dispatch(zio->io_spa->spa_zio_intr_taskq[zio->io_type],
+	    (task_func_t *)zio_execute, zio, TQ_SLEEP);
+}
+
+static int
+zio_issue_async(zio_t *zio)
+{
+	(void) taskq_dispatch(zio->io_spa->spa_zio_issue_taskq[zio->io_type],
+	    (task_func_t *)zio_execute, zio, TQ_SLEEP);
+
+	return (ZIO_PIPELINE_STOP);
 }
 
 /*
@@ -846,18 +848,20 @@ zio_nowait(zio_t *zio)
  * I/O pipeline interlocks: parent/child dependency scoreboarding
  * ==========================================================================
  */
-static void
+static int
 zio_wait_for_children(zio_t *zio, uint32_t stage, uint64_t *countp)
 {
+	int rv = ZIO_PIPELINE_CONTINUE;
+
 	mutex_enter(&zio->io_lock);
-	if (*countp == 0) {
-		ASSERT(zio->io_stalled == 0);
-		mutex_exit(&zio->io_lock);
-		zio_next_stage(zio);
-	} else {
+	ASSERT(zio->io_stalled == 0);
+	if (*countp != 0) {
 		zio->io_stalled = stage;
-		mutex_exit(&zio->io_lock);
+		rv = ZIO_PIPELINE_STOP;
 	}
+	mutex_exit(&zio->io_lock);
+
+	return (rv);
 }
 
 static void
@@ -872,48 +876,54 @@ zio_notify_parent(zio_t *zio, uint32_t stage, uint64_t *countp)
 	if (--*countp == 0 && pio->io_stalled == stage) {
 		pio->io_stalled = 0;
 		mutex_exit(&pio->io_lock);
-		zio_next_stage_async(pio);
+		zio_execute(pio);
 	} else {
 		mutex_exit(&pio->io_lock);
 	}
 }
 
-static void
-zio_wait_children_ready(zio_t *zio)
+int
+zio_wait_for_children_ready(zio_t *zio)
 {
-	zio_wait_for_children(zio, ZIO_STAGE_WAIT_CHILDREN_READY,
-	    &zio->io_children_notready);
+	return (zio_wait_for_children(zio, ZIO_STAGE_WAIT_FOR_CHILDREN_READY,
+	    &zio->io_children_notready));
 }
 
-void
-zio_wait_children_done(zio_t *zio)
+int
+zio_wait_for_children_done(zio_t *zio)
 {
-	zio_wait_for_children(zio, ZIO_STAGE_WAIT_CHILDREN_DONE,
-	    &zio->io_children_notdone);
+	return (zio_wait_for_children(zio, ZIO_STAGE_WAIT_FOR_CHILDREN_DONE,
+	    &zio->io_children_notdone));
 }
 
-static void
+static int
 zio_read_init(zio_t *zio)
 {
-	if (BP_GET_COMPRESS(zio->io_bp) != ZIO_COMPRESS_OFF) {
-		uint64_t csize = BP_GET_PSIZE(zio->io_bp);
+	blkptr_t *bp = zio->io_bp;
+
+	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF) {
+		uint64_t csize = BP_GET_PSIZE(bp);
 		void *cbuf = zio_buf_alloc(csize);
 
 		zio_push_transform(zio, cbuf, csize, csize);
 		zio->io_pipeline |= 1U << ZIO_STAGE_READ_DECOMPRESS;
 	}
 
-	if (BP_IS_GANG(zio->io_bp)) {
+	if (BP_IS_GANG(bp)) {
 		uint64_t gsize = SPA_GANGBLOCKSIZE;
 		void *gbuf = zio_buf_alloc(gsize);
 
 		zio_push_transform(zio, gbuf, gsize, gsize);
 		zio->io_pipeline |= 1U << ZIO_STAGE_READ_GANG_MEMBERS;
 	}
-	zio_next_stage(zio);
+
+	if (!dmu_ot[BP_GET_TYPE(bp)].ot_metadata && BP_GET_LEVEL(bp) == 0)
+		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_ready(zio_t *zio)
 {
 	zio_t *pio = zio->io_parent;
@@ -922,16 +932,16 @@ zio_ready(zio_t *zio)
 		zio->io_ready(zio);
 
 	if (pio != NULL)
-		zio_notify_parent(zio, ZIO_STAGE_WAIT_CHILDREN_READY,
+		zio_notify_parent(zio, ZIO_STAGE_WAIT_FOR_CHILDREN_READY,
 		    &pio->io_children_notready);
 
 	if (zio->io_bp)
 		zio->io_bp_copy = *zio->io_bp;
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_vdev_retry_io(zio_t *zio)
 {
 	zio_t *pio = zio->io_parent;
@@ -967,7 +977,7 @@ zio_vdev_retry_io(zio_t *zio)
 		if (pio->io_stage > ZIO_STAGE_OPEN && IO_IS_ALLOCATING(pio))
 			pio->io_flags |= ZIO_FLAG_WRITE_RETRY;
 
-		ASSERT(pio->io_stage <= ZIO_STAGE_WAIT_CHILDREN_DONE);
+		ASSERT(pio->io_stage <= ZIO_STAGE_WAIT_FOR_CHILDREN_DONE);
 		mutex_exit(&pio->io_lock);
 	}
 
@@ -977,7 +987,8 @@ zio_vdev_retry_io(zio_t *zio)
 	 */
 	zio->io_flags &= ~ZIO_FLAG_WRITE_RETRY;
 	zio->io_error = 0;
-	zio_next_stage_async(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 int
@@ -1029,7 +1040,7 @@ zio_vdev_resume_io(spa_t *spa)
 			zio->io_stage = ZIO_STAGE_READY;
 		}
 
-		(void) taskq_dispatch(zio_taskq, zio_resubmit_stage_async,
+		(void) taskq_dispatch(zio_taskq, (task_func_t *)zio_execute,
 		    zio, TQ_SLEEP);
 	}
 	mutex_exit(&spa->spa_zio_lock);
@@ -1049,7 +1060,7 @@ zio_vdev_resume_io(spa_t *spa)
 	return (0);
 }
 
-static void
+static int
 zio_vdev_suspend_io(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
@@ -1069,9 +1080,11 @@ zio_vdev_suspend_io(zio_t *zio)
 	cv_broadcast(&spa->spa_zio_cv);
 #endif
 	mutex_exit(&spa->spa_zio_lock);
+
+	return (ZIO_PIPELINE_STOP);
 }
 
-static void
+static int
 zio_assess(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
@@ -1138,10 +1151,9 @@ zio_assess(zio_t *zio)
 		 * property.
 		 */
 		if (zio_write_retry && zio->io_error != ENOSPC &&
-		    IO_IS_ALLOCATING(zio)) {
-			zio_vdev_retry_io(zio);
-			return;
-		}
+		    IO_IS_ALLOCATING(zio))
+			return (zio_vdev_retry_io(zio));
+
 		ASSERT(!(zio->io_flags & ZIO_FLAG_WRITE_RETRY));
 
 		/*
@@ -1175,22 +1187,20 @@ zio_assess(zio_t *zio)
 				    "uncorrectable I/O failure and the "
 				    "failure mode property for this pool "
 				    "is set to panic.", spa_name(spa));
-			} else {
-				cmn_err(CE_WARN, "Pool '%s' has encountered "
-				    "an uncorrectable I/O error. Manual "
-				    "intervention is required.",
-				    spa_name(spa));
-				zio_vdev_suspend_io(zio);
 			}
-			return;
+			cmn_err(CE_WARN, "Pool '%s' has encountered "
+			    "an uncorrectable I/O error. "
+			    "Manual intervention is required.", spa_name(spa));
+			return (zio_vdev_suspend_io(zio));
 		}
 	}
 	ASSERT(!(zio->io_flags & ZIO_FLAG_WRITE_RETRY));
 	ASSERT(zio->io_children_notready == 0);
-	zio_next_stage(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_done(zio_t *zio)
 {
 	zio_t *pio = zio->io_parent;
@@ -1221,7 +1231,7 @@ zio_done(zio_t *zio)
 			pio->io_child = next;
 		mutex_exit(&pio->io_lock);
 
-		zio_notify_parent(zio, ZIO_STAGE_WAIT_CHILDREN_DONE,
+		zio_notify_parent(zio, ZIO_STAGE_WAIT_FOR_CHILDREN_DONE,
 		    &pio->io_children_notdone);
 	}
 
@@ -1243,6 +1253,8 @@ zio_done(zio_t *zio)
 		cv_destroy(&zio->io_cv);
 		kmem_cache_free(zio_cache, zio);
 	}
+
+	return (ZIO_PIPELINE_STOP);
 }
 
 /*
@@ -1250,7 +1262,7 @@ zio_done(zio_t *zio)
  * Compression support
  * ==========================================================================
  */
-static void
+static int
 zio_write_compress(zio_t *zio)
 {
 	int compress = zio->io_compress;
@@ -1300,7 +1312,7 @@ zio_write_compress(zio_t *zio)
 		ASSERT(csize != 0);
 		BP_SET_LSIZE(bp, lsize);
 		BP_SET_COMPRESS(bp, compress);
-		zio->io_pipeline = ZIO_REWRITE_PIPELINE;
+		zio->io_pipeline = ZIO_REWRITE_PIPELINE(bp);
 	} else {
 		if (bp->blk_birth == zio->io_txg)
 			BP_ZERO(bp);
@@ -1316,10 +1328,10 @@ zio_write_compress(zio_t *zio)
 		}
 	}
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_read_decompress(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
@@ -1338,7 +1350,7 @@ zio_read_decompress(zio_t *zio)
 
 	zio_buf_free(data, bufsize);
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 /*
@@ -1346,19 +1358,6 @@ zio_read_decompress(zio_t *zio)
  * Gang block support
  * ==========================================================================
  */
-static void
-zio_gang_pipeline(zio_t *zio)
-{
-	/*
-	 * By default, the pipeline assumes that we're dealing with a gang
-	 * block.  If we're not, strip out any gang-specific stages.
-	 */
-	if (!BP_IS_GANG(zio->io_bp))
-		zio->io_pipeline &= ~ZIO_GANG_STAGES;
-
-	zio_next_stage(zio);
-}
-
 static void
 zio_gang_byteswap(zio_t *zio)
 {
@@ -1368,7 +1367,7 @@ zio_gang_byteswap(zio_t *zio)
 		byteswap_uint64_array(zio->io_data, zio->io_size);
 }
 
-static void
+static int
 zio_get_gang_header(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
@@ -1384,10 +1383,10 @@ zio_get_gang_header(zio_t *zio)
 	    zio->io_flags & ZIO_FLAG_GANG_INHERIT,
 	    ZIO_STAGE_OPEN, ZIO_READ_GANG_PIPELINE));
 
-	zio_wait_children_done(zio);
+	return (zio_wait_for_children_done(zio));
 }
 
-static void
+static int
 zio_read_gang_members(zio_t *zio)
 {
 	zio_gbh_phys_t *gbh;
@@ -1410,16 +1409,17 @@ zio_read_gang_members(zio_t *zio)
 		ASSERT(!BP_IS_HOLE(gbp));
 
 		zio_nowait(zio_read(zio, zio->io_spa, gbp,
-		    (char *)zio->io_data + loff, lsize, NULL, NULL,
-		    zio->io_priority, zio->io_flags & ZIO_FLAG_GANG_INHERIT,
-		    &zio->io_bookmark));
+		    (char *)zio->io_data + loff, lsize,
+		    NULL, NULL, zio->io_priority,
+		    zio->io_flags & ZIO_FLAG_GANG_INHERIT, &zio->io_bookmark));
 	}
 
 	zio_buf_free(gbh, gbufsize);
-	zio_wait_children_done(zio);
+
+	return (zio_wait_for_children_done(zio));
 }
 
-static void
+static int
 zio_rewrite_gang_members(zio_t *zio)
 {
 	zio_gbh_phys_t *gbh;
@@ -1446,15 +1446,16 @@ zio_rewrite_gang_members(zio_t *zio)
 
 		zio_nowait(zio_rewrite(zio, zio->io_spa, zio->io_checksum,
 		    zio->io_txg, gbp, (char *)zio->io_data + loff, lsize,
-		    NULL, NULL, zio->io_priority, zio->io_flags,
-		    &zio->io_bookmark));
+		    NULL, NULL, zio->io_priority,
+		    zio->io_flags & ZIO_FLAG_GANG_INHERIT, &zio->io_bookmark));
 	}
 
 	zio_push_transform(zio, gbh, gsize, gbufsize);
-	zio_wait_children_ready(zio);
+
+	return (zio_wait_for_children_ready(zio));
 }
 
-static void
+static int
 zio_free_gang_members(zio_t *zio)
 {
 	zio_gbh_phys_t *gbh;
@@ -1476,10 +1477,11 @@ zio_free_gang_members(zio_t *zio)
 	}
 
 	zio_buf_free(gbh, gbufsize);
-	zio_next_stage(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_claim_gang_members(zio_t *zio)
 {
 	zio_gbh_phys_t *gbh;
@@ -1500,7 +1502,8 @@ zio_claim_gang_members(zio_t *zio)
 	}
 
 	zio_buf_free(gbh, gbufsize);
-	zio_next_stage(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 static void
@@ -1549,8 +1552,10 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 
 	error = metaslab_alloc(spa, mc, gsize, bp, gbh_ndvas, txg, NULL,
 	    B_FALSE);
-	if (error)
-		return (error);
+	if (error) {
+		zio->io_error = error;
+		return (ZIO_PIPELINE_CONTINUE);
+	}
 
 	for (d = 0; d < gbh_ndvas; d++)
 		DVA_SET_GANG(&dva[d], 1);
@@ -1559,10 +1564,6 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 
 	gbh = zio_buf_alloc(gsize);
 	bzero(gbh, gsize);
-
-	/* We need to test multi-level gang blocks */
-	if (maxalloc >= zio_gang_bang && (lbolt & 0x1) == 0)
-		maxalloc = MAX(maxalloc >> 2, SPA_MINBLOCKSIZE);
 
 	for (loff = 0, i = 0; loff != zio->io_size;
 	    loff += lsize, resid -= lsize, gbps_left--, i++) {
@@ -1579,8 +1580,10 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 				break;
 			ASSERT3U(error, ==, ENOSPC);
 			/* XXX - free up previous allocations? */
-			if (maxalloc == SPA_MINBLOCKSIZE)
-				return (error);
+			if (maxalloc == SPA_MINBLOCKSIZE) {
+				zio->io_error = error;
+				return (ZIO_PIPELINE_CONTINUE);
+			}
 			maxalloc = P2ROUNDUP(maxalloc >> 1, SPA_MINBLOCKSIZE);
 		}
 
@@ -1614,14 +1617,14 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 	zio->io_pipeline |= 1U << ZIO_STAGE_GANG_CHECKSUM_GENERATE;
 
 	zio_push_transform(zio, gbh, gsize, gsize);
+
 	/*
-	 * As much as we'd like this to be zio_wait_children_ready(),
+	 * As much as we'd like this to be 'ready' instead of 'done',
 	 * updating our ASIZE doesn't happen until the io_done callback,
 	 * so we have to wait for that to finish in order for our BP
 	 * to be stable.
 	 */
-	zio_wait_children_done(zio);
-	return (0);
+	return (zio_wait_for_children_done(zio));
 }
 
 /*
@@ -1629,7 +1632,7 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
  * Allocate and free blocks
  * ==========================================================================
  */
-static void
+static int
 zio_dva_allocate(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
@@ -1641,14 +1644,6 @@ zio_dva_allocate(zio_t *zio)
 	ASSERT3U(BP_GET_NDVAS(bp), ==, 0);
 	ASSERT3U(zio->io_ndvas, >, 0);
 	ASSERT3U(zio->io_ndvas, <=, spa_max_replication(spa));
-
-	/* For testing, make some blocks above a certain size be gang blocks */
-	if (zio->io_size >= zio_gang_bang && (lbolt & 0x3) == 0) {
-		error = zio_write_allocate_gang_members(zio, mc);
-		if (error)
-			zio->io_error = error;
-		return;
-	}
 
 	/*
 	 * For testing purposes, we force I/Os to retry. We don't allow
@@ -1668,17 +1663,15 @@ zio_dva_allocate(zio_t *zio)
 	if (error == 0) {
 		bp->blk_birth = zio->io_txg;
 	} else if (error == ENOSPC && zio->io_size > SPA_MINBLOCKSIZE) {
-		error = zio_write_allocate_gang_members(zio, mc);
-		if (error == 0)
-			return;
-		zio->io_error = error;
+		return (zio_write_allocate_gang_members(zio, mc));
 	} else {
 		zio->io_error = error;
 	}
-	zio_next_stage(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_dva_free(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
@@ -1687,15 +1680,15 @@ zio_dva_free(zio_t *zio)
 
 	BP_ZERO(bp);
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_dva_claim(zio_t *zio)
 {
 	zio->io_error = metaslab_claim(zio->io_spa, zio->io_bp, zio->io_txg);
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 /*
@@ -1704,7 +1697,7 @@ zio_dva_claim(zio_t *zio)
  * ==========================================================================
  */
 
-static void
+static int
 zio_vdev_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
@@ -1719,24 +1712,21 @@ zio_vdev_io_start(zio_t *zio)
 	 * at that time.
 	 */
 	if (spa_state(spa) == POOL_STATE_IO_FAILURE &&
-	    zio->io_type == ZIO_TYPE_WRITE) {
-		zio_vdev_suspend_io(zio);
-		return;
-	}
+	    zio->io_type == ZIO_TYPE_WRITE)
+		return (zio_vdev_suspend_io(zio));
 
-	if (vd == NULL) {
-		/* The mirror_ops handle multiple DVAs in a single BP */
-		vdev_mirror_ops.vdev_op_io_start(zio);
-		return;
-	}
+	/*
+	 * The mirror_ops handle multiple DVAs in a single BP
+	 */
+	if (vd == NULL)
+		return (vdev_mirror_ops.vdev_op_io_start(zio));
 
 	align = 1ULL << tvd->vdev_ashift;
 
 	if (zio->io_retries == 0 && vd == tvd)
 		zio->io_flags |= ZIO_FLAG_FAILFAST;
 
-	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) &&
-	    vd->vdev_children == 0) {
+	if (!(zio->io_flags & ZIO_FLAG_PHYSICAL) && vd->vdev_children == 0) {
 		zio->io_flags |= ZIO_FLAG_PHYSICAL;
 		zio->io_offset += VDEV_LABEL_START_SIZE;
 	}
@@ -1760,19 +1750,16 @@ zio_vdev_io_start(zio_t *zio)
 	    P2ROUNDUP(ZIO_GET_IOSIZE(zio), align) == zio->io_size);
 	ASSERT(zio->io_type != ZIO_TYPE_WRITE || (spa_mode & FWRITE));
 
-	vdev_io_start(zio);
-
-	/* zio_next_stage_async() gets called from io completion interrupt */
+	return (vd->vdev_ops->vdev_op_io_start(zio));
 }
 
-static void
+static int
 zio_vdev_io_done(zio_t *zio)
 {
 	if (zio->io_vd == NULL)
-		/* The mirror_ops handle multiple DVAs in a single BP */
-		vdev_mirror_ops.vdev_op_io_done(zio);
-	else
-		vdev_io_done(zio);
+		return (vdev_mirror_ops.vdev_op_io_done(zio));
+
+	return (zio->io_vd->vdev_ops->vdev_op_io_done(zio));
 }
 
 /* XXPOLICY */
@@ -1795,7 +1782,7 @@ zio_should_retry(zio_t *zio)
 	return (B_TRUE);
 }
 
-static void
+static int
 zio_vdev_io_assess(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
@@ -1833,15 +1820,10 @@ zio_vdev_io_assess(zio_t *zio)
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
 		zio->io_stage = ZIO_STAGE_VDEV_IO_START - 1;
 
-		dprintf("retry #%d for %s to %s offset %llx\n",
-		    zio->io_retries, zio_type_name[zio->io_type],
-		    vdev_description(vd), zio->io_offset);
-
-		zio_next_stage_async(zio);
-		return;
+		return (ZIO_PIPELINE_CONTINUE);
 	}
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 void
@@ -1876,7 +1858,7 @@ zio_vdev_io_bypass(zio_t *zio)
  * Generate and verify checksums
  * ==========================================================================
  */
-static void
+static int
 zio_checksum_generate(zio_t *zio)
 {
 	int checksum = zio->io_checksum;
@@ -1889,10 +1871,10 @@ zio_checksum_generate(zio_t *zio)
 
 	zio_checksum(checksum, &bp->blk_cksum, zio->io_data, zio->io_size);
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_gang_checksum_generate(zio_t *zio)
 {
 	zio_cksum_t zc;
@@ -1905,10 +1887,10 @@ zio_gang_checksum_generate(zio_t *zio)
 
 	zio_checksum(ZIO_CHECKSUM_GANG_HEADER, &zc, zio->io_data, zio->io_size);
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
-static void
+static int
 zio_checksum_verify(zio_t *zio)
 {
 	if (zio->io_bp != NULL) {
@@ -1918,7 +1900,7 @@ zio_checksum_verify(zio_t *zio)
 			    zio->io_spa, zio->io_vd, zio, 0, 0);
 	}
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 /*
@@ -1949,20 +1931,15 @@ zio_set_gang_verifier(zio_t *zio, zio_cksum_t *zcp)
  * Define the pipeline
  * ==========================================================================
  */
-typedef void zio_pipe_stage_t(zio_t *zio);
-
-static void
-zio_badop(zio_t *zio)
-{
-	panic("Invalid I/O pipeline stage %u for zio %p", zio->io_stage, zio);
-}
+typedef int zio_pipe_stage_t(zio_t *zio);
 
 zio_pipe_stage_t *zio_pipeline[ZIO_STAGE_DONE + 2] = {
-	zio_badop,
-	zio_wait_children_ready,
+	NULL,
+	zio_wait_for_children_ready,
+	zio_read_init,
+	zio_issue_async,
 	zio_write_compress,
 	zio_checksum_generate,
-	zio_gang_pipeline,
 	zio_get_gang_header,
 	zio_rewrite_gang_members,
 	zio_free_gang_members,
@@ -1972,114 +1949,61 @@ zio_pipe_stage_t *zio_pipeline[ZIO_STAGE_DONE + 2] = {
 	zio_dva_claim,
 	zio_gang_checksum_generate,
 	zio_ready,
-	zio_read_init,
 	zio_vdev_io_start,
 	zio_vdev_io_done,
 	zio_vdev_io_assess,
-	zio_wait_children_done,
+	zio_wait_for_children_done,
 	zio_checksum_verify,
 	zio_read_gang_members,
 	zio_read_decompress,
 	zio_assess,
 	zio_done,
-	zio_badop
+	NULL
 };
 
 /*
- * Move an I/O to the next stage of the pipeline and execute that stage.
- * There's no locking on io_stage because there's no legitimate way for
- * multiple threads to be attempting to process the same I/O.
+ * Execute the I/O pipeline until one of the following occurs:
+ * (1) the I/O completes; (2) the pipeline stalls waiting for
+ * dependent child I/Os; (3) the I/O issues, so we're waiting
+ * for an I/O completion interrupt; (4) the I/O is delegated by
+ * vdev-level caching or aggregation; (5) the I/O is deferred
+ * due to vdev-level queueing; (6) the I/O is handed off to
+ * another thread.  In all cases, the pipeline stops whenever
+ * there's no CPU work; it never burns a thread in cv_wait().
+ *
+ * There's no locking on io_stage because there's no legitimate way
+ * for multiple threads to be attempting to process the same I/O.
  */
 void
-zio_next_stage(zio_t *zio)
+zio_execute(zio_t *zio)
 {
-	uint32_t pipeline = zio->io_pipeline;
+	while (zio->io_stage < ZIO_STAGE_DONE) {
+		uint32_t pipeline = zio->io_pipeline;
+		int rv;
 
-	ASSERT(!MUTEX_HELD(&zio->io_lock));
+		ASSERT(!MUTEX_HELD(&zio->io_lock));
 
-	if (zio->io_error) {
-		dprintf("zio %p vdev %s offset %llx stage %d error %d\n",
-		    zio, vdev_description(zio->io_vd),
-		    zio->io_offset, zio->io_stage, zio->io_error);
-		if (((1U << zio->io_stage) & ZIO_VDEV_IO_PIPELINE) == 0)
+		/*
+		 * If an error occurred outside the vdev stack,
+		 * just execute the interlock stages to clean up.
+		 */
+		if (zio->io_error &&
+		    ((1U << zio->io_stage) & ZIO_VDEV_IO_STAGES) == 0)
 			pipeline &= ZIO_ERROR_PIPELINE_MASK;
+
+		while (((1U << ++zio->io_stage) & pipeline) == 0)
+			continue;
+
+		ASSERT(zio->io_stage <= ZIO_STAGE_DONE);
+		ASSERT(zio->io_stalled == 0);
+
+		rv = zio_pipeline[zio->io_stage](zio);
+
+		if (rv == ZIO_PIPELINE_STOP)
+			return;
+
+		ASSERT(rv == ZIO_PIPELINE_CONTINUE);
 	}
-
-	while (((1U << ++zio->io_stage) & pipeline) == 0)
-		continue;
-
-	ASSERT(zio->io_stage <= ZIO_STAGE_DONE);
-	ASSERT(zio->io_stalled == 0);
-
-	/*
-	 * See the comment in zio_next_stage_async() about per-CPU taskqs.
-	 */
-	if (((1U << zio->io_stage) & zio->io_async_stages) &&
-	    (zio->io_stage == ZIO_STAGE_WRITE_COMPRESS) &&
-	    !(zio->io_flags & ZIO_FLAG_METADATA)) {
-		taskq_t *tq = zio->io_spa->spa_zio_issue_taskq[zio->io_type];
-		(void) taskq_dispatch(tq,
-		    (task_func_t *)zio_pipeline[zio->io_stage], zio, TQ_SLEEP);
-	} else {
-		zio_pipeline[zio->io_stage](zio);
-	}
-}
-
-void
-zio_next_stage_async(zio_t *zio)
-{
-	taskq_t *tq;
-	uint32_t pipeline = zio->io_pipeline;
-
-	ASSERT(!MUTEX_HELD(&zio->io_lock));
-
-	if (zio->io_error) {
-		dprintf("zio %p vdev %s offset %llx stage %d error %d\n",
-		    zio, vdev_description(zio->io_vd),
-		    zio->io_offset, zio->io_stage, zio->io_error);
-		if (((1U << zio->io_stage) & ZIO_VDEV_IO_PIPELINE) == 0)
-			pipeline &= ZIO_ERROR_PIPELINE_MASK;
-	}
-
-	while (((1U << ++zio->io_stage) & pipeline) == 0)
-		continue;
-
-	ASSERT(zio->io_stage <= ZIO_STAGE_DONE);
-	ASSERT(zio->io_stalled == 0);
-
-	/*
-	 * For performance, we'll probably want two sets of task queues:
-	 * per-CPU issue taskqs and per-CPU completion taskqs.  The per-CPU
-	 * part is for read performance: since we have to make a pass over
-	 * the data to checksum it anyway, we want to do this on the same CPU
-	 * that issued the read, because (assuming CPU scheduling affinity)
-	 * that thread is probably still there.  Getting this optimization
-	 * right avoids performance-hostile cache-to-cache transfers.
-	 *
-	 * Note that having two sets of task queues is also necessary for
-	 * correctness: if all of the issue threads get bogged down waiting
-	 * for dependent reads (e.g. metaslab freelist) to complete, then
-	 * there won't be any threads available to service I/O completion
-	 * interrupts.
-	 */
-	if ((1U << zio->io_stage) & zio->io_async_stages) {
-		if (zio->io_stage < ZIO_STAGE_VDEV_IO_DONE)
-			tq = zio->io_spa->spa_zio_issue_taskq[zio->io_type];
-		else
-			tq = zio->io_spa->spa_zio_intr_taskq[zio->io_type];
-		(void) taskq_dispatch(tq,
-		    (task_func_t *)zio_pipeline[zio->io_stage], zio, TQ_SLEEP);
-	} else {
-		zio_pipeline[zio->io_stage](zio);
-	}
-}
-
-void
-zio_resubmit_stage_async(void *arg)
-{
-	zio_t *zio = (zio_t *)(uintptr_t)arg;
-
-	zio_next_stage_async(zio);
 }
 
 static boolean_t

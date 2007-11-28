@@ -48,6 +48,6 @@
 #include <sys/bplist.h>
 #include <sys/zfs_znode.h>
 
-extern uint64_t zio_gang_bang;
+extern uint64_t metaslab_gang_bang;
 extern uint16_t zio_zil_fail_shift;
 extern uint16_t zio_io_fail_shift;

@@ -35,6 +35,7 @@
 #include <sys/zio.h>
 
 uint64_t metaslab_aliquot = 512ULL << 10;
+uint64_t metaslab_gang_bang = SPA_MAXBLOCKSIZE + 1;	/* force gang blocks */
 
 /*
  * ==========================================================================
@@ -726,6 +727,12 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	uint64_t distance;
 
 	ASSERT(!DVA_IS_VALID(&dva[d]));
+
+	/*
+	 * For testing, make some blocks above a certain size be gang blocks.
+	 */
+	if (psize >= metaslab_gang_bang && (lbolt & 3) == 0)
+		return (ENOSPC);
 
 	/*
 	 * Start at the rotor and loop through all mgs until we find something.

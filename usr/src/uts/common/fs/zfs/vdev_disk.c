@@ -386,7 +386,7 @@ vdev_disk_io_intr(buf_t *bp)
 
 	kmem_free(vdb, sizeof (vdev_disk_buf_t));
 
-	zio_next_stage_async(zio);
+	zio_interrupt(zio);
 }
 
 static void
@@ -396,10 +396,10 @@ vdev_disk_ioctl_done(void *zio_arg, int error)
 
 	zio->io_error = error;
 
-	zio_next_stage_async(zio);
+	zio_interrupt(zio);
 }
 
-static void
+static int
 vdev_disk_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
@@ -414,8 +414,7 @@ vdev_disk_io_start(zio_t *zio)
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = ENXIO;
-			zio_next_stage_async(zio);
-			return;
+			return (ZIO_PIPELINE_CONTINUE);
 		}
 
 		switch (zio->io_cmd) {
@@ -444,8 +443,10 @@ vdev_disk_io_start(zio_t *zio)
 				 * and will call vdev_disk_ioctl_done()
 				 * upon completion.
 				 */
-				return;
-			} else if (error == ENOTSUP || error == ENOTTY) {
+				return (ZIO_PIPELINE_STOP);
+			}
+
+			if (error == ENOTSUP || error == ENOTTY) {
 				/*
 				 * If we get ENOTSUP or ENOTTY, we know that
 				 * no future attempts will ever succeed.
@@ -463,15 +464,26 @@ vdev_disk_io_start(zio_t *zio)
 			zio->io_error = ENOTSUP;
 		}
 
-		zio_next_stage_async(zio);
-		return;
+		return (ZIO_PIPELINE_CONTINUE);
 	}
 
 	if (zio->io_type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
-		return;
+		return (ZIO_PIPELINE_STOP);
 
 	if ((zio = vdev_queue_io(zio)) == NULL)
-		return;
+		return (ZIO_PIPELINE_STOP);
+
+	if (zio->io_type == ZIO_TYPE_WRITE)
+		error = vdev_writeable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
+	else
+		error = vdev_readable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
+	error = (vd->vdev_remove_wanted || vd->vdev_is_failing) ? ENXIO : error;
+
+	if (error) {
+		zio->io_error = error;
+		zio_interrupt(zio);
+		return (ZIO_PIPELINE_STOP);
+	}
 
 	flags = (zio->io_type == ZIO_TYPE_READ ? B_READ : B_WRITE);
 	flags |= B_BUSY | B_NOCACHE;
@@ -491,26 +503,14 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = (int (*)())vdev_disk_io_intr;
 
-	/* XXPOLICY */
-	if (zio->io_type == ZIO_TYPE_WRITE)
-		error = vdev_writeable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
-	else
-		error = vdev_readable(vd) ? vdev_error_inject(vd, zio) : ENXIO;
-	error = (vd->vdev_remove_wanted || vd->vdev_is_failing) ? ENXIO : error;
-	if (error) {
-		zio->io_error = error;
-		bioerror(bp, error);
-		bp->b_resid = bp->b_bcount;
-		bp->b_iodone(bp);
-		return;
-	}
-
 	error = ldi_strategy(dvd->vd_lh, bp);
 	/* ldi_strategy() will return non-zero only on programming errors */
 	ASSERT(error == 0);
+
+	return (ZIO_PIPELINE_STOP);
 }
 
-static void
+static int
 vdev_disk_io_done(zio_t *zio)
 {
 	vdev_queue_io_done(zio);
@@ -544,7 +544,7 @@ vdev_disk_io_done(zio_t *zio)
 		}
 	}
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 vdev_ops_t vdev_disk_ops = {

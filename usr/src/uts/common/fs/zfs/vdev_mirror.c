@@ -253,7 +253,7 @@ vdev_mirror_child_select(zio_t *zio)
 	return (-1);
 }
 
-static void
+static int
 vdev_mirror_io_start(zio_t *zio)
 {
 	mirror_map_t *mm;
@@ -279,8 +279,7 @@ vdev_mirror_io_start(zio_t *zio)
 				    ZIO_FLAG_CANFAIL,
 				    vdev_mirror_scrub_done, mc));
 			}
-			zio_wait_children_done(zio);
-			return;
+			return (zio_wait_for_children_done(zio));
 		}
 		/*
 		 * For normal reads just pick one child.
@@ -316,10 +315,10 @@ vdev_mirror_io_start(zio_t *zio)
 		c++;
 	}
 
-	zio_wait_children_done(zio);
+	return (zio_wait_for_children_done(zio));
 }
 
-static void
+static int
 vdev_mirror_io_done(zio_t *zio)
 {
 	mirror_map_t *mm = zio->io_vsd;
@@ -362,8 +361,7 @@ vdev_mirror_io_done(zio_t *zio)
 		if (good_copies != 0)
 			zio->io_error = 0;
 		vdev_mirror_map_free(zio);
-		zio_next_stage(zio);
-		return;
+		return (ZIO_PIPELINE_CONTINUE);
 	}
 
 	ASSERT(zio->io_type == ZIO_TYPE_READ);
@@ -383,8 +381,7 @@ vdev_mirror_io_done(zio_t *zio)
 		    mc->mc_vd, mc->mc_offset, zio->io_data, zio->io_size,
 		    ZIO_TYPE_READ, zio->io_priority, ZIO_FLAG_CANFAIL,
 		    vdev_mirror_child_done, mc));
-		zio_wait_children_done(zio);
-		return;
+		return (zio_wait_for_children_done(zio));
 	}
 
 	/* XXPOLICY */
@@ -441,12 +438,13 @@ vdev_mirror_io_done(zio_t *zio)
 		}
 
 		zio_nowait(rio);
-		zio_wait_children_done(zio);
-		return;
+
+		return (zio_wait_for_children_done(zio));
 	}
 
 	vdev_mirror_map_free(zio);
-	zio_next_stage(zio);
+
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 static void

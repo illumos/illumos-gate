@@ -215,7 +215,7 @@ vdev_file_probe(vdev_t *vd)
 	return (error);
 }
 
-static void
+static int
 vdev_file_io_start(zio_t *zio)
 {
 	vdev_t *vd = zio->io_vd;
@@ -229,8 +229,7 @@ vdev_file_io_start(zio_t *zio)
 		/* XXPOLICY */
 		if (!vdev_readable(vd)) {
 			zio->io_error = ENXIO;
-			zio_next_stage_async(zio);
-			return;
+			return (ZIO_PIPELINE_CONTINUE);
 		}
 
 		switch (zio->io_cmd) {
@@ -244,8 +243,7 @@ vdev_file_io_start(zio_t *zio)
 			zio->io_error = ENOTSUP;
 		}
 
-		zio_next_stage_async(zio);
-		return;
+		return (ZIO_PIPELINE_CONTINUE);
 	}
 
 	/*
@@ -254,11 +252,11 @@ vdev_file_io_start(zio_t *zio)
 	 */
 #ifndef _KERNEL
 	if (zio->io_type == ZIO_TYPE_READ && vdev_cache_read(zio) == 0)
-		return;
+		return (ZIO_PIPELINE_STOP);
 #endif
 
 	if ((zio = vdev_queue_io(zio)) == NULL)
-		return;
+		return (ZIO_PIPELINE_STOP);
 
 	/* XXPOLICY */
 	if (zio->io_type == ZIO_TYPE_WRITE)
@@ -268,8 +266,8 @@ vdev_file_io_start(zio_t *zio)
 	error = (vd->vdev_remove_wanted || vd->vdev_is_failing) ? ENXIO : error;
 	if (error) {
 		zio->io_error = error;
-		zio_next_stage_async(zio);
-		return;
+		zio_interrupt(zio);
+		return (ZIO_PIPELINE_STOP);
 	}
 
 	zio->io_error = vn_rdwr(zio->io_type == ZIO_TYPE_READ ?
@@ -280,26 +278,25 @@ vdev_file_io_start(zio_t *zio)
 	if (resid != 0 && zio->io_error == 0)
 		zio->io_error = ENOSPC;
 
-	zio_next_stage_async(zio);
+	zio_interrupt(zio);
+
+	return (ZIO_PIPELINE_STOP);
 }
 
-static void
+static int
 vdev_file_io_done(zio_t *zio)
 {
+	vdev_t *vd = zio->io_vd;
 
 	if (zio_injection_enabled && zio->io_error == 0)
-		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);
+		zio->io_error = zio_handle_device_injection(vd, EIO);
 
 	/*
 	 * If an error has been encountered then attempt to probe the device
 	 * to determine if it's still accessible.
 	 */
-	if (zio->io_error == EIO) {
-		vdev_t *vd = zio->io_vd;
-
-		if (vdev_probe(vd) != 0)
-			vd->vdev_is_failing = B_TRUE;
-	}
+	if (zio->io_error == EIO && vdev_probe(vd) != 0)
+		vd->vdev_is_failing = B_TRUE;
 
 	vdev_queue_io_done(zio);
 
@@ -308,7 +305,7 @@ vdev_file_io_done(zio_t *zio)
 		vdev_cache_write(zio);
 #endif
 
-	zio_next_stage(zio);
+	return (ZIO_PIPELINE_CONTINUE);
 }
 
 vdev_ops_t vdev_file_ops = {

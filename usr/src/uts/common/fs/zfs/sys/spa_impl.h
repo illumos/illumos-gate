@@ -37,7 +37,6 @@
 #include <sys/zfs_context.h>
 #include <sys/avl.h>
 #include <sys/refcount.h>
-#include <sys/rprwlock.h>
 #include <sys/bplist.h>
 
 #ifdef	__cplusplus
@@ -67,6 +66,14 @@ struct spa_aux_vdev {
 	nvlist_t	**sav_pending;		/* pending device additions */
 	uint_t		sav_npending;		/* # pending devices */
 };
+
+typedef struct spa_config_lock {
+	kmutex_t	scl_lock;
+	kthread_t	*scl_writer;
+	uint16_t	scl_write_wanted;
+	kcondvar_t	scl_cv;
+	refcount_t	scl_count;
+} spa_config_lock_t;
 
 struct spa {
 	/*
@@ -157,7 +164,7 @@ struct spa {
 	 * In order for the MDB module to function correctly, the other
 	 * fields must remain in the same location.
 	 */
-	rprwlock_t	spa_config_lock;	/* configuration changes */
+	spa_config_lock_t spa_config_lock;	/* configuration changes */
 	refcount_t	spa_refcount;		/* number of opens */
 };
 

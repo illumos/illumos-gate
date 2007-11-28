@@ -231,7 +231,7 @@ vdev_cache_fill(zio_t *zio)
 		zio->io_delegate_list = dio->io_delegate_next;
 		dio->io_delegate_next = NULL;
 		dio->io_error = zio->io_error;
-		zio_next_stage(dio);
+		zio_execute(dio);
 	}
 }
 
@@ -286,13 +286,8 @@ vdev_cache_read(zio_t *zio)
 		zio_vdev_io_bypass(zio);
 
 		mutex_exit(&vc->vc_lock);
-		zio_next_stage(zio);
+		zio_execute(zio);
 		return (0);
-	}
-
-	if (!(zio->io_flags & ZIO_FLAG_METADATA)) {
-		mutex_exit(&vc->vc_lock);
-		return (EINVAL);
 	}
 
 	ve = vdev_cache_allocate(zio);

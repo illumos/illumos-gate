@@ -136,6 +136,9 @@ vdev_lookup_top(spa_t *spa, uint64_t vdev)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
 
+	ASSERT(spa_config_held(spa, RW_READER) ||
+	    curthread == spa->spa_scrub_thread);
+
 	if (vdev < rvd->vdev_children)
 		return (rvd->vdev_child[vdev]);
 
@@ -1457,18 +1460,6 @@ uint64_t
 vdev_psize_to_asize(vdev_t *vd, uint64_t psize)
 {
 	return (vd->vdev_ops->vdev_op_asize(vd, psize));
-}
-
-void
-vdev_io_start(zio_t *zio)
-{
-	zio->io_vd->vdev_ops->vdev_op_io_start(zio);
-}
-
-void
-vdev_io_done(zio_t *zio)
-{
-	zio->io_vd->vdev_ops->vdev_op_io_done(zio);
 }
 
 const char *

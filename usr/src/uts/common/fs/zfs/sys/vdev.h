@@ -83,9 +83,6 @@ extern void vdev_space_update(vdev_t *vd, int64_t space_delta,
 
 extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
 
-extern void vdev_io_start(zio_t *zio);
-extern void vdev_io_done(zio_t *zio);
-
 extern int vdev_fault(spa_t *spa, uint64_t guid);
 extern int vdev_degrade(spa_t *spa, uint64_t guid);
 extern int vdev_online(spa_t *spa, uint64_t guid, uint64_t flags,
