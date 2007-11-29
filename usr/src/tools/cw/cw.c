@@ -383,25 +383,25 @@ typedef struct xarch_table {
 static const xarch_table_t xtbl[] = {
 #if defined(__x86)
 	{ "generic",	SS11 },
-	{ "generic64",	(SS11|M64), "-m64", "-mtune=opteron" },
-	{ "amd64",	(SS11|M64), "-m64", "-mtune=opteron" },
-	{ "386",	SS11,	"-march=i386" },
-	{ "pentium_pro", SS11,	"-march=pentiumpro" },
+	{ "generic64",	(SS11|M64), { "-m64", "-mtune=opteron" } },
+	{ "amd64",	(SS11|M64), { "-m64", "-mtune=opteron" } },
+	{ "386",	SS11,	{ "-march=i386" } },
+	{ "pentium_pro", SS11,	{ "-march=pentiumpro" } },
 #elif defined(__sparc)
-	{ "generic",	(SS11|M32), "-m32", "-mcpu=v8" },
-	{ "generic64",	(SS11|M64), "-m64", "-mcpu=v9" },
-	{ "v8",		(SS11|M32), "-m32", "-mcpu=v8", "-mno-v8plus" },
-	{ "v8plus",	(SS11|M32), "-m32", "-mcpu=v9", "-mv8plus" },
-	{ "v8plusa",	(SS11|M32), "-m32", "-mcpu=ultrasparc", "-mv8plus",
-			"-mvis" },
-	{ "v8plusb",	(SS11|M32), "-m32", "-mcpu=ultrasparc3", "-mv8plus",
-			"-mvis" },
-	{ "v9",		(SS11|M64), "-m64", "-mcpu=v9" },
-	{ "v9a",	(SS11|M64), "-m64", "-mcpu=ultrasparc", "-mvis" },
-	{ "v9b",	(SS11|M64), "-m64", "-mcpu=ultrasparc3", "-mvis" },
-	{ "sparc",	SS12, "-mcpu=v9", "-mv8plus" },
-	{ "sparcvis",	SS12, "-mcpu=ultrasparc", "-mvis" },
-	{ "sparcvis2",	SS12, "-mcpu=ultrasparc3", "-mvis" }
+	{ "generic",	(SS11|M32), { "-m32", "-mcpu=v8" } },
+	{ "generic64",	(SS11|M64), { "-m64", "-mcpu=v9" } },
+	{ "v8",		(SS11|M32), { "-m32", "-mcpu=v8", "-mno-v8plus" } },
+	{ "v8plus",	(SS11|M32), { "-m32", "-mcpu=v9", "-mv8plus" } },
+	{ "v8plusa",	(SS11|M32), { "-m32", "-mcpu=ultrasparc", "-mv8plus",
+			"-mvis" } },
+	{ "v8plusb",	(SS11|M32), { "-m32", "-mcpu=ultrasparc3", "-mv8plus",
+			"-mvis" } },
+	{ "v9",		(SS11|M64), { "-m64", "-mcpu=v9" } },
+	{ "v9a",	(SS11|M64), { "-m64", "-mcpu=ultrasparc", "-mvis" } },
+	{ "v9b",	(SS11|M64), { "-m64", "-mcpu=ultrasparc3", "-mvis" } },
+	{ "sparc",	SS12, { "-mcpu=v9", "-mv8plus" } },
+	{ "sparcvis",	SS12, { "-mcpu=ultrasparc", "-mvis" } },
+	{ "sparcvis2",	SS12, { "-mcpu=ultrasparc3", "-mvis" } }
 #endif
 };
 
@@ -1478,8 +1478,7 @@ do_gcc(cw_ictx_t *ctx)
 		break;
 	default:
 		(void) fprintf(stderr,
-		    "Incompatible -xarch= and/or -m32/-m64 options used.\n",
-		    mflag);
+		    "Incompatible -xarch= and/or -m32/-m64 options used.\n");
 		exit(2);
 	}
 	if (op == CW_O_LINK && (ctx->i_flags & CW_F_SHADOW))
