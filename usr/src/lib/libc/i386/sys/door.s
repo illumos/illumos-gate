@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,7 +148,7 @@
 
 door_restart:
 	SYSTRAP_RVAL1(door)
-	jb	3f			/* errno is set */
+	jb	2f			/* errno is set */
 	/*
 	 * On return, we're serving a door_call.  Our stack looks like this:
 	 *
@@ -176,13 +177,11 @@ door_restart:
 	/* Call the door server function now */
 	movl	DOOR_PC(%esp), %eax
 	call	*%eax
-
-2:
 	/* Exit the thread if we return here */
 	pushl	$0
 	call	_thr_terminate
 	/* NOTREACHED */
-3:
+2:
 	/*
 	 * Error during door_return call.  Repark the thread in the kernel if
 	 * the error code is EINTR (or ERESTART) and this lwp is still part
@@ -192,14 +191,12 @@ door_restart:
 	 * corrupted by a partial door call, so we refresh the system call
 	 * arguments.
 	 */
-	cmpl	$EEXIST, %eax		/* exit this thread if EEXIST */
-	je	2b
 	cmpl	$ERESTART, %eax		/* ERESTART is same as EINTR */
-	jne	4f
+	jne	3f
 	movl	$EINTR, %eax
-4:
+3:
 	cmpl	$EINTR, %eax		/* interrupted while waiting? */
-	jne	5f			/* if not, return the error */
+	jne	4f			/* if not, return the error */
 	_prologue_
 	call	_private_getpid		/* get current process id */
 	movl	_daref_(door_create_pid), %edx
@@ -207,7 +204,7 @@ door_restart:
 	_epilogue_
 	cmpl	%eax, %edx		/* same process? */
 	movl	$EINTR, %eax	/* if no, return EINTR (child of forkall) */
-	jne	5f
+	jne	4f
 
 	movl	$0, 4(%esp)		/* clear arguments and restart */
 	movl	$0, 8(%esp)
@@ -216,7 +213,7 @@ door_restart:
 	movl	%edi, 20(%esp)		/* refresh ssize */
 	movl	$DOOR_RETURN, 24(%esp)	/* refresh syscall subcode */
 	jmp	door_restart
-5:
+4:
 	/* Something bad happened during the door_return */
 	addl	$28, %esp
 	popl	%esi

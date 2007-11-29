@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +100,7 @@
 door_restart:
 	mov	DOOR_RETURN, %o5	/* subcode */
 	SYSTRAP_RVAL1(door)
-	bcs,pn	%icc, 3f			/* errno is set */
+	bcs,pn	%icc, 2f			/* errno is set */
 	ld	[%sp + DOOR_SERVERS], %g1	/* (delay) load nservers */
 	/*
 	 * On return, we're serving a door_call.  Our stack looks like this:
@@ -138,27 +139,20 @@ door_restart:
 	jmpl	%g1, %o7
 	ldn	[%sp + DOOR_DESC_SIZE], %o4
 
-2:
 	/* Exit the thread if we return here */
 	call	_thr_terminate
 	mov	%g0, %o0
 	/* NOTREACHED */
-
-3:
+2:
 	/*
 	 * Error during door_return call.  Repark the thread in the kernel if
 	 * the error code is EINTR (or ERESTART) and this lwp is still part
-	 * of the same process. If error is EEXIST then we don't need
-	 * this server thread.
+	 * of the same process.
 	 */
-	cmp	%o0, EEXIST
-	be	2b
-	nop
 	cmp	%o0, ERESTART		/* ERESTART is same as EINTR */
-	be,a	4f
+	be,a	3f
 	mov	EINTR, %o0
-
-4:
+3:
 	cmp	%o0, EINTR		/* interrupted while waiting? */
 	bne	__cerror		/* if not, return the error */
 	nop
