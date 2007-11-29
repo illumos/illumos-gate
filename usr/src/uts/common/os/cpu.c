@@ -3089,7 +3089,7 @@ cpu_sys_stats_ks_update(kstat_t *ksp, int rw)
 	csskd->ufsinopage.value.ui64 = css->ufsinopage;
 	csskd->procovf.value.ui64 = css->procovf;
 	csskd->intrthread.value.ui64 = 0;
-	for (i = 0; i < LOCK_LEVEL; i++)
+	for (i = 0; i < LOCK_LEVEL - 1; i++)
 		csskd->intrthread.value.ui64 += css->intr[i];
 	csskd->intrblk.value.ui64 = css->intrblk;
 	csskd->intrunpin.value.ui64 = css->intrunpin;
@@ -3229,7 +3229,7 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 	cso->cpu_sysinfo.fileovf	= 0;
 	cso->cpu_sysinfo.procovf	= CPU_STATS(cp, sys.procovf);
 	cso->cpu_sysinfo.intrthread	= 0;
-	for (i = 0; i < LOCK_LEVEL; i++)
+	for (i = 0; i < LOCK_LEVEL - 1; i++)
 		cso->cpu_sysinfo.intrthread += CPU_STATS(cp, sys.intr[i]);
 	cso->cpu_sysinfo.intrblk	= CPU_STATS(cp, sys.intrblk);
 	cso->cpu_sysinfo.idlethread	= CPU_STATS(cp, sys.idlethread);
