@@ -30,6 +30,7 @@
  */
 
 #include "k5-int.h"
+#include "rc-int.h"
 
 static krb5_error_code KRB5_CALLCONV
 krb5_rc_none_init(krb5_context ctx, krb5_rcache rc, krb5_deltat lifespan)
@@ -78,6 +79,7 @@ const krb5_rc_ops krb5_rc_none_ops = {
 	"NONE",
 	krb5_rc_none_init,
 	krb5_rc_none_recover,
+	krb5_rc_none_recover_or_init,
 	krb5_rc_none_destroy,
 	krb5_rc_none_close,
 	krb5_rc_none_store,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,10 @@ struct krb5_rc_typelist
   const krb5_rc_ops *ops;
   struct krb5_rc_typelist *next;
  };
-static struct krb5_rc_typelist rc_mem_type = { &krb5_rc_mem_ops, 0 };
+
+static struct krb5_rc_typelist rc_none_type = { &krb5_rc_none_ops, 0 };
+static struct krb5_rc_typelist rc_mem_type =
+	{ &krb5_rc_mem_ops, &rc_none_type };
 static struct krb5_rc_typelist krb5_rc_typelist_dfl =
 	{ &krb5_rc_file_ops, &rc_mem_type };
 static struct krb5_rc_typelist *typehead = &krb5_rc_typelist_dfl;

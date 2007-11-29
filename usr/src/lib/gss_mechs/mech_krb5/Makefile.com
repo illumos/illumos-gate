@@ -161,7 +161,7 @@ K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 K5_POSIX= setenv.o daemon.o
 
 K5_RCACHE=rc_base.o rc_file.o rc_mem.o rc_common.o rc_io.o rcdef.o rc_conv.o \
-	ser_rc.o rcfns.o
+	ser_rc.o rcfns.o rc_none.o
 
 MECH= 	accept_sec_context.o store_cred.o \
 	add_cred.o disp_com_err_status.o  disp_major_status.o \
