@@ -2493,9 +2493,10 @@ top:
 		    (XVA_ISSET_REQ(xvap, XAT_AV_MODIFIED) &&
 		    xoap->xoa_av_modified !=
 		    ((pzp->zp_flags & ZFS_AV_MODIFIED) != 0)) ||
-		    (XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED) &&
+		    ((XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED) &&
+		    ((vp->v_type != VREG && xoap->xoa_av_quarantined) ||
 		    xoap->xoa_av_quarantined !=
-		    ((pzp->zp_flags & ZFS_AV_QUARANTINED) != 0)) ||
+		    ((pzp->zp_flags & ZFS_AV_QUARANTINED) != 0)))) ||
 		    (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP)) ||
 		    (XVA_ISSET_REQ(xvap, XAT_OPAQUE))) {
 			need_policy = TRUE;

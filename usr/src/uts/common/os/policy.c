@@ -1038,7 +1038,7 @@ secpolicy_xvattr(xvattr_t *xvap, uid_t owner, cred_t *cr, vtype_t vtype)
 	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_AV_QUARANTINED)) {
 		error = ATTR_FLAG_PRIV(XAT_AV_QUARANTINED,
 		    xoap->xoa_av_quarantined, cr);
-		if (error == 0 && vtype != VREG)
+		if (error == 0 && vtype != VREG && xoap->xoa_av_quarantined)
 			error = EINVAL;
 	}
 	if (error == 0 && XVA_ISSET_REQ(xvap, XAT_AV_MODIFIED))
