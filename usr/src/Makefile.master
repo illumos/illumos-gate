@@ -180,6 +180,7 @@ SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs
+ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace
 CHECK_FNAMES=	$(ONBLD_TOOLS)/bin/check_fnames
