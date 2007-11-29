@@ -150,8 +150,12 @@ set_model_info()
 		}
 	}
 
+	/*
+	 * If model not matched, it's an unknown model.
+	 * just return.
+	 */
 	if (i == opl_num_models)
-		halt("No valid OPL model is found!");
+		return;
 
 	if ((opl_cur_model->model_cmds & EXT_DISPATCH_TABLE) &&
 	    (ts_dispatch_extended == -1)) {
@@ -852,6 +856,12 @@ plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 	 */
 	if (opl_cur_model == NULL) {
 		set_model_info();
+
+		/*
+		 * if not matched, return
+		 */
+		if (opl_cur_model == NULL)
+			return (ENODEV);
 	}
 
 	ASSERT((opl_cur_model - opl_models) == (opl_cur_model->model_type));
