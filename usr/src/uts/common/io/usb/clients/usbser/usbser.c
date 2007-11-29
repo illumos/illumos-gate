@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,7 +448,7 @@ usbser_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
 		usbser_remove(usp);
 		(void) rseq_undo(rseq_att, NELEM(rseq_att), (uintptr_t)usp, 0);
 		USB_DPRINTF_L4(DPRINT_DETACH, NULL,
-			"usbser_detach.%d: end", instance);
+		    "usbser_detach.%d: end", instance);
 
 		return (DDI_SUCCESS);
 	case DDI_SUSPEND:
@@ -737,8 +737,8 @@ static int
 usbser_init_soft_state(usbser_state_t *usp)
 {
 	usp->us_lh = usb_alloc_log_hdl(usp->us_dip, "usbs[*].",
-		&usbser_errlevel, &usbser_errmask, &usbser_instance_debug,
-		0);
+	    &usbser_errlevel, &usbser_errmask, &usbser_instance_debug,
+	    0);
 	mutex_init(&usp->us_mutex, NULL, MUTEX_DRIVER, (void *)NULL);
 
 	/* save state pointer for use in event callbacks */
@@ -819,7 +819,7 @@ usbser_attach_ports(usbser_state_t *usp)
 	 * allocate port array
 	 */
 	usp->us_ports = kmem_zalloc(usp->us_port_cnt *
-					sizeof (usbser_port_t), KM_SLEEP);
+	    sizeof (usbser_port_t), KM_SLEEP);
 
 	/* callback handlers */
 	ds_cb.cb_tx = usbser_tx_cb;
@@ -843,8 +843,8 @@ usbser_attach_ports(usbser_state_t *usp)
 		/* allocate log handle */
 		(void) sprintf(pp->port_lh_name, "usbs[%d].", i);
 		pp->port_lh = usb_alloc_log_hdl(usp->us_dip,
-			pp->port_lh_name, &usbser_errlevel, &usbser_errmask,
-			&usbser_instance_debug, 0);
+		    pp->port_lh_name, &usbser_errlevel, &usbser_errmask,
+		    &usbser_instance_debug, 0);
 
 		mutex_init(&pp->port_mutex, NULL, MUTEX_DRIVER, (void *)NULL);
 		cv_init(&pp->port_state_cv, NULL, CV_DEFAULT, NULL);
@@ -1017,23 +1017,29 @@ usbser_disconnect_cb(dev_info_t *dip)
 	    "usbser_disconnect_cb: dip=%p", dip);
 
 	mutex_enter(&usp->us_mutex);
-	/* safety check in case we're called before attach is complete */
-	if (usp->us_dev_state != USB_DEV_ONLINE) {
+	switch (usp->us_dev_state) {
+	case USB_DEV_ONLINE:
+	case USB_DEV_PWRED_DOWN:
+		/* prevent further activity */
+		usp->us_dev_state = USB_DEV_DISCONNECTED;
 		mutex_exit(&usp->us_mutex);
 
-		return (USB_SUCCESS);
-	}
-	/* prevent further activity */
-	usp->us_dev_state = USB_DEV_DISCONNECTED;
-	mutex_exit(&usp->us_mutex);
+		/* see if any of the ports are open and do necessary handling */
+		usbser_disconnect_ports(usp);
 
-	/* see if any of the ports are open and do necessary handling */
-	usbser_disconnect_ports(usp);
+		/* call DSD to do any necessary work */
+		if (USBSER_DS_DISCONNECT(usp) != USB_DEV_DISCONNECTED) {
+			USB_DPRINTF_L2(DPRINT_EVENTS, usp->us_lh,
+			    "usbser_disconnect_cb: ds_disconnect failed");
+		}
 
-	/* call DSD to do any necessary work */
-	if (USBSER_DS_DISCONNECT(usp) != USB_DEV_DISCONNECTED) {
-		USB_DPRINTF_L2(DPRINT_EVENTS, usp->us_lh,
-		    "usbser_disconnect_cb: ds_disconnect failed");
+		break;
+	case USB_DEV_SUSPENDED:
+		/* we remain suspended */
+	default:
+		mutex_exit(&usp->us_mutex);
+
+		break;
 	}
 
 	return (USB_SUCCESS);
@@ -1235,12 +1241,16 @@ usbser_restore_device_state(usbser_state_t *usp)
 {
 	int	new_state, current_state;
 
+	/* needed as power up state of dev is "unknown" to system */
+	(void) pm_busy_component(usp->us_dip, 0);
+	(void) pm_raise_power(usp->us_dip, 0, USB_DEV_OS_FULL_PWR);
+
 	mutex_enter(&usp->us_mutex);
 	current_state = usp->us_dev_state;
 	mutex_exit(&usp->us_mutex);
 
 	ASSERT((current_state == USB_DEV_DISCONNECTED) ||
-		(current_state == USB_DEV_SUSPENDED));
+	    (current_state == USB_DEV_SUSPENDED));
 
 	/*
 	 * call DSD to perform device-specific work
@@ -1261,6 +1271,8 @@ usbser_restore_device_state(usbser_state_t *usp)
 		 */
 		usbser_restore_ports_state(usp);
 	}
+
+	(void) pm_idle_component(usp->us_dip, 0);
 
 	return (USB_SUCCESS);
 }
@@ -1401,7 +1413,7 @@ loop:
 		break;
 	case USBSER_PORT_OPEN:
 		if ((pp->port_ttycommon.t_flags & TS_XCLUDE) &&
-			secpolicy_excl_open(cr) != 0) {
+		    secpolicy_excl_open(cr) != 0) {
 			/*
 			 * exclusive use
 			 */
@@ -1546,7 +1558,7 @@ usbser_check_port_props(usbser_port_t *pp)
 
 			if (termiosp->c_iflag & (IXON | IXANY)) {
 				tp->t_iflag =
-					termiosp->c_iflag & (IXON | IXANY);
+				    termiosp->c_iflag & (IXON | IXANY);
 				tp->t_startc = termiosp->c_cc[VSTART];
 				tp->t_stopc = termiosp->c_cc[VSTOP];
 			}
@@ -1756,7 +1768,7 @@ usbser_close_drain(usbser_port_t *pp)
 	 * data has been sent over USB. To be continued in the next comment...
 	 */
 	until = ddi_get_lbolt() +
-		drv_usectohz(USBSER_WQ_DRAIN_TIMEOUT * 1000000);
+	    drv_usectohz(USBSER_WQ_DRAIN_TIMEOUT * 1000000);
 
 	while ((pp->port_wq_data_cnt > 0) && USBSER_PORT_IS_BUSY(pp)) {
 		if ((rval = cv_timedwait_sig(&pp->port_act_cv, &pp->port_mutex,
@@ -1768,7 +1780,7 @@ usbser_close_drain(usbser_port_t *pp)
 
 	/* don't drain if timed out or received a signal */
 	need_drain = (pp->port_wq_data_cnt == 0) || !USBSER_PORT_IS_BUSY(pp) ||
-			(rval != 0);
+	    (rval != 0);
 
 	mutex_exit(&pp->port_mutex);
 	/*
@@ -1860,7 +1872,7 @@ usbser_thr_dispatch(usbser_thread_t *thr)
 	thr->thr_flags = USBSER_THR_RUNNING;
 
 	rval = ddi_taskq_dispatch(usp->us_taskq, thr->thr_func, thr->thr_arg,
-			DDI_SLEEP);
+	    DDI_SLEEP);
 	ASSERT(rval == DDI_SUCCESS);
 }
 
@@ -2676,7 +2688,7 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 			mutex_enter(&pp->port_mutex);
 			pp->port_act |= USBSER_ACT_BREAK;
 			pp->port_delay_id = timeout(usbser_restart, pp,
-							drv_usectohz(250000));
+			    drv_usectohz(250000));
 			mutex_exit(&pp->port_mutex);
 		}
 
@@ -3054,7 +3066,7 @@ usbser_break(usbser_port_t *pp, mblk_t *mp)
 	if (rval == USB_SUCCESS) {
 		pp->port_act |= USBSER_ACT_BREAK;
 		pp->port_delay_id = timeout(usbser_restart, pp,
-						drv_usectohz(250000));
+		    drv_usectohz(250000));
 	}
 	freemsg(mp);
 }
@@ -3071,7 +3083,7 @@ usbser_delay(usbser_port_t *pp, mblk_t *mp)
 	 */
 	pp->port_act |= USBSER_ACT_DELAY;
 	pp->port_delay_id = timeout(usbser_restart, pp,
-			(clock_t)(*(uchar_t *)mp->b_rptr + 6));
+	    (clock_t)(*(uchar_t *)mp->b_rptr + 6));
 	freemsg(mp);
 }
 
@@ -3138,7 +3150,7 @@ usbser_port_program(usbser_port_t *pp)
 		if (baudrate > CBAUD) {
 			tp->t_cflag |= CIBAUDEXT;
 			tp->t_cflag |=
-				(((baudrate - CBAUD - 1) << IBSHIFT) & CIBAUD);
+			    (((baudrate - CBAUD - 1) << IBSHIFT) & CIBAUD);
 		} else {
 			tp->t_cflag &= ~CIBAUDEXT;
 			tp->t_cflag |= ((baudrate << IBSHIFT) & CIBAUD);

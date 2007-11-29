@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,8 @@
  * which is available at http://www.usb.org. Given the broad nature
  * of communication equipment, this driver supports the following
  * types of devices:
- * 	+ Telecommunications devices: analog modems, mobile phones;
- * 	+ Networking devices: cable modems;
+ *	+ Telecommunications devices: analog modems, mobile phones;
+ *	+ Networking devices: cable modems;
  * Except the above mentioned acm devices, this driver also supports
  * some devices which provide modem-like function and have pairs of
  * bulk in/out pipes.
@@ -70,9 +70,9 @@
  * not restricted to interfaces using the Data Class. Rather, a data
  * interface is used to transmit and/or receive data that is not
  * defined by any other class. The data could be:
- * 	+ Some form of raw data from a communication line.
- * 	+ Legacy modem data.
- * 	+ Data using a proprietary format.
+ *	+ Some form of raw data from a communication line.
+ *	+ Legacy modem data.
+ *	+ Data using a proprietary format.
  *
  * 1.3 Endpoint Requirements
  * -------------------------
@@ -178,7 +178,7 @@
  *		usbsacm_init_alloc_ports  usbsacm_free_ports
  *				|		^
  *				v		|
- *	          |---->------ USBSACM_PORT_CLOSED ------>------+
+ *		  |---->------ USBSACM_PORT_CLOSED ------>------+
  *		  ^						|
  *		  |				reconnect/resume/open_port
  *		  |						|
@@ -228,7 +228,7 @@
 /* devops entry points */
 static int	usbsacm_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	usbsacm_detach(dev_info_t *, ddi_detach_cmd_t);
-static int 	usbsacm_getinfo(dev_info_t *, ddi_info_cmd_t, void *,
+static int	usbsacm_getinfo(dev_info_t *, ddi_info_cmd_t, void *,
 		void **);
 static int	usbsacm_open(queue_t *, dev_t *, int, int, cred_t *);
 
@@ -875,6 +875,19 @@ usbsacm_ds_usb_power(ds_hdl_t hdl, int comp, int level, int *new_state)
 		break;
 	case USB_DEV_OS_FULL_PWR:
 		rval = usbsacm_pwrlvl3(acmp);
+		/*
+		 * If usbser dev_state is DISCONNECTED or SUSPENDED, it shows
+		 * that the usb serial device is disconnected/suspended while it
+		 * is under power down state, now the device is powered up
+		 * before it is reconnected/resumed. xxx_pwrlvl3() will set dev
+		 * state to ONLINE, we need to set the dev state back to
+		 * DISCONNECTED/SUSPENDED.
+		 */
+		if ((rval == USB_SUCCESS) &&
+		    ((*new_state == USB_DEV_DISCONNECTED) ||
+		    (*new_state == USB_DEV_SUSPENDED))) {
+			acmp->acm_dev_state = *new_state;
+		}
 
 		break;
 	}
@@ -895,14 +908,21 @@ static int
 usbsacm_ds_suspend(ds_hdl_t hdl)
 {
 	usbsacm_state_t	*acmp = (usbsacm_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_SUSPENDED;
 
 	USB_DPRINTF_L4(PRINT_MASK_PM, acmp->acm_lh,
 	    "usbsacm_ds_suspend: ");
-
+	/*
+	 * If the device is suspended while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * SUSPENDED state.
+	 */
 	mutex_enter(&acmp->acm_mutex);
-	/* set device status to suspend */
-	state = acmp->acm_dev_state = USB_DEV_SUSPENDED;
+	if (acmp->acm_dev_state != USB_DEV_PWRED_DOWN) {
+		/* set device status to suspend */
+		acmp->acm_dev_state = USB_DEV_SUSPENDED;
+	}
 	mutex_exit(&acmp->acm_mutex);
 
 	usbsacm_disconnect_pipes(acmp);
@@ -949,14 +969,22 @@ static int
 usbsacm_ds_disconnect(ds_hdl_t hdl)
 {
 	usbsacm_state_t	*acmp = (usbsacm_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_DISCONNECTED;
 
 	USB_DPRINTF_L4(PRINT_MASK_CLOSE, acmp->acm_lh,
 	    "usbsacm_ds_disconnect: ");
 
+	/*
+	 * If the device is disconnected while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * DISCONNECTED state.
+	 */
 	mutex_enter(&acmp->acm_mutex);
-	/* set device status to disconnected */
-	state = acmp->acm_dev_state = USB_DEV_DISCONNECTED;
+	if (acmp->acm_dev_state != USB_DEV_PWRED_DOWN) {
+		/* set device status to disconnected */
+		acmp->acm_dev_state = USB_DEV_DISCONNECTED;
+	}
 	mutex_exit(&acmp->acm_mutex);
 
 	usbsacm_disconnect_pipes(acmp);
@@ -1132,7 +1160,7 @@ usbsacm_ds_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 	 * controls.
 	 */
 	if ((acm_port->acm_cap & USB_CDC_ACM_CAP_SERIAL_LINE) == 0 &&
-		acmp->acm_compatibility == B_TRUE) {
+	    acmp->acm_compatibility == B_TRUE) {
 
 		mutex_exit(&acm_port->acm_port_mutex);
 		USB_DPRINTF_L2(PRINT_MASK_ALL, acmp->acm_lh,
@@ -1219,7 +1247,7 @@ usbsacm_ds_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 	 * If device conform to acm spec, check if it support to send break.
 	 */
 	if ((acm_port->acm_cap & USB_CDC_ACM_CAP_SEND_BREAK) == 0 &&
-		acmp->acm_compatibility == B_TRUE) {
+	    acmp->acm_compatibility == B_TRUE) {
 
 		mutex_exit(&acm_port->acm_port_mutex);
 		USB_DPRINTF_L2(PRINT_MASK_ALL, acmp->acm_lh,
@@ -1230,7 +1258,7 @@ usbsacm_ds_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 	mutex_exit(&acm_port->acm_port_mutex);
 
 	return (usbsacm_req_write(acm_port, USB_CDC_REQ_SEND_BREAK,
-		((ctl == DS_ON) ? 0xffff : 0), NULL));
+	    ((ctl == DS_ON) ? 0xffff : 0), NULL));
 }
 
 
@@ -1443,16 +1471,17 @@ usbsacm_get_bulk_pipe_number(usbsacm_state_t *acmp, uint_t dir)
 		 * which type is input parameter 'dir'
 		 */
 		for (skip = 0; skip < ep_num; skip++) {
-		    if (usb_lookup_ep_data(acmp->acm_dip, acmp->acm_dev_data,
-			if_no + i, 0, skip, USB_EP_ATTR_BULK, dir) == NULL) {
+			if (usb_lookup_ep_data(acmp->acm_dip,
+			    acmp->acm_dev_data, if_no + i, 0, skip,
+			    USB_EP_ATTR_BULK, dir) == NULL) {
 
-			/*
-			 * If not found, skip the internal loop and search
-			 * the next interface.
-			 */
-			break;
-		    }
-		    count++;
+				/*
+				 * If not found, skip the internal loop
+				 * and search the next interface.
+				 */
+				break;
+			}
+			count++;
 		}
 
 		cur_if++;
@@ -1524,9 +1553,9 @@ usbsacm_init_ports_status(usbsacm_state_t *acmp)
 
 	/* search each interface which have bulk in and out */
 	for (i = 0; i < if_num; i++) {
-	    ep_num = cur_if->if_alt->altif_n_ep;
+		ep_num = cur_if->if_alt->altif_n_ep;
 
-	    for (skip = 0; skip < ep_num; skip++) {
+		for (skip = 0; skip < ep_num; skip++) {
 
 		/* search interrupt pipe. */
 		if ((usb_lookup_ep_data(acmp->acm_dip, acmp->acm_dev_data,
@@ -1549,9 +1578,9 @@ usbsacm_init_ports_status(usbsacm_state_t *acmp)
 		cur_port->acm_data_port_no = skip;
 		cur_port++;
 		intr_if_no = 0;
-	    }
+		}
 
-	    cur_if++;
+		cur_if++;
 	}
 
 	return (USB_SUCCESS);
@@ -1565,7 +1594,7 @@ usbsacm_init_ports_status(usbsacm_state_t *acmp)
 static int
 usbsacm_init_alloc_ports(usbsacm_state_t *acmp)
 {
-	int 		rval = USB_SUCCESS;
+	int		rval = USB_SUCCESS;
 	int		count_in = 0, count_out = 0;
 
 	if (acmp->acm_compatibility) {
@@ -1718,7 +1747,7 @@ usbsacm_get_descriptors(usbsacm_state_t *acmp)
 	}
 
 	if (acm_port->acm_data_if_no == 0 &&
-		slave_if != acm_port->acm_data_if_no) {
+	    slave_if != acm_port->acm_data_if_no) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, acmp->acm_lh,
 		    "usbsacm_get_descriptors: Device hasn't call management "
 		    "descriptor and use Union Descriptor.");
@@ -1816,7 +1845,7 @@ usbsacm_cleanup(usbsacm_state_t *acmp)
 		/* unregister callback function */
 		if (acmp->acm_usb_events != NULL) {
 			usb_unregister_event_cbs(acmp->acm_dip,
-				acmp->acm_usb_events);
+			    acmp->acm_usb_events);
 		}
 
 		/* destroy power management components */
@@ -2876,21 +2905,24 @@ usbsacm_pwrlvl0(usbsacm_state_t *acmp)
 		ASSERT(rval == USB_SUCCESS);
 
 		if (cur_port != NULL) {
-		    for (i = 0; i < acmp->acm_port_cnt; i++) {
-			cur_port = &acmp->acm_ports[i];
-			if (cur_port->acm_intr_ph != NULL &&
-			    cur_port->acm_port_state != USBSACM_PORT_CLOSED) {
+			for (i = 0; i < acmp->acm_port_cnt; i++) {
+				cur_port = &acmp->acm_ports[i];
+				if (cur_port->acm_intr_ph != NULL &&
+				    cur_port->acm_port_state !=
+				    USBSACM_PORT_CLOSED) {
 
-			    mutex_exit(&acmp->acm_mutex);
-			    usb_pipe_stop_intr_polling(cur_port->acm_intr_ph,
-				USB_FLAGS_SLEEP);
-			    mutex_enter(&acmp->acm_mutex);
+					mutex_exit(&acmp->acm_mutex);
+					usb_pipe_stop_intr_polling(
+					    cur_port->acm_intr_ph,
+					    USB_FLAGS_SLEEP);
+					mutex_enter(&acmp->acm_mutex);
 
-			    mutex_enter(&cur_port->acm_port_mutex);
-			    cur_port->acm_intr_state = USBSACM_PIPE_IDLE;
-			    mutex_exit(&cur_port->acm_port_mutex);
+					mutex_enter(&cur_port->acm_port_mutex);
+					cur_port->acm_intr_state =
+					    USBSACM_PIPE_IDLE;
+					mutex_exit(&cur_port->acm_port_mutex);
+				}
 			}
-		    }
 		}
 
 		acmp->acm_dev_state = USB_DEV_PWRED_DOWN;
@@ -2962,16 +2994,17 @@ usbsacm_pwrlvl3(usbsacm_state_t *acmp)
 		ASSERT(rval == USB_SUCCESS);
 
 		if (cur_port != NULL) {
-		    for (i = 0; i < acmp->acm_port_cnt; i++) {
-			cur_port = &acmp->acm_ports[i];
-			if (cur_port->acm_intr_ph != NULL &&
-			    cur_port->acm_port_state != USBSACM_PORT_CLOSED) {
+			for (i = 0; i < acmp->acm_port_cnt; i++) {
+				cur_port = &acmp->acm_ports[i];
+				if (cur_port->acm_intr_ph != NULL &&
+				    cur_port->acm_port_state !=
+				    USBSACM_PORT_CLOSED) {
 
-			    mutex_exit(&acmp->acm_mutex);
-			    usbsacm_pipe_start_polling(cur_port);
-			    mutex_enter(&acmp->acm_mutex);
+					mutex_exit(&acmp->acm_mutex);
+					usbsacm_pipe_start_polling(cur_port);
+					mutex_enter(&acmp->acm_mutex);
+				}
 			}
-		    }
 		}
 
 		acmp->acm_dev_state = USB_DEV_ONLINE;
@@ -3029,7 +3062,7 @@ usbsacm_pipe_start_polling(usbsacm_port_t *acm_port)
 
 	/* initialize the interrupt request. */
 	intr->intr_attributes = USB_ATTRS_SHORT_XFER_OK |
-		USB_ATTRS_AUTOCLEARING;
+	    USB_ATTRS_AUTOCLEARING;
 	mutex_enter(&acm_port->acm_port_mutex);
 	intr->intr_len = acm_port->acm_intr_ep_descr.wMaxPacketSize;
 	mutex_exit(&acm_port->acm_port_mutex);

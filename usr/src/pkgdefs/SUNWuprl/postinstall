@@ -48,12 +48,14 @@ EXIT=0
 # "usb56e,5004" ELECOM UC-SGT USB serial adapter
 # "usb557,2008" Aten UC-232A USB serial adapter
 # "usb6189,2068" Sitecom CN-104 USB serial adapter
+# "usb5ad,fba" Radio Shack 6-Ft USB serial adapter
 USBSPRL_ALIASES="\
 	\"usb67b,2303\" \
 	\"usb67b,aaa2\" \
 	\"usb56e,5004\" \
 	\"usb557,2008\" \
 	\"usb6189,2068\" \
+	\"usb5ad,fba\" \
 	"
 
 installed usbsprl || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \

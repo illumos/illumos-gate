@@ -515,6 +515,19 @@ pl2303_usb_power(ds_hdl_t hdl, int comp, int level, int *new_state)
 		break;
 	case USB_DEV_OS_FULL_PWR:
 		rval = pl2303_pwrlvl3(plp);
+		/*
+		 * If usbser dev_state is DISCONNECTED or SUSPENDED, it shows
+		 * that the usb serial device is disconnected/suspended while it
+		 * is under power down state, now the device is powered up
+		 * before it is reconnected/resumed. xxx_pwrlvl3() will set dev
+		 * state to ONLINE, we need to set the dev state back to
+		 * DISCONNECTED/SUSPENDED.
+		 */
+		if ((rval == USB_SUCCESS) &&
+		    ((*new_state == USB_DEV_DISCONNECTED) ||
+		    (*new_state == USB_DEV_SUSPENDED))) {
+			plp->pl_dev_state = *new_state;
+		}
 
 		break;
 	default:
@@ -535,12 +548,20 @@ static int
 pl2303_suspend(ds_hdl_t hdl)
 {
 	pl2303_state_t	*plp = (pl2303_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_SUSPENDED;
 
 	USB_DPRINTF_L4(DPRINT_PM, plp->pl_lh, "pl2303_suspend");
 
+	/*
+	 * If the device is suspended while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * SUSPENDED state.
+	 */
 	mutex_enter(&plp->pl_mutex);
-	state = plp->pl_dev_state = USB_DEV_SUSPENDED;
+	if (plp->pl_dev_state != USB_DEV_PWRED_DOWN) {
+		plp->pl_dev_state = USB_DEV_SUSPENDED;
+	}
 	mutex_exit(&plp->pl_mutex);
 
 	pl2303_disconnect_pipes(plp);
@@ -561,9 +582,6 @@ pl2303_resume(ds_hdl_t hdl)
 
 	USB_DPRINTF_L4(DPRINT_PM, plp->pl_lh, "pl2303_resume");
 
-	(void) pm_busy_component(plp->pl_dip, 0);
-	(void) pm_raise_power(plp->pl_dip, 0, USB_DEV_OS_FULL_PWR);
-
 	mutex_enter(&plp->pl_mutex);
 	current_state = plp->pl_dev_state;
 	mutex_exit(&plp->pl_mutex);
@@ -573,8 +591,6 @@ pl2303_resume(ds_hdl_t hdl)
 	} else {
 		rval = USB_SUCCESS;
 	}
-
-	(void) pm_idle_component(plp->pl_dip, 0);
 
 	return (rval);
 }
@@ -587,12 +603,20 @@ static int
 pl2303_disconnect(ds_hdl_t hdl)
 {
 	pl2303_state_t	*plp = (pl2303_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_DISCONNECTED;
 
 	USB_DPRINTF_L4(DPRINT_HOTPLUG, plp->pl_lh, "pl2303_disconnect");
 
+	/*
+	 * If the device is disconnected while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * DISCONNECTED state.
+	 */
 	mutex_enter(&plp->pl_mutex);
-	state = plp->pl_dev_state = USB_DEV_DISCONNECTED;
+	if (plp->pl_dev_state != USB_DEV_PWRED_DOWN) {
+		plp->pl_dev_state = USB_DEV_DISCONNECTED;
+	}
 	mutex_exit(&plp->pl_mutex);
 
 	pl2303_disconnect_pipes(plp);
@@ -739,17 +763,17 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 					xon_char = pe->val.uc[0];
 					xoff_char = pe->val.uc[1];
 					xonxoff_symbol = (xoff_char << 8)
-							| xon_char;
+					    | xon_char;
 
 					rval =	pl2303_cmd_vendor_write0(
-						plp, SET_XONXOFF,
-						xonxoff_symbol);
+					    plp, SET_XONXOFF,
+					    xonxoff_symbol);
 
 					if (rval != USB_SUCCESS) {
 						USB_DPRINTF_L3(DPRINT_CTLOP,
-						plp->pl_lh,
-						"pl2303_set_port_params: "
-						"set XonXoff failed");
+						    plp->pl_lh,
+						    "pl2303_set_port_params: "
+						    "set XonXoff failed");
 					}
 
 					break;
@@ -765,12 +789,12 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 			/* Hardware flow control */
 			if (pe->val.ui & CTSXON) {
 				if ((rval = pl2303_cmd_set_rtscts(plp))
-						!= USB_SUCCESS) {
+				    != USB_SUCCESS) {
 
 					USB_DPRINTF_L3(DPRINT_CTLOP,
-						plp->pl_lh,
-						"pl2303_set_port_params: "
-						"pl2303_cmd_set_rtscts failed");
+					    plp->pl_lh,
+					    "pl2303_set_port_params: "
+					    "pl2303_cmd_set_rtscts failed");
 				}
 			}
 
@@ -1199,7 +1223,7 @@ pl2303_create_pm_components(pl2303_state_t *plp)
 	pm->pm_pwr_states = (uint8_t)pwr_states;
 	pm->pm_cur_power = USB_DEV_OS_FULL_PWR;
 	pm->pm_wakeup_enabled = (usb_handle_remote_wakeup(dip,
-				USB_REMOTE_WAKEUP_ENABLE) == USB_SUCCESS);
+	    USB_REMOTE_WAKEUP_ENABLE) == USB_SUCCESS);
 
 	(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
 
@@ -1231,7 +1255,7 @@ pl2303_destroy_pm_components(pl2303_state_t *plp)
 			}
 
 			rval = usb_handle_remote_wakeup(dip,
-						USB_REMOTE_WAKEUP_DISABLE);
+			    USB_REMOTE_WAKEUP_DISABLE);
 			if (rval != USB_SUCCESS) {
 				USB_DPRINTF_L2(DPRINT_PM, plp->pl_lh,
 				    "pl2303_destroy_pm_components: disable "
@@ -1544,7 +1568,7 @@ pl2303_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 	/* save data and notify GSD */
 	if ((plp->pl_port_state == PL2303_PORT_OPEN) && (data_len) &&
-			(req->bulk_completion_reason == USB_CR_OK)) {
+	    (req->bulk_completion_reason == USB_CR_OK)) {
 		req->bulk_data = NULL;
 		pl2303_put_tail(&plp->pl_rx_mp, data);
 		if (plp->pl_cb.cb_rx) {
@@ -1799,11 +1823,11 @@ pl2303_wait_tx_drain(pl2303_state_t *plp, int timeout)
 		if (timeout > 0) {
 			/* whether timedout or signal pending */
 			over = (cv_timedwait_sig(&plp->pl_tx_cv,
-					&plp->pl_mutex, until) <= 0);
+			    &plp->pl_mutex, until) <= 0);
 		} else {
 			/* whether a signal is pending */
 			over = (cv_wait_sig(&plp->pl_tx_cv,
-					&plp->pl_mutex) == 0);
+			    &plp->pl_mutex) == 0);
 		}
 	}
 
@@ -1832,21 +1856,21 @@ pl2303_open_hw_port(pl2303_state_t *plp)
 	case (pl2303_H):
 		/* Set DCR0 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR0,
-					DCR0_INIT_H)) != USB_SUCCESS) {
+		    DCR0_INIT_H)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* Set DCR1 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR1,
-					DCR1_INIT_H)) != USB_SUCCESS) {
+		    DCR1_INIT_H)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* Set DCR2 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR2,
-					DCR2_INIT_H)) != USB_SUCCESS) {
+		    DCR2_INIT_H)) != USB_SUCCESS) {
 
 			return (rval);
 		}
@@ -1857,35 +1881,35 @@ pl2303_open_hw_port(pl2303_state_t *plp)
 
 		/* Set DCR0 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR0,
-					DCR0_INIT)) != USB_SUCCESS) {
+		    DCR0_INIT)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* Set DCR1 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR1,
-					DCR1_INIT_X)) != USB_SUCCESS) {
+		    DCR1_INIT_X)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* Set DCR2 */
 		if ((rval = pl2303_cmd_vendor_write0(plp, SET_DCR2,
-					DCR2_INIT_X)) != USB_SUCCESS) {
+		    DCR2_INIT_X)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* reset Downstream data pipes */
 		if ((rval = pl2303_cmd_vendor_write0(plp,
-			RESET_DOWNSTREAM_DATA_PIPE, 0)) != USB_SUCCESS) {
+		    RESET_DOWNSTREAM_DATA_PIPE, 0)) != USB_SUCCESS) {
 
 			return (rval);
 		}
 
 		/* reset Upstream data pipes */
 		if ((rval = pl2303_cmd_vendor_write0(plp,
-				RESET_UPSTREAM_DATA_PIPE, 0)) != USB_SUCCESS) {
+		    RESET_UPSTREAM_DATA_PIPE, 0)) != USB_SUCCESS) {
 
 			return (rval);
 		}
@@ -1894,7 +1918,7 @@ pl2303_open_hw_port(pl2303_state_t *plp)
 	case (pl2303_UNKNOWN):
 	default:
 		USB_DPRINTF_L2(DPRINT_OPEN, plp->pl_lh,
-			"pl2303_open_hw_port: unknown chiptype");
+		    "pl2303_open_hw_port: unknown chiptype");
 
 		rval = USB_FAILURE;
 	}
@@ -1914,8 +1938,8 @@ static int
 pl2303_cmd_get_line(pl2303_state_t *plp, mblk_t **data)
 {
 	usb_ctrl_setup_t setup = { PL2303_GET_LINE_CODING_REQUEST_TYPE,
-			PL2303_GET_LINE_CODING_REQUEST, 0, 0,
-			PL2303_GET_LINE_CODING_LENGTH, 0 };
+	    PL2303_GET_LINE_CODING_REQUEST, 0, 0,
+	    PL2303_GET_LINE_CODING_LENGTH, 0 };
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	int		rval;
@@ -1923,7 +1947,7 @@ pl2303_cmd_get_line(pl2303_state_t *plp, mblk_t **data)
 	*data = NULL;
 
 	rval = usb_pipe_ctrl_xfer_wait(plp->pl_def_ph, &setup, data,
-		&cr, &cb_flags, 0);
+	    &cr, &cb_flags, 0);
 
 	if ((rval == USB_SUCCESS) && (*data != NULL)) {
 		USB_DPRINTF_L4(DPRINT_DEF_PIPE, plp->pl_lh,
@@ -1952,8 +1976,8 @@ static int
 pl2303_cmd_set_line(pl2303_state_t *plp, mblk_t *data)
 {
 	usb_ctrl_setup_t setup = { PL2303_SET_LINE_CODING_REQUEST_TYPE,
-			PL2303_SET_LINE_CODING_REQUEST, 0, 0,
-			PL2303_SET_LINE_CODING_LENGTH, 0 };
+	    PL2303_SET_LINE_CODING_REQUEST, 0, 0,
+	    PL2303_SET_LINE_CODING_LENGTH, 0 };
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	int		rval;
@@ -1964,7 +1988,7 @@ pl2303_cmd_set_line(pl2303_state_t *plp, mblk_t *data)
 	    data->b_rptr[3], data->b_rptr[4], data->b_rptr[5], data->b_rptr[6]);
 
 	rval = usb_pipe_ctrl_xfer_wait(plp->pl_def_ph, &setup, &data,
-		&cr, &cb_flags, 0);
+	    &cr, &cb_flags, 0);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, plp->pl_lh,
@@ -1983,8 +2007,8 @@ static int
 pl2303_cmd_set_ctl(pl2303_state_t *plp, uint8_t val)
 {
 	usb_ctrl_setup_t setup = { PL2303_SET_CONTROL_REQUEST_TYPE,
-			PL2303_SET_CONTROL_REQUEST, 0, 0,
-			PL2303_SET_CONTROL_LENGTH, 0 };
+	    PL2303_SET_CONTROL_REQUEST, 0, 0,
+	    PL2303_SET_CONTROL_LENGTH, 0 };
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	int		rval;
@@ -1992,7 +2016,7 @@ pl2303_cmd_set_ctl(pl2303_state_t *plp, uint8_t val)
 	setup.wValue = val;
 
 	rval = usb_pipe_ctrl_xfer_wait(plp->pl_def_ph, &setup, NULL,
-		&cr, &cb_flags, 0);
+	    &cr, &cb_flags, 0);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, plp->pl_lh,
@@ -2012,8 +2036,8 @@ static int
 pl2303_cmd_vendor_write0(pl2303_state_t *plp, uint16_t value, int16_t index)
 {
 	usb_ctrl_setup_t setup = { PL2303_VENDOR_WRITE_REQUEST_TYPE,
-			PL2303_VENDOR_WRITE_REQUEST, 0, 0,
-			PL2303_VENDOR_WRITE_LENGTH, 0 };
+	    PL2303_VENDOR_WRITE_REQUEST, 0, 0,
+	    PL2303_VENDOR_WRITE_LENGTH, 0 };
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	int		rval;
@@ -2022,7 +2046,7 @@ pl2303_cmd_vendor_write0(pl2303_state_t *plp, uint16_t value, int16_t index)
 	setup.wIndex = index;
 
 	rval = usb_pipe_ctrl_xfer_wait(plp->pl_def_ph, &setup, NULL,
-		&cr, &cb_flags, 0);
+	    &cr, &cb_flags, 0);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, plp->pl_lh,
@@ -2064,8 +2088,8 @@ static int
 pl2303_cmd_break(pl2303_state_t *plp, int ctl)
 {
 	usb_ctrl_setup_t setup = { PL2303_BREAK_REQUEST_TYPE,
-			PL2303_BREAK_REQUEST, 0, 0,
-			PL2303_BREAK_LENGTH, 0 };
+	    PL2303_BREAK_REQUEST, 0, 0,
+	    PL2303_BREAK_LENGTH, 0 };
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	int		rval;
@@ -2073,12 +2097,12 @@ pl2303_cmd_break(pl2303_state_t *plp, int ctl)
 	setup.wValue = (ctl == DS_ON) ? PL2303_BREAK_ON : PL2303_BREAK_OFF;
 
 	rval = usb_pipe_ctrl_xfer_wait(plp->pl_def_ph, &setup, NULL,
-		&cr, &cb_flags, 0);
+	    &cr, &cb_flags, 0);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_DEF_PIPE, plp->pl_lh,
-			"pl2303_cmd_break: failed rval=%d,cr=%d,cb_flags=0x%x",
-			rval, cr, cb_flags);
+		    "pl2303_cmd_break: failed rval=%d,cr=%d,cb_flags=0x%x",
+		    rval, cr, cb_flags);
 	}
 
 	return (rval);

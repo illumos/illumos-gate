@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,7 +480,7 @@ keyspan_open_hw_port(keyspan_port_t *kp, boolean_t open_pipes)
 	case KEYSPAN_USA19HS_PID:
 	case KEYSPAN_USA49WLC_PID:
 		if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
-			kp->kp_read_len, kp)) != USB_SUCCESS) {
+		    kp->kp_read_len, kp)) != USB_SUCCESS) {
 
 				goto fail;
 		}
@@ -493,7 +493,7 @@ keyspan_open_hw_port(keyspan_port_t *kp, boolean_t open_pipes)
 		if ((ksp->ks_datain_open_cnt == 1) && open_pipes) {
 			mutex_exit(&ksp->ks_mutex);
 			if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
-				kp->kp_read_len, kp)) != USB_SUCCESS) {
+			    kp->kp_read_len, kp)) != USB_SUCCESS) {
 
 					goto fail;
 			}
@@ -501,7 +501,7 @@ keyspan_open_hw_port(keyspan_port_t *kp, boolean_t open_pipes)
 		} else if ((ksp->ks_reconnect_flag) && (!open_pipes)) {
 			mutex_exit(&ksp->ks_mutex);
 			if ((rval = keyspan_receive_data(&kp->kp_datain_pipe,
-				kp->kp_read_len, kp)) != USB_SUCCESS) {
+			    kp->kp_read_len, kp)) != USB_SUCCESS) {
 
 					goto fail;
 			}
@@ -685,7 +685,7 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 	/* send close port cmd to this port */
 	if (keyspan_send_cmd(kp) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-		"keyspan_close_hw_port: closing hw port, send cmd FAILED");
+		    "keyspan_close_hw_port: closing hw port, send cmd FAILED");
 	}
 
 	/* blow away bulkin requests or pipe close will wait until timeout */
@@ -693,8 +693,8 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 		case KEYSPAN_USA19HS_PID:
 		case KEYSPAN_USA49WLC_PID:
 			usb_pipe_reset(ksp->ks_dip,
-				kp->kp_datain_pipe.pipe_handle,
-				USB_FLAGS_SLEEP, NULL, NULL);
+			    kp->kp_datain_pipe.pipe_handle,
+			    USB_FLAGS_SLEEP, NULL, NULL);
 
 			break;
 		case KEYSPAN_USA49WG_PID:
@@ -707,8 +707,8 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 				mutex_exit(&ksp->ks_mutex);
 
 				usb_pipe_reset(ksp->ks_dip,
-					kp->kp_datain_pipe.pipe_handle,
-					USB_FLAGS_SLEEP, NULL, NULL);
+				    kp->kp_datain_pipe.pipe_handle,
+				    USB_FLAGS_SLEEP, NULL, NULL);
 			} else {
 				mutex_exit(&ksp->ks_mutex);
 			}
@@ -716,8 +716,8 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 			break;
 		default:
 			USB_DPRINTF_L2(DPRINT_CLOSE, kp->kp_lh,
-			"keyspan_close_hw_port: the device's product id can't"
-			"be recognized");
+			    "keyspan_close_hw_port: the device's"
+			    " product id can't be recognized");
 	}
 
 	(void) keyspan_close_port_pipes(kp);
@@ -824,6 +824,19 @@ keyspan_usb_power(ds_hdl_t hdl, int comp, int level, int *new_state)
 		break;
 	case USB_DEV_OS_FULL_PWR:
 		rval = keyspan_pwrlvl3(ksp);
+		/*
+		 * If usbser dev_state is DISCONNECTED or SUSPENDED, it shows
+		 * that the usb serial device is disconnected/suspended while it
+		 * is under power down state, now the device is powered up
+		 * before it is reconnected/resumed. xxx_pwrlvl3() will set dev
+		 * state to ONLINE, we need to set the dev state back to
+		 * DISCONNECTED/SUSPENDED.
+		 */
+		if ((rval == USB_SUCCESS) &&
+		    ((*new_state == USB_DEV_DISCONNECTED) ||
+		    (*new_state == USB_DEV_SUSPENDED))) {
+			ksp->ks_dev_state = *new_state;
+		}
 
 		break;
 	default:
@@ -844,12 +857,20 @@ static int
 keyspan_suspend(ds_hdl_t hdl)
 {
 	keyspan_state_t	*ksp = (keyspan_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_SUSPENDED;
 
 	USB_DPRINTF_L4(DPRINT_PM, ksp->ks_lh, "keyspan_suspend");
 
+	/*
+	 * If the device is suspended while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * SUSPENDED state.
+	 */
 	mutex_enter(&ksp->ks_mutex);
-	state = ksp->ks_dev_state = USB_DEV_SUSPENDED;
+	if (ksp->ks_dev_state != USB_DEV_PWRED_DOWN) {
+		ksp->ks_dev_state = USB_DEV_SUSPENDED;
+	}
 	mutex_exit(&ksp->ks_mutex);
 
 	keyspan_disconnect_pipes(ksp);
@@ -870,10 +891,6 @@ keyspan_resume(ds_hdl_t hdl)
 
 	USB_DPRINTF_L4(DPRINT_PM, ksp->ks_lh, "keyspan_resume");
 
-	/* needed as power up state of dev is "unknown" to system */
-	(void) pm_busy_component(ksp->ks_dip, 0);
-	(void) pm_raise_power(ksp->ks_dip, 0, USB_DEV_OS_FULL_PWR);
-
 	mutex_enter(&ksp->ks_mutex);
 	current_state = ksp->ks_dev_state;
 	mutex_exit(&ksp->ks_mutex);
@@ -883,8 +900,6 @@ keyspan_resume(ds_hdl_t hdl)
 	} else {
 		rval = USB_SUCCESS;
 	}
-
-	(void) pm_idle_component(ksp->ks_dip, 0);
 
 	return (rval);
 }
@@ -897,12 +912,20 @@ static int
 keyspan_disconnect(ds_hdl_t hdl)
 {
 	keyspan_state_t	*ksp = (keyspan_state_t *)hdl;
-	int		state;
+	int		state = USB_DEV_DISCONNECTED;
 
 	USB_DPRINTF_L4(DPRINT_HOTPLUG, ksp->ks_lh, "keyspan_disconnect");
 
+	/*
+	 * If the device is disconnected while it is under PWRED_DOWN state, we
+	 * need to keep the PWRED_DOWN state so that it could be powered up
+	 * later. In the mean while, usbser dev state will be changed to
+	 * DISCONNECTED state.
+	 */
 	mutex_enter(&ksp->ks_mutex);
-	state = ksp->ks_dev_state = USB_DEV_DISCONNECTED;
+	if (ksp->ks_dev_state != USB_DEV_PWRED_DOWN) {
+		ksp->ks_dev_state = USB_DEV_DISCONNECTED;
+	}
 	mutex_exit(&ksp->ks_mutex);
 
 	keyspan_disconnect_pipes(ksp);
@@ -1547,7 +1570,7 @@ static void
 keyspan_init_sync_objs(keyspan_state_t *ksp)
 {
 	mutex_init(&ksp->ks_mutex, NULL, MUTEX_DRIVER,
-			ksp->ks_dev_data->dev_iblock_cookie);
+	    ksp->ks_dev_data->dev_iblock_cookie);
 	sema_init(&ksp->ks_pipes_sema, 1, NULL, SEMA_DRIVER, NULL);
 }
 
@@ -1634,7 +1657,7 @@ keyspan_attach_ports(keyspan_state_t *ksp)
 	keyspan_port_t	*kp;
 
 	ksp->ks_ports = kmem_zalloc(ksp->ks_dev_spec.port_cnt *
-					sizeof (keyspan_port_t), KM_SLEEP);
+	    sizeof (keyspan_port_t), KM_SLEEP);
 
 	for (i = 0; i < ksp->ks_dev_spec.port_cnt; i++) {
 		kp = &ksp->ks_ports[i];
@@ -1643,12 +1666,12 @@ keyspan_attach_ports(keyspan_state_t *ksp)
 
 		(void) sprintf(kp->kp_lh_name, "keyspan[%d].", i);
 		kp->kp_lh = usb_alloc_log_hdl(ksp->ks_dip, kp->kp_lh_name,
-			&keyspan_errlevel, &keyspan_errmask,
-			&keyspan_instance_debug, 0);
+		    &keyspan_errlevel, &keyspan_errmask,
+		    &keyspan_instance_debug, 0);
 
 		kp->kp_state = KEYSPAN_PORT_CLOSED;
 		mutex_init(&kp->kp_mutex, NULL, MUTEX_DRIVER,
-				ksp->ks_dev_data->dev_iblock_cookie);
+		    ksp->ks_dev_data->dev_iblock_cookie);
 		cv_init(&kp->kp_tx_cv, NULL, CV_DRIVER, NULL);
 	}
 }
@@ -1687,7 +1710,7 @@ keyspan_init_port_params(keyspan_state_t *ksp)
 
 	/* the max data len of every bulk in req. */
 	if (usb_pipe_get_max_bulk_transfer_size(ksp->ks_dip, &sz) ==
-		USB_SUCCESS) {
+	    USB_SUCCESS) {
 		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
 			read_len = min(sz, KEYSPAN_BULKIN_MAX_LEN_49WG);
 		} else {
@@ -1707,12 +1730,12 @@ keyspan_init_port_params(keyspan_state_t *ksp)
 		switch (ksp->ks_dev_spec.id_product) {
 		case KEYSPAN_USA19HS_PID:
 			ksp->ks_ports[i].kp_write_len =
-					KEYSPAN_BULKOUT_MAX_LEN_19HS;
+			    KEYSPAN_BULKOUT_MAX_LEN_19HS;
 
 			break;
 		case KEYSPAN_USA49WLC_PID:
 			ksp->ks_ports[i].kp_write_len =
-					KEYSPAN_BULKOUT_MAX_LEN_49WLC;
+			    KEYSPAN_BULKOUT_MAX_LEN_49WLC;
 
 			break;
 		case KEYSPAN_USA49WG_PID:
@@ -1723,14 +1746,14 @@ keyspan_init_port_params(keyspan_state_t *ksp)
 			 * ports' while the same as USA49WLC.
 			 */
 			write_len = ((i == 0) ? KEYSPAN_BULKOUT_MAX_LEN_49WLC :
-					KEYSPAN_BULKOUT_MAX_LEN_49WG);
+			    KEYSPAN_BULKOUT_MAX_LEN_49WG);
 			ksp->ks_ports[i].kp_write_len = write_len;
 
 			break;
 		default:
 			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
-				"keyspan_init_port_params:"
-				"the device's product id can't be recognized");
+			    "keyspan_init_port_params:"
+			    "the device's product id can't be recognized");
 
 			return;
 		}
@@ -1802,8 +1825,8 @@ keyspan_send_cmd_usa49(keyspan_port_t *kp)
 
 	default:
 		USB_DPRINTF_L2(DPRINT_CTLOP, ksp->ks_lh,
-		"keyspan_send_cmd_usa49:"
-		"the device's product id can't be recognized");
+		    "keyspan_send_cmd_usa49:"
+		    "the device's product id can't be recognized");
 		return (USB_FAILURE);
 	}
 
@@ -1828,7 +1851,7 @@ keyspan_send_cmd_usa49(keyspan_port_t *kp)
 		mutex_exit(&kp->kp_mutex);
 	} else {
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh, "keyspan_send_cmd_usa49"
-		": failure, rval=%d", rval);
+		    ": failure, rval=%d", rval);
 	}
 
 	usb_free_bulk_req(br);
@@ -1876,7 +1899,7 @@ keyspan_send_cmd_usa49wg(keyspan_port_t *kp)
 		mutex_exit(&kp->kp_mutex);
 	} else {
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-			"keyspan_send_cmd_usa49wg: failure, rval=%d", rval);
+		    "keyspan_send_cmd_usa49wg: failure, rval=%d", rval);
 	}
 	if (mp) {
 		freemsg(mp);
@@ -1906,8 +1929,8 @@ keyspan_send_cmd(keyspan_port_t *kp)
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
-		"keyspan_send_cmd: "
-		"the device's product id can't be recognized");
+		    "keyspan_send_cmd: "
+		    "the device's product id can't be recognized");
 	}
 
 	if (rval != USB_SUCCESS) {
@@ -2039,7 +2062,7 @@ keyspan_create_pm_components(keyspan_state_t *ksp)
 	}
 
 	pm->pm_wakeup_enabled = (usb_handle_remote_wakeup(dip,
-				USB_REMOTE_WAKEUP_ENABLE) == USB_SUCCESS);
+	    USB_REMOTE_WAKEUP_ENABLE) == USB_SUCCESS);
 	pm->pm_pwr_states = (uint8_t)pwr_states;
 
 	(void) pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
@@ -2171,7 +2194,7 @@ keyspan_pwrlvl0(keyspan_state_t *ksp)
 		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
 			mutex_exit(&ksp->ks_mutex);
 			usb_pipe_stop_intr_polling(statin->pipe_handle,
-				USB_FLAGS_SLEEP);
+			    USB_FLAGS_SLEEP);
 			mutex_enter(&ksp->ks_mutex);
 
 			mutex_enter(&statin->pipe_mutex);
@@ -2285,7 +2308,7 @@ keyspan_detach_pipes(keyspan_state_t *ksp)
 	 */
 	if (ksp->ks_statin_pipe.pipe_handle) {
 		usb_pipe_stop_intr_polling(ksp->ks_statin_pipe.pipe_handle,
-			USB_FLAGS_SLEEP);
+		    USB_FLAGS_SLEEP);
 	}
 
 	/* Close the globle pipes */
@@ -2377,8 +2400,8 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 		data_len = keyspan_tx_copy_data(kp, data, len);
 		if (data_len <= 0) {
 			USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh,
-			"keyspan_tx_start:keyspan_tx_copy_data copied"
-			" zero bytes");
+			    "keyspan_tx_start:keyspan_tx_copy_data copied"
+			    " zero bytes");
 		}
 
 		break;
@@ -2403,8 +2426,8 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 			tran_len = keyspan_tx_copy_data(kp, data, 63);
 			if (tran_len <= 0) {
 				USB_DPRINTF_L3(DPRINT_OUT_PIPE, kp->kp_lh,
-				"keyspan_tx_start:keyspan_tx_copy_data copied"
-				" zero bytes");
+				    "keyspan_tx_start:keyspan_tx_copy_data"
+				    " copied zero bytes");
 
 				break;
 			}
@@ -2429,7 +2452,7 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 	 */
 
 	if ((kp->kp_port_num == 0) &&
-			(ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID)) {
+	    (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID)) {
 		rval = keyspan_send_data_port0(&kp->kp_dataout_pipe, &data, kp);
 	} else {
 		rval = keyspan_send_data(&kp->kp_dataout_pipe, &data, kp);
@@ -2513,7 +2536,7 @@ keyspan_wait_tx_drain(keyspan_port_t *kp, int timeout)
 	while (kp->kp_tx_mp && !over) {
 		if (timeout > 0) {
 			over = (cv_timedwait_sig(&kp->kp_tx_cv,
-					&kp->kp_mutex, until) <= 0);
+			    &kp->kp_mutex, until) <= 0);
 		} else {
 			over = (cv_wait_sig(&kp->kp_tx_cv, &kp->kp_mutex) == 0);
 		}
@@ -3039,9 +3062,9 @@ keyspan_build_cmd_msg_usa49(keyspan_port_t *kp, ds_port_params_t *tp)
 			if (kp->kp_baud == keyspan_speedtab_usa49[ui]) {
 
 				USB_DPRINTF_L3(DPRINT_CTLOP, kp->kp_lh,
-					"keyspan_build_cmd_msg_usa49: "
-					"same as old baud setting, baud = %d",
-					keyspan_speed2baud[ui]);
+				    "keyspan_build_cmd_msg_usa49: "
+				    "same as old baud setting, baud = %d",
+				    keyspan_speed2baud[ui]);
 
 				break;
 			}
