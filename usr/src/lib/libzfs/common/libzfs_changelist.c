@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Portions Copyright 2007 Ramprakash Jelari
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,6 +67,7 @@ typedef struct prop_changenode {
 	int			cn_shared;
 	int			cn_mounted;
 	int			cn_zoned;
+	boolean_t		cn_needpost;	/* is postfix() needed? */
 	uu_list_node_t		cn_listnode;
 } prop_changenode_t;
 
@@ -115,8 +118,12 @@ changelist_prefix(prop_changelist_t *clp)
 				(void) zfs_unshare_iscsi(cn->cn_handle);
 
 				if (zvol_remove_link(cn->cn_handle->zfs_hdl,
-				    cn->cn_handle->zfs_name) != 0)
+				    cn->cn_handle->zfs_name) != 0) {
 					ret = -1;
+					(void) zfs_share_iscsi(cn->cn_handle);
+				} else {
+					cn->cn_needpost = B_TRUE;
+				}
 				break;
 
 			case ZFS_PROP_VOLSIZE:
@@ -125,13 +132,22 @@ changelist_prefix(prop_changelist_t *clp)
 				 * need to unshare and reshare the volume.
 				 */
 				(void) zfs_unshare_iscsi(cn->cn_handle);
+				cn->cn_needpost = B_TRUE;
 				break;
 			}
 		} else if (zfs_unmount(cn->cn_handle, NULL,
 		    clp->cl_flags) != 0) {
 			ret = -1;
+		} else {
+			cn->cn_needpost = B_TRUE;
 		}
+
+		if (ret == -1)
+			break;
 	}
+
+	if (ret == -1)
+		(void) changelist_postfix(clp);
 
 	return (ret);
 }
@@ -195,6 +211,10 @@ changelist_postfix(prop_changelist_t *clp)
 		 */
 		if (getzoneid() == GLOBAL_ZONEID && cn->cn_zoned)
 			continue;
+
+		if (!cn->cn_needpost)
+			continue;
+		cn->cn_needpost = B_FALSE;
 
 		zfs_refresh_properties(cn->cn_handle);
 
@@ -639,6 +659,7 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	cn->cn_mounted = zfs_is_mounted(temp, NULL);
 	cn->cn_shared = zfs_is_shared(temp);
 	cn->cn_zoned = zfs_prop_get_int(zhp, ZFS_PROP_ZONED);
+	cn->cn_needpost = B_FALSE;
 
 	uu_list_node_init(cn, &cn->cn_listnode, clp->cl_pool);
 	if (clp->cl_sorted) {
