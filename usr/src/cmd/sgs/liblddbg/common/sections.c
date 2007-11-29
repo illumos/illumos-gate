@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,23 +28,12 @@
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
-
-/*
- * Error message string table.
- */
-static const Msg order_errors[] = {
-	MSG_ORD_ERR_INFORANGE,		/* MSG_INTL(MSG_ORD_ERR_INFORANGE) */
-	MSG_ORD_ERR_ORDER,		/* MSG_INTL(MSG_ORD_ERR_ORDER) */
-	MSG_ORD_ERR_LINKRANGE,		/* MSG_INTL(MSG_ORD_ERR_LINKRANGE) */
-	MSG_ORD_ERR_FLAGS,		/* MSG_INTL(MSG_ORD_ERR_FLAGS) */
-	MSG_ORD_ERR_CYCLIC,		/* MSG_INTL(MSG_ORD_ERR_CYCLIC) */
-	MSG_ORD_ERR_LINKINV		/* MSG_INTL(MSG_ORD_ERR_LINKINV) */
-};
+#include	"_string_table.h"
 
 void
 Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 {
-	uint_t	i;
+	uint_t	cnt;
 
 	if (DBG_NOTCLASS(DBG_C_STRTAB))
 		return;
@@ -55,10 +44,10 @@ Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	if (stp->st_flags & FLG_STTAB_COMPRESS)
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_COMP), osp->os_name,
-		    stp->st_fullstringsize, stp->st_stringsize);
+		    stp->st_fullstrsize, stp->st_strsize);
 	else
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_STND), osp->os_name,
-		    stp->st_fullstringsize);
+		    stp->st_fullstrsize);
 
 	if ((DBG_NOTDETAIL()) ||
 	    ((stp->st_flags & FLG_STTAB_COMPRESS) == 0))
@@ -68,27 +57,31 @@ Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 	dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_HD), osp->os_name,
 	    stp->st_hbckcnt);
 
-	for (i = 0; i < stp->st_hbckcnt; i++) {
-		Str_hash	*sthash;
+	for (cnt = 0; cnt < stp->st_hbckcnt; cnt++) {
+		Str_hash	*strhash = stp->st_hashbcks[cnt];
 
-		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_BCKT), i);
+		if (strhash == 0)
+			continue;
 
-		for (sthash = stp->st_hashbcks[i]; sthash;
-		    sthash = sthash->hi_next) {
-			uint_t	stroff = sthash->hi_mstr->sm_stlen -
-			    sthash->hi_stlen;
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_BCKT), cnt);
+
+		while (strhash) {
+			uint_t	stroff = strhash->hi_mstr->sm_strlen -
+			    strhash->hi_strlen;
 
 			if (stroff == 0) {
 				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_MSTR),
-				    sthash->hi_refcnt, sthash->hi_mstr->sm_str);
+				    strhash->hi_refcnt,
+				    strhash->hi_mstr->sm_str);
 			} else {
 				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_SUFSTR),
-				    sthash->hi_refcnt,
-				    &sthash->hi_mstr->sm_str[stroff],
-				    sthash->hi_mstr->sm_str);
+				    strhash->hi_refcnt,
+				    &strhash->hi_mstr->sm_str[stroff],
+				    strhash->hi_mstr->sm_str);
 			}
-		}
 
+			strhash = strhash->hi_next;
+		}
 	}
 }
 
@@ -143,7 +136,7 @@ Dbg_sec_created(Lm_list *lml, Os_desc *osp, Sg_desc *sgp)
 void
 Dbg_sec_discarded(Lm_list *lml, Is_desc *isp, Is_desc *disp)
 {
-	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+	if (DBG_NOTCLASS(DBG_C_SECTIONS | DBG_C_UNUSED))
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
@@ -243,6 +236,18 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
+
+/*
+ * Error message string table.
+ */
+static const Msg order_errors[] = {
+	MSG_ORD_ERR_INFORANGE,		/* MSG_INTL(MSG_ORD_ERR_INFORANGE) */
+	MSG_ORD_ERR_ORDER,		/* MSG_INTL(MSG_ORD_ERR_ORDER) */
+	MSG_ORD_ERR_LINKRANGE,		/* MSG_INTL(MSG_ORD_ERR_LINKRANGE) */
+	MSG_ORD_ERR_FLAGS,		/* MSG_INTL(MSG_ORD_ERR_FLAGS) */
+	MSG_ORD_ERR_CYCLIC,		/* MSG_INTL(MSG_ORD_ERR_CYCLIC) */
+	MSG_ORD_ERR_LINKINV		/* MSG_INTL(MSG_ORD_ERR_LINKINV) */
+};
 
 void
 Dbg_sec_order_error(Lm_list *lml, Ifl_desc *ifl, Word ndx, int error)

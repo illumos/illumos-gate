@@ -566,12 +566,11 @@
 			 discarded: member of existing group: %s:%s"
 
 @ MSG_SEC_STRTAB_STND	"strtab=%s; full size: %d; uncompressed"
-@ MSG_SEC_STRTAB_COMP	"strtab=%s; full size: %d -> compressed down to: %d"
-@ MSG_SEC_STRTAB_HD	"Compressed String Table: %s \
-			 [%d buckets]:"
-@ MSG_SEC_STRTAB_BCKT	" Bucket[%3d]:"
-@ MSG_SEC_STRTAB_MSTR	"   ref[%2d] %s <master>"
-@ MSG_SEC_STRTAB_SUFSTR	"   ref[%2d] %s <suffix of> %s"
+@ MSG_SEC_STRTAB_COMP	"strtab=%s; full size: %d; compressed down to: %d"
+@ MSG_SEC_STRTAB_HD	"strtab=%s; compression information [%d buckets]:"
+@ MSG_SEC_STRTAB_BCKT	" bucket[%d]:"
+@ MSG_SEC_STRTAB_MSTR	"   [%d] %s  <master>"
+@ MSG_SEC_STRTAB_SUFSTR	"   [%d] %s  <suffix of: %s>"
 
 # Unused messages
 
@@ -638,8 +637,10 @@
 @ MSG_SYM_ELIMINATING	"symbol=%s;  eliminating"
 @ MSG_SYM_NOTELIMINATE	"symbol=%s;  not eliminated: referenced by \
 			 section=%s, entry[%d]"
-@ MSG_SYM_DISCARDED	"symbol=%s;  discarded because it is part of \
+@ MSG_SYM_DISCARD_SEC	"symbol=%s;  discarded: originates from unused or \
 			 discarded section=%s from file=%s"
+@ MSG_SYM_DISCARD_FILE	"symbol=%s;  discarded: originates from unused or \
+			 discarded file=%s"
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"

@@ -25,7 +25,7 @@
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	<stdlib.h>
+#include	<stdio.h>
 #include	"_debug.h"
 #include	"msg.h"
 #include	"libld.h"

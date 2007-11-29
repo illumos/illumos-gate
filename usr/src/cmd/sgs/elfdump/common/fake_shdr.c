@@ -63,6 +63,7 @@
 
 #include	<machdep.h>
 #include	<sys/elf_amd64.h>
+#include	<stdio.h>
 #include	<unistd.h>
 #include	<errno.h>
 #include	<string.h>

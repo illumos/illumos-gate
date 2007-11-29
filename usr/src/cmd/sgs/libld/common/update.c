@@ -1927,7 +1927,8 @@ update_osym(Ofl_desc *ofl)
 				dynsort_compare_syms = ldynsym;
 				qsort(dynsymsort, dynsymsort_ndx,
 				    sizeof (*dynsymsort), dynsort_compare);
-				dynsort_dupwarn(ofl, ldynsym, dynstr->st_strbuf,
+				dynsort_dupwarn(ofl, ldynsym,
+				    st_getstrbuf(dynstr),
 				    dynsymsort, dynsymsort_ndx,
 				    MSG_ORIG(MSG_SCN_DYNSYMSORT));
 			}
@@ -1941,7 +1942,8 @@ update_osym(Ofl_desc *ofl)
 				dynsort_compare_syms = ldynsym;
 				qsort(dyntlssort, dyntlssort_ndx,
 				    sizeof (*dyntlssort), dynsort_compare);
-				dynsort_dupwarn(ofl, ldynsym, dynstr->st_strbuf,
+				dynsort_dupwarn(ofl, ldynsym,
+				    st_getstrbuf(dynstr),
 				    dyntlssort, dyntlssort_ndx,
 				    MSG_ORIG(MSG_SCN_DYNTLSSORT));
 			}

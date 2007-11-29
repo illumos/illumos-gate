@@ -1300,3 +1300,4 @@ Bugid   Risk Synopsis
 	PSARC/2007/620 elfdump -T, and simplified matching
 6627765 soffice failure after integration of 6603313 - dangling GROUP pointer.
 6319025 SUNWbtool packaging issues in Nevada and S10u1.
+6629404 ld with -z ignore doesn't scale

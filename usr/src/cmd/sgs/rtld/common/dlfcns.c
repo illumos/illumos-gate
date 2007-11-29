@@ -35,6 +35,7 @@
 #include	"_synonyms.h"
 
 #include	<sys/debug.h>
+#include	<stdio.h>
 #include	<string.h>
 #include	<dlfcn.h>
 #include	<synch.h>

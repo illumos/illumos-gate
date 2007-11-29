@@ -33,6 +33,7 @@
 #include	<sys/elf_amd64.h>
 #include	<sys/elf_SPARC.h>
 #include	<dwarf.h>
+#include	<stdio.h>
 #include	<unistd.h>
 #include	<errno.h>
 #include	<strings.h>
@@ -40,7 +41,6 @@
 #include	<conv.h>
 #include	<msg.h>
 #include	<_elfdump.h>
-
 
 
 /*

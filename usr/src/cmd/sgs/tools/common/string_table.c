@@ -20,46 +20,42 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <string_table.h>
+#include <_string_table.h>
 #include <strings.h>
 #include <sgs.h>
 #include <stdio.h>
 
-
-
 /*
- * This file provides the interfaces to build a Str_tbl suitable
- * for use by either the sgsmsg system or a standard ELF
- * SHT_STRTAB.
+ * This file provides the interfaces to build a Str_tbl suitable for use by
+ * either the sgsmsg message system, or a standard ELF string table (SHT_STRTAB)
+ * as created by ld(1).
  *
- * There are two modes which can be used when constructing a
- * string table:
+ * There are two modes which can be used when constructing a string table:
  *
  *	st_new(0)
  *		standard string table - no compression.  This is the
- *		traditional method and fast
+ *		traditional, fast method.
  *
- *	st_new(FLG_STNEW_COMPRESS)
- *		build a compressed string table which both
- *		eliminates duplicate strings and permits
- *		strings with common suffixes (atexit vs. exit) to
- *		overlap in the table.  This provides space
- *		savings for many string tables.
+ *	st_new(FLG_STTAB_COMPRESS)
+ *		builds a compressed string table which both eliminates
+ *		duplicate strings, and permits strings with common suffixes
+ *		(atexit vs. exit) to overlap in the table.  This provides space
+ *		savings for many string tables.  Although more work than the
+ *		traditional method, the algorithms used are designed to scale
+ *		and keep any overhead at a minimum.
  *
- * These string tables are now built with a common interface in a
- * two-pass manner, the first pass it to find all of the strings
- * required for the string-table and to calculate the size that
- * will be required for the final string table.
+ * These string tables are built with a common interface in a two-pass manner.
+ * The first pass finds all of the strings required for the string-table and
+ * calculates the size required for the final string table.
  *
- * The second pass allocates the string table and populates the
- * strings into the table and returns the offsets the strings
- * have been assigned.
+ * The second pass allocates the string table, populates the strings into the
+ * table and returns the offsets the strings have been assigned.
  *
  * The calling sequence to build and populate a string table is:
  *
@@ -71,7 +67,6 @@
  *
  *		st_delstring(st?);	// remove string previously
  *					// inserted
- *
  *		st_insert(stN);
  *
  *		st_getstrtab_sz();	// freezes strtab and computes
@@ -113,68 +108,196 @@
  *   The above method will find all suffixes of a given string given
  *   that the strings are inserted from shortest to longest.  That is
  *   why this is a two phase method, we first collect all of the
- *   strings and store them based off of their length in a nice AVL tree.
+ *   strings and store them based off of their length in an AVL tree.
  *   Once all of the strings have been submitted we then start the
  *   hash table build by traversing the AVL tree in order and
  *   inserting the strings from shortest to longest as described
  *   above.
- *
  */
 
 /* LINTLIBRARY */
 
-
-int
-strlen_compare(const void *elem1, const void *elem2)
+static int
+avl_len_compare(const void *n1, const void *n2)
 {
-	uint_t	l1, l2;
-	l1 = ((Stringelem *)elem1)->se_stlen;
-	l2 = ((Stringelem *)elem2)->se_stlen;
+	uint_t	len1, len2;
 
-	if (l1 == l2)
+	len1 = ((LenNode *)n1)->ln_strlen;
+	len2 = ((LenNode *)n2)->ln_strlen;
+
+	if (len1 == len2)
 		return (0);
-	if (l2 < l1)
+	if (len2 < len1)
 		return (1);
-
 	return (-1);
 }
 
+static int
+avl_str_compare(const void *n1, const void *n2)
+{
+	const char	*str1, *str2;
+	int		rc;
+
+	str1 = ((StrNode *)n1)->sn_str;
+	str2 = ((StrNode *)n2)->sn_str;
+
+	rc = strcmp(str1, str2);
+	if (rc > 0)
+		return (1);
+	if (rc < 0)
+		return (-1);
+	return (0);
+}
+
 /*
- * Return a initialized Str_tbl - returns NULL on failure.
+ * Return an initialized Str_tbl - returns NULL on failure.
  *
- * stflags:
- *
- *	FLG_STNEW_COMPRESS - build a compressed string table
- *
+ * flags:
+ *	FLG_STTAB_COMPRESS - build a compressed string table
  */
 Str_tbl *
-st_new(uint_t stflags)
+st_new(uint_t flags)
 {
 	Str_tbl	*stp;
 
-	if ((stp = calloc(sizeof (Str_tbl), 1)) == 0)
-		return (0);
+	if ((stp = calloc(sizeof (Str_tbl), 1)) == NULL)
+		return (NULL);
 
 	/*
 	 * Start with a leading '\0' - it's tradition.
 	 */
-	stp->st_stringsize = stp->st_fullstringsize = stp->st_nextoff = 1;
+	stp->st_strsize = stp->st_fullstrsize = stp->st_nextoff = 1;
 
 	/*
-	 * Do we compress this string table
+	 * Do we compress this string table?
 	 */
-	if ((stflags & FLG_STNEW_COMPRESS) == 0)
+	stp->st_flags = flags;
+	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
 		return (stp);
 
-	stp->st_flags |= FLG_STTAB_COMPRESS;
-	if ((stp->st_strtree = calloc(sizeof (avl_tree_t), 1)) == 0) {
-		return (0);
-	}
+	if ((stp->st_lentree = calloc(sizeof (avl_tree_t), 1)) == NULL)
+		return (NULL);
 
-	avl_create(stp->st_strtree, &strlen_compare, sizeof (Stringelem),
-		SGSOFFSETOF(Stringelem, se_avlnode));
+	avl_create(stp->st_lentree, &avl_len_compare, sizeof (LenNode),
+	    SGSOFFSETOF(LenNode, ln_avlnode));
 
 	return (stp);
+}
+
+/*
+ * Insert a new string into the Str_tbl.  There are two AVL trees used.
+ *
+ *  .	The first LenNode AVL tree maintains a tree of nodes based on string
+ *	sizes.
+ *  .	Each LenNode maintains a StrNode AVL tree for each string.  Large
+ *	applications have been known to contribute thousands of strings of
+ *	the same size.  Should strings need to be removed (-z ignore), then
+ *	the string AVL tree makes this removal efficient and scalable.
+ */
+int
+st_insert(Str_tbl *stp, const char *str)
+{
+	uint_t		len;
+	StrNode		*snp, sn = { 0 };
+	LenNode		*lnp, ln = { 0 };
+	avl_index_t	where;
+
+	/*
+	 * String table can't have been cooked
+	 */
+	assert((stp->st_flags & FLG_STTAB_COOKED) == 0);
+
+	/*
+	 * Null strings always point to the head of the string
+	 * table - no reason to keep searching.
+	 */
+	if ((len = (uint_t)strlen(str)) == 0)
+		return (0);
+
+	stp->st_fullstrsize += len + 1;
+	stp->st_strcnt++;
+
+	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
+		return (0);
+
+	/*
+	 * From the controlling string table, determine which LenNode AVL node
+	 * provides for this string length.  If the node doesn't exist, insert
+	 * a new node to represent this string length.
+	 */
+	ln.ln_strlen = len;
+	if ((lnp = avl_find(stp->st_lentree, &ln, &where)) == NULL) {
+		if ((lnp = calloc(sizeof (LenNode), 1)) == NULL)
+			return (-1);
+		lnp->ln_strlen = len;
+		avl_insert(stp->st_lentree, lnp, where);
+
+		if ((lnp->ln_strtree = calloc(sizeof (avl_tree_t), 1)) == NULL)
+			return (0);
+
+		avl_create(lnp->ln_strtree, &avl_str_compare, sizeof (StrNode),
+		    SGSOFFSETOF(StrNode, sn_avlnode));
+	}
+
+	/*
+	 * From the string length AVL node determine whether a StrNode AVL node
+	 * provides this string.  If the node doesn't exist, insert a new node
+	 * to represent this string.
+	 */
+	sn.sn_str = str;
+	if ((snp = avl_find(lnp->ln_strtree, &sn, &where)) == NULL) {
+		if ((snp = calloc(sizeof (StrNode), 1)) == NULL)
+			return (-1);
+		snp->sn_str = str;
+		avl_insert(lnp->ln_strtree, snp, where);
+	}
+	snp->sn_refcnt++;
+
+	return (0);
+}
+
+/*
+ * Remove a previously inserted string from the Str_tbl.
+ */
+int
+st_delstring(Str_tbl *stp, const char *str)
+{
+	uint_t		len;
+	LenNode		*lnp, ln = { 0 };
+	StrNode		*snp, sn = { 0 };
+
+	/*
+	 * String table can't have been cooked
+	 */
+	assert((stp->st_flags & FLG_STTAB_COOKED) == 0);
+
+	len = (uint_t)strlen(str);
+	stp->st_fullstrsize -= len + 1;
+
+	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
+		return (0);
+
+	/*
+	 * Determine which LenNode AVL node provides for this string length.
+	 */
+	ln.ln_strlen = len;
+	if ((lnp = avl_find(stp->st_lentree, &ln, 0)) != NULL) {
+		sn.sn_str = str;
+		if ((snp = avl_find(lnp->ln_strtree, &sn, 0)) != NULL) {
+			/*
+			 * Reduce the reference count, and if zero remove the
+			 * node.
+			 */
+			if (--snp->sn_refcnt == 0)
+				avl_remove(lnp->ln_strtree, snp);
+			return (0);
+		}
+	}
+
+	/*
+	 * No strings of this length, or no string itself - someone goofed.
+	 */
+	return (-1);
 }
 
 /*
@@ -213,119 +336,6 @@ st_destroy(Str_tbl *stp)
 		free(stp->st_hashbcks);
 	}
 	free(stp);
-}
-
-
-
-
-/*
- * Remove a previously inserted string from the Str_tbl
- */
-int
-st_delstring(Str_tbl *stp, const char *str)
-{
-	uint_t		stlen;
-	Stringelem	qstelem;
-	Stringelem	*stelem;
-	Stringlist	*stlist, *pstlist;
-
-	/*
-	 * String table can't have been cooked
-	 */
-	assert((stp->st_flags & FLG_STTAB_COOKED) == 0);
-
-	stlen = (uint_t)strlen(str);
-	stp->st_fullstringsize -= stlen + 1;
-
-	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
-		return (0);
-
-	qstelem.se_stlen = stlen;
-	if ((stelem = avl_find(stp->st_strtree, &qstelem, 0)) == NULL) {
-		/*
-		 * no strings of this length recorded, let alone
-		 * this specific string - someone goofed.
-		 */
-		return (-1);
-	}
-
-	pstlist = 0;
-	for (stlist = stelem->se_strlist; stlist; stlist = stlist->sl_next) {
-		if (strcmp(str, stlist->sl_string) == 0)
-			break;
-		pstlist = stlist;
-	}
-
-	if (stlist == 0) {
-		/*
-		 * string was not found
-		 */
-		return (-1);
-	}
-
-	if (pstlist == 0) {
-		/*
-		 * String is first on list.
-		 */
-		stelem->se_strlist = stlist->sl_next;
-	} else {
-		/*
-		 * remove string from list.
-		 */
-		pstlist->sl_next = stlist->sl_next;
-	}
-
-	free(stlist);
-	return (0);
-}
-
-
-/*
- * Insert a new string into the Str_tbl
- */
-int
-st_insert(Str_tbl *stp, const char *str)
-{
-	uint_t	stlen;
-	Stringelem	qstelem;
-	Stringelem	*stelem;
-	Stringlist	*strlist;
-	avl_index_t	where;
-
-	/*
-	 * String table can't have been cooked
-	 */
-	assert((stp->st_flags & FLG_STTAB_COOKED) == 0);
-	stlen = (uint_t)strlen(str);
-	/*
-	 * Null strings always point to the head of the string
-	 * table - no reason to keep searching.
-	 */
-	if (stlen == 0)
-		return (0);
-
-	stp->st_fullstringsize += stlen + 1;
-	stp->st_stringcnt++;
-
-	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
-		return (0);
-
-	qstelem.se_stlen = strlen(str);
-	if ((stelem = avl_find(stp->st_strtree, &qstelem,
-	    &where)) == NULL) {
-		if ((stelem = calloc(sizeof (Stringelem), 1)) == 0)
-			return (-1);
-		stelem->se_stlen = qstelem.se_stlen;
-		avl_insert(stp->st_strtree, stelem, where);
-	}
-	if ((strlist = malloc(sizeof (Stringlist))) == 0)
-		return (-1);
-
-	strlist->sl_string = str;
-	strlist->sl_next = stelem->se_strlist;
-	stelem->se_strlist = strlist;
-
-	return (0);
 }
 
 
@@ -368,7 +378,7 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 		/*
 		 * Have we overflowed our assigned buffer?
 		 */
-		if ((_stoff + stlen) > stp->st_fullstringsize)
+		if ((_stoff + stlen) > stp->st_fullstrsize)
 			return (-1);
 		memcpy(stp->st_strbuf + _stoff, str, stlen);
 		*stoff = _stoff;
@@ -377,26 +387,25 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 	}
 
 	/*
-	 * Calculate reverse hash for string
+	 * Calculate reverse hash for string.
 	 */
 	hashval = HASHSEED;
 	for (i = stlen; i >= 0; i--) {
 		hashval = ((hashval << 5) + hashval) +
-			str[i];			/* h = ((h * 33) + c) */
+		    str[i];			/* h = ((h * 33) + c) */
 	}
 
 	for (sthash = stp->st_hashbcks[hashval % stp->st_hbckcnt]; sthash;
 	    sthash = sthash->hi_next) {
-		if (sthash->hi_hashval == hashval) {
-			const char	*hstr;
+		const char	*hstr;
 
-			hstr = &sthash->hi_mstr->sm_str[
-			    sthash->hi_mstr->sm_stlen -
-			    sthash->hi_stlen];
-			if (strcmp(str, hstr) == 0) {
-				break;
-			}
-		}
+		if (sthash->hi_hashval != hashval)
+			continue;
+
+		hstr = &sthash->hi_mstr->sm_str[sthash->hi_mstr->sm_strlen -
+		    sthash->hi_strlen];
+		if (strcmp(str, hstr) == 0)
+			break;
 	}
 
 	/*
@@ -409,29 +418,33 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 	 * Has this string been copied into the string table?
 	 */
 	mstr = sthash->hi_mstr;
-	if (mstr->sm_stoff == 0) {
-		uint_t	mstlen = mstr->sm_stlen + 1;
-		mstr->sm_stoff = stp->st_nextoff;
+	if (mstr->sm_stroff == 0) {
+		uint_t	mstrlen = mstr->sm_strlen + 1;
+
+		mstr->sm_stroff = stp->st_nextoff;
+
 		/*
 		 * Have we overflowed our assigned buffer?
 		 */
-		if ((mstr->sm_stoff + mstlen) > stp->st_fullstringsize)
+		if ((mstr->sm_stroff + mstrlen) > stp->st_fullstrsize)
 			return (-1);
-		memcpy(stp->st_strbuf + mstr->sm_stoff, mstr->sm_str,
-			mstlen);
-		stp->st_nextoff += mstlen;
+
+		(void) memcpy(stp->st_strbuf + mstr->sm_stroff,
+		    mstr->sm_str, mstrlen);
+		stp->st_nextoff += mstrlen;
 	}
+
 	/*
-	 * Calculate offset of (sub)string
+	 * Calculate offset of (sub)string.
 	 */
-	*stoff = mstr->sm_stoff + mstr->sm_stlen - sthash->hi_stlen;
+	*stoff = mstr->sm_stroff + mstr->sm_strlen - sthash->hi_strlen;
 
 	return (0);
 }
 
 
 static int
-st_hash_insert(Str_tbl *stp, const char *str, uint_t stlen)
+st_hash_insert(Str_tbl *stp, const char *str, uint_t len)
 {
 	int		i;
 	uint_t		hashval = HASHSEED;
@@ -450,50 +463,47 @@ st_hash_insert(Str_tbl *stp, const char *str, uint_t stlen)
 	 * any suffixes already exist in the tree as we generate
 	 * the hash.
 	 */
-	for (i = stlen; i >= 0; i--) {
-
+	for (i = len; i >= 0; i--) {
 		hashval = ((hashval << 5) + hashval) +
-			str[i];			/* h = ((h * 33) + c) */
+		    str[i];			/* h = ((h * 33) + c) */
+
 		for (sthash = hashbcks[hashval % bckcnt];
 		    sthash; sthash = sthash->hi_next) {
+			const char	*hstr;
+			Str_master	*_mstr;
 
-			if (sthash->hi_hashval == hashval) {
-				const char	*hstr;
-				Str_master	*_mstr;
+			if (sthash->hi_hashval != hashval)
+				continue;
 
-				_mstr = sthash->hi_mstr;
-				hstr = &_mstr->sm_str[_mstr->sm_stlen -
-				    sthash->hi_stlen];
-				if (strcmp(&str[i], hstr) == 0) {
-					if (i == 0) {
-						/*
-						 * Entry already in table,
-						 * increment refcnt and get
-						 * out.
-						 */
-						sthash->hi_refcnt++;
-						return (0);
-					} else {
-						/*
-						 * If this 'suffix' is
-						 * presently a 'master' string,
-						 * then take over it's record.
-						 */
-						if (sthash->hi_stlen ==
-						    _mstr->sm_stlen) {
-							/*
-							 * we should only do
-							 * this once.
-							 */
-							assert(mstr == 0);
-							mstr = _mstr;
-						}
-					}
+			_mstr = sthash->hi_mstr;
+			hstr = &_mstr->sm_str[_mstr->sm_strlen -
+			    sthash->hi_strlen];
+
+			if (strcmp(&str[i], hstr))
+				continue;
+
+			if (i == 0) {
+				/*
+				 * Entry already in table, increment refcnt and
+				 * get out.
+				 */
+				sthash->hi_refcnt++;
+				return (0);
+			} else {
+				/*
+				 * If this 'suffix' is presently a 'master
+				 * string, then take over it's record.
+				 */
+				if (sthash->hi_strlen == _mstr->sm_strlen) {
+					/*
+					 * we should only do this once.
+					 */
+					assert(mstr == 0);
+					mstr = _mstr;
 				}
 			}
 		}
 	}
-
 
 	/*
 	 * Do we need a new master string, or can we take over
@@ -507,23 +517,22 @@ st_hash_insert(Str_tbl *stp, const char *str, uint_t stlen)
 			return (-1);
 		mstr->sm_next = stp->st_mstrlist;
 		stp->st_mstrlist = mstr;
-		stp->st_stringsize += stlen + 1;
+		stp->st_strsize += len + 1;
 	} else {
 		/*
-		 * We are taking over a existing master string,
-		 * the stringsize only increments by the
-		 * difference between the currnet string and the
-		 * previous master.
+		 * We are taking over a existing master string, the string size
+		 * only increments by the difference between the current string
+		 * and the previous master.
 		 */
-		assert(stlen > mstr->sm_stlen);
-		stp->st_stringsize += stlen - mstr->sm_stlen;
+		assert(len > mstr->sm_strlen);
+		stp->st_strsize += len - mstr->sm_strlen;
 	}
 
 	if ((sthash = calloc(sizeof (Str_hash), 1)) == 0)
 		return (-1);
 
 	mstr->sm_hashval = sthash->hi_hashval = hashval;
-	mstr->sm_stlen = sthash->hi_stlen = stlen;
+	mstr->sm_strlen = sthash->hi_strlen = len;
 	mstr->sm_str = str;
 	sthash->hi_refcnt = 1;
 	sthash->hi_mstr = mstr;
@@ -543,16 +552,15 @@ st_hash_insert(Str_tbl *stp, const char *str, uint_t stlen)
 uint_t
 st_getstrtab_sz(Str_tbl *stp)
 {
-	assert(stp->st_fullstringsize > 0);
+	assert(stp->st_fullstrsize > 0);
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
 		stp->st_flags |= FLG_STTAB_COOKED;
-		return (stp->st_fullstringsize);
+		return (stp->st_fullstrsize);
 	}
 
-
 	if ((stp->st_flags & FLG_STTAB_COOKED) == 0) {
-		Stringelem	*stelem;
+		LenNode		*lnp;
 		void		*cookie;
 
 		stp->st_flags |= FLG_STTAB_COOKED;
@@ -560,77 +568,87 @@ st_getstrtab_sz(Str_tbl *stp)
 		 * allocate a hash table about the size of # of
 		 * strings input.
 		 */
-		stp->st_hbckcnt = findprime(stp->st_stringcnt);
+		stp->st_hbckcnt = findprime(stp->st_strcnt);
 		if ((stp->st_hashbcks =
 		    calloc(sizeof (Str_hash), stp->st_hbckcnt)) == NULL)
 			return (0);
 
 		/*
-		 * We now walk all of the strings in the list,
-		 * from shortest to longest, and insert them into
-		 * the hashtable.
+		 * We now walk all of the strings in the list, from shortest to
+		 * longest, and insert them into the hashtable.
 		 */
-		if ((stelem = avl_first(stp->st_strtree)) == NULL) {
+		if ((lnp = avl_first(stp->st_lentree)) == NULL) {
 			/*
-			 * Is it possible we have a empty string table,
-			 * if so - the table still conains '\0'
-			 * so still return the size.
+			 * Is it possible we have an empty string table, if so,
+			 * the table still contains '\0', so return the size.
 			 */
-			if (avl_numnodes(stp->st_strtree) == 0) {
-				assert(stp->st_stringsize == 1);
-				return (stp->st_stringsize);
+			if (avl_numnodes(stp->st_lentree) == 0) {
+				assert(stp->st_strsize == 1);
+				return (stp->st_strsize);
 			}
 			return (0);
 		}
-		while (stelem) {
-			Stringlist	*strlist, *pstrlist;
+
+		while (lnp) {
+			StrNode	*snp;
 
 			/*
-			 * Walk the string lists and insert them
-			 * into the hash list.  Once a string is
-			 * inserted we no longer need it's entry,
-			 * so free it
+			 * Walk the string lists and insert them into the hash
+			 * list.  Once a string is inserted we no longer need
+			 * it's entry, so the string can be freed.
 			 */
-			for (strlist = stelem->se_strlist, pstrlist = 0;
-			    strlist; strlist = strlist->sl_next) {
-				if (st_hash_insert(stp, strlist->sl_string,
-				    stelem->se_stlen) == -1)
+			for (snp = avl_first(lnp->ln_strtree); snp;
+			    snp = AVL_NEXT(lnp->ln_strtree, snp)) {
+				if (st_hash_insert(stp, snp->sn_str,
+				    lnp->ln_strlen) == -1)
 					return (0);
-				if (pstrlist)
-					free(pstrlist);
 			}
-			free(pstrlist);
-			stelem->se_strlist = 0;
-			stelem = AVL_NEXT(stp->st_strtree, stelem);
+
+			/*
+			 * Now that the strings have been copied, walk the
+			 * StrNode tree and free all the AVL nodes.  Note,
+			 * avl_destroy_nodes() beats avl_remove() as the
+			 * latter balances the nodes as they are removed.
+			 * We just want to tear the whole thing down fast.
+			 */
+			cookie = NULL;
+			while ((snp = avl_destroy_nodes(lnp->ln_strtree,
+			    &cookie)) != NULL)
+				free(snp);
+			avl_destroy(lnp->ln_strtree);
+			free(lnp->ln_strtree);
+			lnp->ln_strtree = NULL;
+
+			/*
+			 * Move on to the next LenNode.
+			 */
+			lnp = AVL_NEXT(stp->st_lentree, lnp);
 		}
 
 		/*
-		 * Now that all of the strings have been freed,
-		 * go ahead and quickly re-walk the AVL tree and
-		 * free all of the AVL nodes.
-		 *
-		 * avl_destroy_nodes() beats avl_remove() because
-		 * avl_remove will 'ballance' the tree as nodes
-		 * are deleted - we just want to tear the whole
-		 * thing down now.
+		 * Now that all of the strings have been freed, walk the
+		 * LenNode tree and free all of the AVL nodes.  Note,
+		 * avl_destroy_nodes() beats avl_remove() as the latter
+		 * balances the nodes as they are removed. We just want to
+		 * tear the whole thing down fast.
 		 */
 		cookie = NULL;
-		while ((stelem = avl_destroy_nodes(stp->st_strtree,
+		while ((lnp = avl_destroy_nodes(stp->st_lentree,
 		    &cookie)) != NULL)
-			free(stelem);
-		avl_destroy(stp->st_strtree);
-		free(stp->st_strtree);
-		stp->st_strtree = 0;
+			free(lnp);
+		avl_destroy(stp->st_lentree);
+		free(stp->st_lentree);
+		stp->st_lentree = 0;
 	}
 
-	assert(stp->st_stringsize > 0);
-	assert(stp->st_fullstringsize >= stp->st_stringsize);
+	assert(stp->st_strsize > 0);
+	assert(stp->st_fullstrsize >= stp->st_strsize);
 
-	return (stp->st_stringsize);
+	return (stp->st_strsize);
 }
 
 /*
- * Associate a buffer with the string table.
+ * Associate a buffer with a string table.
  */
 const char *
 st_getstrbuf(Str_tbl *stp)
@@ -644,10 +662,10 @@ st_setstrbuf(Str_tbl *stp, char *stbuf, uint_t bufsize)
 	assert(stp->st_flags & FLG_STTAB_COOKED);
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
-		if (bufsize < stp->st_fullstringsize)
+		if (bufsize < stp->st_fullstrsize)
 			return (-1);
 	} else {
-		if (bufsize < stp->st_stringsize)
+		if (bufsize < stp->st_strsize)
 			return (-1);
 	}
 

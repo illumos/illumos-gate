@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * sgsmsg generates several message files from an input template file.  Messages
  * are constructed for use with gettext(3i) - the default - or catgets(3c).  The
@@ -80,7 +79,7 @@
 #include	<sys/param.h>
 
 #include	<sgs.h>
-#include	<string_table.h>
+#include	<_string_table.h>
 
 /*
  * Define any error message strings.
@@ -150,14 +149,13 @@ message_append(const char *defn, const char *message)
 		(void) fprintf(stderr, Errmsg_nmem, strerror(errno));
 		exit(1);
 	}
-	if (stp == 0) {
-		/*
-		 * Initialize string table
-		 */
-		if ((stp = st_new(FLG_STNEW_COMPRESS)) == 0) {
-			(void) fprintf(stderr, Errmsg_stnw, strerror(errno));
-			exit(1);
-		}
+
+	/*
+	 * Initialize the string table.
+	 */
+	if ((stp == 0) && ((stp = st_new(FLG_STNEW_COMPRESS)) == NULL)) {
+		(void) fprintf(stderr, Errmsg_stnw, strerror(errno));
+		exit(1);
 	}
 
 
@@ -313,45 +311,51 @@ getmesgid(char *id)
 	return (0);
 }
 
-
 /*
  * Dump contents of String Table to standard out
  */
 static void
 dump_stringtab(Str_tbl *stp)
 {
-	uint_t	i;
+	uint_t	cnt;
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
-		(void) printf("uncompressed strings: %d\n",
-			stp->st_fullstringsize);
+		(void) printf("string table full size: %d: uncompressed\n",
+		    stp->st_fullstrsize);
 		return;
 	}
 
+	(void) printf("string table full size: %d compressed down to: %d\n\n",
+	    stp->st_fullstrsize, stp->st_strsize);
+	(void) printf("string table compression information [%d buckets]:\n",
+	    stp->st_hbckcnt);
 
-	for (i = 0; i < stp->st_hbckcnt; i++) {
-		Str_hash	*sthash;
-		(void) printf("Bucket: [%3d]\n", i);
-		for (sthash = stp->st_hashbcks[i]; sthash;
-		    sthash = sthash->hi_next) {
-			uint_t		stroff;
-			stroff = sthash->hi_mstr->sm_stlen - sthash->hi_stlen;
+	for (cnt = 0; cnt < stp->st_hbckcnt; cnt++) {
+		Str_hash	*sthash = stp->st_hashbcks[cnt];
+
+		if (sthash == 0)
+			continue;
+
+		(void) printf(" bucket: [%d]\n", cnt);
+
+		while (sthash) {
+			uint_t	stroff = sthash->hi_mstr->sm_strlen -
+			    sthash->hi_strlen;
+
 			if (stroff == 0) {
-				(void) printf("  %2d %s  <master>\n",
-					sthash->hi_refcnt,
-					sthash->hi_mstr->sm_str);
+				(void) printf("  [%d]: '%s'  <master>\n",
+				    sthash->hi_refcnt, sthash->hi_mstr->sm_str);
 			} else {
-				const char	*str;
-				str = &sthash->hi_mstr->sm_str[stroff];
-				(void) printf("  %2d %s <suffix of> -> %s\n",
-					sthash->hi_refcnt,
-					str, sthash->hi_mstr->sm_str);
+				(void) printf("  [%d]: '%s'  <suffix of: "
+				    "'%s'>\n", sthash->hi_refcnt,
+				    &sthash->hi_mstr->sm_str[stroff],
+				    sthash->hi_mstr->sm_str);
 			}
+			sthash = sthash->hi_next;
 		}
 	}
-	(void) printf("fullstringsize: %d compressed: %d\n",
-		stp->st_fullstringsize, stp->st_stringsize);
 }
+
 /*
  * Initialize the message definition header file stream.
  */
@@ -518,7 +522,6 @@ fini_defs(void)
 
 	return (0);
 }
-
 
 /*
  * The entire messaging file has been scanned - and all strings have been
@@ -899,6 +902,7 @@ message:
 					 * unless an escape character is found
 					 * terminate the data string with a 0.
 					 */
+					/* BEGIN CSTYLED */
 					if (*token == '"') {
 					    if (fdlint && (fprintf(fdlint,
 						"%c", *token) < 0)) {
@@ -924,6 +928,7 @@ message:
 					    _token = '\0';
 					} else
 					    _token = *token;
+					/* END CSTYLED */
 				}
 
 				if (fdmsgs && (prtmsgs == 1) &&
@@ -1185,7 +1190,6 @@ main(int argc, char ** argv)
 
 	if (vflag)
 		dump_stringtab(stp);
-
 
 	/*
 	 * Close up everything and go home.

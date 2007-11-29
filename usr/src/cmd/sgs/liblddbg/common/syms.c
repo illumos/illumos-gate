@@ -178,20 +178,28 @@ Dbg_syms_spec_title(Lm_list *lml)
 }
 
 void
-Dbg_syms_discarded(Lm_list *lml, Sym_desc *sdp, Is_desc *disp)
+Dbg_syms_discarded(Lm_list *lml, Sym_desc *sdp)
 {
-	const char	*sectname;
+	const char	*file;
 
-	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS | DBG_C_UNUSED))
 		return;
 	if (DBG_NOTDETAIL())
 		return;
 
-	if ((sectname = disp->is_basename) == 0)
-		sectname = disp->is_name;
+	if ((sdp->sd_file == NULL) || ((file = sdp->sd_file->ifl_name) == NULL))
+		file = MSG_INTL(MSG_STR_UNKNOWN);
 
-	dbg_print(lml, MSG_INTL(MSG_SYM_DISCARDED),
-	    Dbg_demangle_name(sdp->sd_name), sectname, disp->is_file->ifl_name);
+	if (sdp->sd_isc) {
+		const char	*sec;
+
+		if ((sec = sdp->sd_isc->is_basename) == 0)
+			sec = sdp->sd_isc->is_name;
+		dbg_print(lml, MSG_INTL(MSG_SYM_DISCARD_SEC),
+		    Dbg_demangle_name(sdp->sd_name), sec, file);
+	} else
+		dbg_print(lml, MSG_INTL(MSG_SYM_DISCARD_FILE),
+		    Dbg_demangle_name(sdp->sd_name), file);
 }
 
 void

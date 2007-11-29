@@ -39,7 +39,7 @@
 #include	"msg.h"
 #include	"_libld.h"
 
-static void
+inline static void
 remove_local(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 {
 	Sym	*sym = sdp->sd_sym;
@@ -49,11 +49,13 @@ remove_local(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 
 	if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
 		ofl->ofl_locscnt--;
+
 		err = st_delstring(ofl->ofl_strtab, sdp->sd_name);
 		assert(err != -1);
 
 		if (allow_ldynsym && ldynsym_symtype[type]) {
 			ofl->ofl_dynlocscnt--;
+
 			err = st_delstring(ofl->ofl_dynstrtab, sdp->sd_name);
 			assert(err != -1);
 			/* Remove from sort section? */
@@ -63,7 +65,7 @@ remove_local(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 	sdp->sd_flags |= FLG_SY_ISDISC;
 }
 
-static void
+inline static void
 remove_scoped(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 {
 	Sym	*sym = sdp->sd_sym;
@@ -79,6 +81,7 @@ remove_scoped(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 
 	if (allow_ldynsym && ldynsym_symtype[type]) {
 		ofl->ofl_dynscopecnt--;
+
 		err = st_delstring(ofl->ofl_dynstrtab, sdp->sd_name);
 		assert(err != -1);
 		/* Remove from sort section? */
@@ -87,11 +90,80 @@ remove_scoped(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 	sdp->sd_flags1 |= FLG_SY1_ELIM;
 }
 
-#pragma inline(remove_local)
-#pragma inline(remove_scoped)
+inline static void
+ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
+{
+	Os_desc	*osp;
+	Is_desc	*isp = sdp->sd_isc;
+	uchar_t	bind = ELF_ST_BIND(sdp->sd_sym->st_info);
+
+	if (bind == STB_LOCAL) {
+		uchar_t	type = ELF_ST_TYPE(sdp->sd_sym->st_info);
+
+		/*
+		 * Skip section symbols, these were never collected in the
+		 * first place.
+		 */
+		if (type == STT_SECTION)
+			return;
+
+		/*
+		 * Determine if the whole file is being removed.  Remove any
+		 * file symbol, and any symbol that is not associated with a
+		 * section, provided the symbol has not been identified as
+		 * (update) required.
+		 */
+		if (((ifl->ifl_flags & FLG_IF_FILEREF) == 0) &&
+		    ((type == STT_FILE) || ((isp == NULL) &&
+		    ((sdp->sd_flags & FLG_SY_UPREQD) == 0)))) {
+			DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
+			if (ifl->ifl_flags & FLG_IF_IGNORE)
+				remove_local(ofl, sdp, allow_ldynsym);
+			return;
+		}
+
+	} else {
+		/*
+		 * Global symbols can only be eliminated when the interfaces of
+		 * an object have been defined via versioning/scoping.
+		 */
+		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
+			return;
+
+		/*
+		 * Remove any unreferenced symbols that are not associated with
+		 * a section.
+		 */
+		if ((isp == NULL) && ((sdp->sd_flags & FLG_SY_UPREQD) == 0)) {
+			DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
+			if (ifl->ifl_flags & FLG_IF_IGNORE)
+				remove_scoped(ofl, sdp, allow_ldynsym);
+			return;
+		}
+	}
+
+	/*
+	 * Do not discard any symbols that are associated with non-allocable
+	 * segments.
+	 */
+	if (isp && ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
+	    ((osp = isp->is_osdesc) != 0) &&
+	    (osp->os_sgdesc->sg_phdr.p_type == PT_LOAD)) {
+		DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
+		if (ifl->ifl_flags & FLG_IF_IGNORE) {
+			if (bind == STB_LOCAL)
+				remove_local(ofl, sdp, allow_ldynsym);
+			else
+				remove_scoped(ofl, sdp, allow_ldynsym);
+		}
+	}
+}
 
 /*
- * If -zignore is in effect, scan all input sections to see if there are any
+ * If -zignore has been in effect, scan all input files to determine if the
+ * file, or sections from the file, have been referenced.  If not, the file or
+ * some of the files sections can be discarded.
+ *
  * which haven't been referenced (and hence can be discarded).  If sections are
  * to be discarded, rescan the output relocations and the symbol table and
  * remove the relocations and symbol entries that are no longer required.
@@ -112,9 +184,7 @@ ignore_section_processing(Ofl_desc *ofl)
 	Listnode	*lnp;
 	Ifl_desc	*ifl;
 	Rel_cache	*rcp;
-	int		allow_ldynsym;
-
-	allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
+	int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 
 	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, ifl)) {
 		uint_t	num, discard;
@@ -165,82 +235,28 @@ ignore_section_processing(Ofl_desc *ofl)
 		 */
 		for (num = 1; num < ifl->ifl_symscnt; num++) {
 			Sym_desc	*sdp;
-			Sym		*symp;
-			Os_desc		*osp;
-			/* LINTED - only used for assert() */
-			int		err;
-			uchar_t		type;
 
+			/*
+			 * If the symbol definition has been resolved to another
+			 * file, or the symbol has already been discarded or
+			 * eliminated, skip it.
+			 */
 			sdp = ifl->ifl_oldndx[num];
-			symp = sdp->sd_sym;
-			type = ELF_ST_TYPE(symp->st_info);
-
-			/*
-			 * If the whole file is being eliminated, remove the
-			 * local file symbol, and any COMMON symbols (which
-			 * aren't associated with a section) provided they
-			 * haven't been referenced by a relocation.
-			 */
-			if ((ofl->ofl_flags1 & FLG_OF1_IGNORE) &&
-			    ((ifl->ifl_flags & FLG_IF_FILEREF) == 0) &&
-			    ((type == STT_FILE) ||
-			    ((symp->st_shndx == SHN_COMMON) &&
-			    ((sdp->sd_flags & FLG_SY_UPREQD) == 0)))) {
-				remove_local(ofl, sdp, allow_ldynsym);
-				continue;
-			}
-
-			/*
-			 * Skip any undefined, reserved section symbols, already
-			 * discarded or eliminated symbols.  Also skip any
-			 * symbols that don't originate from a section, or
-			 * aren't defined from the file being examined.
-			 */
-			if ((symp->st_shndx == SHN_UNDEF) ||
-			    (symp->st_shndx >= SHN_LORESERVE) ||
-			    (type == STT_SECTION) ||
+			if ((sdp->sd_file != ifl) ||
 			    (sdp->sd_flags & FLG_SY_ISDISC) ||
-			    (sdp->sd_flags1 & FLG_SY1_ELIM) ||
-			    (sdp->sd_isc == 0) || (sdp->sd_file != ifl))
+			    (sdp->sd_flags1 & FLG_SY1_ELIM))
 				continue;
 
 			/*
-			 * If any references were made against the section
-			 * the symbol is being defined in - skip it.
+			 * Complete the investigation of the symbol.
 			 */
-			if ((sdp->sd_isc->is_flags & FLG_IS_SECTREF) ||
-			    ((ifl->ifl_flags & FLG_IF_FILEREF) &&
-			    ((osp = sdp->sd_isc->is_osdesc) != 0) &&
-			    (osp->os_sgdesc->sg_phdr.p_type != PT_LOAD)))
-				continue;
-
-			/*
-			 * Finish processing any local symbols.
-			 */
-			if (ELF_ST_BIND(symp->st_info) == STB_LOCAL) {
-				if (ofl->ofl_flags1 & FLG_OF1_IGNORE)
-					remove_local(ofl, sdp, allow_ldynsym);
-
-				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
-				    sdp, sdp->sd_isc));
-				continue;
-			}
-
-			/*
-			 * Global symbols can only be eliminated when an objects
-			 * interfaces (versioning/scoping) is defined.
-			 */
-			if (sdp->sd_flags1 & FLG_SY1_HIDDEN) {
-				if (ofl->ofl_flags1 & FLG_OF1_IGNORE)
-					remove_scoped(ofl, sdp, allow_ldynsym);
-
-				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
-				    sdp, sdp->sd_isc));
-				continue;
-			}
+			ignore_sym(ofl, ifl, sdp, allow_ldynsym);
 		}
 	}
 
+	/*
+	 * If we were only here to solicit debugging diagnostics, we're done.
+	 */
 	if ((ofl->ofl_flags1 & FLG_OF1_IGNPRC) == 0)
 		return (1);
 
@@ -249,45 +265,44 @@ ignore_section_processing(Ofl_desc *ofl)
 	 * ignored sections.  If one is found, decrement the total outrel count.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp, rcp)) {
-		Rel_desc	*orsp;
-		Os_desc		*relosp;
+		Rel_desc	*rsp;
+		Os_desc		*osp;
 
 		/* LINTED */
-		for (orsp = (Rel_desc *)(rcp + 1);
-		    orsp < rcp->rc_free; orsp++) {
-			Is_desc		*_isdesc = orsp->rel_isdesc;
+		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
+			Is_desc		*isc = rsp->rel_isdesc;
 			uint_t		flags, entsize;
 			Shdr		*shdr;
 			Ifl_desc	*ifl;
 
-			if ((_isdesc == 0) ||
-			    ((_isdesc->is_flags & (FLG_IS_SECTREF))) ||
-			    ((ifl = _isdesc->is_file) == 0) ||
+			if ((isc == 0) ||
+			    ((isc->is_flags & (FLG_IS_SECTREF))) ||
+			    ((ifl = isc->is_file) == 0) ||
 			    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0) ||
-			    ((shdr = _isdesc->is_shdr) == 0) ||
+			    ((shdr = isc->is_shdr) == 0) ||
 			    ((shdr->sh_flags & SHF_ALLOC) == 0))
 				continue;
 
-			flags = orsp->rel_flags;
+			flags = rsp->rel_flags;
 
 			if (flags & (FLG_REL_GOT | FLG_REL_BSS |
 			    FLG_REL_NOINFO | FLG_REL_PLT))
 				continue;
 
-			relosp = orsp->rel_osdesc;
+			osp = rsp->rel_osdesc;
 
-			if (orsp->rel_flags & FLG_REL_RELA)
+			if (rsp->rel_flags & FLG_REL_RELA)
 				entsize = sizeof (Rela);
 			else
 				entsize = sizeof (Rel);
 
-			assert(relosp->os_szoutrels > 0);
-			relosp->os_szoutrels -= entsize;
+			assert(osp->os_szoutrels > 0);
+			osp->os_szoutrels -= entsize;
 
 			if (!(flags & FLG_REL_PLT))
 				ofl->ofl_reloccntsub++;
 
-			if (orsp->rel_rtype == M_R_RELATIVE)
+			if (rsp->rel_rtype == M_R_RELATIVE)
 				ofl->ofl_relocrelcnt--;
 		}
 	}

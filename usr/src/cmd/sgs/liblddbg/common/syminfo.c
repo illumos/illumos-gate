@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sgs.h>
+#include	<stdio.h>
 #include	<debug.h>
 #include	<msg.h>
 

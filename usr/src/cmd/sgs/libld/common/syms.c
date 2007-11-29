@@ -73,7 +73,7 @@ ld_sym_avl_comp(const void *elem1, const void *elem2)
 /*
  * Focal point for verifying symbol names.
  */
-static const char *
+inline static const char *
 string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
     int symndx, Word shndx, const char *symsecname, const char *strsecname,
     Word *flags)
@@ -231,7 +231,7 @@ ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
 	/*
 	 * Perform search for symbol in AVL tree.  Note that the 'where' field
 	 * is passed in from the caller.  If a 'where' is present, it can be
-	 * used in subsequent 'sym_enter()' calls if required.
+	 * used in subsequent 'ld_sym_enter()' calls if required.
 	 */
 	sav = avl_find(&ofl->ofl_symavl, &qsav, where);
 
@@ -1957,8 +1957,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (sdp->sd_isc &&
 			    (sdp->sd_isc->is_flags & FLG_IS_DISCARD)) {
 				sdp->sd_flags |= FLG_SY_ISDISC;
-				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml,
-				    sdp, sdp->sd_isc));
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
 				continue;
 			}
 
@@ -2183,8 +2182,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				sdp->sd_flags = FLG_SY_ISDISC;
 				ifl->ifl_oldndx[ndx] = sdp;
 
-				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp,
-				    sdp->sd_isc));
+				DBG_CALL(Dbg_syms_discarded(ofl->ofl_lml, sdp));
 				continue;
 			}
 		}

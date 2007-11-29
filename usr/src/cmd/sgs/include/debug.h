@@ -786,7 +786,7 @@ extern	void	Dbg_syms_ar_resolve(Lm_list *, Xword, Elf_Arsym *,
 		    const char *, int);
 extern	void	Dbg_syms_ar_title(Lm_list *, const char *, int);
 extern	void	Dbg_syms_created(Lm_list *, const char *);
-extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *, Is_desc *);
+extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *);
 extern	void	Dbg_syms_dlsym(Rt_map *, const char *, const char *, int);
 extern	void	Dbg_syms_dup_sort_addr(Lm_list *, const char *, const char *,
 		    const char *, Addr);
