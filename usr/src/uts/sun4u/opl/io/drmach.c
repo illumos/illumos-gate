@@ -1396,8 +1396,10 @@ drmach_board_connect(drmachid_t id, drmach_opts_t *opts)
 		return (drerr_new(1, EOPL_PROBE, NULL));
 
 	if (cpu_alljupiter) {
-		if (cpu_impl & (1 << OLYMPUS_C_IMPL))
+		if (cpu_impl & (1 << OLYMPUS_C_IMPL)) {
+			(void) opl_unprobe_sb(obj->bnum);
 			return (drerr_new(1, EOPL_MIXED_CPU, NULL));
+		}
 	}
 
 	(void) prom_attach_notice(obj->bnum);
