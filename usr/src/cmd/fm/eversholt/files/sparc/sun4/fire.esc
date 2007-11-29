@@ -47,9 +47,16 @@
  
 /*
  * Macros for CE Fabric ereports
+ *
+ * The current kernel sends ereports with a severity of PF_CE and PF_NO_ERROR.
+ * However, a simple change in the kernel may end up sending only a severity
+ * of PF_CE for CE errors. Since both methods are correct, we match on
+ * an ereport severity of either PF_CE only or PF_CE plus PF_NO_ERROR.
  */
+#define	PF_NO_ERROR (1 << 0)
 #define	PF_CE (1 << 1)
-#define	MATCH_CE (payloadprop("severity") == PF_CE)
+#define	MATCH_CE ((payloadprop("severity") == PF_CE) || \
+    (payloadprop("severity") == (PF_CE | PF_NO_ERROR)))
 
 /*
  * Test for primary or secondary ereports
