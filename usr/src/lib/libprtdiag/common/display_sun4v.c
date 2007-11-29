@@ -101,7 +101,7 @@ static int all_status_ok;
 /* local functions */
 static int sun4v_get_first_compatible_value(picl_nodehdl_t, char **);
 static void sun4v_display_memory_conf(picl_nodehdl_t);
-static void sun4v_disp_env_status();
+static int sun4v_disp_env_status();
 static void sun4v_env_print_fan_sensors();
 static void sun4v_env_print_fan_indicators();
 static void sun4v_env_print_temp_sensors();
@@ -125,6 +125,7 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 	struct mem_total memory_total;	/* Total memory in system */
 	struct grp_info grps;	/* Info on all groups in system */
 	char machine[MAXSTRLEN];
+	int	exit_code = 0;
 
 	if (sysinfo(SI_MACHINE, machine, sizeof (machine)) == -1)
 		return (1);
@@ -173,9 +174,14 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 
 		if (picl_get_root(&rooth) != PICL_SUCCESS)
 			return (1);
+
+		/*
+		 * The physical-platform node may be missing on systems with
+		 * older firmware so don't consider that an error.
+		 */
 		if (sun4v_get_node_by_name(rooth, PICL_NODE_PHYSICAL_PLATFORM,
 		    &phyplatformh) != PICL_SUCCESS)
-			return (1);
+			return (0);
 
 		if (picl_find_node(phyplatformh, PICL_PROP_CLASSNAME,
 		    PICL_PTYPE_CHARSTRING, (void *)PICL_CLASS_CHASSIS,
@@ -183,9 +189,9 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 			return (1);
 
 		syserrlog = log;
-		sun4v_disp_env_status();
+		exit_code = sun4v_disp_env_status();
 	}
-	return (0);
+	return (exit_code);
 }
 
 static void
@@ -902,11 +908,13 @@ display_boardnum(int num)
 	log_printf("%2d   ", num, 0);
 }
 
-static void
+static int
 sun4v_disp_env_status()
 {
+	int	exit_code = 0;
+
 	if (phyplatformh == 0)
-		return;
+		return (0);
 	log_printf("\n");
 	log_printf("============================");
 	log_printf(" Environmental Status ");
@@ -916,41 +924,52 @@ sun4v_disp_env_status()
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_fan_sensors();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_fan_indicators();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_temp_sensors();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_temp_indicators();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_current_sensors();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_current_indicators();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_voltage_sensors();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_env_print_voltage_indicators();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
+	all_status_ok = 1;
 	sun4v_env_print_LEDs();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	all_status_ok = 1;
 	sun4v_print_fru_status();
+	exit_code |= (!all_status_ok);
 
 	class_node_found = 0;
 	sun4v_print_fw_rev();
@@ -959,6 +978,8 @@ sun4v_disp_env_status()
 	sun4v_print_openprom_rev();
 
 	sun4v_print_chassis_serial_no();
+
+	return (exit_code);
 }
 
 /*ARGSUSED*/
