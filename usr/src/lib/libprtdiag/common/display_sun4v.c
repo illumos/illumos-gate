@@ -442,7 +442,7 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 		/* Print IO Type */
 		log_printf("%-6s", pci_card.bus_type);
 		/* Printf Card Name */
-		log_printf("%-44s", pci_card.name);
+		log_printf("%-34s", pci_card.name);
 		/* Print Card Model */
 		log_printf("%-8s", pci_card.model);
 		log_printf("\n");
@@ -467,7 +467,7 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 void
 sun4v_display_pci(picl_nodehdl_t plafh)
 {
-	char *fmt = "%-17s %-5s %-44s %-8s";
+	char *fmt = "%-17s %-5s %-33s %-8s";
 	/* Have we printed the column headings? */
 	static int banner = FALSE;
 
@@ -564,9 +564,17 @@ print_memory_segment_size(uint64_t size)
 	uint64_t kbyte = 1024;
 	uint64_t mbyte = kbyte * kbyte;
 	uint64_t gbyte = kbyte * mbyte;
+	uint64_t tbyte = kbyte * gbyte;
 	char buf[MEMORY_SIZE_FIELD];
 
-	if (size >= gbyte) {
+	if (size >= tbyte) {
+		if (size % tbyte == 0)
+			(void) snprintf(buf, sizeof (buf), "%d TB",
+			    (int)(size / tbyte));
+		else
+			(void) snprintf(buf, sizeof (buf), "%.2f TB",
+			    (float)size / tbyte);
+	} else if (size >= gbyte) {
 		if (size % gbyte == 0)
 			(void) snprintf(buf, sizeof (buf), "%d GB",
 			    (int)(size / gbyte));
@@ -588,7 +596,7 @@ print_memory_segment_size(uint64_t size)
 			(void) snprintf(buf, sizeof (buf), "%.2f KB",
 			    (float)size / kbyte);
 	}
-	log_printf("%-7s ", buf);
+	log_printf("%-9s", buf);
 }
 
 /*
@@ -602,11 +610,23 @@ print_memory_segment_contain(picl_nodehdl_t bank_nodeh)
 	char val[PICL_PROPNAMELEN_MAX];
 	picl_nodehdl_t module_nodeh;
 	int flag = 0;
+	uint64_t size;
 
 	do {
 		if (picl_get_propval_by_name(bank_nodeh, PICL_PROP_CHILD,
 		    &module_nodeh, sizeof (picl_nodehdl_t)) != PICL_SUCCESS)
 			continue;
+		if (picl_get_propval_by_name(bank_nodeh, PICL_PROP_SIZE,
+		    &size, sizeof (size)) == PICL_SUCCESS) {
+			if (!flag) {
+				print_memory_segment_size(size);
+			} else {
+				log_printf("                "
+				    "                    ");
+				print_memory_segment_size(size);
+				flag = 0;
+			}
+		}
 		do {
 			if (picl_get_propval_by_name(module_nodeh,
 			    PICL_PROP_NAC, val, sizeof (val)) !=
@@ -614,10 +634,14 @@ print_memory_segment_contain(picl_nodehdl_t bank_nodeh)
 				continue;
 			else {
 				if (!flag) {
-					log_printf("%-30s\n", val);
+					log_printf("%s\n", val);
 					flag = 1;
-				} else
-					log_printf("%57s\n", val);
+				} else {
+					log_printf("%s%s\n",
+					    "                       "
+					    "                      ",
+					    val);
+				}
 			}
 		} while (picl_get_propval_by_name(module_nodeh, PICL_PROP_PEER,
 		    &module_nodeh, sizeof (picl_nodehdl_t)) ==
@@ -657,9 +681,9 @@ sun4v_memory_conf_callback(picl_nodehdl_t nodeh, void *args)
 		    sizeof (ifactor));
 		if (err !=  PICL_SUCCESS)
 			break;
-		log_printf("%-13llx", base);
+		log_printf("0x%-13llx", base);
 		print_memory_segment_size(size);
-		log_printf("%-18lld", ifactor);
+		log_printf("%-12lld", ifactor);
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
 		    &nodeh, sizeof (nodeh));
 		if (err ==  PICL_SUCCESS)
@@ -676,24 +700,25 @@ sun4v_memory_conf_callback(picl_nodehdl_t nodeh, void *args)
 void
 sun4v_display_memory_conf(picl_nodehdl_t plafh)
 {
-	char *fmt = "%-12s %-7s %-9s %-20s";
+	char *fmt = "%-14s %-8s %-11s %-8s %-s";
 	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_MEMORY_SEGMENT,
 	    NULL, sun4v_memory_conf_callback);
 	if (class_node_found == 0)
 		return;
 	log_printf("\n");
-	log_printf("============================");
-	log_printf(" Memory Configuration ");
-	log_printf("============================");
+	log_printf("=======================");
+	log_printf(" Physical Memory Configuration ");
+	log_printf("========================");
 	log_printf("\n");
 	log_printf("Segment Table:\n");
 	log_printf(
-	    "---------------------------------------------------------\n");
-	log_printf(fmt, "Base Address", "Size", "Interleave Factor",
-	    "Contains", 0);
+	    "--------------------------------------------------------------\n");
+	log_printf(fmt, "Base", "Segment", "Interleave", "Bank", "Contains", 0);
+	log_printf("\n");
+	log_printf(fmt, "Address", "Size", "Factor", "Size", "Modules", 0);
 	log_printf("\n");
 	log_printf(
-	    "---------------------------------------------------------\n");
+	    "--------------------------------------------------------------\n");
 	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_MEMORY_SEGMENT,
 	    NULL, sun4v_memory_conf_callback);
 }
@@ -701,7 +726,7 @@ sun4v_display_memory_conf(picl_nodehdl_t plafh)
 void
 sun4v_display_cpu_devices(picl_nodehdl_t plafh)
 {
-	char *fmt = "%-12s %-5s %-8s %-19s %-5s";
+	char *fmt = "%-6s %-9s %-22s %-6s";
 
 	/*
 	 * Display the table header for CPUs . Then display the CPU
@@ -709,21 +734,21 @@ sun4v_display_cpu_devices(picl_nodehdl_t plafh)
 	 */
 	log_printf(dgettext(TEXT_DOMAIN,
 	    "\n"
-	    "========================="
-	    " CPUs "
-	    "==============================================="
+	    "================================"
+	    " Virtual CPUs "
+	    "================================"
 	    "\n"
 	    "\n"));
-	log_printf(fmt, "", "", "", "CPU", "CPU", 0);
 	log_printf("\n");
-	log_printf(fmt, "Location", "CPU", "Freq",
-	    "Implementation", "State", 0);
+	log_printf(fmt, "CPU ID", "Frequency", "Implementation",
+	    "Status", 0);
 	log_printf("\n");
-	log_printf(fmt, "------------", "-----", "--------",
-	    "-------------------", "-----", 0);
+	log_printf(fmt, "------", "---------",
+	    "----------------------", "-------", 0);
 	log_printf("\n");
 
-	(void) picl_walk_tree_by_class(plafh, "cpu", "cpu", sun4v_display_cpus);
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_CPU, PICL_CLASS_CPU,
+	    sun4v_display_cpus);
 }
 
 /*
@@ -743,27 +768,22 @@ sun4v_display_cpus(picl_nodehdl_t cpuh, void* args)
 	char *comp_value;
 	char *no_prop_value = "   ";
 	char freq_str[MAXSTRLEN];
-	char fru_name[MAXSTRLEN];
 	char state[MAXSTRLEN];
 
 	/*
 	 * Get cpuid property and print it and the NAC name
 	 */
-	status = picl_get_propinfo_by_name(cpuh, "cpuid", &propinfo, &proph);
+	status = picl_get_propinfo_by_name(cpuh, OBP_PROP_CPUID, &propinfo,
+	    &proph);
 	if (status == PICL_SUCCESS) {
 		status = picl_get_propval(proph, &cpuid, sizeof (cpuid));
 		if (status != PICL_SUCCESS) {
-			log_printf("%-13s", no_prop_value);
-			log_printf("%-6s", no_prop_value);
+			log_printf("%-7s", no_prop_value);
 		} else {
-			(void) snprintf(fru_name, sizeof (fru_name), "%s%d",
-			    CPU_STRAND_NAC, cpuid);
-			log_printf("%-13s", fru_name);
-			log_printf("%-6d", cpuid);
+			log_printf("%-7d", cpuid);
 		}
 	} else {
-		log_printf("%-13s", no_prop_value);
-		log_printf("%-6s", no_prop_value);
+		log_printf("%-7s", no_prop_value);
 	}
 
 clock_freq:
@@ -772,21 +792,21 @@ clock_freq:
 	if (status == PICL_SUCCESS) {
 		int_value = malloc(propinfo.size);
 		if (int_value == NULL) {
-			log_printf("%-9s", no_prop_value);
+			log_printf("%-10s", no_prop_value);
 			goto compatible;
 		}
 		status = picl_get_propval(proph, int_value, propinfo.size);
 		if (status != PICL_SUCCESS) {
-			log_printf("%-9s", no_prop_value);
+			log_printf("%-10s", no_prop_value);
 		} else {
 			/* Running frequency */
 			(void) snprintf(freq_str, sizeof (freq_str), "%d MHz",
 			    CLK_FREQ_TO_MHZ(*int_value));
-			log_printf("%-9s", freq_str);
+			log_printf("%-10s", freq_str);
 		}
 		free(int_value);
 	} else
-		log_printf("%-9s", no_prop_value);
+		log_printf("%-10s", no_prop_value);
 
 compatible:
 	status = picl_get_propinfo_by_name(cpuh, "compatible", &propinfo,
@@ -798,15 +818,15 @@ compatible:
 			 */
 			comp_value = malloc(propinfo.size);
 			if (comp_value == NULL) {
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 				goto state;
 			}
 			status = picl_get_propval(proph, comp_value,
 			    propinfo.size);
 			if (status != PICL_SUCCESS)
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 			else
-				log_printf("%-20s", comp_value, 0);
+				log_printf("%-23s", comp_value, 0);
 			free(comp_value);
 		} else if (propinfo.type == PICL_PTYPE_TABLE) {
 			/*
@@ -814,36 +834,36 @@ compatible:
 			 */
 			status = picl_get_propval(proph, &tblh, propinfo.size);
 			if (status != PICL_SUCCESS) {
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 				goto state;
 			}
 			status = picl_get_next_by_row(tblh, &rowproph);
 			if (status != PICL_SUCCESS) {
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 				goto state;
 			}
 
 			status = picl_get_propinfo(rowproph, &propinfo);
 			if (status != PICL_SUCCESS) {
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 				goto state;
 			}
 
 			comp_value = malloc(propinfo.size);
 			if (comp_value == NULL) {
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 				goto state;
 			}
 			status = picl_get_propval(rowproph, comp_value,
 			    propinfo.size);
 			if (status != PICL_SUCCESS)
-				log_printf("%-20s", no_prop_value, 0);
+				log_printf("%-23s", no_prop_value, 0);
 			else
-				log_printf("%-20s", comp_value, 0);
+				log_printf("%-23s", comp_value, 0);
 			free(comp_value);
 		}
 	} else
-		log_printf("%-20s", no_prop_value, 0);
+		log_printf("%-23s", no_prop_value, 0);
 
 state:
 	status = picl_get_propinfo_by_name(cpuh, PICL_PROP_STATE,
