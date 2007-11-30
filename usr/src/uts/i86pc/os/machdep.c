@@ -156,6 +156,7 @@ void debug_enter(char *);
 
 extern void pm_cfb_check_and_powerup(void);
 extern void pm_cfb_rele(void);
+extern void consconfig_teardown();
 
 /*
  * Machine dependent code to reboot.
@@ -175,14 +176,6 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		kpreempt_disable();
 		affinity_set(CPU_CURRENT);
 	}
-
-	/*
-	 * XXX - rconsvp is set to NULL to ensure that output messages
-	 * are sent to the underlying "hardware" device using the
-	 * monitor's printf routine since we are in the process of
-	 * either rebooting or halting the machine.
-	 */
-	rconsvp = NULL;
 
 	/*
 	 * Print the reboot message now, before pausing other cpus.
@@ -236,6 +229,8 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 		pause_cpus(NULL);
 		mutex_exit(&cpu_lock);
 	}
+
+	consconfig_teardown();
 
 	/*
 	 * try and reset leaf devices.  reset_leaves() should only

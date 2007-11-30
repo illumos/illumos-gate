@@ -741,6 +741,7 @@ stubs_base:
 	STUB(consconfig, consconfig,	0);
 	STUB(consconfig, consconfig_get_usb_kb_path,	0);
 	STUB(consconfig, consconfig_get_usb_ms_path,	0);
+	STUB(consconfig, consconfig_teardown,    0);
 	END_MODULE(consconfig);
 #endif
 

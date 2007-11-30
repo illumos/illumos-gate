@@ -98,6 +98,8 @@ extern uint64_t get_cpuaddr(uint64_t, uint64_t);
 #define	BOOT_CMD_MAX_LEN	256
 #define	BOOT_CMD_BASE		"boot "
 
+extern void consconfig_teardown();
+
 /*
  * In an LDoms system we do not save the user's boot args in NVRAM
  * as is done on legacy systems.  Instead, we format and send a
@@ -159,14 +161,6 @@ void
 mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 {
 	extern void pm_cfb_check_and_powerup(void);
-
-	/*
-	 * XXX - rconsvp is set to NULL to ensure that output messages
-	 * are sent to the underlying "hardware" device using the
-	 * monitor's printf routine since we are in the process of
-	 * either rebooting or halting the machine.
-	 */
-	rconsvp = NULL;
 
 	switch (fcn) {
 	case AD_HALT:
@@ -238,6 +232,8 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	 * from here on out.
 	 */
 	stop_other_cpus();
+
+	consconfig_teardown();
 
 	/*
 	 * try and reset leaf devices.  reset_leaves() should only
