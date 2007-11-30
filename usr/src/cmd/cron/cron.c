@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,13 +118,13 @@
 #define	BADSHELL	"because your login shell \
 isn't /usr/bin/sh, you can't use cron."
 
-#define	BADSTAT		"can't access your crontab file.  Resubmit it."
+#define	BADSTAT		"can't access your crontab or at-job file. Resubmit it."
 #define	BADPROJID	"can't set project id for your job."
 #define	CANTCDHOME	"can't change directory to your home directory.\
 \nYour commands will not be executed."
 #define	CANTEXECSH	"unable to exec the shell for one of your commands."
 #define	NOREAD		"can't read your crontab file.  Resubmit it."
-#define	BADTYPE		"crontab is not a regular file.\n"
+#define	BADTYPE		"crontab or at-job file is not a regular file.\n"
 #define	NOSTDIN		"unable to create a standard input file for \
 one of your crontab commands. \
 \nThat command was not executed."
@@ -159,6 +158,7 @@ error for each of your commands."
 #define	ERR_UNIXERR	1	/* error in some system call */
 #define	ERR_CANTEXECCRON 2	/* error setting up "cron" job environment */
 #define	ERR_CANTEXECAT	3	/* error setting up "at" job environment */
+#define	ERR_NOTREG	4	/* error not a regular file */
 
 #define	PROJECT		"project="
 
@@ -280,7 +280,6 @@ static void thaw_handler(int);
 static void child_handler(int);
 static void child_sigreset(void);
 
-static void dscan(DIR *dir, void (*fp)(char *, time_t));
 static void mod_ctab(char *, time_t);
 static void mod_atjob(char *, time_t);
 static void add_atevent(struct usr *, char *, time_t, int);
@@ -296,7 +295,7 @@ static void quedefs(int);
 static int idle(long);
 static struct usr *find_usr(char *);
 static int ex(struct event *e);
-static void read_dirs(void);
+static void read_dirs(int);
 static void mail(char *, char *, int);
 static char *next_field(int, int);
 static void readcron(struct usr *, time_t);
@@ -360,7 +359,7 @@ static pam_handle_t *pamh;	/* Authentication handle */
  * Function to help check a user's credentials.
  */
 
-static int verify_user_cred(const struct usr *u);
+static int verify_user_cred(struct usr *u);
 
 /*
  * Values returned by verify_user_cred and set_user_cred:
@@ -396,6 +395,12 @@ extern void el_remove(int, int);
 extern int el_empty(void);
 extern void *el_first(void);
 extern void el_delete(void);
+
+static int valid_entry(char *, int);
+static struct usr *create_ulist(char *, int);
+static void init_cronevent(char *, int);
+static void init_atevent(char *, time_t, int, int);
+static void update_atevent(struct usr *, char *, time_t, int);
 
 int
 main(int argc, char *argv[])
@@ -510,7 +515,7 @@ begin:
 #ifdef DEBUG
 			cftime(timebuf, "%C", &next_event->time);
 			(void) fprintf(stderr, "next_time=%ld %s\n",
-				next_event->time, timebuf);
+			    next_event->time, timebuf);
 #endif
 		}
 		if (ne_time > 0) {
@@ -563,21 +568,21 @@ begin:
 				 * kicked off!
 				 */
 				next_event->time =
-					next_time(next_event, newtime);
+				    next_time(next_event, newtime);
 				t_old = time(NULL);
 			} else {
 				next_event->time =
-					next_time(next_event, (time_t)0);
+				    next_time(next_event, (time_t)0);
 			}
 #ifdef DEBUG
 			cftime(timebuf, "%C", &next_event->time);
 			(void) fprintf(stderr,
-				"pushing back cron event %s at %ld (%s)\n",
-				next_event->cmd, next_event->time, timebuf);
+			    "pushing back cron event %s at %ld (%s)\n",
+			    next_event->cmd, next_event->time, timebuf);
 #endif
 
 			el_add(next_event, next_event->time,
-				(next_event->u)->ctid);
+			    (next_event->u)->ctid);
 			break;
 		default:
 			/* remove at or batch job from system */
@@ -621,13 +626,13 @@ initialize(int firstpass)
 		/* for mail(1), make sure messages come from root */
 		if (putenv("LOGNAME=root") != 0) {
 			crabort("cannot expand env variable",
-				REMOVE_FIFO|CONSOLE_MSG);
+			    REMOVE_FIFO|CONSOLE_MSG);
 		}
 		if (access(FIFO, R_OK) == -1) {
 			if (errno == ENOENT) {
 				if (mknod(FIFO, S_IFIFO|0600, 0) != 0)
 					crabort("cannot create fifo queue",
-						REMOVE_FIFO|CONSOLE_MSG);
+					    REMOVE_FIFO|CONSOLE_MSG);
 			} else {
 				if (NOFORK) {
 					/* didn't fork... init(1M) is waiting */
@@ -635,7 +640,7 @@ initialize(int firstpass)
 				}
 				perror("FIFO");
 				crabort("cannot access fifo queue",
-					REMOVE_FIFO|CONSOLE_MSG);
+				    REMOVE_FIFO|CONSOLE_MSG);
 			}
 		} else {
 			if (NOFORK) {
@@ -661,7 +666,7 @@ initialize(int firstpass)
 	 */
 	if (firstpass)
 		uhead = NULL;
-	read_dirs();
+	read_dirs(firstpass);
 	next_event = NULL;
 
 	if (!firstpass)
@@ -685,41 +690,148 @@ initialize(int firstpass)
 }
 
 static void
-read_dirs()
+read_dirs(int first)
 {
-	DIR	*dir;
+	DIR		*dir;
+	struct dirent	*dp;
+	char		*ptr;
+	int		jobtype;
+	time_t		tim;
+
 
 	if (chdir(CRONDIR) == -1)
 		crabort(BADCD, REMOVE_FIFO|CONSOLE_MSG);
 	cwd = CRON;
 	if ((dir = opendir(".")) == NULL)
 		crabort(NOREADDIR, REMOVE_FIFO|CONSOLE_MSG);
-	dscan(dir, mod_ctab);
+	while ((dp = readdir(dir)) != NULL) {
+		if (!valid_entry(dp->d_name, CRONEVENT))
+			continue;
+		init_cronevent(dp->d_name, first);
+	}
 	(void) closedir(dir);
+
 	if (chdir(ATDIR) == -1) {
 		msg("cannot chdir to at directory");
 		return;
 	}
-	cwd = AT;
 	if ((dir = opendir(".")) == NULL) {
 		msg("cannot read at at directory");
 		return;
 	}
-	dscan(dir, mod_atjob);
+	cwd = AT;
+	while ((dp = readdir(dir)) != NULL) {
+		if (!valid_entry(dp->d_name, ATEVENT))
+			continue;
+		ptr = dp->d_name;
+		if (((tim = num(&ptr)) == 0) || (*ptr != '.'))
+			continue;
+		ptr++;
+		if (!isalpha(*ptr))
+			continue;
+		jobtype = *ptr - 'a';
+		if (jobtype >= NQUEUE) {
+			cron_unlink(dp->d_name);
+			continue;
+		}
+		init_atevent(dp->d_name, tim, jobtype, first);
+	}
 	(void) closedir(dir);
 }
 
-static void
-dscan(DIR *df, void (*fp)(char *, time_t))
+static int
+valid_entry(char *name, int type)
 {
-	struct dirent	*dp;
+	struct stat	buf;
 
-	while ((dp = readdir(df)) != NULL) {
-		if (strcmp(dp->d_name, ".") == 0 ||
-		    strcmp(dp->d_name, "..") == 0) {
-			continue;
+	if (strcmp(name, ".") == 0 ||
+	    strcmp(name, "..") == 0)
+		return (0);
+
+	/* skip over ancillary file names */
+	if (audit_cron_is_anc_name(name))
+		return (0);
+
+	if (stat(name, &buf)) {
+		mail(name, BADSTAT, ERR_UNIXERR);
+		cron_unlink(name);
+		return (0);
+	}
+	if (!S_ISREG(buf.st_mode)) {
+		mail(name, BADTYPE, ERR_NOTREG);
+		cron_unlink(name);
+		return (0);
+	}
+	if (type == ATEVENT) {
+		if (!(buf.st_mode & ISUID)) {
+			cron_unlink(name);
+			return (0);
 		}
-		(*fp)(dp->d_name, 0);
+	}
+	return (1);
+}
+
+struct usr *
+create_ulist(char *name, int type)
+{
+	struct usr	*u;
+
+	u = xmalloc(sizeof (struct usr));
+	u->name = xmalloc(strlen(name) + 1);
+	(void) strcpy(u->name, name);
+	u->home = NULL;
+	if (type == CRONEVENT) {
+		u->ctexists = TRUE;
+		u->ctid = ecid++;
+	} else {
+		u->ctexists = FALSE;
+		u->ctid = 0;
+	}
+	u->ctevents = NULL;
+	u->atevents = NULL;
+	u->aruncnt = 0;
+	u->cruncnt = 0;
+	u->nextusr = uhead;
+	uhead = u;
+	return (u);
+}
+
+void
+init_cronevent(char *name, int first)
+{
+	struct usr	*u;
+
+	if (first) {
+		u = create_ulist(name, CRONEVENT);
+		readcron(u, 0);
+	} else {
+		if ((u = find_usr(name)) == NULL) {
+			u = create_ulist(name, CRONEVENT);
+			readcron(u, 0);
+		} else {
+			u->ctexists = TRUE;
+			rm_ctevents(u);
+			el_remove(u->ctid, 0);
+			readcron(u, 0);
+		}
+	}
+}
+
+void
+init_atevent(char *name, time_t tim, int jobtype, int first)
+{
+	struct usr	*u;
+
+	if (first) {
+		u = create_ulist(name, ATEVENT);
+		add_atevent(u, name, tim, jobtype);
+	} else {
+		if ((u = find_usr(name)) == NULL) {
+			u = create_ulist(name, ATEVENT);
+			add_atevent(u, name, tim, jobtype);
+		} else {
+			update_atevent(u, name, tim, jobtype);
+		}
 	}
 }
 
@@ -742,9 +854,9 @@ mod_ctab(char *name, time_t reftime)
 	}
 	if (cwd != CRON) {
 		if (snprintf(namebuf, sizeof (namebuf), "%s/%s",
-				CRONDIR, name) >= sizeof (namebuf)) {
+		    CRONDIR, name) >= sizeof (namebuf)) {
 			msg("Too long path name %s - cron entries not created",
-				namebuf);
+			    namebuf);
 			return;
 		}
 		pname = namebuf;
@@ -777,28 +889,18 @@ mod_ctab(char *name, time_t reftime)
 #ifdef DEBUG
 		(void) fprintf(stderr, "new user (%s) with a crontab\n", name);
 #endif
-		u = xmalloc(sizeof (struct usr));
-		u->name = xmalloc(strlen(name)+1);
-		(void) strcpy(u->name, name);
-		u->home = xmalloc(strlen(pw->pw_dir)+1);
+		u = create_ulist(name, CRONEVENT);
+		u->home = xmalloc(strlen(pw->pw_dir) + 1);
 		(void) strcpy(u->home, pw->pw_dir);
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
-		u->ctexists = TRUE;
-		u->ctid = ecid++;
-		u->ctevents = NULL;
-		u->atevents = NULL;
-		u->aruncnt = 0;
-		u->cruncnt = 0;
-		u->nextusr = uhead;
-		uhead = u;
 		readcron(u, reftime);
 	} else {
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
 		if (strcmp(u->home, pw->pw_dir) != 0) {
 			free(u->home);
-			u->home = xmalloc(strlen(pw->pw_dir)+1);
+			u->home = xmalloc(strlen(pw->pw_dir) + 1);
 			(void) strcpy(u->home, pw->pw_dir);
 		}
 		u->ctexists = TRUE;
@@ -831,7 +933,6 @@ mod_atjob(char *name, time_t reftime)
 	struct	passwd	*pw;
 	struct	stat	buf;
 	struct	usr	*u;
-	struct	event	*e;
 	char	namebuf[PATH_MAX];
 	char	*pname;
 	int	jobtype;
@@ -885,48 +986,21 @@ mod_atjob(char *name, time_t reftime)
 	if ((u = find_usr(pw->pw_name)) == NULL) {
 #ifdef DEBUG
 		(void) fprintf(stderr, "new user (%s) with an at job = %s\n",
-			pw->pw_name, name);
+		    pw->pw_name, name);
 #endif
-		u = xmalloc(sizeof (struct usr));
-		u->name = xmalloc(strlen(pw->pw_name)+1);
-		(void) strcpy(u->name, pw->pw_name);
-		u->home = xmalloc(strlen(pw->pw_dir)+1);
+		u = create_ulist(pw->pw_name, ATEVENT);
+		u->home = xmalloc(strlen(pw->pw_dir) + 1);
 		(void) strcpy(u->home, pw->pw_dir);
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
-		u->ctexists = FALSE;
-		u->ctid = 0;
-		u->ctevents = NULL;
-		u->atevents = NULL;
-		u->aruncnt = 0;
-		u->cruncnt = 0;
-		u->nextusr = uhead;
-		uhead = u;
 		add_atevent(u, name, tim, jobtype);
 	} else {
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
-		if (strcmp(u->home, pw->pw_dir) != 0) {
-			free(u->home);
-			u->home = xmalloc(strlen(pw->pw_dir)+1);
-			(void) strcpy(u->home, pw->pw_dir);
-		}
-		e = u->atevents;
-		while (e != NULL) {
-			if (strcmp(e->cmd, name) == 0) {
-				e->of.at.exists = TRUE;
-				break;
-			} else {
-				e = e->link;
-			}
-		}
-		if (e == NULL) {
-#ifdef DEBUG
-			(void) fprintf(stderr, "%s has a new at job = %s\n",
-				u->name, name);
-#endif
-			add_atevent(u, name, tim, jobtype);
-		}
+		free(u->home);
+		u->home = xmalloc(strlen(pw->pw_dir) + 1);
+		(void) strcpy(u->home, pw->pw_dir);
+		update_atevent(u, name, tim, jobtype);
 	}
 }
 
@@ -937,7 +1011,7 @@ add_atevent(struct usr *u, char *job, time_t tim, int jobtype)
 
 	e = xmalloc(sizeof (struct event));
 	e->etype = jobtype;
-	e->cmd = xmalloc(strlen(job)+1);
+	e->cmd = xmalloc(strlen(job) + 1);
 	(void) strcpy(e->cmd, job);
 	e->u = u;
 	e->link = u->atevents;
@@ -950,11 +1024,33 @@ add_atevent(struct usr *u, char *job, time_t tim, int jobtype)
 		e->time = tim;
 #ifdef DEBUG
 	(void) fprintf(stderr, "add_atevent: user=%s, job=%s, time=%ld\n",
-		u->name, e->cmd, e->time);
+	    u->name, e->cmd, e->time);
 #endif
 	el_add(e, e->time, e->of.at.eventid);
 }
 
+void
+update_atevent(struct usr *u, char *name, time_t tim, int jobtype)
+{
+	struct event *e;
+
+	e = u->atevents;
+	while (e != NULL) {
+		if (strcmp(e->cmd, name) == 0) {
+			e->of.at.exists = TRUE;
+			break;
+		} else {
+			e = e->link;
+		}
+	}
+	if (e == NULL) {
+#ifdef DEBUG
+		(void) fprintf(stderr, "%s has a new at job = %s\n",
+		    u->name, name);
+#endif
+			add_atevent(u, name, tim, jobtype);
+	}
+}
 
 static char line[CTLINESIZE];	/* holds a line from a crontab file */
 static int cursor;		/* cursor for the above line */
@@ -1028,13 +1124,13 @@ again:
 			cursor += 2;
 			goto again;
 		}
-		e->cmd = xmalloc(cursor-start+1);
-		(void) strncpy(e->cmd, line+start, cursor-start);
+		e->cmd = xmalloc(cursor-start + 1);
+		(void) strncpy(e->cmd, line + start, cursor-start);
 		e->cmd[cursor-start] = '\0';
 		/* see if there is any standard input	*/
 		if (line[cursor] == '%') {
-			e->of.ct.input = xmalloc(strlen(line)-cursor+1);
-			(void) strcpy(e->of.ct.input, line+cursor+1);
+			e->of.ct.input = xmalloc(strlen(line)-cursor + 1);
+			(void) strcpy(e->of.ct.input, line + cursor + 1);
 			for (i = 0; i < strlen(e->of.ct.input); i++) {
 				if (e->of.ct.input[i] == '%')
 					e->of.ct.input[i] = '\n';
@@ -1055,7 +1151,7 @@ again:
 #ifdef DEBUG
 		cftime(timebuf, "%C", &e->time);
 		(void) fprintf(stderr, "inserting cron event %s at %ld (%s)\n",
-			e->cmd, e->time, timebuf);
+		    e->cmd, e->time, timebuf);
 #endif
 	}
 	cte_sendmail(u->name);	/* mail errors if any to user */
@@ -1161,7 +1257,7 @@ mail(char *usrname, char *mesg, int format)
 		if ((ruser_ids = getpwnam(usrname)) == NULL)
 			exit(0);
 		(void) setuid(ruser_ids->pw_uid);
-		temp = xmalloc(strlen(MAIL)+strlen(usrname)+2);
+		temp = xmalloc(strlen(MAIL) + strlen(usrname) + 2);
 		(void) sprintf(temp, "%s %s", MAIL, usrname);
 		pipe = popen(temp, "w");
 		if (pipe != NULL) {
@@ -1275,8 +1371,8 @@ next_field(int lower, int upper)
 		if (line[cursor++] != ',')
 			return (NULL);
 	}
-	s = xmalloc(cursor-start+1);
-	(void) strncpy(s, line+start, cursor-start);
+	s = xmalloc(cursor-start + 1);
+	(void) strncpy(s, line + start, cursor-start);
 	s[cursor-start] = '\0';
 	return (s);
 }
@@ -1323,7 +1419,9 @@ next_time(struct event *e, time_t tflag)
 
 	struct tm *tm, ref_tm, tmp, tmp1, tmp2;
 	int tm_mon, tm_mday, tm_wday, wday, m, min, h, hr, carry, day, days,
-	d1, day1, carry1, d2, day2, carry2, daysahead, mon, yr, db, wd, today;
+	    d1, day1, carry1, d2, day2, carry2, daysahead, mon, yr, db, wd,
+	    today;
+
 	time_t t, ref_t, t1, t2, zone_start;
 	int fallback;
 	extern int days_btwn(int, int, int, int, int, int);
@@ -1359,7 +1457,7 @@ recalc:
 		}
 	}
 
-	tm_mon = next_ge(tm->tm_mon+1, e->of.ct.month) - 1;	/* 0-11 */
+	tm_mon = next_ge(tm->tm_mon + 1, e->of.ct.month) - 1;	/* 0-11 */
 	tm_mday = next_ge(tm->tm_mday, e->of.ct.daymon);	/* 1-31 */
 	tm_wday = next_ge(tm->tm_wday, e->of.ct.dayweek);	/* 0-6	*/
 	today = TRUE;
@@ -1382,7 +1480,7 @@ recalc:
 	if (carry == 0 && today) {
 		/* this event must occur today */
 		tm_setup(&tmp, tm->tm_year, tm->tm_mon, tm->tm_mday,
-			hr, min, tm->tm_isdst);
+		    hr, min, tm->tm_isdst);
 		tmp1 = tmp;
 		if ((t1 = xmktime(&tmp1)) == (time_t)-1) {
 			return (0);
@@ -1424,11 +1522,11 @@ recalc:
 				 */
 				if (tmp1.tm_isdst != tmp2.tm_isdst) {
 					t = get_switching_time(tmp1.tm_isdst,
-						t1);
+					    t1);
 				} else {
 					/* does this really happen? */
 					t = get_switching_time(tmp1.tm_isdst,
-						t1 - abs(timezone - altzone));
+					    t1 - abs(timezone - altzone));
 				}
 				if (t == (time_t)-1)
 					return (0);
@@ -1445,10 +1543,10 @@ recalc:
 			 */
 			if (tm->tm_min > min) {
 				t += (time_t)(hr-tm->tm_hour-1) * HOUR +
-					(time_t)(60-tm->tm_min+min) * MINUTE;
+				    (time_t)(60-tm->tm_min + min) * MINUTE;
 			} else {
 				t += (time_t)(hr-tm->tm_hour) * HOUR +
-					(time_t)(min-tm->tm_min) * MINUTE;
+				    (time_t)(min-tm->tm_min) * MINUTE;
 			}
 			t1 = t;
 			t -= (time_t)tm->tm_sec;
@@ -1479,19 +1577,19 @@ recalc:
 	 */
 
 	/* check monthly day specification	*/
-	d1 = tm->tm_mday+1;
-	day1 = next_ge((d1-1)%days_in_mon(tm->tm_mon, tm->tm_year)+1,
-			e->of.ct.daymon);
+	d1 = tm->tm_mday + 1;
+	day1 = next_ge((d1-1)%days_in_mon(tm->tm_mon, tm->tm_year) + 1,
+	    e->of.ct.daymon);
 	carry1 = (day1 < d1) ? 1 : 0;
 
 	/* check weekly day specification	*/
-	d2 = tm->tm_wday+1;
+	d2 = tm->tm_wday + 1;
 	wday = next_ge(d2%7, e->of.ct.dayweek);
 	if (wday < d2)
 		daysahead = 7 - d2 + wday;
 	else
 		daysahead = wday - d2;
-	day2 = (d1+daysahead-1)%days_in_mon(tm->tm_mon, tm->tm_year)+1;
+	day2 = (d1 + daysahead-1)%days_in_mon(tm->tm_mon, tm->tm_year) + 1;
 	carry2 = (day2 < d1) ? 1 : 0;
 
 	/*
@@ -1512,15 +1610,15 @@ recalc:
 	yr = tm->tm_year;
 	if ((carry1 && carry2) || (tm->tm_mon != tm_mon)) {
 		/* event does not occur in this month	*/
-		m = tm->tm_mon+1;
-		mon = next_ge(m%12+1, e->of.ct.month) - 1;	/* 0..11 */
+		m = tm->tm_mon + 1;
+		mon = next_ge(m%12 + 1, e->of.ct.month) - 1;	/* 0..11 */
 		carry = (mon < m) ? 1 : 0;
 		yr += carry;
 		/* recompute day1 and day2	*/
 		day1 = next_ge(1, e->of.ct.daymon);
 		db = days_btwn(tm->tm_mon, tm->tm_mday, tm->tm_year, mon,
-				1, yr) + 1;
-		wd = (tm->tm_wday+db)%7;
+		    1, yr) + 1;
+		wd = (tm->tm_wday + db)%7;
 		/* wd is the day of the week of the first of month mon	*/
 		wday = next_ge(wd, e->of.ct.dayweek);
 		if (wday < wd)
@@ -1598,7 +1696,8 @@ recalc:
 			 * is invalid.
 			 */
 			if (strcmp(e->of.ct.dayweek, "*") == 0 &&
-			    mon == (next_ge((mon+1)%12+1, e->of.ct.month)-1) &&
+			    mon == (next_ge((mon + 1)%12 + 1,
+			    e->of.ct.month) - 1) &&
 			    day <= next_ge(1, e->of.ct.daymon)) {
 				/* job never run */
 				return (0);
@@ -1647,7 +1746,7 @@ recalc:
 			t2 += abs(timezone - altzone);
 			(void) localtime_r(&t2, &tmp2);
 			zone_start = get_switching_time(tmp2.tm_isdst,
-						t1 - abs(timezone - altzone));
+			    t1 - abs(timezone - altzone));
 			if (zone_start == (time_t)-1) {
 				return (0);
 			}
@@ -1658,11 +1757,11 @@ recalc:
 			 * old code.
 			 */
 			days = days_btwn(tm->tm_mon,
-				tm->tm_mday, tm->tm_year, mon, day, yr);
+			    tm->tm_mday, tm->tm_year, mon, day, yr);
 			t += (time_t)(23-tm->tm_hour)*HOUR
-				+ (time_t)(60-tm->tm_min)*MINUTE
-				+ (time_t)hr*HOUR + (time_t)min*MINUTE
-				+ (time_t)days*DAY;
+			    + (time_t)(60-tm->tm_min)*MINUTE
+			    + (time_t)hr*HOUR + (time_t)min*MINUTE
+			    + (time_t)days*DAY;
 			t1 = t;
 			t -= (time_t)tm->tm_sec;
 			(void) localtime_r(&t, &tmp);
@@ -1738,7 +1837,7 @@ xmktime(struct tm *tmp)
 			return ((time_t)-1);
 		}
 		crabort("internal error: mktime failed",
-			REMOVE_FIFO|CONSOLE_MSG);
+		    REMOVE_FIFO|CONSOLE_MSG);
 	}
 	return (ret);
 }
@@ -1811,8 +1910,8 @@ free_if_unused(struct usr *u)
 		(void) fprintf(stderr, "%s removed from usr list\n", u->name);
 #endif
 		for (cur = uhead, prev = NULL;
-			cur != u;
-			prev = cur, cur = cur->nextusr) {
+		    cur != u;
+		    prev = cur, cur = cur->nextusr) {
 			if (cur == NULL) {
 				return;
 			}
@@ -1951,7 +2050,7 @@ ex(struct event *e)
 
 	qp = &qt[e->etype];	/* set pointer to queue defs */
 	if (qp->nrun >= qp->njob) {
-		msg("%c queue max run limit reached", e->etype+'a');
+		msg("%c queue max run limit reached", e->etype + 'a');
 		resched(qp->nwait);
 		return (0);
 	}
@@ -1960,7 +2059,7 @@ ex(struct event *e)
 #ifdef ATLIMIT
 	if ((e->u)->uid != 0 && (e->u)->aruncnt >= ATLIMIT) {
 		msg("ATLIMIT (%d) reached for uid %d",
-			ATLIMIT, (e->u)->uid);
+		    ATLIMIT, (e->u)->uid);
 		rinfo_free(rp);
 		resched(qp->nwait);
 		return (0);
@@ -1969,7 +2068,7 @@ ex(struct event *e)
 #ifdef CRONLIMIT
 	if ((e->u)->uid != 0 && (e->u)->cruncnt >= CRONLIMIT) {
 		msg("CRONLIMIT (%d) reached for uid %d",
-			CRONLIMIT, (e->u)->uid);
+		    CRONLIMIT, (e->u)->uid);
 		rinfo_free(rp);
 		resched(qp->nwait);
 		return (0);
@@ -1991,12 +2090,12 @@ ex(struct event *e)
 	rp->outfile = tempnam(TMPDIR, PFX);
 	rp->jobtype = e->etype;
 	if (e->etype == CRONEVENT) {
-		rp->jobname = xmalloc(strlen(e->cmd)+1);
+		rp->jobname = xmalloc(strlen(e->cmd) + 1);
 		(void) strcpy(rp->jobname, e->cmd);
 		/* "cron" jobs only produce mail if there's output */
 		rp->mailwhendone = 0;
 	} else {
-		at_cmdfile = xmalloc(strlen(ATDIR)+strlen(e->cmd)+2);
+		at_cmdfile = xmalloc(strlen(ATDIR) + strlen(e->cmd) + 2);
 		(void) sprintf(at_cmdfile, "%s/%s", ATDIR, e->cmd);
 		if ((atcmdfp = fopen(at_cmdfile, "r")) == NULL) {
 			if (errno == ENAMETOOLONG) {
@@ -2010,7 +2109,7 @@ ex(struct event *e)
 			rinfo_free(rp);
 			return (0);
 		}
-		rp->jobname = xmalloc(strlen(at_cmdfile)+1);
+		rp->jobname = xmalloc(strlen(at_cmdfile) + 1);
 		(void) strcpy(rp->jobname, at_cmdfile);
 
 		/*
@@ -2019,7 +2118,7 @@ ex(struct event *e)
 		(void) fscanf(atcmdfp, "%*[^\n]\n");
 		(void) fscanf(atcmdfp, "%*[^\n]\n");
 		if (fscanf(atcmdfp, ": notify by mail: %3s%*[^\n]\n",
-			mailvar) == 1) {
+		    mailvar) == 1) {
 			/*
 			 * Check to see if we should always send mail
 			 * to the owner.
@@ -2049,11 +2148,11 @@ ex(struct event *e)
 			msg("correcting cron event\n");
 			next_event->time = next_time(next_event, dhltime);
 			el_add(next_event, next_event->time,
-				(next_event->u)->ctid);
+			    (next_event->u)->ctid);
 		} else { /* etype == ATEVENT */
 			msg("correcting batch event\n");
 			el_add(next_event, next_event->time,
-				next_event->of.at.eventid);
+			    next_event->of.at.eventid);
 		}
 		delayed++;
 		t_old = time(NULL);
@@ -2181,7 +2280,7 @@ ex(struct event *e)
 	    setgid(e->u->gid) == -1 ||
 	    initgroups(e->u->name, e->u->gid) == -1) {
 		msg("bad user (%s) or setgid failed (%s)",
-			e->u->name, e->u->name);
+		    e->u->name, e->u->name);
 		audit_cron_bad_user(e->u->name);
 		clean_out_user(e->u);
 		exit(1);
@@ -2189,17 +2288,15 @@ ex(struct event *e)
 
 	if (e->etype != CRONEVENT) {
 		r = audit_cron_session(e->u->name, NULL,
-					e->u->uid, e->u->gid,
-					at_cmdfile);
+		    e->u->uid, e->u->gid, at_cmdfile);
 		cron_unlink(at_cmdfile);
 	} else {
 		r = audit_cron_session(e->u->name, CRONDIR,
-					e->u->uid, e->u->gid,
-					NULL);
+		    e->u->uid, e->u->gid, NULL);
 	}
 	if (r != 0) {
 		msg("cron audit problem. job failed (%s) for user %s",
-			e->cmd, e->u->name);
+		    e->cmd, e->u->name);
 		exit(1);
 	}
 
@@ -2216,20 +2313,20 @@ ex(struct event *e)
 		if (e->of.ct.input != NULL) {
 			if ((tmpfile = strdup(TMPINFILE)) == NULL) {
 				mail((e->u)->name, MALLOCERR,
-					ERR_CANTEXECCRON);
+				    ERR_CANTEXECCRON);
 				exit(1);
 			}
 			if ((fd = mkstemp(tmpfile)) == -1 ||
-				(fptr = fdopen(fd, "w")) == NULL) {
+			    (fptr = fdopen(fd, "w")) == NULL) {
 				mail((e->u)->name, NOSTDIN,
-					ERR_CANTEXECCRON);
+				    ERR_CANTEXECCRON);
 				cron_unlink(tmpfile);
 				free(tmpfile);
 				exit(1);
 			}
 			if ((fwrite(e->of.ct.input, sizeof (char),
-				strlen(e->of.ct.input), fptr)) !=
-					strlen(e->of.ct.input)) {
+			    strlen(e->of.ct.input), fptr)) !=
+			    strlen(e->of.ct.input)) {
 				mail((e->u)->name, NOSTDIN, ERR_CANTEXECCRON);
 				cron_unlink(tmpfile);
 				free(tmpfile);
@@ -2270,8 +2367,8 @@ ex(struct event *e)
 	environ = envinit;
 	if (chdir((e->u)->home) == -1) {
 		mail((e->u)->name, CANTCDHOME,
-			e->etype == CRONEVENT ? ERR_CANTEXECCRON :
-				ERR_CANTEXECAT);
+		    e->etype == CRONEVENT ? ERR_CANTEXECCRON :
+		    ERR_CANTEXECAT);
 		exit(1);
 	}
 #ifdef TESTING
@@ -2290,7 +2387,7 @@ ex(struct event *e)
 	else		/* type == ATEVENT */
 		(void) execl(SHELL, "sh", 0);
 	mail((e->u)->name, CANTEXECSH,
-		e->etype == CRONEVENT ? ERR_CANTEXECCRON : ERR_CANTEXECAT);
+	    e->etype == CRONEVENT ? ERR_CANTEXECCRON : ERR_CANTEXECAT);
 	exit(1);
 	/*NOTREACHED*/
 }
@@ -2345,7 +2442,7 @@ reap_child()
 			break;
 #ifdef DEBUG
 		fprintf(stderr,
-			"wait returned %x for process %d\n", prc, pid);
+		    "wait returned %x for process %d\n", prc, pid);
 #endif
 		if ((rp = rinfo_get(pid)) == NULL) {
 			if (miscpid_delete(pid) == 0) {
@@ -2434,7 +2531,7 @@ mail_result(struct usr *p, struct runinfo *pr, size_t filesize)
 		exit(0);
 	(void) setuid(ruser_ids->pw_uid);
 
-	cmd = xmalloc(strlen(MAIL)+strlen(p->name)+2);
+	cmd = xmalloc(strlen(MAIL) + strlen(p->name)+2);
 	(void) sprintf(cmd, "%s %s", MAIL, p->name);
 	mailpipe = popen(cmd, "w");
 	free(cmd);
@@ -2444,14 +2541,14 @@ mail_result(struct usr *p, struct runinfo *pr, size_t filesize)
 	if (pr->jobtype == CRONEVENT) {
 		(void) fprintf(mailpipe, CRONOUT);
 		(void) fprintf(mailpipe, "Your \"cron\" job on %s\n",
-			name.nodename);
+		    name.nodename);
 		if (pr->jobname != NULL) {
 			(void) fprintf(mailpipe, "%s\n\n", pr->jobname);
 		}
 	} else {
 		(void) fprintf(mailpipe, "Subject: Output from \"at\" job\n\n");
 		(void) fprintf(mailpipe, "Your \"at\" job on %s\n",
-			name.nodename);
+		    name.nodename);
 		if (pr->jobname != NULL) {
 			(void) fprintf(mailpipe, "\"%s\"\n\n", pr->jobname);
 		}
@@ -2460,7 +2557,7 @@ mail_result(struct usr *p, struct runinfo *pr, size_t filesize)
 	if (filesize > 0 &&
 	    (st = fopen(pr->outfile, "r")) != NULL) {
 		(void) fprintf(mailpipe,
-			"produced the following output:\n\n");
+		    "produced the following output:\n\n");
 		while ((nbytes = fread(iobuf, sizeof (char), BUFSIZ, st)) != 0)
 			(void) fwrite(iobuf, sizeof (char), nbytes, mailpipe);
 		(void) fclose(st);
@@ -2604,10 +2701,10 @@ process_msg(struct message *pmsg, time_t reftime)
 	if (next_event != NULL) {
 		if (next_event->etype == CRONEVENT)
 			el_add(next_event, next_event->time,
-				(next_event->u)->ctid);
+			    (next_event->u)->ctid);
 		else	/* etype == ATEVENT */
 			el_add(next_event, next_event->time,
-				next_event->of.at.eventid);
+			    next_event->of.at.eventid);
 		next_event = NULL;
 	}
 	(void) fflush(stdout);
@@ -2764,7 +2861,7 @@ logit(int cc, struct runinfo *rp, int rc)
 		(void) printf("%c  CMD: %s\n", cc, next_event->cmd);
 	(void) strftime(timebuf, sizeof (timebuf), FORMAT, localtime(&t));
 	(void) printf("%c  %.8s %u %c %s",
-		cc, (rp->rusr)->name, rp->pid, QUE(rp->que), timebuf);
+	    cc, (rp->rusr)->name, rp->pid, QUE(rp->que), timebuf);
 	if ((ret = TSTAT(rc)) != 0)
 		(void) printf(" ts=%d", ret);
 	if ((ret = RCODE(rc)) != 0)
@@ -2872,7 +2969,7 @@ defaults()
 	 * get TZ value for environment
 	 */
 	(void) snprintf(tzone, sizeof (tzone), "TZ=%s",
-		((tz = getenv("TZ")) != NULL) ? tz : DEFTZ);
+	    ((tz = getenv("TZ")) != NULL) ? tz : DEFTZ);
 
 	if (defopen(DEFFILE) == 0) {
 		/* ignore case */
@@ -2908,7 +3005,7 @@ defaults()
  */
 
 static int
-verify_user_cred(const struct usr *u)
+verify_user_cred(struct usr *u)
 {
 	struct passwd *pw;
 	size_t numUsrGrps = 0;
@@ -2933,10 +3030,22 @@ verify_user_cred(const struct usr *u)
 	static gid_t *UsrGrps;
 	static gid_t *OrigGrps;
 
-	if (((pw = getpwnam(u->name)) == NULL) ||
-	    (pw->pw_uid != u->uid)) {
+	if ((pw = getpwnam(u->name)) == NULL)
 		return (VUC_BADUSER);
+	if (u->home != NULL) {
+		if (strcmp(u->home, pw->pw_dir) != 0) {
+			free(u->home);
+			u->home = xmalloc(strlen(pw->pw_dir) + 1);
+			(void) strcpy(u->home, pw->pw_dir);
+		}
+	} else {
+		u->home = xmalloc(strlen(pw->pw_dir) + 1);
+		(void) strcpy(u->home, pw->pw_dir);
 	}
+	if (u->uid != pw->pw_uid)
+		u->uid = pw->pw_uid;
+	if (u->gid != pw->pw_gid)
+		u->gid  = pw->pw_gid;
 
 	/*
 	 * Create the group id lists needed for job credential
@@ -2995,7 +3104,7 @@ set_user_cred(const struct usr *u, struct project *pproj)
 	int r = 0, rval = 0;
 
 	if ((r = pam_start(progname, u->name, &pam_conv, &pamh))
-		!= PAM_SUCCESS) {
+	    != PAM_SUCCESS) {
 #ifdef DEBUG
 		msg("pam_start returns %d\n", r);
 #endif
@@ -3055,15 +3164,15 @@ clean_out_atjobs(struct usr *u)
 	struct event *ev, *pv;
 
 	for (pv = NULL, ev = u->atevents;
-		ev != NULL;
-		pv = ev, ev = ev->link, free(pv)) {
+	    ev != NULL;
+	    pv = ev, ev = ev->link, free(pv)) {
 		el_remove(ev->of.at.eventid, 1);
 		if (cwd == AT)
 			cron_unlink(ev->cmd);
 		else {
 			char buf[PATH_MAX];
 			if (strlen(ATDIR) + strlen(ev->cmd) + 2
-				< PATH_MAX) {
+			    < PATH_MAX) {
 				(void) sprintf(buf, "%s/%s", ATDIR, ev->cmd);
 				cron_unlink(buf);
 			}
@@ -3098,12 +3207,11 @@ static void
 create_anc_ctab(struct event *e)
 {
 	if (audit_cron_create_anc_file(e->u->name,
-		(cwd == CRON) ? NULL:CRONDIR,
-		e->u->name,
-		e->u->uid) == -1) {
+	    (cwd == CRON) ? NULL:CRONDIR,
+	    e->u->name, e->u->uid) == -1) {
 		process_anc_files(CRON_ANC_DELETE);
 		crabort("cannot create ancillary files for crontabs",
-			REMOVE_FIFO|CONSOLE_MSG);
+		    REMOVE_FIFO|CONSOLE_MSG);
 	}
 }
 
@@ -3111,7 +3219,7 @@ static void
 delete_anc_ctab(struct event *e)
 {
 	(void) audit_cron_delete_anc_file(e->u->name,
-		(cwd == CRON) ? NULL:CRONDIR);
+	    (cwd == CRON) ? NULL:CRONDIR);
 }
 
 static void
@@ -3121,12 +3229,11 @@ create_anc_atjob(struct event *e)
 		return;
 
 	if (audit_cron_create_anc_file(e->cmd,
-		(cwd == AT) ? NULL:ATDIR,
-		e->u->name,
-		e->u->uid) == -1) {
+	    (cwd == AT) ? NULL:ATDIR,
+	    e->u->name, e->u->uid) == -1) {
 		process_anc_files(CRON_ANC_DELETE);
 		crabort("cannot create ancillary files for atjobs",
-			REMOVE_FIFO|CONSOLE_MSG);
+		    REMOVE_FIFO|CONSOLE_MSG);
 	}
 }
 
@@ -3137,7 +3244,7 @@ delete_anc_atjob(struct event *e)
 		return;
 
 	(void) audit_cron_delete_anc_file(e->cmd,
-		(cwd == AT) ? NULL:ATDIR);
+	    (cwd == AT) ? NULL:ATDIR);
 }
 
 
