@@ -7530,9 +7530,6 @@ get_softstate_failed:
 probe_failed:
 	scsi_unprobe(devp);
 
-	SD_ERROR(SD_LOG_ATTACH_DETACH, un, "sd_unit_attach: \
-	    un:0x%p exit failure\n", (void *)un);
-
 	return (DDI_FAILURE);
 }
 
