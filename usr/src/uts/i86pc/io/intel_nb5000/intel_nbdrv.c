@@ -150,6 +150,8 @@ inb_rank(nvlist_t *newdimm, nb_dimm_t *nb_dimm, uint8_t channel, uint32_t dimm)
 	}
 	(void) nvlist_add_nvlist_array(newdimm, MCINTEL_NVLIST_RANKS, newrank,
 	    nb_dimm->nranks);
+	for (i = 0; i < nb_dimm->nranks; i++)
+		nvlist_free(newrank[i]);
 	kmem_free(newrank, sizeof (nvlist_t *) * nb_dimm->nranks);
 }
 
@@ -248,6 +250,8 @@ inb_dimmlist(nvlist_t *nvl)
 	}
 	(void) nvlist_add_nvlist_array(nvl, MCINTEL_NVLIST_MC, newchannel,
 	    nchannels);
+	for (i = 0; i < nchannels; i++)
+		nvlist_free(newchannel[i]);
 	kmem_free(dimmlist, sizeof (nvlist_t *) * nb_dimms_per_channel);
 	kmem_free(newchannel, sizeof (nvlist_t *) * nchannels);
 }
