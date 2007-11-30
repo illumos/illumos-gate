@@ -454,17 +454,17 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 	if (flow == NULL) {
 		flow = (flow_t *)kmem_zalloc(FLOWACCT_FLOW_SZ, KM_NOSLEEP);
 		if (flow == NULL) {
+			mutex_exit(&fhead->lock);
 			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
 			    "error"));
-			mutex_exit(&fhead->lock);
 			return (-1);
 		}
 		flow->hdr = flowacct_add_obj(fhead, fhead->tail, (void *)flow);
 		if (flow->hdr == NULL) {
+			mutex_exit(&fhead->lock);
+			kmem_free(flow, FLOWACCT_FLOW_SZ);
 			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
 			    "error"));
-			kmem_free(flow, FLOWACCT_FLOW_SZ);
-			mutex_exit(&fhead->lock);
 			return (-1);
 		}
 
@@ -519,43 +519,44 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				goto try_again;
 			} else {
 				flow->inuse = B_FALSE;
-				mutex_exit(&fhead->lock);
-				flowacct1dbg(("flowacct_update_flows_tbl: "\
-				    "maximum active flows exceeded\n"));
+				/* Need to remove the flow, if one was added */
 				if (added_flow) {
 					flowacct_del_obj(fhead, flow->hdr,
 					    FLOWACCT_DEL_OBJ);
 				}
+				mutex_exit(&fhead->lock);
+				flowacct1dbg(("flowacct_update_flows_tbl: "\
+				    "maximum active flows exceeded\n"));
 				return (-1);
 			}
 		}
 		item = (flow_item_t *)kmem_zalloc(FLOWACCT_ITEM_SZ, KM_NOSLEEP);
 		if (item == NULL) {
-			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
-			    "error"));
+			flow->inuse = B_FALSE;
 			/* Need to remove the flow, if one was added */
 			if (added_flow) {
 				flowacct_del_obj(fhead, flow->hdr,
 				    FLOWACCT_DEL_OBJ);
 			}
-			atomic_add_32(&flowacct_data->nflows, -1);
-			flow->inuse = B_FALSE;
 			mutex_exit(&fhead->lock);
+			atomic_add_32(&flowacct_data->nflows, -1);
+			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
+			    "error"));
 			return (-1);
 		}
 		item->hdr = flowacct_add_obj(ihead, ihead->tail, (void *)item);
 		if (item->hdr == NULL) {
-			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
-			    "error\n"));
-			kmem_free(item, FLOWACCT_ITEM_SZ);
+			flow->inuse = B_FALSE;
 			/* Need to remove the flow, if one was added */
 			if (added_flow) {
 				flowacct_del_obj(fhead, flow->hdr,
 				    FLOWACCT_DEL_OBJ);
 			}
-			atomic_add_32(&flowacct_data->nflows, -1);
-			flow->inuse = B_FALSE;
 			mutex_exit(&fhead->lock);
+			atomic_add_32(&flowacct_data->nflows, -1);
+			kmem_free(item, FLOWACCT_ITEM_SZ);
+			flowacct0dbg(("flowacct_update_flows_tbl: mem alloc "\
+			    "error\n"));
 			return (-1);
 		}
 		/* If a flow was added, add it too */
@@ -600,32 +601,41 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 	/*
 	 * Else, move this flow to the tail of the timeout list, if it is not
 	 * already.
+	 * flow->hdr in the timeout list :-
+	 * timeout_next = NULL, timeout_prev != NULL, at the tail end.
+	 * timeout_next != NULL, timeout_prev = NULL, at the head.
+	 * timeout_next != NULL, timeout_prev != NULL, in the middle.
+	 * timeout_next = NULL, timeout_prev = NULL, not in the timeout list,
+	 * ignore such flow.
 	 */
-	} else if (flow->hdr != thead->tail) {
-		if (flow->hdr == thead->head) {
-			thead->head->timeout_next->timeout_prev = NULL;
-			thead->head = thead->head->timeout_next;
-			flow->hdr->timeout_next = NULL;
-			thead->tail->timeout_next = flow->hdr;
-			flow->hdr->timeout_prev = thead->tail;
-			thead->tail = flow->hdr;
-		} else {
-			flow->hdr->timeout_prev->timeout_next =
-			    flow->hdr->timeout_next;
-			flow->hdr->timeout_next->timeout_prev =
-			    flow->hdr->timeout_prev;
-			flow->hdr->timeout_next = NULL;
-			thead->tail->timeout_next = flow->hdr;
-			flow->hdr->timeout_prev = thead->tail;
-			thead->tail = flow->hdr;
+	} else if ((flow->hdr->timeout_next != NULL) ||
+	    (flow->hdr->timeout_prev != NULL)) {
+		if (flow->hdr != thead->tail) {
+			if (flow->hdr == thead->head) {
+				thead->head->timeout_next->timeout_prev = NULL;
+				thead->head = thead->head->timeout_next;
+				flow->hdr->timeout_next = NULL;
+				thead->tail->timeout_next = flow->hdr;
+				flow->hdr->timeout_prev = thead->tail;
+				thead->tail = flow->hdr;
+			} else {
+				flow->hdr->timeout_prev->timeout_next =
+				    flow->hdr->timeout_next;
+				flow->hdr->timeout_next->timeout_prev =
+				    flow->hdr->timeout_prev;
+				flow->hdr->timeout_next = NULL;
+				thead->tail->timeout_next = flow->hdr;
+				flow->hdr->timeout_prev = thead->tail;
+				thead->tail = flow->hdr;
+			}
 		}
-		/*
-		 * Unset this variable, now it is fine even if this
-		 * flow gets deleted (i.e. after timing out its
-		 * flow items) since we are done using it.
-		 */
-		flow->inuse = B_FALSE;
 	}
+	/*
+	 * Unset this variable, now it is fine even if this
+	 * flow gets deleted (i.e. after timing out its
+	 * flow items) since we are done using it.
+	 */
+	flow->inuse = B_FALSE;
 	mutex_exit(&fhead->lock);
 	mutex_exit(&thead->lock);
 	atomic_add_64(&flowacct_data->tbytes, header->pktlen);
