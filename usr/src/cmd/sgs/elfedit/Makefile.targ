@@ -42,6 +42,11 @@
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
+elfcap.o:	$(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
+		$(POST_PROCESS_O)
+
+
 $(PROG):	$(OBJS) $(MAPFILE)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)

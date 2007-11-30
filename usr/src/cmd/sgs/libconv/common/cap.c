@@ -37,8 +37,7 @@
 
 static int
 conv_cap_1(Xword val, char *str, size_t len, Half mach,
-    Conv_fmt_flags_t fmt_flags,
-    int (*fptr)(uint64_t, char *, size_t, int, ushort_t))
+    Conv_fmt_flags_t fmt_flags, elfcap_to_str_func_t *fptr)
 {
 	size_t	_len;
 	int do_bkt = (fmt_flags & CONV_FMT_NOBKT) == 0;
@@ -56,7 +55,8 @@ conv_cap_1(Xword val, char *str, size_t len, Half mach,
 		str += _len;
 	}
 
-	if ((*fptr)(val, str, len, CAP_FMT_SNGSPACE, mach) != 0)
+	if ((*fptr)(ELFCAP_STYLE_UC, val, str, len, ELFCAP_FMT_SNGSPACE,
+	    mach) != 0)
 		return (0);
 
 	if (do_bkt) {
@@ -77,7 +77,7 @@ conv_cap_val_hw1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	if (conv_cap_1(val, cap_val_hw1_buf->buf, sizeof (cap_val_hw1_buf->buf),
-	    mach, fmt_flags, hwcap_1_val2str) == 0)
+	    mach, fmt_flags, elfcap_hw1_to_str) == 0)
 		return (conv_invalid_val(&cap_val_hw1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_hw1_buf->buf);
 }
@@ -90,7 +90,7 @@ conv_cap_val_sf1(Xword val, Half mach, Conv_fmt_flags_t fmt_flags,
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	if (conv_cap_1(val, cap_val_sf1_buf->buf, sizeof (cap_val_sf1_buf->buf),
-	    mach, fmt_flags, sfcap_1_val2str) == 0)
+	    mach, fmt_flags, elfcap_sf1_to_str) == 0)
 		return (conv_invalid_val(&cap_val_sf1_buf->inv_buf, val, 0));
 	return ((const char *)cap_val_sf1_buf->buf);
 }

@@ -1301,3 +1301,5 @@ Bugid   Risk Synopsis
 6627765 soffice failure after integration of 6603313 - dangling GROUP pointer.
 6319025 SUNWbtool packaging issues in Nevada and S10u1.
 6629404 ld with -z ignore doesn't scale
+6626135 elfedit capabilities str->value mapping should come from
+	usr/src/common/elfcap

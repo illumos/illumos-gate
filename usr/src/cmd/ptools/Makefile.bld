@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,7 @@ LDLIBS += $(LDLIBS_$(PROG))
 
 ELFCAP =	$(SRC)/common/elfcap
 
-CPPFLAGS_pargs =-DCAP_UPPERCASE -I$(ELFCAP)
+CPPFLAGS_pargs =-I$(ELFCAP)
 OBJS_pargs =	elfcap.o
 SRCS_pargs =	$(ELFCAP)/elfcap.c
 

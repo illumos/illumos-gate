@@ -34,7 +34,6 @@
 #include	<strings.h>
 #include	<stdio.h>
 #include	<ctype.h>
-#include	<limits.h>
 #include	<sys/machelf.h>
 #include	<sys/elf.h>
 #include	<sys/auxv_SPARC.h>
@@ -42,246 +41,297 @@
 #include	<elfcap.h>
 
 /*
- * Define separators for val2str processing.
+ * Given a literal string, generate an initialization for an
+ * elfcap_str_t value.
  */
-static const Fmt_desc format[] = {
-	{" ",	1 },
-	{"  ",	2 },
-	{" | ",	3 }
-};
+#define	STRDESC(_str) { _str, sizeof (_str) - 1 }
 
 /*
- * Define all known capabilities as both lower and upper case strings.  This
- * duplication is necessary, rather than have one string and use something
- * like toupper(), as a client such as ld.so.1 doesn't need the overhead of
- * dragging in the internationalization support of toupper().  The Intel 3DNow
- * flags are a slightly odd convention too.
+ * The items in the elfcap_desc_t arrays are required to be
+ * ordered so that the array index is related to the
+ * c_val field as:
  *
- * Define all known software capabilities.
+ *	array[ndx].c_val = 2^ndx
+ *
+ * meaning that
+ *
+ *	array[0].c_val = 2^0 = 1
+ *	array[1].c_val = 2^1 = 2
+ *	array[2].c_val = 2^2 = 4
+ *	.
+ *	.
+ *	.
+ *
+ * Since 0 is not a valid value for the c_val field, we use it to
+ * mark an array entry that is a placeholder. This can happen if there
+ * is a hole in the assigned bits.
+ *
+ * The RESERVED_ELFCAP_DESC macro is used to reserve such holes.
  */
-#ifdef	CAP_UPPERCASE
-static const char Sf1_fpknwn[] =	"FPKNWN";
-static const char Sf1_fpused[] =	"FPUSED";
-#elif	CAP_LOWERCASE
-static const char Sf1_fpknwn[] =	"fpknwn";
-static const char Sf1_fpused[] =	"fpused";
-#else
-#error	"Software Capabilities - what case do you want?"
-#endif
+#define	RESERVED_ELFCAP_DESC { 0, { NULL, 0 }, { NULL, 0 }, { NULL, 0 } }
 
 /*
- * Order the software capabilities to match their numeric value.  See SF1_SUNW_
+ * Define separators for output string processing. This must be kept in
+ * sync with the elfcap_fmt_t values in elfcap.h.
+ */
+static const elfcap_str_t format[] = {
+	STRDESC(" "),			/* ELFCAP_FMT_SNGSPACE */
+	STRDESC("  "),			/* ELFCAP_FMT_DBLSPACE */
+	STRDESC(" | ")			/* ELFCAP_FMT_PIPSPACE */
+};
+#define	FORMAT_NELTS	(sizeof (format) / sizeof (format[0]))
+
+
+
+/*
+ * Define all known software capabilities in all the supported styles.
+ * Order the capabilities by their numeric value. See SF1_SUNW_
  * values in sys/elf.h.
  */
-static const Cap_desc sf1[] = {
-	{ SF1_SUNW_FPKNWN,	Sf1_fpknwn,	(sizeof (Sf1_fpknwn) - 1) },
-	{ SF1_SUNW_FPUSED,	Sf1_fpused,	(sizeof (Sf1_fpused) - 1) }
+static const elfcap_desc_t sf1[ELFCAP_NUM_SF1] = {
+	{						/* 0x00000001 */
+		SF1_SUNW_FPKNWN, STRDESC("SF1_SUNW_FPKNWN"),
+		STRDESC("FPKNWN"), STRDESC("fpknwn")
+	},
+	{						/* 0x00000002 */
+		SF1_SUNW_FPUSED, STRDESC("SF1_SUNW_FPUSED"),
+		STRDESC("FPUSED"), STRDESC("fpused"),
+	}
 };
-static const uint_t sf1_num = sizeof (sf1) / sizeof (Cap_desc);
 
-/*
- * Define all known SPARC hardware capabilities.
- */
-#ifdef	CAP_UPPERCASE
-static const char Hw1_s_mul32[] =	"MUL32";
-static const char Hw1_s_div32[] =	"DIV32";
-static const char Hw1_s_fsmuld[] =	"FSMULD";
-static const char Hw1_s_v8plus[] =	"V8PLUS";
-static const char Hw1_s_popc[] =	"POPC";
-static const char Hw1_s_vis[] =		"VIS";
-static const char Hw1_s_vis2[] =	"VIS2";
-static const char Hw1_s_asi_blk_init[] =	"ASI_BLK_INIT";
-static const char Hw1_s_fmaf[] = 	"FMAF";
-static const char Hw1_s_reserved1[] = 	"RESERVED1";
-static const char Hw1_s_reserved2[] = 	"RESERVED2";
-static const char Hw1_s_reserved3[] = 	"RESERVED3";
-static const char Hw1_s_reserved4[] = 	"RESERVED4";
-static const char Hw1_s_reserved5[] = 	"RESERVED5";
-static const char Hw1_s_fjfmau[] = 	"FJFMAU";
-static const char Hw1_s_ima[] = 	"IMA";
-#elif	CAP_LOWERCASE
-static const char Hw1_s_mul32[] =	"mul32";
-static const char Hw1_s_div32[] =	"div32";
-static const char Hw1_s_fsmuld[] =	"fsmuld";
-static const char Hw1_s_v8plus[] =	"v8plus";
-static const char Hw1_s_popc[] =	"popc";
-static const char Hw1_s_vis[] =		"vis";
-static const char Hw1_s_vis2[] =	"vis2";
-static const char Hw1_s_asi_blk_init[] =	"asi_blk_init";
-static const char Hw1_s_fmaf[] =	"fmaf";
-static const char Hw1_s_reserved1[] = 	"reserved1";
-static const char Hw1_s_reserved2[] = 	"reserved2";
-static const char Hw1_s_reserved3[] = 	"reserved3";
-static const char Hw1_s_reserved4[] = 	"reserved4";
-static const char Hw1_s_reserved5[] = 	"reserved5";
-static const char Hw1_s_fjfmau[] =	"fjfmau";
-static const char Hw1_s_ima[] =		"ima";
 
-#else
-#error	"Hardware Capabilities (sparc) - what case do you want?"
-#endif
 
 /*
  * Order the SPARC hardware capabilities to match their numeric value.  See
  * AV_SPARC_ values in sys/auxv_SPARC.h.
  */
-static const Cap_desc hw1_s[] = {
-	{ AV_SPARC_MUL32,	Hw1_s_mul32,	sizeof (Hw1_s_mul32) - 1 },
-	{ AV_SPARC_DIV32,	Hw1_s_div32,	sizeof (Hw1_s_div32) - 1 },
-	{ AV_SPARC_FSMULD,	Hw1_s_fsmuld,	sizeof (Hw1_s_fsmuld) - 1 },
-	{ AV_SPARC_V8PLUS,	Hw1_s_v8plus,	sizeof (Hw1_s_v8plus) - 1 },
-	{ AV_SPARC_POPC,	Hw1_s_popc,	sizeof (Hw1_s_popc) - 1 },
-	{ AV_SPARC_VIS,		Hw1_s_vis,	sizeof (Hw1_s_vis) - 1 },
-	{ AV_SPARC_VIS2,	Hw1_s_vis2,	sizeof (Hw1_s_vis2) - 1 },
-	{ AV_SPARC_ASI_BLK_INIT,	Hw1_s_asi_blk_init,
-		sizeof (Hw1_s_asi_blk_init) - 1 },
-	{ AV_SPARC_FMAF,	Hw1_s_fmaf,	sizeof (Hw1_s_fmaf) - 1 },
-	{ 0,	Hw1_s_reserved1,	sizeof (Hw1_s_reserved1) - 1 },
-	{ 0,	Hw1_s_reserved2,	sizeof (Hw1_s_reserved2) - 1 },
-	{ 0,	Hw1_s_reserved3,	sizeof (Hw1_s_reserved3) - 1 },
-	{ 0,	Hw1_s_reserved4,	sizeof (Hw1_s_reserved4) - 1 },
-	{ 0,	Hw1_s_reserved5,	sizeof (Hw1_s_reserved5) - 1 },
-	{ AV_SPARC_FJFMAU,	Hw1_s_fjfmau,	sizeof (Hw1_s_fjfmau) - 1 },
-	{ AV_SPARC_IMA,		Hw1_s_ima,	sizeof (Hw1_s_ima) - 1 }
+static const elfcap_desc_t hw1_sparc[ELFCAP_NUM_HW1_SPARC] = {
+	{						/* 0x00000001 */
+		AV_SPARC_MUL32, STRDESC("AV_SPARC_MUL32"),
+		STRDESC("MUL32"), STRDESC("mul32"),
+	},
+	{						/* 0x00000002 */
+		AV_SPARC_DIV32, STRDESC("AV_SPARC_DIV32"),
+		STRDESC("DIV32"), STRDESC("div32"),
+	},
+	{						/* 0x00000004 */
+		AV_SPARC_FSMULD, STRDESC("AV_SPARC_FSMULD"),
+		STRDESC("FSMULD"), STRDESC("fsmuld"),
+	},
+	{						/* 0x00000008 */
+		AV_SPARC_V8PLUS, STRDESC("AV_SPARC_V8PLUS"),
+		STRDESC("V8PLUS"), STRDESC("v8plus"),
+	},
+	{						/* 0x00000010 */
+		AV_SPARC_POPC, STRDESC("AV_SPARC_POPC"),
+		STRDESC("POPC"), STRDESC("popc"),
+	},
+	{						/* 0x00000020 */
+		AV_SPARC_VIS, STRDESC("AV_SPARC_VIS"),
+		STRDESC("VIS"), STRDESC("vis"),
+	},
+	{						/* 0x00000040 */
+		AV_SPARC_VIS2, STRDESC("AV_SPARC_VIS2"),
+		STRDESC("VIS2"), STRDESC("vis2"),
+	},
+	{						/* 0x00000080 */
+		AV_SPARC_ASI_BLK_INIT, STRDESC("AV_SPARC_ASI_BLK_INIT"),
+		STRDESC("ASI_BLK_INIT"), STRDESC("asi_blk_init"),
+	},
+	{						/* 0x00000100 */
+		AV_SPARC_FMAF, STRDESC("AV_SPARC_FMAF"),
+		STRDESC("FMAF"), STRDESC("fmaf"),
+	},
+	RESERVED_ELFCAP_DESC,				/* 0x00000200 */
+	RESERVED_ELFCAP_DESC,				/* 0x00000400 */
+	RESERVED_ELFCAP_DESC,				/* 0x00000800 */
+	RESERVED_ELFCAP_DESC,				/* 0x00001000 */
+	RESERVED_ELFCAP_DESC,				/* 0x00002000 */
+	{						/* 0x00004000 */
+		AV_SPARC_FJFMAU, STRDESC("AV_SPARC_FJFMAU"),
+		STRDESC("FJFMAU"), STRDESC("fjfmau"),
+	},
+	{						/* 0x00008000 */
+		AV_SPARC_IMA, STRDESC("AV_SPARC_IMA"),
+		STRDESC("IMA"), STRDESC("ima"),
+	}
 };
-static const uint_t hw1_s_num = sizeof (hw1_s) / sizeof (Cap_desc);
 
-/*
- * Define all known Intel hardware capabilities.
- */
-#ifdef	CAP_UPPERCASE
-static const char Hw1_i_fpu[] =		"FPU";
-static const char Hw1_i_tsc[] =		"TSC";
-static const char Hw1_i_cx8[] =		"CX8";
-static const char Hw1_i_sep[] =		"SEP";
-static const char Hw1_i_amd_sysc[] =	"AMD_SYSC";
-static const char Hw1_i_cmov[] =	"CMOV";
-static const char Hw1_i_mmx[] =		"MMX";
-static const char Hw1_i_amd_mmx[] =	"AMD_MMX";
-static const char Hw1_i_amd_3dnow[] =	"AMD_3DNow";
-static const char Hw1_i_amd_3dnowx[] =	"AMD_3DNowx";
-static const char Hw1_i_fxsr[] =	"FXSR";
-static const char Hw1_i_sse[] =		"SSE";
-static const char Hw1_i_sse2[] =	"SSE2";
-static const char Hw1_i_pause[] =	"PAUSE";
-static const char Hw1_i_sse3[] =	"SSE3";
-static const char Hw1_i_mon[] =		"MON";
-static const char Hw1_i_cx16[] =	"CX16";
-static const char Hw1_i_ahf[] =		"AHF";
-static const char Hw1_i_tscp[] =	"TSCP";
-static const char Hw1_i_amd_sse4a[] =	"AMD_SSE4A";
-static const char Hw1_i_popcnt[] =	"POPCNT";
-static const char Hw1_i_amd_lzcnt[] =	"AMD_LZCNT";
-static const char Hw1_i_ssse3[] =	"SSSE3";
-static const char Hw1_i_sse4_1[] =	"SSE4.1";
-static const char Hw1_i_sse4_2[] =	"SSE4.2";
-#elif	CAP_LOWERCASE
-static const char Hw1_i_fpu[] =		"fpu";
-static const char Hw1_i_tsc[] =		"tsc";
-static const char Hw1_i_cx8[] =		"cx8";
-static const char Hw1_i_sep[] =		"sep";
-static const char Hw1_i_amd_sysc[] =	"amd_sysc";
-static const char Hw1_i_cmov[] =	"cmov";
-static const char Hw1_i_mmx[] =		"mmx";
-static const char Hw1_i_amd_mmx[] =	"amd_mmx";
-static const char Hw1_i_amd_3dnow[] =	"amd_3dnow";
-static const char Hw1_i_amd_3dnowx[] =	"amd_3dnowx";
-static const char Hw1_i_fxsr[] =	"fxsr";
-static const char Hw1_i_sse[] =		"sse";
-static const char Hw1_i_sse2[] =	"sse2";
-static const char Hw1_i_pause[] =	"pause";
-static const char Hw1_i_sse3[] =	"sse3";
-static const char Hw1_i_mon[] =		"mon";
-static const char Hw1_i_cx16[] =	"cx16";
-static const char Hw1_i_ahf[] =		"ahf";
-static const char Hw1_i_tscp[] = 	"tscp";
-static const char Hw1_i_amd_sse4a[] = 	"amd_sse4a";
-static const char Hw1_i_popcnt[] = 	"popcnt";
-static const char Hw1_i_amd_lzcnt[] = 	"amd_lzcnt";
-static const char Hw1_i_ssse3[] =	"ssse3";
-static const char Hw1_i_sse4_1[] =	"sse4.1";
-static const char Hw1_i_sse4_2[] =	"sse4.2";
-#else
-#error	"Hardware Capabilities (intel) - what case do you want?"
-#endif
+
 
 /*
  * Order the Intel hardware capabilities to match their numeric value.  See
  * AV_386_ values in sys/auxv_386.h.
  */
-static const Cap_desc hw1_i[] = {
-	{ AV_386_FPU,		Hw1_i_fpu,	sizeof (Hw1_i_fpu) - 1 },
-	{ AV_386_TSC,		Hw1_i_tsc,	sizeof (Hw1_i_tsc) - 1 },
-	{ AV_386_CX8,		Hw1_i_cx8,	sizeof (Hw1_i_cx8) - 1 },
-	{ AV_386_SEP,		Hw1_i_sep,	sizeof (Hw1_i_sep) - 1 },
-	{ AV_386_AMD_SYSC,	Hw1_i_amd_sysc,	sizeof (Hw1_i_amd_sysc) - 1 },
-	{ AV_386_CMOV,		Hw1_i_cmov,	sizeof (Hw1_i_cmov) - 1 },
-	{ AV_386_MMX,		Hw1_i_mmx,	sizeof (Hw1_i_mmx) - 1 },
-	{ AV_386_AMD_MMX,	Hw1_i_amd_mmx,	sizeof (Hw1_i_amd_mmx) - 1 },
-	{ AV_386_AMD_3DNow,	Hw1_i_amd_3dnow,
-						sizeof (Hw1_i_amd_3dnow) - 1 },
-	{ AV_386_AMD_3DNowx,	Hw1_i_amd_3dnowx,
-						sizeof (Hw1_i_amd_3dnowx) - 1 },
-	{ AV_386_FXSR,		Hw1_i_fxsr,	sizeof (Hw1_i_fxsr) - 1 },
-	{ AV_386_SSE,		Hw1_i_sse,	sizeof (Hw1_i_sse) - 1 },
-	{ AV_386_SSE2,		Hw1_i_sse2,	sizeof (Hw1_i_sse2) - 1 },
-	{ AV_386_PAUSE,		Hw1_i_pause,	sizeof (Hw1_i_pause) - 1 },
-	{ AV_386_SSE3,		Hw1_i_sse3,	sizeof (Hw1_i_sse3) - 1 },
-	{ AV_386_MON,		Hw1_i_mon,	sizeof (Hw1_i_mon) - 1 },
-	{ AV_386_CX16,		Hw1_i_cx16,	sizeof (Hw1_i_cx16) - 1 },
-	{ AV_386_AHF,		Hw1_i_ahf,	sizeof (Hw1_i_ahf) - 1 },
-	{ AV_386_TSCP,		Hw1_i_tscp,	sizeof (Hw1_i_tscp) - 1 },
-	{ AV_386_AMD_SSE4A,	Hw1_i_amd_sse4a,
-						sizeof (Hw1_i_amd_sse4a) - 1 },
-	{ AV_386_POPCNT,	Hw1_i_popcnt,	sizeof (Hw1_i_popcnt) - 1 },
-	{ AV_386_AMD_LZCNT,	Hw1_i_amd_lzcnt,
-						sizeof (Hw1_i_amd_lzcnt) - 1 },
-	{ AV_386_SSSE3,		Hw1_i_ssse3,	sizeof (Hw1_i_ssse3) - 1 },
-	{ AV_386_SSE4_1,	Hw1_i_sse4_1,	sizeof (Hw1_i_sse4_1) - 1 },
-	{ AV_386_SSE4_2,	Hw1_i_sse4_2,	sizeof (Hw1_i_sse4_2) - 1 }
+static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
+	{						/* 0x00000001 */
+		AV_386_FPU, STRDESC("AV_386_FPU"),
+		STRDESC("FPU"), STRDESC("fpu"),
+	},
+	{						/* 0x00000002 */
+		AV_386_TSC, STRDESC("AV_386_TSC"),
+		STRDESC("TSC"), STRDESC("tsc"),
+	},
+	{						/* 0x00000004 */
+		AV_386_CX8, STRDESC("AV_386_CX8"),
+		STRDESC("CX8"), STRDESC("cx8"),
+	},
+	{						/* 0x00000008 */
+		AV_386_SEP, STRDESC("AV_386_SEP"),
+		STRDESC("SEP"), STRDESC("sep"),
+	},
+	{						/* 0x00000010 */
+		AV_386_AMD_SYSC, STRDESC("AV_386_AMD_SYSC"),
+		STRDESC("AMD_SYSC"), STRDESC("amd_sysc"),
+	},
+	{						/* 0x00000020 */
+		AV_386_CMOV, STRDESC("AV_386_CMOV"),
+		STRDESC("CMOV"), STRDESC("cmov"),
+	},
+	{						/* 0x00000040 */
+		AV_386_MMX, STRDESC("AV_386_MMX"),
+		STRDESC("MMX"), STRDESC("mmx"),
+	},
+	{						/* 0x00000080 */
+		AV_386_AMD_MMX, STRDESC("AV_386_AMD_MMX"),
+		STRDESC("AMD_MMX"), STRDESC("amd_mmx"),
+	},
+	{						/* 0x00000100 */
+		AV_386_AMD_3DNow, STRDESC("AV_386_AMD_3DNow"),
+		STRDESC("AMD_3DNow"), STRDESC("amd_3dnow"),
+	},
+	{						/* 0x00000200 */
+		AV_386_AMD_3DNowx, STRDESC("AV_386_AMD_3DNowx"),
+		STRDESC("AMD_3DNowx"), STRDESC("amd_3dnowx"),
+	},
+	{						/* 0x00000400 */
+		AV_386_FXSR, STRDESC("AV_386_FXSR"),
+		STRDESC("FXSR"), STRDESC("fxsr"),
+	},
+	{						/* 0x00000800 */
+		AV_386_SSE, STRDESC("AV_386_SSE"),
+		STRDESC("SSE"), STRDESC("sse"),
+	},
+	{						/* 0x00001000 */
+		AV_386_SSE2, STRDESC("AV_386_SSE2"),
+		STRDESC("SSE2"), STRDESC("sse2"),
+	},
+	{						/* 0x00002000 */
+		AV_386_PAUSE, STRDESC("AV_386_PAUSE"),
+		STRDESC("PAUSE"), STRDESC("pause"),
+	},
+	{						/* 0x00004000 */
+		AV_386_SSE3, STRDESC("AV_386_SSE3"),
+		STRDESC("SSE3"), STRDESC("sse3"),
+	},
+	{						/* 0x00008000 */
+		AV_386_MON, STRDESC("AV_386_MON"),
+		STRDESC("MON"), STRDESC("mon"),
+	},
+	{						/* 0x00010000 */
+		AV_386_CX16, STRDESC("AV_386_CX16"),
+		STRDESC("CX16"), STRDESC("cx16"),
+	},
+	{						/* 0x00020000 */
+		AV_386_AHF, STRDESC("AV_386_AHF"),
+		STRDESC("AHF"), STRDESC("ahf"),
+	},
+	{						/* 0x00040000 */
+		AV_386_TSCP, STRDESC("AV_386_TSCP"),
+		STRDESC("TSCP"), STRDESC("tscp"),
+	},
+	{						/* 0x00080000 */
+		AV_386_AMD_SSE4A, STRDESC("AV_386_AMD_SSE4A"),
+		STRDESC("AMD_SSE4A"), STRDESC("amd_sse4a"),
+	},
+	{						/* 0x00100000 */
+		AV_386_POPCNT, STRDESC("AV_386_POPCNT"),
+		STRDESC("POPCNT"), STRDESC("popcnt"),
+	},
+	{						/* 0x00200000 */
+		AV_386_AMD_LZCNT, STRDESC("AV_386_AMD_LZCNT"),
+		STRDESC("AMD_LZCNT"), STRDESC("amd_lzcnt"),
+	},
+	{						/* 0x00400000 */
+		AV_386_SSSE3, STRDESC("AV_386_SSSE3"),
+		STRDESC("SSSE3"), STRDESC("ssse3"),
+	},
+	{						/* 0x00800000 */
+		AV_386_SSE4_1, STRDESC("AV_386_SSE4_1"),
+		STRDESC("SSE4.1"), STRDESC("sse4.1"),
+	},
+	{						/* 0x01000000 */
+		AV_386_SSE4_2, STRDESC("AV_386_SSE4_2"),
+		STRDESC("SSE4.2"), STRDESC("sse4.2"),
+	}
 };
-static const uint_t hw1_i_num = sizeof (hw1_i) / sizeof (Cap_desc);
 
 /*
  * Concatenate a token to the string buffer.  This can be a capabilities token
  * or a separator token.
  */
-static int
-token(char **ostr, size_t *olen, const char *nstr, size_t nlen)
+static elfcap_err_t
+token(char **ostr, size_t *olen, const elfcap_str_t *nstr)
 {
-	if (*olen < nlen)
-		return (CAP_ERR_BUFOVFL);
+	if (*olen < nstr->s_len)
+		return (ELFCAP_ERR_BUFOVFL);
 
-	(void) strcat(*ostr, nstr);
-	*ostr += nlen;
-	*olen -= nlen;
+	(void) strcat(*ostr, nstr->s_str);
+	*ostr += nstr->s_len;
+	*olen -= nstr->s_len;
 
-	return (0);
+	return (ELFCAP_ERR_NONE);
 }
+
+static elfcap_err_t
+get_str_desc(elfcap_style_t style, const elfcap_desc_t *cdp,
+    const elfcap_str_t **ret_str)
+{
+	switch (style) {
+	case ELFCAP_STYLE_FULL:
+		*ret_str = &cdp->c_full;
+		break;
+	case ELFCAP_STYLE_UC:
+		*ret_str = &cdp->c_uc;
+		break;
+	case ELFCAP_STYLE_LC:
+		*ret_str = &cdp->c_lc;
+		break;
+	default:
+		return (ELFCAP_ERR_INVSTYLE);
+	}
+
+	return (ELFCAP_ERR_NONE);
+}
+
 
 /*
  * Expand a capabilities value into the strings defined in the associated
  * capabilities descriptor.
  */
-static int
-expand(uint64_t val, const Cap_desc *cdp, uint_t cnum, char *str, size_t slen,
-    int fmt)
+static elfcap_err_t
+expand(elfcap_style_t style, uint64_t val, const elfcap_desc_t *cdp,
+    uint_t cnum, char *str, size_t slen, elfcap_fmt_t fmt)
 {
-	uint_t	cnt, mask;
-	int	follow = 0, err;
+	uint_t			cnt;
+	int			follow = 0, err;
+	const elfcap_str_t	*nstr;
 
 	if (val == 0)
-		return (0);
+		return (ELFCAP_ERR_NONE);
 
-	for (cnt = WORD_BIT, mask = 0x80000000; cnt; cnt--,
-	    (mask = mask >> 1)) {
-		if ((val & mask) && (cnt <= cnum) && cdp[cnt - 1].c_val) {
+	for (cnt = cnum; cnt > 0; cnt--) {
+		uint_t mask = cdp[cnt - 1].c_val;
+
+		if ((val & mask) != 0) {
 			if (follow++ && ((err = token(&str, &slen,
-			    format[fmt].f_str, format[fmt].f_len)) != 0))
+			    &format[fmt])) != ELFCAP_ERR_NONE))
 				return (err);
 
-			if ((err = token(&str, &slen, cdp[cnt - 1].c_str,
-			    cdp[cnt - 1].c_len)) != 0)
+			err = get_str_desc(style, &cdp[cnt - 1], &nstr);
+			if (err != ELFCAP_ERR_NONE)
+				return (err);
+			if ((err = token(&str, &slen, nstr)) != ELFCAP_ERR_NONE)
 				return (err);
 
 			val = val & ~mask;
@@ -292,103 +342,141 @@ expand(uint64_t val, const Cap_desc *cdp, uint_t cnum, char *str, size_t slen,
 	 * If there are any unknown bits remaining display the numeric value.
 	 */
 	if (val) {
-		if (follow && ((err = token(&str, &slen, format[fmt].f_str,
-		    format[fmt].f_len)) != 0))
+		if (follow && ((err = token(&str, &slen, &format[fmt])) !=
+		    ELFCAP_ERR_NONE))
 			return (err);
 
 		(void) snprintf(str, slen, "0x%llx", val);
 	}
-	return (0);
+	return (ELFCAP_ERR_NONE);
 }
 
 /*
  * Expand a CA_SUNW_HW_1 value.
  */
-int
-hwcap_1_val2str(uint64_t val, char *str, size_t len, int fmt, ushort_t mach)
+elfcap_err_t
+elfcap_hw1_to_str(elfcap_style_t style, uint64_t val, char *str,
+    size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
 	/*
 	 * Initialize the string buffer, and validate the format request.
 	 */
 	*str = '\0';
-	if (fmt > CAP_MAX_TYPE)
-		return (CAP_ERR_INVFMT);
+	if ((fmt < 0) || (fmt >= FORMAT_NELTS))
+		return (ELFCAP_ERR_INVFMT);
 
 	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
-		return (expand(val, &hw1_i[0], hw1_i_num, str, len, fmt));
+		return (expand(style, val, &hw1_386[0], ELFCAP_NUM_HW1_386,
+		    str, len, fmt));
 
 	if ((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9))
-		return (expand(val, &hw1_s[0], hw1_s_num, str, len, fmt));
+		return (expand(style, val, hw1_sparc, ELFCAP_NUM_HW1_SPARC,
+		    str, len, fmt));
 
-	return (CAP_ERR_UNKMACH);
+	return (ELFCAP_ERR_UNKMACH);
 }
 
 /*
  * Expand a CA_SUNW_SF_1 value.  Note, that at present these capabilities are
  * common across all platforms.  The use of "mach" is therefore redundant, but
- * is retained for compatibility with the interface of hwcap_1_val2str(), and
+ * is retained for compatibility with the interface of elfcap_hw1_to_str(), and
  * possible future expansion.
  */
-int
+elfcap_err_t
 /* ARGSUSED4 */
-sfcap_1_val2str(uint64_t val, char *str, size_t len, int fmt, ushort_t mach)
+elfcap_sf1_to_str(elfcap_style_t style, uint64_t val, char *str,
+    size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
 	/*
 	 * Initialize the string buffer, and validate the format request.
 	 */
 	*str = '\0';
-	if (fmt > CAP_MAX_TYPE)
-		return (CAP_ERR_INVFMT);
+	if ((fmt < 0) || (fmt >= FORMAT_NELTS))
+		return (ELFCAP_ERR_INVFMT);
 
-	return (expand(val, &sf1[0], sf1_num, str, len, fmt));
+	return (expand(style, val, &sf1[0], ELFCAP_NUM_SF1, str, len, fmt));
 }
 
 /*
- * Determine capability type from the capability tag.
+ * Given a capability tag type and value, map it to a string representation.
  */
-int
-cap_val2str(uint64_t tag, uint64_t val, char *str, size_t len, int fmt,
-    ushort_t mach)
+elfcap_err_t
+elfcap_tag_to_str(elfcap_style_t style, uint64_t tag, uint64_t val,
+    char *str, size_t len, elfcap_fmt_t fmt, ushort_t mach)
 {
 	if (tag == CA_SUNW_HW_1)
-		return (hwcap_1_val2str(val, str, len, fmt, mach));
+		return (elfcap_hw1_to_str(style, val, str, len, fmt, mach));
 	if (tag == CA_SUNW_SF_1)
-		return (sfcap_1_val2str(val, str, len, fmt, mach));
+		return (elfcap_sf1_to_str(style, val, str, len, fmt, mach));
 
-	return (CAP_ERR_UNKTAG);
+	return (ELFCAP_ERR_UNKTAG);
 }
 
 /*
  * Determine a capabilities value from a capabilities string.
  */
 static uint64_t
-value(const char *str, const Cap_desc *cdp, uint_t cnum)
+value(elfcap_style_t style, const char *str, const elfcap_desc_t *cdp,
+    uint_t cnum)
 {
+	const elfcap_str_t	*nstr;
 	uint_t	num;
+	int	err;
 
 	for (num = 0; num < cnum; num++) {
-		if (strcmp(str, cdp[num].c_str) == 0)
+		/*
+		 * Skip "reserved" bits. These are unassigned bits in the
+		 * middle of the assigned range.
+		 */
+		if (cdp[num].c_val == 0)
+			continue;
+
+		if ((err = get_str_desc(style, &cdp[num], &nstr)) != 0)
+			return (err);
+		if (strcmp(str, nstr->s_str) == 0)
 			return (cdp[num].c_val);
 	}
 	return (0);
 }
 
 uint64_t
-sfcap_1_str2val(const char *str, ushort_t mach)
+elfcap_sf1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 {
-	return (value(str, &sf1[0], sf1_num));
+	return (value(style, str, &sf1[0], ELFCAP_NUM_SF1));
 }
 
 uint64_t
-hwcap_1_str2val(const char *str, ushort_t mach)
+elfcap_hw1_from_str(elfcap_style_t style, const char *str, ushort_t mach)
 {
 	if ((mach == EM_386) || (mach == EM_IA_64) || (mach == EM_AMD64))
-		return (value(str, &hw1_i[0], hw1_i_num));
+		return (value(style, str, &hw1_386[0], ELFCAP_NUM_HW1_386));
 
 	if ((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9))
-		return (value(str, &hw1_s[0], hw1_s_num));
+		return (value(style, str, hw1_sparc, ELFCAP_NUM_HW1_SPARC));
 
 	return (0);
+}
+
+/*
+ * These functions allow the caller to get direct access to the
+ * cap descriptors.
+ */
+const elfcap_desc_t *
+elfcap_getdesc_hw1_sparc(void)
+{
+	return (hw1_sparc);
+}
+
+const elfcap_desc_t *
+elfcap_getdesc_hw1_386(void)
+{
+	return (hw1_386);
+}
+
+const elfcap_desc_t *
+elfcap_getdesc_sf1(void)
+{
+	return (sf1);
 }

@@ -41,6 +41,7 @@
 #include	<sys/auxv_386.h>
 #include	<sys/auxv_SPARC.h>
 #include	<msg.h>
+#include	<elfcap.h>
 
 
 
@@ -1327,130 +1328,37 @@ static elfedit_atoui_sym_t sym_ca[] = {
 	{ NULL }
 };
 
+
 /*
  * AV_386 flags used for CA_SUNW_HW_1 capabilities
+ *
+ * The space for this is reserved at compile time, but the values are
+ * filled in at runtime on demand from the usr/src/common/elfcap code.
+ * Note that we need two slots for every capability, one for the full
+ * string, and another for the informal lowercase version.
  */
-static elfedit_atoui_sym_t sym_av_386[] = {
-	{ MSG_ORIG(MSG_AV_386_FPU),		AV_386_FPU },
-	{ MSG_ORIG(MSG_AV_386_FPU_ALT1),	AV_386_FPU },
-
-	{ MSG_ORIG(MSG_AV_386_TSC),		AV_386_TSC },
-	{ MSG_ORIG(MSG_AV_386_TSC_ALT1),	AV_386_TSC },
-
-	{ MSG_ORIG(MSG_AV_386_CX8),		AV_386_CX8 },
-	{ MSG_ORIG(MSG_AV_386_CX8_ALT1),	AV_386_CX8 },
-
-	{ MSG_ORIG(MSG_AV_386_SEP),		AV_386_SEP },
-	{ MSG_ORIG(MSG_AV_386_SEP_ALT1),	AV_386_SEP },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_SYSC),	AV_386_AMD_SYSC },
-	{ MSG_ORIG(MSG_AV_386_AMD_SYSC_ALT1),	AV_386_AMD_SYSC },
-
-	{ MSG_ORIG(MSG_AV_386_CMOV),		AV_386_CMOV },
-	{ MSG_ORIG(MSG_AV_386_CMOV_ALT1),	AV_386_CMOV },
-
-	{ MSG_ORIG(MSG_AV_386_MMX),		AV_386_MMX },
-	{ MSG_ORIG(MSG_AV_386_MMX_ALT1),	AV_386_MMX },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_MMX),		AV_386_AMD_MMX },
-	{ MSG_ORIG(MSG_AV_386_AMD_MMX_ALT1),	AV_386_AMD_MMX },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_3DNOW),	AV_386_AMD_3DNow },
-	{ MSG_ORIG(MSG_AV_386_AMD_3DNOW_ALT1),	AV_386_AMD_3DNow },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_3DNOWX),	AV_386_AMD_3DNowx },
-	{ MSG_ORIG(MSG_AV_386_AMD_3DNOWX_ALT1),	AV_386_AMD_3DNowx },
-
-	{ MSG_ORIG(MSG_AV_386_FXSR),		AV_386_FXSR },
-	{ MSG_ORIG(MSG_AV_386_FXSR_ALT1),	AV_386_FXSR },
-
-	{ MSG_ORIG(MSG_AV_386_SSE),		AV_386_SSE },
-	{ MSG_ORIG(MSG_AV_386_SSE_ALT1),	AV_386_SSE },
-
-	{ MSG_ORIG(MSG_AV_386_SSE2),		AV_386_SSE2 },
-	{ MSG_ORIG(MSG_AV_386_SSE2_ALT1),	AV_386_SSE2 },
-
-	{ MSG_ORIG(MSG_AV_386_PAUSE),		AV_386_PAUSE },
-	{ MSG_ORIG(MSG_AV_386_PAUSE_ALT1),	AV_386_PAUSE },
-
-	{ MSG_ORIG(MSG_AV_386_SSE3),		AV_386_SSE3 },
-	{ MSG_ORIG(MSG_AV_386_SSE3_ALT1),	AV_386_SSE3 },
-
-	{ MSG_ORIG(MSG_AV_386_MON),		AV_386_MON },
-	{ MSG_ORIG(MSG_AV_386_MON_ALT1),	AV_386_MON },
-
-	{ MSG_ORIG(MSG_AV_386_CX16),		AV_386_CX16 },
-	{ MSG_ORIG(MSG_AV_386_CX16_ALT1),	AV_386_CX16 },
-
-	{ MSG_ORIG(MSG_AV_386_AHF),		AV_386_AHF },
-	{ MSG_ORIG(MSG_AV_386_AHF_ALT1),	AV_386_AHF },
-
-	{ MSG_ORIG(MSG_AV_386_TSCP),		AV_386_TSCP },
-	{ MSG_ORIG(MSG_AV_386_TSCP_ALT1),	AV_386_TSCP },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_SSE4A),	AV_386_AMD_SSE4A },
-	{ MSG_ORIG(MSG_AV_386_AMD_SSE4A_ALT1),	AV_386_AMD_SSE4A },
-
-	{ MSG_ORIG(MSG_AV_386_POPCNT),		AV_386_POPCNT },
-	{ MSG_ORIG(MSG_AV_386_POPCNT_ALT1),	AV_386_POPCNT },
-
-	{ MSG_ORIG(MSG_AV_386_AMD_LZCNT),	AV_386_AMD_LZCNT },
-	{ MSG_ORIG(MSG_AV_386_AMD_LZCNT_ALT1),	AV_386_AMD_LZCNT },
-
-	{ NULL }
-};
-
+static elfedit_atoui_sym_t sym_av_386[(2 * ELFCAP_NUM_HW1_386) + 1];
 
 /*
  * AV_SPARC flags used for CA_SUNW_HW_1 capabilities
+ *
+ * The space for this is reserved at compile time, but the values are
+ * filled in at runtime on demand from the usr/src/common/elfcap code.
+ * Note that we need two slots for every capability, one for the full
+ * string, and another for the informal lowercase version.
  */
-static elfedit_atoui_sym_t sym_av_sparc[] = {
-	{ MSG_ORIG(MSG_AV_SPARC_MUL32),		AV_SPARC_MUL32 },
-	{ MSG_ORIG(MSG_AV_SPARC_MUL32_ALT1),	AV_SPARC_MUL32 },
-
-	{ MSG_ORIG(MSG_AV_SPARC_DIV32),		AV_SPARC_DIV32 },
-	{ MSG_ORIG(MSG_AV_SPARC_DIV32_ALT1),	AV_SPARC_DIV32 },
-
-	{ MSG_ORIG(MSG_AV_SPARC_FSMULD),	AV_SPARC_FSMULD },
-	{ MSG_ORIG(MSG_AV_SPARC_FSMULD_ALT1),	AV_SPARC_FSMULD },
-
-	{ MSG_ORIG(MSG_AV_SPARC_V8PLUS),	AV_SPARC_V8PLUS },
-	{ MSG_ORIG(MSG_AV_SPARC_V8PLUS_ALT1),	AV_SPARC_V8PLUS },
-
-	{ MSG_ORIG(MSG_AV_SPARC_POPC),		AV_SPARC_POPC },
-	{ MSG_ORIG(MSG_AV_SPARC_POPC_ALT1),	AV_SPARC_POPC },
-
-	{ MSG_ORIG(MSG_AV_SPARC_VIS),		AV_SPARC_VIS },
-	{ MSG_ORIG(MSG_AV_SPARC_VIS_ALT1),	AV_SPARC_VIS },
-
-	{ MSG_ORIG(MSG_AV_SPARC_VIS2),		AV_SPARC_VIS2 },
-	{ MSG_ORIG(MSG_AV_SPARC_VIS2_ALT1),	AV_SPARC_VIS2 },
-
-	{ MSG_ORIG(MSG_AV_SPARC_ASI_BLK_INIT),	AV_SPARC_ASI_BLK_INIT },
-	{ MSG_ORIG(MSG_AV_SPARC_ASI_BLK_INIT_ALT1), AV_SPARC_ASI_BLK_INIT },
-
-	{ MSG_ORIG(MSG_AV_SPARC_FMAF),		AV_SPARC_FMAF },
-	{ MSG_ORIG(MSG_AV_SPARC_FMAF_ALT1),	AV_SPARC_FMAF },
-
-	{ MSG_ORIG(MSG_AV_SPARC_FJFMAU),	AV_SPARC_FJFMAU },
-	{ MSG_ORIG(MSG_AV_SPARC_FJFMAU_ALT1),	AV_SPARC_FJFMAU },
-
-	{ NULL }
-};
-
+static elfedit_atoui_sym_t sym_av_sparc[(2 * ELFCAP_NUM_HW1_SPARC) + 1];
 
 /*
  * SF1_SUNW flags used for CA_SUNW_SF_1 capabilities
+ *
+ * The space for this is reserved at compile time, but the values are
+ * filled in at runtime on demand from the usr/src/common/elfcap code.
+ * Note that we need two slots for every capability, one for the full
+ * string, and another for the informal lowercase version.
  */
-static elfedit_atoui_sym_t sym_sf1_sunw[] = {
-	{ MSG_ORIG(MSG_SF1_SUNW_FPKNWN),	SF1_SUNW_FPKNWN },
-	{ MSG_ORIG(MSG_SF1_SUNW_FPKNWN_ALT1),	SF1_SUNW_FPKNWN },
+static elfedit_atoui_sym_t sym_sf1_sunw[(2 * ELFCAP_NUM_SF1) + 1];
 
-	{ MSG_ORIG(MSG_SF1_SUNW_FPUSED),	SF1_SUNW_FPUSED },
-	{ MSG_ORIG(MSG_SF1_SUNW_FPUSED_ALT1),	SF1_SUNW_FPUSED },
-
-	{ NULL }
-};
 
 
 
@@ -1496,14 +1404,57 @@ static elfedit_atoui_sym_t *sym_table[] = {
 	sym_syminfo_bt,		/* 29: ELFEDIT_CONST_SYMINFO_BT:Syminfo bndto */
 	sym_syminfo_flg,	/* 30: ELFEDIT_CONST_SYMINFO_FLG:Syminfo flag */
 	sym_ca,			/* 31: ELFEDIT_CONST_CA: Capabilities tags */
-	sym_av_386,		/* 32: ELFEDIT_CONST_AV_386: X86 HW caps */
-	sym_av_sparc,		/* 33: ELFEDIT_CONST_AV_SPARC: sparc HW caps */
-	sym_sf1_sunw,		/* 34: ELFEDIT_CONST_SF1_SUNW: software caps */
+	NULL,			/* 32: ELFEDIT_CONST_AV_386: X86 HW caps */
+	NULL,			/* 33: ELFEDIT_CONST_AV_SPARC: sparc HW caps */
+	NULL,			/* 34: ELFEDIT_CONST_SF1_SUNW: software caps */
 };
 
 
 
 
+
+
+
+/*
+ * Fill in the specified hardware/software capability array
+ * with data from usr/src/common/elfcap.
+ *
+ * entry:
+ *	const_type - Index of constant item being filled
+ *	arr - elfedit_atoui_sym_t array to be filled
+ *	desc - Array of capability descriptors from elfcap
+ *	cnt - # of capability descriptors.
+ *
+ * exit:
+ *	arr is expected to have [(2 * cnt) + 1] elements, all zero filled.
+ *	For each descriptor, 2 array elements are filled in. The first one
+ *	has the full name, and the second has the lowecase informal version.
+ *	The final element of arr is left as NULL, to serve as termination.
+ */
+static void
+fill_capability_array(elfedit_const_t const_type,
+    elfedit_atoui_sym_t *arr, const elfcap_desc_t *desc, size_t cnt)
+{
+	sym_table[const_type] = arr;
+
+	for (; cnt-- > 0; desc++) {
+		/*
+		 * Ignore "placeholder" items. These represent
+		 * unallocated holes in the capability bits.
+		 */
+		if (desc->c_val == 0)
+			continue;
+
+		arr->sym_name = desc->c_full.s_str;
+		arr->sym_value = desc->c_val;
+		arr++;
+
+		arr->sym_name = desc->c_lc.s_str;
+		arr->sym_value = desc->c_val;
+		arr++;
+	}
+
+}
 
 
 
@@ -1517,6 +1468,27 @@ elfedit_const_to_atoui(elfedit_const_t const_type)
 	if ((const_type < 0) ||
 	    (const_type >= (sizeof (sym_table) / sizeof (sym_table[0]))))
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_BADCONST));
+
+	/* Fill capability constant array on demand? */
+	switch (const_type) {
+	case ELFEDIT_CONST_AV_386:
+		if (sym_table[ELFEDIT_CONST_AV_386] == NULL)
+			fill_capability_array(ELFEDIT_CONST_AV_386,
+			    sym_av_386, elfcap_getdesc_hw1_386(),
+			    ELFCAP_NUM_HW1_386);
+		break;
+	case ELFEDIT_CONST_AV_SPARC:
+		if (sym_table[ELFEDIT_CONST_AV_SPARC] == NULL)
+			fill_capability_array(ELFEDIT_CONST_AV_SPARC,
+			    sym_av_sparc, elfcap_getdesc_hw1_sparc(),
+			    ELFCAP_NUM_HW1_SPARC);
+		break;
+	case ELFEDIT_CONST_SF1_SUNW:
+		if (sym_table[ELFEDIT_CONST_SF1_SUNW] == NULL)
+			fill_capability_array(ELFEDIT_CONST_SF1_SUNW,
+			    sym_sf1_sunw, elfcap_getdesc_sf1(), ELFCAP_NUM_SF1);
+		break;
+	}
 
 	return (sym_table[const_type]);
 }

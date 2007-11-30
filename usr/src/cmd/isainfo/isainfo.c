@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,8 +151,8 @@ report_hwcap(int d, const char *isa)
 	if (ioctl(d, CPUID_GET_HWCAP, cgh) != 0)
 		return;
 
-	(void) hwcap_1_val2str(cgh->cgh_hwcap, buffer, sizeof (buffer),
-	    CAP_FMT_SNGSPACE, machtype(isa));
+	(void) elfcap_hw1_to_str(ELFCAP_STYLE_LC, cgh->cgh_hwcap,
+	    buffer, sizeof (buffer), ELFCAP_FMT_SNGSPACE, machtype(isa));
 
 	if (mode & EXTN_MODE) {
 		(void) printf(": %s\n", buffer);

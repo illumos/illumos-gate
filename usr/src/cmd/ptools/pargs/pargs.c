@@ -694,10 +694,12 @@ static void
 at_hwcap(long val, char *instr, size_t n, char *str)
 {
 #if defined(__sparc) || defined(__sparcv9)
-	(void) hwcap_1_val2str(val, str, n, CAP_FMT_PIPSPACE, EM_SPARC);
+	(void) elfcap_hw1_to_str(ELFCAP_STYLE_UC, val, str, n,
+	    ELFCAP_FMT_PIPSPACE, EM_SPARC);
 
 #elif defined(__i386) || defined(__amd64)
-	(void) hwcap_1_val2str(val, str, n, CAP_FMT_PIPSPACE, EM_386);
+	(void) elfcap_hw1_to_str(ELFCAP_STYLE_UC, val, str, n,
+	    ELFCAP_FMT_PIPSPACE, EM_386);
 #else
 #error	"port me"
 #endif

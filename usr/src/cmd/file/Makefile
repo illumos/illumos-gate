@@ -48,7 +48,7 @@ POFILES= $(SRCS:%.c=%.po)
 # for static global variables in elf_read32.o and elf_read64.o
 
 LDLIBS += -lelf
-CPPFLAGS += -DCAP_UPPERCASE -I$(ELFCAP) -I$(SGSRTCID)
+CPPFLAGS += -I$(ELFCAP) -I$(SGSRTCID)
 $(XPG4) := CFLAGS += -DXPG4
 
 ROOTETCMAGIC= $(MAGIC:%=$(ROOTETC)/%)

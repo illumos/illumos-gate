@@ -478,9 +478,11 @@ process_shdr(Elf_Info *EI)
 				}
 
 				if (Chdr.c_tag != CA_SUNW_NULL) {
-					(void) cap_val2str(Chdr.c_tag,
+					(void) elfcap_tag_to_str(
+					    ELFCAP_STYLE_UC, Chdr.c_tag,
 					    Chdr.c_un.c_val, EI->cap_str,
-					    sizeof (EI->cap_str), 0, mac);
+					    sizeof (EI->cap_str),
+					    ELFCAP_FMT_SNGSPACE, mac);
 				}
 				cap_off += csize;
 			}

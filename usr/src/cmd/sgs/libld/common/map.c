@@ -233,15 +233,15 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 		 * hardware capability, or a generic software capability.
 		 */
 		if (type == CA_SUNW_HW_1) {
-			if ((number = (Xword)hwcap_1_str2val(Start_tok,
-			    M_MACH)) != 0) {
+			if ((number = (Xword)elfcap_hw1_from_str(
+			    ELFCAP_STYLE_LC, Start_tok, M_MACH)) != 0) {
 				ofl->ofl_hwcap_1 |= number;
 				used++;
 				continue;
 			}
 		} else {
-			if ((number = (Xword)sfcap_1_str2val(Start_tok,
-			    M_MACH)) != 0) {
+			if ((number = (Xword)elfcap_sf1_from_str(
+			    ELFCAP_STYLE_LC, Start_tok, M_MACH)) != 0) {
 				ofl->ofl_sfcap_1 |= number;
 				used++;
 				continue;

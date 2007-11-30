@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@ pics/%.o:	$(VAR_AVLDIR)/%.c
 #		$(POST_PROCESS_O)
 
 pics/elfcap.o:	$(ELFCAP)/elfcap.c
-		$(COMPILE.c) -o  $@ -DCAP_LOWERCASE $(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o  $@ $(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
 $(LIBLINKS):

@@ -43,7 +43,7 @@ pics/%64.o:	../common/%.c
 		$(POST_PROCESS_O)
 
 pics/elfcap.o:	$(ELFCAP)/elfcap.c
-		$(COMPILE.c) -DCAP_UPPERCASE -o $@ $(ELFCAP)/elfcap.c
+		$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
 # This rule generates the report_bufsize.h include file used by libconv
