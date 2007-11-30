@@ -1114,7 +1114,9 @@ nfs4_wait_for_grace(mntinfo4_t *mi, nfs4_recov_state_t *rsp)
 
 				mutex_exit(&mi->mi_lock);
 
-				delay(SEC_TO_TICK(time_to_wait));
+				error = delay_sig(SEC_TO_TICK(time_to_wait));
+				if (error)
+					return (error);
 
 				curtime = gethrestime_sec();
 
@@ -1171,7 +1173,9 @@ nfs4_wait_for_delay(vnode_t *vp, nfs4_recov_state_t *rsp)
 
 				mutex_exit(&rp->r_statelock);
 
-				delay(SEC_TO_TICK(time_to_wait));
+				error = delay_sig(SEC_TO_TICK(time_to_wait));
+				if (error)
+					return (error);
 
 				curtime = gethrestime_sec();
 
