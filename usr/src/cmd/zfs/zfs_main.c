@@ -214,7 +214,7 @@ get_usage(zfs_help_t idx)
 		    "\trename -p <filesystem|volume> <filesystem|volume>\n"
 		    "\trename -r <snapshot> <snapshot>"));
 	case HELP_ROLLBACK:
-		return (gettext("\trollback [-rR] <snapshot>\n"));
+		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
 		return (gettext("\tsend [-R] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
@@ -1924,10 +1924,11 @@ zfs_do_promote(int argc, char **argv)
 }
 
 /*
- * zfs rollback [-rR] <snapshot>
+ * zfs rollback [-rRf] <snapshot>
  *
  * 	-r	Delete any intervening snapshots before doing rollback
  * 	-R	Delete any snapshots and their clones
+ * 	-f	ignored for backwards compatability
  *
  * Given a filesystem, rollback to a specific snapshot, discarding any changes
  * since then and making it the active dataset.  If more recent snapshots exist,
@@ -2020,7 +2021,7 @@ zfs_do_rollback(int argc, char **argv)
 	char *delim;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "rR")) != -1) {
+	while ((c = getopt(argc, argv, "rRf")) != -1) {
 		switch (c) {
 		case 'r':
 			cb.cb_recurse = 1;
@@ -2028,6 +2029,12 @@ zfs_do_rollback(int argc, char **argv)
 		case 'R':
 			cb.cb_recurse = 1;
 			cb.cb_doclones = 1;
+			break;
+		case 'f':
+			/*
+			 * this is accepted and ignored for backwards
+			 * compatability.
+			 */
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
