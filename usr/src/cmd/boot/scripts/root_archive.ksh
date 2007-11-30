@@ -103,6 +103,11 @@ archive_Gnome()
 		SCHEMADIR="$MINIROOT/.tmp_proto/root/etc/gconf/schemas"
 		export SCHEMADIR
 		/usr/bin/gconftool-2 --makefile-install-rule $SCHEMADIR/*.schemas >/dev/null 2>&1
+		echo '
+		xml:readwrite:/tmp/root/.gconf
+		xml:readonly:/etc/gconf/gconf.xml.defaults
+		' > /"$MINIROOT"/.tmp_proto/root/etc/gconf/2/path
+
 		# usr/share gnome stuff
 		cd "$MINIROOT"
 		find usr/share/GConf usr/share/application-registry \
@@ -363,7 +368,7 @@ archive_Perl()
 		    "$CPIO_DIR/perl.cpio.bz2"
 
 		rm -rf `cat /tmp/perl.$$` 2>/dev/null
-		ln -s /tmp/root/perl5 usr/perl5 2>/dev/null
+		ln -s /tmp/root/usr/perl5 usr/perl5 2>/dev/null
 
 		rm -f /tmp/perl.$$
 	)
