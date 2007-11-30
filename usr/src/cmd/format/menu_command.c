@@ -674,7 +674,6 @@ c_partition()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 
@@ -1088,7 +1087,6 @@ c_repair()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 	/*
@@ -1335,7 +1333,6 @@ c_label()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 	/*
@@ -1719,7 +1716,6 @@ c_backup()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 	/*
@@ -1951,7 +1947,6 @@ c_verify()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 	/*
@@ -2207,7 +2202,6 @@ c_volname()
 	 * Check for a valid fdisk table entry for Solaris
 	 */
 	if (!good_fdisk()) {
-		err_print("Please run fdisk first.\n");
 		return (-1);
 	}
 	/*

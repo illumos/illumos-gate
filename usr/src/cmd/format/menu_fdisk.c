@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -735,8 +735,14 @@ good_fdisk()
 		return (1);
 	}
 
-	if (lel(cur_disk->fdisk_part.numsect) > 0)
+	if (lel(cur_disk->fdisk_part.numsect) > 0) {
 		return (1);
-	else
+	} else {
+		err_print("WARNING - ");
+		err_print("This disk may be in use by an application "
+			"that has\n\t  modified the fdisk table. Ensure "
+			"that this disk is\n\t  not currently in use "
+			"before proceeding to use fdisk.\n");
 		return (0);
+	}
 }
