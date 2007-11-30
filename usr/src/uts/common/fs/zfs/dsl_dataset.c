@@ -375,8 +375,14 @@ dsl_dataset_open_obj(dsl_pool_t *dp, uint64_t dsobj, const char *snapname,
 		}
 
 		if (!dsl_dataset_is_snapshot(ds)) {
+			/*
+			 * In sync context, we're called with either no lock
+			 * or with the write lock.  If we're not syncing,
+			 * we're always called with the read lock held.
+			 */
 			boolean_t need_lock =
-			    !RW_LOCK_HELD(&dp->dp_config_rwlock);
+			    !RW_WRITE_HELD(&dp->dp_config_rwlock) &&
+			    dsl_pool_sync_context(dp);
 
 			if (need_lock)
 				rw_enter(&dp->dp_config_rwlock, RW_READER);

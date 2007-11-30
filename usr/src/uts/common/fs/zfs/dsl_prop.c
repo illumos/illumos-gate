@@ -130,7 +130,8 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 
 	err = dsl_prop_get_impl(dd, propname, 8, 1, &value, NULL);
 	if (err != 0) {
-		rw_exit(&dd->dd_pool->dp_config_rwlock);
+		if (need_rwlock)
+			rw_exit(&dd->dd_pool->dp_config_rwlock);
 		return (err);
 	}
 
