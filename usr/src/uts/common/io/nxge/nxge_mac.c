@@ -615,6 +615,11 @@ nxge_mac_init(p_nxge_t nxgep)
 	if ((status = nxge_rx_mac_enable(nxgep)) != NXGE_OK)
 		goto fail;
 
+	/* Initialize MAC control configuration */
+	if ((status = nxge_mac_ctrl_init(nxgep)) != NXGE_OK) {
+		goto fail;
+	}
+
 	nxgep->statsp->mac_stats.mac_mtu = nxgep->mac.maxframesize;
 
 	/* The Neptune Serdes needs to be reinitialized again */
@@ -924,6 +929,117 @@ fail:
 			"nxge_pcs_init: Failed to initialize PCS port<%d>",
 			portn));
 	return (NXGE_ERROR | rs);
+}
+
+/*
+ * Initialize the MAC CTRL sub-block within the MAC
+ * Only the receive-pause-cap is supported.
+ */
+nxge_status_t
+nxge_mac_ctrl_init(p_nxge_t nxgep)
+{
+	uint8_t			portn;
+	nxge_port_t		portt;
+	p_nxge_stats_t		statsp;
+	npi_handle_t		handle;
+	uint32_t		val;
+
+	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_mac_ctrl_init: port<%d>",
+	    portn));
+
+	handle = nxgep->npi_handle;
+	portt = nxgep->mac.porttype;
+	statsp = nxgep->statsp;
+
+	if (portt == PORT_TYPE_XMAC) {
+		/* Readin the current XMAC Config Register for XMAC */
+		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
+
+		/*
+		 * Setup XMAC Configuration for XMAC
+		 * XMAC only supports receive-pause
+		 */
+		if (statsp->mac_stats.adv_cap_asmpause) {
+			if (!statsp->mac_stats.adv_cap_pause) {
+				/*
+				 * If adv_cap_asmpause is 1 and adv_cap_pause
+				 * is 0, enable receive pause.
+				 */
+				val |= XMAC_RX_CFG_RX_PAUSE_EN;
+			} else {
+				/*
+				 * If adv_cap_asmpause is 1 and adv_cap_pause
+				 * is 1, disable receive pause.  Send pause is
+				 * not supported.
+				 */
+				val &= ~XMAC_RX_CFG_RX_PAUSE_EN;
+			}
+		} else {
+			if (statsp->mac_stats.adv_cap_pause) {
+				/*
+				 * If adv_cap_asmpause is 0 and adv_cap_pause
+				 * is 1, enable receive pause.
+				 */
+				val |= XMAC_RX_CFG_RX_PAUSE_EN;
+			} else {
+				/*
+				 * If adv_cap_asmpause is 0 and adv_cap_pause
+				 * is 0, disable receive pause. Send pause is
+				 * not supported
+				 */
+				val &= ~XMAC_RX_CFG_RX_PAUSE_EN;
+			}
+		}
+		XMAC_REG_WR(handle, portn, XMAC_CONFIG_REG, val);
+	} else if (portt == PORT_TYPE_BMAC) {
+		/* Readin the current MAC CTRL Config Register for BMAC */
+		BMAC_REG_RD(handle, portn, MAC_CTRL_CONFIG_REG, &val);
+
+		/* Setup MAC CTRL Configuration for BMAC */
+		if (statsp->mac_stats.adv_cap_asmpause) {
+			if (statsp->mac_stats.adv_cap_pause) {
+				/*
+				 * If adv_cap_asmpause is 1 and adv_cap_pause
+				 * is 1, disable receive pause. Send pause
+				 * is not supported
+				 */
+				val &= ~MAC_CTRL_CFG_RECV_PAUSE_EN;
+			} else {
+				/*
+				 * If adv_cap_asmpause is 1 and adv_cap_pause
+				 * is 0, enable receive pause and disable
+				 * send pause.
+				 */
+				val |= MAC_CTRL_CFG_RECV_PAUSE_EN;
+				val &= ~MAC_CTRL_CFG_SEND_PAUSE_EN;
+			}
+		} else {
+			if (statsp->mac_stats.adv_cap_pause) {
+				/*
+				 * If adv_cap_asmpause is 0 and adv_cap_pause
+				 * is 1, enable receive pause. Send pause is
+				 * not supported.
+				 */
+				val |= MAC_CTRL_CFG_RECV_PAUSE_EN;
+			} else {
+				/*
+				 * If adv_cap_asmpause is 0 and adv_cap_pause
+				 * is 0, pause capability is not available in
+				 * either direction.
+				 */
+				val &= (~MAC_CTRL_CFG_SEND_PAUSE_EN &
+					~MAC_CTRL_CFG_RECV_PAUSE_EN);
+			}
+		}
+		BMAC_REG_WR(handle, portn, MAC_CTRL_CONFIG_REG, val);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_mac_ctrl_init: port<%d>",
+	    portn));
+
+	return (NXGE_OK);
 }
 
 /* Initialize the Internal Serdes */
@@ -1707,7 +1823,11 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_OPTICS_DIGITAL_CTRL_REG,
 	    &op_ctr.value)) != NXGE_OK)
 		goto fail;
-	op_ctr.bits.gpio_sel = 0x3;
+	if (NXGE_IS_XAUI_PLATFORM(nxgep)) {
+		op_ctr.bits.gpio_sel = 0x1;
+	} else {
+		op_ctr.bits.gpio_sel = 0x3;
+	}
 	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
 	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_OPTICS_DIGITAL_CTRL_REG,
 	    op_ctr.value)) != NXGE_OK)

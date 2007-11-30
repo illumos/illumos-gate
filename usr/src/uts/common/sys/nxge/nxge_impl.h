@@ -363,6 +363,12 @@ typedef enum {
 	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_ALONSO))
 
+#define	NXGE_IS_XAUI_PLATFORM(nxgep) \
+	(((nxgep->platform_type) == P_NEPTUNE_NIU) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P0) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1))
+
+
 typedef enum {
 	CFG_DEFAULT = 0,	/* default cfg */
 	CFG_EQUAL,	/* Equal */
@@ -869,6 +875,7 @@ nxge_status_t nxge_mac_init(p_nxge_t);
 nxge_status_t nxge_link_init(p_nxge_t);
 nxge_status_t nxge_xif_init(p_nxge_t);
 nxge_status_t nxge_pcs_init(p_nxge_t);
+nxge_status_t nxge_mac_ctrl_init(p_nxge_t);
 nxge_status_t nxge_serdes_init(p_nxge_t);
 nxge_status_t nxge_serdes_reset(p_nxge_t);
 nxge_status_t nxge_xcvr_find(p_nxge_t);
