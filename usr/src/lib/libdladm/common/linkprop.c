@@ -741,18 +741,17 @@ i_dladm_get_zoneid(const char *link, zoneid_t *zidp)
 	(void) strlcpy(dhv.dhv_name, link, IFNAMSIZ);
 	dhv.dhv_zid = -1;
 
-	if (i_dladm_ioctl(fd, DLDIOCZIDGET, &dhv, sizeof (dhv)) < 0 &&
-	    errno != ENOENT) {
-		dladm_status_t status = dladm_errno2status(errno);
-
-		(void) close(fd);
-		return (status);
-	}
-
-	if (errno == ENOENT)
-		*zidp = GLOBAL_ZONEID;
-	else
+	if (i_dladm_ioctl(fd, DLDIOCZIDGET, &dhv, sizeof (dhv)) < 0)  {
+		if (errno == ENOENT) {
+			*zidp = GLOBAL_ZONEID;
+		} else {
+			dladm_status_t status = dladm_errno2status(errno);
+			(void) close(fd);
+			return (status);
+		}
+	} else {
 		*zidp = dhv.dhv_zid;
+	}
 
 	(void) close(fd);
 	return (DLADM_STATUS_OK);
