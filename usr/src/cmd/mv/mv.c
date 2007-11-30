@@ -1857,8 +1857,7 @@ copy_sysattr(char *source, char *target)
 	struct dirent	*dp;
 	nvlist_t	*response;
 	int		error = 0;
-	int		chk_support = 0;
-	int		sa_support = 1;
+	int		target_sa_support = 0;
 
 	if (sysattr_support(source, _PC_SATTR_EXISTS) != 1)
 		return (0);
@@ -1874,89 +1873,82 @@ copy_sysattr(char *source, char *target)
 	 */
 	response = sysattr_list(cmd, srcfd, source);
 
-	if (response != NULL &&
-	    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
-		(void) fprintf(stderr,
-		    gettext(
-		    "%s: cannot preserve extended system "
-		    "attribute, operation not supported on file"
-		    " %s\n"), cmd, target);
-		error++;
-		goto out;
-	}
-
-	if (srcdirp == NULL) {
-		if (open_target_srctarg_attrdirs(source, target) !=  0) {
-			error++;
-			goto out;
-		}
-		if (open_attrdirp(source) != 0) {
+	if (sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
+		if (response != NULL) {
+			(void) fprintf(stderr,
+			    gettext(
+			    "%s: cannot preserve extended system "
+			    "attribute, operation not supported on file"
+			    " %s\n"), cmd, target);
 			error++;
 			goto out;
 		}
 	} else {
-		rewind_attrdir(srcdirp);
+		target_sa_support = 1;
 	}
-	while (sa_support && (dp = readdir(srcdirp)) != NULL) {
-		nvlist_t	*res;
-		int		ret;
 
-		if ((ret = traverse_attrfile(dp, source, target, 0)) == -1)
-			continue;
-		else if (ret > 0) {
-			++error;
-			goto out;
-		}
-		/*
-		 * Gets non default extended system attributes from the
-		 * attribute file to copy to the target. The target has
-		 * the defaults set when its created and thus  no need
-		 * to copy the defaults.
-		 */
-		if (dp->d_name != NULL) {
-			res = sysattr_list(cmd, srcattrfd, dp->d_name);
-			if (res == NULL)
-				goto next;
-
-			if (!chk_support &&
-			    sysattr_support(target, _PC_SATTR_ENABLED) != 1) {
-				(void) fprintf(stderr,
-				    gettext(
-				    "%s: cannot preserve extended "
-				    "system attribute, operation not "
-				    " %s\n"), cmd, target);
+	if (target_sa_support) {
+		if (srcdirp == NULL) {
+			if (open_target_srctarg_attrdirs(source,
+			    target) !=  0) {
 				error++;
-				sa_support = 0;
-			} else {
-				chk_support = 1;
+				goto out;
 			}
+			if (open_attrdirp(source) != 0) {
+				error++;
+				goto out;
+			}
+		} else {
+			rewind_attrdir(srcdirp);
+		}
+		while ((dp = readdir(srcdirp)) != NULL) {
+			nvlist_t	*res;
+			int		ret;
+
+			if ((ret = traverse_attrfile(dp, source, target,
+			    0)) == -1)
+				continue;
+			else if (ret > 0) {
+				++error;
+				goto out;
+			}
+			/*
+			 * Gets non default extended system attributes from the
+			 * attribute file to copy to the target. The target has
+			 * the defaults set when its created and thus  no need
+			 * to copy the defaults.
+			 */
+			if (dp->d_name != NULL) {
+				res = sysattr_list(cmd, srcattrfd, dp->d_name);
+				if (res == NULL)
+					goto next;
 
 			/*
 			 * Copy non default extended system attributes of named
 			 * attribute file.
 			 */
-			if (sa_support && fsetattr(targattrfd,
-			    XATTR_VIEW_READWRITE, res) != 0) {
-				++error;
-				(void) fprintf(stderr, gettext("%s: "
-				    "Failed to copy extended system "
-				    "attributes from attribute file "
-				    "%s of %s to %s\n"), cmd,
-				    dp->d_name, source, target);
+				if (fsetattr(targattrfd,
+				    XATTR_VIEW_READWRITE, res) != 0) {
+					++error;
+					(void) fprintf(stderr, gettext("%s: "
+					    "Failed to copy extended system "
+					    "attributes from attribute file "
+					    "%s of %s to %s\n"), cmd,
+					    dp->d_name, source, target);
+				}
 			}
-		}
 next:
-		if (srcattrfd != -1)
-			(void) close(srcattrfd);
-		if (targattrfd != -1)
-			(void) close(targattrfd);
-		srcattrfd = targattrfd = -1;
-		if (res != NULL)
-			nvlist_free(res);
+			if (srcattrfd != -1)
+				(void) close(srcattrfd);
+			if (targattrfd != -1)
+				(void) close(targattrfd);
+			srcattrfd = targattrfd = -1;
+			if (res != NULL)
+				nvlist_free(res);
+		}
 	}
-
 	/* Copy source file non default extended system attributes to target */
-	if ((response != NULL) &&
+	if (target_sa_support && (response != NULL) &&
 	    (fsetattr(targfd, XATTR_VIEW_READWRITE, response)) != 0) {
 		++error;
 		(void) fprintf(stderr, gettext("%s: Failed to "
