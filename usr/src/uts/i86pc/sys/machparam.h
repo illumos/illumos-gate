@@ -287,14 +287,18 @@ extern "C" {
 
 /*
  * Reserve pages just below KERNEL_TEXT for the GDT, IDT, TSS and debug info.
+ *
+ * For now, DEBUG_INFO_VA must be first in this list for "xm" initiated dumps
+ * of solaris domUs to be usable with mdb. Relying on a fixed VA is not viable
+ * long term, but it's the best we've got for now.
  */
 #if !defined(_ASM)
-#define	GDT_VA		(KERNEL_TEXT - MMU_PAGESIZE)
+#define	DEBUG_INFO_VA	(KERNEL_TEXT - MMU_PAGESIZE)
+#define	GDT_VA		(DEBUG_INFO_VA - MMU_PAGESIZE)
 #define	IDT_VA		(GDT_VA - MMU_PAGESIZE)
 #define	KTSS_VA		(IDT_VA - MMU_PAGESIZE)
 #define	DFTSS_VA	(KTSS_VA - MMU_PAGESIZE)
-#define	DEBUG_INFO_VA	(DFTSS_VA - MMU_PAGESIZE)
-#define	MISC_VA_BASE	(DEBUG_INFO_VA)
+#define	MISC_VA_BASE	(DFTSS_VA)
 #define	MISC_VA_SIZE	(KERNEL_TEXT - MISC_VA_BASE)
 #endif /* !_ASM */
 
