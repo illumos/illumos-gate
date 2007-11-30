@@ -1360,14 +1360,26 @@ makeConnection(Connection **conp, const char *serverAddr,
 	}
 
 	if (serverAddr) {
-		rc = __s_api_requestServer(NS_CACHE_NEW, serverAddr,
-		    &sinfo, errorp, serverAddrType);
-		if (rc != NS_LDAP_SUCCESS || sinfo.server == NULL) {
-			(void) snprintf(errmsg, sizeof (errmsg),
-			gettext("makeConnection: unable to get "
-			"server information for %s"), serverAddr);
-			syslog(LOG_ERR, "libsldap: %s", errmsg);
-			return (NS_LDAP_OP_FAILED);
+		/*
+		 * We're given the server address, just use it.
+		 * In case of sasl/GSSAPI, serverAddr would need to be a FQDN.
+		 * We assume this is the case for now.
+		 *
+		 * Only the server address fields of sinfo structure are filled
+		 * in since these are the only relevant data that we have. Other
+		 * fields of this structure (controls, saslMechanisms) are
+		 * kept to NULL.
+		 */
+		sinfo.server = strdup(serverAddr);
+		if (sinfo.server == NULL)  {
+			return (NS_LDAP_MEMORY);
+		}
+		if (auth->auth.saslmech == NS_LDAP_SASL_GSSAPI) {
+			sinfo.serverFQDN = strdup(serverAddr);
+			if (sinfo.serverFQDN == NULL) {
+				free(sinfo.server);
+				return (NS_LDAP_MEMORY);
+			}
 		}
 		rc = openConnection(&ld, *bindHost, auth, timeoutSec, errorp,
 		    fail_if_new_pwd_reqd, passwd_mgmt);
@@ -1376,6 +1388,19 @@ makeConnection(Connection **conp, const char *serverAddr,
 			exit_rc = rc;
 			goto create_con;
 		} else {
+			if (auth->auth.saslmech == NS_LDAP_SASL_GSSAPI) {
+				(void) snprintf(errmsg, sizeof (errmsg),
+				    "%s %s", gettext("makeConnection: "
+				    "failed to open connection using "
+				    "sasl/GSSAPI to"), *bindHost);
+			} else {
+				(void) snprintf(errmsg, sizeof (errmsg),
+				    "%s %s", gettext("makeConnection: "
+				    "failed to open connection to"),
+				    *bindHost);
+			}
+			syslog(LOG_ERR, "libsldap: %s", errmsg);
+			__s_api_free_server_info(&sinfo);
 			return (rc);
 		}
 	}
@@ -1534,6 +1559,7 @@ create_con:
 			(void) __ns_ldap_freeError(errorp);
 			*errorp = NULL;
 		}
+		(void) ldap_unbind(ld);
 		return (NS_LDAP_MEMORY);
 	}
 
@@ -1547,7 +1573,8 @@ create_con:
 
 	con->auth = __ns_ldap_dupAuth(auth);
 	if (con->auth == NULL) {
-		free(con);
+		(void) ldap_unbind(ld);
+		freeConnection(con);
 		/*
 		 * If password control attached in **errorp,
 		 * e.g. rc == NS_LDAP_SUCCESS_WITH_INFO,
@@ -1565,6 +1592,7 @@ create_con:
 
 	con->ld = ld;
 	if ((id = addConnection(con)) == -1) {
+		(void) ldap_unbind(ld);
 		freeConnection(con);
 		/*
 		 * If password control attached in **errorp,
