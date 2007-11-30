@@ -1,4 +1,4 @@
-   Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+   Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
    Use is subject to license terms.
 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -612,7 +612,7 @@ A.    References
 
     Note that for SSHv1 no on-the-wire messages are processed by the
     monitor after authentication.  In fact, the monitor thinks it's
-    running SSHv2, even if the on-the-wire protocol is v2.
+    running SSHv2, even if the on-the-wire protocol is v1.
 
 
 A.  References

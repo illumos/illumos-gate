@@ -87,10 +87,6 @@ RCSID("$OpenBSD: sshd.c,v 1.260 2002/09/27 10:42:09 mickey Exp $");
 #include "dispatch.h"
 #include "channels.h"
 #include "session.h"
-#include "monitor_mm.h"
-#include "monitor.h"
-#include "monitor_wrap.h"
-#include "monitor_fdpass.h"
 #include "g11n.h"
 #include "sshlogin.h"
 #include "xlist.h"
@@ -233,10 +229,6 @@ u_int utmp_len = MAXHOSTNAMELEN;
 /* options.max_startup sized array of fd ints */
 static int *startup_pipes = NULL;
 static int startup_pipe = -1;	/* in child */
-
-/* variables used for privilege separation */
-extern struct monitor *pmonitor;
-extern int use_privsep;
 
 #ifdef GSSAPI
 static gss_OID_set mechs = GSS_C_NULL_OID_SET;
@@ -697,155 +689,6 @@ demote_sensitive_data(void)
 	/* We do not clear ssh1_host key and cookie.  XXX - Okay Niels? */
 }
 
-static void
-privsep_preauth_child(void)
-{
-	u_int32_t rnd[256];
-	gid_t gidset[1];
-	struct passwd *pw;
-	int i;
-
-	/* Enable challenge-response authentication for privilege separation */
-	privsep_challenge_enable();
-
-	for (i = 0; i < 256; i++)
-		rnd[i] = arc4random();
-	RAND_seed(rnd, sizeof(rnd));
-
-	/* Demote the private keys to public keys. */
-	demote_sensitive_data();
-
-	if ((pw = getpwnam(SSH_PRIVSEP_USER)) == NULL)
-		fatal("Privilege separation user %s does not exist",
-		    SSH_PRIVSEP_USER);
-	(void) memset(pw->pw_passwd, 0, strlen(pw->pw_passwd));
-	endpwent();
-
-	/* Change our root directory */
-	if (chroot(_PATH_PRIVSEP_CHROOT_DIR) == -1)
-		fatal("chroot(\"%s\"): %s", _PATH_PRIVSEP_CHROOT_DIR,
-		    strerror(errno));
-	if (chdir("/") == -1)
-		fatal("chdir(\"/\"): %s", strerror(errno));
-
-	/* Drop our privileges */
-	debug3("privsep user:group %u:%u", (u_int)pw->pw_uid,
-	    (u_int)pw->pw_gid);
-#if 0
-	/* XXX not ready, to heavy after chroot */
-	do_setusercontext(pw);
-#else
-	gidset[0] = pw->pw_gid;
-	if (setgid(pw->pw_gid) < 0)
-		fatal("setgid failed for %u", pw->pw_gid);
-	if (setgroups(1, gidset) < 0)
-		fatal("setgroups: %.100s", strerror(errno));
-	permanently_set_uid(pw);
-#endif
-}
-
-static Authctxt *
-privsep_preauth(void)
-{
-	Authctxt *authctxt = NULL;
-	int status;
-	pid_t pid;
-
-	/* Set up unprivileged child process to deal with network data */
-	pmonitor = monitor_init();
-	/* Store a pointer to the kex for later rekeying */
-	pmonitor->m_pkex = &xxx_kex;
-
-	pid = fork();
-	if (pid == -1) {
-		fatal("fork of unprivileged child failed");
-	} else if (pid != 0) {
-		fatal_remove_cleanup((void (*) (void *)) packet_close, NULL);
-
-		debug2("Network child is on pid %ld", (long)pid);
-
-		(void) close(pmonitor->m_recvfd);
-		authctxt = monitor_child_preauth(pmonitor);
-		(void) close(pmonitor->m_sendfd);
-
-		/* Sync memory */
-		monitor_sync(pmonitor);
-
-		/* Wait for the child's exit status */
-		while (waitpid(pid, &status, 0) < 0)
-			if (errno != EINTR)
-				break;
-
-		/* Reinstall, since the child has finished */
-		fatal_add_cleanup((void (*) (void *)) packet_close, NULL);
-
-		return (authctxt);
-	} else {
-		/* child */
-
-		(void) close(pmonitor->m_sendfd);
-
-		/* Demote the child */
-		if (getuid() == 0 || geteuid() == 0)
-			privsep_preauth_child();
-		setproctitle("%s", "[net]");
-	}
-	return (NULL);
-}
-
-static void
-privsep_postauth(Authctxt *authctxt)
-{
-	extern Authctxt *x_authctxt;
-
-	/* XXX - Remote port forwarding */
-	x_authctxt = authctxt;
-
-#ifdef DISABLE_FD_PASSING
-	if (1) {
-#else
-	if (authctxt->pw->pw_uid == 0 || options.use_login) {
-#endif
-		/* File descriptor passing is broken or root login */
-		monitor_apply_keystate(pmonitor);
-		use_privsep = 0;
-		return;
-	}
-
-	if (startup_pipe != -1) {
-		(void) close(startup_pipe);
-		startup_pipe = -1;
-	}
-
-	/* New socket pair */
-	monitor_reinit(pmonitor);
-
-	pmonitor->m_pid = fork();
-	if (pmonitor->m_pid == -1)
-		fatal("fork of unprivileged child failed");
-	else if (pmonitor->m_pid != 0) {
-		fatal_remove_cleanup((void (*) (void *)) packet_close, NULL);
-
-		debug2("User child is on pid %ld", (long)pmonitor->m_pid);
-		(void) close(pmonitor->m_recvfd);
-		monitor_child_postauth(pmonitor);
-
-		/* NEVERREACHED */
-		exit(0);
-	}
-
-	(void) close(pmonitor->m_sendfd);
-
-	/* Demote the private keys to public keys. */
-	demote_sensitive_data();
-
-	/* Drop privileges */
-	do_setusercontext(authctxt->pw);
-
-	/* It is safe now to apply the key state */
-	monitor_apply_keystate(pmonitor);
-}
-
 static char *
 list_hostkey_types(void)
 {
@@ -1240,28 +1083,6 @@ main(int ac, char **av)
 		}
 	}
 
-	if (use_privsep) {
-		struct stat st;
-
-		if (getpwnam(SSH_PRIVSEP_USER) == NULL)
-			fatal("Privilege separation user %s does not exist",
-			    SSH_PRIVSEP_USER);
-		if ((stat(_PATH_PRIVSEP_CHROOT_DIR, &st) == -1) ||
-		    (S_ISDIR(st.st_mode) == 0))
-			fatal("Missing privilege separation directory: %s",
-			    _PATH_PRIVSEP_CHROOT_DIR);
-
-#ifdef HAVE_CYGWIN
-		if (check_ntsec(_PATH_PRIVSEP_CHROOT_DIR) &&
-		    (st.st_uid != getuid () ||
-		    (st.st_mode & (S_IWGRP|S_IWOTH)) != 0))
-#else
-		if (st.st_uid != 0 || (st.st_mode & (S_IWGRP|S_IWOTH)) != 0)
-#endif
-			fatal("Bad owner or mode for %s",
-			    _PATH_PRIVSEP_CHROOT_DIR);
-	}
-
 	/* Configuration looks good, so exit if in test mode. */
 	if (test_flag)
 		exit(0);
@@ -1565,6 +1386,7 @@ main(int ac, char **av)
 #ifdef HAVE_SOLARIS_CONTRACTS
 						contracts_post_fork_child();
 #endif /* HAVE_SOLARIS_CONTRACTS */
+						xfree(fdset);
 						startup_pipe = startup_p[1];
 						close_startup_pipes();
 						close_listen_socks();
@@ -1714,10 +1536,6 @@ main(int ac, char **av)
 
 	packet_set_nonblocking();
 
-	if (use_privsep)
-		if ((authctxt = privsep_preauth()) != NULL)
-			goto authenticated;
-
 	/* perform the key exchange */
 	/* authenticate user and start session */
 	if (compat20) {
@@ -1728,15 +1546,6 @@ main(int ac, char **av)
 		authctxt = do_authentication();
 	}
 
-	/*
-	 * If we use privilege separation, the unprivileged child transfers
-	 * the current keystate and exits
-	 */
-	if (use_privsep) {
-		mm_send_keystate(pmonitor);
-		exit(0);
-	}
-
 authenticated:
 	/* Authentication complete */
 	(void) alarm(0);
@@ -1744,17 +1553,6 @@ authenticated:
 	if (startup_pipe != -1) {
 		(void) close(startup_pipe);
 		startup_pipe = -1;
-	}
-
-	/*
-	 * In privilege separation, we fork another child and prepare
-	 * file descriptor passing.
-	 */
-	if (use_privsep) {
-		privsep_postauth(authctxt);
-		/* the monitor process [priv] will not return */
-		if (!compat20)
-			destroy_sensitive_data();
 	}
 
 #ifdef ALTPRIVSEP
@@ -1781,7 +1579,7 @@ authenticated:
 		 *
 		 * NOTE: Order matters -- these fatal cleanups must come before
 		 * the audit logout fatal cleanup as these functions are called
-		 * in in LIFO.
+		 * in LIFO.
 		 *
 		 * NOTE: The monitor will packet_close(), which will close
 		 * "newsock," so we dup() it.
@@ -1893,70 +1691,6 @@ authenticated:
 
 		/* NOTREACHED */
 	}
-
-#else /* ALTPRIVSEP */
-
-	if (compat20) {
-		debug3("Recording SSHv2 session login in wtmpx");
-		record_login(getpid(), NULL, "sshd", authctxt->user);
-	}
-
-#ifdef HAVE_BSM
-	fatal_remove_cleanup(
-		(void (*)(void *))audit_failed_login_cleanup,
-		(void *)authctxt);
-
-	/* Initialize the group list, audit sometimes needs it. */
-	if (initgroups(authctxt->pw->pw_name, authctxt->pw->pw_gid) < 0) {
-		perror("initgroups");
-		exit (1);
-	}
-	audit_sshd_login(&ah, authctxt->pw->pw_uid,
-		authctxt->pw->pw_gid);
-
-	fatal_add_cleanup((void (*)(void *))audit_sshd_logout,
-		(void *)&ah);
-#endif /* HAVE_BSM */
-
-#ifdef GSSAPI
-	fatal_add_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
-		(void *)&xxx_gssctxt);
-#endif /* GSSAPI */
-
-	/* Perform session preparation. */
-	do_authenticated(authctxt);
-
-	/* XXX - Add PRIVSEP() macro */
-	if (compat20) {
-		debug3("Recording SSHv2 session logout in wtmpx");
-		record_logout(getpid(), NULL, "sshd", authctxt->user);
-	}
-
-#ifdef GSSAPI
-	fatal_remove_cleanup((void (*)(void *))ssh_gssapi_cleanup_creds,
-		&xxx_gssctxt);
-	ssh_gssapi_cleanup_creds(xxx_gssctxt);
-	ssh_gssapi_server_mechs(NULL); /* release cached server mechs */
-#endif /* GSSAPI */
-
-#ifdef HAVE_BSM
-	fatal_remove_cleanup((void (*)(void *))audit_sshd_logout, (void *)&ah);
-	audit_sshd_logout(&ah);
-#endif /* HAVE_BSM */
-
-#ifdef USE_PAM
-	finish_pam(authctxt);
-#endif /* USE_PAM */
-
-	/* The connection has been terminated. */
-	verbose("Closing connection to %.100s", remote_ip);
-
-	packet_close();
-
-	if (use_privsep)
-		mm_terminate();
-
-	return (0);
 #endif /* ALTPRIVSEP */
 }
 
@@ -2123,7 +1857,7 @@ do_ssh1_kex(void)
 	packet_check_eom();
 
 	/* Decrypt session_key_int using host/server keys */
-	rsafail = PRIVSEP(ssh1_session_key(session_key_int));
+	rsafail = ssh1_session_key(session_key_int);
 
 	/*
 	 * Extract session key from the decrypted integer.  The key is in the
@@ -2177,9 +1911,6 @@ do_ssh1_kex(void)
 	}
 	/* Destroy the private and public keys. No longer. */
 	destroy_sensitive_data();
-
-	if (use_privsep)
-		mm_ssh1_session_id(session_id);
 
 	/* Destroy the decrypted integer.  It is no longer needed. */
 	BN_clear_free(session_key_int);
@@ -2249,6 +1980,9 @@ do_ssh2_kex(void)
 				g11n_locales2langs(locales);
 	}
 
+	if (locales != NULL)
+		g11n_freelist(locales);
+
 	if ((myproposal[PROPOSAL_LANG_STOC] != NULL) || 
 	    (strcmp(myproposal[PROPOSAL_LANG_STOC], "")) != 0)
 		myproposal[PROPOSAL_LANG_CTOS] =
@@ -2261,6 +1995,12 @@ do_ssh2_kex(void)
 
 	/* start key exchange */
 	kex = kex_setup(NULL, myproposal, kex_hook);
+
+	if (myproposal[PROPOSAL_LANG_STOC] != NULL)
+		xfree(myproposal[PROPOSAL_LANG_STOC]);
+	if (myproposal[PROPOSAL_LANG_CTOS] != NULL)
+		xfree(myproposal[PROPOSAL_LANG_CTOS]);
+
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 #ifdef GSSAPI

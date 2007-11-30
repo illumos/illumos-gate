@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,8 @@ char **g11n_langtag_set_locale_set_intersect(char *langtag_set,
 
 char *g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales);
 
+/* auxiliary functions */
+void g11n_freelist(char **list);
 
 /*
  * Functions for validating ASCII and UTF-8 strings

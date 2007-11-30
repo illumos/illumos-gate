@@ -71,7 +71,6 @@ RCSID("$OpenBSD: session.c,v 1.150 2002/09/16 19:55:33 stevesk Exp $");
 #include "serverloop.h"
 #include "canohost.h"
 #include "session.h"
-#include "monitor_wrap.h"
 
 #ifdef USE_PAM
 #include <security/pam_appl.h>
@@ -786,11 +785,6 @@ do_login(Session *s, const char *command)
 #ifdef ALTPRIVSEP
 	debug3("Recording SSHv2 channel login in utmpx/wtmpx");
 	altprivsep_record_login(pid, s->tty);
-#else /* ALTPRIVSEP*/
-	if (!use_privsep) {
-		debug3("Recording SSHv2 channel login in utmpx/wtmpx");
-		record_login(pid, s->tty, NULL, pw->pw_name);
-	}
 #endif /* ALTPRIVSEP*/
 
 	if (check_quietlogin(s, command))
@@ -1776,7 +1770,7 @@ session_pty_req(Session *s)
 
 	/* Allocate a pty and open it. */
 	debug("Allocating pty.");
-	if (!PRIVSEP(pty_allocate(&s->ptyfd, &s->ttyfd, s->tty, sizeof(s->tty)))) {
+	if (!pty_allocate(&s->ptyfd, &s->ttyfd, s->tty, sizeof(s->tty))) {
 		if (s->term)
 			xfree(s->term);
 		s->term = NULL;
@@ -1797,8 +1791,7 @@ session_pty_req(Session *s)
 	 * time in case we call fatal() (e.g., the connection gets closed).
 	 */
 	fatal_add_cleanup(session_pty_cleanup, (void *)s);
-	if (!use_privsep)
-		pty_setowner(s->pw, s->tty);
+	pty_setowner(s->pw, s->tty);
 
 	/* Set window size from the packet. */
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
@@ -2164,8 +2157,6 @@ session_pty_cleanup2(void *session)
 		debug3("Recording SSHv2 channel login in utmpx/wtmpx");
 #ifdef ALTPRIVSEP
 		altprivsep_record_logout(s->pid);
-#else /* ALTPRIVSEP */
-		record_logout(s->pid, s->tty, NULL, s->pw->pw_name);
 #endif /* ALTPRIVSEP */
 	}
 
@@ -2188,7 +2179,7 @@ session_pty_cleanup2(void *session)
 void
 session_pty_cleanup(void *session)
 {
-	PRIVSEP(session_pty_cleanup2(session));
+	session_pty_cleanup2(session);
 }
 
 /*

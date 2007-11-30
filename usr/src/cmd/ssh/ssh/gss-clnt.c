@@ -21,7 +21,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,6 @@
 #include "kex.h"
 #include "log.h"
 #include "compat.h"
-#include "monitor_wrap.h"
 
 #include <netdb.h>
 
@@ -72,6 +71,7 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 	gss_buffer_desc	tok;
 	OM_uint32	maj, min;
 	int		i;
+	char		*errmsg;
 
 	if (!mechs)
 		return;
@@ -85,8 +85,9 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 
 	maj = gss_create_empty_oid_set(&min, &supported);
 	if (GSS_ERROR(maj)) {
-		debug("Failed to allocate resources (%s) for GSS-API",
-			ssh_gssapi_last_error(NULL, &maj, &min));
+		errmsg = ssh_gssapi_last_error(NULL, &maj, &min);
+		debug("Failed to allocate resources (%s) for GSS-API", errmsg);
+		xfree(errmsg);
 		(void) gss_release_oid_set(&min, &indicated);
 		return;
 	}
@@ -94,9 +95,10 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 			GSS_C_INITIATE, &creds, &acquired, NULL);
 
 	if (GSS_ERROR(maj)) {
+		errmsg = ssh_gssapi_last_error(NULL, &maj, &min);
 		debug("Failed to acquire GSS-API credentials for any "
-			"mechanisms (%s)",
-			ssh_gssapi_last_error(NULL, &maj, &min));
+			"mechanisms (%s)", errmsg);
+		xfree(errmsg);
 		(void) gss_release_oid_set(&min, &indicated);
 		(void) gss_release_oid_set(&min, &supported);
 		return;
@@ -125,18 +127,22 @@ ssh_gssapi_client_mechs(const char *server_host, gss_OID_set *mechs)
 		maj = ssh_gssapi_init_ctx(ctxt, server_host, 0,
 				NULL, &tok);
 		if (GSS_ERROR(maj)) {
+			errmsg = ssh_gssapi_last_error(ctxt, NULL, NULL);
 			debug("Skipping GSS-API mechanism %s (%s)",
-				ssh_gssapi_oid_to_name(mech),
-				ssh_gssapi_last_error(ctxt, NULL, NULL));
+			    ssh_gssapi_oid_to_name(mech), errmsg);
+			xfree(errmsg);
 			continue;
 		}
 
 		(void) gss_release_buffer(&min, &tok);
 
 		maj = gss_add_oid_set_member(&min, mech, &supported);
-		if (GSS_ERROR(maj))
+		if (GSS_ERROR(maj)) {
+			errmsg = ssh_gssapi_last_error(NULL, &maj, &min);
 			debug("Failed to allocate resources (%s) for GSS-API",
-				ssh_gssapi_last_error(NULL, &maj, &min));
+			    errmsg);
+			xfree(errmsg);
+		}
 	}
 
 	*mechs = supported;

@@ -56,8 +56,6 @@ static void add_one_listen_addr(ServerOptions *, char *, u_short);
 
 /* AF_UNSPEC or AF_INET or AF_INET6 */
 extern int IPv4or6;
-/* Use of privilege separation or not */
-extern int use_privsep;
 
 /* Initializes the server options to their default values. */
 
@@ -149,9 +147,6 @@ initialize_server_options(ServerOptions *options)
 	options->max_init_auth_tries_log = -1;
 
 	options->lookup_client_hostnames = -1;
-
-	/* Needs to be accessable in many places */
-	use_privsep = -1;
 }
 
 #ifdef HAVE_DEFOPEN
@@ -380,21 +375,6 @@ fill_default_server_options(ServerOptions *options)
 
 	if (options->lookup_client_hostnames == -1)
 		options->lookup_client_hostnames = 1;
-
-	/* XXX SUNWssh resync */
-	/* Turn privilege separation OFF by default */
-	if (use_privsep == -1)
-		use_privsep = 0;
-
-#ifndef HAVE_MMAP
-	if (use_privsep && options->compression == 1) {
-		error("This platform does not support both privilege "
-		    "separation and compression");
-		error("Compression disabled");
-		options->compression = 0;
-	}
-#endif
-
 }
 
 /* Keyword tokens. */
@@ -939,8 +919,11 @@ parse_flag:
 		goto parse_flag;
 
 	case sUsePrivilegeSeparation:
-		intptr = &use_privsep;
-		goto parse_flag;
+		log("%s line %d: ignoring UsePrivilegeSeparation option value."
+		    " This option is always on.", filename, linenum);
+		while (arg)
+		    arg = strdelim(&cp);
+		break;
 
 	case sAllowUsers:
 		while (((arg = strdelim(&cp)) != NULL) && *arg != '\0') {

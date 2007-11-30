@@ -36,30 +36,29 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#include "includes.h"
-RCSID("$OpenBSD: packet.c,v 1.97 2002/07/04 08:12:15 deraadt Exp $");
+/* $OpenBSD: packet.c,v 1.148 2007/06/07 19:37:34 pvalchev Exp $ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "includes.h"
+
+#include "sys-queue.h"
 #include "xmalloc.h"
 #include "buffer.h"
 #include "packet.h"
 #include "bufaux.h"
 #include "crc32.h"
 #include "getput.h"
-
 #include "compress.h"
 #include "deattack.h"
 #include "channels.h"
-
 #include "compat.h"
 #include "ssh1.h"
 #include "ssh2.h"
-
 #include "cipher.h"
 #include "kex.h"
 #include "mac.h"
@@ -127,8 +126,14 @@ static int interactive_mode = 0;
 
 /* Session key information for Encryption and MAC */
 Newkeys *newkeys[MODE_MAX];
-static u_int32_t read_seqnr = 0;
-static u_int32_t send_seqnr = 0;
+static struct packet_state {
+	u_int32_t seqnr;
+	u_int32_t packets;
+	u_int64_t blocks;
+} p_read, p_send;
+
+static u_int64_t max_blocks_in, max_blocks_out;
+static u_int32_t rekey_limit;
 
 /* Session key for protocol v1 */
 static u_char ssh1_key[SSH_SESSION_KEY_LENGTH];
@@ -136,6 +141,13 @@ static u_int ssh1_keylen;
 
 /* roundup current message to extra_pad bytes */
 static u_char extra_pad = 0;
+
+struct packet {
+	TAILQ_ENTRY(packet) next;
+	u_char type;
+	Buffer payload;
+};
+TAILQ_HEAD(, packet) outgoing;
 
 /*
  * Sets the descriptors used for communication.  Disables encryption until
@@ -159,6 +171,7 @@ packet_set_connection(int fd_in, int fd_out)
 		buffer_init(&output);
 		buffer_init(&outgoing_packet);
 		buffer_init(&incoming_packet);
+		TAILQ_INIT(&outgoing);
 	} else {
 		buffer_clear(&input);
 		buffer_clear(&output);
@@ -200,99 +213,6 @@ packet_connection_is_on_socket(void)
 	if (from.ss_family != AF_INET && from.ss_family != AF_INET6)
 		return 0;
 	return 1;
-}
-
-/*
- * Exports an IV from the CipherContext required to export the key
- * state back from the unprivileged child to the privileged parent
- * process.
- */
-
-void
-packet_get_keyiv(int mode, u_char *iv, u_int len)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &send_context;
-	else
-		cc = &receive_context;
-
-	cipher_get_keyiv(cc, iv, len);
-}
-
-int
-packet_get_keycontext(int mode, u_char *dat)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &send_context;
-	else
-		cc = &receive_context;
-
-	return (cipher_get_keycontext(cc, dat));
-}
-
-void
-packet_set_keycontext(int mode, u_char *dat)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &send_context;
-	else
-		cc = &receive_context;
-
-	cipher_set_keycontext(cc, dat);
-}
-
-int
-packet_get_keyiv_len(int mode)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &send_context;
-	else
-		cc = &receive_context;
-
-	return (cipher_get_keyiv_len(cc));
-}
-void
-packet_set_iv(int mode, u_char *dat)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &send_context;
-	else
-		cc = &receive_context;
-
-	cipher_set_keyiv(cc, dat);
-}
-int
-packet_get_ssh1_cipher()
-{
-	return (cipher_get_number(receive_context.cipher));
-}
-
-
-u_int32_t
-packet_get_seqnr(int mode)
-{
-	return (mode == MODE_IN ? read_seqnr : send_seqnr);
-}
-
-void
-packet_set_seqnr(int mode, u_int32_t seqnr)
-{
-	if (mode == MODE_IN)
-		read_seqnr = seqnr;
-	else if (mode == MODE_OUT)
-		send_seqnr = seqnr;
-	else
-		fatal("packet_set_seqnr: bad mode %d", mode);
 }
 
 /* returns 1 if connection is via ipv4 */
@@ -478,21 +398,25 @@ packet_put_char(int value)
 
 	buffer_append(&outgoing_packet, &ch, 1);
 }
+
 void
 packet_put_int(u_int value)
 {
 	buffer_put_int(&outgoing_packet, value);
 }
+
 void
 packet_put_string(const void *buf, u_int len)
 {
 	buffer_put_string(&outgoing_packet, buf, len);
 }
+
 void
 packet_put_cstring(const char *str)
 {
 	buffer_put_cstring(&outgoing_packet, str);
 }
+
 void
 packet_put_ascii_cstring(const char *str)
 {
@@ -520,11 +444,13 @@ packet_put_raw(const void *buf, u_int len)
 {
 	buffer_append(&outgoing_packet, buf, len);
 }
+
 void
 packet_put_bignum(BIGNUM * value)
 {
 	buffer_put_bignum(&outgoing_packet, value);
 }
+
 void
 packet_put_bignum2(BIGNUM * value)
 {
@@ -542,7 +468,7 @@ packet_send1(void)
 	u_char buf[8], *cp;
 	int i, padding, len;
 	u_int checksum;
-	u_int32_t rand = 0;
+	u_int32_t rnd = 0;
 
 	/*
 	 * If using packet compression, compress the payload of the outgoing
@@ -568,9 +494,9 @@ packet_send1(void)
 		cp = buffer_ptr(&outgoing_packet);
 		for (i = 0; i < padding; i++) {
 			if (i % 4 == 0)
-				rand = arc4random();
-			cp[7 - i] = rand & 0xff;
-			rand >>= 8;
+				rnd = arc4random();
+			cp[7 - i] = rnd & 0xff;
+			rnd >>= 8;
 		}
 	}
 	buffer_consume(&outgoing_packet, 8 - padding);
@@ -614,31 +540,26 @@ set_newkeys(int mode)
 	Mac *mac;
 	Comp *comp;
 	CipherContext *cc;
-	int encrypt;
+	u_int64_t *max_blocks;
+	int crypt_type;
 
-	debug("newkeys: mode %d", mode);
+	debug2("set_newkeys: mode %d", mode);
 
 	if (mode == MODE_OUT) {
 		cc = &send_context;
-		encrypt = CIPHER_ENCRYPT;
+		crypt_type = CIPHER_ENCRYPT;
+		p_send.packets = p_send.blocks = 0;
+		max_blocks = &max_blocks_out;
 	} else {
 		cc = &receive_context;
-		encrypt = CIPHER_DECRYPT;
+		crypt_type = CIPHER_DECRYPT;
+		p_read.packets = p_read.blocks = 0;
+		max_blocks = &max_blocks_in;
 	}
 	if (newkeys[mode] != NULL) {
-		debug("newkeys: rekeying");
+		debug("set_newkeys: rekeying");
 		cipher_cleanup(cc);
-		enc  = &newkeys[mode]->enc;
-		mac  = &newkeys[mode]->mac;
-		comp = &newkeys[mode]->comp;
-		memset(mac->key, 0, mac->key_len);
-		xfree(enc->name);
-		xfree(enc->iv);
-		xfree(enc->key);
-		xfree(mac->name);
-		xfree(mac->key);
-		xfree(comp->name);
-		xfree(newkeys[mode]);
+		free_keys(newkeys[mode]);
 	}
 	newkeys[mode] = kex_get_newkeys(mode);
 	if (newkeys[mode] == NULL)
@@ -650,7 +571,7 @@ set_newkeys(int mode)
 		mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
 	cipher_init(cc, enc->cipher, enc->key, enc->key_len,
-	    enc->iv, enc->block_size, encrypt);
+	    enc->iv, enc->block_size, crypt_type);
 	/* Deleting the keys does not gain extra security */
 	/* memset(enc->iv,  0, enc->block_size);
 	   memset(enc->key, 0, enc->key_len); */
@@ -662,19 +583,74 @@ set_newkeys(int mode)
 			buffer_compress_init_recv();
 		comp->enabled = 1;
 	}
+
+	/*
+	 * In accordance to the RFCs listed below we enforce the key
+	 * re-exchange for:
+	 * 
+	 * - every 1GB of transmitted data if the selected cipher block size
+	 *   is less than 16 bytes (3DES, Blowfish)
+	 * - every 2^(2*B) cipher blocks transmitted (B is block size in bytes)
+	 *   if the cipher block size is greater than or equal to 16 bytes (AES)
+	 * - and we never send more than 2^32 SSH packets using the same keys.
+	 *   The recommendation of 2^31 packets is not enforced here but in
+	 *   packet_need_rekeying(). There is also a hard check in
+	 *   packet_send2_wrapped() that we don't send more than 2^32 packets.
+	 *
+	 * Note that if the SSH_BUG_NOREKEY compatibility flag is set then no
+	 * automatic rekeying is performed nor do we enforce the 3rd rule.
+	 * This means that we can be always forced by the opposite side to never
+	 * initiate automatic key re-exchange. This might change in the future.
+	 *
+	 * The RekeyLimit option keyword may only enforce more frequent key
+	 * renegotiation, never less. For more information on key renegotiation,
+	 * see:
+	 *
+	 * - RFC 4253 (SSH Transport Layer Protocol), section "9. Key
+	 *   Re-Exchange"
+	 * - RFC 4344 (SSH Transport Layer Encryption Modes), sections "3.
+	 *   Rekeying" and "6.1 Rekeying Considerations"
+	 */
+	if (enc->block_size >= 16)
+		*max_blocks = (u_int64_t)1 << (enc->block_size * 2);
+	else
+		*max_blocks = ((u_int64_t)1 << 30) / enc->block_size;
+
+	if (rekey_limit)
+		*max_blocks = MIN(*max_blocks, rekey_limit / enc->block_size);
+}
+
+void
+free_keys(Newkeys *keys)
+{
+	Enc *enc;
+	Mac *mac;
+	Comp *comp;
+
+	enc  = &keys->enc;
+	mac  = &keys->mac;
+	comp = &keys->comp;
+	memset(mac->key, 0, mac->key_len);
+	xfree(enc->name);
+	xfree(enc->iv);
+	xfree(enc->key);
+	xfree(mac->name);
+	xfree(mac->key);
+	xfree(comp->name);
+	xfree(keys);
 }
 
 /*
  * Finalize packet in SSH2 format (compress, mac, encrypt, enqueue)
  */
 static void
-packet_send2(void)
+packet_send2_wrapped(void)
 {
 	u_char type, *cp, *macbuf = NULL;
 	u_char padlen, pad;
 	u_int packet_length = 0;
 	u_int i, len;
-	u_int32_t rand = 0;
+	u_int32_t rnd = 0;
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
@@ -733,9 +709,9 @@ packet_send2(void)
 		/* random padding */
 		for (i = 0; i < padlen; i++) {
 			if (i % 4 == 0)
-				rand = arc4random();
-			cp[i] = rand & 0xff;
-			rand >>= 8;
+				rnd = arc4random();
+			cp[i] = rnd & 0xff;
+			rnd >>= 8;
 		}
 	} else {
 		/* clear padding */
@@ -750,10 +726,10 @@ packet_send2(void)
 
 	/* compute MAC over seqnr and packet(length fields, payload, padding) */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, send_seqnr,
+		macbuf = mac_compute(mac, p_send.seqnr,
 		    buffer_ptr(&outgoing_packet),
 		    buffer_len(&outgoing_packet));
-		DBG(debug("done calc MAC out #%d", send_seqnr));
+		DBG(debug("done calc MAC out #%d", p_send.seqnr));
 	}
 	/* encrypt packet and append to output buffer. */
 	cp = buffer_append_space(&output, buffer_len(&outgoing_packet));
@@ -767,8 +743,25 @@ packet_send2(void)
 	buffer_dump(&output);
 #endif
 	/* increment sequence number for outgoing packets */
-	if (++send_seqnr == 0)
+	if (++p_send.seqnr == 0)
 		log("outgoing seqnr wraps around");
+
+	/*
+	 * RFC 4344: 3.1. First Rekeying Recommendation
+	 *
+	 * "Because of possible information leakage through the MAC tag after a
+	 * key exchange, .... an SSH implementation SHOULD NOT send more than
+	 * 2**32 packets before rekeying again."
+	 *
+	 * The code below is a hard check so that we are sure we don't go across
+	 * the suggestion. However, since the largest cipher block size we have
+	 * (AES) is 16 bytes we can't reach 2^32 SSH packets encrypted with the
+	 * same key while performing periodic rekeying.
+	 */
+	if (++p_send.packets == 0)
+		if (!(datafellows & SSH_BUG_NOREKEY))
+			fatal("too many packets encrypted with same key");
+	p_send.blocks += (packet_length + 4) / block_size;
 	buffer_clear(&outgoing_packet);
 
 	if (type == SSH2_MSG_NEWKEYS)
@@ -777,6 +770,51 @@ packet_send2(void)
 		if (!packet_is_server() && !packet_is_monitor())
 #endif /* ALTPRIVSEP */
 		set_newkeys(MODE_OUT);
+}
+
+static void
+packet_send2(void)
+{
+	static int rekeying = 0;
+	struct packet *p;
+	u_char type, *cp;
+
+	cp = buffer_ptr(&outgoing_packet);
+	type = cp[5];
+
+	/* during rekeying we can only send key exchange messages */
+	if (rekeying) {
+		if (!((type >= SSH2_MSG_TRANSPORT_MIN) &&
+		    (type <= SSH2_MSG_TRANSPORT_MAX))) {
+			debug("enqueue packet: %u", type);
+			p = xmalloc(sizeof(*p));
+			p->type = type;
+			memcpy(&p->payload, &outgoing_packet, sizeof(Buffer));
+			buffer_init(&outgoing_packet);
+			TAILQ_INSERT_TAIL(&outgoing, p, next);
+			return;
+		}
+	}
+
+	/* rekeying starts with sending KEXINIT */
+	if (type == SSH2_MSG_KEXINIT)
+		rekeying = 1;
+
+	packet_send2_wrapped();
+
+	/* after a NEWKEYS message we can send the complete queue */
+	if (type == SSH2_MSG_NEWKEYS) {
+		rekeying = 0;
+		while ((p = TAILQ_FIRST(&outgoing)) != NULL) {
+			type = p->type;
+			debug("dequeue packet: %u", type);
+			buffer_free(&outgoing_packet);
+			memcpy(&outgoing_packet, &p->payload, sizeof(Buffer));
+			TAILQ_REMOVE(&outgoing, p, next);
+			xfree(p);
+			packet_send2_wrapped();
+		}
+	}
 }
 
 void
@@ -1003,7 +1041,7 @@ packet_read_poll2(u_int32_t *seqnr_p)
 			buffer_dump(&incoming_packet);
 			packet_disconnect("Bad packet length %d.", packet_length);
 		}
-		DBG(debug("input: packet len %d", packet_length+4));
+		DBG(debug("input: packet len %u", packet_length + 4));
 		buffer_consume(&input, block_size);
 	}
 	/* we have a partial packet of block_size bytes */
@@ -1031,18 +1069,24 @@ packet_read_poll2(u_int32_t *seqnr_p)
 	 * increment sequence number for incoming packet
 	 */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, read_seqnr,
+		macbuf = mac_compute(mac, p_read.seqnr,
 		    buffer_ptr(&incoming_packet),
 		    buffer_len(&incoming_packet));
 		if (memcmp(macbuf, buffer_ptr(&input), mac->mac_len) != 0)
 			packet_disconnect("Corrupted MAC on input.");
-		DBG(debug("MAC #%d ok", read_seqnr));
+		DBG(debug("MAC #%d ok", p_read.seqnr));
 		buffer_consume(&input, mac->mac_len);
 	}
 	if (seqnr_p != NULL)
-		*seqnr_p = read_seqnr;
-	if (++read_seqnr == 0)
+		*seqnr_p = p_read.seqnr;
+	if (++p_read.seqnr == 0)
 		log("incoming seqnr wraps around");
+
+	/* see above for the comment on "First Rekeying Recommendation" */
+	if (++p_read.packets == 0)
+		if (!(datafellows & SSH_BUG_NOREKEY))
+			fatal("too many packets with same key");
+	p_read.blocks += (packet_length + 4) / block_size;
 
 	/* get padlen */
 	cp = buffer_ptr(&incoming_packet);
@@ -1518,7 +1562,7 @@ packet_add_padding(u_char pad)
 void
 packet_send_ignore(int nbytes)
 {
-	u_int32_t rand = 0;
+	u_int32_t rnd = 0;
 	int i;
 
 #ifdef ALTPRIVSEP
@@ -1531,10 +1575,29 @@ packet_send_ignore(int nbytes)
 	packet_put_int(nbytes);
 	for (i = 0; i < nbytes; i++) {
 		if (i % 4 == 0)
-			rand = arc4random();
-		packet_put_char(rand & 0xff);
-		rand >>= 8;
+			rnd = arc4random();
+		packet_put_char((u_char)rnd & 0xff);
+		rnd >>= 8;
 	}
+}
+
+#define MAX_PACKETS	(1U<<31)
+int
+packet_need_rekeying(void)
+{
+	if (datafellows & SSH_BUG_NOREKEY)
+		return 0;
+	return
+	    (p_send.packets > MAX_PACKETS) ||
+	    (p_read.packets > MAX_PACKETS) ||
+	    (max_blocks_out && (p_send.blocks > max_blocks_out)) ||
+	    (max_blocks_in  && (p_read.blocks > max_blocks_in));
+}
+
+void
+packet_set_rekey_limit(u_int32_t bytes)
+{
+	rekey_limit = bytes;
 }
 
 #ifdef ALTPRIVSEP

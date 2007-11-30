@@ -9,7 +9,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@ RCSID("$OpenBSD: auth1.c,v 1.44 2002/09/26 11:38:43 markus Exp $");
 #include "channels.h"
 #include "session.h"
 #include "uidswap.h"
-#include "monitor_wrap.h"
 
 #ifdef HAVE_BSM
 #include "bsmaudit.h"
@@ -95,7 +94,7 @@ do_authloop(Authctxt *authctxt)
 #if defined(KRB4) || defined(KRB5)
 	    (!options.kerberos_authentication || options.kerberos_or_local_passwd) &&
 #endif
-	    PRIVSEP(auth_password(authctxt, ""))) {
+	    auth_password(authctxt, "")) {
 		auth_log(authctxt, 1, "without authentication", "");
 		return;
 	}
@@ -137,8 +136,8 @@ do_authloop(Authctxt *authctxt)
 					if (tkt.length < MAX_KTXT_LEN)
 						memcpy(tkt.dat, kdata, tkt.length);
 
-					if (PRIVSEP(auth_krb4(authctxt, &tkt,
-					    &client_user, &reply))) {
+					if (auth_krb4(authctxt, &tkt,
+					    &client_user, &reply)) {
 						authenticated = 1;
 						snprintf(info, sizeof(info),
 						    " tktuser %.100s",
@@ -158,8 +157,8 @@ do_authloop(Authctxt *authctxt)
 					tkt.length = dlen;
 					tkt.data = kdata;
 
-					if (PRIVSEP(auth_krb5(authctxt, &tkt,
-					    &client_user, &reply))) {
+					if (auth_krb5(authctxt, &tkt,
+					    &client_user, &reply)) {
 						authenticated = 1;
 						snprintf(info, sizeof(info),
 						    " tktuser %.100s",
@@ -279,8 +278,7 @@ do_authloop(Authctxt *authctxt)
 			if (authctxt->init_failures <
 				options.max_init_auth_tries)
 				authenticated =
-				    PRIVSEP(auth_password(authctxt,
-						password));
+				    auth_password(authctxt, password);
 
 			memset(password, 0, strlen(password));
 			xfree(password);
@@ -351,16 +349,11 @@ do_authloop(Authctxt *authctxt)
 		}
 #else
 		/* Special handling for root */
-		if (!use_privsep &&
-		    authenticated && authctxt->pw->pw_uid == 0 &&
+		if (authenticated && authctxt->pw->pw_uid == 0 &&
 		    !auth_root_allowed(get_authname(type)))
 			authenticated = 0;
 #endif
 #ifdef USE_PAM
-		/* XXX PAM and PRIVSEP don't mix */
-		if (use_privsep && authenticated)
-			fatal("Privsep is not supported");
-
 		if (authenticated && type != SSH_CMSG_AUTH_PASSWORD)
 			authenticated = do_pam_non_initial_userauth(authctxt);
 		else if (authenticated && !AUTHPAM_DONE(authctxt))
@@ -440,28 +433,21 @@ do_authentication(void)
 #endif /* HAVE_BSM */
 
 	/* Verify that the user is a valid user. */
-	if ((authctxt->pw = PRIVSEP(getpwnamallow(user))) != NULL) {
+	if ((authctxt->pw = getpwnamallow(user)) != NULL) {
 		authctxt->valid = 1;
 	} else {
 		authctxt->valid = 0;
 		debug("do_authentication: illegal user %s", user);
 	}
 
-	setproctitle("%s%s", authctxt->pw ? user : "unknown",
-	    use_privsep ? " [net]" : "");
-
-#if 0
-#ifdef USE_PAM
-	PRIVSEP(start_pam(authctxt->pw == NULL ? "NOUSER" : user));
-#endif
-#endif
+	setproctitle("%s", authctxt->pw ? user : "unknown");
 
 	/*
 	 * If we are not running as root, the user must have the same uid as
 	 * the server. (Unless you are running Windows)
 	 */
 #ifndef HAVE_CYGWIN
-	if (!use_privsep && getuid() != 0 && authctxt->pw &&
+	if (getuid() != 0 && authctxt->pw &&
 	    authctxt->pw->pw_uid != getuid())
 		packet_disconnect("Cannot change user when server not running as root.");
 #endif

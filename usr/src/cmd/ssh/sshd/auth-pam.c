@@ -39,13 +39,11 @@
 #include "compat.h"
 #include "misc.h"
 #include "sshlogin.h"
-#include "monitor_wrap.h"
+#include "ssh-gss.h"
 
 #include <security/pam_appl.h>
 
 extern char *__progname;
-
-extern int use_privsep;
 
 extern u_int utmp_len;
 extern ServerOptions options;
@@ -58,8 +56,6 @@ RCSID("$Id: auth-pam.c,v 1.54 2002/07/28 20:24:08 stevesk Exp $");
 
 #define NEW_AUTHTOK_MSG \
 	"Warning: Your password has expired, please change it now."
-#define NEW_AUTHTOK_MSG_PRIVSEP \
-	"Your password has expired, the session cannot proceed."
 
 /* PAM conversation for non-interactive userauth methods */
 static int do_pam_conversation(int num_msg, const struct pam_message **msg,
@@ -282,7 +278,7 @@ finish_userauth_do_pam(Authctxt *authctxt)
 	if (strcmp(user, authctxt->user) != 0) {
 		log("PAM changed the SSH username");
 		pwfree(&authctxt->pw);
-		authctxt->pw = PRIVSEP(getpwnamallow(user));
+		authctxt->pw = getpwnamallow(user);
 		authctxt->valid = (authctxt->pw != NULL);
 		xfree(authctxt->user);
 		authctxt->user = xstrdup(user);

@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@ RCSID("$OpenBSD: auth2-pubkey.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
 #include "uidswap.h"
 #include "auth-options.h"
 #include "canohost.h"
-#include "monitor_wrap.h"
 
 #ifdef USE_PAM
 #include <security/pam_appl.h>
@@ -155,10 +154,11 @@ userauth_pubkey(Authctxt *authctxt)
 		buffer_dump(&b);
 #endif
 		/* test for correct signature */
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
-		    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
-				buffer_len(&b))) == 1)
+		if (user_key_allowed(authctxt->pw, key) &&
+		    key_verify(key, sig, slen, buffer_ptr(&b),
+		    buffer_len(&b)) == 1) {
 			authenticated = 1;
+		}
 		authctxt->method->postponed = 0;
 		buffer_clear(&b);
 		xfree(sig);
@@ -174,7 +174,7 @@ userauth_pubkey(Authctxt *authctxt)
 		 * if a user is not allowed to login. is this an
 		 * issue? -markus
 		 */
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key))) {
+		if (user_key_allowed(authctxt->pw, key)) {
 			packet_start(SSH2_MSG_USERAUTH_PK_OK);
 			packet_put_string(pkalg, alen);
 			packet_put_string(pkblob, blen);

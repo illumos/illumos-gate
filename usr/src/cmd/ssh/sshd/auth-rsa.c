@@ -34,7 +34,6 @@ RCSID("$OpenBSD: auth-rsa.c,v 1.56 2002/06/10 16:53:06 stevesk Exp $");
 #include "servconf.h"
 #include "auth.h"
 #include "hostfile.h"
-#include "monitor_wrap.h"
 #include "ssh.h"
 
 /* import */
@@ -124,7 +123,7 @@ auth_rsa_challenge_dialog(Key *key)
 	if ((encrypted_challenge = BN_new()) == NULL)
 		fatal("auth_rsa_challenge_dialog: BN_new() failed");
 
-	challenge = PRIVSEP(auth_rsa_generate_challenge(key));
+	challenge = auth_rsa_generate_challenge(key);
 
 	/* Encrypt the challenge with the public key. */
 	rsa_public_encrypt(encrypted_challenge, challenge, key->rsa);
@@ -142,7 +141,7 @@ auth_rsa_challenge_dialog(Key *key)
 		response[i] = packet_get_char();
 	packet_check_eom();
 
-	success = PRIVSEP(auth_rsa_verify_response(key, challenge, response));
+	success = auth_rsa_verify_response(key, challenge, response);
 	BN_clear_free(challenge);
 	return (success);
 }
@@ -295,7 +294,7 @@ auth_rsa(struct passwd *pw, BIGNUM *client_n)
 	if (pw == NULL)
 		return 0;
 
-	if (!PRIVSEP(auth_rsa_key_allowed(pw, client_n, &key))) {
+	if (!auth_rsa_key_allowed(pw, client_n, &key)) {
 		auth_clear_options();
 		return (0);
 	}

@@ -32,7 +32,6 @@ RCSID("$OpenBSD: auth-skey.c,v 1.20 2002/06/30 21:59:45 deraadt Exp $");
 
 #include "xmalloc.h"
 #include "auth.h"
-#include "monitor_wrap.h"
 
 static void *
 skey_init_ctx(Authctxt *authctxt)

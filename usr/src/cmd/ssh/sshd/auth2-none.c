@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@ RCSID("$OpenBSD: auth2-none.c,v 1.4 2002/06/27 10:35:47 deraadt Exp $");
 #include "atomicio.h"
 #include "compat.h"
 #include "ssh2.h"
-#include "monitor_wrap.h"
 
 /* import */
 extern ServerOptions options;
@@ -83,7 +82,7 @@ userauth_banner(void)
 	if (options.banner == NULL || (datafellows & SSH_BUG_BANNER))
 		return;
 
-	if ((banner = PRIVSEP(auth2_read_banner())) == NULL)
+	if ((banner = auth2_read_banner()) == NULL)
 		goto done;
 
 	packet_start(SSH2_MSG_USERAUTH_BANNER);
@@ -110,7 +109,7 @@ userauth_none(Authctxt *authctxt)
 	if (check_nt_auth(1, authctxt->pw) == 0)
 		return(0);
 #endif
-	authctxt->method->authenticated = PRIVSEP(auth_password(authctxt, ""));
+	authctxt->method->authenticated = auth_password(authctxt, "");
 }
 
 Authmethod method_none = {

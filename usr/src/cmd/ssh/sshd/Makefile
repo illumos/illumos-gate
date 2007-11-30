@@ -60,8 +60,6 @@ OBJS	= sshd.o \
 	  gss-serv.o \
 	  loginrec.o \
 	  md5crypt.o \
-	  monitor.o \
-	  monitor_mm.o \
 	  servconf.o \
 	  serverloop.o \
 	  session.o \

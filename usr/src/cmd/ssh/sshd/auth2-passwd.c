@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,6 @@ RCSID("$OpenBSD: auth2-passwd.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
 #include "packet.h"
 #include "log.h"
 #include "auth.h"
-#include "monitor_wrap.h"
 #include "servconf.h"
 
 /* import */
@@ -60,8 +59,9 @@ userauth_passwd(Authctxt *authctxt)
 #ifdef HAVE_CYGWIN
 	    check_nt_auth(1, authctxt->pw) &&
 #endif
-	    PRIVSEP(auth_password(authctxt, password)) == 1)
+	    auth_password(authctxt, password) == 1) {
 		authctxt->method->authenticated = 1;
+	}
 	memset(password, 0, len);
 	xfree(password);
 }

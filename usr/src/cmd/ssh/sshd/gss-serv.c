@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,6 @@
 #include "servconf.h"
 #include "uidswap.h"
 #include "compat.h"
-#include "monitor_wrap.h"
 #include <pwd.h>
 
 #include "ssh-gss.h"

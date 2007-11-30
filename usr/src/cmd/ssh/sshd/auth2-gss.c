@@ -41,7 +41,6 @@
 #include "buffer.h"
 #include "bufaux.h"
 #include "packet.h"
-#include "monitor_wrap.h"
 
 #include <gssapi/gssapi.h>
 #include "ssh-gss.h"
@@ -202,15 +201,14 @@ input_gssapi_token(int type, u_int32_t plen, void *ctxt)
 	u_int len;
 
         if (authctxt == NULL || authctxt->method == NULL ||
-	    (authctxt->method->method_data == NULL && !use_privsep))
+	    (authctxt->method->method_data == NULL))
                 fatal("No authentication or GSSAPI context during gssapi-with-mic userauth");
 
         gssctxt=authctxt->method->method_data;
         recv_tok.value=packet_get_string(&len);
         recv_tok.length=len; /* u_int vs. size_t */
 
-        maj_status=PRIVSEP(ssh_gssapi_accept_ctx(gssctxt, &recv_tok,
-        					 &send_tok));
+        maj_status = ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
         packet_check_eom();
 
         if (GSS_ERROR(maj_status)) {
@@ -251,7 +249,7 @@ input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
         gss_buffer_desc send_tok,recv_tok;
 
         if (authctxt == NULL || authctxt->method == NULL ||
-	    (authctxt->method->method_data == NULL && !use_privsep))
+	    (authctxt->method->method_data == NULL))
                 fatal("No authentication or GSSAPI context during gssapi-with-mic userauth");
 
         gssctxt=authctxt->method->method_data;
@@ -259,7 +257,7 @@ input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
         packet_check_eom();
 
         /* Push the error token into GSSAPI to see what it says */
-        (void) PRIVSEP(ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok));
+        (void) ssh_gssapi_accept_ctx(gssctxt, &recv_tok, &send_tok);
 
 	debug("Client sent GSS-API error token during GSS userauth-- %s",
 		ssh_gssapi_last_error(gssctxt, NULL, NULL));
@@ -352,7 +350,7 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 	packet_check_eom();
 
 	if (authctxt == NULL || authctxt->method == NULL ||
-	    (authctxt->method->method_data == NULL && !use_privsep))
+	    (authctxt->method->method_data == NULL))
                 fatal("No authentication or GSSAPI context");
 
         gssctxt=authctxt->method->method_data;
@@ -380,7 +378,7 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 	 * this will do for now.
 	 */
 #if 0
-        authctxt->method->authenticated = PRIVSEP(ssh_gssapi_userok(gssctxt, authctxt->user));
+        authctxt->method->authenticated = ssh_gssapi_userok(gssctxt, authctxt->user);
 #endif
 
 	if (xxx_gssctxt != gssctxt)
@@ -425,7 +423,7 @@ userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 	OM_uint32 major;
 
 	if (*authctxt->user != '\0' &&
-		PRIVSEP(ssh_gssapi_userok(gssctxt, authctxt->user))) {
+	    ssh_gssapi_userok(gssctxt, authctxt->user)) {
 
 		/*
 		 * If the client princ did not map to the requested

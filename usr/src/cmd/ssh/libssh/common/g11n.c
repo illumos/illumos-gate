@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,10 @@ static char *g11n_locale2langtag(char *locale);
 uint_t g11n_validate_ascii(const char *str, uint_t len, uchar_t **error_str);
 uint_t g11n_validate_utf8(const uchar_t *str, uint_t len, uchar_t **error_str);
 
+/*
+ * Convert locale string name into a language tag. The caller is responsible for
+ * freeing the memory allocated for the result.
+ */
 static char *
 g11n_locale2langtag(char *locale)
 {
@@ -67,7 +71,7 @@ g11n_locale2langtag(char *locale)
 		return (NULL);
 
 	if (strcmp(locale, "POSIX") == 0 || strcmp(locale, "C") == 0)
-		return ("i-default");
+		return (xstrdup("i-default"));
 
 	/* punt for language codes which are not exactly 2 letters */
 	if (strlen(locale) < 2 ||
@@ -270,8 +274,10 @@ g11n_getlocales()
 		list[n_elems++] = xstrdup(locale);
 	}
 
-	if (n_elems == 0)
+	if (n_elems == 0) {
+		xfree(list);
 		return (NULL);
+	}
 
 	list[n_elems] = NULL;
 	(void) pclose(locale_out);
@@ -300,7 +306,7 @@ char *
 g11n_locales2langs(char **locale_set)
 {
 	char **p, **r, **q;
-	char *langtag;
+	char *langtag, *langs;
 	int locales, skip;
 
 	for (locales = 0, p = locale_set; p && *p; p++)
@@ -321,10 +327,15 @@ g11n_locales2langs(char **locale_set)
 		}
 		if (!skip)
 			*(q++) = langtag;
+		else
+			xfree(langtag);
 		*q = NULL;
 	}
 
-	return (xjoin(r, ','));
+	langs = xjoin(r, ',');
+	g11n_freelist(r);
+
+	return (langs);
 }
 
 static int
@@ -343,12 +354,12 @@ g11n_langtag_match(char *langtag1, char *langtag2)
 	char c1, c2;
 
 	len1 = (strchr(langtag1, '-')) ?
-		(strchr(langtag1, '-') - langtag1)
-		: strlen(langtag1);
+	    (strchr(langtag1, '-') - langtag1)
+	    : strlen(langtag1);
 
 	len2 = (strchr(langtag2, '-')) ?
-		(strchr(langtag2, '-') - langtag2)
-		: strlen(langtag2);
+	    (strchr(langtag2, '-') - langtag2)
+	    : strlen(langtag2);
 
 	/* no match */
 	if (len1 != len2 || strncmp(langtag1, langtag2, len1) != 0)
@@ -628,17 +639,25 @@ g11n_langtag_set_locale_set_intersect(char *langtag_set, char **locale_set)
 char *
 g11n_srvr_locale_negotiate(char *clnt_langtags, char **srvr_locales)
 {
-	char **results, *result = NULL;
+	char **results, **locales, *result = NULL;
+
+	if (srvr_locales == NULL)
+		locales = g11n_getlocales();
+	else
+		locales = srvr_locales;
 
 	if ((results = g11n_langtag_set_locale_set_intersect(clnt_langtags,
-	    srvr_locales ?  srvr_locales : g11n_getlocales())) == NULL)
-		return (NULL);
+	    locales)) == NULL)
+		goto err;
 
 	if (*results != NULL)
 		result = xstrdup(*results);
 
 	xfree_split_list(results);
 
+err:
+	if (locales != srvr_locales)
+		g11n_freelist(locales);
 	return (result);
 }
 
@@ -801,8 +820,8 @@ g11n_convert_from_ascii(const char *str, int *err_ptr, uchar_t **error_str)
 		 * same, and there are aliases of codesets to boot...
 		 */
 		if (strcmp("646", nl_langinfo(CODESET)) == 0 ||
-			strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
-			strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
+		    strcmp("ASCII",  nl_langinfo(CODESET)) == 0 ||
+		    strcmp("US-ASCII",  nl_langinfo(CODESET)) == 0) {
 			initialized = 1;
 			do_convert = 0;
 		} else {
@@ -1034,4 +1053,21 @@ do_iconv(iconv_t cd, uint_t *mul_ptr, const void *buf, uint_t len,
 		*mul_ptr = mul;
 
 	return (converted);
+}
+
+/*
+ * Free all strings in the list and then free the list itself. We know that the
+ * list ends with a NULL pointer.
+ */
+void
+g11n_freelist(char **list)
+{
+	int i = 0;
+
+	while (list[i] != NULL) {
+		xfree(list[i]);
+		i++;
+	}
+
+	xfree(list);
 }

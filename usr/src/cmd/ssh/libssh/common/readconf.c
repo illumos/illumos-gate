@@ -129,7 +129,8 @@ typedef enum {
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oFallBackToRsh, oUseRsh, oConnectTimeout, oHashKnownHosts,
 	oServerAliveInterval, oServerAliveCountMax, oDisableBanner,
-	oIgnoreIfUnknown, oDeprecated
+	oIgnoreIfUnknown, oRekeyLimit,
+	oDeprecated
 } OpCodes;
 
 /* Textual representations of the tokens. */
@@ -215,6 +216,7 @@ static struct {
 	{ "smartcarddevice", oSmartcardDevice },
 	{ "clearallforwardings", oClearAllForwardings },
 	{ "nohostauthenticationforlocalhost", oNoHostAuthenticationForLocalhost },
+	{ "rekeylimit", oRekeyLimit },
 	{ "connecttimeout", oConnectTimeout },
 	{ "serveraliveinterval", oServerAliveInterval },
 	{ "serveralivecountmax", oServerAliveCountMax },
@@ -318,7 +320,8 @@ process_config_line(Options *options, const char *host,
 		    int *activep)
 {
 	char *s, *string, **charptr, *endofnumber, *keyword, *arg, *arg2, fwdarg[256];
-	int opcode, *intptr, value, i;
+	int opcode, *intptr, value, scale, i;
+	long long orig, val64;
 	StoredOption *so;
 	Forward fwd;
 
@@ -529,6 +532,44 @@ parse_flag:
 	case oCompressionLevel:
 		intptr = &options->compression_level;
 		goto parse_int;
+
+	case oRekeyLimit:
+		arg = strdelim(&s);
+		if (!arg || *arg == '\0')
+			fatal("%.200s line %d: Missing argument.", filename, linenum);
+		if (arg[0] < '0' || arg[0] > '9')
+			fatal("%.200s line %d: Bad number.", filename, linenum);
+		orig = val64 = strtoll(arg, &endofnumber, 10);
+		if (arg == endofnumber)
+			fatal("%.200s line %d: Bad number.", filename, linenum);
+		switch (toupper(*endofnumber)) {
+		case '\0':
+			scale = 1;
+			break;
+		case 'K':
+			scale = 1<<10;
+			break;
+		case 'M':
+			scale = 1<<20;
+			break;
+		case 'G':
+			scale = 1<<30;
+			break;
+		default:
+			fatal("%.200s line %d: Invalid RekeyLimit suffix",
+			    filename, linenum);
+		}
+		val64 *= scale;
+		/* detect integer wrap and too-large limits */
+		if ((val64 / scale) != orig || val64 > UINT_MAX)
+			fatal("%.200s line %d: RekeyLimit too large",
+			    filename, linenum);
+		if (val64 < 16)
+			fatal("%.200s line %d: RekeyLimit too small",
+			    filename, linenum);
+		if (*activep && options->rekey_limit == -1)
+			options->rekey_limit = (u_int32_t)val64;
+		break;
 
 	case oIdentityFile:
 		arg = strdelim(&s);
@@ -938,7 +979,8 @@ initialize_options(Options * options)
 	options->preferred_authentications = NULL;
 	options->bind_address = NULL;
 	options->smartcard_device = NULL;
-	options->no_host_authentication_for_localhost = - 1;
+	options->no_host_authentication_for_localhost = -1;
+	options->rekey_limit = -1;
 	options->fallback_to_rsh = -1;
 	options->use_rsh = -1;
 	options->server_alive_interval = -1;
@@ -1077,11 +1119,13 @@ fill_default_options(Options * options)
 		options->log_level = SYSLOG_LEVEL_INFO;
 	if (options->clear_forwardings == 1)
 		clear_forwardings(options);
-	if (options->no_host_authentication_for_localhost == - 1)
+	if (options->no_host_authentication_for_localhost == -1)
 		options->no_host_authentication_for_localhost = 0;
-	if (options->fallback_to_rsh == - 1)
+	if (options->rekey_limit == -1)
+		options->rekey_limit = 0;
+	if (options->fallback_to_rsh == -1)
 		options->fallback_to_rsh = 0;
-	if (options->use_rsh == - 1)
+	if (options->use_rsh == -1)
 		options->use_rsh = 0;
 	if (options->server_alive_interval == -1)
 		options->server_alive_interval = 0;

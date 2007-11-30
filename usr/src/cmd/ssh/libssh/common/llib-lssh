@@ -84,10 +84,6 @@
 #include <match.h>
 #include <misc.h>
 #include <mktemp.h>
-#include <monitor_fdpass.h>
-#include <monitor.h>
-#include <monitor_mm.h>
-#include <monitor_wrap.h>
 #include <mpaux.h>
 #include <msg.h>
 #include <myproposal.h>

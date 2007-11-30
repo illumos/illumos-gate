@@ -80,8 +80,6 @@ OBJECTS =	\
 		uuencode.o \
 		xlist.o \
 		xmalloc.o \
-		monitor_wrap.o \
-		monitor_fdpass.o \
 		readconf.o \
 		sftp-common.o \
 		proxy-io.o

@@ -39,7 +39,6 @@ RCSID("$OpenBSD: kexdh.c,v 1.18 2002/03/18 17:50:31 provos Exp $");
 #include "packet.h"
 #include "dh.h"
 #include "ssh2.h"
-#include "monitor_wrap.h"
 
 void
 kexdh_server(Kex *kex)
@@ -123,7 +122,7 @@ kexdh_server(Kex *kex)
 
 	/* sign H */
 	/* XXX hashlen depends on KEX */
-	PRIVSEP(key_sign(server_host_key, &signature, &slen, hash, 20));
+	key_sign(server_host_key, &signature, &slen, hash, 20);
 
 	/* destroy_sensitive_data(); */
 

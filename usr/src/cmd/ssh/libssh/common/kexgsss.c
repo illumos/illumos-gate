@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@
 #include "dh.h"
 #include "ssh2.h"
 #include "ssh-gss.h"
-#include "monitor_wrap.h"
 #include "auth.h"
 
 Gssctxt *xxx_gssctxt;
@@ -127,8 +126,7 @@ kexgss_server(Kex *kex)
 					   type);
 		}
 
-		maj_status=PRIVSEP(ssh_gssapi_accept_ctx(ctxt,&recv_tok,
-							 &send_tok));
+		maj_status = ssh_gssapi_accept_ctx(ctxt,&recv_tok, &send_tok);
 
 		xfree(recv_tok.value); /* We allocated this, not gss */
 

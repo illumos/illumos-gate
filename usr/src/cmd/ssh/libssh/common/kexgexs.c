@@ -40,7 +40,6 @@ RCSID("$OpenBSD: kexgex.c,v 1.22 2002/03/24 17:27:03 stevesk Exp $");
 #include "dh.h"
 #include "ssh2.h"
 #include "compat.h"
-#include "monitor_wrap.h"
 
 void
 kexgex_server(Kex *kex)
@@ -85,7 +84,7 @@ kexgex_server(Kex *kex)
 		    min, nbits, max);
 
 	/* Contact privileged parent */
-	dh = PRIVSEP(choose_dh(min, nbits, max));
+	dh = choose_dh(min, nbits, max);
 	if (dh == NULL)
 		packet_disconnect("Protocol error: no matching DH grp found");
 
@@ -168,7 +167,7 @@ kexgex_server(Kex *kex)
 
 	/* sign H */
 	/* XXX hashlen depends on KEX */
-	PRIVSEP(key_sign(server_host_key, &signature, &slen, hash, 20));
+	key_sign(server_host_key, &signature, &slen, hash, 20);
 
 	/* destroy_sensitive_data(); */
 

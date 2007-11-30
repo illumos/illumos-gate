@@ -30,7 +30,6 @@ RCSID("$OpenBSD: auth-bsdauth.c,v 1.5 2002/06/30 21:59:45 deraadt Exp $");
 #include "xmalloc.h"
 #include "auth.h"
 #include "log.h"
-#include "monitor_wrap.h"
 
 static void *
 bsdauth_init_ctx(Authctxt *authctxt)

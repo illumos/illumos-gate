@@ -137,6 +137,9 @@ ssh_kex2(char *host, struct sockaddr *hostaddr)
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
 		    options.hostkeyalgorithms;
 
+	if (options.rekey_limit)
+		packet_set_rekey_limit((u_int32_t)options.rekey_limit);
+
 	if (datafellows & SSH_BUG_LOCALES_NOT_LANGTAGS) {
 		char *locale = setlocale(LC_ALL, "");
 

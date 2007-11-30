@@ -22,7 +22,6 @@ RCSID("$OpenBSD: auth-options.c,v 1.26 2002/07/30 17:03:55 markus Exp $");
 #include "auth-options.h"
 #include "servconf.h"
 #include "misc.h"
-#include "monitor_wrap.h"
 #include "auth.h"
 
 /* Flags set authorized_keys flags */
@@ -282,8 +281,7 @@ next_option:
 		/* Process the next option. */
 	}
 
-	if (!use_privsep)
-		auth_debug_send();
+	auth_debug_send();
 
 	/* grant access */
 	return 1;
@@ -294,8 +292,7 @@ bad_option:
 	auth_debug_add("Bad options in %.100s file, line %lu: %.50s",
 	    file, linenum, opts);
 
-	if (!use_privsep)
-		auth_debug_send();
+	auth_debug_send();
 
 	/* deny access */
 	return 0;

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,6 @@ RCSID("$OpenBSD: kex.c,v 1.51 2002/06/24 14:55:38 markus Exp $");
 #include "mac.h"
 #include "match.h"
 #include "dispatch.h"
-#include "monitor.h"
 #include "g11n.h"
 
 #ifdef GSSAPI
@@ -55,10 +54,6 @@ RCSID("$OpenBSD: kex.c,v 1.51 2002/06/24 14:55:38 markus Exp $");
 #endif
 
 #define KEX_COOKIE_LEN	16
-
-/* Use privilege separation for sshd */
-int use_privsep;
-struct monitor *pmonitor;
 
 char *session_lang = NULL;
 
@@ -182,11 +177,8 @@ skip_newkeys:
 	buffer_clear(&kex->peer);
 	/* buffer_clear(&kex->my); */
 	kex->flags &= ~KEX_INIT_SENT;
-#if 0
-	/* Must have this name for use in sshd (audit_save_kex())... */
 	xfree(kex->name);
 	kex->name = NULL;
-#endif
 }
 
 void
@@ -543,6 +535,7 @@ kex_choose_conf(Kex *kex)
 					g11n_setlocale(LC_ALL, locale);
 					debug("Negotiated main locale: %s", locale);
 					packet_send_debug("Negotiated main locale: %s", locale);
+					xfree(locale);
 				}
 				if (plangs != p_langs_s2c &&
 				    p_langs_s2c && *p_langs_s2c) {
@@ -550,14 +543,11 @@ kex_choose_conf(Kex *kex)
 					if (locale) {
 						g11n_setlocale(LC_MESSAGES, locale);
 						debug("Negotiated messages locale: %s", locale);
-						packet_send_debug("Negotiated messages locale: %s", locale);
+						packet_send_debug("Negotiated "
+						    "messages locale: %s", locale);
+						xfree(locale);
 					}
 				}
-				/*
-				 * Should we free locale? Or does setlocale
-				 * retain a reference?
-				 */
-				/*xfree(locale);*/
 			}
 		}
 		else {

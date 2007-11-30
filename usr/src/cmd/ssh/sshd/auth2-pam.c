@@ -23,7 +23,6 @@ RCSID("$Id: auth2-pam.c,v 1.14 2002/06/28 16:48:12 mouring Exp $");
 #include "canohost.h"
 #include "log.h"
 #include "servconf.h"
-#include "monitor_wrap.h"
 #include "misc.h"
 
 #ifdef HAVE_BSM
@@ -251,6 +250,8 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 	}
 
 	if (conv_ctxt->num_expected == 0 && text == NULL) {
+		xfree(conv_ctxt->prompts);
+		xfree(conv_ctxt->responses);
 		xfree(conv_ctxt);
 		return PAM_SUCCESS;
 	}
@@ -301,6 +302,8 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 
 	if (conv_ctxt->abandoned) {
 		authctxt->unwind_dispatch_loop = 1;
+		xfree(conv_ctxt->prompts);
+		xfree(conv_ctxt->responses);
 		xfree(conv_ctxt);
 		debug("PAM conv function returns PAM_CONV_ERR");
 		return PAM_CONV_ERR;
@@ -308,12 +311,15 @@ do_pam_conv_kbd_int(int num_msg, struct pam_message **msg,
 
 	if (conv_ctxt->num_received == conv_ctxt->num_expected) {
 		*resp = conv_ctxt->responses;
+		xfree(conv_ctxt->prompts);
 		xfree(conv_ctxt);
 		debug("PAM conv function returns PAM_SUCCESS");
 		return PAM_SUCCESS;
 	}
 
 	debug("PAM conv function returns PAM_CONV_ERR");
+	xfree(conv_ctxt->prompts);
+	xfree(conv_ctxt->responses);
 	xfree(conv_ctxt);
 	return PAM_CONV_ERR;
 }

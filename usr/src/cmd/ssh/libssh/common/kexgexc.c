@@ -40,7 +40,6 @@ RCSID("$OpenBSD: kexgex.c,v 1.22 2002/03/24 17:27:03 stevesk Exp $");
 #include "dh.h"
 #include "ssh2.h"
 #include "compat.h"
-#include "monitor_wrap.h"
 
 void
 kexgex_client(Kex *kex)

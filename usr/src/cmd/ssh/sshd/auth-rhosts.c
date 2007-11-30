@@ -28,7 +28,6 @@ RCSID("$OpenBSD: auth-rhosts.c,v 1.28 2002/05/13 21:26:49 markus Exp $");
 
 /* import */
 extern ServerOptions options;
-extern int use_privsep;
 
 /*
  * This function processes an rhosts-style file (.rhosts, .shosts, or
@@ -295,7 +294,6 @@ auth_rhosts2(struct passwd *pw, const char *client_user, const char *hostname,
 
 	auth_debug_reset();
 	ret = auth_rhosts2_raw(pw, client_user, hostname, ipaddr);
-	if (!use_privsep)
-		auth_debug_send();
+	auth_debug_send();
 	return ret;
 }

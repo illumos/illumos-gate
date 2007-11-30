@@ -27,8 +27,6 @@ RCSID("$OpenBSD: auth-rh-rsa.c,v 1.34 2002/03/25 09:25:06 markus Exp $");
 #include "auth.h"
 #include "canohost.h"
 
-#include "monitor_wrap.h"
-
 /* import */
 extern ServerOptions options;
 
@@ -68,7 +66,7 @@ auth_rhosts_rsa(struct passwd *pw, char *cuser, Key *client_host_key)
 	chost = (char *)get_canonical_hostname(options.verify_reverse_mapping);
 	debug("Rhosts RSA authentication: canonical host %.900s", chost);
 
-	if (!PRIVSEP(auth_rhosts_rsa_key_allowed(pw, cuser, chost, client_host_key))) {
+	if (!auth_rhosts_rsa_key_allowed(pw, cuser, chost, client_host_key)) {
 		debug("Rhosts with RSA host authentication denied: unknown or invalid host key");
 		packet_send_debug("Your host key cannot be verified: unknown or invalid host key.");
 		return 0;

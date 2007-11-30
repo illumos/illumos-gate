@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@ RCSID("$OpenBSD: auth2.c,v 1.95 2002/08/22 21:33:58 markus Exp $");
 #include "dispatch.h"
 #include "sshlogin.h"
 #include "pathnames.h"
-#include "monitor_wrap.h"
 
 #ifdef HAVE_BSM
 #include "bsmaudit.h"
@@ -120,8 +119,6 @@ do_authentication2(void)
 		options.kbd_interactive_authentication = 1;
 	if (options.pam_authentication_via_kbd_int)
 		options.kbd_interactive_authentication = 1;
-	if (use_privsep)
-		options.pam_authentication_via_kbd_int = 0;
 
 	dispatch_init(&dispatch_protocol_error);
 	dispatch_set(SSH2_MSG_SERVICE_REQUEST, &input_service_request);
@@ -193,7 +190,7 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 
 	if (authctxt->attempt == 1) {
 		/* setup auth context */
-		authctxt->pw = PRIVSEP(getpwnamallow(user));
+		authctxt->pw = getpwnamallow(user);
 		/* May want to abstract SSHv2 services someday */
 		if (authctxt->pw && strcmp(service, "ssh-connection")==0) {
 			/* enforced in userauth_finish() below */
@@ -202,14 +199,11 @@ input_userauth_request(int type, u_int32_t seq, void *ctxt)
 		} else {
 			log("input_userauth_request: illegal user %s", user);
 		}
-		setproctitle("%s%s", authctxt->pw ? user : "unknown",
-		    use_privsep ? " [net]" : "");
+		setproctitle("%s", authctxt->pw ? user : "unknown");
 		authctxt->user = xstrdup(user);
 		authctxt->service = xstrdup(service);
 		authctxt->style = style ? xstrdup(style) : NULL;
 		userauth_reset_methods();
-		if (use_privsep)
-			mm_inform_authserv(service, style);
 	} else {
 		char *abandoned;
 
@@ -293,8 +287,7 @@ userauth_finish(Authctxt *authctxt, char *method)
 
 #ifndef USE_PAM
 	/* Special handling for root (done elsewhere for PAM) */
-	if (!use_privsep &&
-	    authctxt->method->authenticated &&
+	if (authctxt->method->authenticated &&
 	    authctxt->pw != NULL && authctxt->pw->pw_uid == 0 &&
 	    !auth_root_allowed(method))
 		authctxt->method->authenticated = 0;
@@ -457,7 +450,7 @@ userauth_user_svc_change(Authctxt *authctxt, char *user, char *service)
 	xfree(authctxt->user);
 	authctxt->user = xstrdup(user);
 	pwfree(&authctxt->pw);
-	authctxt->pw = PRIVSEP(getpwnamallow(user));
+	authctxt->pw = getpwnamallow(user);
 	authctxt->valid = (authctxt->pw != NULL);
 
 	/* Forget method state; abandon postponed userauths */

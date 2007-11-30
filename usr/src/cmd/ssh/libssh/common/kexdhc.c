@@ -39,7 +39,6 @@ RCSID("$OpenBSD: kexdh.c,v 1.18 2002/03/18 17:50:31 provos Exp $");
 #include "packet.h"
 #include "dh.h"
 #include "ssh2.h"
-#include "monitor_wrap.h"
 
 void
 kexdh_client(Kex *kex)

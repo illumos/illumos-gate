@@ -953,8 +953,14 @@ server_loop2(Authctxt *authctxt)
 
 		collect_children();
 
-		if (!rekeying)
+		if (!rekeying) {
 			channel_after_select(readset, writeset);
+			if (packet_need_rekeying()) {
+				debug("need rekeying");
+				xxx_kex->done = 0;
+				kex_send_kexinit(xxx_kex);
+			}
+		}
 #ifdef ALTPRIVSEP
 		else
 			altprivsep_process_input(xxx_kex, readset);
@@ -990,7 +996,6 @@ server_input_channel_failure(int type, u_int32_t seq, void *ctxt)
 	 */
 	client_alive_timeouts = 0;
 }
-
 
 static void
 server_input_stdin_data(int type, u_int32_t seq, void *ctxt)

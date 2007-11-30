@@ -21,7 +21,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,6 @@
 #include "log.h"
 #include "compat.h"
 #include "xlist.h"
-#include "monitor_wrap.h"
 
 #include <netdb.h>
 
@@ -523,13 +522,17 @@ void ssh_gssapi_set_oid(Gssctxt *ctx, gss_OID oid) {
 /* All this effort to report an error ... */
 
 void
-ssh_gssapi_error(Gssctxt *ctxt, const char *where) {
-	if (where)
-		debug("GSS-API error while %s: %s", where,
-			ssh_gssapi_last_error(ctxt,NULL,NULL));
+ssh_gssapi_error(Gssctxt *ctxt, const char *where)
+{
+	char *errmsg = ssh_gssapi_last_error(ctxt, NULL, NULL);
+
+	if (where != NULL)
+		debug("GSS-API error while %s: %s", where, errmsg);
 	else
-		debug("GSS-API error: %s",
-			ssh_gssapi_last_error(ctxt,NULL,NULL));
+		debug("GSS-API error: %s", errmsg);
+
+	/* ssh_gssapi_last_error() can't return NULL */
+	xfree(errmsg);
 }
 
 char *

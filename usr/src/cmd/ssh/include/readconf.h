@@ -150,6 +150,8 @@ typedef struct {
 	int     num_remote_forwards;
 	Forward remote_forwards[SSH_MAX_FORWARDS_PER_DIRECTION];
 	int	clear_forwardings;
+
+	int64_t rekey_limit;
 	int	no_host_authentication_for_localhost;
 	int	server_alive_interval;
 	int	server_alive_count_max;

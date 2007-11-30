@@ -47,7 +47,6 @@ RCSID("$OpenBSD: auth2-hostbased.c,v 1.2 2002/05/31 11:35:15 markus Exp $");
 
 #include "key.h"
 #include "canohost.h"
-#include "monitor_wrap.h"
 #include "pathnames.h"
 
 /* import */
@@ -119,9 +118,8 @@ userauth_hostbased(Authctxt *authctxt)
 #endif
 	/* test for allowed key and correct signature */
 	authenticated = 0;
-	if (PRIVSEP(hostbased_key_allowed(authctxt->pw, cuser, chost, key)) &&
-	    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
-			buffer_len(&b))) == 1)
+	if (hostbased_key_allowed(authctxt->pw, cuser, chost, key) &&
+	    key_verify(key, sig, slen, buffer_ptr(&b), buffer_len(&b)) == 1)
 		authenticated = 1;
 
 	buffer_clear(&b);
