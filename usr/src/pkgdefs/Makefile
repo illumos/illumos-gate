@@ -269,6 +269,7 @@ COMMON_SUBDIRS= \
 	SUNWmxfe \
 	SUNWncar \
 	SUNWncau \
+	SUNWnetcat \
 	SUNWnfsckr \
 	SUNWnfsskr \
 	SUNWnfssr \

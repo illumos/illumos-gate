@@ -31,7 +31,8 @@ ALL=		$(PROG) $(SUIDPROG)
 SRCS=		$(ALL:%=%.c)
 KCMDPROGS=	rcp rlogin rsh
 
-SUBDIRS=	chat ftp nca netstat pppd pppdump pppstats rdist talk tftp telnet 
+SUBDIRS=	chat ftp nc nca netstat \
+		pppd pppdump pppstats rdist talk telnet tftp
 SUBDIR1=	talk 
 MSGSUBDIRS=	nca talk
 
