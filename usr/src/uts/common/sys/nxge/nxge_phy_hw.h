@@ -45,6 +45,9 @@ extern "C" {
 #define	NXGE_PHY_ID_REG_1		2
 #define	NXGE_PHY_ID_REG_2		3
 
+#define	BCM8704_CHIP_ID			0x8704
+#define	BCM8706_CHIP_ID			0x8706
+
 /*
  * The BCM_PHY_ID_MASK is explained below:
  * The first nibble (bits 0 through 3) is changed with every revision
@@ -56,6 +59,7 @@ extern "C" {
 #define	BCM_PHY_ID_MASK			0xfffff0f0
 #define	BCM8704_DEV_ID			0x206033
 #define	BCM5464R_PHY_ID			0x2060b1
+#define	BCM8706_DEV_ID			0x206035
 #define	PHY_BCM8704_FAMILY		(BCM8704_DEV_ID & BCM_PHY_ID_MASK)
 #define	PHY_BCM5464R_FAMILY		(BCM5464R_PHY_ID & BCM_PHY_ID_MASK)
 
@@ -66,6 +70,12 @@ extern "C" {
 #define	BCM8704_NEPTUNE_PORT_ADDR_BASE		8
 #define	BCM8704_N2_PORT_ADDR_BASE		16
 
+/*
+ * Phy address for the second NIU port on Goa NEM card can be either
+ * 20 or 17
+ */
+#define	BCM8706_GOA_PORT_ADDR_BASE		16
+#define	BCM8706_ALT_GOA_PORT1_ADDR		20
 /*
  * Phy addresses for Maramba support. Support for P0 will eventually
  * be removed.
@@ -504,6 +514,7 @@ typedef	union _mii_test1_t {
 #define	BCM8704_USER_PMD_RX_CONTROL_REG		0xC802
 #define	BCM8704_USER_PMD_TX_CONTROL_REG		0xC803
 #define	BCM8704_USER_ANALOG_STATUS0_REG		0xC804
+#define	BCM8704_CHIP_ID_REG			0xC807
 #define	BCM8704_USER_OPTICS_DIGITAL_CTRL_REG	0xC808
 #define	BCM8704_USER_RX2_CONTROL1_REG		0x80C6
 #define	BCM8704_USER_RX1_CONTROL1_REG		0x80D6

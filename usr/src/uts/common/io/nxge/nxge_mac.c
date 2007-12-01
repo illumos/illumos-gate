@@ -58,7 +58,7 @@ static ether_addr_st etherzeroaddr =
 /*
  * Supported chip types
  */
-static uint32_t nxge_supported_cl45_ids[] = {BCM8704_DEV_ID};
+static uint32_t nxge_supported_cl45_ids[] = {BCM8704_DEV_ID, BCM8706_DEV_ID};
 static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID};
 
 #define	NUM_CLAUSE_45_IDS	(sizeof (nxge_supported_cl45_ids) /	\
@@ -72,6 +72,7 @@ static uint32_t nxge_get_cl45_pma_pmd_id(p_nxge_t, int);
 static uint32_t nxge_get_cl45_pcs_id(p_nxge_t, int);
 static uint32_t nxge_get_cl22_phy_id(p_nxge_t, int);
 static boolean_t nxge_is_supported_phy(uint32_t, uint8_t);
+static boolean_t nxge_is_phy_present(p_nxge_t, int, uint32_t, uint32_t);
 static nxge_status_t nxge_n2_serdes_init(p_nxge_t);
 static nxge_status_t nxge_neptune_10G_serdes_init(p_nxge_t);
 static nxge_status_t nxge_1G_serdes_init(p_nxge_t);
@@ -84,6 +85,8 @@ static nxge_status_t nxge_1G_fiber_link_intr_start(p_nxge_t);
 static nxge_status_t nxge_check_mii_link(p_nxge_t);
 static nxge_status_t nxge_check_10g_link(p_nxge_t);
 static nxge_status_t nxge_10G_xcvr_init(p_nxge_t);
+static nxge_status_t nxge_BCM8704_xcvr_init(p_nxge_t);
+static nxge_status_t nxge_BCM8706_xcvr_init(p_nxge_t);
 static nxge_status_t nxge_1G_xcvr_init(p_nxge_t);
 static void nxge_bcm5464_link_led_off(p_nxge_t);
 
@@ -97,8 +100,7 @@ static nxge_xcvr_table_t nxge_n2_10G_table = {
 	nxge_10G_link_intr_stop,
 	nxge_10G_link_intr_start,
 	nxge_check_10g_link,
-	PCS_XCVR,
-	BCM8704_N2_PORT_ADDR_BASE
+	PCS_XCVR
 };
 
 static nxge_xcvr_table_t nxge_n2_1G_table = {
@@ -107,8 +109,7 @@ static nxge_xcvr_table_t nxge_n2_1G_table = {
 	nxge_1G_fiber_link_intr_stop,
 	nxge_1G_fiber_link_intr_start,
 	nxge_check_mii_link,
-	PCS_XCVR,
-	0
+	PCS_XCVR
 };
 
 static nxge_xcvr_table_t nxge_10G_fiber_table = {
@@ -117,8 +118,7 @@ static nxge_xcvr_table_t nxge_10G_fiber_table = {
 	nxge_10G_link_intr_stop,
 	nxge_10G_link_intr_start,
 	nxge_check_10g_link,
-	PCS_XCVR,
-	BCM8704_NEPTUNE_PORT_ADDR_BASE
+	PCS_XCVR
 };
 
 static nxge_xcvr_table_t nxge_1G_copper_table = {
@@ -127,8 +127,7 @@ static nxge_xcvr_table_t nxge_1G_copper_table = {
 	nxge_1G_copper_link_intr_stop,
 	nxge_1G_copper_link_intr_start,
 	nxge_check_mii_link,
-	INT_MII_XCVR,
-	BCM5464_NEPTUNE_PORT_ADDR_BASE
+	INT_MII_XCVR
 };
 
 static nxge_xcvr_table_t nxge_1G_fiber_table = {
@@ -137,8 +136,7 @@ static nxge_xcvr_table_t nxge_1G_fiber_table = {
 	nxge_1G_fiber_link_intr_stop,
 	nxge_1G_fiber_link_intr_start,
 	nxge_check_mii_link,
-	PCS_XCVR,
-	0
+	PCS_XCVR
 };
 
 static nxge_xcvr_table_t nxge_10G_copper_table = {
@@ -147,8 +145,7 @@ static nxge_xcvr_table_t nxge_10G_copper_table = {
 	NULL,
 	NULL,
 	NULL,
-	PCS_XCVR,
-	0
+	PCS_XCVR
 };
 
 nxge_status_t nxge_mac_init(p_nxge_t);
@@ -166,8 +163,72 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 	char *prop_val;
 
 	nxgep->mac.portmode = 0;
+	nxgep->xcvr_addr = 0;
 
-	/* Get property from the driver conf. file */
+	/*
+	 * First check for hot swappable phy property.
+	 */
+	if (nxgep->hot_swappable_phy == B_TRUE) {
+		nxgep->statsp->mac_stats.xcvr_inuse = HSP_XCVR;
+		nxgep->mac.portmode = PORT_HSP_MODE;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "Other: Hot Swappable"));
+	} else if (ddi_prop_exists(DDI_DEV_T_ANY, nxgep->dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "hot-swappable-phy") == 1) {
+		nxgep->statsp->mac_stats.xcvr_inuse = HSP_XCVR;
+		nxgep->mac.portmode = PORT_HSP_MODE;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, ".conf: Hot Swappable"));
+	} else if (nxgep->niu_type == N2_NIU &&
+	    ddi_prop_exists(DDI_DEV_T_ANY, nxgep->dip, 0,
+	    "hot-swappable-phy") == 1) {
+		nxgep->statsp->mac_stats.xcvr_inuse = HSP_XCVR;
+		nxgep->mac.portmode = PORT_HSP_MODE;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "OBP: Hot Swappable"));
+	}
+
+	/*
+	 * MDIO polling support for Monza RTM card, Goa NEM card
+	 */
+	if (nxgep->mac.portmode == PORT_HSP_MODE) {
+
+		uint8_t portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+		nxgep->hot_swappable_phy = B_TRUE;
+		/*
+		 * If this is the 2nd NIU port, then check 2 addresses
+		 * to take care of the Goa NEM card. Port 1 can have addr 17
+		 * (in the eval board) or 20 (in the P0 board).
+		 */
+		if (portn == 1) {
+			if (nxge_is_phy_present(nxgep,
+			    BCM8706_ALT_GOA_PORT1_ADDR, BCM8706_DEV_ID,
+			    BCM_PHY_ID_MASK)) {
+				nxgep->xcvr_addr =
+				    BCM8706_ALT_GOA_PORT1_ADDR;
+				goto found_phy;
+			}
+		}
+		if (nxge_is_phy_present(nxgep,
+		    (BCM8706_GOA_PORT_ADDR_BASE) + portn,
+		    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
+			nxgep->xcvr_addr = (BCM8706_GOA_PORT_ADDR_BASE) +
+			    portn;
+			goto found_phy;
+		}
+
+		nxgep->phy_absent = B_TRUE;
+		goto check_phy_done;
+found_phy:
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		nxgep->mac.portmode = PORT_10G_FIBER;
+		nxgep->phy_absent = B_FALSE;
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G Fiber Xcvr "
+		    "found for hot swappable phy"));
+check_phy_done:
+		return (status);
+	}
+
+	/* Get phy-type property from the driver conf. file */
 	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "phy-type", &prop_val)) == DDI_PROP_SUCCESS) {
@@ -202,10 +263,8 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 
 		return (NXGE_OK);
 	}
-/*
- * TODO add MDIO support for Monza RTM card, Glendale (also Goa) -
- * only N2-NIU
- */
+
+	/* Get phy-type property from OBP */
 	if (nxgep->niu_type == N2_NIU) {
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip, 0,
 		    "phy-type", &prop_val) == DDI_PROP_SUCCESS) {
@@ -340,6 +399,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 	uint32_t	pcs_id = 0;
 	uint32_t	pma_pmd_id = 0;
 	uint32_t	phy_id = 0;
+	uint16_t	chip_id = 0;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_setup_xcvr_table: port<%d>",
 	    portn));
@@ -350,7 +410,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		case PORT_1G_FIBER:
 		case PORT_1G_SERDES:
 			nxgep->xcvr = nxge_n2_1G_table;
-			nxgep->xcvr.xcvr_addr = portn;
+			nxgep->xcvr_addr = portn;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "NIU 1G %s Xcvr",
 			    (nxgep->mac.portmode == PORT_1G_FIBER) ? "Fiber" :
 			    "Serdes"));
@@ -358,10 +418,19 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		case PORT_10G_FIBER:
 		case PORT_10G_SERDES:
 			nxgep->xcvr = nxge_n2_10G_table;
-			nxgep->xcvr.xcvr_addr += portn;
+			if (nxgep->nxge_hw_p->xcvr_addr[portn]) {
+				nxgep->xcvr_addr =
+				    nxgep->nxge_hw_p->xcvr_addr[portn];
+			}
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "NIU 10G %s Xcvr",
 			    (nxgep->mac.portmode == PORT_10G_FIBER) ? "Fiber" :
 			    "Serdes"));
+			break;
+		case PORT_HSP_MODE:
+			nxgep->xcvr = nxge_n2_10G_table;
+			nxgep->xcvr.xcvr_inuse = HSP_XCVR;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "NIU 10G Hot "
+			    "Swappable Xcvr (not present)"));
 			break;
 		default:
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -424,27 +493,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		case PORT_1G_COPPER:
 		case PORT_1G_RGMII_FIBER:
 			nxgep->xcvr = nxge_1G_copper_table;
-
-			/*
-			 * For Altas 4-1G copper, Xcvr port numbers are
-			 * swapped with ethernet port number. This is
-			 * designed for better signal integrity in
-			 * routing. This is also the case for the
-			 * on-board Neptune copper ports on the Maramba
-			 * platform.
-			 */
-			switch (nxgep->platform_type) {
-			case P_NEPTUNE_MARAMBA_P1:
-				nxgep->xcvr.xcvr_addr =
-				    BCM5464_MARAMBA_P1_PORT_ADDR_BASE;
-				break;
-			case P_NEPTUNE_MARAMBA_P0:
-				nxgep->xcvr.xcvr_addr =
-				    BCM5464_MARAMBA_P0_PORT_ADDR_BASE;
-				break;
-			default:
-				break;
-			}
+			nxgep->xcvr_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
 			/*
 			 * For Altas 4-1G copper, Xcvr port numbers are
 			 * swapped with ethernet port number. This is
@@ -459,15 +508,16 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			case P_NEPTUNE_MARAMBA_P1:
 				switch (portn) {
 				case 0:
-					nxgep->xcvr.xcvr_addr += 3;
+					nxgep->xcvr_addr += 3;
 					break;
 				case 1:
-					nxgep->xcvr.xcvr_addr += 2;
+					nxgep->xcvr_addr += 1;
 					break;
 				case 2:
-					nxgep->xcvr.xcvr_addr += 1;
+					nxgep->xcvr_addr -= 1;
 					break;
 				case 3:
+					nxgep->xcvr_addr -= 3;
 					break;
 				default:
 					return (NXGE_ERROR);
@@ -480,8 +530,10 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			 * the BCM5464_PORT_BASE_ADDR and port 3 has
 			 * next address.
 			 */
+				nxgep->xcvr_addr =
+				    BCM5464_NEPTUNE_PORT_ADDR_BASE;
 				if (portn == 3) {
-					nxgep->xcvr.xcvr_addr += 1;
+					nxgep->xcvr_addr += 1;
 				}
 				break;
 			default:
@@ -499,7 +551,7 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		case PORT_1G_FIBER:
 		case PORT_1G_SERDES:
 			nxgep->xcvr = nxge_1G_fiber_table;
-			nxgep->xcvr.xcvr_addr = portn;
+			nxgep->xcvr_addr = portn;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "1G %s Xcvr",
 			    (nxgep->mac.portmode == PORT_1G_FIBER) ?
 			    "Fiber" : "Serdes"));
@@ -507,11 +559,18 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		case PORT_10G_FIBER:
 		case PORT_10G_SERDES:
 			nxgep->xcvr = nxge_10G_fiber_table;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G xcvr "
+			    "nxgep->nxge_hw_p->xcvr_addr[portn] = [%d] "
+			    "nxgep->xcvr_addr = [%d]",
+			    nxgep->nxge_hw_p->xcvr_addr[portn],
+			    nxgep->xcvr_addr));
+			if (nxgep->nxge_hw_p->xcvr_addr[portn]) {
+				nxgep->xcvr_addr =
+				    nxgep->nxge_hw_p->xcvr_addr[portn];
+			}
 			switch (nxgep->platform_type) {
 			case P_NEPTUNE_MARAMBA_P0:
 			case P_NEPTUNE_MARAMBA_P1:
-				nxgep->xcvr.xcvr_addr =
-				    BCM8704_MARAMBA_PORT_ADDR_BASE;
 				/*
 				 * Switch off LED for corresponding copper
 				 * port
@@ -521,10 +580,16 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			default:
 				break;
 			}
-			nxgep->xcvr.xcvr_addr += portn;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G %s Xcvr",
 			    (nxgep->mac.portmode == PORT_10G_FIBER) ?
 			    "Fiber" : "Serdes"));
+			break;
+
+		case PORT_HSP_MODE:
+			nxgep->xcvr = nxge_10G_fiber_table;
+			nxgep->xcvr.xcvr_inuse = HSP_XCVR;
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "Neptune 10G Hot "
+			    "Swappable Xcvr (not present)"));
 			break;
 		default:
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -533,24 +598,53 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 		}
 	}
 
+	if (nxgep->mac.portmode == PORT_10G_FIBER) {
+		if ((status = nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+		    BCM8704_PCS_DEV_ADDR, BCM8704_CHIP_ID_REG,
+		    &chip_id)) == NXGE_OK) {
+
+			switch (chip_id) {
+			case BCM8704_CHIP_ID:
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "nxge_setup_xcvr_table: "
+				    "Chip ID 8704 [0x%x] for 10G xcvr",
+				    chip_id));
+				break;
+			case BCM8706_CHIP_ID:
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "nxge_setup_xcvr_table: "
+				    "Chip ID 8706 [0x%x] for 10G xcvr",
+				    chip_id));
+				break;
+			default:
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "nxge_setup_xcvr_table: "
+				    "Unknown Chip ID [0x%x] for 10G xcvr",
+				    chip_id));
+				break;
+			}
+		}
+	}
+
 	nxgep->statsp->mac_stats.xcvr_inuse = nxgep->xcvr.xcvr_inuse;
-	nxgep->statsp->mac_stats.xcvr_portn = nxgep->xcvr.xcvr_addr;
+	nxgep->statsp->mac_stats.xcvr_portn = nxgep->xcvr_addr;
+	nxgep->chip_id = chip_id;
 
 	/*
 	 * Get the actual device ID value returned by MDIO read.
 	 */
 	nxgep->statsp->mac_stats.xcvr_id = 0;
 
-	pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep, nxgep->xcvr.xcvr_addr);
+	pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep, nxgep->xcvr_addr);
 	if (nxge_is_supported_phy(pma_pmd_id, CLAUSE_45_TYPE)) {
 		nxgep->statsp->mac_stats.xcvr_id = pma_pmd_id;
 	} else {
-		pcs_id = nxge_get_cl45_pcs_id(nxgep, nxgep->xcvr.xcvr_addr);
+		pcs_id = nxge_get_cl45_pcs_id(nxgep, nxgep->xcvr_addr);
 		if (nxge_is_supported_phy(pcs_id, CLAUSE_45_TYPE)) {
 			nxgep->statsp->mac_stats.xcvr_id = pcs_id;
 		} else {
 			phy_id = nxge_get_cl22_phy_id(nxgep,
-			    nxgep->xcvr.xcvr_addr);
+			    nxgep->xcvr_addr);
 			if (nxge_is_supported_phy(phy_id, CLAUSE_22_TYPE)) {
 				nxgep->statsp->mac_stats.xcvr_id = phy_id;
 			}
@@ -560,8 +654,8 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 	nxgep->mac.linkchkmode = LINKCHK_TIMER;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_setup_xcvr_table: niu_type"
-	    "[0x%x] platform type[0x%x]", nxgep->niu_type,
-	    nxgep->platform_type));
+	    "[0x%x] platform type[0x%x] xcvr_arr[%d]", nxgep->niu_type,
+	    nxgep->platform_type, nxgep->xcvr_addr));
 
 	return (status);
 }
@@ -659,8 +753,14 @@ nxge_link_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_init: port<%d>", portn));
 #endif
+	if (nxgep->hot_swappable_phy && nxgep->phy_absent) {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_link_init: "
+		    "Phy not present, cannot initialize link"));
+		return (status);
+	}
 
 	portmode = nxgep->mac.portmode;
+
 	if (nxgep->niu_type == N2_NIU && (portmode != PORT_10G_SERDES) &&
 	    (portmode != PORT_1G_SERDES)) {
 		/* Workaround to get link up in both NIU ports */
@@ -1257,9 +1357,9 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 
 	return (NXGE_OK);
 fail:
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-	"nxge_n2_serdes_init: Failed to initialize N2 serdes for port<%d>",
-				portn));
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_n2_serdes_init: Failed to initialize N2 serdes for port<%d>",
+	    portn));
 
 	return (status);
 }
@@ -1457,7 +1557,7 @@ done:
 
 	return (NXGE_OK);
 fail:
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_neptune_10G_serdes_init: "
 	    "Failed to initialize Neptune serdes for port<%d>", portn));
 
@@ -1703,12 +1803,11 @@ fail:
 	return (status);
 }
 
-/* Initialize the 10G (BCM8704) Transceiver */
+/* Initialize the BCM 8704 xcvr */
 
 static nxge_status_t
-nxge_10G_xcvr_init(p_nxge_t nxgep)
+nxge_BCM8704_xcvr_init(p_nxge_t nxgep)
 {
-	p_nxge_stats_t		statsp;
 	uint16_t		val;
 #ifdef	NXGE_DEBUG
 	uint8_t			portn;
@@ -1725,23 +1824,10 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 #ifdef	NXGE_DEBUG
 	portn = nxgep->mac.portnum;
 #endif
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_10G_xcvr_init: port<%d>",
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_BCM8704_xcvr_init: port<%d>",
 	    portn));
 
-	statsp = nxgep->statsp;
-
-	if (nxgep->mac.portmode == PORT_10G_SERDES) {
-		goto done;
-	}
-
 	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
-
-	/* Disable Link LEDs */
-	if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
-		goto fail;
-
-	/* Set Clause 45 */
-	npi_mac_mif_set_indirect_mode(nxgep->npi_handle, B_TRUE);
 
 	/* Reset the transceiver */
 	if ((status = nxge_mdio_read(nxgep, phy_port_addr, BCM8704_PHYXS_ADDR,
@@ -1907,6 +1993,149 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 	}
 #endif
 
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_BCM8704_xcvr_init: port<%d>",
+	    portn));
+	return (NXGE_OK);
+
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_BCM8704_xcvr_init: failed to initialize transceiver for "
+	    "port<%d>", nxgep->mac.portnum));
+	return (NXGE_ERROR);
+}
+
+/* Initialize the BCM 8706 Transceiver */
+
+static nxge_status_t
+nxge_BCM8706_xcvr_init(p_nxge_t nxgep)
+{
+	uint8_t			phy_port_addr;
+	phyxs_control_t		phyxs_ctl;
+	pcs_control_t		pcs_ctl;
+	uint32_t		delay = 0;
+	optics_dcntr_t		op_ctr;
+	nxge_status_t		status = NXGE_OK;
+#ifdef	NXGE_DEBUG
+	uint8_t			portn = nxgep->mac.portnum;
+#endif
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_BCM8706_xcvr_init: port<%d>",
+	    portn));
+
+	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
+
+	/* Reset the transceiver */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr, BCM8704_PHYXS_ADDR,
+	    BCM8704_PHYXS_CONTROL_REG, &phyxs_ctl.value)) != NXGE_OK)
+		goto fail;
+
+	phyxs_ctl.bits.reset = 1;
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr, BCM8704_PHYXS_ADDR,
+	    BCM8704_PHYXS_CONTROL_REG, phyxs_ctl.value)) != NXGE_OK)
+		goto fail;
+	do {
+		drv_usecwait(500);
+		if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+		    BCM8704_PHYXS_ADDR, BCM8704_PHYXS_CONTROL_REG,
+		    &phyxs_ctl.value)) != NXGE_OK)
+			goto fail;
+		delay++;
+	} while ((phyxs_ctl.bits.reset) && (delay < 100));
+
+	if (delay == 100) {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		    "failed to reset Transceiver on port<%d>", portn));
+		status = NXGE_ERROR;
+		goto fail;
+	}
+
+	NXGE_DELAY(1000000);
+
+	/* Set BCM8706 Internal Loopback mode if necessary */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    BCM8704_PCS_DEV_ADDR, BCM8704_PCS_CONTROL_REG, &pcs_ctl.value))
+	    != NXGE_OK)
+		goto fail;
+	if (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g)
+		pcs_ctl.bits.loopback = 1;
+	else
+		pcs_ctl.bits.loopback = 0;
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    BCM8704_PCS_DEV_ADDR, BCM8704_PCS_CONTROL_REG, pcs_ctl.value))
+	    != NXGE_OK)
+		goto fail;
+
+	/* Enable Tx and Rx LEDs to be driven by traffic */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_OPTICS_DIGITAL_CTRL_REG,
+	    &op_ctr.value)) != NXGE_OK)
+		goto fail;
+	op_ctr.bits.gpio_sel = 0x3;
+	op_ctr.bits.res2 = 0x1;
+
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_OPTICS_DIGITAL_CTRL_REG,
+	    op_ctr.value)) != NXGE_OK)
+		goto fail;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_BCM8706_xcvr_init: port<%d>",
+	    portn));
+	return (NXGE_OK);
+
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_BCM8706_xcvr_init: failed to initialize transceiver for "
+	    "port<%d>", nxgep->mac.portnum));
+	return (status);
+}
+
+/* Initialize the 10G Transceiver */
+
+static nxge_status_t
+nxge_10G_xcvr_init(p_nxge_t nxgep)
+{
+	p_nxge_stats_t		statsp;
+	nxge_status_t		status = NXGE_OK;
+#ifdef	NXGE_DEBUG
+	uint8_t			portn = nxgep->mac.portnum;
+#endif
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_10G_xcvr_init: port<%d>",
+	    portn));
+
+	statsp = nxgep->statsp;
+
+	if (nxgep->mac.portmode == PORT_10G_SERDES) {
+		goto done;
+	}
+
+	/* Disable Link LEDs */
+	if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
+		goto fail;
+
+	/* Set Clause 45 */
+	npi_mac_mif_set_indirect_mode(nxgep->npi_handle, B_TRUE);
+
+	switch (nxgep->chip_id) {
+	case BCM8704_CHIP_ID:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		    "Chip ID 8704 [0x%x] for 10G xcvr", nxgep->chip_id));
+		status = nxge_BCM8704_xcvr_init(nxgep);
+		break;
+	case BCM8706_CHIP_ID:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
+		status = nxge_BCM8706_xcvr_init(nxgep);
+		break;
+	default:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_xcvr_init: "
+		    "Unknown chip ID 0x%x for 10G xcvr addr[%d]",
+		    nxgep->chip_id, nxgep->statsp->mac_stats.xcvr_portn));
+		goto fail;
+	}
+
+	if (status != NXGE_OK) {
+		goto fail;
+	}
 done:
 	statsp->mac_stats.cap_10gfdx = 1;
 	statsp->mac_stats.lp_cap_10gfdx = 1;
@@ -1916,10 +2145,10 @@ done:
 	return (NXGE_OK);
 
 fail:
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "nxge_10G_xcvr_init: failed to initialize transceiver for "
-	    "port<%d>", portn));
-	return (status);
+	    "port<%d>", nxgep->mac.portnum));
+	return (NXGE_ERROR);
 }
 
 /* Initialize the 1G copper (BCM 5464) Transceiver */
@@ -3906,7 +4135,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_check_mii_link port<0x%x> "
 		    "RIGHT AFTER READ bmsr_data 0x%x (nxgep->bmsr 0x%x ",
-		    xcvr_portn, bmsr_data.value, nxgep->bmsr.value));
+		    portn, bmsr_data.value, nxgep->bmsr.value));
 
 		if (nxgep->param_arr[param_autoneg].value) {
 			if ((status = nxge_mii_read(nxgep,
@@ -3958,7 +4187,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_check_mii_link port<0x%x> :"
 		    "BEFORE BMSR ^ nxgep->bmsr 0x%x bmsr_data 0x%x",
-		    xcvr_portn, nxgep->bmsr.value, bmsr_data.value));
+		    portn, nxgep->bmsr.value, bmsr_data.value));
 
 		bmsr_ints.value = nxgep->bmsr.value ^ bmsr_data.value;
 		nxgep->bmsr.value = bmsr_data.value;
@@ -3966,7 +4195,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_check_mii_link port<0x%x> CALLING "
 		    "bmsr_data 0x%x bmsr_ints.value 0x%x",
-		    xcvr_portn, bmsr_data.value, bmsr_ints.value));
+		    portn, bmsr_data.value, bmsr_ints.value));
 
 		if ((status = nxge_mii_check(nxgep, bmsr_data, bmsr_ints,
 		    &link_up)) != NXGE_OK) {
@@ -4034,6 +4263,83 @@ nxge_check_10g_link(p_nxge_t nxgep)
 
 	switch (nxgep->mac.portmode) {
 	default:
+		/*
+		 * Check if the phy is present in case of hot swappable phy
+		 */
+		if (nxgep->hot_swappable_phy) {
+			boolean_t phy_present_now = B_FALSE;
+
+			/*
+			 * If this is the 2nd Goa port, then check 2 addresses
+			 * to take care of the Goa NEM card requirements.
+			 */
+			if (portn == 1) {
+				if (nxge_is_phy_present(nxgep,
+				    BCM8706_ALT_GOA_PORT1_ADDR,
+				    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
+					phy_present_now = B_TRUE;
+					nxgep->xcvr_addr =
+					    BCM8706_ALT_GOA_PORT1_ADDR;
+					goto phy_check_done;
+				}
+			}
+			if (nxge_is_phy_present(nxgep,
+			    (BCM8706_GOA_PORT_ADDR_BASE) + portn,
+			    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
+				nxgep->xcvr_addr =
+				    (BCM8706_GOA_PORT_ADDR_BASE) + portn;
+				phy_present_now = B_TRUE;
+			}
+
+phy_check_done:
+			if (nxgep->phy_absent) {
+				if (phy_present_now) {
+				/*
+				 * Detect, Initialize phy and do link up
+				 * set xcvr vals, link_init, nxge_init
+				 */
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "Hot swappable phy DETECTED!!"));
+					nxgep->phy_absent = B_FALSE;
+					(void) nxge_xcvr_find(nxgep);
+					(void) nxge_link_init(nxgep);
+					if (!(nxgep->drv_state &
+					    STATE_HW_INITIALIZED)) {
+						status = nxge_init(nxgep);
+						if (status != NXGE_OK) {
+							NXGE_ERROR_MSG((nxgep,
+							    NXGE_ERR_CTL,
+							    "Hot swappable "
+							    "phy present, but"
+							    " driver init"
+							    "  failed..."));
+							goto fail;
+						}
+					}
+				}
+
+				goto start_link_check;
+
+			} else if (!phy_present_now) {
+				/*
+				 * Phy gone, bring link down reset xcvr vals
+				 */
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "Hot swappable phy REMOVED!!"));
+				nxgep->phy_absent = B_TRUE;
+				nxgep->statsp->mac_stats.link_up = 0;
+				nxgep->statsp->mac_stats.link_speed = 0;
+				nxgep->statsp->mac_stats.link_duplex = 0;
+				nxge_link_is_down(nxgep);
+				nxgep->link_notify = B_FALSE;
+
+				(void) nxge_xcvr_find(nxgep);
+
+				goto start_link_check;
+
+			}
+		}
+
 		status = nxge_check_bcm8704_link(nxgep, &link_up);
 		if (status != NXGE_OK)
 			goto fail;
@@ -4085,6 +4391,7 @@ nxge_check_10g_link(p_nxge_t nxgep)
 		}
 	}
 
+start_link_check:
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_10g_link port<%d>",
 	    portn));
@@ -4708,9 +5015,25 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 			&val3);
 	if (status != NXGE_OK)
 		goto fail;
-	link_align = (val3 == (XGXS_LANE_ALIGN_STATUS | XGXS_LANE3_SYNC |
-				XGXS_LANE2_SYNC | XGXS_LANE1_SYNC |
-				XGXS_LANE0_SYNC | 0x400)) ? B_TRUE : B_FALSE;
+
+	switch (nxgep->chip_id) {
+	case BCM8704_CHIP_ID:
+		link_align = (val3 == (XGXS_LANE_ALIGN_STATUS |
+		    XGXS_LANE3_SYNC | XGXS_LANE2_SYNC | XGXS_LANE1_SYNC |
+		    XGXS_LANE0_SYNC | 0x400)) ? B_TRUE : B_FALSE;
+		break;
+	case BCM8706_CHIP_ID:
+		link_align = ((val3 & XGXS_LANE_ALIGN_STATUS) &&
+		    (val3 & XGXS_LANE3_SYNC) && (val3 & XGXS_LANE2_SYNC) &&
+		    (val3 & XGXS_LANE1_SYNC) && (val3 & XGXS_LANE0_SYNC)) ?
+		    B_TRUE : B_FALSE;
+		break;
+	default:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_check_bcm8704_link:"
+		    "Unknown chip ID [0x%x]", nxgep->chip_id));
+		goto fail;
+	}
+
 
 #ifdef	NXGE_DEBUG_ALIGN_ERR
 	/* Temp workaround for link down issue */
@@ -4770,6 +5093,35 @@ nxge_10g_link_led_off(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	else
 		return (NXGE_OK);
+}
+
+static boolean_t
+nxge_is_phy_present(p_nxge_t nxgep, int addr, uint32_t id, uint32_t mask)
+{
+	uint32_t pma_pmd_id = 0;
+	uint32_t pcs_id = 0;
+	uint32_t phy_id = 0;
+
+	pma_pmd_id = nxge_get_cl45_pma_pmd_id(nxgep, addr);
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_is_phy_present: pma_pmd_id[0x%x]", pma_pmd_id));
+	if ((pma_pmd_id & mask) == (id & mask))
+		goto found_phy;
+	pcs_id = nxge_get_cl45_pcs_id(nxgep, addr);
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_is_phy_present: pcs_id[0x%x]", pcs_id));
+	if ((pcs_id & mask) == (id & mask))
+		goto found_phy;
+	phy_id = nxge_get_cl22_phy_id(nxgep, addr);
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "nxge_is_phy_present: phy_id[0x%x]", phy_id));
+	if ((phy_id & mask) == (id & mask))
+		goto found_phy;
+
+	return (B_FALSE);
+
+found_phy:
+	return (B_TRUE);
 }
 
 /* Check if the given id read using the given MDIO Clause is supported */
@@ -4908,11 +5260,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	uint32_t	port_phy_id[NXGE_PORTS_NEPTUNE];
 	uint8_t		pma_pmd_dev_fd[NXGE_MAX_PHY_PORTS];
 	uint8_t		pcs_dev_fd[NXGE_MAX_PHY_PORTS];
-	uint8_t		phy_fd[NXGE_MAX_PHY_PORTS];
-	uint8_t		port_fd[NXGE_MAX_PHY_PORTS];
+	uint8_t		phy_fd_arr[NXGE_MAX_PHY_PORTS];
+	uint8_t		port_fd_arr[NXGE_MAX_PHY_PORTS];
 	uint8_t		total_port_fd, total_phy_fd;
 	nxge_status_t	status = NXGE_OK;
-	int		prt_id = -1;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_scan_ports_phy: "));
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -4936,6 +5287,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			if (j < NXGE_PORTS_NEPTUNE) {
 				port_pma_pmd_dev_id[j] = pma_pmd_dev_id &
 				    BCM_PHY_ID_MASK;
+				port_fd_arr[j] = (uint8_t)i;
 				j++;
 			}
 		} else {
@@ -4951,32 +5303,29 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			if (k < NXGE_PORTS_NEPTUNE) {
 				port_pcs_dev_id[k] = pcs_dev_id &
 				    BCM_PHY_ID_MASK;
+				port_fd_arr[k] = (uint8_t)i;
 				k++;
 			}
 		} else {
 			pcs_dev_fd[i] = 0;
 		}
 
-		if (pcs_dev_fd[i] || pma_pmd_dev_fd[i])
-			port_fd[i] = 1;
-		else
-			port_fd[i] = 0;
-		total_port_fd += port_fd[i];
+		if (pcs_dev_fd[i] || pma_pmd_dev_fd[i]) {
+			total_port_fd ++;
+		}
 
 		phy_id = nxge_get_cl22_phy_id(nxgep, i);
 
 		if (nxge_is_supported_phy(phy_id, CLAUSE_22_TYPE)) {
-			phy_fd[i] = 1;
+			total_phy_fd ++;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID"
 			    "found", i));
 			if (l < NXGE_PORTS_NEPTUNE) {
 				port_phy_id[l] = phy_id & BCM_PHY_ID_MASK;
+				phy_fd_arr[l] = (uint8_t)i;
 				l++;
 			}
-		} else {
-			phy_fd[i] = 0;
 		}
-		total_phy_fd += phy_fd[i];
 	}
 
 	switch (total_port_fd) {
@@ -5003,21 +5352,31 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * the known phy start addresses to determine
 				 * the platform type.
 				 */
-				for (i = NXGE_EXT_PHY_PORT_ST;
-				    i < NXGE_MAX_PHY_PORTS; i++) {
-					if (port_fd[i] == 1)
-						break;
-				}
-				if (i == BCM8704_NEPTUNE_PORT_ADDR_BASE) {
+
+				switch (port_fd_arr[0]) {
+				case BCM8704_NEPTUNE_PORT_ADDR_BASE:
 					hw_p->niu_type = NEPTUNE_2_10GF;
 					hw_p->platform_type =
 					    P_NEPTUNE_ATLAS_2PORT;
-				} else {
-					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					break;
+				case BCM8706_GOA_PORT_ADDR_BASE:
+					if (hw_p->platform_type !=
+					    P_NEPTUNE_NIU) {
+						hw_p->platform_type =
+						    P_NEPTUNE_GENERIC;
+						hw_p->niu_type =
+						    NEPTUNE_2_10GF;
+					}
+					break;
+				default:
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    "Unsupported neptune type 2 - 1"));
 					goto error_exit;
 				}
-				hw_p->niu_type = NEPTUNE_2_10GF;
+
+				for (i = 0; i < 2; i++) {
+					hw_p->xcvr_addr[i] = port_fd_arr[i];
+				}
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 2"));
@@ -5040,25 +5399,28 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * the known phy start addresses to determine
 				 * the platform type.
 				 */
-				for (i = NXGE_EXT_PHY_PORT_ST;
-				    i < NXGE_MAX_PHY_PORTS; i++) {
-					if (phy_fd[i] == 1)
-						break;
-				}
-				if (i == BCM5464_MARAMBA_P0_PORT_ADDR_BASE) {
+				switch (phy_fd_arr[0]) {
+				case BCM5464_MARAMBA_P0_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P0;
-				} else if (i ==
-				    BCM5464_MARAMBA_P1_PORT_ADDR_BASE) {
+					break;
+				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P1;
-				} else {
+					break;
+				default:
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    "Unknown port %d...Cannot "
 					    "determine platform type", i));
 					goto error_exit;
 				}
+
 				hw_p->niu_type = NEPTUNE_2_10GF_2_1GC;
+
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
+				hw_p->xcvr_addr[2] = phy_fd_arr[2];
+				hw_p->xcvr_addr[3] = phy_fd_arr[3];
 
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Maramba with 2 XAUI"));
@@ -5104,10 +5466,41 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			    "Unsupported neptune type 9"));
 			goto error_exit;
 		case 0:
-			/* TODO 1 10G mode */
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			    "Unsupported neptune type 10"));
-			goto error_exit;
+			/* 1 10G mode, N2 with 1 XAUI */
+			if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY ||
+			    port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) {
+
+				/*
+				 * Check the first phy port address against
+				 * the known phy start addresses to determine
+				 * the platform type.
+				 */
+
+				switch (port_fd_arr[0]) {
+				case BCM8704_N2_PORT_ADDR_BASE:
+				case (BCM8704_N2_PORT_ADDR_BASE + 1):
+				case BCM8706_ALT_GOA_PORT1_ADDR:
+					if (hw_p->platform_type !=
+					    P_NEPTUNE_NIU) {
+						hw_p->platform_type =
+						    P_NEPTUNE_GENERIC;
+						hw_p->niu_type =
+						    NEPTUNE_2_10GF;
+					}
+					break;
+				default:
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "Unsupported neptune type 10"));
+					goto error_exit;
+				}
+
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+			} else {
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "Unsupported neptune type 10 - 1"));
+				goto error_exit;
+			}
+			break;
 		case 4:
 			/* Maramba with 1 XAUI */
 			if ((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) ||
@@ -5118,42 +5511,45 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * the known phy start addresses to determine
 				 * the platform type.
 				 */
-				for (i = NXGE_EXT_PHY_PORT_ST;
-				    i < NXGE_MAX_PHY_PORTS; i++) {
-					if (phy_fd[i] == 1)
-						break;
-				}
-
-				if (i == BCM5464_MARAMBA_P0_PORT_ADDR_BASE) {
+				switch (phy_fd_arr[0]) {
+				case BCM5464_MARAMBA_P0_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P0;
-				} else if (i ==
-				    BCM5464_MARAMBA_P1_PORT_ADDR_BASE) {
+					break;
+				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P1;
-				} else {
+					break;
+				default:
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    "Unknown port %d...Cannot "
-					    "determine platform type", i));
+					    "determine platform type 10 - 2",
+					    i));
 					goto error_exit;
 				}
 
-				/* The 10G port is BCM8704 */
-				for (i = NXGE_EXT_PHY_PORT_ST;
-				    i < NXGE_MAX_PHY_PORTS; i++) {
-					if (port_fd[i] == 1) {
-						prt_id = i;
-						break;
-					}
-				}
-
-				prt_id %= BCM8704_MARAMBA_PORT_ADDR_BASE;
-				if (prt_id == 0) {
+				/*
+				 * Check the BCM8704 address to determine
+				 * if XAUI is in port 0 or port 1.
+				 */
+				switch (port_fd_arr[0]) {
+				case BCM8704_MARAMBA_PORT_ADDR_BASE:
 					hw_p->niu_type = NEPTUNE_1_10GF_3_1GC;
-				} else if (prt_id == 1) {
+					hw_p->xcvr_addr[0] = port_fd_arr[0];
+					for (i = 1; i < NXGE_MAX_PORTS; i++) {
+						hw_p->xcvr_addr[i] =
+						    phy_fd_arr[i];
+					}
+					break;
+				case (BCM8704_MARAMBA_PORT_ADDR_BASE + 1):
 					hw_p->niu_type =
 					    NEPTUNE_1_1GC_1_10GF_2_1GC;
-				} else {
+					hw_p->xcvr_addr[0] = phy_fd_arr[0];
+					hw_p->xcvr_addr[1] = port_fd_arr[0];
+					hw_p->xcvr_addr[2] = phy_fd_arr[2];
+					hw_p->xcvr_addr[3] = phy_fd_arr[3];
+					break;
+				default:
 					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 					    "Unsupported neptune type 11"));
 					goto error_exit;
@@ -5185,26 +5581,25 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * the known phy start addresses to determine
 				 * the platform type.
 				 */
-				for (i = NXGE_EXT_PHY_PORT_ST;
-				    i < NXGE_MAX_PHY_PORTS; i++) {
-					if (phy_fd[i] == 1)
-						break;
-				}
-
-				if (i == BCM5464_MARAMBA_P1_PORT_ADDR_BASE) {
+				switch (phy_fd_arr[0]) {
+				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P1;
-				} else if (i ==
-				    BCM5464_NEPTUNE_PORT_ADDR_BASE) {
+					break;
+				case BCM5464_NEPTUNE_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_ATLAS_4PORT;
-				} else {
+					break;
+				default:
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    "Unknown port %d...Cannot "
 					    "determine platform type", i));
 					goto error_exit;
 				}
 				hw_p->niu_type = NEPTUNE_4_1GC;
+				for (i = 0; i < NXGE_MAX_PORTS; i++) {
+					hw_p->xcvr_addr[i] = phy_fd_arr[i];
+				}
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 14"));
@@ -5396,7 +5791,6 @@ nxge_mii_dump(p_nxge_t nxgep)
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "==> nxge_mii_dump"));
 
-	param_arr = nxgep->param_arr;
 	statsp = nxgep->statsp;
 	xcvr_portn = statsp->mac_stats.xcvr_portn;
 

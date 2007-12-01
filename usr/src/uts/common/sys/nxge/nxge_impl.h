@@ -348,6 +348,7 @@ typedef enum {
 
 typedef enum {
 	P_NEPTUNE_NONE,
+	P_NEPTUNE_GENERIC,
 	P_NEPTUNE_ATLAS_2PORT,
 	P_NEPTUNE_ATLAS_4PORT,
 	P_NEPTUNE_MARAMBA_P0,
@@ -361,6 +362,7 @@ typedef enum {
 	    ((nxgep->platform_type) == P_NEPTUNE_ATLAS_4PORT) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P0) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_MARAMBA_P1) || \
+	    ((nxgep->platform_type) == P_NEPTUNE_GENERIC) || \
 	    ((nxgep->platform_type) == P_NEPTUNE_ALONSO))
 
 #define	NXGE_IS_XAUI_PLATFORM(nxgep) \
@@ -424,7 +426,6 @@ typedef struct _nxge_xcvr_table {
 	nxge_status_t	(*check_link) ();	/* Link check routine */
 
 	uint32_t	xcvr_inuse;
-	uint32_t	xcvr_addr;
 } nxge_xcvr_table_t, *p_nxge_xcvr_table_t;
 
 /*

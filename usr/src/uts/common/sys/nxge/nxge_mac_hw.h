@@ -159,7 +159,8 @@ typedef	enum nxge_port_mode {
 	PORT_10G_FIBER,
 	PORT_10G_SERDES,
 	PORT_1G_SERDES,
-	PORT_1G_RGMII_FIBER
+	PORT_1G_RGMII_FIBER,
+	PORT_HSP_MODE
 } nxge_port_mode_t;
 
 typedef	enum nxge_linkchk_mode {
@@ -183,7 +184,8 @@ typedef enum {
 	INT_MII_XCVR,
 	EXT_MII_XCVR,
 	PCS_XCVR,
-	XPCS_XCVR
+	XPCS_XCVR,
+	HSP_XCVR
 } xcvr_inuse_t;
 
 /* macros for port offset calculations */

@@ -535,6 +535,10 @@ struct _nxge_t {
 	npi_handle_t		npi_v2reg_handle;
 
 	nxge_xcvr_table_t	xcvr;
+	boolean_t		hot_swappable_phy;
+	boolean_t		phy_absent;
+	uint32_t		xcvr_addr;
+	uint16_t		chip_id;
 	nxge_mac_t		mac;
 	nxge_ipp_t		ipp;
 	nxge_txc_t		txc;

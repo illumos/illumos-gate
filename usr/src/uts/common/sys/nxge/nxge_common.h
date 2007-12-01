@@ -480,6 +480,7 @@ typedef struct nxge_hw_list {
 	uint32_t 		magic;
 	uint32_t		niu_type;
 	uint32_t		platform_type;
+	uint8_t			xcvr_addr[NXGE_MAX_PORTS];
 } nxge_hw_list_t, *p_nxge_hw_list_t;
 
 #ifdef	__cplusplus

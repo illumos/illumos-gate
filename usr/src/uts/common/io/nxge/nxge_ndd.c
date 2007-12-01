@@ -899,36 +899,48 @@ nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	switch (nxgep->mac.portmode) {
 	case PORT_1G_COPPER:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Copper\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Copper %s\n",
+		    nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_1G_FIBER:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Fiber\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Fiber %s\n",
+		    nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_10G_COPPER:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Copper\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Copper "
+		    "%s\n", nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_10G_FIBER:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Fiber\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Fiber %s\n",
+		    nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_10G_SERDES:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Serdes\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  10G Serdes "
+		    "%s\n", nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_1G_SERDES:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Serdes\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G Serdes %s\n",
+		    nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_1G_RGMII_FIBER:
 		(void) mi_mpprintf(mp, "Port mode for nxge%d:  1G RGMII "
-		    "Fiber\n", nxgep->instance);
+		    "Fiber %s\n", nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
+		break;
+	case PORT_HSP_MODE:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Hot Swappable "
+		    "PHY, Currently NOT present\n", nxgep->instance);
 		break;
 	default:
-		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Unknown\n",
-		    nxgep->instance);
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Unknown %s\n",
+		    nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	}
 
