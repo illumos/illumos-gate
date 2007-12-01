@@ -775,9 +775,11 @@ xen_psm_rebind_irq(int irq)
 		CPUSET_ONLY(ncpu, newcpu & ~IRQ_USER_BOUND);
 	}
 	ec_set_irq_affinity(irq, ncpu);
-	irqptr = apic_irq_table[irq];
-	ASSERT(irqptr != NULL);
-	irqptr->airq_temp_cpu = (uchar_t)newcpu;
+	if (irq <= APIC_MAX_VECTOR) {
+		irqptr = apic_irq_table[irq];
+		ASSERT(irqptr != NULL);
+		irqptr->airq_temp_cpu = (uchar_t)newcpu;
+	}
 }
 
 /*

@@ -658,7 +658,8 @@ ec_set_irq_affinity(int irq, cpuset_t dest)
 	 * It will check for any pending interrupts, and so service any that
 	 * got delivered to the wrong processor by mistake.
 	 */
-	poke_cpu(tcpu);
+	if (ncpus > 1)
+		poke_cpu(tcpu);
 }
 
 int
