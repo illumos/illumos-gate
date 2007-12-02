@@ -1471,6 +1471,9 @@ DMFE_OBJS += dmfe_log.o dmfe_main.o dmfe_mii.o dmfe_ndd.o
 IXGB_OBJS += ixgb.o ixgb_atomic.o ixgb_chip.o ixgb_gld.o ixgb_kstats.o \
 		ixgb_log.o ixgb_ndd.o ixgb_rx.o ixgb_tx.o ixgb_xmii.o
 
+NGE_OBJS += nge_main.o nge_atomic.o nge_chip.o nge_ndd.o nge_kstats.o \
+		nge_log.o nge_rx.o nge_tx.o nge_xmii.o
+
 RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
 ATH_OBJS += ath_aux.o ath_main.o ath_osdep.o ath_rate.o
