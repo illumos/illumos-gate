@@ -631,7 +631,14 @@ check_dst(in_addr_t addr)
 	if (IN_LINKLOCAL(addr))
 		return (_B_FALSE);
 
-	return (IN_CLASSB(addr) || IN_CLASSC(addr));
+	if (IN_CLASSB(addr) || IN_CLASSC(addr))
+		return (_B_TRUE);
+
+	if (IN_CLASSD(addr))
+		return (_B_FALSE);
+
+	return (_B_TRUE);
+
 }
 
 /*
@@ -1102,7 +1109,7 @@ calculate_lifc_len:
 			ifs.int_if_flags = lifrp->lifr_flags;
 		}
 
-		if (IN_EXPERIMENTAL(ntohl(ifs.int_addr)) ||
+		if (IN_CLASSD(ntohl(ifs.int_addr)) ||
 		    (ntohl(ifs.int_addr) & IN_CLASSA_NET) == 0) {
 			if (IS_IFF_UP(ifs.int_if_flags)) {
 				if (!(prev_complaints & COMP_BADADDR))
@@ -1150,8 +1157,8 @@ calculate_lifc_len:
 				continue;
 			}
 			ifs.int_net = ntohl(sinp->sin_addr.s_addr);
-			if (IN_EXPERIMENTAL(ifs.int_net) ||
-			    (ifs.int_net != 0 &&
+			if (IN_CLASSD(ntohl(ifs.int_net)) ||
+			   (ifs.int_net != 0 &&
 			    (ifs.int_net & IN_CLASSA_NET) == 0)) {
 				if (IS_IFF_UP(ifs.int_if_flags)) {
 					if (!(prev_complaints & COMP_NODST))
@@ -1214,8 +1221,8 @@ calculate_lifc_len:
 				continue;
 			}
 			haddr = ntohl(sinp->sin_addr.s_addr);
-			if (IN_EXPERIMENTAL(haddr) ||
-			    (haddr & IN_CLASSA_NET) == 0) {
+			if (IN_CLASSD(haddr) ||
+			(haddr & IN_CLASSA_NET) == 0) {
 				if (IS_IFF_UP(ifs.int_if_flags)) {
 					if (!(prev_complaints & COMP_NOBADDR))
 						writelog(LOG_NOTICE,

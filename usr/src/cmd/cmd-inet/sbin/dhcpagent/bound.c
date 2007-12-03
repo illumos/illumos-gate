@@ -1061,8 +1061,15 @@ configure_v4_lease(dhcp_smach_t *dsmp)
 			inaddr.s_addr = htonl(IN_CLASSA_NET);
 		else if (IN_CLASSB(addrhbo))
 			inaddr.s_addr = htonl(IN_CLASSB_NET);
-		else	/* must be class c */
+		else if (IN_CLASSC(addrhbo))
 			inaddr.s_addr = htonl(IN_CLASSC_NET);
+		else {
+			/*
+			 * Cant be Class D as that is multicast
+			 * Must be Class E
+			 */
+			inaddr.s_addr =  htonl(IN_CLASSE_NET);
+		}
 	}
 	lif->lif_v6mask._S6_un._S6_u32[3] = inaddr.s_addr;
 

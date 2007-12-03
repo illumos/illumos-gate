@@ -1,4 +1,7 @@
 /*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ *
  * Copyright (c) 1982, 1986 Regents of the University of California.
  * All rights reserved.
  *
@@ -16,7 +19,7 @@
  */
 
 #ifndef _netinet_in_h
-#define _netinet_in_h
+#define	_netinet_in_h
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -119,6 +122,11 @@ struct in_addr {
  * Definitions of bits in internet address integers.
  * On subnets, the decomposition of addresses to host and net parts
  * is done according to subnet mask, not the masks here.
+ *
+ * Note that with the introduction of CIDR, IN_CLASSA, IN_CLASSB,
+ * IN_CLASSC, IN_CLASSD and IN_CLASSE macros have become "de-facto obsolete".
+ * IN_MULTICAST macro should be used to test if a address is a
+ * multicast address.
  */
 #define	IN_CLASSA(i)		(((long)(i) & 0x80000000) == 0)
 #define	IN_CLASSA_NET		0xff000000
@@ -140,8 +148,19 @@ struct in_addr {
 #define	IN_CLASSD(i)		(((long)(i) & 0xf0000000) == 0xe0000000)
 #define	IN_MULTICAST(i)		IN_CLASSD(i)
 
+#define	IN_CLASSE(i)		(((long)(i) & 0xf0000000) == 0xf0000000)
+				    
+#define	IN_CLASSE_NET		0xffffffff
+
+/*
+ * We have removed CLASS E checks from the kernel
+ * But we preserve these defines for userland  in order
+ * to avoid compile  breakage of some 3rd party piece of software
+ */
+#ifndef	KERNEL
 #define	IN_EXPERIMENTAL(i)	(((long)(i) & 0xe0000000) == 0xe0000000)
 #define	IN_BADCLASS(i)		(((long)(i) & 0xf0000000) == 0xf0000000)
+#endif
 
 #define	INADDR_ANY		(u_long)0x00000000
 #define	INADDR_LOOPBACK		(u_long)0x7F000001
@@ -192,4 +211,4 @@ struct	in_addr in_makeaddr();
 u_long	in_netof(), in_lnaof();
 #endif
 
-#endif /*!_netinet_in_h*/
+#endif /* !_netinet_in_h */

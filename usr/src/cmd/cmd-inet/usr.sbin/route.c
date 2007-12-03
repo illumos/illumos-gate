@@ -1942,6 +1942,10 @@ inet_makenetandmask(rtcmd_irep_t *rcip, in_addr_t net, struct sockaddr_in *sin)
 	}
 	sin->sin_addr.s_addr = htonl(addr);
 
+	/* Class E default mask is 32 */
+	if (IN_CLASSE(addr))
+		mask = IN_CLASSE_NET;
+
 	if (!(rcip->ri_addrs & RTA_NETMASK)) {
 		rcip->ri_addrs |= RTA_NETMASK;
 		sin = &rcip->ri_mask.sin;

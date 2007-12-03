@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -25,7 +25,9 @@ std_mask(in_addr_t addr)	/* network byte order */
 		return (IN_CLASSA_NET);
 	if (IN_CLASSB(addr))
 		return (IN_CLASSB_NET);
-	return (IN_CLASSC_NET);
+	if (IN_CLASSC(addr))
+		return (IN_CLASSC_NET);
+	return (IN_CLASSE_NET);
 }
 
 /*

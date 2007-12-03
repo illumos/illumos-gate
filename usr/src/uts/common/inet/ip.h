@@ -3004,16 +3004,20 @@ extern struct module_info ip_mod_info;
  * Network byte order macros
  */
 #ifdef	_BIG_ENDIAN
+#define	N_IN_CLASSA_NET		IN_CLASSA_NET
 #define	N_IN_CLASSD_NET		IN_CLASSD_NET
 #define	N_INADDR_UNSPEC_GROUP	INADDR_UNSPEC_GROUP
+#define	N_IN_LOOPBACK_NET	(ipaddr_t)0x7f000000U
 #else /* _BIG_ENDIAN */
+#define	N_IN_CLASSA_NET		(ipaddr_t)0x000000ffU
 #define	N_IN_CLASSD_NET		(ipaddr_t)0x000000f0U
 #define	N_INADDR_UNSPEC_GROUP	(ipaddr_t)0x000000e0U
+#define	N_IN_LOOPBACK_NET	(ipaddr_t)0x0000007fU
 #endif /* _BIG_ENDIAN */
 #define	CLASSD(addr)	(((addr) & N_IN_CLASSD_NET) == N_INADDR_UNSPEC_GROUP)
-
+#define	CLASSE(addr)	(((addr) & N_IN_CLASSD_NET) == N_IN_CLASSD_NET)
 #define	IP_LOOPBACK_ADDR(addr)			\
-	((ntohl(addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
+	(((addr) & N_IN_CLASSA_NET == N_IN_LOOPBACK_NET))
 
 #ifdef DEBUG
 /* IPsec HW acceleration debugging support */

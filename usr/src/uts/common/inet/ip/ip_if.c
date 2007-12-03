@@ -5760,7 +5760,7 @@ ip_addr_ok_v4(ipaddr_t addr, ipaddr_t subnet_mask)
 	ipaddr_t	net_mask;
 
 	/*
-	 * Don't allow all zeroes, all ones or experimental address, but allow
+	 * Don't allow all zeroes, or all ones, but allow
 	 * all ones netmask.
 	 */
 	if ((net_mask = ip_net_mask(addr)) == 0)
@@ -5772,6 +5772,14 @@ ip_addr_ok_v4(ipaddr_t addr, ipaddr_t subnet_mask)
 	    (addr == (addr | ~net_mask)))) {
 		return (B_FALSE);
 	}
+
+	/*
+	 * Even if the netmask is all ones, we do not allow address to be
+	 * 255.255.255.255
+	 */
+	if (addr == INADDR_BROADCAST)
+		return (B_FALSE);
+
 	if (CLASSD(addr))
 		return (B_FALSE);
 

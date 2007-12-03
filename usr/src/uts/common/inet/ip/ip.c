@@ -7668,6 +7668,11 @@ ip_net_mask(ipaddr_t addr)
 		maskp[0] = 0xF0;
 		return (mask);
 	}
+
+	/* We assume Class E default netmask to be 32 */
+	if (CLASSE(addr))
+		return (0xffffffffU);
+
 	if (addr == 0)
 		return (0);
 	maskp[0] = 0xFF;
@@ -7682,7 +7687,7 @@ ip_net_mask(ipaddr_t addr)
 	if ((up[0] & 0xE0) == 0xC0)
 		return (mask);
 
-	/* Must be experimental or multicast, indicate as much */
+	/* Otherwise return no mask */
 	return ((ipaddr_t)0);
 }
 
@@ -13866,15 +13871,14 @@ ire_t *
 ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 {
 	ipha_t	*ipha;
-	ipaddr_t ip_dst, ip_src;
-	ire_t	*src_ire = NULL;
+	ire_t	*src_ire;
 	ill_t	*stq_ill;
 	uint_t	hlen;
 	uint_t	pkt_len;
 	uint32_t sum;
 	queue_t	*dev_q;
-	boolean_t check_multirt = B_FALSE;
 	ip_stack_t *ipst = ill->ill_ipst;
+	mblk_t *fpmp;
 
 	ipha = (ipha_t *)mp->b_rptr;
 
@@ -13883,11 +13887,8 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	 * The loopback address check for both src and dst has already
 	 * been checked in ip_input
 	 */
-	ip_dst = ntohl(dst);
-	ip_src = ntohl(ipha->ipha_src);
 
-	if (ip_dst == INADDR_ANY || IN_BADCLASS(ip_dst) ||
-	    IN_CLASSD(ip_src)) {
+	if (dst == INADDR_ANY || CLASSD(ipha->ipha_src)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		goto drop;
 	}
@@ -13896,19 +13897,21 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 	if (src_ire != NULL) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
+		ire_refrele(src_ire);
 		goto drop;
 	}
 
 
 	/* No ire cache of nexthop. So first create one  */
 	if (ire == NULL) {
+		boolean_t check_multirt;
+
 		ire = ire_forward(dst, &check_multirt, NULL, NULL, NULL, ipst);
 		/*
 		 * We only come to ip_fast_forward if ip_cgtp_filter is
 		 * is not set. So upon return from ire_forward
 		 * check_multirt should remain as false.
 		 */
-		ASSERT(!check_multirt);
 		if (ire == NULL) {
 			/* An attempt was made to forward the packet */
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
@@ -13938,6 +13941,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	 *	  IPMP group
 	 *	o corresponding ire is in incomplete state
 	 *	o packet needs fragmentation
+	 *	o ARP cache is not resolved
 	 *
 	 * The codeflow from here on is thus:
 	 *	ip_rput_process_forward->ip_rput_forward->ip_xmit_v4
@@ -13949,8 +13953,9 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	    (ill == stq_ill) ||
 	    (ill->ill_group != NULL && ill->ill_group == stq_ill->ill_group) ||
 	    (ire->ire_nce == NULL) ||
-	    (ire->ire_nce->nce_state != ND_REACHABLE) ||
 	    (pkt_len > ire->ire_max_frag) ||
+	    ((fpmp = ire->ire_nce->nce_fp_mp) == NULL) ||
+	    ((hlen = MBLKL(fpmp)) > MBLKHEAD(mp)) ||
 	    ipha->ipha_ttl <= 1) {
 		ip_rput_process_forward(ill->ill_rq, mp, ire,
 		    ipha, ill, B_FALSE);
@@ -13976,50 +13981,52 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
 	ipha->ipha_ttl--;
 
+	/*
+	 * Write the link layer header.  We can do this safely here,
+	 * because we have already tested to make sure that the IP
+	 * policy is not set, and that we have a fast path destination
+	 * header.
+	 */
+	mp->b_rptr -= hlen;
+	bcopy(fpmp->b_rptr, mp->b_rptr, hlen);
+
+	UPDATE_IB_PKT_COUNT(ire);
+	ire->ire_last_used_time = lbolt;
+	BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutForwDatagrams);
+	BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+	UPDATE_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutOctets, pkt_len);
+
 	dev_q = ire->ire_stq->q_next;
-	if ((dev_q->q_next != NULL ||
-	    dev_q->q_first != NULL) && !canput(dev_q)) {
+	if ((dev_q->q_next != NULL || dev_q->q_first != NULL) &&
+	    !canputnext(ire->ire_stq)) {
 		goto indiscard;
 	}
-
-	hlen = ire->ire_nce->nce_fp_mp != NULL ?
-	    MBLKL(ire->ire_nce->nce_fp_mp) : 0;
-
-	if (hlen != 0 || ire->ire_nce->nce_res_mp != NULL) {
-		mblk_t *mpip = mp;
-
-		mp = ip_wput_attach_llhdr(mpip, ire, 0, 0);
-		if (mp != NULL) {
-			DTRACE_PROBE4(ip4__physical__out__start,
-			    ill_t *, NULL, ill_t *, stq_ill,
-			    ipha_t *, ipha, mblk_t *, mp);
-			FW_HOOKS(ipst->ips_ip4_physical_out_event,
-			    ipst->ips_ipv4firewall_physical_out,
-			    NULL, stq_ill, ipha, mp, mpip, ipst);
-			DTRACE_PROBE1(ip4__physical__out__end, mblk_t *,
-			    mp);
-			if (mp == NULL)
-				goto drop;
-
-			UPDATE_IB_PKT_COUNT(ire);
-			ire->ire_last_used_time = lbolt;
-			BUMP_MIB(stq_ill->ill_ip_mib,
-			    ipIfStatsHCOutForwDatagrams);
-			BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
-			UPDATE_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutOctets,
-			    pkt_len);
-			putnext(ire->ire_stq, mp);
-			return (ire);
-		}
+	if (ILL_DLS_CAPABLE(stq_ill)) {
+		/*
+		 * Send the packet directly to DLD, where it
+		 * may be queued depending on the availability
+		 * of transmit resources at the media layer.
+		 */
+		IP_DLS_ILL_TX(stq_ill, ipha, mp, ipst);
+	} else {
+		DTRACE_PROBE4(ip4__physical__out__start,
+		    ill_t *, NULL, ill_t *, stq_ill,
+		    ipha_t *, ipha, mblk_t *, mp);
+		FW_HOOKS(ipst->ips_ip4_physical_out_event,
+		    ipst->ips_ipv4firewall_physical_out,
+		    NULL, stq_ill, ipha, mp, mp, ipst);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+		if (mp == NULL)
+			goto drop;
+		putnext(ire->ire_stq, mp);
 	}
+	return (ire);
 
 indiscard:
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 drop:
 	if (mp != NULL)
 		freemsg(mp);
-	if (src_ire != NULL)
-		ire_refrele(src_ire);
 	return (ire);
 
 }
@@ -14060,8 +14067,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	 */
 	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
 	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	if (src_ire != NULL || ntohl(ipha->ipha_dst) == INADDR_ANY ||
-	    IN_BADCLASS(ntohl(ipha->ipha_dst))) {
+	if (src_ire != NULL || ipha->ipha_dst == INADDR_ANY) {
 		if (src_ire != NULL)
 			ire_refrele(src_ire);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
@@ -14912,6 +14918,16 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			if (ip_rput_process_notdata(q, &first_mp, ill,
 			    &ll_multicast, &mp))
 				continue;
+
+			/*
+			 * The only way we can get here is if we had a
+			 * packet that was either a DL_UNITDATA_IND or
+			 * an M_CTL for an IPsec accelerated packet.
+			 *
+			 * In either case, the first_mp will point to
+			 * the leading M_PROTO or M_CTL.
+			 */
+			ASSERT(first_mp != NULL);
 		}
 
 		/* Make sure its an M_DATA and that its aligned */
@@ -14961,11 +14977,15 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		/* Obtain the dst of the current packet */
 		dst = ipha->ipha_dst;
 
-		if (IP_LOOPBACK_ADDR(dst) ||
-		    IP_LOOPBACK_ADDR(ipha->ipha_src)) {
+		/*
+		 * The following test for loopback is faster than
+		 * IP_LOOPBACK_ADDR(), because it avoids any bitwise
+		 * operations.
+		 * Note that these addresses are always in network byte order
+		 */
+		if (((*(uchar_t *)&ipha->ipha_dst) == 127) ||
+		    ((*(uchar_t *)&ipha->ipha_src) == 127)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
-			cmn_err(CE_CONT, "dst %X src %X\n",
-			    dst, ipha->ipha_src);
 			freemsg(mp);
 			continue;
 		}

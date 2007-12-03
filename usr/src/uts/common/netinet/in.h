@@ -306,6 +306,11 @@ struct in_addr {
  * Definitions of bits in internet address integers.
  * On subnets, the decomposition of addresses to host and net parts
  * is done according to subnet mask, not the masks here.
+ *
+ * Note that with the introduction of CIDR, IN_CLASSA, IN_CLASSB,
+ * IN_CLASSC, IN_CLASSD and IN_CLASSE macros have become "de-facto
+ * obsolete". IN_MULTICAST macro should be used to test if a address
+ * is a multicast address.
  */
 #define	IN_CLASSA(i)		(((i) & 0x80000000U) == 0)
 #define	IN_CLASSA_NET		0xff000000U
@@ -328,10 +333,21 @@ struct in_addr {
 #define	IN_CLASSD_NET		0xf0000000U	/* These aren't really  */
 #define	IN_CLASSD_NSHIFT	28		/* net and host fields, but */
 #define	IN_CLASSD_HOST		0x0fffffffU	/* routing needn't know */
+
+#define	IN_CLASSE(i)		(((i) & 0xf0000000U) == 0xf0000000U)
+#define	IN_CLASSE_NET		0xffffffffU
+
 #define	IN_MULTICAST(i)		IN_CLASSD(i)
 
+/*
+ * We have removed CLASS E checks from the kernel
+ * But we preserve these defines for userland in order
+ * to avoid compile  breakage of some 3rd party piece of software
+ */
+#ifndef _KERNEL
 #define	IN_EXPERIMENTAL(i)	(((i) & 0xe0000000U) == 0xe0000000U)
 #define	IN_BADCLASS(i)		(((i) & 0xf0000000U) == 0xf0000000U)
+#endif
 
 #define	INADDR_ANY		0x00000000U
 #define	INADDR_LOOPBACK		0x7F000001U

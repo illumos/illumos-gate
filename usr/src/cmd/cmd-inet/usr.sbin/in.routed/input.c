@@ -193,7 +193,7 @@ input(struct sockaddr_in *from,		/* received from this IP address */
 	}
 
 	gate = ntohl(FROM_NADDR);
-	if (IN_EXPERIMENTAL(gate) || (gate >> IN_CLASSA_NSHIFT) == 0) {
+	if (IN_CLASSD(gate) || (gate >> IN_CLASSA_NSHIFT) == 0) {
 		msglim(&bad_router, FROM_NADDR, "source address %s unusable",
 		    naddr_ntoa(FROM_NADDR));
 		return;

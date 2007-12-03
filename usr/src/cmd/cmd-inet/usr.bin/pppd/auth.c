@@ -1,7 +1,7 @@
 /*
  * auth.c - PPP authentication and phase control.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1993 The Australian National University.
@@ -1874,7 +1874,7 @@ bad_ip_adrs(addr)
 #ifndef ALLOW_0_NET
 	((addr >> IN_CLASSA_NSHIFT) == 0 && addr != 0) ||
 #endif
-	IN_MULTICAST(addr) || IN_BADCLASS(addr);
+	IN_MULTICAST(addr);
 }
 
 /*

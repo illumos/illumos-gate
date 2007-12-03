@@ -1095,9 +1095,11 @@ dhcpinit(void)
 			subnet.s_addr = htonl(IN_CLASSB_NET);
 		else if (IN_CLASSC(ntohl(myIPaddr.s_addr)))
 			subnet.s_addr = htonl(IN_CLASSC_NET);
-		else
+		else if (IN_CLASSD(ntohl(myIPaddr.s_addr)))
 			cmn_err(CE_WARN, "dhcp:  bad IP address (%s)",
 			    inet_ntoa(myIPaddr));
+		else
+			subnet.s_addr = htonl(IN_CLASSE_NET);
 	}
 	/* and broadcast address */
 	if (pl->opts[CD_BROADCASTADDR] != NULL) {
