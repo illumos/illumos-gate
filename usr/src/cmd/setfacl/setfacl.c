@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef lint
-static char sccsid[] = "@(#)setfacl.c	1.10	05/06/16 SMI";
+static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
 #endif
 
 /*
@@ -53,7 +53,6 @@ static char sccsid[] = "@(#)setfacl.c	1.10	05/06/16 SMI";
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
-
 
 #define	ADD	1
 #define	MODIFY	2
@@ -419,7 +418,7 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 {
 	aclent_t	*new_aclp;
 	aclent_t	tmpacl;
-	aclent_t	*taclp;
+	aclent_t	*taclp, *centry, *gentry;
 	int		cur_cnt;
 	int		found = 0;
 	int		is_obj;
@@ -449,9 +448,9 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 		return (-1);
 
 	is_obj = ((tmpacl.a_type == USER_OBJ) ||
-		    (tmpacl.a_type == GROUP_OBJ) ||
-		    (tmpacl.a_type == DEF_USER_OBJ) ||
-		    (tmpacl.a_type == DEF_GROUP_OBJ));
+	    (tmpacl.a_type == GROUP_OBJ) ||
+	    (tmpacl.a_type == DEF_USER_OBJ) ||
+	    (tmpacl.a_type == DEF_GROUP_OBJ));
 
 	cur_cnt = *cntp - 1;
 	switch (mode) {
@@ -500,6 +499,37 @@ convert_to_aclent_t(char *entryp, int *cntp, aclent_t **aclpp, int mode)
 		break;
 	}
 
+	/*
+	 * If converting from non-trivial acl entry to trivial one,
+	 * reset CLASS_OBJ's permission with that of GROUP_OBJ.
+	 */
+
+	if (mode == DELETE) {
+		boolean_t	trivial = B_TRUE;	/* assumption */
+		cur_cnt = *cntp;
+		for (taclp = new_aclp; cur_cnt-- > 0; taclp++) {
+			switch (taclp->a_type) {
+				case USER_OBJ:
+				case OTHER_OBJ:
+					break;
+				case CLASS_OBJ:
+					centry = taclp;
+					break;
+				case GROUP_OBJ:
+					gentry = taclp;
+					break;
+				default:
+					/*
+					 * Confirmed that the new acl set is
+					 * still a non-trivial acl.
+					 * Skip reset.
+					 */
+					trivial = B_FALSE;
+			}
+		}
+		if (centry != NULL && gentry != NULL && trivial == B_TRUE)
+			centry->a_perm = gentry->a_perm;
+	}
 	*aclpp = new_aclp; 	/* return new acl entries */
 	return (0);
 }
@@ -709,7 +739,7 @@ parse_entry(char *fieldp, aclent_t *aclentp, int mode)
 		if (mo_flag == 1) {
 			/* Use only single : on mask/other entry */
 			(void) fprintf(stderr, gettext("use only 1 colon for "
-						"mask and other entries.\n"));
+			    "mask and other entries.\n"));
 			return (-1);
 		} else {
 			/* it's ok to have extra colon */
