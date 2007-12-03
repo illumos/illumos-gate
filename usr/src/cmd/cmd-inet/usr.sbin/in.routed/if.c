@@ -1158,7 +1158,7 @@ calculate_lifc_len:
 			}
 			ifs.int_net = ntohl(sinp->sin_addr.s_addr);
 			if (IN_CLASSD(ntohl(ifs.int_net)) ||
-			   (ifs.int_net != 0 &&
+			    (ifs.int_net != 0 &&
 			    (ifs.int_net & IN_CLASSA_NET) == 0)) {
 				if (IS_IFF_UP(ifs.int_if_flags)) {
 					if (!(prev_complaints & COMP_NODST))
@@ -1222,7 +1222,7 @@ calculate_lifc_len:
 			}
 			haddr = ntohl(sinp->sin_addr.s_addr);
 			if (IN_CLASSD(haddr) ||
-			(haddr & IN_CLASSA_NET) == 0) {
+			    (haddr & IN_CLASSA_NET) == 0) {
 				if (IS_IFF_UP(ifs.int_if_flags)) {
 					if (!(prev_complaints & COMP_NOBADDR))
 						writelog(LOG_NOTICE,
