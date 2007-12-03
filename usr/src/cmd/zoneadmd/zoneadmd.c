@@ -503,6 +503,7 @@ init_template(void)
 typedef struct fs_callback {
 	zlog_t		*zlogp;
 	zoneid_t	zoneid;
+	boolean_t	mount_cmd;
 } fs_callback_t;
 
 static int
@@ -511,6 +512,7 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 {
 	zlog_t *zlogp = ((fs_callback_t *)data)->zlogp;
 	zoneid_t zoneid = ((fs_callback_t *)data)->zoneid;
+	boolean_t mount_cmd = ((fs_callback_t *)data)->mount_cmd;
 	char rootpath[MAXPATHLEN];
 	pid_t child;
 	int child_status;
@@ -518,9 +520,28 @@ mount_early_fs(void *data, const char *spec, const char *dir,
 	int rv;
 	ctid_t ct;
 
-	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "unable to determine zone root");
-		return (-1);
+	/* determine the zone rootpath */
+	if (mount_cmd) {
+		char zonepath[MAXPATHLEN];
+		char luroot[MAXPATHLEN];
+
+		assert(zone_isnative || zone_iscluster);
+
+		if (zone_get_zonepath(zone_name,
+		    zonepath, sizeof (zonepath)) != Z_OK) {
+			zerror(zlogp, B_FALSE, "unable to determine zone path");
+			return (-1);
+		}
+
+		(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
+		resolve_lofs(zlogp, luroot, sizeof (luroot));
+		(void) strlcpy(rootpath, luroot, sizeof (rootpath));
+	} else {
+		if (zone_get_rootpath(zone_name,
+		    rootpath, sizeof (rootpath)) != Z_OK) {
+			zerror(zlogp, B_FALSE, "unable to determine zone root");
+			return (-1);
+		}
 	}
 
 	if ((rv = valid_mount_path(zlogp, rootpath, spec, dir, fstype)) < 0) {
@@ -672,6 +693,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 
 	cb.zlogp = zlogp;
 	cb.zoneid = zoneid;
+	cb.mount_cmd = B_FALSE;
 
 	/* Get a handle to the brand info for this zone */
 	if ((bh = brand_open(brand_name)) == NULL) {
@@ -1087,6 +1109,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			 */
 			cb.zlogp = zlogp;
 			cb.zoneid = zone_id;
+			cb.mount_cmd = B_TRUE;
 			rval = brand_platform_iter_mounts(bh,
 			    mount_early_fs, &cb);
 

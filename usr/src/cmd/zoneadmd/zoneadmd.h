@@ -124,6 +124,7 @@ extern int valid_mount_path(zlog_t *, const char *, const char *,
     const char *, const char *);
 extern int make_one_dir(zlog_t *, const char *, const char *,
     mode_t, uid_t, gid_t);
+extern void resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen);
 
 /*
  * Console subsystem routines.

@@ -282,7 +282,7 @@ lofs_read_mnttab(zlog_t *zlogp)
  * This function loops over potential loopback mounts and symlinks in a given
  * path and resolves them all down to an absolute path.
  */
-static void
+void
 resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen)
 {
 	int len, arlen;
