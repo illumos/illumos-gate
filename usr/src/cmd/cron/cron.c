@@ -898,8 +898,13 @@ mod_ctab(char *name, time_t reftime)
 	} else {
 		u->uid = pw->pw_uid;
 		u->gid = pw->pw_gid;
-		if (strcmp(u->home, pw->pw_dir) != 0) {
-			free(u->home);
+		if (u->home != NULL) {
+			if (strcmp(u->home, pw->pw_dir) != 0) {
+				free(u->home);
+				u->home = xmalloc(strlen(pw->pw_dir) + 1);
+				(void) strcpy(u->home, pw->pw_dir);
+			}
+		} else {
 			u->home = xmalloc(strlen(pw->pw_dir) + 1);
 			(void) strcpy(u->home, pw->pw_dir);
 		}
