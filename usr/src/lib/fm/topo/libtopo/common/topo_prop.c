@@ -136,10 +136,23 @@ prop_method_get(tnode_t *node, topo_propval_t *pv, topo_propmethod_t *pm,
 		if (nvlist_add_nvlist(args, TOPO_PROP_PARGS, pargs) != 0)
 			return (method_geterror(args, ETOPO_PROP_NVL, err));
 
-	/* Now, get the latest value */
+	/*
+	 * Now, get the latest value
+	 *
+	 * Grab a reference to the property and then unlock the node.  This will
+	 * allow property methods to safely re-enter the prop_get codepath,
+	 * making it possible for property methods to access other property
+	 * values on the same node w\o causing a deadlock.
+	 */
+	topo_prop_hold(pv);
+	topo_node_unlock(node);
 	if (topo_method_call(node, pm->tpm_name, pm->tpm_version,
-	    args, &nvl, err) < 0)
+	    args, &nvl, err) < 0) {
+		topo_prop_rele(pv);
 		return (method_geterror(args, *err, err));
+	}
+	topo_node_lock(node);
+	topo_prop_rele(pv);
 
 	nvlist_free(args);
 
@@ -777,8 +790,26 @@ topo_prop_setprop(tnode_t *node, const char *pgname, nvlist_t *prop,
 			return (-1);
 		}
 
+		/*
+		 *
+		 * Grab a reference to the property and then unlock the node.
+		 * This will allow property methods to safely re-enter the
+		 * prop_get codepath, making it possible for property methods
+		 * to access other property values on the same node w\o causing
+		 * a deadlock.
+		 *
+		 * We don't technically need this now, since this interface is
+		 * currently only used by fmtopo (which is single-threaded), but
+		 * we may make this interface available to other parts of
+		 * libtopo in the future, so best to make it MT-safe now.
+		 */
+		topo_prop_hold(pv);
+		topo_node_unlock(node);
 		ret = topo_method_call(node, pm->tpm_name, pm->tpm_version,
 		    args, &nvl, err);
+		topo_node_lock(node);
+		topo_prop_rele(pv);
+
 		nvlist_free(args);
 	} else {
 		if ((ret = topo_hdl_nvdup(thp, prop, &nvl)) != 0)

@@ -856,11 +856,11 @@ propset_contains(topo_mod_t *mp, char *key, char *set)
 	    "set = %s)\n", key, set);
 
 	prod = strtok((char *)set, "|");
-	if (prod && (strncmp(key, prod, strlen(prod)) == 0))
+	if (prod && (strcmp(key, prod) == 0))
 		return (1);
 
 	while ((prod = strtok(NULL, "|")))
-		if (strncmp(key, prod, strlen(prod)) == 0)
+		if (strcmp(key, prod) == 0)
 			return (1);
 
 	return (rv);

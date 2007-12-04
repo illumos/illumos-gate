@@ -72,6 +72,7 @@ extern "C" {
 #define	SEQ_DIMM_LBL		"seq_dimm_label"
 #define	SIMPLE_CHIP_LBL		"simple_chip_label"
 #define	G4_CHIP_LBL		"g4_chip_label"
+#define	SIMPLE_CS_LBL_MP	"simple_cs_label_mp"
 
 typedef struct chip {
 	kstat_ctl_t *chip_kc;
@@ -92,6 +93,9 @@ extern int simple_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+extern int simple_cs_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 /*

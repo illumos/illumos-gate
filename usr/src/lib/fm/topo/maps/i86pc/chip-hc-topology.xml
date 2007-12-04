@@ -48,7 +48,7 @@
 
         </propset> 
         <propset type='product'
-	    set='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2'>
+	    set='Sun-Fire(TM)-X2100|Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4200E|Sun-Fire-X4500|X2100-M2|Sun-Blade-X8440-Server-Module|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
 	    
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
@@ -102,6 +102,50 @@
 
         <range name='memory-controller' min='0' max='16'>
         <dependents grouping='children'>
+
+            <range name='dram-channel' min='0' max='1'>
+            <dependents grouping='children'>
+	    
+                <range name='chip-select' min='0' max='7'>
+                    <propset type='product' set='Sun-Blade-X8440-Server-Module|Sun-Fire-X4600-M2'>
+		    
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                                <argval name='format' type='string'
+			            value='CPU %d DIMM %d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+
+                        </propgroup>
+
+                    </propset>
+                    <propset type='product' set='Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
+		    
+                        <propgroup name='protocol' version='1'
+                               name-stability='Private'
+			       data-stability='Private' >
+
+                            <propmethod name='simple_cs_label_mp' version='0'
+			            propname='label' proptype='string' >
+              
+                                <argval name='format' type='string'
+			            value='CPU %d D%d' />
+                                <argval name='offset' type='uint32' value='0' />
+
+                            </propmethod>
+
+                        </propgroup>
+
+                    </propset>
+		</range>
+            </dependents>
+	    </range>
 
             <range name='dimm' min='0' max='16'>
 

@@ -38,24 +38,24 @@
 #define	BUFSZ	128
 
 static char *
-get_fmtstr(topo_mod_t *mod, nvlist_t *in, int *err)
+get_fmtstr(topo_mod_t *mod, nvlist_t *in)
 {
 	char *fmtstr;
 	nvlist_t *args;
+	int ret;
 
 	topo_mod_dprintf(mod, "get_fmtstr() called\n");
 
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(errno));
-		*err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+		    strerror(ret));
+		(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 		return (NULL);
 	}
-	if (nvlist_lookup_string(args, "format", &fmtstr) != 0) {
+	if ((ret = nvlist_lookup_string(args, "format", &fmtstr)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'format' arg (%s)\n",
-		    strerror(errno));
-		*err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
+		    strerror(ret));
+		(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 		return (NULL);
 	}
 	return (fmtstr);
@@ -111,39 +111,36 @@ simple_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
 	char *fmtstr, buf[BUFSZ];
-	int err;
+	int ret;
 	uint32_t offset;
 	nvlist_t *args;
 
 	topo_mod_dprintf(mod, "simple_dimm_label() called\n");
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_uint32(args, "offset", &offset) != 0) {
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((fmtstr = get_fmtstr(mod, in, &err)) == NULL) {
-		topo_mod_dprintf(mod, "Failed to retrieve format arg\n");
-		nvlist_free(args);
-		return (err);
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
 	}
 
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) snprintf(buf, BUFSZ, fmtstr,
 	    (topo_node_instance(node) + offset));
 
-	if ((err = store_prop_val(mod, buf, "label", out)) != 0) {
+	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	return (0);
@@ -176,45 +173,38 @@ simple_dimm_label_mp(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 {
 	char *fmtstr, *order, buf[BUFSZ];
 	tnode_t *chip;
-	int err;
+	int ret;
 	uint32_t offset, dimms_per_chip;
 	nvlist_t *args;
 
 	topo_mod_dprintf(mod, "simple_dimm_label_mp() called\n");
 
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_uint32(args, "offset", &offset) != 0) {
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_uint32(args, "dimms_per_chip", &dimms_per_chip)
-	    != 0) {
+	if ((ret = nvlist_lookup_uint32(args, "dimms_per_chip",
+	    &dimms_per_chip)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'dimms_per_chip' arg "
-		    "(%s)\n", strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    "(%s)\n", strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_string(args, "order", &order) != 0) {
+	if ((ret = nvlist_lookup_string(args, "order", &order)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'order' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if ((fmtstr = get_fmtstr(mod, in, &err)) == NULL) {
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	chip = topo_node_parent(topo_node_parent(node));
@@ -230,17 +220,15 @@ simple_dimm_label_mp(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		    - (topo_node_instance(node)) - 1 + offset));
 	else {
 		topo_mod_dprintf(mod, "Invalid value for order arg\n");
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((err = store_prop_val(mod, buf, "label", out)) != 0) {
+	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	return (0);
@@ -270,38 +258,33 @@ seq_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
 	char *fmtstr, *order, buf[BUFSZ];
-	int err;
+	int ret;
 	uint32_t offset;
 	nvlist_t *args;
 	tnode_t *chip;
 
 	topo_mod_dprintf(mod, "seq_dimm_label() called\n");
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_uint32(args, "offset", &offset) != 0) {
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_string(args, "order", &order) != 0) {
+	if ((ret = nvlist_lookup_string(args, "order", &order)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'order' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((fmtstr = get_fmtstr(mod, in, &err)) == NULL) {
-		topo_mod_dprintf(mod, "Failed to retrieve 'fmtstr' arg\n");
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	chip = topo_node_parent(topo_node_parent(node));
@@ -317,17 +300,15 @@ seq_dimm_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		    - (topo_node_instance(node)) - 1 + offset));
 	else {
 		topo_mod_dprintf(mod, "Invalid value for order arg\n");
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((err = store_prop_val(mod, buf, "label", out)) != 0) {
+	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");
 		topo_mod_free(mod, order, BUFSZ);
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	return (0);
@@ -355,39 +336,36 @@ simple_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
 	char *fmtstr, buf[BUFSZ];
-	int err;
+	int ret;
 	uint32_t offset;
 	nvlist_t *args;
 
 	topo_mod_dprintf(mod, "simple_chip_label() called\n");
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
-	if (nvlist_lookup_uint32(args, "offset", &offset) != 0) {
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
-		    strerror(errno));
-		err = topo_mod_seterrno(mod, EMOD_NVL_INVAL);
-		nvlist_free(args);
-		return (err);
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((fmtstr = get_fmtstr(mod, in, &err)) == NULL) {
-		topo_mod_dprintf(mod, "Failed to retrieve format arg\n");
-		nvlist_free(args);
-		return (err);
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
 	}
 
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) snprintf(buf, BUFSZ, fmtstr,
 	    (topo_node_instance(node) + offset));
 
-	if ((err = store_prop_val(mod, buf, "label", out)) != 0) {
+	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");
-		nvlist_free(args);
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
 
 	return (0);
@@ -425,16 +403,34 @@ g4_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	};
 
 	topo_mod_dprintf(mod, "g4_chip_label() called\n");
-	if ((fmtstr = get_fmtstr(mod, in, &err)) == NULL) {
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
-		return (err);
+		/* topo errno already set */
+		return (-1);
 	}
-
+	/*
+	 * The chip-properties property will not exist if this platform has
+	 * AMD family 0x10 modules.  In that case we don't want to treat it as a
+	 * fatal error as that will cause calls like topo_prop_getprops to fail
+	 * to return any properties on this node.  Therefore, if the topo errno
+	 * is set to ETOPO_PROP_NOENT, then we'll just set an empty label
+	 * and return 0.  If the topo errno is set to anything else we'll
+	 * return -1.
+	 */
 	if (topo_prop_get_uint32(node, "chip-properties", "CoherentNodes",
 	    &num_nodes, &err) != 0) {
-		topo_mod_dprintf(mod, "Failed to lookup 'CoherentNodes'"
-		    "property\n");
-		return (err);
+		if (err == ETOPO_PROP_NOENT) {
+			if (store_prop_val(mod, "", "label", out) != 0) {
+				topo_mod_dprintf(mod, "Failed to set label\n");
+				/* topo errno already set */
+				return (-1);
+			}
+			return (0);
+		} else {
+			topo_mod_dprintf(mod, "Failed to lookup 'CoherentNodes'"
+			    "property\n");
+			return (topo_mod_seterrno(mod, err));
+		}
 	}
 
 	mapidx = num_nodes / 2 - 1;
@@ -465,9 +461,83 @@ g4_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	/* LINTED: E_SEC_PRINTF_VAR_FMT */
 	(void) snprintf(buf, BUFSZ, fmtstr, slot_id);
 
-	if ((err = store_prop_val(mod, buf, "label", out)) != 0) {
+	if (store_prop_val(mod, buf, "label", out) != 0) {
 		topo_mod_dprintf(mod, "Failed to set label\n");
-		return (err);
+		/* topo errno already set */
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * This is a somewhat generic property method for labelling the chip-select
+ * nodes on multi-socket AMD family 0x10 platforms.  This is necessary because
+ * these platforms are not supported by the current AMD memory controller driver
+ * and therefore we're not able to discover the memory topology on AMD family
+ * 0x10 systems.  As a result, instead of enumerating the installed dimms and
+ * their ranks, the chip enumerator generically enumerates all of the possible
+ * chip-selects beneath each dram channel.
+ *
+ * When we diagnose a dimm fault, the FRU fmri will be for the chip-select node,
+ * so we need to attach FRU labels to the chip-select nodes.
+ *
+ * format:	a string containing a printf-like format with a two %d tokens
+ *              for the cpu and dimm slot label numbers, which this method
+ *              computes
+ *
+ *              i.e.: CPU %d DIMM %d
+ *
+ * offset:      a numeric offset that we'll number the dimms from.  This is to
+ *              allow for the fact that some systems may number the dimm slots
+ *              from zero while others may start from one
+ *
+ * This function computes the DIMM slot number using the following formula:
+ *
+ * 	slot = cs - (cs % 2) + channel + offset
+ */
+/* ARGSUSED */
+int
+simple_cs_label_mp(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	char *fmtstr, buf[BUFSZ];
+	tnode_t *chip, *chan;
+	int dimm_num, ret;
+	uint32_t offset;
+	nvlist_t *args;
+
+	topo_mod_dprintf(mod, "simple_cs_label_mp() called\n");
+
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'args' list (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((ret = nvlist_lookup_uint32(args, "offset", &offset)) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup 'offset' arg (%s)\n",
+		    strerror(ret));
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+	if ((fmtstr = get_fmtstr(mod, in)) == NULL) {
+		topo_mod_dprintf(mod, "Failed to retrieve 'format' arg\n");
+		/* topo errno already set */
+		return (-1);
+	}
+
+	chip = topo_node_parent(topo_node_parent(topo_node_parent(node)));
+	chan = topo_node_parent(node);
+
+	dimm_num = topo_node_instance(node) - (topo_node_instance(node) % 2)
+	    + topo_node_instance(chan) + offset;
+	/* LINTED: E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(buf, BUFSZ, fmtstr, topo_node_instance(chip),
+	    dimm_num);
+
+	if (store_prop_val(mod, buf, "label", out) != 0) {
+		topo_mod_dprintf(mod, "Failed to set label\n");
+		/* topo errno already set */
+		return (-1);
 	}
 
 	return (0);

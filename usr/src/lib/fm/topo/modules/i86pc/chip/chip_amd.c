@@ -79,6 +79,8 @@ static const topo_method_t gen_cs_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    mem_asru_compute },
+	{ SIMPLE_CS_LBL_MP, "Property method", 0,
+	    TOPO_STABILITY_INTERNAL, simple_cs_label_mp},
 	{ NULL }
 };
 
