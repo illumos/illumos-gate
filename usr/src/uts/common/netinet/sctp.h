@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +53,7 @@ typedef int32_t	sctp_assoc32_t;
 #define	SCTP_AUTOCLOSE			5
 #define	SCTP_SET_PEER_PRIMARY_ADDR	6
 #define	SCTP_PRIMARY_ADDR		7
-#define	SCTP_ADAPTION_LAYER		8
+#define	SCTP_ADAPTATION_LAYER		8
 #define	SCTP_DISABLE_FRAGMENTS		9
 #define	SCTP_PEER_ADDR_PARAMS		10
 #define	SCTP_DEFAULT_SEND_PARAM		11
@@ -95,7 +94,7 @@ typedef int32_t	sctp_assoc32_t;
 #define	SCTP_REMOTE_ERROR		3
 #define	SCTP_SEND_FAILED		4
 #define	SCTP_SHUTDOWN_EVENT		5
-#define	SCTP_ADAPTION_INDICATION	6
+#define	SCTP_ADAPTATION_INDICATION	6
 #define	SCTP_PARTIAL_DELIVERY_EVENT	7
 
 /*
@@ -162,7 +161,7 @@ struct sctp_event_subscribe {
 	uint8_t sctp_peer_error_event;
 	uint8_t sctp_shutdown_event;
 	uint8_t sctp_partial_delivery_event;
-	uint8_t sctp_adaption_layer_event;
+	uint8_t sctp_adaptation_layer_event;
 };
 
 /* Association events used in sctp_assoc_change structure */
@@ -284,15 +283,15 @@ struct sctp_shutdown_event {
 };
 
 /*
- * When a peer sends an Adaption Layer Indication parameter, SCTP
- * delivers the sctp_adaption_event notification to inform the socket
- * user the peer's requested adaption layer.
+ * When a peer sends an Adaptation Layer Indication parameter, SCTP
+ * delivers the sctp_adaptation_event notification to inform the socket
+ * user the peer's requested adaptation layer.
  */
-struct sctp_adaption_event {
+struct sctp_adaptation_event {
 	uint16_t	sai_type;
 	uint16_t	sai_flags;
 	uint32_t	sai_length;
-	uint32_t	sai_adaption_ind;
+	uint32_t	sai_adaptation_ind;
 	sctp_assoc_t	sai_assoc_id;
 };
 
@@ -326,7 +325,7 @@ union sctp_notification {
 	struct sctp_remote_error	sn_remote_error;
 	struct sctp_send_failed		sn_send_failed;
 	struct sctp_shutdown_event	sn_shutdown_event;
-	struct sctp_adaption_event	sn_adaption_event;
+	struct sctp_adaptation_event	sn_adaptation_event;
 	struct sctp_pdapi_event		sn_pdapi_event;
 };
 
@@ -476,11 +475,11 @@ struct sctp_status {
 
 /*
  * A socket user can request that the local endpoint set the specified
- * Adaption Layer Indication parameter for all future INIT and INIT-ACK
- * exchanges.  The sctp_setadaption structure is used to make such request.
+ * Adaptation Layer Indication parameter for all future INIT and INIT-ACK
+ * exchanges.  The sctp_setadaptation structure is used to make such request.
  */
-struct sctp_setadaption {
-	uint32_t   ssb_adaption_ind;
+struct sctp_setadaptation {
+	uint32_t   ssb_adaptation_ind;
 };
 
 /*

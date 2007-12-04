@@ -158,7 +158,7 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 		serror = SCTP_ERR_BAD_MANDPARM;
 		dprint(1,
 		    ("validate_init_params: bad sid, is=%d os=%d\n",
-			htons(init->sic_instr), htons(init->sic_outstr)));
+		    htons(init->sic_instr), htons(init->sic_outstr)));
 		goto abort;
 	}
 	if (ntohl(init->sic_inittag) == 0) {
@@ -466,7 +466,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	/* Make sure we like the peer's parameters */
 	if (validate_init_params(sctp, ch, init, initmp, NULL, &errmp,
-		&supp_af, &sctp_options) == 0) {
+	    &supp_af, &sctp_options) == 0) {
 		return;
 	}
 	if (errmp != NULL)
@@ -518,7 +518,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	 */
 	cookielen = SCTP_CALC_COOKIE_LEN(ch);
 	iacklen = sizeof (*iack_ch) + sizeof (*iack) + cookielen;
-	if (sctp->sctp_send_adaption)
+	if (sctp->sctp_send_adaptation)
 		iacklen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
 	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
 	    sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled) {
@@ -623,7 +623,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	iack->sic_instr = htons(sctp->sctp_num_istr);
 
 	p = (char *)(iack + 1);
-	p += sctp_adaption_code_param(sctp, (uchar_t *)p);
+	p += sctp_adaptation_code_param(sctp, (uchar_t *)p);
 	if (initcollision)
 		p += sctp_supaddr_param(sctp, (uchar_t *)p);
 	if (!linklocal)
@@ -798,7 +798,7 @@ sctp_send_cookie_ack(sctp_t *sctp)
 }
 
 static int
-sctp_find_al_ind(sctp_parm_hdr_t *sph, ssize_t len, uint32_t *adaption_code)
+sctp_find_al_ind(sctp_parm_hdr_t *sph, ssize_t len, uint32_t *adaptation_code)
 {
 
 	if (len < sizeof (*sph))
@@ -806,8 +806,8 @@ sctp_find_al_ind(sctp_parm_hdr_t *sph, ssize_t len, uint32_t *adaption_code)
 	while (sph != NULL) {
 		if (sph->sph_type == htons(PARM_ADAPT_LAYER_IND) &&
 		    ntohs(sph->sph_len) >= (sizeof (*sph) +
-			sizeof (uint32_t))) {
-			*adaption_code = *(uint32_t *)(sph + 1);
+		    sizeof (uint32_t))) {
+			*adaptation_code = *(uint32_t *)(sph + 1);
 			return (0);
 		}
 		sph = sctp_next_parm(sph, &len);
@@ -974,9 +974,9 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 		sctp->sctp_prsctp_aware = B_FALSE;
 
 	if (sctp_find_al_ind((sctp_parm_hdr_t *)(iack + 1),
-		ntohs(iackch->sch_len) - (sizeof (*iackch) + sizeof (*iack)),
-		&sctp->sctp_rx_adaption_code) == 0) {
-		sctp->sctp_recv_adaption = 1;
+	    ntohs(iackch->sch_len) - (sizeof (*iackch) + sizeof (*iack)),
+	    &sctp->sctp_rx_adaptation_code) == 0) {
+		sctp->sctp_recv_adaptation = 1;
 	}
 
 	cech = (sctp_chunk_hdr_t *)cemp->b_rptr;
@@ -1101,7 +1101,7 @@ sendcookie:
 
 int
 sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
-    sctp_init_chunk_t **iackpp, sctp_hdr_t *insctph, int *recv_adaption,
+    sctp_init_chunk_t **iackpp, sctp_hdr_t *insctph, int *recv_adaptation,
     in6_addr_t *peer_addr)
 {
 	int32_t			clen;
@@ -1169,7 +1169,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	init = (sctp_init_chunk_t *)(initch + 1);
 	initplen = ntohs(initch->sch_len) - (sizeof (*init) + sizeof (*initch));
 	*iackpp = iack;
-	*recv_adaption = 0;
+	*recv_adaptation = 0;
 
 	/*
 	 * Check the staleness of the Cookie, specified in 3.3.10.3 of
@@ -1205,8 +1205,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	/* Look for adaptation code if there any parms in the INIT chunk */
 	if ((initplen >= sizeof (sctp_parm_hdr_t)) &&
 	    (sctp_find_al_ind((sctp_parm_hdr_t *)(init + 1), initplen,
-	    &sctp->sctp_rx_adaption_code) == 0)) {
-		*recv_adaption = 1;
+	    &sctp->sctp_rx_adaptation_code) == 0)) {
+		*recv_adaptation = 1;
 	}
 
 	/* Examine tie-tags */

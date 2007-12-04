@@ -3495,7 +3495,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	sctp_hdr_t		*sctph;
 	uint_t			ip_hdr_len;
 	mblk_t			*dups = NULL;
-	int			recv_adaption;
+	int			recv_adaptation;
 	boolean_t		wake_eager = B_FALSE;
 	mblk_t			*pinfo_mp;
 	ip_pktinfo_t		*pinfo = NULL;
@@ -3751,13 +3751,13 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				break;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaption, NULL) != -1) {
+				    sctph, &recv_adaptation, NULL) != -1) {
 					sctp_send_cookie_ack(sctp);
 					sctp_assoc_event(sctp, SCTP_RESTART,
 					    0, NULL);
-					if (recv_adaption) {
-						sctp->sctp_recv_adaption = 1;
-						sctp_adaption_event(sctp);
+					if (recv_adaptation) {
+						sctp->sctp_recv_adaptation = 1;
+						sctp_adaptation_event(sctp);
 					}
 				} else {
 					BUMP_MIB(&sctps->sctps_mib,
@@ -3812,7 +3812,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_t *eager;
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaption, &peer_src) == -1) {
+				    sctph, &recv_adaptation, &peer_src) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					goto done;
@@ -3868,11 +3868,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					 */
 				}
 				sctp_assoc_event(eager, SCTP_COMM_UP, 0, NULL);
-				if (recv_adaption) {
-					eager->sctp_recv_adaption = 1;
-					eager->sctp_rx_adaption_code =
-					    sctp->sctp_rx_adaption_code;
-					sctp_adaption_event(eager);
+				if (recv_adaptation) {
+					eager->sctp_recv_adaptation = 1;
+					eager->sctp_rx_adaptation_code =
+					    sctp->sctp_rx_adaptation_code;
+					sctp_adaptation_event(eager);
 				}
 
 				eager->sctp_active = now;
@@ -3933,7 +3933,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				break;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaption, NULL) == -1) {
+				    sctph, &recv_adaptation, NULL) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
@@ -3958,9 +3958,9 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_validate_peer(sctp);
 
 				sctp_assoc_event(sctp, SCTP_COMM_UP, 0, NULL);
-				if (recv_adaption) {
-					sctp->sctp_recv_adaption = 1;
-					sctp_adaption_event(sctp);
+				if (recv_adaptation) {
+					sctp->sctp_recv_adaptation = 1;
+					sctp_adaptation_event(sctp);
 				}
 				/* Try sending queued data, or ASCONFs */
 				trysend = 1;
@@ -3999,14 +3999,14 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				/* Try sending queued data, or ASCONFs */
 				trysend = 1;
 				sctp_assoc_event(sctp, SCTP_COMM_UP, 0, NULL);
-				sctp_adaption_event(sctp);
+				sctp_adaptation_event(sctp);
 				break;
 			case CHUNK_ABORT:
 				sctp_process_abort(sctp, ch, ECONNREFUSED);
 				goto done;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaption, NULL) == -1) {
+				    sctph, &recv_adaptation, NULL) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
@@ -4032,9 +4032,9 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_validate_peer(sctp);
 
 				sctp_assoc_event(sctp, SCTP_COMM_UP, 0, NULL);
-				if (recv_adaption) {
-					sctp->sctp_recv_adaption = 1;
-					sctp_adaption_event(sctp);
+				if (recv_adaptation) {
+					sctp->sctp_recv_adaptation = 1;
+					sctp_adaptation_event(sctp);
 				}
 				/* Try sending queued data, or ASCONFs */
 				trysend = 1;

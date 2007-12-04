@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +224,7 @@ _getaddrinfo(const char *hostname, const char *servname,
 			return (EAI_BADFLAGS);
 		}
 		if ((hostname == NULL || *hostname == '\0') &&
-			(hints->ai_flags & AI_CANONNAME)) {
+		    (hints->ai_flags & AI_CANONNAME)) {
 				*res = NULL;
 				return (EAI_BADFLAGS);
 		}
@@ -253,6 +252,7 @@ _getaddrinfo(const char *hostname, const char *servname,
 				aip->ai_socktype = SOCK_DGRAM;
 				break;
 			case IPPROTO_TCP:
+			case IPPROTO_SCTP:
 				aip->ai_socktype = SOCK_STREAM;
 				break;
 			default:
@@ -262,11 +262,25 @@ _getaddrinfo(const char *hostname, const char *servname,
 			break;
 		case SOCK_RAW:
 			break;
+		case SOCK_SEQPACKET:
+			/*
+			 * If the hint does not have a preference on the
+			 * protocol, use SCTP as the default for
+			 * SOCK_SEQPACKET.
+			 */
+			if (aip->ai_protocol == ANY)
+				aip->ai_protocol = IPPROTO_SCTP;
+			break;
 		case SOCK_DGRAM:
 			aip->ai_protocol = IPPROTO_UDP;
 			break;
 		case SOCK_STREAM:
-			aip->ai_protocol = IPPROTO_TCP;
+			/*
+			 * If the hint does not have a preference on the
+			 * protocol, use TCP as the default for SOCK_STREAM.
+			 */
+			if (aip->ai_protocol == ANY)
+				aip->ai_protocol = IPPROTO_TCP;
 			break;
 		default:
 			*res = NULL;
@@ -293,7 +307,29 @@ _getaddrinfo(const char *hostname, const char *servname,
 			proto = "udp";
 			break;
 		case SOCK_STREAM:
-			proto = "tcp";
+			/*
+			 * If there is no hint given, use TCP as the default
+			 * protocol.
+			 */
+			switch (aip->ai_protocol) {
+			case ANY:
+			case IPPROTO_TCP:
+			default:
+				proto = "tcp";
+				break;
+			case IPPROTO_SCTP:
+				proto = "sctp";
+				break;
+			}
+			break;
+		case SOCK_SEQPACKET:
+			/* Default to SCTP if no hint given. */
+			switch (aip->ai_protocol) {
+			case ANY:
+			default:
+				proto = "sctp";
+				break;
+			}
 			break;
 		}
 		/*
@@ -378,6 +414,9 @@ _getaddrinfo(const char *hostname, const char *servname,
 			} else if (strcmp(sp->s_proto, "tcp") == 0) {
 				aip->ai_socktype = SOCK_STREAM;
 				aip->ai_protocol = IPPROTO_TCP;
+			} else if (strcmp(sp->s_proto, "sctp") == 0) {
+				aip->ai_socktype = SOCK_STREAM;
+				aip->ai_protocol = IPPROTO_SCTP;
 			} else {
 				if (buf != NULL)
 					free(buf);
@@ -646,7 +685,7 @@ get_addr(int family, const char *hostname, struct addrinfo *aip, struct
 				 */
 				if ((errnum =
 				    getscopeidfromzone(ai2sin6(nai), zonestr,
-					&ai2sin6(nai)->sin6_scope_id)) != 0) {
+				    &ai2sin6(nai)->sin6_scope_id)) != 0) {
 					return (errnum);
 				}
 			} else {

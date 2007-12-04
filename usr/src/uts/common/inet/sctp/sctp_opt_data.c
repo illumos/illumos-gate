@@ -779,13 +779,13 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SCTP_AUTOCLOSE:
 			*i1 = TICK_TO_SEC(sctp->sctp_autoclose);
 			break;
-		case SCTP_ADAPTION_LAYER:
-			if (buflen < sizeof (struct sctp_setadaption)) {
+		case SCTP_ADAPTATION_LAYER:
+			if (buflen < sizeof (struct sctp_setadaptation)) {
 				retval = EINVAL;
 				break;
 			}
-			((struct sctp_setadaption *)ptr)->ssb_adaption_ind =
-			    sctp->sctp_tx_adaption_code;
+			((struct sctp_setadaptation *)ptr)->ssb_adaptation_ind =
+			    sctp->sctp_tx_adaptation_code;
 			break;
 		case SCTP_PEER_ADDR_PARAMS:
 			if (buflen < sizeof (struct sctp_paddrparams)) {
@@ -823,7 +823,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			    ONOFF(sctp->sctp_recvshutdownevnt);
 			ev->sctp_partial_delivery_event =
 			    ONOFF(sctp->sctp_recvpdevnt);
-			ev->sctp_adaption_layer_event =
+			ev->sctp_adaptation_layer_event =
 			    ONOFF(sctp->sctp_recvalevnt);
 			*optlen = sizeof (struct sctp_event_subscribe);
 			break;
@@ -1305,16 +1305,16 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		case SCTP_PRIMARY_ADDR:
 			retval = sctp_set_prim(sctp, invalp, inlen);
 			break;
-		case SCTP_ADAPTION_LAYER: {
-			struct sctp_setadaption *ssb;
+		case SCTP_ADAPTATION_LAYER: {
+			struct sctp_setadaptation *ssb;
 
-			if (inlen < sizeof (struct sctp_setadaption)) {
+			if (inlen < sizeof (struct sctp_setadaptation)) {
 				retval = EINVAL;
 				break;
 			}
-			ssb = (struct sctp_setadaption *)invalp;
-			sctp->sctp_send_adaption = 1;
-			sctp->sctp_tx_adaption_code = ssb->ssb_adaption_ind;
+			ssb = (struct sctp_setadaptation *)invalp;
+			sctp->sctp_send_adaptation = 1;
+			sctp->sctp_tx_adaptation_code = ssb->ssb_adaptation_ind;
 			break;
 		}
 		case SCTP_PEER_ADDR_PARAMS:
@@ -1347,7 +1347,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			sctp->sctp_recvpdevnt =
 			    ONOFF(ev->sctp_partial_delivery_event);
 			sctp->sctp_recvalevnt =
-			    ONOFF(ev->sctp_adaption_layer_event);
+			    ONOFF(ev->sctp_adaptation_layer_event);
 			break;
 		}
 		case SCTP_ADD_ADDR:

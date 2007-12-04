@@ -786,7 +786,7 @@ sctp_free(conn_t *connp)
 	sctp->sctp_reassmsgs = 0;
 
 	sctp->sctp_autoclose = 0;
-	sctp->sctp_tx_adaption_code = 0;
+	sctp->sctp_tx_adaptation_code = 0;
 
 	sctp->sctp_v6label_len = 0;
 	sctp->sctp_v4label_len = 0;
@@ -978,13 +978,13 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 		sctp->sctp_hb_interval = psctp->sctp_hb_interval;
 		sctp->sctp_autoclose = psctp->sctp_autoclose;
-		sctp->sctp_tx_adaption_code = psctp->sctp_tx_adaption_code;
+		sctp->sctp_tx_adaptation_code = psctp->sctp_tx_adaptation_code;
 
 		/* xxx should be a better way to copy these flags xxx */
 		sctp->sctp_debug = psctp->sctp_debug;
 		sctp->sctp_bound_to_all = psctp->sctp_bound_to_all;
 		sctp->sctp_cansleep = psctp->sctp_cansleep;
-		sctp->sctp_send_adaption = psctp->sctp_send_adaption;
+		sctp->sctp_send_adaptation = psctp->sctp_send_adaptation;
 		sctp->sctp_ndelay = psctp->sctp_ndelay;
 		sctp->sctp_events = psctp->sctp_events;
 		sctp->sctp_ipv6_recvancillary = psctp->sctp_ipv6_recvancillary;

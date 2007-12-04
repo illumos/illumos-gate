@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -420,32 +419,32 @@ sctp_shutdown_event(sctp_t *sctp)
 }
 
 void
-sctp_adaption_event(sctp_t *sctp)
+sctp_adaptation_event(sctp_t *sctp)
 {
-	struct sctp_adaption_event *sai;
+	struct sctp_adaptation_event *sai;
 	mblk_t *mp;
 
-	if (!sctp->sctp_recvalevnt || !sctp->sctp_recv_adaption) {
+	if (!sctp->sctp_recvalevnt || !sctp->sctp_recv_adaptation) {
 		return;
 	}
 	if ((mp = allocb(sizeof (*sai), BPRI_MED)) == NULL) {
 		return;
 	}
 
-	sai = (struct sctp_adaption_event *)mp->b_rptr;
-	sai->sai_type = SCTP_ADAPTION_INDICATION;
+	sai = (struct sctp_adaptation_event *)mp->b_rptr;
+	sai->sai_type = SCTP_ADAPTATION_INDICATION;
 	sai->sai_flags = 0;
 	sai->sai_length = sizeof (*sai);
 	sai->sai_assoc_id = 0;
 	/*
 	 * Adaptation code delivered in network byte order.
 	 */
-	sai->sai_adaption_ind = sctp->sctp_rx_adaption_code;
+	sai->sai_adaptation_ind = sctp->sctp_rx_adaptation_code;
 
 	mp->b_wptr = (uchar_t *)(sai + 1);
 	sctp_notify(sctp, mp, sai->sai_length);
 
-	sctp->sctp_recv_adaption = 0; /* in case there's a restart later */
+	sctp->sctp_recv_adaptation = 0; /* in case there's a restart later */
 }
 
 /* Send partial deliver event */

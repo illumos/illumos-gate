@@ -758,9 +758,9 @@ typedef struct sctp_s {
 		sctp_bound_to_all : 1,
 		sctp_cansleep : 1,	/* itf routines can sleep */
 		sctp_detached : 1,	/* If we're detached from a stream */
-		sctp_send_adaption : 1,	/* send adaption layer ind */
+		sctp_send_adaptation : 1,	/* send adaptation layer ind */
 
-		sctp_recv_adaption : 1,	/* received adaption layer ind */
+		sctp_recv_adaptation : 1,	/* recv adaptation layer ind */
 		sctp_ndelay : 1,	/* turn off Nagle */
 		sctp_condemned : 1,	/* this sctp is about to disappear */
 		sctp_chk_fast_rexmit : 1, /* check for fast rexmit message */
@@ -802,8 +802,8 @@ typedef struct sctp_s {
 #define	sctp_bound_to_all sctp_bits.sctp_bound_to_all
 #define	sctp_cansleep sctp_bits.sctp_cansleep
 #define	sctp_detached sctp_bits.sctp_detached
-#define	sctp_send_adaption sctp_bits.sctp_send_adaption
-#define	sctp_recv_adaption sctp_bits.sctp_recv_adaption
+#define	sctp_send_adaptation sctp_bits.sctp_send_adaptation
+#define	sctp_recv_adaptation sctp_bits.sctp_recv_adaptation
 #define	sctp_ndelay sctp_bits.sctp_ndelay
 #define	sctp_condemned sctp_bits.sctp_condemned
 #define	sctp_chk_fast_rexmit sctp_bits.sctp_chk_fast_rexmit
@@ -868,8 +868,8 @@ typedef struct sctp_s {
 
 	int32_t		sctp_autoclose;	/* Auto disconnect in ticks */
 	int64_t		sctp_active;	/* Last time data/sack on this conn */
-	uint32_t	sctp_tx_adaption_code;	/* TX adaptation code */
-	uint32_t	sctp_rx_adaption_code;	/* RX adaptation code */
+	uint32_t	sctp_tx_adaptation_code; /* TX adaptation code */
+	uint32_t	sctp_rx_adaptation_code; /* RX adaptation code */
 
 	/* Reliable control chunks */
 	mblk_t		*sctp_cxmit_list; /* Xmit list for control chunks */
@@ -940,8 +940,8 @@ typedef struct sctp_s {
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
 
 extern void	sctp_ack_timer(sctp_t *);
-extern size_t	sctp_adaption_code_param(sctp_t *, uchar_t *);
-extern void	sctp_adaption_event(sctp_t *);
+extern size_t	sctp_adaptation_code_param(sctp_t *, uchar_t *);
+extern void	sctp_adaptation_event(sctp_t *);
 extern void	sctp_add_err(sctp_t *, uint16_t, void *, size_t,
 		    sctp_faddr_t *);
 extern int	sctp_add_faddr(sctp_t *, in6_addr_t *, int, boolean_t);

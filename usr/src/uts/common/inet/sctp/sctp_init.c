@@ -151,17 +151,17 @@ sctp_options_param(const sctp_t *sctp, void *p, int option)
 }
 
 size_t
-sctp_adaption_code_param(sctp_t *sctp, uchar_t *p)
+sctp_adaptation_code_param(sctp_t *sctp, uchar_t *p)
 {
 	sctp_parm_hdr_t *sph;
 
-	if (!sctp->sctp_send_adaption) {
+	if (!sctp->sctp_send_adaptation) {
 		return (0);
 	}
 	sph = (sctp_parm_hdr_t *)p;
 	sph->sph_type = htons(PARM_ADAPT_LAYER_IND);
 	sph->sph_len = htons(sizeof (*sph) + sizeof (uint32_t));
-	*(uint32_t *)(sph + 1) = htonl(sctp->sctp_tx_adaption_code);
+	*(uint32_t *)(sph + 1) = htonl(sctp->sctp_tx_adaptation_code);
 
 	return (sizeof (*sph) + sizeof (uint32_t));
 }
@@ -188,7 +188,7 @@ sctp_init_mp(sctp_t *sctp)
 			supp_af = PARM_SUPP_V6 | PARM_SUPP_V4;
 	}
 	initlen = sizeof (*chp) + sizeof (*icp);
-	if (sctp->sctp_send_adaption) {
+	if (sctp->sctp_send_adaptation) {
 		initlen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
 	}
 	initlen += sctp_supaddr_param_len(sctp);
@@ -227,8 +227,8 @@ sctp_init_mp(sctp_t *sctp)
 
 	p = (uchar_t *)(icp + 1);
 
-	/* Adaption layer param */
-	p += sctp_adaption_code_param(sctp, p);
+	/* Adaptation layer param */
+	p += sctp_adaptation_code_param(sctp, p);
 
 	/* Add supported address types parameter */
 	p += sctp_supaddr_param(sctp, p);

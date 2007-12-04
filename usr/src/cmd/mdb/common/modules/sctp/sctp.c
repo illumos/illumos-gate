@@ -585,9 +585,9 @@ show_sctp_flags(sctp_t *sctp)
 	mdb_printf("\tbound_to_all\t\t%d\n", sctp->sctp_bound_to_all);
 	mdb_printf("\tcansleep\t\t%d\n", sctp->sctp_cansleep);
 	mdb_printf("\tdetached\t\t%d\n", sctp->sctp_detached);
-	mdb_printf("\tsend_adaption\t\t%d\n", sctp->sctp_send_adaption);
+	mdb_printf("\tsend_adaptation\t\t%d\n", sctp->sctp_send_adaptation);
 
-	mdb_printf("\trecv_adaption\t\t%d\n", sctp->sctp_recv_adaption);
+	mdb_printf("\trecv_adaptation\t\t%d\n", sctp->sctp_recv_adaptation);
 	mdb_printf("\tndelay\t\t\t%d\n", sctp->sctp_ndelay);
 	mdb_printf("\tcondemned\t\t%d\n", sctp->sctp_condemned);
 	mdb_printf("\tchk_fast_rexmit\t\t%d\n", sctp->sctp_chk_fast_rexmit);
@@ -952,14 +952,14 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("bound_if\t%?u\theartbeat_mp\t%?p\n"
 		    "family\t\t%?u\tipversion\t%?hu\n"
 		    "hb_interval\t%?u\tautoclose\t%?d\n"
-		    "active\t\t%?ld\ttx_adaption_code%?x\n"
-		    "rx_adaption_code%?x\ttimer_mp\t%?p\n"
+		    "active\t\t%?ld\ttx_adaptation_code%?x\n"
+		    "rx_adaptation_code%?x\ttimer_mp\t%?p\n"
 		    "partial_delivery_point\t%?d\n",
 		    sctp.sctp_bound_if, sctp.sctp_heartbeat_mp,
 		    sctp.sctp_family, sctp.sctp_ipversion,
 		    sctp.sctp_hb_interval, sctp.sctp_autoclose,
-		    sctp.sctp_active, sctp.sctp_tx_adaption_code,
-		    sctp.sctp_rx_adaption_code, sctp.sctp_timer_mp,
+		    sctp.sctp_active, sctp.sctp_tx_adaptation_code,
+		    sctp.sctp_rx_adaptation_code, sctp.sctp_timer_mp,
 		    sctp.sctp_pd_point);
 	}
 

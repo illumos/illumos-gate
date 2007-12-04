@@ -2583,8 +2583,8 @@ sctp_assoc_recv(void *handle, mblk_t *mp, int flags)
 		case SCTP_SHUTDOWN_EVENT:
 			sn->sn_shutdown_event.sse_assoc_id = ssa->ssa_id;
 			break;
-		case SCTP_ADAPTION_INDICATION:
-			sn->sn_adaption_event.sai_assoc_id = ssa->ssa_id;
+		case SCTP_ADAPTATION_INDICATION:
+			sn->sn_adaptation_event.sai_assoc_id = ssa->ssa_id;
 			break;
 		case SCTP_PARTIAL_DELIVERY_EVENT:
 			sn->sn_pdapi_event.pdapi_assoc_id = ssa->ssa_id;
