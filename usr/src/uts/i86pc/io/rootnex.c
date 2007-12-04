@@ -1828,15 +1828,6 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	}
 
 	/*
-	 * If the driver supports FMA, insert the handle in the FMA DMA handle
-	 * cache.
-	 */
-	if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
-		hp->dmai_error.err_cf = rootnex_dma_check;
-		(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
-	}
-
-	/*
 	 * if we don't need the copybuf and we don't need to do a partial,  we
 	 * hit the fast path. All the high performance devices should be trying
 	 * to hit this path. To hit this path, a device should be able to reach
@@ -1847,6 +1838,15 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	if ((sinfo->si_copybuf_req == 0) &&
 	    (sinfo->si_sgl_size <= attr->dma_attr_sgllen) &&
 	    (dma->dp_dma.dmao_size < dma->dp_maxxfer)) {
+		/*
+		 * If the driver supports FMA, insert the handle in the FMA DMA
+		 * handle cache.
+		 */
+		if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
+			hp->dmai_error.err_cf = rootnex_dma_check;
+			(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
+		}
+
 		/*
 		 * copy out the first cookie and ccountp, set the cookie
 		 * pointer to the second cookie. The first cookie is passed
@@ -1877,6 +1877,15 @@ rootnex_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_BIND_FAIL]);
 		rootnex_clean_dmahdl(hp); /* must be after free cookie */
 		return (e);
+	}
+
+	/*
+	 * If the driver supports FMA, insert the handle in the FMA DMA handle
+	 * cache.
+	 */
+	if (attr->dma_attr_flags & DDI_DMA_FLAGERR) {
+		hp->dmai_error.err_cf = rootnex_dma_check;
+		(void) ndi_fmc_insert(rdip, DMA_HANDLE, hp, NULL);
 	}
 
 	/* if the first window uses the copy buffer, sync it for the device */
