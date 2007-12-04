@@ -103,6 +103,8 @@ typedef enum nfs4_acl_op {
 	NFS4_ACL_SET
 } nfs4_acl_op_t;
 
+static struct lm_sysid *nfs4_find_sysid(mntinfo4_t *mi);
+
 static void	nfs4_update_dircaches(change_info4 *, vnode_t *, vnode_t *,
 			char *, dirattr_info_t *);
 
@@ -2284,8 +2286,18 @@ nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	} else
 		e.error = nfs4_lockrelease(vp, flag, offset, cr);
 
-	if (e.error)
+	if (e.error) {
+		struct lm_sysid *lmsid;
+		lmsid = nfs4_find_sysid(VTOMI4(vp));
+		if (lmsid == NULL) {
+			DTRACE_PROBE2(unknown__sysid, int, e.error,
+			    vnode_t *, vp);
+		} else {
+			cleanlocks(vp, ttoproc(curthread)->p_pid,
+			    (lm_sysidt(lmsid) | LM_SYSID_CLIENT));
+		}
 		return (e.error);
+	}
 
 	if (count > 1)
 		return (0);
