@@ -146,14 +146,16 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 
 	stxa	%g2, [%g3]ASI_MMU_CTX		/* set invalid ctx */
 	membar	#Sync
-
+	
 0:
-	ldxa	[%g7]ASI_MMU_CTX, %g5		/* get pgz | pri-ctx */
-	and     %g5, %g4, %g5			/* %g5 = pri-ctx */
+	ldxa	[%g7]ASI_MMU_CTX, %g3		/* get pgz | pri-ctx */
+	and     %g3, %g4, %g5			/* %g5 = pri-ctx */
 	cmp	%g5, INVALID_CONTEXT		/* kernel ctx or invald ctx? */
 	ble,pn	%xcc, 2f			/* yes, no need to change */
-	  nop
-
+	  srlx	%g3, CTXREG_NEXT_SHIFT, %g3	/* %g3 = nucleus pgsz */
+	sllx	%g3, CTXREG_NEXT_SHIFT, %g3	/* need to preserve nucleus pgsz */
+	or	%g3, %g2, %g2			/* %g2 = nucleus pgsz | INVALID_CONTEXT */
+	
 	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid */
 	retry
 
@@ -177,12 +179,14 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	membar	#Sync
 
 0:
-	ldxa	[%g7]ASI_MMU_CTX, %g4		/* %g4 = pgsz | pri-ctx */
+	ldxa	[%g7]ASI_MMU_CTX, %g3		/* %g3 = pgsz | pri-ctx */
 	set     CTXREG_CTX_MASK, %g6
-	and	%g4, %g6, %g4			/* %g4 = pri-ctx */
+	and	%g3, %g6, %g4			/* %g4 = pri-ctx */
 	cmp	%g4, INVALID_CONTEXT		/* is pri-ctx the victim? */
 	ble 	%icc, 2f			/* no, no need to change it */
-	  nop
+	  srlx	%g3, CTXREG_NEXT_SHIFT, %g3	/* %g3 = nucleus pgsz */
+	sllx	%g3, CTXREG_NEXT_SHIFT, %g3	/* need to preserve nucleus pgsz */
+	or	%g3, %g2, %g2			/* %g2 = nucleus pgsz | INVALID_CONTEXT */
 	stxa	%g2, [%g7]ASI_MMU_CTX		/* set pri-ctx to invalid */
 	/* next instruction is retry so no membar sync */
 2:

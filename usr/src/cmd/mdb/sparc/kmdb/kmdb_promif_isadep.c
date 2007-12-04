@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,10 @@
 #include <kmdb/kmdb_kdi.h>
 #include <mdb/mdb_string.h>
 #include <mdb/mdb.h>
+
+#ifndef sun4v
+int kmdb_prom_preserve_kctx = 0;
+#endif /* sun4v */
 
 ssize_t
 kmdb_prom_obp_writer(caddr_t buf, size_t len)
@@ -171,8 +175,7 @@ kmdb_prom_getcpu_propnode(pnode_t node)
 	 */
 	if (prom_getprop(node, "portid", (caddr_t)&val) == -1 &&
 	    prom_getprop(node, "upa-portid", (caddr_t)&val) == -1 &&
-	    prom_getprop((pnode = prom_parentnode(node)),
-			"name", name) != -1 &&
+	    prom_getprop((pnode = prom_parentnode(node)), "name", name) != -1 &&
 	    strcmp(name, "core") == 0)
 		return (pnode);
 
@@ -218,3 +221,19 @@ kmdb_prom_stdout_is_framebuffer(kmdb_auxv_t *kav)
 {
 	return (prom_stdout_is_framebuffer());
 }
+
+#ifndef sun4v
+#define	PROM_KCTX_PRESERVED_PROPNAME	"context0-page-size-preserved"
+void
+kmdb_prom_preserve_kctx_init(void)
+{
+	pnode_t	pnode;
+	int	val;
+
+	pnode = (pnode_t)prom_getphandle(prom_mmu_ihandle());
+	if (prom_getprop(pnode, PROM_KCTX_PRESERVED_PROPNAME,
+	    (caddr_t)&val) == 0) {
+		kmdb_prom_preserve_kctx = 1;
+	}
+}
+#endif /* sun4v */

@@ -2778,6 +2778,7 @@ obp_bpt:
 kctx_obp_bpt:
 	set	obp_bpt, %g2
 1:
+#ifndef _OPL
 	mov	MMU_PCONTEXT, %g1
 	ldxa	[%g1]ASI_DMMU, %g1
 	srlx	%g1, CTXREG_NEXT_SHIFT, %g3
@@ -2797,6 +2798,7 @@ kctx_obp_bpt:
         membar  #Sync
 	sethi	%hi(FLUSH_ADDR), %g1
 	flush	%g1			! flush required by immu
+#endif /* _OPL */
 3:
 	jmp	%g2
 	  nop

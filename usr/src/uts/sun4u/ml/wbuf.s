@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,8 +361,6 @@
 	!
 	FAULT_WINTRACE(%g1, %g2, %g3, TT_F32_FN1)
 	!
-	srl	%sp, 0, %g7
-	!
 .fault_fn1_common:	
 	!
 	! Fill normal tl1 fault.
@@ -418,6 +415,15 @@
 	sethi   %hi(kcontextreg), %g5           ! mov   KCONTEXT, %g5
         ldx     [%g5 + %lo(kcontextreg)], %g5
 	mov	MMU_PCONTEXT, %g6
+	ldxa	[%g6]ASI_MMU_CTX, %g7
+	xor	%g5, %g7, %g7
+	srlx	%g7, CTXREG_NEXT_SHIFT, %g7
+	brz	%g7, 1f				! if N_pgsz0/1 changed, need demap
+	  nop
+	mov	DEMAP_ALL_TYPE, %g7
+	stxa	%g0, [%g7]ASI_DTLB_DEMAP
+	stxa	%g0, [%g7]ASI_ITLB_DEMAP
+1:
 	stxa	%g5, [%g6]ASI_MMU_CTX
 	sethi   %hi(FLUSH_ADDR), %g5
 	flush   %g5

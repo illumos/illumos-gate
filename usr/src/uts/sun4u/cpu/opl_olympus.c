@@ -78,6 +78,7 @@ static void opl_cpu_sync_error(struct regs *, ulong_t, ulong_t, uint_t, uint_t);
 static int  cpu_flt_in_memory(opl_async_flt_t *, uint64_t);
 static int prom_SPARC64VII_support_enabled(void);
 static void opl_ta3();
+static int plat_prom_preserve_kctx_is_supported(void);
 
 /*
  * Error counters resetting interval.
@@ -2145,7 +2146,7 @@ cpu_mp_init(void)
 	mutex_exit(&cpu_lock);
 }
 
-int heaplp_use_stlb = 0;
+int heaplp_use_stlb = -1;
 
 void
 mmu_init_kernel_pgsz(struct hat *hat)
@@ -2156,6 +2157,10 @@ mmu_init_kernel_pgsz(struct hat *hat)
 	if (heaplp_use_stlb == 0) {
 		/* do not reprogram stlb */
 		tte = TTE8K;
+	} else if (!plat_prom_preserve_kctx_is_supported()) {
+		/* OBP does not support non-zero primary context */
+		tte = TTE8K;
+		heaplp_use_stlb = 0;
 	}
 
 	new_cext_nucleus = TAGACCEXT_MKSZPAIR(tte, TTE8K);
@@ -2351,5 +2356,28 @@ prom_SPARC64VII_support_enabled(void)
 	int val;
 
 	return ((prom_getprop(prom_rootnode(), PROM_SPARC64VII_MODE_PROPNAME,
+	    (caddr_t)&val) == 0) ? 1 : 0);
+}
+
+#define	PROM_KCTX_PRESERVED_PROPNAME	"context0-page-size-preserved"
+
+/*
+ * Check for existence of OPL OBP property that indicates support for
+ * preserving Solaris kernel page sizes when entering OBP.  We need to
+ * check the prom tree since the ddi tree is not yet built when the
+ * platform startup sequence is called.
+ */
+static int
+plat_prom_preserve_kctx_is_supported(void)
+{
+	pnode_t		pnode;
+	int		val;
+
+	/*
+	 * Check for existence of context0-page-size-preserved property
+	 * in virtual-memory prom node.
+	 */
+	pnode = (pnode_t)prom_getphandle(prom_mmu_ihandle());
+	return ((prom_getprop(pnode, PROM_KCTX_PRESERVED_PROPNAME,
 	    (caddr_t)&val) == 0) ? 1 : 0);
 }

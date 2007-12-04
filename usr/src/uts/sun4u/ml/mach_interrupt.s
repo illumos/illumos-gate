@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,8 @@ vec_interrupt_resume:
 	cmp	%g5, %g4
 	bl,a,pt	%xcc, 7f
 	  nop
+
+#ifndef _OPL
 	mov	MMU_PCONTEXT, %g1
 	ldxa	[%g1]ASI_DMMU, %g1
 	srlx	%g1, CTXREG_NEXT_SHIFT, %g3
@@ -106,6 +108,8 @@ vec_interrupt_resume:
         membar  #Sync
 	sethi	%hi(FLUSH_ADDR), %g1
 	flush	%g1			! flush required by immu
+#endif /* _OPL */
+
 7:
 	!
 	!  Cross-trap request case

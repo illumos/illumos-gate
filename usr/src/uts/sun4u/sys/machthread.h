@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,15 +264,26 @@ extern "C" {
 	/*								\
 	 * back to alternate globals.					\
 	 * set PCONTEXT to run kernel.					\
-	 * no need to demap I/DTLB as we				\
-	 * never went back to user mode.				\ 
+	 * A demap of I/DTLB is required if the nucleus bits differ	\
+	 * from kcontextreg.						\
 	 */								\
 	mov	MMU_PCONTEXT, scr1;					\
 	sethi	%hi(kcontextreg), scr2;					\
 	ldx     [scr2 + %lo(kcontextreg)], scr2;			\
+	ldxa	[scr1]ASI_MMU_CTX, %g5;					\
+	xor	scr2, %g5, %g5;						\
+	srlx	%g5, CTXREG_NEXT_SHIFT, %g5;				\
+	/*								\
+	 * If N_pgsz0/1 changed, need to demap.				\
+	 */								\
+	brz	%g5, 1f;						\
+	sethi   %hi(FLUSH_ADDR), %g5;					\
+	mov	DEMAP_ALL_TYPE, %g6;					\
+	stxa	%g0, [%g6]ASI_DTLB_DEMAP;				\
+	stxa	%g0, [%g6]ASI_ITLB_DEMAP;				\
+1:									\
 	stxa    scr2, [scr1]ASI_MMU_CTX;				\
-	sethi   %hi(FLUSH_ADDR), scr1;					\
-	flush	scr1;
+	flush	%g5;
 
 /* END CSTYLED */
 

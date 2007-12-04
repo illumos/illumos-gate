@@ -265,4 +265,9 @@ kmdb_kdi_init_isadep(kdi_t *kdi, kmdb_auxv_t *kav)
 
 	mdb.m_kdi->mkdi_cpu_init(kdi_dcache_size, kdi_dcache_linesize,
 	    kdi_icache_size, kdi_icache_linesize);
+
+#ifndef sun4v
+	kmdb_prom_preserve_kctx_init();
+#endif /* sun4v */
+
 }

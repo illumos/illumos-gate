@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +65,24 @@
 	ldx	[src + KREG_OFF(idx)], tmp;	\
 	stx	tmp, [tgt + KREG_OFF(idx)]
 
+#ifndef sun4v
+/*
+ * Creates a new primary context register value by copying the nucleus page
+ * size bits to the primary context page size bits and setting the primary
+ * context to zero.  The updated value is stored in the ctx parameter.
+ */
+#define	KAIF_MAKE_NEW_CTXREG(ctx, tmp)		\
+	srlx	ctx, CTXREG_NEXT_SHIFT, ctx ;	\
+	sllx 	ctx, CTXREG_NEXT_SHIFT, ctx;	\
+	sllx	ctx, 3, tmp;			\
+	srlx	tmp, CTXREG_NEXT_SHIFT, tmp;	\
+	sllx	tmp, CTXREG_EXT_SHIFT, tmp;	\
+	or	ctx, tmp, ctx;			\
+	srlx	ctx, CTXREG_NEXT_SHIFT + 3, tmp; \
+	sllx	tmp, CTXREG_EXT_SHIFT, tmp;	\
+	or	ctx, tmp, ctx
+#endif /* sun4v */
+	
 #if !defined(__lint)
 
 	/*
@@ -423,9 +440,37 @@ main_not_in_obp:
 	mov	MMU_PCONTEXT, %g3
 	ldxa	[%g3]ASI_MMU_CTX, %g2	! ASI_MMU_CTX == ASI_DMMU for sun4u
 	stx	%g2, [%g6 + KRS_MMU_PCONTEXT]
+
+#ifndef sun4v
+	/*
+	 * If OBP supports preserving the Solaris kernel context register,
+	 * then shift the nucleus bits into the primary and set context to 0,
+	 * Otherwise, flush TLBs and clear the entire context register since
+	 * OBP will clear it without flushing on entry to OBP.
+	 */
+	sethi	%hi(kmdb_prom_preserve_kctx), %g4
+	ld	[%g4 + %lo(kmdb_prom_preserve_kctx)], %g4
+	brz	%g4, 1f
+	  nop
+	/*
+	 * Move nucleus context page size bits into primary context page size
+	 * and set context to 0.  Use %g4 as a temporary.
+	 */
+	KAIF_MAKE_NEW_CTXREG(%g2, %g4)		! new context reg in %g2
+
+	stxa	%g2, [%g3]ASI_MMU_CTX
+	membar	#Sync
+	ba	2f
+	  nop
+1:
+#endif /* sun4v */
+	/*
+	 * Flush TLBs and clear primary context register.
+	 */
 	KAIF_DEMAP_TLB_ALL(%g4)
 	stxa	%g0, [%g3]ASI_MMU_CTX	! ASI_MMU_CTX == ASI_DMMU for sun4u
 	membar	#Sync
+2:
 
 	set	kaif_trap_common, %g7
 
@@ -536,9 +581,38 @@ kaif_slave_entry(void)
 	 */
 	mov	MMU_PCONTEXT, %g3
 	ldxa	[%g3]ASI_MMU_CTX, %g4
+
+#ifndef sun4v
+	/*
+	 * If OBP supports preserving the Solaris kernel context register,
+	 * then shift the nucleus bits into the primary and set context to 0,
+	 * Otherwise, flush TLBs and clear the entire context register since
+	 * OBP will clear it without flushing on entry to OBP.
+	 */
+	sethi	%hi(kmdb_prom_preserve_kctx), %g1
+	ld	[%g1 + %lo(kmdb_prom_preserve_kctx)], %g1
+	brz	%g1, 1f
+	  nop
+	/*
+	 * Move nucleus context page size bits into primary context page size
+	 * and set context to 0.  Use %g2 as a temporary.
+	 */
+	mov	%g4, %g2
+	KAIF_MAKE_NEW_CTXREG(%g2, %g1)		! new context reg in %g2
+
+	stxa	%g2, [%g3]ASI_MMU_CTX
+	membar	#Sync
+	ba	2f
+	  nop
+1:
+#endif /* sun4v */
+	/*
+	 * Flush TLBs and clear primary context register.
+	 */
 	KAIF_DEMAP_TLB_ALL(%g1)
 	stxa	%g0, [%g3]ASI_MMU_CTX
 	membar	#Sync
+2:
 
 	set	1f, %g7
 	set	kaif_cpusave_getaddr, %g6
@@ -790,9 +864,37 @@ obp_normal_entry:
 	mov	MMU_PCONTEXT, %g3
 	ldxa	[%g3]ASI_MMU_CTX, %g2
 	stx	%g2, [%g6 + KRS_MMU_PCONTEXT]
-	KAIF_DEMAP_TLB_ALL(%g4)
-	stxa	%g0, [%g3]ASI_MMU_CTX
+
+#ifndef sun4v
+	/*
+	 * If OBP supports preserving the Solaris kernel context register,
+	 * then shift the nucleus bits into the primary and set context to 0,
+	 * Otherwise, flush TLBs and clear the entire context register since
+	 * OBP will clear it without flushing on entry to OBP.
+	 */
+	sethi	%hi(kmdb_prom_preserve_kctx), %g4
+	ld	[%g4 + %lo(kmdb_prom_preserve_kctx)], %g4
+	brz	%g4, 1f
+	  nop
+	/*
+	 * Move nucleus context page size bits into primary context page size
+	 * and set context to 0.  Use %g4 as a temporary.
+	 */
+	KAIF_MAKE_NEW_CTXREG(%g2, %g4)		! new context reg in %g2
+
+	stxa	%g2, [%g3]ASI_MMU_CTX
 	membar	#Sync
+	ba	2f
+	  nop
+1:
+#endif /* sun4v */
+	/*
+	 * Flush TLBs and clear primary context register.
+	 */
+	KAIF_DEMAP_TLB_ALL(%g4)
+	stxa	%g0, [%g3]ASI_MMU_CTX	! ASI_MMU_CTX == ASI_DMMU for sun4u
+	membar	#Sync
+2:
 
 	ba,a	kaif_trap_common
 

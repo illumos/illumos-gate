@@ -125,12 +125,15 @@ vtag_flushpage(caddr_t vaddr, uint64_t sfmmup)
 	
 	ldub	[%o1 + SFMMU_CEXT], %o4		! %o4 = sfmmup->sfmmu_cext
 	sll	%o4, CTXREG_EXT_SHIFT, %o4
-	or	%g1, %o4, %g1			! %g1 = pgsz | cnum
+	or	%g1, %o4, %g1			! %g1 = primary pgsz | cnum
 
 	wrpr	%g0, 1, %tl
 	set	MMU_PCONTEXT, %o4
 	or	DEMAP_PRIMARY | DEMAP_PAGE_TYPE, %o0, %o0
 	ldxa	[%o4]ASI_DMMU, %o2		! %o2 = save old ctxnum
+	srlx	%o2, CTXREG_NEXT_SHIFT, %o1	! need to preserve nucleus pgsz
+	sllx	%o1, CTXREG_NEXT_SHIFT, %o1	! %o1 = nucleus pgsz
+	or	%g1, %o1, %g1			! %g1 = nucleus pgsz | primary pgsz | cnum
 	stxa	%g1, [%o4]ASI_DMMU		! wr new ctxum 
 
 	stxa	%g0, [%o0]ASI_DTLB_DEMAP
@@ -210,14 +213,17 @@ vtag_flushpage_tl1(uint64_t vaddr, uint64_t sfmmup)
 	
 	ldub	[%g2 + SFMMU_CEXT], %g4		! %g4 = sfmmup->cext
 	sll	%g4, CTXREG_EXT_SHIFT, %g4
-	or	%g6, %g4, %g6			! %g6 = pgsz | cnum
+	or	%g6, %g4, %g6			! %g6 = primary pgsz | cnum
 
 	set	MMU_PCONTEXT, %g4
-	ldxa	[%g4]ASI_DMMU, %g5		/* rd old ctxnum */
-	stxa	%g6, [%g4]ASI_DMMU		/* wr new ctxum */
+	ldxa	[%g4]ASI_DMMU, %g5		! %g5 = save old ctxnum
+	srlx	%g5, CTXREG_NEXT_SHIFT, %g2	! %g2 = nucleus pgsz 
+	sllx	%g2, CTXREG_NEXT_SHIFT, %g2	! preserve nucleus pgsz 
+	or	%g6, %g2, %g6			! %g6 = nucleus pgsz | primary pgsz | cnum	
+	stxa	%g6, [%g4]ASI_DMMU		! wr new ctxum
 	stxa	%g0, [%g1]ASI_DTLB_DEMAP
 	stxa	%g0, [%g1]ASI_ITLB_DEMAP
-	stxa	%g5, [%g4]ASI_DMMU		/* restore old ctxnum */
+	stxa	%g5, [%g4]ASI_DMMU		! restore old ctxnum
 	retry
 	SET_SIZE(vtag_flushpage_tl1)
 
@@ -291,6 +297,9 @@ vtag_flush_pgcnt_tl1(uint64_t vaddr, uint64_t sfmmup_pgcnt)
 
 	set	MMU_PCONTEXT, %g4
 	ldxa	[%g4]ASI_DMMU, %g6		/* rd old ctxnum */
+	srlx	%g6, CTXREG_NEXT_SHIFT, %g2	/* %g2 = nucleus pgsz */
+	sllx	%g2, CTXREG_NEXT_SHIFT, %g2	/* preserve nucleus pgsz */
+	or	%g5, %g2, %g5			/* %g5 = nucleus pgsz | primary pgsz | cnum */
 	stxa	%g5, [%g4]ASI_DMMU		/* wr new ctxum */
 
 	set	MMU_PAGESIZE, %g2		/* g2 = pgsize */

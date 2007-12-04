@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ extern int kmdb_prom_getprop(pnode_t, char *, caddr_t);
 
 #ifndef	sun4v
 extern pnode_t kmdb_prom_getcpu_propnode(pnode_t);
+extern void kmdb_prom_preserve_kctx_init(void);
 #endif	/* sun4v */
 
 /* private to promif */

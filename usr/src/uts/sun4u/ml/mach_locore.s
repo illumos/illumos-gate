@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1348,14 +1348,28 @@ state_saved:
 	!
 	! Set pcontext to run kernel.
 	!
+	! For OPL, load kcontexreg instead of clearing primary
+	! context register.  This is to avoid changing nucleus page
+	! size bits after boot initialization.
+	!
+#ifdef _OPL
+	sethi	%hi(kcontextreg), %g4
+	ldx	[%g4 + %lo(kcontextreg)], %g4
+#endif /* _OPL */
+
 	set	DEMAP_ALL_TYPE, %g1
+	sethi	%hi(FLUSH_ADDR), %g3
+	set	MMU_PCONTEXT, %g2
+
 	stxa	%g0, [%g1]ASI_DTLB_DEMAP
 	stxa	%g0, [%g1]ASI_ITLB_DEMAP
-	set	MMU_PCONTEXT, %g1
-	stxa	%g0, [%g1]ASI_MMU_CTX
 
-	sethi	%hi(FLUSH_ADDR), %g3
-	membar  #Sync
+#ifdef _OPL
+	stxa	%g4, [%g2]ASI_MMU_CTX
+#else /* _OPL */
+	stxa	%g0, [%g2]ASI_MMU_CTX
+#endif /* _OPL */
+
 	flush	%g3
 
 	rdpr	%cwp, %g1
@@ -1572,7 +1586,11 @@ client_handler(void *cif_handler, void *arg_array)
 	rdpr	%wstate, %l5			! save %wstate
 	andn	%l5, WSTATE_MASK, %l6
 	wrpr	%l6, WSTATE_KMIX, %wstate
-! switch to PCONTEXT=0
+
+	!
+	! switch to PCONTEXT=0
+	!
+#ifndef _OPL
 	mov	MMU_PCONTEXT, %o2
 	ldxa	[%o2]ASI_DMMU, %o2
 	srlx	%o2, CTXREG_NEXT_SHIFT, %o2
@@ -1590,9 +1608,10 @@ client_handler(void *cif_handler, void *arg_array)
 	sethi	%hi(FLUSH_ADDR), %o2
 	flush	%o2				! flush required by immu
 	wrpr	%g0, %l4, %pstate		! restore interrupt state
-!
+#endif /* _OPL */
+
 1:	mov	%i1, %o0
-1:	rdpr	%pstate, %l4			! Get the present pstate value
+	rdpr	%pstate, %l4			! Get the present pstate value
 	andn	%l4, PSTATE_AM, %l6
 	wrpr	%l6, 0, %pstate			! Set PSTATE_AM = 0
 	jmpl	%i0, %o7			! Call cif handler
@@ -1602,7 +1621,10 @@ client_handler(void *cif_handler, void *arg_array)
 	  nop
 	wrpr	%g0, %l5, %wstate		! restore wstate
 
-! switch to PCONTEXT=kcontexreg
+	!
+	! switch to PCONTEXT=kcontexreg
+	!
+#ifndef _OPL
 	sethi	%hi(kcontextreg), %o3
 	ldx     [%o3 + %lo(kcontextreg)], %o3
 	brz	%o3, 1f
@@ -1619,7 +1641,8 @@ client_handler(void *cif_handler, void *arg_array)
 	sethi	%hi(FLUSH_ADDR), %o2
 	flush	%o2				! flush required by immu
 	wrpr	%g0, %l4, %pstate		! restore interrupt state
-!
+#endif /* _OPL */
+
 1:	ret					! Return result ...
 	restore	%o0, %g0, %o0			! delay; result in %o0
 	SET_SIZE(client_handler)
