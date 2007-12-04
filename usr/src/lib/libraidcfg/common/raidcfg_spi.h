@@ -145,15 +145,6 @@ extern "C" {
 #define	DISK_PRODUCT_LEN	16
 #define	DISK_REV_LEN		4
 
-#define	DISK_ID(c, id, l)	((c) << 7 | (l) << 4 | (id))
-#define	BUS(disk_id)		((disk_id) >> 7)
-#define	TARGET(disk_id)		((disk_id) & 0xf)
-#define	LUN(disk_id)		(((disk_id) >> 4) & 0x7)
-
-#define	ARRAY_ID(id, l)		((l) << 16 | (id))
-#define	ARRAY_TARGET(array_id)	((array_id) & 0xffff)
-#define	ARRAY_LUN(array_id)	((array_id) >> 16)
-
 #define	RDCFG_PLUGIN_V1		0x10000
 #define	CFGDIR		"/dev/cfg"
 #define	MAX_PATH_LEN		255

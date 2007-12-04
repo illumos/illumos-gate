@@ -3119,6 +3119,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	array_attr_t *array_attr, array_attr2;
 	disk_attr_t *disk_attr;
 	arraypart_attr_t *arraypart_attrs;
+	disk_tag_t *disk_tags;
 	raid_obj_id_t obj_id, controller_obj_id = OBJ_NONE;
 	raid_lib_t *raid_lib;
 	int i, j, ret, fd;
@@ -3426,6 +3427,11 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 		if (diskid_list == NULL) {
 			return (ERR_NOMEM);
 		}
+		disk_tags = (disk_tag_t *)calloc(num_of_comp,
+		    sizeof (disk_tag_t));
+		if (disk_tags == NULL) {
+			return (ERR_NOMEM);
+		}
 
 		for (i = 0; i < num_of_comp; ++i) {
 			if (*(disk_list + i) == OBJ_SEPARATOR_BEGIN) {
@@ -3440,6 +3446,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 					return (ret);
 				}
 				diskid_list[i] = disk_attr->disk_id;
+				disk_tags[i] = disk_attr->tag;
 			}
 		}
 
@@ -3449,20 +3456,22 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 				continue;
 			}
 
-			if (TARGET(diskid_list[i]) ==
-			    ARRAY_TARGET(array_attr->array_id) &&
-			    LUN(diskid_list[i]) ==
-			    ARRAY_LUN(array_attr->array_id))
+			if ((disk_tags[i].cidl.target_id ==
+			    array_attr->tag.idl.target_id) &&
+			    (disk_tags[i].cidl.lun ==
+			    array_attr->tag.idl.lun))
 				continue;
 
 			ret = raid_dev_config(CFGA_CMD_UNCONFIGURE,
 			    controller_attr->controller_id, diskid_list[i], 0);
 			if (ret != SUCCESS) {
 				free(diskid_list);
+				free(disk_tags);
 				return (ret);
 			}
 		}
 		free(diskid_list);
+		free(disk_tags);
 	} else {
 		/* for HW raid */
 		ret = raid_dev_config(CFGA_CMD_CONFIGURE,
@@ -3480,6 +3489,7 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	controller_attr_t *controller_attr;
 	array_attr_t *array_attr;
 	arraypart_attr_t *arraypart_attr;
+	disk_attr_t *disk_attr;
 	raid_obj_id_t arraypart_obj_id;
 	raid_lib_t *raid_lib;
 	int i = 0, j = 0, ret, fd;
@@ -3537,10 +3547,17 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 			if (ret != SUCCESS) {
 				return (ret);
 			}
-			if (TARGET(arraypart_attr->disk_id) ==
-			    ARRAY_TARGET(array_attr->array_id) &&
-			    LUN(arraypart_attr->disk_id) ==
-			    ARRAY_LUN(array_attr->array_id)) {
+
+			ret = obj_get_attr(raid_tab, arraypart_obj_id,
+			    (void **)(&disk_attr));
+			if (ret != SUCCESS) {
+				return (ret);
+			}
+
+			if (array_attr->tag.idl.target_id ==
+			    disk_attr->tag.cidl.target_id &&
+			    array_attr->tag.idl.lun ==
+			    disk_attr->tag.cidl.target_id) {
 				arraypart_obj_id = obj_get_sibling(raid_tab,
 				    arraypart_obj_id);
 				continue;
