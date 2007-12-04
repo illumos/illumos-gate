@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +120,7 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	char *c;
 	char *name;
 	uint64_t guid;
+	uint64_t version;
 	uint64_t state;
 	nvlist_t *devices;
 	uint_t n;
@@ -130,10 +130,11 @@ add_pool_to_xml(nvlist_t *config, void *data)
 
 	if (nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME, &name) ||
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &version) ||
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE, &state) ||
 	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &devices) ||
 	    nvlist_lookup_uint64_array(
-		devices, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &n)) {
+	    devices, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &n)) {
 		return (-1);
 	}
 
@@ -141,6 +142,7 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
 
 	set_uint64_prop(pool, ATTR_POOL_ID, guid);
+	set_uint64_prop(pool, ATTR_POOL_VERSION, version);
 	set_uint64_prop(pool, ATTR_POOL_USED, vs->vs_alloc);
 	set_uint64_prop(pool, ATTR_POOL_SIZE, vs->vs_space);
 	set_uint64_prop(pool, ATTR_POOL_REPLACEMENT_SIZE, vs->vs_rsize);

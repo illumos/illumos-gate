@@ -382,6 +382,10 @@ populate_PoolBean(JNIEnv *env, zpool_handle_t *zphp, zfs_handle_t *zhp,
 		    zjni_pool_status_to_obj(env,
 		    zpool_get_status(zphp, &msgid)));
 
+		(*env)->CallVoidMethod(env, object->object,
+		    pool_stats->method_setPoolVersion,
+		    zpool_get_prop_int(zphp, ZPOOL_PROP_VERSION, NULL));
+
 		/*
 		 * If a root file system does not exist for this pool, the pool
 		 * is likely faulted, so just set its name in the Java object.

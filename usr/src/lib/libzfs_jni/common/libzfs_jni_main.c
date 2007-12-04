@@ -578,3 +578,18 @@ Java_com_sun_zfs_common_model_SystemDataModel_getValidPropertyNames(JNIEnv *env,
 	return (zjni_Collection_to_array(
 	    env, (zjni_Collection_t *)list, "java/lang/String"));
 }
+
+/*
+ * Class:     com_sun_zfs_common_model_SystemDataModel
+ * Method:    getPoolCurrentVersion
+ * Signature: ()J;
+ */
+/* ARGSUSED */
+JNIEXPORT jlong JNICALL
+Java_com_sun_zfs_common_model_SystemDataModel_getPoolCurrentVersion(
+    JNIEnv *env, jobject obj)
+{
+	jlong pool_current_version = SPA_VERSION;
+
+	return (pool_current_version);
+}

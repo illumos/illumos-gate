@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,16 @@ Java_com_sun_zfs_common_model_SystemDataModel_getPropertyDefault(
 JNIEXPORT jobjectArray JNICALL
 Java_com_sun_zfs_common_model_SystemDataModel_getValidPropertyNames(
     JNIEnv *, jobject, jclass);
+
+/*
+ * Class:     com_sun_zfs_common_model_SystemDataModel
+ * Method:    getPoolCurrentVersion
+ * Signature: ()J
+ *
+ */
+JNIEXPORT jlong JNICALL
+Java_com_sun_zfs_common_model_SystemDataModel_getPoolCurrentVersion(
+    JNIEnv *, jobject);
 
 #ifdef __cplusplus
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ typedef struct PoolStatsBean {
 	DeviceStatsBean_t super;
 	jmethodID method_setPoolState;
 	jmethodID method_setPoolStatus;
+	jmethodID method_setPoolVersion;
 } PoolStatsBean_t;
 
 /*

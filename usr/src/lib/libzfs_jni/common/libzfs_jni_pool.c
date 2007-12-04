@@ -111,35 +111,33 @@ static zjni_field_mapping_t pool_state_map[] = {
 	{ POOL_STATE_ACTIVE, "POOL_STATE_ACTIVE" },
 	{ POOL_STATE_EXPORTED, "POOL_STATE_EXPORTED" },
 	{ POOL_STATE_DESTROYED, "POOL_STATE_DESTROYED" },
+	{ POOL_STATE_SPARE, "POOL_STATE_SPARE" },
 	{ POOL_STATE_UNINITIALIZED, "POOL_STATE_UNINITIALIZED" },
 	{ POOL_STATE_UNAVAIL, "POOL_STATE_UNAVAIL" },
+	{ POOL_STATE_POTENTIALLY_ACTIVE, "POOL_STATE_POTENTIALLY_ACTIVE" },
 	{ -1, NULL },
 };
 
 /* zpool_status_t to PoolStats$PoolStatus map */
 static zjni_field_mapping_t zpool_status_map[] = {
-	{ ZPOOL_STATUS_CORRUPT_CACHE,
-	    "ZPOOL_STATUS_CORRUPT_CACHE" },
-	{ ZPOOL_STATUS_MISSING_DEV_R,
-	    "ZPOOL_STATUS_MISSING_DEV_R" },
-	{ ZPOOL_STATUS_MISSING_DEV_NR,
-	    "ZPOOL_STATUS_MISSING_DEV_NR" },
-	{ ZPOOL_STATUS_CORRUPT_LABEL_R,
-	    "ZPOOL_STATUS_CORRUPT_LABEL_R" },
-	{ ZPOOL_STATUS_CORRUPT_LABEL_NR,
-	    "ZPOOL_STATUS_CORRUPT_LABEL_NR" },
+	{ ZPOOL_STATUS_CORRUPT_CACHE, "ZPOOL_STATUS_CORRUPT_CACHE" },
+	{ ZPOOL_STATUS_MISSING_DEV_R, "ZPOOL_STATUS_MISSING_DEV_R" },
+	{ ZPOOL_STATUS_MISSING_DEV_NR, "ZPOOL_STATUS_MISSING_DEV_NR" },
+	{ ZPOOL_STATUS_CORRUPT_LABEL_R, "ZPOOL_STATUS_CORRUPT_LABEL_R" },
+	{ ZPOOL_STATUS_CORRUPT_LABEL_NR, "ZPOOL_STATUS_CORRUPT_LABEL_NR" },
 	{ ZPOOL_STATUS_BAD_GUID_SUM, "ZPOOL_STATUS_BAD_GUID_SUM" },
 	{ ZPOOL_STATUS_CORRUPT_POOL, "ZPOOL_STATUS_CORRUPT_POOL" },
 	{ ZPOOL_STATUS_CORRUPT_DATA, "ZPOOL_STATUS_CORRUPT_DATA" },
 	{ ZPOOL_STATUS_FAILING_DEV, "ZPOOL_STATUS_FAILING_DEV" },
-	{ ZPOOL_STATUS_VERSION_OLDER,
-	    "ZPOOL_STATUS_VERSION_OLDER" },
-	{ ZPOOL_STATUS_VERSION_NEWER,
-	    "ZPOOL_STATUS_VERSION_NEWER" },
+	{ ZPOOL_STATUS_VERSION_NEWER, "ZPOOL_STATUS_VERSION_NEWER" },
+	{ ZPOOL_STATUS_HOSTID_MISMATCH, "ZPOOL_STATUS_HOSTID_MISMATCH" },
+	{ ZPOOL_STATUS_FAULTED_DEV_R, "ZPOOL_STATUS_FAULTED_DEV_R" },
+	{ ZPOOL_STATUS_FAULTED_DEV_NR, "ZPOOL_STATUS_FAULTED_DEV_NR" },
+	{ ZPOOL_STATUS_VERSION_OLDER, "ZPOOL_STATUS_VERSION_OLDER" },
 	{ ZPOOL_STATUS_RESILVERING, "ZPOOL_STATUS_RESILVERING" },
 	{ ZPOOL_STATUS_OFFLINE_DEV, "ZPOOL_STATUS_OFFLINE_DEV" },
 	{ ZPOOL_STATUS_OK, "ZPOOL_STATUS_OK" },
-	{ -1, NULL },
+	{ -1, NULL }
 };
 
 /*
@@ -382,6 +380,7 @@ populate_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean,
 	char *name;
 	uint64_t guid;
 	uint64_t state;
+	uint64_t version;
 	nvlist_t *devices;
 
 	zjni_Object_t *object = (zjni_Object_t *)bean;
@@ -391,6 +390,7 @@ populate_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean,
 	if (nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME, &name) ||
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) ||
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE, &state) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &version) ||
 	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &devices) ||
 	    populate_DeviceStatsBean(env, devices, dev_stats, object)) {
 		return (-1);
@@ -409,6 +409,9 @@ populate_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean,
 	(*env)->CallVoidMethod(env, object->object,
 	    pool_stats->method_setPoolStatus,
 	    zjni_pool_status_to_obj(env, zpool_import_status(config, &c)));
+
+	(*env)->CallVoidMethod(env, object->object,
+	    pool_stats->method_setPoolVersion, (jlong)version);
 
 	return (0);
 }
@@ -825,6 +828,9 @@ new_PoolStats(JNIEnv *env, PoolStatsBean_t *bean, zjni_Object_t *object)
 	bean->method_setPoolStatus = (*env)->GetMethodID(
 	    env, object->class, "setPoolStatus",
 	    "(L" ZFSJNI_PACKAGE_DATA "PoolStats$PoolStatus;)V");
+
+	bean->method_setPoolVersion = (*env)->GetMethodID(
+	    env, object->class, "setPoolVersion", "(J)V");
 }
 
 /*
