@@ -1193,16 +1193,16 @@ mir_clnt_dup_request(queue_t *q, mblk_t *mp)
 static int
 mir_close(queue_t *q)
 {
-	mir_t	*mir;
+	mir_t	*mir = q->q_ptr;
 	mblk_t	*mp;
 	bool_t queue_cleaned = FALSE;
 
 	RPCLOG(32, "rpcmod: mir_close of q 0x%p\n", (void *)q);
-	mir = (mir_t *)q->q_ptr;
 	ASSERT(MUTEX_NOT_HELD(&mir->mir_mutex));
 	mutex_enter(&mir->mir_mutex);
 	if ((mp = mir->mir_head_mp) != NULL) {
-		mir->mir_head_mp = (mblk_t *)0;
+		mir->mir_head_mp = NULL;
+		mir->mir_tail_mp = NULL;
 		freemsg(mp);
 	}
 	/*
