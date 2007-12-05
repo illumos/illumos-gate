@@ -14556,7 +14556,10 @@ sd_free_rqs(struct sd_lun *un)
 	}
 
 	if (un->un_rqs_bp != NULL) {
-		kmem_free(SD_GET_XBUF(un->un_rqs_bp), sizeof (struct sd_xbuf));
+		struct sd_xbuf *xp = SD_GET_XBUF(un->un_rqs_bp);
+		if (xp != NULL) {
+			kmem_free(xp, sizeof (struct sd_xbuf));
+		}
 		scsi_free_consistent_buf(un->un_rqs_bp);
 		un->un_rqs_bp = NULL;
 	}
