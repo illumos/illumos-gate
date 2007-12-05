@@ -58,6 +58,8 @@
 #define	RMCRESBUFLEN	1024
 #define	DATE_TIME_MSG_SIZE	78
 #define	RMCLOMV_WATCHDOG_MODE	"rmclomv-watchdog-mode"
+#define	DELAY_TIME	5000000	 /* 5 seconds, in microseconds */
+#define	CPU_SIGNATURE_DELAY_TIME	5000000	 /* 5 secs, in microsecs */
 
 extern void	pmugpio_watchdog_pat();
 static clock_t	timesync_interval;
@@ -392,7 +394,7 @@ rmclomv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		err = ddi_create_minor_node(dip, "rmclomv", S_IFCHR,
-			instance, DDI_PSEUDO, NULL);
+		    instance, DDI_PSEUDO, NULL);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 
@@ -432,8 +434,8 @@ rmclomv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Check whether we have an application watchdog
 		 */
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, RMCLOMV_WATCHDOG_MODE,
-			&wdog_state) == DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, RMCLOMV_WATCHDOG_MODE,
+		    &wdog_state) == DDI_PROP_SUCCESS) {
 			if (strcmp(wdog_state, "app") == 0) {
 				rmclomv_watchdog_mode = 1;
 				watchdog_enable = 0;
@@ -543,7 +545,7 @@ rmclomv_remove_intr_handlers(void)
 	    rmclomv_event_data_handler);
 	if (err != 0) {
 		cmn_err(CE_WARN, "Failed to unregister DP_RMC_EVENTS "
-			"handler. Err=%d", err);
+		    "handler. Err=%d", err);
 		return (DDI_FAILURE);
 	}
 	ddi_remove_softintr(rmclomv_softintr_id);
@@ -555,7 +557,7 @@ rmclomv_abort_seq_handler(char *msg)
 {
 	if (key_position == RMC_KEYSWITCH_POS_LOCKED)
 		cmn_err(CE_CONT, "KEY in LOCKED position, "
-			"ignoring debug enter sequence");
+		    "ignoring debug enter sequence");
 	else  {
 		rmclomv_break_requested = B_TRUE;
 		if (msg != NULL)
@@ -733,9 +735,9 @@ rmclomv_hdl_to_envhdl(dp_handle_t hdl, envmon_handle_t *envhdl)
 	for (next = rmclomv_cache; next != NULL; next = next->next_section) {
 		for (i = 0; i < next->num_entries; i++) {
 			if (next->entry[i].handle == hdl) {
-				    *envhdl = next->entry[i].handle_name;
-				    RELEASE_CACHE
-				    return;
+				*envhdl = next->entry[i].handle_name;
+					RELEASE_CACHE
+					return;
 			}
 		}
 	}
@@ -1723,14 +1725,14 @@ refresh_name_cache(int force_fail)
 	if (retval == 0) {
 		alarm_cmd.handle = DP_NULL_HANDLE;
 		retval1 = rmclomv_do_cmd(DP_GET_ALARM_STATE,
-			DP_GET_ALARM_STATE_R, RMCRESBUFLEN,
-			(intptr_t)&alarm_cmd, (intptr_t)&alarm_r);
+		    DP_GET_ALARM_STATE_R, RMCRESBUFLEN,
+		    (intptr_t)&alarm_cmd, (intptr_t)&alarm_r);
 		if ((retval1 == 0) && alarm_r.num_alarms) {
 			section = create_cache_section(RMCLOMV_ALARM_IND,
-				alarm_r.num_alarms);
+			    alarm_r.num_alarms);
 			for (index = 0; index < alarm_r.num_alarms; index++) {
 				section->entry[index].handle =
-					alarm_r.alarm_state[index].handle;
+				    alarm_r.alarm_state[index].handle;
 			}
 			add_section(&my_chain, section);
 		}
@@ -1879,7 +1881,7 @@ do_psu_cmd(intptr_t arg, int mode, envmon_indicator_t *env_ind,
 	}
 
 	if (rmclomv_rmc_error != RMCLOMV_RMCERROR_NONE)
-	    env_ind->sensor_status = ENVMON_INACCESSIBLE;
+		env_ind->sensor_status = ENVMON_INACCESSIBLE;
 
 	if (ddi_copyout((caddr_t)env_ind, (caddr_t)arg,
 	    sizeof (envmon_indicator_t), mode) != 0)
@@ -2397,8 +2399,8 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		 * out an inaccessible evironmental.
 		 */
 		if (rmclomv_rmc_error != RMCLOMV_RMCERROR_NONE) {
-		    env_ind.sensor_status = ENVMON_INACCESSIBLE;
-		    env_ind.condition = ENVMON_INACCESSIBLE;
+			env_ind.sensor_status = ENVMON_INACCESSIBLE;
+			env_ind.condition = ENVMON_INACCESSIBLE;
 		}
 
 		if (ddi_copyout((caddr_t)&env_ind, (caddr_t)arg,
@@ -2517,8 +2519,8 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		 * out an inaccessible environmental.
 		 */
 		if (rmclomv_rmc_error != RMCLOMV_RMCERROR_NONE) {
-		    env_hpu.sensor_status = ENVMON_INACCESSIBLE;
-		    env_hpu.fru_status = ENVMON_INACCESSIBLE;
+			env_hpu.sensor_status = ENVMON_INACCESSIBLE;
+			env_hpu.fru_status = ENVMON_INACCESSIBLE;
 		}
 
 		if (ddi_copyout((caddr_t)&env_hpu, (caddr_t)arg,
@@ -2624,8 +2626,8 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		 * out an inaccessible environmental.
 		 */
 		if (rmclomv_rmc_error != RMCLOMV_RMCERROR_NONE) {
-		    env_ledinfo.sensor_status = ENVMON_INACCESSIBLE;
-		    env_ledinfo.led_state = ENVMON_INACCESSIBLE;
+			env_ledinfo.sensor_status = ENVMON_INACCESSIBLE;
+			env_ledinfo.led_state = ENVMON_INACCESSIBLE;
 		}
 
 		if (ddi_copyout((caddr_t)&env_ledinfo, (caddr_t)arg,
@@ -2776,7 +2778,7 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		}
 		RELEASE_CACHE
 		if ((sensor_status == ENVMON_SENSOR_OK) &&
-			(rmclomv_rmc_error ||
+		    (rmclomv_rmc_error ||
 		    rmclomv_do_cmd(DP_GET_ALARM_STATE, DP_GET_ALARM_STATE_R,
 		    sizeof (rmc_alarm_r), (intptr_t)&rmc_alarm,
 		    (intptr_t)&rmc_alarm_r) != 0)) {
@@ -2794,7 +2796,7 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 			if (rmc_alarm_r.alarm_state[0].sensor_status !=
 			    DP_SENSOR_DATA_AVAILABLE)
 				env_alarminfo.sensor_status =
-					ENVMON_INACCESSIBLE;
+				    ENVMON_INACCESSIBLE;
 			else {
 				dp_alarm_state_t alarmState;
 				alarmState = rmc_alarm_r.alarm_state[0];
@@ -2804,7 +2806,7 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 					break;
 				case DP_ALARM_ON:
 					env_alarminfo.alarm_state =
-						ENVMON_ALARM_ON;
+					    ENVMON_ALARM_ON;
 					break;
 				default:
 					break;
@@ -2818,8 +2820,8 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		 * out an inaccessible environmental.
 		 */
 		if (rmclomv_rmc_error != RMCLOMV_RMCERROR_NONE) {
-		    env_alarminfo.sensor_status = ENVMON_INACCESSIBLE;
-		    env_alarminfo.alarm_state = ENVMON_INACCESSIBLE;
+			env_alarminfo.sensor_status = ENVMON_INACCESSIBLE;
+			env_alarminfo.alarm_state = ENVMON_INACCESSIBLE;
 		}
 
 		if (ddi_copyout((caddr_t)&env_alarminfo, (caddr_t)arg,
@@ -2861,10 +2863,10 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		RELEASE_CACHE
 		rmc_setalarm.state = (rsci8)env_alarmctl.alarm_state;
 		retval = rmclomv_do_cmd(DP_SET_ALARM_STATE,
-					DP_SET_ALARM_STATE_R,
-					sizeof (rmc_setalarm_r),
-					(intptr_t)&rmc_setalarm,
-					(intptr_t)&rmc_setalarm_r);
+		    DP_SET_ALARM_STATE_R,
+		    sizeof (rmc_setalarm_r),
+		    (intptr_t)&rmc_setalarm,
+		    (intptr_t)&rmc_setalarm_r);
 
 		if (retval != 0) {
 			break;
@@ -2872,8 +2874,8 @@ rmclomv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 
 		if (rmc_setalarm_r.status != 0) {
 			cmn_err(CE_WARN, "ENVMONIOCSETALARM: \"%s\" status: "
-				"0x%x", env_alarmctl.id.name,
-				rmc_setalarm_r.status);
+			    "0x%x", env_alarmctl.id.name,
+			    rmc_setalarm_r.status);
 			return (EIO);
 		}
 		break;
@@ -3095,9 +3097,24 @@ rmclomv_refresh(caddr_t arg)
 	sig_state_t		*current_sgn_p;
 	callb_cpr_t		cprinfo;
 	int			state;
+	int			tmp_checkrmc_sig;
 
 	CALLB_CPR_INIT(&cprinfo, &rmclomv_refresh_lock, callb_generic_cpr,
 	    "rmclomv_refresh");
+
+	/*
+	 * Wait until the rmclomv_checkrmc() thread has had a chance to
+	 * run its main loop.  This is done so that rmclomv_refresh will
+	 * only run its main loop once at start of day; otherwise, it may
+	 * run twice and generate warning messages when redundantly populating
+	 * its internal cache.
+	 */
+	do {
+		delay(drv_usectohz(DELAY_TIME));
+		mutex_enter(&rmclomv_checkrmc_lock);
+		tmp_checkrmc_sig = rmclomv_checkrmc_sig;
+		mutex_exit(&rmclomv_checkrmc_lock);
+	} while (tmp_checkrmc_sig != RMCLOMV_CHECKRMC_WAIT);
 
 	mutex_enter(&rmclomv_refresh_lock);
 	for (;;) {
@@ -3166,13 +3183,33 @@ rmclomv_refresh(caddr_t arg)
 			current_sgn_p = (sig_state_t *)modgetsymvalue(
 			    "current_sgn", 0);
 
+			/*
+			 * Delay before calling CPU_SIGNATURE, to allow
+			 * any pending asynchronous communications (i.e.
+			 * plat_timesync()) to complete.  This helps to
+			 * prevent the situation where the message associated
+			 * with the CPU_SIGNATURE state cannot be sent to the
+			 * system controller.
+			 */
 			if ((current_sgn_p != NULL) &&
 			    (current_sgn_p->state_t.sig != 0)) {
+				delay(drv_usectohz(CPU_SIGNATURE_DELAY_TIME));
 				CPU_SIGNATURE(current_sgn_p->state_t.sig,
 				    current_sgn_p->state_t.state,
 				    current_sgn_p->state_t.sub_state, -1);
 
 				if (!(boothowto & RB_DEBUG)) {
+					/*
+					 * Delay before calling
+					 * send_watchdog_msg, to allow
+					 * CPU_SIGNATURE() time to
+					 * complete; this increases the
+					 * chances of successfully sending
+					 * the watchdog message to the
+					 * system controller.
+					 */
+					delay(drv_usectohz(
+					    CPU_SIGNATURE_DELAY_TIME));
 					send_watchdog_msg(last_watchdog_msg);
 				}
 			}
@@ -3402,8 +3439,8 @@ rmclomv_alarm_get(int alarm_type, int *alarm_state)
 	sensor_status = ENVMON_SENSOR_OK;
 
 	if ((rmclomv_cache_valid == B_FALSE) ||
-		((section = rmclomv_find_section(rmclomv_cache,
-		RMCLOMV_ALARM_IND)) == NULL)) {
+	    ((section = rmclomv_find_section(rmclomv_cache,
+	    RMCLOMV_ALARM_IND)) == NULL)) {
 		sensor_status = ENVMON_NOT_PRESENT;
 	}
 	if (sensor_status == ENVMON_SENSOR_OK) {
@@ -3419,9 +3456,9 @@ rmclomv_alarm_get(int alarm_type, int *alarm_state)
 	}
 	RELEASE_CACHE
 	if ((sensor_status == ENVMON_SENSOR_OK) && (rmclomv_rmc_error ||
-		rmclomv_do_cmd(DP_GET_ALARM_STATE, DP_GET_ALARM_STATE_R,
-		sizeof (u_rmc_alarm_r), (intptr_t)&u_rmc_alarm,
-		(intptr_t)&u_rmc_alarm_r) != 0)) {
+	    rmclomv_do_cmd(DP_GET_ALARM_STATE, DP_GET_ALARM_STATE_R,
+	    sizeof (u_rmc_alarm_r), (intptr_t)&u_rmc_alarm,
+	    (intptr_t)&u_rmc_alarm_r) != 0)) {
 		sensor_status = ENVMON_INACCESSIBLE;
 	}
 	if (sensor_status == ENVMON_SENSOR_OK) {
@@ -3432,7 +3469,7 @@ rmclomv_alarm_get(int alarm_type, int *alarm_state)
 		*alarm_state = 0;
 
 		if (u_rmc_alarm_r.alarm_state[0].sensor_status !=
-			DP_SENSOR_DATA_AVAILABLE)
+		    DP_SENSOR_DATA_AVAILABLE)
 			return (ENXIO);
 		else {
 			dp_alarm_state_t alarmState;
@@ -3468,8 +3505,8 @@ rmclomv_alarm_set(int alarm_type, int new_state)
 	sensor_status = ENVMON_SENSOR_OK;
 
 	if ((rmclomv_cache_valid == B_FALSE) ||
-		((section = rmclomv_find_section(rmclomv_cache,
-		RMCLOMV_ALARM_IND)) == NULL)) {
+	    ((section = rmclomv_find_section(rmclomv_cache,
+	    RMCLOMV_ALARM_IND)) == NULL)) {
 		sensor_status = ENVMON_NOT_PRESENT;
 	}
 	if (sensor_status == ENVMON_SENSOR_OK) {
@@ -3487,10 +3524,10 @@ rmclomv_alarm_set(int alarm_type, int new_state)
 	}
 	RELEASE_CACHE
 	if ((sensor_status == ENVMON_SENSOR_OK) &&
-		(rmclomv_rmc_error ||
-		rmclomv_do_cmd(DP_SET_ALARM_STATE, DP_SET_ALARM_STATE_R,
-		sizeof (u_rmc_setalarm_r), (intptr_t)&u_rmc_setalarm,
-		(intptr_t)&u_rmc_setalarm_r) != 0)) {
+	    (rmclomv_rmc_error ||
+	    rmclomv_do_cmd(DP_SET_ALARM_STATE, DP_SET_ALARM_STATE_R,
+	    sizeof (u_rmc_setalarm_r), (intptr_t)&u_rmc_setalarm,
+	    (intptr_t)&u_rmc_setalarm_r) != 0)) {
 		sensor_status = ENVMON_INACCESSIBLE;
 	}
 
