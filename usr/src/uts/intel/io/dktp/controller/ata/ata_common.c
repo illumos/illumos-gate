@@ -105,6 +105,7 @@ static int	ata_resume(dev_info_t *);
 static int	ata_power(dev_info_t *, int, int);
 static int	ata_change_power(dev_info_t *, uint8_t);
 static int	ata_is_pci(dev_info_t *);
+static void	ata_disable_DMA(ata_drv_t *ata_drvp);
 
 /*
  * Local static data
@@ -832,9 +833,11 @@ ata_bus_ctl(
 		 * properties could reside on the devinfo node should finer
 		 * grained dma control be required.
 		 */
-		ata_drvp->ad_pciide_dma = ata_init_drive_pcidma(ata_ctlp,
-		    ata_drvp, tdip);
-		ata_show_transfer_mode(ata_ctlp, ata_drvp);
+		if (ata_drvp->ad_pciide_dma == ATA_DMA_UNINITIALIZED) {
+			ata_drvp->ad_pciide_dma =
+			    ata_init_drive_pcidma(ata_ctlp, ata_drvp, tdip);
+			ata_show_transfer_mode(ata_ctlp, ata_drvp);
+		}
 	}
 
 	if (target_type == ATA_DEV_ATAPI) {
@@ -884,6 +887,7 @@ ata_timeout_func(
 {
 	ata_ctl_t *ata_ctlp;
 	ata_pkt_t *ata_pktp;
+	ata_drv_t *ata_drvp;
 
 	ADBG_TRACE(("ata_timeout_func entered\n"));
 
@@ -928,9 +932,14 @@ ata_timeout_func(
 		 * But only if this is a timed-out request. Target
 		 * driver reset requests are ignored because ATA
 		 * and ATAPI devices shouldn't be gratuitously reset.
+		 * Also disable DMA if it is a CF device.
 		 */
 		if (gcmdp == NULL)
 			break;
+		ata_drvp = GCMD2DRV(gcmdp);
+		if (ata_drvp != NULL)
+			if (ata_drvp->ad_id.ai_config == ATA_ID_CF_TO_ATA)
+				ata_disable_DMA(ata_drvp);
 		return (ata_reset_bus(ata_ctlp));
 	default:
 		break;
@@ -1160,6 +1169,7 @@ ata_init_drive(
 	 * set up drive struct
 	 */
 	ata_drvp->ad_ctlp = ata_ctlp;
+	ata_drvp->ad_pciide_dma = ATA_DMA_UNINITIALIZED;
 	ata_drvp->ad_targ = targ;
 	ata_drvp->ad_drive_bits =
 	    (ata_drvp->ad_targ == 0 ? ATDH_DRIVE0 : ATDH_DRIVE1);
@@ -3711,4 +3721,37 @@ ata_is_pci(dev_info_t *dip)
 	ddi_prop_free(bufp);
 
 	return (ispci);
+}
+
+/*
+ * Disable DMA for this drive
+ */
+static void
+ata_disable_DMA(ata_drv_t *ata_drvp)
+{
+	struct ata_id *aidp;
+	char buf[sizeof (aidp->ai_model) +2];
+	int i;
+
+	if (ata_drvp == NULL)
+		return;
+
+	if (ata_drvp->ad_pciide_dma == ATA_DMA_OFF)
+		return;
+
+	ata_drvp->ad_pciide_dma = ATA_DMA_OFF;
+
+	/* Print the message */
+	buf[0] = '\0';
+	aidp = &ata_drvp->ad_id;
+	if (aidp != NULL) {
+		(void) strncpy(buf, aidp->ai_model, sizeof (aidp->ai_model));
+		buf[sizeof (aidp->ai_model) -1] = '\0';
+		for (i = sizeof (aidp->ai_model) - 2; buf[i] == ' '; i--)
+			buf[i] = '\0';
+	}
+	cmn_err(CE_CONT,
+	    "?DMA disabled on %s target=%d, lun=%d due to DMA errors,",
+	    buf, ata_drvp->ad_targ, ata_drvp->ad_lun);
+	cmn_err(CE_CONT, "?most likely due to the CF-to-IDE adapter.");
 }

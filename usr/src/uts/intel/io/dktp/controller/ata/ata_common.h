@@ -500,8 +500,9 @@ typedef	struct	ata_tgt {
 } ata_tgt_t;
 
 /* values for ad_pciide_dma */
-#define	ATA_DMA_OFF	0x0
-#define	ATA_DMA_ON	0x1
+#define	ATA_DMA_OFF		0x0
+#define	ATA_DMA_ON		0x1
+#define	ATA_DMA_UNINITIALIZED	0x2
 
 /*
  * (ata_pkt_t *) to (gcmd_t *)
