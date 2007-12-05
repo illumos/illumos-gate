@@ -122,6 +122,8 @@
 #include <libtsnet.h>
 #include <sys/priv.h>
 
+#include <sys/dld.h>	/* DLIOCHOLDVLAN and friends */
+
 #define	V4_ADDR_LEN	32
 #define	V6_ADDR_LEN	128
 
@@ -144,6 +146,9 @@ static struct mnttab *resolve_lofs_mnts, *resolve_lofs_mnt_max;
 static tsol_zcent_t *get_zone_label(zlog_t *, priv_set_t *);
 static int tsol_mounts(zlog_t *, char *, char *);
 static void tsol_unmounts(zlog_t *, char *);
+static int driver_hold_link(const char *name, zoneid_t zoneid);
+static int driver_rele_link(const char *name, zoneid_t zoneid);
+
 static m_label_t *zlabel = NULL;
 static m_label_t *zid_label = NULL;
 static priv_set_t *zprivs = NULL;
@@ -2577,6 +2582,14 @@ add_datalink(zlog_t *zlogp, zoneid_t zoneid, char *dlname)
 		old_errno = errno;
 		res = dladm_info(dlname, &da);
 		if (res < 0 && errno == ENODEV) {
+			/*
+			 * Check if this is a link like 'ce*' which supports
+			 * a direct ioctl.
+			 */
+			res = driver_hold_link(dlname, zoneid);
+			if (res == 0)
+				return (0);
+
 			zerror(zlogp, B_FALSE, "WARNING: legacy network "
 			    "interface '%s'\nunsupported with an "
 			    "ip-type=exclusive configuration.", dlname);
@@ -2610,9 +2623,12 @@ remove_datalink(zlog_t *zlogp, zoneid_t zoneid, char *dlname)
 	}
 
 	if (dladm_rele_link(dlname, 0, B_FALSE) < 0) {
-		zerror(zlogp, B_TRUE, "unable to release network "
-		    "interface '%s'", dlname);
-		return (-1);
+		/* Fallback to 'ce*' type link */
+		if (driver_rele_link(dlname, 0) < 0) {
+			zerror(zlogp, B_TRUE, "unable to release network "
+			    "interface '%s'", dlname);
+			return (-1);
+		}
 	}
 	return (0);
 }
@@ -4622,4 +4638,72 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 error:
 	lofs_discard_mnttab();
 	return (-1);
+}
+
+/*
+ * Common routine for driver_hold_link and driver_rele_link.
+ * It invokes ioctl for a link like "ce*", for which the driver has been
+ * enhanced to support DLDIOC{HOLD,RELE}VLAN.
+ */
+static int
+driver_vlan_ioctl(const char *name, zoneid_t zoneid, int cmd)
+{
+	int		fd;
+	uint_t		ppa;
+	dld_hold_vlan_t	dhv;
+	struct strioctl istr;
+	char		providername[IFNAMSIZ];
+	char		path[MAXPATHLEN];
+
+	if (strlen(name) >= IFNAMSIZ) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (dlpi_parselink(name, providername, &ppa) != DLPI_SUCCESS) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	(void) snprintf(path, sizeof (path), "/dev/%s", providername);
+	fd = open(path, O_RDWR);
+	if (fd < 0)
+		return (-1);
+	bzero(&dhv, sizeof (dld_hold_vlan_t));
+	(void) strlcpy(dhv.dhv_name, name, IFNAMSIZ);
+	dhv.dhv_zid = zoneid;
+	dhv.dhv_docheck = B_FALSE;
+
+	istr.ic_cmd = cmd;
+	istr.ic_len = sizeof (dhv);
+	istr.ic_dp = (void *)&dhv;
+	istr.ic_timout = 0;
+
+	if (ioctl(fd, I_STR, &istr) < 0) {
+		int olderrno = errno;
+		(void) close(fd);
+		errno = olderrno;
+		return (-1);
+	}
+	(void) close(fd);
+	return (0);
+}
+
+/*
+ * Hold a data-link where the style-2 datalink driver supports DLDIOCHOLDVLAN.
+ */
+static int
+driver_hold_link(const char *name, zoneid_t zoneid)
+{
+	return (driver_vlan_ioctl(name, zoneid, DLDIOCHOLDVLAN));
+}
+
+/*
+ * Release a data-link where the style-2 datalink driver supports
+ * DLDIOC{HOLD,RELE}VLAN.
+ */
+static int
+driver_rele_link(const char *name, zoneid_t zoneid)
+{
+	return (driver_vlan_ioctl(name, zoneid, DLDIOCRELEVLAN));
 }
