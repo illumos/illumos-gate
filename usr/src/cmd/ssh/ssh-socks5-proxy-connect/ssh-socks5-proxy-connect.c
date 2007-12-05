@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +158,16 @@ send_request(
 	    exit(1);
 	}
 
-	if (read(sockfd, &recv_buf, sizeof (recv_buf)) == -1) {
+	/*
+	 * The maximum size of the protocol message we are waiting for is 10
+	 * bytes -- VER[1], REP[1], RSV[1], ATYP[1], BND.ADDR[4] and
+	 * BND.PORT[2]; see RFC 1928, section "6. Replies" for more details.
+	 * Everything else is already a part of the data we are supposed to
+	 * deliver to the requester. We know that BND.ADDR is exactly 4 bytes
+	 * since as you can see below, we accept only ATYP == 1 which specifies
+	 * that the IPv4 address is in a binary format.
+	 */
+	if (read(sockfd, &recv_buf, 10) == -1) {
 	    perror("read");
 	    exit(1);
 	}

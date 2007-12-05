@@ -42,7 +42,6 @@
 #include <bsd-cygwin_util.h>
 #include <bsd-getpeereid.h>
 #include <bsd-misc.h>
-#include <bsd-nextstep.h>
 #include <bsd-snprintf.h>
 #include <bsd-waitpid.h>
 #include <bufaux.h>

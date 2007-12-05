@@ -24,7 +24,7 @@ extern "C" {
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,9 +78,6 @@ static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 #endif
 #ifdef HAVE_MAILLOCK_H
 # include <maillock.h> /* For _PATH_MAILDIR */
-#endif
-#ifdef HAVE_NEXT
-#  include <libc.h>
 #endif
 #include <unistd.h> /* For STDIN_FILENO, etc */
 #include <termios.h> /* Struct winsize */
@@ -182,7 +179,6 @@ static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 #include "version.h"
 #include "openbsd-compat.h"
 #include "bsd-cygwin_util.h"
-#include "bsd-nextstep.h"
 
 #include "entropy.h"
 #include "g11n.h"

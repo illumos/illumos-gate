@@ -82,9 +82,6 @@ extern "C" {
 /* Define if you have a broken realpath. */
 /* #undef BROKEN_REALPATH */
 
-/* Define if you are on NeXT */
-/* #undef HAVE_NEXT */
-
 /* Define if you are on NEWS-OS */
 /* #undef HAVE_NEWS4 */
 

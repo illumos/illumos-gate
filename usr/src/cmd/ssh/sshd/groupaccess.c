@@ -33,7 +33,7 @@ RCSID("$OpenBSD: groupaccess.c,v 1.5 2002/03/04 17:27:39 stevesk Exp $");
 #include "log.h"
 
 static int ngroups;
-static char *groups_byname[NGROUPS_MAX + 1];	/* +1 for base/primary group */
+static char *groups_byname[NGROUPS_UMAX + 1];	/* +1 for base/primary group */
 
 /*
  * Initialize group access list for user with primary (base) and
@@ -42,7 +42,7 @@ static char *groups_byname[NGROUPS_MAX + 1];	/* +1 for base/primary group */
 int
 ga_init(const char *user, gid_t base)
 {
-	gid_t groups_bygid[NGROUPS_MAX + 1];
+	gid_t groups_bygid[NGROUPS_UMAX + 1];
 	int i, j;
 	struct group *gr;
 

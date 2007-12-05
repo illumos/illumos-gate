@@ -1,8 +1,4 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -13,6 +9,10 @@
  * software must be clearly marked as such, and if the derived work is
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include "includes.h"
@@ -44,7 +44,7 @@ static gid_t	saved_egid = 0;
 /* Saved effective uid. */
 static int	privileged = 0;
 static int	temporarily_use_uid_effective = 0;
-static gid_t	saved_egroups[NGROUPS_MAX], user_groups[NGROUPS_MAX];
+static gid_t	saved_egroups[NGROUPS_UMAX], user_groups[NGROUPS_UMAX];
 static int	saved_egroupslen = -1, user_groupslen = -1;
 
 /*
@@ -74,7 +74,7 @@ temporarily_use_uid(struct passwd *pw)
 
 	privileged = 1;
 	temporarily_use_uid_effective = 1;
-	saved_egroupslen = getgroups(NGROUPS_MAX, saved_egroups);
+	saved_egroupslen = getgroups(NGROUPS_UMAX, saved_egroups);
 	if (saved_egroupslen < 0)
 		fatal("getgroups: %.100s", strerror(errno));
 
@@ -83,7 +83,7 @@ temporarily_use_uid(struct passwd *pw)
 		if (initgroups(pw->pw_name, pw->pw_gid) < 0)
 			fatal("initgroups: %s: %.100s", pw->pw_name,
 			    strerror(errno));
-		user_groupslen = getgroups(NGROUPS_MAX, user_groups);
+		user_groupslen = getgroups(NGROUPS_UMAX, user_groups);
 		if (user_groupslen < 0)
 			fatal("getgroups: %.100s", strerror(errno));
 	}

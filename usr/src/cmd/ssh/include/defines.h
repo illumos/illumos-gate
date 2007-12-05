@@ -78,11 +78,14 @@ enum
 # define STDERR_FILENO   2
 #endif
 
-#ifndef NGROUPS_MAX	/* Disable groupaccess if NGROUP_MAX is not set */
-#ifdef NGROUPS
-#define NGROUPS_MAX NGROUPS
+/* Disable groupaccess if NGROUPS_UMAX, NGROUPS_MAX and NGROUPS are not set */
+#ifndef NGROUPS_UMAX
+#ifdef NGROUPS_MAX
+#define NGROUPS_UMAX NGROUPS_MAX
+#elif defined(NGROUPS)
+#define NGROUPS_UMAX NGROUPS
 #else
-#define NGROUPS_MAX 0
+#define NGROUPS_UMAX 0
 #endif
 #endif
 

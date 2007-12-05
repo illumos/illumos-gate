@@ -35,7 +35,6 @@ OBJECTS =	\
 		bsd-cygwin_util.o \
 		bsd-getpeereid.o \
 		bsd-misc.o \
-		bsd-nextstep.o \
 		bsd-asprintf.o \
 		bsd-snprintf.o \
 		bsd-waitpid.o \

@@ -1859,6 +1859,7 @@ session_x11_req(Session *s)
 		xfree(s->auth_data);
 		s->auth_proto = NULL;
 		s->auth_data = NULL;
+		return (success);
 	}
 
 	/*
@@ -1870,7 +1871,7 @@ session_x11_req(Session *s)
 	 * means that we won't set XAUTHORITY variable in child's environment
 	 * and xauth(1) will use the default location for the authority file.
 	 */
-	if (success && mkdtemp(xauthdir) != NULL) {
+	if (mkdtemp(xauthdir) != NULL) {
 		s->auth_file = xmalloc(MAXPATHLEN);
 		snprintf(s->auth_file, MAXPATHLEN, "%s/xauthfile",
 		    xauthdir);
@@ -1909,7 +1910,7 @@ session_x11_req(Session *s)
 		    strerror(errno));
 	}
 
-	return success;
+	return (success);
 }
 
 static int
