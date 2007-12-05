@@ -1440,13 +1440,20 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	aflags = area->area_flags;
 
 	/*
-	 * If this is a replacement, ditch the original, but remember the
-	 * duplicate address detection state.  If it's a new entry, then we're
-	 * obligated to do duplicate address detection now.
+	 * If the previous entry wasn't published and we are now going
+	 * to publish, then we need to do address verification. The previous
+	 * entry may have been a local unpublished address or even an external
+	 * address. If the entry we find was in an unverified state we retain
+	 * this.
+	 * If it's a new published entry, then we're obligated to do
+	 * duplicate address detection now.
 	 */
 	ace = ar_ce_lookup_from_area(as, mp, ar_ce_lookup_entry);
 	if (ace != NULL) {
-		unverified = (ace->ace_flags & ACE_F_UNVERIFIED) != 0;
+		unverified = !(ace->ace_flags & ACE_F_PUBLISH) &&
+		    (aflags & ACE_F_PUBLISH);
+		if (ace->ace_flags & ACE_F_UNVERIFIED)
+			unverified = B_TRUE;
 		ar_ce_delete(ace);
 	} else {
 		unverified = (aflags & ACE_F_PUBLISH) != 0;
