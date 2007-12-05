@@ -208,7 +208,7 @@ _init(void)
 
 	sgen_log(NULL, SGEN_DIAG2, "in sgen_init()");
 	if ((err = ddi_soft_state_init(&sgen_soft_state,
-		sizeof (sgen_state_t), SGEN_ESTIMATED_NUM_DEVS)) != 0) {
+	    sizeof (sgen_state_t), SGEN_ESTIMATED_NUM_DEVS)) != 0) {
 		goto done;
 	}
 
@@ -630,8 +630,8 @@ sgen_do_attach(dev_info_t *dip)
 		scsi_unprobe(scsidevp);
 		ddi_prop_remove_all(dip);
 		sgen_log(sg_state, SGEN_DIAG1,
-			"sgen_do_attach: minor node creation failed, "
-			"device unit-address @%s", ddi_get_name_addr(dip));
+		    "sgen_do_attach: minor node creation failed, "
+		    "device unit-address @%s", ddi_get_name_addr(dip));
 		ddi_soft_state_free(sgen_soft_state, instance);
 		return (DDI_FAILURE);
 	}
@@ -739,7 +739,7 @@ sgen_setup_sense(sgen_state_t *sg_state)
 	struct scsi_pkt *rqpkt;
 
 	if ((bp = scsi_alloc_consistent_buf(&sg_state->sgen_scsiaddr, NULL,
-	    SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL)) == NULL) {
+	    MAX_SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL)) == NULL) {
 		return (-1);
 	}
 
@@ -756,7 +756,7 @@ sgen_setup_sense(sgen_state_t *sg_state)
 	sg_state->sgen_sense = (struct scsi_extended_sense *)bp->b_un.b_addr;
 
 	(void) scsi_setup_cdb((union scsi_cdb *)rqpkt->pkt_cdbp,
-	    SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
+	    SCMD_REQUEST_SENSE, 0, MAX_SENSE_LENGTH, 0);
 	FILL_SCSI1_LUN(sg_state->sgen_scsidev, rqpkt);
 
 	rqpkt->pkt_comp = sgen_callback;
@@ -1417,7 +1417,8 @@ sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
 {
 	struct scsi_pkt	*pkt;
 	struct uscsi_cmd *ucmd;
-	int stat_size;
+	int stat_size = 1;
+	int flags = 0;
 
 	ASSERT(bp);
 
@@ -1426,9 +1427,14 @@ sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
 	ucmd = (struct uscsi_cmd *)bp->b_private;
 
 	if (ucmd->uscsi_flags & USCSI_RQENABLE) {
-		stat_size = sizeof (struct scsi_arq_status);
-	} else {
-		stat_size = 1;
+		if (ucmd->uscsi_rqlen > SENSE_LENGTH) {
+			stat_size = (int)(ucmd->uscsi_rqlen) +
+			    sizeof (struct scsi_arq_status) -
+			    sizeof (struct scsi_extended_sense);
+			flags = PKT_XARQ;
+		} else {
+			stat_size = sizeof (struct scsi_arq_status);
+		}
 	}
 
 	sgen_log(sg_state, SGEN_DIAG3, "sgen_make_uscsi_cmd: b_bcount = %ld",
@@ -1439,7 +1445,7 @@ sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
 	    ucmd->uscsi_cdblen,		/* cmdlen */
 	    stat_size,			/* statuslen */
 	    0,				/* privatelen */
-	    0,				/* flags */
+	    flags,			/* flags */
 	    SLEEP_FUNC,			/* callback */
 	    (caddr_t)sg_state);		/* callback_arg */
 
@@ -1692,12 +1698,22 @@ sgen_handle_autosense(sgen_state_t *sg_state, struct scsi_pkt *pkt)
 		return (COMMAND_DONE_ERROR);
 	}
 
+	if (pkt->pkt_state & STATE_XARQ_DONE) {
+		amt = MAX_SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+	} else {
+		if (arqstat->sts_rqpkt_resid > SENSE_LENGTH) {
+			amt = MAX_SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+		} else {
+			amt = SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+		}
+	}
+
 	if (ucmd->uscsi_flags & USCSI_RQENABLE) {
 		ucmd->uscsi_rqstatus = *((char *)&arqstat->sts_rqpkt_status);
-		ucmd->uscsi_rqresid = arqstat->sts_rqpkt_resid;
+		uchar_t rqlen = min((uchar_t)amt, ucmd->uscsi_rqlen);
+		ucmd->uscsi_rqresid = ucmd->uscsi_rqlen - rqlen;
 		ASSERT(ucmd->uscsi_rqlen && sg_state->sgen_rqs_sen);
-		bcopy(&(arqstat->sts_sensedata), sg_state->sgen_rqs_sen,
-		    ucmd->uscsi_rqlen);
+		bcopy(&(arqstat->sts_sensedata), sg_state->sgen_rqs_sen, rqlen);
 		sgen_log(sg_state, SGEN_DIAG2, "sgen_handle_autosense: "
 		    "uscsi_rqstatus=0x%x uscsi_rqresid=%d\n",
 		    ucmd->uscsi_rqstatus, ucmd->uscsi_rqresid);
@@ -1710,7 +1726,6 @@ sgen_handle_autosense(sgen_state_t *sg_state, struct scsi_pkt *pkt)
 		return (COMMAND_DONE_ERROR);
 	}
 
-	amt = SENSE_LENGTH - arqstat->sts_rqpkt_resid;
 	if (((arqstat->sts_rqpkt_state & STATE_XFERRED_DATA) == 0) ||
 	    (amt == 0)) {
 		sgen_log(sg_state, SGEN_DIAG1, "sgen_handle_autosense: got "
@@ -1764,12 +1779,14 @@ sgen_handle_sense(sgen_state_t *sg_state)
 
 	SGEN_DO_ERRSTATS(sg_state, sgen_sense_rcv);
 
+	amt = MAX_SENSE_LENGTH - rqpkt->pkt_resid;
+
 	if (ucmd->uscsi_flags & USCSI_RQENABLE) {
 		ucmd->uscsi_rqstatus = *((char *)rqstatus);
-		ucmd->uscsi_rqresid = rqpkt->pkt_resid;
+		uchar_t rqlen = min((uchar_t)amt, ucmd->uscsi_rqlen);
+		ucmd->uscsi_rqresid = ucmd->uscsi_rqlen - rqlen;
 		ASSERT(ucmd->uscsi_rqlen && sg_state->sgen_rqs_sen);
-		bcopy(sg_state->sgen_sense, sg_state->sgen_rqs_sen,
-		    ucmd->uscsi_rqlen);
+		bcopy(sg_state->sgen_sense, sg_state->sgen_rqs_sen, rqlen);
 		sgen_log(sg_state, SGEN_DIAG2, "sgen_handle_sense: "
 		    "uscsi_rqstatus=0x%x uscsi_rqresid=%d\n",
 		    ucmd->uscsi_rqstatus, ucmd->uscsi_rqresid);
@@ -1789,7 +1806,6 @@ sgen_handle_sense(sgen_state_t *sg_state)
 		return (COMMAND_DONE_ERROR);
 	}
 
-	amt = SENSE_LENGTH - rqpkt->pkt_resid;
 	if ((rqpkt->pkt_state & STATE_XFERRED_DATA) == 0 || amt == 0) {
 		sgen_log(sg_state, SGEN_DIAG1, "sgen_handle_sense: got "
 		    "sense, but it contains no data");

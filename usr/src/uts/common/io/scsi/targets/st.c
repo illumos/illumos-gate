@@ -1508,7 +1508,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	}
 
 	bp = scsi_alloc_consistent_buf(&devp->sd_address, (struct buf *)NULL,
-	    SENSE_LENGTH, B_READ, canwait, NULL);
+	    MAX_SENSE_LENGTH, B_READ, canwait, NULL);
 	if (!bp) {
 		goto error;
 	}
@@ -1521,7 +1521,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	ASSERT(geterror(bp) == NULL);
 
 	(void) scsi_setup_cdb((union scsi_cdb *)rqpkt->pkt_cdbp,
-	    SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
+	    SCMD_REQUEST_SENSE, 0, MAX_SENSE_LENGTH, 0);
 	FILL_SCSI1_LUN(devp, rqpkt);
 
 	/*
@@ -5941,8 +5941,8 @@ st_ioctl_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 	if (uscmd->uscsi_cdb != NULL) {
 		bp->b_forw =
 		    (struct buf *)(uintptr_t)((char *)uscmd->uscsi_cdb)[0];
-		bp->b_back = (struct buf *)uscmd;
 	}
+	bp->b_back = (struct buf *)uscmd;
 
 	mutex_exit(ST_MUTEX);
 	err = scsi_uscsi_handle_cmd(dev, uioseg, uscmd,
@@ -8499,7 +8499,8 @@ st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
 	struct scsi_pkt *pkt;
 	caddr_t cdb;
 	int	cdblen;
-	int stat_size;
+	int	stat_size = 1;
+	int	flags = 0;
 
 	ST_FUNC(ST_DEVINFO, st_make_uscsi_cmd);
 
@@ -8507,10 +8508,16 @@ st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
 	    "st_make_uscsi_cmd(): dev = 0x%lx\n", un->un_dev);
 
 	if (ucmd->uscsi_flags & USCSI_RQENABLE) {
-		stat_size = (un->un_arq_enabled ?
-		    sizeof (struct scsi_arq_status) : 1);
-	} else {
-		stat_size = 1;
+		if (un->un_arq_enabled) {
+			if (ucmd->uscsi_rqlen > SENSE_LENGTH) {
+				stat_size = (int)(ucmd->uscsi_rqlen) +
+				    sizeof (struct scsi_arq_status) -
+				    sizeof (struct scsi_extended_sense);
+				flags = PKT_XARQ;
+			} else {
+				stat_size = sizeof (struct scsi_arq_status);
+			}
+		}
 	}
 
 	ASSERT(mutex_owned(ST_MUTEX));
@@ -8523,7 +8530,7 @@ st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
 	    ucmd->uscsi_buflen, bp->b_bcount);
 	pkt = scsi_init_pkt(ROUTE, NULL,
 	    (bp->b_bcount > 0) ? bp : NULL,
-	    cdblen, stat_size, 0, 0, func, (caddr_t)un);
+	    cdblen, stat_size, 0, flags, func, (caddr_t)un);
 	if (pkt == NULL) {
 		goto exit;
 	}
@@ -9868,7 +9875,7 @@ st_handle_sense(struct scsi_tape *un, struct buf *bp)
 	}
 
 	/* was there enough data? */
-	amt = (int)SENSE_LENGTH - rqpkt->pkt_resid;
+	amt = (int)MAX_SENSE_LENGTH - rqpkt->pkt_resid;
 	if ((rqpkt->pkt_state & STATE_XFERRED_DATA) == 0 ||
 	    (amt < SUN_MIN_SENSE_LENGTH)) {
 		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
@@ -9948,7 +9955,15 @@ st_handle_autosense(struct scsi_tape *un, struct buf *bp)
 
 
 	/* was there enough data? */
-	amt = (int)SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+	if (pkt->pkt_state & STATE_XARQ_DONE) {
+		amt = (int)MAX_SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+	} else {
+		if (arqstat->sts_rqpkt_resid > SENSE_LENGTH) {
+			amt = (int)MAX_SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+		} else {
+			amt = (int)SENSE_LENGTH - arqstat->sts_rqpkt_resid;
+		}
+	}
 	if ((arqstat->sts_rqpkt_state & STATE_XFERRED_DATA) == 0 ||
 	    (amt < SUN_MIN_SENSE_LENGTH)) {
 		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
@@ -9956,12 +9971,16 @@ st_handle_autosense(struct scsi_tape *un, struct buf *bp)
 		return (rval);
 	}
 
+	if (pkt->pkt_state & STATE_XARQ_DONE) {
+		bcopy(&arqstat->sts_sensedata, ST_RQSENSE, MAX_SENSE_LENGTH);
+	} else {
+		bcopy(&arqstat->sts_sensedata, ST_RQSENSE, SENSE_LENGTH);
+	}
+
 	/*
 	 * copy one arqstat entry in the sense data buffer
 	 */
 	st_update_error_stack(un, pkt, arqstat);
-
-	bcopy(&arqstat->sts_sensedata, ST_RQSENSE, SENSE_LENGTH);
 
 	return (st_decode_sense(un, bp, amt, &arqstat->sts_rqpkt_status));
 }

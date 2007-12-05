@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,6 +177,7 @@ struct scsi_pkt {
 #define	STATE_XFERRED_DATA	0x08	/* Data transfer took place */
 #define	STATE_GOT_STATUS	0x10	/* SCSI status received */
 #define	STATE_ARQ_DONE		0x20	/* auto rqsense took place */
+#define	STATE_XARQ_DONE		0X40	/* extra auto rqsense took place */
 
 /*
  * Definitions for the pkt_statistics field

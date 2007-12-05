@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@ extern "C" {
  */
 #define	PKT_CONSISTENT	0x0001		/* this is an 'iopb' packet */
 #define	PKT_DMA_PARTIAL	0x040000	/* partial xfer ok */
+#define	PKT_XARQ	0x080000	/* request for extra sense */
 
 /*
  * Old PKT_CONSISTENT value for binary compatibility with x86 2.1
