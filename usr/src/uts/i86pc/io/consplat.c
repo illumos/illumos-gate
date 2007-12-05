@@ -77,6 +77,8 @@ plat_support_serial_kbd_and_ms() {
 #define	CONS_USBSER	3
 #define	CONS_HYPERVISOR	4
 
+char *plat_fbpath(void);
+
 static int
 console_type()
 {
@@ -98,13 +100,16 @@ console_type()
 	/*
 	 * console is defined by "console" property, with
 	 * fallback on the old "input-device" property.
+	 * If "input-device" is not defined either, also check "output-device".
 	 */
 	boot_console = CONS_SCREEN;	/* default is screen/kb */
 	root = ddi_root_node();
 	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, root,
 	    DDI_PROP_DONTPASS, "console", &cons) == DDI_SUCCESS) ||
 	    (ddi_prop_lookup_string(DDI_DEV_T_ANY, root,
-	    DDI_PROP_DONTPASS, "input-device", &cons) == DDI_SUCCESS)) {
+	    DDI_PROP_DONTPASS, "input-device", &cons) == DDI_SUCCESS) ||
+	    (ddi_prop_lookup_string(DDI_DEV_T_ANY, root,
+	    DDI_PROP_DONTPASS, "output-device", &cons) == DDI_SUCCESS)) {
 		if (strcmp(cons, "ttya") == 0) {
 			boot_console = CONS_TTYA;
 		} else if (strcmp(cons, "ttyb") == 0) {
@@ -126,6 +131,15 @@ console_type()
 		}
 		ddi_prop_free(cons);
 	}
+
+	/*
+	 * If the console is configured to use a framebuffer but none
+	 * could be found, fallback to "ttya" since it's likely to exist
+	 * and it matches longstanding behavior on SPARC.
+	 */
+	if (boot_console == CONS_SCREEN && plat_fbpath() == NULL)
+		boot_console = CONS_TTYA;
+
 	return (boot_console);
 }
 
