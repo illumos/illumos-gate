@@ -1862,7 +1862,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
     char **source, uint64_t *val)
 {
 	zfs_cmd_t zc = { 0 };
-	nvlist_t *zplprops;
+	nvlist_t *zplprops = NULL;
 	struct mnttab mnt;
 	char *mntopt_on = NULL;
 	char *mntopt_off = NULL;
@@ -2009,6 +2009,8 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 			return (zfs_error(zhp->zfs_hdl, EZFS_NOMEM,
 			    dgettext(TEXT_DOMAIN, "internal error")));
 		}
+		if (zplprops)
+			nvlist_free(zplprops);
 		zcmd_free_nvlists(&zc);
 		break;
 
