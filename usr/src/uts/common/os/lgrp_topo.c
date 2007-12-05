@@ -1323,8 +1323,13 @@ lgrp_topo_flatten(int levels, lgrp_t **lgrps, int lgrp_count,
 		 * Skip non-existent lgroups and root
 		 */
 		lgrp = lgrps[i];
-		if (!LGRP_EXISTS(lgrp) || lgrp == lgrp_root)
+		if (!LGRP_EXISTS(lgrp))
 			continue;
+
+		if(lgrp == lgrp_root) {
+			lgrp->lgrp_latency = lgrp_plat_latency(lgrp->lgrp_plathand, lgrp->lgrp_plathand);
+			continue;
+		}
 
 		if (lgrp->lgrp_childcnt > 0) {
 			lgrp_t	*parent;
@@ -1357,6 +1362,8 @@ lgrp_topo_flatten(int levels, lgrp_t **lgrps, int lgrp_count,
 			klgrpset_add(lgrp_root->lgrp_children, lgrp->lgrp_id);
 			lgrp_root->lgrp_childcnt++;
 			klgrpset_add(lgrp_root->lgrp_leaves, lgrp->lgrp_id);
+
+			lgrp->lgrp_latency = lgrp_plat_latency(lgrp->lgrp_plathand, lgrp->lgrp_plathand);
 		}
 	}
 
