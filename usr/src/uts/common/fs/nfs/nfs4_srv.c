@@ -471,24 +471,24 @@ extern size_t strlcpy(char *dst, const char *src, size_t dstsize);
 #define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
 
 static const fs_operation_def_t nfs4_rd_deleg_tmpl[] = {
-	VOPNAME_OPEN,		{ .femop_open = deleg_rdopen },
-	VOPNAME_WRITE,		{ .femop_write = deleg_write },
-	VOPNAME_SETATTR,	{ .femop_setattr = deleg_setattr },
+	VOPNAME_OPEN,		{ .femop_open = deleg_rd_open },
+	VOPNAME_WRITE,		{ .femop_write = deleg_rd_write },
+	VOPNAME_SETATTR,	{ .femop_setattr = deleg_rd_setattr },
 	VOPNAME_RWLOCK,		{ .femop_rwlock = deleg_rd_rwlock },
-	VOPNAME_SPACE,		{ .femop_space = deleg_space },
-	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_setsecattr },
-	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_vnevent },
+	VOPNAME_SPACE,		{ .femop_space = deleg_rd_space },
+	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_rd_setsecattr },
+	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_rd_vnevent },
 	NULL,			NULL
 };
 static const fs_operation_def_t nfs4_wr_deleg_tmpl[] = {
-	VOPNAME_OPEN,		{ .femop_open = deleg_wropen },
-	VOPNAME_READ,		{ .femop_read = deleg_read },
-	VOPNAME_WRITE,		{ .femop_write = deleg_write },
-	VOPNAME_SETATTR,	{ .femop_setattr = deleg_setattr },
+	VOPNAME_OPEN,		{ .femop_open = deleg_wr_open },
+	VOPNAME_READ,		{ .femop_read = deleg_wr_read },
+	VOPNAME_WRITE,		{ .femop_write = deleg_wr_write },
+	VOPNAME_SETATTR,	{ .femop_setattr = deleg_wr_setattr },
 	VOPNAME_RWLOCK,		{ .femop_rwlock = deleg_wr_rwlock },
-	VOPNAME_SPACE,		{ .femop_space = deleg_space },
-	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_setsecattr },
-	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_vnevent },
+	VOPNAME_SPACE,		{ .femop_space = deleg_wr_space },
+	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_wr_setsecattr },
+	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_wr_vnevent },
 	NULL,			NULL
 };
 

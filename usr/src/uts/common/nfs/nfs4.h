@@ -909,19 +909,31 @@ extern	void		rfs4_clear_dont_grant(rfs4_file_t *);
 /*
  * nfs4 monitored operations.
  */
-extern int deleg_rdopen(femarg_t *, int, cred_t *, caller_context_t *);
-extern int deleg_wropen(femarg_t *, int, cred_t *, caller_context_t *);
+extern int deleg_rd_open(femarg_t *, int, cred_t *, caller_context_t *);
+extern int deleg_wr_open(femarg_t *, int, cred_t *, caller_context_t *);
+extern int deleg_wr_read(femarg_t *, uio_t *, int, cred_t *,
+	    caller_context_t *);
+extern int deleg_rd_write(femarg_t *, uio_t *, int, cred_t *,
+	    caller_context_t *);
+extern int deleg_wr_write(femarg_t *, uio_t *, int, cred_t *,
+	    caller_context_t *);
+extern int deleg_rd_setattr(femarg_t *, vattr_t *, int, cred_t *,
+		caller_context_t *);
+extern int deleg_wr_setattr(femarg_t *, vattr_t *, int, cred_t *,
+		caller_context_t *);
 extern int deleg_rd_rwlock(femarg_t *, int, caller_context_t *);
 extern int deleg_wr_rwlock(femarg_t *, int, caller_context_t *);
-extern int deleg_read(femarg_t *, uio_t *, int, cred_t *, caller_context_t *);
-extern int deleg_write(femarg_t *, uio_t *, int, cred_t *, caller_context_t *);
-extern int deleg_setattr(femarg_t *, vattr_t *, int, cred_t *,
+extern int deleg_rd_space(femarg_t *, int, flock64_t *, int, offset_t, cred_t *,
 		caller_context_t *);
-extern int deleg_space(femarg_t *, int, flock64_t *, int, offset_t, cred_t *,
+extern int deleg_wr_space(femarg_t *, int, flock64_t *, int, offset_t, cred_t *,
 		caller_context_t *);
-extern int deleg_setsecattr(femarg_t *, vsecattr_t *, int, cred_t *,
+extern int deleg_rd_setsecattr(femarg_t *, vsecattr_t *, int, cred_t *,
 		caller_context_t *);
-extern int deleg_vnevent(femarg_t *, vnevent_t, vnode_t *, char *,
+extern int deleg_wr_setsecattr(femarg_t *, vsecattr_t *, int, cred_t *,
+		caller_context_t *);
+extern int deleg_rd_vnevent(femarg_t *, vnevent_t, vnode_t *, char *,
+		caller_context_t *);
+extern int deleg_wr_vnevent(femarg_t *, vnevent_t, vnode_t *, char *,
 		caller_context_t *);
 
 extern void rfs4_mon_hold(void *);

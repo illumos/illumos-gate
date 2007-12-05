@@ -84,6 +84,8 @@ static int	vattr_to_wcc_attr(struct vattr *, wcc_attr *);
 static void	vattr_to_pre_op_attr(struct vattr *, pre_op_attr *);
 static void	vattr_to_wcc_data(struct vattr *, struct vattr *, wcc_data *);
 
+u_longlong_t nfs3_srv_caller_id;
+
 /* ARGSUSED */
 void
 rfs3_getattr(GETATTR3args *args, GETATTR3res *resp, struct exportinfo *exi,
@@ -141,6 +143,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	int flag;
 	int in_crit = 0;
 	struct flock64 bf;
+	caller_context_t ct;
 
 	bvap = NULL;
 	avap = NULL;
@@ -181,10 +184,6 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	 * allow the client to retrasmit its request.
 	 */
 	if (vp->v_type == VREG && (ava.va_mask & AT_SIZE)) {
-		if (rfs4_check_delegated(FWRITE, vp, TRUE)) {
-			resp->status = NFS3ERR_JUKEBOX;
-			goto out1;
-		}
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_READER);
 			in_crit = 1;
@@ -233,6 +232,11 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	    (exi->exi_export.ex_flags & EX_NOSUID))
 		ava.va_mode &= ~(VSUID | VSGID);
 
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs3_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
+
 	/*
 	 * We need to specially handle size changes because it is
 	 * possible for the client to create a file with modes
@@ -278,12 +282,18 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 			bf.l_sysid = 0;
 			bf.l_pid = 0;
 			error = VOP_SPACE(vp, F_FREESP, &bf, FWRITE,
-			    (offset_t)ava.va_size, cr, NULL);
+			    (offset_t)ava.va_size, cr, &ct);
 		}
 	}
 
 	if (!error && ava.va_mask)
-		error = VOP_SETATTR(vp, &ava, flag, cr, NULL);
+		error = VOP_SETATTR(vp, &ava, flag, cr, &ct);
+
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		resp->status = NFS3ERR_JUKEBOX;
+		goto out1;
+	}
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -299,7 +309,7 @@ rfs3_setattr(SETATTR3args *args, SETATTR3res *resp, struct exportinfo *exi,
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, &ct);
 
 	if (error)
 		goto out;
@@ -401,7 +411,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 	if (PUBLIC_FH3(&args->what.dir)) {
 		publicfh_flag = TRUE;
 		error = rfs_publicfh_mclookup(args->what.name, dvp, cr, &vp,
-					&exi, &sec);
+		    &exi, &sec);
 		if (error && exi != NULL)
 			exi_rele(exi); /* See comment below Re: publicfh_flag */
 		/*
@@ -439,7 +449,7 @@ rfs3_lookup(LOOKUP3args *args, LOOKUP3res *resp, struct exportinfo *exi,
 		}
 	} else {
 		error = VOP_LOOKUP(dvp, args->what.name, &vp,
-				NULL, 0, NULL, cr, NULL, NULL, NULL);
+		    NULL, 0, NULL, cr, NULL, NULL, NULL);
 	}
 
 	if (is_system_labeled() && error == 0) {
@@ -855,6 +865,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	int alloc_err = 0;
 	int in_crit = 0;
 	int need_rwunlock = 0;
+	caller_context_t ct;
 
 	vap = NULL;
 
@@ -879,15 +890,10 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	/*
-	 * Check to see if the v4 side of the server has delegated
-	 * this file.  If so, then we return JUKEBOX to allow the
-	 * client to retrasmit its request.
-	 */
-	if (rfs4_check_delegated(FREAD, vp, FALSE)) {
-		resp->status = NFS3ERR_JUKEBOX;
-		goto out1;
-	}
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs3_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
 
 	/*
 	 * Enter the critical region before calling VOP_RWLOCK
@@ -903,11 +909,18 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	error = VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &ct);
+
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		resp->status = NFS3ERR_JUKEBOX;
+		goto out1;
+	}
+
 	need_rwunlock = 1;
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -929,11 +942,11 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	}
 
 	if (crgetuid(cr) != va.va_uid) {
-		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, &ct);
 		if (error) {
 			if (curthread->t_flag & T_WOULDBLOCK)
 				goto out;
-			error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
+			error = VOP_ACCESS(vp, VEXEC, 0, cr, &ct);
 			if (error)
 				goto out;
 		}
@@ -946,7 +959,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 
 	offset = args->offset;
 	if (offset >= va.va_size) {
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		VN_RELE(vp);
@@ -961,7 +974,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	}
 
 	if (args->count == 0) {
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		VN_RELE(vp);
@@ -1002,15 +1015,20 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	uio.uio_loffset = args->offset;
 	uio.uio_resid = args->count;
 
-	error = VOP_READ(vp, &uio, 0, cr, NULL);
+	error = VOP_READ(vp, &uio, 0, cr, &ct);
 
 	if (error) {
 		freeb(mp);
+		/* check if a monitor detected a delegation conflict */
+		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+			resp->status = NFS3ERR_JUKEBOX;
+			goto out1;
+		}
 		goto out;
 	}
 
 	va.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 
 #ifdef DEBUG
 	if (rfs3_do_post_op_attr) {
@@ -1027,7 +1045,7 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		vap = &va;
 #endif
 
-	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 
 #if 0 /* notyet */
 	/*
@@ -1069,7 +1087,7 @@ out:
 out1:
 	if (vp != NULL) {
 		if (need_rwunlock)
-			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		VN_RELE(vp);
@@ -1123,6 +1141,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	cred_t *savecred;
 	int in_crit = 0;
 	int rwlock_ret = -1;
+	caller_context_t ct;
 
 	vp = nfs3_fhtovp(&args->file, exi);
 	if (vp == NULL) {
@@ -1145,15 +1164,10 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	/*
-	 * Check to see if the v4 side of the server has delegated
-	 * this file.  If so, then we return JUKEBOX to allow the
-	 * client to retrasmit its request.
-	 */
-	if (rfs4_check_delegated(FWRITE, vp, FALSE)) {
-		resp->status = NFS3ERR_JUKEBOX;
-		goto out1;
-	}
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs3_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
 
 	/*
 	 * We have to enter the critical region before calling VOP_RWLOCK
@@ -1169,10 +1183,18 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 		}
 	}
 
-	rwlock_ret = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	rwlock_ret = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
+
+	/* check if a monitor detected a delegation conflict */
+	if (rwlock_ret == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		resp->status = NFS3ERR_JUKEBOX;
+		rwlock_ret = -1;
+		goto out1;
+	}
+
 
 	bva.va_mask = AT_ALL;
-	error = VOP_GETATTR(vp, &bva, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &bva, 0, cr, &ct);
 
 	/*
 	 * If we can't get the attributes, then we can't do the
@@ -1204,7 +1226,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	}
 
 	if (crgetuid(cr) != bva.va_uid &&
-	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL)))
+	    (error = VOP_ACCESS(vp, VWRITE, 0, cr, &ct)))
 		goto out;
 
 	if (MANDLOCK(vp, bva.va_mode)) {
@@ -1213,7 +1235,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	}
 
 	if (args->count == 0) {
-		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
 		VN_RELE(vp);
 		resp->status = NFS3_OK;
 		vattr_to_wcc_data(bvap, avap, &resp->resok.file_wcc);
@@ -1278,14 +1300,20 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	 */
 	savecred = curthread->t_cred;
 	curthread->t_cred = cr;
-	error = VOP_WRITE(vp, &uio, ioflag, cr, NULL);
+	error = VOP_WRITE(vp, &uio, ioflag, cr, &ct);
 	curthread->t_cred = savecred;
 
 	if (iovp != iov)
 		kmem_free(iovp, sizeof (*iovp) * iovcnt);
 
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		resp->status = NFS3ERR_JUKEBOX;
+		goto out1;
+	}
+
 	ava.va_mask = AT_ALL;
-	avap = VOP_GETATTR(vp, &ava, 0, cr, NULL) ? NULL : &ava;
+	avap = VOP_GETATTR(vp, &ava, 0, cr, &ct) ? NULL : &ava;
 
 #ifdef DEBUG
 	if (!rfs3_do_post_op_attr)
@@ -1295,7 +1323,7 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	if (error)
 		goto out;
 
-	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
 	if (in_crit)
 		nbl_end_crit(vp);
 	VN_RELE(vp);
@@ -1309,8 +1337,8 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 	 */
 	if (rwlock_ret != V_WRITELOCK_TRUE) {
 		if (bvap == NULL || avap == NULL ||
-				bvap->va_seq == 0 || avap->va_seq == 0 ||
-				avap->va_seq != (bvap->va_seq + 1)) {
+		    bvap->va_seq == 0 || avap->va_seq == 0 ||
+		    avap->va_seq != (bvap->va_seq + 1)) {
 			bvap = NULL;
 		}
 	}
@@ -1331,7 +1359,7 @@ out:
 out1:
 	if (vp != NULL) {
 		if (rwlock_ret != -1)
-			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		VN_RELE(vp);
@@ -1455,7 +1483,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 				 * Does file already exist?
 				 */
 				error = VOP_LOOKUP(dvp, args->where.name, &tvp,
-					NULL, 0, NULL, cr, NULL, NULL, NULL);
+				    NULL, 0, NULL, cr, NULL, NULL, NULL);
 
 				/*
 				 * Check to see if the file has been delegated
@@ -1483,7 +1511,7 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 
 					tva.va_mask = AT_SIZE;
 					error = VOP_GETATTR(tvp, &tva, 0, cr,
-						NULL);
+					    NULL);
 					/*
 					 * Can't check for conflicts, so return
 					 * error.
@@ -1492,12 +1520,12 @@ rfs3_create(CREATE3args *args, CREATE3res *resp, struct exportinfo *exi,
 						goto out;
 
 					offset = tva.va_size < va.va_size ?
-						tva.va_size : va.va_size;
+					    tva.va_size : va.va_size;
 					len = tva.va_size < va.va_size ?
-						va.va_size - tva.va_size :
-						tva.va_size - va.va_size;
+					    va.va_size - tva.va_size :
+					    tva.va_size - va.va_size;
 					if (nbl_conflict(tvp, NBL_WRITE,
-							offset, len, 0, NULL)) {
+					    offset, len, 0, NULL)) {
 						error = EACCES;
 						goto out;
 					}
@@ -1964,7 +1992,7 @@ rfs3_symlink(SYMLINK3args *args, SYMLINK3res *resp, struct exportinfo *exi,
 		goto out;
 
 	error = VOP_LOOKUP(dvp, args->where.name, &vp, NULL, 0, NULL, cr,
-			NULL, NULL, NULL);
+	    NULL, NULL, NULL);
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2310,7 +2338,7 @@ rfs3_remove(REMOVE3args *args, REMOVE3res *resp, struct exportinfo *exi,
 	 * reservation and V4 delegations
 	 */
 	error = VOP_LOOKUP(vp, args->object.name, &targvp, NULL, 0,
-			NULL, cr, NULL, NULL, NULL);
+	    NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto out;
 
@@ -2624,7 +2652,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 	 * reservation or V4 delegations.
 	 */
 	error = VOP_LOOKUP(fvp, args->from.name, &srcvp, NULL, 0,
-			NULL, cr, NULL, NULL, NULL);
+	    NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		goto out;
 
@@ -2656,14 +2684,14 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 
 	if (!nbl_need_check(srcvp)) {
 		error = VOP_RENAME(fvp, args->from.name, tvp,
-				    args->to.name, cr, NULL, 0);
+		    args->to.name, cr, NULL, 0);
 	} else {
 		nbl_start_crit(srcvp, RW_READER);
 		if (nbl_conflict(srcvp, NBL_RENAME, 0, 0, 0, NULL)) {
 			error = EACCES;
 		} else {
 			error = VOP_RENAME(fvp, args->from.name, tvp,
-				    args->to.name, cr, NULL, 0);
+			    args->to.name, cr, NULL, 0);
 		}
 		nbl_end_crit(srcvp);
 	}
@@ -2676,7 +2704,7 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		srcvp->v_path = NULL;
 		mutex_exit(&srcvp->v_lock);
 		vn_setpath(rootdir, tvp, srcvp, args->to.name,
-				strlen(args->to.name));
+		    strlen(args->to.name));
 		if (tmp != NULL)
 			kmem_free(tmp, strlen(tmp) + 1);
 	}
@@ -3083,7 +3111,7 @@ rfs3_readdir(READDIR3args *args, READDIR3res *resp, struct exportinfo *exi,
 		if (count != uio.uio_resid) {
 			namlen = strlen(((struct dirent64 *)data)->d_name);
 			bufsize += (1 + 2 + 1 + 2) * BYTES_PER_XDR_UNIT +
-				    roundup(namlen, BYTES_PER_XDR_UNIT);
+			    roundup(namlen, BYTES_PER_XDR_UNIT);
 		}
 		/*
 		 * We need to check to see if the number of bytes left
@@ -3355,8 +3383,8 @@ getmoredents:
 	 * entry exists and attributes and filehandle are also valid
 	 */
 	for (size = prev_len - uio.uio_resid;
-		size > 0;
-		size -= dp->d_reclen, dp = nextdp(dp)) {
+	    size > 0;
+	    size -= dp->d_reclen, dp = nextdp(dp)) {
 
 		if (dp->d_ino == 0) {
 			nents++;
@@ -3444,7 +3472,7 @@ good:
 		infop[i].namelen = namlen[i];
 
 		error = VOP_LOOKUP(vp, dp->d_name, &nvp, NULL, 0, NULL, cr,
-			NULL, NULL, NULL);
+		    NULL, NULL, NULL);
 		if (error) {
 			infop[i].attr.attributes = FALSE;
 			infop[i].fh.handle_follows = FALSE;
@@ -3456,7 +3484,7 @@ good:
 		if (rfs3_do_post_op_attr) {
 			nva.va_mask = AT_ALL;
 			nvap = rfs4_delegated_getattr(nvp, &nva, 0, cr) ?
-				NULL : &nva;
+			    NULL : &nva;
 		} else
 			nvap = NULL;
 #else
@@ -3541,7 +3569,7 @@ rfs3_readdirplus_free(READDIRPLUS3res *resp)
 	if (resp->status == NFS3_OK) {
 		kmem_free(resp->resok.reply.entries, resp->resok.count);
 		kmem_free(resp->resok.infop,
-			resp->resok.size * sizeof (struct entryplus3_info));
+		    resp->resok.size * sizeof (struct entryplus3_info));
 	}
 }
 
@@ -3970,7 +3998,7 @@ sattr3_to_vattr(sattr3 *sap, struct vattr *vap)
 		 * unless sysadmin set nfs_allow_preepoch_time.
 		 */
 		NFS_TIME_T_CONVERT(vap->va_atime.tv_sec,
-			sap->atime.atime.seconds);
+		    sap->atime.atime.seconds);
 		vap->va_atime.tv_nsec = (uint32_t)sap->atime.atime.nseconds;
 		vap->va_mask |= AT_ATIME;
 	} else if (sap->atime.set_it == SET_TO_SERVER_TIME) {
@@ -3988,7 +4016,7 @@ sattr3_to_vattr(sattr3 *sap, struct vattr *vap)
 		 * unless sysadmin set nfs_allow_preepoch_time.
 		 */
 		NFS_TIME_T_CONVERT(vap->va_mtime.tv_sec,
-			sap->mtime.mtime.seconds);
+		    sap->mtime.mtime.seconds);
 		vap->va_mtime.tv_nsec = (uint32_t)sap->mtime.mtime.nseconds;
 		vap->va_mask |= AT_MTIME;
 	} else if (sap->mtime.set_it == SET_TO_SERVER_TIME) {
@@ -4044,8 +4072,8 @@ vattr_to_wcc_attr(struct vattr *vap, wcc_attr *wccap)
 
 	/* Return error if time or size overflow */
 	if (!  (NFS_TIME_T_OK(vap->va_mtime.tv_sec) &&
-		NFS_TIME_T_OK(vap->va_ctime.tv_sec) &&
-		NFS3_SIZE_OK(vap->va_size))) {
+	    NFS_TIME_T_OK(vap->va_ctime.tv_sec) &&
+	    NFS3_SIZE_OK(vap->va_size))) {
 		return (EOVERFLOW);
 	}
 	wccap->size = (size3)vap->va_size;
@@ -4128,6 +4156,8 @@ rfs3_srvrinit(void)
 
 	if (verfp->id == 0)
 		verfp->id = (uint_t)now.tv_nsec;
+
+	nfs3_srv_caller_id = fs_new_caller_id();
 
 }
 

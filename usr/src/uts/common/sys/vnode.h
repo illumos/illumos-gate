@@ -756,7 +756,16 @@ typedef struct caller_context {
 	pid_t		cc_pid;		/* Process ID of the caller */
 	int		cc_sysid;	/* System ID, used for remote calls */
 	u_longlong_t	cc_caller_id;	/* Identifier for (set of) caller(s) */
+	ulong_t		cc_flags;
 } caller_context_t;
+
+/*
+ * Flags for caller context.  The caller sets CC_DONTBLOCK if it does not
+ * want to block inside of a FEM monitor.  The monitor will set CC_WOULDBLOCK
+ * and return EAGAIN if the operation would have blocked.
+ */
+#define	CC_WOULDBLOCK	0x01
+#define	CC_DONTBLOCK	0x02
 
 /*
  * Structure tags for function prototypes, defined elsewhere.

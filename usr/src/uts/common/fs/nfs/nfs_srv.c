@@ -87,6 +87,8 @@ static void	acl_perm(struct vnode *, struct exportinfo *, struct vattr *,
 #define	IFBLK		0060000		/* block special */
 #define	IFSOCK		0140000		/* socket */
 
+u_longlong_t nfs2_srv_caller_id;
+
 /*
  * Get file attributes.
  * Returns the current attributes of the file with the given fhandle.
@@ -152,6 +154,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	struct vattr va;
 	struct vattr bva;
 	struct flock64 bf;
+	caller_context_t ct;
 
 	TRACE_0(TR_FAC_NFS, TR_RFS_SETATTR_START, "rfs_setattr_start:");
 
@@ -211,6 +214,11 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	    (exi->exi_export.ex_flags & EX_NOSUID))
 		va.va_mode &= ~(VSUID | VSGID);
 
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs2_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
+
 	/*
 	 * We need to specially handle size changes because it is
 	 * possible for the client to create a file with modes
@@ -227,21 +235,8 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	 * Also the client should not be allowed to change the
 	 * size of the file if there is a conflicting non-blocking
 	 * mandatory lock in the region of change.
-	 *
-	 * Also(2), check to see if the v4 side of the server has
-	 * delegated this file.  If so, then we set T_WOULDBLOCK
-	 * so that the dispatch function dosn't send a reply, forcing
-	 * the client to retrasmit its request.
 	 */
 	if (vp->v_type == VREG && va.va_mask & AT_SIZE) {
-		/* If delegated, mark as wouldblock so response is dropped */
-		if (rfs4_check_delegated(FWRITE, vp, TRUE)) {
-			VN_RELE(vp);
-			curthread->t_flag |= T_WOULDBLOCK;
-			TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-			    "rfs_setattr_end:(%S)", "delegated");
-			return;
-		}
 		if (nbl_need_check(vp)) {
 			nbl_start_crit(vp, RW_READER);
 			in_crit = 1;
@@ -249,7 +244,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 
 		bva.va_mask = AT_UID | AT_SIZE;
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-		error = VOP_GETATTR(vp, &bva, 0, cr, NULL);
+		error = VOP_GETATTR(vp, &bva, 0, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 		if (error) {
 			if (in_crit)
@@ -290,7 +285,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 			TRACE_0(TR_FAC_NFS, TR_VOP_SPACE_START,
 			    "vop_space_start:");
 			error = VOP_SPACE(vp, F_FREESP, &bf, FWRITE,
-			    (offset_t)va.va_size, cr, NULL);
+			    (offset_t)va.va_size, cr, &ct);
 			TRACE_0(TR_FAC_NFS, TR_VOP_SPACE_END, "vop_space_end:");
 		}
 		if (in_crit)
@@ -303,8 +298,22 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	 */
 	if (!error && va.va_mask) {
 		TRACE_0(TR_FAC_NFS, TR_VOP_SETATTR_START, "vop_setattr_start:");
-		error = VOP_SETATTR(vp, &va, flag, cr, NULL);
+		error = VOP_SETATTR(vp, &va, flag, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_SETATTR_END, "vop_setattr_end:");
+	}
+
+	/*
+	 * check if the monitor on either vop_space or vop_setattr detected
+	 * a delegation conflict and if so, mark the thread flag as
+	 * wouldblock so that the response is dropped and the client will
+	 * try again.
+	 */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		VN_RELE(vp);
+		curthread->t_flag |= T_WOULDBLOCK;
+		TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
+		    "rfs_setattr_end:(%S)", "delegated");
+		return;
 	}
 
 	if (!error) {
@@ -320,10 +329,12 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 		}
 	}
 
+	ct.cc_flags = 0;
+
 	/*
 	 * Force modified metadata out to stable storage.
 	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+	(void) VOP_FSYNC(vp, FNODSYNC, cr, &ct);
 
 	VN_RELE(vp);
 
@@ -633,6 +644,7 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	mblk_t *mp;
 	int alloc_err = 0;
 	int in_crit = 0;
+	caller_context_t ct;
 
 	TRACE_0(TR_FAC_NFS, TR_RFS_READ_START, "rfs_read_start:");
 
@@ -654,19 +666,10 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 		return;
 	}
 
-	/*
-	 * Check to see if the v4 side of the server has delegated
-	 * this file.  If so, then we mark thread as wouldblock so
-	 * the response is dropped.
-	 */
-	if (rfs4_check_delegated(FREAD, vp, FALSE)) {
-		VN_RELE(vp);
-		curthread->t_flag |= T_WOULDBLOCK;
-		rr->rr_data = NULL;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "delegated");
-		return;
-	}
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs2_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
 
 	/*
 	 * Enter the critical region before calling VOP_RWLOCK
@@ -688,18 +691,29 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	}
 
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_rwlock_start:");
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	error = VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_rwlock_end:");
+
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		VN_RELE(vp);
+		/* mark as wouldblock so response is dropped */
+		curthread->t_flag |= T_WOULDBLOCK;
+		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
+		    "rfs_read_end:(%S)", "delegated");
+		rr->rr_data = NULL;
+		return;
+	}
 
 	va.va_mask = AT_ALL;
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	if (error) {
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
 		    "vop_rwunlock_start:");
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
@@ -718,7 +732,7 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	 */
 	if (crgetuid(cr) != va.va_uid) {
 		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START, "vop_access_start:");
-		error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
+		error = VOP_ACCESS(vp, VREAD, 0, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END, "vop_access_end:");
 		if (error) {
 			/*
@@ -727,14 +741,14 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 			 */
 			TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START,
 			    "vop_access_start:");
-			error = VOP_ACCESS(vp, VEXEC, 0, cr, NULL);
+			error = VOP_ACCESS(vp, VEXEC, 0, cr, &ct);
 			TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END,
 			    "vop_access_end:");
 		}
 		if (error) {
 			TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
 			    "vop_rwunlock_start:");
-			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 			if (in_crit)
 				nbl_end_crit(vp);
 			TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END,
@@ -751,7 +765,7 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	if (MANDLOCK(vp, va.va_mode)) {
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
 		    "vop_rwunlock_start:");
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
@@ -801,20 +815,29 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	uio.uio_resid = ra->ra_count;
 
 	TRACE_0(TR_FAC_NFS, TR_VOP_READ_START, "vop_read_start:");
-	error = VOP_READ(vp, &uio, 0, cr, NULL);
+	error = VOP_READ(vp, &uio, 0, cr, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_READ_END, "vop_read_end:");
 
 	if (error) {
 		freeb(mp);
+
+		/*
+		 * check if a monitor detected a delegation conflict and
+		 * mark as wouldblock so response is dropped
+		 */
+		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
+			curthread->t_flag |= T_WOULDBLOCK;
+		else
+			rr->rr_status = puterrno(error);
+
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
 		    "vop_rwunlock_start:");
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 		VN_RELE(vp);
 		rr->rr_data = NULL;
-		rr->rr_status = puterrno(error);
 		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
 		    "rfs_read_end:(%S)", "read error");
 		return;
@@ -826,13 +849,13 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	 */
 	va.va_mask = AT_ALL;
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 	if (error) {
 		freeb(mp);
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
 		    "vop_rwunlock_start:");
-		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
 		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END,
@@ -851,7 +874,7 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 
 done:
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
-	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 	if (in_crit)
 		nbl_end_crit(vp);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
@@ -930,6 +953,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	int iovcnt;
 	cred_t *savecred;
 	int in_crit = 0;
+	caller_context_t ct;
 
 	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_START, "rfs_write_start:(%S)", "sync");
 
@@ -957,22 +981,14 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		return;
 	}
 
-	/*
-	 * Check to see if the v4 side of the server has delegated
-	 * this file.  If so, then we mark thread as wouldblock so
-	 * the response is dropped.
-	 */
-	if (rfs4_check_delegated(FWRITE, vp, FALSE)) {
-		VN_RELE(vp);
-		curthread->t_flag |= T_WOULDBLOCK;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_write_end:(%S)", "delegated");
-		return;
-	}
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs2_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
 
 	va.va_mask = AT_UID|AT_MODE;
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	if (error) {
@@ -990,7 +1006,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 * is always allowed to write it.
 		 */
 		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START, "vop_access_start:");
-		error = VOP_ACCESS(vp, VWRITE, 0, cr, NULL);
+		error = VOP_ACCESS(vp, VWRITE, 0, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END, "vop_access_end:");
 		if (error) {
 			VN_RELE(vp);
@@ -1029,8 +1045,18 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	}
 
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_rwlock_start:");
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	error = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_rwlock_end:");
+
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		VN_RELE(vp);
+		/* mark as wouldblock so response is dropped */
+		curthread->t_flag |= T_WOULDBLOCK;
+		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
+		    "rfs_write_end:(%S)", "delegated");
+		return;
+	}
 
 	if (wa->wa_data) {
 		iov[0].iov_base = wa->wa_data;
@@ -1062,7 +1088,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 */
 		savecred = curthread->t_cred;
 		curthread->t_cred = cr;
-		error = VOP_WRITE(vp, &uio, FSYNC, cr, NULL);
+		error = VOP_WRITE(vp, &uio, FSYNC, cr, &ct);
 		curthread->t_cred = savecred;
 		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
 	} else {
@@ -1108,7 +1134,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 */
 		savecred = curthread->t_cred;
 		curthread->t_cred = cr;
-		error = VOP_WRITE(vp, &uio, FSYNC, cr, NULL);
+		error = VOP_WRITE(vp, &uio, FSYNC, cr, &ct);
 		curthread->t_cred = savecred;
 		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
 
@@ -1117,7 +1143,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	}
 
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
-	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 	if (!error) {
@@ -1127,7 +1153,7 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 */
 		va.va_mask = AT_ALL;	/* now we want everything */
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-		error = VOP_GETATTR(vp, &va, 0, cr, NULL);
+		error = VOP_GETATTR(vp, &va, 0, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 		/* check for overflows */
 		if (!error) {
@@ -1141,7 +1167,12 @@ out:
 		nbl_end_crit(vp);
 	VN_RELE(vp);
 
-	ns->ns_status = puterrno(error);
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
+		/* mark as wouldblock so response is dropped */
+		curthread->t_flag |= T_WOULDBLOCK;
+	else
+		ns->ns_status = puterrno(error);
 
 	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END, "rfs_write_end:(%S)", "sync");
 }
@@ -1208,6 +1239,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	ushort_t t_flag;
 	cred_t *savecred;
 	int in_crit = 0;
+	caller_context_t ct;
 
 	if (!rfs_write_async) {
 		rfs_write_sync(wa, ns, exi, req, cr);
@@ -1355,13 +1387,37 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		in_crit = 1;
 	}
 
+	ct.cc_sysid = 0;
+	ct.cc_pid = 0;
+	ct.cc_caller_id = nfs2_srv_caller_id;
+	ct.cc_flags = CC_DONTBLOCK;
+
 	/*
 	 * Lock the file for writing.  This operation provides
 	 * the delay which allows clusters to grow.
 	 */
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_wrlock_start:");
-	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	error = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_wrlock_end");
+
+	/* check if a monitor detected a delegation conflict */
+	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
+		VN_RELE(vp);
+		/* mark as wouldblock so response is dropped */
+		curthread->t_flag |= T_WOULDBLOCK;
+		mutex_enter(&rfs_async_write_lock);
+		for (rp = nlp->list; rp != NULL; rp = rp->list) {
+			if (rp->ns->ns_status == RFSWRITE_INITVAL) {
+				rp->ns->ns_status = puterrno(error);
+				rp->thread->t_flag |= T_WOULDBLOCK;
+			}
+		}
+		cv_broadcast(&nlp->cv);
+		mutex_exit(&rfs_async_write_lock);
+		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
+		    "rfs_write_end:(%S)", "delegated");
+		return;
+	}
 
 	/*
 	 * Disconnect this cluster from the list of clusters.
@@ -1415,7 +1471,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 
 		va.va_mask = AT_UID|AT_MODE;
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
-		error = VOP_GETATTR(vp, &va, 0, rp->cr, NULL);
+		error = VOP_GETATTR(vp, &va, 0, rp->cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 		if (!error) {
 			if (crgetuid(rp->cr) != va.va_uid) {
@@ -1427,7 +1483,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 				 */
 				TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START,
 				    "vop_access_start:");
-				error = VOP_ACCESS(vp, VWRITE, 0, rp->cr, NULL);
+				error = VOP_ACCESS(vp, VWRITE, 0, rp->cr, &ct);
 				TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END,
 				    "vop_access_end:");
 			}
@@ -1564,29 +1620,21 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		    "vop_write_start:(%S)", "async");
 
 		/*
-		 * Check to see if the v4 side of the server has
-		 * delegated this file.  If so, then we mark thread
-		 * as wouldblock so the response is dropped.
+		 * We're changing creds because VM may fault
+		 * and we need the cred of the current
+		 * thread to be used if quota * checking is
+		 * enabled.
 		 */
-		if (rfs4_check_delegated(FWRITE, vp, FALSE)) {
+		savecred = curthread->t_cred;
+		curthread->t_cred = cr;
+		error = VOP_WRITE(vp, &uio, 0, rp->cr, &ct);
+		curthread->t_cred = savecred;
+		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
+
+		/* check if a monitor detected a delegation conflict */
+		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
+			/* mark as wouldblock so response is dropped */
 			curthread->t_flag |= T_WOULDBLOCK;
-			error = EACCES; /* just to have an error */
-			TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-			    "rfs_write_end:(%S)", "delegated");
-		} else {
-			/*
-			 * We're changing creds because VM may fault
-			 * and we need the cred of the current
-			 * thread to be used if quota * checking is
-			 * enabled.
-			 */
-			savecred = curthread->t_cred;
-			curthread->t_cred = cr;
-			error = VOP_WRITE(vp, &uio, 0, rp->cr, NULL);
-			curthread->t_cred = savecred;
-			TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END,
-			    "vop_write_end:");
-		}
 
 		if (niovp != iov)
 			kmem_free(niovp, sizeof (*niovp) * iovcnt);
@@ -1600,7 +1648,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 			va.va_mask = AT_ALL;	/* now we want everything */
 			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
 			    "vop_getattr_start:");
-			error = VOP_GETATTR(vp, &va, 0, rp->cr, NULL);
+			error = VOP_GETATTR(vp, &va, 0, rp->cr, &ct);
 			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END,
 			    "vop_getattr_end:");
 			if (!error)
@@ -1631,18 +1679,18 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	 */
 	if (data_written) {
 		TRACE_0(TR_FAC_NFS, TR_VOP_PUTPAGE_START, "vop_putpage_start:");
-		error = VOP_PUTPAGE(vp, (u_offset_t)off, len, 0, cr, NULL);
+		error = VOP_PUTPAGE(vp, (u_offset_t)off, len, 0, cr, &ct);
 		TRACE_0(TR_FAC_NFS, TR_VOP_PUTPAGE_END, "vop_putpage_end:");
 		if (!error) {
 			TRACE_0(TR_FAC_NFS, TR_VOP_FSYNC_START,
 			    "vop_fsync_start:");
-			error = VOP_FSYNC(vp, FNODSYNC, cr, NULL);
+			error = VOP_FSYNC(vp, FNODSYNC, cr, &ct);
 			TRACE_0(TR_FAC_NFS, TR_VOP_FSYNC_END, "vop_fsync_end:");
 		}
 	}
 
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
-	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 	if (in_crit)
@@ -3063,6 +3111,7 @@ void
 rfs_srvrinit(void)
 {
 	mutex_init(&rfs_async_write_lock, NULL, MUTEX_DEFAULT, NULL);
+	nfs2_srv_caller_id = fs_new_caller_id();
 }
 
 void
