@@ -276,6 +276,7 @@ struct sd_lun {
 
 	uchar_t	un_reservation_type;	/* SCSI-3 or SCSI-2 */
 	uint_t	un_max_xfer_size;	/* Maximum DMA transfer size */
+	int	un_partial_dma_supported;
 
 	int	un_mincdb;		/* Smallest CDB to use */
 	int	un_maxcdb;		/* Largest CDB to use */
@@ -615,6 +616,7 @@ _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	sd_lun::un_reserve_release_time
 	sd_lun::un_max_xfer_size
+	sd_lun::un_partial_dma_supported
 	sd_lun::un_f_is_fibre
 	sd_lun::un_node_type
 	sd_lun::un_buf_chain_type

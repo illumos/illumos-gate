@@ -1236,10 +1236,8 @@ static int sd_setup_rw_pkt(struct sd_lun *un, struct scsi_pkt **pktpp,
 	struct buf *bp, int flags,
 	int (*callback)(caddr_t), caddr_t callback_arg,
 	diskaddr_t lba, uint32_t blockcount);
-#if defined(__i386) || defined(__amd64)
 static int sd_setup_next_rw_pkt(struct sd_lun *un, struct scsi_pkt *pktp,
 	struct buf *bp, diskaddr_t lba, uint32_t blockcount);
-#endif /* defined(__i386) || defined(__amd64) */
 
 /*
  * Prototypes for functions to support USCSI IO.
@@ -1533,12 +1531,10 @@ static int sd_failfast_flushq_callback(struct buf *bp);
 static void sd_is_lsi(struct sd_lun *un);
 
 /*
- * Function prototypes for x86 support
+ * Function prototypes for partial DMA support
  */
-#if defined(__i386) || defined(__amd64)
 static int sd_setup_next_xfer(struct sd_lun *un, struct buf *bp,
 		struct scsi_pkt *pkt, struct sd_xbuf *xp);
-#endif
 
 
 /* Function prototypes for cmlb */
@@ -6380,6 +6376,9 @@ sd_unit_attach(dev_info_t *devi)
 	dev_info_t	*pdip = ddi_get_parent(devi);
 	int		offbyone = 0;
 	int		geom_label_valid = 0;
+#if defined(__sparc)
+	int		max_xfer_size;
+#endif
 
 	/*
 	 * Retrieve the target driver's private data area. This was set
@@ -6684,6 +6683,7 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 #if defined(__i386) || defined(__amd64)
 	un->un_max_xfer_size = (uint_t)SD_DEFAULT_MAX_XFER_SIZE;
+	un->un_partial_dma_supported = 1;
 #else
 	un->un_max_xfer_size = (uint_t)maxphys;
 #endif
@@ -6997,6 +6997,31 @@ sd_unit_attach(dev_info_t *devi)
 			SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_unit_attach: "
 			    "un:0x%p lun-reset capability not set\n", un);
 		}
+	}
+
+	/*
+	 * Adjust the maximum transfer size. This is to fix
+	 * the problem of partial DMA support on SPARC. Some
+	 * HBA driver, like aac, has very small dma_attr_maxxfer
+	 * size, which requires partial DMA support on SPARC.
+	 * In the future the SPARC pci nexus driver may solve
+	 * the problem instead of this fix.
+	 */
+#if defined(__sparc)
+	max_xfer_size = scsi_ifgetcap(SD_ADDRESS(un), "dma-max", 1);
+	if ((max_xfer_size > 0) && (max_xfer_size < un->un_max_xfer_size)) {
+		un->un_max_xfer_size = max_xfer_size;
+		un->un_partial_dma_supported = 1;
+	}
+#endif
+
+	/*
+	 * Set PKT_DMA_PARTIAL flag.
+	 */
+	if (un->un_partial_dma_supported == 1) {
+		un->un_pkt_flags = PKT_DMA_PARTIAL;
+	} else {
+		un->un_pkt_flags = 0;
 	}
 
 	/*
@@ -11692,15 +11717,6 @@ sd_init_cdb_limits(struct sd_lun *un)
 	    min(hba_cdb_limit, SD_CDB_GROUP1);
 #endif
 
-	/*
-	 * x86 systems require the PKT_DMA_PARTIAL flag
-	 */
-#if defined(__x86)
-	un->un_pkt_flags = PKT_DMA_PARTIAL;
-#else
-	un->un_pkt_flags = 0;
-#endif
-
 	un->un_status_len = (int)((un->un_f_arq_enabled == TRUE)
 	    ? sizeof (struct scsi_arq_status) : 1);
 	un->un_cmd_timeout = (ushort_t)sd_io_time;
@@ -12045,7 +12061,6 @@ sd_setup_rw_pkt(struct sd_lun *un,
 	return (SD_PKT_ALLOC_FAILURE_CDB_TOO_SMALL);
 }
 
-#if defined(__i386) || defined(__amd64)
 /*
  *    Function: sd_setup_next_rw_pkt
  *
@@ -12121,7 +12136,6 @@ sd_setup_next_rw_pkt(struct sd_lun *un,
 	 */
 	return (SD_PKT_ALLOC_FAILURE);
 }
-#endif /* defined(__i386) || defined(__amd64) */
 
 /*
  *    Function: sd_initpkt_for_uscsi
@@ -13378,9 +13392,7 @@ static void
 sd_return_command(struct sd_lun *un, struct buf *bp)
 {
 	struct sd_xbuf *xp;
-#if defined(__i386) || defined(__amd64)
 	struct scsi_pkt *pktp;
-#endif
 
 	ASSERT(bp != NULL);
 	ASSERT(un != NULL);
@@ -13389,17 +13401,15 @@ sd_return_command(struct sd_lun *un, struct buf *bp)
 	xp = SD_GET_XBUF(bp);
 	ASSERT(xp != NULL);
 
-#if defined(__i386) || defined(__amd64)
 	pktp = SD_GET_PKTP(bp);
-#endif
 
 	SD_TRACE(SD_LOG_IO_CORE, un, "sd_return_command: entry\n");
 
-#if defined(__i386) || defined(__amd64)
 	/*
-	 * Note:x86: check for the "sdrestart failed" case.
+	 * Note: check for the "sdrestart failed" case.
 	 */
-	if (((xp->xb_pkt_flags & SD_XB_USCSICMD) != SD_XB_USCSICMD) &&
+	if ((un->un_partial_dma_supported == 1) &&
+	    ((xp->xb_pkt_flags & SD_XB_USCSICMD) != SD_XB_USCSICMD) &&
 	    (geterror(bp) == 0) && (xp->xb_dma_resid != 0) &&
 	    (xp->xb_pktp->pkt_resid == 0)) {
 
@@ -13414,7 +13424,6 @@ sd_return_command(struct sd_lun *un, struct buf *bp)
 			return;	/* Note:x86: need a return here? */
 		}
 	}
-#endif
 
 	/*
 	 * If this is the failfast bp, clear it from un_failfast_bp. This
@@ -22711,10 +22720,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	size_t		io_start_offset;
 	int		doing_rmw = FALSE;
 	int		rval;
-#if defined(__i386) || defined(__amd64)
-	ssize_t dma_resid;
-	daddr_t oblkno;
-#endif
+	ssize_t		dma_resid;
+	daddr_t		oblkno;
 	diskaddr_t	nblks = 0;
 	diskaddr_t	start_block;
 
@@ -22929,35 +22936,36 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 	wr_pktp = NULL;
 
-#if defined(__i386) || defined(__amd64)
 	dma_resid = wr_bp->b_bcount;
 	oblkno = blkno;
+
 	while (dma_resid != 0) {
-#endif
 
 	for (i = 0; i < SD_NDUMP_RETRIES; i++) {
 		wr_bp->b_flags &= ~B_ERROR;
 
-#if defined(__i386) || defined(__amd64)
-		blkno = oblkno +
-		    ((wr_bp->b_bcount - dma_resid) /
-		    un->un_tgt_blocksize);
-		nblk = dma_resid / un->un_tgt_blocksize;
+		if (un->un_partial_dma_supported == 1) {
+			blkno = oblkno +
+			    ((wr_bp->b_bcount - dma_resid) /
+			    un->un_tgt_blocksize);
+			nblk = dma_resid / un->un_tgt_blocksize;
 
-		if (wr_pktp) {
-			/* Partial DMA transfers after initial transfer */
-			rval = sd_setup_next_rw_pkt(un, wr_pktp, wr_bp,
-			    blkno, nblk);
+			if (wr_pktp) {
+				/*
+				 * Partial DMA transfers after initial transfer
+				 */
+				rval = sd_setup_next_rw_pkt(un, wr_pktp, wr_bp,
+				    blkno, nblk);
+			} else {
+				/* Initial transfer */
+				rval = sd_setup_rw_pkt(un, &wr_pktp, wr_bp,
+				    un->un_pkt_flags, NULL_FUNC, NULL,
+				    blkno, nblk);
+			}
 		} else {
-			/* Initial transfer */
 			rval = sd_setup_rw_pkt(un, &wr_pktp, wr_bp,
-			    un->un_pkt_flags, NULL_FUNC, NULL,
-			    blkno, nblk);
+			    0, NULL_FUNC, NULL, blkno, nblk);
 		}
-#else
-		rval = sd_setup_rw_pkt(un, &wr_pktp, wr_bp,
-		    0, NULL_FUNC, NULL, blkno, nblk);
-#endif
 
 		if (rval == 0) {
 			/* We were given a SCSI packet, continue. */
@@ -23004,15 +23012,17 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		drv_usecwait(10000);
 	}
 
-#if defined(__i386) || defined(__amd64)
-	/*
-	 * save the resid from PARTIAL_DMA
-	 */
-	dma_resid = wr_pktp->pkt_resid;
-	if (dma_resid != 0)
-		nblk -= SD_BYTES2TGTBLOCKS(un, dma_resid);
-	wr_pktp->pkt_resid = 0;
-#endif
+	if (un->un_partial_dma_supported == 1) {
+		/*
+		 * save the resid from PARTIAL_DMA
+		 */
+		dma_resid = wr_pktp->pkt_resid;
+		if (dma_resid != 0)
+			nblk -= SD_BYTES2TGTBLOCKS(un, dma_resid);
+		wr_pktp->pkt_resid = 0;
+	} else {
+		dma_resid = 0;
+	}
 
 	/* SunBug 1222170 */
 	wr_pktp->pkt_flags = FLAG_NOINTR;
@@ -23087,11 +23097,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 			(void) scsi_reset(SD_ADDRESS(un), RESET_ALL);
 			(void) sd_send_polled_RQS(un);
 		}
-
 	}
-#if defined(__i386) || defined(__amd64)
-	}	/* dma_resid */
-#endif
+	}
 
 	scsi_destroy_pkt(wr_pktp);
 	mutex_enter(SD_MUTEX(un));
@@ -26749,7 +26756,6 @@ sd_failfast_flushq_callback(struct buf *bp)
 
 
 
-#if defined(__i386) || defined(__amd64)
 /*
  * Function: sd_setup_next_xfer
  *
@@ -26823,7 +26829,6 @@ sd_setup_next_xfer(struct sd_lun *un, struct buf *bp,
 
 	return (0);
 }
-#endif
 
 /*
  *    Function: sd_panic_for_res_conflict
