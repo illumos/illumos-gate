@@ -114,7 +114,8 @@
  * -xcrossfile[=<n>] Enable optimization and inlining across source files,
  *		n={0|1}
  * -xe		Perform only syntax/semantic checking, no code generation
- * -xF		Compile for later mapfile reordering
+ * -xF		Compile for later mapfile reordering or unused section
+ *		elimination
  * -xhelp=<f>	Display on-line help information f(flags, readme, errors)
  * -xildoff	Cancel -xildon
  * -xildon	Enable use of the incremental linker, ild
@@ -1237,8 +1238,12 @@ do_gcc(cw_ictx_t *ctx)
 				error(arg);
 				break;
 			case 'F':
-				/* compile for mapfile reordering -- ignore */
-				if (strcmp(arg, "-xF") == 0)
+				/*
+				 * Compile for mapfile reordering, or unused
+				 * section elimination, syntax can be -xF or
+				 * more complex, like -xF=%all -- ignore.
+				 */
+				if (strncmp(arg, "-xF", 3) == 0)
 					break;
 				error(arg);
 				break;
