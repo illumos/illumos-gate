@@ -97,11 +97,12 @@ typedef struct cpudrv_pm {
  * Idle & user threads water marks in percentage
  */
 #if defined(__x86)
-#define	CPUDRV_PM_IDLE_LWM		80	/* idle low water mark */
+#define	CPUDRV_PM_IDLE_HWM		85	/* idle high water mark */
+#define	CPUDRV_PM_IDLE_LWM		70	/* idle low water mark */
 #else
+#define	CPUDRV_PM_IDLE_HWM		98	/* idle high water mark */
 #define	CPUDRV_PM_IDLE_LWM		8	/* idle low water mark */
 #endif
-#define	CPUDRV_PM_IDLE_HWM		98	/* idle high water mark */
 #define	CPUDRV_PM_USER_HWM		20	/* user high water mark */
 #define	CPUDRV_PM_IDLE_BUF_ZONE		4    /* buffer zone when going down */
 

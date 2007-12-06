@@ -47,6 +47,7 @@ extern "C" {
 
 #define	CPU_ACPI_PSTATE(sp, i)		&sp->cs_pstates->pss_pstates[i]
 #define	CPU_ACPI_FREQ(pstate)		pstate->ps_freq
+#define	CPU_ACPI_TRANSLAT(pstate)	pstate->ps_translat
 #define	CPU_ACPI_CTRL(pstate)		pstate->ps_ctrl
 #define	CPU_ACPI_STAT(pstate)		pstate->ps_state
 

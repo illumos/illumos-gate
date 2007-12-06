@@ -904,24 +904,6 @@ cpudrv_pm_monitor_disp(void *arg)
 }
 
 /*
- * Get current CPU microstate times and scale them. We should probably be
- * using get_cpu_mstate() to get this data, but bugs in some of the ISRs
- * have led to inflated system times and prevented CPUs from being power
- * managed. We can probably safely ignore time spent in ISRs when
- * determining idleness.
- */
-static void
-cpudrv_get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
-{
-	int i;
-
-	for (i = 0; i < NCMSTATES; i++) {
-		times[i] = cpu->cpu_acct[i];
-		scalehrtime(&times[i]);
-	}
-}
-
-/*
  * Monitors each CPU for the amount of time idle thread was running in the
  * last quantum and arranges for the CPU to go to the lower or higher speed.
  * Called at the time interval appropriate for the current speed. The
@@ -1020,7 +1002,7 @@ cpudrv_pm_monitor(void *arg)
 		set_supp_freqs(cp, cpupm);
 	}
 
-	cpudrv_get_cpu_mstate(cp, msnsecs);
+	get_cpu_mstate(cp, msnsecs);
 	GET_CPU_MSTATE_CNT(CMS_IDLE, idle_cnt);
 	GET_CPU_MSTATE_CNT(CMS_USER, user_cnt);
 	GET_CPU_MSTATE_CNT(CMS_SYSTEM, system_cnt);

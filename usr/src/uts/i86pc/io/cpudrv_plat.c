@@ -35,12 +35,13 @@
 #include <sys/cpudrv_plat.h>
 #include <sys/cpudrv.h>
 #include <sys/speedstep.h>
+#include <sys/pwrnow.h>
 #include <sys/machsystm.h>
 
 /*
  * Different processor families have their own technologies for supporting
- * CPU power management (i.e., Intel has Enhanced Speedstep for some of it's
- * processors and AMD has PowerNOW for some of it's processors). We support
+ * CPU power management (i.e., Intel has Enhanced SpeedStep for some of it's
+ * processors and AMD has PowerNow! for some of it's processors). We support
  * these different technologies via modules that export the interfaces
  * described below.
  *
@@ -59,13 +60,23 @@ struct cpudrv_module_ops {
 };
 
 /*
- * Interfaces for modules implementing Intel's Enhanced Speedstep.
+ * Interfaces for modules implementing Intel's Enhanced SpeedStep.
  */
 static struct cpudrv_module_ops speedstep_ops = {
-	"Enhanced Speedstep Technology",
+	"Enhanced SpeedStep Technology",
 	speedstep_init,
 	speedstep_fini,
 	speedstep_power,
+};
+
+/*
+ * Interfaces for modules implementing AMD's PowerNow!.
+ */
+static struct cpudrv_module_ops pwrnow_ops = {
+	"PowerNow! Technology",
+	pwrnow_init,
+	pwrnow_fini,
+	pwrnow_power
 };
 
 /*
@@ -73,6 +84,7 @@ static struct cpudrv_module_ops speedstep_ops = {
  */
 static struct cpudrv_module_ops *cpudrv_module_ops_table[] = {
 	&speedstep_ops,
+	&pwrnow_ops,
 	NULL
 };
 static struct cpudrv_module_ops **cpumops;
