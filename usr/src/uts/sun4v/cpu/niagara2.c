@@ -642,7 +642,12 @@ page_coloring_init_cpu()
 	mem_node_iterator_t it;
 	static uchar_t idmask[] = {0, 0x7, 0x1f, 0x1f, 0x1f, 0x1f};
 
-	(void) plat_mem_node_iterator_init(0, 0, &it, 1);
+	for (i = 0; i < max_mem_nodes; i++) {
+		memset(&it, 0, sizeof (it));
+		if (plat_mem_node_iterator_init(0, i, &it, 1) != (pfn_t)-1)
+			break;
+	}
+	ASSERT(i < max_mem_nodes);
 	for (i = 0; i < mmu_page_sizes; i++) {
 		(void) memset(&m, 0, sizeof (m));
 		id = it.mi_mnode_pfn_mask >> 15;	/* node id mask */
