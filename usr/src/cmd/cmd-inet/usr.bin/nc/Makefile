@@ -32,7 +32,7 @@ SRCS= $(OBJS:%.o=%.c)
 
 include		../../../Makefile.cmd
 
-LDLIBS= -lresolv -lsocket
+LDLIBS +=	-lresolv -lsocket
 
 .KEEP_STATE:
 
