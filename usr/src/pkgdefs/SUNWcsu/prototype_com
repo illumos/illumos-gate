@@ -1170,6 +1170,7 @@ l none usr/share/lib/zoneinfo/America/Louisville=../../../../../usr/share/lib/zo
 f none usr/share/lib/zoneinfo/America/Maceio 644 root bin
 f none usr/share/lib/zoneinfo/America/Managua 644 root bin
 f none usr/share/lib/zoneinfo/America/Manaus 644 root bin
+l none usr/share/lib/zoneinfo/America/Marigot=../../../../../usr/share/lib/zoneinfo/America/Guadeloupe
 f none usr/share/lib/zoneinfo/America/Martinique 644 root bin
 f none usr/share/lib/zoneinfo/America/Mazatlan 644 root bin
 l none usr/share/lib/zoneinfo/America/Mendoza=../../../../../usr/share/lib/zoneinfo/America/Argentina/Mendoza
@@ -1211,6 +1212,7 @@ f none usr/share/lib/zoneinfo/America/Santo_Domingo 644 root bin
 f none usr/share/lib/zoneinfo/America/Sao_Paulo 644 root bin
 f none usr/share/lib/zoneinfo/America/Scoresbysund 644 root bin
 l none usr/share/lib/zoneinfo/America/Shiprock=../../../../../usr/share/lib/zoneinfo/America/Denver
+l none usr/share/lib/zoneinfo/America/St_Barthelemy=../../../../../usr/share/lib/zoneinfo/America/Guadeloupe
 f none usr/share/lib/zoneinfo/America/St_Johns 644 root bin
 f none usr/share/lib/zoneinfo/America/St_Kitts 644 root bin
 f none usr/share/lib/zoneinfo/America/St_Lucia 644 root bin
