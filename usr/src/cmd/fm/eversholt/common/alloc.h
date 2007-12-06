@@ -44,10 +44,21 @@ char *alloc_strdup(const char *ptr, const char *fname, int line);
 void *alloc_xmalloc(size_t size);
 void alloc_xfree(void *ptr, size_t size);
 
+#ifdef DEBUG
+
 #define	MALLOC(nbytes) alloc_malloc(nbytes, __FILE__, __LINE__)
 #define	REALLOC(ptr, nbytes) alloc_realloc(ptr, nbytes, __FILE__, __LINE__)
 #define	FREE(ptr) alloc_free(ptr, __FILE__, __LINE__)
 #define	STRDUP(ptr) alloc_strdup(ptr, __FILE__, __LINE__)
+
+#else
+
+#define	MALLOC(nbytes) alloc_malloc(nbytes, "???", __LINE__)
+#define	REALLOC(ptr, nbytes) alloc_realloc(ptr, nbytes, "???", __LINE__)
+#define	FREE(ptr) alloc_free(ptr, "???", __LINE__)
+#define	STRDUP(ptr) alloc_strdup(ptr, "???", __LINE__)
+
+#endif
 
 #ifdef	__cplusplus
 }

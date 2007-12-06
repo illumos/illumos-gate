@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -39,9 +38,8 @@ flt_short(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_UUID, &uuid);
 	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_DIAG_CODE, &code);
 
-	fmdump_printf(fp, "%-15s.%4.4llu %-32s %s\n",
-	    fmdump_date(buf, sizeof (buf), rp),
-	    rp->rec_nsec / (NANOSEC / 10000), uuid, code);
+	fmdump_printf(fp, "%-20s %-32s %s\n",
+	    fmdump_date(buf, sizeof (buf), rp), uuid, code);
 
 	return (0);
 }

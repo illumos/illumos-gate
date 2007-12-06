@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +36,8 @@ asru_short(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
 	char buf[32];
 
-	fmdump_printf(fp, "%-15s.%4.4llu %-32s\n",
-	    fmdump_date(buf, sizeof (buf), rp),
-	    rp->rec_nsec / (NANOSEC / 10000), rp->rec_class);
+	fmdump_printf(fp, "%-20s %-32s\n",
+	    fmdump_date(buf, sizeof (buf), rp), rp->rec_class);
 
 	return (0);
 }
@@ -67,9 +65,8 @@ asru_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	if (!f && !u)
 		(void) strcat(state, ",ok");
 
-	fmdump_printf(fp, "%-15s.%4.4llu %-36s %s\n",
-	    fmdump_date(buf, sizeof (buf), rp),
-	    rp->rec_nsec / (NANOSEC / 10000), uuid, state + 1);
+	fmdump_printf(fp, "%-20s %-36s %s\n",
+	    fmdump_date(buf, sizeof (buf), rp), uuid, state + 1);
 
 	return (0);
 }

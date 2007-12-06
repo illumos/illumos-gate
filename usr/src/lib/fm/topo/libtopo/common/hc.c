@@ -285,6 +285,12 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 		return (-1);
 	}
 
+	/*
+	 * Set FRU for the motherboard node
+	 */
+	if (strcmp(name, MOTHERBOARD) == 0)
+		(void) topo_node_fru_set(node, nvl, 0, &err);
+
 	hc_prop_set(node, auth);
 	nvlist_free(nvl);
 	nvlist_free(auth);

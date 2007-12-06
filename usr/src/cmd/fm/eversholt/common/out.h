@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * out.h -- public definitions for output module
@@ -67,6 +67,8 @@ int out_warncount(void);
 #define	O_USAGE	0x0800	/* stderr, usage message */
 #define	O_ABORT	0x1000	/* call abort() after issuing any output */
 
+#ifdef DEBUG
+
 #define	ASSERT(cnd) \
 	((void)((cnd) || (outfl(O_ABORT, __FILE__, __LINE__, \
 	    "assertion failure: %s", #cnd), 0)))
@@ -84,6 +86,15 @@ int out_warncount(void);
 	((void)(((lhs) != (rhs)) || (outfl(O_ABORT, __FILE__, __LINE__, \
 	    "assertion failure: %s (%s) != %s (%s)", #lhs, \
 	    tostring(lhs), #rhs, tostring(rhs)), 0)))
+
+#else
+
+#define	ASSERT(cnd) ((void)0)
+#define	ASSERTinfo(cnd, info) ((void)0)
+#define	ASSERTeq(lhs, rhs, tostring) ((void)0)
+#define	ASSERTne(lhs, rhs, tostring) ((void)0)
+
+#endif
 
 extern int Debug;
 extern int Verbose;

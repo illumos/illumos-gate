@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eftwrite.c -- routines for writing .eft files
@@ -129,9 +129,15 @@ eftwrite(const char *fname)
 	hdr.identlen = Identlen;
 	hdr.dictlen = Dictlen;
 	buf[BUFLEN - 1] = '\0';
+
+#ifdef DEBUG
 	(void) snprintf(hdr.comment, EFT_HDR_MAXCOMMENT,
 	    "Built using esc-%d.%d\tArgs: \"%s\"\n", VERSION_MAJOR,
 	    VERSION_MINOR, Args);
+#else
+	(void) snprintf(hdr.comment, EFT_HDR_MAXCOMMENT,
+	    "Built using esc-%d.%d\n", VERSION_MAJOR, VERSION_MINOR);
+#endif
 
 	if ((fp = fopen(fname, "w")) == NULL)
 		out(O_DIE|O_SYS, "can't open output file: %s", fname);

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -31,8 +31,6 @@
     <node instance='0'>
       <propgroup name='protocol' version='1'
         name-stability='Private' data-stability='Private' >
-        <propval name='FRU' type='fmri'
-          value='hc:///component=MB' />
         <propval name='label' type='string'
           value='MB' />
       </propgroup>

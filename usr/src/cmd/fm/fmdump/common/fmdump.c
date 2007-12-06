@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +99,17 @@ fmdump_date(char *buf, size_t len, const fmd_log_record_t *rp)
 		(void) snprintf(buf, len, "0x%llx", rp->rec_sec);
 	} else {
 		time_t tod = (time_t)rp->rec_sec;
-		(void) strftime(buf, len, "%b %d %T", localtime(&tod));
+		time_t now = time(NULL);
+		if (tod > now+60 ||
+		    tod < now - 6L*30L*24L*60L*60L) { /* 6 months ago */
+			(void) strftime(buf, len, "%b %d %Y %T",
+			    localtime(&tod));
+		} else {
+			size_t sz;
+			sz = strftime(buf, len, "%b %d %T", localtime(&tod));
+			(void) snprintf(buf + sz, len - sz, ".%4.4llu",
+			    rp->rec_nsec / (NANOSEC / 10000));
+		}
 	}
 
 	return (buf);

@@ -32,8 +32,6 @@
     <node instance='0'>
       <propgroup name='protocol' version='1'
         name-stability='Private' data-stability='Private' >
-        <propval name='FRU' type='fmri'
-          value='hc:///component=motherboard' />
         <propval name='label' type='string'
           value='MB' />
       </propgroup>
