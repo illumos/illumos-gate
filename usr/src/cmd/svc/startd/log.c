@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,10 +263,10 @@ setlog(const char *logstem)
 	if (fd == -1)
 		return;
 
-	(void) dup2(fd, 1);
-	(void) dup2(fd, 2);
+	(void) dup2(fd, STDOUT_FILENO);
+	(void) dup2(fd, STDERR_FILENO);
 
-	if (fd != 1 && fd != 2)
+	if (fd != STDOUT_FILENO && fd != STDERR_FILENO)
 		startd_close(fd);
 }
 
@@ -434,7 +434,7 @@ log_transition(const restarter_inst_t *inst, start_outcome_t outcome)
 
 		if (cname)
 			(void) snprintf(omessage, sizeof (omessage), " (%s)",
-			cname);
+			    cname);
 		else
 			*omessage = '\0';
 

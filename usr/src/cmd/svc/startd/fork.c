@@ -212,7 +212,7 @@ void
 fork_sulogin(boolean_t immediate, const char *format, ...)
 {
 	va_list args;
-	int i, fd_console;
+	int fd_console;
 
 	(void) printf("Requesting System Maintenance Mode\n");
 
@@ -245,8 +245,9 @@ fork_sulogin(boolean_t immediate, const char *format, ...)
 		 * Can't call closefrom() in this MT section
 		 * so safely close a minimum set of fds.
 		 */
-		for (i = 0; i < 3; i++)
-			(void) close(i);
+		(void) close(STDIN_FILENO);
+		(void) close(STDOUT_FILENO);
+		(void) close(STDERR_FILENO);
 	}
 
 	(void) setpgrp();
@@ -265,7 +266,7 @@ fork_sulogin(boolean_t immediate, const char *format, ...)
 			while (dup2(fd_console, STDERR_FILENO) < 0 &&
 			    errno == EINTR)
 				;
-		if (fd_console > 2)
+		if (fd_console > STDERR_FILENO)
 			(void) close(fd_console);
 	}
 

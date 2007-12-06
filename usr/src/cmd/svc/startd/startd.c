@@ -802,17 +802,17 @@ daemonize_start(void)
 	if (pid != 0)
 		exit(0);
 
-	(void) close(0);
+	(void) close(STDIN_FILENO);
 
 	if ((fd = open("/dev/null", O_RDONLY)) == -1) {
 		uu_warn(gettext("can't connect stdin to /dev/null"));
-	} else if (fd != 0) {
-		(void) dup2(fd, 0);
+	} else if (fd != STDIN_FILENO) {
+		(void) dup2(fd, STDIN_FILENO);
 		startd_close(fd);
 	}
 
 	closefrom(3);
-	(void) dup2(2, 1);
+	(void) dup2(STDERR_FILENO, STDOUT_FILENO);
 
 	(void) setsid();
 	(void) chdir("/");
