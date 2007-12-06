@@ -514,7 +514,7 @@ list_file_objects(KMF_HANDLE_T kmfhandle, int oclass,
 	char *issuer, char *subject,
 	KMF_CERT_VALIDITY find_criteria_flag)
 {
-	int rv;
+	KMF_RETURN rv = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_OPENSSL;
 	int numattr = 0;
 	KMF_ATTRIBUTE attrlist[16];

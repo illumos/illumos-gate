@@ -32,6 +32,7 @@ RELEASECRYPTO =		SUNW_SunOS_5.10 \
 ETCCRYPTOFILES = \
 	kcf.conf \
 	pkcs11.conf \
+	kmf.conf \
 	$(RELEASECRYPTO:%=certs/%) \
 	certs/CA \
 	certs/SUNWObjectCA

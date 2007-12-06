@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,9 @@ CLASS_ACTION_SCRIPTS = \
 	i.kcfconf \
 	r.kcfconf \
 	i.pkcs11conf \
-	r.pkcs11conf
+	r.pkcs11conf \
+	i.kmfconf \
+	r.kmfconf
 
 MANIFEST =		cryptosvc.xml
 

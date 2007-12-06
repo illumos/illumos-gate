@@ -32,6 +32,8 @@
 #include <errno.h>
 #include <kmfapiP.h>
 #include <cryptoutil.h>
+#include <sys/stat.h>
+#include <sys/param.h>
 #include "util.h"
 
 #define	KC_IGNORE_DATE			0x0000001
@@ -60,8 +62,11 @@
 #define	KC_EKUS				0x0800000
 #define	KC_EKUS_NONE			0x1000000
 
+static int err; /* To store errno which may be overwritten by gettext() */
+
+
 int
-kc_modify(int argc, char *argv[])
+kc_modify_policy(int argc, char *argv[])
 {
 	KMF_RETURN	ret;
 	int 		rv = KC_OK;
@@ -842,4 +847,259 @@ out:
 	kmf_free_policy_record(&oplc);
 
 	return (rv);
+}
+
+
+static int
+kc_modify_plugin(int argc, char *argv[])
+{
+	int 		rv = KC_OK;
+	int		opt;
+	extern int	optind_av;
+	extern char	*optarg_av;
+	char 		*keystore_name = NULL;
+	char		*option = NULL;
+	boolean_t	modify_plugin = B_FALSE;
+	boolean_t 	has_option_arg = B_FALSE;
+	conf_entry_t	*entry = NULL;
+	FILE		*pfile = NULL;
+	FILE		*pfile_tmp = NULL;
+	char		tmpfile_name[MAXPATHLEN];
+	char 		buffer[MAXPATHLEN];
+	char 		buffer2[MAXPATHLEN];
+
+	while ((opt = getopt_av(argc, argv, "p(plugin)k:(keystore)o:(option)"))
+	    != EOF) {
+		switch (opt) {
+		case 'p':
+			if (modify_plugin) {
+				(void) fprintf(stderr,
+				    gettext("duplicate plugin input.\n"));
+				rv = KC_ERR_USAGE;
+			} else {
+				modify_plugin = B_TRUE;
+			}
+			break;
+		case 'k':
+			if (keystore_name != NULL)
+				rv = KC_ERR_USAGE;
+			else {
+				keystore_name = get_string(optarg_av, &rv);
+				if (keystore_name == NULL) {
+					(void) fprintf(stderr, gettext(
+					    "Error keystore input.\n"));
+					rv = KC_ERR_USAGE;
+				}
+			}
+			break;
+		case 'o':
+			if (has_option_arg) {
+				(void) fprintf(stderr,
+				    gettext("duplicate option input.\n"));
+				rv = KC_ERR_USAGE;
+			} else {
+				has_option_arg = B_TRUE;
+				option = get_string(optarg_av, NULL);
+			}
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("Error input option.\n"));
+			rv = KC_ERR_USAGE;
+			break;
+		}
+
+		if (rv != KC_OK)
+			goto out;
+	}
+
+	/* No additional args allowed. */
+	argc -= optind_av;
+	if (argc) {
+		(void) fprintf(stderr,
+		    gettext("Error input option\n"));
+		rv = KC_ERR_USAGE;
+		goto out;
+	}
+
+	if (keystore_name == NULL || has_option_arg == B_FALSE) {
+		(void) fprintf(stderr,
+		    gettext("Error input option\n"));
+		rv = KC_ERR_USAGE;
+		goto out;
+	}
+
+	if (strcasecmp(keystore_name, "nss") == 0 ||
+	    strcasecmp(keystore_name, "pkcs11") == 0 ||
+	    strcasecmp(keystore_name, "file") == 0) {
+		(void) fprintf(stderr,
+		    gettext("Can not modify the built-in keystore %s\n"),
+		    keystore_name);
+		rv = KC_ERR_USAGE;
+		goto out;
+	}
+
+	entry = get_keystore_entry(keystore_name);
+	if (entry == NULL) {
+		(void) fprintf(stderr, gettext("%s does not exist.\n"),
+		    keystore_name);
+		rv = KC_ERR_USAGE;
+		goto out;
+	}
+
+	if ((entry->option == NULL && option == NULL) ||
+	    (entry->option != NULL && option != NULL &&
+	    strcmp(entry->option, option) == 0)) {
+		(void) fprintf(stderr, gettext("No change - "
+		    "the new option is same as the old option.\n"));
+		rv = KC_OK;
+		goto out;
+	}
+
+	if ((pfile = fopen(_PATH_KMF_CONF, "r+")) == NULL) {
+		err = errno;
+		(void) fprintf(stderr,
+		    gettext("failed to update the configuration - %s\n"),
+		    strerror(err));
+		rv = KC_ERR_ACCESS;
+		goto out;
+	}
+
+	if (lockf(fileno(pfile), F_TLOCK, 0) == -1) {
+		err = errno;
+		(void) fprintf(stderr,
+		    gettext("failed to lock the configuration - %s\n"),
+		    strerror(err));
+		rv = KC_ERR_MODIFY_PLUGIN;
+		goto out;
+	}
+
+	/*
+	 * Create a temporary file in the /etc/crypto directory.
+	 */
+	(void) strlcpy(tmpfile_name, CONF_TEMPFILE, sizeof (tmpfile_name));
+	if (mkstemp(tmpfile_name) == -1) {
+		err = errno;
+		(void) fprintf(stderr,
+		    gettext("failed to create a temporary file - %s\n"),
+		    strerror(err));
+		rv = KC_ERR_MODIFY_PLUGIN;
+		goto out;
+	}
+
+	if ((pfile_tmp = fopen(tmpfile_name, "w")) == NULL) {
+		err = errno;
+		(void) fprintf(stderr,
+		    gettext("failed to open %s - %s\n"),
+		    tmpfile_name, strerror(err));
+		rv = KC_ERR_MODIFY_PLUGIN;
+		goto out;
+	}
+
+	/*
+	 * Loop thru the config file and update the entry.
+	 */
+	while (fgets(buffer, MAXPATHLEN, pfile) != NULL) {
+		char *name;
+		int len;
+
+		if (buffer[0] == '#') {
+			if (fputs(buffer, pfile_tmp) == EOF) {
+				rv = KC_ERR_MODIFY_PLUGIN;
+				goto out;
+			} else {
+				continue;
+			}
+		}
+
+		/*
+		 * make a copy of the original buffer to buffer2.  Also get
+		 * rid of the trailing '\n' from buffer2.
+		 */
+		(void) strlcpy(buffer2, buffer, MAXPATHLEN);
+		len = strlen(buffer2);
+		if (buffer2[len-1] == '\n') {
+			len--;
+		}
+		buffer2[len] = '\0';
+
+		if ((name = strtok(buffer2, SEP_COLON)) == NULL) {
+			rv = KC_ERR_UNINSTALL;
+			goto out;
+		}
+
+		if (strcmp(name, keystore_name) == 0) {
+			/* found the entry */
+			if (option == NULL)
+				(void) snprintf(buffer, MAXPATHLEN,
+				    "%s:%s%s\n", keystore_name,
+				    CONF_MODULEPATH, entry->modulepath);
+			else
+				(void) snprintf(buffer, MAXPATHLEN,
+				    "%s:%s%s;%s%s\n", keystore_name,
+				    CONF_MODULEPATH, entry->modulepath,
+				    CONF_OPTION, option);
+
+			if (fputs(buffer, pfile_tmp) == EOF) {
+				err = errno;
+				(void) fprintf(stderr, gettext(
+				    "failed to write to %s: %s\n"),
+				    tmpfile_name, strerror(err));
+				rv = KC_ERR_MODIFY_PLUGIN;
+				goto out;
+			}
+		} else {
+
+			if (fputs(buffer, pfile_tmp) == EOF) {
+				rv = KC_ERR_UNINSTALL;
+				goto out;
+			}
+		}
+	}
+
+	if (rename(tmpfile_name, _PATH_KMF_CONF) == -1) {
+		err = errno;
+		(void) fprintf(stderr, gettext(
+		    "failed to update the configuration - %s"), strerror(err));
+		rv = KC_ERR_MODIFY_PLUGIN;
+		goto out;
+	}
+
+	if (chmod(_PATH_KMF_CONF,
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+		err = errno;
+		(void) fprintf(stderr, gettext(
+		    "failed to update the configuration - %s\n"),
+		    strerror(err));
+		rv = KC_ERR_MODIFY_PLUGIN;
+		goto out;
+	}
+
+out:
+	if (entry != NULL)
+		free_entry(entry);
+
+	if (pfile != NULL)
+		(void) fclose(pfile);
+
+	if (rv != KC_OK && pfile_tmp != NULL)
+		(void) unlink(tmpfile_name);
+
+	if (pfile_tmp != NULL)
+		(void) fclose(pfile_tmp);
+
+	return (rv);
+}
+
+
+int
+kc_modify(int argc, char *argv[])
+{
+	if (argc > 2 &&
+	    strcmp(argv[0], "modify") == 0 &&
+	    strcmp(argv[1], "plugin") == 0) {
+		return (kc_modify_plugin(argc, argv));
+	} else {
+		return (kc_modify_policy(argc, argv));
+	}
 }

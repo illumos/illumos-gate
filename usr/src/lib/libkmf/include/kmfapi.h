@@ -289,6 +289,9 @@ extern char *kmf_ku_to_string(uint32_t);
 extern KMF_RETURN kmf_hexstr_to_bytes(unsigned char *, unsigned char **,
 	size_t *);
 
+extern KMF_RETURN kmf_get_plugin_info(KMF_HANDLE_T, char *,
+	KMF_KEYSTORE_TYPE *, char **);
+
 #define	KMF_CompareRDNs kmf_compare_rdns
 
 /*

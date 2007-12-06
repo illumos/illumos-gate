@@ -83,6 +83,7 @@ i i.manifest
 i r.manifest
 i i.ttydefs
 i i.hosts
+i i.kmfconfbase
 #
 # source locations relative to the prototype file
 #
@@ -109,6 +110,7 @@ e preserve etc/cron.d/cron.deny 644 root sys
 f none etc/cron.d/queuedefs 644 root sys
 d none etc/crypto 755 root sys
 e pkcs11confbase etc/crypto/pkcs11.conf 644 root sys
+e kmfconfbase etc/crypto/kmf.conf 644 root sys
 d none etc/crypto/certs 755 root sys
 f none etc/crypto/certs/CA 644 root sys
 l none etc/crypto/certs/SUNWObjectCA=../../../etc/certs/SUNWObjectCA

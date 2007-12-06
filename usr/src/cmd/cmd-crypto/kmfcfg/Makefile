@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,9 @@ OBJS =	kmfcfg.o \
 	create.o \
 	modify.o \
 	export.o \
-	import.o
+	import.o \
+	install.o \
+	uninstall.o
 
 include ../../Makefile.cmd
 

@@ -1371,7 +1371,7 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 	    issuer_cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	if (!VALID_KEYSTORE_TYPE(*kstype))
+	if (!is_valid_keystore_type(*kstype))
 		return (KMF_ERR_BAD_PARAMETER);
 
 	policy = handle->policy;
@@ -1985,7 +1985,7 @@ find_issuer_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
 	    issuer_cert == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	if (!VALID_KEYSTORE_TYPE(*kstype))
+	if (!is_valid_keystore_type(*kstype))
 		return (KMF_ERR_BAD_PARAMETER);
 
 	kmf_set_attr_at_index(fc_attrlist, fc_numattr, KMF_KEYSTORE_TYPE_ATTR,
@@ -2117,7 +2117,7 @@ find_ta_cert(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE *kstype,
 	    user_issuerDN == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
-	if (!VALID_KEYSTORE_TYPE(*kstype))
+	if (!is_valid_keystore_type(*kstype))
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* Get the TA name and serial number from the policy */

@@ -30,9 +30,12 @@
 #include <libgen.h>
 #include <libintl.h>
 #include <errno.h>
+#include <sys/stat.h>
 #include <kmfapiP.h>
-
 #include "util.h"
+
+#define	LIB_NSS_PATH	"/usr/lib/mps/libnss3.so"
+#define	LIB_NSPR_PATH	"/usr/lib/mps/libnspr4.so"
 
 static void
 show_policy(KMF_POLICY_RECORD *plc)
@@ -162,6 +165,46 @@ show_policy(KMF_POLICY_RECORD *plc)
 	(void) printf("\n");
 }
 
+void
+show_plugin(void)
+{
+	conf_entrylist_t *phead = NULL;
+	struct stat 	statbuf;
+
+	(void) printf(gettext("KMF plugin information:\n"));
+	(void) printf(gettext("-----------------------\n"));
+
+	/* List the built-in plugins */
+	(void) printf("pkcs11:kmf_pkcs11.so.1 (built-in)\n");
+	(void) printf("file:kmf_openssl.so.1 (built-in)\n");
+
+	/*
+	 * If the NSS libraries are not installed in the system,
+	 * then we will not show the nss plugin either.
+	 */
+	if (stat(LIB_NSS_PATH, &statbuf) == 0 &&
+	    stat(LIB_NSPR_PATH, &statbuf) == 0) {
+		(void) printf("nss:kmf_nss.so.1 (built-in)\n");
+	}
+
+	/* List non-default plugins, if there is any. */
+	if (get_entrylist(&phead) == KMF_OK) {
+		while (phead != NULL) {
+			(void) printf("%s:%s", phead->entry->keystore,
+			    phead->entry->modulepath);
+
+			if (phead->entry->option == NULL)
+				(void) printf("\n");
+			else
+				(void) printf(";option=%s\n",
+				    phead->entry->option);
+			phead = phead->next;
+		}
+		free_entrylist(phead);
+	}
+}
+
+
 int
 kc_list(int argc, char *argv[])
 {
@@ -173,28 +216,41 @@ kc_list(int argc, char *argv[])
 	char		*policyname = NULL;
 	POLICY_LIST	*plclist = NULL, *pnode;
 	int		sanity_err = 0;
+	boolean_t	list_plugin = B_FALSE;
 
-	while ((opt = getopt_av(argc, argv, "i:(dbfile)p:(policy)")) != EOF) {
+	while ((opt = getopt_av(argc, argv, "i:(dbfile)p:(policy)m(plugin)"))
+	    != EOF) {
 		switch (opt) {
-			case 'i':
+		case 'i':
+			if (list_plugin)
+				rv = KC_ERR_USAGE;
+			else {
 				filename = get_string(optarg_av, &rv);
 				if (filename == NULL) {
 					(void) fprintf(stderr,
 					    gettext("Error dbfile input.\n"));
 				}
-				break;
-			case 'p':
+			}
+			break;
+		case 'p':
+			if (list_plugin)
+				rv = KC_ERR_USAGE;
+			else {
 				policyname = get_string(optarg_av, &rv);
 				if (policyname == NULL) {
 					(void) fprintf(stderr,
 					    gettext("Error policy name.\n"));
 				}
-				break;
-			default:
-				(void) fprintf(stderr,
-				    gettext("Error input option.\n"));
-				rv = KC_ERR_USAGE;
-				break;
+			}
+			break;
+		case 'm':
+			list_plugin = B_TRUE;
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("Error input option.\n"));
+			rv = KC_ERR_USAGE;
+			break;
 		}
 		if (rv != KC_OK)
 			goto out;
@@ -206,6 +262,11 @@ kc_list(int argc, char *argv[])
 		(void) fprintf(stderr,
 		    gettext("Error input option\n"));
 		rv = KC_ERR_USAGE;
+		goto out;
+	}
+
+	if (list_plugin) {
+		show_plugin();
 		goto out;
 	}
 

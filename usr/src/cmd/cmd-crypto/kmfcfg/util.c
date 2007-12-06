@@ -34,8 +34,8 @@
 #include <libxml/parser.h>
 
 #include <kmfapiP.h>
-
 #include "util.h"
+
 
 /* Supporting structures and global variables for getopt_av(). */
 typedef struct	av_opts_s {
@@ -489,4 +489,32 @@ print_sanity_error(KMF_RETURN ret)
 	default:
 		break;
 	}
+}
+
+
+conf_entry_t *
+get_keystore_entry(char *kstore_name)
+{
+	conf_entrylist_t *phead = NULL;
+	conf_entrylist_t *ptr;
+	conf_entry_t	*rtn_entry = NULL;
+
+	if (kstore_name == NULL)
+		return (NULL);
+
+	if (get_entrylist(&phead) != KMF_OK)
+		return (NULL);
+
+	ptr = phead;
+	while (ptr != NULL) {
+		if (strcmp(ptr->entry->keystore, kstore_name) == 0)
+			break;
+		ptr = ptr->next;
+	}
+
+	if (ptr != NULL) /* found the entry */
+		rtn_entry = dup_entry(ptr->entry);
+
+	free_entrylist(phead);
+	return (rtn_entry);
 }

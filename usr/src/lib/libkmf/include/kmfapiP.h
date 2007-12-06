@@ -330,6 +330,29 @@ typedef enum {
 #define	OCSPREQ_TEMPNAME	"/tmp/ocsp.reqXXXXXX"
 #define	OCSPRESP_TEMPNAME	"/tmp/ocsp.respXXXXXX"
 
+#define	_PATH_KMF_CONF	"/etc/crypto/kmf.conf"
+#define	CONF_MODULEPATH	"modulepath="
+#define	CONF_OPTION	"option="
+
+typedef struct {
+	char			*keystore;
+	char			*modulepath;
+	char 			*option;
+	KMF_KEYSTORE_TYPE	kstype;
+} conf_entry_t;
+
+typedef struct conf_entrylist {
+	conf_entry_t		*entry;
+	struct conf_entrylist 	*next;
+} conf_entrylist_t;
+
+
+extern KMF_RETURN get_entrylist(conf_entrylist_t **);
+extern void free_entrylist(conf_entrylist_t *);
+extern void free_entry(conf_entry_t *);
+extern conf_entry_t *dup_entry(conf_entry_t *);
+boolean_t is_valid_keystore_type(KMF_KEYSTORE_TYPE);
+
 #ifdef __cplusplus
 }
 #endif

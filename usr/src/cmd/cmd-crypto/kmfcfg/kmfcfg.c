@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,11 +53,15 @@ int	kc_create(int argc, char *argv[]);
 int	kc_modify(int argc, char *argv[]);
 int	kc_export(int argc, char *argv[]);
 int	kc_import(int argc, char *argv[]);
+int	kc_install(int argc, char *argv[]);
+int	kc_uninstall(int argc, char *argv[]);
+
 static int	kc_help();
 
 static verbcmd cmds[] = {
-	{ "list",	kc_list,   "list [dbfile=dbfile] "
-		"[policy=policyname]" },
+	{ "list",	kc_list,
+		"list [dbfile=dbfile] [policy=policyname]\n"
+		"\tlist plugin" },
 	{ "delete",	kc_delete, "delete [dbfile=dbfile] "
 		"policy=policyname" },
 	{ "create",	kc_create,
@@ -125,11 +129,16 @@ static verbcmd cmds[] = {
 		"\t\tipsecUser | timeStamping |\n\t"
 		"\t\tOCSPSigning],[...]\n"
 		"\t\t[ekuoids=OID,OID,OID...]\n"
-		"\t\t[eku-none=true|false]\n" },
+		"\t\t[eku-none=true|false]\n\n"
+		"\tmodify plugin keystore=keystorename option=optionstring\n"},
+
 	{ "import",	kc_import, "import [dbfile=dbfile] policy=policyname "
 		"infile=inputdbfile\n" },
 	{ "export",	kc_export, "export [dbfile=dbfile] policy=policyname "
 		"outfile=newdbfile\n" },
+	{ "install", 	kc_install, "install keystore=keystorename "
+		"modulepath=path [option=optionstring]\n"},
+	{ "uninstall", 	kc_uninstall, "uninstall keystore=keystorename\n"},
 	{ "-?",		kc_help, 	"help"},
 	{ "help",	kc_help, 	""}
 };
@@ -234,6 +243,10 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, gettext("Out of memory.\n"));
 			break;
 		case KC_ERR_ACCESS:
+			break;
+		case KC_ERR_INSTALL:
+			break;
+		case KC_ERR_UNINSTALL:
 			break;
 		default:
 			(void) fprintf(stderr, gettext("%s operation failed. "

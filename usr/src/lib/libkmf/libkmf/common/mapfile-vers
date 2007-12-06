@@ -232,6 +232,7 @@ SUNW_1.1 {
 	kmf_get_ocsp_status_for_cert;
 	kmf_get_pk11_handle;
 	kmf_get_plugin_error_str;
+	kmf_get_plugin_info;
 	kmf_get_policy;
 	kmf_get_string_attr;
 	kmf_get_sym_key_value;
@@ -318,6 +319,10 @@ SUNWprivate_1.1 {
 	KMF_SignDataWithKey;
 	KMF_VerifyCertWithCert;
 	KMF_VerifyDataWithCert;
+	dup_entry;
+	free_entry;
+	free_entrylist;
+	get_entrylist;
 	parsePolicyElement;
 	PKCS_AcquirePublicKeyHandle;
 	PKCS_GetDefaultSignatureMode;

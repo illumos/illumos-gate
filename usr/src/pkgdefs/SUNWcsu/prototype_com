@@ -714,11 +714,13 @@ f none usr/sadm/install/miniroot.db 444 root sys
 d none usr/sadm/install/scripts 755 root bin
 f none usr/sadm/install/scripts/i.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/i.kcfconf 555 root sys
+f none usr/sadm/install/scripts/i.kmfconf 555 root sys
 f none usr/sadm/install/scripts/i.manifest 555 root sys
 f none usr/sadm/install/scripts/i.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/i.rbac 555 root sys
 f none usr/sadm/install/scripts/r.ipsecalgs 555 root sys
 f none usr/sadm/install/scripts/r.kcfconf 555 root sys
+f none usr/sadm/install/scripts/r.kmfconf 555 root sys
 f none usr/sadm/install/scripts/r.manifest 555 root sys
 f none usr/sadm/install/scripts/r.pkcs11conf 555 root sys
 f none usr/sadm/install/scripts/r.rbac 555 root sys

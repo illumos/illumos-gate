@@ -159,6 +159,22 @@ static KMF_RETURN AddPlugin(KMF_HANDLE_T, KMF_PLUGIN *);
 static void free_extensions(KMF_X509_EXTENSIONS *extns);
 static void DestroyPlugin(KMF_PLUGIN *);
 
+#if defined(__sparcv9)
+#define	ISA_PATH	"/sparcv9"
+#elif defined(__sparc)
+#define	ISA_PATH	"/"
+#elif defined(__i386)
+#define	ISA_PATH	"/"
+#elif defined(__amd64)
+#define	ISA_PATH	"/amd64"
+#endif
+
+#define	DEFAULT_KEYSTORE_NUM	3
+static int kstore_num = DEFAULT_KEYSTORE_NUM;
+conf_entrylist_t *extra_plugin_list = NULL;
+static boolean_t check_extra_plugin = B_FALSE;
+mutex_t extra_plugin_lock = DEFAULTMUTEX;
+
 KMF_RETURN
 init_pk11()
 {
@@ -186,6 +202,7 @@ FindPlugin(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE kstype)
 {
 	KMF_PLUGIN_LIST *node;
 	KMF_RETURN ret = KMF_OK;
+	KMF_PLUGIN *pluginrec = NULL;
 
 	if (handle == NULL)
 		return (NULL);
@@ -196,10 +213,12 @@ FindPlugin(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE kstype)
 	while (node != NULL && node->plugin->type != kstype)
 		node = node->next;
 
-	/* If the plugin was not found, try to initialize it here. */
-	if (node == NULL) {
+	if (node != NULL)
+		return (node->plugin);
+
+	/* The plugin was not found, try to initialize it here. */
+	if (VALID_DEFAULT_KEYSTORE_TYPE(kstype)) {
 		int i;
-		KMF_PLUGIN *pluginrec = NULL;
 		int numitems = sizeof (plugin_list)/sizeof (KMF_PLUGIN_ITEM);
 		for (i = 0; i < numitems; i++) {
 			if (plugin_list[i].kstype == kstype) {
@@ -209,20 +228,79 @@ FindPlugin(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE kstype)
 			}
 		}
 
-		/* No matching plugins found in the available list */
-		if (ret != KMF_OK || pluginrec == NULL)
+		goto out;
+
+	} else {
+		/*
+		 * Not a built-in plugin. Check if it is in the
+		 * extra_plugin_list.  If it is, try to initialize it here.
+		 */
+		conf_entrylist_t *phead = extra_plugin_list;
+		char realpath[MAXPATHLEN];
+
+		while (phead != NULL) {
+			if (phead->entry->kstype == kstype)
+				break;
+			else
+				phead = phead->next;
+		}
+
+		if (phead == NULL)
 			return (NULL);
 
-		ret = AddPlugin(handle, pluginrec);
-		if (ret != KMF_OK) {
-			DestroyPlugin(pluginrec);
-			pluginrec = NULL;
+		/*
+		 * Get the absolute path of the module.
+		 * - If modulepath is not a full path, then prepend it
+		 *   with KMF_PLUGIN_PATH.
+		 * - If modulepath is a full path and contain $ISA, then
+		 *   subsitute the architecture dependent path.
+		 */
+		(void) memset(realpath, 0, sizeof (realpath));
+		if (strncmp(phead->entry->modulepath, "/", 1) != 0) {
+			(void) snprintf(realpath, MAXPATHLEN, "%s%s",
+			    KMF_PLUGIN_PATH, phead->entry->modulepath);
+		} else {
+			char *buf = phead->entry->modulepath;
+			char *isa;
+
+			if ((isa = strstr(buf, PKCS11_ISA)) != NULL) {
+				char *isa_str;
+
+				(void) strncpy(realpath, buf, isa - buf);
+				isa_str = strdup(ISA_PATH);
+				if (isa_str == NULL) /* not enough memory */
+					return (NULL);
+
+				(void) strncat(realpath, isa_str,
+				    strlen(isa_str));
+				free(isa_str);
+
+				isa += strlen(PKCS11_ISA);
+				(void) strlcat(realpath, isa, MAXPATHLEN);
+			} else {
+				(void) snprintf(realpath, MAXPATHLEN, "%s",
+				    phead->entry->modulepath);
+			}
 		}
-		return (pluginrec);
-	} else {
-		return (node->plugin);
+
+		ret = InitializePlugin(phead->entry->kstype, realpath,
+		    &pluginrec);
+		goto out;
 	}
+
+out:
+	if (ret != KMF_OK || pluginrec == NULL)
+		/* No matching plugins found in the built-in list */
+		return (NULL);
+
+	ret = AddPlugin(handle, pluginrec);
+	if (ret != KMF_OK) {
+		DestroyPlugin(pluginrec);
+		pluginrec = NULL;
+	}
+	return (pluginrec);
 }
+
 
 static KMF_RETURN
 InitializePlugin(KMF_KEYSTORE_TYPE kstype, char *path, KMF_PLUGIN **plugin)
@@ -360,6 +438,46 @@ kmf_initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 
 	(void) memset(handle, 0, sizeof (KMF_HANDLE));
 	handle->plugins = NULL;
+
+	/*
+	 * When this function is called the first time, get the additional
+	 * plugins from the config file.
+	 */
+	(void) mutex_lock(&extra_plugin_lock);
+	if (!check_extra_plugin) {
+
+		ret = get_entrylist(&extra_plugin_list);
+		check_extra_plugin = B_TRUE;
+
+		/*
+		 * Assign the kstype number to the additional plugins here.
+		 * The global kstore_num will be protected by the mutex lock.
+		 */
+		if (ret == KMF_OK) {
+			conf_entrylist_t *phead = extra_plugin_list;
+			while (phead != NULL) {
+				phead->entry->kstype = ++kstore_num;
+				phead = phead->next;
+			}
+		}
+
+		/*
+		 * If the KMF configuration file does not exist or cannot be
+		 * parsed correctly, we will give a warning in syslog and
+		 * continue on as there is no extra plugins in the system.
+		 */
+		if (ret == KMF_ERR_KMF_CONF) {
+			cryptoerror(LOG_WARNING, "KMF was unable to parse "
+			    "the private KMF config file.\n");
+			ret = KMF_OK;
+		}
+
+		if (ret != KMF_OK) {
+			(void) mutex_unlock(&extra_plugin_lock);
+			goto errout;
+		}
+	}
+	(void) mutex_unlock(&extra_plugin_lock);
 
 	/* Initialize the handle with the policy */
 	ret = kmf_set_policy((void *)handle,
@@ -2144,6 +2262,286 @@ kmf_get_string_attr(KMF_ATTR_TYPE type, KMF_ATTRIBUTE *attrlist,
 
 	return (rv);
 }
+
+
+void
+free_entry(conf_entry_t *entry)
+{
+	if (entry == NULL)
+		return;
+	free(entry->keystore);
+	free(entry->modulepath);
+	free(entry->option);
+}
+
+void
+free_entrylist(conf_entrylist_t *list)
+{
+	conf_entrylist_t *next;
+
+	while (list != NULL) {
+		next = list->next;
+		free_entry(list->entry);
+		free(list);
+		list = next;
+	}
+}
+
+static KMF_RETURN
+parse_entry(char *buf, conf_entry_t **entry)
+{
+	KMF_RETURN ret = KMF_OK;
+	conf_entry_t *tmp = NULL;
+	char *token1;
+	char *token2;
+	char *token3;
+	char *lasts;
+	char *value;
+
+	if ((token1 = strtok_r(buf, SEP_COLON, &lasts)) == NULL)
+		return (KMF_ERR_KMF_CONF);
+
+	if ((tmp = calloc(sizeof (conf_entry_t), 1)) == NULL)
+		return (KMF_ERR_MEMORY);
+
+	if ((tmp->keystore = strdup(token1)) == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto end;
+	}
+
+	if ((token2 = strtok_r(NULL, SEP_SEMICOLON, &lasts)) == NULL) {
+		ret = KMF_ERR_KMF_CONF;
+		goto end;
+	}
+
+	/* need to get token3 first to satisfy nested strtok invocations */
+	token3 = strtok_r(NULL, SEP_SEMICOLON, &lasts);
+
+	/* parse token2 */
+	if (strncmp(token2, CONF_MODULEPATH, strlen(CONF_MODULEPATH)) != 0) {
+		ret = KMF_ERR_KMF_CONF;
+		goto end;
+	}
+
+	if (value = strpbrk(token2, SEP_EQUAL)) {
+		value++; /* get rid of = */
+	} else {
+		ret = KMF_ERR_KMF_CONF;
+		goto end;
+	}
+
+	if ((tmp->modulepath = strdup(value)) == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto end;
+	}
+
+	/* parse token3, if it exists */
+	if (token3 != NULL) {
+		if (strncmp(token3, CONF_OPTION, strlen(CONF_OPTION))
+		    != 0) {
+			ret = KMF_ERR_KMF_CONF;
+			goto end;
+		}
+
+		if (value = strpbrk(token3, SEP_EQUAL)) {
+			value++; /* get rid of = */
+		} else {
+			ret = KMF_ERR_KMF_CONF;
+			goto end;
+		}
+
+		if ((tmp->option = strdup(value)) == NULL) {
+			ret = KMF_ERR_MEMORY;
+			goto end;
+		}
+	}
+
+	*entry = tmp;
+
+end:
+	if (ret != KMF_OK) {
+		free_entry(tmp);
+		free(tmp);
+	}
+	return (ret);
+}
+
+
+conf_entry_t *
+dup_entry(conf_entry_t *entry)
+{
+	conf_entry_t *rtn_entry;
+
+	if (entry == NULL)
+		return (NULL);
+
+	rtn_entry = malloc(sizeof (conf_entry_t));
+	if (rtn_entry == NULL)
+		return (NULL);
+
+	if ((rtn_entry->keystore = strdup(entry->keystore)) == NULL)
+		goto out;
+
+	if ((rtn_entry->modulepath = strdup(entry->modulepath)) == NULL)
+		goto out;
+
+	if (entry->option != NULL &&
+	    (rtn_entry->option = strdup(entry->modulepath)) == NULL)
+		goto out;
+
+	return (rtn_entry);
+
+out:
+	free_entry(rtn_entry);
+	return (NULL);
+}
+
+
+/*
+ * This function takes a keystore_name as input and returns
+ * the KMF_KEYSTORE_TYPE value assigned to it.  If the "option"
+ * argument is not NULL, this function also returns the option string
+ * if there is an option string for the plugin module.
+ */
+KMF_RETURN
+kmf_get_plugin_info(KMF_HANDLE_T handle, char *keystore_name,
+    KMF_KEYSTORE_TYPE *kstype, char **option)
+{
+	KMF_RETURN ret = KMF_OK;
+	conf_entrylist_t  *phead = extra_plugin_list;
+	boolean_t is_default = B_TRUE;
+
+	/*
+	 * Although handle is not really used in the function, we will
+	 * check the handle to make sure that kmf_intialize() is called
+	 * before this function.
+	 */
+	if (handle == NULL || keystore_name == NULL || kstype == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	if (strcmp(keystore_name, "pkcs11") == 0) {
+		*kstype = KMF_KEYSTORE_PK11TOKEN;
+	} else if (strcmp(keystore_name, "file") == 0) {
+		*kstype = KMF_KEYSTORE_OPENSSL;
+	} else if (strcmp(keystore_name, "nss") == 0) {
+		*kstype = KMF_KEYSTORE_NSS;
+	} else {
+		is_default = B_FALSE;
+	}
+
+	if (is_default) {
+		if (option != NULL)
+			*option = NULL;
+		goto out;
+	}
+
+	/* Not a built-in plugin; check if it is in extra_plugin_list. */
+	while (phead != NULL) {
+		if (strcmp(phead->entry->keystore, keystore_name) == 0)
+			break;
+		phead = phead->next;
+	}
+
+	if (phead == NULL) {
+		ret = KMF_ERR_PLUGIN_NOTFOUND;
+		goto out;
+	}
+
+	/* found it */
+	*kstype = phead->entry->kstype;
+	if (option != NULL) {
+		if (phead->entry->option == NULL)
+			*option = NULL;
+		else {
+			*option = strdup(phead->entry->option);
+			if (*option == NULL) {
+				ret = KMF_ERR_MEMORY;
+				goto out;
+			}
+		}
+	}
+
+out:
+	return (ret);
+}
+
+/*
+ * Retrieve the non-default plugin list from the kmf.conf file.
+ */
+KMF_RETURN
+get_entrylist(conf_entrylist_t **entlist)
+{
+	KMF_RETURN rv = KMF_OK;
+	FILE *pfile;
+	conf_entry_t *entry;
+	conf_entrylist_t *rtnlist = NULL;
+	conf_entrylist_t *ptmp;
+	conf_entrylist_t *pcur;
+	char buffer[MAXPATHLEN];
+	size_t len;
+
+	if ((pfile = fopen(_PATH_KMF_CONF, "rF")) == NULL) {
+		cryptoerror(LOG_ERR, "failed to open %s.\n", _PATH_KMF_CONF);
+		return (KMF_ERR_KMF_CONF);
+	}
+
+	while (fgets(buffer, MAXPATHLEN, pfile) != NULL) {
+		if (buffer[0] == '#' || buffer[0] == ' ' ||
+		    buffer[0] == '\n'|| buffer[0] == '\t') {
+			continue;   /* ignore comment lines */
+		}
+
+		len = strlen(buffer);
+		if (buffer[len-1] == '\n') { /* get rid of trailing '\n' */
+			len--;
+		}
+		buffer[len] = '\0';
+
+		rv = parse_entry(buffer, &entry);
+		if (rv != KMF_OK) {
+			goto end;
+		}
+
+		if ((ptmp = malloc(sizeof (conf_entrylist_t))) == NULL) {
+			rv = KMF_ERR_MEMORY;
+			goto end;
+		}
+		ptmp->entry = entry;
+		ptmp->next = NULL;
+
+		if (rtnlist == NULL) {
+			rtnlist = pcur = ptmp;
+		} else {
+			pcur->next = ptmp;
+			pcur = ptmp;
+		}
+	}
+
+end:
+	(void) fclose(pfile);
+
+	if (rv == KMF_OK) {
+		*entlist = rtnlist;
+	} else if (rtnlist != NULL) {
+		free_entrylist(rtnlist);
+		*entlist = NULL;
+		kstore_num = DEFAULT_KEYSTORE_NUM;
+	}
+
+	return (rv);
+}
+
+
+boolean_t
+is_valid_keystore_type(KMF_KEYSTORE_TYPE kstype)
+{
+
+	if (kstype > 0 && kstype <= kstore_num)
+		return (B_TRUE);
+	else
+		return (B_FALSE);
+}
+
 
 /*
  * This API is used by elfsign. We must keep it in old API form.

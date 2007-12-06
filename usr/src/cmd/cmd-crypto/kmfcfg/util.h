@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_UTIL_H
@@ -49,6 +49,8 @@ int parseEKUNames(char *, KMF_POLICY_RECORD *);
 uint16_t parseKUlist(char *);
 void print_sanity_error(KMF_RETURN);
 
+conf_entry_t *get_keystore_entry(char *);
+
 #define	KC_OK			0
 #define	KC_ERR_USAGE		1
 #define	KC_ERR_LOADDB		2
@@ -59,6 +61,11 @@ void print_sanity_error(KMF_RETURN);
 #define	KC_ERR_INCOMPLETE_POLICY 7
 #define	KC_ERR_MEMORY		8
 #define	KC_ERR_ACCESS		9
+#define	KC_ERR_INSTALL		10
+#define	KC_ERR_UNINSTALL	11
+#define	KC_ERR_MODIFY_PLUGIN	12
+
+#define	CONF_TEMPFILE	"/etc/crypto/kmfXXXXXX"
 
 #ifdef __cplusplus
 }

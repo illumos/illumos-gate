@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -23,60 +24,11 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.com
-
-DATAFILES += \
-	i.cronroot	\
-	i.definit	\
-	i.defkbd	\
-	i.deflogin	\
-	i.defpasswd	\
-	i.defsu		\
-	i.dhcpinittab	\
-	i.etcprofile	\
-	i.etcremote	\
-	i.etcrpc	\
-	i.fstypes	\
-	i.group		\
-	i.hosts		\
-	i.inetdconf	\
-	i.initd		\
-	i.inittab	\
-	i.kmfconfbase   \
-	i.locallogin	\
-	i.localprofile	\
-	i.logadmconf	\
-	i.logindevperm	\
-	i.mailxrc	\
-	i.manifest	\
-	r.manifest	\
-	i.netconfig	\
-	i.nscd		\
-	i.nsswitch	\
-	i.pamconf	\
-	i.passwd	\
-	i.pkcs11confbase \
-	i.policyconf	\
-	i.preserve	\
-	i.rbac		\
-	r.rbac		\
-	i.renamenew	\
-	i.renameold	\
-	i.services	\
-	i.shadow	\
-	i.syslogconf	\
-	i.tiservices	\
-	i.ttydefs	\
-	i.ttysrch	\
-	i.vfstab
-
-CHKINSTALLSRC=checkinstall.initd
-
-.KEEP_STATE:
-
-all: $(FILES) preinstall postinstall
-install: all pkg
-
-include ../Makefile.targ
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	fi
+done
+exit 0
