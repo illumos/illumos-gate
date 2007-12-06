@@ -50,6 +50,7 @@ HTMLENTS = \
 	RtMaintAndRepair.html \
 	RtMediaBkup.html \
 	RtMediaRestore.html \
+	RtNDMPMngmnt.html \
 	RtNameServiceAdmin.html \
 	RtNameServiceSecure.html \
 	RtNetIPsec.html \

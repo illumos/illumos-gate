@@ -449,6 +449,9 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
 	$(CLOSED)/cmd/mtst	\
+	$(CLOSED)/cmd/ndmpadm	\
+	$(CLOSED)/cmd/ndmpd	\
+	$(CLOSED)/cmd/ndmpstat	\
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
@@ -715,6 +718,8 @@ $(CLOSED_BUILD)MSGSUBDIRS += \
 	$(CLOSED)/cmd/llc2	\
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
+	$(CLOSED)/cmd/ndmpadm   \
+	$(CLOSED)/cmd/ndmpstat  \
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\

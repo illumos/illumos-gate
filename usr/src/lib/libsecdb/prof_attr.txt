@@ -50,8 +50,9 @@ Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.man
 Inetd Management:::Manage inetd configuration parameters:auths=solaris.smf.manage.inetd,solaris.smf.value.inetd;help=RtInetdMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range;help=RtMaintAndRepair.html
-Media Backup:::Backup files and file systems:help=RtMediaBkup.html
-Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
+Media Backup:::Backup files and file systems:profiles=NDMP Management;help=RtMediaBkup.html
+Media Restore:::Restore files and file systems from backups:profiles=NDMP Management;help=RtMediaRestore.html
+NDMP Management:::Manage the NDMP service:auths=solaris.smf.manage.ndmp,solaris.smf.value.ndmp,solaris.smf.read.ndmp;help=RtNdmpMngmnt.html
 Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa,solaris.smf.value.mdns,solaris.smf.manage.mdns;profiles=Network Wifi Management,Inetd Management;help=RtNetMngmnt.html
 Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html

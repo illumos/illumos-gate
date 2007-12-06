@@ -129,6 +129,7 @@ Use is subject to license terms.
 				char
 				char * (blank is optional)
 				char ** (blank is optional)
+				fd_t (int, a file descriptor)
 				uint_t, int, int32_t, uid_t, gid_t
 				uid_t *, gid_t *
 				long, ulong_t
@@ -1309,9 +1310,84 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+<!-- ndmp service event; ndmp client connect -->
+    <event id="AUE_ndmp_connect" instance_of="AUE_generic_basic" header="0"
+	idNo="61" omit="JNI">
+	<title>NDMP Connect</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+    </event>
+
+<!-- ndmp service event; ndmp client disconnect -->
+    <event id="AUE_ndmp_disconnect" instance_of="AUE_generic_basic" header="0"
+	idNo="62" omit="JNI">
+	<title>NDMP Disconnect</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+    </event>
+
+<!-- ndmp service event; ndmp backup -->
+    <event id="AUE_ndmp_backup" header="0" idNo="63" omit="JNI">
+	<title>NDMP Backup</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="source">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>path to be backed up</comment>
+	</entry>
+	<entry id="local_dest">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>local path of backup destination</comment>
+	</entry>
+	<entry id="remote_dest">
+	    <internal token="in_peer"/>
+	    <external opt="optional" type="fd_t"/>
+	    <comment>remote ip address and port of backup destination</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- ndmp service event; ndmp restore -->
+    <event id="AUE_ndmp_restore" header="0" idNo="64" omit="JNI">
+	<title>NDMP Restore</title>
+	<program>/usr/lib/ndmp/ndmpd</program>
+	<see>ndmpd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="destination">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	    <comment>path to restore to</comment>
+	</entry>
+	<entry id="local_source">
+	    <internal token="path"/>
+	    <external opt="optional" type="char *"/>
+	    <comment>local path to restore from</comment>
+	</entry>
+	<entry id="remote_source">
+	    <internal token="in_peer"/>
+	    <external opt="optional" type="fd_t"/>
+	    <comment>remote ip address and port to restore from</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
 
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 60, so next is 61, then fix this comment -->
+<!-- Highest idNo is 64, so next is 65, then fix this comment -->
 <!-- end of C Only events -->
 
 

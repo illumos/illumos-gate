@@ -21,7 +21,7 @@
 /*
  * adt.h
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is a contract private interface and is subject to change
@@ -122,6 +122,12 @@ extern	int	adt_load_hostname(const char *, adt_termid_t **);
 extern	int	adt_load_ttyname(const char *, adt_termid_t **);
 
 extern	boolean_t	adt_audit_enabled(void);
+
+/*
+ * Special typedefs for translations.
+ */
+
+typedef	int	fd_t;		/* file descriptor */
 
 #ifdef	__cplusplus
 }

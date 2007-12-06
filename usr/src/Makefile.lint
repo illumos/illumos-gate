@@ -420,6 +420,9 @@ COMMON_SUBDIRS = \
 $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
 	$(CLOSED)/cmd/fwflash \
+	$(CLOSED)/cmd/ndmpadm \
+	$(CLOSED)/cmd/ndmpd \
+	$(CLOSED)/cmd/ndmpstat \
 	$(CLOSED)/cmd/pax \
 	$(CLOSED)/cmd/pcitool \
 	$(CLOSED)/cmd/sed_xpg4 \
@@ -427,6 +430,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/tail \
 	$(CLOSED)/cmd/tr \
 	$(CLOSED)/lib/libc_i18n \
+	$(CLOSED)/lib/libndmp \
 	$(CLOSED)/lib/smartcard
 
 i386_SUBDIRS= \

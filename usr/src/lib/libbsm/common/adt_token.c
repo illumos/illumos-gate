@@ -881,16 +881,21 @@ adt_to_in_peer(datadef *def, void *p_data, int required,
 
 	DPRINTF(("    adt_to_in_peer dd_datatype=%d\n", def->dd_datatype));
 
-	sock = ((union convert *)p_data)->tint;
+	sock = ((union convert *)p_data)->tfd;
 
 	if (sock < 0) {
 		DPRINTF(("  Socket fd %d\n", sock));
+		if (required) {
+			adt_write_syslog("adt_to_in_peer no required socket",
+			    0);
+		}
 		return;
 	}
 	if (getpeername(sock, (struct sockaddr *)&peer, (socklen_t *)&peerlen)
 	    < 0) {
 
 		adt_write_syslog("adt_to_in_addr getpeername", errno);
+		return;
 	}
 	if (peer.sin6_family == AF_INET6) {
 		(void) au_write(event->ae_event_handle,

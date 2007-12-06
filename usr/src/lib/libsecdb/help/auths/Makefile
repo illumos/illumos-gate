@@ -79,6 +79,7 @@ HTMLENTS = \
 	SmfModifyMethod.html \
 	SmfNscdStates.html \
 	SmfNADDStates.html \
+	SmfNDMPStates.html \
 	SmfNWAMStates.html \
 	SmfPowerStates.html \
 	SmfRoutingStates.html \
@@ -91,6 +92,8 @@ HTMLENTS = \
 	SmfValueIscsitgt.html \
 	SmfValueMDNS.html \
 	SmfValueNADD.html \
+	SmfValueNDMP.html \
+	AuthReadNDMP.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \
 	SmfValueSMB.html \

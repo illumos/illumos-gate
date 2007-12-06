@@ -765,6 +765,7 @@ sub formatTableEntry {
 		     'uint64_t'		=> ['ADT_UINT64',	''],
 		     'uint64_t*'	=> ['ADT_UINT64STAR',	''],
 		     'm_label_t*'	=> ['ADT_MLABELSTAR',	''],
+		     'fd_t'		=> ['ADT_FD',		'-1'],
 		    );
     my $xlateLabel = $uniLabel.$xlateUniLabelInc;
     my $xlateLabelInc = 0;

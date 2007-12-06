@@ -266,6 +266,9 @@ f none usr/lib/help/auths/locale/SmfValueIPsec.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIscsitgt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueMDNS.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNADD.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueNDMP.html 444 root bin
+f none usr/lib/help/auths/locale/SmfNDMPStates.html 444 root bin
+f none usr/lib/help/auths/locale/AuthReadNDMP.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueNWAM.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueRouting.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueSMB.html 444 root bin
@@ -324,6 +327,7 @@ f none usr/lib/help/profiles/locale/RtKerberosClntMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtKerberosSrvrMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMailMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMaintAndRepair.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNDMPMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMediaBkup.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceAdmin.html 444 root bin

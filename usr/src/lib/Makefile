@@ -169,7 +169,8 @@ SUBDIRS += \
 	libdhcputil	\
 	libipsecutil
 $(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/libike
+	$(CLOSED)/lib/libike \
+	$(CLOSED)/lib/libndmp
 SUBDIRS += \
 	nsswitch	\
 	print		\
@@ -431,6 +432,7 @@ HDRSUBDIRS=		\
 $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/libc_i18n	\
 	$(CLOSED)/lib/libike	\
+	$(CLOSED)/lib/libndmp	\
 	$(CLOSED)/lib/smartcard
 
 sparc_HDRSUBDIRS=	\

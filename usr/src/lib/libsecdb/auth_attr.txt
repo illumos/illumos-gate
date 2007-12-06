@@ -132,6 +132,7 @@ solaris.smf.manage.tnctl:::Manage Refresh of Trusted Network Parameters::help=TN
 solaris.smf.manage.tnd:::Manage Trusted Network Daemon::help=TNDaemon.html
 solaris.smf.manage.vscan:::Manage VSCAN Service States::help=SmfVscanStates.html
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
+solaris.smf.manage.ndmp:::Manage NDMP Service States::help=SmfNDMPStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
 solaris.smf.value.discover.printers.snmp:::Manage Network Attached Device Discovery Service Properties::help=SmfValueNADD.html
 solaris.smf.value.idmap:::Change Values of SMF Identity Mapping Service Properties::help=SmfValueIdmap.html
@@ -144,6 +145,8 @@ solaris.smf.read.smb:::Read permission for protected SMF SMB Service Properties:
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
 solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::help=ValueTND.html
 solaris.smf.value.vscan:::Change Values of VSCAN Properties::help=SmfValueVscan.html
+solaris.smf.value.ndmp:::Change Values of SMF NDMP Service Properties::help=SmfValueNDMP.html
+solaris.smf.read.ndmp:::Read permission for protected SMF NDMP Service Properties::help=AuthReadNDMP.html
 #
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html
