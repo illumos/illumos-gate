@@ -191,6 +191,7 @@ static void cmlb_clear_vtoc(struct cmlb_lun *cl, void *tg_cookie);
 static void cmlb_setup_default_geometry(struct cmlb_lun *cl, void *tg_cookie);
 static int cmlb_create_minor_nodes(struct cmlb_lun *cl);
 static int cmlb_check_update_blockcount(struct cmlb_lun *cl, void *tg_cookie);
+static int cmlb_check_efi_mbr(uchar_t *buf);
 
 #if defined(__i386) || defined(__amd64)
 static int cmlb_update_fdisk_and_vtoc(struct cmlb_lun *cl, void *tg_cookie);
@@ -2016,6 +2017,40 @@ cmlb_validate_efi(efi_gpt_t *labp)
 	return (0);
 }
 
+/*
+ * This function returns FALSE if there is a valid MBR signature and no
+ * partition table entries of type EFI_PMBR (0xEE). Otherwise it returns TRUE.
+ *
+ * The EFI spec (1.10 and later) requires having a Protective MBR (PMBR) to
+ * recognize the disk as GPT partitioned. However, some other OS creates an MBR
+ * where a PMBR entry is not the only one. Also, if the first block has been
+ * corrupted, currently best attempt to allow data access would be to try to
+ * check for GPT headers. Hence in case of more than one partition entry, but
+ * at least one EFI_PMBR partition type or no valid magic number, the function
+ * returns TRUE to continue with looking for GPT header.
+ */
+
+static int
+cmlb_check_efi_mbr(uchar_t *buf)
+{
+	struct ipart	*fdp;
+	struct mboot	*mbp = (struct mboot *)buf;
+	struct ipart	fdisk[FD_NUMPART];
+	int		i;
+
+	if (LE_16(mbp->signature) != MBB_MAGIC)
+		return (TRUE);
+
+	bcopy(&mbp->parts[0], fdisk, sizeof (fdisk));
+
+	for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
+		if (fdp->systid == EFI_PMBR)
+			return (TRUE);
+	}
+
+	return (FALSE);
+}
+
 static int
 cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
     void *tg_cookie)
@@ -2054,6 +2089,11 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	if (((struct dk_label *)buf)->dkl_magic == DKL_MAGIC) {
 		/* not ours */
 		rval = ESRCH;
+		goto done_err;
+	}
+
+	if (cmlb_check_efi_mbr(buf) == FALSE) {
+		rval = EINVAL;
 		goto done_err;
 	}
 
