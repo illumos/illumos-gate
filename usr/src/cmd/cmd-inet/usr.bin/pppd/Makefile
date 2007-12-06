@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/cmd-inet/usr.bin/pppd/Makefile
@@ -45,7 +45,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS +=	-DDEBUG
 all:		$(PROG) $(SUBDIRS)
 
 # MS-CHAP support
-CPPFLAGS +=	-DHAVE_CRYPT_H -DUSE_CRYPT
+CPPFLAGS +=	-DHAVE_CRYPT_H -DUSE_CRYPT -DHAVE_LIBMD
 CPPFLAGS +=	-DCHAPMS -DMSLANMAN
 CPPFLAGS +=	-DCHAPMSV2
 OBJS +=		chap_ms.o
@@ -56,7 +56,7 @@ CLOBBERFILES +=	mschap_test
 # required for MS-CHAPv1.  It is not needed in any normal system and
 # is not built by default.
 mschap_test:	mschap_test.o chap_ms.o
-	$(LINK.c) -o mschap_test mschap_test.o chap_ms.o $(LDFLAGS)
+	$(LINK.c) -o mschap_test mschap_test.o chap_ms.o $(LDFLAGS) -lmd
 	@echo "Run with 'mschap_test 00000000000000000000000000000000 hello'"
 	@echo
 	@echo "Output should be:"

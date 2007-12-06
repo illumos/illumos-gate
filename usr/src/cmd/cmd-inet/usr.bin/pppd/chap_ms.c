@@ -1,8 +1,8 @@
 /*
  * chap_ms.c - Microsoft MS-CHAP compatible implementation.
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Copyright (c) 1995 Eric Rosenquist, Strata Software Limited.
  * http://www.strataware.com/
@@ -290,7 +290,7 @@ ChapMS_NT(rchallenge, secret, secret_len, response)
     MS_ChapResponse    *response;
 {
     int			i;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(HAVE_LIBMD)
     /* NetBSD uses the libc md4 routines which take bytes instead of bits */
     int			mdlen = secret_len * 2;
 #else
@@ -457,7 +457,7 @@ ChapMSv2_NT(username, rchallenge, secret, secret_len, response)
     MS_Chapv2Response    *response;
 {
     int			i;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(HAVE_LIBMD)
     /* NetBSD uses the libc md4 routines that take bytes instead of bits */
     int			mdlen = secret_len * 2;
 #else
@@ -525,7 +525,7 @@ ChapMSv2Success(cstate, msresp, authchall, rhostname, secret, secret_len)
     static const u_char Magic1[39] = "Magic server to client signing constant";
     static const u_char Magic2[41] =
 	"Pad to make it do more than one iteration";
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(HAVE_LIBMD)
     /* NetBSD uses the libc md4 routines that take bytes instead of bits */
     int mdlen = 1;
 #else

@@ -1,8 +1,8 @@
 /*
  * Test MS-CHAPv1 library code.
  *
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Originally from the README.MSCHAP80 file written by:
  *	Eric Rosenquist          rosenqui@strataware.com
@@ -87,5 +87,5 @@ int main(argc, argv)
 	printf("Cannot validate own MS-CHAPv2 response.\n");
 #endif
 
-    exit(0);
+    return (0);
 }
