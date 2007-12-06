@@ -81,7 +81,7 @@ recall_all_delegations(
 		return (0);
 	}
 
-	if (ct->cc_flags & CC_DONTBLOCK) {
+	if (ct != NULL && ct->cc_flags & CC_DONTBLOCK) {
 		rfs4_dbe_unlock(fp->dbe);
 		ct->cc_flags |= CC_WOULDBLOCK;
 		return (NFS4ERR_DELAY);
