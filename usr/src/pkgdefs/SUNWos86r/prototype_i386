@@ -87,6 +87,7 @@ f none kernel/drv/spwr 755 root sys
 f none kernel/drv/spwr.conf 644 root sys
 # EXPORT DELETE END
 d none kernel/drv/amd64 755 root sys
+f none kernel/drv/amd64/dnet 755 root sys
 f none kernel/drv/amd64/elxl 755 root sys
 f none kernel/drv/amd64/iprb 755 root sys
 f none kernel/drv/amd64/pcn 755 root sys

@@ -63,11 +63,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 CPPFLAGS   	+= -DSUNDDI
 
-# Only build 32-bit version (until hat_getkfpnum() call is removed)
-# See PSARC 2004/405
-DEF_BUILDS	= $(DEF_BUILDS32)
-ALL_BUILDS	= $(ALL_BUILDS32)
-
 #
 # For now, disable these lint checks; maintainers should endeavor
 # to investigate and remove these for maximum lint coverage.

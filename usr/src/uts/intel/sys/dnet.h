@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,7 +365,7 @@ typedef struct srom_format {
 #define	EXT_BIT			0x40
 
 struct dnetinstance {
-	int			io_reg;		/* mapped register */
+	caddr_t			io_reg;		/* mapped register */
 	int 			board_type;	/* board type: 21040 or 21140 */
 	int			full_duplex;
 	int 			bnc_indicator; 	/* Flag for BNC connector */
@@ -380,11 +379,11 @@ struct dnetinstance {
 	int			need_saddr;
 	int			max_tx_desc;	/* max xmit descriptors */
 	caddr_t 		setup_buf_vaddr; /* setup buffer (virt) */
-	caddr_t 		setup_buf_paddr; /* setup buffer (phys) */
+	uint32_t 		setup_buf_paddr; /* setup buffer (phys) */
 	struct tx_desc_type	*tx_desc;	/* virtual addr of xmit desc */
-	caddr_t			tx_desc_paddr;	/* physical addr of xmit desc */
+	uint32_t		tx_desc_paddr;	/* physical addr of xmit desc */
 	struct rx_desc_type	*rx_desc;	/* virtual addr of recv desc */
-	caddr_t			rx_desc_paddr;	/* physical addr of recv desc */
+	uint32_t		rx_desc_paddr;	/* physical addr of recv desc */
 	char			multicast_cnt[MCASTBUF_SIZE];
 	ddi_acc_handle_t	io_handle;	/* ddi I/O handle */
 	dev_info_t		*devinfo;
@@ -394,7 +393,6 @@ struct dnetinstance {
 	ddi_dma_handle_t	dma_handle_txdesc;
 	ddi_dma_handle_t	dma_handle_setbuf;
 	int			pgmask;
-	int			pgshft;
 	ddi_acc_handle_t	setup_buf_acchdl;
 	int			nxmit_desc;	/* #of xmit descriptors */
 	int			nrecv_desc;	/* #of recv descriptors */
@@ -403,9 +401,11 @@ struct dnetinstance {
 	mblk_t			**tx_msgbufp;	/* streams message buffers */
 						/* used for xmit */
 	caddr_t			*rx_buf_vaddr;	/* recv buf addresses (virt) */
-	caddr_t			*rx_buf_paddr;	/* recv buf addresses (phys) */
+	uint32_t		*rx_buf_paddr;	/* recv buf addresses (phys) */
 	kmutex_t		txlock;
 	kmutex_t		intrlock;
+	boolean_t		suspended;
+	boolean_t		running;
 	int	need_gld_sched;
 
 	uint32_t	stat_errrcv;
@@ -434,12 +434,6 @@ struct dnetinstance {
 	uchar_t		vendor_addr[ETHERADDRL];
 	uchar_t		curr_macaddr[ETHERADDRL];
 	media_block_t		*selected_media_block;
-	struct {
-		int _10mb;
-		int _100mb;
-		int _10mb_fd;
-		int _100mb_fd;
-	} 			v1_phy_media;
 	uint32_t		disallowed_media;
 	int			disable_scrambler;
 	int			overrun_workaround;
@@ -452,14 +446,6 @@ struct dnetinstance {
 		uint32_t	start_ticks;
 	} timer;
 };
-
-/*
- * Macro to convert Virtual to physical address
- */
-#define	DNET_KVTOP(vaddr) 	\
-			((uint32_t)(hat_getkpfnum((caddr_t)(vaddr)) << \
-			(dnetp->pgshft)) | ((uintptr_t)(vaddr) & \
-			(dnetp->pgmask)))
 
 #pragma pack(1)
 
