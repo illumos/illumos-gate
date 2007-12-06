@@ -53,7 +53,6 @@ do
 		    -e '/^ncr[	]*scsi$/d' \
 		    -e '/^vme[ 	]*vme$/d' \
 		    -e '/^pci[ 	]*pci$/d' \
-		    -e '/^mpt[ 	]*scsi$/d' \
 		    $dest > /tmp/rest.$$ 2>/dev/null
 		cat /tmp/newident.$$ /tmp/rest.$$ > $dest
 		grep '^isp	scsi' $dest > /dev/null 2>&1
@@ -95,6 +94,10 @@ do
 		grep '^simba[ 	]*pci' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'simba	pci' >> $dest
+		fi
+		grep '^mpt[ 	].*scsi' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'mpt	scsi' >> $dest
 		fi
 	fi
 done

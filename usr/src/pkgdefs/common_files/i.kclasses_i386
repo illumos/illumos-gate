@@ -65,7 +65,6 @@ do
 		    -e '/^smartii[ 	].*dada/d' \
 		    -e '/^trantor[	].*scsi/d' \
 		    -e '/^corvette[	].*scsi/d' \
-		    -e '/^mpt[	].*scsi/d' \
 		    -e '/^pci_to_i2o[	].*i2o/d' \
 		    -e '/^i2o_scsi[	].*scsi/d' \
 		$dest > /tmp/c.$$
@@ -90,6 +89,10 @@ do
 		grep '^mscsi[ 	].*scsi' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'mscsi scsi' >> $dest
+		fi
+		grep '^mpt[ 	].*scsi' $dest > /dev/null 2>&1
+		if [ $? != 0 ] ; then
+			echo 'mpt	scsi' >> $dest
 		fi
 	fi
 done

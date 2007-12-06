@@ -29,3 +29,4 @@ isa	sysbus
 eisa	sysbus
 pci	pci
 pci_pci	pci
+mpt	scsi

@@ -35,3 +35,4 @@ ebus	ebus
 glm	scsi
 uata	dada
 uata	scsi
+mpt	scsi
