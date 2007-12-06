@@ -38,7 +38,8 @@ LIBRARY =	libc.a
 # from the object file; the internal functions with SSE instructions are
 # called conditionally on systems which have SSE instruction support
 pics/fpcw.o := POST_PROCESS_O += ; \
-	$(ELFEDIT) -e 'cap:hw1 -and -cmp SSE' $@
-
+	if $(ELFDUMP) -H $@ | grep " SSE "; then \
+		$(ELFEDIT) -e 'cap:hw1 -and -cmp SSE' $@; \
+	fi
 
 include Makefile.com
