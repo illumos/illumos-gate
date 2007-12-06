@@ -36,17 +36,17 @@
 #include <vm/vm_dep.h>
 #include <vm/hat_i86.h>
 #include <sys/cmn_err.h>
+#include <sys/avl.h>
 
 
 /*
  * When pages are shared by more than one mapping, a list of these
  * structs hangs off of the page_t connected by the hm_next and hm_prev
  * fields.  Every hment is also indexed by a system-wide hash table, using
- * hm_hashnext to connect it to the chain of hments in a single hash
- * bucket.
+ * hm_hashlink to connect the hments within each hash bucket.
  */
 struct hment {
-	struct hment	*hm_hashnext;	/* next mapping on hash chain */
+	avl_node_t	hm_hashlink;	/* links for hash table */
 	struct hment	*hm_next;	/* next mapping of same page */
 	struct hment	*hm_prev;	/* previous mapping of same page */
 	htable_t	*hm_htable;	/* corresponding htable_t */
@@ -80,12 +80,11 @@ uint_t	hment_reserve_count;
 hment_t	*hment_reserve_pool;
 
 /*
- * Possible performance RFE: we might need to make this dynamic, perhaps
- * based on the number of pages in the system.
+ * All hments are stored in a system wide hash of AVL trees.
  */
 #define	HMENT_HASH_SIZE (64 * 1024)
 static uint_t hment_hash_entries = HMENT_HASH_SIZE;
-static hment_t **hment_hash;
+static avl_tree_t *hment_table;
 
 /*
  * Lots of highly shared pages will have the same value for "entry" (consider
@@ -103,8 +102,8 @@ static hment_t **hment_hash;
  * maintaining a separate lock for each page, while still achieving better
  * scalability than a single lock would allow.
  */
-#define	MLIST_NUM_LOCK	256		/* must be power of two */
-static kmutex_t mlist_lock[MLIST_NUM_LOCK];
+#define	MLIST_NUM_LOCK	2048		/* must be power of two */
+static kmutex_t *mlist_lock;
 
 /*
  * the shift by 9 is so that all large pages don't use the same hash bucket
@@ -113,12 +112,37 @@ static kmutex_t mlist_lock[MLIST_NUM_LOCK];
 	&mlist_lock[((pp)->p_pagenum + ((pp)->p_pagenum >> 9)) & \
 	(MLIST_NUM_LOCK - 1)]
 
-#define	HASH_NUM_LOCK	256		/* must be power of two */
-static kmutex_t hash_lock[HASH_NUM_LOCK];
+#define	HASH_NUM_LOCK	2048		/* must be power of two */
+static kmutex_t *hash_lock;
 
 #define	HASH_MUTEX(idx) &hash_lock[(idx) & (HASH_NUM_LOCK-1)]
 
+static avl_node_t null_avl_link;	/* always zero */
 static hment_t *hment_steal(void);
+
+/*
+ * Utility to compare hment_t's for use in AVL tree. The ordering
+ * is entirely arbitrary and is just so that the AVL algorithm works.
+ */
+static int
+hment_compare(const void *hm1, const void *hm2)
+{
+	hment_t *h1 = (hment_t *)hm1;
+	hment_t *h2 = (hment_t *)hm2;
+	long diff;
+
+	diff = (uintptr_t)h1->hm_htable - (uintptr_t)h2->hm_htable;
+	if (diff == 0) {
+		diff = h1->hm_entry - h2->hm_entry;
+		if (diff == 0)
+			diff = h1->hm_pfn - h2->hm_pfn;
+	}
+	if (diff < 0)
+		diff = -1;
+	else if (diff > 0)
+		diff = 1;
+	return (diff);
+}
 
 /*
  * put one hment onto the reserves list
@@ -217,7 +241,7 @@ hment_alloc()
 
 	hm->hm_entry = 0;
 	hm->hm_htable = NULL;
-	hm->hm_hashnext = NULL;
+	hm->hm_hashlink = null_avl_link;
 	hm->hm_next = NULL;
 	hm->hm_prev = NULL;
 	hm->hm_pfn = PFN_INVALID;
@@ -249,10 +273,17 @@ hment_free(hment_t *hm)
 	}
 }
 
+/*
+ * These must test for mlist_lock not having been allocated yet.
+ * We just ignore locking in that case, as it means were in early
+ * single threaded startup.
+ */
 int
 x86_hm_held(page_t *pp)
 {
 	ASSERT(pp != NULL);
+	if (mlist_lock == NULL)
+		return (1);
 	return (MUTEX_HELD(MLIST_MUTEX(pp)));
 }
 
@@ -260,14 +291,16 @@ void
 x86_hm_enter(page_t *pp)
 {
 	ASSERT(pp != NULL);
-	mutex_enter(MLIST_MUTEX(pp));
+	if (mlist_lock != NULL)
+		mutex_enter(MLIST_MUTEX(pp));
 }
 
 void
 x86_hm_exit(page_t *pp)
 {
 	ASSERT(pp != NULL);
-	mutex_exit(MLIST_MUTEX(pp));
+	if (mlist_lock != NULL)
+		mutex_exit(MLIST_MUTEX(pp));
 }
 
 /*
@@ -296,8 +329,7 @@ hment_insert(hment_t *hm, page_t *pp)
 	idx = HMENT_HASH(hm->hm_htable->ht_pfn, hm->hm_entry);
 
 	mutex_enter(HASH_MUTEX(idx));
-	hm->hm_hashnext = hment_hash[idx];
-	hment_hash[idx] = hm;
+	avl_add(&hment_table[idx], hm);
 	mutex_exit(HASH_MUTEX(idx));
 }
 
@@ -496,10 +528,10 @@ hment_walk(page_t *pp, htable_t **ht, uint_t *entry, hment_t *prev)
 hment_t *
 hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 {
-	hment_t		*prev = NULL;
+	hment_t		dummy;
+	avl_index_t	where;
 	hment_t		*hm;
 	uint_t		idx;
-	pfn_t		pfn;
 
 	ASSERT(x86_hm_held(pp));
 
@@ -521,25 +553,17 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 	 * Find the hment in the system-wide hash table and remove it.
 	 */
 	ASSERT(pp->p_share != 0);
-	pfn = pp->p_pagenum;
+	dummy.hm_htable = ht;
+	dummy.hm_entry = entry;
+	dummy.hm_pfn = pp->p_pagenum;
 	idx = HMENT_HASH(ht->ht_pfn, entry);
 	mutex_enter(HASH_MUTEX(idx));
-	hm = hment_hash[idx];
-	while (hm && (hm->hm_htable != ht || hm->hm_entry != entry ||
-	    hm->hm_pfn != pfn)) {
-		prev = hm;
-		hm = hm->hm_hashnext;
-	}
-	if (hm == NULL) {
+	hm = avl_find(&hment_table[idx], &dummy, &where);
+	if (hm == NULL)
 		panic("hment_remove() missing in hash table pp=%lx, ht=%lx,"
 		    "entry=0x%x hash index=0x%x", (uintptr_t)pp, (uintptr_t)ht,
 		    entry, idx);
-	}
-
-	if (prev)
-		prev->hm_hashnext = hm->hm_hashnext;
-	else
-		hment_hash[idx] = hm->hm_hashnext;
+	avl_remove(&hment_table[idx], hm);
 	mutex_exit(HASH_MUTEX(idx));
 
 	/*
@@ -553,7 +577,7 @@ hment_remove(page_t *pp, htable_t *ht, uint_t entry)
 		pp->p_mapping = hm->hm_next;
 
 	--pp->p_share;
-	hm->hm_hashnext = NULL;
+	hm->hm_hashlink = null_avl_link;
 	hm->hm_next = NULL;
 	hm->hm_prev = NULL;
 
@@ -615,8 +639,16 @@ hment_init(void)
 	    sizeof (hment_t), 0, NULL, NULL, NULL,
 	    NULL, hat_memload_arena, flags);
 
-	hment_hash = kmem_zalloc(hment_hash_entries * sizeof (hment_t *),
+	hment_table = kmem_zalloc(hment_hash_entries * sizeof (*hment_table),
 	    KM_SLEEP);
+
+	mlist_lock = kmem_zalloc(MLIST_NUM_LOCK * sizeof (kmutex_t), KM_SLEEP);
+
+	hash_lock = kmem_zalloc(HASH_NUM_LOCK * sizeof (kmutex_t), KM_SLEEP);
+
+	for (i = 0; i < hment_hash_entries; ++i)
+		avl_create(&hment_table[i], hment_compare, sizeof (hment_t),
+		    offsetof(hment_t, hm_hashlink));
 
 	for (i = 0; i < MLIST_NUM_LOCK; i++)
 		mutex_init(&mlist_lock[i], NULL, MUTEX_DEFAULT, NULL);
