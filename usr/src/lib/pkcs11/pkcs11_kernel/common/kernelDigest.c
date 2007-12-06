@@ -34,8 +34,9 @@
 #include "kernelSession.h"
 #include "kernelEmulate.h"
 
-CK_RV
-C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
+static CK_RV
+common_digest_init(CK_SESSION_HANDLE hSession,
+    CK_MECHANISM_PTR pMechanism, boolean_t is_external_caller)
 {
 	CK_RV rv;
 	kernel_session_t *session_p;
@@ -73,7 +74,18 @@ C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 	 * C_Digest or C_DigestFinal to actually obtain the value of
 	 * the message digest.
 	 */
-	session_p->digest.flags = CRYPTO_OPERATION_ACTIVE;
+	session_p->digest.flags |= CRYPTO_OPERATION_ACTIVE;
+
+	if (SLOT_HAS_LIMITED_HASH(session_p) && is_external_caller) {
+		session_p->digest.mech.mechanism = pMechanism->mechanism;
+		session_p->digest.mech.pParameter = NULL;
+		session_p->digest.mech.ulParameterLen = 0;
+		session_p->digest.flags |= CRYPTO_EMULATE;
+		rv = emulate_buf_init(session_p, EDIGEST_LENGTH, OP_DIGEST);
+		REFRELE(session_p, ses_lock_held);
+		return (rv);
+	}
+
 	digest_init.di_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	digest_init.di_mech.cm_type = k_mech_type;
@@ -98,13 +110,6 @@ C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 		rv = crypto2pkcs11_error_number(digest_init.di_return_value);
 	}
 
-	if (rv == CKR_OK && SLOT_HAS_LIMITED_HASH(session_p)) {
-		(void) pthread_mutex_lock(&session_p->session_mutex);
-		session_p->digest.flags |= CRYPTO_EMULATE;
-		(void) pthread_mutex_unlock(&session_p->session_mutex);
-		rv = emulate_init(session_p, pMechanism, NULL, OP_DIGEST);
-	}
-
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
 		session_p->digest.flags &= ~CRYPTO_OPERATION_ACTIVE;
@@ -124,6 +129,12 @@ C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 	ses_lock_held = B_FALSE;
 	REFRELE(session_p, ses_lock_held);
 	return (rv);
+}
+
+CK_RV
+C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
+{
+	return (common_digest_init(hSession, pMechanism, B_TRUE));
 }
 
 CK_RV
@@ -186,16 +197,31 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	}
 
 	if (session_p->digest.flags & CRYPTO_EMULATE) {
+		crypto_active_op_t *opp;
+		CK_MECHANISM_PTR pMechanism;
+
+		opp = &(session_p->digest);
+		if (opp->context == NULL)
+			return (CKR_ARGUMENTS_BAD);
+		pMechanism = &(opp->mech);
+
 		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
 		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
 			session_p->digest.flags |= CRYPTO_EMULATE_USING_SW;
 			(void) pthread_mutex_unlock(&session_p->session_mutex);
 
-			rv = do_soft_digest(get_spp(&session_p->digest), NULL,
-			    pData, ulDataLen, pDigest, pulDigestLen, OP_SINGLE);
+			rv = do_soft_digest(get_spp(opp), pMechanism,
+			    pData, ulDataLen, pDigest, pulDigestLen,
+			    OP_INIT | OP_SINGLE);
 			goto done;
-		} else {
-			free_soft_ctx(get_sp(&session_p->digest), OP_DIGEST);
+		} else if (!(session_p->digest.flags &
+		    CRYPTO_EMULATE_INIT_DONE)) {
+			session_p->digest.flags |= CRYPTO_EMULATE_INIT_DONE;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = common_digest_init(hSession, pMechanism, B_FALSE);
+			if (rv != CKR_OK)
+				goto clean_exit;
+			(void) pthread_mutex_lock(&session_p->session_mutex);
 		}
 	}
 

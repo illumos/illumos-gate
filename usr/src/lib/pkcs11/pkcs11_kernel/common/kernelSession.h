@@ -69,6 +69,7 @@ typedef struct digest_buf {
 #define	CRYPTO_EMULATE		0x00000004 /* op needs emulation */
 #define	CRYPTO_EMULATE_USING_SW	0x00000008 /* ... use software */
 #define	CRYPTO_EMULATE_UPDATE_DONE 0x00000010 /* did at least one update */
+#define	CRYPTO_EMULATE_INIT_DONE 0x00000020 /* did init */
 
 typedef struct session {
 	CK_ULONG	magic_marker;	/* magic # be validated for integrity */

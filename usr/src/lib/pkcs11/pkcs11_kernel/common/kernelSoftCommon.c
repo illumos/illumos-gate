@@ -40,9 +40,7 @@
 #include "kernelSoftCommon.h"
 
 /*
- * Do the operation specified by opflag. We assume that the caller
- * does only one operation at a time. This code needs revisiting
- * if that assumption is not true.
+ * Do the operation(s) specified by opflag.
  */
 CK_RV
 do_soft_digest(void **s, CK_MECHANISM_PTR pMechanism, CK_BYTE_PTR pData,
@@ -50,7 +48,7 @@ do_soft_digest(void **s, CK_MECHANISM_PTR pMechanism, CK_BYTE_PTR pData,
     int opflag)
 {
 	soft_session_t *session_p;
-	CK_RV rv;
+	CK_RV rv = CKR_ARGUMENTS_BAD;
 
 	session_p = *((soft_session_t **)s);
 	if (session_p == NULL) {
@@ -74,26 +72,26 @@ do_soft_digest(void **s, CK_MECHANISM_PTR pMechanism, CK_BYTE_PTR pData,
 		free_soft_ctx(session_p, OP_DIGEST);
 	}
 
-	switch (opflag & (OP_INIT | OP_UPDATE | OP_SINGLE | OP_FINAL)) {
-	case OP_INIT:
+	if (opflag & OP_INIT) {
 		rv = soft_digest_init(session_p, pMechanism);
-		break;
+		if (rv != CKR_OK)
+			return (rv);
+	}
 
-	case OP_SINGLE:
+	if (opflag & OP_SINGLE) {
 		rv = soft_digest(session_p, pData, ulDataLen,
 		    pDigest, pulDigestLen);
-		break;
+	} else {
+		if (opflag & OP_UPDATE) {
+			rv = soft_digest_update(session_p, pData, ulDataLen);
+			if (rv != CKR_OK)
+				return (rv);
+		}
 
-	case OP_UPDATE:
-		rv = soft_digest_update(session_p, pData, ulDataLen);
-		break;
-
-	case OP_FINAL:
-		rv = soft_digest_final(session_p, pDigest, pulDigestLen);
-		break;
-
-	default:
-		rv = CKR_ARGUMENTS_BAD;
+		if (opflag & OP_FINAL) {
+			rv = soft_digest_final(session_p,
+			    pDigest, pulDigestLen);
+		}
 	}
 
 	return (rv);

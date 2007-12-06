@@ -63,17 +63,12 @@ is_hmac(CK_MECHANISM_TYPE mechanism)
 }
 
 /*
- * Setup the support necessary to do this operation in a
- * single part. We allocate a buffer to accumulate the
- * input data from later calls. We also get ready for
- * the case where we have to do it in software by initializing
- * a standby context. The opflag tells if this is a digest, sign or verify.
+ * Helper routine to allocate an emulation structure for the session.
+ * buflen indicates the size of the scratch buffer to be allocated.
  */
 CK_RV
-emulate_init(kernel_session_t *session_p, CK_MECHANISM_PTR pMechanism,
-    crypto_key_t *keyp, int opflag)
+emulate_buf_init(kernel_session_t *session_p, int buflen, int opflag)
 {
-	CK_RV rv;
 	digest_buf_t *bufp;
 	crypto_active_op_t *opp;
 
@@ -81,31 +76,57 @@ emulate_init(kernel_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	    ((opflag & OP_SIGN) ? &(session_p->sign) : &(session_p->verify));
 
 	bufp = opp->context;
+
+	if (bufp != NULL) {
+		bufp->indata_len = 0;
+		if (buflen > bufp->buf_len) {
+			free(bufp);
+			bufp = opp->context = NULL;
+		}
+	}
+
 	if (bufp == NULL) {
 		bufp = calloc(1, sizeof (digest_buf_t));
 		if (bufp == NULL) {
 			return (CKR_HOST_MEMORY);
 		}
 
-		bufp->buf = malloc(EDIGEST_LENGTH);
+		bufp->buf = malloc(buflen);
 		if (bufp->buf == NULL) {
 			free(bufp);
 			return (CKR_HOST_MEMORY);
 		}
-		bufp->buf_len = EDIGEST_LENGTH;
+		bufp->buf_len = buflen;
 		bufp->indata_len = 0;
 		opp->context = bufp;
-	} else
-		bufp->indata_len = 0;
+	}
+
+	return (CKR_OK);
+}
+
+/*
+ * Setup the support necessary to do this operation in a
+ * single part. We allocate a buffer to accumulate the
+ * input data from later calls. We also get ready for
+ * the case where we have to do it in software by initializing
+ * a standby context. The opflag tells if this is a sign or verify.
+ */
+CK_RV
+emulate_init(kernel_session_t *session_p, CK_MECHANISM_PTR pMechanism,
+    crypto_key_t *keyp, int opflag)
+{
+	CK_RV rv;
+	crypto_active_op_t *opp;
+
+	if ((rv = emulate_buf_init(session_p, EDIGEST_LENGTH, opflag)) !=
+	    CKR_OK)
+		return (rv);
+
+	opp = (opflag & OP_SIGN) ? &(session_p->sign) : &(session_p->verify);
 
 	opflag |= OP_INIT;
-	if (opflag & OP_DIGEST) {
-		rv = do_soft_digest(get_spp(opp), pMechanism, NULL, 0,
-		    NULL, NULL, opflag);
-	} else {
-		rv = do_soft_hmac_init(get_spp(opp), pMechanism, keyp->ck_data,
-		    keyp->ck_length >> 3, opflag);
-	}
+	rv = do_soft_hmac_init(get_spp(opp), pMechanism, keyp->ck_data,
+	    keyp->ck_length >> 3, opflag);
 
 	return (rv);
 }
@@ -171,6 +192,16 @@ emulate_update(kernel_session_t *session_p, CK_BYTE_PTR pPart,
 
 	if (use_soft) {
 		opp->flags |= CRYPTO_EMULATE_USING_SW;
+
+		if (opflag & OP_DIGEST) {
+			CK_MECHANISM_PTR pMechanism;
+
+			pMechanism = &(opp->mech);
+			rv = do_soft_digest(get_spp(opp), pMechanism, NULL, 0,
+			    NULL, NULL, OP_INIT);
+			if (rv != CKR_OK)
+				return (rv);
+		}
 
 		opflag |= OP_UPDATE;
 		DO_SOFT_UPDATE(opp, bufp->buf, bufp->indata_len, opflag);

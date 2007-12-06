@@ -59,6 +59,7 @@ extern "C" {
 }
 
 boolean_t is_hmac(CK_MECHANISM_TYPE mechanism);
+CK_RV emulate_buf_init(kernel_session_t *session_p, int buflen, int opflag);
 CK_RV emulate_init(kernel_session_t *session_p, CK_MECHANISM_PTR pMechanism,
     crypto_key_t *keyp, int opflag);
 CK_RV emulate_update(kernel_session_t *session_p, CK_BYTE_PTR pPart,
