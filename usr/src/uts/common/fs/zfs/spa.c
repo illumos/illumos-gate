@@ -3920,11 +3920,27 @@ spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 				spa->spa_config_dir = spa_strdup(strval);
 				spa->spa_config_file = NULL;
 			} else {
+				/*
+				 * If the cachefile is in the root directory,
+				 * we will end up with an empty string for
+				 * spa_config_dir.  This value is only ever
+				 * used when concatenated with '/', so an empty
+				 * string still behaves correctly and keeps the
+				 * rest of the code simple.
+				 */
 				slash = strrchr(strval, '/');
 				ASSERT(slash != NULL);
 				*slash = '\0';
-				spa->spa_config_dir = spa_strdup(strval);
-				spa->spa_config_file = spa_strdup(slash + 1);
+				if (strcmp(strval, spa_config_dir) == 0 &&
+				    strcmp(slash + 1, ZPOOL_CACHE_FILE) == 0) {
+					spa->spa_config_dir = NULL;
+					spa->spa_config_file = NULL;
+				} else {
+					spa->spa_config_dir =
+					    spa_strdup(strval);
+					spa->spa_config_file =
+					    spa_strdup(slash + 1);
+				}
 			}
 			spa_async_request(spa, SPA_ASYNC_CONFIG_UPDATE);
 			break;

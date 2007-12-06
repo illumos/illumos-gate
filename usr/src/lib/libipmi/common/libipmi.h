@@ -30,6 +30,7 @@
 
 #include <sys/bmc_intf.h>
 #include <sys/byteorder.h>
+#include <sys/sysmacros.h>
 
 /*
  * Private interfaces for communicating with attached services over IPMI.  This
@@ -47,10 +48,6 @@ extern "C" {
 #endif
 
 typedef struct ipmi_handle ipmi_handle_t;
-
-#if !defined(_BIT_FIELDS_LTOH) && !defined(_BIT_FIELDS_HTOL)
-#error  One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
-#endif
 
 #pragma pack(1)
 
@@ -130,22 +127,13 @@ extern ipmi_cmd_t *ipmi_send(ipmi_handle_t *, ipmi_cmd_t *);
 
 typedef struct ipmi_deviceid {
 	uint8_t		id_devid;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		id_dev_rev:4;
-	uint8_t		__reserved:3;
-	uint8_t		id_dev_sdrs:1;
-#else
-	uint8_t		id_dev_sdrs:1;
-	uint8_t		__reserved:3;
-	uint8_t		id_dev_rev:4;
-#endif
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		id_firm_major:7;
-	uint8_t		id_dev_available:1;
-#else
-	uint8_t		id_dev_available:1;
-	uint8_t		id_firm_major:7;
-#endif
+	DECL_BITFIELD3(
+	    id_dev_rev		:4,
+	    __reserved		:3,
+	    id_dev_sdrs		:1);
+	DECL_BITFIELD2(
+	    id_firm_major	:7,
+	    id_dev_available	:1);
 	uint8_t		id_firm_minor;
 	uint8_t		id_ipmi_rev;
 	uint8_t		id_dev_support;
@@ -202,44 +190,29 @@ extern ipmi_sdr_t *ipmi_sdr_get(ipmi_handle_t *, uint16_t, uint16_t *);
 
 typedef struct ipmi_sdr_generic_locator {
 	/* RECORD KEY BYTES */
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		__reserved1:1;
-	uint8_t		is_gl_accessaddr:7;
-	uint8_t		is_gl_channel_msb:1;
-	uint8_t		is_gl_slaveaddr:7;
-	uint8_t		is_gl_bus:3;
-	uint8_t		is_gl_lun:2;
-	uint8_t		is_gl_channel:3;
-#else
-	uint8_t		is_gl_accessaddr:7;
-	uint8_t		__reserved1:1;
-	uint8_t		is_gl_slaveaddr:7;
-	uint8_t		is_gl_channel_msb:1;
-	uint8_t		is_gl_channel:3;
-	uint8_t		is_gl_lun:2;
-	uint8_t		is_gl_bus:3;
-#endif
+	DECL_BITFIELD2(
+	    __reserved1		:1,
+	    is_gl_accessaddr	:7);
+	DECL_BITFIELD2(
+	    is_gl_channel_msb	:1,
+	    is_gl_slaveaddr	:7);
+	DECL_BITFIELD3(
+	    is_gl_bus		:3,
+	    is_gl_lun		:2,
+	    is_gl_channel	:3);
 	/* RECORD BODY BYTES */
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		is_gl_span:3;
-	uint8_t		__reserved2:5;
-#else
-	uint8_t		__reserved2:5;
-	uint8_t		is_gl_span:3;
-#endif
+	DECL_BITFIELD2(
+	    is_gl_span		:3,
+	    __reserved2		:5);
 	uint8_t		__reserved3;
 	uint8_t		is_gl_type;
 	uint8_t		is_gl_modifier;
 	uint8_t		is_gl_entity;
 	uint8_t		is_gl_instance;
 	uint8_t		is_gl_oem;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		is_gl_idlen:6;
-	uint8_t		is_gl_idtype:2;
-#else
-	uint8_t		is_gl_idtype:2;
-	uint8_t		is_gl_idlen:6;
-#endif
+	DECL_BITFIELD2(
+	    is_gl_idlen		:6,
+	    is_gl_idtype	:2);
 	char		is_gl_idstring[1];
 } ipmi_sdr_generic_locator_t;
 
@@ -251,42 +224,27 @@ typedef struct ipmi_sdr_generic_locator {
 
 typedef struct ipmi_sdr_fru_locator {
 	/* RECORD KEY BYTES */
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		__reserved1:1;
-	uint8_t		is_fl_accessaddr:7;
-#else
-	uint8_t		is_fl_accessaddr:7;
-	uint8_t		__reserved1:1;
-#endif
+	DECL_BITFIELD2(
+	    __reserved1		:1,
+	    is_fl_accessaddr	:7);
 	union {
 		struct {
 			uint8_t	_is_fl_devid;
 		} _logical;
 		struct {
-#if defined(_BIT_FIELDS_LTOH)
-			uint8_t	__reserved:1;
-			uint8_t	_is_fl_slaveaddr:7;
-#else
-			uint8_t	_is_fl_slaveaddr:7;
-			uint8_t	__reserved:1;
-#endif
+			DECL_BITFIELD2(
+			    __reserved		:1,
+			    _is_fl_slaveaddr	:7);
 		} _nonintelligent;
 	} _devid_or_slaveaddr;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		is_fl_bus:3;
-	uint8_t		is_fl_lun:2;
-	uint8_t		__reserved2:2;
-	uint8_t		is_fl_logical:1;
-	uint8_t		__reserved3:4;
-	uint8_t		is_fl_channel:4;
-#else
-	uint8_t		is_fl_logical:1;
-	uint8_t		__reserved2:2;
-	uint8_t		is_fl_lun:2;
-	uint8_t		is_fl_bus:3;
-	uint8_t		is_fl_channel:4;
-	uint8_t		__reserved3:4;
-#endif
+	DECL_BITFIELD4(
+	    is_fl_bus		:3,
+	    is_fl_lun		:2,
+	    __reserved2		:2,
+	    is_fl_logical	:1);
+	DECL_BITFIELD2(
+	    __reserved3		:4,
+	    is_fl_channel	:4);
 	/* RECORD BODY BYTES */
 	uint8_t		__reserved4;
 	uint8_t		is_fl_type;
@@ -294,13 +252,9 @@ typedef struct ipmi_sdr_fru_locator {
 	uint8_t		is_fl_entity;
 	uint8_t		is_fl_instance;
 	uint8_t		is_fl_oem;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		is_fl_idlen:6;
-	uint8_t		is_fl_idtype:2;
-#else
-	uint8_t		is_fl_idtype:2;
-	uint8_t		is_fl_idlen:6;
-#endif
+	DECL_BITFIELD2(
+	    is_fl_idlen		:6,
+	    is_fl_idtype	:2);
 	char		is_fl_idstring[1];
 } ipmi_sdr_fru_locator_t;
 
@@ -337,17 +291,11 @@ extern ipmi_sdr_generic_locator_t *ipmi_sdr_lookup_generic(ipmi_handle_t *,
 
 typedef struct ipmi_sensor_reading {
 	uint8_t		isr_reading;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		__reserved1:5;
-	uint8_t		isr_state_unavailable:1;
-	uint8_t		isr_scanning_disabled:1;
-	uint8_t		isr_event_disabled:1;
-#else
-	uint8_t		isr_event_disabled:1;
-	uint8_t		isr_scanning_disabled:1;
-	uint8_t		isr_state_unavailable:1;
-	uint8_t		__reserved1:5;
-#endif
+	DECL_BITFIELD4(
+	    __reserved1			:5,
+	    isr_state_unavailable	:1,
+	    isr_scanning_disabled	:1,
+	    isr_event_disabled		:1);
 	uint16_t	isr_state;
 } ipmi_sensor_reading_t;
 
@@ -364,19 +312,12 @@ extern ipmi_sensor_reading_t *ipmi_get_sensor_reading(ipmi_handle_t *, uint8_t);
 
 typedef struct ipmi_set_sensor_reading {
 	uint8_t		iss_id;
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		iss_set_reading:1;
-	uint8_t		__reserved:1;
-	uint8_t		iss_deassrt_op:2;
-	uint8_t		iss_assert_op:2;
-	uint8_t		iss_data_bytes:2;
-#else
-	uint8_t		iss_data_bytes:2;
-	uint8_t		iss_assert_op:2;
-	uint8_t		iss_deassrt_op:2;
-	uint8_t		__reserved:1;
-	uint8_t		iss_set_reading:1;
-#endif
+	DECL_BITFIELD5(
+	    iss_set_reading		:1,
+	    __reserved			:1,
+	    iss_deassrt_op		:2,
+	    iss_assert_op		:2,
+	    iss_data_bytes		:2);
 	uint8_t		iss_sensor_reading;
 	uint16_t	iss_assert_state;	/* optional */
 	uint16_t	iss_deassert_state;	/* optional */
@@ -483,57 +424,6 @@ extern int ipmi_user_set_password(ipmi_handle_t *, uint8_t, const char *);
 /*
  * Sun OEM LED requests.
  */
-
-#define	IPMI_CMD_SUNOEM_LED_GET		0x21
-#define	IPMI_CMD_SUNOEM_LED_SET		0x22
-
-typedef struct ipmi_cmd_sunoem_led_set {
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		ic_sls_channel_msb:1;	/* device slave address */
-	uint8_t		ic_sls_slaveaddr:7;	/* (from SDR record) */
-#else
-	uint8_t		ic_sls_slaveaddr:7;
-	uint8_t		ic_sls_channel_msb:1;
-#endif
-	uint8_t		ic_sls_type;		/* led type */
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		__reserved:1;		/* device access address */
-	uint8_t		ic_sls_accessaddr:7;	/* (from SDR record) */
-#else
-	uint8_t		ic_sls_accessaddr:7;
-	uint8_t		__reserved:1;
-#endif
-	uint8_t		ic_sls_hwinfo;		/* OEM hardware info */
-	uint8_t		ic_sls_mode;		/* LED mode */
-	uint8_t		ic_sls_force;		/* force direct access */
-	uint8_t		ic_sls_role;		/* BMC authorization */
-} ipmi_cmd_sunoem_led_set_t;
-
-typedef struct ipmi_cmd_sunoem_led_get {
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		ic_slg_channel_msb:1;	/* device slave address */
-	uint8_t		ic_slg_slaveaddr:7;	/* (from SDR record) */
-#else
-	uint8_t		ic_slg_slaveaddr:7;
-	uint8_t		ic_slg_channel_msb:1;
-#endif
-	uint8_t		ic_slg_type;		/* led type */
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		__reserved:1;		/* device access address */
-	uint8_t		ic_slg_accessaddr:7;	/* (from SDR record) */
-#else
-	uint8_t		ic_slg_accessaddr:7;
-	uint8_t		__reserved:1;
-#endif
-	uint8_t		ic_slg_hwinfo;		/* OEM hardware info */
-	uint8_t		ic_slg_force;		/* force direct access */
-} ipmi_cmd_sunoem_led_get_t;
-
-#define	IPMI_SUNOEM_LED_TYPE_OK2RM	0
-#define	IPMI_SUNOEM_LED_TYPE_SERVICE	1
-#define	IPMI_SUNOEM_LED_TYPE_ACT	2
-#define	IPMI_SUNOEM_LED_TYPE_LOCATE	3
-#define	IPMI_SUNOEM_LED_TYPE_ANY	0xFF
 
 #define	IPMI_SUNOEM_LED_MODE_OFF	0
 #define	IPMI_SUNOEM_LED_MODE_ON		1

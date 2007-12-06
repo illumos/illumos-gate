@@ -37,47 +37,32 @@
  */
 
 typedef struct ipmi_get_user_access_req {
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		igua_channel:4;
-	uint8_t		__reserved1:4;
-	uint8_t		igua_uid:2;
-	uint8_t		__reserved2:6;
-#else
-	uint8_t		__reserved1:4;
-	uint8_t		igua_channel:4;
-	uint8_t		__reserved2:2;
-	uint8_t		igua_uid:6;
-#endif
+	DECL_BITFIELD2(
+	    igua_channel		:4,
+	    __reserved1			:4);
+	DECL_BITFIELD2(
+	    igua_uid			:2,
+	    __reserved2			:6);
 } ipmi_get_user_access_req_t;
 
 #define	IPMI_CMD_GET_USER_ACCESS	0x44
 
 typedef struct ipmi_get_user_access {
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		igua_max_uid:4;
-	uint8_t		__reserved1:4;
-	uint8_t		igua_enable_status:4;
-	uint8_t		igua_enabled_uid:4;
-	uint8_t		__reserved2:4;
-	uint8_t		igua_fixed_uid:4;
-	uint8_t		__reserved3:1;
-	uint8_t		igua_only_callback:1;
-	uint8_t		igua_link_auth_enable:1;
-	uint8_t		igua_ipmi_msg_enable:1;
-	uint8_t		igua_privilege_level:4;
-#else
-	uint8_t		__reserved1:4;
-	uint8_t		igua_max_uid:4;
-	uint8_t		igua_enabled_uid:4;
-	uint8_t		igua_enable_status:4;
-	uint8_t		igua_fixed_uid:4;
-	uint8_t		__reserved2:4;
-	uint8_t		igua_privilege_level:4;
-	uint8_t		igua_ipmi_msg_enable:1;
-	uint8_t		igua_link_auth_enable:1;
-	uint8_t		igua_only_callback:1;
-	uint8_t		__reserved3:1;
-#endif
+	DECL_BITFIELD2(
+	    igua_max_uid		:4,
+	    __reserved1			:4);
+	DECL_BITFIELD2(
+	    igua_enable_status		:4,
+	    igua_enabled_uid		:4);
+	DECL_BITFIELD2(
+	    __reserved2			:4,
+	    igua_fixed_uid		:4);
+	DECL_BITFIELD5(
+	    __reserved3			:1,
+	    igua_only_callback		:1,
+	    igua_link_auth_enable	:1,
+	    igua_ipmi_msg_enable	:1,
+	    igua_privilege_level	:4);
 } ipmi_get_user_access_t;
 
 #define	IPMI_USER_ENABLE_UNSPECIFIED	0x00
@@ -99,19 +84,13 @@ typedef struct ipmi_get_user_access {
 #define	IPMI_CMD_SET_USER_PASSWORD	0x47
 
 typedef struct ipmi_set_user_password {
-#if defined(_BIT_FIELDS_LTOH)
-	uint8_t		isup_uid:6;
-	uint8_t		__reserved1:1;
-	uint8_t		isup_len20:1;
-	uint8_t		isup_op:2;
-	uint8_t		__reserved2:6;
-#else
-	uint8_t		isup_len20:1;
-	uint8_t		__reserved1:1;
-	uint8_t		isup_uid:6;
-	uint8_t		__reserved2:6;
-	uint8_t		isup_op:2;
-#endif
+	DECL_BITFIELD3(
+	    isup_uid		:6,
+	    __reserved1		:1,
+	    isup_len20		:1);
+	DECL_BITFIELD2(
+	    isup_op		:2,
+	    __reserved2		:6);
 	char		isup_passwd[20];
 } ipmi_set_user_password_t;
 

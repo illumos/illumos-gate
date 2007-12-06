@@ -31,6 +31,41 @@
 
 #include "ipmi_impl.h"
 
+#define	IPMI_CMD_SUNOEM_LED_GET		0x21
+#define	IPMI_CMD_SUNOEM_LED_SET		0x22
+
+typedef struct ipmi_cmd_sunoem_led_set {
+	DECL_BITFIELD2(
+	    ic_sls_channel_msb		:1,	/* device slave address */
+	    ic_sls_slaveaddr		:7);	/* (from SDR record) */
+	uint8_t		ic_sls_type;		/* led type */
+	DECL_BITFIELD2(
+	    __reserved			:1,	/* device access address */
+	    ic_sls_accessaddr		:7);	/* (from SDR record */
+	uint8_t		ic_sls_hwinfo;		/* OEM hardware info */
+	uint8_t		ic_sls_mode;		/* LED mode */
+	uint8_t		ic_sls_force;		/* force direct access */
+	uint8_t		ic_sls_role;		/* BMC authorization */
+} ipmi_cmd_sunoem_led_set_t;
+
+typedef struct ipmi_cmd_sunoem_led_get {
+	DECL_BITFIELD2(
+	    ic_slg_channel_msb		:1,	/* device slave address */
+	    ic_slg_slaveaddr		:7);	/* (from SDR record) */
+	uint8_t		ic_slg_type;		/* led type */
+	DECL_BITFIELD2(
+	    __reserved			:1,	/* device access address */
+	    ic_slg_accessaddr		:7);	/* (from SDR record */
+	uint8_t		ic_slg_hwinfo;		/* OEM hardware info */
+	uint8_t		ic_slg_force;		/* force direct access */
+} ipmi_cmd_sunoem_led_get_t;
+
+#define	IPMI_SUNOEM_LED_TYPE_OK2RM	0
+#define	IPMI_SUNOEM_LED_TYPE_SERVICE	1
+#define	IPMI_SUNOEM_LED_TYPE_ACT	2
+#define	IPMI_SUNOEM_LED_TYPE_LOCATE	3
+#define	IPMI_SUNOEM_LED_TYPE_ANY	0xFF
+
 static int
 check_sunoem(ipmi_handle_t *ihp)
 {

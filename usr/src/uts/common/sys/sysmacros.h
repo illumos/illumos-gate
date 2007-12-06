@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,6 +271,46 @@ extern unsigned char bcd_to_byte[256];
  */
 #define	INCR_COUNT(var, mutex) mutex_enter(mutex), (*(var))++, mutex_exit(mutex)
 #define	DECR_COUNT(var, mutex) mutex_enter(mutex), (*(var))--, mutex_exit(mutex)
+
+/*
+ * Macros to declare bitfields - the order in the parameter list is
+ * Low to High - that is, declare bit 0 first.  We only support 8-bit bitfields
+ * because if a field crosses a byte boundary it's not likely to be meaningful
+ * without reassembly in its nonnative endianness.
+ */
+#if defined(_BIT_FIELDS_LTOH)
+#define	DECL_BITFIELD2(_a, _b)				\
+	uint8_t _a, _b
+#define	DECL_BITFIELD3(_a, _b, _c)			\
+	uint8_t _a, _b, _c
+#define	DECL_BITFIELD4(_a, _b, _c, _d)			\
+	uint8_t _a, _b, _c, _d
+#define	DECL_BITFIELD5(_a, _b, _c, _d, _e)		\
+	uint8_t _a, _b, _c, _d, _e
+#define	DECL_BITFIELD6(_a, _b, _c, _d, _e, _f)		\
+	uint8_t _a, _b, _c, _d, _e, _f
+#define	DECL_BITFIELD7(_a, _b, _c, _d, _e, _f, _g)	\
+	uint8_t _a, _b, _c, _d, _e, _f, _g
+#define	DECL_BITFIELD8(_a, _b, _c, _d, _e, _f, _g, _h)	\
+	uint8_t _a, _b, _c, _d, _e, _f, _g, _h
+#elif defined(_BIT_FIELDS_HTOL)
+#define	DECL_BITFIELD2(_a, _b)				\
+	uint8_t _b, _a
+#define	DECL_BITFIELD3(_a, _b, _c)			\
+	uint8_t _c, _b, _a
+#define	DECL_BITFIELD4(_a, _b, _c, _d)			\
+	uint8_t _d, _c, _b, _a
+#define	DECL_BITFIELD5(_a, _b, _c, _d, _e)		\
+	uint8_t _e, _d, _c, _b, _a
+#define	DECL_BITFIELD6(_a, _b, _c, _d, _e, _f)		\
+	uint8_t _f, _e, _d, _c, _b, _a
+#define	DECL_BITFIELD7(_a, _b, _c, _d, _e, _f, _g)	\
+	uint8_t _g, _f, _e, _d, _c, _b, _a
+#define	DECL_BITFIELD8(_a, _b, _c, _d, _e, _f, _g, _h)	\
+	uint8_t _h, _g, _f, _e, _d, _c, _b, _a
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif  /* _BIT_FIELDS_LTOH */
 
 #if defined(_KERNEL) && !defined(_KMEMUSER) && !defined(offsetof)
 
