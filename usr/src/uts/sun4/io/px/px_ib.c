@@ -217,7 +217,7 @@ px_ib_intr_dist_en(dev_info_t *dip, cpuid_t cpu_id, devino_t ino,
 
 	for (curr = start_time = gethrtime(); !panicstr &&
 	    ((e = px_lib_intr_getstate(dip, sysino, &intr_state)) ==
-		DDI_SUCCESS) &&
+	    DDI_SUCCESS) &&
 	    (intr_state == INTR_DELIVERED_STATE); /* */) {
 		/*
 		 * If we have a really large jump in hrtime, it is most
@@ -430,7 +430,8 @@ px_ib_locate_ino(px_ib_t *ib_p, devino_t ino_num)
 
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p);
+	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p)
+		;
 
 	return (ino_p);
 }
@@ -491,7 +492,8 @@ px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 		ino_p->ino_ipil_p = ipil_p->ipil_next_p;
 	else {
 		for (prev = next = ino_p->ino_ipil_p; next != ipil_p;
-		    prev = next, next = next->ipil_next_p);
+		    prev = next, next = next->ipil_next_p)
+			;
 
 		if (prev)
 			prev->ipil_next_p = ipil_p->ipil_next_p;
@@ -500,7 +502,7 @@ px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 	kmem_free(ipil_p, sizeof (px_ino_pil_t));
 
 	if (ino_p->ino_lopil == pil) {
-		for (pil = 0, next = ino_p->ino_ipil_p; next;
+		for (next = ino_p->ino_ipil_p; next;
 		    next = next->ipil_next_p) {
 			if (pil > next->ipil_pil)
 				pil = next->ipil_pil;
@@ -517,7 +519,8 @@ px_ib_delete_ino_pil(px_ib_t *ib_p, px_ino_pil_t *ipil_p)
 	else {
 		px_ino_t	*list = ib_p->ib_ino_lst;
 
-		for (; list->ino_next_p != ino_p; list = list->ino_next_p);
+		for (; list->ino_next_p != ino_p; list = list->ino_next_p)
+			;
 		list->ino_next_p = ino_p->ino_next_p;
 	}
 }
@@ -547,7 +550,8 @@ px_ib_ino_locate_ipil(px_ino_t *ino_p, uint_t pil)
 {
 	px_ino_pil_t	*ipil_p = ino_p->ino_ipil_p;
 
-	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p);
+	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p)
+		;
 
 	return (ipil_p);
 }
@@ -704,7 +708,8 @@ px_ib_ino_rem_intr(px_t *px_p, px_ino_pil_t *ipil_p, px_ih_t *ih_p)
 
 	/* Search the link list for ih_p */
 	for (i = 0; (i < ipil_p->ipil_ih_size) &&
-	    (ih_lst->ih_next != ih_p); i++, ih_lst = ih_lst->ih_next);
+	    (ih_lst->ih_next != ih_p); i++, ih_lst = ih_lst->ih_next)
+		;
 
 	if (ih_lst->ih_next != ih_p)
 		goto not_found;
@@ -732,7 +737,7 @@ reset:
 
 not_found:
 	DBG(DBG_R_INTX, ino_p->ino_ib_p->ib_px_p->px_dip,
-		"ino_p=%x does not have ih_p=%x\n", ino_p, ih_p);
+	    "ino_p=%x does not have ih_p=%x\n", ino_p, ih_p);
 
 	return (DDI_FAILURE);
 }

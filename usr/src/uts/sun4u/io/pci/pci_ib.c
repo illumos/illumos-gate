@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,42 +73,42 @@ ib_create(pci_t *pci_p)
 	 * registers that have common offsets.
 	 */
 	ib_p->ib_slot_clear_intr_regs =
-		a + COMMON_IB_SLOT_CLEAR_INTR_REG_OFFSET;
+	    a + COMMON_IB_SLOT_CLEAR_INTR_REG_OFFSET;
 	ib_p->ib_intr_retry_timer_reg =
-		(uint64_t *)(a + COMMON_IB_INTR_RETRY_TIMER_OFFSET);
+	    (uint64_t *)(a + COMMON_IB_INTR_RETRY_TIMER_OFFSET);
 	ib_p->ib_slot_intr_state_diag_reg =
-		(uint64_t *)(a + COMMON_IB_SLOT_INTR_STATE_DIAG_REG);
+	    (uint64_t *)(a + COMMON_IB_SLOT_INTR_STATE_DIAG_REG);
 	ib_p->ib_obio_intr_state_diag_reg =
-		(uint64_t *)(a + COMMON_IB_OBIO_INTR_STATE_DIAG_REG);
+	    (uint64_t *)(a + COMMON_IB_OBIO_INTR_STATE_DIAG_REG);
 
 	if (CHIP_TYPE(pci_p) != PCI_CHIP_XMITS) {
 		ib_p->ib_upa_imr[0] = (volatile uint64_t *)
-				(a + COMMON_IB_UPA0_INTR_MAP_REG_OFFSET);
+		    (a + COMMON_IB_UPA0_INTR_MAP_REG_OFFSET);
 		ib_p->ib_upa_imr[1] = (volatile uint64_t *)
-				(a + COMMON_IB_UPA1_INTR_MAP_REG_OFFSET);
+		    (a + COMMON_IB_UPA1_INTR_MAP_REG_OFFSET);
 	}
 
 	DEBUG2(DBG_ATTACH, dip, "ib_create: slot_imr=%x, slot_cir=%x\n",
-		ib_p->ib_slot_intr_map_regs, ib_p->ib_obio_intr_map_regs);
+	    ib_p->ib_slot_intr_map_regs, ib_p->ib_obio_intr_map_regs);
 	DEBUG2(DBG_ATTACH, dip, "ib_create: obio_imr=%x, obio_cir=%x\n",
-		ib_p->ib_slot_clear_intr_regs, ib_p->ib_obio_clear_intr_regs);
+	    ib_p->ib_slot_clear_intr_regs, ib_p->ib_obio_clear_intr_regs);
 	DEBUG2(DBG_ATTACH, dip, "ib_create: upa0_imr=%x, upa1_imr=%x\n",
-		ib_p->ib_upa_imr[0], ib_p->ib_upa_imr[1]);
+	    ib_p->ib_upa_imr[0], ib_p->ib_upa_imr[1]);
 	DEBUG3(DBG_ATTACH, dip,
-		"ib_create: retry_timer=%x, obio_diag=%x slot_diag=%x\n",
-		ib_p->ib_intr_retry_timer_reg,
-		ib_p->ib_obio_intr_state_diag_reg,
-		ib_p->ib_slot_intr_state_diag_reg);
+	    "ib_create: retry_timer=%x, obio_diag=%x slot_diag=%x\n",
+	    ib_p->ib_intr_retry_timer_reg,
+	    ib_p->ib_obio_intr_state_diag_reg,
+	    ib_p->ib_slot_intr_state_diag_reg);
 
 	ib_p->ib_ino_lst = (ib_ino_info_t *)NULL;
 	mutex_init(&ib_p->ib_intr_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ib_p->ib_ino_lst_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	DEBUG1(DBG_ATTACH, dip, "ib_create: numproxy=%x\n",
-		pci_p->pci_numproxy);
+	    pci_p->pci_numproxy);
 	for (i = 1; i <= pci_p->pci_numproxy; i++) {
 		set_intr_mapping_reg(pci_p->pci_id,
-			(uint64_t *)ib_p->ib_upa_imr[i - 1], i);
+		    (uint64_t *)ib_p->ib_upa_imr[i - 1], i);
 	}
 
 	ib_configure(ib_p);
@@ -160,10 +160,10 @@ ib_intr_enable(pci_t *pci_p, ib_ino_t ino)
 	cpu_id = intr_dist_cpuid();
 #ifdef _STARFIRE
 	cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie, cpu_id,
-		IB_GET_MAPREG_INO(ino));
+	    IB_GET_MAPREG_INO(ino));
 #endif /* _STARFIRE */
 	DEBUG2(DBG_IB, pci_p->pci_dip,
-		"ib_intr_enable: ino=%x cpu_id=%x\n", ino, cpu_id);
+	    "ib_intr_enable: ino=%x cpu_id=%x\n", ino, cpu_id);
 
 	*imr_p = ib_get_map_reg(mondo, cpu_id);
 	IB_INO_INTR_CLEAR(ib_clear_intr_reg_addr(ib_p, ino));
@@ -197,8 +197,8 @@ ib_intr_disable(ib_t *ib_p, ib_ino_t ino, int wait)
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = ib_p->ib_pci_p->pci_pbm_p;
 			cmn_err(CE_WARN, "%s:%s: ib_intr_disable timeout %x",
-				pbm_p->pbm_nameinst_str,
-				pbm_p->pbm_nameaddr_str, ino);
+			    pbm_p->pbm_nameinst_str,
+			    pbm_p->pbm_nameaddr_str, ino);
 				break;
 		}
 	}
@@ -236,7 +236,7 @@ ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino, volatile uint64_t *imr_p)
 #ifdef _STARFIRE
 	if (ino) {
 		cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie,
-			cpu_id, IB_GET_MAPREG_INO(ino));
+		    cpu_id, IB_GET_MAPREG_INO(ino));
 	}
 #else /* _STARFIRE */
 	if (ib_map_reg_get_cpu(*imr_p) == cpu_id)
@@ -297,7 +297,7 @@ ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 	 * reprogram all the time.
 	 */
 	cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie, cpu_id,
-		IB_GET_MAPREG_INO(ino));
+	    IB_GET_MAPREG_INO(ino));
 #else
 	if (ib_map_reg_get_cpu(*imr_p) == cpu_id) /* same cpu, no reprog */
 		return;
@@ -313,9 +313,9 @@ ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = ib_p->ib_pci_p->pci_pbm_p;
 			cmn_err(CE_WARN, "%s:%s: ib_intr_dist(%p,%x) timeout",
-				pbm_p->pbm_nameinst_str,
-				pbm_p->pbm_nameaddr_str,
-				imr_p, IB_INO_TO_MONDO(ib_p, ino));
+			    pbm_p->pbm_nameinst_str,
+			    pbm_p->pbm_nameaddr_str,
+			    imr_p, IB_INO_TO_MONDO(ib_p, ino));
 			break;
 		}
 	}
@@ -530,7 +530,8 @@ ib_locate_ino(ib_t *ib_p, ib_ino_t ino_num)
 	ib_ino_info_t *ino_p = ib_p->ib_ino_lst;
 	ASSERT(MUTEX_HELD(&ib_p->ib_ino_lst_mutex));
 
-	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p);
+	for (; ino_p && ino_p->ino_ino != ino_num; ino_p = ino_p->ino_next_p)
+		;
 	return (ino_p);
 }
 
@@ -588,7 +589,8 @@ ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p)
 		ino_p->ino_ipil_p = ipil_p->ipil_next_p;
 	else {
 		for (prev = next = ino_p->ino_ipil_p; next != ipil_p;
-		    prev = next, next = next->ipil_next_p);
+		    prev = next, next = next->ipil_next_p)
+			;
 
 		if (prev)
 			prev->ipil_next_p = ipil_p->ipil_next_p;
@@ -597,7 +599,7 @@ ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p)
 	kmem_free(ipil_p, sizeof (ib_ino_pil_t));
 
 	if (ino_p->ino_lopil == pil) {
-		for (pil = 0, next = ino_p->ino_ipil_p; next;
+		for (next = ino_p->ino_ipil_p; next;
 		    next = next->ipil_next_p) {
 			if (pil > next->ipil_pil)
 				pil = next->ipil_pil;
@@ -614,7 +616,8 @@ ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p)
 	else {
 		ib_ino_info_t	*list = ib_p->ib_ino_lst;
 
-		for (; list->ino_next_p != ino_p; list = list->ino_next_p);
+		for (; list->ino_next_p != ino_p; list = list->ino_next_p)
+			;
 		list->ino_next_p = ino_p->ino_next_p;
 	}
 }
@@ -642,7 +645,8 @@ ib_ino_locate_ipil(ib_ino_info_t *ino_p, uint_t pil)
 {
 	ib_ino_pil_t	*ipil_p = ino_p->ino_ipil_p;
 
-	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p);
+	for (; ipil_p && ipil_p->ipil_pil != pil; ipil_p = ipil_p->ipil_next_p)
+		;
 
 	return (ipil_p);
 }
@@ -673,12 +677,12 @@ ib_ino_add_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
 	 */
 	start_time = gethrtime();
 	while ((ino_p->ino_unclaimed_intrs <= pci_unclaimed_intr_max) &&
-		IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
+	    IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = pci_p->pci_pbm_p;
 			cmn_err(CE_WARN, "%s:%s: ib_ino_add_intr %x timeout",
-				pbm_p->pbm_nameinst_str,
-				pbm_p->pbm_nameaddr_str, ino);
+			    pbm_p->pbm_nameinst_str,
+			    pbm_p->pbm_nameaddr_str, ino);
 			break;
 		}
 	}
@@ -726,7 +730,7 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
 	ib_ino_t ino = ino_p->ino_ino;
 	ih_t *ih_lst = ipil_p->ipil_ih_head;
 	volatile uint64_t *state_reg =
-		IB_INO_INTR_STATE_REG(ino_p->ino_ib_p, ino);
+	    IB_INO_INTR_STATE_REG(ino_p->ino_ib_p, ino);
 	hrtime_t start_time;
 
 	ASSERT(MUTEX_HELD(&ino_p->ino_ib_p->ib_ino_lst_mutex));
@@ -744,12 +748,12 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
 	 */
 	start_time = gethrtime();
 	while ((ino_p->ino_unclaimed_intrs <= pci_unclaimed_intr_max) &&
-		IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
+	    IB_INO_INTR_PENDING(state_reg, ino) && !panicstr) {
 		if (gethrtime() - start_time > pci_intrpend_timeout) {
 			pbm_t *pbm_p = pci_p->pci_pbm_p;
 			cmn_err(CE_WARN, "%s:%s: ib_ino_rem_intr %x timeout",
-				pbm_p->pbm_nameinst_str,
-				pbm_p->pbm_nameaddr_str, ino);
+			    pbm_p->pbm_nameinst_str,
+			    pbm_p->pbm_nameaddr_str, ino);
 			break;
 		}
 	}
@@ -778,8 +782,9 @@ ib_ino_rem_intr(pci_t *pci_p, ib_ino_pil_t *ipil_p, ih_t *ih_p)
 
 	/* search the link list for ih_p */
 	for (i = 0;
-		(i < ipil_p->ipil_ih_size) && (ih_lst->ih_next != ih_p);
-		i++, ih_lst = ih_lst->ih_next);
+	    (i < ipil_p->ipil_ih_size) && (ih_lst->ih_next != ih_p);
+	    i++, ih_lst = ih_lst->ih_next)
+		;
 	if (ih_lst->ih_next != ih_p)
 		goto not_found;
 
@@ -801,7 +806,7 @@ reset:
 	return;
 not_found:
 	DEBUG2(DBG_R_INTX, ino_p->ino_ib_p->ib_pci_p->pci_dip,
-		"ino_p=%x does not have ih_p=%x\n", ino_p, ih_p);
+	    "ino_p=%x does not have ih_p=%x\n", ino_p, ih_p);
 }
 
 ih_t *
