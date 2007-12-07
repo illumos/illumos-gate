@@ -99,6 +99,7 @@
  */
 
 #include <sys/types.h>
+#include <netinet/in.h>
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 #include <sys/uio.h>
@@ -123,10 +124,10 @@
 #include <vm/seg_map.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/zmod.h>
 
-/* seems safer than having to get the string right many times */
 #define	NBLOCKS_PROP_NAME	"Nblocks"
-#define	SIZE_PROP_NAME	"Size"
+#define	SIZE_PROP_NAME		"Size"
 
 static dev_info_t *lofi_dip;
 static void	*lofi_statep;
@@ -148,6 +149,15 @@ static int lofi_taskq_maxalloc = 104857600 / DEV_BSIZE;
 static int lofi_taskq_nthreads = 4;	/* # of taskq threads per device */
 
 uint32_t lofi_max_files = LOFI_MAX_FILES;
+
+static int gzip_decompress(void *src, size_t srclen, void *dst,
+	size_t *destlen, int level);
+
+lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
+	{gzip_decompress,	NULL,	6,	"gzip"}, /* default */
+	{gzip_decompress,	NULL,	6,	"gzip-6"},
+	{gzip_decompress,	NULL,	9,	"gzip-9"}
+};
 
 static int
 lofi_busy(void)
@@ -324,6 +334,100 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	return (0);
 }
 
+static int
+lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
+	struct lofi_state *lsp)
+{
+	int error;
+	offset_t alignedoffset, mapoffset;
+	size_t	xfersize;
+	int	isread;
+	int 	smflags;
+	caddr_t	mapaddr;
+	size_t	len;
+	enum seg_rw srw;
+
+	/*
+	 * segmap always gives us an 8K (MAXBSIZE) chunk, aligned on
+	 * an 8K boundary, but the buf transfer address may not be
+	 * aligned on more than a 512-byte boundary (we don't enforce
+	 * that even though we could). This matters since the initial
+	 * part of the transfer may not start at offset 0 within the
+	 * segmap'd chunk. So we have to compensate for that with
+	 * 'mapoffset'. Subsequent chunks always start off at the
+	 * beginning, and the last is capped by b_resid
+	 */
+	mapoffset = offset & MAXBOFFSET;
+	alignedoffset = offset - mapoffset;
+	bp->b_resid = bp->b_bcount;
+	isread = bp->b_flags & B_READ;
+	srw = isread ? S_READ : S_WRITE;
+	do {
+		xfersize = MIN(lsp->ls_vp_comp_size - offset,
+		    MIN(MAXBSIZE - mapoffset, bp->b_resid));
+		len = roundup(mapoffset + xfersize, PAGESIZE);
+		mapaddr = segmap_getmapflt(segkmap, lsp->ls_vp,
+		    alignedoffset, MAXBSIZE, 1, srw);
+		/*
+		 * Now fault in the pages. This lets us check
+		 * for errors before we reference mapaddr and
+		 * try to resolve the fault in bcopy (which would
+		 * panic instead). And this can easily happen,
+		 * particularly if you've lofi'd a file over NFS
+		 * and someone deletes the file on the server.
+		 */
+		error = segmap_fault(kas.a_hat, segkmap, mapaddr,
+		    len, F_SOFTLOCK, srw);
+		if (error) {
+			(void) segmap_release(segkmap, mapaddr, 0);
+			if (FC_CODE(error) == FC_OBJERR)
+				error = FC_ERRNO(error);
+			else
+				error = EIO;
+			break;
+		}
+		smflags = 0;
+		if (isread) {
+			smflags |= SM_FREE;
+			/*
+			 * If we're reading an entire page starting
+			 * at a page boundary, there's a good chance
+			 * we won't need it again. Put it on the
+			 * head of the freelist.
+			 */
+			if (mapoffset == 0 && xfersize == PAGESIZE)
+				smflags |= SM_DONTNEED;
+			bcopy(mapaddr + mapoffset, bufaddr, xfersize);
+		} else {
+			smflags |= SM_WRITE;
+			bcopy(bufaddr, mapaddr + mapoffset, xfersize);
+		}
+		bp->b_resid -= xfersize;
+		bufaddr += xfersize;
+		offset += xfersize;
+		(void) segmap_fault(kas.a_hat, segkmap, mapaddr,
+		    len, F_SOFTUNLOCK, srw);
+		error = segmap_release(segkmap, mapaddr, smflags);
+		/* only the first map may start partial */
+		mapoffset = 0;
+		alignedoffset += MAXBSIZE;
+	} while ((error == 0) && (bp->b_resid > 0) &&
+	    (offset < lsp->ls_vp_comp_size));
+
+	return (error);
+}
+
+/*ARGSUSED*/
+static int gzip_decompress(void *src, size_t srclen, void *dst,
+    size_t *dstlen, int level)
+{
+	ASSERT(*dstlen >= srclen);
+
+	if (z_uncompress(dst, dstlen, src, srclen) != Z_OK)
+		return (-1);
+	return (0);
+}
+
 /*
  * This is basically what strategy used to be before we found we
  * needed task queues.
@@ -334,15 +438,17 @@ lofi_strategy_task(void *arg)
 	struct buf *bp = (struct buf *)arg;
 	int error;
 	struct lofi_state *lsp;
-	offset_t	offset, alignedoffset;
-	offset_t	mapoffset;
-	caddr_t	bufaddr;
-	caddr_t	mapaddr;
-	size_t	xfersize;
-	size_t	len;
-	int	isread;
-	int	smflags;
-	enum seg_rw srw;
+	uint64_t sblkno, eblkno, cmpbytes;
+	offset_t offset, sblkoff, eblkoff;
+	u_offset_t salign, ealign;
+	u_offset_t sdiff;
+	uint32_t comp_data_sz;
+	caddr_t bufaddr;
+	unsigned char *compressed_seg = NULL, *cmpbuf;
+	unsigned char *uncompressed_seg = NULL;
+	lofi_compress_info_t *li;
+	size_t oblkcount, xfersize;
+	unsigned long seglen;
 
 	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
 	if (lsp->ls_kstat) {
@@ -365,63 +471,158 @@ lofi_strategy_task(void *arg)
 		error = EIO;
 	} else if (((lsp->ls_vp->v_flag & VNOMAP) == 0) &&
 	    (lsp->ls_vp->v_type != VCHR)) {
+		uint64_t i;
+
 		/*
-		 * segmap always gives us an 8K (MAXBSIZE) chunk, aligned on
-		 * an 8K boundary, but the buf transfer address may not be
-		 * aligned on more than a 512-byte boundary (we don't
-		 * enforce that, though we could). This matters since the
-		 * initial part of the transfer may not start at offset 0
-		 * within the segmap'd chunk. So we have to compensate for
-		 * that with 'mapoffset'. Subsequent chunks always start
-		 * off at the beginning, and the last is capped by b_resid.
+		 * Handle uncompressed files with a regular read
 		 */
-		mapoffset = offset & MAXBOFFSET;
-		alignedoffset = offset - mapoffset;	/* now map-aligned */
-		bp->b_resid = bp->b_bcount;
-		isread = bp->b_flags & B_READ;
-		srw = isread ? S_READ : S_WRITE;
-		do {
-			xfersize = MIN(lsp->ls_vp_size - offset,
-			    MIN(MAXBSIZE - mapoffset, bp->b_resid));
-			len = roundup(mapoffset + xfersize, PAGESIZE);
-			mapaddr = segmap_getmapflt(segkmap, lsp->ls_vp,
-			    alignedoffset, MAXBSIZE, 1, srw);
+		if (lsp->ls_uncomp_seg_sz == 0) {
+			error = lofi_mapped_rdwr(bufaddr, offset, bp, lsp);
+			goto done;
+		}
+
+		/*
+		 * From here on we're dealing primarily with compressed files
+		 */
+
+		/*
+		 * Compressed files can only be read from and
+		 * not written to
+		 */
+		if (!(bp->b_flags & B_READ)) {
+			bp->b_resid = bp->b_bcount;
+			error = EROFS;
+			goto done;
+		}
+
+		ASSERT(lsp->ls_comp_algorithm_index >= 0);
+		li = &lofi_compress_table[lsp->ls_comp_algorithm_index];
+		/*
+		 * Compute starting and ending compressed segment numbers
+		 * We use only bitwise operations avoiding division and
+		 * modulus because we enforce the compression segment size
+		 * to a power of 2
+		 */
+		sblkno = offset >> lsp->ls_comp_seg_shift;
+		sblkoff = offset & (lsp->ls_uncomp_seg_sz - 1);
+		eblkno = (offset + bp->b_bcount) >> lsp->ls_comp_seg_shift;
+		eblkoff = (offset + bp->b_bcount) & (lsp->ls_uncomp_seg_sz - 1);
+
+		/*
+		 * Align start offset to block boundary for segmap
+		 */
+		salign = lsp->ls_comp_seg_index[sblkno];
+		sdiff = salign & (DEV_BSIZE - 1);
+		salign -= sdiff;
+		if (eblkno >= (lsp->ls_comp_index_sz - 1)) {
 			/*
-			 * Now fault in the pages. This lets us check
-			 * for errors before we reference mapaddr and
-			 * try to resolve the fault in bcopy (which would
-			 * panic instead). And this can easily happen,
-			 * particularly if you've lofi'd a file over NFS
-			 * and someone deletes the file on the server.
+			 * We're dealing with the last segment of
+			 * the compressed file -- the size of this
+			 * segment *may not* be the same as the
+			 * segment size for the file
 			 */
-			error = segmap_fault(kas.a_hat, segkmap, mapaddr,
-			    len, F_SOFTLOCK, srw);
-			if (error) {
-				(void) segmap_release(segkmap, mapaddr, 0);
-				if (FC_CODE(error) == FC_OBJERR)
-					error = FC_ERRNO(error);
-				else
-					error = EIO;
-				break;
-			}
-			smflags = 0;
-			if (isread) {
-				bcopy(mapaddr + mapoffset, bufaddr, xfersize);
+			eblkoff = (offset + bp->b_bcount) &
+			    (lsp->ls_uncomp_last_seg_sz - 1);
+			ealign = lsp->ls_vp_comp_size;
+		} else {
+			ealign = lsp->ls_comp_seg_index[eblkno + 1];
+		}
+
+		/*
+		 * Preserve original request paramaters
+		 */
+		oblkcount = bp->b_bcount;
+
+		/*
+		 * Assign the calculated parameters
+		 */
+		comp_data_sz = ealign - salign;
+		bp->b_bcount = comp_data_sz;
+
+		/*
+		 * Allocate fixed size memory blocks to hold compressed
+		 * segments and one uncompressed segment since we
+		 * uncompress segments one at a time
+		 */
+		compressed_seg = kmem_alloc(bp->b_bcount, KM_SLEEP);
+		uncompressed_seg = kmem_alloc(lsp->ls_uncomp_seg_sz, KM_SLEEP);
+		/*
+		 * Map in the calculated number of blocks
+		 */
+		error = lofi_mapped_rdwr((caddr_t)compressed_seg, salign,
+		    bp, lsp);
+
+		bp->b_bcount = oblkcount;
+		bp->b_resid = oblkcount;
+		if (error != 0)
+			goto done;
+
+		/*
+		 * We have the compressed blocks, now uncompress them
+		 */
+		cmpbuf = compressed_seg + sdiff;
+		for (i = sblkno; i < (eblkno + 1) && i < lsp->ls_comp_index_sz;
+		    i++) {
+			/*
+			 * Each of the segment index entries contains
+			 * the starting block number for that segment.
+			 * The number of compressed bytes in a segment
+			 * is thus the difference between the starting
+			 * block number of this segment and the starting
+			 * block number of the next segment.
+			 */
+			if ((i == eblkno) &&
+			    (i == lsp->ls_comp_index_sz - 1)) {
+				cmpbytes = lsp->ls_vp_comp_size -
+				    lsp->ls_comp_seg_index[i];
 			} else {
-				smflags |= SM_WRITE;
-				bcopy(bufaddr, mapaddr + mapoffset, xfersize);
+				cmpbytes = lsp->ls_comp_seg_index[i + 1] -
+				    lsp->ls_comp_seg_index[i];
 			}
-			bp->b_resid -= xfersize;
+
+			/*
+			 * The first byte in a compressed segment is a flag
+			 * that indicates whether this segment is compressed
+			 * at all
+			 */
+			if (*cmpbuf == UNCOMPRESSED) {
+				bcopy((cmpbuf + SEGHDR), uncompressed_seg,
+				    (cmpbytes - SEGHDR));
+			} else {
+				seglen = lsp->ls_uncomp_seg_sz;
+
+				if (li->l_decompress((cmpbuf + SEGHDR),
+				    (cmpbytes - SEGHDR), uncompressed_seg,
+				    &seglen, li->l_level) != 0) {
+					error = EIO;
+					goto done;
+				}
+			}
+
+			/*
+			 * Determine how much uncompressed data we
+			 * have to copy and copy it
+			 */
+			xfersize = lsp->ls_uncomp_seg_sz - sblkoff;
+			if (i == eblkno) {
+				if (i == (lsp->ls_comp_index_sz - 1))
+					xfersize -= (lsp->ls_uncomp_last_seg_sz
+					    - eblkoff);
+				else
+					xfersize -=
+					    (lsp->ls_uncomp_seg_sz - eblkoff);
+			}
+
+			bcopy((uncompressed_seg + sblkoff), bufaddr, xfersize);
+
+			cmpbuf += cmpbytes;
 			bufaddr += xfersize;
-			offset += xfersize;
-			(void) segmap_fault(kas.a_hat, segkmap, mapaddr,
-			    len, F_SOFTUNLOCK, srw);
-			error = segmap_release(segkmap, mapaddr, smflags);
-			/* only the first map may start partial */
-			mapoffset = 0;
-			alignedoffset += MAXBSIZE;
-		} while ((error == 0) && (bp->b_resid > 0) &&
-		    (offset < lsp->ls_vp_size));
+			bp->b_resid -= xfersize;
+			sblkoff = 0;
+
+			if (bp->b_resid == 0)
+				break;
+		}
 	} else {
 		ssize_t	resid;
 		enum uio_rw rw;
@@ -434,6 +635,12 @@ lofi_strategy_task(void *arg)
 		    offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
 		bp->b_resid = resid;
 	}
+
+done:
+	if (compressed_seg != NULL)
+		kmem_free(compressed_seg, comp_data_sz);
+	if (uncompressed_seg != NULL)
+		kmem_free(uncompressed_seg, lsp->ls_uncomp_seg_sz);
 
 	if (lsp->ls_kstat) {
 		size_t n_done = bp->b_bcount - bp->b_resid;
@@ -753,7 +960,16 @@ fake_disk_geometry(struct lofi_state *lsp)
 	lsp->ls_vtoc.v_sectorsz = DEV_BSIZE;
 	lsp->ls_vtoc.v_nparts = 1;
 	lsp->ls_vtoc.v_part[0].p_tag = V_UNASSIGNED;
-	lsp->ls_vtoc.v_part[0].p_flag = V_UNMNT;
+
+	/*
+	 * A compressed file is read-only, other files can
+	 * be read-write
+	 */
+	if (lsp->ls_uncomp_seg_sz > 0) {
+		lsp->ls_vtoc.v_part[0].p_flag = V_UNMNT | V_RONLY;
+	} else {
+		lsp->ls_vtoc.v_part[0].p_flag = V_UNMNT;
+	}
 	lsp->ls_vtoc.v_part[0].p_start = (daddr_t)0;
 	/*
 	 * The partition size cannot just be the number of sectors, because
@@ -788,6 +1004,130 @@ fake_disk_geometry(struct lofi_state *lsp)
 }
 
 /*
+ * map in a compressed file
+ *
+ * Read in the header and the index that follows.
+ *
+ * The header is as follows -
+ *
+ * Signature (name of the compression algorithm)
+ * Compression segment size (a multiple of 512)
+ * Number of index entries
+ * Size of the last block
+ * The array containing the index entries
+ *
+ * The header information is always stored in
+ * network byte order on disk.
+ */
+static int
+lofi_map_compressed_file(struct lofi_state *lsp, char *buf)
+{
+	uint32_t index_sz, header_len, i;
+	ssize_t	resid;
+	enum uio_rw rw;
+	char *tbuf = buf;
+	int error;
+
+	/* The signature has already been read */
+	tbuf += sizeof (lsp->ls_comp_algorithm);
+	bcopy(tbuf, &(lsp->ls_uncomp_seg_sz), sizeof (lsp->ls_uncomp_seg_sz));
+	lsp->ls_uncomp_seg_sz = ntohl(lsp->ls_uncomp_seg_sz);
+
+	/*
+	 * The compressed segment size must be a power of 2
+	 */
+	if (lsp->ls_uncomp_seg_sz % 2)
+		return (EINVAL);
+
+	for (i = 0; !((lsp->ls_uncomp_seg_sz >> i) & 1); i++)
+		;
+
+	lsp->ls_comp_seg_shift = i;
+
+	tbuf += sizeof (lsp->ls_uncomp_seg_sz);
+	bcopy(tbuf, &(lsp->ls_comp_index_sz), sizeof (lsp->ls_comp_index_sz));
+	lsp->ls_comp_index_sz = ntohl(lsp->ls_comp_index_sz);
+
+	tbuf += sizeof (lsp->ls_comp_index_sz);
+	bcopy(tbuf, &(lsp->ls_uncomp_last_seg_sz),
+	    sizeof (lsp->ls_uncomp_last_seg_sz));
+	lsp->ls_uncomp_last_seg_sz = ntohl(lsp->ls_uncomp_last_seg_sz);
+
+	/*
+	 * Compute the total size of the uncompressed data
+	 * for use in fake_disk_geometry and other calculations.
+	 * Disk geometry has to be faked with respect to the
+	 * actual uncompressed data size rather than the
+	 * compressed file size.
+	 */
+	lsp->ls_vp_size = (lsp->ls_comp_index_sz - 2) * lsp->ls_uncomp_seg_sz
+	    + lsp->ls_uncomp_last_seg_sz;
+
+	/*
+	 * Index size is rounded up to a 512 byte boundary for ease
+	 * of segmapping
+	 */
+	index_sz = sizeof (*lsp->ls_comp_seg_index) * lsp->ls_comp_index_sz;
+	header_len = sizeof (lsp->ls_comp_algorithm) +
+	    sizeof (lsp->ls_uncomp_seg_sz) +
+	    sizeof (lsp->ls_comp_index_sz) +
+	    sizeof (lsp->ls_uncomp_last_seg_sz);
+	lsp->ls_comp_offbase = header_len + index_sz;
+
+	index_sz += header_len;
+	index_sz = roundup(index_sz, DEV_BSIZE);
+
+	lsp->ls_comp_index_data = kmem_alloc(index_sz, KM_SLEEP);
+	lsp->ls_comp_index_data_sz = index_sz;
+
+	/*
+	 * Read in the index -- this has a side-effect
+	 * of reading in the header as well
+	 */
+	rw = UIO_READ;
+	error = vn_rdwr(rw, lsp->ls_vp, lsp->ls_comp_index_data, index_sz,
+	    0, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
+
+	if (error != 0)
+		return (error);
+
+	/* Skip the header, this is where the index really begins */
+	lsp->ls_comp_seg_index =
+	    /*LINTED*/
+	    (uint64_t *)(lsp->ls_comp_index_data + header_len);
+
+	/*
+	 * Now recompute offsets in the index to account for
+	 * the header length
+	 */
+	for (i = 0; i < lsp->ls_comp_index_sz; i++) {
+		lsp->ls_comp_seg_index[i] = lsp->ls_comp_offbase +
+		    BE_64(lsp->ls_comp_seg_index[i]);
+	}
+
+	return (error);
+}
+
+/*
+ * Check to see if the passed in signature is a valid
+ * one. If it is valid, return the index into
+ * lofi_compress_table.
+ *
+ * Return -1 if it is invalid
+ */
+static int lofi_compress_select(char *signature)
+{
+	int i;
+
+	for (i = 0; i < LOFI_COMPRESS_FUNCTIONS; i++) {
+		if (strcmp(lofi_compress_table[i].l_name, signature) == 0)
+			return (i);
+	}
+
+	return (-1);
+}
+
+/*
  * map a file to a minor number. Return the minor number.
  */
 static int
@@ -801,12 +1141,17 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	struct vnode *vp;
 	int64_t	Nblocks_prop_val;
 	int64_t	Size_prop_val;
+	int	compress_index;
 	vattr_t	vattr;
 	int	flag;
 	enum vtype v_type;
 	int zalloced = 0;
 	dev_t	newdev;
 	char	namebuf[50];
+	char 	buf[DEV_BSIZE];
+	char 	*tbuf;
+	ssize_t	resid;
+	enum uio_rw rw;
 
 	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
@@ -962,6 +1307,49 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		*rvalp = (int)newminor;
 	klip->li_minor = newminor;
 
+	/*
+	 * Read the file signature to check if it is compressed.
+	 * 'rw' is set to read since only reads are allowed to
+	 * a compressed file.
+	 */
+	rw = UIO_READ;
+	error = vn_rdwr(rw, lsp->ls_vp, buf, DEV_BSIZE, 0, UIO_SYSSPACE,
+	    0, RLIM64_INFINITY, kcred, &resid);
+
+	if (error != 0)
+		goto propout;
+
+	tbuf = buf;
+	lsp->ls_uncomp_seg_sz = 0;
+	lsp->ls_vp_comp_size = lsp->ls_vp_size;
+	lsp->ls_comp_algorithm[0] = '\0';
+
+	compress_index = lofi_compress_select(tbuf);
+	if (compress_index != -1) {
+		lsp->ls_comp_algorithm_index = compress_index;
+		(void) strlcpy(lsp->ls_comp_algorithm,
+		    lofi_compress_table[compress_index].l_name,
+		    sizeof (lsp->ls_comp_algorithm));
+		error = lofi_map_compressed_file(lsp, buf);
+		if (error != 0)
+			goto propout;
+
+		/* update DDI properties */
+		Size_prop_val = lsp->ls_vp_size;
+		if ((ddi_prop_update_int64(newdev, lofi_dip, SIZE_PROP_NAME,
+		    Size_prop_val)) != DDI_PROP_SUCCESS) {
+			error = EINVAL;
+			goto propout;
+		}
+
+		Nblocks_prop_val = lsp->ls_vp_size / DEV_BSIZE;
+		if ((ddi_prop_update_int64(newdev, lofi_dip, NBLOCKS_PROP_NAME,
+		    Nblocks_prop_val)) != DDI_PROP_SUCCESS) {
+			error = EINVAL;
+			goto propout;
+		}
+	}
+
 	fake_disk_geometry(lsp);
 	mutex_exit(&lofi_lock);
 	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
@@ -1052,6 +1440,11 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 		return (EBUSY);
 	}
 
+	if (lsp->ls_uncomp_seg_sz > 0) {
+		kmem_free(lsp->ls_comp_index_data, lsp->ls_comp_index_data_sz);
+		lsp->ls_uncomp_seg_sz = 0;
+	}
+
 	lofi_free_handle(dev, minor, lsp, credp);
 
 	klip->li_minor = minor;
@@ -1095,6 +1488,8 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 			return (ENXIO);
 		}
 		(void) strcpy(klip->li_filename, lsp->ls_filename);
+		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
+		    sizeof (klip->li_algorithm));
 		mutex_exit(&lofi_lock);
 		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
@@ -1107,6 +1502,29 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 			free_lofi_ioctl(klip);
 			return (ENOENT);
 		}
+		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
+		free_lofi_ioctl(klip);
+		return (error);
+	case LOFI_CHECK_COMPRESSED:
+		mutex_enter(&lofi_lock);
+		klip->li_minor = file_to_minor(klip->li_filename);
+		mutex_exit(&lofi_lock);
+		if (klip->li_minor == 0) {
+			free_lofi_ioctl(klip);
+			return (ENOENT);
+		}
+		mutex_enter(&lofi_lock);
+		lsp = ddi_get_soft_state(lofi_statep, klip->li_minor);
+		if (lsp == NULL) {
+			mutex_exit(&lofi_lock);
+			free_lofi_ioctl(klip);
+			return (ENXIO);
+		}
+		ASSERT(strcmp(klip->li_filename, lsp->ls_filename) == 0);
+
+		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
+		    sizeof (klip->li_algorithm));
+		mutex_exit(&lofi_lock);
 		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
 		return (error);
@@ -1169,6 +1587,9 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			if (error)
 				return (EFAULT);
 			return (0);
+		case LOFI_CHECK_COMPRESSED:
+			return (lofi_get_info(dev, lip, LOFI_CHECK_COMPRESSED,
+			    credp, flag));
 		default:
 			break;
 		}

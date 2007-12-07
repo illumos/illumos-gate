@@ -52,6 +52,11 @@ extern "C" {
 #define	LOFI_BLOCK_NAME		LOFI_DRIVER_NAME
 #define	LOFI_CHAR_NAME		"r" LOFI_DRIVER_NAME
 
+#define	SEGHDR		1
+#define	COMPRESSED	1
+#define	UNCOMPRESSED	0
+#define	MAXALGLEN	36
+
 /*
  *
  * Use is:
@@ -91,6 +96,10 @@ extern "C" {
  *	ioctl(ld, LOFI_GET_MAXMINOR, &li);
  *	maxminor = li.li_minor;
  *
+ *	strcpy(li.li_filename, "somefilename");
+ *	li.li_minor = 0;
+ *	ioctl(ld, LOFI_CHECK_COMPRESSED, &li);
+ *
  * If the 'li_force' flag is set for any of the LOFI_UNMAP_* commands, then if
  * the device is busy, the underlying vnode will be closed, and any subsequent
  * operations will fail.  It will behave as if the device had been forcibly
@@ -106,6 +115,7 @@ struct lofi_ioctl {
 	uint32_t 	li_minor;
 	boolean_t	li_force;
 	char	li_filename[MAXPATHLEN + 1];
+	char	li_algorithm[MAXALGLEN];
 };
 
 #define	LOFI_IOC_BASE		(('L' << 16) | ('F' << 8))
@@ -117,6 +127,7 @@ struct lofi_ioctl {
 #define	LOFI_GET_FILENAME	(LOFI_IOC_BASE | 0x05)
 #define	LOFI_GET_MINOR		(LOFI_IOC_BASE | 0x06)
 #define	LOFI_GET_MAXMINOR	(LOFI_IOC_BASE | 0x07)
+#define	LOFI_CHECK_COMPRESSED	(LOFI_IOC_BASE | 0x08)
 
 /*
  * file types that might be usable with lofi, maybe. Only regular
@@ -158,9 +169,45 @@ struct lofi_state {
 	struct dk_geom	ls_dkg;
 	struct vtoc	ls_vtoc;
 	struct dk_cinfo	ls_ci;
+
+	/* the following fields are required for compression support */
+	int		ls_comp_algorithm_index; /* idx into compress_table */
+	char		ls_comp_algorithm[MAXALGLEN];
+	uint32_t	ls_uncomp_seg_sz; /* sz of uncompressed segment */
+	uint32_t	ls_comp_index_sz; /* number of index entries */
+	uint32_t	ls_comp_seg_shift; /* exponent for byte shift */
+	uint32_t	ls_uncomp_last_seg_sz; /* sz of last uncomp segment */
+	uint64_t	ls_comp_offbase; /* offset of actual compressed data */
+	uint64_t	*ls_comp_seg_index; /* array of index entries */
+	caddr_t		ls_comp_index_data; /* index pages loaded from file */
+	uint32_t	ls_comp_index_data_sz;
+	u_offset_t	ls_vp_comp_size; /* actual compressed file size */
 };
 
-#endif
+#endif	/* _KERNEL */
+
+/*
+ * Common signature for all lofi compress functions
+ */
+typedef int lofi_compress_func_t(void *src, size_t srclen, void *dst,
+	size_t *destlen, int level);
+
+/*
+ * Information about each compression function
+ */
+typedef struct lofi_compress_info {
+	lofi_compress_func_t	*l_decompress;
+	lofi_compress_func_t	*l_compress;
+	int			l_level;
+	char			*l_name;	/* algorithm name */
+} lofi_compress_info_t;
+
+enum lofi_compress {
+	LOFI_COMPRESS_GZIP = 0,
+	LOFI_COMPRESS_GZIP_6 = 1,
+	LOFI_COMPRESS_GZIP_9 = 2,
+	LOFI_COMPRESS_FUNCTIONS
+};
 
 #ifdef	__cplusplus
 }
