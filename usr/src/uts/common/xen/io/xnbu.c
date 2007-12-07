@@ -129,7 +129,7 @@ xnbu_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 		 * Because we calculated the checksum ourselves we
 		 * know that it must be good, so we assert this.
 		 */
-		flags &= NETTXF_data_validated;
+		flags |= NETTXF_data_validated;
 	}
 
 	if ((flags & NETTXF_data_validated) != 0) {

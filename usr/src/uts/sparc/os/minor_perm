@@ -162,6 +162,7 @@ clone:vnet 0666 root sys
 clone:afe 0666 root sys
 clone:mxfe 0666 root sys
 clone:rtls 0666 root sys
+clone:vnic 0666 root sys
 bge:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys

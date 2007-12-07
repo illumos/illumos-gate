@@ -130,6 +130,7 @@ clone:chxge 0666 root sys
 clone:pcn 0666 root sys
 clone:rtls 0666 root sys
 clone:ath 0666 root sys
+clone:vnic 0666 root sys
 clone:ipw 0666 root sys
 clone:iwi 0666 root sys
 clone:iwk 0666 root sys

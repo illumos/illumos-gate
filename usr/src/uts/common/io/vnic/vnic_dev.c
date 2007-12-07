@@ -646,6 +646,10 @@ vnic_add_unicstaddr(vnic_t *vnic, mac_multi_addr_t *maddr)
 	vnic_mac_t *vnic_mac = vnic->vn_vnic_mac;
 	int err;
 
+	if (mac_unicst_verify(vnic_mac->va_mh, maddr->mma_addr,
+	    maddr->mma_addrlen) == B_FALSE)
+		return (EINVAL);
+
 	if (mac_vnic_capab_get(vnic_mac->va_mh, MAC_CAPAB_MULTIADDRESS,
 	    &(vnic->vn_mma_capab))) {
 		if (vnic->vn_maddr_naddrfree == 0) {
