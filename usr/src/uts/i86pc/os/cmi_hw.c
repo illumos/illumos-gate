@@ -557,6 +557,8 @@ ntv_setcr4(cmi_hdl_impl_t *hdl, ulong_t val)
 	(void) call_func_ntv(cp->cpu_id, ntv_setcr4_xc, (xc_arg_t)val, NULL);
 }
 
+volatile uint32_t cmi_trapped_rdmsr;
+
 /*ARGSUSED*/
 static int
 ntv_rdmsr_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
@@ -574,6 +576,7 @@ ntv_rdmsr_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 			*rcp = CMIERR_NOTSUP;
 	} else {
 		*rcp = CMIERR_MSRGPF;
+		atomic_inc_32(&cmi_trapped_rdmsr);
 	}
 	no_trap();
 
@@ -588,6 +591,8 @@ ntv_rdmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t *valp)
 	return (call_func_ntv(cp->cpu_id, ntv_rdmsr_xc,
 	    (xc_arg_t)msr, (xc_arg_t)valp));
 }
+
+volatile uint32_t cmi_trapped_wrmsr;
 
 /*ARGSUSED*/
 static int
@@ -605,6 +610,7 @@ ntv_wrmsr_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 			*rcp = CMIERR_NOTSUP;
 	} else {
 		*rcp = CMIERR_MSRGPF;
+		atomic_inc_32(&cmi_trapped_wrmsr);
 	}
 	no_trap();
 

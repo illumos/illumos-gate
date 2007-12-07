@@ -86,6 +86,13 @@ int authamd_ms_support_disable = 0;
 	(fam) == AUTHAMD_FAMILY_10)
 
 /*
+ * Models that include an on-chip NorthBridge.
+ */
+#define	AUTHAMD_NBONCHIP(rev) \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
+	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
+
+/*
  * Families/revisions for which we can recognise main memory ECC errors.
  */
 #define	AUTHAMD_MEMECC_RECOGNISED(rev) \
@@ -103,14 +110,14 @@ int authamd_ms_support_disable = 0;
  * Families/revisions for which we will perform NB MCA Config changes
  */
 #define	AUTHAMD_DO_NBMCACFG(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) || \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
 	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
 
 /*
  * Families/revisions that have chip cache scrubbers.
  */
 #define	AUTHAMD_HAS_CHIPSCRUB(rev) \
-	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_F) || \
+	(X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_B) || \
 	X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_10_REV_A))
 
 /*
@@ -520,15 +527,25 @@ authamd_mcgctl_val(cmi_hdl_t hdl, int nbanks, uint64_t proposed)
  *
  * On K6 we do not initialize MC0_CTL since, reportedly, this bank (for DC)
  * may produce spurious machine checks.
+ *
+ * Only allow a single core to setup the NorthBridge MCi_CTL register.
  */
 /*ARGSUSED*/
 boolean_t
 authamd_bankctl_skipinit(cmi_hdl_t hdl, int bank)
 {
 	authamd_data_t *authamd = cms_hdl_getcmsdata(hdl);
+	uint32_t rev = authamd->amd_shared->acs_rev;
 
-	return (authamd->amd_shared->acs_family == AUTHAMD_FAMILY_6 &&
-	    bank == 0 ?  B_TRUE : B_FALSE);
+	if (authamd->amd_shared->acs_family == AUTHAMD_FAMILY_6)
+		return (bank == 0 ?  B_TRUE : B_FALSE);
+
+	if (AUTHAMD_NBONCHIP(rev) && bank == AMD_MCA_BANK_NB) {
+		return (authamd_chip_once(authamd, AUTHAMD_CFGONCE_NBMCA) ==
+		    B_TRUE ? B_FALSE : B_TRUE);
+	}
+
+	return (B_FALSE);
 }
 
 /*

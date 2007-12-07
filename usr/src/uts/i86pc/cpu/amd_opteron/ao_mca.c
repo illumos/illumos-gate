@@ -759,7 +759,12 @@ ao_ms_bankctl_skipinit(cmi_hdl_t hdl, int banknum)
 	if (banknum != AMD_MCA_BANK_NB)
 		return (B_FALSE);
 
-	return (ao_chip_once(ao, AO_CFGONCE_NBMCA));
+	/*
+	 * If we are the first to atomically set the "I'll do it" bit
+	 * then return B_FALSE (do not skip), otherwise skip with B_TRUE.
+	 */
+	return (ao_chip_once(ao, AO_CFGONCE_NBMCA) == B_TRUE ?
+	    B_FALSE : B_TRUE);
 }
 
 uint64_t

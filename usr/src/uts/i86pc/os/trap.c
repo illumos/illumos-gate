@@ -1088,8 +1088,14 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		break;
 
 	case T_GPFLT:	/* general protection violation */
-#if defined(__amd64) || defined(__xpv)
 		/*
+		 * Any #GP that occurs during an on_trap .. no_trap bracket
+		 * with OT_DATA_ACCESS or OT_SEGMENT_ACCESS protection,
+		 * or in a on_fault .. no_fault bracket, is forgiven
+		 * and we trampoline.  This protection is given regardless
+		 * of whether we are 32/64 bit etc - if a distinction is
+		 * required then define new on_trap protection types.
+		 *
 		 * On amd64, we can get a #gp from referencing addresses
 		 * in the virtual address hole e.g. from a copyin or in
 		 * update_sregs while updating user segment registers.
@@ -1133,10 +1139,15 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			rp->r_pc = ct->t_lofault;
 			goto cleanup;
 		}
+
+		/*
+		 * We fall through to the next case, which repeats
+		 * the OT_SEGMENT_ACCESS check which we've already
+		 * done, so we'll always fall through to the
+		 * T_STKFLT case.
+		 */
 		/*FALLTHROUGH*/
-#endif	/* __amd64 || __xpv */
 	case T_SEGFLT:	/* segment not present fault */
-#if defined(__amd64)
 		/*
 		 * One example of this is #NP in update_sregs while
 		 * attempting to update a user segment register
@@ -1151,7 +1162,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			rp->r_pc = ct->t_ontrap->ot_trampoline;
 			goto cleanup;
 		}
-#endif	/* __amd64 */
 		/*FALLTHROUGH*/
 	case T_STKFLT:	/* stack fault */
 	case T_TSSFLT:	/* invalid TSS fault */
@@ -1160,7 +1170,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		if (kern_gpfault(rp))
 			(void) die(type, rp, addr, cpuid);
 		goto cleanup;
-		/*FALLTHROUGH*/
 
 	/*
 	 * ONLY 32-bit PROCESSES can USE a PRIVATE LDT! 64-bit apps
