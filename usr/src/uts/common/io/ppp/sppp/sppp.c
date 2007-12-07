@@ -1,7 +1,7 @@
 /*
  * sppp.c - Solaris STREAMS PPP multiplexing pseudo-driver
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -77,7 +77,7 @@
  */
 #ifdef INTERNAL_BUILD
 /* MODINFO is limited to 32 characters. */
-const char sppp_module_description[] = "PPP 4.0 mux v%I%";
+const char sppp_module_description[] = "PPP 4.0 mux";
 #else /* INTERNAL_BUILD */
 const char sppp_module_description[] = "ANU PPP mux $Revision: 1.0$";
 
@@ -125,15 +125,12 @@ static const char *kstats64_names[] = { SPPP_KSTATS64_NAMES };
 static uint32_t
 sppp_ppp2np(uint16_t proto)
 {
-	if (proto > 0x7fff)
-		return (0);
 	switch (proto) {
 	case PPP_IP:
 		return (NP_IP);
 	case PPP_IPV6:
 		return (NP_IPV6);
 	default:
-		printf("sppp: unknown protocol 0x%x\n", proto);
 		return (0);
 	}
 }
@@ -248,7 +245,7 @@ sppp_create_ppa(uint32_t ppa_id)
 	 * name plus the ppa number so that netstat
 	 * can find the statistics.
 	 */
-	(void) sprintf(unit, "%s%d", PPP_DRV_NAME, ppa_id);
+	(void) sprintf(unit, "%s" "%d", PPP_DRV_NAME, ppa_id);
 	/*
 	 * Make sure we can allocate a buffer to
 	 * contain the ppa to be sent upstream, as
@@ -667,7 +664,7 @@ sppp_ioctl(struct queue *q, mblk_t *mp)
  * Description:
  *    Upper write-side put procedure. Messages from above arrive here.
  */
-int
+void
 sppp_uwput(queue_t *q, mblk_t *mp)
 {
 	queue_t		*nextq;
@@ -708,7 +705,8 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 				freemsg(mp);
 			}
 		} else {
-			return (sppp_mproto(q, mp, sps));
+			(void) sppp_mproto(q, mp, sps);
+			return;
 		}
 		break;
 	case M_DATA:
@@ -731,12 +729,12 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 		case PPPIO_BLOCKNP:
 		case PPPIO_UNBLOCKNP:
 			qwriter(q, mp, sppp_inner_ioctl, PERIM_INNER);
-			return (0);
+			return;
 		case I_LINK:
 		case I_UNLINK:
 		case PPPIO_NEWPPA:
 			qwriter(q, mp, sppp_outer_ioctl, PERIM_OUTER);
-			return (0);
+			return;
 		case PPPIO_NPMODE:
 		case PPPIO_GIDLE:
 		case PPPIO_GTYPE:
@@ -748,7 +746,7 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 			 * they're moved off to a separate function.
 			 */
 			sppp_ioctl(q, mp);
-			return (0);
+			return;
 		case PPPIO_GETSTAT:
 			break;			/* 32 bit interface gone */
 		default:
@@ -769,7 +767,7 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 			 */
 			sps->sps_ioc_id = iop->ioc_id;
 			putnext(ppa->ppa_lower_wq, mp);
-			return (0);	/* don't ack or nak the request */
+			return;		/* don't ack or nak the request */
 		}
 		/* Failure; send error back upstream. */
 		miocnak(q, mp, 0, error);
@@ -789,7 +787,6 @@ sppp_uwput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
-	return (0);
 }
 
 /*
@@ -806,7 +803,7 @@ sppp_uwput(queue_t *q, mblk_t *mp)
  *    the write-side queue. Therefore, this procedure gets called when
  *    the lower write service procedure qenable() the upper write stream queue.
  */
-int
+void
 sppp_uwsrv(queue_t *q)
 {
 	spppstr_t	*sps;
@@ -826,7 +823,6 @@ sppp_uwsrv(queue_t *q)
 			putnext(nextq, mp);
 		}
 	}
-	return (0);
 }
 
 void
@@ -932,7 +928,7 @@ sppp_inner_ioctl(queue_t *q, mblk_t *mp)
 		} else if ((mp->b_cont == NULL) ||
 		    *((t_uscalar_t *)mp->b_cont->b_rptr) != DL_UNITDATA_REQ ||
 		    (MBLKL(mp->b_cont) < (sizeof (dl_unitdata_req_t) +
-			SPPP_ADDRL))) {
+		    SPPP_ADDRL))) {
 			error = EPROTO;
 			break;
 		} else if (ppa == NULL) {
@@ -1658,7 +1654,7 @@ sppp_outpkt(queue_t *q, mblk_t **mpp, int msize, spppstr_t *sps)
  *    the write queue here, this just back-enables all upper write side
  *    service procedures.
  */
-int
+void
 sppp_lwsrv(queue_t *q)
 {
 	sppa_t		*ppa;
@@ -1679,7 +1675,6 @@ sppp_lwsrv(queue_t *q)
 		}
 	}
 	rw_exit(&ppa->ppa_sib_lock);
-	return (0);
 }
 
 /*
@@ -1692,14 +1687,24 @@ sppp_lwsrv(queue_t *q)
  *    Lower read-side put procedure. Messages from below get here.
  *    Data messages are handled separately to limit stack usage
  *    going into IP.
+ *
+ *    Note that during I_UNLINK processing, it's possible for a downstream
+ *    message to enable upstream data (due to pass_wput() removing the
+ *    SQ_BLOCKED flag), and thus we must protect against a NULL sppa pointer.
+ *    In this case, the only thing above us is passthru, and we might as well
+ *    discard.
  */
-int
+void
 sppp_lrput(queue_t *q, mblk_t *mp)
 {
 	sppa_t		*ppa;
 	spppstr_t	*sps;
 
-	ppa = (sppa_t *)q->q_ptr;
+	if ((ppa = q->q_ptr) == NULL) {
+		freemsg(mp);
+		return;
+	}
+
 	sps = ppa->ppa_ctl;
 
 	if (MTYPE(mp) != M_DATA) {
@@ -1709,7 +1714,6 @@ sppp_lrput(queue_t *q, mblk_t *mp)
 	} else if ((q = sppp_recv(q, &mp, sps)) != NULL) {
 		putnext(q, mp);
 	}
-	return (0);
 }
 
 /*

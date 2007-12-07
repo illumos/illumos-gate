@@ -1,7 +1,7 @@
 /*
  * sppp.h - Solaris STREAMS PPP multiplexing pseudo-driver definitions
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -358,12 +358,12 @@ extern int	sppp_close(queue_t *);
 extern mblk_t	*sppp_dladdud(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
 extern void	sppp_dlpi_pinfoinit(void);
 extern void	sppp_dlprsendup(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
-extern int	sppp_lrput(queue_t *, mblk_t *);
-extern int	sppp_lwsrv(queue_t *);
+extern void	sppp_lrput(queue_t *, mblk_t *);
+extern void	sppp_lwsrv(queue_t *);
 extern int	sppp_mproto(queue_t *, mblk_t *, spppstr_t *);
 extern int	sppp_open(queue_t *, dev_t *, int, int, cred_t *);
-extern int	sppp_uwput(queue_t *, mblk_t *);
-extern int	sppp_uwsrv(queue_t *);
+extern void	sppp_uwput(queue_t *, mblk_t *);
+extern void	sppp_uwsrv(queue_t *);
 extern void	sppp_remove_ppa(spppstr_t *sps);
 extern sppa_t	*sppp_find_ppa(uint32_t ppa_id);
 extern sppa_t	*sppp_create_ppa(uint32_t ppa_id);

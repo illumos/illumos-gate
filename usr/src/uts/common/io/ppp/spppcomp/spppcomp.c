@@ -1,7 +1,7 @@
 /*
  * spppcomp.c - STREAMS module for kernel-level compression and CCP support.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -87,7 +87,7 @@
  */
 #ifdef INTERNAL_BUILD
 /* MODINFO is limited to 32 characters. */
-const char spppcomp_module_description[] = "PPP 4.0 compression v%I%";
+const char spppcomp_module_description[] = "PPP 4.0 compression";
 #else /* INTERNAL_BUILD */
 const char spppcomp_module_description[] =
 	"ANU PPP compression $Revision: 1.16$ ";
@@ -336,7 +336,7 @@ spppcomp_wput(queue_t *q, mblk_t *mp)
 	case M_DATA:
 		if (q->q_first != NULL || !bcanputnext(q, mp->b_band) ||
 		    ((cp->cp_flags & (COMP_VJC|CCP_COMP_RUN)) &&
-			servicing_interrupt())) {
+		    servicing_interrupt())) {
 #ifdef SPC_DEBUG
 			cp->cp_out_queued++;
 #endif
@@ -618,12 +618,12 @@ spppcomp_outpkt(queue_t *q, mblk_t *mp)
 		comp_ccp(q, mp, cp, B_FALSE);
 		mutex_exit(&cp->cp_pair_lock);
 	} else if (proto != PPP_LCP && IS_CCP_COMP_RUN(cp) &&
-	    cp->cp_xstate != NULL) {
+	    IS_CCP_ISUP(cp) && cp->cp_xstate != NULL) {
 		mblk_t	*cmp = NULL;
 
 		len = msgsize(mp);
 		len = (*cp->cp_xcomp->compress)(cp->cp_xstate, &cmp, mp, len,
-			(IS_CCP_ISUP(cp) ? cp->cp_mtu + PPP_HDRLEN : 0));
+		    cp->cp_mtu + PPP_HDRLEN);
 
 		if (cmp != NULL) {
 			/* Success!  Discard uncompressed version */
@@ -752,7 +752,9 @@ spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 
 		cp->cp_flags = (cp->cp_flags & ~mask) | (flags & mask);
 
-		if ((mask & CCP_ISOPEN) && (flags & CCP_ISOPEN) == 0) {
+		if ((mask & CCP_ISOPEN) && !(flags & CCP_ISOPEN)) {
+			cp->cp_flags &= ~CCP_ISUP & ~CCP_COMP_RUN &
+			    ~CCP_DECOMP_RUN;
 			if (cp->cp_xstate != NULL) {
 				(*cp->cp_xcomp->comp_free)(cp->cp_xstate);
 				cp->cp_xstate = NULL;
@@ -761,7 +763,6 @@ spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 				(*cp->cp_rcomp->decomp_free)(cp->cp_rstate);
 				cp->cp_rstate = NULL;
 			}
-			cp->cp_flags &= ~CCP_ISUP;
 		}
 
 		CPDEBUG((DBGSTART
@@ -843,6 +844,8 @@ spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 				 * stuff.
 				 */
 				if ((xtemp = cp->cp_xstate) != NULL) {
+					cp->cp_flags &= ~CCP_ISUP &
+					    ~CCP_COMP_RUN;
 					cp->cp_xstate = NULL;
 					(*cp->cp_xcomp->comp_free)(xtemp);
 				}
@@ -862,6 +865,8 @@ spppcomp_inner_ioctl(queue_t *q, mblk_t *mp)
 				    CP_FLAGSSTR));
 			} else {
 				if ((xtemp = cp->cp_rstate) != NULL) {
+					cp->cp_flags &= ~CCP_ISUP &
+					    ~CCP_DECOMP_RUN;
 					cp->cp_rstate = NULL;
 					(*cp->cp_rcomp->decomp_free)(xtemp);
 				}
@@ -1120,10 +1125,10 @@ spppcomp_mctl(queue_t *q, mblk_t *mp)
 		cp->cp_unit = ((uint32_t *)mp->b_rptr)[1];
 
 		/* Create kstats for this unit. */
-		(void) sprintf(unit, "%s%d", COMP_MOD_NAME, cp->cp_unit);
+		(void) sprintf(unit, "%s" "%d", COMP_MOD_NAME, cp->cp_unit);
 		ksp = kstat_create(COMP_MOD_NAME, cp->cp_unit, unit, "net",
-			KSTAT_TYPE_NAMED, sizeof (spppcomp_kstats_t) /
-			sizeof (kstat_named_t), 0);
+		    KSTAT_TYPE_NAMED, sizeof (spppcomp_kstats_t) /
+		    sizeof (kstat_named_t), 0);
 
 		if (ksp != NULL) {
 			cp->cp_flags |= CP_HASUNIT;
@@ -1583,7 +1588,7 @@ spppcomp_inpkt(queue_t *q, mblk_t *mp)
 			}
 
 			vjlen = vj_uncompress_tcp(dp, np->b_wptr - dp, len,
-					&cp->cp_vj, &iphdr, &iphlen);
+			    &cp->cp_vj, &iphdr, &iphlen);
 
 			if (vjlen < 0 || iphlen == 0) {
 				/*
@@ -1708,8 +1713,8 @@ comp_ccp(queue_t *q, mblk_t *mp, sppp_comp_t *cp, boolean_t rcvd)
 		break;
 	case CCP_CONFACK:
 		if ((cp->cp_flags & (CCP_ISOPEN | CCP_ISUP)) == CCP_ISOPEN &&
-			clen >= CCP_HDRLEN + CCP_OPT_MINLEN &&
-			clen >= CCP_HDRLEN + CCP_OPT_LENGTH(dp + CCP_HDRLEN)) {
+		    clen >= CCP_HDRLEN + CCP_OPT_MINLEN &&
+		    clen >= CCP_HDRLEN + CCP_OPT_LENGTH(dp + CCP_HDRLEN)) {
 
 			int	rc;
 

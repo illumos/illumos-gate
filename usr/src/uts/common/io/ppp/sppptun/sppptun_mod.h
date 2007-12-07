@@ -1,8 +1,8 @@
 /*
  * sppptun_mod.h - References between sppptun.c and sppptun_mod.c
  *
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SPPPTUN_MOD_H
@@ -26,30 +26,6 @@ extern void sppptun_tcl_fini(void);
  */
 extern const char sppptun_driver_description[];
 extern const char sppptun_module_description[];
-
-#if 0
-#define	DBGPLUMB(x)	cmn_err x
-#else
-#define	DBGPLUMB(x)	((void) 0)
-#endif
-
-#if 0
-#define	DBGENTRY(x)	cmn_err x
-#else
-#define	DBGENTRY(x)	((void) 0)
-#endif
-
-#if 0
-#define	DBGERROR(x)	cmn_err x
-#else
-#define	DBGERROR(x)	((void) 0)
-#endif
-
-#if 0
-#define	DBGNORMAL(x)	cmn_err x
-#else
-#define	DBGNORMAL(x)	((void) 0)
-#endif
 
 #ifdef	__cplusplus
 }

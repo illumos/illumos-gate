@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Because this code is derived from the 4.3BSD compress source:
  *
@@ -61,7 +61,6 @@
 /* Defined for platform-neutral include file */
 #define	PACKETPTR		mblk_t *
 #include <net/ppp-comp.h>
-#include "s_common.h"
 
 #ifndef _BIG_ENDIAN
 #define	BSD_LITTLE_ENDIAN
@@ -147,6 +146,7 @@ struct bsd_db {
 #define	DS_DEBUG	0x01
 #define	DS_TESTIN	0x02
 #define	DS_TESTOUT	0x04
+#define	DS_INITDONE	0x08
 
 static void	*bsd_comp_alloc(uchar_t *options, int opt_len);
 static void	*bsd_decomp_alloc(uchar_t *options, int opt_len);
@@ -275,7 +275,7 @@ bsd_check(struct bsd_db *db)
 			}
 
 			if (new_ratio < db->ratio ||
-						new_ratio < 1 * RATIO_SCALE) {
+			    new_ratio < 1 * RATIO_SCALE) {
 				bsd_clear(db);
 				return (1);
 			}
@@ -355,9 +355,9 @@ bsd_alloc(uchar_t *options, int opt_len, int decomp)
 	struct bsd_db	*db;
 
 	if (opt_len != 3 ||
-		options[0] != CI_BSD_COMPRESS ||
-		options[1] != 3 ||
-		BSD_VERSION(options[2]) != BSD_CURRENT_VERSION) {
+	    options[0] != CI_BSD_COMPRESS ||
+	    options[1] != 3 ||
+	    BSD_VERSION(options[2]) != BSD_CURRENT_VERSION) {
 
 		return (NULL);
 	}
@@ -480,11 +480,11 @@ bsd_init(struct bsd_db *db, uchar_t *options, int opt_len, int unit,
 	int	i;
 
 	if (db->hsize == 0 || opt_len < CILEN_BSD_COMPRESS ||
-		options[0] != CI_BSD_COMPRESS ||
-		options[1] != CILEN_BSD_COMPRESS ||
-		BSD_VERSION(options[2]) != BSD_CURRENT_VERSION ||
-		BSD_NBITS(options[2]) != db->maxbits ||
-		decomp && db->lens == NULL) {
+	    options[0] != CI_BSD_COMPRESS ||
+	    options[1] != CILEN_BSD_COMPRESS ||
+	    BSD_VERSION(options[2]) != BSD_CURRENT_VERSION ||
+	    BSD_NBITS(options[2]) != db->maxbits ||
+	    decomp && db->lens == NULL) {
 
 		return (0);
 	}
@@ -514,6 +514,8 @@ bsd_init(struct bsd_db *db, uchar_t *options, int opt_len, int unit,
 
 	bsd_reset(db);
 
+	db->flags |= DS_INITDONE;
+
 	return (1);
 }
 
@@ -525,7 +527,7 @@ bsd_comp_init(void *state, uchar_t *options, int opt_len, int unit, int hdrlen,
 	int debug)
 {
 	return (bsd_init((struct bsd_db *)state, options, opt_len,
-						unit, hdrlen, 0, debug, 0));
+	    unit, hdrlen, 0, debug, 0));
 }
 
 /*
@@ -536,7 +538,7 @@ bsd_decomp_init(void *state, uchar_t *options, int opt_len, int unit,
 	int hdrlen, int mru, int debug)
 {
 	return (bsd_init((struct bsd_db *)state, options, opt_len,
-						unit, hdrlen, mru, debug, 1));
+	    unit, hdrlen, mru, debug, 1));
 }
 
 
@@ -577,6 +579,8 @@ bsd_compress(void *state, mblk_t **mretp, mblk_t *mp, int slen,	int maxolen)
 #else
 	int		hdlcaddr, hdlcctl;
 #endif
+
+	ASSERT(db->flags & DS_INITDONE);
 
 #define	PUTBYTE(v) {						\
 	if (wptr) {						\
@@ -910,6 +914,8 @@ bsd_incomp(void *state, mblk_t *mp)
 	uchar_t		*rptr, *rmax;
 	uint_t		ent;
 
+	ASSERT(db->flags & DS_INITDONE);
+
 	if (db->hsize == 0)
 		return (-1);
 
@@ -1027,7 +1033,7 @@ nomatch:				/* output (count) the prefix */
 				dictp2 = &db->dict[max_ent+1];
 				if (db->dict[dictp2->cptr].codem1 == max_ent) {
 					db->dict[dictp2->cptr].codem1 =
-								BADCODEM1;
+					    BADCODEM1;
 				}
 
 				dictp2->cptr = (ushort_t)hval;
@@ -1118,6 +1124,8 @@ bsd_decompress(void *state, mblk_t **dmpp)
 	int		adrs, ctrl;
 #endif
 
+	ASSERT(db->flags & DS_INITDONE);
+
 	/* Note: spppcomp already did a pullup to fix the first buffer. */
 	*dmpp = NULL;
 	rptr = cmsg->b_rptr;
@@ -1176,7 +1184,7 @@ bsd_decompress(void *state, mblk_t **dmpp)
 		freemsg(cmsg);
 		if (db->flags & DS_DEBUG) {
 			cmn_err(CE_CONT, "bsd_decomp%d: bad sequence # %d, "
-				"expected %d\n", db->unit, seq, db->seqno - 1);
+			    "expected %d\n", db->unit, seq, db->seqno - 1);
 		}
 
 		return (DECOMP_ERROR);
@@ -1330,7 +1338,7 @@ bsd_decompress(void *state, mblk_t **dmpp)
 					    "buffers; outlen %d+%d\n",
 					    db->unit,
 					    (blockctr < 0 ? "too many" :
-						"can't allocate"),
+					    "can't allocate"),
 					    outlen, dlen);
 				}
 				return (DECOMP_ERROR);
@@ -1411,7 +1419,7 @@ bsd_decompress(void *state, mblk_t **dmpp)
 			    db->unit);
 							}
 							return
-						    (DECOMP_FATALERROR);
+							    (DECOMP_FATALERROR);
 						}
 					}
 
@@ -1441,7 +1449,7 @@ bsd_decompress(void *state, mblk_t **dmpp)
 			 * Expand code size if needed
 			 */
 			if (max_ent >= MAXCODE(n_bits) &&
-						max_ent < db->maxmaxcode) {
+			    max_ent < db->maxmaxcode) {
 
 				db->n_bits = ++n_bits;
 				tgtbitno = 32-n_bits;
@@ -1463,8 +1471,8 @@ bsd_decompress(void *state, mblk_t **dmpp)
 	 */
 	if (bsd_check(db) && (db->flags & DS_DEBUG)) {
 		cmn_err(CE_CONT,
-			"bsd_decomp%d: peer should have cleared dictionary\n",
-			db->unit);
+		    "bsd_decomp%d: peer should have cleared dictionary\n",
+		    db->unit);
 	}
 
 	++db->comp_count;

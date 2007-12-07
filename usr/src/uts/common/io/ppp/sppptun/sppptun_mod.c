@@ -1,7 +1,7 @@
 /*
  * sppptun_mod.c - modload support for PPP multiplexing tunnel driver.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,12 +15,9 @@
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/time.h>
-#include <sys/cmn_err.h>
 #include <sys/conf.h>
-#include <sys/ddi.h>
 #include <sys/kstat.h>
 #include <sys/sunddi.h>
-#include <sys/sysmacros.h>
 #include <net/sppptun.h>
 #include <netinet/in.h>
 
@@ -110,12 +107,8 @@ _init(void)
 	int retv;
 
 	sppptun_init();
-	if ((retv = mod_install(&modlinkage)) == 0) {
+	if ((retv = mod_install(&modlinkage)) == 0)
 		sppptun_tcl_init();
-	} else {
-		DBGERROR((CE_CONT, "_init: error %d from mod_install\n",
-		    retv));
-	}
 	return (retv);
 }
 
@@ -127,10 +120,8 @@ _fini(void)
 	if ((retv = sppptun_tcl_fintest()) != 0)
 		return (retv);
 	retv = mod_remove(&modlinkage);
-	if (retv != 0) {
-		DBGERROR((CE_CONT, "_fini: mod_remove returns %d\n", retv));
+	if (retv != 0)
 		return (retv);
-	}
 	sppptun_tcl_fini();
 	return (0);
 }
@@ -138,13 +129,7 @@ _fini(void)
 int
 _info(struct modinfo *modinfop)
 {
-	int retv;
-
-	retv = mod_info(&modlinkage, modinfop);
-	if (retv == 0) {
-		DBGERROR((CE_CONT, "_info: mod_info failed\n"));
-	}
-	return (retv);
+	return (mod_info(&modlinkage, modinfop));
 }
 
 /*
@@ -156,13 +141,10 @@ _info(struct modinfo *modinfop)
 static int
 tun_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	if (cmd != DDI_ATTACH) {
-		DBGERROR((CE_CONT, "attach: bad command %d\n", cmd));
+	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
-	}
 	if (ddi_create_minor_node(dip, PPP_TUN_NAME, S_IFCHR, 0, DDI_PSEUDO,
 	    CLONE_DEV) == DDI_FAILURE) {
-		DBGERROR((CE_CONT, "attach: create minor node failed\n"));
 		ddi_remove_minor_node(dip, NULL);
 		return (DDI_FAILURE);
 	}
@@ -179,10 +161,8 @@ tun_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 tun_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	if (cmd != DDI_DETACH) {
-		DBGERROR((CE_CONT, "detach: bad command %d\n", cmd));
+	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
-	}
 	tun_dev_info = NULL;
 	ddi_remove_minor_node(dip, NULL);
 	return (DDI_SUCCESS);
@@ -204,7 +184,6 @@ tun_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
 		if (tun_dev_info == NULL) {
-			DBGERROR((CE_CONT, "DEVT2DEVINFO missing dev ptr\n"));
 			rc = DDI_FAILURE;
 		} else {
 			*result = (void *)tun_dev_info;
@@ -216,7 +195,6 @@ tun_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		rc = DDI_SUCCESS;
 		break;
 	default:
-		DBGERROR((CE_CONT, "tun_info: unknown command %d\n", infocmd));
 		rc = DDI_FAILURE;
 		break;
 	}

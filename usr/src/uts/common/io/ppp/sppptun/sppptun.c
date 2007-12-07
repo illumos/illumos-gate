@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,6 +16,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/cmn_err.h>
+#include <sys/sdt.h>
 #include <sys/conf.h>
 #include <sys/dlpi.h>
 #include <sys/ddi.h>
@@ -45,8 +46,8 @@
  */
 #ifdef INTERNAL_BUILD
 /* MODINFO is limited to 32 characters. */
-const char sppptun_driver_description[] = "PPP 4.0 tunnel driver v%I%";
-const char sppptun_module_description[] = "PPP 4.0 tunnel module v%I%";
+const char sppptun_driver_description[] = "PPP 4.0 tunnel driver";
+const char sppptun_module_description[] = "PPP 4.0 tunnel module";
 #else
 const char sppptun_driver_description[] = "ANU PPP tundrv $Revision: $";
 const char sppptun_module_description[] = "ANU PPP tunmod $Revision: $";
@@ -88,10 +89,6 @@ static const char *tcl_kstats_list[] = { TCL_KSTATS_NAMES };
 
 #define	KCINCR(vn)	KINCR(tcl, tcl_kstats, vn)
 #define	KCDECR(vn)	KDECR(tcl, tcl_kstats, vn)
-
-#define	DBGTSIDE(t)	((((tuncl_t *)(t))->tcl_flags & TCLF_ISCLIENT) ? \
-				"device" : "module")
-#define	DBGQSIDE(q)	(DBGTSIDE((q)->q_ptr))
 
 static int	sppptun_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	sppptun_close(queue_t *);
@@ -203,69 +200,6 @@ struct streamtab sppptun_tab = {
 	&sppptun_lrinit,	/* st_muxrinit */
 	&sppptun_lwinit		/* st_muxwrinit */
 };
-
-/*
- * Nifty packet dumper; copied from pppd AIX 4.1 port.  This routine
- * dumps the raw received and transmitted data through syslog.  This
- * allows debug of communications problems without resorting to a line
- * analyzer.
- *
- * The expression "3*BYTES_PER_LINE" used frequently here represents
- * the size of each hex value printed -- two hex digits and a space.
- */
-#define	BYTES_PER_LINE	8
-static void
-sppp_dump_frame(int unit, mblk_t *mptr, const char *msg)
-{
-	/*
-	 * Buffer is big enough for hex digits, two spaces, ASCII output,
-	 * and one NUL byte.
-	 */
-	char buf[3 * BYTES_PER_LINE + 2 + BYTES_PER_LINE + 1];
-	uchar_t *rptr, *eptr;
-	int i, chr;
-	char *bp;
-	static const char digits[] = "0123456789abcdef";
-
-	cmn_err(CE_CONT, "!sppp%d: %s %ld bytes\n", unit, msg, msgsize(mptr));
-	i = 0;
-	bp = buf;
-	/* Add filler spaces between hex output and ASCII */
-	buf[3 * BYTES_PER_LINE] = ' ';
-	buf[3 * BYTES_PER_LINE + 1] = ' ';
-	/* Add NUL byte at end */
-	buf[sizeof (buf) - 1] = '\0';
-	while (mptr != NULL) {
-		rptr = mptr->b_rptr; /* get pointer to beginning  */
-		eptr = mptr->b_wptr;
-		while (rptr < eptr) {
-			chr = *rptr++;
-			/* convert byte to ascii hex */
-			*bp++ = digits[chr >> 4];
-			*bp++ = digits[chr & 0xf];
-			*bp++ = ' ';
-			/* Insert ASCII past hex output and filler */
-			buf[3 * BYTES_PER_LINE + 2 + i] =
-			    (chr >= 0x20 && chr <= 0x7E) ? (char)chr : '.';
-			i++;
-			if (i >= BYTES_PER_LINE) {
-				cmn_err(CE_CONT, "!sppp%d: %s\n", unit,
-				    buf);
-				bp = buf;
-				i = 0;
-			}
-		}
-		mptr = mptr->b_cont;
-	}
-	if (bp > buf) {
-		/* fill over unused hex display positions */
-		while (bp < buf + 3 * BYTES_PER_LINE)
-			*bp++ = ' ';
-		/* terminate ASCII string at right position */
-		buf[3 * BYTES_PER_LINE + 2 + i] = '\0';
-		cmn_err(CE_CONT, "!sppp%d: %s\n", unit, buf);
-	}
-}
 
 /*
  * Allocate another slot table twice as large as the original one
@@ -458,7 +392,7 @@ kstat_setup(kstat_named_t *knt, const char **names, int nstat,
 		kstat_set_string(knt[i].name, names[i]);
 		knt[i].data_type = KSTAT_DATA_UINT64;
 	}
-	(void) sprintf(unitname, "%s%d", modname, unitnum);
+	(void) sprintf(unitname, "%s" "%d", modname, unitnum);
 	ksp = kstat_create(modname, unitnum, unitname, "net",
 	    KSTAT_TYPE_NAMED, nstat, KSTAT_FLAG_VIRTUAL);
 	if (ksp != NULL) {
@@ -481,20 +415,14 @@ static int
 sppptun_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *credp)
 {
 	_NOTE(ARGUNUSED(oflag))
-	ASSERT(q != NULL);
-
-	DBGENTRY((CE_CONT, "sppptun_open as %s",
-	    (sflag & MODOPEN) ? "module" :"device"));
 
 	/* Allow a re-open */
 	if (q->q_ptr != NULL)
 		return (0);
 
 	/* In the off chance that we're on our way out, just return error */
-	if (tcl_slots == NULL) {
-		DBGERROR((CE_CONT, "tcl_slots is NULL on open\n"));
+	if (tcl_slots == NULL)
 		return (EINVAL);
-	}
 
 	if (sflag & MODOPEN) {
 		tunll_t *tll;
@@ -681,12 +609,10 @@ sppptun_close(queue_t *q)
 	tunll_t *tll;
 	tuncl_t *tcl;
 
-	ASSERT(q != NULL);
 	qptr = q->q_ptr;
-	ASSERT(qptr != NULL);
 
 	err = 0;
-	tll = (tunll_t *)qptr;
+	tll = qptr;
 	if (!(tll->tll_flags & TLLF_NOTLOWER)) {
 		/* q_next is set on modules */
 		ASSERT(WR(q)->q_next != NULL);
@@ -718,13 +644,13 @@ sppptun_close(queue_t *q)
 			kstat_delete(tll->tll_ksp);
 		kmem_free(tll, sizeof (*tll));
 	} else {
-		tcl = (tuncl_t *)tll;
+		tcl = qptr;
 
 		/* devices are end of line; no q_next. */
 		ASSERT(WR(q)->q_next == NULL);
 
 		qprocsoff(q);
-		DBGNORMAL((CE_CONT, "session %d closed", tcl->tcl_rsessid));
+		DTRACE_PROBE1(sppptun__client__close, tuncl_t *, tcl);
 		tcl->tcl_rq = NULL;
 		q->q_ptr = WR(q)->q_ptr = NULL;
 
@@ -742,7 +668,6 @@ sppptun_close(queue_t *q)
 		if (!(tcl->tcl_flags & TCLF_DAEMON) &&
 		    (tll = tcl->tcl_ctrl_tll) != NULL &&
 		    tll->tll_defcl != NULL) {
-			DBGERROR((CE_CONT, "unexpected client disconnect"));
 			send_control(tcl, tll, PTCA_DISCONNECT,
 			    tll->tll_defcl);
 		}
@@ -848,16 +773,11 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 	boolean_t isdata;
 	struct ppptun_control *ptc;
 
-	ASSERT(mpp != NULL);
 	mp = *mpp;
-	ASSERT(mp != NULL);
-	ASSERT(q != NULL);
-	tcl = (tuncl_t *)q->q_ptr;
-	ASSERT(tcl != NULL);
+	tcl = q->q_ptr;
 
 	*mpp = NULL;
 	if (!(tcl->tcl_flags & TCLF_ISCLIENT)) {
-		DBGERROR((CE_CONT, "discard data sent on lower stream\n"));
 		merror(q, mp, EINVAL);
 		return (NULL);
 	}
@@ -874,7 +794,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 		if (MBLKL(mp) != sizeof (*ptc) || DB_REF(mp) > 1 ||
 		    !IS_P2ALIGNED(mp->b_rptr, sizeof (ptc))) {
 			KCINCR(cks_octrl_drop);
-			DBGERROR((CE_CONT, "discard bad control message\n"));
+			DTRACE_PROBE2(sppptun__bad__control, tuncl_t *, tcl,
+			    mblk_t *, mp);
 			merror(q, mp, EINVAL);
 			return (NULL);
 		}
@@ -886,7 +807,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 
 		/* If this is a test message, then reply to caller. */
 		if (ptc->ptc_action == PTCA_TEST) {
-			DBGNORMAL((CE_CONT, "sending test reply"));
+			DTRACE_PROBE2(sppptun__test, tuncl_t *, tcl,
+			    struct ppptun_control *, ptc);
 			if (mp->b_cont != NULL) {
 				freemsg(mp->b_cont);
 				mp->b_cont = NULL;
@@ -898,8 +820,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 
 		/* If this one isn't for us, then discard it */
 		if (tcl->tcl_ctlval != ptc->ptc_discrim) {
-			DBGNORMAL((CE_CONT, "Discriminator %X != %X; ignoring",
-			    tcl->tcl_ctlval, ptc->ptc_discrim));
+			DTRACE_PROBE2(sppptun__bad__discrim, tuncl_t *, tcl,
+			    struct ppptun_control *, ptc);
 			freemsg(mp);
 			return (NULL);
 		}
@@ -914,9 +836,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 	}
 
 	if (tll == NULL || (lowerq = tll->tll_wq) == NULL) {
-		DBGERROR((CE_CONT, "can't send; no %s on %X\n",
-		    tll == NULL ? "attached lower layer" : "output queue",
-		    tll == NULL ? (unsigned)tcl : (unsigned)tll));
+		DTRACE_PROBE3(sppptun__cannot__send, tuncl_t *, tcl,
+		    tunll_t *, tll, mblk_t *, mp);
 		merror(q, mp, ENXIO);
 		if (isdata) {
 			tcl->tcl_stats.ppp_oerrors++;
@@ -933,7 +854,8 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 	 * still there.
 	 */
 	if (!bcanputnext(lowerq, mp->b_band)) {
-		DBGNORMAL((CE_CONT, "can't send; !canputnext\n"));
+		DTRACE_PROBE3(sppptun__flow__control, tuncl_t *, tcl,
+		    tunll_t *, tll, mblk_t *, mp);
 		*mpp = mp;
 		return (NULL);
 	}
@@ -949,7 +871,7 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 	if (isdata) {
 		if (tll->tll_alen != 0 &&
 		    bcmp(&tcl->tcl_address, &tll->tll_lcladdr,
-			tll->tll_alen) == 0)
+		    tll->tll_alen) == 0)
 			loopup = luSend;
 		switch (tll->tll_style) {
 		case PTS_PPPOE:
@@ -1037,7 +959,7 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 			 */
 			if (bcmp(tcl->tcl_address.pta_pppoe.ptma_mac,
 			    zero_mac_addr, sizeof (zero_mac_addr)) == 0 ||
-				(tcl->tcl_flags & TCLF_DAEMON)) {
+			    (tcl->tcl_flags & TCLF_DAEMON)) {
 				ether_copy(ptc->ptc_address.pta_pppoe.ptma_mac,
 				    edestp->addr);
 			} else {
@@ -1061,7 +983,7 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 		mp = datamb;
 	}
 	if (mp == NULL || encmb == NULL) {
-		DBGERROR((CE_CONT, "output failure\n"));
+		DTRACE_PROBE1(sppptun__output__failure, tuncl_t *, tcl);
 		freemsg(mp);
 		freemsg(encmb);
 		if (isdata) {
@@ -1072,9 +994,6 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 		}
 		lowerq = NULL;
 	} else {
-		if (tcl->tcl_flags & TCLF_DEBUG)
-			sppp_dump_frame(tcl->tcl_unit, mp,
-			    isdata ? "sent" : "sctl");
 		if (isdata) {
 			tcl->tcl_stats.ppp_obytes += msgsize(mp);
 			tcl->tcl_stats.ppp_opackets++;
@@ -1169,35 +1088,23 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 	ppptun_atype *pap;
 	struct ppp_stats64 *psp;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
-
 	iop = (struct iocblk *)mp->b_rptr;
 	tcl = NULL;
-	tll = (tunll_t *)q->q_ptr;
+	tll = q->q_ptr;
 	if (tll->tll_flags & TLLF_NOTLOWER) {
 		tcl = (tuncl_t *)tll;
 		tll = NULL;
 	}
 
+	DTRACE_PROBE3(sppptun__ioctl, tuncl_t *, tcl, tunll_t *, tll,
+	    struct iocblk *, iop);
+
 	switch (iop->ioc_cmd) {
 	case PPPIO_DEBUG:
-		/* Client (device) side only */
-		if (tcl == NULL || iop->ioc_count != sizeof (uint32_t) ||
-		    mp->b_cont == NULL) {
-			DBGERROR((CE_CONT, "bad PPPIO_DEBUG"));
-			rc = EINVAL;
-			break;
-		}
-
-		/* just one type of debug so far */
-		i = *(uint32_t *)mp->b_cont->b_rptr;
-		if (i != PPPDBG_LOG + PPPDBG_AHDLC)
-			rc =  EINVAL;
-		else
-			tcl->tcl_flags |= TCLF_DEBUG;
+		/*
+		 * Debug requests are now ignored; use dtrace or wireshark
+		 * instead.
+		 */
 		break;
 
 	case PPPIO_GETSTAT:
@@ -1207,7 +1114,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 	case PPPIO_GETSTAT64:
 		/* Client (device) side only */
 		if (tcl == NULL) {
-			DBGERROR((CE_CONT, "bad PPPIO_GETSTAT64"));
 			rc = EINVAL;
 			break;
 		}
@@ -1267,7 +1173,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 	case PPPTUN_GINFO:
 		/* Either side */
 		if (mp->b_cont == NULL || iop->ioc_count != sizeof (*pti)) {
-			DBGERROR((CE_CONT, "missing ioctl data"));
 			rc = EINVAL;
 			break;
 		}
@@ -1276,11 +1181,9 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 			tll = tll_lookup_on_name(pti->pti_name);
 		if (tll == NULL) {
 			/* Driver (client) side must have name */
-			if (tcl != NULL && pti->pti_name[0] == '\0') {
-				DBGERROR((CE_CONT,
-				    "null sinfo name on driver"));
+			if (tcl != NULL && pti->pti_name[0] == '\0')
 				rc = EINVAL;
-			} else
+			else
 				rc = ESRCH;
 			break;
 		}
@@ -1311,8 +1214,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 			save_for_close(tll, mptmp);
 			break;
 		default:
-			DBGERROR((CE_CONT, "bad style %d driver",
-			    tll->tll_style));
 			tll->tll_style = PTS_NONE;
 			tll->tll_alen = 0;
 			rc = EINVAL;
@@ -1361,21 +1262,19 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		/* Client (device) side only; before SDATA */
 		if (tcl == NULL || mp->b_cont == NULL ||
 		    iop->ioc_count != sizeof (*ptp)) {
-			DBGERROR((CE_CONT, "bad speer ioctl"));
 			rc = EINVAL;
 			break;
 		}
 		if (tcl->tcl_data_tll != NULL) {
-			DBGERROR((CE_CONT, "data link already set"));
 			rc = EINVAL;
 			break;
 		}
 		ptp = (struct ppptun_peer *)mp->b_cont->b_rptr;
+		DTRACE_PROBE2(sppptun__speer, tuncl_t *, tcl,
+		    struct ppptun_peer *, ptp);
 		/* Once set, the style cannot change. */
 		if (tcl->tcl_style != PTS_NONE &&
 		    tcl->tcl_style != ptp->ptp_style) {
-			DBGERROR((CE_CONT, "bad style; %d != %d",
-			    tcl->tcl_style, ptp->ptp_style));
 			rc = EINVAL;
 			break;
 		}
@@ -1391,14 +1290,11 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		} else {
 			/* Normal client connection */
 			if (tcl->tcl_flags & TCLF_DAEMON) {
-				DBGERROR((CE_CONT, "can't change to daemon"));
 				rc = EINVAL;
 				break;
 			}
 			if (ptp->ptp_lsessid != 0 &&
 			    ptp->ptp_lsessid != tcl->tcl_lsessid) {
-				DBGERROR((CE_CONT, "bad lsessid; %d != %d",
-				    ptp->ptp_lsessid, tcl->tcl_lsessid));
 				rc = EINVAL;
 				break;
 			}
@@ -1409,12 +1305,11 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 			 */
 			if ((tcl->tcl_flags & TCLF_SPEER_DONE) &&
 			    ((tcl->tcl_ltunid != 0 &&
-				tcl->tcl_ltunid != ptp->ptp_ltunid) ||
-				(tcl->tcl_rtunid != 0 &&
-				    tcl->tcl_rtunid != ptp->ptp_rtunid) ||
-				(tcl->tcl_rsessid != 0 &&
-				    tcl->tcl_rsessid != ptp->ptp_rsessid))) {
-				DBGERROR((CE_CONT, "can't change parameters"));
+			    tcl->tcl_ltunid != ptp->ptp_ltunid) ||
+			    (tcl->tcl_rtunid != 0 &&
+			    tcl->tcl_rtunid != ptp->ptp_rtunid) ||
+			    (tcl->tcl_rsessid != 0 &&
+			    tcl->tcl_rsessid != ptp->ptp_rsessid))) {
 				rc = EINVAL;
 				break;
 			}
@@ -1423,8 +1318,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 				tcl->tcl_ltunid = ptp->ptp_lsessid;
 			tcl->tcl_rtunid = ptp->ptp_rtunid;
 			tcl->tcl_rsessid = ptp->ptp_rsessid;
-			DBGNORMAL((CE_CONT, "set session ID to %d",
-			    tcl->tcl_rsessid));
 		}
 		tcl->tcl_flags |= TCLF_SPEER_DONE;
 		tcl->tcl_style = ptp->ptp_style;
@@ -1463,12 +1356,10 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		if (tcl == NULL || mp->b_cont == NULL ||
 		    iop->ioc_count != sizeof (*ptn) ||
 		    *mp->b_cont->b_rptr == '\0') {
-			DBGERROR((CE_CONT, "bad ioctl data"));
 			rc = EINVAL;
 			break;
 		}
 		if (!(tcl->tcl_flags & TCLF_SPEER_DONE)) {
-			DBGERROR((CE_CONT, "speer not yet done"));
 			rc = EINVAL;
 			break;
 		}
@@ -1476,34 +1367,26 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		ptn->ptn_name[sizeof (ptn->ptn_name) - 1] = '\0';
 		tll = tll_lookup_on_name(ptn->ptn_name);
 		if (tll == NULL) {
-			DBGERROR((CE_CONT, "cannot locate \"%s\"",
-			    ptn->ptn_name));
 			rc = ESRCH;
 			break;
 		}
 		if (tll->tll_style != tcl->tcl_style) {
-			DBGERROR((CE_CONT, "user style %d doesn't match lower"
-			    " style %d", tcl->tcl_style, tll->tll_style));
 			rc = ENXIO;
 			break;
 		}
 		if (iop->ioc_cmd == PPPTUN_SDATA) {
 			if (tcl->tcl_data_tll != NULL) {
-				DBGERROR((CE_CONT, "data link already set"));
 				rc = EEXIST;
 				break;
 			}
 			/* server daemons cannot use regular data */
 			if (tcl->tcl_flags & TCLF_DAEMON) {
-				DBGERROR((CE_CONT, "daemon has no data"));
 				rc = EINVAL;
 				break;
 			}
 			tcl->tcl_data_tll = tll;
 		} else if (tcl->tcl_flags & TCLF_DAEMON) {
 			if (tll->tll_defcl != NULL && tll->tll_defcl != tcl) {
-				DBGERROR((CE_CONT,
-				    "control link already set"));
 				rc = EEXIST;
 				break;
 			}
@@ -1515,8 +1398,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 			tcl->tcl_ctrl_tll = tll;
 		} else {
 			if (tcl->tcl_ctrl_tll != NULL) {
-				DBGERROR((CE_CONT,
-				    "control link already set"));
 				rc = EEXIST;
 				break;
 			}
@@ -1564,8 +1445,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		ptn->ptn_name[sizeof (ptn->ptn_name) - 1] = '\0';
 		tll = tll_lookup_on_name(ptn->ptn_name);
 		if (tll == NULL || tll->tll_defcl != tcl) {
-			DBGERROR((CE_CONT, "cannot locate \"%s\"",
-			    ptn->ptn_name));
 			rc = ESRCH;
 			break;
 		}
@@ -1577,7 +1456,6 @@ sppptun_inner_ioctl(queue_t *q, mblk_t *mp)
 		ASSERT(0);
 	}
 	if (rc != 0) {
-		DBGERROR((CE_CONT, "error %d for ioctl %X", rc, iop->ioc_cmd));
 		miocnak(q, mp, 0, rc);
 	} else {
 		if (len > 0)
@@ -1604,14 +1482,8 @@ sppptun_ioctl(queue_t *q, mblk_t *mp)
 	uint32_t val = 0;
 	tunll_t *tll;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
-
 	iop = (struct iocblk *)mp->b_rptr;
 
-	DBGNORMAL((CE_CONT, "got ioctl %X\n", iop->ioc_cmd));
 	switch (iop->ioc_cmd) {
 	case PPPIO_DEBUG:
 	case PPPIO_GETSTAT:
@@ -1684,7 +1556,6 @@ sppptun_ioctl(queue_t *q, mblk_t *mp)
 	if (rc == 0) {
 		miocack(q, mp, len, 0);
 	} else {
-		DBGERROR((CE_CONT, "error %d for ioctl %X", rc, iop->ioc_cmd));
 		miocnak(q, mp, 0, rc);
 	}
 }
@@ -1705,10 +1576,7 @@ sppptun_inner_mctl(queue_t *q, mblk_t *mp)
 	int msglen;
 	tuncl_t *tcl;
 
-	ASSERT(q != NULL && mp != NULL);
-	ASSERT(q->q_ptr != NULL && mp->b_rptr != NULL);
-
-	tcl = (tuncl_t *)q->q_ptr;
+	tcl = q->q_ptr;
 
 	if (!(tcl->tcl_flags & TCLF_ISCLIENT)) {
 		freemsg(mp);
@@ -1742,12 +1610,7 @@ sppptun_uwput(queue_t *q, mblk_t *mp)
 	queue_t *nextq;
 	tuncl_t *tcl;
 
-	ASSERT(q != NULL);
 	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_rptr != NULL);
-
-	DBGENTRY((CE_CONT, "sppptun_uwput as %s", DBGQSIDE(q)));
 
 	switch (MTYPE(mp)) {
 	case M_DATA:
@@ -1848,6 +1711,31 @@ tll_close_req(tunll_t *tll)
 }
 
 /*
+ * This function is called when a backenable occurs on the write side of a
+ * lower stream.  It walks over the client streams, looking for ones that use
+ * the given tunll_t lower stream.  Each client is then backenabled.
+ */
+static void
+tclvm_backenable(void *arg, void *firstv, size_t numv)
+{
+	tunll_t *tll = arg;
+	int minorn = (int)(uintptr_t)firstv;
+	int minormax = minorn + numv;
+	tuncl_t *tcl;
+	queue_t *q;
+
+	while (minorn < minormax) {
+		tcl = tcl_slots[minorn - 1];
+		if ((tcl->tcl_data_tll == tll ||
+		    tcl->tcl_ctrl_tll == tll) &&
+		    (q = tcl->tcl_rq) != NULL) {
+			qenable(OTHERQ(q));
+		}
+		minorn++;
+	}
+}
+
+/*
  * sppptun_uwsrv()
  *
  * MT-Perimeters:
@@ -1867,17 +1755,22 @@ sppptun_uwsrv(queue_t *q)
 	mblk_t *mp;
 	queue_t *nextq;
 
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-
-	tcl = (tuncl_t *)q->q_ptr;
+	tcl = q->q_ptr;
 	if (!(tcl->tcl_flags & TCLF_ISCLIENT)) {
 		tunll_t *tll = (tunll_t *)tcl;
+
 		if ((tll->tll_flags & (TLLF_CLOSING|TLLF_CLOSE_DONE)) ==
 		    TLLF_CLOSING) {
-			DBGPLUMB((CE_CONT, "sending close req\n"));
 			tll->tll_error = tll_close_req(tll);
 			tll->tll_flags |= TLLF_CLOSE_DONE;
+		} else {
+			/*
+			 * We've been enabled here because of a backenable on
+			 * output flow control.  Backenable clients using this
+			 * lower layer.
+			 */
+			vmem_walk(tcl_minor_arena, VMEM_ALLOC, tclvm_backenable,
+			    tll);
 		}
 		return (0);
 	}
@@ -1906,10 +1799,6 @@ sppptun_uwsrv(queue_t *q)
 static void
 sppptun_lwput(queue_t *q, mblk_t *mp)
 {
-	ASSERT(q != NULL);
-	ASSERT(mp != NULL);
-	DBGENTRY((CE_CONT, "sppptun_lwput as %s", DBGQSIDE(q)));
-
 	switch (MTYPE(mp)) {
 	case M_PROTO:
 		putnext(q, mp);
@@ -1934,14 +1823,8 @@ sppptun_lrput(queue_t *q, mblk_t *mp)
 {
 	tuncl_t *tcl;
 
-	ASSERT(q != NULL);
-	ASSERT(mp != NULL);
-
-	DBGENTRY((CE_CONT, "sppptun_lrput as %s", DBGQSIDE(q)));
-
 	switch (MTYPE(mp)) {
 	case M_IOCTL:
-		DBGERROR((CE_CONT, "unexpected lrput ioctl"));
 		miocnak(q, mp, 0, EINVAL);
 		return;
 	case M_FLUSH:
@@ -1986,23 +1869,16 @@ urput_dlpi(queue_t *q, mblk_t *mp)
 {
 	int err;
 	union DL_primitives *dlp = (union DL_primitives *)mp->b_rptr;
-	tunll_t *tll = (tunll_t *)q->q_ptr;
+	tunll_t *tll = q->q_ptr;
+	size_t mlen = MBLKL(mp);
 
-	DBGNORMAL((CE_CONT, "received DLPI primitive %d\n",
-	    dlp->dl_primitive));
 	switch (dlp->dl_primitive) {
 	case DL_UDERROR_IND:
-		DBGERROR((CE_CONT, "uderror:  unix %d, dlpi %d\n",
-		    dlp->uderror_ind.dl_unix_errno,
-		    dlp->uderror_ind.dl_errno));
 		break;
 
 	case DL_ERROR_ACK:
-		DBGERROR((CE_CONT,
-		    "error-ack: unix %d, dlpi %d on primitive %d\n",
-		    dlp->error_ack.dl_unix_errno,
-		    dlp->error_ack.dl_errno,
-		    dlp->error_ack.dl_error_primitive));
+		if (mlen < DL_ERROR_ACK_SIZE)
+			break;
 		err = dlp->error_ack.dl_unix_errno ?
 		    dlp->error_ack.dl_unix_errno : ENXIO;
 		switch (dlp->error_ack.dl_error_primitive) {
@@ -2012,8 +1888,6 @@ urput_dlpi(queue_t *q, mblk_t *mp)
 		case DL_DETACH_REQ:
 			message_done(tll);
 			tll->tll_error = err;
-			DBGPLUMB((CE_CONT, "detach error %d; shutdown done\n",
-			    err));
 			tll->tll_flags |= TLLF_SHUTDOWN_DONE;
 			break;
 		case DL_PHYS_ADDR_REQ:
@@ -2024,7 +1898,6 @@ urput_dlpi(queue_t *q, mblk_t *mp)
 		case DL_BIND_REQ:
 			message_done(tll);
 			tll->tll_error = err;
-			DBGPLUMB((CE_CONT, "bind error %d\n", err));
 			break;
 		}
 		break;
@@ -2035,24 +1908,23 @@ urput_dlpi(queue_t *q, mblk_t *mp)
 
 	case DL_BIND_ACK:
 		message_done(tll);
-		DBGPLUMB((CE_CONT, "bind ack\n"));
 		break;
 
 	case DL_PHYS_ADDR_ACK:
 		break;
 
 	case DL_OK_ACK:
+		if (mlen < DL_OK_ACK_SIZE)
+			break;
 		switch (dlp->ok_ack.dl_correct_primitive) {
 		case DL_UNBIND_REQ:
 			message_done(tll);
 			break;
 		case DL_DETACH_REQ:
-			DBGPLUMB((CE_CONT, "detach ack; shutdown done\n"));
 			tll->tll_flags |= TLLF_SHUTDOWN_DONE;
 			break;
 		case DL_ATTACH_REQ:
 			message_done(tll);
-			DBGPLUMB((CE_CONT, "attach ack\n"));
 			break;
 		}
 		break;
@@ -2064,7 +1936,7 @@ urput_dlpi(queue_t *q, mblk_t *mp)
 struct poedat {
 	uint_t sessid;
 	tunll_t *tll;
-	void *srcaddr;
+	const void *srcaddr;
 	int isdata;
 	tuncl_t *tcl;
 };
@@ -2101,11 +1973,10 @@ tclvm_pppoe_search(void *arg, void *firstv, size_t numv)
 		ASSERT(tcl != NULL);
 		if (tcl->tcl_rsessid == poedat->sessid &&
 		    ((!poedat->isdata && tcl->tcl_ctrl_tll == poedat->tll) ||
-			(poedat->isdata &&
-			    tcl->tcl_data_tll == poedat->tll)) &&
+		    (poedat->isdata && tcl->tcl_data_tll == poedat->tll)) &&
 		    bcmp(tcl->tcl_address.pta_pppoe.ptma_mac,
-			poedat->srcaddr,
-			sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) == 0) {
+		    poedat->srcaddr,
+		    sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) == 0) {
 			poedat->tcl = tcl;
 			break;
 		}
@@ -2162,7 +2033,7 @@ tclvm_pppoe_search(void *arg, void *firstv, size_t numv)
  *	L2TP.
  */
 static queue_t *
-sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
+sppptun_recv(queue_t *q, mblk_t **mpp, const void *srcaddr)
 {
 	mblk_t *mp;
 	tunll_t *tll;
@@ -2172,34 +2043,31 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 	int msglen;
 	int isdata;
 	int i;
-	ushort_t *usp;
-	uchar_t *ucp;
-	poep_t *poep;
+	const uchar_t *ucp;
+	const poep_t *poep;
 	mblk_t *mnew;
 	ppptun_atype *pap;
 
-	_NOTE(ARGUNUSED(destaddr))
-	ASSERT(mpp != NULL);
 	mp = *mpp;
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
 
-	tll = (tunll_t *)q->q_ptr;
+	tll = q->q_ptr;
 	ASSERT(!(tll->tll_flags & TLLF_NOTLOWER));
 
-	/*
-	 * First, extract a session ID number.  All protocols have
-	 * this.
-	 */
-	usp = (ushort_t *)mp->b_rptr;
-	ucp = (uchar_t *)mp->b_rptr;
 	tcl = NULL;
 	switch (tll->tll_style) {
 	case PTS_PPPOE:
-		poep = (poep_t *)usp;
+		/* Note that poep_t alignment is uint16_t */
+		if ((!IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)) ||
+		    MBLKL(mp) < sizeof (poep_t)) &&
+		    !pullupmsg(mp, sizeof (poep_t)))
+			break;
+		poep = (const poep_t *)mp->b_rptr;
 		if (poep->poep_version_type != POE_VERSION)
 			break;
+		/*
+		 * First, extract a session ID number.  All protocols have
+		 * this.
+		 */
 		isdata = (poep->poep_code == POECODE_DATA);
 		sessid = ntohs(poep->poep_session_id);
 		remlen = sizeof (*poep);
@@ -2215,7 +2083,7 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 			 * our local ID number when generating
 			 * PADI/PADR).
 			 */
-			ucp += sizeof (*poep);
+			ucp = (const uchar_t *)(poep + 1);
 			i = msglen;
 			while (i > POET_HDRLEN) {
 				if (POET_GET_TYPE(ucp) == POETT_END) {
@@ -2248,14 +2116,14 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 			    (isdata && tcl->tcl_data_tll != tll) ||
 			    sessid != tcl->tcl_rsessid ||
 			    bcmp(srcaddr, tcl->tcl_address.pta_pppoe.ptma_mac,
-			sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) != 0)
+			    sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) != 0)
 				tcl = tll->tll_lastcl;
 			if (tcl == NULL ||
 			    (!isdata && tcl->tcl_ctrl_tll != tll) ||
 			    (isdata && tcl->tcl_data_tll != tll) ||
 			    sessid != tcl->tcl_rsessid ||
 			    bcmp(srcaddr, tcl->tcl_address.pta_pppoe.ptma_mac,
-			sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) != 0)
+			    sizeof (tcl->tcl_address.pta_pppoe.ptma_mac)) != 0)
 				tcl = NULL;
 			if (tcl == NULL && sessid != 0) {
 				struct poedat poedat;
@@ -2282,8 +2150,8 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 	}
 
 	if (tcl == NULL || tcl->tcl_rq == NULL) {
-		DBGERROR((CE_CONT, "discard; session %d %s", sessid,
-		    tcl == NULL ? "not found" : "terminated"));
+		DTRACE_PROBE3(sppptun__recv__discard, int, sessid,
+		    tuncl_t *, tcl, mblk_t *, mp);
 		if (tcl == NULL) {
 			KLINCR(lks_in_nomatch);
 		}
@@ -2321,8 +2189,6 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 			mp->b_rptr[1] = 0x03;
 		}
 		MTYPE(mp) = M_DATA;
-		if (tcl->tcl_flags & TCLF_DEBUG)
-			sppp_dump_frame(tcl->tcl_unit, mp, "rcvd");
 		tcl->tcl_stats.ppp_ibytes += msgsize(mp);
 		tcl->tcl_stats.ppp_ipackets++;
 		KLINCR(lks_indata);
@@ -2335,8 +2201,6 @@ sppptun_recv(queue_t *q, mblk_t **mpp, void *destaddr, void *srcaddr)
 			freemsg(mp);
 			return (NULL);
 		}
-		if (tcl->tcl_flags & TCLF_DEBUG)
-			sppp_dump_frame(tcl->tcl_unit, mp, "rctl");
 		/* Fix up source address; peer might not be set yet. */
 		pap = &((struct ppptun_control *)mnew->b_rptr)->ptc_address;
 		bcopy(srcaddr, pap->pta_pppoe.ptma_mac,
@@ -2369,12 +2233,7 @@ sppptun_urput(queue_t *q, mblk_t *mp)
 	tunll_t *tll;
 	queue_t *nextq;
 
-	DBGENTRY((CE_CONT, "sppptun_urput as %s", DBGQSIDE(q)));
-
-	ASSERT(q != NULL);
-	ASSERT(q->q_ptr != NULL);
-	ASSERT(mp != NULL);
-	tll = (tunll_t *)q->q_ptr;
+	tll = q->q_ptr;
 	ASSERT(!(tll->tll_flags & TLLF_NOTLOWER));
 
 	switch (MTYPE(mp)) {
@@ -2383,7 +2242,7 @@ sppptun_urput(queue_t *q, mblk_t *mp)
 		 * When we're bound over IP, data arrives here.  The
 		 * packet starts with the IP header itself.
 		 */
-		if ((nextq = sppptun_recv(q, &mp, NULL, NULL)) != NULL)
+		if ((nextq = sppptun_recv(q, &mp, NULL)) != NULL)
 			putnext(nextq, mp);
 		break;
 
@@ -2398,40 +2257,47 @@ sppptun_urput(queue_t *q, mblk_t *mp)
 			break;
 
 		case PTS_PPPOE:		/* DLPI message */
+			if (MBLKL(mp) < sizeof (t_uscalar_t))
+				break;
 			dlprim = (union DL_primitives *)mp->b_rptr;
 			switch (dlprim->dl_primitive) {
-			case DL_UNITDATA_IND:
-				mpnext = mp->b_cont;
-				MTYPE(mpnext) = M_DATA;
-				nextq = sppptun_recv(q, &mpnext,
-				    mp->b_rptr +
-				    dlprim->unitdata_ind.dl_dest_addr_offset,
-				    mp->b_rptr +
-				    dlprim->unitdata_ind.dl_src_addr_offset);
-				if (nextq != NULL)
-					putnext(nextq, mpnext);
-				freeb(mp);
-				break;
+			case DL_UNITDATA_IND: {
+				size_t mlen = MBLKL(mp);
 
-			/* For loopback support. */
-			case DL_UNITDATA_REQ:
-				mpnext = mp->b_cont;
+				if (mlen < DL_UNITDATA_IND_SIZE)
+					break;
+				if (dlprim->unitdata_ind.dl_src_addr_offset <
+				    DL_UNITDATA_IND_SIZE ||
+				    dlprim->unitdata_ind.dl_src_addr_offset +
+				    dlprim->unitdata_ind.dl_src_addr_length >
+				    mlen)
+					break;
+			}
+				/* FALLTHROUGH */
+			case DL_UNITDATA_REQ:	/* For loopback support. */
+				if (dlprim->dl_primitive == DL_UNITDATA_REQ &&
+				    MBLKL(mp) < DL_UNITDATA_REQ_SIZE)
+					break;
+				if ((mpnext = mp->b_cont) == NULL)
+					break;
 				MTYPE(mpnext) = M_DATA;
 				nextq = sppptun_recv(q, &mpnext,
+				    dlprim->dl_primitive == DL_UNITDATA_IND ?
 				    mp->b_rptr +
-				    dlprim->unitdata_req.dl_dest_addr_offset,
+				    dlprim->unitdata_ind.dl_src_addr_offset :
 				    tll->tll_lcladdr.pta_pppoe.ptma_mac);
 				if (nextq != NULL)
 					putnext(nextq, mpnext);
 				freeb(mp);
-				break;
+				return;
 
 			default:
 				urput_dlpi(q, mp);
-				break;
+				return;
 			}
 			break;
 		}
+		freemsg(mp);
 		break;
 
 	default:
@@ -2456,7 +2322,6 @@ sppptun_ursrv(queue_t *q)
 {
 	mblk_t		*mp;
 
-	ASSERT(q != NULL);
 	ASSERT(q->q_ptr != NULL);
 
 	while ((mp = getq(q)) != NULL) {
@@ -2559,13 +2424,10 @@ sppptun_tcl_init(void)
 int
 sppptun_tcl_fintest(void)
 {
-	if (tunll_list.q_forw != &tunll_list || tcl_inuse > 0) {
-		DBGERROR((CE_CONT,
-		    "_fini: return busy; plumbed and %d in use\n",
-		    tcl_inuse));
+	if (tunll_list.q_forw != &tunll_list || tcl_inuse > 0)
 		return (EBUSY);
-	}
-	return (0);
+	else
+		return (0);
 }
 
 /*

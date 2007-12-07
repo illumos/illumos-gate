@@ -1,7 +1,7 @@
 /*
  * sppp_mod.c - modload support for PPP pseudo-device driver.
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -49,16 +49,12 @@
 #define	RCSID	" $Id: sppp_mod.c,v 1.0 2000/05/08 10:53:28 masputra Exp $"
 
 #include <sys/types.h>
-#include <sys/debug.h>
 #include <sys/systm.h>
 #include <sys/ddi.h>
-#include <sys/strlog.h>
 #include <sys/conf.h>
 #include <sys/sunddi.h>
-#include <sys/ksynch.h>
 #include <sys/stat.h>
 #include <sys/kstat.h>
-#include <sys/socket.h>
 #include <net/pppio.h>
 #include <sys/modctl.h>
 
@@ -98,8 +94,8 @@ static struct qinit sppp_urinit = {
 };
 
 static struct qinit sppp_uwinit = {
-	sppp_uwput,		/* qi_putp */
-	sppp_uwsrv,		/* qi_srvp */
+	(int (*)())sppp_uwput,	/* qi_putp */
+	(int (*)())sppp_uwsrv,	/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -108,7 +104,7 @@ static struct qinit sppp_uwinit = {
 };
 
 static struct qinit sppp_lrinit = {
-	sppp_lrput,		/* qi_putp */
+	(int (*)())sppp_lrput,	/* qi_putp */
 	NULL,			/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
@@ -119,7 +115,7 @@ static struct qinit sppp_lrinit = {
 
 static struct qinit sppp_lwinit = {
 	NULL,			/* qi_putp */
-	sppp_lwsrv,		/* qi_srvp */
+	(int (*)())sppp_lwsrv,	/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */

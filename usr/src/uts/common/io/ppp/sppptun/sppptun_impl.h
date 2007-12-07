@@ -1,7 +1,7 @@
 /*
  * sppptun_impl.h - Internal sppptun data exposed for adb/mdb macros.
  *
- * Copyright 2001,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +132,6 @@ struct tuncl_s {
 
 #define	TCLF_ISCLIENT		0x00000001	/* always set */
 #define	TCLF_FASTPATH		0x00000004	/* enable fast path recv */
-#define	TCLF_DEBUG		0x00000008	/* enable debug messages */
 #define	TCLF_DAEMON		0x00000010	/* server side; session 0 */
 #define	TCLF_SPEER_DONE		0x00000020	/* SPEER ioctl done */
 

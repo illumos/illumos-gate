@@ -1,7 +1,7 @@
 /*
  * spppasyn.c - STREAMS module for doing PPP asynchronous HDLC.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
@@ -72,7 +72,7 @@
  */
 #ifdef INTERNAL_BUILD
 /* MODINFO is limited to 32 characters. */
-const char spppasyn_module_description[] = "PPP 4.0 AHDLC v%I%";
+const char spppasyn_module_description[] = "PPP 4.0 AHDLC";
 #else /* INTERNAL_BUILD */
 const char spppasyn_module_description[] = "ANU PPP AHDLC $Revision: 1.16$";
 
@@ -492,7 +492,7 @@ create_kstats(sppp_ahdlc_t *state)
 	 * string length from %d is 11.  This was once snprintf, but
 	 * that's not backward-compatible with Solaris 2.6.
 	 */
-	(void) sprintf(unitname, "%s%d", AHDLC_MOD_NAME, state->sa_unit);
+	(void) sprintf(unitname, "%s" "%d", AHDLC_MOD_NAME, state->sa_unit);
 	ksp = kstat_create(AHDLC_MOD_NAME, state->sa_unit, unitname, "net",
 	    KSTAT_TYPE_NAMED, nstat, KSTAT_FLAG_VIRTUAL);
 	if (ksp != NULL) {
@@ -657,10 +657,10 @@ spppasyn_inner_ioctl(queue_t *q, mblk_t *mp)
 
 		flagval = (((uint32_t *)mp->b_cont->b_rptr)[0] << 20) &
 		    (SAF_RDECOMP_PROT | SAF_RDECOMP_AC | SAF_XCOMP_PROT |
-			SAF_XCOMP_AC);
+		    SAF_XCOMP_AC);
 		flagmask = (((uint32_t *)mp->b_cont->b_rptr)[1] << 20) &
 		    (SAF_RDECOMP_PROT | SAF_RDECOMP_AC | SAF_XCOMP_PROT |
-			SAF_XCOMP_AC);
+		    SAF_XCOMP_AC);
 		state->sa_flags = flagval | (state->sa_flags & ~flagmask);
 		*(uint32_t *)mp->b_cont->b_rptr = state->sa_flags >> 20;
 		len = sizeof (uint32_t);
@@ -1282,8 +1282,8 @@ receive_frame(queue_t *q, mblk_t *outmp, ushort_t fcs16, uint32_t fcs32)
 	 */
 	if ((is_lcp && (fcs16 == PPPGOODFCS16 || fcs32 == PPPGOODFCS32)) ||
 	    ((fcs16 == PPPGOODFCS16 && !(state->sa_flags & SAF_RECVCRC32)) ||
-		(fcs32 == PPPGOODFCS32 &&
-		    (state->sa_flags & SAF_RECVCRC32))) ||
+	    (fcs32 == PPPGOODFCS32 &&
+	    (state->sa_flags & SAF_RECVCRC32))) ||
 	    (!is_ctrl && !is_lcp && (state->sa_flags & SAF_RECVCRCNONE))) {
 
 		state->sa_stats.ppp_ipackets++;
@@ -1513,7 +1513,7 @@ ahdlc_decode(queue_t *q, mblk_t  *mp)
 				int maxlen;
 
 				if ((maxlen = state->sa_mru) < PPP_MRU)
-				    maxlen = PPP_MRU;
+					maxlen = PPP_MRU;
 				maxlen += PPP_FCS32LEN + 32;
 				outmp = allocb(maxlen, BPRI_MED);
 
@@ -1847,7 +1847,7 @@ spppasyn_muxencode(queue_t *q, mblk_t *mp)
 				*mp->b_rptr = PFF | (len);
 
 			} else if (state->sa_mqtail->b_wptr <
-				    DB_LIM(state->sa_mqtail)) {
+			    DB_LIM(state->sa_mqtail)) {
 					*state->sa_mqtail->b_wptr++ = PFF |len;
 			} else {
 				/* allocate a new mblk & add the byte */
