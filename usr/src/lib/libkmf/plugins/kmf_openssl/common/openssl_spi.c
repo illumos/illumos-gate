@@ -1416,6 +1416,8 @@ ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	switch (format) {
+		case KMF_FORMAT_RAWKEY:
+			/* same as ASN.1 */
 		case KMF_FORMAT_ASN1:
 			if (pkey->type == EVP_PKEY_RSA) {
 				rsa = EVP_PKEY_get1_RSA(pkey);
@@ -2953,6 +2955,8 @@ OpenSSL_FindKey(KMF_HANDLE_T handle,
 
 	if (rv == KMF_OK && (*numkeys) == 0)
 		rv = KMF_ERR_KEY_NOT_FOUND;
+	else if (rv == KMF_ERR_KEY_NOT_FOUND && (*numkeys) > 0)
+		rv = KMF_OK;
 
 	return (rv);
 }
@@ -5133,7 +5137,6 @@ OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
 			}
 		}
 	} else if (rawkey != NULL) {
-		/* RAW keys are always private */
 		if (rawkey->keytype == KMF_RSA) {
 			pkey = ImportRawRSAKey(&rawkey->rawdata.rsa);
 		} else if (rawkey->keytype == KMF_DSA) {
@@ -5142,8 +5145,14 @@ OpenSSL_StoreKey(KMF_HANDLE_T handle, int numattr,
 			rv = KMF_ERR_BAD_PARAMETER;
 		}
 		if (pkey != NULL) {
+			KMF_KEY_CLASS kclass = KMF_ASYM_PRI;
+
+			rv = kmf_get_attr(KMF_KEYCLASS_ATTR, attrlist, numattr,
+			    (void *)&kclass, NULL);
+			if (rv != KMF_OK)
+				rv = KMF_OK;
 			rv = ssl_write_key(kmfh, format, out,
-			    &cred, pkey, TRUE);
+			    &cred, pkey, (kclass == KMF_ASYM_PRI));
 			EVP_PKEY_free(pkey);
 		}
 	}

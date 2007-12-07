@@ -2173,6 +2173,42 @@ attr2bigint(CK_ATTRIBUTE_PTR attr, KMF_BIGINT *big)
 	big->len = attr->ulValueLen;
 }
 
+static KMF_RETURN
+get_bigint_attr(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj,
+	CK_ATTRIBUTE_TYPE attrtype, KMF_BIGINT *bigint)
+{
+	CK_RV ckrv;
+	CK_ATTRIBUTE attr;
+
+	attr.type = attrtype;
+	attr.pValue = NULL;
+	attr.ulValueLen = 0;
+
+	if ((ckrv = C_GetAttributeValue(sess, obj,
+	    &attr, 1)) != CKR_OK) {
+		/* Mask this error so the caller can continue */
+		if (ckrv == CKR_ATTRIBUTE_TYPE_INVALID)
+			return (KMF_OK);
+		else
+			return (KMF_ERR_INTERNAL);
+	}
+	if (attr.ulValueLen > 0 && bigint != NULL) {
+		attr.pValue = malloc(attr.ulValueLen);
+		if (attr.pValue == NULL)
+			return (KMF_ERR_MEMORY);
+
+		if ((ckrv = C_GetAttributeValue(sess, obj,
+		    &attr, 1)) != CKR_OK)
+		if (ckrv != CKR_OK) {
+			free(attr.pValue);
+			return (KMF_ERR_INTERNAL);
+		}
+
+		bigint->val = attr.pValue;
+		bigint->len = attr.ulValueLen;
+	}
+	return (KMF_OK);
+}
 
 static KMF_RETURN
 get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
@@ -2180,19 +2216,17 @@ get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
 	KMF_RETURN rv = KMF_OK;
 	CK_RV ckrv;
 	CK_SESSION_HANDLE sess = kmfh->pk11handle;
-	CK_ATTRIBUTE rsa_pri_attrs[8] = {
+	CK_ATTRIBUTE rsa_pri_attrs[2] = {
 		{ CKA_MODULUS, NULL, 0 },
-		{ CKA_PUBLIC_EXPONENT, NULL, 0 },
-		{ CKA_PRIVATE_EXPONENT, NULL, 0 },	/* optional */
-		{ CKA_PRIME_1, NULL, 0 },		/*  |  */
-		{ CKA_PRIME_2, NULL, 0 },		/*  |  */
-		{ CKA_EXPONENT_1, NULL, 0 },		/*  |  */
-		{ CKA_EXPONENT_2, NULL, 0 },		/*  |  */
-		{ CKA_COEFFICIENT, NULL, 0 }		/*  V  */
-	    };
+		{ CKA_PUBLIC_EXPONENT, NULL, 0 }
+	};
 	CK_ULONG count = sizeof (rsa_pri_attrs) / sizeof (CK_ATTRIBUTE);
 	int i;
 
+	if (rawrsa == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	(void) memset(rawrsa, 0, sizeof (KMF_RAW_RSA_KEY));
 	if ((ckrv = C_GetAttributeValue(sess, obj,
 	    rsa_pri_attrs, count)) != CKR_OK) {
 		SET_ERROR(kmfh, ckrv);
@@ -2229,35 +2263,25 @@ get_raw_rsa(KMF_HANDLE *kmfh, CK_OBJECT_HANDLE obj, KMF_RAW_RSA_KEY *rawrsa)
 	attr2bigint(&(rsa_pri_attrs[i++]), &rawrsa->mod);
 	attr2bigint(&(rsa_pri_attrs[i++]), &rawrsa->pubexp);
 
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->priexp);
-	i++;
-
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->prime1);
-	i++;
-
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->prime2);
-	i++;
-
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->exp1);
-	i++;
-
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->exp2);
-	i++;
-
-	if (rsa_pri_attrs[i].ulValueLen != (CK_ULONG)-1 &&
-	    rsa_pri_attrs[i].ulValueLen != 0)
-		attr2bigint(&(rsa_pri_attrs[i]), &rawrsa->coef);
-	i++;
+	/* Now get the optional parameters */
+	rv = get_bigint_attr(sess, obj, CKA_PRIVATE_EXPONENT, &rawrsa->priexp);
+	if (rv != KMF_OK)
+		goto end;
+	rv = get_bigint_attr(sess, obj, CKA_PRIME_1, &rawrsa->prime1);
+	if (rv != KMF_OK)
+		goto end;
+	rv = get_bigint_attr(sess, obj, CKA_PRIME_2, &rawrsa->prime2);
+	if (rv != KMF_OK)
+		goto end;
+	rv = get_bigint_attr(sess, obj, CKA_EXPONENT_1, &rawrsa->exp1);
+	if (rv != KMF_OK)
+		goto end;
+	rv = get_bigint_attr(sess, obj, CKA_EXPONENT_2, &rawrsa->exp2);
+	if (rv != KMF_OK)
+		goto end;
+	rv = get_bigint_attr(sess, obj, CKA_COEFFICIENT, &rawrsa->coef);
+	if (rv != KMF_OK)
+		goto end;
 
 end:
 	if (rv != KMF_OK) {
@@ -2265,6 +2289,18 @@ end:
 			if (rsa_pri_attrs[i].pValue != NULL)
 				free(rsa_pri_attrs[i].pValue);
 		}
+		if (rawrsa->priexp.val)
+			free(rawrsa->priexp.val);
+		if (rawrsa->prime1.val)
+			free(rawrsa->prime1.val);
+		if (rawrsa->prime2.val)
+			free(rawrsa->prime2.val);
+		if (rawrsa->exp1.val)
+			free(rawrsa->exp1.val);
+		if (rawrsa->exp2.val)
+			free(rawrsa->exp2.val);
+		if (rawrsa->coef.val)
+			free(rawrsa->coef.val);
 		(void) memset(rawrsa, 0, sizeof (KMF_RAW_RSA_KEY));
 	}
 	return (rv);
@@ -2591,7 +2627,7 @@ KMFPK11_FindKey(KMF_HANDLE_T handle,
 	CK_OBJECT_CLASS class;
 	CK_BBOOL true = TRUE;
 	CK_ULONG alg;
-	boolean_t is_token, is_private;
+	boolean_t is_token = B_TRUE, is_private = B_FALSE;
 	KMF_KEY_HANDLE *keys;
 	uint32_t *numkeys;
 	KMF_CREDENTIAL cred;

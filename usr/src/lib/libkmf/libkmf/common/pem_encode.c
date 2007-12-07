@@ -490,8 +490,8 @@ Pem2Der(unsigned char *in, int inlen,
 	PEM_ENCODE_CTX ctx;
 	int i, j, k, bl = 0;
 	char buf[2048];
-	char *nameB;
-	unsigned char *dataB;
+	char *nameB = NULL;
+	unsigned char *dataB = NULL;
 	int total = 0;
 
 	if (in == NULL || inlen == 0 || out == NULL)
@@ -600,8 +600,9 @@ Pem2Der(unsigned char *in, int inlen,
 	*outlen = bl;
 
 err:
-	free(nameB);
-	if (kmf_rv != KMF_OK)
+	if (nameB != NULL)
+		free(nameB);
+	if (kmf_rv != KMF_OK && dataB != NULL)
 		free(dataB);
 
 	return (kmf_rv);

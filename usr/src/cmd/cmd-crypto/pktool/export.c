@@ -453,10 +453,11 @@ pk_export_pk12_pk11(KMF_HANDLE_T kmfhandle, char *token_spec,
 static KMF_RETURN
 pk_export_pk11_keys(KMF_HANDLE_T kmfhandle, char *token,
 	KMF_CREDENTIAL *cred, KMF_ENCODE_FORMAT format,
-	char *label, char *filename)
+	char *label, char *filename, int oclass)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_KEYSTORE_TYPE kstype = KMF_KEYSTORE_PK11TOKEN;
+	KMF_KEY_CLASS kclass = KMF_KEYCLASS_NONE;
 	int numattr = 0;
 	uint32_t numkeys = 1;
 	KMF_ATTRIBUTE attrlist[16];
@@ -502,6 +503,20 @@ pk_export_pk11_keys(KMF_HANDLE_T kmfhandle, char *token,
 
 	kmf_set_attr_at_index(attrlist, numattr, KMF_ENCODE_FORMAT_ATTR,
 	    &format, sizeof (format));
+	numattr++;
+
+	/* Check to see if we are exporting private or public only */
+	if ((oclass & PK_KEY_OBJ) == PK_PRIKEY_OBJ)
+		kclass = KMF_ASYM_PRI;
+	else if ((oclass & PK_KEY_OBJ) == PK_PUBKEY_OBJ)
+		kclass = KMF_ASYM_PUB;
+	else if ((oclass & PK_KEY_OBJ) == PK_SYMKEY_OBJ)
+		kclass = KMF_SYMMETRIC;
+	else /* only 1 key at a time can be exported here, so default to pri */
+		kclass = KMF_ASYM_PRI;
+
+	kmf_set_attr_at_index(attrlist, numattr, KMF_KEYCLASS_ATTR,
+	    &kclass, sizeof (kclass));
 	numattr++;
 
 	rv = kmf_find_key(kmfhandle, numattr, attrlist);
@@ -555,6 +570,10 @@ done:
 
 		kmf_set_attr_at_index(attrlist, numattr, KMF_KEY_FILENAME_ATTR,
 		    filename, strlen(filename));
+		numattr++;
+
+		kmf_set_attr_at_index(attrlist, numattr, KMF_KEYCLASS_ATTR,
+		    &key.keyclass, sizeof (KMF_KEY_CLASS));
 		numattr++;
 
 		rv = kmf_store_key(kmfhandle, numattr, attrlist);
@@ -815,6 +834,9 @@ pk_export(int argc, char *argv[])
 		if (yesno(gettext("Continue with export? "),
 		    gettext("Respond with yes or no.\n"), B_FALSE) == B_FALSE) {
 			return (0);
+		} else {
+			/* remove the file */
+			(void) unlink(filename);
 		}
 	} else {
 		rv = verify_file(filename);
@@ -866,7 +888,7 @@ pk_export(int argc, char *argv[])
 			    kfmt == KMF_FORMAT_RAWKEY)
 				rv = pk_export_pk11_keys(kmfhandle,
 				    token_spec, &tokencred, kfmt,
-				    certlabel, filename);
+				    certlabel, filename, oclass);
 			else
 				rv = pk_export_pk11_objects(kmfhandle,
 				    token_spec, certlabel,
