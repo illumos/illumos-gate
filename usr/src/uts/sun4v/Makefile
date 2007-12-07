@@ -37,6 +37,7 @@ include Makefile.maramba
 include Makefile.thunder
 include Makefile.turgo
 include Makefile.congo
+include Makefile.monza
 
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
@@ -206,7 +207,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_TURGO_DIR) $(USR_TURGO_SBIN_DIR) \
 			$(USR_TURGO_LIB_DIR) \
 			$(USR_CONGO_DIR) $(USR_CONGO_SBIN_DIR) \
-			$(USR_CONGO_LIB_DIR)
+			$(USR_CONGO_LIB_DIR) \
+			$(USR_MONZA_DIR) \
+			$(USR_MONZA_SBIN_DIR) $(USR_MONZA_SBIN_LINKS)
 
 
 #
@@ -284,6 +287,15 @@ $(USR_CONGO_SBIN_DIR):		$(USR_CONGO_DIR)
 
 $(USR_CONGO_LIB_DIR):		$(USR_CONGO_DIR)
 	-$(INS.dir.root.bin)
+
+$(USR_MONZA_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_MONZA_SBIN_DIR):		$(USR_MONZA_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_MONZA_SBIN_LINKS):	$(USR_MONZA_SBIN_DIR)
+	$(INS.slink7)
 
 #
 #	Full kernel lint target.

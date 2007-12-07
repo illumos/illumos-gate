@@ -564,6 +564,7 @@ INS.slink3= $(RM) -r $@; $(SYMLINK) $(IMPLEMENTED_PLATFORM) $@ $(CHOWNLINK) $(CH
 INS.slink4= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/include $@ $(CHOWNLINK) $(CHGRPLINK)
 INS.slink5= $(RM) -r $@; $(SYMLINK) ../$(PLATFORM)/sbin $@ $(CHOWNLINK) $(CHGRPLINK)
 INS.slink6= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+INS.slink7= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/$(@F) $@ $(CHOWNLINK) $(CHGRPLINK)
 
 ROOT_PLAT_LINKS		 = $(PLAT_LINKS:%=$(ROOT_PLAT_DIR)/%)
 ROOT_PLAT_LINKS_2	 = $(PLAT_LINKS_2:%=$(ROOT_PLAT_DIR)/%)

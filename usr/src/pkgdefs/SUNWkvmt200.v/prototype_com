@@ -183,3 +183,9 @@ s none usr/platform/SUNW,Netra-T5220/include=../sun4v/include
 s none usr/platform/SUNW,Netra-T5440/lib/libtsalarm.so.1=../../sun4v/lib/libtsalarm.so.1
 s none usr/platform/SUNW,Netra-T5440/lib/libtsalarm.so=../../sun4v/lib/libtsalarm.so
 s none usr/platform/SUNW,Netra-T5440/include=../sun4v/include
+
+# Add Monza links to individual component
+#
+d none usr/platform/SUNW,Netra-CP3260/sbin 0755 root bin
+s none usr/platform/SUNW,Netra-CP3260/sbin/prtdiag=../../sun4v/sbin/prtdiag
+s none usr/platform/SUNW,Netra-CP3260/sbin/trapstat=../../sun4v/sbin/trapstat
