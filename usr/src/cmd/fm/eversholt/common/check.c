@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * check.c -- routines for checking the prop tree
@@ -169,10 +169,10 @@ check_arrow(struct node *np)
 	}
 
 	if (!check_nork(np->u.arrow.nnp) ||
-		!check_nork(np->u.arrow.knp))
-			outfl(O_ERR, np->file, np->line,
-			    "counts associated with propagation arrows "
-			    "must be integers");
+	    !check_nork(np->u.arrow.knp))
+		outfl(O_ERR, np->file, np->line,
+		    "counts associated with propagation arrows "
+		    "must be integers");
 
 	check_path_iterators(np);
 }
@@ -205,9 +205,9 @@ check_nork(struct node *np)
 
 		/*  simple expressions allowed */
 		if (np->t == T_SUB ||
-			np->t == T_ADD ||
-			np->t == T_MUL ||
-			np->t == T_DIV)
+		    np->t == T_ADD ||
+		    np->t == T_MUL ||
+		    np->t == T_DIV)
 			rval = 1;
 	}
 
@@ -290,20 +290,20 @@ check_fru_asru(enum nodetype t, const char *s, struct node *np)
 
 	/* make sure it is a node type T_NAME? */
 	if (np->t == T_NAME) {
-	    if (s == L_ASRU) {
-		if (tree_name2np_lut_lookup_name(ASRUs, np) == NULL)
+		if (s == L_ASRU) {
+			if (tree_name2np_lut_lookup_name(ASRUs, np) == NULL)
+				outfl(O_ERR, np->file, np->line,
+				    "ASRU property contains undeclared asru");
+		} else if (s == L_FRU) {
+			if (tree_name2np_lut_lookup_name(FRUs, np) == NULL)
+				outfl(O_ERR, np->file, np->line,
+				    "FRU property contains undeclared fru");
+		} else {
 			outfl(O_ERR, np->file, np->line,
-			    "ASRU property contains undeclared asru");
-	    } else if (s == L_FRU) {
-		if (tree_name2np_lut_lookup_name(FRUs, np) == NULL)
-			outfl(O_ERR, np->file, np->line,
-			    "FRU property contains undeclared fru");
-	    } else {
-		    outfl(O_ERR, np->file, np->line,
-			"illegal property name in %s declaration: %s",
-			ptree_nodetype2str(t), s);
-	    }
-	    check_type_iterator(np);
+			    "illegal property name in %s declaration: %s",
+			    ptree_nodetype2str(t), s);
+		}
+		check_type_iterator(np);
 	} else
 		outfl(O_ERR, np->file, np->line,
 		    "illegal type used for %s property: %s",
@@ -473,7 +473,7 @@ check_propnames(enum nodetype t, struct node *np, int from, int to)
 
 	ASSERT(np != NULL);
 	ASSERTinfo(np->t == T_EVENT || np->t == T_LIST || np->t == T_ARROW,
-				ptree_nodetype2str(np->t));
+	    ptree_nodetype2str(np->t));
 
 	if (np->t == T_EVENT) {
 		switch (np->u.event.ename->u.name.t) {
@@ -626,12 +626,11 @@ check_exprscope(struct node *np, struct lut *ex)
 	case T_NAME:
 		if (np->u.name.child && np->u.name.child->t == T_NAME) {
 			if (lut_lookup(ex,
-					(void *) np->u.name.child->u.name.s,
-					NULL) == NULL)
+			    (void *) np->u.name.child->u.name.s, NULL) == NULL)
 				outfl(O_ERR, np->file, np->line,
-					"constraint contains undefined"
-					" iterator: %s",
-					np->u.name.child->u.name.s);
+				    "constraint contains undefined"
+				    " iterator: %s",
+				    np->u.name.child->u.name.s);
 		}
 		check_exprscope(np->u.name.next, ex);
 		break;
@@ -968,15 +967,17 @@ check_func(struct node *np)
 		switch (arglist->t) {
 			case T_NUM:
 				if (arglist->u.ull != 0ULL)
-				    outfl(O_ERR, arglist->file, arglist->line,
-					"parameter of within must be 0"
-					", \"infinity\" or a time value.");
+					outfl(O_ERR,
+					    arglist->file, arglist->line,
+					    "parameter of within must be 0"
+					    ", \"infinity\" or a time value.");
 				break;
 			case T_NAME:
 				if (arglist->u.name.s != L_infinity)
-				    outfl(O_ERR, arglist->file, arglist->line,
-					"parameter of within must be 0"
-					", \"infinity\" or a time value.");
+					outfl(O_ERR,
+					    arglist->file, arglist->line,
+					    "parameter of within must be 0"
+					    ", \"infinity\" or a time value.");
 				break;
 			case T_LIST:
 				/*
@@ -1009,26 +1010,29 @@ check_func(struct node *np)
 				 */
 				if (arglist->u.expr.left->t == T_NUM)
 					if (arglist->u.expr.left->u.ull != 0ULL)
-					    outfl(O_ERR,
-						arglist->file, arglist->line,
-						"within parameter must be 0 or"
-						" a time value.");
+						outfl(O_ERR, arglist->file,
+						    arglist->line,
+						    "within parameter must be "
+						    "0 or a time value.");
 				if (arglist->u.expr.right->t == T_NUM)
 					if (arglist->u.expr.right->u.ull
 					    != 0ULL)
-					    outfl(O_ERR,
-						arglist->file, arglist->line,
-						"within parameter must be 0 or"
-						" a time value.");
+						outfl(O_ERR,
+						    arglist->file,
+						    arglist->line,
+						    "within parameter must be "
+						    "0 or a time value.");
 
 				/* if right is a T_NAME it must be "infinity" */
 				if (arglist->u.expr.right->t == T_NAME)
 					if (arglist->u.expr.right->u.name.s
 					    != L_infinity)
-					    outfl(O_ERR,
-						arglist->file, arglist->line,
-						"\"infinity\" is the only valid"
-						" name for within parameter.");
+						outfl(O_ERR,
+						    arglist->file,
+						    arglist->line,
+						    "\"infinity\" is the only "
+						    "valid name for within "
+						    "parameter.");
 
 				/*
 				 * the first parameter [min] must not be greater
@@ -1046,8 +1050,8 @@ check_func(struct node *np)
 				break; /* no restrictions on T_TIMEVAL */
 			default:
 				outfl(O_ERR, arglist->file, arglist->line,
-					"parameter of within must be 0"
-					", \"infinity\" or a time value.");
+				    "parameter of within must be 0"
+				    ", \"infinity\" or a time value.");
 		}
 	} else if (np->u.func.s == L_call) {
 		if (np->u.func.arglist->t != T_QUOTE &&
@@ -1057,18 +1061,18 @@ check_func(struct node *np)
 		    np->u.func.arglist->t != T_LIST &&
 		    np->u.func.arglist->t != T_FUNC)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"invalid first argument to call()");
+			    np->u.func.arglist->line,
+			    "invalid first argument to call()");
 	} else if (np->u.func.s == L_fru) {
 		if (np->u.func.arglist->t != T_NAME)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"argument to fru() must be a path");
+			    np->u.func.arglist->line,
+			    "argument to fru() must be a path");
 	} else if (np->u.func.s == L_asru) {
 		if (np->u.func.arglist->t != T_NAME)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"argument to asru() must be a path");
+			    np->u.func.arglist->line,
+			    "argument to asru() must be a path");
 	} else if (np->u.func.s == L_is_connected ||
 	    np->u.func.s == L_is_under) {
 		if (np->u.func.arglist->t == T_LIST &&
@@ -1156,13 +1160,13 @@ check_func(struct node *np)
 	} else if (np->u.func.s == L_defined) {
 		if (np->u.func.arglist->t != T_GLOBID)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"argument to defined() must be a global");
+			    np->u.func.arglist->line,
+			    "argument to defined() must be a global");
 	} else if (np->u.func.s == L_payloadprop) {
 		if (np->u.func.arglist->t != T_QUOTE)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"argument to payloadprop() must be a string");
+			    np->u.func.arglist->line,
+			    "argument to payloadprop() must be a string");
 	} else if (np->u.func.s == L_payloadprop_contains) {
 		if (np->u.func.arglist->t != T_LIST ||
 		    np->u.func.arglist->u.expr.left->t != T_QUOTE ||
@@ -1193,12 +1197,12 @@ check_func(struct node *np)
 	} else if (np->u.func.s == L_envprop) {
 		if (np->u.func.arglist->t != T_QUOTE)
 			outfl(O_ERR, np->u.func.arglist->file,
-				np->u.func.arglist->line,
-				"argument to envprop() must be a string");
+			    np->u.func.arglist->line,
+			    "argument to envprop() must be a string");
 	} else
 		outfl(O_WARN, np->file, np->line,
-			"possible platform-specific function: %s",
-			np->u.func.s);
+		    "possible platform-specific function: %s",
+		    np->u.func.s);
 }
 
 void
@@ -1239,9 +1243,7 @@ check_event(struct node *np)
 void
 check_required_props(struct node *lhs, struct node *rhs, void *arg)
 {
-	enum nodetype t = (enum nodetype)arg;
-
-	ASSERTeq(rhs->t, t, ptree_nodetype2str);
+	ASSERTeq(rhs->t, (enum nodetype)arg, ptree_nodetype2str);
 
 	check_stmt_required_properties(rhs);
 }
@@ -1271,9 +1273,8 @@ check_proplists_lhs(enum nodetype t, struct node *lhs)
 	if (lhs->t == T_ARROW) {
 		if (lhs->u.arrow.rhs->t == T_LIST) {
 			outfl(O_ERR, lhs->file, lhs->line,
-				"lists are not allowed internally on"
-				" cascading %s",
-				(t == T_PROP) ? "propagations" : "masks");
+			    "lists are not allowed internally on cascading %s",
+			    (t == T_PROP) ? "propagations" : "masks");
 		}
 		check_proplists_lhs(t, lhs->u.arrow.lhs);
 	}
