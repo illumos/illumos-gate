@@ -100,7 +100,7 @@ int arc_tryread(spa_t *spa, blkptr_t *bp, void *data);
 void arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private);
 int arc_buf_evict(arc_buf_t *buf);
 
-void arc_flush(void);
+void arc_flush(spa_t *spa);
 void arc_tempreserve_clear(uint64_t tempreserve);
 int arc_tempreserve_space(uint64_t tempreserve);
 

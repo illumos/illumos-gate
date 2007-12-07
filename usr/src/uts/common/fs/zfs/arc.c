@@ -437,7 +437,7 @@ static arc_buf_hdr_t arc_eviction_hdr;
 static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 static int arc_evict_needed(arc_buf_contents_t type);
-static void arc_evict_ghost(arc_state_t *state, int64_t bytes);
+static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
 
 #define	GHOST_STATE(state)	\
 	((state) == arc_mru_ghost || (state) == arc_mfu_ghost ||	\
@@ -1396,9 +1396,13 @@ arc_buf_size(arc_buf_t *buf)
  * - return the data block from this buffer rather than freeing it.
  * This flag is used by callers that are trying to make space for a
  * new buffer in a full arc cache.
+ *
+ * This function makes a "best effort".  It skips over any buffers
+ * it can't get a hash_lock on, and so may not catch all candidates.
+ * It may also return without evicting as much space as requested.
  */
 static void *
-arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
+arc_evict(arc_state_t *state, spa_t *spa, int64_t bytes, boolean_t recycle,
     arc_buf_contents_t type)
 {
 	arc_state_t *evicted_state;
@@ -1420,6 +1424,7 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
 		ab_prev = list_prev(list, ab);
 		/* prefetch buffers have a minimum lifespan */
 		if (HDR_IO_IN_PROGRESS(ab) ||
+		    (spa && ab->b_spa != spa) ||
 		    (ab->b_flags & (ARC_PREFETCH|ARC_INDIRECT) &&
 		    lbolt - ab->b_arc_access < arc_min_prefetch_lifespan)) {
 			skipped++;
@@ -1499,12 +1504,12 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
 		if (mru_over > 0 && arc_mru_ghost->arcs_lsize[type] > 0) {
 			int64_t todelete =
 			    MIN(arc_mru_ghost->arcs_lsize[type], mru_over);
-			arc_evict_ghost(arc_mru_ghost, todelete);
+			arc_evict_ghost(arc_mru_ghost, NULL, todelete);
 		} else if (arc_mfu_ghost->arcs_lsize[type] > 0) {
 			int64_t todelete = MIN(arc_mfu_ghost->arcs_lsize[type],
 			    arc_mru_ghost->arcs_size +
 			    arc_mfu_ghost->arcs_size - arc_c);
-			arc_evict_ghost(arc_mfu_ghost, todelete);
+			arc_evict_ghost(arc_mfu_ghost, NULL, todelete);
 		}
 	}
 
@@ -1516,7 +1521,7 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
  * bytes.  Destroy the buffers that are removed.
  */
 static void
-arc_evict_ghost(arc_state_t *state, int64_t bytes)
+arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes)
 {
 	arc_buf_hdr_t *ab, *ab_prev;
 	list_t *list = &state->arcs_list[ARC_BUFC_DATA];
@@ -1529,6 +1534,8 @@ top:
 	mutex_enter(&state->arcs_mtx);
 	for (ab = list_tail(list); ab; ab = ab_prev) {
 		ab_prev = list_prev(list, ab);
+		if (spa && ab->b_spa != spa)
+			continue;
 		hash_lock = HDR_LOCK(ab);
 		if (mutex_tryenter(hash_lock)) {
 			ASSERT(!HDR_IO_IN_PROGRESS(ab));
@@ -1585,19 +1592,20 @@ arc_adjust(void)
 {
 	int64_t top_sz, mru_over, arc_over, todelete;
 
-	top_sz = arc_anon->arcs_size + arc_mru->arcs_size;
+	top_sz = arc_anon->arcs_size + arc_mru->arcs_size + arc_meta_used;
 
 	if (top_sz > arc_p && arc_mru->arcs_lsize[ARC_BUFC_DATA] > 0) {
 		int64_t toevict =
 		    MIN(arc_mru->arcs_lsize[ARC_BUFC_DATA], top_sz - arc_p);
-		(void) arc_evict(arc_mru, toevict, FALSE, ARC_BUFC_DATA);
+		(void) arc_evict(arc_mru, NULL, toevict, FALSE, ARC_BUFC_DATA);
 		top_sz = arc_anon->arcs_size + arc_mru->arcs_size;
 	}
 
 	if (top_sz > arc_p && arc_mru->arcs_lsize[ARC_BUFC_METADATA] > 0) {
 		int64_t toevict =
 		    MIN(arc_mru->arcs_lsize[ARC_BUFC_METADATA], top_sz - arc_p);
-		(void) arc_evict(arc_mru, toevict, FALSE, ARC_BUFC_METADATA);
+		(void) arc_evict(arc_mru, NULL, toevict, FALSE,
+		    ARC_BUFC_METADATA);
 		top_sz = arc_anon->arcs_size + arc_mru->arcs_size;
 	}
 
@@ -1606,7 +1614,7 @@ arc_adjust(void)
 	if (mru_over > 0) {
 		if (arc_mru_ghost->arcs_size > 0) {
 			todelete = MIN(arc_mru_ghost->arcs_size, mru_over);
-			arc_evict_ghost(arc_mru_ghost, todelete);
+			arc_evict_ghost(arc_mru_ghost, NULL, todelete);
 		}
 	}
 
@@ -1616,7 +1624,7 @@ arc_adjust(void)
 		if (arc_mfu->arcs_lsize[ARC_BUFC_DATA] > 0) {
 			int64_t toevict =
 			    MIN(arc_mfu->arcs_lsize[ARC_BUFC_DATA], arc_over);
-			(void) arc_evict(arc_mfu, toevict, FALSE,
+			(void) arc_evict(arc_mfu, NULL, toevict, FALSE,
 			    ARC_BUFC_DATA);
 			arc_over = arc_size - arc_c;
 		}
@@ -1626,7 +1634,7 @@ arc_adjust(void)
 			int64_t toevict =
 			    MIN(arc_mfu->arcs_lsize[ARC_BUFC_METADATA],
 			    arc_over);
-			(void) arc_evict(arc_mfu, toevict, FALSE,
+			(void) arc_evict(arc_mfu, NULL, toevict, FALSE,
 			    ARC_BUFC_METADATA);
 		}
 
@@ -1635,7 +1643,7 @@ arc_adjust(void)
 
 		if (tbl_over > 0 && arc_mfu_ghost->arcs_size > 0) {
 			todelete = MIN(arc_mfu_ghost->arcs_size, tbl_over);
-			arc_evict_ghost(arc_mfu_ghost, todelete);
+			arc_evict_ghost(arc_mfu_ghost, NULL, todelete);
 		}
 	}
 }
@@ -1662,28 +1670,40 @@ arc_do_user_evicts(void)
 }
 
 /*
- * Flush all *evictable* data from the cache.
+ * Flush all *evictable* data from the cache for the given spa.
  * NOTE: this will not touch "active" (i.e. referenced) data.
  */
 void
-arc_flush(void)
+arc_flush(spa_t *spa)
 {
-	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA]))
-		(void) arc_evict(arc_mru, -1, FALSE, ARC_BUFC_DATA);
-	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA]))
-		(void) arc_evict(arc_mru, -1, FALSE, ARC_BUFC_METADATA);
-	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA]))
-		(void) arc_evict(arc_mfu, -1, FALSE, ARC_BUFC_DATA);
-	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA]))
-		(void) arc_evict(arc_mfu, -1, FALSE, ARC_BUFC_METADATA);
+	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
+		(void) arc_evict(arc_mru, spa, -1, FALSE, ARC_BUFC_DATA);
+		if (spa)
+			break;
+	}
+	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA])) {
+		(void) arc_evict(arc_mru, spa, -1, FALSE, ARC_BUFC_METADATA);
+		if (spa)
+			break;
+	}
+	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA])) {
+		(void) arc_evict(arc_mfu, spa, -1, FALSE, ARC_BUFC_DATA);
+		if (spa)
+			break;
+	}
+	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA])) {
+		(void) arc_evict(arc_mfu, spa, -1, FALSE, ARC_BUFC_METADATA);
+		if (spa)
+			break;
+	}
 
-	arc_evict_ghost(arc_mru_ghost, -1);
-	arc_evict_ghost(arc_mfu_ghost, -1);
+	arc_evict_ghost(arc_mru_ghost, spa, -1);
+	arc_evict_ghost(arc_mfu_ghost, spa, -1);
 
 	mutex_enter(&arc_reclaim_thr_lock);
 	arc_do_user_evicts();
 	mutex_exit(&arc_reclaim_thr_lock);
-	ASSERT(arc_eviction_list == NULL);
+	ASSERT(spa || arc_eviction_list == NULL);
 }
 
 int arc_shrink_shift = 5;		/* log2(fraction of arc to reclaim) */
@@ -2033,7 +2053,7 @@ arc_get_data_buf(arc_buf_t *buf)
 		state =  (arc_mru->arcs_lsize[type] > 0 &&
 		    mfu_space > arc_mfu->arcs_size) ? arc_mru : arc_mfu;
 	}
-	if ((buf->b_data = arc_evict(state, size, TRUE, type)) == NULL) {
+	if ((buf->b_data = arc_evict(state, NULL, size, TRUE, type)) == NULL) {
 		if (type == ARC_BUFC_METADATA) {
 			buf->b_data = zio_buf_alloc(size);
 			arc_space_consume(size);
@@ -3237,7 +3257,7 @@ arc_fini(void)
 		cv_wait(&arc_reclaim_thr_cv, &arc_reclaim_thr_lock);
 	mutex_exit(&arc_reclaim_thr_lock);
 
-	arc_flush();
+	arc_flush(NULL);
 
 	arc_dead = TRUE;
 

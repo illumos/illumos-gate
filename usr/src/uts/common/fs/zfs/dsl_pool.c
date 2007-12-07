@@ -131,7 +131,7 @@ dsl_pool_close(dsl_pool_t *dp)
 	txg_list_destroy(&dp->dp_dirty_dirs);
 	list_destroy(&dp->dp_synced_datasets);
 
-	arc_flush();
+	arc_flush(dp->dp_spa);
 	txg_fini(dp);
 	rw_destroy(&dp->dp_config_rwlock);
 	kmem_free(dp, sizeof (dsl_pool_t));

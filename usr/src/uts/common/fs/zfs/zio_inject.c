@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ zio_inject_fault(char *name, int flags, int *id, zinject_record_t *record)
 	 * fault injection isn't a performance critical path.
 	 */
 	if (flags & ZINJECT_FLUSH_ARC)
-		arc_flush();
+		arc_flush(NULL);
 
 	return (0);
 }

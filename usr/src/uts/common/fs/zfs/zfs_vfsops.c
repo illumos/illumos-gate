@@ -1130,8 +1130,7 @@ static int
 zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 {
 	objset_t *os = zfsvfs->z_os;
-	znode_t	*zp, *nextzp;
-	znode_t markerzp;
+	znode_t	*zp;
 
 	rrw_enter(&zfsvfs->z_teardown_lock, RW_WRITER, FTAG);
 
@@ -1173,37 +1172,14 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	 * relavent for forced unmount).
 	 *
 	 * Release all holds on dbufs.
-	 * Note, the dmu can still callback via znode_pageout_func()
-	 * which can zfs_znode_free() the znode.  So we lock
-	 * z_all_znodes; search the list for a held dbuf; drop the lock
-	 * (we know zp can't disappear if we hold a dbuf lock) then
-	 * regrab the lock and restart.
-	 *
-	 * Since we have to restart the search after finding each held dbuf,
-	 * we do two things to speed up searching: we insert a dummy znode
-	 * ('markerzp') to detect the original tail of the list, and move
-	 * non-held znodes to the end of the list.  Once we hit 'markerzp',
-	 * we know we've looked at each znode and can break out.
 	 */
 	mutex_enter(&zfsvfs->z_znodes_lock);
-	list_insert_tail(&zfsvfs->z_all_znodes, &markerzp);
-	for (zp = list_head(&zfsvfs->z_all_znodes); zp != &markerzp;
-	    zp = nextzp) {
-		nextzp = list_next(&zfsvfs->z_all_znodes, zp);
+	for (zp = list_head(&zfsvfs->z_all_znodes); zp != NULL;
+	    zp = list_next(&zfsvfs->z_all_znodes, zp))
 		if (zp->z_dbuf) {
-			/* dbufs should only be held when force unmounting */
-			mutex_exit(&zfsvfs->z_znodes_lock);
-			dmu_buf_rele(zp->z_dbuf, NULL);
-			zp->z_dbuf = NULL;
-			mutex_enter(&zfsvfs->z_znodes_lock);
-			/* Start again */
-			nextzp = list_head(&zfsvfs->z_all_znodes);
-		} else {
-			list_remove(&zfsvfs->z_all_znodes, zp);
-			list_insert_tail(&zfsvfs->z_all_znodes, zp);
+			ASSERT(ZTOV(zp)->v_count > 0);
+			zfs_znode_dmu_fini(zp);
 		}
-	}
-	list_remove(&zfsvfs->z_all_znodes, &markerzp);
 	mutex_exit(&zfsvfs->z_znodes_lock);
 
 	/*

@@ -1502,7 +1502,6 @@ top:
 		mutex_exit(&vp->v_lock);
 		mutex_exit(&zp->z_lock);
 		zfs_znode_delete(zp, tx);
-		VFS_RELE(zfsvfs->z_vfs);
 	} else if (unlinked) {
 		zfs_unlinked_add(zp, tx);
 	}
@@ -3650,8 +3649,8 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	rw_enter(&zfsvfs->z_teardown_inactive_lock, RW_READER);
 	if (zp->z_dbuf == NULL) {
 		/*
-		 * This fs has been unmounted, or we did
-		 * zfs_suspend/resume and it no longer exists.
+		 * The fs has been unmounted, or we did a
+		 * suspend/resume and this file no longer exists.
 		 */
 		if (vn_has_cached_data(vp)) {
 			(void) pvn_vplist_dirty(vp, 0, zfs_null_putapage,
@@ -3661,9 +3660,8 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 		mutex_enter(&zp->z_lock);
 		vp->v_count = 0; /* count arrives as 1 */
 		mutex_exit(&zp->z_lock);
-		zfs_znode_free(zp);
 		rw_exit(&zfsvfs->z_teardown_inactive_lock);
-		VFS_RELE(zfsvfs->z_vfs);
+		zfs_znode_free(zp);
 		return;
 	}
 

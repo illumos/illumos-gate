@@ -75,20 +75,13 @@ struct kmem_cache *znode_cache = NULL;
 
 /*ARGSUSED*/
 static void
-znode_pageout_func(dmu_buf_t *dbuf, void *user_ptr)
+znode_evict_error(dmu_buf_t *dbuf, void *user_ptr)
 {
-	znode_t *zp = user_ptr;
-	vnode_t *vp = ZTOV(zp);
-
-	mutex_enter(&zp->z_lock);
-	zp->z_dbuf = NULL;
-	if (vp->v_count == 0) {
-		mutex_exit(&zp->z_lock);
-		vn_invalid(vp);
-		zfs_znode_free(zp);
-	} else {
-		mutex_exit(&zp->z_lock);
-	}
+	/*
+	 * We should never drop all dbuf refs without first clearing
+	 * the eviction callback.
+	 */
+	panic("evicting znode %p\n", user_ptr);
 }
 
 /*ARGSUSED*/
@@ -436,7 +429,7 @@ zfs_znode_dmu_init(znode_t *zp, dmu_buf_t *db)
 
 	ASSERT(zp->z_dbuf == NULL);
 	zp->z_dbuf = db;
-	nzp = dmu_buf_set_user_ie(db, zp, &zp->z_phys, znode_pageout_func);
+	nzp = dmu_buf_set_user_ie(db, zp, &zp->z_phys, znode_evict_error);
 
 	/*
 	 * there should be no
@@ -455,13 +448,15 @@ zfs_znode_dmu_init(znode_t *zp, dmu_buf_t *db)
 	vn_exists(ZTOV(zp));
 }
 
-static void
+void
 zfs_znode_dmu_fini(znode_t *zp)
 {
 	dmu_buf_t *db = zp->z_dbuf;
-	ASSERT(MUTEX_HELD(ZFS_OBJ_MUTEX(zp)));
+	ASSERT(MUTEX_HELD(ZFS_OBJ_MUTEX(zp)) ||
+	    RW_WRITE_HELD(&zp->z_zfsvfs->z_teardown_inactive_lock));
 	ASSERT(zp->z_dbuf != NULL);
 	zp->z_dbuf = NULL;
+	VERIFY(zp == dmu_buf_update_user(db, zp, NULL, NULL, NULL));
 	dmu_buf_rele(db, NULL);
 }
 
@@ -539,9 +534,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz)
 		break;
 	}
 
-	/* it can be NULL from zfs_create_fs */
-	if (zfsvfs->z_vfs)
-		VFS_HOLD(zfsvfs->z_vfs);
+	VFS_HOLD(zfsvfs->z_vfs);
 	return (zp);
 }
 
@@ -635,6 +628,7 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
 	 * to reference the just-allocated physical data area.
 	 */
 	if (flag & IS_ROOT_NODE) {
+		dzp->z_dbuf = db;
 		dzp->z_phys = pzp;
 		dzp->z_id = obj;
 	}
@@ -679,9 +673,17 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, dmu_tx_t *tx, cred_t *cr,
 	}
 
 	pzp->zp_mode = MAKEIMODE(vap->va_type, vap->va_mode);
-	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj)
-	*zpp = zfs_znode_alloc(zfsvfs, db, 0);
-	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj);
+	if (!(flag & IS_ROOT_NODE)) {
+		ZFS_OBJ_HOLD_ENTER(zfsvfs, obj)
+		*zpp = zfs_znode_alloc(zfsvfs, db, 0);
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj);
+	} else {
+		/*
+		 * If we are creating the root node, the "parent" we
+		 * passed in is the znode for the root.
+		 */
+		*zpp = dzp;
+	}
 	zfs_perm_init(*zpp, dzp, flag, vap, tx, cr, setaclp, fuidp);
 }
 
@@ -862,6 +864,7 @@ zfs_znode_delete(znode_t *zp, dmu_tx_t *tx)
 	VERIFY(0 == dmu_object_free(zfsvfs->z_os, obj, tx));
 	zfs_znode_dmu_fini(zp);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj);
+	zfs_znode_free(zp);
 }
 
 void
@@ -908,15 +911,12 @@ zfs_zinactive(znode_t *zp)
 		mutex_exit(&zp->z_lock);
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
 		zfs_rmnode(zp);
-		VFS_RELE(zfsvfs->z_vfs);
 		return;
 	}
 	mutex_exit(&zp->z_lock);
 	zfs_znode_dmu_fini(zp);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
-	/* it can be NULL from zfs_create_fs */
-	if (zfsvfs->z_vfs)
-		VFS_RELE(zfsvfs->z_vfs);
+	zfs_znode_free(zp);
 }
 
 void
@@ -924,11 +924,15 @@ zfs_znode_free(znode_t *zp)
 {
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 
+	vn_invalid(ZTOV(zp));
+
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	list_remove(&zfsvfs->z_all_znodes, zp);
 	mutex_exit(&zfsvfs->z_znodes_lock);
 
 	kmem_cache_free(znode_cache, zp);
+
+	VFS_RELE(zfsvfs->z_vfs);
 }
 
 void
@@ -1294,13 +1298,14 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	list_create(&zfsvfs.z_all_znodes, sizeof (znode_t),
 	    offsetof(znode_t, z_link_node));
 
-	zfs_mknode(rootzp, &vattr, tx, cr, IS_ROOT_NODE,
-	    &zp, 0, NULL, NULL);
-	VN_RELE(ZTOV(zp));
+	zfs_mknode(rootzp, &vattr, tx, cr, IS_ROOT_NODE, &zp, 0, NULL, NULL);
+	ASSERT3P(zp, ==, rootzp);
 	error = zap_add(os, moid, ZFS_ROOT_OBJ, 8, 1, &rootzp->z_id, tx);
 	ASSERT(error == 0);
 
 	ZTOV(rootzp)->v_count = 0;
+	dmu_buf_rele(rootzp->z_dbuf, NULL);
+	rootzp->z_dbuf = NULL;
 	kmem_cache_free(znode_cache, rootzp);
 }
 
