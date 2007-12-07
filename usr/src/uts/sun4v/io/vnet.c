@@ -72,6 +72,8 @@ static int vnet_read_mac_address(vnet_t *vnetp);
 static void vnet_add_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
 static void vnet_del_vptl(vnet_t *vnetp, vp_tl_t *vp_tlp);
 static vp_tl_t *vnet_get_vptl(vnet_t *vnetp, const char *devname);
+static void vnet_fdb_alloc(vnet_t *vnetp);
+static void vnet_fdb_free(vnet_t *vnetp);
 static fdb_t *vnet_lookup_fdb(fdb_fanout_t *fdbhp, uint8_t *macaddr);
 
 /* exported functions */
@@ -251,7 +253,6 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		instance;
 	int		status;
 	mac_register_t	*vgenmacp = NULL;
-	uint32_t	nfdbh = 0;
 	enum	{ AST_init = 0x0, AST_vnet_alloc = 0x1,
 		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
 		AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
@@ -306,6 +307,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		DERR(vnetp, "vgen_init() failed\n");
 		goto vnet_attach_fail;
 	}
+	rw_init(&vnetp->trwlock, NULL, RW_DRIVER, NULL);
 	attach_state |= AST_vgen_init;
 
 	vp_tlp = kmem_zalloc(sizeof (vp_tl_t), KM_SLEEP);
@@ -317,16 +319,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_add_vptl(vnetp, vp_tlp);
 	attach_state |= AST_vptl_alloc;
 
-	nfdbh = vnet_nfdb_hash;
-	if ((nfdbh < VNET_NFDB_HASH) || (nfdbh > VNET_NFDB_HASH_MAX)) {
-		vnetp->nfdb_hash = VNET_NFDB_HASH;
-	}
-	else
-		vnetp->nfdb_hash = nfdbh;
-
-	/* allocate fdb hash table, with an extra slot for default route */
-	vnetp->fdbhp = kmem_zalloc(sizeof (fdb_fanout_t) *
-	    (vnetp->nfdb_hash + 1), KM_SLEEP);
+	vnet_fdb_alloc(vnetp);
 	attach_state |= AST_fdbh_alloc;
 
 	/* register with MAC layer */
@@ -346,8 +339,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 vnet_attach_fail:
 	if (attach_state & AST_fdbh_alloc) {
-		kmem_free(vnetp->fdbhp,
-		    sizeof (fdb_fanout_t) * (vnetp->nfdb_hash + 1));
+		vnet_fdb_free(vnetp);
 	}
 	if (attach_state & AST_vptl_alloc) {
 		WRITE_ENTER(&vnetp->trwlock);
@@ -356,6 +348,7 @@ vnet_attach_fail:
 	}
 	if (attach_state & AST_vgen_init) {
 		(void) vgen_uninit(vgenmacp->m_driver);
+		rw_destroy(&vnetp->trwlock);
 	}
 	if (attach_state & AST_vnet_alloc) {
 		KMEM_FREE(vnetp);
@@ -425,9 +418,9 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	RW_EXIT(&vnet_rw);
 
-	kmem_free(vnetp->fdbhp,
-	    sizeof (fdb_fanout_t) * (vnetp->nfdb_hash + 1));
+	vnet_fdb_free(vnetp);
 
+	rw_destroy(&vnetp->trwlock);
 	KMEM_FREE(vnetp);
 
 	return (DDI_SUCCESS);
@@ -888,6 +881,47 @@ vnet_modify_fdb(void *arg, uint8_t *macaddr, mac_tx_t m_tx, void *txarg,
 	} else {
 		RW_EXIT(&fdbhp->rwlock);
 	}
+}
+
+/* allocate the forwarding database */
+static void
+vnet_fdb_alloc(vnet_t *vnetp)
+{
+	int		i;
+	uint32_t	nfdbh = 0;
+
+	nfdbh = vnet_nfdb_hash;
+	if ((nfdbh < VNET_NFDB_HASH) || (nfdbh > VNET_NFDB_HASH_MAX)) {
+		vnetp->nfdb_hash = VNET_NFDB_HASH;
+	} else {
+		vnetp->nfdb_hash = nfdbh;
+	}
+
+	/* allocate fdb hash table, with an extra slot for default route */
+	vnetp->fdbhp = kmem_zalloc(sizeof (fdb_fanout_t) *
+	    (vnetp->nfdb_hash + 1), KM_SLEEP);
+
+	for (i = 0; i <= vnetp->nfdb_hash; i++) {
+		rw_init(&vnetp->fdbhp[i].rwlock, NULL, RW_DRIVER, NULL);
+	}
+}
+
+/* free the forwarding database */
+static void
+vnet_fdb_free(vnet_t *vnetp)
+{
+	int i;
+
+	for (i = 0; i <= vnetp->nfdb_hash; i++) {
+		rw_destroy(&vnetp->fdbhp[i].rwlock);
+	}
+
+	/*
+	 * deallocate fdb hash table, including an extra slot for default
+	 * route.
+	 */
+	kmem_free(vnetp->fdbhp, sizeof (fdb_fanout_t) * (vnetp->nfdb_hash + 1));
+	vnetp->fdbhp = NULL;
 }
 
 /* look up an fdb entry based on the mac address, caller holds lock */

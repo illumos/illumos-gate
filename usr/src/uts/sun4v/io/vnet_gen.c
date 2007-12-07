@@ -416,9 +416,11 @@ vgen_init(void *vnetp, dev_info_t *vnetdip, const uint8_t *macaddr,
 	vgenp->mcsize = VGEN_INIT_MCTAB_SIZE;
 
 	mutex_init(&vgenp->lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&vgenp->vgenports.rwlock, NULL, RW_DRIVER, NULL);
 
 	/* register with MD event generator */
 	if (vgen_mdeg_reg(vgenp) != DDI_SUCCESS) {
+		rw_destroy(&vgenp->vgenports.rwlock);
 		mutex_destroy(&vgenp->lock);
 		kmem_free(vgenp->mctab, VGEN_INIT_MCTAB_SIZE *
 		    sizeof (struct ether_addr));
@@ -480,6 +482,7 @@ vgen_uninit(void *arg)
 
 	mutex_exit(&vgenp->lock);
 
+	rw_destroy(&vgenp->vgenports.rwlock);
 	mutex_destroy(&vgenp->lock);
 
 	KMEM_FREE(vgenp);
@@ -980,6 +983,7 @@ vgen_port_detach(vgen_port_t *portp)
 		vgen_ldc_detach(ldclp->headp);
 	}
 	RW_EXIT(&ldclp->rwlock);
+	rw_destroy(&ldclp->rwlock);
 
 	if (vgenp->vsw_portp == portp) {
 		vgenp->vsw_portp = NULL;
@@ -1472,7 +1476,6 @@ vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
 	for (i = 0; i < num_ids; i++) {
 		DBG2(vgenp, NULL, "ldcid (%lx)\n", ldcids[i]);
 		if (vgen_ldc_attach(portp, ldcids[i]) == DDI_FAILURE) {
-			rw_destroy(&portp->ldclist.rwlock);
 			vgen_port_detach(portp);
 			return (DDI_FAILURE);
 		}
