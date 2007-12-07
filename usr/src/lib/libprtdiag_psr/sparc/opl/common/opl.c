@@ -65,10 +65,6 @@
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif	/* TEXT_DOMAIN */
-#define	IS_PCI_BRIDGE(name, type) \
-	(((name) != NULL) && ((type) != NULL) && \
-	(strncmp((name), "pci", 3) == 0) && \
-	(strncmp((type), "pci", 3) == 0))
 
 /*
  * Global functions and variables
@@ -87,7 +83,6 @@ struct  cs_status {
 
 int	do_prominfo(int syserrlog, char *pgname, int log_flag, int prt_flag);
 void	*get_prop_val(Prop *prop);
-void	display_pci(Board_node *);
 void	display_ffb(Board_node *, int);
 void	display_sbus(Board_node *board);
 void	display_cpu_devices(Sys_tree *tree);
@@ -113,6 +108,55 @@ static	int get_prop_size(Prop *prop);
 static int v_flag = 0;
 
 /*
+ * Linked list of IO card info for display.
+ * Using file scope for use in a recursive function.
+ */
+static struct io_card *card_list = NULL;
+
+/*
+ * Check prom node for a class-code. If it exists and it's not a bridge device
+ * then add an io_card to card_list. Then recursively call this function for
+ * its child and sibling nodes.
+ */
+static void
+walk_tree_for_pci_devices(Prom_node *node, int board_number)
+{
+	struct io_card card;
+	char	*str;
+	void	*val;
+	int	ccode;
+
+	if (node == NULL) {
+		return;
+	}
+
+	/* Look for a class-code property. Skip, if it's a bridge */
+	ccode = -1;
+	val = get_prop_val(find_prop(node, "class-code"));
+	if (val != NULL) {
+		ccode = *(int *)val;
+	}
+	if ((ccode != -1) && (ccode < 0x60000 || ccode > 0x6ffff)) {
+		(void) memset(&card, 0, sizeof (card));
+		card.board = board_number;
+
+		str = (char *)get_prop_val(find_prop(node, "name"));
+		(void) strlcpy(card.name, (str == NULL ? "N/A":str),
+		    sizeof (card.name));
+
+		str = (char *)get_prop_val(find_prop(node, "model"));
+		(void) strlcpy(card.model, (str == NULL ? "N/A":str),
+		    sizeof (card.model));
+
+		/* insert card to the list */
+		card_list = insert_io_card(card_list, &card);
+	}
+	/* Call this function for its child/sibling */
+	walk_tree_for_pci_devices(node->child, board_number);
+	walk_tree_for_pci_devices(node->sibling, board_number);
+}
+
+/*
  * For display of I/O devices for "prtdiag"
  */
 void
@@ -135,176 +179,13 @@ display_io_devices(Sys_tree *tree)
 		log_printf("\n", 0);
 		bnode = tree->bd_list;
 		while (bnode != NULL) {
-			display_pci(bnode);
+			walk_tree_for_pci_devices(bnode->nodes,
+			    bnode->board_num);
 			bnode = bnode->next;
 		}
+		display_io_cards(card_list);
+		free_io_cards(card_list);
 	}
-}
-
-/*
- * Display all the leaf PCI nodes on this board that have "reg" property.
- * If the "reg" property is NULL for a leaf node, skip parsing its sibling
- * nodes and display the parent node properties.
- */
-void
-display_pci(Board_node *board)
-{
-	struct io_card *card_list = NULL;
-	struct io_card card;
-	Prom_node *pci, *card_node;
-	char	*name, *type;
-	int	*int_val;
-
-	if (board == NULL)
-		return;
-
-	/* Initialize common information */
-	card.board = board->board_num;
-
-	pci = board->nodes;
-	while (pci != NULL) {
-		name = get_node_name(pci);
-
-		/* Skip non-PCI board nodes */
-		if ((name == NULL) || (strcmp(name, "pci") != 0)) {
-			pci = pci->sibling;
-			continue;
-		}
-
-		type = (char *)get_prop_val(find_prop(pci, "device_type"));
-
-		/*
-		 * Skip PCI/ebus devices
-		 * They have name == "pci" and type == "pci"
-		 */
-		if (strcmp(type, "pci") == 0) {
-			pci = pci->sibling;
-			continue;
-		}
-
-		card_node = pci;
-		while (card_node != NULL) {
-			int pci_parent_bridge = 0;
-
-			/* If it does have a child, skip to leaf child */
-			if (card_node->child != NULL) {
-				card_node = card_node->child;
-				continue;
-			}
-
-			/* Get name of the card */
-			name = (char *)get_prop_val(find_prop
-			    (card_node, "name"));
-
-			/* Get type of card */
-			type = (char *)get_prop_val(find_prop
-			    (card_node, "device_type"));
-
-			/* Leaf pci-bridges are to be ignored */
-			if (!IS_PCI_BRIDGE(name, type)) {
-
-				/* Get reg property of the node */
-				int_val = (int *)get_prop_val(find_prop
-				    (card_node, "reg"));
-
-				/*
-				 * If no "reg" property check to see
-				 * whether parent node has reg property.
-				 * and check if parent is a bridge
-				 */
-				if (int_val == NULL) {
-					Prom_node *cparent = card_node->parent;
-					if (cparent == NULL)
-						break;
-
-					name = (char *)get_prop_val(find_prop
-					    (cparent, "name"));
-
-					type = (char *)get_prop_val(find_prop
-					    (cparent, "device_type"));
-
-					/* check if parent is a bridge */
-					if (IS_PCI_BRIDGE(name, type))
-						pci_parent_bridge = 1;
-
-					int_val = (int *)get_prop_val(
-					    find_prop(cparent, "reg"));
-
-					if (int_val != NULL)
-						/* Switch to parent */
-						card_node = cparent;
-					else
-						/* parent node has no reg */
-						break;
-				}
-
-				if (!pci_parent_bridge) {
-
-					name = (char *)get_prop_val(find_prop
-					    (card_node, "name"));
-
-					if (name == NULL)
-						card.name[0] = '\0';
-					else {
-						(void) snprintf(card.name,
-						    MAXSTRLEN, "%s", name);
-					}
-
-					/* Get the model of this card */
-					name = (char *)get_prop_val(find_prop
-					    (card_node, "model"));
-
-					if (name == NULL) {
-						(void) snprintf(card.model,
-						    MAXSTRLEN, "%s", "N/A");
-					} else {
-						(void) snprintf(card.model,
-						    MAXSTRLEN, "%s", name);
-					}
-
-					/* insert card to the list */
-					card_list = insert_io_card(card_list,
-					    &card);
-
-				}
-
-			}
-
-			/*
-			 * Parse sibling nodes.
-			 * Then move up the parent's sibling upto the top
-			 * intermediate node
-			 * Stop if pci board node is reached.
-			 */
-			if (card_node->sibling != NULL) {
-				if (card_node == pci)
-					card_node = NULL;
-				else
-					card_node = card_node->sibling;
-			} else {
-				Prom_node *cparent;
-				cparent = card_node->parent;
-				card_node = NULL;
-				while (cparent != NULL) {
-					if (cparent == pci)
-						break;
-					if (cparent->sibling != NULL) {
-						card_node = cparent->sibling;
-						break;
-					}
-					cparent = cparent->parent;
-				}
-			}
-
-		}
-
-	/* On to the next board node */
-	pci = pci->sibling;
-
-	}
-
-	display_io_cards(card_list);
-	free_io_cards(card_list);
 }
 
 /*
