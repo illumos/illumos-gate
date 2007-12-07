@@ -129,6 +129,7 @@ i386_SUBDIRS= \
 	SUNWlxr \
 	SUNWlxu \
 	SUNWmv88sx \
+	SUNWnge \
 	SUNWnvsata \
 	SUNWnxge.i \
 	SUNWonmtst.i \
@@ -149,7 +150,6 @@ i386_XMODS= \
 	BRCMbnx \
 	SUNWadpu320 \
 	SUNWlsimega \
-	SUNWnge
 
 COMMON_SUBDIRS= \
 	SUNW1394h \
