@@ -148,6 +148,7 @@ prop_method_get(tnode_t *node, topo_propval_t *pv, topo_propmethod_t *pm,
 	topo_node_unlock(node);
 	if (topo_method_call(node, pm->tpm_name, pm->tpm_version,
 	    args, &nvl, err) < 0) {
+		topo_node_lock(node);
 		topo_prop_rele(pv);
 		return (method_geterror(args, *err, err));
 	}
