@@ -76,34 +76,26 @@ mutex_setup(void)
 }
 
 /*
- * The default spin counts of 1000 and 500 are experimentally determined.
- * On sun4u machines with any number of processors they could be raised
+ * The default spin count of 1000 is experimentally determined.
+ * On sun4u machines with any number of processors it could be raised
  * to 10,000 but that (experimentally) makes almost no difference.
- * The environment variables:
+ * The environment variable:
  *	_THREAD_ADAPTIVE_SPIN=count
- *	_THREAD_RELEASE_SPIN=count
- * can be used to override and set the counts in the range [0 .. 1,000,000].
+ * can be used to override and set the count in the range [0 .. 1,000,000].
  */
 int	thread_adaptive_spin = 1000;
 uint_t	thread_max_spinners = 100;
-int	thread_release_spin = 500;
 int	thread_queue_verify = 0;
 static	int	ncpus;
 
 /*
  * Distinguish spinning for queue locks from spinning for regular locks.
+ * We try harder to acquire queue locks by spinning.
  * The environment variable:
  *	_THREAD_QUEUE_SPIN=count
  * can be used to override and set the count in the range [0 .. 1,000,000].
- * There is no release spin concept for queue locks.
  */
-int	thread_queue_spin = 1000;
-
-/*
- * Use the otherwise-unused 'mutex_ownerpid' field of a USYNC_THREAD
- * mutex to be a count of adaptive spins in progress.
- */
-#define	mutex_spinners	mutex_ownerpid
+int	thread_queue_spin = 10000;
 
 #define	ALL_ATTRIBUTES				\
 	(LOCK_RECURSIVE | LOCK_ERRORCHECK |	\
@@ -282,8 +274,66 @@ _ceil_prio_waive(void)
 }
 
 /*
+ * Clear the lock byte.  Retain the waiters byte and the spinners byte.
+ * Return the old value of the lock word.
+ */
+static uint32_t
+clear_lockbyte(volatile uint32_t *lockword)
+{
+	uint32_t old;
+	uint32_t new;
+
+	do {
+		old = *lockword;
+		new = old & ~LOCKMASK;
+	} while (atomic_cas_32(lockword, old, new) != old);
+
+	return (old);
+}
+
+/*
+ * Increment the spinners count in the mutex lock word.
+ * Return 0 on success.  Return -1 if the count would overflow.
+ */
+static int
+spinners_incr(volatile uint32_t *lockword, uint8_t max_spinners)
+{
+	uint32_t old;
+	uint32_t new;
+
+	do {
+		old = *lockword;
+		if (((old & SPINNERMASK) >> SPINNERSHIFT) >= max_spinners)
+			return (-1);
+		new = old + (1 << SPINNERSHIFT);
+	} while (atomic_cas_32(lockword, old, new) != old);
+
+	return (0);
+}
+
+/*
+ * Decrement the spinners count in the mutex lock word.
+ * Return the new value of the lock word.
+ */
+static uint32_t
+spinners_decr(volatile uint32_t *lockword)
+{
+	uint32_t old;
+	uint32_t new;
+
+	do {
+		new = old = *lockword;
+		if (new & SPINNERMASK)
+			new -= (1 << SPINNERSHIFT);
+	} while (atomic_cas_32(lockword, old, new) != old);
+
+	return (new);
+}
+
+/*
  * Non-preemptive spin locks.  Used by queue_lock().
  * No lock statistics are gathered for these locks.
+ * No DTrace probes are provided for these locks.
  */
 void
 spin_lock_set(mutex_t *mp)
@@ -389,7 +439,7 @@ QVERIFY(queue_head_t *qp)
 	ASSERT(qp >= udp->queue_head && (qp - udp->queue_head) < 2 * QHASHSIZE);
 	ASSERT(MUTEX_OWNED(&qp->qh_lock, self));
 	ASSERT((qp->qh_head != NULL && qp->qh_tail != NULL) ||
-		(qp->qh_head == NULL && qp->qh_tail == NULL));
+	    (qp->qh_head == NULL && qp->qh_tail == NULL));
 	if (!thread_queue_verify)
 		return;
 	/* real expensive stuff, only for _THREAD_QUEUE_VERIFY */
@@ -498,7 +548,7 @@ enqueue(queue_head_t *qp, ulwp_t *ulwp, void *wchan, int qtype)
 	 * SUSV3 requires this for semaphores.
 	 */
 	do_fifo = (force_fifo ||
-		((++qp->qh_qcnt << curthread->ul_queue_fifo) & 0xff) == 0);
+	    ((++qp->qh_qcnt << curthread->ul_queue_fifo) & 0xff) == 0);
 
 	if (qp->qh_head == NULL) {
 		/*
@@ -1007,10 +1057,12 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 	int error = EBUSY;
 	ulwp_t *ulwp;
 	volatile sc_shared_t *scp;
-	volatile uint8_t *lockp;
-	volatile uint64_t *ownerp;
-	int count;
-	int max;
+	volatile uint8_t *lockp = (volatile uint8_t *)&mp->mutex_lockw;
+	volatile uint64_t *ownerp = (volatile uint64_t *)&mp->mutex_owner;
+	uint32_t new_lockword;
+	int count = 0;
+	int max_count;
+	uint8_t max_spinners;
 
 	ASSERT(!(mp->mutex_type & USYNC_PROCESS));
 
@@ -1020,19 +1072,29 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 	/* short-cut, not definitive (see below) */
 	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
-		DTRACE_PROBE2(plockstat, mutex__error, mp, ENOTRECOVERABLE);
-		return (ENOTRECOVERABLE);
+		error = ENOTRECOVERABLE;
+		goto done;
 	}
 
-	if (!tryhard ||
-	    (max = self->ul_adaptive_spin) == 0 ||
-	    mp->mutex_spinners >= self->ul_max_spinners)
-		max = 1;	/* try at least once */
+	/*
+	 * Make one attempt to acquire the lock before
+	 * incurring the overhead of the spin loop.
+	 */
+	if (set_lock_byte(lockp) == 0) {
+		*ownerp = (uintptr_t)self;
+		error = 0;
+		goto done;
+	}
+	if (!tryhard)
+		goto done;
+	if (ncpus == 0)
+		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
+	if ((max_spinners = self->ul_max_spinners) >= ncpus)
+		max_spinners = ncpus - 1;
+	max_count = (max_spinners != 0)? self->ul_adaptive_spin : 0;
+	if (max_count == 0)
+		goto done;
 
-	DTRACE_PROBE1(plockstat, mutex__spin, mp);
-
-	lockp = (volatile uint8_t *)&mp->mutex_lockw;
-	ownerp = (volatile uint64_t *)&mp->mutex_owner;
 	/*
 	 * This spin loop is unfair to lwps that have already dropped into
 	 * the kernel to sleep.  They will starve on a highly-contended mutex.
@@ -1042,14 +1104,20 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 	 * Being fair would reduce the speed of such programs and well-written
 	 * programs will not suffer in any case.
 	 */
-	enter_critical(self);		/* protects ul_schedctl */
-	atomic_inc_32(&mp->mutex_spinners);
-	for (count = 1; count <= max; count++) {
+	enter_critical(self);
+	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1) {
+		exit_critical(self);
+		goto done;
+	}
+	DTRACE_PROBE1(plockstat, mutex__spin, mp);
+	for (count = 1; ; count++) {
 		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
 			*ownerp = (uintptr_t)self;
 			error = 0;
 			break;
 		}
+		if (count == max_count)
+			break;
 		SMT_PAUSE();
 		/*
 		 * Stop spinning if the mutex owner is not running on
@@ -1074,27 +1142,54 @@ mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 		    scp->sc_state != SC_ONPROC))
 			break;
 	}
-	atomic_dec_32(&mp->mutex_spinners);
+	new_lockword = spinners_decr(&mp->mutex_lockword);
+	if (error && (new_lockword & (LOCKMASK | SPINNERMASK)) == 0) {
+		/*
+		 * We haven't yet acquired the lock, the lock
+		 * is free, and there are no other spinners.
+		 * Make one final attempt to acquire the lock.
+		 *
+		 * This isn't strictly necessary since mutex_lock_queue()
+		 * (the next action this thread will take if it doesn't
+		 * acquire the lock here) makes one attempt to acquire
+		 * the lock before putting the thread to sleep.
+		 *
+		 * If the next action for this thread (on failure here)
+		 * were not to call mutex_lock_queue(), this would be
+		 * necessary for correctness, to avoid ending up with an
+		 * unheld mutex with waiters but no one to wake them up.
+		 */
+		if (set_lock_byte(lockp) == 0) {
+			*ownerp = (uintptr_t)self;
+			error = 0;
+		}
+		count++;
+	}
 	exit_critical(self);
 
+done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
 		 * We shouldn't own the mutex; clear the lock.
 		 */
 		mp->mutex_owner = 0;
-		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
+		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK)
 			mutex_wakeup_all(mp);
 		error = ENOTRECOVERABLE;
 	}
 
 	if (error) {
-		DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		if (count) {
+			DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		}
 		if (error != EBUSY) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 		}
 	} else {
-		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		if (count) {
+			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		}
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 		if (mp->mutex_flag & LOCK_OWNERDEAD) {
 			ASSERT(mp->mutex_type & LOCK_ROBUST);
@@ -1149,10 +1244,13 @@ static int
 mutex_trylock_process(mutex_t *mp, int tryhard)
 {
 	ulwp_t *self = curthread;
+	uberdata_t *udp = self->ul_uberdata;
 	int error = EBUSY;
-	volatile uint8_t *lockp;
-	int count;
-	int max;
+	volatile uint8_t *lockp = (volatile uint8_t *)&mp->mutex_lockw;
+	uint32_t new_lockword;
+	int count = 0;
+	int max_count;
+	uint8_t max_spinners;
 
 	ASSERT(mp->mutex_type & USYNC_PROCESS);
 
@@ -1162,36 +1260,82 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	/* short-cut, not definitive (see below) */
 	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
-		DTRACE_PROBE2(plockstat, mutex__error, mp, ENOTRECOVERABLE);
-		return (ENOTRECOVERABLE);
+		error = ENOTRECOVERABLE;
+		goto done;
 	}
 
+	/*
+	 * Make one attempt to acquire the lock before
+	 * incurring the overhead of the spin loop.
+	 */
+	enter_critical(self);
+	if (set_lock_byte(lockp) == 0) {
+		mp->mutex_owner = (uintptr_t)self;
+		mp->mutex_ownerpid = udp->pid;
+		exit_critical(self);
+		error = 0;
+		goto done;
+	}
+	exit_critical(self);
+	if (!tryhard)
+		goto done;
 	if (ncpus == 0)
 		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
-	max = (tryhard && ncpus > 1)? self->ul_adaptive_spin : 1;
-	if (max == 0)
-		max = 1;	/* try at least once */
+	if ((max_spinners = self->ul_max_spinners) >= ncpus)
+		max_spinners = ncpus - 1;
+	max_count = (max_spinners != 0)? self->ul_adaptive_spin : 0;
+	if (max_count == 0)
+		goto done;
 
-	DTRACE_PROBE1(plockstat, mutex__spin, mp);
-
-	lockp = (volatile uint8_t *)&mp->mutex_lockw;
 	/*
 	 * This is a process-shared mutex.
 	 * We cannot know if the owner is running on a processor.
 	 * We just spin and hope that it is on a processor.
 	 */
 	enter_critical(self);
-	for (count = 1; count <= max; count++) {
+	if (spinners_incr(&mp->mutex_lockword, max_spinners) == -1) {
+		exit_critical(self);
+		goto done;
+	}
+	DTRACE_PROBE1(plockstat, mutex__spin, mp);
+	for (count = 1; ; count++) {
 		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
-			mp->mutex_ownerpid = self->ul_uberdata->pid;
+			mp->mutex_ownerpid = udp->pid;
 			error = 0;
 			break;
 		}
+		if (count == max_count)
+			break;
 		SMT_PAUSE();
+	}
+	new_lockword = spinners_decr(&mp->mutex_lockword);
+	if (error && (new_lockword & (LOCKMASK | SPINNERMASK)) == 0) {
+		/*
+		 * We haven't yet acquired the lock, the lock
+		 * is free, and there are no other spinners.
+		 * Make one final attempt to acquire the lock.
+		 *
+		 * This isn't strictly necessary since mutex_lock_kernel()
+		 * (the next action this thread will take if it doesn't
+		 * acquire the lock here) makes one attempt to acquire
+		 * the lock before putting the thread to sleep.
+		 *
+		 * If the next action for this thread (on failure here)
+		 * were not to call mutex_lock_kernel(), this would be
+		 * necessary for correctness, to avoid ending up with an
+		 * unheld mutex with waiters but no one to wake them up.
+		 */
+		if (set_lock_byte(lockp) == 0) {
+			mp->mutex_owner = (uintptr_t)self;
+			mp->mutex_ownerpid = udp->pid;
+			error = 0;
+		}
+		count++;
 	}
 	exit_critical(self);
 
+done:
 	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
 		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
@@ -1199,7 +1343,7 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 		 */
 		mp->mutex_owner = 0;
 		mp->mutex_ownerpid = 0;
-		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK) {
+		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK) {
 			no_preempt(self);
 			(void) ___lwp_mutex_wakeup(mp, 1);
 			preempt(self);
@@ -1208,12 +1352,16 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	}
 
 	if (error) {
-		DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		if (count) {
+			DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		}
 		if (error != EBUSY) {
 			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 		}
 	} else {
-		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		if (count) {
+			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		}
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 		if (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
 			ASSERT(mp->mutex_type & LOCK_ROBUST);
@@ -1301,11 +1449,11 @@ mutex_wakeup_all(mutex_t *mp)
 			lwpid[nlwpid++] = ulwp->ul_lwpid;
 		}
 	}
-	mp->mutex_waiters = 0;
 
 	if (nlwpid == 0) {
 		queue_unlock(qp);
 	} else {
+		mp->mutex_waiters = 0;
 		no_preempt(curthread);
 		queue_unlock(qp);
 		if (nlwpid == 1)
@@ -1320,143 +1468,55 @@ mutex_wakeup_all(mutex_t *mp)
 }
 
 /*
- * Spin for a while, testing to see if the lock has been grabbed.
- * If this fails, call mutex_wakeup() to release a waiter.
+ * Release a process-private mutex.
+ * As an optimization, if there are waiters but there are also spinners
+ * attempting to acquire the mutex, then don't bother waking up a waiter;
+ * one of the spinners will acquire the mutex soon and it would be a waste
+ * of resources to wake up some thread just to have it spin for a while
+ * and then possibly go back to sleep.  See mutex_trylock_adaptive().
  */
 static lwpid_t
 mutex_unlock_queue(mutex_t *mp, int release_all)
 {
-	ulwp_t *self = curthread;
-	uint32_t *lockw = &mp->mutex_lockword;
-	lwpid_t lwpid;
-	volatile uint8_t *lockp;
-	volatile uint32_t *spinp;
-	int count;
+	lwpid_t lwpid = 0;
+	uint32_t old_lockword;
 
-	/*
-	 * We use the swap primitive to clear the lock, but we must
-	 * atomically retain the waiters bit for the remainder of this
-	 * code to work.  We first check to see if the waiters bit is
-	 * set and if so clear the lock by swapping in a word containing
-	 * only the waiters bit.  This could produce a false positive test
-	 * for whether there are waiters that need to be waked up, but
-	 * this just causes an extra call to mutex_wakeup() to do nothing.
-	 * The opposite case is more delicate:  If there are no waiters,
-	 * we swap in a zero lock byte and a zero waiters bit.  The result
-	 * of the swap could indicate that there really was a waiter so in
-	 * this case we go directly to mutex_wakeup() without performing
-	 * any of the adaptive code because the waiter bit has been cleared
-	 * and the adaptive code is unreliable in this case.
-	 */
-	if (release_all || !(*lockw & WAITERMASK)) {
-		mp->mutex_owner = 0;
-		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-		if (!(atomic_swap_32(lockw, 0) & WAITERMASK))
-			return (0);	/* no waiters */
+	mp->mutex_owner = 0;
+	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
+	old_lockword = clear_lockbyte(&mp->mutex_lockword);
+	if ((old_lockword & WAITERMASK) &&
+	    (release_all || (old_lockword & SPINNERMASK) == 0)) {
+		ulwp_t *self = curthread;
 		no_preempt(self);	/* ensure a prompt wakeup */
-	} else {
-		no_preempt(self);	/* ensure a prompt wakeup */
-		lockp = (volatile uint8_t *)&mp->mutex_lockw;
-		spinp = (volatile uint32_t *)&mp->mutex_spinners;
-		mp->mutex_owner = 0;
-		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-		/* clear lock, retain waiter */
-		(void) atomic_swap_32(lockw, WAITER);
-
-		/*
-		 * We spin here fewer times than mutex_trylock_adaptive().
-		 * We are trying to balance two conflicting goals:
-		 * 1. Avoid waking up anyone if a spinning thread
-		 *    grabs the lock.
-		 * 2. Wake up a sleeping thread promptly to get on
-		 *    with useful work.
-		 * We don't spin at all if there is no acquiring spinner;
-		 * (mp->mutex_spinners is non-zero if there are spinners).
-		 */
-		for (count = self->ul_release_spin;
-		    *spinp && count > 0; count--) {
-			/*
-			 * There is a waiter that we will have to wake
-			 * up unless someone else grabs the lock while
-			 * we are busy spinning.  Like the spin loop in
-			 * mutex_trylock_adaptive(), this spin loop is
-			 * unfair to lwps that have already dropped into
-			 * the kernel to sleep.  They will starve on a
-			 * highly-contended mutex.  Too bad.
-			 */
-			if (*lockp != 0) {	/* somebody grabbed the lock */
-				preempt(self);
-				return (0);
-			}
-			SMT_PAUSE();
-		}
-
-		/*
-		 * No one grabbed the lock.
-		 * Wake up some lwp that is waiting for it.
-		 */
-		mp->mutex_waiters = 0;
+		if (release_all)
+			mutex_wakeup_all(mp);
+		else
+			lwpid = mutex_wakeup(mp);
+		if (lwpid == 0)
+			preempt(self);
 	}
-
-	if (release_all) {
-		mutex_wakeup_all(mp);
-		lwpid = 0;
-	} else {
-		lwpid = mutex_wakeup(mp);
-	}
-	if (lwpid == 0)
-		preempt(self);
 	return (lwpid);
 }
 
 /*
  * Like mutex_unlock_queue(), but for process-shared mutexes.
- * We tested the waiters field before calling here and it was non-zero.
  */
 static void
 mutex_unlock_process(mutex_t *mp, int release_all)
 {
-	ulwp_t *self = curthread;
-	int count;
-	volatile uint8_t *lockp;
+	uint32_t old_lockword;
 
-	/*
-	 * See the comments in mutex_unlock_queue(), above.
-	 */
-	if (ncpus == 0)
-		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
-	count = (ncpus > 1)? self->ul_release_spin : 0;
-	no_preempt(self);
 	mp->mutex_owner = 0;
 	mp->mutex_ownerpid = 0;
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-	if (release_all || count == 0) {
-		/* clear lock, test waiter */
-		if (!(atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)) {
-			/* no waiters now */
-			preempt(self);
-			return;
-		}
-	} else {
-		/* clear lock, retain waiter */
-		(void) atomic_swap_32(&mp->mutex_lockword, WAITER);
-		lockp = (volatile uint8_t *)&mp->mutex_lockw;
-		while (--count >= 0) {
-			if (*lockp != 0) {
-				/* somebody grabbed the lock */
-				preempt(self);
-				return;
-			}
-			SMT_PAUSE();
-		}
-		/*
-		 * We must clear the waiters field before going
-		 * to the kernel, else it could remain set forever.
-		 */
-		mp->mutex_waiters = 0;
+	old_lockword = clear_lockbyte(&mp->mutex_lockword);
+	if ((old_lockword & WAITERMASK) &&
+	    (release_all || (old_lockword & SPINNERMASK) == 0)) {
+		ulwp_t *self = curthread;
+		no_preempt(self);	/* ensure a prompt wakeup */
+		(void) ___lwp_mutex_wakeup(mp, release_all);
+		preempt(self);
 	}
-	(void) ___lwp_mutex_wakeup(mp, release_all);
-	preempt(self);
 }
 
 /*
@@ -1526,8 +1586,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		 * __lwp_park() will return the residual time in tsp
 		 * if we are unparked before the timeout expires.
 		 */
-		if ((error = __lwp_park(tsp, 0)) == EINTR)
-			error = 0;
+		error = __lwp_park(tsp, 0);
 		set_parking_flag(self, 0);
 		/*
 		 * We could have taken a signal or suspended ourself.
@@ -1539,8 +1598,12 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		 */
 		qp = queue_lock(mp, MX);
 		if (self->ul_sleepq == NULL) {
-			if (error)
-				break;
+			if (error) {
+				mp->mutex_waiters = queue_waiter(qp, mp)? 1 : 0;
+				if (error != EINTR)
+					break;
+				error = 0;
+			}
 			if (set_lock_byte(&mp->mutex_lockw) == 0) {
 				mp->mutex_owner = (uintptr_t)self;
 				break;
@@ -1552,8 +1615,11 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		    self->ul_qtype == MX &&
 		    self->ul_wchan == mp);
 		if (error) {
-			mp->mutex_waiters = dequeue_self(qp, mp);
-			break;
+			if (error != EINTR) {
+				mp->mutex_waiters = dequeue_self(qp, mp);
+				break;
+			}
+			error = 0;
 		}
 	}
 	ASSERT(self->ul_sleepq == NULL && self->ul_link == NULL &&
@@ -1572,7 +1638,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		 * We shouldn't own the mutex; clear the lock.
 		 */
 		mp->mutex_owner = 0;
-		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
+		if (clear_lockbyte(&mp->mutex_lockword) & WAITERMASK)
 			mutex_wakeup_all(mp);
 		error = ENOTRECOVERABLE;
 	}
@@ -1788,7 +1854,7 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 		error = mutex_trylock_process(mp, try == MUTEX_LOCK);
 		if (error == EBUSY && try == MUTEX_LOCK)
 			error = mutex_lock_kernel(mp, tsp, msp);
-	} else  {	/* USYNC_THREAD */
+	} else {	/* USYNC_THREAD */
 		error = mutex_trylock_adaptive(mp, try == MUTEX_LOCK);
 		if (error == EBUSY && try == MUTEX_LOCK)
 			error = mutex_lock_queue(self, msp, mp, tsp);
@@ -2084,19 +2150,7 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 		error = ___lwp_mutex_unlock(mp);
 		preempt(self);
 	} else if (mtype & USYNC_PROCESS) {
-		if (mp->mutex_lockword & WAITERMASK) {
-			mutex_unlock_process(mp, release_all);
-		} else {
-			mp->mutex_owner = 0;
-			mp->mutex_ownerpid = 0;
-			DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-			if (atomic_swap_32(&mp->mutex_lockword, 0) &
-			    WAITERMASK) {  /* a waiter suddenly appeared */
-				no_preempt(self);
-				(void) ___lwp_mutex_wakeup(mp, release_all);
-				preempt(self);
-			}
-		}
+		mutex_unlock_process(mp, release_all);
 	} else {	/* USYNC_THREAD */
 		if ((lwpid = mutex_unlock_queue(mp, release_all)) != 0) {
 			(void) __lwp_unpark(lwpid);
@@ -2168,19 +2222,7 @@ __mutex_unlock(mutex_t *mp)
 	if ((gflags = self->ul_schedctl_called) != NULL) {
 		if (((el = gflags->uf_trs_ted) | mtype) == 0) {
 fast_unlock:
-			if (!(mp->mutex_lockword & WAITERMASK)) {
-				/* no waiter exists right now */
-				mp->mutex_owner = 0;
-				DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-				if (atomic_swap_32(&mp->mutex_lockword, 0) &
-				    WAITERMASK) {
-					/* a waiter suddenly appeared */
-					no_preempt(self);
-					if ((lwpid = mutex_wakeup(mp)) != 0)
-						(void) __lwp_unpark(lwpid);
-					preempt(self);
-				}
-			} else if ((lwpid = mutex_unlock_queue(mp, 0)) != 0) {
+			if ((lwpid = mutex_unlock_queue(mp, 0)) != 0) {
 				(void) __lwp_unpark(lwpid);
 				preempt(self);
 			}
@@ -2216,19 +2258,7 @@ fast_unlock:
 				DTRACE_PROBE2(plockstat, mutex__release, mp, 1);
 				return (0);
 			}
-			if (mp->mutex_lockword & WAITERMASK) {
-				mutex_unlock_process(mp, 0);
-			} else {
-				mp->mutex_owner = 0;
-				mp->mutex_ownerpid = 0;
-				DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-				if (atomic_swap_32(&mp->mutex_lockword, 0) &
-				    WAITERMASK) {
-					no_preempt(self);
-					(void) ___lwp_mutex_wakeup(mp, 0);
-					preempt(self);
-				}
-			}
+			mutex_unlock_process(mp, 0);
 			return (0);
 		}
 	}
@@ -2537,21 +2567,23 @@ _pthread_spin_lock(pthread_spinlock_t *lock)
 	 * We just spin because that's what this interface requires.
 	 */
 	for (;;) {
-		if (count < INT_MAX)
-			count++;
 		if (*lockp == 0) {	/* lock byte appears to be clear */
 			no_preempt(self);
 			if (set_lock_byte(lockp) == 0)
 				break;
 			preempt(self);
 		}
+		if (count < INT_MAX)
+			count++;
 		SMT_PAUSE();
 	}
 	mp->mutex_owner = (uintptr_t)self;
 	if (mp->mutex_type == USYNC_PROCESS)
 		mp->mutex_ownerpid = self->ul_uberdata->pid;
 	preempt(self);
-	DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+	if (count) {
+		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+	}
 	DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
 	return (0);
 }
@@ -2572,7 +2604,7 @@ _pthread_spin_unlock(pthread_spinlock_t *lock)
 	return (0);
 }
 
-#define	INITIAL_LOCKS	8	/* initialial size of ul_heldlocks.array */
+#define	INITIAL_LOCKS	8	/* initial size of ul_heldlocks.array */
 
 /*
  * Find/allocate an entry for 'lock' in our array of held locks.
@@ -2851,8 +2883,7 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 }
 
 int
-cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
-	tdb_mutex_stats_t *msp)
+cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 {
 	ulwp_t *self = curthread;
 	int error;
@@ -2880,12 +2911,8 @@ cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
 	/*
 	 * Reacquire the mutex.
 	 */
-	if ((merror = mutex_trylock_adaptive(mp, 1)) == EBUSY)
-		merror = mutex_lock_queue(self, msp, mp, NULL);
-	if (merror)
+	if ((merror = mutex_lock_impl(mp, NULL)) != 0)
 		error = merror;
-	if (msp && (merror == 0 || merror == EOWNERDEAD))
-		record_begin_hold(msp);
 
 	/*
 	 * Take any deferred signal now, after we have reacquired the mutex.
@@ -2957,7 +2984,7 @@ cond_wait_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	 * the caller must see the EOWNERDEAD or ENOTRECOVERABLE
 	 * errors in order to take corrective action.
 	 */
-	if ((merror = _private_mutex_lock(mp)) != 0)
+	if ((merror = mutex_lock_impl(mp, NULL)) != 0)
 		error = merror;
 
 	/*
@@ -3022,17 +3049,17 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 			lock_error(mp, "cond_wait", cvp, NULL);
 		if ((mtype & LOCK_RECURSIVE) && mp->mutex_rcount != 0)
 			lock_error(mp, "recursive mutex in cond_wait",
-				cvp, NULL);
+			    cvp, NULL);
 		if (cvp->cond_type & USYNC_PROCESS) {
 			if (!(mtype & USYNC_PROCESS))
 				lock_error(mp, "cond_wait", cvp,
-					"condvar process-shared, "
-					"mutex process-private");
+				    "condvar process-shared, "
+				    "mutex process-private");
 		} else {
 			if (mtype & USYNC_PROCESS)
 				lock_error(mp, "cond_wait", cvp,
-					"condvar process-private, "
-					"mutex process-shared");
+				    "condvar process-private, "
+				    "mutex process-shared");
 		}
 	}
 
@@ -3049,7 +3076,7 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	    (cvp->cond_type & USYNC_PROCESS))
 		error = cond_wait_kernel(cvp, mp, tsp);
 	else
-		error = cond_wait_queue(cvp, mp, tsp, msp);
+		error = cond_wait_queue(cvp, mp, tsp);
 	mp->mutex_rcount = rcount;
 
 	if (csp) {
@@ -3085,7 +3112,7 @@ _cond_wait(cond_t *cvp, mutex_t *mp)
 	    (cvp->cond_type | mp->mutex_type | gflags->uf_trs_ted |
 	    self->ul_td_events_enable |
 	    udp->tdb.tdb_ev_global_mask.event_bits[0]) == 0)
-		return (cond_wait_queue(cvp, mp, NULL, NULL));
+		return (cond_wait_queue(cvp, mp, NULL));
 
 	/*
 	 * Else do it the long way.
@@ -3560,8 +3587,8 @@ dump_queue_statistics(void)
 			continue;
 		spin_lock_total += qp->qh_lockcount;
 		if (fprintf(stderr, "%5d %12llu%12u\n", qn,
-			(u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
-				return;
+		    (u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
+			return;
 	}
 
 	if (fprintf(stderr, "\n%5d condvar queues:\n", QHASHSIZE) < 0 ||
@@ -3572,18 +3599,18 @@ dump_queue_statistics(void)
 			continue;
 		spin_lock_total += qp->qh_lockcount;
 		if (fprintf(stderr, "%5d %12llu%12u\n", qn,
-			(u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
-				return;
+		    (u_longlong_t)qp->qh_lockcount, qp->qh_qmax) < 0)
+			return;
 	}
 
 	(void) fprintf(stderr, "\n  spin_lock_total  = %10llu\n",
-		(u_longlong_t)spin_lock_total);
+	    (u_longlong_t)spin_lock_total);
 	(void) fprintf(stderr, "  spin_lock_spin   = %10llu\n",
-		(u_longlong_t)spin_lock_spin);
+	    (u_longlong_t)spin_lock_spin);
 	(void) fprintf(stderr, "  spin_lock_spin2  = %10llu\n",
-		(u_longlong_t)spin_lock_spin2);
+	    (u_longlong_t)spin_lock_spin2);
 	(void) fprintf(stderr, "  spin_lock_sleep  = %10llu\n",
-		(u_longlong_t)spin_lock_sleep);
+	    (u_longlong_t)spin_lock_sleep);
 	(void) fprintf(stderr, "  spin_lock_wakeup = %10llu\n",
-		(u_longlong_t)spin_lock_wakeup);
+	    (u_longlong_t)spin_lock_wakeup);
 }

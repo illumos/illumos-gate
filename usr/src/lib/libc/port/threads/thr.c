@@ -643,7 +643,6 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	ulwp->ul_async_safe = self->ul_async_safe;
 	ulwp->ul_max_spinners = self->ul_max_spinners;
 	ulwp->ul_adaptive_spin = self->ul_adaptive_spin;
-	ulwp->ul_release_spin = self->ul_release_spin;
 	ulwp->ul_queue_spin = self->ul_queue_spin;
 	ulwp->ul_door_noreserve = self->ul_door_noreserve;
 
@@ -1188,13 +1187,9 @@ etest(const char *ev)
 
 	if ((value = envvar(ev, "QUEUE_SPIN", 1000000)) >= 0)
 		thread_queue_spin = value;
-	if ((value = envvar(ev, "ADAPTIVE_SPIN", 1000000)) >= 0) {
+	if ((value = envvar(ev, "ADAPTIVE_SPIN", 1000000)) >= 0)
 		thread_adaptive_spin = value;
-		thread_release_spin = (value + 1) / 2;
-	}
-	if ((value = envvar(ev, "RELEASE_SPIN", 1000000)) >= 0)
-		thread_release_spin = value;
-	if ((value = envvar(ev, "MAX_SPINNERS", 100)) >= 0)
+	if ((value = envvar(ev, "MAX_SPINNERS", 255)) >= 0)
 		thread_max_spinners = value;
 	if ((value = envvar(ev, "QUEUE_FIFO", 8)) >= 0)
 		thread_queue_fifo = value;
@@ -1469,9 +1464,8 @@ libc_init(void)
 	self->ul_error_detection = (char)thread_error_detection;
 	self->ul_async_safe = (char)thread_async_safe;
 	self->ul_door_noreserve = (char)thread_door_noreserve;
-	self->ul_max_spinners = (uchar_t)thread_max_spinners;
+	self->ul_max_spinners = (uint8_t)thread_max_spinners;
 	self->ul_adaptive_spin = thread_adaptive_spin;
-	self->ul_release_spin = thread_release_spin;
 	self->ul_queue_spin = thread_queue_spin;
 
 	/*

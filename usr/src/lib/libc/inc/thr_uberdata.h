@@ -105,6 +105,8 @@
 /* lock.lock64.pad[x]	   4 5 6 7 */
 #define	LOCKMASK	0xff000000
 #define	WAITERMASK	0x000000ff
+#define	SPINNERMASK	0x00ff0000
+#define	SPINNERSHIFT	16
 #define	WAITER		0x00000001
 #define	LOCKSET		0xff
 #define	LOCKCLEAR	0
@@ -112,6 +114,8 @@
 /* lock.lock64.pad[x]	   7 6 5 4 */
 #define	LOCKMASK	0xff000000
 #define	WAITERMASK	0x00ff0000
+#define	SPINNERMASK	0x0000ff00
+#define	SPINNERSHIFT	8
 #define	WAITER		0x00010000
 #define	LOCKSET		0x01
 #define	LOCKCLEAR	0
@@ -498,7 +502,7 @@ typedef struct ulwp {
 	char		ul_fork;	/* thread is performing a fork */
 	char		ul_primarymap;	/* primary link-map is initialized */
 	/* per-thread copies of the corresponding global variables */
-	uchar_t		ul_max_spinners;	/* thread_max_spinners */
+	uint8_t		ul_max_spinners;	/* thread_max_spinners */
 	char		ul_door_noreserve;	/* thread_door_noreserve */
 	char		ul_queue_fifo;		/* thread_queue_fifo */
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
@@ -506,7 +510,6 @@ typedef struct ulwp {
 	char		ul_async_safe;		/* thread_async_safe */
 	char		ul_pad1[2];
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
-	int		ul_release_spin;	/* thread_release_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	volatile int	ul_critical;	/* non-zero == in a critical region */
 	int		ul_sigdefer;	/* non-zero == defer signals */
@@ -612,7 +615,6 @@ extern	const sigset_t maskset;		/* set of all maskable signals */
 
 extern	int	thread_adaptive_spin;
 extern	uint_t	thread_max_spinners;
-extern	int	thread_release_spin;
 extern	int	thread_queue_spin;
 extern	int	thread_queue_fifo;
 extern	int	thread_queue_dump;
@@ -897,7 +899,7 @@ typedef struct ulwp32 {
 	char		ul_fork;	/* thread is performing a fork */
 	char		ul_primarymap;	/* primary link-map is initialized */
 	/* per-thread copies of the corresponding global variables */
-	uchar_t		ul_max_spinners;	/* thread_max_spinners */
+	uint8_t		ul_max_spinners;	/* thread_max_spinners */
 	char		ul_door_noreserve;	/* thread_door_noreserve */
 	char		ul_queue_fifo;		/* thread_queue_fifo */
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
@@ -905,7 +907,6 @@ typedef struct ulwp32 {
 	char		ul_async_safe;		/* thread_async_safe */
 	char		ul_pad1[2];
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
-	int		ul_release_spin;	/* thread_release_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	int		ul_critical;	/* non-zero == in a critical region */
 	int		ul_sigdefer;	/* non-zero == defer signals */

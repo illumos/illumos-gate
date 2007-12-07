@@ -530,11 +530,10 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulwp.ul_pad1[0],
 		ulwp.ul_pad1[1]);
 
-	HD("adapt'spin rele'spin  queue_spin critical   sigdefer   vfork");
-	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
+	HD("adapt'spin queue_spin critical   sigdefer   vfork");
+	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %d\n",
 		OFFSET(ul_adaptive_spin),
 		ulwp.ul_adaptive_spin,
-		ulwp.ul_release_spin,
 		ulwp.ul_queue_spin,
 		ulwp.ul_critical,
 		ulwp.ul_sigdefer,

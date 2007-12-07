@@ -44,6 +44,7 @@ extern "C" {
 #define	mutex_lockword		lock.lock32.lockword /* address of */
 #define	mutex_lockw		lock.lock64.pad[7]
 #define	mutex_waiters		lock.lock64.pad[6]
+#define	mutex_spinners		lock.lock64.pad[5]
 
 /* process-shared lock owner pid */
 #define	mutex_ownerpid		lock.lock32.ownerpid
