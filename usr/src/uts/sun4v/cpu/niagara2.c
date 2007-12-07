@@ -90,7 +90,7 @@ cpu_setup(void)
 {
 	extern int mmu_exported_pagesize_mask;
 	extern int cpc_has_overflow_intr;
-	extern size_t contig_mem_prealloc_base;
+	extern size_t contig_mem_prealloc_base_size;
 	int status;
 
 	/*
@@ -147,7 +147,13 @@ cpu_setup(void)
 	max_ustack_lpsize = MMU_PAGESIZE4M;
 	max_privmap_lpsize = MMU_PAGESIZE4M;
 
-	contig_mem_prealloc_base = NIAGARA2_PREALLOC_BASE;
+#ifdef SUN4V_CONTIG_MEM_PREALLOC_SIZE_MB
+	/*
+	 * Use CPU Makefile specific compile time define (if exists)
+	 * to add to the contig preallocation size.
+	 */
+	contig_mem_prealloc_base_size = MB(SUN4V_CONTIG_MEM_PREALLOC_SIZE_MB);
+#endif
 }
 
 /*

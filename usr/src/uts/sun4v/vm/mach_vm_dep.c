@@ -165,8 +165,8 @@ static size_t contig_mem_import_size_max	= MMU_PAGESIZE4M;
 size_t contig_mem_slab_size			= MMU_PAGESIZE4M;
 
 /* Boot-time allocated buffer to pre-populate the contig_mem_arena */
-static size_t prealloc_size;
-static void *prealloc_buf;
+static size_t contig_mem_prealloc_size;
+static void *contig_mem_prealloc_buf;
 
 /*
  * map_addr_proc() is the routine called when the system is to
@@ -252,11 +252,11 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	}
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    allow_largepage_alignment &&
-		(len >= MMU_PAGESIZE256M)) {	/* 256MB mappings */
+	    (len >= MMU_PAGESIZE256M)) {	/* 256MB mappings */
 		align_amount = MMU_PAGESIZE256M;
 	} else if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    allow_largepage_alignment &&
-		(len >= MMU_PAGESIZE32M)) {	/* 32MB mappings */
+	    (len >= MMU_PAGESIZE32M)) {	/* 32MB mappings */
 		align_amount = MMU_PAGESIZE32M;
 	} else if (len >= MMU_PAGESIZE4M) {  /* 4MB mappings */
 		align_amount = MMU_PAGESIZE4M;
@@ -272,7 +272,7 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		 */
 		align_amount = ELF_SPARC_MAXPGSZ;
 		if ((flags & MAP_ALIGN) && ((uintptr_t)*addrp != 0) &&
-			((uintptr_t)*addrp < align_amount))
+		    ((uintptr_t)*addrp < align_amount))
 			align_amount = (uintptr_t)*addrp;
 	}
 
@@ -692,24 +692,27 @@ contig_mem_init(void)
 	    contig_mem_span_free, contig_mem_slab_arena, 0,
 	    VM_SLEEP | VM_BESTFIT | VMC_XALIGN);
 
-	if (vmem_add(contig_mem_arena, prealloc_buf, prealloc_size,
-	    VM_SLEEP) == NULL)
+	if (vmem_add(contig_mem_arena, contig_mem_prealloc_buf,
+	    contig_mem_prealloc_size, VM_SLEEP) == NULL)
 		cmn_err(CE_PANIC, "Failed to pre-populate contig_mem_arena");
 }
 
 /*
  * In calculating how much memory to pre-allocate, we include a small
  * amount per-CPU to account for per-CPU buffers in line with measured
- * values for different size systems. contig_mem_prealloc_base is the
- * base fixed amount to be preallocated before considering per-CPU
- * requirements and memory size. We take the minimum of
- * contig_mem_prealloc_base and a small percentage of physical memory
- * to prevent allocating too much on smaller systems.
+ * values for different size systems. contig_mem_prealloc_base_size is
+ * a cpu specific amount to be pre-allocated before considering per-CPU
+ * requirements and memory size. We always pre-allocate a minimum amount
+ * of memory determined by PREALLOC_MIN. Beyond that, we take the minimum
+ * of contig_mem_prealloc_base_size and a small percentage of physical
+ * memory to prevent allocating too much on smaller systems.
+ * contig_mem_prealloc_base_size is global, allowing for the CPU module
+ * to increase its value if necessary.
  */
 #define	PREALLOC_PER_CPU	(256 * 1024)		/* 256K */
 #define	PREALLOC_PERCENT	(4)			/* 4% */
 #define	PREALLOC_MIN		(16 * 1024 * 1024)	/* 16M */
-size_t contig_mem_prealloc_base = 0;
+size_t contig_mem_prealloc_base_size = 0;
 
 /*
  * Called at boot-time allowing pre-allocation of contiguous memory.
@@ -719,14 +722,16 @@ size_t contig_mem_prealloc_base = 0;
 caddr_t
 contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 {
-	prealloc_size = MIN((PREALLOC_PER_CPU * ncpu_guest_max) +
-	    contig_mem_prealloc_base, (ptob(npages) * PREALLOC_PERCENT) / 100);
-	prealloc_size = MAX(prealloc_size, PREALLOC_MIN);
-	prealloc_size = P2ROUNDUP(prealloc_size, MMU_PAGESIZE4M);
+	contig_mem_prealloc_size = MIN((PREALLOC_PER_CPU * ncpu_guest_max) +
+	    contig_mem_prealloc_base_size,
+	    (ptob(npages) * PREALLOC_PERCENT) / 100);
+	contig_mem_prealloc_size = MAX(contig_mem_prealloc_size, PREALLOC_MIN);
+	contig_mem_prealloc_size = P2ROUNDUP(contig_mem_prealloc_size,
+	    MMU_PAGESIZE4M);
 
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, MMU_PAGESIZE4M);
-	prealloc_buf = alloc_base;
-	alloc_base += prealloc_size;
+	contig_mem_prealloc_buf = alloc_base;
+	alloc_base += contig_mem_prealloc_size;
 
 	return (alloc_base);
 }
