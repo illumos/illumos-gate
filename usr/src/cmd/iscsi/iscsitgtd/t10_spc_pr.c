@@ -129,11 +129,11 @@ spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 			conflict = (cdb[4] & 0x1) ? True: False;
 			break;
 
-		case SCMD_REPORT_TARGET_PORT_GROUPS:	/* SCMD_REPORT_ */
+		case SCMD_MAINTENANCE_IN:	/* SCMD_REPORT_ */
 			/*
-			 * As pee SPC-3, Revision 23, Section 6.23
+			 * As per SPC-3, Revision 23, Section 6.23
 			 */
-			switch ((cdb[1] & 0x03)) {
+			switch ((cdb[1] & 0x1f)) {
 				/* SCMD_REPORT_SUPPORTED_OPERATION_CODES */
 				case 0x0c:
 				/* SCMD_REPORT_SUPPORTED_MANAGEMENT_FUNCTIONS */
@@ -144,7 +144,7 @@ spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 			}
 			break;
 
-		case SCMD_SET_DEVICE:
+		case SCMD_MAINTENANCE_OUT:
 			/*
 			 * SPC-3, Revision 23, Section 6.29
 			 */

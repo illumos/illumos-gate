@@ -164,7 +164,7 @@ main(int argc, char **argv)
 		 * the tape and then space to the desired file.
 		 */
 		int usecnt;
-		int mt_fileno;
+		daddr_t mt_fileno;
 
 		usecnt = argc > 2 && comp->c_usecnt;
 		mt_fileno = usecnt ? atol(argv[2]) : 1;
@@ -190,7 +190,7 @@ main(int argc, char **argv)
 			mt_com.mt_count = 1;
 			mt_com.mt_op = MTREW;
 			if (ioctl(mtfd, MTIOCLTOP, &mt_com) < 0) {
-				(void) fprintf(stderr, "%s %s %d ",
+				(void) fprintf(stderr, "%s %s %ld ",
 				    tape, comp->c_name, mt_fileno);
 				perror("mt");
 				return (2);
@@ -209,7 +209,7 @@ main(int argc, char **argv)
 			/* printf("mt: fsf= %d\n", mt_com.mt_count); */
 		}
 		if (ioctl(mtfd, MTIOCLTOP, &mt_com) < 0) {
-			(void) fprintf(stderr, "%s %s %d ", tape, comp->c_name,
+			(void) fprintf(stderr, "%s %s %ld ", tape, comp->c_name,
 			    mt_fileno);
 			perror("failed");
 			return (2);
@@ -380,8 +380,19 @@ status(int mtfd, struct mtget *bp)
 		(void) printf("   sense key(0x%x)= %s   residual= %ld   ",
 		    bp->mt_erreg, print_key(bp->mt_erreg), bp->mt_resid);
 		(void) printf("retries= %d\n", bp->mt_dsreg);
-		(void) printf("   file no= %ld   block no= %ld\n",
-		    bp->mt_fileno, bp->mt_blkno);
+		/*
+		 * Can overflow the signed numbers.
+		 * fileno will be -1 on error but all other positions are
+		 * positive. blkno will never be negative.
+		 */
+		if (bp->mt_fileno == -1) {
+			(void) printf("   file no= -1   block no= %lu\n",
+			    (unsigned long)bp->mt_blkno);
+		} else {
+			(void) printf("   file no= %lu   block no= %lu\n",
+			    (unsigned long)bp->mt_fileno,
+			    (unsigned long)bp->mt_blkno);
+		}
 		if ((bp->mt_flags & MTF_WORM_MEDIA) != 0) {
 			(void) printf("   WORM media\n");
 		}

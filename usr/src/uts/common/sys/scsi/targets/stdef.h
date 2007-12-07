@@ -32,9 +32,12 @@
 #include <sys/note.h>
 #include <sys/condvar.h>
 #include <sys/kstat.h>
+#include <sys/int_limits.h>
 #include <sys/scsi/scsi_types.h>
 #include <sys/scsi/generic/sense.h>
 #include <sys/mtio.h>
+#include <sys/taskq.h>
+#include <sys/taskq_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -719,7 +722,7 @@ typedef struct tapepos {
 	int32_t partition;
 	pstatus eof;			/* eof states */
 	posmode	pmode;
-	char	pad[4];
+	uint32_t: 32;
 }tapepos_t;
 
 /* byte 1 of cdb for type of read position command */
@@ -790,30 +793,32 @@ typedef struct tape_position_long {
 
 typedef struct tape_position_ext {
 #if defined(_BIT_FIELDS_HTOL)
-	uint32_t begin_of_part:	1;
-	uint32_t end_of_part:	1;
-	uint32_t blk_cnt_unkwn:	1;
-	uint32_t byte_cnt_unkwn:1;
-	uint32_t mrk_posi_unkwn:1;
-	uint32_t blk_posi_unkwn:1;
-	uint32_t posi_err:	1;
-	uint32_t reserved0:	1;
-	uint32_t partition:	8;
-	uint32_t parameter_len:	16;
+	uchar_t begin_of_part:	1;
+	uchar_t end_of_part:	1;
+	uchar_t blk_cnt_unkwn:	1;
+	uchar_t byte_cnt_unkwn:	1;
+	uchar_t mrk_posi_unkwn:	1;
+	uchar_t blk_posi_unkwn:	1;
+	uchar_t posi_err:	1;
+	uchar_t reserved0:	1;
+
+	uchar_t partition;
+	uint16_t parameter_len;
 /* start next word */
 	uint32_t reserved1:	8;
 	uint32_t blks_in_buf:	24;
 #elif defined(_BIT_FIELDS_LTOH)
-	uint32_t parameter_len:	16;
-	uint32_t partition:	8;
-	uint32_t reserved0:	1;
-	uint32_t posi_err:	1;
-	uint32_t blk_posi_unkwn:1;
-	uint32_t mrk_posi_unkwn:1;
-	uint32_t byte_cnt_unkwn:1;
-	uint32_t blk_cnt_unkwn:	1;
-	uint32_t end_of_part:	1;
-	uint32_t begin_of_part:	1;
+	uchar_t reserved0:	1;
+	uchar_t posi_err:	1;
+	uchar_t blk_posi_unkwn:	1;
+	uchar_t mrk_posi_unkwn:	1;
+	uchar_t byte_cnt_unkwn:	1;
+	uchar_t blk_cnt_unkwn:	1;
+	uchar_t end_of_part:	1;
+	uchar_t begin_of_part:	1;
+
+	uchar_t partition;
+	uint16_t parameter_len;
 /* start next word */
 	uint32_t blks_in_buf:	24;
 	uint32_t reserved1:	8;
@@ -828,6 +833,53 @@ typedef union {
 	tape_position_ext_t ext;
 	tape_position_long_t lng;
 }read_pos_data_t;
+
+typedef struct {
+	unsigned char cmd;
+	unsigned char
+		requires_reserve:	1,	/* reserve must be done */
+		retriable:		1,	/* can be retried */
+		chg_tape_pos:		1,	/* position will change */
+		chg_tape_data:		1,	/* data on media will change */
+		explicit:		1,	/* explicit command set */
+		/*
+		 * 0 doesn't, 1 forward,
+		 * 2 back, 3 either
+		 */
+		chg_tape_direction:	2;	/* direction of pos change */
+#define	DIR_NONE	0
+#define	DIR_FORW	1
+#define	DIR_REVC	2
+#define	DIR_EITH	3
+	unsigned char
+		/*
+		 * 0 doesn't 1 read, 2 write
+		 */
+		transfers_data:		2,
+#define	TRAN_NONE	0
+#define	TRAN_READ	1
+#define	TRAN_WRTE	2
+		recov_pos_type:		1,
+#define	POS_EXPECTED	0
+#define	POS_STARTING	1
+		do_not_recover:		1;
+	uchar_t reserve_byte;
+	uint32_t reserve_mask;
+	uint64_t (*get_cnt)(uchar_t *);
+	uint64_t (*get_lba)(uchar_t *);
+}cmd_attribute;
+
+typedef struct {
+	buf_t *cmd_bp;
+	size_t privatelen;
+}pkt_info;
+
+typedef struct {
+	buf_t *cmd_bp;
+	size_t privatelen;
+	tapepos_t pos;
+	const cmd_attribute *cmd_attrib;
+}recov_info;
 
 #ifdef _KERNEL
 
@@ -947,7 +999,7 @@ struct scsi_tape {
 	uchar_t	un_comp_page;		/* compression page */
 	uchar_t	un_rsvd_status;		/* Reservation Status */
 	kstat_t *un_errstats;		/* for error statistics */
-	int	un_init_options;  	/* Init time drive options */
+	int	un_init_options;	/* Init time drive options */
 	int	un_save_fileno;		/* Save here for recovery */
 	daddr_t	un_save_blkno;		/* Save here for recovery */
 	uchar_t un_restore_pos;		/* Indication to do recovery */
@@ -979,7 +1031,23 @@ struct scsi_tape {
 	kcondvar_t un_contig_mem_cv;
 	int un_maxdma_arch;		/* max dma xfer allowed by HBA & arch */
 #endif
+	caddr_t un_media_id;
+	int un_media_id_len;
+	int (*un_media_id_method)(struct scsi_tape *, int (*)());
+	buf_t *un_recov_buf;		/* buf to recover failed commands */
+	kcondvar_t un_recov_buf_cv;	/* cv for buf un_recov_buf */
+	uchar_t un_recov_buf_busy;
+#ifdef _KERNEL
+	ddi_taskq_t *un_recov_taskq;
+#else
+	void *un_recov_taskq;
+#endif
+	tapepos_t un_running;
+	uchar_t un_unit_attention_flags;
 };
+
+typedef int (*bufunc_t)(struct scsi_tape *, int, int64_t, int);
+typedef int (*ubufunc_t)(struct scsi_tape *, struct uscsi_cmd *, int);
 
 
 /*
@@ -1106,18 +1174,33 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #define	ST_RQS_ERROR		0x8	/* RQS resulted in an EIO */
 
 /*
- * stintr codes
+ * st_intr codes
  */
-
-#define	COMMAND_DONE					0
-#define	COMMAND_DONE_ERROR				1
-#define	COMMAND_DONE_ERROR_RECOVERED			2
-#define	QUE_COMMAND					3
-#define	QUE_BUSY_COMMAND				4
-#define	QUE_SENSE					5
-#define	JUST_RETURN					6
-#define	COMMAND_DONE_EACCES				7
-#define	QUE_LAST_COMMAND				8
+typedef enum {
+	COMMAND_DONE,
+	COMMAND_DONE_ERROR,
+	COMMAND_DONE_ERROR_RECOVERED,
+	QUE_COMMAND,
+	QUE_BUSY_COMMAND,
+	QUE_SENSE,
+	JUST_RETURN,
+	COMMAND_DONE_EACCES,
+	QUE_LAST_COMMAND,
+	COMMAND_TIMEOUT,
+	PATH_FAILED,
+	DEVICE_RESET,
+	DEVICE_TAMPER,
+	ATTEMPT_RETRY
+}errstate;
+#ifdef _KERNEL
+typedef struct {
+	struct scsi_pkt ei_failed_pkt;
+	struct scsi_arq_status ei_failing_status;
+	tapepos_t ei_expected_pos;
+	errstate ei_error_type;
+	buf_t *ei_failing_bp;
+} st_err_info;
+#endif
 
 
 /*
@@ -1138,6 +1221,7 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #define	ST_RESERVATION_CONFLICT 	0x010
 #define	ST_LOST_RESERVE			0x020
 #define	ST_APPLICATION_RESERVATIONS	0x040
+#define	ST_INITIATED_RESET		0x080
 #define	ST_LOST_RESERVE_BETWEEN_OPENS  \
 		(ST_RESERVE | ST_LOST_RESERVE | ST_PRESERVE_RESERVE)
 
@@ -1228,7 +1312,7 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 /*
  * convenient defines
  */
-#define	ST_SCSI_DEVP	(un->un_sd)
+#define	ST_SCSI_DEVP		(un->un_sd)
 #define	ST_DEVINFO		(ST_SCSI_DEVP->sd_dev)
 #define	ST_INQUIRY		(ST_SCSI_DEVP->sd_inq)
 #define	ST_RQSENSE		(ST_SCSI_DEVP->sd_sense)
@@ -1252,17 +1336,6 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #define	ASYNC_CMD	0
 #define	SYNC_CMD	1
 
-/*
- * Flush tape wait queue as needed.
- */
-
-#define	IS_PE_FLAG_SET(un) ((un)->un_persistence && (un)->un_persist_errors)
-
-#define	TURN_PE_ON(un)		st_turn_pe_on(un)
-#define	TURN_PE_OFF(un)		st_turn_pe_off(un)
-#define	SET_PE_FLAG(un)		st_set_pe_flag(un)
-#define	CLEAR_PE(un)		st_clear_pe(un)
-
 #define	st_bioerror(bp, error) \
 		{ bioerror(bp, error); \
 		un->un_errno = error; }
@@ -1270,31 +1343,51 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 /*
  * Macros for internal coding of count for SPACE command:
  *
- * Isfmk is 1 when spacing filemarks; 0 when spacing records:
- * bit 24 set indicates a space filemark command.
- * Fmk sets the filemark bit (24) and changes a backspace
- * count into a positive number with the sign bit set.
- * Blk changes a backspace count into a positive number with
- * the sign bit set.
- * space_cnt converts backwards counts to negative numbers.
+ * Top 3 bits of b_bcount define direction and type of space.
+ * Since b_bcount (size_t) is 32 bits on 32 platforms and 64 bits on
+ * 64 bit platforms different defines are used.
+ * if SP_BACKSP is set direction is backward (toward BOP)
+ * The type of space (Blocks, Filemark or sequential filemarks) is
+ * carried in the next 2 bits. The remaining bits a signed count of
+ * how many of that direction and type to do.
  */
-#define	SP_BLK		0
-#define	SP_FLM		((1<<24))
-#define	SP_SQFLM	((2<<24))
-#define	SP_EOD		((3<<24))
-#define	SP_BACKSP	((1<<30))
-#define	SP_CMD_MASK	((7<<24))
-#define	SP_CNT_MASK	((1<<24)-1)
+#if (SIZE_MAX < UINT64_MAX)
+
+#define	SP_BLK		UINT32_C(0x00000000)
+#define	SP_FLM		UINT32_C(0x20000000)
+#define	SP_SQFLM	UINT32_C(0x40000000)
+#define	SP_EOD		UINT32_C(0x60000000)
+#define	SP_BACKSP	UINT32_C(0x80000000)
+#define	SP_CMD_MASK	UINT32_C(0x60000000)
+#define	SP_CNT_MASK	UINT32_C(0x1fffffff)
+
+/* Macros to interpret space cmds */
+#define	SPACE_CNT(x)	(((x) & SP_BACKSP)? \
+	(-((x)&(SP_CNT_MASK))):(x)&(SP_CNT_MASK))
+#define	SPACE_TYPE(x)	((x & SP_CMD_MASK)>>29)
+
+#else /* end of small size_t in buf_t */
+
+#define	SP_BLK		UINT64_C(0x0000000000000000)
+#define	SP_FLM		UINT64_C(0x2000000000000000)
+#define	SP_SQFLM	UINT64_C(0x4000000000000000)
+#define	SP_EOD		UINT64_C(0x6000000000000000)
+#define	SP_BACKSP	UINT64_C(0x8000000000000000)
+#define	SP_CMD_MASK	UINT64_C(0x6000000000000000)
+#define	SP_CNT_MASK	UINT64_C(0x1fffffffffffffff)
+
+/* Macros to interpret space cmds */
+#define	SPACE_CNT(x)	(((x) & SP_BACKSP)? \
+	(-((x)&(SP_CNT_MASK))):(x)&(SP_CNT_MASK))
+#define	SPACE_TYPE(x)	((x & SP_CMD_MASK)>>61)
+
+#endif /* end of big size_t in buf_t */
 
 /* Macros to assemble space cmds */
 #define	SPACE(cmd, cnt)	((cnt < 0) ? (SP_BACKSP | (-(cnt)) | cmd) : (cmd | cnt))
 #define	Fmk(x)		SPACE(SP_FLM, x)
 #define	Blk(x)		SPACE(SP_BLK, x)
 
-/* Macros to interpret space cmds */
-#define	SPACE_CNT(x)	(((x) & SP_BACKSP)? \
-	(-((x)&(SP_CNT_MASK))):(x)&(SP_CNT_MASK))
-#define	SPACE_TYPE(x)	((x & SP_CMD_MASK)>>24)
 
 
 /* Defines for byte 4 of load/unload cmd */
@@ -1324,46 +1417,58 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #endif
 
 #ifdef	STDEBUG
-#define	DEBUGGING	((scsi_options & SCSI_DEBUG_TGT) || (st_debug & 0xf))
+#define	DEBUGGING\
+	((scsi_options & SCSI_DEBUG_TGT) || (st_debug & 0x7))
 
-#define	ST_DARGS	st_label, SCSI_DEBUG
-
+#define	ST_DARGS(d) st_label, ((d == st_lastdev || d == 0) ?CE_CONT:CE_NOTE)
 
 	/* initialization */
-#define	ST_DEBUG1	if ((st_debug & 0xf) >= 1) scsi_log
+#define	ST_DEBUG1	if ((st_debug & 0x7) >= 1) scsi_log
 #define	ST_DEBUG	ST_DEBUG1
 
 	/* errors and UA's */
-#define	ST_DEBUG2	if ((st_debug & 0xf) >= 2) scsi_log
+#define	ST_DEBUG2	if ((st_debug & 0x7) >= 2) scsi_log
 
 	/* func calls */
-#define	ST_DEBUG3	if ((st_debug & 0xf) >= 3) scsi_log
+#define	ST_DEBUG3	if ((st_debug & 0x7) >= 3) scsi_log
 
 	/* ioctl calls */
-#define	ST_DEBUG4	if ((st_debug & 0xf) >= 4) scsi_log
+#define	ST_DEBUG4	if ((st_debug & 0x7) >= 4) scsi_log
 
-#define	ST_DEBUG5	if ((st_debug & 0xf) >= 5) scsi_log
+#define	ST_DEBUG5	if ((st_debug & 0x7) >= 5) scsi_log
 
 	/* full data tracking */
-#define	ST_DEBUG6	if ((st_debug & 0xf) >= 6) scsi_log
+#define	ST_DEBUG6	if ((st_debug & 0x7) >= 6) scsi_log
 
-	/* special cases */
-#define	ST_DEBUG_SP	if ((st_debug & 0xf) == 10) scsi_log
+	/* debug error recovery */
+#define	ST_RECOV	if (st_debug & 0x8) scsi_log
 
 	/* Entry Point Functions */
-#define	ST_ENTR(d, fn)	if (st_debug & 0x10) scsi_log(d, ST_DARGS, #fn)
+#define	ST_ENTR(d, fn)\
+    if (st_debug & 0x10) { scsi_log(d, ST_DARGS(d), #fn);\
+    if (d != 0 && d != st_lastdev) st_lastdev = d; }
 
 	/* Non-Entry Point Functions */
-#define	ST_FUNC(d, fn)	if (st_debug & 0x20) scsi_log(d, ST_DARGS, #fn)
+#define	ST_FUNC(d, fn)\
+    if (st_debug & 0x20) { scsi_log(d, ST_DARGS(d), #fn);\
+    if (d != 0 && d != st_lastdev) st_lastdev = d; }
 
 	/* Space Information */
 #define	ST_SPAC		if (st_debug & 0x40) scsi_log
 
 	/* CDB's sent */
-#define	ST_CDB(d, cmnt, cdb) if (st_debug & 0x180) \
-    st_print_cdb(d, ST_DARGS, cmnt, cdb)
-#define	ST_SENSE(d, cmnt, sense, size) if (st_debug & 0x200) \
-    st_clean_print(d, ST_DARGS, cmnt, sense, size)
+#define	ST_CDB(d, cmnt, cdb) if (st_debug & 0x180) { \
+    st_print_cdb(d, ST_DARGS(d), cmnt, cdb);\
+    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+	/* sense data */
+#define	ST_SENSE(d, cmnt, sense, size) if (st_debug & 0x200) { \
+    st_clean_print(d, ST_DARGS(d), cmnt, sense, size);\
+    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+	/* position data */
+#define	ST_POS(d, cmnt, pdata) if (st_debug & 0x400) { \
+    st_print_position(d, ST_DARGS(d), cmnt, pdata);\
+    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+
 
 #else
 
@@ -1376,14 +1481,15 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #define	ST_DEBUG4	if (0) scsi_log
 #define	ST_DEBUG5	if (0) scsi_log
 #define	ST_DEBUG6	if (0) scsi_log
-
-#define	ST_DEBUG_SP	if (0) scsi_log /* special cases */
+#define	ST_RECOV	if (0) scsi_log
 
 #define	ST_ENTR(d, fn)
 #define	ST_FUNC(d, fn)
 #define	ST_SPAC		if (0) scsi_log
 #define	ST_CDB(d, cmnt, cdb)
 #define	ST_SENSE(d, cmnt, sense, size)
+#define	ST_SENSE(d, cmnt, sense, size)
+#define	ST_POS(d, cmnt, pdata)
 
 #endif
 

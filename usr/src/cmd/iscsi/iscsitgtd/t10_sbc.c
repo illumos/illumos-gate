@@ -234,9 +234,9 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	case SCMD_INQUIRY:
 	case SCMD_LOG_SENSE_G1:
 	case SCMD_PERSISTENT_RESERVE_IN:
-	case SCMD_READ_MEDIA_SERIAL:
+	case SCMD_SVC_ACTION_IN_G5:
 	case SCMD_REPORT_LUNS:
-	case SCMD_REPORT_TARGET_PORT_GROUPS:
+	case SCMD_MAINTENANCE_OUT:
 	case SCMD_REQUEST_SENSE:
 	case SCMD_TEST_UNIT_READY:
 		break;

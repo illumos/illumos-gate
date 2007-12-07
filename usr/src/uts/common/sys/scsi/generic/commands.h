@@ -322,8 +322,11 @@ extern "C" {
 /*
  * Group 4 Commands, Sequential Access Devics
  */
+#define	SCMD_WRITE_FILE_MARK_G4	0x80
+#define	SCMD_READ_REVERSE_G4	0x81
 #define	SCMD_READ_ATTRIBUTE	0x8c
 #define	SCMD_WRITE_ATTRIBUTE	0x8d
+#define	SCMD_SPACE_G4		0x91
 #define	SCMD_LOCATE_G4		0x92
 
 /*
@@ -331,17 +334,20 @@ extern "C" {
  */
 #define	SCMD_GROUP5		0xA0
 #define	SCMD_REPORT_LUNS	0xA0
-#define	SCMD_REPORT_TARGET_PORT_GROUPS	0xA3
-#define	SCMD_SET_DEVICE		0xA4
+#define	SCMD_SECURITY_PROTO_IN	0xA2
+#define	SCMD_MAINTENANCE_IN	0xA3
+#define	SCMD_MAINTENANCE_OUT	0xA4
 #define	SCMD_SET_DEVICE_IDENTIFIER	0x06
 #define	SCMD_SET_PRIORITY		0x0e
 #define	SCMD_SET_TARGET_PORT_GROUPS	0x0a
 #define	SCMD_SET_TIMESTAMP		0x0f
 #define	SCMD_READ_G5		0xA8
 #define	SCMD_WRITE_G5		0xAA
-#define	SCMD_READ_MEDIA_SERIAL	0xAB
+#define	SCMD_SVC_ACTION_OUT_G5	0xA9
+#define	SCMD_SVC_ACTION_IN_G5	0xAB
 #define	SCMD_GET_PERFORMANCE	0xAC
 #define	SCMD_VERIFY_G5		0xAF
+#define	SCMD_SECURITY_PROTO_OUT	0xB5
 
 
 /*
@@ -416,18 +422,29 @@ extern "C" {
 /* 0x5a */ SCMD_MODE_SENSE_G1,		"mode_sense(10)",		\
 /* 0x5e */ SCMD_PERSISTENT_RESERVE_IN,	"persistent_reserve_in",	\
 /* 0x5f */ SCMD_PERSISTENT_RESERVE_OUT,	"persistent_reserve_out",	\
+/* 0x80 */ SCMD_WRITE_FILE_MARK_G4,	"write_file_mark(16)",		\
+/* 0x81 */ SCMD_READ_REVERSE_G4,	"read_reverse(16)",		\
 /* 0x83 */ SCMD_EXTENDED_COPY,		"extended_copy",		\
 /* 0x88 */ SCMD_READ_G4,		"read(16)",			\
 /* 0x8a */ SCMD_WRITE_G4,		"write(16)",			\
 /* 0x8c */ SCMD_READ_ATTRIBUTE,		"read_attribute",		\
 /* 0x8d */ SCMD_WRITE_ATTRIBUTE,	"write_attribute",		\
 /* 0x8f */ SCMD_VERIFY_G4,		"verify(16)",			\
+/* 0x91 */ SCMD_SPACE_G4,		"space(16)",			\
 /* 0x92 */ SCMD_LOCATE_G4,		"locate(16)",			\
+/* 0x9e */ SCMD_SVC_ACTION_IN_G4,	"service_action_in(16)",	\
+/* 0x9f */ SCMD_SVC_ACTION_OUT_G4,	"service_action_out(16)",	\
 /* 0xa0 */ SCMD_REPORT_LUNS,		"report_luns",			\
+/* 0xa2 */ SCMD_SECURITY_PROTO_IN,	"security_protocol_in",		\
+/* 0xa3 */ SCMD_MAINTENANCE_IN,		"maintenance_in",		\
+/* 0xa4 */ SCMD_MAINTENANCE_OUT,	"maintenance_out",		\
 /* 0xa8 */ SCMD_READ_G5,		"read(12)",			\
+/* 0xa9 */ SCMD_SVC_ACTION_OUT_G5,	"service_action_out(12)",	\
 /* 0xaa */ SCMD_WRITE_G5,		"write(12)",			\
+/* 0xab */ SCMD_SVC_ACTION_IN_G5,	"service_action_in(12)",	\
 /* 0xac */ SCMD_GET_PERFORMANCE,	"get_performance",		\
-/* 0xAF */ SCMD_VERIFY_G5,		"verify(12)"			\
+/* 0xAF */ SCMD_VERIFY_G5,		"verify(12)",			\
+/* 0xb5 */ SCMD_SECURITY_PROTO_OUT,	"security_protocol_out"		\
 	/* see cdio.h for additional command-to-string translations */
 
 /* XXX not a command code, does not belong here */

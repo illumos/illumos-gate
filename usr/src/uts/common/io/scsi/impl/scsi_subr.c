@@ -377,32 +377,9 @@ scsi_dname(int dtyp)
 char *
 scsi_rname(uchar_t reason)
 {
-	static char *rnames[] = {
-		"cmplt",
-		"incomplete",
-		"dma_derr",
-		"tran_err",
-		"reset",
-		"aborted",
-		"timeout",
-		"data_ovr",
-		"cmd_ovr",
-		"sts_ovr",
-		"badmsg",
-		"nomsgout",
-		"xid_fail",
-		"ide_fail",
-		"abort_fail",
-		"reject_fail",
-		"nop_fail",
-		"per_fail",
-		"bdr_fail",
-		"id_fail",
-		"unexpected_bus_free",
-		"tag reject",
-		"terminated"
-	};
-	if (reason > CMD_TAG_REJECT) {
+	static char *rnames[] = CMD_REASON_ASCII;
+
+	if ((reason > CMD_DEV_GONE) || (reason == (CMD_TERMINATED + 1))) {
 		return ("<unknown reason>");
 	} else {
 		return (rnames[reason]);

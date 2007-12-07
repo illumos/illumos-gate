@@ -69,7 +69,6 @@ SCSI_FAILOVER_OP(SFO_NAME_TPGS, std, "%I%");
 #define	STD_UNAVAILABLE		0x3
 #define	STD_TRANSITIONING	0xf
 
-#define	STD_SCSI_TPG_SERVICE_ACTION	0x0A
 #define	STD_SCSI_ASC_STATE_TRANS	0x04
 #define	STD_SCSI_ASCQ_STATE_TRANS_FAIL  0x0A
 #define	STD_SCSI_ASC_STATE_CHG		0x2A
@@ -80,8 +79,6 @@ SCSI_FAILOVER_OP(SFO_NAME_TPGS, std, "%I%");
 #define	STD_LOGICAL_UNIT_NOT_ACCESSIBLE	0x04
 #define	STD_TGT_PORT_UNAVAILABLE	0x0C
 
-#define	SCMD_REPORT_TARGET_PORT_GROUP	0xA3;
-#define	SCMD_SET_TARGET_PORT_GROUP	0xA4;
 
 /* Special exported for direct use by MP-API */
 int std_set_target_groups(struct scsi_address *, int, int);
@@ -404,8 +401,8 @@ try_again:
 		return (1);
 	}
 
-	pkt->pkt_cdbp[0] = SCMD_REPORT_TARGET_PORT_GROUP;
-	pkt->pkt_cdbp[1] = STD_SCSI_TPG_SERVICE_ACTION;
+	pkt->pkt_cdbp[0] = SCMD_MAINTENANCE_IN;
+	pkt->pkt_cdbp[1] = SCMD_SET_TARGET_PORT_GROUPS;
 	pkt->pkt_cdbp[6] = ((len >>  24) & 0xff);
 	pkt->pkt_cdbp[7] = ((len >> 16) & 0xff);
 	pkt->pkt_cdbp[8] = ((len >> 8) & 0xff);
@@ -985,8 +982,8 @@ std_set_target_groups(struct scsi_address *ap, int set_state, int tpg_id)
 	 * Sends 1 TPG descriptor only. Hence Parameter list length pkt_cdbp[9]
 	 * is set to 8 bytes - Refer SPC3 for details.
 	 */
-	pkt->pkt_cdbp[0] = SCMD_SET_TARGET_PORT_GROUP;
-	pkt->pkt_cdbp[1] = STD_SCSI_TPG_SERVICE_ACTION;
+	pkt->pkt_cdbp[0] = SCMD_MAINTENANCE_OUT;
+	pkt->pkt_cdbp[1] = SCMD_SET_TARGET_PORT_GROUPS;
 	pkt->pkt_cdbp[9] = 8;
 	pkt->pkt_time = 90;
 
