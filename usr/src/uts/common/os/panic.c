@@ -300,7 +300,16 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		(void) FTRACE_STOP();
 		(void) callb_execute_class(CB_CL_PANIC, NULL);
 
-		log_flushall();
+		if (log_intrq != NULL)
+			log_flushq(log_intrq);
+
+		/*
+		 * If log_consq has been initialized and syslogd has started,
+		 * print any messages in log_consq that haven't been consumed.
+		 */
+		if (log_consq != NULL && log_consq != log_backlogq)
+			log_printq(log_consq);
+
 		fm_banner();
 
 #if defined(__x86)

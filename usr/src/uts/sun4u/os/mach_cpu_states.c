@@ -51,8 +51,6 @@ extern u_longlong_t	gettick();
 static void reboot_machine(char *);
 int disable_watchdog_on_exit = 0;
 
-extern void consconfig_teardown();
-
 /*
  * Machine dependent code to reboot.
  * "mdep" is interpreted as a character pointer; if non-null, it is a pointer
@@ -77,6 +75,14 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		(void) tod_ops.tod_clear_watchdog_timer();
 		mutex_exit(&tod_lock);
 	}
+
+	/*
+	 * XXX - rconsvp is set to NULL to ensure that output messages
+	 * are sent to the underlying "hardware" device using the
+	 * monitor's printf routine since we are in the process of
+	 * either rebooting or halting the machine.
+	 */
+	rconsvp = NULL;
 
 	/*
 	 * At a high interrupt level we can't:
@@ -107,8 +113,6 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 	 * from here on out.
 	 */
 	stop_other_cpus();
-
-	consconfig_teardown();
 
 	/*
 	 * try and reset leaf devices.  reset_leaves() should only

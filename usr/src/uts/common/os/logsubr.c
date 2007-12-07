@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,7 +252,7 @@ log_init(void)
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
 	printf("Copyright 1983-2007 Sun Microsystems, Inc.  "
-	    "All rights reserved.\nUse is subject to license terms.\n");
+		"All rights reserved.\nUse is subject to license terms.\n");
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif
@@ -740,15 +740,6 @@ log_printq(queue_t *qfirst)
 			console_printf("%s", cp);
 		}
 	} while ((qlast = q) != qfirst);
-}
-
-void
-log_flushall()
-{
-	if (log_intrq != NULL)
-		log_flushq(log_intrq);
-	if (log_consq != NULL && log_consq != log_backlogq)
-		log_printq(log_consq);
 }
 
 /* ARGSUSED */

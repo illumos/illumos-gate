@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +58,7 @@
 #include <sys/errno.h>
 #include <sys/devops.h>
 #include <sys/note.h>
-#include <sys/log.h>
-#include <sys/consdev.h>
+
 
 /*
  * On supported configurations, the firmware defines the keyboard and mouse
@@ -128,18 +128,4 @@ consconfig_get_usb_ms_path(void) {
 	if (usb_ms_path)
 		return (i_ddi_strdup(usb_ms_path, KM_SLEEP));
 	return (NULL);
-}
-
-void
-consconfig_teardown(void)
-{
-	/*
-	 * rconsvp is set to NULL to ensure that output messages
-	 * are sent to the underlying "hardware" device using the
-	 * monitor's printf routine since we are in the process of
-	 * either rebooting or halting the machine.
-	 */
-	rconsvp = NULL;
-
-	log_flushall();
 }
