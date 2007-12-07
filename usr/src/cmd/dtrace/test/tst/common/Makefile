@@ -29,6 +29,11 @@
 include $(SRC)/Makefile.master
 include ../Makefile.com
 
+SNOOPDIR = $(SRC)/cmd/cmd-inet/usr.sbin/snoop
+SNOOPOBJS = nfs4_xdr.o
+SNOOPSRCS = ${SNOOPOBJS:%.o=%.c}
+CLOBBERFILES += nfs/$(SNOOPOBJS)
+
 fasttrap/tst.fasttrap.exe := LDLIBS += -ldtrace
 fasttrap/tst.stack.exe := LDLIBS += -ldtrace
 
@@ -40,6 +45,13 @@ sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 ustack/tst.bigstack.exe := COPTFLAG += -xO1
 
 GCC = $(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
+
+nfs/%.o: $(SNOOPDIR)/%.c
+	$(COMPILE.c) -o $@ $< -I$(SNOOPDIR)
+	$(POST_PROCESS_O)
+nfs/tst.call.exe: nfs/tst.call.o nfs/$(SNOOPOBJS)
+	$(LINK.c) -o $@ nfs/tst.call.o nfs/$(SNOOPOBJS) $(LDLIBS) -lnsl
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
 pid/tst.gcc.exe: pid/tst.gcc.c
 	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS)

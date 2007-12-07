@@ -77,6 +77,8 @@ DLIBSRCS += \
 	errno.d \
 	io.d \
 	ip.d \
+	net.d \
+	nfs.d \
 	procfs.d \
 	regs.d \
 	sched.d \

@@ -400,6 +400,9 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	utf8string owner, group;
 	int owner_error, group_error;
 
+	DTRACE_NFSV4_2(op__readdir__start, struct compound_state *, cs,
+	    READDIR4args *, args);
+
 	lu_set = lg_set = 0;
 	owner.utf8string_len = group.utf8string_len = 0;
 	owner.utf8string_val = group.utf8string_val = NULL;
@@ -411,7 +414,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 
 	if (dvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -420,17 +423,17 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	 */
 	if (vn_ismntpt(dvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (dvp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	if (args->maxcount <= RFS4_MINLEN_RDDIR4) {
 		*cs->statusp = resp->status = NFS4ERR_TOOSMALL;
-		return;
+		goto out;
 	}
 
 	/*
@@ -439,18 +442,18 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (args->attr_request &
 	    (FATTR4_TIME_MODIFY_SET_MASK | FATTR4_TIME_ACCESS_SET_MASK)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	error = VOP_ACCESS(dvp, VREAD, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	if (args->cookieverf != Readdir4verf) {
 		*cs->statusp = resp->status = NFS4ERR_NOT_SAME;
-		return;
+		goto out;
 	}
 
 	/* Is there pseudo-fs work that is needed for this readdir? */
@@ -465,7 +468,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 		FATTR4_MAXNAME_MASK)) {
 		if (error = rfs4_get_pc_encode(cs->vp, &dpce, ar, cs->cr)) {
 			*cs->statusp = resp->status = puterrno4(error);
-			return;
+			goto out;
 		}
 		pce = dpce;
 	}
@@ -480,7 +483,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	    FATTR4_FILES_TOTAL_MASK)) {
 		if (error = rfs4_get_sb_encode(dvp->v_vfsp, &dsbe)) {
 			*cs->statusp = resp->status = puterrno4(error);
-			return;
+			goto out;
 		}
 		sbe = dsbe;
 	}
@@ -497,7 +500,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop,
 	else if (args->maxcount < RFS4_MINLEN_RDDIR_BUF) {
 		if (args->maxcount < RFS4_MINLEN_ENTRY4) {
 			*cs->statusp = resp->status = NFS4ERR_TOOSMALL;
-			return;
+			goto out;
 		}
 	}
 
@@ -621,7 +624,7 @@ readagain:
 		resp->mblk = NULL;
 		resp->data_len = 0;
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 
@@ -637,7 +640,7 @@ readagain:
 		resp->mblk->b_wptr += resp->data_len;
 		kmem_free((caddr_t)rddir_data, rddir_data_len);
 		*cs->statusp = resp->status = NFS4_OK;
-		return;
+		goto out;
 	}
 
 	lastentry_ptr = ptr;
@@ -1472,4 +1475,8 @@ reencode_attrs:
 		kmem_free(owner.utf8string_val,	owner.utf8string_len);
 	if (group.utf8string_len != 0)
 		kmem_free(group.utf8string_val, group.utf8string_len);
+
+out:
+	DTRACE_NFSV4_2(op__readdir__done, struct compound_state *, cs,
+	    READDIR4res *, resp);
 }

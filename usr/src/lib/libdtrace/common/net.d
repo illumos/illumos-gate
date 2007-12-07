@@ -27,24 +27,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * ASSERTION:
- *
- * Test invocation of offsetof() with a member that is a bit-field.
- * This should fail at compile time.
- *
- * SECTION: Structs and Unions/Member Sizes and Offsets
- *
- * NOTES:
- *
+ * The conninfo_t structure should be used by all application protocal
+ * providers as the first arguments to indicate some basic information
+ * about the connection. This structure may be augmented to accomodate
+ * the particularities of additional protocols in the future.
  */
-
-struct foo {
-	int a:1;
-	int b:3;
-};
-
-BEGIN
-{
-	trace(offsetof(struct foo, b));
-	exit(0);
-}
+typedef struct conninfo {
+	string ci_local;	/* local host address */
+	string ci_remote;	/* remote host address */
+	string ci_protocol;	/* protocol (ipv4, ipv6, etc) */
+} conninfo_t;

@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 i pkginfo
 i copyright
@@ -50,6 +50,8 @@ f none usr/lib/dtrace/drti.o 644 root bin
 f none usr/lib/dtrace/errno.d 644 root bin
 f none usr/lib/dtrace/io.d 644 root bin
 f none usr/lib/dtrace/ip.d 644 root bin
+f none usr/lib/dtrace/net.d 644 root bin
+f none usr/lib/dtrace/nfs.d 644 root bin
 f none usr/lib/dtrace/procfs.d 644 root bin
 f none usr/lib/dtrace/regs.d 644 root bin
 f none usr/lib/dtrace/sched.d 644 root bin

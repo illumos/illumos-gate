@@ -62,6 +62,7 @@ clobber: FRC
 	-$(RM) $(CSRCS:%.c=%.exe) $(CSRCS:%.c=%.o)
 	-$(RM) $(SSRCS:%.s=%.exe) $(SSRCS:%.s=%.o)
 	-$(RM) $(DSRCS:%.d=%.o)
+	-$(RM) $(CLOBBERFILES)
 
 install: $(ROOT_TSTS) $(ROOT_EXES)
 

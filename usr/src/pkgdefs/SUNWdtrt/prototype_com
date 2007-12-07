@@ -627,6 +627,9 @@ f none SUNWdtrt/tst/common/multiaggs/tst.zero2.d 0444 root bin
 f none SUNWdtrt/tst/common/multiaggs/tst.zero2.d.out 0444 root bin
 f none SUNWdtrt/tst/common/multiaggs/tst.zero3.d 0444 root bin
 f none SUNWdtrt/tst/common/multiaggs/tst.zero3.d.out 0444 root bin
+d none SUNWdtrt/tst/common/nfs 0755 root bin
+f none SUNWdtrt/tst/common/nfs/tst.call.d 0444 root bin
+f none SUNWdtrt/tst/common/nfs/tst.call.exe 0555 root bin
 d none SUNWdtrt/tst/common/offsetof 0755 root bin
 f none SUNWdtrt/tst/common/offsetof/err.D_OFFSETOF_BITFIELD.bitfield.d 0444 root bin
 f none SUNWdtrt/tst/common/offsetof/err.D_OFFSETOF_TYPE.badtype.d 0444 root bin

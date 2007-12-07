@@ -165,7 +165,9 @@ static void	rfs4_op_create(nfs_argop4 *, nfs_resop4 *, struct svc_req *,
 			struct compound_state *);
 static void	rfs4_op_create_free(nfs_resop4 *resop);
 static void	rfs4_op_delegreturn(nfs_argop4 *, nfs_resop4 *,
-				    struct svc_req *, struct compound_state *);
+			struct svc_req *, struct compound_state *);
+static void	rfs4_op_delegpurge(nfs_argop4 *, nfs_resop4 *,
+			struct svc_req *, struct compound_state *);
 static void	rfs4_op_getattr(nfs_argop4 *, nfs_resop4 *, struct svc_req *,
 			struct compound_state *);
 static void	rfs4_op_getattr_free(nfs_resop4 *);
@@ -306,7 +308,7 @@ static struct rfsv4disp rfsv4disptab[] = {
 	{rfs4_op_create, nullfree, 0},
 
 	/* OP_DELEGPURGE = 7 */
-	{rfs4_op_inval, nullfree, 0},
+	{rfs4_op_delegpurge, nullfree, 0},
 
 	/* OP_DELEGRETURN = 8 */
 	{rfs4_op_delegreturn, nullfree, 0},
@@ -1073,7 +1075,10 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 		resok_val = kmem_alloc(ret_cnt * sizeof (secinfo4), KM_SLEEP);
 
 		for (i = 0; i < count; i++) {
-		/* If the flavor is in the flavor list, fill in resok_val. */
+			/*
+			 * If the flavor is in the flavor list,
+			 * fill in resok_val.
+			 */
 			si = &secp[i].s_secinfo;
 			if (in_flavor_list(si->sc_nfsnum,
 			    flavor_list, ret_cnt)) {
@@ -1098,8 +1103,8 @@ do_rfs4_op_secinfo(struct compound_state *cs, char *nm, SECINFO4res *resp)
 				}
 				k++;
 			}
-		if (k >= ret_cnt)
-			break;
+			if (k >= ret_cnt)
+				break;
 		}
 		resp->SECINFO4resok_len = ret_cnt;
 		resp->SECINFO4resok_val = resok_val;
@@ -1120,10 +1125,14 @@ static void
 rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct compound_state *cs)
 {
+	SECINFO4args *args = &argop->nfs_argop4_u.opsecinfo;
 	SECINFO4res *resp = &resop->nfs_resop4_u.opsecinfo;
-	utf8string *utfnm = &argop->nfs_argop4_u.opsecinfo.name;
+	utf8string *utfnm = &args->name;
 	uint_t len;
 	char *nm;
+
+	DTRACE_NFSV4_2(op__secinfo__start, struct compound_state *, cs,
+	    SECINFO4args *, args);
 
 	/*
 	 * Current file handle (cfh) should have been set before getting
@@ -1131,12 +1140,12 @@ rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->vp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	/*
@@ -1149,25 +1158,29 @@ rfs4_op_secinfo(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    utfnm->utf8string_val[0] != '.' ||
 		    utfnm->utf8string_val[1] != '.') {
 			*cs->statusp = resp->status = NFS4ERR_INVAL;
-			return;
+			goto out;
 		}
 	}
 
 	nm = utf8_to_str(utfnm, &len, NULL);
 	if (nm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (len > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = do_rfs4_op_secinfo(cs, nm, resp);
 
 	kmem_free(nm, len);
+
+out:
+	DTRACE_NFSV4_2(op__secinfo__done, struct compound_state *, cs,
+	    SECINFO4res *, resp);
 }
 
 /*
@@ -1219,15 +1232,18 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	ts_label_t *tslabel;
 	boolean_t admin_low_client;
 
+	DTRACE_NFSV4_2(op__access__start, struct compound_state *, cs,
+	    ACCESS4args *, args);
+
 #if 0	/* XXX allow access even if !cs->access. Eventually only pseudo fs */
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 #endif
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	ASSERT(cr != NULL);
@@ -1257,7 +1273,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 	resp->access = 0;
 	resp->supported = 0;
@@ -1271,7 +1287,7 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		if (!blequal(&l_admin_low->tsl_label, clabel)) {
 			if ((tslabel = nfs_getflabel(vp)) == NULL) {
 				*cs->statusp = resp->status = puterrno4(EACCES);
-				return;
+				goto out;
 			}
 			slabel = label2bslabel(tslabel);
 			DTRACE_PROBE3(tx__rfs4__log__info__opaccess__slabel,
@@ -1330,6 +1346,9 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		label_rele(tslabel);
 
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__access__done, struct compound_state *, cs,
+	    ACCESS4res *, resp);
 }
 
 /* ARGSUSED */
@@ -1344,18 +1363,21 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	cred_t *cr = cs->cr;
 	vattr_t va;
 
+	DTRACE_NFSV4_2(op__commit__start, struct compound_state *, cs,
+	    COMMIT4args *, args);
+
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (args->offset + args->count < args->offset) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	va.va_mask = AT_UID;
@@ -1367,11 +1389,11 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
-		return;
+		goto out;
 	}
 
 	if (vp->v_type != VREG) {
@@ -1380,13 +1402,13 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		else
 			resp->status = NFS4ERR_INVAL;
 		*cs->statusp = resp->status;
-		return;
+		goto out;
 	}
 
 	if (crgetuid(cr) != va.va_uid &&
 	    (error = VOP_ACCESS(vp, VWRITE, 0, cs->cr, NULL))) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	error = VOP_PUTPAGE(vp, args->offset, args->count, 0, cr, NULL);
@@ -1395,11 +1417,14 @@ rfs4_op_commit(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = NFS4_OK;
 	resp->writeverf = Write4verf;
+out:
+	DTRACE_NFSV4_2(op__commit__done, struct compound_state *, cs,
+	    COMMIT4res *, resp);
 }
 
 /*
@@ -1488,11 +1513,14 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct statvfs64 sb;
 	nfsstat4 status;
 
+	DTRACE_NFSV4_2(op__create__start, struct compound_state *, cs,
+	    CREATE4args *, args);
+
 	resp->attrset = 0;
 
 	if (dvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -1501,7 +1529,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(dvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	/* Verify that type is correct */
@@ -1515,25 +1543,25 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		break;
 	default:
 		*cs->statusp = resp->status = NFS4ERR_BADTYPE;
-		return;
+		goto out;
 	};
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 	if (dvp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 	if (!utf8_dir_verify(&args->objname)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
-		return;
+		goto out;
 	}
 
 	/*
@@ -1542,13 +1570,13 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	nm = utf8_to_fn(&args->objname, &len, NULL);
 	if (nm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (len > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	resp->attrset = 0;
@@ -1567,7 +1595,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		kmem_free(nm, len);
 		nfs4_ntov_table_free(&ntov, &sarg);
 		resp->attrset = 0;
-		return;
+		goto out;
 	}
 
 	/* Get "before" change value */
@@ -1578,7 +1606,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		kmem_free(nm, len);
 		nfs4_ntov_table_free(&ntov, &sarg);
 		resp->attrset = 0;
-		return;
+		goto out;
 	}
 	NFS4_SET_FATTR4_CHANGE(resp->cinfo.before, bva.va_ctime)
 
@@ -1634,7 +1662,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			kmem_free(nm, len);
 			nfs4_ntov_table_free(&ntov, &sarg);
 			resp->attrset = 0;
-			return;
+			goto out;
 		}
 
 		if (llen > MAXPATHLEN) {
@@ -1643,7 +1671,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			kmem_free(lnm, llen);
 			nfs4_ntov_table_free(&ntov, &sarg);
 			resp->attrset = 0;
-			return;
+			goto out;
 		}
 
 		error = VOP_SYMLINK(dvp, nm, vap, lnm, cr, NULL, 0);
@@ -1692,7 +1720,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			kmem_free(nm, len);
 			nfs4_ntov_table_free(&ntov, &sarg);
 			resp->attrset = 0;
-			return;
+			goto out;
 		}
 
 		/*
@@ -1721,7 +1749,7 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			VN_RELE(vp);
 		nfs4_ntov_table_free(&ntov, &sarg);
 		resp->attrset = 0;
-		return;
+		goto out;
 	}
 
 	/*
@@ -1780,15 +1808,31 @@ rfs4_op_create(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (resp->status != NFS4_OK) {
 		VN_RELE(vp);
-		return;
+		goto out;
 	}
 	if (cs->vp)
 		VN_RELE(cs->vp);
 
 	cs->vp = vp;
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__create__done, struct compound_state *, cs,
+	    CREATE4res *, resp);
 }
 
+/*ARGSUSED*/
+static void
+rfs4_op_delegpurge(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
+    struct compound_state *cs)
+{
+	DTRACE_NFSV4_2(op__delegpurge__start, struct compound_state *, cs,
+	    DELEGPURGE4args *, &argop->nfs_argop4_u.opdelegpurge);
+
+	rfs4_op_inval(argop, resop, req, cs);
+
+	DTRACE_NFSV4_2(op__delegpurge__done, struct compound_state *, cs,
+	    DELEGPURGE4res *, &resop->nfs_resop4_u.opdelegpurge);
+}
 
 /*ARGSUSED*/
 static void
@@ -1800,10 +1844,13 @@ rfs4_op_delegreturn(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	rfs4_deleg_state_t *dsp;
 	nfsstat4 status;
 
+	DTRACE_NFSV4_2(op__delegreturn__start, struct compound_state *, cs,
+	    DELEGRETURN4args *, args);
+
 	status = rfs4_get_deleg_state(&args->deleg_stateid, &dsp);
 	resp->status = *cs->statusp = status;
 	if (status != NFS4_OK)
-		return;
+		goto out;
 
 	/* Ensure specified filehandle matches */
 	if (cs->vp != dsp->finfo->vp) {
@@ -1814,6 +1861,9 @@ rfs4_op_delegreturn(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	rfs4_update_lease(dsp->client);
 
 	rfs4_deleg_state_rele(dsp);
+out:
+	DTRACE_NFSV4_2(op__delegreturn__done, struct compound_state *, cs,
+	    DELEGRETURN4res *, resp);
 }
 
 /*
@@ -2190,14 +2240,17 @@ rfs4_op_getattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct statvfs64 sb;
 	nfsstat4 status;
 
+	DTRACE_NFSV4_2(op__getattr__start, struct compound_state *, cs,
+	    GETATTR4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	sarg.sbp = &sb;
@@ -2211,6 +2264,9 @@ rfs4_op_getattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			    &resp->obj_attributes, &sarg);
 	}
 	*cs->statusp = resp->status = status;
+out:
+	DTRACE_NFSV4_2(op__getattr__done, struct compound_state *, cs,
+	    GETATTR4res *, resp);
 }
 
 static void
@@ -2228,19 +2284,24 @@ rfs4_op_getfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 {
 	GETFH4res *resp = &resop->nfs_resop4_u.opgetfh;
 
+	DTRACE_NFSV4_1(op__getfh__start, struct compound_state *, cs);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	resp->object.nfs_fh4_val =
 	    kmem_alloc(cs->fh.nfs_fh4_len, KM_SLEEP);
 	nfs_fh4_copy(&cs->fh, &resp->object);
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__getfh__done, struct compound_state *, cs,
+	    GETFH4res *, resp);
 }
 
 static void
@@ -2289,18 +2350,21 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	char *nm;
 	uint_t  len;
 
+	DTRACE_NFSV4_2(op__link__start, struct compound_state *, cs,
+	    LINK4args *, args);
+
 	/* SAVED_FH: source object */
 	vp = cs->saved_vp;
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/* CURRENT_FH: target directory */
 	dvp = cs->vp;
 	if (dvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -2309,52 +2373,52 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(dvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	/* Check source object's type validity */
 	if (vp->v_type == VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_ISDIR;
-		return;
+		goto out;
 	}
 
 	/* Check target directory's type */
 	if (dvp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	if (cs->saved_exi != cs->exi) {
 		*cs->statusp = resp->status = NFS4ERR_XDEV;
-		return;
+		goto out;
 	}
 
 	if (!utf8_dir_verify(&args->newname)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	nm = utf8_to_fn(&args->newname, &len, NULL);
 	if (nm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (len > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	/* Get "before" change value */
@@ -2363,7 +2427,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	NFS4_SET_FATTR4_CHANGE(resp->cinfo.before, bdva.va_ctime)
@@ -2387,7 +2451,7 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	/*
@@ -2414,6 +2478,9 @@ rfs4_op_link(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->cinfo.atomic = FALSE;
 
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__link__done, struct compound_state *, cs,
+	    LINK4res *, resp);
 }
 
 /*
@@ -2710,41 +2777,48 @@ rfs4_op_lookup(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	char *nm;
 	uint_t len;
 
+	DTRACE_NFSV4_2(op__lookup__start, struct compound_state *, cs,
+	    LOOKUP4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->vp->v_type == VLNK) {
 		*cs->statusp = resp->status = NFS4ERR_SYMLINK;
-		return;
+		goto out;
 	}
 
 	if (cs->vp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	if (!utf8_dir_verify(&args->objname)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	nm = utf8_to_str(&args->objname, &len, NULL);
 	if (nm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (len > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = do_rfs4_op_lookup(nm, len, req, cs);
 
 	kmem_free(nm, len);
+
+out:
+	DTRACE_NFSV4_2(op__lookup__done, struct compound_state *, cs,
+	    LOOKUP4res *, resp);
 }
 
 /* ARGSUSED */
@@ -2754,14 +2828,16 @@ rfs4_op_lookupp(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 {
 	LOOKUPP4res *resp = &resop->nfs_resop4_u.oplookupp;
 
+	DTRACE_NFSV4_1(op__lookupp__start, struct compound_state *, cs);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->vp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = do_rfs4_op_lookup("..", 3, req, cs);
@@ -2773,6 +2849,10 @@ rfs4_op_lookupp(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 	if (resp->status == NFS4ERR_WRONGSEC) {
 		*cs->statusp = resp->status = NFS4_OK;
 	}
+
+out:
+	DTRACE_NFSV4_2(op__lookupp__done, struct compound_state *, cs,
+	    LOOKUPP4res *, resp);
 }
 
 
@@ -2787,9 +2867,12 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int		lookup_flags = LOOKUP_XATTR, error;
 	int		exp_ro = 0;
 
+	DTRACE_NFSV4_2(op__openattr__start, struct compound_state *, cs,
+	    OPENATTR4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -2811,15 +2894,15 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if ((cs->vp->v_vfsp->vfs_flag & VFS_XATTR) == 0 &&
 	    !vfs_has_feature(cs->vp->v_vfsp, VFSFT_XVATTR)) {
-		error = ENOTSUP;
-		goto error_out;
+		*cs->statusp = resp->status = puterrno4(ENOTSUP);
+		goto out;
 	}
 
 	if ((VOP_ACCESS(cs->vp, VREAD, 0, cs->cr, NULL) != 0) &&
 	    (VOP_ACCESS(cs->vp, VWRITE, 0, cs->cr, NULL) != 0) &&
 	    (VOP_ACCESS(cs->vp, VEXEC, 0, cs->cr, NULL) != 0)) {
-		error = EACCES;
-		goto error_out;
+		*cs->statusp = resp->status = puterrno4(EACCES);
+		goto out;
 	}
 
 	/*
@@ -2844,10 +2927,12 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		if (error == ENOENT && args->createdir && exp_ro)
-			error = EROFS;
+			*cs->statusp = resp->status = puterrno4(EROFS);
 		else if (error == EINVAL || error == ENOSYS)
-			error = ENOTSUP;
-		goto error_out;
+			*cs->statusp = resp->status = puterrno4(ENOTSUP);
+		else
+			*cs->statusp = resp->status = puterrno4(error);
+		goto out;
 	}
 
 	ASSERT(avp->v_flag & V_XATTRDIR);
@@ -2856,7 +2941,8 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		VN_RELE(avp);
-		goto error_out;
+		*cs->statusp = resp->status = puterrno4(error);
+		goto out;
 	}
 
 	VN_RELE(cs->vp);
@@ -2870,11 +2956,10 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	set_fh4_flag(&cs->fh, FH4_ATTRDIR);
 	*cs->statusp = resp->status = NFS4_OK;
-	return;
 
-error_out:
-
-	*cs->statusp = resp->status = puterrno4(error);
+out:
+	DTRACE_NFSV4_2(op__openattr__done, struct compound_state *, cs,
+	    OPENATTR4res *, resp);
 }
 
 static int
@@ -2939,14 +3024,17 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int alloc_err = 0;
 	caller_context_t ct;
 
+	DTRACE_NFSV4_2(op__read__start, struct compound_state *, cs,
+	    READ4args, args);
+
 	vp = cs->vp;
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if ((stat = rfs4_check_stateid(FREAD, vp, &args->stateid, FALSE,
@@ -3086,6 +3174,9 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 out:
 	if (in_crit)
 		nbl_end_crit(vp);
+
+	DTRACE_NFSV4_2(op__read__done, struct compound_state *, cs,
+	    READ4res *, resp);
 }
 
 static void
@@ -3125,6 +3216,8 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 	struct exportinfo *exi, *sav_exi;
 	nfs_fh4_fmt_t *fh_fmtp;
 
+	DTRACE_NFSV4_1(op__putpubfh__start, struct compound_state *, cs);
+
 	if (cs->vp) {
 		VN_RELE(cs->vp);
 		cs->vp = NULL;
@@ -3138,7 +3231,7 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 	vp = exi_public->exi_vp;
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_SERVERFAULT;
-		return;
+		goto out;
 	}
 
 	if (is_system_labeled()) {
@@ -3161,7 +3254,7 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 	error = makefh4(&cs->fh, vp, exi_public);
 	if (error != 0) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 	sav_exi = cs->exi;
 	if (exi_public == exi_root) {
@@ -3194,10 +3287,13 @@ rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 		VN_RELE(cs->vp);
 		cs->vp = NULL;
 		cs->exi = sav_exi;
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__putpubfh__done, struct compound_state *, cs,
+	    PUTPUBFH4res *, resp);
 }
 
 /*
@@ -3225,6 +3321,9 @@ rfs4_op_putfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	PUTFH4res *resp = &resop->nfs_resop4_u.opputfh;
 	nfs_fh4_fmt_t *fh_fmtp;
 
+	DTRACE_NFSV4_2(op__putfh__start, struct compound_state *, cs,
+	    PUTFH4args *, args);
+
 	if (cs->vp) {
 		VN_RELE(cs->vp);
 		cs->vp = NULL;
@@ -3238,7 +3337,7 @@ rfs4_op_putfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (args->object.nfs_fh4_len < NFS_FH4_LEN) {
 		*cs->statusp = resp->status = NFS4ERR_BADHANDLE;
-		return;
+		goto out;
 	}
 
 	fh_fmtp = (nfs_fh4_fmt_t *)args->object.nfs_fh4_val;
@@ -3247,7 +3346,7 @@ rfs4_op_putfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (cs->exi == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_STALE;
-		return;
+		goto out;
 	}
 
 	cs->cr = crdup(cs->basecr);
@@ -3256,18 +3355,22 @@ rfs4_op_putfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (! (cs->vp = nfs4_fhtovp(&args->object, cs->exi, &resp->status))) {
 		*cs->statusp = resp->status;
-		return;
+		goto out;
 	}
 
 	if ((resp->status = call_checkauth4(cs, req)) != NFS4_OK) {
 		VN_RELE(cs->vp);
 		cs->vp = NULL;
-		return;
+		goto out;
 	}
 
 	nfs_fh4_copy(&args->object, &cs->fh);
 	*cs->statusp = resp->status = NFS4_OK;
 	cs->deleg = FALSE;
+
+out:
+	DTRACE_NFSV4_2(op__putfh__done, struct compound_state *, cs,
+	    PUTFH4res *, resp);
 }
 
 /* ARGSUSED */
@@ -3280,6 +3383,8 @@ rfs4_op_putrootfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int error;
 	fid_t fid;
 	struct exportinfo *exi, *sav_exi;
+
+	DTRACE_NFSV4_1(op__putrootfh__start, struct compound_state *, cs);
 
 	if (cs->vp) {
 		VN_RELE(cs->vp);
@@ -3300,7 +3405,7 @@ rfs4_op_putrootfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	error = vop_fid_pseudo(rootdir, &fid);
 	if (error != 0) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	/*
@@ -3316,7 +3421,7 @@ rfs4_op_putrootfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		NFS4_DEBUG(rfs4_debug,
 			(CE_WARN, "rfs4_op_putrootfh: export check failure"));
 		*cs->statusp = resp->status = NFS4ERR_SERVERFAULT;
-		return;
+		goto out;
 	}
 
 	/*
@@ -3326,7 +3431,7 @@ rfs4_op_putrootfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	error = makefh4(&cs->fh, rootdir, exi);
 	if (error != 0) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	sav_exi = cs->exi;
@@ -3339,11 +3444,14 @@ rfs4_op_putrootfh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		VN_RELE(rootdir);
 		cs->vp = NULL;
 		cs->exi = sav_exi;
-		return;
+		goto out;
 	}
 
 	*cs->statusp = resp->status = NFS4_OK;
 	cs->deleg = FALSE;
+out:
+	DTRACE_NFSV4_2(op__putrootfh__done, struct compound_state *, cs,
+	    PUTROOTFH4res *, resp);
 }
 
 /*
@@ -3463,38 +3571,40 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct uio uio;
 	char *data;
 
+	DTRACE_NFSV4_1(op__readlink__start, struct compound_state *, cs);
+
 	/* CURRENT_FH: directory */
 	vp = cs->vp;
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (vp->v_type == VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_ISDIR;
-		return;
+		goto out;
 	}
 
 	if (vp->v_type != VLNK) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	va.va_mask = AT_MODE;
 	error = VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	if (MANDLOCK(vp, va.va_mode)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	data = kmem_alloc(MAXPATHLEN + 1, KM_SLEEP);
@@ -3513,7 +3623,7 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (error) {
 		kmem_free((caddr_t)data, (uint_t)MAXPATHLEN + 1);
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	*(data + MAXPATHLEN - uio.uio_resid) = '\0';
@@ -3525,6 +3635,10 @@ rfs4_op_readlink(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	kmem_free((caddr_t)data, (uint_t)MAXPATHLEN + 1);
 	*cs->statusp = resp->status = NFS4_OK;
+
+out:
+	DTRACE_NFSV4_2(op__readlink__done, struct compound_state *, cs,
+	    READLINK4res *, resp);
 }
 
 static void
@@ -3565,20 +3679,23 @@ rfs4_op_release_lockowner(nfs_argop4 *argop, nfs_resop4 *resop,
 	locklist_t *llist;
 	sysid_t sysid;
 
+	DTRACE_NFSV4_2(op__release__lockowner__start, struct compound_state *,
+	    cs, RELEASE_LOCKOWNER4args *, ap);
+
 	/* Make sure there is a clientid around for this request */
 	cp = rfs4_findclient_by_id(ap->lock_owner.clientid, FALSE);
 
 	if (cp == NULL) {
 		*cs->statusp = resp->status =
 		    rfs4_check_clientid(&ap->lock_owner.clientid, 0);
-		return;
+		goto out;
 	}
 	rfs4_client_rele(cp);
 
 	lo = rfs4_findlockowner(&ap->lock_owner, &create);
 	if (lo == NULL) {
 		*cs->statusp = resp->status = NFS4_OK;
-		return;
+		goto out;
 	}
 	ASSERT(lo->client != NULL);
 
@@ -3589,7 +3706,7 @@ rfs4_op_release_lockowner(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (rfs4_lease_expired(lo->client)) {
 		rfs4_lockowner_rele(lo);
 		*cs->statusp = resp->status = NFS4ERR_EXPIRED;
-		return;
+		goto out;
 	}
 
 	/*
@@ -3599,7 +3716,7 @@ rfs4_op_release_lockowner(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (lo->client->sysidt == LM_NOSYSID) {
 		rfs4_lockowner_rele(lo);
 		rfs4_dbe_unlock(lo->client->dbe);
-		return;
+		goto out;
 	}
 
 	sysid = lo->client->sysidt;
@@ -3640,7 +3757,7 @@ rfs4_op_release_lockowner(nfs_argop4 *argop, nfs_resop4 *resop,
 		 */
 		rfs4_dbe_unhide(lo->dbe);
 		rfs4_lockowner_rele(lo);
-		return;
+		goto out;
 	}
 
 	/*
@@ -3675,6 +3792,10 @@ rfs4_op_release_lockowner(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_lockowner_rele(lo);
 
 	*cs->statusp = resp->status = NFS4_OK;
+
+out:
+	DTRACE_NFSV4_2(op__release__lockowner__done, struct compound_state *,
+	    cs, RELEASE_LOCKOWNER4res *, resp);
 }
 
 /*
@@ -3729,16 +3850,19 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int in_crit = 0;
 	bslabel_t *clabel;
 
+	DTRACE_NFSV4_2(op__remove__start, struct compound_state *, cs,
+	    REMOVE4args *, args);
+
 	/* CURRENT_FH: directory */
 	dvp = cs->vp;
 	if (dvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	/*
@@ -3747,17 +3871,17 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(dvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (dvp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	if (!utf8_dir_verify(&args->target)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	/*
@@ -3766,19 +3890,19 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	nm = utf8_to_fn(&args->target, &len, NULL);
 	if (nm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (len > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	/*
@@ -3795,7 +3919,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			rfs4_file_rele(fp);
 			*cs->statusp = resp->status = NFS4ERR_DELAY;
 			kmem_free(nm, len);
-			return;
+			goto out;
 		}
 	}
 
@@ -3803,7 +3927,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (vp == NULL) {
 		*cs->statusp = resp->status = error;
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 
 	if (nbl_need_check(vp)) {
@@ -3818,7 +3942,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 				rfs4_clear_dont_grant(fp);
 				rfs4_file_rele(fp);
 			}
-			return;
+			goto out;
 		}
 	}
 
@@ -3840,7 +3964,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 					rfs4_clear_dont_grant(fp);
 					rfs4_file_rele(fp);
 				}
-				return;
+				goto out;
 			}
 		}
 	}
@@ -3851,7 +3975,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(nm, len);
-		return;
+		goto out;
 	}
 	NFS4_SET_FATTR4_CHANGE(resp->cinfo.before, bdva.va_ctime)
 
@@ -3918,7 +4042,7 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	/*
@@ -3958,6 +4082,10 @@ rfs4_op_remove(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->cinfo.atomic = FALSE;
 
 	*cs->statusp = resp->status = NFS4_OK;
+
+out:
+	DTRACE_NFSV4_2(op__remove__done, struct compound_state *, cs,
+	    REMOVE4res *, resp);
 }
 
 /*
@@ -3986,6 +4114,9 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int fp_rele_grant_hold, sfp_rele_grant_hold;
 	bslabel_t *clabel;
 
+	DTRACE_NFSV4_2(op__rename__start, struct compound_state *, cs,
+	    RENAME4args *, args);
+
 	fp = sfp = NULL;
 	srcvp = targvp = NULL;
 	in_crit_src = in_crit_targ = 0;
@@ -3995,19 +4126,19 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	ndvp = cs->vp;
 	if (ndvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/* SAVED_FH: from directory */
 	odvp = cs->saved_vp;
 	if (odvp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	/*
@@ -4016,7 +4147,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(odvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	/*
@@ -4025,47 +4156,47 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(ndvp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	if (odvp->v_type != VDIR || ndvp->v_type != VDIR) {
 		*cs->statusp = resp->status = NFS4ERR_NOTDIR;
-		return;
+		goto out;
 	}
 
 	if (cs->saved_exi != cs->exi) {
 		*cs->statusp = resp->status = NFS4ERR_XDEV;
-		return;
+		goto out;
 	}
 
 	if (!utf8_dir_verify(&args->oldname)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	if (!utf8_dir_verify(&args->newname)) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	onm = utf8_to_fn(&args->oldname, &olen, NULL);
 	if (onm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	nnm = utf8_to_fn(&args->newname, &nlen, NULL);
 	if (nnm == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
 		kmem_free(onm, olen);
-		return;
+		goto out;
 	}
 
 	if (olen > MAXNAMELEN || nlen > MAXNAMELEN) {
 		*cs->statusp = resp->status = NFS4ERR_NAMETOOLONG;
 		kmem_free(onm, olen);
 		kmem_free(nnm, nlen);
-		return;
+		goto out;
 	}
 
 
@@ -4073,7 +4204,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
 		kmem_free(onm, olen);
 		kmem_free(nnm, nlen);
-		return;
+		goto out;
 	}
 
 	/* check label of the target dir */
@@ -4087,7 +4218,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			if (!do_rfs_label_check(clabel, ndvp,
 			    EQUALITY_CHECK)) {
 				*cs->statusp = resp->status = NFS4ERR_ACCESS;
-				return;
+				goto out;
 			}
 		}
 	}
@@ -4110,7 +4241,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		*cs->statusp = resp->status = puterrno4(error);
 		kmem_free(onm, olen);
 		kmem_free(nnm, nlen);
-		return;
+		goto out;
 	}
 
 	sfp_rele_grant_hold = 1;
@@ -4238,7 +4369,7 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	if (error) {
 		*cs->statusp = resp->status = puterrno4(error);
-		return;
+		goto out;
 	}
 
 	/*
@@ -4304,6 +4435,9 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 #endif	/* VOLATILE_FH_TEST */
 
 	*cs->statusp = resp->status = NFS4_OK;
+out:
+	DTRACE_NFSV4_2(op__rename__done, struct compound_state *, cs,
+	    RENAME4res *, resp);
 	return;
 
 err_out:
@@ -4322,6 +4456,9 @@ err_out:
 		if (fp_rele_grant_hold) rfs4_clear_dont_grant(fp);
 		rfs4_file_rele(fp);
 	}
+
+	DTRACE_NFSV4_2(op__rename__done, struct compound_state *, cs,
+	    RENAME4res *, resp);
 }
 
 /* ARGSUSED */
@@ -4333,16 +4470,19 @@ rfs4_op_renew(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	RENEW4res *resp = &resop->nfs_resop4_u.oprenew;
 	rfs4_client_t *cp;
 
+	DTRACE_NFSV4_2(op__renew__start, struct compound_state *, cs,
+	    RENEW4args *, args);
+
 	if ((cp = rfs4_findclient_by_id(args->clientid, FALSE)) == NULL) {
 		*cs->statusp = resp->status =
 		    rfs4_check_clientid(&args->clientid, 0);
-		return;
+		goto out;
 	}
 
 	if (rfs4_lease_expired(cp)) {
 		rfs4_client_rele(cp);
 		*cs->statusp = resp->status = NFS4ERR_EXPIRED;
-		return;
+		goto out;
 	}
 
 	rfs4_update_lease(cp);
@@ -4358,6 +4498,9 @@ rfs4_op_renew(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	rfs4_client_rele(cp);
 
+out:
+	DTRACE_NFSV4_2(op__renew__done, struct compound_state *, cs,
+	    RENEW4res *, resp);
 }
 
 /* ARGSUSED */
@@ -4367,10 +4510,12 @@ rfs4_op_restorefh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 {
 	RESTOREFH4res *resp = &resop->nfs_resop4_u.oprestorefh;
 
+	DTRACE_NFSV4_1(op__restorefh__start, struct compound_state *, cs);
+
 	/* No need to check cs->access - we are not accessing any object */
 	if ((cs->saved_vp == NULL) || (cs->saved_fh.nfs_fh4_val == NULL)) {
 		*cs->statusp = resp->status = NFS4ERR_RESTOREFH;
-		return;
+		goto out;
 	}
 	if (cs->vp != NULL) {
 		VN_RELE(cs->vp);
@@ -4381,6 +4526,10 @@ rfs4_op_restorefh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
 	nfs_fh4_copy(&cs->saved_fh, &cs->fh);
 	*cs->statusp = resp->status = NFS4_OK;
 	cs->deleg = FALSE;
+
+out:
+	DTRACE_NFSV4_2(op__restorefh__done, struct compound_state *, cs,
+	    RESTOREFH4res *, resp);
 }
 
 /* ARGSUSED */
@@ -4390,10 +4539,12 @@ rfs4_op_savefh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 {
 	SAVEFH4res *resp = &resop->nfs_resop4_u.opsavefh;
 
+	DTRACE_NFSV4_1(op__savefh__start, struct compound_state *, cs);
+
 	/* No need to check cs->access - we are not accessing any object */
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 	if (cs->saved_vp != NULL) {
 		VN_RELE(cs->saved_vp);
@@ -4410,6 +4561,10 @@ rfs4_op_savefh(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	}
 	nfs_fh4_copy(&cs->fh, &cs->saved_fh);
 	*cs->statusp = resp->status = NFS4_OK;
+
+out:
+	DTRACE_NFSV4_2(op__savefh__done, struct compound_state *, cs,
+	    SAVEFH4res *, resp);
 }
 
 /*
@@ -4905,9 +5060,12 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	SETATTR4res *resp = &resop->nfs_resop4_u.opsetattr;
 	bslabel_t *clabel;
 
+	DTRACE_NFSV4_2(op__setattr__start, struct compound_state *, cs,
+	    SETATTR4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -4916,14 +5074,14 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	 */
 	if (vn_ismntpt(cs->vp)) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	resp->attrsset = 0;
 
 	if (rdonly4(cs->exi, cs->vp, req)) {
 		*cs->statusp = resp->status = NFS4ERR_ROFS;
-		return;
+		goto out;
 	}
 
 	/* check label before setting attributes */
@@ -4937,7 +5095,7 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			if (!do_rfs_label_check(clabel, cs->vp,
 			    EQUALITY_CHECK)) {
 				*cs->statusp = resp->status = NFS4ERR_ACCESS;
-				return;
+				goto out;
 			}
 		}
 	}
@@ -4945,6 +5103,10 @@ rfs4_op_setattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	*cs->statusp = resp->status =
 	    do_rfs4_op_setattr(&resp->attrsset, &args->obj_attributes, cs,
 	    &args->stateid);
+
+out:
+	DTRACE_NFSV4_2(op__setattr__done, struct compound_state *, cs,
+	    SETATTR4res *, resp);
 }
 
 /* ARGSUSED */
@@ -4966,9 +5128,12 @@ rfs4_op_verify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct statvfs64 sb;
 	struct nfs4_ntov_table ntov;
 
+	DTRACE_NFSV4_2(op__verify__start, struct compound_state *, cs,
+	    VERIFY4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	sarg.sbp = &sb;
@@ -4999,6 +5164,9 @@ rfs4_op_verify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 done:
 	*cs->statusp = resp->status;
 	nfs4_ntov_table_free(&ntov, &sarg);
+out:
+	DTRACE_NFSV4_2(op__verify__done, struct compound_state *, cs,
+	    VERIFY4res *, resp);
 }
 
 /* ARGSUSED */
@@ -5020,8 +5188,13 @@ rfs4_op_nverify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct statvfs64 sb;
 	struct nfs4_ntov_table ntov;
 
+	DTRACE_NFSV4_2(op__nverify__start, struct compound_state *, cs,
+	    NVERIFY4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
+		DTRACE_NFSV4_2(op__nverify__done, struct compound_state *, cs,
+		    NVERIFY4res *, resp);
 		return;
 	}
 	sarg.sbp = &sb;
@@ -5052,6 +5225,9 @@ rfs4_op_nverify(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 done:
 	*cs->statusp = resp->status;
 	nfs4_ntov_table_free(&ntov, &sarg);
+
+	DTRACE_NFSV4_2(op__nverify__done, struct compound_state *, cs,
+	    NVERIFY4res *, resp);
 }
 
 /*
@@ -5064,7 +5240,7 @@ static void
 rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	struct compound_state *cs)
 {
-	WRITE4args  *args = &argop->nfs_argop4_u.opwrite;
+	WRITE4args *args = &argop->nfs_argop4_u.opwrite;
 	WRITE4res *resp = &resop->nfs_resop4_u.opwrite;
 	int error;
 	vnode_t *vp;
@@ -5081,14 +5257,17 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int in_crit = 0;
 	caller_context_t ct;
 
+	DTRACE_NFSV4_2(op__write__start, struct compound_state *, cs,
+	    WRITE4args *, args);
+
 	vp = cs->vp;
 	if (vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 	if (cs->access == CS_ACCESS_DENIED) {
 		*cs->statusp = resp->status = NFS4ERR_ACCESS;
-		return;
+		goto out;
 	}
 
 	cr = cs->cr;
@@ -5247,6 +5426,9 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 out:
 	if (in_crit)
 		nbl_end_crit(vp);
+
+	DTRACE_NFSV4_2(op__write__done, struct compound_state *, cs,
+	    WRITE4res *, resp);
 }
 
 
@@ -5271,14 +5453,20 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	    resp->tag.utf8string_len);
 
 	cs.statusp = &resp->status;
+	cs.req = req;
 
 	/*
 	 * XXX for now, minorversion should be zero
 	 */
 	if (args->minorversion != NFS4_MINORVERSION) {
+		DTRACE_NFSV4_2(compound__start, struct compound_state *,
+		    &cs, COMPOUND4args *, args);
 		resp->array_len = 0;
 		resp->array = NULL;
 		resp->status = NFS4ERR_MINOR_VERS_MISMATCH;
+		DTRACE_NFSV4_2(compound__done, struct compound_state *,
+		    &cs, COMPOUND4res *, resp);
+		resp->array_len = 0;
 		return;
 	}
 
@@ -5293,13 +5481,18 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	ASSERT(cr != NULL);
 
 	if (sec_svc_getcred(req, cr, &cs.principal, &cs.nfsflavor) == 0) {
+		DTRACE_NFSV4_2(compound__start, struct compound_state *,
+		    &cs, COMPOUND4args *, args);
 		crfree(cr);
+		DTRACE_NFSV4_2(compound__done, struct compound_state *,
+		    &cs, COMPOUND4res *, resp);
 		return;
 	}
 
 	cs.basecr = cr;
 
-	cs.req = req;
+	DTRACE_NFSV4_2(compound__start, struct compound_state *, &cs,
+	    COMPOUND4args *, args);
 
 	/*
 	 * For now, NFS4 compound processing must be protected by
@@ -5383,6 +5576,9 @@ rfs4_compound(COMPOUND4args *args, COMPOUND4res *resp, struct exportinfo *exi,
 	}
 
 	rw_exit(&exported_lock);
+
+	DTRACE_NFSV4_2(compound__done, struct compound_state *, &cs,
+	    COMPOUND4res *, resp);
 
 	if (cs.vp)
 		VN_RELE(cs.vp);
@@ -6721,10 +6917,12 @@ rfs4_op_open(nfs_argop4 *argop, nfs_resop4 *resop,
 	bool_t replay = FALSE;
 	int can_reclaim;
 
+	DTRACE_NFSV4_2(op__open__start, struct compound_state *, cs,
+	    OPEN4args *, args);
 
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto end;
 	}
 
 	/*
@@ -6735,13 +6933,13 @@ rfs4_op_open(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (cp == NULL) {
 		*cs->statusp = resp->status =
 		    rfs4_check_clientid(&owner->clientid, 0);
-		return;
+		goto end;
 	}
 
 	if (rfs4_lease_expired(cp)) {
 		rfs4_client_close(cp);
 		*cs->statusp = resp->status = NFS4ERR_EXPIRED;
-		return;
+		goto end;
 	}
 	can_reclaim = cp->can_reclaim;
 
@@ -6756,7 +6954,7 @@ retry:
 	if (oo == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_STALE_CLIENTID;
 		rfs4_client_rele(cp);
-		return;
+		goto end;
 	}
 
 	/* Hold off access to the sequence space while the open is done */
@@ -6982,6 +7180,10 @@ finish:
 
 	rfs4_sw_exit(&oo->oo_sw);
 	rfs4_openowner_rele(oo);
+
+end:
+	DTRACE_NFSV4_2(op__open__done, struct compound_state *, cs,
+	    OPEN4res *, resp);
 }
 
 /*ARGSUSED*/
@@ -6994,22 +7196,25 @@ rfs4_op_open_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_state_t *sp;
 	nfsstat4 status;
 
+	DTRACE_NFSV4_2(op__open__confirm__start, struct compound_state *, cs,
+	    OPEN_CONFIRM4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_VALID);
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
-		return;
+		goto out;
 	}
 
 	/* Ensure specified filehandle matches */
 	if (cs->vp != sp->finfo->vp) {
 		rfs4_state_rele(sp);
 		*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
-		return;
+		goto out;
 	}
 
 	/* hold off other access to open_owner while we tinker */
@@ -7085,6 +7290,10 @@ rfs4_op_open_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	}
 	rfs4_sw_exit(&sp->owner->oo_sw);
 	rfs4_state_rele(sp);
+
+out:
+	DTRACE_NFSV4_2(op__open__confirm__done, struct compound_state *, cs,
+	    OPEN_CONFIRM4res *, resp);
 }
 
 /*ARGSUSED*/
@@ -7101,22 +7310,25 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_file_t *fp;
 	int fflags = 0;
 
+	DTRACE_NFSV4_2(op__open__downgrade__start, struct compound_state *, cs,
+	    OPEN_DOWNGRADE4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_VALID);
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
-		return;
+		goto out;
 	}
 
 	/* Ensure specified filehandle matches */
 	if (cs->vp != sp->finfo->vp) {
 		rfs4_state_rele(sp);
 		*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
-		return;
+		goto out;
 	}
 
 	/* hold off other access to open_owner while we tinker */
@@ -7318,6 +7530,9 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 end:
 	rfs4_sw_exit(&sp->owner->oo_sw);
 	rfs4_state_rele(sp);
+out:
+	DTRACE_NFSV4_2(op__open__downgrade__done, struct compound_state *, cs,
+	    OPEN_DOWNGRADE4res *, resp);
 }
 
 /*
@@ -7337,6 +7552,8 @@ rfs4_op_setclientid(nfs_argop4 *argop, nfs_resop4 *resop,
 	char *addr, *netid;
 	int len;
 
+	DTRACE_NFSV4_2(op__setclientid__start, struct compound_state *, cs,
+	    SETCLIENTID4args *, args);
 retry:
 	newcp = cp_confirmed = cp_unconfirmed = NULL;
 
@@ -7352,7 +7569,7 @@ retry:
 
 	if (cp == NULL) {
 		*cs->statusp = res->status = NFS4ERR_SERVERFAULT;
-		return;
+		goto out;
 	}
 
 	/*
@@ -7370,7 +7587,7 @@ retry:
 		rfs4_client_setcb(cp, &args->callback, args->callback_ident);
 
 		rfs4_client_rele(cp);
-		return;
+		goto out;
 	}
 
 	/*
@@ -7448,7 +7665,7 @@ retry:
 			    cp_confirmed->confirm_verf;
 
 			rfs4_client_rele(cp_confirmed);
-			return;
+			goto out;
 		}
 
 		/*
@@ -7501,7 +7718,7 @@ retry:
 	if (newcp == NULL) {
 		*cs->statusp = res->status = NFS4ERR_SERVERFAULT;
 		rfs4_client_rele(cp_confirmed);
-		return;
+		goto out;
 	}
 
 	/*
@@ -7524,6 +7741,10 @@ retry:
 	newcp->cp_confirmed = cp_confirmed;
 
 	rfs4_client_rele(newcp);
+
+out:
+	DTRACE_NFSV4_2(op__setclientid__done, struct compound_state *, cs,
+	    SETCLIENTID4res *, res);
 }
 
 /*ARGSUSED*/
@@ -7537,6 +7758,10 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	    &resop->nfs_resop4_u.opsetclientid_confirm;
 	rfs4_client_t *cp, *cptoclose = NULL;
 
+	DTRACE_NFSV4_2(op__setclientid__confirm__start,
+	    struct compound_state *, cs,
+	    SETCLIENTID_CONFIRM4args *, args);
+
 	*cs->statusp = res->status = NFS4_OK;
 
 	cp = rfs4_findclient_by_id(args->clientid, TRUE);
@@ -7544,20 +7769,20 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (cp == NULL) {
 		*cs->statusp = res->status =
 		    rfs4_check_clientid(&args->clientid, 1);
-		return;
+		goto out;
 	}
 
 	if (!creds_ok(cp, req, cs)) {
 		*cs->statusp = res->status = NFS4ERR_CLID_INUSE;
 		rfs4_client_rele(cp);
-		return;
+		goto out;
 	}
 
 	/* If the verifier doesn't match, the record doesn't match */
 	if (cp->confirm_verf != args->setclientid_confirm) {
 		*cs->statusp = res->status = NFS4ERR_STALE_CLIENTID;
 		rfs4_client_rele(cp);
-		return;
+		goto out;
 	}
 
 	rfs4_dbe_lock(cp->dbe);
@@ -7597,6 +7822,11 @@ rfs4_op_setclientid_confirm(nfs_argop4 *argop, nfs_resop4 *resop,
 	rfs4_ss_chkclid(cp);
 
 	rfs4_client_rele(cp);
+
+out:
+	DTRACE_NFSV4_2(op__setclientid__confirm__done,
+	    struct compound_state *, cs,
+	    SETCLIENTID_CONFIRM4 *, res);
 }
 
 
@@ -7605,28 +7835,30 @@ void
 rfs4_op_close(nfs_argop4 *argop, nfs_resop4 *resop,
 	    struct svc_req *req, struct compound_state *cs)
 {
-	/* XXX Currently not using req arg */
 	CLOSE4args *args = &argop->nfs_argop4_u.opclose;
 	CLOSE4res *resp = &resop->nfs_resop4_u.opclose;
 	rfs4_state_t *sp;
 	nfsstat4 status;
 
+	DTRACE_NFSV4_2(op__close__start, struct compound_state *, cs,
+	    CLOSE4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	status = rfs4_get_state(&args->open_stateid, &sp, RFS4_DBS_INVALID);
 	if (status != NFS4_OK) {
 		*cs->statusp = resp->status = status;
-		return;
+		goto out;
 	}
 
 	/* Ensure specified filehandle matches */
 	if (cs->vp != sp->finfo->vp) {
 		rfs4_state_rele(sp);
 		*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
-		return;
+		goto out;
 	}
 
 	/* hold off other access to open_owner while we tinker */
@@ -7701,6 +7933,9 @@ rfs4_op_close(nfs_argop4 *argop, nfs_resop4 *resop,
 end:
 	rfs4_sw_exit(&sp->owner->oo_sw);
 	rfs4_state_rele(sp);
+out:
+	DTRACE_NFSV4_2(op__close__done, struct compound_state *, cs,
+	    CLOSE4res *, resp);
 }
 
 /*
@@ -8058,7 +8293,6 @@ void
 rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 	    struct svc_req *req, struct compound_state *cs)
 {
-	/* XXX Currently not using req arg */
 	LOCK4args *args = &argop->nfs_argop4_u.oplock;
 	LOCK4res *resp = &resop->nfs_resop4_u.oplock;
 	nfsstat4 status;
@@ -8073,8 +8307,13 @@ rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 	bool_t dup_lock = FALSE;
 	int rc;
 
+	DTRACE_NFSV4_2(op__lock__start, struct compound_state *, cs,
+	    LOCK4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
+		DTRACE_NFSV4_2(op__lock__done, struct compound_state *,
+		    cs, LOCK4res *, resp);
 		return;
 	}
 
@@ -8090,6 +8329,8 @@ rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 			NFS4_DEBUG(rfs4_debug,
 			    (CE_NOTE, "Get state failed in lock %d", status));
 			*cs->statusp = resp->status = status;
+			DTRACE_NFSV4_2(op__lock__done, struct compound_state *,
+			    cs, LOCK4res *, resp);
 			return;
 		}
 
@@ -8097,6 +8338,8 @@ rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 		if (cs->vp != sp->finfo->vp) {
 			rfs4_state_rele(sp);
 			*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
+			DTRACE_NFSV4_2(op__lock__done, struct compound_state *,
+			    cs, LOCK4res *, resp);
 			return;
 		}
 
@@ -8260,6 +8503,8 @@ rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 		if ((status = rfs4_get_lo_state(stateid, &lsp, TRUE))
 		    != NFS4_OK) {
 			*cs->statusp = resp->status = status;
+			DTRACE_NFSV4_2(op__lock__done, struct compound_state *,
+			    cs, LOCK4res *, resp);
 			return;
 		}
 		create = FALSE;	/* We didn't create lsp */
@@ -8268,6 +8513,8 @@ rfs4_op_lock(nfs_argop4 *argop, nfs_resop4 *resop,
 		if (cs->vp != lsp->state->finfo->vp) {
 			rfs4_lo_state_rele(lsp, TRUE);
 			*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
+			DTRACE_NFSV4_2(op__lock__done, struct compound_state *,
+			    cs, LOCK4res *, resp);
 			return;
 		}
 
@@ -8438,6 +8685,9 @@ end:
 		rfs4_sw_exit(&sp->owner->oo_sw);
 		rfs4_state_rele(sp);
 	}
+
+	DTRACE_NFSV4_2(op__lock__done, struct compound_state *, cs,
+	    LOCK4res *, resp);
 }
 
 /* free function for LOCK/LOCKT */
@@ -8468,20 +8718,26 @@ void
 rfs4_op_locku(nfs_argop4 *argop, nfs_resop4 *resop,
 	    struct svc_req *req, struct compound_state *cs)
 {
-	/* XXX Currently not using req arg */
 	LOCKU4args *args = &argop->nfs_argop4_u.oplocku;
 	LOCKU4res *resp = &resop->nfs_resop4_u.oplocku;
 	nfsstat4 status;
 	stateid4 *stateid = &args->lock_stateid;
 	rfs4_lo_state_t *lsp;
 
+	DTRACE_NFSV4_2(op__locku__start, struct compound_state *, cs,
+	    LOCKU4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
+		DTRACE_NFSV4_2(op__locku__done, struct compound_state *, cs,
+		    LOCKU4res *, resp);
 		return;
 	}
 
 	if ((status = rfs4_get_lo_state(stateid, &lsp, TRUE)) != NFS4_OK) {
 		*cs->statusp = resp->status = status;
+		DTRACE_NFSV4_2(op__locku__done, struct compound_state *, cs,
+		    LOCKU4res *, resp);
 		return;
 	}
 
@@ -8489,6 +8745,8 @@ rfs4_op_locku(nfs_argop4 *argop, nfs_resop4 *resop,
 	if (cs->vp != lsp->state->finfo->vp) {
 		rfs4_lo_state_rele(lsp, TRUE);
 		*cs->statusp = resp->status = NFS4ERR_BAD_STATEID;
+		DTRACE_NFSV4_2(op__locku__done, struct compound_state *, cs,
+		    LOCKU4res *, resp);
 		return;
 	}
 
@@ -8571,6 +8829,9 @@ out:
 end:
 	rfs4_sw_exit(&lsp->ls_sw);
 	rfs4_lo_state_rele(lsp, TRUE);
+
+	DTRACE_NFSV4_2(op__locku__done, struct compound_state *, cs,
+	    LOCKU4res *, resp);
 }
 
 /*
@@ -8597,9 +8858,12 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 	sysid_t sysid;
 	pid_t pid;
 
+	DTRACE_NFSV4_2(op__lockt__start, struct compound_state *, cs,
+	    LOCKT4args *, args);
+
 	if (cs->vp == NULL) {
 		*cs->statusp = resp->status = NFS4ERR_NOFILEHANDLE;
-		return;
+		goto out;
 	}
 
 	/*
@@ -8611,7 +8875,7 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 			*cs->statusp = resp->status = NFS4ERR_ISDIR;
 		else
 			*cs->statusp = resp->status =  NFS4ERR_INVAL;
-		return;
+		goto out;
 	}
 
 	/*
@@ -8622,7 +8886,7 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 	    == NULL) {
 		*cs->statusp = resp->status =
 		    rfs4_check_clientid(&args->owner.clientid, 0);
-		return;
+		goto out;
 	}
 	if (rfs4_lease_expired(cp)) {
 		rfs4_client_close(cp);
@@ -8632,12 +8896,12 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 		 * is returned instead
 		 */
 		*cs->statusp = resp->status = NFS4ERR_STALE_CLIENTID;
-		return;
+		goto out;
 	}
 
 	if (rfs4_clnt_in_grace(cp)) {
 		*cs->statusp = resp->status = NFS4ERR_GRACE;
-		return;
+		goto out;
 	}
 	rfs4_client_rele(cp);
 
@@ -8658,7 +8922,7 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 	/* Check for zero length. To lock to end of file use all ones for V4 */
 	if (posix_length == 0) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
-		return;
+		goto out;
 	} else if (posix_length == (length4)(~0)) {
 		posix_length = 0;	/* Posix to end of file  */
 	}
@@ -8670,6 +8934,7 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 		pid = lo->pid;
 		if ((resp->status =
 		    rfs4_client_sysid(lo->client, &sysid)) != NFS4_OK)
+			goto err;
 		goto out;
 	} else {
 		pid = 0;
@@ -8689,7 +8954,7 @@ retry:
 	/* Note that length4 is uint64_t but l_len and l_start are off64_t */
 	if (flk.l_len < 0 || flk.l_start < 0) {
 		resp->status = NFS4ERR_INVAL;
-		goto out;
+		goto err;
 	}
 	error = VOP_FRLOCK(cs->vp, F_GETLK, &flk, flag, (u_offset_t)0,
 	    NULL, cs->cr, NULL);
@@ -8721,10 +8986,13 @@ retry:
 		break;
 	}
 
-out:
+err:
 	if (lo)
 		rfs4_lockowner_rele(lo);
 	*cs->statusp = resp->status;
+out:
+	DTRACE_NFSV4_2(op__lockt__done, struct compound_state *, cs,
+	    LOCKT4res *, resp);
 }
 
 static int

@@ -27,24 +27,44 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * ASSERTION:
+ * ASSERTION: Make sure nfs provider probes are firing
  *
- * Test invocation of offsetof() with a member that is a bit-field.
- * This should fail at compile time.
- *
- * SECTION: Structs and Unions/Member Sizes and Offsets
- *
- * NOTES:
- *
+ * SECTION: nfs4 provider
  */
 
-struct foo {
-	int a:1;
-	int b:3;
-};
+#pragma D option destructive
+#pragma D option quiet
 
-BEGIN
+pid$1:a.out:waiting:entry
 {
-	trace(offsetof(struct foo, b));
+	this->value = (int *)alloca(sizeof (int));
+	*this->value = 1;
+	copyout(this->value, arg0, sizeof (int));
+}
+
+nfsv4:::compound-start
+{
+	cstart++;
+}
+
+nfsv4:::op-putrootfh-start
+{
+	opstart++;
+}
+
+nfsv4:::op-putrootfh-done
+{
+	opdone++;
+}
+
+nfsv4:::compound-done
+/cstart && opstart && opdone/
+{
 	exit(0);
+}
+
+tick-1s
+/tick++ == 3/
+{
+	exit(1);
 }

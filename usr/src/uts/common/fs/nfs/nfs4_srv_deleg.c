@@ -33,6 +33,7 @@
 #include <nfs/lm.h>
 #include <sys/cmn_err.h>
 #include <sys/disp.h>
+#include <sys/sdt.h>
 
 #include <sys/pathname.h>
 
@@ -837,6 +838,7 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	CB_COMPOUND4args	cb4_args;
 	CB_COMPOUND4res		cb4_res;
 	CB_RECALL4args		*rec_argp;
+	CB_RECALL4res		*rec_resp;
 	nfs_cb_argop4		*argop;
 	int			numops;
 	int			argoplist_size;
@@ -881,7 +883,16 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	timeout.tv_sec = (rfs4_lease_time * 80) / 100;
 	timeout.tv_usec = 0;
 
+	DTRACE_NFSV4_3(cb__recall__start, rfs4_client_t *, dsp->client,
+	    rfs4_deleg_state_t *, dsp, CB_RECALL4args *, rec_argp);
+
 	call_stat = rfs4_do_callback(dsp->client, &cb4_args, &cb4_res, timeout);
+
+	rec_resp = (cb4_res.array_len == 0) ? NULL :
+	    &cb4_res.array[0].nfs_cb_resop4_u.opcbrecall;
+
+	DTRACE_NFSV4_3(cb__recall__done, rfs4_client_t *, dsp->client,
+	    rfs4_deleg_state_t *, dsp, CB_RECALL4res *, rec_resp);
 
 	if (call_stat != RPC_SUCCESS || cb4_res.status != NFS4_OK) {
 		rfs4_revoke_deleg(dsp);

@@ -85,7 +85,7 @@ rfs4_init_drc(uint32_t drc_size, uint32_t drc_hash_size)
 	}
 
 	list_create(&(drc->dr_cache), sizeof (rfs4_dupreq_t),
-		    offsetof(rfs4_dupreq_t, dr_next));
+	    offsetof(rfs4_dupreq_t, dr_next));
 
 	return (drc);
 }
@@ -116,7 +116,7 @@ rfs4_fini_drc(rfs4_drc_t *drc)
 
 	mutex_destroy(&drc->lock);
 	kmem_free(drc->dr_buckets,
-		sizeof (list_t)*drc->dr_hash);
+	    sizeof (list_t)*drc->dr_hash);
 	kmem_free(drc, sizeof (rfs4_drc_t));
 }
 
@@ -199,7 +199,7 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
 		case NFS4_DUP_FREE:
 			list_remove(&(drc->dr_cache), drp_tail);
 			DTRACE_PROBE1(nfss__i__drc_freeclaim,
-					rfs4_dupreq_t *, drp_tail);
+			    rfs4_dupreq_t *, drp_tail);
 			return (drp_tail);
 			/* NOTREACHED */
 
@@ -207,7 +207,7 @@ rfs4_alloc_dr(rfs4_drc_t *drc)
 			/* grab it. */
 			rfs4_dr_chstate(drp_tail, NFS4_DUP_FREE);
 			DTRACE_PROBE1(nfss__i__drc_replayclaim,
-					rfs4_dupreq_t *, drp_tail);
+			    rfs4_dupreq_t *, drp_tail);
 			return (drp_tail);
 			/* NOTREACHED */
 		}
@@ -244,12 +244,12 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 	bktdex = the_xid % drc->dr_hash;
 
 	dr_bkt = (list_t *)
-		&(drc->dr_buckets[(the_xid % drc->dr_hash)]);
+	    &(drc->dr_buckets[(the_xid % drc->dr_hash)]);
 
 	DTRACE_PROBE3(nfss__i__drc_bktdex,
-			int, bktdex,
-			uint32_t, the_xid,
-			list_t *, dr_bkt);
+	    int, bktdex,
+	    uint32_t, the_xid,
+	    list_t *, dr_bkt);
 
 	*dup = NULL;
 
@@ -258,7 +258,7 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 	 * Search the bucket for a matching xid and address.
 	 */
 	for (drp = list_head(dr_bkt); drp != NULL;
-		drp = list_next(dr_bkt, drp)) {
+	    drp = list_next(dr_bkt, drp)) {
 
 		if (drp->dr_xid == the_xid &&
 		    drp->dr_addr.len == req->rq_xprt->xp_rtaddr.len &&
@@ -274,7 +274,7 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 				mutex_exit(&drc->lock);
 				*dup = drp;
 				DTRACE_PROBE1(nfss__i__drc_replay,
-					rfs4_dupreq_t *, drp);
+				    rfs4_dupreq_t *, drp);
 				return (NFS4_DUP_REPLAY);
 			}
 
@@ -344,8 +344,8 @@ rfs4_find_dr(struct svc_req *req, rfs4_drc_t *drc, rfs4_dupreq_t **dup)
 	drp->dr_addr.len = req->rq_xprt->xp_rtaddr.len;
 
 	bcopy((caddr_t)req->rq_xprt->xp_rtaddr.buf,
-		(caddr_t)drp->dr_addr.buf,
-		drp->dr_addr.len);
+	    (caddr_t)drp->dr_addr.buf,
+	    drp->dr_addr.len);
 
 	drp->dr_xid = the_xid;
 	drp->dr_bkt = dr_bkt;
@@ -407,9 +407,12 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	 * Short circuit the RPC_NULL proc.
 	 */
 	if (disp->dis_proc == rpc_null) {
+		DTRACE_NFSV4_1(null__start, struct svc_req *, req);
 		if (!svc_sendreply(xprt, xdr_void, NULL)) {
+			DTRACE_NFSV4_1(null__done, struct svc_req *, req);
 			return (1);
 		}
+		DTRACE_NFSV4_1(null__done, struct svc_req *, req);
 		return (0);
 	}
 
@@ -499,8 +502,8 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	 */
 	if (!svc_sendreply(xprt,  xdr_COMPOUND4res_srv, (char *)rbp)) {
 		DTRACE_PROBE2(nfss__e__dispatch_sendfail,
-			struct svc_req *, xprt,
-			char *, rbp);
+		    struct svc_req *, xprt,
+		    char *, rbp);
 		error++;
 	}
 

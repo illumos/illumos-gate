@@ -26,6 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#pragma D depends_on library net.d
 #pragma D depends_on module genunix
 
 typedef struct iscsiinfo {
@@ -43,12 +44,6 @@ typedef struct iscsiinfo {
 	uint32_t ii_datalen;		/* length of data payload */
 	uint32_t ii_flags;		/* probe-specific flags */
 } iscsiinfo_t;
-
-typedef struct conninfo {
-	string ci_local;	/* local host address */
-	string ci_remote;	/* remote host address */
-	string ci_protocol;	/* protocol (ipv4, ipv6, etc) */
-} conninfo_t;
 
 typedef struct uiscsiproto uiscsiproto_t;
 
