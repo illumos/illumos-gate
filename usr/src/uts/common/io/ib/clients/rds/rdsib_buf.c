@@ -243,6 +243,24 @@ rds_init_recv_caches(rds_state_t *statep)
 		    &mem_attr, &hcap->hca_mrhdl, &mem_desc);
 		if (ret != IBT_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "ibt_register_mr failed: %d", ret);
+			hcap = statep->rds_hcalistp;
+			while ((hcap) && (hcap->hca_mrhdl != NULL)) {
+				ret = ibt_deregister_mr(hcap->hca_hdl,
+				    hcap->hca_mrhdl);
+				if (ret == IBT_SUCCESS) {
+					hcap->hca_mrhdl = NULL;
+					hcap->hca_lkey = 0;
+					hcap->hca_rkey = 0;
+				} else {
+					RDS_DPRINTF2(LABEL, "ibt_deregister_mr "
+					    "failed: %d, mrhdl: 0x%p", ret,
+					    hcap->hca_mrhdl);
+				}
+				hcap = hcap->hca_nextp;
+			}
+			kmem_free(bufmemp, nbuf * sizeof (rds_buf_t));
+			kmem_free(memp, memsize);
+			mutex_exit(&rds_dpool.pool_lock);
 			return (-1);
 		}
 
