@@ -83,13 +83,22 @@
  * LOGIC_TEST_BUG_MAX.  As further protecion against false positives,
  * we report success if the the number of mismatches does not exceed
  * LOGIC_TEST_ERRORS_ALLOWED.
+ *
+ * When running on maramba systems, delays as high as 20000 were observed
+ * LOGIC_TEST_BUG_MAX was increased to twice this observed value since all
+ * that matters is that the hardware is indeed generating the expected values
+ * in diag mode.  The code was also modified to exit as soon as the required
+ * number of matches is detected.
  */
 
-#define	LOGIC_TEST_CYCLES	38859
-#define	LOGIC_TEST_EXPECTED_M1	0xb8820c7bd387e32cULL
-#define	LOGIC_TEST_BUG_MAX	400
-#define	LOGIC_TEST_WORDS	8 /* includes first one, unused */
+#define	LOGIC_TEST_CYCLES	  38859
+#define	LOGIC_TEST_EXPECTED_M1	  0xb8820c7bd387e32cULL
+#define	LOGIC_TEST_BUG_MAX	  40000
+#define	LOGIC_TEST_WORDS	  8 /* includes first one, unused */
 #define	LOGIC_TEST_ERRORS_ALLOWED 1
+#define	LOGIC_TEST_MATCHES_NEEDED (LOGIC_TEST_WORDS - 1 - \
+					LOGIC_TEST_ERRORS_ALLOWED)
+
 #define	RNG_POLY		0x231dcee91262b8a3ULL
 #define	ENTDIVISOR		(((1ULL << LOG_VAL_SCALE) + 500ULL) / 1000ULL)
 
@@ -125,9 +134,8 @@ lfsr64_adv_seq(uint64_t poly, uint64_t in, uint64_t exp, uint64_t *out)
 	*out = res;
 }
 
-
 int
-n2rng_logic_test(n2rng_t *n2rng)
+n2rng_logic_test(n2rng_t *n2rng, int rngid)
 {
 	n2rng_setup_t	logictest;
 	uint64_t	buffer[LOGIC_TEST_WORDS];
@@ -135,6 +143,9 @@ n2rng_logic_test(n2rng_t *n2rng)
 	int		rv;
 	int		i, j;
 	int		correctcount = 0;
+	rng_entry_t	*rng = &n2rng->n_ctl_data->n_rngs[rngid];
+	int		cycles[LOGIC_TEST_WORDS] =
+			{0, 0, 0, 0, 0, 0, 0, 0};
 
 	/*
 	 * This test runs the RNG with no entropy for
@@ -154,14 +165,12 @@ n2rng_logic_test(n2rng_t *n2rng)
 	logictest.ctlwds[3].fields.rnc_cnt = LOGIC_TEST_CYCLES - 2;
 
 	/* read LOGIC_TEST_WORDS 64-bit words */
-
-
-	rv = n2rng_collect_diag_bits(n2rng, &logictest, buffer,
+	rv = n2rng_collect_diag_bits(n2rng, rngid, &logictest, buffer,
 	    LOGIC_TEST_WORDS * sizeof (uint64_t),
-	    &n2rng->n_preferred_config, n2rng->n_rng_state);
+	    &rng->n_preferred_config, rng->n_rng_state);
 	if (rv) {
-		cmn_err(CE_WARN,
-		    "n2rng: n2rng_collect_diag_bits fails with 0x%x", rv);
+		cmn_err(CE_WARN, "n2rng: n2rng_collect_diag_bits failed with "
+		    "0x%x on rng(%d)", rv, rngid);
 		return (rv);
 	}
 
@@ -170,15 +179,32 @@ n2rng_logic_test(n2rng_t *n2rng)
 		for (j = 1; j < LOGIC_TEST_WORDS; ++j) {
 			if (buffer[j] == reg) {
 				++correctcount;
+				cycles[j] = i;
 			}
+		}
+		/* exit loop if we have already found enough matches */
+		if (correctcount >= LOGIC_TEST_MATCHES_NEEDED) {
+			break;
 		}
 		/* advance reg by one step */
 		lfsr64_adv_seq(RNG_POLY, reg, 1, &reg);
 	}
 
-	if (correctcount < LOGIC_TEST_WORDS - 1 - LOGIC_TEST_ERRORS_ALLOWED) {
-		cmn_err(CE_WARN, "n2rng: logic error in rng.");
+	if (correctcount < LOGIC_TEST_MATCHES_NEEDED) {
+		cmn_err(CE_WARN, "n2rng: logic error on rng(%d), only %d "
+		    "matches found", rngid, correctcount);
+		for (i = 0; i < LOGIC_TEST_WORDS; i++) {
+			DBG3(n2rng, DHEALTH, "buffer[%d] %016llx, cycles = %d",
+			    i, buffer[i], cycles[i]);
+		}
 		return (EIO);
+	} else {
+		DBG3(n2rng, DHEALTH, "n2rng: rng(%d) logic test passed, "
+		    "%d matches in %d cycles", rngid, correctcount, i);
+		for (i = 0; i < LOGIC_TEST_WORDS; i++) {
+			DBG3(n2rng, DCHATTY, "buffer[%d] %016llx, cycles = %d",
+			    i, buffer[i], cycles[i]);
+		}
 	}
 
 	return (0);
@@ -189,7 +215,7 @@ n2rng_logic_test(n2rng_t *n2rng)
  * gets the metric for the specified state.
  */
 int
-n2rng_collect_metrics(n2rng_t *n2rng, n2rng_setup_t *setupp,
+n2rng_collect_metrics(n2rng_t *n2rng, int rngid, n2rng_setup_t *setupp,
     n2rng_setup_t *exit_setupp,
     uint64_t exit_state, n2rng_osc_perf_t *metricp)
 {
@@ -205,7 +231,7 @@ n2rng_collect_metrics(n2rng_t *n2rng, n2rng_setup_t *setupp,
 		return (ENOMEM);
 	}
 
-	rv = n2rng_collect_diag_bits(n2rng, setupp, buffer, bufsize,
+	rv = n2rng_collect_diag_bits(n2rng, rngid, setupp, buffer, bufsize,
 	    exit_setupp, exit_state);
 	if (rv) {
 		cmn_err(CE_WARN,
@@ -225,12 +251,13 @@ n2rng_collect_metrics(n2rng_t *n2rng, n2rng_setup_t *setupp,
  * bias setting.  A particular datum goes in table[osc][bias].
  */
 int
-collect_rng_perf(n2rng_t *n2rng, n2rng_osc_perf_table_t ptable)
+collect_rng_perf(n2rng_t *n2rng, int rngid, n2rng_osc_perf_table_t ptable)
 {
 	int		bias;
 	int		osc;
 	n2rng_setup_t	rngstate;
 	int		rv;
+	rng_entry_t	*rng = &n2rng->n_ctl_data->n_rngs[rngid];
 
 	rngstate.ctlwds[0].word = 0;
 	rngstate.ctlwds[0].fields.rnc_anlg_sel = N2RNG_NOANALOGOUT;
@@ -242,9 +269,8 @@ collect_rng_perf(n2rng_t *n2rng, n2rng_osc_perf_table_t ptable)
 		rngstate.ctlwds[3].fields.rnc_selbits = 1 << osc;
 		for (bias = 0; bias < N2RNG_NBIASES; bias++) {
 			rngstate.ctlwds[3].fields.rnc_vcoctl = bias;
-			rv = n2rng_collect_metrics(n2rng, &rngstate,
-			    &n2rng->n_preferred_config,
-			    n2rng->n_rng_state,
+			rv = n2rng_collect_metrics(n2rng, rngid, &rngstate,
+			    &rng->n_preferred_config, rng->n_rng_state,
 			    &(ptable[osc][bias]));
 			if (rv) {
 				return (rv);
@@ -254,8 +280,6 @@ collect_rng_perf(n2rng_t *n2rng, n2rng_osc_perf_table_t ptable)
 
 	return (rv);
 }
-
-
 
 /*
  * The following 2 functions test the performance of each noise cell
@@ -278,7 +302,7 @@ collect_rng_perf(n2rng_t *n2rng, n2rng_osc_perf_table_t ptable)
  * preferred configuration in the n2rng structure.
  */
 int
-n2rng_noise_gen_preferred(n2rng_t *n2rng)
+n2rng_noise_gen_preferred(n2rng_t *n2rng, int rngid)
 {
 	int			rv;
 	int			rventropy = 0; /* EIO if entropy is too low */
@@ -290,8 +314,9 @@ n2rng_noise_gen_preferred(n2rng_t *n2rng)
 	uint64_t		bestentropy = 0;
 	n2rng_ctl_t		rng_ctl = {0};
 	int			i;
+	rng_entry_t		*rng = &n2rng->n_ctl_data->n_rngs[rngid];
 
-	rv = collect_rng_perf(n2rng, n2rng->n_perftable);
+	rv = collect_rng_perf(n2rng, rngid, rng->n_perftable);
 	if (rv) {
 		return (rv);
 	}
@@ -299,7 +324,7 @@ n2rng_noise_gen_preferred(n2rng_t *n2rng)
 	/*
 	 * bset is the bias setting of all 3 oscillators packed into a
 	 * word, 2 bits for each: b2:b1:b0.  First we set up an
-	 * arbitrary assignement, because in an earlier version of
+	 * arbitrary assignment, because in an earlier version of
 	 * this code, there were cases where the assignment would
 	 * never happen.  Also, that way we don't need to prove
 	 * assignment to prove we never have uninitalized variables,
@@ -315,15 +340,15 @@ n2rng_noise_gen_preferred(n2rng_t *n2rng)
 	 */
 	bset = ENCODEBIAS(2, 2) | ENCODEBIAS(1, 1) | ENCODEBIAS(0, 0);
 	for (b0 = 0; b0 < N2RNG_NBIASES; b0++) {
-		candidates[0] = &n2rng->n_perftable[0][b0];
+		candidates[0] = &rng->n_perftable[0][b0];
 		for (b1 = 0; b1 < N2RNG_NBIASES; b1++) {
 			if (b0 == b1) continue;
-			candidates[1] = &n2rng->n_perftable[1][b1];
+			candidates[1] = &rng->n_perftable[1][b1];
 			for (b2 = 0; b2 < N2RNG_NBIASES; b2++) {
 				uint64_t totalentropy = 0;
 
 				if (b0 == b2 || b1 == b2) continue;
-				candidates[2] = &n2rng->n_perftable[2][b2];
+				candidates[2] = &rng->n_perftable[2][b2];
 				for (i = 0; i < N2RNG_NOSC; i++) {
 					totalentropy += candidates[i]->H2;
 				}
@@ -356,7 +381,7 @@ n2rng_noise_gen_preferred(n2rng_t *n2rng)
 	 * osciallators and for final value that selects all
 	 * oscillators.
 	 */
-	rng_ctl.fields.rnc_cnt = RNG_DEFAULT_ACCUMULATE_CYCLES;
+	rng_ctl.fields.rnc_cnt = n2rng->n_ctl_data->n_accumulate_cycles;
 	rng_ctl.fields.rnc_mode = 1;  /* set normal mode */
 	rng_ctl.fields.rnc_anlg_sel = N2RNG_NOANALOGOUT;
 
@@ -367,76 +392,90 @@ n2rng_noise_gen_preferred(n2rng_t *n2rng)
 	for (osc = 0; osc < N2RNG_NOSC; osc++) {
 		rng_ctl.fields.rnc_selbits = 1 << osc;
 		rng_ctl.fields.rnc_vcoctl = EXTRACTBIAS(bset, osc);
-		n2rng->n_preferred_config.ctlwds[osc] = rng_ctl;
+		rng->n_preferred_config.ctlwds[osc] = rng_ctl;
 	}
 
-	rng_ctl.fields.rnc_cnt = RNG_DEFAULT_ACCUMULATE_CYCLES;
+	rng_ctl.fields.rnc_cnt = n2rng->n_ctl_data->n_accumulate_cycles;
 	rng_ctl.fields.rnc_vcoctl = 0;
 	rng_ctl.fields.rnc_selbits = 0x7;
-	n2rng->n_preferred_config.ctlwds[3] = rng_ctl;
+	rng->n_preferred_config.ctlwds[3] = rng_ctl;
 
-	/*
-	 * Log the entropy and bias setting for the admin and security
-	 * auditors.
-	 */
 	if (rventropy == 0) {
-		cmn_err(CE_NOTE,
-		    "!n2rng: RNG passes, "
-		    "cell 0 bias %d: %ld, "
-		    "cell 1 bias %d: %ld, "
-		    "cell 2 bias %d: %ld",
-		    EXTRACTBIAS(bset, 0),
-		    (uint64_t)(bestcellentropy[0] / ENTDIVISOR),
-		    EXTRACTBIAS(bset, 1),
-		    (uint64_t)(bestcellentropy[1] / ENTDIVISOR),
-		    EXTRACTBIAS(bset, 2),
-		    (uint64_t)(bestcellentropy[2] / ENTDIVISOR));
 
+		/* Save bias and entropy results for kstats */
+		for (i = 0; i < N2RNG_NOSC; i++) {
+			rng->n_bias_info[i].bias =
+			    (uint64_t)EXTRACTBIAS(bset, i);
+			rng->n_bias_info[i].entropy =
+			    (uint64_t)(bestcellentropy[i] / ENTDIVISOR);
+			DBG4(n2rng, DCHATTY,
+			    "n2rng_noise_gen_preferred: rng %d cell %d bias "
+			    "%ld: %ld", rngid, i, rng->n_bias_info[i].bias,
+			    rng->n_bias_info[i].entropy);
+		}
+	} else {
+
+		/* Clear bias and entropy results for kstats */
+		for (i = 0; i < N2RNG_NOSC; i++) {
+			rng->n_bias_info[i].bias = 0;
+			rng->n_bias_info[i].entropy = 0;
+		}
 	}
 
 	return (rv ? rv : rventropy);
 }
 
-
-
 /*
  * Do a logic test, then find and set the best bias confuration
  * (failing if insufficient entropy is generated, then set state to
- * configured.
+ * configured.  This function should only be called when running in
+ * the control domain.
  */
 int
-n2rng_do_health_check(n2rng_t *n2rng)
+n2rng_do_health_check(n2rng_t *n2rng, int rngid)
 {
-	int		rv;
-	int		hverr;
+	int		rv = EIO;
+	rng_entry_t	*rng = &n2rng->n_ctl_data->n_rngs[rngid];
+	int		attempts;
 
-	/* Take control of RNG */
-	do {
-		hverr = hv_rng_get_diag_control();
-		rv = n2rng_herr2kerr(hverr);
-	} while (hverr == H_EWOULDBLOCK);
-
-	if (hverr)
-		return (rv);
-
-	rv = n2rng_logic_test(n2rng);
-	if (rv) {
-		return (rv);
+	for (attempts = 0;
+	    (attempts < RNG_MAX_LOGIC_TEST_ATTEMPTS) && rv; attempts++) {
+		rv = n2rng_logic_test(n2rng, rngid);
 	}
 
-	rv = n2rng_noise_gen_preferred(n2rng);
 	if (rv) {
-		return (rv);
+		cmn_err(CE_WARN, "n2rng: n2rng_logic_test failed %d attempts",
+		    RNG_MAX_LOGIC_TEST_ATTEMPTS);
+		goto errorexit;
+	} else if (attempts > 1) {
+		DBG1(n2rng, DHEALTH,
+		    "n2rng: n2rng_logic_test failed %d attempts",
+		    attempts - 1);
+		goto errorexit;
+	}
+
+	rv = n2rng_noise_gen_preferred(n2rng, rngid);
+	if (rv) {
+		DBG0(n2rng, DHEALTH,
+		    "n2rng: n2rng_noise_gen_preferred failed");
+		goto errorexit;
 	}
 
 	/* Push the selected config into HW */
-	rv = n2rng_collect_diag_bits(n2rng, NULL, NULL, 0,
-	    &n2rng->n_preferred_config, CTL_STATE_CONFIGURED);
+	rv = n2rng_collect_diag_bits(n2rng, rngid, NULL, NULL, 0,
+	    &rng->n_preferred_config, CTL_STATE_CONFIGURED);
 	if (rv) {
-		return (rv);
+		DBG0(n2rng, DHEALTH,
+		    "n2rng: n2rng_collect_diag_bits failed");
+		goto errorexit;
 	}
 
-	n2rng->n_rng_state = CTL_STATE_CONFIGURED;
+	return (rv);
+
+errorexit:
+	/* Push the selected config into HW with an error state */
+	(void) n2rng_collect_diag_bits(n2rng, rngid, NULL, NULL, 0,
+	    &rng->n_preferred_config, CTL_STATE_ERROR);
 
 	return (rv);
 }

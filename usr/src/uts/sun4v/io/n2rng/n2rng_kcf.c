@@ -177,6 +177,147 @@ ext_info(crypto_provider_handle_t prov, crypto_provider_ext_info_t *ext_info,
 	return (CRYPTO_SUCCESS);
 }
 
+static void
+unregister_task(void *targ)
+{
+	n2rng_t *n2rng = (n2rng_t *)targ;
+
+	/* Unregister provider without checking result */
+	(void) n2rng_unregister_provider(n2rng);
+}
+
+/*
+ * Register with KCF if not already registered
+ */
+int
+n2rng_register_provider(n2rng_t *n2rng)
+{
+	int	ret;
+
+	if (n2rng_isregistered(n2rng)) {
+		DBG0(n2rng, DKCF, "n2rng_kcf: Crypto provider already "
+		    "registered");
+		return (DDI_SUCCESS);
+	} else {
+		ret = crypto_register_provider(&n2rng_prov_info,
+		    &n2rng->n_prov);
+		if (ret == CRYPTO_SUCCESS) {
+			DBG0(n2rng, DKCF, "n2rng_kcf: Crypto provider "
+			    "registered");
+		} else {
+			cmn_err(CE_WARN,
+			    "crypto_register_provider() failed (%d)", ret);
+			n2rng->n_prov = NULL;
+			return (DDI_FAILURE);
+		}
+	}
+	n2rng_setregistered(n2rng);
+	crypto_provider_notification(n2rng->n_prov, CRYPTO_PROVIDER_READY);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Unregister with KCF if not already registered
+ */
+int
+n2rng_unregister_provider(n2rng_t *n2rng)
+{
+	if (!n2rng_isregistered(n2rng)) {
+		DBG0(n2rng, DKCF, "n2rng_kcf: Crypto provider already "
+		    "unregistered");
+	} else {
+		if (crypto_unregister_provider(n2rng->n_prov) ==
+		    CRYPTO_SUCCESS) {
+			DBG0(n2rng, DKCF, "n2rng_kcf: Crypto provider "
+			    "unregistered");
+		} else {
+			n2rng_error(n2rng, "unable to unregister from kcf");
+			return (DDI_FAILURE);
+		}
+	}
+	n2rng->n_prov = NULL;
+	n2rng_clrregistered(n2rng);
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * Set state to failed for all rngs if in control domain and dispatch a task
+ * to unregister from kcf
+ */
+void
+n2rng_failure(n2rng_t *n2rng)
+{
+	int		rngid;
+	rng_entry_t	*rng;
+
+	mutex_enter(&n2rng->n_lock);
+	/* Check if error has already been detected */
+	if (n2rng_isfailed(n2rng)) {
+		mutex_exit(&n2rng->n_lock);
+		return;
+	}
+
+	cmn_err(CE_WARN, "n2rng: hardware failure detected");
+	n2rng_setfailed(n2rng);
+
+	/* Set each rng to failed if running in control domain */
+	if (n2rng_iscontrol(n2rng)) {
+		for (rngid = 0; rngid < n2rng->n_ctl_data->n_num_rngs;
+		    rngid++) {
+			rng = &n2rng->n_ctl_data->n_rngs[rngid];
+			rng->n_rng_state = CTL_STATE_ERROR;
+		}
+	}
+	mutex_exit(&n2rng->n_lock);
+
+	/* Dispatch task to unregister from kcf */
+	if (ddi_taskq_dispatch(n2rng->n_taskq, unregister_task,
+	    (void *)n2rng, DDI_SLEEP) !=  DDI_SUCCESS) {
+		cmn_err(CE_WARN, "n2rng: ddi_taskq_dispatch() failed");
+	}
+}
+
+/*
+ * Set state to unconfigured for all rngs if in control domain and dispatch a
+ * task to unregister from kcf.
+ */
+void
+n2rng_unconfigured(n2rng_t *n2rng)
+{
+	int		rngid;
+	rng_entry_t	*rng;
+
+	mutex_enter(&n2rng->n_lock);
+	/* Check if unconfigured state has already been detected */
+	if (!n2rng_isconfigured(n2rng)) {
+		mutex_exit(&n2rng->n_lock);
+		return;
+	}
+
+	cmn_err(CE_WARN, "n2rng: no longer generating entropy");
+	n2rng_clrconfigured(n2rng);
+
+	/* Set each rng to unconfigured if running in control domain */
+	if (n2rng_iscontrol(n2rng)) {
+		for (rngid = 0; rngid < n2rng->n_ctl_data->n_num_rngs;
+		    rngid++) {
+			rng = &n2rng->n_ctl_data->n_rngs[rngid];
+			rng->n_rng_state = CTL_STATE_UNCONFIGURED;
+		}
+	}
+	mutex_exit(&n2rng->n_lock);
+
+	/* Dispatch task to unregister from kcf */
+	if (ddi_taskq_dispatch(n2rng->n_taskq, unregister_task,
+	    (void *)n2rng, DDI_SLEEP) !=  DDI_SUCCESS) {
+		cmn_err(CE_WARN, "n2rng: ddi_taskq_dispatch() failed");
+	} else {
+		/* Schedule a configuration retry */
+		n2rng_config_retry(n2rng, RNG_CFG_RETRY_SECS);
+	}
+}
 
 /*
  * Setup and also register to kCF
@@ -190,38 +331,40 @@ n2rng_init(n2rng_t *n2rng)
 
 	dip = n2rng->n_dip;
 
-	/* initialize kstats */
-	n2rng_ksinit(n2rng);
+	/* Initialize data structures if not already done */
+	if (!n2rng_isinitialized(n2rng)) {
+		/* initialize kstats */
+		n2rng_ksinit(n2rng);
 
-	/* initialize the FIPS data and mutexes */
-	ret = fips_init(n2rng);
-	if (ret) {
-		n2rng_ksdeinit(n2rng);
-		return (DDI_FAILURE);
+		/* initialize the FIPS data and mutexes */
+		ret = fips_init(n2rng);
+		if (ret) {
+			n2rng_ksdeinit(n2rng);
+			return (DDI_FAILURE);
+		}
 	}
 
-	/* register with the crypto framework */
-	/* Be careful not to exceed 32 chars */
+	/*
+	 * Register with crypto framework if not already registered.
+	 * Be careful not to exceed 32 characters.
+	 */
 	(void) sprintf(ID, "%s/%d %s",
 	    ddi_driver_name(dip), ddi_get_instance(dip),
 	    IDENT_N2RNG);
 	n2rng_prov_info.pi_provider_description = ID;
 	n2rng_prov_info.pi_provider_dev.pd_hw = dip;
 	n2rng_prov_info.pi_provider_handle = n2rng;
-	ret = crypto_register_provider(&n2rng_prov_info, &n2rng->n_prov);
-	if (ret != CRYPTO_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "crypto_register_provider() failed (%d)", ret);
+	n2rng_setinitialized(n2rng);
+	ret = n2rng_register_provider(n2rng);
+	if (ret != DDI_SUCCESS) {
 		fips_fini(n2rng);
 		n2rng_ksdeinit(n2rng);
+		n2rng_clrinitialized(n2rng);
 		return (DDI_FAILURE);
 	}
 
-	crypto_provider_notification(n2rng->n_prov, CRYPTO_PROVIDER_READY);
-
 	return (DDI_SUCCESS);
 }
-
 
 /*
  * Unregister from kCF and cleanup
@@ -229,24 +372,22 @@ n2rng_init(n2rng_t *n2rng)
 int
 n2rng_uninit(n2rng_t *n2rng)
 {
-	/*
-	 * Unregister from kCF.
-	 * This needs to be done at the beginning of detach.
-	 */
-	if (n2rng->n_prov != NULL) {
-		if (crypto_unregister_provider(n2rng->n_prov) !=
-		    CRYPTO_SUCCESS) {
-			n2rng_error(n2rng, "unable to unregister from kcf");
+	/* Un-initialize data structures if they exist */
+	if (n2rng_isinitialized(n2rng)) {
+		/*
+		 * Unregister from kCF.
+		 * This needs to be done at the beginning of detach.
+		 */
+		if (n2rng_unregister_provider(n2rng) != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
-		n2rng->n_prov = NULL;
+
+		fips_fini(n2rng);
+
+		/* deinitialize kstats */
+		n2rng_ksdeinit(n2rng);
+		n2rng_clrinitialized(n2rng);
 	}
-
-	fips_fini(n2rng);
-
-
-	/* deinitialize kstats */
-	n2rng_ksdeinit(n2rng);
 
 	return (DDI_SUCCESS);
 }
@@ -301,7 +442,6 @@ fips_init(n2rng_t *n2rng)
 	}
 	return (0);
 }
-
 
 static void
 fips_fini(n2rng_t *n2rng)

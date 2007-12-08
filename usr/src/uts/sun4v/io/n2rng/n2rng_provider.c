@@ -68,9 +68,6 @@
  */
 #define	ENTROPY_STARVATION	10000ULL
 
-extern int	n2rng_herr2kerr(uint64_t);
-
-
 /*
  * Adds val1 and val2 and stores result into sum.  The various input
  * pointers can be exactly aliased.  (They cannot be offset and
@@ -151,7 +148,7 @@ fips_random_inner(fipsrandomstruct_t *frsp, uint32_t *x_j,
 	 */
 	(void) add160(XVAL, frsp->XKEY, XSEED_j, 0, 0);
 	/*
-	 * Step 3c: x_sub_j = G(t, XVAL) mod q.
+	 * Step 3c: x_sub_j = G(t, XVAL)
 	 */
 	SHA1Init(&sha1_context);
 	SHA1Update(&sha1_context, (unsigned char *)XVAL, SHA1BYTES);
@@ -190,6 +187,7 @@ fips_random(n2rng_t *n2rng, uint8_t *out, size_t nbytes)
 {
 	int			i;
 	fipsrandomstruct_t	*frsp;
+	int			rv;
 	union {
 		uint32_t	as32[SHA1WORDS];
 		uint64_t	as64[ROUNDUP(SHA1WORDS, 2) >> 1];
@@ -198,16 +196,28 @@ fips_random(n2rng_t *n2rng, uint8_t *out, size_t nbytes)
 
 
 	for (i = 0; i < nbytes; i += SHA1BYTES) {
+		frsp = &n2rng->n_frs.fipsarray[
+		    atomic_inc_32_nv(&n2rng->n_frs.fips_round_robin_j) %
+		    N2RNG_FIPS_INSTANCES];
 		/*
 		 * Since in the new scheme of things, the RNG latency
 		 * will be high on reads after the first, we get just
-		 * one word of entropy per call.  And if it fails, we
-		 * just go on, but if the number of successive
-		 * failures gets too big, we fail.
+		 * one word of entropy per call.
 		 */
-		if (n2rng_getentropy(n2rng, (void *)&entropy.as64[1],
-		    sizeof (uint64_t))) {
-			/* failure case */
+		if ((rv = n2rng_getentropy(n2rng, (void *)&entropy.as64[1],
+		    sizeof (uint64_t))) != 0) {
+
+			/*
+			 * If all rngs have failed, dispatch task to unregister
+			 * from kcf and put the driver in an error state.  If
+			 * recoverable errors persist, a configuration retry
+			 * will be initiated.
+			 */
+			if (rv == EPERM) {
+				n2rng_failure(n2rng);
+				return (EIO);
+			}
+			/* Failure with possible recovery */
 			entropy.as64[1] = 0;
 		}
 
@@ -241,8 +251,7 @@ fips_random(n2rng_t *n2rng, uint8_t *out, size_t nbytes)
 			 */
 			if (++frsp->entropyhunger > ENTROPY_STARVATION) {
 				mutex_exit(&frsp->mtx);
-				cmn_err(CE_WARN, "n2rng: not generating "
-				    "entropy");
+				n2rng_unconfigured(n2rng);
 				return (EIO);
 			}
 		} else {
@@ -286,7 +295,7 @@ n2rng_fips_random_init(n2rng_t *n2rng, fipsrandomstruct_t *frsp)
 	if (rv) {
 		return (rv);
 	}
-
+	frsp->entropyhunger = 0;
 	mutex_init(&frsp->mtx, NULL, MUTEX_DRIVER, NULL);
 
 	return (0);
