@@ -340,7 +340,7 @@ px_err_bit_desc_t px_err_ilu_tbl[] = {
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
-	PX_ERR_PEC_CLASS(bit)
+	PX_ERR_PEC_OB_CLASS(bit)
 px_err_bit_desc_t px_err_tlu_ue_tbl[] = {
 	/* PCI-E Receive Uncorrectable Errors */
 	{ TLU_UC_BIT_DESC(UR,		pciex_ue,	pciex_rx_ue) },
