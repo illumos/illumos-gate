@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -127,6 +127,25 @@ do
 		else
 			printf '/^webservd:x\na\n%s\n.\nw\nq\n' \
 			    "$POSTGRES_LIN" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'svctag' user if it doesn't exist.
+		#
+		SVCTAG_LIN="svctag:x:95:12:Service Tag UID:/:"
+		cur_name=`awk -F: '$3 == 95 { print $1 }' $dest`
+		cur_id=`awk -F: '$1 == "svctag" { print $3 }' $dest`
+		if [ ! -z "$cur_name" -a "$cur_name" != "svctag" ]; then
+			echo "ERROR: Reserved UID 95 already assigned" \
+			    "to '$cur_name'" >> /tmp/CLEANUP
+		elif [ ! -z "$cur_id" -a "$cur_id" != "95" ]; then
+			echo "NOTE: svctag username already assigned" \
+			    "to id '$cur_id'" >> /tmp/CLEANUP
+		elif grep "$SVCTAG_LIN" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^postgres:x\na\n%s\n.\nw\nq\n' \
+			    "$SVCTAG_LIN" | ed -s $dest > /dev/null
 		fi
 
 		#

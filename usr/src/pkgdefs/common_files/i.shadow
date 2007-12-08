@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -101,6 +101,17 @@ do
 		else
 			printf '/^webservd:\*LK\*\na\n%s\n.\nw\nq\n' \
 			    "$POSTGRES_LINE" | ed -s $dest > /dev/null
+		fi
+
+		#
+		# Add the 'svctag' reserved user if it doesn't exist.
+		#
+		SVCTAG_LINE="svctag:*LK*:6445::::::"
+		if grep "^svctag:" $dest 2>&1 >/dev/null; then
+			:
+		else
+			printf '/^postgres:NP\na\n%s\n.\nw\nq\n' \
+			    "$SVCTAG_LINE" | ed -s $dest > /dev/null
 		fi
 
 		#

@@ -151,6 +151,9 @@
   <service name='application/print/rfc1179' version='1' type='service'>
     <instance name='default' enabled='true' />
   </service>
+  <service name='application/stosreg' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
 
   <!--
       Enable CDE services.

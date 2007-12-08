@@ -180,6 +180,9 @@
   <service name='application/print/rfc1179' version='1' type='service'>
     <instance name='default' enabled='false' />
   </service>
+  <service name='application/stosreg' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
 
   <!--
 	default inetd(1M) services
@@ -236,6 +239,12 @@
     <instance name='default' enabled='false'/>
   </service>
   <service name='network/talk' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/stdiscover' version='1' type='service'>
+    <instance name='default' enabled='false'/>
+  </service>
+  <service name='network/stlisten' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
 
