@@ -4901,7 +4901,9 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 
 	if (len)  {
 		uchar_t	*p;
+		uchar_t dtype;
 		scsa2usb_read_cap_t *cap;
+		struct scsi_inquiry *inq;
 
 		switch (cmd->cmd_cdb[SCSA2USB_OPCODE]) {
 		case SCMD_INQUIRY:
@@ -4914,6 +4916,27 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 			 */
 			if (((cmd->cmd_cdb[SCSA2USB_LUN] & 0x1f) == 0) &&
 			    (len >= SCSA2USB_MAX_INQ_LEN)) {
+				inq = (struct scsi_inquiry *)data->b_rptr;
+				dtype = inq->inq_dtype & DTYPE_MASK;
+				/*
+				 * scsi framework sends zero byte write(10) cmd
+				 * to (Simplified) direct-access devices with
+				 * inquiry version > 2 for reservation changes.
+				 * But some USB devices don't support zero byte
+				 * write(10) even though they have inquiry
+				 * version > 2. Considering scsa2usb driver
+				 * doesn't support reservation and all the
+				 * reservation cmds are being faked, we fake
+				 * the inquiry version to 0 to make scsi
+				 * framework send test unit ready cmd which is
+				 * supported by all the usb devices.
+				 */
+				if (((dtype == DTYPE_DIRECT) ||
+				    (dtype == DTYPE_RBC)) &&
+				    (inq->inq_ansi > 2)) {
+					inq->inq_ansi = 0;
+				}
+
 				bzero(&scsa2usbp->scsa2usb_lun_inquiry
 				    [pkt->pkt_address.a_lun],
 				    sizeof (struct scsi_inquiry));
@@ -4997,7 +5020,7 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 			cmd->cmd_done = 1;
 			/* FALLTHROUGH */
 
-		default:
+			default:
 handle_data:
 			if (bp && len && (cmd->cmd_dir == USB_EP_DIR_IN)) {
 				/*
