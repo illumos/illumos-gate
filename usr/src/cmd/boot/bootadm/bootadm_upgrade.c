@@ -56,6 +56,12 @@ dboot_or_multiboot(const char *root)
 	multiboot_header_t *mbh;
 	struct stat sb;
 
+	if (!is_grub(root)) {
+		/* there is no non dboot sparc new-boot */
+		bam_direct = BAM_DIRECT_DBOOT;
+		return (BAM_SUCCESS);
+	}
+
 	(void) snprintf(fname, PATH_MAX, "%s/%s", root,
 	    "platform/i86pc/kernel/unix");
 	fd = open(fname, O_RDONLY);

@@ -519,5 +519,4 @@ f none platform/sun4u/kernel/tod/sparcv9/todsg 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todstarcat 755 root sys
 f none platform/sun4u/kernel/tod/sparcv9/todstarfire 755 root sys
 s none platform/sun4u/kernel/unix=sparcv9/unix
-f none platform/sun4u/ufsboot 644 root sys
 f none platform/sun4u/wanboot 644 root sys

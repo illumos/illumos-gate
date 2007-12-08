@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,670 +34,518 @@
  */
 
 #include <sys/types.h>
+#include <sys/systm.h>
 #include <sys/reboot.h>
 #include <sys/param.h>
 #include <sys/varargs.h>
 #include <sys/obpdefs.h>
-#include <sys/promif.h>
+#include <sys/promimpl.h>
+#include <sys/prom_plat.h>
 #include <sys/bootconf.h>
 #include <sys/bootstat.h>
+#include <sys/kobj_impl.h>
 
-/*
- * Implementation of the "version" boot service.
- * Return the compiled version number of this implementation.
- *
- * Note: An individual service can be tested for and versioned with
- * bop_serviceavail();
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] Res0: returned version number
- */
-uint_t
-bop_getversion(struct bootops *bop)
+struct bootops *bootops;
+struct bootops kbootops;
+
+pnode_t chosennode;
+
+#define	FAKE_ROOT	(pnode_t)1
+
+struct fakeprop {
+	char	*bootname;
+	pnode_t	promnode;
+	char	*promname;
+} fakeprops[] = {
+	{ "mfg-name", FAKE_ROOT, "name" },
+	{ NULL, 0, NULL }
+};
+
+static void
+fakelook_init(void)
 {
-	return (bop->bsys_version);
+	struct fakeprop *fpp = fakeprops;
+
+	while (fpp->bootname != NULL) {
+		switch (fpp->promnode) {
+		case FAKE_ROOT:
+			fpp->promnode = prom_rootnode();
+			break;
+		}
+		fpp++;
+	}
 }
 
+static struct fakeprop *
+fakelook(const char *prop)
+{
+	struct fakeprop *fpp = fakeprops;
+
+	while (fpp->bootname != NULL) {
+		if (strcmp(prop, fpp->bootname) == 0)
+			return (fpp);
+		fpp++;
+	}
+	return (NULL);
+}
+
+ihandle_t bfs_ih = OBP_BADNODE;
+ihandle_t afs_ih = OBP_BADNODE;
+
+void
+bop_init(void)
+{
+	chosennode = prom_chosennode();
+
+	fakelook_init();
+
+	/* fake bootops - it needs to point to non-NULL */
+	bootops = &kbootops;
+}
+
+#define	MAXPROMFD	16
+
+static ihandle_t prom_ihs[MAXPROMFD];
+int filter_etc = 1;
 
 /*
  * Implementation of the "open" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] filename string
- * args[4] flags
- * args[5] Res0: returned result
- *
  */
+/*ARGSUSED*/
 int
-bop_open(struct bootops *bop, char *name, int flags)
+bop_open(const char *name, int flags)
 {
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
+	int fd = -1, layered;
+	ihandle_t ih;
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("open");
-	args[1] = 2;
-	args[2] = 1;
+	/*
+	 * Only look underneath archive for /etc files
+	 */
+	layered = filter_etc ?
+	    strncmp(name, "/etc", sizeof ("/etc") - 1) == 0 : 1;
 
-	args[3] = boot_ptr2cell(name);
-	args[4] = boot_int2cell(flags);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[5]));
+	if (afs_ih != OBP_BADNODE) {
+		ih = afs_ih;
+		fd = prom_fopen(ih, (char *)name);
+		if (fd == -1 && !layered)
+			return (BOOT_SVC_FAIL);
+	}
+	if (fd == -1 && bfs_ih != OBP_BADNODE) {
+		ih = bfs_ih;
+		fd = prom_fopen(ih, (char *)name);
+	}
+	if (fd == -1)
+		return (BOOT_SVC_FAIL);
+	ASSERT(fd < MAXPROMFD);
+	ASSERT(prom_ihs[fd] == 0);
+	prom_ihs[fd] = ih;
+	return (fd);
+}
+
+static void
+spinner(void)
+{
+	static int pos;
+	static char ind[] = "|/-\\";	/* that's entertainment? */
+	static int blks_read;
+
+	if ((blks_read++ & 0x3) == 0)
+		prom_printf("%c\b", ind[pos++ & 3]);
 }
 
 /*
  * Implementation of the "read" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] boot-opened file descriptor
- * args[4] client's buffer
- * args[5] size of read request
- * args[6] Res0: returned result
- *
  */
 int
-bop_read(struct bootops *bop, int fd, caddr_t buf, size_t size)
+bop_read(int fd, caddr_t buf, size_t size)
 {
-	boot_cell_t args[7];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("read");
-	args[1] = 3;
-	args[2] = 1;
-
-	args[3] = boot_int2cell(fd);
-	args[4] = boot_ptr2cell(buf);
-	args[5] = boot_uint2cell(size);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[6]));
+	ASSERT(prom_ihs[fd] != 0);
+	spinner();
+	return (prom_fread(prom_ihs[fd], fd, buf, size));
 }
 
 /*
  * Implementation of the "seek" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] boot-opened file descriptor
- * args[4] offset hi		XXX just use one cell for offset?
- * args[5] offset lo
- * args[6] Res0: returned result
  */
 int
-bop_seek(struct bootops *bop, int fd, off_t hi, off_t lo)
+bop_seek(int fd, off_t off)
 {
-	boot_cell_t args[7];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("seek");
-	args[1] = 3;
-	args[2] = 1;
-
-	args[3] = boot_int2cell(fd);
-	args[4] = boot_offt2cell(hi);
-	args[5] = boot_offt2cell(lo);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[6]));
+	ASSERT(prom_ihs[fd] != 0);
+	return (prom_fseek(prom_ihs[fd], fd, off));
 }
 
 /*
  * Implementation of the "close" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] boot-opened file descriptor
- * args[4] Res0: returned result
  */
 int
-bop_close(struct bootops *bop, int fd)
+bop_close(int fd)
 {
-	boot_cell_t args[5];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("close");
-	args[1] = 1;
-	args[2] = 1;
-
-	args[3] = boot_int2cell(fd);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[4]));
+	ASSERT(prom_ihs[fd] != 0);
+	prom_fclose(prom_ihs[fd], fd);
+	prom_ihs[fd] = 0;
+	return (0);
 }
 
 /*
- * Implementation of the "alloc" boot service.
+ * Simple temp memory allocator
  *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] virtual hint
- * args[4] size to allocate
- * args[5] alignment
- * args[6] Res0: returned result
+ * >PAGESIZE allocations are gotten directly from prom at bighand
+ * smaller ones are satisfied from littlehand, which does a
+ *  1 page bighand allocation when it runs out of memory
+ */
+static	caddr_t bighand = (caddr_t)BOOTTMPBASE;
+static	caddr_t littlehand = (caddr_t)BOOTTMPBASE;
+
+#define	NTMPALLOC	128
+
+static	caddr_t temp_base[NTMPALLOC];
+static	size_t	temp_size[NTMPALLOC];
+static	int temp_indx;
+
+#if defined(C_OBP)
+void	cobp_free_mem(caddr_t, size_t);
+#endif	/* C_OBP */
+
+
+/*
+ * temporary memory storage until bop_tmp_freeall is called
+ * (after the kernel heap is initialized)
  */
 caddr_t
-bop_alloc(struct bootops *bop, caddr_t virthint, size_t size, int align)
+bop_temp_alloc(size_t size, int align)
 {
-	boot_cell_t args[7];
-	int	(*bsys_1275_call)(void *);
+	caddr_t ret;
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("alloc");
-	args[1] = 3;
-	args[2] = 1;
+	/*
+	 * OBP allocs 10MB to boot, which is where virthint = 0
+	 * memory was allocated from.  Without boot, we allocate
+	 * from BOOTTMPBASE and free when we're ready to take
+	 * the machine from OBP
+	 */
+	if (size < PAGESIZE) {
+		size_t left =
+		    ALIGN(littlehand, PAGESIZE) - (uintptr_t)littlehand;
 
-	args[3] = boot_ptr2cell(virthint);
-	args[4] = boot_size2cell(size);
-	args[5] = boot_int2cell(align);
-	(void) (bsys_1275_call)(args);
-	return ((caddr_t)(uintptr_t)boot_ptr2cell((uintptr_t)args[6]));
+		size = roundup(size, MAX(align, 8));
+		if (size <= left) {
+			ret = littlehand;
+			littlehand += size;
+			return (ret);
+		}
+		littlehand = bighand + size;
+	}
+	size = roundup(size, PAGESIZE);
+	ret = prom_alloc(bighand, size, align);
+	if (ret == NULL)
+		prom_panic("boot temp overflow");
+	bighand += size;
+
+	/* log it for bop_fini() */
+	temp_base[temp_indx] = ret;
+	temp_size[temp_indx] = size;
+	if (++temp_indx == NTMPALLOC)
+		prom_panic("out of bop temp space");
+
+	return (ret);
+}
+
+void
+bop_temp_freeall(void)
+{
+	int i;
+
+	/*
+	 * We have to call prom_free() with the same args
+	 * as we used in prom_alloc()
+	 */
+	for (i = 0; i < NTMPALLOC; i++) {
+		if (temp_base[i] == NULL)
+			break;
+#if !defined(C_OBP)
+		prom_free(temp_base[i], temp_size[i]);
+#else	/* !C_OBP */
+		cobp_free_mem(temp_base[i], temp_size[i]);
+#endif	/* !C_OBP */
+	}
+}
+
+
+/*
+ * Implementation of the "alloc" boot service.
+ */
+caddr_t
+bop_alloc(caddr_t virthint, size_t size, int align)
+{
+	if (virthint == NULL)
+		return (bop_temp_alloc(size, align));
+	return (prom_alloc(virthint, size, align));
 }
 
 /*
  * Implementation of the "alloc_virt" boot service
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] virtual address
- * args[4] size to allocate
- * args[5] Resi: returned result
  */
 caddr_t
-bop_alloc_virt(struct bootops *bop, caddr_t virt, size_t size)
+bop_alloc_virt(caddr_t virt, size_t size)
 {
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("alloc_virt");
-	args[1] = 2;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(virt);
-	args[4] = boot_size2cell(size);
-	(void) (bsys_1275_call)(args);
-	return ((caddr_t)(uintptr_t)boot_ptr2cell((uintptr_t)args[5]));
+	return (prom_claim_virt(size, virt));
 }
 
 /*
  * Implementation of the "free" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] virtual hint
- * args[4] size to free
- * args[5] Res0: returned result
  */
 /*ARGSUSED*/
 void
-bop_free(struct bootops *bop, caddr_t virt, size_t size)
+bop_free(caddr_t virt, size_t size)
 {
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("free");
-	args[1] = 2;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(virt);
-	args[4] = boot_size2cell(size);
-	(void) (bsys_1275_call)(args);
+	prom_free(virt, size);
 }
 
-/*
- * Implementation of the "map" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] virtual address
- * args[4] space of phys addr
- * args[5] phys addr
- * args[6] size
- * args[7] Res0: returned result
- */
-/*ARGSUSED*/
-caddr_t
-bop_map(struct bootops *bop, caddr_t virt, int space,
-	caddr_t phys, size_t size)
-{
-	boot_cell_t args[8];
-	int	(*bsys_1275_call)(void *);
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("map");
-	args[1] = 3;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(virt);
-	args[4] = boot_int2cell(space);
-	args[5] = boot_ptr2cell(phys);
-	args[6] = boot_size2cell(size);
-	(void) (bsys_1275_call)(args);
-	return ((caddr_t)boot_cell2ptr(args[7]));
-}
-
-/*
- * Implementation of the "unmap" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] virtual address
- * args[4] size of chunk
- * args[5] Res0: returned result
- */
-/*ARGSUSED*/
-void
-bop_unmap(struct bootops *bop, caddr_t virt, size_t size)
-{
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("unmap");
-	args[1] = 2;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(virt);
-	args[4] = boot_size2cell(size);
-	(void) (bsys_1275_call)(args);
-}
-
-/*
- * Implementation of the "quiesce" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] Res0: returned result
- */
-/*ARGSUSED*/
-void
-bop_quiesce_io(struct bootops *bop)
-{
-	boot_cell_t args[4];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("quiesce");
-	args[1] = 0;
-	args[2] = 1;
-
-	(void) (bsys_1275_call)(args);
-}
 
 /*
  * Implementation of the "getproplen" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] property name string
- * args[4] Res0: returned result
  */
 /*ARGSUSED*/
 int
-bop_getproplen(struct bootops *bop, char *name)
+bop_getproplen(const char *name)
 {
-	boot_cell_t args[7];
-	int	(*bsys_1275_call)(void *);
+	struct fakeprop *fpp;
+	pnode_t node;
+	char *prop;
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("getproplen");
-	args[1] = 1;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(name);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[4]));
+	fpp = fakelook(name);
+	if (fpp != NULL) {
+		node = fpp->promnode;
+		prop = fpp->promname;
+	} else {
+		node = chosennode;
+		prop = (char *)name;
+	}
+	return (prom_getproplen(node, prop));
 }
 
 /*
  * Implementation of the "getprop" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] property name string
- * args[4] buffer pointer to hold value of the property
- * args[5] Res0: returned result
  */
 /*ARGSUSED*/
 int
-bop_getprop(struct bootops *bop, char *name, void *value)
+bop_getprop(const char *name, void *value)
 {
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
+	struct fakeprop *fpp;
+	pnode_t node;
+	char *prop;
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("getprop");
-	args[1] = 2;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(name);
-	args[4] = boot_ptr2cell(value);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[5]));
+	fpp = fakelook(name);
+	if (fpp != NULL) {
+		node = fpp->promnode;
+		prop = fpp->promname;
+	} else {
+		node = chosennode;
+		prop = (char *)name;
+	}
+	return (prom_getprop(node, prop, value));
 }
 
 /*
- * Implementation of the "nextprop" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] previous property name string
- * args[4] Res0: returned result
- */
-/*ARGSUSED*/
-char *
-bop_nextprop(struct bootops *bop, char *prevprop)
-{
-	boot_cell_t args[5];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("nextprop");
-	args[1] = 1;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(prevprop);
-	(void) (bsys_1275_call)(args);
-	return ((char *)boot_cell2ptr(args[4]));
-}
-
-/*
- * Implementation of the "puts" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] string to print
+ * Implementation of the "print" boot service.
  */
 /*ARGSUSED*/
 void
-bop_puts(struct bootops *bop, char *string)
+bop_printf(void *ops, const char *fmt, ...)
 {
-	boot_cell_t	args[6];
-	int	(*bsys_1275_call)(void *);
-	void	(*bsys_printf)(struct bootops *, char *, ...);
+	va_list adx;
 
-	/* so new kernel, old boot can print a message before dying */
-	if (!BOOTOPS_ARE_1275(bop)) {
-		/* use uintptr_t to suppress the gcc warning */
-		bsys_printf = (void (*)(struct bootops *, char *, ...))
-		    (uintptr_t)bop->bsys_printf;
-		(*bsys_printf)(bop, string);
-		return;
-	}
-
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("puts");
-	args[1] = 1;
-	args[2] = 0;
-
-	args[3] = boot_ptr2cell(string);
-	(void) (bsys_1275_call)(args);
-
+	va_start(adx, fmt);
+	prom_vprintf(fmt, adx);
+	va_end(adx);
 }
 
 /*
- * Implementation of the "putsarg" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] string to print (with '%*' format)
- * args[4] 64-bit thing to print
+ * Special routine for kmdb
  */
-/*ARGSUSED*/
 void
-bop_putsarg(struct bootops *bop, const char *string, ...)
+bop_putsarg(const char *fmt, char *arg)
 {
-	boot_cell_t	args[6];
-	int	(*bsys_1275_call)(void *);
-	void	(*bsys_printf)(struct bootops *, char *, ...);
-	va_list		ap;
-	const char	*fmt = string;
-	int		ells = 0;
-	uint64_t	arg;
+	prom_printf(fmt, arg);
+}
 
-	/*
-	 * We need to do the minimum printf-like stuff here to figure
-	 * out the size of argument, if present.
-	 */
-	while (*fmt) {
-		if (*fmt++ != '%')
-			continue;
-		if (*fmt == '%') {
-			fmt++;
-			continue;
-		}
-
-		while (*fmt >= '0' && *fmt <= '9')
-			fmt++;
-		for (ells = 0; *fmt == 'l'; fmt++)
-			ells++;
-		va_start(ap, string);
-		switch (*fmt) {
-		case 's':
-			/* use uintptr_t to suppress the gcc warning */
-			arg = (uint64_t)(uintptr_t)va_arg(ap, char *);
-			break;
-		case 'p':
-			arg = (uint64_t)(uintptr_t)va_arg(ap, void *);
-			break;
-		case 'd':
-		case 'D':
-		case 'x':
-		case 'X':
-		case 'u':
-		case 'U':
-		case 'o':
-		case 'O':
-			if (ells == 0)
-				arg = (uint64_t)va_arg(ap, uint_t);
-			else if (ells == 1)
-				arg = (uint64_t)va_arg(ap, ulong_t);
-			else
-				arg = (uint64_t)va_arg(ap, uint64_t);
-			break;
-		default:
-			arg = (uint64_t)va_arg(ap, uint_t);
-			break;
-		}
-		va_end(ap);
-		break;
-	}
-
-	/* so new kernel, old boot can print a message before dying */
-	if (!BOOTOPS_ARE_1275(bop)) {
-		/* use uintptr_t to suppress the gcc warning */
-		bsys_printf = (void (*)(struct bootops *, char *, ...))
-		    (uintptr_t)bop->bsys_printf;
-		(*bsys_printf)(bop, (char *)string, arg);
-		return;
-	}
-
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("putsarg");
-	args[1] = 2;
-	args[2] = 0;
-	args[3] = boot_ptr2cell(string);
-	args[4] = boot_uint642cell(arg);
-
-	(void) (bsys_1275_call)(args);
+/*
+ * panic for krtld only
+ */
+void
+bop_panic(const char *s)
+{
+	prom_panic((char *)s);
 }
 
 /*
  * Implementation of the "mount" boot service.
  *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] pathname string
- * args[4] Res0: returned result
  */
 /*ARGSUSED*/
 int
-bop_mountroot(struct bootops *bop, char *path)
+bop_mountroot(void)
 {
-	boot_cell_t args[5];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("mountroot");
-	args[1] = 2;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(path);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[4]));
+	(void) prom_getprop(chosennode, "bootfs", (caddr_t)&bfs_ih);
+	(void) prom_getprop(chosennode, "archfs", (caddr_t)&afs_ih);
+	return ((bfs_ih == -1 && afs_ih == -1) ? BOOT_SVC_FAIL : BOOT_SVC_OK);
 }
 
 /*
  * Implementation of the "unmountroot" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] Res0: returned result
  */
 /*ARGSUSED*/
 int
-bop_unmountroot(struct bootops *bop)
+bop_unmountroot(void)
 {
-	boot_cell_t args[4];
-	int	(*bsys_1275_call)(void *);
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("unmountroot");
-	args[1] = 0;
-	args[2] = 1;
-
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[3]));
-}
-
-/*
- * Implementation of the "serviceavail" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] name string of service to be tested for
- * args[4] Res0: returned version number or 0
- */
-/*ARGSUSED*/
-int
-bop_serviceavail(struct bootops *bop, char *name)
-{
-	/* use uintptr_t to suppress the gcc warning */
-	boot_cell_t args[5];
-	int	(*bsys_1275_call)(void *) =
-	    (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-
-	args[0] = boot_ptr2cell("serviceavail");
-	args[1] = 1;
-	args[2] = 1;
-
-	args[3] = boot_ptr2cell(name);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[4]));
+	if (bfs_ih != OBP_BADNODE) {
+		(void) prom_close(bfs_ih);
+		bfs_ih = OBP_BADNODE;
+	}
+	if (afs_ih != OBP_BADNODE) {
+		(void) prom_close(afs_ih);
+		afs_ih = OBP_BADNODE;
+	}
+	return (BOOT_SVC_OK);
 }
 
 /*
  * Implementation of the "fstat" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells
- * args[2] #result cells
- * args[3] fd
- * args[4] client's stat structure
  */
 int
-bop_fstat(struct bootops *bop, int fd, struct bootstat *st)
+bop_fstat(int fd, struct bootstat *st)
 {
-	boot_cell_t args[6];
-	int	(*bsys_1275_call)(void *);
-
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("fstat");
-	args[1] = 2;
-	args[2] = 1;
-	args[3] = boot_int2cell(fd);
-	args[4] = boot_ptr2cell(st);
-	(void) (bsys_1275_call)(args);
-	return (boot_cell2int(args[5]));
+	ASSERT(prom_ihs[fd] != 0);
+	return (prom_fsize(prom_ihs[fd], fd, (size_t *)&st->st_size));
 }
+
+int
+boot_compinfo(int fd, struct compinfo *cb)
+{
+	ASSERT(prom_ihs[fd] != 0);
+	return (prom_compinfo(prom_ihs[fd], fd,
+	    &cb->iscmp, &cb->fsize, &cb->blksize));
+}
+
+void
+bop_free_archive(void)
+{
+	char archive[OBP_MAXPATHLEN];
+	pnode_t arph;
+	uint32_t arbase, arsize, alloc_size;
+
+	/*
+	 * If the ramdisk will eventually be root, or we weren't
+	 * booted via the archive, then nothing to do here
+	 */
+	if (root_is_ramdisk == B_TRUE ||
+	    prom_getprop(chosennode, "bootarchive", archive) == -1)
+		return;
+	arph = prom_finddevice(archive);
+	if (arph == -1 ||
+	    prom_getprop(arph, OBP_ALLOCSIZE, (caddr_t)&alloc_size) == -1 ||
+	    prom_getprop(arph, OBP_SIZE, (caddr_t)&arsize) == -1 ||
+	    prom_getprop(arph, OBP_ADDRESS, (caddr_t)&arbase) == -1)
+		prom_panic("can't free boot archive");
+
+#if !defined(C_OBP)
+	if (alloc_size == 0)
+		prom_free((caddr_t)(uintptr_t)arbase, arsize);
+	else {
+		uint32_t arend = arbase + arsize;
+
+		while (arbase < arend) {
+			prom_free((caddr_t)(uintptr_t)arbase,
+			    MIN(alloc_size, arend - arbase));
+			arbase += alloc_size;
+		}
+	}
+#else	/* !C_OBP */
+	cobp_free_mem((caddr_t)(uintptr_t)arbase, arsize);
+#endif	/* !C_OBP */
+}
+
+#if defined(C_OBP)
+/*
+ * Blech.  The C proms have a bug when freeing areas that cross
+ * page sizes, so we have to break up the free into sections
+ * bounded by the various pagesizes.
+ */
+void
+cobp_free_mem(caddr_t base, size_t size)
+{
+	int i;
+	size_t len, pgsz;
+
+	/*
+	 * Large pages only used when size > 512k
+	 */
+	if (size < MMU_PAGESIZE512K ||
+	    ((uintptr_t)base & MMU_PAGEOFFSET512K) != 0) {
+		prom_free(base, size);
+		return;
+	}
+	for (i = 3; i >= 0; i--) {
+		pgsz = page_get_pagesize(i);
+		if (size < pgsz)
+			continue;
+		len = size & ~(pgsz - 1);
+		prom_free(base, len);
+		base += len;
+		size -= len;
+	}
+}
+#endif	/* C_OBP */
+
 
 /*
  * Implementation of the "enter_mon" boot service.
- *
- * Calling spec:
- * args[0] Service name string
- * args[1] #argument cells (0)
- * args[2] #result cells (0)
  */
 void
-bop_enter_mon(struct bootops *bop)
+bop_enter_mon(void)
 {
-	boot_cell_t args[4];
-	int (*bsys_1275_call)(void *);
+	prom_enter_mon();
+}
 
-	/* use uintptr_t to suppress the gcc warning */
-	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
-	args[0] = boot_ptr2cell("enter_mon");
-	args[1] = 0;
-	args[2] = 0;
-	(void) (bsys_1275_call)(args);
+/*
+ * free elf info allocated by booter
+ */
+void
+bop_free_elf(void)
+{
+	uint32_t eadr;
+	uint32_t esize;
+	extern Addr dynseg;
+	extern size_t dynsize;
+
+	if (bop_getprop("elfheader-address", (caddr_t)&eadr) == -1 ||
+	    bop_getprop("elfheader-length", (caddr_t)&esize) == -1)
+		prom_panic("missing elfheader");
+	prom_free((caddr_t)(uintptr_t)eadr, roundup(esize, PAGESIZE));
+
+	prom_free((caddr_t)(uintptr_t)dynseg, roundup(dynsize, PAGESIZE));
+}
+
+
+/* Simple message to indicate that the bootops pointer has been zeroed */
+#ifdef DEBUG
+int bootops_gone_on = 0;
+#define	BOOTOPS_GONE() \
+	if (bootops_gone_on) \
+		prom_printf("The bootops vec is zeroed now!\n");
+#else
+#define	BOOTOPS_GONE()
+#endif	/* DEBUG */
+
+void
+bop_fini(void)
+{
+	bop_free_archive();
+	(void) bop_unmountroot();
+	bop_free_elf();
+	bop_temp_freeall();
+
+	bootops = (struct bootops *)NULL;
+	BOOTOPS_GONE();
 }

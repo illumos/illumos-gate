@@ -98,6 +98,8 @@
 
 #include <fs/fs_subr.h>
 
+#include <sys/fs/decomp.h>
+
 static struct instats ins;
 
 static 	int ufs_getpage_ra(struct vnode *, u_offset_t, struct seg *, caddr_t);
@@ -177,7 +179,6 @@ static	int ufs_getsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 		caller_context_t *);
 static	int ufs_setsecattr(struct vnode *, vsecattr_t *, int, struct cred *,
 		caller_context_t *);
-
 extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
 
 /*
@@ -860,7 +861,7 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 	 */
 	if ((type == IFSHAD) ||
 	    (rw_owner(&ufsvfsp->vfs_dqrwlock) == curthread)) {
-			do_dqrwlock = 0;
+		do_dqrwlock = 0;
 	} else {
 		do_dqrwlock = 1;
 	}
@@ -1508,7 +1509,7 @@ out:
 	 */
 	if (ioflag & FRSYNC) {
 		if (TRANS_ISTRANS(ufsvfsp) && ((ip->i_mode & IFMT) == IFDIR)) {
-				doupdate = 0;
+			doupdate = 0;
 		}
 		if (doupdate) {
 			if ((ioflag & FSYNC) ||
@@ -1929,10 +1930,52 @@ ufs_ioctl(
 				return (EFAULT);
 			return (0);
 
+		case _FIO_COMPRESSED:
+		{
+			/*
+			 * This is a project private ufs ioctl() to mark
+			 * the inode as that belonging to a compressed
+			 * file. This is used to mark individual
+			 * files in a miniroot archive for SPARC boot.
+			 * The files compressed in this manner are
+			 * automatically decompressed by the dcfs filesystem
+			 * (via an interception in ufs_lookup - see decompvp())
+			 * which is layered on top of ufs on a system running
+			 * the new archive booted SPARC system. See
+			 * uts/common/fs/dcfs for details.
+			 * This ioctl only marks the file as compressed - the
+			 * actual compression is done by fiocompress (a
+			 * userland utility) which invokes this ioctl().
+			 */
+			struct inode *ip = VTOI(vp);
+
+			error = ufs_lockfs_begin(ufsvfsp, &ulp,
+			    ULOCKFS_SETATTR_MASK);
+			if (error)
+				return (error);
+
+			if (ulp) {
+				TRANS_BEGIN_ASYNC(ufsvfsp, TOP_IUPDAT,
+				    TOP_IUPDAT_SIZE(ip));
+			}
+
+			error = ufs_mark_compressed(vp);
+
+			if (ulp) {
+				TRANS_END_ASYNC(ufsvfsp, TOP_IUPDAT,
+				    TOP_IUPDAT_SIZE(ip));
+				ufs_lockfs_end(ulp);
+			}
+
+			return (error);
+
+		}
+
 		default:
 			return (ENOTTY);
 	}
 }
+
 
 /* ARGSUSED */
 static int
@@ -2807,6 +2850,18 @@ fastpath:
 
 			newvp = specvp(*vpp, (*vpp)->v_rdev, (*vpp)->v_type,
 			    cr);
+			VN_RELE(*vpp);
+			if (newvp == NULL)
+				error = ENOSYS;
+			else
+				*vpp = newvp;
+		} else if (ip->i_cflags & ICOMPRESS) {
+			struct vnode *newvp;
+
+			/*
+			 * Compressed file, substitute dcfs vnode
+			 */
+			newvp = decompvp(*vpp, cr, ct);
 			VN_RELE(*vpp);
 			if (newvp == NULL)
 				error = ENOSYS;

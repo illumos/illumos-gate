@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,15 +50,9 @@ PSMPROMLIBDIR64	= $(PSMSTANDDIR)/lib/promif/$(MACH64)
 # XXX	one day we should just be able to set PROG to 'cfsboot'..
 #	and everything will become a lot easier.
 #
-# XXX	note that we build but -don't- install the HSFS boot
-#	program - it's unused and untested, and until it is we
-#	shouldn't ship it!
-#
 UNIBOOT		= multiboot
-UFSBOOT		= ufsboot
 WANBOOT		= wanboot
 NFSBOOT		= inetboot
-HSFSBOOT	= hsfsboot
 
 #
 # Common install modes and owners
@@ -73,10 +66,8 @@ GROUP		= sys
 # Install locations
 #
 ROOT_PSM_UNIBOOT= $(ROOT_PSM_DIR)/$(UNIBOOT)
-ROOT_PSM_UFSBOOT= $(ROOT_PSM_DIR)/$(UFSBOOT)
 ROOT_PSM_WANBOOT= $(ROOT_PSM_DIR)/$(WANBOOT)
 USR_PSM_NFSBOOT	= $(USR_PSM_LIB_NFS_DIR)/$(NFSBOOT)
-USR_PSM_HSFSBOOT= $(USR_PSM_LIB_HSFS_DIR)/$(HSFSBOOT)
 
 #
 # While things are pretty much 32-bit lint-clean, there are a ton of

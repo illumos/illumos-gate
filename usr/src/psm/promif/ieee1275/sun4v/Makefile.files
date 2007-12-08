@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,15 +31,17 @@
 #
 
 #
-# Note that the kernel doesn't use/need prom_map.o and prom_alloc.o
+# Note that the kernel doesn't use/need prom_map.o
 #
 
 #
 #			PROM Platform-dependent routines
 #
 CORE_OBJS +=				\
+	prom_alloc.o			\
 	prom_cpuctl.o			\
 	prom_efcode.o			\
+	prom_fio.o			\
 	prom_getunum.o			\
 	prom_idprom.o			\
 	prom_heartbeat.o		\

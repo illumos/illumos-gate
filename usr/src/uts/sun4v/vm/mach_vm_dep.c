@@ -53,6 +53,7 @@
 #include <vm/seg_kmem.h>
 #include <sys/stack.h>
 #include <sys/atomic.h>
+#include <sys/promif.h>
 
 uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
@@ -730,6 +731,10 @@ contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
 	    MMU_PAGESIZE4M);
 
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, MMU_PAGESIZE4M);
+	if (prom_alloc(alloc_base, contig_mem_prealloc_size,
+	    MMU_PAGESIZE4M) != alloc_base)
+		prom_panic("can't allocate contig mem");
+
 	contig_mem_prealloc_buf = alloc_base;
 	alloc_base += contig_mem_prealloc_size;
 

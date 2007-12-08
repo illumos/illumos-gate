@@ -206,6 +206,9 @@
  *	This indicates that the implementation uses a dynamically
  *	linked unix + krtld to form the core kernel image at boot
  *	time, or (in the absence of this symbol) a prelinked kernel image.
+ *
+ * _OBP
+ *	This indicates the firmware interface is OBP.
  */
 
 #ifdef	__cplusplus
@@ -402,7 +405,7 @@ extern "C" {
 #define	_DMA_USES_VIRTADDR
 #define	_NO_FDISK_PRESENT
 #define	_HAVE_TEM_FIRMWARE
-#define	_UNIX_KRTLD
+#define	_OBP
 
 /*
  * The following set of definitions characterize the implementation of

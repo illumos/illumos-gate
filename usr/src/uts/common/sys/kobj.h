@@ -122,10 +122,14 @@ struct _buf {
 	char		*_ptr;
 	char		*_base;
 	char 		*_name;
+	char		*_dbuf;
 	int		 _size;
 	int		_cnt;
 	int		 _off;
 	int		_ln;
+	int		_bsize;
+	int		_iscmp;
+	int		_dsize;
 };
 
 
@@ -144,9 +148,15 @@ typedef struct {
 #define	kobj_newline(p)	 ((p)->_ln++)
 #define	kobj_getc(p)	(--(p)->_cnt >= 0 ? ((int)*(p)->_ptr++):kobj_filbuf(p))
 #define	kobj_ungetc(p)	 (++(p)->_cnt > (p)->_size ? -1 : ((int)*(--(p)->_ptr)))
+#define	kobj_comphdr(p)	((struct comphdr *)(p)->_dbuf)
 
-#define	B_OFFSET(f_offset) (f_offset & (MAXBSIZE-1))	/* Offset into buffer */
-#define	F_PAGE(f_offset)   (f_offset & ~(MAXBSIZE-1))	/* Start of page */
+/* Offset into buffer */
+#define	B_OFFSET(file, off)	(off % (file)->_bsize)
+
+/* Start of page */
+#define	F_PAGE(file, off)	(off - B_OFFSET(file, off))
+
+#define	F_BLKS(file, size)	((size / (file)->_bsize) * (file)->_bsize)
 
 #if defined(_KERNEL)
 

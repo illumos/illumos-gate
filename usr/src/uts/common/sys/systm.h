@@ -90,7 +90,9 @@ extern pgcnt_t	freemem;	/* Current free memory.			*/
 
 extern dev_t	rootdev;	/* device of the root */
 extern struct vnode *rootvp;	/* vnode of root device */
-extern int	root_is_svm;	/* root is a mirrored device flag */
+extern boolean_t root_is_svm;		/* root is a mirrored device flag */
+extern boolean_t root_is_ramdisk;	/* root is boot_archive ramdisk */
+extern uint32_t  ramdisk_size;		/* (KB) set only for sparc netboots */
 extern char *volatile panicstr;	/* panic string pointer */
 extern va_list  panicargs;	/* panic arguments */
 

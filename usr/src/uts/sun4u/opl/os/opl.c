@@ -457,7 +457,7 @@ plat_pfn_to_mem_node(pfn_t pfn)
 
 /* ARGSUSED */
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 {
 	size_t	elem;
 	pfn_t	basepfn;
@@ -475,9 +475,9 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	 * Boot install lists are arranged <addr, len>, <addr, len>, ...
 	 */
 	ssize = (1ull << OPL_MC_MEMBOARD_SHIFT);
-	for (elem = 0; elem < nelems; elem += 2) {
-		low  = (uint64_t)list[elem];
-		high = low+(uint64_t)(list[elem+1]);
+	for (elem = 0; elem < nelems; list++, elem++) {
+		low  = list->addr;
+		high = low + list->size;
 		while (low < high) {
 			boundary = roundup(low+1, ssize);
 			boundary = MIN(high, boundary);

@@ -91,7 +91,7 @@ static boolean_t netboot_over_ib(char *bootpath);
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "root and swap configuration %I%"
+	&mod_miscops, "root and swap configuration"
 };
 
 static struct modlinkage modlinkage = {
@@ -308,7 +308,7 @@ loadrootmodules(void)
 	char		*name;
 	int		err;
 /* ONC_PLUS EXTRACT END */
-	int		i, proplen, dhcacklen;
+	int		i, proplen;
 	extern char	*impl_module_list[];
 	extern char	*platform_module_list[];
 
@@ -415,23 +415,19 @@ loop:
 	 * ("bootp-response" boot property exists). If so, then before
 	 * bootops disappears we need to save the value of this property
 	 * such that the userland dhcpagent can adopt the DHCP management
-	 * of our primary network interface. We leave room at the beginning of
-	 * saved property to cache the interface name we used to boot the
-	 * client. This context is necessary for the user land dhcpagent
-	 * to do its job properly on a multi-homed system.
+	 * of our primary network interface.
 	 */
 	proplen = BOP_GETPROPLEN(bootops, "bootp-response");
 	if (proplen > 0) {
-		dhcacklen = proplen + IFNAMSIZ;
-		dhcack = kmem_zalloc(dhcacklen, KM_SLEEP);
-		if (BOP_GETPROP(bootops, "bootp-response",
-		    (uchar_t *)&dhcack[IFNAMSIZ]) == -1) {
+		dhcack = kmem_zalloc(proplen, KM_SLEEP);
+		if (BOP_GETPROP(bootops, "bootp-response", dhcack) == -1) {
 			cmn_err(CE_WARN, "BOP_GETPROP of  "
 			    "\"bootp-response\" failed\n");
 			kmem_free(dhcack, dhcacklen);
 			dhcack = NULL;
 			goto out;
 		}
+		dhcacklen = proplen;
 
 		/*
 		 * Fetch the "netdev-path" boot property (if it exists), and
@@ -522,6 +518,36 @@ out:
 }
 /* ONC_PLUS EXTRACT END */
 
+static int
+get_bootpath_prop(char *bootpath)
+{
+	if (root_is_ramdisk) {
+		if (BOP_GETPROP(bootops, "bootarchive", bootpath) == -1)
+			return (-1);
+		(void) strlcat(bootpath, ":a", BO_MAXOBJNAME);
+	} else {
+		/*
+		 * Look for the 1275 compliant name 'bootpath' first,
+		 * but make certain it has a non-NULL value as well.
+		 */
+		if ((BOP_GETPROP(bootops, "bootpath", bootpath) == -1) ||
+		    strlen(bootpath) == 0) {
+			if (BOP_GETPROP(bootops,
+			    "boot-path", bootpath) == -1)
+				return (-1);
+		}
+	}
+	return (0);
+}
+
+static int
+get_fstype_prop(char *fstype)
+{
+	char *prop = (root_is_ramdisk) ? "archive-fstype" : "fstype";
+
+	return (BOP_GETPROP(bootops, prop, fstype));
+}
+
 /*
  * Get the name of the root or swap filesystem type, and return
  * the corresponding entry in the vfs switch.
@@ -558,7 +584,7 @@ getfstype(char *askfor, char *fsname, size_t fsnamelen)
 	int root = 0;
 
 	if (strcmp(askfor, "root") == 0) {
-		(void) BOP_GETPROP(bootops, "fstype", defaultfs);
+		(void) get_fstype_prop(defaultfs);
 		root++;
 	} else {
 		(void) strcpy(defaultfs, "swapfs");
@@ -628,16 +654,8 @@ getphysdev(char *askfor, char *name, size_t namelen)
 	 * ease-of-use ..
 	 */
 	if (strcmp(askfor, "root") == 0) {
-		/*
-		 * Look for the 1275 compliant name 'bootpath' first,
-		 * but make certain it has a non-NULL value as well.
-		 */
-		if ((BOP_GETPROP(bootops, "bootpath", defaultpath) == -1) ||
-		    strlen(defaultpath) == 0) {
-			if (BOP_GETPROP(bootops,
-			    "boot-path", defaultpath) == -1)
-				boothowto |= RB_ASKNAME | RB_VERBOSE;
-		}
+		if (get_bootpath_prop(defaultpath) == -1)
+			boothowto |= RB_ASKNAME | RB_VERBOSE;
 	} else {
 		(void) strcpy(defaultpath, rootfs.bo_name);
 		defaultpath[strlen(defaultpath) - 1] = 'b';

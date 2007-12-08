@@ -35,6 +35,7 @@ extern "C" {
 #ifdef	_KERNEL
 
 #include <sys/lgrp.h>
+#include <sys/memlist_plat.h>
 
 /*
  * This file defines the mappings between physical addresses and memory
@@ -103,7 +104,7 @@ struct	mem_node_conf {
 
 struct memlist;
 
-extern void startup_build_mem_nodes(u_longlong_t *, size_t);
+extern void startup_build_mem_nodes(prom_memlist_t *, size_t);
 extern void mem_node_add_slice(pfn_t, pfn_t);
 extern void mem_node_pre_del_slice(pfn_t, pfn_t);
 extern void mem_node_post_del_slice(pfn_t, pfn_t, int);

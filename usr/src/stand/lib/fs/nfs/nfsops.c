@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple nfs ops - open, close, read, and lseek.
@@ -103,6 +102,11 @@ boot_nfs_closeall(int flag)
 	if ((boothowto & DBFLAGS) == DBFLAGS)
 		printf("boot_nfs_closeall(%x)\n", flag);
 #endif
+
+	if (nfs_files->file.version == 0 &&
+	    nfs_files->desc == 0 &&
+	    nfs_files->next == NULL)
+		return;
 
 	/* delete any dynamically allocated entries */
 	while ((filep = nfs_files->next) != NULL) {
@@ -211,7 +215,7 @@ boot_nfs_open(char *path, int flags)
 #ifdef NFS_OPS_DEBUG
 	if ((boothowto & DBFLAGS) == DBFLAGS)
 		printf("boot_nfs_open(): '%s' successful, fd = 0x%x\n",
-			path, filep->desc);
+		    path, filep->desc);
 #endif
 	return (filep->desc);
 }
@@ -283,7 +287,7 @@ boot_nfs_read(int fd, char *buf, size_t size)
 		break;
 	default:
 		printf("boot_nfs_read: NFS Version %d not supported\n",
-							filep->file.version);
+		    filep->file.version);
 		count = -1;
 		break;
 	}
@@ -382,8 +386,8 @@ boot_nfs_fstat(int fd, struct bootstat *stp)
 		return (-1);
 
 	bzero((char *)&va, sizeof (va));
-	va.va_mask = AT_TYPE | AT_SIZE | AT_MODE | AT_NODEID | \
-		AT_ATIME | AT_CTIME | AT_MTIME;
+	va.va_mask = AT_TYPE | AT_SIZE | AT_MODE | AT_NODEID |
+	    AT_ATIME | AT_CTIME | AT_MTIME;
 
 	switch (filep->file.version) {
 	case NFS_VERSION:
@@ -397,7 +401,7 @@ boot_nfs_fstat(int fd, struct bootstat *stp)
 		break;
 	default:
 		printf("boot_nfs_fstat: NFS Version %d not supported\n",
-							filep->file.version);
+		    filep->file.version);
 		status = -1;
 		break;
 	}
@@ -455,7 +459,7 @@ boot_nfs_getdents(int fd, struct dirent *dep, unsigned size)
 		break;
 	default:
 		printf("boot_nfs_getdents: NFS Version %d not supported\n",
-							filep->file.version);
+		    filep->file.version);
 		status = -1;
 	}
 

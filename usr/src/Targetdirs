@@ -48,18 +48,18 @@ $(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64) $(SYM.ROOT.SFW64)
 TARGETDIRS	+= $(SYMLINKS)
 
 i386_ROOT.SYS= \
-	/boot \
 	/boot/acpi \
 	/boot/acpi/tables \
 	/boot/grub \
 	/boot/grub/bin \
-	/boot/solaris \
-	/boot/solaris/bin \
 	/platform/i86pc
 
 sparc_ROOT.SYS=
 
 ROOT.SYS= \
+	/boot \
+	/boot/solaris \
+	/boot/solaris/bin \
 	$($(MACH)_ROOT.SYS) \
 	/dev \
 	/dev/dsk \

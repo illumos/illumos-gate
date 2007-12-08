@@ -489,9 +489,9 @@ copy_kernel() {
 	done
 
 	#
-	# on x86, add the glommed kernel name to the root archive
+	# Add the glommed kernel name to the root archive
 	#
-	if [[ $MACH = "i386" && $GLOM == "yes" ]];
+	if [[ $GLOM == "yes" ]];
 	then
 		filelist="$INSTALL_FILES/etc/boot/solaris/filelist.ramdisk"
 		mkdir -p `dirname $filelist`

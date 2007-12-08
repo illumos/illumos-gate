@@ -47,6 +47,7 @@
 #include <sys/promif.h>
 #include <sys/zone.h>
 #include <sys/model.h>
+#include <netinet/inetutil.h>
 
 static void get_netif_name(char *, char *);
 
@@ -91,7 +92,7 @@ systeminfo(int command, char *buf, long count)
 		break;
 	case SI_ARCHITECTURE_NATIVE:
 		kstr = get_udatamodel() == DATAMODEL_NATIVE ?
-			architecture : architecture_32;
+		    architecture : architecture_32;
 		break;
 #else
 	case SI_ARCHITECTURE_K:
@@ -141,6 +142,7 @@ systeminfo(int command, char *buf, long count)
 	case SI_DHCP_CACHE:
 	{
 		char	*tmp;
+		unsigned int tlen, octlen;
 
 		if (dhcack == NULL) {
 			tmp = "";
@@ -157,37 +159,53 @@ systeminfo(int command, char *buf, long count)
 			}
 			/*
 			 * If the interface name has not yet been resolved
-			 * (first IFNAMSIZ bytes of dhcack[]) and a valid
-			 * netdev_path[] was stashed by loadrootmodules in
-			 * swapgeneric.c, or established above, resolve
-			 * the interface name now.
+			 * and a validnetdev_path[] was stashed by
+			 * loadrootmodules in swapgeneric.c, or established
+			 * above, resolve the interface name now.
 			 */
-			if (dhcack[0] == '\0' &&
+			if (dhcifname[0] == '\0' &&
 			    netdev_path != NULL && netdev_path[0] != '\0') {
-				get_netif_name(netdev_path, dhcack);
+				get_netif_name(netdev_path, dhcifname);
 			}
 
-			tmp = dhcack;
-			strcnt = IFNAMSIZ + strlen(&tmp[IFNAMSIZ]);
+			/*
+			 * Form reply:
+			 *  IFNAMESIZ array of dhcp i/f
+			 *  hexascii representation of dhcp reply
+			 */
+			octlen = dhcacklen * 2 + 1;
+			tlen = octlen + IFNAMSIZ;
+			tmp = kmem_alloc(tlen, KM_SLEEP);
+			(void) strncpy(tmp, dhcifname, IFNAMSIZ);
+			if (octet_to_hexascii(dhcack, dhcacklen,
+			    &tmp[IFNAMSIZ], &octlen) != 0) {
+				kmem_free(tmp, tlen);
+				error = EINVAL;
+				break;
+			} else {
+				strcnt = IFNAMSIZ + octlen;
+			}
 		}
 
 		if (count > 0) {
 			if (count <= strcnt) {
 				getcnt = count - 1;
-				if (subyte((buf + getcnt), 0) < 0) {
-					error = EFAULT;
-					break;
-				}
+				if (subyte((buf + getcnt), 0) < 0)
+					goto fail;
 			} else {
 				getcnt = strcnt + 1;
 			}
-			if (copyout(tmp, buf, getcnt)) {
-				error = EFAULT;
-				break;
-			}
+			if (copyout(tmp, buf, getcnt))
+				goto fail;
 		}
-
+		if (strcnt != 0)
+			kmem_free(tmp, tlen);
 		return (strcnt + 1);
+fail:
+		if (strcnt != 0)
+			kmem_free(tmp, tlen);
+		error = EFAULT;
+		break;
 	}
 
 	case SI_SET_HOSTNAME:

@@ -232,17 +232,21 @@ afsrbuf:
 	! Stash away our arguments in memory.
 	!
 	sethi	%hi(_local_p1275cis), %g1
-	stn	%o0, [%g1 + %lo(_local_p1275cis)]
-	sethi	%hi(bootops), %g1
-	stn	%o1, [%g1 + %lo(bootops)]
+	stn	%o4, [%g1 + %lo(_local_p1275cis)]
 
 	!
 	! Initialize CPU state registers
 	!
 	wrpr	%g0, PSTATE_KERN, %pstate
 	wr	%g0, %g0, %fprs
-	CLEARTICKNPT			! allow user rdtick
 
+	!
+	! call krtld to link the world together
+	!
+	call	kobj_start
+	mov	%o4, %o0
+
+	CLEARTICKNPT			! allow user rdtick
 	!
 	! Get maxwin from %ver
 	!
@@ -297,8 +301,8 @@ afsrbuf:
 	set	t0stacktop, %g1		! setup kernel stack pointer
 	sub	%g1, SA(KFPUSIZE+GSR_SIZE), %g2
 	and	%g2, 0x3f, %g3
-	sub	%g2, %g3, %o2
-	sub	%o2, SA(MPCBSIZE) + STACK_BIAS, %sp
+	sub	%g2, %g3, %o1
+	sub	%o1, SA(MPCBSIZE) + STACK_BIAS, %sp
 
 	!
 	! Initialize global thread register.
@@ -326,10 +330,7 @@ afsrbuf:
 
 	!
 	! Call mlsetup with address of prototype user registers.
-	! and p1275cis pointers.
-
-	sethi	%hi(_local_p1275cis), %o1
-	ldn	[%o1 + %lo(_local_p1275cis)], %o1
+	!
 	call	mlsetup
 	add	%sp, REGOFF + STACK_BIAS, %o0
 

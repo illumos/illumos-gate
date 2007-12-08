@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,23 +37,18 @@
 #include <util/getoptstr.h>
 #include "boot_plat.h"
 
-static char impl_arch_buf[MAXNAMELEN];
 static char default_path_buf[MAXPATHLEN];
 
 char	wanboot_arguments[OBP_MAXPATHLEN];	/* args following "-o" */
+
+char	cmd_line_boot_archive[MAXPATHLEN];
+
+boolean_t	halt;
 
 /*
  * Parse the boot arguments, adding the options found to the existing boothowto
  * value (if any) or other state.  Then rewrite the buffer with arguments for
  * the standalone.
- *
- * We assume that the buffer contains only the arguments (no preceeding
- * filename or whitespace).  We start interpreting flags, ignoring those used
- * by the boot block (-H, -X, and -F filename) and acting on those intended
- * for us (those documented in boot(1M) as well as some undocumented), and
- * stop at unknown flags.  Finally we reconstitute flags to be passed on to
- * the standalone and the remaining arguments, excluding the first "--", to
- * the beginning of the buffer, and return an integer representing our flags.
  *
  * NOTE: boothowto may already have bits set when this function is called
  */
@@ -67,8 +61,8 @@ bootflags(char *args, size_t argsz)
 	char *np;
 	size_t npres;
 	int c;
+	char *cmd_line_default_path;
 
-	impl_arch_name = NULL;
 	cmd_line_default_path = NULL;
 
 	params.gos_opts = "HXF:VnI:D:advhko:";
@@ -77,11 +71,24 @@ bootflags(char *args, size_t argsz)
 	while ((c = getoptstr(&params)) != -1) {
 		switch (c) {
 		/*
-		 * Bootblock flags: ignore.
+		 * Bootblock flags.
 		 */
 		case 'H':
+			halt = B_TRUE;
+			/*FALLTHRU*/
 		case 'X':
+			break;
+
 		case 'F':
+			if (params.gos_optarglen >=
+			    sizeof (cmd_line_boot_archive)) {
+				printf("boot: -F argument too long.  "
+				    "Ignoring.\n");
+				break;
+			}
+			(void) strncpy(cmd_line_boot_archive,
+			    params.gos_optargp, params.gos_optarglen);
+			cmd_line_boot_archive[params.gos_optarglen] = '\0';
 			break;
 
 		/*
@@ -93,18 +100,6 @@ bootflags(char *args, size_t argsz)
 		case 'n':
 			cache_state = 0;
 			printf("Warning: boot will not enable cache\n");
-			break;
-
-		case 'I':
-			if (params.gos_optarglen >= sizeof (impl_arch_buf)) {
-				printf("boot: -I argument too long.  "
-				    "Ignoring.\n");
-				break;
-			}
-			(void) strncpy(impl_arch_buf, params.gos_optargp,
-			    params.gos_optarglen);
-			impl_arch_buf[params.gos_optarglen] = '\0';
-			impl_arch_name = impl_arch_buf;
 			break;
 
 		case 'D':
@@ -160,8 +155,6 @@ bootflags(char *args, size_t argsz)
 			 */
 			switch (params.gos_last_opt) {
 			case 'F':
-				/* -F is a bootblock flag, so ignore. */
-				break;
 			case 'I':
 			case 'D':
 			case 'o':
@@ -271,4 +264,10 @@ done:
 	 */
 	if (cmd_line_default_path)
 		set_default_filename(cmd_line_default_path);
+
+	/*
+	 * See if user wants to examine things
+	 */
+	if (halt == B_TRUE)
+		prom_enter_mon();
 }

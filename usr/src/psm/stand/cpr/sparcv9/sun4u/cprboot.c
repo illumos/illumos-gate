@@ -84,7 +84,7 @@ static char cb_argbuf[CB_MAXPROP];
 static char *cb_args[CB_MAXARGS];
 
 static int reusable;
-static char *specialstate;
+char *specialstate;
 
 
 static int
@@ -399,7 +399,10 @@ cb_read_statefile(void)
 
 	cnt = 0;
 	dtlb_index = cb_dents - 1;
-	(void) prom_seek(sfile.fd, specialstate ? CPR_SPEC_OFFSET : 0);
+	if (specialstate)
+		(void) prom_seek(sfile.fd, CPR_SPEC_OFFSET);
+	else
+		(void) cpr_fs_seek(sfile.fd, 0);
 	CPR_DEBUG(CPR_DEBUG1, "%s: reading statefile... ", prog);
 	for (resid = cdump.cdd_filesize; resid; resid -= len) {
 		/*
@@ -422,7 +425,7 @@ cb_read_statefile(void)
 		cnt++;
 
 		len = min(PROM_MAX_READ, resid);
-		nread = prom_read(sfile.fd, dst_virt, len, 0, 0);
+		nread = cpr_read(sfile.fd, dst_virt, len);
 		if (nread != (ssize_t)len) {
 			prom_printf("\n%s: prom read error, "
 			    "expect %ld, got %ld\n", str, len, nread);
@@ -469,9 +472,11 @@ cb_read_statefile(void)
  */
 static int (*first_worklist[])(void) = {
 	cb_intro,
+	cb_mountroot,
 	cb_startup,
 	cb_get_props,
 	cb_usb_setup,
+	cb_unmountroot,
 	cb_open_sf,
 	cb_read_statefile,
 	cb_close_sf,

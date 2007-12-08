@@ -76,6 +76,7 @@ CPPFEATUREMACROS= $(VAR_RTLD_CPPFEATUREMACROS)
 
 CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc \
 		-I$(SRCBASE)/uts/common/krtld \
+		-I$(SRCBASE)/uts/$(PLAT) \
 		-I$(SRCBASE)/uts/$(PLAT)/krtld \
 		-I$(SRC)/common/sgsrtcid \
 		 $(CPPFEATUREMACROS)

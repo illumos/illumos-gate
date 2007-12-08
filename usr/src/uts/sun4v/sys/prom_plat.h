@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,6 +149,14 @@ extern	int		prom_map_phys(int mode, size_t size, caddr_t virt,
 			    unsigned long long physaddr);
 extern	void		prom_unmap_phys(size_t size, caddr_t virt);
 extern	void		prom_unmap_virt(size_t size, caddr_t virt);
+
+extern	int		prom_phys_installed_len(void);
+extern	int		prom_phys_avail_len(void);
+extern	int		prom_virt_avail_len(void);
+
+extern	int		prom_phys_installed(caddr_t);
+extern	int		prom_phys_avail(caddr_t);
+extern	int		prom_virt_avail(caddr_t);
 
 /*
  * prom_retain allocates or returns retained physical memory

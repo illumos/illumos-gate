@@ -153,7 +153,7 @@ load_platform_drivers(void)
 
 	/* Gain access into the ssc050_get_port function */
 	daktari_ssc050_get_port_bit = (int (*) (dev_info_t *, int, int,
-		uint8_t *, int)) modgetsymvalue("ssc050_get_port_bit", 0);
+	    uint8_t *, int)) modgetsymvalue("ssc050_get_port_bit", 0);
 	if (daktari_ssc050_get_port_bit == NULL) {
 		cmn_err(CE_WARN, "cannot find ssc050_get_port_bit");
 		return;
@@ -181,14 +181,14 @@ daktari_dev_search(dev_info_t *dip, void *arg)
 	int		err;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-				"compatible", &compatible) != DDI_PROP_SUCCESS)
+	    "compatible", &compatible) != DDI_PROP_SUCCESS)
 		return (DDI_WALK_CONTINUE);
 
 	if (strcmp(compatible, "i2c-ssc050") == 0) {
 		ddi_prop_free(compatible);
 
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "reg", &dev_regs, &len);
+		    DDI_PROP_DONTPASS, "reg", &dev_regs, &len);
 		if (err != DDI_PROP_SUCCESS) {
 			return (DDI_WALK_CONTINUE);
 		}
@@ -220,10 +220,10 @@ keyswitch_poll(void *arg)
 	int	err;
 
 	err = daktari_ssc050_get_port_bit(dip, port, bit,
-		&port_byte, I2C_NOSLEEP);
+	    &port_byte, I2C_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "keyswitch polling disabled: "
-			"errno=%d while reading ssc050", err);
+		    "errno=%d while reading ssc050", err);
 		return;
 	}
 
@@ -236,7 +236,7 @@ daktari_abort_seq_handler(char *msg)
 {
 	if (key_locked_bit == 0)
 		cmn_err(CE_CONT, "KEY in LOCKED position, "
-			"ignoring debug enter sequence");
+		    "ignoring debug enter sequence");
 	else  {
 		debug_enter(msg);
 	}
@@ -430,7 +430,7 @@ plat_fill_mc(pnode_t nodeid)
  */
 /* ARGSUSED */
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t  nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t  nelems)
 {
 	int	slice;
 	pfn_t   basepfn;
@@ -540,7 +540,7 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 {
 	if (flt_in_memory && (p2get_mem_unum != NULL))
 		return (p2get_mem_unum(synd_code, P2ALIGN(flt_addr, 8),
-			buf, buflen, lenp));
+		    buf, buflen, lenp));
 	else
 		return (ENOTSUP);
 }

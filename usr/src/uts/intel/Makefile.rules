@@ -258,6 +258,11 @@ $(OBJS_DIR)/%.o:	$(UTSBASE)/intel/$(SUBARCH_DIR)/krtld/%.c
 	$(COMPILE.c) $(KRTLD_INC_PATH) $(KRTLD_CPPFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
+#
+# _DBOOT indicates that krtld is called from a dboot ELF section
+#
+$(OBJS_DIR)/kobj.o		:= CPPFLAGS += -D_DBOOT
+
 $(OBJS_DIR)/%.o:	$(UTSBASE)/intel/$(SUBARCH_DIR)/krtld/%.s
 	$(COMPILE.s) $(KRTLD_INC_PATH) $(KRTLD_CPPFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
@@ -432,3 +437,4 @@ $(LINTS_DIR)/%.ln:	$(UTSBASE)/intel/$(SUBARCH_DIR)/krtld/%.s
 $(LINTS_DIR)/%.ln:	$(SRC)/common/util/$(SUBARCH_DIR)/%.c
 	@($(LHEAD) $(LINT.c) $(KRTLD_INC_PATH) $(KRTLD_CPPFLAGS) $< $(LTAIL))
 
+$(OBJS_DIR)/kobj.ln		:= CPPFLAGS += -D_DBOOT

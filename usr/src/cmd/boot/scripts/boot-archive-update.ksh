@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,17 +32,14 @@ UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
 
 smf_is_globalzone || exit $SMF_EXIT_OK
 
-# no boot-archive on sparc...yet
+# on x86 get rid of transient reboot entry in the GRUB menu
 #
-if [ `uname -p` = "sparc" ]; then
-        exit $SMF_EXIT_OK
-fi
-
-# get rid of transient reboot entry in GRUB menu
-if [ -f /stubboot/boot/grub/menu.lst ]; then
-	/sbin/bootadm -m update_temp -R /stubboot
-else
-	/sbin/bootadm -m update_temp
+if [ `uname -p` = "i386" ]; then
+	if [ -f /stubboot/boot/grub/menu.lst ]; then
+		/sbin/bootadm -m update_temp -R /stubboot
+	else
+		/sbin/bootadm -m update_temp
+	fi
 fi
 
 if [ -f $UPDATEFILE ] || [ -f /reconfigure ]; then

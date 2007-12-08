@@ -96,7 +96,7 @@ forthdebug_init(void)
 	char *fth_buf, *buf_p;
 	ulong_t modsym;
 	int i, sz;
-	struct bootstat bstat;
+	uint64_t fsz;
 	struct _buf *file;
 
 	if (!forthdebug_supported) {
@@ -113,20 +113,20 @@ forthdebug_init(void)
 		return;
 	}
 
-	i = BOP_FSTAT(bootops, file->_fd, &bstat);
-	if (i || !bstat.st_size) {
+	i = kobj_get_filesize(file, &fsz);
+	if (i || !fsz) {
 		cmn_err(CE_CONT, "Can't stat %s stat=%x sz=%llx\n",
-		    FDEBUGFILE, i, (long long)bstat.st_size);
+		    FDEBUGFILE, i, (long long)fsz);
 		goto err_stat;
 	}
 
-	fth_buf = (char *)kobj_zalloc(bstat.st_size + 1, KM_SLEEP);
-	sz = kobj_read_file(file, fth_buf, bstat.st_size, 0); /* entire file */
+	fth_buf = (char *)kobj_zalloc(fsz + 1, KM_SLEEP);
+	sz = kobj_read_file(file, fth_buf, fsz, 0); /* entire file */
 	if (sz < 0) {
 		cmn_err(CE_CONT, "Error(%d) reading %s\n", sz, FDEBUGFILE);
 		goto done;
 	}
-	ASSERT(bstat.st_size == sz);
+	ASSERT(fsz == sz);
 	fth_buf[sz] = 0;
 
 	/* resolve all essential symbols in basic_sym[] */
@@ -176,7 +176,7 @@ forthdebug_init(void)
 		debug_enter("Defer breakpoint enabled. Add breakpoints, then");
 	}
 done:
-	kobj_free(fth_buf, bstat.st_size + 1);
+	kobj_free(fth_buf, fsz + 1);
 err_stat:
 	kobj_close_file(file);
 

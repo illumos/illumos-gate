@@ -667,36 +667,52 @@ uint64_t ecache_tl1_flushaddr = (uint64_t)-1; /* physaddr for E$ flushing */
 
 /*
  * Allocate and initialize the exclusive displacement flush area.
- * Called twice. The first time allocates virtual address. The second
- * call looks up the physical address.
  */
 caddr_t
 ecache_init_scrub_flush_area(caddr_t alloc_base)
 {
-	static caddr_t ecache_tl1_virtaddr;
+	unsigned size = 2 * CH_ECACHE_8M_SIZE;
+	caddr_t tmp_alloc_base = alloc_base;
+	caddr_t flush_alloc_base =
+	    (caddr_t)roundup((uintptr_t)alloc_base, size);
+	caddr_t ecache_tl1_virtaddr;
 
-	if (alloc_base != NULL) {
+	/*
+	 * Allocate the physical memory for the exclusive flush area
+	 *
+	 * Need to allocate an exclusive flush area that is twice the
+	 * largest supported E$ size, physically contiguous, and
+	 * aligned on twice the largest E$ size boundary.
+	 *
+	 * Memory allocated via prom_alloc is included in the "cage"
+	 * from the DR perspective and due to this, its physical
+	 * address will never change and the memory will not be
+	 * removed.
+	 *
+	 * prom_alloc takes 3 arguments: bootops, virtual address hint,
+	 * size of the area to allocate, and alignment of the area to
+	 * allocate. It returns zero if the allocation fails, or the
+	 * virtual address for a successful allocation. Memory prom_alloc'd
+	 * is physically contiguous.
+	 */
+	if ((ecache_tl1_virtaddr =
+	    prom_alloc(flush_alloc_base, size, size)) != NULL) {
+
+		tmp_alloc_base =
+		    (caddr_t)roundup((uintptr_t)(ecache_tl1_virtaddr + size),
+		    ecache_alignsize);
+
 		/*
-		 * Need to allocate an exclusive flush area that is twice the
-		 * largest supported E$ size, physically contiguous, and
-		 * aligned on twice the largest E$ size boundary.
+		 * get the physical address of the exclusive flush area
 		 */
-		unsigned size = 2 * CH_ECACHE_8M_SIZE;
-		caddr_t va = (caddr_t)roundup((uintptr_t)alloc_base, size);
-
-		ecache_tl1_virtaddr = va;
-		alloc_base = va + size;
+		ecache_tl1_flushaddr = va_to_pa(ecache_tl1_virtaddr);
 
 	} else {
-		/*
-		 * Get the physical address of the exclusive flush area.
-		 */
-		ASSERT(ecache_tl1_virtaddr != NULL);
-		ecache_tl1_flushaddr = va_to_pa(ecache_tl1_virtaddr);
-		ASSERT(ecache_tl1_flushaddr != ((uint64_t)-1));
+		ecache_tl1_virtaddr = (caddr_t)-1;
+		cmn_err(CE_NOTE, "!ecache_init_scrub_flush_area failed\n");
 	}
 
-	return (alloc_base);
+	return (tmp_alloc_base);
 }
 
 /*

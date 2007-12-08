@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +80,6 @@ int client_isLP64 = 1;			/* SPARC clients are always LP64 */
  * filename is the name of the standalone we're going to execute.
  */
 char	filename[MAXPATHLEN];
-char	*cmd_line_default_path;
 
 char * const defname = "kernel/sparcv9/unix";
 
@@ -236,24 +234,6 @@ boot_open(char *pathname, void *arg)
 	return (open(pathname, O_RDONLY));
 }
 
-static int
-boot_isdir(char *pathname)
-{
-	int fd, retval;
-	struct stat sbuf;
-
-	dprintf("trying '%s'\n", pathname);
-	if ((fd = open(pathname, O_RDONLY)) == -1)
-		return (0);
-	retval = 1;
-	if (fstat(fd, &sbuf) == -1)
-		retval = 0;
-	else if ((sbuf.st_mode & S_IFMT) != S_IFDIR)
-		retval = 0;
-	(void) close(fd);
-	return (retval);
-}
-
 /*
  * Open the given filename, expanding to it's
  * platform-dependent location if necessary.
@@ -266,8 +246,6 @@ int
 openfile(char *filename)
 {
 	static char *fullpath;
-	static char *iarch;
-	static char *orig_impl_arch_name;
 	static int once;
 	int fd;
 
@@ -282,78 +260,16 @@ openfile(char *filename)
 		if (mfg_name == NULL)
 			mfg_name = get_mfg_name();
 
-		/*
-		 * If impl_arch_name was specified on the command line
-		 * via the -I <arch> argument, remember the original value.
-		 */
-		if (impl_arch_name) {
-			orig_impl_arch_name = (char *)
-			    kmem_alloc(strlen(impl_arch_name) + 1, 0);
-			(void) strcpy(orig_impl_arch_name, impl_arch_name);
-		}
-
 		fullpath = (char *)kmem_alloc(MAXPATHLEN, 0);
-		iarch = (char *)kmem_alloc(MAXPATHLEN, 0);
 	}
 
-	/*
-	 * impl_arch_name is exported as boot property, and is
-	 * set according to the following algorithm, depending
-	 * on the contents of the filesystem.
-	 * XXX: This shouldn't be a side effect of openfile().
-	 *
-	 * impl_arch_name table:
-	 *
-	 *			root name 	default name	neither name
-	 * boot args		found		found		found
-	 *
-	 * relative path	root name	fail		fail
-	 * absolute path	root name	default name	empty
-	 * -I arch		arch		arch		arch
-	 *
-	 */
-
-	/*
-	 * If the caller -specifies- an absolute pathname, then we just try to
-	 * open it. (Mostly for booting non-kernel standalones.)
-	 *
-	 * In case this absolute pathname is the kernel, make sure that
-	 * impl_arch_name (exported as a boot property) is set to some
-	 * valid string value.
-	 */
 	if (*filename == '/') {
-		if (orig_impl_arch_name == NULL) {
-			if (find_platform_dir(boot_isdir, iarch, 1) != 0)
-				impl_arch_name = iarch;
-			else
-				impl_arch_name = "";
-		}
 		(void) strcpy(fullpath, filename);
 		fd = boot_open(fullpath, NULL);
 		return (fd);
 	}
 
-	/*
-	 * If the -I flag has been used, impl_arch_name will
-	 * be specified .. otherwise we ask find_platform_dir() to
-	 * look for the existance of a directory for this platform name.
-	 * Preserve the given impl-arch-name, because the 'kernel file'
-	 * may be elsewhere. (impl-arch-name could be 'SUNW,Ultra-1',
-	 * but the kernel file itself might be in the 'sun4u' directory).
-	 *
-	 * When booting any file by relative pathname this code fails
-	 * if the platform-name dir doesn't exist unless some
-	 * -I <iarch> argument has been given on the command line.
-	 */
-	if (orig_impl_arch_name == NULL) {
-		if (find_platform_dir(boot_isdir, iarch, 0) != 0)
-			impl_arch_name = iarch;
-		else
-			return (-1);
-	}
-
-	fd = open_platform_file(filename, boot_open, NULL, fullpath,
-	    orig_impl_arch_name);
+	fd = open_platform_file(filename, boot_open, NULL, fullpath);
 	if (fd == -1)
 		return (-1);
 

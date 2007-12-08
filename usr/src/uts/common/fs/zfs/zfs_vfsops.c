@@ -859,6 +859,9 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	znode_t *zp = NULL;
 	vnode_t *vp = NULL;
 	char *zfs_bootpath;
+#if defined(_OBP)
+	int proplen;
+#endif
 
 	ASSERT(vfsp);
 
@@ -870,6 +873,18 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		if (zfsrootdone++)
 			return (EBUSY);
 
+#if defined(_OBP)
+		proplen = BOP_GETPROPLEN(bootops, "zfs-bootfs");
+		if (proplen == 0)
+			return (EIO);
+		zfs_bootpath = kmem_zalloc(proplen, KM_SLEEP);
+		if (BOP_GETPROP(bootops, "zfs-bootfs", zfs_bootpath) == -1) {
+			kmem_free(zfs_bootpath, proplen);
+			return (EIO);
+		}
+		error = parse_bootpath(zfs_bootpath, rootfs.bo_name);
+		kmem_free(zfs_bootpath, proplen);
+#else
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 		    DDI_PROP_DONTPASS, "zfs-bootfs", &zfs_bootpath) !=
 		    DDI_SUCCESS)
@@ -877,6 +892,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 
 		error = parse_bootpath(zfs_bootpath, rootfs.bo_name);
 		ddi_prop_free(zfs_bootpath);
+#endif
 
 		if (error)
 			return (error);

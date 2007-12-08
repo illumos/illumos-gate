@@ -76,7 +76,7 @@
 #include <sys/reboot.h>
 #include <sys/kdi_impl.h>
 
-#include <kobj_kdi.h>
+#include <krtld/kobj_kdi.h>
 
 #define	KOBJ_KDI_MOD_IDLE	0
 #define	KOBJ_KDI_MOD_CHANGING	1

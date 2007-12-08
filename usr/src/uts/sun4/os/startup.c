@@ -128,7 +128,6 @@ char *cache_mode = NULL;
 int use_mix = 1;
 int prom_debug = 0;
 
-struct bootops *bootops = 0;	/* passed in from boot in %o2 */
 caddr_t boot_tba;		/* %tba at boot - used by kmdb */
 uint_t	tba_taken_over = 0;
 
@@ -149,10 +148,6 @@ caddr_t		econtig32;	/* end of first blk of contiguous kernel */
 
 caddr_t		ncbase;		/* beginning of non-cached segment */
 caddr_t		ncend;		/* end of non-cached segment */
-caddr_t		sdata;		/* beginning of data segment */
-
-caddr_t		extra_etva;	/* beginning of unused nucleus text */
-pgcnt_t		extra_etpg;	/* number of pages of unused nucleus text */
 
 size_t	ndata_remain_sz;	/* bytes from end of data to 4MB boundary */
 caddr_t	nalloc_base;		/* beginning of nucleus allocation */
@@ -161,8 +156,8 @@ caddr_t valloc_base;		/* beginning of kvalloc segment	*/
 
 caddr_t kmem64_base;		/* base of kernel mem segment in 64-bit space */
 caddr_t kmem64_end;		/* end of kernel mem segment in 64-bit space */
+size_t	kmem64_sz;		/* bytes in kernel mem segment, 64-bit space */
 caddr_t kmem64_aligned_end;	/* end of large page, overmaps 64-bit space */
-int	kmem64_alignsize;	/* page size for mem segment in 64-bit space */
 int	kmem64_szc;		/* page size code */
 uint64_t kmem64_pabase = (uint64_t)-1;	/* physical address of kmem64_base */
 
@@ -170,6 +165,7 @@ uintptr_t shm_alignment;	/* VAC address consistency modulus */
 struct memlist *phys_install;	/* Total installed physical memory */
 struct memlist *phys_avail;	/* Available (unreserved) physical memory */
 struct memlist *virt_avail;	/* Available (unmapped?) virtual memory */
+struct memlist *nopp_list;	/* pages with no backing page structs */
 struct memlist ndata;		/* memlist of nucleus allocatable memory */
 int memexp_flag;		/* memory expansion card flag */
 uint64_t ecache_flushaddr;	/* physical address used for flushing E$ */
@@ -193,7 +189,7 @@ struct seg kmapseg;		/* Segment used for generic kernel mappings */
 struct seg kpmseg;		/* Segment used for physical mapping */
 struct seg kdebugseg;		/* Segment used for the kernel debugger */
 
-uintptr_t kpm_pp_base;		/* Base of system kpm_page array */
+void *kpm_pp_base;		/* Base of system kpm_page array */
 size_t	kpm_pp_sz;		/* Size of system kpm_page array */
 pgcnt_t	kpm_npages;		/* How many kpm pages are managed */
 
@@ -221,8 +217,8 @@ const size_t kdi_segdebugsize = SEGDEBUGSIZE;
  */
 struct seg kmem64;
 
-struct memseg *memseg_base;
-size_t memseg_sz;		/* Used to translate a va to page */
+struct memseg *memseg_free;
+
 struct vnode unused_pages_vp;
 
 /*
@@ -239,11 +235,13 @@ size_t	mpo_heap32_bufsz = 0;
 /*
  * Static Routines:
  */
-static void memlist_add(uint64_t, uint64_t, struct memlist **,
-	struct memlist **);
-static void kphysm_init(page_t *, struct memseg *, pgcnt_t, uintptr_t,
-	pgcnt_t);
+static int ndata_alloc_memseg(struct memlist *, size_t);
+static void memlist_new(uint64_t, uint64_t, struct memlist **);
+static void memlist_add(uint64_t, uint64_t,
+	struct memlist **, struct memlist **);
+static void kphysm_init(void);
 static void kvm_init(void);
+static void install_kmem64_tte(void);
 
 static void startup_init(void);
 static void startup_memlist(void);
@@ -270,9 +268,6 @@ uint_t hblk1_min = H1MIN;
 int iam_positron(void);
 #pragma weak iam_positron
 static void do_prom_version_check(void);
-static void kpm_init(void);
-static void kpm_npages_setup(int);
-static void kpm_memseg_init(void);
 
 /*
  * After receiving a thermal interrupt, this is the number of seconds
@@ -339,51 +334,8 @@ printmemseg(struct memseg *memseg)
 #define	MPRINTF3(str, a, b, c)
 #endif	/* DEBUGGING_MEM */
 
-/* Simple message to indicate that the bootops pointer has been zeroed */
-#ifdef DEBUG
-static int bootops_gone_on = 0;
-#define	BOOTOPS_GONE() \
-	if (bootops_gone_on) \
-		prom_printf("The bootops vec is zeroed now!\n");
-#else
-#define	BOOTOPS_GONE()
-#endif /* DEBUG */
 
 /*
- * Monitor pages may not be where this says they are.
- * and the debugger may not be there either.
- *
- * Note that 'pages' here are *physical* pages, which are 8k on sun4u.
- *
- *                        Physical memory layout
- *                     (not necessarily contiguous)
- *                       (THIS IS SOMEWHAT WRONG)
- *                       /-----------------------\
- *                       |       monitor pages   |
- *             availmem -|-----------------------|
- *                       |                       |
- *                       |       page pool       |
- *                       |                       |
- *                       |-----------------------|
- *                       |   configured tables   |
- *                       |       buffers         |
- *            firstaddr -|-----------------------|
- *                       |   hat data structures |
- *                       |-----------------------|
- *                       |    kernel data, bss   |
- *                       |-----------------------|
- *                       |    interrupt stack    |
- *                       |-----------------------|
- *                       |    kernel text (RO)   |
- *                       |-----------------------|
- *                       |    trap table (4k)    |
- *                       |-----------------------|
- *               page 1  |      panicbuf         |
- *                       |-----------------------|
- *               page 0  |       reclaimed       |
- *                       |_______________________|
- *
- *
  *
  *                    Kernel's Virtual Memory Layout.
  *                       /-----------------------\
@@ -425,6 +377,11 @@ static int bootops_gone_on = 0;
  * 0x000007FF.00000000  -|-----------------------|- hole_start -----
  *                       :                       :		   ^
  *                       :                       :		   |
+ *                       |-----------------------|                 |
+ *                       |                       |                 |
+ *                       |  ecache flush area    |                 |
+ *                       |  (twice largest e$)   |                 |
+ *                       |                       |                 |
  * 0x00000XXX.XXX00000  -|-----------------------|- kmem64_	   |
  *                       | overmapped area       |   alignend_end  |
  *                       | (kmem64_alignsize     |		   |
@@ -493,9 +450,12 @@ static int bootops_gone_on = 0;
  *                       |                       |
  *                       |  segkmem32 segment    | (SYSLIMIT32 - SYSBASE32 =
  *                       |                       |    ~64MB)
- * 0x00000000.78002000  -|-----------------------|
+ * 0x00000000.70002000  -|-----------------------|
  *                       |     panicbuf          |
- * 0x00000000.78000000  -|-----------------------|- SYSBASE32
+ * 0x00000000.70000000  -|-----------------------|- SYSBASE32
+ *                       |       boot-time       |
+ *                       |    temporary space    |
+ * 0x00000000.4C000000  -|-----------------------|- BOOTTMPBASE
  *                       :                       :
  *                       :                       :
  *                       |                       |
@@ -557,7 +517,7 @@ static int bootops_gone_on = 0;
  *                       |       user data       |
  *                      -|-----------------------|-
  *                       |       user text       |
- *  0x00000000.00100000 -|-----------------------|-
+ *  0x00000000.01000000 -|-----------------------|-
  *                       |       invalid         |
  *  0x00000000.00000000 _|_______________________|
  */
@@ -698,8 +658,6 @@ startup_init(void)
 	 */
 	char 		bp[sizeof (sync_str) + 16 * 20];
 
-	(void) check_boot_version(BOP_GETVERSION(bootops));
-
 	/*
 	 * Initialize ptl1 stack for the 1st CPU.
 	 */
@@ -736,12 +694,111 @@ startup_init(void)
 	add_vx_handler("sync", 1, (void (*)(cell_t *))sync_handler);
 }
 
-static u_longlong_t *boot_physinstalled, *boot_physavail, *boot_virtavail;
+
+size_t
+calc_pp_sz(pgcnt_t npages)
+{
+
+	return (npages * sizeof (struct page));
+}
+
+size_t
+calc_kpmpp_sz(pgcnt_t npages)
+{
+
+	kpm_pgshft = (kpm_smallpages == 0) ? MMU_PAGESHIFT4M : MMU_PAGESHIFT;
+	kpm_pgsz = 1ull << kpm_pgshft;
+	kpm_pgoff = kpm_pgsz - 1;
+	kpmp2pshft = kpm_pgshft - PAGESHIFT;
+	kpmpnpgs = 1 << kpmp2pshft;
+
+	if (kpm_smallpages == 0) {
+		/*
+		 * Avoid fragmentation problems in kphysm_init()
+		 * by allocating for all of physical memory
+		 */
+		kpm_npages = ptokpmpr(physinstalled);
+		return (kpm_npages * sizeof (kpm_page_t));
+	} else {
+		kpm_npages = npages;
+		return (kpm_npages * sizeof (kpm_spage_t));
+	}
+}
+
+size_t
+calc_pagehash_sz(pgcnt_t npages)
+{
+
+	/*
+	 * The page structure hash table size is a power of 2
+	 * such that the average hash chain length is PAGE_HASHAVELEN.
+	 */
+	page_hashsz = npages / PAGE_HASHAVELEN;
+	page_hashsz = 1 << highbit(page_hashsz);
+	return (page_hashsz * sizeof (struct page *));
+}
+
+void
+alloc_kmem64(caddr_t base, caddr_t end)
+{
+	int i;
+	caddr_t aligned_end = NULL;
+
+	/*
+	 * Make one large memory alloc after figuring out the 64-bit size. This
+	 * will enable use of the largest page size appropriate for the system
+	 * architecture.
+	 */
+	ASSERT(mmu_exported_pagesize_mask & (1 << TTE8K));
+	ASSERT(IS_P2ALIGNED(base, TTEBYTES(max_bootlp_tteszc)));
+	for (i = max_bootlp_tteszc; i >= TTE8K; i--) {
+		size_t alloc_size, alignsize;
+#if !defined(C_OBP)
+		unsigned long long pa;
+#endif	/* !C_OBP */
+
+		if ((mmu_exported_pagesize_mask & (1 << i)) == 0)
+			continue;
+		alignsize = TTEBYTES(i);
+		kmem64_szc = i;
+
+		/* limit page size for small memory */
+		if (mmu_btop(alignsize) > (npages >> 2))
+			continue;
+
+		aligned_end = (caddr_t)roundup((uintptr_t)end, alignsize);
+		alloc_size = aligned_end - base;
+#if !defined(C_OBP)
+		if (prom_allocate_phys(alloc_size, alignsize, &pa) == 0) {
+			if (prom_claim_virt(alloc_size, base) != (caddr_t)-1) {
+				kmem64_pabase = pa;
+				kmem64_aligned_end = aligned_end;
+				install_kmem64_tte();
+				break;
+			} else {
+				prom_free_phys(alloc_size, pa);
+			}
+		}
+#else	/* !C_OBP */
+		if (prom_alloc(base, alloc_size, alignsize) == base) {
+			kmem64_pabase = va_to_pa(kmem64_base);
+			kmem64_aligned_end = aligned_end;
+			break;
+		}
+#endif	/* !C_OBP */
+		if (i == TTE8K) {
+			prom_panic("kmem64 allocation failure");
+		}
+	}
+	ASSERT(aligned_end != NULL);
+}
+
+static prom_memlist_t *boot_physinstalled, *boot_physavail, *boot_virtavail;
 static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
 
-#define	IVSIZE	((MAXIVNUM * sizeof (intr_vec_t *)) + \
-		(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
-		(MAX_RSVD_IVX * sizeof (intr_vecx_t)))
+#define	IVSIZE	roundup(((MAXIVNUM * sizeof (intr_vec_t *)) + \
+			(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
+			(MAX_RSVD_IVX * sizeof (intr_vecx_t))), PAGESIZE)
 
 #if !defined(C_OBP)
 /*
@@ -782,18 +839,18 @@ static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
  * }
  */
 char kmem64_obp_str[] =
-	"h# %lx constant kmem64_base "
-	"h# %lx constant kmem64_end "
-	"h# %lx constant kmem64_pagemask "
-	"h# %lx constant kmem64_template "
+	"h# %lx constant kmem64-base "
+	"h# %lx constant kmem64-end "
+	"h# %lx constant kmem64-pagemask "
+	"h# %lx constant kmem64-template "
 
 	": kmem64-tte ( addr cnum -- false | tte-data true ) "
 	"    if                                       ( addr ) "
 	"       drop false exit then                  ( false ) "
-	"    dup  kmem64_base kmem64_end  within  if  ( addr ) "
-	"	kmem64_pagemask and                   ( addr' ) "
-	"	kmem64_base -                         ( addr' ) "
-	"	kmem64_template +                     ( tte ) "
+	"    dup  kmem64-base kmem64-end  within  if  ( addr ) "
+	"	kmem64-pagemask and                   ( addr' ) "
+	"	kmem64-base -                         ( addr' ) "
+	"	kmem64-template +                     ( tte ) "
 	"	true                                  ( tte true ) "
 	"    else                                     ( addr ) "
 	"	pgmap@                                ( tte ) "
@@ -804,7 +861,7 @@ char kmem64_obp_str[] =
 	"' kmem64-tte is va>tte-data "
 ;
 
-void
+static void
 install_kmem64_tte()
 {
 	char b[sizeof (kmem64_obp_str) + (4 * 16)];
@@ -843,24 +900,19 @@ pgcnt_t	tune_npages = (pgcnt_t)
 
 #pragma weak page_set_colorequiv_arr_cpu
 extern void page_set_colorequiv_arr_cpu(void);
+extern void page_set_colorequiv_arr(void);
+
 
 static void
 startup_memlist(void)
 {
-	size_t alloc_sz;
-	size_t ctrs_sz;
+	size_t hmehash_sz, pagelist_sz, tt_sz;
+	size_t psetable_sz;
 	caddr_t alloc_base;
-	caddr_t ctrs_base, ctrs_end;
 	caddr_t memspace;
-	caddr_t va;
-	int memblocks = 0;
 	struct memlist *cur;
 	size_t syslimit = (size_t)SYSLIMIT;
 	size_t sysbase = (size_t)SYSBASE;
-	int alloc_alignsize = ecache_alignsize;
-	int i;
-	extern void page_coloring_init(void);
-	extern void page_set_colorequiv_arr(void);
 
 	/*
 	 * Initialize enough of the system to allow kmem_alloc to work by
@@ -896,12 +948,11 @@ startup_memlist(void)
 	 * handling operations.  We align nalloc_base to a l2 cache
 	 * linesize because this is the line size the hardware uses to
 	 * maintain cache coherency.
-	 * 256K is carved out for module data.
+	 * 512K is carved out for module data.
 	 */
 
-	nalloc_base = (caddr_t)roundup((uintptr_t)e_data, MMU_PAGESIZE);
-	moddata = nalloc_base;
-	e_moddata = nalloc_base + MODDATA;
+	moddata = (caddr_t)roundup((uintptr_t)e_data, MMU_PAGESIZE);
+	e_moddata = moddata + MODDATA;
 	nalloc_base = e_moddata;
 
 	nalloc_end = (caddr_t)roundup((uintptr_t)nalloc_base, MMU_PAGESIZE4M);
@@ -910,12 +961,12 @@ startup_memlist(void)
 	/*
 	 * Calculate the start of the data segment.
 	 */
-	sdata = (caddr_t)((uintptr_t)e_data & MMU_PAGEMASK4M);
+	if (((uintptr_t)e_moddata & MMU_PAGEMASK4M) != (uintptr_t)s_data)
+		prom_panic("nucleus data overflow");
 
 	PRM_DEBUG(moddata);
 	PRM_DEBUG(nalloc_base);
 	PRM_DEBUG(nalloc_end);
-	PRM_DEBUG(sdata);
 
 	/*
 	 * Remember any slop after e_text so we can give it to the modules.
@@ -929,9 +980,11 @@ startup_memlist(void)
 	PRM_DEBUG(modtext);
 	PRM_DEBUG(modtext_sz);
 
+	init_boot_memlists();
 	copy_boot_memlists(&boot_physinstalled, &boot_physinstalled_len,
 	    &boot_physavail, &boot_physavail_len,
 	    &boot_virtavail, &boot_virtavail_len);
+
 	/*
 	 * Remember what the physically available highest page is
 	 * so that dumpsys works properly, and find out how much
@@ -946,106 +999,39 @@ startup_memlist(void)
 	startup_build_mem_nodes(boot_physinstalled, boot_physinstalled_len);
 
 	/*
-	 * Get the list of physically available memory to size
-	 * the number of page structures needed.
-	 */
-	size_physavail(boot_physavail, boot_physavail_len, &npages, &memblocks);
-	/*
-	 * This first snap shot of npages can represent the pages used
-	 * by OBP's text and data approximately. This is used in the
-	 * the calculation of the kernel size
-	 */
-	obp_pages = physinstalled - npages;
-
-
-	/*
-	 * On small-memory systems (<MODTEXT_SM_SIZE MB, currently 256MB), the
-	 * in-nucleus module text is capped to MODTEXT_SM_CAP bytes (currently
-	 * 2MB) and any excess pages are put on physavail.  The assumption is
-	 * that small-memory systems will need more pages more than they'll
-	 * need efficiently-mapped module texts.
-	 */
-	if ((physinstalled < mmu_btop(MODTEXT_SM_SIZE << 20)) &&
-	    modtext_sz > MODTEXT_SM_CAP) {
-		extra_etpg = mmu_btop(modtext_sz - MODTEXT_SM_CAP);
-		modtext_sz = MODTEXT_SM_CAP;
-		extra_etva = modtext + modtext_sz;
-	}
-
-	PRM_DEBUG(extra_etpg);
-	PRM_DEBUG(modtext_sz);
-	PRM_DEBUG(extra_etva);
-
-	/*
-	 * Account for any pages after e_text and e_data.
-	 */
-	npages += extra_etpg;
-	npages += mmu_btopr(nalloc_end - nalloc_base);
-	PRM_DEBUG(npages);
-
-	/*
 	 * npages is the maximum of available physical memory possible.
 	 * (ie. it will never be more than this)
+	 *
+	 * When we boot from a ramdisk, the ramdisk memory isn't free, so
+	 * using phys_avail will underestimate what will end up being freed.
+	 * A better initial guess is just total memory minus the kernel text
 	 */
+	npages = physinstalled - btop(MMU_PAGESIZE4M);
 
 	/*
-	 * initialize the nucleus memory allocator.
+	 * First allocate things that can go in the nucleus data page
+	 * (fault status, TSBs, dmv, CPUs)
 	 */
 	ndata_alloc_init(&ndata, (uintptr_t)nalloc_base, (uintptr_t)nalloc_end);
 
-	/*
-	 * Allocate mmu fault status area from the nucleus data area.
-	 */
 	if ((&ndata_alloc_mmfsa != NULL) && (ndata_alloc_mmfsa(&ndata) != 0))
 		cmn_err(CE_PANIC, "no more nucleus memory after mfsa alloc");
 
-	/*
-	 * Allocate kernel TSBs from the nucleus data area.
-	 */
 	if (ndata_alloc_tsbs(&ndata, npages) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after tsbs alloc");
 
-	/*
-	 * Allocate dmv dispatch table from the nucleus data area.
-	 */
 	if (ndata_alloc_dmv(&ndata) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after dmv alloc");
 
-
-	page_coloring_init();
-
-	/*
-	 * Allocate page_freelists bin headers for memnode 0 from the
-	 * nucleus data area.
-	 */
-	if (ndata_alloc_page_freelists(&ndata, 0) != 0)
+	if (ndata_alloc_page_mutexs(&ndata) != 0)
 		cmn_err(CE_PANIC,
 		    "no more nucleus memory after page free lists alloc");
 
-	if (kpm_enable) {
-		kpm_init();
-		/*
-		 * kpm page space -- Update kpm_npages and make the
-		 * same assumption about fragmenting as it is done
-		 * for memseg_sz.
-		 */
-		kpm_npages_setup(memblocks + 4);
-	}
-
-	/*
-	 * Allocate hat related structs from the nucleus data area.
-	 */
-	if (ndata_alloc_hat(&ndata, npages, kpm_npages) != 0)
+	if (ndata_alloc_hat(&ndata, npages) != 0)
 		cmn_err(CE_PANIC, "no more nucleus memory after hat alloc");
 
-	/*
-	 * We want to do the BOP_ALLOCs before the real allocation of page
-	 * structs in order to not have to allocate page structs for this
-	 * memory.  We need to calculate a virtual address because we want
-	 * the page structs to come before other allocations in virtual address
-	 * space.  This is so some (if not all) of page structs can actually
-	 * live in the nucleus.
-	 */
+	if (ndata_alloc_memseg(&ndata, boot_physavail_len) != 0)
+		cmn_err(CE_PANIC, "no more nucleus memory after memseg alloc");
 
 	/*
 	 * WARNING WARNING WARNING WARNING WARNING WARNING WARNING
@@ -1059,6 +1045,8 @@ startup_memlist(void)
 	 * WARNING WARNING WARNING WARNING WARNING WARNING WARNING
 	 */
 	alloc_base = (caddr_t)roundup((uintptr_t)nalloc_end, MMU_PAGESIZE);
+	PRM_DEBUG(alloc_base);
+
 	alloc_base = sfmmu_ktsb_alloc(alloc_base);
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
 	PRM_DEBUG(alloc_base);
@@ -1068,9 +1056,13 @@ startup_memlist(void)
 	 * memory gets deducted from the PROM's physical memory list.
 	 */
 	alloc_base = iommu_tsb_init(alloc_base);
-	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-	    ecache_alignsize);
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
 	PRM_DEBUG(alloc_base);
+
+	/*
+	 * Allow for an early allocation of physically contiguous memory.
+	 */
+	alloc_base = contig_mem_prealloc(alloc_base, npages);
 
 	/*
 	 * Platforms like Starcat and OPL need special structures assigned in
@@ -1090,189 +1082,117 @@ startup_memlist(void)
 	 */
 	econtig32 = alloc_base;
 	PRM_DEBUG(econtig32);
-
 	if (econtig32 > (caddr_t)KERNEL_LIMIT32)
 		cmn_err(CE_PANIC, "econtig32 too big");
 
-	/*
-	 * To avoid memory allocation collisions in the 32-bit virtual address
-	 * space, make allocations from this point forward in 64-bit virtual
-	 * address space starting at syslimit and working up.
-	 *
-	 * All this is needed because on large memory systems, the default
-	 * Solaris allocations will collide with SYSBASE32, which is hard
-	 * coded to be at the virtual address 0x78000000.  Therefore, on 64-bit
-	 * kernels, move the allocations to a location in the 64-bit virtual
-	 * address space space, allowing those structures to grow without
-	 * worry.
-	 *
-	 * On current CPUs we'll run out of physical memory address bits before
-	 * we need to worry about the allocations running into anything else in
-	 * VM or the virtual address holes on US-I and II, as there's currently
-	 * about 1 TB of addressable space before the US-I/II VA hole.
-	 */
-	kmem64_base = (caddr_t)syslimit;
-	PRM_DEBUG(kmem64_base);
+	pp_sz = calc_pp_sz(npages);
+	PRM_DEBUG(pp_sz);
+	if (kpm_enable) {
+		kpm_pp_sz = calc_kpmpp_sz(npages);
+		PRM_DEBUG(kpm_pp_sz);
+	}
+
+	hmehash_sz = calc_hmehash_sz(npages);
+	PRM_DEBUG(hmehash_sz);
+
+	pagehash_sz = calc_pagehash_sz(npages);
+	PRM_DEBUG(pagehash_sz);
+
+	pagelist_sz = calc_free_pagelist_sz();
+	PRM_DEBUG(pagelist_sz);
+
+#ifdef	TRAPTRACE
+	tt_sz = calc_traptrace_sz();
+	PRM_DEBUG(tt_sz);
+#else
+	tt_sz = 0;
+#endif	/* TRAPTRACE */
 
 	/*
-	 * Allocate addresses, but not physical memory. None of these locations
-	 * can be touched until physical memory is allocated below.
+	 * Place the array that protects pp->p_selock in the kmem64 wad.
+	 */
+	pse_shift = size_pse_array(physmem, max_ncpus);
+	PRM_DEBUG(pse_shift);
+	pse_table_size = 1 << pse_shift;
+	PRM_DEBUG(pse_table_size);
+	psetable_sz = roundup(
+	    pse_table_size * sizeof (pad_mutex_t), ecache_alignsize);
+	PRM_DEBUG(psetable_sz);
+
+	/*
+	 * Now allocate the whole wad
+	 */
+	kmem64_sz = pp_sz + kpm_pp_sz + hmehash_sz + pagehash_sz +
+	    pagelist_sz + tt_sz + psetable_sz;
+	kmem64_sz = roundup(kmem64_sz, PAGESIZE);
+	kmem64_base = (caddr_t)syslimit;
+	kmem64_end = kmem64_base + kmem64_sz;
+	alloc_kmem64(kmem64_base, kmem64_end);
+	if (kmem64_aligned_end > (hole_start ? hole_start : kpm_vbase))
+		cmn_err(CE_PANIC, "not enough kmem64 space");
+	PRM_DEBUG(kmem64_base);
+	PRM_DEBUG(kmem64_end);
+	PRM_DEBUG(kmem64_aligned_end);
+
+	/*
+	 * ... and divy it up
 	 */
 	alloc_base = kmem64_base;
-
-	/*
-	 * If KHME and/or UHME hash buckets won't fit in the nucleus, allocate
-	 * them here.
-	 */
-	if (khme_hash == NULL || uhme_hash == NULL) {
-		/*
-		 * alloc_hme_buckets() will align alloc_base properly before
-		 * assigning the hash buckets, so we don't need to do it
-		 * before the call...
-		 */
-		alloc_base = alloc_hme_buckets(alloc_base, alloc_alignsize);
-
-		PRM_DEBUG(alloc_base);
-		PRM_DEBUG(khme_hash);
-		PRM_DEBUG(uhme_hash);
-	}
-
-	/*
-	 * Allow for an early allocation of physically contiguous memory.
-	 */
-	alloc_base = contig_mem_prealloc(alloc_base, npages);
-
-	/*
-	 * Allocate the remaining page freelists.  NUMA systems can
-	 * have lots of page freelists, one per node, which quickly
-	 * outgrow the amount of nucleus memory available.
-	 */
-	if (max_mem_nodes > 1) {
-		int mnode;
-
-		for (mnode = 1; mnode < max_mem_nodes; mnode++) {
-			alloc_base = alloc_page_freelists(mnode, alloc_base,
-			    ecache_alignsize);
-		}
-		PRM_DEBUG(alloc_base);
-	}
-
-	if (!mml_table) {
-		size_t mmltable_sz;
-
-		/*
-		 * We need to allocate the mml_table here because there
-		 * was not enough space within the nucleus.
-		 */
-		mmltable_sz = sizeof (kmutex_t) * mml_table_sz;
-		alloc_sz = roundup(mmltable_sz, alloc_alignsize);
-		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-		    alloc_alignsize);
-		mml_table = (kmutex_t *)alloc_base;
-		alloc_base += alloc_sz;
-		PRM_DEBUG(mml_table);
-		PRM_DEBUG(alloc_base);
-	}
-
-	if (kpm_enable && !(kpmp_table || kpmp_stable)) {
-		size_t kpmptable_sz;
-		caddr_t table;
-
-		/*
-		 * We need to allocate either kpmp_table or kpmp_stable here
-		 * because there was not enough space within the nucleus.
-		 */
-		kpmptable_sz = (kpm_smallpages == 0) ?
-		    sizeof (kpm_hlk_t) * kpmp_table_sz :
-		    sizeof (kpm_shlk_t) * kpmp_stable_sz;
-
-		alloc_sz = roundup(kpmptable_sz, alloc_alignsize);
-		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-		    alloc_alignsize);
-
-		table = alloc_base;
-
-		if (kpm_smallpages == 0) {
-			kpmp_table = (kpm_hlk_t *)table;
-			PRM_DEBUG(kpmp_table);
-		} else {
-			kpmp_stable = (kpm_shlk_t *)table;
-			PRM_DEBUG(kpmp_stable);
-		}
-
-		alloc_base += alloc_sz;
-		PRM_DEBUG(alloc_base);
-	}
-
-	if (&ecache_init_scrub_flush_area) {
-		/*
-		 * Pass alloc_base directly, as the routine itself is
-		 * responsible for any special alignment requirements...
-		 */
-		alloc_base = ecache_init_scrub_flush_area(alloc_base);
-		PRM_DEBUG(alloc_base);
-	}
-
-	/*
-	 * Take the most current snapshot we can by calling mem-update.
-	 */
-	copy_boot_memlists(&boot_physinstalled, &boot_physinstalled_len,
-	    &boot_physavail, &boot_physavail_len,
-	    &boot_virtavail, &boot_virtavail_len);
-
-	/*
-	 * Reset npages and memblocks based on boot_physavail list.
-	 */
-	size_physavail(boot_physavail, boot_physavail_len, &npages, &memblocks);
+	npages -= kmem64_sz / (PAGESIZE + sizeof (struct page));
+	pp_base = (page_t *)alloc_base;
+	pp_sz = npages * sizeof (struct page);
+	alloc_base += pp_sz;
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(pp_base);
 	PRM_DEBUG(npages);
 
-	/*
-	 * Account for extra memory after e_text.
-	 */
-	npages += extra_etpg;
+	if (kpm_enable) {
+		kpm_pp_base = alloc_base;
+		if (kpm_smallpages == 0) {
+			/* kpm_npages based on physinstalled, don't reset */
+			kpm_pp_sz = kpm_npages * sizeof (kpm_page_t);
+		} else {
+			kpm_npages = ptokpmpr(npages);
+			kpm_pp_sz = kpm_npages * sizeof (kpm_spage_t);
+		}
+		alloc_base += kpm_pp_sz;
+		alloc_base =
+		    (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+		PRM_DEBUG(kpm_pp_base);
+	}
 
-	/*
-	 * Calculate the largest free memory chunk in the nucleus data area.
-	 * We need to figure out if page structs can fit in there or not.
-	 * We also make sure enough page structs get created for any physical
-	 * memory we might be returning to the system.
-	 */
-	ndata_remain_sz = ndata_maxsize(&ndata);
-	PRM_DEBUG(ndata_remain_sz);
+	alloc_base = alloc_hmehash(alloc_base);
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(alloc_base);
 
-	pp_sz = sizeof (struct page) * npages;
+	page_hash = (page_t **)alloc_base;
+	alloc_base += pagehash_sz;
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(page_hash);
 
-	/*
-	 * Here's a nice bit of code based on somewhat recursive logic:
-	 *
-	 * If the page array would fit within the nucleus, we want to
-	 * add npages to cover any extra memory we may be returning back
-	 * to the system.
-	 *
-	 * HOWEVER, the page array is sized by calculating the size of
-	 * (struct page * npages), as are the pagehash table, ctrs and
-	 * memseg_list, so the very act of performing the calculation below may
-	 * in fact make the array large enough that it no longer fits in the
-	 * nucleus, meaning there would now be a much larger area of the
-	 * nucleus free that should really be added to npages, which would
-	 * make the page array that much larger, and so on.
-	 *
-	 * This also ignores the memory possibly used in the nucleus for the
-	 * the page hash, ctrs and memseg list and the fact that whether they
-	 * fit there or not varies with the npages calculation below, but we
-	 * don't even factor them into the equation at this point; perhaps we
-	 * should or perhaps we should just take the approach that the few
-	 * extra pages we could add via this calculation REALLY aren't worth
-	 * the hassle...
-	 */
-	if (ndata_remain_sz > pp_sz) {
-		size_t spare = ndata_spare(&ndata, pp_sz, ecache_alignsize);
+	alloc_base = alloc_page_freelists(alloc_base);
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(alloc_base);
 
-		npages += mmu_btop(spare);
+#ifdef	TRAPTRACE
+	ttrace_buf = alloc_base;
+	alloc_base += tt_sz;
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(alloc_base);
+#endif	/* TRAPTRACE */
 
-		pp_sz = npages * sizeof (struct page);
+	pse_mutex = (pad_mutex_t *)alloc_base;
+	alloc_base += psetable_sz;
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
+	PRM_DEBUG(alloc_base);
 
-		pp_base = ndata_alloc(&ndata, pp_sz, ecache_alignsize);
+	/* adjust kmem64_end to what we really allocated */
+	kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base, PAGESIZE);
+	kmem64_sz = kmem64_end - kmem64_base;
+
+	if (&ecache_init_scrub_flush_area) {
+		alloc_base = ecache_init_scrub_flush_area(kmem64_aligned_end);
+		ASSERT(alloc_base <= (hole_start ? hole_start : kpm_vbase));
 	}
 
 	/*
@@ -1284,283 +1204,52 @@ startup_memlist(void)
 		physmem = npages;
 
 	/*
-	 * If pp_base is NULL that means the routines above have determined
-	 * the page array will not fit in the nucleus; we'll have to
-	 * BOP_ALLOC() ourselves some space for them.
-	 */
-	if (pp_base == NULL) {
-		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-		    alloc_alignsize);
-		alloc_sz = roundup(pp_sz, alloc_alignsize);
-
-		pp_base = (struct page *)alloc_base;
-
-		alloc_base += alloc_sz;
-	}
-
-	/*
-	 * The page structure hash table size is a power of 2
-	 * such that the average hash chain length is PAGE_HASHAVELEN.
-	 */
-	page_hashsz = npages / PAGE_HASHAVELEN;
-	page_hashsz = 1 << highbit((ulong_t)page_hashsz);
-	pagehash_sz = sizeof (struct page *) * page_hashsz;
-
-	/*
-	 * We want to TRY to fit the page structure hash table,
-	 * the page size free list counters, the memseg list and
-	 * and the kpm page space in the nucleus if possible.
+	 * root_is_ramdisk is set via /etc/system when the ramdisk miniroot
+	 * is mounted as root. This memory is held down by OBP and unlike
+	 * the stub boot_archive is never released.
 	 *
-	 * alloc_sz counts how much memory needs to be allocated by
-	 * BOP_ALLOC().
+	 * In order to get things sized correctly on lower memory
+	 * machines (where the memory used by the ramdisk represents
+	 * a significant portion of memory), physmem is adjusted.
+	 *
+	 * This is done by subtracting the ramdisk_size which is set
+	 * to the size of the ramdisk (in Kb) in /etc/system at the
+	 * time the miniroot archive is constructed.
 	 */
-	page_hash = ndata_alloc(&ndata, pagehash_sz, ecache_alignsize);
+	if (root_is_ramdisk == B_TRUE)
+		physmem -= (ramdisk_size * 1024) / PAGESIZE;
 
-	alloc_sz = (page_hash == NULL ? pagehash_sz : 0);
+	if (kpm_enable && (ndata_alloc_kpm(&ndata, kpm_npages) != 0))
+		cmn_err(CE_PANIC, "no more nucleus memory after kpm alloc");
 
 	/*
-	 * Size up per page size free list counters.
+	 * Allocate space for the interrupt vector table.
 	 */
-	ctrs_sz = page_ctrs_sz();
-	ctrs_base = ndata_alloc(&ndata, ctrs_sz, ecache_alignsize);
-
-	if (ctrs_base == NULL)
-		alloc_sz = roundup(alloc_sz, ecache_alignsize) + ctrs_sz;
-
-	/*
-	 * The memseg list is for the chunks of physical memory that
-	 * will be managed by the vm system.  The number calculated is
-	 * a guess as boot may fragment it more when memory allocations
-	 * are made before kphysm_init().  Currently, there are two
-	 * allocations before then, so we assume each causes fragmen-
-	 * tation, and add a couple more for good measure.
-	 */
-	memseg_sz = sizeof (struct memseg) * (memblocks + 4);
-	memseg_base = ndata_alloc(&ndata, memseg_sz, ecache_alignsize);
-
-	if (memseg_base == NULL)
-		alloc_sz = roundup(alloc_sz, ecache_alignsize) + memseg_sz;
-
-
-	if (kpm_enable) {
-		/*
-		 * kpm page space -- Update kpm_npages and make the
-		 * same assumption about fragmenting as it is done
-		 * for memseg_sz above.
-		 */
-		kpm_npages_setup(memblocks + 4);
-		kpm_pp_sz = (kpm_smallpages == 0) ?
-		    kpm_npages * sizeof (kpm_page_t):
-		    kpm_npages * sizeof (kpm_spage_t);
-
-		kpm_pp_base = (uintptr_t)ndata_alloc(&ndata, kpm_pp_sz,
-		    ecache_alignsize);
-
-		if (kpm_pp_base == NULL)
-			alloc_sz = roundup(alloc_sz, ecache_alignsize) +
-			    kpm_pp_sz;
-	}
-
-	/*
-	 * Allocate the array that protects pp->p_selock.
-	 */
-	pse_shift = size_pse_array(physmem, max_ncpus);
-	pse_table_size = 1 << pse_shift;
-	pse_mutex = ndata_alloc(&ndata, pse_table_size * sizeof (pad_mutex_t),
-	    ecache_alignsize);
-	if (pse_mutex == NULL)
-		alloc_sz = roundup(alloc_sz, ecache_alignsize) +
-		    pse_table_size * sizeof (pad_mutex_t);
-
-	if (alloc_sz > 0) {
-		uintptr_t bop_base;
-
-		/*
-		 * We need extra memory allocated through BOP_ALLOC.
-		 */
-		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-		    alloc_alignsize);
-
-		alloc_sz = roundup(alloc_sz, alloc_alignsize);
-
-		bop_base = (uintptr_t)alloc_base;
-
-		alloc_base += alloc_sz;
-
-		if (page_hash == NULL) {
-			page_hash = (struct page **)bop_base;
-			bop_base = roundup(bop_base + pagehash_sz,
-			    ecache_alignsize);
-		}
-
-		if (ctrs_base == NULL) {
-			ctrs_base = (caddr_t)bop_base;
-			bop_base = roundup(bop_base + ctrs_sz,
-			    ecache_alignsize);
-		}
-
-		if (memseg_base == NULL) {
-			memseg_base = (struct memseg *)bop_base;
-			bop_base = roundup(bop_base + memseg_sz,
-			    ecache_alignsize);
-		}
-
-		if (kpm_enable && kpm_pp_base == NULL) {
-			kpm_pp_base = (uintptr_t)bop_base;
-			bop_base = roundup(bop_base + kpm_pp_sz,
-			    ecache_alignsize);
-		}
-
-		if (pse_mutex == NULL) {
-			pse_mutex = (pad_mutex_t *)bop_base;
-			bop_base = roundup(bop_base +
-			    pse_table_size * sizeof (pad_mutex_t),
-			    ecache_alignsize);
-		}
-
-		ASSERT(bop_base <= (uintptr_t)alloc_base);
-	}
-
-	PRM_DEBUG(page_hash);
-	PRM_DEBUG(memseg_base);
-	PRM_DEBUG(kpm_pp_base);
-	PRM_DEBUG(kpm_pp_sz);
-	PRM_DEBUG(pp_base);
-	PRM_DEBUG(pp_sz);
-	PRM_DEBUG(alloc_base);
-
-#ifdef	TRAPTRACE
-	alloc_base = trap_trace_alloc(alloc_base);
-	PRM_DEBUG(alloc_base);
-#endif	/* TRAPTRACE */
-
-	/*
-	 * In theory it's possible that kmem64 chunk is 0 sized
-	 * (on very small machines). Check for that.
-	 */
-	if (alloc_base == kmem64_base) {
-		kmem64_base = NULL;
-		kmem64_end = NULL;
-		kmem64_aligned_end = NULL;
-		goto kmem64_alloced;
-	}
-
-	/*
-	 * Allocate kmem64 memory.
-	 * Round up to end of large page and overmap.
-	 * kmem64_end..kmem64_aligned_end is added to memory list for reuse
-	 */
-	kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base,
-	    MMU_PAGESIZE);
-
-	/*
-	 * Make one large memory alloc after figuring out the 64-bit size. This
-	 * will enable use of the largest page size appropriate for the system
-	 * architecture.
-	 */
-	ASSERT(mmu_exported_pagesize_mask & (1 << TTE8K));
-	ASSERT(IS_P2ALIGNED(kmem64_base, TTEBYTES(max_bootlp_tteszc)));
-	for (i = max_bootlp_tteszc; i >= TTE8K; i--) {
-		size_t asize;
-#if !defined(C_OBP)
-		unsigned long long pa;
-#endif	/* !C_OBP */
-
-		if ((mmu_exported_pagesize_mask & (1 << i)) == 0)
-			continue;
-		kmem64_alignsize = TTEBYTES(i);
-		kmem64_szc = i;
-
-		/* limit page size for small memory */
-		if (mmu_btop(kmem64_alignsize) > (npages >> 2))
-			continue;
-
-		kmem64_aligned_end = (caddr_t)roundup((uintptr_t)kmem64_end,
-		    kmem64_alignsize);
-		asize = kmem64_aligned_end - kmem64_base;
-#if !defined(C_OBP)
-		if (prom_allocate_phys(asize, kmem64_alignsize, &pa) == 0) {
-			if (prom_claim_virt(asize, kmem64_base) !=
-			    (caddr_t)-1) {
-				kmem64_pabase = pa;
-				install_kmem64_tte();
-				break;
-			} else {
-				prom_free_phys(asize, pa);
-			}
-		}
-#else	/* !C_OBP */
-		if ((caddr_t)BOP_ALLOC(bootops, kmem64_base, asize,
-		    kmem64_alignsize) == kmem64_base) {
-			kmem64_pabase = va_to_pa(kmem64_base);
-			break;
-		}
-#endif	/* !C_OBP */
-		if (i == TTE8K) {
-			prom_panic("kmem64 allocation failure");
-		}
-	}
-
-	PRM_DEBUG(kmem64_base);
-	PRM_DEBUG(kmem64_end);
-	PRM_DEBUG(kmem64_aligned_end);
-	PRM_DEBUG(kmem64_alignsize);
-
-	/*
-	 * Now set pa using saved va from above.
-	 */
-	if (&ecache_init_scrub_flush_area) {
-		(void) ecache_init_scrub_flush_area(NULL);
-	}
-
-kmem64_alloced:
-
-	/*
-	 * Initialize per page size free list counters.
-	 */
-	ctrs_end = page_ctrs_alloc(ctrs_base);
-	ASSERT(ctrs_base + ctrs_sz >= ctrs_end);
-
-	/*
-	 * Allocate space for the interrupt vector table and also for the
-	 * reserved interrupt vector data structures.
-	 */
-	memspace = (caddr_t)BOP_ALLOC(bootops, (caddr_t)intr_vec_table,
-	    IVSIZE, MMU_PAGESIZE);
+	memspace = prom_alloc((caddr_t)intr_vec_table, IVSIZE, MMU_PAGESIZE);
 	if (memspace != (caddr_t)intr_vec_table)
 		prom_panic("interrupt vector table allocation failure");
 
 	/*
-	 * The memory lists from boot are allocated from the heap arena
-	 * so that later they can be freed and/or reallocated.
-	 */
-	if (BOP_GETPROP(bootops, "extent", &memlist_sz) == -1)
-		prom_panic("could not retrieve property \"extent\"");
-
-	/*
 	 * Between now and when we finish copying in the memory lists,
 	 * allocations happen so the space gets fragmented and the
-	 * lists longer.  Leave enough space for lists twice as long
-	 * as what boot says it has now; roundup to a pagesize.
-	 * Also add space for the final phys-avail copy in the fixup
-	 * routine.
+	 * lists longer.  Leave enough space for lists twice as
+	 * long as we have now; then roundup to a pagesize.
 	 */
-	va = (caddr_t)(sysbase + PAGESIZE + PANICBUFSIZE +
-	    roundup(IVSIZE, MMU_PAGESIZE));
-	memlist_sz *= 4;
-	memlist_sz = roundup(memlist_sz, MMU_PAGESIZE);
-	memspace = (caddr_t)BOP_ALLOC(bootops, va, memlist_sz, BO_NO_ALIGN);
+	memlist_sz = sizeof (struct memlist) * (prom_phys_installed_len() +
+	    prom_phys_avail_len() + prom_virt_avail_len());
+	memlist_sz *= 2;
+	memlist_sz = roundup(memlist_sz, PAGESIZE);
+	memspace = ndata_alloc(&ndata, memlist_sz, ecache_alignsize);
 	if (memspace == NULL)
-		halt("Boot allocation failed.");
+		cmn_err(CE_PANIC, "no more nucleus memory after memlist alloc");
 
 	memlist = (struct memlist *)memspace;
 	memlist_end = (char *)memspace + memlist_sz;
-
 	PRM_DEBUG(memlist);
 	PRM_DEBUG(memlist_end);
+
 	PRM_DEBUG(sysbase);
 	PRM_DEBUG(syslimit);
-
 	kernelheap_init((void *)sysbase, (void *)syslimit,
 	    (caddr_t)sysbase + PAGESIZE, NULL, NULL);
 
@@ -1572,7 +1261,7 @@ kmem64_alloced:
 	    &boot_virtavail, &boot_virtavail_len);
 
 	/*
-	 * Remove the space used by BOP_ALLOC from the kernel heap
+	 * Remove the space used by prom_alloc from the kernel heap
 	 * plus the area actually used by the OBP (if any)
 	 * ignoring virtual addresses in virt_avail, above syslimit.
 	 */
@@ -1597,30 +1286,7 @@ kmem64_alloced:
 	}
 
 	phys_avail = memlist;
-	(void) copy_physavail(boot_physavail, boot_physavail_len,
-	    &memlist, 0, 0);
-
-	/*
-	 * Add any unused kmem64 memory from overmapped page
-	 * (Note: va_to_pa does not work for kmem64_end)
-	 */
-	if (kmem64_end < kmem64_aligned_end) {
-		uint64_t overlap_size = kmem64_aligned_end - kmem64_end;
-		uint64_t overlap_pa = kmem64_pabase +
-		    (kmem64_end - kmem64_base);
-
-		PRM_DEBUG(overlap_pa);
-		PRM_DEBUG(overlap_size);
-		memlist_add(overlap_pa, overlap_size, &memlist, &phys_avail);
-	}
-
-	/*
-	 * Add any extra memory after e_text to the phys_avail list, as long
-	 * as there's at least a page to add.
-	 */
-	if (extra_etpg)
-		memlist_add(va_to_pa(extra_etva), mmu_ptob(extra_etpg),
-		    &memlist, &phys_avail);
+	copy_memlist(boot_physavail, boot_physavail_len, &memlist);
 
 	/*
 	 * Add any extra memory at the end of the ndata region if there's at
@@ -1632,25 +1298,34 @@ kmem64_alloced:
 		nalloc_base = nalloc_end;
 	ndata_remain_sz = nalloc_end - nalloc_base;
 
-	if (ndata_remain_sz >= MMU_PAGESIZE)
-		memlist_add(va_to_pa(nalloc_base),
-		    (uint64_t)ndata_remain_sz, &memlist, &phys_avail);
+	/*
+	 * Copy physinstalled list into kernel space.
+	 */
+	phys_install = memlist;
+	copy_memlist(boot_physinstalled, boot_physinstalled_len, &memlist);
 
-	PRM_DEBUG(memlist);
-	PRM_DEBUG(memlist_sz);
-	PRM_DEBUG(memspace);
+	/*
+	 * Create list of physical addrs we don't need pp's for:
+	 * kernel text 4M page
+	 * kernel data 4M page - ndata_remain_sz
+	 * kmem64 pages
+	 *
+	 * NB if adding any pages here, make sure no kpm page
+	 * overlaps can occur (see ASSERTs in kphysm_memsegs)
+	 */
+	nopp_list = memlist;
+	memlist_new(va_to_pa(s_text), MMU_PAGESIZE4M, &memlist);
+	memlist_add(va_to_pa(s_data), MMU_PAGESIZE4M - ndata_remain_sz,
+	    &memlist, &nopp_list);
+	memlist_add(kmem64_pabase, kmem64_sz, &memlist, &nopp_list);
 
 	if ((caddr_t)memlist > (memspace + memlist_sz))
 		prom_panic("memlist overflow");
 
-	PRM_DEBUG(pp_base);
-	PRM_DEBUG(memseg_base);
-	PRM_DEBUG(npages);
-
 	/*
 	 * Initialize the page structures from the memory lists.
 	 */
-	kphysm_init(pp_base, memseg_base, npages, kpm_pp_base, kpm_npages);
+	kphysm_init();
 
 	availrmem_initial = availrmem = freemem;
 	PRM_DEBUG(availrmem);
@@ -1703,24 +1378,10 @@ kmem64_alloced:
 static void
 startup_modules(void)
 {
-	int proplen, nhblk1, nhblk8;
+	int nhblk1, nhblk8;
 	size_t  nhblksz;
 	pgcnt_t pages_per_hblk;
 	size_t hme8blk_sz, hme1blk_sz;
-
-	/*
-	 * Log any optional messages from the boot program
-	 */
-	proplen = (size_t)BOP_GETPROPLEN(bootops, "boot-message");
-	if (proplen > 0) {
-		char *msg;
-		size_t len = (size_t)proplen;
-
-		msg = kmem_zalloc(len, KM_SLEEP);
-		(void) BOP_GETPROP(bootops, "boot-message", msg);
-		cmn_err(CE_CONT, "?%s\n", msg);
-		kmem_free(msg, len);
-	}
 
 	/*
 	 * Let the platforms have a chance to change default
@@ -1903,7 +1564,6 @@ startup_modules(void)
 static void
 startup_bop_gone(void)
 {
-	extern int bop_io_quiesced;
 
 	/*
 	 * Destroy the MD initialized at startup
@@ -1913,19 +1573,13 @@ startup_bop_gone(void)
 	mach_descrip_startup_fini();
 
 	/*
-	 * Call back into boot and release boots resources.
+	 * We're done with prom allocations.
 	 */
-	BOP_QUIESCE_IO(bootops);
-	bop_io_quiesced = 1;
+	bop_fini();
 
 	copy_boot_memlists(&boot_physinstalled, &boot_physinstalled_len,
 	    &boot_physavail, &boot_physavail_len,
 	    &boot_virtavail, &boot_virtavail_len);
-	/*
-	 * Copy physinstalled list into kernel space.
-	 */
-	phys_install = memlist;
-	copy_memlist(boot_physinstalled, boot_physinstalled_len, &memlist);
 
 	/*
 	 * setup physically contiguous area twice as large as the ecache.
@@ -1947,9 +1601,6 @@ startup_bop_gone(void)
 	virt_avail = memlist;
 	copy_memlist(boot_virtavail, boot_virtavail_len, &memlist);
 
-	/*
-	 * Last chance to ask our booter questions ..
-	 */
 }
 
 
@@ -1979,8 +1630,7 @@ startup_fixup_physavail(void)
 	 * from the original list we copied earlier.
 	 */
 	cur = memlist;
-	(void) copy_physavail(boot_physavail, boot_physavail_len,
-	    &memlist, 0, 0);
+	copy_memlist(boot_physavail, boot_physavail_len, &memlist);
 
 	/*
 	 * Add any unused kmem64 memory from overmapped page
@@ -1988,17 +1638,13 @@ startup_fixup_physavail(void)
 	 */
 	if (kmem64_overmap_size) {
 		memlist_add(kmem64_pabase + (kmem64_end - kmem64_base),
-		    kmem64_overmap_size,
-		    &memlist, &cur);
+		    kmem64_overmap_size, &memlist, &cur);
 	}
 
 	/*
-	 * Add any extra memory after e_text we added to the phys_avail list
+	 * Add any extra memory after e_data we added to the phys_avail list
 	 * back to the old list.
 	 */
-	if (extra_etpg)
-		memlist_add(va_to_pa(extra_etva), mmu_ptob(extra_etpg),
-		    &memlist, &cur);
 	if (ndata_remain_sz >= MMU_PAGESIZE)
 		memlist_add(va_to_pa(nalloc_base),
 		    (uint64_t)ndata_remain_sz, &memlist, &cur);
@@ -2016,19 +1662,12 @@ startup_fixup_physavail(void)
 	 * the prom has allocated for it's own book-keeping, and remove
 	 * them from the freelist too. sigh.
 	 */
-	fix_prom_pages(phys_avail, cur);
+	sync_memlists(phys_avail, cur);
 
 	ASSERT(phys_avail != NULL);
 	memlist_free_list(phys_avail);
 	phys_avail = cur;
 
-	/*
-	 * We're done with boot.  Just after this point in time, boot
-	 * gets unmapped, so we can no longer rely on its services.
-	 * Zero the bootops to indicate this fact.
-	 */
-	bootops = (struct bootops *)NULL;
-	BOOTOPS_GONE();
 }
 
 static void
@@ -2086,13 +1725,6 @@ startup_vm(void)
 	 * Initialize VM system, and map kernel address space.
 	 */
 	kvm_init();
-
-	/*
-	 * XXX4U: previously, we initialized and turned on
-	 * the caches at this point. But of course we have
-	 * nothing to do, as the prom has already done this
-	 * for us -- main memory must be E$able at all times.
-	 */
 
 	/*
 	 * If the following is true, someone has patched
@@ -2595,6 +2227,17 @@ init_ptl1_thread(void)
 #endif	/* PTL1_PANIC_DEBUG */
 
 
+static void
+memlist_new(uint64_t start, uint64_t len, struct memlist **memlistp)
+{
+	struct memlist *new;
+
+	new = *memlistp;
+	new->address = start;
+	new->size = len;
+	*memlistp = new + 1;
+}
+
 /*
  * Add to a memory list.
  * start = start of new memory segment
@@ -2606,14 +2249,39 @@ static void
 memlist_add(uint64_t start, uint64_t len, struct memlist **memlistp,
 	struct memlist **curmemlistp)
 {
-	struct memlist *new;
+	struct memlist *new = *memlistp;
 
-	new = *memlistp;
-	new->address = start;
-	new->size = len;
-	*memlistp = new + 1;
-
+	memlist_new(start, len, memlistp);
 	memlist_insert(new, curmemlistp);
+}
+
+static int
+ndata_alloc_memseg(struct memlist *ndata, size_t avail)
+{
+	int nseg;
+	size_t memseg_sz;
+	struct memseg *msp;
+
+	/*
+	 * The memseg list is for the chunks of physical memory that
+	 * will be managed by the vm system.  The number calculated is
+	 * a guess as boot may fragment it more when memory allocations
+	 * are made before kphysm_init().
+	 */
+	memseg_sz = (avail + 10) * sizeof (struct memseg);
+	memseg_sz = roundup(memseg_sz, PAGESIZE);
+	nseg = memseg_sz / sizeof (struct memseg);
+	msp = ndata_alloc(ndata, memseg_sz, ecache_alignsize);
+	if (msp == NULL)
+		return (1);
+	PRM_DEBUG(memseg_free);
+
+	while (nseg--) {
+		msp->next = memseg_free;
+		memseg_free = msp;
+		msp++;
+	}
+	return (0);
 }
 
 /*
@@ -2687,131 +2355,206 @@ add_physmem_cb(page_t *pp, pfn_t pnum)
 }
 
 /*
- * kphysm_init() tackles the problem of initializing physical memory.
- * The old startup made some assumptions about the kernel living in
- * physically contiguous space which is no longer valid.
+ * Find memseg with given pfn
+ */
+static struct memseg *
+memseg_find(pfn_t base, pfn_t *next)
+{
+	struct memseg *seg;
+
+	if (next != NULL)
+		*next = LONG_MAX;
+	for (seg = memsegs; seg != NULL; seg = seg->next) {
+		if (base >= seg->pages_base && base < seg->pages_end)
+			return (seg);
+		if (next != NULL && seg->pages_base > base &&
+		    seg->pages_base < *next)
+			*next = seg->pages_base;
+	}
+	return (NULL);
+}
+
+extern struct vnode prom_ppages;
+
+/*
+ * Put page allocated by OBP on prom_ppages
  */
 static void
-kphysm_init(page_t *pp, struct memseg *memsegp, pgcnt_t npages,
-	uintptr_t kpm_pp, pgcnt_t kpm_npages)
+kphysm_erase(uint64_t addr, uint64_t len)
 {
-	struct memlist	*pmem;
-	struct memseg	*msp;
-	pfn_t		 base;
-	pgcnt_t		 num;
-	pfn_t		 lastseg_pages_end = 0;
-	pgcnt_t		 nelem_used = 0;
+	struct page *pp;
+	struct memseg *seg;
+	pfn_t base = btop(addr), next;
+	pgcnt_t num = btop(len);
+
+	while (num != 0) {
+		pgcnt_t off, left;
+
+		seg = memseg_find(base, &next);
+		if (seg == NULL) {
+			if (next == LONG_MAX)
+				break;
+			left = MIN(next - base, num);
+			base += left, num -= left;
+			continue;
+		}
+		off = base - seg->pages_base;
+		pp = seg->pages + off;
+		left = num - MIN(num, (seg->pages_end - seg->pages_base) - off);
+		while (num != left) {
+			/*
+			 * init it, lock it, and hashin on prom_pages vp.
+			 *
+			 * XXX	vnode offsets on the prom_ppages vnode
+			 *	are page numbers (gack) for >32 bit
+			 *	physical memory machines.
+			 */
+			add_physmem_cb(pp, base);
+			if (page_trylock(pp, SE_EXCL) == 0)
+				cmn_err(CE_PANIC, "prom page locked");
+			(void) page_hashin(pp, &prom_ppages,
+			    (offset_t)base, NULL);
+			(void) page_pp_lock(pp, 0, 1);
+			pp++, base++, num--;
+		}
+	}
+}
+
+static page_t *ppnext;
+static pgcnt_t ppleft;
+
+static void *kpm_ppnext;
+static pgcnt_t kpm_ppleft;
+
+/*
+ * Create a memseg
+ */
+static void
+kphysm_memseg(uint64_t addr, uint64_t len)
+{
+	pfn_t base = btop(addr);
+	pgcnt_t num = btop(len);
+	struct memseg *seg;
+
+	seg = memseg_free;
+	memseg_free = seg->next;
+	ASSERT(seg != NULL);
+
+	seg->pages = ppnext;
+	seg->epages = ppnext + num;
+	seg->pages_base = base;
+	seg->pages_end = base + num;
+	ppnext += num;
+	ppleft -= num;
+
+	if (kpm_enable) {
+		pgcnt_t kpnum = ptokpmpr(num);
+
+		if (kpnum > kpm_ppleft)
+			panic("kphysm_memseg: kpm_pp overflow");
+		seg->pagespa = va_to_pa(seg->pages);
+		seg->epagespa = va_to_pa(seg->epages);
+		seg->kpm_pbase = kpmptop(ptokpmp(base));
+		seg->kpm_nkpmpgs = kpnum;
+		/*
+		 * In the kpm_smallpage case, the kpm array
+		 * is 1-1 wrt the page array
+		 */
+		if (kpm_smallpages) {
+			kpm_spage_t *kpm_pp = kpm_ppnext;
+
+			kpm_ppnext = kpm_pp + kpnum;
+			seg->kpm_spages = kpm_pp;
+			seg->kpm_pagespa = va_to_pa(seg->kpm_spages);
+		} else {
+			kpm_page_t *kpm_pp = kpm_ppnext;
+
+			kpm_ppnext = kpm_pp + kpnum;
+			seg->kpm_pages = kpm_pp;
+			seg->kpm_pagespa = va_to_pa(seg->kpm_pages);
+			/* ASSERT no kpm overlaps */
+			ASSERT(
+			    memseg_find(base - pmodkpmp(base), NULL) == NULL);
+			ASSERT(memseg_find(
+			    roundup(base + num, kpmpnpgs) - 1, NULL) == NULL);
+		}
+		kpm_ppleft -= num;
+	}
+
+	memseg_list_add(seg);
+}
+
+/*
+ * Add range to free list
+ */
+void
+kphysm_add(uint64_t addr, uint64_t len, int reclaim)
+{
+	struct page *pp;
+	struct memseg *seg;
+	pfn_t base = btop(addr);
+	pgcnt_t num = btop(len);
+
+	seg = memseg_find(base, NULL);
+	ASSERT(seg != NULL);
+	pp = seg->pages + (base - seg->pages_base);
+
+	if (reclaim) {
+		struct page *rpp = pp;
+		struct page *lpp = pp + num;
+
+		/*
+		 * page should be locked on prom_ppages
+		 * unhash and unlock it
+		 */
+		while (rpp < lpp) {
+			ASSERT(PAGE_EXCL(rpp) && rpp->p_vnode == &prom_ppages);
+			page_pp_unlock(rpp, 0, 1);
+			page_hashout(rpp, NULL);
+			page_unlock(rpp);
+			rpp++;
+		}
+	}
+
+	/*
+	 * add_physmem() initializes the PSM part of the page
+	 * struct by calling the PSM back with add_physmem_cb().
+	 * In addition it coalesces pages into larger pages as
+	 * it initializes them.
+	 */
+	add_physmem(pp, num, base);
+}
+
+/*
+ * kphysm_init() tackles the problem of initializing physical memory.
+ */
+static void
+kphysm_init(void)
+{
+	struct memlist *pmem;
 
 	ASSERT(page_hash != NULL && page_hashsz != 0);
 
-	msp = memsegp;
-	for (pmem = phys_avail; pmem && npages; pmem = pmem->next) {
+	ppnext = pp_base;
+	ppleft = npages;
+	kpm_ppnext = kpm_pp_base;
+	kpm_ppleft = kpm_npages;
 
-		/*
-		 * Build the memsegs entry
-		 */
-		num = btop(pmem->size);
-		if (num > npages)
-			num = npages;
-		npages -= num;
-		base = btop(pmem->address);
+	/*
+	 * installed pages not on nopp_memlist go in memseg list
+	 */
+	diff_memlists(phys_install, nopp_list, kphysm_memseg);
 
-		msp->pages = pp;
-		msp->epages = pp + num;
-		msp->pages_base = base;
-		msp->pages_end = base + num;
+	/*
+	 * Free the avail list
+	 */
+	for (pmem = phys_avail; pmem != NULL; pmem = pmem->next)
+		kphysm_add(pmem->address, pmem->size, 0);
 
-		if (kpm_enable) {
-			pfn_t pbase_a;
-			pfn_t pend_a;
-			pfn_t prev_pend_a;
-			pgcnt_t	nelem;
-
-			msp->pagespa = va_to_pa(pp);
-			msp->epagespa = va_to_pa(pp + num);
-			pbase_a = kpmptop(ptokpmp(base));
-			pend_a = kpmptop(ptokpmp(base + num - 1)) + kpmpnpgs;
-			nelem = ptokpmp(pend_a - pbase_a);
-			msp->kpm_nkpmpgs = nelem;
-			msp->kpm_pbase = pbase_a;
-			if (lastseg_pages_end) {
-				/*
-				 * Assume phys_avail is in ascending order
-				 * of physical addresses.
-				 */
-				ASSERT(base + num > lastseg_pages_end);
-				prev_pend_a = kpmptop(
-				    ptokpmp(lastseg_pages_end - 1)) + kpmpnpgs;
-
-				if (prev_pend_a > pbase_a) {
-					/*
-					 * Overlap, more than one memseg may
-					 * point to the same kpm_page range.
-					 */
-					if (kpm_smallpages == 0) {
-						msp->kpm_pages =
-						    (kpm_page_t *)kpm_pp - 1;
-						kpm_pp = (uintptr_t)
-						    ((kpm_page_t *)kpm_pp
-						    + nelem - 1);
-					} else {
-						msp->kpm_spages =
-						    (kpm_spage_t *)kpm_pp - 1;
-						kpm_pp = (uintptr_t)
-						    ((kpm_spage_t *)kpm_pp
-						    + nelem - 1);
-					}
-					nelem_used += nelem - 1;
-
-				} else {
-					if (kpm_smallpages == 0) {
-						msp->kpm_pages =
-						    (kpm_page_t *)kpm_pp;
-						kpm_pp = (uintptr_t)
-						    ((kpm_page_t *)kpm_pp
-						    + nelem);
-					} else {
-						msp->kpm_spages =
-						    (kpm_spage_t *)kpm_pp;
-						kpm_pp = (uintptr_t)
-						    ((kpm_spage_t *)
-						    kpm_pp + nelem);
-					}
-					nelem_used += nelem;
-				}
-
-			} else {
-				if (kpm_smallpages == 0) {
-					msp->kpm_pages = (kpm_page_t *)kpm_pp;
-					kpm_pp = (uintptr_t)
-					    ((kpm_page_t *)kpm_pp + nelem);
-				} else {
-					msp->kpm_spages = (kpm_spage_t *)kpm_pp;
-					kpm_pp = (uintptr_t)
-					    ((kpm_spage_t *)kpm_pp + nelem);
-				}
-				nelem_used = nelem;
-			}
-
-			if (nelem_used > kpm_npages)
-				panic("kphysm_init: kpm_pp overflow\n");
-
-			msp->kpm_pagespa = va_to_pa(msp->kpm_pages);
-			lastseg_pages_end = msp->pages_end;
-		}
-
-		memseg_list_add(msp);
-
-		/*
-		 * add_physmem() initializes the PSM part of the page
-		 * struct by calling the PSM back with add_physmem_cb().
-		 * In addition it coalesces pages into larger pages as
-		 * it initializes them.
-		 */
-		add_physmem(pp, num, base);
-		pp += num;
-		msp++;
-	}
+	/*
+	 * Erase pages that aren't available
+	 */
+	diff_memlists(phys_install, phys_avail, kphysm_erase);
 
 	build_pfn_hash();
 }
@@ -3201,25 +2944,6 @@ do_prom_version_check(void)
 	cmn_err(CE_WARN, drev, " on one or more CPU boards", buf);
 }
 
-static void
-kpm_init()
-{
-	kpm_pgshft = (kpm_smallpages == 0) ? MMU_PAGESHIFT4M : MMU_PAGESHIFT;
-	kpm_pgsz = 1ull << kpm_pgshft;
-	kpm_pgoff = kpm_pgsz - 1;
-	kpmp2pshft = kpm_pgshft - PAGESHIFT;
-	kpmpnpgs = 1 << kpmp2pshft;
-	ASSERT(((uintptr_t)kpm_vbase & (kpm_pgsz - 1)) == 0);
-}
-
-void
-kpm_npages_setup(int memblocks)
-{
-	/*
-	 * npages can be scattered in a maximum of 'memblocks'
-	 */
-	kpm_npages = ptokpmpr(npages) + memblocks;
-}
 
 /*
  * Must be defined in platform dependent code.

@@ -34,7 +34,6 @@
 #	object lists
 #
 CORE_OBJS +=	bootops.o
-CORE_OBJS +=	prom_alloc.o
 CORE_OBJS +=	cmp.o
 CORE_OBJS +=	cpc_hwreg.o
 CORE_OBJS +=	cpc_subr.o

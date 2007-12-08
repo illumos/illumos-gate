@@ -201,6 +201,14 @@ extern "C" {
 #define	SYSLIMIT32	ADDRESS_C(0x80000000)
 
 /*
+ * BOOTTMPBASE is the base of a space that can be reclaimed
+ * after the kernel takes over the machine.  It contains the
+ * boot archive and memory allocated by krtld before kmem_alloc
+ * is brought online.
+ */
+#define	BOOTTMPBASE	ADDRESS_C(0x4C000000)
+
+/*
  * MEMSCRUBBASE is the base virtual address for the memory scrubber
  * to read large pages.  It MUST be 4MB page aligned.
  */
@@ -242,15 +250,7 @@ extern "C" {
 /*
  * Allocate space for kernel modules on nucleus pages
  */
-#define	MODDATA	1024 * 256
-
-/*
- * On systems with <MODTEXT_SM_SIZE MB available physical memory,
- * cap the in-nucleus module text to MODTEXT_SM_CAP bytes.  The
- * cap must be a multiple of the base page size.  Also see startup.c.
- */
-#define	MODTEXT_SM_CAP		(0x200000)		/* bytes */
-#define	MODTEXT_SM_SIZE		(256)			/* MB */
+#define	MODDATA	1024 * 512
 
 /*
  * The heap has a region allocated from it specifically for module text that
@@ -292,7 +292,7 @@ extern "C" {
  * reflect the fact that it's actually the limit for 32-bit kernel virtual
  * addresses.
  */
-#define	KERNEL_LIMIT32	(SYSBASE32)
+#define	KERNEL_LIMIT32	BOOTTMPBASE
 
 #define	PFN_TO_BUSTYPE(pfn)	(((pfn) >> 19) & 0x1FF)
 #define	IO_BUSTYPE(pfn)	((PFN_TO_BUSTYPE(pfn) & 0x100) >> 8)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +30,8 @@
 #include <sys/pte.h>
 #include <sys/promimpl.h>
 #include <sys/prom_plat.h>
+#include "cprboot.h"
 
-extern int	cpr_ufs_close(int);
-extern int	cpr_ufs_open(char *, char *);
-extern int	cpr_ufs_read(int, char *, int);
-extern int	cpr_read(int, char *, size_t);
 extern void	prom_unmap(caddr_t, uint_t);
 
 extern int cpr_debug;
@@ -51,7 +47,7 @@ cpr_read_cprinfo(int fd, char *file_path, char *fs_path)
 {
 	struct cprconfig cf;
 
-	if (cpr_ufs_read(fd, (char *)&cf, sizeof (cf)) != sizeof (cf) ||
+	if (cpr_fs_read(fd, (char *)&cf, sizeof (cf)) != sizeof (cf) ||
 	    cf.cf_magic != CPR_CONFIG_MAGIC)
 		return (-1);
 
@@ -71,12 +67,11 @@ int
 cpr_locate_statefile(char *file_path, char *fs_path)
 {
 	int fd;
-	char *boot_path = prom_bootpath();
 	int rc;
 
-	if ((fd = cpr_ufs_open(CPR_CONFIG, boot_path)) != -1) {
+	if ((fd = cpr_fs_open(CPR_CONFIG)) != -1) {
 		rc = cpr_read_cprinfo(fd, file_path, fs_path);
-		(void) cpr_ufs_close(fd);
+		(void) cpr_fs_close(fd);
 	} else
 		rc = -1;
 
@@ -95,7 +90,7 @@ cpr_locate_statefile(char *file_path, char *fs_path)
 int
 cpr_reset_properties(void)
 {
-	char *str, *boot_path, *default_path;
+	char *str, *default_path;
 	int fd, len, rc, prop_errors;
 	cprop_t *prop, *tail;
 	cdef_t cdef;
@@ -103,16 +98,15 @@ cpr_reset_properties(void)
 
 	str = "cpr_reset_properties";
 	default_path = CPR_DEFAULT;
-	boot_path = prom_bootpath();
 
-	if ((fd = cpr_ufs_open(default_path, boot_path)) == -1) {
-		prom_printf("%s: unable to open %s on %s\n",
-		    str, default_path, boot_path);
+	if ((fd = cpr_fs_open(default_path)) == -1) {
+		prom_printf("%s: unable to open %s\n",
+		    str, default_path);
 		return (-1);
 	}
 
 	rc = 0;
-	len = cpr_ufs_read(fd, (char *)&cdef, sizeof (cdef));
+	len = cpr_fs_read(fd, (char *)&cdef, sizeof (cdef));
 	if (len != sizeof (cdef)) {
 		prom_printf("%s: error reading %s\n", str, default_path);
 		rc = -1;
@@ -121,7 +115,7 @@ cpr_reset_properties(void)
 		rc = -1;
 	}
 
-	(void) cpr_ufs_close(fd);
+	(void) cpr_fs_close(fd);
 	if (rc)
 		return (rc);
 

@@ -391,6 +391,7 @@ rd_phys_free(page_t **ppa, pgcnt_t npages)
 static void
 rd_unmap_window(rd_devstate_t *rsp)
 {
+	ASSERT(rsp->rd_window_obp == 0);
 	if (rsp->rd_window_base != RD_WINDOW_NOT_MAPPED) {
 		hat_unload(kas.a_hat, rsp->rd_window_virt, rsp->rd_window_size,
 		    HAT_UNLOAD_UNLOCK);
@@ -574,7 +575,7 @@ rd_dealloc_resources(rd_devstate_t *rsp)
 	char		namebuf[RD_NAME_LEN + 5];
 	dev_t		fulldev;
 
-	if (rsp->rd_window_virt != NULL) {
+	if (rsp->rd_window_obp == 0 && rsp->rd_window_virt != NULL) {
 		if (rsp->rd_window_base != RD_WINDOW_NOT_MAPPED) {
 			rd_unmap_window(rsp);
 		}
@@ -624,7 +625,7 @@ rd_dealloc_resources(rd_devstate_t *rsp)
  * to a ramdisk.
  */
 static rd_devstate_t *
-rd_alloc_resources(char *name, size_t size, dev_info_t *dip)
+rd_alloc_resources(char *name, uint_t addr, size_t size, dev_info_t *dip)
 {
 	minor_t		minor;
 	rd_devstate_t	*rsp;
@@ -648,12 +649,20 @@ rd_alloc_resources(char *name, size_t size, dev_info_t *dip)
 	 * Allocate virtual window onto ramdisk.
 	 */
 	mutex_init(&rsp->rd_device_lock, NULL, MUTEX_DRIVER, NULL);
-	rsp->rd_window_base = RD_WINDOW_NOT_MAPPED;
-	rsp->rd_window_size = PAGESIZE;
-	rsp->rd_window_virt = vmem_alloc(heap_arena,
-	    rsp->rd_window_size, VM_SLEEP);
-	if (rsp->rd_window_virt == NULL) {
-		goto create_failed;
+	if (addr == 0) {
+		rsp->rd_window_obp = 0;
+		rsp->rd_window_base = RD_WINDOW_NOT_MAPPED;
+		rsp->rd_window_size = PAGESIZE;
+		rsp->rd_window_virt = vmem_alloc(heap_arena,
+		    rsp->rd_window_size, VM_SLEEP);
+		if (rsp->rd_window_virt == NULL) {
+			goto create_failed;
+		}
+	} else {
+		rsp->rd_window_obp = 1;
+		rsp->rd_window_base = 0;
+		rsp->rd_window_size = size;
+		rsp->rd_window_virt = (caddr_t)((ulong_t)addr);
 	}
 
 	/*
@@ -779,7 +788,7 @@ rd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	char		*name;
 	rd_existing_t	*ep = NULL;
-	uint_t		nep, i;
+	uint_t		obpaddr = 0, nep, i;
 	size_t		size = 0;
 	rd_devstate_t	*rsp;
 
@@ -825,32 +834,39 @@ rd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * property; get and check it.
 			 */
 			if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_DONTPASS, RD_EXISTING_PROP_NAME,
-			    (uchar_t **)&ep, &nep) != DDI_SUCCESS) {
-				cmn_err(CE_CONT,
-				    "%s: " RD_EXISTING_PROP_NAME
-				    " property missing\n", name);
-				goto attach_failed;
-			}
-			if (nep == 0 || (nep % sizeof (*ep)) != 0) {
-				cmn_err(CE_CONT,
-				    "%s: " RD_EXISTING_PROP_NAME
-				    " illegal size\n", name);
-				goto attach_failed;
-			}
-			nep /= sizeof (*ep);
+			    DDI_PROP_DONTPASS, OBP_EXISTING_PROP_NAME,
+			    (uchar_t **)&ep, &nep) == DDI_SUCCESS) {
 
-			/*
-			 * Calculate the size of the ramdisk.
-			 */
-			for (i = 0; i < nep; ++i) {
-				size += ep[i].size;
+				if (nep == 0 || (nep % sizeof (*ep)) != 0) {
+					cmn_err(CE_CONT,
+					    "%s: " OBP_EXISTING_PROP_NAME
+					    " illegal size\n", name);
+					goto attach_failed;
+				}
+				nep /= sizeof (*ep);
+
+				/*
+				 * Calculate the size of the ramdisk.
+				 */
+				for (i = 0; i < nep; ++i) {
+					size += ep[i].size;
+				}
+			} else if ((obpaddr = ddi_prop_get_int(DDI_DEV_T_ANY,
+			    dip, DDI_PROP_DONTPASS, OBP_ADDRESS_PROP_NAME,
+			    0)) != 0)  {
+
+				size = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+				    DDI_PROP_DONTPASS, OBP_SIZE_PROP_NAME, 0);
+			} else {
+				cmn_err(CE_CONT, "%s: missing OBP properties\n",
+				    name);
+				goto attach_failed;
 			}
 
 			/*
 			 * Allocate driver resources for the ramdisk.
 			 */
-			if ((rsp = rd_alloc_resources(name, size,
+			if ((rsp = rd_alloc_resources(name, obpaddr, size,
 			    dip)) == NULL) {
 				goto attach_failed;
 			}
@@ -1164,7 +1180,7 @@ rd_create_disk(dev_t dev, struct rd_ioctl *urip, int mode, int *rvalp)
 		return (EEXIST);
 	}
 
-	rsp = rd_alloc_resources(kri.ri_name, size, rd_dip);
+	rsp = rd_alloc_resources(kri.ri_name, 0, size, rd_dip);
 	if (rsp == NULL) {
 		mutex_exit(&rd_lock);
 		return (EAGAIN);
@@ -1337,7 +1353,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"ramdisk driver v%I%",
+	"ramdisk driver",
 	&rd_ops
 };
 

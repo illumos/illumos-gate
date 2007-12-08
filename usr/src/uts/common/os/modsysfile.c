@@ -64,7 +64,7 @@ static char class_file[] = CLASSFILE;
 static char dafile[] = DAFILE;
 static char dacffile[] = DACFFILE;
 
-char *systemfile = "etc/system";	/* name of ascii system file */
+char *systemfile = "/etc/system";	/* name of ascii system file */
 
 static struct sysparam *sysparam_hd;	/* head of parameters list */
 static struct sysparam *sysparam_tl;	/* tail of parameters list */

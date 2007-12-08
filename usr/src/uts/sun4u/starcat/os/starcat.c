@@ -313,7 +313,7 @@ plat_pfn_to_mem_node(pfn_t pfn)
 
 /* ARGSUSED */
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 {
 	size_t	elem;
 	pfn_t	basepfn;
@@ -330,9 +330,9 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	/*
 	 * Boot install lists are arranged <addr, len>, <addr, len>, ...
 	 */
-	for (elem = 0; elem < nelems; elem += 2) {
-		basepfn = btop(list[elem]);
-		npgs = btop(list[elem+1]);
+	for (elem = 0; elem < nelems; list++, elem++) {
+		basepfn = btop(list->addr);
+		npgs = btop(list->size);
 		mem_node_add_slice(basepfn, basepfn + npgs - 1);
 	}
 }

@@ -30,36 +30,41 @@
 MANIFEST= boot-archive-update.xml
 SVCMETHOD= boot-archive-update
 
-PROG= create_ramdisk create_diskmap update_grub
-METHODPROG= boot-archive-update
-SBINPROG= root_archive
+sparc_BOOTPROG=
 
-SBINLINKS= $(SBINPROG)
+i386_BOOTPROG=			\
+	create_diskmap		\
+	update_grub
+
+COMMON_BOOTPROG=		\
+	create_ramdisk		\
+	extract_boot_filelist
+
+
+BOOTPROG= $(COMMON_BOOTPROG) $($(MACH)_BOOTPROG)
+METHODPROG= boot-archive-update
+PROG= root_archive
 
 include ../Makefile.com
-
-ROOTSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
 
 ROOTMANIFESTDIR= $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE= 444
 
-ROOTBOOTSOLARISBINLINKS= $(SBINLINKS:%=$(ROOTBOOTSOLARISBIN)/%)
+ROOTBOOTSOLARISUSRSBINLINKS= $(PROG:%=$(ROOTBOOTSOLARISBIN)/%)
 
 .KEEP_STATE:
 
-all: $(PROG) $(METHODPROG) $(SBINPROG)
-
-$(ROOTBOOTSOLARISBINLINKS):
-	-$(RM) $@; $(SYMLINK) ../../../usr/sbin/$(@F) $@
+all: $(BOOTPROG) $(METHODPROG) $(PROG)
 
 check:	$(CHKMANIFEST)
 
 clean:
-	$(RM) $(PROG) $(METHODPROG) $(SBINPROG)
+	$(RM) $(BOOTPROG) $(METHODPROG) $(PROG)
 
- _msg:
+lint _msg:
 
-lint:
+$(ROOTBOOTSOLARISUSRSBINLINKS):
+	$(RM) $@; $(SYMLINK) ../../../usr/sbin/$(@F) $@
 
 # Default rule for building ksh scripts.
 .ksh:

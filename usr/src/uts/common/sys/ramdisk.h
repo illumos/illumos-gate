@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,7 +163,11 @@ struct rd_ioctl {
  * ranges; these are described by the 'existing' property, whose value
  * is a (corresponding) number of {phys,size} pairs.
  */
-#define	RD_EXISTING_PROP_NAME	"existing"
+#define	OBP_EXISTING_PROP_NAME	"existing"
+#define	OBP_ADDRESS_PROP_NAME	"address"
+#define	OBP_SIZE_PROP_NAME	"size"
+
+#define	RD_EXISTING_PROP_NAME	"existing"	/* for x86 */
 
 typedef struct {
 	uint64_t	phys;			/* Phys addr of range */
@@ -199,6 +202,7 @@ typedef struct rd_devstate {
 	 * giving the offset within the ramdisk of the window, its size,
 	 * and its virtual address (in the kernel heap).
 	 */
+	uint_t		rd_window_obp;		/* using OBP's vaddr */
 	offset_t	rd_window_base;
 	uint64_t	rd_window_size;
 	caddr_t		rd_window_virt;

@@ -74,6 +74,7 @@ package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
 CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
 		    -I$(SRCBASE)/uts/common/krtld -I$(ELFCAP) \
+		    -I$(SRCBASE)/uts/sparc \
 		    $(VAR_LIBLD_CPPFLAGS) -DDO_RELOC_LIBLD
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc

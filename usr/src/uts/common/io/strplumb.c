@@ -96,7 +96,7 @@ int	strplumbdebug = 0;
 /*
  * Module linkage information for the kernel.
  */
-#define	STRPLUMB_IDENT	"STREAMS Plumbing Module v%I%"
+#define	STRPLUMB_IDENT	"STREAMS Plumbing Module"
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
@@ -339,10 +339,22 @@ resolve_boot_path(void)
 	dev_info_t		*dip;
 	const char		*driver;
 	int			instance;
+#ifdef	_OBP
+	char			stripped_path[OBP_MAXPATHLEN];
+#endif
 
+#ifdef _OBP
+	/*
+	 * OBP passes options e.g, "net:dhcp"
+	 * remove them here
+	 */
+	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0) {
+		prom_strip_options(rootfs.bo_name, stripped_path);
+		devpath = stripped_path;
+	}
+#else
 	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0)
 		devpath = rootfs.bo_name;
-#ifndef __sparc
 	else
 		devpath = strplumb_get_netdev_path();
 #endif
@@ -614,7 +626,7 @@ done:
 
 /* multiboot:  diskless boot interface discovery */
 
-#ifndef	__sparc
+#ifndef	_OBP
 
 static uchar_t boot_macaddr[16];
 static int boot_maclen;
@@ -625,15 +637,15 @@ int dl_bind(ldi_handle_t lh, uint_t sap, uint_t max_conn,
     uint_t service, uint_t conn_mgmt);
 int dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr);
 
-#endif  /* !__sparc */
+#endif  /* !_OBP */
 
 char *
 strplumb_get_netdev_path(void)
 {
-#ifndef	__sparc
+#ifndef	_OBP
 	char *macstr, *devpath = NULL;
 	uchar_t *bootp;
-	uint_t bootp_len, len;
+	uint_t bootp_len;
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, BP_BOOT_MAC, &macstr) == DDI_SUCCESS) {
@@ -658,14 +670,12 @@ strplumb_get_netdev_path(void)
 		 */
 		boot_maclen = *(bootp + 2);
 		ASSERT(boot_maclen <= 16);
-		(void) bcopy(bootp + 28, boot_macaddr, boot_maclen);
+		bcopy(bootp + 28, boot_macaddr, boot_maclen);
 
-		/* encode to ascii string to match what sparc OBP exports */
-		dhcack = kmem_zalloc(bootp_len * 2 + IFNAMSIZ + 2, KM_SLEEP);
-		len = bootp_len * 2 + 2;
-		(void) octet_to_hexascii(bootp, bootp_len, dhcack + IFNAMSIZ,
-		    &len);
-		ASSERT(len < bootp_len * 2 + 2);
+		dhcack = kmem_alloc(bootp_len, KM_SLEEP);
+		bcopy(bootp, dhcack, bootp_len);
+		dhcacklen = bootp_len;
+
 		ddi_prop_free(bootp);
 	} else
 		return (NULL);
@@ -675,10 +685,10 @@ strplumb_get_netdev_path(void)
 
 #else
 	return (NULL);
-#endif  /* !__sparc */
+#endif  /* !_OBP */
 }
 
-#ifndef __sparc
+#ifndef _OBP
 
 /*
  * Get boot path from the boot_mac address
@@ -726,10 +736,11 @@ matchmac(dev_info_t *dip, void *arg)
 	*devpathp = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	(void) ddi_pathname(dip, *devpathp);
 
-	/* fill in the name portion of dhcack */
-	if (dhcack)
-		(void) snprintf(dhcack, IFNAMSIZ, "%s%d",
+	/* fill in dhcifname */
+	if (dhcack) {
+		(void) snprintf(dhcifname, IFNAMSIZ, "%s%d",
 		    ddi_driver_name(dip), i_ddi_devi_get_ppa(dip));
+	}
 	return (DDI_WALK_TERMINATE);
 }
 
@@ -812,7 +823,7 @@ getmacaddr(dev_info_t *dip, int *maclenp)
 	return (macaddr);
 }
 
-#endif	/* !__sparc */
+#endif	/* !_OBP */
 
 int
 dl_attach(ldi_handle_t lh, int unit)

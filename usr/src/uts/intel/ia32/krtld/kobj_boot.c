@@ -35,8 +35,8 @@
 #include <sys/auxv.h>
 #include <sys/kobj.h>
 #include <sys/bootsvcs.h>
-#include <sys/kobj_impl.h>
 #include <vm/kboot_mmu.h>
+#include <sys/kobj_impl.h>
 
 /*
  * the kernel's entry point (from locore.s)

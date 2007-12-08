@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,8 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 CPPFLAGS +=	-I../../rtld/common -I$(SRCBASE)/lib/libc/inc \
-		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid
+		-I$(SRCBASE)/uts/common/krtld -I$(SRC)/common/sgsrtcid \
+		-I$(SRCBASE)/uts/sparc
 DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) '-R$$ORIGIN'
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +102,15 @@ static caddr_t	free_addr[N_FREELIST];
 
 static caddr_t top_bootmem = MAPPEDMEM_MINTOP;
 static caddr_t top_resvmem, scratchresvp;
+
+/*
+ * with newboot, boot goes away when it launches the client,
+ * so we can safely extend bootmem on sg, and give it back
+ * before we die.
+ */
+int is_sg;
+caddr_t sg_addr;
+size_t sg_len;
 
 static int
 impl_name(char *buf, size_t bufsz)
@@ -212,8 +220,13 @@ resalloc_init(void)
 	 * but we don't have the ability to check for the firmware version here.
 	 */
 	if (strcmp(iarch, "SUNW,Sun-Fire") == 0 ||
-	    strcmp(iarch, "SUNW,Netra-T12") == 0)
-		return;
+	    strcmp(iarch, "SUNW,Netra-T12") == 0) {
+		is_sg = 1;
+		sg_addr = MAPPEDMEM_MINTOP;
+		sg_len = MAPPEDMEM_FULLTOP - MAPPEDMEM_MINTOP;
+		if (prom_alloc(sg_addr, sg_len, 1) != sg_addr)
+			prom_panic("can't extend sg bootmem");
+	}
 
 	top_bootmem = MAPPEDMEM_FULLTOP;
 
@@ -264,7 +277,7 @@ resalloc(enum RESOURCES type, size_t bytes, caddr_t virthint, int align)
 		if (vaddr == (caddr_t)virthint)
 			return (vaddr);
 		printf("Alloc of 0x%lx bytes at 0x%p refused.\n",
-			bytes, (void *)virthint);
+		    bytes, (void *)virthint);
 		return ((caddr_t)0);
 		/*NOTREACHED*/
 

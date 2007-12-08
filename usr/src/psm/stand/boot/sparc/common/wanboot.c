@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +76,8 @@
 /*
  * Experimentation has shown that an 8K download buffer is optimal
  */
-static char	buffer[8192];
+#define	HTTP_XFER_SIZE		8192
+static char	buffer[HTTP_XFER_SIZE];
 
 bc_handle_t	bc_handle;
 
@@ -428,7 +428,7 @@ read_digest(const char *what, http_handle_t handle, unsigned char *sdigest)
 	lenstr = http_get_header_value(handle, CONTENT_LENGTH);
 	if (lenstr == NULL) {
 		bootlog("wanboot", BOOTLOG_ALERT,
-			"%s: error getting digest length", what);
+		    "%s: error getting digest length", what);
 		return (1);
 	}
 	digest_size = (size_t)strtol(lenstr, NULL, 10);
@@ -439,8 +439,8 @@ read_digest(const char *what, http_handle_t handle, unsigned char *sdigest)
 	 */
 	if (digest_size != HMAC_DIGEST_LEN) {
 		bootlog("wanboot", BOOTLOG_CRIT,
-			"%s: error validating response - invalid digest size",
-			what);
+		    "%s: error validating response - invalid digest size",
+		    what);
 		return (-1);
 	}
 
@@ -449,7 +449,7 @@ read_digest(const char *what, http_handle_t handle, unsigned char *sdigest)
 	 */
 	if (read_bytes(handle, (char *)sdigest, digest_size) != 0) {
 		bootlog("wanboot", BOOTLOG_ALERT,
-			"%s: error reading digest", what);
+		    "%s: error reading digest", what);
 		return (1);
 	}
 
@@ -469,7 +469,7 @@ read_digest(const char *what, http_handle_t handle, unsigned char *sdigest)
  *	 1 = HTTP download error
  */
 static int
-write_msg_to_ramdisk(const char *what, int fd, http_handle_t handle,
+write_msg_to_ramdisk(const char *what, caddr_t addr, http_handle_t handle,
     size_t ramdisk_size, off_t *offset, SHA1_CTX *sha)
 {
 	int len;
@@ -497,13 +497,14 @@ write_msg_to_ramdisk(const char *what, int fd, http_handle_t handle,
 		    "Continuing read of %s file system (%ld kB)",
 		    what, ramdisk_size / 1024);
 	}
-	for (ret = 0; ret == 0 && *offset < ramdisk_size; *offset += len) {
+	for (ret = 0; ret == 0 && *offset < ramdisk_size;
+	    *offset += len, addr += len) {
 		nleft = ramdisk_size - *offset;
 
 		if (nleft > sizeof (buffer))
 			nleft = sizeof (buffer);
 
-		len = http_read_body(handle, buffer, nleft);
+		len = http_read_body(handle, addr, nleft);
 		if (len <= 0) {
 			print_errors("http_read_body", handle);
 			/*
@@ -517,13 +518,7 @@ write_msg_to_ramdisk(const char *what, int fd, http_handle_t handle,
 			ret = 1;
 		}
 		if (sha != NULL) {
-			HMACUpdate(sha, (uchar_t *)buffer, (size_t)len);
-		}
-		if (prom_write(fd, buffer, (size_t)len, 0, 0) != (ssize_t)len) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: write to ramdisk failed", what);
-			ret = -1;
-			continue;
+			HMACUpdate(sha, (uchar_t *)addr, (size_t)len);
 		}
 		if (bootlog_progress == bootlog_message_interval) {
 			bootlog("wanboot", BOOTLOG_PROGRESS,
@@ -790,10 +785,10 @@ establish_http_connection(const char *what, http_handle_t *handlep,
 	if ((offset == 0 && resp->code != 200) ||
 	    (offset != 0 && resp->code != 206)) {
 		bootlog("wanboot", BOOTLOG_ALERT,
-			"%s: Request returned code %d", what, resp->code);
+		    "%s: Request returned code %d", what, resp->code);
 		if (resp->statusmsg != NULL && resp->statusmsg[0] != '\0')
 			bootlog("wanboot", BOOTLOG_ALERT,
-				"%s", resp->statusmsg);
+			    "%s", resp->statusmsg);
 		http_free_respinfo(resp);
 		(void) http_srv_close(*handlep);
 		return (1);
@@ -929,7 +924,7 @@ get_miniinfo(const url_t *server_url, size_t *mini_size,
 		}
 
 		if ((ret = process_miniinfo(handle, mini_size,
-			sdigest)) > 0) {
+		    sdigest)) > 0) {
 			if (!wanboot_retry(++retry_cnt, retry_max)) {
 				(void) http_srv_close(handle);
 				break;
@@ -985,10 +980,10 @@ process_miniroot(http_handle_t handle, hash_type_t htype,
 {
 	static SHA1_CTX	sha;
 	static size_t	miniroot_size;
-	static int	fd = -1;
+	static caddr_t	miniroot_vaddr = NULL;
 	int		ret;
 
-	if (fd == -1) {
+	if (miniroot_vaddr == NULL) {
 		if (htype == HASH_HMAC_SHA1) {
 			bootlog("wanboot", BOOTLOG_INFO,
 			    "%s: Authentication will use HMAC-SHA1", MINIROOT);
@@ -997,31 +992,20 @@ process_miniroot(http_handle_t handle, hash_type_t htype,
 
 		miniroot_size = length;
 
-		fd = create_ramdisk(RD_ROOTFS, miniroot_size, devpath);
+		miniroot_vaddr = create_ramdisk(RD_ROOTFS, miniroot_size,
+		    devpath);
 	}
 
-	if (prom_seek(fd, *offset) == -1) {
-		bootlog("wanboot", BOOTLOG_CRIT,
-			"%s: prom_seek error", MINIROOT);
-		return (-1);
-	}
+	miniroot_vaddr += *offset;
 
-	if ((ret = write_msg_to_ramdisk(MINIROOT, fd, handle, miniroot_size,
-	    offset, (htype == HASH_NONE) ? NULL : &sha)) != 0) {
-		if (ret < 0) {
-			/*
-			 * Reentry not supported.
-			 */
-			(void) prom_close(fd);
-		}
+	if ((ret = write_msg_to_ramdisk(MINIROOT, miniroot_vaddr, handle,
+	    miniroot_size, offset, (htype == HASH_NONE) ? NULL : &sha)) != 0) {
 		return (ret);
 	}
 
 	if (htype != HASH_NONE) {
 		HMACFinal(&sha, g_hash_key, WANBOOT_HMAC_KEY_SIZE, cdigest);
 	}
-
-	(void) prom_close(fd);
 
 	return (0);
 }
@@ -1177,9 +1161,8 @@ encr_fini(encr_type_t etype, void *eh)
 }
 
 /*
- * This routine is called by process_wanbootfs() to read the encrypted
- * file system from ramdisk and decrypt it. This routine will rewrite
- * the file system back to ramdisk in place. The method of decryption
+ * This routine is called by process_wanbootfs() to decrypt the encrypted
+ * file system from ramdisk in place.  The method of decryption
  * (algorithm) will have already been determined by process_wanbootfs()
  * and the cbc_handle passed to this routine will already have been
  * initialized appropriately.
@@ -1189,45 +1172,13 @@ encr_fini(encr_type_t etype, void *eh)
  *	 0 = Success
  */
 static int
-decrypt_wanbootfs(int fd, cbc_handle_t *ch, uint8_t *iv,
-    size_t block_size, size_t wanbootfs_size)
+decrypt_wanbootfs(caddr_t addr, cbc_handle_t *ch, uint8_t *iv,
+    size_t wanbootfs_size)
 {
-	size_t total;
-	size_t len;
-	size_t nleft;
-	size_t max_read_size;
-
-	max_read_size = (sizeof (buffer) / block_size) * block_size;
-	for (total = 0; total < wanbootfs_size; total += len) {
-		if (prom_seek(fd, total) == -1) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: prom_seek error", WANBOOTFS);
-			return (-1);
-		}
-		nleft = wanbootfs_size - total;
-		if (nleft > max_read_size)
-			nleft = max_read_size;
-		len = prom_read(fd, buffer, nleft, 0, 0);
-		if (len != nleft) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: prom_read error", WANBOOTFS);
-			return (-1);
-		}
-		if (!cbc_decrypt(ch, (uint8_t *)buffer, len, iv)) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: cbc decrypt error", WANBOOTFS);
-			return (-1);
-		}
-		if (prom_seek(fd, total) == -1) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: prom_seek error", WANBOOTFS);
-			return (-1);
-		}
-		if (prom_write(fd, buffer, len, 0, 0) != len) {
-			bootlog("wanboot", BOOTLOG_CRIT,
-			    "%s: prom_write error", WANBOOTFS);
-			return (-1);
-		}
+	if (!cbc_decrypt(ch, (uint8_t *)addr, wanbootfs_size, iv)) {
+		bootlog("wanboot", BOOTLOG_CRIT,
+		    "%s: cbc decrypt error", WANBOOTFS);
+		return (-1);
 	}
 	return (0);
 }
@@ -1279,7 +1230,7 @@ process_wanbootfs(http_handle_t handle, char **devpath,
 	size_t		wanbootfs_size;
 	size_t		block_size;
 	off_t		offset;
-	static int	fd = -1;
+	static caddr_t	bootfs_vaddr = NULL;
 	int		ret;
 
 	switch (hash_type) {
@@ -1371,25 +1322,16 @@ process_wanbootfs(http_handle_t handle, char **devpath,
 	 * the already existing ramdisk and seek back to the
 	 * beginning of the file.
 	 */
-	if (fd == -1) {
-		fd = create_ramdisk(RD_BOOTFS, wanbootfs_size, devpath);
+	if (bootfs_vaddr == NULL) {
+		bootfs_vaddr = create_ramdisk(RD_BOOTFS, wanbootfs_size,
+		    devpath);
 	}
 
 	offset = 0;
-	if (prom_seek(fd, offset) == -1) {
-		bootlog("wanboot", BOOTLOG_CRIT,
-			"%s: prom_seek error", WANBOOTFS);
-		return (-1);
-	}
 
-	if ((ret = write_msg_to_ramdisk(WANBOOTFS, fd, handle, wanbootfs_size,
-	    &offset, (hash_type == HASH_NONE) ? NULL : &sha)) != 0) {
-		if (ret < 0) {
-			/*
-			 * Reentry not supported.
-			 */
-			(void) prom_close(fd);
-		}
+	if ((ret = write_msg_to_ramdisk(WANBOOTFS, bootfs_vaddr, handle,
+	    wanbootfs_size, &offset, (hash_type == HASH_NONE) ? NULL : &sha))
+	    != 0) {
 		return (ret);
 	}
 
@@ -1401,17 +1343,13 @@ process_wanbootfs(http_handle_t handle, char **devpath,
 	 * If encrypted, then decrypt it.
 	 */
 	if (encr_type != ENCR_NONE) {
-		ret = decrypt_wanbootfs(fd, &ch, iv, block_size,
-		    wanbootfs_size);
+		ret = decrypt_wanbootfs(bootfs_vaddr, &ch, iv, wanbootfs_size);
 		if (ret != 0) {
 			encr_fini(encr_type, eh);
-			(void) prom_close(fd);
 			return (-1);
 		}
 		encr_fini(encr_type, eh);
 	}
-
-	(void) prom_close(fd);
 
 	return (read_digest(WANBOOTFS, handle, sdigest));
 }
@@ -1472,7 +1410,7 @@ get_wanbootfs(const url_t *server_url)
 	bzero(cdigest, sizeof (cdigest));
 	do {
 		if ((ret = establish_http_connection(WANBOOTFS, &handle,
-			&req_url, 0)) < 0) {
+		    &req_url, 0)) < 0) {
 			break;
 		} else if (ret > 0) {
 			if (wanboot_retry(++retry_cnt, retry_max)) {
@@ -1483,7 +1421,7 @@ get_wanbootfs(const url_t *server_url)
 		}
 
 		if ((ret = process_wanbootfs(handle, &devpath,
-			cdigest, sdigest)) > 0) {
+		    cdigest, sdigest)) > 0) {
 			if (!wanboot_retry(++retry_cnt, retry_max)) {
 				(void) http_srv_close(handle);
 				break;
@@ -1498,7 +1436,7 @@ get_wanbootfs(const url_t *server_url)
 	 * Validate the computed digest against the one received.
 	 */
 	if (ret != 0 ||
-		!verify_digests(WANBOOTFS, cdigest, sdigest)) {
+	    !verify_digests(WANBOOTFS, cdigest, sdigest)) {
 		bootlog("wanboot", BOOTLOG_CRIT,
 		    "The wanboot file system download aborted");
 		return (-1);
@@ -1530,7 +1468,7 @@ get_wanbootfs(const url_t *server_url)
 	 */
 	if ((fd = open(WANBOOTFS_NONCE_FILE, O_RDONLY)) == -1) {
 		bootlog("wanboot", BOOTLOG_CRIT,
-			"No nonce found in the wanboot file system");
+		    "No nonce found in the wanboot file system");
 		bootlog("wanboot", BOOTLOG_CRIT,
 		    "The wanboot file system download aborted");
 		return (-1);
@@ -1540,7 +1478,7 @@ get_wanbootfs(const url_t *server_url)
 	    bcmp(nonce, buf, NONCELEN) != 0) {
 		(void) close(fd);
 		bootlog("wanboot", BOOTLOG_CRIT,
-			"Invalid nonce found in the wanboot file system");
+		    "Invalid nonce found in the wanboot file system");
 		bootlog("wanboot", BOOTLOG_CRIT,
 		    "The wanboot file system download aborted");
 		return (-1);
@@ -1633,7 +1571,7 @@ init_netdev(char *bpath)
  *
  * - The wanboot miniroot is downloaded over http/https into the rootfs
  *   ramdisk.  The bootfs filesystem is unmounted, and the rootfs filesystem
- *   is mounted.
+ *   is booted.
  */
 /* EXPORT DELETE END */
 /*ARGSUSED*/
@@ -1723,39 +1661,7 @@ bootprog(char *bpath, char *bargs, boolean_t user_specified_filename)
 	 */
 	(void) unmountroot();
 
-	/*
-	 * Mount the miniroot.
-	 */
-	if (determine_fstype_and_mountroot(miniroot_path) != VFS_SUCCESS) {
-		bootlog("wanboot", BOOTLOG_CRIT,
-		    "Could not mount miniroot filesystem");
-		return (-1);
-	}
-	bootlog("wanboot", BOOTLOG_VERBOSE, "The miniroot has been mounted");
-
-	v2path = "/ramdisk-rootfs:a";
-	bootlog("wanboot", BOOTLOG_VERBOSE, "device path '%s'", v2path);
-
-	/*
-	 * kernname (default-name) might have changed if mountroot() called
-	 * boot_nfs_mountroot(), and it called set_default_filename().
-	 */
-	if (! user_specified_filename)
-		(void) strcpy(filename, kernname);
-
-	bootlog("wanboot", BOOTLOG_VERBOSE,
-	    "standalone = `%s', args = `%s'", filename, bargs);
-
-	set_client_bootargs(filename, bargs);
-
-	/*
-	 * We're done with the mac interface that was initialized by
-	 * mac_init() inside init_netdev().
-	 */
-	mac_fini();
-
-	bootconf_end(&bc_handle);
-	bootinfo_end();
+	boot_ramdisk(RD_ROOTFS);
 
 /* EXPORT DELETE END */
 	return (0);

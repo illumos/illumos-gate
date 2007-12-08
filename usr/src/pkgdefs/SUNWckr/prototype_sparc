@@ -145,6 +145,7 @@ d none kernel/fs/sparcv9 755 root sys
 f none kernel/fs/sparcv9/autofs 755 root sys
 f none kernel/fs/sparcv9/cachefs 755 root sys
 f none kernel/fs/sparcv9/ctfs 755 root sys
+f none kernel/fs/sparcv9/dcfs 755 root sys
 f none kernel/fs/sparcv9/devfs 755 root sys
 f none kernel/fs/sparcv9/dev 755 root sys
 f none kernel/fs/sparcv9/fifofs 755 root sys
@@ -189,7 +190,6 @@ f none kernel/misc/sparcv9/idmap 755 root sys
 f none kernel/misc/sparcv9/ipc 755 root sys
 f none kernel/misc/sparcv9/kbtrans 755 root sys
 f none kernel/misc/sparcv9/kcf 755 root sys
-f none kernel/misc/sparcv9/krtld 755 root sys
 f none kernel/misc/sparcv9/mac 755 root sys
 l none kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
 f none kernel/misc/sparcv9/neti 755 root sys

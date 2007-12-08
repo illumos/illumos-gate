@@ -1,0 +1,82 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# psm/stand/bootblks/zfs/Makefile.zfs
+#
+
+include $(BASEDIR)/Makefile.com
+
+#
+# Define FS dependent targets
+#
+
+ZFS_DIR			= $(BASEDIR)/zfs/common
+
+ZFSBOOT_FTH		= $(ZFS_DIR)/boot-zfs.fth
+ZFS_FTH			= $(ZFS_DIR)/zfs.fth
+
+FS_FCODE		= boot-zfs.fcode
+FS_BB			= zfs.bb
+
+ZFSDBGBOOT_FTH		= $(ZFS_DIR)/debug-zfs.fth
+ZFSDBG_FTH		= $(ZFS_DIR)/big-zfs.fth
+
+DBGBOOT_FCODE		= debug-zfs.fcode
+DBGFS_FCODE		= big-zfs.fcode
+
+DBGFS_BB		= debugzfs.bb
+DBGPROG			= debugbb
+
+DBG_CLEAN		+= $(DBGBOOT_FCODE) $(DBGFS_FCODE)
+DBG_CLOBBER		+= $(DBGPROG) $(DBGFS_BB)
+
+#
+# Where and how stuff gets installed
+#
+USR_PSM_BOOTBLOCK	= $(USR_PSM_LIB_ZFS_DIR)/$(PROG)
+
+%.fcode:	$(BASEDIR)/zfs/common/%.fth
+	$(TOKENIZE) $<
+
+# make doesn't know fload
+$(FS_FCODE):	$(UTIL_FTH) $(ZFS_FTH) $(BOOT_FTH)
+	$(TOKENIZE) $(ZFSBOOT_FTH)
+
+
+$(DBGBOOT_FCODE):	$(UTIL_FTH) $(BOOT_FTH)
+	$(TOKENIZE) $(ZFSDBGBOOT_FTH)
+
+$(DBGFS_FCODE):		$(UTIL_FTH) $(ZFS_FTH)
+	$(TOKENIZE) $(ZFSDBG_FTH)
+
+$(DBGFS_BB):		$(MKBB) $(DBGBOOT_FCODE) $(DBGFS_FCODE) $(RD_FCODE)
+	$(MKBB) -e $(DBGFS_FCODE) $(DBGBOOT_FCODE) $(RD_FCODE) $(DBGFS_BB)
+
+$(DBGPROG):		$(DBGFS_BB)
+	@-$(RM) $@
+	cp -p $(DBGFS_BB) $@
+
+debug:	$(DBGPROG)

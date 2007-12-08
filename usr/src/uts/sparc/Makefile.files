@@ -79,13 +79,9 @@ CORE_OBJS +=	prmachdep.o
 #
 #			misc modules
 #
-KRTLD_BOOT_OBJS +=	kobj_boot.o
 KRTLD_OBJS +=		\
-	bootops.o	\
 	doreloc.o 	\
-	kobj_alloc.o	\
 	kobj_convrelstr.o \
-	kobj_crt.o	\
 	kobj_isa.o 	\
 	kobj_reloc.o
 
@@ -110,6 +106,7 @@ SDT_OBJS	+= sdt.o
 #
 LINT_DEFS	+= -Dsparc
 INC_PATH	+= -I$(UTSBASE)/sparc
+INC_PATH	+= -I$(UTSBASE)/sparc/krtld
 
 #
 # Since assym.h is a derived file, the dependency must be explicit for

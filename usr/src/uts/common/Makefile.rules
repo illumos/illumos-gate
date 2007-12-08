@@ -178,6 +178,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/cachefs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/dcfs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/devfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -907,6 +911,22 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/ktli/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+#
+# krtld must refer to its own bzero/bcopy until the kernel is fully linked
+#
+$(OBJS_DIR)/bootrd.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/doreloc.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_boot.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_bootflags.o	:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_convrelstr.o	:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_isa.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_kdi.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_lm.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_reloc.o	:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_stubs.o	:= CPPFLAGS += -DKOBJ_OVERRIDES
+$(OBJS_DIR)/kobj_subr.o		:= CPPFLAGS += -DKOBJ_OVERRIDES
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/krtld/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1140,6 +1160,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/ctfs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/doorfs/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/dcfs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/fs/devfs/%.c

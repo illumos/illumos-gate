@@ -739,6 +739,15 @@ fcnname/**/_info:							\
 #endif
 
 /*
+ * Stubs for dcfs
+ */
+#ifndef DCFS_MODULE
+	MODULE(dcfs,fs);
+	STUB(dcfs, decompvp, 0);
+	END_MODULE(dcfs);
+#endif
+
+/*
  * Stubs for namefs
  */
 #ifndef NAMEFS_MODULE

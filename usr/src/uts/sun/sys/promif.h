@@ -312,6 +312,18 @@ extern	pnode_t		prom_findnode_bydevtype(pnode_t id, char *devtype);
 	prom_enter_mon();	\
 }
 
+/*
+ * file IO
+ */
+extern	int		prom_fopen(ihandle_t, char *);
+extern	int		prom_fseek(ihandle_t, int, unsigned long long);
+extern	int		prom_fread(ihandle_t, int, caddr_t, size_t);
+extern	int		prom_fsize(ihandle_t, int, size_t *);
+extern	int		prom_compinfo(ihandle_t, int, int *,
+			    size_t *, size_t *);
+extern	void		prom_fclose(ihandle_t, int);
+
+
 #endif	/* _KERNEL || _KMDB */
 
 #ifdef _KERNEL

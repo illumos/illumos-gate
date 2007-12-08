@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Implementation of the vestigial bootops vector for platforms using the
- * 1275-like boot interfaces.
- */
 
 #include <sys/types.h>
 #include <sys/bootconf.h>
@@ -51,38 +45,20 @@ static const int debug = 0;
 
 extern void	closeall(int);
 
-/*
- * This is the number for this version of bootops, which is vestigial.
- * Standalones that require the old bootops will look in bootops.bsys_version,
- * see this number is higher than they expect and fail gracefully.
- * They can make this "peek" successfully even if they are ILP32 programs.
- */
-int boot_version = BO_VERSION;
-
 struct bootops bootops;
+
+static void
+boot_fail(void)
+{
+	prom_panic("bootops is gone, it should not be called");
+}
 
 void
 setup_bootops(void)
 {
-	/* sanity-check bsys_printf - old kernels need to fail with a message */
-#if !defined(lint)
-	if (offsetof(struct bootops, bsys_printf) != 60) {
-		printf("boot: bsys_printf is at offset 0x%lx instead of 60\n"
-		    "boot: this will likely make old kernels die without "
-		    "printing a message.\n",
-		    offsetof(struct bootops, bsys_printf));
-	}
-	/* sanity-check bsys_1275_call - if it moves, kernels cannot boot */
-	if (offsetof(struct bootops, bsys_1275_call) != 24) {
-		printf("boot: bsys_1275_call is at offset 0x%lx instead of 24\n"
-			"boot: this will likely break the kernel\n",
-		    offsetof(struct bootops, bsys_1275_call));
-	}
-#endif
-	bootops.bsys_version = boot_version;
-	bootops.bsys_1275_call = (uint64_t)boot1275_entry;
-	/* so old kernels die with a message */
-	bootops.bsys_printf = (uint32_t)boot_fail_gracefully;
+	bootops.bsys_version = BO_VERSION;
+	bootops.bsys_1275_call = (uint64_t)boot_fail;
+	bootops.bsys_printf = (uint32_t)boot_fail;
 
 	if (!memlistpage) /* paranoia runs rampant */
 		prom_panic("\nMemlistpage not setup yet.");
@@ -203,11 +179,4 @@ kern_killboot(void)
 	dump_mmu();
 	prom_enter_mon();
 #endif
-}
-
-void
-boot_fail_gracefully(void)
-{
-	prom_panic(
-	    "mismatched version of /boot interface: new boot, old kernel");
 }

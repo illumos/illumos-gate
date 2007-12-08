@@ -20,13 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
-#include	"reloc.h"
+#include	"krtld/reloc.h"
 
 static const char	*rels[R_SPARC_NUM] = {
 	"R_SPARC_NONE",			"R_SPARC_8",

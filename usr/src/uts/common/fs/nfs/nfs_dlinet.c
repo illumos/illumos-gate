@@ -951,7 +951,7 @@ getfile(char *fileid,
 }
 
 /*
- * If the boot property "bootp-response" exists, then inetboot performed a
+ * If the boot property "bootp-response" exists, then OBP performed a
  * successful DHCP lease acquisition for us and left the resultant ACK packet
  * encoded at that location.
  *
@@ -968,8 +968,6 @@ dhcpinit(void)
 	DHCP_OPT *doptp;
 	TIUSER *tiptr;
 	struct sockaddr_in *sin;
-	int true_dhcacklen;
-	char *ackp;
 	static int once_only = 0;
 
 	if (once_only == 1) {
@@ -981,45 +979,24 @@ dhcpinit(void)
 		return (-1);
 	}
 
-	ackp = (char *)(dhcack + IFNAMSIZ);
-	true_dhcacklen = strlen(ackp);
-
-	/*
-	 *	Since we expect the "bootp-response" property to have
-	 *	been encoded via octet_to_hexascii(), its length should
-	 *	always be even.
-	 */
-	ASSERT((true_dhcacklen % 2) == 0);
-
 	if (dldebug) {
 		printf("dhcp:  dhcack %p, len %d\n", (void *)dhcack,
-		    true_dhcacklen + IFNAMSIZ);
+		    dhcacklen);
 	}
 
 	pl = kmem_alloc(sizeof (PKT_LIST), KM_SLEEP);
-	pl->len = true_dhcacklen / 2;
+	pl->len = dhcacklen;
 	pl->pkt = kmem_alloc(pl->len, KM_SLEEP);
+	bcopy(dhcack, pl->pkt, dhcacklen);
 
 	/*
-	 * Store our interface name in the reserved block at the
-	 * head of our packet. For x86, ifname is not initialized
+	 * For x86, ifname is not initialized
 	 * in the netinstall case and dhcack interface name is
 	 * set in strplumb(). So we only copy the name if ifname
 	 * is set properly.
 	 */
 	if (ifname[0])
-		(void) strncpy(dhcack, ifname, IFNAMSIZ - 1);
-
-	/* skip over the interface name section */
-	if (hexascii_to_octet(ackp, true_dhcacklen, (uchar_t *)pl->pkt,
-	    &(pl->len)) != 0) {
-		cmn_err(CE_WARN,
-		    "dhcp: boot dhcp cache is corrupted.");
-		kmem_free(pl->pkt, pl->len);
-		kmem_free(pl, sizeof (PKT_LIST));
-		pl = NULL;
-		return (-1);
-	}
+		(void) strlcpy(dhcifname, ifname, sizeof (dhcifname));
 
 	/* remember the server_ip in dhcack */
 	bcopy((uchar_t *)pl->pkt + 20, dhcp_server_ip, 4);

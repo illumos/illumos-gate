@@ -514,37 +514,6 @@ ndata_maxsize(struct memlist *ndata)
 	return (chunksize);
 }
 
-/*
- * This is a special function to figure out if the memory chunk needed
- * for the page structs can fit in the nucleus or not. If it fits the
- * function calculates and returns the possible remaining ndata size
- * in the last element if the size needed for page structs would be
- * allocated from the nucleus.
- */
-size_t
-ndata_spare(struct memlist *ndata, size_t wanted, size_t alignment)
-{
-	struct memlist *frlist;
-	uintptr_t base;
-	uintptr_t end;
-
-	for (frlist = ndata; frlist != NULL; frlist = frlist->next) {
-		base = roundup(frlist->address, alignment);
-		end = roundup(base + wanted, ecache_alignsize);
-
-		if (end <= frlist->address + frlist->size) {
-			if (frlist->next == NULL)
-				return (frlist->address + frlist->size - end);
-
-			while (frlist->next != NULL)
-				frlist = frlist->next;
-
-			return (frlist->size);
-		}
-	}
-
-	return (0);
-}
 
 /*
  * Allocate the last properly aligned memory chunk.
@@ -876,26 +845,10 @@ ndata_alloc_tsbs(struct memlist *ndata, pgcnt_t npages)
 	return (0);
 }
 
-/*
- * Allocate hat structs from the nucleus data memory.
- */
-int
-ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
+size_t
+calc_hmehash_sz(pgcnt_t npages)
 {
-	size_t	mml_alloc_sz;
-	size_t	cb_alloc_sz;
-	int	max_nucuhme_buckets = MAX_NUCUHME_BUCKETS;
-	int	max_nuckhme_buckets = MAX_NUCKHME_BUCKETS;
 	ulong_t hme_buckets;
-
-	if (enable_bigktsb) {
-		ASSERT((max_nucuhme_buckets + max_nuckhme_buckets) *
-		    sizeof (struct hmehash_bucket) <=
-		    TSB_BYTES(TSB_1M_SZCODE));
-
-		max_nucuhme_buckets *= 2;
-		max_nuckhme_buckets *= 2;
-	}
 
 	/*
 	 * The number of buckets in the hme hash tables
@@ -925,27 +878,36 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	khmehash_num = 1 << highbit(khmehash_num - 1);
 	khmehash_num = MAX(khmehash_num, MIN_KHME_BUCKETS);
 
-	if ((khmehash_num > max_nuckhme_buckets) ||
-	    (uhmehash_num > max_nucuhme_buckets)) {
-		khme_hash = NULL;
-		uhme_hash = NULL;
-	} else {
-		size_t hmehash_sz = (uhmehash_num + khmehash_num) *
-		    sizeof (struct hmehash_bucket);
+	return ((uhmehash_num + khmehash_num) * sizeof (struct hmehash_bucket));
+}
 
-		if ((khme_hash = ndata_alloc(ndata, hmehash_sz,
-		    ecache_alignsize)) != NULL)
-			uhme_hash = &khme_hash[khmehash_num];
-		else
-			uhme_hash = NULL;
+caddr_t
+alloc_hmehash(caddr_t alloc_base)
+{
+	size_t khmehash_sz, uhmehash_sz;
 
-		PRM_DEBUG(hmehash_sz);
-	}
+	khme_hash = (struct hmehash_bucket *)alloc_base;
+	khmehash_sz = khmehash_num * sizeof (struct hmehash_bucket);
+	alloc_base += khmehash_sz;
+
+	uhme_hash = (struct hmehash_bucket *)alloc_base;
+	uhmehash_sz = uhmehash_num * sizeof (struct hmehash_bucket);
+	alloc_base += uhmehash_sz;
 
 	PRM_DEBUG(khme_hash);
-	PRM_DEBUG(khmehash_num);
 	PRM_DEBUG(uhme_hash);
-	PRM_DEBUG(uhmehash_num);
+
+	return (alloc_base);
+}
+
+/*
+ * Allocate hat structs from the nucleus data memory.
+ */
+int
+ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages)
+{
+	size_t	mml_alloc_sz;
+	size_t	cb_alloc_sz;
 
 	/*
 	 * For the page mapping list mutex array we allocate one mutex
@@ -954,13 +916,6 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	 * is rounded up (ie. 1 << highbit(npages * 1.5 / 128))
 	 *
 	 * mml_shift is roughly log2(mml_table_sz) + 3 for MLIST_HASH
-	 *
-	 * It is not required that this be allocated from the nucleus,
-	 * but it is desirable.  So we first allocate from the nucleus
-	 * everything that must be there.  Having done so, if mml_table
-	 * will fit within what remains of the nucleus then it will be
-	 * allocated here.  If not, set mml_table to NULL, which will cause
-	 * startup_memlist() to BOP_ALLOC() space for it after our return...
 	 */
 	mml_table_sz = 1 << highbit((npages * 3) / 256);
 	if (mml_table_sz < 64)
@@ -975,89 +930,70 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	mml_alloc_sz = mml_table_sz * sizeof (kmutex_t);
 
 	mml_table = ndata_alloc(ndata, mml_alloc_sz, ecache_alignsize);
-
+	if (mml_table == NULL)
+		return (-1);
 	PRM_DEBUG(mml_table);
 
 	cb_alloc_sz = sfmmu_max_cb_id * sizeof (struct sfmmu_callback);
 	PRM_DEBUG(cb_alloc_sz);
 	sfmmu_cb_table = ndata_alloc(ndata, cb_alloc_sz, ecache_alignsize);
+	if (sfmmu_cb_table == NULL)
+		return (-1);
 	PRM_DEBUG(sfmmu_cb_table);
+
+	return (0);
+}
+
+int
+ndata_alloc_kpm(struct memlist *ndata, pgcnt_t kpm_npages)
+{
+	size_t	kpmp_alloc_sz;
 
 	/*
 	 * For the kpm_page mutex array we allocate one mutex every 16
 	 * kpm pages (64MB). In smallpage mode we allocate one mutex
 	 * every 8K pages. The minimum is set to 64 entries and the
 	 * maximum to 8K entries.
-	 *
-	 * It is not required that this be allocated from the nucleus,
-	 * but it is desirable.  So we first allocate from the nucleus
-	 * everything that must be there.  Having done so, if kpmp_table
-	 * or kpmp_stable will fit within what remains of the nucleus
-	 * then it will be allocated here.  If not, startup_memlist()
-	 * will use BOP_ALLOC() space for it after our return...
 	 */
-	if (kpm_enable) {
-		size_t	kpmp_alloc_sz;
+	if (kpm_smallpages == 0) {
+		kpmp_shift = highbit(sizeof (kpm_page_t)) - 1;
+		kpmp_table_sz = 1 << highbit(kpm_npages / 16);
+		kpmp_table_sz = (kpmp_table_sz < 64) ? 64 :
+		    ((kpmp_table_sz > 8192) ? 8192 : kpmp_table_sz);
+		kpmp_alloc_sz = kpmp_table_sz * sizeof (kpm_hlk_t);
 
-		if (kpm_smallpages == 0) {
-			kpmp_shift = highbit(sizeof (kpm_page_t)) - 1;
-			kpmp_table_sz = 1 << highbit(kpm_npages / 16);
-			kpmp_table_sz = (kpmp_table_sz < 64) ? 64 :
-			    ((kpmp_table_sz > 8192) ? 8192 : kpmp_table_sz);
-			kpmp_alloc_sz = kpmp_table_sz * sizeof (kpm_hlk_t);
+		kpmp_table = ndata_alloc(ndata, kpmp_alloc_sz,
+		    ecache_alignsize);
+		if (kpmp_table == NULL)
+			return (-1);
 
-			kpmp_table = ndata_alloc(ndata, kpmp_alloc_sz,
-			    ecache_alignsize);
+		PRM_DEBUG(kpmp_table);
+		PRM_DEBUG(kpmp_table_sz);
 
-			PRM_DEBUG(kpmp_table);
-			PRM_DEBUG(kpmp_table_sz);
+		kpmp_stable_sz = 0;
+		kpmp_stable = NULL;
+	} else {
+		ASSERT(kpm_pgsz == PAGESIZE);
+		kpmp_shift = highbit(sizeof (kpm_shlk_t)) + 1;
+		kpmp_stable_sz = 1 << highbit(kpm_npages / 8192);
+		kpmp_stable_sz = (kpmp_stable_sz < 64) ? 64 :
+		    ((kpmp_stable_sz > 8192) ? 8192 : kpmp_stable_sz);
+		kpmp_alloc_sz = kpmp_stable_sz * sizeof (kpm_shlk_t);
 
-			kpmp_stable_sz = 0;
-			kpmp_stable = NULL;
-		} else {
-			ASSERT(kpm_pgsz == PAGESIZE);
-			kpmp_shift = highbit(sizeof (kpm_shlk_t)) + 1;
-			kpmp_stable_sz = 1 << highbit(kpm_npages / 8192);
-			kpmp_stable_sz = (kpmp_stable_sz < 64) ? 64 :
-			    ((kpmp_stable_sz > 8192) ? 8192 : kpmp_stable_sz);
-			kpmp_alloc_sz = kpmp_stable_sz * sizeof (kpm_shlk_t);
+		kpmp_stable = ndata_alloc(ndata, kpmp_alloc_sz,
+		    ecache_alignsize);
+		if (kpmp_stable == NULL)
+			return (-1);
 
-			kpmp_stable = ndata_alloc(ndata, kpmp_alloc_sz,
-			    ecache_alignsize);
+		PRM_DEBUG(kpmp_stable);
+		PRM_DEBUG(kpmp_stable_sz);
 
-			PRM_DEBUG(kpmp_stable);
-			PRM_DEBUG(kpmp_stable_sz);
-
-			kpmp_table_sz = 0;
-			kpmp_table = NULL;
-		}
-		PRM_DEBUG(kpmp_shift);
+		kpmp_table_sz = 0;
+		kpmp_table = NULL;
 	}
+	PRM_DEBUG(kpmp_shift);
 
 	return (0);
-}
-
-/*
- * Allocate virtual addresses at base with given alignment.
- * Note that there is no physical memory behind the address yet.
- */
-caddr_t
-alloc_hme_buckets(caddr_t base, int alignsize)
-{
-	size_t hmehash_sz = (uhmehash_num + khmehash_num) *
-	    sizeof (struct hmehash_bucket);
-
-	ASSERT(khme_hash == NULL);
-	ASSERT(uhme_hash == NULL);
-
-	base = (caddr_t)roundup((uintptr_t)base, alignsize);
-	hmehash_sz = roundup(hmehash_sz, alignsize);
-
-	khme_hash = (struct hmehash_bucket *)base;
-	uhme_hash = (struct hmehash_bucket *)((caddr_t)khme_hash +
-	    khmehash_num * sizeof (struct hmehash_bucket));
-	base += hmehash_sz;
-	return (base);
 }
 
 /*
@@ -1070,8 +1006,7 @@ sfmmu_ktsb_alloc(caddr_t tsbbase)
 
 	if (enable_bigktsb) {
 		ktsb_base = (caddr_t)roundup((uintptr_t)tsbbase, ktsb_sz);
-		vaddr = (caddr_t)BOP_ALLOC(bootops, ktsb_base, ktsb_sz,
-		    ktsb_sz);
+		vaddr = prom_alloc(ktsb_base, ktsb_sz, ktsb_sz);
 		if (vaddr != ktsb_base)
 			cmn_err(CE_PANIC, "sfmmu_ktsb_alloc: can't alloc"
 			    " 8K bigktsb");
@@ -1275,7 +1210,8 @@ sfmmu_tsb_segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
 		 * to do this the hard way.
 		 */
 		for (lgrpid = 0; lgrpid < NLGRPS_MAX &&
-		    vmp != kmem_tsb_default_arena[lgrpid]; lgrpid++);
+		    vmp != kmem_tsb_default_arena[lgrpid]; lgrpid++)
+			;
 		if (lgrpid == NLGRPS_MAX)
 			lgrpid = LGRP_NONE;
 	}

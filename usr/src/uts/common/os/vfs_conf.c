@@ -80,6 +80,7 @@ struct vfssw vfssw[] = {
 	{ "ctfs" },				/* CONTRACTFS */
 	{ "objfs" },				/* OBJFS */
 	{ "sharefs" },				/* SHAREFS */
+	{ "dcfs" },				/* DCFS */
 	{ "" },					/* reserved for loadable fs */
 	{ "" },
 	{ "" },

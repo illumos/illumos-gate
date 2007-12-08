@@ -56,7 +56,7 @@ uint64_t	cpu_pa[NCPU];	/* pointers to all CPUs in PA */
 cpu_core_t	cpu_core[NCPU];	/* cpu_core structures */
 
 #ifdef TRAPTRACE
-caddr_t	ttrace_buf;	/* bop alloced traptrace for all cpus except 0 */
+caddr_t	ttrace_buf;	/* kmem64 traptrace for all cpus except 0 */
 #endif /* TRAPTRACE */
 
 /* bit mask of cpus ready for x-calls, protected by cpu_lock */
@@ -83,25 +83,14 @@ static void	slave_startup(void);
 /*
  * This function sets traptrace buffers for all cpus
  * other than boot cpu.
- * Note that the memory at base will be allocated later.
  */
-caddr_t
-trap_trace_alloc(caddr_t base)
+size_t
+calc_traptrace_sz(void)
 {
-	caddr_t	vaddr;
-	extern int max_ncpus;
-
-	if (max_ncpus == 1) {
-		return (base);
-	}
-
-	vaddr = (caddr_t)base;
-
-	ttrace_buf = vaddr;
-	PRM_DEBUG(ttrace_buf);
-	return (vaddr + (TRAP_TSIZE * (max_ncpus - 1)));
+	return (TRAP_TSIZE * (max_ncpus - 1));
 }
 #endif	/* TRAPTRACE */
+
 
 /*
  * common slave cpu initialization code

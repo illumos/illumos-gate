@@ -185,7 +185,7 @@ mem_node_post_del_slice(pfn_t start, pfn_t end, int cancelled)
 }
 
 void
-startup_build_mem_nodes(u_longlong_t *list, size_t nelems)
+startup_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 {
 	size_t	elem;
 	pfn_t	basepfn;
@@ -200,13 +200,11 @@ startup_build_mem_nodes(u_longlong_t *list, size_t nelems)
 		/*
 		 * Boot install lists are arranged <addr, len>, ...
 		 */
-		for (elem = 0; elem < nelems; elem += 2) {
-			basepfn = btop(list[elem]);
-			npgs = btop(list[elem+1]);
+		for (elem = 0; elem < nelems; list++, elem++) {
+			basepfn = btop(list->addr);
+			npgs = btop(list->size);
 			mem_node_add_slice(basepfn, basepfn + npgs - 1);
 		}
-		mem_node_physalign = 0;
-		mem_node_pfn_shift = 0;
 	}
 }
 

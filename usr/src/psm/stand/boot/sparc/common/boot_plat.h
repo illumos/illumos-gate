@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +35,6 @@ extern "C" {
 
 
 /* boot_plat.c */
-extern char	*cmd_line_default_path;
 extern int	verbosemode;
 extern char	filename[];
 extern char	*const defname;
@@ -52,21 +50,11 @@ extern void	set_client_bootargs(const char *, const char *);
 extern boolean_t is_netdev(char *devpath);
 
 
-/* boot_1275entry.c */
-extern int	boot1275_entry_asm(void *);
-extern void	boot_fail_gracefully_asm(void);
-
-
-/* boot_services.c */
-extern int	boot1275_entry(void *);
-
-
 /* bootops.c */
 extern struct bootops	bootops;
 
 extern void	setup_bootops(void);
 extern void	update_memlist(char *, char *, struct memlist **);
-extern void	boot_fail_gracefully(void);
 
 
 /*
@@ -81,7 +69,6 @@ extern char	*mfg_name;
 extern char	*impl_arch_name;
 extern char	*bootp_response;
 extern char	*boot_message;
-extern char	*cmd_line_default_path;
 extern int	cache_state;
 extern uint64_t	memlistextent;
 extern char	*netdev_path;

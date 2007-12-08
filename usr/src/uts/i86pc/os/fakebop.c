@@ -383,7 +383,7 @@ bsetpropsi(char *name, int value)
  */
 /*ARGSUSED*/
 int
-do_bsys_getproplen(bootops_t *bop, char *name)
+do_bsys_getproplen(bootops_t *bop, const char *name)
 {
 	bootprop_t *b;
 
@@ -400,7 +400,7 @@ do_bsys_getproplen(bootops_t *bop, char *name)
  */
 /*ARGSUSED*/
 int
-do_bsys_getprop(bootops_t *bop, char *name, void *value)
+do_bsys_getprop(bootops_t *bop, const char *name, void *value)
 {
 	bootprop_t *b;
 
@@ -698,7 +698,7 @@ done:
 /*PRINTFLIKE2*/
 /*ARGSUSED*/
 void
-bop_printf(bootops_t *bop, char *fmt, ...)
+bop_printf(bootops_t *bop, const char *fmt, ...)
 {
 	va_list	ap;
 
@@ -717,7 +717,7 @@ bop_printf(bootops_t *bop, char *fmt, ...)
  */
 /*PRINTFLIKE1*/
 void
-bop_panic(char *fmt, ...)
+bop_panic(const char *fmt, ...)
 {
 	va_list ap;
 
@@ -1216,8 +1216,11 @@ build_boot_properties(void)
 
 	/*
 	 * set boot-args property
+	 * 1275 name is bootargs, so set
+	 * that too
 	 */
 	bsetprops("boot-args", boot_args);
+	bsetprops("bootargs", boot_args);
 
 #ifndef __xpv
 	/*
@@ -2028,4 +2031,13 @@ usbser_init(size_t size)
 	bsetprop("usb-serial-buf", strlen("usb-serial-buf") + 1,
 	    &p, sizeof (p));
 	return (p);
+}
+
+/*ARGSUSED*/
+int
+boot_compinfo(int fd, struct compinfo *cbp)
+{
+	cbp->iscmp = 0;
+	cbp->blksize = MAXBSIZE;
+	return (0);
 }

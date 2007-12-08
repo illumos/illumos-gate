@@ -19971,11 +19971,11 @@ ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	 * and miniroot network configuration is driven from userland
 	 * these things still need to be set. This situation can be detected
 	 * by comparing the interface being configured here to the one
-	 * dhcack was set to reference by the boot loader. Once sysid is
+	 * dhcifname was set to reference by the boot loader. Once sysid is
 	 * converted to use dhcp_ipc_getinfo() this call can go away.
 	 */
-	if ((ipif->ipif_flags & IPIF_DHCPRUNNING) && (dhcack != NULL) &&
-	    (strcmp(ill->ill_name, dhcack) == 0) &&
+	if ((ipif->ipif_flags & IPIF_DHCPRUNNING) &&
+	    (strcmp(ill->ill_name, dhcifname) == 0) &&
 	    (strlen(srpc_domain) == 0)) {
 		if (dhcpinit() != 0)
 			cmn_err(CE_WARN, "no cached dhcp response");

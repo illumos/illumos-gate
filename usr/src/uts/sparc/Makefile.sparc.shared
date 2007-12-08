@@ -340,7 +340,7 @@ SCHED_KMODS	+= RT TS RT_DPTBL TS_DPTBL IA FSS FX FX_DPTBL
 #
 FS_KMODS	+= dev devfs fdfs fifofs hsfs lofs namefs nfs pcfs tmpfs zfs
 FS_KMODS	+= specfs udfs ufs autofs cachefs procfs sockfs mntfs
-FS_KMODS	+= ctfs objfs sharefs
+FS_KMODS	+= ctfs objfs sharefs dcfs
 
 #
 #	Streams Modules (/kernel/strmod):
@@ -368,7 +368,6 @@ SYS_KMODS	+= doorfs pset acctctl portfs
 MISC_KMODS	+= amsrc2 audiosup diaudio mixer
 MISC_KMODS	+= consconfig gld ipc nfs_dlboot nfssrv scsi
 MISC_KMODS	+= strplumb swapgeneric tlimod
-MISC_KMODS	+= krtld
 MISC_KMODS	+= rpcsec rpcsec_gss kgssapi kmech_dummy
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= fssnap_if

@@ -86,7 +86,6 @@ struct pci_bus_resource *pci_bus_res;
 
 size_t dma_max_copybuf_size = 0x101000;		/* 1M + 4K */
 
-extern int root_is_svm;
 uint64_t ramdisk_start, ramdisk_end;
 
 /*
@@ -2557,7 +2556,7 @@ getrootdev(void)
 	/*
 	 * Precedence given to rootdev if set in /etc/system
 	 */
-	if (root_is_svm) {
+	if (root_is_svm == B_TRUE) {
 		return (ddi_pathname_to_dev_t(svm_bootpath));
 	}
 

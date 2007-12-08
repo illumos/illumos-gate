@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +33,6 @@ SRCS= installgrub.c floppy.c $(PCFS_SRC)
 SBINLINKS= $(PROG)
 
 include ../Makefile.com
-
-ROOTUSRSBINLINKS= $(SBINLINKS:%=$(ROOTUSRSBIN)/%)
 
 CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
 
@@ -58,9 +54,6 @@ $(PROG): $(OBJS)
 # pick pcfs from usr/src/common/fs
 pcfs.o:	$(PCFS_SRC)
 	$(COMPILE.c) -o $@ $(PCFS_SRC)
-
-$(ROOTUSRSBINLINKS):
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
 
 install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
 

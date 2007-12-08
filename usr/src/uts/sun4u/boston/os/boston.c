@@ -191,7 +191,7 @@ load_platform_drivers(void)
 	 * updates to ALOM.
 	 */
 	rmc_req_now = (int (*)(rmc_comm_msg_t *, uint8_t))
-		modgetsymvalue("rmc_comm_request_nowait", 0);
+	    modgetsymvalue("rmc_comm_request_nowait", 0);
 }
 
 /*
@@ -313,7 +313,7 @@ plat_nodename_set(void)
 	 * find the symbol for the mailbox routine
 	 */
 	rmc_req_res = (int (*)(rmc_comm_msg_t *, rmc_comm_msg_t *, time_t))
-		modgetsymvalue("rmc_comm_request_response", 0);
+	    modgetsymvalue("rmc_comm_request_response", 0);
 
 	if (rmc_req_res == NULL) {
 		return;
@@ -385,7 +385,7 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	 * find the symbol for the mailbox routine
 	 */
 	rmc_req_now = (int (*)(rmc_comm_msg_t *, uint8_t))
-		modgetsymvalue("rmc_comm_request_nowait", 0);
+	    modgetsymvalue("rmc_comm_request_nowait", 0);
 	if (rmc_req_now == NULL) {
 		return;
 	}
@@ -563,23 +563,6 @@ plat_fill_mc(pnode_t nodeid)
 		plat_assign_lgrphand_to_mem_node((lgrp_handle_t)portid, portid);
 }
 
-/* ARGSUSED */
-void
-plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
-{
-	size_t	elem;
-	pfn_t	basepfn;
-	pgcnt_t	npgs;
-
-	/*
-	 * Boot install lists are arranged <addr, len>, <addr, len>, ...
-	 */
-	for (elem = 0; elem < nelems; elem += 2) {
-		basepfn = btop(list[elem]);
-		npgs = btop(list[elem+1]);
-		mem_node_add_slice(basepfn, basepfn + npgs - 1);
-	}
-}
 
 /*
  * Common locking enter code

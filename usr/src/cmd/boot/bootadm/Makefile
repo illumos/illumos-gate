@@ -27,8 +27,6 @@
 
 PROG= bootadm
 
-i386_DATA= filelist.ramdisk filelist.safe
-
 SBINLINKS= $(PROG)
 
 OBJS= bootadm.o bootadm_upgrade.o
@@ -36,12 +34,6 @@ SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com
 
-ROOTBOOTSOLARISDATA= $($(MACH)_DATA:%=$(ROOTBOOTSOLARIS)/%)
-ROOTUSRSBINLINKS= $(SBINLINKS:%=$(ROOTUSRSBIN)/%)
-
-$(ROOTBOOTSOLARISDATA) :=	OWNER = root
-$(ROOTBOOTSOLARISDATA) :=	GROUP = sys
-$(ROOTBOOTSOLARISDATA) :=	FILEMODE = 0644
 
 .KEEP_STATE:
 
@@ -59,10 +51,7 @@ $(PROG): $(OBJS) bootadm.h
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-$(ROOTUSRSBINLINKS):
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
-
-install: all $(ROOTSBINPROG) $(ROOTBOOTSOLARISDATA) .WAIT $(ROOTUSRSBINLINKS)
+install: all $(ROOTSBINPROG) .WAIT $(ROOTUSRSBINLINKS)
 
 clean:
 	-$(RM) $(OBJS)

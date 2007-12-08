@@ -90,6 +90,13 @@ i i.kmfconfbase
 # SUNWcsr
 #
 s none bin=./usr/bin
+d none boot 755 root sys
+d none boot/solaris 755 root sys
+d none boot/solaris/bin 0755 root sys
+f none boot/solaris/bin/create_ramdisk 0555 root sys
+f none boot/solaris/bin/extract_boot_filelist 0555 root sys
+f none boot/solaris/filelist.ramdisk 0644 root sys
+f none boot/solaris/filelist.safe 0644 root sys
 d none dev 755 root sys
 d none etc 755 root sys
 e renamenew etc/.login 644 root sys
@@ -346,6 +353,7 @@ f none lib/svc/bin/svc.startd 0555 root sys
 d none lib/svc/capture 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/boot-archive 0555 root bin
+f none lib/svc/method/boot-archive-update 0555 root bin
 f none lib/svc/method/console-login 0555 root bin
 f none lib/svc/method/devices-local 0555 root bin
 f none lib/svc/method/fs-local 0555 root bin
@@ -515,6 +523,7 @@ d none var/svc/manifest/platform 755 root sys
 d none var/svc/manifest/site 755 root sys
 d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/boot-archive.xml 0444 root sys
+f none var/svc/manifest/system/boot-archive-update.xml 0444 root sys
 d none var/svc/manifest/system/device 755 root sys
 f manifest var/svc/manifest/system/device/devices-local.xml 0444 root sys
 f manifest var/svc/manifest/system/device/mpxio-upgrade.xml 0444 root sys

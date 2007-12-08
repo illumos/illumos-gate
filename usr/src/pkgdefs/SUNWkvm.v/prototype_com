@@ -72,5 +72,9 @@ d none usr/platform/sun4v/lib/fs 755 root bin
 #
 d none usr/platform/sun4v/lib/fs/ufs 755 root bin
 f none usr/platform/sun4v/lib/fs/ufs/bootblk 444 root sys
+d none usr/platform/sun4v/lib/fs/hsfs 755 root bin
+f none usr/platform/sun4v/lib/fs/hsfs/bootblk 444 root sys
+d none usr/platform/sun4v/lib/fs/zfs 755 root bin
+f none usr/platform/sun4v/lib/fs/zfs/bootblk 444 root sys
 d none usr/platform/sun4v/lib/fs/nfs 755 root bin
 f none usr/platform/sun4v/lib/fs/nfs/inetboot 644 root sys

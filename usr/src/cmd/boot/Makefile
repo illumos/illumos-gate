@@ -25,11 +25,12 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 .PARALLEL:
 
 COMMON_SUBDIRS=		\
+	filelist	\
 	scripts		\
 	bootadm
 
@@ -38,7 +39,8 @@ i386_SUBDIRS=		\
 	mbr		\
 	symdef
 
-sparc_SUBDIRS=
+sparc_SUBDIRS=		\
+	fiocompress
 
 COMMON_LINTSUBDIRS=	\
 	bootadm	
@@ -47,7 +49,8 @@ i386_LINTSUBDIRS=	\
 	installgrub	\
 	symdef
 
-sparc_LINTSUBDIRS=
+sparc_LINTSUBDIRS=	\
+	fiocompress
 
 COMMON_MSGSUBDIRS=	\
 	bootadm
@@ -55,7 +58,9 @@ COMMON_MSGSUBDIRS=	\
 i386_MSGSUBDIRS=	\
 	installgrub
 
-sparc_MSGSUBDIRS=
+sparc_MSGSUBDIRS=	\
+	fiocompress
+
 
 all:=		TARGET= all
 install:=	TARGET= install

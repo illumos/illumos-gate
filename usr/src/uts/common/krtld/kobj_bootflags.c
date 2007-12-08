@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,25 +51,37 @@ bootflags(struct bootops *ops)
 	int c;
 	char scratch[BOOTARGS_MAX];
 
-	if (BOP_GETPROP(ops, "boot-args", kern_bootargs) != 0) {
+	if (BOP_GETPROP(ops, "bootargs", kern_bootargs) == -1) {
 		boothowto |= RB_ASKNAME;
 		return;
 	}
 
 	cp = kern_bootargs;
 
-#if !defined(__i386) && !defined(__amd64)
+#if defined(_OBP)
 	/*
 	 * x86: The boot scripts (i.e., /etc/bootrc) don't prepend the kernel
 	 * name to the boot arguments.  (And beware making it do so: if the
 	 * run-kernel command returns, it will loop, and you will end up with
 	 * multiple copies of the kernel name.)
 	 */
-	SKIP_WORD(cp);		/* Skip the kernel's filename. */
+	if (cp[0] != '-') {
+		/* if user booted kadb or kmdb, load kmdb */
+		if (cp[0] == 'k' && (cp[1] == 'a' || cp[1] == 'm') &&
+		    cp[2] == 'd' && cp[3] == 'b' &&
+		    (cp[4] == ' ' || cp[4] == '	' || cp[4] == 0))
+			boothowto |= RB_KMDB;
+		SKIP_WORD(cp);		/* Skip the kernel's filename. */
+	}
 #endif
 	SKIP_SPC(cp);
 
+#if defined(_OBP)
+	/* skip bootblk args */
+	params.gos_opts = "abcdDF:gGHhi:km:o:O:rsvVwx";
+#else
 	params.gos_opts = "abcdgGhi:km:O:rsvwx";
+#endif
 	params.gos_strp = cp;
 	getoptstr_init(&params);
 	while ((c = getoptstr(&params)) != -1) {
@@ -87,6 +99,11 @@ bootflags(struct bootops *ops)
 		case 'd':
 			boothowto |= RB_DEBUGENTER;
 			break;
+#if defined(_OBP)
+		case 'D':
+		case 'F':
+			break;
+#endif
 		case 'g':
 			boothowto |= RB_FORTHDEBUG;
 			break;
@@ -96,6 +113,10 @@ bootflags(struct bootops *ops)
 		case 'h':
 			boothowto |= RB_HALT;
 			break;
+#if defined(_OBP)
+		case 'H':
+			break;
+#endif
 		case 'i':
 			if (params.gos_optarglen + 1 > sizeof (initname)) {
 				_kobj_printf(ops, "krtld: initname too long.  "
@@ -122,9 +143,15 @@ bootflags(struct bootops *ops)
 			    params.gos_optarglen);
 			scratch[params.gos_optarglen] = '\0';
 			(void) strlcat(initargs, "-m ", sizeof (initargs));
-			(void) strlcat(initargs, scratch, sizeof (initargs));
+			(void) strlcat(initargs, scratch,
+			    sizeof (initargs));
 			(void) strlcat(initargs, " ", sizeof (initargs));
 			break;
+#if defined(_OBP)
+		/* Ignore argument meant for wanboot standalone */
+		case 'o':
+			break;
+#endif
 		case 'O': {
 			char **str = &kobj_kmdb_argv[num_O_opt];
 
@@ -169,6 +196,10 @@ bootflags(struct bootops *ops)
 			boothowto |= RB_VERBOSE;
 			(void) strlcat(initargs, "-v ", sizeof (initargs));
 			break;
+#if defined(_OBP)
+		case 'V':
+			break;
+#endif
 		case 'w':
 			boothowto |= RB_WRITABLE;
 			break;

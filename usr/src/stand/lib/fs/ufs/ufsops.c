@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,7 @@ openi(fileid_t *filep, ino_t inode)
 	/* Nope, not there so lets read it off the disk. */
 	filep->fi_offset = 0;
 	filep->fi_blocknum = fsbtodb(&devp->un_fs.di_fs,
-				itod(&devp->un_fs.di_fs, inode));
+	    itod(&devp->un_fs.di_fs, inode));
 
 	/* never more than 1 disk block */
 	filep->fi_count = devp->un_fs.di_fs.fs_bsize;
@@ -147,7 +147,7 @@ openi(fileid_t *filep, ino_t inode)
 	    dp[itoo(&devp->un_fs.di_fs, inode)].di_un.di_icom;
 	filep->fi_inode->i_number = inode;
 	if (set_ricache(devp->di_dcookie, inode, (void *)filep->fi_inode,
-			sizeof (struct inode)))
+	    sizeof (struct inode)))
 		filep->fi_inode->i_flag = FI_NOCACHE;
 	return (0);
 }
@@ -210,8 +210,8 @@ find(fileid_t *filep, char *path)
 				    filep->fi_inode->i_db[0]);
 				filep->fi_count = DEV_BSIZE;
 				/* check the block cache */
-				if ((filep->fi_memp = get_bcache(filep))
-					== NULL) {
+				if ((filep->fi_memp =
+				    get_bcache(filep)) == NULL) {
 					if (set_bcache(filep))
 						return ((ino_t)0);
 					lufs_merge_deltas(filep);
@@ -385,7 +385,7 @@ dlook(fileid_t *filep, char *path)
 			continue;
 
 		if (set_rdcache(devp->di_dcookie, dp->d_name, ip->i_number,
-				dp->d_ino)) {
+		    dp->d_ino)) {
 			ip->i_flag &= ~FI_CACHED;
 			ip->i_flag |= FI_PARTIAL_CACHE;
 #ifdef DEBUG
@@ -825,16 +825,24 @@ boot_ufs_close(int fd)
 	}
 }
 
+/* closeall is now idempotent */
 /*ARGSUSED*/
 static void
 boot_ufs_closeall(int flag)
 {
 	fileid_t *filep = head;
 
+	if (ufs_devp == NULL) {
+		if (head)
+			prom_panic("boot_ufs_closeall: head != NULL.\n");
+		return;
+	}
+
 	while ((filep = filep->fi_forw) != head)
 		if (filep->fi_taken)
 			if (boot_ufs_close(filep->fi_filedes))
 				prom_panic("Filesystem may be inconsistent.\n");
+
 
 	release_cache(ufs_devp->di_dcookie);
 	(void) prom_close(ufs_devp->di_dcookie);
@@ -896,7 +904,7 @@ boot_ufs_getdents(int fd, struct dirent *dep, unsigned size)
 			}
 		}
 
-	    if ((fp->fi_inode->i_smode & IFMT) == IFDIR) {
+		if ((fp->fi_inode->i_smode & IFMT) == IFDIR) {
 			/*
 			 * If target file is a directory, go ahead
 			 * and read it.  This consists of making

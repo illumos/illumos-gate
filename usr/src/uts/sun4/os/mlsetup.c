@@ -33,6 +33,8 @@
 #include <sys/autoconf.h>
 #include <sys/promif.h>
 #include <sys/prom_plat.h>
+#include <sys/promimpl.h>
+#include <sys/platform_module.h>
 #include <sys/clock.h>
 #include <sys/pte.h>
 #include <sys/scb.h>
@@ -66,6 +68,10 @@
 #include <sys/sunddi.h>
 #include <sys/lgrp.h>
 #include <sys/traptrace.h>
+
+#include <sys/kobj_impl.h>
+#include <sys/kdi_machimpl.h>
+
 /*
  * External Routines:
  */
@@ -115,7 +121,7 @@ static void kern_splx_postprom(void);
  */
 
 void
-mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
+mlsetup(struct regs *rp, kfpu_t *fp)
 {
 	struct machpcb *mpcb;
 
@@ -127,6 +133,10 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 #ifdef TRAPTRACE
 	TRAP_TRACE_CTL *ctlp;
 #endif /* TRAPTRACE */
+
+	/* drop into kmdb on boot -d */
+	if (boothowto & RB_DEBUGENTER)
+		kmdb_enter();
 
 	/*
 	 * initialize cpu_self
@@ -205,10 +215,8 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 
 	cpu_vm_data_init(CPU);
 
-	prom_init("kernel", cif);
 	(void) prom_set_preprom(kern_splr_preprom);
 	(void) prom_set_postprom(kern_splx_postprom);
-
 	PRM_INFO("mlsetup: now ok to call prom_printf");
 
 	mpcb->mpcb_pa = va_to_pa(t0.t_stk);
@@ -297,4 +305,240 @@ static void
 kern_splx_postprom(void)
 {
 	splx(saved_spl);
+}
+
+
+/*
+ * WARNING
+ * The code fom here to the end of mlsetup.c runs before krtld has
+ * knitted unix and genunix together.  It can call routines in unix,
+ * but calls into genunix will fail spectacularly.  More specifically,
+ * calls to prom_*, bop_* and str* will work, everything else is
+ * caveat emptor.
+ *
+ * Also note that while #ifdef sun4u is generally a bad idea, they
+ * exist here to concentrate the dangerous code into a single file.
+ */
+
+static char *
+getcpulist(void)
+{
+	pnode_t node;
+	/* big enough for OBP_NAME and for a reasonably sized OBP_COMPATIBLE. */
+	static char cpubuf[5 * OBP_MAXDRVNAME];
+	int nlen, clen, i;
+#ifdef	sun4u
+	char dname[OBP_MAXDRVNAME];
+#endif
+
+	node = prom_findnode_bydevtype(prom_rootnode(), OBP_CPU);
+	if (node != OBP_NONODE && node != OBP_BADNODE) {
+		if ((nlen = prom_getproplen(node, OBP_NAME)) <= 0 ||
+		    nlen > sizeof (cpubuf) ||
+		    prom_getprop(node, OBP_NAME, cpubuf) <= 0)
+			prom_panic("no name in cpu node");
+
+		/* nlen includes the terminating null character */
+#ifdef	sun4v
+		if ((clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0) {
+#else	/* sun4u */
+		/*
+		 * For the CMT case, need check the parent "core"
+		 * node for the compatible property.
+		 */
+		if ((clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0 ||
+		    ((node = prom_parentnode(node)) != OBP_NONODE &&
+		    node != OBP_BADNODE &&
+		    (clen = prom_getproplen(node, OBP_COMPATIBLE)) > 0 &&
+		    prom_getprop(node, OBP_DEVICETYPE, dname) > 0 &&
+		    strcmp(dname, "core") == 0)) {
+#endif
+			if ((clen + nlen) > sizeof (cpubuf))
+				prom_panic("cpu node \"compatible\" too long");
+			/* read in compatible, leaving space for ':' */
+			if (prom_getprop(node, OBP_COMPATIBLE,
+			    &cpubuf[nlen]) != clen)
+				prom_panic("cpu node \"compatible\" error");
+			clen += nlen;	/* total length */
+			/* convert all null characters to ':' */
+			clen--;	/* except the final one... */
+			for (i = 0; i < clen; i++)
+				if (cpubuf[i] == '\0')
+					cpubuf[i] = ':';
+		}
+#ifdef	sun4u
+		/*
+		 * Some PROMs return SUNW,UltraSPARC when they actually have
+		 * SUNW,UltraSPARC-II cpus. SInce we're now filtering out all
+		 * SUNW,UltraSPARC systems during the boot phase, we can safely
+		 * point the auxv CPU value at SUNW,UltraSPARC-II.
+		 */
+		if (strcmp("SUNW,UltraSPARC", cpubuf) == 0)
+			(void) strcpy(cpubuf, "SUNW,UltraSPARC-II");
+#endif
+		return (cpubuf);
+	} else
+		return (NULL);
+}
+
+/*
+ * called immediately from _start to stich the
+ * primary modules together
+ */
+void
+kobj_start(void *cif)
+{
+	Ehdr *ehdr;
+	Phdr *phdr;
+	uint32_t eadr, padr;
+	val_t bootaux[BA_NUM];
+	int i;
+
+	prom_init("kernel", cif);
+	bop_init();
+#ifdef	DEBUG
+	if (bop_getproplen("stop-me") != -1)
+		prom_enter_mon();
+#endif
+
+	if (bop_getprop("elfheader-address", (caddr_t)&eadr) == -1)
+		prom_panic("no ELF image");
+	ehdr = (Ehdr *)(uintptr_t)eadr;
+	for (i = 0; i < BA_NUM; i++)
+		bootaux[i].ba_val = NULL;
+	bootaux[BA_PHNUM].ba_val = ehdr->e_phnum;
+	bootaux[BA_PHENT].ba_val = ehdr->e_phentsize;
+	bootaux[BA_LDNAME].ba_ptr = NULL;
+
+	padr = eadr + ehdr->e_phoff;
+	bootaux[BA_PHDR].ba_ptr = (void *)(uintptr_t)padr;
+	for (i = 0; i < ehdr->e_phnum; i++) {
+		phdr = (Phdr *)((uintptr_t)padr + i * ehdr->e_phentsize);
+		if (phdr->p_type == PT_DYNAMIC) {
+			bootaux[BA_DYNAMIC].ba_ptr = (void *)phdr->p_vaddr;
+			break;
+		}
+	}
+
+	bootaux[BA_LPAGESZ].ba_val = MMU_PAGESIZE4M;
+	bootaux[BA_PAGESZ].ba_val = MMU_PAGESIZE;
+	bootaux[BA_IFLUSH].ba_val = 1;
+	bootaux[BA_CPU].ba_ptr = getcpulist();
+	bootaux[BA_MMU].ba_ptr = NULL;
+
+	kobj_init(cif, NULL, bootops, bootaux);
+
+	/* kernel stitched together; we can now test #pragma's */
+	if (&plat_setprop_enter != NULL) {
+		prom_setprop_enter = &plat_setprop_enter;
+		prom_setprop_exit = &plat_setprop_exit;
+		ASSERT(prom_setprop_exit != NULL);
+	}
+
+}
+
+/*
+ * Create modpath from kernel name.
+ * If we booted:
+ *  /platform/`uname -i`/kernel/sparcv9/unix
+ *   or
+ *  /platform/`uname -m`/kernel/sparcv9/unix
+ *
+ * then make the modpath:
+ *  /platform/`uname -i`/kernel /platform/`uname -m`/kernel
+ *
+ * otherwise, make the modpath the dir the kernel was
+ * loaded from, minus any sparcv9 extension
+ *
+ * note the sparcv9 dir is optional since a unix -> sparcv9/unix
+ * symlink is available as a shortcut.
+ */
+void
+mach_modpath(char *path, const char *fname)
+{
+	char *p;
+	int len, compat;
+	const char prefix[] = "/platform/";
+	char platname[MAXPATHLEN];
+#ifdef	sun4u
+	char defname[] = "sun4u";
+#else
+	char defname[] = "sun4v";
+#endif
+	const char suffix[] = "/kernel";
+	const char isastr[] = "/sparcv9";
+
+	/*
+	 * check for /platform
+	 */
+	p = (char *)fname;
+	if (strncmp(p, prefix, sizeof (prefix) - 1) != 0)
+		goto nopath;
+	p += sizeof (prefix) - 1;
+
+	/*
+	 * check for the default name or the platform name.
+	 * also see if we used the 'compatible' name
+	 * (platname == default)
+	 */
+	(void) bop_getprop("impl-arch-name", platname);
+	compat = strcmp(platname, defname) == 0;
+	len = strlen(platname);
+	if (strncmp(p, platname, len) == 0)
+		p += len;
+	else if (strncmp(p, defname, sizeof (defname) - 1) == 0)
+		p += sizeof (defname) - 1;
+	else
+		goto nopath;
+
+	/*
+	 * check for /kernel/sparcv9 or just /kernel
+	 */
+	if (strncmp(p, suffix, sizeof (suffix) - 1) != 0)
+		goto nopath;
+	p += sizeof (suffix) - 1;
+	if (strncmp(p, isastr, sizeof (isastr) - 1) == 0)
+		p += sizeof (isastr) - 1;
+
+	/*
+	 * check we're at the last component
+	 */
+	if (p != strrchr(fname, '/'))
+		goto nopath;
+
+	/*
+	 * everything is kosher; setup modpath
+	 */
+	(void) strcpy(path, "/platform/");
+	(void) strcat(path, platname);
+	(void) strcat(path, "/kernel ");
+	if (!compat) {
+		(void) strcat(path, "/platform/");
+		(void) strcat(path, defname);
+		(void) strcat(path, "/kernel ");
+	}
+	return;
+
+nopath:
+	/*
+	 * Construct the directory path from the filename.
+	 */
+	if ((p = strrchr(fname, '/')) == NULL)
+		return;
+
+	while (p > fname && *(p - 1) == '/')
+		p--;	/* remove trailing '/' characters */
+	if (p == fname)
+		p++;	/* so "/" -is- the modpath in this case */
+
+	/*
+	 * Remove optional isa-dependent directory name - the module
+	 * subsystem will put this back again (!)
+	 */
+	len = p - fname;
+	if (len > sizeof (isastr) - 1 &&
+	    strncmp(&fname[len - (sizeof (isastr) - 1)], isastr,
+	    sizeof (isastr) - 1) == 0)
+		p -= sizeof (isastr) - 1;
+	(void) strncpy(path, fname, p - fname);
 }

@@ -339,9 +339,7 @@ superfluous_nonglobal_zone_files="
 	platform/sun4u/lib/sparcv9/libwrsmconf.so
 	platform/sun4u/lib/sparcv9/libwrsmconf.so.1
 	platform/sun4u/sbin
-	platform/sun4u/ufsboot
 	platform/sun4u/wanboot
-	platform/sun4v/ufsboot
 	platform/sun4v/wanboot
 	sbin/metadb
 	sbin/metadevadm
@@ -2356,6 +2354,15 @@ fi
 if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
     grep etc/dladm > /dev/null 2>&1 ; then
 	new_dladm=yes
+fi
+
+#
+# Check whether the build is boot-archive or ufsboot sparc
+# boot based on the existence of a generic.boot archive
+#
+newboot_sparc=no
+if [ $target_isa = sparc -a -f $cpiodir/generic.boot$ZFIX ]; then
+	newboot_sparc=yes
 fi
 
 time_ref=/tmp/bfu.time_ref.$$
@@ -4712,7 +4719,8 @@ get_rootdev_list()
 		elif [[ $metadev = /dev/md/rdsk/* ]]; then
        		 	metavol=`echo "$metadev" | sed -e "s#/dev/md/rdsk/##"`
 			rootdevlist=`metastat -p $metavol |\
-			    grep -v "^$metavol[ 	]" | nawk '{print $4}'`
+			    grep -v "^$metavol[ 	]" |\
+			    nawk '{print $4}' | sed -e "s#/dev/rdsk/##"`
 		fi
 		for rootdev in $rootdevlist
 		do
@@ -5091,6 +5099,39 @@ EOF
 	chmod +x $rootprefix/etc/rc2.d/S99postbfu
 	chmod +x $rootprefix/lib/svc/method/boot-archive
 	chmod +x $rootprefix/bfu.conflicts/lib/svc/method/boot-archive
+}
+
+#
+# Install failsafe archive on a sparc machine if not present.
+# Use a well-known server for the archive if we need it.
+#
+install_sparc_failsafe()
+{
+	# check if failsafe already installed
+	if [ -f $rootprefix/platform/$karch/failsafe ]; then
+		return
+	fi
+	if [ -z "$FAILSAFE_SERVER" ]; then
+		FAILSAFE_SERVER="netinstall.sfbay"
+	fi
+	if [ -z "$FAILSAFE_IMAGE" ]; then
+		FAILSAFE_IMAGE="export/nv/s/latest"
+	fi
+	fs_wos_image="/net/${FAILSAFE_SERVER}/${FAILSAFE_IMAGE}"
+	fs_archive="${fs_wos_image}/boot/sparc.miniroot"
+	if [ ! -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
+		# XXX Remove this fallback to a known good archive once real
+		# XXX images with boot archives become available.
+		fs_wos_image="/net/netinstall.sfbay/export/setje/nbs-latest"
+		fs_archive="${fs_wos_image}/boot/sparc.miniroot"
+	fi
+	if [ ! -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
+		echo "no failsafe archive, but can't find one to install"
+		return
+	fi
+
+	echo "Installing failsafe archive from $fs_wos_image"
+	cp $fs_archive $rootprefix/platform/$karch/failsafe
 }
 
 disable_boot_service()
@@ -7017,6 +7058,14 @@ mondo_loop() {
 				print "Installing boot block on $rootslice."
 				cd $usr/platform/$karch/lib/fs/ufs
 				installboot ./bootblk $rootslice
+			elif [[ "$rootslice" = /dev/md/rdsk/* ]]; then
+				print "Detected SVM root."
+				cd $usr/platform/$karch/lib/fs/ufs
+				get_rootdev_list | while read physlice
+				do 
+					print "Installing bootblk on $physlice."
+					installboot ./bootblk $physlice
+				done
 			fi
 			;;
 		    i386)
@@ -7044,6 +7093,8 @@ mondo_loop() {
 		extract_archives root generic $archlist
 		if [ $target_isa = i386 ]; then
 			extract_boot_archives boot $archlist
+		elif [ $newboot_sparc = yes ]; then
+			extract_boot_archives boot generic
 		fi
 	else
 		export PATH=/tmp/bfubin
@@ -7064,6 +7115,8 @@ mondo_loop() {
 				#  .root archives.
 				#
 				extract_boot_archives boot $rootarchs
+			elif [ $newboot_sparc = yes ]; then
+				extract_boot_archives boot generic
 			fi
 		else
 			dir_is_inherited usr ||
@@ -7342,6 +7395,16 @@ mondo_loop() {
 		if [ $target_isa = i386 ] && [[ $rootslice = /dev/rdsk/* || \
 		    $rootslice = /dev/md/rdsk/* ]]; then
 			check_boot_env
+		fi
+
+		#
+		# update boot archives for new boot sparc
+		#
+		if [ $newboot_sparc = yes ] && \
+		    [[ $rootslice = /dev/rdsk/* ||
+			$rootslice = /dev/md/rdsk/* ]]; then
+				build_boot_archive
+				install_sparc_failsafe
 		fi
 
 		# Check for damage due to CR 6379341.  This was actually fixed

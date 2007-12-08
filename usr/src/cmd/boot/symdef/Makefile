@@ -25,9 +25,9 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 # 
 
-PROG= symdef
+BOOTPROG= symdef
 
-OBJS= symdef.o
+OBJS= $(BOOTPROG).o
 SRCS = $(OBJS:.o=.c)
 
 include ../Makefile.com
@@ -40,11 +40,7 @@ LDLIBS +=	-lelf
 # behavior, which causes us to take SIGSEGV on such a write.
 CFLAGS +=	$(XSTRCONST)
 
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
+all: $(BOOTPROG)
 
 install: all $(ROOTBOOTSOLARISBINPROG)
 

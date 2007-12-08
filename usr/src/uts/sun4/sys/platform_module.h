@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 
 #include <sys/async.h>
 #include <sys/sunddi.h>
+#include <sys/memlist_plat.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,7 +60,7 @@ extern void load_platform_modules(void);
 extern int plat_cpu_poweron(struct cpu *cp);	/* power on CPU */
 extern int plat_cpu_poweroff(struct cpu *cp);	/* power off CPU */
 extern void plat_freelist_process(int mnode);
-extern void plat_build_mem_nodes(u_longlong_t *, size_t);
+extern void plat_build_mem_nodes(prom_memlist_t *, size_t);
 extern void plat_slice_add(pfn_t, pfn_t);
 extern void plat_slice_del(pfn_t, pfn_t);
 extern int plat_lpkmem_is_supported(void);

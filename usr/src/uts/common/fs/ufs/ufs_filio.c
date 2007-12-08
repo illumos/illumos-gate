@@ -693,3 +693,24 @@ ufs_fio_holey(vnode_t *vp, int cmd, offset_t *off)
 	*off = noff;
 	return (error);
 }
+
+int
+ufs_mark_compressed(struct vnode *vp)
+{
+	struct inode *ip = VTOI(vp);
+	struct ufsvfs *ufsvfsp = ip->i_ufsvfs;
+
+	if (vp->v_type != VREG)
+		return (EINVAL);
+
+	rw_enter(&ip->i_contents, RW_WRITER);
+	ip->i_cflags |= ICOMPRESS;
+	TRANS_INODE(ufsvfsp, ip);
+	ip->i_flag |= (ICHG|ISEQ);
+	ip->i_seq++;
+	if (!TRANS_ISTRANS(ufsvfsp))
+		ufs_iupdat(ip, I_ASYNC);
+	rw_exit(&ip->i_contents);
+
+	return (0);
+}

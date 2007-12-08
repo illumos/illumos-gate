@@ -46,6 +46,7 @@
 #
 # SUNWcsr
 #
+f none sbin/fiocompress 555 root bin
 d none var/ld/sparcv9 755 root bin
 s none var/ld/64=sparcv9
 d none var/svc/manifest/platform/sun4u 755 root sys

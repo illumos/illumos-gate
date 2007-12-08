@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,8 +135,20 @@ extern int kobj_debug;		/* different than moddebug */
 #define	KM_WAIT			0x0	/* wait for it */
 #define	KM_NOWAIT		0x1	/* return immediately */
 
-#define	KM_TMP			0x1000	/* freed before kobj_init return */
-#define	KM_SCRATCH		0x2000	/* not freed until boot unmap */
+#define	KM_TMP			0x1000	/* freed before kobj_init returns */
+#define	KM_SCRATCH		0x2000	/* not freed until kobj_sync */
+
+#ifdef	KOBJ_OVERRIDES
+/*
+ * Until the kernel is fully linked, all code running in the
+ * context of krtld/kobj using bcopy or bzero must be directed
+ * to the kobj equivalents.  All (ok, most) references to bcopy
+ * or bzero are thus so vectored.
+ */
+#define	bcopy(s, d, n)		kobj_bcopy((s), (d), (n))
+#define	bzero(p, n)		kobj_bzero((p), (n))
+#define	strlcat(s, d, n)	kobj_strlcat((s), (d), (n))
+#endif
 
 extern kdi_t kobj_kdi;
 
@@ -155,7 +166,6 @@ extern int kobj_notify_add(kobj_notify_list_t *);
 extern int kobj_notify_remove(kobj_notify_list_t *);
 extern int do_relocations(struct module *);
 extern int do_relocate(struct module *, char *, Word, int, int, Addr);
-extern void (*_kobj_printf)(void *, const char *fmt, ...);
 extern struct bootops *ops;
 extern void exitto(caddr_t);
 extern void kobj_sync_instruction_memory(caddr_t, size_t);
@@ -170,15 +180,15 @@ extern Sym *kobj_lookup_kernel(const char *);
 extern struct modctl *kobj_boot_mod_lookup(const char *);
 extern void kobj_export_module(struct module *);
 extern int kobj_load_primary_module(struct modctl *);
+extern int boot_compinfo(int, struct compinfo *);
+extern void mach_modpath(char *, const char *);
 
-#ifdef __sparc
-extern void *kobj_bs_alloc(size_t);
-
-extern void *kobj_tmp_alloc(size_t);
-extern void kobj_tmp_free(void);
-#else
-extern void kobj_boot_unmountroot(void);
-#endif
+extern void kobj_setup_standalone_vectors(void);
+extern void kobj_restore_vectors(void);
+extern void (*_kobj_printf)(void *, const char *fmt, ...);
+extern void (*kobj_bcopy)(const void *, void *, size_t);
+extern void (*kobj_bzero)(void *, size_t);
+extern size_t (*kobj_strlcat)(char *, const char *, size_t);
 
 #define	KOBJ_LM_PRIMARY		0x0
 #define	KOBJ_LM_DEBUGGER	0x1

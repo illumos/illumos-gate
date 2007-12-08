@@ -27,16 +27,34 @@
 
 format=ufs
 ALT_ROOT=
+ALTROOT_ARG=
 compress=yes
 SPLIT=unknown
 ERROR=0
 dirsize32=0
 dirsize64=0
 
-BOOT_ARCHIVE=platform/i86pc/boot_archive
-BOOT_ARCHIVE_64=platform/i86pc/amd64/boot_archive
+PLAT=`uname -m`
+if [ $PLAT = i86pc ] ; then
+	ARCH64=amd64
+else
+	ARCH64=sparcv9
+fi
+BOOT_ARCHIVE=platform/$PLAT/boot_archive
+BOOT_ARCHIVE_64=platform/$PLAT/$ARCH64/boot_archive
 
-export PATH=$PATH:/usr/sbin:/usr/bin:/sbin
+#
+# set path, but inherit /tmp/bfubin if owned by
+# same uid executing this process, which must be root.
+#
+if [ "`echo $PATH | cut -f 1 -d :`" = /tmp/bfubin ] && \
+    [ -O /tmp/bfubin ] ; then
+	export PATH=/tmp/bfubin:/usr/sbin:/usr/bin:/sbin
+else
+	export PATH=/usr/sbin:/usr/bin:/sbin
+fi
+
+EXTRACT_FILELIST="/boot/solaris/bin/extract_boot_filelist"
 
 #
 # Parse options
@@ -48,6 +66,8 @@ do
 		ALT_ROOT="$1"
 		if [ "$ALT_ROOT" != "/" ]; then
 			echo "Creating ram disk for $ALT_ROOT"
+			ALTROOT_ARG="-R $ALT_ROOT"
+			EXTRACT_FILELIST="${ALT_ROOT}${EXTRACT_FILELIST}"
 		fi
 		;;
 	-n|--nocompress) compress=no
@@ -79,19 +99,24 @@ if [ $# -eq 1 ]; then
 	echo "Creating ram disk for $ALT_ROOT"
 fi
 
-rundir=`dirname $0`
-if [ ! -x "$rundir"/symdef ]; then
-	# Shouldn't happen
-	echo "Warning: $rundir/symdef not present."
-	echo "Creating single archive at $ALT_ROOT/platform/i86pc/boot_archive"
-	SPLIT=no
-	compress=no
-elif "$rundir"/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
-    dboot_image 2>/dev/null; then
-	SPLIT=yes
-else
-	SPLIT=no
-	compress=no
+if [ $PLAT = i86pc ] ; then
+	rundir=`dirname $0`
+	if [ ! -x "$rundir"/symdef ]; then
+		# Shouldn't happen
+		echo "Warning: $rundir/symdef not present."
+		echo "Creating single archive at $ALT_ROOT/$BOOT_ARCHIVE"
+		SPLIT=no
+		compress=no
+	elif "$rundir"/symdef "$ALT_ROOT"/platform/i86pc/kernel/unix \
+	    dboot_image 2>/dev/null; then
+		SPLIT=yes
+	else
+		SPLIT=no
+		compress=no
+	fi
+else			# must be sparc
+	SPLIT=no	# there's only 64-bit (sparcv9), so don't split
+	compress=no	
 fi
 
 [ -x /usr/bin/gzip ] || compress=no
@@ -119,15 +144,19 @@ function getsize
 	# next multiple of 1024.  This mimics the behavior of ufs especially
 	# with directories.  This results in a total size that's slightly
 	# bigger than if du was called on a ufs directory.
-	size32=$(cat "$list32" | xargs -I {} ls -lLd "{}" | nawk '
-		{t += ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}
+	size32=$(cat "$list32" | xargs -I {} ls -lLd "{}" 2> /dev/null |
+		nawk '{t += ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}
 		END {print int(t * 1.10 / 1024)}')
 	(( size32 += dirsize32 ))
-	size64=$(cat "$list64" | xargs -I {} ls -lLd "{}" | nawk '
-		{t += ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}
+	size64=$(cat "$list64" | xargs -I {} ls -lLd "{}" 2> /dev/null |
+		nawk '{t += ($5 % 1024) ? (int($5 / 1024) + 1) * 1024 : $5}
 		END {print int(t * 1.10 / 1024)}')
 	(( size64 += dirsize64 ))
 	(( total_size = size32 + size64 ))
+
+	if [ $compress = yes ] ; then
+		total_size=`echo $total_size | nawk '{print int($1 / 2)}'`
+	fi
 }
 
 #
@@ -161,6 +190,18 @@ function copy_files
 			print "$path"
 		fi
 	done <"$list" | cpio -pdum "$rdmnt" 2>/dev/null
+
+	if [ `uname -p` = sparc ] ; then
+		# copy links
+		find $filelist -type l -print 2>/dev/null |\
+		    cpio -pdum "$rdmnt" 2>/dev/null
+		if [ $compress = yes ] ; then
+			# always copy unix uncompressed
+			find $filelist -name unix -type f -print 2>/dev/null |\
+			    cpio -pdum "$rdmnt" 2>/dev/null
+		fi
+	fi
+
 }
 
 #
@@ -202,6 +243,12 @@ function create_ufs
 	umount "$rdmnt"
 	rmdir "$rdmnt"
 
+	if [ `uname -p` = sparc ] ; then
+		rlofidev=`echo "$lofidev" | sed -e "s/dev\/lofi/dev\/rlofi/"`
+		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/ufs/bootblk"
+	        installboot "$bb" $rlofidev
+	fi
+
 	#
 	# Check if gzip exists in /usr/bin, so we only try to run gzip
 	# on systems that have gzip. Then run gzip out of the patch to
@@ -211,7 +258,8 @@ function create_ufs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ $compress = no ] && [ -x /usr/bin/gzip ] ; then
+	if [ `uname -p` = i386 ] && [ $compress = no ] && \
+	    [ -x /usr/bin/gzip ] ; then
 		gzip -c "$rdfile" > "${archive}-new"
 	else
 		cat "$rdfile" > "${archive}-new"
@@ -250,6 +298,11 @@ function create_isofs
 	files=
 	isocmd="mkisofs -quiet -graft-points -dlrDJN -relaxed-filenames"
 
+	if [ `uname -p` = sparc ] ; then
+		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/hsfs/bootblk"
+		isocmd="$isocmd -G \"$bb\""
+	fi
+
 	copy_files "$list"
 	isocmd="$isocmd \"$rdmnt\""
 	rm -f "$errlog"
@@ -263,11 +316,20 @@ function create_isofs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ $compress = no ] && [ -x /usr/bin/gzip ] ; then
+	if [ `uname -p` = i386 ] &&[ $compress = no ] && [ -x /usr/bin/gzip ]
+	then
 		ksh -c "$isocmd" 2> "$errlog" | \
 		    gzip > "${archive}-new"
 	else
 		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
+	fi
+
+	if [ `uname -p` = sparc ] ; then
+		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/hsfs/bootblk"
+		lofidev=`lofiadm -a "${archive}-new"`
+		rlofidev=`echo "$lofidev" | sed -e "s/dev\/lofi/dev\/rlofi/"`
+		installboot "$bb" "$rlofidev"
+		lofiadm -d "$lofidev"
 	fi
 
 	if [ -s "$errlog" ]; then
@@ -286,7 +348,7 @@ function create_archive
 	archive=$2
 	lofidev=$3
 
-	echo "updating $archive...this may take a minute"
+	echo "updating $archive"
 
 	if [ "$format" = "ufs" ]; then
 		create_ufs "$which" "$archive" "$lofidev"
@@ -297,8 +359,7 @@ function create_archive
 	# sanity check the archive before moving it into place
 	#
 	ARCHIVE_SIZE=`ls -l "${archive}-new" | nawk '{ print $5 }'`
-	if [ $compress = yes ]
-	then
+	if [ $compress = yes ] || [ `uname -p` = sparc ] ; then
 		#
 		# 'file' will report "English text" for uncompressed
 		# boot_archives.  Checking for that doesn't seem stable,
@@ -345,8 +406,8 @@ then
 	print -u2 "Can't find filelist.ramdisk"
 	exit 1
 fi
-filelist=$(cat "$ALT_ROOT/boot/solaris/filelist.ramdisk" \
-    "$ALT_ROOT/etc/boot/solaris/filelist.ramdisk" 2>/dev/null | sort -u)
+filelist=$($EXTRACT_FILELIST $ALTROOT_ARG /boot/solaris/filelist.ramdisk \
+    /etc/boot/solaris/filelist.ramdisk 2>/dev/null | sort -u)
 
 #
 # We use /tmp/ for scratch space now.  This may be changed later if there
@@ -362,6 +423,8 @@ trap 'cleanup' EXIT
 
 list32="$rddir/filelist.32"
 list64="$rddir/filelist.64"
+
+touch $list32 $list64
 
 #
 # This loop creates the 32-bit and 64-bit lists of files.  The 32-bit list

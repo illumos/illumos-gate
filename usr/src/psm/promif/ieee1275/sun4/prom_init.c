@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,12 +106,6 @@ prom_init(char *pgmname, void *p1275cookie)
 	 */
 	(void) prom_set_preprom(default_prepost_prom);
 	(void) prom_set_postprom(default_prepost_prom);
-
-	if (&plat_setprop_enter != NULL) {
-		prom_setprop_enter = &plat_setprop_enter;
-		prom_setprop_exit = &plat_setprop_exit;
-		ASSERT(prom_setprop_exit != NULL);
-	}
 }
 
 /*

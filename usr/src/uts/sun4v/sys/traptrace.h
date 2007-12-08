@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ extern "C" {
  * the TRAP_ENT_TT field
  */
 
-#define	TRAP_TBUF	(2 * PAGESIZE)	/* default size is two pages */
+#define	TRAP_TSIZE	(2 * PAGESIZE)	/* default size is two pages */
 
 #ifndef	_ASM
 
@@ -113,19 +113,10 @@ struct trap_trace_record {
 	uintptr_t	tt_f4;
 };
 
-#define	TRAP_TSIZE	((TRAP_TBUF / sizeof (struct trap_trace_record)) * \
-			sizeof (struct trap_trace_record))
-
-/* Rounding not needed, done for consistency */
-#define	HTRAP_TSIZE	((TRAP_TBUF / sizeof (struct htrap_trace_record)) * \
-			sizeof (struct htrap_trace_record))
-
-#else
-
-#define	TRAP_TSIZE	((TRAP_TBUF / TRAP_ENT_SIZE) * TRAP_ENT_SIZE)
-#define	HTRAP_TSIZE	((TRAP_TBUF / HTRAP_ENT_SIZE) * HTRAP_ENT_SIZE)
-
 #endif
+
+#define	HTRAP_TSIZE	TRAP_TSIZE
+
 
 /*
  * Trap tracing buffer header.
@@ -159,9 +150,9 @@ extern TRAP_TRACE_CTL	trap_trace_ctl[];	/* allocated in locore.s */
 extern int		trap_trace_bufsize;	/* default buffer size */
 extern char		trap_tr0[];		/* prealloc buf for boot cpu */
 extern int		trap_freeze;		/* freeze the trap trace */
-extern caddr_t		ttrace_buf;		/* buffer bop alloced */
+extern caddr_t		ttrace_buf;		/* kmem64 buffer */
 extern int		ttrace_index;		/* index used */
-extern caddr_t trap_trace_alloc(caddr_t);
+extern size_t		calc_traptrace_sz(void);
 
 extern int		htrap_trace_bufsize;	/* default hv buffer size */
 extern int		mach_htraptrace_enable;

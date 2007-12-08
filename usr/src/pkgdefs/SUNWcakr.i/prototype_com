@@ -48,13 +48,10 @@ d none boot 755 root sys
 d none boot/solaris 755 root sys
 d none boot/solaris/bin 0755 root sys
 f none boot/solaris/bin/create_diskmap 0555 root sys
-f none boot/solaris/bin/create_ramdisk 0555 root sys
 f none boot/solaris/bin/mbr 0555 root sys
 s none boot/solaris/bin/root_archive=../../../usr/sbin/root_archive
 f none boot/solaris/bin/symdef 0555 root sys
 f none boot/solaris/bin/update_grub 0555 root sys
-f none boot/solaris/filelist.ramdisk 0644 root sys
-f none boot/solaris/filelist.safe 0644 root sys
 d none platform 755 root sys
 d none platform/i86pc 755 root sys
 d none platform/i86pc/amd64 755 root sys

@@ -242,7 +242,7 @@ map_addr(caddr_t *addrp, size_t len, offset_t off, int vacalign, uint_t flags)
 {
 	struct proc *p = curproc;
 	caddr_t userlimit = flags & _MAP_LOW32 ?
-		(caddr_t)USERLIMIT32 : p->p_as->a_userlimit;
+	    (caddr_t)USERLIMIT32 : p->p_as->a_userlimit;
 	map_addr_proc(addrp, len, off, vacalign, userlimit, p, flags);
 }
 
@@ -665,27 +665,33 @@ map_pgszcvec(caddr_t addr, size_t size, uintptr_t off, int flags, int type,
     int memcntl)
 {
 	if (flags & MAP_TEXT) {
-	    return (map_szcvec(addr, size, off, disable_auto_text_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_text_large_pages,
 		    max_utext_lpsize, shm_lpg_min_physmem));
 
 	} else if (flags & MAP_INITDATA) {
-	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_data_large_pages,
 		    max_uidata_lpsize, privm_lpg_min_physmem));
 
 	} else if (type == MAPPGSZC_SHM) {
-	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_data_large_pages,
 		    max_shm_lpsize, shm_lpg_min_physmem));
 
 	} else if (type == MAPPGSZC_HEAP) {
-	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_data_large_pages,
 		    max_uheap_lpsize, privm_lpg_min_physmem));
 
 	} else if (type == MAPPGSZC_STACK) {
-	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_data_large_pages,
 		    max_ustack_lpsize, privm_lpg_min_physmem));
 
 	} else {
-	    return (map_szcvec(addr, size, off, disable_auto_data_large_pages,
+		return (map_szcvec(addr, size, off,
+		    disable_auto_data_large_pages,
 		    max_privmap_lpsize, privm_lpg_min_physmem));
 	}
 }
@@ -734,119 +740,111 @@ page_t ***page_cachelists[MAX_MEM_TYPES];
 kmutex_t *fpc_mutex[NPC_MUTEX];
 kmutex_t *cpc_mutex[NPC_MUTEX];
 
-caddr_t
-alloc_page_freelists(int mnode, caddr_t alloc_base, int alloc_align)
+/*
+ * Calculate space needed for page freelists and counters
+ */
+size_t
+calc_free_pagelist_sz(void)
 {
-	int	mtype;
-	uint_t	szc;
+	int szc;
+	size_t alloc_sz, cache_sz, free_sz;
 
-	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, alloc_align);
+	/*
+	 * one cachelist per color, node, and type
+	 */
+	cache_sz = (page_get_pagecolors(0) * sizeof (page_t *)) +
+	    sizeof (page_t **);
+	cache_sz *= max_mem_nodes * MAX_MEM_TYPES;
+
+	/*
+	 * one freelist per size, color, node, and type
+	 */
+	free_sz = sizeof (page_t **);
+	for (szc = 0; szc < mmu_page_sizes; szc++)
+		free_sz += sizeof (page_t *) * page_get_pagecolors(szc);
+	free_sz *= max_mem_nodes * MAX_MEM_TYPES;
+
+	alloc_sz = cache_sz + free_sz + page_ctrs_sz();
+	return (alloc_sz);
+}
+
+caddr_t
+alloc_page_freelists(caddr_t alloc_base)
+{
+	int	mnode, mtype;
+	int	szc, clrs;
 
 	/*
 	 * We only support small pages in the cachelist.
 	 */
 	for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-		page_cachelists[mtype][mnode] = (page_t **)alloc_base;
-		alloc_base += (sizeof (page_t *) * page_get_pagecolors(0));
-		/*
-		 * Allocate freelists bins for all
-		 * supported page sizes.
-		 */
-		for (szc = 0; szc < mmu_page_sizes; szc++) {
-			page_freelists[szc][mtype][mnode] =
-			    (page_t **)alloc_base;
-			alloc_base += ((sizeof (page_t *) *
-			    page_get_pagecolors(szc)));
+		page_cachelists[mtype] = (page_t ***)alloc_base;
+		alloc_base += (max_mem_nodes * sizeof (page_t **));
+		for (mnode = 0; mnode < max_mem_nodes; mnode++) {
+			page_cachelists[mtype][mnode] = (page_t **)alloc_base;
+			alloc_base +=
+			    (page_get_pagecolors(0) * sizeof (page_t *));
 		}
 	}
 
-	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, alloc_align);
+	/*
+	 * Allocate freelists bins for all
+	 * supported page sizes.
+	 */
+	for (szc = 0; szc < mmu_page_sizes; szc++) {
+		clrs = page_get_pagecolors(szc);
+		for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
+			page_freelists[szc][mtype] = (page_t ***)alloc_base;
+			alloc_base += (max_mem_nodes * sizeof (page_t **));
+			for (mnode = 0; mnode < max_mem_nodes; mnode++) {
+				page_freelists[szc][mtype][mnode] =
+				    (page_t **)alloc_base;
+				alloc_base += (clrs * (sizeof (page_t *)));
+			}
+		}
+	}
 
+	alloc_base = page_ctrs_alloc(alloc_base);
 	return (alloc_base);
 }
 
 /*
- * Allocate page_freelists bin headers for a memnode from the
- * nucleus data area. This is the first time that mmu_page_sizes is
- * used during sun4u bootup, so check mmu_page_sizes initialization.
+ * Allocate page_freelists locks for a memnode from the nucleus data
+ * area. This is the first time that mmu_page_sizes is used during
+ * bootup, so check mmu_page_sizes initialization.
  */
 int
-ndata_alloc_page_freelists(struct memlist *ndata, int mnode)
+ndata_alloc_page_mutexs(struct memlist *ndata)
 {
 	size_t alloc_sz;
 	caddr_t alloc_base;
-	caddr_t end;
-	int	mtype;
-	uint_t	szc;
-	int32_t allp = 0;
+	int	i;
+	void	page_coloring_init();
 
+	page_coloring_init();
 	if (&mmu_init_mmu_page_sizes) {
-		if (!mmu_init_mmu_page_sizes(allp)) {
+		if (!mmu_init_mmu_page_sizes(0)) {
 			cmn_err(CE_PANIC, "mmu_page_sizes %d not initialized",
 			    mmu_page_sizes);
 		}
 	}
 	ASSERT(mmu_page_sizes >= DEFAULT_MMU_PAGE_SIZES);
 
-	/* first time called - allocate max_mem_nodes dimension */
-	if (mnode == 0) {
-		int	i;
-
-		/* page_cachelists */
-		alloc_sz = MAX_MEM_TYPES * max_mem_nodes *
-		    sizeof (page_t **);
-
-		/* page_freelists */
-		alloc_sz += MAX_MEM_TYPES * mmu_page_sizes * max_mem_nodes *
-		    sizeof (page_t **);
-
-		/* fpc_mutex and cpc_mutex */
-		alloc_sz += 2 * NPC_MUTEX * max_mem_nodes * sizeof (kmutex_t);
-
-		alloc_base = ndata_alloc(ndata, alloc_sz, ecache_alignsize);
-		if (alloc_base == NULL)
-			return (-1);
-
-		ASSERT(((uintptr_t)alloc_base & (ecache_alignsize - 1)) == 0);
-
-		for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-			page_cachelists[mtype] = (page_t ***)alloc_base;
-			alloc_base += (max_mem_nodes * sizeof (page_t **));
-			for (szc = 0; szc < mmu_page_sizes; szc++) {
-				page_freelists[szc][mtype] =
-				    (page_t ***)alloc_base;
-				alloc_base += (max_mem_nodes *
-				    sizeof (page_t **));
-			}
-		}
-		for (i = 0; i < NPC_MUTEX; i++) {
-			fpc_mutex[i] = (kmutex_t *)alloc_base;
-			alloc_base += (sizeof (kmutex_t) * max_mem_nodes);
-			cpc_mutex[i] = (kmutex_t *)alloc_base;
-			alloc_base += (sizeof (kmutex_t) * max_mem_nodes);
-		}
-		alloc_sz = 0;
-	}
-
-	/*
-	 * Calculate the size needed by alloc_page_freelists().
-	 */
-	for (mtype = 0; mtype < MAX_MEM_TYPES; mtype++) {
-		alloc_sz += sizeof (page_t *) * page_get_pagecolors(0);
-
-		for (szc = 0; szc < mmu_page_sizes; szc++)
-			alloc_sz += sizeof (page_t *) *
-			    page_get_pagecolors(szc);
-	}
+	/* fpc_mutex and cpc_mutex */
+	alloc_sz = 2 * NPC_MUTEX * max_mem_nodes * sizeof (kmutex_t);
 
 	alloc_base = ndata_alloc(ndata, alloc_sz, ecache_alignsize);
 	if (alloc_base == NULL)
 		return (-1);
 
-	end = alloc_page_freelists(mnode, alloc_base, ecache_alignsize);
-	ASSERT((uintptr_t)end == roundup((uintptr_t)alloc_base + alloc_sz,
-	    ecache_alignsize));
+	ASSERT(((uintptr_t)alloc_base & (ecache_alignsize - 1)) == 0);
 
+	for (i = 0; i < NPC_MUTEX; i++) {
+		fpc_mutex[i] = (kmutex_t *)alloc_base;
+		alloc_base += (sizeof (kmutex_t) * max_mem_nodes);
+		cpc_mutex[i] = (kmutex_t *)alloc_base;
+		alloc_base += (sizeof (kmutex_t) * max_mem_nodes);
+	}
 	return (0);
 }
 

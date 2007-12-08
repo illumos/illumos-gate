@@ -1,0 +1,1221 @@
+
+\ ident	"%Z%%M%	%I%	%E% SMI"
+\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Use is subject to license terms.
+\
+\ CDDL HEADER START
+\
+\ The contents of this file are subject to the terms of the
+\ Common Development and Distribution License (the "License").
+\ You may not use this file except in compliance with the License.
+\
+\ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+\ or http://www.opensolaris.org/os/licensing.
+\ See the License for the specific language governing permissions
+\ and limitations under the License.
+\
+\ When distributing Covered Code, include this CDDL HEADER in each
+\ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+\ If applicable, add the following below this CDDL HEADER, with the
+\ fields enclosed by brackets "[]" replaced with your own identifying
+\ information: Portions Copyright [yyyy] [name of copyright owner]
+\
+\ CDDL HEADER END
+\
+\
+
+[ifdef] doheaders
+headers
+[else]
+headerless
+[then]
+
+
+id: %Z%%M%	%I%	%E% SMI
+purpose: ZFS file system support package
+copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
+
+" /packages" get-package  push-package
+
+new-device
+   fs-pkg$  device-name  diag-cr?
+
+   0 instance value temp-space
+
+
+   \ 64b ops
+   \ fcode is still 32b on 64b sparc-v9, so
+   \ we need to override some arithmetic ops
+   \ stack ops and logical ops (dup, and, etc) are 64b
+   : xcmp  ( x1 x2 -- -1|0|1 )
+      xlsplit rot xlsplit        ( x2.lo x2.hi x1.lo x1.hi )
+      rot 2dup  <  if            ( x2.lo x1.lo x1.hi x2.hi )
+         2drop 2drop  -1         ( lt )
+      else  >  if                ( x2.lo x1.lo )
+         2drop  1                ( gt )
+      else  swap 2dup <  if      ( x1.lo x2.lo )
+         2drop  -1               ( lt )
+      else  >  if                (  )
+         1                       ( gt )
+      else                       (  )
+         0                       ( eq )
+      then then then then        ( -1|0|1 )
+   ;
+   : x<   ( x1 x2 -- <? )   xcmp  -1 =  ;
+   : x>   ( x1 x2 -- >? )   xcmp   1 =  ;
+\  : x=   ( x1 x2 -- =? )   xcmp   0=   ;
+   : x<>  ( x1 x2 -- <>? )  xcmp   0<>  ;
+   : x0=  ( x -- 0=? )      xlsplit 0=  swap 0=  and  ;
+
+   /buf-len  instance buffer:  numbuf
+
+   : (xu.)  ( u -- u$ )
+      numbuf /buf-len +  swap         ( adr u )
+      begin
+         d# 10 /mod  swap             ( adr u' rem )
+         ascii 0  +                   ( adr u' c )
+         rot 1-  tuck c!              ( u adr' )
+         swap  dup 0=                 ( adr u done? )
+      until  drop                     ( adr )
+      dup  numbuf -  /buf-len swap -  ( adr len )
+   ;
+
+   \ pool name
+   /buf-len  instance buffer:  bootprop-buf
+   : bootprop$  ( -- prop$ )  bootprop-buf cscount  ;
+
+   \ decompression
+   \
+   \ uts/common/os/compress.c has a definitive theory of operation comment
+   \ on lzjb, but here's the reader's digest version:
+   \
+   \ repeated phrases are replaced by referenced to the original
+   \ e.g.,
+   \ y a d d a _ y a d d a _ y a d d a , _ b l a h _ b l a h _ b l a h
+   \ becomes
+   \ y a d d a _ 6 11 , _ b l a h 5 10
+   \ where 6 11 means memmove(ptr, ptr - 6, 11)
+   \
+   \ data is separated from metadata with embedded copymap entries
+   \ every 8 items  e.g., 
+   \ 0x40 y a d d a _ 6 11 , 0x20 _ b l a h 5 10
+   \ the copymap has a set bit for copy refercences
+   \ and a clear bit for bytes to be copied directly
+   \
+   \ the reference marks are encoded with match-bits and match-min
+   \ e.g.,
+   \ byte[0] = ((mlen - MATCH_MIN) << (NBBY - MATCH_BITS) | (off >> NBBY)
+   \ byte[1] = (uint8_t)off
+   \
+
+   : pow2  ( n -- 2**n )  1 swap lshift  ;
+
+   \ assume MATCH_BITS=6 and MATCH_MIN=3
+   6                       constant mbits
+   3                       constant mmin
+   8 mbits -               constant mshift
+   d# 16 mbits -  pow2 1-  constant mmask
+
+   : decode-src  ( src -- mlen off )
+      dup c@  swap  1+ c@              ( c[0] c[1] )
+      over  mshift rshift  mmin +      ( c[0] c[1] mlen )
+      -rot  swap bwjoin  mmask  and    ( mlen off )
+   ;
+
+   \ equivalent of memmove(dst, dst - off, len)
+   \ src points to a copy reference to be decoded
+   : mcopy  ( dend dst src -- dend dst' )
+      decode-src                         ( dend dst mlen off )
+      2 pick  swap -  >r                 ( dent dst mlen  r: cpy )
+      begin
+         1-  dup 0>=                     ( dend dst mlen' any?  r: cpy )
+         2over >  and                    ( dend dst mlen !done?  r : cpy )
+      while                              ( dend dst mlen  r: cpy )
+         swap  r> dup 1+ >r  c@          ( dend mlen dst c  r: cpy' )
+         over c!  1+  swap               ( dend dst' mlen  r: cpy )
+      repeat                             ( dend dst' mlen  r: cpy )
+      r> 2drop                           ( dend dst )
+   ;
+
+
+   : lzjb ( src dst len -- )
+      over +  swap                  ( src dend dst )
+      rot >r                        ( dend dst  r: src )
+
+      \ setup mask so 1st while iteration fills map
+      0  7 pow2  2swap              ( map mask dend dst  r: src )
+
+      begin  2dup >  while
+         2swap  1 lshift            ( dend dst map mask'  r: src )
+
+         dup  8 pow2  =  if
+            \ fetch next copymap
+            2drop                   ( dend dst  r: src )
+            r> dup 1+ >r  c@  1     ( dend dst map' mask'  r: src' )
+         then                       ( dend dst map mask  r: src' )
+
+         \ if (map & mask) we hit a copy reference
+         \ else just copy 1 byte
+         2swap  2over and  if       ( map mask dend dst  r: src )
+            r> dup 2+ >r            ( map mask dend dst src  r: src' )
+            mcopy                   ( map mask dend dst'  r: src )
+         else
+            r> dup 1+ >r  c@        ( map mask dend dst c  r: src' )
+            over c!  1+             ( map mask dend dst'  r: src )
+         then
+      repeat                        ( map mask dend dst  r: src )
+      2drop 2drop  r> drop          (  )
+   ;
+
+
+   \
+   \	ZFS block (SPA) routines
+   \
+
+   2           constant  no-comp#
+   h# 2.0000   constant  /max-bsize
+   d# 512      constant  /disk-block
+   d# 128      constant  /blkp
+
+   : blk_offset    ( bp -- n )  h#  8 +  x@  -1 h# 8fff.ffff  lxjoin  and  ;
+   : blk_gang      ( bp -- n )  h#  8 +  x@  xlsplit  nip  d# 31 rshift  ;
+   : blk_comp      ( bp -- n )  h# 33 +  c@  ;
+   : blk_psize     ( bp -- n )  h# 34 +  w@  ;
+   : blk_lsize     ( bp -- n )  h# 36 +  w@  ;
+   : blk_birth     ( bp -- n )  h# 50 +  x@  ;
+
+   0 instance value dev-ih
+   0 instance value blk-space
+   0 instance value gang-space
+
+   : foff>doff  ( fs-off -- disk-off )    /disk-block *  h# 40.0000 +  ;
+   : fsz>dsz    ( fs-size -- disk-size )  1+  /disk-block *  ;
+
+   : bp-dsize  ( bp -- dsize )  blk_psize fsz>dsz  ;
+   : bp-lsize  ( bp -- lsize )  blk_lsize fsz>dsz  ;
+
+   : (read-bp)  ( adr len bp -- )
+      blk_offset foff>doff  dev-ih  read-disk
+   ;
+
+   : gang-read  ( adr len bp -- )
+
+      \ read gang block
+      gang-space /disk-block  rot      ( adr len gb-adr gb-len bp )
+      (read-bp)                        ( adr len )
+
+      \ read gang indirected blocks to blk-space
+      \ and copy requested len from there
+      blk-space  gang-space            ( adr len tmp-adr bp0 )
+      dup  /blkp 3 *  +  bounds  do    ( adr len tmp-adr )
+         i blk_offset x0=  ?leave
+         i bp-dsize                    ( adr len tmp-adr rd-len )
+         2dup  i (read-bp)
+         +                             ( adr len tmp-adr' )
+      /blkp  +loop
+      drop                             ( adr len )
+      blk-space -rot  move             (  )
+   ;
+
+   \ block read that check for holes, gangs, compression, etc
+   : read-bp  ( adr len bp -- )
+      \ sparse block?
+      dup  blk_birth x0=  if
+         drop  erase  exit            (  )
+      then
+      \ gang block?
+      dup  blk_gang   if
+         gang-read  exit              (  )
+      then
+      \ compression?
+      dup  blk_comp no-comp#  <>  if
+         blk-space  over bp-dsize     ( adr len bp b-adr rd-len )
+         rot  (read-bp)               ( adr len )
+         blk-space -rot  lzjb  exit   ( )
+      then
+      \ boring direct block
+      (read-bp)                       (  )
+   ;
+
+   \
+   \    ZFS vdev routines
+   \
+
+   h# 1.c000  constant /nvpairs
+   h# 4000    constant nvpairs-off
+
+   \
+   \ xdr packed nvlist
+   \
+   \  12B header
+   \  array of xdr packed nvpairs
+   \     4B encoded nvpair size
+   \     4B decoded nvpair size
+   \     4B name string size
+   \     name string
+   \     4B data type
+   \     4B # of data elements
+   \     data
+   \  8B of 0
+   \
+   d# 12      constant /nvhead
+
+   : >nvsize  ( nv -- size )  l@  ;
+   : >nvname  ( nv -- name$ )
+      /l 2* +  dup /l +  swap l@
+   ;
+   : >nvdata  ( nv -- data )
+      >nvname +  /l roundup
+   ;
+   alias nvdata>$ >nvname
+
+   : nv-lookup  ( nv name$ -- nvdata false  |  true )
+      rot /nvhead +               ( name$ nvpair )
+      begin  dup >nvsize  while
+         dup >r  >nvname          ( name$ nvname$  r: nvpair )
+         2over $=  if             ( name$  r: nvpair )
+            2drop  r> >nvdata     ( nvdata )
+            false exit            ( nvdata found )
+         then                     ( name$  r: nvpair )
+         r>  dup >nvsize  +       ( name$ nvpair' )
+      repeat
+      3drop  true                 ( not-found )
+   ;
+
+   : scan-vdev  ( -- )
+      temp-space /nvpairs nvpairs-off    ( adr len off )
+      dev-ih  read-disk                  (  )
+      temp-space " name"  nv-lookup  if
+         ." no name nvpair"  abort
+      then  nvdata>$                     ( pool$ )
+      bootprop-buf swap  move            (  )
+   ;
+
+
+   \
+   \	ZFS ueber-block routines
+   \
+
+   d# 1024                  constant /uber-block
+   d# 128                   constant #ub/label
+   #ub/label /uber-block *  constant /ub-ring
+   h# 2.0000                constant ubring-off
+
+   : ub_magic      ( ub -- n )          x@  ;
+   : ub_txg        ( ub -- n )  h# 10 + x@  ;
+   : ub_timestamp  ( ub -- n )  h# 20 + x@  ;
+   : ub_rootbp     ( ub -- p )  h# 28 +     ;
+
+   0 instance value uber-block
+
+   : ub-cmp  ( ub1 ub2 -- best-ub )
+
+      \ ub1 wins if ub2 isn't valid
+      dup  ub_magic h# 00bab10c  x<>  if
+         drop  exit                  ( ub1 )
+      then
+
+      \ if ub1 is 0, ub2 wins by default
+      over 0=  if  nip  exit  then   ( ub2 )
+
+      \ 2 valid ubs, compare transaction groups
+      over ub_txg  over ub_txg       ( ub1 ub2 txg1 txg2 )
+      2dup x<  if
+         2drop nip  exit             ( ub2 )
+      then                           ( ub1 ub2 txg1 txg2 )
+      x>  if  drop  exit  then       ( ub1 )
+
+      \ same txg, check timestamps
+      over ub_timestamp  over ub_timestamp  x>  if
+         nip                         ( ub2 )
+      else
+         drop                        ( ub1 )
+      then
+   ;
+
+   \ find best uber-block in ring, and copy it to uber-block
+   : get-ub  ( -- )
+      temp-space  /ub-ring ubring-off       ( adr len off )
+      dev-ih  read-disk                     (  )
+      0  temp-space /ub-ring                ( null-ub adr len )
+      bounds  do                            ( ub )
+         i ub-cmp                           ( best-ub )
+      /uber-block +loop
+
+      \ make sure we found a valid ub
+      dup 0=  if  ." no ub found" abort  then
+
+      uber-block /uber-block  move          (  )
+   ;
+
+
+   \
+   \	ZFS dnode (DMU) routines
+   \
+
+   d# 512 constant /dnode
+
+   : dn_indblkshift   ( dn -- n )  h#  1 +  c@  ;
+   : dn_nlevels       ( dn -- n )  h#  2 +  c@  ;
+   : dn_datablkszsec  ( dn -- n )  h#  8 +  w@  ;
+   : dn_blkptr        ( dn -- p )  h# 40 +      ;
+   : dn_bonus         ( dn -- p )  h# c0 +      ;
+
+   0 instance value dnode
+
+   \ indirect cache
+   \
+   \ ind-cache is a 1 block indirect block cache from dnode ic-dn
+   \
+   \ ic-bp and ic-bplim point into the ic-dn's block ptr array,
+   \ either in dn_blkptr or in ind-cache   ic-bp is the ic-blk#'th
+   \ block ptr, and ic-bplim is limit of the current bp array
+   \
+   \ the assumption is that reads will be sequential, so we can
+   \ just increment ic-bp
+   \
+   0 instance value  ind-cache
+   0 instance value  ic-dn
+   0 instance value  ic-blk#
+   0 instance value  ic-bp
+   0 instance value  ic-bplim
+
+   : dn-bsize    ( dn -- bsize )    dn_datablkszsec /disk-block  *  ;
+   : dn-indsize  ( dn -- indsize )  dn_indblkshift  pow2  ;
+   : dn-indmask  ( dn -- mask )     dn-indsize 1-  ;
+
+   \ recursively climb the block tree from the leaf to the root
+   : blk@lvl>bp  ( dn blk# lvl -- bp )   tokenizer[ reveal ]tokenizer
+      >r  /blkp *  over dn_nlevels         ( dn bp-off #lvls  r: lvl )
+
+      \ at top, just add dn_blkptr
+      r@  =  if                            ( dn bp-off  r: lvl )
+         swap dn_blkptr  +                 ( bp  r: lvl )
+         r> drop  exit                     ( bp )
+      then                                 ( dn bp-off  r: lvl )
+
+      \ shift bp-off down and find parent indir blk
+      2dup over  dn_indblkshift  rshift    ( dn bp-off dn blk#  r: lvl )
+      r> 1+  blk@lvl>bp                    ( dn bp-off bp )
+
+      \ read parent indir and index
+      rot tuck dn-indsize                  ( bp-off dn bp len )
+      ind-cache swap rot  read-bp          ( bp-off dn )
+      dn-indmask  and                      ( bp-off' )
+      ind-cache +                          ( bp )
+   ;
+
+   \ return end of current bp array
+   : bplim ( dn bp -- bp-lim )
+      over dn_nlevels  1  =  if
+          drop dn_blkptr              ( bp0 )
+          3 /blkp *  +                ( bplim )
+      else
+          1+  swap dn-indsize         ( bp+1 indsz )
+          roundup                     ( bplim )
+      then
+   ;
+
+   \ return the lblk#'th block ptr from dnode
+   : lblk#>bp  ( dn blk# -- bp )
+      2dup                               ( dn blk# dn blk# )
+      ic-blk# <>  swap  ic-dn  <>  or    ( dn blk# cache-miss? )
+      ic-bp  ic-bplim  =                 ( dn blk# cache-miss? cache-empty? )
+      or  if                             ( dn blk# )
+         2dup  1 blk@lvl>bp              ( dn blk# bp )
+         dup         to ic-bp            ( dn blk# bp )
+         swap        to ic-blk#          ( dn bp )
+         2dup bplim  to ic-bplim         ( dn bp )
+         over        to ic-dn
+      then  2drop                        (  )
+      ic-blk# 1+          to ic-blk#
+      ic-bp dup  /blkp +  to ic-bp       ( bp )
+   ;
+
+
+   \
+   \	ZFS attribute (ZAP) routines
+   \
+
+   1        constant  fzap#
+   3        constant  uzap#
+
+   d# 64    constant  /uzap
+
+   d# 24    constant  /lf-chunk
+   d# 21    constant  /lf-arr
+   h# ffff  constant  chain-end#
+
+   h# 100   constant /lf-buf
+   /lf-buf  instance buffer: leaf-value
+   /lf-buf  instance buffer: leaf-name
+
+   : +le              ( len off -- n )  +  w@  ;
+   : le_next          ( le -- n )  h# 2 +le  ;
+   : le_name_chunk    ( le -- n )  h# 4 +le  ;
+   : le_name_length   ( le -- n )  h# 6 +le  ;
+   : le_value_chunk   ( le -- n )  h# 8 +le  ;
+   : le_value_length  ( le -- n )  h# a +le  ;
+
+   : la_array  ( la -- adr )  1+  ;
+   : la_next   ( la -- n )    h# 16 +  w@  ;
+
+   0 instance value zap-space
+
+   \ setup leaf hash bounds
+   : >leaf-hash  ( dn lh -- hash-adr /hash )
+      /lf-chunk 2*  +                 ( dn hash-adr ) 
+      \ size = (bsize / 32) * 2
+      swap dn-bsize  4 rshift         ( hash-adr /hash )
+   ;
+   : >leaf-chunks  ( lf -- ch0 )  >leaf-hash +  ;
+
+   \ convert chunk # to leaf chunk
+   : ch#>lc  ( dn ch# -- lc )
+      /lf-chunk *                     ( dn lc-off )
+      swap zap-space  >leaf-chunks    ( lc-off ch0 )
+      +                               ( lc )
+   ;
+
+   \ assemble chunk chain into single buffer
+   : get-chunk-data  ( dn ch# adr -- )
+      dup >r  /lf-buf  erase          ( dn ch#  r: adr )
+      begin
+         2dup  ch#>lc  nip            ( dn la  r: adr )
+         dup la_array                 ( dn la la-arr  r: adr )
+         r@  /lf-arr  move            ( dn la  r: adr )
+         r>  /lf-arr +  >r            ( dn la  r: adr' )
+         la_next  dup chain-end#  =   ( dn la-ch# end?  r: adr )
+      until  r> 3drop                 (  )
+   ;
+
+   \ get leaf entry's name
+   : entry-name$  ( dn le -- name$ )
+      2dup le_name_chunk              ( dn le dn la-ch# )
+      leaf-name  get-chunk-data       ( dn le )
+      nip le_name_length              ( len )
+      leaf-name swap                  ( name$ )
+   ;
+
+   \ return entry value as int
+   : entry-int-val  ( dn le -- n )
+      le_value_chunk                  ( dn la-ch# )
+      leaf-value  get-chunk-data      (  )
+      leaf-value x@                   ( n )
+   ;
+
+
+[ifdef] strlookup
+   \ get leaf entry's value as string
+   : entry-val$  ( dn le -- val$ )
+      2dup le_value_chunk             ( dn le dn la-ch# )
+      leaf-value  get-chunk-data      ( dn le )
+      nip le_value_length             ( len )
+      leaf-value swap                 ( name$ )
+   ;
+[then]
+
+   \ apply xt to entry
+   : entry-apply  ( xt dn le -- xt dn false  |  ??? true )
+      over >r                    ( xt dn le  r: dn )
+      rot  dup >r  execute  if   ( ???  r: xt dn )
+         r> r>  2drop  true      ( ??? true )
+      else                       (  )
+         r> r>  false            ( xt dn false )
+      then
+   ;
+         
+   \ apply xt to every entry in chain
+   : chain-apply  ( xt dn ch# -- xt dn false  |  ??? true )
+      begin
+         2dup  ch#>lc  nip               ( xt dn le )
+         dup >r  entry-apply  if         ( ???  r: le )
+            r> drop  true  exit          ( ??? found )
+         then                            ( xt dn  r: le )
+         r> le_next                      ( xt dn ch# )
+         dup chain-end#  =               ( xt dn ch# end? )
+      until  drop                        ( xt dn )
+      false                              ( xt dn false )
+   ;
+
+   \ apply xt to every entry in leaf
+   : leaf-apply  ( xt dn blk# -- xt dn false  |  ??? true )
+
+      \ read zap leaf into zap-space
+      2dup lblk#>bp                       ( xt dn blk# bp )
+      nip  over dn-bsize  zap-space       ( xt dn bp len adr )
+      swap rot  read-bp                   ( xt dn )
+
+     \ call chunk-look for every valid chunk list
+      dup zap-space  >leaf-hash           ( xt dn hash-adr /hash )
+      bounds  do                          ( xt dn )
+         i w@  dup chain-end#  <>  if     ( xt dn ch# )
+            chain-apply  if               ( ??? )
+               unloop  true  exit         ( ??? found )
+            then                          ( xt dn )
+         else  drop  then                 ( xt dn )
+      /w  +loop
+      false                               ( xt dn not-found )
+   ;
+
+   \ apply xt to every entry in fzap
+   : fzap-apply  ( xt dn fz -- ??? not-found? )
+
+      \ blk# 1 is always the 1st leaf
+      >r  1 leaf-apply  if              ( ???  r: fz )
+         r> drop  false  exit           ( ??? found )
+      then  r>                          ( xt dn fz )
+
+      \ call leaf-apply on every non-duplicate hash entry
+      \ embedded hash is in 2nd half of fzap block
+      over dn-bsize  tuck +             ( xt dn bsize hash-eadr )
+      swap 2dup  2/  -                  ( xt dn hash-eadr bsize hash-adr )
+      nip  do                           ( xt dn )
+         i x@  dup 1  <>  if            ( xt dn blk# )
+            leaf-apply  if              ( ??? )
+               unloop  true  exit       ( ??? found )
+            then                        ( xt dn )
+         else  drop  then               ( xt dn )
+      /x  +loop
+      2drop  false                      ( not-found )
+   ;
+
+   : mze_value  ( uz -- n )  x@  ;
+   : mze_name   ( uz -- p )  h# e +  ;
+
+   : uzap-name$  ( uz -- name$ )  mze_name  cscount  ;
+
+   \ apply xt to each entry in micro-zap
+   : uzap-apply ( xt uz len -- ??? not-found? )
+      bounds  do                      ( xt )
+         i swap  dup >r               ( uz xt  r: xt )
+         execute  if                  ( ???  r: xt )
+            r> drop                   ( ??? )
+            unloop true  exit         ( ??? found )
+         then  r>                     ( xt )
+      /uzap  +loop
+      drop  false                     ( not-found )
+   ;
+
+   \ match by name
+   : fz-nmlook  ( prop$ dn le -- prop$ false  |  prop$ dn le true )
+      2dup entry-name$        ( prop$ dn le name$ )
+      2rot 2swap              ( dn le prop$ name$ )
+      2over  $=  if           ( dn le prop$ )
+         2swap  true          ( prop$ dn le true )
+      else                    ( dn le prop$ )
+         2swap 2drop  false   ( prop$ false )
+      then                    ( prop$ false  |  prop$ dn le true )
+   ;
+
+   \ match by name
+   : uz-nmlook  ( prop$ uz -- prop$ false  |  prop$ uz true )
+      dup >r  uzap-name$      ( prop$ name$  r: uz )
+      2over  $=  if           ( prop$  r: uz )
+         r>  true             ( prop$ uz true )
+      else                    ( prop$  r: uz )
+         r> drop  false       ( prop$ false )
+      then                    ( prop$ false  |  prop$ uz true )
+   ;
+
+   : zap-type   ( zp -- n )     h#  7 + c@  ;
+   : >uzap-ent  ( adr -- ent )  h# 40 +  ;
+
+   \ read zap block into temp-space
+   : get-zap  ( dn -- zp )
+      dup  0 lblk#>bp    ( dn bp )
+      swap dn-bsize      ( bp len )
+      temp-space swap    ( bp adr len )
+      rot read-bp        (  )
+      temp-space         ( zp )
+   ;
+
+   \ find prop in zap dnode
+   : zap-lookup  ( dn prop$ -- [ n ] not-found? )
+      rot  dup get-zap                    ( prop$ dn zp )
+      dup zap-type  case
+         uzap#  of
+            >uzap-ent  swap dn-bsize      ( prop$ uz len )
+            ['] uz-nmlook  -rot           ( prop$ xt uz len )
+            uzap-apply  if                ( prop$ uz )
+               mze_value  -rot 2drop      ( n )
+               false                      ( n found )
+            else                          ( prop$ )
+               2drop  true                ( !found )
+            then                          ( [ n ] not-found? )
+         endof
+         fzap#  of
+            ['] fz-nmlook  -rot           ( prop$ xt dn fz )
+            fzap-apply  if                ( prop$ dn le )
+               entry-int-val              ( prop$ n )
+               -rot 2drop  false          ( n found )
+            else                          ( prop$ )
+               2drop  true                ( !found )
+            then                          ( [ n ] not-found? )
+         endof
+         3drop 2drop  true                ( !found )
+      endcase                             ( [ n ] not-found? )
+   ;
+
+[ifdef] strlookup
+   : zap-lookup-str  ( dn prop$ -- [ val$ ] not-found? )
+      rot  dup get-zap                    ( prop$ dn zp )
+      dup zap-type  fzap#  <>  if         ( prop$ dn zp )
+         2drop 2drop  true  exit          ( !found )
+      then                                ( prop$ dn zp )
+      ['] fz-nmlook -rot                  ( prop$ xt dn fz )
+      fzap-apply  if                      ( prop$ dn le )
+         entry-val$  2swap 2drop  false   ( val$ found )
+      else                                ( prop$ )
+         2drop  true                      ( !found )
+      then                                ( [ val$ ] not-found? )
+   ;
+[then]
+
+[ifdef] bigbootblk
+   : fz-print  ( dn le -- false )
+      entry-name$  type cr  false
+   ;
+
+   : uz-print  ( uz -- false )
+      uzap-name$  type cr  false
+   ;
+
+   : zap-print  ( dn -- )
+      dup get-zap                         ( dn zp )
+      dup zap-type  case
+         uzap#  of
+            >uzap-ent  swap dn-bsize      ( uz len )
+            ['] uz-print  -rot            ( xt uz len )
+            uzap-apply                    ( false )
+         endof
+         fzap#  of
+            ['] fz-print -rot             ( xt dn fz )
+            fzap-apply                    ( false )
+         endof
+         3drop  false                     ( false )
+      endcase                             ( false )
+      drop                                (  )
+   ;
+[then]
+
+
+   \
+   \	ZFS object set (DSL) routines
+   \
+
+   1 constant pool-dir#
+
+   : dd_head_dataset_obj  ( dd -- n )  h#  8 +  x@  ;
+   : dd_child_dir_zapobj  ( dd -- n )  h# 20 +  x@  ;
+   : ds_bp                ( ds -- p )  h# 80 +      ;
+
+   0 instance value mos-dn
+   0 instance value obj-dir
+   0 instance value root-dsl
+   0 instance value root-dsl#
+   0 instance value fs-dn
+
+   \ dn-cache contains dc-dn's contents at dc-blk#
+   \ dc-dn will be either mos-dn or fs-dn
+   0 instance value dn-cache
+   0 instance value dc-dn
+   0 instance value dc-blk#
+
+   alias  >dsl-dir  dn_bonus
+   alias  >dsl-ds   dn_bonus
+
+   : #dn/blk  ( dn -- n )  dn-bsize /dnode  /  ;
+
+   \ read block into dn-cache
+   : get-dnblk  ( dn blk# -- )
+      lblk#>bp  dn-cache swap         ( adr bp )
+      dup bp-lsize swap  read-bp      (  )
+   ;
+
+   \ read obj# from objset dir dn into dnode
+   : get-dnode  ( dn obj# -- )
+
+      \ check dn-cache
+      2dup  swap #dn/blk  /mod       ( dn obj# off# blk# )
+      swap >r  nip                   ( dn blk#  r: off# )
+      2dup  dc-blk#  <>              ( dn blk# dn !blk-hit?  r: off# )
+      swap dc-dn  <>  or  if         ( dn blk#  r: off# )
+         \ cache miss, fill from dir
+         2dup  get-dnblk
+         over  to dc-dn
+         dup   to dc-blk#
+      then                           ( dn blk#  r: off# )
+
+      \ index and copy
+      2drop r>  /dnode *             ( off )
+      dn-cache +                     ( dn-adr )
+      dnode  /dnode  move            (  )
+   ;
+
+   \ read meta object set from uber-block
+   : get-mos  ( -- )
+      mos-dn  /dnode                  ( adr len )
+      uber-block ub_rootbp  read-bp
+   ;
+
+   : get-mos-dnode  ( obj# -- )
+      mos-dn swap  get-dnode
+   ;
+
+   \ get root dataset
+   : get-root-dsl  ( -- )
+
+      \ read MOS
+      get-mos
+
+      \ read object dir
+      pool-dir#  get-mos-dnode
+      dnode obj-dir  /dnode  move
+
+      \ read root dataset
+      obj-dir " root_dataset"  zap-lookup  if
+         ." no root_dataset"  abort
+      then                                   ( obj# )
+      dup to root-dsl#
+      get-mos-dnode                          (  )
+      dnode root-dsl  /dnode  move
+   ;
+
+   \ look thru the dsl hierarchy for path
+   \ this looks almost exactly like a FS directory lookup
+   : dsl-lookup ( path$ -- [ ds-obj# ] not-found? )
+      root-dsl >r                                 ( path$  r: root-dn )
+      begin
+         ascii /  left-parse-string               ( path$ file$  r: dn )
+      dup  while
+
+         \ get child dir zap dnode
+         r>  >dsl-dir dd_child_dir_zapobj         ( path$ file$ obj# )
+         get-mos-dnode                            ( path$ file$ )
+
+         \ search it
+         dnode -rot zap-lookup  if                ( path$ )
+            \ not found
+            2drop true  exit                      ( not-found )
+         then                                     ( path$ obj# )
+         get-mos-dnode                            ( path$ )
+         dnode >r                                 ( path$  r: dn )
+      repeat                                      ( path$ file$  r: dn)
+      2drop 2drop  r> drop                        (  )
+
+      \ found it, return dataset obj#
+      dnode >dsl-dir dd_head_dataset_obj          ( ds-obj# )
+      false                                       ( ds-obj# found )
+   ;
+
+   \ get objset from dataset
+   : get-objset  ( adr dn -- )
+      >dsl-ds ds_bp  /dnode swap  read-bp
+   ;
+
+
+   \
+   \	ZFS file-system (ZPL) routines
+   \
+
+   1       constant master-node#
+   d# 264  constant /znode
+   d#  56  constant /zn-slink
+
+   : zp_mode    ( zn -- n )  h# 48 +  x@  ;
+   : zp_size    ( zn -- n )  h# 50 +  x@  ;
+   : zp_parent  ( zn -- n )  h# 58 +  x@  ;
+
+   0 instance value bootfs-obj#
+   0 instance value root-obj#
+   0 instance value current-obj#
+   0 instance value search-obj#
+
+   alias  >znode  dn_bonus
+
+   : fsize     ( dn -- n )     >znode zp_size  ;
+   : ftype     ( dn -- n )     >znode zp_mode  h# f000  and  ;
+   : dir?      ( dn -- flag )  ftype  h# 4000  =  ;
+   : regular?  ( dn -- flag )  ftype  h# 8000  =  ;
+   : symlink?  ( dn -- flag )  ftype  h# a000  =  ;
+
+   \ read obj# from fs objset
+   : get-fs-dnode  ( obj# -- )
+      dup to current-obj#
+      fs-dn swap  get-dnode    (  )
+   ;
+
+   \ get root-obj# from dataset
+   : get-rootobj#  ( ds-obj# -- fsroot-obj# )
+      dup to bootfs-obj#
+      get-mos-dnode                   (  )
+      fs-dn dnode  get-objset
+
+      \ get root obj# from master node
+      master-node#  get-fs-dnode
+      dnode  " ROOT"  zap-lookup  if
+         ." no ROOT"  abort
+      then                             ( fsroot-obj# )
+   ;
+
+   : prop>rootobj#  ( -- )
+      obj-dir " pool_props" zap-lookup  if
+         ." no pool_props"  abort
+      then                               ( prop-obj# )
+      get-mos-dnode                      (  )
+      dnode " bootfs" zap-lookup  if
+         ." no bootfs"  abort
+      then                               ( ds-obj# )
+      get-rootobj#                       ( fsroot-obj# )
+   ;
+
+   : fs>rootobj#  ( fs$ -- root-obj# not-found? )
+
+      \ skip pool name
+      ascii /  left-parse-string  2drop
+
+      \ lookup fs in dsl 
+      dsl-lookup  if                   (  )
+         true  exit                    ( not-found )
+      then                             ( ds-obj# )
+
+      get-rootobj#                     ( fsroot-obj# )
+      false                            ( fsroot-obj# found )
+   ;
+
+   \ lookup file is current directory
+   : dirlook  ( file$ dn -- not-found? )
+      \ . and .. are magic
+      -rot  2dup " ."  $=  if     ( dn file$ )
+         3drop  false  exit       ( found )
+      then
+
+      2dup " .."  $=  if
+         2drop  >znode zp_parent  ( obj# )
+      else                        ( dn file$ )
+         \ search dir
+         current-obj# to search-obj#
+         zap-lookup  if           (  )
+            true  exit            ( not-found )
+         then                     ( obj# )
+      then                        ( obj# )
+      get-fs-dnode  false         ( found )
+   ;
+
+   /buf-len  instance buffer: fpath-buf
+   : clr-fpath-buf  ( -- )  fpath-buf /buf-len  erase  ;
+
+   : fpath-buf$  ( -- path$ )  fpath-buf cscount  ;
+
+   \ copy symlink target to adr
+   : readlink  ( dst dn -- )
+      dup fsize  tuck /zn-slink  >  if    ( dst size dn )
+         \ contents in 1st block
+         temp-space  over dn-bsize        ( dst size dn t-adr bsize )
+         rot  0 lblk#>bp  read-bp         ( dst size )
+         temp-space                       ( dst size src )
+      else                                ( dst size dn )
+         \ contents in dnode
+         >znode  /znode +                 ( dst size src )
+      then                                ( dst size src )
+      -rot  move                          (  )
+   ;
+
+   \ modify tail to account for symlink
+   : follow-symlink  ( tail$ -- tail$' )
+      clr-fpath-buf                             ( tail$ )
+      fpath-buf dnode  readlink
+
+      \ append to current path
+      ?dup  if                                  ( tail$ )
+	 " /" fpath-buf$  $append               ( tail$ )
+	 fpath-buf$  $append                    (  )
+      else  drop  then                          (  )
+      fpath-buf$                                ( path$ )
+
+      \ get directory that starts changed path
+      over c@  ascii /  =  if                   ( path$ )
+	 str++  root-obj#                       ( path$' obj# )
+      else                                      ( path$ )
+         search-obj#                            ( path$ obj# )
+      then                                      ( path$ obj# )
+      get-fs-dnode                              ( path$ )
+   ;
+
+   \ open dnode at path
+   : lookup  ( path$ -- not-found? )
+
+      \ get directory that starts path
+      over c@  ascii /  =  if
+         str++  root-obj#                         ( path$' obj# )
+      else
+         current-obj#                             ( path$ obj# )
+      then                                        ( path$ obj# )
+      get-fs-dnode                                ( path$ )
+
+      \ lookup each path component
+      begin                                       ( path$ )
+         ascii /  left-parse-string               ( path$ file$ )
+      dup  while
+         dnode dir?  0=  if
+            2drop true  exit                      ( not-found )
+         then                                     ( path$ file$ )
+         dnode dirlook  if                        ( path$ )
+            2drop true  exit                      ( not-found )
+         then                                     ( path$ )
+         dnode symlink?  if
+            follow-symlink                        ( path$' )
+         then                                     ( path$ )
+      repeat                                      ( path$ file$ )
+      2drop 2drop  false                          ( found )
+   ;
+
+   \
+   \	ZFS installation routines
+   \
+
+   \ ZFS file interface
+   struct
+      /x     field >busy
+      /x     field >offset
+      /dnode field >dnode
+   constant /file-record
+
+   d# 10                  constant #opens
+   #opens /file-record *  constant /file-records
+
+   /file-records  instance buffer: file-records
+
+   -1 instance value current-fd
+
+   : fd>record     ( fd -- rec )  /file-record *  file-records +  ;
+   : file-offset@  ( -- off )     current-fd fd>record >offset  x@  ;
+   : file-offset!  ( off -- )     current-fd fd>record >offset  x!  ;
+   : file-dnode    ( -- dn )      current-fd fd>record >dnode  ;
+   : file-size     ( -- size )    file-dnode  fsize  ;
+   : file-bsize    ( -- bsize )   file-dnode  dn-bsize  ;
+
+   \ find free fd slot
+   : get-slot  ( -- fd false | true )
+      #opens 0  do
+         i fd>record >busy x@  0=  if
+            i false  unloop exit
+         then
+      loop  true
+   ;
+
+   : free-slot  ( fd -- )
+      0 swap  fd>record >busy  x!
+   ;
+
+   \ init fd to offset 0 and copy dnode
+   : init-fd  ( fd -- )
+      fd>record                ( rec )
+      dup  >busy  1 swap  x!
+      dup  >dnode  dnode swap  /dnode  move
+      >offset  0 swap  x!
+   ;
+
+   \ make fd current
+   : set-fd  ( fd -- error? )
+      dup fd>record  >busy x@  0=  if   ( fd )
+         drop true  exit                ( failed )
+      then                              ( fd )
+      to current-fd  false              ( succeeded )
+   ;
+
+   \ read next fs block
+   : file-bread  ( adr -- )
+      file-bsize                      ( adr len )
+      file-offset@ over  /            ( adr len blk# )
+      file-dnode swap  lblk#>bp       ( adr len bp )
+      read-bp                         ( )
+   ;
+
+   \ advance file io stack by n
+   : fio+  ( # adr len n -- #+n adr+n len-n )
+      dup file-offset@ +  file-offset!
+      dup >r  -  -rot   ( len' # adr  r: n )
+      r@  +  -rot       ( adr' len' #  r: n )
+      r>  +  -rot       ( #' adr' len' )
+   ;
+
+   /max-bsize  5 *
+   /uber-block      +
+   /dnode      5 *  +
+   /disk-block      +
+   constant alloc-size
+
+   : allocate-buffers  ( -- )
+      alloc-size h# a0.0000 vmem-alloc  dup 0=  if
+         ." no memory"  abort
+      then                                ( adr )
+      dup to temp-space    /max-bsize  +  ( adr )
+      dup to dn-cache      /max-bsize  +  ( adr )
+      dup to blk-space     /max-bsize  +  ( adr )
+      dup to ind-cache     /max-bsize  +  ( adr )
+      dup to zap-space     /max-bsize  +  ( adr )
+      dup to uber-block    /uber-block +  ( adr )
+      dup to mos-dn        /dnode      +  ( adr )
+      dup to obj-dir       /dnode      +  ( adr )
+      dup to root-dsl      /dnode      +  ( adr )
+      dup to fs-dn         /dnode      +  ( adr )
+      dup to dnode         /dnode      +  ( adr )
+          to gang-space                   (  )
+
+      \ zero instance buffers
+      file-records /file-records  erase
+      bootprop-buf /buf-len  erase 
+   ;
+
+   : release-buffers  ( -- )
+      temp-space  alloc-size  mem-free
+   ;
+
+   external
+
+   : open ( -- okay? )
+      my-args dev-open  dup 0=  if
+         exit                       ( failed )
+      then  to dev-ih
+
+      allocate-buffers
+      scan-vdev
+      get-ub
+      get-root-dsl
+      true
+   ;
+
+   : open-fs  ( fs$ -- okay? )
+      fs>rootobj#  if        (  )
+         false               ( failed )
+      else                   ( obj# )
+         to root-obj#  true  ( succeeded )
+      then                   ( okay? )
+   ;
+
+   : close  ( -- )
+      dev-ih dev-close
+      0 to dev-ih
+      release-buffers
+   ;
+
+   : open-file  ( path$ -- fd true | false )
+
+      \ open default fs if no open-fs
+      root-obj# 0=  if
+         prop>rootobj#  to root-obj#
+      then
+
+      get-slot  if
+         2drop false  exit         ( failed )
+      then  -rot                   ( fd path$ )
+
+      lookup  if                   ( fd )
+         drop false  exit          ( failed )
+      then                         ( fd )
+
+      dup init-fd  true            ( fd succeeded )
+   ;
+
+   : close-file  ( fd -- )
+      free-slot   (  )
+   ;
+
+   : size-file  ( fd -- size )
+      set-fd  if  0  else  file-size  then
+   ;
+
+   : seek-file  ( off fd -- off true | false )
+      set-fd  if                ( off )
+         drop false  exit       ( failed )
+      then                      ( off )
+
+      dup file-size >  if       ( off )
+         drop false  exit       ( failed )
+      then                      ( off )
+      dup  file-offset!  true   ( off succeeded )
+   ;
+
+   : read-file  ( adr len fd -- #read )
+      set-fd  if                   ( adr len )
+         2drop 0  exit             ( 0 )
+      then                         ( adr len )
+
+      file-dnode regular? 0=  if  2drop 0  exit  then
+
+      \ adjust len if reading past eof
+      dup  file-offset@ +  file-size  >  if
+         dup  file-offset@ +  file-size -  -
+      then
+      dup 0=  if  nip exit  then
+
+      0 -rot                              ( #read adr len )
+
+      \ initial partial block
+      file-offset@ file-bsize  mod  ?dup  if  ( #read adr len off )
+         temp-space  file-bread
+         2dup  file-bsize  swap -  min    ( #read adr len off cpy-len )
+         2over drop -rot                  ( #read adr len adr off cpy-len )
+         >r  temp-space +  swap           ( #read adr len cpy-src adr  r: cpy-len )
+         r@  move  r> fio+                ( #read' adr' len' )
+      then                                ( #read adr len )
+
+      dup file-bsize /  0  ?do            ( #read adr len )
+         over  file-bread
+         file-bsize fio+                  ( #read' adr' len' )
+      loop                                ( #read adr len )
+
+      \ final partial block
+      dup  if                             ( #read adr len )
+         temp-space  file-bread
+         2dup temp-space -rot  move       ( #read adr len )
+         dup fio+                         ( #read' adr' 0 )
+      then  2drop                         ( #read )
+   ;
+
+   : cinfo-file  ( fd -- bsize fsize comp? )
+      set-fd  if
+         0 0 0
+      else
+         file-bsize  file-size             ( bsize fsize )
+         \ zfs does internal compression
+         0                                 ( bsize fsize comp? )
+      then
+   ;
+
+   \ read ramdisk fcode at rd-offset
+   : get-rd   ( adr len -- )
+      rd-offset dev-ih  read-disk
+   ;
+
+   : bootprop
+      " /"  bootprop$  $append
+      bootfs-obj# (xu.)  bootprop$  $append
+      bootprop$  encode-string  " zfs-bootfs"   ( propval propname )
+      true
+   ;
+
+
+[ifdef] bigbootblk
+   : chdir  ( dir$ -- )
+      current-obj# -rot            ( obj# dir$ )
+      lookup  if                   ( obj# )
+         to current-obj#           (  )
+         ." no such dir" cr  exit
+      then                         ( obj# )
+      dnode dir?  0=  if           ( obj# )
+         to current-obj#           (  )
+         ." not a dir" cr  exit
+      then  drop                   (  )
+   ;
+
+   : dir  ( -- )
+      current-obj# get-fs-dnode
+      dnode zap-print
+   ;
+[then]
+
+finish-device
+pop-package

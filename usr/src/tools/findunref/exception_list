@@ -262,13 +262,6 @@
 ./src/lib/libresolv2/include/err.h
 
 #
-# Ignore ufs unix version of the boot block, useful for testing.
-#
-./src/psm/stand/bootblks/ufs/common/iob.h
-./src/psm/stand/bootblks/ufs/common/ufs.c
-./src/psm/stand/bootblks/obp-c/common/cbootblk.h
-
-#
 # Ignore mont_mulf.c. It is used as a starting point for some hand optimized
 # assembly files. We keep it around for future reference.
 #

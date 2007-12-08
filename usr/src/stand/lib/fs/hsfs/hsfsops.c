@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,7 +145,7 @@ opendir(fileid_t *filep, ino_t inode)
 	filep->fi_blocknum = hdbtodb(inode);
 
 	if (inode != root_ino)
-	    return (0);
+		return (0);
 
 	if ((int)(parse_dir(filep, 0, &hsdep)) > 0) {
 		hs_seti(filep, &hsdep, inode);
@@ -168,7 +167,7 @@ find(fileid_t *filep, char *path)
 	}
 
 	if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-	    printf("find(): path=<%s>\n", path);
+		printf("find(): path=<%s>\n", path);
 
 	/* Read the ROOT directory */
 	if (opendir(filep, inode = root_ino)) {
@@ -464,7 +463,7 @@ boot_hsfs_mountroot(char *str)
 	char 		*bufp;
 
 	if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-	    printf("mountroot()\n");
+		printf("mountroot()\n");
 
 	/*
 	 * If already mounted, just return success.
@@ -595,7 +594,7 @@ boot_hsfs_open(char *filename, int flags)
 	inode = find(filep, filename);
 	if (inode == (ino_t)0) {
 		if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-		    printf("open(%s) ENOENT\n", filename);
+			printf("open(%s) ENOENT\n", filename);
 		(void) boot_hsfs_close(filep->fi_filedes);
 		return (-1);
 	}
@@ -604,7 +603,7 @@ boot_hsfs_open(char *filename, int flags)
 	filep->fi_offset = filep->fi_count = 0;
 
 	if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-	    printf("open(%s) fd=%d\n", filename, filep->fi_filedes);
+		printf("open(%s) fd=%d\n", filename, filep->fi_filedes);
 	return (filep->fi_filedes);
 }
 
@@ -679,7 +678,7 @@ boot_hsfs_close(int fd)
 	fileid_t *filep;
 
 	if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-	    printf("close(%d)\n", fd);
+		printf("close(%d)\n", fd);
 
 	if (filep = find_fp(fd)) {
 		/* Clear the ranks */
@@ -702,6 +701,7 @@ boot_hsfs_close(int fd)
 	}
 }
 
+/* closeall is now idempotent */
 /*ARGSUSED*/
 static void
 boot_hsfs_closeall(int flag)
@@ -709,10 +709,17 @@ boot_hsfs_closeall(int flag)
 	fileid_t	*filep = head;
 	extern int verbosemode;
 
+	if (devp == NULL) {
+		if (head)
+			prom_panic("boot_hsfs_closeall: head != NULL.\n");
+		return;
+	}
+
 	while ((filep = filep->fi_forw) != head)
 		if (filep->fi_taken)
 			if (boot_hsfs_close(filep->fi_filedes))
 				prom_panic("Filesystem may be inconsistent.\n");
+
 
 	release_cache(devp->di_dcookie);
 	(void) prom_close(devp->di_dcookie);
@@ -722,6 +729,8 @@ boot_hsfs_closeall(int flag)
 	bkmem_free((char *)devp, sizeof (devid_t));
 	bkmem_free((char *)head, sizeof (fileid_t));
 	root_ino = 0;
+	devp = NULL;
+	head = NULL;
 }
 
 static uint_t
@@ -796,52 +805,53 @@ parse_dir(fileid_t *filep, int offset, struct hs_direct *hsdep)
 	ce_len = IDE_SUA_LEN(bufp);
 	ce_lbn = 0;
 	if ((int)(ce_len) > 0) {
-	ce_lbn = parse_susp((char *)IDE_sys_use_area(bufp), &ce_len, hsdep);
-	while (ce_lbn) {
-	    daddr_t save_blocknum = filep->fi_blocknum;
-	    daddr_t save_offset = filep->fi_offset;
-	    caddr_t save_memp = filep->fi_memp;
-	    uint_t save_count = filep->fi_count;
+		ce_lbn = parse_susp((char *)IDE_sys_use_area(bufp),
+		    &ce_len, hsdep);
+		while (ce_lbn) {
+			daddr_t save_blocknum = filep->fi_blocknum;
+			daddr_t save_offset = filep->fi_offset;
+			caddr_t save_memp = filep->fi_memp;
+			uint_t save_count = filep->fi_count;
 
 #ifdef	noisy
-	    print_io_req(filep, "parse_dir(): [I]");
+			print_io_req(filep, "parse_dir(): [I]");
 #endif	/* noisy */
 
-	    filep->fi_blocknum = hdbtodb(ce_lbn);
-	    filep->fi_offset = 0;
-	    filep->fi_count = ISO_SECTOR_SIZE;
+			filep->fi_blocknum = hdbtodb(ce_lbn);
+			filep->fi_offset = 0;
+			filep->fi_count = ISO_SECTOR_SIZE;
 
 #ifdef	noisy
-	    print_io_req(filep, "parse_dir(): [0]");
+			print_io_req(filep, "parse_dir(): [0]");
 #endif	/* noisy */
 
-	    if ((filep->fi_memp = get_bcache(filep)) == 0)
-		    ret_code = set_bcache(filep);
+			if ((filep->fi_memp = get_bcache(filep)) == 0)
+				ret_code = set_bcache(filep);
 
 #ifdef	noisy
-	    print_io_req(filep, "parse_dir(): [1]");
+			print_io_req(filep, "parse_dir(): [1]");
 #endif	/* noisy */
 
-	    if (ret_code) {
-		    filep->fi_blocknum = save_blocknum;
-		    filep->fi_offset = save_offset;
-		    filep->fi_memp = save_memp;
-		    filep->fi_count = save_count;
-		    printf("parse_dir(): set_bcache() failed (%d)\n",
-			    ret_code);
-		    break;
-	    }
-	    ce_lbn = parse_susp(filep->fi_memp, &ce_len, hsdep);
+			if (ret_code) {
+				filep->fi_blocknum = save_blocknum;
+				filep->fi_offset = save_offset;
+				filep->fi_memp = save_memp;
+				filep->fi_count = save_count;
+				printf("parse_dir(): "
+				    "set_bcache() failed (%d)\n", ret_code);
+				break;
+			}
+			ce_lbn = parse_susp(filep->fi_memp, &ce_len, hsdep);
 
-	    filep->fi_blocknum = save_blocknum;
-	    filep->fi_offset = save_offset;
-	    filep->fi_memp = save_memp;
-	    filep->fi_count = save_count;
+			filep->fi_blocknum = save_blocknum;
+			filep->fi_offset = save_offset;
+			filep->fi_memp = save_memp;
+			filep->fi_count = save_count;
 
 #ifdef	noisy
-	    print_io_req(filep, "parse_dir(): [2]");
+			print_io_req(filep, "parse_dir(): [2]");
 #endif	/* noisy */
-	}
+		}
 	}
 
 	return (udp->d_reclen);
@@ -859,75 +869,84 @@ parse_susp(char *bufp, uint_t *ce_len, struct hs_direct *hsdep)
 	uint_t i;
 
 	while (cur_off < blk_len) {
-	    susp = (uchar_t *)(bufp + cur_off);
-	    if (susp[0] == '\0' || susp[1] == '\0')
-		break;
-	    susp_len = SUF_LEN(susp);
-	    if (susp_len == 0)
-		break;
-	    for (i = 0; i < hsfs_num_sig; i++) {
-		if (strncmp(hsfs_sig_tab[i], (char *)susp, SUF_SIG_LEN) == 0) {
+		susp = (uchar_t *)(bufp + cur_off);
+		if (susp[0] == '\0' || susp[1] == '\0')
+			break;
+		susp_len = SUF_LEN(susp);
+		if (susp_len == 0)
+			break;
+		for (i = 0; i < hsfs_num_sig; i++) {
+			if (strncmp(hsfs_sig_tab[i],
+			    (char *)susp, SUF_SIG_LEN) == 0) {
 #ifdef	noisy
-		    if ((boothowto & RB_DEBUG) && (boothowto & RB_VERBOSE))
-			printf("  SUSP_%c%c %d\n", susp[0], susp[1], susp_len);
+				if ((boothowto & RB_DEBUG) &&
+				    (boothowto & RB_VERBOSE))
+					printf("  SUSP_%c%c %d\n",
+					    susp[0], susp[1], susp_len);
 #endif	/* noisy */
-		    switch (i) {
-			case SUSP_SP_IX:
-			    if (CHECK_BYTES_OK(susp)) {
-				sua_offset = SP_SUA_OFFSET(susp);
+				switch (i) {
+				case SUSP_SP_IX:
+					if (CHECK_BYTES_OK(susp)) {
+						sua_offset =
+						    SP_SUA_OFFSET(susp);
 #ifdef	lint
-				/* Like the man said, this may not be needed */
-				i = (int)sua_offset;
+						/* this may not be needed */
+						i = (int)sua_offset;
 #endif	/* lint */
-			    }
-			    break;
+					}
+					break;
 
-			case SUSP_CE_IX:
-			    ce_lbn = CE_BLK_LOC(susp);
-			    *ce_len = CE_CONT_LEN(susp);
+				case SUSP_CE_IX:
+					ce_lbn = CE_BLK_LOC(susp);
+					*ce_len = CE_CONT_LEN(susp);
 #ifdef	noisy
-			    if ((boothowto & RB_DEBUG) &&
-				(boothowto & RB_VERBOSE))
-				printf("parse_susp(): "
-				    "CE: ce_lbn = %d ce_len=%d\n",
-				    ce_lbn, *ce_len);
+					if ((boothowto & RB_DEBUG) &&
+					    (boothowto & RB_VERBOSE))
+						printf("parse_susp(): "
+						    "CE: ce_lbn = %d "
+						    "ce_len=%d\n",
+						    ce_lbn, *ce_len);
 #endif	/* noisy */
-			    break;
+					break;
 
-			case SUSP_ST_IX:
-			    printf("parse_susp(): ST: returning %d\n", ce_lbn);
-			    return (ce_lbn);
+				case SUSP_ST_IX:
+					printf("parse_susp(): ST: returning "
+					    "%d\n", ce_lbn);
+					return (ce_lbn);
 
-			case RRIP_SL_IX:
+				case RRIP_SL_IX:
 #ifdef	noisy
-			    if ((boothowto & RB_DEBUG) &&
-				(boothowto & RB_VERBOSE))
-				printf("parse_susp(): ******* SL *******\n");
+					if ((boothowto & RB_DEBUG) &&
+					    (boothowto & RB_VERBOSE))
+						printf("parse_susp(): "
+						    "******* SL *******\n");
 #endif	/* noisy */
-			    break;
+					break;
 
-			case RRIP_RR_IX:
-			    break;
+				case RRIP_RR_IX:
+					break;
 
-			case RRIP_NM_IX:
-			    if (!RRIP_NAME_FLAGS(susp)) {
-				udp->d_namlen = RRIP_NAME_LEN(susp);
-				bcopy((char *)RRIP_name(susp),
-					(char *)udp->d_name,
-					udp->d_namlen);
-				udp->d_name[udp->d_namlen] = '\0';
-			    }
-			    break;
-		    }
-		    cur_off += susp_len;
-		    break;
+				case RRIP_NM_IX:
+					if (!RRIP_NAME_FLAGS(susp)) {
+						udp->d_namlen =
+						    RRIP_NAME_LEN(susp);
+						bcopy((char *)RRIP_name(susp),
+						    (char *)udp->d_name,
+						    udp->d_namlen);
+						udp->d_name
+						    [udp->d_namlen] = '\0';
+					}
+					break;
+				}
+			cur_off += susp_len;
+			break;
+			}
 		}
-	    }
-	    if (i > hsfs_num_sig) {
-		printf("parse_susp(): Bad SUSP\n");
-		cur_off = blk_len;
-		break;
-	    }
+		if (i > hsfs_num_sig) {
+			printf("parse_susp(): Bad SUSP\n");
+			cur_off = blk_len;
+			break;
+		}
 	}
 	return (ce_lbn);
 }
@@ -962,11 +981,11 @@ static void
 print_io_req(fileid_t *filep, char *str)
 {
 	printf("%s o=%d b=%d c=%d m=%x\n",
-	str,
-	filep->fi_offset,
-	filep->fi_blocknum,
-	filep->fi_count,
-	(uint_t)filep->fi_memp);
+	    str,
+	    filep->fi_offset,
+	    filep->fi_blocknum,
+	    filep->fi_count,
+	    (uint_t)filep->fi_memp);
 }
 #endif	/* noisy */
 

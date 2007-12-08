@@ -86,6 +86,7 @@
 #include <sys/memlist_plat.h>
 #include <sys/systeminfo.h>
 #include <sys/promif.h>
+#include <sys/prom_plat.h>
 
 u_longlong_t	spec_hole_start = 0x80000000000ull;
 u_longlong_t	spec_hole_end = 0xfffff80000000000ull;
@@ -102,29 +103,9 @@ num_phys_pages()
 	return (npages);
 }
 
-/*
- * Count the number of available pages and the number of
- * chunks in the list of available memory.
- */
-void
-size_physavail(
-	u_longlong_t	*physavail,
-	size_t		nelems,
-	pgcnt_t		*npages,
-	int		*memblocks)
-{
-	size_t	i;
-
-	*npages = 0;
-	*memblocks = 0;
-	for (i = 0; i < nelems; i += 2) {
-		*npages += (pgcnt_t)(physavail[i+1] >> PAGESHIFT);
-		(*memblocks)++;
-	}
-}
 
 pgcnt_t
-size_virtalloc(u_longlong_t *avail, size_t nelems)
+size_virtalloc(prom_memlist_t *avail, size_t nelems)
 {
 
 	u_longlong_t	start, end;
@@ -132,10 +113,10 @@ size_virtalloc(u_longlong_t *avail, size_t nelems)
 	uint_t		hole_allocated = 0;
 	uint_t		i;
 
-	for (i = 0; i < (nelems - 2); i += 2) {
+	for (i = 0; i < nelems - 1; i++) {
 
-		start = avail[i] + avail[i + 1];
-		end = avail[i + 2];
+		start = avail[i].addr + avail[i].size;
+		end = avail[i + 1].addr;
 
 		/*
 		 * Notes:
@@ -195,181 +176,196 @@ get_max_phys_size(
 }
 
 
-/*
- * Copy boot's physavail list deducting memory at "start"
- * for "size" bytes.
- */
-int
-copy_physavail(
-	u_longlong_t	*src,
-	size_t		nelems,
-	struct memlist	**dstp,
-	uint_t		start,
-	uint_t		size)
-{
-	struct memlist *dst, *prev;
-	uint_t end1;
-	int deducted = 0;
-	size_t	i;
-
-	dst = *dstp;
-	prev = dst;
-	end1 = start + size;
-
-	for (i = 0; i < nelems; i += 2) {
-		uint64_t addr, lsize, end2;
-
-		addr = src[i];
-		lsize = src[i+1];
-		end2 = addr + lsize;
-
-		if ((size != 0) && start >= addr && end1 <= end2) {
-			/* deducted range in this chunk */
-			deducted = 1;
-			if (start == addr) {
-				/* abuts start of chunk */
-				if (end1 == end2)
-					/* is equal to the chunk */
-					continue;
-				dst->address = end1;
-				dst->size = lsize - size;
-			} else if (end1 == end2) {
-				/* abuts end of chunk */
-				dst->address = addr;
-				dst->size = lsize - size;
-			} else {
-				/* in the middle of the chunk */
-				dst->address = addr;
-				dst->size = start - addr;
-				dst->next = 0;
-				if (prev == dst) {
-					dst->prev = 0;
-					dst++;
-				} else {
-					dst->prev = prev;
-					prev->next = dst;
-					dst++;
-					prev++;
-				}
-				dst->address = end1;
-				dst->size = end2 - end1;
-			}
-			dst->next = 0;
-			if (prev == dst) {
-				dst->prev = 0;
-				dst++;
-			} else {
-				dst->prev = prev;
-				prev->next = dst;
-				dst++;
-				prev++;
-			}
-		} else {
-			dst->address = src[i];
-			dst->size = src[i+1];
-			dst->next = 0;
-			if (prev == dst) {
-				dst->prev = 0;
-				dst++;
-			} else {
-				dst->prev = prev;
-				prev->next = dst;
-				dst++;
-				prev++;
-			}
-		}
-	}
-
-	*dstp = dst;
-	return (deducted);
-}
 
 struct vnode prom_ppages;
 
-/*
- * Find the pages allocated by the prom by diffing the original
- * phys_avail list and the current list.  In the difference, the
- * pages not locked belong to the PROM.  (The kernel has already locked
- * and removed all the pages it has allocated from the freelist, this
- * routine removes the remaining "free" pages that really belong to the
- * PROM and hashs them in on the 'prom_pages' vnode.)
- */
-void
-fix_prom_pages(struct memlist *orig, struct memlist *new)
+static void
+more_pages(uint64_t base, uint64_t len)
 {
-	struct memlist *list, *nlist;
+	void kphysm_add();
+
+	kphysm_add(base, len, 1);
+}
+
+static void
+less_pages(uint64_t base, uint64_t len)
+{
+	uint64_t pa, end = base + len;
 	extern int kcage_on;
 
-	nlist = new;
-	for (list = orig; list; list = list->next) {
-		uint64_t pa, end;
+	for (pa = base; pa < end; pa += PAGESIZE) {
 		pfn_t pfnum;
 		page_t *pp;
 
-		if (list->address == nlist->address &&
-		    list->size == nlist->size) {
-			nlist = nlist->next ? nlist->next : nlist;
+		pfnum = (pfn_t)(pa >> PAGESHIFT);
+		if ((pp = page_numtopp_nolock(pfnum)) == NULL)
+			cmn_err(CE_PANIC, "missing pfnum %lx", pfnum);
+
+		/*
+		 * must break up any large pages that may have
+		 * constituent pages being utilized for
+		 * prom_alloc()'s. page_reclaim() can't handle
+		 * large pages.
+		 */
+		if (pp->p_szc != 0)
+			page_boot_demote(pp);
+
+		if (!PAGE_LOCKED(pp) && pp->p_lckcnt == 0) {
+			/*
+			 * Ahhh yes, a prom page,
+			 * suck it off the freelist,
+			 * lock it, and hashin on prom_pages vp.
+			 */
+			if (page_trylock(pp, SE_EXCL) == 0)
+				cmn_err(CE_PANIC, "prom page locked");
+
+			(void) page_reclaim(pp, NULL);
+			/*
+			 * vnode offsets on the prom_ppages vnode
+			 * are page numbers (gack) for >32 bit
+			 * physical memory machines.
+			 */
+			(void) page_hashin(pp, &prom_ppages,
+			    (offset_t)pfnum, NULL);
+
+			if (kcage_on) {
+				ASSERT(pp->p_szc == 0);
+				PP_SETNORELOC(pp);
+			}
+			(void) page_pp_lock(pp, 0, 1);
+		}
+	}
+}
+
+void
+diff_memlists(struct memlist *proto, struct memlist *diff, void (*func)())
+{
+	uint64_t p_base, p_end, d_base, d_end;
+
+	while (proto != NULL) {
+		/*
+		 * find diff item which may overlap with proto item
+		 * if none, apply func to all of proto item
+		 */
+		while (diff != NULL &&
+		    proto->address >= diff->address + diff->size)
+			diff = diff->next;
+		if (diff == NULL) {
+			(*func)(proto->address, proto->size);
+			proto = proto->next;
+			continue;
+		}
+		if (proto->address == diff->address &&
+		    proto->size == diff->size) {
+			proto = proto->next;
+			diff = diff->next;
+			continue;
+		}
+
+		p_base = proto->address;
+		p_end = p_base + proto->size;
+		d_base = diff->address;
+		d_end = d_base + diff->size;
+		/*
+		 * here p_base < d_end
+		 * there are 5 cases
+		 */
+
+		/*
+		 *	d_end
+		 *	d_base
+		 *  p_end
+		 *  p_base
+		 *
+		 * apply func to all of proto item
+		 */
+		if (p_end <= d_base) {
+			(*func)(p_base, proto->size);
+			proto = proto->next;
 			continue;
 		}
 
 		/*
-		 * Loop through the old list looking to
-		 * see if each page is still in the new one.
-		 * If a page is not in the new list then we
-		 * check to see if it locked permanently.
-		 * If so, the kernel allocated and owns it.
-		 * If not, then the prom must own it. We
-		 * remove any pages found to owned by the prom
-		 * from the freelist.
+		 * ...
+		 *	d_base
+		 *  p_base
+		 *
+		 * normalize by applying func from p_base to d_base
 		 */
-		end = list->address + list->size;
-		for (pa = list->address; pa < end; pa += PAGESIZE) {
+		if (p_base < d_base)
+			(*func)(p_base, d_base - p_base);
 
-			if (address_in_memlist(new, pa, PAGESIZE))
-				continue;
-
-			pfnum = (pfn_t)(pa >> PAGESHIFT);
-			if ((pp = page_numtopp_nolock(pfnum)) == NULL)
-				cmn_err(CE_PANIC, "missing pfnum %lx", pfnum);
-
+		if (p_end <= d_end) {
 			/*
-			 * must break up any large pages that may have
-			 * constituent pages being utilized for
-			 * BOP_ALLOC()'s. page_reclaim() can't handle
-			 * large pages.
+			 *	d_end
+			 *  p_end
+			 *	d_base
+			 *  p_base
+			 *
+			 *	-or-
+			 *
+			 *	d_end
+			 *  p_end
+			 *  p_base
+			 *	d_base
+			 *
+			 * any non-overlapping ranges applied above,
+			 * so just continue
 			 */
-			if (pp->p_szc != 0)
-				page_boot_demote(pp);
-
-			if (!PAGE_LOCKED(pp) && pp->p_lckcnt == 0) {
-				/*
-				 * Ahhh yes, a prom page,
-				 * suck it off the freelist,
-				 * lock it, and hashin on prom_pages vp.
-				 */
-				if (page_trylock(pp, SE_EXCL) == 0)
-					cmn_err(CE_PANIC, "prom page locked");
-
-				(void) page_reclaim(pp, NULL);
-				/*
-				 * XXX	vnode offsets on the prom_ppages vnode
-				 *	are page numbers (gack) for >32 bit
-				 *	physical memory machines.
-				 */
-				(void) page_hashin(pp, &prom_ppages,
-				    (offset_t)pfnum, NULL);
-
-				if (kcage_on) {
-					ASSERT(pp->p_szc == 0);
-					PP_SETNORELOC(pp);
-				}
-				(void) page_pp_lock(pp, 0, 1);
-				page_downgrade(pp);
-			}
+			proto = proto->next;
+			continue;
 		}
-		nlist = nlist->next ? nlist->next : nlist;
+
+		/*
+		 *  p_end
+		 *	d_end
+		 *	d_base
+		 *  p_base
+		 *
+		 *	-or-
+		 *
+		 *  p_end
+		 *	d_end
+		 *  p_base
+		 *	d_base
+		 *
+		 * Find overlapping d_base..d_end ranges, and apply func
+		 * where no overlap occurs.  Stop when d_base is above
+		 * p_end
+		 */
+		for (p_base = d_end, diff = diff->next; diff != NULL;
+		    p_base = d_end, diff = diff->next) {
+			d_base = diff->address;
+			d_end = d_base + diff->size;
+			if (p_end <= d_base) {
+				(*func)(p_base, p_end - p_base);
+				break;
+			} else
+				(*func)(p_base, d_base - p_base);
+		}
+		if (diff == NULL)
+			(*func)(p_base, p_end - p_base);
+		proto = proto->next;
 	}
 }
+
+void
+sync_memlists(struct memlist *orig, struct memlist *new)
+{
+
+	/*
+	 * Find pages allocated via prom by looking for
+	 * pages on orig, but no on new.
+	 */
+	diff_memlists(orig, new, less_pages);
+
+	/*
+	 * Find pages free'd via prom by looking for
+	 * pages on new, but not on orig.
+	 */
+	diff_memlists(new, orig, more_pages);
+}
+
 
 /*
  * Find the page number of the highest installed physical
@@ -379,7 +375,7 @@ fix_prom_pages(struct memlist *orig, struct memlist *new)
  */
 void
 installed_top_size_memlist_array(
-	u_longlong_t *list,	/* base of array */
+	prom_memlist_t *list,	/* base of array */
 	size_t	nelems,		/* number of elements */
 	pfn_t *topp,		/* return ptr for top value */
 	pgcnt_t *sumpagesp)	/* return prt for sum of installed pages */
@@ -389,11 +385,11 @@ installed_top_size_memlist_array(
 	pfn_t highp;		/* high page in a chunk */
 	size_t i;
 
-	for (i = 0; i < nelems; i += 2) {
-		highp = (list[i] + list[i+1] - 1) >> PAGESHIFT;
+	for (i = 0; i < nelems; list++, i++) {
+		highp = (list->addr + list->size - 1) >> PAGESHIFT;
 		if (top < highp)
 			top = highp;
-		sumpages += (list[i+1] >> PAGESHIFT);
+		sumpages += (list->size >> PAGESHIFT);
 	}
 
 	*topp = top;
@@ -406,7 +402,7 @@ installed_top_size_memlist_array(
  */
 void
 copy_memlist(
-	u_longlong_t	*src,
+	prom_memlist_t	*src,
 	size_t		nelems,
 	struct memlist	**dstp)
 {
@@ -416,9 +412,9 @@ copy_memlist(
 	dst = *dstp;
 	prev = dst;
 
-	for (i = 0; i < nelems; i += 2) {
-		dst->address = src[i];
-		dst->size = src[i+1];
+	for (i = 0; i < nelems; src++, i++) {
+		dst->address = src->addr;
+		dst->size = src->size;
 		dst->next = 0;
 		if (prev == dst) {
 			dst->prev = 0;
@@ -434,93 +430,176 @@ copy_memlist(
 	*dstp = dst;
 }
 
+
 static struct bootmem_props {
-	char		*name;
-	u_longlong_t	*ptr;
+	prom_memlist_t	*ptr;
 	size_t		nelems;		/* actual number of elements */
-	size_t		bufsize;	/* length of allocated buffer */
-} bootmem_props[] = {
-	{ "phys-installed", NULL, 0, 0 },
-	{ "phys-avail", NULL, 0, 0 },
-	{ "virt-avail", NULL, 0, 0 },
-	{ NULL, NULL, 0, 0 }
-};
+	size_t		maxsize;	/* max buffer */
+} bootmem_props[3];
 
 #define	PHYSINSTALLED	0
 #define	PHYSAVAIL	1
 #define	VIRTAVAIL	2
 
-void
-copy_boot_memlists(u_longlong_t **physinstalled, size_t *physinstalled_len,
-    u_longlong_t **physavail, size_t *physavail_len,
-    u_longlong_t **virtavail, size_t *virtavail_len)
+/*
+ * Comapct contiguous memory list elements
+ */
+static void
+compact_promlist(struct bootmem_props *bpp)
 {
-	int	align = BO_ALIGN_L3;
-	size_t	len;
-	struct bootmem_props *tmp = bootmem_props;
+	int i = 0, j;
+	struct prom_memlist *pmp = bpp->ptr;
 
-tryagain:
-	for (tmp = bootmem_props; tmp->name != NULL; tmp++) {
-		len = BOP_GETPROPLEN(bootops, tmp->name);
-		if (len == 0) {
-			panic("cannot get length of \"%s\" property",
-			    tmp->name);
-		}
-		tmp->nelems = len / sizeof (u_longlong_t);
-		len = roundup(len, PAGESIZE);
-		if (len <= tmp->bufsize)
-			continue;
-		/* need to allocate more */
-		if (tmp->ptr) {
-			BOP_FREE(bootops, (caddr_t)tmp->ptr, tmp->bufsize);
-			tmp->ptr = NULL;
-			tmp->bufsize = 0;
-		}
-		tmp->bufsize = len;
-		tmp->ptr = (void *)BOP_ALLOC(bootops, 0, tmp->bufsize, align);
-		if (tmp->ptr == NULL)
-			panic("cannot allocate %lu bytes for \"%s\" property",
-			    tmp->bufsize, tmp->name);
-
+	for (;;) {
+		if (pmp[i].addr + pmp[i].size == pmp[i+1].addr) {
+			pmp[i].size += pmp[i+1].size;
+			bpp->nelems--;
+			for (j = i + 1; j < bpp->nelems; j++)
+				pmp[j] = pmp[j+1];
+			pmp[j].addr = 0;
+		} else
+			i++;
+		if (i == bpp->nelems)
+			break;
 	}
+}
+
+/*
+ *  Sort prom memory lists into ascending order
+ */
+static void
+sort_promlist(struct bootmem_props *bpp)
+{
+	int i, j, min;
+	struct prom_memlist *pmp = bpp->ptr;
+	struct prom_memlist temp;
+
+	for (i = 0; i < bpp->nelems; i++) {
+		min = i;
+
+		for (j = i+1; j < bpp->nelems; j++)  {
+			if (pmp[j].addr < pmp[min].addr)
+				min = j;
+		}
+
+		if (i != min)  {
+			/* Swap pmp[i] and pmp[min] */
+			temp = pmp[min];
+			pmp[min] = pmp[i];
+			pmp[i] = temp;
+		}
+	}
+}
+
+static int max_bootlist_sz;
+
+void
+init_boot_memlists(void)
+{
+	size_t	size, len;
+	char *start;
+	struct bootmem_props *tmp;
+
 	/*
-	 * take the most current snapshot we can by calling mem-update
+	 * These lists can get fragmented as the prom allocates
+	 * memory, so generously round up.
 	 */
-	if (BOP_GETPROPLEN(bootops, "memory-update") == 0)
-		(void) BOP_GETPROP(bootops, "memory-update", NULL);
+	size = prom_phys_installed_len() + prom_phys_avail_len() +
+	    prom_virt_avail_len();
+	size *= 4;
+	size = roundup(size, PAGESIZE);
+	start = prom_alloc(0, size, BO_NO_ALIGN);
 
-	/* did the sizes change? */
-	for (tmp = bootmem_props; tmp->name != NULL; tmp++) {
-		len = BOP_GETPROPLEN(bootops, tmp->name);
-		tmp->nelems = len / sizeof (u_longlong_t);
-		len = roundup(len, PAGESIZE);
-		if (len > tmp->bufsize) {
-			/* ick. Free them all and try again */
-			for (tmp = bootmem_props; tmp->name != NULL; tmp++) {
-				BOP_FREE(bootops, (caddr_t)tmp->ptr,
-				    tmp->bufsize);
-				tmp->ptr = NULL;
-				tmp->bufsize = 0;
-			}
-			goto tryagain;
-		}
+	/*
+	 * Get physinstalled
+	 */
+	tmp = &bootmem_props[PHYSINSTALLED];
+	len = prom_phys_installed_len();
+	if (len == 0)
+		panic("no \"reg\" in /memory");
+	tmp->nelems = len / sizeof (struct prom_memlist);
+	tmp->maxsize = len;
+	tmp->ptr = (prom_memlist_t *)start;
+	start += len;
+	size -= len;
+	(void) prom_phys_installed((caddr_t)tmp->ptr);
+	sort_promlist(tmp);
+	compact_promlist(tmp);
+
+	/*
+	 * Start out giving each half of available space
+	 */
+	max_bootlist_sz = size;
+	len = size / 2;
+	tmp = &bootmem_props[PHYSAVAIL];
+	tmp->maxsize = len;
+	tmp->ptr = (prom_memlist_t *)start;
+	start += len;
+
+	tmp = &bootmem_props[VIRTAVAIL];
+	tmp->maxsize = len;
+	tmp->ptr = (prom_memlist_t *)start;
+}
+
+
+void
+copy_boot_memlists(
+    prom_memlist_t **physinstalled, size_t *physinstalled_len,
+    prom_memlist_t **physavail, size_t *physavail_len,
+    prom_memlist_t **virtavail, size_t *virtavail_len)
+{
+	size_t	plen, vlen, move = 0;
+	struct bootmem_props *il, *pl, *vl;
+
+	plen = prom_phys_avail_len();
+	if (plen == 0)
+		panic("no \"available\" in /memory");
+	vlen = prom_virt_avail_len();
+	if (vlen == 0)
+		panic("no \"available\" in /virtual-memory");
+	if (plen + vlen > max_bootlist_sz)
+		panic("ran out of prom_memlist space");
+
+	pl = &bootmem_props[PHYSAVAIL];
+	vl = &bootmem_props[VIRTAVAIL];
+
+	/*
+	 * re-adjust ptrs if needed
+	 */
+	if (plen > pl->maxsize) {
+		/* move virt avail up */
+		move = plen - pl->maxsize;
+		pl->maxsize = plen;
+		vl->ptr += move / sizeof (struct prom_memlist);
+		vl->maxsize -= move;
+	} else if (vlen > vl->maxsize) {
+		/* move virt avail down */
+		move = vlen - vl->maxsize;
+		vl->maxsize = vlen;
+		vl->ptr -= move / sizeof (struct prom_memlist);
+		pl->maxsize -= move;
 	}
+
+	pl->nelems = plen / sizeof (struct prom_memlist);
+	vl->nelems = vlen / sizeof (struct prom_memlist);
 
 	/* now we can retrieve the properties */
-	for (tmp = bootmem_props; tmp->name != NULL; tmp++) {
-		if (BOP_GETPROP(bootops, tmp->name, tmp->ptr) == -1) {
-			panic("cannot retrieve \"%s\" property",
-			    tmp->name);
-		}
-	}
-	*physinstalled = bootmem_props[PHYSINSTALLED].ptr;
-	*physinstalled_len = bootmem_props[PHYSINSTALLED].nelems;
+	(void) prom_phys_avail((caddr_t)pl->ptr);
+	(void) prom_virt_avail((caddr_t)vl->ptr);
 
-	*physavail = bootmem_props[PHYSAVAIL].ptr;
-	*physavail_len = bootmem_props[PHYSAVAIL].nelems;
+	/* .. and sort them */
+	sort_promlist(pl);
+	sort_promlist(vl);
 
-	*virtavail = bootmem_props[VIRTAVAIL].ptr;
-	*virtavail_len = bootmem_props[VIRTAVAIL].nelems;
+	il = &bootmem_props[PHYSINSTALLED];
+	*physinstalled = il->ptr;
+	*physinstalled_len = il->nelems;
+
+	*physavail = pl->ptr;
+	*physavail_len = pl->nelems;
+
+	*virtavail = vl->ptr;
+	*virtavail_len = vl->nelems;
 }
 
 

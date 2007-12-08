@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,7 +186,7 @@ extern void sas_symtab(int start, int end);
  * repeat reads (forever) until size of request is satisfied
  * (Thus, you don't want to use this cases where short reads are ok)
  */
-static ssize_t
+ssize_t
 xread(int fd, char *p, size_t nbytes)
 {
 	size_t bytesread = 0;
@@ -274,7 +273,7 @@ readfile(int fd, int print)
 					printf("FATAL: 64-bit ELF executable "
 					    "not for AMD64\n       (e_machine "
 					    "= %d).\n", elfhdr.e_machine);
-				    return (FAIL);
+					return (FAIL);
 				}
 
 				/*
@@ -395,7 +394,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			continue;
 		if (verbosemode) {
 			dprintf("allocating 0x%x bytes for note hdr\n",
-				phdr->p_filesz);
+			    phdr->p_filesz);
 		}
 		if ((note_buf = kmem_alloc(phdr->p_filesz, 0)) == NULL)
 			goto elferror;
@@ -405,14 +404,14 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			goto elferror;
 		if (verbosemode) {
 			dprintf("reading 0x%x bytes into %p\n",
-				phdr->p_filesz, (void *)nhdr);
+			    phdr->p_filesz, (void *)nhdr);
 		}
 		nhdr = (Elf32_Nhdr *)note_buf;
 		if (xread(fd, (caddr_t)nhdr, phdr->p_filesz) != phdr->p_filesz)
 			goto elferror;
 		if (verbosemode) {
 			dprintf("p_note namesz %x descsz %x type %x\n",
-				nhdr->n_namesz, nhdr->n_descsz, nhdr->n_type);
+			    nhdr->n_namesz, nhdr->n_descsz, nhdr->n_type);
 		}
 
 		/*
@@ -453,9 +452,9 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			dprintf("Doing header 0x%x\n", i);
 			dprintf("phdr\n");
 			dprintf("\tp_offset = %x, p_vaddr = %x\n",
-				phdr->p_offset, phdr->p_vaddr);
+			    phdr->p_offset, phdr->p_vaddr);
 			dprintf("\tp_memsz = %x, p_filesz = %x\n",
-				phdr->p_memsz, phdr->p_filesz);
+			    phdr->p_memsz, phdr->p_filesz);
 		}
 		if (phdr->p_type == PT_LOAD) {
 			if (verbosemode)
@@ -464,7 +463,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				goto elferror;
 
 			if (phdr->p_flags == (PF_R | PF_W) &&
-					phdr->p_vaddr == 0) {
+			    phdr->p_vaddr == 0) {
 				/*
 				 * It's a PT_LOAD segment that is RW but
 				 * not executable and has a vaddr
@@ -494,7 +493,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				if (use_align && npagesize != 0) {
 					off = loadaddr & (npagesize - 1);
 					size = roundup(phdr->p_memsz + off,
-						npagesize);
+					    npagesize);
 					base = loadaddr - off;
 				} else {
 					npagesize = 0;
@@ -558,7 +557,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 
 			if (verbosemode) {
 				dprintf("reading 0x%x bytes into 0x%x\n",
-				phdr->p_filesz, loadaddr);
+				    phdr->p_filesz, loadaddr);
 			}
 			/* use uintptr_t to suppress the gcc warning */
 			if (xread(fd, (caddr_t)(uintptr_t)loadaddr,
@@ -590,7 +589,7 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			}
 #ifdef	MPSAS
 			sas_symtab(phdr->p_vaddr,
-				    phdr->p_vaddr + phdr->p_memsz);
+			    phdr->p_vaddr + phdr->p_memsz);
 #endif
 		} else if (phdr->p_type == PT_INTERP) {
 			/*
@@ -799,7 +798,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 			continue;
 		if (verbosemode) {
 			dprintf("allocating 0x%llx bytes for note hdr\n",
-				(u_longlong_t)phdr->p_filesz);
+			    (u_longlong_t)phdr->p_filesz);
 		}
 		if ((note_buf = kmem_alloc(phdr->p_filesz, 0)) == NULL)
 			goto elf64error;
@@ -810,14 +809,14 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 			goto elf64error;
 		if (verbosemode) {
 			dprintf("reading 0x%llx bytes into 0x%p\n",
-				(u_longlong_t)phdr->p_filesz, (void *)nhdr);
+			    (u_longlong_t)phdr->p_filesz, (void *)nhdr);
 		}
 		nhdr = (Elf64_Nhdr *)note_buf;
 		if (xread(fd, (caddr_t)nhdr, phdr->p_filesz) != phdr->p_filesz)
 			goto elf64error;
 		if (verbosemode) {
 			dprintf("p_note namesz %x descsz %x type %x\n",
-				nhdr->n_namesz, nhdr->n_descsz, nhdr->n_type);
+			    nhdr->n_namesz, nhdr->n_descsz, nhdr->n_type);
 		}
 
 		/*
@@ -858,13 +857,13 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 			dprintf("Doing header 0x%x\n", i);
 			dprintf("phdr\n");
 			dprintf("\tp_offset = %llx, p_vaddr = %llx\n",
-				(u_longlong_t)phdr->p_offset,
-				(u_longlong_t)phdr->p_vaddr);
+			    (u_longlong_t)phdr->p_offset,
+			    (u_longlong_t)phdr->p_vaddr);
 			dprintf("\tp_memsz = %llx, p_filesz = %llx\n",
-				(u_longlong_t)phdr->p_memsz,
-				(u_longlong_t)phdr->p_filesz);
+			    (u_longlong_t)phdr->p_memsz,
+			    (u_longlong_t)phdr->p_filesz);
 			dprintf("\tp_type = %x, p_flags = %x\n",
-				phdr->p_type, phdr->p_flags);
+			    phdr->p_type, phdr->p_flags);
 		}
 		if (phdr->p_type == PT_LOAD) {
 			if (verbosemode)
@@ -874,7 +873,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				goto elf64error;
 
 			if (phdr->p_flags == (PF_R | PF_W) &&
-					phdr->p_vaddr == 0) {
+			    phdr->p_vaddr == 0) {
 				/*
 				 * It's a PT_LOAD segment that is RW but
 				 * not executable and has a vaddr
@@ -912,7 +911,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 				if (use_align && npagesize != 0) {
 					off = loadaddr & (npagesize - 1);
 					size = roundup(phdr->p_memsz + off,
-						npagesize);
+					    npagesize);
 					base = loadaddr - off;
 				} else {
 					npagesize = 0;
@@ -951,8 +950,8 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 
 			if (verbosemode) {
 				dprintf("reading 0x%llx bytes into 0x%llx\n",
-				(u_longlong_t)phdr->p_filesz,
-				(u_longlong_t)loadaddr);
+				    (u_longlong_t)phdr->p_filesz,
+				    (u_longlong_t)loadaddr);
 			}
 			if (xread(fd, (caddr_t)(uintptr_t)
 			    loadaddr, phdr->p_filesz) != phdr->p_filesz)
@@ -984,7 +983,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 
 #ifdef	MPSAS
 			sas_symtab(phdr->p_vaddr,
-				    phdr->p_vaddr + phdr->p_memsz);
+			    phdr->p_vaddr + phdr->p_memsz);
 #endif
 		} else if (phdr->p_type == PT_INTERP) {
 			/*
@@ -1090,7 +1089,7 @@ read_elf64(int fd, int print, Elf64_Ehdr *elfhdrp)
 		}
 
 		bcopy((char *)auxv, (char *)(elfbootvecELF64->eb_un.eb_ptr),
-			size);
+		    size);
 #endif	/* BOOTAMD64 */
 	} else {
 		kmem_free(allphdrs, phdrsize);
@@ -1180,13 +1179,13 @@ iload32(char *rtld, Elf32_Phdr *thdr, Elf32_Phdr *dhdr, auxv32_t **avp)
 		 * to do relocation, skip it.
 		 */
 		if (!(sp->sh_flags & SHF_ALLOC) &&
-		    sp->sh_type != SHT_SYMTAB &&
-		    sp->sh_type != SHT_STRTAB &&
 #ifdef i386
-		    sp->sh_type != SHT_REL)
+		    sp->sh_type != SHT_REL &&
 #else
-		    sp->sh_type != SHT_RELA)
+		    sp->sh_type != SHT_RELA &&
 #endif
+		    sp->sh_type != SHT_SYMTAB &&
+		    sp->sh_type != SHT_STRTAB)
 			continue;
 		/*
 		 * If the section is read-only,
@@ -1392,10 +1391,9 @@ iload64(char *rtld, Elf64_Phdr *thdr, Elf64_Phdr *dhdr, auxv64_t **avp)
 			 */
 			if (lseek(fd, sp->sh_offset, 0) == -1 ||
 			    xread(fd, (caddr_t)(uintptr_t)load, sp->sh_size) !=
-				sp->sh_size) {
-				    printf("boot: error reading section %d\n",
-					i);
-				    goto error;
+			    sp->sh_size) {
+				printf("boot: error reading section %d\n", i);
+				goto error;
 			}
 		}
 		/*

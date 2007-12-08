@@ -49,13 +49,14 @@ LINTS		= $(SPECIAL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(MACH_NOT_YET_KMODS:%.o=$(LINTS_DIR)/%.ln) \
 		  $(LINTS_DIR)/vers.ln \
 		  $(LINTS_DIR)/modstubs.ln
+
+KRTLD_MAPFILE	= $(UTSBASE)/sparc/krtld/mapfile
+KRTLD_OBJECTS	= $(KRTLD_OBJS:%=$(OBJS_DIR)/%)
+KRTLD_O		= $(OBJS_DIR)/krtld.o
+
 ROOTMODULE	= $(ROOT_STARFIRE_KERN_DIR)/$(UNIX)
 UNIX32_LINK	= $(ROOT_STARFIRE_KERN_DIR_32)/$(UNIX)
 UNIX_BIN	= $(OBJS_DIR)/$(UNIX)
-
-KRTLD_32	= misc/krtld
-KRTLD_64	= misc/$(SUBDIR64)/krtld
-KRTLD		= $(KRTLD_$(CLASS))
 
 LIBS		= $(GENLIB) $(PLATLIB) $(CPULIB)
 
@@ -93,8 +94,9 @@ UNIX_DIR	= .
 #
 #	Overrides
 #
-CLEANFILES	+= $(UNIX_O) $(MODSTUBS_O) $(OBJS_DIR)/vers.c \
-		   $(OBJS_DIR)/vers.o $(CPU_OBJ) $(CPULIB) \
+CLEANFILES	+= $(UNIX_O) $(MODSTUBS_O) $(KRTLD_O) $(KRTLD_OBJECTS) \
+		   $(OBJS_DIR)/vers.c  $(OBJS_DIR)/vers.o \
+		   $(CPU_OBJ) $(CPULIB) \
 		   $(DTRACESTUBS_O) $(DTRACESTUBS)
 
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
@@ -125,21 +127,25 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:  	$(INSTALL_DEPS)
 
-$(UNIX_BIN):	$(UNIX_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) $(DTRACESTUBS) 
-	$(LD) -dy -b -o $@ -e _start -I $(KRTLD) -M $(MAPFILE) \
-	    $(UNIX_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
+$(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) \
+		$(DTRACESTUBS) 
+	$(LD) -dy -b -o $@ -e _start -M $(MAPFILE) \
+	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
 $(UNIX32_LINK):	$(ROOT_PSM_KERN_DIR_32) $(UNIX_BIN)
 	-$(RM) $@; ln -s $(SUBDIR64)/$(UNIX) $@
 
-symcheck:	$(UNIX_O) $(MODSTUBS_O) $(LIBS)
+symcheck:	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBS)
 	$(LD) -dy -b -o $(SYM_MOD) -M $(MAPFILE) \
-	$(UNIX_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
+	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o
+
+$(KRTLD_O):	$(KRTLD_OBJECTS)
+	$(LD) -r -o $@ -M$(KRTLD_MAPFILE) $(KRTLD_OBJECTS)
 
 #
 #	Special rules for generating assym.h for inclusion in assembly files.

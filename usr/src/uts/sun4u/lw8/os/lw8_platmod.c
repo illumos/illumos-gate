@@ -412,7 +412,7 @@ plat_fill_mc(pnode_t nodeid)
  */
 /* ARGSUSED */
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t  nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t  nelems)
 {
 	int	slice;
 	pfn_t	basepfn;
@@ -657,8 +657,7 @@ find_chosen_dip(void)
 	dip = e_ddi_hold_devi_by_path(master_sbbc, 0);
 	if ((dip == NULL) || (ddi_get_nodeid(dip) != tunnel)) {
 		cmn_err(CE_PANIC,
-			"e_ddi_hold_devi_by_path(%x) failed for SBBC\n",
-		    tunnel);
+		    "e_ddi_hold_devi_by_path(%x) failed for SBBC\n", tunnel);
 	}
 
 	/* make sure devi_ref is ZERO */
@@ -824,7 +823,7 @@ plat_nodename_set(void)
 	 */
 	if (sg_mbox == NULL)
 		sg_mbox = (int (*)(sbbc_msg_t *, sbbc_msg_t *, time_t))
-			modgetsymvalue("sbbc_mbox_request_response", 0);
+		    modgetsymvalue("sbbc_mbox_request_response", 0);
 
 	if (sg_mbox == NULL) {
 		cmn_err(CE_NOTE, "!plat_nodename_set: sg_mbox not found\n");
@@ -867,7 +866,7 @@ plat_nodename_set(void)
 		cmn_err(CE_NOTE, "!plat_nodename_set: sg_mbox retval %d\n", rv);
 	} else if (resp.msg_status != 0) {
 		cmn_err(CE_NOTE, "!plat_nodename_set: msg_status %d\n",
-			resp.msg_status);
+		    resp.msg_status);
 	} else {
 		DCMNERR(CE_NOTE, "!plat_nodename_set was successful\n");
 
@@ -1130,10 +1129,10 @@ plat_send_ecc_mailbox_msg(plat_ecc_message_type_t msg_type, void *datap)
 	}
 
 	msgp = (sbbc_ecc_mbox_t *)kmem_zalloc(sizeof (sbbc_ecc_mbox_t),
-		sleep_flag);
+	    sleep_flag);
 	if (msgp == NULL) {
 		cmn_err(CE_NOTE, "!plat_send_ecc_mailbox_msg: "
-				"unable to allocate sbbc_ecc_mbox");
+		    "unable to allocate sbbc_ecc_mbox");
 		return (ENOMEM);
 	}
 
@@ -1150,7 +1149,7 @@ plat_send_ecc_mailbox_msg(plat_ecc_message_type_t msg_type, void *datap)
 
 	if (msgp->ecc_req.msg_buf == NULL) {
 		cmn_err(CE_NOTE, "!plat_send_ecc_mailbox_msg: "
-				"unable to allocate request msg_buf");
+		    "unable to allocate request msg_buf");
 		kmem_free((void *)msgp, sizeof (sbbc_ecc_mbox_t));
 		return (ENOMEM);
 	}
@@ -1274,11 +1273,11 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 			    " could not check current domain signature\n");
 		} else {
 			(void) (*iosram_read_ptr)(SBBC_SIGBLCK_KEY,
-				SG_SGNBLK_DOMAINSIG_OFFSET,
-				(char *)&current_sgn, sizeof (current_sgn));
+			    SG_SGNBLK_DOMAINSIG_OFFSET,
+			    (char *)&current_sgn, sizeof (current_sgn));
 			if (current_sgn.state_t.state == SIGST_EXIT)
 				signature = CPU_SIG_BLD(sig, state,
-					SIGSUBST_PANIC_REBOOT);
+				    SIGSUBST_PANIC_REBOOT);
 		}
 	}
 
@@ -1287,17 +1286,17 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	 */
 	if (cpuid >= 0) {
 		(void) (*iosram_write_ptr)(SBBC_SIGBLCK_KEY,
-			SG_SGNBLK_CPUSIG_OFFSET(cpuid), (char *)&signature,
-			sizeof (signature));
+		    SG_SGNBLK_CPUSIG_OFFSET(cpuid), (char *)&signature,
+		    sizeof (signature));
 	} else {
 		for (i = 0; i < NCPU; i++) {
 			if (cpu[i] == NULL || !(cpu[i]->cpu_flags &
-				(CPU_EXISTS|CPU_QUIESCED))) {
+			    (CPU_EXISTS|CPU_QUIESCED))) {
 				continue;
 			}
 			(void) (*iosram_write_ptr)(SBBC_SIGBLCK_KEY,
-				SG_SGNBLK_CPUSIG_OFFSET(i), (char *)&signature,
-				sizeof (signature));
+			    SG_SGNBLK_CPUSIG_OFFSET(i), (char *)&signature,
+			    sizeof (signature));
 		}
 	}
 
@@ -1306,8 +1305,8 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	}
 
 	(void) (*iosram_write_ptr)(SBBC_SIGBLCK_KEY,
-		SG_SGNBLK_DOMAINSIG_OFFSET, (char *)&signature,
-		sizeof (signature));
+	    SG_SGNBLK_DOMAINSIG_OFFSET, (char *)&signature,
+	    sizeof (signature));
 }
 
 void

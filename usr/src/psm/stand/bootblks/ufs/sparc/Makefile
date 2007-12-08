@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/ufs/sparc/Makefile
@@ -30,9 +29,25 @@
 
 BASEDIR = ../..
 
-include $(BASEDIR)/ufs/Makefile.ufs
+include $(BASEDIR)/Makefile.com
 
-SUBDIRS	= unix sun4c sun4m sun4d sun4u sun4v
+#
+# This program is used to install the boot block
+#
+INSTALLBOOT		= installboot
+
+USR			= $(ROOT)/usr
+USR_SBIN		= $(USR)/sbin
+USR_SBIN_INSTALLBOOT	= $(USR_SBIN)/$(INSTALLBOOT)
+
+#
+# Overrides for installing installboot.
+#
+INS.file.555		= $(RM) $@; $(INS) -s -m 555 -f $(@D) $<
+$(CH)INS.file.555	= $(INS) -s -m 555 -u $(OWNER) -g $(GROUP) -f $(@D) $<
+
+
+SUBDIRS	= sun4u sun4v
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -55,6 +70,12 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+#
+# install rules
+#
+$(USR_SBIN)/%:	% $(USR_SBIN)
+	$(INS.file.555)
 
 #
 # Pattern matching rules for source in this directory

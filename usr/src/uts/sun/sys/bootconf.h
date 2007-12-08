@@ -33,8 +33,11 @@
  */
 
 #include <sys/types.h>
+#include <sys/varargs.h>
+#include <sys/sysmacros.h>
 #include <sys/memlist.h>
 #include <sys/bootstat.h>
+#include <net/if.h>			/* for IFNAMSIZ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -72,26 +75,12 @@ typedef struct bootops {
 	uint_t	bsys_version;
 
 	/*
-	 * pointer to our parents bootops
-	 */
-	struct bootops  *bsys_super;
-
-	/*
-	 * the area containing boot's memlists (non-LP64 boot)
-	 */
-	struct  bsys_mem *boot_mem;
-
-#ifndef _LP64
-	uint32_t	bsys_pad2[2]; /* pointers above get larger */
-#endif
-	/*
 	 * The entry point to jump to for boot services.
 	 * Pass this routine the array of boot_cell_t's describing the
 	 * service requested.
 	 */
 	uint64_t bsys_1275_call;
 
-	uint32_t	bsys_pad1[7];
 	/*
 	 * print formatted output - PRINTFLIKE1
 	 * here (and maintained) so old kernels can fail with
@@ -101,51 +90,43 @@ typedef struct bootops {
 	uint32_t	bsys_printf;
 } bootops_t;
 
-extern uint_t bop_getversion(struct bootops *bootops);
-extern int bop_open(struct bootops *bop, char *s, int flags);
-extern int bop_read(struct bootops *bop, int fd, caddr_t buf, size_t size);
-extern int bop_seek(struct bootops *bop, int fd, off_t hi, off_t lo);
-extern int bop_close(struct bootops *bop, int fd);
-extern caddr_t bop_alloc(struct bootops *bop, caddr_t virthint, size_t size,
-    int align);
-extern caddr_t bop_alloc_virt(struct bootops *bop, caddr_t virt, size_t size);
-extern void bop_free(struct bootops *bop, caddr_t virt, size_t size);
-extern caddr_t bop_map(struct bootops *bop, caddr_t virt, int space,
-    caddr_t phys, size_t size);
-extern void bop_unmap(struct bootops *bop, caddr_t virt, size_t size);
-extern void bop_quiesce_io(struct bootops *bop);
-extern int bop_getproplen(struct bootops *bop, char *name);
-extern int bop_getprop(struct bootops *bop, char *name, void *value);
-extern char *bop_nextprop(struct bootops *bop, char *prevprop);
-extern int bop_mountroot(struct bootops *bop, char *path);
-extern int bop_unmountroot(struct bootops *bop);
-extern void bop_puts(struct bootops *, char *);
-extern void bop_putsarg(struct bootops *, const char *, ...);
-extern int bop_fstat(struct bootops *, int fd, struct bootstat *);
-extern void bop_enter_mon(struct bootops *bop);
+extern void bop_init(void);
+extern int bop_open(const char *s, int flags);
+extern int bop_read(int fd, caddr_t buf, size_t size);
+extern int bop_seek(int fd, off_t off);
+extern int bop_close(int fd);
+extern caddr_t bop_alloc(caddr_t virthint, size_t size, int align);
+extern caddr_t bop_alloc_virt(caddr_t virt, size_t size);
+extern caddr_t bop_temp_alloc(size_t size, int align);
+extern void bop_free(caddr_t virt, size_t size);
+extern int bop_getproplen(const char *name);
+extern int bop_getprop(const char *name, void *value);
+extern int bop_mountroot(void);
+extern int bop_unmountroot(void);
+extern int bop_fstat(int fd, struct bootstat *st);
+extern void bop_enter_mon(void);
+extern void bop_fini(void);
 
-#define	BOP_GETVERSION(bop)		bop_getversion(bop)
-#define	BOP_OPEN(bop, s, flags)		bop_open(bop, s, flags)
-#define	BOP_READ(bop, fd, buf, size)	bop_read(bop, fd, buf, size)
-#define	BOP_SEEK(bop, fd, hi, lo)	bop_seek(bop, fd, hi, lo)
-#define	BOP_CLOSE(bop, fd)		bop_close(bop, fd)
+extern void bop_printf(void *ops, const char *fmt, ...);
+extern void bop_putsarg(const char *fmt, char *arg);
+extern void bop_panic(const char *s);
+
+#define	BOP_OPEN(s, flags)		bop_open(s, flags)
+#define	BOP_READ(fd, buf, size)		bop_read(fd, buf, size)
+#define	BOP_SEEK(fd, off)		bop_seek(fd, off)
+#define	BOP_CLOSE(fd)			bop_close(fd)
 #define	BOP_ALLOC(bop, virthint, size, align)	\
-				bop_alloc(bop, virthint, size, align)
-#define	BOP_ALLOC_VIRT(bop, virt, size)	bop_alloc_virt(bop, virt, size)
-#define	BOP_FREE(bop, virt, size)	bop_free(bop, virt, size)
-#define	BOP_MAP(bop, virt, space, phys, size)	\
-				bop_map(bop, virt, space, phys, size)
-#define	BOP_UNMAP(bop, virt, size)	bop_unmap(bop, virt, size)
-#define	BOP_QUIESCE_IO(bop)		bop_quiesce_io(bop)
-#define	BOP_GETPROPLEN(bop, name)	bop_getproplen(bop, name)
-#define	BOP_GETPROP(bop, name, buf)	bop_getprop(bop, name, buf)
-#define	BOP_NEXTPROP(bop, prev)		bop_nextprop(bop, prev)
-#define	BOP_MOUNTROOT(bop, path)	bop_mountroot(bop, path)
-#define	BOP_UNMOUNTROOT(bop)		bop_unmountroot(bop)
-#define	BOP_PUTS(bop, msg)		bop_puts(bop, msg)
-#define	BOP_PUTSARG(bop, msg, arg)	bop_putsarg(bop, msg, arg)
-#define	BOP_FSTAT(bop, fd, st)		bop_fstat(bop, fd, st)
-#define	BOP_ENTER_MON(bop)		bop_enter_mon(bop)
+				bop_alloc(virthint, size, align)
+#define	BOP_ALLOC_VIRT(virt, size)	bop_alloc_virt(virt, size)
+#define	BOP_FREE(bop, virt, size)	bop_free(virt, size)
+#define	BOP_GETPROPLEN(bop, name)	bop_getproplen(name)
+#define	BOP_GETPROP(bop, name, buf)	bop_getprop(name, buf)
+#define	BOP_MOUNTROOT()			bop_mountroot()
+#define	BOP_UNMOUNTROOT()		bop_unmountroot()
+#define	BOP_FSTAT(bop, fd, st)		bop_fstat(fd, st)
+
+/* special routine for kmdb only */
+#define	BOP_PUTSARG(bop, fmt, arg)	bop_putsarg(fmt, arg)
 
 /*
  * macros and declarations needed by clients of boot to
@@ -243,6 +224,8 @@ extern char kern_bootargs[];
 extern char *kobj_module_path;
 extern char *default_path;
 extern char *dhcack;
+extern int dhcacklen;
+extern char dhcifname[IFNAMSIZ];
 extern char *netdev_path;
 
 extern char *strplumb_get_netdev_path(void);

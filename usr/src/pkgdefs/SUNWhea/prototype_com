@@ -837,6 +837,7 @@ f none usr/include/sys/fs/cachefs_fscache.h 644 root bin
 f none usr/include/sys/fs/cachefs_log.h 644 root bin
 f none usr/include/sys/fs/cachefs_dlog.h 644 root bin
 f none usr/include/sys/fs/cachefs_ioctl.h 644 root bin
+f none usr/include/sys/fs/decomp.h 644 root bin
 f none usr/include/sys/fs/dv_node.h 644 root bin
 f none usr/include/sys/fs/sdev_node.h 644 root bin
 f none usr/include/sys/fs/sdev_impl.h 644 root bin

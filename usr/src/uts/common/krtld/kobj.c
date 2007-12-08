@@ -61,16 +61,18 @@
 #include <sys/varargs.h>
 #include <sys/kstat.h>
 #include <sys/kobj_impl.h>
+#include <sys/fs/decomp.h>
 #include <sys/callb.h>
 #include <sys/cmn_err.h>
 #include <sys/tnf_probe.h>
+#include <sys/zmod.h>
 
-#include <reloc.h>
-#include <kobj_kdi.h>
+#include <krtld/reloc.h>
+#include <krtld/kobj_kdi.h>
 #include <sys/sha1.h>
 #include <sys/crypto/elfsign.h>
 
-#if !defined(__sparc)
+#if !defined(_OBP)
 #include <sys/bootvfs.h>
 #endif
 
@@ -80,7 +82,10 @@
 #define	DOSYM_UNDEF		-1	/* undefined symbol */
 #define	DOSYM_UNSAFE		-2	/* MT-unsafe driver symbol */
 
+#if !defined(_OBP)
 static void synthetic_bootaux(char *, val_t *);
+#endif
+
 static struct module *load_exec(val_t *, char *);
 static void load_linker(val_t *);
 static struct modctl *add_primary(const char *filename, int);
@@ -104,18 +109,19 @@ static void attr_val(val_t *);
 static char *find_libmacro(char *);
 static char *expand_libmacro(char *, char *, char *);
 static int read_bootflags(void);
+static int kobj_comp_setup(struct _buf *, struct compinfo *);
+static int kobj_uncomp_blk(struct _buf *, caddr_t, uint_t);
+static int kobj_read_blks(struct _buf *, caddr_t, uint_t, uint_t);
 static int kobj_boot_open(char *, int);
 static int kobj_boot_close(int);
 static int kobj_boot_seek(int, off_t, off_t);
 static int kobj_boot_read(int, caddr_t, size_t);
 static int kobj_boot_fstat(int, struct bootstat *);
+static int kobj_boot_compinfo(int, struct compinfo *);
 
 static Sym *lookup_one(struct module *, const char *);
 static void sym_insert(struct module *, char *, symid_t);
 static Sym *sym_lookup(struct module *, Sym *);
-
-/*PRINTFLIKE2*/
-static void kprintf(void *, const char *, ...)  __KPRINTFLIKE(2);
 
 static struct kobjopen_tctl *kobjopen_alloc(char *filename);
 static void kobjopen_free(struct kobjopen_tctl *ltp);
@@ -125,12 +131,21 @@ extern int kcopy(const void *, void *, size_t);
 extern int elf_mach_ok(Ehdr *);
 extern int alloc_gottable(struct module *, caddr_t *, caddr_t *);
 
-static void tnf_unsplice_probes(unsigned int, struct modctl *);
+#if !defined(_OBP)
+extern int kobj_boot_mountroot(void);
+#endif
+
+static void tnf_unsplice_probes(uint_t, struct modctl *);
+extern tnf_probe_control_t *__tnf_probe_list_head;
+extern tnf_tag_data_t *__tnf_tag_list_head;
 
 extern int modrootloaded;
 extern int swaploaded;
 extern int bop_io_quiesced;
 extern int last_module_id;
+
+extern char stubs_base[];
+extern char stubs_end[];
 
 #ifdef KOBJ_DEBUG
 /*
@@ -198,10 +213,6 @@ struct lib_macro_info {
 
 char *boot_cpu_compatible_list;			/* make $CPU available */
 
-#ifdef	MPSAS
-void	sas_prisyms(struct modctl_list *);
-void	sas_syms(struct module *);
-#endif
 
 char *kobj_module_path;				/* module search path */
 vmem_t	*text_arena;				/* module text arena */
@@ -256,17 +267,6 @@ int			tnf_changed_probe_list = 0;
  */
 const char		*sdt_prefix = "__dtrace_probe_";
 
-#if defined(__sparc)
-/*
- * Some PROMs return SUNW,UltraSPARC when they actually have
- * SUNW,UltraSPARC-II cpus. SInce we're now filtering out all
- * SUNW,UltraSPARC systems during the boot phase, we can safely
- * point the auxv CPU value at SUNW,UltraSPARC-II. This is what
- * we point it at.
- */
-const char		*ultra_2 = "SUNW,UltraSPARC-II";
-#endif
-
 /*
  * Beginning and end of the kernel's dynamic text/data segments.
  */
@@ -275,14 +275,21 @@ static caddr_t _etext;
 static caddr_t _data;
 
 /*
- * XXX Hmm. The sparc linker fails to define this symbol.
+ * The sparc linker doesn't create a memory location
+ * for a variable named _edata, so _edata can only be
+ * referred to, not modified.  krtld needs a static
+ * variable to modify it - within krtld, of course -
+ * outside of krtld, e_data is used in all kernels.
  */
-#if !defined(__sparc)
-extern
+#if defined(__sparc)
+static caddr_t _edata;
+#else
+extern caddr_t _edata;
 #endif
-caddr_t _edata;
 
-static Addr dynseg = 0;	/* load address of "dynamic" segment */
+Addr dynseg = 0;	/* load address of "dynamic" segment */
+size_t dynsize;		/* "dynamic" segment size */
+
 
 int standalone = 1;			/* an unwholey kernel? */
 int use_iflush;				/* iflush after relocations */
@@ -296,6 +303,17 @@ int use_iflush;				/* iflush after relocations */
  * specification in the format string.
  */
 void (*_kobj_printf)(void *, const char *, ...);	/* printf routine */
+
+/*
+ * Standalone function pointers for use within krtld.
+ * Many platforms implement optimized platmod versions of
+ * utilities such as bcopy and any such are not yet available
+ * until the kernel is more completely stitched together.
+ * See kobj_impl.h
+ */
+void (*kobj_bcopy)(const void *, void *, size_t);
+void (*kobj_bzero)(void *, size_t);
+size_t (*kobj_strlcat)(char *, const char *, size_t);
 
 static kobj_stat_t kobj_stat;
 
@@ -359,39 +377,9 @@ kobj_init(
 	dbvec = dvec;
 
 	ops = bootvec;
-#if defined(__i386) || defined(__amd64)
-	_kobj_printf = (void (*)(void *, const char *, ...))ops->bsys_printf;
-#else
-	_kobj_printf = (void (*)(void *, const char *, ...))bop_putsarg;
-#endif
+	kobj_setup_standalone_vectors();
+
 	KOBJ_MARK("Entered kobj_init()");
-
-#if defined(__sparc)
-	/* XXXQ should suppress this test on sun4v */
-	if (bootaux[BA_CPU].ba_ptr) {
-		if (strcmp("SUNW,UltraSPARC", bootaux[BA_CPU].ba_ptr) == 0) {
-			bootaux[BA_CPU].ba_ptr = (void *) ultra_2;
-		}
-	}
-#endif
-
-	/*
-	 * Check bootops version.
-	 */
-	if (BOP_GETVERSION(ops) != BO_VERSION) {
-		_kobj_printf(ops, "Warning: Using boot version %d, ",
-		    BOP_GETVERSION(ops));
-		_kobj_printf(ops, "expected %d\n", BO_VERSION);
-	}
-#ifdef KOBJ_DEBUG
-	else if (kobj_debug & D_DEBUG) {
-		/*
-		 * Say -something- so we know we got this far ..
-		 */
-		_kobj_printf(ops, "krtld: Using boot version %d.\n",
-		    BOP_GETVERSION(ops));
-	}
-#endif
 
 	(void) BOP_GETPROP(ops, "whoami", filename);
 
@@ -410,10 +398,21 @@ kobj_init(
 		goto fail;
 	}
 
-#ifndef __sparc
+#if defined(_OBP)
+	/*
+	 * OBP allows us to read both the ramdisk and
+	 * the underlying root fs when root is a disk.
+	 * This can lower incidences of unbootable systems
+	 * when the archive is out-of-date with the /etc
+	 * state files.
+	 */
+	if (BOP_MOUNTROOT() != BOOT_SVC_OK) {
+		_kobj_printf(ops, "can't mount boot fs\n");
+		goto fail;
+	}
+#else
 	{
 		/* on x86, we always boot with a ramdisk */
-		extern int kobj_boot_mountroot(void);
 		(void) kobj_boot_mountroot();
 
 		/*
@@ -422,11 +421,10 @@ kobj_init(
 		 */
 		boot_prop_finish();
 	}
-#endif
 
 #if !defined(_UNIX_KRTLD)
 	/*
-	 * If 'unix' is linked together with 'krtld' into one executable,
+	 * 'unix' is linked together with 'krtld' into one executable and
 	 * the early boot code does -not- hand us any of the dynamic metadata
 	 * about the executable. In particular, it does not read in, map or
 	 * otherwise look at the program headers. We fake all that up now.
@@ -434,10 +432,15 @@ kobj_init(
 	 * We do this early as DTrace static probes and tnf probes both call
 	 * undefined references.  We have to process those relocations before
 	 * calling any of them.
+	 *
+	 * OBP tells kobj_start() where the ELF image is in memory, so it
+	 * synthesized bootaux before kobj_init() was called
 	 */
 	if (bootaux[BA_PHDR].ba_ptr == NULL)
 		synthetic_bootaux(filename, bootaux);
-#endif
+
+#endif	/* !_UNIX_KRTLD */
+#endif	/* _OBP */
 
 	/*
 	 * Save the interesting attribute-values
@@ -476,15 +479,6 @@ kobj_init(
 
 	entry = bootaux[BA_ENTRY].ba_val;
 
-#ifdef	__sparc
-	/*
-	 * On sparcv9, boot scratch memory is running out.
-	 * Free the temporary allocations here to allow boot
-	 * to continue.
-	 */
-	kobj_tmp_free();
-#endif
-
 	/*
 	 * Get the boot flags
 	 */
@@ -503,9 +497,6 @@ kobj_init(
 	/*
 	 * Post setup.
 	 */
-#ifdef	MPSAS
-	sas_prisyms(kobj_lm_lookup(KOBJ_LM_PRIMARY));
-#endif
 	s_text = _text;
 	e_text = _etext;
 	s_data = _data;
@@ -534,17 +525,28 @@ kobj_init(
 
 	standalone = 0;
 
-#ifdef	__sparc
-	/*
-	 * On sparcv9, boot scratch memory is running out.
-	 * Free the temporary allocations here to allow boot
-	 * to continue.
-	 */
-	kobj_tmp_free();
+#ifdef	KOBJ_DEBUG
+	if (kobj_debug & D_DEBUG)
+		_kobj_printf(ops,
+		    "krtld: really transferring control to: 0x%p\n", entry);
 #endif
 
-	_kobj_printf = kprintf;
+	/* restore printf/bcopy/bzero vectors before returning */
+	kobj_restore_vectors();
+
+#if defined(_DBOOT)
+	/*
+	 * krtld was called from a dboot ELF section, the embedded
+	 * dboot code contains the real entry via bootaux
+	 */
 	exitto((caddr_t)entry);
+#else
+	/*
+	 * krtld was directly called from startup
+	 */
+	return;
+#endif
+
 fail:
 
 	_kobj_printf(ops, "krtld: error during initial load/link phase\n");
@@ -563,9 +565,10 @@ fail:
 #endif
 }
 
-#if !defined(_UNIX_KRTLD)
+#if !defined(_UNIX_KRTLD) && !defined(_OBP)
 /*
- * Synthesize additional metadata that describes the executable.
+ * Synthesize additional metadata that describes the executable if
+ * krtld's caller didn't do it.
  *
  * (When the dynamic executable has an interpreter, the boot program
  * does all this for us.  Where we don't have an interpreter, (or a
@@ -627,7 +630,7 @@ synthetic_bootaux(char *filename, val_t *bootaux)
 	}
 	KOBJ_MARK("synthetic_bootaux() done");
 }
-#endif
+#endif	/* !_UNIX_KRTLD && !_OBP */
 
 /*
  * Set up any global information derived
@@ -652,14 +655,22 @@ attr_val(val_t *bootaux)
 	for (i = 0; i < phnum; i++) {
 		phdr = (Phdr *)(bootaux[BA_PHDR].ba_val + i * phsize);
 
-		if (phdr->p_type != PT_LOAD)
+		if (phdr->p_type != PT_LOAD) {
 			continue;
+		}
 		/*
 		 * Bounds of the various segments.
 		 */
 		if (!(phdr->p_flags & PF_X)) {
-#if defined(_UNIX_KRTLD)
+#if defined(_RELSEG)
+			/*
+			 * sparc kernel puts the dynamic info
+			 * into a separate segment, which is
+			 * free'd in bop_fini()
+			 */
+			ASSERT(phdr->p_vaddr != 0);
 			dynseg = phdr->p_vaddr;
+			dynsize = phdr->p_memsz;
 #else
 			ASSERT(phdr->p_vaddr == 0);
 #endif
@@ -699,11 +710,7 @@ load_exec(val_t *bootaux, char *filename)
 	Sym *sp;
 	int i, lsize, osize, nsize, allocsize;
 	char *libname, *tmp;
-
-	/*
-	 * Set the module search path.
-	 */
-	kobj_module_path = getmodpath(filename);
+	char path[MAXPATHLEN];
 
 #ifdef KOBJ_DEBUG
 	if (kobj_debug & D_DEBUG)
@@ -745,17 +752,14 @@ load_exec(val_t *bootaux, char *filename)
 	    dyn->d_tag != DT_NULL; dyn++) {
 		switch (dyn->d_tag) {
 		case DT_SYMTAB:
-			dyn->d_un.d_ptr += dynseg;
 			mp->symspace = mp->symtbl = (char *)dyn->d_un.d_ptr;
 			mp->symhdr->sh_addr = dyn->d_un.d_ptr;
 			break;
 		case DT_HASH:
-			dyn->d_un.d_ptr += dynseg;
 			mp->nsyms = *((uint_t *)dyn->d_un.d_ptr + 1);
 			mp->hashsize = *(uint_t *)dyn->d_un.d_ptr;
 			break;
 		case DT_STRTAB:
-			dyn->d_un.d_ptr += dynseg;
 			mp->strings = (char *)dyn->d_un.d_ptr;
 			mp->strhdr->sh_addr = dyn->d_un.d_ptr;
 			break;
@@ -785,7 +789,7 @@ load_exec(val_t *bootaux, char *filename)
 			libname = mp->strings + dyn->d_un.d_val;
 			if (strchr(libname, '$') != NULL) {
 				if ((_lib = expand_libmacro(libname,
-				    filename, filename)) != NULL)
+				    path, path)) != NULL)
 					libname = _lib;
 				else
 					_kobj_printf(ops, "krtld: "
@@ -863,7 +867,7 @@ load_exec(val_t *bootaux, char *filename)
 
 		if (sp->st_name == 0 || sp->st_shndx == SHN_UNDEF)
 			continue;
-#ifdef	__sparc
+#if defined(__sparc)
 		/*
 		 * Register symbols are ignored in the kernel
 		 */
@@ -1063,67 +1067,21 @@ kobj_notify(int type, struct modctl *modp)
 }
 
 /*
- * Ask boot for the module path.
+ * Create the module path.
  */
-/*ARGSUSED*/
 static char *
 getmodpath(const char *filename)
 {
-	char *path;
-	int len;
-
-#if defined(_UNIX_KRTLD)
-	/*
-	 * The boot program provides the module name when it detects
-	 * that the executable has an interpreter, thus we can ask
-	 * it directly in this case.
-	 */
-	if ((len = BOP_GETPROPLEN(ops, MODPATH_PROPNAME)) == -1)
-		return (MOD_DEFPATH);
-
-	path = kobj_zalloc(len, KM_WAIT);
-
-	(void) BOP_GETPROP(ops, MODPATH_PROPNAME, path);
-
-	return (*path ? path : MOD_DEFPATH);
-
-#else
+	char *path = kobj_zalloc(MAXPATHLEN, KM_WAIT);
 
 	/*
-	 * Construct the directory path from the filename.
+	 * Platform code gets first crack, then add
+	 * the default components
 	 */
-
-	char *p;
-	const char isastr[] = "/amd64";
-	size_t isalen = strlen(isastr);
-
-	if ((p = strrchr(filename, '/')) == NULL)
-		return (MOD_DEFPATH);
-
-	while (p > filename && *(p - 1) == '/')
-		p--;	/* remove trailing '/' characters */
-	if (p == filename)
-		p++;	/* so "/" -is- the modpath in this case */
-
-	/*
-	 * Remove optional isa-dependent directory name - the module
-	 * subsystem will put this back again (!)
-	 */
-	len = p - filename;
-	if (len > isalen &&
-	    strncmp(&filename[len - isalen], isastr, isalen) == 0)
-		p -= isalen;
-
-	/*
-	 * "/platform/mumblefrotz" + " " + MOD_DEFPATH
-	 */
-	len += (p - filename) + 1 + strlen(MOD_DEFPATH) + 1;
-
-	path = kobj_zalloc(len, KM_WAIT);
-	(void) strncpy(path, filename, p - filename);
-	(void) strcat(path, " ");
+	mach_modpath(path, filename);
+	if (*path != '\0')
+		(void) strcat(path, " ");
 	return (strcat(path, MOD_DEFPATH));
-#endif
 }
 
 static struct modctl *
@@ -1230,13 +1188,11 @@ bind_primary(val_t *bootaux, int lmid)
 					break;
 				case DT_RELA:
 					shtype = SHT_RELA;
-					rela = (char *)(dyn->d_un.d_ptr +
-					    dynseg);
+					rela = (char *)dyn->d_un.d_ptr;
 					break;
 				case DT_REL:
 					shtype = SHT_REL;
-					rela = (char *)(dyn->d_un.d_ptr +
-					    dynseg);
+					rela = (char *)dyn->d_un.d_ptr;
 					break;
 				}
 			}
@@ -2105,9 +2061,6 @@ kobj_load_module(struct modctl *modp, int use_path)
 
 		/* sync_instruction_memory */
 		kobj_sync_instruction_memory(mp->text, mp->text_size);
-#ifdef	MPSAS
-		sas_syms(mp);
-#endif
 		kobj_export_module(mp);
 		kobj_notify(KOBJ_NOTIFY_MODLOADED, modp);
 	}
@@ -2312,9 +2265,9 @@ get_progbits(struct module *mp, struct _buf *file)
 	uint_t shn;
 	int err = -1;
 
-	tp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT);
-	dp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT);
-	sdp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT);
+	tp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT|KM_TMP);
+	dp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT|KM_TMP);
+	sdp = kobj_zalloc(sizeof (struct proginfo), KM_WAIT|KM_TMP);
 	/*
 	 * loop through sections to find out how much space we need
 	 * for text, data, (also bss that is already assigned)
@@ -2513,7 +2466,6 @@ get_syms(struct module *mp, struct _buf *file)
 	Sym	*sp, *ksp;
 	char		*symname;
 	int		dosymtab = 0;
-	extern char 	stubs_base[], stubs_end[];
 
 	/*
 	 * Find the interesting sections.
@@ -2534,6 +2486,8 @@ get_syms(struct module *mp, struct _buf *file)
 			 */
 			if (shp->sh_addr)
 				continue;
+
+			/* KM_TMP since kobj_free'd in do_relocations */
 			shp->sh_addr = (Addr)
 			    kobj_alloc(shp->sh_size, KM_WAIT|KM_TMP);
 
@@ -3028,7 +2982,7 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 		name = mp->strings + sp->st_name;
 		if (sp->st_shndx != SHN_UNDEF && sp->st_shndx != SHN_COMMON)
 			continue;
-#ifdef	__sparc
+#if defined(__sparc)
 		/*
 		 * Register symbols are ignored in the kernel
 		 */
@@ -3127,7 +3081,7 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 uint_t
 kobj_hash_name(const char *p)
 {
-	unsigned int g;
+	uint_t g;
 	uint_t hval;
 
 	hval = 0;
@@ -3661,7 +3615,7 @@ kobjopen_free(struct kobjopen_tctl *ltp)
 }
 
 int
-kobj_read(intptr_t descr, char *buf, unsigned size, unsigned offset)
+kobj_read(intptr_t descr, char *buf, uint_t size, uint_t offset)
 {
 	int stat;
 	ssize_t resid;
@@ -3755,6 +3709,7 @@ struct _buf *
 kobj_open_file(char *name)
 {
 	struct _buf *file;
+	struct compinfo cbuf;
 	intptr_t fd;
 
 	if ((fd = kobj_open(name)) == -1) {
@@ -3764,25 +3719,80 @@ kobj_open_file(char *name)
 	file = kobj_zalloc(sizeof (struct _buf), KM_WAIT|KM_TMP);
 	file->_fd = fd;
 	file->_name = kobj_alloc(strlen(name)+1, KM_WAIT|KM_TMP);
-	file->_base = kobj_zalloc(MAXBSIZE, KM_WAIT|KM_TMP);
 	file->_cnt = file->_size = file->_off = 0;
 	file->_ln = 1;
 	file->_ptr = file->_base;
 	(void) strcpy(file->_name, name);
+
+	/*
+	 * Before root is mounted, we must check
+	 * for a compressed file and do our own
+	 * buffering.
+	 */
+	if (_modrootloaded) {
+		file->_base = kobj_zalloc(MAXBSIZE, KM_WAIT);
+		file->_bsize = MAXBSIZE;
+	} else {
+		if (kobj_boot_compinfo(fd, &cbuf) != 0) {
+			kobj_close_file(file);
+			return ((struct _buf *)-1);
+		}
+		file->_iscmp = cbuf.iscmp;
+		if (file->_iscmp) {
+			if (kobj_comp_setup(file, &cbuf) != 0) {
+				kobj_close_file(file);
+				return ((struct _buf *)-1);
+			}
+		} else {
+			file->_base = kobj_zalloc(cbuf.blksize, KM_WAIT|KM_TMP);
+			file->_bsize = cbuf.blksize;
+		}
+	}
 	return (file);
+}
+
+static int
+kobj_comp_setup(struct _buf *file, struct compinfo *cip)
+{
+	struct comphdr *hdr;
+
+	/*
+	 * read the compressed image into memory,
+	 * so we can deompress from there
+	 */
+	file->_dsize = cip->fsize;
+	file->_dbuf = kobj_alloc(cip->fsize, KM_WAIT|KM_TMP);
+	if (kobj_read(file->_fd, file->_dbuf, cip->fsize, 0) != cip->fsize) {
+		kobj_free(file->_dbuf, cip->fsize);
+		return (-1);
+	}
+
+	hdr = kobj_comphdr(file);
+	if (hdr->ch_magic != CH_MAGIC || hdr->ch_version != CH_VERSION ||
+	    hdr->ch_algorithm != CH_ALG_ZLIB || hdr->ch_fsize == 0 ||
+	    (hdr->ch_blksize & (hdr->ch_blksize - 1)) != 0) {
+		kobj_free(file->_dbuf, cip->fsize);
+		return (-1);
+	}
+	file->_base = kobj_alloc(hdr->ch_blksize, KM_WAIT|KM_TMP);
+	file->_bsize = hdr->ch_blksize;
+	return (0);
 }
 
 void
 kobj_close_file(struct _buf *file)
 {
 	kobj_close(file->_fd);
-	kobj_free(file->_base, MAXBSIZE);
+	if (file->_base != NULL)
+		kobj_free(file->_base, file->_bsize);
+	if (file->_dbuf != NULL)
+		kobj_free(file->_dbuf, file->_dsize);
 	kobj_free(file->_name, strlen(file->_name)+1);
 	kobj_free(file, sizeof (struct _buf));
 }
 
 int
-kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
+kobj_read_file(struct _buf *file, char *buf, uint_t size, uint_t off)
 {
 	int b_size, c_size;
 	int b_off;	/* Offset into buffer for start of bcopy */
@@ -3796,7 +3806,7 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 	}
 
 	while (size) {
-		page_addr = F_PAGE(off);
+		page_addr = F_PAGE(file, off);
 		b_size = file->_size;
 		/*
 		 * If we have the filesystem page the caller's referring to
@@ -3804,7 +3814,7 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 		 * satisfy as much of the request from the buffer as we can.
 		 */
 		if (page_addr == file->_off && b_size > 0) {
-			b_off = B_OFFSET(off);
+			b_off = B_OFFSET(file, off);
 			c_size = b_size - b_off;
 			/*
 			 * If there's nothing to copy, we're at EOF.
@@ -3835,15 +3845,15 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 			 * read directly into the caller's buffer.
 			 */
 			if (page_addr == off &&
-			    (c_size = F_PAGE(size)) && buf) {
-				c_size = kobj_read(file->_fd, buf, c_size,
+			    (c_size = F_BLKS(file, size)) && buf) {
+				c_size = kobj_read_blks(file, buf, c_size,
 				    page_addr);
 				if (c_size < 0) {
 					count = -1;
 					break;
 				}
 				count += c_size;
-				if (c_size != F_PAGE(size))
+				if (c_size != F_BLKS(file, size))
 					break;
 				size -= c_size;
 				off += c_size;
@@ -3854,8 +3864,8 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 			 */
 			} else {
 				file->_off = page_addr;
-				c_size = kobj_read(file->_fd, file->_base,
-				    MAXBSIZE, page_addr);
+				c_size = kobj_read_blks(file, file->_base,
+				    file->_bsize, page_addr);
 				file->_ptr = file->_base;
 				file->_cnt = c_size;
 				file->_size = c_size;
@@ -3877,10 +3887,56 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 	return (count);
 }
 
+static int
+kobj_read_blks(struct _buf *file, char *buf, uint_t size, uint_t off)
+{
+	int ret;
+
+	ASSERT(B_OFFSET(file, size) == 0 && B_OFFSET(file, off) == 0);
+	if (file->_iscmp) {
+		uint_t blks;
+		int nret;
+
+		ret = 0;
+		for (blks = size / file->_bsize; blks != 0; blks--) {
+			nret = kobj_uncomp_blk(file, buf, off);
+			if (nret == -1)
+				return (-1);
+			buf += nret;
+			off += nret;
+			ret += nret;
+			if (nret < file->_bsize)
+				break;
+		}
+	} else
+		ret = kobj_read(file->_fd, buf, size, off);
+	return (ret);
+}
+
+static int
+kobj_uncomp_blk(struct _buf *file, char *buf, uint_t off)
+{
+	struct comphdr *hdr = kobj_comphdr(file);
+	ulong_t dlen, slen;
+	caddr_t src;
+	int i;
+
+	dlen = file->_bsize;
+	i = off / file->_bsize;
+	src = file->_dbuf + hdr->ch_blkmap[i];
+	if (i == hdr->ch_fsize / file->_bsize)
+		slen = hdr->ch_fsize - hdr->ch_blkmap[i];
+	else
+		slen = hdr->ch_blkmap[i + 1] - hdr->ch_blkmap[i];
+	if (z_uncompress(buf, &dlen, src, slen) != Z_OK)
+		return (-1);
+	return (dlen);
+}
+
 int
 kobj_filbuf(struct _buf *f)
 {
-	if (kobj_read_file(f, NULL, MAXBSIZE, f->_off + f->_size) > 0)
+	if (kobj_read_file(f, NULL, f->_bsize, f->_off + f->_size) > 0)
 		return (kobj_getc(f));
 	return (-1);
 }
@@ -3919,23 +3975,10 @@ kobj_alloc(size_t size, int flag)
 	 * permanently using the dynamic data segment.
 	 */
 	if (standalone) {
-#ifdef __sparc
-		if (flag & KM_TMP) {
-			return (kobj_tmp_alloc(size));
-		} else if (flag & KM_SCRATCH) {
-			void *buf = kobj_bs_alloc(size);
-
-			if (buf != NULL)
-				return (buf);
-#ifdef	KOBJ_DEBUG
-			if (kobj_debug & D_DEBUG) {
-				_kobj_printf(ops, "krtld: failed scratch alloc "
-				    "of %lu bytes -- falling back\n", size);
-			}
-#endif
-		}
-
-#else /* x86 */
+#if defined(_OBP)
+		if (flag & (KM_TMP | KM_SCRATCH))
+			return (bop_temp_alloc(size, MINALIGN));
+#else
 		if (flag & (KM_TMP | KM_SCRATCH))
 			return (BOP_ALLOC(ops, 0, size, MINALIGN));
 #endif
@@ -4068,6 +4111,19 @@ kobj_get_filesize(struct _buf *file, uint64_t *size)
 			return (EIO);
 		*size = bst.st_size;
 	} else {
+
+#if defined(_OBP)
+		struct bootstat bsb;
+
+		if (file->_iscmp) {
+			struct comphdr *hdr = kobj_comphdr(file);
+
+			*size = hdr->ch_fsize;
+		} else if (kobj_boot_fstat(file->_fd, &bsb) != 0)
+			return (EIO);
+		else
+			*size = bsb.st_size;
+#else
 		char *buf;
 		int count;
 		uint64_t offset = 0;
@@ -4084,6 +4140,7 @@ kobj_get_filesize(struct _buf *file, uint64_t *size)
 		kmem_free(buf, MAXBSIZE);
 
 		*size = offset;
+#endif
 	}
 
 	return (0);
@@ -4101,17 +4158,6 @@ basename(char *s)
 			q = p;
 	} while (*p++);
 	return (q ? q + 1 : s);
-}
-
-/*ARGSUSED*/
-static void
-kprintf(void *op, const char *fmt, ...)
-{
-	va_list adx;
-
-	va_start(adx, fmt);
-	vprintf(fmt, adx);
-	va_end(adx);
 }
 
 void
@@ -4327,10 +4373,8 @@ tnf_add_notifyunload(kobj_notify_f *fp)
 
 /* ARGSUSED */
 static void
-tnf_unsplice_probes(unsigned int what, struct modctl *mod)
+tnf_unsplice_probes(uint_t what, struct modctl *mod)
 {
-	extern tnf_probe_control_t *__tnf_probe_list_head;
-	extern tnf_tag_data_t *__tnf_tag_list_head;
 	tnf_probe_control_t **p;
 	tnf_tag_data_t **q;
 	struct module *mp = mod->mod_mp;
@@ -4397,7 +4441,9 @@ tnf_splice_probes(int boot_load, tnf_probe_control_t *plist,
 	return (result);
 }
 
-#if defined(__x86)
+char *kobj_file_buf;
+int kobj_file_bufsize;
+
 /*
  * This code is for the purpose of manually recording which files
  * needs to go into the boot archive on any given system.
@@ -4408,14 +4454,9 @@ tnf_splice_probes(int boot_load, tnf_probe_control_t *plist,
 static void
 kobj_record_file(char *filename)
 {
-	extern char *kobj_file_buf;
-	extern int kobj_file_bufsize;
 	static char *buf;
 	static int size = 0;
 	int n;
-
-	if (standalone)		/* kernel symbol not available */
-		return;
 
 	if (kobj_file_bufsize == 0)	/* don't bother */
 		return;
@@ -4431,12 +4472,11 @@ kobj_record_file(char *filename)
 	size -= n;
 	buf += n;
 }
-#endif	/* __x86 */
 
 static int
 kobj_boot_fstat(int fd, struct bootstat *stp)
 {
-#if defined(__sparc)
+#if defined(_OBP)
 	if (!standalone && _ioquiesced)
 		return (-1);
 	return (BOP_FSTAT(ops, fd, stp));
@@ -4445,14 +4485,11 @@ kobj_boot_fstat(int fd, struct bootstat *stp)
 #endif
 }
 
-/*
- * XXX these wrappers should go away when sparc is converted
- * boot from ramdisk
- */
 static int
 kobj_boot_open(char *filename, int flags)
 {
-#if defined(__sparc)
+#if defined(_OBP)
+
 	/*
 	 * If io via bootops is quiesced, it means boot is no longer
 	 * available to us.  We make it look as if we can't open the
@@ -4461,7 +4498,8 @@ kobj_boot_open(char *filename, int flags)
 	if (!standalone && _ioquiesced)
 		return (-1);
 
-	return (BOP_OPEN(ops, filename, flags));
+	kobj_record_file(filename);
+	return (BOP_OPEN(filename, flags));
 #else /* x86 */
 	kobj_record_file(filename);
 	return (BRD_OPEN(bfs_ops, filename, flags));
@@ -4471,11 +4509,11 @@ kobj_boot_open(char *filename, int flags)
 static int
 kobj_boot_close(int fd)
 {
-#if defined(__sparc)
+#if defined(_OBP)
 	if (!standalone && _ioquiesced)
 		return (-1);
 
-	return (BOP_CLOSE(ops, fd));
+	return (BOP_CLOSE(fd));
 #else /* x86 */
 	return (BRD_CLOSE(bfs_ops, fd));
 #endif
@@ -4485,8 +4523,8 @@ kobj_boot_close(int fd)
 static int
 kobj_boot_seek(int fd, off_t hi, off_t lo)
 {
-#if defined(__sparc)
-	return (BOP_SEEK(ops, fd, hi, lo));
+#if defined(_OBP)
+	return (BOP_SEEK(fd, lo) == -1 ? -1 : 0);
 #else
 	return (BRD_SEEK(bfs_ops, fd, lo, SEEK_SET));
 #endif
@@ -4495,9 +4533,15 @@ kobj_boot_seek(int fd, off_t hi, off_t lo)
 static int
 kobj_boot_read(int fd, caddr_t buf, size_t size)
 {
-#if defined(__sparc)
-	return (BOP_READ(ops, fd, buf, size));
+#if defined(_OBP)
+	return (BOP_READ(fd, buf, size));
 #else
 	return (BRD_READ(bfs_ops, fd, buf, size));
 #endif
+}
+
+static int
+kobj_boot_compinfo(int fd, struct compinfo *cb)
+{
+	return (boot_compinfo(fd, cb));
 }

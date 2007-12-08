@@ -28,7 +28,7 @@
 
 #if	defined(_KERNEL)
 #include	<sys/types.h>
-#include	"reloc.h"
+#include	"krtld/reloc.h"
 #else
 #include	<stdio.h>
 #include	"sgs.h"
@@ -450,7 +450,7 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		 */
 		if (re_flags & FLG_RE_WDISP16) {
 			uvalue = ((basevalue & 0x300000) >> 6) |
-				(basevalue & 0x3fff);
+			    (basevalue & 0x3fff);
 			basevalue &= ~0x303fff;
 		} else {
 			uvalue = sigbit_mask & basevalue;
@@ -533,7 +533,7 @@ do_reloc_rtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
 		 */
 		if (re_flags & FLG_RE_WDISP16)
 			uvalue = ((uvalue & 0xc000) << 6) |
-				(uvalue & 0x3fff);
+			    (uvalue & 0x3fff);
 		else
 			uvalue &= sigbit_mask;
 		/*

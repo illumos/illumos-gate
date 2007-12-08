@@ -214,6 +214,7 @@ GENUNIX_OBJS +=	\
 		nvpair.o	\
 		nvpair_alloc_system.o	\
 		nvpair_alloc_fixed.o	\
+		octet.o		\
 		open.o		\
 		p_online.o	\
 		pathconf.o	\
@@ -836,6 +837,8 @@ CACHEFS_OBJS +=	cachefs_cnode.o		cachefs_cod.o \
 		cachefs_subr.o		cachefs_vfsops.o \
 		cachefs_vnops.o
 
+DCFS_OBJS +=	dc_vnops.o
+
 DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 
 DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
@@ -1372,23 +1375,12 @@ DES_OBJS +=	des_crypt.o des_cbc_crypt.o des_impl.o des_ks.o des_soft.o
 
 DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 
-sparc_KRTLD_OBJS =	\
-	kobj_subr.o
-
-i386_KRTLD_OBJS =
-
-COMMON_KRTLD_OBJS =	\
-	kobj_bootflags.o \
-	getoptstr.o	\
-	kobj.o		\
-	kobj_kdi.o	\
-	kobj_lm.o
-
-KRTLD_OBJS +=	$(COMMON_KRTLD_OBJS) $($(MACH)_KRTLD_OBJS)
+KRTLD_OBJS +=	kobj_bootflags.o getoptstr.o \
+		kobj.o kobj_kdi.o kobj_lm.o kobj_subr.o
 
 MOD_OBJS +=	modctl.o modsubr.o modsysfile.o modconf.o modhash.o
 
-STRPLUMB_OBJS += strplumb.o octet.o
+STRPLUMB_OBJS += strplumb.o
 
 CPR_OBJS +=	cpr_driver.o cpr_dump.o \
 		cpr_main.o cpr_misc.o cpr_mod.o cpr_stat.o \

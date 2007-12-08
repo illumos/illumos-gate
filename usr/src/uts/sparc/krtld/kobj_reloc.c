@@ -44,7 +44,7 @@
 #include <sys/tnf_probe.h>
 #include <sys/sdt.h>
 
-#include "reloc.h"
+#include "krtld/reloc.h"
 
 
 /*

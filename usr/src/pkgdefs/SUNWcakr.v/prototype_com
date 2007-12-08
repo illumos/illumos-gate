@@ -92,5 +92,6 @@ d none platform/sun4v/kernel/sys 755 root sys
 d none platform/sun4v/kernel/sys/sparcv9 755 root sys
 s none platform/sun4v/kernel/unix=sparcv9/unix
 #
-f none platform/sun4v/ufsboot 644 root sys
+
+
 f none platform/sun4v/wanboot 644 root sys

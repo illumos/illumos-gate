@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,93 +29,61 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-/*
- * Standalone copies of some basic routines.  Note that these routines
- * are transformed via Makefile -D flags into krtld_* routines.  So,
- * this version of strcmp() will become krtld_strcmp() when built.
- *
- * This dubious practice is so that krtld can have its own private
- * versions of these routines suitable for use during early boot,
- * when kernel-based routines might not work.  Make sure to use 'nm'
- * on your krtld to make sure it is calling the appropriate routines.
- */
-
-int
-strcmp(const char *s1, const char *s2)
-{
-	if (s1 == s2)
-		return (0);
-	while (*s1 == *s2++)
-		if (*s1++ == '\0')
-			return (0);
-	return (*s1 - s2[-1]);
-}
+#include <sys/bootconf.h>
+#include <sys/kobj_impl.h>
+#include <sys/cmn_err.h>
 
 /*
- * Compare strings (at most n bytes): return *s1-*s2 for the last
- * characters in s1 and s2 which were compared.
+ * Standalone utility functions for use within krtld.
+ * Many platforms implement optimized platmod versions of
+ * utilities such as bcopy and any such are not yet available
+ * until the kernel is more completely stitched together.
+ * These standalones are referenced through vectors
+ * kobj_bzero, etc.  Throughout krtld, the usual utility
+ * is redefined to reference through the corresponding
+ * vector so that krtld may simply refer to bzero etc.
+ * as usual.  See kobj_impl.h.
  */
-int
-strncmp(const char *s1, const char *s2, size_t n)
+
+/*ARGSUSED*/
+static void
+kprintf(void *op, const char *fmt, ...)
 {
-	if (s1 == s2)
-		return (0);
-	n++;
-	while (--n != 0 && *s1 == *s2++)
-		if (*s1++ == '\0')
-			return (0);
-	return ((n == 0) ? 0 : *s1 - *--s2);
+	va_list adx;
+
+	va_start(adx, fmt);
+	vprintf(fmt, adx);
+	va_end(adx);
 }
 
-size_t
-strlen(const char *s)
+static void
+stand_bzero(void *p_arg, size_t count)
 {
-	const char *s0 = s + 1;
+	char zero = 0;
+	caddr_t p = p_arg;
 
-	while (*s++ != '\0')
-		;
-	return (s - s0);
+	while (count != 0)
+		*p++ = zero, count--;
 }
 
-char *
-strcpy(char *s1, const char *s2)
+static void
+stand_bcopy(const void *src_arg, void *dest_arg, size_t count)
 {
-	char *os1 = s1;
+	caddr_t src = (caddr_t)src_arg;
+	caddr_t dest = dest_arg;
 
-	while (*s1++ = *s2++)
-		;
-	return (os1);
+	if (src < dest && (src + count) > dest) {
+		/* overlap copy */
+		while (--count != -1)
+			*(dest + count) = *(src + count);
+	} else {
+		while (--count != -1)
+			*dest++ = *src++;
+	}
 }
 
-char *
-strncpy(char *s1, const char *s2, size_t n)
-{
-	char *os1 = s1;
-
-	n++;
-	while ((--n != 0) && ((*s1++ = *s2++) != '\0'))
-		;
-	if (n != 0)
-		while (--n != 0)
-			*s1++ = '\0';
-	return (os1);
-}
-
-char *
-strcat(char *s1, const char *s2)
-{
-	char *os1 = s1;
-
-	while (*s1++)
-		;
-	--s1;
-	while (*s1++ = *s2++)
-		;
-	return (os1);
-}
-
-size_t
-strlcat(char *dst, const char *src, size_t dstsize)
+static size_t
+stand_strlcat(char *dst, const char *src, size_t dstsize)
 {
 	char *df = dst;
 	size_t left = dstsize;
@@ -135,39 +103,36 @@ strlcat(char *dst, const char *src, size_t dstsize)
 	return (l1 + l2);
 }
 
-char *
-strchr(const char *sp, int c)
+/*
+ * Set up the krtld standalone utilty vectors
+ */
+void
+kobj_setup_standalone_vectors()
 {
-
-	do {
-		if (*sp == (char)c)
-			return ((char *)sp);
-	} while (*sp++);
-	return (NULL);
+	_kobj_printf = (void (*)(void *, const char *, ...))bop_printf;
+	kobj_bcopy = stand_bcopy;
+	kobj_bzero = stand_bzero;
+	kobj_strlcat = stand_strlcat;
 }
 
+/*
+ * Restore the kprintf/bcopy/bzero kobj vectors.
+ * We need to undefine the override macros to
+ * accomplish this.
+ *
+ * Do NOT add new code after the point or at least
+ * certainly not code using bcopy or bzero which would
+ * need to be vectored to the krtld equivalents.
+ */
+#undef	bcopy
+#undef	bzero
+#undef	strlcat
+
 void
-bzero(void *p_arg, size_t count)
+kobj_restore_vectors()
 {
-	char zero = 0;
-	caddr_t p = p_arg;
-
-	while (count != 0)
-		*p++ = zero, count--;	/* Avoid clr for 68000, still... */
-}
-
-void
-bcopy(const void *src_arg, void *dest_arg, size_t count)
-{
-	caddr_t src = (caddr_t)src_arg;
-	caddr_t dest = dest_arg;
-
-	if (src < dest && (src + count) > dest) {
-		/* overlap copy */
-		while (--count != -1)
-			*(dest + count) = *(src + count);
-	} else {
-		while (--count != -1)
-			*dest++ = *src++;
-	}
+	_kobj_printf = kprintf;
+	kobj_bcopy = bcopy;
+	kobj_bzero = bzero;
+	kobj_strlcat = strlcat;
 }

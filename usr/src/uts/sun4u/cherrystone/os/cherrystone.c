@@ -144,7 +144,7 @@ load_platform_drivers(void)
 	for (drv = boot_time_drivers; *drv; drv++) {
 		if (i_ddi_attach_hw_nodes(*drv) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "Failed to install \"%s\" driver.",
-				*drv);
+			    *drv);
 	}
 
 	/*
@@ -156,7 +156,7 @@ load_platform_drivers(void)
 
 	/* Gain access into the ssc050_get_port function */
 	cherry_ssc050_get_port_bit = (int (*) (dev_info_t *, int, int,
-		uint8_t *, int)) modgetsymvalue("ssc050_get_port_bit", 0);
+	    uint8_t *, int)) modgetsymvalue("ssc050_get_port_bit", 0);
 	if (cherry_ssc050_get_port_bit == NULL) {
 		cmn_err(CE_WARN, "cannot find ssc050_get_port_bit");
 		return;
@@ -199,7 +199,7 @@ cherry_dev_search(dev_info_t *dip, void *arg)
 		return (DDI_WALK_CONTINUE);
 
 	err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "reg", &dev_regs, &len);
+	    DDI_PROP_DONTPASS, "reg", &dev_regs, &len);
 	if (err != DDI_PROP_SUCCESS) {
 		return (DDI_WALK_CONTINUE);
 	}
@@ -228,10 +228,10 @@ keyswitch_poll(void *arg)
 	int	err;
 
 	err = cherry_ssc050_get_port_bit(dip, port, bit,
-		&port_byte, I2C_NOSLEEP);
+	    &port_byte, I2C_NOSLEEP);
 	if (err != 0) {
 		cmn_err(CE_WARN, "keyswitch polling disabled: "
-			"errno=%d while reading ssc050", err);
+		    "errno=%d while reading ssc050", err);
 		return;
 	}
 
@@ -244,7 +244,7 @@ cherry_abort_seq_handler(char *msg)
 {
 	if (key_locked_bit == 0)
 		cmn_err(CE_CONT, "KEY in LOCKED position, "
-			"ignoring debug enter sequence");
+		    "ignoring debug enter sequence");
 	else  {
 		debug_enter(msg);
 	}
@@ -277,7 +277,7 @@ plat_discover_slice(pfn_t pfn, pfn_t *first, pfn_t *last)
 	for (bd = 0; bd < CHERRYSTONE_SBD_SLOTS; bd++) {
 		for (cpu = 0; cpu < CHERRYSTONE_CPUS_PER_BOARD; cpu++) {
 			for (bank = 0; bank < CHERRYSTONE_BANKS_PER_MC;
-				bank++) {
+			    bank++) {
 				uint64_t *slice = slice_table[bd][cpu][bank];
 				uint64_t base = btop(slice[SLICE_PA]);
 				uint64_t len = btop(slice[SLICE_SPAN]);
@@ -437,7 +437,7 @@ plat_fill_mc(pnode_t nodeid)
  */
 /* ARGSUSED */
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t  nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t  nelems)
 {
 	int	slice;
 	pfn_t	basepfn;
@@ -549,7 +549,7 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 {
 	if (flt_in_memory && (p2get_mem_unum != NULL))
 		return (p2get_mem_unum(synd_code, P2ALIGN(flt_addr, 8),
-			buf, buflen, lenp));
+		    buf, buflen, lenp));
 	else
 		return (ENOTSUP);
 }

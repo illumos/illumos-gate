@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,22 +39,34 @@
 extern "C" {
 #endif
 
+/*
+ * The prom hands us an array of these
+ * as available and installed props
+ */
+typedef struct prom_memlist {
+	u_longlong_t	addr;
+	u_longlong_t	size;
+} prom_memlist_t;
+
 extern int check_boot_version(int);
-extern int check_memexp(struct memlist *, uint_t);
-extern void copy_memlist(u_longlong_t *, size_t, struct memlist **);
-extern int copy_physavail(u_longlong_t *, size_t, struct memlist **,
-    uint_t, uint_t);
-extern void size_physavail(u_longlong_t *physavail, size_t size,
+extern void copy_memlist(prom_memlist_t *, size_t, struct memlist **);
+extern void size_physavail(prom_memlist_t *physavail, size_t size,
     pgcnt_t *npages, int *memblocks);
-extern pgcnt_t size_virtalloc(u_longlong_t *avail, size_t size);
-extern void installed_top_size_memlist_array(u_longlong_t *, size_t, pfn_t *,
+extern pgcnt_t size_virtalloc(prom_memlist_t *avail, size_t size);
+extern void installed_top_size_memlist_array(prom_memlist_t *, size_t, pfn_t *,
     pgcnt_t *);
 extern void installed_top_size(struct memlist *, pfn_t *, pgcnt_t *);
 extern void fix_prom_pages(struct memlist *, struct memlist *);
-extern void copy_boot_memlists(u_longlong_t **physinstalled,
-    size_t *physinstalled_len, u_longlong_t **physavail, size_t *physavail_len,
-    u_longlong_t **virtavail, size_t *virtavail_len);
+extern void init_boot_memlists(void);
+extern void copy_boot_memlists(
+    prom_memlist_t **physinstalled, size_t *physinstalled_len,
+    prom_memlist_t **physavail, size_t *physavail_len,
+    prom_memlist_t **virtavail, size_t *virtavail_len);
 extern void phys_install_has_changed(void);
+
+extern void diff_memlists(struct memlist *, struct memlist *,
+    void (*)(uint64_t, uint64_t));
+extern void sync_memlists(struct memlist *, struct memlist *);
 
 #ifdef __cplusplus
 }

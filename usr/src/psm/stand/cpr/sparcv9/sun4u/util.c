@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,10 +30,14 @@
 #include "cprboot.h"
 
 
+static ihandle_t	cb_rih;
+static pnode_t		chosen;
+
+static int statefile_special;
+
 static int reset_input = 0;
 static char kbd_input[] = "keyboard input";
 static char null_input[] = "\" /nulldev\" input";
-
 
 /*
  * Ask prom to open a disk file given either the OBP device path, or the
@@ -44,113 +47,149 @@ static char null_input[] = "\" /nulldev\" input";
  */
 /* ARGSUSED */
 int
-cpr_statefile_open(char *path, char *fs)
+cpr_statefile_open(char *path, char *fs_dev)
 {
-	char full_path[OBP_MAXPATHLEN];
-	char *fp;
+	int plen, dlen;
 	int handle;
-	int c;
+	char fs_pkg[OBP_MAXPATHLEN];
+	char fs_name[OBP_MAXDRVNAME];
 
 	/*
 	 * instead of using specialstate, we use fs as the flag
 	 */
-	if (*fs == '\0') {	/* device open */
+	if (*fs_dev == '\0') {	/* device open */
+		statefile_special = 1;
 		handle = prom_open(path);
 		/* IEEE1275 prom_open returns 0 on failure; we return -1 */
 		return (handle ? handle : -1);
 	}
 
 	/*
-	 * IEEE 1275 prom needs "device-path,|file-path" where
-	 * file-path can have embedded |'s.
+	 * No cif for $open-package, so we have to use interpret
 	 */
-	fp = full_path;
-	(void) prom_strcpy(fp, fs);
-	fp += prom_strlen(fp);
-	*fp++ = ',';
-	*fp++ = '|';
-
-	/* Skip a leading slash in file path -- we provided for it above. */
-	if (*path == '/')
-		path++;
-
-	/* Copy file path and convert separators. */
-	while ((c = *path++) != '\0')
-		if (c == '/')
-			*fp++ = '|';
-		else
-			*fp++ = c;
-	*fp = '\0';
-
-	handle = prom_open(full_path);
-	if (verbose) {
-		if (fp = prom_strrchr(full_path, '/'))
-			fp++;
-		else
-			fp = full_path;
-		prom_printf("cso: prom_open(\"%s\") = 0x%x\n", fp, handle);
+	if (prom_getprop(chosen, "fs-package", fs_pkg) == -1) {
+		prom_printf("Missing fs-package name\n");
+		return (-1);
+	}
+	plen = prom_strlen(fs_pkg);
+	dlen = prom_strlen(fs_dev);
+	prom_interpret("$open-package swap l!", plen, (uintptr_t)fs_pkg,
+	    dlen, (uintptr_t)fs_dev, (uintptr_t)&cb_rih);
+	if (cb_rih == OBP_BADNODE || cb_rih == 0) {
+		prom_printf("Can't open %s\n", fs_pkg);
+		return (-1);
 	}
 
 	/*
-	 * IEEE1275 prom_open returns 0 on failure; we return -1
+	 * Prepend '/' if it's not there already
 	 */
-	return (handle ? handle : -1);
+	if (*path != '/') {
+		(void) prom_sprintf(fs_name, "/%s", path);
+		return (cpr_fs_open(fs_name));
+	} else
+		return (cpr_fs_open(path));
 }
 
+/*
+ * Mount root fs so we can read statefile, etc
+ *
+ * sets global
+ *	cb_rih
+ */
+int
+cb_mountroot()
+{
+
+	chosen = prom_chosennode();
+	if (chosen == OBP_BADNODE) {
+		prom_printf("Missing chosen node\n");
+		return (ERR);
+	}
+	if (prom_getprop(chosen, "bootfs", (caddr_t)&cb_rih) == -1) {
+		prom_printf("Missing bootfs ihandle\n");
+		return (ERR);
+	}
+	return (0);
+}
 
 /*
- * Ask prom to open a disk file given the device path representing
- * the target drive/partition and the fs-relative path of the file.
- * Handle file pathnames with or without leading '/'.  if fs points
- * to a null char, it indicates that we are opening a device.
+ * Unmount root
+ */
+int
+cb_unmountroot()
+{
+	(void) prom_close(cb_rih);
+	cb_rih = OBP_BADNODE;
+	return (0);
+}
+
+/*
+ * Ask prom to open a disk file.
  */
 /* ARGSUSED */
 int
-cpr_ufs_open(char *path, char *fs)
+cpr_fs_open(char *path)
 {
-	CB_VENTRY(cpr_ufs_open);
 
-	/*
-	 * screen invalid state, then just use the other code rather than
-	 * duplicating it
-	 */
-	if (*fs == '\0') {	/* device open */
-		prom_printf("cpr_ufs_open: NULL fs, path %s\n", path);
-		return (ERR);
-	}
-	return (cpr_statefile_open(path, fs));
+	CB_VENTRY(cpr_fs_open);
+
+	if (cb_rih == OBP_BADNODE)
+		return (-1);
+	return (prom_fopen(cb_rih, path));
 }
 
 
 /*
- * On sun4u there's no difference here, since prom groks ufs directly
+ * Direct read if using block special,
+ * otherwise use fs read
  */
 int
 cpr_read(int fd, caddr_t buf, size_t len)
 {
-	return (prom_read(fd, buf, len, 0, 0));
+	if (!statefile_special)
+		return (cpr_fs_read(fd, buf, len));
+	else
+		return (prom_read(fd, buf, len, 0, 0));
 }
 
 
 int
-cpr_ufs_read(int fd, caddr_t buf, int len)
+cpr_fs_read(int fd, caddr_t buf, int len)
 {
-	return (prom_read(fd, buf, len, 0, 0));
+	if (cb_rih == OBP_BADNODE)
+		return (-1);
+	return (prom_fread(cb_rih, fd, buf, len));
 }
 
 
 int
-cpr_ufs_close(int fd)
+cpr_fs_close(int fd)
 {
-	CB_VPRINTF(("cpr_ufs_close 0x%x\n", fd));
-	return (prom_close(fd));
+	CB_VPRINTF(("cpr_fs_close 0x%x\n", fd));
+
+	if (cb_rih == OBP_BADNODE)
+		return (-1);
+	prom_fclose(cb_rih, fd);
+	return (0);
+}
+
+int
+cpr_fs_seek(int fd, offset_t off)
+{
+	if (cb_rih == OBP_BADNODE)
+		return (-1);
+	return (prom_fseek(cb_rih, fd, off));
 }
 
 
 int
 cpr_statefile_close(int fd)
 {
-	return (prom_close(fd));
+	if (statefile_special) {
+		statefile_special = 0;
+		return (prom_close(fd));
+	} else
+		return (cpr_fs_close(fd));
 }
 
 

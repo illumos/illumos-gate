@@ -54,7 +54,8 @@
 #include <sys/systeminfo.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/param.h>
-#if defined(__i386)
+
+#if !defined(_OPB)
 #include <sys/ucode.h>
 #endif
 
@@ -108,8 +109,9 @@ typedef struct {
 #define	BAM_LOCK_FILE		"/var/run/bootadm.lock"
 #define	LOCK_FILE_PERMS		(S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
 
-#define	CREATE_RAMDISK		"/boot/solaris/bin/create_ramdisk"
-#define	CREATE_DISKMAP		"/boot/solaris/bin/create_diskmap"
+#define	CREATE_RAMDISK		"boot/solaris/bin/create_ramdisk"
+#define	CREATE_DISKMAP		"boot/solaris/bin/create_diskmap"
+#define	EXTRACT_BOOT_FILELIST	"boot/solaris/bin/extract_boot_filelist"
 #define	GRUBDISK_MAP		"/var/run/solaris_grubdisk.map"
 
 #define	GRUB_slice		"/etc/lu/GRUB_slice"
@@ -201,56 +203,51 @@ static char rootbuf[PATH_MAX] = "/";
 static int bam_update_all;
 
 /* function prototypes */
-static void parse_args_internal(int argc, char *argv[]);
-static void parse_args(int argc, char *argv[]);
-static error_t bam_menu(char *subcmd, char *opt, int argc, char *argv[]);
-static error_t bam_archive(char *subcmd, char *opt);
+static void parse_args_internal(int, char *[]);
+static void parse_args(int, char *argv[]);
+static error_t bam_menu(char *, char *, int, char *[]);
+static error_t bam_archive(char *, char *);
 
-static void bam_print(char *format, ...);
-static void bam_exit(int excode);
+static void bam_print(char *, ...);
+static void bam_exit(int);
 static void bam_lock(void);
 static void bam_unlock(void);
 
-static int exec_cmd(char *cmdline, char *output, int64_t osize);
-static error_t read_globals(menu_t *mp, char *menu_path,
-    char *globalcmd, int quiet);
+static int exec_cmd(char *, filelist_t *);
+static error_t read_globals(menu_t *, char *, char *, int);
 
-static menu_t *menu_read(char *menu_path);
-static error_t menu_write(char *root, menu_t *mp);
-static void linelist_free(line_t *start);
-static void menu_free(menu_t *mp);
-static void line_free(line_t *lp);
-static void filelist_free(filelist_t *flistp);
-static error_t list2file(char *root, char *tmp,
-    char *final, line_t *start);
-static error_t list_entry(menu_t *mp, char *menu_path, char *opt);
-static error_t delete_all_entries(menu_t *mp, char *menu_path, char *opt);
-static error_t update_entry(menu_t *mp, char *root, char *opt);
-static error_t update_temp(menu_t *mp, char *root, char *opt);
+static menu_t *menu_read(char *);
+static error_t menu_write(char *, menu_t *);
+static void linelist_free(line_t *);
+static void menu_free(menu_t *);
+static void line_free(line_t *);
+static void filelist_free(filelist_t *);
+static error_t list2file(char *, char *, char *, line_t *);
+static error_t list_entry(menu_t *, char *, char *);
+static error_t delete_all_entries(menu_t *, char *, char *);
+static error_t update_entry(menu_t *, char *, char *);
+static error_t update_temp(menu_t *, char *, char *);
 
-static error_t update_archive(char *root, char *opt);
-static error_t list_archive(char *root, char *opt);
-static error_t update_all(char *root, char *opt);
-static error_t read_list(char *root, filelist_t  *flistp);
-static error_t set_global(menu_t *mp, char *globalcmd, int val);
-static error_t set_option(menu_t *mp, char *globalcmd, char *opt);
-static error_t set_kernel(menu_t *mp, menu_cmd_t optnum, char *path,
-    char *buf, size_t bufsize);
-static char *expand_path(const char *partial_path);
+static error_t update_archive(char *, char *);
+static error_t list_archive(char *, char *);
+static error_t update_all(char *, char *);
+static error_t read_list(char *, filelist_t *);
+static error_t set_global(menu_t *, char *, int);
+static error_t set_option(menu_t *, char *, char *);
+static error_t set_kernel(menu_t *, menu_cmd_t, char *, char *, size_t);
+static char *expand_path(const char *);
 
-static long s_strtol(char *str);
-static int s_fputs(char *str, FILE *fp);
+static long s_strtol(char *);
+static int s_fputs(char *, FILE *);
 
-static char *s_strdup(char *str);
+static char *s_strdup(char *);
 static int is_readonly(char *);
 static int is_amd64(void);
+static int is_sun4u(void);
+static int is_sun4v(void);
 static void append_to_flist(filelist_t *, char *);
 
-#if defined(__sparc)
-static void sparc_abort(void);
-#endif
-
-#if defined(__i386)
+#if !defined(_OPB)
 static void ucode_install();
 #endif
 
@@ -298,7 +295,7 @@ usage(void)
 	(void) fprintf(stderr, "\t%s update-archive [-vn] [-R altroot]\n",
 	    prog);
 	(void) fprintf(stderr, "\t%s list-archive [-R altroot]\n", prog);
-#ifndef __sparc
+#if !defined(_OPB)
 	/* x86 only */
 	(void) fprintf(stderr, "\t%s set-menu [-R altroot] key=value\n", prog);
 	(void) fprintf(stderr, "\t%s list-menu [-R altroot]\n", prog);
@@ -327,21 +324,6 @@ main(int argc, char *argv[])
 
 	parse_args(argc, argv);
 
-#if defined(__sparc)
-	/*
-	 * There are only two valid invocations of bootadm
-	 * on SPARC:
-	 *
-	 *	- SPARC diskless server creating boot_archive for i386 clients
-	 *	- archive creation call during reboot of a SPARC system
-	 *
-	 *	The latter should be a NOP
-	 */
-	if (bam_cmd != BAM_ARCHIVE) {
-		sparc_abort();
-	}
-#endif
-
 	switch (bam_cmd) {
 		case BAM_MENU:
 			ret = bam_menu(bam_subcmd, bam_opt, bam_argc, bam_argv);
@@ -360,17 +342,6 @@ main(int argc, char *argv[])
 	bam_unlock();
 	return (0);
 }
-
-#if defined(__sparc)
-
-static void
-sparc_abort(void)
-{
-	bam_error(NOT_ON_SPARC);
-	bam_exit(1);
-}
-
-#endif
 
 /*
  * Equivalence of public and internal commands:
@@ -738,7 +709,7 @@ mount_grub_slice(int *mnted, char **physlice, char **logslice, char **fs_type)
 	(void) snprintf(cmd, sizeof (cmd), "/sbin/mount -F %s %s %s",
 	    fstype, dev, mntpt);
 
-	if (exec_cmd(cmd, NULL, 0) != 0) {
+	if (exec_cmd(cmd, NULL) != 0) {
 		bam_error(MOUNT_FAILED, dev, fstype);
 		if (rmdir(mntpt) != 0) {
 			bam_error(RMDIR_FAILED, mntpt, strerror(errno));
@@ -791,7 +762,7 @@ umount_grub_slice(
 	if (mnted) {
 		(void) snprintf(cmd, sizeof (cmd), "/sbin/umount %s",
 		    mntpt);
-		if (exec_cmd(cmd, NULL, 0) != 0) {
+		if (exec_cmd(cmd, NULL) != 0) {
 			bam_error(UMOUNT_FAILED, mntpt);
 		}
 		if (rmdir(mntpt) != 0) {
@@ -853,7 +824,7 @@ use_stubboot(void)
 	 */
 	(void) snprintf(cmd, sizeof (cmd), "/sbin/mount %s",
 	    STUBBOOT);
-	if (exec_cmd(cmd, NULL, 0) != 0) {
+	if (exec_cmd(cmd, NULL) != 0) {
 		bam_error(MOUNT_MNTPT_FAILED, STUBBOOT);
 		return (NULL);
 	}
@@ -908,6 +879,16 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 	struct stat sb;
 	int mnted;	/* set if we did a mount */
 	error_t (*f)(menu_t *mp, char *menu_path, char *opt);
+	char *rootpath;
+
+	/*
+	 * Menu sub-command only applies to GRUB (i.e. x86)
+	 */
+	rootpath = (bam_alt_root) ? bam_root : "/";
+	if (!is_grub((const char *)rootpath)) {
+		bam_error(NOT_ON_SPARC);
+		return (BAM_ERROR);
+	}
 
 	/*
 	 * Check arguments
@@ -1033,16 +1014,6 @@ bam_archive(
 		return (BAM_ERROR);
 	}
 
-#if defined(__sparc)
-	/*
-	 * A NOP if called on SPARC during reboot
-	 */
-	if (strcmp(subcmd, "update_all") == 0)
-		return (BAM_SUCCESS);
-	else if (strcmp(subcmd, "update") != 0)
-		sparc_abort();
-#endif
-
 	ret = dboot_or_multiboot(rootbuf);
 	if (ret != BAM_SUCCESS)
 		return (ret);
@@ -1060,7 +1031,7 @@ bam_archive(
 	if (strcmp(subcmd, "update_all") == 0)
 		bam_update_all = 1;
 
-#if defined(__i386)
+#if !defined(_OPB)
 	ucode_install(bam_root);
 #endif
 
@@ -1496,23 +1467,33 @@ check_flags_and_files(char *root)
 	/*
 	 * If archive is missing, create archive
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root,
-	    DIRECT_BOOT_ARCHIVE_32);
+
+	if (is_sun4u())
+		(void) snprintf(path, sizeof (path), "%s%s", root,
+		    SUN4U__ARCHIVE);
+	else if (is_sun4v())
+		(void) snprintf(path, sizeof (path), "%s%s", root,
+		    SUN4V__ARCHIVE);
+	else {
+		if (bam_direct == BAM_DIRECT_DBOOT) {
+			(void) snprintf(path, sizeof (path), "%s%s", root,
+			    DIRECT_BOOT_ARCHIVE_64);
+			if (stat(path, &sb) != 0) {
+				if (bam_verbose && !bam_check)
+					bam_print(UPDATE_ARCH_MISS, path);
+				walk_arg.need_update = 1;
+				return;
+			}
+		}
+		(void) snprintf(path, sizeof (path), "%s%s", root,
+		    DIRECT_BOOT_ARCHIVE_32);
+	}
+
 	if (stat(path, &sb) != 0) {
 		if (bam_verbose && !bam_check)
 			bam_print(UPDATE_ARCH_MISS, path);
 		walk_arg.need_update = 1;
 		return;
-	}
-	if (bam_direct == BAM_DIRECT_DBOOT) {
-		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    DIRECT_BOOT_ARCHIVE_64);
-		if (stat(path, &sb) != 0) {
-			if (bam_verbose && !bam_check)
-				bam_print(UPDATE_ARCH_MISS, path);
-			walk_arg.need_update = 1;
-			return;
-		}
 	}
 }
 
@@ -1547,17 +1528,55 @@ read_one_list(char *root, filelist_t  *flistp, char *filelist)
 static error_t
 read_list(char *root, filelist_t  *flistp)
 {
-	int rval;
+	char path[PATH_MAX];
+	char cmd[PATH_MAX];
+	struct stat sb;
+	int n, rval;
 
 	flistp->head = flistp->tail = NULL;
 
 	/*
-	 * Read current lists of files - only the first is mandatory
+	 * build and check path to extract_boot_filelist.ksh
 	 */
-	rval = read_one_list(root, flistp, BOOT_FILE_LIST);
-	if (rval != BAM_SUCCESS)
-		return (rval);
-	(void) read_one_list(root, flistp, ETC_FILE_LIST);
+	n = snprintf(path, sizeof (path), "%s%s", root, EXTRACT_BOOT_FILELIST);
+	if (n >= sizeof (path)) {
+		bam_error(NO_FLIST);
+		return (BAM_ERROR);
+	}
+
+	/*
+	 * If extract_boot_filelist is present, exec it, otherwise read
+	 * the filelists directly, for compatibility with older images.
+	 */
+	if (stat(path, &sb) == 0) {
+		/*
+		 * build arguments to exec extract_boot_filelist.ksh
+		 */
+		if (strlen(root) > 1) {
+			n = snprintf(cmd, sizeof (cmd), "%s -R %s /%s /%s",
+			    path, root, BOOT_FILE_LIST, ETC_FILE_LIST);
+		} else {
+			n = snprintf(cmd, sizeof (cmd), "%s /%s /%s",
+			    path, BOOT_FILE_LIST, ETC_FILE_LIST);
+		}
+		if (n >= sizeof (cmd)) {
+			bam_error(NO_FLIST);
+			return (BAM_ERROR);
+		}
+		if (exec_cmd(cmd, flistp) != 0) {
+			if (bam_debug)
+				bam_error(FLIST_FAIL, path, strerror(errno));
+			return (BAM_ERROR);
+		}
+	} else {
+		/*
+		 * Read current lists of files - only the first is mandatory
+		 */
+		rval = read_one_list(root, flistp, BOOT_FILE_LIST);
+		if (rval != BAM_SUCCESS)
+			return (rval);
+		(void) read_one_list(root, flistp, ETC_FILE_LIST);
+	}
 
 	if (flistp->head == NULL) {
 		bam_error(NO_FLIST);
@@ -1678,9 +1697,14 @@ walk_list(char *root, filelist_t *flistp)
 	line_t *lp;
 
 	for (lp = flistp->head; lp; lp = lp->next) {
+		/*
+		 * Don't follow symlinks.  A symlink must refer to
+		 * a file that would appear in the archive through
+		 * a direct reference.  This matches the archive
+		 * construction behavior.
+		 */
 		(void) snprintf(path, sizeof (path), "%s%s", root, lp->line);
-		/* XXX shouldn't we use FTW_MOUNT ? */
-		if (nftw(path, cmpstat, 20, 0) == -1) {
+		if (nftw(path, cmpstat, 20, FTW_PHYS) == -1) {
 			/*
 			 * Some files may not exist.
 			 * For example: etc/rtc_config on a x86 diskless system
@@ -1849,15 +1873,6 @@ update_required(char *root)
 		return (0);
 	}
 
-	/*
-	 * At this point we need an update - so save new stat data
-	 * However, if only checking (-n), don't save new stat data.
-	 */
-	if (!bam_check)
-		savenew(root);
-
-	clear_walk_args();
-
 	return (1);
 }
 
@@ -1871,7 +1886,7 @@ create_ramdisk(char *root)
 	/*
 	 * Setup command args for create_ramdisk.ksh
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root, CREATE_RAMDISK);
+	(void) snprintf(path, sizeof (path), "%s/%s", root, CREATE_RAMDISK);
 	if (stat(path, &sb) != 0) {
 		bam_error(ARCH_EXEC_MISS, path, strerror(errno));
 		return (BAM_ERROR);
@@ -1887,7 +1902,7 @@ create_ramdisk(char *root)
 	} else
 		(void) snprintf(cmdline, len, "%s", path);
 
-	if (exec_cmd(cmdline, NULL, 0) != 0) {
+	if (exec_cmd(cmdline, NULL) != 0) {
 		bam_error(ARCHIVE_FAIL, cmdline);
 		free(cmdline);
 		return (BAM_ERROR);
@@ -1895,22 +1910,10 @@ create_ramdisk(char *root)
 	free(cmdline);
 
 	/*
-	 * Verify that the archive has been created
+	 * The existence of the expected archives used to be
+	 * verified here. This check is done in create_ramdisk as
+	 * it needs to be in sync with the altroot operated upon.
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root,
-	    DIRECT_BOOT_ARCHIVE_32);
-	if (stat(path, &sb) != 0) {
-		bam_error(ARCHIVE_NOT_CREATED, path);
-		return (BAM_ERROR);
-	}
-	if (bam_direct == BAM_DIRECT_DBOOT) {
-		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    DIRECT_BOOT_ARCHIVE_64);
-		if (stat(path, &sb) != 0) {
-			bam_error(ARCHIVE_NOT_CREATED, path);
-			return (BAM_ERROR);
-		}
-	}
 
 	return (BAM_SUCCESS);
 }
@@ -1986,27 +1989,39 @@ is_ramdisk(char *root)
 }
 
 static int
-is_newboot(char *root)
+is_boot_archive(char *root)
 {
 	char path[PATH_MAX];
 	struct stat sb;
 
 	/*
-	 * We can't boot without MULTI_BOOT
+	 * We can't create an archive without the create_ramdisk script
 	 */
-	(void) snprintf(path, sizeof (path), "%s%s", root, MULTI_BOOT);
+	(void) snprintf(path, sizeof (path), "%s/%s", root, CREATE_RAMDISK);
 	if (stat(path, &sb) == -1) {
 		if (bam_verbose)
 			bam_print(FILE_MISS, path);
 		return (0);
 	}
 
+	return (1);
+}
+
+/*
+ * Need to call this for anything that operates on the GRUB menu
+ */
+int
+is_grub(const char *root)
+{
+	char path[PATH_MAX];
+	struct stat sb;
+
 	/*
-	 * We can't generate archive without GRUB_DIR
+	 * GRUB_DIR is required to modify the menu
 	 */
 	(void) snprintf(path, sizeof (path), "%s%s", root, GRUB_DIR);
 	if (stat(path, &sb) == -1) {
-		if (bam_verbose)
+		if (bam_debug)
 			bam_print(DIR_MISS, path);
 		return (0);
 	}
@@ -2045,10 +2060,9 @@ update_archive(char *root, char *opt)
 	assert(opt == NULL);
 
 	/*
-	 * root must belong to a GRUB boot OS,
-	 * don't care on sparc except for diskless clients
+	 * root must belong to a boot archive based  OS,
 	 */
-	if (!is_newboot(root)) {
+	if (!is_boot_archive(root)) {
 		/*
 		 * Emit message only if not in context of update_all.
 		 * If in update_all, emit only if verbose flag is set.
@@ -2103,6 +2117,14 @@ update_archive(char *root, char *opt)
 		/* create the ramdisk */
 		ret = create_ramdisk(root);
 	}
+
+	/* if the archive is updated, save the new stat data */
+	if (ret == 0 && walk_arg.new_nvlp != NULL) {
+		savenew(root);
+	}
+
+	clear_walk_args();
+
 	return (ret);
 }
 
@@ -2120,7 +2142,7 @@ update_fdisk(void)
 	    GRUB_fdisk, GRUB_fdisk_target);
 
 	bam_print(UPDATING_FDISK);
-	if (exec_cmd(cmd, NULL, 0) != 0) {
+	if (exec_cmd(cmd, NULL) != 0) {
 		bam_error(FDISK_UPDATE_FAILED);
 	}
 
@@ -2178,7 +2200,7 @@ restore_grub_slice(void)
 	(void) snprintf(cmd, sizeof (cmd), "%s %s %s %s",
 	    INSTALLGRUB, STAGE1, STAGE2, physlice);
 
-	if (exec_cmd(cmd, NULL, 0) != 0) {
+	if (exec_cmd(cmd, NULL) != 0) {
 		bam_error(RESTORE_GRUB_FAILED);
 		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
@@ -2194,7 +2216,7 @@ restore_grub_slice(void)
 	(void) snprintf(cmd, sizeof (cmd), "/bin/cp %s %s",
 	    GRUB_backup_menu, menupath);
 
-	if (exec_cmd(cmd, NULL, 0) != 0) {
+	if (exec_cmd(cmd, NULL) != 0) {
 		bam_error(RESTORE_MENU_FAILED, menupath);
 		umount_grub_slice(mnted, mntpt, physlice, NULL, NULL);
 		return;
@@ -2211,6 +2233,7 @@ update_all(char *root, char *opt)
 	struct stat sb;
 	FILE *fp;
 	char multibt[PATH_MAX];
+	char creatram[PATH_MAX];
 	error_t ret = BAM_SUCCESS;
 	int ret1, ret2;
 
@@ -2239,7 +2262,7 @@ update_all(char *root, char *opt)
 		}
 		(void) snprintf(multibt, sizeof (multibt),
 		    "/sbin/mount -F lofs -o nosub /  %s", LOFS_PATCH_MNT);
-		if (exec_cmd(multibt, NULL, 0) != 0) {
+		if (exec_cmd(multibt, NULL) != 0) {
 			bam_error(MOUNT_FAILED, LOFS_PATCH_MNT, "lofs");
 			ret = BAM_ERROR;
 		}
@@ -2255,7 +2278,7 @@ update_all(char *root, char *opt)
 			 */
 			(void) snprintf(multibt, sizeof (multibt),
 			    "/sbin/umount %s", LOFS_PATCH_MNT);
-			if (exec_cmd(multibt, NULL, 0) != 0) {
+			if (exec_cmd(multibt, NULL) != 0) {
 				bam_error(UMOUNT_FAILED, LOFS_PATCH_MNT);
 				ret = BAM_ERROR;
 			}
@@ -2292,10 +2315,10 @@ update_all(char *root, char *opt)
 		if (strcmp(mnt.mnt_mountp, "/") == 0)
 			continue;
 
-		(void) snprintf(multibt, sizeof (multibt), "%s%s",
-		    mnt.mnt_mountp, MULTI_BOOT);
+		(void) snprintf(creatram, sizeof (creatram), "%s/%s",
+		    mnt.mnt_mountp, CREATE_RAMDISK);
 
-		if (stat(multibt, &sb) == -1)
+		if (stat(creatram, &sb) == -1)
 			continue;
 
 		/*
@@ -3019,7 +3042,7 @@ open_diskmap(char *root)
 	fp = fopen(GRUBDISK_MAP, "r");
 	if (fp == NULL) {
 		(void) snprintf(cmd, sizeof (cmd),
-		    "%s%s > /dev/null", root, CREATE_DISKMAP);
+		    "%s/%s > /dev/null", root, CREATE_DISKMAP);
 		(void) system(cmd);
 		fp = fopen(GRUBDISK_MAP, "r");
 	}
@@ -4341,12 +4364,11 @@ menu_free(menu_t *mp)
  * Any other value indicates an error
  */
 static int
-exec_cmd(char *cmdline, char *output, int64_t osize)
+exec_cmd(char *cmdline, filelist_t *flistp)
 {
 	char buf[BUFSIZ];
 	int ret;
 	FILE *ptr;
-	size_t len;
 	sigset_t set;
 	void (*disp)(int);
 
@@ -4407,14 +4429,12 @@ exec_cmd(char *cmdline, char *output, int64_t osize)
 	 * we can safely reap the exit status of the command
 	 * from the value returned by pclose()
 	 */
-	while (fgets(buf, sizeof (buf), ptr) != NULL) {
-		/* if (bam_verbose)  XXX */
-			bam_print(PRINT_NO_NEWLINE, buf);
-		if (output && osize > 0) {
-			(void) snprintf(output, osize, "%s", buf);
-			len = strlen(buf);
-			output += len;
-			osize -= len;
+	while (s_fgets(buf, sizeof (buf), ptr) != NULL) {
+		if (flistp == NULL) {
+			/* s_fgets strips newlines, so insert them at the end */
+			bam_print(PRINT, buf);
+		} else {
+			append_to_flist(flistp, buf);
 		}
 	}
 
@@ -4551,6 +4571,33 @@ is_amd64(void)
 	return (amd64);
 }
 
+static int
+is_sun4u(void)
+{
+	static int sun4u = 0;
+	char mbuf[257];	/* from sysinfo(2) manpage */
+
+	if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
+	    strncmp(mbuf, "sun4u", strlen("sun4u")) == 0)
+		sun4u = 1;
+
+	return (sun4u);
+}
+
+static int
+is_sun4v(void)
+{
+	static int sun4v = 0;
+	char mbuf[257];	/* from sysinfo(2) manpage */
+
+	if (sysinfo(SI_MACHINE, mbuf, sizeof (mbuf)) > 0 &&
+	    strncmp(mbuf, "sun4v", strlen("sun4v")) == 0)
+		sun4v = 1;
+
+	return (sun4v);
+}
+
+
 static void
 append_to_flist(filelist_t *flistp, char *s)
 {
@@ -4565,7 +4612,7 @@ append_to_flist(filelist_t *flistp, char *s)
 	flistp->tail = lp;
 }
 
-#if defined(__i386)
+#if !defined(_OPB)
 
 UCODE_VENDORS;
 

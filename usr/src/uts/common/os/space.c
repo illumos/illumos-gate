@@ -106,15 +106,12 @@ struct var v;
  */
 struct vnode *rootvp;		/* vnode of the root device */
 dev_t rootdev;			/* dev_t of the root device */
-int root_is_svm;		/* root is a mirrored device flag */
-
-int netboot;
-int obpdebug;
-char *dhcack;	/* Used to cache ascii form of DHCPACK handed up by boot */
-char *netdev_path;	/* Used to cache the netdev_path handed up by boot */
+boolean_t root_is_svm;		/* root is a mirrored device flag */
+boolean_t root_is_ramdisk;	/* root is ramdisk */
+uint32_t ramdisk_size;		/* (KB) currently set only for sparc netboots */
 
 /*
- * Data from arp.c that must be resident.
+ * dhcp
  */
 #include <sys/socket.h>
 #include <sys/errno.h>
@@ -123,12 +120,24 @@ char *netdev_path;	/* Used to cache the netdev_path handed up by boot */
 #include <sys/stropts.h>
 #include <sys/dlpi.h>
 #include <net/if.h>
+
+int netboot;
+int obpdebug;
+char *dhcack;		/* dhcp response packet */
+int dhcacklen;
+char *netdev_path;	/* Used to cache the netdev_path handed up by boot */
+char dhcifname[IFNAMSIZ];
+
+/*
+ * Data from arp.c that must be resident.
+ */
 #include <net/if_arp.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_ether.h>
 
 ether_addr_t etherbroadcastaddr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+
 
 /*
  * Data from timod that must be resident
@@ -260,7 +269,7 @@ static void
 store_fetch_initspace()
 {
 	space_hash = mod_hash_create_strhash(space_hash_name,
-		space_hash_nchains, mod_hash_null_valdtor);
+	    space_hash_nchains, mod_hash_null_valdtor);
 	ASSERT(space_hash);
 }
 
@@ -288,7 +297,7 @@ space_store(char *key, uintptr_t ptr)
 	bcopy(key, s, l);
 
 	rval = mod_hash_insert(space_hash,
-		(mod_hash_key_t)s, (mod_hash_val_t)ptr);
+	    (mod_hash_key_t)s, (mod_hash_val_t)ptr);
 
 	switch (rval) {
 	case 0:

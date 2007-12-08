@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,10 +41,10 @@
 #   Solaris media and all the things that don't go into the ramdisk image
 #   are (un)cpio'd as well
 #
-# This utility is also used to pack parts (in essence the window system, 
-# usr/dt and usr/openwin) of the non ramdisk SPARC 
-# miniroot. (un)packmedia will recognize that they are being run a SPARC 
-# miniroot and do the appropriate work. 
+# This utility is also used to pack parts (in essence the window system,
+# usr/dt and usr/openwin) of the non ramdisk SPARC
+# miniroot. (un)packmedia will recognize that they are being run a SPARC
+# miniroot and do the appropriate work.
 #
 
 usage()
@@ -63,7 +63,10 @@ cleanup()
 	fi
 
 	lofiadm -d "$TMR" 2>/dev/null
-	rm -f "$TMR" "$TMR.gz"
+        if [ "$REALTHING" != true ] ; then
+		rm -f "$TMR"
+	fi
+	rm -f "$TMR.gz"
 }
 
 archive_Gnome()
@@ -74,12 +77,7 @@ archive_Gnome()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-		mkdir -p "$CPIO_DIR"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 	
 
 	# Create the gnome archive
@@ -98,11 +96,13 @@ archive_Gnome()
 		HOME="./tmp/root"
 		export HOME
 		umask 0022
-		GCONF_CONFIG_SOURCE="xml:merged:"$MINIROOT"/.tmp_proto/root/etc/gconf/gconf.xml.defaults"
+		mumble=.tmp_proto/root/etc/gconf/gconf.xml.defaults
+		GCONF_CONFIG_SOURCE="xml:merged:$MINIROOT/$mumble"
 		export GCONF_CONFIG_SOURCE
 		SCHEMADIR="$MINIROOT/.tmp_proto/root/etc/gconf/schemas"
 		export SCHEMADIR
-		/usr/bin/gconftool-2 --makefile-install-rule $SCHEMADIR/*.schemas >/dev/null 2>&1
+		/usr/bin/gconftool-2 --makefile-install-rule \
+		    $SCHEMADIR/*.schemas >/dev/null 2>&1
 		echo '
 		xml:readwrite:/tmp/root/.gconf
 		xml:readonly:/etc/gconf/gconf.xml.defaults
@@ -124,7 +124,7 @@ archive_Gnome()
 
 		if [ ! -f /tmp/gnome_share.$$ ] ; then
 			echo "/tmp/gnome_share.$$ file list not found."
-			return 
+			return
 		fi
 
 		# usr/lib gnome stuff
@@ -191,7 +191,7 @@ archive_Gnome()
 
 		if [ ! -f /tmp/gnome_bin.$$ ] ; then
 			echo "/tmp/gnome_bin.$$ file list not found."
-			return 
+			return
 		fi
 
 		# Cat all the files together and create the gnome archive
@@ -221,13 +221,13 @@ archive_Gnome()
 		cpio -ocmPuB < /tmp/gnome.$$ 2>/dev/null | bzip2 > \
 		    "$CPIO_DIR/gnome.cpio.bz2"
 
-		# Remove files from miniroot that are in archive. 
+		# Remove files from miniroot that are in archive.
 		# Create symlinks for files in archive
 		
 		rm -rf `cat /tmp/gnome_share.$$`
 
 		for i in `cat /tmp/gnome_share.$$`
-		do 
+		do
 			ln -s /tmp/root/$i $i 2>/dev/null
 		done
 
@@ -239,19 +239,19 @@ archive_Gnome()
 
 		rm -rf `cat /tmp/gnome_libdir.$$`
 		for i in `cat /tmp/gnome_libdir.$$`
-		do 
+		do
 			ln -s /tmp/root/$i $i 2>/dev/null
 		done
 
 		rm -rf `cat /tmp/gnome_sfw.$$`
 		for i in `cat /tmp/gnome_sfw.$$`
-		do 
+		do
 			ln -s /tmp/root/$i $i 2>/dev/null
 		done
 
 		rm -rf `cat /tmp/gnome_bin.$$`
 		for i in `cat /tmp/gnome_bin.$$`
-		do 
+		do
 			ln -s /tmp/root/$i $i 2>/dev/null
 		done
 		rm -f /tmp/gnome_share.$$
@@ -269,12 +269,7 @@ archive_JavaGUI()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-		mkdir -p "$CPIO_DIR"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 	
 	# Archive the java wizard components that are only used in the
 	# non developer express path.
@@ -287,14 +282,15 @@ archive_JavaGUI()
 
 		if [ ! -f /tmp/java_ui.$$ ] ; then
 			echo "/tmp/java_ui.$$ file list not found."
-			return 
+			return
 		fi
 
 		cpio -ocmPuB < /tmp/java_ui.$$ 2>/dev/null | bzip2 > \
 		    "$CPIO_DIR/javaui.cpio.bz2"
 
 		rm -rf `cat /tmp/java_ui.$$`
-		ln -s /tmp/root/usr/lib/install/data/wizards usr/lib/install/data/wizards 2>/dev/null
+		ln -s /tmp/root/usr/lib/install/data/wizards \
+		    usr/lib/install/data/wizards 2>/dev/null
 
 		rm -f /tmp/java_ui.$$
 	
@@ -309,12 +305,7 @@ archive_Misc()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-		mkdir -p "$CPIO_DIR"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 
 	# Archive misc stuff that is needed by non devex installer
 	#
@@ -324,7 +315,7 @@ archive_Misc()
 		find usr/lib/lp -print > /tmp/lp.$$ 2>/dev/null
 		if [ ! -f /tmp/lp.$$ ] ; then
 			echo "/tmp/lp.$$ file list not found."
-			return 
+			return
 		fi
 
 		cpio -ocmPuB < /tmp/lp.$$ 2>/dev/null | bzip2 > \
@@ -346,12 +337,7 @@ archive_Perl()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-		mkdir -p "$CPIO_DIR"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 
 	# Archive perl, it is only needed by gnome gui.
 	#
@@ -362,7 +348,7 @@ archive_Perl()
 
 		if [ ! -f /tmp/perl.$$ ] ; then
 			echo "/tmp/perl.$$ file list not found."
-			return 
+			return
 		fi
 		cpio -ocmPuB < /tmp/perl.$$ 2>/dev/null | bzip2 > \
 		    "$CPIO_DIR/perl.cpio.bz2"
@@ -381,12 +367,7 @@ archive_X()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-		mkdir -p "$CPIO_DIR"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 
 	# create the graphics and non-graphics X archive
 	#
@@ -409,6 +390,24 @@ archive_X()
 	)
 }
 
+archive_lu()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+
+	(
+		cd "$MINIROOT"
+		find usr/lib/install usr/snadm usr/sbin | \
+		    cpio -ocmPuB 2> /dev/null | bzip2 > "$CPIO_DIR"/lu.cpio.bz2
+		ls platform > "$CPIO_DIR/lu.platforms"
+	)
+}
+
 packmedia()
 {
 	MEDIA="$1"
@@ -418,11 +417,56 @@ packmedia()
 	RELEASE=`basename "$RELEASE"`
 
 	mkdir -p "$MEDIA/$RELEASE/Tools/Boot"
-	mkdir -p "$MEDIA/boot/amd64"
-	mkdir -p "$MEDIA/boot/platform/i86pc/kernel"
-	mkdir -p "$MEDIA/boot/platform/i86pc/kernel/amd64"
-	mkdir -p "$MEDIA/boot/platform/i86xpv/kernel"
-	mkdir -p "$MEDIA/boot/platform/i86xpv/kernel/amd64"
+
+	if [ -d "$MINIROOT/platform/i86pc" ] ; then
+		mkdir -p "$MEDIA/boot/amd64"
+		mkdir -p "$MEDIA/boot/platform/i86pc/kernel"
+		mkdir -p "$MEDIA/boot/platform/i86pc/kernel/amd64"
+		mkdir -p "$MEDIA/boot/platform/i86xpv/kernel"
+		mkdir -p "$MEDIA/boot/platform/i86xpv/kernel/amd64"
+		cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
+		cp "$MINIROOT/platform/i86pc/kernel/unix" \
+		    "$MEDIA/boot/platform/i86pc/kernel/unix"
+		cp "$MINIROOT/platform/i86pc/kernel/amd64/unix" \
+		    "$MEDIA/boot/platform/i86pc/kernel/amd64/unix"
+		cp "$MINIROOT/platform/i86xpv/kernel/unix" \
+		    "$MEDIA/boot/platform/i86xpv/kernel/unix"
+		cp "$MINIROOT/platform/i86xpv/kernel/amd64/unix" \
+		    "$MEDIA/boot/platform/i86xpv/kernel/amd64/unix"
+		(
+			cd "$MEDIA/$RELEASE/Tools/Boot"
+			ln -sf ../../../boot/x86.miniroot
+			ln -sf ../../../boot/multiboot
+			ln -sf ../../../boot/platform/i86pc/kernel/unix
+			ln -sf ../../../boot/platform/i86pc/kernel/amd64/unix
+			ln -sf ../../../boot/platform/i86xpv/kernel/unix
+			ln -sf ../../../boot/platform/i86xpv/kernel/amd64/unix
+			ln -sf ../../../boot/grub/pxegrub
+		)
+	fi
+
+	if [ -d "$MINIROOT/platform/sun4u" ] ; then
+		mkdir -p "$MEDIA/boot"
+		dd if="$MINIROOT/usr/platform/sun4u/lib/fs/hsfs/bootblk" \
+		    of="$MEDIA/boot/hsfs.bootblock" \
+		    bs=1b oseek=1 count=15 conv=sync 2> /dev/null
+	fi
+
+	for arch in sun4u sun4v ; do
+		if [ -d "$MINIROOT/platform/$arch" ] ; then
+			archdir="$MEDIA/$RELEASE/Tools/Boot/platform/$arch"
+			mkdir -p $archdir
+			ln -sf ../../../../../boot/sparc.miniroot \
+			    "$archdir/boot_archive"
+			cp "$MINIROOT/usr/platform/$arch/lib/fs/nfs/inetboot" \
+			    "$archdir"
+			cp "$MINIROOT/platform/$arch/wanboot" \
+			    "$archdir"
+			mkdir -p "$MEDIA/platform/$arch"
+			ln -sf ../../boot/sparc.miniroot \
+			    "$MEDIA/platform/$arch/boot_archive"
+		fi
+	done
 
 	# archive package databases to conserve memory
 	#
@@ -432,49 +476,37 @@ packmedia()
 		    cpio -ocmPuB 2> /dev/null | bzip2 > \
 		    "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2"
 	)
-
 	rm -rf "$MINIROOT/tmp/root/var/sadm/install"
 	rm -rf "$MINIROOT/tmp/root/var/sadm/pkg"
+
+	if [ -d "$MINIROOT/kernel/drv/sparcv9" ] ; then
+		archive_lu "$MEDIA" "$MINIROOT"
+	elif [ "$STRIP_AMD64" != false ] ; then
+		# clear out 64 bit support to conserve memory
+		#
+		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
+	fi
 
 	archive_X "$MEDIA" "$MINIROOT"
 
 	# Take out the gnome and java parts of the installer from
 	# the miniroot. These are not required to boot the system
 	# and start the installers.
-	
-	archive_Gnome "$MEDIA" "$MINIROOT"
-	archive_JavaGUI "$MEDIA" "$MINIROOT"
-	archive_Perl "$MEDIA" "$MINIROOT"
-	archive_Misc "$MEDIA" "$MINIROOT"
 
-	cp "$MINIROOT/platform/i86pc/multiboot" "$MEDIA/boot"
-	cp "$MINIROOT/platform/i86pc/kernel/unix" \
-	    "$MEDIA/boot/platform/i86pc/kernel/unix"
-	cp "$MINIROOT/platform/i86pc/kernel/amd64/unix" \
-	    "$MEDIA/boot/platform/i86pc/kernel/amd64/unix"
-	cp "$MINIROOT/platform/i86xpv/kernel/unix" \
-	    "$MEDIA/boot/platform/i86xpv/kernel/unix"
-	cp "$MINIROOT/platform/i86xpv/kernel/amd64/unix" \
-	    "$MEDIA/boot/platform/i86xpv/kernel/amd64/unix"
+	if [ -d "$MINIROOT/platform/i86pc" ] ; then
+		archive_Gnome "$MEDIA" "$MINIROOT"
+		archive_JavaGUI "$MEDIA" "$MINIROOT"
+		archive_Misc "$MEDIA" "$MINIROOT"
+		archive_Perl "$MEDIA" "$MINIROOT"
+	fi
 
 	# copy the install menu to menu.lst so we have a menu
 	# on the install media
 	#
-	if [ -f "${MINIROOT}/boot/grub/install_menu" ] ; then
-		cp ${MINIROOT}/boot/grub/install_menu \
-		    ${MEDIA}/boot/grub/menu.lst
+	if [ -f "$MINIROOT/boot/grub/install_menu" ] ; then
+		cp $MINIROOT/boot/grub/install_menu \
+		    $MEDIA/boot/grub/menu.lst
 	fi
-
-	(
-		cd "$MEDIA/$RELEASE/Tools/Boot"
-		ln -sf ../../../boot/x86.miniroot
-		ln -sf ../../../boot/platform/i86pc/kernel/unix
-		ln -sf ../../../boot/platform/i86pc/kernel/amd64/unix
-		ln -sf ../../../boot/platform/i86xpv/kernel/unix
-		ln -sf ../../../boot/platform/i86xpv/kernel/amd64/unix
-		ln -sf ../../../boot/multiboot
-		ln -sf ../../../boot/grub/pxegrub
-	)
 }
 
 unarchive_X()
@@ -485,11 +517,7 @@ unarchive_X()
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
 
-	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/miniroot_extra"
-	else
-		CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
-	fi
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 
 	# unpack X
 	#
@@ -527,7 +555,7 @@ unpackmedia()
 
 		# Gnome list saved off from packmedia
 		for i in `cat .tmp_proto/gnome_saved`
-		do 
+		do
 			rm -rf $i
 		done
 		
@@ -561,7 +589,12 @@ unpack()
 		exit 1
 	fi
 
-	gzcat "$MR" > $TMR
+	if [ `basename $MR` = x86.miniroot ] ; then
+		gzcat "$MR" > $TMR
+	else
+		REALTHING=true ; export REALTHING
+		TMR="$MR"
+	fi
 
 	LOFIDEV=`/usr/sbin/lofiadm -a $TMR`
 	if [ $? != 0 ] ; then
@@ -583,9 +616,64 @@ unpack()
 		printf "invalid root archive\n"
 	fi
 
+
 	rmdir $MNT
 	lofiadm -d $TMR ; LOFIDEV=
-	rm $TMR
+	if [ "$REALTHING" != true ] ; then
+		rm $TMR
+	fi
+}
+
+compress()
+{
+	SRC=$1
+	DST=$2
+
+	(
+		cd $SRC
+		filelist=`find .`
+
+		for file in $filelist ; do
+
+			file=`echo $file | sed s#^./##`
+
+			# copy all files over to preserve hard links
+			#
+			echo $file | cpio -pdum $DST 2> /dev/null
+
+			if [ -f $file ] && [ -s $file ] && [ ! -h $file ] ; then
+				fiocompress -mc $file $DST/$file &
+			fi
+
+		done
+
+		# now re-copy a couple of uncompressed files
+		#
+
+		find kernel platform -name unix | cpio -pdum $DST 2> /dev/null
+		find kernel platform -name genunix | cpio -pdum $DST \
+		    2> /dev/null
+		find kernel platform -name platmod | cpio -pdum $DST \
+		    2> /dev/null
+		find `find kernel platform -name cpu` | cpio -pdum $DST \
+		    2> /dev/null
+		find `find kernel platform -name kmdb\*` | cpio -pdum $DST \
+		    2> /dev/null
+		find kernel/misc/sparcv9/ctf kernel/fs/sparcv9/dcfs \
+		    etc/system etc/name_to_major etc/path_to_inst \
+		    etc/name_to_sysnum | cpio -pdum $DST 2> /dev/null
+	)
+}
+
+root_is_ramdisk()
+{
+	grep -v "set root_is_ramdisk=" "$UNPACKED_ROOT"/etc/system | \
+	    grep -v "set ramdisk_size=" > /tmp/system.$$
+	cat /tmp/system.$$ > "$UNPACKED_ROOT"/etc/system
+	rm /tmp/system.$$
+
+	echo set root_is_ramdisk=1 >> "$UNPACKED_ROOT"/etc/system
+	echo set ramdisk_size=$1 >> "$UNPACKED_ROOT"/etc/system
 }
 
 pack()
@@ -595,10 +683,17 @@ pack()
 		exit 1
 	fi
 
+	# always compress on sparc if fiocompress exists
+	#
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] && \
+	    [ -x /usr/sbin/fiocompress ] ; then
+		COMPRESS=true
+	fi
+
 	# Estimate image size and add %10 overhead for ufs stuff.
 	# Note, we can't use du here in case $UNPACKED_ROOT is on a filesystem,
 	# e.g. zfs, in which the disk usage is less than the sum of the file
-	# sizes.  The nawk code 
+	# sizes.  The nawk code
 	#
 	#	{t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
 	#
@@ -606,9 +701,16 @@ pack()
 	# next multiple of 1024.  This mimics the behavior of ufs especially
 	# with directories.  This results in a total size that's slightly
 	# bigger than if du was called on a ufs directory.
+	#
+	# if the operation in turn is compressing the files the amount
+	# of typical shrinkage is used to come up with a useful archive
+	# size
 	size=$(find "$UNPACKED_ROOT" -ls | nawk '
 	    {t += ($7 % 1024) ? (int($7 / 1024) + 1) * 1024 : $7}
 	    END {print int(t * 1.10 / 1024)}')
+	if [ "$COMPRESS" = true ] ; then
+		size=`echo $size | nawk '{s = $1} END {print int(s * .53)}'`
+	fi
 
 	/usr/sbin/mkfile ${size}k "$TMR"
 
@@ -619,23 +721,45 @@ pack()
 	fi
 
 	RLOFIDEV=`echo $LOFIDEV | sed s/lofi/rlofi/`
-	newfs $RLOFIDEV < /dev/null 2> /dev/null 
+	newfs $RLOFIDEV < /dev/null 2> /dev/null
 	mkdir -p $MNT
-	mount -o nologging $LOFIDEV $MNT 
+	mount -o nologging $LOFIDEV $MNT
 	rmdir $MNT/lost+found
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		root_is_ramdisk $size
+	fi
+
 	(
 		cd "$UNPACKED_ROOT"
-		find . -print | cpio -pdum $MNT 2> /dev/null
+		if [ "$COMPRESS" = true ] ; then
+			compress . $MNT
+		else
+			find . -print | cpio -pdum $MNT 2> /dev/null
+		fi
 	)
 	lockfs -f $MNT
 	umount $MNT
 	rmdir $MNT
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		"$UNPACKED_ROOT/usr/sbin/installboot" \
+		    "$UNPACKED_ROOT/usr/platform/sun4u/lib/fs/ufs/bootblk" \
+		    $RLOFIDEV
+	fi
+
 	lofiadm -d $LOFIDEV
 	LOFIDEV=
 
 	rm -f "$TMR.gz"
-	gzip -f "$TMR"
-	mv "$TMR.gz" "$MR"
+
+	if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
+		mv "$TMR" "$MR"
+	else
+		gzip -f "$TMR"
+		mv "$TMR.gz" "$MR"
+	fi
+
 	chmod a+r "$MR"
 }
 
@@ -644,12 +768,17 @@ pack()
 
 EXTRA_SPACE=0
 STRIP_AMD64=
+COMPRESS=
 
-while getopts s:6 opt ; do
+PATH=/usr/sbin:/usr/bin:/opt/sfw/bin ; export PATH
+
+while getopts s:6c opt ; do
 	case $opt in
 	s)	EXTRA_SPACE="$OPTARG"
 		;;
 	6)	STRIP_AMD64=false
+		;;
+	c)	COMPRESS=true
 		;;
 	*)	usage
 		exit 1
@@ -677,45 +806,36 @@ if [ "`dirname $UNPACKED_ROOT`" = . ] ; then
 	UNPACKED_ROOT="$BASE/$UNPACKED_ROOT"
 fi
 
+
+MEDIA="$MR"
+
 trap cleanup EXIT
 
 case $1 in
 	packmedia)
-		MEDIA="$MR"
-		MR="$MEDIA/boot/x86.miniroot"
-
 		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-			archive_X "$MEDIA" "$UNPACKED_ROOT"
+			ARCHIVE=sparc.miniroot
 		else
-			packmedia "$MEDIA" "$UNPACKED_ROOT"
-			
-			# create the 64-bit miniroot
-			# if the -6 option was passed, don't strip
-			# the 64-bit modules from the 32-bit miniroot
-			MR="$MEDIA/boot/amd64/x86.miniroot"
-			pack
-
-			if [ "$STRIP_AMD64" = false ] ; then
-				ln $MR $MEDIA/boot/x86.miniroot
-			else
-				# create the 32-bit miniroot
-				MR="$MEDIA/boot/x86.miniroot"
-				find "$UNPACKED_ROOT" -name amd64 \
-				    -type directory | xargs rm -rf
-				pack
-			fi
-		fi ;;
+			ARCHIVE=x86.miniroot
+		fi
+		MR="$MR/boot/$ARCHIVE"
+		packmedia "$MEDIA" "$UNPACKED_ROOT"
+		pack
+		;;
 	unpackmedia)
-		MEDIA="$MR"
-		MR="$MR/boot/x86.miniroot"
-
-		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
-			unarchive_X "$MEDIA" "$UNPACKED_ROOT"
+		if [ -f "$MEDIA/boot/sparc.miniroot" ] ; then
+			ARCHIVE=sparc.miniroot
 		else
-			unpack
-			unpackmedia "$MEDIA" "$UNPACKED_ROOT"
-		fi ;;
-	pack)	pack ;;
-	unpack)	unpack ;;
-	*)	usage ;;
+			ARCHIVE=x86.miniroot
+		fi
+		MR="$MR/boot/$ARCHIVE"
+		unpack
+		unpackmedia "$MEDIA" "$UNPACKED_ROOT"
+		;;
+	pack)	pack
+		;;
+	unpack)	unpack
+		;;
+	*)	usage
+		;;
 esac

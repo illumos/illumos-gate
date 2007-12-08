@@ -731,6 +731,7 @@ FSHDRS=				\
 	cachefs_fscache.h	\
 	cachefs_ioctl.h		\
 	cachefs_log.h		\
+	decomp.h		\
 	dv_node.h		\
 	sdev_impl.h		\
 	sdev_node.h		\

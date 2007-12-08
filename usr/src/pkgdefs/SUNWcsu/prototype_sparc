@@ -105,6 +105,7 @@ s none usr/lib/sparcv9/ld.so.1=../../../lib/sparcv9/ld.so.1
 f none usr/lib/sparcv9/libshare.so.1 755 root bin
 d none usr/lib/fs/nfs 755 root sys
 d none usr/lib/fs/nfs/sparcv9 755 root sys
+s none usr/sbin/fiocompress=../../sbin/fiocompress
 l none usr/sbin/prtdiag=../../usr/lib/platexec
 d none usr/sbin/sparcv9 755 root bin
 f none usr/sbin/sparcv9/add_drv 555 root sys

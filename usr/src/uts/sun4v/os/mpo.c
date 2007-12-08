@@ -874,7 +874,7 @@ mpo_plat_assign_lgrphand_to_mem_node(lgrp_handle_t plathand, int mnode)
  */
 
 void
-plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
+plat_build_mem_nodes(prom_memlist_t *list, size_t nelems)
 {
 	lgrp_handle_t lgrphand, lgrp_start;
 	int i, mnode, elem;
@@ -888,9 +888,9 @@ plat_build_mem_nodes(u_longlong_t *list, size_t nelems)
 	/* Check for non-MPO sun4v platforms */
 	if (n_locality_groups <= 1) {
 		mpo_plat_assign_lgrphand_to_mem_node(LGRP_DEFAULT_HANDLE, 0);
-		for (elem = 0; elem < nelems; elem += 2) {
-			base = list[elem];
-			len = list[elem+1];
+		for (elem = 0; elem < nelems; list++, elem++) {
+			base = list->addr;
+			len = list->size;
 
 			mpo_mem_node_add_slice(btop(base),
 			    btop(base + len - 1));

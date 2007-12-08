@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,534 +33,400 @@
 /* EXPORT DELETE END */
 #include "ramdisk.h"
 
-/*
- * This is a chunk of Forth delivered by the OBP group.  When loaded
- * into OBP it creates a ramdisk device node whose functionality is
- * defined in FWARC 2002/299.
- *
- * Note the %s in the line following " new-device" - this is where we
- * plug the name of the node in.
- */
-static const char ramdisk_fth[] =
+#include <sys/param.h>
+#include <sys/fcntl.h>
+#include <sys/obpdefs.h>
+#include <sys/reboot.h>
+#include <sys/promif.h>
+#include <sys/stat.h>
+#include <sys/bootvfs.h>
+#include <sys/platnames.h>
+#include <sys/salib.h>
+#include <sys/elf.h>
+#include <sys/link.h>
+#include <sys/auxv.h>
+#include <sys/boot_policy.h>
+#include <sys/boot_redirect.h>
+#include <sys/bootconf.h>
+#include <sys/boot.h>
+#include "boot_plat.h"
 
-"headerless "
 
-"\" /\" find-package 0= if"
-"   .\" Can't find /\" abort "
-"then  push-package "
+static char ramdisk_preamble_fth[] =
 
-"new-device"
-"   \" %s\"		device-name"
-"   \" block\"		encode-string \" device_type\" property"
-/* CSTYLED */
+": find-abort ( name$ -- ) "
+"   .\" Can't find \" type abort "
+"; "
+
+": get-package ( pkg$ -- ph ) "
+"   2dup  find-package 0=  if "
+"      find-abort "
+"   then                       ( pkg$ ph ) "
+"   nip nip                    ( ph ) "
+"; "
+
+"\" /openprom/client-services\" get-package  constant cif-ph "
+
+"instance defer cif-open     ( dev$ -- ihandle|0 ) "
+"instance defer cif-close    ( ihandle -- ) "
+
+": find-cif-method ( adr,len -- acf ) "
+"   2dup  cif-ph find-method 0=  if    ( adr,len ) "
+"      find-abort "
+"   then                               ( adr,len acf ) "
+"   nip nip                            ( acf ) "
+"; "
+
+"\" open\"     find-cif-method to cif-open "
+"\" close\"    find-cif-method to cif-close "
+
+"0 value dev-ih "
+
+"d# 100 buffer: open-cstr "
+
+": dev-open ( dev$ -- okay? ) "
+/* copy to C string for open  */
+"   0  over open-cstr +  c! "
+"   open-cstr swap  move "
+"   open-cstr  cif-open dup  if "
+"      dup to dev-ih "
+"   then "
+"; "
+
+": dev-close ( -- ) "
+"   dev-ih cif-close "
+"   0 to dev-ih "
+"; "
+
+": open-abort  ( file$ -- ) "
+"   .\" Can't open \"  type  abort "
+"; "
+;
+
+static char ramdisk_fth[] =
+
+"\" /\" get-package  push-package "
+
+"new-device "
+"   \" %s\" device-name "
+"    "
+"   \" block\"          device-type "
 "   \" SUNW,ramdisk\"	encode-string \" compatible\"  property"
 
-"   hex"
-
-"   headerless"
-
-"   0 value mmu-ihandle"
-"   0 value mem-ihandle"
-
-"   : get-memory-ihandles" /* ( -- ) */
-"      \" /chosen\" find-package drop dup \" mmu\" rot"
-"      get-package-property if"
-"	  .\" Can't find chosen mmu property\" cr abort"
-"      then"
-"      decode-int to mmu-ihandle 2drop"
-"      \" memory\" rot get-package-property if"
-" 	  .\" Can't find chosen memory property\" cr abort"
-"      then"
-"      decode-int to mem-ihandle 2drop"
-"   ;"
-
-"   : get-page-size" /* ( -- page-size ) */
-"     mmu-ihandle ihandle>phandle \" page-size\" rot get-package-property"
-"      if  h# 2000  else  decode-int nip nip  then "
-"   ;"
-
-"   : get-mode" /* ( -- rw-mode ) */
-"      here \" translate\" mmu-ihandle $call-method if"
-" 	  nip nip"
-"      else"
-" 	  h# 27"
-"      then"
-"   ;"
-
-"   : 64>32bit-phys" /* ( 64bit.lo 64bit.hi -- 32bit.lo 32bit.hi ) */
-"      drop xlsplit"
-"   ;"
-
-"   : 32>64bit-phys" /* ( 32bit.lo 32bit.hi -- 64bit.lo 64bit.hi ) */
-"      lxjoin 0"
-"   ;"
-
-"   : phy-claim" /* ( size align -- base.lo base.hi 0 | error ) */
-"       \" claim\" mem-ihandle ['] $call-method catch if"
-"	    drop 2drop 2drop -1"
-"	else"
-"	   64>32bit-phys 0"
-"	then"
-"   ;"
-
-"   : phy-release" /* ( phys.lo phys.hi size -- ) */
-"      >r 32>64bit-phys r> \" release\" mem-ihandle $call-method"
-"   ;"
-
-"   : vir-claim" /* ( [ virt ] size align -- base ) */
-"      \" claim\" mmu-ihandle $call-method"
-"   ;"
-
-"   : vir-release" /* ( virt size -- ) */
-"      \" release\" mmu-ihandle $call-method"
-"   ;"
-
-"   : vir-map" /* ( phys-lo phys-hi virt size mode -- ) */
-"      >r >r >r 32>64bit-phys r> r> r>"
-"      \" map\" mmu-ihandle $call-method"
-"   ;"
-
-"   : vir-unmap" /* ( virt size -- ) */
-"      \" unmap\" mmu-ihandle $call-method"
-"   ;"
-"   headers"
-
-/*  \ This structure represents a physical "chunk" of ramdisk memory */
-"   struct"
-"      /l field >res-pa.lo"		/* \ lower 32bits of physical address */
-"      /l field >res-pa.hi"		/* \ upper 32bits of physical address */
-"      /l field >res-len.lo"		/* \ lower 32bits of chunk size */
-"      /l field >res-len.hi"		/* \ upper 32bits of chunk size */
-"   constant /res-entry"
-
-"   4	value    max-res-entries"	/* \ Max # of non-contig phys chunks */
-
-"   max-res-entries /res-entry *"	/* \ size of resource buffer */
-"   ( value ) buffer: my-resources"	/* \ resource buffer label */
-"   0      value      num-res-entries"	/* \ current # of chunks allocated */
-"   h# 10 constant    label-size"	/* \ size of disk-label buffer */
-"   label-size instance buffer: my-label" /* \ for disk-label argument string */
-
-"   get-memory-ihandles"		/* \ So we can claim/map/free memory */
-"   get-page-size value pagesize"	/* \ get virt pagesize from vmem node */
-"   get-mode	value	 mode"		/* \ get mode to map virt memory with */
-
-"   0 instance	value	 window-mapped?" /* \ just in case for pa's near 0 */
-"   0 instance	value	 window-pa"	/* \ physical base of virtual window */
-"   0 instance	value	 window-base"	/* \ virtual window base */
-"   h# 10000	constant window-size"	/* \ virtual window size */
-
-"   0 instance	value	 filepos"	/* \ file position marker */
-"   -1		value	 new-disk?"	/* \ need to alloc new resources? */
-
-"   0 instance	value	 offset-low"	/* \ Offset to start of partition */
-"   0 instance	value	 offset-high"	/* \ For partition relative seeks */
-"   0 instance	value	 label-package"	/* \ ihandle for disk-label package */
-
-"   external"				/* \ Because device_type = block */
-
-"   0		value	 size"		/* \ size of disk */
-"   0		value	 #blocks"	/* \ size of disk / decimal 512 */
-
-"   headerless"
-
-"   : round-up"	/* ( n -- n' ) */
-"      1- tuck + swap invert and"
-"   ;"
-
-"   : init-label-package" /* ( adr len -- okay? ) */
-"      0 to offset-high  0 to offset-low"
-"      \" disk-label\"  $open-package to label-package"
-"      label-package  if"
-"	  0 0  \" offset\" label-package $call-method"
-"	  to offset-high to offset-low"
-" 	  true"
-"      else"
-" 	  .\" Can't open disk label package\"  cr  false"
-"      then"
-"   ;"
-
-"   : res-entry-len" /* ( n -- 64bit-len | 0 )	\ Get length of chunk n */
-"      dup num-res-entries > if"
-"	  drop 0"
-"      else"
-" 	  /res-entry * my-resources +"
-" 	  dup >res-len.lo l@ swap >res-len.hi l@"
-" 	  lxjoin"
-"      then"
-"   ;"
-
-"   : res-entry-pa" /* ( n -- 64bit-pa | 0 )	\ Get phys address of chunk n */
-"      dup num-res-entries > if"		/* ( n ) */
-" 	  drop 0"				/* ( 0 ) */
-"      else"					/* ( n ) */
-" 	  /res-entry * my-resources +"		/* ( chunk-adr ) */
-" 	  dup >res-pa.lo l@ swap >res-pa.hi l@"	/* ( pa.lo pa.hi ) */
-" 	  lxjoin"				/* ( 64bit-pa ) */
-"      then"					/* ( 64bit-pa ) */
-"   ;"
-
-"   : claim-window" /* ( -- )			\ Claim mem for virt window */
-"      window-size pagesize vir-claim to window-base"
-"   ;"
-
-"   : release-window" /* ( -- )			\ Free virt window memory */
-"      window-base window-size"
-"      2dup vir-unmap"
-"      vir-release"
-"   ;"
-
-"   : map-window" /* ( 64bit-pa -- ) \ Map a physical address to the v-window */
-"      dup to window-pa"
-"      xlsplit window-base window-size mode vir-map"
-"      -1 to window-mapped?"
-"   ;"
-
-"   : unmap-window" /* ( -- )			\ Unmap the virtual window */
-"      window-base window-size vir-unmap"
-"      0 to window-mapped?"
-"   ;"
-
-"   : in-window?" /* ( pa -- in-window? ) */
-"      window-mapped? if"
-"	  window-pa dup window-size + 1- between"
-"      else"
-"	  drop 0"
-"      then"
-"   ;"
-
-"   : window-left" /* ( offset -- space-left-in-window ) */
-"     window-size mod"
-"     window-size swap -"
-"   ;"
-
-"   : release-resources" /* ( -- )  \ release previously claimed phys addrs */
-"      num-res-entries 0 2dup = if"			/* ( res-entries 0 ) */
-"	 2drop exit"					/* ( ) */
-"      then"						/* ( res-entries 0 ) */
-"      do"						/* ( ) */
-" 	  i res-entry-pa xlsplit"			/* ( pa.lo pa.hi ) */
-" 	  i res-entry-len phy-release"			/* ( ) */
-"      loop"						/* ( ) */
-"      0 to num-res-entries"				/* ( ) */
-"      my-resources max-res-entries /res-entry * erase"	/* ( ) */
-"   ;"
-
-"   : fill-entry" /* ( pa.lo pa.hi size.lo size.hi  -- )    \ fill chunk buf */
-"      num-res-entries /res-entry * my-resources +"
-"      tuck >res-len.hi l!"
-"      tuck >res-len.lo l!"
-"      tuck >res-pa.hi  l!"
-"      >res-pa.lo	l!"
-"      num-res-entries 1+ to num-res-entries"
-"   ;"
-
-/*  \ First attempt to claim the whole ramdisk contiguously. */
-/*  \ If that doesn't work, try to claim it in smaller chunks */
-
-"   : attempt-claim" /* ( size -- error? ) */
-"      size 0 begin"			/* ( next totcl ) */
-"	  over pagesize phy-claim if"	/* ( next totcl ) */
-"	     swap 2 / window-size"	/* ( totcl next' ) */
-" 	     round-up swap"		/* ( next' totcl ) */
-"	  else"				/* ( next totcl pa.lo,hi ) */
-" 	     2over drop xlsplit"	/* ( next totcl pa.lo,hi len.lo,hi ) */
-" 	     fill-entry"		/* ( next totcl ) */
-" 	     over +"			/* ( next totcl ) */
-" 	  then"				/* ( next totcl ) */
-" 	  2dup size - 0>="		/* ( next totcl next comp? ) */
-" 	  swap size max-res-entries /"	/* ( next totcl comp? next smallest ) */
-" 	  - 0< or"			/* ( next totcl ) */
-"      until"				/* ( next totcl ) */
-"      nip size - 0< if  -1  else  0  then"
-"   ;"
-
-"   : claim-resources" /* ( -- error? ) */
-"      attempt-claim if  release-resources -1  else  0  then"
-"   ;"
-
-/*  \ Given a 0-relative disk offset compute the proper physical address */
-"   : offset>pa" /* ( disk-offset -- 64bit-pa error? ) */
-"      0 num-res-entries 0 do"		/* ( disk-offset 0 ) */
-"	  i res-entry-len +"		/* ( disk-offset len' ) */
-" 	  2dup - 0< if"			/* ( disk-offset len' ) */
-"	     - i res-entry-len +"	/* ( offset-into-pa ) \ briefly -ve */
-" 	     i res-entry-pa + 0"	/* ( pa 0 ) */
-" 	     unloop exit"		/* ( pa 0 ) */
-" 	  then"				/* ( disk-offset len' ) */
-"      loop"				/* ( disk-offset len' ) */
-"      drop -1"				/* ( offset error ) */
-"   ;"
-
-/*  \ Map the virtual window to the physical-address corresponding to the */
-/*  \ given 0-relative disk offset */
-"   : get-window" /* ( offset -- va len error? ) */
-"      dup offset>pa if"			/* ( offset pa ) */
-" 	  -1"					/* ( offset pa -1 ) */
-"      else"					/* ( offset pa ) */
-" 	  dup in-window? 0= if"			/* ( offset pa ) */
-" 	     unmap-window"			/* ( offset pa ) */
-" 	     over window-size mod - map-window"	/* ( offset ) */
-" 	  else"
-" 	     drop"
-" 	  then"
-" 	   window-base over window-size mod +"	/* ( offset va ) */
-" 	  swap window-left 0"			/* ( va len 0 ) */
-"      then"					/* ( va len error? ) */
-"   ;"
-
-"   headers"
-
-/*  \ Write len1 bytes from src into va. */
-"   : partial-write" /* ( src len0 va len1 -- len' ) */
-"      rot min dup >r move r>"
-"   ;"
-
-/*  \ Read len1 bytes from src into va. */
-"   : partial-read" /* ( src len0 va len1 -- len' ) */
-"      rot min dup >r >r swap r> move r>"
-"   ;"
-
-"   defer operation ' partial-write is operation"
-
-/*  \ Write or Read len given the src address.  The block-operation word */
-/*  \ determines the physical address that corresponds to the current file */
-/*  \ position, and maps/unmaps the 64K virtual window */
-"   : block-operation" /* ( src len acf -- len' ) */
-"      is operation"
-"      0 -rot begin"			/* ( 0 src len ) */
-" 	  dup 0>"			/* ( len' src len more? ) */
-"      while"				/* ( len' src len  ) */
-" 	  2dup filepos"			/* ( len' src len src len filepos ) */
-" 	  get-window if"		/* ( len' src len src len va len ) */
-" 	     2drop 2drop 2drop exit"	/* ( len' ) */
-" 	  then"				/* ( len src len src len va len ) */
-" 	  operation"			/* ( len src len len' ) */
-" 	  dup filepos + to filepos"	/* ( len src len len' ) */
-" 	  >r r@ - rot r@ + rot r> + rot" /* ( len' src' len' ) */
-"      repeat"				/* ( len' src' len' ) */
-"      2drop"				/* ( len' ) */
-"   ;"
-
-"   : range-bad?" /* ( adr -- range-bad? ) */
-"      0 size between 0="
-"   ;"
-
-"   : space-left" /* ( -- space-left ) */
-"      size filepos -"
-"   ;"
-
-"   : hex-number" /* ( adr,len -- true | n false ) */
-"      base @ >r hex $number r> base !"
-"   ;"
-
-"   : parse-size" /* ( $nums -- 64bit-size | 0 )  \ poss ',' seperated ints */
-"      ascii , left-parse-string"		/* ( $num $num ) */
-"      hex-number if  2drop 0 exit  then"	/* ( $num n ) */
-"      over 0= if  nip nip exit  then"		/* ( $num n ) */
-"      -rot hex-number if  drop 0 exit  then"	/* ( hi lo ) */
-"      swap lxjoin"
-"   ;"
-
-"   : set-size" /* ( adr len -- error? ) */
-"      parse-size dup 0= if"		/* ( size ) */
-"	  drop -1"			/* ( -1 ) */
-"      else"				/* ( size ) */
-" 	  window-size round-up"		/* ( size' ) */
-" 	  dup to size"			/* ( size' ) */
-" 	  d# 512 / to #blocks"		/* ( ) */
-" 	  \" nolabel\" my-label pack"	/* \ first open cannot have a label */
-" 	  drop 0"			/* ( 0 ) */
-"      then"				/* ( error? ) */
-"   ;"
-
-"   : $=" /* (s adr1 len1 adr2 len2 -- same? ) */
-"      rot tuck  <>  if  3drop false exit  then"	/* ( adr1 adr2 len1 ) */
-"      comp 0="						/* ( same? ) */
-"   ;"
-
-"   : is-label?" /* ( adr len -- is-label? )	\ $= "nolabel" or <a-z> */
-"      dup 1 = if"				/* ( adr len ) */
-" 	  drop c@ ascii a ascii z between"	/* ( is-label? ) */
-"      else"					/* ( adr len ) */
-" 	  \" nolabel\" $="			/* ( is-label? ) */
-"      then"					/* ( is-label? ) */
-"   ;"
-
-"   : set-label" /* ( adr len -- error? ) */
-"      my-label label-size erase"
-"      dup 1+ label-size > if"
-"	  2drop -1"
-"      else"
-"	  my-label pack drop 0"
-"      then"
-"   ;"
-
-"   : process-args" /* ( arg$ -- error? ) */
-"      ascii = left-parse-string"		/* ( value$ key$ ) */
-"      new-disk? if"				/* ( value$ key$ ) */
-" 	  2dup \" size\" $= if"			/* ( value$ key$ ) */
-" 	    2drop set-size exit"		/* ( error? ) */
-" 	  then"					/* ( value$ key$ ) */
-"      else"					/* ( value$ key$ ) */
-" 	  2dup is-label? if"			/* ( value$ key$ ) */
-" 	    2swap 2drop set-label exit"		/* ( error? ) */
-" 	  then"					/* ( value$ key$ ) */
-"      then"					/* ( value$ key$ ) */
-"     .\" Inappropriate argument \" type cr  2drop -1"	/* ( -1 ) */
-"   ;"
-
-/*  \ Publish the physical chunks that make up the ramdisk in the */
-/*  \ existing property */
-"   : create-existing-prop" /* ( -- ) */
-"     0 0 encode-bytes"				/* ( adr 0 ) */
-"     num-res-entries 0 do"			/* ( adr 0 ) */
-"       i /res-entry * my-resources + >r"	/* ( adr len ) */
-"       r@ >res-pa.hi l@  encode-int encode+"	/* ( adr len ) */
-"       r@ >res-pa.lo l@  encode-int encode+"	/* ( adr len ) */
-"       r@ >res-len.hi l@ encode-int encode+"	/* ( adr len ) */
-"       r> >res-len.lo l@ encode-int encode+"	/* ( adr len ) */
-"     loop"					/* ( adr len ) */
-"     \" existing\" property"			/* ( ) */
-"   ;"
-
-"   external"
-
-"   : read" /* ( adr,len -- len' ) */
-"      space-left"			/* ( adr len space-left ) */
-"      min ['] partial-read"		/* ( adr len' read-acf ) */
-"      block-operation"			/* ( len' ) */
-"   ;"
-
-"   : write" /* ( adr,len -- len' ) */
-"      space-left"			/* ( adr len space-left ) */
-"      min ['] partial-write"		/* ( adr len' write-acf ) */
-"      block-operation"			/* ( len' ) */
-"   ;"
-
-"   : seek" /* ( offset other -- error? ) */
-"      offset-high + swap offset-low + swap drop"  /* \ "other" arg unused */
-"      dup 0< if"			/* ( offset ) */
-"	  size +"			/* ( offset' ) */
-"      then"				/* ( offset' ) */
-"	  0 + dup range-bad? if"	/* ( offset' ) */
-" 	  drop -1"			/* ( -1 ) */
-"      else"				/* ( offset' ) */
-" 	  to filepos false"		/* ( 0 ) */
-"      then"				/* ( error? ) */
-"   ;"
-
-"   : load" /* ( addr -- size ) */
-"      \" load\"  label-package $call-method"
-"   ;"
-
-"   : offset" /* ( rel -- abs )  \ needed for device_type = block */
-"      offset-low +"
-"   ;"
-
-/*  \ release resources, initialize data, remove existing property */
-/*  \ Can be called with no instance data */
-"   : destroy" /* ( -- ) */
-"      \" existing\" delete-property"
-"      0 to size"
-"      -1 to new-disk?"
-"      release-resources"
-"   ;"
-
-"   : open" /* ( -- flag ) */
-"      my-args process-args if"
-"	  0 exit"				/* \ unrecognized arguments */
-"      then"
-"      new-disk? if"
-"	  claim-resources if  0 exit  then"	/* \ can't claim */
-"	  create-existing-prop"			/* \ advertise resources */
-"	  0 to new-disk?"			/* \ no longer a new-disk */
-"      then"
-"      claim-window"				/* \ claim virtual window */
-"      my-label count init-label-package 0= if  0 exit  then"
-"      -1"
-"   ;"
-
-"   : close" /* ( -- ) */
-"      window-base if "
-"	  release-window"
-"      then"
+"   0 instance value current-offset "
+"    "
+"   0 value ramdisk-base-va "
+"   0 value ramdisk-size "
+"   0 value alloc-size "
+"    "
+"   : set-props "
+"      ramdisk-size     encode-int  \" size\"        property "
+"      ramdisk-base-va  encode-int  \" address\"     property "
+"      alloc-size       encode-int  \" alloc-size\"  property "
 "   ; "
+"   set-props "
+"    "
+"   : current-va  ( -- adr )  ramdisk-base-va current-offset +  ; "
+"    "
+"   external "
+"    "
+"   : open  ( -- okay? ) "
+/* " .\" ramdisk-open\" cr " */
+"      true "
+"   ; "
+"    "
+"   : close  ( -- ) "
+"   ; "
+"    "
+"   : seek  ( off.low off.high -- error? ) "
+/* " 2dup .\" ramdisk-seek: \" .x .x " */
+"      drop  dup  ramdisk-size  >  if "
+/* " .\" fail\" cr " */
+"         drop true  exit         ( failed ) "
+"      then "
+"      to current-offset  false   ( succeeded ) "
+/* " .\" OK\" cr " */
+"   ; "
+"    "
+"   : read  ( addr len -- actual-len ) "
+/* " 2dup .\" ramdisk-read: \" .x .x " */
+"      dup  current-offset  +            ( addr len new-off ) "
+"      dup  ramdisk-size  >  if "
+"         ramdisk-size -  -              ( addr len' ) "
+"         ramdisk-size                   ( addr len new-off ) "
+"      then  -rot                        ( new-off addr len ) "
+"      tuck  current-va  -rot  move      ( new-off len ) "
+"      swap  to current-offset           ( len ) "
+/* " dup .x cr " */
+"   ; "
+"    "
+"   : create ( alloc-sz base size -- ) "
+"      to ramdisk-size "
+"      to ramdisk-base-va "
+"      to alloc-size "
+"      set-props "
+"   ; "
+"    "
 "finish-device "
+"pop-package "
 
-"pop-package"
+"\" /%s\" 2dup  dev-open  0=  if "
+"   open-abort "
+"then 2drop "
 
-;	/* end of ramdisk_fth[] initialization */
+/* %x %x %x will be replaced by alloc-sz, base, size respectively */
+"h# %x h# %x h# %x ( alloc-sz base size ) "
+"\" create\" dev-ih  $call-method  (  ) "
+"dev-close "
 
+;
+
+char ramdisk_bootable[] =
+
+"\" /chosen\" get-package  push-package "
+"   \" nfs\"             encode-string  \" fstype\"  property "
+"   \" /%s\"	  	 encode-string  \" bootarchive\"  property "
+"pop-package "
+
+"   h# %x d# 512 +  to load-base init-program "
+;
+
+#define	BOOT_ARCHIVE_ALLOC_SIZE	(32 * 1024 * 1024)	/* 32 MB */
+#define	BOOTFS_VIRT		((caddr_t)0x50f00000)
+#define	ROOTFS_VIRT		((caddr_t)0x51000000)
+
+struct ramdisk_attr {
+	char *rd_name;
+	caddr_t rd_base;
+	size_t rd_size;
+} ramdisk_attr[] = {
+	RD_BOOTFS,	BOOTFS_VIRT,	0,
+	RD_ROOTFS,	ROOTFS_VIRT,	0,
+	0
+};
+
+static struct ramdisk_attr *
+ramdisk_lookup(char *ramdisk_name)
+{
+	int i;
+
+	for (i = 0; ramdisk_attr[i].rd_name != 0; i++) {
+		if (strcmp(ramdisk_name, ramdisk_attr[i].rd_name) == 0) {
+			return (&ramdisk_attr[i]);
+		}
+	}
+	return (NULL);
+}
+
+static void
+ramdisk_free_mem(caddr_t addr, size_t size)
+{
+	caddr_t	end_addr;
+
+	for (end_addr = addr + size; addr < end_addr;
+	    addr += BOOT_ARCHIVE_ALLOC_SIZE) {
+		prom_free(addr, MIN(BOOT_ARCHIVE_ALLOC_SIZE, end_addr - addr));
+	}
+}
 
 /*
- * Create an actual ramdisk instance.
+ * Allocate memory for ramdisk image.
  */
-static void
-create_ramdisk_node(const char *ramdisk_name)
+static caddr_t
+ramdisk_alloc_mem(caddr_t addr, size_t size)
+{
+	caddr_t virt = addr;
+	caddr_t	end_addr;
+
+	for (end_addr = virt + size; virt < end_addr;
+	    virt += BOOT_ARCHIVE_ALLOC_SIZE) {
+		if (prom_alloc(virt,
+		    MIN(BOOT_ARCHIVE_ALLOC_SIZE, end_addr - virt),
+		    1) == NULL) {
+			ramdisk_free_mem(addr, virt - addr);
+			return (NULL);
+		}
+	}
+	return (addr);
+}
+
+caddr_t
+create_ramdisk(char *ramdisk_name, size_t size, char **devpath)
 {
 	char	*fth_buf;
 	size_t	buf_size;
+	struct ramdisk_attr *rdp;
+	char tdevpath[80];
+	caddr_t virt;
+	static int need_preamble = 1;
 
-	buf_size = sizeof (ramdisk_fth) + strlen(ramdisk_name);
+	/*
+	 * lookup ramdisk name.
+	 */
+	if ((rdp = ramdisk_lookup(ramdisk_name)) == NULL)
+		prom_panic("invalid ramdisk name");
 
-	fth_buf = bkmem_alloc(buf_size);
-	if (fth_buf == NULL) {
-		prom_panic("unable to allocate Forth buffer for ramdisk");
+	virt = rdp->rd_base;
+
+	/*
+	 * Allocate memory.
+	 */
+	size = roundup(size, PAGESIZE);
+	if (ramdisk_alloc_mem(virt, size) == NULL)
+		prom_panic("can't alloc ramdisk memory");
+
+	rdp->rd_size = size;
+
+	if (need_preamble) {
+		prom_interpret(ramdisk_preamble_fth, 0, 0, 0, 0, 0);
+		need_preamble = 0;
 	}
 
-	(void) snprintf(fth_buf, buf_size, ramdisk_fth, ramdisk_name);
+	/*
+	 * add some space to the size to accommodate a few words in the
+	 * snprintf() below.
+	 */
+	buf_size = sizeof (ramdisk_fth) + 80;
+
+	fth_buf = bkmem_alloc(buf_size);
+	if (fth_buf == NULL)
+		prom_panic("unable to allocate Forth buffer for ramdisk");
+
+	(void) snprintf(fth_buf, buf_size, ramdisk_fth,
+	    ramdisk_name, ramdisk_name,
+	    BOOT_ARCHIVE_ALLOC_SIZE, virt, size);
+
+	prom_interpret(fth_buf, 0, 0, 0, 0, 0);
+	bkmem_free(fth_buf, buf_size);
+
+	if (devpath != NULL) {
+		(void) snprintf(tdevpath, sizeof (tdevpath), "/%s:nolabel",
+		    ramdisk_name);
+		*devpath = strdup(tdevpath);
+	}
+
+	return (virt);
+}
+
+void
+destroy_ramdisk(char *ramdisk_name)
+{
+	struct ramdisk_attr *rdp;
+
+	/*
+	 * lookup ramdisk name.
+	 */
+	if ((rdp = ramdisk_lookup(ramdisk_name)) == NULL)
+		prom_panic("invalid ramdisk name");
+
+	ramdisk_free_mem(rdp->rd_base, rdp->rd_size);
+	rdp->rd_size = 0;
+}
+
+/*
+ * change cwp! to drop in the 2nd word of (init-program) - really
+ * init-c-stack, but that word has no header.
+ * (you are not expected to undertsnad this)
+ */
+char obpfix[] = "' drop ' cwp!  ' (init-program) >body ta1+ token@ (patch";
+char obpver[OBP_MAXPROPNAME];
+const char badver[] = "OBP 4.27.";
+
+
+void
+boot_ramdisk(char *ramdisk_name)
+{
+	char	*fth_buf;
+	size_t	buf_size;
+	struct ramdisk_attr *rdp;
+	void do_sg_go(void);
+
+	/*
+	 * OBP revs 4.27.0 to 4.27.8 started using
+	 * windowed regs for the forth kernel, but
+	 * init-program still blindly 0'd %cwp, which
+	 * causes predictably disaterous consequences
+	 * when called with %cwp != 0.
+	 *
+	 * We detect and fix this here
+	 */
+	if (prom_version_name(obpver, OBP_MAXPROPNAME) != -1 &&
+	    strncmp(obpver, badver, sizeof (badver) - 1) == 0) {
+		char ch = obpver[sizeof (badver) - 1];
+
+		if (ch >= '0' && ch <= '8') {
+			prom_interpret(obpfix, 0, 0, 0, 0, 0);
+		}
+	}
+
+	/* close all open devices */
+	closeall(1);
+
+	/*
+	 * lookup ramdisk name.
+	 */
+	if ((rdp = ramdisk_lookup(ramdisk_name)) == NULL)
+		prom_panic("invalid ramdisk name");
+
+	/*
+	 * add some space to the size to accommodate a few words in the
+	 * snprintf() below.
+	 */
+	buf_size = sizeof (ramdisk_bootable) + 80;
+
+	fth_buf = bkmem_alloc(buf_size);
+	if (fth_buf == NULL)
+		prom_panic("unable to allocate Forth buffer for ramdisk");
+
+	(void) snprintf(fth_buf, buf_size, ramdisk_bootable,
+	    ramdisk_name, rdp->rd_base);
 
 	prom_interpret(fth_buf, 0, 0, 0, 0, 0);
 
-	bkmem_free(fth_buf, buf_size);
+	/*
+	 * Ugh  Serengeti proms don't execute C programs
+	 * in init-program, and 'go' doesn't work when
+	 * launching a second C program (inetboot itself
+	 * was launched as the 1st C program).  Nested fcode
+	 * programs work, but that doesn't help the kernel.
+	 */
+	do_sg_go();
 }
 
-int
-create_ramdisk(const char *ramdisk_name, size_t size, char **device_path)
+void
+do_sg_go()
 {
-	static int	first_time = 1;
-	char		buf[OBP_MAXPATHLEN];
-	ihandle_t	ih;
+	pnode_t chosen = prom_chosennode();
+	Elf64_Ehdr *ehdr;
+	Elf64_Addr entry;
+	uint32_t eadr;
+	extern int is_sg;
+	extern caddr_t sg_addr;
+	extern size_t sg_len;
+
+	if (!is_sg)
+		prom_panic("do_sg_go");
 
 	/*
-	 * Ensure that size is a multiple of page size (rounded up).
+	 * The ramdisk bootblk left a pointer to the elf image
+	 * in 'elfheader-address'  Use it to find the kernel's
+	 * entry point.
 	 */
-	size = ptob(btopr(size));
+	if (prom_getprop(chosen, "elfheader-address", (caddr_t)&eadr) == -1)
+		prom_panic("no elf header property");
+	ehdr = (Elf64_Ehdr *)(uintptr_t)eadr;
+	if (ehdr->e_machine != EM_SPARCV9)
+		prom_panic("bad ELF header");
+	entry = ehdr->e_entry;
 
-/* EXPORT DELETE START */
-	bootlog("wanboot", BOOTLOG_VERBOSE, "Creating ramdisk, size=0x%lx",
-	    size);
-/* EXPORT DELETE END */
+	/*
+	 * free extra bootmem
+	 */
+	prom_free(sg_addr, sg_len);
 
-	if (strcmp(ramdisk_name, RD_ROOTFS) == 0 ||
-	    strcmp(ramdisk_name, RD_BOOTFS) == 0) {
-
-		if (first_time) {
-			first_time = 0;
-
-			create_ramdisk_node(RD_ROOTFS);
-			create_ramdisk_node(RD_BOOTFS);
-		}
-
-		(void) snprintf(buf, sizeof (buf), "/%s:nolabel", ramdisk_name);
-		*device_path = strdup(buf);
-
-		if (*device_path != NULL) {
-			(void) snprintf(buf, sizeof (buf), "/%s:size=%x,%x",
-			    ramdisk_name,
-			    (uint32_t)(size >> 32), (uint32_t)size);
-
-			if ((ih = prom_open(buf)) != 0) {
-				return (ih);
-			}
-		}
-	}
-
-/* EXPORT DELETE START */
-	bootlog("wanboot", BOOTLOG_CRIT, "Cannot create ramdisk \"%s\"",
-	    ramdisk_name);
-/* EXPORT DELETE END */
-	prom_panic("create_ramdisk: fatal error");
-	/* NOTREACHED */
+	/*
+	 * Use pre-newboot's exitto64() to launch the kernel
+	 */
+	exitto64((int (*)())entry, NULL);
+	prom_panic("exitto returned");
 }

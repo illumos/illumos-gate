@@ -150,6 +150,7 @@ extern char *get_special(char *);
 extern char *os_to_grubdisk(char *, int);
 extern void update_line(line_t *);
 extern int add_boot_entry(menu_t *, char *, char *, char *, char *, char *);
+extern int is_grub(const char *);
 
 #define	BAM_MAXLINE	8192
 
@@ -187,6 +188,8 @@ extern int add_boot_entry(menu_t *, char *, char *, char *, char *, char *);
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
 
 /* Boot archives */
+#define	SUN4U__ARCHIVE		"/platform/sun4u/boot_archive"
+#define	SUN4V__ARCHIVE		"/platform/sun4v/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE	"/platform/i86pc/$ISADIR/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_32	"/platform/i86pc/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"

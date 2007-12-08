@@ -369,6 +369,8 @@ struct dinode {
 /* cflags */
 #define	IXATTR		0x0001		/* extended attribute */
 #define	IFALLOCATE	0x0002		/* fallocate'd file */
+#define	ICOMPRESS	0x0004		/* compressed for dcfs - see */
+					/*   `ufs_ioctl()`_FIO_COMPRESSED */
 
 /* modes */
 #define	IFMT		0170000		/* type of file */

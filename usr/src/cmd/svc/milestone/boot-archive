@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,13 +31,6 @@
 ERRORFILE=/etc/svc/volatile/boot_archive_error
 FILELIST=/etc/svc/volatile/boot_archive_filelist
 UPDATEFILE=/etc/svc/volatile/boot_archive_needs_update
-
-#
-# no boot-archive on sparc...yet
-#
-if [  `uname -p` = "sparc" ]; then
-	exit $SMF_EXIT_OK
-fi
 
 smf_is_globalzone || exit $SMF_EXIT_OK
 
@@ -69,10 +62,13 @@ cecho ""
 /sbin/bootadm update-archive -vn | grep -v "cannot find" > /dev/msglog
 
 cecho ""
-cecho "The recommended action is to reboot and select the \"Solaris failsafe\""
-cecho "option from the boot menu. Then follow the prompts to update the"
-cecho "boot archive. To continue booting at your own risk, you may clear the"
-cecho "service by running: \"svcadm clear system/boot-archive\""
+cecho "The recommended action is to reboot to the failsafe archive to correct"
+cecho "the above inconsistency.  To accomplish this, on a GRUB-based platform,"
+cecho "reboot and select the \"Solaris failsafe\" option from the boot menu."
+cecho "On an OBP-based platform, reboot then type \"boot -F failsafe\".  Then"
+cecho "follow the prompts to update the boot archive. Alternately, to continue"
+cecho "booting at your own risk, you may clear the service by running:"
+cecho "\"svcadm clear system/boot-archive\""
 cecho ""
 
 exit $SMF_EXIT_ERR_FATAL

@@ -48,6 +48,7 @@
 #include <sys/sysevent_impl.h>
 #include <sys/sunldi_impl.h>
 #include <sys/disp.h>
+#include <sys/bootconf.h>
 #include <sys/fm/util.h>
 
 extern dev_info_t *top_devinfo;
@@ -126,7 +127,6 @@ impl_create_root_class(void)
 	major_t major;
 	size_t size;
 	char *cp;
-	extern struct bootops *bootops;
 
 	/*
 	 * The name for the root nexus is exactly as the manufacturer

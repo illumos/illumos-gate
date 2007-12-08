@@ -225,11 +225,18 @@ extern pfn_t cpr_vatopfn(caddr_t);
 extern int prom_remap(size_t, caddr_t, physaddr_t);
 extern void install_remap(void);
 extern int cb_alloc(size_t, uint_t, caddr_t *, physaddr_t *);
+extern int cb_mountroot(void);
+extern int cb_unmountroot(void);
 extern int cb_get_props(void);
 extern void cb_mapin(caddr_t, pfn_t, uint_t, uint_t, uint_t);
 extern int cb_usb_setup(void);
 extern void cb_enter_mon(void);
 extern void cb_exit_to_mon(void);
+extern int cpr_fs_close(int);
+extern int cpr_fs_open(char *);
+extern int cpr_fs_read(int, char *, int);
+extern int cpr_fs_seek(int, offset_t);
+extern int cpr_read(int, char *, size_t);
 
 /*
  * cb_srt0.s

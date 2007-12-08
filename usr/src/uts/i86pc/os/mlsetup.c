@@ -347,3 +347,40 @@ mlsetup(struct regs *rp)
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");
 }
+
+
+void
+mach_modpath(char *path, const char *filename)
+{
+	/*
+	 * Construct the directory path from the filename.
+	 */
+
+	int len;
+	char *p;
+	const char isastr[] = "/amd64";
+	size_t isalen = strlen(isastr);
+
+	if ((p = strrchr(filename, '/')) == NULL)
+		return;
+
+	while (p > filename && *(p - 1) == '/')
+		p--;	/* remove trailing '/' characters */
+	if (p == filename)
+		p++;	/* so "/" -is- the modpath in this case */
+
+	/*
+	 * Remove optional isa-dependent directory name - the module
+	 * subsystem will put this back again (!)
+	 */
+	len = p - filename;
+	if (len > isalen &&
+	    strncmp(&filename[len - isalen], isastr, isalen) == 0)
+		p -= isalen;
+
+	/*
+	 * "/platform/mumblefrotz" + " " + MOD_DEFPATH
+	 */
+	len += (p - filename) + 1 + strlen(MOD_DEFPATH) + 1;
+	(void) strncpy(path, filename, p - filename);
+}

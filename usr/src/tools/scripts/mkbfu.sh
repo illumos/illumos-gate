@@ -197,8 +197,13 @@ do
 done
 
 if [ -d boot ]; then
-	( find boot -depth -print | create_archive $CLASS boot ) \
-	    2>$CPIODIR/${CLASS}.boot.err &
+	if [ "$CLASS" = "i86pc" ]; then
+		ARCHIVECLASS="$CLASS"
+	else
+		ARCHIVECLASS="generic"
+	fi
+	( find boot -depth -print | create_archive $ARCHIVECLASS boot ) \
+	    2>$CPIODIR/$ARCHIVECLASS.boot.err &
 	bgcheck
 fi
 

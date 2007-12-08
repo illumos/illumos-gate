@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +195,7 @@ e_ddi_instance_init(void)
 
 	case PTI_REBUILD:
 		cmn_err(CE_CONT,
-			"?Using default device instance data\n");
+		    "?Using default device instance data\n");
 		break;
 	}
 
@@ -245,14 +245,14 @@ in_preassign_instance()
 static int
 in_get_infile(char *filename)
 {
-	intptr_t file;
+	struct _buf *file;
 	int return_val;
 	char buf[PTI_MAGIC_STR_LEN];
 
 	/*
 	 * Try to open the file.
 	 */
-	if ((file = kobj_open(filename)) == -1) {
+	if ((file = kobj_open_file(filename)) == (struct _buf *)-1) {
 		return (PTI_NOT_FOUND);
 	}
 	return_val = PTI_FOUND;
@@ -263,7 +263,7 @@ in_get_infile(char *filename)
 	 * in the file, then assume file is correct and no magic string
 	 * and move on.
 	 */
-	switch (kobj_read(file, buf, PTI_MAGIC_STR_LEN, 0)) {
+	switch (kobj_read_file(file, buf, PTI_MAGIC_STR_LEN, 0)) {
 
 	case PTI_MAGIC_STR_LEN:
 		/*
@@ -285,7 +285,7 @@ in_get_infile(char *filename)
 		break;
 	}
 
-	kobj_close(file);
+	kobj_close_file(file);
 	return (return_val);
 }
 
@@ -1360,13 +1360,13 @@ i_log_devfs_instance_mod(void)
 		return;
 
 	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_INSTANCE_MOD, EP_DDI,
-		SE_NOSLEEP);
+	    SE_NOSLEEP);
 	if (ev == NULL) {
 		return;
 	}
 	if (log_sysevent(ev, SE_NOSLEEP, &eid) != 0) {
 		cmn_err(CE_WARN, "i_log_devfs_instance_mod: failed to post "
-			"event");
+		    "event");
 	} else {
 		sent_one = 1;
 	}

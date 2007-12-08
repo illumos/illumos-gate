@@ -74,6 +74,8 @@ typedef	phandle_t	pnode_t;
 #define	OBP_IPI			"ipi3"
 #define	OBP_CPU			"cpu"
 #define	OBP_ADDRESS		"address"
+#define	OBP_SIZE		"size"
+#define	OBP_ALLOCSIZE		"alloc-size"
 
 /*
  * OBP status values defines

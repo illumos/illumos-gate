@@ -276,9 +276,19 @@ extern uint_t vac_colors_mask;
 extern int ndata_alloc_page_freelists(struct memlist *, int);
 extern int ndata_alloc_dmv(struct memlist *);
 extern int ndata_alloc_tsbs(struct memlist *, pgcnt_t);
-extern int ndata_alloc_hat(struct memlist *, pgcnt_t, pgcnt_t);
-extern caddr_t alloc_page_freelists(int, caddr_t, int);
-extern caddr_t alloc_hme_buckets(caddr_t, int);
+extern int ndata_alloc_hat(struct memlist *, pgcnt_t);
+extern int ndata_alloc_kpm(struct memlist *, pgcnt_t);
+extern int ndata_alloc_page_mutexs(struct memlist *ndata);
+
+extern size_t calc_pp_sz(pgcnt_t);
+extern size_t calc_kpmpp_sz(pgcnt_t);
+extern size_t calc_hmehash_sz(pgcnt_t);
+extern size_t calc_pagehash_sz(pgcnt_t);
+extern size_t calc_free_pagelist_sz(void);
+
+extern caddr_t alloc_hmehash(caddr_t);
+extern caddr_t alloc_page_freelists(caddr_t);
+
 extern size_t page_ctrs_sz(void);
 extern caddr_t page_ctrs_alloc(caddr_t);
 extern void page_freelist_coalesce_all(int);
