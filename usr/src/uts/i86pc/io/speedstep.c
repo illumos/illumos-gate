@@ -63,7 +63,7 @@
 /*
  * MSR registers for changing and reading processor power state.
  */
-#define	IA32_PERF_STATCPUDRV_MSR		0x198
+#define	IA32_PERF_STAT_MSR		0x198
 #define	IA32_PERF_CTL_MSR		0x199
 
 #define	IA32_CPUID_TSC_CONSTANT		0xF30
@@ -101,7 +101,7 @@ read_status(cpu_acpi_handle_t handle, uint32_t *stat)
 
 	switch (pct_stat->pc_addrspace_id) {
 	case ACPI_ADR_SPACE_FIXED_HARDWARE:
-		reg = rdmsr(IA32_PERF_STATCPUDRV_MSR);
+		reg = rdmsr(IA32_PERF_STAT_MSR);
 		*stat = reg & 0xFFFF;
 		ret = 0;
 		break;

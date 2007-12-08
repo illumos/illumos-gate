@@ -90,6 +90,16 @@ static struct cpudrv_module_ops *cpudrv_module_ops_table[] = {
 static struct cpudrv_module_ops **cpumops;
 
 /*
+ * Constants used by the Processor Device Notification handler
+ * that identify what kind of change has occurred. We currently
+ * only handle PPC_CHANGE_NOTIFICATION. The other two are
+ * ignored.
+ */
+#define	PPC_CHANGE_NOTIFICATION	0x80
+#define	CST_CHANGE_NOTIFICATION	0x81
+#define	TPC_CHANGE_NOTIFICATION	0x82
+
+/*
  * Note that our driver numbers the power levels from lowest to
  * highest starting at 1 (i.e., the lowest power level is 1 and
  * the highest power level is cpupm->num_spd). The x86 modules get
@@ -276,7 +286,11 @@ cpudrv_pm_get_topspeed(void *ctx)
 void
 cpudrv_pm_ppc_notify_handler(ACPI_HANDLE obj, UINT32 val, void *ctx)
 {
-	cpudrv_pm_redefine_topspeed(ctx);
+	/*
+	 * We only handle _PPC change notifications.
+	 */
+	if (val == PPC_CHANGE_NOTIFICATION)
+		cpudrv_pm_redefine_topspeed(ctx);
 }
 
 void
