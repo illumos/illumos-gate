@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -128,7 +129,7 @@ typedef struct err_ret {
 	{ (args)->nfs_args_ext = NFS_ARGS_EXTB, \
 	(args)->nfs_ext_u.nfs_extB.secdata = secdata; }
 
-extern int __clnt_bindresvport();
+extern int __clnt_bindresvport(CLIENT *);
 extern char *nfs_get_qop_name();
 extern AUTH * nfs_create_ah();
 extern enum snego_stat nfs_sec_nego();

@@ -18,11 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # The list is built of owner-group combinations.  ROOT.SYS occurs twice
 # because some directories owned by root and in group sys are subdirectories
@@ -1027,6 +1030,8 @@ $(ROOT)/usr/lib/llib-lpthread.ln:=	REALPATH=../../lib/llib-lpthread.ln
 $(ROOT)/usr/lib/llib-lpthread:=		REALPATH=../../lib/llib-lpthread
 $(ROOT)/usr/lib/llib-lresolv.ln:=	REALPATH=../../lib/llib-lresolv.ln
 $(ROOT)/usr/lib/llib-lresolv:=		REALPATH=../../lib/llib-lresolv
+$(ROOT)/usr/lib/llib-lrpcsvc.ln:=	REALPATH=../../lib/llib-lrpcsvc.ln
+$(ROOT)/usr/lib/llib-lrpcsvc:=		REALPATH=../../lib/llib-lrpcsvc
 $(ROOT)/usr/lib/llib-lrt.ln:=		REALPATH=../../lib/llib-lrt.ln
 $(ROOT)/usr/lib/llib-lrt:=		REALPATH=../../lib/llib-lrt
 $(ROOT)/usr/lib/llib-lrtld_db.ln:=	REALPATH=../../lib/llib-lrtld_db.ln
@@ -1362,6 +1367,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lpthread.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lpthread.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lresolv.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lresolv.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lrpcsvc.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lrpcsvc.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lrt.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lrt.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lrtld_db.ln:= \
@@ -1607,6 +1614,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-lpthread.ln \
 	/usr/lib/llib-lresolv \
 	/usr/lib/llib-lresolv.ln \
+	/usr/lib/llib-lrpcsvc \
+	/usr/lib/llib-lrpcsvc.ln \
 	/usr/lib/llib-lrt \
 	/usr/lib/llib-lrt.ln \
 	/usr/lib/llib-lrtld_db \
@@ -1802,6 +1811,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lposix4.ln \
 	/usr/lib/$(MACH64)/llib-lpthread.ln \
 	/usr/lib/$(MACH64)/llib-lresolv.ln \
+	/usr/lib/$(MACH64)/llib-lrpcsvc.ln \
 	/usr/lib/$(MACH64)/llib-lrt.ln \
 	/usr/lib/$(MACH64)/llib-lrtld_db.ln \
 	/usr/lib/$(MACH64)/llib-lscf.ln \

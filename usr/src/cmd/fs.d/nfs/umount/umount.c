@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -75,7 +76,7 @@ static	void	usage();
 static	int	nfs_unmount(char *, int);
 static	void	inform_server(char *, char *, bool_t);
 static	struct extmnttab *mnttab_find();
-extern int __clnt_bindresvport();
+extern int __clnt_bindresvport(CLIENT *);
 
 static	int is_v4_mount(struct extmnttab *);
 
@@ -98,7 +99,7 @@ main(int argc, char *argv[])
 
 	myname = strrchr(argv[0], '/');
 	myname = myname ? myname+1 : argv[0];
-	(void) sprintf(typename, "nfs %s", myname);
+	(void) snprintf(typename, sizeof (typename), "nfs %s", myname);
 	argv[0] = typename;
 
 	/*
@@ -154,7 +155,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr,
-	    gettext("Usage: nfs umount [-o opts] {server:path | dir}\n"));
+	    gettext("Usage: nfs umount [-f] {server:path | dir}\n"));
 	exit(RET_ERR);
 }
 
@@ -226,7 +227,7 @@ mnttab_find(dirname)
 		}
 	}
 
-	fclose(fp);
+	(void) fclose(fp);
 	return (res);
 }
 
@@ -251,7 +252,7 @@ inform_server(char *string, char *opts, bool_t quick)
 	if (list == NULL) {
 		if (n < 0)
 			pr_err(gettext("%s is not hostname:path format\n"),
-				string);
+			    string);
 		else
 			pr_err(gettext("no memory\n"));
 		return;
@@ -296,7 +297,7 @@ retry:
 		 */
 		timep = (quick ? &create_timeout : NULL);
 		cl = clnt_create_timed(list[i].host, MOUNTPROG, vers,
-				"datagram_n", timep);
+		    "datagram_n", timep);
 		/*
 		 * Do not print any error messages in case of forced
 		 * unmount.
@@ -305,7 +306,7 @@ retry:
 			if (!quick)
 				pr_err("%s:%s %s\n", list[i].host, list[i].path,
 				    clnt_spcreateerror(
-					"server not responding"));
+				    "server not responding"));
 			continue;
 		}
 		/*
@@ -334,8 +335,8 @@ retry:
 		clnt_control(cl, CLSET_RETRY_TIMEOUT, (char *)&timeout);
 		timeout.tv_sec = 25;
 		rpc_stat = clnt_call(cl, MOUNTPROC_UMNT, xdr_dirpath,
-			(char *)&list[i].path, xdr_void, (char *)NULL,
-			timeout);
+		    (char *)&list[i].path, xdr_void, (char *)NULL,
+		    timeout);
 		AUTH_DESTROY(cl->cl_auth);
 		clnt_destroy(cl);
 		if (rpc_stat == RPC_PROGVERSMISMATCH && vers == MOUNTVERS) {
@@ -361,7 +362,6 @@ is_v4_mount(struct extmnttab *mntp)
 {
 	kstat_ctl_t *kc = NULL;		/* libkstat cookie */
 	kstat_t *ksp;
-	ulong_t fsid;
 	struct mntinfo_kstat mik;
 
 	if (mntp == NULL)

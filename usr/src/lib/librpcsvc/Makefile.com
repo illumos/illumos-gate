@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,9 +46,12 @@ pics/%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-LIBS = $(DYNLIB)
+LIBS = $(DYNLIB) $(LINTLIB)
 
 CPPFLAGS += -DYP
+
+$(LINTLIB):= SRCS = $(SRCDIR)/$(LINTSRC)
+
 LDLIBS += -lnsl -lc
 
 .KEEP_STATE:
