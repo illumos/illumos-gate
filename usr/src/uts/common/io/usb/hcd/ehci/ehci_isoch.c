@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,8 +166,8 @@ ehci_isoc_cleanup(
 				mutex_enter(&ehcip->ehci_int_mutex);
 
 				itw = (ehci_isoc_xwrapper_t *)
-					EHCI_LOOKUP_ID((uint32_t)
-					Get_ITD(itd->itd_trans_wrapper));
+				    EHCI_LOOKUP_ID((uint32_t)
+				    Get_ITD(itd->itd_trans_wrapper));
 
 				/* Obtain the pipe private structure */
 				pp = itw->itw_pipe_private;
@@ -318,7 +318,7 @@ ehci_allocate_isoc_resources(
 	uint_t			max_ep_pkt_size, max_isoc_xfer_size;
 	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
 	size_t			isoc_pkt_count, isoc_pkts_length;
-	size_t 			itw_xfer_size = 0;
+	size_t			itw_xfer_size = 0;
 	ehci_isoc_xwrapper_t	*itw;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
@@ -338,7 +338,10 @@ ehci_allocate_isoc_resources(
 	}
 
 	/* Calculate the maximum isochronous transfer size we allow */
-	max_ep_pkt_size = ph->p_ep.wMaxPacketSize;
+	max_ep_pkt_size = (ph->p_ep.wMaxPacketSize &
+	    EHCI_ITD_CTRL_MAX_PACKET_MASK) *
+	    CalculateITDMultiField(ph->p_ep.wMaxPacketSize);
+
 	max_isoc_xfer_size = EHCI_MAX_ISOC_PKTS_PER_XFER * max_ep_pkt_size;
 
 	/* Get the packet descriptor and number of packets to send */
@@ -361,12 +364,23 @@ ehci_allocate_isoc_resources(
 	pipe_dir = ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK;
 	if (pipe_dir == USB_EP_DIR_IN) {
 		for (i = 0; i < isoc_pkt_count; i++) {
+			/*
+			 * isoc_pkt_length is used as Transaction Length and
+			 * according to EHCI spec Table 3-3, the maximum value
+			 * allowed is 3072
+			 */
+			if (isoc_pkt_descr->isoc_pkt_length > 3072) {
+
+				return (NULL);
+			}
+
 			itw_xfer_size += isoc_pkt_descr->isoc_pkt_length;
+
 			isoc_pkt_descr++;
 		}
 
 		if ((isoc_pkts_length) &&
-			(isoc_pkts_length != itw_xfer_size)) {
+		    (isoc_pkts_length != itw_xfer_size)) {
 
 			USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 			    "ehci_allocate_isoc_resources: "
@@ -557,8 +571,9 @@ ehci_insert_itd_req(
 	ASSERT((page % EHCI_4K_ALIGN) == 0);
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_insert_itd_req: itw_curr_xfer_reqp = 0x%p page = 0x%p",
-	    itw->itw_curr_xfer_reqp, page);
+	    "ehci_insert_itd_req: itw_curr_xfer_reqp = 0x%p page = 0x%p,"
+	    " pagesize = 0x%x", itw->itw_curr_xfer_reqp, page,
+	    itw->itw_cookie.dmac_size);
 
 	/* Insert all the isochronous TDs */
 	count = 0;
@@ -592,8 +607,8 @@ ehci_insert_itd_req(
 
 			curr_isoc_pkt_descr = itw->itw_curr_isoc_pktp;
 
-			isoc_pkt_length = ph->p_ep.wMaxPacketSize &
-			    EHCI_ITD_CTRL_MAX_PACKET_MASK;
+			isoc_pkt_length =
+			    curr_isoc_pkt_descr->isoc_pkt_length;
 
 			curr_isoc_pkt_descr->isoc_pkt_actual_length
 			    = isoc_pkt_length;
@@ -614,7 +629,7 @@ ehci_insert_itd_req(
 
 			xact_status = curr_isoc_xfer_offset;
 			xact_status |= (pageselected << 12);
-			xact_status |= (isoc_pkt_length * multi) << 16;
+			xact_status |= isoc_pkt_length << 16;
 			xact_status |= EHCI_ITD_XFER_ACTIVE;
 
 			/* Set IOC on the last TD. */
@@ -636,7 +651,7 @@ ehci_insert_itd_req(
 			itw->itw_curr_isoc_pktp++;
 			Set_ITD_INDEX(new_itd, xactcount, index++);
 
-			curr_isoc_xfer_offset += isoc_pkt_length * multi;
+			curr_isoc_xfer_offset += isoc_pkt_length;
 
 			if (curr_isoc_xfer_offset >= EHCI_4K_ALIGN) {
 				pageselected ++;
@@ -647,13 +662,15 @@ ehci_insert_itd_req(
 			count ++;
 			if (count >= curr_isoc_reqp->isoc_pkts_count) {
 
-			    break;
+				break;
 			}
 		}
 
 		buf[0] |= (itw->itw_endpoint_num << 8);
 		buf[0] |= itw->itw_device_addr;
-		buf[1] |= isoc_pkt_length;
+		buf[1] |= ph->p_ep.wMaxPacketSize &
+		    EHCI_ITD_CTRL_MAX_PACKET_MASK;
+
 		if (itw->itw_direction == USB_EP_DIR_IN) {
 			buf[1] |= EHCI_ITD_CTRL_DIR_IN;
 		}
@@ -750,7 +767,7 @@ ehci_insert_sitd_req(
 
 	/* Insert all the isochronous TDs */
 	for (count = 0, curr_isoc_xfer_offset = 0;
-		count < itw->itw_num_itds; count++) {
+	    count < itw->itw_num_itds; count++) {
 
 		curr_isoc_pkt_descr = itw->itw_curr_isoc_pktp;
 
@@ -1015,7 +1032,7 @@ ehci_start_isoc_polling(
 	int			error = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-		"ehci_start_isoc_polling:");
+	    "ehci_start_isoc_polling:");
 
 	/* Allocate all the necessary resources for the IN transfer */
 	itw_list = NULL;
@@ -1029,7 +1046,7 @@ ehci_start_isoc_polling(
 			while (itw != NULL) {
 				itw_list = itw->itw_next;
 				ehci_deallocate_isoc_in_resource(
-					ehcip, pp, itw);
+				    ehcip, pp, itw);
 				ehci_deallocate_itw(ehcip, pp, itw);
 				itw = itw_list;
 			}
@@ -1066,7 +1083,7 @@ ehci_start_isoc_polling(
 			while (itw != NULL) {
 				itw_list = itw->itw_next;
 				ehci_deallocate_isoc_in_resource(
-					ehcip, pp, itw);
+				    ehcip, pp, itw);
 				ehci_deallocate_itw(ehcip, pp, itw);
 				itw = itw_list;
 			}
@@ -1122,7 +1139,7 @@ ehci_traverse_active_isoc_list(
 
 		/* Get the transfer wrapper and the pp */
 		curr_itw = (ehci_isoc_xwrapper_t *)EHCI_LOOKUP_ID(
-			(uint32_t)Get_ITD(curr_itd->itd_trans_wrapper));
+		    (uint32_t)Get_ITD(curr_itd->itd_trans_wrapper));
 		pp = curr_itw->itw_pipe_private;
 
 		if (curr_itw->itw_port_status == USBA_HIGH_SPEED_DEV) {
@@ -1206,7 +1223,7 @@ ehci_handle_itd(
 {
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 	usb_isoc_req_t		*curr_isoc_reqp =
-				    (usb_isoc_req_t *)itw->itw_curr_xfer_reqp;
+	    (usb_isoc_req_t *)itw->itw_curr_xfer_reqp;
 	int			error = USB_SUCCESS;
 	int			i, index;
 
@@ -1218,16 +1235,17 @@ ehci_handle_itd(
 	if (itw->itw_port_status == USBA_HIGH_SPEED_DEV &&
 	    curr_isoc_reqp != NULL) {
 
-	    for (i = 0; i < EHCI_ITD_CTRL_LIST_SIZE; i++) {
+		for (i = 0; i < EHCI_ITD_CTRL_LIST_SIZE; i++) {
 
-		index = Get_ITD_INDEX(itd, i);
-		if (index == EHCI_ITD_UNUSED_INDEX) {
+			index = Get_ITD_INDEX(itd, i);
+			if (index == EHCI_ITD_UNUSED_INDEX) {
 
-			continue;
+				continue;
+			}
+			curr_isoc_reqp->
+			    isoc_pkt_descr[index].isoc_pkt_actual_length =
+			    (Get_ITD_BODY(itd, i) & EHCI_ITD_XFER_LENGTH) >> 16;
 		}
-		curr_isoc_reqp->isoc_pkt_descr[index].isoc_pkt_actual_length =
-			(Get_ITD_BODY(itd, i) & EHCI_ITD_XFER_LENGTH) >> 16;
-	    }
 	}
 
 	/*
@@ -1391,7 +1409,7 @@ ehci_hcdi_isoc_callback(
 	usb_cr_t		completion_reason)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	usb_opaque_t		curr_xfer_reqp;
 	uint_t			pipe_state = 0;

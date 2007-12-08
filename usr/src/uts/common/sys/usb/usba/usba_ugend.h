@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +159,23 @@ typedef uint64_t ugen_minor_t;
 
 
 /*
+ * According to usb2.0 spec (table 9-13), for all ep, bits 10..0 specify the
+ * max pkt size; for high speed ISOC/INTR ep, bits 12..11 specify the number of
+ * additional transaction opportunities per microframe.
+ */
+#define	UGEN_PKT_SIZE(pktsize)	(pktsize & 0x07ff) * (1 + ((pktsize >> 11) & 3))
+
+
+/*
+ * Structure for holding isoc data packets information
+ */
+typedef struct ugen_isoc_pkt_info {
+	ushort_t	isoc_pkts_count;
+	uint_t		isoc_pkts_length;
+	ugen_isoc_pkt_descr_t    *isoc_pkt_descr; /* array of pkt descr */
+} ugen_isoc_pkt_info_t;
+
+/*
  * Endpoint structure
  * Holds all the information needed to manage the endpoint
  */
@@ -183,6 +199,8 @@ typedef struct ugen_ep {
 	mblk_t		*ep_data;	/* IN data (ctrl & intr) */
 	struct buf	*ep_bp;		/* save current buf ptr */
 	struct pollhead	ep_pollhead;	/* for polling	*/
+	ugen_isoc_pkt_info_t ep_isoc_info;	/* for isoc eps */
+	int		ep_isoc_in_inited;	/* isoc IN init flag */
 } ugen_ep_t;
 
 _NOTE(MUTEX_PROTECTS_DATA(ugen_ep::ep_mutex, ugen_ep))
@@ -204,6 +222,10 @@ _NOTE(MUTEX_PROTECTS_DATA(ugen_ep::ep_mutex, ugen_ep))
 #define	UGEN_EP_STATE_INTR_IN_POLLING_ON		0x10
 #define	UGEN_EP_STATE_INTR_IN_POLLING_IS_STOPPED	0x20
 #define	UGEN_EP_STATE_INTR_IN_POLL_PENDING		0x40
+
+#define	UGEN_EP_STATE_ISOC_IN_POLLING_ON	0x100
+#define	UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED	0x200
+#define	UGEN_EP_STATE_ISOC_IN_POLL_PENDING	0x400
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ugen_ep::ep_ph))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ugen_ep::ep_descr))

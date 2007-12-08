@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,11 +53,11 @@ int ehci_get_itd_pool_size();
  * Isochronous Transfer Wrapper Functions
  */
 ehci_isoc_xwrapper_t *ehci_allocate_itw_resources(
-	ehci_state_t 		*ehcip,
+	ehci_state_t		*ehcip,
 	ehci_pipe_private_t	*pp,
 	size_t			itw_length,
 	usb_flags_t		usb_flags,
-	size_t 			pkt_count);
+	size_t			pkt_count);
 static ehci_isoc_xwrapper_t *ehci_allocate_itw(
 	ehci_state_t		*ehcip,
 	ehci_pipe_private_t	*pp,
@@ -83,7 +83,7 @@ void ehci_deallocate_itd(
 	ehci_itd_t		*old_itd);
 uint_t ehci_calc_num_itds(
 	ehci_isoc_xwrapper_t	*itw,
-	size_t 			pkt_count);
+	size_t			pkt_count);
 int ehci_allocate_itds_for_itw(
 	ehci_state_t		*ehcip,
 	ehci_isoc_xwrapper_t	*itw,
@@ -222,18 +222,18 @@ ehci_allocate_isoc_pools(ehci_state_t	*ehcip)
 
 	/* Map the ITD pool into the I/O address space */
 	result = ddi_dma_addr_bind_handle(
-			ehcip->ehci_itd_pool_dma_handle,
-			NULL,
-			(caddr_t)ehcip->ehci_itd_pool_addr,
-			real_length,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&ehcip->ehci_itd_pool_cookie,
-			&ccount);
+	    ehcip->ehci_itd_pool_dma_handle,
+	    NULL,
+	    (caddr_t)ehcip->ehci_itd_pool_addr,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &ehcip->ehci_itd_pool_cookie,
+	    &ccount);
 
 	bzero((void *)ehcip->ehci_itd_pool_addr,
-			ehci_itd_pool_size * sizeof (ehci_itd_t));
+	    ehci_itd_pool_size * sizeof (ehci_itd_t));
 
 	/* Process the result */
 	if (result == DDI_DMA_MAPPED) {
@@ -293,11 +293,11 @@ ehci_get_itd_pool_size()
  */
 ehci_isoc_xwrapper_t *
 ehci_allocate_itw_resources(
-	ehci_state_t 		*ehcip,
+	ehci_state_t		*ehcip,
 	ehci_pipe_private_t	*pp,
 	size_t			itw_length,
 	usb_flags_t		usb_flags,
-	size_t 			pkt_count)
+	size_t			pkt_count)
 {
 	uint_t			itd_count;
 	ehci_isoc_xwrapper_t	*itw;
@@ -698,7 +698,7 @@ ehci_deallocate_itd(
 		}
 	} else {
 		itw->itw_itd_head = ehci_itd_iommu_to_cpu(
-			ehcip, Get_ITD(old_itd->itd_itw_next_itd));
+		    ehcip, Get_ITD(old_itd->itd_itw_next_itd));
 
 		if (itw->itw_itd_head == NULL) {
 			itw->itw_itd_tail = NULL;
@@ -726,7 +726,7 @@ ehci_deallocate_itd(
 uint_t
 ehci_calc_num_itds(
 	ehci_isoc_xwrapper_t	*itw,
-	size_t 			pkt_count)
+	size_t			pkt_count)
 {
 	uint_t			multiplier, itd_count;
 
@@ -930,7 +930,7 @@ ehci_remove_itd_from_active_list(
 	} else {
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_remove_itd_from_active_list: "
-			"Unable to find ITD in active_itd_list");
+		    "Unable to find ITD in active_itd_list");
 	}
 }
 
@@ -984,9 +984,9 @@ ehci_create_done_itd_list(
 		state = Get_ITD(curr_itd->itd_state);
 
 		if (((state == EHCI_ITD_ACTIVE) &&
-			(itd_frame_number < current_frame_number)) ||
+		    (itd_frame_number < current_frame_number)) ||
 		    ((state == EHCI_ITD_RECLAIM) &&
-			(itd_reclaim_number < current_frame_number))) {
+		    (itd_reclaim_number < current_frame_number))) {
 
 			/* Remove this ITD from active ITD list */
 			ehci_remove_itd_from_active_list(ehcip, curr_itd);
@@ -1058,8 +1058,8 @@ ehci_insert_isoc_to_pfl(
 			/* Check for the Starting usb frame number */
 			if ((isoc_reqp->isoc_frame_no == 0) ||
 			    ((isoc_reqp->isoc_frame_no +
-				isoc_reqp->isoc_pkts_count) <
-				current_frame_number)) {
+			    isoc_reqp->isoc_pkts_count) <
+			    current_frame_number)) {
 
 				/* Exit the critical */
 				ddi_exit_critical(ddic);
@@ -1381,12 +1381,12 @@ ehci_itd_cpu_to_iommu(
 
 	td = (uint32_t)ehcip->ehci_itd_pool_cookie.dmac_address +
 	    (uint32_t)((uintptr_t)addr -
-		(uintptr_t)(ehcip->ehci_itd_pool_addr));
+	    (uintptr_t)(ehcip->ehci_itd_pool_addr));
 
 	ASSERT(((uint32_t) (sizeof (ehci_itd_t) *
-		(addr - ehcip->ehci_itd_pool_addr))) ==
+	    (addr - ehcip->ehci_itd_pool_addr))) ==
 	    ((uint32_t)((uintptr_t)addr - (uintptr_t)
-		(ehcip->ehci_itd_pool_addr))));
+	    (ehcip->ehci_itd_pool_addr))));
 
 	ASSERT(td >= ehcip->ehci_itd_pool_cookie.dmac_address);
 	ASSERT(td <= ehcip->ehci_itd_pool_cookie.dmac_address +
@@ -1437,7 +1437,7 @@ void ehci_parse_isoc_error(
 	ehci_itd_t		*itd)
 {
 	usb_isoc_req_t		*isoc_reqp;
-	usb_cr_t 		error;
+	usb_cr_t		error;
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -1447,15 +1447,16 @@ void ehci_parse_isoc_error(
 		error = ehci_parse_itd_error(ehcip, itw, itd);
 	} else {
 		error = ehci_parse_sitd_error(ehcip, itw, itd);
-	}
 
-	if (error != USB_CR_OK) {
-		isoc_reqp->isoc_error_count++;
+		if (error != USB_CR_OK) {
+			isoc_reqp->isoc_error_count++;
 
-		USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-		    "ehci_parse_isoc_error: Error %d Device Address %d "
-		    "Endpoint number %d", error, itw->itw_device_addr,
-		    itw->itw_endpoint_num);
+			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_parse_sitd_error: Error %d Device Address %d"
+			    " Endpoint number %d", error, itw->itw_device_addr,
+			    itw->itw_endpoint_num);
+		}
+
 	}
 }
 
@@ -1467,8 +1468,11 @@ static usb_cr_t ehci_parse_itd_error(
 	ehci_itd_t		*itd)
 {
 	uint32_t		status, index;
-	usb_cr_t 		error = USB_CR_OK;
+	usb_cr_t		error = USB_CR_OK;
 	uint32_t		i;
+	usb_isoc_req_t		*isoc_reqp;
+
+	isoc_reqp = itw->itw_curr_xfer_reqp;
 
 	for (i = 0; i < EHCI_ITD_CTRL_LIST_SIZE; i++) {
 		index = Get_ITD_INDEX(itd, i);
@@ -1477,22 +1481,24 @@ static usb_cr_t ehci_parse_itd_error(
 			continue;
 		}
 
+		error = USB_CR_OK;
+
 		status = Get_ITD_BODY(itd, EHCI_ITD_CTRL0 + i) &
 		    EHCI_ITD_XFER_STATUS_MASK;
 
 		if (status & EHCI_ITD_XFER_DATA_BUFFER_ERR) {
 			if (itw->itw_direction == USB_EP_DIR_OUT) {
-			    USB_DPRINTF_L3(PRINT_MASK_INTR,
-				ehcip->ehci_log_hdl,
-				"ehci_parse_itd_error: BUFFER Underrun");
+				USB_DPRINTF_L3(PRINT_MASK_INTR,
+				    ehcip->ehci_log_hdl,
+				    "ehci_parse_itd_error: BUFFER Underrun");
 
-			    error = USB_CR_BUFFER_UNDERRUN;
+				error = USB_CR_BUFFER_UNDERRUN;
 			} else {
-			    USB_DPRINTF_L3(PRINT_MASK_INTR,
-				ehcip->ehci_log_hdl,
-				"ehci_parse_itd_error: BUFFER Overrun");
+				USB_DPRINTF_L3(PRINT_MASK_INTR,
+				    ehcip->ehci_log_hdl,
+				    "ehci_parse_itd_error: BUFFER Overrun");
 
-			    error = USB_CR_BUFFER_OVERRUN;
+				error = USB_CR_BUFFER_OVERRUN;
 			}
 		}
 
@@ -1522,8 +1528,18 @@ static usb_cr_t ehci_parse_itd_error(
 		/* Write the status of isoc data packet */
 		itw->itw_curr_isoc_pktp->isoc_pkt_status = error;
 
+		/* counts total number of error packets in this req */
+		if (error != USB_CR_OK) {
+			isoc_reqp->isoc_error_count++;
+			USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_parse_itd_error: Error %d Device Address %d "
+			    "Endpoint number %d", error, itw->itw_device_addr,
+			    itw->itw_endpoint_num);
+		}
+
 		itw->itw_curr_isoc_pktp++;
 	}
+
 	return (error);
 }
 
@@ -1533,7 +1549,7 @@ static usb_cr_t ehci_parse_sitd_error(
 	ehci_itd_t		*itd)
 {
 	uint32_t		status;
-	usb_cr_t 		error;
+	usb_cr_t		error;
 	usb_isoc_pkt_descr_t	*isoc_pkt_descr;
 	uint32_t		residue;
 
@@ -1597,7 +1613,7 @@ static usb_cr_t ehci_parse_sitd_error(
 	/* This is HCD specific and may not have this information */
 	residue =
 	    (Get_ITD_BODY(itd, EHCI_SITD_XFER_STATE) &
-		EHCI_SITD_XFER_TOTAL_MASK) >>
+	    EHCI_SITD_XFER_TOTAL_MASK) >>
 	    EHCI_SITD_XFER_TOTAL_SHIFT;
 
 	/*

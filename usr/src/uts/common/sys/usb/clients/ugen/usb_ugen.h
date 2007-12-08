@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +68,9 @@ extern "C" {
 #define	USB_LC_STAT_INTERRUPTED		0x47	/* request was interrupted  */
 #define	USB_LC_STAT_NO_RESOURCES	0x48	/* no resources for req	  */
 #define	USB_LC_STAT_INTR_POLLING_FAILED	0x49	/* failed to restart poll  */
+#define	USB_LC_STAT_ISOC_POLLING_FAILED	0x50	/* failed to restart iso poll */
+#define	USB_LC_STAT_ISOC_UNINITIALIZED	0x51	/* isoc_info not inited yet */
+#define	USB_LC_STAT_ISOC_PKT_ERROR	0x52	/* All pkts in last req fail */
 
 /*
  * Endpoint control
@@ -86,6 +88,35 @@ extern "C" {
 #define	USB_DEV_STAT_DISCONNECTED	0x2	/* Device is disconnected */
 #define	USB_DEV_STAT_RESUMED		0x4	/* Device resumed	  */
 #define	USB_DEV_STAT_UNAVAILABLE	0x5	/* Device unavailable	  */
+
+/*
+ * Structure for holding isoc data packets information. Application and ugen
+ * driver use these structures to exchange isoc packet information.
+ */
+typedef struct ugen_isoc_pkt_descr {
+	/*
+	 * Set by the application, for all isochronous requests, to the
+	 * number of bytes to transfer in a packet.
+	 */
+	ushort_t	dsc_isoc_pkt_len;
+
+	/*
+	 * Set by ugen to actual number of bytes sent/received in a packet.
+	 */
+	ushort_t	dsc_isoc_pkt_actual_len;
+
+	/*
+	 * Per packet status set by ugen driver both for the isochronous IN
+	 * and OUT requests.
+	 */
+	int	dsc_isoc_pkt_status;
+} ugen_isoc_pkt_descr_t;
+
+typedef struct ugen_isoc_req_head {
+	int	req_isoc_pkts_count; /* pkt count of the isoc request */
+	ugen_isoc_pkt_descr_t req_isoc_pkt_descrs[1]; /* pkt descriptors */
+} ugen_isoc_req_head_t;
+
 
 #ifdef	__cplusplus
 }

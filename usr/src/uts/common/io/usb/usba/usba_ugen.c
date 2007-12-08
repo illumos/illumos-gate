@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +67,7 @@ int	ugen_ctrl_timeout	= 10;
 int	ugen_bulk_timeout	= 10;
 int	ugen_intr_timeout	= 10;
 int	ugen_enable_pm		= 0;
+int	ugen_isoc_buf_limit	= 1000;	/* ms */
 
 
 /* local function prototypes */
@@ -118,6 +118,14 @@ static void	ugen_epx_intr_IN_req_cb(usb_pipe_handle_t, usb_intr_req_t *);
 static int	ugen_epx_intr_OUT_req(ugen_state_t *, ugen_ep_t *,
 					struct buf *, boolean_t *);
 static void	ugen_epx_intr_OUT_req_cb(usb_pipe_handle_t, usb_intr_req_t *);
+static int	ugen_epx_isoc_IN_req(ugen_state_t *, ugen_ep_t *,
+					struct buf *, boolean_t *);
+static int	ugen_epx_isoc_IN_start_polling(ugen_state_t *, ugen_ep_t *);
+static void	ugen_epx_isoc_IN_stop_polling(ugen_state_t *, ugen_ep_t *);
+static void	ugen_epx_isoc_IN_req_cb(usb_pipe_handle_t, usb_isoc_req_t *);
+static int	ugen_epx_isoc_OUT_req(ugen_state_t *, ugen_ep_t *,
+					struct buf *, boolean_t *);
+static void	ugen_epx_isoc_OUT_req_cb(usb_pipe_handle_t, usb_isoc_req_t *);
 
 static int	ugen_eps_open(ugen_state_t *, dev_t, int);
 static void	ugen_eps_close(ugen_state_t *, dev_t, int);
@@ -163,7 +171,7 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 {
 	usb_ugen_hdl_impl_t	*hdl = kmem_zalloc(sizeof (*hdl), KM_SLEEP);
 	ugen_state_t		*ugenp = kmem_zalloc(sizeof (ugen_state_t),
-								KM_SLEEP);
+	    KM_SLEEP);
 	uint_t			len, shift, limit;
 	int			rval;
 
@@ -188,7 +196,7 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 
 	/* Initialize state structure for this instance */
 	mutex_init(&ugenp->ug_mutex, NULL, MUTEX_DRIVER,
-				ugenp->ug_dev_data->dev_iblock_cookie);
+	    ugenp->ug_dev_data->dev_iblock_cookie);
 
 	mutex_enter(&ugenp->ug_mutex);
 	ugenp->ug_dip		= dip;
@@ -204,20 +212,20 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 		(void) snprintf(name, len, "%s_ugen", ddi_driver_name(dip));
 
 		ugenp->ug_log_hdl = usb_alloc_log_hdl(dip, name, &ugen_errlevel,
-					&ugen_errmask, &ugen_instance_debug, 0);
+		    &ugen_errmask, &ugen_instance_debug, 0);
 		hdl->hdl_log_name = name;
 		hdl->hdl_log_name_length = len;
 	} else {
 		ugenp->ug_log_hdl = usb_alloc_log_hdl(dip, "ugen",
-					&ugen_errlevel,
-					&ugen_errmask, &ugen_instance_debug, 0);
+		    &ugen_errlevel,
+		    &ugen_errmask, &ugen_instance_debug, 0);
 	}
 
 	hdl->hdl_dip = dip;
 	hdl->hdl_flags = usb_ugen_info->usb_ugen_flags;
 
 	ugen_check_mask(usb_ugen_info->usb_ugen_minor_node_ugen_bits_mask,
-							&shift, &limit);
+	    &shift, &limit);
 	if (limit == 0) {
 		usb_ugen_release_hdl((usb_ugen_hdl_t)hdl);
 		mutex_exit(&ugenp->ug_mutex);
@@ -225,12 +233,12 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 		return (NULL);
 	}
 	hdl->hdl_minor_node_ugen_bits_mask = usb_ugen_info->
-					usb_ugen_minor_node_ugen_bits_mask;
+	    usb_ugen_minor_node_ugen_bits_mask;
 	hdl->hdl_minor_node_ugen_bits_shift = shift;
 	hdl->hdl_minor_node_ugen_bits_limit = limit;
 
 	ugen_check_mask(usb_ugen_info->usb_ugen_minor_node_instance_mask,
-							&shift, &limit);
+	    &shift, &limit);
 	if (limit == 0) {
 		usb_ugen_release_hdl((usb_ugen_hdl_t)hdl);
 		mutex_exit(&ugenp->ug_mutex);
@@ -239,7 +247,7 @@ usb_ugen_get_hdl(dev_info_t *dip, usb_ugen_info_t *usb_ugen_info)
 	}
 
 	hdl->hdl_minor_node_instance_mask = usb_ugen_info->
-					usb_ugen_minor_node_instance_mask;
+	    usb_ugen_minor_node_instance_mask;
 	hdl->hdl_minor_node_instance_shift = shift;
 	hdl->hdl_minor_node_instance_limit = limit;
 
@@ -267,7 +275,7 @@ void
 usb_ugen_release_hdl(usb_ugen_hdl_t usb_ugen_hdl)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 
 	if (usb_ugen_hdl_impl) {
 		ugen_state_t *ugenp = usb_ugen_hdl_impl->hdl_ugenp;
@@ -276,12 +284,12 @@ usb_ugen_release_hdl(usb_ugen_hdl_t usb_ugen_hdl)
 			mutex_destroy(&ugenp->ug_mutex);
 			usb_free_log_hdl(ugenp->ug_log_hdl);
 			usb_free_dev_data(usb_ugen_hdl_impl->hdl_dip,
-				ugenp->ug_dev_data);
+			    ugenp->ug_dev_data);
 			kmem_free(ugenp, sizeof (*ugenp));
 		}
 		if (usb_ugen_hdl_impl->hdl_log_name) {
 			kmem_free(usb_ugen_hdl_impl->hdl_log_name,
-				usb_ugen_hdl_impl->hdl_log_name_length);
+			    usb_ugen_hdl_impl->hdl_log_name_length);
 		}
 		kmem_free(usb_ugen_hdl_impl, sizeof (*usb_ugen_hdl_impl));
 	}
@@ -295,7 +303,7 @@ int
 usb_ugen_attach(usb_ugen_hdl_t usb_ugen_hdl, ddi_attach_cmd_t cmd)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 	dev_info_t		*dip;
 
@@ -414,7 +422,7 @@ int
 usb_ugen_detach(usb_ugen_hdl_t usb_ugen_hdl, ddi_detach_cmd_t cmd)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	int			rval = USB_FAILURE;
 
 	if (usb_ugen_hdl) {
@@ -469,7 +477,7 @@ ugen_cleanup(ugen_state_t *ugenp)
 		 * activity must have drained (paranoia)
 		 */
 		(void) usb_serialize_access(ugenp->ug_ser_cookie,
-							USB_WAIT, 0);
+		    USB_WAIT, 0);
 		usb_release_access(ugenp->ug_ser_cookie);
 
 		mutex_enter(&ugenp->ug_mutex);
@@ -556,7 +564,7 @@ ugen_cpr_suspend(ugen_state_t *ugenp)
 
 			mutex_exit(&ugenp->ug_mutex);
 			(void) usb_serialize_access(ugenp->ug_ser_cookie,
-								USB_WAIT, 0);
+			    USB_WAIT, 0);
 			/* close all pipes */
 			ugen_epx_shutdown(ugenp);
 
@@ -602,7 +610,7 @@ int
 usb_ugen_disconnect_ev_cb(usb_ugen_hdl_t usb_ugen_hdl)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 
 	if (usb_ugen_hdl_impl == NULL) {
@@ -648,7 +656,7 @@ int
 usb_ugen_reconnect_ev_cb(usb_ugen_hdl_t usb_ugen_hdl)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp = usb_ugen_hdl_impl->hdl_ugenp;
 
 	USB_DPRINTF_L4(UGEN_PRINT_HOTPLUG, ugenp->ug_log_hdl,
@@ -746,7 +754,7 @@ usb_ugen_open(usb_ugen_hdl_t usb_ugen_hdl, dev_t *devp, int flag, int sflag,
     cred_t *cr)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 	int			rval;
 	int			minor_node_type;
@@ -824,7 +832,7 @@ usb_ugen_open(usb_ugen_hdl_t usb_ugen_hdl, dev_t *devp, int flag, int sflag,
 		if (ugenp->ug_hdl->hdl_flags & USB_UGEN_ENABLE_PM) {
 			ugen_pm_busy_component(ugenp);
 			(void) pm_raise_power(ugenp->ug_dip, 0,
-						USB_DEV_OS_FULL_PWR);
+			    USB_DEV_OS_FULL_PWR);
 		}
 
 		rval = ugen_epx_open(ugenp, *devp, flag);
@@ -883,7 +891,7 @@ usb_ugen_close(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, int flag, int otype,
     cred_t *cr)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 	int			minor_node_type;
 
@@ -976,7 +984,7 @@ usb_ugen_read(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, struct uio *uiop,
 {
 	ugen_state_t		*ugenp;
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 
 	if (usb_ugen_hdl == NULL) {
 
@@ -1001,7 +1009,7 @@ usb_ugen_write(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, struct uio *uiop,
 {
 	ugen_state_t		*ugenp;
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 
 	if (usb_ugen_hdl == NULL) {
 
@@ -1027,7 +1035,7 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
     int anyyet,  short *reventsp, struct pollhead **phpp)
 {
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 	int			minor_node_type;
 	uint_t			ep_index;
@@ -1081,6 +1089,26 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 					    UGEN_EP_STATE_INTR_IN_POLL_PENDING;
 				}
 				mutex_exit(&epp->ep_mutex);
+
+			} else if ((UGEN_XFER_TYPE(epp) == USB_EP_ATTR_ISOCH) &&
+			    (UGEN_XFER_DIR(epp) & USB_EP_DIR_IN)) {
+
+				/*
+				 * if we are not polling, force another
+				 * read to kick off polling
+				 */
+				mutex_enter(&epp->ep_mutex);
+				if ((epp->ep_data) ||
+				    ((epp->ep_state &
+				    UGEN_EP_STATE_ISOC_IN_POLLING_ON) == 0)) {
+					*reventsp |= POLLIN;
+				} else if (!anyyet) {
+					*phpp = &epp->ep_pollhead;
+					epp->ep_state |=
+					    UGEN_EP_STATE_ISOC_IN_POLL_PENDING;
+				}
+				mutex_exit(&epp->ep_mutex);
+
 			} else {
 				/* no poll on other ep nodes */
 				*reventsp |= POLLERR;
@@ -1109,7 +1137,7 @@ usb_ugen_poll(usb_ugen_hdl_t usb_ugen_hdl, dev_t dev, short events,
 		} else if (!anyyet) {
 			*phpp = &ugenp->ug_ds.dev_pollhead;
 			ugenp->ug_ds.dev_stat |=
-				    UGEN_DEV_STATUS_POLL_PENDING;
+			    UGEN_DEV_STATUS_POLL_PENDING;
 		}
 	}
 
@@ -1216,6 +1244,7 @@ ugen_minphys(struct buf *bp)
 			break;
 		case USB_EP_ATTR_INTR:
 		case USB_EP_ATTR_CONTROL:
+		case USB_EP_ATTR_ISOCH:
 		default:
 
 			break;
@@ -1229,6 +1258,46 @@ ugen_minphys(struct buf *bp)
 	}
 }
 
+/*
+ * Get bmAttributes and bAddress of the endpoint which is going to
+ * be opened
+ */
+static int
+ugen_get_ep_descr(ugen_state_t *ugenp, dev_t dev, uint8_t *bmAttr,
+    uint8_t *bAddr)
+{
+	uint_t	alt = UGEN_MINOR_ALT(ugenp, dev);
+	uint_t	ifc = UGEN_MINOR_IF(ugenp, dev);
+	uint_t	cfgidx = UGEN_MINOR_CFGIDX(ugenp, dev);
+	usb_cfg_data_t	*dev_cfg;
+	usb_if_data_t	*if_data;
+	usb_alt_if_data_t *alt_if_data;
+	usb_ep_data_t	*ep_data;
+	int ep;
+	int epidx = UGEN_MINOR_EPIDX(ugenp, dev);
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "cfg=%d, if=%d, alt=%d, ep=0x%x", cfgidx, ifc,
+	    alt, epidx);
+
+	dev_cfg = &ugenp->ug_dev_data->dev_cfg[cfgidx];
+	if_data = &dev_cfg->cfg_if[ifc];
+	alt_if_data = &if_data->if_alt[alt];
+	for (ep = 0; ep < alt_if_data->altif_n_ep; ep++) {
+		ep_data = &alt_if_data->altif_ep[ep];
+
+		if (usb_get_ep_index(ep_data->ep_descr.
+		    bEndpointAddress) == epidx) {
+
+			*bmAttr = ep_data->ep_descr.bmAttributes;
+			*bAddr = ep_data->ep_descr.bEndpointAddress;
+
+			return (USB_SUCCESS);
+		}
+	}
+
+	return (USB_FAILURE);
+}
 
 /*
  * check whether flag is appropriate for node type
@@ -1239,6 +1308,8 @@ ugen_check_open_flags(ugen_state_t *ugenp, dev_t dev, int flag)
 	ugen_ep_t *epp;
 	int	minor_node_type = UGEN_MINOR_TYPE(ugenp, dev);
 	int	rval = 0;
+	uint8_t bmAttribute;
+	uint8_t bAddress;
 
 	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
 	    "ugen_check_open_flags: "
@@ -1248,11 +1319,46 @@ ugen_check_open_flags(ugen_state_t *ugenp, dev_t dev, int flag)
 	switch (minor_node_type) {
 	case UGEN_MINOR_EP_XFER_NODE:
 		epp = &ugenp->ug_ep[UGEN_MINOR_EPIDX(ugenp, dev)];
-		switch (UGEN_XFER_TYPE(epp)) {
+
+		/*
+		 * Endpoints in two altsetting happen to have the same
+		 * bEndpointAddress, but they are different type, e.g,
+		 * one is BULK and the other is ISOC. They use the same
+		 * slot of ug_ep array. It's OK after switch_alt, because
+		 * after alt switch, ep info is updated to the new endpoint.
+		 * But it's not right here to use the other EP's info for
+		 * checking.
+		 */
+		if (UGEN_MINOR_EPIDX(ugenp, dev) != 0) {
+			if ((rval = ugen_get_ep_descr(ugenp, dev, &bmAttribute,
+			    &bAddress)) != USB_SUCCESS) {
+				USB_DPRINTF_L2(UGEN_PRINT_XFER,
+				    ugenp->ug_log_hdl, "ugen_get_descr: fail");
+
+				return (ENODEV);
+			}
+		} else {
+			bmAttribute = ugen_default_ep_descr.bmAttributes;
+			bAddress = ugen_default_ep_descr.bEndpointAddress;
+		}
+
+		USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_check_open_flags: epp = %p,"
+		    "epp type = %d, bmAttr =0x%x, bAddr = 0x%02x", epp,
+		    UGEN_XFER_TYPE(epp), bmAttribute, bAddress);
+
+		switch (bmAttribute & USB_EP_ATTR_MASK) {
 		case USB_EP_ATTR_CONTROL:
 			/* read and write must be set, ndelay not allowed */
 			if (((flag & (FREAD | FWRITE)) != (FREAD | FWRITE)) ||
 			    (flag & (FNDELAY | FNONBLOCK))) {
+				rval = EACCES;
+			}
+
+			break;
+		case USB_EP_ATTR_ISOCH:
+			/* read and write must be set */
+			if ((flag & (FREAD | FWRITE)) != (FREAD | FWRITE)) {
 				rval = EACCES;
 			}
 
@@ -1265,15 +1371,13 @@ ugen_check_open_flags(ugen_state_t *ugenp, dev_t dev, int flag)
 				break;
 			}
 			/*FALLTHRU*/
-		case USB_EP_ATTR_ISOCH:
 		case USB_EP_ATTR_INTR:
 			/* check flag versus direction */
-			if ((flag & FWRITE) &&
-			    (UGEN_XFER_DIR(epp) & USB_EP_DIR_IN)) {
+			if ((flag & FWRITE) && (bAddress & USB_EP_DIR_IN)) {
 				rval = EACCES;
 			}
 			if ((flag & FREAD) &&
-			    ((UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) == 0)) {
+			    ((bAddress & USB_EP_DIR_IN) == 0)) {
 				rval = EACCES;
 			}
 
@@ -1378,7 +1482,7 @@ ugen_epxs_data_init(ugen_state_t *ugenp, usb_ep_data_t *ep_data,
 
 	/* is this the default endpoint */
 	ep_index = (ep_data == NULL) ? 0 :
-		    usb_get_ep_index(ep_data->ep_descr.bEndpointAddress);
+	    usb_get_ep_index(ep_data->ep_descr.bEndpointAddress);
 	epp = &ugenp->ug_ep[ep_index];
 
 	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
@@ -1387,10 +1491,10 @@ ugen_epxs_data_init(ugen_state_t *ugenp, usb_ep_data_t *ep_data,
 	    cfgval, cfgidx, iface, alt, ep_index);
 
 	ep_descr = (ep_data == NULL) ? &ugen_default_ep_descr :
-						&ep_data->ep_descr;
+	    &ep_data->ep_descr;
 
 	mutex_init(&epp->ep_mutex, NULL, MUTEX_DRIVER,
-		    ugenp->ug_dev_data->dev_iblock_cookie);
+	    ugenp->ug_dev_data->dev_iblock_cookie);
 
 	mutex_enter(&epp->ep_mutex);
 
@@ -1406,7 +1510,7 @@ ugen_epxs_data_init(ugen_state_t *ugenp, usb_ep_data_t *ep_data,
 
 		cv_init(&epp->ep_wait_cv, NULL, CV_DRIVER, NULL);
 		epp->ep_ser_cookie	= usb_init_serialization(
-						ugenp->ug_dip, 0);
+		    ugenp->ug_dip, 0);
 	}
 
 	mutex_exit(&epp->ep_mutex);
@@ -1471,15 +1575,15 @@ ugen_epxs_minor_nodes_create(ugen_state_t *ugenp, usb_ep_descr_t *ep_descr,
 	int		minor_index;
 	ugen_minor_t	minor_code, minor_code_base;
 	int		owns_device = (usb_owns_device(ugenp->ug_dip) ?
-						    UGEN_OWNS_DEVICE : 0);
+	    UGEN_OWNS_DEVICE : 0);
 	int		ep_index =
-			    usb_get_ep_index(ep_descr->bEndpointAddress);
+	    usb_get_ep_index(ep_descr->bEndpointAddress);
 	int		ep_addr =
-			    ep_descr->bEndpointAddress & USB_EP_NUM_MASK;
+	    ep_descr->bEndpointAddress & USB_EP_NUM_MASK;
 	int		ep_type =
-			    ep_descr->bmAttributes & USB_EP_ATTR_MASK;
+	    ep_descr->bmAttributes & USB_EP_ATTR_MASK;
 	int		ep_dir =
-			    ep_descr->bEndpointAddress & USB_EP_DIR_IN;
+	    ep_descr->bEndpointAddress & USB_EP_DIR_IN;
 
 	USB_DPRINTF_L4(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
 	    "ugen_epxs_minor_nodes_create: "
@@ -1495,11 +1599,11 @@ ugen_epxs_minor_nodes_create(ugen_state_t *ugenp, usb_ep_descr_t *ep_descr,
 
 	/* create stat and xfer minor node */
 	minor_code_base =
-		((ugen_minor_t)cfgval) << UGEN_MINOR_CFGVAL_SHIFT |
-		((ugen_minor_t)cfgidx) << UGEN_MINOR_CFGIDX_SHIFT |
-		iface << UGEN_MINOR_IF_SHIFT |
-		alt << UGEN_MINOR_ALT_SHIFT |
-		ep_index << UGEN_MINOR_EPIDX_SHIFT | owns_device;
+	    ((ugen_minor_t)cfgval) << UGEN_MINOR_CFGVAL_SHIFT |
+	    ((ugen_minor_t)cfgidx) << UGEN_MINOR_CFGIDX_SHIFT |
+	    iface << UGEN_MINOR_IF_SHIFT |
+	    alt << UGEN_MINOR_ALT_SHIFT |
+	    ep_index << UGEN_MINOR_EPIDX_SHIFT | owns_device;
 	minor_code = minor_code_base | UGEN_MINOR_EP_XFER_NODE;
 
 	minor_index = ugen_minor_index_create(ugenp, minor_code);
@@ -1513,7 +1617,7 @@ ugen_epxs_minor_nodes_create(ugen_state_t *ugenp, usb_ep_descr_t *ep_descr,
 		return (USB_SUCCESS);
 	}
 	minor = (minor_index << UGEN_MINOR_IDX_SHIFT(ugenp)) |
-		ugenp->ug_instance << UGEN_MINOR_INSTANCE_SHIFT(ugenp);
+	    ugenp->ug_instance << UGEN_MINOR_INSTANCE_SHIFT(ugenp);
 
 	if (ep_type == USB_EP_ATTR_CONTROL) {
 		type = "cntrl";
@@ -1570,7 +1674,7 @@ ugen_epxs_minor_nodes_create(ugen_state_t *ugenp, usb_ep_descr_t *ep_descr,
 		return (USB_SUCCESS);
 	}
 	minor = (minor_index << UGEN_MINOR_IDX_SHIFT(ugenp)) |
-		ugenp->ug_instance << UGEN_MINOR_INSTANCE_SHIFT(ugenp);
+	    ugenp->ug_instance << UGEN_MINOR_INSTANCE_SHIFT(ugenp);
 
 	(void) strcat(node_name, "stat");
 
@@ -1609,7 +1713,7 @@ ugen_epx_shutdown(ugen_state_t *ugenp)
 		if (epp->ep_state != UGEN_EP_STATE_NONE) {
 			mutex_exit(&epp->ep_mutex);
 			(void) usb_serialize_access(epp->ep_ser_cookie,
-							USB_WAIT, 0);
+			    USB_WAIT, 0);
 			(void) ugen_epx_close_pipe(ugenp, epp);
 			usb_release_access(epp->ep_ser_cookie);
 		} else {
@@ -1741,7 +1845,7 @@ ugen_epxs_switch_cfg_alt(ugen_state_t *ugenp, ugen_ep_t *epp, dev_t dev)
 		    "no need for switching: n_cfg=%d n_alt=%d",
 		    ugenp->ug_dev_data->dev_n_cfg,
 		    ugenp->ug_dev_data->
-				dev_cfg[0].cfg_if[new_if].if_n_alt);
+		    dev_cfg[0].cfg_if[new_if].if_n_alt);
 
 		ASSERT(epp->ep_alt == new_alt);
 		ASSERT(epp->ep_cfgidx == new_cfgidx);
@@ -1978,7 +2082,7 @@ ugen_epx_open_pipe(ugen_state_t *ugenp, ugen_ep_t *epp, int flag)
 
 		if (rval == USB_SUCCESS) {
 			(void) usb_pipe_set_private(epp->ep_ph,
-						(usb_opaque_t)epp);
+			    (usb_opaque_t)epp);
 
 			/*
 			 * if interrupt IN pipe, and one xfer mode
@@ -2007,6 +2111,43 @@ ugen_epx_open_pipe(ugen_state_t *ugenp, ugen_ep_t *epp, int flag)
 					    epp->ep_descr.wMaxPacketSize;
 				}
 			}
+
+			/* set ep_buf_limit for isoc IN pipe */
+			if ((UGEN_XFER_TYPE(epp) == USB_EP_ATTR_ISOCH) &&
+			    (UGEN_XFER_DIR(epp) == USB_EP_DIR_IN)) {
+				uint16_t max_size;
+				uint32_t framecnt;
+
+				max_size =
+				    UGEN_PKT_SIZE(epp->ep_descr.wMaxPacketSize);
+
+				/*
+				 * wMaxPacketSize bits 10..0 specifies maximum
+				 * packet size, which can hold 1024 bytes. If
+				 * bits 12..11 is non zero, max_size will be
+				 * greater than 1024 and the endpoint is a
+				 * high-bandwidth endpoint.
+				 */
+				if (max_size <= 1024) {
+				/*
+				 * allowing about 1s data of highspeed and 8s
+				 * data of full speed device
+				 */
+					framecnt = ugen_isoc_buf_limit;
+					epp->ep_buf_limit = framecnt *
+					    max_size * 8;
+				} else {
+				/*
+				 * allow for about 333 ms data for high-speed
+				 * high-bandwidth data
+				 */
+					framecnt = ugen_isoc_buf_limit/3;
+					epp->ep_buf_limit =
+					    framecnt * max_size * 8;
+				}
+
+				epp->ep_isoc_in_inited = 0;
+			}
 		}
 	}
 
@@ -2030,9 +2171,41 @@ ugen_epx_close_pipe(ugen_state_t *ugenp, ugen_ep_t *epp)
 
 	mutex_enter(&epp->ep_mutex);
 	if (epp->ep_state & UGEN_EP_STATE_XFER_OPEN) {
+
+		/*  free isoc pipe private data ep_isoc_info.isoc_pkt_descr. */
+		if (UGEN_XFER_TYPE(epp) == USB_EP_ATTR_ISOCH) {
+			int len;
+			int n_pkt;
+
+			if (UGEN_XFER_DIR(epp) == USB_EP_DIR_IN &&
+			    (epp->ep_state &
+			    UGEN_EP_STATE_ISOC_IN_POLLING_ON)) {
+				mutex_exit(&epp->ep_mutex);
+				usb_pipe_stop_isoc_polling(epp->ep_ph,
+				    USB_FLAGS_SLEEP);
+				mutex_enter(&epp->ep_mutex);
+			}
+
+			if (epp->ep_isoc_info.isoc_pkt_descr) {
+				n_pkt = epp->ep_isoc_info.
+				    isoc_pkts_count;
+				len = sizeof (ugen_isoc_pkt_descr_t) * n_pkt;
+
+				kmem_free(epp->ep_isoc_info.isoc_pkt_descr,
+				    len);
+
+				epp->ep_isoc_info.isoc_pkt_descr = NULL;
+			}
+			epp->ep_isoc_in_inited = 0;
+
+		}
+
+
 		epp->ep_state &= ~(UGEN_EP_STATE_XFER_OPEN |
-				UGEN_EP_STATE_INTR_IN_POLLING_IS_STOPPED |
-				UGEN_EP_STATE_INTR_IN_POLLING_ON);
+		    UGEN_EP_STATE_INTR_IN_POLLING_IS_STOPPED |
+		    UGEN_EP_STATE_INTR_IN_POLLING_ON |
+		    UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED |
+		    UGEN_EP_STATE_ISOC_IN_POLLING_ON);
 
 		if (epp->ep_ph == ugenp->ug_dev_data->dev_default_ph) {
 			mutex_exit(&epp->ep_mutex);
@@ -2151,6 +2324,13 @@ ugen_epx_req(ugen_state_t *ugenp, struct buf *bp)
 
 		break;
 	case USB_EP_ATTR_ISOCH:
+		if (bp->b_flags & B_READ) {
+			rval = ugen_epx_isoc_IN_req(ugenp, epp, bp, &wait);
+		} else {
+			rval = ugen_epx_isoc_OUT_req(ugenp, epp, bp, &wait);
+		}
+
+		break;
 	default:
 		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
 		rval = USB_INVALID_REQUEST;
@@ -2230,7 +2410,7 @@ ugen_epx_ctrl_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	if (bp->b_flags & B_READ) {
 		if (epp->ep_data) {
 			int ep_len = epp->ep_data->b_wptr -
-						epp->ep_data->b_rptr;
+			    epp->ep_data->b_rptr;
 			int len = min(bp->b_bcount, ep_len);
 
 			bcopy(epp->ep_data->b_rptr, bp->b_un.b_addr, len);
@@ -2271,7 +2451,7 @@ ugen_epx_ctrl_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	reqp->ctrl_wLength	= wLength;
 	reqp->ctrl_timeout	= ugen_ctrl_timeout;
 	reqp->ctrl_attributes	= USB_ATTRS_AUTOCLEARING |
-					USB_ATTRS_SHORT_XFER_OK;
+	    USB_ATTRS_SHORT_XFER_OK;
 	reqp->ctrl_cb		= ugen_epx_ctrl_req_cb;
 	reqp->ctrl_exc_cb	= ugen_epx_ctrl_req_cb;
 	reqp->ctrl_client_private = (usb_opaque_t)ugenp;
@@ -2419,7 +2599,7 @@ ugen_epx_bulk_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 {
 	int		rval;
 	usb_bulk_req_t	*reqp = usb_alloc_bulk_req(ugenp->ug_dip,
-				bp->b_bcount, USB_FLAGS_NOSLEEP);
+	    bp->b_bcount, USB_FLAGS_NOSLEEP);
 
 	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
 	    "ugen_epx_bulk_req: epp=0x%p state=0x%x bp=0x%p",
@@ -2447,7 +2627,7 @@ ugen_epx_bulk_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	/* copy data into bp for OUT pipes */
 	if ((UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) == 0) {
 		bcopy(epp->ep_bp->b_un.b_addr, reqp->bulk_data->b_rptr,
-								bp->b_bcount);
+		    bp->b_bcount);
 		reqp->bulk_data->b_wptr += bp->b_bcount;
 	} else {
 		reqp->bulk_attributes |= USB_ATTRS_SHORT_XFER_OK;
@@ -2490,8 +2670,8 @@ ugen_epx_bulk_req_cb(usb_pipe_handle_t ph, usb_bulk_req_t *reqp)
 		mutex_enter(&epp->ep_mutex);
 		if (epp->ep_bp && reqp->bulk_data) {
 			int len = min(reqp->bulk_data->b_wptr -
-					reqp->bulk_data->b_rptr,
-					epp->ep_bp->b_bcount);
+			    reqp->bulk_data->b_rptr,
+			    epp->ep_bp->b_bcount);
 			if (UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) {
 				if (len) {
 					bcopy(reqp->bulk_data->b_rptr,
@@ -2501,7 +2681,7 @@ ugen_epx_bulk_req_cb(usb_pipe_handle_t ph, usb_bulk_req_t *reqp)
 				}
 			} else {
 				epp->ep_bp->b_resid =
-					epp->ep_bp->b_bcount - len;
+				    epp->ep_bp->b_bcount - len;
 			}
 		}
 		switch (reqp->bulk_completion_reason) {
@@ -2547,7 +2727,7 @@ ugen_epx_intr_IN_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	/* can we satisfy this read? */
 	if (epp->ep_data) {
 		len = min(epp->ep_data->b_wptr - epp->ep_data->b_rptr,
-							bp->b_bcount);
+		    bp->b_bcount);
 	}
 
 	/*
@@ -2562,7 +2742,7 @@ ugen_epx_intr_IN_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 				if (epp->ep_lcmd_status ==
 				    USB_LC_STAT_NOERROR) {
 					epp->ep_lcmd_status =
-						USB_LC_STAT_INTR_BUF_FULL;
+					    USB_LC_STAT_INTR_BUF_FULL;
 				}
 			}
 			if (ugen_epx_intr_IN_start_polling(ugenp,
@@ -2645,11 +2825,11 @@ ugen_epx_intr_IN_start_polling(ugen_state_t *ugenp, ugen_ep_t *epp)
 		mutex_exit(&epp->ep_mutex);
 
 		reqp = usb_alloc_intr_req(ugenp->ug_dip, 0,
-						USB_FLAGS_SLEEP);
+		    USB_FLAGS_SLEEP);
 		reqp->intr_client_private = (usb_opaque_t)ugenp;
 
 		reqp->intr_attributes	= USB_ATTRS_AUTOCLEARING |
-						USB_ATTRS_SHORT_XFER_OK;
+		    USB_ATTRS_SHORT_XFER_OK;
 		mutex_enter(&epp->ep_mutex);
 		if (epp->ep_one_xfer) {
 			reqp->intr_attributes |= USB_ATTRS_ONE_XFER;
@@ -2754,7 +2934,7 @@ ugen_epx_intr_IN_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 		mblk_t *mp;
 
 		USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
-		    "ep%x coalesce data", epp->ep_descr.bEndpointAddress);
+		    "intr ep%x coalesce data", epp->ep_descr.bEndpointAddress);
 
 		/* coalesce the data into one mblk */
 		epp->ep_data->b_cont = reqp->intr_data;
@@ -2798,7 +2978,7 @@ ugen_epx_intr_IN_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 	if ((reqp->intr_completion_reason) ||
 	    (epp->ep_one_xfer)) {
 		epp->ep_state &= ~(UGEN_EP_STATE_INTR_IN_POLLING_ON |
-				    UGEN_EP_STATE_INTR_IN_POLLING_IS_STOPPED);
+		    UGEN_EP_STATE_INTR_IN_POLLING_IS_STOPPED);
 	}
 
 	/* is there a poll pending? should we stop polling? */
@@ -2855,7 +3035,7 @@ ugen_epx_intr_OUT_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	    epp, epp->ep_state, bp);
 
 	reqp = usb_alloc_intr_req(ugenp->ug_dip, bp->b_bcount,
-					USB_FLAGS_NOSLEEP);
+	    USB_FLAGS_NOSLEEP);
 	if (reqp == NULL) {
 		epp->ep_lcmd_status = USB_LC_STAT_NO_RESOURCES;
 
@@ -2873,7 +3053,7 @@ ugen_epx_intr_OUT_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 
 	/* copy data from bp */
 	bcopy(epp->ep_bp->b_un.b_addr, reqp->intr_data->b_rptr,
-							bp->b_bcount);
+	    bp->b_bcount);
 	reqp->intr_data->b_wptr += bp->b_bcount;
 
 	mutex_exit(&epp->ep_mutex);
@@ -2944,6 +3124,745 @@ ugen_epx_intr_OUT_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 
 
 /*
+ * handle isoc IN xfers
+ */
+static int
+ugen_epx_isoc_IN_req(ugen_state_t *ugenp, ugen_ep_t *epp,
+    struct buf *bp, boolean_t *wait)
+{
+	int rval = USB_SUCCESS;
+	ugen_isoc_pkt_descr_t *pkt_descr;
+	ushort_t n_pkt;
+	uint_t pkts_len, len = 0;
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_IN_req: epp=0x%p state=0x%x bp=0x%p",
+	    epp, epp->ep_state, bp);
+
+	*wait = B_FALSE;
+
+	/* check if the isoc in pkt info has been initialized */
+	pkt_descr = epp->ep_isoc_info.isoc_pkt_descr;
+	n_pkt = epp->ep_isoc_info.isoc_pkts_count;
+	if ((n_pkt == 0) || (pkt_descr == NULL)) {
+		rval = USB_FAILURE;
+		epp->ep_lcmd_status = USB_LC_STAT_ISOC_UNINITIALIZED;
+
+		goto done;
+	}
+
+
+	/* For OUT endpoint, return pkts transfer status of last request */
+	if (UGEN_XFER_DIR(epp) != USB_EP_DIR_IN) {
+		if (bp->b_bcount < sizeof (ugen_isoc_pkt_descr_t) * n_pkt) {
+			rval = USB_INVALID_REQUEST;
+			epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+
+			return (rval);
+		}
+		bcopy(epp->ep_isoc_info.isoc_pkt_descr, bp->b_un.b_addr,
+		    n_pkt * sizeof (ugen_isoc_pkt_descr_t));
+		epp->ep_lcmd_status = USB_LC_STAT_NOERROR;
+
+		return (USB_SUCCESS);
+	}
+
+	/* read length should be the sum of pkt descrs and data length */
+	pkts_len = epp->ep_isoc_info.isoc_pkts_length;
+	if (bp->b_bcount != pkts_len + sizeof (ugen_isoc_pkt_descr_t) * n_pkt) {
+		rval = USB_INVALID_REQUEST;
+		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+
+		goto done;
+	}
+
+	/* can we satisfy this read? */
+	if (epp->ep_data) {
+		len = min(epp->ep_data->b_wptr - epp->ep_data->b_rptr,
+		    bp->b_bcount);
+		/*
+		 * every msg block in ep_data must be the size of
+		 * pkts_len(payload length) + pkt descrs len
+		 */
+		ASSERT((len == 0) || (len == bp->b_bcount));
+	}
+
+	/*
+	 * if polling not active, restart
+	 * if there is some data, return the data
+	 */
+	if ((epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_ON) == 0) {
+		if (len == 0) {
+			rval = USB_FAILURE;
+			if ((rval = ugen_epx_isoc_IN_start_polling(ugenp,
+			    epp)) != USB_SUCCESS) {
+				epp->ep_lcmd_status =
+				    USB_LC_STAT_ISOC_POLLING_FAILED;
+			}
+
+			goto done;
+
+		} else if (epp->ep_data && (len >= bp->b_bcount)) {
+			bcopy(epp->ep_data->b_rptr, bp->b_un.b_addr,
+			    bp->b_bcount);
+			bp->b_resid = 0;
+			epp->ep_data->b_rptr += bp->b_bcount;
+
+			goto done;
+		}
+	}
+
+	/*
+	 * if there is data or FNDELAY, return available data
+	 */
+	if (epp->ep_data && (len >= bp->b_bcount)) {
+		/* can fulfill this read request */
+		bcopy(epp->ep_data->b_rptr, bp->b_un.b_addr, bp->b_bcount);
+		epp->ep_data->b_rptr += bp->b_bcount;
+		bp->b_resid = 0;
+	} else if (epp->ep_xfer_oflag & (FNDELAY | FNONBLOCK)) {
+		bp->b_resid = bp->b_bcount;
+	} else {
+		/* otherwise just wait for data */
+		*wait = B_TRUE;
+	}
+
+done:
+	/* data have been read */
+	if (epp->ep_data && (epp->ep_data->b_rptr == epp->ep_data->b_wptr)) {
+		mblk_t *mp = NULL;
+
+		/* remove the just read msg block */
+		mp = unlinkb(epp->ep_data);
+		freemsg(epp->ep_data);
+
+		if (mp) {
+			epp->ep_data = mp;
+		} else {
+			epp->ep_data = NULL;
+		}
+	}
+
+	if (*wait) {
+		ASSERT(epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_ON);
+	}
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_IN_req end: rval=%d bcount=%lu len=%d data=0x%p",
+	    rval, bp->b_bcount, len, epp->ep_data);
+
+	return (rval);
+}
+
+
+/*
+ * Start polling on isoc endpoint, asynchronously
+ */
+static int
+ugen_epx_isoc_IN_start_polling(ugen_state_t *ugenp, ugen_ep_t *epp)
+{
+	int rval = USB_FAILURE;
+	usb_isoc_req_t	*reqp;
+	ugen_isoc_pkt_descr_t *pkt_descr;
+	ushort_t n_pkt, pkt;
+	uint_t pkts_len;
+
+	/*
+	 * if polling is being stopped, we restart polling in the
+	 * isoc callback again
+	 */
+	if (epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED) {
+
+		return (rval);
+	}
+
+	if ((epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_ON) == 0) {
+		USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_epx_isoc_IN_start_polling: epp=0x%p state=0x%x",
+		    epp, epp->ep_state);
+
+		pkts_len = epp->ep_isoc_info.isoc_pkts_length;
+		n_pkt = epp->ep_isoc_info.isoc_pkts_count;
+		pkt_descr = epp->ep_isoc_info.isoc_pkt_descr;
+
+		epp->ep_state |= UGEN_EP_STATE_ISOC_IN_POLLING_ON;
+		mutex_exit(&epp->ep_mutex);
+
+		if ((reqp = usb_alloc_isoc_req(ugenp->ug_dip, n_pkt, pkts_len,
+		    USB_FLAGS_NOSLEEP)) == NULL) {
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "ugen_epx_isoc_IN_start_polling: alloc isoc "
+			    "req failed");
+			mutex_enter(&epp->ep_mutex);
+			epp->ep_state &= ~UGEN_EP_STATE_ISOC_IN_POLLING_ON;
+
+			return (USB_NO_RESOURCES);
+		}
+		reqp->isoc_client_private = (usb_opaque_t)ugenp;
+
+		reqp->isoc_attributes	= USB_ATTRS_AUTOCLEARING |
+		    USB_ATTRS_SHORT_XFER_OK | USB_ATTRS_ISOC_XFER_ASAP;
+
+		/*
+		 * isoc_pkts_length was defined to be ushort_t. This
+		 * has been obsoleted by usb high speed isoc support.
+		 * It is set here just for compatibility reason
+		 */
+		reqp->isoc_pkts_length = 0;
+
+		for (pkt = 0; pkt < n_pkt; pkt++) {
+			reqp->isoc_pkt_descr[pkt].isoc_pkt_length =
+			    pkt_descr[pkt].dsc_isoc_pkt_len;
+		}
+		reqp->isoc_pkts_count	= n_pkt;
+		reqp->isoc_cb		= ugen_epx_isoc_IN_req_cb;
+		reqp->isoc_exc_cb	= ugen_epx_isoc_IN_req_cb;
+
+		if ((rval = usb_pipe_isoc_xfer(epp->ep_ph, reqp,
+		    USB_FLAGS_NOSLEEP)) != USB_SUCCESS) {
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "ugen_epx_isoc_IN_start_polling: failed %d", rval);
+			usb_free_isoc_req(reqp);
+		}
+
+		mutex_enter(&epp->ep_mutex);
+		if (rval != USB_SUCCESS) {
+			epp->ep_state &= ~UGEN_EP_STATE_ISOC_IN_POLLING_ON;
+		}
+	} else {
+		rval = USB_SUCCESS;
+	}
+
+	return (rval);
+}
+
+
+/*
+ * stop polling on an isoc endpoint, asynchronously
+ */
+static void
+ugen_epx_isoc_IN_stop_polling(ugen_state_t *ugenp, ugen_ep_t *epp)
+{
+	if ((epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_ON) &&
+	    ((epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED) == 0)) {
+		USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_epx_isoc_IN_stop_polling: epp=0x%p state=0x%x",
+		    epp, epp->ep_state);
+
+		epp->ep_state |= UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED;
+		mutex_exit(&epp->ep_mutex);
+		usb_pipe_stop_isoc_polling(epp->ep_ph, USB_FLAGS_NOSLEEP);
+		mutex_enter(&epp->ep_mutex);
+	}
+}
+
+
+/*
+ * poll management
+ */
+static void
+ugen_epx_isoc_IN_poll_wakeup(ugen_state_t *ugenp, ugen_ep_t *epp)
+{
+	if (epp->ep_state & UGEN_EP_STATE_ISOC_IN_POLL_PENDING) {
+		struct pollhead *phpp = &epp->ep_pollhead;
+
+		USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_epx_isoc_IN_poll_wakeup: state=0x%x", epp->ep_state);
+
+		epp->ep_state &= ~UGEN_EP_STATE_ISOC_IN_POLL_PENDING;
+		mutex_exit(&epp->ep_mutex);
+		pollwakeup(phpp, POLLIN);
+		mutex_enter(&epp->ep_mutex);
+	}
+}
+
+
+/*
+ * callback functions for isoc IN pipe
+ */
+static void
+ugen_epx_isoc_IN_req_cb(usb_pipe_handle_t ph, usb_isoc_req_t *reqp)
+{
+	ugen_state_t *ugenp = (ugen_state_t *)reqp->isoc_client_private;
+	ugen_ep_t *epp = (ugen_ep_t *)usb_pipe_get_private(ph);
+
+	if (epp == NULL) {
+		/* pipe is closing */
+
+		goto done;
+	}
+
+	ASSERT(!mutex_owned(&epp->ep_mutex)); /* not owned */
+
+	mutex_enter(&epp->ep_mutex);
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_IN_req_cb: "
+	    "epp=0x%p state=0x%x ph=0x%p reqp=0x%p cr=%d cb=0x%x len=%d "
+	    "isoc error count=%d, pkt cnt=%d", epp, epp->ep_state, ph, reqp,
+	    reqp->isoc_completion_reason, reqp->isoc_cb_flags,
+	    (reqp->isoc_data == NULL) ? 0 :
+	    reqp->isoc_data->b_wptr - reqp->isoc_data->b_rptr,
+	    reqp->isoc_error_count, reqp->isoc_pkts_count);
+
+	/* Too many packet errors during isoc transfer of this request */
+	if (reqp->isoc_error_count == reqp->isoc_pkts_count) {
+		USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "too many errors(%d) in this req, stop polling",
+		    reqp->isoc_error_count);
+		epp->ep_lcmd_status = USB_LC_STAT_ISOC_PKT_ERROR;
+		ugen_epx_isoc_IN_stop_polling(ugenp, epp);
+	}
+
+	/* Data OK */
+	if (reqp->isoc_data && !reqp->isoc_completion_reason) {
+		mblk_t *mp1 = NULL, *mp2 = NULL;
+		usb_isoc_pkt_descr_t *pkt_descr =
+		    reqp->isoc_pkt_descr;
+		ushort_t i, n_pkt = reqp->isoc_pkts_count;
+
+		for (i = 0; i < n_pkt; i++) {
+			USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "pkt %d: len=%d status=%d actual_len=%d", i,
+			    pkt_descr[i].isoc_pkt_length,
+			    pkt_descr[i].isoc_pkt_status,
+			    pkt_descr[i].isoc_pkt_actual_length);
+
+			/* translate cr to ugen lcstat */
+			pkt_descr[i].isoc_pkt_status =
+			    ugen_cr2lcstat(pkt_descr[i].isoc_pkt_status);
+		}
+
+		/* construct data buffer: pkt descriptors + payload */
+		mp2 = allocb(sizeof (ugen_isoc_pkt_descr_t) * n_pkt, BPRI_HI);
+		if (mp2 == NULL) {
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "alloc msgblk failed, discard data");
+		} else {
+			/* pkt descrs first */
+			bcopy(pkt_descr, mp2->b_wptr,
+			    sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+
+			mp2->b_wptr += sizeof (ugen_isoc_pkt_descr_t) * n_pkt;
+
+			/* payload follows */
+			linkb(mp2, reqp->isoc_data);
+
+			/* concatenate data bytes in mp2 */
+			if ((mp1 = msgpullup(mp2, -1)) != NULL) {
+				/*
+				 * now we get the required data:
+				 *	pkt descrs + payload
+				 */
+				reqp->isoc_data = NULL;
+			} else {
+				USB_DPRINTF_L2(UGEN_PRINT_XFER,
+				    ugenp->ug_log_hdl,
+				    "msgpullup status blk failed, "
+				    "discard data");
+				mp2->b_cont = NULL;
+			}
+
+			freemsg(mp2);
+			mp2 = NULL;
+		}
+
+		if (epp->ep_data && (mp1 != NULL)) {
+			USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "ISOC ep%x coalesce ep_data",
+			    epp->ep_descr.bEndpointAddress);
+
+			/* add mp1 to the tail of ep_data */
+			linkb(epp->ep_data, mp1);
+
+		} else if (mp1 != NULL) {
+			USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "setting ep_data");
+			epp->ep_data = mp1;
+		}
+	}
+
+	switch (reqp->isoc_completion_reason) {
+	case USB_CR_OK:
+		epp->ep_lcmd_status = USB_LC_STAT_NOERROR;
+
+		break;
+	case USB_CR_PIPE_RESET:
+	case USB_CR_STOPPED_POLLING:
+	case USB_CR_PIPE_CLOSING:
+
+		break;
+	default:
+		epp->ep_lcmd_status =
+		    ugen_cr2lcstat(reqp->isoc_completion_reason);
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_exp_isoc_cb_req: error lcmd_status=0x%x ",
+		    epp->ep_lcmd_status);
+
+		break;
+	}
+
+	/* any non-zero completion reason signifies polling has stopped */
+	if (reqp->isoc_completion_reason) {
+		epp->ep_state &= ~(UGEN_EP_STATE_ISOC_IN_POLLING_ON |
+		    UGEN_EP_STATE_ISOC_IN_POLLING_IS_STOPPED);
+	}
+
+
+	/* is there a poll pending? should we stop polling? */
+	if (epp->ep_data) {
+		USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "ugen_epx_isoc_IN_req_cb: data len=0x%x, limit=0x%x",
+		    msgdsize(epp->ep_data),
+		    epp->ep_buf_limit);
+
+		ugen_epx_isoc_IN_poll_wakeup(ugenp, epp);
+
+
+		/*
+		 * Since isoc is unreliable xfer, if buffered data size exceeds
+		 * the limit, we just discard and free data in the oldest mblk
+		 */
+		if (epp->ep_data &&
+		    (msgdsize(epp->ep_data) >= epp->ep_buf_limit)) {
+			mblk_t *mp = NULL;
+
+			/* exceed buf lenth limit, remove the oldest one */
+			USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "ugen_epx_isoc_IN_req_cb: overflow!");
+			mp = unlinkb(epp->ep_data);
+			if (epp->ep_data) {
+				freeb(epp->ep_data);
+			}
+			epp->ep_data = mp;
+		}
+
+	}
+
+	if (reqp->isoc_completion_reason && epp->ep_bp) {
+		bioerror(epp->ep_bp, EIO);
+		epp->ep_done++;
+		cv_signal(&epp->ep_wait_cv);
+
+	} else if (epp->ep_data && epp->ep_bp && !epp->ep_done) {
+		boolean_t wait;
+
+		/* can we satisfy the read now */
+		if ((ugen_epx_isoc_IN_req(ugenp, epp, epp->ep_bp, &wait) ==
+		    USB_SUCCESS) && (wait == B_FALSE)) {
+			epp->ep_done++;
+			cv_signal(&epp->ep_wait_cv);
+		}
+	}
+	mutex_exit(&epp->ep_mutex);
+
+done:
+
+	usb_free_isoc_req(reqp);
+}
+
+/*
+ * handle isoc OUT xfers or init isoc IN polling
+ */
+static int
+ugen_epx_isoc_OUT_req(ugen_state_t *ugenp, ugen_ep_t *epp,
+    struct buf *bp, boolean_t *wait)
+{
+	int rval = USB_SUCCESS;
+	usb_isoc_req_t *reqp;
+	ugen_isoc_pkt_descr_t *pkt_descr;
+	ushort_t pkt, n_pkt = 0;
+	uint_t pkts_len = 0;
+	uint_t head_len;
+	char *p;
+	ugen_isoc_req_head_t *pkth;
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_OUT_req: epp=0x%p state=0x%x bp=0x%p",
+	    epp, epp->ep_state, bp);
+
+	*wait = B_FALSE;
+
+	if (bp->b_bcount < sizeof (int)) {
+		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+		rval = USB_INVALID_REQUEST;
+
+		goto done;
+	}
+
+	pkth = (ugen_isoc_req_head_t *)bp->b_un.b_addr;
+	n_pkt = pkth->req_isoc_pkts_count;
+	head_len = sizeof (ugen_isoc_pkt_descr_t) * n_pkt +
+	    sizeof (int);
+
+	if ((n_pkt == 0) ||
+	    (n_pkt > usb_get_max_pkts_per_isoc_request(ugenp->ug_dip)) ||
+	    (bp->b_bcount < head_len)) {
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "Invalid params: bcount=%d, head_len=%d, pktcnt=%d",
+		    bp->b_bcount, head_len, n_pkt);
+
+		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+		rval = USB_INVALID_REQUEST;
+
+		goto done;
+	}
+
+	p = bp->b_un.b_addr;
+	p += sizeof (int); /* points to pkt_descrs */
+
+	pkt_descr = kmem_zalloc(sizeof (ugen_isoc_pkt_descr_t) * n_pkt,
+	    KM_NOSLEEP);
+	if (pkt_descr == NULL) {
+		epp->ep_lcmd_status = USB_LC_STAT_NO_RESOURCES;
+		rval = USB_NO_RESOURCES;
+
+		goto done;
+	}
+	bcopy(p, pkt_descr, sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+	p += sizeof (ugen_isoc_pkt_descr_t) * n_pkt;
+
+	/* total packet payload length */
+	for (pkt = 0; pkt < n_pkt; pkt++) {
+		pkts_len += pkt_descr[pkt].dsc_isoc_pkt_len;
+	}
+
+	/*
+	 * write length may either be header length for isoc IN endpoint or
+	 * the sum of header and data pkts length for isoc OUT endpoint
+	 */
+	if (((bp->b_bcount != head_len) &&
+	    (bp->b_bcount != head_len + pkts_len))) {
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "invalid length: bcount=%d, head_len=%d, pkts_len = %d,"
+		    "pktcnt=%d", bp->b_bcount, head_len, pkts_len, n_pkt);
+
+		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+		kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+		rval = USB_INVALID_REQUEST;
+
+		goto done;
+	}
+
+
+	ASSERT(epp->ep_state & UGEN_EP_STATE_XS_OPEN);
+
+	/* Set parameters for READ */
+	if (bp->b_bcount == head_len) {
+		/* must be isoc IN endpoint */
+		if ((UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) == 0) {
+			epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+			kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) *
+			    n_pkt);
+			rval = USB_INVALID_REQUEST;
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "write length invalid for OUT ep%x",
+			    epp->ep_descr.bEndpointAddress);
+
+			goto done;
+		}
+
+		if (epp->ep_isoc_in_inited) {
+			epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+			kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) *
+			    n_pkt);
+			rval = USB_INVALID_REQUEST;
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "isoc IN polling fail: already inited, need to"
+			    "close the ep before initing again");
+
+			goto done;
+		}
+
+		/* save pkts info for the READ */
+		epp->ep_isoc_info.isoc_pkts_count = n_pkt;
+		epp->ep_isoc_info.isoc_pkts_length = pkts_len;
+		epp->ep_isoc_info.isoc_pkt_descr = pkt_descr;
+
+		if ((rval = ugen_epx_isoc_IN_start_polling(ugenp,
+		    epp)) != USB_SUCCESS) {
+			epp->ep_lcmd_status =
+			    USB_LC_STAT_ISOC_POLLING_FAILED;
+			kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) *
+			    n_pkt);
+			epp->ep_isoc_info.isoc_pkts_count = 0;
+			epp->ep_isoc_info.isoc_pkts_length = 0;
+			epp->ep_isoc_info.isoc_pkt_descr = NULL;
+
+			USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+			    "isoc IN start polling failed");
+
+			goto done;
+		}
+
+		epp->ep_bp->b_resid = epp->ep_bp->b_bcount - head_len;
+
+		epp->ep_isoc_in_inited++;
+		USB_DPRINTF_L3(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "isoc IN ep inited");
+
+		goto done;
+	}
+
+	/* must be isoc OUT endpoint */
+	if (UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) {
+		epp->ep_lcmd_status = USB_LC_STAT_INVALID_REQ;
+		kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+		rval = USB_INVALID_REQUEST;
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "write length invalid for an IN ep%x",
+		    epp->ep_descr.bEndpointAddress);
+
+		goto done;
+	}
+
+	/* OUT endpoint, free previous info if there's any */
+	if (epp->ep_isoc_info.isoc_pkt_descr) {
+		kmem_free(epp->ep_isoc_info.isoc_pkt_descr,
+		    sizeof (ugen_isoc_pkt_descr_t) *
+		    epp->ep_isoc_info.isoc_pkts_count);
+	}
+
+	/* save pkts info for the WRITE */
+	epp->ep_isoc_info.isoc_pkts_count = n_pkt;
+	epp->ep_isoc_info.isoc_pkts_length = pkts_len;
+	epp->ep_isoc_info.isoc_pkt_descr = pkt_descr;
+
+	reqp = usb_alloc_isoc_req(ugenp->ug_dip, n_pkt, pkts_len,
+	    USB_FLAGS_NOSLEEP);
+	if (reqp == NULL) {
+		epp->ep_lcmd_status = USB_LC_STAT_NO_RESOURCES;
+		kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+		rval = USB_NO_RESOURCES;
+		epp->ep_isoc_info.isoc_pkts_count = 0;
+		epp->ep_isoc_info.isoc_pkts_length = 0;
+		epp->ep_isoc_info.isoc_pkt_descr = NULL;
+
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "alloc isoc out req failed");
+		goto done;
+	}
+
+	for (pkt = 0; pkt < n_pkt; pkt++) {
+		reqp->isoc_pkt_descr[pkt].isoc_pkt_length =
+		    pkt_descr[pkt].dsc_isoc_pkt_len;
+	}
+	reqp->isoc_pkts_count = n_pkt;
+	reqp->isoc_client_private = (usb_opaque_t)ugenp;
+	reqp->isoc_attributes	= USB_ATTRS_AUTOCLEARING |
+	    USB_ATTRS_ISOC_XFER_ASAP;
+
+	reqp->isoc_cb		= ugen_epx_isoc_OUT_req_cb;
+	reqp->isoc_exc_cb	= ugen_epx_isoc_OUT_req_cb;
+
+	/* copy data from bp */
+	bcopy(p, reqp->isoc_data->b_wptr, pkts_len);
+	reqp->isoc_data->b_wptr += pkts_len;
+
+	mutex_exit(&epp->ep_mutex);
+	if ((rval = usb_pipe_isoc_xfer(epp->ep_ph, reqp,
+	    USB_FLAGS_NOSLEEP)) != USB_SUCCESS) {
+		mutex_enter(&epp->ep_mutex);
+		epp->ep_lcmd_status =
+		    ugen_cr2lcstat(reqp->isoc_completion_reason);
+		usb_free_isoc_req(reqp);
+		kmem_free(pkt_descr, sizeof (ugen_isoc_pkt_descr_t) * n_pkt);
+
+		epp->ep_isoc_info.isoc_pkt_descr = NULL;
+		epp->ep_isoc_info.isoc_pkts_count = 0;
+		epp->ep_isoc_info.isoc_pkts_length = 0;
+
+		USB_DPRINTF_L2(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+		    "isoc out xfer failed");
+
+		bioerror(bp, EIO);
+	} else {
+		mutex_enter(&epp->ep_mutex);
+	}
+	*wait = (rval == USB_SUCCESS) ? B_TRUE : B_FALSE;
+
+done:
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_OUT_req end: rval=%d bcount=%lu xfer_len=%d",
+	    rval, bp->b_bcount, pkts_len);
+
+	return (rval);
+}
+
+
+/*
+ * callback functions for isoc OUT pipe
+ */
+static void
+ugen_epx_isoc_OUT_req_cb(usb_pipe_handle_t ph, usb_isoc_req_t *reqp)
+{
+	ugen_state_t *ugenp = (ugen_state_t *)reqp->isoc_client_private;
+	ugen_ep_t *epp = (ugen_ep_t *)usb_pipe_get_private(ph);
+
+	USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
+	    "ugen_epx_isoc_OUT_req_cb: ph=0x%p reqp=0x%p cr=%d cb=0x%x",
+	    ph, reqp, reqp->isoc_completion_reason, reqp->isoc_cb_flags);
+
+	/* epp might be NULL if we are closing the pipe */
+	if (epp) {
+		ugen_isoc_pkt_info_t info;
+
+		mutex_enter(&epp->ep_mutex);
+
+		info = epp->ep_isoc_info;
+		if (epp->ep_bp) {
+			int len, i;
+			int headlen;
+			usb_isoc_pkt_descr_t *pktdesc;
+
+			pktdesc = reqp->isoc_pkt_descr;
+			headlen = info.isoc_pkts_count *
+			    sizeof (ugen_isoc_pkt_descr_t);
+
+			len = min(headlen + reqp->isoc_data->b_wptr -
+			    reqp->isoc_data->b_rptr, epp->ep_bp->b_bcount);
+
+			epp->ep_bp->b_resid = epp->ep_bp->b_bcount - len;
+
+
+			switch (reqp->isoc_completion_reason) {
+			case USB_CR_OK:
+
+				epp->ep_lcmd_status = USB_LC_STAT_NOERROR;
+
+				for (i = 0; i < reqp->isoc_pkts_count; i++) {
+					pktdesc[i].isoc_pkt_status =
+					    ugen_cr2lcstat(pktdesc[i].
+					    isoc_pkt_status);
+				}
+
+				/* save the status info */
+				bcopy(reqp->isoc_pkt_descr,
+				    info.isoc_pkt_descr,
+				    (sizeof (ugen_isoc_pkt_descr_t) *
+				    info.isoc_pkts_count));
+
+				break;
+			case USB_CR_PIPE_RESET:
+
+				break;
+			default:
+				epp->ep_lcmd_status =
+				    ugen_cr2lcstat(
+				    reqp->isoc_completion_reason);
+				bioerror(epp->ep_bp, EIO);
+			}
+		}
+		epp->ep_done++;
+		cv_signal(&epp->ep_wait_cv);
+		mutex_exit(&epp->ep_mutex);
+	}
+
+	usb_free_isoc_req(reqp);
+}
+
+
+/*
  * Endpoint status node management
  *
  * open/close an endpoint status node.
@@ -2989,7 +3908,8 @@ ugen_eps_close(ugen_state_t *ugenp, dev_t dev, int flag)
 	    dev, flag, epp->ep_state);
 
 	epp->ep_state &= ~(UGEN_EP_STATE_STAT_OPEN |
-			UGEN_EP_STATE_INTR_IN_POLL_PENDING);
+	    UGEN_EP_STATE_INTR_IN_POLL_PENDING |
+	    UGEN_EP_STATE_ISOC_IN_POLL_PENDING);
 	epp->ep_one_xfer = B_FALSE;
 
 	USB_DPRINTF_L4(UGEN_PRINT_STAT, ugenp->ug_log_hdl,
@@ -3102,7 +4022,7 @@ ugen_ds_open(ugen_state_t *ugenp, dev_t dev, int flag)
 		 * first read on device node should return status
 		 */
 		ugenp->ug_ds.dev_stat |= UGEN_DEV_STATUS_CHANGED |
-						UGEN_DEV_STATUS_ACTIVE;
+		    UGEN_DEV_STATUS_ACTIVE;
 		ugenp->ug_ds.dev_oflag = flag;
 		mutex_exit(&ugenp->ug_mutex);
 
@@ -3236,7 +4156,7 @@ ugen_ds_minor_nodes_create(ugen_state_t *ugenp)
 	minor_t	minor;
 	int	minor_index;
 	int	owns_device = (usb_owns_device(ugenp->ug_dip) ?
-						UGEN_OWNS_DEVICE : 0);
+	    UGEN_OWNS_DEVICE : 0);
 
 	USB_DPRINTF_L4(UGEN_PRINT_CBOPS, ugenp->ug_log_hdl,
 	    "ugen_ds_minor_nodes_create: idx shift=%d inst shift=%d",
@@ -3357,7 +4277,7 @@ ugen_minor_index_create(ugen_state_t *ugenp, ugen_minor_t minor)
 	if (ugenp->ug_minor_node_table_index <
 	    (ugenp->ug_minor_node_table_size/sizeof (ugen_minor_t))) {
 		ugenp->ug_minor_node_table[ugenp->
-				ug_minor_node_table_index] = minor;
+		    ug_minor_node_table_index] = minor;
 
 		USB_DPRINTF_L4(UGEN_PRINT_ATTA, ugenp->ug_log_hdl,
 		    "ugen_minor_index_create: %d: 0x%lx",
@@ -3381,7 +4301,7 @@ ugen_devt2minor(ugen_state_t *ugenp, dev_t dev)
 	    ugenp->ug_minor_node_table[UGEN_MINOR_GET_IDX(ugenp, dev)]);
 
 	ASSERT(UGEN_MINOR_GET_IDX(ugenp, dev) <
-			ugenp->ug_minor_node_table_index);
+	    ugenp->ug_minor_node_table_index);
 
 	return (ugenp->ug_minor_node_table[UGEN_MINOR_GET_IDX(ugenp, dev)]);
 }
@@ -3422,12 +4342,12 @@ ugen_minor_node_table_shrink(ugen_state_t *ugenp)
 	/* reduce the table size to save some memory */
 	if (ugenp->ug_minor_node_table_index < UGEN_MINOR_IDX_LIMIT(ugenp)) {
 		size_t newsize = sizeof (ugen_minor_t) *
-				ugenp->ug_minor_node_table_index;
+		    ugenp->ug_minor_node_table_index;
 		ugen_minor_t *buf = kmem_zalloc(newsize, KM_SLEEP);
 
 		bcopy(ugenp->ug_minor_node_table, buf, newsize);
 		kmem_free(ugenp->ug_minor_node_table,
-					ugenp->ug_minor_node_table_size);
+		    ugenp->ug_minor_node_table_size);
 		ugenp->ug_minor_node_table = buf;
 		ugenp->ug_minor_node_table_size = newsize;
 	}
@@ -3439,7 +4359,7 @@ ugen_minor_node_table_destroy(ugen_state_t *ugenp)
 {
 	if (ugenp->ug_minor_node_table) {
 		kmem_free(ugenp->ug_minor_node_table,
-				ugenp->ug_minor_node_table_size);
+		    ugenp->ug_minor_node_table_size);
 	}
 }
 
@@ -3595,7 +4515,7 @@ usb_ugen_power(usb_ugen_hdl_t usb_ugen_hdl, int comp, int level)
 	ugen_power_t		*pm;
 	int			rval = USB_FAILURE;
 	usb_ugen_hdl_impl_t	*usb_ugen_hdl_impl =
-				(usb_ugen_hdl_impl_t *)usb_ugen_hdl;
+	    (usb_ugen_hdl_impl_t *)usb_ugen_hdl;
 	ugen_state_t		*ugenp;
 	dev_info_t		*dip;
 
@@ -3616,7 +4536,7 @@ usb_ugen_power(usb_ugen_hdl_t usb_ugen_hdl, int comp, int level)
 	    "usb_ugen_power: level=%d", level);
 
 	(void) usb_serialize_access(ugenp->ug_ser_cookie,
-						USB_WAIT, 0);
+	    USB_WAIT, 0);
 	/*
 	 * If we are disconnected/suspended, return success. Note that if we
 	 * return failure, bringing down the system will hang when
@@ -3774,7 +4694,7 @@ static void
 ugen_store_devt(ugen_state_t *ugenp, minor_t minor)
 {
 	ugen_devt_list_entry_t *e = kmem_zalloc(
-				sizeof (ugen_devt_list_entry_t), KM_SLEEP);
+	    sizeof (ugen_devt_list_entry_t), KM_SLEEP);
 	ugen_devt_list_entry_t *t;
 
 	mutex_enter(&ugen_devt_list_mutex);
@@ -3831,7 +4751,7 @@ ugen_devt2state(dev_t dev)
 			ugen_devt_cache_index %= UGEN_DEVT_CACHE_SIZE;
 			ugen_devt_cache[ugen_devt_cache_index].cache_dev = dev;
 			ugen_devt_cache[ugen_devt_cache_index].cache_state =
-									ugenp;
+			    ugenp;
 			mutex_exit(&ugen_devt_list_mutex);
 
 			return (ugenp);
@@ -3855,8 +4775,8 @@ ugen_free_devt(ugen_state_t *ugenp)
 	prev = &ugen_devt_list;
 	for (e = prev->list_next; e != 0; e = next) {
 		int i = (getminor(e->list_dev) &
-			ugenp->ug_hdl->hdl_minor_node_instance_mask) >>
-			ugenp->ug_hdl->hdl_minor_node_instance_shift;
+		    ugenp->ug_hdl->hdl_minor_node_instance_mask) >>
+		    ugenp->ug_hdl->hdl_minor_node_instance_shift;
 		int m = getmajor(e->list_dev);
 
 		next = e->list_next;
