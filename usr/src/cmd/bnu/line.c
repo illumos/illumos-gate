@@ -160,6 +160,12 @@ int	tty, spwant, type;
 				break;
 			}
 	}
+	/*
+	 * In order to prevent attempts at split speed, all baud rate
+	 * bitfields should be cleared. Thus cfsetispeed is used to
+	 * set the speed to zero.
+	 */
+	(void) cfsetispeed(&ttbufs, 0);
 	ttbufs.c_iflag &= 0xffff0000;
 	ttbufs.c_oflag &= 0xffff0000;
 	ttbufs.c_lflag &= 0xffff0000;
