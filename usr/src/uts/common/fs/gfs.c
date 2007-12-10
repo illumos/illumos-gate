@@ -152,6 +152,38 @@ gfs_make_opsvec(gfs_opsvec_t *vec)
  */
 
 /*
+ * gfs_get_parent_ino: used to obtain a parent inode number and the
+ * inode number of the given vnode in preparation for calling gfs_readdir_init.
+ */
+int
+gfs_get_parent_ino(vnode_t *dvp, cred_t *cr, caller_context_t *ct,
+    ino64_t *pino, ino64_t *ino)
+{
+	vnode_t *parent;
+	gfs_dir_t *dp = dvp->v_data;
+	int error;
+
+	*ino = dp->gfsd_file.gfs_ino;
+	parent = dp->gfsd_file.gfs_parent;
+
+	if (parent == NULL) {
+		*pino = *ino;		/* root of filesystem */
+	} else if (dvp->v_flag & V_XATTRDIR) {
+		vattr_t va;
+
+		va.va_mask = AT_NODEID;
+		error = VOP_GETATTR(parent, &va, 0, cr, ct);
+		if (error)
+			return (error);
+		*pino = va.va_nodeid;
+	} else {
+		*pino = ((gfs_file_t *)(parent->v_data))->gfs_ino;
+	}
+
+	return (0);
+}
+
+/*
  * gfs_readdir_init: initiate a generic readdir
  *   st		- a pointer to an uninitialized gfs_readdir_state_t structure
  *   name_max	- the directory's maximum file name length
@@ -159,6 +191,7 @@ gfs_make_opsvec(gfs_opsvec_t *vec)
  *   uiop	- the uiop passed to readdir
  *   parent	- the parent directory's inode
  *   self	- this directory's inode
+ *   flags	- flags from VOP_READDIR
  *
  * Returns 0 or a non-zero errno.
  *
@@ -189,8 +222,10 @@ gfs_make_opsvec(gfs_opsvec_t *vec)
  */
 int
 gfs_readdir_init(gfs_readdir_state_t *st, int name_max, int ureclen,
-    uio_t *uiop, ino64_t parent, ino64_t self)
+    uio_t *uiop, ino64_t parent, ino64_t self, int flags)
 {
+	size_t dirent_size;
+
 	if (uiop->uio_loffset < 0 || uiop->uio_resid <= 0 ||
 	    (uiop->uio_loffset % ureclen) != 0)
 		return (EINVAL);
@@ -198,9 +233,14 @@ gfs_readdir_init(gfs_readdir_state_t *st, int name_max, int ureclen,
 	st->grd_ureclen = ureclen;
 	st->grd_oresid = uiop->uio_resid;
 	st->grd_namlen = name_max;
-	st->grd_dirent = kmem_zalloc(DIRENT64_RECLEN(st->grd_namlen), KM_SLEEP);
+	if (flags & V_RDDIR_ENTFLAGS)
+		dirent_size = EDIRENT_RECLEN(st->grd_namlen);
+	else
+		dirent_size = DIRENT64_RECLEN(st->grd_namlen);
+	st->grd_dirent = kmem_zalloc(dirent_size, KM_SLEEP);
 	st->grd_parent = parent;
 	st->grd_self = self;
+	st->grd_flags = flags;
 
 	return (0);
 }
@@ -208,8 +248,8 @@ gfs_readdir_init(gfs_readdir_state_t *st, int name_max, int ureclen,
 /*
  * gfs_readdir_emit_int: internal routine to emit directory entry
  *
- *   st		- the current readdir state, which must have d_ino and d_name
- *                set
+ *   st		- the current readdir state, which must have d_ino/ed_ino
+ *		  and d_name/ed_name set
  *   uiop	- caller-supplied uio pointer
  *   next	- the offset of the next entry
  */
@@ -217,8 +257,16 @@ static int
 gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t next)
 {
 	int reclen;
+	dirent64_t *dp;
+	edirent_t *edp;
 
-	reclen = DIRENT64_RECLEN(strlen(st->grd_dirent->d_name));
+	if (st->grd_flags & V_RDDIR_ENTFLAGS) {
+		edp = st->grd_dirent;
+		reclen = EDIRENT_RECLEN(strlen(edp->ed_name));
+	} else {
+		dp = st->grd_dirent;
+		reclen = DIRENT64_RECLEN(strlen(dp->d_name));
+	}
 
 	if (reclen > uiop->uio_resid) {
 		/*
@@ -229,8 +277,13 @@ gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t next)
 		return (-1);
 	}
 
-	st->grd_dirent->d_off = next;
-	st->grd_dirent->d_reclen = (ushort_t)reclen;
+	if (st->grd_flags & V_RDDIR_ENTFLAGS) {
+		edp->ed_off = next;
+		edp->ed_reclen = (ushort_t)reclen;
+	} else {
+		dp->d_off = next;
+		dp->d_reclen = (ushort_t)reclen;
+	}
 
 	if (uiomove((caddr_t)st->grd_dirent, reclen, UIO_READ, uiop))
 		return (EFAULT);
@@ -245,6 +298,7 @@ gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t next)
  *   voff       - the virtual offset (obtained from gfs_readdir_pred)
  *   ino        - the entry's inode
  *   name       - the entry's name
+ *   eflags	- value for ed_eflags (if processing edirent_t)
  *
  * Returns a 0 on success, a non-zero errno on failure, or -1 if the
  * readdir loop should terminate.  A non-zero result (either errno or
@@ -253,12 +307,22 @@ gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t next)
  */
 int
 gfs_readdir_emit(gfs_readdir_state_t *st, uio_t *uiop, offset_t voff,
-    ino64_t ino, const char *name)
+    ino64_t ino, const char *name, int eflags)
 {
 	offset_t off = (voff + 2) * st->grd_ureclen;
 
-	st->grd_dirent->d_ino = ino;
-	(void) strncpy(st->grd_dirent->d_name, name, st->grd_namlen);
+	if (st->grd_flags & V_RDDIR_ENTFLAGS) {
+		edirent_t *edp = st->grd_dirent;
+
+		edp->ed_ino = ino;
+		(void) strncpy(edp->ed_name, name, st->grd_namlen);
+		edp->ed_eflags = eflags;
+	} else {
+		dirent64_t *dp = st->grd_dirent;
+
+		dp->d_ino = ino;
+		(void) strncpy(dp->d_name, name, st->grd_namlen);
+	}
 
 	/*
 	 * Inter-entry offsets are invalid, so we assume a record size of
@@ -278,7 +342,7 @@ gfs_readdir_emitn(gfs_readdir_state_t *st, uio_t *uiop, offset_t voff,
 	char buf[40];
 
 	numtos(num, buf);
-	return (gfs_readdir_emit(st, uiop, voff, ino, buf));
+	return (gfs_readdir_emit(st, uiop, voff, ino, buf, 0));
 }
 
 /*
@@ -304,11 +368,11 @@ top:
 	voff = off - 2;
 	if (off == 0) {
 		if ((error = gfs_readdir_emit(st, uiop, voff, st->grd_self,
-		    ".")) == 0)
+		    ".", 0)) == 0)
 			goto top;
 	} else if (off == 1) {
 		if ((error = gfs_readdir_emit(st, uiop, voff, st->grd_parent,
-		    "..")) == 0)
+		    "..", 0)) == 0)
 			goto top;
 	} else {
 		*voffp = voff;
@@ -330,7 +394,13 @@ top:
 int
 gfs_readdir_fini(gfs_readdir_state_t *st, int error, int *eofp, int eof)
 {
-	kmem_free(st->grd_dirent, DIRENT64_RECLEN(st->grd_namlen));
+	size_t dirent_size;
+
+	if (st->grd_flags & V_RDDIR_ENTFLAGS)
+		dirent_size = EDIRENT_RECLEN(st->grd_namlen);
+	else
+		dirent_size = DIRENT64_RECLEN(st->grd_namlen);
+	kmem_free(st->grd_dirent, dirent_size);
 	if (error > 0)
 		return (error);
 	if (eofp)
@@ -806,13 +876,15 @@ out:
  * This is significantly more complex, thanks to the particulars of
  * VOP_READDIR().
  *
- *	int gfs_readdir_cb(vnode_t *vp, struct dirent64 *dp, int *eofp,
- *	    offset_t *off, offset_t *nextoff, void *data)
+ *	int gfs_readdir_cb(vnode_t *vp, void *dp, int *eofp,
+ *	    offset_t *off, offset_t *nextoff, void *data, int flags)
  *
  *	vp	- directory vnode
  *	dp	- directory entry, sized according to maxlen given to
  *		  gfs_dir_create().  callback must fill in d_name and
- *		  d_ino.
+ *		  d_ino (if a dirent64_t), or ed_name, ed_ino, and ed_eflags
+ *		  (if an edirent_t). edirent_t is used if V_RDDIR_ENTFLAGS
+ *		  is set in 'flags'.
  *	eofp	- callback must set to 1 when EOF has been reached
  *	off	- on entry, the last offset read from the directory.  Callback
  *		  must set to the offset of the current entry, typically left
@@ -820,38 +892,26 @@ out:
  *	nextoff	- callback must set to offset of next entry.  Typically
  *		  (off + 1)
  *	data	- caller-supplied data
+ *	flags	- VOP_READDIR flags
  *
  *	Return 0 on success, or error on failure.
  */
 int
 gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data, cred_t *cr,
-    caller_context_t *ct)
+    caller_context_t *ct, int flags)
 {
 	gfs_readdir_state_t gstate;
 	int error, eof = 0;
 	ino64_t ino, pino;
 	offset_t off, next;
 	gfs_dir_t *dp = dvp->v_data;
-	vnode_t *parent;
 
-	ino = dp->gfsd_file.gfs_ino;
-	parent = dp->gfsd_file.gfs_parent;
-
-	if (parent == NULL)
-		pino = ino;		/* root of filesystem */
-	else if (dvp->v_flag & V_XATTRDIR) {
-		vattr_t va;
-
-		va.va_mask = AT_NODEID;
-		error = VOP_GETATTR(parent, &va, 0, cr, ct);
-		if (error)
-			return (error);
-		pino = va.va_nodeid;
-	} else
-		pino = ((gfs_file_t *)(parent->v_data))->gfs_ino;
+	error = gfs_get_parent_ino(dvp, cr, ct, &pino, &ino);
+	if (error)
+		return (error);
 
 	if ((error = gfs_readdir_init(&gstate, dp->gfsd_maxlen, 1, uiop,
-	    pino, ino)) != 0)
+	    pino, ino, flags)) != 0)
 		return (error);
 
 	while ((error = gfs_readdir_pred(&gstate, uiop, &off)) == 0 &&
@@ -861,7 +921,7 @@ gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data, cred_t *cr,
 			ino = dp->gfsd_inode(dvp, off);
 
 			if ((error = gfs_readdir_emit(&gstate, uiop,
-			    off, ino, dp->gfsd_static[off].gfse_name))
+			    off, ino, dp->gfsd_static[off].gfse_name, 0))
 			    != 0)
 				break;
 
@@ -870,7 +930,7 @@ gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data, cred_t *cr,
 
 			if ((error = dp->gfsd_readdir(dvp,
 			    gstate.grd_dirent, &eof, &off, &next,
-			    data)) != 0 || eof)
+			    data, flags)) != 0 || eof)
 				break;
 
 			off += dp->gfsd_nstatic + 2;
@@ -918,7 +978,7 @@ int
 gfs_vop_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
     caller_context_t *ct, int flags)
 {
-	return (gfs_dir_readdir(vp, uiop, eofp, NULL, cr, ct));
+	return (gfs_dir_readdir(vp, uiop, eofp, NULL, cr, ct, flags));
 }
 
 

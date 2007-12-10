@@ -1309,7 +1309,7 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 
 	error = dmu_snapshot_list_next(os,
 	    sizeof (zc->zc_name) - strlen(zc->zc_name),
-	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie);
+	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie, NULL);
 	if (error == ENOENT)
 		error = ESRCH;
 

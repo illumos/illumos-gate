@@ -780,25 +780,41 @@ domount:
 
 /* ARGSUSED */
 static int
-zfsctl_snapdir_readdir_cb(vnode_t *vp, struct dirent64 *dp, int *eofp,
-    offset_t *offp, offset_t *nextp, void *data)
+zfsctl_snapdir_readdir_cb(vnode_t *vp, void *dp, int *eofp,
+    offset_t *offp, offset_t *nextp, void *data, int flags)
 {
 	zfsvfs_t *zfsvfs = vp->v_vfsp->vfs_data;
 	char snapname[MAXNAMELEN];
 	uint64_t id, cookie;
+	boolean_t case_conflict;
+	int error;
 
 	ZFS_ENTER(zfsvfs);
 
 	cookie = *offp;
-	if (dmu_snapshot_list_next(zfsvfs->z_os, MAXNAMELEN, snapname, &id,
-	    &cookie) == ENOENT) {
-		*eofp = 1;
+	error = dmu_snapshot_list_next(zfsvfs->z_os, MAXNAMELEN, snapname, &id,
+	    &cookie, &case_conflict);
+	if (error) {
 		ZFS_EXIT(zfsvfs);
-		return (0);
+		if (error == ENOENT) {
+			*eofp = 1;
+			return (0);
+		}
+		return (error);
 	}
 
-	(void) strcpy(dp->d_name, snapname);
-	dp->d_ino = ZFSCTL_INO_SNAP(id);
+	if (flags & V_RDDIR_ENTFLAGS) {
+		edirent_t *eodp = dp;
+
+		(void) strcpy(eodp->ed_name, snapname);
+		eodp->ed_ino = ZFSCTL_INO_SNAP(id);
+		eodp->ed_eflags = case_conflict ? ED_CASE_CONFLICT : 0;
+	} else {
+		struct dirent64 *odp = dp;
+
+		(void) strcpy(odp->d_name, snapname);
+		odp->d_ino = ZFSCTL_INO_SNAP(id);
+	}
 	*nextp = cookie;
 
 	ZFS_EXIT(zfsvfs);

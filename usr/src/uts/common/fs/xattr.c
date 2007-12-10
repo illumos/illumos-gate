@@ -769,6 +769,22 @@ is_sattr_name(char *s)
 	return (0);
 }
 
+/*
+ * Given the name of an extended attribute file, determine if there is a
+ * normalization conflict with a sysattr view name.
+ */
+int
+xattr_sysattr_casechk(char *s)
+{
+	int i;
+
+	for (i = 0; i < XATTRDIR_NENTS; ++i) {
+		if (strcasecmp(s, xattr_dirents[i].gfse_name) == 0)
+			return (1);
+	}
+	return (0);
+}
+
 static int
 xattr_copy(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
     cred_t *cr, caller_context_t *ct)
@@ -1075,6 +1091,37 @@ xattr_dir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	return (error);
 }
 
+/*
+ * readdir_xattr_casecmp: given a system attribute name, see if there
+ * is a real xattr with the same normalized name.
+ */
+static int
+readdir_xattr_casecmp(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
+    int *eflags)
+{
+	int error;
+	vnode_t *vp;
+	struct pathname pn;
+	int flags = FIGNORECASE;
+
+	*eflags = 0;
+
+	error = pn_get(nm, UIO_SYSSPACE, &pn);
+	if (error == 0) {
+		error = VOP_LOOKUP(dvp, nm, &vp, &pn, LOOKUP_XATTR, rootvp,
+		    cr, ct, &flags, NULL);
+		if (error == 0) {
+			*eflags = ED_CASE_CONFLICT;
+			VN_RELE(vp);
+		} else if (error == ENOENT) {
+			error = 0;
+		}
+		pn_free(&pn);
+	}
+
+	return (error);
+}
+
 static int
 xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
     caller_context_t *ct, int flags)
@@ -1101,6 +1148,11 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 	 * Start by reading up the static entries.
 	 */
 	if (uiop->uio_loffset == 0) {
+		ino64_t pino, ino;
+		offset_t off;
+		gfs_dir_t *dp = dvp->v_data;
+		gfs_readdir_state_t gstate;
+
 		if (has_xattrs) {
 			/*
 			 * If there is a real xattr dir, skip . and ..
@@ -1109,13 +1161,53 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 			 */
 			uiop->uio_loffset = GFS_STATIC_ENTRY_OFFSET;
 		}
-		error = gfs_dir_readdir(dvp, uiop, eofp, NULL, cr, ct);
+		error = gfs_get_parent_ino(dvp, cr, ct, &pino, &ino);
+		if (error == 0) {
+			error = gfs_readdir_init(&gstate, dp->gfsd_maxlen, 1,
+			    uiop, pino, ino, flags);
+		}
 		if (error) {
-			if (has_xattrs) {
+			if (has_xattrs)
 				VN_RELE(pvp);
-			}
 			return (error);
 		}
+
+		while ((error = gfs_readdir_pred(&gstate, uiop, &off)) == 0 &&
+		    !*eofp) {
+			if (off >= 0 && off < dp->gfsd_nstatic) {
+				int eflags = 0;
+
+				/*
+				 * Check to see if this sysattr set name has a
+				 * case-insensitive conflict with a real xattr
+				 * name.
+				 */
+				if ((flags & V_RDDIR_ENTFLAGS) && has_xattrs) {
+					error = readdir_xattr_casecmp(pvp,
+					    dp->gfsd_static[off].gfse_name,
+					    cr, ct, &eflags);
+					if (error)
+						break;
+				}
+				ino = dp->gfsd_inode(dvp, off);
+
+				error = gfs_readdir_emit(&gstate, uiop, off,
+				    ino, dp->gfsd_static[off].gfse_name,
+				    eflags);
+				if (error)
+					break;
+			} else {
+				*eofp = 1;
+			}
+		}
+
+		error = gfs_readdir_fini(&gstate, error, eofp, *eofp);
+		if (error) {
+			if (has_xattrs)
+				VN_RELE(pvp);
+			return (error);
+		}
+
 		/*
 		 * We must read all of the static entries in the first
 		 * call.  Otherwise we won't know if uio_loffset in a

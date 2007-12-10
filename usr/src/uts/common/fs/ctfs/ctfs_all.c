@@ -48,8 +48,8 @@
  * CTFS routines for the /system/contract/all vnode.
  */
 
-static int ctfs_adir_do_readdir(vnode_t *, struct dirent64 *, int *, offset_t *,
-    offset_t *, void *);
+static int ctfs_adir_do_readdir(vnode_t *, void *, int *, offset_t *,
+    offset_t *, void *, int);
 static int ctfs_adir_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
     cred_t *);
 
@@ -120,11 +120,16 @@ ctfs_adir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
 
 /* ARGSUSED */
 static int
-ctfs_adir_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
-    offset_t *offp, offset_t *nextp, void *unused)
+ctfs_adir_do_readdir(vnode_t *vp, void *dp, int *eofp,
+    offset_t *offp, offset_t *nextp, void *unused, int flags)
 {
 	uint64_t zuniqid;
 	ctid_t next;
+	struct dirent64 *odp = dp;
+
+	/* ctfs does not support V_RDDIR_ENTFLAGS */
+	if (flags & V_RDDIR_ENTFLAGS)
+		return (ENOTSUP);
 
 	zuniqid = VTOZONE(vp)->zone_uniqid;
 	next = contract_lookup(zuniqid, *offp);
@@ -134,8 +139,8 @@ ctfs_adir_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 		return (0);
 	}
 
-	dp->d_ino = CTFS_INO_CT_LINK(next);
-	numtos(next, dp->d_name);
+	odp->d_ino = CTFS_INO_CT_LINK(next);
+	numtos(next, odp->d_name);
 	*offp = next;
 	*nextp = next + 1;
 

@@ -40,8 +40,8 @@ extern int last_module_id;
 
 static int objfs_root_do_lookup(vnode_t *, const char *, vnode_t **, ino64_t *,
     cred_t *);
-static int objfs_root_do_readdir(vnode_t *, struct dirent64 *, int *,
-    offset_t *, offset_t *, void *);
+static int objfs_root_do_readdir(vnode_t *, void *, int *,
+    offset_t *, offset_t *, void *, int);
 
 vnode_t *
 objfs_create_root(vfs_t *vfsp)
@@ -105,11 +105,16 @@ objfs_root_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop,
 
 /* ARGSUSED */
 int
-objfs_root_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
-    offset_t *offp, offset_t *nextp, void *data)
+objfs_root_do_readdir(vnode_t *vp, void *dp, int *eofp,
+    offset_t *offp, offset_t *nextp, void *data, int flags)
 {
 	struct modctl **mpp = data;
 	struct modctl *mp = *mpp;
+	struct dirent64 *odp = dp;
+
+	/* objfs does not support V_RDDIR_ENTFLAGS */
+	if (flags & V_RDDIR_ENTFLAGS)
+		return (ENOTSUP);
 
 	mutex_enter(&mod_lock);
 
@@ -142,8 +147,8 @@ objfs_root_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 	 */
 	mutex_exit(&mod_lock);
 
-	(void) strncpy(dp->d_name, mp->mod_modname, OBJFS_NAME_MAX);
-	dp->d_ino = OBJFS_INO_ODIR(mp->mod_id);
+	(void) strncpy(odp->d_name, mp->mod_modname, OBJFS_NAME_MAX);
+	odp->d_ino = OBJFS_INO_ODIR(mp->mod_id);
 	*offp = mp->mod_id;
 	*nextp = mp->mod_id + 1;
 
@@ -157,7 +162,7 @@ objfs_root_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp,
 {
 	struct modctl *mp = &modules;
 
-	return (gfs_dir_readdir(vp, uiop, eofp, &mp, cr, ct));
+	return (gfs_dir_readdir(vp, uiop, eofp, &mp, cr, ct, flags));
 }
 
 const fs_operation_def_t objfs_tops_root[] = {

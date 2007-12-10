@@ -73,6 +73,7 @@
 #include <sys/extdirent.h>
 #include <sys/kidmap.h>
 #include <sys/cred_impl.h>
+#include <sys/attr.h>
 
 /*
  * Programming rules.
@@ -1861,6 +1862,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	int		outcount;
 	int		error;
 	uint8_t		prefetch;
+	boolean_t	check_sysattrs;
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
@@ -1924,6 +1926,16 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 	eodp = (struct edirent *)odp;
 
 	/*
+	 * If this VFS supports system attributes; and we're looking at an
+	 * extended attribute directory; and we care about normalization
+	 * conflicts on this vfs; then we must check for normalization
+	 * conflicts with the sysattr name space.
+	 */
+	check_sysattrs = vfs_has_feature(vp->v_vfsp, VFSFT_XVATTR) &&
+	    (vp->v_flag & V_XATTRDIR) && zfsvfs->z_norm &&
+	    (flags & V_RDDIR_ENTFLAGS);
+
+	/*
 	 * Transform to file-system independent format
 	 */
 	outcount = 0;
@@ -1973,6 +1985,11 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			 * MacOS X can extract the object type here such as:
 			 * uint8_t type = ZFS_DIRENT_TYPE(zap.za_first_integer);
 			 */
+
+			if (check_sysattrs && !zap.za_normalization_conflict) {
+				zap.za_normalization_conflict =
+				    xattr_sysattr_casechk(zap.za_name);
+			}
 		}
 
 		if (flags & V_RDDIR_ENTFLAGS)

@@ -946,7 +946,7 @@ dmu_objset_is_snapshot(objset_t *os)
 
 int
 dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
-    uint64_t *idp, uint64_t *offp)
+    uint64_t *idp, uint64_t *offp, boolean_t *case_conflict)
 {
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
 	zap_cursor_t cursor;
@@ -972,6 +972,8 @@ dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
 	(void) strcpy(name, attr.za_name);
 	if (idp)
 		*idp = attr.za_first_integer;
+	if (case_conflict)
+		*case_conflict = attr.za_normalization_conflict;
 	zap_cursor_advance(&cursor);
 	*offp = zap_cursor_serialize(&cursor);
 	zap_cursor_fini(&cursor);

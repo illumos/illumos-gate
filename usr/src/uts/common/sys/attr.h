@@ -131,6 +131,7 @@ typedef struct {
 #define	XATTR_FIDSZ (sizeof (xattr_fid_t) - sizeof (uint16_t))
 
 int xattr_dir_vget(vfs_t *, vnode_t **, fid_t *);
+int xattr_sysattr_casechk(char *name);
 #endif
 
 int attr_count(void);

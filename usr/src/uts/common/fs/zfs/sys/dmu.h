@@ -539,7 +539,7 @@ extern void dmu_objset_name(objset_t *os, char *buf);
 extern dmu_objset_type_t dmu_objset_type(objset_t *os);
 extern uint64_t dmu_objset_id(objset_t *os);
 extern int dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
-    uint64_t *id, uint64_t *offp);
+    uint64_t *id, uint64_t *offp, boolean_t *case_conflict);
 extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
     uint64_t *idp, uint64_t *offp);
 extern void dmu_objset_set_user(objset_t *os, void *user_ptr);

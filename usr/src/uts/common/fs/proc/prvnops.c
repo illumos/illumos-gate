@@ -420,7 +420,7 @@ prclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 		return (0);
 
 	ASSERT(type != PR_OBJECT && type != PR_FD &&
-		type != PR_CURDIR && type != PR_ROOTDIR);
+	    type != PR_CURDIR && type != PR_ROOTDIR);
 
 	/*
 	 * If the process exists, lock it now.
@@ -2267,7 +2267,7 @@ pr_read_lusage_32(prnode_t *pnp, uio_t *uiop)
 		ASSERT(nlwp > 0);
 		--nlwp;
 		upup = (prusage32_t *)
-			((caddr_t)upup + LSPAN32(prusage32_t));
+		    ((caddr_t)upup + LSPAN32(prusage32_t));
 		prgetusage(t, pup);
 		prcvtusage32(pup, upup);
 	}
@@ -2825,7 +2825,7 @@ prgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 	vap->va_nlink = 1;
 	vap->va_nodeid = pnp->pr_ino? pnp->pr_ino :
-		pmkino(pcp->prc_tslot, pcp->prc_slot, pnp->pr_type);
+	    pmkino(pcp->prc_tslot, pcp->prc_slot, pnp->pr_type);
 	if ((pcp->prc_flags & PRC_LWP) && pcp->prc_tslot != -1) {
 		vap->va_atime.tv_sec = vap->va_mtime.tv_sec =
 		    vap->va_ctime.tv_sec =
@@ -3519,7 +3519,7 @@ pr_lookup_piddir(vnode_t *dp, char *comp)
 	case PR_ROOTDIR:
 		up = PTOU(p);
 		vp = (type == PR_CURDIR)? up->u_cdir :
-			(up->u_rdir? up->u_rdir : rootdir);
+		    (up->u_rdir? up->u_rdir : rootdir);
 
 		if (vp == NULL) {	/* can't happen? */
 			prunlock(dpnp);
@@ -4635,7 +4635,7 @@ pr_readdir_procdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 	zoneid = VTOZONE(PTOV(pnp))->zone_id;
 
 	if ((error = gfs_readdir_init(&gstate, PNSIZ, PRSDSIZE, uiop,
-	    PRROOTINO, PRROOTINO)) != 0)
+	    PRROOTINO, PRROOTINO, 0)) != 0)
 		return (error);
 
 	/*
@@ -4726,7 +4726,7 @@ pr_readdir_piddir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			dirent.d_ino = PRROOTINO;
 		else
 			dirent.d_ino = pmkino(0, pnp->pr_pcommon->prc_slot,
-					dirent.d_ino);
+			    dirent.d_ino);
 		if ((error = uiomove((caddr_t)&dirent, sizeof (prdirent_t),
 		    UIO_READ, uiop)) != 0)
 			return (error);
@@ -4819,9 +4819,9 @@ rebuild_objdir(struct as *as)
 		 */
 		ulong_t newsize = (nold + nnew + 0xf) & ~0xf;
 		vnode_t **newdir = kmem_zalloc(newsize * sizeof (vnode_t *),
-					KM_SLEEP);
+		    KM_SLEEP);
 		bcopy(as->a_objectdir, newdir,
-			as->a_sizedir * sizeof (vnode_t *));
+		    as->a_sizedir * sizeof (vnode_t *));
 		kmem_free(as->a_objectdir, as->a_sizedir * sizeof (vnode_t *));
 		as->a_objectdir = newdir;
 		as->a_sizedir = newsize;
@@ -4891,7 +4891,7 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 
 	if ((error = gfs_readdir_init(&gstate, 64, PRSDSIZE, uiop,
 	    pmkino(0, pslot, PR_PIDDIR),
-	    pmkino(0, pslot, PR_OBJECTDIR))) != 0) {
+	    pmkino(0, pslot, PR_OBJECTDIR), 0)) != 0) {
 		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		return (error);
@@ -4952,7 +4952,7 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			pr_object_name(str, vp, &vattr);
 
 		error = gfs_readdir_emit(&gstate, uiop, n, vattr.va_nodeid,
-		    str);
+		    str, 0);
 
 		if (error)
 			break;
@@ -4996,7 +4996,8 @@ pr_readdir_lwpdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 
 
 	if ((error = gfs_readdir_init(&gstate, PLNSIZ, PRSDSIZE, uiop,
-	    pmkino(0, pslot, PR_PIDDIR), pmkino(0, pslot, PR_LWPDIR))) != 0) {
+	    pmkino(0, pslot, PR_PIDDIR),
+	    pmkino(0, pslot, PR_LWPDIR), 0)) != 0) {
 		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		return (error);
@@ -5126,7 +5127,7 @@ pr_readdir_fddir(prnode_t *pnp, uio_t *uiop, int *eofp)
 	mutex_exit(&p->p_lock);
 
 	if ((error = gfs_readdir_init(&gstate, PLNSIZ, PRSDSIZE, uiop,
-	    pmkino(0, pslot, PR_PIDDIR), pmkino(0, pslot, PR_FDDIR))) != 0) {
+	    pmkino(0, pslot, PR_PIDDIR), pmkino(0, pslot, PR_FDDIR), 0)) != 0) {
 		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		return (error);
@@ -5353,7 +5354,7 @@ pr_readdir_tmpldir(prnode_t *pnp, uio_t *uiop, int *eofp)
 
 	if ((error = gfs_readdir_init(&gstate, PRDIRSIZE, PRSDSIZE, uiop,
 	    pmkino(tslot, pslot, PR_LWPDIR),
-	    pmkino(tslot, pslot, PR_TMPLDIR))) != 0) {
+	    pmkino(tslot, pslot, PR_TMPLDIR), 0)) != 0) {
 		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		return (error);
@@ -5382,7 +5383,7 @@ pr_readdir_tmpldir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		ASSERT(ct_ntypes <= 4);
 		error = gfs_readdir_emit(&gstate, uiop, n,
 		    pmkino((tslot << 2) | n, pslot, PR_TMPL),
-		    ct_types[n]->ct_type_name);
+		    ct_types[n]->ct_type_name, 0);
 		if (error)
 			break;
 	}
@@ -5412,7 +5413,7 @@ pr_readdir_ctdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 	mutex_exit(&p->p_lock);
 
 	if ((error = gfs_readdir_init(&gstate, PRDIRSIZE, PRSDSIZE, uiop,
-	    pmkino(0, pslot, PR_PIDDIR), pmkino(0, pslot, PR_CTDIR))) != 0) {
+	    pmkino(0, pslot, PR_PIDDIR), pmkino(0, pslot, PR_CTDIR), 0)) != 0) {
 		mutex_enter(&p->p_lock);
 		prunlock(pnp);
 		return (error);
