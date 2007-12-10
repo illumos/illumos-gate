@@ -75,6 +75,7 @@
 #include <sys/sunddi.h>
 #include <sys/types.h>
 #include <sys/promif.h>
+#include <sys/var.h>
 #include <sys/vtoc.h>
 #include <sys/archsystm.h>
 #include <sys/sysmacros.h>
@@ -82,8 +83,11 @@
 #include <sys/cdio.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/dktp/dadkio.h>
+#include <sys/mhd.h>
 #include <sys/scsi/generic/sense.h>
-#include <sys/scsi/impl/uscsi.h>	/* Needed for defn of USCSICMD ioctl */
+#include <sys/scsi/impl/uscsi.h>
+#include <sys/scsi/impl/services.h>
+#include <sys/scsi/targets/sddef.h>
 
 #include <sys/ldoms.h>
 #include <sys/ldc.h>
@@ -165,9 +169,9 @@ static int	vdc_map_to_shared_dring(vdc_t *vdcp, int idx);
 static int 	vdc_populate_descriptor(vdc_t *vdcp, int operation,
 		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
 		    int cb_type, void *cb_arg, vio_desc_direction_t dir);
-static int 	vdc_do_sync_op(vdc_t *vdcp, int operation,
-		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
-		    int cb_type, void *cb_arg, vio_desc_direction_t dir);
+static int 	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
+		    size_t nbytes, int slice, diskaddr_t offset, int cb_type,
+		    void *cb_arg, vio_desc_direction_t dir, boolean_t);
 
 static int	vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp);
 static int	vdc_drain_response(vdc_t *vdcp);
@@ -176,7 +180,9 @@ static int	vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep);
 static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
 
 /* dkio */
-static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
+static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode,
+		    int *rvalp);
+static int	vd_process_efi_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
 static void	vdc_create_fake_geometry(vdc_t *vdc);
 static int	vdc_validate_geometry(vdc_t *vdc);
 static void	vdc_validate(vdc_t *vdc);
@@ -199,6 +205,11 @@ static int	vdc_get_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
+
+static void 	vdc_ownership_update(vdc_t *vdc, int ownership_flags);
+static int	vdc_access_set(vdc_t *vdc, uint64_t flags, int mode);
+static vdc_io_t	*vdc_failfast_io_queue(vdc_t *vdc, struct buf *buf);
+static int	vdc_failfast_check_resv(vdc_t *vdc);
 
 /*
  * Module variables
@@ -224,8 +235,15 @@ static uint64_t vdc_ldc_read_max_delay = 100 * MILLISEC;
 static uint64_t	vdc_usec_timeout_dump = 100 * MILLISEC;	/* 0.1s units: ns */
 static int	vdc_dump_retries = 100;
 
+static uint16_t	vdc_scsi_timeout = 60;	/* 60s units: seconds  */
+
+static uint64_t vdc_ownership_delay = 6 * MICROSEC; /* 6s units: usec */
+
 /* Count of the number of vdc instances attached */
 static volatile uint32_t	vdc_instance_count = 0;
+
+/* Tunable to log all SCSI errors */
+static boolean_t vdc_scsi_log_error = B_FALSE;
 
 /* Soft state pointer */
 static void	*vdc_state;
@@ -309,7 +327,7 @@ _init(void)
 		return (status);
 	if ((status = mod_install(&modlinkage)) != 0)
 		ddi_soft_state_fini(&vdc_state);
-	vdc_efi_init(vd_process_ioctl);
+	vdc_efi_init(vd_process_efi_ioctl);
 	return (status);
 }
 
@@ -359,6 +377,7 @@ vdc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,  void *arg, void **resultp)
 static int
 vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
+	kt_did_t failfast_tid, ownership_tid;
 	int	instance;
 	int	rv;
 	vdc_t	*vdc = NULL;
@@ -383,7 +402,14 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	if (vdc_is_opened(vdc)) {
+	/*
+	 * This function is called when vdc is detached or if it has failed to
+	 * attach. In that case, the attach may have fail before the vdisk type
+	 * has been set so we can't call vdc_is_opened(). However as the attach
+	 * has failed, we know that the vdisk is not opened and we can safely
+	 * detach.
+	 */
+	if (vdc->vdisk_type != VD_DISK_TYPE_UNK && vdc_is_opened(vdc)) {
 		DMSG(vdc, 0, "[%d] Cannot detach: device is open", instance);
 		return (DDI_FAILURE);
 	}
@@ -403,6 +429,16 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	DMSG(vdc, 0, "[%d] proceeding...\n", instance);
+
+	/* If we took ownership, release ownership */
+	mutex_enter(&vdc->ownership_lock);
+	if (vdc->ownership & VDC_OWNERSHIP_GRANTED) {
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR, FKIOCTL);
+		if (rv == 0) {
+			vdc_ownership_update(vdc, VDC_OWNERSHIP_NONE);
+		}
+	}
+	mutex_exit(&vdc->ownership_lock);
 
 	/* mark instance as detaching */
 	vdc->lifecycle	= VDC_LC_DETACHING;
@@ -449,7 +485,29 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->initialized & VDC_LDC)
 		vdc_terminate_ldc(vdc);
 
+	if (vdc->failfast_thread) {
+		failfast_tid = vdc->failfast_thread->t_did;
+		vdc->failfast_interval = 0;
+		cv_signal(&vdc->failfast_cv);
+	} else {
+		failfast_tid = 0;
+	}
+
+	if (vdc->ownership & VDC_OWNERSHIP_WANTED) {
+		ownership_tid = vdc->ownership_thread->t_did;
+		vdc->ownership = VDC_OWNERSHIP_NONE;
+		cv_signal(&vdc->ownership_cv);
+	} else {
+		ownership_tid = 0;
+	}
+
 	mutex_exit(&vdc->lock);
+
+	if (failfast_tid != 0)
+		thread_join(failfast_tid);
+
+	if (ownership_tid != 0)
+		thread_join(ownership_tid);
 
 	if (vdc->initialized & VDC_MINOR) {
 		ddi_prop_remove_all(dip);
@@ -459,6 +517,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (vdc->initialized & VDC_LOCKS) {
 		mutex_destroy(&vdc->lock);
 		mutex_destroy(&vdc->read_lock);
+		mutex_destroy(&vdc->ownership_lock);
 		cv_destroy(&vdc->initwait_cv);
 		cv_destroy(&vdc->dring_free_cv);
 		cv_destroy(&vdc->membind_cv);
@@ -466,6 +525,9 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		cv_destroy(&vdc->sync_blocked_cv);
 		cv_destroy(&vdc->read_cv);
 		cv_destroy(&vdc->running_cv);
+		cv_destroy(&vdc->ownership_cv);
+		cv_destroy(&vdc->failfast_cv);
+		cv_destroy(&vdc->failfast_io_cv);
 	}
 
 	if (vdc->minfo)
@@ -563,6 +625,11 @@ vdc_do_attach(dev_info_t *dip)
 	vdc->sync_op_blocked = B_FALSE;
 	cv_init(&vdc->sync_pending_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&vdc->sync_blocked_cv, NULL, CV_DRIVER, NULL);
+
+	mutex_init(&vdc->ownership_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&vdc->ownership_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&vdc->failfast_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&vdc->failfast_io_cv, NULL, CV_DRIVER, NULL);
 
 	/* init blocking msg read functionality */
 	mutex_init(&vdc->read_lock, NULL, MUTEX_DRIVER, NULL);
@@ -1197,7 +1264,7 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 
 	int	instance;
 	int	slice;
-	int	rv;
+	int	rv, rval;
 	vdc_t	*vdc;
 
 	instance = VDCUNIT(dev);
@@ -1219,7 +1286,7 @@ vdc_close(dev_t dev, int flag, int otyp, cred_t *cred)
 	 * not a supported IOCTL command or the backing device is read-only
 	 * do not fail the close operation.
 	 */
-	rv = vd_process_ioctl(dev, DKIOCFLUSHWRITECACHE, NULL, FKIOCTL);
+	rv = vd_process_ioctl(dev, DKIOCFLUSHWRITECACHE, NULL, FKIOCTL, &rval);
 
 	if (rv != 0 && rv != ENOTSUP && rv != ENOTTY && rv != EROFS) {
 		DMSG(vdc, 0, "[%d] flush failed with error %d on close\n",
@@ -1238,9 +1305,8 @@ static int
 vdc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
 	_NOTE(ARGUNUSED(credp))
-	_NOTE(ARGUNUSED(rvalp))
 
-	return (vd_process_ioctl(dev, cmd, (caddr_t)arg, mode));
+	return (vd_process_ioctl(dev, cmd, (caddr_t)arg, mode, rvalp));
 }
 
 static int
@@ -2639,6 +2705,16 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 				return (EIO);
 			}
 
+			/*
+			 * If we are panicking and the disk is not ready then
+			 * we can't send any request because we can't complete
+			 * the handshake now.
+			 */
+			if (ddi_in_panic()) {
+				mutex_exit(&vdcp->lock);
+				return (EIO);
+			}
+
 			cv_wait(&vdcp->running_cv, &vdcp->lock);
 		}
 
@@ -2815,20 +2891,27 @@ cleanup_and_exit:
  *			. mode for ioctl(9e)
  *			. LP64 diskaddr_t (block I/O)
  *	dir	  - direction of operation (READ/WRITE/BOTH)
+ *	rconflict - check for reservation conflict in case of failure
+ *
+ * rconflict should be set to B_TRUE by most callers. Callers invoking the
+ * VD_OP_SCSICMD operation can set rconflict to B_FALSE if they check the
+ * result of a successful operation with vd_scsi_status().
  *
  * Return Codes:
  *	0
  *	EAGAIN
- *		EFAULT
- *		ENXIO
- *		EIO
+ *	EFAULT
+ *	ENXIO
+ *	EIO
  */
 static int
 vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
     int slice, diskaddr_t offset, int cb_type, void *cb_arg,
-    vio_desc_direction_t dir)
+    vio_desc_direction_t dir, boolean_t rconflict)
 {
 	int status;
+	vdc_io_t *vio;
+	boolean_t check_resv_conflict = B_FALSE;
 
 	ASSERT(cb_type == CB_SYNC);
 
@@ -2875,6 +2958,15 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 			status = ENXIO;
 		} else {
 			status = vdcp->sync_op_status;
+			if (status != 0 && vdcp->failfast_interval != 0) {
+				/*
+				 * Operation has failed and failfast is enabled.
+				 * We need to check if the failure is due to a
+				 * reservation conflict if this was requested.
+				 */
+				check_resv_conflict = rconflict;
+			}
+
 		}
 	}
 
@@ -2884,6 +2976,19 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 
 	/* signal the next waiting thread */
 	cv_signal(&vdcp->sync_blocked_cv);
+
+	/*
+	 * We have to check for reservation conflict after unblocking sync
+	 * operations because some sync operations will be used to do this
+	 * check.
+	 */
+	if (check_resv_conflict) {
+		vio = vdc_failfast_io_queue(vdcp, NULL);
+		while (vio->vio_qtime != 0)
+			cv_wait(&vdcp->failfast_io_cv, &vdcp->lock);
+		kmem_free(vio, sizeof (vdc_io_t));
+	}
+
 	mutex_exit(&vdcp->lock);
 
 	return (status);
@@ -3872,6 +3977,15 @@ done:
 			 */
 			vdcp->hshake_cnt = 0;
 			cv_broadcast(&vdcp->running_cv);
+
+			/* failfast has to been checked after reset */
+			cv_signal(&vdcp->failfast_cv);
+
+			/* ownership is lost during reset */
+			if (vdcp->ownership & VDC_OWNERSHIP_WANTED)
+				vdcp->ownership |= VDC_OWNERSHIP_RESET;
+			cv_signal(&vdcp->ownership_cv);
+
 			mutex_exit(&vdcp->lock);
 
 			for (;;) {
@@ -4098,12 +4212,23 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 				DMSG(vdcp, 1, "strategy status=%d\n", status);
 				bioerror(bufp, status);
 			}
-			status = vdc_depopulate_descriptor(vdcp, idx);
-			biodone(bufp);
+
+			(void) vdc_depopulate_descriptor(vdcp, idx);
 
 			DMSG(vdcp, 1,
 			    "strategy complete req=%ld bytes resp=%ld bytes\n",
 			    bufp->b_bcount, ldep->dep->payload.nbytes);
+
+			if (status != 0 && vdcp->failfast_interval != 0) {
+				/*
+				 * The I/O has failed and failfast is enabled.
+				 * We need the failfast thread to check if the
+				 * failure is due to a reservation conflict.
+				 */
+				(void) vdc_failfast_io_queue(vdcp, bufp);
+			} else {
+				biodone(bufp);
+			}
 			break;
 
 		default:
@@ -4253,10 +4378,16 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 			break;
 		}
 
+		if (attr_msg->vdisk_size == VD_SIZE_UNKNOWN) {
+			DMSG(vdc, 0, "[%d] Unknown disk size from vds",
+			    vdc->instance);
+			attr_msg->vdisk_size = 0;
+		}
+
 		/*
 		 * If the disk size is already set check that it hasn't changed.
 		 */
-		if ((vdc->vdisk_size != 0) &&
+		if ((vdc->vdisk_size != 0) && (attr_msg->vdisk_size != 0) &&
 		    (vdc->vdisk_size != attr_msg->vdisk_size)) {
 			DMSG(vdc, 0, "[%d] Different disk size from vds "
 			    "(old=0x%lx - new=0x%lx", vdc->instance,
@@ -4562,7 +4693,7 @@ vdc_dkio_flush_cb(void *arg)
 	ASSERT(vdc != NULL);
 
 	rv = vdc_do_sync_op(vdc, VD_OP_FLUSH, NULL, 0,
-	    VDCPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir);
+	    VDCPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir, B_TRUE);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
 		    vdc->instance, rv,
@@ -4730,6 +4861,1258 @@ vdc_dioctl_rwcmd(dev_t dev, caddr_t arg, int flag)
 }
 
 /*
+ * Allocate a buffer for a VD_OP_SCSICMD operation. The size of the allocated
+ * buffer is returned in alloc_len.
+ */
+static vd_scsi_t *
+vdc_scsi_alloc(int cdb_len, int sense_len, int datain_len, int dataout_len,
+    int *alloc_len)
+{
+	vd_scsi_t *vd_scsi;
+	int vd_scsi_len = VD_SCSI_SIZE;
+
+	vd_scsi_len += P2ROUNDUP(cdb_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(sense_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(datain_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(dataout_len, sizeof (uint64_t));
+
+	ASSERT(vd_scsi_len % sizeof (uint64_t) == 0);
+
+	vd_scsi = kmem_zalloc(vd_scsi_len, KM_SLEEP);
+
+	vd_scsi->cdb_len = cdb_len;
+	vd_scsi->sense_len = sense_len;
+	vd_scsi->datain_len = datain_len;
+	vd_scsi->dataout_len = dataout_len;
+
+	*alloc_len = vd_scsi_len;
+
+	return (vd_scsi);
+}
+
+/*
+ * Convert the status of a SCSI command to a Solaris return code.
+ *
+ * Arguments:
+ *	vd_scsi		- The SCSI operation buffer.
+ *	log_error	- indicate if an error message should be logged.
+ *
+ * Note that our SCSI error messages are rather primitive for the moment
+ * and could be improved by decoding some data like the SCSI command and
+ * the sense key.
+ *
+ * Return value:
+ *	0		- Status is good.
+ *	EACCES		- Status reports a reservation conflict.
+ *	ENOTSUP		- Status reports a check condition and sense key
+ *			  reports an illegal request.
+ *	EIO		- Any other status.
+ */
+static int
+vdc_scsi_status(vdc_t *vdc, vd_scsi_t *vd_scsi, boolean_t log_error)
+{
+	int rv;
+	char path_str[MAXPATHLEN];
+	char panic_str[VDC_RESV_CONFLICT_FMT_LEN + MAXPATHLEN];
+	union scsi_cdb *cdb;
+	struct scsi_extended_sense *sense;
+
+	if (vd_scsi->cmd_status == STATUS_GOOD)
+		/* no error */
+		return (0);
+
+	/* when the tunable vdc_scsi_log_error is true we log all errors */
+	if (vdc_scsi_log_error)
+		log_error = B_TRUE;
+
+	if (log_error) {
+		cmn_err(CE_WARN, "%s (vdc%d):\tError for Command: 0x%x)\n",
+		    ddi_pathname(vdc->dip, path_str), vdc->instance,
+		    GETCMD(VD_SCSI_DATA_CDB(vd_scsi)));
+	}
+
+	/* default returned value */
+	rv = EIO;
+
+	switch (vd_scsi->cmd_status) {
+
+	case STATUS_CHECK:
+	case STATUS_TERMINATED:
+		if (log_error)
+			cmn_err(CE_CONT, "\tCheck Condition Error\n");
+
+		/* check sense buffer */
+		if (vd_scsi->sense_len == 0 ||
+		    vd_scsi->sense_status != STATUS_GOOD) {
+			if (log_error)
+				cmn_err(CE_CONT, "\tNo Sense Data Available\n");
+			break;
+		}
+
+		sense = VD_SCSI_DATA_SENSE(vd_scsi);
+
+		if (log_error) {
+			cmn_err(CE_CONT, "\tSense Key:  0x%x\n"
+			    "\tASC: 0x%x, ASCQ: 0x%x\n",
+			    scsi_sense_key((uint8_t *)sense),
+			    scsi_sense_asc((uint8_t *)sense),
+			    scsi_sense_ascq((uint8_t *)sense));
+		}
+
+		if (scsi_sense_key((uint8_t *)sense) == KEY_ILLEGAL_REQUEST)
+			rv = ENOTSUP;
+		break;
+
+	case STATUS_BUSY:
+		if (log_error)
+			cmn_err(CE_NOTE, "\tDevice Busy\n");
+		break;
+
+	case STATUS_RESERVATION_CONFLICT:
+		/*
+		 * If the command was PERSISTENT_RESERVATION_[IN|OUT] then
+		 * reservation conflict could be due to various reasons like
+		 * incorrect keys, not registered or not reserved etc. So,
+		 * we should not panic in that case.
+		 */
+		cdb = VD_SCSI_DATA_CDB(vd_scsi);
+		if (vdc->failfast_interval != 0 &&
+		    cdb->scc_cmd != SCMD_PERSISTENT_RESERVE_IN &&
+		    cdb->scc_cmd != SCMD_PERSISTENT_RESERVE_OUT) {
+			/* failfast is enabled so we have to panic */
+			(void) snprintf(panic_str, sizeof (panic_str),
+			    VDC_RESV_CONFLICT_FMT_STR "%s",
+			    ddi_pathname(vdc->dip, path_str));
+			panic(panic_str);
+		}
+		if (log_error)
+			cmn_err(CE_NOTE, "\tReservation Conflict\n");
+		rv = EACCES;
+		break;
+
+	case STATUS_QFULL:
+		if (log_error)
+			cmn_err(CE_NOTE, "\tQueue Full\n");
+		break;
+
+	case STATUS_MET:
+	case STATUS_INTERMEDIATE:
+	case STATUS_SCSI2:
+	case STATUS_INTERMEDIATE_MET:
+	case STATUS_ACA_ACTIVE:
+		if (log_error)
+			cmn_err(CE_CONT,
+			    "\tUnexpected SCSI status received: 0x%x\n",
+			    vd_scsi->cmd_status);
+		break;
+
+	default:
+		if (log_error)
+			cmn_err(CE_CONT,
+			    "\tInvalid SCSI status received: 0x%x\n",
+			    vd_scsi->cmd_status);
+		break;
+	}
+
+	return (rv);
+}
+
+/*
+ * Implemented the USCSICMD uscsi(7I) ioctl. This ioctl is converted to
+ * a VD_OP_SCSICMD operation which is sent to the vdisk server. If a SCSI
+ * reset is requested (i.e. a flag USCSI_RESET* is set) then the ioctl is
+ * converted to a VD_OP_RESET operation.
+ */
+static int
+vdc_uscsi_cmd(vdc_t *vdc, caddr_t arg, int mode)
+{
+	struct uscsi_cmd 	uscsi;
+	struct uscsi_cmd32	uscsi32;
+	vd_scsi_t 		*vd_scsi;
+	int 			vd_scsi_len;
+	union scsi_cdb		*cdb;
+	struct scsi_extended_sense *sense;
+	char 			*datain, *dataout;
+	size_t			cdb_len, datain_len, dataout_len, sense_len;
+	int 			rv;
+
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		if (ddi_copyin(arg, &uscsi32, sizeof (struct uscsi_cmd32),
+		    mode) != 0)
+			return (EFAULT);
+		uscsi_cmd32touscsi_cmd((&uscsi32), (&uscsi));
+	} else {
+		if (ddi_copyin(arg, &uscsi, sizeof (struct uscsi_cmd),
+		    mode) != 0)
+			return (EFAULT);
+	}
+
+	/* a uscsi reset is converted to a VD_OP_RESET operation */
+	if (uscsi.uscsi_flags & (USCSI_RESET | USCSI_RESET_LUN |
+	    USCSI_RESET_ALL)) {
+		rv = vdc_do_sync_op(vdc, VD_OP_RESET, NULL, 0, 0, 0, CB_SYNC,
+		    (void *)(uint64_t)mode, VIO_both_dir, B_TRUE);
+		return (rv);
+	}
+
+	/* cdb buffer length */
+	cdb_len = uscsi.uscsi_cdblen;
+
+	/* data in and out buffers length */
+	if (uscsi.uscsi_flags & USCSI_READ) {
+		datain_len = uscsi.uscsi_buflen;
+		dataout_len = 0;
+	} else {
+		datain_len = 0;
+		dataout_len = uscsi.uscsi_buflen;
+	}
+
+	/* sense buffer length */
+	if (uscsi.uscsi_flags & USCSI_RQENABLE)
+		sense_len = uscsi.uscsi_rqlen;
+	else
+		sense_len = 0;
+
+	/* allocate buffer for the VD_SCSICMD_OP operation */
+	vd_scsi = vdc_scsi_alloc(cdb_len, sense_len, datain_len, dataout_len,
+	    &vd_scsi_len);
+
+	/*
+	 * The documentation of USCSI_ISOLATE and USCSI_DIAGNOSE is very vague,
+	 * but basically they prevent a SCSI command from being retried in case
+	 * of an error.
+	 */
+	if ((uscsi.uscsi_flags & USCSI_ISOLATE) ||
+	    (uscsi.uscsi_flags & USCSI_DIAGNOSE))
+		vd_scsi->options |= VD_SCSI_OPT_NORETRY;
+
+	/* set task attribute */
+	if (uscsi.uscsi_flags & USCSI_NOTAG) {
+		vd_scsi->task_attribute = 0;
+	} else {
+		if (uscsi.uscsi_flags & USCSI_HEAD)
+			vd_scsi->task_attribute = VD_SCSI_TASK_ACA;
+		else if (uscsi.uscsi_flags & USCSI_HTAG)
+			vd_scsi->task_attribute = VD_SCSI_TASK_HQUEUE;
+		else if (uscsi.uscsi_flags & USCSI_OTAG)
+			vd_scsi->task_attribute = VD_SCSI_TASK_ORDERED;
+		else
+			vd_scsi->task_attribute = 0;
+	}
+
+	/* set timeout */
+	vd_scsi->timeout = uscsi.uscsi_timeout;
+
+	/* copy-in cdb data */
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+	if (ddi_copyin(uscsi.uscsi_cdb, cdb, cdb_len, mode) != 0) {
+		rv = EFAULT;
+		goto done;
+	}
+
+	/* keep a pointer to the sense buffer */
+	sense = VD_SCSI_DATA_SENSE(vd_scsi);
+
+	/* keep a pointer to the data-in buffer */
+	datain = (char *)VD_SCSI_DATA_IN(vd_scsi);
+
+	/* copy-in request data to the data-out buffer */
+	dataout = (char *)VD_SCSI_DATA_OUT(vd_scsi);
+	if (!(uscsi.uscsi_flags & USCSI_READ)) {
+		if (ddi_copyin(uscsi.uscsi_bufaddr, dataout, dataout_len,
+		    mode)) {
+			rv = EFAULT;
+			goto done;
+		}
+	}
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv != 0)
+		goto done;
+
+	/* update scsi status */
+	uscsi.uscsi_status = vd_scsi->cmd_status;
+
+	/* update sense data */
+	if ((uscsi.uscsi_flags & USCSI_RQENABLE) &&
+	    (uscsi.uscsi_status == STATUS_CHECK ||
+	    uscsi.uscsi_status == STATUS_TERMINATED)) {
+
+		uscsi.uscsi_rqstatus = vd_scsi->sense_status;
+
+		if (uscsi.uscsi_rqstatus == STATUS_GOOD) {
+			uscsi.uscsi_rqresid = uscsi.uscsi_rqlen -
+			    vd_scsi->sense_len;
+			if (ddi_copyout(sense, uscsi.uscsi_rqbuf,
+			    vd_scsi->sense_len, mode) != 0) {
+				rv = EFAULT;
+				goto done;
+			}
+		}
+	}
+
+	/* update request data */
+	if (uscsi.uscsi_status == STATUS_GOOD) {
+		if (uscsi.uscsi_flags & USCSI_READ) {
+			uscsi.uscsi_resid = uscsi.uscsi_buflen -
+			    vd_scsi->datain_len;
+			if (ddi_copyout(datain, uscsi.uscsi_bufaddr,
+			    vd_scsi->datain_len, mode) != 0) {
+				rv = EFAULT;
+				goto done;
+			}
+		} else {
+			uscsi.uscsi_resid = uscsi.uscsi_buflen -
+			    vd_scsi->dataout_len;
+		}
+	}
+
+	/* copy-out result */
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		uscsi_cmdtouscsi_cmd32((&uscsi), (&uscsi32));
+		if (ddi_copyout(&uscsi32, arg, sizeof (struct uscsi_cmd32),
+		    mode) != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+	} else {
+		if (ddi_copyout(&uscsi, arg, sizeof (struct uscsi_cmd),
+		    mode) != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+	}
+
+	/* get the return code from the SCSI command status */
+	rv = vdc_scsi_status(vdc, vd_scsi,
+	    !(uscsi.uscsi_flags & USCSI_SILENT));
+
+done:
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * Create a VD_OP_SCSICMD buffer for a SCSI PERSISTENT IN command.
+ *
+ * Arguments:
+ *	cmd		- SCSI PERSISTENT IN command
+ *	len		- length of the SCSI input buffer
+ *	vd_scsi_len	- return the length of the allocated buffer
+ *
+ * Returned Value:
+ *	a pointer to the allocated VD_OP_SCSICMD buffer.
+ */
+static vd_scsi_t *
+vdc_scsi_alloc_persistent_in(uchar_t cmd, int len, int *vd_scsi_len)
+{
+	int cdb_len, sense_len, datain_len, dataout_len;
+	vd_scsi_t *vd_scsi;
+	union scsi_cdb *cdb;
+
+	cdb_len = CDB_GROUP1;
+	sense_len = sizeof (struct scsi_extended_sense);
+	datain_len = len;
+	dataout_len = 0;
+
+	vd_scsi = vdc_scsi_alloc(cdb_len, sense_len, datain_len, dataout_len,
+	    vd_scsi_len);
+
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+
+	/* set cdb */
+	cdb->scc_cmd = SCMD_PERSISTENT_RESERVE_IN;
+	cdb->cdb_opaque[1] = cmd;
+	FORMG1COUNT(cdb, datain_len);
+
+	vd_scsi->timeout = vdc_scsi_timeout;
+
+	return (vd_scsi);
+}
+
+/*
+ * Create a VD_OP_SCSICMD buffer for a SCSI PERSISTENT OUT command.
+ *
+ * Arguments:
+ *	cmd		- SCSI PERSISTENT OUT command
+ *	len		- length of the SCSI output buffer
+ *	vd_scsi_len	- return the length of the allocated buffer
+ *
+ * Returned Code:
+ *	a pointer to the allocated VD_OP_SCSICMD buffer.
+ */
+static vd_scsi_t *
+vdc_scsi_alloc_persistent_out(uchar_t cmd, int len, int *vd_scsi_len)
+{
+	int cdb_len, sense_len, datain_len, dataout_len;
+	vd_scsi_t *vd_scsi;
+	union scsi_cdb *cdb;
+
+	cdb_len = CDB_GROUP1;
+	sense_len = sizeof (struct scsi_extended_sense);
+	datain_len = 0;
+	dataout_len = len;
+
+	vd_scsi = vdc_scsi_alloc(cdb_len, sense_len, datain_len, dataout_len,
+	    vd_scsi_len);
+
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+
+	/* set cdb */
+	cdb->scc_cmd = SCMD_PERSISTENT_RESERVE_OUT;
+	cdb->cdb_opaque[1] = cmd;
+	FORMG1COUNT(cdb, dataout_len);
+
+	vd_scsi->timeout = vdc_scsi_timeout;
+
+	return (vd_scsi);
+}
+
+/*
+ * Implement the MHIOCGRP_INKEYS mhd(7i) ioctl. The ioctl is converted
+ * to a SCSI PERSISTENT IN READ KEYS command which is sent to the vdisk
+ * server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_inkeys(vdc_t *vdc, caddr_t arg, int mode)
+{
+	vd_scsi_t *vd_scsi;
+	mhioc_inkeys_t inkeys;
+	mhioc_key_list_t klist;
+	struct mhioc_inkeys32 inkeys32;
+	struct mhioc_key_list32 klist32;
+	sd_prin_readkeys_t *scsi_keys;
+	void *user_keys;
+	int vd_scsi_len;
+	int listsize, listlen, rv;
+
+	/* copyin arguments */
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		rv = ddi_copyin(arg, &inkeys32, sizeof (inkeys32), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		rv = ddi_copyin((caddr_t)(uintptr_t)inkeys32.li, &klist32,
+		    sizeof (klist32), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		listsize = klist32.listsize;
+	} else {
+		rv = ddi_copyin(arg, &inkeys, sizeof (inkeys), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		rv = ddi_copyin(inkeys.li, &klist, sizeof (klist), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		listsize = klist.listsize;
+	}
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_in(SD_READ_KEYS,
+	    sizeof (sd_prin_readkeys_t) - sizeof (caddr_t) +
+	    (sizeof (mhioc_resv_key_t) * listsize), &vd_scsi_len);
+
+	scsi_keys = (sd_prin_readkeys_t *)VD_SCSI_DATA_IN(vd_scsi);
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv != 0)
+		goto done;
+
+	listlen = scsi_keys->len / MHIOC_RESV_KEY_SIZE;
+
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		inkeys32.generation = scsi_keys->generation;
+		rv = ddi_copyout(&inkeys32, arg, sizeof (inkeys32), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		klist32.listlen = listlen;
+		rv = ddi_copyout(&klist32, (caddr_t)(uintptr_t)inkeys32.li,
+		    sizeof (klist32), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		user_keys = (caddr_t)(uintptr_t)klist32.list;
+	} else {
+		inkeys.generation = scsi_keys->generation;
+		rv = ddi_copyout(&inkeys, arg, sizeof (inkeys), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		klist.listlen = listlen;
+		rv = ddi_copyout(&klist, inkeys.li, sizeof (klist), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		user_keys = klist.list;
+	}
+
+	/* copy out keys */
+	if (listlen > 0 && listsize > 0) {
+		if (listsize < listlen)
+			listlen = listsize;
+		rv = ddi_copyout(&scsi_keys->keylist, user_keys,
+		    listlen * MHIOC_RESV_KEY_SIZE, mode);
+		if (rv != 0)
+			rv = EFAULT;
+	}
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+done:
+	kmem_free(vd_scsi, vd_scsi_len);
+
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCGRP_INRESV mhd(7i) ioctl. The ioctl is converted
+ * to a SCSI PERSISTENT IN READ RESERVATION command which is sent to
+ * the vdisk server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_inresv(vdc_t *vdc, caddr_t arg, int mode)
+{
+	vd_scsi_t *vd_scsi;
+	mhioc_inresvs_t inresv;
+	mhioc_resv_desc_list_t rlist;
+	struct mhioc_inresvs32 inresv32;
+	struct mhioc_resv_desc_list32 rlist32;
+	mhioc_resv_desc_t mhd_resv;
+	sd_prin_readresv_t *scsi_resv;
+	sd_readresv_desc_t *resv;
+	mhioc_resv_desc_t *user_resv;
+	int vd_scsi_len;
+	int listsize, listlen, i, rv;
+
+	/* copyin arguments */
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		rv = ddi_copyin(arg, &inresv32, sizeof (inresv32), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		rv = ddi_copyin((caddr_t)(uintptr_t)inresv32.li, &rlist32,
+		    sizeof (rlist32), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		listsize = rlist32.listsize;
+	} else {
+		rv = ddi_copyin(arg, &inresv, sizeof (inresv), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		rv = ddi_copyin(inresv.li, &rlist, sizeof (rlist), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		listsize = rlist.listsize;
+	}
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_in(SD_READ_RESV,
+	    sizeof (sd_prin_readresv_t) - sizeof (caddr_t) +
+	    (SCSI3_RESV_DESC_LEN * listsize), &vd_scsi_len);
+
+	scsi_resv = (sd_prin_readresv_t *)VD_SCSI_DATA_IN(vd_scsi);
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv != 0)
+		goto done;
+
+	listlen = scsi_resv->len / SCSI3_RESV_DESC_LEN;
+
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		inresv32.generation = scsi_resv->generation;
+		rv = ddi_copyout(&inresv32, arg, sizeof (inresv32), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		rlist32.listlen = listlen;
+		rv = ddi_copyout(&rlist32, (caddr_t)(uintptr_t)inresv32.li,
+		    sizeof (rlist32), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		user_resv = (mhioc_resv_desc_t *)(uintptr_t)rlist32.list;
+	} else {
+		inresv.generation = scsi_resv->generation;
+		rv = ddi_copyout(&inresv, arg, sizeof (inresv), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		rlist.listlen = listlen;
+		rv = ddi_copyout(&rlist, inresv.li, sizeof (rlist), mode);
+		if (rv != 0) {
+			rv = EFAULT;
+			goto done;
+		}
+
+		user_resv = rlist.list;
+	}
+
+	/* copy out reservations */
+	if (listsize > 0 && listlen > 0) {
+		if (listsize < listlen)
+			listlen = listsize;
+		resv = (sd_readresv_desc_t *)&scsi_resv->readresv_desc;
+
+		for (i = 0; i < listlen; i++) {
+			mhd_resv.type = resv->type;
+			mhd_resv.scope = resv->scope;
+			mhd_resv.scope_specific_addr =
+			    BE_32(resv->scope_specific_addr);
+			bcopy(&resv->resvkey, &mhd_resv.key,
+			    MHIOC_RESV_KEY_SIZE);
+
+			rv = ddi_copyout(&mhd_resv, user_resv,
+			    sizeof (mhd_resv), mode);
+			if (rv != 0) {
+				rv = EFAULT;
+				goto done;
+			}
+			resv++;
+			user_resv++;
+		}
+	}
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+done:
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCGRP_REGISTER mhd(7i) ioctl. The ioctl is converted
+ * to a SCSI PERSISTENT OUT REGISTER command which is sent to the vdisk
+ * server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_register(vdc_t *vdc, caddr_t arg, int mode)
+{
+	vd_scsi_t *vd_scsi;
+	sd_prout_t *scsi_prout;
+	mhioc_register_t mhd_reg;
+	int vd_scsi_len, rv;
+
+	/* copyin arguments */
+	rv = ddi_copyin(arg, &mhd_reg, sizeof (mhd_reg), mode);
+	if (rv != 0)
+		return (EFAULT);
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_out(SD_SCSI3_REGISTER,
+	    sizeof (sd_prout_t), &vd_scsi_len);
+
+	/* set parameters */
+	scsi_prout = (sd_prout_t *)VD_SCSI_DATA_OUT(vd_scsi);
+	bcopy(mhd_reg.oldkey.key, scsi_prout->res_key, MHIOC_RESV_KEY_SIZE);
+	bcopy(mhd_reg.newkey.key, scsi_prout->service_key, MHIOC_RESV_KEY_SIZE);
+	scsi_prout->aptpl = (uchar_t)mhd_reg.aptpl;
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCGRP_RESERVE mhd(7i) ioctl. The ioctl is converted
+ * to a SCSI PERSISTENT OUT RESERVE command which is sent to the vdisk
+ * server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_reserve(vdc_t *vdc, caddr_t arg, int mode)
+{
+	union scsi_cdb *cdb;
+	vd_scsi_t *vd_scsi;
+	sd_prout_t *scsi_prout;
+	mhioc_resv_desc_t mhd_resv;
+	int vd_scsi_len, rv;
+
+	/* copyin arguments */
+	rv = ddi_copyin(arg, &mhd_resv, sizeof (mhd_resv), mode);
+	if (rv != 0)
+		return (EFAULT);
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_out(SD_SCSI3_RESERVE,
+	    sizeof (sd_prout_t), &vd_scsi_len);
+
+	/* set parameters */
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+	scsi_prout = (sd_prout_t *)VD_SCSI_DATA_OUT(vd_scsi);
+	bcopy(mhd_resv.key.key, scsi_prout->res_key, MHIOC_RESV_KEY_SIZE);
+	scsi_prout->scope_address = mhd_resv.scope_specific_addr;
+	cdb->cdb_opaque[2] = mhd_resv.type;
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCGRP_PREEMPTANDABORT mhd(7i) ioctl. The ioctl is
+ * converted to a SCSI PERSISTENT OUT PREEMPT AND ABORT command which
+ * is sent to the vdisk server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_preemptabort(vdc_t *vdc, caddr_t arg, int mode)
+{
+	union scsi_cdb *cdb;
+	vd_scsi_t *vd_scsi;
+	sd_prout_t *scsi_prout;
+	mhioc_preemptandabort_t mhd_preempt;
+	int vd_scsi_len, rv;
+
+	/* copyin arguments */
+	rv = ddi_copyin(arg, &mhd_preempt, sizeof (mhd_preempt), mode);
+	if (rv != 0)
+		return (EFAULT);
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_out(SD_SCSI3_PREEMPTANDABORT,
+	    sizeof (sd_prout_t), &vd_scsi_len);
+
+	/* set parameters */
+	vd_scsi->task_attribute = VD_SCSI_TASK_ACA;
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+	scsi_prout = (sd_prout_t *)VD_SCSI_DATA_OUT(vd_scsi);
+	bcopy(mhd_preempt.resvdesc.key.key, scsi_prout->res_key,
+	    MHIOC_RESV_KEY_SIZE);
+	bcopy(mhd_preempt.victim_key.key, scsi_prout->service_key,
+	    MHIOC_RESV_KEY_SIZE);
+	scsi_prout->scope_address = mhd_preempt.resvdesc.scope_specific_addr;
+	cdb->cdb_opaque[2] = mhd_preempt.resvdesc.type;
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCGRP_REGISTERANDIGNOREKEY mhd(7i) ioctl. The ioctl
+ * is converted to a SCSI PERSISTENT OUT REGISTER AND IGNORE EXISTING KEY
+ * command which is sent to the vdisk server with a VD_OP_SCSICMD operation.
+ */
+static int
+vdc_mhd_registerignore(vdc_t *vdc, caddr_t arg, int mode)
+{
+	vd_scsi_t *vd_scsi;
+	sd_prout_t *scsi_prout;
+	mhioc_registerandignorekey_t mhd_regi;
+	int vd_scsi_len, rv;
+
+	/* copyin arguments */
+	rv = ddi_copyin(arg, &mhd_regi, sizeof (mhd_regi), mode);
+	if (rv != 0)
+		return (EFAULT);
+
+	/* build SCSI VD_OP request */
+	vd_scsi = vdc_scsi_alloc_persistent_out(SD_SCSI3_REGISTERANDIGNOREKEY,
+	    sizeof (sd_prout_t), &vd_scsi_len);
+
+	/* set parameters */
+	scsi_prout = (sd_prout_t *)VD_SCSI_DATA_OUT(vd_scsi);
+	bcopy(mhd_regi.newkey.key, scsi_prout->service_key,
+	    MHIOC_RESV_KEY_SIZE);
+	scsi_prout->aptpl = (uchar_t)mhd_regi.aptpl;
+
+	/* submit the request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+
+	if (rv == 0)
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * This function is used by the failfast mechanism to send a SCSI command
+ * to check for reservation conflict.
+ */
+static int
+vdc_failfast_scsi_cmd(vdc_t *vdc, uchar_t scmd)
+{
+	int cdb_len, sense_len, vd_scsi_len;
+	vd_scsi_t *vd_scsi;
+	union scsi_cdb *cdb;
+	int rv;
+
+	ASSERT(scmd == SCMD_TEST_UNIT_READY || scmd == SCMD_WRITE_G1);
+
+	if (scmd == SCMD_WRITE_G1)
+		cdb_len = CDB_GROUP1;
+	else
+		cdb_len = CDB_GROUP0;
+
+	sense_len = sizeof (struct scsi_extended_sense);
+
+	vd_scsi = vdc_scsi_alloc(cdb_len, sense_len, 0, 0, &vd_scsi_len);
+
+	/* set cdb */
+	cdb = VD_SCSI_DATA_CDB(vd_scsi);
+	cdb->scc_cmd = scmd;
+
+	vd_scsi->timeout = vdc_scsi_timeout;
+
+	/*
+	 * Submit the request. The last argument has to be B_FALSE so that
+	 * vdc_do_sync_op does not loop checking for reservation conflict if
+	 * the operation returns an error.
+	 */
+	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)FKIOCTL, VIO_both_dir, B_FALSE);
+
+	if (rv == 0)
+		(void) vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+
+	kmem_free(vd_scsi, vd_scsi_len);
+	return (rv);
+}
+
+/*
+ * This function is used by the failfast mechanism to check for reservation
+ * conflict. It sends some SCSI commands which will fail with a reservation
+ * conflict error if the system does not have access to the disk and this
+ * will panic the system.
+ *
+ * Returned Code:
+ *	0	- disk is accessible without reservation conflict error
+ *	!= 0	- unable to check if disk is accessible
+ */
+int
+vdc_failfast_check_resv(vdc_t *vdc)
+{
+	int failure = 0;
+
+	/*
+	 * Send a TEST UNIT READY command. The command will panic
+	 * the system if it fails with a reservation conflict.
+	 */
+	if (vdc_failfast_scsi_cmd(vdc, SCMD_TEST_UNIT_READY) != 0)
+		failure++;
+
+	/*
+	 * With SPC-3 compliant devices TEST UNIT READY will succeed on
+	 * a reserved device, so we also do a WRITE(10) of zero byte in
+	 * order to provoke a Reservation Conflict status on those newer
+	 * devices.
+	 */
+	if (vdc_failfast_scsi_cmd(vdc, SCMD_WRITE_G1) != 0)
+		failure++;
+
+	return (failure);
+}
+
+/*
+ * Add a pending I/O to the failfast I/O queue. An I/O is added to this
+ * queue when it has failed and failfast is enabled. Then we have to check
+ * if it has failed because of a reservation conflict in which case we have
+ * to panic the system.
+ *
+ * Async I/O should be queued with their block I/O data transfer structure
+ * (buf). Sync I/O should be queued with buf = NULL.
+ */
+static vdc_io_t *
+vdc_failfast_io_queue(vdc_t *vdc, struct buf *buf)
+{
+	vdc_io_t *vio;
+
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	vio = kmem_alloc(sizeof (vdc_io_t), KM_SLEEP);
+	vio->vio_next = vdc->failfast_io_queue;
+	vio->vio_buf = buf;
+	vio->vio_qtime = ddi_get_lbolt();
+
+	vdc->failfast_io_queue = vio;
+
+	/* notify the failfast thread that a new I/O is queued */
+	cv_signal(&vdc->failfast_cv);
+
+	return (vio);
+}
+
+/*
+ * Remove and complete I/O in the failfast I/O queue which have been
+ * added after the indicated deadline. A deadline of 0 means that all
+ * I/O have to be unqueued and marked as completed.
+ */
+static void
+vdc_failfast_io_unqueue(vdc_t *vdc, clock_t deadline)
+{
+	vdc_io_t *vio, *vio_tmp;
+
+	ASSERT(MUTEX_HELD(&vdc->lock));
+
+	vio_tmp = NULL;
+	vio = vdc->failfast_io_queue;
+
+	if (deadline != 0) {
+		/*
+		 * Skip any io queued after the deadline. The failfast
+		 * I/O queue is ordered starting with the last I/O added
+		 * to the queue.
+		 */
+		while (vio != NULL && vio->vio_qtime > deadline) {
+			vio_tmp = vio;
+			vio = vio->vio_next;
+		}
+	}
+
+	if (vio == NULL)
+		/* nothing to unqueue */
+		return;
+
+	/* update the queue */
+	if (vio_tmp == NULL)
+		vdc->failfast_io_queue = NULL;
+	else
+		vio_tmp->vio_next = NULL;
+
+	/*
+	 * Complete unqueued I/O. Async I/O have a block I/O data transfer
+	 * structure (buf) and they are completed by calling biodone(). Sync
+	 * I/O do not have a buf and they are completed by setting the
+	 * vio_qtime to zero and signaling failfast_io_cv. In that case, the
+	 * thread waiting for the I/O to complete is responsible for freeing
+	 * the vio structure.
+	 */
+	while (vio != NULL) {
+		vio_tmp = vio->vio_next;
+		if (vio->vio_buf != NULL) {
+			biodone(vio->vio_buf);
+			kmem_free(vio, sizeof (vdc_io_t));
+		} else {
+			vio->vio_qtime = 0;
+		}
+		vio = vio_tmp;
+	}
+
+	cv_broadcast(&vdc->failfast_io_cv);
+}
+
+/*
+ * Failfast Thread.
+ *
+ * While failfast is enabled, the failfast thread sends a TEST UNIT READY
+ * and a zero size WRITE(10) SCSI commands on a regular basis to check that
+ * we still have access to the disk. If a command fails with a RESERVATION
+ * CONFLICT error then the system will immediatly panic.
+ *
+ * The failfast thread is also woken up when an I/O has failed. It then check
+ * the access to the disk to ensure that the I/O failure was not due to a
+ * reservation conflict.
+ *
+ * There is one failfast thread for each virtual disk for which failfast is
+ * enabled. We could have only one thread sending requests for all disks but
+ * this would need vdc to send asynchronous requests and to have callbacks to
+ * process replies.
+ */
+static void
+vdc_failfast_thread(void *arg)
+{
+	int status;
+	vdc_t *vdc = (vdc_t *)arg;
+	clock_t timeout, starttime;
+
+	mutex_enter(&vdc->lock);
+
+	while (vdc->failfast_interval != 0) {
+
+		starttime = ddi_get_lbolt();
+
+		mutex_exit(&vdc->lock);
+
+		/* check for reservation conflict */
+		status = vdc_failfast_check_resv(vdc);
+
+		mutex_enter(&vdc->lock);
+		/*
+		 * We have dropped the lock to send the SCSI command so we have
+		 * to check that failfast is still enabled.
+		 */
+		if (vdc->failfast_interval == 0)
+			break;
+
+		/*
+		 * If we have successfully check the disk access and there was
+		 * no reservation conflict then we can complete any I/O queued
+		 * before the last check.
+		 */
+		if (status == 0)
+			vdc_failfast_io_unqueue(vdc, starttime);
+
+		/* proceed again if some I/O are still in the queue */
+		if (vdc->failfast_io_queue != NULL)
+			continue;
+
+		timeout = ddi_get_lbolt() +
+		    drv_usectohz(vdc->failfast_interval);
+		(void) cv_timedwait(&vdc->failfast_cv, &vdc->lock, timeout);
+	}
+
+	/*
+	 * Failfast is being stop so we can complete any queued I/O.
+	 */
+	vdc_failfast_io_unqueue(vdc, 0);
+	vdc->failfast_thread = NULL;
+	mutex_exit(&vdc->lock);
+	thread_exit();
+}
+
+/*
+ * Implement the MHIOCENFAILFAST mhd(7i) ioctl.
+ */
+static int
+vdc_failfast(vdc_t *vdc, caddr_t arg, int mode)
+{
+	unsigned int mh_time;
+
+	if (ddi_copyin((void *)arg, &mh_time, sizeof (int), mode))
+		return (EFAULT);
+
+	mutex_enter(&vdc->lock);
+	if (mh_time != 0 && vdc->failfast_thread == NULL) {
+		vdc->failfast_thread = thread_create(NULL, 0,
+		    vdc_failfast_thread, vdc, 0, &p0, TS_RUN,
+		    v.v_maxsyspri - 2);
+	}
+
+	vdc->failfast_interval = mh_time * 1000;
+	cv_signal(&vdc->failfast_cv);
+	mutex_exit(&vdc->lock);
+
+	return (0);
+}
+
+/*
+ * Implement the MHIOCTKOWN and MHIOCRELEASE mhd(7i) ioctls. These ioctls are
+ * converted to VD_OP_SET_ACCESS operations.
+ */
+static int
+vdc_access_set(vdc_t *vdc, uint64_t flags, int mode)
+{
+	int rv;
+
+	/* submit owership command request */
+	rv = vdc_do_sync_op(vdc, VD_OP_SET_ACCESS, (caddr_t)&flags,
+	    sizeof (uint64_t), 0, 0, CB_SYNC, (void *)(uint64_t)mode,
+	    VIO_both_dir, B_TRUE);
+
+	return (rv);
+}
+
+/*
+ * Implement the MHIOCSTATUS mhd(7i) ioctl. This ioctl is converted to a
+ * VD_OP_GET_ACCESS operation.
+ */
+static int
+vdc_access_get(vdc_t *vdc, uint64_t *status, int mode)
+{
+	int rv;
+
+	/* submit owership command request */
+	rv = vdc_do_sync_op(vdc, VD_OP_GET_ACCESS, (caddr_t)status,
+	    sizeof (uint64_t), 0, 0, CB_SYNC, (void *)(uint64_t)mode,
+	    VIO_both_dir, B_TRUE);
+
+	return (rv);
+}
+
+/*
+ * Disk Ownership Thread.
+ *
+ * When we have taken the ownership of a disk, this thread waits to be
+ * notified when the LDC channel is reset so that it can recover the
+ * ownership.
+ *
+ * Note that the thread handling the LDC reset (vdc_process_msg_thread())
+ * can not be used to do the ownership recovery because it has to be
+ * running to handle the reply message to the ownership operation.
+ */
+static void
+vdc_ownership_thread(void *arg)
+{
+	vdc_t *vdc = (vdc_t *)arg;
+	clock_t timeout;
+	uint64_t status;
+
+	mutex_enter(&vdc->ownership_lock);
+	mutex_enter(&vdc->lock);
+
+	while (vdc->ownership & VDC_OWNERSHIP_WANTED) {
+
+		if ((vdc->ownership & VDC_OWNERSHIP_RESET) ||
+		    !(vdc->ownership & VDC_OWNERSHIP_GRANTED)) {
+			/*
+			 * There was a reset so the ownership has been lost,
+			 * try to recover. We do this without using the preempt
+			 * option so that we don't steal the ownership from
+			 * someone who has preempted us.
+			 */
+			DMSG(vdc, 0, "[%d] Ownership lost, recovering",
+			    vdc->instance);
+
+			vdc->ownership &= ~(VDC_OWNERSHIP_RESET |
+			    VDC_OWNERSHIP_GRANTED);
+
+			mutex_exit(&vdc->lock);
+
+			status = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE |
+			    VD_ACCESS_SET_PRESERVE, FKIOCTL);
+
+			mutex_enter(&vdc->lock);
+
+			if (status == 0) {
+				DMSG(vdc, 0, "[%d] Ownership recovered",
+				    vdc->instance);
+				vdc->ownership |= VDC_OWNERSHIP_GRANTED;
+			} else {
+				DMSG(vdc, 0, "[%d] Fail to recover ownership",
+				    vdc->instance);
+			}
+
+		}
+
+		/*
+		 * If we have the ownership then we just wait for an event
+		 * to happen (LDC reset), otherwise we will retry to recover
+		 * after a delay.
+		 */
+		if (vdc->ownership & VDC_OWNERSHIP_GRANTED)
+			timeout = 0;
+		else
+			timeout = ddi_get_lbolt() +
+			    drv_usectohz(vdc_ownership_delay);
+
+		/* Release the ownership_lock and wait on the vdc lock */
+		mutex_exit(&vdc->ownership_lock);
+
+		if (timeout == 0)
+			(void) cv_wait(&vdc->ownership_cv, &vdc->lock);
+		else
+			(void) cv_timedwait(&vdc->ownership_cv,
+			    &vdc->lock, timeout);
+
+		mutex_exit(&vdc->lock);
+
+		mutex_enter(&vdc->ownership_lock);
+		mutex_enter(&vdc->lock);
+	}
+
+	vdc->ownership_thread = NULL;
+	mutex_exit(&vdc->lock);
+	mutex_exit(&vdc->ownership_lock);
+
+	thread_exit();
+}
+
+static void
+vdc_ownership_update(vdc_t *vdc, int ownership_flags)
+{
+	ASSERT(MUTEX_HELD(&vdc->ownership_lock));
+
+	mutex_enter(&vdc->lock);
+	vdc->ownership = ownership_flags;
+	if ((vdc->ownership & VDC_OWNERSHIP_WANTED) &&
+	    vdc->ownership_thread == NULL) {
+		/* start ownership thread */
+		vdc->ownership_thread = thread_create(NULL, 0,
+		    vdc_ownership_thread, vdc, 0, &p0, TS_RUN,
+		    v.v_maxsyspri - 2);
+	} else {
+		/* notify the ownership thread */
+		cv_signal(&vdc->ownership_cv);
+	}
+	mutex_exit(&vdc->lock);
+}
+
+/*
+ * Get the size and the block size of a virtual disk from the vdisk server.
+ * We need to use this operation when the vdisk_size attribute was not
+ * available during the handshake with the vdisk server.
+ */
+static int
+vdc_check_capacity(vdc_t *vdc)
+{
+	int rv = 0;
+	size_t alloc_len;
+	vd_capacity_t *vd_cap;
+
+	if (vdc->vdisk_size != 0)
+		return (0);
+
+	alloc_len = P2ROUNDUP(sizeof (vd_capacity_t), sizeof (uint64_t));
+
+	vd_cap = kmem_zalloc(alloc_len, KM_SLEEP);
+
+	rv = vdc_do_sync_op(vdc, VD_OP_GET_CAPACITY, (caddr_t)vd_cap, alloc_len,
+	    0, 0, CB_SYNC, (void *)(uint64_t)FKIOCTL, VIO_both_dir, B_TRUE);
+
+	if (rv == 0) {
+		if (vd_cap->vdisk_block_size != vdc->block_size ||
+		    vd_cap->vdisk_size == VD_SIZE_UNKNOWN ||
+		    vd_cap->vdisk_size == 0)
+			rv = EINVAL;
+		else
+			vdc->vdisk_size = vd_cap->vdisk_size;
+	}
+
+	kmem_free(vd_cap, alloc_len);
+	return (rv);
+}
+
+/*
  * This structure is used in the DKIO(7I) array below.
  */
 typedef struct vdc_dk_ioctl {
@@ -4772,6 +6155,23 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	/* DIOCTL_RWCMD is converted to a read or a write */
 	{0, DIOCTL_RWCMD,  sizeof (struct dadkio_rwcmd), NULL},
 
+	/* mhd(7I) non-shared multihost disks ioctls */
+	{0, MHIOCTKOWN,				0, vdc_null_copy_func},
+	{0, MHIOCRELEASE,			0, vdc_null_copy_func},
+	{0, MHIOCSTATUS,			0, vdc_null_copy_func},
+	{0, MHIOCQRESERVE,			0, vdc_null_copy_func},
+
+	/* mhd(7I) shared multihost disks ioctls */
+	{0, MHIOCGRP_INKEYS,			0, vdc_null_copy_func},
+	{0, MHIOCGRP_INRESV,			0, vdc_null_copy_func},
+	{0, MHIOCGRP_REGISTER,			0, vdc_null_copy_func},
+	{0, MHIOCGRP_RESERVE, 			0, vdc_null_copy_func},
+	{0, MHIOCGRP_PREEMPTANDABORT,		0, vdc_null_copy_func},
+	{0, MHIOCGRP_REGISTERANDIGNOREKEY,	0, vdc_null_copy_func},
+
+	/* mhd(7I) failfast ioctl */
+	{0, MHIOCENFAILFAST,			0, vdc_null_copy_func},
+
 	/*
 	 * These particular ioctls are not sent to the server - vdc fakes up
 	 * the necessary info.
@@ -4783,6 +6183,21 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{0, DKIOCREMOVABLE, 0, vdc_null_copy_func},
 	{0, CDROMREADOFFSET, 0, vdc_null_copy_func}
 };
+
+/*
+ * The signature of vd_process_ioctl() has changed to include the return value
+ * pointer. However we don't want to change vd_efi_* functions now so we add
+ * this wrapper function so that we can use it with vdc_efi_init().
+ *
+ * vd_efi_* functions need some changes to fix 6528974 and so we will eventually
+ * remove this function when fixing that bug.
+ */
+static int
+vd_process_efi_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
+{
+	int rval;
+	return (vd_process_ioctl(dev, cmd, arg, mode, &rval));
+}
 
 /*
  * Function:
@@ -4797,6 +6212,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
  *	arg	- pointer to user provided structure
  *		  (contains data to be set or reference parameter for get)
  *	mode	- bit flag, indicating open settings, 32/64 bit type, etc
+ *	rvalp	- pointer to return value for calling process.
  *
  * Return Code:
  *	0
@@ -4806,7 +6222,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
  *	ENOTSUP
  */
 static int
-vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
+vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 {
 	int		instance = VDCUNIT(dev);
 	vdc_t		*vdc = NULL;
@@ -4827,6 +6243,11 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 	DMSG(vdc, 0, "[%d] Processing ioctl(%x) for dev %lx : model %x\n",
 	    instance, cmd, dev, ddi_model_convert_from(mode & FMODELS));
+
+	if (rvalp != NULL) {
+		/* the return value of the ioctl is 0 by default */
+		*rvalp = 0;
+	}
 
 	/*
 	 * Validate the ioctl operation to be performed.
@@ -4860,61 +6281,185 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		len = iop->nbytes;
 	}
 
-	/*
-	 * Deal with the ioctls which the server does not provide. vdc can
-	 * fake these up and return immediately
-	 */
+	/* check if the ioctl is applicable */
 	switch (cmd) {
 	case CDROMREADOFFSET:
 	case DKIOCREMOVABLE:
-	case USCSICMD:
 		return (ENOTTY);
 
+	case USCSICMD:
+	case MHIOCTKOWN:
+	case MHIOCSTATUS:
+	case MHIOCQRESERVE:
+	case MHIOCRELEASE:
+	case MHIOCGRP_INKEYS:
+	case MHIOCGRP_INRESV:
+	case MHIOCGRP_REGISTER:
+	case MHIOCGRP_RESERVE:
+	case MHIOCGRP_PREEMPTANDABORT:
+	case MHIOCGRP_REGISTERANDIGNOREKEY:
+	case MHIOCENFAILFAST:
+		if (vdc->cinfo == NULL)
+			return (ENXIO);
+		if (vdc->cinfo->dki_ctype != DKC_SCSI_CCS)
+			return (ENOTTY);
+		break;
+
 	case DIOCTL_RWCMD:
-		{
-			if (vdc->cinfo == NULL)
-				return (ENXIO);
-
-			if (vdc->cinfo->dki_ctype != DKC_DIRECT)
-				return (ENOTTY);
-
-			return (vdc_dioctl_rwcmd(dev, arg, mode));
-		}
-
-	case DKIOCGAPART:
-		{
-			return (vdc_dkio_get_partition(vdc, arg, mode));
-		}
+		if (vdc->cinfo == NULL)
+			return (ENXIO);
+		if (vdc->cinfo->dki_ctype != DKC_DIRECT)
+			return (ENOTTY);
+		break;
 
 	case DKIOCINFO:
-		{
-			struct dk_cinfo	cinfo;
-			if (vdc->cinfo == NULL)
-				return (ENXIO);
-
-			bcopy(vdc->cinfo, &cinfo, sizeof (struct dk_cinfo));
-			cinfo.dki_partition = VDCPART(dev);
-
-			rv = ddi_copyout(&cinfo, (void *)arg,
-			    sizeof (struct dk_cinfo), mode);
-			if (rv != 0)
-				return (EFAULT);
-
-			return (0);
-		}
+		if (vdc->cinfo == NULL)
+			return (ENXIO);
+		break;
 
 	case DKIOCGMEDIAINFO:
-		{
-			if (vdc->minfo == NULL)
-				return (ENXIO);
+		if (vdc->minfo == NULL)
+			return (ENXIO);
+		if (vdc_check_capacity(vdc) != 0)
+			/* disk capacity is not available */
+			return (EIO);
+		break;
+	}
 
-			rv = ddi_copyout(vdc->minfo, (void *)arg,
-			    sizeof (struct dk_minfo), mode);
-			if (rv != 0)
-				return (EFAULT);
+	/*
+	 * Deal with ioctls which require a processing different than
+	 * converting ioctl arguments and sending a corresponding
+	 * VD operation.
+	 */
+	switch (cmd) {
 
-			return (0);
+	case USCSICMD:
+	{
+		return (vdc_uscsi_cmd(vdc, arg, mode));
+	}
+
+	case MHIOCTKOWN:
+	{
+		mutex_enter(&vdc->ownership_lock);
+		/*
+		 * We have to set VDC_OWNERSHIP_WANTED now so that the ownership
+		 * can be flagged with VDC_OWNERSHIP_RESET if the LDC is reset
+		 * while we are processing the ioctl.
+		 */
+		vdc_ownership_update(vdc, VDC_OWNERSHIP_WANTED);
+
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE |
+		    VD_ACCESS_SET_PREEMPT | VD_ACCESS_SET_PRESERVE, mode);
+		if (rv == 0) {
+			vdc_ownership_update(vdc, VDC_OWNERSHIP_WANTED |
+			    VDC_OWNERSHIP_GRANTED);
+		} else {
+			vdc_ownership_update(vdc, VDC_OWNERSHIP_NONE);
 		}
+		mutex_exit(&vdc->ownership_lock);
+		return (rv);
+	}
+
+	case MHIOCRELEASE:
+	{
+		mutex_enter(&vdc->ownership_lock);
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR, mode);
+		if (rv == 0) {
+			vdc_ownership_update(vdc, VDC_OWNERSHIP_NONE);
+		}
+		mutex_exit(&vdc->ownership_lock);
+		return (rv);
+	}
+
+	case MHIOCSTATUS:
+	{
+		uint64_t status;
+
+		rv = vdc_access_get(vdc, &status, mode);
+		if (rv == 0 && rvalp != NULL)
+			*rvalp = (status & VD_ACCESS_ALLOWED)? 0 : 1;
+		return (rv);
+	}
+
+	case MHIOCQRESERVE:
+	{
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE, mode);
+		return (rv);
+	}
+
+	case MHIOCGRP_INKEYS:
+	{
+		return (vdc_mhd_inkeys(vdc, arg, mode));
+	}
+
+	case MHIOCGRP_INRESV:
+	{
+		return (vdc_mhd_inresv(vdc, arg, mode));
+	}
+
+	case MHIOCGRP_REGISTER:
+	{
+		return (vdc_mhd_register(vdc, arg, mode));
+	}
+
+	case MHIOCGRP_RESERVE:
+	{
+		return (vdc_mhd_reserve(vdc, arg, mode));
+	}
+
+	case MHIOCGRP_PREEMPTANDABORT:
+	{
+		return (vdc_mhd_preemptabort(vdc, arg, mode));
+	}
+
+	case MHIOCGRP_REGISTERANDIGNOREKEY:
+	{
+		return (vdc_mhd_registerignore(vdc, arg, mode));
+	}
+
+	case MHIOCENFAILFAST:
+	{
+		rv = vdc_failfast(vdc, arg, mode);
+		return (rv);
+	}
+
+	case DIOCTL_RWCMD:
+	{
+		return (vdc_dioctl_rwcmd(dev, arg, mode));
+	}
+
+	case DKIOCGAPART:
+	{
+		return (vdc_dkio_get_partition(vdc, arg, mode));
+	}
+
+	case DKIOCINFO:
+	{
+		struct dk_cinfo	cinfo;
+
+		bcopy(vdc->cinfo, &cinfo, sizeof (struct dk_cinfo));
+		cinfo.dki_partition = VDCPART(dev);
+
+		rv = ddi_copyout(&cinfo, (void *)arg,
+		    sizeof (struct dk_cinfo), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		return (0);
+	}
+
+	case DKIOCGMEDIAINFO:
+	{
+		ASSERT(vdc->vdisk_size != 0);
+		if (vdc->minfo->dki_capacity == 0)
+			vdc->minfo->dki_capacity = vdc->vdisk_size;
+		rv = ddi_copyout(vdc->minfo, (void *)arg,
+		    sizeof (struct dk_minfo), mode);
+		if (rv != 0)
+			return (EFAULT);
+
+		return (0);
+	}
 
 	case DKIOCFLUSHWRITECACHE:
 		{
@@ -5013,16 +6558,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	 */
 	rv = vdc_do_sync_op(vdc, iop->op, mem_p, alloc_len,
 	    VDCPART(dev), 0, CB_SYNC, (void *)(uint64_t)mode,
-	    VIO_both_dir);
-
-	if (cmd == DKIOCSVTOC || cmd == DKIOCSETEFI) {
-		/*
-		 * The disk label may have changed. Revalidate the disk
-		 * geometry. This will also update the device nodes and
-		 * properties.
-		 */
-		vdc_validate(vdc);
-	}
+	    VIO_both_dir, B_TRUE);
 
 	if (rv != 0) {
 		/*
@@ -5204,18 +6740,20 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 {
 	_NOTE(ARGUNUSED(vdc))
 
-	void		*tmp_mem = NULL;
+	void		*tmp_mem = NULL, *uvtoc;
 	struct vtoc	vt;
 	struct vtoc	*vtp = &vt;
 	vd_vtoc_t	vtvd;
 	int		copy_len = 0;
-	int		rv = 0;
-
-	if (dir != VD_COPYIN)
-		return (0);	/* nothing to do */
+	int		i, rv = 0;
 
 	if ((from == NULL) || (to == NULL))
 		return (ENXIO);
+
+	if (dir == VD_COPYIN)
+		uvtoc = from;
+	else
+		uvtoc = to;
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32)
 		copy_len = sizeof (struct vtoc32);
@@ -5224,7 +6762,7 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 
 	tmp_mem = kmem_alloc(copy_len, KM_SLEEP);
 
-	rv = ddi_copyin(from, tmp_mem, copy_len, mode);
+	rv = ddi_copyin(uvtoc, tmp_mem, copy_len, mode);
 	if (rv != 0) {
 		kmem_free(tmp_mem, copy_len);
 		return (EFAULT);
@@ -5234,6 +6772,24 @@ vdc_set_vtoc_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 		vtoc32tovtoc((*(struct vtoc32 *)tmp_mem), vt);
 	} else {
 		vtp = tmp_mem;
+	}
+
+	if (dir == VD_COPYOUT) {
+		/*
+		 * The disk label may have changed. Revalidate the disk
+		 * geometry. This will also update the device nodes and
+		 * properties.
+		 */
+		vdc_validate(vdc);
+
+		/*
+		 * We also need to keep track of the timestamp fields.
+		 */
+		for (i = 0; i < V_NUMPAR; i++) {
+			vdc->vtoc->timestamp[i] = vtp->timestamp[i];
+		}
+
+		return (0);
 	}
 
 	VTOC2VD_VTOC(vtp, &vtvd);
@@ -5393,8 +6949,15 @@ vdc_set_efi_convert(vdc_t *vdc, void *from, void *to, int mode, int dir)
 	dk_efi_t	dk_efi;
 	void		*uaddr;
 
-	if (dir == VD_COPYOUT)
-		return (0);	/* nothing to do */
+	if (dir == VD_COPYOUT) {
+		/*
+		 * The disk label may have changed. Revalidate the disk
+		 * geometry. This will also update the device nodes and
+		 * properties.
+		 */
+		vdc_validate(vdc);
+		return (0);
+	}
 
 	if ((from == NULL) || (to == NULL))
 		return (ENXIO);
@@ -5440,7 +7003,6 @@ static void
 vdc_create_fake_geometry(vdc_t *vdc)
 {
 	ASSERT(vdc != NULL);
-	ASSERT(vdc->vdisk_size != 0);
 	ASSERT(vdc->max_xfer_sz != 0);
 
 	/*
@@ -5453,10 +7015,13 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	(void) strcpy(vdc->cinfo->dki_dname, VDC_DRIVER_NAME);
 	/* max_xfer_sz is #blocks so we don't need to divide by DEV_BSIZE */
 	vdc->cinfo->dki_maxtransfer = vdc->max_xfer_sz;
+
 	/*
-	 * We currently set the controller type to DKC_DIRECT for any disk.
-	 * When SCSI support is implemented, we will eventually change this
-	 * type to DKC_SCSI_CCS for disks supporting the SCSI protocol.
+	 * We set the controller type to DKC_SCSI_CCS only if the VD_OP_SCSICMD
+	 * operation is supported, otherwise the controller type is DKC_DIRECT.
+	 * Version 1.0 does not support the VD_OP_SCSICMD operation, so the
+	 * controller type is always DKC_DIRECT in that case.
+	 *
 	 * If the virtual disk is backed by a physical CD/DVD device or
 	 * an ISO image, modify the controller type to indicate this
 	 */
@@ -5466,7 +7031,10 @@ vdc_create_fake_geometry(vdc_t *vdc)
 		vdc->cinfo->dki_ctype = DKC_CDROM;
 		break;
 	case VD_MEDIA_FIXED:
-		vdc->cinfo->dki_ctype = DKC_DIRECT;
+		if (VD_OP_SUPPORTED(vdc->operations, VD_OP_SCSICMD))
+			vdc->cinfo->dki_ctype = DKC_SCSI_CCS;
+		else
+			vdc->cinfo->dki_ctype = DKC_DIRECT;
 		break;
 	default:
 		/* in the case of v1.0 we default to a fixed disk */
@@ -5544,7 +7112,7 @@ vdc_validate_geometry(vdc_t *vdc)
 {
 	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
-	int	rv;
+	int	rv, rval;
 	struct dk_label label;
 	struct dk_geom geom;
 	struct vtoc vtoc;
@@ -5558,9 +7126,10 @@ vdc_validate_geometry(vdc_t *vdc)
 	dev = makedevice(ddi_driver_major(vdc->dip),
 	    VD_MAKE_DEV(vdc->instance, 0));
 
-	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL);
+	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL, &rval);
 	if (rv == 0)
-		rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc, FKIOCTL);
+		rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc,
+		    FKIOCTL, &rval);
 
 	if (rv == ENOTSUP) {
 		/*
@@ -5779,7 +7348,7 @@ vdc_setup_devid(vdc_t *vdc)
 	bufid_len = bufsize - sizeof (vd_efi_t) - 1;
 
 	rv = vdc_do_sync_op(vdc, VD_OP_GET_DEVID, (caddr_t)vd_devid,
-	    bufsize, 0, 0, CB_SYNC, 0, VIO_both_dir);
+	    bufsize, 0, 0, CB_SYNC, 0, VIO_both_dir, B_TRUE);
 
 	DMSG(vdc, 2, "sync_op returned %d\n", rv);
 
@@ -5801,7 +7370,7 @@ vdc_setup_devid(vdc_t *vdc)
 
 		rv = vdc_do_sync_op(vdc, VD_OP_GET_DEVID,
 		    (caddr_t)vd_devid, bufsize, 0, 0, CB_SYNC, 0,
-		    VIO_both_dir);
+		    VIO_both_dir, B_TRUE);
 
 		if (rv) {
 			kmem_free(vd_devid, bufsize);

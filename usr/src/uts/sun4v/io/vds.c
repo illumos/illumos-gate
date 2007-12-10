@@ -39,6 +39,7 @@
 #include <sys/file.h>
 #include <sys/fs/hsfs_isospec.h>
 #include <sys/mdeg.h>
+#include <sys/mhd.h>
 #include <sys/modhash.h>
 #include <sys/note.h>
 #include <sys/pathname.h>
@@ -136,6 +137,10 @@
 #define	VD_FILE_LABEL_WRITE(vd, labelp)	\
 	vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BWRITE, (caddr_t)labelp, \
 	    0, sizeof (struct dk_label))
+
+/* Message for disk access rights reset failure */
+#define	VD_RESET_ACCESS_FAILURE_MSG \
+	"Fail to reset disk access rights for disk %s"
 
 /*
  * Specification of an MD node passed to the MDEG to filter any
@@ -347,6 +352,7 @@ typedef struct vd {
 	size_t			block_size;	/* blk size of actual device */
 	boolean_t		pseudo;		/* underlying pseudo dev */
 	boolean_t		file;		/* is vDisk backed by a file? */
+	boolean_t		scsi;		/* is vDisk backed by scsi? */
 	vnode_t			*file_vnode;	/* file vnode */
 	size_t			file_size;	/* file size */
 	ddi_devid_t		file_devid;	/* devid for disk image */
@@ -354,6 +360,7 @@ typedef struct vd {
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct dk_minfo		dk_minfo;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
+	boolean_t		ownership;	/* disk ownership status */
 	ldc_status_t		ldc_state;	/* LDC connection state */
 	ldc_handle_t		ldc_handle;	/* handle for LDC comm */
 	size_t			max_msglen;	/* largest LDC message len */
@@ -391,7 +398,7 @@ typedef struct vd_ioctl {
 	const char	*cmd_name;		/* ioctl cmd name */
 	void		*arg;			/* ioctl cmd argument */
 	/* convert input vd_buf to output ioctl_arg */
-	void		(*copyin)(void *vd_buf, void *ioctl_arg);
+	int		(*copyin)(void *vd_buf, size_t, void *ioctl_arg);
 	/* convert input ioctl_arg to output vd_buf */
 	void		(*copyout)(void *ioctl_arg, void *vd_buf);
 	/* write is true if the operation writes any data to the backend */
@@ -399,7 +406,8 @@ typedef struct vd_ioctl {
 } vd_ioctl_t;
 
 /* Define trivial copyin/copyout conversion function flag */
-#define	VD_IDENTITY	((void (*)(void *, void *))-1)
+#define	VD_IDENTITY_IN	((int (*)(void *, size_t, void *))-1)
+#define	VD_IDENTITY_OUT	((void (*)(void *, void *))-1)
 
 
 static int	vds_ldc_retries = VDS_RETRIES;
@@ -411,6 +419,31 @@ static void	*vds_state;
 static uint_t	vd_file_write_flags = VD_FILE_WRITE_FLAGS;
 
 static short	vd_scsi_rdwr_timeout = VD_SCSI_RDWR_TIMEOUT;
+static int	vd_scsi_debug = USCSI_SILENT;
+
+/*
+ * Tunable to define the behavior of the service domain if the vdisk server
+ * fails to reset disk exclusive access when a LDC channel is reset. When a
+ * LDC channel is reset the vdisk server will try to reset disk exclusive
+ * access by releasing any SCSI-2 reservation or resetting the disk. If these
+ * actions fail then the default behavior (vd_reset_access_failure = 0) is to
+ * print a warning message. This default behavior can be changed by setting
+ * the vd_reset_access_failure variable to A_REBOOT (= 0x1) and that will
+ * cause the service domain to reboot, or A_DUMP (= 0x5) and that will cause
+ * the service domain to panic. In both cases, the reset of the service domain
+ * should trigger a reset SCSI buses and hopefully clear any SCSI-2 reservation.
+ */
+static int 	vd_reset_access_failure = 0;
+
+/*
+ * Tunable for backward compatibility. When this variable is set to B_TRUE,
+ * all disk volumes (ZFS, SVM, VxvM volumes) will be exported as single
+ * slice disks whether or not they have the "slice" option set. This is
+ * to provide a simple backward compatibility mechanism when upgrading
+ * the vds driver and using a domain configuration created before the
+ * "slice" option was available.
+ */
+static boolean_t vd_volume_force_slice = B_FALSE;
 
 /*
  * Supported protocol version pairs, from highest (newest) to lowest (oldest)
@@ -426,11 +459,13 @@ static const size_t	vds_num_versions =
 static void vd_free_dring_task(vd_t *vdp);
 static int vd_setup_vd(vd_t *vd);
 static int vd_setup_single_slice_disk(vd_t *vd);
+static int vd_setup_mediainfo(vd_t *vd);
 static boolean_t vd_enabled(vd_t *vd);
 static ushort_t vd_lbl2cksum(struct dk_label *label);
 static int vd_file_validate_geometry(vd_t *vd);
 static boolean_t vd_file_is_iso_image(vd_t *vd);
 static void vd_set_exported_operations(vd_t *vd);
+static void vd_reset_access(vd_t *vd);
 
 /*
  * Function:
@@ -1109,6 +1144,15 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 	size_t	plen;	/* length of data to be read from physical device */
 	char	*buf;	/* buffer area to fit physical device's block size */
 
+	if (vd->block_size == 0) {
+		/*
+		 * The block size was not available during the attach,
+		 * try to update it now.
+		 */
+		if (vd_setup_mediainfo(vd) != 0)
+			return (EIO);
+	}
+
 	/*
 	 * If the vdisk block size and the block size of the underlying device
 	 * match we can skip straight to vd_do_scsi_rdwr(), otherwise we need
@@ -1419,6 +1463,9 @@ vd_reset_if_needed(vd_t *vd)
 	if (vd->reset_ldc && ((status = ldc_down(vd->ldc_handle)) != 0))
 		PR0("ldc_down() returned errno %d", status);
 
+	/* Reset exclusive access rights */
+	vd_reset_access(vd);
+
 	vd->initialized	&= ~(VD_SID | VD_SEQ_NUM | VD_DRING);
 	vd->state	= VD_STATE_INIT;
 	vd->max_msglen	= sizeof (vio_msg_t);	/* baseline vio message size */
@@ -1675,16 +1722,20 @@ vd_serial_notify(void *arg)
 	vd_notify(task);
 }
 
-static void
-vd_geom2dk_geom(void *vd_buf, void *ioctl_arg)
+/* ARGSUSED */
+static int
+vd_geom2dk_geom(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 {
 	VD_GEOM2DK_GEOM((vd_geom_t *)vd_buf, (struct dk_geom *)ioctl_arg);
+	return (0);
 }
 
-static void
-vd_vtoc2vtoc(void *vd_buf, void *ioctl_arg)
+/* ARGSUSED */
+static int
+vd_vtoc2vtoc(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 {
 	VD_VTOC2VTOC((vd_vtoc_t *)vd_buf, (struct vtoc *)ioctl_arg);
+	return (0);
 }
 
 static void
@@ -1699,15 +1750,21 @@ vtoc2vd_vtoc(void *ioctl_arg, void *vd_buf)
 	VTOC2VD_VTOC((struct vtoc *)ioctl_arg, (vd_vtoc_t *)vd_buf);
 }
 
-static void
-vd_get_efi_in(void *vd_buf, void *ioctl_arg)
+static int
+vd_get_efi_in(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 {
 	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
 	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+	size_t data_len;
+
+	data_len = vd_buf_len - (sizeof (vd_efi_t) - sizeof (uint64_t));
+	if (vd_efi->length > data_len)
+		return (EINVAL);
 
 	dk_efi->dki_lba = vd_efi->lba;
 	dk_efi->dki_length = vd_efi->length;
 	dk_efi->dki_data = kmem_zalloc(vd_efi->length, KM_SLEEP);
+	return (0);
 }
 
 static void
@@ -1722,14 +1779,20 @@ vd_get_efi_out(void *ioctl_arg, void *vd_buf)
 	kmem_free(dk_efi->dki_data, len);
 }
 
-static void
-vd_set_efi_in(void *vd_buf, void *ioctl_arg)
+static int
+vd_set_efi_in(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
 {
 	vd_efi_t *vd_efi = (vd_efi_t *)vd_buf;
 	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
+	size_t data_len;
+
+	data_len = vd_buf_len - (sizeof (vd_efi_t) - sizeof (uint64_t));
+	if (vd_efi->length > data_len)
+		return (EINVAL);
 
 	dk_efi->dki_data = kmem_alloc(vd_efi->length, KM_SLEEP);
 	VD_EFI2DK_EFI(vd_efi, dk_efi);
+	return (0);
 }
 
 static void
@@ -1739,6 +1802,123 @@ vd_set_efi_out(void *ioctl_arg, void *vd_buf)
 	dk_efi_t *dk_efi = (dk_efi_t *)ioctl_arg;
 
 	kmem_free(dk_efi->dki_data, vd_efi->length);
+}
+
+static int
+vd_scsicmd_in(void *vd_buf, size_t vd_buf_len, void *ioctl_arg)
+{
+	size_t vd_scsi_len;
+	vd_scsi_t *vd_scsi = (vd_scsi_t *)vd_buf;
+	struct uscsi_cmd *uscsi = (struct uscsi_cmd *)ioctl_arg;
+
+	/* check buffer size */
+	vd_scsi_len = VD_SCSI_SIZE;
+	vd_scsi_len += P2ROUNDUP(vd_scsi->cdb_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(vd_scsi->sense_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(vd_scsi->datain_len, sizeof (uint64_t));
+	vd_scsi_len += P2ROUNDUP(vd_scsi->dataout_len, sizeof (uint64_t));
+
+	ASSERT(vd_scsi_len % sizeof (uint64_t) == 0);
+
+	if (vd_buf_len < vd_scsi_len)
+		return (EINVAL);
+
+	/* set flags */
+	uscsi->uscsi_flags = vd_scsi_debug;
+
+	if (vd_scsi->options & VD_SCSI_OPT_NORETRY) {
+		uscsi->uscsi_flags |= USCSI_ISOLATE;
+		uscsi->uscsi_flags |= USCSI_DIAGNOSE;
+	}
+
+	/* task attribute */
+	switch (vd_scsi->task_attribute) {
+	case VD_SCSI_TASK_ACA:
+		uscsi->uscsi_flags |= USCSI_HEAD;
+		break;
+	case VD_SCSI_TASK_HQUEUE:
+		uscsi->uscsi_flags |= USCSI_HTAG;
+		break;
+	case VD_SCSI_TASK_ORDERED:
+		uscsi->uscsi_flags |= USCSI_OTAG;
+		break;
+	default:
+		uscsi->uscsi_flags |= USCSI_NOTAG;
+		break;
+	}
+
+	/* timeout */
+	uscsi->uscsi_timeout = vd_scsi->timeout;
+
+	/* cdb data */
+	uscsi->uscsi_cdb = (caddr_t)VD_SCSI_DATA_CDB(vd_scsi);
+	uscsi->uscsi_cdblen = vd_scsi->cdb_len;
+
+	/* sense buffer */
+	if (vd_scsi->sense_len != 0) {
+		uscsi->uscsi_flags |= USCSI_RQENABLE;
+		uscsi->uscsi_rqbuf = (caddr_t)VD_SCSI_DATA_SENSE(vd_scsi);
+		uscsi->uscsi_rqlen = vd_scsi->sense_len;
+	}
+
+	if (vd_scsi->datain_len != 0 && vd_scsi->dataout_len != 0) {
+		/* uscsi does not support read/write request */
+		return (EINVAL);
+	}
+
+	/* request data-in */
+	if (vd_scsi->datain_len != 0) {
+		uscsi->uscsi_flags |= USCSI_READ;
+		uscsi->uscsi_buflen = vd_scsi->datain_len;
+		uscsi->uscsi_bufaddr = (char *)VD_SCSI_DATA_IN(vd_scsi);
+	}
+
+	/* request data-out */
+	if (vd_scsi->dataout_len != 0) {
+		uscsi->uscsi_buflen = vd_scsi->dataout_len;
+		uscsi->uscsi_bufaddr = (char *)VD_SCSI_DATA_OUT(vd_scsi);
+	}
+
+	return (0);
+}
+
+static void
+vd_scsicmd_out(void *ioctl_arg, void *vd_buf)
+{
+	vd_scsi_t *vd_scsi = (vd_scsi_t *)vd_buf;
+	struct uscsi_cmd *uscsi = (struct uscsi_cmd *)ioctl_arg;
+
+	/* output fields */
+	vd_scsi->cmd_status = uscsi->uscsi_status;
+
+	/* sense data */
+	if ((uscsi->uscsi_flags & USCSI_RQENABLE) &&
+	    (uscsi->uscsi_status == STATUS_CHECK ||
+	    uscsi->uscsi_status == STATUS_TERMINATED)) {
+		vd_scsi->sense_status = uscsi->uscsi_rqstatus;
+		if (uscsi->uscsi_rqstatus == STATUS_GOOD)
+			vd_scsi->sense_len -= uscsi->uscsi_resid;
+		else
+			vd_scsi->sense_len = 0;
+	} else {
+		vd_scsi->sense_len = 0;
+	}
+
+	if (uscsi->uscsi_status != STATUS_GOOD) {
+		vd_scsi->dataout_len = 0;
+		vd_scsi->datain_len = 0;
+		return;
+	}
+
+	if (uscsi->uscsi_flags & USCSI_READ) {
+		/* request data (read) */
+		vd_scsi->datain_len -= uscsi->uscsi_resid;
+		vd_scsi->dataout_len = 0;
+	} else {
+		/* request data (write) */
+		vd_scsi->datain_len = 0;
+		vd_scsi->dataout_len -= uscsi->uscsi_resid;
+	}
 }
 
 static vd_disk_label_t
@@ -2143,10 +2323,30 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 		}
 
 		/* Convert client's data, if necessary */
-		if (ioctl->copyin == VD_IDENTITY)	/* use client buffer */
+		if (ioctl->copyin == VD_IDENTITY_IN) {
+			/* use client buffer */
 			ioctl->arg = buf;
-		else	/* convert client vdisk operation data to ioctl data */
-			(ioctl->copyin)(buf, (void *)ioctl->arg);
+		} else {
+			/* convert client vdisk operation data to ioctl data */
+			status = (ioctl->copyin)(buf, nbytes,
+			    (void *)ioctl->arg);
+			if (status != 0) {
+				request->status = status;
+				return (0);
+			}
+		}
+	}
+
+	if (ioctl->operation == VD_OP_SCSICMD) {
+		struct uscsi_cmd *uscsi = (struct uscsi_cmd *)ioctl->arg;
+
+		/* check write permission */
+		if (!(vd->open_flags & FWRITE) &&
+		    !(uscsi->uscsi_flags & USCSI_READ)) {
+			PR0("uscsi fails because backend is opened read-only");
+			request->status = EROFS;
+			return (0);
+		}
 	}
 
 	/*
@@ -2176,7 +2376,19 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 
 	if (request->status != 0) {
 		PR0("ioctl(%s) = errno %d", ioctl->cmd_name, request->status);
-		return (0);
+		if (ioctl->operation == VD_OP_SCSICMD &&
+		    ((struct uscsi_cmd *)ioctl->arg)->uscsi_status != 0)
+			/*
+			 * USCSICMD has reported an error and the uscsi_status
+			 * field is not zero. This means that the SCSI command
+			 * has completed but it has an error. So we should
+			 * mark the VD operation has succesfully completed
+			 * and clients can check the SCSI status field for
+			 * SCSI errors.
+			 */
+			request->status = 0;
+		else
+			return (0);
 	}
 
 	/* Convert data and send to client, if necessary */
@@ -2185,7 +2397,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 		PR1("Sending \"arg\" data to client");
 
 		/* Convert ioctl data to vdisk operation data, if necessary */
-		if (ioctl->copyout != VD_IDENTITY)
+		if (ioctl->copyout != VD_IDENTITY_OUT)
 			(ioctl->copyout)((void *)ioctl->arg, buf);
 
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
@@ -2239,6 +2451,7 @@ vd_ioctl(vd_task_t *task)
 	struct dk_geom		dk_geom = {0};
 	struct vtoc		vtoc = {0};
 	struct dk_efi		dk_efi = {0};
+	struct uscsi_cmd	uscsi = {0};
 	vd_t			*vd		= task->vd;
 	vd_dring_payload_t	*request	= task->request;
 	vd_ioctl_t		ioctl[] = {
@@ -2250,7 +2463,7 @@ vd_ioctl(vd_task_t *task)
 		/* "Get" (copy-out) operations */
 		{VD_OP_GET_WCE, STRINGIZE(VD_OP_GET_WCE), RNDSIZE(int),
 		    DKIOCGETWCE, STRINGIZE(DKIOCGETWCE),
-		    NULL, VD_IDENTITY, VD_IDENTITY, B_FALSE},
+		    NULL, VD_IDENTITY_IN, VD_IDENTITY_OUT, B_FALSE},
 		{VD_OP_GET_DISKGEOM, STRINGIZE(VD_OP_GET_DISKGEOM),
 		    RNDSIZE(vd_geom_t),
 		    DKIOCGGEOM, STRINGIZE(DKIOCGGEOM),
@@ -2265,7 +2478,7 @@ vd_ioctl(vd_task_t *task)
 		/* "Set" (copy-in) operations */
 		{VD_OP_SET_WCE, STRINGIZE(VD_OP_SET_WCE), RNDSIZE(int),
 		    DKIOCSETWCE, STRINGIZE(DKIOCSETWCE),
-		    NULL, VD_IDENTITY, VD_IDENTITY, B_TRUE},
+		    NULL, VD_IDENTITY_IN, VD_IDENTITY_OUT, B_TRUE},
 		{VD_OP_SET_DISKGEOM, STRINGIZE(VD_OP_SET_DISKGEOM),
 		    RNDSIZE(vd_geom_t),
 		    DKIOCSGEOM, STRINGIZE(DKIOCSGEOM),
@@ -2276,6 +2489,10 @@ vd_ioctl(vd_task_t *task)
 		{VD_OP_SET_EFI, STRINGIZE(VD_OP_SET_EFI), RNDSIZE(vd_efi_t),
 		    DKIOCSETEFI, STRINGIZE(DKIOCSETEFI),
 		    &dk_efi, vd_set_efi_in, vd_set_efi_out, B_TRUE},
+
+		{VD_OP_SCSICMD, STRINGIZE(VD_OP_SCSICMD), RNDSIZE(vd_scsi_t),
+		    USCSICMD, STRINGIZE(USCSICMD),
+		    &uscsi, vd_scsicmd_in, vd_scsicmd_out, B_FALSE},
 	};
 	size_t		nioctls = (sizeof (ioctl))/(sizeof (ioctl[0]));
 
@@ -2294,7 +2511,8 @@ vd_ioctl(vd_task_t *task)
 			ASSERT(ioctl[i].nbytes % sizeof (uint64_t) == 0);
 
 			if (request->operation == VD_OP_GET_EFI ||
-			    request->operation == VD_OP_SET_EFI) {
+			    request->operation == VD_OP_SET_EFI ||
+			    request->operation == VD_OP_SCSICMD) {
 				if (request->nbytes >= ioctl[i].nbytes)
 					break;
 				PR0("%s:  Expected at least nbytes = %lu, "
@@ -2399,6 +2617,308 @@ vd_get_devid(vd_task_t *task)
 	return (status);
 }
 
+static int
+vd_scsi_reset(vd_t *vd)
+{
+	int rval, status;
+	struct uscsi_cmd uscsi = { 0 };
+
+	uscsi.uscsi_flags = vd_scsi_debug | USCSI_RESET;
+	uscsi.uscsi_timeout = vd_scsi_rdwr_timeout;
+
+	status = ldi_ioctl(vd->ldi_handle[0], USCSICMD, (intptr_t)&uscsi,
+	    (vd->open_flags | FKIOCTL), kcred, &rval);
+
+	return (status);
+}
+
+static int
+vd_reset(vd_task_t *task)
+{
+	vd_t *vd = task->vd;
+	vd_dring_payload_t *request = task->request;
+
+	ASSERT(request->operation == VD_OP_RESET);
+	ASSERT(vd->scsi);
+
+	PR0("Performing VD_OP_RESET");
+
+	if (request->nbytes != 0) {
+		PR0("VD_OP_RESET:  Expected nbytes = 0, got %lu",
+		    request->nbytes);
+		return (EINVAL);
+	}
+
+	request->status = vd_scsi_reset(vd);
+
+	return (0);
+}
+
+static int
+vd_get_capacity(vd_task_t *task)
+{
+	int rv;
+	size_t nbytes;
+	vd_t *vd = task->vd;
+	vd_dring_payload_t *request = task->request;
+	vd_capacity_t vd_cap = { 0 };
+
+	ASSERT(request->operation == VD_OP_GET_CAPACITY);
+	ASSERT(vd->scsi);
+
+	PR0("Performing VD_OP_GET_CAPACITY");
+
+	nbytes = request->nbytes;
+
+	if (nbytes != RNDSIZE(vd_capacity_t)) {
+		PR0("VD_OP_GET_CAPACITY:  Expected nbytes = %lu, got %lu",
+		    RNDSIZE(vd_capacity_t), nbytes);
+		return (EINVAL);
+	}
+
+	if (vd->vdisk_size == VD_SIZE_UNKNOWN) {
+		if (vd_setup_mediainfo(vd) != 0)
+			ASSERT(vd->vdisk_size == VD_SIZE_UNKNOWN);
+	}
+
+	ASSERT(vd->vdisk_size != 0);
+
+	request->status = 0;
+
+	vd_cap.vdisk_block_size = vd->vdisk_block_size;
+	vd_cap.vdisk_size = vd->vdisk_size;
+
+	if ((rv = ldc_mem_copy(vd->ldc_handle, (char *)&vd_cap, 0, &nbytes,
+	    request->cookie, request->ncookies, LDC_COPY_OUT)) != 0) {
+		PR0("ldc_mem_copy() returned errno %d copying to client", rv);
+		return (rv);
+	}
+
+	return (0);
+}
+
+static int
+vd_get_access(vd_task_t *task)
+{
+	uint64_t access;
+	int rv, rval = 0;
+	size_t nbytes;
+	vd_t *vd = task->vd;
+	vd_dring_payload_t *request = task->request;
+
+	ASSERT(request->operation == VD_OP_GET_ACCESS);
+	ASSERT(vd->scsi);
+
+	PR0("Performing VD_OP_GET_ACCESS");
+
+	nbytes = request->nbytes;
+
+	if (nbytes != sizeof (uint64_t)) {
+		PR0("VD_OP_GET_ACCESS:  Expected nbytes = %lu, got %lu",
+		    sizeof (uint64_t), nbytes);
+		return (EINVAL);
+	}
+
+	request->status = ldi_ioctl(vd->ldi_handle[request->slice], MHIOCSTATUS,
+	    NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+
+	if (request->status != 0)
+		return (0);
+
+	access = (rval == 0)? VD_ACCESS_ALLOWED : VD_ACCESS_DENIED;
+
+	if ((rv = ldc_mem_copy(vd->ldc_handle, (char *)&access, 0, &nbytes,
+	    request->cookie, request->ncookies, LDC_COPY_OUT)) != 0) {
+		PR0("ldc_mem_copy() returned errno %d copying to client", rv);
+		return (rv);
+	}
+
+	return (0);
+}
+
+static int
+vd_set_access(vd_task_t *task)
+{
+	uint64_t flags;
+	int rv, rval;
+	size_t nbytes;
+	vd_t *vd = task->vd;
+	vd_dring_payload_t *request = task->request;
+
+	ASSERT(request->operation == VD_OP_SET_ACCESS);
+	ASSERT(vd->scsi);
+
+	nbytes = request->nbytes;
+
+	if (nbytes != sizeof (uint64_t)) {
+		PR0("VD_OP_SET_ACCESS:  Expected nbytes = %lu, got %lu",
+		    sizeof (uint64_t), nbytes);
+		return (EINVAL);
+	}
+
+	if ((rv = ldc_mem_copy(vd->ldc_handle, (char *)&flags, 0, &nbytes,
+	    request->cookie, request->ncookies, LDC_COPY_IN)) != 0) {
+		PR0("ldc_mem_copy() returned errno %d copying from client", rv);
+		return (rv);
+	}
+
+	if (flags == VD_ACCESS_SET_CLEAR) {
+		PR0("Performing VD_OP_SET_ACCESS (CLEAR)");
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCRELEASE, NULL, (vd->open_flags | FKIOCTL), kcred,
+		    &rval);
+		if (request->status == 0)
+			vd->ownership = B_FALSE;
+		return (0);
+	}
+
+	/*
+	 * As per the VIO spec, the PREEMPT and PRESERVE flags are only valid
+	 * when the EXCLUSIVE flag is set.
+	 */
+	if (!(flags & VD_ACCESS_SET_EXCLUSIVE)) {
+		PR0("Invalid VD_OP_SET_ACCESS flags: 0x%lx", flags);
+		request->status = EINVAL;
+		return (0);
+	}
+
+	switch (flags & (VD_ACCESS_SET_PREEMPT | VD_ACCESS_SET_PRESERVE)) {
+
+	case VD_ACCESS_SET_PREEMPT | VD_ACCESS_SET_PRESERVE:
+		/*
+		 * Flags EXCLUSIVE and PREEMPT and PRESERVE. We have to
+		 * acquire exclusive access rights, preserve them and we
+		 * can use preemption. So we can use the MHIOCTKNOWN ioctl.
+		 */
+		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PREEMPT|PRESERVE)");
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCTKOWN, NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+		break;
+
+	case VD_ACCESS_SET_PRESERVE:
+		/*
+		 * Flags EXCLUSIVE and PRESERVE. We have to acquire exclusive
+		 * access rights and preserve them, but not preempt any other
+		 * host. So we need to use the MHIOCTKOWN ioctl to enable the
+		 * "preserve" feature but we can not called it directly
+		 * because it uses preemption. So before that, we use the
+		 * MHIOCQRESERVE ioctl to ensure we can get exclusive rights
+		 * without preempting anyone.
+		 */
+		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PRESERVE)");
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
+		    &rval);
+		if (request->status != 0)
+			break;
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCTKOWN, NULL, (vd->open_flags | FKIOCTL), kcred, &rval);
+		break;
+
+	case VD_ACCESS_SET_PREEMPT:
+		/*
+		 * Flags EXCLUSIVE and PREEMPT. We have to acquire exclusive
+		 * access rights and we can use preemption. So we try to do
+		 * a SCSI reservation, if it fails we reset the disk to clear
+		 * any reservation and we try to reserve again.
+		 */
+		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE|PREEMPT)");
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
+		    &rval);
+		if (request->status == 0)
+			break;
+
+		/* reset the disk */
+		(void) vd_scsi_reset(vd);
+
+		/* try again even if the reset has failed */
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
+		    &rval);
+		break;
+
+	case 0:
+		/* Flag EXCLUSIVE only. Just issue a SCSI reservation */
+		PR0("Performing VD_OP_SET_ACCESS (EXCLUSIVE)");
+		request->status = ldi_ioctl(vd->ldi_handle[request->slice],
+		    MHIOCQRESERVE, NULL, (vd->open_flags | FKIOCTL), kcred,
+		    &rval);
+		break;
+	}
+
+	if (request->status == 0)
+		vd->ownership = B_TRUE;
+	else
+		PR0("VD_OP_SET_ACCESS: error %d", request->status);
+
+	return (0);
+}
+
+static void
+vd_reset_access(vd_t *vd)
+{
+	int status, rval;
+
+	if (vd->file || !vd->ownership)
+		return;
+
+	PR0("Releasing disk ownership");
+	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, NULL,
+	    (vd->open_flags | FKIOCTL), kcred, &rval);
+
+	/*
+	 * An EACCES failure means that there is a reservation conflict,
+	 * so we are not the owner of the disk anymore.
+	 */
+	if (status == 0 || status == EACCES) {
+		vd->ownership = B_FALSE;
+		return;
+	}
+
+	PR0("Fail to release ownership, error %d", status);
+
+	/*
+	 * We have failed to release the ownership, try to reset the disk
+	 * to release reservations.
+	 */
+	PR0("Resetting disk");
+	status = vd_scsi_reset(vd);
+
+	if (status != 0)
+		PR0("Fail to reset disk, error %d", status);
+
+	/* whatever the result of the reset is, we try the release again */
+	status = ldi_ioctl(vd->ldi_handle[0], MHIOCRELEASE, NULL,
+	    (vd->open_flags | FKIOCTL), kcred, &rval);
+
+	if (status == 0 || status == EACCES) {
+		vd->ownership = B_FALSE;
+		return;
+	}
+
+	PR0("Fail to release ownership, error %d", status);
+
+	/*
+	 * At this point we have done our best to try to reset the
+	 * access rights to the disk and we don't know if we still
+	 * own a reservation and if any mechanism to preserve the
+	 * ownership is still in place. The ultimate solution would
+	 * be to reset the system but this is usually not what we
+	 * want to happen.
+	 */
+
+	if (vd_reset_access_failure == A_REBOOT) {
+		cmn_err(CE_WARN, VD_RESET_ACCESS_FAILURE_MSG
+		    ", rebooting the system", vd->device_path);
+		(void) uadmin(A_SHUTDOWN, AD_BOOT, NULL);
+	} else if (vd_reset_access_failure == A_DUMP) {
+		panic(VD_RESET_ACCESS_FAILURE_MSG, vd->device_path);
+	}
+
+	cmn_err(CE_WARN, VD_RESET_ACCESS_FAILURE_MSG, vd->device_path);
+}
+
 /*
  * Define the supported operations once the functions for performing them have
  * been defined
@@ -2417,6 +2937,11 @@ static const vds_operation_t	vds_operation[] = {
 	{X(VD_OP_GET_EFI),	vd_ioctl,	NULL},
 	{X(VD_OP_SET_EFI),	vd_ioctl,	NULL},
 	{X(VD_OP_GET_DEVID),	vd_get_devid,	NULL},
+	{X(VD_OP_SCSICMD),	vd_ioctl,	NULL},
+	{X(VD_OP_RESET),	vd_reset,	NULL},
+	{X(VD_OP_GET_CAPACITY),	vd_get_capacity, NULL},
+	{X(VD_OP_SET_ACCESS),	vd_set_access,	NULL},
+	{X(VD_OP_GET_ACCESS),	vd_get_access,	NULL},
 #undef	X
 };
 
@@ -2702,6 +3227,9 @@ vd_set_exported_operations(vd_t *vd)
 		if (vd->open_flags & FWRITE)
 			vd->operations |= VD_OP_MASK_WRITE;
 
+		if (vd->scsi)
+			vd->operations |= VD_OP_MASK_SCSI;
+
 		if (vd->file && vd_file_is_iso_image(vd)) {
 			/*
 			 * can't write to ISO images, make sure that write
@@ -2823,8 +3351,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	/* Return the device's block size and max transfer size to the client */
-	attr_msg->vdisk_block_size	= DEV_BSIZE;
-	attr_msg->vdisk_block_size	= vd->block_size;
+	attr_msg->vdisk_block_size	= vd->vdisk_block_size;
 	attr_msg->max_xfer_sz		= vd->max_xfer_sz;
 
 	attr_msg->vdisk_size = vd->vdisk_size;
@@ -3806,32 +4333,65 @@ vd_is_atapi_device(vd_t *vd)
 }
 
 static int
-vd_setup_full_disk(vd_t *vd)
+vd_setup_mediainfo(vd_t *vd)
 {
-	int		rval, status;
-	major_t		major = getmajor(vd->dev[0]);
-	minor_t		minor = getminor(vd->dev[0]) - VD_ENTIRE_DISK_SLICE;
+	int status, rval;
 	struct dk_minfo	dk_minfo;
 
+	ASSERT(vd->ldi_handle[0] != NULL);
+	ASSERT(vd->vdisk_block_size != 0);
+
+	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
+	    (intptr_t)&dk_minfo, (vd->open_flags | FKIOCTL),
+	    kcred, &rval)) != 0)
+		return (status);
+
+	ASSERT(dk_minfo.dki_lbsize % vd->vdisk_block_size == 0);
+
+	vd->block_size = dk_minfo.dki_lbsize;
+	vd->vdisk_size = (dk_minfo.dki_capacity * dk_minfo.dki_lbsize) /
+	    vd->vdisk_block_size;
+	vd->vdisk_media = DK_MEDIATYPE2VD_MEDIATYPE(dk_minfo.dki_media_type);
+	return (0);
+}
+
+static int
+vd_setup_full_disk(vd_t *vd)
+{
+	int		status;
+	major_t		major = getmajor(vd->dev[0]);
+	minor_t		minor = getminor(vd->dev[0]) - VD_ENTIRE_DISK_SLICE;
+
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+
+	vd->vdisk_block_size = DEV_BSIZE;
 
 	/*
 	 * At this point, vdisk_size is set to the size of partition 2 but
 	 * this does not represent the size of the disk because partition 2
 	 * may not cover the entire disk and its size does not include reserved
-	 * blocks. So we update vdisk_size to be the size of the entire disk.
+	 * blocks. So we call vd_get_mediainfo to udpate this information and
+	 * set the block size and the media type of the disk.
 	 */
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
-	    (intptr_t)&dk_minfo, (vd->open_flags | FKIOCTL),
-	    kcred, &rval)) != 0) {
-		PRN("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
-		    status);
-		return (status);
+	status = vd_setup_mediainfo(vd);
+
+	if (status != 0) {
+		if (!vd->scsi) {
+			/* unexpected failure */
+			PRN("ldi_ioctl(DKIOCGMEDIAINFO) returned errno %d",
+			    status);
+			return (status);
+		}
+
+		/*
+		 * The function can fail for SCSI disks which are present but
+		 * reserved by another system. In that case, we don't know the
+		 * size of the disk and the block size.
+		 */
+		vd->vdisk_size = VD_SIZE_UNKNOWN;
+		vd->block_size = 0;
+		vd->vdisk_media = VD_MEDIA_FIXED;
 	}
-	vd->vdisk_size = dk_minfo.dki_capacity;
-	vd->block_size = dk_minfo.dki_lbsize;
-	vd->vdisk_media = DK_MEDIATYPE2VD_MEDIATYPE(dk_minfo.dki_media_type);
-	vd->vdisk_block_size = DEV_BSIZE;
 
 	/* Move dev number and LDI handle to entire-disk-slice array elements */
 	vd->dev[VD_ENTIRE_DISK_SLICE]		= vd->dev[0];
@@ -4337,6 +4897,8 @@ vd_setup_backend_ldi(vd_t *vd)
 	    vd->vdisk_type == VD_DISK_TYPE_DISK) ||
 	    dk_cinfo.dki_ctype == DKC_CDROM) {
 		ASSERT(!vd->pseudo);
+		if (dk_cinfo.dki_ctype == DKC_SCSI_CCS)
+			vd->scsi = B_TRUE;
 		return (vd_setup_full_disk(vd));
 	}
 
@@ -4349,8 +4911,6 @@ vd_setup_backend_ldi(vd_t *vd)
 	 * If it is disk slice 2 or a pseudo device then it is exported as a
 	 * single slice disk only if the "slice" option is specified.
 	 */
-	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE ||
-	    dk_cinfo.dki_partition == VD_ENTIRE_DISK_SLICE);
 	return (vd_setup_single_slice_disk(vd));
 }
 
@@ -4472,13 +5032,26 @@ vd_setup_vd(vd_t *vd)
 		ddi_release_devi(dip);
 		VN_RELE(vnp);
 
+		if (!vd->pseudo) {
+			status = vd_setup_backend_ldi(vd);
+			break;
+		}
+
 		/*
 		 * If this is a pseudo device then its usage depends if the
 		 * "slice" option is set or not. If the "slice" option is set
 		 * then the pseudo device will be exported as a single slice,
 		 * otherwise it will be exported as a full disk.
+		 *
+		 * For backward compatibility, if vd_volume_force_slice is set
+		 * then we always export pseudo devices as slices.
 		 */
-		if (vd->pseudo && vd->vdisk_type == VD_DISK_TYPE_DISK)
+		if (vd_volume_force_slice) {
+			vd->vdisk_type = VD_DISK_TYPE_SLICE;
+			vd->nslices = 1;
+		}
+
+		if (vd->vdisk_type == VD_DISK_TYPE_DISK)
 			status = vd_setup_backend_vnode(vd);
 		else
 			status = vd_setup_backend_ldi(vd);

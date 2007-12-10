@@ -104,8 +104,26 @@ extern "C" {
 #define	VD_OP_GET_DEVID		0x0b	/* Get device id */
 #define	VD_OP_GET_EFI 		0x0c	/* Get EFI */
 #define	VD_OP_SET_EFI 		0x0d	/* Set EFI */
+#define	VD_OP_RESET		0x0e	/* Reset disk */
+#define	VD_OP_GET_ACCESS	0x0f	/* Get disk access */
+#define	VD_OP_SET_ACCESS	0x10	/* Set disk access */
+#define	VD_OP_GET_CAPACITY	0x11	/* Get disk capacity */
 #define	VD_OP_MASK		0xFF	/* mask of all possible operations */
-#define	VD_OP_COUNT		13	/* Number of operations */
+#define	VD_OP_COUNT		0x11	/* Number of operations */
+
+/*
+ * Status for the VD_OP_GET_ACCESS operation
+ */
+#define	VD_ACCESS_DENIED	0x00	/* access is not allowed */
+#define	VD_ACCESS_ALLOWED	0x01	/* access is allowed */
+
+/*
+ * Flags for the VD_OP_SET_ACCESS operation
+ */
+#define	VD_ACCESS_SET_CLEAR	0x00	/* clear exclusive access rights */
+#define	VD_ACCESS_SET_EXCLUSIVE	0x01	/* set exclusive access rights */
+#define	VD_ACCESS_SET_PREEMPT	0x02	/* forcefully set access rights */
+#define	VD_ACCESS_SET_PRESERVE	0x04	/* preserve access rights */
 
 /*
  * This is a mask of all the basic operations supported by all
@@ -127,6 +145,15 @@ extern "C" {
 	(1 << VD_OP_SET_DISKGEOM) |		\
 	(1 << VD_OP_SET_EFI))
 
+/*
+ * Mask for additional operations provided for SCSI disks (v1.1)
+ */
+#define	VD_OP_MASK_SCSI				\
+	((1 << VD_OP_SCSICMD) |			\
+	(1 << VD_OP_RESET) |			\
+	(1 << VD_OP_GET_ACCESS) |		\
+	(1 << VD_OP_SET_ACCESS) |		\
+	(1 << VD_OP_GET_CAPACITY))
 
 /*
  * macro to check if the operation 'op' is supported by checking the list
@@ -259,6 +286,73 @@ typedef struct vd_devid {
 	uint32_t	length;		/* length the device id */
 	char		id[1];		/* device id */
 } vd_devid_t;
+
+/*
+ * vDisk CAPACITY definition (VD_OP_GET_CAPACITY)
+ */
+typedef struct vd_capacity {
+	uint32_t	vdisk_block_size;	/* block size in bytes */
+	uint32_t	reserved;		/* reserved */
+	uint64_t	vdisk_size;		/* disk size in blocks */
+} vd_capacity_t;
+
+/* Identifier for unknown disk size */
+#define	VD_SIZE_UNKNOWN		-1
+
+/*
+ * vDisk SCSI definition (VD_OP_SCSICMD)
+ */
+typedef struct vd_scsi {
+	uint8_t		cmd_status;	/* command completion status */
+	uint8_t		sense_status;	/* sense command completion status */
+	uint8_t		task_attribute;	/* task attribute */
+	uint8_t		task_priority;	/* task priority */
+	uint8_t		crn;		/* command reference number */
+	uint8_t		reserved;	/* reserved */
+	uint16_t	timeout;	/* command timeout */
+	uint64_t	options;	/* options */
+	uint64_t	cdb_len;	/* CDB data length */
+	uint64_t	sense_len;	/* sense request length */
+	uint64_t	datain_len;	/* data in buffer length */
+	uint64_t	dataout_len;	/* data out buffer length */
+	char		data[1];	/* data (CDB, sense, data in/out */
+} vd_scsi_t;
+
+/* Minimum size of the vd_scsi structure */
+#define	VD_SCSI_SIZE	(sizeof (vd_scsi_t) - sizeof (uint64_t))
+
+/*
+ * Macros to access data buffers in a vd_scsi structure. When using these
+ * macros, the vd_scsi structure needs to be populated with the sizes of
+ * data buffers allocated in the structure.
+ */
+#define	VD_SCSI_DATA_CDB(vscsi)		\
+	((union scsi_cdb *)(uintptr_t)((vscsi)->data))
+
+#define	VD_SCSI_DATA_SENSE(vscsi) 	\
+	((struct scsi_extended_sense *)(uintptr_t)((vscsi)->data + \
+	    P2ROUNDUP((vscsi)->cdb_len, sizeof (uint64_t))))
+
+#define	VD_SCSI_DATA_IN(vscsi)		\
+	((uintptr_t)((vscsi)->data +	\
+	    P2ROUNDUP((vscsi)->cdb_len, sizeof (uint64_t)) + 	\
+	    P2ROUNDUP((vscsi)->sense_len, sizeof (uint64_t))))
+
+#define	VD_SCSI_DATA_OUT(vscsi)		\
+	((uintptr_t)((vscsi)->data +	\
+	    P2ROUNDUP((vscsi)->cdb_len, sizeof (uint64_t)) + 	\
+	    P2ROUNDUP((vscsi)->sense_len, sizeof (uint64_t)) + 	\
+	    P2ROUNDUP((vscsi)->datain_len, sizeof (uint64_t))))
+
+/* vDisk SCSI task attribute */
+#define	VD_SCSI_TASK_SIMPLE	0x01	/* simple task */
+#define	VD_SCSI_TASK_ORDERED	0x02	/* ordered task */
+#define	VD_SCSI_TASK_HQUEUE	0x03	/* head of queue task */
+#define	VD_SCSI_TASK_ACA	0x04	/* ACA task */
+
+/* vDisk SCSI options */
+#define	VD_SCSI_OPT_CRN		0x01	/* request has a CRN */
+#define	VD_SCSI_OPT_NORETRY	0x02	/* do not attempt any retry */
 
 /*
  * Copy the contents of a vd_geom_t to the contents of a dk_geom struct

@@ -231,6 +231,15 @@ typedef struct vdc_local_desc {
 } vdc_local_desc_t;
 
 /*
+ * I/O queue used by failfast
+ */
+typedef struct vdc_io {
+	struct vdc_io	*vio_next;	/* next pending I/O in the queue */
+	struct buf	*vio_buf;	/* buf for CB_STRATEGY I/O */
+	clock_t		vio_qtime;	/* time the I/O was queued */
+} vdc_io_t;
+
+/*
  * vdc soft state structure
  */
 typedef struct vdc {
@@ -291,6 +300,25 @@ typedef struct vdc {
 	uint64_t	ctimeout;	/* connection timeout in seconds */
 	boolean_t	ctimeout_reached; /* connection timeout has expired */
 
+	/*
+	 * The ownership fields are protected by the lock mutex. The
+	 * ownership_lock mutex is used to serialize ownership operations;
+	 * it should be acquired before the lock mutex.
+	 */
+	kmutex_t	ownership_lock;		/* serialize ownership ops */
+	int		ownership;		/* ownership status flags */
+	kthread_t	*ownership_thread;	/* ownership thread */
+	kcondvar_t	ownership_cv;		/* cv for ownership update */
+
+	/*
+	 * The failfast fields are protected by the lock mutex.
+	 */
+	kthread_t	*failfast_thread;	/* failfast thread */
+	clock_t		failfast_interval;	/* interval in microsecs */
+	kcondvar_t	failfast_cv;		/* cv for failfast update */
+	kcondvar_t	failfast_io_cv;		/* cv wait for I/O to finish */
+	vdc_io_t	*failfast_io_queue;	/* failfast io queue */
+
 	ldc_mem_info_t		dring_mem_info;		/* dring information */
 	uint_t			dring_curr_idx;		/* current index */
 	uint32_t		dring_len;		/* dring length */
@@ -312,6 +340,20 @@ typedef struct vdc {
 	ldc_handle_t		ldc_handle;		/* LDC handle */
 	ldc_dring_handle_t	ldc_dring_hdl;		/* LDC dring handle */
 } vdc_t;
+
+/*
+ * Ownership status flags
+ */
+#define	VDC_OWNERSHIP_NONE	0x00 /* no ownership wanted */
+#define	VDC_OWNERSHIP_WANTED	0x01 /* ownership is wanted */
+#define	VDC_OWNERSHIP_GRANTED	0x02 /* ownership has been granted */
+#define	VDC_OWNERSHIP_RESET	0x04 /* ownership has been reset */
+
+/*
+ * Reservation conflict panic message
+ */
+#define	VDC_RESV_CONFLICT_FMT_STR	"Reservation Conflict\nDisk: "
+#define	VDC_RESV_CONFLICT_FMT_LEN 	(sizeof (VDC_RESV_CONFLICT_FMT_STR))
 
 /*
  * Debugging macros

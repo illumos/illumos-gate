@@ -70,7 +70,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS	+= $(CCVERBOSE)
 CFLAGS	+= -errwarn=%all
 
-LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc
+LDFLAGS += -dy -Nmisc/ldc -Nmisc/platsvc -Nmisc/scsi
 
 #
 #	Default build targets.
