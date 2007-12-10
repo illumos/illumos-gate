@@ -56,10 +56,11 @@ typedef struct cnex_intr {
 	uint64_t	ino;		/* dev intr number */
 	uint64_t	cpuid;		/* Target CPU */
 	uint64_t	icookie;	/* dev intr cookie */
+	uint64_t	id;		/* LDC channel ID  */
+	dev_info_t	*dip;		/* LDC channel devinfo */
 	uint_t		(*hdlr)();	/* intr handler */
 	caddr_t		arg1;		/* intr argument 1 */
 	caddr_t		arg2;		/* intr argument 2 */
-	struct cnex_ldc *cldcp;		/* back pointer to the ldc */
 } cnex_intr_t;
 
 /* cnex interrupt types */

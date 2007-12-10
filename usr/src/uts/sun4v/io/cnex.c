@@ -218,7 +218,7 @@ static struct dev_ops cnex_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"sun4v channel-devices nexus %I%",
+	"sun4v channel-devices nexus 1.11",
 	&cnex_ops,
 };
 
@@ -620,7 +620,9 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	iinfo->arg1 = arg1;
 	iinfo->arg2 = arg2;
 
-	iinfo->cldcp = cldcp;
+	/* save data for DTrace probes used by intrstat(1m) */
+	iinfo->dip = cldcp->dip;
+	iinfo->id = cldcp->id;
 
 	iinfo->icookie = MINVINTR_COOKIE + iinfo->ino;
 
@@ -894,7 +896,7 @@ cnex_clr_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype)
 		return (EINVAL);
 	}
 
-	D1("cnex_rem_intr: interrupt ino=0x%x\n", iinfo->ino);
+	D1("%s: interrupt ino=0x%x\n", __func__, iinfo->ino);
 
 	/* check if a handler is already added */
 	if (iinfo->hdlr == 0) {
@@ -943,19 +945,19 @@ cnex_intr_wrapper(caddr_t arg)
 	 * probes('channelintr__start','channelintr__complete')
 	 * are provided here.
 	 */
-	DTRACE_PROBE4(channelintr__start, uint64_t, iinfo->cldcp->id,
+	DTRACE_PROBE4(channelintr__start, uint64_t, iinfo->id,
 	    cnex_intr_t *, iinfo, void *, handler, caddr_t, handler_arg1);
 
-	DTRACE_PROBE4(interrupt__start, dev_info_t, iinfo->cldcp->dip,
+	DTRACE_PROBE4(interrupt__start, dev_info_t, iinfo->dip,
 	    void *, handler, caddr_t, handler_arg1, caddr_t, handler_arg2);
 
 	D1("cnex_intr_wrapper:ino=0x%llx invoke client handler\n", iinfo->ino);
 	res = (*handler)(handler_arg1, handler_arg2);
 
-	DTRACE_PROBE4(interrupt__complete, dev_info_t, iinfo->cldcp->dip,
+	DTRACE_PROBE4(interrupt__complete, dev_info_t, iinfo->dip,
 	    void *, handler, caddr_t, handler_arg1, int, res);
 
-	DTRACE_PROBE4(channelintr__complete, uint64_t, iinfo->cldcp->id,
+	DTRACE_PROBE4(channelintr__complete, uint64_t, iinfo->id,
 	    cnex_intr_t *, iinfo, void *, handler, caddr_t, handler_arg1);
 
 	return (res);
