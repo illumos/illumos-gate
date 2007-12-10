@@ -1116,6 +1116,8 @@ segkmem_xalloc_lp(vmem_t *vmp, void *inaddr, size_t size, int vmflag,
 	page_t *pp, *rootpp, **ppa, *pplist = NULL;
 	int i;
 
+	vmflag |= VM_NOSLEEP;
+
 	if (page_resv(npages, vmflag & VM_KMFLAGS) == 0) {
 		return (NULL);
 	}
