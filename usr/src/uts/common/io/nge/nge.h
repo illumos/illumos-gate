@@ -159,7 +159,7 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	NGE_MAX_MTU		9000
 #define	NGE_MAX_SDU		9018
 
-#define	NGE_DESC_MIN		0x100
+#define	NGE_DESC_MIN		0x200
 
 #define	NGE_STD_BUFSZ		1792
 #define	NGE_JB2500_BUFSZ	(3*1024)
@@ -192,9 +192,10 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	NGE_MAX_COOKIES		3
 #define	NGE_MAX_DMA_HDR		(4*1024)
 
-/* Used by interrupt blank */
-#define	NGE_TICKS_CNT	128
-#define	NGE_RX_PKT_CNT	8
+/* Used by interrupt moderation */
+#define	NGE_POLL_QUIET_TIME	100
+#define	NGE_POLL_BUSY_TIME	2
+#define	NGE_TX_N_INTR		128
 
 /*
  * NGE-specific ioctls ...
@@ -315,6 +316,11 @@ enum {
 	PARAM_TXBCOPY_THRESHOLD,
 	PARAM_RXBCOPY_THRESHOLD,
 	PARAM_RECV_MAX_PACKET,
+	PARAM_POLL_QUIET_TIME,
+	PARAM_POLL_BUSY_TIME,
+	PARAM_RX_INTR_HWATER,
+	PARAM_RX_INTR_LWATER,
+	PARAM_TX_N_INTR,
 
 	PARAM_COUNT
 };
@@ -818,8 +824,11 @@ typedef struct nge {
 	uint32_t		intr_masks;
 	boolean_t		poll;
 	boolean_t		ch_intr_mode;
+	boolean_t		intr_moderation;
 	uint32_t		recv_count;
-	uint32_t		poll_time;
+	uint32_t		quiet_time;
+	uint32_t		busy_time;
+	uint32_t		stint_count;
 	uint32_t		sw_intr_intv;
 	nge_mac_addr_t		cur_uni_addr;
 	uint32_t		rx_datahwm;
@@ -899,6 +908,11 @@ extern const nge_ksindex_t nge_statistics[];
 #define	param_txbcopy_threshold	nd_params[PARAM_TXBCOPY_THRESHOLD].ndp_val
 #define	param_rxbcopy_threshold	nd_params[PARAM_RXBCOPY_THRESHOLD].ndp_val
 #define	param_recv_max_packet	nd_params[PARAM_RECV_MAX_PACKET].ndp_val
+#define	param_poll_quiet_time	nd_params[PARAM_POLL_QUIET_TIME].ndp_val
+#define	param_poll_busy_time	nd_params[PARAM_POLL_BUSY_TIME].ndp_val
+#define	param_rx_intr_hwater	nd_params[PARAM_RX_INTR_HWATER].ndp_val
+#define	param_rx_intr_lwater	nd_params[PARAM_RX_INTR_LWATER].ndp_val
+#define	param_tx_n_intr		nd_params[PARAM_TX_N_INTR].ndp_val
 
 /*
  * Sync a DMA area described by a dma_area_t

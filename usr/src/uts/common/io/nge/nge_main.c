@@ -158,6 +158,7 @@ static char nge_ident[] = "nVidia 1Gb Ethernet %I%";
 static char clsize_propname[] = "cache-line-size";
 static char latency_propname[] = "latency-timer";
 static char debug_propname[]	= "nge-debug-flags";
+static char intr_moderation[] = "intr-moderation";
 static char rx_data_hw[] = "rx-data-hw";
 static char rx_prd_lw[] = "rx-prd-lw";
 static char rx_prd_hw[] = "rx-prd-hw";
@@ -176,7 +177,7 @@ static void		nge_m_resources(void *);
 static void		nge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	nge_m_getcapab(void *, mac_capab_t, void *);
 
-#define		NGE_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+#define		NGE_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
 
 static mac_callbacks_t nge_m_callbacks = {
 	NGE_M_CALLBACK_FLAGS,
@@ -187,7 +188,7 @@ static mac_callbacks_t nge_m_callbacks = {
 	nge_m_multicst,
 	nge_m_unicst,
 	nge_m_tx,
-	nge_m_resources,
+	NULL,
 	nge_m_ioctl,
 	nge_m_getcapab
 };
@@ -953,6 +954,8 @@ nge_get_props(nge_t *ngep)
 
 	infop->latency = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 	    DDI_PROP_DONTPASS, latency_propname, 64);
+	ngep->intr_moderation = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+	    DDI_PROP_DONTPASS, intr_moderation, NGE_SET);
 	ngep->rx_datahwm = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 	    DDI_PROP_DONTPASS, rx_data_hw, 0x20);
 	ngep->rx_prdlwm = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
@@ -1456,36 +1459,6 @@ nge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		qreply(wq, mp);
 		break;
 	}
-}
-
-static void
-nge_chip_blank(void *arg, time_t ticks, uint_t count)
-{
-	_NOTE(ARGUNUSED(arg, ticks, count));
-}
-
-static void
-nge_m_resources(void *arg)
-{
-	nge_t *ngep = arg;
-	recv_ring_t *rrp;
-	mac_rx_fifo_t mrf;
-
-	mutex_enter(ngep->genlock);
-
-	/*
-	 * Register Rx rings as resources and save mac
-	 * resource id for future reference
-	 */
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = nge_chip_blank;
-	mrf.mrf_arg = (void *)ngep;
-	mrf.mrf_normal_blank_time = NGE_TICKS_CNT;
-	mrf.mrf_normal_pkt_count = NGE_RX_PKT_CNT;
-
-	rrp = ngep->recv;
-	rrp->handle = mac_resource_add(ngep->mh, (mac_resource_t *)&mrf);
-	mutex_exit(ngep->genlock);
 }
 
 /* ARGSUSED */

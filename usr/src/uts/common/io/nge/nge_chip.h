@@ -170,9 +170,9 @@ typedef union _nge_swtr_cntl {
  * Software Timer Interval
  */
 #define	NGE_SWTR_ITC		0x00c
-#define	POLL_LWATER		0x10
-#define	INTR_HWATER		0x5
-#define	SWTR_ITC		0x10
+
+/* Default timer interval, 97 would mean 1 ms */
+#define	SWTR_ITC		0x8
 typedef union _nge_itc {
 	uint32_t	itc_val;
 	struct {

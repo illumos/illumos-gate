@@ -120,8 +120,28 @@ static const nd_param_t nd_template[] = {
 "+rx_bcopy_threshold" },
 
 /* Max packet received per interrupt */
-{ PARAM_RECV_MAX_PACKET,	0,	NGE_RECV_SLOTS_DESC_1024,	32,
+{ PARAM_RECV_MAX_PACKET,	0,	NGE_RECV_SLOTS_DESC_1024,	128,
 "+recv_max_packet" },
+/* Quiet time switch from polling interrupt to per packet interrupt */
+{ PARAM_POLL_QUIET_TIME,	0,	10000,	NGE_POLL_QUIET_TIME,
+"+poll_quiet_time" },
+
+/* Busy time switch from per packet interrupt to polling interrupt */
+{ PARAM_POLL_BUSY_TIME,		0,	10000,	NGE_POLL_BUSY_TIME,
+"+poll_busy_time" },
+
+/* Packets received to trigger the poll_quiet_time counter */
+{ PARAM_RX_INTR_HWATER,		0,	PARAM_RECV_MAX_PACKET,	1,
+"+rx_intr_hwater" },
+
+/* Packets received to trigger the poll_busy_time counter */
+{ PARAM_RX_INTR_LWATER,		0,	PARAM_RECV_MAX_PACKET,	8,
+"+rx_intr_lwater" },
+
+/* Per N tx packets to do tx recycle in poll mode */
+{ PARAM_TX_N_INTR,		1,	10000,	NGE_TX_N_INTR,
+"+tx_n_intr" },
+
 /* Terminator */
 { PARAM_COUNT,		    0,	  0,	0,	NULL			}
 };

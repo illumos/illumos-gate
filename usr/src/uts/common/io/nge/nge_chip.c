@@ -1722,26 +1722,39 @@ nge_intr_handle(nge_t *ngep, nge_intr_src *pintr_src)
 		nge_receive(ngep);
 	btx = (pintr_src->int_bits.teint | pintr_src->int_bits.tcint)
 	    > 0 ? B_TRUE : B_FALSE;
+	if (pintr_src->int_bits.stint && ngep->poll)
+		ngep->stint_count ++;
+	btx |= (ngep->poll && (ngep->stint_count % ngep->param_tx_n_intr == 0));
 	if (btx)
 		nge_tx_recycle(ngep, B_TRUE);
 	if (pintr_src->int_bits.teint)
 		ngep->statistics.sw_statistics.tx_stop_err++;
-	if (pintr_src->int_bits.stint) {
-		if ((ngep->poll) &&
-		    (ngep->recv_count < INTR_HWATER)) {
-			ngep->poll_time++;
+	if (ngep->intr_moderation && brx) {
+		if (ngep->poll) {
+			if (ngep->recv_count < ngep->param_rx_intr_hwater) {
+				ngep->quiet_time++;
+				if (ngep->quiet_time ==
+				    ngep->param_poll_quiet_time) {
+					ngep->poll = B_FALSE;
+					ngep->quiet_time = 0;
+					ngep->stint_count = 0;
+					nge_tx_recycle(ngep, B_TRUE);
+				}
+			} else
+				ngep->quiet_time = 0;
+		} else {
+			if (ngep->recv_count > ngep->param_rx_intr_lwater) {
+				ngep->busy_time++;
+				if (ngep->busy_time ==
+				    ngep->param_poll_busy_time) {
+					ngep->poll = B_TRUE;
+					ngep->busy_time = 0;
+				}
+			} else
+				ngep->busy_time = 0;
 		}
-		if ((ngep->recv_count > POLL_LWATER) &&
-		    (!ngep->poll)) {
-			ngep->poll = B_TRUE;
-		}
-
-		if (ngep->poll_time == 10) {
-			ngep->poll = B_FALSE;
-			ngep->poll_time = 0;
-		}
-		ngep->recv_count = 0;
 	}
+	ngep->recv_count = 0;
 	if (pintr_src->int_bits.feint)
 		nge_chip_err(ngep);
 	/* link interrupt, check the link state */
@@ -1786,8 +1799,11 @@ nge_chip_intr(caddr_t arg1, caddr_t arg2)
 	nge_intr_handle(ngep, &intr_src);
 	if (ngep->poll && !ngep->ch_intr_mode) {
 		intr_mask.mask_val = nge_reg_get32(ngep, NGE_INTR_MASK);
-		intr_mask.mask_val &= ~(ngep->intr_masks);
 		intr_mask.mask_bits.stint = NGE_SET;
+		intr_mask.mask_bits.rcint = NGE_CLEAR;
+		intr_mask.mask_bits.reint = NGE_CLEAR;
+		intr_mask.mask_bits.tcint = NGE_CLEAR;
+		intr_mask.mask_bits.teint = NGE_CLEAR;
 		nge_reg_put32(ngep, NGE_INTR_MASK, intr_mask.mask_val);
 		ngep->ch_intr_mode = B_TRUE;
 	} else if ((ngep->ch_intr_mode) && (!ngep->poll)) {

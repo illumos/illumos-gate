@@ -301,7 +301,6 @@ nge_recv_ring(nge_t *ngep)
 	uint32_t stflag;
 	uint32_t flag_err;
 	uint32_t sum_flags;
-	uint32_t count;
 	size_t len;
 	uint64_t end_index;
 	uint64_t sync_start;
@@ -316,7 +315,6 @@ nge_recv_ring(nge_t *ngep)
 
 	mp = NULL;
 	head = NULL;
-	count = 0;
 	tail = &head;
 	rrp = ngep->recv;
 	brp = ngep->buff;
@@ -369,7 +367,6 @@ nge_recv_ring(nge_t *ngep)
 			    srbdp->bufp->alength);
 			srbdp->flags = CONTROLER_OWN;
 		}
-		count++;
 		if (mp != NULL) {
 			if (!(flag_err & (RX_SUM_NO | RX_SUM_ERR))) {
 				(void) hcksum_assoc(mp, NULL, NULL,
@@ -380,15 +377,15 @@ nge_recv_ring(nge_t *ngep)
 			mp = NULL;
 		}
 		rrp->prod_index = NEXT(end_index, rrp->desc.nslots);
-		if (count > ngep->param_recv_max_packet)
+		if (ngep->recv_count > ngep->param_recv_max_packet)
 			break;
 	}
 
 	/* Sync the descriptors for device */
-	if (sync_start + count <= ngep->rx_desc) {
+	if (sync_start + ngep->recv_count <= ngep->rx_desc) {
 		(void) ddi_dma_sync(rrp->desc.dma_hdl,
 		    sync_start * ngep->desc_attr.rxd_size,
-		    count * ngep->desc_attr.rxd_size,
+		    ngep->recv_count * ngep->desc_attr.rxd_size,
 		    DDI_DMA_SYNC_FORDEV);
 	} else {
 		(void) ddi_dma_sync(rrp->desc.dma_hdl,
@@ -397,7 +394,7 @@ nge_recv_ring(nge_t *ngep)
 		    DDI_DMA_SYNC_FORDEV);
 		(void) ddi_dma_sync(rrp->desc.dma_hdl,
 		    0,
-		    (count + sync_start - ngep->rx_desc) *
+		    (ngep->recv_count + sync_start - ngep->rx_desc) *
 		    ngep->desc_attr.rxd_size,
 		    DDI_DMA_SYNC_FORDEV);
 	}
