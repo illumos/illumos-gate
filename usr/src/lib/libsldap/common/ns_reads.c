@@ -2528,8 +2528,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					    gettext("LDAP ERROR (%d): "
 					    "Error occurred during"
 					    " receiving results. "
-					    "This may be due to a "
-					    "stalled connection."),
+					    "Connection to server lost."),
 					    cookie->err_rc);
 				} else if (cookie->err_rc == LDAP_TIMEOUT) {
 					(void) sprintf(errstr,
@@ -2547,8 +2546,13 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				    ldap_err2string(cookie->err_rc));
 			err = strdup(errstr);
 			if (cookie->err_from_result) {
-				MKERROR(LOG_WARNING, *errorp, cookie->err_rc,
-				    err, NULL);
+				if (cookie->err_rc == LDAP_SERVER_DOWN) {
+					MKERROR(LOG_INFO, *errorp,
+					    cookie->err_rc, err, NULL);
+				} else {
+					MKERROR(LOG_WARNING, *errorp,
+					    cookie->err_rc, err, NULL);
+				}
 			} else {
 				MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL,
 				    err, NULL);
