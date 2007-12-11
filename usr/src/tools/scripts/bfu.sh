@@ -5125,13 +5125,10 @@ install_sparc_failsafe()
 		fs_wos_image="/net/netinstall.sfbay/export/setje/nbs-latest"
 		fs_archive="${fs_wos_image}/boot/sparc.miniroot"
 	fi
-	if [ ! -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
-		echo "no failsafe archive, but can't find one to install"
-		return
+	if [ -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
+		echo "Installing failsafe archive from $fs_wos_image"
+		cp $fs_archive $rootprefix/platform/$karch/failsafe
 	fi
-
-	echo "Installing failsafe archive from $fs_wos_image"
-	cp $fs_archive $rootprefix/platform/$karch/failsafe
 }
 
 disable_boot_service()
@@ -6411,6 +6408,18 @@ mondo_loop() {
 		$usr/platform/sun4u/lib/prom/SUNW,Ultra-1 > /dev/null 2>&1;
 		print "done.";
 	fi;
+
+	# Remove pre dboot krtld as well as obsolete boot blocks
+	#
+	if [ $zone = global ]; then
+		rm -rf \
+		    $root/kernel/misc/sparcv9/krtld \
+		    $root/platform/sun4u/ufsboot \
+		    $root/platform/sun4v/ufsboot \
+		    $usr/platform/sun4c/lib/fs/ufs/bootblk \
+		    $usr/platform/sun4d/lib/fs/ufs/bootblk \
+		    $usr/platform/sun4m/lib/fs/ufs/bootblk
+	fi
 
 	#
 	# Remove kmdbmod from /kernel
