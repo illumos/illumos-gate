@@ -1589,6 +1589,47 @@ sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 #error - the size of hmehash_bucket structure is not power of 2
 #endif
 
+#ifdef HMELOCK_BACKOFF_ENABLE
+
+#define HMELOCK_BACKOFF(reg, val)                               \
+	set     val, reg                                        ;\
+	brnz    reg, .                                          ;\
+	  dec   reg
+
+#define CAS_HME(tmp1, tmp2, exitlabel, asi)                     \
+	mov     0xff, tmp2                                      ;\
+	casa    [tmp1]asi, %g0, tmp2                            ;\
+	brz,a,pt tmp2, exitlabel                                ;\
+	membar  #LoadLoad
+
+#define HMELOCK_ENTER(hmebp, tmp1, tmp2, label, asi)            \
+	mov     0xff, tmp2                                      ;\
+	add     hmebp, HMEBUCK_LOCK, tmp1                       ;\
+	casa    [tmp1]asi, %g0, tmp2                            ;\
+	brz,a,pt tmp2, label/**/2                               ;\
+	membar  #LoadLoad                                       ;\
+	HMELOCK_BACKOFF(tmp2,0x80)                              ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x100)                             ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x200)                             ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+label/**/1:                                                     ;\
+	HMELOCK_BACKOFF(tmp2,0x400)                             ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x800)                             ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x1000)                            ;\
+	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
+	HMELOCK_BACKOFF(tmp2,0x2000)                            ;\
+	mov     0xff, tmp2                                      ;\
+	casa    [tmp1]asi, %g0, tmp2                            ;\
+	brnz,pn tmp2, label/**/1     /* reset backoff */        ;\
+	membar  #LoadLoad                                       ;\
+label/**/2:
+
+#else /* HMELOCK_BACKOFF_ENABLE */
+
 #define HMELOCK_ENTER(hmebp, tmp1, tmp2, label1, asi)           \
 	mov     0xff, tmp2                                      ;\
 	add     hmebp, HMEBUCK_LOCK, tmp1                       ;\
@@ -1597,6 +1638,8 @@ label1:                                                         ;\
 	brnz,pn tmp2, label1                                    ;\
 	mov     0xff, tmp2                                      ;\
 	membar  #LoadLoad
+
+#endif /* HMELOCK_BACKOFF_ENABLE */
 
 #define HMELOCK_EXIT(hmebp, tmp1, asi)                          \
 	membar  #LoadStore|#StoreStore                          ;\

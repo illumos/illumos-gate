@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ struct segdev_crargs {
  */
 struct	segdev_data {
 	offset_t	offset;		/* device offset for start of mapping */
-	kmutex_t	lock;		/* protects segdev_data */
+	krwlock_t	lock;		/* protects segdev_data */
 	int	(*mapfunc)(dev_t dev, off_t off, int prot);
 	struct	vnode *vp;	/* vnode associated with device */
 	uchar_t	pageprot;	/* true if per page protections present */

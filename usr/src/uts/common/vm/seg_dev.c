@@ -439,7 +439,7 @@ sdp_alloc(void)
 	struct segdev_data *sdp;
 
 	sdp = kmem_zalloc(sizeof (struct segdev_data), KM_SLEEP);
-	mutex_init(&sdp->lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&sdp->lock, NULL, RW_DEFAULT, NULL);
 
 	return (sdp);
 }
@@ -504,7 +504,7 @@ segdev_dup(struct seg *seg, struct seg *newseg)
 	 */
 	if (dhp != NULL) {
 		ret = devmap_handle_dup(dhp,
-			(devmap_handle_t **)&newsdp->devmap_data, newseg);
+		    (devmap_handle_t **)&newsdp->devmap_data, newseg);
 		if (ret != 0) {
 			TRACE_3(TR_FAC_DEVMAP, TR_DEVMAP_DUP_CK1,
 			    "segdev_dup:ret1 ret=%x, dhp=%p seg=%p",
@@ -520,9 +520,9 @@ segdev_dup(struct seg *seg, struct seg *newseg)
 	 * Inform the common vnode of the new mapping.
 	 */
 	return (VOP_ADDMAP(VTOCVP(newsdp->vp),
-		newsdp->offset, newseg->s_as,
-		newseg->s_base, newseg->s_size, newsdp->prot,
-		newsdp->maxprot, sdp->type, CRED(), NULL));
+	    newsdp->offset, newseg->s_as,
+	    newseg->s_base, newseg->s_size, newsdp->prot,
+	    newsdp->maxprot, sdp->type, CRED(), NULL));
 }
 
 /*
@@ -577,7 +577,7 @@ devmap_handle_dup(devmap_handle_t *dhp, devmap_handle_t **new_dhp,
 			 * duplicate its private data.
 			 */
 			ret = (*callbackops->devmap_dup)(dhp, dhp->dh_pvtp,
-				(devmap_cookie_t *)newdhp, &newdhp->dh_pvtp);
+			    (devmap_cookie_t *)newdhp, &newdhp->dh_pvtp);
 
 			if (ret != 0) {
 				/*
@@ -680,7 +680,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 			while (slen != 0) {
 				mlen = MIN(slen, (dhpp->dh_len - soff));
 				hat_unload(seg->s_as->a_hat, dhpp->dh_uvaddr,
-					dhpp->dh_len, HAT_UNLOAD_UNMAP);
+				    dhpp->dh_len, HAT_UNLOAD_UNMAP);
 				dhpp = dhpp->dh_next;
 				ASSERT(slen >= mlen);
 				slen -= mlen;
@@ -688,7 +688,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 			}
 		} else
 			hat_unload(seg->s_as->a_hat, addr, len,
-				HAT_UNLOAD_UNMAP);
+			    HAT_UNLOAD_UNMAP);
 	} else {
 		/*
 		 * Unload any hardware translations in the range
@@ -707,7 +707,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 	 */
 	ASSERT(sdp->vp != NULL);
 	(void) VOP_DELMAP(VTOCVP(sdp->vp), off, seg->s_as, addr, len,
-		sdp->prot, sdp->maxprot, sdp->type, CRED(), NULL);
+	    sdp->prot, sdp->maxprot, sdp->type, CRED(), NULL);
 
 	/*
 	 * Check for entire segment
@@ -862,7 +862,7 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 		} else if (addr > (dhp->dh_uvaddr + dhp->dh_len)) {
 			dhp = dhp->dh_next;
 		} else if (addr > dhp->dh_uvaddr &&
-			(addr + len) < (dhp->dh_uvaddr + dhp->dh_len)) {
+		    (addr + len) < (dhp->dh_uvaddr + dhp->dh_len)) {
 			/*
 			 * <addr, addr+len> is enclosed by dhp.
 			 * create a newdhp that begins at addr+len and
@@ -876,19 +876,19 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 			newdhp->dh_next = dhp->dh_next;
 			if (dhp->dh_softlock != NULL)
 				newdhp->dh_softlock = devmap_softlock_init(
-					newdhp->dh_dev,
-					(ulong_t)callbackops->devmap_access);
+				    newdhp->dh_dev,
+				    (ulong_t)callbackops->devmap_access);
 			if (dhp->dh_ctx != NULL)
 				newdhp->dh_ctx = devmap_ctxinit(newdhp->dh_dev,
-					(ulong_t)callbackops->devmap_access);
+				    (ulong_t)callbackops->devmap_access);
 			if (newdhp->dh_flags & DEVMAP_LOCK_INITED) {
 				mutex_init(&newdhp->dh_lock,
 				    NULL, MUTEX_DEFAULT, NULL);
 			}
 			if (callbackops->devmap_unmap != NULL)
 				(*callbackops->devmap_unmap)(dhp, dhp->dh_pvtp,
-					off, len, dhp, &dhp->dh_pvtp,
-					newdhp, &newdhp->dh_pvtp);
+				    off, len, dhp, &dhp->dh_pvtp,
+				    newdhp, &newdhp->dh_pvtp);
 			mlen = len + (addr - dhp->dh_uvaddr);
 			devmap_handle_reduce_len(newdhp, mlen);
 			nsdp->devmap_data = newdhp;
@@ -898,15 +898,15 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 			dhp->dh_next = NULL;
 			dhp = dhpp;
 		} else if ((addr > dhp->dh_uvaddr) &&
-			    ((addr + len) >= (dhp->dh_uvaddr + dhp->dh_len))) {
+		    ((addr + len) >= (dhp->dh_uvaddr + dhp->dh_len))) {
 			mlen = dhp->dh_len + dhp->dh_uvaddr - addr;
 			/*
 			 * <addr, addr+len> spans over dhps.
 			 */
 			if (callbackops->devmap_unmap != NULL)
 				(*callbackops->devmap_unmap)(dhp, dhp->dh_pvtp,
-					off, mlen, (devmap_cookie_t *)dhp,
-					&dhp->dh_pvtp, NULL, NULL);
+				    off, mlen, (devmap_cookie_t *)dhp,
+				    &dhp->dh_pvtp, NULL, NULL);
 			/* XX Changing len should recalculate LARGE flag */
 			dhp->dh_len = addr - dhp->dh_uvaddr;
 			dhpp = dhp->dh_next;
@@ -922,12 +922,12 @@ segdev_unmap(struct seg *seg, caddr_t addr, size_t len)
 			dhp = devmap_handle_unmap(dhp);
 			nsdp->devmap_data = dhp; /* XX redundant? */
 		} else if (((addr + len) > dhp->dh_uvaddr) &&
-			    ((addr + len) < (dhp->dh_uvaddr + dhp->dh_len))) {
+		    ((addr + len) < (dhp->dh_uvaddr + dhp->dh_len))) {
 			mlen = addr + len - dhp->dh_uvaddr;
 			if (callbackops->devmap_unmap != NULL)
 				(*callbackops->devmap_unmap)(dhp, dhp->dh_pvtp,
-					dhp->dh_uoff, mlen, NULL,
-					NULL, dhp, &dhp->dh_pvtp);
+				    dhp->dh_uoff, mlen, NULL,
+				    NULL, dhp, &dhp->dh_pvtp);
 			devmap_handle_reduce_len(dhp, mlen);
 			nsdp->devmap_data = dhp;
 			dhp->dh_seg = nseg;
@@ -972,13 +972,13 @@ devmap_handle_reduce_len(devmap_handle_t *dhp, size_t len)
 		} else if (cookie_is_pmem(cp)) {
 			pcp = (struct devmap_pmem_cookie *)dhp->dh_pcookie;
 			ASSERT((dhp->dh_roff & PAGEOFFSET) == 0 &&
-				dhp->dh_roff < ptob(pcp->dp_npages));
+			    dhp->dh_roff < ptob(pcp->dp_npages));
 		} else {
 			ASSERT(dhp->dh_roff < cp->size);
 			ASSERT(dhp->dh_cvaddr >= cp->cvaddr &&
-				dhp->dh_cvaddr < (cp->cvaddr + cp->size));
+			    dhp->dh_cvaddr < (cp->cvaddr + cp->size));
 			ASSERT((dhp->dh_cvaddr + len) <=
-				(cp->cvaddr + cp->size));
+			    (cp->cvaddr + cp->size));
 
 			dhp->dh_cvaddr += len;
 		}
@@ -1006,7 +1006,7 @@ devmap_handle_unmap(devmap_handle_t *dhp)
 	 */
 	if (callbackops->devmap_unmap != NULL) {
 		(*callbackops->devmap_unmap)(dhp, dhp->dh_pvtp, dhp->dh_uoff,
-			dhp->dh_len, NULL, NULL, NULL, NULL);
+		    dhp->dh_len, NULL, NULL, NULL, NULL);
 	}
 
 	if (dhpp == dhp) {	/* releasing first dhp, change sdp data */
@@ -1096,9 +1096,9 @@ devmap_handle_unmap_tail(devmap_handle_t *dhp, caddr_t addr)
 			 */
 			if (callbackops->devmap_unmap != NULL)
 				(*callbackops->devmap_unmap)(dhph,
-					dhph->dh_pvtp, off, len,
-					(devmap_cookie_t *)dhph,
-					&dhph->dh_pvtp, NULL, NULL);
+				    dhph->dh_pvtp, off, len,
+				    (devmap_cookie_t *)dhph,
+				    &dhph->dh_pvtp, NULL, NULL);
 			/* XXX Reducing len needs to recalculate LARGE flag */
 			dhph->dh_len = maplen;
 			maplen = 0;
@@ -1136,7 +1136,7 @@ segdev_free(struct seg *seg)
 	if (sdp->vpage != NULL)
 		kmem_free(sdp->vpage, vpgtob(seg_pages(seg)));
 
-	mutex_destroy(&sdp->lock);
+	rw_destroy(&sdp->lock);
 	kmem_free(sdp, sizeof (*sdp));
 }
 
@@ -1356,7 +1356,7 @@ segdev_softunlock(
 			 */
 			if (dhp->dh_callbackops.devmap_access != NULL) {
 				devmap_softlock_exit(dhp->dh_softlock,
-					btopr(mlen), F_SOFTLOCK);
+				    btopr(mlen), F_SOFTLOCK);
 			}
 
 			tlen -= mlen;
@@ -1465,7 +1465,7 @@ segdev_faultpage(
 		/* If segment has devmap_data, then dhp should be non-NULL */
 		ASSERT(sdp->devmap_data == NULL);
 		pfnum = (pfn_t)cdev_mmap(sdp->mapfunc, sdp->vp->v_rdev,
-			(off_t)offset, prot);
+		    (off_t)offset, prot);
 		prot |= sdp->hat_attr;
 	} else {
 		ulong_t off;
@@ -1474,7 +1474,7 @@ segdev_faultpage(
 
 		/* ensure the dhp passed in contains addr. */
 		ASSERT(dhp == devmap_find_handle(
-			(devmap_handle_t *)sdp->devmap_data, addr));
+		    (devmap_handle_t *)sdp->devmap_data, addr));
 
 		off = addr - dhp->dh_uvaddr;
 
@@ -1491,43 +1491,47 @@ segdev_faultpage(
 		} else if (cookie_is_pmem(cp)) {
 			pcp = (struct devmap_pmem_cookie *)dhp->dh_pcookie;
 			ASSERT((dhp->dh_roff & PAGEOFFSET) == 0 &&
-				dhp->dh_roff < ptob(pcp->dp_npages));
+			    dhp->dh_roff < ptob(pcp->dp_npages));
 			pfnum = page_pptonum(
 			    pcp->dp_pparray[btop(off + dhp->dh_roff)]);
 		} else {
 			ASSERT(dhp->dh_roff < cp->size);
 			ASSERT(dhp->dh_cvaddr >= cp->cvaddr &&
-				dhp->dh_cvaddr < (cp->cvaddr + cp->size));
+			    dhp->dh_cvaddr < (cp->cvaddr + cp->size));
 			ASSERT((dhp->dh_cvaddr + off) <=
-				(cp->cvaddr + cp->size));
+			    (cp->cvaddr + cp->size));
 			ASSERT((dhp->dh_cvaddr + off + PAGESIZE) <=
-				(cp->cvaddr + cp->size));
+			    (cp->cvaddr + cp->size));
 
 			switch (cp->type) {
 			case UMEM_LOCKED :
-			    if (cp->pparray != NULL) {
-				ASSERT((dhp->dh_roff & PAGEOFFSET) == 0);
-				pfnum = page_pptonum(
-				    cp->pparray[btop(off + dhp->dh_roff)]);
-			    } else {
-				pfnum = hat_getpfnum(
-				    ((proc_t *)cp->procp)->p_as->a_hat,
-				    cp->cvaddr + off);
-			    }
-			    break;
+				if (cp->pparray != NULL) {
+					ASSERT((dhp->dh_roff &
+					    PAGEOFFSET) == 0);
+					pfnum = page_pptonum(
+					    cp->pparray[btop(off +
+					    dhp->dh_roff)]);
+				} else {
+					pfnum = hat_getpfnum(
+					    ((proc_t *)cp->procp)->p_as->a_hat,
+					    cp->cvaddr + off);
+				}
+			break;
 			case UMEM_TRASH :
-			    pfnum = page_pptonum(trashpp);
-			    /* We should set hat_flags to HAT_NOFAULT also */
-			    /* However, not all hat layers implement this */
-			    break;
+				pfnum = page_pptonum(trashpp);
+				/*
+				 * We should set hat_flags to HAT_NOFAULT also
+				 * However, not all hat layers implement this
+				 */
+				break;
 			case KMEM_PAGEABLE:
 			case KMEM_NON_PAGEABLE:
-			    pfnum = hat_getpfnum(kas.a_hat,
-				dhp->dh_cvaddr + off);
-			    break;
+				pfnum = hat_getpfnum(kas.a_hat,
+				    dhp->dh_cvaddr + off);
+				break;
 			default :
-			    pfnum = PFN_INVALID;
-			    break;
+				pfnum = PFN_INVALID;
+				break;
 			}
 		}
 		prot |= dhp->dh_hat_attr;
@@ -1551,7 +1555,7 @@ segdev_faultpage(
 		 * are non-consistent, anyway.
 		 */
 		hat_devload(hat, addr, PAGESIZE, pfnum,
-				prot, hat_flags | sdp->hat_flags);
+		    prot, hat_flags | sdp->hat_flags);
 		return (0);
 	}
 
@@ -1785,7 +1789,7 @@ segdev_fault(
 		if ((sdp->pageprot == 0) &&
 		    (dhp->dh_flags & DEVMAP_FLAG_LARGE)) {
 			devmap_get_large_pgsize(dhp, mlen, maddr,
-				&llen, &laddr);
+			    &llen, &laddr);
 			ASSERT(maddr == addr || laddr == maddr);
 		} else {
 			llen = mlen;
@@ -1835,14 +1839,14 @@ segdev_fault(
 				 */
 				size_t done = (size_t)(maddr - addr);
 				(void) segdev_fault(hat, seg, addr, done,
-					F_SOFTUNLOCK, S_OTHER);
+				    F_SOFTUNLOCK, S_OTHER);
 				/*
 				 * reduce slpage by number of pages
 				 * released by segdev_softunlock
 				 */
 				ASSERT(slpage >= btopr(done));
 				devmap_softlock_exit(slock,
-					slpage - btopr(done), type);
+				    slpage - btopr(done), type);
 			} else {
 				devmap_softlock_exit(slock, slpage, type);
 			}
@@ -1940,7 +1944,7 @@ segdev_faultpages(
 	 * If we have the same protections for the entire segment,
 	 * insure that the access being attempted is legitimate.
 	 */
-	mutex_enter(&sdp->lock);
+	rw_enter(&sdp->lock, RW_READER);
 	if (sdp->pageprot == 0) {
 		uint_t protchk;
 
@@ -1961,7 +1965,7 @@ segdev_faultpages(
 		}
 
 		if ((sdp->prot & protchk) == 0) {
-			mutex_exit(&sdp->lock);
+			rw_exit(&sdp->lock);
 			/* undo kpmem locking */
 			if (kpmem_cookie != NULL) {
 				release_kpmem_lock(kpmem_cookie, btopr(len));
@@ -1981,7 +1985,7 @@ segdev_faultpages(
 		uint_t hat_flags;
 
 		if (dhp->dh_flags & DEVMAP_MAPPING_INVALID) {
-			mutex_exit(&sdp->lock);
+			rw_exit(&sdp->lock);
 			return (FC_NOMAP);
 		}
 
@@ -1996,8 +2000,8 @@ segdev_faultpages(
 		ASSERT(!pf_is_memory(pfnum));
 
 		hat_devload(hat, addr, len, pfnum, sdp->prot | dhp->dh_hat_attr,
-			hat_flags | sdp->hat_flags);
-		mutex_exit(&sdp->lock);
+		    hat_flags | sdp->hat_flags);
+		rw_exit(&sdp->lock);
 		return (0);
 	}
 
@@ -2016,7 +2020,7 @@ segdev_faultpages(
 		if (vpage != NULL)
 			vpage++;
 	}
-	mutex_exit(&sdp->lock);
+	rw_exit(&sdp->lock);
 	if (err && (type == F_SOFTLOCK)) { /* error handling for F_SOFTLOCK */
 		size_t done = (size_t)(a - addr); /* pages fault successfully */
 		if (done > 0) {
@@ -2102,10 +2106,10 @@ segdev_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			return (EACCES);
 	}
 
-	mutex_enter(&sdp->lock);
+	rw_enter(&sdp->lock, RW_WRITER);
 	if (addr == seg->s_base && len == seg->s_size && sdp->pageprot == 0) {
 		if (sdp->prot == prot) {
-			mutex_exit(&sdp->lock);
+			rw_exit(&sdp->lock);
 			return (0);			/* all done */
 		}
 		sdp->prot = (uchar_t)prot;
@@ -2129,7 +2133,7 @@ segdev_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		for (vp = &sdp->vpage[seg_page(seg, addr)]; vp < evp; vp++)
 			VPP_SETPROT(vp, prot);
 	}
-	mutex_exit(&sdp->lock);
+	rw_exit(&sdp->lock);
 
 	if (dhp_head != NULL) {
 		devmap_handle_t *tdhp;
@@ -2153,7 +2157,7 @@ segdev_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			while (slen != 0) {
 				mlen = MIN(slen, (dhp->dh_len - soff));
 				hat_unload(seg->s_as->a_hat, dhp->dh_uvaddr,
-					dhp->dh_len, HAT_UNLOAD);
+				    dhp->dh_len, HAT_UNLOAD);
 				dhp = dhp->dh_next;
 				ASSERT(slen >= mlen);
 				slen -= mlen;
@@ -2191,12 +2195,12 @@ segdev_checkprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	/*
 	 * If segment protection can be used, simply check against them
 	 */
-	mutex_enter(&sdp->lock);
+	rw_enter(&sdp->lock, RW_READER);
 	if (sdp->pageprot == 0) {
 		register int err;
 
 		err = ((sdp->prot & prot) != prot) ? EACCES : 0;
-		mutex_exit(&sdp->lock);
+		rw_exit(&sdp->lock);
 		return (err);
 	}
 
@@ -2206,11 +2210,11 @@ segdev_checkprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	evp = &sdp->vpage[seg_page(seg, addr + len)];
 	for (vp = &sdp->vpage[seg_page(seg, addr)]; vp < evp; vp++) {
 		if ((VPP_PROT(vp) & prot) != prot) {
-			mutex_exit(&sdp->lock);
+			rw_exit(&sdp->lock);
 			return (EACCES);
 		}
 	}
-	mutex_exit(&sdp->lock);
+	rw_exit(&sdp->lock);
 	return (0);
 }
 
@@ -2227,21 +2231,21 @@ segdev_getprot(struct seg *seg, caddr_t addr, size_t len, uint_t *protv)
 
 	pgno = seg_page(seg, addr + len) - seg_page(seg, addr) + 1;
 	if (pgno != 0) {
-		mutex_enter(&sdp->lock);
+		rw_enter(&sdp->lock, RW_READER);
 		if (sdp->pageprot == 0) {
-			do
+			do {
 				protv[--pgno] = sdp->prot;
-			while (pgno != 0);
+			} while (pgno != 0);
 		} else {
 			size_t pgoff = seg_page(seg, addr);
 
 			do {
 				pgno--;
 				protv[pgno] =
-					VPP_PROT(&sdp->vpage[pgno + pgoff]);
+				    VPP_PROT(&sdp->vpage[pgno + pgoff]);
 			} while (pgno != 0);
 		}
-		mutex_exit(&sdp->lock);
+		rw_exit(&sdp->lock);
 	}
 	return (0);
 }
@@ -2298,7 +2302,7 @@ static void
 segdev_badop(void)
 {
 	TRACE_0(TR_FAC_DEVMAP, TR_DEVMAP_SEGDEV_BADOP,
-		"segdev_badop:start");
+	    "segdev_badop:start");
 	panic("segdev_badop");
 	/*NOTREACHED*/
 }
@@ -2425,11 +2429,11 @@ ddi_segmap_setup(dev_t dev, off_t offset, struct as *as, caddr_t *addrp,
 			 * used later to get user address.
 			 */
 			if ((pfn = (pfn_t)cdev_mmap(mapfunc, dev, offset,
-				maxprot)) == PFN_INVALID)
+			    maxprot)) == PFN_INVALID)
 				return (ENXIO);
 		} else {
 			if (cdev_mmap(mapfunc, dev, offset + i, maxprot) ==
-				PFN_INVALID)
+			    PFN_INVALID)
 				return (ENXIO);
 		}
 	}
@@ -2517,7 +2521,7 @@ devmap_device(devmap_handle_t *dhp, struct as *as, caddr_t *addr,
 		rdhp = maxdhp = dhp;
 		while (rdhp != NULL) {
 			maxdhp = (maxdhp->dh_len > rdhp->dh_len) ?
-				maxdhp : rdhp;
+			    maxdhp : rdhp;
 			rdhp = rdhp->dh_next;
 			maxprot |= dhp->dh_maxprot;
 		}
@@ -2839,10 +2843,10 @@ devmap_unload(devmap_cookie_t dhc, offset_t offset, size_t len)
 	 */
 	if (dhp->dh_flags & DEVMAP_FLAG_LARGE) {
 		hat_unload(dhp->dh_seg->s_as->a_hat, dhp->dh_uvaddr,
-			dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
+		    dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
 	} else {
 		hat_unload(dhp->dh_seg->s_as->a_hat,  addr, size,
-			HAT_UNLOAD|HAT_UNLOAD_OTHER);
+		    HAT_UNLOAD|HAT_UNLOAD_OTHER);
 	}
 
 	return (0);
@@ -2965,7 +2969,7 @@ devmap_softlock_rele(devmap_handle_t *dhp)
 		else {
 			parent = devmap_slist;
 			for (tmp = devmap_slist->next; tmp != NULL;
-				tmp = tmp->next) {
+			    tmp = tmp->next) {
 				if (tmp == slock) {
 					parent->next = tmp->next;
 					break;
@@ -3031,7 +3035,7 @@ devmap_ctx_rele(devmap_handle_t *dhp)
 		else {
 			parent = devmapctx_list;
 			for (tmp = devmapctx_list->next; tmp != NULL;
-				tmp = tmp->next) {
+			    tmp = tmp->next) {
 				if (tmp == devctx) {
 					parent->next = tmp->next;
 					break;
@@ -3068,7 +3072,7 @@ devmap_load(devmap_cookie_t dhc, offset_t offset, size_t len, uint_t type,
 
 	TRACE_3(TR_FAC_DEVMAP, TR_DEVMAP_LOAD,
 	    "devmap_load:start dhp=%p offset=%llx len=%lx",
-		(void *)dhp, offset, len);
+	    (void *)dhp, offset, len);
 
 	DEBUGF(7, (CE_CONT, "devmap_load: dhp %p offset %llx len %lx\n",
 	    (void *)dhp, offset, len));
@@ -3114,7 +3118,7 @@ devmap_load(devmap_cookie_t dhc, offset_t offset, size_t len, uint_t type,
 
 	HOLD_DHP_LOCK(dhp);
 	rc = segdev_faultpages(asp->a_hat,
-			dhp->dh_seg, addr, size, type, rw, dhp);
+	    dhp->dh_seg, addr, size, type, rw, dhp);
 	RELE_DHP_LOCK(dhp);
 	return (rc);
 }
@@ -3125,7 +3129,7 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 {
 	register devmap_handle_t *dhp;
 	int (*devmap)(dev_t, devmap_cookie_t, offset_t, size_t,
-		size_t *, uint_t);
+	    size_t *, uint_t);
 	int (*mmap)(dev_t, off_t, int);
 	struct devmap_callback_ctl *callbackops;
 	devmap_handle_t *dhp_head = NULL;
@@ -3207,8 +3211,8 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 		callbackops = &dhp->dh_callbackops;
 
 		if ((callbackops->devmap_access == NULL) ||
-			(callbackops->devmap_access == nulldev) ||
-			(callbackops->devmap_access == nodev)) {
+		    (callbackops->devmap_access == nulldev) ||
+		    (callbackops->devmap_access == nodev)) {
 			/*
 			 * Normally devmap does not support MAP_PRIVATE unless
 			 * the drivers provide a valid devmap_access routine.
@@ -3223,9 +3227,9 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 			 * provide devmap_access.
 			 */
 			dhp->dh_softlock = devmap_softlock_init(dev,
-				(ulong_t)callbackops->devmap_access);
+			    (ulong_t)callbackops->devmap_access);
 			dhp->dh_ctx = devmap_ctxinit(dev,
-				(ulong_t)callbackops->devmap_access);
+			    (ulong_t)callbackops->devmap_access);
 
 			/*
 			 * segdev_fault can only work when all
@@ -3253,7 +3257,7 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 	 * uvaddr and device physical address.
 	 */
 	if ((ret = devmap_device(dhp_head, as, addrp, off, len, flags))
-			!= 0) {
+	    != 0) {
 		/*
 		 * free devmap handles if error during the mapping.
 		 */
@@ -3275,8 +3279,8 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 		dhp_curr = dhp;
 		if (callbackops->devmap_map != NULL) {
 			ret = (*callbackops->devmap_map)((devmap_cookie_t)dhp,
-					dev, flags, map_off,
-					dhp->dh_len, &dhp->dh_pvtp);
+			    dev, flags, map_off,
+			    dhp->dh_len, &dhp->dh_pvtp);
 			if (ret != 0) {
 				struct segdev_data *sdp;
 
@@ -3290,9 +3294,9 @@ devmap_setup(dev_t dev, offset_t off, struct as *as, caddr_t *addrp,
 					callbackops = &dhp->dh_callbackops;
 					if (callbackops->devmap_unmap != NULL) {
 						(*callbackops->devmap_unmap)(
-							dhp, dhp->dh_pvtp,
-							map_off, dhp->dh_len,
-							NULL, NULL, NULL, NULL);
+						    dhp, dhp->dh_pvtp,
+						    map_off, dhp->dh_len,
+						    NULL, NULL, NULL, NULL);
 					}
 					map_off += dhp->dh_len;
 					dhp = dhp->dh_next;
@@ -3352,7 +3356,7 @@ devmap_devmem_large_page_setup(devmap_handle_t *dhp)
 			size_t pgsize = page_get_pagesize(level);
 			if ((dhp->dh_len < pgsize) ||
 			    (!VA_PA_PGSIZE_ALIGNED((uintptr_t)dhp->dh_uvaddr,
-					base, pgsize))) {
+			    base, pgsize))) {
 				break;
 			}
 		}
@@ -3523,7 +3527,7 @@ devmap_devmem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	 * the mappings
 	 */
 	hat_unload(dhp->dh_seg->s_as->a_hat, dhp->dh_uvaddr,
-		dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
+	    dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
 
 	if (flags & DEVMAP_MAPPING_INVALID) {
 		dhp->dh_flags |= DEVMAP_MAPPING_INVALID;
@@ -3712,7 +3716,7 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	 * has been granted during the setup.
 	 */
 	if ((dhp->dh_flags & DEVMAP_SETUP_DONE) == 0 ||
-		(dhp->dh_flags & DEVMAP_ALLOW_REMAP) == 0)
+	    (dhp->dh_flags & DEVMAP_ALLOW_REMAP) == 0)
 		return (DDI_FAILURE);
 
 	/* No flags supported for remap yet */
@@ -3737,7 +3741,7 @@ devmap_umem_remap(devmap_cookie_t dhc, dev_info_t *dip,
 	 * the mappings
 	 */
 	hat_unload(dhp->dh_seg->s_as->a_hat, dhp->dh_uvaddr,
-		dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
+	    dhp->dh_len, HAT_UNLOAD|HAT_UNLOAD_OTHER);
 
 	dhp->dh_cookie = cookie;
 	dhp->dh_roff = ptob(btop(off));
@@ -3903,7 +3907,7 @@ ddi_umem_alloc(size_t size, int flags, ddi_umem_cookie_t *cookie)
 	 * allocate cookie
 	 */
 	if ((cp = kmem_zalloc(sizeof (struct ddi_umem_cookie),
-		flags & DDI_UMEM_NOSLEEP ? KM_NOSLEEP : KM_SLEEP)) == NULL) {
+	    flags & DDI_UMEM_NOSLEEP ? KM_NOSLEEP : KM_SLEEP)) == NULL) {
 		ASSERT(flags & DDI_UMEM_NOSLEEP);
 		return ((void *)NULL);
 	}
