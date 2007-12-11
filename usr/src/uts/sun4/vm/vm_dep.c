@@ -258,39 +258,45 @@ caddr_t kpm_vbase;
 size_t  kpm_size;
 uchar_t kpm_size_shift;
 
+int valid_va_range_aligned_wraparound;
 /*
- * Determine whether [base, base+len] contains a mapable range of
- * addresses at least minlen long. base and len are adjusted if
- * required to provide a mapable range.
+ * Determine whether [*basep, *basep + *lenp) contains a mappable range of
+ * addresses at least "minlen" long, where the base of the range is at "off"
+ * phase from an "align" boundary and there is space for a "redzone"-sized
+ * redzone on either side of the range.  On success, 1 is returned and *basep
+ * and *lenp are adjusted to describe the acceptable range (including
+ * the redzone).  On failure, 0 is returned.
  */
-/* ARGSUSED */
 int
-valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
+valid_va_range_aligned(caddr_t *basep, size_t *lenp, size_t minlen, int dir,
+    size_t align, size_t redzone, size_t off)
 {
 	caddr_t hi, lo;
+	size_t tot_len;
+
+	ASSERT(align == 0 ? off == 0 : off < align);
+	ASSERT(ISP2(align));
+	ASSERT(align == 0 || align >= PAGESIZE);
 
 	lo = *basep;
 	hi = lo + *lenp;
+	tot_len = minlen + 2 * redzone;	/* need at least this much space */
 
-	/*
-	 * If hi rolled over the top, try cutting back.
-	 */
+	/* If hi rolled over the top try cutting back. */
 	if (hi < lo) {
-		size_t newlen = 0 - (uintptr_t)lo - 1l;
-
-		if (newlen + (uintptr_t)hi < minlen)
-			return (0);
-		if (newlen < minlen)
-			return (0);
-		*lenp = newlen;
-	} else if (hi - lo < minlen)
+		*lenp = 0UL - (uintptr_t)lo - 1UL;
+		/* Trying to see if this really happens, and then if so, why */
+		valid_va_range_aligned_wraparound++;
+		hi = lo + *lenp;
+	}
+	if (*lenp < tot_len) {
 		return (0);
+	}
 
 	/*
 	 * Deal with a possible hole in the address range between
 	 * hole_start and hole_end that should never be mapped by the MMU.
 	 */
-	hi = lo + *lenp;
 
 	if (lo < hole_start) {
 		if (hi > hole_start)
@@ -302,9 +308,9 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 					/*
 					 * prefer lowest range
 					 */
-					if (hole_start - lo >= minlen)
+					if (hole_start - lo >= tot_len)
 						hi = hole_start;
-					else if (hi - hole_end >= minlen)
+					else if (hi - hole_end >= tot_len)
 						lo = hole_end;
 					else
 						return (0);
@@ -312,9 +318,9 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 					/*
 					 * prefer highest range
 					 */
-					if (hi - hole_end >= minlen)
+					if (hi - hole_end >= tot_len)
 						lo = hole_end;
-					else if (hole_start - lo >= minlen)
+					else if (hole_start - lo >= tot_len)
 						hi = hole_start;
 					else
 						return (0);
@@ -327,13 +333,36 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 			lo = hole_end;
 	}
 
-	if (hi - lo < minlen)
+	/* Check if remaining length is too small */
+	if (hi - lo < tot_len) {
 		return (0);
-
+	}
+	if (align > 1) {
+		caddr_t tlo = lo + redzone;
+		caddr_t thi = hi - redzone;
+		tlo = (caddr_t)P2PHASEUP((uintptr_t)tlo, align, off);
+		if (tlo < lo + redzone) {
+			return (0);
+		}
+		if (thi < tlo || thi - tlo < minlen) {
+			return (0);
+		}
+	}
 	*basep = lo;
 	*lenp = hi - lo;
-
 	return (1);
+}
+
+/*
+ * Determine whether [*basep, *basep + *lenp) contains a mappable range of
+ * addresses at least "minlen" long.  On success, 1 is returned and *basep
+ * and *lenp are adjusted to describe the acceptable range.  On failure, 0
+ * is returned.
+ */
+int
+valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
+{
+	return (valid_va_range_aligned(basep, lenp, minlen, dir, 0, 0, 0));
 }
 
 /*

@@ -629,15 +629,24 @@ map_addr_vacalign_check(caddr_t addr, u_offset_t off)
  * choose an address for the user.  We will pick an address
  * range which is the highest available below userlimit.
  *
+ * Every mapping will have a redzone of a single page on either side of
+ * the request. This is done to leave one page unmapped between segments.
+ * This is not required, but it's useful for the user because if their
+ * program strays across a segment boundary, it will catch a fault
+ * immediately making debugging a little easier.  Currently the redzone
+ * is mandatory.
+ *
  * addrp is a value/result parameter.
  *	On input it is a hint from the user to be used in a completely
  *	machine dependent fashion.  We decide to completely ignore this hint.
+ *	If MAP_ALIGN was specified, addrp contains the minimal alignment, which
+ *	must be some "power of two" multiple of pagesize.
  *
  *	On output it is NULL if no address can be found in the current
  *	processes address space or else an address that is currently
  *	not mapped for len bytes with a page of red zone on either side.
  *
- *	align is not needed on x86 (it's for viturally addressed caches)
+ *	vacalign is not needed on x86 (it's for viturally addressed caches)
  */
 /*ARGSUSED*/
 void
@@ -696,16 +705,8 @@ map_addr_proc(
 #endif
 		slen = userlimit - base;
 
+	/* Make len be a multiple of PAGESIZE */
 	len = (len + PAGEOFFSET) & PAGEMASK;
-
-	/*
-	 * Redzone for each side of the request. This is done to leave
-	 * one page unmapped between segments. This is not required, but
-	 * it's useful for the user because if their program strays across
-	 * a segment boundary, it will catch a fault immediately making
-	 * debugging a little easier.
-	 */
-	len += 2 * MMU_PAGESIZE;
 
 	/*
 	 * figure out what the alignment should be
@@ -731,63 +732,86 @@ map_addr_proc(
 	if ((flags & MAP_ALIGN) && ((uintptr_t)*addrp > align_amount))
 		align_amount = (uintptr_t)*addrp;
 
-	len += align_amount;
+	ASSERT(ISP2(align_amount));
+	ASSERT(align_amount == 0 || align_amount >= PAGESIZE);
 
+	off = off & (align_amount - 1);
 	/*
 	 * Look for a large enough hole starting below userlimit.
-	 * After finding it, use the upper part.  Addition of PAGESIZE
-	 * is for the redzone as described above.
+	 * After finding it, use the upper part.
 	 */
-	if (as_gap(as, len, &base, &slen, AH_HI, NULL) == 0) {
+	if (as_gap_aligned(as, len, &base, &slen, AH_HI, NULL, align_amount,
+	    PAGESIZE, off) == 0) {
 		caddr_t as_addr;
 
-		addr = base + slen - len + MMU_PAGESIZE;
+		/*
+		 * addr is the highest possible address to use since we have
+		 * a PAGESIZE redzone at the beginning and end.
+		 */
+		addr = base + slen - (PAGESIZE + len);
 		as_addr = addr;
 		/*
-		 * Round address DOWN to the alignment amount,
-		 * add the offset, and if this address is less
-		 * than the original address, add alignment amount.
+		 * Round address DOWN to the alignment amount and
+		 * add the offset in.
+		 * If addr is greater than as_addr, len would not be large
+		 * enough to include the redzone, so we must adjust down
+		 * by the alignment amount.
 		 */
 		addr = (caddr_t)((uintptr_t)addr & (~(align_amount - 1)));
-		addr += (uintptr_t)(off & (align_amount - 1));
-		if (addr < as_addr)
-			addr += align_amount;
+		addr += (uintptr_t)off;
+		if (addr > as_addr) {
+			addr -= align_amount;
+		}
 
-		ASSERT(addr <= (as_addr + align_amount));
+		ASSERT(addr > base);
+		ASSERT(addr + len < base + slen);
 		ASSERT(((uintptr_t)addr & (align_amount - 1)) ==
-		    ((uintptr_t)(off & (align_amount - 1))));
+		    ((uintptr_t)(off)));
 		*addrp = addr;
 	} else {
 		*addrp = NULL;	/* no more virtual space */
 	}
 }
 
+int valid_va_range_aligned_wraparound;
+
 /*
- * Determine whether [base, base+len] contains a valid range of
- * addresses at least minlen long. base and len are adjusted if
- * required to provide a valid range.
+ * Determine whether [*basep, *basep + *lenp) contains a mappable range of
+ * addresses at least "minlen" long, where the base of the range is at "off"
+ * phase from an "align" boundary and there is space for a "redzone"-sized
+ * redzone on either side of the range.  On success, 1 is returned and *basep
+ * and *lenp are adjusted to describe the acceptable range (including
+ * the redzone).  On failure, 0 is returned.
  */
 /*ARGSUSED3*/
 int
-valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
+valid_va_range_aligned(caddr_t *basep, size_t *lenp, size_t minlen, int dir,
+    size_t align, size_t redzone, size_t off)
 {
 	uintptr_t hi, lo;
+	size_t tot_len;
+
+	ASSERT(align == 0 ? off == 0 : off < align);
+	ASSERT(ISP2(align));
+	ASSERT(align == 0 || align >= PAGESIZE);
 
 	lo = (uintptr_t)*basep;
 	hi = lo + *lenp;
+	tot_len = minlen + 2 * redzone; /* need at least this much space */
 
 	/*
 	 * If hi rolled over the top, try cutting back.
 	 */
 	if (hi < lo) {
-		if (0 - lo + hi < minlen)
-			return (0);
-		if (0 - lo < minlen)
-			return (0);
-		*lenp = 0 - lo;
-	} else if (hi - lo < minlen) {
+		*lenp = 0UL - lo - 1UL;
+		/* See if this really happens. If so, then we figure out why */
+		valid_va_range_aligned_wraparound++;
+		hi = lo + *lenp;
+	}
+	if (*lenp < tot_len) {
 		return (0);
 	}
+
 #if defined(__amd64)
 	/*
 	 * Deal with a possible hole in the address range between
@@ -803,9 +827,9 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 					/*
 					 * prefer lowest range
 					 */
-					if (hole_start - lo >= minlen)
+					if (hole_start - lo >= tot_len)
 						hi = hole_start;
-					else if (hi - hole_end >= minlen)
+					else if (hi - hole_end >= tot_len)
 						lo = hole_end;
 					else
 						return (0);
@@ -813,9 +837,9 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 					/*
 					 * prefer highest range
 					 */
-					if (hi - hole_end >= minlen)
+					if (hi - hole_end >= tot_len)
 						lo = hole_end;
-					else if (hole_start - lo >= minlen)
+					else if (hole_start - lo >= tot_len)
 						hi = hole_start;
 					else
 						return (0);
@@ -829,14 +853,38 @@ valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
 		if (lo < hole_end)
 			lo = hole_end;
 	}
+#endif
 
-	if (hi - lo < minlen)
+	if (hi - lo < tot_len)
 		return (0);
+
+	if (align > 1) {
+		uintptr_t tlo = lo + redzone;
+		uintptr_t thi = hi - redzone;
+		tlo = (uintptr_t)P2PHASEUP(tlo, align, off);
+		if (tlo < lo + redzone) {
+			return (0);
+		}
+		if (thi < tlo || thi - tlo < minlen) {
+			return (0);
+		}
+	}
 
 	*basep = (caddr_t)lo;
 	*lenp = hi - lo;
-#endif
 	return (1);
+}
+
+/*
+ * Determine whether [*basep, *basep + *lenp) contains a mappable range of
+ * addresses at least "minlen" long.  On success, 1 is returned and *basep
+ * and *lenp are adjusted to describe the acceptable range.  On failure, 0
+ * is returned.
+ */
+int
+valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen, int dir)
+{
+	return (valid_va_range_aligned(basep, lenp, minlen, dir, 0, 0, 0));
 }
 
 /*

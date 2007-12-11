@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,6 +265,10 @@ int	as_map(struct as *as, caddr_t addr, size_t size, int ((*crfp)()),
 void	as_purge(struct as *as);
 int	as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 		uint_t flags, caddr_t addr);
+int	as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep,
+	    size_t *lenp, uint_t flags, caddr_t addr, size_t align,
+	    size_t redzone, size_t off);
+
 int	as_memory(struct as *as, caddr_t *basep, size_t *lenp);
 size_t	as_swapout(struct as *as);
 int	as_incore(struct as *as, caddr_t addr, size_t size, char *vec,

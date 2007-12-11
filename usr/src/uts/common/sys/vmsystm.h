@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,9 @@ extern void swapout_lwp(klwp_t *);
 
 extern	int valid_va_range(caddr_t *basep, size_t *lenp, size_t minlen,
 		int dir);
+extern	int valid_va_range_aligned(caddr_t *basep, size_t *lenp,
+    size_t minlen, int dir, size_t align, size_t redzone, size_t off);
+
 extern	int valid_usr_range(caddr_t, size_t, uint_t, struct as *, caddr_t);
 extern	int useracc(void *, size_t, int);
 extern	size_t map_pgsz(int maptype, struct proc *p, caddr_t addr, size_t len,

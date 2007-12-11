@@ -1815,7 +1815,12 @@ as_purge(struct as *as)
 }
 
 /*
- * Find a hole of at least size minlen within [base, base + len).
+ * Find a hole within [*basep, *basep + *lenp), which contains a mappable
+ * range of addresses at least "minlen" long, where the base of the range is
+ * at "off" phase from an "align" boundary and there is space for a
+ * "redzone"-sized redzone on eithe rside of the range.  Thus,
+ * if align was 4M and off was 16k, the user wants a hole which will start
+ * 16k into a 4M page.
  *
  * If flags specifies AH_HI, the hole will have the highest possible address
  * in the range.  We use the as->a_lastgap field to figure out where to
@@ -1825,15 +1830,14 @@ as_purge(struct as *as)
  *
  * If flags specifies AH_CONTAIN, the hole will contain the address addr.
  *
- * If an adequate hole is found, base and len are set to reflect the part of
- * the hole that is within range, and 0 is returned, otherwise,
- * -1 is returned.
+ * If an adequate hole is found, *basep and *lenp are set to reflect the part of
+ * the hole that is within range, and 0 is returned. On failure, -1 is returned.
  *
  * NOTE: This routine is not correct when base+len overflows caddr_t.
  */
 int
-as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp, uint_t flags,
-    caddr_t addr)
+as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
+    uint_t flags, caddr_t addr, size_t align, size_t redzone, size_t off)
 {
 	caddr_t lobound = *basep;
 	caddr_t hibound = lobound + *lenp;
@@ -1847,7 +1851,8 @@ as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp, uint_t flags,
 	save_len = *lenp;
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 	if (AS_SEGFIRST(as) == NULL) {
-		if (valid_va_range(basep, lenp, minlen, flags & AH_DIR)) {
+		if (valid_va_range_aligned(basep, lenp, minlen, flags & AH_DIR,
+		    align, redzone, off)) {
 			AS_LOCK_EXIT(as, &as->a_lock);
 			return (0);
 		} else {
@@ -1920,8 +1925,8 @@ as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp, uint_t flags,
 		 */
 		*basep = lo;
 		*lenp = hi - lo;
-		if (valid_va_range(basep, lenp, minlen,
-		    forward ? AH_LO : AH_HI) &&
+		if (valid_va_range_aligned(basep, lenp, minlen,
+		    forward ? AH_LO : AH_HI, align, redzone, off) &&
 		    ((flags & AH_CONTAIN) == 0 ||
 		    (*basep <= addr && *basep + *lenp > addr))) {
 			if (!forward)
@@ -1953,6 +1958,31 @@ as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp, uint_t flags,
 	*lenp = save_len;
 	AS_LOCK_EXIT(as, &as->a_lock);
 	return (-1);
+}
+
+/*
+ * Find a hole of at least size minlen within [*basep, *basep + *lenp).
+ *
+ * If flags specifies AH_HI, the hole will have the highest possible address
+ * in the range.  We use the as->a_lastgap field to figure out where to
+ * start looking for a gap.
+ *
+ * Otherwise, the gap will have the lowest possible address.
+ *
+ * If flags specifies AH_CONTAIN, the hole will contain the address addr.
+ *
+ * If an adequate hole is found, base and len are set to reflect the part of
+ * the hole that is within range, and 0 is returned, otherwise,
+ * -1 is returned.
+ *
+ * NOTE: This routine is not correct when base+len overflows caddr_t.
+ */
+int
+as_gap(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp, uint_t flags,
+    caddr_t addr)
+{
+
+	return (as_gap_aligned(as, minlen, basep, lenp, flags, addr, 0, 0, 0));
 }
 
 /*

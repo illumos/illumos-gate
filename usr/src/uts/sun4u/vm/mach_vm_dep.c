@@ -151,10 +151,19 @@ adjust_data_maxlpsize(size_t ismpagesize)
  * lower level code must manage the translations so that this
  * is not seen here (at the cost of efficiency, of course).
  *
+ * Every mapping will have a redzone of a single page on either side of
+ * the request. This is done to leave one page unmapped between segments.
+ * This is not required, but it's useful for the user because if their
+ * program strays across a segment boundary, it will catch a fault
+ * immediately making debugging a little easier.  Currently the redzone
+ * is mandatory.
+ *
+ *
  * addrp is a value/result parameter.
  *	On input it is a hint from the user to be used in a completely
  *	machine dependent fashion.  For MAP_ALIGN, addrp contains the
- *	minimal alignment.
+ *	minimal alignment, which must be some "power of two" multiple of
+ *	pagesize.
  *
  *	On output it is NULL if no address can be found in the current
  *	processes address space or else an address that is currently
@@ -190,16 +199,9 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		    rctlproc_legacy[RLIMIT_STACK], p->p_rctls, p) + PAGEOFFSET)
 		    & PAGEMASK);
 	}
-	len = (len + PAGEOFFSET) & PAGEMASK;
 
-	/*
-	 * Redzone for each side of the request. This is done to leave
-	 * one page unmapped between segments. This is not required, but
-	 * it's useful for the user because if their program strays across
-	 * a segment boundary, it will catch a fault immediately making
-	 * debugging a little easier.
-	 */
-	len += (2 * PAGESIZE);
+	/* Make len be a multiple of PAGESIZE */
+	len = (len + PAGEOFFSET) & PAGEMASK;
 
 	/*
 	 *  If the request is larger than the size of a particular
@@ -219,11 +221,11 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	}
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    allow_largepage_alignment &&
-		(len >= MMU_PAGESIZE256M)) {	/* 256MB mappings */
+	    (len >= MMU_PAGESIZE256M)) {	/* 256MB mappings */
 		align_amount = MMU_PAGESIZE256M;
 	} else if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    allow_largepage_alignment &&
-		(len >= MMU_PAGESIZE32M)) {	/* 32MB mappings */
+	    (len >= MMU_PAGESIZE32M)) {	/* 32MB mappings */
 		align_amount = MMU_PAGESIZE32M;
 	} else if (len >= MMU_PAGESIZE4M) {  /* 4MB mappings */
 		align_amount = MMU_PAGESIZE4M;
@@ -239,7 +241,7 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 		 */
 		align_amount = ELF_SPARC_MAXPGSZ;
 		if ((flags & MAP_ALIGN) && ((uintptr_t)*addrp != 0) &&
-			((uintptr_t)*addrp < align_amount))
+		    ((uintptr_t)*addrp < align_amount))
 			align_amount = (uintptr_t)*addrp;
 	}
 
@@ -256,33 +258,43 @@ map_addr_proc(caddr_t *addrp, size_t len, offset_t off, int vacalign,
 	if ((flags & MAP_ALIGN) && ((uintptr_t)*addrp > align_amount)) {
 		align_amount = (uintptr_t)*addrp;
 	}
-	len += align_amount;
+
+	ASSERT(ISP2(align_amount));
+	ASSERT(align_amount == 0 || align_amount >= PAGESIZE);
 
 	/*
 	 * Look for a large enough hole starting below the stack limit.
-	 * After finding it, use the upper part.  Addition of PAGESIZE is
-	 * for the redzone as described above.
+	 * After finding it, use the upper part.
 	 */
 	as_purge(as);
-	if (as_gap(as, len, &base, &slen, AH_HI, NULL) == 0) {
+	off = off & (align_amount - 1);
+	if (as_gap_aligned(as, len, &base, &slen, AH_HI, NULL, align_amount,
+	    PAGESIZE, off) == 0) {
 		caddr_t as_addr;
 
-		addr = base + slen - len + PAGESIZE;
+		/*
+		 * addr is the highest possible address to use since we have
+		 * a PAGESIZE redzone at the beginning and end.
+		 */
+		addr = base + slen - (PAGESIZE + len);
 		as_addr = addr;
 		/*
-		 * Round address DOWN to the alignment amount,
-		 * add the offset, and if this address is less
-		 * than the original address, add alignment amount.
+		 * Round address DOWN to the alignment amount and
+		 * add the offset in.
+		 * If addr is greater than as_addr, len would not be large
+		 * enough to include the redzone, so we must adjust down
+		 * by the alignment amount.
 		 */
 		addr = (caddr_t)((uintptr_t)addr & (~(align_amount - 1l)));
-		addr += (long)(off & (align_amount - 1l));
-		if (addr < as_addr) {
-			addr += align_amount;
+		addr += (long)off;
+		if (addr > as_addr) {
+			addr -= align_amount;
 		}
 
-		ASSERT(addr <= (as_addr + align_amount));
+		ASSERT(addr > base);
+		ASSERT(addr + len < base + slen);
 		ASSERT(((uintptr_t)addr & (align_amount - 1l)) ==
-		    ((uintptr_t)(off & (align_amount - 1l))));
+		    ((uintptr_t)(off)));
 		*addrp = addr;
 
 #if defined(SF_ERRATA_57)
