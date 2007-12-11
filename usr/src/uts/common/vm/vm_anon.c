@@ -963,6 +963,9 @@ anon_decref(struct anon *ap)
 		panic("anon_decref: slot count 0");
 	if (--ap->an_refcnt == 0) {
 		swap_xlate(ap, &vp, &off);
+		anon_rmhash(ap);
+		if (ap->an_pvp != NULL)
+			swap_phys_free(ap->an_pvp, ap->an_poff, PAGESIZE);
 		mutex_exit(ahm);
 
 		/*
@@ -974,27 +977,13 @@ anon_decref(struct anon *ap)
 		 * is freed.
 		 */
 		pp = page_lookup(vp, (u_offset_t)off, SE_EXCL);
-
-		/*
-		 * If there was a page, we've synchronized on it (getting
-		 * the exclusive lock is as good as gettting the iolock)
-		 * so now we can free the physical backing store. Also, this
-		 * is where we would free the name of the anonymous page
-		 * (swap_free(ap)), a no-op in the current implementation.
-		 */
-		mutex_enter(ahm);
-		ASSERT(ap->an_refcnt == 0);
-		anon_rmhash(ap);
-		if (ap->an_pvp)
-			swap_phys_free(ap->an_pvp, ap->an_poff, PAGESIZE);
-		mutex_exit(ahm);
-
 		if (pp != NULL) {
 			/*LINTED: constant in conditional context */
 			VN_DISPOSE(pp, B_INVAL, 0, kcred);
 		}
 		ANON_PRINT(A_ANON, ("anon_decref: free ap %p, vp %p\n",
 		    (void *)ap, (void *)ap->an_vp));
+
 		kmem_cache_free(anon_cache, ap);
 
 		ANI_ADD(1);
@@ -1128,6 +1117,11 @@ anon_decref_pages(
 					swap_phys_free(ap->an_pvp, ap->an_poff,
 					    PAGESIZE);
 				mutex_exit(ahm);
+				if (pp == NULL) {
+					pp = page_lookup(vp, (u_offset_t)off,
+					    SE_EXCL);
+					ASSERT(pp == NULL || pp->p_szc == 0);
+				}
 				if (pp != NULL) {
 					VM_STAT_ADD(anonvmstats.decrefpages[4]);
 					/*LINTED*/
@@ -1175,24 +1169,6 @@ anon_decref_pages(
 					    (fs_generic_func_p)fs_dispose))
 						dispose = 1;
 				}
-				if (!dispose) {
-					VM_STAT_ADD(anonvmstats.decrefpages[6]);
-					page_destroy_pages(ppa[0]);
-				} else {
-					VM_STAT_ADD(anonvmstats.decrefpages[7]);
-					for (j = 0; j < curpgcnt; j++) {
-						ASSERT(PAGE_EXCL(ppa[j]));
-						ppa[j]->p_szc = 0;
-					}
-					for (j = 0; j < curpgcnt; j++) {
-						ASSERT(!hat_page_is_mapped(
-						    ppa[j]));
-						/*LINTED*/
-						VN_DISPOSE(ppa[j], B_INVAL, 0,
-						    kcred);
-					}
-				}
-				kmem_free(ppa, ppasize);
 				for (j = i; j < i + curpgcnt; j++) {
 					ap = anon_get_ptr(ahp, an_idx + j);
 					ASSERT(ap != NULL &&
@@ -1212,6 +1188,24 @@ anon_decref_pages(
 					kmem_cache_free(anon_cache, ap);
 					ANI_ADD(1);
 				}
+				if (!dispose) {
+					VM_STAT_ADD(anonvmstats.decrefpages[6]);
+					page_destroy_pages(ppa[0]);
+				} else {
+					VM_STAT_ADD(anonvmstats.decrefpages[7]);
+					for (j = 0; j < curpgcnt; j++) {
+						ASSERT(PAGE_EXCL(ppa[j]));
+						ppa[j]->p_szc = 0;
+					}
+					for (j = 0; j < curpgcnt; j++) {
+						ASSERT(!hat_page_is_mapped(
+						    ppa[j]));
+						/*LINTED*/
+						VN_DISPOSE(ppa[j], B_INVAL, 0,
+						    kcred);
+					}
+				}
+				kmem_free(ppa, ppasize);
 				i += curpgcnt;
 			}
 		} else {

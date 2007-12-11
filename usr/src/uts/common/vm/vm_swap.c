@@ -206,7 +206,7 @@ found:
 			silast = swapinfo;
 	}
 	TRACE_2(TR_FAC_VM, TR_SWAP_ALLOC,
-		"swap_alloc:sip %p offset %lx", sip, soff);
+	    "swap_alloc:sip %p offset %lx", sip, soff);
 	mutex_exit(&swapinfo_lock);
 	return (1);
 }
@@ -484,7 +484,7 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 		 */
 		avail = MAX((spgcnt_t)(availrmem - swapfs_minfree), 0);
 		ai.ani_max = (k_anoninfo.ani_max +
-			k_anoninfo.ani_mem_resv) +avail;
+		    k_anoninfo.ani_mem_resv) +avail;
 
 		ai.ani_free = k_anoninfo.ani_free + avail;
 
@@ -524,7 +524,7 @@ swapctl(int sc_cmd, void *sc_arg, int *rv)
 			mutex_exit(&swapinfo_lock);
 			if (copyout(&st, ust, sizeof (swapent_t)) != 0 ||
 			    copyout(swappath, st.ste_path,
-				    strlen(swappath) + 1) != 0) {
+			    strlen(swappath) + 1) != 0) {
 				return (EFAULT);
 			}
 			*rv = 1;
@@ -598,7 +598,7 @@ retry:
 			if (!tsip->si_pnamelen)
 				continue;
 			if (copyout(tsip->si_pname, st.ste_path,
-				tsip->si_pnamelen) != 0) {
+			    tsip->si_pnamelen) != 0) {
 				error = EFAULT;
 				goto lout;
 			}
@@ -667,7 +667,7 @@ lout:
 			error = swapdel(vp, sr.sr_start);
 		else
 			error = swapadd(vp, sr.sr_start,
-					sr.sr_length, swapname);
+			    sr.sr_length, swapname);
 	}
 	VN_RELE(vp);
 out:
@@ -960,8 +960,8 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 	 */
 	if (vattr.va_size > MAXOFF32_T) {
 		cmn_err(CE_NOTE,
-			"!swap device %s truncated from 0x%llx to 0x%x bytes",
-			swapname, vattr.va_size, MAXOFF32_T);
+		    "!swap device %s truncated from 0x%llx to 0x%x bytes",
+		    swapname, vattr.va_size, MAXOFF32_T);
 		vattr.va_size = MAXOFF32_T;
 	}
 #endif	/* _ILP32 */
@@ -973,7 +973,7 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 
 	/* Fail if fs does not support VOP_PAGEIO */
 	error = VOP_PAGEIO(cvp, (page_t *)NULL, (u_offset_t)0, 0, 0, CRED(),
-		NULL);
+	    NULL);
 
 	if (error == ENOSYS)
 		goto out;
@@ -998,7 +998,7 @@ swapadd(struct vnode *vp, ulong_t lowblk, ulong_t nblks, char *swapname)
 	 * If user specified 0 blks, use the size of the device
 	 */
 	eoff = nblks ?  soff + (nblks - (startblk - lowblk) << SCTRSHFT) :
-			vattr.va_size;
+	    vattr.va_size;
 
 	SWAP_PRINT(SW_CTL, "swapadd: va_size %ld soff %ld eoff %ld\n",
 	    vattr.va_size, soff, eoff, 0, 0);
@@ -1166,7 +1166,7 @@ out:
 		}
 		mutex_enter(&swap_lock);
 		(void) VOP_CLOSE(cvp, FREAD|FWRITE, 1, (offset_t)0, CRED(),
-			NULL);
+		    NULL);
 		mutex_exit(&swap_lock);
 	}
 	return (error);
@@ -1382,63 +1382,87 @@ swapslot_free(
 	u_offset_t off,
 	struct swapinfo *sip)
 {
-	struct page *pl[2], *pp;
+	struct page *pp = NULL;
 	struct anon *ap = NULL;
 	int error = 0;
 	kmutex_t *ahm;
+	struct vnode *pvp = NULL;
+	u_offset_t poff;
+	int	alloc_pg = 0;
+
+	ASSERT(sip->si_vp != NULL);
+	/*
+	 * Get the page for the old swap slot if exists or create a new one.
+	 */
+again:
+	if ((pp = page_lookup(vp, off, SE_SHARED)) == NULL) {
+		pp = page_create_va(vp, off, PAGESIZE, PG_WAIT | PG_EXCL,
+		    segkmap, NULL);
+		if (pp == NULL)
+			goto again;
+		alloc_pg = 1;
+
+		error = swap_getphysname(vp, off, &pvp, &poff);
+		if (error || pvp != sip->si_vp || poff < sip->si_soff ||
+		    poff >= sip->si_eoff) {
+			page_io_unlock(pp);
+			/*LINTED: constant in conditional context*/
+			VN_DISPOSE(pp, B_INVAL, 0, kcred);
+			return (0);
+		}
+
+		error = VOP_PAGEIO(pvp, pp, poff, PAGESIZE, B_READ,
+		    CRED(), NULL);
+		if (error) {
+			page_io_unlock(pp);
+			if (error == EFAULT)
+				error = 0;
+			/*LINTED: constant in conditional context*/
+			VN_DISPOSE(pp, B_INVAL, 0, kcred);
+			return (error);
+		}
+	}
 
 	/*
-	 * Get the page for the old swap slot and i/o lock it.
-	 * Users of the physical slot will synchronize on the i/o lock.
+	 * The anon could have been removed by anon_decref* and/or reallocated
+	 * by anon layer (an_pvp == NULL) with the same vp, off.
+	 * In this case the page which has been allocated needs to
+	 * be freed.
 	 */
-	if (error = VOP_GETPAGE(vp, (offset_t)off, ptob(1), NULL,
-	    pl, ptob(1), segkmap, NULL, S_READ, CRED(), NULL)) {
-		/*
-		 * Anon slot went away (EIDRM) or vp was truncated (EFAULT)
-		 * while we got the page. Thus the physical slot must be
-		 * free, so we have succeeded.
-		 */
-		if (error == EIDRM || error == EFAULT)
-			error = 0;
-		return (error);
-	}
-	pp = pl[0];
-	page_io_lock(pp);
-
+	if (!alloc_pg)
+		page_io_lock(pp);
 	ahm = &anonhash_lock[AH_LOCK(vp, off)];
 	mutex_enter(ahm);
-	/*
-	 * Get the anon slot; anon struct cannot vanish while we hold
-	 * SE_SHARED lock on the physical page since anon_decref() blocks
-	 * in page_lookup() before it can proceed further to remove
-	 * anon struct from anon_hash table.
-	 */
-	if ((ap = swap_anon(vp, off)) == NULL) {
-		panic("swapslot_free(%p, %llx, %p), page: %p, null anon",
-			vp, off, sip, pp);
+	ap = swap_anon(vp, off);
+	if ((ap == NULL || ap->an_pvp == NULL) && alloc_pg) {
+		mutex_exit(ahm);
+		page_io_unlock(pp);
+		/*LINTED: constant in conditional context*/
+		VN_DISPOSE(pp, B_INVAL, 0, kcred);
+		return (0);
 	}
+
 	/*
 	 * Free the physical slot. It may have been freed up and replaced with
 	 * another one while we were getting the page so we have to re-verify
 	 * that this is really one we want. If we do free the slot we have
 	 * to mark the page modified, as its backing store is now gone.
 	 */
-	if (ap->an_pvp == sip->si_vp && ap->an_poff >= sip->si_soff &&
-	    ap->an_poff < sip->si_eoff) {
+	if ((ap != NULL) && (ap->an_pvp == sip->si_vp && ap->an_poff >=
+	    sip->si_soff && ap->an_poff < sip->si_eoff)) {
 		swap_phys_free(ap->an_pvp, ap->an_poff, PAGESIZE);
 		ap->an_pvp = NULL;
-		ap->an_poff = NULL;
+		ap->an_poff = 0;
 		mutex_exit(ahm);
 		hat_setmod(pp);
 	} else {
 		mutex_exit(ahm);
 	}
-out:
-	/* Release the page locks */
-	page_unlock(pp);
 	page_io_unlock(pp);
-	return (error);
+	page_unlock(pp);
+	return (0);
 }
+
 
 /*
  * Get contig physical backing store for vp, in the range
