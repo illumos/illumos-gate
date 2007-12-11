@@ -71,3 +71,4 @@ s none platform/SUNW,Sun-Blade-T6300=sun4v
 s none platform/SUNW,Sun-Blade-T6320=sun4v
 s none platform/SUNW,Netra-CP3260=sun4v
 s none platform/SUNW,USBRDT-5240=sun4v
+s none platform/SUNW,Sun-Blade-T6340=sun4v

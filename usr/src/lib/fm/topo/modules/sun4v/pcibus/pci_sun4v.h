@@ -103,6 +103,12 @@ physnm_t t5440_pnms[] = {
 	{   7, "MB/PCIE7" }
 };
 
+physnm_t blade_t6340_pnms[] = {
+	/* Slot #, Label */
+	{   0, "SYS/EM0" },
+	{   1, "SYS/EM1" }
+};
+
 pphysnm_t plat_pnames[] = {
 	{ "Sun-Fire-T200",
 	    sizeof (t200_pnms) / sizeof (physnm_t),
@@ -134,7 +140,10 @@ pphysnm_t plat_pnames[] = {
 	    netra_t5220_pnms },
 	{ "Netra-T5440",
 	    sizeof (netra_t5440_pnms) / sizeof (physnm_t),
-	    netra_t5440_pnms }
+	    netra_t5440_pnms },
+	{ "Sun-Blade-T6340",
+	    sizeof (blade_t6340_pnms) / sizeof (physnm_t),
+	    blade_t6340_pnms }
 };
 
 physlot_names_t PhyslotNMs = {

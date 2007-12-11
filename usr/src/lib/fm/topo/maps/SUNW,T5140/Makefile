@@ -29,7 +29,8 @@ CLASS = platform
 DTDFILE =
 TOPOFILE = T5140-hc-topology.xml \
 	T5240-hc-topology.xml \
-	T5440-hc-topology.xml
+	T5440-hc-topology.xml \
+	Sun-Blade-T6340-hc-topology.xml
 SRCDIR = ../SUNW,T5140
 
 include ../Makefile.map
