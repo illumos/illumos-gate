@@ -1318,7 +1318,7 @@ ptree_create_prop(const ptree_propinfo_t *pinfo, const void *valbuf,
 			return (err);
 	} else if ((strcmp(pinfo->piclinfo.name, PICL_PROP_CLASSNAME) == 0) &&
 	    ((pinfo->piclinfo.type != PICL_PTYPE_CHARSTRING) ||
-		(strlen(valbuf) >= PICL_CLASSNAMELEN_MAX)))
+	    (strlen(valbuf) >= PICL_CLASSNAMELEN_MAX)))
 		return (PICL_RESERVEDNAME);
 	else if ((strcmp(pinfo->piclinfo.name, PICL_PROP_NAME) == 0) &&
 	    (pinfo->piclinfo.type != PICL_PTYPE_CHARSTRING))
@@ -2831,8 +2831,8 @@ get_child_by_path(picl_nodehdl_t rooth, char *prl,
 
 	for (err = ptree_get_propval_by_name(rooth, PICL_PROP_CHILD, &chdh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
-		    sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
+	    sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS) {
 			free_list(plist);
 			return (PICL_FAILURE);
@@ -2860,8 +2860,8 @@ get_child_by_path(picl_nodehdl_t rooth, char *prl,
 			if ((ptree_get_propval_by_name(chdh, PICL_PROP_BUS_ADDR,
 			    busval, (strlen(baddr) + 1)) != PICL_SUCCESS) &&
 			    (ptree_get_propval_by_name(chdh,
-				PICL_PROP_UNIT_ADDRESS, busval,
-				(strlen(baddr) + 1)) != PICL_SUCCESS))
+			    PICL_PROP_UNIT_ADDRESS, busval,
+			    (strlen(baddr) + 1)) != PICL_SUCCESS))
 				continue;
 
 			if (strcmp(busval, baddr) != 0)
@@ -3639,26 +3639,30 @@ xptree_refresh_notify(uint32_t secs)
 	int	ret;
 	timespec_t	to;
 
-	if (pthread_mutex_lock(&ptree_refresh_mutex) != 0)
-		return (PICL_FAILURE);
+	if (secs != 0) {
+		if (pthread_mutex_lock(&ptree_refresh_mutex) != 0)
+			return (PICL_FAILURE);
 
-	curgen = ptree_generation;
+		curgen = ptree_generation;
 
-	while (curgen == ptree_generation) {
-		if (secs == 0)	/* wait forever */
-			(void) pthread_cond_wait(&ptree_refresh_cond,
-			    &ptree_refresh_mutex);
-		else {
-			to.tv_sec = secs;
-			to.tv_nsec = 0;
-			ret = pthread_cond_reltimedwait_np(&ptree_refresh_cond,
-			    &ptree_refresh_mutex, &to);
-			if (ret == ETIMEDOUT)
-				break;
+		while (curgen == ptree_generation) {
+			if (secs == -1)	/* wait forever */
+				(void) pthread_cond_wait(&ptree_refresh_cond,
+				    &ptree_refresh_mutex);
+			else {
+				to.tv_sec = secs;
+				to.tv_nsec = 0;
+				ret = pthread_cond_reltimedwait_np(
+				    &ptree_refresh_cond,
+				    &ptree_refresh_mutex, &to);
+				if (ret == ETIMEDOUT)
+					break;
+			}
 		}
+
+		(void) pthread_mutex_unlock(&ptree_refresh_mutex);
 	}
 
-	(void) pthread_mutex_unlock(&ptree_refresh_mutex);
 	return (PICL_SUCCESS);
 }
 
