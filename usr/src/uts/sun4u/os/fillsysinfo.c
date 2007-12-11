@@ -452,6 +452,7 @@ fill_cpu(pnode_t node)
 	pnode_t cmpnode;
 	char namebuf[OBP_MAXPROPNAME], unum[UNUM_NAMLEN];
 	char *namebufp;
+	int proplen;
 
 	if ((portid = get_portid(node, &cmpnode)) == -1) {
 		cmn_err(CE_PANIC, "portid not found");
@@ -491,6 +492,16 @@ fill_cpu(pnode_t node)
 	}
 
 	(void) GETPROP(node, (cmpnode ? "compatible" : "name"), namebuf);
+
+	/* Make sure CPU name is within boundary and NULL terminated */
+	proplen = GETPROPLEN(node, (cmpnode ? "compatible" : "name"));
+	ASSERT(proplen > 0 && proplen <= OBP_MAXPROPNAME);
+
+	if (proplen >= OBP_MAXPROPNAME)
+		proplen = OBP_MAXPROPNAME - 1;
+
+	namebuf[proplen] = '\0';
+
 	namebufp = namebuf;
 	if (strncmp(namebufp, "SUNW,", 5) == 0)
 		namebufp += 5;
