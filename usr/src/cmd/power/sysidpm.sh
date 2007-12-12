@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 # The -c and -u options are used by system configruation.
 USAGE="$0 [-c|-u]"
@@ -303,7 +302,10 @@ if [ $? = 0 ]; then
 		print_estar_guidelines
 		question1 "$MSG1"
 		question2 "$MSG2"
-		echo "`gettext '\n\tThe \"Power Management\" chapter in the \"Solaris Common Desktop\n\tEnvironment: User Guide\" describes more about how to change\n\tand set workstation energy-saving features.'`"
+		# Currently, we do not have documentation for changing and 
+		# setting workstation energy-saving features.  When we do, 
+		# gettext messages should be emitting here. see CR6520924
+		#
 		echo
 	fi
 	exit 0
