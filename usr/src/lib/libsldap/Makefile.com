@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,7 @@ CFLAGS +=	$(CCVERBOSE)
 LOCFLAGS +=	-D_REENTRANT -DSUNW_OPTIONS
 CPPFLAGS +=	-I../common -I$(SRC)/lib/libldap5/include/ldap \
 		-I/usr/include/mps $(LOCFLAGS)
+DYNFLAGS +=	$(BDIRECT)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 

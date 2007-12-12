@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,7 @@ LDLIBS		+= -lsldap -lnsl -lc
 CPPFLAGS	+= -DENABLE_SUNOS_AGING -D_REENTRANT \
 		   -I$(SRC)/lib/libsldap/common -I$(SRC)/lib/libnsl/include
 CFLAGS		+= $(CCVERBOSE)
+DYNFLAGS 	+= $(BDIRECT)
 
 #
 # We depend upon a rpcgen file. Specify some additional macros
