@@ -8935,7 +8935,6 @@ rfs4_op_lockt(nfs_argop4 *argop, nfs_resop4 *resop,
 		if ((resp->status =
 		    rfs4_client_sysid(lo->client, &sysid)) != NFS4_OK)
 			goto err;
-		goto out;
 	} else {
 		pid = 0;
 		sysid = lockt_sysid;
