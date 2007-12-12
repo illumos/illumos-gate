@@ -46,6 +46,25 @@
  * corresponding to the fileset's filesetentry tree.
  */
 
+/* parallel allocation control */
+#define	MAX_PARALLOC_THREADS 32
+static pthread_mutex_t	paralloc_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t	paralloc_cv = PTHREAD_COND_INITIALIZER;
+static int		paralloc_count;
+
+/*
+ * returns pointer to file or fileset
+ * string, as appropriate
+ */
+static char *
+fileset_entity_name(fileset_t *fileset)
+{
+	if (fileset->fs_attrs & FILESET_IS_FILE)
+		return ("file");
+	else
+		return ("fileset");
+}
+
 /*
  * Removes the last file or directory name from a pathname.
  * Basically removes characters from the end of the path by
@@ -74,15 +93,19 @@ trunc_dirname(char *dir)
 void
 fileset_usage(void)
 {
-	(void) fprintf(stderr, "define fileset name=<name>,path=<pathname>,"
-	    "entries=<number>\n");
-	(void) fprintf(stderr, "		        [,dirwidth=[width]\n");
-	(void) fprintf(stderr, "		        [,dirgamma=[100-10000] "
+	(void) fprintf(stderr,
+	    "define [file name=<name> | fileset name=<name>],path=<pathname>,"
+	    ",entries=<number>\n");
+	(void) fprintf(stderr,
+	    "		        [,dirwidth=[width]]\n");
+	(void) fprintf(stderr,
+	    "		        [,dirgamma=[100-10000]] "
 	    "(Gamma * 1000)\n");
 	(void) fprintf(stderr,
-	    "		        [,sizegamma=[100-10000] (Gamma * 1000)\n");
+	    "		        [,sizegamma=[100-10000]] (Gamma * 1000)\n");
 	(void) fprintf(stderr,
 	    "		        [,prealloc=[percent]]\n");
+	(void) fprintf(stderr, "		        [,paralloc]\n");
 	(void) fprintf(stderr, "		        [,reuse]\n");
 	(void) fprintf(stderr, "\n");
 }
@@ -196,6 +219,167 @@ null_str:
 	    "Failed to create directory path %s: Out of memory", path);
 
 	return (-1);
+}
+
+/*
+ * creates the subdirectory tree for a fileset.
+ */
+static int
+fileset_create_subdirs(fileset_t *fileset, char *filesetpath)
+{
+	filesetentry_t *direntry;
+	char full_path[MAXPATHLEN];
+	char *part_path;
+
+	/* walk the subdirectory list, enstanciating subdirs */
+	direntry = fileset->fs_dirlist;
+	while (direntry) {
+		(void) strcpy(full_path, filesetpath);
+		part_path = fileset_resolvepath(direntry);
+		(void) strcat(full_path, part_path);
+		free(part_path);
+
+		/* now create this portion of the subdirectory tree */
+		if (fileset_mkdir(full_path, 0755) == -1)
+			return (-1);
+
+		direntry = direntry->fse_dirnext;
+	}
+	return (0);
+}
+
+/*
+ * given a fileset entry, determines if the associated file
+ * needs to be allocated or not, and if so does the allocation.
+ */
+static int
+fileset_alloc_file(filesetentry_t *entry)
+{
+	char path[MAXPATHLEN];
+	char *buf;
+	struct stat64 sb;
+	char *pathtmp;
+	off64_t seek;
+	int fd;
+
+	*path = 0;
+	(void) strcpy(path, *entry->fse_fileset->fs_path);
+	(void) strcat(path, "/");
+	(void) strcat(path, entry->fse_fileset->fs_name);
+	pathtmp = fileset_resolvepath(entry);
+	(void) strcat(path, pathtmp);
+
+	filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
+
+	/* see if reusing and this file exists */
+	if ((entry->fse_flags & FSE_REUSING) && (stat64(path, &sb) == 0)) {
+		if ((fd = open64(path, O_RDWR)) < 0) {
+			filebench_log(LOG_INFO,
+			    "Attempted but failed to Re-use file %s",
+			    path);
+			return (-1);
+		}
+
+		if (sb.st_size == (off64_t)entry->fse_size) {
+			filebench_log(LOG_INFO,
+			    "Re-using file %s", path);
+
+			if (!integer_isset(entry->fse_fileset->fs_cached))
+				(void) fileset_freemem(fd,
+				    entry->fse_size);
+
+			entry->fse_flags |= FSE_EXISTS;
+			(void) close(fd);
+			return (0);
+
+		} else if (sb.st_size > (off64_t)entry->fse_size) {
+			/* reuse, but too large */
+			filebench_log(LOG_INFO,
+			    "Truncating & re-using file %s", path);
+
+			(void) ftruncate64(fd,
+			    (off64_t)entry->fse_size);
+
+			if (!integer_isset(entry->fse_fileset->fs_cached))
+				(void) fileset_freemem(fd,
+				    entry->fse_size);
+
+			entry->fse_flags |= FSE_EXISTS;
+			(void) close(fd);
+			return (0);
+		}
+	} else {
+
+		/* No file or not reusing, so create */
+		if ((fd = open64(path, O_RDWR | O_CREAT, 0644)) < 0) {
+			filebench_log(LOG_ERROR,
+			    "Failed to pre-allocate file %s: %s",
+			    path, strerror(errno));
+
+			return (-1);
+		}
+	}
+
+	if ((buf = (char *)malloc(FILE_ALLOC_BLOCK)) == NULL)
+		return (-1);
+
+	entry->fse_flags |= FSE_EXISTS;
+
+	for (seek = 0; seek < entry->fse_size; ) {
+		off64_t wsize;
+		int ret = 0;
+
+		/*
+		 * Write FILE_ALLOC_BLOCK's worth,
+		 * except on last write
+		 */
+		wsize = MIN(entry->fse_size - seek, FILE_ALLOC_BLOCK);
+
+		ret = write(fd, buf, wsize);
+		if (ret != wsize) {
+			filebench_log(LOG_ERROR,
+			    "Failed to pre-allocate file %s: %s",
+			    path, strerror(errno));
+			(void) close(fd);
+			free(buf);
+			return (-1);
+		}
+		seek += wsize;
+	}
+
+	if (!integer_isset(entry->fse_fileset->fs_cached))
+		(void) fileset_freemem(fd, entry->fse_size);
+
+	(void) close(fd);
+
+	free(buf);
+
+	filebench_log(LOG_DEBUG_IMPL,
+	    "Pre-allocated file %s size %lld", path, entry->fse_size);
+
+	return (0);
+}
+
+/*
+ * given a fileset entry, determines if the associated file
+ * needs to be allocated or not, and if so does the allocation.
+ */
+static void *
+fileset_alloc_thread(filesetentry_t *entry)
+{
+	if (fileset_alloc_file(entry) == -1) {
+		(void) pthread_mutex_lock(&paralloc_lock);
+		paralloc_count = -1;
+	} else {
+		(void) pthread_mutex_lock(&paralloc_lock);
+		paralloc_count--;
+	}
+
+	(void) pthread_cond_signal(&paralloc_cv);
+	(void) pthread_mutex_unlock(&paralloc_lock);
+
+	pthread_exit(NULL);
+	return (NULL);
 }
 
 
@@ -389,20 +573,23 @@ fileset_create(fileset_t *fileset)
 {
 	filesetentry_t *entry;
 	char path[MAXPATHLEN];
-	char *buf;
 	struct stat64 sb;
 	int pickflags = FILESET_PICKUNIQUE | FILESET_PICKRESET;
 	hrtime_t start = gethrtime();
 	int preallocated = 0;
 	int reusing = 0;
 
-	if ((buf = (char *)malloc(FILE_ALLOC_BLOCK)) == NULL)
-		return (-1);
-
 	if (*fileset->fs_path == NULL) {
-		filebench_log(LOG_ERROR, "Fileset path not set");
+		filebench_log(LOG_ERROR, "%s path not set",
+		    fileset_entity_name(fileset));
 		return (-1);
 	}
+
+#ifdef HAVE_RAW_SUPPORT
+	/* treat raw device as special case */
+	if (fileset->fs_attrs & FILESET_IS_RAW_DEV)
+		return (0);
+#endif /* HAVE_RAW_SUPPORT */
 
 	/* XXX Add check to see if there is enough space */
 
@@ -418,162 +605,96 @@ fileset_create(fileset_t *fileset)
 			(void) snprintf(cmd, sizeof (cmd), "rm -rf %s", path);
 			(void) system(cmd);
 			filebench_log(LOG_VERBOSE,
-			    "Removed any existing fileset %s in %d seconds",
-			    fileset->fs_name,
+			    "Removed any existing %s %s in %lld seconds",
+			    fileset_entity_name(fileset), fileset->fs_name,
 			    ((gethrtime() - start) / 1000000000) + 1);
 		} else {
 			/* we are re-using */
 			reusing = 1;
 			filebench_log(LOG_VERBOSE,
-			    "Re-using fileset %s on %s file system.",
+			    "Re-using %s %s on %s file system.",
+			    fileset_entity_name(fileset),
 			    fileset->fs_name, sb.st_fstype);
 		}
 	}
 	(void) mkdir(path, 0755);
 
+	/* make the filesets directory tree */
+	if (fileset_create_subdirs(fileset, path) == -1)
+		return (-1);
+
 	start = gethrtime();
 
-	filebench_log(LOG_VERBOSE, "Creating fileset %s...",
-	    fileset->fs_name);
+	filebench_log(LOG_VERBOSE, "Creating %s %s...",
+	    fileset_entity_name(fileset), fileset->fs_name);
+
+	if (!integer_isset(fileset->fs_prealloc))
+		goto exit;
 
 	while (entry = fileset_pick(fileset, pickflags, 0)) {
-		char dir[MAXPATHLEN];
-		char *pathtmp;
-		off64_t seek;
-		int fd;
 		int randno;
+		pthread_t tid;
 
 		pickflags = FILESET_PICKUNIQUE;
 
 		entry->fse_flags &= ~FSE_EXISTS;
 
-		if (!integer_isset(fileset->fs_prealloc)) {
-			(void) ipc_mutex_unlock(&entry->fse_lock);
-			continue;
-		}
-
-		*path = 0;
-		(void) strcpy(path, *fileset->fs_path);
-		(void) strcat(path, "/");
-		(void) strcat(path, fileset->fs_name);
-		pathtmp = fileset_resolvepath(entry);
-		(void) strcat(path, pathtmp);
-		(void) strcpy(dir, path);
-		free(pathtmp);
-
-		(void) trunc_dirname(dir);
-
-		if (stat64(dir, &sb) != 0) {
-			if (fileset_mkdir(dir, 0775) == -1) {
-				(void) ipc_mutex_unlock(&entry->fse_lock);
-				return (-1);
-			}
-		}
-
 		randno = ((RAND_MAX * (100 - *(fileset->fs_preallocpercent)))
 		    / 100);
 
-		if (rand() < randno) {
-			(void) ipc_mutex_unlock(&entry->fse_lock);
+		/* entry doesn't need to be locked during initialization */
+		(void) ipc_mutex_unlock(&entry->fse_lock);
+
+		if (rand() < randno)
 			continue;
-		}
 
 		preallocated++;
 
-		filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
+		if (reusing)
+			entry->fse_flags |= FSE_REUSING;
+		else
+			entry->fse_flags &= (~FSE_REUSING);
 
-		/* see if reusing and this file exists */
-		if (reusing && (stat64(path, &sb) == 0)) {
-			if ((fd = open64(path, O_RDWR)) < 0) {
-				filebench_log(LOG_INFO,
-				    "Attempted but failed to Re-use file %s",
-				    path);
-				(void) ipc_mutex_unlock(&entry->fse_lock);
+		if (integer_isset(fileset->fs_paralloc)) {
+
+			/* fire off a separate allocation thread */
+			(void) pthread_mutex_lock(&paralloc_lock);
+			while (paralloc_count >= MAX_PARALLOC_THREADS) {
+				(void) pthread_cond_wait(
+				    &paralloc_cv, &paralloc_lock);
+			}
+
+			if (paralloc_count < 0) {
+				(void) pthread_mutex_unlock(&paralloc_lock);
 				return (-1);
 			}
 
-			if (sb.st_size == (off64_t)entry->fse_size) {
-				filebench_log(LOG_INFO,
-				    "Re-using file %s", path);
+			paralloc_count++;
+			(void) pthread_mutex_unlock(&paralloc_lock);
 
-				if (!integer_isset(fileset->fs_cached))
-					(void) fileset_freemem(fd,
-					    entry->fse_size);
-
-				entry->fse_flags |= FSE_EXISTS;
-				(void) close(fd);
-				(void) ipc_mutex_unlock(&entry->fse_lock);
-				continue;
-
-			} else if (sb.st_size > (off64_t)entry->fse_size) {
-				/* reuse, but too large */
-				filebench_log(LOG_INFO,
-				    "Truncating & re-using file %s", path);
-
-				(void) ftruncate64(fd,
-				    (off64_t)entry->fse_size);
-
-				if (!integer_isset(fileset->fs_cached))
-					(void) fileset_freemem(fd,
-					    entry->fse_size);
-
-				entry->fse_flags |= FSE_EXISTS;
-				(void) close(fd);
-				(void) ipc_mutex_unlock(&entry->fse_lock);
-				continue;
+			if (pthread_create(&tid, NULL,
+			    (void *(*)(void*))fileset_alloc_thread,
+			    entry) != 0) {
+				filebench_log(LOG_ERROR,
+				    "File prealloc thread create failed");
+				filebench_shutdown(1);
 			}
+
 		} else {
-
-			/* No file or not reusing, so create */
-			if ((fd = open64(path, O_RDWR | O_CREAT, 0644)) < 0) {
-				filebench_log(LOG_ERROR,
-				    "Failed to pre-allocate file %s: %s",
-				    path, strerror(errno));
-
+			if (fileset_alloc_file(entry) == -1)
 				return (-1);
-			}
 		}
-
-		entry->fse_flags |= FSE_EXISTS;
-
-		for (seek = 0; seek < entry->fse_size; ) {
-			off64_t wsize;
-			int ret = 0;
-
-			/*
-			 * Write FILE_ALLOC_BLOCK's worth,
-			 * except on last write
-			 */
-			wsize = MIN(entry->fse_size - seek, FILE_ALLOC_BLOCK);
-
-			ret = write(fd, buf, wsize);
-			if (ret != wsize) {
-				filebench_log(LOG_ERROR,
-				    "Failed to pre-allocate file %s: %s",
-				    path, strerror(errno));
-				(void) close(fd);
-				return (-1);
-			}
-			seek += wsize;
-		}
-
-		if (!integer_isset(fileset->fs_cached))
-			(void) fileset_freemem(fd, entry->fse_size);
-
-		(void) close(fd);
-		(void) ipc_mutex_unlock(&entry->fse_lock);
-
-		filebench_log(LOG_DEBUG_IMPL,
-		    "Pre-allocated file %s size %lld", path, entry->fse_size);
 	}
+
+exit:
 	filebench_log(LOG_VERBOSE,
-	    "Preallocated %d of %lld of fileset %s in %d seconds",
+	    "Preallocated %d of %lld of %s %s in %lld seconds",
 	    preallocated,
 	    *(fileset->fs_entries),
+	    fileset_entity_name(fileset),
 	    fileset->fs_name,
 	    ((gethrtime() - start) / 1000000000) + 1);
 
-	free(buf);
 	return (0);
 }
 
@@ -782,6 +903,12 @@ fileset_populate(fileset_t *fileset)
 	if (fileset->fs_bytes > 0)
 		goto exists;
 
+#ifdef HAVE_RAW_SUPPORT
+	/* check for raw device */
+	if (fileset->fs_attrs & FILESET_IS_RAW_DEV)
+		return (0);
+#endif /* HAVE_RAW_SUPPORT */
+
 	/*
 	 * Input params are:
 	 *	# of files
@@ -800,14 +927,19 @@ fileset_populate(fileset_t *fileset)
 
 
 exists:
-	filebench_log(LOG_VERBOSE, "Fileset %s: %lld files, "
-	    "avg dir = %.1lf, avg depth = %.1lf, mbytes=%lld",
-	    fileset->fs_name,
-	    *(fileset->fs_entries),
-	    fileset->fs_meanwidth,
-	    fileset->fs_meandepth,
-	    fileset->fs_bytes / 1024UL / 1024UL);
-
+	if (fileset->fs_attrs & FILESET_IS_FILE) {
+		filebench_log(LOG_VERBOSE, "File %s: mbytes=%lld",
+		    fileset->fs_name,
+		    fileset->fs_bytes / 1024UL / 1024UL);
+	} else {
+		filebench_log(LOG_VERBOSE, "Fileset %s: %lld files, "
+		    "avg dir = %.1lf, avg depth = %.1lf, mbytes=%lld",
+		    fileset->fs_name,
+		    *(fileset->fs_entries),
+		    fileset->fs_meanwidth,
+		    fileset->fs_meandepth,
+		    fileset->fs_bytes / 1024UL / 1024UL);
+	}
 	return (0);
 }
 
@@ -873,20 +1005,48 @@ fileset_createset(fileset_t *fileset)
 	fileset_t *list;
 	int ret = 0;
 
+	/* set up for possible parallel allocate */
+	paralloc_count = 0;
+
 	if (fileset && integer_isset(fileset->fs_prealloc)) {
+
+		filebench_log(LOG_INFO,
+		    "creating/pre-allocating %s %s",
+		    fileset_entity_name(fileset), fileset->fs_name);
+
 		if ((ret = fileset_populate(fileset)) != 0)
 			return (ret);
-		return (fileset_create(fileset));
+
+		if ((ret = fileset_create(fileset)) != 0)
+			return (ret);
+	} else {
+
+		filebench_log(LOG_INFO,
+		    "Creating/pre-allocating files and filesets");
+
+		list = filebench_shm->filesetlist;
+		while (list) {
+			if ((ret = fileset_populate(list)) != 0)
+				return (ret);
+			if ((ret = fileset_create(list)) != 0)
+				return (ret);
+			list = list->fs_next;
+		}
 	}
 
-	list = filebench_shm->filesetlist;
-	while (list) {
-		ret += fileset_populate(list);
-		ret += fileset_create(list);
-		list = list->fs_next;
-	}
+	/* wait for allocation threads to finish */
+	filebench_log(LOG_INFO,
+	    "waiting for fileset pre-allocation to finish");
 
-	return (ret);
+	(void) pthread_mutex_lock(&paralloc_lock);
+	while (paralloc_count > 0)
+		(void) pthread_cond_wait(&paralloc_cv, &paralloc_lock);
+	(void) pthread_mutex_unlock(&paralloc_lock);
+
+	if (paralloc_count < 0)
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -910,4 +1070,104 @@ fileset_find(char *name)
 	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
 
 	return (NULL);
+}
+
+/*
+ * Iterates over all the file sets in the filesetlist,
+ * executing the supplied command "*cmd()" on them. Also
+ * indicates to the executed command if it is the first
+ * time the command has been executed since the current
+ * call to fileset_iter.
+ */
+void
+fileset_iter(int (*cmd)(fileset_t *fileset, int first))
+{
+	fileset_t *fileset = filebench_shm->filesetlist;
+	int count = 0;
+
+	(void) ipc_mutex_lock(&filebench_shm->fileset_lock);
+
+	while (fileset) {
+		cmd(fileset, count == 0);
+		fileset = fileset->fs_next;
+		count++;
+	}
+
+	(void) ipc_mutex_unlock(&filebench_shm->fileset_lock);
+}
+
+/*
+ * Prints information to the filebench log about the file
+ * object. Also prints a header on the first call.
+ */
+int
+fileset_print(fileset_t *fileset, int first)
+{
+	int pathlength = strlen(*fileset->fs_path) + strlen(fileset->fs_name);
+	/* 30 spaces */
+	char pad[] = "                              ";
+
+	if (pathlength > 29)
+		pathlength = 29;
+
+	if (first) {
+		filebench_log(LOG_INFO, "File or Fileset name%20s%12s%10s",
+		    "file size",
+		    "dir width",
+		    "entries");
+	}
+
+	if (fileset->fs_attrs & FILESET_IS_FILE) {
+		if (fileset->fs_attrs & FILESET_IS_RAW_DEV) {
+			filebench_log(LOG_INFO,
+			    "%s/%s%s         (Raw Device)",
+			    *fileset->fs_path,
+			    fileset->fs_name,
+			    &pad[pathlength]);
+		} else {
+			filebench_log(LOG_INFO,
+			    "%s/%s%s%9lld     (Single File)",
+			    *fileset->fs_path,
+			    fileset->fs_name,
+			    &pad[pathlength],
+			    *fileset->fs_size);
+		}
+	} else {
+		filebench_log(LOG_INFO, "%s/%s%s%9lld%12lld%10lld",
+		    *fileset->fs_path,
+		    fileset->fs_name,
+		    &pad[pathlength],
+		    *fileset->fs_size,
+		    *fileset->fs_dirwidth,
+		    *fileset->fs_entries);
+	}
+	return (0);
+}
+/*
+ * checks to see if the path/name pair points to a raw device. If
+ * so it sets the raw device flag (FILESET_IS_RAW_DEV) and returns 1.
+ * If RAW is not defined, or it is not a raw device, it clears the
+ * raw device flag and returns 0.
+ */
+int
+fileset_checkraw(fileset_t *fileset)
+{
+	char path[MAXPATHLEN];
+	struct stat64 sb;
+
+	fileset->fs_attrs &= (~FILESET_IS_RAW_DEV);
+
+#ifdef HAVE_RAW_SUPPORT
+	/* check for raw device */
+	(void) strcpy(path, *fileset->fs_path);
+	(void) strcat(path, "/");
+	(void) strcat(path, fileset->fs_name);
+	if ((stat64(path, &sb) == 0) &&
+	    ((sb.st_mode & S_IFMT) == S_IFBLK) && sb.st_rdev) {
+		fileset->fs_attrs |= FILESET_IS_RAW_DEV;
+		return (1);
+	}
+#endif /* HAVE_RAW_SUPPORT */
+
+	return (0);
 }

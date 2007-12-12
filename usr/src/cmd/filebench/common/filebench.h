@@ -102,7 +102,7 @@ int filebench_randomno64(uint64_t *, uint64_t, uint64_t);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.0.1"
+#define	FILEBENCH_VERSION	"1.1.0"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

@@ -74,7 +74,9 @@ var_t *var_list = NULL;
 pidlist_t *pidlist = NULL;
 char *cwd = NULL;
 FILE *parentscript = NULL;
-	
+
+static int filecreate_done = 0;
+
 /* yacc externals */
 extern FILE *yyin;
 extern int yydebug;
@@ -92,7 +94,6 @@ static var_t *get_var(cmd_t *cmd, int64_t name);
 static list_t *alloc_list();
 
 /* Info Commands */
-static void parser_show(cmd_t *);
 static void parser_list(cmd_t *);
 
 /* Define Commands */
@@ -106,7 +107,6 @@ static void parser_fileset_define(cmd_t *);
 static void parser_proc_create(cmd_t *);
 static void parser_thread_create(cmd_t *);
 static void parser_flowop_create(cmd_t *);
-static void parser_file_create(cmd_t *);
 static void parser_fileset_create(cmd_t *);
 
 /* Shutdown Commands */
@@ -826,10 +826,8 @@ create_command: FSC_CREATE entity
 	case FSE_PROC:
 		$$->cmd = &parser_proc_create;
 		break;
-	case FSE_FILE:
-		$$->cmd = &parser_file_create;
-		break;
 	case FSE_FILESET:
+	case FSE_FILE:
 		$$->cmd = &parser_fileset_create;
 		break;
 	default:
@@ -1427,12 +1425,13 @@ parser_foreach_string(cmd_t *cmd)
 }
 
 /*
- * Lists the file name, path name and file size for all defined file objects.
+ * Lists the fileset name, path name and average size for all defined
+ * filesets.
  */
 static void
 parser_list(cmd_t *cmd)
 {
-	(void) fileobj_iter(fileobj_print);
+	(void) fileset_iter(fileset_print);
 }
 
 /*
@@ -1590,7 +1589,6 @@ static void
 parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
 {
 	flowop_t *flowop, *flowop_type;
-	fileobj_t *fileobj;
 	char *type = (char *)cmd->cmd_name;
 	char *name;
 	attr_t *attr;
@@ -1624,11 +1622,9 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
 
 	/* Get the filename from attribute */
 	if (attr = get_attr(cmd, FSA_FILE)) {
-		flowop->fo_file = fileobj_find(*attr->attr_string);
 		flowop->fo_fileset = fileset_find(*attr->attr_string);
 
-		if ((flowop->fo_file == NULL) &&
-		    (flowop->fo_fileset == NULL)) {
+		if ((flowop->fo_fileset == NULL)) {
 			filebench_log(LOG_ERROR,
 			    "define flowop: file %s not found",
 			    *attr->attr_string);
@@ -1711,94 +1707,13 @@ parser_flowop_define(cmd_t *cmd, threadflow_t *thread)
 }
 
 /*
- * Calls fileobj_define() to allocate a fileobj with the supplied name
- * and initializes the fileobj's pathname attribute, fo_path and fo_create,
- * and optionally the fo_prealloc, fo_paralloc, fo_reuse, fo_cached,
- * and fo_size attributes.
- */
-static void
-parser_file_define(cmd_t *cmd)
-{
-	fileobj_t *fileobj;
-	char *name;
-	attr_t *attr;
-	var_string_t pathname;
-
-	/* Get the name of the file */
-	if (attr = get_attr(cmd, FSA_NAME)) {
-		name = *attr->attr_string;
-	} else {
-		filebench_log(LOG_ERROR,
-		    "define file: file specifies no name");
-		return;
-	}
-
-	if ((fileobj = fileobj_define(name)) == NULL) {
-		filebench_log(LOG_ERROR,
-		    "define file: failed to instantiate file %s\n",
-		    cmd->cmd_name);
-		return;
-	}
-
-	/* Get the pathname from attribute */
-	if ((attr = get_attr(cmd, FSA_PATH)) == NULL) {
-		filebench_log(LOG_ERROR,
-		    "define file: no pathname specified");
-		return;
-	}
-
-	/* Expand variables in pathname */
-	if ((pathname = parser_list2varstring(attr->attr_param_list))
-	    == NULL) {
-		filebench_log(LOG_ERROR, "Cannot interpret path");
-		return;
-	}
-
-	fileobj->fo_path = pathname;
-
-	/* For now, all files are pre-created */
-	fileobj->fo_create = integer_alloc(1);
-
-	/* Should we preallocate? */
-	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
-		fileobj->fo_prealloc = attr->attr_integer;
-	} else
-		fileobj->fo_prealloc = integer_alloc(0);
-
-	/* Should we prealloc in parallel? */
-	if (attr = get_attr_bool(cmd, FSA_PARALLOC)) {
-		fileobj->fo_paralloc = attr->attr_integer;
-	} else
-		fileobj->fo_paralloc = integer_alloc(0);
-
-	/* Should we reuse the existing file? */
-	if (attr = get_attr_bool(cmd, FSA_REUSE)) {
-		fileobj->fo_reuse = attr->attr_integer;
-	} else
-		fileobj->fo_reuse = integer_alloc(0);
-
-	/* Should we leave in cache? */
-	if (attr = get_attr_bool(cmd, FSA_CACHED)) {
-		fileobj->fo_cached = attr->attr_integer;
-	} else
-		fileobj->fo_cached = integer_alloc(0);
-
-	/* Get the size of the file */
-	if (attr = get_attr_integer(cmd, FSA_SIZE)) {
-		fileobj->fo_size = attr->attr_integer;
-	} else
-		fileobj->fo_size = integer_alloc(0);
-
-}
-
-/*
  * Calls fileset_define() to allocate a fileset with the supplied name and
  * initializes the fileset's pathname attribute, and optionally the fs_cached,
- * fs_reuse, fs_preallocpercent, fs_prealloc, fs_entries, fs_dirwidth,
- * fs_size, fs_dirgamma, and fs_sizegamma attributes.
+ * fs_reuse, fs_prealloc and fs_size attributes.
+ *
  */
-static void
-parser_fileset_define(cmd_t *cmd)
+static fileset_t *
+parser_fileset_define_common(cmd_t *cmd)
 {
 	fileset_t *fileset;
 	char *name;
@@ -1810,36 +1725,37 @@ parser_fileset_define(cmd_t *cmd)
 		name = *attr->attr_string;
 	} else {
 		filebench_log(LOG_ERROR,
-		    "define file: file specifies no name");
-		return;
+		    "define fileset: file or fileset specifies no name");
+		return (NULL);
 	}
 
 	if ((fileset = fileset_define(name)) == NULL) {
 		filebench_log(LOG_ERROR,
 		    "define file: failed to instantiate file %s\n",
-		    cmd->cmd_name);
-		return;
+		    name);
+		return (NULL);
 	}
 
 	/* Get the pathname from attribute */
 	if ((attr = get_attr(cmd, FSA_PATH)) == NULL) {
 		filebench_log(LOG_ERROR, "define file: no pathname specified");
-		return;
+		return (NULL);
 	}
 
 	/* Expand variables in pathname */
-	if ((pathname = parser_list2varstring(attr->attr_param_list)) == NULL) {
+	if ((pathname = parser_list2varstring(attr->attr_param_list))
+	    == NULL) {
 		filebench_log(LOG_ERROR, "Cannot interpret path");
-		return;
+		return (NULL);
 	}
 
 	fileset->fs_path = pathname;
 
-	/* Should we leave in cache? */
-	if (attr = get_attr_bool(cmd, FSA_CACHED)) {
-		fileset->fs_cached = attr->attr_integer;
+	/* Should we prealloc in parallel? */
+	if (attr = get_attr_bool(cmd, FSA_PARALLOC)) {
+		fileset->fs_paralloc = attr->attr_integer;
 	} else
-		fileset->fs_cached = integer_alloc(0);
+		fileset->fs_paralloc = integer_alloc(0);
 
 	/* Should we reuse the existing file? */
 	if (attr = get_attr_bool(cmd, FSA_REUSE)) {
@@ -1847,7 +1763,101 @@ parser_fileset_define(cmd_t *cmd)
 	} else
 		fileset->fs_reuse = integer_alloc(0);
 
-	/* How much should we prealloc */
+	/* Should we leave in cache? */
+	if (attr = get_attr_bool(cmd, FSA_CACHED)) {
+		fileset->fs_cached = attr->attr_integer;
+	} else
+		fileset->fs_cached = integer_alloc(0);
+
+	/* Get the mean or absolute size of the file */
+	if (attr = get_attr_integer(cmd, FSA_SIZE)) {
+		fileset->fs_size = attr->attr_integer;
+	} else
+		fileset->fs_size = integer_alloc(0);
+
+	return (fileset);
+}
+
+/*
+ * Calls parser_fileset_define_common() to allocate a fileset with
+ * one entry and optionally the fs_prealloc. Sets the fs_preallocpercent,
+ * fs_entries, fs_dirwidth, fs_dirgamma, and fs_sizegamma attributes
+ * to appropriate values for emulating the old "fileobj" entity
+ */
+static void
+parser_file_define(cmd_t *cmd)
+{
+	fileset_t *fileset;
+	attr_t *attr;
+
+	if ((fileset = parser_fileset_define_common(cmd)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "define file: failed to instantiate file");
+		filebench_shutdown(1);
+		return;
+	}
+
+	/* fileset is emulating a single file */
+	fileset->fs_attrs = FILESET_IS_FILE;
+
+	/* Set the size of the fileset to 1 */
+	fileset->fs_entries = integer_alloc(1);
+
+	/* Set the mean dir width to more than 1 */
+	fileset->fs_dirwidth = integer_alloc(10);
+
+	/* Set the dir and size gammas to 0 */
+	fileset->fs_dirgamma = integer_alloc(0);
+	fileset->fs_sizegamma = integer_alloc(0);
+
+	/* if a raw device, all done */
+	if (fileset_checkraw(fileset)) {
+		filebench_log(LOG_VERBOSE, "File %s/%s is RAW device",
+		    *fileset->fs_path, fileset->fs_name);
+		return;
+	}
+
+	/* Does file need to be preallocated? */
+	if (attr = get_attr_bool(cmd, FSA_PREALLOC)) {
+		/* yes */
+		fileset->fs_prealloc = attr->attr_integer;
+		fileset->fs_preallocpercent = integer_alloc(100);
+	} else {
+		/* no */
+		fileset->fs_prealloc = integer_alloc(0);
+		fileset->fs_preallocpercent = integer_alloc(0);
+	}
+}
+
+/*
+ * Calls parser_fileset_define_common() to allocate a fileset with the
+ * supplied name and initializes the fileset's fs_preallocpercent,
+ * fs_prealloc, fs_entries, fs_dirwidth, fs_dirgamma, and fs_sizegamma
+ * attributes.
+ */
+static void
+parser_fileset_define(cmd_t *cmd)
+{
+	fileset_t *fileset;
+	attr_t *attr;
+
+	if ((fileset = parser_fileset_define_common(cmd)) == NULL) {
+		filebench_log(LOG_ERROR,
+		    "define fileset: failed to instantiate fileset");
+		filebench_shutdown(1);
+		return;
+	}
+
+	/* if a raw device, Error */
+	if (fileset_checkraw(fileset)) {
+		filebench_log(LOG_ERROR,
+		    "Fileset %s/%s: Cannot create a fileset on a RAW device",
+		    *fileset->fs_path, fileset->fs_name);
+		filebench_shutdown(0);
+		return;
+	}
+
+	/* How much should we preallocate? */
 	if ((attr = get_attr_integer(cmd, FSA_PREALLOC)) &&
 	    attr->attr_integer) {
 		fileset->fs_preallocpercent = attr->attr_integer;
@@ -1863,7 +1873,7 @@ parser_fileset_define(cmd_t *cmd)
 	} else
 		fileset->fs_prealloc = integer_alloc(0);
 
-	/* Get the size of the fileset */
+	/* Get the number of files in the fileset */
 	if (attr = get_attr_integer(cmd, FSA_ENTRIES)) {
 		fileset->fs_entries = attr->attr_integer;
 	} else {
@@ -1878,12 +1888,6 @@ parser_fileset_define(cmd_t *cmd)
 		filebench_log(LOG_ERROR, "Fileset has zero directory width");
 		fileset->fs_dirwidth = integer_alloc(0);
 	}
-
-	/* Get the mean or absolute size of the file */
-	if (attr = get_attr_integer(cmd, FSA_SIZE)) {
-		fileset->fs_size = attr->attr_integer;
-	} else
-		fileset->fs_size = integer_alloc(0);
 
 	/* Get the gamma value for dir width distributions */
 	if (attr = get_attr_integer(cmd, FSA_DIRGAMMA)) {
@@ -1939,37 +1943,25 @@ parser_proc_create(cmd_t *cmd)
 }
 
 /*
- * Calls fileobj_init() to create  and optionally pre fill files
- * for all fileobjs on the master list of fileobjs (filelist).
- * If errors are encountered, calls filebench_shutdown()
- * to exit filebench.
- */
-static void
-parser_file_create(cmd_t *cmd)
-{
-	fileobj_t *fileobj;
-
-	if (fileobj_init() != 0) {
-		filebench_log(LOG_ERROR, "Failed to create files");
-		filebench_shutdown(1);
-	}
-}
-
-/*
- * Calls fileset_createset() to populate all filesets and create all
- * associated, initially existant,  files and subdirectories.
+ * Calls fileset_createset() to populate all files and filesets and
+ * create all associated, initially existant,  files and subdirectories.
  * If errors are encountered, calls filebench_shutdown()
  * to exit filebench.
  */
 static void
 parser_fileset_create(cmd_t *cmd)
 {
-	fileset_t *fileset;
-
-	if (fileset_createset(NULL) != 0) {
-		filebench_log(LOG_ERROR, "Failed to create filesets");
-		filebench_shutdown(1);
+	if (!filecreate_done) {
+		filecreate_done = 1;
+		if (fileset_createset(NULL) != 0) {
+			filebench_log(LOG_ERROR, "Failed to create filesets");
+			filebench_shutdown(1);
+		}
+	} else {
+		filebench_log(LOG_INFO,
+		    "Attempting to create fileset more than once, ignoring");
 	}
+
 }
 
 /*
@@ -1981,6 +1973,7 @@ static void
 parser_proc_shutdown(cmd_t *cmd)
 {
 	filebench_log(LOG_INFO, "Shutting down processes");
+	filecreate_done = 0;
 	procflow_shutdown();
 	if (filebench_shm->shm_required)
 		ipc_ismdelete();
@@ -2037,7 +2030,6 @@ parser_run(cmd_t *cmd)
 
 	runtime = cmd->cmd_qty;
 	parser_fileset_create(cmd);
-	parser_file_create(cmd);
 	parser_proc_create(cmd);
 
 	/* check for startup errors */
@@ -2766,7 +2758,6 @@ usage(int help)
 
 		(void) fprintf(stderr,
 		    "\n'f' language definition:\n\n");
-		fileobj_usage();
 		fileset_usage();
 		procflow_usage();
 		threadflow_usage();

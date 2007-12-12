@@ -303,8 +303,8 @@ ipc_init(void)
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	if ((filebench_shm = (filebench_shm_t *)mmap((caddr_t)0,
-	    sizeof (filebench_shm_t), PROT_READ | PROT_WRITE, MAP_SHARED,
-	    shmfd, 0)) == NULL) {
+	    sizeof (filebench_shm_t), PROT_READ | PROT_WRITE,
+	    MAP_SHARED, shmfd, 0)) == NULL) {
 		filebench_log(LOG_FATAL, "Cannot mmap shm");
 		exit(1);
 	}
@@ -328,8 +328,6 @@ ipc_init(void)
 	filebench_shm->path_ptr = &filebench_shm->filesetpaths[0];
 
 	/* Setup mutexes for object lists */
-	(void) pthread_mutex_init(&filebench_shm->fileobj_lock,
-	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->fileset_lock,
 	    ipc_mutexattr());
 	(void) pthread_mutex_init(&filebench_shm->procflow_lock,
@@ -411,7 +409,6 @@ ipc_attach(caddr_t shmaddr)
 }
 
 static int filebench_sizes[] = {
-	FILEBENCH_NFILEOBJS,
 	FILEBENCH_NPROCFLOWS,
 	FILEBENCH_NTHREADFLOWS,
 	FILEBENCH_NFLOWOPS,
@@ -452,12 +449,6 @@ ipc_malloc(int type)
 	filebench_shm->bitmap[type][i] = 1;
 
 	switch (type) {
-	case FILEBENCH_FILEOBJ:
-		(void) memset((char *)&filebench_shm->fileobj[i], 0,
-		    sizeof (fileobj_t));
-		(void) ipc_mutex_unlock(&filebench_shm->malloc_lock);
-		return ((char *)&filebench_shm->fileobj[i]);
-
 	case FILEBENCH_FILESET:
 		(void) memset((char *)&filebench_shm->fileset[i], 0,
 		    sizeof (fileset_t));
@@ -530,10 +521,6 @@ ipc_free(int type, char *addr)
 	}
 
 	switch (type) {
-	case FILEBENCH_FILEOBJ:
-		base = (caddr_t)&filebench_shm->fileobj[0];
-		size = sizeof (fileobj_t);
-		break;
 
 	case FILEBENCH_FILESET:
 		base = (caddr_t)&filebench_shm->fileset[0];

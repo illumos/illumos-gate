@@ -53,7 +53,7 @@ define process name=lgwr,instances=1
   thread name=lgwr,memsize=$memperthread,useism
   {
     flowop aiowrite name=lg-write,filesetname=logfile,
-        iosize=256k,random,directio=$directio
+        iosize=256k,random,directio=$directio,dsync
     flowop aiowait name=lg-aiowait
     flowop semblock name=lg-block,value=3200,highwater=1000
   }
@@ -86,7 +86,7 @@ define process name=shadow,instances=$nshadows
   }
 }
 
-echo "OLTP Version 2.0 personality successfully loaded"
+echo "OLTP Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage " "
 usage "       set \$filesize=<size>   defaults to $filesize, n.b. there are ten files of this size"

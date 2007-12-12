@@ -30,6 +30,7 @@ set $meandirwidth=1000000
 set $filesize=16k
 set $nthreads=16
 set $meaniosize=16k
+set $readiosize=1m
 
 define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80
 
@@ -43,22 +44,23 @@ define process name=filereader,instances=1
     flowop fsync name=fsyncfile2,fd=1
     flowop closefile name=closefile2,fd=1
     flowop openfile name=openfile3,filesetname=bigfileset,fd=1
-    flowop readwholefile name=readfile3,fd=1
+    flowop readwholefile name=readfile3,fd=1,iosize=$readiosize
     flowop appendfilerand name=appendfilerand3,iosize=$meaniosize,fd=1
     flowop fsync name=fsyncfile3,fd=1
     flowop closefile name=closefile3,fd=1
     flowop openfile name=openfile4,filesetname=bigfileset,fd=1
-    flowop readwholefile name=readfile4,fd=1
+    flowop readwholefile name=readfile4,fd=1,iosize=$readiosize
     flowop closefile name=closefile4,fd=1
   }
 }
 
-echo  "Varmail Version 2.0 personality successfully loaded"
+echo  "Varmail Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
 usage "       set \$nthreads=<value>   defaults to $nthreads"
 usage "       set \$meaniosize=<value> defaults to $meaniosize"
+usage "       set \$readiosize=<size>  defaults to $readiosize"
 usage "       set \$meandirwidth=<size> defaults to $meandirwidth"
 usage "(sets mean dir width and dir depth is calculated as log (width, nfiles)"
 usage " dirdepth therefore defaults to dir depth of 1 as in postmark"

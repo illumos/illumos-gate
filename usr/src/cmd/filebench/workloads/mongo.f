@@ -30,6 +30,7 @@ set $dirwidth=20
 set $filesize=16k
 set $nthreads=1
 set $meaniosize=16k
+set $readiosize=1m
 
 define fileset name=postset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
 define fileset name=postsetdel,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
@@ -42,17 +43,18 @@ define process name=filereader,instances=1
     flowop appendfilerand name=appendfilerand1,iosize=$meaniosize,fd=1
     flowop closefile name=closefile1,fd=1
     flowop openfile name=openfile2,filesetname=postset,fd=1
-    flowop readwholefile name=readfile1,fd=1
+    flowop readwholefile name=readfile1,fd=1,iosize=$readiosize
     flowop closefile name=closefile2,fd=1
     flowop deletefile name=deletefile1,filesetname=postsetdel
   }
 }
 
-echo  "Mongo-like Version 2.0 personality successfully loaded"
+echo  "Mongo-like Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
 usage "       set \$dirwidth=<value>   defaults to $dirwidth"
 usage "       set \$nthreads=<value>   defaults to $nthreads"
 usage "       set \$meaniosize=<value> defaults to $meaniosize"
+usage "       set \$readiosize=<size>  defaults to $readiosize"
 usage "       run runtime (e.g. run 60)"

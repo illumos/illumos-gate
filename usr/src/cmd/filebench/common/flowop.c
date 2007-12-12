@@ -121,7 +121,7 @@ static int controlstats_zeroed = 0;
  * and io count statistics.
  */
 void
-flowop_endop(threadflow_t *threadflow, flowop_t *flowop)
+flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes)
 {
 	hrtime_t t;
 
@@ -155,23 +155,23 @@ flowop_endop(threadflow_t *threadflow, flowop_t *flowop)
 #endif
 
 	flowop->fo_stats.fs_count++;
-	flowop->fo_stats.fs_bytes += *flowop->fo_iosize;
+	flowop->fo_stats.fs_bytes += bytes;
 	if ((flowop->fo_type & FLOW_TYPE_IO) ||
 	    (flowop->fo_type & FLOW_TYPE_AIO)) {
 		controlstats.fs_count++;
-		controlstats.fs_bytes += *flowop->fo_iosize;
+		controlstats.fs_bytes += bytes;
 	}
 	if (flowop->fo_attrs & FLOW_ATTR_READ) {
-		threadflow->tf_stats.fs_rbytes += *flowop->fo_iosize;
+		threadflow->tf_stats.fs_rbytes += bytes;
 		threadflow->tf_stats.fs_rcount++;
 		flowop->fo_stats.fs_rcount++;
-		controlstats.fs_rbytes += *flowop->fo_iosize;
+		controlstats.fs_rbytes += bytes;
 		controlstats.fs_rcount++;
 	} else if (flowop->fo_attrs & FLOW_ATTR_WRITE) {
-		threadflow->tf_stats.fs_wbytes += *flowop->fo_iosize;
+		threadflow->tf_stats.fs_wbytes += bytes;
 		threadflow->tf_stats.fs_wcount++;
 		flowop->fo_stats.fs_wcount++;
-		controlstats.fs_wbytes += *flowop->fo_iosize;
+		controlstats.fs_wbytes += bytes;
 		controlstats.fs_wcount++;
 	}
 }

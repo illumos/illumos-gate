@@ -50,7 +50,8 @@
 #include <sys/resource.h>
 #include <pthread.h>
 
-#include "fileobj.h"
+#include "vars.h"
+#define	FILE_ALLOC_BLOCK (off64_t)(1024 * 1024)
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,10 +60,11 @@ extern "C" {
 #define	FSE_MAXTID 16384
 
 #define	FSE_MAXPATHLEN 16
-#define	FSE_DIR		0x1
-#define	FSE_FREE	0x2
-#define	FSE_EXISTS	0x4
-#define	FSE_BUSY	0x8
+#define	FSE_DIR		0x01
+#define	FSE_FREE	0x02
+#define	FSE_EXISTS	0x04
+#define	FSE_BUSY	0x08
+#define	FSE_REUSING	0x10
 
 typedef struct filesetentry {
 	struct filesetentry	*fse_next;
@@ -84,10 +86,13 @@ typedef struct filesetentry {
 #define	FILESET_PICKEXISTS  0x10 /* Pick an existing file */
 #define	FILESET_PICKNOEXIST 0x20 /* Pick a file that doesn't exist */
 
+/* fileset attributes */
+#define	FILESET_IS_RAW_DEV  0x01 /* fileset is a raw device */
+#define	FILESET_IS_FILE	    0x02 /* Fileset is emulating a single file */
+
 typedef struct fileset {
 	struct fileset	*fs_next;	/* Next in list */
 	char		fs_name[128];	/* Name */
-	pthread_t	fs_tid;		/* Thread id, for par alloc */
 	var_string_t	fs_path;	/* Pathname prefix in fs */
 	var_integer_t	fs_entries;	/* Set size */
 	var_integer_t	fs_preallocpercent; /* Prealloc size */
@@ -98,6 +103,7 @@ typedef struct fileset {
 	var_integer_t	fs_sizegamma; /* Filesize Gamma distribution (* 1000) */
 	var_integer_t	fs_create;	/* Attr */
 	var_integer_t	fs_prealloc;	/* Attr */
+	var_integer_t	fs_paralloc;	/* Attr */
 	var_integer_t	fs_cached;	/* Attr */
 	var_integer_t	fs_reuse;	/* Attr */
 	double		fs_meandepth;	/* Computed mean depth */
@@ -121,6 +127,10 @@ fileset_t *fileset_find(char *name);
 filesetentry_t *fileset_pick(fileset_t *fileset, int flags, int tid);
 char *fileset_resolvepath(filesetentry_t *entry);
 void fileset_usage(void);
+void fileset_iter(int (*cmd)(fileset_t *fileset, int first));
+int fileset_print(fileset_t *fileset, int first);
+int fileset_checkraw(fileset_t *fileset);
+
 
 #ifdef	__cplusplus
 }

@@ -33,7 +33,6 @@
 
 #include "procflow.h"
 #include "threadflow.h"
-#include "fileobj.h"
 #include "fileset.h"
 #include "flowop.h"
 #include "filebench.h"
@@ -48,7 +47,6 @@ extern "C" {
 #define	FILEBENCH_MEMSIZE 2048
 #endif /* USE_PROCESS_MODEL */
 
-#define	FILEBENCH_NFILEOBJS FILEBENCH_MEMSIZE
 #define	FILEBENCH_NFILESETS FILEBENCH_MEMSIZE
 #define	FILEBENCH_NFILESETENTRIES (1024 * 1024)
 #define	FILEBENCH_NPROCFLOWS FILEBENCH_MEMSIZE
@@ -59,21 +57,19 @@ extern "C" {
 #define	FILEBENCH_STRINGMEMORY FILEBENCH_NVARS * 128
 #define	FILEBENCH_MAXBITMAP FILEBENCH_NFILESETENTRIES
 
-#define	FILEBENCH_FILEOBJ	0
-#define	FILEBENCH_PROCFLOW	1
-#define	FILEBENCH_THREADFLOW	2
-#define	FILEBENCH_FLOWOP	3
-#define	FILEBENCH_INTEGER	4
-#define	FILEBENCH_STRING	5
-#define	FILEBENCH_VARIABLE	6
-#define	FILEBENCH_FILESET	7
-#define	FILEBENCH_FILESETENTRY	8
-#define	FILEBENCH_TYPES		9
+#define	FILEBENCH_PROCFLOW	0
+#define	FILEBENCH_THREADFLOW	1
+#define	FILEBENCH_FLOWOP	2
+#define	FILEBENCH_INTEGER	3
+#define	FILEBENCH_STRING	4
+#define	FILEBENCH_VARIABLE	5
+#define	FILEBENCH_FILESET	6
+#define	FILEBENCH_FILESETENTRY	7
+#define	FILEBENCH_TYPES		8
 
 #define	FILEBENCH_NSEMS 128
 
 typedef struct filebench_shm {
-	pthread_mutex_t fileobj_lock;
 	pthread_mutex_t fileset_lock;
 	pthread_mutex_t procflow_lock;
 	pthread_mutex_t threadflow_lock;
@@ -86,7 +82,6 @@ typedef struct filebench_shm {
 
 	char		*string_ptr;
 	char		*path_ptr;
-	fileobj_t	*filelist;
 	fileset_t	*filesetlist;
 	flowop_t	*flowoplist;
 	procflow_t	*proclist;
@@ -106,7 +101,7 @@ typedef struct filebench_shm {
 	pthread_mutex_t	eventgen_lock;
 	pthread_cond_t	eventgen_cv;
 	int		eventgen_hz;
-	int		eventgen_q;
+	uint64_t	eventgen_q;
 	char		fscriptname[1024];
 	int		shm_id;
 	size_t		shm_required;
@@ -118,7 +113,6 @@ typedef struct filebench_shm {
 
 	int		marker;
 
-	fileobj_t	fileobj[FILEBENCH_NFILEOBJS];
 	fileset_t	fileset[FILEBENCH_NFILESETS];
 	filesetentry_t	filesetentry[FILEBENCH_NFILESETENTRIES];
 	char		filesetpaths[FILEBENCH_FILESETPATHMEMORY];

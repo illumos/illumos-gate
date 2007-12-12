@@ -29,6 +29,7 @@ set $dir=/tmp
 set $nfiles=1000
 set $dirwidth=20
 set $filesize=16k
+set $iosize=1m
 set $nthreads=1
 
 define fileset name=srcfiles,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$dirwidth,prealloc
@@ -39,18 +40,19 @@ define process name=filereader,instances=1
   thread name=filereaderthread,memsize=10m,instances=$nthreads
   {
     flowop openfile name=openfile1,filesetname=srcfiles,fd=1
-    flowop readwholefile name=readfile1,fd=1
+    flowop readwholefile name=readfile1,fd=1,iosize=$iosize
     flowop createfile name=createfile2,filesetname=destfiles,fd=2
-    flowop writewholefile name=writefile2,filesetname=destfiles,fd=2,srcfd=1
+    flowop writewholefile name=writefile2,filesetname=destfiles,fd=2,srcfd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
     flowop closefile name=closefile2,fd=2
   }
 }
 
-echo  "Bringover Version 2.0 personality successfully loaded"
+echo  "Bringover Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>   defaults to $filesize"
 usage "       set \$nfiles=<value>    defaults to $nfiles"
+usage "       set \$iosize=<size>     defaults to $iosize"
 usage "       set \$dirwidth=<value>  defaults to $dirwidth"
 usage "       set \$nthreads=<value>  defaults to $nthreads"
 usage "       run runtime (e.g. run 60)"

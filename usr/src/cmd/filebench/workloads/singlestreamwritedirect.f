@@ -28,7 +28,7 @@ set $dir=/tmp
 set $nthreads=1
 set $iosize=1m
 
-define file name=largefile1,path=$dir
+define file name=largefile1,path=$dir,prealloc
 
 define process name=seqwrite,instances=1
 {
@@ -39,7 +39,7 @@ define process name=seqwrite,instances=1
   }
 }
 
-echo  "Single Stream Write Version 2.0 personality successfully loaded"
+echo  "Single Stream Write Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
 usage "       set \$nthreads=<value>   defaults to $nthreads"

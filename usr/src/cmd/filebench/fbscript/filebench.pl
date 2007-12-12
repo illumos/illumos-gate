@@ -117,8 +117,6 @@ sub op_load {
            op_load_defaults();
 
            # Create the associated files and filesets
-           print FSCRIPT "create files\n";	
-
            print FSCRIPT "create filesets\n";	
 
     }

@@ -64,7 +64,6 @@ typedef struct flowop {
 	void		(*fo_destruct)(); /* Destructor Method */
 	int		fo_type;	/* Type */
 	int		fo_attrs;	/* Flow op attribute */
-	fileobj_t	*fo_file;	/* File for op */
 	fileset_t	*fo_fileset;	/* Fileset for op */
 	int		fo_fd;		/* File descriptor */
 	int		fo_fdnumber;	/* User specified file descriptor */
@@ -88,6 +87,7 @@ typedef struct flowop {
 	pthread_cond_t	fo_cv;		/* Block/wakeup cv */
 	pthread_mutex_t	fo_lock;	/* Mutex around flowop */
 	char		*fo_buf;	/* Per-flowop buffer */
+	uint64_t	fo_buf_size;	/* current size of buffer */
 #ifdef HAVE_SYSV_SEM
 	int		fo_semid_lw;	/* sem id */
 	int		fo_semid_hw;	/* sem id for highwater block */
@@ -134,7 +134,7 @@ flowop_t *flowop_find_one(char *name, int instance);
 void flowoplib_usage(void);
 void flowoplib_init(void);
 void flowop_delete_all(flowop_t **threadlist);
-void flowop_endop(threadflow_t *threadflow, flowop_t *flowop);
+void flowop_endop(threadflow_t *threadflow, flowop_t *flowop, int64_t bytes);
 void flowop_beginop(threadflow_t *threadflow, flowop_t *flowop);
 
 #ifdef	__cplusplus

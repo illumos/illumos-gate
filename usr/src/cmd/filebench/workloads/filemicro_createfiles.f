@@ -28,6 +28,7 @@ set $dir=/tmp
 set $nfiles=20000
 set $meandirwidth=100000
 set $filesize=1k
+set $iosize=1m
 set $nthreads=1
 set $count=5000
 
@@ -38,15 +39,16 @@ define process name=filecreate,instances=1
   thread name=filecreatethread,memsize=10m,instances=$nthreads
   {
     flowop createfile name=createfile1,filesetname=bigfileset,fd=1
-    flowop writewholefile name=writefile1,filesetname=bigfileset,fd=1
+    flowop writewholefile name=writefile1,filesetname=bigfileset,fd=1,iosize=$iosize
     flowop closefile name=closefile1,fd=1
     flowop finishoncount name=finish,value=$count
   }
 }
 
-echo  "FileMicro-Createfiles Version 2.0 personality successfully loaded"
+echo  "FileMicro-Createfiles Version 2.1 personality successfully loaded"
 usage "Usage: set \$dir=<dir>"
 usage "       set \$filesize=<size>    defaults to $filesize"
+usage "       set \$iosize=<size>      defaults to $iosize"
 usage "       set \$nfiles=<value>     defaults to $nfiles"
 usage "       set \$count=<value>      defaults to $count"
 usage "       set \$nthreads=<value>   defaults to $nthreads"

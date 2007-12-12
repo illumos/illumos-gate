@@ -32,7 +32,6 @@ include ../../Makefile.targ
 SRCS = \
 	auto_comp.c \
         eventgen.c \
-        fileobj.c \
         fileset.c \
         flowop.c \
         flowop_library.c \
