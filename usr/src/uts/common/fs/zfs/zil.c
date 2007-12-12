@@ -1473,10 +1473,12 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 			 * On the first pass, arrange for the replay vector
 			 * to fail its dmu_tx_assign().  That's the only way
 			 * to ensure that those code paths remain well tested.
+			 *
+			 * Only byteswap (if needed) on the 1st pass.
 			 */
 			*zr->zr_txgp = replay_txg - (pass == 1);
 			error = zr->zr_replay[txtype](zr->zr_arg, zr->zr_lrbuf,
-			    zr->zr_byteswap);
+			    zr->zr_byteswap && pass == 1);
 			*zr->zr_txgp = TXG_NOWAIT;
 		}
 
