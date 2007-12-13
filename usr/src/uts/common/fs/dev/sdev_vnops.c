@@ -441,7 +441,7 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 			/* allowing create/read-only an existing directory */
 			error = EISDIR;
 		} else {
-			error = VOP_ACCESS(vp, mode, flag, cred, ct);
+			error = VOP_ACCESS(vp, mode, 0, cred, ct);
 		}
 
 		if (error) {
