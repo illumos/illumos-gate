@@ -124,6 +124,113 @@ do_bootupd()
 	fi
 }
 
+setup_tx_changes(){
+#
+# No comments or blanks lines allowed in entries below
+#
+cat > ${TX_ENTRIES} << EOF
+dtlogin		account		requisite	pam_roles.so.1
+dtlogin		account		required	pam_unix_account.so.1
+dtsession	account		requisite	pam_roles.so.1
+dtsession	account		required	pam_unix_account.so.1
+gdm		account		requisite	pam_roles.so.1
+gdm		account		required	pam_unix_account.so.1
+xscreensaver	account		requisite	pam_roles.so.1
+xscreensaver	account		required	pam_unix_account.so.1
+passwd		account		requisite	pam_roles.so.1
+passwd		account		required	pam_unix_account.so.1
+dtpasswd	account		requisite	pam_roles.so.1
+dtpasswd	account		required	pam_unix_account.so.1
+other		account		required	pam_tsol_account.so.1
+EOF
+}
+
+do_addpam()
+{
+	PAM_TMP=/tmp/pam_conf.$$
+	TX_ENTRIES=$PAM_TMP/sct.$$
+	PAM_DEST=$ROOT_PATH/etc/pam.conf
+
+	mkdir $PAM_TMP  || exit $SMF_EXIT_ERR_FATAL
+	setup_tx_changes
+
+	# verify that pam.conf file exists...
+	if [ ! -f ${PAM_DEST} ]; then
+		echo "$0: ${PAM_DEST} not found; aborting"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	#
+	# Update pam.conf to append Trusted Extensions entries if not
+	# already present.
+	#
+	rm -f /tmp/pamconf.$$
+	while read e1 e2 e3 e4 e5
+	do
+		# If this is the 'other' entry, add it unless it already
+		# exists.
+		if [ $e1 = "other" ]; then
+			grep \
+"^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4" \
+			    $PAM_DEST >/dev/null 2>&1
+			if [ $? = 1 ] ; then
+				# Doesn't exist, enter into pam.conf
+				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
+				    >> /tmp/pamconf.$$
+			fi
+		else
+			# Add other entries unless they already have a
+			# stack of their own.
+			grep "^[# 	]*$e1[ 	][ 	]*$e2[ 	]" \
+			    $PAM_DEST >/dev/null 2>&1
+			if [ $? = 1 ] ; then
+				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
+				    >> /tmp/pamconf.$$ 
+			fi
+		fi
+	done < ${TX_ENTRIES}
+	# Append TX lines if any were not present already.
+	if [ -f /tmp/pamconf.$$ ] ; then
+		echo "# Entries for Trusted Extensions" >> $PAM_DEST
+		cat /tmp/pamconf.$$ >> $PAM_DEST
+		echo "$0: updating $PAM_DEST entries for Trusted Extensions;"
+		echo "$0: please examine/update any new entries"
+    		rm -f /tmp/pamconf.$$
+    	fi
+
+	rm -rf $PAM_TMP
+}
+
+do_pamremove()
+{
+	PAM_TMP=/tmp/pam_conf.$$
+	TX_ENTRIES=$PAM_TMP/sct.$$
+	PAM_DEST=$ROOT_PATH/etc/pam.conf
+	TMPFILE=$PAM_TMP/pam.conf
+
+	mkdir $PAM_TMP  || exit $SMF_EXIT_ERR_FATAL
+
+	# verify that pam.conf file exists...
+	if [ ! -f ${PAM_DEST} ]; then
+		echo "$0: ${PAM_DEST} not found; aborting"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+
+	grep '^[a-z].*pam_tsol_account' $PAM_DEST > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "$0: pam_tsol_account module not present," 
+		echo "$0: No changes were made to $PAM_DEST."
+		return
+	fi
+
+	grep -v pam_tsol_account $PAM_DEST > $TMPFILE
+	echo "$0: $PAM_DEST "tsol" entries removed"
+	cp $TMPFILE $PAM_DEST
+
+	rm -rf $PAM_TMP
+}
+
 do_commonstart()
 {
 	echo "$0: Updating $ROOT_PATH/etc/system..."
@@ -141,14 +248,15 @@ do_commonstart()
 		exit $SMF_EXIT_ERR_FATAL
 	fi
 
-	do_bootupd
-
 	# Setup dependent services
 	do_otherservices
 
 	do_logindev
 	do_bsmconv
 	do_nscd
+	do_addpam
+
+	do_bootupd
 }
 
 
@@ -266,6 +374,8 @@ __TRUSTED_ENABLE
 		exit $SMF_EXIT_ERR_FATAL
 	fi
 
+	do_pamremove
+	
 	do_bootupd
 
 	/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld

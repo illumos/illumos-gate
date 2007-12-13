@@ -30,7 +30,6 @@ PAM_TMP=/tmp/pam_conf.$$
 KERB_ENTRIES=$PAM_TMP/scr.$$
 PPP_ENTRIES=$PAM_TMP/scp.$$
 CRON_ENTRIES=$PAM_TMP/scc.$$
-TX_ENTRIES=$PAM_TMP/sct.$$
 mkdir $PAM_TMP  || exit 1
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -72,32 +71,10 @@ cron		account		required	pam_unix_account.so.1
 EOF
 }
 
-setup_tx_changes(){
-#
-# No comments or blanks lines allowed in entries below
-#
-cat > ${TX_ENTRIES} << EOF
-dtlogin		account		requisite	pam_roles.so.1
-dtlogin		account		required	pam_unix_account.so.1
-dtsession	account		requisite	pam_roles.so.1
-dtsession	account		required	pam_unix_account.so.1
-gdm		account		requisite	pam_roles.so.1
-gdm		account		required	pam_unix_account.so.1
-xscreensaver	account		requisite	pam_roles.so.1
-xscreensaver	account		required	pam_unix_account.so.1
-passwd		account		requisite	pam_roles.so.1
-passwd		account		required	pam_unix_account.so.1
-dtpasswd	account		requisite	pam_roles.so.1
-dtpasswd	account		required	pam_unix_account.so.1
-other		account		required	pam_tsol_account.so.1
-EOF
-}
-
 #
 setup_kerb_changes
 setup_ppp_changes
 setup_cron_changes
-setup_tx_changes
 while read src dest
 do
     if [ ! -f $dest ] ; then
@@ -396,45 +373,6 @@ do
 		    >> ${CLEANUP_FILE}
 		echo "refer to pam_ldap(5) documentation for more information" \
 		    >> ${CLEANUP_FILE}
-    	fi
-
-#
-# Update pam.conf to append Trusted Extensions entries if not
-# already present.
-#
-	rm -f /tmp/pamconf.$$
-	while read e1 e2 e3 e4 e5
-	do
-		# If this is the 'other' entry, add it unless it already
-		# exists.
-		if [ $e1 = "other" ]; then
-			grep \
-"^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4" \
-			    $dest >/dev/null 2>&1
-			if [ $? = 1 ] ; then
-				# Doesn't exist, enter into pam.conf
-				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
-				    >> /tmp/pamconf.$$
-			fi
-		else
-			# Add other entries unless they already have a
-			# stack of their own.
-			grep "^[# 	]*$e1[ 	][ 	]*$e2[ 	]" \
-			    $dest >/dev/null 2>&1
-			if [ $? = 1 ] ; then
-				echo "$e1\t$e2 $e3\t\t$e4 $e5" \
-				    >> /tmp/pamconf.$$ 
-			fi
-		fi
-	done < ${TX_ENTRIES}
-	# Append TX lines if any were not present already.
-	if [ -f /tmp/pamconf.$$ ] ; then
-		cat /tmp/pamconf.$$ >> $dest
-		echo "${dest} updating entries for Trusted Extensions; \c" \
-		    >> ${CLEANUP_FILE}
-		echo "please examine/update any new entries" \
-		    >> ${CLEANUP_FILE}
-    		rm -f /tmp/pamconf.$$
     	fi
 
     fi 

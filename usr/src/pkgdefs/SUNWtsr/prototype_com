@@ -38,6 +38,7 @@
 i pkginfo
 i copyright
 i depend
+i postinstall
 #
 # source locations relative to the prototype file
 #
