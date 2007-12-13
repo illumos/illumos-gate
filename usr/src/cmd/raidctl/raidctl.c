@@ -2001,11 +2001,11 @@ print_disk_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle)
 	}
 
 	/* Print header */
-	(void) fprintf(stdout, gettext("Disk\tVendor\tProduct\t\tCapacity\t"
-	    "Status\tHSP"));
+	(void) fprintf(stdout, gettext("Disk\tVendor\tProduct\t\tFirmware\t"
+	    "Capacity\tStatus\tHSP"));
 	(void) fprintf(stdout, "\n");
-	(void) fprintf(stdout, "--------------------------------");
-	(void) fprintf(stdout, "--------------------------------");
+	(void) fprintf(stdout, "--------------------------------------");
+	(void) fprintf(stdout, "--------------------------------------");
 	(void) fprintf(stdout, "\n");
 
 
@@ -2184,6 +2184,7 @@ print_disk_attr(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle,
 {
 	char vendor[DISK_VENDER_LEN];
 	char product[DISK_PRODUCT_LEN];
+	char revision[DISK_REV_LEN + 1];
 	char capacity[16];
 	char hsp[16];
 
@@ -2202,6 +2203,9 @@ print_disk_attr(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle,
 
 	(void) snprintf(product, sizeof (product), "%s", attrp->productid);
 	(void) printf("%s\t", product);
+
+	(void) snprintf(revision, sizeof (revision), "%s", attrp->revision);
+	(void) printf("%s\t\t", revision);
 
 	if (attrp->capacity != MAX64BIT) {
 		if (size_to_string(attrp->capacity, capacity, 16) != SUCCESS) {
