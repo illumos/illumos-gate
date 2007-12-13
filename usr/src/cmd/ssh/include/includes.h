@@ -1,15 +1,3 @@
-/*	$OpenBSD: includes.h,v 1.17 2002/01/26 16:44:22 stevesk Exp $	*/
-
-#ifndef	_INCLUDES_H
-#define	_INCLUDES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -22,14 +10,24 @@ extern "C" {
  * incompatible with the protocol description in the RFC file, it must be
  * called by a name other than "ssh" or "Secure Shell".
  */
-
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#define RCSID(msg) \
-static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
+#ifndef	_INCLUDES_H
+#define	_INCLUDES_H
+
+/*	$OpenBSD: includes.h,v 1.17 2002/01/26 16:44:22 stevesk Exp $	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define	RCSID(msg) \
+static const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 
 #include "config.h"
 
@@ -49,102 +47,127 @@ static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 #include <locale.h>
 
 #ifdef HAVE_LIMITS_H
-# include <limits.h> /* For PATH_MAX */
+#include <limits.h> /* For PATH_MAX */
 #endif
+
 #ifdef HAVE_GETOPT_H
-# include <getopt.h>
+#include <getopt.h>
 #endif
+
 #ifdef HAVE_BSTRING_H
-# include <bstring.h>
+#include <bstring.h>
 #endif
+
 #if defined(HAVE_GLOB_H) && defined(GLOB_HAS_ALTDIRFUNC) && \
     defined(GLOB_HAS_GL_MATCHC)
-# include <glob.h>
+#include <glob.h>
 #endif
+
 #ifdef HAVE_NETGROUP_H
-# include <netgroup.h>
+#include <netgroup.h>
 #endif
+
 #if defined(HAVE_NETDB_H)
-# include <netdb.h>
+#include <netdb.h>
 #endif
+
 #ifdef HAVE_ENDIAN_H
-# include <endian.h>
+#include <endian.h>
 #endif
+
 #ifdef HAVE_TTYENT_H
-# include <ttyent.h>
+#include <ttyent.h>
 #endif
+
 #ifdef HAVE_UTIME_H
-# include <utime.h>
+#include <utime.h>
 #endif
+
 #ifdef HAVE_MAILLOCK_H
-# include <maillock.h> /* For _PATH_MAILDIR */
+#include <maillock.h> /* For _PATH_MAILDIR */
 #endif
+
 #include <unistd.h> /* For STDIN_FILENO, etc */
 #include <termios.h> /* Struct winsize */
 
 /*
- *-*-nto-qnx needs these headers for strcasecmp and LASTLOG_FILE respectively
+ * *-*-nto-qnx needs these headers for strcasecmp and LASTLOG_FILE
+ * respectively
  */
 #ifdef HAVE_STRINGS_H
-# include <strings.h>
+#include <strings.h>
 #endif
+
 #ifdef HAVE_LOGIN_H
-# include <login.h>
+#include <login.h>
 #endif
 
 #ifdef HAVE_UCRED_H
-#  include <ucred.h>
+#include <ucred.h>
 #endif
 
 #ifdef HAVE_UTMP_H
-#  include <utmp.h>
+#include <utmp.h>
 #endif
+
 #ifdef HAVE_UTMPX_H
-#  ifdef HAVE_TV_IN_UTMPX
-#    include <sys/time.h>
-#  endif
-#  include <utmpx.h>
+#ifdef HAVE_TV_IN_UTMPX
+#include <sys/time.h>
 #endif
+#include <utmpx.h>
+#endif
+
 #ifdef HAVE_LASTLOG_H
-#  include <lastlog.h>
+#include <lastlog.h>
 #endif
+
 #ifdef HAVE_PATHS_H
-#  include <paths.h> /* For _PATH_XXX */
+#include <paths.h> /* For _PATH_XXX */
 #endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
+
 #ifdef HAVE_SYS_TIME_H
-# include <sys/time.h> /* For timersub */
+#include <sys/time.h> /* For timersub */
 #endif
+
 #include <sys/resource.h>
 #ifdef HAVE_SYS_SELECT_H
-# include <sys/select.h>
+#include <sys/select.h>
 #endif
+
 #ifdef HAVE_SYS_BSDTTY_H
-# include <sys/bsdtty.h>
+#include <sys/bsdtty.h>
 #endif
+
 #include <sys/param.h> /* For MAXPATHLEN and roundup() */
 #ifdef HAVE_SYS_UN_H
-# include <sys/un.h> /* For sockaddr_un */
+#include <sys/un.h> /* For sockaddr_un */
 #endif
+
 #ifdef HAVE_STDINT_H
-# include <stdint.h>
+#include <stdint.h>
 #endif
+
 #ifdef HAVE_SYS_BITYPES_H
-# include <sys/bitypes.h> /* For u_intXX_t */
+#include <sys/bitypes.h> /* For u_intXX_t */
 #endif
+
 #ifdef HAVE_SYS_CDEFS_H
-# include <sys/cdefs.h> /* For __P() */
+#include <sys/cdefs.h> /* For __P() */
 #endif
+
 #ifdef HAVE_SYS_STAT_H
-# include <sys/stat.h> /* For S_* constants and macros */
+#include <sys/stat.h> /* For S_* constants and macros */
 #endif
+
 #ifdef HAVE_SYS_SYSMACROS_H
-# include <sys/sysmacros.h> /* For MIN, MAX, etc */
+#include <sys/sysmacros.h> /* For MIN, MAX, etc */
 #endif
+
 #ifdef HAVE_SYS_MMAN_H
 #include <sys/mman.h> /* for MAP_ANONYMOUS */
 #endif
@@ -154,22 +177,25 @@ static /**/const char *const rcsid[] = { (char *)rcsid, "\100(#)" msg }
 #include <netinet/ip.h> /* For IPTOS macros */
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+
 #ifdef HAVE_RPC_TYPES_H
-# include <rpc/types.h> /* For INADDR_LOOPBACK */
+#include <rpc/types.h> /* For INADDR_LOOPBACK */
 #endif
+
 #ifdef USE_PAM
-# include <security/pam_appl.h>
+#include <security/pam_appl.h>
 #endif
+
 #ifdef HAVE_READPASSPHRASE_H
-# include <readpassphrase.h>
+#include <readpassphrase.h>
 #endif
 
 #ifdef HAVE_IA_H
-# include <ia.h>
+#include <ia.h>
 #endif
 
 #ifdef HAVE_TMPDIR_H
-# include <tmpdir.h>
+#include <tmpdir.h>
 #endif
 
 #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
