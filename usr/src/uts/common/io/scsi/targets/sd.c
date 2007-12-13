@@ -14838,8 +14838,8 @@ sdintr(struct scsi_pkt *pktp)
 	 * state if needed.
 	 */
 	if (pktp->pkt_reason == CMD_DEV_GONE) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-		    "Device is gone\n");
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "Command failed to complete...Device is gone\n");
 		if (un->un_mediastate != DKIO_DEV_GONE) {
 			un->un_mediastate = DKIO_DEV_GONE;
 			cv_broadcast(&un->un_state_cv);
@@ -23142,8 +23142,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 		 * Check CMD_DEV_GONE 1st, give up if device is gone.
 		 */
 		if (wr_pktp->pkt_reason == CMD_DEV_GONE) {
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-			    "Device is gone\n");
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+			    "Error while dumping state...Device is gone\n");
 			break;
 		}
 
@@ -26600,7 +26600,8 @@ sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
 		 * no need to read RQS data.
 		 */
 		if (pkt->pkt_reason == CMD_DEV_GONE) {
-			scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+			    "Error while dumping state with rmw..."
 			    "Device is gone\n");
 			break;
 		}
