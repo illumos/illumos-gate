@@ -1164,7 +1164,7 @@ require_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 		if (i == 1)
 			continue;
 
-		log_framework(LOG_DEBUG,
+		log_framework2(LOG_DEBUG, DEBUG_DEPENDENCIES,
 		    "require_all(%s): %s is unsatisfi%s.\n", groupv->gv_name,
 		    edge->ge_vertex->gv_name, i == 0 ? "ed" : "able");
 
@@ -1204,7 +1204,7 @@ require_any_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 		if (s == 1)
 			return (1);
 
-		log_framework(LOG_DEBUG,
+		log_framework2(LOG_DEBUG, DEBUG_DEPENDENCIES,
 		    "require_any(%s): %s is unsatisfi%s.\n",
 		    groupv->gv_name, edge->ge_vertex->gv_name,
 		    s == 0 ? "ed" : "able");
@@ -1354,7 +1354,7 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 		if (i == 1)
 			continue;
 
-		log_framework(LOG_DEBUG,
+		log_framework2(LOG_DEBUG, DEBUG_DEPENDENCIES,
 		    "optional_all(%s): %s is unsatisfi%s.\n", groupv->gv_name,
 		    v->gv_name, i == 0 ? "ed" : "able");
 
@@ -1378,7 +1378,8 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
  * unsatisfiable.
  */
 #define	LOG_EXCLUDE(u, v)						\
-	log_framework(LOG_DEBUG, "exclude_all(%s): %s is satisfied.\n",	\
+	log_framework2(LOG_DEBUG, DEBUG_DEPENDENCIES,			\
+	    "exclude_all(%s): %s is satisfied.\n",			\
 	    (u)->gv_name, (v)->gv_name)
 
 /* ARGSUSED */

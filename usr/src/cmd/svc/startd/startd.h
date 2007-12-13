@@ -485,6 +485,13 @@ typedef struct wait_info {
 #define	STARTD_BOOT_QUIET	0x1
 #define	STARTD_BOOT_VERBOSE	0x2
 
+/*
+ * Internal debug flags used to reduce the amount of data sent to the
+ * internal debug buffer. They can be turned on & off dynamically using
+ * internal_debug_flags variable in mdb. By default, they're off.
+ */
+#define	DEBUG_DEPENDENCIES	0x1
+
 typedef struct startd_state {
 	/* Logging configuration */
 	char		*st_log_prefix;	/* directory prefix */
@@ -672,6 +679,7 @@ void libscf_reget_instance(restarter_inst_t *);
 void log_init();
 void log_error(int, const char *, ...);
 void log_framework(int, const char *, ...);
+void log_framework2(int, int, const char *, ...);
 void log_console(int, const char *, ...);
 void log_preexec(void);
 void setlog(const char *);

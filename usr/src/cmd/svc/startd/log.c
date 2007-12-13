@@ -126,6 +126,12 @@
 
 static FILE *logfile = NULL;
 
+/*
+ * This parameter can be modified using mdb to turn on & off extended
+ * internal debug logging. Although a performance loss can be expected.
+ */
+static int internal_debug_flags = 0x0;
+
 #ifndef NDEBUG
 /*
  * This is a circular buffer for all (even those not emitted externally)
@@ -224,6 +230,29 @@ log_framework(int severity, const char *format, ...)
 	va_start(args, format);
 	vlog_prefix(severity, "", format, args);
 	va_end(args);
+}
+
+/*
+ * log_framework2() differs from log_framework() by the fact that
+ * some checking are done before logging the messages in the internal
+ * buffer for performance reasons.
+ * The messages aren't logged if:
+ * - severity >= LOG_DEBUG and
+ * - st_log_level_min < LOG_DEBUG and
+ * - internal_debug_flags is not set for 'flags'
+ */
+void
+log_framework2(int severity, int flags, const char *format, ...)
+{
+	va_list args;
+
+	if ((severity < LOG_DEBUG) ||
+	    (internal_debug_flags & flags) ||
+	    st->st_log_level_min >= LOG_DEBUG) {
+		va_start(args, format);
+		vlog_prefix(severity, "", format, args);
+		va_end(args);
+	}
 }
 
 /*
