@@ -666,7 +666,7 @@ dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 		    (void *)soft_ringp->dls_rx_handle;
 		softring->s_ring_upcall_arg2 =
 		    dip->di_ring_add((void *)soft_ringp->dls_rx_handle,
-			(mac_resource_t *)&mrf);
+		    (mac_resource_t *)&mrf);
 		softring->s_ring_upcall =
 		    (s_ring_proc_t)soft_ringp->dls_rx;
 	}
@@ -723,10 +723,10 @@ dls_soft_ring_fanout(void *rx_handle, void *rx_cookie, mblk_t *mp_chain,
 		mp_chain = mp_chain->b_next;
 		mp->b_next = NULL;
 		if ((MBLKL(mp) < sizeof (ipha_t)) || !OK_32PTR(mp->b_rptr)) {
-			if ((mp = msgpullup(mp, sizeof (ipha_t))) == NULL) {
-				/* Let's toss this away */
+			mp = msgpullup(bp, sizeof (ipha_t));
+			freemsg(bp);
+			if (mp == NULL) {
 				dls_bad_ip_pkt++;
-				freemsg(mp);
 				continue;
 			}
 			bp = mp;
