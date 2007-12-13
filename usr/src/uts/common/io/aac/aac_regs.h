@@ -1436,6 +1436,72 @@ typedef enum {
 #define	Write10				0x0057
 
 /*
+ * The following definitions come from Adaptec:
+ *
+ * SRB is required for the new management tools
+ * and non-DASD support.
+ */
+struct aac_srb
+{
+	uint32_t function;
+	uint32_t channel;
+	uint32_t id;
+	uint32_t lun;
+	uint32_t timeout;	/* timeout in sec. */
+	uint32_t flags;
+	uint32_t count;		/* data xfer size */
+	uint32_t retry_limit;	/* obsolete */
+	uint32_t cdb_size;
+	uint8_t cdb[16];
+	struct aac_sg_table sg;
+};
+
+#define	AAC_SENSE_BUFFERSIZE	 30
+
+struct aac_srb_reply
+{
+	uint32_t status;
+	uint32_t srb_status;
+	uint32_t scsi_status;
+	uint32_t data_xfer_length;
+	uint32_t sense_data_size;
+	uint8_t sense_data[AAC_SENSE_BUFFERSIZE];    /* Can this be */
+						    /* SCSI_SENSE_BUFFERSIZE */
+};
+
+/*
+ * SRB Flags
+ */
+#define	SRB_NoDataXfer			0x0000
+#define	SRB_DisableDisconnect		0x0004
+#define	SRB_DisableSynchTransfer	0x0008
+#define	SRB_BypassFrozenQueue		0x0010
+#define	SRB_DisableAutosense		0x0020
+#define	SRB_DataIn			0x0040
+#define	SRB_DataOut			0x0080
+
+/*
+ * SRB Functions - set in aac_srb->function
+ */
+#define	SRBF_ExecuteScsi		0x0000
+#define	SRBF_ClaimDevice		0x0001
+#define	SRBF_IO_Control			0x0002
+#define	SRBF_ReceiveEvent		0x0003
+#define	SRBF_ReleaseQueue		0x0004
+#define	SRBF_AttachDevice		0x0005
+#define	SRBF_ReleaseDevice		0x0006
+#define	SRBF_Shutdown			0x0007
+#define	SRBF_Flush			0x0008
+#define	SRBF_AbortCommand		0x0010
+#define	SRBF_ReleaseRecovery		0x0011
+#define	SRBF_ResetBus			0x0012
+#define	SRBF_ResetDevice		0x0013
+#define	SRBF_TerminateIO		0x0014
+#define	SRBF_FlushQueue			0x0015
+#define	SRBF_RemoveDevice		0x0016
+#define	SRBF_DomainValidation		0x0017
+
+/*
  * SRB SCSI Status
  * Status codes for SCSI passthrough commands,
  * set in aac_srb->scsi_status
@@ -1472,42 +1538,16 @@ typedef enum {
 #define	SRB_STATUS_FORCE_ABORT			0x31
 #define	SRB_STATUS_DOMAIN_VALIDATION_FAIL	0x32
 
-/*
- * The following definitions come from Adaptec:
- *
- * SRB is required for the new management tools
- * and non-DASD support.
- */
-#define	SRB_DataIn	0x0040
-#define	SRB_DataOut	0x0080
-struct aac_srb
-{
-	uint32_t function;
-	uint32_t channel;
-	uint32_t id;
-	uint32_t lun;
-	uint32_t timeout;
-	uint32_t flags;
-	uint32_t count;	/* Data xfer size */
-	uint32_t retry_limit;
-	uint32_t cdb_size;
-	uint8_t cdb[16];
-	struct aac_sg_table sg;
-};
-
-#define	AAC_SENSE_BUFFERSIZE	 30
-struct aac_srb_reply
-{
-	uint32_t status;
-	uint32_t srb_status;
-	uint32_t scsi_status;
-	uint32_t data_xfer_length;
-	uint32_t sense_data_size;
-	uint8_t sense_data[AAC_SENSE_BUFFERSIZE];    /* Can this be */
-						    /* SCSI_SENSE_BUFFERSIZE */
-};
-
 #pragma	pack()
+
+/*
+ * Aligned structure definition for variable declarations that require
+ * alignment.
+ */
+union aac_fib_align {
+	struct aac_fib d;
+	uint32_t dumb;
+};
 
 /* AAC Communication Space */
 struct aac_comm_space {

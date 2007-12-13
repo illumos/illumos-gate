@@ -1556,3 +1556,8 @@ NXGE_HCALL_OBJS =	\
 #	kiconv modules
 #
 KICONV_EMEA_OBJS += kiconv_emea.o
+
+#
+#	AAC module
+#
+AAC_OBJS = aac.o aac_ioctl.o

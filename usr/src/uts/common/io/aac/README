@@ -61,3 +61,10 @@ UART trace support is added in this release:
 	ration line as below should be added to /etc/remote:
 	aac:\
 		:dv=/dev/term/a:br#115200:el=^C^S^Q^U^D:ie=%$:oe=^D:
+
+aac driver 2.2.0
+==================
+SPARC platform support is added in this release:
+	To support SPARC, the driver is modified for DDI compliance. The driver
+	now uses DDI compliant functions to access the device's IO and memory
+	spaces for DMA transfers.

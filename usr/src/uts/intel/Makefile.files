@@ -232,11 +232,6 @@ P4_PCBE_OBJS = p4_pcbe.o
 OPTERON_PCBE_OBJS = opteron_pcbe.o
 
 #
-#	AAC module
-#
-AAC_OBJS = aac.o aac_ioctl.o
-
-#
 #	AMR module
 #
 AMR_OBJS = amr.o

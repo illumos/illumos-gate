@@ -85,7 +85,7 @@ struct aac_revision
 struct aac_get_adapter_fib
 {
 	uint32_t context;
-	int wait;
+	int32_t wait;
 	uint32_t aif_fib;	/* RAID config app is 32bit */
 };
 
@@ -130,6 +130,45 @@ struct aac_features {
 };
 
 #pragma pack()
+
+/*
+ * Aligned structure definitions for variable declarations that require
+ * alignment.
+ *
+ * Normally the packed structures are defined in a way that if the initial
+ * member is aligned, then the following members will also be aligned. So
+ * we need only to make the packed structure, ie. the first member, is
+ * aligned to satisfy alignment requirement.
+ */
+union aac_revision_align {
+	struct aac_revision d;
+	uint32_t dummy;
+};
+
+union aac_get_adapter_fib_align {
+	struct aac_get_adapter_fib d;
+	uint32_t dummy;
+};
+
+union aac_pci_info_align {
+	struct aac_pci_info d;
+	uint32_t dummy;
+};
+
+union aac_query_disk_align {
+	struct aac_query_disk d;
+	int32_t dummy;
+};
+
+union aac_delete_disk_align {
+	struct aac_delete_disk d;
+	int32_t dummy;
+};
+
+union aac_features_align {
+	struct aac_features d;
+	uint32_t dummy;
+};
 
 #ifdef	__cplusplus
 }

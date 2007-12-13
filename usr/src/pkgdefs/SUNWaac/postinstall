@@ -1,6 +1,6 @@
 #!/sbin/sh
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -107,4 +107,4 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pci1028,3" "pci1028,a" "pci9005,285" "pci9005,286"' -b "$BASEDIR" -c scsi aac
+check_add_drv -i '"pci1028,3" "pci1028,a" "pci9005,285" "pci9005,286" "pciex9005,285" "pciex9005,286"' -b "$BASEDIR" -c scsi aac

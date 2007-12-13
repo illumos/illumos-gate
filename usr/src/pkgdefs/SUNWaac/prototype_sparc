@@ -38,14 +38,12 @@
 #!<param>=<value>                       # puts parameter in pkg environment
 
 #
+# Include ISA independent files (prototype_com)
 #
-i pkginfo
-i copyright
-i depend
-i postinstall
-i postremove
+!include prototype_com
+#
+#
 
 # Adaptec AdvanceRaid Controller Driver
-d none kernel 0755 root sys
-d none kernel/drv 0755 root sys
-f none kernel/drv/aac.conf 0644 root sys
+d none kernel/drv/sparcv9 0755 root sys
+f none kernel/drv/sparcv9/aac 0755 root sys

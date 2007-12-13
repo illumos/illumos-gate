@@ -27,7 +27,7 @@
 #
 #	This makefile drives the production of the aac driver kernel module.
 #
-#	intel implementation architecture dependent
+#	Sparc implementation architecture dependent
 #
 
 #
@@ -42,7 +42,7 @@ MODULE		= aac
 OBJECTS		= $(AAC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AAC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR     = $(UTSBASE)/common/io/aac
+CONF_SRCDIR	= $(UTSBASE)/common/io/aac
 WARLOCK_OUT     = $(AAC_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
 WLCMD_DIR       = $(UTSBASE)/common/io/warlock
@@ -50,7 +50,7 @@ WLCMD_DIR       = $(UTSBASE)/common/io/warlock
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -58,6 +58,11 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+# 
+# lint pass one enforcement 
+# 
+CFLAGS		+= $(CCVERBOSE)
 
 #
 # 	Kernel Module Dependencies
@@ -100,7 +105,7 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ
 
 #
 #	Defines for local commands.
@@ -113,7 +118,7 @@ TEST		= test
 #
 #	lock_lint rules
 #
-SCSI_FILES = $(SCSI_OBJS:%.o= -l $(UTSBASE)/intel/scsi/%.ll)
+SCSI_FILES = $(SCSI_OBJS:%.o= -l $(UTSBASE)/sparc/scsi/%.ll)
 
 %.wlcmd:
 	cd $(WLCMD_DIR); $(TEST) -f $@ || $(SCCS) get $@
@@ -123,15 +128,15 @@ warlock: $(WARLOCK_OK)
 $(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files scsi.files aac.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/aac.wlcmd $(WARLOCK_OUT) \
 	$(SCSI_FILES) \
-	$(UTSBASE)/intel/warlock/scsi.ll \
-	-l $(UTSBASE)/intel/warlock/ddi_dki_impl.ll
+	$(UTSBASE)/sparc/warlock/scsi.ll \
+	-l $(UTSBASE)/sparc/warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
 %.ll: $(UTSBASE)/common/io/aac/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock_ddi.files:
-	@cd $(UTSBASE)/intel/warlock; pwd; $(MAKE) warlock
+	@cd $(UTSBASE)/sparc/warlock; pwd; $(MAKE) warlock
 
 scsi.files:
-	@cd $(UTSBASE)/intel/scsi; pwd; $(MAKE) warlock
+	@cd $(UTSBASE)/sparc/scsi; pwd; $(MAKE) warlock

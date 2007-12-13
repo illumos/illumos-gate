@@ -56,8 +56,8 @@ extern "C" {
 #endif
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
-#define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		19
+#define	AAC_DRIVER_MINOR_VERSION	2
+#define	AAC_DRIVER_BUGFIX_LEVEL		0
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -90,7 +90,11 @@ extern "C" {
  */
 #define	AAC_AIFQ_LENGTH			64
 
+#ifdef __x86
 #define	AAC_IMMEDIATE_TIMEOUT		30	/* seconds */
+#else
+#define	AAC_IMMEDIATE_TIMEOUT		60	/* seconds */
+#endif
 #define	AAC_FWUP_TIMEOUT		180	/* wait up to 3 minutes */
 #define	AAC_IOCTL_TIMEOUT		180	/* wait up to 3 minutes */
 
@@ -103,6 +107,11 @@ extern "C" {
 #define	AAC_TYPE_SCSI			1
 #define	AAC_TYPE_SATA			2
 #define	AAC_TYPE_SAS			3
+
+#define	AAC_LS32(d)			((uint32_t)((d) & 0xffffffffull))
+#define	AAC_MS32(d)			((uint32_t)((d) >> 32))
+#define	AAC_LO32(p64)			((uint32_t *)(p64))
+#define	AAC_HI32(p64)			((uint32_t *)(p64) + 1)
 
 /*
  * AAC_CMDQ_SYNC should be 0 and AAC_CMDQ_ASYNC be 1 for Sync FIB io
@@ -150,18 +159,10 @@ struct aac_container {
 	uint64_t size;		/* in block */
 	uint8_t locked;
 	uint8_t deleted;
-	uint8_t reset;		/* container is being reseted */
+	uint8_t reset;			/* container is being reseted */
 	int ncmds[AAC_CMDQ_NUM];	/* outstanding cmds of the device */
 	int throttle[AAC_CMDQ_NUM];	/* hold IO cmds for the device */
 };
-
-struct sync_mode_res {
-	struct aac_fib *fib;
-	uint64_t fib_phyaddr;
-	kmutex_t mutex;
-};
-
-_NOTE(MUTEX_PROTECTS_DATA(sync_mode_res::mutex, sync_mode_res))
 
 /*
  * The firmware can support a lot of outstanding commands. Each aac_slot
@@ -229,7 +230,7 @@ struct aac_fib_context {
 	struct aac_fib_context *next, *prev;
 };
 
-typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *, int);
+typedef void (*aac_cmd_fib_t)(struct aac_softstate *, struct aac_cmd *);
 
 #define	AAC_VENDOR_LEN		8
 #define	AAC_PRODUCT_LEN		16
@@ -264,7 +265,7 @@ struct aac_softstate {
 
 	struct aac_interface aac_if;	/* adapter hardware interface */
 
-	struct sync_mode_res sync_mode;	/* sync FIB */
+	struct aac_slot sync_slot;	/* sync FIB */
 
 	/* Communication space */
 	struct aac_comm_space *comm_space;
@@ -283,6 +284,7 @@ struct aac_softstate {
 	uint32_t aac_max_sectors;	/* max. I/O size from host (blocks) */
 
 	aac_cmd_fib_t aac_cmd_fib;	/* IO cmd FIB construct function */
+	aac_cmd_fib_t aac_cmd_fib_scsi;	/* SRB construct function */
 
 	ddi_iblock_cookie_t iblock_cookie;
 	ddi_softintr_t softint_id;	/* soft intr */
@@ -290,7 +292,7 @@ struct aac_softstate {
 	kmutex_t io_lock;
 	int state;			/* driver state */
 
-	struct aac_container container[AAC_MAX_LD];
+	struct aac_container containers[AAC_MAX_LD];
 	int container_count;		/* max container id + 1 */
 
 	/*
@@ -322,7 +324,7 @@ struct aac_softstate {
 	/* AIF */
 	kmutex_t aifq_mutex;		/* for AIF queue aifq */
 	kcondvar_t aifv;
-	struct aac_fib aifq[AAC_AIFQ_LENGTH];
+	union aac_fib_align aifq[AAC_AIFQ_LENGTH];
 	int aifq_idx;			/* slot for next new AIF */
 	int aifq_wrap;			/* AIF queue has ever been wrapped */
 	struct aac_fib_context *fibctx;
@@ -340,17 +342,29 @@ struct aac_softstate {
 #endif
 };
 
+/*
+ * The following data are kept stable because they are only written at driver
+ * initialization, and we do not allow them changed otherwise even at driver
+ * re-initialization.
+ */
 _NOTE(SCHEME_PROTECTS_DATA("stable data", aac_softstate::{flags slen \
-    buf_dma_attr pci_mem_handle pci_mem_base_vaddr sync_mode \
+    buf_dma_attr pci_mem_handle pci_mem_base_vaddr \
     comm_space_acc_handle comm_space_dma_handle aac_max_fib_size \
-    aac_sg_tablesize aac_cmd_fib debug_flags debug_fw_flags debug_buf_offset \
-    debug_buf_size debug_header_size}))
-_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::io_lock, aac_softstate::{ \
-    state container container_count q_wait q_busy total_slots total_fibs \
-    io_slot free_io_slot_head timeout_id drain_timeid ndrains drain_cv event}))
-_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::q_comp_mutex, aac_softstate::q_comp))
-_NOTE(MUTEX_PROTECTS_DATA(aac_softstate::aifq_mutex, aac_softstate::{ \
-    aifv aifq aifq_idx aifq_wrap fibctx devcfg_wait_on}))
+    aac_sg_tablesize aac_cmd_fib aac_cmd_fib_scsi debug_flags}))
+
+/*
+ * Scatter-gather list structure defined by HBA hardware
+ */
+struct aac_sge {
+	uint32_t bcount;	/* byte count */
+	union {
+		uint32_t ad32;	/* 32 bit address */
+		struct {
+			uint32_t lo;
+			uint32_t hi;
+		} ad64;		/* 64 bit address */
+	} addr;
+};
 
 /* aac_cmd flags */
 #define	AAC_CMD_CONSISTENT		(1 << 0)
@@ -394,7 +408,10 @@ struct aac_cmd {
 	size_t total_xfer;
 	uint64_t blkno;
 	uint32_t bcount;	/* buffer size in byte */
+	struct aac_sge *sgt;	/* sg table */
 
+	/* FIB construct function */
+	aac_cmd_fib_t aac_cmd_fib;
 	/* Call back function for completed command */
 	void (*ac_comp)(struct aac_softstate *, struct aac_cmd *);
 
@@ -402,7 +419,6 @@ struct aac_cmd {
 	struct aac_container *dvp;	/* target device */
 
 	/* FIB for this IO command */
-	int fib_kmsz; /* size of kmem_alloc'ed FIB */
 	int fib_size; /* size of the FIB xferred to/from the card */
 	struct aac_fib *fibp;
 };
@@ -412,14 +428,15 @@ struct aac_cmd {
 #define	AACDB_FLAGS_MASK		0x0000ffff
 #define	AACDB_FLAGS_KERNEL_PRINT	0x00000001
 #define	AACDB_FLAGS_FW_PRINT		0x00000002
+#define	AACDB_FLAGS_NO_HEADERS		0x00000004
 
-#define	AACDB_FLAGS_MISC		0x00000004
-#define	AACDB_FLAGS_FUNC1		0x00000008
-#define	AACDB_FLAGS_FUNC2		0x00000010
-#define	AACDB_FLAGS_SCMD		0x00000020
-#define	AACDB_FLAGS_AIF			0x00000040
-#define	AACDB_FLAGS_FIB			0x00000080
-#define	AACDB_FLAGS_IOCTL		0x00000100
+#define	AACDB_FLAGS_MISC		0x00000010
+#define	AACDB_FLAGS_FUNC1		0x00000020
+#define	AACDB_FLAGS_FUNC2		0x00000040
+#define	AACDB_FLAGS_SCMD		0x00000080
+#define	AACDB_FLAGS_AIF			0x00000100
+#define	AACDB_FLAGS_FIB			0x00000200
+#define	AACDB_FLAGS_IOCTL		0x00000400
 
 extern uint32_t aac_debug_flags;
 extern int aac_dbflag_on(struct aac_softstate *, int);

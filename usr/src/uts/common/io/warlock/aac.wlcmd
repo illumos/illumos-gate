@@ -37,10 +37,16 @@ add aac_softstate::aac_if.aif_get_mailbox target \
 add aac_softstate::aac_if.aif_set_mailbox target \
 	aac_rx_set_mailbox \
 	aac_rkt_set_mailbox
-add aac.c:aac_tran_init_pkt/aac_cmd_fib target \
+add aac_cmd::aac_cmd_fib target \
 	aac_cmd_fib_rawio \
 	aac_cmd_fib_brw64 \
-	aac_cmd_fib_brw
+	aac_cmd_fib_brw \
+	aac_cmd_fib_copy \
+	aac_cmd_fib_scsi32 \
+	aac_cmd_fib_scsi64
+add aac_softstate::aac_cmd_fib_scsi target \
+	aac_cmd_fib_scsi32 \
+	aac_cmd_fib_scsi64
 
 root aac_intr_old aac_intr_new aac_fm_error_cb
 
