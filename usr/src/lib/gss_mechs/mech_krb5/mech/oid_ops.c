@@ -50,7 +50,7 @@ generic_gss_release_oid(minor_status, oid)
     if (minor_status)
 	*minor_status = 0;
 
-    if (*oid == GSS_C_NO_OID)
+    if (oid == NULL || *oid == GSS_C_NO_OID)
 	return(GSS_S_COMPLETE);
 
     /*
@@ -228,12 +228,18 @@ generic_gss_oid_to_str(minor_status, oid, oid_str)
     unsigned char	*cp;
     char		*bp;
 
-    *minor_status = 0;
+    if (minor_status != NULL)
+	*minor_status = 0;
+
+    if (oid_str != GSS_C_NO_BUFFER) {
+	oid_str->length = 0;
+	oid_str->value = NULL;
+    }
 
     if (oid == NULL || oid->length == 0 || oid->elements == NULL)
 	return (GSS_S_CALL_INACCESSIBLE_READ);
 
-    if (oid_str == NULL)
+    if (oid_str == GSS_C_NO_BUFFER)
 	return (GSS_S_CALL_INACCESSIBLE_WRITE);
 
     /* Decoded according to krb5/gssapi_krb5.c */
@@ -308,7 +314,11 @@ generic_gss_str_to_oid(minor_status, oid_str, oid)
     int		index;
     unsigned char *op;
 
-    *minor_status = 0;
+    if (minor_status != NULL)
+	*minor_status = 0;
+
+    if (oid != NULL)
+	*oid = GSS_C_NO_OID;
 
     if (GSS_EMPTY_BUFFER(oid_str))
 	return (GSS_S_CALL_INACCESSIBLE_READ);
@@ -459,16 +469,17 @@ gssint_copy_oid_set(
     OM_uint32 major = GSS_S_COMPLETE;
     OM_uint32 index;
 
-    if (minor_status)
+    if (minor_status != NULL)
 	*minor_status = 0;
 
-    if (oidset == NULL)
+    if (new_oidset != NULL)
+	*new_oidset = GSS_C_NO_OID_SET;
+
+    if (oidset == GSS_C_NO_OID_SET)
 	return (GSS_S_CALL_INACCESSIBLE_READ);
 
     if (new_oidset == NULL)
 	return (GSS_S_CALL_INACCESSIBLE_WRITE);
-
-    *new_oidset = NULL;
 
     if ((copy = (gss_OID_set_desc *) calloc(1, sizeof (*copy))) == NULL) {
 	major = GSS_S_FAILURE;
