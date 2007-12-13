@@ -2003,9 +2003,8 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 
 		err = release_set(cp, mode);
 
-		/* Unblock I/O state only if release_set failed */
-		if (err)
-			md_clearblock_setio(setno);
+		/* Always unblock I/O even if release_set fails */
+		md_clearblock_setio(setno);
 
 		break;
 	}
