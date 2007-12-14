@@ -173,7 +173,6 @@ static void		nge_m_stop(void *);
 static int		nge_m_promisc(void *, boolean_t);
 static int		nge_m_multicst(void *, boolean_t, const uint8_t *);
 static int		nge_m_unicst(void *, const uint8_t *);
-static void		nge_m_resources(void *);
 static void		nge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	nge_m_getcapab(void *, mac_capab_t, void *);
 

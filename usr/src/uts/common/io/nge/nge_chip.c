@@ -1712,21 +1712,22 @@ nge_intr_handle(nge_t *ngep, nge_intr_src *pintr_src)
 	ngep->statistics.sw_statistics.intr_lval = pintr_src->intr_val;
 	brx = (pintr_src->int_bits.reint | pintr_src->int_bits.miss
 	    | pintr_src->int_bits.rcint | pintr_src->int_bits.stint)
-	    > 0 ? B_TRUE : B_FALSE;
+	    != 0 ? B_TRUE : B_FALSE;
 	if (pintr_src->int_bits.reint)
 		ngep->statistics.sw_statistics.rx_err++;
 	if (pintr_src->int_bits.miss)
 		ngep->statistics.sw_statistics.rx_nobuffer++;
 
-	if (brx)
-		nge_receive(ngep);
 	btx = (pintr_src->int_bits.teint | pintr_src->int_bits.tcint)
-	    > 0 ? B_TRUE : B_FALSE;
+	    != 0 ? B_TRUE : B_FALSE;
 	if (pintr_src->int_bits.stint && ngep->poll)
 		ngep->stint_count ++;
-	btx |= (ngep->poll && (ngep->stint_count % ngep->param_tx_n_intr == 0));
+	if (ngep->poll && (ngep->stint_count % ngep->param_tx_n_intr == 0))
+		btx = B_TRUE;
 	if (btx)
 		nge_tx_recycle(ngep, B_TRUE);
+	if (brx)
+		nge_receive(ngep);
 	if (pintr_src->int_bits.teint)
 		ngep->statistics.sw_statistics.tx_stop_err++;
 	if (ngep->intr_moderation && brx) {
