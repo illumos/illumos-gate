@@ -1972,11 +1972,17 @@ sotpi_connect(struct sonode *so,
 
 	mutex_enter(&so->so_lock);
 	/*
-	 * Make sure that there is a preallocated unbind_req
-	 * message before any binding. This message allocated when
-	 * the socket is created  but it might be have been
-	 * consumed.
+	 * Make sure there is a preallocated T_unbind_req message
+	 * before any binding. This message is allocated when the
+	 * socket is created. Since another thread can consume
+	 * so_unbind_mp by the time we return from so_lock_single(),
+	 * we should check the availability of so_unbind_mp after
+	 * we return from so_lock_single().
 	 */
+
+	so_lock_single(so);	/* Set SOLOCKED */
+	need_unlock = B_TRUE;
+
 	if (so->so_unbind_mp == NULL) {
 		dprintso(so, 1, ("sotpi_connect: allocating unbind_req\n"));
 		/* NOTE: holding so_lock while sleeping */
@@ -1984,13 +1990,9 @@ sotpi_connect(struct sonode *so,
 		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_INTR);
 		if (so->so_unbind_mp == NULL) {
 			error = EINTR;
-			need_unlock = B_FALSE;
 			goto done;
 		}
 	}
-
-	so_lock_single(so);	/* Set SOLOCKED */
-	need_unlock = B_TRUE;
 
 	/*
 	 * Can't have done a listen before connecting.
