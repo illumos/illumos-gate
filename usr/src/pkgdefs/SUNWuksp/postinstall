@@ -21,7 +21,7 @@
 #
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,11 +35,24 @@ then
 	BASEDIR_OPT="-b $BASEDIR" 
 fi
 
-not_installed() {
+installed() {
 	driver=$1
 	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
 
 	return $?
+}
+
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases > /dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
+		fi
+	done
 }
 
 EXIT=0
@@ -55,7 +68,11 @@ USBSKSP_ALIASES="\
 	\"usb6cd,131\" \
 	"
 
-not_installed usbsksp || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	-i "${USBSKSP_ALIASES}" -n usbsksp || EXIT=1
+if installed usbsksp ; then
+	update_driver usbsksp "${USBSKSP_ALIASES}" || EXIT=1
+else
+	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
+	    -i "${USBSKSP_ALIASES}" -n usbsksp || EXIT=1
+fi
 
 exit $EXIT

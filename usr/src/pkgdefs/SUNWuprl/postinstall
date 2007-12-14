@@ -41,6 +41,19 @@ installed() {
 	return $?
 }
 
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases > /dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
+		fi
+	done
+}
+
 EXIT=0
 
 # "usb67b,2303" Most adapters based on pl2303 chip set have this ID
@@ -58,7 +71,11 @@ USBSPRL_ALIASES="\
 	\"usb5ad,fba\" \
 	"
 
-installed usbsprl || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	-i "${USBSPRL_ALIASES}" -n usbsprl || EXIT=1
+if installed usbsprl ; then
+	update_driver usbsprl "${USBSPRL_ALIASES}" || EXIT=1
+else
+	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
+	    -i "${USBSPRL_ALIASES}" -n usbsprl || EXIT=1
+fi
 
 exit $EXIT

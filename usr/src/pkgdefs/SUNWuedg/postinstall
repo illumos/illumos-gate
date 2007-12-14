@@ -34,26 +34,24 @@ then
 	BASEDIR_OPT="-b $BASEDIR" 
 fi
 
-# In addition to the list of aliases in USBSER_EDGE_ALIASES, a
-# new alias is needed for the latest edgeport f/w revision. To
-# ensure that upgrades work we use update_drv(1M) to add this
-# new alias if the driver has already been installed
-# Note that postinstall gets executed on both initial install
-# and upgrade
-
-NEW_ALIAS=usbif1608,1.100.config1.0
-
-new_alias_not_added() {
-	grep ${NEW_ALIAS} $BASEDIR/etc/driver_aliases > /dev/null 2>&1
-
-	return $?
-}	
-
 installed() {
 	driver=$1
 	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
 
 	return $?
+}
+
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases > /dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
+		fi
+	done
 }
 
 EXIT=0
@@ -89,16 +87,14 @@ USBSER_EDGE_ALIASES="\
 	\"usbif1608,243.config1.0\" \
 	\"usbif1608,244.config1.0\" \
 	\"usbif1608,247.config1.0\" \
+	\"usbif1608,1.100.config1.0\" \
 	"
 
 if installed usbser_edge ; then
-	new_alias_not_added ||
-		echo "${driver} \"${NEW_ALIAS}\"" >> \
-		    ${BASEDIR}/etc/driver_aliases 2>/dev/null \
-			|| EXIT 1
+	update_driver usbser_edge "${USBSER_EDGE_ALIASES}" || EXIT=1
 else
 	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	    -i "${USBSER_EDGE_ALIASES} \"${NEW_ALIAS}\"" -n usbser_edge || \
+	    -i "${USBSER_EDGE_ALIASES}" -n usbser_edge || \
 	    EXIT=1
 fi
 

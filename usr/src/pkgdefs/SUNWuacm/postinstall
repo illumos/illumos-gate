@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
  
@@ -41,6 +41,19 @@ installed() {
 	return $?
 }
 
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases > /dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
+		fi
+	done
+}
+
 EXIT=0
 
 #"usbc88,17da"	EVDO card of Kyocera KPC650
@@ -53,8 +66,7 @@ USBSACM_ALIASES="\
 	"
 
 if installed usbsacm ; then
-	echo "usbsacm already installed" || EXIT=1
-
+	update_driver usbsacm "${USBSACM_ALIASES}" || EXIT=1
 else
 	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
 	    -i "${USBSACM_ALIASES}" -n usbsacm || \
