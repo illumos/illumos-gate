@@ -322,6 +322,7 @@ typedef struct ipoptp_s
 #define	IP6_IN_LLMCAST		0x1000	/* Multicast */
 
 #define	IP_FF_LOOPBACK		0x2000	/* Loopback fanout */
+#define	IP_FF_SCTP_CSUM_ERR	0x4000	/* sctp pkt has failed chksum */
 
 #ifndef	IRE_DB_TYPE
 #define	IRE_DB_TYPE	M_SIG

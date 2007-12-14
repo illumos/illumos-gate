@@ -13414,6 +13414,7 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	ill_t		*ill = (ill_t *)q->q_ptr;
 	ip_stack_t	*ipst;
 	sctp_stack_t	*sctps;
+	boolean_t	sctp_csum_err = B_FALSE;
 
 	ASSERT(recv_ill != NULL);
 	ipst = recv_ill->ill_ipst;
@@ -13495,11 +13496,9 @@ find_sctp_client:
 		pktsum = sctph->sh_chksum;
 		sctph->sh_chksum = 0;
 		calcsum = sctp_cksum(mp, u1);
-		if (calcsum != pktsum) {
-			BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
-			goto error;
-		}
 		sctph->sh_chksum = pktsum;
+		if (calcsum != pktsum)
+			sctp_csum_err = B_TRUE;
 #ifdef	DEBUG	/* skip_sctp_cksum */
 	}
 #endif
@@ -13509,6 +13508,19 @@ find_sctp_client:
 	IRE_REFRELE(ire);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_dst);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_src);
+	if (sctp_csum_err) {
+		/*
+		 * No potential sctp checksum errors go to the Sun
+		 * sctp stack however they might be Adler-32 summed
+		 * packets a userland stack bound to a raw IP socket
+		 * could reasonably use. Note though that Adler-32 is
+		 * a long deprecated algorithm and customer sctp
+		 * networks should eventually migrate to CRC-32 at
+		 * which time this facility should be removed.
+		 */
+		flags |= IP_FF_SCTP_CSUM_ERR;
+		goto no_conn;
+	}
 	if ((connp = sctp_fanout(&map_src, &map_dst, ports, zoneid, mp,
 	    sctps)) == NULL) {
 		/* Check for raw socket or OOTB handling */
@@ -29603,6 +29615,13 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 	ip6_t		*ip6h;
 	ip_stack_t	*ipst = recv_ill->ill_ipst;
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	sctp_stack_t	*sctps = ipst->ips_netstack->netstack_sctp;
+	boolean_t	sctp_csum_err = B_FALSE;
+
+	if (flags & IP_FF_SCTP_CSUM_ERR) {
+		sctp_csum_err = B_TRUE;
+		flags &= ~IP_FF_SCTP_CSUM_ERR;
+	}
 
 	first_mp = mp;
 	if (mctl_present) {
@@ -29616,6 +29635,15 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
 
 	connp = ipcl_classify_raw(mp, IPPROTO_SCTP, zoneid, ports, ipha, ipst);
 	if (connp == NULL) {
+		/*
+		 * Although raw sctp is not summed, OOB chunks must be.
+		 * Drop the packet here if the sctp checksum failed.
+		 */
+		if (sctp_csum_err) {
+			BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
+			freemsg(first_mp);
+			return;
+		}
 		sctp_ootb_input(first_mp, recv_ill, zoneid, mctl_present);
 		return;
 	}
