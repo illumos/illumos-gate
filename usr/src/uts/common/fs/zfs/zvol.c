@@ -694,7 +694,7 @@ zvol_get_done(dmu_buf_t *db, void *vzgd)
 
 	dmu_buf_rele(db, vzgd);
 	zfs_range_unlock(rl);
-	zil_add_vdev(zgd->zgd_zilog, DVA_GET_VDEV(BP_IDENTITY(zgd->zgd_bp)));
+	zil_add_block(zgd->zgd_zilog, zgd->zgd_bp);
 	kmem_free(zgd, sizeof (zgd_t));
 }
 
@@ -744,8 +744,7 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	error = dmu_sync(zio, db, &lr->lr_blkptr,
 	    lr->lr_common.lrc_txg, zvol_get_done, zgd);
 	if (error == 0)
-		zil_add_vdev(zv->zv_zilog,
-		    DVA_GET_VDEV(BP_IDENTITY(&lr->lr_blkptr)));
+		zil_add_block(zv->zv_zilog, &lr->lr_blkptr);
 	/*
 	 * If we get EINPROGRESS, then we need to wait for a
 	 * write IO initiated by dmu_sync() to complete before

@@ -368,7 +368,7 @@ extern int	zil_is_committed(zilog_t *zilog);
 extern int	zil_suspend(zilog_t *zilog);
 extern void	zil_resume(zilog_t *zilog);
 
-extern void	zil_add_vdev(zilog_t *zilog, uint64_t vdev);
+extern void	zil_add_block(zilog_t *zilog, blkptr_t *bp);
 
 extern int zil_disable;
 

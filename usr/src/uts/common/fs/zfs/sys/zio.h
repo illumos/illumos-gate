@@ -167,6 +167,13 @@ enum zio_compress {
 	(ZIO_FLAG_GANG_INHERIT |	\
 	ZIO_FLAG_PHYSICAL)
 
+#define	ZIO_FLAG_RETRY_INHERIT		\
+	(ZIO_FLAG_VDEV_INHERIT |	\
+	ZIO_FLAG_CONFIG_GRABBED |	\
+	ZIO_FLAG_DONT_PROPAGATE |	\
+	ZIO_FLAG_NOBOOKMARK)
+
+
 #define	ZIO_PIPELINE_CONTINUE		0x100
 #define	ZIO_PIPELINE_STOP		0x101
 
@@ -317,7 +324,7 @@ extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
 extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp,
     blkptr_t *old_bp, uint64_t txg);
 extern void zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg);
-extern void zio_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio);
+extern void zio_flush(zio_t *zio, vdev_t *vd);
 
 extern int zio_wait(zio_t *zio);
 extern void zio_nowait(zio_t *zio);

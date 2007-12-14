@@ -1114,7 +1114,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 {
 	dnode_t *dn = db->db_dnode;
 	uint64_t txg = tx->tx_txg;
-	dbuf_dirty_record_t *dr;
+	dbuf_dirty_record_t *dr, **drp;
 
 	ASSERT(txg != 0);
 	ASSERT(db->db_blkid != DB_BONUS_BLKID);
@@ -1124,7 +1124,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	/*
 	 * If this buffer is not dirty, we're done.
 	 */
-	for (dr = db->db_last_dirty; dr; dr = dr->dr_next)
+	for (drp = &db->db_last_dirty; (dr = *drp) != NULL; drp = &dr->dr_next)
 		if (dr->dr_txg <= txg)
 			break;
 	if (dr == NULL || dr->dr_txg < txg) {
@@ -1154,7 +1154,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	/* XXX would be nice to fix up dn_towrite_space[] */
 
-	db->db_last_dirty = dr->dr_next;
+	*drp = dr->dr_next;
 
 	if (dr->dr_parent) {
 		mutex_enter(&dr->dr_parent->dt.di.dr_mtx);
@@ -1927,8 +1927,8 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		drp = &db->db_last_dirty;
 		while (*drp != dr)
 			drp = &(*drp)->dr_next;
-		ASSERT((*drp)->dr_next == NULL);
-		*drp = NULL;
+		ASSERT(dr->dr_next == NULL);
+		*drp = dr->dr_next;
 		kmem_free(dr, sizeof (dbuf_dirty_record_t));
 		ASSERT(db->db_dirtycnt > 0);
 		db->db_dirtycnt -= 1;
@@ -2203,13 +2203,12 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 	mutex_enter(&db->db_mtx);
 
 	drp = &db->db_last_dirty;
-	while (*drp != db->db_data_pending)
-		drp = &(*drp)->dr_next;
-	ASSERT(!list_link_active(&(*drp)->dr_dirty_node));
-	ASSERT((*drp)->dr_txg == txg);
-	ASSERT((*drp)->dr_next == NULL);
-	dr = *drp;
-	*drp = NULL;
+	while ((dr = *drp) != db->db_data_pending)
+		drp = &dr->dr_next;
+	ASSERT(!list_link_active(&dr->dr_dirty_node));
+	ASSERT(dr->dr_txg == txg);
+	ASSERT(dr->dr_next == NULL);
+	*drp = dr->dr_next;
 
 	if (db->db_level == 0) {
 		ASSERT(db->db_blkid != DB_BONUS_BLKID);

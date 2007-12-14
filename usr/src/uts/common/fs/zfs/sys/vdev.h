@@ -108,7 +108,7 @@ extern void vdev_queue_io_done(zio_t *zio);
 
 extern void vdev_config_dirty(vdev_t *vd);
 extern void vdev_config_clean(vdev_t *vd);
-extern int vdev_config_sync(vdev_t *vd, uint64_t txg);
+extern int vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg);
 
 extern nvlist_t *vdev_config_generate(spa_t *spa, vdev_t *vd,
     boolean_t getstats, boolean_t isspare, boolean_t isl2cache);

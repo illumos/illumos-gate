@@ -175,15 +175,14 @@ vdev_label_read(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
 
 static void
 vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
-	uint64_t size, zio_done_func_t *done, void *private)
+	uint64_t size, zio_done_func_t *done, void *private, int flags)
 {
 	ASSERT(vd->vdev_children == 0);
 
 	zio_nowait(zio_write_phys(zio, vd,
 	    vdev_label_offset(vd->vdev_psize, l, offset),
 	    size, buf, ZIO_CHECKSUM_LABEL, done, private,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL,
-	    B_TRUE));
+	    ZIO_PRIORITY_SYNC_WRITE, flags, B_TRUE));
 }
 
 /*
@@ -480,6 +479,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	size_t buflen;
 	int error;
 	uint64_t spare_guid, l2cache_guid;
+	int flags = ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
 
@@ -641,23 +641,22 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	/*
 	 * Write everything in parallel.
 	 */
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
+	zio = zio_root(spa, NULL, NULL, flags);
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 
 		vdev_label_write(zio, vd, l, vp,
 		    offsetof(vdev_label_t, vl_vdev_phys),
-		    sizeof (vdev_phys_t), NULL, NULL);
+		    sizeof (vdev_phys_t), NULL, NULL, flags);
 
 		vdev_label_write(zio, vd, l, vb,
 		    offsetof(vdev_label_t, vl_boot_header),
-		    sizeof (vdev_boot_header_t), NULL, NULL);
+		    sizeof (vdev_boot_header_t), NULL, NULL, flags);
 
 		for (n = 0; n < VDEV_UBERBLOCK_COUNT(vd); n++) {
 			vdev_label_write(zio, vd, l, ub,
 			    VDEV_UBERBLOCK_OFFSET(vd, n),
-			    VDEV_UBERBLOCK_SIZE(vd), NULL, NULL);
+			    VDEV_UBERBLOCK_SIZE(vd), NULL, NULL, flags);
 		}
 	}
 
@@ -764,25 +763,29 @@ vdev_uberblock_load(zio_t *zio, vdev_t *vd, uberblock_t *ubbest)
 }
 
 /*
- * Write the uberblock to both labels of all leaves of the specified vdev.
+ * On success, increment root zio's count of good writes.
  * We only get credit for writes to known-visible vdevs; see spa_vdev_add().
  */
 static void
 vdev_uberblock_sync_done(zio_t *zio)
 {
-	uint64_t *good_writes = zio->io_root->io_private;
+	uint64_t *good_writes = zio->io_private;
 
 	if (zio->io_error == 0 && zio->io_vd->vdev_top->vdev_ms_array != 0)
 		atomic_add_64(good_writes, 1);
 }
 
+/*
+ * Write the uberblock to all labels of all leaves of the specified vdev.
+ */
 static void
-vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd, uint64_t txg)
+vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd)
 {
 	int l, c, n;
+	uberblock_t *ubbuf;
 
 	for (c = 0; c < vd->vdev_children; c++)
-		vdev_uberblock_sync(zio, ub, vd->vdev_child[c], txg);
+		vdev_uberblock_sync(zio, ub, vd->vdev_child[c]);
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return;
@@ -790,73 +793,83 @@ vdev_uberblock_sync(zio_t *zio, uberblock_t *ub, vdev_t *vd, uint64_t txg)
 	if (vdev_is_dead(vd))
 		return;
 
-	n = txg & (VDEV_UBERBLOCK_COUNT(vd) - 1);
+	n = ub->ub_txg & (VDEV_UBERBLOCK_COUNT(vd) - 1);
 
-	ASSERT(ub->ub_txg == txg);
-
-	for (l = 0; l < VDEV_LABELS; l++)
-		vdev_label_write(zio, vd, l, ub,
-		    VDEV_UBERBLOCK_OFFSET(vd, n),
-		    VDEV_UBERBLOCK_SIZE(vd),
-		    vdev_uberblock_sync_done, NULL);
-
-	dprintf("vdev %s in txg %llu\n", vdev_description(vd), txg);
-}
-
-static int
-vdev_uberblock_sync_tree(spa_t *spa, uberblock_t *ub, vdev_t *vd, uint64_t txg)
-{
-	uberblock_t *ubbuf;
-	size_t size = vd->vdev_top ? VDEV_UBERBLOCK_SIZE(vd) : SPA_MAXBLOCKSIZE;
-	uint64_t *good_writes;
-	zio_t *zio;
-	int error;
-
-	ubbuf = zio_buf_alloc(size);
-	bzero(ubbuf, size);
+	ubbuf = zio_buf_alloc(VDEV_UBERBLOCK_SIZE(vd));
+	bzero(ubbuf, VDEV_UBERBLOCK_SIZE(vd));
 	*ubbuf = *ub;
 
-	good_writes = kmem_zalloc(sizeof (uint64_t), KM_SLEEP);
+	for (l = 0; l < VDEV_LABELS; l++)
+		vdev_label_write(zio, vd, l, ubbuf,
+		    VDEV_UBERBLOCK_OFFSET(vd, n),
+		    VDEV_UBERBLOCK_SIZE(vd),
+		    vdev_uberblock_sync_done, zio->io_private,
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE);
 
-	zio = zio_root(spa, NULL, good_writes,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
+	zio_buf_free(ubbuf, VDEV_UBERBLOCK_SIZE(vd));
+}
 
-	vdev_uberblock_sync(zio, ubbuf, vd, txg);
+int
+vdev_uberblock_sync_list(vdev_t **svd, int svdcount, uberblock_t *ub, int flags)
+{
+	spa_t *spa = svd[0]->vdev_spa;
+	int v;
+	zio_t *zio;
+	uint64_t good_writes = 0;
 
-	error = zio_wait(zio);
+	zio = zio_root(spa, NULL, &good_writes, flags);
 
-	if (error && *good_writes != 0) {
-		dprintf("partial success: good_writes = %llu\n", *good_writes);
-		error = 0;
-	}
+	for (v = 0; v < svdcount; v++)
+		vdev_uberblock_sync(zio, ub, svd[v]);
+
+	(void) zio_wait(zio);
 
 	/*
-	 * It's possible to have no good writes and no error if every vdev is in
-	 * the CANT_OPEN state.
+	 * Flush the uberblocks to disk.  This ensures that the odd labels
+	 * are no longer needed (because the new uberblocks and the even
+	 * labels are safely on disk), so it is safe to overwrite them.
 	 */
-	if (*good_writes == 0 && error == 0)
-		error = EIO;
+	zio = zio_root(spa, NULL, NULL, flags);
 
-	kmem_free(good_writes, sizeof (uint64_t));
-	zio_buf_free(ubbuf, size);
+	for (v = 0; v < svdcount; v++)
+		zio_flush(zio, svd[v]);
 
-	return (error);
+	(void) zio_wait(zio);
+
+	return (good_writes >= 1 ? 0 : EIO);
 }
 
 /*
- * Sync out an individual vdev.
+ * On success, increment the count of good writes for our top-level vdev.
  */
 static void
-vdev_sync_label_done(zio_t *zio)
+vdev_label_sync_done(zio_t *zio)
 {
-	uint64_t *good_writes = zio->io_root->io_private;
+	uint64_t *good_writes = zio->io_private;
 
 	if (zio->io_error == 0)
 		atomic_add_64(good_writes, 1);
 }
 
+/*
+ * If there weren't enough good writes, indicate failure to the parent.
+ */
 static void
-vdev_sync_label(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
+vdev_label_sync_top_done(zio_t *zio)
+{
+	uint64_t *good_writes = zio->io_private;
+
+	if (*good_writes == 0)
+		zio->io_error = EIO;
+
+	kmem_free(good_writes, sizeof (uint64_t));
+}
+
+/*
+ * Write all even or odd labels to all leaves of the specified vdev.
+ */
+static void
+vdev_label_sync(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
 {
 	nvlist_t *label;
 	vdev_phys_t *vp;
@@ -865,7 +878,7 @@ vdev_sync_label(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
 	int c;
 
 	for (c = 0; c < vd->vdev_children; c++)
-		vdev_sync_label(zio, vd->vdev_child[c], l, txg);
+		vdev_label_sync(zio, vd->vdev_child[c], l, txg);
 
 	if (!vd->vdev_ops->vdev_op_leaf)
 		return;
@@ -884,102 +897,95 @@ vdev_sync_label(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
 	buf = vp->vp_nvlist;
 	buflen = sizeof (vp->vp_nvlist);
 
-	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) == 0)
-		vdev_label_write(zio, vd, l, vp,
-		    offsetof(vdev_label_t, vl_vdev_phys), sizeof (vdev_phys_t),
-		    vdev_sync_label_done, NULL);
+	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) == 0) {
+		for (; l < VDEV_LABELS; l += 2) {
+			vdev_label_write(zio, vd, l, vp,
+			    offsetof(vdev_label_t, vl_vdev_phys),
+			    sizeof (vdev_phys_t),
+			    vdev_label_sync_done, zio->io_private,
+			    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE);
+		}
+	}
 
 	zio_buf_free(vp, sizeof (vdev_phys_t));
 	nvlist_free(label);
-
-	dprintf("%s label %d txg %llu\n", vdev_description(vd), l, txg);
 }
 
-static int
-vdev_sync_labels(vdev_t *vd, int l, uint64_t txg)
+int
+vdev_label_sync_list(spa_t *spa, int l, int flags, uint64_t txg)
 {
-	uint64_t *good_writes;
+	list_t *dl = &spa->spa_dirty_list;
+	vdev_t *vd;
 	zio_t *zio;
 	int error;
 
-	ASSERT(vd == vd->vdev_top);
-
-	good_writes = kmem_zalloc(sizeof (uint64_t), KM_SLEEP);
-
-	zio = zio_root(vd->vdev_spa, NULL, good_writes,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
-
 	/*
-	 * Recursively kick off writes to all labels.
+	 * Write the new labels to disk.
 	 */
-	vdev_sync_label(zio, vd, l, txg);
+	zio = zio_root(spa, NULL, NULL, flags);
+
+	for (vd = list_head(dl); vd != NULL; vd = list_next(dl, vd)) {
+		uint64_t *good_writes = kmem_zalloc(sizeof (uint64_t),
+		    KM_SLEEP);
+		zio_t *vio = zio_null(zio, spa, vdev_label_sync_top_done,
+		    good_writes, flags);
+		vdev_label_sync(vio, vd, l, txg);
+		zio_nowait(vio);
+	}
 
 	error = zio_wait(zio);
 
-	if (error && *good_writes != 0) {
-		dprintf("partial success: good_writes = %llu\n", *good_writes);
-		error = 0;
-	}
-
-	if (*good_writes == 0 && error == 0)
-		error = ENODEV;
-
 	/*
-	 * Failure to write a label can be fatal for a
-	 * top level vdev. We don't want this for slogs
-	 * as we use the main pool if they go away.
+	 * Flush the new labels to disk.
 	 */
-	if (vd->vdev_islog)
-		error = 0;
+	zio = zio_root(spa, NULL, NULL, flags);
 
-	kmem_free(good_writes, sizeof (uint64_t));
+	for (vd = list_head(dl); vd != NULL; vd = list_next(dl, vd))
+		zio_flush(zio, vd);
+
+	(void) zio_wait(zio);
 
 	return (error);
 }
 
 /*
- * Sync the entire vdev configuration.
+ * Sync the uberblock and any changes to the vdev configuration.
  *
  * The order of operations is carefully crafted to ensure that
  * if the system panics or loses power at any time, the state on disk
  * is still transactionally consistent.  The in-line comments below
  * describe the failure semantics at each stage.
  *
- * Moreover, it is designed to be idempotent: if spa_sync_labels() fails
+ * Moreover, vdev_config_sync() is designed to be idempotent: if it fails
  * at any time, you can just call it again, and it will resume its work.
  */
 int
-vdev_config_sync(vdev_t *uvd, uint64_t txg)
+vdev_config_sync(vdev_t **svd, int svdcount, uint64_t txg)
 {
-	spa_t *spa = uvd->vdev_spa;
+	spa_t *spa = svd[0]->vdev_spa;
 	uberblock_t *ub = &spa->spa_uberblock;
-	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *vd;
 	zio_t *zio;
-	int l, last_error = 0, error = 0;
-	uint64_t good_writes = 0;
-	boolean_t retry_avail = B_TRUE;
+	int error;
+	int flags = ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL;
 
 	ASSERT(ub->ub_txg <= txg);
 
 	/*
-	 * If this isn't a resync due to I/O errors, and nothing changed
-	 * in this transaction group, and the vdev configuration hasn't changed,
+	 * If this isn't a resync due to I/O errors,
+	 * and nothing changed in this transaction group,
+	 * and the vdev configuration hasn't changed,
 	 * then there's nothing to do.
 	 */
-	if (ub->ub_txg < txg && uberblock_update(ub, rvd, txg) == B_FALSE &&
-	    list_is_empty(&spa->spa_dirty_list)) {
-		dprintf("nothing to sync in %s in txg %llu\n",
-		    spa_name(spa), txg);
+	if (ub->ub_txg < txg &&
+	    uberblock_update(ub, spa->spa_root_vdev, txg) == B_FALSE &&
+	    list_is_empty(&spa->spa_dirty_list))
 		return (0);
-	}
 
 	if (txg > spa_freeze_txg(spa))
 		return (0);
 
 	ASSERT(txg <= spa->spa_final_txg);
-
-	dprintf("syncing %s txg %llu\n", spa_name(spa), txg);
 
 	/*
 	 * Flush the write cache of every disk that's been written to
@@ -987,68 +993,28 @@ vdev_config_sync(vdev_t *uvd, uint64_t txg)
 	 * written in this txg will be committed to stable storage
 	 * before any uberblock that references them.
 	 */
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
+	zio = zio_root(spa, NULL, NULL, flags);
+
 	for (vd = txg_list_head(&spa->spa_vdev_txg_list, TXG_CLEAN(txg)); vd;
-	    vd = txg_list_next(&spa->spa_vdev_txg_list, vd, TXG_CLEAN(txg))) {
-		zio_nowait(zio_ioctl(zio, spa, vd, DKIOCFLUSHWRITECACHE,
-		    NULL, NULL, ZIO_PRIORITY_NOW,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-	}
+	    vd = txg_list_next(&spa->spa_vdev_txg_list, vd, TXG_CLEAN(txg)))
+		zio_flush(zio, vd);
+
 	(void) zio_wait(zio);
 
-retry:
 	/*
 	 * Sync out the even labels (L0, L2) for every dirty vdev.  If the
 	 * system dies in the middle of this process, that's OK: all of the
 	 * even labels that made it to disk will be newer than any uberblock,
 	 * and will therefore be considered invalid.  The odd labels (L1, L3),
-	 * which have not yet been touched, will still be valid.
+	 * which have not yet been touched, will still be valid.  We flush
+	 * the new labels to disk to ensure that all even-label updates
+	 * are committed to stable storage before the uberblock update.
 	 */
-	for (vd = list_head(&spa->spa_dirty_list); vd != NULL;
-	    vd = list_next(&spa->spa_dirty_list, vd)) {
-		for (l = 0; l < VDEV_LABELS; l++) {
-			if (l & 1)
-				continue;
-			if ((error = vdev_sync_labels(vd, l, txg)) != 0)
-				last_error = error;
-			else
-				good_writes++;
-		}
-	}
+	if ((error = vdev_label_sync_list(spa, 0, flags, txg)) != 0)
+		return (error);
 
 	/*
-	 * If all the vdevs that are currently dirty have failed or the
-	 * spa_dirty_list is empty then we dirty all the vdevs and try again.
-	 * This is a last ditch effort to ensure that we get at least one
-	 * update before proceeding to the uberblock.
-	 */
-	if (good_writes == 0 && retry_avail) {
-		vdev_config_dirty(rvd);
-		retry_avail = B_FALSE;
-		last_error = 0;
-		goto retry;
-	}
-
-	if (good_writes == 0)
-		return (last_error);
-
-	/*
-	 * Flush the new labels to disk.  This ensures that all even-label
-	 * updates are committed to stable storage before the uberblock update.
-	 */
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
-	for (vd = list_head(&spa->spa_dirty_list); vd != NULL;
-	    vd = list_next(&spa->spa_dirty_list, vd)) {
-		zio_nowait(zio_ioctl(zio, spa, vd, DKIOCFLUSHWRITECACHE,
-		    NULL, NULL, ZIO_PRIORITY_NOW,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-	}
-	(void) zio_wait(zio);
-
-	/*
-	 * Sync the uberblocks to all vdevs in the tree specified by uvd.
+	 * Sync the uberblocks to all vdevs in svd[].
 	 * If the system dies in the middle of this step, there are two cases
 	 * to consider, and the on-disk state is consistent either way:
 	 *
@@ -1061,64 +1027,19 @@ retry:
 	 *	will be the newest, and the even labels (which had all
 	 *	been successfully committed) will be valid with respect
 	 *	to the new uberblocks.
-	 *
-	 * NOTE: We retry to an uberblock update on the root if we were
-	 * failed our initial update attempt.
 	 */
-	error = vdev_uberblock_sync_tree(spa, ub, uvd, txg);
-	if (error && uvd != rvd)
-		error = vdev_uberblock_sync_tree(spa, ub, rvd, txg);
-
-	if (error)
+	if ((error = vdev_uberblock_sync_list(svd, svdcount, ub, flags)) != 0)
 		return (error);
 
-	/*
-	 * Flush the uberblocks to disk.  This ensures that the odd labels
-	 * are no longer needed (because the new uberblocks and the even
-	 * labels are safely on disk), so it is safe to overwrite them.
-	 */
-	(void) zio_wait(zio_ioctl(NULL, spa, uvd, DKIOCFLUSHWRITECACHE,
-	    NULL, NULL, ZIO_PRIORITY_NOW,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-
-	last_error = 0;
 	/*
 	 * Sync out odd labels for every dirty vdev.  If the system dies
 	 * in the middle of this process, the even labels and the new
 	 * uberblocks will suffice to open the pool.  The next time
 	 * the pool is opened, the first thing we'll do -- before any
 	 * user data is modified -- is mark every vdev dirty so that
-	 * all labels will be brought up to date.
+	 * all labels will be brought up to date.  We flush the new labels
+	 * to disk to ensure that all odd-label updates are committed to
+	 * stable storage before the next transaction group begins.
 	 */
-	for (vd = list_head(&spa->spa_dirty_list); vd != NULL;
-	    vd = list_next(&spa->spa_dirty_list, vd)) {
-		for (l = 0; l < VDEV_LABELS; l++) {
-			if ((l & 1) == 0)
-				continue;
-			if ((error = vdev_sync_labels(vd, l, txg)) != 0)
-				last_error = error;
-			else
-				good_writes++;
-		}
-	}
-
-	if (good_writes == 0)
-		return (last_error);
-
-	/*
-	 * Flush the new labels to disk.  This ensures that all odd-label
-	 * updates are committed to stable storage before the next
-	 * transaction group begins.
-	 */
-	zio = zio_root(spa, NULL, NULL,
-	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
-	for (vd = list_head(&spa->spa_dirty_list); vd != NULL;
-	    vd = list_next(&spa->spa_dirty_list, vd)) {
-		zio_nowait(zio_ioctl(zio, spa, vd, DKIOCFLUSHWRITECACHE,
-		    NULL, NULL, ZIO_PRIORITY_NOW,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-	}
-	(void) zio_wait(zio);
-
-	return (0);
+	return (vdev_label_sync_list(spa, 1, flags, txg));
 }

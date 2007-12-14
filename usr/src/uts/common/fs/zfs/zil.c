@@ -529,87 +529,88 @@ zil_claim(char *osname, void *txarg)
 	return (0);
 }
 
-void
-zil_add_vdev(zilog_t *zilog, uint64_t vdev)
+static int
+zil_vdev_compare(const void *x1, const void *x2)
 {
-	zil_vdev_t *zv, *new;
-	uint64_t bmap_sz = sizeof (zilog->zl_vdev_bmap) << 3;
-	uchar_t *cp;
+	const uint64_t *v1 = x1;
+	const uint64_t *v2 = x2;
+
+	if (v1 < v2)
+		return (-1);
+	if (v1 > v2)
+		return (1);
+
+	return (0);
+}
+
+void
+zil_add_block(zilog_t *zilog, blkptr_t *bp)
+{
+	avl_tree_t *t = &zilog->zl_vdev_tree;
+	avl_index_t where;
+	zil_vdev_node_t *zv, zvsearch;
+	int ndvas = BP_GET_NDVAS(bp);
+	int i;
 
 	if (zfs_nocacheflush)
 		return;
 
-	if (vdev < bmap_sz) {
-		cp = zilog->zl_vdev_bmap + (vdev / 8);
-		atomic_or_8(cp, 1 << (vdev % 8));
-	} else  {
-		/*
-		 * insert into ordered list
-		 */
-		mutex_enter(&zilog->zl_lock);
-		for (zv = list_head(&zilog->zl_vdev_list); zv != NULL;
-		    zv = list_next(&zilog->zl_vdev_list, zv)) {
-			if (zv->vdev == vdev) {
-				/* duplicate found - just return */
-				mutex_exit(&zilog->zl_lock);
-				return;
-			}
-			if (zv->vdev > vdev) {
-				/* insert before this entry */
-				new = kmem_alloc(sizeof (zil_vdev_t),
-				    KM_SLEEP);
-				new->vdev = vdev;
-				list_insert_before(&zilog->zl_vdev_list,
-				    zv, new);
-				mutex_exit(&zilog->zl_lock);
-				return;
-			}
+	ASSERT(zilog->zl_writer);
+
+	/*
+	 * Even though we're zl_writer, we still need a lock because the
+	 * zl_get_data() callbacks may have dmu_sync() done callbacks
+	 * that will run concurrently.
+	 */
+	mutex_enter(&zilog->zl_vdev_lock);
+	for (i = 0; i < ndvas; i++) {
+		zvsearch.zv_vdev = DVA_GET_VDEV(&bp->blk_dva[i]);
+		if (avl_find(t, &zvsearch, &where) == NULL) {
+			zv = kmem_alloc(sizeof (*zv), KM_SLEEP);
+			zv->zv_vdev = zvsearch.zv_vdev;
+			avl_insert(t, zv, where);
 		}
-		/* ran off end of list, insert at the end */
-		ASSERT(zv == NULL);
-		new = kmem_alloc(sizeof (zil_vdev_t), KM_SLEEP);
-		new->vdev = vdev;
-		list_insert_tail(&zilog->zl_vdev_list, new);
-		mutex_exit(&zilog->zl_lock);
 	}
+	mutex_exit(&zilog->zl_vdev_lock);
 }
 
 void
 zil_flush_vdevs(zilog_t *zilog)
 {
-	zil_vdev_t *zv;
-	zio_t *zio = NULL;
 	spa_t *spa = zilog->zl_spa;
-	uint64_t vdev;
-	uint8_t b;
-	int i, j;
+	avl_tree_t *t = &zilog->zl_vdev_tree;
+	void *cookie = NULL;
+	zil_vdev_node_t *zv;
+	zio_t *zio;
 
 	ASSERT(zilog->zl_writer);
 
-	for (i = 0; i < sizeof (zilog->zl_vdev_bmap); i++) {
-		b = zilog->zl_vdev_bmap[i];
-		if (b == 0)
-			continue;
-		for (j = 0; j < 8; j++) {
-			if (b & (1 << j)) {
-				vdev = (i << 3) + j;
-				zio_flush_vdev(spa, vdev, &zio);
-			}
-		}
-		zilog->zl_vdev_bmap[i] = 0;
+	/*
+	 * We don't need zl_vdev_lock here because we're the zl_writer,
+	 * and all zl_get_data() callbacks are done.
+	 */
+	if (avl_numnodes(t) == 0)
+		return;
+
+	spa_config_enter(spa, RW_READER, FTAG);
+
+	zio = zio_root(spa, NULL, NULL,
+	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL);
+
+	while ((zv = avl_destroy_nodes(t, &cookie)) != NULL) {
+		vdev_t *vd = vdev_lookup_top(spa, zv->zv_vdev);
+		if (vd != NULL)
+			zio_flush(zio, vd);
+		kmem_free(zv, sizeof (*zv));
 	}
 
-	while ((zv = list_head(&zilog->zl_vdev_list)) != NULL) {
-		zio_flush_vdev(spa, zv->vdev, &zio);
-		list_remove(&zilog->zl_vdev_list, zv);
-		kmem_free(zv, sizeof (zil_vdev_t));
-	}
 	/*
 	 * Wait for all the flushes to complete.  Not all devices actually
 	 * support the DKIOCFLUSHWRITECACHE ioctl, so it's OK if it fails.
 	 */
-	if (zio)
-		(void) zio_wait(zio);
+	(void) zio_wait(zio);
+
+	spa_config_exit(spa, FTAG);
 }
 
 /*
@@ -760,8 +761,8 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	list_insert_tail(&zilog->zl_lwb_list, nlwb);
 	mutex_exit(&zilog->zl_lock);
 
-	/* Record the vdev for later flushing */
-	zil_add_vdev(zilog, DVA_GET_VDEV(BP_IDENTITY(&(lwb->lwb_blk))));
+	/* Record the block for later vdev flushing */
+	zil_add_block(zilog, &lwb->lwb_blk);
 
 	/*
 	 * kick off the write for the old log block
@@ -1068,8 +1069,7 @@ zil_commit_writer(zilog_t *zilog, uint64_t seq, uint64_t foid)
 		DTRACE_PROBE1(zil__cw3, zilog_t *, zilog);
 		(void) zio_wait(zilog->zl_root_zio);
 		DTRACE_PROBE1(zil__cw4, zilog_t *, zilog);
-		if (!zfs_nocacheflush)
-			zil_flush_vdevs(zilog);
+		zil_flush_vdevs(zilog);
 	}
 
 	if (zilog->zl_log_error || lwb == NULL) {
@@ -1211,8 +1211,10 @@ zil_alloc(objset_t *os, zil_header_t *zh_phys)
 	list_create(&zilog->zl_lwb_list, sizeof (lwb_t),
 	    offsetof(lwb_t, lwb_node));
 
-	list_create(&zilog->zl_vdev_list, sizeof (zil_vdev_t),
-	    offsetof(zil_vdev_t, vdev_seq_node));
+	mutex_init(&zilog->zl_vdev_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	avl_create(&zilog->zl_vdev_tree, zil_vdev_compare,
+	    sizeof (zil_vdev_node_t), offsetof(zil_vdev_node_t, zv_node));
 
 	return (zilog);
 }
@@ -1221,7 +1223,6 @@ void
 zil_free(zilog_t *zilog)
 {
 	lwb_t *lwb;
-	zil_vdev_t *zv;
 
 	zilog->zl_stop_sync = 1;
 
@@ -1233,11 +1234,8 @@ zil_free(zilog_t *zilog)
 	}
 	list_destroy(&zilog->zl_lwb_list);
 
-	while ((zv = list_head(&zilog->zl_vdev_list)) != NULL) {
-		list_remove(&zilog->zl_vdev_list, zv);
-		kmem_free(zv, sizeof (zil_vdev_t));
-	}
-	list_destroy(&zilog->zl_vdev_list);
+	avl_destroy(&zilog->zl_vdev_tree);
+	mutex_destroy(&zilog->zl_vdev_lock);
 
 	ASSERT(list_head(&zilog->zl_itx_list) == NULL);
 	list_destroy(&zilog->zl_itx_list);

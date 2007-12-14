@@ -118,8 +118,7 @@ extern vmem_t *zio_alloc_arena;
  * stage set or will have it later in it's lifetime.
  */
 #define	IO_IS_ALLOCATING(zio) \
-	((zio)->io_orig_pipeline == ZIO_WRITE_PIPELINE ||		\
-	(zio)->io_pipeline & (1U << ZIO_STAGE_DVA_ALLOCATE))
+	((zio)->io_orig_pipeline & (1U << ZIO_STAGE_DVA_ALLOCATE))
 
 void
 zio_init(void)
@@ -1324,7 +1323,6 @@ zio_write_compress(zio_t *zio)
 			BP_SET_LSIZE(bp, lsize);
 			BP_SET_PSIZE(bp, csize);
 			BP_SET_COMPRESS(bp, compress);
-			zio->io_pipeline = ZIO_WRITE_ALLOCATE_PIPELINE;
 		}
 	}
 
@@ -1813,8 +1811,7 @@ zio_vdev_io_assess(zio_t *zio)
 
 		zio->io_retries++;
 		zio->io_error = 0;
-		zio->io_flags &= ZIO_FLAG_VDEV_INHERIT |
-		    ZIO_FLAG_CONFIG_GRABBED;
+		zio->io_flags &= ZIO_FLAG_RETRY_INHERIT;
 		/* XXPOLICY */
 		zio->io_flags &= ~ZIO_FLAG_FAILFAST;
 		zio->io_flags |= ZIO_FLAG_DONT_CACHE;
@@ -2077,24 +2074,9 @@ zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg)
  * start an async flush of the write cache for this vdev
  */
 void
-zio_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio)
+zio_flush(zio_t *zio, vdev_t *vd)
 {
-	vdev_t *vd;
-
-	/*
-	 * Lock out configuration changes.
-	 */
-	spa_config_enter(spa, RW_READER, FTAG);
-
-	if (*zio == NULL)
-		*zio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL);
-
-	vd = vdev_lookup_top(spa, vdev);
-	ASSERT(vd);
-
-	(void) zio_nowait(zio_ioctl(*zio, spa, vd, DKIOCFLUSHWRITECACHE,
+	zio_nowait(zio_ioctl(zio, zio->io_spa, vd, DKIOCFLUSHWRITECACHE,
 	    NULL, NULL, ZIO_PRIORITY_NOW,
 	    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-
-	spa_config_exit(spa, FTAG);
 }

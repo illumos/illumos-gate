@@ -109,7 +109,8 @@ typedef enum zio_stage {
 
 #define	ZIO_WRITE_PIPELINE					\
 	(ZIO_WRITE_COMMON_STAGES |				\
-	(1U << ZIO_STAGE_WRITE_COMPRESS))
+	(1U << ZIO_STAGE_WRITE_COMPRESS) |			\
+	(1U << ZIO_STAGE_DVA_ALLOCATE))
 
 #define	ZIO_GANG_REWRITE_STAGES					\
 	((1U << ZIO_STAGE_GET_GANG_HEADER) |			\

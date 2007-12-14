@@ -839,7 +839,7 @@ zfs_get_done(dmu_buf_t *db, void *vzgd)
 	dmu_buf_rele(db, vzgd);
 	zfs_range_unlock(rl);
 	VN_RELE(vp);
-	zil_add_vdev(zgd->zgd_zilog, DVA_GET_VDEV(BP_IDENTITY(zgd->zgd_bp)));
+	zil_add_block(zgd->zgd_zilog, zgd->zgd_bp);
 	kmem_free(zgd, sizeof (zgd_t));
 }
 
@@ -925,10 +925,8 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		    lr->lr_common.lrc_txg, zfs_get_done, zgd);
 		ASSERT((error && error != EINPROGRESS) ||
 		    lr->lr_length <= zp->z_blksz);
-		if (error == 0) {
-			zil_add_vdev(zfsvfs->z_log,
-			    DVA_GET_VDEV(BP_IDENTITY(&lr->lr_blkptr)));
-		}
+		if (error == 0)
+			zil_add_block(zfsvfs->z_log, &lr->lr_blkptr);
 		/*
 		 * If we get EINPROGRESS, then we need to wait for a
 		 * write IO initiated by dmu_sync() to complete before
