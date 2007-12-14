@@ -337,7 +337,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		 * Get the soft state structure for the bridge.
 		 */
 		pxb = (pxb_devstate_t *)
-			ddi_get_soft_state(pxb_state, instance);
+		    ddi_get_soft_state(pxb_state, instance);
 		(void) pcie_pwr_resume(devi);
 
 		return (DDI_SUCCESS);
@@ -403,14 +403,15 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCI_CAP_ID_PCI_E,
-		&cap_ptr)) != DDI_FAILURE)
+	    &cap_ptr)) != DDI_FAILURE)
 		pxb->pxb_port_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	else
 		pxb->pxb_port_type = PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
 
 	if ((pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_UP) &&
 	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_DOWN) &&
+	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_ROOT) &&
 	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
 	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) {
 		DBG(DBG_ATTACH, devi, "This is not a switch or bridge\n");
@@ -433,7 +434,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * the configuration registers
 	 */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"ranges") == 0) {
+	    "ranges") == 0) {
 		pxb_create_ranges_prop(devi, config_handle);
 	}
 
@@ -472,7 +473,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * property before setting the AER CE mask.
 	 */
 	(void) ddi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
-		"pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
+	    "pcie_ce_mask", PCIE_AER_CE_RECEIVER_ERR);
 
 	/*
 	 * There is a bug in the PLX 8114 bridge, such that an 8-bit
@@ -498,6 +499,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 #endif /* PX_PLX */
 
 	if ((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
 	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ||
 	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) {
 #ifdef PX_PLX
@@ -530,8 +532,8 @@ hotplug_done:
 		 * create minor node for devctl interfaces
 		 */
 		if (ddi_create_minor_node(devi, "devctl", S_IFCHR,
-			PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
-			DDI_NT_NEXUS, 0) != DDI_SUCCESS)
+		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
+		    DDI_NT_NEXUS, 0) != DDI_SUCCESS)
 			goto fail;
 	}
 
@@ -613,7 +615,7 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 		pxb = (pxb_devstate_t *)
-			ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
+		    ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
 
 		error = pcie_pwr_suspend(devi);
 
@@ -770,8 +772,8 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	*(int *)result = 0;
 	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip,
-		DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
-		(caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "reg",
+	    (caddr_t)&drv_regp, &reglen) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	totreg = reglen / sizeof (pci_regspec_t);
@@ -784,7 +786,7 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		}
 		*(off_t *)result = drv_regp[rn].pci_size_low |
-			((uint64_t)drv_regp[rn].pci_size_hi << 32);
+		    ((uint64_t)drv_regp[rn].pci_size_hi << 32);
 	}
 
 	kmem_free(drv_regp, reglen);
@@ -993,9 +995,9 @@ pxb_initchild(dev_info_t *child)
 	if (ddi_prop_exists(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "config-regs-saved-by-child") == 1) {
 		DBG(DBG_PWR, ddi_get_parent(child),
-			"INITCHILD: config regs to be restored by child"
-			" for %s@%s\n", ddi_node_name(child),
-				ddi_get_name_addr(child));
+		    "INITCHILD: config regs to be restored by child"
+		    " for %s@%s\n", ddi_node_name(child),
+		    ddi_get_name_addr(child));
 
 		result = DDI_SUCCESS;
 		goto cleanup;
@@ -1287,9 +1289,9 @@ pxb_intr(caddr_t arg1, caddr_t arg2)
 			rval = pcishpc_intr(pxb->pxb_dip);
 	}
 	if ((rval == DDI_INTR_UNCLAIMED) && (pxb->pxb_intr_type ==
-			DDI_INTR_TYPE_MSI))
+	    DDI_INTR_TYPE_MSI))
 		cmn_err(CE_WARN, "%s%d: Cannot handle interrupt",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	return (rval);
 }
@@ -1321,6 +1323,7 @@ pxb_init_hotplug(pxb_devstate_t *pxb)
 	int rv = DDI_FAILURE;
 
 	if (((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
 	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) &&
 	    (pxb_pciehpc_probe(pxb->pxb_dip,
 	    pxb->pxb_config_handle) == DDI_SUCCESS)) {
@@ -1391,9 +1394,9 @@ pxb_create_ranges_prop(dev_info_t *dip,
 	 */
 	ranges[i].size_low = ranges[i].size_high = 0;
 	ranges[i].parent_mid = ranges[i].child_mid =
-		ranges[i].parent_high = 0;
+	    ranges[i].parent_high = 0;
 	ranges[i].child_high = ranges[i].parent_high |=
-		(PCI_REG_REL_M | PCI_ADDR_IO);
+	    (PCI_REG_REL_M | PCI_ADDR_IO);
 	base = PXB_16bit_IOADDR(io_base_lo);
 	limit = PXB_16bit_IOADDR(io_limit_lo);
 
@@ -1416,9 +1419,9 @@ pxb_create_ranges_prop(dev_info_t *dip,
 	limit = PXB_32bit_MEMADDR(mem_limit);
 	ranges[i].size_low = ranges[i].size_high = 0;
 	ranges[i].parent_mid = ranges[i].child_mid =
-		ranges[i].parent_high = 0;
+	    ranges[i].parent_high = 0;
 	ranges[i].child_high = ranges[i].parent_high |=
-		(PCI_REG_REL_M | PCI_ADDR_MEM32);
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
 	ranges[i].child_low = ranges[i].parent_low = base;
 	if (limit >= base) {
 		ranges[i].size_low = limit - base + PXB_MEMGRAIN;
@@ -1661,7 +1664,7 @@ pxb_pwr_setup(dev_info_t *dip)
 	 * Walk the capabilities searching for a PM entry.
 	 */
 	if ((PCI_CAP_LOCATE(conf_hdl, PCI_CAP_ID_PM, &cap_ptr))
-		== DDI_FAILURE) {
+	    == DDI_FAILURE) {
 		DBG(DBG_PWR, dip, "switch/bridge does not support PM. PCI"
 		    " PM data structure not found in config header\n");
 		pci_config_teardown(&conf_hdl);
@@ -1767,7 +1770,7 @@ pxb_fm_init(pxb_devstate_t *pxb_p)
 	dev_info_t	*dip = pxb_p->pxb_dip;
 
 	pxb_p->pxb_fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
-		DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
 	/*
 	 * Request our capability level and get our parents capability
@@ -1849,12 +1852,12 @@ static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	uint16_t cap_ptr;
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr))
-		!= DDI_FAILURE) {
+	    != DDI_FAILURE) {
 		uint16_t slotimpl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
+		    PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		if (slotimpl)
 			if (PCI_CAP_GET32(config_handle, NULL, cap_ptr,
-				PCIE_SLOTCAP) & PCIE_SLOTCAP_HP_CAPABLE)
+			    PCIE_SLOTCAP) & PCIE_SLOTCAP_HP_CAPABLE)
 				return (DDI_SUCCESS);
 	}
 
@@ -1868,7 +1871,7 @@ static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	uint16_t cap_ptr;
 
 	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_HOTPLUG, &cap_ptr))
-		!= DDI_FAILURE) {
+	    != DDI_FAILURE) {
 		return (DDI_SUCCESS);
 	}
 
@@ -1888,8 +1891,9 @@ pxb_pcie_device_type(pxb_devstate_t *pxb_p)
 
 	/* check for all PCIe device_types */
 	if ((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-			(port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-			(port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
 		return (DDI_SUCCESS);
 
 	return (DDI_FAILURE);
@@ -1969,22 +1973,22 @@ pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p)
 	if (ddi_dev_regsize(dip, 1, &bar_size) != DDI_SUCCESS)
 		return;
 	if (ddi_regs_map_setup(dip, 1, (caddr_t *)&mp, 0, bar_size,
-			&mattr, &h) != DDI_SUCCESS)
+	    &mattr, &h) != DDI_SUCCESS)
 		return;
 	ddi_put32(h, (uint32_t *)((uchar_t *)mp + addr_reg_off), data);
 	delay(drv_usectohz(1000000));
 	printf("%s#%d: EEPROM StatusReg = %x, CRC = %x\n",
-		ddi_driver_name(dip), ddi_get_instance(dip),
-		ddi_get32(h, (uint32_t *)((uchar_t *)mp + addr_reg_off)),
-		ddi_get32(h, (uint32_t *)((uchar_t *)mp + data_reg_off)));
+	    ddi_driver_name(dip), ddi_get_instance(dip),
+	    ddi_get32(h, (uint32_t *)((uchar_t *)mp + addr_reg_off)),
+	    ddi_get32(h, (uint32_t *)((uchar_t *)mp + data_reg_off)));
 #ifdef PLX_HOT_RESET_DISABLE
 	/* prevent hot reset from propogating downstream. */
 	data = ddi_get32(h, (uint32_t *)((uchar_t *)mp + 0x1DC));
 	ddi_put32(h, (uint32_t *)((uchar_t *)mp + 0x1DC), data | 0x80000);
 	delay(drv_usectohz(1000000));
 	printf("%s#%d: EEPROM 0x1DC prewrite=%x postwrite=%x\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), data,
-		ddi_get32(h, (uint32_t *)((uchar_t *)mp + 0x1DC)));
+	    ddi_driver_name(dip), ddi_get_instance(dip), data,
+	    ddi_get32(h, (uint32_t *)((uchar_t *)mp + 0x1DC)));
 #endif
 	ddi_regs_map_free(&h);
 }
@@ -2030,10 +2034,10 @@ pxb_id_props(pxb_devstate_t *pxb)
 
 	if (fic)
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
-			"first-in-chassis");
+		    "first-in-chassis");
 	if (serialid)
 		(void) ddi_prop_update_int64(DDI_DEV_T_NONE, pxb->pxb_dip,
-			"serialid#", serialid);
+		    "serialid#", serialid);
 }
 
 /*
