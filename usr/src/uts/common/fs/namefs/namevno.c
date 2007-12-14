@@ -259,7 +259,7 @@ nm_access_unlocked(void *vnp, int mode, cred_t *crp)
 		return (0);
 
 	return (secpolicy_vnode_access(crp, NMTOV(nodep),
-						nodep->nm_vattr.va_uid, mode));
+	    nodep->nm_vattr.va_uid, mode));
 }
 /*
  * Set the attributes of the namenode from the attributes in vap.
@@ -293,7 +293,7 @@ nm_setattr(
 	 */
 
 	error = secpolicy_vnode_setattr(crp, vp, vap, nmvap, flags,
-					    nm_access_unlocked, nodep);
+	    nm_access_unlocked, nodep);
 	if (error)
 		goto out;
 
@@ -400,6 +400,7 @@ static void
 nm_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 {
 	struct namenode *nodep = VTONM(vp);
+	vfs_t *vfsp = vp->v_vfsp;
 
 	mutex_enter(&vp->v_lock);
 	ASSERT(vp->v_count >= 1);
@@ -414,6 +415,8 @@ nm_inactive(vnode_t *vp, cred_t *crp, caller_context_t *ct)
 	}
 	vn_invalid(vp);
 	vn_free(vp);
+	if (vfsp != &namevfs)
+		VFS_RELE(vfsp);
 	namenodeno_free(nodep->nm_vattr.va_nodeid);
 	kmem_free(nodep, sizeof (struct namenode));
 }

@@ -80,6 +80,7 @@ kmutex_t ntable_lock;
 static vmem_t	*nm_inoarena;	/* vmem arena to allocate inode no's from */
 static kmutex_t	nm_inolock;
 
+vfsops_t *namefs_vfsops;
 /*
  * Functions to allocate node id's starting from 1. Based on vmem routines.
  * The vmem arena is extended in NM_INOQUANT chunks.
@@ -221,7 +222,8 @@ nm_umountall(vnode_t *vp, cred_t *crp)
 	nodep = *NM_FILEVP_HASH(vp);
 	while (nodep) {
 		if (nodep->nm_filevp == vp &&
-		    (vfsp = NMTOV(nodep)->v_vfsp) != NULL && vfsp != &namevfs) {
+		    (vfsp = NMTOV(nodep)->v_vfsp) != NULL &&
+		    vfsp != &namevfs && (NMTOV(nodep)->v_flag & VROOT)) {
 
 			/*
 			 * If the vn_vfswlock fails, skip the vfs since
@@ -341,8 +343,10 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	 * Or unmount has completed but the namefs ROOT vnode
 	 * count has not decremented to zero, disallow this mount.
 	 */
+
 	mutex_enter(&mvp->v_lock);
-	if ((mvp->v_flag & VROOT) || (mvp->v_vfsp == &namevfs)) {
+	if ((mvp->v_flag & VROOT) ||
+	    vfs_matchops(mvp->v_vfsp, namefs_vfsops)) {
 		mutex_exit(&mvp->v_lock);
 		releasef(namefdp.fd);
 		return (EBUSY);
@@ -476,6 +480,7 @@ nm_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *crp)
 	newvp->v_type = filevp->v_type;
 	newvp->v_rdev = filevp->v_rdev;
 	newvp->v_data = (caddr_t)nodep;
+	VFS_HOLD(vfsp);
 	vn_exists(newvp);
 
 	/*
@@ -583,11 +588,11 @@ nm_unmount(vfs_t *vfsp, int flag, cred_t *crp)
 		mutex_exit(&thisvp->v_lock);
 		vn_invalid(thisvp);
 		vn_free(thisvp);
+		VFS_RELE(vfsp);
 		namenodeno_free(nodep->nm_vattr.va_nodeid);
 		kmem_free(nodep, sizeof (struct namenode));
 	} else {
 		thisvp->v_flag &= ~VROOT;
-		thisvp->v_vfsp = &namevfs;
 		mutex_exit(&thisvp->v_lock);
 	}
 	if (namefind(vp, NULLVP) == NULL && vp->v_stream) {
@@ -677,7 +682,6 @@ nameinit(int fstype, char *name)
 	};
 	int error;
 	int dev;
-	vfsops_t *namefs_vfsops;
 	vfsops_t *dummy_vfsops;
 
 	error = vfs_setfsops(fstype, nm_vfsops_template, &namefs_vfsops);
