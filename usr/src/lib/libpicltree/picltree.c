@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3646,7 +3646,7 @@ xptree_refresh_notify(uint32_t secs)
 		curgen = ptree_generation;
 
 		while (curgen == ptree_generation) {
-			if (secs == -1)	/* wait forever */
+			if (secs == UINT32_MAX)	/* wait forever */
 				(void) pthread_cond_wait(&ptree_refresh_cond,
 				    &ptree_refresh_mutex);
 			else {
