@@ -557,7 +557,9 @@ kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
 		if (results.ids.ids_len >= 1 &&
-		    results.ids.ids_val[0].id.idtype == IDMAP_SID) {
+		    (results.ids.ids_val[0].id.idtype == IDMAP_SID ||
+		    results.ids.ids_val[0].id.idtype == IDMAP_USID ||
+		    results.ids.ids_val[0].id.idtype == IDMAP_GSID)) {
 			status = results.ids.ids_val[0].retcode;
 			id = &results.ids.ids_val[0].id;
 			*sid_prefix = kidmap_find_sid_prefix(
@@ -629,7 +631,9 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
 		if (results.ids.ids_len >= 1 &&
-		    results.ids.ids_val[0].id.idtype == IDMAP_SID) {
+		    (results.ids.ids_val[0].id.idtype == IDMAP_SID ||
+		    results.ids.ids_val[0].id.idtype == IDMAP_USID ||
+		    results.ids.ids_val[0].id.idtype == IDMAP_GSID)) {
 			status = results.ids.ids_val[0].retcode;
 			id = &results.ids.ids_val[0].id;
 			*sid_prefix = kidmap_find_sid_prefix(
@@ -1109,6 +1113,8 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				break;
 
 			case IDMAP_SID:
+			case IDMAP_USID:
+			case IDMAP_GSID:
 				sid_prefix = kidmap_find_sid_prefix(
 				    id->idmap_id_u.sid.prefix);
 				if (result->sid_prefix && result->rid) {

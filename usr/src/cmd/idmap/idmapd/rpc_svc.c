@@ -50,33 +50,38 @@ _idmap_null_1(void  *argp, void *result, struct svc_req *rqstp)
 
 int
 _idmap_get_mapped_ids_1(idmap_mapping_batch  *argp, idmap_ids_res *result,
-		struct svc_req *rqstp) {
+		struct svc_req *rqstp)
+{
 	return (idmap_get_mapped_ids_1_svc(*argp, result, rqstp));
 }
 
 int
 _idmap_list_mappings_1(idmap_list_mappings_1_argument *argp,
-		idmap_mappings_res *result, struct svc_req *rqstp) {
-	return (idmap_list_mappings_1_svc(argp->is_user, argp->lastrowid,
-		argp->limit, result, rqstp));
+		idmap_mappings_res *result, struct svc_req *rqstp)
+{
+	return (idmap_list_mappings_1_svc(argp->lastrowid,
+	    argp->limit, result, rqstp));
 }
 
 int
 _idmap_list_namerules_1(idmap_list_namerules_1_argument *argp,
-		idmap_namerules_res *result, struct svc_req *rqstp) {
+		idmap_namerules_res *result, struct svc_req *rqstp)
+{
 	return (idmap_list_namerules_1_svc(argp->rule, argp->lastrowid,
-		argp->limit, result, rqstp));
+	    argp->limit, result, rqstp));
 }
 
 int
 _idmap_update_1(idmap_update_batch  *argp, idmap_update_res *res,
-		struct svc_req *rqstp) {
+		struct svc_req *rqstp)
+{
 	return (idmap_update_1_svc(*argp, res, rqstp));
 }
 
 int
 _idmap_get_mapped_id_by_name_1(idmap_mapping  *argp,
-		idmap_mappings_res *result, struct svc_req *rqstp) {
+		idmap_mappings_res *result, struct svc_req *rqstp)
+{
 	return (idmap_get_mapped_id_by_name_1_svc(*argp, result, rqstp));
 }
 

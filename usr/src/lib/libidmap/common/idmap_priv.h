@@ -74,25 +74,25 @@ extern idmap_stat idmap_udt_get_error_index(idmap_udt_handle_t *, int64_t *);
 
 /* Get the rule which caused the batch to failed */
 extern idmap_stat idmap_udt_get_error_rule(idmap_udt_handle_t *, char **,
-    char **, char **, boolean_t *, boolean_t *, int *);
+    char **, char **, boolean_t *, boolean_t *, boolean_t *, int *);
 
 /* Get the rule which caused a conflict */
 extern idmap_stat idmap_udt_get_conflict_rule(idmap_udt_handle_t *, char **,
-    char **, char **, boolean_t *, boolean_t *, int *);
+    char **, char **, boolean_t *, boolean_t *, boolean_t *, int *);
 
 /* Destroy the update handle */
 extern void idmap_udt_destroy(idmap_udt_handle_t *);
 
 /* Add name-based mapping rule */
 extern idmap_stat idmap_udt_add_namerule(idmap_udt_handle_t *, const char *,
-	boolean_t, const char *, const char *, boolean_t, int);
+	boolean_t, boolean_t, const char *, const char *, boolean_t, int);
 
 /* Remove name-based mapping rule */
 extern idmap_stat idmap_udt_rm_namerule(idmap_udt_handle_t *, boolean_t,
-	const char *, const char *, const char *, int);
+	boolean_t, const char *, const char *, const char *, int);
 
 /* Flush name-based mapping rules */
-extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *, boolean_t);
+extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *);
 
 
 /*
@@ -100,20 +100,20 @@ extern idmap_stat idmap_udt_flush_namerules(idmap_udt_handle_t *, boolean_t);
  */
 
 /* Create a iterator to get SID to UID/GID mappings */
-extern idmap_stat idmap_iter_mappings(idmap_handle_t *, boolean_t,
-	idmap_iter_t **);
+extern idmap_stat idmap_iter_mappings(idmap_handle_t *,	idmap_iter_t **);
 
 /* Iterate through the SID to UID/GID mappings */
 extern idmap_stat idmap_iter_next_mapping(idmap_iter_t *, char **,
-	idmap_rid_t *, uid_t *, char **, char **, char **, int *);
+	idmap_rid_t *, uid_t *, char **, char **, char **, boolean_t *,
+	boolean_t *, int *);
 
 /* Create a iterator to get name-based mapping rules */
 extern idmap_stat idmap_iter_namerules(idmap_handle_t *, const char *,
-	boolean_t, const char *, const char *, idmap_iter_t **);
+	boolean_t, boolean_t, const char *, const char *, idmap_iter_t **);
 
 /* Iterate through the name-based mapping rules */
 extern idmap_stat idmap_iter_next_namerule(idmap_iter_t *, char **,
-	char **, char **, boolean_t *, int *);
+	char **, char **, boolean_t *, boolean_t *, boolean_t *, int *);
 
 /* Set the number of entries requested per batch */
 extern idmap_stat idmap_iter_set_limit(idmap_iter_t *, uint64_t);
@@ -126,11 +126,11 @@ extern void idmap_iter_destroy(idmap_iter_t *);
  * Get mapping
  */
 extern idmap_stat idmap_get_w2u_mapping(idmap_handle_t *, const char *,
-	idmap_rid_t *, const char *, const char *, int, int *,
+	idmap_rid_t *, const char *, const char *, int, int *, int *,
 	uid_t *, char **, int *);
 
 extern idmap_stat idmap_get_u2w_mapping(idmap_handle_t *, uid_t *,
-	const char *, int, int, char **, idmap_rid_t *, char **,
+	const char *, int, int, int *, char **, idmap_rid_t *, char **,
 	char **, int *);
 
 

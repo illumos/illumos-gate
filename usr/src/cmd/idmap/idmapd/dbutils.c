@@ -43,18 +43,20 @@
 #include <grp.h>
 #include <pthread.h>
 #include <assert.h>
+#include <sys/u8_textprep.h>
 
 #include "idmapd.h"
 #include "adutils.h"
 #include "string.h"
 #include "idmap_priv.h"
+#include "schema.h"
 
 
 static int degraded = 0;	/* whether the FMRI has been marked degraded */
 
 static idmap_retcode sql_compile_n_step_once(sqlite *, char *,
 		sqlite_vm **, int *, int, const char ***);
-static idmap_retcode lookup_wksids_name2sid(const char *, char **,
+static idmap_retcode lookup_wksids_name2sid(const char *, char **, char **,
 		idmap_rid_t *, int *);
 
 #define	EMPTY_NAME(name)	(*name == 0 || strcmp(name, "\"\"") == 0)
@@ -125,8 +127,8 @@ idmap_tsd_destroy(void *key)
 }
 
 int
-idmap_init_tsd_key(void) {
-
+idmap_init_tsd_key(void)
+{
 	return (pthread_key_create(&idmap_tsd_key, idmap_tsd_destroy));
 }
 
@@ -156,6 +158,32 @@ idmap_get_tsd(void)
 	return (tsd);
 }
 
+static
+const char *
+get_fmri(void)
+{
+	static char *fmri = NULL;
+	static char buf[60];
+	char *s;
+
+	membar_consumer();
+	s = fmri;
+	if (s != NULL && *s == '\0')
+		return (NULL);
+	else if (s != NULL)
+		return (s);
+
+	if ((s = getenv("SMF_FMRI")) == NULL || strlen(s) >= sizeof (buf))
+		buf[0] = '\0';
+	else
+		(void) strlcpy(buf, s, sizeof (buf));
+
+	membar_producer();
+	fmri = buf;
+
+	return (get_fmri());
+}
+
 /*
  * Wrappers for smf_degrade/restore_instance()
  *
@@ -165,10 +193,16 @@ idmap_get_tsd(void)
 void
 degrade_svc(void)
 {
+	const char *fmri;
+
+	if ((fmri = get_fmri()) == NULL)
+		return;
+
 	membar_consumer();
 	if (degraded)
 		return;
-	(void) smf_degrade_instance(NULL, 0);
+
+	(void) smf_degrade_instance(fmri, 0);
 	membar_producer();
 	degraded = 1;
 }
@@ -177,94 +211,178 @@ degrade_svc(void)
 void
 restore_svc(void)
 {
+	const char *fmri;
+
+	if ((fmri = get_fmri()) == NULL)
+		return;
+
 	membar_consumer();
 	if (!degraded)
 		return;
-	(void) smf_restore_instance(NULL);
+	(void) smf_restore_instance(fmri);
 	membar_producer();
 	degraded = 0;
 }
+
+/*
+ * A simple wrapper around u8_textprep_str() that returns the Unicode
+ * lower-case version of some string.  The result must be freed.
+ */
+char *
+tolower_u8(const char *s)
+{
+	char *res = NULL;
+	char *outs;
+	size_t inlen, outlen, inbytesleft, outbytesleft;
+	int rc, err;
+
+	/*
+	 * u8_textprep_str() does not allocate memory.  The input and
+	 * output buffers may differ in size (though that would be more
+	 * likely when normalization is done).  We have to loop over it...
+	 *
+	 * To improve the chances that we can avoid looping we add 10
+	 * bytes of output buffer room the first go around.
+	 */
+	inlen = inbytesleft = strlen(s);
+	outlen = outbytesleft = inlen + 10;
+	if ((res = malloc(outlen)) == NULL)
+		return (NULL);
+	outs = res;
+
+	while ((rc = u8_textprep_str((char *)s, &inbytesleft, outs,
+	    &outbytesleft, U8_TEXTPREP_TOLOWER, U8_UNICODE_LATEST, &err)) < 0 &&
+	    err == E2BIG) {
+		if ((res = realloc(res, outlen + inbytesleft)) == NULL)
+			return (NULL);
+		/* adjust input/output buffer pointers */
+		s += (inlen - inbytesleft);
+		outs = res + outlen - outbytesleft;
+		/* adjust outbytesleft and outlen */
+		outlen += inbytesleft;
+		outbytesleft += inbytesleft;
+	}
+
+	if (rc < 0) {
+		free(res);
+		res = NULL;
+		return (NULL);
+	}
+
+	res[outlen - outbytesleft] = '\0';
+
+	return (res);
+}
+
+static int sql_exec_tran_no_cb(sqlite *db, char *sql, const char *dbname,
+	const char *while_doing);
 
 
 /*
  * Initialize 'dbname' using 'sql'
  */
-static int
-init_db_instance(const char *dbname, const char *sql, init_db_option_t opt,
-		int *new_db_created)
+static
+int
+init_db_instance(const char *dbname, int version,
+	const char *detect_version_sql, char * const *sql,
+	init_db_option_t opt, int *created, int *upgraded)
 {
-	int rc = 0;
-	int tries = 0;
+	int rc, curr_version;
+	int tries = 1;
+	int prio = LOG_NOTICE;
 	sqlite *db = NULL;
-	char *str = NULL;
+	char *errmsg = NULL;
 
-	if (new_db_created != NULL)
-		*new_db_created = 0;
+	*created = 0;
+	*upgraded = 0;
 
-	db = sqlite_open(dbname, 0600, &str);
-	while (db == NULL) {
-		idmapdlog(LOG_ERR,
-		    "Error creating database %s (%s)",
-		    dbname, CHECK_NULL(str));
-		sqlite_freemem(str);
-		if (opt == FAIL_IF_CORRUPT || opt != REMOVE_IF_CORRUPT ||
-		    tries > 0)
-			return (-1);
+	if (opt == REMOVE_IF_CORRUPT)
+		tries = 3;
 
-		tries++;
-		(void) unlink(dbname);
-		db = sqlite_open(dbname, 0600, &str);
+rinse_repeat:
+	if (tries == 0) {
+		idmapdlog(LOG_ERR, "Failed to initialize db %s", dbname);
+		return (-1);
+	}
+	if (tries-- == 1)
+		/* Last try, log errors */
+		prio = LOG_ERR;
+
+	db = sqlite_open(dbname, 0600, &errmsg);
+	if (db == NULL) {
+		idmapdlog(prio, "Error creating database %s (%s)",
+		    dbname, CHECK_NULL(errmsg));
+		sqlite_freemem(errmsg);
+		if (opt == REMOVE_IF_CORRUPT)
+			(void) unlink(dbname);
+		goto rinse_repeat;
 	}
 
 	sqlite_busy_timeout(db, 3000);
-	rc = sqlite_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &str);
-	if (SQLITE_OK != rc) {
-		idmapdlog(LOG_ERR, "Cannot begin database transaction (%s)",
-		    str);
-		sqlite_freemem(str);
-		sqlite_close(db);
-		return (1);
+
+	/* Detect current version of schema in the db, if any */
+	curr_version = 0;
+	if (detect_version_sql != NULL) {
+		char *end, **results;
+		int nrow;
+
+#ifdef	IDMAPD_DEBUG
+		(void) fprintf(stderr, "Schema version detection SQL: %s\n",
+		    detect_version_sql);
+#endif	/* IDMAPD_DEBUG */
+		rc = sqlite_get_table(db, detect_version_sql, &results,
+		    &nrow, NULL, &errmsg);
+		if (rc != SQLITE_OK) {
+			idmapdlog(prio,
+			    "Error detecting schema version of db %s (%s)",
+			    dbname, errmsg);
+			sqlite_freemem(errmsg);
+			sqlite_free_table(results);
+			sqlite_close(db);
+			return (-1);
+		}
+		if (nrow != 1) {
+			idmapdlog(prio,
+			    "Error detecting schema version of db %s", dbname);
+			sqlite_close(db);
+			sqlite_free_table(results);
+			return (-1);
+		}
+		curr_version = strtol(results[1], &end, 10);
+		sqlite_free_table(results);
 	}
 
-	switch (sqlite_exec(db, sql, NULL, NULL, &str)) {
-	case SQLITE_ERROR:
-/*
- * This is the normal situation: CREATE probably failed because tables
- * already exist. It may indicate an error in SQL as well, but we cannot
- * tell.
- */
-		sqlite_freemem(str);
-		rc =  sqlite_exec(db, "ROLLBACK TRANSACTION",
-		    NULL, NULL, &str);
-		break;
-	case SQLITE_OK:
-		rc =  sqlite_exec(db, "COMMIT TRANSACTION",
-		    NULL, NULL, &str);
-		idmapdlog(LOG_INFO,
-		    "Database created at %s", dbname);
-
-		if (new_db_created != NULL)
-			*new_db_created = 1;
-		break;
-	default:
-		idmapdlog(LOG_ERR,
-		    "Error initializing database %s (%s)",
-		    dbname, str);
-		sqlite_freemem(str);
-		rc =  sqlite_exec(db, "ROLLBACK TRANSACTION",
-		    NULL, NULL, &str);
-		break;
+	if (curr_version < 0) {
+		if (opt == REMOVE_IF_CORRUPT)
+			(void) unlink(dbname);
+		goto rinse_repeat;
 	}
 
-	if (SQLITE_OK != rc) {
-		/* this is bad - database may be left in a locked state */
-		idmapdlog(LOG_ERR,
-		    "Error closing transaction (%s)", str);
-		sqlite_freemem(str);
+	if (curr_version == version)
+		goto done;
+
+	/* Install or upgrade schema */
+#ifdef	IDMAPD_DEBUG
+	(void) fprintf(stderr, "Schema init/upgrade SQL: %s\n",
+	    sql[curr_version]);
+#endif	/* IDMAPD_DEBUG */
+	rc = sql_exec_tran_no_cb(db, sql[curr_version], dbname,
+	    (curr_version == 0) ? "installing schema" : "upgrading schema");
+	if (rc != 0) {
+		idmapdlog(prio, "Error %s schema for db %s", dbname,
+		    (curr_version == 0) ? "installing schema" :
+		    "upgrading schema");
+		if (opt == REMOVE_IF_CORRUPT)
+			(void) unlink(dbname);
+		goto rinse_repeat;
 	}
 
+	*upgraded = (curr_version > 0);
+	*created = (curr_version == 0);
+
+done:
 	(void) sqlite_close(db);
-	return (rc);
+	return (0);
 }
 
 
@@ -308,9 +426,10 @@ idmap_sqlite_busy_handler(void *arg, const char *table_name, int count)
  * Get the database handle
  */
 idmap_retcode
-get_db_handle(sqlite **db) {
-	char	*errmsg;
-	idmap_tsd_t *tsd;
+get_db_handle(sqlite **db)
+{
+	char		*errmsg;
+	idmap_tsd_t	*tsd;
 
 	/*
 	 * Retrieve the db handle from thread-specific storage
@@ -318,20 +437,19 @@ get_db_handle(sqlite **db) {
 	 */
 	if ((tsd = idmap_get_tsd()) == NULL) {
 		idmapdlog(LOG_ERR,
-			"Error getting thread specific data for %s",
-			IDMAP_DBNAME);
+		    "Error getting thread specific data for %s", IDMAP_DBNAME);
 		return (IDMAP_ERR_MEMORY);
 	}
 
 	if (tsd->db_db == NULL) {
 		tsd->db_db = sqlite_open(IDMAP_DBNAME, 0, &errmsg);
 		if (tsd->db_db == NULL) {
-			idmapdlog(LOG_ERR,
-				"Error opening database %s (%s)",
-				IDMAP_DBNAME, CHECK_NULL(errmsg));
+			idmapdlog(LOG_ERR, "Error opening database %s (%s)",
+			    IDMAP_DBNAME, CHECK_NULL(errmsg));
 			sqlite_freemem(errmsg);
-			return (IDMAP_ERR_INTERNAL);
+			return (IDMAP_ERR_DB);
 		}
+
 		tsd->db_busy.name = IDMAP_DBNAME;
 		tsd->db_busy.delays = db_delay_table;
 		tsd->db_busy.delay_size = sizeof (db_delay_table) /
@@ -347,30 +465,30 @@ get_db_handle(sqlite **db) {
  * Get the cache handle
  */
 idmap_retcode
-get_cache_handle(sqlite **cache) {
-	char	*errmsg;
-	idmap_tsd_t *tsd;
+get_cache_handle(sqlite **cache)
+{
+	char		*errmsg;
+	idmap_tsd_t	*tsd;
 
 	/*
 	 * Retrieve the db handle from thread-specific storage
 	 * If none exists, open and store in thread-specific storage.
 	 */
 	if ((tsd = idmap_get_tsd()) == NULL) {
-		idmapdlog(LOG_ERR,
-			"Error getting thread specific data for %s",
-			IDMAP_DBNAME);
+		idmapdlog(LOG_ERR, "Error getting thread specific data for %s",
+		    IDMAP_DBNAME);
 		return (IDMAP_ERR_MEMORY);
 	}
 
 	if (tsd->cache_db == NULL) {
 		tsd->cache_db = sqlite_open(IDMAP_CACHENAME, 0, &errmsg);
 		if (tsd->cache_db == NULL) {
-			idmapdlog(LOG_ERR,
-				"Error opening database %s (%s)",
-				IDMAP_CACHENAME, CHECK_NULL(errmsg));
+			idmapdlog(LOG_ERR, "Error opening database %s (%s)",
+			    IDMAP_CACHENAME, CHECK_NULL(errmsg));
 			sqlite_freemem(errmsg);
-			return (IDMAP_ERR_INTERNAL);
+			return (IDMAP_ERR_DB);
 		}
+
 		tsd->cache_busy.name = IDMAP_CACHENAME;
 		tsd->cache_busy.delays = cache_delay_table;
 		tsd->cache_busy.delay_size = sizeof (cache_delay_table) /
@@ -382,62 +500,31 @@ get_cache_handle(sqlite **cache) {
 	return (IDMAP_SUCCESS);
 }
 
-#define	CACHE_SQL\
-	"CREATE TABLE idmap_cache ("\
-	"	sidprefix TEXT,"\
-	"	rid INTEGER,"\
-	"	windomain TEXT,"\
-	"	winname TEXT,"\
-	"	pid INTEGER,"\
-	"	unixname TEXT,"\
-	"	is_user INTEGER,"\
-	"	w2u INTEGER,"\
-	"	u2w INTEGER,"\
-	"	expiration INTEGER"\
-	");"\
-	"CREATE UNIQUE INDEX idmap_cache_sid_w2u ON idmap_cache"\
-	"		(sidprefix, rid, w2u);"\
-	"CREATE UNIQUE INDEX idmap_cache_pid_u2w ON idmap_cache"\
-	"		(pid, is_user, u2w);"\
-	"CREATE TABLE name_cache ("\
-	"	sidprefix TEXT,"\
-	"	rid INTEGER,"\
-	"	name TEXT,"\
-	"	domain TEXT,"\
-	"	type INTEGER,"\
-	"	expiration INTEGER"\
-	");"\
-	"CREATE UNIQUE INDEX name_cache_sid ON name_cache"\
-	"		(sidprefix, rid);"
-
-#define	DB_SQL\
-	"CREATE TABLE namerules ("\
-	"	is_user INTEGER NOT NULL,"\
-	"	windomain TEXT,"\
-	"	winname TEXT NOT NULL,"\
-	"	is_nt4 INTEGER NOT NULL,"\
-	"	unixname NOT NULL,"\
-	"	w2u_order INTEGER,"\
-	"	u2w_order INTEGER"\
-	");"\
-	"CREATE UNIQUE INDEX namerules_w2u ON namerules"\
-	"		(winname, windomain, is_user, w2u_order);"\
-	"CREATE UNIQUE INDEX namerules_u2w ON namerules"\
-	"		(unixname, is_user, u2w_order);"
-
 /*
  * Initialize cache and db
  */
 int
-init_dbs() {
+init_dbs()
+{
+	char *sql[2];
+	int created, upgraded;
+
 	/* name-based mappings; probably OK to blow away in a pinch(?) */
-	if (init_db_instance(IDMAP_DBNAME, DB_SQL, FAIL_IF_CORRUPT, NULL) < 0)
+	sql[0] = DB_INSTALL_SQL;
+	sql[1] = DB_UPGRADE_FROM_v1_SQL;
+
+	if (init_db_instance(IDMAP_DBNAME, DB_VERSION, DB_VERSION_SQL, sql,
+	    FAIL_IF_CORRUPT, &created, &upgraded) < 0)
 		return (-1);
 
 	/* mappings, name/SID lookup cache + ephemeral IDs; OK to blow away */
-	if (init_db_instance(IDMAP_CACHENAME, CACHE_SQL, REMOVE_IF_CORRUPT,
-			&_idmapdstate.new_eph_db) < 0)
+	sql[0] = CACHE_INSTALL_SQL;
+	sql[1] = CACHE_UPGRADE_FROM_v1_SQL;
+	if (init_db_instance(IDMAP_CACHENAME, CACHE_VERSION, CACHE_VERSION_SQL,
+	    sql, REMOVE_IF_CORRUPT, &created, &upgraded) < 0)
 		return (-1);
+
+	_idmapdstate.new_eph_db = (created || upgraded) ? 1 : 0;
 
 	return (0);
 }
@@ -446,7 +533,8 @@ init_dbs() {
  * Finalize databases
  */
 void
-fini_dbs() {
+fini_dbs()
+{
 }
 
 /*
@@ -457,7 +545,9 @@ static msg_table_t sqlmsgtable[] = {
 	{IDMAP_ERR_U2W_NAMERULE_CONFLICT,
 	"columns unixname, is_user, u2w_order are not unique"},
 	{IDMAP_ERR_W2U_NAMERULE_CONFLICT,
-	"columns winname, windomain, is_user, w2u_order are not unique"},
+	"columns winname, windomain, is_user, is_wuser, w2u_order are not"
+	" unique"},
+	{IDMAP_ERR_W2U_NAMERULE_CONFLICT, "Conflicting w2u namerules"},
 	{-1, NULL}
 };
 
@@ -466,7 +556,8 @@ static msg_table_t sqlmsgtable[] = {
  * status codes
  */
 idmap_retcode
-idmapd_string2stat(const char *msg) {
+idmapd_string2stat(const char *msg)
+{
 	int i;
 	for (i = 0; sqlmsgtable[i].msg; i++) {
 		if (strcasecmp(sqlmsgtable[i].msg, msg) == 0)
@@ -476,10 +567,66 @@ idmapd_string2stat(const char *msg) {
 }
 
 /*
+ * Executes some SQL in a transaction.
+ *
+ * Returns 0 on success, -1 if it failed but the rollback succeeded, -2
+ * if the rollback failed.
+ */
+static
+int
+sql_exec_tran_no_cb(sqlite *db, char *sql, const char *dbname,
+	const char *while_doing)
+{
+	char		*errmsg = NULL;
+	int		rc;
+
+	rc = sqlite_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errmsg);
+	if (rc != SQLITE_OK) {
+		idmapdlog(LOG_ERR, "Begin transaction failed (%s) "
+		    "while %s (%s)", errmsg, while_doing, dbname);
+		sqlite_freemem(errmsg);
+		return (-1);
+	}
+
+	rc = sqlite_exec(db, sql, NULL, NULL, &errmsg);
+	if (rc != SQLITE_OK) {
+		idmapdlog(LOG_ERR, "Database error (%s) while %s (%s)", errmsg,
+		    while_doing, dbname);
+		sqlite_freemem(errmsg);
+		errmsg = NULL;
+		goto rollback;
+	}
+
+	rc = sqlite_exec(db, "COMMIT TRANSACTION", NULL, NULL, &errmsg);
+	if (rc == SQLITE_OK) {
+		sqlite_freemem(errmsg);
+		return (0);
+	}
+
+	idmapdlog(LOG_ERR, "Database commit error (%s) while s (%s)",
+	    errmsg, while_doing, dbname);
+	sqlite_freemem(errmsg);
+	errmsg = NULL;
+
+rollback:
+	rc = sqlite_exec(db, "ROLLBACK TRANSACTION", NULL, NULL, &errmsg);
+	if (rc != SQLITE_OK) {
+		idmapdlog(LOG_ERR, "Rollback failed (%s) while %s (%s)",
+		    errmsg, while_doing, dbname);
+		sqlite_freemem(errmsg);
+		return (-2);
+	}
+	sqlite_freemem(errmsg);
+
+	return (-1);
+}
+
+/*
  * Execute the given SQL statment without using any callbacks
  */
 idmap_retcode
-sql_exec_no_cb(sqlite *db, char *sql) {
+sql_exec_no_cb(sqlite *db, char *sql)
+{
 	char		*errmsg = NULL;
 	int		r;
 	idmap_retcode	retcode;
@@ -488,8 +635,8 @@ sql_exec_no_cb(sqlite *db, char *sql) {
 	assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 
 	if (r != SQLITE_OK) {
-		idmapdlog(LOG_ERR, "Database error during %s (%s)",
-			sql, CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
+		    CHECK_NULL(errmsg));
 		retcode = idmapd_string2stat(errmsg);
 		if (errmsg != NULL)
 			sqlite_freemem(errmsg);
@@ -506,33 +653,81 @@ sql_exec_no_cb(sqlite *db, char *sql) {
  * ""       "unixuser" "="  "foo" "AND"
  */
 idmap_retcode
-gen_sql_expr_from_utf8str(const char *prefix, const char *col,
-		const char *op, char *value,
-		const char *suffix, char **out) {
+gen_sql_expr_from_rule(idmap_namerule *rule, char **out)
+{
+	char	*s_windomain = NULL, *s_winname = NULL;
+	char	*s_unixname = NULL;
+	char	*lower_winname;
+	int	retcode = IDMAP_SUCCESS;
+
 	if (out == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (value == NULL)
-		return (IDMAP_SUCCESS);
 
-	if (prefix == NULL)
-		prefix = "";
-	if (suffix == NULL)
-		suffix = "";
+	if (!EMPTY_STRING(rule->windomain)) {
+		s_windomain =  sqlite_mprintf("AND windomain = %Q ",
+		    rule->windomain);
+		if (s_windomain == NULL) {
+			retcode = IDMAP_ERR_MEMORY;
+			goto out;
+		}
+	}
 
-	*out = sqlite_mprintf("%s %s %s %Q %s",
-			prefix, col, op, value, suffix);
-	if (*out == NULL)
-		return (IDMAP_ERR_MEMORY);
-	return (IDMAP_SUCCESS);
+	if (!EMPTY_STRING(rule->winname)) {
+		if ((lower_winname = tolower_u8(rule->winname)) == NULL)
+			lower_winname = rule->winname;
+		s_winname = sqlite_mprintf(
+		    "AND winname = %Q AND is_wuser = %d ",
+		    lower_winname, rule->is_wuser ? 1 : 0);
+		if (lower_winname != rule->winname)
+			free(lower_winname);
+		if (s_winname == NULL) {
+			retcode = IDMAP_ERR_MEMORY;
+			goto out;
+		}
+	}
+
+	if (!EMPTY_STRING(rule->unixname)) {
+		s_unixname = sqlite_mprintf(
+		    "AND unixname = %Q AND is_user = %d ",
+		    rule->unixname, rule->is_user ? 1 : 0);
+		if (s_unixname == NULL) {
+			retcode = IDMAP_ERR_MEMORY;
+			goto out;
+		}
+	}
+
+	*out = sqlite_mprintf("%s %s %s",
+	    s_windomain ? s_windomain : "",
+	    s_winname ? s_winname : "",
+	    s_unixname ? s_unixname : "");
+
+	if (*out == NULL) {
+		retcode = IDMAP_ERR_MEMORY;
+		idmapdlog(LOG_ERR, "Out of memory");
+		goto out;
+	}
+
+out:
+	if (s_windomain != NULL)
+		sqlite_freemem(s_windomain);
+	if (s_winname != NULL)
+		sqlite_freemem(s_winname);
+	if (s_unixname != NULL)
+		sqlite_freemem(s_unixname);
+
+	return (retcode);
 }
+
+
 
 /*
  * Generate and execute SQL statement for LIST RPC calls
  */
 idmap_retcode
 process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
-		list_svc_cb cb, void *result) {
+		list_svc_cb cb, void *result)
+{
 	list_cb_data_t	cb_data;
 	char		*errmsg = NULL;
 	int		r;
@@ -552,9 +747,8 @@ process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
 
 	default:
 		retcode = IDMAP_ERR_INTERNAL;
-		idmapdlog(LOG_ERR,
-			"Database error during %s (%s)",
-			sql, CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
+		    CHECK_NULL(errmsg));
 		break;
 	}
 	if (errmsg != NULL)
@@ -569,7 +763,8 @@ process_list_svc_sql(sqlite *db, char *sql, uint64_t limit,
  */
 idmap_retcode
 validate_list_cb_data(list_cb_data_t *cb_data, int argc, char **argv,
-		int ncol, uchar_t **list, size_t valsize) {
+		int ncol, uchar_t **list, size_t valsize)
+{
 	size_t	nsize;
 	void	*tmplist;
 
@@ -591,16 +786,17 @@ validate_list_cb_data(list_cb_data_t *cb_data, int argc, char **argv,
 		}
 		*list = tmplist;
 		(void) memset(*list + (cb_data->len * valsize), 0,
-			SIZE_INCR * valsize);
+		    SIZE_INCR * valsize);
 		cb_data->len += SIZE_INCR;
 	}
 	return (IDMAP_SUCCESS);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 get_namerule_order(char *winname, char *windomain, char *unixname,
-		int direction, int *w2u_order, int *u2w_order) {
-
+	int direction, int is_diagonal, int *w2u_order, int *u2w_order)
+{
 	*w2u_order = 0;
 	*u2w_order = 0;
 
@@ -663,16 +859,24 @@ get_namerule_order(char *winname, char *windomain, char *unixname,
 			else /* name */
 				*w2u_order = 2;
 		}
+
 	}
 
 	/*
-	 * 1. unixname to ""
-	 * 2. unixname to winname@domain (or winname)
-	 * 3. * to *@domain (or *)
-	 * 4. * to ""
-	 * 5. * to winname@domain (or winname)
+	 * 1. unixname to "", non-diagonal
+	 * 2. unixname to winname@domain (or winname), non-diagonal
+	 * 3. unixname to "", diagonal
+	 * 4. unixname to winname@domain (or winname), diagonal
+	 * 5. * to *@domain (or *), non-diagonal
+	 * 5. * to *@domain (or *), diagonal
+	 * 7. * to ""
+	 * 8. * to winname@domain (or winname)
+	 * 9. * to "", non-diagonal
+	 * 10. * to winname@domain (or winname), diagonal
 	 */
 	if (direction != IDMAP_DIRECTION_W2U) {
+		int diagonal = is_diagonal ? 1 : 0;
+
 		/* bi-directional or from unix to windows */
 		if (unixname == NULL || EMPTY_NAME(unixname))
 			return (IDMAP_ERR_U2W_NAMERULE);
@@ -682,18 +886,18 @@ get_namerule_order(char *winname, char *windomain, char *unixname,
 			return (IDMAP_ERR_U2W_NAMERULE);
 		else if (*unixname == '*') {
 			if (*winname == '*')
-				*u2w_order = 3;
+				*u2w_order = 5 + diagonal;
 			else if (EMPTY_NAME(winname))
-				*u2w_order = 4;
+				*u2w_order = 7 + 2 * diagonal;
 			else
-				*u2w_order = 5;
+				*u2w_order = 8 + 2 * diagonal;
 		} else {
 			if (*winname == '*')
 				return (IDMAP_ERR_U2W_NAMERULE);
 			else if (EMPTY_NAME(winname))
-				*u2w_order = 1;
+				*u2w_order = 1 + 2 * diagonal;
 			else
-				*u2w_order = 2;
+				*u2w_order = 2 + 2 * diagonal;
 		}
 	}
 	return (IDMAP_SUCCESS);
@@ -703,7 +907,8 @@ get_namerule_order(char *winname, char *windomain, char *unixname,
  * Generate and execute SQL statement to add name-based mapping rule
  */
 idmap_retcode
-add_namerule(sqlite *db, idmap_namerule *rule) {
+add_namerule(sqlite *db, idmap_namerule *rule)
+{
 	char		*sql = NULL;
 	idmap_stat	retcode;
 	char		*dom = NULL;
@@ -711,7 +916,8 @@ add_namerule(sqlite *db, idmap_namerule *rule) {
 	char		w2ubuf[11], u2wbuf[11];
 
 	retcode = get_namerule_order(rule->winname, rule->windomain,
-	    rule->unixname, rule->direction, &w2u_order, &u2w_order);
+	    rule->unixname, rule->direction,
+	    rule->is_user == rule->is_wuser ? 0 : 1, &w2u_order, &u2w_order);
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
@@ -728,7 +934,7 @@ add_namerule(sqlite *db, idmap_namerule *rule) {
 
 	if (rule->windomain != NULL)
 		dom = rule->windomain;
-	else if (lookup_wksids_name2sid(rule->winname, NULL, NULL, NULL)
+	else if (lookup_wksids_name2sid(rule->winname, NULL, NULL, NULL, NULL)
 	    == IDMAP_SUCCESS) {
 		/* well-known SIDs don't need domain */
 		dom = "";
@@ -742,15 +948,12 @@ add_namerule(sqlite *db, idmap_namerule *rule) {
 			dom = "";
 	}
 	sql = sqlite_mprintf("INSERT into namerules "
-		"(is_user, windomain, winname, is_nt4, "
-		"unixname, w2u_order, u2w_order) "
-		"VALUES(%d, %Q, %Q, %d, %Q, %q, %q);",
-		rule->is_user?1:0,
-		dom,
-		rule->winname, rule->is_nt4?1:0,
-		rule->unixname,
-		w2u_order?w2ubuf:NULL,
-		u2w_order?u2wbuf:NULL);
+	    "(is_user, is_wuser, windomain, winname_display, is_nt4, "
+	    "unixname, w2u_order, u2w_order) "
+	    "VALUES(%d, %d, %Q, %Q, %d, %Q, %q, %q);",
+	    rule->is_user ? 1 : 0, rule->is_wuser ? 1 : 0, dom,
+	    rule->winname, rule->is_nt4 ? 1 : 0, rule->unixname,
+	    w2u_order ? w2ubuf : NULL, u2w_order ? u2wbuf : NULL);
 	UNLOCK_CONFIG();
 
 	if (sql == NULL) {
@@ -774,21 +977,12 @@ out:
  * Flush name-based mapping rules
  */
 idmap_retcode
-flush_namerules(sqlite *db, bool_t is_user) {
-	char		*sql = NULL;
+flush_namerules(sqlite *db)
+{
 	idmap_stat	retcode;
 
-	sql = sqlite_mprintf("DELETE FROM namerules WHERE "
-		"is_user = %d;", is_user?1:0);
+	retcode = sql_exec_no_cb(db, "DELETE FROM namerules;");
 
-	if (sql == NULL) {
-		idmapdlog(LOG_ERR, "Out of memory");
-		return (IDMAP_ERR_MEMORY);
-	}
-
-	retcode = sql_exec_no_cb(db, sql);
-
-	sqlite_freemem(sql);
 	return (retcode);
 }
 
@@ -796,56 +990,35 @@ flush_namerules(sqlite *db, bool_t is_user) {
  * Generate and execute SQL statement to remove a name-based mapping rule
  */
 idmap_retcode
-rm_namerule(sqlite *db, idmap_namerule *rule) {
+rm_namerule(sqlite *db, idmap_namerule *rule)
+{
 	char		*sql = NULL;
 	idmap_stat	retcode;
-	char		*s_windomain = NULL, *s_winname = NULL;
-	char		*s_unixname = NULL;
 	char		buf[80];
+	char		*expr = NULL;
 
 	if (rule->direction < 0 && EMPTY_STRING(rule->windomain) &&
 	    EMPTY_STRING(rule->winname) && EMPTY_STRING(rule->unixname))
 		return (IDMAP_SUCCESS);
 
-	if (rule->direction < 0) {
-		buf[0] = 0;
-	} else if (rule->direction == IDMAP_DIRECTION_BI) {
+	buf[0] = 0;
+
+	if (rule->direction == IDMAP_DIRECTION_BI)
 		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
-				" AND u2w_order > 0");
-	} else if (rule->direction == IDMAP_DIRECTION_W2U) {
+		    " AND u2w_order > 0");
+	else if (rule->direction == IDMAP_DIRECTION_W2U)
 		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
-				" AND (u2w_order = 0 OR u2w_order ISNULL)");
-	} else if (rule->direction == IDMAP_DIRECTION_U2W) {
+		    " AND (u2w_order = 0 OR u2w_order ISNULL)");
+	else if (rule->direction == IDMAP_DIRECTION_U2W)
 		(void) snprintf(buf, sizeof (buf), "AND u2w_order > 0"
-				" AND (w2u_order = 0 OR w2u_order ISNULL)");
-	}
+		    " AND (w2u_order = 0 OR w2u_order ISNULL)");
 
-	retcode = IDMAP_ERR_INTERNAL;
-	if (!EMPTY_STRING(rule->windomain)) {
-		if (gen_sql_expr_from_utf8str("AND", "windomain", "=",
-			rule->windomain, "", &s_windomain) != IDMAP_SUCCESS)
-			goto out;
-	}
+	retcode = gen_sql_expr_from_rule(rule, &expr);
+	if (retcode != IDMAP_SUCCESS)
+		goto out;
 
-	if (!EMPTY_STRING(rule->winname)) {
-		if (gen_sql_expr_from_utf8str("AND", "winname", "=",
-			rule->winname, "", &s_winname) != IDMAP_SUCCESS)
-			goto out;
-	}
-
-	if (!EMPTY_STRING(rule->unixname)) {
-		if (gen_sql_expr_from_utf8str("AND", "unixname", "=",
-			rule->unixname,	"", &s_unixname) != IDMAP_SUCCESS)
-			goto out;
-	}
-
-	sql = sqlite_mprintf("DELETE FROM namerules WHERE "
-		"is_user = %d %s %s %s %s;",
-		rule->is_user?1:0,
-		s_windomain?s_windomain:"",
-		s_winname?s_winname:"",
-		s_unixname?s_unixname:"",
-		buf);
+	sql = sqlite_mprintf("DELETE FROM namerules WHERE 1 %s %s;", expr,
+	    buf);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -853,15 +1026,12 @@ rm_namerule(sqlite *db, idmap_namerule *rule) {
 		goto out;
 	}
 
+
 	retcode = sql_exec_no_cb(db, sql);
 
 out:
-	if (s_windomain != NULL)
-		sqlite_freemem(s_windomain);
-	if (s_winname != NULL)
-		sqlite_freemem(s_winname);
-	if (s_unixname != NULL)
-		sqlite_freemem(s_unixname);
+	if (expr != NULL)
+		sqlite_freemem(expr);
 	if (sql != NULL)
 		sqlite_freemem(sql);
 	return (retcode);
@@ -885,16 +1055,17 @@ out:
  * IDMAP_ERR_INTERNAL
  */
 
-static idmap_retcode
+static
+idmap_retcode
 sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
-		int reqcol, const char ***values) {
+		int reqcol, const char ***values)
+{
 	char		*errmsg = NULL;
 	int		r;
 
 	if ((r = sqlite_compile(db, sql, NULL, vm, &errmsg)) != SQLITE_OK) {
-		idmapdlog(LOG_ERR,
-			"Database error during %s (%s)",
-			sql, CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
+		    CHECK_NULL(errmsg));
 		sqlite_freemem(errmsg);
 		return (IDMAP_ERR_INTERNAL);
 	}
@@ -918,8 +1089,8 @@ sql_compile_n_step_once(sqlite *db, char *sql, sqlite_vm **vm, int *ncol,
 
 	(void) sqlite_finalize(*vm, &errmsg);
 	*vm = NULL;
-	idmapdlog(LOG_ERR, "Database error during %s (%s)",
-	    sql, CHECK_NULL(errmsg));
+	idmapdlog(LOG_ERR, "Database error during %s (%s)", sql,
+	    CHECK_NULL(errmsg));
 	sqlite_freemem(errmsg);
 	return (IDMAP_ERR_INTERNAL);
 }
@@ -1015,8 +1186,10 @@ static wksids_table_t wksids[] = {
 	{NULL, UINT32_MAX, NULL, -1, SENTINEL_PID, -1}
 };
 
-static idmap_retcode
-lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res) {
+static
+idmap_retcode
+lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res)
+{
 	int i;
 	for (i = 0; wksids[i].sidprefix != NULL; i++) {
 		if (wksids[i].rid == req->id1.idmap_id_u.sid.rid &&
@@ -1044,8 +1217,8 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res) {
 				return (IDMAP_SUCCESS);
 			case IDMAP_POSIXID:
 				res->id.idmap_id_u.uid = wksids[i].pid;
-				res->id.idtype = (!wksids[i].is_user)?
-						IDMAP_GID:IDMAP_UID;
+				res->id.idtype = (!wksids[i].is_user) ?
+				    IDMAP_GID : IDMAP_UID;
 				res->direction = wksids[i].direction;
 				return (IDMAP_SUCCESS);
 			default:
@@ -1056,10 +1229,13 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res) {
 	return (IDMAP_ERR_NOTFOUND);
 }
 
-static idmap_retcode
-lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user) {
+
+static
+idmap_retcode
+lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user)
+{
 	int i;
-	if (req->id2.idtype != IDMAP_SID)
+	if (!IS_REQUEST_SID(*req, 2))
 		return (IDMAP_ERR_NOTSUPPORTED);
 	for (i = 0; wksids[i].sidprefix != NULL; i++) {
 		if (wksids[i].pid == req->id1.idmap_id_u.uid &&
@@ -1067,7 +1243,7 @@ lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 		    wksids[i].direction != IDMAP_DIRECTION_W2U) {
 			res->id.idmap_id_u.sid.rid = wksids[i].rid;
 			res->id.idmap_id_u.sid.prefix =
-				strdup(wksids[i].sidprefix);
+			    strdup(wksids[i].sidprefix);
 			if (res->id.idmap_id_u.sid.prefix == NULL) {
 				idmapdlog(LOG_ERR, "Out of memory");
 				return (IDMAP_ERR_MEMORY);
@@ -1079,9 +1255,11 @@ lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 	return (IDMAP_ERR_NOTFOUND);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_wksids_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
-		int *type) {
+		int *type)
+{
 	int i;
 	for (i = 0; wksids[i].sidprefix != NULL; i++) {
 		if ((strcasecmp(wksids[i].sidprefix, sidprefix) == 0) &&
@@ -1098,14 +1276,22 @@ lookup_wksids_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
 	return (IDMAP_ERR_NOTFOUND);
 }
 
-static idmap_retcode
-lookup_wksids_name2sid(const char *name, char **sidprefix, idmap_rid_t *rid,
-		int *type) {
+static
+idmap_retcode
+lookup_wksids_name2sid(const char *name, char **canonname, char **sidprefix,
+	idmap_rid_t *rid, int *type)
+{
 	int i;
+
 	for (i = 0; wksids[i].sidprefix != NULL; i++) {
 		if (strcasecmp(wksids[i].winname, name) == 0) {
 			if (sidprefix != NULL && (*sidprefix =
 			    strdup(wksids[i].sidprefix)) == NULL) {
+				idmapdlog(LOG_ERR, "Out of memory");
+				return (IDMAP_ERR_MEMORY);
+			}
+			if (canonname != NULL &&
+			    (*canonname = strdup(wksids[i].winname)) == NULL) {
 				idmapdlog(LOG_ERR, "Out of memory");
 				return (IDMAP_ERR_MEMORY);
 			}
@@ -1120,8 +1306,10 @@ lookup_wksids_name2sid(const char *name, char **sidprefix, idmap_rid_t *rid,
 	return (IDMAP_ERR_NOTFOUND);
 }
 
-static idmap_retcode
-lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
+static
+idmap_retcode
+lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
+{
 	char		*end;
 	char		*sql = NULL;
 	const char	**values;
@@ -1130,27 +1318,44 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
 	uid_t		pid;
 	time_t		curtime, exp;
 	idmap_retcode	retcode;
+	char *is_user_string;
 
 	/* Current time */
 	errno = 0;
 	if ((curtime = time(NULL)) == (time_t)-1) {
-		idmapdlog(LOG_ERR,
-			"Failed to get current time (%s)",
-			strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to get current time (%s)",
+		    strerror(errno));
 		retcode = IDMAP_ERR_INTERNAL;
+		goto out;
+	}
+
+	switch (req->id2.idtype) {
+	case IDMAP_UID:
+		is_user_string = "1";
+		break;
+	case IDMAP_GID:
+		is_user_string = "0";
+		break;
+	case IDMAP_POSIXID:
+		/* the non-diagonal mapping */
+		is_user_string = "is_wuser";
+		break;
+	default:
+		retcode = IDMAP_ERR_NOTSUPPORTED;
 		goto out;
 	}
 
 	/* SQL to lookup the cache */
 	sql = sqlite_mprintf("SELECT pid, is_user, expiration, unixname, u2w "
-			"FROM idmap_cache WHERE "
-			"sidprefix = %Q AND rid = %u AND w2u = 1 AND "
-			"(pid >= 2147483648 OR "
-			"(expiration = 0 OR expiration ISNULL OR "
-			"expiration > %d));",
-			req->id1.idmap_id_u.sid.prefix,
-			req->id1.idmap_id_u.sid.rid,
-			curtime);
+	    "FROM idmap_cache WHERE is_user = %s AND "
+	    "sidprefix = %Q AND rid = %u AND w2u = 1 AND "
+	    "(pid >= 2147483648 OR "
+	    "(expiration = 0 OR expiration ISNULL OR "
+	    "expiration > %d));",
+	    is_user_string,
+	    req->id1.idmap_id_u.sid.prefix,
+	    req->id1.idmap_id_u.sid.rid,
+	    curtime);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
@@ -1171,6 +1376,14 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
 		pid = strtoul(values[0], &end, 10);
 		is_user = strncmp(values[1], "0", 2)?1:0;
 
+		if (is_user) {
+			res->id.idtype = IDMAP_UID;
+			res->id.idmap_id_u.uid = pid;
+		} else {
+			res->id.idtype = IDMAP_GID;
+			res->id.idmap_id_u.gid = pid;
+		}
+
 		/*
 		 * We may have an expired ephemeral mapping. Consider
 		 * the expired entry as valid if we are not going to
@@ -1181,44 +1394,17 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
 		 * if we end up doing dynamic mapping again.
 		 */
 		if (!DO_NOT_ALLOC_NEW_ID_MAPPING(req) &&
-				!AVOID_NAMESERVICE(req)) {
-			if (IS_EPHEMERAL(pid) && values[2] != NULL) {
-				exp = strtoll(values[2], &end, 10);
-				if (exp && exp <= curtime) {
-					/* Store the ephemeral pid */
-					res->id.idmap_id_u.uid = pid;
-					res->id.idtype = is_user?
-						IDMAP_UID:IDMAP_GID;
-					res->direction = IDMAP_DIRECTION_BI;
-					req->direction |= is_user?
-						_IDMAP_F_EXP_EPH_UID:
-						_IDMAP_F_EXP_EPH_GID;
-					retcode = IDMAP_ERR_NOTFOUND;
-					goto out;
-				}
+		    !AVOID_NAMESERVICE(req) &&
+		    IS_EPHEMERAL(pid) && values[2] != NULL) {
+			exp = strtoll(values[2], &end, 10);
+			if (exp && exp <= curtime) {
+				/* Store the ephemeral pid */
+				res->direction = IDMAP_DIRECTION_BI;
+				req->direction |= is_user
+				    ? _IDMAP_F_EXP_EPH_UID
+				    : _IDMAP_F_EXP_EPH_GID;
+				retcode = IDMAP_ERR_NOTFOUND;
 			}
-		}
-
-		switch (req->id2.idtype) {
-		case IDMAP_UID:
-			if (!is_user)
-				retcode = IDMAP_ERR_NOTUSER;
-			else
-				res->id.idmap_id_u.uid = pid;
-			break;
-		case IDMAP_GID:
-			if (is_user)
-				retcode = IDMAP_ERR_NOTGROUP;
-			else
-				res->id.idmap_id_u.gid = pid;
-			break;
-		case IDMAP_POSIXID:
-			res->id.idmap_id_u.uid = pid;
-			res->id.idtype = (is_user)?IDMAP_UID:IDMAP_GID;
-			break;
-		default:
-			retcode = IDMAP_ERR_NOTSUPPORTED;
-			break;
 		}
 	}
 
@@ -1244,9 +1430,11 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_cache_sid2name(sqlite *cache, const char *sidprefix, idmap_rid_t rid,
-		char **name, char **domain, int *type) {
+		char **name, char **domain, int *type)
+{
 	char		*end;
 	char		*sql = NULL;
 	const char	**values;
@@ -1258,19 +1446,19 @@ lookup_cache_sid2name(sqlite *cache, const char *sidprefix, idmap_rid_t rid,
 	/* Get current time */
 	errno = 0;
 	if ((curtime = time(NULL)) == (time_t)-1) {
-		idmapdlog(LOG_ERR,
-			"Failed to get current time (%s)",
-			strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to get current time (%s)",
+		    strerror(errno));
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
 
 	/* SQL to lookup the cache */
-	sql = sqlite_mprintf("SELECT name, domain, type FROM name_cache WHERE "
-			"sidprefix = %Q AND rid = %u AND "
-			"(expiration = 0 OR expiration ISNULL OR "
-			"expiration > %d);",
-			sidprefix, rid, curtime);
+	sql = sqlite_mprintf("SELECT canon_name, domain, type "
+	    "FROM name_cache WHERE "
+	    "sidprefix = %Q AND rid = %u AND "
+	    "(expiration = 0 OR expiration ISNULL OR "
+	    "expiration > %d);",
+	    sidprefix, rid, curtime);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
@@ -1315,38 +1503,13 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
-verify_type(idmap_id_type idtype, int type, idmap_id_res *res) {
-	switch (idtype) {
-	case IDMAP_UID:
-		if (type != _IDMAP_T_USER)
-			return (IDMAP_ERR_NOTUSER);
-		res->id.idtype = IDMAP_UID;
-		break;
-	case IDMAP_GID:
-		if (type != _IDMAP_T_GROUP)
-			return (IDMAP_ERR_NOTGROUP);
-		res->id.idtype = IDMAP_GID;
-		break;
-	case IDMAP_POSIXID:
-		if (type == _IDMAP_T_USER)
-			res->id.idtype = IDMAP_UID;
-		else if (type == _IDMAP_T_GROUP)
-			res->id.idtype = IDMAP_GID;
-		else
-			return (IDMAP_ERR_SID);
-		break;
-	default:
-		return (IDMAP_ERR_NOTSUPPORTED);
-	}
-	return (IDMAP_SUCCESS);
-}
-
 /*
  * Lookup sid to name locally
  */
-static idmap_retcode
-lookup_local_sid2name(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
+static
+idmap_retcode
+lookup_local_sid2name(sqlite *cache, idmap_mapping *req)
+{
 	int		type = -1;
 	idmap_retcode	retcode;
 	char		*sidprefix;
@@ -1363,14 +1526,14 @@ lookup_local_sid2name(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
 
 	/* Lookup sid to name in cache */
 	retcode = lookup_cache_sid2name(cache, sidprefix, rid, &name,
-		&domain, &type);
+	    &domain, &type);
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
 out:
 	if (retcode == IDMAP_SUCCESS) {
-		/* Verify that the sid type matches the request */
-		retcode = verify_type(req->id2.idtype, type, res);
+		req->id1.idtype = type == _IDMAP_T_USER
+		    ? IDMAP_USID : IDMAP_GSID;
 
 		/* update state in 'req' */
 		if (name != NULL)
@@ -1388,7 +1551,8 @@ out:
 
 idmap_retcode
 lookup_win_batch_sid2name(lookup_state_t *state, idmap_mapping_batch *batch,
-		idmap_ids_res *result) {
+		idmap_ids_res *result)
+{
 	idmap_retcode	retcode;
 	int		ret, i;
 	int		retries = 0;
@@ -1400,11 +1564,11 @@ lookup_win_batch_sid2name(lookup_state_t *state, idmap_mapping_batch *batch,
 
 retry:
 	ret = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
-		&state->ad_lookup);
+	    &state->ad_lookup);
 	if (ret != 0) {
 		degrade_svc();
 		idmapdlog(LOG_ERR,
-		"Failed to create sid2name batch for AD lookup");
+		    "Failed to create sid2name batch for AD lookup");
 		return (IDMAP_ERR_INTERNAL);
 	}
 
@@ -1414,20 +1578,17 @@ retry:
 		req = &batch->idmap_mapping_batch_val[i];
 		res = &result->ids.ids_val[i];
 
-		if (req->id1.idtype == IDMAP_SID &&
-				req->direction & _IDMAP_F_S2N_AD) {
+		if (IS_REQUEST_SID(*req, 1) &&
+		    req->direction & _IDMAP_F_S2N_AD) {
 			if (retries == 0)
 				res->retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
 			else if (res->retcode != IDMAP_ERR_RETRIABLE_NET_ERR)
 				continue;
 			retcode = idmap_sid2name_batch_add1(
-					state->ad_lookup,
-					req->id1.idmap_id_u.sid.prefix,
-					&req->id1.idmap_id_u.sid.rid,
-					&req->id1name,
-					&req->id1domain,
-					(int *)&res->id.idtype,
-					&res->retcode);
+			    state->ad_lookup, req->id1.idmap_id_u.sid.prefix,
+			    &req->id1.idmap_id_u.sid.rid, &req->id1name,
+			    &req->id1domain, (int *)&res->id.idtype,
+			    &res->retcode);
 
 			if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
 				break;
@@ -1440,6 +1601,35 @@ retry:
 		idmap_lookup_release_batch(&state->ad_lookup);
 	else
 		retcode = idmap_lookup_batch_end(&state->ad_lookup, NULL);
+
+	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
+		req = &batch->idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
+		if (res->retcode != IDMAP_SUCCESS)
+			continue;
+
+		if (!(IS_REQUEST_SID(*req, 1)))
+			continue;
+		if (!(req->direction & _IDMAP_F_S2N_AD))
+			continue;
+		/*
+		 * Map from type values known to adutils to type values
+		 * understood everywhere else in idmapd/libidmap/idmap.
+		 */
+		if (res->id.idtype == _IDMAP_T_USER) {
+			req->id1.idtype = IDMAP_USID;
+			res->id.idtype = IDMAP_UID;
+		} else if (res->id.idtype == _IDMAP_T_GROUP) {
+			req->id1.idtype = IDMAP_GSID;
+			res->id.idtype = IDMAP_GID;
+		} else {
+			res->retcode = IDMAP_ERR_SID;
+		}
+
+		if (res->retcode == IDMAP_SUCCESS &&
+		    req->id2.idtype == IDMAP_POSIXID)
+			req->id2.idtype = res->id.idtype;
+	}
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
@@ -1454,9 +1644,74 @@ out:
 	return (retcode);
 }
 
+/*
+ * Convention when processing win2unix requests:
+ *
+ * Windows identity:
+ * req->id1name =
+ *              winname if given otherwise winname found will be placed
+ *              here.
+ * req->id1domain =
+ *              windomain if given otherwise windomain found will be
+ *              placed here.
+ * req->id1.idtype =
+ *              Either IDMAP_SID/USID/GSID. If this is IDMAP_SID then it'll
+ *              be set to IDMAP_USID/GSID depending upon whether the
+ *              given SID is user or group respectively. The user/group-ness
+ *              is determined either when looking up well-known SIDs table OR
+ *              if the SID is found in namecache OR by ad_lookup() OR by
+ *              ad_lookup_batch().
+ * req->id1..sid.[prefix, rid] =
+ *              SID if given otherwise SID found will be placed here.
+ *
+ * Unix identity:
+ * req->id2name =
+ *              unixname found will be placed here.
+ * req->id2domain =
+ *              NOT USED
+ * res->id.idtype =
+ *              Target type initialized from req->id2.idtype. If
+ *              it is IDMAP_POSIXID then actual type (IDMAP_UID/GID) found
+ *              will be placed here.
+ * res->id..[uid or gid] =
+ *              UID/GID found will be placed here.
+ *
+ * Others:
+ * res->retcode =
+ *              Return status for this request will be placed here.
+ * res->direction =
+ *              Direction found will be placed here. Direction
+ *              meaning whether the resultant mapping is valid
+ *              only from win2unix or bi-directional.
+ * req->direction =
+ *              INTERNAL USE. Used by idmapd to set various
+ *              flags (_IDMAP_F_xxxx) to aid in processing
+ *              of the request.
+ * req->id2.idtype =
+ *              INTERNAL USE. Initially this is the requested target
+ *              type and is used to initialize res->id.idtype.
+ *              ad_lookup_batch() uses this field temporarily to store
+ *              sid_type obtained by the batched AD lookups and after
+ *              use resets it to IDMAP_NONE to prevent xdr from
+ *              mis-interpreting the contents of req->id2.
+ * req->id2..[uid or gid or sid] =
+ *              NOT USED
+ */
+
+/*
+ * This function does the following:
+ * 1. Lookup well-known SIDs table.
+ * 2. Check if the given SID is a local-SID and if so extract UID/GID from it.
+ * 3. Lookup cache.
+ * 4. Check if the client does not want new mapping to be allocated
+ *    in which case this pass is the final pass.
+ * 5. Set AD lookup flag if it determines that the next stage needs
+ *    to do AD lookup.
+ */
 idmap_retcode
 sid2pid_first_pass(lookup_state_t *state, sqlite *cache, idmap_mapping *req,
-		idmap_id_res *res) {
+		idmap_id_res *res)
+{
 	idmap_retcode	retcode;
 
 	/*
@@ -1510,7 +1765,7 @@ sid2pid_first_pass(lookup_state_t *state, sqlite *cache, idmap_mapping *req,
 	}
 
 	/* Lookup sid to winname@domain locally first */
-	retcode = lookup_local_sid2name(cache, req, res);
+	retcode = lookup_local_sid2name(cache, req);
 	if (retcode == IDMAP_SUCCESS) {
 		req->direction |= _IDMAP_F_S2N_CACHE;
 	} else if (retcode == IDMAP_ERR_NOTFOUND) {
@@ -1532,18 +1787,19 @@ out:
  * 	<machine-sid-prefix>-<1000 + uid>
  * 	<machine-sid-prefix>-<2^31 + gid>
  */
-static idmap_retcode
-generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user) {
-
+static
+idmap_retcode
+generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user)
+{
 	if (_idmapdstate.cfg->pgcfg.machine_sid != NULL) {
 		/* Skip 1000 UIDs */
 		if (is_user && req->id1.idmap_id_u.uid >
-				(INT32_MAX - LOCALRID_MIN))
+		    (INT32_MAX - LOCALRID_MIN))
 			return (IDMAP_ERR_NOMAPPING);
 
 		RDLOCK_CONFIG();
 		res->id.idmap_id_u.sid.prefix =
-			strdup(_idmapdstate.cfg->pgcfg.machine_sid);
+		    strdup(_idmapdstate.cfg->pgcfg.machine_sid);
 		if (res->id.idmap_id_u.sid.prefix == NULL) {
 			UNLOCK_CONFIG();
 			idmapdlog(LOG_ERR, "Out of memory");
@@ -1551,8 +1807,8 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 		}
 		UNLOCK_CONFIG();
 		res->id.idmap_id_u.sid.rid =
-			(is_user)?req->id1.idmap_id_u.uid + LOCALRID_MIN:
-			req->id1.idmap_id_u.gid + INT32_MAX + 1;
+		    (is_user) ? req->id1.idmap_id_u.uid + LOCALRID_MIN :
+		    req->id1.idmap_id_u.gid + INT32_MAX + 1;
 		res->direction = IDMAP_DIRECTION_BI;
 
 		/*
@@ -1568,8 +1824,10 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 	return (IDMAP_ERR_NOMAPPING);
 }
 
-static idmap_retcode
-lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res) {
+static
+idmap_retcode
+lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res)
+{
 	char		*sidprefix;
 	uint32_t	rid;
 	int		s;
@@ -1582,16 +1840,15 @@ lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res) {
 	rid = req->id1.idmap_id_u.sid.rid;
 
 	RDLOCK_CONFIG();
-	s = (_idmapdstate.cfg->pgcfg.machine_sid)?
-		strcasecmp(sidprefix,
-		_idmapdstate.cfg->pgcfg.machine_sid):1;
+	s = (_idmapdstate.cfg->pgcfg.machine_sid) ?
+	    strcasecmp(sidprefix, _idmapdstate.cfg->pgcfg.machine_sid) : 1;
 	UNLOCK_CONFIG();
 
 	if (s == 0) {
 		switch (req->id2.idtype) {
 		case IDMAP_UID:
 			if (rid > INT32_MAX) {
-				return (IDMAP_ERR_NOTUSER);
+				return (IDMAP_ERR_NOTFOUND);
 			} else if (rid < LOCALRID_MIN) {
 				return (IDMAP_ERR_NOTFOUND);
 			}
@@ -1600,15 +1857,14 @@ lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res) {
 			break;
 		case IDMAP_GID:
 			if (rid <= INT32_MAX) {
-				return (IDMAP_ERR_NOTGROUP);
+				return (IDMAP_ERR_NOTFOUND);
 			}
 			res->id.idmap_id_u.gid = rid - INT32_MAX - 1;
 			res->id.idtype = IDMAP_GID;
 			break;
 		case IDMAP_POSIXID:
 			if (rid > INT32_MAX) {
-				res->id.idmap_id_u.gid =
-					rid - INT32_MAX - 1;
+				res->id.idmap_id_u.gid = rid - INT32_MAX - 1;
 				res->id.idtype = IDMAP_GID;
 			} else if (rid < LOCALRID_MIN) {
 				return (IDMAP_ERR_NOTFOUND);
@@ -1626,21 +1882,28 @@ lookup_localsid2pid(idmap_mapping *req, idmap_id_res *res) {
 	return (IDMAP_ERR_NOTFOUND);
 }
 
-static idmap_retcode
-ns_lookup_byname(int is_user, const char *name, idmap_id_res *res) {
-	struct passwd	pwd;
-	struct group	grp;
+static
+idmap_retcode
+ns_lookup_byname(int is_user, const char *name, const char *lower_name,
+	idmap_id_res *res)
+{
+	struct passwd	pwd, *pwdp;
+	struct group	grp, *grpp;
 	char		buf[1024];
 	int		errnum;
 	const char	*me = "ns_lookup_byname";
 
 	if (is_user) {
-		if (getpwnam_r(name, &pwd, buf, sizeof (buf)) == NULL) {
+		pwdp = getpwnam_r(name, &pwd, buf, sizeof (buf));
+		if (pwdp == NULL && lower_name != NULL &&
+		    name != lower_name && strcmp(name, lower_name) != 0)
+			pwdp = getpwnam_r(lower_name, &pwd, buf, sizeof (buf));
+
+		if (pwdp == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
-			"%s: getpwnam_r(%s) failed (%s).",
-				me, name,
-				errnum?strerror(errnum):"not found");
+			    "%s: getpwnam_r(%s) failed (%s).",
+			    me, name, errnum ? strerror(errnum) : "not found");
 			if (errnum == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
@@ -1649,12 +1912,15 @@ ns_lookup_byname(int is_user, const char *name, idmap_id_res *res) {
 		res->id.idmap_id_u.uid = pwd.pw_uid;
 		res->id.idtype = IDMAP_UID;
 	} else {
-		if (getgrnam_r(name, &grp, buf, sizeof (buf)) == NULL) {
+		grpp = getgrnam_r(name, &grp, buf, sizeof (buf));
+		if (grpp == NULL && lower_name != NULL &&
+		    name != lower_name && strcmp(name, lower_name) != 0)
+			grpp = getgrnam_r(lower_name, &grp, buf, sizeof (buf));
+		if (grpp == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
-			"%s: getgrnam_r(%s) failed (%s).",
-				me, name,
-				errnum?strerror(errnum):"not found");
+			    "%s: getgrnam_r(%s) failed (%s).",
+			    me, name, errnum ? strerror(errnum) : "not found");
 			if (errnum == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
@@ -1701,20 +1967,48 @@ ns_lookup_byname(int is_user, const char *name, idmap_id_res *res) {
  * the name service then we will return no mapping for foo@sfbay.
  *
  */
-static idmap_retcode
-name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
-	const char	*unixname, *winname, *windomain;
-	char		*sql = NULL, *errmsg = NULL;
+static
+idmap_retcode
+name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res)
+{
+	const char	*unixname, *windomain;
+	char		*sql = NULL, *errmsg = NULL, *lower_winname = NULL;
 	idmap_retcode	retcode;
-	char		*end;
+	char		*end, *lower_unixname, *winname;
 	const char	**values;
 	sqlite_vm	*vm = NULL;
-	int		ncol, r, i, is_user;
+	int		ncol, r, i, is_user, is_wuser;
 	const char	*me = "name_based_mapping_sid2pid";
 
 	winname = req->id1name;
 	windomain = req->id1domain;
-	is_user = (res->id.idtype == IDMAP_UID)?1:0;
+
+	switch (req->id1.idtype) {
+	case IDMAP_USID:
+		is_wuser = 1;
+		break;
+	case IDMAP_GSID:
+		is_wuser = 0;
+		break;
+	default:
+		idmapdlog(LOG_ERR, "Idmapd internal error: userness of the "
+		    "winname undetermined.");
+		return (IDMAP_ERR_INTERNAL);
+		break;
+	}
+
+	switch (req->id2.idtype) {
+	case IDMAP_UID:
+		is_user = 1;
+		break;
+	case IDMAP_GID:
+		is_user = 0;
+		break;
+	case IDMAP_POSIXID:
+		is_user = is_wuser;
+		res->id.idtype = is_user ? IDMAP_UID : IDMAP_GID;
+		break;
+	}
 
 	i = 0;
 	if (windomain == NULL) {
@@ -1729,15 +2023,16 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 		UNLOCK_CONFIG();
 	}
 
+	if ((lower_winname = tolower_u8(winname)) == NULL)
+		lower_winname = winname;    /* hope for the best */
 	sql = sqlite_mprintf(
-		"SELECT unixname, u2w_order FROM namerules WHERE "
-		"w2u_order > 0 AND is_user = %d AND "
-		"(winname = %Q OR winname = '*') AND "
-		"(windomain = %Q OR windomain = '*' %s) "
-		"ORDER BY w2u_order ASC;",
-		is_user, winname,
-		windomain,
-		i?"OR windomain ISNULL OR windomain = ''":"");
+	    "SELECT unixname, u2w_order FROM namerules WHERE "
+	    "w2u_order > 0 AND is_user = %d AND is_wuser = %d AND "
+	    "(winname = %Q OR winname = '*') AND "
+	    "(windomain = %Q OR windomain = '*' %s) "
+	    "ORDER BY w2u_order ASC;",
+	    is_user, is_wuser, lower_winname, windomain,
+	    i ? "OR windomain ISNULL OR windomain = ''" : "");
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
@@ -1746,9 +2041,8 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 
 	if (sqlite_compile(db, sql, NULL, &vm, &errmsg) != SQLITE_OK) {
 		retcode = IDMAP_ERR_INTERNAL;
-		idmapdlog(LOG_ERR,
-			"%s: database error (%s)",
-			me, CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "%s: database error (%s)", me,
+		    CHECK_NULL(errmsg));
 		sqlite_freemem(errmsg);
 		goto out;
 	}
@@ -1771,8 +2065,11 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 				retcode = IDMAP_ERR_NOMAPPING;
 				goto out;
 			}
-			unixname = (values[0][0] == '*')?winname:values[0];
-			retcode = ns_lookup_byname(is_user, unixname, res);
+			unixname = (values[0][0] == '*') ? winname : values[0];
+			lower_unixname = (values[0][0] == '*') ?
+			    lower_winname : NULL;
+			retcode = ns_lookup_byname(is_user, unixname,
+			    lower_unixname, res);
 			if (retcode == IDMAP_ERR_NOTFOUND) {
 				if (unixname == winname)
 					/* Case 4 */
@@ -1788,9 +2085,8 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 		} else {
 			(void) sqlite_finalize(vm, &errmsg);
 			vm = NULL;
-			idmapdlog(LOG_ERR,
-				"%s: database error (%s)",
-				me, CHECK_NULL(errmsg));
+			idmapdlog(LOG_ERR, "%s: database error (%s)", me,
+			    CHECK_NULL(errmsg));
 			sqlite_freemem(errmsg);
 			retcode = IDMAP_ERR_INTERNAL;
 			goto out;
@@ -1798,8 +2094,7 @@ name_based_mapping_sid2pid(sqlite *db, idmap_mapping *req, idmap_id_res *res) {
 	}
 
 out:
-	if (sql != NULL)
-		sqlite_freemem(sql);
+	sqlite_freemem(sql);
 	if (retcode == IDMAP_SUCCESS) {
 		if (values[1] != NULL)
 			res->direction =
@@ -1809,6 +2104,8 @@ out:
 			res->direction = IDMAP_DIRECTION_W2U;
 		req->id2name = strdup(unixname);
 	}
+	if (lower_winname != NULL && lower_winname != winname)
+		free(lower_winname);
 	if (vm != NULL)
 		(void) sqlite_finalize(vm, NULL);
 	return (retcode);
@@ -1860,7 +2157,8 @@ get_next_eph_gid(gid_t *next_gid)
 
 static
 int
-gethash(const char *str, uint32_t num, uint_t htsize) {
+gethash(const char *str, uint32_t num, uint_t htsize)
+{
 	uint_t  hval, i, len;
 
 	if (str == NULL)
@@ -1884,7 +2182,8 @@ gethash(const char *str, uint32_t num, uint_t htsize) {
 static
 int
 get_from_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid,
-		uid_t *pid) {
+		uid_t *pid)
+{
 	uint_t		next, key;
 	uint_t		htsize = state->sid_history_size;
 	idmap_sid	*sid;
@@ -1908,7 +2207,8 @@ get_from_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid,
 
 static
 void
-add_to_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid) {
+add_to_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid)
+{
 	uint_t		hash, next;
 	uint_t		htsize = state->sid_history_size;
 
@@ -1928,7 +2228,8 @@ add_to_sid_history(lookup_state_t *state, const char *prefix, uint32_t rid) {
 static
 idmap_retcode
 dynamic_ephemeral_mapping(lookup_state_t *state, sqlite *cache,
-		idmap_mapping *req, idmap_id_res *res) {
+		idmap_mapping *req, idmap_id_res *res)
+{
 
 	uid_t		next_pid;
 
@@ -1963,7 +2264,8 @@ dynamic_ephemeral_mapping(lookup_state_t *state, sqlite *cache,
 
 idmap_retcode
 sid2pid_second_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
-		idmap_mapping *req, idmap_id_res *res) {
+		idmap_mapping *req, idmap_id_res *res)
+{
 	idmap_retcode	retcode;
 
 	/*
@@ -1976,7 +2278,7 @@ sid2pid_second_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 		return (res->retcode);
 
 	/* Get status from previous pass */
-	retcode = (res->retcode == IDMAP_NEXT)?IDMAP_SUCCESS:res->retcode;
+	retcode = (res->retcode == IDMAP_NEXT) ? IDMAP_SUCCESS : res->retcode;
 
 	if (retcode != IDMAP_SUCCESS) {
 		/* Reset return type */
@@ -1993,20 +2295,6 @@ sid2pid_second_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 			}
 		}
 		goto out;
-	}
-
-	/*
-	 * Verify that the sid type matches the request if the
-	 * SID was validated by an AD lookup.
-	 */
-	if (req->direction & _IDMAP_F_S2N_AD) {
-		retcode = verify_type(req->id2.idtype,
-			(int)res->id.idtype, res);
-		if (retcode != IDMAP_SUCCESS) {
-			res->id.idtype = req->id2.idtype;
-			res->id.idmap_id_u.uid = UID_NOBODY;
-			goto out;
-		}
 	}
 
 	/* Name-based mapping */
@@ -2033,7 +2321,8 @@ out:
 
 idmap_retcode
 update_cache_pid2sid(lookup_state_t *state, sqlite *cache,
-		idmap_mapping *req, idmap_id_res *res) {
+		idmap_mapping *req, idmap_id_res *res)
+{
 	char		*sql = NULL;
 	idmap_retcode	retcode;
 
@@ -2050,18 +2339,15 @@ update_cache_pid2sid(lookup_state_t *state, sqlite *cache,
 	 * the same pid to be the destination in multiple entries
 	 */
 	sql = sqlite_mprintf("INSERT OR REPLACE into idmap_cache "
-		"(sidprefix, rid, windomain, winname, pid, unixname, "
-		"is_user, expiration, w2u, u2w) "
-		"VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, "
-		"strftime('%%s','now') + 600, %q, 1); ",
-		res->id.idmap_id_u.sid.prefix,
-		res->id.idmap_id_u.sid.rid,
-		req->id2domain,
-		req->id2name,
-		req->id1.idmap_id_u.uid,
-		req->id1name,
-		(req->id1.idtype == IDMAP_UID)?1:0,
-		(res->direction == 0)?"1":NULL);
+	    "(sidprefix, rid, windomain, canon_winname, pid, unixname, "
+	    "is_user, is_wuser, expiration, w2u, u2w) "
+	    "VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, %d, "
+	    "strftime('%%s','now') + 600, %q, 1); ",
+	    res->id.idmap_id_u.sid.prefix, res->id.idmap_id_u.sid.rid,
+	    req->id2domain, req->id2name, req->id1.idmap_id_u.uid,
+	    req->id1name, (req->id1.idtype == IDMAP_UID) ? 1 : 0,
+	    (req->id2.idtype == IDMAP_USID) ? 1 : 0,
+	    (res->direction == 0) ? "1" : NULL);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -2085,13 +2371,11 @@ update_cache_pid2sid(lookup_state_t *state, sqlite *cache,
 		goto out;
 
 	sql = sqlite_mprintf("INSERT OR REPLACE into name_cache "
-		"(sidprefix, rid, name, domain, type, expiration) "
-		"VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
-		res->id.idmap_id_u.sid.prefix,
-		res->id.idmap_id_u.sid.rid,
-		req->id2name,
-		req->id2domain,
-		(req->id1.idtype == IDMAP_UID)?_IDMAP_T_USER:_IDMAP_T_GROUP);
+	    "(sidprefix, rid, canon_name, domain, type, expiration) "
+	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
+	    res->id.idmap_id_u.sid.prefix, res->id.idmap_id_u.sid.rid,
+	    req->id2name, req->id2domain,
+	    (req->id2.idtype == IDMAP_UID) ? _IDMAP_T_USER : _IDMAP_T_GROUP);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -2109,7 +2393,8 @@ out:
 
 idmap_retcode
 update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
-		idmap_mapping *req, idmap_id_res *res) {
+		idmap_mapping *req, idmap_id_res *res)
+{
 	char		*sql = NULL;
 	idmap_retcode	retcode;
 	int		is_eph_user;
@@ -2131,12 +2416,12 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 
 	if (is_eph_user >= 0 && !IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
 		sql = sqlite_mprintf("UPDATE idmap_cache "
-			"SET w2u = 0 WHERE "
-			"sidprefix = %Q AND rid = %u AND w2u = 1 AND "
-			"pid >= 2147483648 AND is_user = %d;",
-			req->id1.idmap_id_u.sid.prefix,
-			req->id1.idmap_id_u.sid.rid,
-			is_eph_user);
+		    "SET w2u = 0 WHERE "
+		    "sidprefix = %Q AND rid = %u AND w2u = 1 AND "
+		    "pid >= 2147483648 AND is_user = %d;",
+		    req->id1.idmap_id_u.sid.prefix,
+		    req->id1.idmap_id_u.sid.rid,
+		    is_eph_user);
 		if (sql == NULL) {
 			retcode = IDMAP_ERR_INTERNAL;
 			idmapdlog(LOG_ERR, "Out of memory");
@@ -2151,19 +2436,17 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 		sql = NULL;
 	}
 
+
 	sql = sqlite_mprintf("INSERT OR REPLACE into idmap_cache "
-		"(sidprefix, rid, windomain, winname, pid, unixname, "
-		"is_user, expiration, w2u, u2w) "
-		"VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, "
-		"strftime('%%s','now') + 600, 1, %q); ",
-		req->id1.idmap_id_u.sid.prefix,
-		req->id1.idmap_id_u.sid.rid,
-		req->id1domain,
-		req->id1name,
-		res->id.idmap_id_u.uid,
-		req->id2name,
-		(res->id.idtype == IDMAP_UID)?1:0,
-		(res->direction == 0)?"1":NULL);
+	    "(sidprefix, rid, windomain, canon_winname, pid, unixname, "
+	    "is_user, is_wuser, expiration, w2u, u2w) "
+	    "VALUES(%Q, %u, %Q, %Q, %u, %Q, %d, %d, "
+	    "strftime('%%s','now') + 600, 1, %q); ",
+	    req->id1.idmap_id_u.sid.prefix, req->id1.idmap_id_u.sid.rid,
+	    req->id1domain, req->id1name, res->id.idmap_id_u.uid,
+	    req->id2name, (res->id.idtype == IDMAP_UID) ? 1 : 0,
+	    (req->id1.idtype == IDMAP_USID) ? 1 : 0,
+	    (res->direction == 0) ? "1" : NULL);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -2187,13 +2470,11 @@ update_cache_sid2pid(lookup_state_t *state, sqlite *cache,
 		goto out;
 
 	sql = sqlite_mprintf("INSERT OR REPLACE into name_cache "
-		"(sidprefix, rid, name, domain, type, expiration) "
-		"VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
-		req->id1.idmap_id_u.sid.prefix,
-		req->id1.idmap_id_u.sid.rid,
-		req->id1name,
-		req->id1domain,
-		(res->id.idtype == IDMAP_UID)?_IDMAP_T_USER:_IDMAP_T_GROUP);
+	    "(sidprefix, rid, canon_name, domain, type, expiration) "
+	    "VALUES(%Q, %u, %Q, %Q, %d, strftime('%%s','now') + 3600); ",
+	    req->id1.idmap_id_u.sid.prefix, req->id1.idmap_id_u.sid.rid,
+	    req->id1name, req->id1domain,
+	    (req->id1.idtype == IDMAP_USID) ? _IDMAP_T_USER : _IDMAP_T_GROUP);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -2209,9 +2490,11 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
-		int is_user, int getname) {
+		int is_user, int getname)
+{
 	char		*end;
 	char		*sql = NULL;
 	const char	**values;
@@ -2223,21 +2506,21 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 	/* Current time */
 	errno = 0;
 	if ((curtime = time(NULL)) == (time_t)-1) {
-		idmapdlog(LOG_ERR,
-			"Failed to get current time (%s)",
-			strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to get current time (%s)",
+		    strerror(errno));
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
 
 	/* SQL to lookup the cache */
-	sql = sqlite_mprintf("SELECT sidprefix, rid, winname, windomain, w2u "
-			"FROM idmap_cache WHERE "
-			"pid = %u AND u2w = 1 AND is_user = %d AND "
-			"(pid >= 2147483648 OR "
-			"(expiration = 0 OR expiration ISNULL OR "
-			"expiration > %d));",
-			req->id1.idmap_id_u.uid, is_user, curtime);
+	sql = sqlite_mprintf("SELECT sidprefix, rid, canon_winname, windomain, "
+	    "w2u, is_wuser "
+	    "FROM idmap_cache WHERE "
+	    "pid = %u AND u2w = 1 AND is_user = %d AND "
+	    "(pid >= 2147483648 OR "
+	    "(expiration = 0 OR expiration ISNULL OR "
+	    "expiration > %d));",
+	    req->id1.idmap_id_u.uid, is_user, curtime);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
@@ -2257,8 +2540,24 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 
 		switch (req->id2.idtype) {
 		case IDMAP_SID:
+		case IDMAP_USID:
+		case IDMAP_GSID:
+			res->id.idtype =
+			    strtol(values[5], &end, 10) == 1
+			    ? IDMAP_USID : IDMAP_GSID;
+
+			if (req->id2.idtype == IDMAP_USID &&
+			    res->id.idtype == IDMAP_GSID) {
+				retcode = IDMAP_ERR_NOTUSER;
+				goto out;
+			} else if (req->id2.idtype == IDMAP_GSID &&
+			    res->id.idtype == IDMAP_USID) {
+				retcode = IDMAP_ERR_NOTGROUP;
+				goto out;
+			}
+
 			res->id.idmap_id_u.sid.rid =
-				strtoul(values[1], &end, 10);
+			    strtoul(values[1], &end, 10);
 			res->id.idmap_id_u.sid.prefix = strdup(values[0]);
 			if (res->id.idmap_id_u.sid.prefix == NULL) {
 				idmapdlog(LOG_ERR, "Out of memory");
@@ -2290,6 +2589,9 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 				retcode = IDMAP_ERR_MEMORY;
 				goto out;
 			}
+
+			req->id2.idtype = res->id.idtype;
+
 			break;
 		default:
 			retcode = IDMAP_ERR_NOTSUPPORTED;
@@ -2303,10 +2605,12 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_cache_name2sid(sqlite *cache, const char *name, const char *domain,
-		char **sidprefix, idmap_rid_t *rid, int *type) {
-	char		*end;
+	char **canonname, char **sidprefix, idmap_rid_t *rid, int *type)
+{
+	char		*end, *lower_name;
 	char		*sql = NULL;
 	const char	**values;
 	sqlite_vm	*vm = NULL;
@@ -2317,25 +2621,27 @@ lookup_cache_name2sid(sqlite *cache, const char *name, const char *domain,
 	/* Get current time */
 	errno = 0;
 	if ((curtime = time(NULL)) == (time_t)-1) {
-		idmapdlog(LOG_ERR,
-			"Failed to get current time (%s)",
-			strerror(errno));
+		idmapdlog(LOG_ERR, "Failed to get current time (%s)",
+		    strerror(errno));
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
 
 	/* SQL to lookup the cache */
-	sql = sqlite_mprintf("SELECT sidprefix, rid, type FROM name_cache "
-			"WHERE name = %Q AND domain = %Q AND "
-			"(expiration = 0 OR expiration ISNULL OR "
-			"expiration > %d);",
-			name, domain, curtime);
+	if ((lower_name = tolower_u8(name)) == NULL)
+		lower_name = (char *)name;
+	sql = sqlite_mprintf("SELECT sidprefix, rid, type, canon_name "
+	    "FROM name_cache WHERE name = %Q AND domain = %Q AND "
+	    "(expiration = 0 OR expiration ISNULL OR "
+	    "expiration > %d);", lower_name, domain, curtime);
+	if (lower_name != name)
+		free(lower_name);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
 		goto out;
 	}
-	retcode = sql_compile_n_step_once(cache, sql, &vm, &ncol, 3, &values);
+	retcode = sql_compile_n_step_once(cache, sql, &vm, &ncol, 4, &values);
 	sqlite_freemem(sql);
 
 	if (retcode == IDMAP_SUCCESS) {
@@ -2345,6 +2651,15 @@ lookup_cache_name2sid(sqlite *cache, const char *name, const char *domain,
 				goto out;
 			}
 			*type = strtol(values[2], &end, 10);
+		}
+
+		if (canonname != NULL) {
+			assert(values[3] != NULL);
+			if ((*canonname = strdup(values[3])) == NULL) {
+				idmapdlog(LOG_ERR, "Out of memory");
+				retcode = IDMAP_ERR_MEMORY;
+				goto out;
+			}
 		}
 
 		if (values[0] == NULL || values[1] == NULL) {
@@ -2365,9 +2680,12 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
-lookup_win_name2sid(const char *name, const char *domain, char **sidprefix,
-		idmap_rid_t *rid, int *type) {
+static
+idmap_retcode
+lookup_win_name2sid(const char *name, const char *domain,
+		char **canonname, char **sidprefix, idmap_rid_t *rid,
+		int *type)
+{
 	int			ret;
 	int			retries = 0;
 	idmap_query_state_t	*qs = NULL;
@@ -2380,20 +2698,19 @@ retry:
 	if (ret != 0) {
 		degrade_svc();
 		idmapdlog(LOG_ERR,
-		"Failed to create name2sid batch for AD lookup");
+		    "Failed to create name2sid batch for AD lookup");
 		return (IDMAP_ERR_INTERNAL);
 	}
 
 	restore_svc();
 
-	retcode = idmap_name2sid_batch_add1(qs, name, domain, sidprefix,
-					rid, type, &rc);
+	retcode = idmap_name2sid_batch_add1(qs, name, domain, canonname,
+	    sidprefix, rid, type, &rc);
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
 		goto out;
 
 	if (retcode != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		"Failed to batch name2sid for AD lookup");
+		idmapdlog(LOG_ERR, "Failed to batch name2sid for AD lookup");
 		idmap_lookup_release_batch(&qs);
 		return (IDMAP_ERR_INTERNAL);
 	}
@@ -2418,15 +2735,21 @@ out:
 	/* NOTREACHED */
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_name2sid(sqlite *cache, const char *name, const char *domain,
-		int *is_user, char **sidprefix, idmap_rid_t *rid,
-		idmap_mapping *req) {
+		int *is_wuser, char **canonname, char **sidprefix,
+		idmap_rid_t *rid, idmap_mapping *req)
+{
 	int		type;
 	idmap_retcode	retcode;
 
+	*sidprefix = NULL;
+	*canonname = NULL;
+
 	/* Lookup name@domain to sid in the well-known sids table */
-	retcode = lookup_wksids_name2sid(name, sidprefix, rid, &type);
+	retcode = lookup_wksids_name2sid(name, canonname, sidprefix, rid,
+	    &type);
 	if (retcode == IDMAP_SUCCESS) {
 		req->direction |= _IDMAP_F_S2N_CACHE;
 		goto out;
@@ -2435,12 +2758,12 @@ lookup_name2sid(sqlite *cache, const char *name, const char *domain,
 	}
 
 	/* Lookup name@domain to sid in cache */
-	retcode = lookup_cache_name2sid(cache, name, domain, sidprefix,
-		rid, &type);
+	retcode = lookup_cache_name2sid(cache, name, domain, canonname,
+	    sidprefix, rid, &type);
 	if (retcode == IDMAP_ERR_NOTFOUND) {
 		/* Lookup Windows NT/AD to map name@domain to sid */
-		retcode = lookup_win_name2sid(name, domain, sidprefix, rid,
-			&type);
+		retcode = lookup_win_name2sid(name, domain, canonname,
+		    sidprefix, rid, &type);
 		if (retcode != IDMAP_SUCCESS)
 			return (retcode);
 		req->direction |= _IDMAP_F_S2N_AD;
@@ -2454,44 +2777,75 @@ lookup_name2sid(sqlite *cache, const char *name, const char *domain,
 out:
 	/*
 	 * Entry found (cache or Windows lookup)
-	 * is_user is both input as well as output parameter
+	 * is_wuser is both input as well as output parameter
 	 */
-	if (*is_user == 1) {
-		if (type != _IDMAP_T_USER)
+	if (*is_wuser == 1) {
+		if (type != _IDMAP_T_USER) {
+			if (*sidprefix != NULL) {
+				free(*sidprefix);
+				*sidprefix = NULL;
+			}
+			if (*canonname != NULL) {
+				free(*canonname);
+				*canonname = NULL;
+			}
 			return (IDMAP_ERR_NOTUSER);
-	} else if (*is_user == 0) {
-		if (type != _IDMAP_T_GROUP)
+		}
+	} else if (*is_wuser == 0) {
+		if (type != _IDMAP_T_GROUP) {
+			if (*sidprefix != NULL) {
+				free(*sidprefix);
+				*sidprefix = NULL;
+			}
+			if (*canonname != NULL) {
+				free(*canonname);
+				*canonname = NULL;
+			}
 			return (IDMAP_ERR_NOTGROUP);
-	} else if (*is_user == -1) {
+		}
+	} else if (*is_wuser == -1) {
 		/* Caller wants to know if its user or group */
 		if (type == _IDMAP_T_USER)
-			*is_user = 1;
+			*is_wuser = 1;
 		else if (type == _IDMAP_T_GROUP)
-			*is_user = 0;
-		else
+			*is_wuser = 0;
+		else {
+			if (*sidprefix != NULL) {
+				free(*sidprefix);
+				*sidprefix = NULL;
+			}
+			if (*canonname != NULL) {
+				free(*canonname);
+				*canonname = NULL;
+			}
 			return (IDMAP_ERR_SID);
+		}
 	}
 
 	return (retcode);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
-		int is_user, idmap_mapping *req, idmap_id_res *res) {
+		int is_user, idmap_mapping *req, idmap_id_res *res)
+{
 	const char	*winname, *windomain;
+	char		*canonname;
 	char		*default_domain = NULL;
 	char		*sql = NULL, *errmsg = NULL;
 	idmap_retcode	retcode;
 	char		*end;
 	const char	**values;
 	sqlite_vm	*vm = NULL;
-	int		ncol, r;
+	int		ncol, r, nrow;
 	const char	*me = "name_based_mapping_pid2sid";
+	int is_wuser;
 
 	RDLOCK_CONFIG();
 	if (_idmapdstate.cfg->pgcfg.default_domain != NULL) {
 		default_domain =
-			strdup(_idmapdstate.cfg->pgcfg.default_domain);
+		    strdup(_idmapdstate.cfg->pgcfg.default_domain);
 		if (default_domain == NULL) {
 			UNLOCK_CONFIG();
 			idmapdlog(LOG_ERR, "Out of memory");
@@ -2502,11 +2856,10 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 	UNLOCK_CONFIG();
 
 	sql = sqlite_mprintf(
-		"SELECT winname, windomain, w2u_order FROM namerules WHERE "
-		"u2w_order > 0 AND is_user = %d AND "
-		"(unixname = %Q OR unixname = '*') "
-		"ORDER BY u2w_order ASC;",
-		is_user, unixname);
+	    "SELECT winname_display, windomain, w2u_order FROM namerules WHERE "
+	    "u2w_order > 0 AND is_user = %d AND "
+	    "(unixname = %Q OR unixname = '*') "
+	    "ORDER BY u2w_order ASC;", is_user, unixname);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		retcode = IDMAP_ERR_MEMORY;
@@ -2515,17 +2868,17 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 
 	if (sqlite_compile(db, sql, NULL, &vm, &errmsg) != SQLITE_OK) {
 		retcode = IDMAP_ERR_INTERNAL;
-		idmapdlog(LOG_ERR,
-			"%s: database error (%s)",
-			me, CHECK_NULL(errmsg));
+		idmapdlog(LOG_ERR, "%s: database error (%s)", me,
+		    CHECK_NULL(errmsg));
 		sqlite_freemem(errmsg);
 		goto out;
 	}
 
-	for (;;) {
+	for (nrow = 0; ; ) {
 		r = sqlite_step(vm, &ncol, &values, NULL);
 		assert(r != SQLITE_LOCKED && r != SQLITE_BUSY);
 		if (r == SQLITE_ROW) {
+			nrow++;
 			if (ncol < 3) {
 				retcode = IDMAP_ERR_INTERNAL;
 				goto out;
@@ -2539,27 +2892,44 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 				retcode = IDMAP_ERR_NOMAPPING;
 				goto out;
 			}
-			winname = (values[0][0] == '*')?unixname:values[0];
+
+			if (values[0][0] == '*') {
+				if (nrow > 1) {
+					/*
+					 * There were non-wildcard rules where
+					 * windows identity doesn't exist
+					 */
+					retcode = IDMAP_ERR_NOMAPPING;
+					goto out;
+				}
+				winname = unixname;
+			} else {
+				winname = values[0];
+			}
+
 			if (values[1] != NULL)
 				windomain = values[1];
 			else if (default_domain != NULL)
 				windomain = default_domain;
 			else {
-				idmapdlog(LOG_ERR,
-					"%s: no domain", me);
+				idmapdlog(LOG_ERR, "%s: no domain", me);
 				retcode = IDMAP_ERR_DOMAIN_NOTFOUND;
 				goto out;
 			}
 			/* Lookup winname@domain to sid */
+
+			is_wuser = res->id.idtype == IDMAP_USID ? 1
+			    : res->id.idtype == IDMAP_GSID ? 0
+			    : -1;
+
 			retcode = lookup_name2sid(cache, winname, windomain,
-				&is_user, &res->id.idmap_id_u.sid.prefix,
-				&res->id.idmap_id_u.sid.rid, req);
+			    &is_wuser, &canonname,
+			    &res->id.idmap_id_u.sid.prefix,
+			    &res->id.idmap_id_u.sid.rid, req);
 			if (retcode == IDMAP_ERR_NOTFOUND) {
-				if (winname == unixname)
-					continue;
-				else
-					retcode = IDMAP_ERR_NOMAPPING;
+				continue;
 			}
+
 			goto out;
 		} else if (r == SQLITE_DONE) {
 			retcode = IDMAP_ERR_NOTFOUND;
@@ -2567,9 +2937,8 @@ name_based_mapping_pid2sid(sqlite *db, sqlite *cache, const char *unixname,
 		} else {
 			(void) sqlite_finalize(vm, &errmsg);
 			vm = NULL;
-			idmapdlog(LOG_ERR,
-				"%s: database error (%s)",
-				me, CHECK_NULL(errmsg));
+			idmapdlog(LOG_ERR, "%s: database error (%s)", me,
+			    CHECK_NULL(errmsg));
 			sqlite_freemem(errmsg);
 			retcode = IDMAP_ERR_INTERNAL;
 			goto out;
@@ -2580,6 +2949,8 @@ out:
 	if (sql != NULL)
 		sqlite_freemem(sql);
 	if (retcode == IDMAP_SUCCESS) {
+		res->id.idtype = is_wuser ? IDMAP_USID : IDMAP_GSID;
+
 		if (values[2] != NULL)
 			res->direction =
 			    (strtol(values[2], &end, 10) == 0)?
@@ -2587,7 +2958,8 @@ out:
 		else
 			res->direction = IDMAP_DIRECTION_U2W;
 
-		req->id2name = strdup(winname);
+		req->id2.idtype = is_wuser ? IDMAP_USID : IDMAP_GSID;
+		req->id2name = canonname;
 		if (req->id2name != NULL) {
 			if (windomain == default_domain) {
 				req->id2domain = (char *)windomain;
@@ -2604,10 +2976,68 @@ out:
 	return (retcode);
 }
 
+/*
+ * Convention when processing unix2win requests:
+ *
+ * Unix identity:
+ * req->id1name =
+ *              unixname if given otherwise unixname found will be placed
+ *              here.
+ * req->id1domain =
+ *              NOT USED
+ * req->id1.idtype =
+ *              Given type (IDMAP_UID or IDMAP_GID)
+ * req->id1..[uid or gid] =
+ *              UID/GID if given otherwise UID/GID found will be placed here.
+ *
+ * Windows identity:
+ * req->id2name =
+ *              winname found will be placed here.
+ * req->id2domain =
+ *              windomain found will be placed here.
+ * res->id.idtype =
+ *              Target type initialized from req->id2.idtype. If
+ *              it is IDMAP_SID then actual type (IDMAP_USID/GSID) found
+ *              will be placed here.
+ * req->id..sid.[prefix, rid] =
+ *              SID found will be placed here.
+ *
+ * Others:
+ * res->retcode =
+ *              Return status for this request will be placed here.
+ * res->direction =
+ *              Direction found will be placed here. Direction
+ *              meaning whether the resultant mapping is valid
+ *              only from unix2win or bi-directional.
+ * req->direction =
+ *              INTERNAL USE. Used by idmapd to set various
+ *              flags (_IDMAP_F_xxxx) to aid in processing
+ *              of the request.
+ * req->id2.idtype =
+ *              INTERNAL USE. Initially this is the requested target
+ *              type and is used to initialize res->id.idtype.
+ *              ad_lookup_batch() uses this field temporarily to store
+ *              sid_type obtained by the batched AD lookups and after
+ *              use resets it to IDMAP_NONE to prevent xdr from
+ *              mis-interpreting the contents of req->id2.
+ * req->id2..[uid or gid or sid] =
+ *              NOT USED
+ */
+
+/*
+ * This function does the following:
+ * 1. Lookup well-known SIDs table.
+ * 2. Lookup cache.
+ * 3. Check if the client does not want new mapping to be allocated
+ *    in which case this pass is the final pass.
+ * 4. Set AD lookup flags if it determines that the next stage needs
+ *    to do AD lookup.
+ */
 idmap_retcode
 pid2sid_first_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 		idmap_mapping *req, idmap_id_res *res, int is_user,
-		int getname) {
+		int getname)
+{
 	char		*unixname = NULL;
 	struct passwd	pwd;
 	struct group	grp;
@@ -2646,28 +3076,28 @@ pid2sid_first_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 	} else if (is_user) {
 		errno = 0;
 		if (getpwuid_r(req->id1.idmap_id_u.uid, &pwd, buf,
-				sizeof (buf)) == NULL) {
+		    sizeof (buf)) == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
-			"%s: getpwuid_r(%u) failed (%s).",
-				me, req->id1.idmap_id_u.uid,
-				errnum?strerror(errnum):"not found");
+			    "%s: getpwuid_r(%u) failed (%s).",
+			    me, req->id1.idmap_id_u.uid,
+			    errnum ? strerror(errnum) : "not found");
 			retcode = (errnum == 0)?IDMAP_ERR_NOTFOUND:
-					IDMAP_ERR_INTERNAL;
+			    IDMAP_ERR_INTERNAL;
 			goto fallback_localsid;
 		}
 		unixname = pwd.pw_name;
 	} else {
 		errno = 0;
 		if (getgrgid_r(req->id1.idmap_id_u.gid, &grp, buf,
-				sizeof (buf)) == NULL) {
+		    sizeof (buf)) == NULL) {
 			errnum = errno;
 			idmapdlog(LOG_WARNING,
-			"%s: getgrgid_r(%u) failed (%s).",
-				me, req->id1.idmap_id_u.gid,
-				errnum?strerror(errnum):"not found");
+			    "%s: getgrgid_r(%u) failed (%s).",
+			    me, req->id1.idmap_id_u.gid,
+			    errnum ? strerror(errnum) : "not found");
 			retcode = (errnum == 0)?IDMAP_ERR_NOTFOUND:
-					IDMAP_ERR_INTERNAL;
+			    IDMAP_ERR_INTERNAL;
 			goto fallback_localsid;
 		}
 		unixname = grp.gr_name;
@@ -2675,7 +3105,7 @@ pid2sid_first_pass(lookup_state_t *state, sqlite *cache, sqlite *db,
 
 	/* Name-based mapping */
 	retcode = name_based_mapping_pid2sid(db, cache, unixname, is_user,
-		req, res);
+	    req, res);
 	if (retcode == IDMAP_ERR_NOTFOUND) {
 		retcode = generate_localsid(req, res, is_user);
 		goto out;
@@ -2704,9 +3134,11 @@ out:
 	return (retcode);
 }
 
-static idmap_retcode
+static
+idmap_retcode
 lookup_win_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
-		char **domain, int *type) {
+		char **domain, int *type)
+{
 	int			ret;
 	idmap_query_state_t	*qs = NULL;
 	idmap_retcode		rc, retcode;
@@ -2717,18 +3149,17 @@ lookup_win_sid2name(const char *sidprefix, idmap_rid_t rid, char **name,
 	if (ret != 0) {
 		degrade_svc();
 		idmapdlog(LOG_ERR,
-		"Failed to create sid2name batch for AD lookup");
+		    "Failed to create sid2name batch for AD lookup");
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
 
 	restore_svc();
 
-	ret = idmap_sid2name_batch_add1(
-			qs, sidprefix, &rid, name, domain, type, &rc);
+	ret = idmap_sid2name_batch_add1(qs, sidprefix, &rid, name, domain,
+	    type, &rc);
 	if (ret != 0) {
-		idmapdlog(LOG_ERR,
-		"Failed to batch sid2name for AD lookup");
+		idmapdlog(LOG_ERR, "Failed to batch sid2name for AD lookup");
 		retcode = IDMAP_ERR_INTERNAL;
 		goto out;
 	}
@@ -2740,7 +3171,7 @@ out:
 			degrade_svc();
 		if (ret != 0) {
 			idmapdlog(LOG_ERR,
-			"Failed to execute sid2name AD lookup");
+			    "Failed to execute sid2name AD lookup");
 			retcode = IDMAP_ERR_INTERNAL;
 		} else
 			retcode = rc;
@@ -2749,7 +3180,8 @@ out:
 	return (retcode);
 }
 
-static int
+static
+int
 copy_mapping_request(idmap_mapping *mapping, idmap_mapping *request)
 {
 	(void) memset(mapping, 0, sizeof (*mapping));
@@ -2759,7 +3191,7 @@ copy_mapping_request(idmap_mapping *mapping, idmap_mapping *request)
 	mapping->id2.idtype = request->id2.idtype;
 
 	mapping->id1.idtype = request->id1.idtype;
-	if (request->id1.idtype == IDMAP_SID) {
+	if (IS_REQUEST_SID(*request, 1)) {
 		mapping->id1.idmap_id_u.sid.rid =
 		    request->id1.idmap_id_u.sid.rid;
 		if (!EMPTY_STRING(request->id1.idmap_id_u.sid.prefix)) {
@@ -2798,23 +3230,25 @@ errout:
 
 idmap_retcode
 get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
-		idmap_mapping *mapping) {
+		idmap_mapping *mapping)
+{
 	idmap_id_res	idres;
 	lookup_state_t	state;
 	char		*cp;
-	int		is_user;
+	int		is_wuser;
 	idmap_retcode	retcode;
 	const char	*winname, *windomain;
+	char		*canonname;
 
 	(void) memset(&idres, 0, sizeof (idres));
 	(void) memset(&state, 0, sizeof (state));
 
-	if (request->id2.idtype == IDMAP_UID)
-		is_user = 1;
-	else if (request->id2.idtype == IDMAP_GID)
-		is_user = 0;
-	else if (request->id2.idtype == IDMAP_POSIXID)
-		is_user = -1;
+	if (request->id1.idtype == IDMAP_USID)
+		is_wuser = 1;
+	else if (request->id1.idtype == IDMAP_GSID)
+		is_wuser = 0;
+	else if (request->id1.idtype == IDMAP_SID)
+		is_wuser = -1;
 	else {
 		retcode = IDMAP_ERR_IDTYPE;
 		goto out;
@@ -2852,7 +3286,7 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 			 */
 				mapping->id1domain =
 				    strdup(_idmapdstate.cfg->
-					pgcfg.default_domain);
+				    pgcfg.default_domain);
 				if (mapping->id1domain == NULL)
 					retcode = IDMAP_ERR_MEMORY;
 			}
@@ -2869,12 +3303,15 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	if (!EMPTY_STRING(winname) &&
 	    EMPTY_STRING(mapping->id1.idmap_id_u.sid.prefix)) {
 		retcode = lookup_name2sid(cache, winname, windomain,
-			&is_user, &mapping->id1.idmap_id_u.sid.prefix,
-			&mapping->id1.idmap_id_u.sid.rid, mapping);
+		    &is_wuser, &canonname, &mapping->id1.idmap_id_u.sid.prefix,
+		    &mapping->id1.idmap_id_u.sid.rid, mapping);
 		if (retcode != IDMAP_SUCCESS)
 			goto out;
-		if (mapping->id2.idtype == IDMAP_POSIXID)
-			mapping->id2.idtype = is_user?IDMAP_UID:IDMAP_GID;
+		free(mapping->id1name);
+		mapping->id1name = canonname;
+		if (mapping->id1.idtype == IDMAP_SID)
+			mapping->id1.idtype = is_wuser ?
+			    IDMAP_USID : IDMAP_GSID;
 	}
 
 	state.sid2pid_done = TRUE;
@@ -2885,11 +3322,11 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	if (state.ad_nqueries) {
 		/* sid2name AD lookup */
 		retcode = lookup_win_sid2name(
-			mapping->id1.idmap_id_u.sid.prefix,
-			mapping->id1.idmap_id_u.sid.rid,
-			&mapping->id1name,
-			&mapping->id1domain,
-			(int *)&idres.id.idtype);
+		    mapping->id1.idmap_id_u.sid.prefix,
+		    mapping->id1.idmap_id_u.sid.rid,
+		    &mapping->id1name,
+		    &mapping->id1domain,
+		    (int *)&idres.id.idtype);
 
 		idres.retcode = retcode;
 	}
@@ -2916,7 +3353,8 @@ out:
 
 idmap_retcode
 get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
-		idmap_mapping *mapping, int is_user) {
+		idmap_mapping *mapping, int is_user)
+{
 	idmap_id_res	idres;
 	lookup_state_t	state;
 	struct passwd	pwd;
@@ -2956,28 +3394,28 @@ get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 		if (is_user) {
 			errno = 0;
 			if (getpwnam_r(unixname, &pwd, buf,
-					sizeof (buf)) == NULL) {
+			    sizeof (buf)) == NULL) {
 				errnum = errno;
 				idmapdlog(LOG_WARNING,
-				"%s: getpwnam_r(%s) failed (%s).",
-					me, unixname,
-					errnum?strerror(errnum):"not found");
+				    "%s: getpwnam_r(%s) failed (%s).",
+				    me, unixname,
+				    errnum ? strerror(errnum) : "not found");
 				retcode = (errnum == 0)?IDMAP_ERR_NOTFOUND:
-						IDMAP_ERR_INTERNAL;
+				    IDMAP_ERR_INTERNAL;
 				goto out;
 			}
 			mapping->id1.idmap_id_u.uid = pwd.pw_uid;
 		} else {
 			errno = 0;
 			if (getgrnam_r(unixname, &grp, buf,
-					sizeof (buf)) == NULL) {
+			    sizeof (buf)) == NULL) {
 				errnum = errno;
 				idmapdlog(LOG_WARNING,
-				"%s: getgrnam_r(%s) failed (%s).",
-					me, unixname,
-					errnum?strerror(errnum):"not found");
+				    "%s: getgrnam_r(%s) failed (%s).",
+				    me, unixname,
+				    errnum ? strerror(errnum) : "not found");
 				retcode = (errnum == 0)?IDMAP_ERR_NOTFOUND:
-						IDMAP_ERR_INTERNAL;
+				    IDMAP_ERR_INTERNAL;
 				goto out;
 			}
 			mapping->id1.idmap_id_u.gid = grp.gr_gid;
@@ -2986,7 +3424,7 @@ get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 
 	state.pid2sid_done = TRUE;
 	retcode = pid2sid_first_pass(&state, cache, db, mapping, &idres,
-			is_user, 1);
+	    is_user, 1);
 	if (IDMAP_ERROR(retcode) || state.pid2sid_done == TRUE)
 		goto out;
 

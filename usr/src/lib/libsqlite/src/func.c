@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <math.h>
 #include <stdlib.h>
+#include <sys/u8_textprep.h>
 #include <assert.h>
 #include "sqliteInt.h"
 #include "os.h"
@@ -178,6 +179,108 @@ static void lowerFunc(sqlite_func *context, int argc, const char **argv){
   for(i=0; z[i]; i++){
     if( isupper(z[i]) ) z[i] = tolower(z[i]);
   }
+}
+
+/*
+ * A utility wrapper around u8_textprep_str() that returns an allocated
+ * string.  The result must be freed or passed to
+ * sqlite_set_result_string().
+ *
+ * This is a Solaris-specific function, though it could be made
+ * portable.  u8_textprep_str() and friends are CDDL'ed.  This code was
+ * added to this file without changing the public domain notice, and
+ * therefore is in the public domain as well.
+ */
+static
+char *
+utf8textprep(const char *s, int flag)
+{
+	char *res = NULL;
+	char *outs;
+	size_t inlen, outlen, inbytesleft, outbytesleft;
+	int rc, err;
+
+	/*
+	 * u8_textprep_str() does not allocate memory.  The input and
+	 * output buffers may differ in size (though that would be more
+	 * likely when normalization is done).  We have to loop over it...
+	 *
+	 * To improve the chances that we can avoid looping we add 10
+	 * bytes of output buffer room the first go around.
+	 */
+	inlen = inbytesleft = strlen(s);
+	outlen = outbytesleft = inlen + 10;
+	if ((res = sqliteMalloc(outlen)) == NULL)
+		return (NULL);
+	outs = res;
+
+	while ((rc = u8_textprep_str((char *)s, &inbytesleft, outs,
+	    &outbytesleft, flag, U8_UNICODE_LATEST, &err)) < 0 &&
+	    err == E2BIG) {
+		if ((res = sqliteRealloc(res, outlen + inbytesleft)) == NULL)
+			return (NULL);
+		/* adjust input/output buffer pointers */
+		s += (inlen - inbytesleft);
+		outs = res + outlen - outbytesleft;
+		/* adjust outbytesleft and outlen */
+		outlen += inbytesleft;
+		outbytesleft += inbytesleft;
+	}
+
+	if (rc < 0) {
+		free(res);
+		res = NULL;
+		return (NULL);
+	}
+
+	res[outlen - outbytesleft] = '\0';
+
+	return (res);
+}
+/*
+ * A Unicode-capable case-folding (to lower) function
+ *
+ * See block comment for case_fold_utf8().
+ */
+static
+void
+lower_utf8Func(sqlite_func *context, int argc, const char **argv)
+{
+	char *lower = NULL;
+
+	/*
+	 * SQLite functions can take many arguments, but this function
+	 * uses only one, and we call sqlite_create_function() with
+	 * nArg == 1.
+	 */
+	assert(argc <= 1);
+
+	if (argv[0] != NULL)
+		lower = utf8textprep(argv[0], U8_TEXTPREP_TOLOWER);
+
+out:
+	(void) sqlite_set_result_string(context, lower, -1);
+	free(lower);
+}
+static
+void
+upper_utf8Func(sqlite_func *context, int argc, const char **argv)
+{
+	char *upper = NULL;
+
+	/*
+	 * SQLite functions can take many arguments, but this function
+	 * uses only one, and we call sqlite_create_function() with
+	 * nArg == 1.
+	 */
+	assert(argc <= 1);
+
+	if (argv[0] != NULL)
+		upper = utf8textprep(argv[0], U8_TEXTPREP_TOUPPER);
+
+out:
+	(void) sqlite_set_result_string(context, upper, -1);
+	free(upper);
 }
 
 /*
@@ -571,28 +674,30 @@ void sqliteRegisterBuiltinFunctions(sqlite *db){
      u8 argType;               /* 0: none.  1: db  2: (-1) */
      void (*xFunc)(sqlite_func*,int,const char**);
   } aFuncs[] = {
-    { "min",       -1, SQLITE_ARGS,    0, minmaxFunc },
-    { "min",        0, 0,              0, 0          },
-    { "max",       -1, SQLITE_ARGS,    2, minmaxFunc },
-    { "max",        0, 0,              2, 0          },
-    { "typeof",     1, SQLITE_TEXT,    0, typeofFunc },
-    { "length",     1, SQLITE_NUMERIC, 0, lengthFunc },
-    { "substr",     3, SQLITE_TEXT,    0, substrFunc },
-    { "abs",        1, SQLITE_NUMERIC, 0, absFunc    },
-    { "round",      1, SQLITE_NUMERIC, 0, roundFunc  },
-    { "round",      2, SQLITE_NUMERIC, 0, roundFunc  },
-    { "upper",      1, SQLITE_TEXT,    0, upperFunc  },
-    { "lower",      1, SQLITE_TEXT,    0, lowerFunc  },
-    { "coalesce",  -1, SQLITE_ARGS,    0, ifnullFunc },
-    { "coalesce",   0, 0,              0, 0          },
-    { "coalesce",   1, 0,              0, 0          },
-    { "ifnull",     2, SQLITE_ARGS,    0, ifnullFunc },
-    { "random",    -1, SQLITE_NUMERIC, 0, randomFunc },
-    { "like",       2, SQLITE_NUMERIC, 0, likeFunc   },
-    { "glob",       2, SQLITE_NUMERIC, 0, globFunc   },
-    { "nullif",     2, SQLITE_ARGS,    0, nullifFunc },
-    { "sqlite_version",0,SQLITE_TEXT,  0, versionFunc},
-    { "quote",      1, SQLITE_ARGS,    0, quoteFunc  },
+    { "min",       -1, SQLITE_ARGS,    0, minmaxFunc      },
+    { "min",        0, 0,              0, 0               },
+    { "max",       -1, SQLITE_ARGS,    2, minmaxFunc      },
+    { "max",        0, 0,              2, 0               },
+    { "typeof",     1, SQLITE_TEXT,    0, typeofFunc      },
+    { "length",     1, SQLITE_NUMERIC, 0, lengthFunc      },
+    { "substr",     3, SQLITE_TEXT,    0, substrFunc      },
+    { "abs",        1, SQLITE_NUMERIC, 0, absFunc         },
+    { "round",      1, SQLITE_NUMERIC, 0, roundFunc       },
+    { "round",      2, SQLITE_NUMERIC, 0, roundFunc       },
+    { "upper",      1, SQLITE_TEXT,    0, upperFunc       },
+    { "lower",      1, SQLITE_TEXT,    0, lowerFunc       },
+    { "lower_utf8", 1, SQLITE_TEXT,    0, lower_utf8Func  },
+    { "upper_utf8", 1, SQLITE_TEXT,    0, upper_utf8Func  },
+    { "coalesce",  -1, SQLITE_ARGS,    0, ifnullFunc      },
+    { "coalesce",   0, 0,              0, 0               },
+    { "coalesce",   1, 0,              0, 0               },
+    { "ifnull",     2, SQLITE_ARGS,    0, ifnullFunc      },
+    { "random",    -1, SQLITE_NUMERIC, 0, randomFunc      },
+    { "like",       2, SQLITE_NUMERIC, 0, likeFunc        },
+    { "glob",       2, SQLITE_NUMERIC, 0, globFunc        },
+    { "nullif",     2, SQLITE_ARGS,    0, nullifFunc      },
+    { "sqlite_version",0,SQLITE_TEXT,  0, versionFunc     },
+    { "quote",      1, SQLITE_ARGS,    0, quoteFunc       },
     { "last_insert_rowid", 0, SQLITE_NUMERIC, 1, last_insert_rowid },
     { "change_count",      0, SQLITE_NUMERIC, 1, change_count      },
     { "last_statement_change_count",

@@ -799,6 +799,9 @@ ad_disc_init(void)
 void
 ad_disc_fini(ad_disc_t ctx)
 {
+	if (ctx == NULL)
+		return;
+
 	res_ndestroy(&ctx->state);
 
 	if (ctx->subnets != NULL)

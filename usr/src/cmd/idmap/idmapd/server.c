@@ -73,27 +73,10 @@
 
 /* ARGSUSED */
 bool_t
-idmap_null_1_svc(void *result, struct svc_req *rqstp) {
+idmap_null_1_svc(void *result, struct svc_req *rqstp)
+{
 	return (TRUE);
 }
-
-#define	IS_BATCH_SID(batch, i)\
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_SID
-
-#define	IS_BATCH_UID(batch, i)\
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_UID
-
-#define	IS_BATCH_GID(batch, i)\
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID
-
-#define	IS_REQUEST_SID(request)\
-	request.id1.idtype == IDMAP_SID
-
-#define	IS_REQUEST_UID(request)\
-	request.id1.idtype == IDMAP_UID
-
-#define	IS_REQUEST_GID(request)\
-	request.id1.idtype == IDMAP_GID
 
 /*
  * RPC layer allocates empty strings to replace NULL char *.
@@ -115,7 +98,8 @@ sanitize_mapping_request(idmap_mapping *req)
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
-		idmap_ids_res *result, struct svc_req *rqstp) {
+		idmap_ids_res *result, struct svc_req *rqstp)
+{
 	sqlite		*cache = NULL, *db = NULL;
 	lookup_state_t	state;
 	idmap_retcode	retcode, winrc;
@@ -141,7 +125,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Allocate result array */
 	result->ids.ids_val = calloc(batch.idmap_mapping_batch_len,
-			sizeof (idmap_id_res));
+	    sizeof (idmap_id_res));
 	if (result->ids.ids_val == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		result->retcode = IDMAP_ERR_MEMORY;
@@ -151,7 +135,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 
 	/* Allocate hash table to check for duplicate sids */
 	state.sid_history = calloc(batch.idmap_mapping_batch_len,
-			sizeof (*state.sid_history));
+	    sizeof (*state.sid_history));
 	if (state.sid_history == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		result->retcode = IDMAP_ERR_MEMORY;
@@ -175,24 +159,24 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		    &batch.idmap_mapping_batch_val[i]);
 		if (IS_BATCH_SID(batch, i)) {
 			retcode = sid2pid_first_pass(
-				&state,
-				cache,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i]);
+			    &state,
+			    cache,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i]);
 		} else if (IS_BATCH_UID(batch, i)) {
 			retcode = pid2sid_first_pass(
-				&state,
-				cache,
-				db,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i], 1, 0);
+			    &state,
+			    cache,
+			    db,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i], 1, 0);
 		} else if (IS_BATCH_GID(batch, i)) {
 			retcode = pid2sid_first_pass(
-				&state,
-				cache,
-				db,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i], 0, 0);
+			    &state,
+			    cache,
+			    db,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i], 0, 0);
 		} else {
 			result->ids.ids_val[i].retcode = IDMAP_ERR_IDTYPE;
 			continue;
@@ -210,7 +194,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	/* Process Windows server lookups for sid2name */
 	if (state.ad_nqueries) {
 		winrc = lookup_win_batch_sid2name(&state, &batch,
-				result);
+		    result);
 		if (IDMAP_FATAL_ERROR(winrc)) {
 			result->retcode = winrc;
 			goto out;
@@ -229,11 +213,11 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 			if (IDMAP_ERROR(winrc))
 				result->ids.ids_val[i].retcode = winrc;
 			retcode = sid2pid_second_pass(
-				&state,
-				cache,
-				db,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i]);
+			    &state,
+			    cache,
+			    db,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i]);
 			if (IDMAP_FATAL_ERROR(retcode)) {
 				result->retcode = retcode;
 				goto out;
@@ -256,17 +240,17 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		state.curpos = i;
 		if (IS_BATCH_SID(batch, i)) {
 			(void) update_cache_sid2pid(
-				&state,
-				cache,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i]);
+			    &state,
+			    cache,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i]);
 		} else if ((IS_BATCH_UID(batch, i)) ||
-				(IS_BATCH_GID(batch, i))) {
+		    (IS_BATCH_GID(batch, i))) {
 			(void) update_cache_pid2sid(
-				&state,
-				cache,
-				&batch.idmap_mapping_batch_val[i],
-				&result->ids.ids_val[i]);
+			    &state,
+			    cache,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i]);
 		}
 	}
 
@@ -290,37 +274,58 @@ out:
 
 
 /* ARGSUSED */
-static int
-list_mappings_cb(void *parg, int argc, char **argv, char **colnames) {
+static
+int
+list_mappings_cb(void *parg, int argc, char **argv, char **colnames)
+{
 	list_cb_data_t		*cb_data;
 	char			*str;
 	idmap_mappings_res	*result;
 	idmap_retcode		retcode;
 	int			w2u, u2w;
 	char			*end;
+	static int		validated_column_names = 0;
+
+	if (!validated_column_names) {
+		assert(strcmp(colnames[0], "rowid") == 0);
+		assert(strcmp(colnames[1], "sidprefix") == 0);
+		assert(strcmp(colnames[2], "rid") == 0);
+		assert(strcmp(colnames[3], "pid") == 0);
+		assert(strcmp(colnames[4], "w2u") == 0);
+		assert(strcmp(colnames[5], "u2w") == 0);
+		assert(strcmp(colnames[6], "windomain") == 0);
+		assert(strcmp(colnames[7], "canon_winname") == 0);
+		assert(strcmp(colnames[8], "unixname") == 0);
+		assert(strcmp(colnames[9], "is_user") == 0);
+		assert(strcmp(colnames[10], "is_wuser") == 0);
+		validated_column_names = 1;
+	}
+
 
 	cb_data = (list_cb_data_t *)parg;
 	result = (idmap_mappings_res *)cb_data->result;
 
-	_VALIDATE_LIST_CB_DATA(9, &result->mappings.mappings_val,
-		sizeof (idmap_mapping));
+	_VALIDATE_LIST_CB_DATA(11, &result->mappings.mappings_val,
+	    sizeof (idmap_mapping));
 
 	result->mappings.mappings_len++;
 
 	if ((str = strdup(argv[1])) == NULL)
 		return (1);
 	result->mappings.mappings_val[cb_data->next].id1.idmap_id_u.sid.prefix =
-		str;
+	    str;
 	result->mappings.mappings_val[cb_data->next].id1.idmap_id_u.sid.rid =
-		strtoul(argv[2], &end, 10);
-	result->mappings.mappings_val[cb_data->next].id1.idtype = IDMAP_SID;
+	    strtoul(argv[2], &end, 10);
+	result->mappings.mappings_val[cb_data->next].id1.idtype =
+	    strtol(argv[10], &end, 10) ? IDMAP_USID : IDMAP_GSID;
 
 	result->mappings.mappings_val[cb_data->next].id2.idmap_id_u.uid =
-		strtoul(argv[3], &end, 10);
-	result->mappings.mappings_val[cb_data->next].id2.idtype = IDMAP_UID;
+	    strtoul(argv[3], &end, 10);
+	result->mappings.mappings_val[cb_data->next].id2.idtype =
+	    strtol(argv[9], &end, 10) ? IDMAP_UID : IDMAP_GID;
 
-	w2u = argv[4]?strtol(argv[4], &end, 10):0;
-	u2w = argv[5]?strtol(argv[5], &end, 10):0;
+	w2u = argv[4] ? strtol(argv[4], &end, 10) : 0;
+	u2w = argv[5] ? strtol(argv[5], &end, 10) : 0;
 
 	if (w2u > 0 && u2w == 0)
 		result->mappings.mappings_val[cb_data->next].direction =
@@ -351,9 +356,9 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames) {
 
 /* ARGSUSED */
 bool_t
-idmap_list_mappings_1_svc(bool_t is_user, int64_t lastrowid,
-		uint64_t limit, idmap_mappings_res *result,
-		struct svc_req *rqstp) {
+idmap_list_mappings_1_svc(int64_t lastrowid, uint64_t limit,
+    idmap_mappings_res *result, struct svc_req *rqstp)
+{
 	sqlite		*cache = NULL;
 	char		lbuf[30], rbuf[30];
 	uint64_t	maxlimit;
@@ -379,7 +384,7 @@ idmap_list_mappings_1_svc(bool_t is_user, int64_t lastrowid,
 		limit = maxlimit;
 	if (limit > 0)
 		(void) snprintf(lbuf, sizeof (lbuf),
-			"LIMIT %" PRIu64, limit + 1ULL);
+		    "LIMIT %" PRIu64, limit + 1ULL);
 
 	(void) snprintf(rbuf, sizeof (rbuf), "rowid > %" PRIu64, lastrowid);
 
@@ -387,11 +392,11 @@ idmap_list_mappings_1_svc(bool_t is_user, int64_t lastrowid,
 	 * Combine all the above into a giant SELECT statement that
 	 * will return the requested mappings
 	 */
-	sql = sqlite_mprintf("SELECT rowid, sidprefix, rid, pid, w2u, u2w,"
-			" windomain, winname, unixname"
-			" FROM idmap_cache WHERE "
-			" %s AND is_user = %d %s;",
-			rbuf, is_user?1:0, lbuf);
+	sql = sqlite_mprintf("SELECT rowid, sidprefix, rid, pid, w2u, u2w, "
+	    "windomain, canon_winname, unixname, is_user, is_wuser "
+	    " FROM idmap_cache WHERE "
+	    " %s %s;",
+	    rbuf, lbuf);
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		goto out;
@@ -399,7 +404,7 @@ idmap_list_mappings_1_svc(bool_t is_user, int64_t lastrowid,
 
 	/* Execute the SQL statement and update the return buffer */
 	PROCESS_LIST_SVC_SQL(retcode, cache, sql, limit, list_mappings_cb,
-		result, result->mappings.mappings_len);
+	    result, result->mappings.mappings_len);
 
 out:
 	if (sql)
@@ -412,39 +417,58 @@ out:
 
 
 /* ARGSUSED */
-static int
-list_namerules_cb(void *parg, int argc, char **argv, char **colnames) {
+static
+int
+list_namerules_cb(void *parg, int argc, char **argv, char **colnames)
+{
 	list_cb_data_t		*cb_data;
 	idmap_namerules_res	*result;
 	idmap_retcode		retcode;
 	int			w2u_order, u2w_order;
 	char			*end;
+	static int		validated_column_names = 0;
+
+	if (!validated_column_names) {
+		assert(strcmp(colnames[0], "rowid") == 0);
+		assert(strcmp(colnames[1], "is_user") == 0);
+		assert(strcmp(colnames[2], "is_wuser") == 0);
+		assert(strcmp(colnames[3], "windomain") == 0);
+		assert(strcmp(colnames[4], "winname_display") == 0);
+		assert(strcmp(colnames[5], "is_nt4") == 0);
+		assert(strcmp(colnames[6], "unixname") == 0);
+		assert(strcmp(colnames[7], "w2u_order") == 0);
+		assert(strcmp(colnames[8], "u2w_order") == 0);
+		validated_column_names = 1;
+	}
 
 	cb_data = (list_cb_data_t *)parg;
 	result = (idmap_namerules_res *)cb_data->result;
 
-	_VALIDATE_LIST_CB_DATA(8, &result->rules.rules_val,
-		sizeof (idmap_namerule));
+	_VALIDATE_LIST_CB_DATA(9, &result->rules.rules_val,
+	    sizeof (idmap_namerule));
 
 	result->rules.rules_len++;
 
 	result->rules.rules_val[cb_data->next].is_user =
-		strtol(argv[1], &end, 10);
+	    strtol(argv[1], &end, 10);
+
+	result->rules.rules_val[cb_data->next].is_wuser =
+	    strtol(argv[2], &end, 10);
 
 	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].windomain,
-	    argv[2]);
-
-	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].winname,
 	    argv[3]);
 
+	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].winname,
+	    argv[4]);
+
 	result->rules.rules_val[cb_data->next].is_nt4 =
-		strtol(argv[4], &end, 10);
+	    strtol(argv[5], &end, 10);
 
 	STRDUP_OR_FAIL(result->rules.rules_val[cb_data->next].unixname,
-	    argv[5]);
+	    argv[6]);
 
-	w2u_order = argv[6]?strtol(argv[6], &end, 10):0;
-	u2w_order = argv[7]?strtol(argv[7], &end, 10):0;
+	w2u_order = argv[7] ? strtol(argv[7], &end, 10) : 0;
+	u2w_order = argv[8] ? strtol(argv[8], &end, 10) : 0;
 
 	if (w2u_order > 0 && u2w_order == 0)
 		result->rules.rules_val[cb_data->next].direction =
@@ -467,14 +491,14 @@ list_namerules_cb(void *parg, int argc, char **argv, char **colnames) {
 bool_t
 idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 		uint64_t limit, idmap_namerules_res *result,
-		struct svc_req *rqstp) {
+		struct svc_req *rqstp)
+{
 
 	sqlite		*db = NULL;
 	char		w2ubuf[15], u2wbuf[15];
 	char		lbuf[30], rbuf[30];
 	char		*sql = NULL;
-	char		*s_windomain = NULL, *s_winname = NULL;
-	char		*s_unixname = NULL;
+	char		*expr = NULL;
 	uint64_t	maxlimit;
 	idmap_retcode	retcode;
 
@@ -492,51 +516,30 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 
 	result->retcode = IDMAP_ERR_INTERNAL;
 
-	if (rule.direction < 0) {
-		w2ubuf[0] = u2wbuf[0] = 0;
-	} else if (rule.direction == IDMAP_DIRECTION_BI) {
+	w2ubuf[0] = u2wbuf[0] = 0;
+	if (rule.direction == IDMAP_DIRECTION_BI) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf), "AND w2u_order > 0");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf), "AND u2w_order > 0");
 	} else if (rule.direction == IDMAP_DIRECTION_W2U) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf), "AND w2u_order > 0");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf),
-				"AND (u2w_order = 0 OR u2w_order ISNULL)");
+		    "AND (u2w_order = 0 OR u2w_order ISNULL)");
 	} else if (rule.direction == IDMAP_DIRECTION_U2W) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf),
-				"AND (w2u_order = 0 OR w2u_order ISNULL)");
+		    "AND (w2u_order = 0 OR w2u_order ISNULL)");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf), "AND u2w_order > 0");
 	}
 
-	/* Create where statement for windomain */
-	if (!EMPTY_STRING(rule.windomain)) {
-		if (gen_sql_expr_from_utf8str("AND", "windomain", "=",
-				rule.windomain,
-				"", &s_windomain) != IDMAP_SUCCESS)
-			goto out;
-	}
-
-	/* Create where statement for winname */
-	if (!EMPTY_STRING(rule.winname)) {
-		if (gen_sql_expr_from_utf8str("AND", "winname", "=",
-				rule.winname,
-				"", &s_winname) != IDMAP_SUCCESS)
-			goto out;
-	}
-
-	/* Create where statement for unixname */
-	if (!EMPTY_STRING(rule.unixname)) {
-		if (gen_sql_expr_from_utf8str("AND", "unixname", "=",
-				rule.unixname,
-				"", &s_unixname) != IDMAP_SUCCESS)
-			goto out;
-	}
+	retcode = gen_sql_expr_from_rule(&rule, &expr);
+	if (retcode != IDMAP_SUCCESS)
+		goto out;
 
 	/* Create LIMIT expression. */
 	if (limit == 0 || (maxlimit > 0 && maxlimit < limit))
 		limit = maxlimit;
 	if (limit > 0)
 		(void) snprintf(lbuf, sizeof (lbuf),
-			"LIMIT %" PRIu64, limit + 1ULL);
+		    "LIMIT %" PRIu64, limit + 1ULL);
 
 	(void) snprintf(rbuf, sizeof (rbuf), "rowid > %" PRIu64, lastrowid);
 
@@ -544,15 +547,12 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	 * Combine all the above into a giant SELECT statement that
 	 * will return the requested rules
 	 */
-	sql = sqlite_mprintf("SELECT rowid, is_user, windomain, winname, "
-			"is_nt4, unixname, w2u_order, u2w_order "
-			"FROM namerules WHERE "
-			" %s AND is_user = %d %s %s %s %s %s %s;",
-			rbuf, rule.is_user?1:0,
-			s_windomain?s_windomain:"",
-			s_winname?s_winname:"",
-			s_unixname?s_unixname:"",
-			w2ubuf, u2wbuf, lbuf);
+	sql = sqlite_mprintf("SELECT rowid, is_user, is_wuser, windomain, "
+	    "winname_display, is_nt4, unixname, w2u_order, u2w_order "
+	    "FROM namerules WHERE "
+	    " %s %s %s %s %s;",
+	    rbuf, expr, w2ubuf, u2wbuf, lbuf);
+
 	if (sql == NULL) {
 		idmapdlog(LOG_ERR, "Out of memory");
 		goto out;
@@ -560,15 +560,11 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 
 	/* Execute the SQL statement and update the return buffer */
 	PROCESS_LIST_SVC_SQL(retcode, db, sql, limit, list_namerules_cb,
-		result, result->rules.rules_len);
+	    result, result->rules.rules_len);
 
 out:
-	if (s_windomain)
-		sqlite_freemem(s_windomain);
-	if (s_winname)
-		sqlite_freemem(s_winname);
-	if (s_unixname)
-		sqlite_freemem(s_unixname);
+	if (expr)
+		sqlite_freemem(expr);
 	if (sql)
 		sqlite_freemem(sql);
 	if (IDMAP_ERROR(result->retcode))
@@ -579,7 +575,8 @@ out:
 
 #define	IDMAP_RULES_AUTH	"solaris.admin.idmap.rules"
 static int
-verify_rules_auth(struct svc_req *rqstp) {
+verify_rules_auth(struct svc_req *rqstp)
+{
 	ucred_t		*uc = NULL;
 	uid_t		uid;
 	char		buf[1024];
@@ -588,32 +585,32 @@ verify_rules_auth(struct svc_req *rqstp) {
 
 	if (svc_getcallerucred(rqstp->rq_xprt, &uc) != 0) {
 		idmapdlog(LOG_ERR,
-			"%s: svc_getcallerucred failed (errno=%d)",
-			me, errno);
+		    "%s: svc_getcallerucred failed (errno=%d)",
+		    me, errno);
 		return (-1);
 	}
 
 	uid = ucred_geteuid(uc);
 	if (uid == (uid_t)-1) {
 		idmapdlog(LOG_ERR,
-			"%s: ucred_geteuid failed (errno=%d)",
-			me, errno);
+		    "%s: ucred_geteuid failed (errno=%d)",
+		    me, errno);
 		ucred_free(uc);
 		return (-1);
 	}
 
 	if (getpwuid_r(uid, &pwd, buf, sizeof (buf)) == NULL) {
 		idmapdlog(LOG_ERR,
-			"%s: getpwuid_r(%u) failed (errno=%d)",
-			me, uid, errno);
+		    "%s: getpwuid_r(%u) failed (errno=%d)",
+		    me, uid, errno);
 		ucred_free(uc);
 		return (-1);
 	}
 
 	if (chkauthattr(IDMAP_RULES_AUTH, pwd.pw_name) != 1) {
 		idmapdlog(LOG_INFO,
-			"%s: %s does not have authorization.",
-			me, pwd.pw_name);
+		    "%s: %s does not have authorization.",
+		    me, pwd.pw_name);
 		ucred_free(uc);
 		return (-1);
 	}
@@ -633,7 +630,8 @@ verify_rules_auth(struct svc_req *rqstp) {
 /* ARGSUSED */
 bool_t
 idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
-		struct svc_req *rqstp) {
+		struct svc_req *rqstp)
+{
 	sqlite		*db = NULL;
 	idmap_update_op	*up;
 	int		i;
@@ -649,7 +647,7 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 	}
 
 	if (batch.idmap_update_batch_len == 0 ||
-			batch.idmap_update_batch_val == NULL) {
+	    batch.idmap_update_batch_val == NULL) {
 		res->retcode = IDMAP_SUCCESS;
 		goto out;
 	}
@@ -672,15 +670,14 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 			break;
 		case OP_ADD_NAMERULE:
 			res->retcode = add_namerule(db,
-				&up->idmap_update_op_u.rule);
+			    &up->idmap_update_op_u.rule);
 			break;
 		case OP_RM_NAMERULE:
 			res->retcode = rm_namerule(db,
-				&up->idmap_update_op_u.rule);
+			    &up->idmap_update_op_u.rule);
 			break;
 		case OP_FLUSH_NAMERULES:
-			res->retcode = flush_namerules(db,
-				up->idmap_update_op_u.is_user);
+			res->retcode = flush_namerules(db);
 			break;
 		default:
 			res->retcode = IDMAP_ERR_NOTSUPPORTED;
@@ -693,7 +690,7 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 			    up->opnum == OP_RM_NAMERULE) {
 				idmap_stat r2 =
 				    idmap_namerule_cpy(&res->error_rule,
-					&up->idmap_update_op_u.rule);
+				    &up->idmap_update_op_u.rule);
 				if (r2 != IDMAP_SUCCESS)
 					res->retcode = r2;
 			}
@@ -722,7 +719,8 @@ out:
 /* ARGSUSED */
 bool_t
 idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
-		idmap_mappings_res *result, struct svc_req *rqstp) {
+		idmap_mappings_res *result, struct svc_req *rqstp)
+{
 	sqlite		*cache = NULL, *db = NULL;
 
 	/* Init */
@@ -747,26 +745,27 @@ idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
 	}
 	result->mappings.mappings_len = 1;
 
-	if (IS_REQUEST_SID(request)) {
+
+	if (IS_REQUEST_SID(request, 1)) {
 		result->retcode = get_w2u_mapping(
-			cache,
-			db,
-			&request,
-			result->mappings.mappings_val);
+		    cache,
+		    db,
+		    &request,
+		    result->mappings.mappings_val);
 	} else if (IS_REQUEST_UID(request)) {
 		result->retcode = get_u2w_mapping(
-			cache,
-			db,
-			&request,
-			result->mappings.mappings_val,
-			1);
+		    cache,
+		    db,
+		    &request,
+		    result->mappings.mappings_val,
+		    1);
 	} else if (IS_REQUEST_GID(request)) {
 		result->retcode = get_u2w_mapping(
-			cache,
-			db,
-			&request,
-			result->mappings.mappings_val,
-			0);
+		    cache,
+		    db,
+		    &request,
+		    result->mappings.mappings_val,
+		    0);
 	} else {
 		result->retcode = IDMAP_ERR_IDTYPE;
 	}
@@ -785,7 +784,8 @@ out:
 /* ARGSUSED */
 int
 idmap_prog_1_freeresult(SVCXPRT *transp, xdrproc_t xdr_result,
-		caddr_t result) {
+		caddr_t result)
+{
 	(void) xdr_free(xdr_result, result);
 	return (TRUE);
 }

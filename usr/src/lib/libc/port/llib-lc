@@ -126,6 +126,7 @@
 #include <sys/task.h>
 #include <sys/termio.h>
 #include <sys/termios.h>
+#include <sys/u8_textprep.h>
 #include <sys/time.h>
 #include <sys/timeb.h>
 #include <sys/times.h>
@@ -1757,3 +1758,16 @@ extern int is_system_labeled(void);
 
 /* until TOG resolves the name, keep this private */
 int __accessat(int, const char *, int);
+
+extern int uconv_u16tou32(const uint16_t *, size_t *, uint32_t *, size_t *,
+	int);
+extern int uconv_u16tou8(const uint16_t *, size_t *, uchar_t *, size_t *, int);
+extern int uconv_u32tou16(const uint32_t *, size_t *, uint16_t *, size_t *,
+	int);
+extern int uconv_u32tou8(const uint32_t *, size_t *, uchar_t *, size_t *, int);
+extern int uconv_u8tou16(const uchar_t *, size_t *, uint16_t *, size_t *, int);
+extern int uconv_u8tou32(const uchar_t *, size_t *, uint32_t *, size_t *, int);
+extern int u8_validate(char *, size_t, char **, int, int *);
+extern int u8_strcmp(const char *, const char *, size_t, int, size_t, int *);
+extern size_t u8_textprep_str(char *, size_t *, char *, size_t *, int, size_t,
+	int *);

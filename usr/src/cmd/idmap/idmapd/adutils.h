@@ -156,7 +156,8 @@ void idmap_lookup_release_batch(idmap_query_state_t **state);
  */
 idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
 		const char *name, const char *dname,
-		char **sid, rid_t *rid, int *sid_type, idmap_retcode *rc);
+		char **canonname, char **sid, rid_t *rid, int *sid_type,
+		idmap_retcode *rc);
 /*
  * Add a SID->name lookup
  *

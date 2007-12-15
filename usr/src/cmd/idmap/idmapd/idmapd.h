@@ -143,6 +143,29 @@ typedef struct wksids_table {
 
 #define	EMPTY_STRING(str)	(str == NULL || *str == 0)
 
+#define	IS_BATCH_SID(batch, i) \
+	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_SID ||	\
+	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_USID ||	\
+	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GSID)
+
+#define	IS_BATCH_UID(batch, i) \
+	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_UID
+
+#define	IS_BATCH_GID(batch, i) \
+	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID
+
+#define	IS_REQUEST_SID(req, n) \
+	((req).id##n.idtype == IDMAP_SID ||	\
+	(req).id##n.idtype == IDMAP_USID ||	\
+	(req).id##n.idtype == IDMAP_GSID)	\
+
+
+#define	IS_REQUEST_UID(request) \
+	request.id1.idtype == IDMAP_UID
+
+#define	IS_REQUEST_GID(request) \
+	request.id1.idtype == IDMAP_GID
+
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
 
@@ -166,12 +189,11 @@ extern idmap_retcode	get_cache_handle(sqlite **);
 extern idmap_retcode	sql_exec_no_cb(sqlite *, char *);
 extern idmap_retcode	add_namerule(sqlite *, idmap_namerule *);
 extern idmap_retcode	rm_namerule(sqlite *, idmap_namerule *);
-extern idmap_retcode	flush_namerules(sqlite *, bool_t);
+extern idmap_retcode	flush_namerules(sqlite *);
 
-extern idmap_retcode	gen_sql_expr_from_utf8str(const char *,
-				const char *, const char *,
-				char *, const char *,
-				char **);
+extern char 		*tolower_u8(const char *);
+
+extern idmap_retcode	gen_sql_expr_from_rule(idmap_namerule *, char **);
 extern idmap_retcode	validate_list_cb_data(list_cb_data_t *, int,
 				char **, int, uchar_t **, size_t);
 extern idmap_retcode	process_list_svc_sql(sqlite *, char *, uint64_t,

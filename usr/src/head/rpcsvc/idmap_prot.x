@@ -37,6 +37,8 @@ enum idmap_id_type {
 	IDMAP_UID = 1,
 	IDMAP_GID,
 	IDMAP_SID,
+	IDMAP_USID,
+	IDMAP_GSID,
 	IDMAP_POSIXID
 };
 
@@ -51,6 +53,8 @@ union idmap_id switch(idmap_id_type idtype) {
 	case IDMAP_UID: uint32_t uid;
 	case IDMAP_GID: uint32_t gid;
 	case IDMAP_SID: idmap_sid sid;
+	case IDMAP_USID: idmap_sid usid;
+	case IDMAP_GSID: idmap_sid gsid;
 	case IDMAP_NONE: void;
 	case IDMAP_POSIXID: void;
 };
@@ -97,6 +101,7 @@ typedef idmap_mapping	idmap_mapping_batch<>;
 /* Name-based mapping rules */
 struct idmap_namerule {
 	bool		is_user;
+	bool		is_wuser;
 	int		direction;
 	idmap_utf8str	windomain;
 	idmap_utf8str	winname;
@@ -128,8 +133,6 @@ union idmap_update_op switch(idmap_opnum opnum) {
 	case OP_ADD_NAMERULE:
 	case OP_RM_NAMERULE:
 		idmap_namerule rule;
-	case OP_FLUSH_NAMERULES:
-		bool is_user;
 	default:
 		void;
 };
@@ -147,7 +150,7 @@ program IDMAP_PROG {
 
 		/* List all identity mappings */
 		idmap_mappings_res
-		IDMAP_LIST_MAPPINGS(bool is_user, int64_t lastrowid,
+		IDMAP_LIST_MAPPINGS(int64_t lastrowid,
 			uint64_t limit) = 2;
 
 		/* List all name-based mapping rules */

@@ -99,7 +99,8 @@ static idmap_stat idmap_strdupnull(char **, const char *);
  * ptr - memory to be freed
  */
 void
-idmap_free(void *ptr) {
+idmap_free(void *ptr)
+{
 	free(ptr);
 }
 
@@ -113,7 +114,8 @@ idmap_free(void *ptr) {
  * handle - idmap handle
  */
 idmap_stat
-idmap_init(idmap_handle_t **handle) {
+idmap_init(idmap_handle_t **handle)
+{
 	CLIENT			*clnt = NULL;
 	struct idmap_handle	*hptr;
 	uint_t			sendsz = 0;
@@ -173,7 +175,8 @@ idmap_init(idmap_handle_t **handle) {
  * handle - idmap handle
  */
 idmap_stat
-idmap_fini(idmap_handle_t *handle) {
+idmap_fini(idmap_handle_t *handle)
+{
 	CLIENT			*clnt;
 	struct idmap_handle	*hptr;
 
@@ -207,7 +210,8 @@ idmap_fini(idmap_handle_t *handle) {
  * udthandle - update handle
  */
 idmap_stat
-idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle) {
+idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle)
+{
 	idmap_udt_handle_t	*tmp;
 
 	if (handle == NULL || udthandle == NULL) {
@@ -236,7 +240,8 @@ idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle) {
  * Status of the commit
  */
 idmap_stat
-idmap_udt_commit(idmap_udt_handle_t *udthandle) {
+idmap_udt_commit(idmap_udt_handle_t *udthandle)
+{
 	CLIENT			*clnt;
 	enum clnt_stat		clntstat;
 	idmap_update_res	res;
@@ -251,9 +256,9 @@ idmap_udt_commit(idmap_udt_handle_t *udthandle) {
 
 	_IDMAP_GET_CLIENT_HANDLE(udthandle->ih, clnt);
 	clntstat = clnt_call(clnt, IDMAP_UPDATE,
-		(xdrproc_t)xdr_idmap_update_batch, (caddr_t)&udthandle->batch,
-		(xdrproc_t)xdr_idmap_update_res, (caddr_t)&res,
-		TIMEOUT);
+	    (xdrproc_t)xdr_idmap_update_batch, (caddr_t)&udthandle->batch,
+	    (xdrproc_t)xdr_idmap_update_res, (caddr_t)&res,
+	    TIMEOUT);
 
 	if (clntstat != RPC_SUCCESS) {
 		retcode = _idmap_rpc2stat(clnt);
@@ -300,8 +305,9 @@ out:
 
 static void
 idmap_namerule_parts_clear(char **windomain, char **winname,
-    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
-    int *direction) {
+    char **unixname, boolean_t *is_user, boolean_t *is_wuser,
+    boolean_t *is_nt4, int *direction)
+{
 	if (windomain)
 		*windomain = NULL;
 	if (winname)
@@ -313,15 +319,18 @@ idmap_namerule_parts_clear(char **windomain, char **winname,
 		*is_nt4 = 0;
 	if (is_user)
 		*is_user = -1;
+	if (is_wuser)
+		*is_wuser = -1;
 	if (direction)
 		*direction = IDMAP_DIRECTION_UNDEF;
 }
 
 static idmap_stat
-idmap_namerule2parts(idmap_namerule	*rule,
+idmap_namerule2parts(idmap_namerule *rule,
     char **windomain, char **winname,
-    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
-    int *direction) {
+    char **unixname, boolean_t *is_user, boolean_t *is_wuser,
+    boolean_t *is_nt4, int *direction)
+{
 	idmap_stat retcode;
 
 	if (EMPTY_STRING(rule->winname) && EMPTY_STRING(rule->unixname))
@@ -343,6 +352,8 @@ idmap_namerule2parts(idmap_namerule	*rule,
 
 	if (is_user)
 		*is_user = rule->is_user;
+	if (is_wuser)
+		*is_wuser = rule->is_wuser;
 	if (is_nt4)
 		*is_nt4 = rule->is_nt4;
 	if (direction)
@@ -360,7 +371,7 @@ errout:
 		free(*unixname);
 
 	idmap_namerule_parts_clear(windomain, winname,
-	    unixname, is_user, is_nt4, direction);
+	    unixname, is_user, is_wuser, is_nt4, direction);
 
 	return (retcode);
 
@@ -378,7 +389,8 @@ errout:
 
 idmap_stat
 idmap_udt_get_error_index(idmap_udt_handle_t *udthandle,
-    int64_t *error_index) {
+    int64_t *error_index)
+{
 	if (error_index)
 		*error_index = udthandle->error_index;
 
@@ -400,23 +412,25 @@ idmap_udt_get_error_index(idmap_udt_handle_t *udthandle,
 idmap_stat
 idmap_udt_get_error_rule(idmap_udt_handle_t *udthandle,
     char **windomain, char **winname,
-    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
-    int *direction) {
+    char **unixname, boolean_t *is_user, boolean_t *is_wuser,
+    boolean_t *is_nt4, int *direction)
+{
 	idmap_namerule_parts_clear(windomain, winname,
-	    unixname, is_user, is_nt4, direction);
+	    unixname, is_user, is_wuser, is_nt4, direction);
 
 	if (udthandle->commit_stat == IDMAP_SUCCESS ||
 	    udthandle->error_index < 0)
 		return (IDMAP_ERR_NORESULT);
 
 	return (idmap_namerule2parts(
-			&udthandle->error_rule,
-			    windomain,
-			    winname,
-			    unixname,
-			    is_user,
-			    is_nt4,
-			    direction));
+	    &udthandle->error_rule,
+	    windomain,
+	    winname,
+	    unixname,
+	    is_user,
+	    is_wuser,
+	    is_nt4,
+	    direction));
 }
 
 /*
@@ -432,24 +446,26 @@ idmap_udt_get_error_rule(idmap_udt_handle_t *udthandle,
 idmap_stat
 idmap_udt_get_conflict_rule(idmap_udt_handle_t *udthandle,
     char **windomain, char **winname,
-    char **unixname, boolean_t *is_user, boolean_t *is_nt4,
-    int *direction) {
+    char **unixname, boolean_t *is_user, boolean_t *is_wuser,
+    boolean_t *is_nt4, int *direction)
+{
 	idmap_namerule_parts_clear(windomain, winname,
-	    unixname, is_user, is_nt4, direction);
+	    unixname, is_user, is_wuser, is_nt4, direction);
 
 	if (udthandle->commit_stat != IDMAP_ERR_W2U_NAMERULE_CONFLICT &&
 	    udthandle->commit_stat != IDMAP_ERR_U2W_NAMERULE_CONFLICT) {
-		    return (IDMAP_ERR_NORESULT);
+		return (IDMAP_ERR_NORESULT);
 	}
 
 	return (idmap_namerule2parts(
-			&udthandle->conflict_rule,
-			    windomain,
-			    winname,
-			    unixname,
-			    is_user,
-			    is_nt4,
-			    direction));
+	    &udthandle->conflict_rule,
+	    windomain,
+	    winname,
+	    unixname,
+	    is_user,
+	    is_wuser,
+	    is_nt4,
+	    direction));
 }
 
 
@@ -457,7 +473,8 @@ idmap_udt_get_conflict_rule(idmap_udt_handle_t *udthandle,
  * Destroy the update handle
  */
 void
-idmap_udt_destroy(idmap_udt_handle_t *udthandle) {
+idmap_udt_destroy(idmap_udt_handle_t *udthandle)
+{
 	if (udthandle == NULL)
 		return;
 	(void) xdr_free(xdr_idmap_update_batch, (caddr_t)&udthandle->batch);
@@ -469,8 +486,9 @@ idmap_udt_destroy(idmap_udt_handle_t *udthandle) {
 
 idmap_stat
 idmap_udt_add_namerule(idmap_udt_handle_t *udthandle, const char *windomain,
-		boolean_t is_user, const char *winname, const char *unixname,
-		boolean_t is_nt4, int direction) {
+    boolean_t is_user, boolean_t is_wuser, const char *winname,
+    const char *unixname, boolean_t is_nt4, int direction)
+{
 	idmap_retcode	retcode;
 	idmap_namerule	*rule = NULL;
 
@@ -479,9 +497,10 @@ idmap_udt_add_namerule(idmap_udt_handle_t *udthandle, const char *windomain,
 		goto errout;
 
 	rule = &udthandle->batch.
-		idmap_update_batch_val[udthandle->next].
-		idmap_update_op_u.rule;
+	    idmap_update_batch_val[udthandle->next].
+	    idmap_update_op_u.rule;
 	rule->is_user = is_user;
+	rule->is_wuser = is_wuser;
 	rule->direction = direction;
 	rule->is_nt4 = is_nt4;
 
@@ -514,8 +533,9 @@ errout:
 /* ARGSUSED */
 idmap_stat
 idmap_udt_rm_namerule(idmap_udt_handle_t *udthandle, boolean_t is_user,
-		const char *windomain, const char *winname,
-		const char *unixname, int direction) {
+    boolean_t is_wuser,	const char *windomain, const char *winname,
+    const char *unixname, int direction)
+{
 	idmap_retcode	retcode;
 	idmap_namerule	*rule = NULL;
 
@@ -524,9 +544,10 @@ idmap_udt_rm_namerule(idmap_udt_handle_t *udthandle, boolean_t is_user,
 		goto errout;
 
 	rule = &udthandle->batch.
-		idmap_update_batch_val[udthandle->next].
-		idmap_update_op_u.rule;
+	    idmap_update_batch_val[udthandle->next].
+	    idmap_update_op_u.rule;
 	rule->is_user = is_user;
+	rule->is_wuser = is_wuser;
 	rule->direction = direction;
 
 	retcode = idmap_strdupnull(&rule->windomain, windomain);
@@ -556,15 +577,13 @@ errout:
 
 /* ARGSUSED */
 idmap_stat
-idmap_udt_flush_namerules(idmap_udt_handle_t *udthandle, boolean_t is_user) {
+idmap_udt_flush_namerules(idmap_udt_handle_t *udthandle)
+{
 	idmap_retcode	retcode;
 
 	retcode = _udt_extend_batch(udthandle);
 	if (retcode != IDMAP_SUCCESS)
 		goto errout;
-
-	udthandle->batch.idmap_update_batch_val[udthandle->next].
-		idmap_update_op_u.is_user = is_user;
 
 	udthandle->batch.idmap_update_batch_val[udthandle->next].opnum =
 	    OP_FLUSH_NAMERULES;
@@ -585,7 +604,8 @@ errout:
  * limit - number of entries requested per batch
  */
 idmap_stat
-idmap_iter_set_limit(idmap_iter_t *iter, uint64_t limit) {
+idmap_iter_set_limit(idmap_iter_t *iter, uint64_t limit)
+{
 	if (iter == NULL) {
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
@@ -609,8 +629,9 @@ idmap_iter_set_limit(idmap_iter_t *iter, uint64_t limit) {
  */
 idmap_stat
 idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
-		boolean_t is_user, const char *winname,
-		const char *unixname, idmap_iter_t **iter) {
+		boolean_t is_user, boolean_t is_wuser, const char *winname,
+		const char *unixname, idmap_iter_t **iter)
+{
 
 	idmap_iter_t			*tmpiter;
 	idmap_list_namerules_1_argument	*arg = NULL;
@@ -621,6 +642,7 @@ idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
 
 	rule = &arg->rule;
 	rule->is_user = is_user;
+	rule->is_wuser = is_wuser;
 	rule->direction = IDMAP_DIRECTION_UNDEF;
 
 	retcode = idmap_strdupnull(&rule->windomain, windomain);
@@ -640,7 +662,7 @@ idmap_iter_namerules(idmap_handle_t *handle, const char *windomain,
 
 errout:
 	__ITER_ERR_RETURN(tmpiter, arg,
-		xdr_idmap_list_namerules_1_argument, retcode);
+	    xdr_idmap_list_namerules_1_argument, retcode);
 }
 
 
@@ -664,28 +686,22 @@ errout:
  */
 idmap_stat
 idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
-		char **winname, char **unixname, boolean_t *is_nt4,
-		int *direction) {
+    char **winname, char **unixname,  boolean_t *is_user,
+    boolean_t *is_wuser, boolean_t *is_nt4, int *direction)
+{
 	idmap_namerules_res		*namerules;
 	idmap_list_namerules_1_argument	*arg;
 	idmap_retcode			retcode;
 
-	if (windomain)
-		*windomain = NULL;
-	if (winname)
-		*winname = NULL;
-	if (unixname)
-		*unixname = NULL;
-	if (is_nt4)
-		*is_nt4 = 0;
-	if (direction)
-		*direction = IDMAP_DIRECTION_UNDEF;
+	idmap_namerule_parts_clear(windomain, winname,
+	    unixname, is_user, is_wuser, is_nt4, direction);
+
 
 	__ITER_CHECK(iter, IDMAP_LIST_NAMERULES);
 
 	namerules = (idmap_namerules_res *)iter->retlist;
 	if (iter->retcode == IDMAP_NEXT && (namerules == NULL ||
-			iter->next >= namerules->rules.rules_len)) {
+	    iter->next >= namerules->rules.rules_len)) {
 
 		if ((arg = iter->arg) == NULL) {
 			errno = EINVAL;
@@ -694,10 +710,10 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 		arg->limit = iter->limit;
 
 		retcode = _iter_get_next_list(IDMAP_LIST_NAMERULES,
-			iter, arg,
-			(uchar_t **)&namerules, sizeof (*namerules),
-			(xdrproc_t)xdr_idmap_list_namerules_1_argument,
-			(xdrproc_t)xdr_idmap_namerules_res);
+		    iter, arg,
+		    (uchar_t **)&namerules, sizeof (*namerules),
+		    (xdrproc_t)xdr_idmap_list_namerules_1_argument,
+		    (xdrproc_t)xdr_idmap_namerules_res);
 		if (retcode != IDMAP_SUCCESS)
 			return (retcode);
 
@@ -736,6 +752,10 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 
 	if (is_nt4)
 		*is_nt4 = namerules->rules.rules_val[iter->next].is_nt4;
+	if (is_user)
+		*is_user = namerules->rules.rules_val[iter->next].is_user;
+	if (is_wuser)
+		*is_wuser = namerules->rules.rules_val[iter->next].is_wuser;
 	if (direction)
 		*direction = namerules->rules.rules_val[iter->next].direction;
 	iter->next++;
@@ -759,21 +779,17 @@ errout:
 /*
  * Create iterator to get SID to UID/GID mappings
  *
- * Input:
- * is_user - user or group
- *
  * Output:
  * iter - iterator
  */
 idmap_stat
-idmap_iter_mappings(idmap_handle_t *handle, boolean_t is_user,
-		idmap_iter_t **iter) {
+idmap_iter_mappings(idmap_handle_t *handle, idmap_iter_t **iter)
+{
 	idmap_iter_t			*tmpiter;
 	idmap_list_mappings_1_argument	*arg = NULL;
 
 	__ITER_CREATE(tmpiter, arg, handle, IDMAP_LIST_MAPPINGS);
 
-	arg->is_user = is_user;
 	*iter = tmpiter;
 	return (IDMAP_SUCCESS);
 }
@@ -796,8 +812,10 @@ idmap_iter_mappings(idmap_handle_t *handle, boolean_t is_user,
  */
 idmap_stat
 idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
-		idmap_rid_t *rid, uid_t *pid, char **winname,
-		char **windomain, char **unixname, int *direction) {
+    idmap_rid_t *rid, uid_t *pid, char **winname,
+    char **windomain, char **unixname, boolean_t *is_user,
+    boolean_t *is_wuser, int *direction)
+{
 	idmap_mappings_res		*mappings;
 	idmap_list_mappings_1_argument	*arg;
 	idmap_retcode			retcode;
@@ -815,6 +833,10 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 		*unixname = NULL;
 	if (pid)
 		*pid = UINT32_MAX;
+	if (is_user)
+		*is_user = -1;
+	if (is_wuser)
+		*is_wuser = -1;
 	if (direction)
 		*direction = IDMAP_DIRECTION_UNDEF;
 
@@ -822,7 +844,7 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 
 	mappings = (idmap_mappings_res *)iter->retlist;
 	if (iter->retcode == IDMAP_NEXT && (mappings == NULL ||
-			iter->next >= mappings->mappings.mappings_len)) {
+	    iter->next >= mappings->mappings.mappings_len)) {
 
 		if ((arg = iter->arg) == NULL) {
 			errno = EINVAL;
@@ -831,10 +853,10 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 		arg->limit = iter->limit;
 
 		retcode = _iter_get_next_list(IDMAP_LIST_MAPPINGS,
-			iter, arg,
-			(uchar_t **)&mappings, sizeof (*mappings),
-			(xdrproc_t)xdr_idmap_list_mappings_1_argument,
-			(xdrproc_t)xdr_idmap_mappings_res);
+		    iter, arg,
+		    (uchar_t **)&mappings, sizeof (*mappings),
+		    (xdrproc_t)xdr_idmap_list_mappings_1_argument,
+		    (xdrproc_t)xdr_idmap_mappings_res);
 		if (retcode != IDMAP_SUCCESS)
 			return (retcode);
 
@@ -858,7 +880,7 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 
 	if (sidprefix) {
 		str = mappings->mappings.mappings_val[iter->next].id1.
-			idmap_id_u.sid.prefix;
+		    idmap_id_u.sid.prefix;
 		if (str && *str != '\0') {
 			*sidprefix = strdup(str);
 			if (*sidprefix == NULL) {
@@ -869,7 +891,7 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 	}
 	if (rid)
 		*rid = mappings->mappings.mappings_val[iter->next].id1.
-			idmap_id_u.sid.rid;
+		    idmap_id_u.sid.rid;
 
 	retcode = idmap_strdupnull(windomain,
 	    mappings->mappings.mappings_val[iter->next].id1domain);
@@ -889,10 +911,17 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 
 	if (pid)
 		*pid = mappings->mappings.mappings_val[iter->next].id2.
-			idmap_id_u.uid;
+		    idmap_id_u.uid;
 	if (direction)
 		*direction = mappings->mappings.mappings_val[iter->next].
-			direction;
+		    direction;
+	if (is_user)
+		*is_user = (mappings->mappings.mappings_val[iter->next].id2
+		    .idtype == IDMAP_UID)?1:0;
+	if (is_wuser)
+		*is_wuser = (mappings->mappings.mappings_val[iter->next].id1
+		    .idtype == IDMAP_USID)?1:0;
+
 	iter->next++;
 
 	if (iter->next == mappings->mappings.mappings_len)
@@ -917,7 +946,8 @@ errout:
  * Destroy the iterator
  */
 void
-idmap_iter_destroy(idmap_iter_t *iter) {
+idmap_iter_destroy(idmap_iter_t *iter)
+{
 	xdrproc_t _xdr_argument, _xdr_result;
 
 	if (iter == NULL)
@@ -956,7 +986,8 @@ idmap_iter_destroy(idmap_iter_t *iter) {
  * gh - "get mapping" handle
  */
 idmap_stat
-idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh) {
+idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh)
+{
 	idmap_get_handle_t	*tmp;
 
 	/* sanity checks */
@@ -993,7 +1024,8 @@ idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh) {
  */
 idmap_stat
 idmap_get_uidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
-		int flag, uid_t *uid, idmap_stat *stat) {
+		int flag, uid_t *uid, idmap_stat *stat)
+{
 
 	idmap_retcode	retcode;
 	idmap_mapping	*mapping = NULL;
@@ -1052,7 +1084,8 @@ errout:
  */
 idmap_stat
 idmap_get_gidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
-		int flag, gid_t *gid, idmap_stat *stat) {
+		int flag, gid_t *gid, idmap_stat *stat)
+{
 
 	idmap_retcode	retcode;
 	idmap_mapping	*mapping = NULL;
@@ -1112,7 +1145,8 @@ errout:
  */
 idmap_stat
 idmap_get_pidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
-		int flag, uid_t *pid, int *is_user, idmap_stat *stat) {
+		int flag, uid_t *pid, int *is_user, idmap_stat *stat)
+{
 	idmap_retcode	retcode;
 	idmap_mapping	*mapping = NULL;
 
@@ -1171,7 +1205,8 @@ errout:
  */
 idmap_stat
 idmap_get_sidbyuid(idmap_get_handle_t *gh, uid_t uid, int flag,
-		char **sidprefix, idmap_rid_t *rid, idmap_stat *stat) {
+		char **sidprefix, idmap_rid_t *rid, idmap_stat *stat)
+{
 
 	idmap_retcode	retcode;
 	idmap_mapping	*mapping = NULL;
@@ -1226,7 +1261,8 @@ errout:
  */
 idmap_stat
 idmap_get_sidbygid(idmap_get_handle_t *gh, gid_t gid, int flag,
-		char **sidprefix, idmap_rid_t *rid, idmap_stat *stat) {
+		char **sidprefix, idmap_rid_t *rid, idmap_stat *stat)
+{
 
 	idmap_retcode	retcode;
 	idmap_mapping	*mapping = NULL;
@@ -1271,7 +1307,8 @@ errout:
  * provided by individual requests.
  */
 idmap_stat
-idmap_get_mappings(idmap_get_handle_t *gh) {
+idmap_get_mappings(idmap_get_handle_t *gh)
+{
 	CLIENT		*clnt;
 	enum clnt_stat	clntstat;
 	idmap_retcode	retcode;
@@ -1287,11 +1324,11 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 
 	(void) memset(&res, 0, sizeof (idmap_ids_res));
 	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_IDS,
-		(xdrproc_t)xdr_idmap_mapping_batch,
-		(caddr_t)&gh->batch,
-		(xdrproc_t)xdr_idmap_ids_res,
-		(caddr_t)&res,
-		TIMEOUT);
+	    (xdrproc_t)xdr_idmap_mapping_batch,
+	    (caddr_t)&gh->batch,
+	    (xdrproc_t)xdr_idmap_ids_res,
+	    (caddr_t)&res,
+	    TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
 		retcode = _idmap_rpc2stat(clnt);
 		goto out;
@@ -1327,6 +1364,8 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 				*gh->retlist[i].is_user = -1;
 			break;
 		case IDMAP_SID:
+		case IDMAP_USID:
+		case IDMAP_GSID:
 			if (gh->retlist[i].rid)
 				*gh->retlist[i].rid = id->idmap_id_u.sid.rid;
 			if (gh->retlist[i].sidprefix) {
@@ -1336,10 +1375,10 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 					break;
 				}
 				*gh->retlist[i].sidprefix =
-					strdup(id->idmap_id_u.sid.prefix);
+				    strdup(id->idmap_id_u.sid.prefix);
 				if (*gh->retlist[i].sidprefix == NULL)
 					*gh->retlist[i].stat =
-						IDMAP_ERR_MEMORY;
+					    IDMAP_ERR_MEMORY;
 			}
 			break;
 		case IDMAP_NONE:
@@ -1363,7 +1402,8 @@ out:
  * Destroy the "get mapping" handle
  */
 void
-idmap_get_destroy(idmap_get_handle_t *gh) {
+idmap_get_destroy(idmap_get_handle_t *gh)
+{
 	if (gh == NULL)
 		return;
 	(void) xdr_free(xdr_idmap_mapping_batch, (caddr_t)&gh->batch);
@@ -1380,8 +1420,9 @@ idmap_stat
 idmap_get_w2u_mapping(idmap_handle_t *handle,
 		const char *sidprefix, idmap_rid_t *rid,
 		const char *winname, const char *windomain,
-		int flag, int *is_user,
-		uid_t *pid, char **unixname, int *direction) {
+		int flag, int *is_user, int *is_wuser,
+		uid_t *pid, char **unixname, int *direction)
+{
 	CLIENT			*clnt;
 	enum clnt_stat		clntstat;
 	idmap_mapping		request, *mapping;
@@ -1398,8 +1439,6 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	(void) memset(&request, 0, sizeof (request));
 	(void) memset(&result, 0, sizeof (result));
 
-	if (is_user)
-		*is_user = -1;
 	if (pid)
 		*pid = UINT32_MAX;
 	if (unixname)
@@ -1427,19 +1466,24 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		return (IDMAP_ERR_ARG);
 	}
 
-	if (is_user == NULL)
-		request.id2.idtype = IDMAP_POSIXID;
-	else if (*is_user == 1)
+	if (*is_user == 1)
 		request.id2.idtype = IDMAP_UID;
 	else if (*is_user == 0)
 		request.id2.idtype = IDMAP_GID;
 	else
 		request.id2.idtype = IDMAP_POSIXID;
 
+	if (*is_wuser == 1)
+		request.id1.idtype = IDMAP_USID;
+	else if (*is_wuser == 0)
+		request.id1.idtype = IDMAP_GSID;
+	else
+		request.id1.idtype = IDMAP_SID;
+
 	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_ID_BY_NAME,
-		(xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
-		(xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
-		TIMEOUT);
+	    (xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
+	    (xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
+	    TIMEOUT);
 
 	if (clntstat != RPC_SUCCESS)
 		return (_idmap_rpc2stat(clnt));
@@ -1453,12 +1497,21 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	}
 
 	if (mapping->id2.idtype == IDMAP_UID) {
-		if (is_user) *is_user = 1;
+		*is_user = 1;
 	} else if (mapping->id2.idtype == IDMAP_GID) {
-		if (is_user) *is_user = 0;
+		*is_user = 0;
 	} else {
 		goto out;
 	}
+
+	if (mapping->id1.idtype == IDMAP_USID) {
+		*is_wuser = 1;
+	} else if (mapping->id1.idtype == IDMAP_GSID) {
+		*is_wuser = 0;
+	} else {
+		goto out;
+	}
+
 	if (direction)
 		*direction = mapping->direction;
 	if (pid)
@@ -1482,10 +1535,11 @@ out:
 idmap_stat
 idmap_get_u2w_mapping(idmap_handle_t *handle,
 		uid_t *pid, const char *unixname,
-		int flag, int is_user,
+		int flag, int is_user, int *is_wuser,
 		char **sidprefix, idmap_rid_t *rid,
 		char **winname, char **windomain,
-		int *direction) {
+		int *direction)
+{
 	CLIENT			*clnt;
 	enum clnt_stat		clntstat;
 	idmap_mapping		request, *mapping;
@@ -1526,12 +1580,19 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 		return (IDMAP_ERR_ARG);
 	}
 
-	request.id2.idtype = IDMAP_SID;
+	if (is_wuser == NULL)
+		request.id2.idtype = IDMAP_SID;
+	else if (*is_wuser == -1)
+		request.id2.idtype = IDMAP_SID;
+	else if (*is_wuser == 0)
+		request.id2.idtype = IDMAP_GSID;
+	else if (*is_wuser == 1)
+		request.id2.idtype = IDMAP_USID;
 
 	clntstat = clnt_call(clnt, IDMAP_GET_MAPPED_ID_BY_NAME,
-		(xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
-		(xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
-		TIMEOUT);
+	    (xdrproc_t)xdr_idmap_mapping, (caddr_t)&request,
+	    (xdrproc_t)xdr_idmap_mappings_res, (caddr_t)&result,
+	    TIMEOUT);
 
 	if (clntstat != RPC_SUCCESS)
 		return (_idmap_rpc2stat(clnt));
@@ -1544,8 +1605,12 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 		goto out;
 	}
 
-	if (direction)
+	if (direction != NULL)
 		*direction = mapping->direction;
+
+	if (is_wuser != NULL)
+		*is_wuser = mapping->id2.idtype == IDMAP_USID ? 1 : 0;
+
 	if (sidprefix && mapping->id2.idmap_id_u.sid.prefix &&
 	    *mapping->id2.idmap_id_u.sid.prefix != '\0') {
 		*sidprefix = strdup(mapping->id2.idmap_id_u.sid.prefix);
@@ -1652,7 +1717,8 @@ static stat_table_t stattable[] = {
  */
 /* ARGSUSED */
 const char *
-idmap_stat2string(idmap_handle_t *handle, idmap_stat status) {
+idmap_stat2string(idmap_handle_t *handle, idmap_stat status)
+{
 	int i;
 
 	for (i = 0; stattable[i].msg; i++) {
@@ -1664,7 +1730,8 @@ idmap_stat2string(idmap_handle_t *handle, idmap_stat status) {
 
 
 static int
-idmap_stat2errno(idmap_stat stat) {
+idmap_stat2errno(idmap_stat stat)
+{
 	int i;
 	for (i = 0; stattable[i].msg; i++) {
 		if (stattable[i].retcode == stat)
@@ -1678,7 +1745,8 @@ idmap_stat2errno(idmap_stat stat) {
  * Get status code from string
  */
 idmap_stat
-idmap_string2stat(const char *str) {
+idmap_string2stat(const char *str)
+{
 	if (str == NULL)
 		return (IDMAP_ERR_INTERNAL);
 
@@ -1729,7 +1797,8 @@ idmap_string2stat(const char *str) {
  * Map the given status to one that can be returned by the protocol
  */
 idmap_stat
-idmap_stat4prot(idmap_stat status) {
+idmap_stat4prot(idmap_stat status)
+{
 	switch (status) {
 	case IDMAP_ERR_MEMORY:
 	case IDMAP_ERR_CACHE:
@@ -1745,7 +1814,8 @@ idmap_stat4prot(idmap_stat status) {
  * either the 'to' OR 'from' pointers are NULL.
  */
 static idmap_stat
-idmap_strdupnull(char **to, const char *from) {
+idmap_strdupnull(char **to, const char *from)
+{
 	if (to == NULL)
 		return (IDMAP_SUCCESS);
 
@@ -1761,7 +1831,8 @@ idmap_strdupnull(char **to, const char *from) {
 }
 
 idmap_stat
-idmap_namerule_cpy(idmap_namerule *to, idmap_namerule *from) {
+idmap_namerule_cpy(idmap_namerule *to, idmap_namerule *from)
+{
 	idmap_stat retval;
 
 	(void) memcpy(to, from, sizeof (idmap_namerule));
@@ -1784,10 +1855,12 @@ idmap_namerule_cpy(idmap_namerule *to, idmap_namerule *from) {
  * Get uid given Windows name
  */
 idmap_stat
-idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid) {
+idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid)
+{
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
-	int		is_user;
+	int		is_user = 1;
+	int		is_wuser = -1;
 
 	if (uid == NULL)
 		return (IDMAP_ERR_ARG);
@@ -1796,7 +1869,7 @@ idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid) {
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
 	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
-	    &is_user, uid, NULL, NULL);
+	    &is_user, &is_wuser, uid, NULL, NULL);
 	(void) idmap_fini(ih);
 
 	/*
@@ -1813,10 +1886,12 @@ idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid) {
  * Get gid given Windows name
  */
 idmap_stat
-idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid) {
+idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid)
+{
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
-	int		is_user;
+	int		is_user = 0;
+	int		is_wuser = -1;
 
 	if (gid == NULL)
 		return (IDMAP_ERR_ARG);
@@ -1825,7 +1900,7 @@ idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid) {
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
 	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
-	    &is_user, gid, NULL, NULL);
+	    &is_user, &is_wuser, gid, NULL, NULL);
 	(void) idmap_fini(ih);
 
 	/*
@@ -1842,7 +1917,8 @@ idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid) {
  * Get winname given pid
  */
 static idmap_retcode
-idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain) {
+idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain)
+{
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		len;
@@ -1854,7 +1930,7 @@ idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain) {
 	/* Get mapping */
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
-	rc = idmap_get_u2w_mapping(ih, &pid, NULL, 0, is_user, NULL,
+	rc = idmap_get_u2w_mapping(ih, &pid, NULL, 0, is_user, NULL, NULL,
 	    NULL, &winname, &windomain, NULL);
 	(void) idmap_fini(ih);
 
@@ -1894,7 +1970,8 @@ idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain) {
  * Get winname given uid
  */
 idmap_stat
-idmap_getwinnamebyuid(uid_t uid, char **name, char **domain) {
+idmap_getwinnamebyuid(uid_t uid, char **name, char **domain)
+{
 	return (idmap_getwinnamebypid(uid, 1, name, domain));
 }
 
@@ -1903,6 +1980,7 @@ idmap_getwinnamebyuid(uid_t uid, char **name, char **domain) {
  * Get winname given gid
  */
 idmap_stat
-idmap_getwinnamebygid(gid_t gid, char **name, char **domain) {
+idmap_getwinnamebygid(gid_t gid, char **name, char **domain)
+{
 	return (idmap_getwinnamebypid(gid, 0, name, domain));
 }
