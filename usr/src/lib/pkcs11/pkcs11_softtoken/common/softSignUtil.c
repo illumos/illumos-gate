@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include "softMAC.h"
 #include "softRSA.h"
 #include "softDSA.h"
+#include "softEC.h"
 #include "softCrypt.h"
 
 /*
@@ -88,6 +89,12 @@ soft_sign_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DSA_SHA1:
 
 		return (soft_dsa_sign_verify_init_common(session_p, pMechanism,
+		    key_p, B_TRUE));
+
+	case CKM_ECDSA:
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_TRUE));
 
 	case CKM_DES_MAC_GENERAL:
@@ -167,13 +174,12 @@ soft_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 		if (pSignature != NULL) {
 			/* Pass local buffer to avoid overflow. */
 			rv = soft_des_sign_verify_common(session_p, pData,
-				ulDataLen, signature, pulSignatureLen, B_TRUE,
-				B_FALSE);
+			    ulDataLen, signature, pulSignatureLen, B_TRUE,
+			    B_FALSE);
 		} else {
 			/* Pass NULL, let callee to handle it. */
 			rv = soft_des_sign_verify_common(session_p, pData,
-				ulDataLen, NULL, pulSignatureLen, B_TRUE,
-				B_FALSE);
+			    ulDataLen, NULL, pulSignatureLen, B_TRUE, B_FALSE);
 		}
 
 		if ((rv == CKR_OK) && (pSignature != NULL))
@@ -204,6 +210,16 @@ soft_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 	case CKM_DSA_SHA1:
 
 		return (soft_dsa_digest_sign_common(session_p, pData, ulDataLen,
+		    pSignature, pulSignatureLen, B_FALSE));
+
+	case CKM_ECDSA:
+
+		return (soft_ecc_sign(session_p, pData, ulDataLen,
+		    pSignature, pulSignatureLen));
+
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_digest_sign_common(session_p, pData, ulDataLen,
 		    pSignature, pulSignatureLen, B_FALSE));
 
 	default:
@@ -267,6 +283,7 @@ soft_sign_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		 * signing.
 		 */
 	case CKM_DSA_SHA1:
+	case CKM_ECDSA_SHA1:
 
 		return (soft_digest_update(session_p, pPart, ulPartLen));
 
@@ -338,11 +355,11 @@ soft_sign_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 		if (pSignature != NULL) {
 			/* Pass local buffer to avoid overflow. */
 			rv = soft_des_sign_verify_common(session_p, NULL, 0,
-				signature, pulSignatureLen, B_TRUE, B_TRUE);
+			    signature, pulSignatureLen, B_TRUE, B_TRUE);
 		} else {
 			/* Pass NULL, let callee to handle it. */
 			rv = soft_des_sign_verify_common(session_p, NULL, 0,
-				NULL, pulSignatureLen, B_TRUE, B_TRUE);
+			    NULL, pulSignatureLen, B_TRUE, B_TRUE);
 		}
 
 		if ((rv == CKR_OK) && (pSignature != NULL))
@@ -362,6 +379,11 @@ soft_sign_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	case CKM_DSA_SHA1:
 
 		return (soft_dsa_digest_sign_common(session_p, NULL, 0,
+		    pSignature, pulSignatureLen, B_TRUE));
+
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_digest_sign_common(session_p, NULL, 0,
 		    pSignature, pulSignatureLen, B_TRUE));
 
 	default:

@@ -57,14 +57,18 @@ OBJECTS= \
 	$(ST_OBJECTS)
 
 AESDIR=		$(SRC)/common/crypto/aes
-BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
+BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 DESDIR=		$(SRC)/common/crypto/des
+ECCDIR=		$(SRC)/common/crypto/ecc
 ST_DIR=		$(SRC)/lib/pkcs11/pkcs11_softtoken/common
 
 lint \
 pics/kernelAttributeUtil.o := \
-	CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR)
+	CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
+	-I$(ECCDIR)
+pics/kernelKeys.o := \
+	CPPFLAGS += -I$(ECCDIR)
 pics/kernelSoftCommon.o := \
 	CPPFLAGS = -I$(ST_DIR) $(CPPFLAGS.master)
 

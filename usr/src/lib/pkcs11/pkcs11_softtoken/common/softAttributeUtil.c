@@ -364,7 +364,7 @@ copy_cert_attr(cert_attr_t *src_attr, cert_attr_t **dest_attr)
 		}
 
 		(void) memcpy((*dest_attr)->value, src_attr->value,
-			src_attr->length);
+		    src_attr->length);
 		(*dest_attr)->length = src_attr->length;
 	}
 
@@ -504,21 +504,21 @@ soft_copy_certificate(certificate_obj_t *oldcert, certificate_obj_t **newcert,
 		x509 = oldcert->cert_type_u.x509;
 		if (x509.subject)
 			if ((rv = copy_cert_attr(x509.subject,
-					&cert->cert_type_u.x509.subject)))
+			    &cert->cert_type_u.x509.subject)))
 				return (rv);
 		if (x509.value)
 			if ((rv = copy_cert_attr(x509.value,
-					&cert->cert_type_u.x509.value)))
+			    &cert->cert_type_u.x509.value)))
 				return (rv);
 	} else if (type == CKC_X_509_ATTR_CERT) {
 		x509_attr = oldcert->cert_type_u.x509_attr;
 		if (x509_attr.owner)
 			if ((rv = copy_cert_attr(x509_attr.owner,
-					&cert->cert_type_u.x509_attr.owner)))
+			    &cert->cert_type_u.x509_attr.owner)))
 				return (rv);
 		if (x509_attr.value)
 			if ((rv = copy_cert_attr(x509_attr.value,
-					&cert->cert_type_u.x509_attr.value)))
+			    &cert->cert_type_u.x509_attr.value)))
 				return (rv);
 	} else {
 		/* wrong certificate type */
@@ -549,7 +549,7 @@ soft_copy_extra_attr(CK_ATTRIBUTE_INFO_PTR old_attrp, soft_object_t *object_p)
 	attrp->attr.ulValueLen = old_attrp->attr.ulValueLen;
 
 	if ((old_attrp->attr.pValue != NULL) &&
-		(old_attrp->attr.ulValueLen > 0)) {
+	    (old_attrp->attr.ulValueLen > 0)) {
 		attrp->attr.pValue = malloc(old_attrp->attr.ulValueLen);
 		if (attrp->attr.pValue == NULL) {
 			free(attrp);
@@ -927,7 +927,7 @@ get_cert_attr_from_template(cert_attr_t **dest, CK_ATTRIBUTE_PTR src)
 		if (*dest != NULL) {
 			if ((*dest)->value != NULL) {
 				(void) memset((*dest)->value, 0,
-					(*dest)->length);
+				    (*dest)->length);
 				free((*dest)->value);
 			}
 		} else {
@@ -1065,8 +1065,6 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 				    object_p));
 				break;
 			case CKK_EC:
-				bigint_attr_cleanup(OBJ_PUB_EC_PARAM(
-				    object_p));
 				bigint_attr_cleanup(OBJ_PUB_EC_POINT(
 				    object_p));
 				break;
@@ -1132,8 +1130,6 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 				break;
 
 			case CKK_EC:
-				bigint_attr_cleanup(OBJ_PRI_EC_PARAM(
-				    object_p));
 				bigint_attr_cleanup(OBJ_PRI_EC_VALUE(
 				    object_p));
 				break;
@@ -1151,14 +1147,14 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 			if (OBJ_SEC_VALUE(object_p) != NULL &&
 			    OBJ_SEC_VALUE_LEN(object_p) > 0) {
 				(void) memset(OBJ_SEC_VALUE(object_p), 0,
-					OBJ_SEC_VALUE_LEN(object_p));
+				    OBJ_SEC_VALUE_LEN(object_p));
 				free(OBJ_SEC_VALUE(object_p));
 			}
 			/* cleanup key schedule data area */
 			if (OBJ_KEY_SCHED(object_p) != NULL &&
 			    OBJ_KEY_SCHED_LEN(object_p) > 0) {
 				(void) memset(OBJ_KEY_SCHED(object_p), 0,
-					OBJ_KEY_SCHED_LEN(object_p));
+				    OBJ_KEY_SCHED_LEN(object_p));
 				free(OBJ_KEY_SCHED(object_p));
 			}
 
@@ -1304,11 +1300,13 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 	biginteger_t	modulus;
 	biginteger_t	pubexpo;
-	biginteger_t	prime;		/* Shared with CKA_EC_PARAMS */
-	biginteger_t	subprime;	/* Shared with CKA_EC_POINT */
+	biginteger_t	prime;
+	biginteger_t	subprime;
 	biginteger_t	base;
 	biginteger_t	value;
+	biginteger_t	point;
 	CK_ATTRIBUTE	string_tmp;
+	CK_ATTRIBUTE	param_tmp;
 
 	public_key_obj_t  *pbk;
 	uchar_t	object_type = 0;
@@ -1320,7 +1318,9 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	(void) memset(&subprime, 0x0, sizeof (biginteger_t));
 	(void) memset(&base, 0x0, sizeof (biginteger_t));
 	(void) memset(&value, 0x0, sizeof (biginteger_t));
+	(void) memset(&point, 0x0, sizeof (biginteger_t));
 	string_tmp.pValue = NULL;
+	param_tmp.pValue = NULL;
 
 	for (i = 0; i < ulAttrNum; i++) {
 
@@ -1472,7 +1472,7 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				    (template[i].pValue == NULL)) {
 					rv = CKR_ATTRIBUTE_VALUE_INVALID;
 					goto fail_cleanup;
-			    }
+				}
 			}
 
 			rv = get_bigint_attr_from_template(&value,
@@ -1497,17 +1497,14 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKA_EC_PARAMS:
 			isECParam = 1;
-			/* use prime variable for ec_param */
-			rv = get_bigint_attr_from_template(&prime,
-			    &template[i]);
+			rv = get_string_from_template(&param_tmp, &template[i]);
 			if (rv != CKR_OK)
 				goto fail_cleanup;
 			break;
 
 		case CKA_EC_POINT:
 			isECPoint = 1;
-			/* use subprime variable for ec_point */
-			rv = get_bigint_attr_from_template(&subprime,
+			rv = get_bigint_attr_from_template(&point,
 			    &template[i]);
 			if (rv != CKR_OK)
 				goto fail_cleanup;
@@ -1705,18 +1702,35 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		break;
 
 	case CKK_EC:
-		if (isModulusBits || isModulus || isPubExpo || isPrime ||
-			isSubprime || isBase || isValue) {
-			rv = CKR_TEMPLATE_INCONSISTENT;
-			goto fail_cleanup;
+		if (mode == SOFT_CREATE_OBJ) {
+			if (isModulusBits || isModulus || isPubExpo ||
+			    isPrime || isSubprime || isBase || isValue) {
+				rv = CKR_TEMPLATE_INCONSISTENT;
+				goto fail_cleanup;
 
-		} else if (!isECParam && !isECPoint) {
-			rv = CKR_TEMPLATE_INCOMPLETE;
-			goto fail_cleanup;
+			} else if (!isECParam || !isECPoint) {
+				rv = CKR_TEMPLATE_INCOMPLETE;
+				goto fail_cleanup;
+			}
+		} else {
+			if (isModulusBits || isModulus || isPubExpo ||
+			    isPrime || isSubprime || isBase || isValue) {
+				rv = CKR_TEMPLATE_INCONSISTENT;
+				goto fail_cleanup;
+
+			} else if (!isECParam) {
+				rv = CKR_TEMPLATE_INCOMPLETE;
+				goto fail_cleanup;
+			}
 		}
 
-		copy_bigint_attr(&prime, KEY_PUB_EC_PARAM(pbk));
-		copy_bigint_attr(&subprime, KEY_PUB_EC_POINT(pbk));
+		if (isECPoint) {
+			copy_bigint_attr(&point, KEY_PUB_EC_POINT(pbk));
+		}
+		rv = soft_add_extra_attr(&param_tmp, new_object);
+		if (rv != CKR_OK)
+			goto fail_cleanup;
+		string_attr_cleanup(&param_tmp);
 		break;
 
 	default:
@@ -1746,7 +1760,9 @@ fail_cleanup:
 	bigint_attr_cleanup(&subprime);
 	bigint_attr_cleanup(&base);
 	bigint_attr_cleanup(&value);
+	bigint_attr_cleanup(&point);
 	string_attr_cleanup(&string_tmp);
+	string_attr_cleanup(&param_tmp);
 
 	/*
 	 * cleanup the storage allocated inside the object itself.
@@ -1818,6 +1834,7 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	biginteger_t	expo2;
 	biginteger_t	coef;
 	CK_ATTRIBUTE	string_tmp;
+	CK_ATTRIBUTE	param_tmp;
 	BIGNUM	x, q;
 
 	private_key_obj_t *pvk;
@@ -1837,6 +1854,7 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	(void) memset(&expo2, 0x0, sizeof (biginteger_t));
 	(void) memset(&coef, 0x0, sizeof (biginteger_t));
 	string_tmp.pValue = NULL;
+	param_tmp.pValue = NULL;
 	x.malloced = 0;
 	q.malloced = 0;
 
@@ -2082,8 +2100,7 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKA_EC_PARAMS:
 			isECParam = 1;
-			/* use prime variable for ec_param */
-			rv = get_bigint_attr_from_template(&prime,
+			rv = get_string_from_template(&param_tmp,
 			    &template[i]);
 			if (rv != CKR_OK)
 				goto fail_cleanup;
@@ -2236,22 +2253,26 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 #ifdef	__sparcv9
 			/* LINTED */
 			if (big_init(&x, ((int)value.big_value_len +
-#else	/* !__sparcv9 */
-			if (big_init(&x, (value.big_value_len +
-#endif	/* __sparcv9 */
 			    (int)sizeof (uint32_t) - 1) /
 			    (int)sizeof (uint32_t)) != BIG_OK) {
+#else	/* !__sparcv9 */
+			if (big_init(&x, (value.big_value_len +
+			    (int)sizeof (uint32_t) - 1) /
+			    (int)sizeof (uint32_t)) != BIG_OK) {
+#endif	/* __sparcv9 */
 				rv = CKR_HOST_MEMORY;
 				goto fail_cleanup;
 			}
 #ifdef	__sparcv9
 			/* LINTED */
 			if (big_init(&q, ((int)subprime.big_value_len +
-#else	/* !__sparcv9 */
-			if (big_init(&q, (subprime.big_value_len +
-#endif	/* __sparcv9 */
 			    (int)sizeof (uint32_t) - 1) /
 			    (int)sizeof (uint32_t)) != BIG_OK) {
+#else	/* !__sparcv9 */
+			if (big_init(&q, (subprime.big_value_len +
+			    (int)sizeof (uint32_t) - 1) /
+			    (int)sizeof (uint32_t)) != BIG_OK) {
+#endif	/* __sparcv9 */
 				rv = CKR_HOST_MEMORY;
 				goto fail_cleanup;
 			}
@@ -2344,7 +2365,7 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 			copy_bigint_attr(&base, KEY_PRI_DH942_BASE(pvk));
 
 			copy_bigint_attr(&subprime,
-				KEY_PRI_DH942_SUBPRIME(pvk));
+			    KEY_PRI_DH942_SUBPRIME(pvk));
 
 			copy_bigint_attr(&value, KEY_PRI_DH942_VALUE(pvk));
 		} else {
@@ -2356,17 +2377,19 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	case CKK_EC:
 		if (isModulus || isPubExpo || isPrime ||
 		    isPrime1 || isPrime2 || isExpo1 || isExpo2 || isCoef ||
-			isValueBits || isBase) {
+		    isValueBits || isBase) {
 			rv = CKR_TEMPLATE_INCONSISTENT;
 			goto fail_cleanup;
 
-		} else if (!isECParam && !isValue) {
-			rv = CKR_TEMPLATE_INCOMPLETE;
-			goto fail_cleanup;
+		} else if (isECParam) {
+			rv = soft_add_extra_attr(&param_tmp, new_object);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			string_attr_cleanup(&param_tmp);
 		}
-
-		copy_bigint_attr(&prime, KEY_PRI_EC_PARAM(pvk));
-		copy_bigint_attr(&value, KEY_PRI_EC_VALUE(pvk));
+		if (isValue) {
+			copy_bigint_attr(&value, KEY_PRI_EC_VALUE(pvk));
+		}
 		break;
 
 	default:
@@ -2405,6 +2428,7 @@ fail_cleanup:
 	bigint_attr_cleanup(&expo2);
 	bigint_attr_cleanup(&coef);
 	string_attr_cleanup(&string_tmp);
+	string_attr_cleanup(&param_tmp);
 	big_finish(&x);
 	big_finish(&q);
 
@@ -2814,7 +2838,7 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 			}
 
 			if ((sck->sk_value_len < ARCFOUR_MIN_KEY_BYTES) ||
-				(sck->sk_value_len > ARCFOUR_MAX_KEY_BYTES)) {
+			    (sck->sk_value_len > ARCFOUR_MAX_KEY_BYTES)) {
 				rv = CKR_ATTRIBUTE_VALUE_INVALID;
 				goto fail_cleanup;
 			}
@@ -2942,12 +2966,10 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		case CKK_BLOWFISH:
 			if (isValueLen &&
 			    ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
-				(sck->sk_value_len > BLOWFISH_MAXBYTES))) {
-					rv = CKR_ATTRIBUTE_VALUE_INVALID;
-					goto fail_cleanup;
-				}
-
-
+			    (sck->sk_value_len > BLOWFISH_MAXBYTES))) {
+				rv = CKR_ATTRIBUTE_VALUE_INVALID;
+				goto fail_cleanup;
+			}
 			break;
 
 		case CKK_DES:
@@ -3016,12 +3038,10 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		case CKK_BLOWFISH:
 			if (isValueLen &&
 			    ((sck->sk_value_len < BLOWFISH_MINBYTES) ||
-				(sck->sk_value_len > BLOWFISH_MAXBYTES))) {
-					rv = CKR_ATTRIBUTE_VALUE_INVALID;
-					goto fail_cleanup;
-				}
-
-
+			    (sck->sk_value_len > BLOWFISH_MAXBYTES))) {
+				rv = CKR_ATTRIBUTE_VALUE_INVALID;
+				goto fail_cleanup;
+			}
 			break;
 
 		case CKK_DES:
@@ -3298,7 +3318,7 @@ soft_build_domain_parameters_object(CK_ATTRIBUTE_PTR template,
 			copy_bigint_attr(&base, KEY_DOM_DH942_BASE(dom));
 
 			copy_bigint_attr(&subprime,
-				KEY_DOM_DH942_SUBPRIME(dom));
+			    KEY_DOM_DH942_SUBPRIME(dom));
 		} else {
 			rv = CKR_TEMPLATE_INCOMPLETE;
 			goto fail_cleanup;
@@ -3421,19 +3441,19 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 			switch (template[i].type) {
 				case CKA_SUBJECT:
 					rv = get_cert_attr_from_template(
-						&cert->cert_type_u.x509.subject,
-						&template[i]);
+					    &cert->cert_type_u.x509.subject,
+					    &template[i]);
 					break;
 				case CKA_VALUE:
 					rv = get_cert_attr_from_template(
-						&cert->cert_type_u.x509.value,
-						&template[i]);
+					    &cert->cert_type_u.x509.value,
+					    &template[i]);
 					break;
 				case CKA_LABEL:
 					isLabel = 1;
 					rv = get_string_from_template(
-							&string_tmp,
-							&template[i]);
+					    &string_tmp,
+					    &template[i]);
 					if (rv != CKR_OK)
 						goto fail_cleanup;
 					break;
@@ -3441,7 +3461,7 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 				case CKA_ISSUER:
 				case CKA_SERIAL_NUMBER:
 					rv = soft_add_extra_attr(&template[i],
-						new_object);
+					    new_object);
 					break;
 				case CKA_MODIFIABLE:
 					if ((*(CK_BBOOL *)template[i].pValue) ==
@@ -3452,10 +3472,10 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 				case CKA_CERTIFICATE_TYPE:
 					break;
 				default:
-				    rv = soft_parse_common_attrs(&template[i],
-					&object_type);
-				    if (rv != CKR_OK)
-					goto fail_cleanup;
+					rv = soft_parse_common_attrs(
+					    &template[i], &object_type);
+					if (rv != CKR_OK)
+						goto fail_cleanup;
 			}
 			break;
 			case CKC_X_509_ATTR_CERT:
@@ -3473,7 +3493,7 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 				case CKA_LABEL:
 					isLabel = 1;
 					rv = get_string_from_template(
-						&string_tmp, &template[i]);
+					    &string_tmp, &template[i]);
 					if (rv != CKR_OK)
 						goto fail_cleanup;
 					break;
@@ -3481,7 +3501,7 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 				case CKA_AC_ISSUER:
 				case CKA_ATTR_TYPES:
 					rv = soft_add_extra_attr(&template[i],
-						new_object);
+					    new_object);
 					break;
 
 				case CKA_MODIFIABLE:
@@ -3493,11 +3513,11 @@ soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
 				case CKA_CERTIFICATE_TYPE:
 					break;
 				default:
-				    rv = soft_parse_common_attrs(&template[i],
-					&object_type);
-				    if (rv != CKR_OK)
-					goto fail_cleanup;
-				    break;
+					rv = soft_parse_common_attrs(
+					    &template[i], &object_type);
+					if (rv != CKR_OK)
+						goto fail_cleanup;
+					break;
 			}
 			break;
 			default:
@@ -3590,7 +3610,7 @@ soft_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 	case CKO_CERTIFICATE:
 		rv = soft_build_certificate_object(template, ulAttrNum,
-			new_object, (CK_CERTIFICATE_TYPE)~0UL);
+		    new_object, (CK_CERTIFICATE_TYPE)~0UL);
 		break;
 
 	case CKO_DATA:
@@ -3823,6 +3843,7 @@ soft_get_public_key_attribute(soft_object_t *object_p,
 	switch (template->type) {
 
 	case CKA_SUBJECT:
+	case CKA_EC_PARAMS:
 		/*
 		 * The above extra attributes have byte array type.
 		 */
@@ -3934,13 +3955,9 @@ soft_get_public_key_attribute(soft_object_t *object_p,
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
 		}
 
-	case CKA_EC_PARAMS:
-		return (get_bigint_attr_from_object(OBJ_PUB_EC_PARAM(
-			    object_p), template));
-
 	case CKA_EC_POINT:
-		return (get_bigint_attr_from_object(OBJ_PUB_EC_POINT(
-			    object_p), template));
+		return (get_bigint_attr_from_object(
+		    OBJ_PUB_EC_POINT(object_p), template));
 
 	case CKA_VALUE:
 		switch (keytype) {
@@ -4021,6 +4038,7 @@ soft_get_private_key_attribute(soft_object_t *object_p,
 	switch (template->type) {
 
 	case CKA_SUBJECT:
+	case CKA_EC_PARAMS:
 		/*
 		 * The above extra attributes have byte array type.
 		 */
@@ -4206,10 +4224,6 @@ soft_get_private_key_attribute(soft_object_t *object_p,
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
 		}
-
-	case CKA_EC_PARAMS:
-		return (get_bigint_attr_from_object(OBJ_PRI_EC_PARAM(
-			    object_p), template));
 
 	case CKA_VALUE:
 		switch (keytype) {
@@ -4504,24 +4518,22 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 		case CKA_SUBJECT:
 			if (certtype == CKC_X_509) {
 				return (get_cert_attr_from_object(
-					X509_CERT_SUBJECT(object_p), template));
+				    X509_CERT_SUBJECT(object_p), template));
 			}
 			break;
 		case CKA_VALUE:
 			if (certtype == CKC_X_509) {
-			    return (get_cert_attr_from_object(
-				X509_CERT_VALUE(object_p), template));
+				return (get_cert_attr_from_object(
+				    X509_CERT_VALUE(object_p), template));
 			} else if (certtype == CKC_X_509_ATTR_CERT) {
-			    return (get_cert_attr_from_object(
-				X509_ATTR_CERT_VALUE(object_p),
-				template));
+				return (get_cert_attr_from_object(
+				    X509_ATTR_CERT_VALUE(object_p), template));
 			}
 			break;
 		case CKA_OWNER:
 			if (certtype == CKC_X_509_ATTR_CERT) {
 				return (get_cert_attr_from_object(
-					X509_ATTR_CERT_OWNER(object_p),
-					template));
+				    X509_ATTR_CERT_OWNER(object_p), template));
 			}
 			break;
 		case CKA_CERTIFICATE_TYPE:
@@ -4531,7 +4543,7 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 			break;
 		case CKA_TRUSTED:
 			return (get_bool_attr_from_object(object_p,
-				TRUSTED_BOOL_ON, template));
+			    TRUSTED_BOOL_ON, template));
 		case CKA_ID:
 		case CKA_ISSUER:
 		case CKA_SERIAL_NUMBER:
@@ -4542,7 +4554,7 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 			break;
 		default:
 			return (soft_get_common_attrs(object_p, template,
-				object_p->object_type));
+			    object_p->object_type));
 			break;
 	}
 
@@ -4580,20 +4592,20 @@ soft_set_certificate_attribute(soft_object_t *object_p,
 		case CKA_ISSUER:
 			if (certtype == CKC_X_509) {
 				return (set_extra_attr_to_object(object_p,
-					template->type, template));
+				    template->type, template));
 			}
 			break;
 		case CKA_AC_ISSUER:
 		case CKA_ATTR_TYPES:
 			if (certtype == CKC_X_509_ATTR_CERT) {
 				return (set_extra_attr_to_object(object_p,
-					template->type, template));
+				    template->type, template));
 			}
 			break;
 		case CKA_SERIAL_NUMBER:
 		case CKA_LABEL:
 			return (set_extra_attr_to_object(object_p,
-				template->type, template));
+			    template->type, template));
 			break;
 		default:
 			return (soft_set_common_storage_attribute(
@@ -5711,6 +5723,9 @@ free_public_key_attr(public_key_obj_t *pbk, CK_KEY_TYPE key_type)
 			bigint_attr_cleanup(KEY_PUB_DH_BASE(pbk));
 			bigint_attr_cleanup(KEY_PUB_DH_VALUE(pbk));
 			break;
+		case CKK_EC:
+			bigint_attr_cleanup(KEY_PUB_EC_POINT(pbk));
+			break;
 		case CKK_X9_42_DH:
 			bigint_attr_cleanup(KEY_PUB_DH942_PRIME(pbk));
 			bigint_attr_cleanup(KEY_PUB_DH942_SUBPRIME(pbk));
@@ -5739,7 +5754,7 @@ soft_copy_public_key_attr(public_key_obj_t *old_pub_key_obj_p,
 	switch (key_type) {
 		case CKK_RSA:
 			(void) memcpy(KEY_PUB_RSA(pbk),
-				KEY_PUB_RSA(old_pub_key_obj_p),
+			    KEY_PUB_RSA(old_pub_key_obj_p),
 			    sizeof (rsa_pub_key_t));
 			/* copy modulus */
 			rv = copy_bigint(KEY_PUB_RSA_MOD(pbk),
@@ -5822,6 +5837,19 @@ soft_copy_public_key_attr(public_key_obj_t *old_pub_key_obj_p,
 				return (rv);
 			}
 			break;
+		case CKK_EC:
+			(void) memcpy(KEY_PUB_EC(pbk),
+			    KEY_PUB_EC(old_pub_key_obj_p),
+			    sizeof (ec_pub_key_t));
+
+			/* copy point */
+			rv = copy_bigint(KEY_PUB_EC_POINT(pbk),
+			    KEY_PUB_EC_POINT(old_pub_key_obj_p));
+			if (rv != CKR_OK) {
+				free_public_key_attr(pbk, key_type);
+				return (rv);
+			}
+			break;
 		case CKK_X9_42_DH:
 			(void) memcpy(KEY_PUB_DH942(pbk),
 			    KEY_PUB_DH942(old_pub_key_obj_p),
@@ -5894,6 +5922,9 @@ free_private_key_attr(private_key_obj_t *pbk, CK_KEY_TYPE key_type)
 			bigint_attr_cleanup(KEY_PRI_DH_PRIME(pbk));
 			bigint_attr_cleanup(KEY_PRI_DH_BASE(pbk));
 			bigint_attr_cleanup(KEY_PRI_DH_VALUE(pbk));
+			break;
+		case CKK_EC:
+			bigint_attr_cleanup(KEY_PRI_EC_VALUE(pbk));
 			break;
 		case CKK_X9_42_DH:
 			bigint_attr_cleanup(KEY_PRI_DH942_PRIME(pbk));
@@ -6042,6 +6073,19 @@ soft_copy_private_key_attr(private_key_obj_t *old_pri_key_obj_p,
 			/* copy value */
 			rv = copy_bigint(KEY_PRI_DH_VALUE(pbk),
 			    KEY_PRI_DH_VALUE(old_pri_key_obj_p));
+			if (rv != CKR_OK) {
+				free_private_key_attr(pbk, key_type);
+				return (rv);
+			}
+			break;
+		case CKK_EC:
+			(void) memcpy(KEY_PRI_EC(pbk),
+			    KEY_PRI_EC(old_pri_key_obj_p),
+			    sizeof (ec_pri_key_t));
+
+			/* copy value */
+			rv = copy_bigint(KEY_PRI_EC_VALUE(pbk),
+			    KEY_PRI_EC_VALUE(old_pri_key_obj_p));
 			if (rv != CKR_OK) {
 				free_private_key_attr(pbk, key_type);
 				return (rv);
@@ -6254,7 +6298,7 @@ soft_copy_secret_key_attr(secret_key_obj_t *old_secret_key_obj_p,
 		}
 		sk->keysched_len = old_secret_key_obj_p->keysched_len;
 		(void) memcpy(sk->key_sched, old_secret_key_obj_p->key_sched,
-			sk->keysched_len);
+		    sk->keysched_len);
 	}
 
 	*new_secret_key_obj_p = sk;

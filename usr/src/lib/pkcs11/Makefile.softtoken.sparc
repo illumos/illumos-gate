@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,8 @@ BIGNUM_PSR_OBJECTS = mont_mulf_sparc.o
 BIGNUM_CFG = -DUSE_FLOATING_POINT
 
 include ../Makefile.com
-CFLAGS	+=	-Dsun4u
+CFLAGS		+=	-Dsun4u
+CPPFLAGS	+=	-DMP_USE_UINT_DIGIT
 
 install: all $(ROOTLIBS) $(ROOTLINKS)
 

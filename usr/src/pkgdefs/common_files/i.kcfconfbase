@@ -35,6 +35,10 @@ do
 		if [ $? != 0 ]; then
 			rc4=`egrep '^arcfour' $src` 
 		fi
+		egrep '^ecc' $dest > /dev/null 2>&1
+		if [ $? != 0 ]; then
+			ecc=`egrep '^ecc' $src`
+		fi
 		egrep '^rsa' $dest > /dev/null 2>&1
 		if [ $? != 0 ]; then
 			rsa=`egrep '^rsa' $src`
@@ -51,6 +55,7 @@ do
 		if [ $? != 0 ]; then
 			md4=`egrep '^md4' $src`
 		fi
+		export ecc
 		export rsa
 		export rc4
 		export sha2
@@ -58,6 +63,7 @@ do
 		export md4
 		nawk '/^# End SUNWcsr/ { \
 			if (ENVIRON["rc4"] != "") {print ENVIRON["rc4"]} \
+			if (ENVIRON["ecc"] != "") {print ENVIRON["ecc"]} \
 			if (ENVIRON["rsa"] != "") {print ENVIRON["rsa"]} \
 			if (ENVIRON["sha2"] != "") {print ENVIRON["sha2"]} \
 			if (ENVIRON["swrand"] != "") {print ENVIRON["swrand"]} \

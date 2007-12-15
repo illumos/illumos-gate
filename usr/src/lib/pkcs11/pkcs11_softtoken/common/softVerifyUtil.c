@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,7 @@
 #include "softMAC.h"
 #include "softRSA.h"
 #include "softDSA.h"
+#include "softEC.h"
 #include "softCrypt.h"
 
 /*
@@ -90,6 +90,12 @@ soft_verify_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DSA_SHA1:
 
 		return (soft_dsa_sign_verify_init_common(session_p, pMechanism,
+		    key_p, B_FALSE));
+
+	case CKM_ECDSA:
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_sign_verify_init_common(session_p, pMechanism,
 		    key_p, B_FALSE));
 
 	case CKM_DES_MAC_GENERAL:
@@ -217,6 +223,16 @@ soft_verify(soft_session_t *session_p, CK_BYTE_PTR pData,
 		return (soft_dsa_digest_verify_common(session_p, pData,
 		    ulDataLen, pSignature, ulSignatureLen, B_FALSE));
 
+	case CKM_ECDSA:
+
+		return (soft_ecc_verify(session_p, pData, ulDataLen,
+		    pSignature, ulSignatureLen));
+
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_digest_verify_common(session_p, pData,
+		    ulDataLen, pSignature, ulSignatureLen, B_FALSE));
+
 	default:
 		return (CKR_MECHANISM_INVALID);
 	}
@@ -264,7 +280,7 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	case CKM_DES_MAC:
 
 		return (soft_des_mac_sign_verify_update(session_p, pPart,
-			ulPartLen));
+		    ulPartLen));
 
 	case CKM_MD5_RSA_PKCS:
 	case CKM_SHA1_RSA_PKCS:
@@ -278,6 +294,7 @@ soft_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 		 * verification.
 		 */
 	case CKM_DSA_SHA1:
+	case CKM_ECDSA_SHA1:
 
 		return (soft_digest_update(session_p, pPart, ulPartLen));
 
@@ -358,7 +375,7 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 
 		/* Pass local buffer to avoid overflow. */
 		rv = soft_des_sign_verify_common(session_p, NULL, 0,
-			signature, &len, B_FALSE, B_TRUE);
+		    signature, &len, B_FALSE, B_TRUE);
 
 		if (rv == CKR_OK) {
 			if (len != ulSignatureLen) {
@@ -384,6 +401,11 @@ soft_verify_final(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	case CKM_DSA_SHA1:
 
 		return (soft_dsa_digest_verify_common(session_p, NULL, 0,
+		    pSignature, ulSignatureLen, B_TRUE));
+
+	case CKM_ECDSA_SHA1:
+
+		return (soft_ecc_digest_verify_common(session_p, NULL, 0,
 		    pSignature, ulSignatureLen, B_TRUE));
 
 	default:

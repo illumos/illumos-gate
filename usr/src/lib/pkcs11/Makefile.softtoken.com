@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,8 @@ LCL_OBJECTS = \
 	softKeystoreUtil.o	\
 	softSSL.o		\
 	softASN1.o		\
-	softBlowfishCrypt.o
+	softBlowfishCrypt.o	\
+	softEC.o
 
 ASFLAGS = $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS)
 
@@ -68,6 +69,16 @@ AES_COBJECTS = aes_cbc_crypt.o  aes_impl.o
 BLOWFISH_COBJECTS = blowfish_cbc_crypt.o blowfish_impl.o
 ARCFOUR_COBJECTS = arcfour_crypt.o
 DES_COBJECTS = des_cbc_crypt.o des_impl.o des_ks.o
+
+ECC_COBJECTS = \
+	ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o	ecp_384.o \
+	ecp_jac.o ec2_193.o ecl.o ecp_192.o ecp_521.o \
+	ecp_jm.o ec2_233.o ecl_curve.o ecp_224.o ecp_aff.o ecp_mont.o \
+	ec2_aff.o ec_naf.o ecl_gf.o ecp_256.o oid.o secitem.o \
+	ec2_test.o ecp_test.o
+
+MPI_COBJECTS = mp_gf2m.o mpi.o mpcpucache.o mplogic.o mpmontg.o mpprime.o
+
 RSA_COBJECTS = rsa_impl.o
 BIGNUM_COBJECTS = bignumimpl.o
 
@@ -75,6 +86,9 @@ AES_OBJECTS = $(AES_COBJECTS) $(AES_PSR_OBJECTS)
 BLOWFISH_OBJECTS = $(BLOWFISH_COBJECTS) $(BLOWFISH_PSR_OBJECTS)
 ARCFOUR_OBJECTS = $(ARCFOUR_COBJECTS) $(ARCFOUR_PSR_OBJECTS)
 DES_OBJECTS = $(DES_COBJECTS) $(DES_PSR_OBJECTS)
+
+ECC_OBJECTS = $(ECC_COBJECTS) $(ECC_PSR_OBJECTS)
+MPI_OBJECTS = $(MPI_COBJECTS) $(MPI_PSR_OBJECTS)
 RSA_OBJECTS = $(RSA_COBJECTS) $(RSA_PSR_OBJECTS)
 SHA1_OBJECTS = $(SHA1_COBJECTS) $(SHA1_PSR_OBJECTS)
 SHA2_OBJECTS = $(SHA2_COBJECTS) $(SHA2_PSR_OBJECTS)
@@ -111,16 +125,20 @@ OBJECTS = \
 	$(BLOWFISH_OBJECTS)	\
 	$(ARCFOUR_OBJECTS)	\
 	$(DES_OBJECTS)		\
+	$(MPI_OBJECTS)		\
 	$(RSA_OBJECTS)		\
 	$(SHA1_OBJECTS)		\
 	$(SHA2_OBJECTS)		\
 	$(BIGNUM_OBJECTS)	\
-	$(BER_OBJECTS)
+	$(BER_OBJECTS)		\
+	$(ECC_OBJECTS)
 
 AESDIR=		$(SRC)/common/crypto/aes
 BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 DESDIR=		$(SRC)/common/crypto/des
+ECCDIR=		$(SRC)/common/crypto/ecc
+MPIDIR=		$(SRC)/common/mpi
 RSADIR=		$(SRC)/common/crypto/rsa
 BIGNUMDIR=	$(SRC)/common/bignum
 BERDIR=		../../../libldap5/sources/ldap/ber
@@ -138,29 +156,47 @@ SRCS =	\
 	$(BLOWFISH_COBJECTS:%.o=$(BLOWFISHDIR)/%.c) \
 	$(ARCFOUR_COBJECTS:%.o=$(ARCFOURDIR)/%.c) \
 	$(DES_COBJECTS:%.o=$(DESDIR)/%.c) \
+	$(MPI_COBJECTS:%.o=$(MPIDIR)/%.c) \
 	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
 	$(SHA1_COBJECTS:%.o=$(SHA1DIR)/%.c) \
 	$(SHA2_COBJECTS:%.o=$(SHA2DIR)/%.c) \
 	$(BIGNUM_COBJECTS:%.o=$(BIGNUMDIR)/%.c) \
-	$(BIGNUM_PSR_SRCS)
+	$(BIGNUM_PSR_SRCS) \
+	$(ECC_COBJECTS:%.o=$(ECCDIR)/%.c)
 
 LIBS    =       $(DYNLIB)
 LDLIBS  +=      -lc -lmd -lcryptoutil
 
 CFLAGS 	+=      $(CCVERBOSE)
 CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
-	    -I$(RSADIR) -I$(SRCDIR) -I$(BIGNUMDIR) -D_POSIX_PTHREAD_SEMANTICS
+	    -I$(ECCDIR) -I$(MPIDIR) -I$(RSADIR) -I$(SRCDIR) -I$(BIGNUMDIR) \
+	    -D_POSIX_PTHREAD_SEMANTICS -DMP_API_COMPATIBLE \
+	    -DNSS_ECC_MORE_THAN_SUITE_B
+
 
 LINTFLAGS64 += -errchk=longptr64
 
 ROOTLIBDIR=     $(ROOT)/usr/lib/security
 ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
 
+LINTSRC = \
+	$(LCL_OBJECTS:%.o=$(SRCDIR)/%.c) \
+	$(AES_COBJECTS:%.o=$(AESDIR)/%.c) \
+	$(BLOWFISH_COBJECTS:%.o=$(BLOWFISHDIR)/%.c) \
+	$(ARCFOUR_COBJECTS:%.o=$(ARCFOURDIR)/%.c) \
+	$(DES_COBJECTS:%.o=$(DESDIR)/%.c) \
+	$(RSA_COBJECTS:%.o=$(RSADIR)/%.c) \
+	$(SHA1_COBJECTS:%.o=$(SHA1DIR)/%.c) \
+	$(SHA2_COBJECTS:%.o=$(SHA2DIR)/%.c) \
+	$(BIGNUM_COBJECTS:%.o=$(BIGNUMDIR)/%.c) \
+	$(BIGNUM_PSR_SRCS)
+
 .KEEP_STATE:
 
 all:	$(LIBS)
 
-lint: 	lintcheck
+lint:	$$(LINTSRC)
+	$(LINT.c) $(LINTCHECKFLAGS) $(LINTSRC) $(LDLIBS)
 
 pics/%.o:	$(AESDIR)/%.c
 	$(COMPILE.c) -o $@ $<
@@ -175,6 +211,14 @@ pics/%.o:	$(ARCFOURDIR)/%.c
 	$(POST_PROCESS_O)
 
 pics/%.o:	$(DESDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(ECCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+pics/%.o:	$(MPIDIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

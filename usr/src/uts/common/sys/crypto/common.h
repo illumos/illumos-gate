@@ -82,7 +82,6 @@ typedef struct CK_AES_CCM_PARAMS {
 	uchar_t *authData;
 } CK_AES_CCM_PARAMS;
 
-
 #ifdef _KERNEL
 /*
  * CK_ECDH1_DERIVE_PARAMS provides the parameters to the
@@ -180,6 +179,10 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_SHA256_RSA_PKCS		"CKM_SHA256_RSA_PKCS"
 #define	SUN_CKM_SHA384_RSA_PKCS		"CKM_SHA384_RSA_PKCS"
 #define	SUN_CKM_SHA512_RSA_PKCS		"CKM_SHA512_RSA_PKCS"
+#define	SUN_CKM_EC_KEY_PAIR_GEN		"CKM_EC_KEY_PAIR_GEN"
+#define	SUN_CKM_ECDH1_DERIVE		"CKM_ECDH1_DERIVE"
+#define	SUN_CKM_ECDSA_SHA1		"CKM_ECDSA_SHA1"
+#define	SUN_CKM_ECDSA			"CKM_ECDSA"
 
 /* Shared operation context format for CKM_RC4 */
 typedef struct {
@@ -256,6 +259,23 @@ typedef uint64_t crypto_attr_type_t;
 #define	SUN_CKA_PRIME			0x00000130
 #define	SUN_CKA_SUBPRIME		0x00000131
 #define	SUN_CKA_BASE			0x00000132
+
+#define	CKK_EC			0x00000003
+#define	CKK_GENERIC_SECRET	0x00000010
+#define	CKK_RC4			0x00000012
+#define	CKK_AES			0x0000001F
+#define	CKK_DES			0x00000013
+#define	CKK_DES2		0x00000014
+#define	CKK_DES3		0x00000015
+
+#define	CKO_PUBLIC_KEY		0x00000002
+#define	CKO_PRIVATE_KEY		0x00000003
+#define	CKA_CLASS		0x00000000
+#define	CKA_VALUE		0x00000011
+#define	CKA_KEY_TYPE		0x00000100
+#define	CKA_VALUE_LEN		0x00000161
+#define	CKA_EC_PARAMS		0x00000180
+#define	CKA_EC_POINT		0x00000181
 
 typedef uint32_t	crypto_object_id_t;
 

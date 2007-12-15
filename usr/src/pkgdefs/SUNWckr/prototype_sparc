@@ -54,6 +54,7 @@ f none kernel/crypto/sparcv9/aes 755 root sys
 f none kernel/crypto/sparcv9/arcfour 755 root sys
 f none kernel/crypto/sparcv9/blowfish 755 root sys
 f none kernel/crypto/sparcv9/des 755 root sys
+f none kernel/crypto/sparcv9/ecc 755 root sys
 f none kernel/crypto/sparcv9/md4 755 root sys
 f none kernel/crypto/sparcv9/md5 755 root sys
 f none kernel/crypto/sparcv9/rsa 755 root sys

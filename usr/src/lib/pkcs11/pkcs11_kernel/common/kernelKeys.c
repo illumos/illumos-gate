@@ -27,6 +27,7 @@
 
 #include <strings.h>
 #include <errno.h>
+#include <ecc_impl.h>
 #include <security/cryptoki.h>
 #include <sys/crypto/ioctl.h>
 #include "kernelGlobal.h"
@@ -197,7 +198,7 @@ get_key_len_from_template(CK_MECHANISM_PTR pMechanism,
 			}
 			*key_len = tmp.ulValueLen;
 		} else if (pMechanism->mechanism == CKM_ECDH1_DERIVE) {
-			*key_len = 72;
+			*key_len = EC_MAX_VALUE_LEN;
 		} else {
 			return (CKR_ARGUMENTS_BAD);
 		}
@@ -1145,8 +1146,8 @@ key_gen_ec_by_value(CK_MECHANISM_PTR pMechanism,
 	CK_BBOOL is_token_obj2 = FALSE;
 	uint_t pub_attr_count, pri_attr_count;
 	uint_t pub_out_attr_count = 0, pri_out_attr_count = 0;
-	char value[72];
-	char point[145];
+	char value[EC_MAX_VALUE_LEN];
+	char point[EC_MAX_POINT_LEN];
 	CK_ULONG pub_class = CKO_PUBLIC_KEY;
 	CK_ULONG pri_class = CKO_PRIVATE_KEY;
 	CK_ULONG key_type;

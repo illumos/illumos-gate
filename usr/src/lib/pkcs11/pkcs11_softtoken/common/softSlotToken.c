@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,9 +31,10 @@
 #include <arcfour.h>
 #include "softGlobal.h"
 #include "softSession.h"
-#include <des_impl.h>
 #include <aes_impl.h>
 #include <blowfish_impl.h>
+#include <des_impl.h>
+#include <ecc_impl.h>
 #include "softDH.h"
 #include "softObject.h"
 #include "softKeystore.h"
@@ -104,7 +105,11 @@ static CK_MECHANISM_TYPE soft_mechanisms[] = {
 	CKM_TLS_MASTER_KEY_DERIVE_DH,
 	CKM_SSL3_KEY_AND_MAC_DERIVE,
 	CKM_TLS_KEY_AND_MAC_DERIVE,
-	CKM_TLS_PRF
+	CKM_TLS_PRF,
+	CKM_EC_KEY_PAIR_GEN,
+	CKM_ECDSA,
+	CKM_ECDSA_SHA1,
+	CKM_ECDH1_DERIVE
 };
 
 /*
@@ -225,7 +230,11 @@ static CK_MECHANISM_INFO soft_mechanism_info[] = {
 	{48, 48, CKF_DERIVE},		/* CKM_TLS_MASTER_KEY_DERIVE_DH */
 	{0, 0, CKF_DERIVE},		/* CKM_SSL3_KEY_AND_MAC_DERIVE */
 	{0, 0, CKF_DERIVE},		/* CKM_TLS_KEY_AND_MAC_DERIVE */
-	{0, 0, CKF_DERIVE}		/* CKM_TLS_PRF */
+	{0, 0, CKF_DERIVE},		/* CKM_TLS_PRF */
+	{EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CKF_GENERATE_KEY_PAIR},
+	{EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CKF_SIGN|CKF_VERIFY},
+	{EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CKF_SIGN|CKF_VERIFY},
+	{EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CKF_DERIVE}
 };
 
 /*

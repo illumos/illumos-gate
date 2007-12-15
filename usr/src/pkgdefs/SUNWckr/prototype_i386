@@ -54,6 +54,7 @@ f none kernel/crypto/blowfish 755 root sys
 f none kernel/crypto/des 755 root sys
 f none kernel/crypto/md4 755 root sys
 f none kernel/crypto/md5 755 root sys
+f none kernel/crypto/ecc 755 root sys
 f none kernel/crypto/rsa 755 root sys
 f none kernel/crypto/sha1 755 root sys
 f none kernel/crypto/sha2 755 root sys
@@ -256,6 +257,7 @@ f none kernel/crypto/amd64/blowfish 755 root sys
 f none kernel/crypto/amd64/des 755 root sys
 f none kernel/crypto/amd64/md4 755 root sys
 f none kernel/crypto/amd64/md5 755 root sys
+f none kernel/crypto/amd64/ecc 755 root sys
 f none kernel/crypto/amd64/rsa 755 root sys
 f none kernel/crypto/amd64/sha1 755 root sys
 f none kernel/crypto/amd64/sha2 755 root sys

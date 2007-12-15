@@ -54,6 +54,10 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/blowfish/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/ecc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/crypto/rsa/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -62,7 +66,11 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/bignum/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(COMMONBASE)/acl/%.c
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/mpi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o: 		$(COMMONBASE)/acl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1067,10 +1075,16 @@ $(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/arcfour/%.c
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/blowfish/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/ecc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/crypto/rsa/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/bignum/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(COMMONBASE)/mpi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(COMMONBASE)/acl/%.c

@@ -474,10 +474,6 @@ typedef enum {
  */
 #define	KEY_PUB_EC(k) \
 	&((k)->key_type_u.ec_pub_key)
-#define	OBJ_PUB_EC_PARAM(o) \
-	&((o)->object_class_u.public_key->key_type_u.ec_pub_key.param)
-#define	KEY_PUB_EC_PARAM(k) \
-	&((k)->key_type_u.ec_pub_key.param)
 #define	OBJ_PUB_EC_POINT(o) \
 	&((o)->object_class_u.public_key->key_type_u.ec_pub_key.point)
 #define	KEY_PUB_EC_POINT(k) \
@@ -596,10 +592,6 @@ typedef enum {
 
 #define	KEY_PRI_EC(k) \
 	&((k)->key_type_u.ec_pri_key)
-#define	OBJ_PRI_EC_PARAM(o) \
-	&((o)->object_class_u.private_key->key_type_u.ec_pri_key.param)
-#define	KEY_PRI_EC_PARAM(k) \
-	&((k)->key_type_u.ec_pri_key.param)
 #define	OBJ_PRI_EC_VALUE(o) \
 	&((o)->object_class_u.private_key->key_type_u.ec_pri_key.value)
 #define	KEY_PRI_EC_VALUE(k) \

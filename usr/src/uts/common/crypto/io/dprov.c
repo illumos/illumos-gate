@@ -95,6 +95,7 @@
 #include <sys/sha2.h>
 #include <aes/aes_cbc_crypt.h>
 #include <des/des_impl.h>
+#include <ecc/ecc_impl.h>
 #include <blowfish/blowfish_impl.h>
 
 /*
@@ -250,6 +251,10 @@ typedef enum dprov_mech_type {
 	AES_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_AES_KEY_GEN */
 	BLOWFISH_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_BLOWFISH_KEY_GEN */
 	RC4_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_RC4_KEY_GEN */
+	EC_KEY_PAIR_GEN_MECH_INFO_TYPE,	/* SUN_CKM_EC_KEY_PAIR_GEN */
+	ECDSA_MECH_INFO_TYPE,		/* SUN_CKM_ECDSA */
+	ECDSA_SHA1_MECH_INFO_TYPE,	/* SUN_CKM_ECDSA_SHA1 */
+	ECDH1_DERIVE_MECH_INFO_TYPE,	/* SUN_CKM_ECDH1_DERIVE */
 	DH_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE, /* SUN_CKM_DH_PKCS_KEY_PAIR_GEN */
 	DH_PKCS_DERIVE_MECH_INFO_TYPE,	/* SUN_CKM_DH_PKCS_DERIVE */
 	RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE /* SUN_CKM_RSA_PKCS_KEY_PAIR_GEN */
@@ -297,6 +302,10 @@ typedef enum dprov_mech_type {
 #define	DPROV_CKM_BLOWFISH_KEY_GEN	"CKM_BLOWFISH_KEY_GEN"
 #define	DPROV_CKM_RC4_KEY_GEN		"CKM_RC4_KEY_GEN"
 #define	DPROV_CKM_RSA_PKCS_KEY_PAIR_GEN	"CKM_RSA_PKCS_KEY_PAIR_GEN"
+#define	DPROV_CKM_EC_KEY_PAIR_GEN	"CKM_EC_KEY_PAIR_GEN"
+#define	DPROV_CKM_ECDSA			"CKM_ECDSA"
+#define	DPROV_CKM_ECDSA_SHA1		"CKM_ECDSA_SHA1"
+#define	DPROV_CKM_ECDH1_DERIVE		"CKM_ECDH1_DERIVE"
 #define	DPROV_CKM_DH_PKCS_KEY_PAIR_GEN	"CKM_DH_PKCS_KEY_PAIR_GEN"
 #define	DPROV_CKM_DH_PKCS_DERIVE	"CKM_DH_PKCS_DERIVE"
 
@@ -579,8 +588,24 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	/* RSA_PKCS_KEY_PAIR_GEN */
 	{DPROV_CKM_RSA_PKCS_KEY_PAIR_GEN, RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_GENERATE_KEY_PAIR, RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN,
-	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
-
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* EC_KEY_PAIR_GEN */
+	{DPROV_CKM_EC_KEY_PAIR_GEN, EC_KEY_PAIR_GEN_MECH_INFO_TYPE,
+	    CRYPTO_FG_GENERATE_KEY_PAIR, EC_MIN_KEY_LEN, EC_MAX_KEY_LEN,
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* ECDSA */
+	{DPROV_CKM_ECDSA, ECDSA_MECH_INFO_TYPE,
+	    CRYPTO_FG_SIGN | CRYPTO_FG_VERIFY |
+	    CRYPTO_FG_SIGN_ATOMIC | CRYPTO_FG_VERIFY_ATOMIC |
+	    EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* ECDSA_SHA1 */
+	{DPROV_CKM_ECDSA_SHA1, ECDSA_SHA1_MECH_INFO_TYPE,
+	    CRYPTO_FG_SIGN | CRYPTO_FG_VERIFY |
+	    CRYPTO_FG_SIGN_ATOMIC | CRYPTO_FG_VERIFY_ATOMIC |
+	    EC_MIN_KEY_LEN, EC_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* ECDH1_DERIVE */
+	{DPROV_CKM_ECDH1_DERIVE, ECDH1_DERIVE_MECH_INFO_TYPE,
+	    CRYPTO_FG_DERIVE, 0, 0, CRYPTO_KEYSIZE_UNIT_IN_BITS}
 };
 
 /*
@@ -1107,6 +1132,8 @@ typedef struct dprov_object {
 #define	DPROV_CKA_VALUE_BITS		0x00000160
 #define	DPROV_CKA_VALUE_LEN		0x00000161
 #define	DPROV_CKA_EXTRACTABLE		0x00000162
+#define	DPROV_CKA_EC_PARAMS		0x00000180
+#define	DPROV_CKA_EC_POINT		0x00000181
 #define	DPROV_HW_FEATURE_TYPE		0x00000300
 
 /*
@@ -1531,6 +1558,7 @@ static int dprov_get_sw_prov(crypto_mechanism_t *, kcf_provider_desc_t **,
 /* object management helper functions */
 static void dprov_free_object(dprov_object_t *);
 static void dprov_release_session_objects(dprov_session_t *);
+static void dprov_adjust_attrs(crypto_object_attribute_t *, int);
 static boolean_t dprov_object_is_private(dprov_object_t *);
 static boolean_t dprov_object_is_token(dprov_object_t *);
 static int dprov_key_value_secret(dprov_state_t *, crypto_session_id_t,
@@ -2288,7 +2316,9 @@ is_publickey_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
-	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
+	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == ECDSA_SHA1_MECH_INFO_TYPE ||
+	    mech_type == ECDSA_MECH_INFO_TYPE);
 }
 
 
@@ -2602,7 +2632,9 @@ dprov_valid_sign_verif_mech(crypto_mech_type_t mech_type)
 	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
 	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
-	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
+	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == ECDSA_SHA1_MECH_INFO_TYPE ||
+	    mech_type == ECDSA_MECH_INFO_TYPE);
 }
 
 static int
@@ -4397,6 +4429,82 @@ out:
 	return (rv);
 }
 
+static int
+copyin_ecc_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	STRUCT_DECL(CK_ECDH1_DERIVE_PARAMS, params);
+	CK_ECDH1_DERIVE_PARAMS *ecc_params;
+	caddr_t pp;
+	size_t param_len, shared_data_len, public_data_len;
+	int error = 0;
+	int rv = 0;
+
+	STRUCT_INIT(mech, mode);
+	STRUCT_INIT(params, mode);
+	bcopy(in_mech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+
+	if (param_len != STRUCT_SIZE(params)) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out;
+	}
+
+	out_mech->cm_type = STRUCT_FGET(mech, cm_type);
+	out_mech->cm_param = NULL;
+	out_mech->cm_param_len = 0;
+	if (pp != NULL) {
+		if (copyin((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		shared_data_len = STRUCT_FGET(params, ulSharedDataLen);
+		public_data_len = STRUCT_FGET(params, ulPublicDataLen);
+		/* allocate param structure and buffers */
+		ecc_params = kmem_alloc(sizeof (CK_ECDH1_DERIVE_PARAMS) +
+		    roundup(shared_data_len, sizeof (caddr_t)) +
+		    roundup(public_data_len, sizeof (caddr_t)), KM_NOSLEEP);
+		if (ecc_params == NULL) {
+			rv = CRYPTO_HOST_MEMORY;
+			goto out;
+		}
+		ecc_params->pSharedData = (uchar_t *)ecc_params +
+		    sizeof (CK_ECDH1_DERIVE_PARAMS);
+		ecc_params->pPublicData = (uchar_t *)ecc_params->pSharedData +
+		    roundup(shared_data_len, sizeof (caddr_t));
+		if (copyin((char *)STRUCT_FGETP(params, pSharedData),
+		    ecc_params->pSharedData, shared_data_len) != 0) {
+			kmem_free(ecc_params, sizeof (CK_ECDH1_DERIVE_PARAMS) +
+			    roundup(shared_data_len, sizeof (caddr_t)) +
+			    roundup(public_data_len, sizeof (caddr_t)));
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		ecc_params->ulSharedDataLen = shared_data_len;
+
+		if (copyin((char *)STRUCT_FGETP(params, pPublicData),
+		    ecc_params->pPublicData, public_data_len) != 0) {
+			kmem_free(ecc_params, sizeof (CK_ECDH1_DERIVE_PARAMS) +
+			    roundup(shared_data_len, sizeof (caddr_t)) +
+			    roundup(public_data_len, sizeof (caddr_t)));
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		ecc_params->ulPublicDataLen = public_data_len;
+		ecc_params->kdf = STRUCT_FGET(params, kdf);
+		out_mech->cm_param = (char *)ecc_params;
+		out_mech->cm_param_len = sizeof (CK_ECDH1_DERIVE_PARAMS);
+	}
+out:
+	*out_error = error;
+	return (rv);
+}
+
 /* ARGSUSED */
 static int
 copyout_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
@@ -4477,6 +4585,10 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 		rv = copyin_aes_ctr_mech(umech, kmech, &error, mode);
 		goto out;
 
+	case ECDH1_DERIVE_MECH_INFO_TYPE:
+		rv = copyin_ecc_mech(umech, kmech, &error, mode);
+		goto out;
+
 	case AES_CCM_MECH_INFO_TYPE:
 		rv = copyin_aes_ccm_mech(umech, kmech, &error, mode);
 		goto out;
@@ -4529,6 +4641,8 @@ dprov_copyout_mechanism(crypto_provider_handle_t provider,
 	case AES_CTR_MECH_INFO_TYPE:
 	case SHA1_KEY_DERIVATION_MECH_INFO_TYPE:	/* for testing only */
 		return (copyout_aes_ctr_mech(kmech, umech, out_error, mode));
+	case ECDH1_DERIVE_MECH_INFO_TYPE:
+		return (CRYPTO_SUCCESS);
 	default:
 		return (CRYPTO_MECHANISM_INVALID);
 	}
@@ -4547,10 +4661,22 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 	if (mech->cm_param == NULL || mech->cm_param_len == 0)
 		return (CRYPTO_SUCCESS);
 
-	if (mech->cm_type == AES_CTR_MECH_INFO_TYPE ||
-	    mech->cm_type == SHA1_KEY_DERIVATION_MECH_INFO_TYPE) {
+	switch (mech->cm_type) {
+	case AES_CTR_MECH_INFO_TYPE:
+	case SHA1_KEY_DERIVATION_MECH_INFO_TYPE:
 		len = sizeof (CK_AES_CTR_PARAMS);
-	} else {
+		break;
+	case ECDH1_DERIVE_MECH_INFO_TYPE: {
+		CK_ECDH1_DERIVE_PARAMS *ecc_params;
+
+		/* LINTED: pointer alignment */
+		ecc_params = (CK_ECDH1_DERIVE_PARAMS *)mech->cm_param;
+		kmem_free(ecc_params, sizeof (CK_ECDH1_DERIVE_PARAMS) +
+		    roundup(ecc_params->ulSharedDataLen, sizeof (caddr_t)) +
+		    roundup(ecc_params->ulPublicDataLen, sizeof (caddr_t)));
+		return (CRYPTO_SUCCESS);
+	}
+	default:
 		len = mech->cm_param_len;
 	}
 	kmem_free(mech->cm_param, len);
@@ -5318,7 +5444,6 @@ dprov_sign_task(dprov_req_t *taskq_req)
 		}
 
 		mutex_enter(&softc->ds_lock);
-		/* get key value for secret key algorithms */
 		if (is_publickey_mech(mech.cm_type)) {
 			if ((error = dprov_key_attr_asymmetric(softc,
 			    ctx->cc_session, taskq_req->dr_type,
@@ -7896,7 +8021,9 @@ free_derived_key:
 	case DPROV_REQ_NOSTORE_KEY_GENERATE_PAIR: {
 		crypto_mechanism_t *mechp;
 		crypto_object_attribute_t *pub_template;
+		crypto_object_attribute_t *pri_template;
 		uint_t pub_attribute_count;
+		uint_t pri_attribute_count;
 		crypto_object_attribute_t *out_pub_template;
 		crypto_object_attribute_t *out_pri_template;
 		uint_t out_pub_attribute_count;
@@ -7905,6 +8032,9 @@ free_derived_key:
 		mechp = taskq_req->dr_key_req.kr_mechanism;
 		pub_template = taskq_req->dr_key_req.kr_template;
 		pub_attribute_count = taskq_req->dr_key_req.kr_attribute_count;
+		pri_template = taskq_req->dr_key_req.kr_private_key_template;
+		pri_attribute_count =
+		    taskq_req->dr_key_req.kr_private_key_attribute_count;
 		out_pub_template = taskq_req->dr_key_req.kr_out_template1;
 		out_pub_attribute_count =
 		    taskq_req->dr_key_req.kr_out_attribute_count1;
@@ -7953,6 +8083,56 @@ free_derived_key:
 			    out_pri_attribute_count, DPROV_CKA_VALUE);
 			break;
 
+		case EC_KEY_PAIR_GEN_MECH_INFO_TYPE: {
+			crypto_mechanism_t mech, *mechp;
+			kcf_req_params_t params;
+			crypto_object_attribute_t *pub_template;
+			uint_t pub_attribute_count;
+			crypto_object_attribute_t *out_pub_template;
+			crypto_object_attribute_t *out_pri_template;
+			uint_t out_pub_attribute_count;
+			uint_t out_pri_attribute_count;
+
+			mechp = taskq_req->dr_key_req.kr_mechanism;
+			pub_template = taskq_req->dr_key_req.kr_template;
+			pub_attribute_count =
+			    taskq_req->dr_key_req.kr_attribute_count;
+			out_pub_template =
+			    taskq_req->dr_key_req.kr_out_template1;
+			out_pub_attribute_count =
+			    taskq_req->dr_key_req.kr_out_attribute_count1;
+			out_pri_template =
+			    taskq_req->dr_key_req.kr_out_template2;
+			out_pri_attribute_count =
+			    taskq_req->dr_key_req.kr_out_attribute_count2;
+
+			/* get the software provider for this mechanism */
+			mech = *mechp;
+			if ((error = dprov_get_sw_prov(mechp, &pd,
+			    &mech.cm_type)) != CRYPTO_SUCCESS)
+				break;
+			/*
+			 * Turn 32-bit values into 64-bit values for certain
+			 * attributes like CKA_CLASS.
+			 */
+			dprov_adjust_attrs(pub_template, pub_attribute_count);
+			dprov_adjust_attrs(pri_template, pri_attribute_count);
+
+			/* bypass the kernel API for now */
+			KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(&params,
+			    KCF_OP_KEY_GENERATE_PAIR,
+			    0, /* session 0 for sw provider */
+			    &mech, pub_template, pub_attribute_count,
+			    pri_template, pri_attribute_count, NULL,
+			    out_pub_template, out_pub_attribute_count,
+			    out_pri_template, out_pri_attribute_count);
+
+			error = kcf_submit_request(pd, NULL, NULL, &params,
+			    B_FALSE);
+
+			KCF_PROV_REFRELE(pd);
+			break;
+		}
 		default:
 			error = CRYPTO_MECHANISM_INVALID;
 		}
@@ -8041,6 +8221,38 @@ free_derived_key:
 				fill_dh(value, value_len);
 			break;
 		}
+		case ECDH1_DERIVE_MECH_INFO_TYPE: {
+			crypto_mechanism_t mech;
+			kcf_req_params_t params;
+
+			/* get the software provider for this mechanism */
+			mech = *mechp;
+			if ((error = dprov_get_sw_prov(mechp, &pd,
+			    &mech.cm_type)) != CRYPTO_SUCCESS)
+				break;
+
+			/*
+			 * Turn 32-bit values into 64-bit values for certain
+			 * attributes like CKA_VALUE_LEN.
+			 */
+			dprov_adjust_attrs(in_template, in_attribute_count);
+
+			/* bypass the kernel API for now */
+			KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(&params,
+			    KCF_OP_KEY_DERIVE,
+			    0, /* session 0 for sw provider */
+			    &mech, in_template, in_attribute_count,
+			    NULL, 0, base_key,
+			    out_template, out_attribute_count,
+			    NULL, 0);
+
+			error = kcf_submit_request(pd, NULL, NULL, &params,
+			    B_FALSE);
+
+			KCF_PROV_REFRELE(pd);
+			break;
+		}
+
 		default:
 			error = CRYPTO_MECHANISM_INVALID;
 		}
@@ -9332,6 +9544,40 @@ dprov_release_session_objects(dprov_session_t *session)
 		object = session->ds_objects[i];
 		if (object != NULL) {
 			DPROV_OBJECT_REFRELE(object);
+		}
+	}
+}
+
+/*
+ * Adjust an attribute list by turning 32-bit values into 64-bit values
+ * for certain attributes like CKA_CLASS. Assumes that at least 8 bytes
+ * of storage have been allocated for all attributes.
+ */
+static void
+dprov_adjust_attrs(crypto_object_attribute_t *in, int in_count)
+{
+	int i;
+	size_t offset = 0;
+	ulong_t tmp = 0;
+
+	for (i = 0; i < in_count; i++) {
+		/*
+		 * For some attributes, it's okay to copy the value
+		 * into a larger container, e.g. copy an unsigned
+		 * 32-bit integer into a 64-bit container.
+		 */
+		if (in[i].oa_type == CKA_VALUE_LEN ||
+		    in[i].oa_type == CKA_KEY_TYPE ||
+		    in[i].oa_type == CKA_CLASS) {
+			if (in[i].oa_value_len < sizeof (ulong_t)) {
+#ifdef _BIG_ENDIAN
+				offset = sizeof (ulong_t) - in[i].oa_value_len;
+#endif
+				bcopy(in[i].oa_value, (uchar_t *)&tmp + offset,
+				    in[i].oa_value_len);
+				bcopy(&tmp, in[i].oa_value, sizeof (ulong_t));
+				in[i].oa_value_len = sizeof (ulong_t);
+			}
 		}
 	}
 }

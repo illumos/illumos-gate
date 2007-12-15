@@ -41,6 +41,7 @@
 #include "softDSA.h"
 #include "softRSA.h"
 #include "softDH.h"
+#include "softEC.h"
 #include "softRandom.h"
 #include "softMAC.h"
 #include "softOps.h"
@@ -212,7 +213,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		 */
 		if (pMechanism->pParameter == NULL ||
 		    pMechanism->ulParameterLen !=
-			sizeof (CK_PKCS5_PBKD2_PARAMS))
+		    sizeof (CK_PKCS5_PBKD2_PARAMS))
 			return (CKR_TEMPLATE_INCOMPLETE);
 		break;
 
@@ -245,7 +246,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		 */
 		if (pMechanism->pParameter == NULL ||
 		    pMechanism->ulParameterLen !=
-			sizeof (CK_PBE_PARAMS))
+		    sizeof (CK_PBE_PARAMS))
 			return (CKR_TEMPLATE_INCOMPLETE);
 		break;
 	default:
@@ -331,7 +332,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_PKCS5_PBKD2:
 		/* Generate keys using PKCS#5 PBKD2 algorithm */
 		rv = soft_generate_pkcs5_pbkdf2_key(session_p, pMechanism,
-					secret_key);
+		    secret_key);
 		if (rv == CKR_OK && des_strength > 0) {
 			/* Perform weak key checking for DES and DES3. */
 			if (des_keycheck(OBJ_SEC_VALUE(secret_key),
@@ -345,7 +346,7 @@ soft_genkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	default:
 		do {
 			rv = soft_random_generator(
-				OBJ_SEC_VALUE(secret_key), keylen, B_FALSE);
+			    OBJ_SEC_VALUE(secret_key), keylen, B_FALSE);
 
 			/* If this fails, bail out */
 			if (rv != CKR_OK)
@@ -423,6 +424,7 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	case CKM_EC_KEY_PAIR_GEN:
 		key_type = CKK_EC;
+		break;
 
 	default:
 		return (CKR_MECHANISM_INVALID);
@@ -477,6 +479,10 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	case CKK_DH:
 		rv = soft_dh_genkey_pair(public_key, private_key);
+		private_key->bool_attr_mask |= DERIVE_BOOL_ON;
+		break;
+	case CKK_EC:
+		rv = soft_ec_genkey_pair(public_key, private_key);
 		private_key->bool_attr_mask |= DERIVE_BOOL_ON;
 		break;
 	}
@@ -536,7 +542,7 @@ soft_key_derive_check_length(soft_object_t *secret_key, CK_ULONG max_keylen)
 	case CKK_AES:
 	case CKK_BLOWFISH:
 		if ((OBJ_SEC_VALUE_LEN(secret_key) == 0) ||
-			(OBJ_SEC_VALUE_LEN(secret_key) > max_keylen)) {
+		    (OBJ_SEC_VALUE_LEN(secret_key) > max_keylen)) {
 			/* RC4 and AES has variable key length */
 			return (CKR_ATTRIBUTE_VALUE_INVALID);
 		}
@@ -670,8 +676,8 @@ soft_pkcs12_pbe(soft_session_t *session_p,
 	 */
 	for (i = 0; i < Slen; i += params->ulSaltLen) {
 		(void) memcpy(S+i, params->pSalt,
-			((Slen - i) > params->ulSaltLen ?
-			params->ulSaltLen : (Slen - i)));
+		    ((Slen - i) > params->ulSaltLen ?
+		    params->ulSaltLen : (Slen - i)));
 	}
 
 	/*
@@ -681,8 +687,8 @@ soft_pkcs12_pbe(soft_session_t *session_p,
 	 */
 	for (i = 0; i < Plen; i += params->ulPasswordLen) {
 		(void) memcpy(P+i, params->pPassword,
-			((Plen - i) > params->ulPasswordLen ?
-			params->ulPasswordLen : (Plen - i)));
+		    ((Plen - i) > params->ulPasswordLen ?
+		    params->ulPasswordLen : (Plen - i)));
 	}
 
 	/*
@@ -733,16 +739,13 @@ soft_pkcs12_pbe(soft_session_t *session_p,
 				goto digest_done;
 
 			if (j == 0) {
-				rv = soft_digest_update(session_p, D,
-					Dlen);
+				rv = soft_digest_update(session_p, D, Dlen);
 				if (rv != CKR_OK)
 					goto digest_done;
 
-				rv = soft_digest_update(session_p, I,
-					Ilen);
+				rv = soft_digest_update(session_p, I, Ilen);
 			} else {
-				rv = soft_digest_update(session_p,
-					Ai, AiLen);
+				rv = soft_digest_update(session_p, Ai, AiLen);
 			}
 			if (rv != CKR_OK)
 				goto digest_done;
@@ -764,7 +767,7 @@ digest_done:
 		 */
 		for (j = 0; j < Blen; j += hashSize) {
 			(void) memcpy(B+j, Ai, ((Blen - j > hashSize) ?
-				hashSize : Blen - j));
+			    hashSize : Blen - j));
 		}
 
 		/*
@@ -869,6 +872,38 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 		break;
 
+	case CKM_ECDH1_DERIVE:
+		/*
+		 * Create a new object for secret key. The key type should
+		 * be provided in the template.
+		 */
+		rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
+		    phKey, session_p, CKO_SECRET_KEY, (CK_KEY_TYPE)~0UL, 0,
+		    SOFT_DERIVE_KEY_DH, B_FALSE);
+
+		if (rv != CKR_OK) {
+			return (rv);
+		}
+
+		/* Obtain the secret object pointer. */
+		secret_key = (soft_object_t *)*phKey;
+
+		rv = soft_ec_key_derive(basekey_p, secret_key,
+		    (CK_BYTE *)pMechanism->pParameter,
+		    pMechanism->ulParameterLen);
+
+		if (rv != CKR_OK) {
+			if (IS_TOKEN_OBJECT(secret_key))
+				soft_delete_token_object(secret_key, B_FALSE,
+				    B_FALSE);
+			else
+				soft_delete_object(session_p, secret_key,
+				    B_FALSE);
+			return (rv);
+		}
+
+		break;
+
 	case CKM_SHA1_KEY_DERIVATION:
 		hash_size = SHA1_HASH_SIZE;
 		digest_mech.mechanism = CKM_SHA_1;
@@ -940,7 +975,7 @@ common:
 		}
 
 		rv = soft_digest(session_p, OBJ_SEC_VALUE(basekey_p),
-			OBJ_SEC_VALUE_LEN(basekey_p), hash, &hash_len);
+		    OBJ_SEC_VALUE_LEN(basekey_p), hash, &hash_len);
 
 		(void) pthread_mutex_lock(&session_p->session_mutex);
 		/* soft_digest_common() has freed the digest context */
@@ -1011,8 +1046,7 @@ common:
 			return (CKR_TEMPLATE_INCONSISTENT);
 
 		return (derive_tls_prf(
-			(CK_TLS_PRF_PARAMS_PTR)pMechanism->pParameter,
-			basekey_p));
+		    (CK_TLS_PRF_PARAMS_PTR)pMechanism->pParameter, basekey_p));
 
 	default:
 		return (CKR_MECHANISM_INVALID);
@@ -1150,8 +1184,7 @@ do_prf(soft_session_t *session_p,
 		}
 
 		/* Call PRF function (SHA1_HMAC for now). */
-		rv = soft_sign(session_p, input, inlen,
-			output, &hmac_outlen);
+		rv = soft_sign(session_p, input, inlen, output, &hmac_outlen);
 
 		if (rv != CKR_OK) {
 			goto cleanup;
@@ -1162,7 +1195,7 @@ do_prf(soft_session_t *session_p,
 		 */
 		if (i == 0) {
 			(void) memcpy(blockdata, output,
-				local_min(blocklen, hmac_outlen));
+			    local_min(blocklen, hmac_outlen));
 		} else {
 			/*
 			 * XOR the existing data with output from PRF.
@@ -1231,10 +1264,9 @@ soft_create_hmac_key(soft_session_t *session_p,  CK_BYTE *passwd,
 	 * mechanism parameter structure.
 	 */
 	rv = soft_gen_keyobject(keytemplate,
-			sizeof (keytemplate)/sizeof (CK_ATTRIBUTE),
-			phKey, session_p, CKO_SECRET_KEY,
-			(CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,
-			SOFT_CREATE_OBJ, B_TRUE);
+	    sizeof (keytemplate)/sizeof (CK_ATTRIBUTE), phKey, session_p,
+	    CKO_SECRET_KEY, (CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,
+	    SOFT_CREATE_OBJ, B_TRUE);
 
 	return (rv);
 }
@@ -1246,7 +1278,7 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 {
 	CK_RV rv = CKR_OK;
 	CK_PKCS5_PBKD2_PARAMS	*params =
-		(CK_PKCS5_PBKD2_PARAMS *)pMechanism->pParameter;
+	    (CK_PKCS5_PBKD2_PARAMS *)pMechanism->pParameter;
 	CK_ULONG hLen = SHA1_HASH_SIZE;
 	CK_ULONG dkLen, i;
 	CK_ULONG blocks, remainder;
@@ -1271,7 +1303,7 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	 * Create a key object to use for HMAC operations.
 	 */
 	rv = soft_create_hmac_key(session_p, params->pPassword,
-		*params->ulPasswordLen, &phKey);
+	    *params->ulPasswordLen, &phKey);
 
 	if (rv != CKR_OK)
 		return (rv);
@@ -1306,10 +1338,9 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 	 * salt, so we will allow for this and not return error
 	 * if the salt is not specified.
 	 */
-	if (params->pSaltSourceData != NULL &&
-		params->ulSaltSourceDataLen > 0)
+	if (params->pSaltSourceData != NULL && params->ulSaltSourceDataLen > 0)
 		(void) memcpy(salt, params->pSaltSourceData,
-			params->ulSaltSourceDataLen);
+		    params->ulSaltSourceDataLen);
 
 	/*
 	 * Get pointer to the data section of the key,
@@ -1341,9 +1372,8 @@ soft_generate_pkcs5_pbkdf2_key(soft_session_t *session_p,
 		 * PRF output to the current key.
 		 */
 		rv = do_prf(session_p, params, hmac_key,
-			salt, params->ulSaltSourceDataLen + 4,
-			keydata,
-			((i + 1) == blocks ? remainder : hLen));
+		    salt, params->ulSaltSourceDataLen + 4, keydata,
+		    ((i + 1) == blocks ? remainder : hLen));
 
 		keydata += hLen;
 	}
@@ -1528,7 +1558,7 @@ soft_unwrap_secret_len_check(CK_KEY_TYPE keytype, CK_MECHANISM_TYPE mechtype,
 		    pTemplate[i].pValue != NULL) {
 			isValueLen = B_TRUE;
 			break;
-		    }
+		}
 	}
 
 	/* Does its presence  conflict with the mech type and key type? */
