@@ -114,7 +114,6 @@ clone:rtls		0600 root sys 0666 root sys	/dev/rtls
 clone:ath		0600 root sys 0666 root sys	/dev/ath
 clone:ipw               0600 root sys 0666 root sys     /dev/ipw
 clone:iwi               0600 root sys 0666 root sys     /dev/iwi
-clone:iwk               0600 root sys 0666 root sys     /dev/iwk
 clone:pcwl              0600 root sys 0666 root sys     /dev/pcwl
 clone:pcan              0600 root sys 0666 root sys     /dev/pcan
 clone:ral		0600 root sys 0666 root sys	/dev/ral
@@ -134,7 +133,6 @@ rtls:*			0600 root sys 0666 root sys	/dev/rtls*
 ath:*			0600 root sys 0666 root sys	/dev/ath*
 ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
 iwi:*                   0600 root sys 0666 root sys     /dev/iwi*
-iwk:*                   0600 root sys 0666 root sys     /dev/iwk*
 pcwl:*                  0600 root sys 0666 root sys     /dev/pcwl*
 pcan:*                  0600 root sys 0666 root sys     /dev/pcan*
 ral:*			0600 root sys 0666 root sys	/dev/ral*
@@ -271,7 +269,6 @@ clone:rtls
 clone:ath
 clone:ipw
 clone:iwi
-clone:iwk
 clone:pcwl
 clone:pcan
 clone:ral
@@ -291,7 +288,6 @@ rtls:*
 ath:*
 ipw:*
 iwi:*
-iwk:*
 pcwl:*
 pcan:*
 ral:*

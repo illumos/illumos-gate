@@ -1481,8 +1481,6 @@ IPW_OBJS += ipw2100_hw.o ipw2100.o
 
 IWI_OBJS += ipw2200_hw.o ipw2200.o
 
-IWK_OBJS += iwk.o
-
 WPI_OBJS += wpi.o
 
 RAL_OBJS += rt2560.o ral_rate.o
