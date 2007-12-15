@@ -1018,9 +1018,7 @@ init_idt_common(gate_desc_t *idt)
 static void
 init_idt(gate_desc_t *idt)
 {
-	/*
-	 * currently nothing extra for the hypervisor
-	 */
+	bzero(idt, sizeof (*idt) * NIDT);
 	init_idt_common(idt);
 }
 
