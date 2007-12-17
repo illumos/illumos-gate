@@ -2154,8 +2154,20 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *capab = cap_data;
 
+		/*
+		 * We declare ourselves capable of HCKSUM_INET_PARTIAL
+		 * in order that the protocol stack insert the
+		 * pseudo-header checksum in packets that it passes
+		 * down to us.
+		 *
+		 * Whilst the flag used to communicate with dom0 is
+		 * called "NETTXF_csum_blank", the checksum in the
+		 * packet must contain the pseudo-header checksum and
+		 * not zero. (In fact, a Solaris dom0 is happy to deal
+		 * with a checksum of zero, but a Linux dom0 is not.)
+		 */
 		if (xnfp->cksum_offload)
-			*capab = HCKSUM_INET_FULL_V4;
+			*capab = HCKSUM_INET_PARTIAL;
 		else
 			*capab = 0;
 		break;

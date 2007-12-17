@@ -417,10 +417,6 @@ vnic_ioc_create(vnic_taskq_args_t *taskq_args)
 	}
 
 	rc = vnic_dev_create(vnic_id, dev_name, mac_len, mac_addr);
-	if (rc != 0) {
-		cmn_err(CE_WARN, "vnic_dev_create failed with %d", rc);
-		goto bail;
-	}
 
 bail:
 	freemsg(mp->b_cont);

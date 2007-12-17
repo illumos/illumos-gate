@@ -921,6 +921,7 @@ vnic_dev_delete(uint_t vnic_id)
 	mod_hash_val_t val;
 	vnic_flow_t *flent;
 	int rc;
+	vnic_mac_t *vnic_mac;
 
 	rw_enter(&vnic_lock, RW_WRITER);
 
@@ -962,10 +963,11 @@ vnic_dev_delete(uint_t vnic_id)
 	rc = mac_unregister(vnic->vn_mh);
 	ASSERT(rc == 0);
 	(void) vnic_remove_unicstaddr(vnic);
-	vnic_mac_close(vnic->vn_vnic_mac);
+	vnic_mac = vnic->vn_vnic_mac;
 	kmem_cache_free(vnic_cache, vnic);
 	vnic_count--;
 	rw_exit(&vnic_lock);
+	vnic_mac_close(vnic_mac);
 	return (0);
 }
 

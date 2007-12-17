@@ -366,7 +366,7 @@ xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		uint32_t *capab = cap_data;
 
 		if (xnbp->x_cksum_offload)
-			*capab = HCKSUM_INET_FULL_V4;
+			*capab = HCKSUM_INET_PARTIAL;
 		else
 			*capab = 0;
 		break;
