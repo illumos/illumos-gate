@@ -1,7 +1,4 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,10 @@
 #
 # CDDL HEADER END
 #
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Japanese Type 6 (USB) key layout
@@ -36,14 +37,14 @@ key  38  base 9 shift ) caps 9 ctrl 9 altg nop
 key  39  base 0 shift nop caps 0 ctrl 0 altg nop
 key  45  base - shift = caps - ctrl - altg nop
 key  46  base ^ shift ~ caps ^ ctrl ^^ altg nop
-key 137  base '\\' shift | caps '\\' ctrl ^\ altg nop
+key 137  base '\\' shift | caps '\\' ctrl ^\ altg nop numl nonl up nop
 key  47  base @ shift ` caps @ ctrl ^@ altg nop
 key  48  base [ shift { caps [ ctrl ^[ altg nop
 key  51  base ; shift + caps ; ctrl ; altg nop
 key  52  base : shift * caps : ctrl : altg nop
-key  50  base ] shift } caps ] ctrl ^] altg nop
+key  50  base ] shift } caps ] ctrl ^] altg nop numl nonl up nop
 key  49  all hole
-key 135  base '\\' shift _ caps '\\' ctrl ^\ altg nop
+key 135  base '\\' shift _ caps '\\' ctrl ^\ altg nop numl nonl up nop
 # key 115: KAKUTEI
 key 139  all bf(1)        
 # key 116: HENKAN

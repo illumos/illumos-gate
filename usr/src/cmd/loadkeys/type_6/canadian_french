@@ -1,8 +1,4 @@
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +17,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -48,9 +48,9 @@ key  48  base $ shift £ caps $ ctrl $ altg ¤
 key   4  base q shift Q caps Q ctrl ^Q altg nop
 key  51  base m shift M caps M ctrl ^M altg nop
 key  52  base ù shift % caps ù ctrl ù altg nop
-key  50  base * shift µ caps * ctrl * altg nop
+key  50  base * shift µ caps * ctrl * altg nop numl nonl up nop
 key  49  all hole
-key 100  base < shift > caps < ctrl < altg nop
+key 100  base < shift > caps < ctrl < altg nop numl nonl up nop
 key  29  base w shift W caps W ctrl ^W altg nop
 key  16  base , shift ? caps , ctrl , altg nop
 key  54  base ; shift . caps ; ctrl ; altg nop
