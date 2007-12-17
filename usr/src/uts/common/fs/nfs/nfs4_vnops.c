@@ -3118,6 +3118,7 @@ nfs4write(vnode_t *vp, caddr_t base, u_offset_t offset, int count, cred_t *cr,
 	nfs4_recov_state_t recov_state;
 	nfs4_stateid_types_t sid_types;
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
+	int recov;
 
 	rp = VTOR4(vp);
 	mi = VTOMI4(vp);
@@ -3132,15 +3133,22 @@ nfs4write(vnode_t *vp, caddr_t base, u_offset_t offset, int count, cred_t *cr,
 	recov_state.rs_num_retry_despite_err = 0;
 	nfs4_init_stateid_types(&sid_types);
 
+	/* Is curthread the recovery thread? */
+	mutex_enter(&mi->mi_lock);
+	recov = (mi->mi_recovthread == curthread);
+	mutex_exit(&mi->mi_lock);
+
 recov_retry:
 	args.ctag = TAG_WRITE;
 	args.array_len = 2;
 	args.array = argop;
 
-	e.error = nfs4_start_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-	    &recov_state, NULL);
-	if (e.error)
-		return (e.error);
+	if (!recov) {
+		e.error = nfs4_start_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
+		    &recov_state, NULL);
+		if (e.error)
+			return (e.error);
+	}
 
 	/* 0. putfh target fh */
 	argop[0].argop = OP_CPUTFH;
@@ -3175,109 +3183,118 @@ recov_retry:
 			mutex_exit(&mi->mi_lock);
 		}
 
-		needrecov = nfs4_needs_recovery(&e, FALSE, mi->mi_vfsp);
-		if (e.error && !needrecov) {
-			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			return (e.error);
-		}
+		if (!recov) {
+			needrecov = nfs4_needs_recovery(&e, FALSE, mi->mi_vfsp);
+			if (e.error && !needrecov) {
+				nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
+				    &recov_state, needrecov);
+				return (e.error);
+			}
 
 
-		/*
-		 * Do handling of OLD_STATEID outside
-		 * of the normal recovery framework.
-		 *
-		 * If write receives a BAD stateid error while using a
-		 * delegation stateid, retry using the open stateid (if it
-		 * exists).  If it doesn't have an open stateid, reopen the
-		 * file first, then retry.
-		 */
-		if (!e.error && res.status == NFS4ERR_OLD_STATEID &&
-		    sid_types.cur_sid_type != SPEC_SID) {
-			nfs4_save_stateid(&wargs->stateid, &sid_types);
-			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-			goto recov_retry;
-		} else if (e.error == 0 && res.status == NFS4ERR_BAD_STATEID &&
-		    sid_types.cur_sid_type == DEL_SID) {
-			nfs4_save_stateid(&wargs->stateid, &sid_types);
-			mutex_enter(&rp->r_statev4_lock);
-			rp->r_deleg_return_pending = TRUE;
-			mutex_exit(&rp->r_statev4_lock);
-			if (nfs4rdwr_check_osid(vp, &e, cr)) {
-				nfs4_end_fop(mi, vp, NULL, OH_WRITE,
+			/*
+			 * Do handling of OLD_STATEID outside
+			 * of the normal recovery framework.
+			 *
+			 * If write receives a BAD stateid error while using a
+			 * delegation stateid, retry using the open stateid
+			 * (if it exists).  If it doesn't have an open stateid,
+			 * reopen the * file first, then retry.
+			 */
+			if (!e.error && res.status == NFS4ERR_OLD_STATEID &&
+			    sid_types.cur_sid_type != SPEC_SID) {
+				nfs4_save_stateid(&wargs->stateid, &sid_types);
+				nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
 				    &recov_state, needrecov);
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
 				    (caddr_t)&res);
-				return (EIO);
+				goto recov_retry;
+			} else if (e.error == 0 &&
+			    res.status == NFS4ERR_BAD_STATEID &&
+			    sid_types.cur_sid_type == DEL_SID) {
+				nfs4_save_stateid(&wargs->stateid, &sid_types);
+				mutex_enter(&rp->r_statev4_lock);
+				rp->r_deleg_return_pending = TRUE;
+				mutex_exit(&rp->r_statev4_lock);
+				if (nfs4rdwr_check_osid(vp, &e, cr)) {
+					nfs4_end_fop(mi, vp, NULL, OH_WRITE,
+					    &recov_state, needrecov);
+					(void) xdr_free(xdr_COMPOUND4res_clnt,
+					    (caddr_t)&res);
+					return (EIO);
+				}
+				nfs4_end_fop(mi, vp, NULL, OH_WRITE,
+				    &recov_state, needrecov);
+				/* hold needed for nfs4delegreturn_thread */
+				VN_HOLD(vp);
+				nfs4delegreturn_async(rp,
+				    (NFS4_DR_PUSH|NFS4_DR_REOPEN|
+				    NFS4_DR_DISCARD), FALSE);
+				(void) xdr_free(xdr_COMPOUND4res_clnt,
+				    (caddr_t)&res);
+				goto recov_retry;
 			}
-			nfs4_end_fop(mi, vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			/* hold needed for nfs4delegreturn_thread */
-			VN_HOLD(vp);
-			nfs4delegreturn_async(rp, (NFS4_DR_PUSH|NFS4_DR_REOPEN|
-			    NFS4_DR_DISCARD), FALSE);
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-			goto recov_retry;
-		}
 
-		if (needrecov) {
-			bool_t abort;
+			if (needrecov) {
+				bool_t abort;
 
-			NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
-			    "nfs4write: client got error %d, res.status %d"
-			    ", so start recovery", e.error, res.status));
+				NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
+				    "nfs4write: client got error %d, "
+				    "res.status %d, so start recovery",
+				    e.error, res.status));
 
-			abort = nfs4_start_recovery(&e,
-			    VTOMI4(vp), vp, NULL, &wargs->stateid,
-			    NULL, OP_WRITE, NULL);
-			if (!e.error) {
+				abort = nfs4_start_recovery(&e,
+				    VTOMI4(vp), vp, NULL, &wargs->stateid,
+				    NULL, OP_WRITE, NULL);
+				if (!e.error) {
+					e.error = geterrno4(res.status);
+					(void) xdr_free(xdr_COMPOUND4res_clnt,
+					    (caddr_t)&res);
+				}
+				nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
+				    &recov_state, needrecov);
+				if (abort == FALSE)
+					goto recov_retry;
+				return (e.error);
+			}
+
+			if (res.status) {
 				e.error = geterrno4(res.status);
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
 				    (caddr_t)&res);
+				nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
+				    &recov_state, needrecov);
+				return (e.error);
 			}
-			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			if (abort == FALSE)
-				goto recov_retry;
-			return (e.error);
-		}
 
-		if (res.status) {
-			e.error = geterrno4(res.status);
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			return (e.error);
-		}
+			resop = &res.array[1];	/* write res */
+			wres = &resop->nfs_resop4_u.opwrite;
 
-		resop = &res.array[1];	/* write res */
-		wres = &resop->nfs_resop4_u.opwrite;
-
-		if ((int)wres->count > tsize) {
-			(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
-
-			zcmn_err(getzoneid(), CE_WARN,
-			    "nfs4write: server wrote %u, requested was %u",
-			    (int)wres->count, tsize);
-			nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
-			    &recov_state, needrecov);
-			return (EIO);
-		}
-		if (wres->committed == UNSTABLE4) {
-			*stab_comm = UNSTABLE4;
-			if (wargs->stable == DATA_SYNC4 ||
-			    wargs->stable == FILE_SYNC4) {
+			if ((int)wres->count > tsize) {
 				(void) xdr_free(xdr_COMPOUND4res_clnt,
 				    (caddr_t)&res);
+
 				zcmn_err(getzoneid(), CE_WARN,
-				    "nfs4write: server %s did not commit "
-				    "to stable storage",
-				    rp->r_server->sv_hostname);
+				    "nfs4write: server wrote %u, requested "
+				    "was %u", (int)wres->count, tsize);
 				nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE,
 				    &recov_state, needrecov);
 				return (EIO);
+			}
+			if (wres->committed == UNSTABLE4) {
+				*stab_comm = UNSTABLE4;
+				if (wargs->stable == DATA_SYNC4 ||
+				    wargs->stable == FILE_SYNC4) {
+					(void) xdr_free(xdr_COMPOUND4res_clnt,
+					    (caddr_t)&res);
+					zcmn_err(getzoneid(), CE_WARN,
+					    "nfs4write: server %s did not "
+					    "commit to stable storage",
+					    rp->r_server->sv_hostname);
+					nfs4_end_fop(VTOMI4(vp), vp, NULL,
+					    OH_WRITE, &recov_state, needrecov);
+					return (EIO);
+				}
 			}
 		}
 
@@ -3311,7 +3328,9 @@ recov_retry:
 		(void) xdr_free(xdr_COMPOUND4res_clnt, (caddr_t)&res);
 	} while (count);
 
-	nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE, &recov_state, needrecov);
+	if (!recov)
+		nfs4_end_fop(VTOMI4(vp), vp, NULL, OH_WRITE, &recov_state,
+		    needrecov);
 
 	return (e.error);
 }
