@@ -710,6 +710,99 @@ manageNets() {
 	done
 }
 
+createLDAPclient() {
+	ldaptitle="$title: Create LDAP Client"
+	ldapdomain=$(zenity --entry \
+	    --width=400 \
+	    --title="$ldaptitle" \
+	    --text="Enter Domain Name: ")
+	ldapserver=$(zenity --entry \
+	    --width=400 \
+	    --title="$ldaptitle" \
+	    --text="Enter Hostname of LDAP Server: ")
+	ldapserveraddr=$(zenity --entry \
+	    --width=400 \
+	    --title="$ldaptitle" \
+	    --text="Enter IP adddress of LDAP Server $ldapserver: ")
+	ldappassword=""
+	while [[ -z ${ldappassword} || "x$ldappassword" != "x$ldappasswordconfirm" ]]; do
+	    ldappassword=$(zenity --entry \
+		--width=400 \
+		--title="$ldaptitle" \
+		--hide-text \
+		--text="Enter LDAP Proxy Password:")
+	    ldappasswordconfirm=$(zenity --entry \
+		--width=400 \
+		--title="$ldaptitle" \
+		--hide-text \
+		--text="Confirm LDAP Proxy Password:")
+	done
+	ldapprofile=$(zenity --entry \
+	    --width=400 \
+	    --title="$ldaptitle" \
+	    --text="Enter LDAP Profile Name: ")
+	whatnext=$(zenity --list \
+	    --width=400 \
+	    --height=250 \
+	    --title="$ldaptitle" \
+	    --text="Proceed to create LDAP Client?" \
+	    --column=Parameter --column=Value \
+	    "Domain Name" "$ldapdomain" \
+	    "Hostname" "$ldapserver" \
+	    "IP Address" "$ldapserveraddr" \
+	    "Password" "`echo "$ldappassword" | sed 's/./*/g'`" \
+	    "Profile" "$ldapprofile")
+	if [ $? != 0 ]; then
+		return
+	fi
+
+	/bin/grep "^${ldapserveraddr}[^0-9]" /etc/hosts > /dev/null
+	if [ $? -eq 1 ]; then
+		/bin/echo "$ldapserveraddr $ldapserver" >> /etc/hosts
+	fi
+
+	/bin/grep "${ldapserver}:" /etc/security/tsol/tnrhdb > /dev/null
+	if [ $? -eq 1 ]; then
+		/bin/echo "# ${ldapserver} - ldap server" \
+		    >> /etc/security/tsol/tnrhdb
+		/bin/echo "${ldapserveraddr}:cipso" \
+		    >> /etc/security/tsol/tnrhdb
+		/usr/sbin/tnctl -h "${ldapserveraddr}:cipso"
+	fi
+
+	proxyDN=`echo $ldapdomain|awk -F"." \
+	    "{ ORS = \"\" } { for (i = 1; i < NF; i++) print \"dc=\"\\\$i\",\" }{ print \"dc=\"\\\$NF }"`
+
+	zenity --info \
+	    --title="$ldaptitle" \
+	    --width=500 \
+	    --text="global zone will be LDAP client of $ldapserver"
+
+	ldapout=/tmp/ldapclient.$$
+
+	ldapclient init -a profileName="$ldapprofile" \
+	    -a domainName="$ldapdomain" \
+	    -a proxyDN"=cn=proxyagent,ou=profile,$proxyDN" \
+	    -a proxyPassword="$ldappassword" \
+	    "$ldapserveraddr" >$ldapout 2>&1
+
+	if [ $? -eq 0 ]; then
+	    ldapstatus=Success
+	else
+	    ldapstatus=Error
+	fi
+
+	zenity --text-info \
+	    --width=700 \
+	    --height=300 \
+	    --title="$ldaptitle: $ldapstatus" \
+	    --filename=$ldapout
+
+	rm -f $ldapout
+
+
+}
+
 # Loop for single-zone menu
 singleZone() {
 
@@ -876,7 +969,11 @@ while [ "${command}" != Exit ]; do
 	else
 		NSCD_OPT="Unconfigure per-zone name service"
 	fi
-	zonelist=${zonelist}"Manage Network Interfaces...\n\n\nCreate a new zone...\n\n\n${NSCD_OPT}\n\n\nExit\n\n"
+	zonelist=${zonelist}"Manage Network Interfaces...\n\n\n"
+	zonelist=${zonelist}"Create a new zone...\n\n\n"
+	zonelist=${zonelist}"${NSCD_OPT}"
+	zonelist=${zonelist}"\n\n\nCreate LDAP Client...\n\n\n"
+	zonelist=${zonelist}"Exit\n\n"
 
 	zonename=""
 	topcommand=$(echo $zonelist|zenity --list \
@@ -925,6 +1022,10 @@ commit
 		# Now, go to the singleZone menu, using the global
 		# variable zonename, and continue with zone creation
 		singleZone
+		continue
+	elif [ "$topcommand" = "Create LDAP Client..." ]; then
+		command=LDAPclient
+		createLDAPclient
 		continue
 	fi
 	# if the menu choice was a zonename, pop up zone menu
