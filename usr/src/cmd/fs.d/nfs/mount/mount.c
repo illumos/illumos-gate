@@ -2179,7 +2179,9 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 					    fshost, fspath);
 				} else {
 					pr_err(gettext("%s:%s: %s\n"), fshost,
-					    fspath, strerror(errno));
+					    fspath, errno >= 0 ?
+					    strerror(errno) : "invalid error "
+					    "returned by server");
 				}
 			}
 			clnt_destroy(cl);
@@ -2254,7 +2256,11 @@ get_fh(struct nfs_args *args, char *fshost, char *fspath, int *versp,
 					msg = "server fault";
 					break;
 				default:
-					msg = strerror(errno);
+					if (errno >= 0)
+						msg = strerror(errno);
+					else
+						msg = "invalid error returned "
+						    "by server";
 					break;
 				}
 				pr_err(gettext("%s:%s: %s\n"), fshost,
@@ -2524,8 +2530,8 @@ retry(struct mnttab *mntp, int ro)
 	if (bg) {
 		if (fork() > 0)
 			return (RET_OK);
-		pr_err(gettext("backgrounding: %s\n"), mntp->mnt_mountp);
 		backgrounded = 1;
+		pr_err(gettext("backgrounding: %s\n"), mntp->mnt_mountp);
 	} else {
 		if (!nfsretry_vers)
 			pr_err(gettext("retrying: %s\n"), mntp->mnt_mountp);
