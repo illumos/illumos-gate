@@ -562,13 +562,11 @@ dls_soft_ring_disable(dls_channel_t dc)
 	soft_ring_t	**ringp_list = NULL;
 	int		ring_size;
 
-	rw_enter(&(dip->di_lock), RW_WRITER);
+	rw_enter(&(dip->di_lock), RW_READER);
 	if (dip->di_soft_ring_list != NULL) {
 		ringp_list = dip->di_soft_ring_list;
 		ring_size = dip->di_soft_ring_size;
-		dip->di_soft_ring_list = NULL;
 	}
-	dip->di_soft_ring_size = 0;
 	rw_exit(&(dip->di_lock));
 
 	if (ringp_list != NULL)
