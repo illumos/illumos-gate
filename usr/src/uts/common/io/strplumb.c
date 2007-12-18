@@ -335,7 +335,7 @@ int	ndev_unit = 0;
 static int
 resolve_boot_path(void)
 {
-	char			*devpath = NULL;
+	char			*devpath;
 	dev_info_t		*dip;
 	const char		*driver;
 	int			instance;
@@ -343,25 +343,21 @@ resolve_boot_path(void)
 	char			stripped_path[OBP_MAXPATHLEN];
 #endif
 
-#ifdef _OBP
-	/*
-	 * OBP passes options e.g, "net:dhcp"
-	 * remove them here
-	 */
-	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0) {
-		prom_strip_options(rootfs.bo_name, stripped_path);
-		devpath = stripped_path;
-	}
-#else
 	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0)
 		devpath = rootfs.bo_name;
 	else
 		devpath = strplumb_get_netdev_path();
-#endif
 
 	if (devpath != NULL) {
 		DBG1("resolving boot-path: %s\n", devpath);
-
+#ifdef _OBP
+		/*
+		 * OBP passes options e.g, "net:dhcp"
+		 * remove them here
+		 */
+		prom_strip_options(devpath, stripped_path);
+		devpath = stripped_path;
+#endif
 		/*
 		 * Hold the devi since this is the root device.
 		 */
@@ -642,7 +638,18 @@ int dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr);
 char *
 strplumb_get_netdev_path(void)
 {
-#ifndef	_OBP
+#ifdef	_OBP
+	char fstype[OBP_MAXPROPNAME];
+
+	if (bop_getprop("fstype", fstype) == -1)
+		return (NULL);
+
+	if (strncmp(fstype, "nfs", 3) == 0)
+		return (prom_bootpath());
+	else
+		return (NULL);
+#else
+
 	char *macstr, *devpath = NULL;
 	uchar_t *bootp;
 	uint_t bootp_len;
@@ -683,9 +690,7 @@ strplumb_get_netdev_path(void)
 	ddi_walk_devs(ddi_root_node(), matchmac, (void *)&devpath);
 	return (devpath);
 
-#else
-	return (NULL);
-#endif  /* !_OBP */
+#endif  /* _OBP */
 }
 
 #ifndef _OBP
