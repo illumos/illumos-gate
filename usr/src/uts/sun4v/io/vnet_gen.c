@@ -1985,8 +1985,8 @@ vgen_ldc_init(vgen_ldc_t *ldcp)
 		mutex_exit(&ldcp->tclock);
 		mutex_exit(&ldcp->txlock);
 		mutex_exit(&ldcp->wrlock);
-		vgen_handshake(vh_nextphase(ldcp));
 		mutex_exit(&ldcp->rxlock);
+		vgen_handshake(vh_nextphase(ldcp));
 		mutex_exit(&ldcp->cblock);
 	} else {
 		LDC_UNLOCK(ldcp);
@@ -2534,16 +2534,50 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 	if (event & LDC_EVT_UP) {
 		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
 			DWARN(vgenp, ldcp, "ldc_status err\n");
-		} else {
-			ldcp->ldc_status = istatus;
+			/* status couldn't be determined */
+			mutex_exit(&ldcp->cblock);
+			return (LDC_FAILURE);
 		}
-		ASSERT(ldcp->ldc_status == LDC_UP);
+		ldcp->ldc_status = istatus;
+		if (ldcp->ldc_status != LDC_UP) {
+			DWARN(vgenp, ldcp, "LDC_EVT_UP received "
+			    " but ldc status is not UP(0x%x)\n",
+			    ldcp->ldc_status);
+			/* spurious interrupt, return success */
+			mutex_exit(&ldcp->cblock);
+			return (LDC_SUCCESS);
+		}
 		DWARN(vgenp, ldcp, "event(%lx) UP, status(%d)\n",
 		    event, ldcp->ldc_status);
 
 		vgen_handle_evt_up(ldcp, B_FALSE);
 
 		ASSERT((event & (LDC_EVT_RESET | LDC_EVT_DOWN)) == 0);
+	}
+
+	/* Handle RESET/DOWN before READ event */
+	if (event & (LDC_EVT_RESET | LDC_EVT_DOWN)) {
+		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
+			DWARN(vgenp, ldcp, "ldc_status error\n");
+			/* status couldn't be determined */
+			mutex_exit(&ldcp->cblock);
+			return (LDC_FAILURE);
+		}
+		ldcp->ldc_status = istatus;
+		DWARN(vgenp, ldcp, "event(%lx) RESET/DOWN, status(%d)\n",
+		    event, ldcp->ldc_status);
+
+		vgen_handle_evt_reset(ldcp, B_FALSE);
+
+		/*
+		 * As the channel is down/reset, ignore READ event
+		 * but print a debug warning message.
+		 */
+		if (event & LDC_EVT_READ) {
+			DWARN(vgenp, ldcp,
+			    "LDC_EVT_READ set along with RESET/DOWN\n");
+			event &= ~LDC_EVT_READ;
+		}
 	}
 
 	if (event & LDC_EVT_READ) {
@@ -2571,18 +2605,6 @@ vgen_ldc_cb(uint64_t event, caddr_t arg)
 			bp = ldcp->rcv_mhead;
 			ldcp->rcv_mhead = ldcp->rcv_mtail = NULL;
 		}
-	}
-
-	if (event & (LDC_EVT_RESET | LDC_EVT_DOWN)) {
-		if (ldc_status(ldcp->ldc_handle, &istatus) != 0) {
-			DWARN(vgenp, ldcp, "ldc_status error\n");
-		} else {
-			ldcp->ldc_status = istatus;
-		}
-		DWARN(vgenp, ldcp, "event(%lx) RESET/DOWN, status(%d)\n",
-		    event, ldcp->ldc_status);
-
-		vgen_handle_evt_reset(ldcp, B_FALSE);
 	}
 	mutex_exit(&ldcp->cblock);
 
