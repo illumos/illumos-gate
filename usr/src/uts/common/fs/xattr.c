@@ -135,7 +135,6 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 	int error;
 	f_attr_t attr;
 	uint64_t fsid;
-	dev_t mdev;
 	xvattr_t xvattr;
 	xoptattr_t *xoap;	/* Pointer to optional attributes */
 	vnode_t *ppvp;
@@ -214,11 +213,6 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 			    0xffffffff));
 			VERIFY(nvlist_add_uint64(nvlp, attr_to_name(attr),
 			    fsid) == 0);
-			break;
-		case F_MDEV:
-			mdev = ((int16_t)vp->v_vfsp->vfs_dev);
-			VERIFY(nvlist_add_uint16(nvlp, attr_to_name(attr),
-			    mdev) == 0);
 			break;
 		default:
 			break;

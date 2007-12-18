@@ -455,6 +455,7 @@ extern int zfs_name_valid(const char *, zfs_type_t);
 extern zfs_handle_t *zfs_path_to_zhandle(libzfs_handle_t *, char *, zfs_type_t);
 extern boolean_t zfs_dataset_exists(libzfs_handle_t *, const char *,
     zfs_type_t);
+extern int zfs_spa_version(zfs_handle_t *, int *);
 
 /*
  * dataset permission functions.

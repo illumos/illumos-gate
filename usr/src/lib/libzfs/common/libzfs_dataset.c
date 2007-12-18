@@ -465,6 +465,52 @@ zfs_close(zfs_handle_t *zhp)
 	free(zhp);
 }
 
+int
+zfs_spa_version(zfs_handle_t *zhp, int *spa_version)
+{
+	char *pool_name;
+	zpool_handle_t *zpool_handle;
+	char *p;
+
+	pool_name = zfs_alloc(zhp->zfs_hdl, MAXPATHLEN);
+	if (zfs_prop_get(zhp, ZFS_PROP_NAME, pool_name,
+	    MAXPATHLEN, NULL, NULL, 0, B_FALSE) != 0) {
+		free(pool_name);
+		return (-1);
+	}
+
+	if (p = strchr(pool_name, '/'))
+		*p = '\0';
+	zpool_handle = zpool_open(zhp->zfs_hdl, pool_name);
+	free(pool_name);
+	if (zpool_handle == NULL)
+		return (-1);
+
+	*spa_version = zpool_get_prop_int(zpool_handle,
+	    ZPOOL_PROP_VERSION, NULL);
+	zpool_close(zpool_handle);
+	return (0);
+}
+
+/*
+ * The choice of reservation property depends on the SPA version.
+ */
+static int
+zfs_which_resv_prop(zfs_handle_t *zhp, zfs_prop_t *resv_prop)
+{
+	int spa_version;
+
+	if (zfs_spa_version(zhp, &spa_version) < 0)
+		return (-1);
+
+	if (spa_version >= SPA_VERSION_REFRESERVATION)
+		*resv_prop = ZFS_PROP_REFRESERVATION;
+	else
+		*resv_prop = ZFS_PROP_RESERVATION;
+
+	return (0);
+}
+
 /*
  * Given an nvlist of properties to set, validates that they are correct, and
  * parses any numeric properties (index, boolean, etc) if they are specified as
@@ -836,34 +882,10 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 		    ZFS_PROP_VOLSIZE);
 		uint64_t old_reservation;
 		uint64_t new_reservation;
-		char *pool_name;
-		zpool_handle_t *zpool_handle;
-		char *p;
 		zfs_prop_t resv_prop;
-		uint64_t spa_version;
 
-		pool_name = zfs_alloc(zhp->zfs_hdl, MAXPATHLEN);
-		if (zfs_prop_get(zhp, ZFS_PROP_NAME, pool_name,
-		    MAXPATHLEN, NULL, NULL, 0, B_FALSE) != 0) {
-			free(pool_name);
+		if (zfs_which_resv_prop(zhp, &resv_prop) < 0)
 			goto error;
-		}
-
-		if (p = strchr(pool_name, '/'))
-			*p = '\0';
-		zpool_handle = zpool_open(hdl, pool_name);
-		free(pool_name);
-		if (zpool_handle == NULL)
-			goto error;
-
-		spa_version = zpool_get_prop_int(zpool_handle,
-		    ZPOOL_PROP_VERSION, NULL);
-		zpool_close(zpool_handle);
-		if (spa_version >= SPA_VERSION_REFRESERVATION)
-			resv_prop = ZFS_PROP_REFRESERVATION;
-		else
-			resv_prop = ZFS_PROP_RESERVATION;
-
 		old_reservation = zfs_prop_get_int(zhp, resv_prop);
 
 		if (old_volsize == old_reservation &&
@@ -876,7 +898,6 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 		}
 	}
-
 	return (ret);
 
 error:
@@ -1624,7 +1645,6 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 		goto error;
 
 	ret = zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc);
-
 	if (ret != 0) {
 		switch (errno) {
 
@@ -2282,6 +2302,15 @@ zfs_prop_get_int(zfs_handle_t *zhp, zfs_prop_t prop)
 	(void) get_numeric_property(zhp, prop, NULL, &source, &val);
 
 	return (val);
+}
+
+int
+zfs_prop_set_int(zfs_handle_t *zhp, zfs_prop_t prop, uint64_t val)
+{
+	char buf[64];
+
+	zfs_nicenum(val, buf, sizeof (buf));
+	return (zfs_prop_set(zhp, zfs_prop_to_name(prop), buf));
 }
 
 /*
@@ -3349,6 +3378,9 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 	rollback_data_t cb = { 0 };
 	int err;
 	zfs_cmd_t zc = { 0 };
+	boolean_t restore_resv = 0;
+	uint64_t old_volsize, new_volsize;
+	zfs_prop_t resv_prop;
 
 	assert(zhp->zfs_type == ZFS_TYPE_FILESYSTEM ||
 	    zhp->zfs_type == ZFS_TYPE_VOLUME);
@@ -3368,9 +3400,15 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 	 * rollback to the given snapshot.
 	 */
 
-	if (zhp->zfs_type == ZFS_TYPE_VOLUME &&
-	    zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name) != 0)
-		return (-1);
+	if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+		if (zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name) != 0)
+			return (-1);
+		if (zfs_which_resv_prop(zhp, &resv_prop) < 0)
+			return (-1);
+		old_volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
+		restore_resv =
+		    (old_volsize == zfs_prop_get_int(zhp, resv_prop));
+	}
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
@@ -3385,15 +3423,32 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 	 * simply pass the name on to the ioctl() call.  There is still
 	 * an unlikely race condition where the user has taken a
 	 * snapshot since we verified that this was the most recent.
+	 *
 	 */
 	if ((err = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_ROLLBACK, &zc)) != 0) {
 		(void) zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot rollback '%s'"),
 		    zhp->zfs_name);
 	} else if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
-		err = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
-	}
 
+	/*
+	 * For volumes, if the pre-rollback volsize matched the pre-
+	 * rollback reservation and the volsize has changed then set
+	 * the reservation property to the post-rollback volsize.
+	 * Make a new handle since the rollback closed the dataset.
+	 */
+		zhp = make_dataset_handle(zhp->zfs_hdl, zhp->zfs_name);
+		if (!zhp)
+			return (err);
+
+		if (restore_resv) {
+			new_volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
+			if (old_volsize != new_volsize)
+				zfs_prop_set_int(zhp, resv_prop, new_volsize);
+		}
+		err = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+		zfs_close(zhp);
+	}
 	return (err);
 }
 

@@ -1376,23 +1376,11 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 	int version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
 
 	if (cb->cb_version >= ZPL_VERSION_FUID) {
-		char pool_name[MAXPATHLEN];
-		zpool_handle_t *zpool_handle;
 		int spa_version;
-		char *p;
 
-		if (zfs_prop_get(zhp, ZFS_PROP_NAME, pool_name,
-		    sizeof (pool_name), NULL, NULL, 0, B_FALSE) != 0)
+		if (zfs_spa_version(zhp, &spa_version) < 0)
 			return (-1);
 
-		if (p = strchr(pool_name, '/'))
-			*p = '\0';
-		if ((zpool_handle = zpool_open(g_zfs, pool_name)) == NULL)
-			return (-1);
-
-		spa_version = zpool_get_prop_int(zpool_handle,
-		    ZPOOL_PROP_VERSION, NULL);
-		zpool_close(zpool_handle);
 		if (spa_version < SPA_VERSION_FUID) {
 			/* can't upgrade */
 			(void) printf(gettext("%s: can not be upgraded; "

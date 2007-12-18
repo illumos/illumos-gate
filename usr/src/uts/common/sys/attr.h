@@ -54,7 +54,6 @@ extern "C" {
 #define	A_AV_MODIFIED		"av_modified"
 #define	A_FSID			"fsid"
 #define	A_AV_SCANSTAMP		"av_scanstamp"
-#define	A_MDEV			"mdev"
 #define	A_OWNERSID		"ownersid"
 #define	A_GROUPSID		"groupsid"
 
@@ -93,7 +92,6 @@ typedef enum {
 	F_OWNERSID,
 	F_GROUPSID,
 	F_FSID,
-	F_MDEV,
 	F_ATTR_ALL
 } f_attr_t;
 

@@ -98,6 +98,7 @@ SUNWprivate_1.1 {
 	zfs_share_smb;
 	zfs_share_iscsi;
 	zfs_snapshot;
+	zfs_spa_version;
 	zfs_type_to_name;
 	zfs_unmount;
 	zfs_unmountall;
