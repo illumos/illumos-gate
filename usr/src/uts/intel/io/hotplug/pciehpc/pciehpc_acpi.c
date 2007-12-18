@@ -816,7 +816,11 @@ pciehpc_acpi_eval_osc(ACPI_HANDLE osc_hdl, uint32_t *hp_mode)
 	}
 
 	rv = rb.Pointer;
-	ASSERT(rv->Type == ACPI_TYPE_BUFFER);
+	if (rv == NULL || rv->Type != ACPI_TYPE_BUFFER) {
+		PCIEHPC_DEBUG((CE_CONT,
+		    "Failed to execute _OSC method -- bad status\n"));
+		return (AE_ERROR);
+	}
 	rbuf = (UINT32 *)rv->Buffer.Pointer;
 
 	/* check the STATUS word in the capability buffer */
