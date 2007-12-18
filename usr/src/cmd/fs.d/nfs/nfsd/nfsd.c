@@ -148,6 +148,7 @@ main(int ac, char *av[])
 	boolean_t can_do_mlp;
 	uint_t dss_npaths = 0;
 	char **dss_pathnames = NULL;
+	sigset_t sgset;
 
 	MyName = *av;
 
@@ -162,7 +163,7 @@ main(int ac, char *av[])
 	    DAEMON_UID, DAEMON_GID, PRIV_SYS_NFS,
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr, "%s should be run with"
-			" sufficient privileges\n", av[0]);
+		    " sufficient privileges\n", av[0]);
 		exit(1);
 	}
 
@@ -212,7 +213,7 @@ main(int ac, char *av[])
 		if ((defval = defread("NFS_SERVER_VERSMIN=")) != NULL) {
 			errno = 0;
 			nfs_server_vers_min =
-				strtol(defval, (char **)NULL, 10);
+			    strtol(defval, (char **)NULL, 10);
 			if (errno != 0) {
 				nfs_server_vers_min = NFS_VERSMIN_DEFAULT;
 			}
@@ -220,7 +221,7 @@ main(int ac, char *av[])
 		if ((defval = defread("NFS_SERVER_VERSMAX=")) != NULL) {
 			errno = 0;
 			nfs_server_vers_max =
-				strtol(defval, (char **)NULL, 10);
+			    strtol(defval, (char **)NULL, 10);
 			if (errno != 0) {
 				nfs_server_vers_max = NFS_VERSMAX_DEFAULT;
 			}
@@ -344,16 +345,16 @@ main(int ac, char *av[])
 		if (nfs_server_vers_max == NFS_V4) {
 			if (nfs_server_vers_min == NFS_V4) {
 				syslog(LOG_ERR,
-					"NFS version 4 is not supported "
-					"with the UDP protocol.  Exiting\n");
+				    "NFS version 4 is not supported "
+				    "with the UDP protocol.  Exiting\n");
 				fprintf(stderr,
-					"NFS version 4 is not supported "
-					"with the UDP protocol.  Exiting\n");
+				    "NFS version 4 is not supported "
+				    "with the UDP protocol.  Exiting\n");
 				exit(3);
 			} else {
 				fprintf(stderr,
-					"NFS version 4 is not supported "
-					"with the UDP protocol.\n");
+				    "NFS version 4 is not supported "
+				    "with the UDP protocol.\n");
 			}
 		}
 	}
@@ -375,8 +376,8 @@ main(int ac, char *av[])
 	 * Check the ranges for min/max version specified
 	 */
 	else if ((nfs_server_vers_min > nfs_server_vers_max) ||
-		(nfs_server_vers_min < NFS_VERSMIN) ||
-		(nfs_server_vers_max > NFS_VERSMAX))
+	    (nfs_server_vers_min < NFS_VERSMIN) ||
+	    (nfs_server_vers_max > NFS_VERSMAX))
 		usage();
 	/*
 	 * There are no additional arguments, and we haven't set maxservers
@@ -465,13 +466,17 @@ main(int ac, char *av[])
 		}
 	}
 
-	sigset(SIGTERM, sigflush);
-	sigset(SIGUSR1, quiesce);
+	/*
+	 * Block all signals till we spawn other
+	 * threads.
+	 */
+	(void) sigfillset(&sgset);
+	(void) thr_sigsetmask(SIG_BLOCK, &sgset, NULL);
 
 	if (logmaxservers) {
 		(void) syslog(LOG_INFO,
-			"Number of servers not specified. Using default of %d.",
-			maxservers);
+		    "Number of servers not specified. Using default of %d.",
+		    maxservers);
 	}
 
 	/*
@@ -489,7 +494,7 @@ main(int ac, char *av[])
 	 */
 	if (nfssvcpool(maxservers)) {
 		(void) syslog(LOG_ERR,
-			"Can't set up kernel NFS service: %m. Exiting");
+		    "Can't set up kernel NFS service: %m. Exiting");
 		exit(1);
 	}
 
@@ -511,10 +516,18 @@ main(int ac, char *av[])
 	 * start rdma services and block in the kernel.
 	 */
 	if (svcrdma(NFS_SVCPOOL_ID, nfs_server_vers_min, nfs_server_vers_max,
-		nfs_server_delegation)) {
+	    nfs_server_delegation)) {
 		(void) syslog(LOG_ERR,
 		    "Can't set up RDMA creator thread : %m.");
 	}
+
+	/*
+	 * Now open up for signal delivery
+	 */
+
+	(void) thr_sigsetmask(SIG_UNBLOCK, &sgset, NULL);
+	sigset(SIGTERM, sigflush);
+	sigset(SIGUSR1, quiesce);
 
 	/*
 	 * Build a protocol block list for registration.
@@ -531,7 +544,7 @@ main(int ac, char *av[])
 	protobp->versmin = nfs_server_vers_min;
 	/* XXX - this needs work to get the version just right */
 	protobp->versmax = (nfs_server_vers_max > NFS_ACL_V3) ?
-		NFS_ACL_V3 : nfs_server_vers_max;
+	    NFS_ACL_V3 : nfs_server_vers_max;
 	protobp->program = NFS_ACL_PROGRAM;
 	protobp->next = (struct protob *)NULL;
 
@@ -551,19 +564,19 @@ main(int ac, char *av[])
 			if (strcmp(nconf->nc_proto, proto) == 0) {
 				protoFound = TRUE;
 				do_one(nconf->nc_device, NULL,
-					protobp0, nfssvc, 0);
+				    protobp0, nfssvc, 0);
 			}
 		}
 		(void) endnetconfig(nc);
 		if (protoFound == FALSE)
 			syslog(LOG_ERR, "couldn't find netconfig entry \
-for protocol %s", proto);
+			    for protocol %s", proto);
 
 	} else if (provider)
 		do_one(provider, proto, protobp0, nfssvc, 0);
 	else {
 		for (providerp = defaultproviders;
-			*providerp != NULL; providerp++) {
+		    *providerp != NULL; providerp++) {
 			provider = *providerp;
 			do_one(provider, NULL, protobp0, nfssvc, 0);
 		}
@@ -572,6 +585,7 @@ done:
 
 	free(protobp);
 	free(protobp0);
+
 
 	if (num_fds == 0) {
 		(void) syslog(LOG_ERR,
@@ -626,7 +640,7 @@ nfssvc(int fd, struct netbuf addrmask, struct netconfig *nconf)
 	nsa.addrmask = addrmask;
 	if (strncasecmp(nconf->nc_proto, NC_UDP, strlen(NC_UDP)) == 0) {
 		nsa.versmax = (nfs_server_vers_max > NFS_V3) ?
-			NFS_V3 : nfs_server_vers_max;
+		    NFS_V3 : nfs_server_vers_max;
 		nsa.versmin = nfs_server_vers_min;
 		/*
 		 * If no version left, silently do nothing, previous
@@ -656,11 +670,11 @@ usage(void)
 	(void) fprintf(stderr, "> zero,\n");
 	(void) fprintf(stderr, "\tprotocol is a protocol identifier,\n");
 	(void) fprintf(stderr,
-		"\ttransport is a transport provider name (i.e. device),\n");
+	    "\ttransport is a transport provider name (i.e. device),\n");
 	(void) fprintf(stderr,
-		"\tlisten_backlog is the TCP listen backlog,\n");
+	    "\tlisten_backlog is the TCP listen backlog,\n");
 	(void) fprintf(stderr,
-		"\tand <nservers> must be a decimal number > zero.\n");
+	    "\tand <nservers> must be a decimal number > zero.\n");
 	exit(1);
 }
 
@@ -682,7 +696,7 @@ nfsl_flush()
 
 	if (_nfssys(LOG_FLUSH, &nfa) < 0)
 		syslog(LOG_ERR, "_nfssys(LOG_FLUSH) failed: %s\n",
-			strerror(errno));
+		    strerror(errno));
 }
 
 /*
@@ -693,7 +707,7 @@ static void
 sigflush(int sig)
 {
 	nfsl_flush();
-	exit(0);
+	_exit(0);
 }
 
 /*
@@ -722,7 +736,7 @@ quiesce(int sig)
 		 * In this case, just exit as if no error. For all other errors,
 		 * just return and allow caller to retry.
 		 */
-		if (error && error != ENOENT) {
+		if (error && errno != ENOENT) {
 			syslog(LOG_ERR,
 			    "_nfssys(NFS4_SVC_REQUEST_QUIESCE) failed: %s",
 			    strerror(errno));
@@ -733,7 +747,7 @@ quiesce(int sig)
 	/* Flush logging buffers */
 	nfsl_flush();
 
-	exit(0);
+	_exit(0);
 }
 
 /*
