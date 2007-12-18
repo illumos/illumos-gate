@@ -179,20 +179,17 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 	} else {
 		dprintf_bp(bp, "putting on dead list: %s", "");
 		VERIFY(0 == bplist_enqueue(&ds->ds_deadlist, bp, tx));
+		ASSERT3U(ds->ds_prev->ds_object, ==,
+		    ds->ds_phys->ds_prev_snap_obj);
+		ASSERT(ds->ds_prev->ds_phys->ds_num_children > 0);
 		/* if (bp->blk_birth > prev prev snap txg) prev unique += bs */
-		if (ds->ds_phys->ds_prev_snap_obj != 0) {
-			ASSERT3U(ds->ds_prev->ds_object, ==,
-			    ds->ds_phys->ds_prev_snap_obj);
-			ASSERT(ds->ds_prev->ds_phys->ds_num_children > 0);
-			if (ds->ds_prev->ds_phys->ds_next_snap_obj ==
-			    ds->ds_object && bp->blk_birth >
-			    ds->ds_prev->ds_phys->ds_prev_snap_txg) {
-				dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
-				mutex_enter(&ds->ds_prev->ds_lock);
-				ds->ds_prev->ds_phys->ds_unique_bytes +=
-				    used;
-				mutex_exit(&ds->ds_prev->ds_lock);
-			}
+		if (ds->ds_prev->ds_phys->ds_next_snap_obj ==
+		    ds->ds_object && bp->blk_birth >
+		    ds->ds_prev->ds_phys->ds_prev_snap_txg) {
+			dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
+			mutex_enter(&ds->ds_prev->ds_lock);
+			ds->ds_prev->ds_phys->ds_unique_bytes += used;
+			mutex_exit(&ds->ds_prev->ds_lock);
 		}
 	}
 	mutex_enter(&ds->ds_lock);
@@ -1680,9 +1677,9 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	bplist_close(&ds->ds_deadlist);
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-	ASSERT3U(ds->ds_phys->ds_prev_snap_txg, <, dsphys->ds_creation_txg);
+	ASSERT3U(ds->ds_phys->ds_prev_snap_txg, <, tx->tx_txg);
 	ds->ds_phys->ds_prev_snap_obj = dsobj;
-	ds->ds_phys->ds_prev_snap_txg = dsphys->ds_creation_txg;
+	ds->ds_phys->ds_prev_snap_txg = tx->tx_txg;
 	ds->ds_phys->ds_unique_bytes = 0;
 	if (spa_version(dp->dp_spa) >= SPA_VERSION_UNIQUE_ACCURATE)
 		ds->ds_phys->ds_flags |= DS_FLAG_UNIQUE_ACCURATE;

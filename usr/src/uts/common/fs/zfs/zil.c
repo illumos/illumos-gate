@@ -456,12 +456,6 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 	mutex_exit(&zilog->zl_lock);
 
 	dmu_tx_commit(tx);
-
-	if (keep_first)			/* no need to wait in this case */
-		return;
-
-	txg_wait_synced(zilog->zl_dmu_pool, txg);
-	ASSERT(BP_IS_HOLE(&zh->zh_log));
 }
 
 /*
@@ -1349,7 +1343,6 @@ zil_suspend(zilog_t *zilog)
 	zil_destroy(zilog, B_FALSE);
 
 	mutex_enter(&zilog->zl_lock);
-	ASSERT(BP_IS_HOLE(&zh->zh_log));
 	zilog->zl_suspending = B_FALSE;
 	cv_broadcast(&zilog->zl_cv_suspend);
 	mutex_exit(&zilog->zl_lock);
@@ -1568,6 +1561,7 @@ zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 	kmem_free(zr.zr_lrbuf, 2 * SPA_MAXBLOCKSIZE);
 
 	zil_destroy(zilog, B_FALSE);
+	txg_wait_synced(zilog->zl_dmu_pool, zilog->zl_destroy_txg);
 }
 
 /*
