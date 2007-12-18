@@ -304,13 +304,12 @@ ppm_change_cpu_power(ppm_dev_t *ppmd, int newlevel)
 
 		/*
 		 * If the driver was unable to lower cpu speed,
-		 * the cpu probably got busy. Best to change
-		 * speed back to normal.
+		 * the cpu probably got busy; set the previous
+		 * cpus back to the original level
 		 */
-		if (newlevel < oldlevel) {
-			oldlevel = pm_get_normal_power(dip, 0);
+		if (newlevel < oldlevel)
 			ret = ppm_revert_cpu_power(cpup, oldlevel);
-		}
+
 		return (ret);
 	}
 
