@@ -1141,11 +1141,11 @@ aclentry2vsecattr(si_t *sp, vsecattr_t *vsap)
 	if (sp->aclass.acl_ismask)
 		numacls++;
 
-	if (numacls == 0)
-		goto do_defaults;
-
 	if (vsap->vsa_mask & (VSA_ACLCNT | VSA_ACL))
 		vsap->vsa_aclcnt = numacls;
+
+	if (numacls == 0)
+		goto do_defaults;
 
 	if (vsap->vsa_mask & VSA_ACL) {
 		vsap->vsa_aclentp = kmem_zalloc(numacls * sizeof (aclent_t),
@@ -1189,11 +1189,11 @@ do_defaults:
 	if (sp->dclass.acl_ismask)
 		numacls++;
 
-	if (numacls == 0)
-		goto do_others;
-
 	if (vsap->vsa_mask & (VSA_DFACLCNT | VSA_DFACL))
 		vsap->vsa_dfaclcnt = numacls;
+
+	if (numacls == 0)
+		goto do_others;
 
 	if (vsap->vsa_mask & VSA_DFACL) {
 		vsap->vsa_dfaclentp =
