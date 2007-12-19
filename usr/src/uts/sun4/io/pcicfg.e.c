@@ -416,31 +416,31 @@ pcicfg_dump_common_config(ddi_acc_handle_t config_handle)
 	if ((pcicfg_debug & 1) == 0)
 		return;
 	cmn_err(CE_CONT, " Vendor ID   = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_VENID));
+	    pci_config_get16(config_handle, PCI_CONF_VENID));
 	cmn_err(CE_CONT, " Device ID   = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_DEVID));
+	    pci_config_get16(config_handle, PCI_CONF_DEVID));
 	cmn_err(CE_CONT, " Command REG = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_COMM));
+	    pci_config_get16(config_handle, PCI_CONF_COMM));
 	cmn_err(CE_CONT, " Status  REG = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_STAT));
+	    pci_config_get16(config_handle, PCI_CONF_STAT));
 	cmn_err(CE_CONT, " Revision ID = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_REVID));
+	    pci_config_get8(config_handle, PCI_CONF_REVID));
 	cmn_err(CE_CONT, " Prog Class  = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
+	    pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
 	cmn_err(CE_CONT, " Dev Class   = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_SUBCLASS));
+	    pci_config_get8(config_handle, PCI_CONF_SUBCLASS));
 	cmn_err(CE_CONT, " Base Class  = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_BASCLASS));
+	    pci_config_get8(config_handle, PCI_CONF_BASCLASS));
 	cmn_err(CE_CONT, " Device ID   = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ));
+	    pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ));
 	cmn_err(CE_CONT, " Header Type = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_HEADER));
+	    pci_config_get8(config_handle, PCI_CONF_HEADER));
 	cmn_err(CE_CONT, " BIST        = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_BIST));
+	    pci_config_get8(config_handle, PCI_CONF_BIST));
 	cmn_err(CE_CONT, " BASE 0      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE0));
+	    pci_config_get32(config_handle, PCI_CONF_BASE0));
 	cmn_err(CE_CONT, " BASE 1      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE1));
+	    pci_config_get32(config_handle, PCI_CONF_BASE1));
 
 }
 
@@ -452,29 +452,29 @@ pcicfg_dump_device_config(ddi_acc_handle_t config_handle)
 	pcicfg_dump_common_config(config_handle);
 
 	cmn_err(CE_CONT, " BASE 2      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE2));
+	    pci_config_get32(config_handle, PCI_CONF_BASE2));
 	cmn_err(CE_CONT, " BASE 3      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE3));
+	    pci_config_get32(config_handle, PCI_CONF_BASE3));
 	cmn_err(CE_CONT, " BASE 4      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE4));
+	    pci_config_get32(config_handle, PCI_CONF_BASE4));
 	cmn_err(CE_CONT, " BASE 5      = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_BASE5));
+	    pci_config_get32(config_handle, PCI_CONF_BASE5));
 	cmn_err(CE_CONT, " Cardbus CIS = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_CIS));
+	    pci_config_get32(config_handle, PCI_CONF_CIS));
 	cmn_err(CE_CONT, " Sub VID     = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_SUBVENID));
+	    pci_config_get16(config_handle, PCI_CONF_SUBVENID));
 	cmn_err(CE_CONT, " Sub SID     = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_SUBSYSID));
+	    pci_config_get16(config_handle, PCI_CONF_SUBSYSID));
 	cmn_err(CE_CONT, " ROM         = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_CONF_ROM));
+	    pci_config_get32(config_handle, PCI_CONF_ROM));
 	cmn_err(CE_CONT, " I Line      = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_ILINE));
+	    pci_config_get8(config_handle, PCI_CONF_ILINE));
 	cmn_err(CE_CONT, " I Pin       = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_IPIN));
+	    pci_config_get8(config_handle, PCI_CONF_IPIN));
 	cmn_err(CE_CONT, " Max Grant   = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_MIN_G));
+	    pci_config_get8(config_handle, PCI_CONF_MIN_G));
 	cmn_err(CE_CONT, " Max Latent  = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_CONF_MAX_L));
+	    pci_config_get8(config_handle, PCI_CONF_MAX_L));
 }
 
 static void
@@ -488,43 +488,43 @@ pcicfg_dump_bridge_config(ddi_acc_handle_t config_handle)
 	cmn_err(CE_CONT, "........................................\n");
 
 	cmn_err(CE_CONT, " Pri Bus     = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_PRIBUS));
+	    pci_config_get8(config_handle, PCI_BCNF_PRIBUS));
 	cmn_err(CE_CONT, " Sec Bus     = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_SECBUS));
+	    pci_config_get8(config_handle, PCI_BCNF_SECBUS));
 	cmn_err(CE_CONT, " Sub Bus     = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_SUBBUS));
+	    pci_config_get8(config_handle, PCI_BCNF_SUBBUS));
 	cmn_err(CE_CONT, " Latency     = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_LATENCY_TIMER));
+	    pci_config_get8(config_handle, PCI_BCNF_LATENCY_TIMER));
 	cmn_err(CE_CONT, " I/O Base LO = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_IO_BASE_LOW));
+	    pci_config_get8(config_handle, PCI_BCNF_IO_BASE_LOW));
 	cmn_err(CE_CONT, " I/O Lim LO  = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_IO_LIMIT_LOW));
+	    pci_config_get8(config_handle, PCI_BCNF_IO_LIMIT_LOW));
 	cmn_err(CE_CONT, " Sec. Status = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_SEC_STATUS));
+	    pci_config_get16(config_handle, PCI_BCNF_SEC_STATUS));
 	cmn_err(CE_CONT, " Mem Base    = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_MEM_BASE));
+	    pci_config_get16(config_handle, PCI_BCNF_MEM_BASE));
 	cmn_err(CE_CONT, " Mem Limit   = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_MEM_LIMIT));
+	    pci_config_get16(config_handle, PCI_BCNF_MEM_LIMIT));
 	cmn_err(CE_CONT, " PF Mem Base = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_PF_BASE_LOW));
+	    pci_config_get16(config_handle, PCI_BCNF_PF_BASE_LOW));
 	cmn_err(CE_CONT, " PF Mem Lim  = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_PF_LIMIT_LOW));
+	    pci_config_get16(config_handle, PCI_BCNF_PF_LIMIT_LOW));
 	cmn_err(CE_CONT, " PF Base HI  = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_BCNF_PF_BASE_HIGH));
+	    pci_config_get32(config_handle, PCI_BCNF_PF_BASE_HIGH));
 	cmn_err(CE_CONT, " PF Lim  HI  = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_BCNF_PF_LIMIT_HIGH));
+	    pci_config_get32(config_handle, PCI_BCNF_PF_LIMIT_HIGH));
 	cmn_err(CE_CONT, " I/O Base HI = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_IO_BASE_HI));
+	    pci_config_get16(config_handle, PCI_BCNF_IO_BASE_HI));
 	cmn_err(CE_CONT, " I/O Lim HI  = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_IO_LIMIT_HI));
+	    pci_config_get16(config_handle, PCI_BCNF_IO_LIMIT_HI));
 	cmn_err(CE_CONT, " ROM addr    = [0x%x]\n",
-		pci_config_get32(config_handle, PCI_BCNF_ROM));
+	    pci_config_get32(config_handle, PCI_BCNF_ROM));
 	cmn_err(CE_CONT, " Intr Line   = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_ILINE));
+	    pci_config_get8(config_handle, PCI_BCNF_ILINE));
 	cmn_err(CE_CONT, " Intr Pin    = [0x%x]\n",
-		pci_config_get8(config_handle, PCI_BCNF_IPIN));
+	    pci_config_get8(config_handle, PCI_BCNF_IPIN));
 	cmn_err(CE_CONT, " Bridge Ctrl = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_BCNF_BCNTRL));
+	    pci_config_get16(config_handle, PCI_BCNF_BCNTRL));
 }
 
 #endif
@@ -588,7 +588,7 @@ pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
 
 		if ((port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) &&
 		    (PCI_CAP_GET16(handle, NULL, cap_ptr, PCIE_PCIECAP)
-			& PCIE_PCIECAP_SLOT_IMPL))
+		    & PCIE_PCIECAP_SLOT_IMPL))
 				num_slots = 1;
 	}
 
@@ -605,7 +605,7 @@ pcicfg_is_chassis(dev_info_t *dip, ddi_acc_handle_t handle)
 	uint16_t cap_ptr;
 
 	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_SLOT_ID, &cap_ptr)) !=
-		DDI_FAILURE) {
+	    DDI_FAILURE) {
 
 		uint8_t esr_reg = PCI_CAP_GET8(handle, NULL, cap_ptr, 2);
 		if (PCI_CAPSLOT_FIC(esr_reg))
@@ -625,10 +625,10 @@ pcicfg_pcie_dev(dev_info_t *dip, int bus_type, pcicfg_err_regs_t *regs)
 
 	regs->pcie_dev = 0;
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
-		DDI_PROP_DONTPASS, "device_type", &device_type)
-				!= DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "device_type", &device_type)
+	    != DDI_PROP_SUCCESS) {
 		DEBUG2("device_type property missing for %s#%d",
-			ddi_get_name(pdip), ddi_get_instance(pdip));
+		    ddi_get_name(pdip), ddi_get_instance(pdip));
 		return (DDI_FAILURE);
 	}
 	switch (bus_type) {
@@ -657,9 +657,9 @@ pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
 	uint16_t cap_ptr;
 
 	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr)) !=
-		DDI_FAILURE)
+	    DDI_FAILURE)
 		port_type = PCI_CAP_GET16(handle, NULL,
-			cap_ptr, PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+		    cap_ptr, PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 	return (port_type);
 }
@@ -676,8 +676,8 @@ pcicfg_pcie_device_type(dev_info_t *dip, ddi_acc_handle_t handle)
 
 	/* check for all PCIe device_types */
 	if ((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-			(port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-			(port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
 		return (DDI_SUCCESS);
 
 	return (DDI_FAILURE);
@@ -717,7 +717,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	 */
 	len = sizeof (pcicfg_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
+	    "bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -733,23 +733,23 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 		 * Try executing fcode if available.
 		 */
 		switch (rv = pcicfg_fcode_probe(devi, bus, device, func,
-						&highest_bus)) {
+		    &highest_bus)) {
 			case PCICFG_FAILURE:
 				DEBUG2("configure failed: "
-				"bus [0x%x] device [0x%x]\n",
-					bus, device);
+				    "bus [0x%x] device [0x%x]\n",
+				    bus, device);
 				break;
 			case PCICFG_NODEVICE:
 				DEBUG3("no device : bus "
-				"[0x%x] slot [0x%x] func [0x%x]\n",
-					bus, device, func);
+				    "[0x%x] slot [0x%x] func [0x%x]\n",
+				    bus, device, func);
 				if (func)
 					continue;
 				break;
 			default:
 				DEBUG3("configure: bus => [%d] "
-				"slot => [%d] func => [%d]\n",
-					bus, device, func);
+				    "slot => [%d] func => [%d]\n",
+				    bus, device, func);
 				break;
 		}
 
@@ -778,13 +778,13 @@ cleanup:
 
 	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
 		if ((new_device = pcicfg_devi_find(devi,
-			device, func)) == NULL) {
+		    device, func)) == NULL) {
 			DEBUG0("No more devices to clean up\n");
 			continue;
 		}
 
 		DEBUG2("Cleaning up device [0x%x] function [0x%x]\n",
-			device, func);
+		    device, func);
 		/*
 		 * If this was a bridge device it will have a
 		 * probe handle - if not, no harm in calling this.
@@ -824,8 +824,8 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	 * mapped directly under the host.
 	 */
 	if ((rc = ndi_prop_update_int(DDI_DEV_T_NONE, new_device,
-		PCI_DEV_CONF_MAP_PROP, (int)DDI_SUCCESS))
-						!= DDI_SUCCESS) {
+	    PCI_DEV_CONF_MAP_PROP, (int)DDI_SUCCESS))
+	    != DDI_SUCCESS) {
 
 		DEBUG0("Cannot create indirect conf map property.\n");
 		return ((uint_t)PCICFG_FAILURE);
@@ -848,8 +848,8 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	bzero((caddr_t)&req, sizeof (ndi_ra_request_t));
 	req.ra_len = 1;
 	if (ndi_ra_alloc(ddi_get_parent(new_device), &req,
-		&next_bus, &blen, NDI_RA_TYPE_PCI_BUSNUM,
-		NDI_RA_PASS) != NDI_SUCCESS) {
+	    &next_bus, &blen, NDI_RA_TYPE_PCI_BUSNUM,
+	    NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("ntbridge: Failed to get a bus number\n");
 		return (rc);
 	}
@@ -864,7 +864,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	bus_range[1] = (int)next_bus;
 
 	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, new_device,
-		"bus-range", bus_range, 2) != DDI_SUCCESS) {
+	    "bus-range", bus_range, 2) != DDI_SUCCESS) {
 		DEBUG0("Cannot set ntbridge bus-range property");
 		return (rc);
 	}
@@ -892,7 +892,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 
 	/* Now set aside pci resources for our children. */
 	if (pcicfg_ntbridge_allocate_resources(new_device) !=
-				PCICFG_SUCCESS) {
+	    PCICFG_SUCCESS) {
 		max_devs = 0;
 		rc = PCICFG_FAILURE;
 	} else
@@ -903,7 +903,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 
 		if (ndi_devi_alloc(new_device, DEVI_PSEUDO_NEXNAME,
 		    (pnode_t)DEVI_SID_NODEID, &new_ntbridgechild)
-							!= NDI_SUCCESS) {
+		    != NDI_SUCCESS) {
 
 			DEBUG0("pcicfg: Failed to alloc test node\n");
 			rc = PCICFG_FAILURE;
@@ -911,18 +911,18 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		}
 
 		if (pcicfg_add_config_reg(new_ntbridgechild, next_bus, devno, 0)
-					!= DDI_PROP_SUCCESS) {
+		    != DDI_PROP_SUCCESS) {
 			cmn_err(CE_WARN,
-				"Failed to add conf reg for ntbridge child.\n");
+			    "Failed to add conf reg for ntbridge child.\n");
 			(void) ndi_devi_free(new_ntbridgechild);
 			rc = PCICFG_FAILURE;
 			break;
 		}
 
 		if ((rc = pci_config_setup(new_ntbridgechild,
-				&config_handle)) != PCICFG_SUCCESS) {
+		    &config_handle)) != PCICFG_SUCCESS) {
 			cmn_err(CE_WARN,
-				"Cannot map ntbridge child %x\n", devno);
+			    "Cannot map ntbridge child %x\n", devno);
 			(void) ndi_devi_free(new_ntbridgechild);
 			rc = PCICFG_FAILURE;
 			break;
@@ -950,11 +950,11 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 			rc = PCICFG_FAILURE;
 			while (old_dev != devno) {
 				if (pcicfg_ntbridge_unconfigure_child(
-					new_device, old_dev) == PCICFG_FAILURE)
+				    new_device, old_dev) == PCICFG_FAILURE)
 
 					cmn_err(CE_WARN,
-					"Unconfig Error ntbridge child "
-					"dev=%d\n", old_dev);
+					    "Unconfig Error ntbridge child "
+					    "dev=%d\n", old_dev);
 				old_dev++;
 			}
 			break;
@@ -970,19 +970,19 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 		int			k;
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, new_device,
-			DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
-			&k) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
+		    &k) != DDI_PROP_SUCCESS) {
 			DEBUG0("Failed to read bus-range property\n");
 			rc = PCICFG_FAILURE;
 			return (rc);
 		}
 
 		DEBUG2("Need to free bus [%d] range [%d]\n",
-			bus[0], bus[1] - bus[0] + 1);
+		    bus[0], bus[1] - bus[0] + 1);
 
 		if (ndi_ra_free(ddi_get_parent(new_device),
-			(uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
-			NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
+		    (uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
+		    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
 			DEBUG0("Failed to free a bus number\n");
 			rc = PCICFG_FAILURE;
 			/*
@@ -1043,9 +1043,9 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 
 	/* Set Memory space handle for ntbridge */
 	if (pcicfg_get_ntbridge_child_range(dip, &boundbase, &boundlen,
-			PCI_BASE_SPACE_MEM) != DDI_SUCCESS) {
+	    PCI_BASE_SPACE_MEM) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			"ntbridge: Mem resource information failure\n");
+		    "ntbridge: Mem resource information failure\n");
 		phdl->memory_len  = 0;
 		return (PCICFG_FAILURE);
 	}
@@ -1053,7 +1053,7 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 	mem_request->ra_boundlen = boundbase + boundlen;
 	mem_request->ra_len = boundlen;
 	mem_request->ra_align_mask =
-		PCICFG_MEMGRAN - 1; /* 1M alignment on memory space */
+	    PCICFG_MEMGRAN - 1; /* 1M alignment on memory space */
 	mem_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
 
 	/*
@@ -1068,7 +1068,7 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 	phdl->mem_hole.next = (hole_t *)NULL;
 
 	DEBUG2("AP requested [0x%llx], needs [0x%llx] bytes of memory\n",
-		boundlen, mem_request->ra_len);
+	    boundlen, mem_request->ra_len);
 
 	/* set up a memory resource map for NT bridge */
 	if (ndi_ra_map_setup(dip, NDI_RA_TYPE_MEM) == NDI_FAILURE) {
@@ -1077,20 +1077,20 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 	}
 	/* initialize the memory map */
 	if (ndi_ra_free(dip, boundbase, boundlen, NDI_RA_TYPE_MEM,
-					NDI_RA_PASS) != NDI_SUCCESS) {
+	    NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("Can not initalize ntbridge memory resource map\n");
 		return (PCICFG_FAILURE);
 	}
 	/* Set IO space handle for ntbridge */
 	if (pcicfg_get_ntbridge_child_range(dip, &boundbase, &boundlen,
-			PCI_BASE_SPACE_IO) != DDI_SUCCESS) {
+	    PCI_BASE_SPACE_IO) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "ntbridge: IO resource information failure\n");
 		phdl->io_len  = 0;
 		return (PCICFG_FAILURE);
 	}
 	io_request->ra_len = boundlen;
 	io_request->ra_align_mask =
-		PCICFG_IOGRAN - 1;   /* 4K alignment on I/O space */
+	    PCICFG_IOGRAN - 1;   /* 4K alignment on I/O space */
 	io_request->ra_boundbase = boundbase;
 	io_request->ra_boundlen = boundbase + boundlen;
 	io_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
@@ -1107,12 +1107,12 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 	phdl->io_hole.next = (hole_t *)NULL;
 
 	DEBUG2("AP requested [0x%llx], needs [0x%llx] bytes of IO\n",
-		boundlen, io_request->ra_len);
+	    boundlen, io_request->ra_len);
 
 	DEBUG2("MEMORY BASE = [0x%x] length [0x%x]\n",
-		phdl->memory_base, phdl->memory_len);
+	    phdl->memory_base, phdl->memory_len);
 	DEBUG2("IO     BASE = [0x%x] length [0x%x]\n",
-		phdl->io_base, phdl->io_len);
+	    phdl->io_base, phdl->io_len);
 
 	/* set up a IO resource map for NT bridge */
 	if (ndi_ra_map_setup(dip, NDI_RA_TYPE_IO) == NDI_FAILURE) {
@@ -1121,7 +1121,7 @@ pcicfg_ntbridge_allocate_resources(dev_info_t *dip)
 	}
 	/* initialize the IO map */
 	if (ndi_ra_free(dip, boundbase, boundlen, NDI_RA_TYPE_IO,
-					NDI_RA_PASS) != NDI_SUCCESS) {
+	    NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("Can not initalize ntbridge memory resource map\n");
 		return (PCICFG_FAILURE);
 	}
@@ -1144,18 +1144,18 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	ASSERT(entry);
 
 	bzero((caddr_t)range,
-		sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
+	    sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
 	range[1].child_hi = range[1].parent_hi |=
-		(PCI_REG_REL_M | PCI_ADDR_MEM32);
+	    (PCI_REG_REL_M | PCI_ADDR_MEM32);
 	range[1].child_lo = range[1].parent_lo = (uint32_t)entry->memory_base;
 
 	range[0].child_hi = range[0].parent_hi |=
-		(PCI_REG_REL_M | PCI_ADDR_IO);
+	    (PCI_REG_REL_M | PCI_ADDR_IO);
 	range[0].child_lo = range[0].parent_lo = (uint32_t)entry->io_base;
 
 	len = sizeof (pcicfg_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"bus-range", (caddr_t)&bus_range, (int *)&len) != DDI_SUCCESS) {
+	    "bus-range", (caddr_t)&bus_range, (int *)&len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -1164,8 +1164,8 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 	if (entry->highest_bus) {	/* secondary bus number */
 		if (entry->highest_bus < bus_range.lo) {
 			cmn_err(CE_WARN,
-				"ntbridge bus range invalid !(%d,%d)\n",
-					bus_range.lo, entry->highest_bus);
+			    "ntbridge bus range invalid !(%d,%d)\n",
+			    bus_range.lo, entry->highest_bus);
 			new_bus_range[1] = bus_range.lo + entry->highest_bus;
 		}
 		else
@@ -1175,10 +1175,10 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 		new_bus_range[1] = bus_range.hi;
 
 	DEBUG2("ntbridge: bus range lo=%x, hi=%x\n",
-				new_bus_range[0], new_bus_range[1]);
+	    new_bus_range[0], new_bus_range[1]);
 
 	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-			"bus-range", new_bus_range, 2) != DDI_SUCCESS) {
+	    "bus-range", new_bus_range, 2) != DDI_SUCCESS) {
 		DEBUG0("Failed to set bus-range property");
 		entry->error = PCICFG_FAILURE;
 		return (PCICFG_FAILURE);
@@ -1189,7 +1189,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 		uint64_t	unused;
 		unused = pcicfg_unused_space(&entry->io_hole, &len);
 		DEBUG2("ntbridge: Unused IO space %llx bytes over %d holes\n",
-							unused, len);
+		    unused, len);
 	}
 #endif
 
@@ -1205,7 +1205,7 @@ pcicfg_ntbridge_configure_done(dev_info_t *dip)
 		uint64_t	unused;
 		unused = pcicfg_unused_space(&entry->mem_hole, &len);
 		DEBUG2("ntbridge: Unused Mem space %llx bytes over %d holes\n",
-							unused, len);
+		    unused, len);
 	}
 #endif
 
@@ -1231,7 +1231,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 
 	len = sizeof (pcicfg_bus_range_t);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, new_device, DDI_PROP_DONTPASS,
-		"bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
+	    "bus-range", (caddr_t)&pci_bus_range, &len) != DDI_SUCCESS) {
 		DEBUG0("no bus-range property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -1246,10 +1246,10 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	}
 
 	if (pcicfg_add_config_reg(new_ntbridgechild, bus, devno, 0)
-				!= DDI_PROP_SUCCESS) {
+	    != DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
 		"Unconfigure: Failed to add conf reg prop for ntbridge "
-			"child.\n");
+		    "child.\n");
 		(void) ndi_devi_free(new_ntbridgechild);
 		return (PCICFG_FAILURE);
 	}
@@ -1257,7 +1257,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	if (pcicfg_config_setup(new_ntbridgechild, &config_handle)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			"pcicfg: Cannot map ntbridge child %x\n", devno);
+		    "pcicfg: Cannot map ntbridge child %x\n", devno);
 		(void) ndi_devi_free(new_ntbridgechild);
 		return (PCICFG_FAILURE);
 	}
@@ -1287,28 +1287,28 @@ pcicfg_ntbridge_unconfigure(dev_info_t *dip)
 	if (entry->memory_len)
 		if (ndi_ra_map_destroy(dip, NDI_RA_TYPE_MEM) == NDI_FAILURE) {
 			DEBUG1("cannot destroy ntbridge memory map size=%x\n",
-							entry->memory_len);
+			    entry->memory_len);
 			return (PCICFG_FAILURE);
 		}
 	if (entry->io_len)
 		if (ndi_ra_map_destroy(dip, NDI_RA_TYPE_IO) == NDI_FAILURE) {
 			DEBUG1("cannot destroy ntbridge io map size=%x\n",
-							entry->io_len);
+			    entry->io_len);
 			return (PCICFG_FAILURE);
 		}
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
-			&k) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
+	    &k) != DDI_PROP_SUCCESS) {
 		DEBUG0("ntbridge: Failed to read bus-range property\n");
 		return (rc);
 	}
 
 	DEBUG2("ntbridge: Need to free bus [%d] range [%d]\n",
-		bus[0], bus[1] - bus[0] + 1);
+	    bus[0], bus[1] - bus[0] + 1);
 
 	if (ndi_ra_free(ddi_get_parent(dip),
-		(uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
-		NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
+	    (uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
+	    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
 		DEBUG0("ntbridge: Failed to free a bus number\n");
 		/*
 		 * Don't forget to free up memory from ddi_getlongprop
@@ -1343,7 +1343,7 @@ pcicfg_is_ntbridge(dev_info_t *dip)
 
 	if (pcicfg_config_setup(dip, &config_handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
-			"pcicfg: cannot map config space, to get map type\n");
+		    "pcicfg: cannot map config space, to get map type\n");
 		return (DDI_FAILURE);
 	}
 	class = pci_config_get8(config_handle, PCI_CONF_BASCLASS);
@@ -1354,9 +1354,9 @@ pcicfg_is_ntbridge(dev_info_t *dip)
 		rc = DDI_FAILURE;
 
 	DEBUG3("pcicfg: checking device %x,%x for indirect map. rc=%d\n",
-			pci_config_get16(config_handle, PCI_CONF_VENID),
-			pci_config_get16(config_handle, PCI_CONF_DEVID),
-			rc);
+	    pci_config_get16(config_handle, PCI_CONF_VENID),
+	    pci_config_get16(config_handle, PCI_CONF_DEVID),
+	    rc);
 	pci_config_teardown(&config_handle);
 	return (rc);
 }
@@ -1375,12 +1375,12 @@ pcicfg_indirect_map(dev_info_t *dip)
 	int rc = DDI_FAILURE;
 
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
-			PCI_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
+	    PCI_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 		rc = DDI_SUCCESS;
 	else
 		if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				0, PCI_BUS_CONF_MAP_PROP,
-				DDI_FAILURE) != DDI_FAILURE)
+		    0, PCI_BUS_CONF_MAP_PROP,
+		    DDI_FAILURE) != DDI_FAILURE)
 			rc = DDI_SUCCESS;
 	DEBUG1("pci conf map = %d", rc);
 	return (rc);
@@ -1400,33 +1400,34 @@ pcicfg_get_ntbridge_child_range(dev_info_t *dip, uint64_t *boundbase,
 		return (found);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
-			&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG1("Failed to get assigned-addresses property %llx\n", dip);
 		return (found);
 	}
 	DEBUG1("pcicfg: ntbridge child range: dip = %s\n",
-					ddi_driver_name(dip));
+	    ddi_driver_name(dip));
 
 	acount = length / sizeof (pci_regspec_t);
 
 	for (i = 0; i < acount; i++) {
-		if ((PCI_REG_REG_G(assigned[i].pci_phys_hi)
-		== pcicfg_indirect_map_devs[ibridge].mem_range_bar_offset) &&
-				(space_type == PCI_BASE_SPACE_MEM)) {
+		if ((PCI_REG_REG_G(assigned[i].pci_phys_hi) ==
+		    pcicfg_indirect_map_devs[ibridge].mem_range_bar_offset) &&
+		    (space_type == PCI_BASE_SPACE_MEM)) {
 			found = DDI_SUCCESS;
 			break;
 		} else {
-			if ((PCI_REG_REG_G(assigned[i].pci_phys_hi)
-		== pcicfg_indirect_map_devs[ibridge].io_range_bar_offset) &&
-					(space_type == PCI_BASE_SPACE_IO)) {
+			if ((PCI_REG_REG_G(assigned[i].pci_phys_hi) ==
+			    pcicfg_indirect_map_devs[ibridge].\
+			    io_range_bar_offset) &&
+			    (space_type == PCI_BASE_SPACE_IO)) {
 				found = DDI_SUCCESS;
 				break;
 			}
 		}
 	}
 	DEBUG3("pcicfg: ntbridge child range: space=%x, base=%lx, len=%lx\n",
-		space_type, assigned[i].pci_phys_low, assigned[i].pci_size_low);
+	    space_type, assigned[i].pci_phys_low, assigned[i].pci_size_low);
 
 	if (found == DDI_SUCCESS)  {
 		*boundbase = assigned[i].pci_phys_low;
@@ -1467,18 +1468,20 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 		 */
 		DEBUG2("Device [0x%x] function [%x] is busy\n", device, func);
 		for (i = 0; i < func; i++) {
-		    if ((child_dip = pcicfg_devi_find(devi, device, i))
-				== NULL) {
-			DEBUG0("No more devices to put back on line!!\n");
-			/*
-			 * Made it through all functions
-			 */
-			continue;
-		    }
-		    if (ndi_devi_online(child_dip, NDI_CONFIG) != NDI_SUCCESS) {
-			DEBUG0("Failed to put back devices state\n");
-			return (PCICFG_FAILURE);
-		    }
+			if ((child_dip = pcicfg_devi_find(devi, device, i))
+			    == NULL) {
+				DEBUG0(
+				    "No more devices to put back on line!!\n");
+				/*
+				 * Made it through all functions
+				 */
+				continue;
+			}
+			if (ndi_devi_online(child_dip, NDI_CONFIG)
+			    != NDI_SUCCESS) {
+				DEBUG0("Failed to put back devices state\n");
+				return (PCICFG_FAILURE);
+			}
 		}
 		return (PCICFG_FAILURE);
 	}
@@ -1488,26 +1491,26 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 	 */
 	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
 		if ((child_dip = pcicfg_devi_find(devi,
-			device, func)) == NULL) {
+		    device, func)) == NULL) {
 			DEBUG0("No more devices to tear down!\n");
 			continue;
 		}
 
 		DEBUG2("Tearing down device [0x%x] function [0x%x]\n",
-			device, func);
+		    device, func);
 
 		if (pcicfg_is_ntbridge(child_dip) != DDI_FAILURE)
 			if (pcicfg_ntbridge_unconfigure(child_dip) !=
-					PCICFG_SUCCESS) {
+			    PCICFG_SUCCESS) {
 				cmn_err(CE_WARN,
-					"ntbridge: unconfigure failed\n");
+				    "ntbridge: unconfigure failed\n");
 				return (PCICFG_FAILURE);
 			}
 
 		if (pcicfg_teardown_device(child_dip) != PCICFG_SUCCESS) {
 			DEBUG2("Failed to tear down device [0x%x]"
-			"function [0x%x]\n",
-				device, func);
+			    "function [0x%x]\n",
+			    device, func);
 			return (PCICFG_FAILURE);
 		}
 	}
@@ -1579,7 +1582,7 @@ pcicfg_create_phdl(dev_info_t *dip)
 	pcicfg_phdl_t *new;
 
 	new = (pcicfg_phdl_t *)kmem_zalloc(sizeof (pcicfg_phdl_t),
-		KM_SLEEP);
+	    KM_SLEEP);
 
 	new->dip = dip;
 	mutex_enter(&pcicfg_list_mutex);
@@ -1598,7 +1601,7 @@ pcicfg_destroy_phdl(dev_info_t *dip)
 
 	mutex_enter(&pcicfg_list_mutex);
 	for (entry = pcicfg_phdl_list; entry != NULL; follow = entry,
-		entry = entry->next) {
+	    entry = entry->next) {
 		if (entry->dip == dip) {
 			if (entry == pcicfg_phdl_list) {
 				pcicfg_phdl_list = entry->next;
@@ -1612,17 +1615,17 @@ pcicfg_destroy_phdl(dev_info_t *dip)
 			 */
 			if (entry->memory_len > 0) {
 				(void) ndi_ra_free(ddi_get_parent(dip),
-					entry->memory_base,
-					entry->memory_len,
-					NDI_RA_TYPE_MEM, NDI_RA_PASS);
+				    entry->memory_base,
+				    entry->memory_len,
+				    NDI_RA_TYPE_MEM, NDI_RA_PASS);
 			}
 			pcicfg_free_hole(&entry->mem_hole);
 
 			if (entry->io_len > 0) {
 				(void) ndi_ra_free(ddi_get_parent(dip),
-					entry->io_base,
-					entry->io_len,
-					NDI_RA_TYPE_IO, NDI_RA_PASS);
+				    entry->io_base,
+				    entry->io_len,
+				    NDI_RA_TYPE_IO, NDI_RA_PASS);
 			}
 			pcicfg_free_hole(&entry->io_hole);
 
@@ -1738,22 +1741,22 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		bzero((caddr_t)range,
-			sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
+		    sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
 
 		(void) pcicfg_setup_bridge(entry, handle, dip);
 
 		range[0].child_hi = range[0].parent_hi |=
-			(PCI_REG_REL_M | PCI_ADDR_IO);
+		    (PCI_REG_REL_M | PCI_ADDR_IO);
 		range[0].child_lo = range[0].parent_lo =
-			entry->io_last;
+		    entry->io_last;
 		range[1].child_hi = range[1].parent_hi |=
-			(PCI_REG_REL_M | PCI_ADDR_MEM32);
+		    (PCI_REG_REL_M | PCI_ADDR_MEM32);
 		range[1].child_lo = range[1].parent_lo =
-			entry->memory_last;
+		    entry->memory_last;
 
 		ndi_devi_enter(dip, &count);
 		ddi_walk_devs(ddi_get_child(dip),
-			pcicfg_bridge_assign, (void *)entry);
+		    pcicfg_bridge_assign, (void *)entry);
 		ndi_devi_exit(dip, count);
 
 		(void) pcicfg_update_bridge(entry, handle);
@@ -1762,7 +1765,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		bus_range[1] = pci_config_get8(handle, PCI_BCNF_SUBBUS);
 
 		if (ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-				"bus-range", bus_range, 2) != DDI_SUCCESS) {
+		    "bus-range", bus_range, 2) != DDI_SUCCESS) {
 			DEBUG0("Failed to set bus-range property");
 			entry->error = PCICFG_FAILURE;
 			return (DDI_WALK_TERMINATE);
@@ -1778,7 +1781,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		}
 		if (entry->memory_len > 0) {
 			range[1].size_lo =
-				entry->memory_last - entry->memory_base;
+			    entry->memory_last - entry->memory_base;
 			if (pcicfg_update_ranges_prop(dip, &range[1])) {
 				DEBUG0("Failed to update ranges (memory)\n");
 				entry->error = PCICFG_FAILURE;
@@ -1807,8 +1810,8 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	 * and program the base registers.
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
-		&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read reg property\n");
 		entry->error = PCICFG_FAILURE;
 		return (DDI_WALK_TERMINATE);
@@ -1818,7 +1821,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 	offset = PCI_CONF_BASE0;
 	for (i = 0; i < rcount; i++) {
 		if ((reg[i].pci_size_low != 0)||
-			(reg[i].pci_size_hi != 0)) {
+		    (reg[i].pci_size_hi != 0)) {
 
 			offset = PCI_REG_REG_G(reg[i].pci_phys_hi);
 
@@ -1826,18 +1829,18 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
 
 				(void) pcicfg_get_mem(entry,
-				reg[i].pci_size_low, &mem_answer);
+				    reg[i].pci_size_low, &mem_answer);
 				pci_config_put64(handle, offset, mem_answer);
 				DEBUG2("REGISTER off %x (64)LO ----> [0x%x]\n",
-					offset,
-					pci_config_get32(handle, offset));
+				    offset,
+				    pci_config_get32(handle, offset));
 				DEBUG2("REGISTER off %x (64)HI ----> [0x%x]\n",
-					offset + 4,
-					pci_config_get32(handle, offset + 4));
+				    offset + 4,
+				    pci_config_get32(handle, offset + 4));
 
 				reg[i].pci_phys_low = PCICFG_HIADDR(mem_answer);
 				reg[i].pci_phys_mid  =
-					PCICFG_LOADDR(mem_answer);
+				    PCICFG_LOADDR(mem_answer);
 
 				break;
 
@@ -1845,13 +1848,13 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 				/* allocate memory space from the allocator */
 
 				(void) pcicfg_get_mem(entry,
-					reg[i].pci_size_low, &mem_answer);
+				    reg[i].pci_size_low, &mem_answer);
 				pci_config_put32(handle,
-					offset, (uint32_t)mem_answer);
+				    offset, (uint32_t)mem_answer);
 
 				DEBUG2("REGISTER off %x(32)LO ----> [0x%x]\n",
-					offset,
-					pci_config_get32(handle, offset));
+				    offset,
+				    pci_config_get32(handle, offset));
 
 				reg[i].pci_phys_low = (uint32_t)mem_answer;
 
@@ -1860,12 +1863,12 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 				/* allocate I/O space from the allocator */
 
 				(void) pcicfg_get_io(entry,
-					reg[i].pci_size_low, &io_answer);
+				    reg[i].pci_size_low, &io_answer);
 				pci_config_put32(handle, offset, io_answer);
 
 				DEBUG2("REGISTER off %x (I/O)LO ----> [0x%x]\n",
-					offset,
-					pci_config_get32(handle, offset));
+				    offset,
+				    pci_config_get32(handle, offset));
 
 				reg[i].pci_phys_low = io_answer;
 
@@ -1883,7 +1886,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 			 * update the assigned address property.
 			 */
 			if (pcicfg_update_assigned_prop(dip,
-				&reg[i]) != PCICFG_SUCCESS) {
+			    &reg[i]) != PCICFG_SUCCESS) {
 				kmem_free(reg, length);
 				(void) pcicfg_config_teardown(&handle);
 				entry->error = PCICFG_FAILURE;
@@ -1923,8 +1926,8 @@ pcicfg_device_assign(dev_info_t *dip)
 	 * XXX Failure here should be noted
 	 */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
-		&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read reg property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -1964,7 +1967,7 @@ pcicfg_device_assign(dev_info_t *dip)
 	offset = PCI_CONF_BASE0;
 	for (i = 0; i < rcount; i++) {
 		if ((reg[i].pci_size_low != 0)||
-			(reg[i].pci_size_hi != 0)) {
+		    (reg[i].pci_size_hi != 0)) {
 
 			offset = PCI_REG_REG_G(reg[i].pci_phys_hi);
 			request.ra_len = reg[i].pci_size_low;
@@ -1974,25 +1977,25 @@ pcicfg_device_assign(dev_info_t *dip)
 				request.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
 				/* allocate memory space from the allocator */
 				if (ndi_ra_alloc(ddi_get_parent(dip),
-					&request, &answer, &alen,
-					NDI_RA_TYPE_MEM, NDI_RA_PASS)
-							!= NDI_SUCCESS) {
+				    &request, &answer, &alen,
+				    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+				    != NDI_SUCCESS) {
 					DEBUG0("Failed to allocate 64b mem\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
 					return (PCICFG_FAILURE);
 				}
 				DEBUG3("64 addr = [0x%x.%x] len [0x%x]\n",
-					PCICFG_HIADDR(answer),
-					PCICFG_LOADDR(answer),
-					alen);
+				    PCICFG_HIADDR(answer),
+				    PCICFG_LOADDR(answer),
+				    alen);
 				/* program the low word */
 				pci_config_put32(handle,
-					offset, PCICFG_LOADDR(answer));
+				    offset, PCICFG_LOADDR(answer));
 
 				/* program the high word with value zero */
 				pci_config_put32(handle, offset + 4,
-					PCICFG_HIADDR(answer));
+				    PCICFG_HIADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
 				reg[i].pci_phys_mid = PCICFG_HIADDR(answer);
@@ -2001,7 +2004,7 @@ pcicfg_device_assign(dev_info_t *dip)
 				 * assignments only.
 				 */
 				reg[i].pci_phys_hi ^= PCI_ADDR_MEM64 ^
-							PCI_ADDR_MEM32;
+				    PCI_ADDR_MEM32;
 
 				offset += 8;
 				break;
@@ -2010,21 +2013,21 @@ pcicfg_device_assign(dev_info_t *dip)
 				request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 				/* allocate memory space from the allocator */
 				if (ndi_ra_alloc(ddi_get_parent(dip),
-					&request, &answer, &alen,
-					NDI_RA_TYPE_MEM, NDI_RA_PASS)
-							!= NDI_SUCCESS) {
+				    &request, &answer, &alen,
+				    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+				    != NDI_SUCCESS) {
 					DEBUG0("Failed to allocate 32b mem\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
 					return (PCICFG_FAILURE);
 				}
 				DEBUG3("32 addr = [0x%x.%x] len [0x%x]\n",
-					PCICFG_HIADDR(answer),
-					PCICFG_LOADDR(answer),
-					alen);
+				    PCICFG_HIADDR(answer),
+				    PCICFG_LOADDR(answer),
+				    alen);
 				/* program the low word */
 				pci_config_put32(handle,
-					offset, PCICFG_LOADDR(answer));
+				    offset, PCICFG_LOADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
 
@@ -2034,20 +2037,20 @@ pcicfg_device_assign(dev_info_t *dip)
 				/* allocate I/O space from the allocator */
 				request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 				if (ndi_ra_alloc(ddi_get_parent(dip),
-					&request, &answer, &alen,
-					NDI_RA_TYPE_IO, NDI_RA_PASS)
-							!= NDI_SUCCESS) {
+				    &request, &answer, &alen,
+				    NDI_RA_TYPE_IO, NDI_RA_PASS)
+				    != NDI_SUCCESS) {
 					DEBUG0("Failed to allocate I/O\n");
 					kmem_free(reg, length);
 					(void) pcicfg_config_teardown(&handle);
 					return (PCICFG_FAILURE);
 				}
 				DEBUG3("I/O addr = [0x%x.%x] len [0x%x]\n",
-					PCICFG_HIADDR(answer),
-					PCICFG_LOADDR(answer),
-					alen);
+				    PCICFG_HIADDR(answer),
+				    PCICFG_LOADDR(answer),
+				    alen);
 				pci_config_put32(handle,
-					offset, PCICFG_LOADDR(answer));
+				    offset, PCICFG_LOADDR(answer));
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
 
@@ -2066,7 +2069,7 @@ pcicfg_device_assign(dev_info_t *dip)
 			 */
 
 			if (pcicfg_update_assigned_prop(dip,
-				&reg[i]) != PCICFG_SUCCESS) {
+			    &reg[i]) != PCICFG_SUCCESS) {
 				kmem_free(reg, length);
 				(void) pcicfg_config_teardown(&handle);
 				return (PCICFG_FAILURE);
@@ -2129,30 +2132,30 @@ pcicfg_allocate_chunk(dev_info_t *dip)
 	 * Record the addresses returned in the phdl
 	 */
 	DEBUG1("AP requires [0x%x] bytes of memory space\n",
-		mem_request->ra_len);
+	    mem_request->ra_len);
 	DEBUG1("AP requires [0x%x] bytes of I/O    space\n",
-		io_request->ra_len);
+	    io_request->ra_len);
 
 	mem_request->ra_align_mask =
-		PCICFG_MEMGRAN - 1; /* 1M alignment on memory space */
+	    PCICFG_MEMGRAN - 1; /* 1M alignment on memory space */
 	io_request->ra_align_mask =
-		PCICFG_IOGRAN - 1;   /* 4K alignment on I/O space */
+	    PCICFG_IOGRAN - 1;   /* 4K alignment on I/O space */
 	io_request->ra_boundbase = 0;
 	io_request->ra_boundlen = PCICFG_4GIG_LIMIT;
 	io_request->ra_flags |= NDI_RA_ALLOC_BOUNDED;
 
 	mem_request->ra_len =
-		PCICFG_ROUND_UP(mem_request->ra_len, PCICFG_MEMGRAN);
+	    PCICFG_ROUND_UP(mem_request->ra_len, PCICFG_MEMGRAN);
 
 	io_request->ra_len =
-		PCICFG_ROUND_UP(io_request->ra_len, PCICFG_IOGRAN);
+	    PCICFG_ROUND_UP(io_request->ra_len, PCICFG_IOGRAN);
 
-		if (ndi_ra_alloc(ddi_get_parent(dip),
-			mem_request, &mem_answer, &alen,
-				NDI_RA_TYPE_MEM, NDI_RA_PASS) != NDI_SUCCESS) {
-			DEBUG0("Failed to allocate memory\n");
-			return (PCICFG_FAILURE);
-		}
+	if (ndi_ra_alloc(ddi_get_parent(dip),
+	    mem_request, &mem_answer, &alen,
+	    NDI_RA_TYPE_MEM, NDI_RA_PASS) != NDI_SUCCESS) {
+		DEBUG0("Failed to allocate memory\n");
+		return (PCICFG_FAILURE);
+	}
 
 	phdl->memory_base = phdl->memory_last = mem_answer;
 	phdl->memory_len  = alen;
@@ -2161,15 +2164,15 @@ pcicfg_allocate_chunk(dev_info_t *dip)
 	phdl->mem_hole.len = phdl->memory_len;
 	phdl->mem_hole.next = (hole_t *)NULL;
 
-		if (ndi_ra_alloc(ddi_get_parent(dip), io_request, &io_answer,
-			&alen, NDI_RA_TYPE_IO, NDI_RA_PASS) != NDI_SUCCESS) {
+	if (ndi_ra_alloc(ddi_get_parent(dip), io_request, &io_answer,
+	    &alen, NDI_RA_TYPE_IO, NDI_RA_PASS) != NDI_SUCCESS) {
 
-			DEBUG0("Failed to allocate I/O space\n");
-			(void) ndi_ra_free(ddi_get_parent(dip), mem_answer,
-				alen, NDI_RA_TYPE_MEM, NDI_RA_PASS);
-			phdl->memory_len = phdl->io_len = 0;
-			return (PCICFG_FAILURE);
-		}
+		DEBUG0("Failed to allocate I/O space\n");
+		(void) ndi_ra_free(ddi_get_parent(dip), mem_answer,
+		    alen, NDI_RA_TYPE_MEM, NDI_RA_PASS);
+		phdl->memory_len = phdl->io_len = 0;
+		return (PCICFG_FAILURE);
+	}
 
 	phdl->io_base = phdl->io_last = (uint32_t)io_answer;
 	phdl->io_len  = (uint32_t)alen;
@@ -2179,9 +2182,9 @@ pcicfg_allocate_chunk(dev_info_t *dip)
 	phdl->io_hole.next = (hole_t *)NULL;
 
 	DEBUG2("MEMORY BASE = [0x%x] length [0x%x]\n",
-		phdl->memory_base, phdl->memory_len);
+	    phdl->memory_base, phdl->memory_len);
 	DEBUG2("IO     BASE = [0x%x] length [0x%x]\n",
-		phdl->io_base, phdl->io_len);
+	    phdl->io_base, phdl->io_len);
 
 	return (PCICFG_SUCCESS);
 }
@@ -2234,7 +2237,7 @@ pcicfg_alloc_hole(hole_t *addr_hole, uint64_t *alast, uint32_t length)
 		actual_hole_start = PCICFG_ROUND_UP(hole->start, length);
 		if (((actual_hole_start - hole->start) + length) <= hole->len) {
 			DEBUG3("hole found. start %llx, len %llx, req=%x\n",
-				hole->start, hole->len, length);
+			    hole->start, hole->len, length);
 			ostart = hole->start;
 			olen = hole->len;
 			/* current hole parameters adjust */
@@ -2246,7 +2249,7 @@ pcicfg_alloc_hole(hole_t *addr_hole, uint64_t *alast, uint32_t length)
 			} else {
 				hole->len = actual_hole_start - hole->start;
 				nhole = (hole_t *)kmem_zalloc(sizeof (hole_t),
-								KM_SLEEP);
+				    KM_SLEEP);
 				nhole->start = actual_hole_start + length;
 				nhole->len = (ostart + olen) - nhole->start;
 				nhole->next = NULL;
@@ -2256,10 +2259,10 @@ pcicfg_alloc_hole(hole_t *addr_hole, uint64_t *alast, uint32_t length)
 				if (nhole->start > *alast)
 					*alast = nhole->start;
 				DEBUG2("put new hole to %llx, %llx\n",
-					nhole->start, nhole->len);
+				    nhole->start, nhole->len);
 			}
 			DEBUG2("adjust current hole to %llx, %llx\n",
-					hole->start, hole->len);
+			    hole->start, hole->len);
 			break;
 		}
 		actual_hole_start = 0;
@@ -2278,13 +2281,13 @@ pcicfg_get_mem(pcicfg_phdl_t *entry,
 
 	/* See if there is a hole, that can hold this request. */
 	new_mem = pcicfg_alloc_hole(&entry->mem_hole, &entry->memory_last,
-								length);
+	    length);
 	if (new_mem) {	/* if non-zero, found a hole. */
 		if (ans != NULL)
 			*ans = new_mem;
 	} else
 		cmn_err(CE_WARN, "No %u bytes memory window for %s\n",
-					length, ddi_get_name(entry->dip));
+		    length, ddi_get_name(entry->dip));
 }
 
 static void
@@ -2306,7 +2309,7 @@ pcicfg_get_io(pcicfg_phdl_t *entry,
 			*ans = new_io;
 	} else
 		cmn_err(CE_WARN, "No %u bytes IO space window for %s\n",
-					length, ddi_get_name(entry->dip));
+		    length, ddi_get_name(entry->dip));
 }
 
 static int
@@ -2341,9 +2344,9 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		if (entry->highest_bus < pci_config_get8(handle,
-			PCI_BCNF_SECBUS)) {
+		    PCI_BCNF_SECBUS)) {
 			entry->highest_bus =
-				pci_config_get8(handle, PCI_BCNF_SECBUS);
+			    pci_config_get8(handle, PCI_BCNF_SECBUS);
 		}
 
 		(void) pcicfg_config_teardown(&handle);
@@ -2351,8 +2354,8 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 		return (DDI_WALK_CONTINUE);
 	} else {
 		if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "reg", (caddr_t)&pci_rp,
-			&length) != DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, "reg", (caddr_t)&pci_rp,
+		    &length) != DDI_PROP_SUCCESS) {
 			/*
 			 * If one node in (the subtree of nodes)
 			 * does'nt have a "reg" property fail the
@@ -2375,29 +2378,29 @@ pcicfg_sum_resources(dev_info_t *dip, void *hdl)
 
 			case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
 				mem_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(mem_request->ra_len,
-				pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low +
+				    PCICFG_ROUND_UP(mem_request->ra_len,
+				    pci_rp[i].pci_size_low);
 				DEBUG1("ADDING 32 --->0x%x\n",
-					pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low);
 
 			break;
 			case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
 				mem_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(mem_request->ra_len,
-				pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low +
+				    PCICFG_ROUND_UP(mem_request->ra_len,
+				    pci_rp[i].pci_size_low);
 				DEBUG1("ADDING 64 --->0x%x\n",
-					pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low);
 
 			break;
 			case PCI_REG_ADDR_G(PCI_ADDR_IO):
 				io_request->ra_len =
-				pci_rp[i].pci_size_low +
-				PCICFG_ROUND_UP(io_request->ra_len,
-				pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low +
+				    PCICFG_ROUND_UP(io_request->ra_len,
+				    pci_rp[i].pci_size_low);
 				DEBUG1("ADDING I/O --->0x%x\n",
-					pci_rp[i].pci_size_low);
+				    pci_rp[i].pci_size_low);
 			break;
 			default:
 			    /* Config space register - not included */
@@ -2540,12 +2543,12 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges,
-		&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read ranges property\n");
 		if (ddi_get_child(dip)) {
 			cmn_err(CE_WARN, "No ranges property found for %s",
-					ddi_get_name(dip));
+			    ddi_get_name(dip));
 			/*
 			 * strictly speaking, we can check for children with
 			 * assigned-addresses but for now it is better to
@@ -2561,20 +2564,20 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 
 	for (i = 0; i < length / sizeof (pcicfg_range_t); i++) {
 		if (ranges[i].size_lo != 0 ||
-			ranges[i].size_hi != 0) {
+		    ranges[i].size_hi != 0) {
 			switch (ranges[i].parent_hi & PCI_REG_ADDR_M) {
 				case PCI_ADDR_IO:
 					DEBUG2("Free I/O    "
-					"base/length = [0x%x]/[0x%x]\n",
-						ranges[i].child_lo,
-						ranges[i].size_lo);
+					    "base/length = [0x%x]/[0x%x]\n",
+					    ranges[i].child_lo,
+					    ranges[i].size_lo);
 					if (ndi_ra_free(ddi_get_parent(dip),
-						(uint64_t)ranges[i].child_lo,
-						(uint64_t)ranges[i].size_lo,
-						NDI_RA_TYPE_IO, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+					    (uint64_t)ranges[i].child_lo,
+					    (uint64_t)ranges[i].size_lo,
+					    NDI_RA_TYPE_IO, NDI_RA_PASS)
+					    != NDI_SUCCESS) {
 						DEBUG0("Trouble freeing "
-						"PCI i/o space\n");
+						    "PCI i/o space\n");
 						kmem_free(ranges, length);
 						return (PCICFG_FAILURE);
 					}
@@ -2582,18 +2585,18 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 				case PCI_ADDR_MEM32:
 				case PCI_ADDR_MEM64:
 					DEBUG3("Free Memory base/length = "
-					"[0x%x.%x]/[0x%x]\n",
-						ranges[i].child_mid,
-						ranges[i].child_lo,
-						ranges[i].size_lo)
+					    "[0x%x.%x]/[0x%x]\n",
+					    ranges[i].child_mid,
+					    ranges[i].child_lo,
+					    ranges[i].size_lo)
 					if (ndi_ra_free(ddi_get_parent(dip),
-						PCICFG_LADDR(ranges[i].child_lo,
-						ranges[i].child_mid),
-						(uint64_t)ranges[i].size_lo,
-						NDI_RA_TYPE_MEM, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+					    PCICFG_LADDR(ranges[i].child_lo,
+					    ranges[i].child_mid),
+					    (uint64_t)ranges[i].size_lo,
+					    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+					    != NDI_SUCCESS) {
 						DEBUG0("Trouble freeing "
-						"PCI memory space\n");
+						    "PCI memory space\n");
 						kmem_free(ranges, length);
 						return (PCICFG_FAILURE);
 					}
@@ -2609,18 +2612,18 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 		kmem_free(ranges, length);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
-		&k) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
+	    &k) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read bus-range property\n");
 		return (PCICFG_FAILURE);
 	}
 
 	DEBUG2("Need to free bus [%d] range [%d]\n",
-		bus[0], bus[1] - bus[0] + 1);
+	    bus[0], bus[1] - bus[0] + 1);
 
 	if (ndi_ra_free(ddi_get_parent(dip),
-		(uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
-		NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
+	    (uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
+	    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
 		/*EMPTY*/
 		DEBUG0("Failed to free a bus number\n");
 	}
@@ -2642,8 +2645,8 @@ pcicfg_free_device_resources(dev_info_t *dip)
 	int i;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
-		&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read assigned-addresses property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -2753,8 +2756,8 @@ pcicfg_match_dev(dev_info_t *dip, void *hdl)
 	int pci_func;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "reg", (int **)&pci_rp,
-		(uint_t *)&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "reg", (int **)&pci_rp,
+	    (uint_t *)&length) != DDI_PROP_SUCCESS) {
 		ctrl->dip = NULL;
 		return (DDI_WALK_TERMINATE);
 	}
@@ -2791,7 +2794,7 @@ pcicfg_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 
 	DEBUG0("pcicfg_update_assigned_prop()\n");
 	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"assigned-addresses", (caddr_t)&assigned, &alen);
+	    "assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
 		break;
@@ -2800,8 +2803,8 @@ pcicfg_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 			return (PCICFG_FAILURE);
 		default:
 			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-			"assigned-addresses", (int *)newone,
-				sizeof (*newone)/sizeof (int));
+			    "assigned-addresses", (int *)newone,
+			    sizeof (*newone)/sizeof (int));
 
 			(void) pcicfg_dump_assigned(dip);
 
@@ -2823,8 +2826,8 @@ pcicfg_update_assigned_prop(dev_info_t *dip, pci_regspec_t *newone)
 	 * Write out the new "assigned-addresses" spec
 	 */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"assigned-addresses", (int *)newreg,
-		(alen + sizeof (*newone))/sizeof (int));
+	    "assigned-addresses", (int *)newreg,
+	    (alen + sizeof (*newone))/sizeof (int));
 
 	kmem_free((caddr_t)newreg, alen+sizeof (*newone));
 
@@ -2846,7 +2849,7 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 	uint_t		status;
 
 	status = ddi_getlongprop(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges, &rlen);
+	    dip, DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges, &rlen);
 
 
 	switch (status) {
@@ -2858,9 +2861,9 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 		default:
 			DEBUG0("no ranges property - creating one\n");
 			if (ndi_prop_update_int_array(DDI_DEV_T_NONE,
-				dip, "ranges", (int *)addition,
-				sizeof (pcicfg_range_t)/sizeof (int))
-				!= DDI_SUCCESS) {
+			    dip, "ranges", (int *)addition,
+			    sizeof (pcicfg_range_t)/sizeof (int))
+			    != DDI_SUCCESS) {
 				DEBUG0("Did'nt create ranges property\n");
 				return (PCICFG_FAILURE);
 			}
@@ -2880,8 +2883,8 @@ pcicfg_update_ranges_prop(dev_info_t *dip, pcicfg_range_t *addition)
 	 * Write out the new "ranges" property
 	 */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-		dip, "ranges", (int *)newreg,
-		(rlen + sizeof (pcicfg_range_t))/sizeof (int));
+	    dip, "ranges", (int *)newreg,
+	    (rlen + sizeof (pcicfg_range_t))/sizeof (int));
 
 	kmem_free((caddr_t)newreg, rlen+sizeof (pcicfg_range_t));
 
@@ -2902,7 +2905,7 @@ pcicfg_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 	uint_t		status;
 
 	status = ddi_getlongprop(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
+	    dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
 
 	switch (status) {
 		case DDI_PROP_SUCCESS:
@@ -2939,7 +2942,7 @@ pcicfg_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 			if ((PCI_BASE_TYPE_M & regvalue) == PCI_BASE_TYPE_MEM) {
 				hiword |= PCI_ADDR_MEM32;
 			} else if ((PCI_BASE_TYPE_M & regvalue)
-				== PCI_BASE_TYPE_ALL) {
+			    == PCI_BASE_TYPE_ALL) {
 				hiword |= PCI_ADDR_MEM64;
 			}
 		} else {
@@ -2960,8 +2963,8 @@ pcicfg_update_reg_prop(dev_info_t *dip, uint32_t regvalue, uint_t reg_offset)
 	 * Write out the new "reg" property
 	 */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-		dip, "reg", (int *)newreg,
-		(rlen + sizeof (pci_regspec_t))/sizeof (int));
+	    dip, "reg", (int *)newreg,
+	    (rlen + sizeof (pci_regspec_t))/sizeof (int));
 
 	kmem_free((caddr_t)newreg, rlen+sizeof (pci_regspec_t));
 	kmem_free((caddr_t)reg, rlen);
@@ -2979,7 +2982,7 @@ pcicfg_update_available_prop(dev_info_t *dip, pci_regspec_t *newone)
 	DEBUG2("pcicfg_update_available_prop() - Address %lx Size %x\n",
 	    newone->pci_phys_low, newone->pci_size_low);
 	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"available", (caddr_t)&avail_p, &alen);
+	    "available", (caddr_t)&avail_p, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
 			break;
@@ -3005,8 +3008,8 @@ pcicfg_update_available_prop(dev_info_t *dip, pci_regspec_t *newone)
 
 	/* Write out the new "available" spec */
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"available", (int *)new_avail,
-		(alen + sizeof (*newone))/sizeof (int));
+	    "available", (int *)new_avail,
+	    (alen + sizeof (*newone))/sizeof (int));
 
 	kmem_free((caddr_t)new_avail, alen+sizeof (*newone));
 
@@ -3025,7 +3028,7 @@ pcicfg_device_on(ddi_acc_handle_t config_handle)
 	 * fast back-to-back, and addr. stepping?
 	 */
 	pci_config_put16(config_handle, PCI_CONF_COMM,
-		pci_config_get16(config_handle, PCI_CONF_COMM) | 0x7);
+	    pci_config_get16(config_handle, PCI_CONF_COMM) | 0x7);
 }
 
 static void
@@ -3052,16 +3055,16 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	/* These two exists only for non-bridges */
 	if (((pci_config_get8(config_handle, PCI_CONF_HEADER)
-			& PCI_HEADER_TYPE_M) == PCI_HEADER_ZERO) && !pcie_dev) {
+	    & PCI_HEADER_TYPE_M) == PCI_HEADER_ZERO) && !pcie_dev) {
 		byteval = pci_config_get8(config_handle, PCI_CONF_MIN_G);
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			"min-grant", byteval)) != DDI_SUCCESS) {
+		    "min-grant", byteval)) != DDI_SUCCESS) {
 			return (ret);
 		}
 
 		byteval = pci_config_get8(config_handle, PCI_CONF_MAX_L);
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			"max-latency", byteval)) != DDI_SUCCESS) {
+		    "max-latency", byteval)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
@@ -3073,31 +3076,32 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	val = pci_config_get16(config_handle, PCI_CONF_VENID);
 
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"vendor-id", val)) != DDI_SUCCESS) {
+	    "vendor-id", val)) != DDI_SUCCESS) {
 		return (ret);
 	}
 	val = pci_config_get16(config_handle, PCI_CONF_DEVID);
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"device-id", val)) != DDI_SUCCESS) {
+	    "device-id", val)) != DDI_SUCCESS) {
 		return (ret);
 	}
 	byteval = pci_config_get8(config_handle, PCI_CONF_REVID);
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"revision-id", byteval)) != DDI_SUCCESS) {
+	    "revision-id", byteval)) != DDI_SUCCESS) {
 		return (ret);
 	}
 
 	wordval = (pci_config_get16(config_handle, PCI_CONF_SUBCLASS)<< 8) |
-		(pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
+	    (pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
 
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"class-code", wordval)) != DDI_SUCCESS) {
+	    "class-code", wordval)) != DDI_SUCCESS) {
 		return (ret);
 	}
+	/* devsel-speed starts at the 9th bit */
 	val = (pci_config_get16(config_handle,
-		PCI_CONF_STAT) & PCI_STAT_DEVSELT);
+	    PCI_CONF_STAT) & PCI_STAT_DEVSELT) >> 9;
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"devsel-speed", val)) != DDI_SUCCESS) {
+	    "devsel-speed", val)) != DDI_SUCCESS) {
 		return (ret);
 	}
 
@@ -3107,24 +3111,24 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	 * is set, non-existent otherwise
 	 */
 	if ((!pcie_dev) &&
-			(pci_config_get16(config_handle, PCI_CONF_STAT) &
-				PCI_STAT_FBBC)) {
+	    (pci_config_get16(config_handle, PCI_CONF_STAT) &
+	    PCI_STAT_FBBC)) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"fast-back-to-back", 0)) != DDI_SUCCESS) {
+		    "fast-back-to-back", 0)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
 	if ((!pcie_dev) &&
-			(pci_config_get16(config_handle, PCI_CONF_STAT) &
-				PCI_STAT_66MHZ)) {
+	    (pci_config_get16(config_handle, PCI_CONF_STAT) &
+	    PCI_STAT_66MHZ)) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"66mhz-capable", 0)) != DDI_SUCCESS) {
+		    "66mhz-capable", 0)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
 	if (pci_config_get16(config_handle, PCI_CONF_STAT) & PCI_STAT_UDF) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"udf-supported", 0)) != DDI_SUCCESS) {
+		    "udf-supported", 0)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
@@ -3136,23 +3140,23 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	 * of the register.
 	 */
 	if ((val = pci_config_get16(config_handle,
-		PCI_CONF_SUBVENID)) != 0) {
+	    PCI_CONF_SUBVENID)) != 0) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"subsystem-vendor-id", val)) != DDI_SUCCESS) {
+		    "subsystem-vendor-id", val)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
 	if ((val = pci_config_get16(config_handle,
-		PCI_CONF_SUBSYSID)) != 0) {
+	    PCI_CONF_SUBSYSID)) != 0) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"subsystem-id", val)) != DDI_SUCCESS) {
+		    "subsystem-id", val)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
 	if ((val = pci_config_get16(config_handle,
-		PCI_CONF_CACHE_LINESZ)) != 0) {
+	    PCI_CONF_CACHE_LINESZ)) != 0) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"cache-line-size", val)) != DDI_SUCCESS) {
+		    "cache-line-size", val)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
@@ -3167,7 +3171,7 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 		 * record the interrupt line used
 		 */
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"interrupts", byteval)) != DDI_SUCCESS) {
+		    "interrupts", byteval)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
@@ -3176,16 +3180,16 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	if (pcie_dev && (ret == DDI_SUCCESS)) {
 		val = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
+		    PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
 		if (val) {
 			wordval = (PCI_CAP_GET32(config_handle, NULL,
-					cap_ptr, PCIE_SLOTCAP) >>
-					PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
-					PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
+			    cap_ptr, PCIE_SLOTCAP) >>
+			    PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
+			    PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
 			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE,
-					dip, "physical-slot#", wordval))
-						!= DDI_SUCCESS) {
+			    dip, "physical-slot#", wordval))
+			    != DDI_SUCCESS) {
 				return (ret);
 			}
 		}
@@ -3205,15 +3209,15 @@ pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type,
 		(void) strcpy(device_type, "pci");
 
 	if ((ret = ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-				"device_type", device_type)) != DDI_SUCCESS) {
+	    "device_type", device_type)) != DDI_SUCCESS) {
 		return (ret);
 	}
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"#address-cells", 3)) != DDI_SUCCESS) {
+	    "#address-cells", 3)) != DDI_SUCCESS) {
 		return (ret);
 	}
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-				"#size-cells", 2)) != DDI_SUCCESS) {
+	    "#size-cells", 2)) != DDI_SUCCESS) {
 		return (ret);
 	}
 
@@ -3254,9 +3258,9 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 		(void) sprintf(pprefix, "pciex");
 	else
 		(void) sprintf(pprefix, "pci");
-	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
+	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID);
 	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
-	vid = pci_config_get16(config_handle, PCI_CONF_VENID),
+	vid = pci_config_get16(config_handle, PCI_CONF_VENID);
 	did = pci_config_get16(config_handle, PCI_CONF_DEVID);
 	revid = pci_config_get8(config_handle, PCI_CONF_REVID);
 	pif = pci_config_get8(config_handle, PCI_CONF_PROGCLASS);
@@ -3346,13 +3350,13 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	/* pci[ex]VVVV,DDDD.SSSS.ssss.RR */
 	(void) sprintf(buffer, "%s%x,%x.%x.%x.%x", pprefix,  vid, did,
-					sub_vid, sub_sid, revid);
+	    sub_vid, sub_sid, revid);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
 
 	/* pci[ex]VVVV,DDDD.SSSS.ssss */
 	(void) sprintf(buffer, "%s%x,%x.%x.%x", pprefix,  vid, did,
-					sub_vid, sub_sid);
+	    sub_vid, sub_sid);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
 
@@ -3375,7 +3379,7 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	/* pci[ex]class,CCSSPP */
 	(void) sprintf(buffer, "%sclass,%02x%02x%02x", pprefix,
-		pclass, psubclass, pif);
+	    pclass, psubclass, pif);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
 
@@ -3385,7 +3389,7 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	(void) strcpy(compat[n++], buffer);
 
 	if ((ret = ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
-		"compatible", (char **)compat, n)) != DDI_SUCCESS) {
+	    "compatible", (char **)compat, n)) != DDI_SUCCESS) {
 		return (ret);
 	}
 
@@ -3415,7 +3419,7 @@ pcicfg_set_bus_numbers(ddi_acc_handle_t config_handle,
 uint_t primary, uint_t secondary, uint_t subordinate)
 {
 	DEBUG3("Setting bridge bus-range %d,%d,%d\n", primary, secondary,
-		subordinate);
+	    subordinate);
 	/*
 	 * Primary bus#
 	 */
@@ -3474,27 +3478,27 @@ pcicfg_setup_bridge(pcicfg_phdl_t *entry,
 	 * Reset the secondary bus
 	 */
 	pci_config_put16(handle, PCI_BCNF_BCNTRL,
-		pci_config_get16(handle, PCI_BCNF_BCNTRL) | 0x40);
+	    pci_config_get16(handle, PCI_BCNF_BCNTRL) | 0x40);
 
 	drv_usecwait(100);
 
 	pci_config_put16(handle, PCI_BCNF_BCNTRL,
-		pci_config_get16(handle, PCI_BCNF_BCNTRL) & ~0x40);
+	    pci_config_get16(handle, PCI_BCNF_BCNTRL) & ~0x40);
 
 	/*
 	 * Program the memory base register with the
 	 * start of the memory range
 	 */
 	pci_config_put16(handle, PCI_BCNF_MEM_BASE,
-		PCICFG_HIWORD(PCICFG_LOADDR(entry->memory_last)));
+	    PCICFG_HIWORD(PCICFG_LOADDR(entry->memory_last)));
 
 	/*
 	 * Program the I/O base register with the start of the I/O range
 	 */
 	pci_config_put8(handle, PCI_BCNF_IO_BASE_LOW,
-		PCICFG_HIBYTE(PCICFG_LOWORD(PCICFG_LOADDR(entry->io_last))));
+	    PCICFG_HIBYTE(PCICFG_LOWORD(PCICFG_LOADDR(entry->io_last))));
 	pci_config_put16(handle, PCI_BCNF_IO_BASE_HI,
-		PCICFG_HIWORD(PCICFG_LOADDR(entry->io_last)));
+	    PCICFG_HIWORD(PCICFG_LOADDR(entry->io_last)));
 
 	/*
 	 * Clear status bits
@@ -3533,36 +3537,36 @@ pcicfg_update_bridge(pcicfg_phdl_t *entry,
 	 */
 
 	DEBUG1("DOWN ROUNDED ===>[0x%x]\n",
-		PCICFG_ROUND_DOWN(entry->memory_last,
-		PCICFG_MEMGRAN));
+	    PCICFG_ROUND_DOWN(entry->memory_last,
+	    PCICFG_MEMGRAN));
 
 	pci_config_put16(handle, PCI_BCNF_MEM_LIMIT,
-		PCICFG_HIWORD(PCICFG_LOADDR(
-		PCICFG_ROUND_DOWN(entry->memory_last,
-			PCICFG_MEMGRAN))));
+	    PCICFG_HIWORD(PCICFG_LOADDR(
+	    PCICFG_ROUND_DOWN(entry->memory_last,
+	    PCICFG_MEMGRAN))));
 	/*
 	 * Since this is a bridge, the rest of this range will
 	 * be responded to by the bridge.  We have to round up
 	 * so no other device claims it.
 	 */
 	if ((length = (PCICFG_ROUND_UP(entry->memory_last,
-		PCICFG_MEMGRAN) - entry->memory_last)) > 0) {
+	    PCICFG_MEMGRAN) - entry->memory_last)) > 0) {
 		(void) pcicfg_get_mem(entry, length, NULL);
 		DEBUG1("Added [0x%x]at the top of "
-		"the bridge (mem)\n", length);
+		    "the bridge (mem)\n", length);
 	}
 
 	/*
 	 * Program the I/O limit register with the end of the I/O range
 	 */
 	pci_config_put8(handle, PCI_BCNF_IO_LIMIT_LOW,
-		PCICFG_HIBYTE(PCICFG_LOWORD(
-		PCICFG_LOADDR(PCICFG_ROUND_DOWN(entry->io_last,
-			PCICFG_IOGRAN)))));
+	    PCICFG_HIBYTE(PCICFG_LOWORD(
+	    PCICFG_LOADDR(PCICFG_ROUND_DOWN(entry->io_last,
+	    PCICFG_IOGRAN)))));
 
 	pci_config_put16(handle, PCI_BCNF_IO_LIMIT_HI,
-		PCICFG_HIWORD(PCICFG_LOADDR(PCICFG_ROUND_DOWN(entry->io_last,
-		PCICFG_IOGRAN))));
+	    PCICFG_HIWORD(PCICFG_LOADDR(PCICFG_ROUND_DOWN(entry->io_last,
+	    PCICFG_IOGRAN))));
 
 	/*
 	 * Same as above for I/O space. Since this is a
@@ -3571,10 +3575,10 @@ pcicfg_update_bridge(pcicfg_phdl_t *entry,
 	 * other device claims it.
 	 */
 	if ((length = (PCICFG_ROUND_UP(entry->io_last,
-		PCICFG_IOGRAN) - entry->io_last)) > 0) {
+	    PCICFG_IOGRAN) - entry->io_last)) > 0) {
 		(void) pcicfg_get_io(entry, length, NULL);
 		DEBUG1("Added [0x%x]at the top of "
-		"the bridge (I/O)\n",  length);
+		    "the bridge (I/O)\n",  length);
 	}
 }
 
@@ -3594,25 +3598,25 @@ pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 	pci_config_put16(h, PCI_BCNF_BCNTRL, val);
 	/* clear any current pending errors */
 	pci_config_put16(h, PCI_CONF_STAT, PCI_STAT_S_TARG_AB|
-		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
 	pci_config_put16(h, PCI_BCNF_SEC_STATUS, PCI_STAT_S_TARG_AB|
-		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
 	/* if we are a PCIe device, disable the generation of UR, CE and NFE */
 	if (regs->pcie_dev) {
 		uint16_t devctl;
 		uint16_t cap_ptr;
 
 		if ((PCI_CAP_LOCATE(h, PCI_CAP_ID_PCI_E, &cap_ptr)) ==
-			DDI_FAILURE)
+		    DDI_FAILURE)
 			return;
 
 		regs->pcie_cap_off = cap_ptr;
 		regs->devctl = devctl = PCI_CAP_GET16(h, NULL, cap_ptr,
-			PCIE_DEVCTL);
+		    PCIE_DEVCTL);
 		devctl &= ~(PCIE_DEVCTL_UR_REPORTING_EN |
-				PCIE_DEVCTL_CE_REPORTING_EN |
-				PCIE_DEVCTL_NFE_REPORTING_EN |
-				PCIE_DEVCTL_FE_REPORTING_EN);
+		    PCIE_DEVCTL_CE_REPORTING_EN |
+		    PCIE_DEVCTL_NFE_REPORTING_EN |
+		    PCIE_DEVCTL_FE_REPORTING_EN);
 		PCI_CAP_PUT16(h, NULL, cap_ptr, PCIE_DEVCTL, devctl);
 	}
 }
@@ -3624,15 +3628,15 @@ pcicfg_enable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
 {
 	/* clear any pending errors */
 	pci_config_put16(h, PCI_CONF_STAT, PCI_STAT_S_TARG_AB|
-		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
 	pci_config_put16(h, PCI_BCNF_SEC_STATUS, PCI_STAT_S_TARG_AB|
-		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
 
 	/* restore original settings */
 	if (regs->pcie_dev) {
 		pcie_clear_errors(dip, h);
 		pci_config_put16(h, regs->pcie_cap_off + PCIE_DEVCTL,
-				regs->devctl);
+		    regs->devctl);
 	}
 
 	pci_config_put16(h, PCI_BCNF_BCNTRL, regs->bcntl);
@@ -3662,27 +3666,27 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	 * ndi_devi_alloc() is called as ndi_devi_alloc_sleep()
 	 */
 	if (ndi_devi_alloc(parent, DEVI_PSEUDO_NEXNAME,
-		(pnode_t)DEVI_SID_NODEID, &new_child)
-		!= NDI_SUCCESS) {
+	    (pnode_t)DEVI_SID_NODEID, &new_child)
+	    != NDI_SUCCESS) {
 		DEBUG0("pcicfg_probe_children(): Failed to alloc child node\n");
 		return (PCICFG_FAILURE);
 	}
 
 	if (pcicfg_add_config_reg(new_child, bus,
-		device, func) != DDI_SUCCESS) {
+	    device, func) != DDI_SUCCESS) {
 		DEBUG0("pcicfg_probe_children():"
-		"Failed to add candidate REG\n");
+		    "Failed to add candidate REG\n");
 		goto failedconfig;
 	}
 
 	if ((ret = pcicfg_config_setup(new_child, &config_handle))
-		!= PCICFG_SUCCESS) {
+	    != PCICFG_SUCCESS) {
 		if (ret == PCICFG_NODEVICE) {
 			(void) ndi_devi_free(new_child);
 			return (ret);
 		}
 		DEBUG0("pcicfg_probe_children():"
-		"Failed to setup config space\n");
+		    "Failed to setup config space\n");
 		goto failedconfig;
 	}
 
@@ -3695,7 +3699,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 
 	/* check if we are PCIe device */
 	if (pcicfg_pcie_dev(new_child, PCICFG_DEVICE_TYPE_PCIE, &regs)
-					== DDI_SUCCESS) {
+	    == DDI_SUCCESS) {
 		DEBUG0("PCIe device detected\n");
 		pcie_dev = 1;
 	}
@@ -3704,7 +3708,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	 * Set 1275 properties common to all devices
 	 */
 	if (pcicfg_set_standard_props(new_child, config_handle,
-			pcie_dev) != PCICFG_SUCCESS) {
+	    pcie_dev) != PCICFG_SUCCESS) {
 		DEBUG0("Failed to set standard properties\n");
 		goto failedchild;
 	}
@@ -3713,7 +3717,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	 * Child node properties  NOTE: Both for PCI-PCI bridge and child node
 	 */
 	if (pcicfg_set_childnode_props(new_child, config_handle,
-			pcie_dev) != PCICFG_SUCCESS) {
+	    pcie_dev) != PCICFG_SUCCESS) {
 		goto failedchild;
 	}
 
@@ -3730,9 +3734,9 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	}
 
 	DEBUG1("---Vendor ID = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_VENID));
+	    pci_config_get16(config_handle, PCI_CONF_VENID));
 	DEBUG1("---Device ID = [0x%x]\n",
-		pci_config_get16(config_handle, PCI_CONF_DEVID));
+	    pci_config_get16(config_handle, PCI_CONF_DEVID));
 
 	/*
 	 * Attach the child to its parent
@@ -3742,10 +3746,10 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		DEBUG3("--Bridge found bus [0x%x] device"
-			"[0x%x] func [0x%x]\n", bus, device, func);
+		    "[0x%x] func [0x%x]\n", bus, device, func);
 
 		if (pcicfg_probe_bridge(new_child, config_handle,
-				bus, highest_bus) != PCICFG_SUCCESS) {
+		    bus, highest_bus) != PCICFG_SUCCESS) {
 			(void) pcicfg_free_bridge_resources(new_child);
 			goto failedchild;
 		}
@@ -3753,8 +3757,8 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	} else {
 
 		DEBUG3("--Leaf device found bus [0x%x] device"
-			"[0x%x] func [0x%x]\n",
-				bus, device, func);
+		    "[0x%x] func [0x%x]\n",
+		    bus, device, func);
 
 		i = PCI_CONF_BASE0;
 
@@ -3772,12 +3776,12 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 				 * Add to the "reg" property
 				 */
 				if (pcicfg_update_reg_prop(new_child,
-					request, i) != PCICFG_SUCCESS) {
+				    request, i) != PCICFG_SUCCESS) {
 					goto failedchild;
 				}
 			} else {
 				DEBUG1("BASE register [0x%x] asks for "
-				"[0x0]=[0x0](32)\n", i);
+				    "[0x0]=[0x0](32)\n", i);
 				i += 4;
 				continue;
 			}
@@ -3787,15 +3791,15 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 			 */
 			if ((PCI_BASE_TYPE_M & request) == PCI_BASE_TYPE_ALL) {
 				DEBUG3("BASE register [0x%x] asks for "
-				"[0x%x]=[0x%x] (64)\n",
-					i, request,
-					(~(PCI_BASE_M_ADDR_M & request))+1)
+				    "[0x%x]=[0x%x] (64)\n",
+				    i, request,
+				    (~(PCI_BASE_M_ADDR_M & request))+1)
 				i += 8;
 			} else {
 				DEBUG3("BASE register [0x%x] asks for "
-				"[0x%x]=[0x%x](32)\n",
-					i, request,
-					(~(PCI_BASE_M_ADDR_M & request))+1)
+				    "[0x%x]=[0x%x](32)\n",
+				    i, request,
+				    (~(PCI_BASE_M_ADDR_M & request))+1)
 				i += 4;
 			}
 		}
@@ -3813,13 +3817,13 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 
 		if (request != 0) {
 			DEBUG3("BASE register [0x%x] asks for [0x%x]=[0x%x]\n",
-				PCI_CONF_ROM, request,
-				(~(PCI_BASE_ROM_ADDR_M & request))+1);
+			    PCI_CONF_ROM, request,
+			    (~(PCI_BASE_ROM_ADDR_M & request))+1);
 			/*
 			 * Add to the "reg" property
 			 */
 			if (pcicfg_update_reg_prop(new_child,
-				request, PCI_CONF_ROM) != PCICFG_SUCCESS) {
+			    request, PCI_CONF_ROM) != PCICFG_SUCCESS) {
 				goto failedchild;
 			}
 		}
@@ -3874,7 +3878,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 * if so, program config space to disable error msgs during probe.
 	 */
 	if (pcicfg_pcie_dev(parent, PCICFG_DEVICE_TYPE_PCIE, &parent_regs)
-				== DDI_SUCCESS) {
+	    == DDI_SUCCESS) {
 		DEBUG0("PCI/PCIe parent detected. Disable errors.\n");
 		/*
 		 * disable parent generating URs or SERR#s during probing
@@ -3892,8 +3896,8 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 */
 
 	if (ndi_devi_alloc(parent, DEVI_PSEUDO_NEXNAME,
-		(pnode_t)DEVI_SID_NODEID, &new_child)
-		!= NDI_SUCCESS) {
+	    (pnode_t)DEVI_SID_NODEID, &new_child)
+	    != NDI_SUCCESS) {
 		DEBUG0("pcicfg_fcode_probe(): Failed to alloc child node\n");
 		/* return (PCICFG_FAILURE); */
 		ret = PCICFG_FAILURE;
@@ -3906,15 +3910,15 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 * produce one by hand.
 	 */
 	if (pcicfg_add_config_reg(new_child, bus,
-			device, func) != DDI_SUCCESS) {
+	    device, func) != DDI_SUCCESS) {
 		ret = PCICFG_FAILURE;
 		goto failed3;
 	}
 #ifdef	EFCODE21554
 	if ((ret = pcicfg_config_setup(new_child, &h))
-						!= PCICFG_SUCCESS) {
+	    != PCICFG_SUCCESS) {
 		DEBUG0("pcicfg_fcode_probe():"
-			"Failed to setup config space\n");
+		    "Failed to setup config space\n");
 		ret = PCICFG_NODEVICE;
 		goto failed3;
 	}
@@ -3933,7 +3937,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 	if (pcicfg_map_phys(new_child, &p, &virt, &acc, &h)) {
 		DEBUG0("pcicfg_fcode_probe():"
-				"Failed to setup config space\n");
+		    "Failed to setup config space\n");
 		ret = PCICFG_NODEVICE;
 		goto failed3;
 	}
@@ -3960,7 +3964,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 	/* check if we are PCIe device */
 	if (pcicfg_pcie_dev(new_child, PCICFG_DEVICE_TYPE_PCIE, &regs)
-					== DDI_SUCCESS) {
+	    == DDI_SUCCESS) {
 		/*EMPTY*/
 		DEBUG0("PCI/PCIe device detected\n");
 	}
@@ -3978,7 +3982,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 * Child node properties  NOTE: Both for PCI-PCI bridge and child node
 	 */
 	if (pcicfg_set_childnode_props(new_child,
-		h, regs.pcie_dev) != PCICFG_SUCCESS) {
+	    h, regs.pcie_dev) != PCICFG_SUCCESS) {
 		ret = PCICFG_FAILURE;
 		goto failed;
 	}
@@ -4007,17 +4011,17 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 		 */
 
 		DEBUG3("--Bridge found bus [0x%x] device"
-			"[0x%x] func [0x%x]\n", bus, device, func);
+		    "[0x%x] func [0x%x]\n", bus, device, func);
 
 		if ((ret = pcicfg_probe_bridge(new_child, h,
-				bus, highest_bus)) != PCICFG_SUCCESS)
+		    bus, highest_bus)) != PCICFG_SUCCESS)
 			(void) pcicfg_free_bridge_resources(new_child);
 		goto done;
 	} else {
 
 		DEBUG3("--Leaf device found bus [0x%x] device"
-			"[0x%x] func [0x%x]\n",
-				bus, device, func);
+		    "[0x%x] func [0x%x]\n",
+		    bus, device, func);
 
 		/*
 		 * link in tree, but don't bind driver
@@ -4182,7 +4186,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 			goto done;
 		} else if ((error != FC_NO_FCODE) &&
-				(pcicfg_dont_interpret == 0))  {
+		    (pcicfg_dont_interpret == 0))  {
 			/*
 			 * The interpreter located fcode, but had an error in
 			 * processing. Cleanup and fail the operation.
@@ -4218,7 +4222,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			DEBUG0("No Drop-in Probe device ourself\n");
 
 			ret = pcicfg_probe_children(parent, bus, device, func,
-					highest_bus);
+			    highest_bus);
 
 			if (ret != PCICFG_SUCCESS) {
 				DEBUG0("Could not self probe child\n");
@@ -4261,7 +4265,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 				DEBUG0("Found nontransparent bridge.\n");
 
 				ret = pcicfg_configure_ntbridge(new_child,
-								bus, device);
+				    bus, device);
 			}
 			if (ret != PCICFG_SUCCESS) {
 				/*
@@ -4337,10 +4341,10 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	}
 
 	DEBUG2("Bus Range Allocated [base=%d] [len=%d]\n",
-			pcibus_base, pcibus_alen);
+	    pcibus_base, pcibus_alen);
 
 	if (ndi_ra_map_setup(new_child, NDI_RA_TYPE_PCI_BUSNUM)
-				== NDI_FAILURE) {
+	    == NDI_FAILURE) {
 		DEBUG0("Can not setup resource map - NDI_RA_TYPE_PCI_BUSNUM\n");
 		return (PCICFG_FAILURE);
 	}
@@ -4351,7 +4355,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	 * to child.
 	 */
 	(void) ndi_ra_free(new_child, pcibus_base+1, pcibus_alen-1,
-				NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS);
+	    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS);
 
 	next_bus = pcibus_base;
 	max_bus = pcibus_base + pcibus_alen - 1;
@@ -4436,11 +4440,11 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 	if (io_alen) {
 		DEBUG3("Bridge IO Space Allocated [0x%x.%x] len [0x%x]\n",
-			PCICFG_HIADDR(io_answer), PCICFG_LOADDR(io_answer),
-				io_alen);
+		    PCICFG_HIADDR(io_answer), PCICFG_LOADDR(io_answer),
+		    io_alen);
 
 		if (ndi_ra_map_setup(new_child, NDI_RA_TYPE_IO) ==
-				NDI_FAILURE) {
+		    NDI_FAILURE) {
 			DEBUG0("Can not setup resource map - NDI_RA_TYPE_IO\n");
 			return (PCICFG_FAILURE);
 		}
@@ -4449,7 +4453,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		 * Put available I/O into the pool.
 		 */
 		(void) ndi_ra_free(new_child, io_answer, io_alen,
-			NDI_RA_TYPE_IO, NDI_RA_PASS);
+		    NDI_RA_TYPE_IO, NDI_RA_PASS);
 		io_base = io_answer;
 	}
 
@@ -4609,18 +4613,18 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	for (i = 0; i < PCICFG_MAX_DEVICE; i++) {
 		for (j = 0; j < PCICFG_MAX_FUNCTION; j++) {
 			if ((rval = pcicfg_fcode_probe(new_child,
-					new_bus, i, j, highest_bus))
-							!= PCICFG_SUCCESS) {
+			    new_bus, i, j, highest_bus))
+			    != PCICFG_SUCCESS) {
 				if (rval == PCICFG_NODEVICE) {
 					DEBUG3("No Device at bus [0x%x]"
-						"device [0x%x] "
-						"func [0x%x]\n", new_bus, i, j);
+					    "device [0x%x] "
+					    "func [0x%x]\n", new_bus, i, j);
 					if (j)
 						continue;
 				} else {
 					DEBUG3("Failed to configure bus "
-						"[0x%x] device [0x%x] "
-						"func [0x%x]\n", new_bus, i, j);
+					    "[0x%x] device [0x%x] "
+					    "func [0x%x]\n", new_bus, i, j);
 					rval = PCICFG_FAILURE;
 				}
 
@@ -4662,7 +4666,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	io_end = PCICFG_ROUND_UP(phdl.io_base, PCICFG_IOGRAN);
 
 	DEBUG3("Start of Unallocated Bridge(%d slots) Resources "
-		"Mem=0x%lx I/O=0x%lx\n", num_slots, mem_end, io_end);
+	    "Mem=0x%lx I/O=0x%lx\n", num_slots, mem_end, io_end);
 
 	/*
 	 * if the bridge a slots, then preallocate. If not, assume static
@@ -4674,46 +4678,46 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		uint64_t mem_assigned = mem_end;
 		uint64_t io_assigned = io_end;
 		uint64_t mem_reqd = mem_answer + (num_slots *
-						pcicfg_slot_memsize);
+		    pcicfg_slot_memsize);
 		uint64_t io_reqd = io_answer + (num_slots *
-						pcicfg_slot_iosize);
+		    pcicfg_slot_iosize);
 		uint8_t highest_bus_reqd = new_bus + (num_slots *
-						pcicfg_slot_busnums);
+		    pcicfg_slot_busnums);
 
 		if (mem_end > mem_reqd)
 			cmn_err(CE_WARN, "Memory space consumed by bridge"
-				" more than planned for %d slot(s)(%lx, %lx)",
-				num_slots, mem_answer, mem_end);
+			    " more than planned for %d slot(s)(%lx, %lx)",
+			    num_slots, mem_answer, mem_end);
 		if (io_end > io_reqd)
 			cmn_err(CE_WARN, "IO space consumed by bridge"
-				" more than planned for %d slot(s)(%lx, %lx)",
-				num_slots, io_answer, io_end);
+			    " more than planned for %d slot(s)(%lx, %lx)",
+			    num_slots, io_answer, io_end);
 		if (*highest_bus > highest_bus_reqd)
 			cmn_err(CE_WARN, "Buses consumed by bridge"
-				" more than planned for %d slot(s)(%x, %x)",
-				num_slots, new_bus, *highest_bus);
+			    " more than planned for %d slot(s)(%x, %x)",
+			    num_slots, new_bus, *highest_bus);
 
 		if (mem_reqd > (mem_answer + mem_alen))
 			cmn_err(CE_WARN, "Memory space required by bridge"
-				" more than available for %d slot(s)(%lx, %lx)",
-				num_slots, mem_answer, mem_end);
+			    " more than available for %d slot(s)(%lx, %lx)",
+			    num_slots, mem_answer, mem_end);
 
 		if (io_reqd > (io_answer + io_alen))
 			cmn_err(CE_WARN, "IO space required by bridge"
-				" more than available for %d slot(s)(%lx, %lx)",
-				num_slots, io_answer, io_end);
+			    " more than available for %d slot(s)(%lx, %lx)",
+			    num_slots, io_answer, io_end);
 		if (highest_bus_reqd > max_bus)
 			cmn_err(CE_WARN, "Bus numbers required by bridge"
-				" more than available for %d slot(s)(%x, %x)",
-				num_slots, new_bus, *highest_bus);
+			    " more than available for %d slot(s)(%x, %x)",
+			    num_slots, new_bus, *highest_bus);
 
 		mem_end = MAX((MIN(mem_reqd, (mem_answer + mem_alen))),
-								mem_end);
+		    mem_end);
 		io_end = MAX((MIN(io_reqd, (io_answer + io_alen))), io_end);
 		*highest_bus = MAX((MIN(highest_bus_reqd, max_bus)),
-							*highest_bus);
+		    *highest_bus);
 		DEBUG3("mem_end %lx, io_end %lx, highest_bus %x\n",
-				mem_end, io_end, *highest_bus);
+		    mem_end, io_end, *highest_bus);
 
 		mem_size = mem_end - mem_assigned;
 		io_size = io_end - io_assigned;
@@ -4746,7 +4750,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	 */
 	(void) ndi_ra_free(ddi_get_parent(new_child),
 	    mem_end, (mem_answer + mem_alen) - mem_end, NDI_RA_TYPE_MEM,
-		NDI_RA_PASS);
+	    NDI_RA_PASS);
 
 	if (mem_end == mem_answer) {
 		DEBUG0("No memory resources used\n");
@@ -4808,8 +4812,8 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		 * Give back unused bus numbers
 		 */
 		(void) ndi_ra_free(ddi_get_parent(new_child),
-				*highest_bus+1, max_bus - *highest_bus,
-				NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS);
+		    *highest_bus+1, max_bus - *highest_bus,
+		    NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS);
 	}
 
 	/*
@@ -4887,7 +4891,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	}
 
 	if (ndi_ra_map_destroy(new_child, NDI_RA_TYPE_PCI_BUSNUM)
-			== NDI_FAILURE) {
+	    == NDI_FAILURE) {
 		/*EMPTY*/
 		DEBUG0("Can't destroy resource map - NDI_RA_TYPE_PCI_BUSNUM\n");
 	}
@@ -4924,7 +4928,7 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	 * Get the pci register spec from the node
 	 */
 	status = ddi_getlongprop(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
+	    dip, DDI_PROP_DONTPASS, "reg", (caddr_t)&reg, &rlen);
 
 	switch (status) {
 		case DDI_PROP_SUCCESS:
@@ -4950,10 +4954,10 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 
 #ifdef	EFCODE21554
 	if (ddi_regs_map_setup(dip, 0, &virt,
-		0, 0, &attr, handle) != DDI_SUCCESS)
+	    0, 0, &attr, handle) != DDI_SUCCESS)
 #else
 	if (pcicfg_map_phys(dip, reg, &virt, &attr, handle)
-		!= DDI_SUCCESS)
+	    != DDI_SUCCESS)
 #endif
 	{
 		DEBUG0("pcicfg_config_setup():"
@@ -5043,7 +5047,7 @@ pcicfg_add_config_reg(dev_info_t *dip,
 	reg[0] = PCICFG_MAKE_REG_HIGH(bus, device, func, 0);
 
 	return (ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"reg", reg, 5));
+	    "reg", reg, 5));
 }
 
 static int
@@ -5055,8 +5059,8 @@ pcicfg_dump_assigned(dev_info_t *dip)
 	int			i;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&reg,
-		&length) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&reg,
+	    &length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read assigned-addresses property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -5462,8 +5466,8 @@ pcicfg_free_all_resources(dev_info_t *dip)
 	int			i;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
-		&assigned_len) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
+	    &assigned_len) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read assigned-addresses property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -5498,8 +5502,8 @@ pcicfg_alloc_new_resources(dev_info_t *dip)
 	boolean_t		alloc;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
-		&reg_len) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
+	    &reg_len) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read reg property\n");
 		return (PCICFG_FAILURE);
 	}
@@ -5509,8 +5513,8 @@ pcicfg_alloc_new_resources(dev_info_t *dip)
 	    reg_len, rcount);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
-		&assigned_len) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS, "assigned-addresses", (caddr_t)&assigned,
+	    &assigned_len) != DDI_PROP_SUCCESS) {
 		acount = 0;
 	} else {
 		acount = assigned_len / sizeof (pci_regspec_t);
@@ -5622,7 +5626,8 @@ pcicfg_alloc_new_resources(dev_info_t *dip)
 				 * ddi_getlongprop
 				 */
 				if (acount != 0)
-				    kmem_free((caddr_t)assigned, assigned_len);
+					kmem_free((caddr_t)assigned,
+					    assigned_len);
 				kmem_free((caddr_t)reg, reg_len);
 				return (PCICFG_FAILURE);
 			}
@@ -5633,7 +5638,7 @@ pcicfg_alloc_new_resources(dev_info_t *dip)
 	 * Don't forget to free up memory from ddi_getlongprop
 	 */
 	if (acount != 0)
-	    kmem_free((caddr_t)assigned, assigned_len);
+		kmem_free((caddr_t)assigned, assigned_len);
 	kmem_free((caddr_t)reg, reg_len);
 
 	return (PCICFG_SUCCESS);
@@ -5713,17 +5718,17 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 		/* allocate memory space from the allocator */
 
 		if (ndi_ra_alloc(ddi_get_parent(dip),
-			&request, &answer, &alen,
-			NDI_RA_TYPE_MEM, NDI_RA_PASS)
-					!= NDI_SUCCESS) {
+		    &request, &answer, &alen,
+		    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+		    != NDI_SUCCESS) {
 			DEBUG0("(ROM)Failed to allocate 32b mem");
 			pcicfg_unmap_phys(&h, &config);
 			return (1);
 		}
 		DEBUG3("ROM addr = [0x%x.%x] len [0x%x]\n",
-			PCICFG_HIADDR(answer),
-			PCICFG_LOADDR(answer),
-			alen);
+		    PCICFG_HIADDR(answer),
+		    PCICFG_LOADDR(answer),
+		    alen);
 
 		/* program the low word */
 
@@ -5738,14 +5743,14 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			request.ra_flags ^= NDI_RA_ALLOC_BOUNDED;
 			/* allocate memory space from the allocator */
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_MEM, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen,
+			    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+			    != NDI_SUCCESS) {
 				DEBUG0("Failed to allocate 64b mem\n");
 				pcicfg_unmap_phys(&h, &config);
 				return (1);
 			}
-			    DEBUG3("64 addr = [0x%x.%x] len [0x%x]\n",
+			DEBUG3("64 addr = [0x%x.%x] len [0x%x]\n",
 			    PCICFG_HIADDR(answer),
 			    PCICFG_LOADDR(answer),
 			    alen);
@@ -5767,7 +5772,7 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			 * assignments only.
 			 */
 			phys_spec.pci_phys_hi ^= PCI_ADDR_MEM64 ^
-							PCI_ADDR_MEM32;
+			    PCI_ADDR_MEM32;
 
 			break;
 
@@ -5775,9 +5780,9 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 			/* allocate memory space from the allocator */
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_MEM, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen,
+			    NDI_RA_TYPE_MEM, NDI_RA_PASS)
+			    != NDI_SUCCESS) {
 				DEBUG0("Failed to allocate 32b mem\n");
 				pcicfg_unmap_phys(&h, &config);
 				return (1);
@@ -5800,9 +5805,9 @@ pcicfg_alloc_resource(dev_info_t *dip, pci_regspec_t phys_spec)
 			/* allocate I/O space from the allocator */
 			request.ra_flags |= NDI_RA_ALLOC_BOUNDED;
 			if (ndi_ra_alloc(ddi_get_parent(dip),
-				&request, &answer, &alen,
-				NDI_RA_TYPE_IO, NDI_RA_PASS)
-						!= NDI_SUCCESS) {
+			    &request, &answer, &alen,
+			    NDI_RA_TYPE_IO, NDI_RA_PASS)
+			    != NDI_SUCCESS) {
 				DEBUG0("Failed to allocate I/O\n");
 				pcicfg_unmap_phys(&h, &config);
 				return (1);
@@ -5967,7 +5972,7 @@ pcicfg_remove_assigned_prop(dev_info_t *dip, pci_regspec_t *oldone)
 	uint_t		status;
 
 	status = ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"assigned-addresses", (caddr_t)&assigned, &alen);
+	    "assigned-addresses", (caddr_t)&assigned, &alen);
 	switch (status) {
 		case DDI_PROP_SUCCESS:
 		break;
@@ -6085,7 +6090,7 @@ pcicfg_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph)
 	mr.map_vers = DDI_MAP_VERSION;
 
 	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-		hp->ah_len, &hp->ah_addr);
+	    hp->ah_len, &hp->ah_addr);
 
 	impl_acc_hdl_free(*handlep);
 	*handlep = (ddi_acc_handle_t)NULL;
