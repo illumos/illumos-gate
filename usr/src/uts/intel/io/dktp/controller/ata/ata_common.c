@@ -2124,9 +2124,9 @@ ata_init_pciide(
 				ddi_prop_free(rp);
 
 				if (simplex_dma_channel == channel) {
-					cmn_err(CE_NOTE, "?ata: simplex "
+					cmn_err(CE_CONT, "?ata: simplex "
 					    "controller.  DMA on channel"
-					    "  %d PIO on channel %d\n",
+					    "  %d PIO on channel %d",
 					    channel, channel ? 0:1);
 					dma_on = TRUE;
 				} else {
