@@ -87,6 +87,7 @@ static boolean_t	stale_tree = B_TRUE;
 static vol_prophdl_t	*vol_props = NULL;
 static int		volprop_ndx = 0, n_vol_props = 0;
 static int		change_time = 0;
+static time_t		change_time_check;
 
 /*
  * The rebuild_tree_lock and cv are used by the tree builder thread.
@@ -131,18 +132,26 @@ static char *group2[] = {
 	0
 };
 
+static char *group3[] = {
+	OID_sunPlatNumericSensorEnabledThresholds,
+	OID_sunPlatNumericSensorBaseUnits,
+	OID_sunPlatNumericSensorRateUnits,
+	0
+};
+
+static char *group4[] = {
+	OID_sunPlatBinarySensorInterpretTrue,
+	OID_sunPlatBinarySensorInterpretFalse,
+};
+
 static char *volgroup1[] = {
 	OID_sunPlatBinarySensorCurrent,
 	OID_sunPlatBinarySensorExpected,
-	OID_sunPlatBinarySensorInterpretTrue,
-	OID_sunPlatBinarySensorInterpretFalse,
 	0
 };
 
 static char *volgroup2[] = {
-	OID_sunPlatNumericSensorBaseUnits,
 	OID_sunPlatNumericSensorExponent,
-	OID_sunPlatNumericSensorRateUnits,
 	OID_sunPlatNumericSensorCurrent,
 	OID_sunPlatNumericSensorLowerThresholdFatal,
 	OID_sunPlatNumericSensorLowerThresholdCritical,
@@ -150,6 +159,21 @@ static char *volgroup2[] = {
 	OID_sunPlatNumericSensorUpperThresholdNonCritical,
 	OID_sunPlatNumericSensorUpperThresholdCritical,
 	OID_sunPlatNumericSensorUpperThresholdFatal,
+	0
+};
+
+static char *volgroup3[] = {
+	OID_sunPlatEquipmentOperationalState,
+	0
+};
+
+static char *volgroup4[] = {
+	OID_sunPlatAlarmState,
+	0
+};
+
+static char *volgroup5[] = {
+	OID_sunPlatBatteryStatus,
 	0
 };
 
@@ -203,7 +227,7 @@ static picl_nodehdl_t lookup_nodeh(int row);
 
 static void save_volprop(picl_prophdl_t prop, char *oidstr, int row,
     int proptype);
-static void check_for_stale_data(void);
+static void check_for_stale_data(boolean_t nocache);
 static int read_volprop(ptree_rarg_t *parg, void *buf);
 
 static void threshold(picl_nodehdl_t node, char *oidstr, int row,
@@ -360,8 +384,13 @@ tree_builder(void *arg)
 	LOGPRINTF("Registering OID groups.\n");
 	register_group(group1, 0);
 	register_group(group2, 0);
+	register_group(group3, 0);
+	register_group(group4, 0);
 	register_group(volgroup1, 1);
 	register_group(volgroup2, 1);
+	register_group(volgroup3, 1);
+	register_group(volgroup4, 1);
+	register_group(volgroup5, 1);
 
 	(void) mutex_lock(&rebuild_tree_lock);
 
@@ -454,8 +483,9 @@ retry:
 			log_msg(LOG_WARNING, SNMPP_LINK_RESET);
 			clr_linkreset = 1;
 			goto retry;
-		} else
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+		}
+		log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+		    snmp_syserr ? snmp_syserr : ret, OID_entLastChangeTime, 0);
 	}
 
 	/*
@@ -488,6 +518,10 @@ retry:
 			clr_linkreset = 1;
 			goto retry;
 		}
+		if (ret == -1)
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    snmp_syserr ? snmp_syserr : ret,
+			    OID_entPhysicalDescr, row);
 	}
 
 	/*
@@ -502,7 +536,9 @@ retry:
 			clr_linkreset = 1;
 			goto retry;
 		} else
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    snmp_syserr ? snmp_syserr : ret,
+			    OID_entLastChangeTime, row);
 	}
 
 	/*
@@ -609,7 +645,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 	    &ent_physclass, snmp_syserr_p);
 	CHECK_LINKRESET(snmp_syserr_p, NULL)
 	if (ret < 0) {
-		log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+		log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+		    *snmp_syserr_p ? *snmp_syserr_p : ret,
+		    OID_entPhysicalClass, row);
 		free(phys_name);
 		return (NULL);
 	}
@@ -620,7 +658,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		    &sunplat_physclass, snmp_syserr_p);
 		CHECK_LINKRESET(snmp_syserr_p, NULL)
 		if (ret < 0) {
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatPhysicalClass, row);
 			free(phys_name);
 			return (NULL);
 		}
@@ -631,7 +671,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 			CHECK_LINKRESET(snmp_syserr_p, NULL)
 			if (ret < 0) {
 				log_msg(LOG_WARNING,
-				    SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+				    SNMPP_CANT_FETCH_OBJECT_VAL,
+				    *snmp_syserr_p ? *snmp_syserr_p : ret,
+				    OID_sunPlatAlarmType, row);
 				free(phys_name);
 				return (NULL);
 			}
@@ -689,7 +731,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		    row, &ps_class, snmp_syserr_p);
 		CHECK_LINKRESET(snmp_syserr_p, NULL)
 		if (ret < 0) {
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatPowerSupplyClass, row);
 			free(phys_name);
 			return (NULL);
 		}
@@ -719,7 +763,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		    row, &sensor_class, snmp_syserr_p);
 		CHECK_LINKRESET(snmp_syserr_p, NULL)
 		if (ret < 0) {
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatSensorClass, row);
 			free(phys_name);
 			return (NULL);
 		}
@@ -728,7 +774,9 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 		    row, &sensor_type, snmp_syserr_p);
 		CHECK_LINKRESET(snmp_syserr_p, NULL)
 		if (ret < 0) {
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatSensorType, row);
 			free(phys_name);
 			return (NULL);
 		}
@@ -958,7 +1006,7 @@ save_volprop(picl_prophdl_t prop, char *oidstr, int row, int proptype)
 }
 
 static void
-check_for_stale_data(void)
+check_for_stale_data(boolean_t nocache)
 {
 	int	cur_change_time;
 	int	ret;
@@ -975,10 +1023,22 @@ check_for_stale_data(void)
 	}
 
 	/*
+	 * Cache OID_entLastChangeTime for up to 10 seconds before
+	 * fetching it from ILOM again.  This prevents us from fetching
+	 * this value from ILOM when the we're filling or refreshing a
+	 * whole bunch of items in the cache around the same time.
+	 */
+	if (nocache == B_FALSE && time(NULL) - change_time_check <= 10) {
+		(void) rw_unlock(&stale_tree_rwlp);
+		return;
+	}
+
+	/*
 	 * Check if mib data has changed (hotplug? link-reset?)
 	 */
 	ret = snmp_get_int(hdl, OID_entLastChangeTime, 0, &cur_change_time,
 	    &snmp_syserr);
+	(void) time(&change_time_check);
 	if ((ret == 0) && (cur_change_time == change_time)) {
 		(void) rw_unlock(&stale_tree_rwlp);
 		return;
@@ -1040,7 +1100,7 @@ read_volprop(ptree_rarg_t *parg, void *buf)
 	 * another one. If we are rebuilding the subtree, we just
 	 * return the stale value until the tree is fully built.
 	 */
-	check_for_stale_data();
+	check_for_stale_data(B_FALSE);
 
 	(void) rw_rdlock(&stale_tree_rwlp);
 
@@ -1056,6 +1116,7 @@ read_volprop(ptree_rarg_t *parg, void *buf)
 		}
 	}
 	if (i == volprop_ndx) {
+		(void) rw_unlock(&stale_tree_rwlp);
 		log_msg(LOG_ERR, SNMPP_CANT_FIND_VOLPROP, parg->proph);
 		return (PICL_FAILURE);
 	}
@@ -1068,7 +1129,14 @@ read_volprop(ptree_rarg_t *parg, void *buf)
 	ret = snmp_get_int(hdl, vol_props[ndx].oidstr, vol_props[ndx].row,
 	    &propval, &snmp_syserr);
 	if (ret < 0) {
-		log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL, ret);
+		(void) rw_unlock(&stale_tree_rwlp);
+		check_for_stale_data(B_TRUE);
+		if (stale_tree == B_TRUE) {
+			return (PICL_PROPVALUNAVAILABLE);
+		}
+		log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+		    snmp_syserr ? snmp_syserr : ret,
+		    vol_props[ndx].oidstr, vol_props[ndx].row);
 		return (PICL_FAILURE);
 	}
 
@@ -1079,6 +1147,7 @@ read_volprop(ptree_rarg_t *parg, void *buf)
 		} else if (propval == SSOS_ENABLED) {
 			(void) strlcpy(buf, STR_SSOS_ENABLED, MAX_OPSTATE_LEN);
 		} else {
+			(void) rw_unlock(&stale_tree_rwlp);
 			log_msg(LOG_ERR, SNMPP_INV_PLAT_EQUIP_OPSTATE,
 			    propval, vol_props[ndx].row);
 			return (PICL_FAILURE);
@@ -1094,29 +1163,48 @@ read_volprop(ptree_rarg_t *parg, void *buf)
 			ret = snmp_get_str(hdl,
 			    OID_sunPlatBinarySensorInterpretTrue,
 			    vol_props[ndx].row, &pstr, &snmp_syserr);
-			if (snmp_syserr == ECANCELED)
+			if (snmp_syserr == ECANCELED) {
+				(void) rw_unlock(&stale_tree_rwlp);
+				if (pstr)
+					free(pstr);
 				return (PICL_FAILURE);
+			}
 			if (ret < 0 || pstr == NULL) {
+				log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+				    snmp_syserr ? snmp_syserr : ret,
+				    OID_sunPlatBinarySensorInterpretTrue,
+				    vol_props[ndx].row);
 				(void) strlcpy(buf, STR_ST_TRUE,
 				    MAX_TRUTHVAL_LEN);
 			} else {
 				(void) strlcpy(buf, pstr, MAX_TRUTHVAL_LEN);
-				free(pstr);
 			}
+			if (pstr)
+				free(pstr);
 		} else if (propval == ST_FALSE) {
 			ret = snmp_get_str(hdl,
 			    OID_sunPlatBinarySensorInterpretFalse,
 			    vol_props[ndx].row, &pstr, &snmp_syserr);
-			if (snmp_syserr == ECANCELED)
+			if (snmp_syserr == ECANCELED) {
+				(void) rw_unlock(&stale_tree_rwlp);
+				if (pstr)
+					free(pstr);
 				return (PICL_FAILURE);
+			}
 			if (ret < 0 || pstr == NULL) {
+				log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+				    snmp_syserr ? snmp_syserr : ret,
+				    OID_sunPlatBinarySensorInterpretFalse,
+				    vol_props[ndx].row);
 				(void) strlcpy(buf, STR_ST_FALSE,
 				    MAX_TRUTHVAL_LEN);
 			} else {
 				(void) strlcpy(buf, pstr, MAX_TRUTHVAL_LEN);
-				free(pstr);
 			}
+			if (pstr)
+				free(pstr);
 		} else {
+			(void) rw_unlock(&stale_tree_rwlp);
 			log_msg(LOG_ERR, SNMPP_INV_PLAT_BINSNSR_CURRENT,
 			    propval, vol_props[ndx].row);
 			return (PICL_FAILURE);
@@ -1202,12 +1290,14 @@ threshold(picl_nodehdl_t node, char *oidstr, int row, char *propname,
 	int		err;
 	int		val;
 
-	if (snmp_get_int(hdl, oidstr, row, &val, snmp_syserr_p) != -1) {
+	if ((err = snmp_get_int(hdl, oidstr, row, &val, snmp_syserr_p)) != -1) {
 		err = add_volatile_prop(node, propname, PICL_PTYPE_INT,
 		    PICL_READ, sizeof (int), read_volprop, NULL, &prop);
 		if (err == PICL_SUCCESS)
 			save_volprop(prop, oidstr, row, VPT_NUMSENSOR);
-	}
+	} else
+		log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+		    *snmp_syserr_p ? *snmp_syserr_p : err, oidstr, row);
 }
 
 static void
@@ -1218,13 +1308,33 @@ add_thresholds(picl_nodehdl_t node, int row, int *snmp_syserr_p)
 	uint_t	nbytes;
 	int	ret;
 
-	ret = snmp_get_bitstr(hdl, OID_sunPlatNumericSensorEnabledThresholds,
-	    row, &bitstr, &nbytes, snmp_syserr_p);
-	CHECK_LINKRESET_VOID(snmp_syserr_p)
+	ret = snmp_get_str(hdl,
+	    OID_sunPlatNumericSensorEnabledThresholds,
+	    row, (char **)&bitstr, snmp_syserr_p);
+	if (ret == -1) {
+		log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+		    *snmp_syserr_p ? *snmp_syserr_p : ret,
+		    OID_sunPlatNumericSensorEnabledThresholds, row);
+	} else {
+		nbytes = strlen((const char *)bitstr);
+	}
 
-	if (ret < 0 || bitstr == NULL || nbytes > 2)
-		enabled = 0xff;
-	else if (nbytes == 1) {
+	CHECK_LINKRESET_VOID(snmp_syserr_p);
+
+	/*
+	 * No bit string of threshold masks was returned, so we can't
+	 * assume that any thresholds exist.
+	 *
+	 * This mask prevents us from attempting to fetch thresholds
+	 * which don't apply to the sensor or that aren't there anyway,
+	 * That speeds up the plug-in significantly since otherwise it
+	 * takes several seconds to time out.
+	 */
+	if (ret < 0 || bitstr == NULL || nbytes == 0 || 2 < nbytes) {
+		if (bitstr)
+			free(bitstr);
+		return;
+	} else if (nbytes == 1) {
 		/*
 		 * The ALOM snmp agent doesn't adhere to the BER rules for
 		 * encoding bit strings. While the BER states that bitstrings
@@ -1409,6 +1519,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_SERIAL_NUMBER, serial_num);
 			free((void *) serial_num);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalSerialNum, row);
 		break;
 
 	case PP_SLOT_TYPE:
@@ -1539,6 +1653,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 		if ((ret == 0) && (val == ST_TRUE))
 			(void) add_void_prop(nodeh, PICL_PROP_IS_REPLACEABLE);
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatCircuitPackReplaceable, row);
 		break;
 
 	case PP_HOTSWAPPABLE:
@@ -1547,6 +1665,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 		if ((ret == 0) && (val == ST_TRUE))
 			(void) add_void_prop(nodeh, PICL_PROP_IS_HOT_SWAPPABLE);
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatCircuitPackHotSwappable, row);
 		break;
 
 	case PP_IS_FRU:
@@ -1555,6 +1677,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
 		if ((ret == 0) && (val == ST_TRUE))
 			(void) add_void_prop(nodeh, PICL_PROP_IS_FRU);
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalIsFRU, row);
 		break;
 
 	case PP_HW_REVISION:
@@ -1566,6 +1692,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_HW_REVISION, hw_revision);
 			free((void *) hw_revision);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalHardwareRev, row);
 		break;
 
 	case PP_FW_REVISION:
@@ -1577,6 +1707,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_FW_REVISION, fw_revision);
 			free((void *) fw_revision);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalFirmwareRev, row);
 		break;
 
 	case PP_MFG_NAME:
@@ -1588,6 +1722,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_MFG_NAME, mfg_name);
 			free((void *) mfg_name);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalMfgName, row);
 		break;
 
 	case PP_MODEL_NAME:
@@ -1599,6 +1737,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_MODEL_NAME, model_name);
 			free((void *) model_name);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalModelName, row);
 		break;
 
 	case PP_DESCRIPTION:
@@ -1610,6 +1752,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			    PICL_PROP_PHYS_DESCRIPTION, phys_descr);
 			free((void *) phys_descr);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_entPhysicalDescr, row);
 		break;
 
 	case PP_LABEL:
@@ -1625,6 +1771,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_BASE_UNITS, sensor_baseunits[val]);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatNumericSensorBaseUnits, row);
 		break;
 
 	case PP_RATE_UNITS:
@@ -1635,6 +1785,10 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_RATE_UNITS, sensor_rateunits[val]);
 		}
+		if (ret == -1)
+			log_msg(LOG_ERR, SNMPP_CANT_FETCH_OBJECT_VAL,
+			    *snmp_syserr_p ? *snmp_syserr_p : ret,
+			    OID_sunPlatNumericSensorRateUnits, row);
 		break;
 	}
 }

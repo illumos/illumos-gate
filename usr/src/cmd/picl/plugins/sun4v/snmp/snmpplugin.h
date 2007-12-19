@@ -189,7 +189,8 @@ void snmpplugin_fini(void);
     gettext("PICL snmpplugin: cannot add int property (err=%d, node=%lx)\n")
 
 #define	SNMPP_CANT_FETCH_OBJECT_VAL	\
-    gettext("PICL snmpplugin: cannot fetch object value (err=%d)\n")
+    gettext("PICL snmpplugin: cannot fetch object value " \
+	"(err=%d, OID=<%s>, row=%d)\n")
 
 #define	SNMPP_LINK_RESET	\
     gettext("PICL snmpplugin: snmp ds reset happened, rebuilding tree\n")
