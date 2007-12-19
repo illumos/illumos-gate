@@ -33,7 +33,7 @@ POFILES= $(OBJS:%.o=%.po)
 
 include ../Makefile.cmd
 
-LDLIBS += -ldevinfo -lz
+LDLIBS += -ldevinfo
 
 .KEEP_STATE:
 

@@ -49,7 +49,7 @@
 #include <libdevinfo.h>
 #include <libgen.h>
 #include <ctype.h>
-#include <zlib.h>
+#include <dlfcn.h>
 #include "utils.h"
 
 static const char USAGE[] =
@@ -85,13 +85,35 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 #define	KILOBYTE		1024
 #define	MEGABYTE		(KILOBYTE * KILOBYTE)
 #define	GIGABYTE		(KILOBYTE * MEGABYTE)
+#define	LIBZ			"libz.so"
+
+static int (*compress2p)(void *, ulong_t *, void *, size_t, int) = NULL;
 
 static int gzip_compress(void *src, size_t srclen, void *dst,
 	size_t *dstlen, int level)
 {
-	if (compress2(dst, (ulong_t *)dstlen, src, srclen, level) != Z_OK)
-		return (-1);
+	void *libz_hdl = NULL;
 
+	/*
+	 * The first time we are called, attempt to dlopen()
+	 * libz.so and get a pointer to the compress2() function
+	 */
+	if (compress2p == NULL) {
+		if ((libz_hdl = openlib(LIBZ)) == NULL)
+			die(gettext("could not find %s. "
+			    "gzip compression unavailable\n"), LIBZ);
+
+		if ((compress2p =
+		    (int (*)(void *, ulong_t *, void *, size_t, int))
+		    dlsym(libz_hdl, "compress2")) == NULL) {
+			closelib();
+			die(gettext("could not find the correct %s. "
+			    "gzip compression unavailable\n"), LIBZ);
+		}
+	}
+
+	if ((*compress2p)(dst, (ulong_t *)dstlen, src, srclen, level) != 0)
+		return (-1);
 	return (0);
 }
 
@@ -993,6 +1015,8 @@ main(int argc, char *argv[])
 		print_one_mapping(lfd, devicename, filename);
 	else
 		print_mappings(lfd);
+
 	(void) close(lfd);
+	closelib();
 	return (E_SUCCESS);
 }
