@@ -1551,20 +1551,22 @@ meta_object_get_clone(meta_object_t *object,
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	/*
-	 * has an attempt already been made to create this object in
-	 * slot?  If yes, and there's no clone, as indicated above,
-	 * that means this object can't be created in this slot.
-	 */
-	if (object->tried_create_clone[slot_num]) {
-		return (CKR_FUNCTION_FAILED);
-	}
 	(void) pthread_mutex_lock(&object->clone_create_lock);
 
 	/* Maybe someone just created one? */
 	if (object->clones[slot_num] != NULL) {
 		*clone = object->clones[slot_num];
 		goto finish;
+	}
+
+	/*
+	 * has an attempt already been made to create this object in
+	 * slot?  If yes, and there's no clone, as indicated above,
+	 * that means this object can't be created in this slot.
+	 */
+	if (object->tried_create_clone[slot_num]) {
+		(void) pthread_mutex_unlock(&object->clone_create_lock);
+		return (CKR_FUNCTION_FAILED);
 	}
 
 	rv = meta_slot_object_alloc(&newclone);

@@ -63,7 +63,7 @@ CFLAGS		+= $(CCVERBOSE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Nmisc/kcf
+LDFLAGS += -dy -Nmisc/kcf -Nmisc/sha1
 
 #
 # For now, disable these lint checks; maintainers should endeavor
