@@ -3429,7 +3429,8 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 		(void) zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot rollback '%s'"),
 		    zhp->zfs_name);
-	} else if (zhp->zfs_type == ZFS_TYPE_VOLUME) {
+		return (err);
+	}
 
 	/*
 	 * For volumes, if the pre-rollback volsize matched the pre-
@@ -3437,16 +3438,18 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 	 * the reservation property to the post-rollback volsize.
 	 * Make a new handle since the rollback closed the dataset.
 	 */
-		zhp = make_dataset_handle(zhp->zfs_hdl, zhp->zfs_name);
-		if (!zhp)
+	if ((zhp->zfs_type == ZFS_TYPE_VOLUME) &&
+	    (zhp = make_dataset_handle(zhp->zfs_hdl, zhp->zfs_name))) {
+		if (err = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name)) {
+			zfs_close(zhp);
 			return (err);
-
+		}
 		if (restore_resv) {
 			new_volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
 			if (old_volsize != new_volsize)
-				zfs_prop_set_int(zhp, resv_prop, new_volsize);
+				err = zfs_prop_set_int(zhp, resv_prop,
+				    new_volsize);
 		}
-		err = zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
 		zfs_close(zhp);
 	}
 	return (err);
