@@ -481,10 +481,6 @@ packmedia()
 
 	if [ -d "$MINIROOT/kernel/drv/sparcv9" ] ; then
 		archive_lu "$MEDIA" "$MINIROOT"
-	elif [ "$STRIP_AMD64" != false ] ; then
-		# clear out 64 bit support to conserve memory
-		#
-		find "$MINIROOT" -name amd64 -type directory | xargs rm -rf
 	fi
 
 	archive_X "$MEDIA" "$MINIROOT"
@@ -763,6 +759,11 @@ pack()
 	chmod a+r "$MR"
 }
 
+strip_amd64()
+{
+	find "$UNPACKED_ROOT" -name amd64 -type directory | xargs rm -rf
+}
+
 # main
 #
 
@@ -816,11 +817,23 @@ case $1 in
 		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
 			ARCHIVE=sparc.miniroot
 		else
-			ARCHIVE=x86.miniroot
+			ARCHIVE=amd64/x86.miniroot
 		fi
-		MR="$MR/boot/$ARCHIVE"
+		MR="$MEDIA/boot/$ARCHIVE"
+
 		packmedia "$MEDIA" "$UNPACKED_ROOT"
 		pack
+
+		if [ -d "$MINIROOT/platform/i86pc" ] ; then
+			if [ "$STRIP_AMD64" = false ] ; then
+				ln $MR $MEDIA/boot/x86.miniroot
+			else
+				MR="$MEDIA/boot/x86.miniroot"
+				strip_amd64
+				pack
+			fi
+		fi
+
 		;;
 	unpackmedia)
 		if [ -f "$MEDIA/boot/sparc.miniroot" ] ; then
@@ -828,7 +841,7 @@ case $1 in
 		else
 			ARCHIVE=x86.miniroot
 		fi
-		MR="$MR/boot/$ARCHIVE"
+		MR="$MEDIA/boot/$ARCHIVE"
 		unpack
 		unpackmedia "$MEDIA" "$UNPACKED_ROOT"
 		;;
