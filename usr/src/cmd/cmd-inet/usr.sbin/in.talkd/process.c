@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,6 +184,8 @@ find_user(char *name, char *tty)
 	struct utmpx *ubuf;
 	int tfd;
 	char dev[MAXPATHLEN];
+	struct stat stbuf;
+	int problem = NOT_HERE;
 
 	setutxent();		/* reset the utmpx file */
 
@@ -207,15 +208,23 @@ find_user(char *name, char *tty)
 				closelog();
 				continue;
 			}
-			(void) close(tfd);
 			if (*tty == '\0') {
 				/*
 				 * No particular tty was requested.
 				 */
+				if (fstat(tfd, &stbuf) < 0 ||
+				    (stbuf.st_mode&020) == 0) {
+					(void) close(tfd);
+					problem = PERMISSION_DENIED;
+					continue;
+				}
+				(void) close(tfd);
 				(void) strlcpy(tty, ubuf->ut_line, TTY_SIZE);
 				endutxent();	/* close the utmpx file */
 				return (SUCCESS);
-			} else if (strcmp(ubuf->ut_line, tty) == 0) {
+			}
+			(void) close(tfd);
+			if (strcmp(ubuf->ut_line, tty) == 0) {
 				endutxent();	/* close the utmpx file */
 				return (SUCCESS);
 			}
@@ -223,5 +232,5 @@ find_user(char *name, char *tty)
 	}
 
 	endutxent();		/* close the utmpx file */
-	return (NOT_HERE);
+	return (problem);
 }
