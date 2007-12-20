@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,11 +50,18 @@
 
 CLIENT *__clnt_tp_create_bootstrap();
 int __rpcb_getaddr_bootstrap();
-struct hostent *__files_gethostbyname();
+struct hostent *__files_gethostbyname(char *, sa_family_t);
 
 extern int hostNotKnownLocally;
 
 static char *__map_addr();
+static struct hostent host;
+static char hostaddr[sizeof (struct in6_addr)];
+static char *host_aliases[MAXALIASES];
+static char *host_addrs[] = {
+	hostaddr,
+	NULL
+};
 
 /*
  * __clnt_tp_create_bootstrap()
@@ -64,12 +70,13 @@ static char *__map_addr();
  *
  * It relies on the local /etc/hosts file for hostname to address
  * translation and does it itself instead of calling netdir_getbyname
- * thereby avoids recursion.
+ * thereby avoids recursion.  Secondarily, it will use a validated
+ * IP address directly.
  */
 CLIENT *
 __clnt_tp_create_bootstrap(hostname, prog, vers, nconf)
 	char *hostname;
-	u_long prog, vers;
+	ulong_t prog, vers;
 	struct netconfig    *nconf;
 {
 	CLIENT *cl;
@@ -85,7 +92,7 @@ __clnt_tp_create_bootstrap(hostname, prog, vers, nconf)
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		return (NULL);
 	}
-	svc_taddr = (struct netbuf *) malloc(sizeof (struct netbuf));
+	svc_taddr = (struct netbuf *)malloc(sizeof (struct netbuf));
 	if (! svc_taddr) {
 		rpc_createerr.cf_stat = RPC_SYSTEMERROR;
 		t_close(fd);
@@ -128,14 +135,14 @@ __clnt_tp_create_bootstrap(hostname, prog, vers, nconf)
  */
 int
 __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
-	u_long program;
-	u_long version;
+	ulong_t program;
+	ulong_t version;
 	struct netconfig *nconf;
 	struct netbuf *address; /* populate with the taddr of the service */
 	char *hostname;
 {
 	char *svc_uaddr;
-	struct hostent *hent;
+	struct hostent *hent, tmphent;
 	struct sockaddr_in *sa;
 	struct sockaddr_in6 *sa6;
 	struct netbuf rpcb_taddr;
@@ -145,19 +152,38 @@ __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
 	int p1, p2;
 	char *ipaddr, *port;
 	int i, ipaddrlen;
+	sa_family_t type;
+	char addr[sizeof (in6_addr_t)];
+	char *tmphost_addrs[2];
 
-	if (strcmp(nconf->nc_protofmly, NC_INET) != 0 &&
-		strcmp(nconf->nc_protofmly, NC_INET6) != 0) {
+	if (strcmp(nconf->nc_protofmly, NC_INET6) == 0) {
+		type = AF_INET6;
+	} else if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
+		type = AF_INET;
+	} else {
 		rpc_createerr.cf_stat = RPC_UNKNOWNADDR;
 		return (FALSE);
 	}
 
 	/* Get the address of the RPCBIND at hostname */
-	hent = __files_gethostbyname(hostname, nconf->nc_protofmly);
+	hent = __files_gethostbyname(hostname, type);
 	if (hent == (struct hostent *)NULL) {
-		rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
-		hostNotKnownLocally = 1;
-		return (FALSE);
+		/* Make sure this is not an IP address before giving up */
+		if (inet_pton(type, hostname, addr) == 1) {
+			/* This is a numeric address, fill in the blanks */
+			hent = &tmphent;
+			memset(&tmphent, 0, sizeof (struct hostent));
+			hent->h_addrtype = type;
+			hent->h_length = (type == AF_INET6) ?
+			    sizeof (in6_addr_t) : sizeof (in_addr_t);
+			hent->h_addr_list = tmphost_addrs;
+			tmphost_addrs[0] = addr;
+			tmphost_addrs[1] = NULL;
+		} else {
+			rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
+			hostNotKnownLocally = 1;
+			return (FALSE);
+		}
 	}
 
 	switch (hent->h_addrtype) {
@@ -165,7 +191,7 @@ __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
 		local_sa.sin_family = AF_INET;
 		local_sa.sin_port = htons(111); /* RPCBIND port */
 		memcpy((char *)&(local_sa.sin_addr.s_addr),
-			hent->h_addr_list[0], hent->h_length);
+		    hent->h_addr_list[0], hent->h_length);
 		rpcb_taddr.buf = (char *)&local_sa;
 		rpcb_taddr.maxlen = sizeof (local_sa);
 		rpcb_taddr.len = rpcb_taddr.maxlen;
@@ -174,7 +200,7 @@ __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
 		local_sa6.sin6_family = AF_INET6;
 		local_sa6.sin6_port = htons(111); /* RPCBIND port */
 		memcpy((char *)&(local_sa6.sin6_addr.s6_addr),
-			hent->h_addr_list[0], hent->h_length);
+		    hent->h_addr_list[0], hent->h_length);
 		rpcb_taddr.buf = (char *)&local_sa6;
 		rpcb_taddr.maxlen = sizeof (local_sa6);
 		rpcb_taddr.len = rpcb_taddr.maxlen;
@@ -193,10 +219,12 @@ __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
 	ipaddrlen = strlen(ipaddr);
 	/* Look for the first '.' starting from the end */
 	for (i = ipaddrlen-1; i >= 0; i--)
-		if (ipaddr[i] == '.') break;
+		if (ipaddr[i] == '.')
+			break;
 	/* Find the second dot (still counting from the end) */
 	for (i--; i >= 0; i--)
-		if (ipaddr[i] == '.') break;
+		if (ipaddr[i] == '.')
+			break;
 	/* If we didn't find it, the uaddr has a syntax error */
 	if (i < 0) {
 		rpc_createerr.cf_stat = RPC_N2AXLATEFAILURE;
@@ -235,8 +263,8 @@ __rpcb_getaddr_bootstrap(program, version, nconf, address, hostname)
 static char *
 __map_addr(nc, rpcb_taddr, prog, ver)
 	struct netconfig	*nc;		/* Our transport	*/
-	struct netbuf	*rpcb_taddr; /* RPCBIND address */
-	u_long			prog, ver;	/* Name service Prog/vers */
+	struct netbuf		*rpcb_taddr;	/* RPCBIND address */
+	ulong_t			prog, ver;	/* Name service Prog/vers */
 {
 	register CLIENT *client;
 	RPCB 		parms;		/* Parameters for RPC binder	  */
@@ -254,8 +282,8 @@ __map_addr(nc, rpcb_taddr, prog, ver)
 	}
 
 	client = __nis_clnt_create(fd, nc, 0, rpcb_taddr, 0,
-					RPCBPROG, RPCBVERS, 0, 0);
-	if (! client) {
+	    RPCBPROG, RPCBVERS, 0, 0);
+	if (!client) {
 		t_close(fd);
 		rpc_createerr.cf_stat = RPC_TLIERROR;
 		return (NULL);
@@ -272,7 +300,7 @@ __map_addr(nc, rpcb_taddr, prog, ver)
 	parms.r_addr = "";	/* not needed; just for xdring */
 	parms.r_owner = "";	/* not needed; just for xdring */
 	clnt_st = clnt_call(client, RPCBPROC_GETADDR, xdr_rpcb, (char *)&parms,
-					    xdr_wrapstring, (char *)&ua, tv);
+	    xdr_wrapstring, (char *)&ua, tv);
 
 	rpc_createerr.cf_stat = clnt_st;
 	if (clnt_st == RPC_SUCCESS) {
@@ -285,38 +313,38 @@ __map_addr(nc, rpcb_taddr, prog, ver)
 		}
 		return (ua);
 	} else if (((clnt_st == RPC_PROGVERSMISMATCH) ||
-			(clnt_st == RPC_PROGUNAVAIL) ||
-			(clnt_st == RPC_TIMEDOUT)) &&
-			(strcmp(nc->nc_protofmly, NC_INET) == 0)) {
+	    (clnt_st == RPC_PROGUNAVAIL) ||
+	    (clnt_st == RPC_TIMEDOUT)) &&
+	    (strcmp(nc->nc_protofmly, NC_INET) == 0)) {
 		/*
 		 * version 3 not available. Try version 2
 		 * The assumption here is that the netbuf
 		 * is arranged in the sockaddr_in
 		 * style for IP cases.
 		 */
-		u_short	port;
+		ushort_t	port;
 		struct sockaddr_in	*sa;
 		struct netbuf 		remote;
 		int		protocol;
 		char	buf[32];
 		char	*res;
 
-		clnt_control(client, CLGET_SVC_ADDR, (char *) &remote);
+		clnt_control(client, CLGET_SVC_ADDR, (char *)&remote);
 		sa = (struct sockaddr_in *)(remote.buf);
-		protocol = strcmp(nc->nc_proto, NC_TCP) ?
-				IPPROTO_UDP : IPPROTO_TCP;
-		port = (u_short) pmap_getport(sa, prog, ver, protocol);
+		protocol = strcmp(nc->nc_proto, NC_TCP) ? IPPROTO_UDP :
+		    IPPROTO_TCP;
+		port = (ushort_t)pmap_getport(sa, prog, ver, protocol);
 
 		if (port != 0) {
 			/* print s_addr (and port) in host byte order */
 			sa->sin_addr.s_addr = ntohl(sa->sin_addr.s_addr);
 			sprintf(buf, "%d.%d.%d.%d.%d.%d",
-				(sa->sin_addr.s_addr >> 24) & 0xff,
-				(sa->sin_addr.s_addr >> 16) & 0xff,
-				(sa->sin_addr.s_addr >>  8) & 0xff,
-				(sa->sin_addr.s_addr) & 0xff,
-				(port >> 8) & 0xff,
-				port & 0xff);
+			    (sa->sin_addr.s_addr >> 24) & 0xff,
+			    (sa->sin_addr.s_addr >> 16) & 0xff,
+			    (sa->sin_addr.s_addr >>  8) & 0xff,
+			    (sa->sin_addr.s_addr) & 0xff,
+			    (port >> 8) & 0xff,
+			    port & 0xff);
 			res = strdup(buf);
 			if (res != 0) {
 				rpc_createerr.cf_stat = RPC_SUCCESS;
@@ -342,39 +370,23 @@ __map_addr(nc, rpcb_taddr, prog, ver)
 #define	MAXALIASES	35
 
 static char line[BUFSIZ+1];
-static char hostaddr[sizeof (struct in6_addr)];
-static struct hostent host;
-static char *host_aliases[MAXALIASES];
-static char *host_addrs[] = {
-	hostaddr,
-	NULL
-};
 
-static char *_hosts6[] = { "/etc/inet/ipnodes", 0 };
-static char *_hosts4[] = { "/etc/inet/ipnodes", "/etc/hosts", 0 };
+static char *_hosts4_6[] = { "/etc/inet/hosts", "/etc/inet/ipnodes", 0 };
 
 static char *any();
 
 static struct hostent *__files_gethostent();
 
 struct hostent *
-__files_gethostbyname(char *nam, char *fmly)
+__files_gethostbyname(char *nam, sa_family_t af)
 {
 	register struct hostent *hp;
 	register char **cp;
-	char **file;
+	char **file = _hosts4_6;
 	FILE *hostf;
-	sa_family_t af;
 
-	if (strcmp(fmly, NC_INET) == 0) {
-		af = AF_INET;
-		file = _hosts4;
-	} else if (strcmp(fmly, NC_INET6) == 0) {
-		af = AF_INET6;
-		file = _hosts6;
-	} else {
+	if ((af != AF_INET) && (af != AF_INET6))
 		return (0);
-	}
 
 	for (; *file != 0; file++) {
 

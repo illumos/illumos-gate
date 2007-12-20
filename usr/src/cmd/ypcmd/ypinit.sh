@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -65,6 +64,18 @@ enable_next_boot () {
 enable_this_boot () {
 	/usr/sbin/svcadm enable $1
 	[ $? = 0 ] || echo "ypinit: unable to enable $1"
+}
+
+is_valid_ipaddr () {
+	test -n "`echo $1 | awk 'NF != 1 {exit} \
+	    $1 !~ /[0-9]/ || /[;-~]/ || /!--/ || /\// {exit} \
+	    $1 !~ /\./ {exit} {print}'`" || \
+	test -n "`echo $1 | awk 'NF != 1 {exit} \
+	    ($1 !~ /[0-9]/ && $1 !~ /[A-F]/ && \
+	    $1 !~ /[a-f]/) || \
+	    /[;-@]/ || /[G-\`]/ || /[g-~]/ || /!--/ || \
+	    /\// {exit} \
+	    $1 !~ /:/ {exit} {print}'`"
 }
 
 PATH=/bin:/usr/bin:/usr/etc:/usr/sbin:$yproot_exe:$MAKEPATH:$PATH
@@ -242,12 +253,25 @@ or a return on a line by itself."
 
 		while read h ; test -n "$h"
 		do
-			if ( grep $h $hosts_file $hosts6_file > /dev/null )
+			#
+			# Host should be in the v4 or v6 hosts file or
+			# reasonably resemble an IP address.  We'll do a
+			# sanity check that a v4 addr is one word consisting
+			# of only numbers and the "." character,
+			# which should guard against fully qualified
+			# hostnames and most malformed entries.  IPv6
+			# addresses can be numbers, hex letters, and have
+			# at least one ":" character and possibly one or
+			# more "." characters for embedded v4 addresses
+			#
+			if ( grep $h $hosts_file $hosts6_file > /dev/null ) || \
+			    ( test $clientp = T && `is_valid_ipaddr $h` )
 			then
 				echo $h >> $hf
 				echo  "\tnext host to add:  \c"
 			else
-				echo "host $h not found in $hosts_file or $hosts6_file. Not added to the list"
+				echo "host $h not found in $hosts_file or" \
+				    "$hosts6_file.\nNot added to the list."
 				echo ""
 				echo  "Do you wish to abort [y/n: y]  \c"
 				read cont_ok
