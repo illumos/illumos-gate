@@ -1317,6 +1317,7 @@ cnex_find_chan_dip(dev_info_t *dip, uint64_t chan_id,
 			D1("cnex_find_chan_dip:channel(0x%llx): found "
 			    "dip(0x%p) drvname=%s\n", chan_id, cdip,
 			    ddi_driver_name(cdip));
+			ddi_prop_free(cnex_regspec);
 			break;
 		}
 		ddi_prop_free(cnex_regspec);
