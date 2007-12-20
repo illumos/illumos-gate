@@ -3630,6 +3630,8 @@ ibcm_mark_ar(ib_guid_t hca_guid, uint8_t port)
 
 	ASSERT(MUTEX_HELD(&ibcm_svc_info_lock));
 	for (tmp = ibcm_ar_list; tmp != NULL; tmp = tmp->ar_link) {
+		if (tmp->ar_hcap == NULL)
+			continue;
 		if (tmp->ar_hcap->hca_guid == hca_guid &&
 		    tmp->ar_port == port) {
 			/* even if it's busy, we mark it for rewrite */

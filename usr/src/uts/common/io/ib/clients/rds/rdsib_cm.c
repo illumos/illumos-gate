@@ -387,7 +387,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 			 * This session is not the active end, change it
 			 * to passive end.
 			 */
-			ASSERT(sp->session_type == RDS_SESSION_ACTIVE);
 			ep->ep_state = RDS_EP_STATE_PASSIVE_PENDING;
 
 			rw_enter(&sp->session_lock, RW_WRITER);
@@ -602,12 +601,19 @@ rds_handle_cm_event_failure(ibt_cm_event_t *evp)
 		return (IBT_CM_ACCEPT);
 	}
 
+	if ((evp->cm_event.failed.cf_code != IBT_CM_FAILURE_STALE) &&
+	    (evp->cm_event.failed.cf_msg == IBT_CM_FAILURE_REQ)) {
+		/*
+		 * This end is active, just ignore, ibt_open_rc_channel()
+		 * caller will take care of cleanup.
+		 */
+		RDS_DPRINTF2("rds_handle_cm_event_failure",
+		    "Ignoring this event: Chan hdl: 0x%p", evp->cm_channel);
+		return (IBT_CM_ACCEPT);
+	}
+
 	ep = (rds_ep_t *)ibt_get_chan_private(evp->cm_channel);
 	sp = ep->ep_sp;
-
-	mutex_enter(&ep->ep_lock);
-	ep->ep_state = RDS_EP_STATE_ERROR;
-	mutex_exit(&ep->ep_lock);
 
 	rw_enter(&sp->session_lock, RW_WRITER);
 	if (sp->session_type == RDS_SESSION_PASSIVE) {
@@ -893,9 +899,13 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 		(void) ibt_flush_channel(hdl);
 		(void) ibt_free_channel(hdl);
 
-		/* cleanup stuff allocated in rds_ep_alloc_rc_channel */
 		mutex_enter(&ep->ep_lock);
-		rds_ep_free_rc_channel(ep);
+		/* don't cleanup if this failure is due to peer-peer race */
+		if (ep->ep_state == RDS_EP_STATE_ACTIVE_PENDING) {
+			/* cleanup stuff allocated in rds_ep_alloc_rc_channel */
+			ep->ep_state = RDS_EP_STATE_ERROR;
+			rds_ep_free_rc_channel(ep);
+		}
 		mutex_exit(&ep->ep_lock);
 
 		return (-1);
