@@ -73,6 +73,14 @@ typedef struct idmap_pg_config {
 	char		*forest_name;		/* forest name */
 	char		*site_name;		/* site name */
 	ad_disc_ds_t	*global_catalog;	/* global catalog hosts */
+	/*
+	 * Following properties are associated with directory-based
+	 * name-mappings.
+	 */
+	char		*ad_unixuser_attr;
+	char		*ad_unixgroup_attr;
+	char		*nldap_winname_attr;
+	bool_t		ds_name_mapping_enabled;
 } idmap_pg_config_t;
 
 typedef struct idmap_cfg {

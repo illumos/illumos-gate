@@ -286,10 +286,10 @@ init_idmapd() {
 		exit(1);
 	}
 
-	if (init_mapping_system() < 0) {
+	if ((error = init_mapping_system()) < 0) {
 		idmapdlog(LOG_ERR,
 		"idmapd: unable to initialize mapping system");
-		exit(1);
+		exit(error < -2 ? SMF_EXIT_ERR_CONFIG : 1);
 	}
 
 	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, connmaxrec);

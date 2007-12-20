@@ -542,11 +542,11 @@ retry:
 		(void) idmap_cfg_unload(&_idmapdstate.cfg->pgcfg);
 		rc = idmap_cfg_load(&_idmapdstate.cfg->handles,
 		    &_idmapdstate.cfg->pgcfg, 1);
-		if (rc == -2)
+		if (rc < -1)
 			(void) idmapdlog(LOG_ERR,
 			    "idmapd: Various errors re-loading configuration "
 			    "will cause AD lookups to fail");
-		if (rc == -1)
+		else if (rc == -1)
 			(void) idmapdlog(LOG_WARNING,
 			    "idmapd: Various errors re-loading configuration "
 			    "may cause AD lookups to fail");
@@ -761,6 +761,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 {
 	int rc;
 	int errors = 0;
+	uint8_t bool_val;
 	char *str = NULL;
 	ad_disc_t ad_ctx = handles->ad_ctx;
 
@@ -772,6 +773,10 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	pgcfg->forest_name = NULL;
 	pgcfg->site_name = NULL;
 	pgcfg->global_catalog = NULL;
+	pgcfg->ad_unixuser_attr = NULL;
+	pgcfg->ad_unixgroup_attr = NULL;
+	pgcfg->nldap_winname_attr = NULL;
+	pgcfg->ds_name_mapping_enabled = FALSE;
 
 	pthread_mutex_lock(&handles->mutex);
 
@@ -898,6 +903,61 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	else
 		(void) ad_disc_set_GlobalCatalog(ad_ctx, pgcfg->global_catalog);
 
+	/*
+	 * Read directory-based name mappings related SMF properties
+	 */
+	bool_val = 0;
+	rc = get_val_int(handles, "ds_name_mapping_enabled",
+	    &bool_val, SCF_TYPE_BOOLEAN);
+	if (rc != 0) {
+		rc = -2;
+		goto exit;
+	} else if (bool_val) {
+		pgcfg->ds_name_mapping_enabled = TRUE;
+		rc = get_val_astring(handles, "ad_unixuser_attr",
+		    &pgcfg->ad_unixuser_attr);
+		if (rc != 0) {
+			rc = -2;
+			goto exit;
+		}
+
+		rc = get_val_astring(handles, "ad_unixgroup_attr",
+		    &pgcfg->ad_unixgroup_attr);
+		if (rc != 0) {
+			rc = -2;
+			goto exit;
+		}
+
+		rc = get_val_astring(handles, "nldap_winname_attr",
+		    &pgcfg->nldap_winname_attr);
+		if (rc != 0) {
+			rc = -2;
+			goto exit;
+		}
+
+		if (pgcfg->nldap_winname_attr != NULL) {
+			idmapdlog(LOG_ERR,
+			    "%s: native LDAP based name mapping not supported "
+			    "at this time. Please unset "
+			    "config/nldap_winname_attr and restart idmapd.",
+			    me);
+			rc = -3;
+			goto exit;
+		}
+
+		if (pgcfg->ad_unixuser_attr == NULL &&
+		    pgcfg->ad_unixgroup_attr == NULL) {
+			idmapdlog(LOG_ERR,
+			    "%s: If config/ds_name_mapping_enabled property "
+			    "is set to true then atleast one of the following "
+			    "name mapping attributes must be specified. "
+			    "(config/ad_unixuser_attr OR "
+			    "config/ad_unixgroup_attr)", me);
+			rc = -3;
+			goto exit;
+		}
+	}
+
 
 	if (!discover)
 		goto exit;
@@ -958,7 +1018,7 @@ idmap_cfg_load(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 exit:
 	pthread_mutex_unlock(&handles->mutex);
 
-	if (rc == -2)
+	if (rc < -1)
 		return (rc);
 
 	return ((errors == 0) ? 0 : -1);
@@ -1066,6 +1126,18 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg) {
 		free(pgcfg->global_catalog);
 		pgcfg->global_catalog = NULL;
 	}
+	if (pgcfg->ad_unixuser_attr) {
+		free(pgcfg->ad_unixuser_attr);
+		pgcfg->ad_unixuser_attr = NULL;
+	}
+	if (pgcfg->ad_unixgroup_attr) {
+		free(pgcfg->ad_unixgroup_attr);
+		pgcfg->ad_unixgroup_attr = NULL;
+	}
+	if (pgcfg->nldap_winname_attr) {
+		free(pgcfg->nldap_winname_attr);
+		pgcfg->nldap_winname_attr = NULL;
+	}
 }
 
 int
@@ -1080,7 +1152,8 @@ idmap_cfg_fini(idmap_cfg_t *cfg)
 	scf_instance_destroy(handles->instance);
 	scf_service_destroy(handles->service);
 	scf_handle_destroy(handles->main);
-	ad_disc_fini(handles->ad_ctx);
+	if (handles->ad_ctx != NULL)
+		ad_disc_fini(handles->ad_ctx);
 	free(cfg);
 
 	return (0);

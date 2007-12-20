@@ -59,6 +59,13 @@ extern int _rpcsvcstate;	/* set when a request is serviced */
 extern int _rpcsvccount;	/* number of requests being serviced */
 extern mutex_t _svcstate_lock;	/* lock for _rpcsvcstate, _rpcsvccount */
 
+typedef enum idmap_namemap_mode {
+	IDMAP_NM_NONE = 0,
+	IDMAP_NM_AD,
+	IDMAP_NM_NLDAP,
+	IDMAP_NM_MIXED
+} idmap_namemap_mode_t;
+
 /*
  * Global state of idmapd daemon.
  */
@@ -92,14 +99,40 @@ typedef struct hashentry {
 typedef struct lookup_state {
 	bool_t			sid2pid_done;
 	bool_t			pid2sid_done;
-	idmap_query_state_t	*ad_lookup;
 	int			ad_nqueries;
+	int			nldap_nqueries;
 	uint_t			curpos;
 	hashentry_t		*sid_history;
 	uint_t			sid_history_size;
 	idmap_mapping_batch	*batch;
 	idmap_ids_res		*result;
+	idmap_namemap_mode_t	nm_siduid;
+	idmap_namemap_mode_t	nm_sidgid;
+	char			*ad_unixuser_attr;
+	char			*ad_unixgroup_attr;
 } lookup_state_t;
+
+#define	NLDAP_OR_MIXED(nm) \
+	(nm == IDMAP_NM_NLDAP || nm == IDMAP_NM_MIXED)
+#define	AD_OR_MIXED(nm) \
+	(nm == IDMAP_NM_AD || nm == IDMAP_NM_MIXED)
+
+#define	NLDAP_OR_MIXED_MODE(pidtype, ls) \
+	((pidtype == IDMAP_UID && NLDAP_OR_MIXED(ls->nm_siduid)) || \
+	(pidtype == IDMAP_GID && NLDAP_OR_MIXED(ls->nm_sidgid)))
+#define	AD_OR_MIXED_MODE(pidtype, ls)\
+	((pidtype == IDMAP_UID && AD_OR_MIXED(ls->nm_siduid)) || \
+	(pidtype == IDMAP_GID && AD_OR_MIXED(ls->nm_sidgid)))
+#define	NLDAP_MODE(pidtype, ls) \
+	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_NLDAP) || \
+	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_NLDAP))
+#define	AD_MODE(pidtype, ls) \
+	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_AD) || \
+	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_AD))
+#define	MIXED_MODE(pidtype, ls) \
+	((pidtype == IDMAP_UID && ls->nm_siduid == IDMAP_NM_MIXED) || \
+	(pidtype == IDMAP_GID && ls->nm_sidgid == IDMAP_NM_MIXED))
+
 
 typedef struct list_cb_data {
 	void		*result;
@@ -114,24 +147,35 @@ typedef struct msg_table {
 } msg_table_t;
 
 /*
- * Data structure to store well-known SIDs and
- * associated mappings (if any)
+ * The following flags are used by idmapd while processing a
+ * given mapping request. Note that idmapd uses multiple passes to
+ * process the request and the flags are used to pass information
+ * about the state of the request between these passes.
  */
-typedef struct wksids_table {
-	const char	*sidprefix;
-	uint32_t	rid;
-	const char	*winname;
-	int		is_user;
-	uid_t		pid;
-	int		direction;
-} wksids_table_t;
 
+/* Initial state. Done. Reset all flags. Remaining passes can be skipped */
+#define	_IDMAP_F_DONE			0x00000000
+/* Set when subsequent passes are required */
+#define	_IDMAP_F_NOTDONE		0x00000001
+/* Don't update name_cache. (e.g. set when winname,SID found in name_cache) */
+#define	_IDMAP_F_DONT_UPDATE_NAMECACHE	0x00000002
+/* Batch this request for AD lookup */
+#define	_IDMAP_F_LOOKUP_AD		0x00000004
+/* Batch this request for nldap directory lookup */
+#define	_IDMAP_F_LOOKUP_NLDAP		0x00000008
+/*
+ * Expired ephemeral mapping found in cache when processing sid2uid request.
+ * Use it if the given SID cannot be mapped by name
+ */
+#define	_IDMAP_F_EXP_EPH_UID		0x00000010
+/* Same as above. Used for sid2gid request */
+#define	_IDMAP_F_EXP_EPH_GID		0x00000020
 
-#define	_IDMAP_F_DONE		0x00000000
-#define	_IDMAP_F_S2N_CACHE	0x00000001
-#define	_IDMAP_F_S2N_AD		0x00000002
-#define	_IDMAP_F_EXP_EPH_UID	0x00000004
-#define	_IDMAP_F_EXP_EPH_GID	0x00000010
+/*
+ * Check if we are done. If so, subsequent passes can be skipped
+ * when processing a given mapping request.
+ */
+#define	ARE_WE_DONE(f)	((f & _IDMAP_F_NOTDONE) == 0)
 
 #define	SIZE_INCR	5
 #define	MAX_TRIES	5
@@ -161,10 +205,10 @@ typedef struct wksids_table {
 
 
 #define	IS_REQUEST_UID(request) \
-	request.id1.idtype == IDMAP_UID
+	(request).id1.idtype == IDMAP_UID
 
 #define	IS_REQUEST_GID(request) \
-	request.id1.idtype == IDMAP_GID
+	(request).id1.idtype == IDMAP_GID
 
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
@@ -203,8 +247,9 @@ extern idmap_retcode	sid2pid_first_pass(lookup_state_t *, sqlite *,
 extern idmap_retcode	sid2pid_second_pass(lookup_state_t *, sqlite *,
 				sqlite *, idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	pid2sid_first_pass(lookup_state_t *, sqlite *,
-				sqlite *, idmap_mapping *, idmap_id_res *,
-				int, int);
+				idmap_mapping *, idmap_id_res *, int, int);
+extern idmap_retcode	pid2sid_second_pass(lookup_state_t *, sqlite *,
+				sqlite *, idmap_mapping *, idmap_id_res *, int);
 extern idmap_retcode	update_cache_sid2pid(lookup_state_t *, sqlite *,
 				idmap_mapping *, idmap_id_res *);
 extern idmap_retcode	update_cache_pid2sid(lookup_state_t *, sqlite *,
@@ -213,8 +258,10 @@ extern idmap_retcode	get_u2w_mapping(sqlite *, sqlite *, idmap_mapping *,
 				idmap_mapping *, int);
 extern idmap_retcode	get_w2u_mapping(sqlite *, sqlite *, idmap_mapping *,
 				idmap_mapping *);
+extern idmap_retcode	get_ds_namemap_type(lookup_state_t *);
+extern void		cleanup_lookup_state(lookup_state_t *);
 
-extern idmap_retcode	lookup_win_batch_sid2name(lookup_state_t *,
+extern idmap_retcode	ad_lookup_batch(lookup_state_t *,
 				idmap_mapping_batch *, idmap_ids_res *);
 
 

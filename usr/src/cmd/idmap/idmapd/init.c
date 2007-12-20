@@ -48,8 +48,8 @@ init_mapping_system() {
 
 	if (rwlock_init(&_idmapdstate.rwlk_cfg, USYNC_THREAD, NULL) != 0)
 		return (-1);
-	if (load_config() < 0)
-		return (-1);
+	if ((rc = load_config()) < 0)
+		return (rc);
 
 	(void) setegid(DAEMON_GID);
 	(void) seteuid(DAEMON_UID);
@@ -86,7 +86,7 @@ load_config() {
 		degrade_svc();
 		idmapdlog(LOG_ERR, "%s: Fatal error while loading "
 		    "configuration", me);
-		return (-1);
+		return (rc);
 	}
 
 	if (rc != 0)
@@ -170,7 +170,7 @@ reload_ad() {
 void
 print_idmapdstate() {
 	int i;
-	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+	idmap_pg_config_t *pgcfg;
 
 	RDLOCK_CONFIG();
 
@@ -179,6 +179,8 @@ print_idmapdstate() {
 		UNLOCK_CONFIG();
 		return;
 	}
+
+	pgcfg = &_idmapdstate.cfg->pgcfg;
 
 	idmapdlog(LOG_DEBUG, "%s: list_size_limit=%llu", me,
 	    pgcfg->list_size_limit);
@@ -211,6 +213,14 @@ print_idmapdstate() {
 			    pgcfg->global_catalog[i].host,
 			    pgcfg->global_catalog[i].port);
 	}
+	idmapdlog(LOG_DEBUG, "%s: ds_name_mapping_enabled=%s", me,
+	    (pgcfg->ds_name_mapping_enabled == TRUE) ? "true" : "false");
+	idmapdlog(LOG_DEBUG, "%s: ad_unixuser_attr=%s", me,
+	    CHECK_NULL(pgcfg->ad_unixuser_attr));
+	idmapdlog(LOG_DEBUG, "%s: ad_unixgroup_attr=%s", me,
+	    CHECK_NULL(pgcfg->ad_unixgroup_attr));
+	idmapdlog(LOG_DEBUG, "%s: nldap_winname_attr=%s", me,
+	    CHECK_NULL(pgcfg->nldap_winname_attr));
 
 	UNLOCK_CONFIG();
 }

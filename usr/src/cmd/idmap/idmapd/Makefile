@@ -28,7 +28,7 @@
 PROG =		idmapd
 MANIFEST =	idmap.xml
 SERVEROBJS =	idmapd.o init.o dbutils.o rpc_svc.o server.o adutils.o addisc.o\
-	idmap_config.o
+	idmap_config.o nldaputils.o
 SERVERSRCS =	$(SERVEROBJS:%.o=%.c)
 OBJS =		$(SERVEROBJS)
 SRCS =		$(SERVERSRCS)

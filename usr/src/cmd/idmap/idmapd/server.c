@@ -31,6 +31,7 @@
 
 #include "idmapd.h"
 #include "idmap_priv.h"
+#include "nldaputils.h"
 #include <signal.h>
 #include <thread.h>
 #include <string.h>
@@ -82,7 +83,8 @@ idmap_null_1_svc(void *result, struct svc_req *rqstp)
  * RPC layer allocates empty strings to replace NULL char *.
  * This utility function frees these empty strings.
  */
-static void
+static
+void
 sanitize_mapping_request(idmap_mapping *req)
 {
 	free(req->id1name);
@@ -93,6 +95,7 @@ sanitize_mapping_request(idmap_mapping *req)
 	req->id2name = NULL;
 	free(req->id2domain);
 	req->id2domain = NULL;
+	req->direction = _IDMAP_F_DONE;
 }
 
 /* ARGSUSED */
@@ -102,7 +105,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 {
 	sqlite		*cache = NULL, *db = NULL;
 	lookup_state_t	state;
-	idmap_retcode	retcode, winrc;
+	idmap_retcode	retcode;
 	uint_t		i;
 
 	/* Init */
@@ -149,6 +152,11 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	state.batch = &batch;
 	state.result = result;
 
+	/* Get directory-based name mapping info */
+	result->retcode = get_ds_namemap_type(&state);
+	if (result->retcode != IDMAP_SUCCESS)
+		goto out;
+
 	/* Init our 'done' flags */
 	state.sid2pid_done = state.pid2sid_done = TRUE;
 
@@ -167,14 +175,12 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 			retcode = pid2sid_first_pass(
 			    &state,
 			    cache,
-			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 1, 0);
 		} else if (IS_BATCH_GID(batch, i)) {
 			retcode = pid2sid_first_pass(
 			    &state,
 			    cache,
-			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i], 0, 0);
 		} else {
@@ -191,37 +197,87 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 	if (state.sid2pid_done == TRUE && state.pid2sid_done == TRUE)
 		goto out;
 
-	/* Process Windows server lookups for sid2name */
-	if (state.ad_nqueries) {
-		winrc = lookup_win_batch_sid2name(&state, &batch,
-		    result);
-		if (IDMAP_FATAL_ERROR(winrc)) {
-			result->retcode = winrc;
+	/*
+	 * native LDAP lookups:
+	 * If nldap or mixed mode is enabled then pid2sid mapping requests
+	 * need to lookup native LDAP directory service by uid/gid to get
+	 * winname and unixname.
+	 */
+	if (state.nldap_nqueries) {
+		retcode = nldap_lookup_batch(&state, &batch, result);
+		if (IDMAP_FATAL_ERROR(retcode)) {
+			result->retcode = retcode;
 			goto out;
 		}
-	} else
-		winrc = IDMAP_SUCCESS;
+	}
 
-	/* Reset sid2pid 'done' flag */
-	state.sid2pid_done = TRUE;
+	/*
+	 * AD lookups:
+	 * 1. The pid2sid requests in the preceding step which successfully
+	 *    retrieved winname from native LDAP objects will now need to
+	 *    lookup AD by winname to get sid.
+	 * 2. The sid2pid requests will need to lookup AD by sid to get
+	 *    winname and unixname (AD or mixed mode).
+	 * 3. If AD-based name mapping is enabled then pid2sid mapping
+	 *    requests need to lookup AD by unixname to get winname and sid.
+	 */
+	if (state.ad_nqueries) {
+		retcode = ad_lookup_batch(&state, &batch, result);
+		if (IDMAP_FATAL_ERROR(retcode)) {
+			result->retcode = retcode;
+			goto out;
+		}
+	}
+
+	/*
+	 * native LDAP lookups:
+	 * If nldap mode is enabled then sid2pid mapping requests
+	 * which successfully retrieved winname from AD objects in the
+	 * preceding step, will now need to lookup native LDAP directory
+	 * service by winname to get unixname and pid.
+	 */
+	if (state.nldap_nqueries) {
+		retcode = nldap_lookup_batch(&state, &batch, result);
+		if (IDMAP_FATAL_ERROR(retcode)) {
+			result->retcode = retcode;
+			goto out;
+		}
+	}
+
+	/* Reset 'done' flags */
+	state.sid2pid_done = state.pid2sid_done = TRUE;
 
 	/* Second stage */
 	for (i = 0; i < batch.idmap_mapping_batch_len; i++) {
 		state.curpos = i;
-		/* Process sid to pid ONLY */
 		if (IS_BATCH_SID(batch, i)) {
-			if (IDMAP_ERROR(winrc))
-				result->ids.ids_val[i].retcode = winrc;
 			retcode = sid2pid_second_pass(
 			    &state,
 			    cache,
 			    db,
 			    &batch.idmap_mapping_batch_val[i],
 			    &result->ids.ids_val[i]);
-			if (IDMAP_FATAL_ERROR(retcode)) {
-				result->retcode = retcode;
-				goto out;
-			}
+		} else if (IS_BATCH_UID(batch, i)) {
+			retcode = pid2sid_second_pass(
+			    &state,
+			    cache,
+			    db,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i], 1);
+		} else if (IS_BATCH_GID(batch, i)) {
+			retcode = pid2sid_second_pass(
+			    &state,
+			    cache,
+			    db,
+			    &batch.idmap_mapping_batch_val[i],
+			    &result->ids.ids_val[i], 0);
+		} else {
+			/* First stage has already set the error */
+			continue;
+		}
+		if (IDMAP_FATAL_ERROR(retcode)) {
+			result->retcode = retcode;
+			goto out;
 		}
 	}
 
@@ -261,8 +317,7 @@ idmap_get_mapped_ids_1_svc(idmap_mapping_batch batch,
 		(void) sql_exec_no_cb(cache, "END TRANSACTION;");
 
 out:
-	if (state.sid_history)
-		free(state.sid_history);
+	cleanup_lookup_state(&state);
 	if (IDMAP_ERROR(result->retcode)) {
 		xdr_free(xdr_idmap_ids_res, (caddr_t)result);
 		result->ids.ids_len = 0;

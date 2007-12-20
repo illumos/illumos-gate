@@ -62,6 +62,7 @@ extern "C" {
  * namespace with other things in idmapd.
  */
 #define	_IDMAP_T_OTHER		0
+#define	_IDMAP_T_UNDEF		-1
 #define	_IDMAP_T_USER		-1004
 #define	_IDMAP_T_GROUP		-1005
 #define	_IDMAP_T_DOMAIN		-1006
@@ -155,9 +156,9 @@ void idmap_lookup_release_batch(idmap_query_state_t **state);
  *  The caller must free() *sid.
  */
 idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
-		const char *name, const char *dname,
+		const char *name, const char *dname, int eunixtype,
 		char **canonname, char **sid, rid_t *rid, int *sid_type,
-		idmap_retcode *rc);
+		char **unixname, idmap_retcode *rc);
 /*
  * Add a SID->name lookup
  *
@@ -173,8 +174,23 @@ idmap_retcode idmap_name2sid_batch_add1(idmap_query_state_t *state,
  *  The caller must free() *name and *dname (if present).
  */
 idmap_retcode idmap_sid2name_batch_add1(idmap_query_state_t *state,
-		const char *sid, const rid_t *rid,
-		char **name, char **dname, int *sid_type, idmap_retcode *rc);
+		const char *sid, const rid_t *rid, int eunixtype,
+		char **name, char **dname, int *sid_type,
+		char **unixname, idmap_retcode *rc);
+
+/*
+ * Add a unixname->SID lookup
+ */
+idmap_retcode idmap_unixname2sid_batch_add1(idmap_query_state_t *state,
+		const char *unixname, int is_user, int is_wuser,
+		char **sid, rid_t *rid, char **name, char **dname,
+		int *sid_type, idmap_retcode *rc);
+
+/*
+ * Set unixname attribute names for the batch for AD-based name mapping
+ */
+void idmap_lookup_batch_set_unixattr(idmap_query_state_t *state,
+		const char *unixuser_attr, const char *unixgroup_attr);
 
 #ifdef __cplusplus
 }
