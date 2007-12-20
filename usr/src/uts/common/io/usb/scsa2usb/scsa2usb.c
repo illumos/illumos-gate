@@ -2431,7 +2431,14 @@ scsa2usb_scsi_init_pkt(struct scsi_address *ap,
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
 		cmd->cmd_bp	= bp;
-		pkt->pkt_scbp	= (opaque_t)&cmd->cmd_scb;
+		/*
+		 * The buffer size of cmd->cmd_scb is constrained
+		 * to sizeof (struct scsi_arq_status), if the scblen
+		 * is bigger than that, we use pkt->pkt_scbp directly.
+		 */
+		if (cmd->cmd_scblen == sizeof (struct scsi_arq_status)) {
+			pkt->pkt_scbp = (opaque_t)&cmd->cmd_scb;
+		}
 
 		usba_init_list(&cmd->cmd_waitQ, (usb_opaque_t)cmd,
 		    scsa2usbp->scsa2usb_dev_data->dev_iblock_cookie);
@@ -4312,7 +4319,7 @@ scsa2usb_complete_arq_pkt(scsa2usb_state_t *scsa2usbp,
 
 	/* is this meaningful sense data */
 	if (*(bp->b_un.b_addr) != 0) {
-		bcopy(bp->b_un.b_addr, &arqp->sts_sensedata, sp->cmd_scblen);
+		bcopy(bp->b_un.b_addr, &arqp->sts_sensedata, SENSE_LENGTH);
 		ssp->cmd_pkt->pkt_state |= STATE_ARQ_DONE;
 	}
 
