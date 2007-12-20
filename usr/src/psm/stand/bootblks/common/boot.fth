@@ -230,6 +230,7 @@ false     value    kern?
 /buf-len  buffer:  targ-file
 : targ-file$  ( -- file$ )  targ-file cscount  ;
 
+headerless
 : init-targ  ( -- )
    targ-file /buf-len erase
    " /platform/"  targ-file swap  move
@@ -245,9 +246,21 @@ false     value    kern?
    repeat  2drop                  ( name$ )
 ;
 
-\ if the platform exists in the FS, use it
-\ else use a default (e.g., sun4v)
-: get-arch  ( -- )
+headers
+\ does /platform/<name> exist?
+: try-platname  ( name$ -- name$ true | false )
+   munge-name                           ( name$' )
+   init-targ  2dup targ-file$  $append
+   targ-file$ fs-open  if               ( name$ fd )
+      fs-close  true                    ( name$ true )
+   else                                 ( name$ )
+      2drop  false                      ( false )
+   then                                 ( name$ true | false )
+;
+
+\ setup arch-name
+\  sun4v  -or-  sun4u
+: get-def-arch  ( -- )
    " device_type"  root-ph  get-package-property  if
       \ some older sunfires don't have device_type set
       false                             ( sun4u )
@@ -257,15 +270,33 @@ false     value    kern?
    then                                 ( sun4v? )
    if  " sun4v"  else  " sun4u"  then   ( arch$ )
    arch-name swap  move
-   " name"  root-ph  get-string-prop    ( name$ )
-   munge-name                           ( name$' )
-   init-targ  2dup targ-file$  $append
-   targ-file$ fs-open  if               ( name$ fd )
-      fs-close                          ( name$ )
-   else                                 ( name$ )
-      2drop  arch-name$                 ( default$ )
-   then                                 ( name$ )
-   plat-name swap  move                 (  )
+;
+
+\ setup plat-name
+\  platform name  -or-
+\  compatible name  -or-
+\  default name
+: get-arch  ( -- )
+   get-def-arch
+
+   \ first try "name" in root
+   " name"  root-ph  get-string-prop           ( name$ )
+   try-platname  if
+      plat-name swap  move  exit               (  )
+   then                                        (  )
+
+   \ next try "compatible"
+   " compatible"  root-ph                      ( prop$ ph )
+   get-package-property  invert  if            ( compat$ )
+      begin  decode-string dup  while          ( compat$ name$ )
+         try-platname  if
+            plat-name swap  move  2drop  exit  (  )
+         then                                  ( compat$ )
+      repeat  2drop 2drop                      (  )
+   then                                        (  )
+
+   \ else use default name
+   arch-name$  plat-name swap  move
 ;
 
 \ make <pre> <file> into /platform/<pre>/<file>
@@ -512,6 +543,7 @@ false value halt?
 \	ELF parsing
 \
 
+headerless
 0 value elfhdr
 0 value phdr
 
@@ -538,6 +570,7 @@ false value halt?
    4meg (mem-alloc)
 ;
 
+headers
 \ OBP doesn't allocate memory for elf
 \ programs, it assumes they'll fit
 \ under the default 10MB limit
