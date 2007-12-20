@@ -1134,7 +1134,27 @@ pf_tlp_decode(dev_info_t *rpdip, pf_data_t *pf_data_p, pcie_req_id_t *bdf,
 	case PCIE_TLP_TYPE_IO:
 	case PCIE_TLP_TYPE_MEM:
 	case PCIE_TLP_TYPE_MEMLK:
-		tlp_addr = pf_data_p->aer_h3;
+		/*
+		 * Obtain IO/Memory address based on whether TLP
+		 * Header has a 4DW (four doublewords) or 3DW layout.
+		 */
+		if ((tlp_hdr->fmt & 0x1) != 0) {
+			/* then TLP Header contains a 64-bit addr */
+
+			/*
+			 * Use a dummy value for now, as 64-bit addrs
+			 * are not fully supported.  This unique,
+			 * well-known value will assist in debugging.
+			 */
+			tlp_addr = 0;
+		} else {
+			/* TLP Header has the 3DW layout.  */
+			pcie_memio32_t *h;
+
+			h = (pcie_memio32_t *)&pf_data_p->aer_h1;
+			tlp_addr = h->addr0 << 2;
+		}
+
 		/* If the RID_BDF == RP_BDF, PIO, otherwise DMA */
 		rid_bdf = (pcie_req_id_t)(pf_data_p->aer_h1 >> 16);
 		if (rid_bdf == rp_bdf) {
