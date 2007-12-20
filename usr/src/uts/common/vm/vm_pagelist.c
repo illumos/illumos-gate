@@ -3412,7 +3412,7 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		 */
 		if (kcage_on) {
 			if (trimkcage(mseg, &lo, &hi, pfnlo, pfnhi) == 0 ||
-			    ((hi - lo) + 1) < szcpgcnt)
+			    lo >= hi || ((hi - lo) + 1) < szcpgcnt)
 				continue;
 		} else {
 			lo = MAX(pfnlo, mseg->pages_base);
