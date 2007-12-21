@@ -49,9 +49,11 @@ BOOT_ARCHIVE_64=platform/$PLAT/$ARCH64/boot_archive
 #
 if [ "`echo $PATH | cut -f 1 -d :`" = /tmp/bfubin ] && \
     [ -O /tmp/bfubin ] ; then
-	export PATH=/tmp/bfubin:/usr/sbin:/usr/bin:/sbin
+	export PATH=/tmp/bfubin
+	export GZIP_CMD=/tmp/bfubin/gzip
 else
 	export PATH=/usr/sbin:/usr/bin:/sbin
+	export GZIP_CMD=/usr/bin/gzip
 fi
 
 EXTRACT_FILELIST="/boot/solaris/bin/extract_boot_filelist"
@@ -65,7 +67,7 @@ do
         -R)	shift
 		ALT_ROOT="$1"
 		if [ "$ALT_ROOT" != "/" ]; then
-			echo "Creating ram disk for $ALT_ROOT"
+			echo "Creating boot_archive for $ALT_ROOT"
 			ALTROOT_ARG="-R $ALT_ROOT"
 			EXTRACT_FILELIST="${ALT_ROOT}${EXTRACT_FILELIST}"
 		fi
@@ -96,7 +98,7 @@ shift `expr $OPTIND - 1`
 
 if [ $# -eq 1 ]; then
 	ALT_ROOT="$1"
-	echo "Creating ram disk for $ALT_ROOT"
+	echo "Creating boot_archive for $ALT_ROOT"
 fi
 
 if [ $PLAT = i86pc ] ; then
@@ -119,7 +121,7 @@ else			# must be sparc
 	compress=no	
 fi
 
-[ -x /usr/bin/gzip ] || compress=no
+[ -x $GZIP_CMD ] || compress=no
 
 function cleanup
 {
@@ -185,7 +187,7 @@ function copy_files
 		if [ $compress = yes ]; then
 			dir="${path%/*}"
 			mkdir -p "$rdmnt/$dir"
-			/usr/bin/gzip -c "$path" > "$rdmnt/$path"
+			$GZIP_CMD -c "$path" > "$rdmnt/$path"
 		else
 			print "$path"
 		fi
@@ -259,7 +261,7 @@ function create_ufs
 	# little.  To save time, we skip the gzip in this case.
 	#
 	if [ `uname -p` = i386 ] && [ $compress = no ] && \
-	    [ -x /usr/bin/gzip ] ; then
+	    [ -x $GZIP_CMD ] ; then
 		gzip -c "$rdfile" > "${archive}-new"
 	else
 		cat "$rdfile" > "${archive}-new"
@@ -316,7 +318,7 @@ function create_isofs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
-	if [ `uname -p` = i386 ] &&[ $compress = no ] && [ -x /usr/bin/gzip ]
+	if [ `uname -p` = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
 	then
 		ksh -c "$isocmd" 2> "$errlog" | \
 		    gzip > "${archive}-new"
@@ -324,18 +326,18 @@ function create_isofs
 		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
 	fi
 
+	dd_ret=0
 	if [ `uname -p` = sparc ] ; then
 		bb="$ALT_ROOT/usr/platform/`uname -i`/lib/fs/hsfs/bootblk"
-		lofidev=`lofiadm -a "${archive}-new"`
-		rlofidev=`echo "$lofidev" | sed -e "s/dev\/lofi/dev\/rlofi/"`
-		installboot "$bb" "$rlofidev"
-		lofiadm -d "$lofidev"
+		dd if="$bb" of="${archive}-new" bs=1b oseek=1 count=15 \
+		    conv=notrunc conv=sync >> "$errlog" 2>&1
+		dd_ret=$?
 	fi
 
-	if [ -s "$errlog" ]; then
+	if [ -s "$errlog" ] || [ $dd_ret -ne 0 ] ; then
 		grep Error: "$errlog" >/dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			grep Error: "$errlog"
+		if [ $? -eq 0 ] || [ $dd_ret -ne 0 ] ; then
+			cat "$errlog"
 			rm -f "${archive}-new"
 		fi
 	fi
@@ -374,7 +376,7 @@ function create_archive
 		LC_MESSAGES=C file "${archive}-new" | grep gzip > /dev/null
 	fi
 
-	if [ $? = 1 ] && [ -x /usr/bin/gzip ] || [ $ARCHIVE_SIZE -lt 5000 ]
+	if [ $? = 1 ] && [ -x $GZIP_CMD ] || [ $ARCHIVE_SIZE -lt 5000 ]
 	then
 		#
 		# Two of these functions may be run in parallel.  We

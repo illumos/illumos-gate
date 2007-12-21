@@ -373,5 +373,9 @@ else
 fi
 
 echo
-bootadm -a update_all 2>&1
+
+cr_args=${root:+ -R $root}
+LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
+    /tmp/bfubin/ksh $root/boot/solaris/bin/create_ramdisk $cr_args
+
 print "Finished.  See $allresults for complete log."
