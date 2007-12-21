@@ -208,6 +208,11 @@ uint_t ds_log_sz = DS_LOG_DEFAULT_SZ;
 static ds_log_entry_t ds_log_entry_pool[DS_LOG_NPOOL];
 
 /*
+ * Error message features
+ */
+#define	DS_EBUFSIZE			80
+
+/*
  * Debugging Features
  */
 #ifdef DEBUG
@@ -245,6 +250,7 @@ static int ds_ldc_init(ds_port_t *port);
 static int ds_ldc_fini(ds_port_t *port);
 
 /* event processing functions */
+static uint_t ds_ldc_reconnect(ds_port_t *port);
 static uint_t ds_ldc_cb(uint64_t event, caddr_t arg);
 static void ds_dispatch_event(void *arg);
 static int ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep);
@@ -279,6 +285,7 @@ static void ds_port_reset(ds_port_t *port);
 
 /* misc utilities */
 static ds_vers_check_t ds_vers_isvalid(ds_ver_t *vers, int nvers);
+static char *ds_errno_to_str(int errno, char *ebuf);
 
 /* log functions */
 static void ds_log_init(void);
@@ -595,6 +602,7 @@ ds_ldc_init(ds_port_t *port)
 	int		rv;
 	ldc_attr_t	ldc_attr;
 	caddr_t		cb_arg = (caddr_t)port;
+	char		ebuf[DS_EBUFSIZE];
 
 	ASSERT(MUTEX_HELD(&port->lock));
 
@@ -606,21 +614,21 @@ ds_ldc_init(ds_port_t *port)
 	ldc_attr.mtu = DS_STREAM_MTU;
 
 	if ((rv = ldc_init(port->ldc.id, &ldc_attr, &port->ldc.hdl)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_init: ldc_init error (%d)",
-		    port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_init: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		goto done;
 	}
 
 	/* register the LDC callback */
 	if ((rv = ldc_reg_callback(port->ldc.hdl, ds_ldc_cb, cb_arg)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_init: ldc_reg_callback error "
-		    "(%d)", port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_reg_callback: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		goto done;
 	}
 
 	if ((rv = ldc_open(port->ldc.hdl)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_init: ldc_open error (%d)",
-		    port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_open: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		goto done;
 	}
 
@@ -646,27 +654,81 @@ static int
 ds_ldc_fini(ds_port_t *port)
 {
 	int	rv;
+	char	ebuf[DS_EBUFSIZE];
 
 	ASSERT(port->state >= DS_PORT_LDC_INIT);
 
 	DS_DBG("ds@%lx: ldc_fini: ldc_id=%ld\n", port->id, port->ldc.id);
 
 	if ((rv = ldc_close(port->ldc.hdl)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_fini: ldc_close error (%d)",
-		    port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_close: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		return (rv);
 	}
 
 	if ((rv = ldc_unreg_callback(port->ldc.hdl)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_fini: ldc_unreg_callback error "
-		    "(%d)", port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_unreg_callback: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		return (rv);
 	}
 
 	if ((rv = ldc_fini(port->ldc.hdl)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: ldc_fini: ldc_fini error (%d)",
-		    port->id, rv);
+		cmn_err(CE_WARN, "ds@%lx: ldc_fini: %s", port->id,
+		    ds_errno_to_str(rv, ebuf));
 		return (rv);
+	}
+
+	return (rv);
+}
+
+static uint_t
+ds_ldc_reconnect(ds_port_t *port)
+{
+	ldc_status_t	ldc_state;
+	int		rv;
+	ldc_handle_t	ldc_hdl;
+	int		read_held;
+	int		write_held;
+	char		ebuf[DS_EBUFSIZE];
+
+	ldc_hdl = port->ldc.hdl;
+
+	read_held = RW_READ_HELD(&ds_svcs.rwlock);
+	write_held = RW_WRITE_HELD(&ds_svcs.rwlock);
+	if (read_held) {
+		if (!rw_tryupgrade(&ds_svcs.rwlock)) {
+			rw_exit(&ds_svcs.rwlock);
+			rw_enter(&ds_svcs.rwlock, RW_WRITER);
+		}
+	} else if (!write_held) {
+		rw_enter(&ds_svcs.rwlock, RW_WRITER);
+	}
+
+	/* reset the port state */
+	ds_port_reset(port);
+	(void) ldc_up(ldc_hdl);
+
+	/* read status after bringing LDC up */
+	if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
+		cmn_err(CE_NOTE, "ds@%lx: ds_ldc_reconnect: ldc_status: %s",
+		    port->id, ds_errno_to_str(rv, ebuf));
+	} else {
+		port->ldc.state = ldc_state;
+
+		/*
+		 * If the channel is already up, initiate
+		 * the handshake.
+		 */
+		if (ldc_state == LDC_UP)
+			ds_send_init_req(port);
+
+		DS_DBG_LDC("ds@%lx: ds_ldc_reconnect: succeeded", port->id);
+	}
+
+	if (read_held) {
+		rw_downgrade(&ds_svcs.rwlock);
+	} else if (!write_held) {
+		rw_exit(&ds_svcs.rwlock);
 	}
 
 	return (rv);
@@ -688,6 +750,7 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	int		rv;
 	ds_port_t	*port = (ds_port_t *)arg;
 	ldc_handle_t	ldc_hdl;
+	char		ebuf[DS_EBUFSIZE];
 
 	DS_DBG("ds@%lx: LDC event received: 0x%lx\n", port->id, event);
 
@@ -703,41 +766,25 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	 */
 	if (event & (LDC_EVT_DOWN | LDC_EVT_RESET)) {
 
+		ASSERT((event & (LDC_EVT_UP | LDC_EVT_READ)) == 0);
+
 		rw_enter(&ds_svcs.rwlock, RW_WRITER);
 		mutex_enter(&port->lock);
 
-		/* reset the port state */
-		ds_port_reset(port);
-		(void) ldc_up(ldc_hdl);
+		rv = ds_ldc_reconnect(port);
 
-		/* read status after bringing LDC up */
-		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
-			cmn_err(CE_NOTE, "ds@%lx: ldc_status error (%d)\n",
-			    port->id, rv);
-			rw_exit(&ds_svcs.rwlock);
-			goto done;
-		}
-		port->ldc.state = ldc_state;
-
-		/*
-		 * If the channel is already up, initiate
-		 * the handshake.
-		 */
-		if (ldc_state == LDC_UP)
-			ds_send_init_req(port);
-
-		ASSERT((event & (LDC_EVT_UP | LDC_EVT_READ)) == 0);
-
+		mutex_exit(&port->lock);
 		rw_exit(&ds_svcs.rwlock);
-		goto done;
+
+		return (rv);
 	}
 
 	mutex_enter(&port->lock);
 
 	if (event & LDC_EVT_UP) {
 		if ((rv = ldc_status(ldc_hdl, &ldc_state)) != 0) {
-			cmn_err(CE_NOTE, "ds@%lx: ldc_status error (%d)\n",
-			    port->id, rv);
+			cmn_err(CE_NOTE, "ds@%lx: ds_ldc_cb: ldc_status: %s\n",
+			    port->id, ds_errno_to_str(rv, ebuf));
 			goto done;
 		}
 		port->ldc.state = ldc_state;
@@ -754,8 +801,8 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 	}
 
 	if (event & LDC_EVT_WRITE) {
-		DS_DBG("ds@%lx: LDC write event received, not supported\n",
-		    port->id);
+		cmn_err(CE_NOTE, "ds@%lx: LDC write event received, not"
+		    " supported\n", port->id);
 		goto done;
 	}
 
@@ -785,6 +832,7 @@ ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep)
 	size_t	bytes_left = bytes_req;
 	size_t	nbytes;
 	int	retry_count = 0;
+	char	ebuf[DS_EBUFSIZE];
 
 	*sizep = 0;
 
@@ -796,8 +844,14 @@ ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep)
 		nbytes = bytes_left;
 
 		if ((rv = ldc_read(port->ldc.hdl, msgp, &nbytes)) != 0) {
-			if (rv != EAGAIN)
+			if (rv == ECONNRESET) {
+				(void) ds_ldc_reconnect(port);
 				break;
+			} else if (rv != EAGAIN) {
+				cmn_err(CE_NOTE, "ds@%lx: ds_recv_msg: %s",
+				    port->id, ds_errno_to_str(rv, ebuf));
+				break;
+			}
 		} else {
 			if (nbytes != 0) {
 				DS_DBG_LDC("ds@%lx: read %ld bytes, %d "
@@ -868,7 +922,7 @@ ds_handle_recv(void *arg)
 	 * by a separate thread while any malformed messages are
 	 * dropped.
 	 */
-	while ((ldc_chkq(ldc_hdl, &hasdata) == 0) && hasdata) {
+	while ((rv = ldc_chkq(ldc_hdl, &hasdata)) == 0 && hasdata) {
 
 		DS_DBG("ds@%lx: reading next message\n", port->id);
 
@@ -882,8 +936,6 @@ ds_handle_recv(void *arg)
 
 		/* read in the message header */
 		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
-			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
-			    port->id, rv);
 			continue;
 		}
 
@@ -911,8 +963,6 @@ ds_handle_recv(void *arg)
 
 		/* read in the message body */
 		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
-			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
-			    port->id, rv);
 			kmem_free(msg, msglen);
 			continue;
 		}
@@ -949,6 +999,10 @@ ds_handle_recv(void *arg)
 			continue;
 		}
 
+	}
+
+	if (rv == ECONNRESET) {
+		(void) ds_ldc_reconnect(port);
 	}
 
 	mutex_exit(&port->lock);
@@ -1598,6 +1652,7 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	caddr_t	currp = msg;
 	size_t	amt_left = msglen;
 	int	loopcnt = 0;
+	char	ebuf[DS_EBUFSIZE];
 
 	DS_DUMP_MSG(msg, msglen);
 
@@ -1613,12 +1668,15 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	/* send the message */
 	do {
 		if ((rv = ldc_write(port->ldc.hdl, currp, &msglen)) != 0) {
-			if ((rv == EWOULDBLOCK) && (loopcnt++ < ds_retries)) {
+			if (rv == ECONNRESET) {
+				(void) ds_ldc_reconnect(port);
+				return (rv);
+			} else if ((rv == EWOULDBLOCK) &&
+			    (loopcnt++ < ds_retries)) {
 				drv_usecwait(ds_delay);
 			} else {
-				cmn_err(CE_WARN,
-				    "ds@%lx: send_msg: ldc_write failed (%d)",
-				    port->id, rv);
+				cmn_err(CE_WARN, "ds@%lx: ldc_write: %s",
+				    port->id, ds_errno_to_str(rv, ebuf));
 				return (rv);
 			}
 		} else {
@@ -2860,4 +2918,46 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 	rw_exit(&ds_svcs.rwlock);
 
 	return (rv);
+}
+
+/*
+ * Specific errno's that are used by ds.c and ldc.c
+ */
+static struct {
+	int errno;
+	char *estr;
+} ds_errno_to_str_tab[] = {
+	EIO,		"I/O error",
+	EAGAIN,		"Resource temporarily unavailable",
+	ENOMEM,		"Not enough space",
+	EACCES,		"Permission denied",
+	EFAULT,		"Bad address",
+	EBUSY,		"Device busy",
+	EINVAL,		"Invalid argument",
+	ENOSPC,		"No space left on device",
+	ECHRNG,		"Channel number out of range",
+	ENOTSUP,	"Operation not supported",
+	EMSGSIZE,	"Message too long",
+	EADDRINUSE,	"Address already in use",
+	ECONNRESET,	"Connection reset by peer",
+	ENOBUFS,	"No buffer space available",
+	ECONNREFUSED,	"Connection refused",
+	EALREADY,	"Operation already in progress",
+	0,
+};
+
+static char *
+ds_errno_to_str(int errno, char *ebuf)
+{
+	int i, en;
+
+	for (i = 0; (en = ds_errno_to_str_tab[i].errno) != 0; i++) {
+		if (en == errno) {
+			(void) strcpy(ebuf, ds_errno_to_str_tab[i].estr);
+			return (ebuf);
+		}
+	}
+
+	(void) sprintf(ebuf, "errno (%d)", errno);
+	return (ebuf);
 }
