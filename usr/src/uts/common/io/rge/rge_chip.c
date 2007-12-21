@@ -49,23 +49,6 @@ static uint32_t rge_watchdog_count	= 1 << 16;
 /*
  * Operating register get/set access routines
  */
-#if	RGE_DEBUGGING
-
-static void rge_pci_check(rge_t *rgep);
-#pragma	no_inline(rge_pci_check)
-
-static void
-rge_pci_check(rge_t *rgep)
-{
-	uint16_t pcistatus;
-
-	pcistatus = pci_config_get16(rgep->cfg_handle, PCI_CONF_STAT);
-	if ((pcistatus & (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB)) != 0)
-		RGE_DEBUG(("rge_pci_check($%p): PCI status 0x%x",
-			(void *)rgep, pcistatus));
-}
-
-#endif	/* RGE_DEBUGGING */
 
 static uint32_t rge_reg_get32(rge_t *rgep, uintptr_t regno);
 #pragma	inline(rge_reg_get32)
@@ -74,7 +57,7 @@ static uint32_t
 rge_reg_get32(rge_t *rgep, uintptr_t regno)
 {
 	RGE_TRACE(("rge_reg_get32($%p, 0x%lx)",
-		(void *)rgep, regno));
+	    (void *)rgep, regno));
 
 	return (ddi_get32(rgep->io_handle, REG32(rgep, regno)));
 }
@@ -86,10 +69,9 @@ static void
 rge_reg_put32(rge_t *rgep, uintptr_t regno, uint32_t data)
 {
 	RGE_TRACE(("rge_reg_put32($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, data));
+	    (void *)rgep, regno, data));
 
 	ddi_put32(rgep->io_handle, REG32(rgep, regno), data);
-	RGE_PCICHK(rgep);
 }
 
 static void rge_reg_set32(rge_t *rgep, uintptr_t regno, uint32_t bits);
@@ -101,7 +83,7 @@ rge_reg_set32(rge_t *rgep, uintptr_t regno, uint32_t bits)
 	uint32_t regval;
 
 	RGE_TRACE(("rge_reg_set32($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get32(rgep, regno);
 	regval |= bits;
@@ -117,7 +99,7 @@ rge_reg_clr32(rge_t *rgep, uintptr_t regno, uint32_t bits)
 	uint32_t regval;
 
 	RGE_TRACE(("rge_reg_clr32($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get32(rgep, regno);
 	regval &= ~bits;
@@ -131,7 +113,7 @@ static uint16_t
 rge_reg_get16(rge_t *rgep, uintptr_t regno)
 {
 	RGE_TRACE(("rge_reg_get16($%p, 0x%lx)",
-		(void *)rgep, regno));
+	    (void *)rgep, regno));
 
 	return (ddi_get16(rgep->io_handle, REG16(rgep, regno)));
 }
@@ -143,10 +125,9 @@ static void
 rge_reg_put16(rge_t *rgep, uintptr_t regno, uint16_t data)
 {
 	RGE_TRACE(("rge_reg_put16($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, data));
+	    (void *)rgep, regno, data));
 
 	ddi_put16(rgep->io_handle, REG16(rgep, regno), data);
-	RGE_PCICHK(rgep);
 }
 
 static void rge_reg_set16(rge_t *rgep, uintptr_t regno, uint16_t bits);
@@ -158,7 +139,7 @@ rge_reg_set16(rge_t *rgep, uintptr_t regno, uint16_t bits)
 	uint16_t regval;
 
 	RGE_TRACE(("rge_reg_set16($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get16(rgep, regno);
 	regval |= bits;
@@ -174,7 +155,7 @@ rge_reg_clr16(rge_t *rgep, uintptr_t regno, uint16_t bits)
 	uint16_t regval;
 
 	RGE_TRACE(("rge_reg_clr16($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get16(rgep, regno);
 	regval &= ~bits;
@@ -188,7 +169,7 @@ static uint8_t
 rge_reg_get8(rge_t *rgep, uintptr_t regno)
 {
 	RGE_TRACE(("rge_reg_get8($%p, 0x%lx)",
-		(void *)rgep, regno));
+	    (void *)rgep, regno));
 
 	return (ddi_get8(rgep->io_handle, REG8(rgep, regno)));
 }
@@ -200,10 +181,9 @@ static void
 rge_reg_put8(rge_t *rgep, uintptr_t regno, uint8_t data)
 {
 	RGE_TRACE(("rge_reg_put8($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, data));
+	    (void *)rgep, regno, data));
 
 	ddi_put8(rgep->io_handle, REG8(rgep, regno), data);
-	RGE_PCICHK(rgep);
 }
 
 static void rge_reg_set8(rge_t *rgep, uintptr_t regno, uint8_t bits);
@@ -215,7 +195,7 @@ rge_reg_set8(rge_t *rgep, uintptr_t regno, uint8_t bits)
 	uint8_t regval;
 
 	RGE_TRACE(("rge_reg_set8($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get8(rgep, regno);
 	regval |= bits;
@@ -231,7 +211,7 @@ rge_reg_clr8(rge_t *rgep, uintptr_t regno, uint8_t bits)
 	uint8_t regval;
 
 	RGE_TRACE(("rge_reg_clr8($%p, 0x%lx, 0x%x)",
-		(void *)rgep, regno, bits));
+	    (void *)rgep, regno, bits));
 
 	regval = rge_reg_get8(rgep, regno);
 	regval &= ~bits;
@@ -362,9 +342,9 @@ rge_phydump(rge_t *rgep)
 
 	for (i = 0; i < 32; i += 8)
 		RGE_DEBUG(("rge_phydump: "
-				"0x%04x %04x %04x %04x %04x %04x %04x %04x",
-			regs[i+0], regs[i+1], regs[i+2], regs[i+3],
-			regs[i+4], regs[i+5], regs[i+6], regs[i+7]));
+		    "0x%04x %04x %04x %04x %04x %04x %04x %04x",
+		    regs[i+0], regs[i+1], regs[i+2], regs[i+3],
+		    regs[i+4], regs[i+5], regs[i+6], regs[i+7]));
 }
 
 #endif	/* RGE_DEBUGGING */
@@ -494,15 +474,15 @@ rge_phy_update(rge_t *rgep)
 	ASSERT(mutex_owned(rgep->genlock));
 
 	RGE_DEBUG(("rge_phy_update: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		rgep->param_adv_autoneg,
-		rgep->param_adv_pause, rgep->param_adv_asym_pause,
-		rgep->param_adv_1000fdx, rgep->param_adv_1000hdx,
-		rgep->param_adv_100fdx, rgep->param_adv_100hdx,
-		rgep->param_adv_10fdx, rgep->param_adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    rgep->param_adv_autoneg,
+	    rgep->param_adv_pause, rgep->param_adv_asym_pause,
+	    rgep->param_adv_1000fdx, rgep->param_adv_1000hdx,
+	    rgep->param_adv_100fdx, rgep->param_adv_100hdx,
+	    rgep->param_adv_10fdx, rgep->param_adv_10hdx));
 
 	control = gigctrl = anar = 0;
 
@@ -538,36 +518,51 @@ rge_phy_update(rge_t *rgep)
 
 		switch (rgep->param_loop_mode) {
 		case RGE_LOOP_INTERNAL_PHY:
-			rgep->param_link_speed = 1000;
-			adv_1000fdx = B_TRUE;
+			if (rgep->chipid.mac_ver != MAC_VER_8101E) {
+				rgep->param_link_speed = 1000;
+				adv_1000fdx = B_TRUE;
+			} else {
+				rgep->param_link_speed = 100;
+				adv_100fdx = B_TRUE;
+			}
 			control = MII_CONTROL_LOOPBACK;
 			break;
 
 		case RGE_LOOP_INTERNAL_MAC:
-			rgep->param_link_speed = 1000;
-			adv_1000fdx = B_TRUE;
+			if (rgep->chipid.mac_ver != MAC_VER_8101E) {
+				rgep->param_link_speed = 1000;
+				adv_1000fdx = B_TRUE;
+			} else {
+				rgep->param_link_speed = 100;
+				adv_100fdx = B_TRUE;
 			break;
 		}
 	}
 
 	RGE_DEBUG(("rge_phy_update: autoneg %d "
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		adv_autoneg,
-		adv_pause, adv_asym_pause,
-		adv_1000fdx, adv_1000hdx,
-		adv_100fdx, adv_100hdx,
-		adv_10fdx, adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    adv_autoneg,
+	    adv_pause, adv_asym_pause,
+	    adv_1000fdx, adv_1000hdx,
+	    adv_100fdx, adv_100hdx,
+	    adv_10fdx, adv_10hdx));
 
 	/*
 	 * We should have at least one technology capability set;
 	 * if not, we select a default of 1000Mb/s full-duplex
 	 */
 	if (!adv_1000fdx && !adv_100fdx && !adv_10fdx &&
-	    !adv_1000hdx && !adv_100hdx && !adv_10hdx)
-		adv_1000fdx = B_TRUE;
+	    !adv_1000hdx && !adv_100hdx && !adv_10hdx) {
+		if (rgep->chipid.mac_ver != MAC_VER_8101E)
+			adv_1000fdx = B_TRUE;
+		} else {
+			adv_1000fdx = B_FALSE;
+			adv_100fdx = B_TRUE;
+		}
+	}
 
 	/*
 	 * Now transform the adv_* variables into the proper settings
@@ -777,6 +772,7 @@ rge_chip_ident(rge_t *rgep)
 	case MAC_VER_8168:
 	case MAC_VER_8168B_B:
 	case MAC_VER_8168B_C:
+	case MAC_VER_8101E:
 		chip->is_pcie = B_TRUE;
 		break;
 
@@ -887,11 +883,11 @@ rge_chip_cfg_init(rge_t *rgep, chip_id_t *cidp)
 	pci_config_put16(handle, PCI_CONF_COMM, commd);
 
 	RGE_DEBUG(("rge_chip_cfg_init: vendor 0x%x device 0x%x revision 0x%x",
-		cidp->vendor, cidp->device, cidp->revision));
+	    cidp->vendor, cidp->device, cidp->revision));
 	RGE_DEBUG(("rge_chip_cfg_init: subven 0x%x subdev 0x%x",
-		cidp->subven, cidp->subdev));
+	    cidp->subven, cidp->subdev));
 	RGE_DEBUG(("rge_chip_cfg_init: clsize %d latency %d command 0x%x",
-		cidp->clsize, cidp->latency, cidp->command));
+	    cidp->clsize, cidp->latency, cidp->command));
 }
 
 int rge_chip_reset(rge_t *rgep);
@@ -960,17 +956,19 @@ rge_chip_init(rge_t *rgep)
 
 		val16 = rge_reg_get8(rgep, PHY_STATUS_REG);
 		val16 = 0x12<<8 | val16;
-		rge_reg_put16(rgep, PHY_STATUS_REG, val16);
-		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
-		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
-		rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00004000);
-		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f0b0);
-		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x0000f068);
-		val32 = rge_reg_get32(rgep, RT_CSI_DATA_REG);
-		val32 |= 0x7000;
-		val32 &= 0xffff5fff;
-		rge_reg_put32(rgep, RT_CSI_DATA_REG, val32);
-		rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f068);
+		if (rgep->chipid.mac_ver != MAC_VER_8101E) {
+			rge_reg_put16(rgep, PHY_STATUS_REG, val16);
+			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
+			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
+			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00004000);
+			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f0b0);
+			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x0000f068);
+			val32 = rge_reg_get32(rgep, RT_CSI_DATA_REG);
+			val32 |= 0x7000;
+			val32 &= 0xffff5fff;
+			rge_reg_put32(rgep, RT_CSI_DATA_REG, val32);
+			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f068);
+		}
 	}
 
 	/*
@@ -1020,9 +1018,12 @@ rge_chip_init(rge_t *rgep)
 	if (rgep->default_mtu > ETHERMTU) {
 		rge_reg_put8(rgep, TX_MAX_PKTSIZE_REG, TX_PKTSIZE_JUMBO);
 		rge_reg_put16(rgep, RX_MAX_PKTSIZE_REG, RX_PKTSIZE_JUMBO);
-	} else {
+	} else if (rgep->chipid.mac_ver != MAC_VER_8101E) {
 		rge_reg_put8(rgep, TX_MAX_PKTSIZE_REG, TX_PKTSIZE_STD);
 		rge_reg_put16(rgep, RX_MAX_PKTSIZE_REG, RX_PKTSIZE_STD);
+	} else {
+		rge_reg_put8(rgep, TX_MAX_PKTSIZE_REG, TX_PKTSIZE_STD_8101E);
+		rge_reg_put16(rgep, RX_MAX_PKTSIZE_REG, RX_PKTSIZE_STD_8101E);
 	}
 
 	/*
@@ -1058,7 +1059,10 @@ rge_chip_init(rge_t *rgep)
 	/*
 	 * Suggested setting from Realtek
 	 */
-	rge_reg_put16(rgep, RESV_E2_REG, 0x282a);
+	if (rgep->chipid.mac_ver != MAC_VER_8101E)
+		rge_reg_put16(rgep, RESV_E2_REG, 0x282a);
+	else
+		rge_reg_put16(rgep, RESV_E2_REG, 0x0000);
 
 	/*
 	 * Set multicast register
@@ -1627,7 +1631,7 @@ rge_chip_peek_cfg(rge_t *rgep, rge_peekpoke_t *ppd)
 	uint64_t regno;
 
 	RGE_TRACE(("rge_chip_peek_cfg($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	regno = ppd->pp_acc_offset;
 
@@ -1662,7 +1666,7 @@ rge_chip_poke_cfg(rge_t *rgep, rge_peekpoke_t *ppd)
 	uint64_t regno;
 
 	RGE_TRACE(("rge_chip_poke_cfg($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	regno = ppd->pp_acc_offset;
 	regval = ppd->pp_acc_data;
@@ -1696,7 +1700,7 @@ rge_chip_peek_reg(rge_t *rgep, rge_peekpoke_t *ppd)
 	void *regaddr;
 
 	RGE_TRACE(("rge_chip_peek_reg($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	regaddr = PIO_ADDR(rgep, ppd->pp_acc_offset);
 
@@ -1731,7 +1735,7 @@ rge_chip_poke_reg(rge_t *rgep, rge_peekpoke_t *ppd)
 	void *regaddr;
 
 	RGE_TRACE(("rge_chip_poke_reg($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	regaddr = PIO_ADDR(rgep, ppd->pp_acc_offset);
 	regval = ppd->pp_acc_data;
@@ -1753,7 +1757,6 @@ rge_chip_poke_reg(rge_t *rgep, rge_peekpoke_t *ppd)
 		ddi_put64(rgep->io_handle, regaddr, regval);
 		break;
 	}
-	RGE_PCICHK(rgep);
 }
 
 static void rge_chip_peek_mii(rge_t *rgep, rge_peekpoke_t *ppd);
@@ -1763,7 +1766,7 @@ static void
 rge_chip_peek_mii(rge_t *rgep, rge_peekpoke_t *ppd)
 {
 	RGE_TRACE(("rge_chip_peek_mii($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	ppd->pp_acc_data = rge_mii_get16(rgep, ppd->pp_acc_offset/2);
 }
@@ -1775,7 +1778,7 @@ static void
 rge_chip_poke_mii(rge_t *rgep, rge_peekpoke_t *ppd)
 {
 	RGE_TRACE(("rge_chip_poke_mii($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	rge_mii_put16(rgep, ppd->pp_acc_offset/2, ppd->pp_acc_data);
 }
@@ -1790,7 +1793,7 @@ rge_chip_peek_mem(rge_t *rgep, rge_peekpoke_t *ppd)
 	void *vaddr;
 
 	RGE_TRACE(("rge_chip_peek_rge($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	vaddr = (void *)(uintptr_t)ppd->pp_acc_offset;
 
@@ -1813,7 +1816,7 @@ rge_chip_peek_mem(rge_t *rgep, rge_peekpoke_t *ppd)
 	}
 
 	RGE_DEBUG(("rge_chip_peek_mem($%p, $%p) peeked 0x%llx from $%p",
-		(void *)rgep, (void *)ppd, regval, vaddr));
+	    (void *)rgep, (void *)ppd, regval, vaddr));
 
 	ppd->pp_acc_data = regval;
 }
@@ -1828,13 +1831,13 @@ rge_chip_poke_mem(rge_t *rgep, rge_peekpoke_t *ppd)
 	void *vaddr;
 
 	RGE_TRACE(("rge_chip_poke_mem($%p, $%p)",
-		(void *)rgep, (void *)ppd));
+	    (void *)rgep, (void *)ppd));
 
 	vaddr = (void *)(uintptr_t)ppd->pp_acc_offset;
 	regval = ppd->pp_acc_data;
 
 	RGE_DEBUG(("rge_chip_poke_mem($%p, $%p) poking 0x%llx at $%p",
-		(void *)rgep, (void *)ppd, regval, vaddr));
+	    (void *)rgep, (void *)ppd, regval, vaddr));
 
 	switch (ppd->pp_acc_size) {
 	case 1:
@@ -2097,7 +2100,7 @@ rge_chip_ioctl(rge_t *rgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	int cmd;
 
 	RGE_TRACE(("rge_chip_ioctl($%p, $%p, $%p, $%p)",
-		(void *)rgep, (void *)wq, (void *)mp, (void *)iocp));
+	    (void *)rgep, (void *)wq, (void *)mp, (void *)iocp));
 
 	ASSERT(mutex_owned(rgep->genlock));
 

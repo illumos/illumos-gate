@@ -1444,10 +1444,10 @@ rge_unattach(rge_t *rgep)
 	if (rgep->progress & PROGRESS_RESCHED)
 		(void) ddi_intr_remove_softint(rgep->resched_hdl);
 
-	rge_free_bufs(rgep);
-
 	if (rgep->progress & PROGRESS_NDD)
 		rge_nd_cleanup(rgep);
+
+	rge_free_bufs(rgep);
 
 	if (rgep->progress & PROGRESS_REGS)
 		ddi_regs_map_free(&rgep->io_handle);
@@ -1592,15 +1592,6 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	rgep->progress |= PROGRESS_REGS;
 
 	/*
-	 * Register NDD-tweakable parameters
-	 */
-	if (rge_nd_init(rgep)) {
-		rge_problem(rgep, "rge_nd_init() failed");
-		goto attach_fail;
-	}
-	rgep->progress |= PROGRESS_NDD;
-
-	/*
 	 * Characterise the device, so we know its requirements.
 	 * Then allocate the appropriate TX and RX descriptors & buffers.
 	 */
@@ -1610,6 +1601,15 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		rge_problem(rgep, "DMA buffer allocation failed");
 		goto attach_fail;
 	}
+
+	/*
+	 * Register NDD-tweakable parameters
+	 */
+	if (rge_nd_init(rgep)) {
+		rge_problem(rgep, "rge_nd_init() failed");
+		goto attach_fail;
+	}
+	rgep->progress |= PROGRESS_NDD;
 
 	/*
 	 * Add the softint handlers:

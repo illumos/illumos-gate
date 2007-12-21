@@ -50,6 +50,7 @@ extern "C" {
 #define	DEVICE_ID_8111			0x8168	/* PCI-E */
 #define	DEVICE_ID_8169SC		0x8167	/* PCI */
 #define	DEVICE_ID_8110SC		0x8167	/* PCI */
+#define	DEVICE_ID_8101E			0x8136	/* 10/100M PCI-E */
 
 #define	RGE_REGISTER_MAX		0x0100
 
@@ -169,6 +170,7 @@ extern "C" {
 #define	MAC_VER_8168			0x20000000
 #define	MAC_VER_8168B_B			0x30000000
 #define	MAC_VER_8168B_C			0x38000000
+#define	MAC_VER_8101E			0x34000000
 
 #define	TX_CONFIG_DEFAULT		(TX_INTERFRAME_GAP_802_3 | \
 					    TX_DMA_BURST_1024B)
@@ -305,6 +307,7 @@ extern "C" {
 #define	RX_MAX_PKTSIZE_REG		0x00da
 #define	RX_PKTSIZE_JUMBO		0x1bfa	/* 7K bytes */
 #define	RX_PKTSIZE_STD			0x05fa	/* 1530 bytes */
+#define	RX_PKTSIZE_STD_8101E		0x3fff
 
 /*
  * C+ command register
@@ -331,6 +334,7 @@ extern "C" {
 #define	TX_MAX_PKTSIZE_REG_RESV		0xc0
 #define	TX_PKTSIZE_JUMBO		0x3b	/* Realtek suggested value */
 #define	TX_PKTSIZE_STD			0x32	/* document suggested value */
+#define	TX_PKTSIZE_STD_8101E		0x3f
 
 #define	RESV_82_REG			0x0082
 #define	RESV_E2_REG			0x00e2
