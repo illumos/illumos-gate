@@ -4936,9 +4936,10 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 	 * nodes (from .conf files).  Find the drivername by nodeid. If we
 	 * can't find a node with devnm as the node name then we search by
 	 * drivername.  This allows an implementation to supply a genericly
-	 * named boot path (disk) and locate drivename nodes (sd).
+	 * named boot path (disk) and locate drivename nodes (sd).  The
+	 * NDI_PROMNAME flag does not apply to /devices/pseudo paths.
 	 */
-	if (flags & NDI_PROMNAME) {
+	if ((flags & NDI_PROMNAME) && (pdip != pseudo_dip)) {
 		drivername = child_path_to_driver(pdip, name, addr);
 		find_by_addr = 1;
 	}
