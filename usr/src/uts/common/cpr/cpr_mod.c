@@ -326,6 +326,10 @@ cpr(int fcn, void *mdep)
 		break;
 
 	case AD_DEVICE_SUSPEND_TO_RAM:
+		if (mdep == NULL) {
+			/* Didn't pass enough arguments */
+			return (EINVAL);
+		}
 		cpr_test_point = DEVICE_SUSPEND_TO_RAM;
 		cpr_device = (major_t)atoi((char *)mdep);
 		break;

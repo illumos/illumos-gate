@@ -36,6 +36,7 @@
 #include <sys/pte.h>
 #include <vm/seg_kmem.h>
 #include <sys/epm.h>
+#include <sys/cpr.h>
 #include <sys/machsystm.h>
 #include <sys/clock.h>
 
@@ -151,13 +152,13 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 
 	switch (s3ap->s3a_test_point) {
 	case DEVICE_SUSPEND_TO_RAM:
+	case FORCE_SUSPEND_TO_RAM:
 	case LOOP_BACK_PASS:
 		return (0);
 	case LOOP_BACK_FAIL:
 		return (1);
 	default:
-		ASSERT(s3ap->s3a_test_point == LOOP_BACK_NONE ||
-		    s3ap->s3a_test_point == FORCE_SUSPEND_TO_RAM);
+		ASSERT(s3ap->s3a_test_point == LOOP_BACK_NONE);
 	}
 
 	/*
