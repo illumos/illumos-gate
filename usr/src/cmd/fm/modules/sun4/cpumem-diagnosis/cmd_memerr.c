@@ -575,8 +575,8 @@ cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 		while (*q == ' ') {
 			r = strchr(q+1, ' ');
 			if (r == NULL)
-			    r = bank->bank_unum +
-			    strlen(bank->bank_unum) + 1; /* null@end */
+				r = bank->bank_unum +
+				    strlen(bank->bank_unum) + 1; /* null@end */
 			(void) strncpy(dimm_unum_string+baselen,
 			    q+1, r-q-1);
 			dimm_unum_string[baselen+(r-q-1)] = 0;
@@ -594,7 +594,7 @@ cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 			 */
 
 			if (cmd_dimm_lookup(hdl, fmri) == NULL)
-			    (void) cmd_dimm_create(hdl, fmri);
+				(void) cmd_dimm_create(hdl, fmri);
 			nvlist_free(fmri);
 			q = r;
 		}
@@ -622,8 +622,17 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	cmd_bank_t *bank;
 	cmd_cpu_t *cpu;
 
+#ifdef sun4u
+	/*
+	 * Note: Currently all sun4u processors using this code share
+	 * L2 and L3 cache at CMD_CPU_LEVEL_CORE.
+	 */
+	cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,
+	    CMD_CPU_LEVEL_CORE);
+#else /* sun4v */
 	cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class,
 	    CMD_CPU_LEVEL_THREAD);
+#endif /* sun4u */
 
 	if (cpu == NULL) {
 		fmd_hdl_debug(hdl, "cmd_ue_common: cpu not found\n");
