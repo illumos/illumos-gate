@@ -209,7 +209,8 @@ XDB_OBJS += xdb.o
 #
 #	Build up defines and paths.
 #
-INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/i86pc -I$(SRC)/common
+INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/i86pc -I$(SRC)/common \
+	-I$(UTSBASE)/common/xen
 
 #
 # Since the assym files are derived, the dependencies must be explicit for

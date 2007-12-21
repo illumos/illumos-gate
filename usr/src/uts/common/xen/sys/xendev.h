@@ -31,6 +31,11 @@
 
 #include <sys/hypervisor.h>
 #include <sys/taskq.h>
+#ifdef	XPV_HVM_DRIVER
+#include <public/io/ring.h>
+#include <public/event_channel.h>
+#include <public/grant_table.h>
+#endif
 #include <xen/sys/xenbus_impl.h>
 
 #ifdef	__cplusplus

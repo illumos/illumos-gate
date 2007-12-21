@@ -186,6 +186,11 @@ ROOTNEX_OBJS += rootnex.o
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
+XNF_OBJS	+= xnf.o
+XPV_OBJS	+= xpv_support.o xvdi.o gnttab.o evtchn.o \
+		xenbus_comms.o xenbus_client.o xenbus_probe.o xenbus_xs.o \
+		hypercall.o hypersubr.o
+XPVD_OBJS   	+= xpvd.o
 
 #
 #	Build up defines and paths.

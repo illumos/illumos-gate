@@ -40,6 +40,7 @@
 #include <sys/dlpi.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
+#include <sys/types.h>
 #include <sys/pattr.h>
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
@@ -101,8 +102,17 @@ static void	xnb_rxbuf_put(xnb_t *, xnb_rxbuf_t *);
 static void	xnb_rx_notify_peer(xnb_t *);
 static void	xnb_rx_complete(xnb_rxbuf_t *);
 static void	xnb_rx_mark_complete(xnb_t *, RING_IDX, int16_t);
-static void	xnb_rx_schedule_unmop(xnb_t *, gnttab_map_grant_ref_t *);
+static void 	xnb_rx_schedule_unmop(xnb_t *, gnttab_map_grant_ref_t *,
+    xnb_rxbuf_t *);
 static void	xnb_rx_perform_pending_unmop(xnb_t *);
+mblk_t		*xnb_copy_to_peer(xnb_t *, mblk_t *);
+
+int		xnb_unmop_lowwat = NET_TX_RING_SIZE >> 2;
+int		xnb_unmop_hiwat = NET_TX_RING_SIZE - (NET_TX_RING_SIZE >> 2);
+
+
+boolean_t	xnb_hv_copy = B_TRUE;
+boolean_t	xnb_explicit_pageflip_set = B_FALSE;
 
 #ifdef XNB_DEBUG
 #define	NR_GRANT_ENTRIES \
@@ -129,12 +139,17 @@ static char *aux_statistics[] = {
 	"tx_too_early",
 	"rx_too_early",
 	"rx_allocb_failed",
+	"tx_allocb_failed",
+	"tx_foreign_page",
 	"mac_full",
 	"spurious_intr",
 	"allocation_success",
 	"allocation_failure",
 	"small_allocation_success",
 	"small_allocation_failure",
+	"other_allocation_failure",
+	"tx_pageboundary_crossed",
+	"tx_cpoparea_grown",
 	"csum_hardware",
 	"csum_software",
 };
@@ -155,23 +170,28 @@ xnb_ks_aux_update(kstat_t *ksp, int flag)
 	 * Assignment order should match that of the names in
 	 * aux_statistics.
 	 */
-	(knp++)->value.ui64 = xnbp->x_stat_tx_cksum_deferred;
-	(knp++)->value.ui64 = xnbp->x_stat_rx_cksum_no_need;
-	(knp++)->value.ui64 = xnbp->x_stat_tx_notify_deferred;
-	(knp++)->value.ui64 = xnbp->x_stat_tx_notify_sent;
-	(knp++)->value.ui64 = xnbp->x_stat_rx_notify_deferred;
-	(knp++)->value.ui64 = xnbp->x_stat_rx_notify_sent;
-	(knp++)->value.ui64 = xnbp->x_stat_tx_too_early;
-	(knp++)->value.ui64 = xnbp->x_stat_rx_too_early;
-	(knp++)->value.ui64 = xnbp->x_stat_rx_allocb_failed;
-	(knp++)->value.ui64 = xnbp->x_stat_mac_full;
-	(knp++)->value.ui64 = xnbp->x_stat_spurious_intr;
-	(knp++)->value.ui64 = xnbp->x_stat_allocation_success;
-	(knp++)->value.ui64 = xnbp->x_stat_allocation_failure;
-	(knp++)->value.ui64 = xnbp->x_stat_small_allocation_success;
-	(knp++)->value.ui64 = xnbp->x_stat_small_allocation_failure;
-	(knp++)->value.ui64 = xnbp->x_stat_csum_hardware;
-	(knp++)->value.ui64 = xnbp->x_stat_csum_software;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_cksum_deferred;
+	(knp++)->value.ui64 = xnbp->xnb_stat_rx_cksum_no_need;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_notify_deferred;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_notify_sent;
+	(knp++)->value.ui64 = xnbp->xnb_stat_rx_notify_deferred;
+	(knp++)->value.ui64 = xnbp->xnb_stat_rx_notify_sent;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_too_early;
+	(knp++)->value.ui64 = xnbp->xnb_stat_rx_too_early;
+	(knp++)->value.ui64 = xnbp->xnb_stat_rx_allocb_failed;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_allocb_failed;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_foreign_page;
+	(knp++)->value.ui64 = xnbp->xnb_stat_mac_full;
+	(knp++)->value.ui64 = xnbp->xnb_stat_spurious_intr;
+	(knp++)->value.ui64 = xnbp->xnb_stat_allocation_success;
+	(knp++)->value.ui64 = xnbp->xnb_stat_allocation_failure;
+	(knp++)->value.ui64 = xnbp->xnb_stat_small_allocation_success;
+	(knp++)->value.ui64 = xnbp->xnb_stat_small_allocation_failure;
+	(knp++)->value.ui64 = xnbp->xnb_stat_other_allocation_failure;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_pagebndry_crossed;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_cpoparea_grown;
+	(knp++)->value.ui64 = xnbp->xnb_stat_csum_hardware;
+	(knp++)->value.ui64 = xnbp->xnb_stat_csum_software;
 
 	return (0);
 }
@@ -187,16 +207,16 @@ xnb_ks_init(xnb_t *xnbp)
 	/*
 	 * Create and initialise kstats.
 	 */
-	xnbp->x_kstat_aux = kstat_create(ddi_driver_name(xnbp->x_devinfo),
-	    ddi_get_instance(xnbp->x_devinfo), "aux_statistics", "net",
+	xnbp->xnb_kstat_aux = kstat_create(ddi_driver_name(xnbp->xnb_devinfo),
+	    ddi_get_instance(xnbp->xnb_devinfo), "aux_statistics", "net",
 	    KSTAT_TYPE_NAMED, nstat, 0);
-	if (xnbp->x_kstat_aux == NULL)
+	if (xnbp->xnb_kstat_aux == NULL)
 		return (B_FALSE);
 
-	xnbp->x_kstat_aux->ks_private = xnbp;
-	xnbp->x_kstat_aux->ks_update = xnb_ks_aux_update;
+	xnbp->xnb_kstat_aux->ks_private = xnbp;
+	xnbp->xnb_kstat_aux->ks_update = xnb_ks_aux_update;
 
-	knp = xnbp->x_kstat_aux->ks_data;
+	knp = xnbp->xnb_kstat_aux->ks_data;
 	while (nstat > 0) {
 		kstat_named_init(knp, *cp, KSTAT_DATA_UINT64);
 
@@ -205,7 +225,7 @@ xnb_ks_init(xnb_t *xnbp)
 		nstat--;
 	}
 
-	kstat_install(xnbp->x_kstat_aux);
+	kstat_install(xnbp->xnb_kstat_aux);
 
 	return (B_TRUE);
 }
@@ -213,7 +233,7 @@ xnb_ks_init(xnb_t *xnbp)
 static void
 xnb_ks_free(xnb_t *xnbp)
 {
-	kstat_delete(xnbp->x_kstat_aux);
+	kstat_delete(xnbp->xnb_kstat_aux);
 }
 
 /*
@@ -301,7 +321,7 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 			    0, 0, 0, 0,
 			    HCK_FULLCKSUM, KM_NOSLEEP);
 
-			xnbp->x_stat_csum_hardware++;
+			xnbp->xnb_stat_csum_hardware++;
 
 			return (mp);
 		}
@@ -323,7 +343,7 @@ software:
 	 * We are not able to use any offload so do the whole thing in
 	 * software.
 	 */
-	xnbp->x_stat_csum_software++;
+	xnbp->xnb_stat_csum_software++;
 
 	return (xnb_software_csum(xnbp, mp));
 }
@@ -336,38 +356,46 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 
 	xnbp = kmem_zalloc(sizeof (*xnbp), KM_SLEEP);
 
-	xnbp->x_flavour = flavour;
-	xnbp->x_flavour_data = flavour_data;
-	xnbp->x_devinfo = dip;
-	xnbp->x_evtchn = INVALID_EVTCHN;
-	xnbp->x_irq = B_FALSE;
-	xnbp->x_tx_ring_handle = INVALID_GRANT_HANDLE;
-	xnbp->x_rx_ring_handle = INVALID_GRANT_HANDLE;
-	xnbp->x_cksum_offload = xnb_cksum_offload;
-	xnbp->x_connected = B_FALSE;
-	xnbp->x_hotplugged = B_FALSE;
-	xnbp->x_detachable = B_FALSE;
-	xnbp->x_peer = xvdi_get_oeid(dip);
-	xnbp->x_rx_pages_writable = B_FALSE;
+	xnbp->xnb_flavour = flavour;
+	xnbp->xnb_flavour_data = flavour_data;
+	xnbp->xnb_devinfo = dip;
+	xnbp->xnb_evtchn = INVALID_EVTCHN;
+	xnbp->xnb_irq = B_FALSE;
+	xnbp->xnb_tx_ring_handle = INVALID_GRANT_HANDLE;
+	xnbp->xnb_rx_ring_handle = INVALID_GRANT_HANDLE;
+	xnbp->xnb_cksum_offload = xnb_cksum_offload;
+	xnbp->xnb_connected = B_FALSE;
+	xnbp->xnb_hotplugged = B_FALSE;
+	xnbp->xnb_detachable = B_FALSE;
+	xnbp->xnb_peer = xvdi_get_oeid(dip);
+	xnbp->xnb_rx_pages_writable = B_FALSE;
 
-	xnbp->x_rx_buf_count = 0;
-	xnbp->x_rx_unmop_count = 0;
+	xnbp->xnb_rx_buf_count = 0;
+	xnbp->xnb_rx_unmop_count = 0;
 
-	xnbp->x_tx_va = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
-	ASSERT(xnbp->x_tx_va != NULL);
+	xnbp->xnb_hv_copy = B_FALSE;
 
-	if (ddi_get_iblock_cookie(dip, 0, &xnbp->x_icookie)
+	xnbp->xnb_tx_va = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
+	ASSERT(xnbp->xnb_tx_va != NULL);
+
+	if (ddi_get_iblock_cookie(dip, 0, &xnbp->xnb_icookie)
 	    != DDI_SUCCESS)
 		goto failure;
 
-	mutex_init(&xnbp->x_tx_lock, NULL, MUTEX_DRIVER, xnbp->x_icookie);
-	mutex_init(&xnbp->x_rx_lock, NULL, MUTEX_DRIVER, xnbp->x_icookie);
+	/* allocated on demand, when/if we enter xnb_copy_to_peer() */
+	xnbp->xnb_tx_cpop = NULL;
+	xnbp->xnb_cpop_sz = 0;
+
+	mutex_init(&xnbp->xnb_tx_lock, NULL, MUTEX_DRIVER,
+	    xnbp->xnb_icookie);
+	mutex_init(&xnbp->xnb_rx_lock, NULL, MUTEX_DRIVER,
+	    xnbp->xnb_icookie);
 
 	/* set driver private pointer now */
 	ddi_set_driver_private(dip, xnbp);
 
 	if (!xnb_ks_init(xnbp))
-		goto late_failure;
+		goto failure_1;
 
 	/*
 	 * Receive notification of changes in the state of the
@@ -375,35 +403,52 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	 */
 	if (xvdi_add_event_handler(dip, XS_OE_STATE,
 	    xnb_oe_state_change) != DDI_SUCCESS)
-		goto very_late_failure;
+		goto failure_2;
 
 	/*
 	 * Receive notification of hotplug events.
 	 */
 	if (xvdi_add_event_handler(dip, XS_HP_STATE,
 	    xnb_hp_state_change) != DDI_SUCCESS)
-		goto very_late_failure;
+		goto failure_2;
 
 	xsname = xvdi_get_xsname(dip);
 
 	if (xenbus_printf(XBT_NULL, xsname,
 	    "feature-no-csum-offload", "%d",
-	    xnbp->x_cksum_offload ? 0 : 1) != 0)
-		goto very_very_late_failure;
+	    xnbp->xnb_cksum_offload ? 0 : 1) != 0)
+		goto failure_3;
+
+	/*
+	 * Use global xnb_hv_copy to export this feature. This means that
+	 * we have to decide what to do before starting up a guest domain
+	 */
+	if (xenbus_printf(XBT_NULL, xsname,
+	    "feature-rx-copy", "%d", xnb_hv_copy ? 1 : 0) != 0)
+		goto failure_3;
+	/*
+	 * Linux domUs seem to depend on "feature-rx-flip" being 0
+	 * in addition to "feature-rx-copy" being 1. It seems strange
+	 * to use four possible states to describe a binary decision,
+	 * but we might as well play nice.
+	 */
+	if (xenbus_printf(XBT_NULL, xsname,
+	    "feature-rx-flip", "%d", xnb_explicit_pageflip_set ? 1 : 0) != 0)
+		goto failure_3;
 
 	if (xenbus_scanf(XBT_NULL, xsname,
 	    "mac", "%s", mac) != 0) {
 		cmn_err(CE_WARN, "xnb_attach: "
 		    "cannot read mac address from %s",
 		    xsname);
-		goto very_very_late_failure;
+		goto failure_3;
 	}
 
-	if (ether_aton(mac, xnbp->x_mac_addr) != ETHERADDRL) {
+	if (ether_aton(mac, xnbp->xnb_mac_addr) != ETHERADDRL) {
 		cmn_err(CE_WARN,
 		    "xnb_attach: cannot parse mac address %s",
 		    mac);
-		goto very_very_late_failure;
+		goto failure_3;
 	}
 
 	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateInitWait);
@@ -411,18 +456,18 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 
 	return (DDI_SUCCESS);
 
-very_very_late_failure: /* not that the naming is getting silly or anything */
+failure_3:
 	xvdi_remove_event_handler(dip, NULL);
 
-very_late_failure:
+failure_2:
 	xnb_ks_free(xnbp);
 
-late_failure:
-	mutex_destroy(&xnbp->x_rx_lock);
-	mutex_destroy(&xnbp->x_tx_lock);
+failure_1:
+	mutex_destroy(&xnbp->xnb_rx_lock);
+	mutex_destroy(&xnbp->xnb_tx_lock);
 
 failure:
-	vmem_free(heap_arena, xnbp->x_tx_va, PAGESIZE);
+	vmem_free(heap_arena, xnbp->xnb_tx_va, PAGESIZE);
 	kmem_free(xnbp, sizeof (*xnbp));
 	return (DDI_FAILURE);
 }
@@ -434,8 +479,8 @@ xnb_detach(dev_info_t *dip)
 	xnb_t *xnbp = ddi_get_driver_private(dip);
 
 	ASSERT(xnbp != NULL);
-	ASSERT(!xnbp->x_connected);
-	ASSERT(xnbp->x_rx_buf_count == 0);
+	ASSERT(!xnbp->xnb_connected);
+	ASSERT(xnbp->xnb_rx_buf_count == 0);
 
 	xnb_disconnect_rings(dip);
 
@@ -445,11 +490,15 @@ xnb_detach(dev_info_t *dip)
 
 	ddi_set_driver_private(dip, NULL);
 
-	mutex_destroy(&xnbp->x_tx_lock);
-	mutex_destroy(&xnbp->x_rx_lock);
+	mutex_destroy(&xnbp->xnb_tx_lock);
+	mutex_destroy(&xnbp->xnb_rx_lock);
 
-	ASSERT(xnbp->x_tx_va != NULL);
-	vmem_free(heap_arena, xnbp->x_tx_va, PAGESIZE);
+	if (xnbp->xnb_cpop_sz > 0)
+		kmem_free(xnbp->xnb_tx_cpop, sizeof (*xnbp->xnb_tx_cpop)
+		    * xnbp->xnb_cpop_sz);
+
+	ASSERT(xnbp->xnb_tx_va != NULL);
+	vmem_free(heap_arena, xnbp->xnb_tx_va, PAGESIZE);
 
 	kmem_free(xnbp, sizeof (*xnbp));
 }
@@ -467,29 +516,27 @@ xnb_alloc_page(xnb_t *xnbp)
 	mutex_enter(&xnb_alloc_page_lock);
 	if (nth == BATCH_SIZE) {
 		if (balloon_alloc_pages(BATCH_SIZE, mfns) != BATCH_SIZE) {
-			xnbp->x_stat_allocation_failure++;
+			xnbp->xnb_stat_allocation_failure++;
 			mutex_exit(&xnb_alloc_page_lock);
 
 			/*
 			 * Try for a single page in low memory situations.
 			 */
 			if (balloon_alloc_pages(1, &mfn) != 1) {
-				xnbp->x_stat_small_allocation_failure++;
-				if ((xnbp->x_stat_small_allocation_failure
-				    % WARNING_RATE_LIMIT) == 0) {
+				if ((xnbp->xnb_stat_small_allocation_failure++
+				    % WARNING_RATE_LIMIT) == 0)
 					cmn_err(CE_WARN, "xnb_alloc_page: "
 					    "Cannot allocate memory to "
 					    "transfer packets to peer.");
-				}
 				return (0);
 			} else {
-				xnbp->x_stat_small_allocation_success++;
+				xnbp->xnb_stat_small_allocation_success++;
 				return (mfn);
 			}
 		}
 
 		nth = 0;
-		xnbp->x_stat_allocation_success++;
+		xnbp->xnb_stat_allocation_success++;
 	}
 
 	mfn = mfns[nth++];
@@ -524,6 +571,16 @@ xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 	}
 }
 
+/*
+ * Similar to RING_HAS_UNCONSUMED_REQUESTS(&xnbp->rx_ring) but
+ * using local variables.
+ */
+#define	XNB_RING_HAS_UNCONSUMED_REQUESTS(_r)		\
+	((((_r)->sring->req_prod - loop) <		\
+		(RING_SIZE(_r) - (loop - prod))) ?	\
+	    ((_r)->sring->req_prod - loop) :		\
+	    (RING_SIZE(_r) - (loop - prod)))
+
 mblk_t *
 xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
@@ -549,35 +606,26 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 * to transfer them.
 	 */
 
-	mutex_enter(&xnbp->x_tx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
 
 	/*
 	 * If we are not connected to the peer or have not yet
 	 * finished hotplug it is too early to pass packets to the
 	 * peer.
 	 */
-	if (!(xnbp->x_connected && xnbp->x_hotplugged)) {
-		mutex_exit(&xnbp->x_tx_lock);
-		xnbp->x_stat_tx_too_early++;
+	if (!(xnbp->xnb_connected && xnbp->xnb_hotplugged)) {
+		mutex_exit(&xnbp->xnb_tx_lock);
+		DTRACE_PROBE(flip_tx_too_early);
+		xnbp->xnb_stat_tx_too_early++;
 		return (mp);
 	}
 
-	loop = xnbp->x_rx_ring.req_cons;
-	prod = xnbp->x_rx_ring.rsp_prod_pvt;
-	gop = xnbp->x_tx_top;
-
-	/*
-	 * Similar to RING_HAS_UNCONSUMED_REQUESTS(&xnbp->x_rx_ring) but
-	 * using local variables.
-	 */
-#define	XNB_RING_HAS_UNCONSUMED_REQUESTS(_r)		\
-	((((_r)->sring->req_prod - loop) <		\
-		(RING_SIZE(_r) - (loop - prod))) ?	\
-	    ((_r)->sring->req_prod - loop) :		\
-	    (RING_SIZE(_r) - (loop - prod)))
+	loop = xnbp->xnb_rx_ring.req_cons;
+	prod = xnbp->xnb_rx_ring.rsp_prod_pvt;
+	gop = xnbp->xnb_tx_top;
 
 	while ((mp != NULL) &&
-	    XNB_RING_HAS_UNCONSUMED_REQUESTS(&xnbp->x_rx_ring)) {
+	    XNB_RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring)) {
 
 		mfn_t mfn;
 		pfn_t pfn;
@@ -590,12 +638,12 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		/* 1 */
 		if ((mfn = xnb_alloc_page(xnbp)) == 0) {
-			xnbp->x_stat_xmit_defer++;
+			xnbp->xnb_stat_xmit_defer++;
 			break;
 		}
 
 		/* 2 */
-		rxreq = RING_GET_REQUEST(&xnbp->x_rx_ring, loop);
+		rxreq = RING_GET_REQUEST(&xnbp->xnb_rx_ring, loop);
 
 #ifdef XNB_DEBUG
 		if (!(rxreq->id < NET_RX_RING_SIZE))
@@ -610,14 +658,14 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		/* Assign a pfn and map the new page at the allocated va. */
 		pfn = xen_assign_pfn(mfn);
-		hat_devload(kas.a_hat, xnbp->x_tx_va, PAGESIZE,
+		hat_devload(kas.a_hat, xnbp->xnb_tx_va, PAGESIZE,
 		    pfn, PROT_READ | PROT_WRITE, HAT_LOAD);
 
 		offset = TX_BUFFER_HEADROOM;
 
 		/* 3 */
 		len = 0;
-		valoop = xnbp->x_tx_va + offset;
+		valoop = xnbp->xnb_tx_va + offset;
 		for (ml = mp; ml != NULL; ml = ml->b_cont) {
 			size_t chunk = ml->b_wptr - ml->b_rptr;
 
@@ -629,26 +677,26 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 		ASSERT(len + offset < PAGESIZE);
 
 		/* Release the pfn. */
-		hat_unload(kas.a_hat, xnbp->x_tx_va, PAGESIZE,
+		hat_unload(kas.a_hat, xnbp->xnb_tx_va, PAGESIZE,
 		    HAT_UNLOAD_UNMAP);
 		xen_release_pfn(pfn);
 
 		/* 4 */
 		gop->mfn = mfn;
-		gop->domid = xnbp->x_peer;
+		gop->domid = xnbp->xnb_peer;
 		gop->ref = rxreq->gref;
 
 		/* 5.1 */
-		rxresp = RING_GET_RESPONSE(&xnbp->x_rx_ring, prod);
+		rxresp = RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod);
 		rxresp->offset = offset;
 		rxresp->flags = 0;
 
-		cksum_flags = xnbp->x_flavour->xf_cksum_to_peer(xnbp, mp);
+		cksum_flags = xnbp->xnb_flavour->xf_cksum_to_peer(xnbp, mp);
 		if (cksum_flags != 0)
-			xnbp->x_stat_tx_cksum_deferred++;
+			xnbp->xnb_stat_tx_cksum_deferred++;
 		rxresp->flags |= cksum_flags;
 
-		rxresp->id = RING_GET_REQUEST(&xnbp->x_rx_ring, prod)->id;
+		rxresp->id = RING_GET_REQUEST(&xnbp->xnb_rx_ring, prod)->id;
 		rxresp->status = len;
 
 		loop++;
@@ -661,8 +709,8 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 	/*
 	 * Did we actually do anything?
 	 */
-	if (loop == xnbp->x_rx_ring.req_cons) {
-		mutex_exit(&xnbp->x_tx_lock);
+	if (loop == xnbp->xnb_rx_ring.req_cons) {
+		mutex_exit(&xnbp->xnb_tx_lock);
 		return (mp);
 	}
 
@@ -674,14 +722,14 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 	ASSERT(prev != NULL);
 	prev->b_next = NULL;
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_transfer, xnbp->x_tx_top,
-	    loop - xnbp->x_rx_ring.req_cons) != 0) {
+	if (HYPERVISOR_grant_table_op(GNTTABOP_transfer, xnbp->xnb_tx_top,
+	    loop - xnbp->xnb_rx_ring.req_cons) != 0) {
 		cmn_err(CE_WARN, "xnb_to_peer: transfer operation failed");
 	}
 
-	loop = xnbp->x_rx_ring.req_cons;
-	prod = xnbp->x_rx_ring.rsp_prod_pvt;
-	gop = xnbp->x_tx_top;
+	loop = xnbp->xnb_rx_ring.req_cons;
+	prod = xnbp->xnb_rx_ring.rsp_prod_pvt;
+	gop = xnbp->xnb_tx_top;
 
 	while (loop < end) {
 		int16_t status = NETIF_RSP_OKAY;
@@ -716,11 +764,11 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		/* 5.2 */
 		if (status != NETIF_RSP_OKAY) {
-			RING_GET_RESPONSE(&xnbp->x_rx_ring, prod)->status =
+			RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod)->status =
 			    status;
 		} else {
-			xnbp->x_stat_opackets++;
-			xnbp->x_stat_obytes += len;
+			xnbp->xnb_stat_opackets++;
+			xnbp->xnb_stat_obytes += len;
 		}
 
 		loop++;
@@ -728,25 +776,406 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 		gop++;
 	}
 
-	xnbp->x_rx_ring.req_cons = loop;
-	xnbp->x_rx_ring.rsp_prod_pvt = prod;
+	xnbp->xnb_rx_ring.req_cons = loop;
+	xnbp->xnb_rx_ring.rsp_prod_pvt = prod;
 
 	/* 6 */
-	/*LINTED: constant in conditional context*/
-	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->x_rx_ring, notify);
+	/* LINTED: constant in conditional context */
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->xnb_rx_ring, notify);
 	if (notify) {
-		ec_notify_via_evtchn(xnbp->x_evtchn);
-		xnbp->x_stat_tx_notify_sent++;
+		ec_notify_via_evtchn(xnbp->xnb_evtchn);
+		xnbp->xnb_stat_tx_notify_sent++;
 	} else {
-		xnbp->x_stat_tx_notify_deferred++;
+		xnbp->xnb_stat_tx_notify_deferred++;
 	}
 
 	if (mp != NULL)
-		xnbp->x_stat_xmit_defer++;
+		xnbp->xnb_stat_xmit_defer++;
 
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	/* Free mblk_t's that we consumed. */
+	freemsgchain(free);
+
+	return (mp);
+}
+
+/* helper functions for xnb_copy_to_peer */
+
+/*
+ * Grow the array of copy operation descriptors.
+ * Returns a pointer to the next available entry.
+ */
+gnttab_copy_t *
+grow_cpop_area(xnb_t *xnbp, gnttab_copy_t *o_cpop)
+{
+	/*
+	 * o_cpop (arg.1) is a ptr to the area we would like to copy
+	 * something into but cannot, because we haven't alloc'ed it
+	 * yet, or NULL.
+	 * old_cpop and new_cpop (local) are pointers to old/new
+	 * versions of xnbp->xnb_tx_cpop.
+	 */
+	gnttab_copy_t	*new_cpop, *old_cpop, *ret_cpop;
+	size_t		newcount;
+
+	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
+
+	old_cpop = xnbp->xnb_tx_cpop;
+	/*
+	 * o_cpop is a pointer into the array pointed to by old_cpop;
+	 * it would be an error for exactly one of these pointers to be NULL.
+	 * We shouldn't call this function if xnb_tx_cpop has already
+	 * been allocated, but we're starting to fill it from the beginning
+	 * again.
+	 */
+	ASSERT((o_cpop == NULL && old_cpop == NULL) ||
+	    (o_cpop != NULL && old_cpop != NULL && o_cpop != old_cpop));
+
+	newcount = xnbp->xnb_cpop_sz + CPOP_DEFCNT;
+
+	new_cpop = kmem_alloc(sizeof (*new_cpop) * newcount, KM_NOSLEEP);
+	if (new_cpop == NULL) {
+		xnbp->xnb_stat_other_allocation_failure++;
+		return (NULL);
+	}
+
+	if (o_cpop != NULL) {
+		size_t	 offset = (o_cpop - old_cpop);
+
+		/* we only need to move the parts in use ... */
+		(void) memmove(new_cpop, old_cpop, xnbp->xnb_cpop_sz *
+		    (sizeof (*old_cpop)));
+
+		kmem_free(old_cpop, xnbp->xnb_cpop_sz * sizeof (*old_cpop));
+
+		ret_cpop = new_cpop + offset;
+	} else {
+		ret_cpop = new_cpop;
+	}
+
+	xnbp->xnb_tx_cpop = new_cpop;
+	xnbp->xnb_cpop_sz = newcount;
+
+	xnbp->xnb_stat_tx_cpoparea_grown++;
+
+	return (ret_cpop);
+}
+
+/*
+ * Check whether an address is on a page that's foreign to this domain.
+ */
+static boolean_t
+is_foreign(void *addr)
+{
+	pfn_t	pfn = hat_getpfnum(kas.a_hat, addr);
+
+	return (pfn & PFN_IS_FOREIGN_MFN ? B_TRUE : B_FALSE);
+}
+
+/*
+ * Insert a newly allocated mblk into a chain, replacing the old one.
+ */
+static mblk_t *
+replace_msg(mblk_t *mp, size_t len, mblk_t *mp_prev, mblk_t *ml_prev)
+{
+	uint32_t	start, stuff, end, value, flags;
+	mblk_t		*new_mp;
+
+	new_mp = copyb(mp);
+	if (new_mp == NULL)
+		cmn_err(CE_PANIC, "replace_msg: cannot alloc new message"
+		    "for %p, len %lu", (void *) mp, len);
+
+	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value, &flags);
+	(void) hcksum_assoc(new_mp, NULL, NULL, start, stuff, end, value,
+	    flags, KM_NOSLEEP);
+
+	new_mp->b_next = mp->b_next;
+	new_mp->b_prev = mp->b_prev;
+	new_mp->b_cont = mp->b_cont;
+
+	/* Make sure we only overwrite pointers to the mblk being replaced. */
+	if (mp_prev != NULL && mp_prev->b_next == mp)
+		mp_prev->b_next = new_mp;
+
+	if (ml_prev != NULL && ml_prev->b_cont == mp)
+		ml_prev->b_cont = new_mp;
+
+	mp->b_next = mp->b_prev = mp->b_cont = NULL;
+	freemsg(mp);
+
+	return (new_mp);
+}
+
+/*
+ * Set all the fields in a gnttab_copy_t.
+ */
+static void
+setup_gop(xnb_t *xnbp, gnttab_copy_t *gp, uchar_t *rptr,
+    size_t s_off, size_t d_off, size_t len, grant_ref_t d_ref)
+{
+	ASSERT(xnbp != NULL && gp != NULL);
+
+	gp->source.offset = s_off;
+	gp->source.u.gmfn = pfn_to_mfn(hat_getpfnum(kas.a_hat, (caddr_t)rptr));
+	gp->source.domid = DOMID_SELF;
+
+	gp->len = (uint16_t)len;
+	gp->flags = GNTCOPY_dest_gref;
+	gp->status = 0;
+
+	gp->dest.u.ref = d_ref;
+	gp->dest.offset = d_off;
+	gp->dest.domid = xnbp->xnb_peer;
+}
+
+mblk_t *
+xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
+{
+	mblk_t		*free = mp, *mp_prev = NULL, *saved_mp = mp;
+	mblk_t		*ml, *ml_prev;
+	gnttab_copy_t	*gop_cp;
+	boolean_t	notify;
+	RING_IDX	loop, prod;
+	int		i;
+
+	if (!xnbp->xnb_hv_copy)
+		return (xnb_to_peer(xnbp, mp));
+
+	/*
+	 * For each packet the sequence of operations is:
+	 *
+	 *  1. get a request slot from the ring.
+	 *  2. set up data for hypercall (see NOTE below)
+	 *  3. have the hypervisore copy the data
+	 *  4. update the request slot.
+	 *  5. kick the peer.
+	 *
+	 * NOTE ad 2.
+	 *  In order to reduce the number of hypercalls, we prepare
+	 *  several packets (mp->b_cont != NULL) for the peer and
+	 *  perform a single hypercall to transfer them.
+	 *  We also have to set up a seperate copy operation for
+	 *  every page.
+	 *
+	 * If we have more than one message (mp->b_next != NULL),
+	 * we do this whole dance repeatedly.
+	 */
+
+	mutex_enter(&xnbp->xnb_tx_lock);
+
+	if (!(xnbp->xnb_connected && xnbp->xnb_hotplugged)) {
+		mutex_exit(&xnbp->xnb_tx_lock);
+		DTRACE_PROBE(copy_tx_too_early);
+		xnbp->xnb_stat_tx_too_early++;
+		return (mp);
+	}
+
+	loop = xnbp->xnb_rx_ring.req_cons;
+	prod = xnbp->xnb_rx_ring.rsp_prod_pvt;
+
+	while ((mp != NULL) &&
+	    XNB_RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring)) {
+		netif_rx_request_t	*rxreq;
+		netif_rx_response_t	*rxresp;
+		size_t			offset, d_offset;
+		size_t			len;
+		uint16_t		cksum_flags;
+		int16_t			status = NETIF_RSP_OKAY;
+		int			item_count;
+
+		/* 1 */
+		rxreq = RING_GET_REQUEST(&xnbp->xnb_rx_ring, loop);
+
+#ifdef XNB_DEBUG
+		if (!(rxreq->id < NET_RX_RING_SIZE))
+			cmn_err(CE_PANIC, "xnb_copy_to_peer: "
+			    "id %d out of range in request 0x%p",
+			    rxreq->id, (void *)rxreq);
+		if (rxreq->gref >= NR_GRANT_ENTRIES)
+			cmn_err(CE_PANIC, "xnb_copy_to_peer: "
+			    "grant ref %d out of range in request 0x%p",
+			    rxreq->gref, (void *)rxreq);
+#endif /* XNB_DEBUG */
+
+		/* 2 */
+		d_offset = offset = TX_BUFFER_HEADROOM;
+		len = 0;
+		item_count = 0;
+
+		gop_cp = xnbp->xnb_tx_cpop;
+
+		/*
+		 * We walk the b_cont pointers and set up a gop_cp
+		 * structure for every page in every data block we have.
+		 */
+		/* 2a */
+		for (ml = mp, ml_prev = NULL; ml != NULL; ml = ml->b_cont) {
+			size_t	chunk = ml->b_wptr - ml->b_rptr;
+			uchar_t	*r_tmp,	*rpt_align;
+			size_t	r_offset;
+
+			/*
+			 * If we get an mblk on a page that doesn't belong to
+			 * this domain, get a new mblk to replace the old one.
+			 */
+			if (is_foreign(ml->b_rptr) || is_foreign(ml->b_wptr)) {
+				mblk_t *ml_new = replace_msg(ml, chunk,
+				    mp_prev, ml_prev);
+
+				/* We can still use old ml, but not *ml! */
+				if (free == ml)
+					free = ml_new;
+				if (mp == ml)
+					mp = ml_new;
+				ml = ml_new;
+
+				xnbp->xnb_stat_tx_foreign_page++;
+			}
+
+			rpt_align = (uchar_t *)ALIGN2PAGE(ml->b_rptr);
+			r_offset = (uint16_t)(ml->b_rptr - rpt_align);
+			r_tmp = ml->b_rptr;
+
+			if (d_offset + chunk > PAGESIZE)
+				cmn_err(CE_PANIC, "xnb_copy_to_peer: mp %p "
+				    "(svd: %p), ml %p,rpt_alg. %p, d_offset "
+				    "(%lu) + chunk (%lu) > PAGESIZE %d!",
+				    (void *)mp, (void *)saved_mp, (void *)ml,
+				    (void *)rpt_align,
+				    d_offset, chunk, (int)PAGESIZE);
+
+			while (chunk > 0) {
+				size_t part_len;
+
+				item_count++;
+				if (item_count > xnbp->xnb_cpop_sz) {
+					gop_cp = grow_cpop_area(xnbp, gop_cp);
+					if (gop_cp == NULL)
+						goto failure;
+				}
+				/*
+				 * If our mblk crosses a page boundary, we need
+				 * to do a seperate copy for every page.
+				 */
+				if (r_offset + chunk > PAGESIZE) {
+					part_len = PAGESIZE - r_offset;
+
+					DTRACE_PROBE3(mblk_page_crossed,
+					    (mblk_t *), ml, int, chunk, int,
+					    (int)r_offset);
+
+					xnbp->xnb_stat_tx_pagebndry_crossed++;
+				} else {
+					part_len = chunk;
+				}
+
+				setup_gop(xnbp, gop_cp, r_tmp, r_offset,
+				    d_offset, part_len, rxreq->gref);
+
+				chunk -= part_len;
+
+				len += part_len;
+				d_offset += part_len;
+				r_tmp += part_len;
+				/*
+				 * The 2nd, 3rd ... last copies will always
+				 * start at r_tmp, therefore r_offset is 0.
+				 */
+				r_offset = 0;
+				gop_cp++;
+			}
+			ml_prev = ml;
+			DTRACE_PROBE4(mblk_loop_end, (mblk_t *), ml, int,
+			    chunk, int, len, int, item_count);
+		}
+		/* 3 */
+		if (HYPERVISOR_grant_table_op(GNTTABOP_copy, xnbp->xnb_tx_cpop,
+		    item_count) != 0) {
+			cmn_err(CE_WARN, "xnb_copy_to_peer: copy op. failed");
+			DTRACE_PROBE(HV_granttableopfailed);
+		}
+
+		/* 4 */
+		rxresp = RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod);
+		rxresp->offset = offset;
+
+		rxresp->flags = 0;
+
+		DTRACE_PROBE4(got_RX_rsp, int, (int)rxresp->id, int,
+		    (int)rxresp->offset, int, (int)rxresp->flags, int,
+		    (int)rxresp->status);
+
+		cksum_flags = xnbp->xnb_flavour->xf_cksum_to_peer(xnbp, mp);
+		if (cksum_flags != 0)
+			xnbp->xnb_stat_tx_cksum_deferred++;
+		rxresp->flags |= cksum_flags;
+
+		rxresp->id = RING_GET_REQUEST(&xnbp->xnb_rx_ring, prod)->id;
+		rxresp->status = len;
+
+		DTRACE_PROBE4(RX_rsp_set, int, (int)rxresp->id, int,
+		    (int)rxresp->offset, int, (int)rxresp->flags, int,
+		    (int)rxresp->status);
+
+		for (i = 0; i < item_count; i++) {
+			if (xnbp->xnb_tx_cpop[i].status != 0) {
+				DTRACE_PROBE2(cpop__status__nonnull, int,
+				    (int)xnbp->xnb_tx_cpop[i].status,
+				    int, i);
+				status = NETIF_RSP_ERROR;
+			}
+		}
+
+		/* 5.2 */
+		if (status != NETIF_RSP_OKAY) {
+			RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod)->status =
+			    status;
+		} else {
+			xnbp->xnb_stat_opackets++;
+			xnbp->xnb_stat_obytes += len;
+		}
+
+		loop++;
+		prod++;
+		mp_prev = mp;
+		mp = mp->b_next;
+	}
+failure:
+	/*
+	 * Did we actually do anything?
+	 */
+	if (loop == xnbp->xnb_rx_ring.req_cons) {
+		mutex_exit(&xnbp->xnb_tx_lock);
+		return (mp);
+	}
+
+	/*
+	 * Unlink the end of the 'done' list from the remainder.
+	 */
+	ASSERT(mp_prev != NULL);
+	mp_prev->b_next = NULL;
+
+	xnbp->xnb_rx_ring.req_cons = loop;
+	xnbp->xnb_rx_ring.rsp_prod_pvt = prod;
+
+	/* 6 */
+	/* LINTED: constant in conditional context */
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->xnb_rx_ring, notify);
+	if (notify) {
+		ec_notify_via_evtchn(xnbp->xnb_evtchn);
+		xnbp->xnb_stat_tx_notify_sent++;
+	} else {
+		xnbp->xnb_stat_tx_notify_deferred++;
+	}
+
+	if (mp != NULL)
+		xnbp->xnb_stat_xmit_defer++;
+
+	mutex_exit(&xnbp->xnb_tx_lock);
+
+	/* Free mblk_t structs we have consumed. */
 	freemsgchain(free);
 
 	return (mp);
@@ -803,15 +1232,15 @@ xnb_rx_notify_peer(xnb_t *xnbp)
 {
 	boolean_t notify;
 
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 
-	/*LINTED: constant in conditional context*/
-	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->x_tx_ring, notify);
+	/* LINTED: constant in conditional context */
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->xnb_tx_ring, notify);
 	if (notify) {
-		ec_notify_via_evtchn(xnbp->x_evtchn);
-		xnbp->x_stat_rx_notify_sent++;
+		ec_notify_via_evtchn(xnbp->xnb_evtchn);
+		xnbp->xnb_stat_rx_notify_sent++;
 	} else {
-		xnbp->x_stat_rx_notify_deferred++;
+		xnbp->xnb_stat_rx_notify_deferred++;
 	}
 }
 
@@ -822,19 +1251,9 @@ xnb_rx_complete(xnb_rxbuf_t *rxp)
 
 	ASSERT((rxp->xr_flags & XNB_RXBUF_INUSE) == XNB_RXBUF_INUSE);
 
-	mutex_enter(&xnbp->x_rx_lock);
-
-	xnb_rx_schedule_unmop(xnbp, &rxp->xr_mop);
-	xnb_rx_perform_pending_unmop(xnbp);
-
-	if (xnbp->x_connected) {
-		xnb_rx_mark_complete(xnbp, rxp->xr_id, rxp->xr_status);
-		xnb_rx_notify_peer(xnbp);
-	}
-
-	xnb_rxbuf_put(xnbp, rxp);
-
-	mutex_exit(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
+	xnb_rx_schedule_unmop(xnbp, &rxp->xr_mop, rxp);
+	mutex_exit(&xnbp->xnb_rx_lock);
 }
 
 static void
@@ -843,15 +1262,15 @@ xnb_rx_mark_complete(xnb_t *xnbp, RING_IDX id, int16_t status)
 	RING_IDX i;
 	netif_tx_response_t *txresp;
 
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 
-	i = xnbp->x_tx_ring.rsp_prod_pvt;
+	i = xnbp->xnb_tx_ring.rsp_prod_pvt;
 
-	txresp = RING_GET_RESPONSE(&xnbp->x_tx_ring, i);
+	txresp = RING_GET_RESPONSE(&xnbp->xnb_tx_ring, i);
 	txresp->id = id;
 	txresp->status = status;
 
-	xnbp->x_tx_ring.rsp_prod_pvt = i + 1;
+	xnbp->xnb_tx_ring.rsp_prod_pvt = i + 1;
 
 	/*
 	 * Note that we don't push the change to the peer here - that
@@ -859,61 +1278,75 @@ xnb_rx_mark_complete(xnb_t *xnbp, RING_IDX id, int16_t status)
 	 */
 }
 
-/*
- * XXPV dme: currently pending unmap operations are stored on a
- * per-instance basis.  Should they be per-driver?  The locking would
- * have to change (obviously), but there might be an improvement from
- * batching more together.  Right now they are all 'done' either at
- * the tail of each receive operation (copy case) or on each
- * completion (non-copy case).  Should that be changed to some
- * interval (watermark?) to improve the chance of batching?
- */
 static void
-xnb_rx_schedule_unmop(xnb_t *xnbp, gnttab_map_grant_ref_t *mop)
+xnb_rx_schedule_unmop(xnb_t *xnbp, gnttab_map_grant_ref_t *mop,
+    xnb_rxbuf_t *rxp)
 {
-	gnttab_unmap_grant_ref_t *unmop;
+	gnttab_unmap_grant_ref_t	*unmop;
+	int				u_count;
+	int				reqs_on_ring;
 
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
-	ASSERT(xnbp->x_rx_unmop_count <= NET_TX_RING_SIZE);
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
+	ASSERT(xnbp->xnb_rx_unmop_count < NET_TX_RING_SIZE);
 
-	unmop = &xnbp->x_rx_unmop[xnbp->x_rx_unmop_count];
-	xnbp->x_rx_unmop_count++;
+	u_count = xnbp->xnb_rx_unmop_count++;
 
+	/* Cache data for the time when we actually unmap grant refs */
+	xnbp->xnb_rx_unmop_rxp[u_count] = rxp;
+
+	unmop = &xnbp->xnb_rx_unmop[u_count];
 	unmop->host_addr = mop->host_addr;
 	unmop->dev_bus_addr = mop->dev_bus_addr;
 	unmop->handle = mop->handle;
 
-#ifdef XNB_DEBUG
-	if (xnbp->x_rx_unmop_count <= NET_TX_RING_SIZE)
-		ASSERT(xnbp->x_rx_unmop[xnbp->x_rx_unmop_count].host_addr
-		    == NULL);
-#endif /* XNB_DEBUG */
+	/*
+	 * We cannot check the ring once we're disconnected from it. Batching
+	 * doesn't seem to be a useful optimisation in this case either,
+	 * so we directly call into the actual unmap function.
+	 */
+	if (xnbp->xnb_connected) {
+		reqs_on_ring = RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring);
 
+		/*
+		 * By tuning xnb_unmop_hiwat to N, we can emulate "N per batch"
+		 * or (with N == 1) "immediate unmop" behaviour.
+		 * The "> xnb_unmop_lowwat" is a guard against ring exhaustion.
+		 */
+		if (xnbp->xnb_rx_unmop_count < xnb_unmop_hiwat &&
+		    reqs_on_ring > xnb_unmop_lowwat)
+			return;
+	}
+
+	xnb_rx_perform_pending_unmop(xnbp);
 }
 
+/*
+ * Here we perform the actual unmapping of the data that was
+ * accumulated in xnb_rx_schedule_unmop().
+ * Note that it is the caller's responsibility to make sure that
+ * there's actually something there to unmop.
+ */
 static void
 xnb_rx_perform_pending_unmop(xnb_t *xnbp)
 {
-#ifdef XNB_DEBUG
 	RING_IDX loop;
+#ifdef XNB_DEBUG
 	gnttab_unmap_grant_ref_t *unmop;
 #endif /* XNB_DEBUG */
 
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
-
-	if (xnbp->x_rx_unmop_count == 0)
-		return;
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
+	ASSERT(xnbp->xnb_rx_unmop_count > 0);
 
 	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
-	    xnbp->x_rx_unmop, xnbp->x_rx_unmop_count) < 0) {
+	    xnbp->xnb_rx_unmop, xnbp->xnb_rx_unmop_count) < 0) {
 		cmn_err(CE_WARN, "xnb_rx_perform_pending_unmop: "
 		    "unmap grant operation failed, "
-		    "%d pages lost", xnbp->x_rx_unmop_count);
+		    "%d pages lost", xnbp->xnb_rx_unmop_count);
 	}
 
 #ifdef XNB_DEBUG
-	for (loop = 0, unmop = xnbp->x_rx_unmop;
-	    loop < xnbp->x_rx_unmop_count;
+	for (loop = 0, unmop = xnbp->xnb_rx_unmop;
+	    loop < xnbp->xnb_rx_unmop_count;
 	    loop++, unmop++) {
 		if (unmop->status != 0) {
 			cmn_err(CE_WARN, "xnb_rx_perform_pending_unmop: "
@@ -923,10 +1356,27 @@ xnb_rx_perform_pending_unmop(xnb_t *xnbp)
 	}
 #endif /* XNB_DEBUG */
 
-	xnbp->x_rx_unmop_count = 0;
+	for (loop = 0; loop < xnbp->xnb_rx_unmop_count; loop++) {
+		xnb_rxbuf_t	*rxp = xnbp->xnb_rx_unmop_rxp[loop];
+
+		if (rxp == NULL)
+			cmn_err(CE_PANIC,
+			    "xnb_rx_perform_pending_unmop: "
+			    "unexpected NULL rxp (loop %d; count %d)!",
+			    loop, xnbp->xnb_rx_unmop_count);
+
+		if (xnbp->xnb_connected)
+			xnb_rx_mark_complete(xnbp, rxp->xr_id, rxp->xr_status);
+		xnb_rxbuf_put(xnbp, rxp);
+	}
+	if (xnbp->xnb_connected)
+		xnb_rx_notify_peer(xnbp);
+
+	xnbp->xnb_rx_unmop_count = 0;
 
 #ifdef XNB_DEBUG
-	bzero(xnbp->x_rx_unmop, sizeof (xnbp->x_rx_unmop));
+	bzero(xnbp->xnb_rx_unmop, sizeof (xnbp->xnb_rx_unmop));
+	bzero(xnbp->xnb_rx_unmop_rxp, sizeof (xnbp->xnb_rx_unmop_rxp));
 #endif /* XNB_DEBUG */
 }
 
@@ -935,7 +1385,7 @@ xnb_rxbuf_get(xnb_t *xnbp, int flags)
 {
 	xnb_rxbuf_t *rxp;
 
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 
 	rxp = kmem_cache_alloc(xnb_rxbuf_cachep, flags);
 	if (rxp != NULL) {
@@ -943,13 +1393,13 @@ xnb_rxbuf_get(xnb_t *xnbp, int flags)
 		rxp->xr_flags |= XNB_RXBUF_INUSE;
 
 		rxp->xr_xnbp = xnbp;
-		rxp->xr_mop.dom = xnbp->x_peer;
+		rxp->xr_mop.dom = xnbp->xnb_peer;
 
 		rxp->xr_mop.flags = GNTMAP_host_map;
-		if (!xnbp->x_rx_pages_writable)
+		if (!xnbp->xnb_rx_pages_writable)
 			rxp->xr_mop.flags |= GNTMAP_readonly;
 
-		xnbp->x_rx_buf_count++;
+		xnbp->xnb_rx_buf_count++;
 	}
 
 	return (rxp);
@@ -958,11 +1408,11 @@ xnb_rxbuf_get(xnb_t *xnbp, int flags)
 static void
 xnb_rxbuf_put(xnb_t *xnbp, xnb_rxbuf_t *rxp)
 {
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 	ASSERT((rxp->xr_flags & XNB_RXBUF_INUSE) == XNB_RXBUF_INUSE);
 
 	rxp->xr_flags &= ~XNB_RXBUF_INUSE;
-	xnbp->x_rx_buf_count--;
+	xnbp->xnb_rx_buf_count--;
 
 	kmem_cache_free(xnb_rxbuf_cachep, rxp);
 }
@@ -982,7 +1432,7 @@ xnb_recv(xnb_t *xnbp)
 	 * packet be destined for this host) will modify the packet
 	 * 'in place'.
 	 */
-	boolean_t copy = !xnbp->x_rx_pages_writable;
+	boolean_t copy = !xnbp->xnb_rx_pages_writable;
 
 	/*
 	 * For each individual request, the sequence of actions is:
@@ -1001,21 +1451,19 @@ xnb_recv(xnb_t *xnbp)
 
 	head = tail = NULL;
 around:
-	ASSERT(MUTEX_HELD(&xnbp->x_rx_lock));
+	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 
-	/*LINTED: constant in conditional context*/
-	RING_FINAL_CHECK_FOR_REQUESTS(&xnbp->x_tx_ring, work_to_do);
+	/* LINTED: constant in conditional context */
+	RING_FINAL_CHECK_FOR_REQUESTS(&xnbp->xnb_tx_ring, work_to_do);
 	if (!work_to_do) {
 finished:
-		xnb_rx_notify_peer(xnbp);
-
 		return (head);
 	}
 
-	start = xnbp->x_tx_ring.req_cons;
-	end = xnbp->x_tx_ring.sring->req_prod;
+	start = xnbp->xnb_tx_ring.req_cons;
+	end = xnbp->xnb_tx_ring.sring->req_prod;
 
-	for (loop = start, mop = xnbp->x_rx_mop, rxpp = xnbp->x_rx_bufp;
+	for (loop = start, mop = xnbp->xnb_rx_mop, rxpp = xnbp->xnb_rx_bufp;
 	    loop != end;
 	    loop++, mop++, rxpp++) {
 		xnb_rxbuf_t *rxp;
@@ -1024,12 +1472,12 @@ finished:
 		if (rxp == NULL)
 			break;
 
-		ASSERT(xnbp->x_rx_pages_writable ||
+		ASSERT(xnbp->xnb_rx_pages_writable ||
 		    ((rxp->xr_mop.flags & GNTMAP_readonly)
 		    == GNTMAP_readonly));
 
 		rxp->xr_mop.ref =
-		    RING_GET_REQUEST(&xnbp->x_tx_ring, loop)->gref;
+		    RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop)->gref;
 
 		ASSERT(rxp->xr_mop.ref < NR_GRANT_ENTRIES);
 
@@ -1043,12 +1491,12 @@ finished:
 	end = loop;
 
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-	    xnbp->x_rx_mop, end - start) != 0) {
+	    xnbp->xnb_rx_mop, end - start) != 0) {
 
 		cmn_err(CE_WARN, "xnb_recv: map grant operation failed");
 
 		loop = start;
-		rxpp = xnbp->x_rx_bufp;
+		rxpp = xnbp->xnb_rx_bufp;
 
 		while (loop != end) {
 			xnb_rxbuf_put(xnbp, *rxpp);
@@ -1060,7 +1508,7 @@ finished:
 		goto finished;
 	}
 
-	for (loop = start, mop = xnbp->x_rx_mop, rxpp = xnbp->x_rx_bufp;
+	for (loop = start, mop = xnbp->xnb_rx_mop, rxpp = xnbp->xnb_rx_bufp;
 	    loop != end;
 	    loop++, mop++, rxpp++) {
 		mblk_t *mp = NULL;
@@ -1074,14 +1522,14 @@ finished:
 			status = NETIF_RSP_ERROR;
 		}
 
-		txreq = RING_GET_REQUEST(&xnbp->x_tx_ring, loop);
+		txreq = RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop);
 
 		if (status == NETIF_RSP_OKAY) {
 			if (copy) {
 				mp = allocb(txreq->size, BPRI_MED);
 				if (mp == NULL) {
 					status = NETIF_RSP_ERROR;
-					xnbp->x_stat_rx_allocb_failed++;
+					xnbp->xnb_stat_rx_allocb_failed++;
 				} else {
 					bcopy((caddr_t)(uintptr_t)
 					    mop->host_addr + txreq->offset,
@@ -1089,12 +1537,12 @@ finished:
 					mp->b_wptr += txreq->size;
 				}
 			} else {
-				mp = desballoc((unsigned char *)(uintptr_t)
+				mp = desballoc((uchar_t *)(uintptr_t)
 				    mop->host_addr + txreq->offset,
 				    txreq->size, 0, &rxp->xr_free_rtn);
 				if (mp == NULL) {
 					status = NETIF_RSP_ERROR;
-					xnbp->x_stat_rx_allocb_failed++;
+					xnbp->xnb_stat_rx_allocb_failed++;
 				} else {
 					rxp->xr_id = txreq->id;
 					rxp->xr_status = status;
@@ -1112,20 +1560,21 @@ finished:
 			    ((txreq->flags &
 			    (NETTXF_csum_blank | NETTXF_data_validated))
 			    != 0)) {
-				mp = xnbp->x_flavour->xf_cksum_from_peer(xnbp,
+				mp = xnbp->xnb_flavour->xf_cksum_from_peer(xnbp,
 				    mp, txreq->flags);
-				xnbp->x_stat_rx_cksum_no_need++;
+				xnbp->xnb_stat_rx_cksum_no_need++;
 			}
 		}
 
 		if (copy || (mp == NULL)) {
-			xnb_rx_mark_complete(xnbp, txreq->id, status);
-			xnb_rx_schedule_unmop(xnbp, mop);
+			rxp->xr_status = status;
+			rxp->xr_id = txreq->id;
+			xnb_rx_schedule_unmop(xnbp, mop, rxp);
 		}
 
 		if (mp != NULL) {
-			xnbp->x_stat_ipackets++;
-			xnbp->x_stat_rbytes += txreq->size;
+			xnbp->xnb_stat_ipackets++;
+			xnbp->xnb_stat_rbytes += txreq->size;
 
 			mp->b_next = NULL;
 			if (head == NULL) {
@@ -1139,23 +1588,7 @@ finished:
 		}
 	}
 
-	/*
-	 * This has to be here rather than in the 'finished' code
-	 * because we can only handle NET_TX_RING_SIZE pending unmap
-	 * operations, which may be exceeded by multiple trips around
-	 * the receive loop during heavy load (one trip around the
-	 * loop cannot generate more than NET_TX_RING_SIZE unmap
-	 * operations).
-	 */
-	xnb_rx_perform_pending_unmop(xnbp);
-	if (copy) {
-		for (loop = start, rxpp = xnbp->x_rx_bufp;
-		    loop != end;
-		    loop++, rxpp++)
-			xnb_rxbuf_put(xnbp, *rxpp);
-	}
-
-	xnbp->x_tx_ring.req_cons = loop;
+	xnbp->xnb_tx_ring.req_cons = loop;
 
 	goto around;
 	/* NOTREACHED */
@@ -1170,26 +1603,26 @@ xnb_intr(caddr_t arg)
 	xnb_t *xnbp = (xnb_t *)arg;
 	mblk_t *mp;
 
-	xnbp->x_stat_intr++;
+	xnbp->xnb_stat_intr++;
 
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
-	ASSERT(xnbp->x_connected);
+	ASSERT(xnbp->xnb_connected);
 
 	mp = xnb_recv(xnbp);
 
-	mutex_exit(&xnbp->x_rx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
 
-	if (!xnbp->x_hotplugged) {
-		xnbp->x_stat_rx_too_early++;
+	if (!xnbp->xnb_hotplugged) {
+		xnbp->xnb_stat_rx_too_early++;
 		goto fail;
 	}
 	if (mp == NULL) {
-		xnbp->x_stat_spurious_intr++;
+		xnbp->xnb_stat_spurious_intr++;
 		goto fail;
 	}
 
-	xnbp->x_flavour->xf_recv(xnbp, mp);
+	xnbp->xnb_flavour->xf_recv(xnbp, mp);
 
 	return (DDI_INTR_CLAIMED);
 
@@ -1210,14 +1643,14 @@ xnb_connect_rings(dev_info_t *dip)
 	/*
 	 * Cannot attempt to connect the rings if already connected.
 	 */
-	ASSERT(!xnbp->x_connected);
+	ASSERT(!xnbp->xnb_connected);
 
 	oename = xvdi_get_oename(dip);
 
 	if (xenbus_gather(XBT_NULL, oename,
 	    "event-channel", "%u", &evtchn,
-	    "tx-ring-ref", "%lu", &xnbp->x_tx_ring_ref,
-	    "rx-ring-ref", "%lu", &xnbp->x_rx_ring_ref,
+	    "tx-ring-ref", "%lu", &xnbp->xnb_tx_ring_ref,
+	    "rx-ring-ref", "%lu", &xnbp->xnb_rx_ring_ref,
 	    NULL) != 0) {
 		cmn_err(CE_WARN, "xnb_connect_rings: "
 		    "cannot read other-end details from %s",
@@ -1229,13 +1662,20 @@ xnb_connect_rings(dev_info_t *dip)
 	    "feature-tx-writable", "%d", &i) != 0)
 		i = 0;
 	if (i != 0)
-		xnbp->x_rx_pages_writable = B_TRUE;
+		xnbp->xnb_rx_pages_writable = B_TRUE;
 
 	if (xenbus_scanf(XBT_NULL, oename,
 	    "feature-no-csum-offload", "%d", &i) != 0)
 		i = 0;
-	if ((i == 1) || !xnbp->x_cksum_offload)
-		xnbp->x_cksum_offload = B_FALSE;
+	if ((i == 1) || !xnbp->xnb_cksum_offload)
+		xnbp->xnb_cksum_offload = B_FALSE;
+
+	/* Check whether our peer knows and requests hypervisor copy */
+	if (xenbus_scanf(XBT_NULL, oename, "request-rx-copy", "%d", &i)
+	    != 0)
+		i = 0;
+	if (i != 0)
+		xnbp->xnb_hv_copy = B_TRUE;
 
 	/*
 	 * 1. allocate a vaddr for the tx page, one for the rx page.
@@ -1249,57 +1689,57 @@ xnb_connect_rings(dev_info_t *dip)
 	 */
 
 	/* 1.tx */
-	xnbp->x_tx_ring_addr = vmem_xalloc(heap_arena, PAGESIZE, PAGESIZE,
+	xnbp->xnb_tx_ring_addr = vmem_xalloc(heap_arena, PAGESIZE, PAGESIZE,
 	    0, 0, 0, 0, VM_SLEEP);
-	ASSERT(xnbp->x_tx_ring_addr != NULL);
+	ASSERT(xnbp->xnb_tx_ring_addr != NULL);
 
 	/* 2.tx */
-	map_op.host_addr = (uint64_t)((long)xnbp->x_tx_ring_addr);
+	map_op.host_addr = (uint64_t)((long)xnbp->xnb_tx_ring_addr);
 	map_op.flags = GNTMAP_host_map;
-	map_op.ref = xnbp->x_tx_ring_ref;
-	map_op.dom = xnbp->x_peer;
-	hat_prepare_mapping(kas.a_hat, xnbp->x_tx_ring_addr);
+	map_op.ref = xnbp->xnb_tx_ring_ref;
+	map_op.dom = xnbp->xnb_peer;
+	hat_prepare_mapping(kas.a_hat, xnbp->xnb_tx_ring_addr);
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 	    &map_op, 1) != 0 || map_op.status != 0) {
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot map tx-ring page.");
 		goto fail;
 	}
-	xnbp->x_tx_ring_handle = map_op.handle;
+	xnbp->xnb_tx_ring_handle = map_op.handle;
 
-	/*LINTED: constant in conditional context*/
-	BACK_RING_INIT(&xnbp->x_tx_ring,
-	    (netif_tx_sring_t *)xnbp->x_tx_ring_addr, PAGESIZE);
+	/* LINTED: constant in conditional context */
+	BACK_RING_INIT(&xnbp->xnb_tx_ring,
+	    (netif_tx_sring_t *)xnbp->xnb_tx_ring_addr, PAGESIZE);
 
 	/* 1.rx */
-	xnbp->x_rx_ring_addr = vmem_xalloc(heap_arena, PAGESIZE, PAGESIZE,
+	xnbp->xnb_rx_ring_addr = vmem_xalloc(heap_arena, PAGESIZE, PAGESIZE,
 	    0, 0, 0, 0, VM_SLEEP);
-	ASSERT(xnbp->x_rx_ring_addr != NULL);
+	ASSERT(xnbp->xnb_rx_ring_addr != NULL);
 
 	/* 2.rx */
-	map_op.host_addr = (uint64_t)((long)xnbp->x_rx_ring_addr);
+	map_op.host_addr = (uint64_t)((long)xnbp->xnb_rx_ring_addr);
 	map_op.flags = GNTMAP_host_map;
-	map_op.ref = xnbp->x_rx_ring_ref;
-	map_op.dom = xnbp->x_peer;
-	hat_prepare_mapping(kas.a_hat, xnbp->x_rx_ring_addr);
+	map_op.ref = xnbp->xnb_rx_ring_ref;
+	map_op.dom = xnbp->xnb_peer;
+	hat_prepare_mapping(kas.a_hat, xnbp->xnb_rx_ring_addr);
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 	    &map_op, 1) != 0 || map_op.status != 0) {
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot map rx-ring page.");
 		goto fail;
 	}
-	xnbp->x_rx_ring_handle = map_op.handle;
+	xnbp->xnb_rx_ring_handle = map_op.handle;
 
-	/*LINTED: constant in conditional context*/
-	BACK_RING_INIT(&xnbp->x_rx_ring,
-	    (netif_rx_sring_t *)xnbp->x_rx_ring_addr, PAGESIZE);
+	/* LINTED: constant in conditional context */
+	BACK_RING_INIT(&xnbp->xnb_rx_ring,
+	    (netif_rx_sring_t *)xnbp->xnb_rx_ring_addr, PAGESIZE);
 
 	/* 3 */
 	if (xvdi_bind_evtchn(dip, evtchn) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xnb_connect_rings: "
-		    "cannot bind event channel %d", xnbp->x_evtchn);
-		xnbp->x_evtchn = INVALID_EVTCHN;
+		    "cannot bind event channel %d", xnbp->xnb_evtchn);
+		xnbp->xnb_evtchn = INVALID_EVTCHN;
 		goto fail;
 	}
-	xnbp->x_evtchn = xvdi_get_evtchn(dip);
+	xnbp->xnb_evtchn = xvdi_get_evtchn(dip);
 
 	/*
 	 * It would be good to set the state to XenbusStateConnected
@@ -1307,14 +1747,14 @@ xnb_connect_rings(dev_info_t *dip)
 	 * Changing the state in the store will be noticed by the peer
 	 * and cannot be "taken back".
 	 */
-	mutex_enter(&xnbp->x_tx_lock);
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
 	/* 5.1 */
-	xnbp->x_connected = B_TRUE;
+	xnbp->xnb_connected = B_TRUE;
 
-	mutex_exit(&xnbp->x_rx_lock);
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	/* 4, 6 */
 	if (ddi_add_intr(dip, 0, NULL, NULL, xnb_intr, (caddr_t)xnbp)
@@ -1322,7 +1762,7 @@ xnb_connect_rings(dev_info_t *dip)
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot add interrupt");
 		goto fail;
 	}
-	xnbp->x_irq = B_TRUE;
+	xnbp->xnb_irq = B_TRUE;
 
 	/* 5.2 */
 	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateConnected);
@@ -1330,13 +1770,12 @@ xnb_connect_rings(dev_info_t *dip)
 	return (B_TRUE);
 
 fail:
-	mutex_enter(&xnbp->x_tx_lock);
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
-	xnbp->x_connected = B_FALSE;
-
-	mutex_exit(&xnbp->x_rx_lock);
-	mutex_exit(&xnbp->x_tx_lock);
+	xnbp->xnb_connected = B_FALSE;
+	mutex_exit(&xnbp->xnb_rx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	return (B_FALSE);
 }
@@ -1346,56 +1785,61 @@ xnb_disconnect_rings(dev_info_t *dip)
 {
 	xnb_t *xnbp = ddi_get_driver_private(dip);
 
-	if (xnbp->x_irq) {
+	if (xnbp->xnb_irq) {
 		ddi_remove_intr(dip, 0, NULL);
-		xnbp->x_irq = B_FALSE;
+		xnbp->xnb_irq = B_FALSE;
 	}
 
-	if (xnbp->x_evtchn != INVALID_EVTCHN) {
+	if (xnbp->xnb_rx_unmop_count > 0)
+		xnb_rx_perform_pending_unmop(xnbp);
+
+	if (xnbp->xnb_evtchn != INVALID_EVTCHN) {
 		xvdi_free_evtchn(dip);
-		xnbp->x_evtchn = INVALID_EVTCHN;
+		xnbp->xnb_evtchn = INVALID_EVTCHN;
 	}
 
-	if (xnbp->x_rx_ring_handle != INVALID_GRANT_HANDLE) {
+	if (xnbp->xnb_rx_ring_handle != INVALID_GRANT_HANDLE) {
 		struct gnttab_unmap_grant_ref unmap_op;
 
-		unmap_op.host_addr = (uint64_t)(uintptr_t)xnbp->x_rx_ring_addr;
+		unmap_op.host_addr = (uint64_t)(uintptr_t)
+		    xnbp->xnb_rx_ring_addr;
 		unmap_op.dev_bus_addr = 0;
-		unmap_op.handle = xnbp->x_rx_ring_handle;
+		unmap_op.handle = xnbp->xnb_rx_ring_handle;
 		if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
 		    &unmap_op, 1) != 0)
 			cmn_err(CE_WARN, "xnb_disconnect_rings: "
 			    "cannot unmap rx-ring page (%d)",
 			    unmap_op.status);
 
-		xnbp->x_rx_ring_handle = INVALID_GRANT_HANDLE;
+		xnbp->xnb_rx_ring_handle = INVALID_GRANT_HANDLE;
 	}
 
-	if (xnbp->x_rx_ring_addr != NULL) {
-		hat_release_mapping(kas.a_hat, xnbp->x_rx_ring_addr);
-		vmem_free(heap_arena, xnbp->x_rx_ring_addr, PAGESIZE);
-		xnbp->x_rx_ring_addr = NULL;
+	if (xnbp->xnb_rx_ring_addr != NULL) {
+		hat_release_mapping(kas.a_hat, xnbp->xnb_rx_ring_addr);
+		vmem_free(heap_arena, xnbp->xnb_rx_ring_addr, PAGESIZE);
+		xnbp->xnb_rx_ring_addr = NULL;
 	}
 
-	if (xnbp->x_tx_ring_handle != INVALID_GRANT_HANDLE) {
+	if (xnbp->xnb_tx_ring_handle != INVALID_GRANT_HANDLE) {
 		struct gnttab_unmap_grant_ref unmap_op;
 
-		unmap_op.host_addr = (uint64_t)(uintptr_t)xnbp->x_tx_ring_addr;
+		unmap_op.host_addr = (uint64_t)(uintptr_t)
+		    xnbp->xnb_tx_ring_addr;
 		unmap_op.dev_bus_addr = 0;
-		unmap_op.handle = xnbp->x_tx_ring_handle;
+		unmap_op.handle = xnbp->xnb_tx_ring_handle;
 		if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
 		    &unmap_op, 1) != 0)
 			cmn_err(CE_WARN, "xnb_disconnect_rings: "
 			    "cannot unmap tx-ring page (%d)",
 			    unmap_op.status);
 
-		xnbp->x_tx_ring_handle = INVALID_GRANT_HANDLE;
+		xnbp->xnb_tx_ring_handle = INVALID_GRANT_HANDLE;
 	}
 
-	if (xnbp->x_tx_ring_addr != NULL) {
-		hat_release_mapping(kas.a_hat, xnbp->x_tx_ring_addr);
-		vmem_free(heap_arena, xnbp->x_tx_ring_addr, PAGESIZE);
-		xnbp->x_tx_ring_addr = NULL;
+	if (xnbp->xnb_tx_ring_addr != NULL) {
+		hat_release_mapping(kas.a_hat, xnbp->xnb_tx_ring_addr);
+		vmem_free(heap_arena, xnbp->xnb_tx_ring_addr, PAGESIZE);
+		xnbp->xnb_tx_ring_addr = NULL;
 	}
 }
 
@@ -1412,9 +1856,9 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 	switch (new_state) {
 	case XenbusStateConnected:
 		if (xnb_connect_rings(dip)) {
-			xnbp->x_flavour->xf_peer_connected(xnbp);
+			xnbp->xnb_flavour->xf_peer_connected(xnbp);
 		} else {
-			xnbp->x_flavour->xf_peer_disconnected(xnbp);
+			xnbp->xnb_flavour->xf_peer_disconnected(xnbp);
 			xnb_disconnect_rings(dip);
 			(void) xvdi_switch_state(dip, XBT_NULL,
 			    XenbusStateClosed);
@@ -1425,7 +1869,7 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		 * Now that we've attempted to connect it's reasonable
 		 * to allow an attempt to detach.
 		 */
-		xnbp->x_detachable = B_TRUE;
+		xnbp->xnb_detachable = B_TRUE;
 
 		break;
 
@@ -1435,16 +1879,16 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		break;
 
 	case XenbusStateClosed:
-		xnbp->x_flavour->xf_peer_disconnected(xnbp);
+		xnbp->xnb_flavour->xf_peer_disconnected(xnbp);
 
-		mutex_enter(&xnbp->x_tx_lock);
-		mutex_enter(&xnbp->x_rx_lock);
+		mutex_enter(&xnbp->xnb_tx_lock);
+		mutex_enter(&xnbp->xnb_rx_lock);
 
 		xnb_disconnect_rings(dip);
-		xnbp->x_connected = B_FALSE;
+		xnbp->xnb_connected = B_FALSE;
 
-		mutex_exit(&xnbp->x_rx_lock);
-		mutex_exit(&xnbp->x_tx_lock);
+		mutex_exit(&xnbp->xnb_rx_lock);
+		mutex_exit(&xnbp->xnb_tx_lock);
 
 		(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosed);
 		(void) xvdi_post_event(dip, XEN_HP_REMOVE);
@@ -1455,7 +1899,7 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		 * having been through the case above, so we set it to
 		 * be sure.
 		 */
-		xnbp->x_detachable = B_TRUE;
+		xnbp->xnb_detachable = B_TRUE;
 
 		break;
 
@@ -1478,15 +1922,15 @@ xnb_hp_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 	switch (state) {
 	case Connected:
 
-		success = xnbp->x_flavour->xf_hotplug_connected(xnbp);
+		success = xnbp->xnb_flavour->xf_hotplug_connected(xnbp);
 
-		mutex_enter(&xnbp->x_tx_lock);
-		mutex_enter(&xnbp->x_rx_lock);
+		mutex_enter(&xnbp->xnb_tx_lock);
+		mutex_enter(&xnbp->xnb_rx_lock);
 
-		xnbp->x_hotplugged = success;
+		xnbp->xnb_hotplugged = success;
 
-		mutex_exit(&xnbp->x_rx_lock);
-		mutex_exit(&xnbp->x_tx_lock);
+		mutex_exit(&xnbp->xnb_rx_lock);
+		mutex_exit(&xnbp->xnb_tx_lock);
 		break;
 
 	default:

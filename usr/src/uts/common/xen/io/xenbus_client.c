@@ -55,9 +55,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#include <sys/hypervisor.h>
+#else
 #include <sys/hypervisor.h>
 #include <sys/xen_mmu.h>
 #include <sys/evtchn_impl.h>
+#endif
 #include <sys/gnttab.h>
 #include <xen/sys/xenbus_impl.h>
 #include <sys/cmn_err.h>

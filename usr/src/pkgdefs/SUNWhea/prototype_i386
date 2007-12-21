@@ -87,6 +87,7 @@ f none usr/include/sys/dktp/dadkio.h 644 root bin
 f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dma_engine.h 644 root bin
 f none usr/include/sys/fp.h 644 root bin
+f none usr/include/sys/hypervisor.h 644 root bin
 f none usr/include/sys/i8272A.h 644 root bin
 f none usr/include/sys/kd.h 644 root bin
 f none usr/include/sys/mc.h 644 root bin
@@ -120,6 +121,7 @@ f none usr/include/sys/traptrace.h 644 root bin
 f none usr/include/sys/tss.h 644 root bin
 f none usr/include/sys/x86_archext.h 644 root bin
 f none usr/include/sys/ucode.h 644 root bin
+f none usr/include/sys/xen_errno.h 644 root bin
 d none usr/platform 755 root sys
 d none usr/platform/i86pc 755 root sys
 d none usr/platform/i86pc/include 755 root bin
@@ -158,9 +160,7 @@ d none usr/platform/i86xpv 755 root sys
 d none usr/platform/i86xpv/include 755 root bin
 d none usr/platform/i86xpv/include/sys 755 root bin
 f none usr/platform/i86xpv/include/sys/balloon.h 644 root bin
-f none usr/platform/i86xpv/include/sys/hypervisor.h 644 root bin
 f none usr/platform/i86xpv/include/sys/machprivregs.h 644 root bin
-f none usr/platform/i86xpv/include/sys/xen_errno.h 644 root bin
 f none usr/platform/i86xpv/include/sys/xen_mmu.h 644 root bin
 f none usr/platform/i86xpv/include/sys/xpv_impl.h 644 root bin
 d none usr/platform/i86xpv/include/vm 755 root bin

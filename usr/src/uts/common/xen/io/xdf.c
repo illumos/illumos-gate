@@ -33,7 +33,30 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "xdf.h"
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/dditypes.h>
+#include <sys/sunddi.h>
+#include <sys/list.h>
+#include <sys/cmlb.h>
+#include <sys/dkio.h>
+#include <sys/vtoc.h>
+#include <sys/modctl.h>
+#include <sys/bootconf.h>
+#include <sys/promif.h>
+#include <sys/sysmacros.h>
+#include <sys/kstat.h>
+#include <sys/mach_mmu.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#endif
+#include <public/io/xenbus.h>
+#include <xen/sys/xenbus_impl.h>
+#include <xen/sys/xendev.h>
+#include <sys/gnttab.h>
+#include <sys/scsi/generic/inquiry.h>
+#include <io/xdf.h>
 
 #define	FLUSH_DISKCACHE	0x1
 #define	WRITE_BARRIER	0x2
@@ -302,6 +325,16 @@ xdf_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ddi_iblock_cookie_t ibc;
 	ddi_iblock_cookie_t softibc;
 	int instance;
+#if defined(XPV_HVM_DRIVER) && defined(__i386)
+	/* XXX: 6609126 32-bit xdf driver panics on a 64-bit dom0 */
+	extern int xen_is_64bit;
+
+	if (xen_is_64bit) {
+		cmn_err(CE_WARN, "xdf cannot be used in 32-bit domUs on a"
+		    " 64-bit dom0.");
+		return (DDI_FAILURE);
+	}
+#endif
 
 	xdfdebug = ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_NOTPROM,
 	    "xdfdebug", 0);
@@ -534,7 +567,11 @@ xdf_suspend(dev_info_t *devi)
 
 	/* make sure no more I/O responses left in the ring buffer */
 	if ((st == XD_INIT) || (st == XD_READY)) {
+#ifdef XPV_HVM_DRIVER
+		ec_unbind_evtchn(vdp->xdf_evtchn);
+#else
 		(void) ddi_remove_intr(devi, 0, NULL);
+#endif
 		(void) xdf_drain_io(vdp);
 		/*
 		 * no need to teardown the ring buffer here
@@ -1437,7 +1474,9 @@ xdf_drain_io(xdf_t *vdp)
 		if (!xvdi_ring_has_incomp_request(xbr))
 			goto out;
 
+#ifndef	XPV_HVM_DRIVER
 		(void) HYPERVISOR_yield();
+#endif
 		/*
 		 * file-backed devices can be slow
 		 */
@@ -1616,12 +1655,17 @@ xdf_start_connect(xdf_t *vdp)
 		    ddi_get_name_addr(dip));
 		goto errout;
 	}
+	vdp->xdf_evtchn = xvdi_get_evtchn(dip);
+#ifdef XPV_HVM_DRIVER
+	ec_bind_evtchn_to_handler(vdp->xdf_evtchn, IPL_VBD, xdf_intr, vdp);
+#else
 	if (ddi_add_intr(dip, 0, NULL, NULL, xdf_intr, (caddr_t)vdp) !=
 	    DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xdf_start_connect: xdf@%s: "
 		    "failed to add intr handler", ddi_get_name_addr(dip));
 		goto errout1;
 	}
+#endif
 
 	if (xvdi_alloc_ring(dip, BLKIF_RING_SIZE,
 	    sizeof (union blkif_sring_entry), &gref, &vdp->xdf_xb_ring) !=
@@ -1657,7 +1701,7 @@ trans_retry:
 	}
 
 	if (rv = xenbus_printf(xbt, xsnode, "event-channel", "%u",
-	    xvdi_get_evtchn(dip))) {
+	    vdp->xdf_evtchn)) {
 		cmn_err(CE_WARN, "xdf@%s: failed to write event-channel",
 		    ddi_get_name_addr(dip));
 		xvdi_fatal_error(dip, rv, "writing event-channel");
@@ -1694,7 +1738,11 @@ abort_trans:
 fail_trans:
 	xvdi_free_ring(vdp->xdf_xb_ring);
 errout2:
+#ifdef XPV_HVM_DRIVER
+	ec_unbind_evtchn(vdp->xdf_evtchn);
+#else
 	(void) ddi_remove_intr(vdp->xdf_dip, 0, NULL);
+#endif
 errout1:
 	xvdi_free_evtchn(dip);
 errout:
@@ -1786,7 +1834,7 @@ xdf_post_connect(xdf_t *vdp)
 
 	/*
 	 * We've created all the minor nodes via cmlb_attach() using default
-	 * value in xdf_attach() to make it possbile to block in xdf_open(),
+	 * value in xdf_attach() to make it possible to block in xdf_open(),
 	 * in case there's anyone (say, booting thread) ever trying to open
 	 * it before connected to backend. We will refresh all those minor
 	 * nodes w/ latest info we've got now when we are almost connected.
@@ -1857,7 +1905,11 @@ xdf_post_connect(xdf_t *vdp)
 static void
 xdf_post_disconnect(xdf_t *vdp)
 {
+#ifdef XPV_HVM_DRIVER
+	ec_unbind_evtchn(vdp->xdf_evtchn);
+#else
 	(void) ddi_remove_intr(vdp->xdf_dip, 0, NULL);
+#endif
 	xvdi_free_evtchn(vdp->xdf_dip);
 	xvdi_free_ring(vdp->xdf_xb_ring);
 	vdp->xdf_xb_ring = NULL;

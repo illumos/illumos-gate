@@ -55,12 +55,18 @@ caddr_t xb_addr;		/* virtual addr for the store_mfn page */
 
 
 /*
- * Running on the hypervisor, we need to prevent migration while holding
- * PTE values that we might do PTE2PFN() or pa_to_ma() on, as the
- * mfn_to_pfn_mapping and mfn_list[] translation tables might change.
+ * We need to prevent migration or suspension of a domU while it's
+ * manipulating MFN values, as the MFN values will spontaneously
+ * change. The next 4 routines provide a mechanism for that.
+ * The basic idea is to use reader/writer mutex, readers are any thread
+ * that is manipulating MFNs. Only the thread which is going to actually call
+ * HYPERVISOR_suspend() will become a writer.
  *
- * As the suspend process uses the HAT, we need to check we don't already own
- * the lock as a writer before we try to take it as a reader.
+ * Since various places need to manipulate MFNs and also call the HAT,
+ * we track if a thread acquires reader status and allow it to recursively
+ * do so again. This prevents deadlocks if a migration request
+ * is started and waits for some reader, but then the previous reader needs
+ * to call into the HAT.
  */
 #define	NUM_M2P_LOCKS 128
 static struct {
@@ -74,7 +80,7 @@ void
 xen_block_migrate(void)
 {
 	if (!DOMAIN_IS_INITDOMAIN(xen_info) &&
-	    rw_owner(&m2p_lock[XM2P_HASH].m2p_rwlock) != curthread)
+	    ++curthread->t_xpvcntr == 1)
 		rw_enter(&m2p_lock[XM2P_HASH].m2p_rwlock, RW_READER);
 }
 
@@ -82,7 +88,7 @@ void
 xen_allow_migrate(void)
 {
 	if (!DOMAIN_IS_INITDOMAIN(xen_info) &&
-	    rw_owner(&m2p_lock[XM2P_HASH].m2p_rwlock) != curthread)
+	    --curthread->t_xpvcntr == 0)
 		rw_exit(&m2p_lock[XM2P_HASH].m2p_rwlock);
 }
 
@@ -91,6 +97,8 @@ xen_start_migrate(void)
 {
 	int i;
 
+	ASSERT(curthread->t_xpvcntr == 0);
+	++curthread->t_xpvcntr; /* this allows calls into HAT */
 	for (i = 0; i < NUM_M2P_LOCKS; ++i)
 		rw_enter(&m2p_lock[i].m2p_rwlock, RW_WRITER);
 }
@@ -102,6 +110,8 @@ xen_end_migrate(void)
 
 	for (i = 0; i < NUM_M2P_LOCKS; ++i)
 		rw_exit(&m2p_lock[i].m2p_rwlock);
+	ASSERT(curthread->t_xpvcntr == 1);
+	--curthread->t_xpvcntr;
 }
 
 /*ARGSUSED*/

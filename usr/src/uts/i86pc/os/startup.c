@@ -521,6 +521,11 @@ static page_t *rd_pages;
 struct system_hardware system_hardware;
 
 /*
+ * Is this Solaris instance running in a fully virtualized xVM domain?
+ */
+int xpv_is_hvm = 0;
+
+/*
  * Enable some debugging messages concerning memory usage...
  */
 static void
@@ -1339,6 +1344,36 @@ startup_kmem(void)
 	PRM_POINT("startup_kmem() done");
 }
 
+#ifndef __xpv
+/*
+ * If we have detected that we are running in an HVM environment, we need
+ * to prepend the PV driver directory to the module search path.
+ */
+#define	HVM_MOD_DIR "/platform/i86hvm/kernel"
+static void
+update_default_path()
+{
+	char *current, *newpath;
+	int newlen;
+
+	/*
+	 * We are about to resync with krtld.  krtld will reset its
+	 * internal module search path iff Solaris has set default_path.
+	 * We want to be sure we're prepending this new directory to the
+	 * right search path.
+	 */
+	current = (default_path == NULL) ? kobj_module_path : default_path;
+
+	newlen = strlen(HVM_MOD_DIR) + strlen(current) + 1;
+	newpath = kmem_alloc(newlen, KM_SLEEP);
+	(void) strcpy(newpath, HVM_MOD_DIR);
+	(void) strcat(newpath, " ");
+	(void) strcat(newpath, current);
+
+	default_path = newpath;
+}
+#endif
+
 static void
 startup_modules(void)
 {
@@ -1355,6 +1390,9 @@ startup_modules(void)
 	 * caused the drv_usecwait to be way too short.
 	 */
 	microfind();
+
+	if (xpv_is_hvm)
+		update_default_path();
 #endif
 
 	/*

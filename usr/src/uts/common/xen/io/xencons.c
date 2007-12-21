@@ -290,9 +290,9 @@ xenconssetup(struct xencons *xcp)
 		mutex_exit(&xcp->excl);
 	} else {
 		(void) xvdi_alloc_evtchn(xcp->dip);
+		xcp->evtchn = xvdi_get_evtchn(xcp->dip);
 		(void) ddi_add_intr(xcp->dip, 0, NULL, NULL, xenconsintr,
 		    (caddr_t)xcp);
-		xcp->evtchn = xvdi_get_evtchn(xcp->dip);
 	}
 }
 

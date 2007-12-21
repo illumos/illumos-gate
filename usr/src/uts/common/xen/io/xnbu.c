@@ -81,14 +81,14 @@ static mac_callbacks_t xnb_callbacks = {
 static void
 xnbu_to_host(xnb_t *xnbp, mblk_t *mp)
 {
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 	boolean_t sched = B_FALSE;
 
 	ASSERT(mp != NULL);
 
 	mac_rx(xnbup->u_mh, xnbup->u_rx_handle, mp);
 
-	mutex_enter(&xnbp->x_tx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
 
 	/*
 	 * If a transmit attempt failed because we ran out of ring
@@ -96,12 +96,12 @@ xnbu_to_host(xnb_t *xnbp, mblk_t *mp)
 	 * path.
 	 */
 	if (xnbup->u_need_sched &&
-	    RING_HAS_UNCONSUMED_REQUESTS(&xnbp->x_rx_ring)) {
+	    RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring)) {
 		sched = B_TRUE;
 		xnbup->u_need_sched = B_FALSE;
 	}
 
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	if (sched)
 		mac_tx_update(xnbup->u_mh);
@@ -155,7 +155,7 @@ xnbu_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
 	uint16_t r = 0;
 
-	if (xnbp->x_cksum_offload) {
+	if (xnbp->xnb_cksum_offload) {
 		uint32_t pflags;
 
 		hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
@@ -176,7 +176,7 @@ xnbu_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 static void
 xnbu_connected(xnb_t *xnbp)
 {
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
 	mac_link_update(xnbup->u_mh, LINK_STATE_UP);
 	/*
@@ -188,7 +188,7 @@ xnbu_connected(xnb_t *xnbp)
 static void
 xnbu_disconnected(xnb_t *xnbp)
 {
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
 	mac_link_update(xnbup->u_mh, LINK_STATE_DOWN);
 }
@@ -204,9 +204,9 @@ static mblk_t *
 xnbu_m_send(void *arg, mblk_t *mp)
 {
 	xnb_t *xnbp = arg;
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
-	mp = xnb_to_peer(arg, mp);
+	mp = xnb_copy_to_peer(arg, mp);
 
 	/* XXPV dme: playing with need_sched without txlock? */
 
@@ -239,10 +239,10 @@ static int
 xnbu_m_set_mac_addr(void *arg, const uint8_t *macaddr)
 {
 	xnb_t *xnbp = arg;
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
-	bcopy(macaddr, xnbp->x_mac_addr, ETHERADDRL);
-	mac_unicst_update(xnbup->u_mh, xnbp->x_mac_addr);
+	bcopy(macaddr, xnbp->xnb_mac_addr, ETHERADDRL);
+	mac_unicst_update(xnbup->u_mh, xnbp->xnb_mac_addr);
 
 	return (0);
 }
@@ -300,12 +300,12 @@ xnbu_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	xnb_t *xnbp = arg;
 
-	mutex_enter(&xnbp->x_tx_lock);
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
 #define	map_stat(q, r)				\
 	case (MAC_STAT_##q):			\
-		*val = xnbp->x_stat_##r;		\
+		*val = xnbp->xnb_stat_##r;		\
 		break
 
 	switch (stat) {
@@ -316,16 +316,16 @@ xnbu_m_stat(void *arg, uint_t stat, uint64_t *val)
 	map_stat(OBYTES, obytes);
 
 	default:
-		mutex_exit(&xnbp->x_rx_lock);
-		mutex_exit(&xnbp->x_tx_lock);
+		mutex_exit(&xnbp->xnb_rx_lock);
+		mutex_exit(&xnbp->xnb_tx_lock);
 
 		return (ENOTSUP);
 	}
 
 #undef map_stat
 
-	mutex_exit(&xnbp->x_rx_lock);
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	return (0);
 }
@@ -343,7 +343,7 @@ static void
 xnbu_m_resources(void *arg)
 {
 	xnb_t *xnbp = arg;
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 	mac_rx_fifo_t mrf;
 
 	mrf.mrf_type = MAC_RX_FIFO;
@@ -365,7 +365,7 @@ xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *capab = cap_data;
 
-		if (xnbp->x_cksum_offload)
+		if (xnbp->xnb_cksum_offload)
 			*capab = HCKSUM_INET_PARTIAL;
 		else
 			*capab = 0;
@@ -428,13 +428,13 @@ xnbu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 *  used by the generic layer.
 	 */
 	mr->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
-	mr->m_src_addr = xnbp->x_mac_addr;
+	mr->m_src_addr = xnbp->xnb_mac_addr;
 	mr->m_callbacks = &xnb_callbacks;
 	mr->m_min_sdu = 0;
 	mr->m_max_sdu = XNBMAXPKT;
 
-	(void) memset(xnbp->x_mac_addr, 0xff, ETHERADDRL);
-	xnbp->x_mac_addr[0] &= 0xfe;
+	(void) memset(xnbp->xnb_mac_addr, 0xff, ETHERADDRL);
+	xnbp->xnb_mac_addr[0] &= 0xfe;
 	xnbup->u_need_sched = B_FALSE;
 
 	/*
@@ -458,7 +458,7 @@ int
 xnbu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	xnb_t *xnbp = ddi_get_driver_private(dip);
-	xnbu_t *xnbup = xnbp->x_flavour_data;
+	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -472,19 +472,19 @@ xnbu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ASSERT(xnbp != NULL);
 	ASSERT(xnbup != NULL);
 
-	mutex_enter(&xnbp->x_tx_lock);
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
-	if (!xnbp->x_detachable || xnbp->x_connected ||
-	    (xnbp->x_rx_buf_count > 0)) {
-		mutex_exit(&xnbp->x_rx_lock);
-		mutex_exit(&xnbp->x_tx_lock);
+	if (!xnbp->xnb_detachable || xnbp->xnb_connected ||
+	    (xnbp->xnb_rx_buf_count > 0)) {
+		mutex_exit(&xnbp->xnb_rx_lock);
+		mutex_exit(&xnbp->xnb_tx_lock);
 
 		return (DDI_FAILURE);
 	}
 
-	mutex_exit(&xnbp->x_rx_lock);
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	/*
 	 * Attempt to unregister the mac.

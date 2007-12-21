@@ -1034,3 +1034,8 @@ usr/include/libvscan.h	i386
 #
 usr/lib/vscan/llib-lvscan	i386
 usr/lib/vscan/llib-lvscan.ln	i386
+#
+# i86hvm is not a full platform.  It is just a home for paravirtualized
+# drivers.  There is no usr/ component to this sub-platform, but the
+# directory is created in the proto area to keep other tools happy.
+usr/platform/i86hvm		i386

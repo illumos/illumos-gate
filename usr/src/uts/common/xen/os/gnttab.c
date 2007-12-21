@@ -58,6 +58,11 @@
 
 #include <sys/types.h>
 #include <sys/archsystm.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#include <sys/mman.h>
+#include <vm/hat.h>
+#endif
 #include <sys/hypervisor.h>
 #include <sys/gnttab.h>
 #include <sys/sysmacros.h>
@@ -77,11 +82,13 @@
 #include <vm/hat_i86.h>
 #include <sys/bootconf.h>
 #include <sys/bootsvcs.h>
+#ifndef XPV_HVM_DRIVER
 #include <sys/bootinfo.h>
 #include <sys/multiboot.h>
+#include <vm/kboot_mmu.h>
+#endif
 #include <sys/bootvfs.h>
 #include <sys/bootprops.h>
-#include <vm/kboot_mmu.h>
 #include <vm/seg_kmem.h>
 
 #define	cmpxchg(t, c, n) atomic_cas_16((t), (c), (n))
@@ -410,6 +417,61 @@ out:
 	mutex_exit(&gnttab_list_lock);
 }
 
+#ifdef XPV_HVM_DRIVER
+
+static void
+gnttab_map(void)
+{
+	struct xen_add_to_physmap xatp;
+	caddr_t va;
+	pfn_t pfn;
+	int i;
+
+	va = (caddr_t)shared;
+	for (i = 0; i < NR_GRANT_FRAMES; i++) {
+		pfn = hat_getpfnum(kas.a_hat, va);
+
+		xatp.domid = DOMID_SELF;
+		xatp.idx = i;
+		xatp.space = XENMAPSPACE_grant_table;
+		xatp.gpfn = pfn;
+		hat_unload(kas.a_hat, va, MMU_PAGESIZE, HAT_UNLOAD);
+		if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp) != 0)
+			panic("Couldn't map grant table");
+
+		hat_devload(kas.a_hat, va, MMU_PAGESIZE, pfn,
+		    PROT_READ | PROT_WRITE,
+		    HAT_LOAD | HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+
+		va += MMU_PAGESIZE;
+	}
+}
+
+void
+gnttab_init(void)
+{
+	int i;
+
+	shared = (grant_entry_t *)xen_alloc_pages(NR_GRANT_FRAMES);
+
+	gnttab_map();
+
+	for (i = NR_RESERVED_ENTRIES; i < NR_GRANT_ENTRIES; i++)
+		gnttab_list[i] = i + 1;
+	gnttab_free_count = NR_GRANT_ENTRIES - NR_RESERVED_ENTRIES;
+	gnttab_free_head  = NR_RESERVED_ENTRIES;
+
+	mutex_init(&gnttab_list_lock, NULL, MUTEX_DEFAULT, NULL);
+}
+
+void
+gnttab_resume(void)
+{
+	gnttab_map();
+}
+
+#else /* XPV_HVM_DRIVER */
+
 void
 gnttab_init(void)
 {
@@ -471,6 +533,8 @@ gnttab_resume(void)
 		    UVMF_INVLPG | UVMF_ALL);
 	}
 }
+
+#endif /* XPV_HVM_DRIVER */
 
 void
 gnttab_suspend(void)

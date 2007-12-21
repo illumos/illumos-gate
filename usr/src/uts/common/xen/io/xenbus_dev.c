@@ -71,10 +71,15 @@
 #include <sys/condvar.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#ifdef XPV_HVM_DRIVER
+#include <public/io/xenbus.h>
+#include <public/io/xs_wire.h>
+#include <sys/xpv_support.h>
+#endif
 #include <sys/hypervisor.h>
+#include <xen/sys/xenbus.h>
 #include <xen/sys/xenbus_comms.h>
 #include <xen/sys/xenbus_impl.h>
-#include <xen/sys/xenbus.h>
 #include <xen/public/io/xs_wire.h>
 
 #ifdef DEBUG
@@ -287,8 +292,10 @@ xenbusdrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	xenbusdrv_dip = dip;
 	ddi_report_dev(dip);
 
+#ifndef XPV_HVM_DRIVER
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
 		xs_dom0_init();
+#endif
 
 	return (DDI_SUCCESS);
 

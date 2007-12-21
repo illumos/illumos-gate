@@ -43,8 +43,6 @@
  */
 #include <sys/conf.h>
 #include <sys/param.h>
-#include <sys/hypervisor.h>
-#include <sys/xen_mmu.h>
 #include <sys/kmem.h>
 #include <vm/seg_kmem.h>
 #include <sys/debug.h>
@@ -57,8 +55,6 @@
 #include <sys/sunndi.h>
 #include <sys/sunldi.h>
 #include <sys/fs/dv_node.h>
-#include <sys/evtchn_impl.h>
-#include <sys/gnttab.h>
 #include <sys/avintr.h>
 #include <sys/psm.h>
 #include <sys/spl.h>
@@ -68,8 +64,22 @@
 #include <sys/bootsvcs.h>
 #include <sys/bootinfo.h>
 #include <sys/note.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#include <sys/hypervisor.h>
+#include <public/grant_table.h>
+#include <public/xen.h>
+#include <public/io/xenbus.h>
+#include <public/io/xs_wire.h>
+#include <public/event_channel.h>
+#include <public/io/xenbus.h>
+#else /* XPV_HVM_DRIVER */
+#include <sys/hypervisor.h>
 #include <sys/xen_mmu.h>
 #include <xen/sys/xenbus_impl.h>
+#include <sys/evtchn_impl.h>
+#endif /* XPV_HVM_DRIVER */
+#include <sys/gnttab.h>
 #include <xen/sys/xendev.h>
 #include <vm/hat_i86.h>
 #include <sys/scsi/generic/inquiry.h>
@@ -79,7 +89,9 @@
 
 static void xvdi_ring_init_sring(xendev_ring_t *);
 static void xvdi_ring_init_front_ring(xendev_ring_t *, size_t, size_t);
+#ifndef XPV_HVM_DRIVER
 static void xvdi_ring_init_back_ring(xendev_ring_t *, size_t, size_t);
+#endif
 static void xvdi_reinit_ring(dev_info_t *, grant_ref_t *, xendev_ring_t *);
 
 static int i_xvdi_add_watches(dev_info_t *);
@@ -320,6 +332,19 @@ xvdi_init_dev(dev_info_t *dip)
 				    dip, "unit-address", prop_str);
 				kmem_free(prop_str, prop_len);
 			}
+#ifdef XPV_HVM_DRIVER
+			/*
+			 * The mapping between the 'dev' name and the
+			 * device ID maintained by Xenstore has to be
+			 * tracked explicitly in HVM domains.
+			 */
+			prop_str = strrchr(pdp->xd_xsdev.otherend, '/');
+			if (prop_str != NULL) {
+				prop_str = ((caddr_t)prop_str) + 1;
+				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
+				    dip, "xenstore-id", prop_str);
+			}
+#endif /* XPV_HVM_DRIVER */
 			break;
 		default:
 			break;
@@ -342,7 +367,9 @@ xvdi_uninit_dev(dev_info_t *dip)
 		i_xvdi_rem_watches(dip);
 
 		/* tell other end to close */
-		(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateClosed);
+		if (pdp->xd_xsdev.otherend_id != (domid_t)-1)
+			(void) xvdi_switch_state(dip, XBT_NULL,
+			    XenbusStateClosed);
 
 		if (pdp->xd_xsdev.nodename != NULL)
 			kmem_free((char *)(pdp->xd_xsdev.nodename),
@@ -392,7 +419,9 @@ xvdi_bind_evtchn(dev_info_t *dip, evtchn_port_t evtchn)
 			return (DDI_FAILURE);
 		}
 	}
+#ifndef XPV_HVM_DRIVER
 	pdp->xd_ispec.intrspec_vec = ec_bind_evtchn_to_irq(pdp->xd_evtchn);
+#endif
 	mutex_exit(&pdp->xd_lk);
 
 	return (DDI_SUCCESS);
@@ -435,7 +464,9 @@ xvdi_alloc_evtchn(dev_info_t *dip)
 			return (DDI_FAILURE);
 		}
 	}
+#ifndef XPV_HVM_DRIVER
 	pdp->xd_ispec.intrspec_vec = ec_bind_evtchn_to_irq(pdp->xd_evtchn);
+#endif
 	mutex_exit(&pdp->xd_lk);
 
 	return (DDI_SUCCESS);
@@ -455,13 +486,16 @@ xvdi_free_evtchn(dev_info_t *dip)
 
 	mutex_enter(&pdp->xd_lk);
 	if (pdp->xd_evtchn != INVALID_EVTCHN) {
+#ifndef XPV_HVM_DRIVER
 		ec_unbind_irq(pdp->xd_ispec.intrspec_vec);
-		pdp->xd_evtchn = INVALID_EVTCHN;
 		pdp->xd_ispec.intrspec_vec = 0;
+#endif
+		pdp->xd_evtchn = INVALID_EVTCHN;
 	}
 	mutex_exit(&pdp->xd_lk);
 }
 
+#ifndef XPV_HVM_DRIVER
 /*
  * Map an inter-domain communication ring for a virtual device.
  * This is used by backend drivers.
@@ -566,6 +600,7 @@ xvdi_unmap_ring(xendev_ring_t *ring)
 	vmem_xfree(heap_arena, ring->xr_vaddr, PAGESIZE);
 	kmem_free(ring, sizeof (xendev_ring_t));
 }
+#endif /* XPV_HVM_DRIVER */
 
 /*
  * Re-initialise an inter-domain communications ring for the backend domain.
@@ -1961,6 +1996,7 @@ xvdi_ring_init_front_ring(xendev_ring_t *ringp, size_t nentry, size_t entrysize)
 	ringp->xr_entry_size = entrysize;
 }
 
+#ifndef XPV_HVM_DRIVER
 static void
 xvdi_ring_init_back_ring(xendev_ring_t *ringp, size_t nentry, size_t entrysize)
 {
@@ -1975,6 +2011,7 @@ xvdi_ring_init_back_ring(xendev_ring_t *ringp, size_t nentry, size_t entrysize)
 	ringp->xr_frontend = 0;
 	ringp->xr_entry_size = entrysize;
 }
+#endif /* XPV_HVM_DRIVER */
 
 static void
 xendev_offline_device(void *arg)

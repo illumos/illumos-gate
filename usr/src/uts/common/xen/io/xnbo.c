@@ -63,19 +63,19 @@ static void xnbo_close_mac(xnbo_t *);
 static void
 xnbo_to_mac(xnb_t *xnbp, mblk_t *mp)
 {
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 
 	ASSERT(mp != NULL);
 
 	if (!xnbop->o_running) {
-		xnbp->x_stat_rx_too_early++;
+		xnbp->xnb_stat_rx_too_early++;
 		goto fail;
 	}
 
 	mp = xnbop->o_mtx->mt_fn(xnbop->o_mtx->mt_arg, mp);
 
 	if (mp != NULL) {
-		xnbp->x_stat_mac_full++;
+		xnbp->xnb_stat_mac_full++;
 		goto fail;
 	}
 
@@ -88,13 +88,13 @@ fail:
 static mblk_t *
 xnbo_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 {
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 
 	ASSERT(mp->b_next == NULL);
 
 	if ((flags & NETTXF_csum_blank) != 0) {
 		/*
-		 * It would be nice to ASSERT that xnbp->x_cksum_offload
+		 * It would be nice to ASSERT that xnbp->xnb_cksum_offload
 		 * is TRUE here, but some peers insist on assuming
 		 * that it is available even when they have been told
 		 * otherwise.
@@ -128,7 +128,7 @@ xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 * caller must use HCK_PARTIALCKSUM.
 	 */
 
-	if (xnbp->x_cksum_offload) {
+	if (xnbp->xnb_cksum_offload) {
 		uint32_t pflags, csum;
 
 		/*
@@ -162,7 +162,7 @@ xnbo_from_mac(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 {
 	xnb_t *xnbp = arg;
 
-	mp = xnb_to_peer(xnbp, mp);
+	mp = xnb_copy_to_peer(xnbp, mp);
 
 	if (mp != NULL)
 		freemsgchain(mp);
@@ -178,7 +178,7 @@ static void
 xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 {
 	xnb_t *xnbp = arg;
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 	mblk_t *next, *keep, *keep_head, *free, *free_head;
 
 	keep = keep_head = free = free_head = NULL;
@@ -207,8 +207,8 @@ xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 			continue;
 		}
 
-		if (bcmp(hdr_info.mhi_daddr, xnbp->x_mac_addr,
-		    sizeof (xnbp->x_mac_addr)) == 0) {
+		if (bcmp(hdr_info.mhi_daddr, xnbp->xnb_mac_addr,
+		    sizeof (xnbp->xnb_mac_addr)) == 0) {
 			ADD(keep, mp);
 			continue;
 		}
@@ -228,7 +228,7 @@ static void
 xnbo_notify(void *arg, mac_notify_type_t type)
 {
 	xnb_t *xnbp = arg;
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 
 	switch (type) {
 	case MAC_NOTE_PROMISC:
@@ -240,13 +240,13 @@ xnbo_notify(void *arg, mac_notify_type_t type)
 static boolean_t
 xnbo_open_mac(xnb_t *xnbp, char *mac)
 {
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 	int err, need_rx_filter, need_setphysaddr, need_promiscuous;
 	const mac_info_t *mi;
 	char *xsname;
 	void (*rx_fn)(void *, mac_resource_handle_t, mblk_t *);
 
-	xsname = xvdi_get_xsname(xnbp->x_devinfo);
+	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 
 	if ((err = mac_open(mac, &xnbop->o_mh)) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
@@ -313,10 +313,10 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (need_setphysaddr > 0) {
 		struct ether_addr ea;
 
-		err = mac_unicst_set(xnbop->o_mh, xnbp->x_mac_addr);
+		err = mac_unicst_set(xnbop->o_mh, xnbp->xnb_mac_addr);
 		/* Warn, but continue on. */
 		if (err != 0) {
-			bcopy(xnbp->x_mac_addr, ea.ether_addr_octet,
+			bcopy(xnbp->xnb_mac_addr, ea.ether_addr_octet,
 			    ETHERADDRL);
 			cmn_err(CE_WARN, "xnbo_open_mac: "
 			    "cannot set MAC address of %s to "
@@ -367,7 +367,7 @@ xnbo_hotplug(xnb_t *xnbp)
 	char *xsname;
 	char mac[LIFNAMSIZ];
 
-	xsname = xvdi_get_xsname(xnbp->x_devinfo);
+	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 	if (xenbus_scanf(XBT_NULL, xsname, "nic", "%s", mac) != 0) {
 		cmn_err(CE_WARN, "xnbo_hotplug: "
 		    "cannot read nic name from %s", xsname);
@@ -428,7 +428,7 @@ xnbo_connected(xnb_t *xnbp)
 static void
 xnbo_disconnected(xnb_t *xnbp)
 {
-	xnbo_close_mac(xnbp->x_flavour_data);
+	xnbo_close_mac(xnbp->xnb_flavour_data);
 }
 
 static int
@@ -469,7 +469,7 @@ static int
 xnbo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	xnb_t *xnbp = ddi_get_driver_private(dip);
-	xnbo_t *xnbop = xnbp->x_flavour_data;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -480,19 +480,19 @@ xnbo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	mutex_enter(&xnbp->x_tx_lock);
-	mutex_enter(&xnbp->x_rx_lock);
+	mutex_enter(&xnbp->xnb_tx_lock);
+	mutex_enter(&xnbp->xnb_rx_lock);
 
-	if (!xnbp->x_detachable || xnbp->x_connected ||
-	    (xnbp->x_rx_buf_count > 0)) {
-		mutex_exit(&xnbp->x_rx_lock);
-		mutex_exit(&xnbp->x_tx_lock);
+	if (!xnbp->xnb_detachable || xnbp->xnb_connected ||
+	    (xnbp->xnb_rx_buf_count > 0)) {
+		mutex_exit(&xnbp->xnb_rx_lock);
+		mutex_exit(&xnbp->xnb_tx_lock);
 
 		return (DDI_FAILURE);
 	}
 
-	mutex_exit(&xnbp->x_rx_lock);
-	mutex_exit(&xnbp->x_tx_lock);
+	mutex_exit(&xnbp->xnb_rx_lock);
+	mutex_exit(&xnbp->xnb_tx_lock);
 
 	xnbo_close_mac(xnbop);
 	kmem_free(xnbop, sizeof (*xnbop));

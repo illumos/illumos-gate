@@ -16,6 +16,7 @@ etc/path_to_inst
 etc/rtc_config
 etc/system
 kernel
+platform/i86hvm/kernel
 platform/i86pc/kernel
 platform/i86xpv/kernel
 platform/i86pc/ucode/GenuineIntel

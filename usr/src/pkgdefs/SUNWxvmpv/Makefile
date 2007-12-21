@@ -25,48 +25,16 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-UTSBASE = ../..
 
-#
-# include global definitions
-#
-include ../Makefile.i86xpv
+include ../Makefile.com
 
-#
-# Override defaults.
-#
-FILEMODE = 644
-
-HDRS=  \
-	balloon.h	\
-	machprivregs.h	\
-	xen_mmu.h \
-	xpv_impl.h
-
-ROOTHDRS=	$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-
-ROOTDIR=	$(ROOT)/usr/share/src
-ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
-
-ROOTLINK=	$(ROOTDIR)/uts/$(PLATFORM)/sys
-LINKDEST=	../../../../platform/$(PLATFORM)/include/sys
-
-CHECKHDRS=	$(HDRS:%.h=%.check)
+TMPLFILES += postinstall preremove
+DATAFILES += depend
 
 .KEEP_STATE:
 
-.PARALLEL:	$(CHECKHDRS) $(ROOTHDRS)
+all: $(FILES)
+install: all pkg
 
-install_h:	$(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINK)
-
-check:		$(CHECKHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir.root.bin)
-
-$(ROOTLINK):	$(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
-
-FRC:
-
-include ../../Makefile.targ
+include ../Makefile.targ
+include ../Makefile.prtarg

@@ -292,6 +292,7 @@ typedef struct _kthread {
 	uint8_t		t_unpark;	/* modified holding t_delay_lock */
 	uint8_t		t_release;	/* lwp_release() waked up the thread */
 	uint8_t		t_hatdepth;	/* depth of recursive hat_memloads */
+	uint8_t		t_xpvcntr;	/* see xen_block_migrate() */
 	kcondvar_t	t_joincv;	/* cv used to wait for thread exit */
 	void		*t_taskq;	/* for threads belonging to taskq */
 	hrtime_t	t_anttime;	/* most recent time anticipatory load */

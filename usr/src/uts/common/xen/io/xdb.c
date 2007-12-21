@@ -50,9 +50,30 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "xdb.h"
-#include <sys/lofi.h>
+#include <sys/types.h>
+#include <sys/conf.h>
+#include <sys/ddi.h>
+#include <sys/dditypes.h>
+#include <sys/sunddi.h>
+#include <sys/list.h>
+#include <sys/dkio.h>
+#include <sys/cmlb.h>
+#include <sys/vtoc.h>
+#include <sys/modctl.h>
+#include <sys/bootconf.h>
+#include <sys/promif.h>
+#include <sys/sysmacros.h>
+#include <public/io/xenbus.h>
+#include <xen/sys/xenbus_impl.h>
+#include <xen/sys/xendev.h>
+#include <sys/gnttab.h>
+#include <sys/scsi/generic/inquiry.h>
+#include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
+#include <sys/gnttab.h>
+#include <sys/lofi.h>
+#include <io/xdf.h>
+#include <io/xdb.h>
 
 static xdb_t *xdb_statep;
 static int xdb_debug = 0;

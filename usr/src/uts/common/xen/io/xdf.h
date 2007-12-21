@@ -35,26 +35,6 @@ extern "C" {
 #endif
 
 
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/ddi.h>
-#include <sys/dditypes.h>
-#include <sys/sunddi.h>
-#include <sys/list.h>
-#include <sys/dkio.h>
-#include <sys/vtoc.h>
-#include <sys/modctl.h>
-#include <sys/bootconf.h>
-#include <sys/promif.h>
-#include <sys/open.h>
-#include <sys/sysmacros.h>
-#include <sys/kstat.h>
-#include <sys/gnttab.h>
-#include <xen/sys/xenbus_impl.h>
-#include <xen/sys/xendev.h>
-#include <sys/cmlb.h>
-#include <sys/scsi/generic/inquiry.h>
-
 #define	BLKIF_RING_SIZE	__RING_SIZE((blkif_sring_t *)NULL, PAGESIZE)
 
 /*
@@ -108,7 +88,7 @@ enum xdf_state {
 };
 
 /*
- * 16 paritions + fdisk
+ * 16 partitions + fdisk
  */
 #define	XDF_PSHIFT	6
 #define	XDF_PMASK	((1 << XDF_PSHIFT) - 1)
@@ -176,7 +156,7 @@ typedef struct v_req {
  * Status set and checked in vreq->v_status by vreq_setup()
  *
  * These flags will help us to continue the vreq setup work from last failure
- * point, instead of starting from scrath after each failure.
+ * point, instead of starting from scratch after each failure.
  */
 #define	VREQ_INIT		0x0
 #define	VREQ_INIT_DONE		0x1
@@ -218,6 +198,7 @@ typedef struct xdf {
 	int		xdf_wce;
 	char		*xdf_flush_mem;
 	char		*xdf_cache_flush_block;
+	int		xdf_evtchn;
 #ifdef	DEBUG
 	int		xdf_dmacallback_num;
 #endif

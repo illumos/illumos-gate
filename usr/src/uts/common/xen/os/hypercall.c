@@ -39,6 +39,9 @@
  */
 
 #include <sys/types.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#endif
 
 #include <sys/hypervisor.h>
 #include <xen/public/sched.h>
@@ -215,7 +218,7 @@ HYPERVISOR_grant_table_op(uint_t cmd, void *uop, uint_t count)
 	ret_val = __hypercall3(__HYPERVISOR_grant_table_op,
 	    (long)cmd, (ulong_t)uop, (ulong_t)count);
 
-#if !defined(_BOOT)
+#if !defined(_BOOT) && !defined(XPV_HVM_DRIVER)
 	/*
 	 * XXPV --
 	 * The map_grant_ref call suffers a poor design flaw.

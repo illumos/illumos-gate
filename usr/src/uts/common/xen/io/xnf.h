@@ -29,12 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/kstat.h>
-#include <sys/hypervisor.h>
-#include <xen/public/io/netif.h>
-#include <xen/sys/xenbus_impl.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -94,77 +88,83 @@ struct tx_pktinfo {
 /* Per network-interface-controller driver private structure */
 typedef struct xnf {
 	/* most interesting stuff first to assist debugging */
-	dev_info_t		*devinfo;	/* System per-device info. */
-	mac_handle_t		mh;		/* Nemo per-device info. */
-	int			rx_bufs_outstanding;
-	int			tx_descs_free;
-	int			rx_descs_free;	/* count of free rx bufs */
-	int			n_xmits;	/* No. xmit descriptors */
-	int			n_recvs;	/* No. recv descriptors */
-	int			n_recv_bufs;	/* No. recv DMA buffers */
-	int			tx_start_thresh_regval;
-	unsigned char		mac_addr[ETHERADDRL];
-	int			max_recv_bufs;
-	int			recv_buffer_count;
-	int			xmit_buffer_count;
+	dev_info_t		*xnf_devinfo;	/* System per-device info. */
+	mac_handle_t		xnf_mh;		/* Nemo per-device info. */
+	int			xnf_rx_bufs_outstanding;
+	int			xnf_tx_descs_free;
+	int			xnf_rx_descs_free; /* count of free rx bufs */
+	int			xnf_n_tx;	/* No. xmit descriptors */
+	int			xnf_n_rx;	/* No. recv descriptors */
+	int			xnf_n_rx_bufs;	/* No. recv DMA buffers */
+	int			xnf_tx_start_thresh_regval;
+	unsigned char		xnf_mac_addr[ETHERADDRL];
+	int			xnf_max_rx_bufs;
+	int			xnf_rx_buffer_count;
+	int			xnf_tx_buffer_count;
 
-	boolean_t		connected;
-	boolean_t		running;
+	boolean_t		xnf_connected;
+	boolean_t		xnf_running;
 
-	boolean_t		cksum_offload;
+	boolean_t		xnf_cksum_offload;
 
-	uint64_t		stat_intr;
-	uint64_t		stat_norcvbuf;
-	uint64_t		stat_errrcv;
+	uint64_t		xnf_stat_interrupts;
+	uint64_t		xnf_stat_unclaimed_interrupts;
+	uint64_t		xnf_stat_norxbuf;
+	uint64_t		xnf_stat_errrx;
 
-	uint64_t		stat_xmit_attempt;
-	uint64_t		stat_xmit_pullup;
-	uint64_t		stat_xmit_pagebndry;
-	uint64_t		stat_xmit_defer;
-	uint64_t		stat_rx_no_ringbuf;
-	uint64_t		stat_mac_rcv_error;
-	uint64_t		stat_runt;
+	uint64_t		xnf_stat_tx_attempt;
+	uint64_t		xnf_stat_tx_pullup;
+	uint64_t		xnf_stat_tx_pagebndry;
+	uint64_t		xnf_stat_tx_defer;
+	uint64_t		xnf_stat_rx_no_ringbuf;
+	uint64_t		xnf_stat_mac_rcv_error;
+	uint64_t		xnf_stat_runt;
 
-	uint64_t		stat_ipackets;
-	uint64_t		stat_opackets;
-	uint64_t		stat_rbytes;
-	uint64_t		stat_obytes;
+	uint64_t		xnf_stat_ipackets;
+	uint64_t		xnf_stat_opackets;
+	uint64_t		xnf_stat_rbytes;
+	uint64_t		xnf_stat_obytes;
 
-	uint64_t		stat_tx_cksum_deferred;
-	uint64_t		stat_rx_cksum_no_need;
+	uint64_t		xnf_stat_tx_cksum_deferred;
+	uint64_t		xnf_stat_rx_cksum_no_need;
+	uint64_t		xnf_stat_hvcopy_enabled; /* on/off */
+	uint64_t		xnf_stat_hvcopy_packet_processed;
 
-	kstat_t			*kstat_aux;
+	kstat_t			*xnf_kstat_aux;
 
-	struct xnf_buffer_desc	*free_list;
-	struct xnf_buffer_desc	*xmit_free_list;
-	int			tx_pkt_id_list; /* free list of avail pkt ids */
-	struct tx_pktinfo	tx_pkt_info[NET_TX_RING_SIZE];
-	struct xnf_buffer_desc	*rxpkt_bufptr[XNF_MAX_RXDESCS];
+	struct xnf_buffer_desc	*xnf_free_list;
+	struct xnf_buffer_desc	*xnf_tx_free_list;
+	int			xnf_tx_pkt_id_list;
+				/* free list of avail pkt ids */
+	struct tx_pktinfo	xnf_tx_pkt_info[NET_TX_RING_SIZE];
+	struct xnf_buffer_desc	*xnf_rxpkt_bufptr[XNF_MAX_RXDESCS];
 
-	mac_resource_handle_t	rx_handle;
-	ddi_iblock_cookie_t	icookie;
-	kmutex_t		tx_buf_mutex;
-	kmutex_t		rx_buf_mutex;
-	kmutex_t		txlock;
-	kmutex_t		intrlock;
-	boolean_t		tx_pages_readonly;
+	mac_resource_handle_t	xnf_rx_handle;
+	ddi_iblock_cookie_t	xnf_icookie;
+	kmutex_t		xnf_tx_buf_mutex;
+	kmutex_t		xnf_rx_buf_mutex;
+	kmutex_t		xnf_txlock;
+	kmutex_t		xnf_intrlock;
+	boolean_t		xnf_tx_pages_readonly;
 
-	netif_tx_front_ring_t	tx_ring;	/* tx interface struct ptr */
-	ddi_dma_handle_t	tx_ring_dma_handle;
-	ddi_acc_handle_t	tx_ring_dma_acchandle;
-	paddr_t			tx_ring_phys_addr;
-	grant_ref_t		tx_ring_ref;
+	netif_tx_front_ring_t	xnf_tx_ring;	/* tx interface struct ptr */
+	ddi_dma_handle_t	xnf_tx_ring_dma_handle;
+	ddi_acc_handle_t	xnf_tx_ring_dma_acchandle;
+	paddr_t			xnf_tx_ring_phys_addr;
+	grant_ref_t		xnf_tx_ring_ref;
 
-	netif_rx_front_ring_t	rx_ring;	/* rx interface struct ptr */
-	ddi_dma_handle_t	rx_ring_dma_handle;
-	ddi_acc_handle_t	rx_ring_dma_acchandle;
-	paddr_t			rx_ring_phys_addr;
-	grant_ref_t		rx_ring_ref;
+	netif_rx_front_ring_t	xnf_rx_ring;	/* rx interface struct ptr */
+	ddi_dma_handle_t	xnf_rx_ring_dma_handle;
+	ddi_acc_handle_t	xnf_rx_ring_dma_acchandle;
+	paddr_t			xnf_rx_ring_phys_addr;
+	grant_ref_t		xnf_rx_ring_ref;
 
-	uint16_t		evtchn;		/* channel to back end ctlr */
-	grant_ref_t		gref_tx_head;	/* tx grant free list */
-	grant_ref_t		gref_rx_head;	/* rx grant free list */
-	kcondvar_t		cv;
+	uint16_t		xnf_evtchn;	/* channel to back end ctlr */
+	grant_ref_t		xnf_gref_tx_head;	/* tx grant free list */
+	grant_ref_t		xnf_gref_rx_head;	/* rx grant free list */
+	kcondvar_t		xnf_cv;
+
+	boolean_t		xnf_rx_hvcopy;	/* do we do HV copy? */
 } xnf_t;
 
 #ifdef __cplusplus

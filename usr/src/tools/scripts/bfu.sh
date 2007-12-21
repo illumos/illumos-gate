@@ -2149,14 +2149,20 @@ if [ $diskless = no ]; then
 		chgrp sys $root/platform/sun4u-us3
 	fi
 
-	if [ $target_isa = i386 -a $archive_type = xpv ]; then
-		#
-		# On i386, we want to apply the archives for both platforms
-		# (i86pc and i86xpv) if they exist.  We force the platform
-		# to i86xpv so that both will be applied.
-		#
-		karch=i86pc
-		plat=i86xpv
+	if [ $target_isa = i386 ]; then
+		if [ $archive_type = xpv ]; then
+			#
+			# On i386, we want to apply the archives for both
+			# platforms (i86pc and i86xpv) if they exist.  We
+			# force the platform to i86xpv so that both will be
+			# applied.
+			#
+			karch=i86pc
+			plat=i86xpv
+		fi
+		if [ ! -d $root/platform/i86hvm ]; then
+			mkdir $root/platform/i86hvm
+		fi
 	fi
 
 	if [ $karch != $plat -a -f ${cpiodir}/${plat}.usr$ZFIX ]; then

@@ -27,18 +27,10 @@
 #pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
-#include <sys/hypervisor.h>
-
-/*
- * XXPV grr - assembler can't deal with an instruction in a quoted string
- */
-#undef	TRAP_INSTR	/* cause it's currently "int $0x82" */
-
-#if defined(__amd64)
-#define	TRAP_INSTR	syscall
-#elif defined(__i386)
-#define	TRAP_INSTR	int $0x82
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
 #endif
+#include <sys/hypervisor.h>
 
 /*
  * Hypervisor "system calls"
@@ -124,6 +116,63 @@ __hypercall5_int(int callnum,
 { return (0); }
 
 #else	/* __lint */
+
+/*
+ * XXPV grr - assembler can't deal with an instruction in a quoted string
+ */
+#undef	TRAP_INSTR	/* cause it's currently "int $0x82" */
+
+/*
+ * The method for issuing a hypercall (i.e. a system call to the
+ * hypervisor) varies from platform to platform.  In 32-bit PV domains, an
+ * 'int 82' triggers the call.  In 64-bit PV domains, a 'syscall' does the
+ * trick.
+ *
+ * HVM domains are more complicated.  In all cases, we want to issue a
+ * VMEXIT instruction, but AMD and Intel use different opcodes to represent
+ * that instruction.  Rather than build CPU-specific modules with the
+ * different opcodes, we use the 'hypercall page' provided by Xen.  This
+ * page contains a collection of code stubs that do nothing except issue
+ * hypercalls using the proper instructions for this machine.  To keep the
+ * wrapper code as simple and efficient as possible, we preallocate that
+ * page below.  When the module is loaded, we ask Xen to remap the
+ * underlying PFN to that of the hypercall page.
+ *
+ * Note: this same mechanism could be used in PV domains, but using
+ * hypercall page requires a call and several more instructions than simply
+ * issuing the proper trap.
+ */
+#if defined(XPV_HVM_DRIVER)
+
+#define	HYPERCALL_PAGESIZE	0x1000
+	.text
+	.align	HYPERCALL_PAGESIZE
+	.globl	hypercall_page
+	.type	hypercall_page, @function
+hypercall_page:
+	.skip	HYPERCALL_PAGESIZE
+	.size	hypercall_page, HYPERCALL_PAGESIZE
+#if defined(__amd64)
+#define	TRAP_INSTR			\
+	shll	$5, %eax;		\
+	addq	$hypercall_page, %rax;	\
+	jmp	*%rax
+#else
+#define	TRAP_INSTR			\
+	shll	$5, %eax;		\
+	addl	$hypercall_page, %eax;	\
+	call	*%eax
+#endif
+
+#else /* XPV_HVM_DRIVER */
+
+#if defined(__amd64)
+#define	TRAP_INSTR	syscall
+#elif defined(__i386)
+#define	TRAP_INSTR	int $0x82
+#endif
+#endif /* XPV_HVM_DRIVER */
+
 
 #if defined(__amd64) 
 

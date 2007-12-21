@@ -78,10 +78,13 @@
 #include <sys/sunddi.h>
 #include <sys/avintr.h>
 #include <sys/cmn_err.h>
+#include <sys/mach_mmu.h>
 #include <util/sscanf.h>
 #define	_XSD_ERRORS_DEFINED
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#endif
 #include <sys/hypervisor.h>
-#include <sys/mach_mmu.h>
 #include <sys/taskq.h>
 #include <sys/sdt.h>
 #include <xen/sys/xenbus_impl.h>

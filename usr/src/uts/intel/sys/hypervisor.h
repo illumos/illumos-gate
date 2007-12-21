@@ -58,14 +58,20 @@
 extern "C" {
 #endif
 
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#else
 #include <sys/xpv_impl.h>
+#endif
 #include <sys/xen_errno.h>
 
 #if !defined(_ASM)
 
 #include <sys/processor.h>
 #include <sys/cpuvar.h>
+#ifndef XPV_HVM_DRIVER
 #include <sys/xen_mmu.h>
+#endif
 #include <sys/systm.h>
 #include <xen/public/callback.h>
 #include <xen/public/event_channel.h>
@@ -133,11 +139,20 @@ extern void xen_disable_user_iopl(void);
 /*
  * A quick way to ask if we're DOM0 or not ..
  */
+#ifdef XPV_HVM_DRIVER
+
+#define	DOMAIN_IS_INITDOMAIN(info)	(__lintzero)
+#define	DOMAIN_IS_PRIVILEGED(info)	(__lintzero)
+
+#else
+
 #define	DOMAIN_IS_INITDOMAIN(info)	\
 	(((info)->flags & SIF_INITDOMAIN) == SIF_INITDOMAIN)
 
 #define	DOMAIN_IS_PRIVILEGED(info)	\
 	(((info)->flags & SIF_PRIVILEGED) == SIF_PRIVILEGED)
+
+#endif
 
 /*
  * start of day information passed up from the hypervisor

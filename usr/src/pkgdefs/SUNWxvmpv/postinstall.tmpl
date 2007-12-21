@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -25,48 +26,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-UTSBASE = ../..
 
-#
-# include global definitions
-#
-include ../Makefile.i86xpv
+include drv_utils
 
-#
-# Override defaults.
-#
-FILEMODE = 644
-
-HDRS=  \
-	balloon.h	\
-	machprivregs.h	\
-	xen_mmu.h \
-	xpv_impl.h
-
-ROOTHDRS=	$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
-
-ROOTDIR=	$(ROOT)/usr/share/src
-ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
-
-ROOTLINK=	$(ROOTDIR)/uts/$(PLATFORM)/sys
-LINKDEST=	../../../../platform/$(PLATFORM)/include/sys
-
-CHECKHDRS=	$(HDRS:%.h=%.check)
-
-.KEEP_STATE:
-
-.PARALLEL:	$(CHECKHDRS) $(ROOTHDRS)
-
-install_h:	$(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINK)
-
-check:		$(CHECKHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir.root.bin)
-
-$(ROOTLINK):	$(ROOTDIRS)
-	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@ $(CHOWNLINK) $(CHGRPLINK)
-
-FRC:
-
-include ../../Makefile.targ
+pkg_drvadd -i "pci5853,1" -b "$BASEDIR" xpv || exit 1
+pkg_drvadd xpvd || exit 1
+pkg_drvadd xnf || exit 1

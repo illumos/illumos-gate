@@ -36,7 +36,6 @@
  */
 
 #include <sys/conf.h>
-#include <sys/hypervisor.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/modctl.h>
@@ -46,18 +45,29 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
-#include <sys/mach_intr.h>
-#include <sys/evtchn_impl.h>
 #include <sys/avintr.h>
 #include <sys/psm.h>
 #include <sys/spl.h>
 #include <sys/promif.h>
 #include <sys/list.h>
-#include <sys/xen_mmu.h>
 #include <sys/bootconf.h>
 #include <sys/bootsvcs.h>
-#include <sys/bootinfo.h>
 #include <util/sscanf.h>
+#include <sys/mach_intr.h>
+#include <sys/bootinfo.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/xpv_support.h>
+#include <sys/hypervisor.h>
+#include <sys/archsystm.h>
+#include <sys/cpu.h>
+#include <public/xen.h>
+#include <public/event_channel.h>
+#include <public/io/xenbus.h>
+#else
+#include <sys/hypervisor.h>
+#include <sys/evtchn_impl.h>
+#include <sys/xen_mmu.h>
+#endif
 #include <xen/sys/xenbus_impl.h>
 #include <xen/sys/xendev.h>
 
@@ -173,6 +183,10 @@ static ndi_event_set_t xpvd_ndi_events = {
 
 static ndi_event_hdl_t xpvd_ndi_event_handle;
 
+#ifdef XPV_HVM_DRIVER
+static int hvm_vdev_num[26];
+#endif
+
 /*
  * Hypervisor interrupt capabilities
  */
@@ -236,7 +250,16 @@ static int
 xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	extern void xvdi_watch_devices(int);
-	xpvd_dip = devi;
+
+#ifdef XPV_HVM_DRIVER
+	if (xen_info == NULL) {
+		if (ddi_hold_installed_driver(ddi_name_to_major("xpv")) ==
+		    NULL) {
+			cmn_err(CE_WARN, "Couldn't initialize xpv framework");
+			return (DDI_FAILURE);
+		}
+	}
+#endif
 
 	if (ndi_event_alloc_hdl(devi, 0, &xpvd_ndi_event_handle,
 	    NDI_SLEEP) != NDI_SUCCESS) {
@@ -256,6 +279,7 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	else
 		xvdi_watch_devices(XENSTORE_UP);
 
+	xpvd_dip = devi;
 	ddi_report_dev(devi);
 
 	return (DDI_SUCCESS);
@@ -557,6 +581,9 @@ xpvd_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	case DDI_INTROP_SETMASK:
 	case DDI_INTROP_CLRMASK:
+#ifdef XPV_HVM_DRIVER
+		return (DDI_ENOTSUP);
+#else
 		/*
 		 * Handle this here
 		 */
@@ -568,14 +595,18 @@ xpvd_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			ec_enable_irq(hdlp->ih_vector);
 		}
 		break;
-
+#endif
 	case DDI_INTROP_GETPENDING:
+#ifdef XPV_HVM_DRIVER
+		return (DDI_ENOTSUP);
+#else
 		if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
 			return (DDI_FAILURE);
 		*(int *)result = ec_pending_irq(hdlp->ih_vector);
 		DDI_INTR_NEXDBG((CE_CONT, "xpvd: GETPENDING returned = %x\n",
 		    *(int *)result));
 		break;
+#endif
 
 	case DDI_INTROP_NAVAIL:
 		*(int *)result = 1;
@@ -689,6 +720,11 @@ xpvd_name_child(dev_info_t *child, char *name, int namelen)
 	int *domain, *vdev;
 	uint_t ndomain, nvdev;
 	char *unit_address;
+	int devno;
+#ifdef XPV_HVM_DRIVER
+	char *xip;
+	int xenstore_id;
+#endif
 
 	/*
 	 * i_xpvd_parse_devname() knows the formats used by this
@@ -721,11 +757,45 @@ xpvd_name_child(dev_info_t *child, char *name, int namelen)
 
 	/*
 	 * Use "unit-address" property (frontend/softdev drivers).
+	 *
+	 * For PV domains, the disk name should be a simple number.  In an
+	 * HVM domain, it will be a string of the form hdX.  In the latter
+	 * case we convert hda to 0, hdb to 1, and so on.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
 	    DDI_PROP_DONTPASS, "unit-address", &unit_address)
 	    == DDI_PROP_SUCCESS) {
-		(void) snprintf(name, namelen, "%s", unit_address);
+		devno = -1;
+		if (unit_address[0] >= '0' && unit_address[0] <= '9')
+			(void) sscanf(unit_address, "%d", &devno);
+#ifdef XPV_HVM_DRIVER
+		/*
+		 * XXX: we should really check the device class here.  We
+		 * always want to set hvm_vdev_num[] - even if we somehow
+		 * end up with a non-hdX device name.
+		 */
+		else if (strlen(unit_address) == 3 &&
+		    unit_address[0] == 'h' && unit_address[1] == 'd') {
+			devno = unit_address[2] - 'a';
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
+			    DDI_PROP_DONTPASS, "xenstore-id", &xip)
+			    == DDI_PROP_SUCCESS) {
+				(void) sscanf(xip, "%d", &xenstore_id);
+				ddi_prop_free(xip);
+				hvm_vdev_num[devno] = xenstore_id;
+			} else {
+				devno = -1;
+			}
+		}
+#endif
+
+		if (devno < 0) {
+			cmn_err(CE_WARN, "Unrecognized device: %s",
+			    unit_address);
+			ddi_prop_free(unit_address);
+			return (DDI_FAILURE);
+		}
+		(void) snprintf(name, namelen, "%x", devno);
 		ddi_prop_free(unit_address);
 		return (DDI_SUCCESS);
 	}
@@ -846,9 +916,19 @@ i_xpvd_parse_devname(char *name, xendev_devclass_t *devclassp,
 	/* Frontend format is "<vdev>". */
 	*domp = DOMID_SELF;
 	if (sscanf(caddr, "%x", vdevp) == 1) {
+#ifdef XPV_HVM_DRIVER
+		if (*devclassp == XEN_VBLK) {
+			if (*vdevp < 0 || *vdevp > 26) {
+				*vdevp = -1;
+				goto done;
+			}
+			*vdevp = hvm_vdev_num[*vdevp];
+		}
+#endif
 		ret = B_TRUE;
 		goto done;
 	}
+
 
 done:
 	kmem_free(device_name, len);

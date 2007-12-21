@@ -94,84 +94,98 @@ typedef struct xnb_rxbuf {
 /* Per network-interface-controller driver private structure */
 struct xnb {
 	/* most interesting stuff first to assist debugging */
-	dev_info_t		*x_devinfo;	/* System per-device info. */
+	dev_info_t		*xnb_devinfo;	/* System per-device info. */
 
-	xnb_flavour_t		*x_flavour;
-	void			*x_flavour_data;
+	xnb_flavour_t		*xnb_flavour;
+	void			*xnb_flavour_data;
 
-	boolean_t		x_irq;
-	unsigned char		x_mac_addr[ETHERADDRL];
+	boolean_t		xnb_irq;
+	unsigned char		xnb_mac_addr[ETHERADDRL];
 
-	uint64_t		x_stat_ipackets;
-	uint64_t		x_stat_opackets;
-	uint64_t		x_stat_rbytes;
-	uint64_t		x_stat_obytes;
+	uint64_t		xnb_stat_ipackets;
+	uint64_t		xnb_stat_opackets;
+	uint64_t		xnb_stat_rbytes;
+	uint64_t		xnb_stat_obytes;
 
-	uint64_t		x_stat_intr;
-	uint64_t		x_stat_xmit_defer;
+	uint64_t		xnb_stat_intr;
+	uint64_t		xnb_stat_xmit_defer;
 
-	uint64_t		x_stat_tx_cksum_deferred;
-	uint64_t		x_stat_rx_cksum_no_need;
+	uint64_t		xnb_stat_tx_cksum_deferred;
+	uint64_t		xnb_stat_rx_cksum_no_need;
 
-	uint64_t		x_stat_tx_notify_sent;
-	uint64_t		x_stat_tx_notify_deferred;
+	uint64_t		xnb_stat_tx_notify_sent;
+	uint64_t		xnb_stat_tx_notify_deferred;
 
-	uint64_t		x_stat_rx_notify_sent;
-	uint64_t		x_stat_rx_notify_deferred;
+	uint64_t		xnb_stat_rx_notify_sent;
+	uint64_t		xnb_stat_rx_notify_deferred;
 
-	uint64_t		x_stat_tx_too_early;
-	uint64_t		x_stat_rx_too_early;
-	uint64_t		x_stat_rx_allocb_failed;
-	uint64_t		x_stat_mac_full;
-	uint64_t		x_stat_spurious_intr;
-	uint64_t		x_stat_allocation_success;
-	uint64_t		x_stat_allocation_failure;
-	uint64_t		x_stat_small_allocation_success;
-	uint64_t		x_stat_small_allocation_failure;
+	uint64_t		xnb_stat_tx_too_early;
+	uint64_t		xnb_stat_rx_too_early;
+	uint64_t		xnb_stat_rx_allocb_failed;
+	uint64_t		xnb_stat_tx_allocb_failed;
+	uint64_t		xnb_stat_tx_foreign_page;
+	uint64_t		xnb_stat_mac_full;
+	uint64_t		xnb_stat_spurious_intr;
+	uint64_t		xnb_stat_allocation_success;
+	uint64_t		xnb_stat_allocation_failure;
+	uint64_t		xnb_stat_small_allocation_success;
+	uint64_t		xnb_stat_small_allocation_failure;
+	uint64_t		xnb_stat_other_allocation_failure;
 
-	uint64_t		x_stat_csum_hardware;
-	uint64_t		x_stat_csum_software;
+	uint64_t		xnb_stat_tx_pagebndry_crossed;
+	uint64_t		xnb_stat_tx_cpoparea_grown;
 
-	kstat_t			*x_kstat_aux;
+	uint64_t		xnb_stat_csum_hardware;
+	uint64_t		xnb_stat_csum_software;
 
-	boolean_t		x_cksum_offload;
+	kstat_t			*xnb_kstat_aux;
 
-	ddi_iblock_cookie_t	x_icookie;
+	boolean_t		xnb_cksum_offload;
 
-	kmutex_t		x_rx_lock;
-	kmutex_t		x_tx_lock;
+	ddi_iblock_cookie_t	xnb_icookie;
 
-	int			x_rx_unmop_count;
-	int			x_rx_buf_count;
-	boolean_t		x_rx_pages_writable;
+	kmutex_t		xnb_rx_lock;
+	kmutex_t		xnb_tx_lock;
 
-	netif_rx_back_ring_t	x_rx_ring;	/* rx interface struct ptr */
-	void			*x_rx_ring_addr;
-	grant_ref_t		x_rx_ring_ref;
-	grant_handle_t		x_rx_ring_handle;
+	int			xnb_rx_unmop_count;
+	int			xnb_rx_buf_count;
+	boolean_t		xnb_rx_pages_writable;
 
-	netif_tx_back_ring_t	x_tx_ring;	/* tx interface struct ptr */
-	void			*x_tx_ring_addr;
-	grant_ref_t		x_tx_ring_ref;
-	grant_handle_t		x_tx_ring_handle;
+	netif_rx_back_ring_t	xnb_rx_ring;	/* rx interface struct ptr */
+	void			*xnb_rx_ring_addr;
+	grant_ref_t		xnb_rx_ring_ref;
+	grant_handle_t		xnb_rx_ring_handle;
 
-	boolean_t		x_connected;
-	boolean_t		x_hotplugged;
-	boolean_t		x_detachable;
-	int			x_evtchn;	/* channel to front end */
-	domid_t			x_peer;
+	netif_tx_back_ring_t	xnb_tx_ring;	/* tx interface struct ptr */
+	void			*xnb_tx_ring_addr;
+	grant_ref_t		xnb_tx_ring_ref;
+	grant_handle_t		xnb_tx_ring_handle;
 
-	xnb_rxbuf_t			*x_rx_bufp[NET_TX_RING_SIZE];
-	gnttab_map_grant_ref_t		x_rx_mop[NET_TX_RING_SIZE];
-	gnttab_unmap_grant_ref_t	x_rx_unmop[NET_TX_RING_SIZE];
+	boolean_t		xnb_connected;
+	boolean_t		xnb_hotplugged;
+	boolean_t		xnb_detachable;
+	int			xnb_evtchn;	/* channel to front end */
+	domid_t			xnb_peer;
 
-	caddr_t			x_tx_va;
-	gnttab_transfer_t	x_tx_top[NET_RX_RING_SIZE];
+	xnb_rxbuf_t			*xnb_rx_bufp[NET_TX_RING_SIZE];
+	gnttab_map_grant_ref_t		xnb_rx_mop[NET_TX_RING_SIZE];
+	gnttab_unmap_grant_ref_t	xnb_rx_unmop[NET_TX_RING_SIZE];
+
+	/* store information for unmop */
+	xnb_rxbuf_t		*xnb_rx_unmop_rxp[NET_TX_RING_SIZE];
+
+	caddr_t			xnb_tx_va;
+	gnttab_transfer_t	xnb_tx_top[NET_RX_RING_SIZE];
+
+	boolean_t		xnb_hv_copy;	/* do we do hypervisor copy? */
+	gnttab_copy_t		*xnb_tx_cpop;
+#define	CPOP_DEFCNT 	8
+	size_t			xnb_cpop_sz; 	/* in elements, not bytes */
 };
 
 extern int xnb_attach(dev_info_t *, xnb_flavour_t *, void *);
 extern void xnb_detach(dev_info_t *);
-extern mblk_t *xnb_to_peer(xnb_t *, mblk_t *);
+extern mblk_t *xnb_copy_to_peer(xnb_t *, mblk_t *);
 extern mblk_t *xnb_process_cksum_flags(xnb_t *, mblk_t *, uint32_t);
 
 #ifdef __cplusplus

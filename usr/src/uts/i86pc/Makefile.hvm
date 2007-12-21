@@ -1,0 +1,67 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# uts/i86pc/Makefile.hvm
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	This makefile provides support for building PV drivers that run
+#	in an HVM environment.
+#
+
+ROOT_HVM_DIR		= $(ROOT)/platform/i86hvm
+ROOT_HVM_MOD_DIR	= $(ROOT_HVM_DIR)/kernel
+ROOT_HVM_DRV_DIR_32	= $(ROOT_HVM_MOD_DIR)/drv
+ROOT_HVM_DRV_DIR_64	= $(ROOT_HVM_MOD_DIR)/drv/$(MACH64)
+ROOT_HVM_DRV_DIR	= $(ROOT_HVM_DRV_DIR_$(CLASS))
+USR_HVM_DIR		= $(ROOT)/usr/platform/i86hvm
+
+#
+# Indicate that we are building for the i86hvm semi-platform
+#
+CPPFLAGS	+= -DXPV_HVM_DRIVER
+ASFLAGS		+= -DXPV_HVM_DRIVER
+
+#
+#	Installation targets and rules:
+#
+$(ROOT_HVM_DIR):
+	-$(INS.dir.root.sys)
+
+$(ROOT_HVM_MOD_DIR):		$(ROOT_HVM_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_HVM_DRV_DIR):		$(ROOT_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_HVM_MOD_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MOD_DIR) FRC
+	$(INS.file)
+
+$(ROOT_HVM_DRV_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_DRV_DIR) FRC
+	$(INS.file)
+
+$(USR_HVM_DIR):
+	-$(INS.dir.root.sys)
+
+INSTALL_DEPS += $(ROOT_HVM_DIR) $(USR_HVM_DIR)

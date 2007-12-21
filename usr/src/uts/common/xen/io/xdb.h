@@ -34,19 +34,6 @@
 extern "C" {
 #endif
 
-#include <sys/types.h>
-#include <sys/conf.h>
-#include <sys/ddi.h>
-#include <sys/dditypes.h>
-#include <sys/sunddi.h>
-#include <sys/sunldi.h>
-#include <sys/modctl.h>
-#include <vm/seg_kmem.h>
-#include <sys/gnttab.h>
-#include <xen/sys/xenbus_impl.h>
-#include <xen/sys/xendev.h>
-#include "xdf.h"
-
 #define	XDB_DBG_ALL	0xf
 #define	XDB_DBG_IO	0x1
 #define	XDB_DBG_INFO	0x2

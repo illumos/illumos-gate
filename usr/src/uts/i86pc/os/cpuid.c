@@ -564,6 +564,34 @@ cpuid_free_space(cpu_t *cpu)
 	kmem_free(cpu->cpu_m.mcpu_cpi, sizeof (*cpu->cpu_m.mcpu_cpi));
 }
 
+#if !defined(__xpv)
+
+static void
+check_for_hvm()
+{
+	struct cpuid_regs cp;
+	char *xen_str;
+	uint32_t xen_signature[4];
+	extern int xpv_is_hvm;
+
+	/*
+	 * In a fully virtualized domain, Xen's pseudo-cpuid function
+	 * 0x40000000 returns a string representing the Xen signature in
+	 * %ebx, %ecx, and %edx.  %eax contains the maximum supported cpuid
+	 * function.
+	 */
+	cp.cp_eax = 0x40000000;
+	(void) __cpuid_insn(&cp);
+	xen_signature[0] = cp.cp_ebx;
+	xen_signature[1] = cp.cp_ecx;
+	xen_signature[2] = cp.cp_edx;
+	xen_signature[3] = 0;
+	xen_str = (char *)xen_signature;
+	if (strcmp("XenVMMXenVMM", xen_str) == 0 && cp.cp_eax <= 0x40000002)
+		xpv_is_hvm = 1;
+}
+#endif	/* __xpv */
+
 uint_t
 cpuid_pass1(cpu_t *cpu)
 {
@@ -1227,6 +1255,9 @@ cpuid_pass1(cpu_t *cpu)
 	synth_info(cpi);
 
 pass1_done:
+#if !defined(__xpv)
+	check_for_hvm();
+#endif
 	cpi->cpi_pass = 1;
 	return (feature);
 }
@@ -3674,7 +3705,6 @@ void
 patch_tsc_read(int flag)
 {
 	size_t cnt;
-
 	switch (flag) {
 	case X86_NO_TSC:
 		cnt = &_no_rdtsc_end - &_no_rdtsc_start;

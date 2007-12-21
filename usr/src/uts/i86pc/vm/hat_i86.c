@@ -326,7 +326,6 @@ hat_alloc(struct as *as)
 	}
 
 init_done:
-	XPV_ALLOW_MIGRATE();
 
 #if defined(__xpv)
 	/*
@@ -337,6 +336,7 @@ init_done:
 	xen_pin(hat->hat_user_ptable, mmu.max_level);
 #endif
 #endif
+	XPV_ALLOW_MIGRATE();
 
 	/*
 	 * Put it at the start of the global list of all hats (used by stealing)
@@ -3815,6 +3815,7 @@ hat_mempte_setup(caddr_t addr)
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(!IN_VA_HOLE(va));
 	++curthread->t_hatdepth;
+	XPV_DISALLOW_MIGRATE();
 	ht = htable_getpte(kas.a_hat, va, &entry, &oldpte, 0);
 	if (ht == NULL) {
 		ht = htable_create(kas.a_hat, va, 0, NULL);
@@ -3835,6 +3836,7 @@ hat_mempte_setup(caddr_t addr)
 	 * return the PTE physical address to the caller.
 	 */
 	htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 	p = PT_INDEX_PHYSADDR(pfn_to_pa(ht->ht_pfn), entry);
 	--curthread->t_hatdepth;
 	return (p);
@@ -3850,6 +3852,7 @@ hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 {
 	htable_t	*ht;
 
+	XPV_DISALLOW_MIGRATE();
 	/*
 	 * invalidate any left over mapping and decrement the htable valid count
 	 */
@@ -3878,6 +3881,7 @@ hat_mempte_release(caddr_t addr, hat_mempte_t pte_pa)
 	ASSERT(ht->ht_level == 0);
 	HTABLE_DEC(ht->ht_valid_cnt);
 	htable_release(ht);
+	XPV_ALLOW_MIGRATE();
 }
 
 /*
@@ -4266,7 +4270,9 @@ void
 hat_prepare_mapping(hat_t *hat, caddr_t addr)
 {
 	ASSERT(IS_P2ALIGNED((uintptr_t)addr, MMU_PAGESIZE));
+	XPV_DISALLOW_MIGRATE();
 	(void) htable_create(hat, (uintptr_t)addr, 0, NULL);
+	XPV_ALLOW_MIGRATE();
 }
 
 void
@@ -4275,10 +4281,12 @@ hat_release_mapping(hat_t *hat, caddr_t addr)
 	htable_t *ht;
 
 	ASSERT(IS_P2ALIGNED((uintptr_t)addr, MMU_PAGESIZE));
+	XPV_DISALLOW_MIGRATE();
 	ht = htable_lookup(hat, (uintptr_t)addr, 0);
 	ASSERT(ht != NULL);
 	ASSERT(ht->ht_busy >= 2);
 	htable_release(ht);
 	htable_release(ht);
-}
+	XPV_ALLOW_MIGRATE();
+									}
 #endif

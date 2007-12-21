@@ -59,12 +59,18 @@
 #include <sys/types.h>
 #include <vm/hat.h>
 #include <vm/as.h>
-#include <sys/bootinfo.h>
 #include <sys/bootconf.h>
-#include <vm/kboot_mmu.h>
 #include <vm/seg_kmem.h>
+#ifdef XPV_HVM_DRIVER
+#include <sys/pc_mmu.h>
+#include <sys/xpv_support.h>
+#include <sys/hypervisor.h>
+#else
+#include <vm/kboot_mmu.h>
+#include <sys/bootinfo.h>
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
+#endif
 #include <sys/condvar.h>
 #include <sys/mutex.h>
 #include <sys/atomic.h>
@@ -240,10 +246,19 @@ xb_suspend(void)
 void
 xb_setup_intr(void)
 {
+#ifdef XPV_HVM_DRIVER
+	ec_bind_evtchn_to_handler(xen_info->store_evtchn, IPL_XENBUS,
+	    xenbus_intr, NULL);
+#else
 	xenbus_irq = ec_bind_evtchn_to_irq(xen_info->store_evtchn);
+	if (xenbus_irq < 0) {
+		cmn_err(CE_WARN, "Couldn't bind xenbus event channel");
+		return;
+	}
 	if (!add_avintr(NULL, IPL_XENBUS, (avfunc)xenbus_intr, "xenbus",
 	    xenbus_irq, NULL, NULL, NULL, NULL))
 		cmn_err(CE_WARN, "XENBUS add intr failed\n");
+#endif
 }
 
 /*

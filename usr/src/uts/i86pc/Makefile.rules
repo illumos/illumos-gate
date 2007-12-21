@@ -110,6 +110,13 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/tzmon/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xpv/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xpv/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -145,6 +152,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/xen/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xsvc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -176,6 +191,9 @@ $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
 
 $(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/dboot/%.c
 	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
+
+$(DBOOT_OBJS_DIR)/%.o:		$(UTSBASE)/intel/ia32/%.s
+	$(DBOOT_AS) -P -D_ASM $(DBOOT_DEFS) $(DBOOT_AS_INCL) -o $@ $<
 
 $(DBOOT_OBJS_DIR)/%.o:		$(COMMONBASE)/util/%.c
 	$(i386_CC) $(CERRWARN) -O $(DBOOT_DEFS) $(DBOOT_CC_INCL) -c -o $@ $<
@@ -286,6 +304,12 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.s
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/tzmon/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xpv/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/xpv/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
@@ -314,6 +338,12 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/xen/os/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
@@ -346,4 +376,3 @@ $(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/%.c
 
 $(DBOOT_LINTS_DIR)/%.ln: $(COMMONBASE)/util/i386/%.s
 	@($(LHEAD) $(DBOOT_LINT) $(DBOOT_LOCAL_LINTFLAGS) $< $(LTAIL))
-

@@ -105,6 +105,9 @@ mlsetup(struct regs *rp)
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
 	int boot_ncpus;
+#if !defined(__xpv)
+	extern int xpv_is_hvm;
+#endif
 
 	ASSERT_STACK_ALIGNED();
 
@@ -176,8 +179,11 @@ mlsetup(struct regs *rp)
 	 * Note: tsc_read is not patched for x86 processors which do
 	 * not support "mfence". By default tsc_read will use cpuid for
 	 * serialization in such cases.
+	 *
+	 * The Xen hypervisor does not correctly report whether rdtscp is
+	 * supported or not, so we must assume that it is not.
 	 */
-	if (x86_feature & X86_TSCP)
+	if (xpv_is_hvm == 0 && (x86_feature & X86_TSCP))
 		patch_tsc_read(X86_HAVE_TSCP);
 	else if (cpuid_getvendor(CPU) == X86_VENDOR_AMD &&
 	    cpuid_getfamily(CPU) <= 0xf && (x86_feature & X86_SSE2) != 0)

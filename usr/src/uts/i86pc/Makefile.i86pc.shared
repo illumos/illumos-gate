@@ -253,6 +253,9 @@ DRV_KMODS	+= xsvc
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= tzmon
 DRV_KMODS	+= battery
+DRV_KMODS	+= xnf
+DRV_KMODS	+= xpv
+DRV_KMODS	+= xpvd
 
 DRV_KMODS	+= cpudrv
 

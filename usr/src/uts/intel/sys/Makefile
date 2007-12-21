@@ -47,6 +47,7 @@ HDRS	=			\
 	fp.h			\
 	frame.h			\
 	inline.h		\
+	hypervisor.h		\
 	kd.h			\
 	kdi_machimpl.h		\
 	kdi_regs.h		\
@@ -92,7 +93,8 @@ HDRS	=			\
 	ucontext.h		\
 	utrap.h			\
 	vmparam.h		\
-	x86_archext.h
+	x86_archext.h		\
+	xen_errno.h
 
 CLOSEDHDRS = \
 	memtest.h \
