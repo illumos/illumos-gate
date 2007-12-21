@@ -520,6 +520,22 @@ pk_export_pk11_keys(KMF_HANDLE_T kmfhandle, char *token,
 	numattr++;
 
 	rv = kmf_find_key(kmfhandle, numattr, attrlist);
+	/*
+	 * If nothing found but caller wanted ALL keys, try symmetric
+	 * this time.
+	 */
+	if (rv == KMF_ERR_KEY_NOT_FOUND && (oclass == PK_KEY_OBJ)) {
+		kclass = KMF_SYMMETRIC;
+		rv = kmf_find_key(kmfhandle, numattr, attrlist);
+	}
+	/*
+	 * If nothing found but caller wanted ALL keys, try asymmetric
+	 * public this time.
+	 */
+	if (rv == KMF_ERR_KEY_NOT_FOUND && (oclass == PK_KEY_OBJ)) {
+		kclass = KMF_ASYM_PUB;
+		rv = kmf_find_key(kmfhandle, numattr, attrlist);
+	}
 	if (rv == KMF_OK && key.keyclass == KMF_SYMMETRIC) {
 		KMF_RAW_SYM_KEY rkey;
 
