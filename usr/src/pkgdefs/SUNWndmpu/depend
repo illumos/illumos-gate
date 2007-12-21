@@ -49,4 +49,5 @@ P SUNWcnetr	Core Solaris Network Infrastructure (Root)
 P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
+P SUNWzfsr	ZFS (Root)
 P SUNWndmpr	NDMP (Root)
