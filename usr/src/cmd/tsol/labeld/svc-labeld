@@ -50,19 +50,31 @@ if smf_is_nonglobalzone; then
 	exit $SMF_EXIT_ERR_CONFIG
 fi
 
+rewrite_logindev()
+{
+	from="$1"
+	to="$2"
+	# Comment out audio, usb, removable-media, and hotpluggable device
+	# entries in /etc/logindevperm.
+	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
+	if [ ! -f $LOGINDEVPERM ]; then
+		return
+	fi
+	for line in \
+		"/dev/console	0600	/dev/sound/" \
+		"/dev/console	0400	/dev/removable-media/" \
+		"/dev/console	0400	/dev/hotpluggable/" \
+		"/dev/console	0600	/dev/usb/\[0-9a-f\]" \
+			; do
+		sed -e "s!^$from$line!$to$line!" $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+	done
+	rm -f /tmp/tmp.$$
+}
+
 do_logindev()
 {
-	# Comment out audio and usb device entries in /etc/logindevperm.
-	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
-	if [ -f $LOGINDEVPERM ]; then
-		line="\/dev\/console	0600	\/dev\/sound\/\*"
-		sed -e "s/^$line/#$line/" $LOGINDEVPERM > /tmp/tmp.$$
-		cp /tmp/tmp.$$ $LOGINDEVPERM
-		line="\/dev\/console	0600	\/dev\/usb\/\[0-9a-f\]+\[.\]\[0-9a-f\]+\/\[0-9\]+\/\*"
-		sed -e "s/^$line/#$line/" $LOGINDEVPERM > /tmp/tmp.$$
-		cp /tmp/tmp.$$ $LOGINDEVPERM
-		rm -f /tmp/tmp.$$
-	fi
+	rewrite_logindev "" "#"
 }
 
 do_otherservices()
@@ -353,17 +365,9 @@ __TRUSTED_ENABLE
 	/usr/sbin/svcadm disable svc:/system/tsol-zones:default 2>/dev/null
 	/usr/sbin/svcadm disable svc:/network/tnd:default 2>/dev/null
 
-	# Uncomment audio and usb device entries in /etc/logindevperm.
-	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
-	if [ -f $LOGINDEVPERM ]; then
-		line="\/dev\/console	0600	\/dev\/sound\/\*"
-		sed -e "s/^#$line/$line/" $LOGINDEVPERM > /tmp/tmp.$$
-		cp /tmp/tmp.$$ $LOGINDEVPERM
-		line="\/dev\/console	0600	\/dev\/usb\/\[0-9a-f\]+\[.\]\[0-9a-f\]+\/\[0-9\]+\/\*"
-		sed -e "s/^#$line/$line/" $LOGINDEVPERM > /tmp/tmp.$$
-		cp /tmp/tmp.$$ $LOGINDEVPERM
-		rm -f /tmp/tmp.$$
-	fi
+	# Uncomment audio, usb, removable-media, and hotpluggable device
+	# entries in /etc/logindevperm.
+	rewrite_logindev "#" ""
 
 	# Remove sys_labeling from /etc/system
 	grep -v "sys_labeling" ${ROOT_PATH}/etc/system > /tmp/etc.system.$$

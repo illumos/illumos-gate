@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <string.h>
 #include <bsm/audit_uevents.h>
 #include <generic.h>
+#include <stdlib.h>
 
 static int s_audit;	/* successful audit event */
 static int f_audit;	/* failure audit event */
@@ -158,7 +159,7 @@ void
 audit_allocate_list(list)
 	char *list;
 {
-	char buf[1024];
+	char *buf;
 	char *file;
 	char *last;
 
@@ -166,9 +167,12 @@ audit_allocate_list(list)
 		return;
 	}
 
-	(void) strcpy(buf, list);
+	if ((buf = strdup(list)) == NULL)
+		return;
 
 	for (file = strtok_r(buf, " ", &last); file;
 	    file = strtok_r(NULL, " ", &last))
 		(void) au_write(ad, au_to_path(file));
+
+	free(buf);
 }
