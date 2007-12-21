@@ -2578,6 +2578,7 @@ if_report(mib_item_t *item, char *matchname,
 	int			jtemp = 0;
 	uint32_t		ifindex_v4 = 0;
 	uint32_t		ifindex_v6 = 0;
+	boolean_t		first_header = B_TRUE;
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
@@ -2652,6 +2653,9 @@ if_report(mib_item_t *item, char *matchname,
 						    kstat_named_value(ksp,
 						    "collisions");
 						if (first) {
+							if (!first_header)
+							(void) putchar('\n');
+							first_header = B_FALSE;
 						(void) printf(
 						    "%-5.5s %-5.5s%-13.13s "
 						    "%-14.14s %-6.6s %-5.5s "
@@ -2661,7 +2665,8 @@ if_report(mib_item_t *item, char *matchname,
 						    "Address", "Ipkts",
 						    "Ierrs", "Opkts", "Oerrs",
 						    "Collis", "Queue");
-						first = B_FALSE;
+
+						    first = B_FALSE;
 						}
 						if_report_ip4(ap, ifname,
 						    logintname, &stat, B_TRUE);
@@ -2671,8 +2676,6 @@ if_report(mib_item_t *item, char *matchname,
 						    logintname, &stat, B_FALSE);
 					}
 				} /* 'for' loop 2a ends */
-				if (!first)
-					(void) putchar('\n');
 			} else if (!alreadydone) {
 				char    ifname[LIFNAMSIZ + 1];
 				char    buf[LIFNAMSIZ + 1];
@@ -2944,6 +2947,9 @@ if_report(mib_item_t *item, char *matchname,
 						    kstat_named_value(ksp,
 						    "collisions");
 						if (first) {
+							if (!first_header)
+							(void) putchar('\n');
+							first_header = B_FALSE;
 							(void) printf(
 							    "%-5.5s %-5.5s%"
 							    "-27.27s %-27.27s "
@@ -2965,8 +2971,6 @@ if_report(mib_item_t *item, char *matchname,
 						    logintname, &stat, B_FALSE);
 					}
 				} /* 'for' loop 2d ends */
-				if (!first)
-					(void) putchar('\n');
 			} else if (!alreadydone) {
 				char    ifname[LIFNAMSIZ + 1];
 				char    buf[IFNAMSIZ + 1];
@@ -3180,10 +3184,10 @@ if_report(mib_item_t *item, char *matchname,
 			break;
 		}
 		}
-		if (Iflag_only == 0)
-		    (void) putchar('\n');
 		(void) fflush(stdout);
 	} /* 'for' loop 1 ends */
+	if ((Iflag_only == 0) && (!once_only))
+		(void) putchar('\n');
 	reentry = B_TRUE;
 }
 
