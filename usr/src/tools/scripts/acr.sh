@@ -374,8 +374,10 @@ fi
 
 echo
 
+# workaround for 6644920
+BIN=bin
 cr_args=${root:+ -R $root}
 LD_LIBRARY_PATH=/tmp/bfulib PATH=/tmp/bfubin \
-    /tmp/bfubin/ksh $root/boot/solaris/bin/create_ramdisk $cr_args
+    /tmp/bfubin/ksh $root/boot/solaris/$BIN/create_ramdisk $cr_args
 
 print "Finished.  See $allresults for complete log."
