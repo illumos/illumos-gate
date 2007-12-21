@@ -144,8 +144,7 @@ dls_vlan_fini(void)
  */
 
 int
-dls_vlan_create(const char *vlanname, const char *macname, uint_t ddi_instance,
-    uint16_t vid)
+dls_vlan_create(const char *vlanname, const char *macname, uint16_t vid)
 {
 	dls_link_t	*dlp;
 	dls_vlan_t	*dvp;
@@ -168,7 +167,7 @@ dls_vlan_create(const char *vlanname, const char *macname, uint_t ddi_instance,
 	 * Get a reference to a dls_link_t representing the MAC. This call
 	 * will create one if necessary.
 	 */
-	if ((err = dls_link_hold(macname, ddi_instance, &dlp)) != 0)
+	if ((err = dls_link_hold(macname, &dlp)) != 0)
 		return (err);
 
 	/*
@@ -262,7 +261,7 @@ dls_vlan_hold(const char *name, dls_vlan_t **dvpp, boolean_t create_vlan)
 	dls_link_t	*dlp;
 	boolean_t	vlan_created = B_FALSE;
 	uint16_t	vid;
-	uint_t		ddi_inst;
+	uint_t		mac_ppa;
 
 again:
 	rw_enter(&i_dls_vlan_lock, RW_WRITER);
@@ -271,7 +270,7 @@ again:
 	    (mod_hash_val_t *)&dvp);
 	if (err != 0) {
 		char		mac[MAXNAMELEN];
-		uint_t		index, mac_ppa, len;
+		uint_t		index, len;
 
 		ASSERT(err == MH_ERR_NOTFOUND);
 
@@ -295,17 +294,13 @@ again:
 		}
 
 		mac_ppa = (uint_t)DLS_PPA2INST(index);
-		if (strcmp(mac, "aggr") == 0)
-			ddi_inst = 0;
-		else
-			ddi_inst = mac_ppa;
 
 		len = strlen(mac);
 		ASSERT(len < MAXNAMELEN);
 		(void) snprintf(mac + len, MAXNAMELEN - len, "%d", mac_ppa);
 		rw_exit(&i_dls_vlan_lock);
 
-		if ((err = dls_vlan_create(name, mac, ddi_inst, vid)) != 0) {
+		if ((err = dls_vlan_create(name, mac, vid)) != 0) {
 			rw_enter(&i_dls_vlan_lock, RW_WRITER);
 			goto done;
 		}
@@ -329,7 +324,7 @@ again:
 	if (vid != 0 && vlan_created) {
 		/* A tagged VLAN */
 		dvp->dv_minor = dls_minor_hold(B_TRUE);
-		dvp->dv_ppa = DLS_VIDINST2PPA(vid, ddi_inst);
+		dvp->dv_ppa = DLS_VIDINST2PPA(vid, mac_ppa);
 
 		err = mod_hash_insert(i_dls_vlan_dev_hash,
 		    (mod_hash_key_t)(uintptr_t)dvp->dv_minor,

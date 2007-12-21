@@ -69,7 +69,7 @@ extern "C" {
 
 #ifdef	_KERNEL
 
-extern int	dls_create(const char *, const char *, uint_t);
+extern int	dls_create(const char *, const char *);
 extern int	dls_destroy(const char *);
 
 typedef	struct dls_t	*dls_channel_t;

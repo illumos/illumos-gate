@@ -241,8 +241,6 @@ static boolean_t
 xnbo_open_mac(xnb_t *xnbp, char *mac)
 {
 	xnbo_t *xnbop = xnbp->x_flavour_data;
-	char drv[LIFNAMSIZ];
-	uint_t ddi_instance;
 	int err, need_rx_filter, need_setphysaddr, need_promiscuous;
 	const mac_info_t *mi;
 	char *xsname;
@@ -250,13 +248,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 
 	xsname = xvdi_get_xsname(xnbp->x_devinfo);
 
-	if (ddi_parse(mac, drv, &ddi_instance) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "xnbo_hotplug: "
-		    "invalid device name %s", mac);
-		return (B_FALSE);
-	}
-
-	if ((err = mac_open(mac, ddi_instance, &xnbop->o_mh)) != 0) {
+	if ((err = mac_open(mac, &xnbop->o_mh)) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "cannot open mac device %s (%d)", mac, err);
 		return (B_FALSE);

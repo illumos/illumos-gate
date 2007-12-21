@@ -52,7 +52,6 @@ typedef	struct dls_link_s	dls_link_t;
 
 struct dls_link_s {
 	char			dl_name[MAXNAMELEN];
-	uint_t			dl_ddi_instance;
 	mac_handle_t		dl_mh;
 	const mac_info_t	*dl_mip;
 	mac_rx_handle_t		dl_mrh;
@@ -62,7 +61,6 @@ struct dls_link_s {
 	mod_hash_t		*dl_impl_hash;
 	krwlock_t		dl_impl_lock;
 	uint_t			dl_impl_count;
-	mac_txloop_t		dl_txloop;
 	kmutex_t		dl_promisc_lock;
 	uint_t			dl_npromisc;
 	uint_t			dl_nactive;
@@ -118,7 +116,7 @@ struct dls_head_s {
 
 extern void		dls_link_init(void);
 extern int		dls_link_fini(void);
-extern int		dls_link_hold(const char *, uint_t, dls_link_t **);
+extern int		dls_link_hold(const char *, dls_link_t **);
 extern void		dls_link_rele(dls_link_t *);
 extern void		dls_link_add(dls_link_t *, uint32_t, dls_impl_t *);
 extern void		dls_link_remove(dls_link_t *, dls_impl_t *);
@@ -132,8 +130,7 @@ extern void		dls_mac_stat_destroy(dls_vlan_t *);
 
 extern void		dls_vlan_init(void);
 extern int		dls_vlan_fini(void);
-extern int		dls_vlan_create(const char *, const char *, uint_t,
-    uint16_t);
+extern int		dls_vlan_create(const char *, const char *, uint16_t);
 extern int		dls_vlan_destroy(const char *);
 extern int		dls_vlan_hold(const char *, dls_vlan_t **, boolean_t);
 extern void		dls_vlan_rele(dls_vlan_t *);
@@ -150,6 +147,7 @@ extern void		dls_vlan_remove_impl(dls_vlan_t *, dls_impl_t *);
 
 extern void		dls_init(void);
 extern int		dls_fini(void);
+extern void		dls_link_txloop(void *, mblk_t *);
 extern boolean_t	dls_accept(dls_impl_t *, mac_header_info_t *,
     dls_rx_t *, void **);
 extern boolean_t	dls_accept_loopback(dls_impl_t *, mac_header_info_t *,

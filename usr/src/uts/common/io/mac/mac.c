@@ -380,10 +380,10 @@ mac_fini(void)
  */
 
 int
-mac_open(const char *macname, uint_t ddi_instance, mac_handle_t *mhp)
+mac_open(const char *macname, mac_handle_t *mhp)
 {
 	char		driver[MAXNAMELEN];
-	uint_t		instance;
+	uint_t		ddi_instance;
 	major_t		major;
 	dev_info_t	*dip;
 	mac_impl_t	*mip;
@@ -399,7 +399,7 @@ mac_open(const char *macname, uint_t ddi_instance, mac_handle_t *mhp)
 	/*
 	 * Split the device name into driver and instance components.
 	 */
-	if (ddi_parse(macname, driver, &instance) != DDI_SUCCESS)
+	if (ddi_parse(macname, driver, &ddi_instance) != DDI_SUCCESS)
 		return (EINVAL);
 
 	if ((strcmp(driver, "aggr") == 0) || (strcmp(driver, "vnic") == 0))
@@ -1422,8 +1422,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 * Create a link for this MAC.  The link name will be the same as
 	 * the MAC name.
 	 */
-	err = dls_create(mip->mi_name, mip->mi_name,
-	    ddi_get_instance(mip->mi_dip));
+	err = dls_create(mip->mi_name, mip->mi_name);
 	if (err != 0)
 		goto fail;
 

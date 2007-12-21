@@ -135,15 +135,10 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 	uint16_t portid;
 	uint_t i;
 	const mac_info_t *mip;
-	char driver[MAXNAMELEN];
-	uint_t ddi_instance;
 
 	*pp = NULL;
 
-	if (ddi_parse(name, driver, &ddi_instance) != DDI_SUCCESS)
-		return (EINVAL);
-
-	if ((err = mac_open(name, ddi_instance, &mh)) != 0)
+	if ((err = mac_open(name, &mh)) != 0)
 		return (err);
 
 	mip = mac_info(mh);

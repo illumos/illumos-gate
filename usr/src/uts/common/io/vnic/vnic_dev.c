@@ -200,14 +200,9 @@ vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
 	char *str_key;
 	int err;
 	vnic_mac_t *vnic_mac = NULL;
-	char driver[MAXNAMELEN];
-	uint_t ddi_instance;
 	const mac_info_t *mip;
 
 	*vmp = NULL;
-
-	if (ddi_parse(dev_name, driver, &ddi_instance) != DDI_SUCCESS)
-		return (EINVAL);
 
 	mutex_enter(&vnic_mac_lock);
 
@@ -223,7 +218,7 @@ vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
 
 	vnic_mac = kmem_cache_alloc(vnic_mac_cache, KM_SLEEP);
 
-	if ((err = mac_open(dev_name, ddi_instance, &vnic_mac->va_mh)) != 0) {
+	if ((err = mac_open(dev_name, &vnic_mac->va_mh)) != 0) {
 		vnic_mac->va_mh = NULL;
 		goto bail;
 	}
@@ -1353,7 +1348,7 @@ vnic_info(uint_t *nvnics, uint32_t vnic_id, char *dev_name, void *fn_arg,
 	mod_hash_walk(vnic_hash, vnic_info_walker, &state);
 
 	if ((rc = state.vs_rc) == 0 && vnic_id != 0 &&
-	    state.vs_vnic_found)
+	    !state.vs_vnic_found)
 		rc = ENOENT;
 
 	rw_exit(&vnic_lock);

@@ -314,8 +314,6 @@ vsw_unset_addrs(vsw_t *vswp)
 int
 vsw_mac_open(vsw_t *vswp)
 {
-	char	drv[LIFNAMSIZ];
-	uint_t	ddi_instance;
 	int	rv;
 
 	ASSERT(MUTEX_HELD(&vswp->mac_lock));
@@ -330,24 +328,7 @@ vsw_mac_open(vsw_t *vswp)
 		return (EIO);
 	}
 
-	if (ddi_parse(vswp->physname, drv, &ddi_instance) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "!vsw%d: invalid device name: %s",
-		    vswp->instance, vswp->physname);
-		return (EIO);
-	}
-
-	/*
-	 * Aggregation devices are special in that the device instance
-	 * must be set to zero when they are being mac_open()'ed.
-	 *
-	 * The only way to determine if we are being passed an aggregated
-	 * device is to check the device name.
-	 */
-	if (strcmp(drv, "aggr") == 0) {
-		ddi_instance = 0;
-	}
-
-	rv = mac_open(vswp->physname, ddi_instance, &vswp->mh);
+	rv = mac_open(vswp->physname, &vswp->mh);
 	if (rv != 0) {
 		/*
 		 * If mac_open() failed and the error indicates that the

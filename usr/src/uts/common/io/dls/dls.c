@@ -168,9 +168,9 @@ dls_fini(void)
  */
 
 int
-dls_create(const char *linkname, const char *macname, uint_t ddi_instance)
+dls_create(const char *linkname, const char *macname)
 {
-	return (dls_vlan_create(linkname, macname, ddi_instance, 0));
+	return (dls_vlan_create(linkname, macname, 0));
 }
 
 int
@@ -451,7 +451,7 @@ dls_promisc(dls_channel_t dc, uint32_t flags)
 
 multi:
 	/*
-	 * It's easiest to add the txloop handler up-front; if promiscuous
+	 * It's easiest to add the txloop callback up-front; if promiscuous
 	 * mode cannot be enabled, then we'll remove it before returning.
 	 * Use dl_promisc_lock to prevent racing with another thread also
 	 * manipulating the promiscuous state on another dls_impl_t associated
@@ -460,7 +460,7 @@ multi:
 	mutex_enter(&dlp->dl_promisc_lock);
 	if ((dlp->dl_npromisc == 0) && (flags & DLS_PROMISC_PHYS)) {
 		ASSERT(dlp->dl_mth == NULL);
-		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dlp->dl_txloop, dlp);
+		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dls_link_txloop, dlp);
 	}
 
 	/*

@@ -690,8 +690,8 @@ i_dls_link_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	i_dls_link_rx_common(arg, mrh, mp, dls_accept);
 }
 
-static void
-i_dls_link_txloop(void *arg, mblk_t *mp)
+void
+dls_link_txloop(void *arg, mblk_t *mp)
 {
 	i_dls_link_rx_common(arg, NULL, mp, dls_accept_loopback);
 }
@@ -712,7 +712,7 @@ i_dls_link_walk(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 }
 
 static int
-i_dls_link_create(const char *name, uint_t ddi_instance, dls_link_t **dlpp)
+i_dls_link_create(const char *name, dls_link_t **dlpp)
 {
 	dls_link_t		*dlp;
 
@@ -725,13 +725,10 @@ i_dls_link_create(const char *name, uint_t ddi_instance, dls_link_t **dlpp)
 	 * Name the dls_link_t after the MAC interface it represents.
 	 */
 	(void) strlcpy(dlp->dl_name, name, sizeof (dlp->dl_name));
-	dlp->dl_ddi_instance = ddi_instance;
 
 	/*
-	 * Set the packet loopback function for use when the MAC is in
-	 * promiscuous mode, and initialize promiscuous bookeeping fields.
+	 * Initialize promiscuous bookkeeping fields.
 	 */
-	dlp->dl_txloop = i_dls_link_txloop;
 	dlp->dl_npromisc = 0;
 	dlp->dl_mth = NULL;
 
@@ -807,7 +804,7 @@ dls_link_fini(void)
  */
 
 int
-dls_link_hold(const char *name, uint_t ddi_instance, dls_link_t **dlpp)
+dls_link_hold(const char *name, dls_link_t **dlpp)
 {
 	dls_link_t		*dlp;
 	int			err;
@@ -828,7 +825,7 @@ dls_link_hold(const char *name, uint_t ddi_instance, dls_link_t **dlpp)
 	/*
 	 * We didn't find anything so we need to create one.
 	 */
-	if ((err = i_dls_link_create(name, ddi_instance, &dlp)) != 0) {
+	if ((err = i_dls_link_create(name, &dlp)) != 0) {
 		rw_exit(&i_dls_link_lock);
 		return (err);
 	}
@@ -898,7 +895,7 @@ dls_mac_hold(dls_link_t *dlp)
 		/*
 		 * First reference; hold open the MAC interface.
 		 */
-		err = mac_open(dlp->dl_name, dlp->dl_ddi_instance, &dlp->dl_mh);
+		err = mac_open(dlp->dl_name, &dlp->dl_mh);
 		if (err != 0)
 			goto done;
 

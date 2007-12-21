@@ -757,7 +757,7 @@ getmacaddr_gldv3(char *drv, int inst, int *maclenp)
 	uchar_t *macaddr;
 
 	(void) snprintf(ifname, sizeof (ifname), "%s%d", drv, inst);
-	if (mac_open(ifname, inst, &mh) < 0) {
+	if (mac_open(ifname, &mh) < 0) {
 		return (NULL);
 	}
 	*maclenp = sizeof (struct ether_addr);

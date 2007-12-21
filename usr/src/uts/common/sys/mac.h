@@ -492,7 +492,7 @@ typedef struct mactype_register_s {
 /*
  * Client interface functions.
  */
-extern int			mac_open(const char *, uint_t, mac_handle_t *);
+extern int			mac_open(const char *, mac_handle_t *);
 extern void			mac_close(mac_handle_t);
 extern const mac_info_t		*mac_info(mac_handle_t);
 extern boolean_t		mac_info_get(const char *, mac_info_t *);
