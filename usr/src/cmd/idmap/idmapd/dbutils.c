@@ -1880,6 +1880,8 @@ out:
 		req = &batch->idmap_mapping_batch_val[i];
 		type = req->id2.idtype;
 		req->id2.idtype = IDMAP_NONE;
+		res = &result->ids.ids_val[i];
+
 		if (!(req->direction & _IDMAP_F_LOOKUP_AD))
 			/* Entry that wasn't marked for AD lookup - skip */
 			continue;
@@ -1892,7 +1894,6 @@ out:
 		if (!add)
 			continue;
 
-		res = &result->ids.ids_val[i];
 
 		if (IS_REQUEST_SID(*req, 1)) {
 			if (res->retcode != IDMAP_SUCCESS)
