@@ -452,7 +452,7 @@ void
 zfs_znode_dmu_fini(znode_t *zp)
 {
 	dmu_buf_t *db = zp->z_dbuf;
-	ASSERT(MUTEX_HELD(ZFS_OBJ_MUTEX(zp)) ||
+	ASSERT(MUTEX_HELD(ZFS_OBJ_MUTEX(zp)) || zp->z_unlinked ||
 	    RW_WRITE_HELD(&zp->z_zfsvfs->z_teardown_inactive_lock));
 	ASSERT(zp->z_dbuf != NULL);
 	zp->z_dbuf = NULL;

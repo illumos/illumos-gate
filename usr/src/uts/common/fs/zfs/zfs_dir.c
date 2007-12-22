@@ -584,6 +584,8 @@ zfs_rmnode(znode_t *zp)
 			 * Not enough space to delete some xattrs.
 			 * Leave it on the unlinked set.
 			 */
+			zfs_znode_dmu_fini(zp);
+			zfs_znode_free(zp);
 			return;
 		}
 	}
@@ -619,7 +621,9 @@ zfs_rmnode(znode_t *zp)
 		 * which point we'll call zfs_unlinked_drain() to process it).
 		 */
 		dmu_tx_abort(tx);
-		return;
+		zfs_znode_dmu_fini(zp);
+		zfs_znode_free(zp);
+		goto out;
 	}
 
 	if (xzp) {
@@ -639,7 +643,7 @@ zfs_rmnode(znode_t *zp)
 	zfs_znode_delete(zp, tx);
 
 	dmu_tx_commit(tx);
-
+out:
 	if (xzp)
 		VN_RELE(ZTOV(xzp));
 }
