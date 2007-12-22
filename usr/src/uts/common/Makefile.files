@@ -1489,6 +1489,8 @@ RTW_OBJS += rtw.o smc93cx6.o rtwphy.o rtwphyio.o
 
 MXFE_OBJS += mxfe.o
 
+SFE_OBJS += sfe.o sfe_util.o
+
 #
 #	Build up defines and paths.
 #

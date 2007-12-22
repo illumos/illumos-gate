@@ -355,6 +355,7 @@ COMMON_SUBDIRS= \
 	SUNWscplp  \
 	SUNWscsa1394  \
 	SUNWses \
+	SUNWsfe \
 	SUNWslpr \
 	SUNWslpu \
 	SUNWsmapi  \

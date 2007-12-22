@@ -267,6 +267,7 @@ DRV_KMODS	+= mxfe
 DRV_KMODS	+= pcan
 DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
+DRV_KMODS	+= sfe
 DRV_KMODS	+= aac
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 

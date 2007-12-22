@@ -114,6 +114,7 @@ usr/src/uts/common/io/afe/THIRDPARTYLICENSE
 usr/src/uts/common/io/chxge/com/THIRDPARTYLICENSE
 usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE
 usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
+usr/src/uts/common/io/sfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/wpi/fw-wpi/LICENSE
 usr/src/uts/common/sys/THIRDPARTYLICENSE.agpgart
 usr/src/uts/common/sys/THIRDPARTYLICENSE.icu
