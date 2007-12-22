@@ -2457,3 +2457,259 @@ msgid "SCF-8006-YS.impact"
 msgstr "The XSCFU will reboot. If the configuration has redundant XSCFU's, the standby XSCFU \nmay take over as the active XSCFU. There is no impact to the domains.\n"
 msgid "SCF-8006-YS.action"
 msgstr "Please consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-05
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.fe
+#
+msgid "SCF-8007-05.type"
+msgstr "Fault"
+msgid "SCF-8007-05.severity"
+msgstr "Critical"
+msgid "SCF-8007-05.description"
+msgstr "An internal fatal error within a CPU chip was detected.\n  Refer to %s for more information."
+msgid "SCF-8007-05.response"
+msgstr "The domain using this CPU will be reset and the CPU chip will be deconfigured.\n"
+msgid "SCF-8007-05.impact"
+msgstr "The CPU chip will be deconfigured after the domain is reset.\n"
+msgid "SCF-8007-05.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-1S
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.fe
+#
+msgid "SCF-8007-1S.type"
+msgstr "Fault"
+msgid "SCF-8007-1S.severity"
+msgstr "Critical"
+msgid "SCF-8007-1S.description"
+msgstr "An internal fatal error within a core on a CPU chip was detected.\n  Refer to %s for more information."
+msgid "SCF-8007-1S.response"
+msgstr "The domain using this CPU will be reset and the core will be deconfigured.\n"
+msgid "SCF-8007-1S.impact"
+msgstr "The domain using this CPU chip is reset.\n"
+msgid "SCF-8007-1S.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-2A
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.strand.fe
+#
+msgid "SCF-8007-2A.type"
+msgstr "Fault"
+msgid "SCF-8007-2A.severity"
+msgstr "Critical"
+msgid "SCF-8007-2A.description"
+msgstr "An internal fatal error within a strand on a CPU chip was detected.\n  Refer to %s for more information."
+msgid "SCF-8007-2A.response"
+msgstr "The domain using this CPU will be reset and the strand will be deconfigured.\n"
+msgid "SCF-8007-2A.impact"
+msgstr "The domain using this CPU chip is reset.\n"
+msgid "SCF-8007-2A.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-3P
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.se
+#
+msgid "SCF-8007-3P.type"
+msgstr "Fault"
+msgid "SCF-8007-3P.severity"
+msgstr "Major"
+msgid "SCF-8007-3P.description"
+msgstr "An internal non-fatal uncorrectable error within a CPU chip has been detected.\n  Refer to %s for more information."
+msgid "SCF-8007-3P.response"
+msgstr "The CPU chip will be deconfigured after the platform is power cycled or after the domain reboots \nor after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-3P.impact"
+msgstr "The non-fatal uncorrectable error may cause domain to panic. The CPU chip will be deconfigured after the \nplatform is power cycled or after the domain reboots or after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-3P.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-4D
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se
+#
+msgid "SCF-8007-4D.type"
+msgstr "Fault"
+msgid "SCF-8007-4D.severity"
+msgstr "Major"
+msgid "SCF-8007-4D.description"
+msgstr "A non-fatal uncorrectable error associated with a core on a CPU chip has been detected.\n  Refer to %s for more information."
+msgid "SCF-8007-4D.response"
+msgstr "The domain software will attempt to offline the core on the CPU chip.\n"
+msgid "SCF-8007-4D.impact"
+msgstr "The non-fatal uncorrectable error trap may cause the domain to panic. If the domain\ndoes not panic, the domain software will attempt to offline the core on the CPU chip.\nThe core of the CPU chip will be deconfigured after the platform is power cycled or \nafter the domain reboots or after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-4D.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-5H
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.se-offlinereq
+#
+msgid "SCF-8007-5H.type"
+msgstr "Fault"
+msgid "SCF-8007-5H.severity"
+msgstr "Major"
+msgid "SCF-8007-5H.description"
+msgstr "When a non-fatal uncorrectable error occurs on a core on a CPU chip, domain software attempts to\noffline the core. This fault occurs when the number of offline attempts has exceeded an\nacceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-5H.response"
+msgstr "Future non-fatal uncorrectable errors for this core on a CPU chip will not be recorded on the XSCF.\n"
+msgid "SCF-8007-5H.impact"
+msgstr "The uncorrectable error trap may cause the domain to panic.\n"
+msgid "SCF-8007-5H.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-63
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.strand.se
+#
+msgid "SCF-8007-63.type"
+msgstr "Fault"
+msgid "SCF-8007-63.severity"
+msgstr "Major"
+msgid "SCF-8007-63.description"
+msgstr "A non-fatal uncorrectable error has been detected on a strand on a CPU chip.\n  Refer to %s for more information."
+msgid "SCF-8007-63.response"
+msgstr "The strand on the CPU chip is deconfigured.\n"
+msgid "SCF-8007-63.impact"
+msgstr "The non-fatal uncorrectable error trap may cause the domain to panic.\n"
+msgid "SCF-8007-63.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-7Y
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.ce
+#
+msgid "SCF-8007-7Y.type"
+msgstr "Fault"
+msgid "SCF-8007-7Y.severity"
+msgstr "Major"
+msgid "SCF-8007-7Y.description"
+msgstr "The number of correctable errors associated with a CPU chip has exceeded an acceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-7Y.response"
+msgstr "The CPU chip will be deconfigured after the platform is power cycled or \nafter the domain reboots or after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-7Y.impact"
+msgstr "No immediate impact. The CPU chip will be deconfigured after the platform is power cycled or \nafter the domain reboots or after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-7Y.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-8Q
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce
+#
+msgid "SCF-8007-8Q.type"
+msgstr "Fault"
+msgid "SCF-8007-8Q.severity"
+msgstr "Major"
+msgid "SCF-8007-8Q.description"
+msgstr "The number of correctable errors associated with a core on a CPU chip have exceeded an acceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-8Q.response"
+msgstr "A request is sent to the domain software to attempt to offline the core on the CPU chip.\nThe core of the CPU chip will be deconfigured after the platform is power cycled or \nafter the domain reboots or after a Dynamic Reconfiguration operation is performed.\n"
+msgid "SCF-8007-8Q.impact"
+msgstr "No immediate impact.\n"
+msgid "SCF-8007-8Q.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-9C
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce-offlinereq
+#
+msgid "SCF-8007-9C.type"
+msgstr "Fault"
+msgid "SCF-8007-9C.severity"
+msgstr "Major"
+msgid "SCF-8007-9C.description"
+msgstr "The number of correctable errors on a core on a CPU chip has exceeded an acceptable threshold. \nThis fault occurs when the number of offline attempts has exceeded an acceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-9C.response"
+msgstr "Future correctable errors for this core on a CPU chip will not be recorded on the XSCF.\n"
+msgid "SCF-8007-9C.impact"
+msgstr "No immediate impact.\n"
+msgid "SCF-8007-9C.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-AR
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.way.ce
+#
+msgid "SCF-8007-AR.type"
+msgstr "Fault"
+msgid "SCF-8007-AR.severity"
+msgstr "Minor"
+msgid "SCF-8007-AR.description"
+msgstr "The number of correctable errors within a way of a CPU chip's L2 cache has exceeded an acceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-AR.response"
+msgstr "The way of the CPU chip's cache is deconfigured. The performance of the CPU chip is reduced.\n"
+msgid "SCF-8007-AR.impact"
+msgstr "There is a performance loss for the CPU chip.\n"
+msgid "SCF-8007-AR.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-C4
+# keys: upset.chassis.SPARC-Enterprise.cpu.SPARC64-VII.fe
+#
+msgid "SCF-8007-C4.type"
+msgstr "Upset"
+msgid "SCF-8007-C4.severity"
+msgstr "Critical"
+msgid "SCF-8007-C4.description"
+msgstr "A hard-to-diagnose problem was detected by the CPU chip.\n  Refer to %s for more information."
+msgid "SCF-8007-C4.response"
+msgstr "Nothing is deconfigured.\n"
+msgid "SCF-8007-C4.impact"
+msgstr "The domain may drop to the OpenBoot PROM 'OK' prompt.\n"
+msgid "SCF-8007-C4.action"
+msgstr "The platform administrator should check to see if any other hardware failure has occurred on the platform.\nIf the problem occurs while running OpenBoot PROM, then the platform administrator should check to make sure that \nthe OpenBoot PROM environment variables have not been set incorrectly. If neither of these courses of action \nprovide a resolution, then the platform administrator should schedule a service action.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-DX
+# keys: upset.chassis.SPARC-Enterprise.cpu.SPARC64-VII.fe-unexpected-trap
+#
+msgid "SCF-8007-DX.type"
+msgstr "upset"
+msgid "SCF-8007-DX.severity"
+msgstr "Critical"
+msgid "SCF-8007-DX.description"
+msgstr "An unexpected trap with some unknown cause was detected by a CPU chip during POST.\n  Refer to %s for more information."
+msgid "SCF-8007-DX.response"
+msgstr "Nothing is deconfigured.\n"
+msgid "SCF-8007-DX.impact"
+msgstr "The domain is reset.\n"
+msgid "SCF-8007-DX.action"
+msgstr "Please consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-E2
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.se-tmo
+#
+msgid "SCF-8007-E2.type"
+msgstr "Fault"
+msgid "SCF-8007-E2.severity"
+msgstr "Major"
+msgid "SCF-8007-E2.description"
+msgstr "An internal non-fatal uncorrectable error has been detected within the CPU chip.\n  Refer to %s for more information."
+msgid "SCF-8007-E2.response"
+msgstr "Nothing is deconfigured.\n"
+msgid "SCF-8007-E2.impact"
+msgstr "The non-fatal uncorrectable error may cause the domain to panic.\n"
+msgid "SCF-8007-E2.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-FJ
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.se-uncertain
+#
+msgid "SCF-8007-FJ.type"
+msgstr "Fault"
+msgid "SCF-8007-FJ.severity"
+msgstr "Major"
+msgid "SCF-8007-FJ.description"
+msgstr "An internal non-fatal uncorrectable error has been detected within the CPU chip.\n  Refer to %s for more information."
+msgid "SCF-8007-FJ.response"
+msgstr "Nothing is deconfigured.\n"
+msgid "SCF-8007-FJ.impact"
+msgstr "The non-fatal uncorrectable error may cause the domain to panic.\n"
+msgid "SCF-8007-FJ.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
+#
+# code: SCF-8007-GE
+# keys: fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce-warn
+#
+msgid "SCF-8007-GE.type"
+msgstr "Fault"
+msgid "SCF-8007-GE.severity"
+msgstr "Minor"
+msgid "SCF-8007-GE.description"
+msgstr "The number of correctable errors associated with a CPU chip has exceeded an acceptable threshold.\n  Refer to %s for more information."
+msgid "SCF-8007-GE.response"
+msgstr "Nothing is deconfigured.\n"
+msgid "SCF-8007-GE.impact"
+msgstr "No immediate impact.\n"
+msgid "SCF-8007-GE.action"
+msgstr "Schedule a repair action to replace the affected Field Replaceable Unit (FRU),\nthe identity of which can be determined using fmdump -v -u EVENT_ID.\nPlease consult the detail section of the knowledge article for additional information.\n"
