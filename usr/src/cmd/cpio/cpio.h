@@ -159,6 +159,8 @@ extern "C" {
 #define	VIEW_READWRITE	"SUNWattr_rw"
 #endif
 
+#define	min(a, b)	((a) < (b) ? (a) : (b))
+
 /* Values used in typeflag field */
 #define	REGTYPE		'0'		/* Regular File */
 #define	LNKTYPE		'1'		/* Link */

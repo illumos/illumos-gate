@@ -66,6 +66,11 @@
 #include <dirent.h>
 #include <limits.h>
 #include <aclutils.h>
+#if defined(_PC_SATTR_ENABLED)
+#include <libnvpair.h>
+#include <attr.h>
+#include <libcmdutils.h>
+#endif	/* _PC_SATTR_ENABLED */
 #ifdef SOLARIS_PRIVS
 #include <priv.h>
 #endif	/* SOLARIS_PRIVS */
@@ -96,11 +101,20 @@ typedef	ulong_t		u_off_t;
 #define	ARCHIVE_ACL	1
 #define	ARCHIVE_XATTR	2
 
+#ifndef	VIEW_READONLY
+#define	VIEW_READONLY	"SUNWattr_ro"
+#endif
+
+#ifndef	VIEW_READWRITE
+#define	VIEW_READWRITE	"SUNWattr_rw"
+#endif
+
+
 #define	LSTAT(dir, path, statbuf) fstatat(dir, \
-    get_component((Gen.g_attrnam_p == (char *)NULL) ? \
+    get_component((Gen.g_attrnam_p == NULL) ? \
     path : Gen.g_attrnam_p), statbuf, AT_SYMLINK_NOFOLLOW)
 #define	STAT(dir, path, statbuf) fstatat(dir, \
-    get_component((Gen.g_attrnam_p == (char *)NULL) ? \
+    get_component((Gen.g_attrnam_p == NULL) ? \
     path : Gen.g_attrnam_p), statbuf, 0)
 
 /*
@@ -192,7 +206,6 @@ static int open_dir(char *name);
 static int open_dirfd();
 static void close_dirfd();
 static void write_xattr_hdr();
-static int retry_attrdir_open(char *name);
 static char *skipslashes(char *string, char *start);
 static int read_xattr_hdr();
 static void chop_endslashes(char *path);
@@ -245,6 +258,8 @@ struct gen_hdr {
 	char	*g_tname,
 		*g_prefix,
 		*g_nam_p,	/* Filename */
+		*g_attrparent_p, /* attribute parent */
+		*g_attrpath_p, /* attribute path */
 		*g_attrnam_p,	/* attribute */
 		*g_attrfnam_p,  /* Real file name attr belongs to */
 		*g_linktoattrfnam_p, /* file linked attribute belongs to */
@@ -252,6 +267,8 @@ struct gen_hdr {
 		*g_dirpath;	/* dirname currently opened */
 	int	g_dirfd;	/* directory file descriptor */
 	int	g_passdirfd;	/* directory fd to pass to */
+	int	g_rw_sysattr;	/* read-write system attribute */
+	int	g_baseparent_fd;	/* base file's parent fd */
 
 } Gen, *G_p;
 
@@ -296,9 +313,20 @@ typedef struct sl_info
 	struct sl_info *rlink;	/* Right subtree ptr */
 	int bal;		/* Subtree balance factor */
 	ulong_t	sl_count;	/* Number of symlinks */
+	int	sl_ftype;	/* file type of inode */
 	ino_t	sl_ino;		/* Inode of file */
 	ino_t	sl_ino2;	/* alternate inode for -Hodc */
 } sl_info_t;
+
+typedef struct data_in
+{
+	int	data_in_swapfile;
+	int	data_in_proc_mode;
+	int	data_in_partialflg;
+	int	data_in_compress_flag;
+	long	data_in_cksumval;
+	FILE	*data_in_pipef;
+} data_in_t;
 
 /*
  * The following structure maintains a hash entry for the
@@ -329,16 +357,18 @@ typedef struct sl_remap
 /* forward declarations */
 
 static sl_info_t 	*sl_info_alloc(void);
-static sl_info_t 	*sl_insert(dev_t, ino_t);
-static ulong_t		sl_numlinks(dev_t, ino_t);
+static sl_info_t 	*sl_insert(dev_t, ino_t, int);
+static ulong_t		sl_numlinks(dev_t, ino_t, int);
 static void		sl_preview_synonyms(void);
-static void		sl_remember_tgt(const struct stat *, int);
-static sl_info_t 	*sl_search(dev_t, ino_t);
+static void		sl_remember_tgt(const struct stat *, int, int);
+static sl_info_t 	*sl_search(dev_t, ino_t, int);
 static sl_info_t	*sl_devhash_lookup(dev_t);
 static void		sl_devhash_insert(dev_t, sl_info_t *);
 
-extern int		sl_compare(ino_t, ino_t);
-#define	sl_compare(lino, rino)	(lino < rino ? -1 : (lino > rino ? 1 : 0))
+extern int		sl_compare(ino_t, int, ino_t, int);
+#define	sl_compare(lino, lftype, rino, rftype)	(lino < rino ? -1 : \
+	    (lino > rino ? 1 : (lftype < rftype ? -1 : \
+	    (lftype > rftype ? 1 : 0))))
 
 /* global storage */
 
@@ -386,7 +416,8 @@ union swpbuf {
 } *Swp_p;
 
 static
-char	Adir,			/* Flags object as a directory */
+char	*myname,		/* program name */
+	Adir,			/* Flags object as a directory */
 	Hiddendir,		/* Processing hidden attribute directory */
 	Aspec,			/* Flags object as a special file */
 	Do_rename,		/* Indicates rename() is to be used */
@@ -408,6 +439,7 @@ char	Adir,			/* Flags object as a directory */
 	*Savenam_p,		/* copy of filename xattr belongs to */
 	*Own_p,			/* New owner login id string */
 	*Renam_p,		/* Buffer for renaming files */
+	*Renam_attr_p,		/* Buffer for renaming attr with sys attrs */
 	*Renametmp_p,		/* Tmp Buffer for renaming files */
 	*Symlnk_p,		/* Buffer for holding symbolic link name */
 	*Over_p,		/* Holds temporary filename when overwriting */
@@ -436,9 +468,11 @@ int	Append = 0,	/* Flag set while searching to end of archive */
 	Eomflag = 0,
 	Dflag = 0,
 	Atflag = 0,	/* Archive/restore extended attributes */
+	SysAtflag = 0,	/* Archive/restore extended system attributes */
 	Compressed,	/* Flag to indicate if the bar archive is compressed */
 	Bar_vol_num = 0, /* Volume number count for bar archive */
-	privileged = 0;	/* Flag set if running with higher privileges */
+	privileged = 0,	/* Flag set if running with higher privileges */
+	attr_baseparent_fd = -1;	/* attribute's base file descriptor */
 
 
 static
@@ -462,6 +496,8 @@ static u_longlong_t    SBlocks;	/* cumulative char count from short reads */
 static off_t	Max_offset = BIN_OFFSET_MAX;	/* largest file size */
 static off_t	Max_filesz;			/* from getrlimit */
 
+static ulong_t	Savedev;
+
 static
 FILE	*Ef_p,			/* File pointer of pattern input file */
 	*Err_p = stderr,	/* File pointer for error reporting */
@@ -483,6 +519,25 @@ static int	Pflag = 0;	/* flag indicates that acl is preserved */
 static int	acl_is_set = 0; /* True if an acl was set on the file */
 
 acl_t *aclp;
+
+#if defined(O_XATTR)
+typedef enum {
+	ATTR_OK,
+	ATTR_SKIP,
+	ATTR_CHDIR_ERR,
+	ATTR_OPEN_ERR,
+	ATTR_XATTR_ERR,
+	ATTR_SATTR_ERR
+} attr_status_t;
+#endif
+
+#if defined(O_XATTR)
+typedef enum {
+	ARC_CREATE,
+	ARC_RESTORE
+} arc_action_t;
+#endif
+
 
 /*
  *
@@ -664,6 +719,7 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	(void) memset(&Gen, 0, sizeof (Gen));
+	myname = e_strdup(E_EXIT, basename(argv[0]));
 	setup(argc, argv);
 
 	if (signal(SIGINT, sigint) == SIG_IGN)
@@ -671,6 +727,17 @@ main(int argc, char **argv)
 	switch (Args & (OCi | OCo | OCp)) {
 	case OCi: /* COPY IN */
 		Hdr_type = NONE;
+		if (Atflag || SysAtflag) {
+			/*
+			 * Save the current working directory, so
+			 * we can change back here after cd'ing into
+			 * the attribute directory when processing
+			 * attributes.
+			 */
+			if ((attr_baseparent_fd = save_cwd()) < 0) {
+				msg(EXT, "Unable to open current directory.");
+			}
+		}
 		while ((i = gethdr()) != 0) {
 			Gen.g_dirfd = -1;
 			if (i == 1) {
@@ -705,14 +772,13 @@ main(int argc, char **argv)
 		while ((i = getname()) != 0) {
 			if (i == 1) {
 				(void) file_out();
-				if (Atflag) {
+				if (Atflag || SysAtflag) {
 					if (Gen.g_dirfd != -1) {
 						(void) close(Gen.g_dirfd);
 					}
 					Gen.g_dirfd = -1;
 					xattrs_out(file_out);
 				}
-				Hiddendir = 0;
 			}
 			if (aclp != NULL) {
 				acl_free(aclp);
@@ -735,7 +801,7 @@ main(int argc, char **argv)
 			 * and we need to save off the unstripped
 			 * name for attribute traversal.
 			 */
-			if (Atflag) {
+			if (Atflag || SysAtflag) {
 				(void) strcpy(Savenam_p, Gen.g_nam_p);
 			}
 			passret = file_pass();
@@ -747,7 +813,7 @@ main(int argc, char **argv)
 			if (Gen.g_passdirfd != -1)
 				(void) close(Gen.g_passdirfd);
 			Gen.g_passdirfd = -1;
-			if (Atflag) {
+			if (Atflag || SysAtflag) {
 				if (Gen.g_dirfd != -1) {
 					(void) close(Gen.g_dirfd);
 				}
@@ -995,14 +1061,14 @@ chgreel(int dir)
 	Archive = 0;
 	Volcnt++;
 	for (;;) {
-		if (Rtty_p == (FILE *)NULL)
+		if (Rtty_p == NULL)
 			Rtty_p = fopen(Ttyname, "r");
 		do { /* tryagain */
 			if (IOfil_p) {
 				do {
 					msg(EPOST, gettext(Eom_p), Volcnt);
 					if (!Rtty_p || fgets(str, sizeof (str),
-					    Rtty_p) == (char *)NULL)
+					    Rtty_p) == NULL)
 						msg(EXT, "Cannot read tty.");
 					askagain = 0;
 					switch (*str) {
@@ -1024,7 +1090,7 @@ chgreel(int dir)
 				    "To continue, type device/file name when "
 				    "ready.");
 				if (!Rtty_p || fgets(str, sizeof (str),
-				    Rtty_p) == (char *)NULL)
+				    Rtty_p) == NULL)
 					msg(EXT, "Cannot read tty.");
 				lastchar = strlen(str) - 1;
 				if (*(str + lastchar) == '\n') /* remove '\n' */
@@ -1066,7 +1132,8 @@ chgreel(int dir)
 static int
 ckname(int flag)
 {
-	int lastchar, len;
+	int	lastchar;
+	size_t	rename_bufsz = Max_namesz + 1;
 
 	if (Hdr_type != TAR && Hdr_type != USTAR && Hdr_type != BAR) {
 		/* Re-visit tar size issues later */
@@ -1078,16 +1145,15 @@ ckname(int flag)
 
 	if (Pat_pp && !matched())
 		return (F_SKIP);
-	if ((Args & OCr) && !Adir) { /* rename interactively */
+
+	/* rename interactively */
+	if ((Args & OCr) && !Adir && !G_p->g_rw_sysattr) {
 		(void) fprintf(Wtty_p, gettext("Rename \"%s%s%s\"? "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    G_p->g_nam_p : Renam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_attrnam_p);
+		    (G_p->g_attrnam_p == NULL) ? G_p->g_nam_p : Renam_p,
+		    (G_p->g_attrnam_p == NULL) ? "" : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
 		(void) fflush(Wtty_p);
-		if (fgets(Renametmp_p, Max_namesz + 1, Rtty_p) == (char *)NULL)
+		if (fgets(Renametmp_p, rename_bufsz, Rtty_p) == NULL)
 			msg(EXT, "Cannot read tty.");
 		if (feof(Rtty_p))
 			exit(EXIT_CODE);
@@ -1098,32 +1164,61 @@ ckname(int flag)
 			*(Renametmp_p + lastchar) = '\0';
 		if (*Renametmp_p == '\0') {
 			msg(POST, "%s%s%s Skipped.",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    G_p->g_nam_p : G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : G_p->g_attrnam_p);
-			*G_p->g_nam_p = '\0';
+			    (G_p->g_attrnam_p == NULL) ? G_p->g_nam_p :
+			    G_p->g_attrfnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
+			if (G_p->g_attrparent_p == NULL) {
+				*G_p->g_nam_p = '\0';
+			}
+			if (Renam_attr_p) {
+				*Renam_attr_p = '\0';
+			}
 			return (F_SKIP);
 		} else if (strcmp(Renametmp_p, ".") != 0) {
-			len = strlen(Renametmp_p);
-			if (len > (int)strlen(G_p->g_nam_p)) {
-				if ((G_p->g_nam_p != &nambuf[0]) &&
-				    (G_p->g_nam_p != &fullnam[0]))
-					free(G_p->g_nam_p);
-				G_p->g_nam_p = e_zalloc(E_EXIT, len + 1);
-			}
-			if (G_p->g_attrnam_p != (char *)NULL) {
-				free(G_p->g_attrnam_p);
-				G_p->g_attrnam_p = e_strdup(E_EXIT,
-				    Renametmp_p);
-				(void) strcpy(G_p->g_nam_p, Renam_p);
+			if (G_p->g_attrnam_p == NULL) {
+				if (strlen(Renametmp_p) > strlen(
+				    G_p->g_nam_p)) {
+					if ((G_p->g_nam_p != &nambuf[0]) &&
+					    (G_p->g_nam_p != &fullnam[0])) {
+						free(G_p->g_nam_p);
+						G_p->g_nam_p = e_zalloc(E_EXIT,
+						    rename_bufsz);
+					}
+				}
+				if (Renam_attr_p) {
+					*Renam_attr_p = '\0';
+				}
+				if ((strlcpy(Renam_p, Renametmp_p,
+				    rename_bufsz) > rename_bufsz) ||
+				    (strlcpy(G_p->g_nam_p, Renametmp_p,
+				    rename_bufsz) > rename_bufsz)) {
+					msg(EXTN, "buffer overflow");
+				}
 			} else {
-				(void) strcpy(Renam_p, Renametmp_p);
-				(void) strcpy(G_p->g_nam_p, Renametmp_p);
+				if (G_p->g_attrnam_p != NULL) {
+					free(G_p->g_attrnam_p);
+					G_p->g_attrnam_p = e_strdup(E_EXIT,
+					    Renametmp_p);
+					(void) strcpy(G_p->g_nam_p, Renam_p);
+					if (Renam_attr_p) {
+						if (strlcpy(Renam_attr_p,
+						    Renametmp_p, rename_bufsz) >
+						    rename_bufsz) {
+							msg(EXTN,
+							    "buffer overflow");
+						}
+					}
+				}
 			}
-
+		} else {
+			if (G_p->g_attrnam_p == NULL) {
+				*Renam_p = '\0';
+			}
+			if (Renam_attr_p) {
+				*Renam_attr_p = '\0';
+			}
 		}
 	}
 	if (flag != 0 || Onecopy == 0) {
@@ -1259,12 +1354,12 @@ ckopts(long mask)
 		Rtty_p = fopen(Ttyname, "r");
 		Wtty_p = fopen(Ttyname, "w");
 
-		if (Rtty_p == (FILE *)NULL || Wtty_p == (FILE *)NULL) {
+		if (Rtty_p == NULL || Wtty_p == NULL) {
 			msg(ERR, "Cannot rename, \"%s\" missing", Ttyname);
 		}
 	}
 
-	if ((mask & OCE) && (Ef_p = fopen(Efil_p, "r")) == (FILE *)NULL) {
+	if ((mask & OCE) && (Ef_p = fopen(Efil_p, "r")) == NULL) {
 		msg(ERR, "Cannot open \"%s\" to read patterns", Efil_p);
 	}
 
@@ -1313,7 +1408,7 @@ ckopts(long mask)
 #endif	/* SOLARIS_PRIVS */
 
 	if (mask & OCR) {
-		if ((Rpw_p = getpwnam(Own_p)) == (struct passwd *)NULL) {
+		if ((Rpw_p = getpwnam(Own_p)) == NULL) {
 			msg(ERR, "\"%s\" is not a valid user id", Own_p);
 		} else if ((Euid != Rpw_p->pw_uid) && !privileged) {
 			msg(ERR, "R option only valid for super-user or "
@@ -1509,15 +1604,17 @@ creat_hdr(void)
 			(void) strcpy(Gen.g_version, "00");
 
 			dpasswd = getpwuid(SrcSt.st_uid);
-			if (dpasswd == (struct passwd *)NULL) {
+			if (dpasswd == NULL) {
 				msg(EPOST,
 				    "cpio: could not get passwd information "
 				    "for %s%s%s",
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
 				    Gen.g_nam_p : Gen.g_attrfnam_p,
-				    (Gen.g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
+				    "" : Gen.g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (Gen.g_attrnam_p == NULL) ?
 				    "" : Gen.g_attrnam_p);
 				/* make name null string */
 				Gen.g_uname[0] = '\0';
@@ -1526,15 +1623,17 @@ creat_hdr(void)
 				    dpasswd->pw_name, 32);
 			}
 			dgroup = getgrgid(SrcSt.st_gid);
-			if (dgroup == (struct group *)NULL) {
+			if (dgroup == NULL) {
 				msg(EPOST,
 				    "cpio: could not get group information "
 				    "for %s%s%S",
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
 				    Gen.g_nam_p : Gen.g_attrfnam_p,
-				    (Gen.g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
+				    "" : Gen.g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (Gen.g_attrnam_p == NULL) ?
 				    "" : Gen.g_attrnam_p);
 				/* make name null string */
 				Gen.g_gname[0] = '\0';
@@ -1551,7 +1650,20 @@ creat_hdr(void)
 			msg(EXT, "Impossible header type.");
 	}
 
-	dev = SrcSt.st_dev;
+	if (Use_old_stat && (Gen.g_attrnam_p != NULL)) {
+		/*
+		 * When processing extended attributes, creat_hdr()
+		 * can get called multiple times which means that
+		 * SrcSt.st.st_dev would have gotten converted to
+		 * -Hodc format.  We should always use the original
+		 * device here as we need to be able to match on
+		 * the original device id from the file that was
+		 * previewed in sl_preview_synonyms().
+		 */
+		dev = Savedev;
+	} else {
+		dev = SrcSt.st_dev;
+	}
 	ino = SrcSt.st_ino;
 
 	if (Use_old_stat) {
@@ -1566,18 +1678,18 @@ creat_hdr(void)
 	if (Use_old_stat) {
 		/* -Hodc */
 
-		sl_info_t *p = sl_search(dev, ino);
+		sl_info_t *p = sl_search(dev, ino, ftype);
 		Gen.g_ino = p ? p->sl_ino2 : -1;
 
 		if (Gen.g_ino == (ulong_t)-1) {
 			msg(ERR, "%s%s%s: cannot be archived - inode too big "
 			    "for -Hodc format",
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
 			    Gen.g_nam_p : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : Gen.g_attrnam_p);
+			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_attrnam_p);
 			return (0);
 		}
 	} else {
@@ -1586,8 +1698,7 @@ creat_hdr(void)
 
 	Gen.g_mode = SrcSt.st_mode;
 	Gen.g_mtime = SrcSt.st_mtime;
-	Gen.g_nlink = (Adir) ? SrcSt.st_nlink
-	    : sl_numlinks(dev, ino);
+	Gen.g_nlink = Adir ? SrcSt.st_nlink : sl_numlinks(dev, ino, ftype);
 
 	if (ftype == S_IFREG || ftype == S_IFLNK)
 		Gen.g_filesz = (off_t)SrcSt.st_size;
@@ -1674,16 +1785,14 @@ creat_lnk(int dirfd, char *name1_p, char *name2_p)
 		if (Args & OCv) {
 			(void) fprintf(Err_p,
 			    gettext("%s%s%s linked to %s%s%s\n"), newname,
-			    (attrname == (char *)NULL) ?
-			    "" : gettext(" attribute "),
-			    (attrname == (char *)NULL) ?
-			    "" : attrname, fromname,
-			    (attrname == (char *)NULL) ?
-			    "" : gettext(" attribute "),
-			    (attrname == (char *)NULL) ?
-			    "" : name1_p);
+			    (attrname == NULL) ? "" : gettext(" attribute "),
+			    (attrname == NULL) ? "" : attrname,
+			    (attrname == NULL) ? fromname : newname,
+			    (attrname == NULL) ? "" : gettext(" attribute "),
+			    (attrname == NULL) ? "" : name1_p);
+		} else {
+			VERBOSE((Args & (OCv | OCV)), newname);
 		}
-		VERBOSE((Args & (OCv | OCV)), newname);
 	} else if (cnt == 1)
 		msg(ERRN,
 		    "Unable to create directory for \"%s\"", name2_p);
@@ -1721,41 +1830,48 @@ creat_spec(int dirfd)
 
 	/*
 	 * Is this the extraction of the hidden attribute directory?
-	 * If so then just set the mode/times correctly, and return.
+	 * If we are processing the hidden attribute directory of an
+	 * attribute, then just return as modes and times cannot be set.
+	 * Otherwise, if we are processing a hidden attribute, just set
+	 * the mode/times correctly and return.
 	 */
 
 	if (Hiddendir) {
-		if (Args & OCR) {
-			if (fchownat(dirfd, ".", Rpw_p->pw_uid,
-			    Rpw_p->pw_gid, 0) != 0) {
+		if (G_p->g_attrparent_p == NULL) {
+			if (Args & OCR) {
+				if (fchownat(dirfd, ".", Rpw_p->pw_uid,
+				    Rpw_p->pw_gid, 0) != 0) {
+					msg(ERRN,
+					    "Cannot chown() \"attribute "
+					    "directory of file %s\"",
+					    G_p->g_attrfnam_p);
+				}
+			} else if ((fchownat(dirfd, ".", G_p->g_uid,
+			    G_p->g_gid, 0) != 0) && privileged) {
 				msg(ERRN,
 				    "Cannot chown() \"attribute directory of "
 				    "file %s\"", G_p->g_attrfnam_p);
 			}
-		} else if ((fchownat(dirfd, ".", G_p->g_uid,
-		    G_p->g_gid, 0) != 0) && privileged) {
-			msg(ERRN,
-			    "Cannot chown() \"attribute directory of "
-			    "file %s\"", G_p->g_attrfnam_p);
-		}
 
-		if (fchmod(dirfd, G_p->g_mode) != 0) {
-			msg(ERRN,
-			    "Cannot chmod() \"attribute directory of "
-			    "file %s\"", G_p->g_attrfnam_p);
-		}
-
-		acl_is_set = 0;
-		if (Pflag && aclp != NULL) {
-			if (facl_set(dirfd, aclp) < 0) {
+			if (fchmod(dirfd, G_p->g_mode) != 0) {
 				msg(ERRN,
-				    "failed to set acl on attribute"
-				    " directory of %s ", G_p->g_attrfnam_p);
-			} else {
-				acl_is_set = 1;
+				    "Cannot chmod() \"attribute directory of "
+				    "file %s\"", G_p->g_attrfnam_p);
 			}
-			acl_free(aclp);
-			aclp = NULL;
+
+			acl_is_set = 0;
+			if (Pflag && aclp != NULL) {
+				if (facl_set(dirfd, aclp) < 0) {
+					msg(ERRN,
+					    "failed to set acl on attribute"
+					    " directory of %s ",
+					    G_p->g_attrfnam_p);
+				} else {
+					acl_is_set = 1;
+				}
+				acl_free(aclp);
+				aclp = NULL;
+			}
 		}
 
 		return (1);
@@ -1958,7 +2074,7 @@ creat_tmp(char *nam_p)
 
 	(void) strcpy(t_p, "XXXXXX");
 
-	if (G_p->g_attrnam_p != (char *)NULL) {
+	if (G_p->g_attrnam_p != NULL) {
 		/*
 		 * Save our current directory, so we can go into
 		 * the attribute directory to make the temp file
@@ -1971,7 +2087,7 @@ creat_tmp(char *nam_p)
 
 	(void) mktemp(Over_p);
 
-	if (G_p->g_attrnam_p != (char *)NULL) {
+	if (G_p->g_attrnam_p != NULL) {
 		/* Return to the current directory. */
 
 		rest_cwd(cwd);
@@ -2002,19 +2118,19 @@ creat_tmp(char *nam_p)
 		 */
 
 		if (Args & OCp) {
-			if (G_p->g_attrnam_p == (char *)NULL) {
+			if (G_p->g_attrnam_p == NULL) {
 				Fullnam_p = Over_p;
 			} else {
 				Attrfile_p = Over_p;
 			}
 		} else {
 			G_p->g_nam_p = Over_p;
-			if (G_p->g_attrnam_p != (char *)NULL) {
+			if (G_p->g_attrnam_p != NULL) {
 				Attrfile_p = Over_p;
 			}
 		}
 
-		if (G_p->g_attrnam_p == (char *)NULL) {
+		if (G_p->g_attrnam_p == NULL) {
 			Over_p = nam_p;
 		} else {
 			Over_p = G_p->g_attrnam_p;
@@ -2074,7 +2190,8 @@ creat_tmp(char *nam_p)
 				 */
 				if (link(nam_p, Over_p) < 0) {
 					msg(ERRN,
-					    "Cannot create temporary file");
+					    "Cannot rename temporary file "
+					    "\"%s\" to \"%s\"", Over_p, nam_p);
 					*Over_p = '\0';
 					return (-1);
 				}
@@ -2095,6 +2212,193 @@ creat_tmp(char *nam_p)
 }
 
 /*
+ * Copy the datasize amount of data from the input file to buffer.
+ *
+ * ifd		- Input file descriptor.
+ * buffer	- Buffer (allocated by caller) to copy data to.
+ * datasize	- The amount of data to read from the input file
+ *		and copy to the buffer.
+ * error	- When reading from an Archive file, indicates unreadable
+ *		data was encountered, otherwise indicates errno.
+ * data_in_info	- Information needed when called from data_in().
+ */
+static ssize_t
+read_chunk(int ifd, char *buffer, size_t datasize, data_in_t *data_in_info)
+{
+	if (Args & OCp) {
+		return (read(ifd, buffer, datasize));
+	} else {
+		FILL(datasize);
+		if (data_in_info->data_in_proc_mode != P_SKIP) {
+			if (Hdr_type == CRC)
+				data_in_info->data_in_cksumval += cksum(CRC,
+				    datasize, NULL);
+			if (data_in_info->data_in_swapfile)
+				swap(Buffr.b_out_p, datasize);
+
+
+			/*
+			 * if the bar archive is compressed, set up a pipe and
+			 * do the de-compression while reading in the file
+			 */
+			if (Hdr_type == BAR) {
+				if (data_in_info->data_in_compress_flag == 0 &&
+				    Compressed) {
+					setup_uncompress(
+					    &(data_in_info->data_in_pipef));
+					data_in_info->data_in_compress_flag++;
+				}
+			}
+		}
+		(void) memcpy(buffer, Buffr.b_out_p, datasize);
+		Buffr.b_out_p += datasize;
+		Buffr.b_cnt -= datasize;
+		return (datasize);
+	}
+}
+
+
+/*
+ * Copy data from the input file to output file descriptor.
+ * If ifd is -1, then the input file is the archive file.
+ *
+ * Parameters
+ *	ifd		- Input file descriptor to read from.
+ *	ofd		- Output file descriptor of extracted file.
+ *	rw_sysattr	- Flag indicating if a file is an extended
+ *			system attribute file.
+ *	bytes		- Amount of data of copy/write.
+ *	blocksize	- Amount of data to read at a time from either
+ *			the input file descriptor or from the archive.
+ *	data_in_info	- information needed while reading data when
+ *			called by data_in().
+ *
+ * Return code
+ *	0		Success
+ *	< 0		An error occurred during the read of the input
+ *			file
+ *	> 0		An error occurred during the write of the output
+ *			file descriptor.
+ */
+static int
+data_copy(int ifd, int ofd, int rw_sysattr, uint_t bytes,
+    size_t blocksize, data_in_t *data_in_info)
+{
+	char *buf;
+	int write_it = ((data_in_info == NULL) ||
+	    data_in_info->data_in_proc_mode != P_SKIP);
+	size_t bytesread;
+	size_t maxwrite;
+	size_t piosize;		/* preferred I/O size */
+	ssize_t got;
+	ssize_t cnt;
+	struct stat tsbuf;
+
+	/* No data to copy. */
+	if (bytes == 0) {
+		return (0);
+	}
+
+	/*
+	 * To figure out the size of the buffer used to accumulate data
+	 * from readtape() and to write to the file, we need to determine
+	 * the largest chunk of data to be written to the file at one time.
+	 * This is determined based on the following three things:
+	 *	1) The size of the archived file.
+	 *	2) The preferred I/O size of the file.
+	 *	3) If the file is a read-write system attribute file.
+	 *
+	 * If the size of the file is less than the preferred I/O
+	 * size or it's a read-write system attribute file, which must be
+	 * written in one operation, then set the maximum write size to the
+	 * size of the archived file.  Otherwise, the maximum write size is
+	 * preferred I/O size.
+	 */
+	if (rw_sysattr || (bytes < blocksize)) {
+		maxwrite = bytes;
+	} else {
+		if (fstat(ofd, &tsbuf) == 0) {
+			piosize = tsbuf.st_blksize;
+		} else {
+			piosize = blocksize;
+		}
+		maxwrite = min(bytes, piosize);
+	}
+	buf = e_zalloc(E_EXIT, maxwrite);
+
+	while (bytes > 0) {
+		/*
+		 * Read as much data as we can.  We're limited by
+		 * the smallest of:
+		 *	- the number of bytes left to be read,
+		 *	- the size of the chunk of data to read (blocksize).
+		 */
+		for (bytesread = 0; bytesread < maxwrite; bytesread += got) {
+
+			/*
+			 * Read the data from either the input file descriptor
+			 * or the archive file.  read_chunk() will only return
+			 * <= 0 if called from data_pass().
+			 */
+			errno = 0;
+			if ((got = read_chunk(ifd, buf + bytesread,
+			    min(maxwrite - bytesread, blocksize),
+			    data_in_info)) <= 0) {
+
+				/*
+				 * If data couldn't be read from the input file
+				 * descriptor, set corrupt to indicate the error
+				 * and return.
+				 */
+				free(buf);
+				return (-1);
+			}
+		}
+
+		/*
+		 * write_it will always be true when called from data_pass(),
+		 * however, it will not be true when called from data_in()
+		 * if we are just doing a table of contents or if there
+		 * there was a problem writing to the file earlier and now
+		 * we're just reading the data without writing it order to
+		 * process the next file.
+		 */
+		if (write_it) {
+			errno = 0;
+			if ((cnt = write(ofd, buf, maxwrite)) < maxwrite) {
+				/*
+				 * data_in() needs to know if it was an
+				 * actual write(2) failure, or if we just
+				 * couldn't write all of the data requested
+				 * so that we know that the rest of the file's
+				 * data can be read but not written.
+				 */
+				if ((cnt != -1) && (data_in_info != NULL)) {
+					data_in_info->data_in_partialflg = 1;
+				}
+				free(buf);
+				return (1);
+			}
+		}
+		bytes -= maxwrite;
+
+		/*
+		 * If we've reached this point and there is still data
+		 * to be written, maxwrite had to have been determined
+		 * by the preferred I/O size.  If the number of bytes
+		 * left to write is smaller than the preferred I/O size,
+		 * then we're about to do our final write to the file, so
+		 * just set maxwrite to the number of bytes left to write.
+		 */
+		if ((bytes > 0) && (bytes < maxwrite)) {
+			maxwrite = bytes;
+		}
+	}
+	free(buf);
+
+	return (0);
+}
+/*
  * data_in:  If proc_mode == P_PROC, bread() the file's data from the archive
  * and write(2) it to the open fdes gotten from openout().  If proc_mode ==
  * P_SKIP, or becomes P_SKIP (due to errors etc), bread(2) the file's data
@@ -2109,21 +2413,17 @@ static void
 data_in(int proc_mode)
 {
 	char *nam_p;
-	int cnt, pad;
-	long cksumval = 0L;
-	off_t filesz;
-	int rv, swapfile = 0;
-	int compress_flag = 0;	/* if the file is compressed */
+	int pad;
+	int rv;
+	int swapfile = 0;
 	int cstatus = 0;
-	FILE *pipef;		/* pipe for bar to do de-compression */
+	data_in_t *data_in_info;
 
-
-	if (G_p->g_attrnam_p != (char *)NULL) {
+	if (G_p->g_attrnam_p != NULL) {
 		nam_p = G_p->g_attrnam_p;
 	} else {
 		nam_p = G_p->g_nam_p;
 	}
-
 
 	if (((G_p->g_mode & Ftype) == S_IFLNK && proc_mode != P_SKIP) ||
 	    (Hdr_type == BAR && bar_linkflag == '2' && proc_mode != P_SKIP)) {
@@ -2145,51 +2445,50 @@ data_in(int proc_mode)
 			swapfile = 0;
 		}
 	}
-	filesz = G_p->g_filesz;
+
+	data_in_info = e_zalloc(E_EXIT, sizeof (data_in_t));
+	data_in_info->data_in_swapfile = swapfile;
+	data_in_info->data_in_proc_mode = proc_mode;
+	data_in_info->data_in_partialflg = 0;
+	data_in_info->data_in_cksumval = 0L;
+	data_in_info->data_in_compress_flag = 0;
 
 	/* This writes out the file from the archive */
-
-	while (filesz > 0) {
-		cnt = (int)(filesz > CPIOBSZ) ? CPIOBSZ : filesz;
-		FILL(cnt);
-		if (proc_mode != P_SKIP) {
-			if (Hdr_type == CRC)
-				cksumval += cksum(CRC, cnt, NULL);
-			if (swapfile)
-				swap(Buffr.b_out_p, cnt);
-			errno = 0;
-
-			/*
-			 * if the bar archive is compressed, set up a pipe and
-			 * do the de-compression while reading in the file
-			 */
-			if (Hdr_type == BAR) {
-				if (compress_flag == 0 && Compressed) {
-					setup_uncompress(&pipef);
-					compress_flag++;
-				}
-
-			}
-
-			rv = write(Ofile, Buffr.b_out_p, cnt);
-			if (rv < cnt) {
-				if (rv < 0)
-					msg(ERRN, "Cannot write \"%s\"", nam_p);
-				else
-					msg(EXTN, "Cannot write \"%s\"", nam_p);
-				proc_mode = P_SKIP;
-				rstfiles(U_KEEP, G_p->g_dirfd);
-				cstatus = close(Ofile);
-				Ofile = 0;
-				if (cstatus != 0) {
-					msg(EXTN, "close error");
-				}
-			}
+	if ((rv = data_copy(-1, Ofile, (G_p->g_attrnam_p == NULL) ? 0 :
+	    G_p->g_rw_sysattr, G_p->g_filesz, CPIOBSZ, data_in_info)) != 0) {
+		if (data_in_info->data_in_partialflg) {
+			msg(EXTN, "Cannot write \"%s%s%s\"",
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_attrfnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "), nam_p);
+		} else {
+			msg(ERRN, "Cannot write \"%s%s%s\"",
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_attrfnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "), nam_p);
 		}
-		Buffr.b_out_p += cnt;
-		Buffr.b_cnt -= (long)cnt;
-		filesz -= (off_t)cnt;
-	} /* filesz */
+
+		/*
+		 * Even though we couldn't write to the file,
+		 * we need to continue reading the data for this
+		 * file so that we can process the next file in
+		 * the archive.
+		 */
+		proc_mode = P_SKIP;
+		data_in_info->data_in_proc_mode = proc_mode;
+		rstfiles(U_KEEP, G_p->g_dirfd);
+		cstatus = close(Ofile);
+		Ofile = 0;
+		if (cstatus != 0) {
+			msg(EXTN, "close error");
+		}
+	}
 
 	pad = (Pad_val + 1 - (G_p->g_filesz & Pad_val)) & Pad_val;
 	if (pad != 0) {
@@ -2198,13 +2497,14 @@ data_in(int proc_mode)
 		Buffr.b_cnt -= pad;
 	}
 	if (proc_mode != P_SKIP) {
-		if (Hdr_type == CRC && Gen.g_cksum != cksumval) {
+		if (Hdr_type == CRC &&
+		    Gen.g_cksum != data_in_info->data_in_cksumval) {
 			msg(ERR, "\"%s\" - checksum error", nam_p);
 			rstfiles(U_KEEP, G_p->g_dirfd);
 		} else
 			rstfiles(U_OVER, G_p->g_dirfd);
-		if (Hdr_type == BAR && compress_flag) {
-			(void) pclose(pipef);
+		if (Hdr_type == BAR && data_in_info->data_in_compress_flag) {
+			(void) pclose(data_in_info->data_in_pipef);
 		} else {
 			cstatus = close(Ofile);
 		}
@@ -2213,7 +2513,10 @@ data_in(int proc_mode)
 			msg(EXTN, "close error");
 		}
 	}
-	VERBOSE((proc_mode != P_SKIP && (Args & (OCv | OCV))), G_p->g_nam_p);
+	(void) free(data_in_info);
+
+	VERBOSE((proc_mode != P_SKIP && (Args & (OCv | OCV))),
+	    (G_p->g_attrparent_p == NULL) ? G_p->g_nam_p : G_p->g_attrpath_p);
 	Finished = 1;
 }
 
@@ -2316,12 +2619,12 @@ data_out(void)
 	}
 	if ((Ifile = openfile(O_RDONLY)) < 0) {
 		msg(ERR, "\"%s%s%s\" ?",
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    nam_p : Gen.g_attrfnam_p,
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : Gen.g_attrnam_p);
+		    (Gen.g_attrnam_p == NULL) ? nam_p : Gen.g_attrfnam_p,
+		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (Gen.g_attrnam_p == NULL) ? "" :
+		    (Gen.g_attrparent_p == NULL) ? Gen.g_attrnam_p :
+		    Gen.g_attrparent_p);
 		return;
 	}
 
@@ -2329,7 +2632,7 @@ data_out(void)
 	 * Dump extended attribute header.
 	 */
 
-	if (Gen.g_attrnam_p != (char *)NULL) {
+	if (Gen.g_attrnam_p != NULL) {
 		write_xattr_hdr();
 	}
 
@@ -2338,12 +2641,12 @@ data_out(void)
 		if (errret != 0) {
 			G_p->g_cksum = (ulong_t)-1;
 			msg(POST, "\"%s%s%s\" skipped",
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
 			    nam_p : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : nam_p);
+			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (Gen.g_attrnam_p == NULL) ? "" : nam_p);
 			(void) close(Ifile);
 			return;
 		}
@@ -2384,12 +2687,12 @@ data_out(void)
 
 		if ((amount_read = read(Ifile, Buffr.b_in_p, CPIOBSZ)) < 0) {
 			msg(EXTN, "Cannot read \"%s%s%s\"",
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
 			    nam_p : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : nam_p);
+			    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (Gen.g_attrnam_p == NULL) ? "" : nam_p);
 			break;
 		}
 
@@ -2430,22 +2733,20 @@ data_out(void)
 
 	if (real_filesz > G_p->g_filesz) {
 		msg(ERR, "File size of \"%s%s%s\" has increased by %lld",
-		    (Gen.g_attrnam_p == (char *)NULL) ?
+		    (Gen.g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : Gen.g_attrfnam_p,
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_nam_p,
+		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (Gen.g_attrnam_p == NULL) ? "" : G_p->g_nam_p,
 		    (real_filesz - G_p->g_filesz));
 	}
 	if (real_filesz < G_p->g_filesz) {
 		msg(ERR, "File size of \"%s%s%s\" has decreased by %lld",
-		    (Gen.g_attrnam_p == (char *)NULL) ?
+		    (Gen.g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : Gen.g_attrfnam_p,
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (Gen.g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_nam_p,
+		    (Gen.g_attrnam_p == NULL) ? "" : Gen.g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (Gen.g_attrnam_p == NULL) ? "" : G_p->g_nam_p,
 		    (G_p->g_filesz - real_filesz));
 	}
 
@@ -2463,12 +2764,12 @@ data_out(void)
 static void
 data_pass(void)
 {
-	int cnt, done = 1;
+	int rv;
+	int done = 1;
 	int cstatus;
-	off_t filesz;
 	char *namep = Nam_p;
 
-	if (G_p->g_attrnam_p != (char *)NULL) {
+	if (G_p->g_attrnam_p != NULL) {
 		namep = G_p->g_attrnam_p;
 	}
 	if (Aspec) {
@@ -2483,12 +2784,10 @@ data_pass(void)
 	}
 	if ((Ifile = openat(G_p->g_dirfd, get_component(namep), 0)) < 0) {
 		msg(ERRN, "Cannot open \"%s%s%s\", skipped",
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    Nam_p : G_p->g_attrfnam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_attrnam_p);
+		    (G_p->g_attrnam_p == NULL) ? Nam_p : G_p->g_attrfnam_p,
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
 		rstfiles(U_KEEP, G_p->g_passdirfd);
 		cstatus = close(Ofile);
 		Ofile = 0;
@@ -2497,50 +2796,47 @@ data_pass(void)
 		}
 		return;
 	}
-	filesz = G_p->g_filesz;
 
-	while (filesz > 0) {
-		cnt = (unsigned)(filesz > Bufsize) ? Bufsize : filesz;
-		errno = 0;
-		if (read(Ifile, Buf_p, (unsigned)cnt) < 0) {
+	if ((rv = data_copy(Ifile, Ofile, (G_p->g_attrnam_p == NULL) ? 0 :
+	    G_p->g_rw_sysattr, G_p->g_filesz, Bufsize, NULL)) != 0) {
+		/* read error */
+		if (rv < 0) {
 			msg(ERRN, "Cannot read \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
+			    (G_p->g_attrnam_p == NULL) ?
 			    Nam_p : G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : G_p->g_attrnam_p);
-			done = 0;
-			break;
-		}
-		errno = 0;
-		if (write(Ofile, Buf_p, (unsigned)cnt) < 0) {
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p);
+		/* write error */
+		} else if (rv > 0) {
 			if (Do_rename) {
 				msg(ERRN, "Cannot write \"%s%s%s\"", Over_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : Over_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
 			} else {
 				msg(ERRN, "Cannot write \"%s%s%s\"",
 				    Fullnam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ?
 				    "" : G_p->g_attrnam_p);
 			}
-
-			done = 0;
-			break;
 		}
-		Blocks += (u_longlong_t)((cnt + (Bufsize - 1)) / Bufsize);
-		filesz -= (off_t)cnt;
+		done = 0;
 	}
+
 	if (done) {
 		rstfiles(U_OVER, G_p->g_passdirfd);
 	} else {
 		rstfiles(U_KEEP, G_p->g_passdirfd);
 	}
+
 	(void) close(Ifile);
 	cstatus = close(Ofile);
 	Ofile = 0;
@@ -2647,6 +2943,38 @@ file_in(void)
 	G_p = &Gen;
 
 	/*
+	 * Now that we've read the extended header,
+	 * determine if we should restore attributes.
+	 * Don't restore the attribute if we are extracting
+	 * a file from an archive (as opposed to doing a table of
+	 * contents) and any of the following are true:
+	 * 1. neither -@ or -/ was specified.
+	 * 2. -@ was specified, -/ wasn't specified, and we're
+	 * processing a hidden attribute directory of an attribute
+	 * or we're processing a read-write system attribute file.
+	 * 3.  -@ wasn't specified, -/ was specified, and the file
+	 * we're processing it not a read-write system attribute file,
+	 * or we're processing the hidden attribute directory of an
+	 * attribute.
+	 *
+	 * We always process the attributes if we're just generating
+	 * generating a table of contents, or if both -@ and -/ were
+	 * specified.
+	 */
+	if (G_p->g_attrnam_p != NULL) {
+		if (((Args & OCt) == 0) &&
+		    ((!Atflag && !SysAtflag) ||
+		    (Atflag && !SysAtflag && ((G_p->g_attrparent_p != NULL) ||
+		    G_p->g_rw_sysattr)) ||
+		    (!Atflag && SysAtflag && ((G_p->g_attrparent_p != NULL) ||
+		    !G_p->g_rw_sysattr)))) {
+			proc_file = F_SKIP;
+			data_in(P_SKIP);
+			return;
+		}
+	}
+
+	/*
 	 * Open target directory if this isn't a skipped file
 	 * and g_nlink == 1
 	 *
@@ -2709,7 +3037,9 @@ file_in(void)
 		    typeflag == '6') {
 			if (proc_file != F_SKIP &&
 			    creat_spec(G_p->g_dirfd) > 0) {
-				VERBOSE((Args & (OCv | OCV)), G_p->g_nam_p);
+				VERBOSE((Args & (OCv | OCV)),
+				    (G_p->g_attrparent_p == NULL) ?
+				    G_p->g_nam_p : G_p->g_attrpath_p);
 			}
 			close_dirfd();
 			return;
@@ -2757,7 +3087,7 @@ file_in(void)
 	l_p = ttl_p;
 	if (l_p->L_cnt == l_p->L_gen.g_nlink)
 		cleanup = 1;
-	if (!Onecopy || G_p->g_attrnam_p != (char *)NULL) {
+	if (!Onecopy || G_p->g_attrnam_p != NULL) {
 		lnkem = (tl_p != l_p) ? 1 : 0;
 		G_p = &tl_p->L_gen;
 		if (proc_file == F_SKIP) {
@@ -2784,7 +3114,7 @@ file_in(void)
 				 * Are we linking an attribute?
 				 */
 				cwd = -1;
-				if (l_p->L_gen.g_attrnam_p != (char *)NULL) {
+				if (l_p->L_gen.g_attrnam_p != NULL) {
 					(void) strcpy(Lnkend_p,
 					    l_p->L_gen.g_attrnam_p);
 					(void) strcpy(Full_p,
@@ -2801,7 +3131,7 @@ file_in(void)
 				    Lnkend_p, Full_p);
 				data_in(P_SKIP);
 				close_dirfd();
-				l_p->L_lnk_p = (struct Lnk *)NULL;
+				l_p->L_lnk_p = NULL;
 				free(tl_p->L_gen.g_nam_p);
 				free(tl_p);
 				if (cwd != -1)
@@ -2821,7 +3151,7 @@ file_in(void)
 		 * all links.
 		 */
 		savacl = aclchar;
-		while (tl_p != (struct Lnk *)NULL) {
+		while (tl_p != NULL) {
 			G_p = &tl_p->L_gen;
 			aclchar = savacl;
 			if ((proc_file = ckname(1)) != F_SKIP) {
@@ -2858,7 +3188,7 @@ file_in(void)
 				free(l_p->L_gen.g_nam_p);
 				free(l_p);
 			}
-		} /* tl_p->L_lnk_p != (struct Lnk *)NULL */
+		} /* tl_p->L_lnk_p != NULL */
 		if (l_p->L_data == 0) {
 			data_in(P_SKIP);
 		}
@@ -2896,15 +3226,16 @@ file_out(void)
 	if (G_p->g_filesz > Max_offset) {
 		msg(ERR, "cpio: %s%s%s: too large to archive in current mode",
 		    G_p->g_nam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_attrnam_p);
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" :
+		    ((G_p->g_attrparent_p == NULL) ? G_p->g_attrnam_p:
+		    G_p->g_attrpath_p));
 		return (1); /* do not archive if it's too big */
 	}
 	if (Hdr_type == TAR || Hdr_type == USTAR) { /* TAR and USTAR */
 		if (Adir) {
-			if (Gen.g_attrnam_p != (char *)NULL) {
+			if (Gen.g_attrnam_p != NULL) {
 				write_xattr_hdr();
 			}
 			write_hdr(ARCHIVE_NORMAL, 0);
@@ -2969,7 +3300,7 @@ file_out(void)
 			}
 		}
 
-		if (Gen.g_attrnam_p != (char *)NULL) {
+		if (Gen.g_attrnam_p != NULL) {
 			write_xattr_hdr();
 		}
 		write_hdr(ARCHIVE_NORMAL, (off_t)0);
@@ -2985,13 +3316,13 @@ file_out(void)
 
 		if (l_p->L_cnt == l_p->L_gen.g_nlink)
 			cleanup = 1;
-		else if (Onecopy && G_p->g_attrnam_p == (char *)NULL) {
+		else if (Onecopy && G_p->g_attrnam_p == NULL) {
 			return (0); /* don't process data yet */
 		}
 	}
-	if (Onecopy && G_p->g_attrnam_p == (char *)NULL) {
+	if (Onecopy && G_p->g_attrnam_p == NULL) {
 		tl_p = l_p;
-		while (tl_p->L_lnk_p != (struct Lnk *)NULL) {
+		while (tl_p->L_lnk_p != NULL) {
 			G_p = &tl_p->L_gen;
 			G_p->g_filesz = (off_t)0;
 			/* one link with the acl is sufficient */
@@ -3009,6 +3340,385 @@ file_out(void)
 		reclaim(l_p);
 	return (0);
 }
+
+/*
+ * Verify the underlying file system supports the attribute type.
+ * Only archive extended attribute files when '-@' was specified.
+ * Only archive system extended attribute files if '-/' was specified.
+ */
+#if defined(O_XATTR)
+static attr_status_t
+verify_attr_support(char *filename, int attrflg, arc_action_t actflag,
+    int *ext_attrflg)
+{
+	/*
+	 * Verify extended attributes are supported/exist.  We only
+	 * need to check if we are processing a base file, not an
+	 * extended attribute.
+	 */
+	if (attrflg) {
+		*ext_attrflg = (pathconf(filename, (actflag == ARC_CREATE) ?
+		    _PC_XATTR_EXISTS : _PC_XATTR_ENABLED) == 1);
+	}
+	if (Atflag) {
+#if defined(_PC_SATTR_ENABLED)
+		if (!*ext_attrflg) {
+			if (SysAtflag) {
+				/* Verify system attributes are supported */
+				if (sysattr_support(filename,
+				    (actflag == ARC_CREATE) ?_PC_SATTR_EXISTS :
+				    _PC_SATTR_ENABLED) != 1) {
+					return (ATTR_SATTR_ERR);
+				}
+			} else
+				return (ATTR_XATTR_ERR);
+#else
+				return (ATTR_XATTR_ERR);
+#endif  /* _PC_SATTR_ENABLED */
+		}
+
+#if defined(_PC_SATTR_ENABLED)
+	} else if (SysAtflag) {
+		/* Verify system attributes are supported */
+		if (sysattr_support(filename, (actflag == ARC_CREATE) ?
+		    _PC_SATTR_EXISTS : _PC_SATTR_ENABLED) != 1) {
+			return (ATTR_SATTR_ERR);
+	}
+#endif  /* _PC_SATTR_ENABLED */
+	} else {
+		return (ATTR_SKIP);
+	}
+
+return (ATTR_OK);
+}
+#endif
+
+#if defined(O_XATTR)
+/*
+ * Verify the attribute, attrname, is an attribute we want to restore.
+ * Never restore read-only system attribute files.  Only restore read-write
+ * system attributes files when -/ was specified, and only traverse into
+ * the 2nd level attribute directory containing only system attributes if
+ * -@ was specified.  This keeps us from archiving
+ *	<attribute name>/<read-write system attribute file>
+ * when -/ was specified without -@.
+ *
+ * attrname		- attribute file name
+ * attrparent		- attribute's parent name within the base file's
+ *			attribute digrectory hierarchy
+ * arc_rwsysattr	- flag that indicates that read-write system attribute
+ *			file should be archived as it contains other than
+ *			the default system attributes.
+ * rw_sysattr		- on return, flag will indicate if attrname is a
+ *			read-write system attribute file.
+ */
+static attr_status_t
+verify_attr(char *attrname, char *attrparent, int arc_rwsysattr,
+    int *rw_sysattr)
+{
+#if defined(_PC_SATTR_ENABLED)
+	int	attr_supported;
+
+	/* Never restore read-only system attribute files */
+	if ((attr_supported = sysattr_type(attrname)) == _RO_SATTR) {
+		*rw_sysattr = 0;
+		return (ATTR_SKIP);
+	} else {
+		*rw_sysattr = (attr_supported == _RW_SATTR);
+	}
+
+	/*
+	 * Don't archive a read-write system attribute file if
+	 * it contains only the default system attributes.
+	 */
+	if (*rw_sysattr && !arc_rwsysattr) {
+		return (ATTR_SKIP);
+	}
+
+#else
+	/* Never restore read-only system attribute files */
+	if ((*rw_sysattr = is_sysattr(attrname)) == 1) {
+		return (ATTR_SKIP);
+	}
+#endif	/* _PC_SATTR_ENABLED */
+
+	/*
+	 * Only restore read-write system attribute files
+	 * when -/ was specified.  Only restore extended
+	 * attributes when -@ was specified.
+	 */
+	if (Atflag) {
+		if (!SysAtflag) {
+			/*
+			 * Only archive/restore the hidden directory "." if
+			 * we're processing the top level hidden attribute
+			 * directory.  We don't want to process the
+			 * hidden attribute directory of the attribute
+			 * directory that contains only extended system
+			 * attributes.
+			 */
+			if (*rw_sysattr || (Hiddendir &&
+			    (attrparent != NULL))) {
+				return (ATTR_SKIP);
+			}
+		}
+	} else if (SysAtflag) {
+		/*
+		 * Only archive/restore read-write extended system attribute
+		 * files of the base file.
+		 */
+		if (!*rw_sysattr || (attrparent != NULL)) {
+			return (ATTR_SKIP);
+		}
+	} else {
+		return (ATTR_SKIP);
+	}
+
+	return (ATTR_OK);
+}
+#endif
+
+#if defined(O_XATTR)
+static int
+retry_open_attr(int pdirfd, int cwd, char *fullname, char *pattr, char *name,
+    int oflag, mode_t mode)
+{
+	int dirfd;
+	int ofilefd = -1;
+	struct timeval times[2];
+	mode_t newmode;
+	struct stat parentstat;
+	acl_t *aclp = NULL;
+	int error;
+
+	/*
+	 * We couldn't get to attrdir. See if its
+	 * just a mode problem on the parent file.
+	 * for example: a mode such as r-xr--r--
+	 * on a ufs file system without extended
+	 * system attribute support won't let us
+	 * create an attribute dir if it doesn't
+	 * already exist, and on a ufs file system
+	 * with extended system attribute support
+	 * won't let us open the attribute for
+	 * write.
+	 *
+	 * If file has a non-trivial ACL, then save it
+	 * off so that we can place it back on after doing
+	 * chmod's.
+	 */
+	if ((dirfd = openat(cwd, (pattr == NULL) ? fullname : pattr,
+	    O_RDONLY)) == -1) {
+		return (-1);
+	}
+	if (fstat(dirfd, &parentstat) == -1) {
+		msg(ERRN, "Cannot stat %sfile %s",
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? fullname : name);
+		(void) close(dirfd);
+		return (-1);
+	}
+	if ((error = facl_get(dirfd, ACL_NO_TRIVIAL, &aclp)) != 0) {
+		msg(ERRN, "Failed to retrieve ACL on %sfile %s",
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? fullname : name);
+		(void) close(dirfd);
+		return (-1);
+	}
+
+	newmode = S_IWUSR | parentstat.st_mode;
+	if (fchmod(dirfd, newmode) == -1) {
+		msg(ERRN, "Cannot change mode of %sfile %s to %o",
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? fullname : name, newmode);
+		if (aclp)
+			acl_free(aclp);
+		(void) close(dirfd);
+		return (-1);
+	}
+
+
+	if (pdirfd == -1) {
+		/*
+		 * We weren't able to create the attribute directory before.
+		 * Now try again.
+		 */
+		ofilefd = attropen(fullname, ".", oflag);
+	} else {
+		/*
+		 * We weren't able to create open the attribute before.
+		 * Now try again.
+		 */
+		ofilefd = openat(pdirfd, name, oflag, mode);
+	}
+
+	/*
+	 * Put mode back to original
+	 */
+	if (fchmod(dirfd, parentstat.st_mode) == -1) {
+		msg(ERRN, "Cannot restore permissions of %sfile %s to %o",
+		    (pdirfd == -1) ? "" : gettext("parent of "),
+		    (pdirfd == -1) ? fullname : name, newmode);
+	}
+
+	if (aclp) {
+		error = facl_set(dirfd, aclp);
+		if (error) {
+			msg(ERRN, "failed to set acl entries on %sfile %s\n",
+			    (pdirfd == -1) ? "" : gettext("parent of "),
+			    (pdirfd == -1) ? fullname : name);
+		}
+		acl_free(aclp);
+	}
+
+	/*
+	 * Put back time stamps
+	 */
+
+	times[0].tv_sec = parentstat.st_atime;
+	times[0].tv_usec = 0;
+	times[1].tv_sec = parentstat.st_mtime;
+	times[1].tv_usec = 0;
+
+	(void) futimesat(cwd, (pattr == NULL) ? fullname : pattr, times);
+
+	(void) close(dirfd);
+
+	return (ofilefd);
+}
+#endif
+
+#if defined(O_XATTR)
+/*
+ * Recursively open attribute directories until the attribute directory
+ * containing the specified attribute, attrname, is opened.
+ *
+ * Currently, only 2 directory levels of attributes are supported, (i.e.,
+ * extended system attributes on extended attributes).  The following are
+ * the possible input combinations:
+ *	1.  Open the attribute directory of the base file (don't change
+ *	    into it).
+ *		attr_parent = NULL
+ *		attrname = '.'
+ *	2.  Open the attribute directory of the base file and change into it.
+ *		attr_parent = NULL
+ *		attrname = <attr> | <sys_attr>
+ *	3.  Open the attribute directory of the base file, change into it,
+ *	    then recursively call open_attr_dir() to open the attribute's
+ *	    parent directory (don't change into it).
+ *		attr_parent = <attr>
+ *		attrname = '.'
+ *	4.  Open the attribute directory of the base file, change into it,
+ *	    then recursively call open_attr_dir() to open the attribute's
+ *	    parent directory and change into it.
+ *		attr_parent = <attr>
+ *		attrname = <attr> | <sys_attr>
+ *
+ * An attribute directory will be opened only if the underlying file system
+ * supports the attribute type, and if the command line specifications
+ * (f_extended_attr and f_sys_attr) enable the processing of the attribute
+ * type.
+ *
+ * On succesful return, attr_parentfd will be the file descriptor of the
+ * opened attribute directory.  In addition, if the attribute is a read-write
+ * extended system attribute, rw_sysattr will be set to 1, otherwise
+ * it will be set to 0.
+ *
+ * Possible return values:
+ * 	ATTR_OK		Successfully opened and, if needed, changed into the
+ *			attribute directory containing attrname.
+ *	ATTR_SKIP	The command line specifications don't enable the
+ *			processing of the attribute type.
+ * 	ATTR_CHDIR_ERR	An error occurred while trying to change into an
+ *			attribute directory.
+ * 	ATTR_OPEN_ERR	An error occurred while trying to open an
+ *			attribute directory.
+ *	ATTR_XATTR_ERR	The underlying file system doesn't support extended
+ *			attributes.
+ *	ATTR_SATTR_ERR	The underlying file system doesn't support extended
+ *			system attributes.
+ */
+static int
+open_attr_dir(char *attrname, char *dirp, int cwd, char *attr_parent,
+    int *attr_parentfd, int *rw_sysattr)
+{
+	attr_status_t	rc;
+	int		firsttime = (*attr_parentfd == -1);
+	int		saveerrno;
+	int		ext_attr;
+
+	/*
+	 * open_attr_dir() was recursively called (input combination number 4),
+	 * close the previously opened file descriptor as we've already changed
+	 * into it.
+	 */
+	if (!firsttime) {
+		(void) close(*attr_parentfd);
+		*attr_parentfd = -1;
+	}
+
+	/*
+	 * Verify that the underlying file system supports the restoration
+	 * of the attribute.
+	 */
+	if ((rc = verify_attr_support(dirp, firsttime, ARC_RESTORE,
+	    &ext_attr)) != ATTR_OK) {
+		return (rc);
+	}
+
+	/* Open the base file's attribute directory */
+	if ((*attr_parentfd = attropen(dirp, ".", O_RDONLY)) == -1) {
+		/*
+		 * Save the errno from the attropen so it can be reported
+		 * if the retry of the attropen fails.
+		 */
+		saveerrno = errno;
+		if ((*attr_parentfd = retry_open_attr(-1, cwd, dirp,
+		    NULL, ".", O_RDONLY, 0)) == -1) {
+			(void) close(*attr_parentfd);
+			*attr_parentfd = -1;
+			errno = saveerrno;
+			return (ATTR_OPEN_ERR);
+		}
+	}
+
+	/*
+	 * Change into the parent attribute's directory unless we are
+	 * processing the hidden attribute directory of the base file itself.
+	 */
+	if ((Hiddendir == 0) || (firsttime && (attr_parent != NULL))) {
+		if (fchdir(*attr_parentfd) != 0) {
+			saveerrno = errno;
+			(void) close(*attr_parentfd);
+			*attr_parentfd = -1;
+			errno = saveerrno;
+			return (ATTR_CHDIR_ERR);
+		}
+	}
+
+	/* Determine if the attribute should be processed */
+	if ((rc = verify_attr(attrname, attr_parent, 1,
+	    rw_sysattr)) != ATTR_OK) {
+		saveerrno = errno;
+		(void) close(*attr_parentfd);
+		*attr_parentfd = -1;
+		errno = saveerrno;
+		return (rc);
+	}
+
+	/*
+	 * If the attribute is an extended system attribute of an attribute
+	 * (i.e., <attr>/<sys_attr>), then recursively call open_attr_dir() to
+	 * open the attribute directory of the parent attribute.
+	 */
+	if (firsttime && (attr_parent != NULL)) {
+		return (open_attr_dir(attrname, attr_parent, *attr_parentfd,
+		    attr_parent, attr_parentfd, rw_sysattr));
+	}
+
+	return (ATTR_OK);
+}
+#endif
 
 /*
  * file_pass:  If the -l option is set (link files when possible), and the
@@ -3041,11 +3751,10 @@ file_pass(void)
 		G_p->g_nam_p++;
 	}
 
-	(void) strcpy(Full_p,
-	    (G_p->g_attrfnam_p == (char *)NULL) ?
+	(void) strcpy(Full_p, (G_p->g_attrfnam_p == NULL) ?
 	    G_p->g_nam_p : G_p->g_attrfnam_p);
 
-	if (G_p->g_attrnam_p == (char *)NULL) {
+	if (G_p->g_attrnam_p == NULL) {
 		G_p->g_passdirfd = open_dir(Fullnam_p);
 
 		if (G_p->g_passdirfd == -1) {
@@ -3054,17 +3763,32 @@ file_pass(void)
 			return (FILE_PASS_ERR);
 		}
 	} else {
-		G_p->g_passdirfd = attropen(Fullnam_p, ".", O_RDONLY);
+		int	rw_sysattr;
 
+		/*
+		 * Open the file's attribute directory.
+		 * Change into the base file's starting directory then call
+		 * open_attr_dir() to open the attribute directory of either
+		 * the base file (if G_p->g_attrparent_p is NULL) or the
+		 * attribute (if G_p->g_attrparent_p is set) of the base file.
+		 */
+
+		G_p->g_passdirfd = -1;
+		(void) fchdir(G_p->g_baseparent_fd);
+		(void) open_attr_dir(G_p->g_attrnam_p, Fullnam_p,
+		    G_p->g_baseparent_fd, (G_p->g_attrparent_p == NULL) ? NULL :
+		    G_p->g_attrparent_p, &G_p->g_passdirfd, &rw_sysattr);
 		if (G_p->g_passdirfd == -1) {
-			G_p->g_passdirfd = retry_attrdir_open(Fullnam_p);
-
-			if (G_p->g_passdirfd == -1) {
-				msg(ERRN,
-				    "Cannot open attribute directory of"
-				    " file \"%s\"", Fullnam_p);
-				return (FILE_PASS_ERR);
-			}
+			msg(ERRN,
+			    "Cannot open attribute directory of "
+			    "%s%s%sfile \"%s\"",
+			    (G_p->g_attrparent_p == NULL) ? "" :
+			    gettext("attribute \""),
+			    (G_p->g_attrparent_p == NULL) ? "" :
+			    G_p->g_attrparent_p,
+			    (G_p->g_attrparent_p == NULL) ? "" :
+			    gettext("\" of "), Fullnam_p);
+			return (FILE_PASS_ERR);
 		}
 	}
 
@@ -3089,7 +3813,7 @@ file_pass(void)
 				existingfile = Symlnk_p;
 			}
 
-			if (G_p->g_attrnam_p == (char *)NULL) {
+			if (G_p->g_attrnam_p == NULL) {
 				if (creat_lnk(G_p->g_passdirfd,
 				    existingfile, Fullnam_p) == 0) {
 					return (FILE_LINKED);
@@ -3162,7 +3886,7 @@ file_pass(void)
 
 			cwd = -1;
 
-			if (l_p->L_gen.g_attrnam_p != (char *)NULL) {
+			if (l_p->L_gen.g_attrnam_p != NULL) {
 				/* We are linking an attribute */
 
 				(void) strcpy(Lnkend_p, l_p->L_gen.g_attrnam_p);
@@ -3185,7 +3909,7 @@ file_pass(void)
 				rest_cwd(cwd);
 			}
 
-			l_p->L_lnk_p = (struct Lnk *)NULL;
+			l_p->L_lnk_p = NULL;
 			free(tl_p->L_gen.g_nam_p);
 			free(tl_p);
 
@@ -3238,10 +3962,10 @@ flush_lnks(void)
 			tfsize = Gen.g_filesz;
 			Gen.g_filesz = (off_t)0;
 			G_p = &Gen;
-			while (tl_p != (struct Lnk *)NULL) {
+			while (tl_p != NULL) {
 				Gen.g_nam_p = tl_p->L_gen.g_nam_p;
 				Gen.g_namesz = tl_p->L_gen.g_namesz;
-				if (tl_p->L_lnk_p == (struct Lnk *)NULL) {
+				if (tl_p->L_lnk_p == NULL) {
 					Gen.g_filesz = tfsize;
 					if (open_dirfd() != 0) {
 						break;
@@ -3257,11 +3981,13 @@ flush_lnks(void)
 			Gen.g_nam_p = Nam_p;
 		} else /* stat(Gen.g_nam_p, &SrcSt) == 0 */
 			msg(ERR, "\"%s%s%s\" has disappeared",
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
 			    Gen.g_nam_p : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
+			    "" : Gen.g_rw_sysattr ?
+			    gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (Gen.g_attrnam_p == NULL) ?
 			    "" : Gen.g_attrnam_p);
 		tl_p = l_p;
 		l_p = l_p->L_nxt_p;
@@ -3502,14 +4228,14 @@ gethdr(void)
 			return (0);
 		else {
 			preptr = &prebuf[0];
-			if (*preptr != (char)NULL) {
+			if (*preptr != NULL) {
 				k = strlen(&prebuf[0]);
 				if (k < PRESIZ) {
 					(void) strcpy(&fullnam[0], &prebuf[0]);
 					j = 0;
 					fullnam[k++] = '/';
 					while ((j < NAMSIZ) && (&nambuf[j] !=
-					    (char)NULL)) {
+					    '\0')) {
 						fullnam[k] = nambuf[j];
 						k++; j++;
 					}
@@ -3557,9 +4283,13 @@ gethdr(void)
 	if (((Gen.g_mode & S_IFMT) == _XATTR_CPIO_MODE) ||
 	    ((Hdr_type == USTAR || Hdr_type == TAR) &&
 	    Thdr_p->tbuf.t_typeflag == _XATTR_HDRTYPE)) {
+		char	*aname;
+		char	*attrparent = NULL;
+		char	*attrpath = NULL;
 		char	*tapath;
+		char	*taname;
 
-		if (xattrp != (struct xattr_buf *)NULL) {
+		if (xattrp != NULL) {
 			if (xattrbadhead) {
 				free(xattrhead);
 				xattrp = NULL;
@@ -3569,32 +4299,49 @@ gethdr(void)
 			}
 
 			/*
-			 * Skip processing of an attribute if -@ wasn't
-			 * specified, or if -@ was specified and the attribute
-			 * is either an extended system attribute or if the
-			 * attribute name is not a file name, but a path name
-			 * (-@ should only process extended attributes).
+			 * At this point, the attribute path contains
+			 * the path to the attribute rooted at the hidden
+			 * attribute directory of the base file.  This can
+			 * be a simple attribute or extended attribute name,
+			 * or it can be something like <attr>/<sys attr> if
+			 * we are processing a system attribute of an attribute.
+			 * Determine the attribute name and attribute parent
+			 * (if there is one).  When we are processing a simple
+			 * attribute or extended attribute name, the attribute
+			 * parent will be set to NULL.  When we are processing
+			 * something like <attr>/<sys attr>, the attribute
+			 * parent will be contain <attr>, and the attribute
+			 * name will contain <sys attr>.
 			 */
-			tapath = xattrp->h_names + strlen(xattrp->h_names) + 1;
-			if (((Args & OCt) == 0) && ((Atflag == 0) ||
-			    (is_sysattr(tapath) ||
-			    (strpbrk(tapath, "/") != NULL)))) {
-				data_in(P_SKIP);
-				free(xattrhead);
-				xattrhead = NULL;
-				xattrp = NULL;
-				Gen.g_attrfnam_p = (char *)NULL;
-				Gen.g_attrnam_p = (char *)NULL;
-				return (2);
+			tapath = xattrp->h_names +
+			    strlen(xattrp->h_names) + 1;
+			attrpath = e_strdup(E_EXIT, tapath);
+			if ((taname = strpbrk(tapath, "/")) != NULL) {
+				aname = taname + 1;
+				*taname = '\0';
+				attrparent = tapath;
+			} else {
+				aname = tapath;
 			}
 
-			if (Gen.g_attrfnam_p != (char *)NULL) {
+			Gen.g_rw_sysattr = is_sysattr(aname);
+			Gen.g_baseparent_fd = attr_baseparent_fd;
+
+			if (Gen.g_attrfnam_p != NULL) {
 				free(Gen.g_attrfnam_p);
-				Gen.g_attrfnam_p = (char *)NULL;
+				Gen.g_attrfnam_p = NULL;
 			}
-			if (Gen.g_attrnam_p != (char *)NULL) {
+			if (Gen.g_attrnam_p != NULL) {
 				free(Gen.g_attrnam_p);
-				Gen.g_attrnam_p = (char *)NULL;
+				Gen.g_attrnam_p = NULL;
+			}
+			if (Gen.g_attrparent_p != NULL) {
+				free(Gen.g_attrparent_p);
+				Gen.g_attrparent_p = NULL;
+			}
+			if (Gen.g_attrpath_p != NULL) {
+				free(Gen.g_attrpath_p);
+				Gen.g_attrpath_p = NULL;
 			}
 			if (Renam_p && Renam_p[0] != '\0') {
 				Gen.g_attrfnam_p = e_strdup(E_EXIT, Renam_p);
@@ -3602,30 +4349,56 @@ gethdr(void)
 				Gen.g_attrfnam_p = e_strdup(E_EXIT,
 				    xattrp->h_names);
 			}
+			Gen.g_attrnam_p = e_strdup(E_EXIT, aname);
 
-			Gen.g_attrnam_p = e_strdup(E_EXIT, tapath);
+			if (attrparent != NULL) {
+				if (Renam_attr_p && Renam_attr_p[0] != '\0') {
+					size_t	apathlen = strlen(attrparent) +
+					    strlen(aname) + 2;
+					Gen.g_attrparent_p = e_strdup(E_EXIT,
+					    Renam_attr_p);
+					Gen.g_attrpath_p = e_zalloc(E_EXIT,
+					    apathlen);
+					(void) snprintf(Gen.g_attrpath_p,
+					    apathlen, "%s/%s", Renam_attr_p,
+					    aname);
+					(void) free(attrparent);
+					(void) free(attrpath);
+				} else {
+					Gen.g_attrparent_p = attrparent;
+					Gen.g_attrpath_p = attrpath;
+				}
+			} else {
+				Gen.g_attrpath_p = attrpath;
+			}
 
+			if (xattr_linkp != NULL) {
+				if (Gen.g_linktoattrfnam_p != NULL) {
+					free(Gen.g_linktoattrfnam_p);
+					Gen.g_linktoattrfnam_p = NULL;
+				}
+				if (Gen.g_linktoattrnam_p != NULL) {
+					free(Gen.g_linktoattrnam_p);
+					Gen.g_linktoattrnam_p = NULL;
+				}
+				if (Renam_attr_p && Renam_attr_p[0] != '\0') {
+					Gen.g_linktoattrfnam_p = e_strdup(
+					    E_EXIT, Renam_attr_p);
+				} else {
+					Gen.g_linktoattrfnam_p = e_strdup(
+					    E_EXIT, xattr_linkp->h_names);
+				}
+				Gen.g_linktoattrnam_p = e_strdup(E_EXIT,
+				    aname);
+				xattr_linkp = NULL;
+			}
 			if (Hdr_type != USTAR && Hdr_type != TAR) {
 				Gen.g_mode = Gen.g_mode & (~_XATTR_CPIO_MODE);
 				Gen.g_mode |= attrmode(xattrp->h_typeflag);
 			} else if (Hdr_type == USTAR || Hdr_type == TAR) {
 				Thdr_p->tbuf.t_typeflag = xattrp->h_typeflag;
 			}
-			if (xattr_linkp != (struct xattr_buf *)NULL) {
-				if (Gen.g_linktoattrfnam_p != (char *)NULL) {
-					free(Gen.g_linktoattrfnam_p);
-					Gen.g_linktoattrfnam_p = NULL;
-				}
-				if (Gen.g_linktoattrnam_p != (char *)NULL) {
-					free(Gen.g_linktoattrnam_p);
-					Gen.g_linktoattrnam_p = NULL;
-				}
-				Gen.g_linktoattrfnam_p = e_strdup(E_EXIT,
-				    xattr_linkp->h_names);
-				Gen.g_linktoattrnam_p = e_strdup(E_EXIT,
-				    tapath);
-				xattr_linkp = NULL;
-			}
+
 			ftype = Gen.g_mode & Ftype;
 			Adir = ftype == S_IFDIR;
 			Aspec = (ftype == S_IFBLK || ftype == S_IFCHR ||
@@ -3648,6 +4421,8 @@ gethdr(void)
 				return (2);
 			}
 		}
+	} else {
+		Hiddendir = 0;
 	}
 #endif /* O_XATTR */
 
@@ -3770,12 +4545,12 @@ getname(void)
 	char *dir;
 
 	Gen.g_nam_p = Nam_p;
+	Hiddendir = 0;
 
 	while (!goodfile) {
 		err = 0;
 
-		while ((s = fgets(Gen.g_nam_p, APATH+1, In_p))
-		    != NULL) {
+		while ((s = fgets(Gen.g_nam_p, APATH+1, In_p)) != NULL) {
 			lastchar = strlen(s) - 1;
 			issymlink = 0;
 
@@ -3797,7 +4572,7 @@ getname(void)
 			}
 		}
 
-		if (s == (char *)NULL) {
+		if (s == NULL) {
 			if (Gen.g_dirfd != -1) {
 				(void) close(Gen.g_dirfd);
 				Gen.g_dirfd = -1;
@@ -3823,7 +4598,7 @@ getname(void)
 		 * Figure out parent directory
 		 */
 
-		if (Gen.g_attrnam_p != (char *)NULL) {
+		if (Gen.g_attrnam_p != NULL) {
 			if (Gen.g_dirfd != -1) {
 				(void) close(Gen.g_dirfd);
 			}
@@ -3839,7 +4614,7 @@ getname(void)
 			char dirpath[PATH_MAX];
 
 			get_parent(Gen.g_nam_p, dirpath);
-			if (Atflag) {
+			if (Atflag || SysAtflag) {
 				dir = dirpath;
 				if (Gen.g_dirfd != -1) {
 					(void) close(Gen.g_dirfd);
@@ -3908,11 +4683,13 @@ getname(void)
 		    Max_namesz) {
 			if (!err) {
 				msg(ERR, "%s%s%s name too long.",
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
 				    Nam_p : Gen.g_attrfnam_p,
-				    (Gen.g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
+				    "" : Gen.g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (Gen.g_attrnam_p == NULL) ?
 				    "" : Gen.g_attrnam_p);
 			}
 			goodfile = 0;
@@ -3938,17 +4715,19 @@ getname(void)
 							    "Cannot follow"
 							    " \"%s%s%s\"",
 							    (Gen.g_attrnam_p ==
-							    (char *)NULL) ?
+							    NULL) ?
 							    Gen.g_nam_p :
 							    Gen.g_attrfnam_p,
 							    (Gen.g_attrnam_p ==
-							    (char *)NULL) ?
-							    "" :
+							    NULL) ? "" :
+							    Gen.g_rw_sysattr ?
+							    gettext(
+							    " System "
+							    "Attribute ") :
 							    gettext(
 							    " Attribute "),
 							    (Gen.g_attrnam_p ==
-							    (char *)NULL) ?
-							    "" :
+							    NULL) ? "" :
 							    Gen.g_attrnam_p);
 							goodfile = 0;
 						}
@@ -3966,11 +4745,13 @@ getname(void)
 			} else {
 				msg(ERRN,
 				    "Error with fstatat() of \"%s%s%s\"",
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ?
 				    Gen.g_nam_p : Gen.g_attrfnam_p,
-				    (Gen.g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (Gen.g_attrnam_p == (char *)NULL) ?
+				    (Gen.g_attrnam_p == NULL) ? "" :
+				    Gen.g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (Gen.g_attrnam_p == NULL) ?
 				    "" : Gen.g_attrnam_p);
 			}
 		}
@@ -4011,7 +4792,7 @@ getpats(int largc, char **largv)
 		t_pp++;
 		largv++;
 	}
-	while (fgets(Nam_p, Max_namesz + 1, Ef_p) != (char *)NULL) {
+	while (fgets(Nam_p, Max_namesz + 1, Ef_p) != NULL) {
 		if (numpat == maxpat - 1) {
 			maxpat += 10;
 			Pat_pp = e_realloc(E_EXIT, Pat_pp,
@@ -4025,7 +4806,7 @@ getpats(int largc, char **largv)
 		t_pp++;
 		numpat++;
 	}
-	*t_pp = (char *)NULL;
+	*t_pp = NULL;
 }
 
 static void
@@ -4069,7 +4850,7 @@ matched(void)
 	/*
 	 * Check for attribute
 	 */
-	if (G_p->g_attrfnam_p != (char *)NULL)
+	if (G_p->g_attrfnam_p != NULL)
 		str_p = G_p->g_attrfnam_p;
 
 	for (pat_pp = Pat_pp; *pat_pp; pat_pp++) {
@@ -4216,8 +4997,22 @@ msg(int severity, const char *fmt, ...)
 
 	(void) vfprintf(file_p, gettext(fmt), ap);
 	if (severity == ERRN || severity == EXTN) {
-		(void) fprintf(file_p, ", errno %d, ", errno);
-		perror("");
+		if ((G_p->g_attrnam_p != NULL) && G_p->g_rw_sysattr) {
+			if (errno == EPERM) {
+				(void) fprintf(file_p, ", errno %d, %s", errno,
+				    gettext("insufficient privileges\n"));
+			} else if (errno == EINVAL) {
+				(void) fprintf(file_p, ", errno %d, %s",
+				    errno, gettext(
+				    "unsupported on underlying file system\n"));
+			} else {
+				(void) fprintf(file_p, ", errno %d, ", errno);
+				perror("");
+			}
+		} else {
+			(void) fprintf(file_p, ", errno %d, ", errno);
+			perror("");
+		}
 	} else
 		(void) fprintf(file_p, "\n");
 	(void) fflush(file_p);
@@ -4245,7 +5040,7 @@ openout(int dirfd)
 
 	Do_rename = 0;	/* creat_tmp() may reset this */
 
-	if (G_p->g_attrnam_p != (char *)NULL) {
+	if (G_p->g_attrnam_p != NULL) {
 		nam_p = G_p->g_attrnam_p;
 	} else {
 		if (Args & OCp) {
@@ -4260,12 +5055,10 @@ openout(int dirfd)
 	    (Max_filesz < (G_p->g_filesz >> 9))) {
 		/* ... divided by 512 ... */
 		msg(ERR, "Skipping \"%s%s%s\": exceeds ulimit by %lld bytes",
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    nam_p : G_p->g_attrfnam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : nam_p,
+		    (G_p->g_attrnam_p == NULL) ? nam_p : G_p->g_attrfnam_p,
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" : nam_p,
 		    (off_t)(G_p->g_filesz - (Max_filesz << 9)));
 		return (-1);
 	}
@@ -4273,24 +5066,39 @@ openout(int dirfd)
 	if (LSTAT(dirfd, nam_p, &DesSt) == 0) {
 		/*
 		 * A file by the same name exists.  Move it to a temporary
-		 * file.
+		 * file unless it's a system attribute file.  If we are
+		 * restoring a system attribute file on a file system that
+		 * supports system attributes, then the system attribute file
+		 * will already exist (a default system attribute file will
+		 * get created when the file it is associated with is created).
+		 * If we create a temporary system attribute file, we can't
+		 * overwrite the existing system attribute file using
+		 * renameat().  In addition, only system attributes can exist
+		 * for an attribute of a file, therefore, a temporary file
+		 * cannot be created for a system attribute of an attribute.
+		 * Thus, when restoring a system attribute, we won't move it
+		 * to a temporary file, but will attempt to process it as if
+		 * it didn't already exist.
 		 */
 
-		if (creat_tmp(nam_p) < 0) {
-			/*
-			 * We weren't able to create the temp file.  Report
-			 * failure.
-			 */
+#if defined(_PC_SATTR_ENABLED)
+		if (G_p->g_rw_sysattr == 0)
+#endif	/* _PC_SATTR_ENABLED */
+			if (creat_tmp(nam_p) < 0) {
+				/*
+				 * We weren't able to create the temp file.
+				 * Report failure.
+				 */
 
-			return (-1);
-		}
+				return (-1);
+			}
 	}
 
 	if (Do_rename) {
 		/* nam_p was changed by creat_tmp() above. */
 
 		if (Args & OCp) {
-			if (G_p->g_attrnam_p != (char *)NULL) {
+			if (G_p->g_attrnam_p != NULL) {
 				nam_p = Attrfile_p;
 			} else {
 				nam_p = Fullnam_p;
@@ -4390,8 +5198,32 @@ openout(int dirfd)
 				return (-1);
 			}
 		} else {
+			int	saveerrno;
+
 			if ((result = openat(dirfd, get_component(nam_p),
-			    O_CREAT|O_RDWR|O_TRUNC, (int)G_p->g_mode)) >= 0) {
+			    O_CREAT|O_RDWR|O_TRUNC, (int)G_p->g_mode)) < 0) {
+				saveerrno = errno;
+				if (G_p->g_attrnam_p != NULL)  {
+					result = retry_open_attr(dirfd,
+					    Gen.g_baseparent_fd, Fullnam_p,
+					    (G_p->g_attrparent_p == NULL) ?
+					    NULL : G_p->g_attrparent_p, nam_p,
+					    O_CREAT|O_RDWR|O_TRUNC,
+					    (int)G_p->g_mode);
+				}
+			}
+			if (result < 0) {
+				errno = saveerrno;
+				if (errno != ENOENT) {
+					/* The attempt to open failed. */
+					msg(ERRN, "Cannot open file \"%s\"",
+					    nam_p);
+					if (*Over_p != '\0') {
+						rstfiles(U_KEEP, dirfd);
+					}
+					return (-1);
+				}
+			} else {
 				/* acl support */
 				acl_is_set = 0;
 				if (Pflag && aclp != NULL) {
@@ -4407,13 +5239,6 @@ openout(int dirfd)
 				}
 				cnt = 0;
 				break;
-			} else if (errno != ENOENT) {
-				/* The attempt to open failed. */
-				msg(ERRN, "Cannot open file \"%s\"", nam_p);
-				if (*Over_p != '\0') {
-					rstfiles(U_KEEP, dirfd);
-				}
-				return (-1);
 			}
 		}
 		cnt++;
@@ -4435,14 +5260,13 @@ openout(int dirfd)
 					msg(ERRN,
 					    "Error during chown() of "
 					    "\"%s%s%s\"",
-					    (G_p->g_attrnam_p ==
-					    (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ?
 					    nam_p : G_p->g_attrfnam_p,
-					    (G_p->g_attrnam_p ==
-					    (char *)NULL) ?
-					    "" : gettext(" Attribute "),
-					    (G_p->g_attrnam_p ==
-					    (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ?
+					    "" : G_p->g_rw_sysattr ?
+					    gettext(" System Attribute ") :
+					    gettext(" Attribute "),
+					    (G_p->g_attrnam_p == NULL) ?
 					    "" : nam_p);
 				}
 			} else if ((fchownat(dirfd, get_component(nam_p),
@@ -4450,12 +5274,13 @@ openout(int dirfd)
 			    AT_SYMLINK_NOFOLLOW) < 0) && privileged) {
 				msg(ERRN,
 				    "Error during chown() of \"%s%s%s\"",
-				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    (G_p->g_attrnam_p == NULL) ?
 				    nam_p : G_p->g_attrfnam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : nam_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 			}
 		}
 		break;
@@ -4463,38 +5288,45 @@ openout(int dirfd)
 	case 1:
 		if (Do_rename) {
 			msg(ERRN, "Cannot create directory for \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ? Over_p :
+			    (G_p->g_attrnam_p == NULL) ? Over_p :
 			    G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
 			    gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" : Over_p);
+			    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
 		} else {
 			msg(ERRN, "Cannot create directory for \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ? nam_p :
+			    (G_p->g_attrnam_p == NULL) ? nam_p :
 			    G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
 			    gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" : nam_p);
+			    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 		}
 		break;
 
 	case 2:
 		if (Do_rename) {
 			msg(ERRN, "Cannot create \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ? Over_p :
+			    (G_p->g_attrnam_p == NULL) ? Over_p :
 			    G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
 			    gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
+			    (G_p->g_attrnam_p == NULL) ? "" :
 			    Over_p);
 		} else {
 			msg(ERRN, "Cannot create \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ? nam_p :
+			    (G_p->g_attrnam_p == NULL) ? nam_p :
 			    G_p->g_attrfnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ?
+			    gettext(" System Attribute ") :
 			    gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ? "" :
-			    nam_p);
+			    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 		}
 		break;
 
@@ -4605,7 +5437,7 @@ read_hdr(int hdr)
 			    (ulong_t *)&Gen.g_mtime);
 			(void) sscanf(Thdr_p->tbuf.t_cksum, "%8lo",
 			    (ulong_t *)&Gen.g_cksum);
-			if (Thdr_p->tbuf.t_linkname[0] != (char)NULL)
+			if (Thdr_p->tbuf.t_linkname[0] != '\0')
 				Gen.g_nlink = 1;
 			else
 				Gen.g_nlink = 0;
@@ -4753,7 +5585,7 @@ rstbuf(void)
 static void
 setpasswd(char *nam)
 {
-	if ((dpasswd = getpwnam(&Gen.g_uname[0])) == (struct passwd *)NULL) {
+	if ((dpasswd = getpwnam(&Gen.g_uname[0])) == NULL) {
 		msg(EPOST, "cpio: problem reading passwd entry");
 		msg(EPOST, "cpio: %s: owner not changed", nam);
 		if (Gen.g_uid == UID_NOBODY && S_ISREG(Gen.g_mode))
@@ -4761,7 +5593,7 @@ setpasswd(char *nam)
 	} else
 		Gen.g_uid = dpasswd->pw_uid;
 
-	if ((dgroup = getgrnam(&Gen.g_gname[0])) == (struct group *)NULL) {
+	if ((dgroup = getgrnam(&Gen.g_gname[0])) == NULL) {
 		msg(EPOST, "cpio: problem reading group entry");
 		msg(EPOST, "cpio: %s: group not changed", nam);
 		if (Gen.g_gid == GID_NOBODY && S_ISREG(Gen.g_mode))
@@ -4788,8 +5620,15 @@ rstfiles(int over, int dirfd)
 	char *inam_p, *onam_p, *nam_p;
 	int error;
 
+#if defined(_PC_SATTR_ENABLED)
+	/* Time or permissions cannot be set on system attribute files */
+	if ((Gen.g_attrnam_p != NULL) && (Gen.g_rw_sysattr == 1)) {
+		return;
+	}
+#endif	/* _PC_SATTR_ENABLED */
+
 	if (Args & OCp) {
-		if (G_p->g_attrnam_p == (char *)NULL) {
+		if (G_p->g_attrnam_p == NULL) {
 			nam_p = Fullnam_p;
 		} else {
 			nam_p = G_p->g_attrnam_p;
@@ -4801,7 +5640,7 @@ rstfiles(int over, int dirfd)
 			nam_p = Gen.g_nam_p;
 		}
 	}
-	if (Gen.g_attrnam_p != (char *)NULL) {
+	if (Gen.g_attrnam_p != NULL) {
 		nam_p = Gen.g_attrnam_p;
 	}
 
@@ -4811,20 +5650,18 @@ rstfiles(int over, int dirfd)
 	if (over == U_KEEP && *Over_p != '\0') {
 		if (Do_rename) {
 			msg(POST, "Restoring existing \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    Over_p : Fullnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : Over_p);
+			    (G_p->g_attrnam_p == NULL) ? Over_p : Fullnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
 		} else {
 			msg(POST, "Restoring existing \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    nam_p : Fullnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : nam_p);
+			    (G_p->g_attrnam_p == NULL) ? nam_p : Fullnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 		}
 
 		/* delete what we just built */
@@ -4850,22 +5687,26 @@ rstfiles(int over, int dirfd)
 					msg(EXTN,
 					    "Cannot recover original version"
 					    " of \"%s%s%s\"",
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ?
 					    nam_p : Fullnam_p,
-					    (G_p->g_attrnam_p == (char *)NULL) ?
-					    "" : gettext(" Attribute "),
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ? "" :
+					    G_p->g_rw_sysattr ?
+					    gettext(" System Attribute ") :
+					    gettext(" Attribute "),
+					    (G_p->g_attrnam_p == NULL) ?
 					    "" : nam_p);
 				}
 				if (unlinkat(dirfd, get_component(Over_p), 0)) {
 					msg(ERRN,
 					    "Cannot remove temp file "
 					    "\"%s%s%s\"",
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ?
 					    Over_p : Fullnam_p,
-					    (G_p->g_attrnam_p == (char *)NULL) ?
-					    "" : gettext(" Attribute "),
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p == NULL) ? "" :
+					    G_p->g_rw_sysattr ?
+					    gettext(" System Attribute ") :
+					    gettext(" Attribute "),
+					    (G_p->g_attrnam_p == NULL) ?
 					    "" : Over_p);
 				}
 			}
@@ -4879,7 +5720,7 @@ rstfiles(int over, int dirfd)
 			(void) renameat(dirfd, get_component(nam_p),
 			    dirfd, get_component(Over_p));
 			if (Args & OCp) {
-				if (G_p->g_attrnam_p == (char *)NULL) {
+				if (G_p->g_attrnam_p == NULL) {
 					tmp_ptr = Fullnam_p;
 					Fullnam_p = Over_p;
 					Over_p = tmp_ptr;
@@ -4904,18 +5745,19 @@ rstfiles(int over, int dirfd)
 			if (unlinkat(dirfd, get_component(Over_p), 0) < 0) {
 				msg(ERRN,
 				    "Cannot unlink() temp file \"%s%s%s\"",
-				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    (G_p->g_attrnam_p == NULL) ?
 				    Over_p : Fullnam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : Over_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : Over_p);
 			}
 		}
 		*Over_p = '\0';
 	}
 	if (Args & OCp) {
-		if (G_p->g_attrnam_p != (char *)NULL) {
+		if (G_p->g_attrnam_p != NULL) {
 			inam_p = G_p->g_attrfnam_p;
 			onam_p = G_p->g_attrnam_p;
 		} else {
@@ -4923,7 +5765,7 @@ rstfiles(int over, int dirfd)
 			onam_p = Fullnam_p;
 		}
 	} else /* OCi only uses onam_p, OCo only uses inam_p */
-		if (G_p->g_attrnam_p != (char *)NULL) {
+		if (G_p->g_attrnam_p != NULL) {
 			inam_p = onam_p = G_p->g_attrnam_p;
 		} else {
 			inam_p = onam_p = G_p->g_nam_p;
@@ -4943,10 +5785,11 @@ rstfiles(int over, int dirfd)
 			    AT_SYMLINK_NOFOLLOW) < 0) {
 				msg(ERRN, "Cannot chown() \"%s%s%s\"",
 				    onam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : onam_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : onam_p);
 			}
 		} else {
 			if ((fchownat(dirfd, get_component(onam_p),
@@ -4954,10 +5797,11 @@ rstfiles(int over, int dirfd)
 			    AT_SYMLINK_NOFOLLOW) < 0) && privileged) {
 				msg(ERRN, "Cannot chown() \"%s%s%s\"",
 				    onam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : onam_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : onam_p);
 			}
 		}
 
@@ -4986,7 +5830,7 @@ rstfiles(int over, int dirfd)
 				new_mask = G_p->g_mode & ~orig_mask;
 			}
 
-			if (G_p->g_attrnam_p != (char *)NULL) {
+			if (G_p->g_attrnam_p != NULL) {
 				error = fchmod(Ofile, new_mask);
 			} else {
 				error = chmod(onam_p, new_mask);
@@ -4994,12 +5838,13 @@ rstfiles(int over, int dirfd)
 			if (error < 0) {
 				msg(ERRN,
 				    "Cannot chmod() \"%s%s%s\"",
-				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    (G_p->g_attrnam_p == NULL) ?
 				    onam_p : G_p->g_attrfnam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : onam_p);
+				    (G_p->g_attrnam_p == NULL) ? "" :
+				    G_p->g_rw_sysattr ?
+				    gettext(" System Attribute ") :
+				    gettext(" Attribute "),
+				    (G_p->g_attrnam_p == NULL) ? "" : onam_p);
 			}
 			if (!privileged) {
 				(void) umask(orig_mask);
@@ -5031,7 +5876,7 @@ scan4trail(void)
 
 	Append = 1;
 	Hdr_type = NONE;
-	G_p = (struct gen_hdr *)NULL;
+	G_p = NULL;
 	while (gethdr()) {
 		G_p = &Gen;
 		data_in(P_SKIP);
@@ -5066,18 +5911,28 @@ setup(int largc, char **largv)
 	extern char *optarg;
 
 #if defined(O_XATTR)
+#if defined(_PC_SATTR_ENABLED)
+#ifdef WAITAROUND
+	char	*opts_p = "zabcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6@/";
+#else
+	char	*opts_p = "abcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6@/";
+#endif	/* WAITAROUND */
+
+#else	/* _PC_SATTR_ENABLED */
 #ifdef WAITAROUND
 	char	*opts_p = "zabcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6@";
 #else
 	char	*opts_p = "abcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6@";
-#endif
-#else
+#endif	/* WAITAROUND */
+#endif	/* _PC_SATTR_ENABLED */
+
+#else	/* O_XATTR */
 #ifdef WAITAROUND
 	char	*opts_p = "zabcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6";
 #else
 	char	*opts_p = "abcdfiklmoprstuvABC:DE:H:I:LM:O:PR:SV6";
-#endif
-#endif
+#endif	/* WAITAROUND */
+#endif	/* O_XATTR */
 
 	char   *dupl_p = "Only one occurrence of -%c allowed";
 	int option;
@@ -5249,7 +6104,12 @@ setup(int largc, char **largv)
 		case '@':
 			Atflag++;
 			break;
-#endif
+#if defined(_PC_SATTR_ENABLED)
+		case '/':
+			SysAtflag++;
+			break;
+#endif	/* _PC_SATTR_ENABLED */
+#endif	/* O_XATTR */
 		default:
 			Error_cnt++;
 		} /* option */
@@ -5274,6 +6134,9 @@ setup(int largc, char **largv)
 		if (Args & OCr) {
 			Renam_p = e_zalloc(E_EXIT, APATH + 1);
 			Renametmp_p = e_zalloc(E_EXIT, APATH + 1);
+#if defined(_PC_SATTR_ENABLED)
+			Renam_attr_p = e_zalloc(E_EXIT, APATH + 1);
+#endif
 		}
 		Symlnk_p = e_zalloc(E_EXIT, APATH);
 		Over_p = e_zalloc(E_EXIT, APATH);
@@ -5284,7 +6147,7 @@ setup(int largc, char **largv)
 		Fullnam_p = e_zalloc(E_EXIT, APATH);
 		Lnknam_p = e_zalloc(E_EXIT, APATH);
 		Gen.g_nam_p = Nam_p;
-		if ((Fullnam_p = getcwd((char *)NULL, APATH)) == (char *)NULL)
+		if ((Fullnam_p = getcwd(NULL, APATH)) == NULL)
 			msg(EXT, "Unable to determine current directory.");
 		if (Args & OCi) {
 			if (largc > 0) /* save patterns for -i option, if any */
@@ -5400,7 +6263,7 @@ setup(int largc, char **largv)
 	(void) getrlimit(RLIMIT_FSIZE, &rlim);
 	Max_filesz = (off_t)rlim.rlim_cur;
 	Lnk_hd.L_nxt_p = Lnk_hd.L_bck_p = &Lnk_hd;
-	Lnk_hd.L_lnk_p = (struct Lnk *)NULL;
+	Lnk_hd.L_lnk_p = NULL;
 }
 
 /*
@@ -5421,21 +6284,19 @@ set_tym(int dirfd, char *nam_p, time_t atime, time_t mtime)
 		if (Args & OCa) {
 			msg(ERRN,
 			    "Unable to reset access time for \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    nam_p : Fullnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : nam_p);
+			    (G_p->g_attrnam_p == NULL) ? nam_p : Fullnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 		} else {
 			msg(ERRN,
 			    "Unable to reset modification time for \"%s%s%s\"",
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    nam_p : Fullnam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : nam_p);
+			    (G_p->g_attrnam_p == NULL) ? nam_p : Fullnam_p,
+			    (G_p->g_attrnam_p == NULL) ? "" :
+			    G_p->g_rw_sysattr ? gettext(" System Attribute ") :
+			    gettext(" Attribute "),
+			    (G_p->g_attrnam_p == NULL) ? "" : nam_p);
 		}
 	}
 }
@@ -5582,20 +6443,27 @@ verbose(char *nam_p)
 	const char *name = nam_p;
 	const char *attribute = NULL;
 
-	if (Gen.g_attrnam_p != (char *)NULL) {
+	if (Gen.g_attrnam_p != NULL) {
 		/*
 		 * Translation note:
 		 * 'attribute' is a noun.
 		 */
 
-		if (is_sysattr(basename(Gen.g_attrnam_p))) {
+		if (Gen.g_rw_sysattr) {
+			name_fmt = gettext("%s system attribute %s");
+		} else if ((Args & OCt) &&
+		    (is_sysattr(basename(Gen.g_attrnam_p)))) {
 			name_fmt = gettext("%s system attribute %s");
 		} else {
 			name_fmt = gettext("%s attribute %s");
 		}
 
 		name = (Args & OCp) ? nam_p : Gen.g_attrfnam_p;
-		attribute = Gen.g_attrnam_p;
+		if (Gen.g_attrparent_p == NULL) {
+			attribute = Gen.g_attrnam_p;
+		} else {
+			attribute = Gen.g_attrpath_p;
+		}
 	}
 
 	if ((Gen.g_mode == SECMODE) || ((Hdr_type == USTAR ||
@@ -5629,6 +6497,9 @@ verbose(char *nam_p)
 			case (S_IFIFO):
 				modestr[0] = 'p';
 				break;
+			case (S_IFSOCK):
+				modestr[0] = 's';
+				break;
 			case (S_IFCHR):
 				modestr[0] = 'c';
 				break;
@@ -5651,6 +6522,9 @@ verbose(char *nam_p)
 			switch (temp) {
 			case (S_IFIFO):
 				modestr[0] = 'p';
+				break;
+			case (S_IFSOCK):
+				modestr[0] = 's';
 				break;
 			case (S_IFCHR):
 				modestr[0] = 'c';
@@ -5708,6 +6582,7 @@ verbose(char *nam_p)
 
 		/* print file size */
 		if (!Aspec || ((Gen.g_mode & Ftype) == S_IFIFO) ||
+		    ((Gen.g_mode & Ftype) == S_IFSOCK) ||
 		    (Hdr_type == BAR && bar_linkflag == SYMTYPE)) {
 			if (Gen.g_filesz < (1LL << 31))
 				(void) printf("%7lld ",
@@ -5744,11 +6619,11 @@ verbose(char *nam_p)
 		if ((Hdr_type == USTAR || Hdr_type == TAR) &&
 		    Thdr_p->tbuf.t_typeflag == '1') {
 			(void) printf(gettext(" linked to %s%s%s"),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ?
 			    Thdr_p->tbuf.t_linkname : Gen.g_attrfnam_p,
-			    (Gen.g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" attribute "),
-			    (Gen.g_attrnam_p == (char *)NULL) ?
+			    (Gen.g_attrnam_p == NULL) ? "" :
+			    gettext(" attribute "),
+			    (Gen.g_attrnam_p == NULL) ?
 			    "" : Gen.g_linktoattrnam_p);
 		}
 		(void) printf("\n");
@@ -5798,7 +6673,7 @@ write_hdr(int secflag, off_t len)
 		 * and the length of the special header buffer in
 		 * the case of acl and xattr headers.
 		 */
-		if (G_p->g_attrnam_p != (char *)NULL && Hdr_type != USTAR &&
+		if (G_p->g_attrnam_p != NULL && Hdr_type != USTAR &&
 		    Hdr_type != TAR) {
 			mode = (G_p->g_mode & POSIXMODES) | _XATTR_CPIO_MODE;
 		} else {
@@ -5852,24 +6727,22 @@ write_hdr(int secflag, off_t len)
 	 */
 	if (uid != G_p->g_uid && Hdr_type != USTAR) {
 		msg(ERR, warnfmt,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
+		    (G_p->g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : G_p->g_attrfnam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_attrnam_p,
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p,
 		    gettext("uid too large for archive format"));
 		if (S_ISREG(mode))
 			mode &= ~S_ISUID;
 	}
 	if (gid != G_p->g_gid && Hdr_type != USTAR) {
 		msg(ERR, warnfmt,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
+		    (G_p->g_attrnam_p == NULL) ?
 		    G_p->g_nam_p : G_p->g_attrfnam_p,
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : gettext(" Attribute "),
-		    (G_p->g_attrnam_p == (char *)NULL) ?
-		    "" : G_p->g_attrnam_p,
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_rw_sysattr ?
+		    gettext(" System Attribute ") : gettext(" Attribute "),
+		    (G_p->g_attrnam_p == NULL) ? "" : G_p->g_attrnam_p,
 		    gettext("gid too large for archive format"));
 		if (S_ISREG(mode))
 			mode &= ~S_ISGID;
@@ -5941,7 +6814,7 @@ write_hdr(int secflag, off_t len)
 		if (secflag == ARCHIVE_ACL) {
 			Thdr_p->tbuf.t_typeflag = 'A';	/* ACL file type */
 		} else if (secflag == ARCHIVE_XATTR ||
-		    (G_p->g_attrnam_p != (char *)NULL)) {
+		    (G_p->g_attrnam_p != NULL)) {
 			Thdr_p->tbuf.t_typeflag = _XATTR_HDRTYPE;
 		} else {
 			Thdr_p->tbuf.t_typeflag = G_p->g_typeflag;
@@ -5951,7 +6824,7 @@ write_hdr(int secflag, off_t len)
 			 * if not a symbolic link
 			 */
 			if (((G_p->g_mode & Ftype) != S_IFLNK) &&
-			    (G_p->g_attrnam_p == (char *)NULL)) {
+			    (G_p->g_attrnam_p == NULL)) {
 				Thdr_p->tbuf.t_typeflag = LNKTYPE;
 				(void) sprintf(Thdr_p->tbuf.t_size,
 				    "%011lo", 0L);
@@ -6876,14 +7749,82 @@ xattrs_out(int (*func)())
 {
 	int dirpfd;
 	int filefd;
+	int arc_rwsysattr = 0;
+	int rw_sysattr = 0;
+	int ext_attr = 0;
 	DIR *dirp;
 	struct dirent *dp;
 	int slen;
+	int plen;
 	char *namep, *savenamep;
+	char *apathp;
+	char *attrparent = Gen.g_attrparent_p;
+	char *filename;
 
-	if (pathconf(G_p->g_nam_p, _PC_XATTR_EXISTS) != 1) {
+	if (attrparent == NULL) {
+		filename = Gen.g_nam_p;
+	} else {
+		filename = Gen.g_attrnam_p;
+	}
+
+	/*
+	 * If the underlying file system supports it, then
+	 * archive the extended attributes if -@ was specified,
+	 * and the extended system attributes if -/ was
+	 * specified.
+	 */
+	if (verify_attr_support(filename, (attrparent == NULL), ARC_CREATE,
+	    &ext_attr) != ATTR_OK) {
 		return;
 	}
+
+#if defined(_PC_SATTR_ENABLED)
+	if (SysAtflag) {
+		int		filefd;
+		nvlist_t 	*slist = NULL;
+
+		/*
+		 * Determine if there are non-transient system
+		 * attributes.
+		 */
+		errno = 0;
+		if ((filefd = open(filename, O_RDONLY)) == -1) {
+			if (attrparent == NULL) {
+				msg(EXTN,
+				    "unable to open %s%s%sfile %s",
+				    (attrparent == NULL) ? "" :
+				    gettext("attribute "),
+				    (attrparent == NULL) ? "" : attrparent,
+				    (attrparent == NULL) ? "" : gettext(" of "),
+				    (attrparent == NULL) ? G_p->g_nam_p :
+				    G_p->g_attrfnam_p);
+			}
+		}
+		if (((slist = sysattr_list(myname, filefd,
+		    filename)) != NULL) || (errno != 0)) {
+			arc_rwsysattr = 1;
+		}
+		if (slist != NULL) {
+			(void) nvlist_free(slist);
+			slist = NULL;
+		}
+		(void) close(filefd);
+	}
+
+	/*
+	 * If we aren't archiving extended system attributes, and we are
+	 * processing an attribute, or if we are archiving extended system
+	 * attributes, and there are are no extended attributes, then there's
+	 * no need to open up the attribute directory of the file unless the
+	 * extended system attributes are not transient (i.e, the system
+	 * attributes are not the default values).
+	 */
+	if ((arc_rwsysattr == 0) && ((attrparent != NULL) ||
+	    (SysAtflag && !ext_attr))) {
+		return;
+	}
+
+#endif	/* _PC_SATTR_ENABLED */
 
 	/*
 	 * If aclp still exists then free it since it is was set when base
@@ -6895,28 +7836,42 @@ xattrs_out(int (*func)())
 		acl_is_set = 0;
 	}
 
-	Gen.g_dirfd = attropen(G_p->g_nam_p, ".", O_RDONLY);
+	Gen.g_dirfd = attropen(filename, ".", O_RDONLY);
 	if (Gen.g_dirfd == -1) {
-		msg(ERRN, "Cannot open attribute directory of file \"%s\"",
-		    G_p->g_nam_p);
+		msg(ERRN, "Cannot open attribute directory of file \"%s%s%s\"",
+		    (attrparent == NULL) ? "" : gettext("attribute "),
+		    (attrparent == NULL) ? "" : attrparent,
+		    (attrparent == NULL) ? "" : gettext(" of "), filename);
 		return;
 
 	}
-	savenamep = G_p->g_nam_p;
+
+	if (attrparent == NULL) {
+		savenamep = G_p->g_nam_p;
+	} else {
+		savenamep = G_p->g_attrfnam_p;
+	}
 
 	if ((dirpfd = dup(Gen.g_dirfd)) == -1)  {
 		msg(ERRN, "Cannot dup(2) attribute directory descriptor");
 		return;
 	}
 
-	if ((dirp = fdopendir(dirpfd)) == (DIR *)NULL) {
+	if ((dirp = fdopendir(dirpfd)) == NULL) {
 		msg(ERRN, "Cannot fdopendir(2) directory file descriptor");
 		return;
 	}
 
-	while ((dp = readdir(dirp)) != (struct dirent *)NULL) {
-		if ((strcmp(dp->d_name, "..") == 0) ||
-		    is_sysattr(dp->d_name)) {
+	if (attrparent == NULL) {
+		Gen.g_baseparent_fd = save_cwd();
+	}
+
+	while ((dp = readdir(dirp)) != NULL) {
+		if (strcmp(dp->d_name, "..") == 0) {
+			continue;
+		}
+		if (verify_attr(dp->d_name, attrparent,
+		    arc_rwsysattr, &rw_sysattr) != ATTR_OK) {
 			continue;
 		}
 
@@ -6926,16 +7881,19 @@ xattrs_out(int (*func)())
 			Hiddendir = 0;
 		}
 
+		Gen.g_rw_sysattr = rw_sysattr;
 		Gen.g_attrnam_p = dp->d_name;
 
 		if (STAT(Gen.g_dirfd, Gen.g_nam_p, &SrcSt) == -1) {
 			msg(ERRN,
 			    "Could not fstatat(2) attribute \"%s\" of"
-			    " file \"%s\"", dp->d_name, savenamep);
+			    " file \"%s\"", dp->d_name, (attrparent == NULL) ?
+			    savenamep : Gen.g_attrfnam_p);
 			continue;
 		}
 
 		if (Use_old_stat) {
+			Savedev = SrcSt.st_dev;
 			OldSt = convert_to_old_stat(&SrcSt,
 			    Gen.g_nam_p, Gen.g_attrnam_p);
 
@@ -6957,14 +7915,31 @@ xattrs_out(int (*func)())
 		 * and the actual file itself is archived.
 		 */
 		slen = strlen(Gen.g_attrnam_p) + strlen(DEVNULL) +
-		    strlen(XATTRHDR) + 1;
-		if ((namep = e_zalloc(E_NORMAL, slen)) == (char *)NULL) {
+		    strlen(XATTRHDR) + 2;	/* add one for '/' */
+		if ((namep = e_zalloc(E_NORMAL, slen)) == NULL) {
 			msg(ERRN, "Could not calloc memory for attribute name");
 			continue;
 		}
-		(void) sprintf(namep, "%s/%s%s",
+		(void) snprintf(namep, slen, "%s/%s%s",
 		    DEVNULL, Gen.g_attrnam_p, XATTRHDR);
 		Gen.g_nam_p = namep;
+
+		plen = strlen(Gen.g_attrnam_p) + 1;
+		if (Gen.g_attrparent_p != NULL) {
+			plen += strlen(Gen.g_attrparent_p) + 1;
+		}
+		if ((apathp = e_zalloc(E_NORMAL, plen)) == NULL) {
+			msg(ERRN, "Could not calloc memory for attribute name");
+			continue;
+		}
+		(void) snprintf(apathp, plen, "%s%s%s",
+		    (Gen.g_attrparent_p == NULL) ? "" : Gen.g_attrparent_p,
+		    (Gen.g_attrparent_p == NULL) ? "" : "/", Gen.g_attrnam_p);
+
+		if (Gen.g_attrpath_p != NULL) {
+			free(Gen.g_attrpath_p);
+		}
+		Gen.g_attrpath_p = apathp;
 
 		/*
 		 * Get attribute's ACL info: don't bother allocating space
@@ -6986,16 +7961,40 @@ xattrs_out(int (*func)())
 			}
 			(void) close(filefd);
 		}
+
 		(void) creat_hdr();
 		(void) (*func)();
+
+#if defined(_PC_SATTR_ENABLED)
+		/*
+		 * Recursively call xattrs_out() to process the attribute's
+		 * hidden attribute directory and read-write system attributes.
+		 */
+		if (SysAtflag && !Hiddendir && !rw_sysattr) {
+			int	savedirfd = Gen.g_dirfd;
+
+			(void) fchdir(Gen.g_dirfd);
+			Gen.g_attrparent_p = dp->d_name;
+			xattrs_out(func);
+			Gen.g_dirfd = savedirfd;
+			Gen.g_attrparent_p = NULL;
+		}
+#endif	/* _PC_SATTR_ENABLED */
+
 		if (Gen.g_passdirfd != -1) {
 			(void) close(Gen.g_passdirfd);
 			Gen.g_passdirfd = -1;
 		}
-		Gen.g_attrnam_p = (char *)NULL;
-		Gen.g_attrfnam_p = (char *)NULL;
-		Gen.g_linktoattrfnam_p = (char *)NULL;
-		Gen.g_linktoattrnam_p = (char *)NULL;
+		Gen.g_attrnam_p = NULL;
+		Gen.g_attrfnam_p = NULL;
+		Gen.g_linktoattrfnam_p = NULL;
+		Gen.g_linktoattrnam_p = NULL;
+		Gen.g_rw_sysattr = 0;
+		if (Gen.g_attrpath_p != NULL) {
+			free(Gen.g_attrpath_p);
+			Gen.g_attrpath_p = NULL;
+		}
+
 		if (aclp != NULL) {
 			acl_free(aclp);
 			aclp = NULL;
@@ -7006,7 +8005,11 @@ xattrs_out(int (*func)())
 
 	(void) closedir(dirp);
 	(void) close(Gen.g_dirfd);
-	Gen.g_dirfd = -1;
+	if (attrparent == NULL) {
+		rest_cwd(Gen.g_baseparent_fd);
+		Gen.g_dirfd = -1;
+	}
+	Hiddendir = 0;
 }
 #else
 static void
@@ -7058,27 +8061,32 @@ static void
 prepare_xattr_hdr(
 	char		**attrbuf,
 	char		*filename,
-	char		*attrname,
+	char		*attrpath,
 	char		typeflag,
 	struct Lnk	*linkinfo,
 	int		*rlen)
 {
 	char			*bufhead;	/* ptr to full buffer */
+	char			*aptr;
 	struct xattr_hdr 	*hptr;		/* ptr to header in bufhead */
 	struct xattr_buf	*tptr;		/* ptr to pathing pieces */
 	int			totalen;	/* total buffer length */
 	int			len;		/* length returned to user */
 	int			stringlen;	/* length of filename + attr */
-	int			linkstringlen;	/* ditto in link section */
+						/*
+						 * length of filename + attr
+						 * in link section
+						 */
+	int			linkstringlen;
 	int			complen;	/* length of pathing section */
 	int			linklen;	/* length of link section */
-
+	int			attrnames_index; /* attrnames starting index */
 
 	/*
 	 * Release previous buffer if any.
 	 */
 
-	if (*attrbuf != (char *)NULL) {
+	if (*attrbuf != NULL) {
 		free(*attrbuf);
 		*attrbuf = NULL;
 	}
@@ -7091,7 +8099,7 @@ prepare_xattr_hdr(
 	/*
 	 * Add space for two nulls
 	 */
-	stringlen = strlen(attrname) + strlen(filename) + 2;
+	stringlen = strlen(attrpath) + strlen(filename) + 2;
 	complen = stringlen + sizeof (struct xattr_buf);
 
 	len += stringlen;
@@ -7106,7 +8114,10 @@ prepare_xattr_hdr(
 		 */
 		linkstringlen = strlen(linkinfo->L_gen.g_attrfnam_p) +
 		    strlen(linkinfo->L_gen.g_attrnam_p) + 2;
-		len += linkstringlen;
+		linklen = linkstringlen + sizeof (struct xattr_buf);
+		len += linklen;
+	} else {
+		linklen = 0;
 	}
 
 	/*
@@ -7122,12 +8133,6 @@ prepare_xattr_hdr(
 	 * Now we can fill in the necessary pieces
 	 */
 
-	if (linkinfo != (struct Lnk *)NULL) {
-		linklen = linkstringlen + (sizeof (struct xattr_buf));
-	} else {
-		linklen = 0;
-	}
-
 	/*
 	 * first fill in the fixed header
 	 */
@@ -7141,20 +8146,43 @@ prepare_xattr_hdr(
 
 	/*
 	 * Now fill in the filename + attrnames section
+	 * The filename and attrnames section can be composed of two or more
+	 * path segments separated by a null character.  The first segment
+	 * is the path to the parent file that roots the entire sequence in
+	 * the normal name space. The remaining segments describes a path
+	 * rooted at the hidden extended attribute directory of the leaf file of
+	 * the previous segment, making it possible to name attributes on
+	 * attributes.  Thus, if we are just archiving an extended attribute,
+	 * the second segment will contain the attribute name.  If we are
+	 * archiving a system attribute of an extended attribute, then the
+	 * second segment will contain the attribute name, and a third segment
+	 * will contain the system attribute name.  The attribute pathing
+	 * information is obtained from 'attrpath'.
 	 */
 
 	tptr = (struct xattr_buf *)(bufhead + sizeof (struct xattr_hdr));
 	(void) sprintf(tptr->h_namesz, "%0*d", sizeof (tptr->h_namesz) - 1,
 	    stringlen);
 	(void) strcpy(tptr->h_names, filename);
-	(void) strcpy(&tptr->h_names[strlen(filename) + 1], attrname);
+	attrnames_index = strlen(filename) + 1;
+	(void) strcpy(&tptr->h_names[attrnames_index], attrpath);
 	tptr->h_typeflag = typeflag;
+
+	/*
+	 * Split the attrnames section into two segments if 'attrpath'
+	 * contains pathing information for a system attribute of an
+	 * extended attribute.  We split them by replacing the '/' with
+	 * a '\0'.
+	 */
+	if ((aptr = strpbrk(&tptr->h_names[attrnames_index], "/")) != NULL) {
+		*aptr = '\0';
+	}
 
 	/*
 	 * Now fill in the optional link section if we have one
 	 */
 
-	if (linkinfo != (struct Lnk *)NULL) {
+	if (linkinfo != NULL) {
 		tptr = (struct xattr_buf *)(bufhead +
 		    sizeof (struct xattr_hdr) + complen);
 
@@ -7169,7 +8197,7 @@ prepare_xattr_hdr(
 	*attrbuf = (char *)bufhead;
 	*rlen = len;
 }
-#endif /* O_XATTR */
+#endif	/* O_XATTR */
 
 static char
 tartype(int type)
@@ -7203,9 +8231,8 @@ tartype(int type)
 static int
 openfile(int omode)
 {
-
-	if (G_p->g_attrnam_p != (char *)NULL) {
-		return (attropen(G_p->g_attrfnam_p, G_p->g_attrnam_p, omode));
+	if (G_p->g_attrnam_p != NULL) {
+		return (openat(G_p->g_dirfd, G_p->g_attrnam_p, omode));
 	} else {
 		return (openat(G_p->g_dirfd,
 		    get_component(G_p->g_nam_p), omode));
@@ -7413,19 +8440,40 @@ open_dirfd()
 #ifdef O_XATTR
 	if ((Args & OCt) == 0) {
 		close_dirfd();
-		if (G_p->g_attrnam_p != (char *)NULL) {
-			G_p->g_dirfd = attropen(G_p->g_attrfnam_p,
-			    ".", O_RDONLY);
-			if (G_p->g_dirfd == -1 && (Args & (OCi | OCp))) {
-				G_p->g_dirfd =
-				    retry_attrdir_open(G_p->g_attrfnam_p);
-				if (G_p->g_dirfd == -1) {
-					msg(ERRN,
-					    "Cannot open attribute"
-					    " directory of file %s",
-					    G_p->g_attrfnam_p);
-					return (1);
-				}
+		if (G_p->g_attrnam_p != NULL) {
+			int	rw_sysattr;
+
+			/*
+			 * Open the file's attribute directory.
+			 * Change into the base file's starting directory then
+			 * call open_attr_dir() to open the attribute directory
+			 * of either the base file (if G_p->g_attrparent_p is
+			 * NULL) or the attribute (if G_p->g_attrparent_p is
+			 * set) of the base file.
+			 */
+			(void) fchdir(G_p->g_baseparent_fd);
+			(void) open_attr_dir(G_p->g_attrnam_p,
+			    G_p->g_attrfnam_p, G_p->g_baseparent_fd,
+			    (G_p->g_attrparent_p == NULL) ? NULL :
+			    G_p->g_attrparent_p, &G_p->g_dirfd, &rw_sysattr);
+			if (Args & OCi) {
+				int	saveerrno = errno;
+
+				(void) fchdir(G_p->g_baseparent_fd);
+				errno = saveerrno;
+			}
+			if ((G_p->g_dirfd == -1) && (Args & (OCi | OCp))) {
+				msg(ERRN,
+				    "Cannot open attribute directory "
+				    "of %s%s%sfile \"%s\"",
+				    (G_p->g_attrparent_p == NULL) ? "" :
+				    gettext("attribute \""),
+				    (G_p->g_attrparent_p == NULL) ? "" :
+				    G_p->g_attrparent_p,
+				    (G_p->g_attrparent_p == NULL) ? "" :
+				    gettext("\" of "),
+				    G_p->g_attrfnam_p);
+				return (FILE_PASS_ERR);
 			}
 		} else {
 			G_p->g_dirfd = open_dir(G_p->g_nam_p);
@@ -7471,7 +8519,6 @@ write_xattr_hdr()
 	namep = Gen.g_nam_p;
 	(void) creat_hdr();
 
-
 	if (Args & OCo) {
 		linkinfo = NULL;
 		tl_p = Lnk_hd.L_nxt_p;
@@ -7484,8 +8531,8 @@ write_xattr_hdr()
 			tl_p = tl_p->L_nxt_p;
 		}
 		prepare_xattr_hdr(&attrbuf, Gen.g_attrfnam_p,
-		    Gen.g_attrnam_p,
-		    (linkinfo == (struct Lnk *)NULL) ?
+		    Gen.g_attrpath_p,
+		    (linkinfo == NULL) ?
 		    tartype(Gen.g_mode & Ftype) : LNKTYPE,
 		    linkinfo, &attrlen);
 		Gen.g_filesz = attrlen;
@@ -7496,84 +8543,6 @@ write_xattr_hdr()
 
 	(void) creat_hdr();
 #endif
-}
-
-static int
-retry_attrdir_open(char *name)
-{
-	int dirfd = -1;
-	struct timeval times[2];
-	mode_t newmode;
-	struct stat parentstat;
-	acl_t *aclp = NULL;
-	int error;
-
-	/*
-	 * We couldn't get to attrdir. See if its
-	 * just a mode problem on the parent file.
-	 * for example: a mode such as r-xr--r--
-	 * won't let us create an attribute dir
-	 * if it doesn't already exist.
-	 *
-	 * If file has a non-trivial ACL, then save it
-	 * off so that we can place it back on after doing
-	 * chmod's.
-	 */
-
-	if (stat(name, &parentstat) == -1) {
-		msg(ERRN, "Cannot stat file %s", name);
-		return (-1);
-	}
-
-	if ((error = acl_get(name, ACL_NO_TRIVIAL, &aclp)) != 0) {
-		msg(ERRN,
-		    "Failed to retrieve ACL on %s %s", name, strerror(errno));
-		return (-1);
-	}
-
-	newmode = S_IWUSR | parentstat.st_mode;
-	if (chmod(name, newmode) == -1) {
-		msg(ERRN, "Cannot change mode of file %s to %o", name, newmode);
-		if (aclp)
-			acl_free(aclp);
-		return (-1);
-	}
-
-	dirfd = attropen(name, ".", O_RDONLY);
-
-	/*
-	 * Don't print error here, caller will handle printing out
-	 * can't open message.
-	 */
-
-	/*
-	 * Put mode back to original
-	 */
-	if (chmod(name, parentstat.st_mode) != 0) {
-		msg(ERRN, "Cannot restore permissions of file %s to %o",
-		    name, parentstat.st_mode);
-	}
-
-	if (aclp) {
-		error = acl_set(name, aclp);
-		if (error) {
-			msg(ERRN, "failed to set ACL on %s", name);
-		}
-		acl_free(aclp);
-	}
-	/*
-	 * Put back time stamps
-	 */
-
-	times[0].tv_sec = parentstat.st_atime;
-	times[0].tv_usec = 0;
-	times[1].tv_sec = parentstat.st_mtime;
-	times[1].tv_usec = 0;
-	if (utimes(name, times) != 0) {
-		msg(ERRN, "Cannot reset timestamps on file %s");
-	}
-
-	return (dirfd);
 }
 
 /*
@@ -7617,7 +8586,7 @@ sl_info_alloc(void)
  */
 
 sl_info_t *
-sl_insert(dev_t device, ino_t inode)
+sl_insert(dev_t device, ino_t inode, int ftype)
 {
 	sl_info_t *p;		/* moves down the tree */
 	sl_info_t *q;		/* scratch */
@@ -7641,6 +8610,7 @@ sl_insert(dev_t device, ino_t inode)
 
 		p = head->rlink = sl_info_alloc();
 		p->sl_ino = inode;
+		p->sl_ftype = ftype;
 		p->sl_count = 0;
 		p->bal = 0;
 		p->llink = NULL;
@@ -7655,7 +8625,7 @@ sl_insert(dev_t device, ino_t inode)
 	/* compare */
 
 	for (done = 0; ! done; ) {
-		switch (sl_compare(inode, p->sl_ino)) {
+		switch (sl_compare(inode, ftype, p->sl_ino, p->sl_ftype)) {
 			case -1:
 				/* move left */
 
@@ -7701,20 +8671,21 @@ sl_insert(dev_t device, ino_t inode)
 	/* insert */
 
 	q->sl_ino = inode;
+	q->sl_ftype = ftype;
 	q->sl_count = 0;
 	q->llink = q->rlink = NULL;
 	q->bal = 0;
 
 	/* adjust balance factors */
 
-	if ((cmpflg = sl_compare(inode, s->sl_ino)) < 0) {
+	if ((cmpflg = sl_compare(inode, ftype, s->sl_ino, s->sl_ftype)) < 0) {
 		r = p = s->llink;
 	} else {
 		r = p = s->rlink;
 	}
 
 	while (p != q) {
-		switch (sl_compare(inode, p->sl_ino)) {
+		switch (sl_compare(inode, ftype, p->sl_ino, p->sl_ftype)) {
 			case -1:
 				p->bal = -1;
 				p = p->llink;
@@ -7813,9 +8784,9 @@ sl_insert(dev_t device, ino_t inode)
  */
 
 static ulong_t
-sl_numlinks(dev_t device, ino_t inode)
+sl_numlinks(dev_t device, ino_t inode, int ftype)
 {
-	sl_info_t *p = sl_search(device, inode);
+	sl_info_t *p = sl_search(device, inode, ftype);
 
 	if (p) {
 		return (p->sl_count);
@@ -7823,6 +8794,140 @@ sl_numlinks(dev_t device, ino_t inode)
 		return (1);
 	}
 }
+
+/*
+ * Preview extended and extended system attributes.
+ *
+ * Return 0 if successful, otherwise return 1.
+ */
+#if defined(O_XATTR)
+static int
+preview_attrs(char *s, char *attrparent)
+{
+	char		*filename = (attrparent == NULL) ? s : attrparent;
+	int		dirfd;
+	int		tmpfd;
+	int		islnk;
+	int		rc = 0;
+	int		arc_rwsysattr = 0;
+	int		rw_sysattr = 0;
+	int		ext_attr = 0;
+	DIR		*dirp;
+	struct dirent	*dp;
+	struct stat	sb;
+
+	/*
+	 * If the underlying file system supports it, then
+	 * archive the extended attributes if -@ was specified,
+	 * and the extended system attributes if -/ was
+	 * specified.
+	 */
+	if (verify_attr_support(filename, (attrparent == NULL), ARC_CREATE,
+	    &ext_attr) != ATTR_OK) {
+		return (1);
+	}
+
+#if defined(_PC_SATTR_ENABLED)
+	if (SysAtflag) {
+		int		filefd;
+		nvlist_t 	*slist = NULL;
+
+		/* Determine if there are non-transient system attributes. */
+		errno = 0;
+		if ((filefd = open(filename, O_RDONLY)) < 0) {
+			return (1);
+		}
+		if (((slist = sysattr_list(myname, filefd,
+		    filename)) != NULL) || (errno != 0)) {
+			arc_rwsysattr = 1;
+		}
+		if (slist != NULL) {
+			(void) nvlist_free(slist);
+			slist = NULL;
+		}
+		(void) close(filefd);
+	}
+
+	if ((arc_rwsysattr == 0) && ((attrparent != NULL) ||
+	    (SysAtflag && !ext_attr))) {
+		return (1);
+	}
+#endif	/* _PC_SATTR_ENABLED */
+	/*
+	 * We need to open the attribute directory of the
+	 * file, and preview all of the file's attributes as
+	 * attributes of the file can be hard links to other
+	 * attributes of the file.
+	 */
+	dirfd = attropen(filename, ".", O_RDONLY);
+	if (dirfd == -1)
+		return (1);
+
+	tmpfd = dup(dirfd);
+	if (tmpfd == -1) {
+		(void) close(dirfd);
+		return (1);
+	}
+	dirp = fdopendir(tmpfd);
+	if (dirp == NULL) {
+		(void) close(dirfd);
+		(void) close(tmpfd);
+		return (1);
+	}
+
+	while (dp = readdir(dirp)) {
+		if (dp->d_name[0] == '.') {
+			if (dp->d_name[1] == '\0') {
+				Hiddendir = 1;
+			} else if ((dp->d_name[1] == '.') &&
+			    (dp->d_name[2] == '\0')) {
+				continue;
+			} else {
+				Hiddendir = 0;
+			}
+		} else {
+			Hiddendir = 0;
+		}
+
+		if (fstatat(dirfd, dp->d_name, &sb,
+		    AT_SYMLINK_NOFOLLOW) < 0) {
+			continue;
+		}
+
+		if (verify_attr(dp->d_name, attrparent,
+		    arc_rwsysattr, &rw_sysattr) != ATTR_OK) {
+			continue;
+		}
+
+		islnk = 0;
+		if (S_ISLNK(sb.st_mode)) {
+			islnk = 1;
+			if (Args & OCL) {
+				if (fstatat(dirfd, dp->d_name,
+				    &sb, 0) < 0) {
+					continue;
+				}
+			}
+		}
+		sl_remember_tgt(&sb, islnk, rw_sysattr);
+
+		/*
+		 * Recursively call preview_attrs() to preview extended
+		 * system attributes of attributes.
+		 */
+		if (SysAtflag && !Hiddendir && !rw_sysattr) {
+			int	my_cwd = save_cwd();
+
+			(void) fchdir(dirfd);
+			rc = preview_attrs(s, dp->d_name);
+			rest_cwd(my_cwd);
+		}
+	}
+	(void) closedir(dirp);
+	(void) close(dirfd);
+	return (rc);
+}
+#endif	/* O_XATTR */
 
 /*
  * sl_preview_synonyms:  Read the file list from the input stream, remembering
@@ -7860,7 +8965,7 @@ sl_preview_synonyms(void)
 	(void) strcat(tmpfname, suffix);
 
 	if ((tmpfd = mkstemp(tmpfname)) == -1) {
-		msg(EXTN, "cannot open tmpfile %s", tmpfname);
+		msg(EXTN, "cannot open tmpfile %s%s", tmpdir, suffix);
 	}
 
 	if (unlink(tmpfname) == -1) {
@@ -7908,62 +9013,13 @@ sl_preview_synonyms(void)
 				}
 			}
 		}
-		sl_remember_tgt(&sb, islnk);
+		sl_remember_tgt(&sb, islnk, 0);
 
 #if defined(O_XATTR)
-		if (Atflag) {
-			int  dirfd;
-			DIR  *dirp;
-			struct dirent *dp;
-
-			if (pathconf(s, _PC_XATTR_EXISTS) != 1)
-				continue;
-
-			dirfd = attropen(s, ".", O_RDONLY);
-			if (dirfd == -1)
-				continue;
-
-			tmpfd = dup(dirfd);
-			if (tmpfd == -1) {
-				(void) close(dirfd);
-				continue;
-			}
-			dirp = fdopendir(tmpfd);
-			if (dirp == NULL) {
-				(void) close(dirfd);
-				(void) close(tmpfd);
-				continue;
-			}
-
-			while (dp = readdir(dirp)) {
-				if ((dp->d_name[0] == '.' &&
-				    dp->d_name[1] == '\0') ||
-				    (dp->d_name[0] == '.' &&
-				    dp->d_name[1] == '.' &&
-				    dp->d_name[2] == '\0') ||
-				    is_sysattr(dp->d_name))
-					continue;
-
-				if (fstatat(dirfd, dp->d_name, &sb,
-				    AT_SYMLINK_NOFOLLOW) < 0) {
-					continue;
-				}
-				islnk = 0;
-				if (S_ISLNK(sb.st_mode)) {
-					islnk = 1;
-					if (Args & OCL) {
-						if (fstatat(dirfd, dp->d_name,
-						    &sb, 0) < 0) {
-							continue;
-						}
-					}
-				}
-				sl_remember_tgt(&sb, islnk);
-			}
-			(void) closedir(dirp);
-			(void) close(dirfd);
+		if (Atflag || SysAtflag) {
+			(void) preview_attrs(s, NULL);
 		}
-#endif
+#endif	/* O_XATTR */
 	}
 
 	if (ferror(In_p)) {
@@ -7988,22 +9044,32 @@ sl_preview_synonyms(void)
  */
 
 static void
-sl_remember_tgt(const struct stat *sbp, int isSymlink)
+sl_remember_tgt(const struct stat *sbp, int isSymlink, int is_sysattr)
 {
 	sl_info_t *p;
 	dev_t device;
 	ino_t inode;
+	int ftype;
 
 	device = sbp->st_dev;
 	inode  = sbp->st_ino;
+	ftype  = sbp->st_mode & Ftype;
 
 	/* Determine whether we've seen this one before */
 
-	p = sl_insert(device, inode);
+	p = sl_insert(device, inode, ftype);
 
 	if (p->sl_count > 0) {
 		/*
-		 * We have seen this file before.
+		 * It appears as if have seen this file before as we found a
+		 * matching device, inode, and file type as a file already
+		 * processed.  Since there can possibly be files with the
+		 * same device, inode, and file type, but aren't hard links
+		 * (e.g., read-write system attribute files will always have
+		 * the same inode), we need to only attempt to add one to the
+		 * link count if the file we are processing is a hard link
+		 * (i.e., st_nlink > 1).
+		 *
 		 * Note that if we are not chasing symlinks, and this one is a
 		 * symlink, it is identically the one we saw before (you cannot
 		 * have hard links to symlinks); in this case, we leave the
@@ -8011,7 +9077,7 @@ sl_remember_tgt(const struct stat *sbp, int isSymlink)
 		 * itself.
 		 */
 
-		if ((Args & OCL) || (! isSymlink)) {
+		if (((Args & OCL) || (! isSymlink)) && !is_sysattr) {
 			p->sl_count++;
 		}
 	} else {
@@ -8057,7 +9123,7 @@ sl_remember_tgt(const struct stat *sbp, int isSymlink)
  */
 
 sl_info_t *
-sl_search(dev_t device, ino_t inode)
+sl_search(dev_t device, ino_t inode, int ftype)
 {
 	sl_info_t *p;		/* moves down the tree */
 	int c;			/* comparison value */
@@ -8067,7 +9133,8 @@ sl_search(dev_t device, ino_t inode)
 	head = sl_devhash_lookup(device);
 	if (head != NULL) {
 		for (p = head->rlink; p; ) {
-			if ((c = sl_compare(inode, p->sl_ino)) == 0) {
+			if ((c = sl_compare(inode, ftype, p->sl_ino,
+			    p->sl_ftype)) == 0) {
 				retval = p;
 				break;
 			} else if (c < 0) {

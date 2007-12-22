@@ -1715,6 +1715,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 		attrparent = attrinfo->attr_parent;
 		longattrname = attrinfo->attr_path;
 		dirfd = attrinfo->attr_parentfd;
+		rw_sysattr = attrinfo->attr_rw_sysattr;
 	} else {
 		dirfd = open(".", O_RDONLY);
 	}
@@ -2634,14 +2635,21 @@ rest_cwd(int *cwd)
  */
 #if defined(O_XATTR)
 static attr_status_t
-verify_attr_support(char *filename, arc_action_t actflag)
+verify_attr_support(char *filename, int attrflg, arc_action_t actflag,
+    int *ext_attrflg)
 {
 	/*
+	 * Verify extended attributes are supported/exist.  We only
+	 * need to check if we are processing a base file, not an
+	 * extended attribute.
 	 */
+	if (attrflg) {
+		*ext_attrflg = (pathconf(filename, (actflag == ARC_CREATE) ?
+		    _PC_XATTR_EXISTS : _PC_XATTR_ENABLED) == 1);
+	}
+
 	if (atflag) {
-		/* Verify extended attributes are supported */
-		if (pathconf(filename, (actflag == ARC_CREATE) ?
-		    _PC_XATTR_EXISTS : _PC_XATTR_ENABLED) != 1) {
+		if (!*ext_attrflg) {
 #if defined(_PC_SATTR_ENABLED)
 			if (saflag) {
 				/* Verify system attributes are supported */
@@ -2728,6 +2736,7 @@ open_attr_dir(char *attrname, char *dirp, int cwd, attr_data_t *attrinfo)
 	attr_status_t	rc;
 	int		firsttime = (attrinfo->attr_parentfd == -1);
 	int		saveerrno;
+	int		ext_attr;
 
 	/*
 	 * open_attr_dir() was recursively called (input combination number 4),
@@ -2743,7 +2752,8 @@ open_attr_dir(char *attrname, char *dirp, int cwd, attr_data_t *attrinfo)
 	 * Verify that the underlying file system supports the restoration
 	 * of the attribute.
 	 */
-	if ((rc = verify_attr_support(dirp, ARC_RESTORE)) != ATTR_OK) {
+	if ((rc = verify_attr_support(dirp, firsttime, ARC_RESTORE,
+	    &ext_attr)) != ATTR_OK) {
 		return (rc);
 	}
 
@@ -2824,7 +2834,7 @@ doxtract(char *argv[])
 	int dir;
 	int dirfd = -1;
 	int cwd = -1;
-	int rw_sysattr = 0;
+	int rw_sysattr;
 	int saveerrno;
 	uid_t Uid;
 	char *namep, *dirp, *comp, *linkp; /* for removing absolute paths */
@@ -2871,6 +2881,8 @@ doxtract(char *argv[])
 		convflag = 0;
 		symflag = 0;
 		dir = 0;
+		Hiddendir = 0;
+		rw_sysattr = 0;
 		ofile = -1;
 
 		if (dirfd != -1) {
@@ -3545,15 +3557,6 @@ filedone:
 			aclp = NULL;
 		}
 
-#if defined(O_XATTR)
-		if (xattrp != NULL) {
-			free(xattrhead);
-			xattrp = NULL;
-			xattr_linkp = NULL;
-			xattrhead = NULL;
-		}
-#endif
-
 		if (!oflag)
 		    resugname(dirfd, comp, symflag); /* set file ownership */
 
@@ -3588,6 +3591,15 @@ filedone:
 
 			}
 		}
+#if defined(O_XATTR)
+		if (xattrp != NULL) {
+			free(xattrhead);
+			xattrp = NULL;
+			xattr_linkp = NULL;
+			xattrhead = NULL;
+		}
+#endif
+
 		if (ofile != -1) {
 			(void) close(dirfd);
 			dirfd = -1;
@@ -3757,8 +3769,12 @@ filedone:
 /*
  *	xblocks		extract file/extent from tape to output file
  *
- *	xblocks(bytes, ofile);
- *	unsigned long long bytes;	size of extent or file to be extracted
+ *	xblocks(issysattr, bytes, ofile);
+ *
+ *	issysattr			flag set if the files being extracted
+ *					is an extended system attribute file.
+ *	unsigned long long bytes	size of extent or file to be extracted
+ *	ofile				output file
  *
  *	called by doxtract() and xsfile()
  */
@@ -3766,23 +3782,73 @@ filedone:
 static int
 xblocks(int issysattr, off_t bytes, int ofile)
 {
-	blkcnt_t blocks;
-	char buf[TBLOCK];
+	char *buf;
 	char tempname[NAMSIZ+1];
-	int write_count;
+	size_t maxwrite;
+	size_t bytesread;
+	size_t piosize;		/* preferred I/O size */
+	struct stat tsbuf;
 
-	blocks = TBLOCKS(bytes);
-	while (blocks-- > 0) {
-		readtape(buf);
-		if (bytes > TBLOCK)
-			write_count = TBLOCK;
-		else
-			write_count = bytes;
-		if (write(ofile, buf, write_count) < 0) {
+	/* Don't need to do anything if this is a zero size file */
+	if (bytes <= 0) {
+		return (0);
+	}
+
+	/*
+	 * To figure out the size of the buffer used to accumulate data
+	 * from readtape() and to write to the file, we need to determine
+	 * the largest chunk of data to be written to the file at one time.
+	 * This is determined based on the smallest of the following two
+	 * things:
+	 *	1) The size of the archived file.
+	 *	2) The preferred I/O size of the file.
+	 */
+	if (issysattr || (bytes <= TBLOCK)) {
+		/*
+		 * Writes to system attribute files must be
+		 * performed in one operation.
+		 */
+		maxwrite = bytes;
+	} else {
+		/*
+		 * fstat() the file to get the preferred I/O size.
+		 * If it fails, then resort back to just writing
+		 * one block at a time.
+		 */
+		if (fstat(ofile, &tsbuf) == 0) {
+			piosize = tsbuf.st_blksize;
+		} else {
+			piosize = TBLOCK;
+		}
+		maxwrite = min(bytes, piosize);
+	}
+
+	/*
+	 * The buffer used to accumulate the data for the write operation
+	 * needs to be the maximum number of bytes to be written rounded up
+	 * to the nearest TBLOCK since readtape reads one block at a time.
+	 */
+	if ((buf = malloc(TBLOCKS(maxwrite) * TBLOCK)) == NULL) {
+		fatal(gettext("cannot allocate buffer"));
+	}
+
+	while (bytes > 0) {
+
+		/*
+		 * readtape() obtains one block (TBLOCK) of data at a time.
+		 * Accumulate as many blocks of data in buf as we can write
+		 * in one operation.
+		 */
+		for (bytesread = 0; bytesread < maxwrite; bytesread += TBLOCK) {
+			readtape(buf + bytesread);
+		}
+
+		if (write(ofile, buf, maxwrite) < 0) {
 			int saveerrno = errno;
 
 			if (xhdr_flgs & _X_PATH)
-				(void) strcpy(tempname, Xtarhdr.x_path);
+				(void) strlcpy(tempname, Xtarhdr.x_path,
+				    sizeof (tempname));
 			else
 				(void) sprintf(tempname, "%.*s", NAMSIZ,
 				    dblock.dbuf.name);
@@ -3797,6 +3863,7 @@ xblocks(int issysattr, off_t bytes, int ofile)
 				    "tar: unable to extract system attribute "
 				    "%s: insufficient privileges\n"), tempname);
 				Errflg = 1;
+				(void) free(buf);
 				return (1);
 			} else {
 				(void) fprintf(stderr, gettext(
@@ -3805,12 +3872,24 @@ xblocks(int issysattr, off_t bytes, int ofile)
 				done(2);
 			}
 		}
-		bytes -= TBLOCK;
+		bytes -= maxwrite;
+
+		/*
+		 * If we've reached this point and there is still data
+		 * to be written, maxwrite had to have been determined
+		 * by the preferred I/O size.  If the number of bytes
+		 * left to write is smaller than the preferred I/O size,
+		 * then we're about to do our final write to the file, so
+		 * just set maxwrite to the number of bytes left to write.
+		 */
+		if ((bytes > 0) && (bytes < maxwrite)) {
+			maxwrite = bytes;
+		}
 	}
+	free(buf);
 
 	return (0);
 }
-
 
 /*
  * 	xsfile	extract split file
@@ -5658,12 +5737,36 @@ top:
 		goto top;
 	}
 	/*
-	 * Now that we've read the extended header, call passtape() if we aren't
-	 * processing extended attributes.
+	 * Now that we've read the extended header, call passtape()
+	 * if we don't want to restore attributes or system attributes.
+	 * Don't restore the attribute if we are extracting
+	 * a file from an archive (as opposed to doing a table of
+	 * contents) and any of the following are true:
+	 * 1. neither -@ or -/ was specified.
+	 * 2. -@ was specified, -/ wasn't specified, and we're
+	 * processing a hidden attribute directory of an attribute
+	 * or we're processing a read-write system attribute file.
+	 * 3. -@ wasn't specified, -/ was specified, and the file
+	 * we're processing is not a read-write system attribute file,
+	 * or we're processing the hidden attribute directory of an
+	 * attribute.
+	 *
+	 * We always process the attributes if we're just generating
+	 * generating a table of contents, or if both -@ and -/ were
+	 * specified.
 	 */
-	if ((xattrp != NULL) && !atflag && !saflag && !tflag) {
-		passtape();
-		return (0);
+	if (xattrp != NULL) {
+		attr_data_t *ainfo = *attrinfo;
+
+		if (!tflag &&
+		    ((!atflag && !saflag) ||
+		    (atflag && !saflag && ((ainfo->attr_parent != NULL) ||
+		    ainfo->attr_rw_sysattr)) ||
+		    (!atflag && saflag && ((ainfo->attr_parent != NULL) ||
+		    !ainfo->attr_rw_sysattr)))) {
+			passtape();
+			return (0);
+		}
 	}
 #endif
 
@@ -5736,11 +5839,11 @@ setbytes_to_skip(struct stat *st, int err)
 	 */
 	if ((err != 0) && (dblock.dbuf.typeflag == 'A') &&
 	    (Xhdrflag != 0)) {
-		stbuf.st_size += TBLOCK + Xtarhdr.x_filesz;
+		st->st_size += TBLOCK + Xtarhdr.x_filesz;
 		xhdr_flgs |= _X_XHDR;
 	} else if ((dblock.dbuf.typeflag != 'A') &&
 	    (Xhdrflag != 0)) {
-		stbuf.st_size = Xtarhdr.x_filesz;
+		st->st_size = Xtarhdr.x_filesz;
 		xhdr_flgs |= _X_XHDR;
 	}
 }
@@ -6555,7 +6658,6 @@ get_xdata(void)
 	char		*keyword, *value;
 	blkcnt_t	nblocks;
 	int		bufneeded;
-	struct stat	*sp = &stbuf;
 	int		errors;
 
 	(void) memset(&Xtarhdr, 0, sizeof (Xtarhdr));
@@ -7519,6 +7621,7 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 	int dirfd;
 	int fd = -1;
 	int rw_sysattr = 0;
+	int ext_attr = 0;
 	int rc;
 	DIR *dirp;
 	struct dirent *dp;
@@ -7529,7 +7632,8 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 	 * attributes if -@ was specified, and the extended system attributes
 	 * if -/ was specified.
 	 */
-	if (verify_attr_support(filename, ARC_CREATE) != ATTR_OK) {
+	if (verify_attr_support(filename, (attrparent == NULL), ARC_CREATE,
+	    &ext_attr) != ATTR_OK) {
 		return;
 	}
 
@@ -7561,6 +7665,19 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 			slist = NULL;
 		}
 		(void) close(filefd);
+	}
+
+	/*
+	 * If we aren't archiving extended system attributes, and we are
+	 * processing an attribute, or if we are archiving extended system
+	 * attributes, and there are are no extended attributes, then there's
+	 * no need to open up the attribute directory of the file unless the
+	 * extended system attributes are not transient (i.e, the system
+	 * attributes are not the default values).
+	 */
+	if ((arc_rwsysattr == 0) && ((attrparent != NULL) ||
+	    (saflag && !ext_attr))) {
+		return;
 	}
 #endif	/* _PC_SATTR_ENABLED */
 
@@ -7675,6 +7792,7 @@ xattrs_put(char *longname, char *shortname, char *parent, char *attrparent)
 	if (attrparent == NULL) {
 		(void) chdir(parent);
 	}
+	Hiddendir = 0;
 }
 #else
 static void
