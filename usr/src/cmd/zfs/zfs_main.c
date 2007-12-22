@@ -2003,6 +2003,7 @@ zfs_do_rollback(int argc, char **argv)
 {
 	int ret;
 	int c;
+	boolean_t force = B_FALSE;
 	rollback_cbdata_t cb = { 0 };
 	zfs_handle_t *zhp, *snap;
 	char parentname[ZFS_MAXNAMELEN];
@@ -2019,10 +2020,7 @@ zfs_do_rollback(int argc, char **argv)
 			cb.cb_doclones = 1;
 			break;
 		case 'f':
-			/*
-			 * this is accepted and ignored for backwards
-			 * compatability.
-			 */
+			force = B_TRUE;
 			break;
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
@@ -2074,7 +2072,7 @@ zfs_do_rollback(int argc, char **argv)
 	/*
 	 * Rollback parent to the given snapshot.
 	 */
-	ret = zfs_rollback(zhp, snap);
+	ret = zfs_rollback(zhp, snap, force);
 
 out:
 	zfs_close(snap);

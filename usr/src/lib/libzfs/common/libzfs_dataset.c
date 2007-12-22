@@ -3331,8 +3331,9 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 typedef struct rollback_data {
 	const char	*cb_target;		/* the snapshot */
 	uint64_t	cb_create;		/* creation time reference */
-	int		cb_error;
+	boolean_t	cb_error;
 	boolean_t	cb_dependent;
+	boolean_t	cb_force;
 } rollback_data_t;
 
 static int
@@ -3358,7 +3359,22 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 			zhp->zfs_hdl->libzfs_log_str = logstr;
 		}
 	} else {
-		cbp->cb_error |= zfs_destroy(zhp);
+		/* We must destroy this clone; first unmount it */
+		prop_changelist_t *clp;
+
+		clp = changelist_gather(zhp, ZFS_PROP_NAME,
+		    cbp->cb_force ? MS_FORCE: 0);
+		if (clp == NULL || changelist_prefix(clp) != 0) {
+			cbp->cb_error = B_TRUE;
+			zfs_close(zhp);
+			return (0);
+		}
+		if (zfs_destroy(zhp) != 0)
+			cbp->cb_error = B_TRUE;
+		else
+			changelist_remove(clp, zhp->zfs_name);
+		changelist_postfix(clp);
+		changelist_free(clp);
 	}
 
 	zfs_close(zhp);
@@ -3373,7 +3389,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
  * their dependents.
  */
 int
-zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
+zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap, boolean_t force)
 {
 	rollback_data_t cb = { 0 };
 	int err;
@@ -3388,12 +3404,13 @@ zfs_rollback(zfs_handle_t *zhp, zfs_handle_t *snap)
 	/*
 	 * Destroy all recent snapshots and its dependends.
 	 */
+	cb.cb_force = force;
 	cb.cb_target = snap->zfs_name;
 	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
 	(void) zfs_iter_children(zhp, rollback_destroy, &cb);
 
-	if (cb.cb_error != 0)
-		return (cb.cb_error);
+	if (cb.cb_error)
+		return (-1);
 
 	/*
 	 * Now that we have verified that the snapshot is the latest,
