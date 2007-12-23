@@ -3373,7 +3373,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 			cbp->cb_error = B_TRUE;
 		else
 			changelist_remove(clp, zhp->zfs_name);
-		changelist_postfix(clp);
+		(void) changelist_postfix(clp);
 		changelist_free(clp);
 	}
 
