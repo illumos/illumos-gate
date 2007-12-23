@@ -2095,7 +2095,7 @@ _NOTE(READ_ONLY_DATA(ibcm_local_processing_time ibcm_remote_response_time
 #define	IBCM_MAX_SIDR_PROCESS_TIME	16	/* Time to process SIDR REP */
 #define	IBCM_MAX_SIDR_PKT_LIFE_TIME	9	/* Approx pkt lt for UD srver */
 
-#define	IBCM_MAX_IB_PKT_LT		18	/* 1 second */
+#define	IBCM_MAX_IB_PKT_LT		20	/* 4 second */
 #define	IBCM_MAX_IB_MAD_PKT_LT		18	/* 1 second */
 
 #define	IBCM_MAX_SA_RETRIES		0	/* Max CM retry for SA update */

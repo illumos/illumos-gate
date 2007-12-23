@@ -80,6 +80,7 @@ ibcm_arp_get_ibaddr_cb(void *arg, int status)
 
 	mutex_enter(&ib_s->lock);
 	ib_s->status = status;
+	ib_s->done = B_TRUE;
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr_cb: SGID %llX:%llX "
 	    "DGID: %llX:%llX", wqnp->sgid.gid_prefix, wqnp->sgid.gid_guid,
@@ -337,7 +338,7 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 {
 	ibcm_arp_streams_t	*ib_s;
 	ibt_ip_addr_t		srcaddr, destaddr;
-	int			ret;
+	int			ret = 0;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr(%lX, %lX, %p, %p)",
 	    htonl(srcip), htonl(destip), sgid, dgid);
@@ -352,11 +353,15 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 	if (ret != 0) {
 		IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: "
 		    "ibcm_arp_link_drivers failed %d", ret);
-		return (IBT_FAILURE);
+		goto arp_ibaddr_error;
 	}
 
 	bzero(&destaddr, sizeof (ibt_ip_addr_t));
 	bzero(&srcaddr, sizeof (ibt_ip_addr_t));
+
+	mutex_enter(&ib_s->lock);
+	ib_s->done = B_FALSE;
+	mutex_exit(&ib_s->lock);
 
 	destaddr.family = AF_INET_OFFLOAD;
 	destaddr.un.ip4addr = htonl(destip);
@@ -372,13 +377,16 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 	    "returned: %d", ret);
 	if (ret == 0) {
 		mutex_enter(&ib_s->lock);
-		cv_wait(&ib_s->cv, &ib_s->lock);
+		while (ib_s->done != B_TRUE)
+			cv_wait(&ib_s->cv, &ib_s->lock);
 		mutex_exit(&ib_s->lock);
 	}
 
 	(void) ibcm_arp_unlink_drivers(ib_s);
+	mutex_enter(&ib_s->lock);
 	ret = ib_s->status;
 	if (ret == 0) {
+		ibcm_arp_prwqn_t *wqnp = ib_s->wqnp;
 		if (sgid)
 			*sgid = ib_s->wqnp->sgid;
 		if (dgid)
@@ -389,8 +397,13 @@ ibcm_arp_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid,
 		    ib_s->wqnp->sgid.gid_prefix, ib_s->wqnp->sgid.gid_guid,
 		    ib_s->wqnp->dgid.gid_prefix, ib_s->wqnp->dgid.gid_guid);
 
-		ibcm_arp_prwqn_delete(ib_s->wqnp);
+		mutex_exit(&ib_s->lock);
+		ibcm_arp_prwqn_delete(wqnp);
+		mutex_enter(&ib_s->lock);
 	}
+	mutex_exit(&ib_s->lock);
+
+arp_ibaddr_error:
 
 	mutex_destroy(&ib_s->lock);
 	cv_destroy(&ib_s->cv);

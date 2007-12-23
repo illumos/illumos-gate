@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,7 +319,7 @@ ibc_async_handler(ibc_clnt_hdl_t hca_devp, ibt_async_code_t code,
 				IBTF_DPRINTF_L2(ibtf_handlers,
 				    "ibc_async_handler: bad port #: %d",
 				    event_p->ev_port);
-			    break;
+				break;
 			}
 			hca_devp->hd_async_port[port_minus1] =
 			    ((code == IBT_EVENT_PORT_UP) ? IBTL_HCA_PORT_UP :
@@ -417,7 +417,7 @@ ibtl_do_mgr_async_task(void *arg)
 	struct ibtl_mgr_s	*mgrp = (struct ibtl_mgr_s *)arg;
 	ibtl_hca_devinfo_t	*hca_devp = mgrp->mgr_hca_devp;
 
-	IBTF_DPRINTF_L3(ibtf_handlers, "ibtl_do_mgr_async_task(0x%x)",
+	IBTF_DPRINTF_L2(ibtf_handlers, "ibtl_do_mgr_async_task(0x%x)",
 	    hca_devp->hd_async_code);
 
 	mgrp->mgr_async_handler(mgrp->mgr_clnt_private, NULL,
@@ -1348,7 +1348,7 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 	ibtl_clnt_t		*clntp;
 	struct ibtl_new_hca_s	*new_hcap;
 
-	IBTF_DPRINTF_L3(ibtf_handlers, "ibtl_announce_new_hca(%p, %llX)",
+	IBTF_DPRINTF_L2(ibtf_handlers, "ibtl_announce_new_hca(%p, %llX)",
 	    hca_devp, hca_devp->hd_hca_attr->hca_node_guid);
 
 	mutex_enter(&ibtl_clnt_list_mutex);
@@ -1384,9 +1384,10 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 			cv_wait(&ibtl_clnt_cv, &ibtl_clnt_list_mutex);
 	clntp = ibtl_clnt_list;
 	while (clntp != NULL) {
-		if (clntp->clnt_modinfop->mi_clnt_class == IBT_DM) {
-			IBTF_DPRINTF_L4(ibtf_handlers,
-			    "ibtl_announce_new_hca: calling IBDM");
+		if ((clntp->clnt_modinfop->mi_clnt_class == IBT_DM) ||
+		    (clntp->clnt_modinfop->mi_clnt_class == IBT_CM)) {
+			IBTF_DPRINTF_L4(ibtf_handlers, "ibtl_announce_new_hca: "
+			    "calling  %s", clntp->clnt_modinfop->mi_clnt_name);
 			if (clntp->clnt_modinfop->mi_async_handler) {
 				_NOTE(NO_COMPETING_THREADS_NOW)
 				new_hcap = kmem_alloc(sizeof (*new_hcap),
@@ -1414,6 +1415,7 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 	clntp = ibtl_clnt_list;
 	while (clntp != NULL) {
 		if ((clntp->clnt_modinfop->mi_clnt_class != IBT_DM) &&
+		    (clntp->clnt_modinfop->mi_clnt_class != IBT_CM) &&
 		    (clntp->clnt_modinfop->mi_clnt_class != IBT_IBMA)) {
 			IBTF_DPRINTF_L4(ibtf_handlers,
 			    "ibtl_announce_new_hca: Calling %s ",

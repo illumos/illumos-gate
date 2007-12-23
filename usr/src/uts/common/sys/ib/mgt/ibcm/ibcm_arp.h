@@ -97,6 +97,7 @@ typedef struct ibcm_arp_streams_s {
 	queue_t			*arpqueue;
 	vnode_t			*arp_vp;
 	int			status;
+	boolean_t		done;
 	ibcm_arp_prwqn_t	*wqnp;
 } ibcm_arp_streams_t;
 

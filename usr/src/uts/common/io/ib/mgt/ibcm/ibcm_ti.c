@@ -1004,7 +1004,7 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 				    "Query Ports Failed: %d", status);
 				return (status);
 			} else if (port_infop->p_subnet_timeout >
-			    IBCM_MAX_IB_PKT_LT) {
+			    ibcm_max_ib_pkt_lt) {
 				IBTF_DPRINTF_L2(cmlog, "ibcm_init_reply_addr: "
 				    "large subnet timeout %x port_no %x",
 				    port_infop->p_subnet_timeout,
