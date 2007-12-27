@@ -102,10 +102,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 	 * Handle openattrdirat request
 	 */
 	if (filemode & FXATTRDIROPEN) {
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 
 		if (error = lookupnameat(fname, seg, FOLLOW,
 		    NULLVPP, &vp, startvp))
@@ -187,10 +185,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			filemode &= ~FNDELAY;
 		error = falloc((vnode_t *)NULL, filemode, &fp, &fd);
 		if (error == 0) {
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 			/*
 			 * Last arg is a don't-care term if
 			 * !(filemode & FCREAT).
@@ -204,10 +200,8 @@ copen(int startfd, char *fname, int filemode, int createmode)
 			if (startvp != NULL)
 				VN_RELE(startvp);
 			if (error == 0) {
-#ifdef C2_AUDIT
 				if (audit_active)
 					audit_copen(fd, fp, vp);
-#endif /* C2_AUDIT */
 				if ((vp->v_flag & VDUP) == 0) {
 					fp->f_vnode = vp;
 					mutex_exit(&fp->f_tlock);

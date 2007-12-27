@@ -279,7 +279,7 @@ typedef struct	proc {
 	uchar_t			p_tnf_flags;
 
 	/*
-	 * C2 Security  (C2_AUDIT)
+	 * Solaris Audit
 	 */
 	struct p_audit_data	*p_audit_data; /* per process audit structure */
 

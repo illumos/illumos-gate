@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -345,8 +344,8 @@ parse_policy(devplcysys_t *ds, devplcy_t *nullp, devplcy_t *defp)
 	if (priv_isemptyset(&ds->dps_rdp) && priv_isemptyset(&ds->dps_wrp))
 		dphold(np = nullp);
 	else if (defp != nullp &&
-		    priv_isequalset(&ds->dps_rdp, &defp->dp_rdp) &&
-		    priv_isequalset(&ds->dps_wrp, &defp->dp_wrp))
+	    priv_isequalset(&ds->dps_rdp, &defp->dp_rdp) &&
+	    priv_isequalset(&ds->dps_wrp, &defp->dp_wrp))
 		dphold(np = defp);
 	else {
 		np = dpget();
@@ -377,7 +376,7 @@ parse_policy(devplcysys_t *ds, devplcy_t *nullp, devplcy_t *defp)
 	de->dpe_plcy = np;
 
 	ASSERT((de->dpe_flags & (DPE_ALLMINOR|DPE_EXPANDED)) ||
-		de->dpe_expr != NULL);
+	    de->dpe_expr != NULL);
 
 	return (de);
 }
@@ -463,7 +462,7 @@ devpolicy_load(int nitems, size_t sz, devplcysys_t *uitmp)
 		curmaj = items[i].dps_maj;
 		len = strlen(items[i].dps_minornm);
 		wild = len > 0 &&
-			(tmp = strchr(items[i].dps_minornm, '*')) != NULL;
+		    (tmp = strchr(items[i].dps_minornm, '*')) != NULL;
 
 		/* Another default major, string too long or too many ``*'' */
 		if (curmaj == DEVPOLICY_DFLT_MAJ ||
@@ -476,7 +475,7 @@ devpolicy_load(int nitems, size_t sz, devplcysys_t *uitmp)
 			lastmajor = curmaj;
 			nmaj++;
 		} else if (lastmajor > curmaj || lastwild > wild ||
-				lastwild && lastlen < len) {
+		    lastwild && lastlen < len) {
 			kmem_free(items, mem);
 			return (EINVAL);
 		}
@@ -484,10 +483,8 @@ devpolicy_load(int nitems, size_t sz, devplcysys_t *uitmp)
 		lastwild = wild;
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_devpolicy(nitems, items);
-#endif
 
 	/*
 	 * Parse the policy.  We create an array for all major numbers
@@ -625,7 +622,7 @@ devpolicy_get(int *nitemp, size_t sz, devplcysys_t *uitmp)
 			itmp[ind].dps_wrp = de->dpe_plcy->dp_wrp;
 			if (de->dpe_len)
 				(void) strcpy(itmp[ind].dps_minornm,
-						de->dpe_expr);
+				    de->dpe_expr);
 			else if (de->dpe_flags & DPE_ALLMINOR)
 				(void) strcpy(itmp[ind].dps_minornm, "*");
 			else {

@@ -180,12 +180,6 @@ $(LINTS_DIR)/msacct.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
 $(LINTS_DIR)/thread.ln	:=	LINTFLAGS += $(LINTMACHFLAGS)
 
 #
-#	Build `options'. These are entirely historical and the need for these
-#	is completely removed by the module technology.
-#
-OPTION_DEFS	 = -DC2_AUDIT
-
-#
 #	Collect the preprocessor definitions to be associated with *all*
 #	files.
 #

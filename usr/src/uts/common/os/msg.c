@@ -636,10 +636,8 @@ top:
 		    pp->p_rctls, pp);
 		lock = ipc_commit_end(msq_svc, &qp->msg_perm);
 	}
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_ipcget(AT_IPC_MSG, (void *)qp);
-#endif
 	id = qp->msg_perm.ipc_id;
 	mutex_exit(lock);
 	return (id);
@@ -1282,7 +1280,8 @@ msg_fnd_spc_snd(kmsqid_t *qp, int msg_hash, long type)
 	walker = list_head(&qp->msg_wait_snd[msg_hash]);
 
 	while (walker && walker->msgw_type != type &&
-	    (walker = list_next(&qp->msg_wait_snd[msg_hash], walker)));
+	    (walker = list_next(&qp->msg_wait_snd[msg_hash], walker)))
+		continue;
 	return (walker);
 }
 

@@ -716,13 +716,14 @@ shmctl(int shmid, int cmd, void *arg)
 		}
 		if (!isspt(sp) && (sp->shm_lkcnt++ == 0)) {
 			if (error = shmem_lock(sp, sp->shm_amp)) {
-			    ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock, RW_WRITER);
-			    cmn_err(CE_NOTE,
-				"shmctl - couldn't lock %ld pages into memory",
-				sp->shm_amp->size);
-			    ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
-			    error = ENOMEM;
-			    sp->shm_lkcnt--;
+				ANON_LOCK_ENTER(&sp->shm_amp->a_rwlock,
+				    RW_WRITER);
+				cmn_err(CE_NOTE,
+				    "shmctl - couldn't lock %ld pages into "
+				    "memory", sp->shm_amp->size);
+				ANON_LOCK_EXIT(&sp->shm_amp->a_rwlock);
+				error = ENOMEM;
+				sp->shm_lkcnt--;
 			}
 		}
 		break;
@@ -923,10 +924,8 @@ top:
 		lock = ipc_commit_end(shm_svc, &sp->shm_perm);
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_ipcget(AT_IPC_SHM, (void *)sp);
-#endif
 
 	*rvp = (uintptr_t)(sp->shm_perm.ipc_id);
 
@@ -1175,7 +1174,7 @@ shmem_lock(kshmid_t *sp, struct anon_map *amp)
 	error = as_map(as, 0x0, amp->size, segvn_create, &crargs);
 	if (!error) {
 		if ((error = as_ctl(as, 0x0, amp->size, MC_LOCK, 0, 0,
-			NULL, 0)) == 0) {
+		    NULL, 0)) == 0) {
 			lock_again(npages, sp, amp);
 		}
 		(void) as_unmap(as, 0x0, amp->size);

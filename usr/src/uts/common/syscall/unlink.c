@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,13 +94,11 @@ unlinkat(int fd, char *name, int flags)
 		}
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 
 	error = vn_removeat(dirvp, name,
-		UIO_USERSPACE, (flags == AT_REMOVEDIR) ? RMDIRECTORY : RMFILE);
+	    UIO_USERSPACE, (flags == AT_REMOVEDIR) ? RMDIRECTORY : RMFILE);
 	if (dirvp != NULL)
 		VN_RELE(dirvp);
 

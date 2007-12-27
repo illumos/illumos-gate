@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -789,10 +789,8 @@ timodrproc(queue_t *q, mblk_t *mp)
 		default:
 /* ONC_PLUS EXTRACT END */
 
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_sock(T_UNITDATA_IND, q, mp, TIMOD_ID);
-#endif
 /* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
 			break;
@@ -1223,10 +1221,8 @@ timodrproc(queue_t *q, mblk_t *mp)
 				}
 			}
 /* ONC_PLUS EXTRACT END */
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_sock(T_CONN_IND, q, mp, TIMOD_ID);
-#endif
 /* ONC_PLUS EXTRACT START */
 			putnext(q, mp);
 			break;
@@ -2005,10 +2001,8 @@ getname:
 					mp = tmp;
 				}
 			}
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_sock(T_UNITDATA_REQ, q, mp, TIMOD_ID);
-#endif
 		if (!bcanputnext(q, mp->b_band)) {
 				(void) putbq(q, mp);
 				return (1);
@@ -2063,10 +2057,8 @@ getname:
 			if (tp->tim_flags & COTS)
 				tp->tim_flags |= CONNWAIT;
 /* ONC_PLUS EXTRACT END */
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_sock(T_CONN_REQ, q, mp, TIMOD_ID);
-#endif
 /* ONC_PLUS EXTRACT START */
 		putnext(q, mp);
 		break;

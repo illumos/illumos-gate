@@ -194,12 +194,6 @@ $(IF_DEBUG_OBJ)mp_call.o	:= DEBUG_DEFS += -DTRAPTRACE
 $(IF_DEBUG_OBJ)cbe.o		:= DEBUG_DEFS += -DTRAPTRACE
 
 #
-#	Build `options'. These are historical and the need for these
-#	was removed by the module technology.
-#
-OPTION_DEFS	 = -DC2_AUDIT
-
-#
 #	Collect the preprocessor definitions to be associated with *all*
 #	files.
 #

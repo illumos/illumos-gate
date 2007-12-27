@@ -132,10 +132,7 @@ extern "C" {
  */
 #define	F_GETOWN	23	/* Get owner (socket emulation) */
 #define	F_SETOWN	24	/* Set owner (socket emulation) */
-
-#ifdef C2_AUDIT
-#define	F_REVOKE	25	/* C2 Security. Revoke access to file desc. */
-#endif
+#define	F_REVOKE	25	/* Object reuse revoke access to file desc. */
 
 #define	F_HASREMOTELOCKS 26	/* Does vp have NFS locks; private to lock */
 				/* manager */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,10 +285,8 @@ pid_exit(proc_t *prp)
 
 	proc_entry_free(pidp);
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_pfree(prp);
-#endif
 
 	if (practive == prp) {
 		practive = prp->p_next;

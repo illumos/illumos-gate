@@ -2286,10 +2286,8 @@ sotpi_connect(struct sonode *so,
 	soisconnecting(so);
 	mutex_exit(&so->so_lock);
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_sock(T_CONN_REQ, strvp2wq(SOTOV(so)), mp, 0);
-#endif /* C2_AUDIT */
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
@@ -3664,10 +3662,8 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	ASSERT(MBLKL(mp) <= (ssize_t)size);
 
 	ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
-#endif /* C2_AUDIT */
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
 #ifdef SOCK_DEBUG
@@ -3951,10 +3947,8 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
-#endif /* C2_AUDIT */
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
 done:
@@ -4416,10 +4410,8 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 			linkb(mp, mpdata);
 		else
 			mp = mpdata;
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
-#endif /* C2_AUDIT */
 
 		udp_wput(udp_wq, mp);
 		return (0);
@@ -4438,10 +4430,8 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	if (connected)
 		return (strwrite(SOTOV(so), uiop, CRED()));
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
-#endif /* C2_AUDIT */
 
 	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
 done:

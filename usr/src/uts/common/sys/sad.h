@@ -208,7 +208,6 @@ struct autopush {
 /*
  * function prototypes
  */
-#ifdef C2_AUDIT
 void audit_stropen(struct vnode *, dev_t *, int, cred_t *);
 void audit_strclose(struct vnode *, int, cred_t *);
 void audit_strioctl(struct vnode *, int, intptr_t, int, int, cred_t *, int *);
@@ -217,7 +216,6 @@ void audit_strputmsg(struct vnode *, struct strbuf *, struct strbuf *,
 						unsigned char, int, int);
 void audit_fdsend(int, struct file *, int);
 void audit_fdrecv(int, struct file *);
-#endif
 
 extern void sad_initspace(str_stack_t *);
 extern void sad_freespace(str_stack_t *);

@@ -83,12 +83,10 @@ top:
 			vattr.va_mode = 0777;
 			vattr.va_mask = AT_TYPE|AT_MODE;
 			error = VOP_SYMLINK(dvp, lpn.pn_path, &vattr,
-				tbuf, CRED(), NULL, 0);
-#ifdef	C2_AUDIT
+			    tbuf, CRED(), NULL, 0);
 			if (audit_active)
 				audit_symlink_create(dvp, lpn.pn_path,
-					tbuf, error);
-#endif	/* C2_AUDIT */
+				    tbuf, error);
 		}
 		kmem_free(tbuf, MAXPATHLEN);
 	}

@@ -78,7 +78,7 @@ caccess(char *fname, int fmode, vnode_t *startvp)
 
 	/* OK to use effective uid/gid, i.e., no need to crdup(CRED())? */
 	eok = (fmode & E_OK) ||
-		(cr->cr_uid == cr->cr_ruid && cr->cr_gid == cr->cr_rgid);
+	    (cr->cr_uid == cr->cr_ruid && cr->cr_gid == cr->cr_rgid);
 
 	if (eok)
 		tmpcr = cr;
@@ -156,10 +156,8 @@ accessat(int fd, char *fname, int fmode)
 		}
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 
 	error = caccess(fname, fmode, dirvp);
 	if (dirvp != NULL)

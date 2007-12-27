@@ -2107,9 +2107,7 @@ static struct fcntl_flags {
 	const char	*name;
 } fcntl_flags[] = {
 #define	FC_FL(flag)	{ (long)flag, "|" # flag }
-#ifdef C2_AUDIT
 	FC_FL(FREVOKED),
-#endif
 	FC_FL(FREAD),
 	FC_FL(FWRITE),
 	FC_FL(FNDELAY),

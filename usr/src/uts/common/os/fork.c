@@ -372,12 +372,12 @@ cfork(int isvfork, int isfork1, int flags)
 	else
 		cp->p_lwpdir_sz = p->p_lwpdir_sz;
 	cp->p_lwpdir = cp->p_lwpfree = ldp =
-		kmem_zalloc(cp->p_lwpdir_sz * sizeof (lwpdir_t), KM_SLEEP);
+	    kmem_zalloc(cp->p_lwpdir_sz * sizeof (lwpdir_t), KM_SLEEP);
 	for (i = 1; i < cp->p_lwpdir_sz; i++, ldp++)
 		ldp->ld_next = ldp + 1;
 	cp->p_tidhash_sz = (cp->p_lwpdir_sz + 2) / 2;
 	cp->p_tidhash =
-		kmem_zalloc(cp->p_tidhash_sz * sizeof (lwpdir_t *), KM_SLEEP);
+	    kmem_zalloc(cp->p_tidhash_sz * sizeof (lwpdir_t *), KM_SLEEP);
 
 	/*
 	 * Duplicate parent's lwps.
@@ -394,7 +394,7 @@ cfork(int isvfork, int isfork1, int flags)
 		 * Daemon threads should not call fork1(), but oh well...
 		 */
 		lwptot(clone)->t_proc_flag |=
-			(curthread->t_proc_flag & TP_TWAIT);
+		    (curthread->t_proc_flag & TP_TWAIT);
 	} else {
 		/* this is forkall(), no one can be in lwp_wait() */
 		ASSERT(p->p_lwpwait == 0 && p->p_lwpdwait == 0);
@@ -603,7 +603,7 @@ forklwperr:
 			/* restore watchpoints to parent */
 			as = p->p_as;
 			AS_LOCK_ENTER(as, &as->a_lock,
-				RW_WRITER);
+			    RW_WRITER);
 			as->a_wpage = p->p_wpage;
 			avl_create(&p->p_wpage, wp_compare,
 			    sizeof (struct watched_page),
@@ -1085,10 +1085,8 @@ getproc(proc_t **cpp, int kernel)
 	/*
 	 * Duplicate any audit information kept in the process table
 	 */
-#ifdef C2_AUDIT
 	if (audit_active)	/* copy audit data to cp */
 		audit_newproc(cp);
-#endif
 
 	crhold(cp->p_cred = cr);
 

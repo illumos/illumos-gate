@@ -1253,10 +1253,8 @@ top:
 	 */
 	if (error = pn_get(pnamep, seg, &pn))
 		return (error);
-#ifdef  C2_AUDIT
 	if (audit_active)
 		audit_vncreate_start();
-#endif /* C2_AUDIT */
 	dvp = NULL;
 	*vpp = NULL;
 	/*
@@ -1463,10 +1461,8 @@ top:
 
 out:
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_vncreate_finish(*vpp, error);
-#endif  /* C2_AUDIT */
 	if (in_crit) {
 		nbl_end_crit(vp);
 		in_crit = 0;
@@ -1590,10 +1586,8 @@ top:
 	 * use the lib directory for the rename.
 	 */
 
-#ifdef  C2_AUDIT
 	if (audit_active)
 		audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 	/*
 	 * Lookup to and from directories.
 	 */
@@ -1609,10 +1603,8 @@ top:
 		goto out;
 	}
 
-#ifdef  C2_AUDIT
 	if (audit_active)
 		audit_setfsat_path(3);
-#endif /* C2_AUDIT */
 	if (error = lookuppnat(&tpn, NULL, NO_FOLLOW, &tovp, &targvp, tdvp)) {
 		goto out;
 	}

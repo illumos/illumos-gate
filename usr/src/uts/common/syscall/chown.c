@@ -111,10 +111,8 @@ cfchownat(int fd, char *name, int nmflag, uid_t uid, gid_t gid, int flags)
 		}
 	}
 
-#if C2_AUDIT
 	if ((nmflag == 2) && audit_active)
 		audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 
 	/*
 	 * Do lookups for chown, lchown and fchownat when name not NULL

@@ -555,11 +555,9 @@ out:
 		error = EFAULT;
 	}
 out2:
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_cryptoadm(CRYPTO_LOAD_DEV_DISABLED, dev_name, entries,
 		    count, instance, rv, error);
-#endif
 	return (error);
 }
 
@@ -635,11 +633,9 @@ out:
 		error = EFAULT;
 	}
 out2:
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_DISABLED, name, entries,
 		    count, 0, rv, error);
-#endif
 	return (error);
 }
 
@@ -719,11 +715,9 @@ out:
 		error = EFAULT;
 	}
 out2:
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_cryptoadm(CRYPTO_LOAD_SOFT_CONFIG, name, entries, count,
 		    0, rv, error);
-#endif
 	return (error);
 }
 
@@ -766,11 +760,9 @@ out:
 		error = EFAULT;
 	}
 out2:
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_cryptoadm(CRYPTO_UNLOAD_SOFT_MODULE, name, NULL, 0, 0,
 		    rv, error);
-#endif
 
 	return (error);
 }
@@ -804,11 +796,9 @@ out:
 		error = EFAULT;
 
 out2:
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_cryptoadm(CRYPTO_LOAD_DOOR, NULL, NULL,
 		    0, 0, rv, error);
-#endif
 	return (error);
 }
 
@@ -865,11 +855,9 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		 * So, this is a no op. We are keeping this ioctl around
 		 * to be used for any future threadpool related work.
 		 */
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_cryptoadm(CRYPTO_POOL_CREATE, NULL, NULL,
 			    0, 0, 0, 0);
-#endif
 		return (0);
 
 	case CRYPTO_POOL_WAIT: {
@@ -880,11 +868,9 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 			    == -1)
 				err = EFAULT;
 		}
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_cryptoadm(CRYPTO_POOL_WAIT, NULL, NULL,
 			    0, 0, 0, err);
-#endif
 		return (err);
 	}
 
@@ -892,11 +878,9 @@ cryptoadm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 		int err;
 
 		err = kcf_svc_do_run();
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_cryptoadm(CRYPTO_POOL_RUN, NULL, NULL,
 			    0, 0, 0, err);
-#endif
 		return (err);
 	}
 

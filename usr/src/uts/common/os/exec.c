@@ -593,7 +593,7 @@ gexec(
 			if ((privflags & PRIV_INCREASE) != 0 &&
 			    (pp->p_proc_flag & P_PR_PTRACE) != 0)
 				priv_intersect(&CR_OPPRIV(cred),
-						    &CR_IPRIV(cred));
+				    &CR_IPRIV(cred));
 			priv_intersect(&CR_LPRIV(cred), &CR_IPRIV(cred));
 			CR_EPRIV(cred) = CR_PPRIV(cred) = CR_IPRIV(cred);
 			priv_adjust_PA(cred);
@@ -650,7 +650,7 @@ gexec(
 		setidfl |= EXECSETID_PRIVS;
 
 	error = (*eswp->exec_func)(vp, uap, args, idatap, level, execsz,
-		setidfl, exec_file, cred, brand_action);
+	    setidfl, exec_file, cred, brand_action);
 	rw_exit(eswp->exec_lock);
 	if (error != 0) {
 		if (newcred != NULL)
@@ -796,7 +796,7 @@ findexec_by_hdr(char *header)
 		ASSERT(eswp->exec_maglen <= MAGIC_BYTES);
 		if (header && eswp->exec_maglen != 0 &&
 		    bcmp(&header[eswp->exec_magoff], eswp->exec_magic,
-			    eswp->exec_maglen) == 0) {
+		    eswp->exec_maglen) == 0) {
 			if (hold_execsw(eswp) != 0)
 				return (NULL);
 			return (eswp);
@@ -1102,7 +1102,7 @@ execmap(struct vnode *vp, caddr_t addr, size_t len, size_t zfodlen,
 				no_fault();
 				if (seg != NULL && (zprot & PROT_WRITE) == 0)
 					(void) as_setprot(as, (caddr_t)end,
-					zfoddiff - 1, zprot);
+					    zfoddiff - 1, zprot);
 				error = EFAULT;
 				goto bad;
 			}
@@ -1436,11 +1436,11 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 			return (error);
 		if (args->brandname != NULL &&
 		    (error = stk_add(args, args->brandname,
-			UIO_SYSSPACE)) != 0)
+		    UIO_SYSSPACE)) != 0)
 			return (error);
 		if (args->emulator != NULL &&
 		    (error = stk_add(args, args->emulator,
-			UIO_SYSSPACE)) != 0)
+		    UIO_SYSSPACE)) != 0)
 			return (error);
 	}
 
@@ -1745,11 +1745,9 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	if (p->p_itimer != NULL)
 		timer_exit();
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_exec(args->stk_base, args->stk_base + args->arglen,
 		    args->na - args->ne, args->ne);
-#endif
 
 	/*
 	 * Ensure that we don't change resource associations while we

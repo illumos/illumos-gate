@@ -72,10 +72,8 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 
 	pcr = p->p_cred;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_setppriv(op, type, &pset, pcr);
-#endif
 
 	/*
 	 * Filter out unallowed request (bad op and bad type)
@@ -89,7 +87,7 @@ setppriv(priv_op_t op, priv_ptype_t type, priv_set_t *in_pset)
 		 * of P.  Only immediately after exec holds that P <= L.
 		 */
 		if (((type == PRIV_LIMIT &&
-			!priv_issubset(&pset, &CR_LPRIV(pcr))) ||
+		    !priv_issubset(&pset, &CR_LPRIV(pcr))) ||
 		    !priv_issubset(&pset, &CR_OPPRIV(pcr))) &&
 		    !priv_issubset(&pset, priv_getset(pcr, type))) {
 			mutex_exit(&p->p_crlock);

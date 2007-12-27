@@ -250,10 +250,8 @@ stropen(vnode_t *vp, dev_t *devp, int flag, cred_t *crp)
 	zoneid_t zoneid;
 	uint_t anchor;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_stropen(vp, devp, flag, crp);
-#endif
 
 	/*
 	 * If the stream already exists, wait for any open in progress
@@ -269,75 +267,77 @@ retry:
 		 * Waiting for stream to be created to device
 		 * due to another open.
 		 */
-	    mutex_exit(&vp->v_lock);
+		mutex_exit(&vp->v_lock);
 
-	    if (STRMATED(stp)) {
-		struct stdata *strmatep = stp->sd_mate;
+		if (STRMATED(stp)) {
+			struct stdata *strmatep = stp->sd_mate;
 
-		STRLOCKMATES(stp);
-		if (strmatep->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
-			if (flag & (FNDELAY|FNONBLOCK)) {
-				error = EAGAIN;
+			STRLOCKMATES(stp);
+			if (strmatep->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
+				if (flag & (FNDELAY|FNONBLOCK)) {
+					error = EAGAIN;
+					mutex_exit(&strmatep->sd_lock);
+					goto ckreturn;
+				}
+				mutex_exit(&stp->sd_lock);
+				if (!cv_wait_sig(&strmatep->sd_monitor,
+				    &strmatep->sd_lock)) {
+					error = EINTR;
+					mutex_exit(&strmatep->sd_lock);
+					mutex_enter(&stp->sd_lock);
+					goto ckreturn;
+				}
+				mutex_exit(&strmatep->sd_lock);
+				goto retry;
+			}
+			if (stp->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
+				if (flag & (FNDELAY|FNONBLOCK)) {
+					error = EAGAIN;
+					mutex_exit(&strmatep->sd_lock);
+					goto ckreturn;
+				}
+				mutex_exit(&strmatep->sd_lock);
+				if (!cv_wait_sig(&stp->sd_monitor,
+				    &stp->sd_lock)) {
+					error = EINTR;
+					goto ckreturn;
+				}
+				mutex_exit(&stp->sd_lock);
+				goto retry;
+			}
+
+			if (stp->sd_flag & (STRDERR|STWRERR)) {
+				error = EIO;
 				mutex_exit(&strmatep->sd_lock);
 				goto ckreturn;
 			}
+
+			stp->sd_flag |= STWOPEN;
+			STRUNLOCKMATES(stp);
+		} else {
+			mutex_enter(&stp->sd_lock);
+			if (stp->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
+				if (flag & (FNDELAY|FNONBLOCK)) {
+					error = EAGAIN;
+					goto ckreturn;
+				}
+				if (!cv_wait_sig(&stp->sd_monitor,
+				    &stp->sd_lock)) {
+					error = EINTR;
+					goto ckreturn;
+				}
+				mutex_exit(&stp->sd_lock);
+				goto retry;  /* could be clone! */
+			}
+
+			if (stp->sd_flag & (STRDERR|STWRERR)) {
+				error = EIO;
+				goto ckreturn;
+			}
+
+			stp->sd_flag |= STWOPEN;
 			mutex_exit(&stp->sd_lock);
-			if (!cv_wait_sig(&strmatep->sd_monitor,
-			    &strmatep->sd_lock)) {
-				error = EINTR;
-				mutex_exit(&strmatep->sd_lock);
-				mutex_enter(&stp->sd_lock);
-				goto ckreturn;
-			}
-			mutex_exit(&strmatep->sd_lock);
-			goto retry;
 		}
-		if (stp->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
-			if (flag & (FNDELAY|FNONBLOCK)) {
-				error = EAGAIN;
-				mutex_exit(&strmatep->sd_lock);
-				goto ckreturn;
-			}
-			mutex_exit(&strmatep->sd_lock);
-			if (!cv_wait_sig(&stp->sd_monitor, &stp->sd_lock)) {
-				error = EINTR;
-				goto ckreturn;
-			}
-			mutex_exit(&stp->sd_lock);
-			goto retry;
-		}
-
-		if (stp->sd_flag & (STRDERR|STWRERR)) {
-			error = EIO;
-			mutex_exit(&strmatep->sd_lock);
-			goto ckreturn;
-		}
-
-		stp->sd_flag |= STWOPEN;
-		STRUNLOCKMATES(stp);
-	    } else {
-		mutex_enter(&stp->sd_lock);
-		if (stp->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
-			if (flag & (FNDELAY|FNONBLOCK)) {
-				error = EAGAIN;
-				goto ckreturn;
-			}
-			if (!cv_wait_sig(&stp->sd_monitor, &stp->sd_lock)) {
-				error = EINTR;
-				goto ckreturn;
-			}
-			mutex_exit(&stp->sd_lock);
-			goto retry;  /* could be clone! */
-		}
-
-		if (stp->sd_flag & (STRDERR|STWRERR)) {
-			error = EIO;
-			goto ckreturn;
-		}
-
-		stp->sd_flag |= STWOPEN;
-		mutex_exit(&stp->sd_lock);
-	    }
 
 		/*
 		 * Open all modules and devices down stream to notify
@@ -345,22 +345,22 @@ retry:
 		 * last argument to MODOPEN and do not pass any open flags.
 		 * Ignore dummydev since this is not the first open.
 		 */
-	    claimstr(stp->sd_wrq);
-	    qp = stp->sd_wrq;
-	    while (_SAMESTR(qp)) {
-		qp = qp->q_next;
-		if ((error = qreopen(_RD(qp), devp, flag, crp)) != 0)
-			break;
-	    }
-	    releasestr(stp->sd_wrq);
-	    mutex_enter(&stp->sd_lock);
-	    stp->sd_flag &= ~(STRHUP|STWOPEN|STRDERR|STWRERR);
-	    stp->sd_rerror = 0;
-	    stp->sd_werror = 0;
+		claimstr(stp->sd_wrq);
+		qp = stp->sd_wrq;
+		while (_SAMESTR(qp)) {
+			qp = qp->q_next;
+			if ((error = qreopen(_RD(qp), devp, flag, crp)) != 0)
+				break;
+		}
+		releasestr(stp->sd_wrq);
+		mutex_enter(&stp->sd_lock);
+		stp->sd_flag &= ~(STRHUP|STWOPEN|STRDERR|STWRERR);
+		stp->sd_rerror = 0;
+		stp->sd_werror = 0;
 ckreturn:
-	    cv_broadcast(&stp->sd_monitor);
-	    mutex_exit(&stp->sd_lock);
-	    return (error);
+		cv_broadcast(&stp->sd_monitor);
+		mutex_exit(&stp->sd_lock);
+		return (error);
 	}
 
 	/*
@@ -579,13 +579,11 @@ strclose(struct vnode *vp, int flag, cred_t *crp)
 	int freestp = 1;
 	queue_t *rmq;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_strclose(vp, flag, crp);
-#endif
 
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRCLOSE, "strclose:%p", vp);
+	    TR_STRCLOSE, "strclose:%p", vp);
 	ASSERT(vp->v_stream);
 
 	stp = vp->v_stream;
@@ -863,7 +861,7 @@ strclean(struct vnode *vp)
 	int update = 0;
 
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRCLEAN, "strclean:%p", vp);
+	    TR_STRCLEAN, "strclean:%p", vp);
 	stp = vp->v_stream;
 	pssp = NULL;
 	mutex_enter(&stp->sd_lock);
@@ -954,7 +952,7 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 			stp->sd_wakeq &= ~RSLEEP;
 
 		(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov,
-			sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+		    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
 		uiod.d_mp = 0;
 		/*
 		 * Mark that a thread is in rwnext on the read side
@@ -1110,7 +1108,7 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 	unsigned char type;
 
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRREAD_ENTER, "strread:%p", vp);
+	    TR_STRREAD_ENTER, "strread:%p", vp);
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
 
@@ -1167,13 +1165,13 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 			qbackenable(q, 0);
 
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRREAD_WAIT,
-				"strread calls strwaitq:%p, %p, %p",
-				vp, uiop, crp);
+			    "strread calls strwaitq:%p, %p, %p",
+			    vp, uiop, crp);
 			if ((error = strwaitq(stp, waitflag, uiop->uio_resid,
 			    uiop->uio_fmode, -1, &done)) != 0 || done) {
 				TRACE_3(TR_FAC_STREAMS_FR, TR_STRREAD_DONE,
-					"strread error or done:%p, %p, %p",
-					vp, uiop, crp);
+				    "strread error or done:%p, %p, %p",
+				    vp, uiop, crp);
 				if ((uiop->uio_fmode & FNDELAY) &&
 				    (stp->sd_flag & OLDNDELAY) &&
 				    (error == EAGAIN))
@@ -1181,7 +1179,7 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 				goto oops;
 			}
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRREAD_AWAKE,
-				"strread awakes:%p, %p, %p", vp, uiop, crp);
+			    "strread awakes:%p, %p, %p", vp, uiop, crp);
 			if ((error = i_straccess(stp, JCREAD)) != 0) {
 				goto oops;
 			}
@@ -1204,7 +1202,7 @@ strread(struct vnode *vp, struct uio *uiop, cred_t *crp)
 		 */
 		mark = bp->b_flag & (MSGMARK | MSGMARKNEXT | MSGNOTMARKNEXT);
 		ASSERT((mark & (MSGMARKNEXT|MSGNOTMARKNEXT)) !=
-			(MSGMARKNEXT|MSGNOTMARKNEXT));
+		    (MSGMARKNEXT|MSGNOTMARKNEXT));
 		if (mark != 0 && bp == stp->sd_mark) {
 			if (rflg) {
 				putback(stp, q, bp, pri);
@@ -1314,16 +1312,16 @@ ismdata:
 			 * this point.
 			 */
 			while ((((bp = q->q_first)) != NULL) &&
-				(bp->b_datap->db_type == M_SIG)) {
+			    (bp->b_datap->db_type == M_SIG)) {
 				bp = getq_noenab(q);
 				/*
 				 * sd_lock is held so the content of the
 				 * read queue can not change.
 				 */
 				ASSERT(bp != NULL &&
-					bp->b_datap->db_type == M_SIG);
+				    bp->b_datap->db_type == M_SIG);
 				strsignal_nolock(stp, *bp->b_rptr,
-					(int32_t)bp->b_band);
+				    (int32_t)bp->b_band);
 				mutex_exit(&stp->sd_lock);
 				freemsg(bp);
 				if (STREAM_NEEDSERVICE(stp))
@@ -1353,11 +1351,14 @@ ismdata:
 			 */
 			if (stp->sd_read_opt & RD_PROTDAT) {
 				for (nbp = bp; nbp; nbp = nbp->b_next) {
-				    if ((nbp->b_datap->db_type == M_PROTO) ||
-					(nbp->b_datap->db_type == M_PCPROTO))
-					nbp->b_datap->db_type = M_DATA;
-				    else
-					break;
+					if ((nbp->b_datap->db_type ==
+					    M_PROTO) ||
+					    (nbp->b_datap->db_type ==
+					    M_PCPROTO)) {
+						nbp->b_datap->db_type = M_DATA;
+					} else {
+						break;
+					}
 				}
 				/*
 				 * clear stream head hi pri flag based on
@@ -1415,7 +1416,7 @@ ismdata:
 			 * Garbage on stream head read queue.
 			 */
 			cmn_err(CE_WARN, "bad %x found at stream head\n",
-				bp->b_datap->db_type);
+			    bp->b_datap->db_type);
 			freemsg(bp);
 			goto oops1;
 		}
@@ -1511,7 +1512,7 @@ strrput(queue_t *q, mblk_t *bp)
 
 	ASSERT(qclaimed(q));
 	TRACE_2(TR_FAC_STREAMS_FR, TR_STRRPUT_ENTER,
-		"strrput called with message type:q %p bp %p", q, bp);
+	    "strrput called with message type:q %p bp %p", q, bp);
 
 	/*
 	 * Perform initial processing and pass to the parameterized functions.
@@ -1665,7 +1666,7 @@ strrput(queue_t *q, mblk_t *bp)
 	case M_PCPROTO:
 		ASSERT(stp->sd_rprotofunc != NULL);
 		bp = (stp->sd_rprotofunc)(stp->sd_vnode, bp,
-			&wakeups, &firstmsgsigs, &allmsgsigs, &pollwakeups);
+		    &wakeups, &firstmsgsigs, &allmsgsigs, &pollwakeups);
 #define	ALLSIG	(S_INPUT|S_HIPRI|S_OUTPUT|S_MSG|S_ERROR|S_HANGUP|S_RDNORM|\
 		S_WRNORM|S_RDBAND|S_WRBAND|S_BANDURG)
 #define	ALLPOLL	(POLLIN|POLLPRI|POLLOUT|POLLRDNORM|POLLWRNORM|POLLRDBAND|\
@@ -1682,7 +1683,7 @@ strrput(queue_t *q, mblk_t *bp)
 	default:
 		ASSERT(stp->sd_rmiscfunc != NULL);
 		bp = (stp->sd_rmiscfunc)(stp->sd_vnode, bp,
-			&wakeups, &firstmsgsigs, &allmsgsigs, &pollwakeups);
+		    &wakeups, &firstmsgsigs, &allmsgsigs, &pollwakeups);
 		ASSERT((wakeups & ~(RSLEEP|WSLEEP)) == 0);
 		ASSERT((firstmsgsigs & ~ALLSIG) == 0);
 		ASSERT((allmsgsigs & ~ALLSIG) == 0);
@@ -1929,8 +1930,8 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 			}
 			if (rw) {
 				TRACE_2(TR_FAC_STREAMS_FR, TR_STRRPUT_WAKE,
-					"strrput cv_broadcast:q %p, bp %p",
-					q, bp);
+				    "strrput cv_broadcast:q %p, bp %p",
+				    q, bp);
 				cv_broadcast(&q->q_wait); /* readers */
 				cv_broadcast(&_WR(q)->q_wait); /* writers */
 				cv_broadcast(&stp->sd_monitor); /* ioctllers */
@@ -1977,8 +1978,8 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 				stp->sd_rerror = *bp->b_rptr;
 				stp->sd_werror = *bp->b_rptr;
 				TRACE_2(TR_FAC_STREAMS_FR,
-					TR_STRRPUT_WAKE2,
-					"strrput wakeup #2:q %p, bp %p", q, bp);
+				    TR_STRRPUT_WAKE2,
+				    "strrput wakeup #2:q %p, bp %p", q, bp);
 				cv_broadcast(&q->q_wait); /* the readers */
 				cv_broadcast(&_WR(q)->q_wait); /* the writers */
 				cv_broadcast(&stp->sd_monitor); /* ioctllers */
@@ -2295,26 +2296,30 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 		if (sop->so_flags & SO_MAXBLK)
 			stp->sd_maxblk = sop->so_maxblk;
 		if (sop->so_flags & SO_HIWAT) {
-		    if (sop->so_flags & SO_BAND) {
-			if (strqset(q, QHIWAT, sop->so_band, sop->so_hiwat))
-				cmn_err(CE_WARN,
-				    "strrput: could not allocate qband\n");
-			else
-				bpri = sop->so_band;
-		    } else {
-			q->q_hiwat = sop->so_hiwat;
-		    }
+			if (sop->so_flags & SO_BAND) {
+				if (strqset(q, QHIWAT,
+				    sop->so_band, sop->so_hiwat)) {
+					cmn_err(CE_WARN, "strrput: could not "
+					    "allocate qband\n");
+				} else {
+					bpri = sop->so_band;
+				}
+			} else {
+				q->q_hiwat = sop->so_hiwat;
+			}
 		}
 		if (sop->so_flags & SO_LOWAT) {
-		    if (sop->so_flags & SO_BAND) {
-			if (strqset(q, QLOWAT, sop->so_band, sop->so_lowat))
-				cmn_err(CE_WARN,
-				    "strrput: could not allocate qband\n");
-			else
-				bpri = sop->so_band;
-		    } else {
-			q->q_lowat = sop->so_lowat;
-		    }
+			if (sop->so_flags & SO_BAND) {
+				if (strqset(q, QLOWAT,
+				    sop->so_band, sop->so_lowat)) {
+					cmn_err(CE_WARN, "strrput: could not "
+					    "allocate qband\n");
+				} else {
+					bpri = sop->so_band;
+				}
+			} else {
+				q->q_lowat = sop->so_lowat;
+			}
 		}
 		if (sop->so_flags & SO_MREADON)
 			stp->sd_flag |= SNDMREAD;
@@ -2402,8 +2407,8 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 	default:
 #ifdef DEBUG
 		cmn_err(CE_WARN,
-			"bad message type %x received at stream head\n",
-			bp->b_datap->db_type);
+		    "bad message type %x received at stream head\n",
+		    bp->b_datap->db_type);
 #endif
 		freemsg(bp);
 		return (0);
@@ -2497,7 +2502,7 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 		}
 
 		if ((error = strmakedata(iosize, uiop, stp, flags,
-					&mp)) != 0) {
+		    &mp)) != 0) {
 			freemsg(mctl);
 			/*
 			 * need to change return code to ENOMEM
@@ -2578,7 +2583,7 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 	mp->b_band = (uchar_t)pri;
 
 	(void) uiodup(uiop, &uiod.d_uio, uiod.d_iov,
-		sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
+	    sizeof (uiod.d_iov) / sizeof (*uiod.d_iov));
 	uiod.d_uio.uio_offset = 0;
 	uiod.d_mp = mp;
 	error = rwnext(wqp, &uiod);
@@ -2717,14 +2722,14 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 	if (rmin > 0) {
 		if (uiop->uio_resid < rmin) {
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRWRITE_OUT,
-				"strwrite out:q %p out %d error %d",
-				wqp, 0, ERANGE);
+			    "strwrite out:q %p out %d error %d",
+			    wqp, 0, ERANGE);
 			return (ERANGE);
 		}
 		if ((rmax != INFPSZ) && (uiop->uio_resid > rmax)) {
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRWRITE_OUT,
-				"strwrite out:q %p out %d error %d",
-				wqp, 1, ERANGE);
+			    "strwrite out:q %p out %d error %d",
+			    wqp, 1, ERANGE);
 			return (ERANGE);
 		}
 	}
@@ -2767,8 +2772,7 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 		for (;;) {
 			int done = 0;
 
-			error = strput(stp, NULL, uiop, &iosize, b_flag,
-				0, 0);
+			error = strput(stp, NULL, uiop, &iosize, b_flag, 0, 0);
 			if (error == 0)
 				break;
 			if (error != EWOULDBLOCK)
@@ -2786,7 +2790,7 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 				continue;
 			}
 			TRACE_1(TR_FAC_STREAMS_FR, TR_STRWRITE_WAIT,
-				"strwrite wait:q %p wait", wqp);
+			    "strwrite wait:q %p wait", wqp);
 			if ((error = strwaitq(stp, waitflag, (ssize_t)0,
 			    tempmode, -1, &done)) != 0 || done) {
 				mutex_exit(&stp->sd_lock);
@@ -2797,7 +2801,7 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 				goto out;
 			}
 			TRACE_1(TR_FAC_STREAMS_FR, TR_STRWRITE_WAKE,
-				"strwrite wake:q %p awakes", wqp);
+			    "strwrite wake:q %p awakes", wqp);
 			if ((error = i_straccess(stp, JCWRITE)) != 0) {
 				mutex_exit(&stp->sd_lock);
 				goto out;
@@ -2806,7 +2810,7 @@ strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
 		}
 		waitflag |= NOINTR;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRWRITE_RESID,
-			"strwrite resid:q %p uiop %p", wqp, uiop);
+		    "strwrite resid:q %p uiop %p", wqp, uiop);
 		if (uiop->uio_resid) {
 			/* Recheck for errors - needed for sockets */
 			if ((stp->sd_wput_opt & SW_RECHECK_ERR) &&
@@ -2829,7 +2833,7 @@ out:
 	if (error == ENOMEM)
 		error = EAGAIN;
 	TRACE_3(TR_FAC_STREAMS_FR, TR_STRWRITE_OUT,
-		"strwrite out:q %p out %d error %d", wqp, 2, error);
+	    "strwrite out:q %p out %d error %d", wqp, 2, error);
 	return (error);
 }
 
@@ -2853,7 +2857,7 @@ strwsrv(queue_t *q)
 	unsigned char	qbf[NBAND];	/* band flushing backenable flags */
 
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRWSRV, "strwsrv:q %p", q);
+	    TR_STRWSRV, "strwsrv:q %p", q);
 	stp = (struct stdata *)q->q_ptr;
 	ASSERT(qclaimed(q));
 	mutex_enter(&stp->sd_lock);
@@ -2926,16 +2930,16 @@ strwsrv(queue_t *q)
 	mutex_exit(QLOCK(tq));
 
 	if (isevent) {
-	    for (i = tq->q_nband; i; i--) {
-		if (qbf[i]) {
-			pollwakeup(&stp->sd_pollist, POLLWRBAND);
-			mutex_enter(&stp->sd_lock);
-			if (stp->sd_sigflags & S_WRBAND)
-				strsendsig(stp->sd_siglist, S_WRBAND,
-					(uchar_t)i, 0);
-			mutex_exit(&stp->sd_lock);
+		for (i = tq->q_nband; i; i--) {
+			if (qbf[i]) {
+				pollwakeup(&stp->sd_pollist, POLLWRBAND);
+				mutex_enter(&stp->sd_lock);
+				if (stp->sd_sigflags & S_WRBAND)
+					strsendsig(stp->sd_siglist, S_WRBAND,
+					    (uchar_t)i, 0);
+				mutex_exit(&stp->sd_lock);
+			}
 		}
-	    }
 	}
 
 	releasestr(q);
@@ -3157,12 +3161,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 	stp = vp->v_stream;
 
 	TRACE_3(TR_FAC_STREAMS_FR, TR_IOCTL_ENTER,
-		"strioctl:stp %p cmd %X arg %lX", stp, cmd, arg);
+	    "strioctl:stp %p cmd %X arg %lX", stp, cmd, arg);
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_strioctl(vp, cmd, arg, flag, copyflag, crp, rvalp);
-#endif
 
 	/*
 	 * If the copy is kernel to kernel, make sure that the FNATIVE
@@ -3303,7 +3305,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				strioc.ic_len = sizeof (struct termio);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TCSETS:
 			case TCSETSW:
@@ -3311,19 +3313,19 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				strioc.ic_len = sizeof (struct termios);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case LDSETT:
 				strioc.ic_len = sizeof (struct termcb);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TIOCSETP:
 				strioc.ic_len = sizeof (struct sgttyb);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TIOCSTI:
 				if ((flag & FREAD) == 0 &&
@@ -3344,19 +3346,19 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				strioc.ic_len = sizeof (char);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TIOCSWINSZ:
 				strioc.ic_len = sizeof (struct winsize);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TIOCSSIZE:
 				strioc.ic_len = sizeof (struct ttysize);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case TIOCSSOFTCAR:
 			case KIOCTRANS:
@@ -3372,41 +3374,41 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				strioc.ic_len = sizeof (int);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case KIOCSETKEY:
 			case KIOCGETKEY:
 				strioc.ic_len = sizeof (struct kiockey);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case KIOCSKEY:
 			case KIOCGKEY:
 				strioc.ic_len = sizeof (struct kiockeymap);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case KIOCSLED:
 				/* arg is a pointer to char */
 				strioc.ic_len = sizeof (char);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case MSIOSETPARMS:
 				strioc.ic_len = sizeof (Ms_parms);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			case VUIDSADDR:
 			case VUIDGADDR:
 				strioc.ic_len = sizeof (struct vuid_addr_probe);
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 
 			/*
 			 * These M_IOCTL's don't require any data to be sent
@@ -3439,7 +3441,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 				strioc.ic_len = 0;
 				strioc.ic_dp = (char *)arg;
 				return (strdoioctl(stp, &strioc, flag,
-					copyflag, crp, rvalp));
+				    copyflag, crp, rvalp));
 			}
 		}
 
@@ -3516,7 +3518,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * in queue in "arg" and return the number of messages
 		 * in queue in return value.
 		 */
-	    {
+	{
 		size_t	size;
 		int	retval;
 		int	count = 0;
@@ -3554,14 +3556,14 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		if (!error)
 			*rvalp = count;
 		return (error);
-	    }
+	}
 
 	case FIONREAD:
 		/*
 		 * Return number of bytes of data in all data messages
 		 * in queue in "arg".
 		 */
-	    {
+	{
 		size_t	size = 0;
 		int	retval;
 
@@ -3590,7 +3592,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		*rvalp = 0;
 		return (error);
-	    }
+	}
 	case FIORDCHK:
 		/*
 		 * FIORDCHK does not use arg value (like FIONREAD),
@@ -3599,7 +3601,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * to add the msgdsizes of all data  messages until
 		 * a non-data message.
 		 */
-	    {
+	{
 		size_t size = 0;
 
 		mutex_enter(QLOCK(rdq));
@@ -3624,13 +3626,13 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 */
 		*rvalp = MIN(size, INT_MAX);
 		return (0);
-	    }
+	}
 
 	case I_FIND:
 		/*
 		 * Get module name.
 		 */
-	    {
+	{
 		char mname[FMNAMESZ + 1];
 		queue_t *q;
 
@@ -3644,7 +3646,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 */
 		if (fmodsw_find(mname, FMODSW_LOAD) == NULL) {
 			TRACE_0(TR_FAC_STREAMS_FR,
-				TR_I_CANT_FIND, "couldn't I_FIND");
+			    TR_I_CANT_FIND, "couldn't I_FIND");
 			return (EINVAL);
 		}
 
@@ -3664,7 +3666,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		*rvalp = (q ? 1 : 0);
 		return (error);
-	    }
+	}
 
 	case I_PUSH:
 	case __I_PUSH_NOCTTY:
@@ -3674,7 +3676,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * do not allocate controlling tty. See bugid 4025044
 		 */
 
-	    {
+	{
 		char mname[FMNAMESZ + 1];
 		fmodsw_impl_t *fp;
 		dev_t dummydev;
@@ -3765,10 +3767,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		strendplumb(stp);
 		mutex_exit(&stp->sd_lock);
 		return (error);
-	    }
+	}
 
 	case I_POP:
-	    {
+	{
 		queue_t	*q;
 
 		if (stp->sd_flag & STRHUP)
@@ -3808,7 +3810,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		q = wrq->q_next;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_I_POP,
-			"I_POP:%p from %p", q, stp);
+		    "I_POP:%p from %p", q, stp);
 		if (q->q_next == NULL || (q->q_flag & (QREADR|QISDRV))) {
 			error = EINVAL;
 		} else {
@@ -3851,7 +3853,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		strendplumb(stp);
 		mutex_exit(&stp->sd_lock);
 		return (error);
-	    }
+	}
 
 	case _I_MUXID2FD:
 	{
@@ -4261,7 +4263,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * Get name of first module downstream.
 		 * If no module, return an error.
 		 */
-	    {
+	{
 		claimstr(wrq);
 		if (_SAMESTR(wrq) && wrq->q_next->q_next) {
 			char *name = wrq->q_next->q_qinfo->qi_minfo->mi_idname;
@@ -4272,7 +4274,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		}
 		releasestr(wrq);
 		return (EINVAL);
-	    }
+	}
 
 	case I_LINK:
 	case I_PLINK:
@@ -4298,7 +4300,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * controlling stream.  Otherwise, arg is an index number
 		 * for a link to be removed.
 		 */
-	    {
+	{
 		struct linkinfo *linkp;
 		int native_arg = (int)arg;
 		int type;
@@ -4306,7 +4308,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		str_stack_t *ss;
 
 		TRACE_1(TR_FAC_STREAMS_FR,
-			TR_I_UNLINK, "I_UNLINK/I_PUNLINK:%p", stp);
+		    TR_I_UNLINK, "I_UNLINK/I_PUNLINK:%p", stp);
 		if (vp->v_type == VFIFO) {
 			return (EINVAL);
 		}
@@ -4337,7 +4339,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		}
 		netstack_rele(ss->ss_netstack);
 		return (error);
-	    }
+	}
 
 	case I_FLUSH:
 		/*
@@ -4376,7 +4378,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		return (0);
 
 	case I_FLUSHBAND:
-	    {
+	{
 		struct bandinfo binfo;
 
 		error = strcopyin((void *)arg, &binfo, sizeof (binfo),
@@ -4408,7 +4410,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		(void) strdoioctl(stp, &strioc, flag, K_TO_K, crp, rvalp);
 		*rvalp = 0;
 		return (0);
-	    }
+	}
 
 	case I_SRDOPT:
 		/*
@@ -4465,7 +4467,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * Get read option and return the value
 		 * to spot pointed to by arg
 		 */
-	    {
+	{
 		int rdopt;
 
 		rdopt = ((stp->sd_read_opt & RD_MSGDIS) ? RMSGD :
@@ -4475,7 +4477,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		return (strcopyout(&rdopt, (void *)arg, sizeof (int),
 		    copyflag));
-	    }
+	}
 
 	case I_SERROPT:
 		/*
@@ -4514,16 +4516,16 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * Get error option and return the value
 		 * to spot pointed to by arg
 		 */
-	    {
+	{
 		int erropt = 0;
 
 		erropt |= (stp->sd_flag & STRDERRNONPERSIST) ? RERRNONPERSIST :
-			RERRNORM;
+		    RERRNORM;
 		erropt |= (stp->sd_flag & STWRERRNONPERSIST) ? WERRNONPERSIST :
-			WERRNORM;
+		    WERRNORM;
 		return (strcopyout(&erropt, (void *)arg, sizeof (int),
 		    copyflag));
-	    }
+	}
 
 	case I_SETSIG:
 		/*
@@ -4531,7 +4533,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * signal based on the events given in arg.  If
 		 * arg is zero, remove the proc from register list.
 		 */
-	    {
+	{
 		strsig_t *ssp, *pssp;
 		struct pid *pidp;
 
@@ -4543,7 +4545,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 */
 		mutex_enter(&stp->sd_lock);
 		for (ssp = stp->sd_siglist; ssp && (ssp->ss_pidp != pidp);
-			pssp = ssp, ssp = ssp->ss_next)
+		    pssp = ssp, ssp = ssp->ss_next)
 			;
 
 		if (arg) {
@@ -4606,14 +4608,14 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			stp->sd_sigflags |= ssp->ss_events;
 		mutex_exit(&stp->sd_lock);
 		return (0);
-	    }
+	}
 
 	case I_GETSIG:
 		/*
 		 * Return (in arg) the current registration of events
 		 * for which the calling proc is to be signaled.
 		 */
-	    {
+	{
 		struct strsig *ssp;
 		struct pid  *pidp;
 
@@ -4628,7 +4630,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			}
 		mutex_exit(&stp->sd_lock);
 		return (EINVAL);
-	    }
+	}
 
 	case I_ESETSIG:
 		/*
@@ -4691,7 +4693,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 */
 		mutex_enter(&stp->sd_lock);
 		for (ssp = stp->sd_siglist; ssp && (ssp->ss_pid != pid);
-				pssp = ssp, ssp = ssp->ss_next)
+		    pssp = ssp, ssp = ssp->ss_next)
 			;
 
 		if (ss.ss_events) {
@@ -4768,14 +4770,14 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		PID_RELE(pidp);
 		mutex_exit(&pidlock);
 		return (0);
-	    }
+	}
 
 	case I_EGETSIG:
 		/*
 		 * Return (in arg) the current registration of events
 		 * for which the calling proc is to be signaled.
 		 */
-	    {
+	{
 		struct strsig *ssp;
 		struct proc *proc;
 		pid_t pid;
@@ -4825,10 +4827,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		PID_RELE(pidp);
 		mutex_exit(&pidlock);
 		return (EINVAL);
-	    }
+	}
 
 	case I_PEEK:
-	    {
+	{
 		STRUCT_DECL(strpeek, strpeek);
 		size_t n;
 		mblk_t *fmp, *tmp_mp = NULL;
@@ -4974,7 +4976,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 					if ((n = MIN(uio.uio_resid,
 					    mp->b_wptr - mp->b_rptr)) != 0 &&
 					    (error = uiomove((char *)mp->b_rptr,
-						n, UIO_READ, &uio)) != 0) {
+					    n, UIO_READ, &uio)) != 0) {
 						freemsg(tmp_mp);
 						return (error);
 					}
@@ -5035,10 +5037,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		else
 			*rvalp = 1;
 		return (0);
-	    }
+	}
 
 	case I_FDINSERT:
-	    {
+	{
 		STRUCT_DECL(strfdinsert, strfdinsert);
 		struct file *resftp;
 		struct stdata *resstp;
@@ -5072,7 +5074,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		mutex_enter(&resstp->sd_lock);
 		if (resstp->sd_flag & (STRDERR|STWRERR|STRHUP|STPLEX)) {
 			error = strgeterr(resstp,
-					STRDERR|STWRERR|STRHUP|STPLEX, 0);
+			    STRDERR|STWRERR|STRHUP|STPLEX, 0);
 			if (error != 0) {
 				mutex_exit(&resstp->sd_lock);
 				releasef(STRUCT_FGET(strfdinsert, fildes));
@@ -5208,27 +5210,25 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		stream_runservice(stp);
 		releasef(STRUCT_FGET(strfdinsert, fildes));
 		return (error);
-	    }
+	}
 
 	case I_SENDFD:
-	    {
+	{
 		struct file *fp;
 
 		if ((fp = getf((int)arg)) == NULL)
 			return (EBADF);
 		error = do_sendfp(stp, fp, crp);
-#ifdef C2_AUDIT
 		if (audit_active) {
 			audit_fdsend((int)arg, fp, error);
 		}
-#endif
 		releasef((int)arg);
 		return (error);
-	    }
+	}
 
 	case I_RECVFD:
 	case I_E_RECVFD:
-	    {
+	{
 		struct k_strrecvfd *srf;
 		int i, fd;
 
@@ -5308,11 +5308,9 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			mutex_exit(&stp->sd_lock);
 			return (error);
 		}
-#ifdef C2_AUDIT
 		if (audit_active) {
 			audit_fdrecv(fd, srf->fp);
 		}
-#endif
 
 		/*
 		 * Always increment f_count since the freemsg() below will
@@ -5324,7 +5322,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		setf(fd, srf->fp);
 		freemsg(mp);
 		return (0);
-	    }
+	}
 
 	case I_SWROPT:
 		/*
@@ -5350,7 +5348,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		return (0);
 
 	case I_GWROPT:
-	    {
+	{
 		int wropt = 0;
 
 		if (stp->sd_wput_opt & SW_SNDZERO)
@@ -5359,7 +5357,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			wropt |= SNDPIPE;
 		return (strcopyout(&wropt, (void *)arg, sizeof (wropt),
 		    copyflag));
-	    }
+	}
 
 	case I_LIST:
 		/*
@@ -5370,7 +5368,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		 * provided.
 		 */
 
-	    {
+	{
 		queue_t *q;
 		int num_modules, space_allocated;
 		STRUCT_DECL(str_list, strlist);
@@ -5423,10 +5421,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			    sizeof (int), copyflag);
 		}
 		return (error);
-	    }
+	}
 
 	case I_CKBAND:
-	    {
+	{
 		queue_t *q;
 		qband_t *qbp;
 
@@ -5454,10 +5452,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		}
 		mutex_exit(QLOCK(q));
 		return (0);
-	    }
+	}
 
 	case I_GETBAND:
-	    {
+	{
 		int intpri;
 		queue_t *q;
 
@@ -5473,10 +5471,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		    copyflag);
 		mutex_exit(QLOCK(q));
 		return (error);
-	    }
+	}
 
 	case I_ATMARK:
-	    {
+	{
 		queue_t *q;
 
 		if (arg & ~(ANYMARK|LASTMARK))
@@ -5501,10 +5499,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		}
 		mutex_exit(&stp->sd_lock);
 		return (0);
-	    }
+	}
 
 	case I_CANPUT:
-	    {
+	{
 		char band;
 
 		if ((arg < 0) || (arg >= NBAND))
@@ -5512,10 +5510,10 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		band = (char)arg;
 		*rvalp = bcanputnext(stp->sd_wrq, band);
 		return (0);
-	    }
+	}
 
 	case I_SETCLTIME:
-	    {
+	{
 		int closetime;
 
 		error = strcopyin((void *)arg, &closetime, sizeof (int),
@@ -5527,16 +5525,16 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		stp->sd_closetime = closetime;
 		return (0);
-	    }
+	}
 
 	case I_GETCLTIME:
-	    {
+	{
 		int closetime;
 
 		closetime = stp->sd_closetime;
 		return (strcopyout(&closetime, (void *)arg, sizeof (int),
 		    copyflag));
-	    }
+	}
 
 	case TIOCGSID:
 	{
@@ -5833,8 +5831,8 @@ strdoioctl(
 	ASSERT((fflags & FMODELS) != 0);
 
 	TRACE_2(TR_FAC_STREAMS_FR,
-		TR_STRDOIOCTL,
-		"strdoioctl:stp %p strioc %p", stp, strioc);
+	    TR_STRDOIOCTL,
+	    "strdoioctl:stp %p strioc %p", stp, strioc);
 	if (strioc->ic_len == TRANSPARENT) {	/* send arg in M_DATA block */
 		transparent = 1;
 		strioc->ic_len = sizeof (intptr_t);
@@ -5918,8 +5916,8 @@ strdoioctl(
 		clock_t cv_rval;
 
 		TRACE_0(TR_FAC_STREAMS_FR,
-			TR_STRDOIOCTL_WAIT,
-			"strdoioctl sleeps - IOCWAIT");
+		    TR_STRDOIOCTL_WAIT,
+		    "strdoioctl sleeps - IOCWAIT");
 		cv_rval = str_cv_wait(&stp->sd_iocmonitor, &stp->sd_lock,
 		    STRTIMOUT, sigflag);
 		if (cv_rval <= 0) {
@@ -5990,7 +5988,7 @@ strdoioctl(
 	mutex_exit(&stp->sd_lock);
 
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRDOIOCTL_PUT, "strdoioctl put: stp %p", stp);
+	    TR_STRDOIOCTL_PUT, "strdoioctl put: stp %p", stp);
 	stream_willservice(stp);
 	putnext(stp->sd_wrq, bp);
 	stream_runservice(stp);
@@ -6028,8 +6026,8 @@ waitioc:
 		}
 
 		TRACE_0(TR_FAC_STREAMS_FR,
-			TR_STRDOIOCTL_WAIT2,
-			"strdoioctl sleeps awaiting reply");
+		    TR_STRDOIOCTL_WAIT2,
+		    "strdoioctl sleeps awaiting reply");
 		ASSERT(error == 0);
 
 		cv_rval = str_cv_wait(&stp->sd_monitor, &stp->sd_lock,
@@ -6080,7 +6078,7 @@ waitioc:
 					}
 					bp->b_datap->db_type = M_IOCDATA;
 					bp->b_wptr = bp->b_rptr +
-						sizeof (struct copyresp);
+					    sizeof (struct copyresp);
 					resp = (struct copyresp *)bp->b_rptr;
 					resp->cp_rval =
 					    (caddr_t)1; /* failure */
@@ -6107,7 +6105,7 @@ waitioc:
 	 */
 	ASSERT(bp != NULL && bp != (mblk_t *)-1);
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STRDOIOCTL_ACK, "strdoioctl got reply: bp %p", bp);
+	    TR_STRDOIOCTL_ACK, "strdoioctl got reply: bp %p", bp);
 	if ((bp->b_datap->db_type == M_IOCACK) ||
 	    (bp->b_datap->db_type == M_IOCNAK)) {
 		/* for detection of duplicate ioctl replies */
@@ -6337,7 +6335,7 @@ strgetmsg(
 	unsigned char type;
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_STRGETMSG_ENTER,
-		"strgetmsg:%p", vp);
+	    "strgetmsg:%p", vp);
 
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
@@ -6441,21 +6439,21 @@ strgetmsg(
 		 * determine if a high priority messages is waiting
 		 */
 		} else if ((*flagsp & MSG_HIPRI) && q_first != NULL &&
-			    q_first->b_datap->db_type >= QPCTL &&
-			    (bp = getq_noenab(q)) != NULL) {
+		    q_first->b_datap->db_type >= QPCTL &&
+		    (bp = getq_noenab(q)) != NULL) {
 			/* Asked for HIPRI and got one */
 			ASSERT(bp->b_datap->db_type >= QPCTL);
 			break;
 		} else if ((*flagsp & MSG_BAND) && q_first != NULL &&
-			    ((q_first->b_band >= *prip) ||
-			    q_first->b_datap->db_type >= QPCTL) &&
-			    (bp = getq_noenab(q)) != NULL) {
+		    ((q_first->b_band >= *prip) ||
+		    q_first->b_datap->db_type >= QPCTL) &&
+		    (bp = getq_noenab(q)) != NULL) {
 			/*
 			 * Asked for at least band "prip" and got either at
 			 * least that band or a hipri message.
 			 */
 			ASSERT(bp->b_band >= *prip ||
-				bp->b_datap->db_type >= QPCTL);
+			    bp->b_datap->db_type >= QPCTL);
 			if (bp->b_datap->db_type == M_SIG) {
 				strsignal_nolock(stp, *bp->b_rptr,
 				    (int32_t)bp->b_band);
@@ -6482,18 +6480,18 @@ strgetmsg(
 			return (0);
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRGETMSG_WAIT,
-			"strgetmsg calls strwaitq:%p, %p",
-			vp, uiop);
+		    "strgetmsg calls strwaitq:%p, %p",
+		    vp, uiop);
 		if (((error = strwaitq(stp, GETWAIT, (ssize_t)0, fmode, -1,
 		    &done)) != 0) || done) {
 			TRACE_2(TR_FAC_STREAMS_FR, TR_STRGETMSG_DONE,
-				"strgetmsg error or done:%p, %p",
-				vp, uiop);
+			    "strgetmsg error or done:%p, %p",
+			    vp, uiop);
 			mutex_exit(&stp->sd_lock);
 			return (error);
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRGETMSG_AWAKE,
-			"strgetmsg awakes:%p, %p", vp, uiop);
+		    "strgetmsg awakes:%p, %p", vp, uiop);
 		if ((error = i_straccess(stp, JCREAD)) != 0) {
 			mutex_exit(&stp->sd_lock);
 			return (error);
@@ -6512,7 +6510,7 @@ strgetmsg(
 	 */
 	mark = bp->b_flag & (MSGMARK | MSGMARKNEXT | MSGNOTMARKNEXT);
 	ASSERT((mark & (MSGMARKNEXT|MSGNOTMARKNEXT)) !=
-		(MSGMARKNEXT|MSGNOTMARKNEXT));
+	    (MSGMARKNEXT|MSGNOTMARKNEXT));
 	if (mark != 0 && bp == stp->sd_mark) {
 		mark |= _LASTMARK;
 		stp->sd_mark = NULL;
@@ -6902,7 +6900,7 @@ kstrgetmsg(
 	unsigned char type;
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_ENTER,
-		"kstrgetmsg:%p", vp);
+	    "kstrgetmsg:%p", vp);
 
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
@@ -6920,7 +6918,7 @@ kstrgetmsg(
 		if ((stp->sd_flag & STPLEX) ||
 		    (flags & (MSG_IGNERROR|MSG_DELAYERROR)) == 0) {
 			error = strgeterr(stp, STRDERR|STPLEX,
-					(flags & MSG_IPEEK));
+			    (flags & MSG_IPEEK));
 			if (error != 0) {
 				mutex_exit(&stp->sd_lock);
 				return (error);
@@ -6982,20 +6980,20 @@ retry:
 		 * determine if a high priority messages is waiting
 		 */
 		} else if ((flags & MSG_HIPRI) && q_first != NULL &&
-			    q_first->b_datap->db_type >= QPCTL &&
-			    (bp = getq_noenab(q)) != NULL) {
+		    q_first->b_datap->db_type >= QPCTL &&
+		    (bp = getq_noenab(q)) != NULL) {
 			ASSERT(bp->b_datap->db_type >= QPCTL);
 			break;
 		} else if ((flags & MSG_BAND) && q_first != NULL &&
-			    ((q_first->b_band >= *prip) ||
-			    q_first->b_datap->db_type >= QPCTL) &&
-			    (bp = getq_noenab(q)) != NULL) {
+		    ((q_first->b_band >= *prip) ||
+		    q_first->b_datap->db_type >= QPCTL) &&
+		    (bp = getq_noenab(q)) != NULL) {
 			/*
 			 * Asked for at least band "prip" and got either at
 			 * least that band or a hipri message.
 			 */
 			ASSERT(bp->b_band >= *prip ||
-				bp->b_datap->db_type >= QPCTL);
+			    bp->b_datap->db_type >= QPCTL);
 			if (bp->b_datap->db_type == M_SIG) {
 				strsignal_nolock(stp, *bp->b_rptr,
 				    (int32_t)bp->b_band);
@@ -7014,7 +7012,7 @@ retry:
 		if ((stp->sd_flag & (STRDERR|STPLEX)) &&
 		    (flags & (MSG_IGNERROR|MSG_DELAYERROR)) == MSG_DELAYERROR) {
 			error = strgeterr(stp, STRDERR|STPLEX,
-					(flags & MSG_IPEEK));
+			    (flags & MSG_IPEEK));
 			if (error != 0) {
 				mutex_exit(&stp->sd_lock);
 				return (error);
@@ -7057,18 +7055,18 @@ retry:
 			fmode = 0;
 
 		TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_WAIT,
-			"kstrgetmsg calls strwaitq:%p, %p",
-			vp, uiop);
+		    "kstrgetmsg calls strwaitq:%p, %p",
+		    vp, uiop);
 		if (((error = strwaitq(stp, waitflag, (ssize_t)0,
 		    fmode, timout, &done)) != 0) || done) {
 			TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_DONE,
-				"kstrgetmsg error or done:%p, %p",
-				vp, uiop);
+			    "kstrgetmsg error or done:%p, %p",
+			    vp, uiop);
 			mutex_exit(&stp->sd_lock);
 			return (error);
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRGETMSG_AWAKE,
-			"kstrgetmsg awakes:%p, %p", vp, uiop);
+		    "kstrgetmsg awakes:%p, %p", vp, uiop);
 		if ((error = i_straccess(stp, JCREAD)) != 0) {
 			mutex_exit(&stp->sd_lock);
 			return (error);
@@ -7087,7 +7085,7 @@ retry:
 	 */
 	mark = bp->b_flag & (MSGMARK | MSGMARKNEXT | MSGNOTMARKNEXT);
 	ASSERT((mark & (MSGMARKNEXT|MSGNOTMARKNEXT)) !=
-		(MSGMARKNEXT|MSGNOTMARKNEXT));
+	    (MSGMARKNEXT|MSGNOTMARKNEXT));
 	pri = bp->b_band;
 	if (mark != 0) {
 		/*
@@ -7301,7 +7299,7 @@ retry:
 				stp->sd_flag &= ~STRPRI;
 			}
 		} else if (pr && (savemp->b_datap->db_type == M_DATA) &&
-			    msgnodata(savemp)) {
+		    msgnodata(savemp)) {
 			/*
 			 * Avoid queuing a zero-length tail part of
 			 * a message. pr=1 indicates that we read some of
@@ -7537,10 +7535,8 @@ strputmsg(
 	xpg4 = (flag & MSG_XPG4) ? 1 : 0;
 	flag &= ~MSG_XPG4;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_strputmsg(vp, mctl, mdata, pri, flag, fmode);
-#endif
 
 	mutex_enter(&stp->sd_lock);
 
@@ -7575,7 +7571,7 @@ strputmsg(
 	}
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_STRPUTMSG_IN,
-		"strputmsg in:stp %p", stp);
+	    "strputmsg in:stp %p", stp);
 
 	/* get these values from those cached in the stream head */
 	rmin = stp->sd_qn_minpsz;
@@ -7634,8 +7630,8 @@ strputmsg(
 		 */
 		if ((error = strmakectl(mctl, flag, fmode, &mp)) != 0) {
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRPUTMSG_OUT,
-				"strputmsg out:stp %p out %d error %d",
-				stp, 1, error);
+			    "strputmsg out:stp %p out %d error %d",
+			    stp, 1, error);
 			return (error);
 		}
 		/*
@@ -7643,7 +7639,7 @@ strputmsg(
 		 * strput.
 		 */
 		ASSERT(stp->sd_maxblk == INFPSZ ||
-			stp->sd_maxblk >= mdata->len);
+		    stp->sd_maxblk >= mdata->len);
 
 		msgsize = mdata->len;
 		error = strput(stp, mp, uiop, &msgsize, 0, pri, flag);
@@ -7667,17 +7663,17 @@ strputmsg(
 			continue;
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRPUTMSG_WAIT,
-			"strputmsg wait:stp %p waits pri %d", stp, pri);
+		    "strputmsg wait:stp %p waits pri %d", stp, pri);
 		if (((error = strwaitq(stp, WRITEWAIT, (ssize_t)0, fmode, -1,
 		    &done)) != 0) || done) {
 			mutex_exit(&stp->sd_lock);
 			TRACE_3(TR_FAC_STREAMS_FR, TR_STRPUTMSG_OUT,
-				"strputmsg out:q %p out %d error %d",
-				stp, 0, error);
+			    "strputmsg out:q %p out %d error %d",
+			    stp, 0, error);
 			return (error);
 		}
 		TRACE_1(TR_FAC_STREAMS_FR, TR_STRPUTMSG_WAKE,
-			"strputmsg wake:stp %p wakes", stp);
+		    "strputmsg wake:stp %p wakes", stp);
 		if ((error = i_straccess(stp, JCWRITE)) != 0) {
 			mutex_exit(&stp->sd_lock);
 			return (error);
@@ -7693,7 +7689,7 @@ out:
 	if (error == ENOMEM)
 		error = EAGAIN;
 	TRACE_3(TR_FAC_STREAMS_FR, TR_STRPUTMSG_OUT,
-		"strputmsg out:stp %p out %d error %d", stp, 2, error);
+	    "strputmsg out:stp %p out %d error %d", stp, 2, error);
 	return (error);
 }
 
@@ -7728,10 +7724,8 @@ kstrputmsg(
 	ASSERT(vp->v_stream);
 	stp = vp->v_stream;
 	wqp = stp->sd_wrq;
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_strputmsg(vp, NULL, NULL, pri, flag, fmode);
-#endif
 	if (mctl == NULL)
 		return (EINVAL);
 
@@ -7774,7 +7768,7 @@ kstrputmsg(
 	}
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_IN,
-		"kstrputmsg in:stp %p", stp);
+	    "kstrputmsg in:stp %p", stp);
 
 	/* get these values from those cached in the stream head */
 	rmin = stp->sd_qn_minpsz;
@@ -7904,7 +7898,7 @@ kstrputmsg(
 			continue;
 		}
 		TRACE_2(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_WAIT,
-			"kstrputmsg wait:stp %p waits pri %d", stp, pri);
+		    "kstrputmsg wait:stp %p waits pri %d", stp, pri);
 
 		waitflag = WRITEWAIT;
 		if (flag & (MSG_HOLDSIG|MSG_IGNERROR)) {
@@ -7917,13 +7911,13 @@ kstrputmsg(
 		    (ssize_t)0, fmode, -1, &done)) != 0) || done) {
 			mutex_exit(&stp->sd_lock);
 			TRACE_3(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_OUT,
-				"kstrputmsg out:stp %p out %d error %d",
-				stp, 0, error);
+			    "kstrputmsg out:stp %p out %d error %d",
+			    stp, 0, error);
 			freemsg(mctl);
 			return (error);
 		}
 		TRACE_1(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_WAKE,
-			"kstrputmsg wake:stp %p wakes", stp);
+		    "kstrputmsg wake:stp %p wakes", stp);
 		if ((error = i_straccess(stp, JCWRITE)) != 0) {
 			mutex_exit(&stp->sd_lock);
 			freemsg(mctl);
@@ -7941,7 +7935,7 @@ out:
 	if (error == ENOMEM)
 		error = EAGAIN;
 	TRACE_3(TR_FAC_STREAMS_FR, TR_KSTRPUTMSG_OUT,
-		"kstrputmsg out:stp %p out %d error %d", stp, 2, error);
+	    "kstrputmsg out:stp %p out %d error %d", stp, 2, error);
 	return (error);
 }
 

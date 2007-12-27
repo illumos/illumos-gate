@@ -1906,15 +1906,11 @@ kern_gpfault(struct regs *rp)
 		lwp_exit();
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)		/* audit core dump */
 		audit_core_start(SIGSEGV);
-#endif
 	v = core(SIGSEGV, B_FALSE);
-#ifdef C2_AUDIT
 	if (audit_active)		/* audit core dump */
 		audit_core_finish(v ? CLD_KILLED : CLD_DUMPED);
-#endif
 	exit(v ? CLD_KILLED : CLD_DUMPED, SIGSEGV);
 	return (0);
 }

@@ -104,12 +104,10 @@ facl(int fdes, int cmd, int nentries, void *aclbufp)
 
 	if ((fp = getf(fdes)) == NULL)
 		return (set_errno(EBADF));
-#ifdef C2_AUDIT
 	if (fp->f_flag & FREVOKED) {
 		releasef(fdes);
 		return (set_errno(EBADF));
 	}
-#endif /* C2_AUDIT */
 
 	error = cacl(cmd, nentries, aclbufp, fp->f_vnode, &rv);
 	releasef(fdes);
@@ -189,10 +187,10 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 		/* Sort the acl & default acl lists */
 		if (vsecattr.vsa_aclcnt > 1)
 			ksort((caddr_t)vsecattr.vsa_aclentp,
-			vsecattr.vsa_aclcnt, sizeof (aclent_t), cmp2acls);
+			    vsecattr.vsa_aclcnt, sizeof (aclent_t), cmp2acls);
 		if (vsecattr.vsa_dfaclcnt > 1)
 			ksort((caddr_t)vsecattr.vsa_dfaclentp,
-			vsecattr.vsa_dfaclcnt, sizeof (aclent_t), cmp2acls);
+			    vsecattr.vsa_dfaclcnt, sizeof (aclent_t), cmp2acls);
 		/* Copy out acl's */
 		uaddrp = (caddr_t)aclbufp;
 		if (aclbsize > 0) {	/* bug #1262490 */

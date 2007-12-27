@@ -1439,16 +1439,12 @@ psig(void)
 			sig = SIGKILL;
 			ext = (p->p_flag & SEXTKILLED) != 0;
 		} else {
-#ifdef C2_AUDIT
 			if (audit_active)		/* audit core dump */
 				audit_core_start(sig);
-#endif
 			if (core(sig, ext) == 0)
 				code = CLD_DUMPED;
-#ifdef C2_AUDIT
 			if (audit_active)		/* audit core dump */
 				audit_core_finish(code);
-#endif
 		}
 	}
 

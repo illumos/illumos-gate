@@ -312,10 +312,8 @@ static void
 priv_policy_err(const cred_t *cr, int priv, boolean_t allzone, const char *msg)
 {
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_priv(priv, allzone ? ZONEPRIVS(cr) : NULL, 0);
-#endif
 	DTRACE_PROBE2(priv__err, int, priv, boolean_t, allzone);
 
 	if (priv_debug || (CR_FLAGS(cr) & PRIV_DEBUG) ||
@@ -343,11 +341,9 @@ priv_policy(const cred_t *cr, int priv, boolean_t allzone, int err,
 		    !PRIV_ISASSERT(priv_basic, priv)) &&
 		    !servicing_interrupt()) {
 			PTOU(curproc)->u_acflag |= ASU; /* Needed for SVVS */
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_priv(priv,
 				    allzone ? ZONEPRIVS(cr) : NULL, 1);
-#endif
 		}
 		err = 0;
 		DTRACE_PROBE2(priv__ok, int, priv, boolean_t, allzone);
@@ -368,14 +364,12 @@ priv_policy_choice(const cred_t *cr, int priv, boolean_t allzone)
 	boolean_t res = HAS_PRIVILEGE(cr, priv) &&
 	    (!allzone || HAS_ALLZONEPRIVS(cr));
 
-#ifdef C2_AUDIT
 	/* Audit success only */
 	if (res && audit_active &&
 	    (allzone || priv == PRIV_ALL || !PRIV_ISASSERT(priv_basic, priv)) &&
 	    !servicing_interrupt()) {
 		audit_priv(priv, allzone ? ZONEPRIVS(cr) : NULL, 1);
 	}
-#endif
 	if (res) {
 		DTRACE_PROBE2(priv__ok, int, priv, boolean_t, allzone);
 	} else {
@@ -425,10 +419,8 @@ secpolicy_require_set(const cred_t *cr, const priv_set_t *req, const char *msg)
 	priv_inverse(&pset);		/* all non present privileges */
 	priv_intersect(req, &pset);	/* the actual missing privs */
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_priv(PRIV_NONE, &pset, 0);
-#endif
 	/*
 	 * Privilege debugging; special case "one privilege in set".
 	 */

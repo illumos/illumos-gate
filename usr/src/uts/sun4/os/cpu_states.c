@@ -43,10 +43,8 @@
 #include <sys/traptrace.h>
 #endif /* TRAPTRACE */
 
-#ifdef C2_AUDIT
 extern void audit_enterprom();
 extern void audit_exitprom();
-#endif /* C2_AUDIT */
 
 /*
  * Platforms that use CPU signatures need to set cpu_sgn_func
@@ -111,21 +109,15 @@ abort_seq_softintr(caddr_t arg)
 			msg = NULL;
 		abort_seq_tstamp = 0LL;
 		mutex_exit(&abort_seq_lock);
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_enterprom(1);
-#endif /* C2_AUDIT */
 		(*abort_seq_handler)(msg);
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_exitprom(1);
-#endif /* C2_AUDIT */
 	} else {
 		mutex_exit(&abort_seq_lock);
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_enterprom(0);
-#endif /* C2_AUDIT */
 	}
 	return (1);
 }
@@ -191,21 +183,15 @@ abort_sequence_enter(char *msg)
 			 */
 			abort_seq_tstamp = 0LL;
 			mutex_exit(&abort_seq_lock);
-#ifdef C2_AUDIT
 		if (!on_intr && audit_active)
 			audit_enterprom(1);
-#endif /* C2_AUDIT */
 			(*abort_seq_handler)(msg);
-#ifdef C2_AUDIT
 		if (!on_intr && audit_active)
 			audit_exitprom(1);
-#endif /* C2_AUDIT */
 		}
 	} else {
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_enterprom(0);
-#endif /* C2_AUDIT */
 	}
 }
 

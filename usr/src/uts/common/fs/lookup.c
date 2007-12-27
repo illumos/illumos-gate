@@ -94,10 +94,8 @@ lookupnameat(
 
 	error = pn_get_buf(fnamep, seg, &lookpn, namebuf, sizeof (namebuf));
 	if (error == 0) {
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_lookupname();
-#endif
 		error = lookuppnat(&lookpn, NULL, followlink,
 		    dirvpp, compvpp, startvp);
 	}
@@ -229,10 +227,8 @@ lookuppnvp(
 		pp = &presrvd;
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_anchorpath(pnp, vp == rootvp);
-#endif
 
 	/*
 	 * Eliminate any trailing slashes in the pathname.
@@ -261,10 +257,8 @@ next:
 	 * Process the next component of the pathname.
 	 */
 	if (error = pn_getcomponent(pnp, component)) {
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_addcomponent(pnp);
-#endif
 		goto bad;
 	}
 
@@ -395,12 +389,10 @@ checkforroot:
 		 */
 		if (pn_pathleft(pnp) || dirvpp == NULL || error != ENOENT)
 			goto bad;
-#ifdef C2_AUDIT
 		if (audit_active) {	/* directory access */
 			if (error = audit_savepath(pnp, vp, error, cr))
 				goto bad_noaudit;
 		}
-#endif
 		pn_setlast(pnp);
 		/*
 		 * We inform the caller that the desired entry must be
@@ -455,12 +447,10 @@ checkforroot:
 	 */
 	if (cvp->v_type == VLNK && ((flags & FOLLOW) || pn_pathleft(pnp))) {
 		struct pathname linkpath;
-#ifdef C2_AUDIT
 		if (audit_active) {
 			if (error = audit_pathcomp(pnp, cvp, cr))
 				goto bad;
 		}
-#endif
 
 		if (++nlink > MAXSYMLINKS) {
 			error = ELOOP;
@@ -472,10 +462,8 @@ checkforroot:
 			goto bad;
 		}
 
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_symlink(pnp, &linkpath);
-#endif /* C2_AUDIT */
 
 		if (pn_pathleft(&linkpath) == 0)
 			(void) pn_set(&linkpath, ".");
@@ -498,10 +486,8 @@ checkforroot:
 			vp = rootvp;
 			VN_HOLD(vp);
 		}
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_anchorpath(pnp, vp == rootvp);
-#endif
 		if (pn_fixslash(pnp)) {
 			flags |= FOLLOW;
 			must_be_directory = 1;
@@ -573,11 +559,9 @@ checkforroot:
 			 * an alias of the last component.
 			 */
 			if (vn_compare(vp, cvp)) {
-#ifdef C2_AUDIT
 				if (audit_active)
 					(void) audit_savepath(pnp, cvp,
 					    EINVAL, cr);
-#endif
 				pn_setlast(pnp);
 				VN_RELE(vp);
 				VN_RELE(cvp);
@@ -587,19 +571,15 @@ checkforroot:
 					pn_free(pp);
 				return (EINVAL);
 			}
-#ifdef C2_AUDIT
 			if (audit_active) {
 				if (error = audit_pathcomp(pnp, vp, cr))
 					goto bad;
 			}
-#endif
 			*dirvpp = vp;
 		} else
 			VN_RELE(vp);
-#ifdef C2_AUDIT
 		if (audit_active)
 			(void) audit_savepath(pnp, cvp, 0, cr);
-#endif
 		if (pnp->pn_path == pnp->pn_buf)
 			(void) pn_set(pnp, ".");
 		else
@@ -622,12 +602,10 @@ checkforroot:
 		return (0);
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active) {
 		if (error = audit_pathcomp(pnp, cvp, cr))
 			goto bad;
 	}
-#endif
 
 	/*
 	 * Skip over slashes from end of last component.
@@ -648,11 +626,9 @@ checkforroot:
 	goto next;
 
 bad:
-#ifdef C2_AUDIT
 	if (audit_active)	/* reached end of path */
 		(void) audit_savepath(pnp, cvp, error, cr);
 bad_noaudit:
-#endif
 	/*
 	 * Error.  Release vnodes and return.
 	 */

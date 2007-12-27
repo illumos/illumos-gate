@@ -585,13 +585,11 @@ getf(int fd)
 	}
 	ufp->uf_refcnt++;
 
-#ifdef C2_AUDIT
 	/*
 	 * archive per file audit data
 	 */
 	if (audit_active)
 		(void) audit_getf(fd);
-#endif
 	UF_EXIT(ufp);
 
 	set_active_fd(fd);	/* record the active file descriptor */
@@ -664,13 +662,11 @@ closeandsetf(int fd, file_t *newfp)
 		}
 	}
 
-#ifdef C2_AUDIT
 	/*
 	 * archive per file audit data
 	 */
 	if (audit_active)
 		(void) audit_getf(fd);
-#endif
 	ASSERT(ufp->uf_busy);
 	ufp->uf_file = NULL;
 	ufp->uf_flag = 0;
@@ -899,13 +895,11 @@ closef(file_t *fp)
 	int flag;
 	offset_t offset;
 
-#ifdef C2_AUDIT
 	/*
 	 * audit close of file (may be exit)
 	 */
 	if (audit_active)
 		audit_closef(fp);
-#endif
 	ASSERT(MUTEX_NOT_HELD(&P_FINFO(curproc)->fi_lock));
 
 	mutex_enter(&fp->f_tlock);
@@ -928,13 +922,11 @@ closef(file_t *fp)
 	mutex_exit(&fp->f_tlock);
 
 	VN_RELE(vp);
-#ifdef C2_AUDIT
 	/*
 	 * deallocate resources to audit_data
 	 */
 	if (audit_active)
 		audit_unfalloc(fp);
-#endif
 	crfree(fp->f_cred);
 	kmem_cache_free(file_cache, fp);
 	return (error);
@@ -1067,13 +1059,11 @@ falloc(vnode_t *vp, int flag, file_t **fpp, int *fdp)
 	fp->f_offset = 0;
 	fp->f_audit_data = 0;
 	crhold(fp->f_cred = CRED());
-#ifdef C2_AUDIT
 	/*
 	 * allocate resources to audit_data
 	 */
 	if (audit_active)
 		audit_falloc(fp);
-#endif
 	*fpp = fp;
 	if (fdp)
 		*fdp = fd;
@@ -1111,13 +1101,11 @@ unfalloc(file_t *fp)
 {
 	ASSERT(MUTEX_HELD(&fp->f_tlock));
 	if (--fp->f_count <= 0) {
-#ifdef C2_AUDIT
 		/*
 		 * deallocate resources to audit_data
 		 */
 		if (audit_active)
 			audit_unfalloc(fp);
-#endif
 		crfree(fp->f_cred);
 		mutex_exit(&fp->f_tlock);
 		kmem_cache_free(file_cache, fp);
@@ -1135,10 +1123,8 @@ setf(int fd, file_t *fp)
 	uf_info_t *fip = P_FINFO(curproc);
 	uf_entry_t *ufp;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_setf(fp, fd);
-#endif /* C2_AUDIT */
 
 	if (fp == NULL) {
 		mutex_enter(&fip->fi_lock);
@@ -1508,10 +1494,10 @@ vpsetattr(vnode_t *vp, vattr_t *vap, int flags)
 		vattr.va_mask = AT_SIZE;
 		if (!(error = VOP_GETATTR(vp, &vattr, 0, CRED(), NULL))) {
 			begin = vap->va_size > vattr.va_size ?
-					vattr.va_size : vap->va_size;
+			    vattr.va_size : vap->va_size;
 			length = vattr.va_size > vap->va_size ?
-					vattr.va_size - vap->va_size :
-					vap->va_size - vattr.va_size;
+			    vattr.va_size - vap->va_size :
+			    vap->va_size - vattr.va_size;
 
 			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0,
 			    NULL)) {

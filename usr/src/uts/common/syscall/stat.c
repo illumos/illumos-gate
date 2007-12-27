@@ -120,10 +120,8 @@ cstatat_getvp(int fd, char *name, int nmflag,
 	}
 	*cred = cr;
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_setfsat_path(1);
-#endif /* C2_AUDIT */
 
 
 	if (nmflag == 1 || (nmflag == 2 && name != NULL)) {

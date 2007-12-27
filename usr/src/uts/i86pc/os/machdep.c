@@ -126,10 +126,8 @@
 #include <sys/traptrace.h>
 #endif	/* TRAPTRACE */
 
-#ifdef C2_AUDIT
 extern void audit_enterprom(int);
 extern void audit_exitprom(int);
-#endif
 
 /*
  * The panicbuf array is used to record messages and state:
@@ -305,21 +303,15 @@ void
 abort_sequence_enter(char *msg)
 {
 	if (abort_enable == 0) {
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_enterprom(0);
-#endif /* C2_AUDIT */
 		return;
 	}
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_enterprom(1);
-#endif /* C2_AUDIT */
 	debug_enter(msg);
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_exitprom(1);
-#endif /* C2_AUDIT */
 }
 
 /*

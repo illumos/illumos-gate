@@ -191,7 +191,7 @@ soconfig(int domain, int type, int protocol,
 	int error = 0;
 
 	dprint(0, ("soconfig(%d,%d,%d,%s,%d)\n",
-		domain, type, protocol, devpath, devpathlen));
+	    domain, type, protocol, devpath, devpathlen));
 
 	/*
 	 * Look for an existing match.
@@ -231,7 +231,7 @@ soconfig(int domain, int type, int protocol,
 		error = sogetvp(devpath, &vp, UIO_SYSSPACE);
 		if (error) {
 			dprint(0, ("soconfig: vp %s failed with %d\n",
-				devpath, error));
+			    devpath, error));
 			goto done;
 		}
 
@@ -293,7 +293,7 @@ solookup(int domain, int type, int protocol, char *devpath, int *errorp)
 	}
 	if (sp == NULL) {
 		dprint(0, ("solookup(%d,%d,%d) not found\n",
-			domain, type, protocol));
+		    domain, type, protocol));
 		if (devpath == NULL) {
 			/* Determine correct error code */
 			int found = 0;
@@ -329,7 +329,7 @@ solookup(int domain, int type, int protocol, char *devpath, int *errorp)
 		error = sogetvp(devpath, &vp, UIO_USERSPACE);
 		if (error) {
 			dprint(0, ("solookup: vp %p failed with %d\n",
-				devpath, error));
+			    devpath, error));
 			*errorp = EPROTONOSUPPORT;
 			return (NULL);
 		}
@@ -339,7 +339,7 @@ solookup(int domain, int type, int protocol, char *devpath, int *errorp)
 		return (vp);
 	}
 	dprint(0, ("solookup(%d,%d,%d) vp %p devpath %s\n",
-		domain, type, protocol, sp->sp_vnode, sp->sp_devpath));
+	    domain, type, protocol, sp->sp_vnode, sp->sp_devpath));
 
 	vp = sp->sp_vnode;
 	VN_HOLD(vp);
@@ -771,7 +771,7 @@ so_lock_single(struct sonode *so)
 	while (so->so_flag & (SOLOCKED | SOASYNC_UNBIND)) {
 		so->so_flag |= SOWANT;
 		cv_wait_stop(&so->so_want_cv, &so->so_lock,
-			SO_LOCK_WAKEUP_TIME);
+		    SO_LOCK_WAKEUP_TIME);
 	}
 	so->so_flag |= SOLOCKED;
 }
@@ -816,7 +816,7 @@ so_lock_read(struct sonode *so, int fmode)
 			return (EWOULDBLOCK);
 		so->so_flag |= SOWANT;
 		cv_wait_stop(&so->so_want_cv, &so->so_lock,
-			SO_LOCK_WAKEUP_TIME);
+		    SO_LOCK_WAKEUP_TIME);
 	}
 	so->so_flag |= SOREADLOCKED;
 	return (0);
@@ -899,7 +899,7 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 	int		error;
 
 	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n",
-		so, soun->sun_path));
+	    so, soun->sun_path));
 
 	error = lookupname(soun->sun_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
 	if (error) {
@@ -1079,7 +1079,7 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	socklen_t		addrlen;
 
 	dprintso(so, 1, ("so_ux_addr_xlate(%p, %p, %d, %d)\n",
-			so, name, namelen, checkaccess));
+	    so, name, namelen, checkaccess));
 
 	ASSERT(name != NULL);
 	ASSERT(so->so_family == AF_UNIX);
@@ -1107,7 +1107,7 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	addr = &so->so_ux_faddr;
 	addrlen = (socklen_t)sizeof (so->so_ux_faddr);
 	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n",
-				addrlen, vp));
+	    addrlen, vp));
 	VN_RELE(vp);
 	*addrp = addr;
 	*addrlenp = (socklen_t)addrlen;
@@ -1178,7 +1178,7 @@ fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
 	int	numfd;
 
 	dprint(1, ("fdbuf_extract: %d fds, len %d\n",
-		fdbuf->fd_numfd, rightslen));
+	    fdbuf->fd_numfd, rightslen));
 
 	numfd = fdbuf->fd_numfd;
 	ASSERT(rightslen == numfd * (int)sizeof (int));
@@ -1205,12 +1205,10 @@ fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
 		mutex_exit(&fp->f_tlock);
 		setf(fd, fp);
 		*rp++ = fd;
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_fdrecv(fd, fp);
-#endif
 		dprint(1, ("fdbuf_extract: [%d] = %d, %p refcnt %d\n",
-			i, fd, fp, fp->f_count));
+		    i, fd, fp, fp->f_count));
 	}
 	return (0);
 
@@ -1263,7 +1261,7 @@ fdbuf_create(void *rights, int rightslen, struct fdbuf **fdbufp)
 			return (EBADF);
 		}
 		dprint(1, ("fdbuf_create: [%d] = %d, %p refcnt %d\n",
-			i, fds[i], fp, fp->f_count));
+		    i, fds[i], fp, fp->f_count));
 		mutex_enter(&fp->f_tlock);
 		fp->f_count++;
 		mutex_exit(&fp->f_tlock);
@@ -1281,10 +1279,8 @@ fdbuf_create(void *rights, int rightslen, struct fdbuf **fdbufp)
 		fdbuf->fd_fds[i] = fp;
 		fdbuf->fd_numfd++;
 		releasef(fds[i]);
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_fdsend(fds[i], fp, 0);
-#endif
 	}
 	*fdbufp = fdbuf;
 	return (0);
@@ -1334,7 +1330,7 @@ fdbuf_verify(mblk_t *mp, struct fdbuf *fdbuf, int fdbuflen)
 		    frp->free_arg != NULL &&
 		    bcmp(frp->free_arg, fdbuf, fdbuflen) == 0) {
 			dprint(1, ("fdbuf_verify: fdbuf %p len %d\n",
-				fdbuf, fdbuflen));
+			    fdbuf, fdbuflen));
 			return (1);
 		} else {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -1455,7 +1451,7 @@ so_getfdopt(void *control, t_uscalar_t controllen, int oldflg,
 			fds = CMSG_CONTENT(cmsg);
 			fdlen = (int)CMSG_CONTENTLEN(cmsg);
 			dprint(1, ("so_getfdopt: new %lu\n",
-				(size_t)CMSG_CONTENTLEN(cmsg)));
+			    (size_t)CMSG_CONTENTLEN(cmsg)));
 		}
 	}
 	if (fds == NULL) {
@@ -1497,7 +1493,7 @@ so_optlen(void *control, t_uscalar_t controllen, int oldflg)
 		    sizeof (struct T_opthdr));
 	}
 	dprint(1, ("so_optlen: controllen %d, flg %d -> optlen %d\n",
-		controllen, oldflg, optlen));
+	    controllen, oldflg, optlen));
 	return (optlen);
 }
 
@@ -1565,7 +1561,7 @@ so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
 	    tohp && _TPI_TOPT_VALID(tohp, opt, (uintptr_t)opt + optlen);
 	    tohp = _TPI_TOPT_NEXTHDR(opt, optlen, tohp)) {
 		dprint(1, ("so_cmsglen: level 0x%x, name %d, len %d\n",
-			tohp->level, tohp->name, tohp->len));
+		    tohp->level, tohp->name, tohp->len));
 		if (tohp->level == SOL_SOCKET &&
 		    (tohp->name == SO_SRCADDR ||
 		    tohp->name == SO_UNIX_CLOSE)) {
@@ -1612,7 +1608,7 @@ so_cmsglen(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg)
 	}
 	cmsglen -= last_roundup;
 	dprint(1, ("so_cmsglen: optlen %d, flg %d -> cmsglen %d\n",
-		optlen, oldflg, cmsglen));
+	    optlen, oldflg, cmsglen));
 	return (cmsglen);
 }
 
@@ -1645,7 +1641,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 	    tohp && _TPI_TOPT_VALID(tohp, opt, (uintptr_t)opt + optlen);
 	    tohp = _TPI_TOPT_NEXTHDR(opt, optlen, tohp)) {
 		dprint(1, ("so_opt2cmsg: level 0x%x, name %d, len %d\n",
-			tohp->level, tohp->name, tohp->len));
+		    tohp->level, tohp->name, tohp->len));
 
 		if (tohp->level == SOL_SOCKET &&
 		    (tohp->name == SO_SRCADDR ||
@@ -1674,10 +1670,10 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 				cmsg->cmsg_level = tohp->level;
 				cmsg->cmsg_type = SCM_RIGHTS;
 				cmsg->cmsg_len = (socklen_t)(fdlen +
-					sizeof (struct cmsghdr));
+				    sizeof (struct cmsghdr));
 
 				error = fdbuf_extract(fdbuf,
-						CMSG_CONTENT(cmsg), fdlen);
+				    CMSG_CONTENT(cmsg), fdlen);
 				if (error != 0)
 					return (error);
 			}
@@ -1732,7 +1728,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 
 			/* copy content to control data part */
 			bcopy(&tohp[1], CMSG_CONTENT(cmsg),
-				CMSG_CONTENTLEN(cmsg));
+			    CMSG_CONTENTLEN(cmsg));
 		}
 		/* move to next CMSG structure! */
 		cmsg = CMSG_NEXT(cmsg);
@@ -1762,7 +1758,7 @@ so_getopt_srcaddr(void *opt, t_uscalar_t optlen, void **srcp,
 	    tohp && _TPI_TOPT_VALID(tohp, opt, (uintptr_t)opt + optlen);
 	    tohp = _TPI_TOPT_NEXTHDR(opt, optlen, tohp)) {
 		dprint(1, ("so_getopt_srcaddr: level 0x%x, name %d, len %d\n",
-			tohp->level, tohp->name, tohp->len));
+		    tohp->level, tohp->name, tohp->len));
 		if (tohp->level == SOL_SOCKET &&
 		    tohp->name == SO_SRCADDR) {
 			*srcp = _TPI_TOPT_DATA(tohp);
@@ -1785,8 +1781,8 @@ so_getopt_unix_close(void *opt, t_uscalar_t optlen)
 	    tohp && _TPI_TOPT_VALID(tohp, opt, (uintptr_t)opt + optlen);
 	    tohp = _TPI_TOPT_NEXTHDR(opt, optlen, tohp)) {
 		dprint(1,
-			("so_getopt_unix_close: level 0x%x, name %d, len %d\n",
-			tohp->level, tohp->name, tohp->len));
+		    ("so_getopt_unix_close: level 0x%x, name %d, len %d\n",
+		    tohp->level, tohp->name, tohp->len));
 		if (tohp->level == SOL_SOCKET &&
 		    tohp->name == SO_UNIX_CLOSE)
 			return (1);
@@ -2019,8 +2015,8 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 		bcopy(addr, &sin, sizeof (sin));
 
 		(void) sprintf(buf, "(len %d) %x/%d",
-			addrlen, ntohl(sin.sin_addr.s_addr),
-			ntohs(sin.sin_port));
+		    addrlen, ntohl(sin.sin_addr.s_addr),
+		    ntohs(sin.sin_port));
 		break;
 	}
 	case AF_INET6: {
@@ -2041,8 +2037,8 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 		struct sockaddr_un *soun = (struct sockaddr_un *)addr;
 
 		(void) sprintf(buf, "(len %d) %s",
-			addrlen,
-			(soun == NULL) ? "(none)" : soun->sun_path);
+		    addrlen,
+		    (soun == NULL) ? "(none)" : soun->sun_path);
 		break;
 	}
 	default:
@@ -2082,16 +2078,16 @@ so_verify_oobstate(struct sonode *so)
 		break;
 	default:
 		printf("Bad oob state 1 (%p): counts %d/%d state %s\n",
-			so, so->so_oobsigcnt,
-			so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    so, so->so_oobsigcnt,
+		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
 	/* SS_RCVATMARK should only be set when SS_OOBPEND is set */
 	if ((so->so_state & (SS_RCVATMARK|SS_OOBPEND)) == SS_RCVATMARK) {
 		printf("Bad oob state 2 (%p): counts %d/%d state %s\n",
-			so, so->so_oobsigcnt,
-			so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    so, so->so_oobsigcnt,
+		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
@@ -2099,10 +2095,10 @@ so_verify_oobstate(struct sonode *so)
 	 * (so_oobsigcnt != 0 or SS_RCVATMARK) iff SS_OOBPEND
 	 */
 	if (!EQUIV((so->so_oobsigcnt != 0) || (so->so_state & SS_RCVATMARK),
-		so->so_state & SS_OOBPEND)) {
+	    so->so_state & SS_OOBPEND)) {
 		printf("Bad oob state 3 (%p): counts %d/%d state %s\n",
-			so, so->so_oobsigcnt,
-			so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    so, so->so_oobsigcnt,
+		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
@@ -2112,14 +2108,14 @@ so_verify_oobstate(struct sonode *so)
 	if (!(so->so_options & SO_OOBINLINE) &&
 	    !EQUIV(so->so_oobmsg != NULL, so->so_state & SS_HAVEOOBDATA)) {
 		printf("Bad oob state 4 (%p): counts %d/%d state %s\n",
-			so, so->so_oobsigcnt,
-			so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    so, so->so_oobsigcnt,
+		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 	if (so->so_oobsigcnt < so->so_oobcnt) {
 		printf("Bad oob state 5 (%p): counts %d/%d state %s\n",
-			so, so->so_oobsigcnt,
-			so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    so, so->so_oobsigcnt,
+		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 	return (1);
@@ -2254,7 +2250,7 @@ sockfs_snapshot(kstat_t *ksp, void *buf, int rw)
 			    sizeof (pksi->ks_si.si_laddr_sun_path));
 
 			pksi->ks_si.si_laddr_family =
-				so->so_laddr_sa->sa_family;
+			    so->so_laddr_sa->sa_family;
 			if (sn_len != 0) {
 				/* AF_UNIX socket names are NULL terminated */
 				(void) strncpy(pksi->ks_si.si_laddr_sun_path,

@@ -352,10 +352,8 @@ thread_create(
 		stksize &= -PTR24_ALIGN;	/* make thread aligned */
 		t = (kthread_t *)(stk + stksize);
 		bzero(t, sizeof (kthread_t));
-#ifdef	C2_AUDIT
 		if (audit_active)
 			audit_thread_create(t);
-#endif
 		t->t_stk = stk + stksize;
 		t->t_stkbase = stk;
 #else	/* stack grows to larger addresses */
@@ -371,10 +369,8 @@ thread_create(
 		t = kmem_cache_alloc(thread_cache, KM_SLEEP);
 		bzero(t, sizeof (kthread_t));
 		ASSERT(((uintptr_t)t & (PTR24_ALIGN - 1)) == 0);
-#ifdef	C2_AUDIT
 		if (audit_active)
 			audit_thread_create(t);
-#endif
 		/*
 		 * Initialize t_stk to the kernel stack pointer to use
 		 * upon entry to the kernel
@@ -687,10 +683,8 @@ thread_free(kthread_t *t)
 		kmem_free(t->t_pdmsg, strlen(t->t_pdmsg) + 1);
 		t->t_pdmsg = NULL;
 	}
-#ifdef	C2_AUDIT
 	if (audit_active)
 		audit_thread_free(t);
-#endif
 #ifndef NPROBE
 	if (t->t_tnf_tpdp)
 		tnf_thread_free(t);

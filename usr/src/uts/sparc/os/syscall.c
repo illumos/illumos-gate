@@ -108,7 +108,7 @@ realsigprof(int sysnum, int error)
 	hrt2ts(gethrtime(), &lwp->lwp_siginfo.si_tstamp);
 	lwp->lwp_siginfo.si_syscall = sysnum;
 	lwp->lwp_siginfo.si_nsysarg = (sysnum > 0 && sysnum < NSYSCALL) ?
-		LWP_GETSYSENT(lwp)[sysnum].sy_narg : 0;
+	    LWP_GETSYSENT(lwp)[sysnum].sy_narg : 0;
 	lwp->lwp_siginfo.si_fault = lwp->lwp_lastfault;
 	lwp->lwp_siginfo.si_faddr = lwp->lwp_lastfaddr;
 	lwp->lwp_lastfault = 0;
@@ -159,7 +159,7 @@ xregrestore(klwp_t *lwp, int shared)
 
 		if (is64)
 			(void) copyout_nowatch(&lwp->lwp_pcb.pcb_xregs,
-				rwp, rwinsize);
+			    rwp, rwinsize);
 		else {
 			struct rwindow32 rwindow32;
 			int watched;
@@ -175,7 +175,7 @@ xregrestore(klwp_t *lwp, int shared)
 		mpcb->mpcb_rsp[0] = sp;
 		mpcb->mpcb_rsp[1] = NULL;
 		bcopy(&lwp->lwp_pcb.pcb_xregs, &mpcb->mpcb_rwin[0],
-			sizeof (lwp->lwp_pcb.pcb_xregs));
+		    sizeof (lwp->lwp_pcb.pcb_xregs));
 	}
 	lwp->lwp_pcb.pcb_xregstat = XREGNONE;
 }
@@ -496,7 +496,6 @@ pre_syscall(int arg0)
 		return (1);		/* don't do system call, return EINTR */
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active) {	/* begin auditing for this syscall */
 		int error;
 		if (error = audit_start(T_SYSCALL, code, 0, lwp)) {
@@ -506,7 +505,6 @@ pre_syscall(int arg0)
 		}
 		repost = 1;
 	}
-#endif /* C2_AUDIT */
 
 #ifndef NPROBE
 	/* Kernel probe */
@@ -596,7 +594,6 @@ post_syscall(long rval1, long rval2)
 	if (code == 0)
 		goto sig_check;
 
-#ifdef C2_AUDIT
 	if (audit_active) {	/* put out audit record for this syscall */
 		rval_t	rval;	/* fix audit_finish() someday */
 
@@ -606,7 +603,6 @@ post_syscall(long rval1, long rval2)
 		audit_finish(T_SYSCALL, code, error, &rval);
 		repost = 1;
 	}
-#endif /* C2_AUDIT */
 
 	if (curthread->t_pdmsg != NULL) {
 		char *m = curthread->t_pdmsg;
@@ -832,9 +828,9 @@ sig_check:
 	/* Kernel probe */
 	if (tnf_tracing_active) {
 		TNF_PROBE_3(syscall_end, "syscall thread", /* CSTYLED */,
-			tnf_long,	rval1,		rval1,
-			tnf_long,	rval2,		rval2,
-			tnf_long,	errno,		(long)error);
+		    tnf_long,	rval1,		rval1,
+		    tnf_long,	rval2,		rval2,
+		    tnf_long,	errno,		(long)error);
 		repost = 1;
 	}
 #endif /* NPROBE */
@@ -914,7 +910,7 @@ sig_check:
 			if (copyin((stack_t *)lwp->lwp_ustack, &stk,
 			    sizeof (stack_t)) == 0 &&
 			    (stk.ss_size == lwp->lwp_old_stk_ctl ||
-				stk.ss_size == 0) &&
+			    stk.ss_size == 0) &&
 			    stk.ss_sp == top - stk.ss_size) {
 				stk.ss_sp = (void *)((uintptr_t)stk.ss_sp +
 				    stk.ss_size - new_size);

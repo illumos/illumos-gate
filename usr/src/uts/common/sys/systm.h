@@ -101,9 +101,7 @@ extern int	klustsize;
 
 extern int	abort_enable;	/* Platform input-device abort policy */
 
-#ifdef C2_AUDIT
-extern int	audit_active;	/* C2 auditing activate 1, absent 0. */
-#endif
+extern int	audit_active;	/* Solaris Auditing active 1, absent 0. */
 
 extern int	avenrun[];	/* array of load averages */
 

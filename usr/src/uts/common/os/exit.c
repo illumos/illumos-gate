@@ -549,14 +549,12 @@ proc_exit(int why, int what)
 	/*
 	 * Release any resources associated with C2 auditing
 	 */
-#ifdef C2_AUDIT
 	if (audit_active) {
 		/*
 		 * audit exit system call
 		 */
 		audit_exit(why, what);
 	}
-#endif
 
 	/*
 	 * Free address space.

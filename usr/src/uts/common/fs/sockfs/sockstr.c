@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -260,8 +260,8 @@ so_sock2stream(struct sonode *so)
 			so->so_conn_ind_tail = NULL;
 		}
 		dprintso(so, 0,
-			("so_sock2stream(%p): moving T_CONN_IND\n",
-			so));
+		    ("so_sock2stream(%p): moving T_CONN_IND\n",
+		    so));
 
 		/* Drop lock across put() */
 		mutex_exit(&so->so_lock);
@@ -445,10 +445,10 @@ so_strinit(struct sonode *so, struct sonode *tso)
 	ASSERT(so->so_laddr_sa == NULL && so->so_faddr_sa == NULL);
 	ASSERT(so->so_laddr_len == 0 && so->so_faddr_len == 0);
 	so->so_laddr_maxlen = so->so_faddr_maxlen =
-		    P2ROUNDUP(so->so_addr_size, KMEM_ALIGN);
+	    P2ROUNDUP(so->so_addr_size, KMEM_ALIGN);
 	so->so_laddr_sa = kmem_alloc(so->so_laddr_maxlen * 2, KM_SLEEP);
 	so->so_faddr_sa = (struct sockaddr *)((caddr_t)so->so_laddr_sa
-		    + so->so_laddr_maxlen);
+	    + so->so_laddr_maxlen);
 
 	if (so->so_family == AF_UNIX) {
 		/*
@@ -518,7 +518,7 @@ copy_tinfo(struct sonode *so, struct T_info_ack *tia)
 		if (so->so_addr_size == -1) {
 			/* MAXPATHLEN + soun_family + nul termination */
 			so->so_addr_size = (t_scalar_t)(MAXPATHLEN +
-				sizeof (short) + 1);
+			    sizeof (short) + 1);
 		}
 		if (so->so_type == SOCK_STREAM) {
 			/*
@@ -580,7 +580,7 @@ check_tinfo(struct sonode *so)
 	    so->so_addr_size, so->so_opt_size,
 	    so->so_tidu_size));
 	dprintso(so, 1, ("tinfo: so_state %s\n",
-			pr_state(so->so_state, so->so_mode)));
+	    pr_state(so->so_state, so->so_mode)));
 	return (0);
 }
 
@@ -617,7 +617,7 @@ do_tinfo(struct sonode *so)
 	DB_TYPE(mp) = M_PCPROTO;
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
+	    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
 	if (error) {
 		eprintsoline(so, error);
 		return (error);
@@ -925,7 +925,7 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 	int error;
 
 	dprintso(so, 1, ("sowaitprim(%p, %d, %d, %d, %p, %lu)\n",
-		so, request_prim, ack_prim, min_size, mpp, wait));
+	    so, request_prim, ack_prim, min_size, mpp, wait));
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
@@ -968,10 +968,10 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 			error = tlitosyserr(tpr->error_ack.TLI_error);
 		}
 		dprintso(so, 0, ("error_ack for %d: %d/%d ->%d\n",
-			tpr->error_ack.ERROR_prim,
-			tpr->error_ack.TLI_error,
-			tpr->error_ack.UNIX_error,
-			error));
+		    tpr->error_ack.ERROR_prim,
+		    tpr->error_ack.TLI_error,
+		    tpr->error_ack.UNIX_error,
+		    error));
 		freemsg(mp);
 		return (error);
 	}
@@ -981,17 +981,17 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 #ifdef DEBUG
 	if (tpr->type == T_ERROR_ACK) {
 		dprintso(so, 0, ("error_ack for %d: %d/%d\n",
-			tpr->error_ack.ERROR_prim,
-			tpr->error_ack.TLI_error,
-			tpr->error_ack.UNIX_error));
+		    tpr->error_ack.ERROR_prim,
+		    tpr->error_ack.TLI_error,
+		    tpr->error_ack.UNIX_error));
 	} else if (tpr->type == T_OK_ACK) {
 		dprintso(so, 0, ("ok_ack for %d, expected %d for %d\n",
-			tpr->ok_ack.CORRECT_prim,
-			ack_prim, request_prim));
+		    tpr->ok_ack.CORRECT_prim,
+		    ack_prim, request_prim));
 	} else {
 		dprintso(so, 0,
-			("unexpected primitive %d, expected %d for %d\n",
-			tpr->type, ack_prim, request_prim));
+		    ("unexpected primitive %d, expected %d for %d\n",
+		    tpr->type, ack_prim, request_prim));
 	}
 #endif /* DEBUG */
 
@@ -1080,11 +1080,11 @@ sowaitack(struct sonode *so, mblk_t **mpp, clock_t wait)
 		tpr = (union T_primitives *)mp->b_rptr;
 		ASSERT(DB_TYPE(mp) == M_PCPROTO);
 		ASSERT(tpr->type == T_OK_ACK ||
-			tpr->type == T_ERROR_ACK ||
-			tpr->type == T_BIND_ACK ||
-			tpr->type == T_CAPABILITY_ACK ||
-			tpr->type == T_INFO_ACK ||
-			tpr->type == T_OPTMGMT_ACK);
+		    tpr->type == T_ERROR_ACK ||
+		    tpr->type == T_BIND_ACK ||
+		    tpr->type == T_CAPABILITY_ACK ||
+		    tpr->type == T_INFO_ACK ||
+		    tpr->type == T_OPTMGMT_ACK);
 	}
 #endif /* DEBUG */
 	so->so_ack_mp = NULL;
@@ -1184,7 +1184,7 @@ soflushconnind(struct sonode *so, t_scalar_t seqno)
 		tci = (struct T_conn_ind *)mp->b_rptr;
 		if (tci->SEQ_number == seqno) {
 			dprintso(so, 1,
-				("t_discon_ind: found T_CONN_IND %d\n", seqno));
+			    ("t_discon_ind: found T_CONN_IND %d\n", seqno));
 			/* Deleting last? */
 			if (so->so_conn_ind_tail == mp) {
 				so->so_conn_ind_tail = prevmp;
@@ -1240,7 +1240,7 @@ sowaitconnected(struct sonode *so, int fmode, int nosig)
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	while ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
-		SS_ISCONNECTING && so->so_error == 0) {
+	    SS_ISCONNECTING && so->so_error == 0) {
 
 		dprintso(so, 1, ("waiting for SS_ISCONNECTED on %p\n", so));
 		if (fmode & (FNDELAY|FNONBLOCK))
@@ -1572,7 +1572,7 @@ strsock_discon_ind(struct sonode *so, mblk_t *discon_mp)
 		 */
 		(void) putnextctl1(strvp2wq(SOTOV(so)), M_FLUSH, FLUSHRW);
 		error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
-			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
+		    MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR|MSG_IGNFLOW, 0);
 		/* LINTED - warning: statement has no consequent: if */
 		if (error) {
 			eprintsoline(so, error);
@@ -1724,7 +1724,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				t_uscalar_t optlen = tudi->OPT_length;
 
 				opt = sogetoff(mp, tudi->OPT_offset,
-					optlen, __TPI_ALIGN_SIZE);
+				    optlen, __TPI_ALIGN_SIZE);
 				if (opt == NULL) {
 					/* The len/off falls outside mp */
 					freemsg(mp);
@@ -1745,11 +1745,9 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			*allmsgsigs = S_INPUT | S_RDNORM;
 			*pollwakeups = POLLIN | POLLRDNORM;
 			*wakeups = RSLEEP;
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_sock(T_UNITDATA_IND, strvp2wq(vp),
-					mp, 0);
-#endif /* C2_AUDIT */
+				    mp, 0);
 			return (mp);
 		}
 
@@ -1782,7 +1780,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * a sockaddr_in.
 		 */
 		addr = sogetoff(mp, tudi->SRC_offset, addrlen,
-				__TPI_ALIGN_SIZE);
+		    __TPI_ALIGN_SIZE);
 		if (addr == NULL) {
 			freemsg(mp);
 			mutex_enter(&so->so_lock);
@@ -1805,11 +1803,11 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			/* Prevent so_faddr_sa from changing while accessed */
 			mutex_enter(&so->so_lock);
 			ASSERT(so->so_faddr_len ==
-				(socklen_t)sizeof (struct sockaddr_in));
+			    (socklen_t)sizeof (struct sockaddr_in));
 			faddr = (struct sockaddr_in *)so->so_faddr_sa;
 			sin = (struct sockaddr_in *)addr;
 			if (addrlen !=
-				(t_uscalar_t)sizeof (struct sockaddr_in) ||
+			    (t_uscalar_t)sizeof (struct sockaddr_in) ||
 			    (sin->sin_addr.s_addr != faddr->sin_addr.s_addr &&
 			    faddr->sin_addr.s_addr != INADDR_ANY) ||
 			    (so->so_type != SOCK_RAW &&
@@ -1817,13 +1815,13 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			    faddr->sin_port != 0)) {
 #ifdef DEBUG
 				dprintso(so, 0,
-					("sockfs: T_UNITDATA_IND mismatch: %s",
-					pr_addr(so->so_family,
-						(struct sockaddr *)addr,
-						addrlen)));
+				    ("sockfs: T_UNITDATA_IND mismatch: %s",
+				    pr_addr(so->so_family,
+				    (struct sockaddr *)addr,
+				    addrlen)));
 				dprintso(so, 0, (" - %s\n",
-					pr_addr(so->so_family, so->so_faddr_sa,
-					    (t_uscalar_t)so->so_faddr_len)));
+				    pr_addr(so->so_family, so->so_faddr_sa,
+				    (t_uscalar_t)so->so_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -1848,7 +1846,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			if (addrlen !=
 			    (t_uscalar_t)sizeof (struct sockaddr_in6) ||
 			    (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
-				&faddr6->sin6_addr) &&
+			    &faddr6->sin6_addr) &&
 			    !IN6_ARE_ADDR_EQUAL(&faddr6->sin6_addr, &zeroes)) ||
 			    (so->so_type != SOCK_RAW &&
 			    sin6->sin6_port != faddr6->sin6_port &&
@@ -1856,12 +1854,12 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 #ifdef DEBUG
 				dprintso(so, 0,
 				    ("sockfs: T_UNITDATA_IND mismatch: %s",
-					pr_addr(so->so_family,
-					    (struct sockaddr *)addr,
-					    addrlen)));
+				    pr_addr(so->so_family,
+				    (struct sockaddr *)addr,
+				    addrlen)));
 				dprintso(so, 0, (" - %s\n",
 				    pr_addr(so->so_family, so->so_faddr_sa,
-					(t_uscalar_t)so->so_faddr_len)));
+				    (t_uscalar_t)so->so_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -1879,7 +1877,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			t_uscalar_t optlen = tudi->OPT_length;
 
 			opt = sogetoff(mp, tudi->OPT_offset,
-				optlen, __TPI_ALIGN_SIZE);
+			    optlen, __TPI_ALIGN_SIZE);
 			if (opt == NULL) {
 				/* The len/off falls outside mp */
 				freemsg(mp);
@@ -1941,7 +1939,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			t_uscalar_t optlen = tdi->OPT_length;
 
 			opt = sogetoff(mp, tdi->OPT_offset,
-				optlen, __TPI_ALIGN_SIZE);
+			    optlen, __TPI_ALIGN_SIZE);
 			if (opt == NULL) {
 				/* The len/off falls outside mp */
 				freemsg(mp);
@@ -1997,13 +1995,13 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * that data is available).
 		 */
 		dprintso(so, 1,
-			("T_EXDATA_IND(%p): counts %d/%d state %s\n",
-			vp, so->so_oobsigcnt, so->so_oobcnt,
-			pr_state(so->so_state, so->so_mode)));
+		    ("T_EXDATA_IND(%p): counts %d/%d state %s\n",
+		    vp, so->so_oobsigcnt, so->so_oobcnt,
+		    pr_state(so->so_state, so->so_mode)));
 
 		if (msgdsize(mp->b_cont) == 0) {
 			dprintso(so, 0,
-				("strsock_proto: zero length T_EXDATA_IND\n"));
+			    ("strsock_proto: zero length T_EXDATA_IND\n"));
 			freemsg(mp);
 			return (NULL);
 		}
@@ -2092,18 +2090,18 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 #ifdef DEBUG
 		if (mdata == NULL) {
 			dprintso(so, 1,
-				("after outofline T_EXDATA_IND(%p): "
-				"counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-				vp, so->so_oobsigcnt,
-				so->so_oobcnt, *pollwakeups, *allmsgsigs,
-				pr_state(so->so_state, so->so_mode)));
+			    ("after outofline T_EXDATA_IND(%p): "
+			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
+			    vp, so->so_oobsigcnt,
+			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    pr_state(so->so_state, so->so_mode)));
 		} else {
 			dprintso(so, 1,
-				("after inline T_EXDATA_IND(%p): "
-				"counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-				vp, so->so_oobsigcnt,
-				so->so_oobcnt, *pollwakeups, *allmsgsigs,
-				pr_state(so->so_state, so->so_mode)));
+			    ("after inline T_EXDATA_IND(%p): "
+			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
+			    vp, so->so_oobsigcnt,
+			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    pr_state(so->so_state, so->so_mode)));
 		}
 #endif /* DEBUG */
 		mutex_exit(&so->so_lock);
@@ -2134,7 +2132,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		    SS_ISCONNECTING) {
 			mutex_exit(&so->so_lock);
 			dprintso(so, 1,
-				("T_CONN_CON: state %x\n", so->so_state));
+			    ("T_CONN_CON: state %x\n", so->so_state));
 			freemsg(mp);
 			return (NULL);
 		}
@@ -2238,10 +2236,8 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			return (NULL);
 		}
 
-#ifdef C2_AUDIT
 		if (audit_active)
 			audit_sock(T_CONN_IND, strvp2wq(vp), mp, 0);
-#endif /* C2_AUDIT */
 		if (!(so->so_state & SS_ACCEPTCONN)) {
 			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_conn_ind on non-listening socket\n");
@@ -2349,7 +2345,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			mutex_exit(&so->so_lock);
 			strsetwerror(SOTOV(so), 0, 0, sogetwrerr);
 			dprintso(so, 1,
-				("T_DISCON_IND: error %d\n", so->so_error));
+			    ("T_DISCON_IND: error %d\n", so->so_error));
 			freemsg(mp);
 			/*
 			 * Set these variables for caller to process them.
@@ -2382,7 +2378,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		int			error;
 
 		dprintso(so, 0,
-			("T_UDERROR_IND: error %d\n", tudi->ERROR_type));
+		    ("T_UDERROR_IND: error %d\n", tudi->ERROR_type));
 
 		if (MBLKL(mp) < sizeof (struct T_uderror_ind)) {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -2441,14 +2437,14 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				if (addrlen == sizeof (struct sockaddr_in6) &&
 				    sin1->sin6_port == sin2->sin6_port &&
 				    IN6_ARE_ADDR_EQUAL(&sin1->sin6_addr,
-					&sin2->sin6_addr))
+				    &sin2->sin6_addr))
 					match = B_TRUE;
 				break;
 			}
 			case AF_UNIX:
 				faddr = &so->so_ux_faddr;
 				faddr_len =
-					(t_uscalar_t)sizeof (so->so_ux_faddr);
+				    (t_uscalar_t)sizeof (so->so_ux_faddr);
 				if (faddr_len == addrlen &&
 				    bcmp(addr, faddr, addrlen) == 0)
 					match = B_TRUE;
@@ -2465,13 +2461,13 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			if (!match) {
 #ifdef DEBUG
 				dprintso(so, 0,
-					("sockfs: T_UDERR_IND mismatch: %s - ",
-					pr_addr(so->so_family,
-						(struct sockaddr *)addr,
-						addrlen)));
+				    ("sockfs: T_UDERR_IND mismatch: %s - ",
+				    pr_addr(so->so_family,
+				    (struct sockaddr *)addr,
+				    addrlen)));
 				dprintso(so, 0, ("%s\n",
-					pr_addr(so->so_family, so->so_faddr_sa,
-						so->so_faddr_len)));
+				    pr_addr(so->so_family, so->so_faddr_sa,
+				    so->so_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -2527,10 +2523,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_ERROR_ACK:
 		dprintso(so, 0,
-			("strsock_proto: T_ERROR_ACK for %d, error %d/%d\n",
-			tpr->error_ack.ERROR_prim,
-			tpr->error_ack.TLI_error,
-			tpr->error_ack.UNIX_error));
+		    ("strsock_proto: T_ERROR_ACK for %d, error %d/%d\n",
+		    tpr->error_ack.ERROR_prim,
+		    tpr->error_ack.TLI_error,
+		    tpr->error_ack.UNIX_error));
 
 		if (MBLKL(mp) < sizeof (struct T_error_ack)) {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -2569,7 +2565,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		if ((so->so_flag & SOASYNC_UNBIND) &&
 		    tpr->ok_ack.CORRECT_prim == T_UNBIND_REQ) {
 			dprintso(so, 1,
-				("strsock_proto: T_OK_ACK async unbind\n"));
+			    ("strsock_proto: T_OK_ACK async unbind\n"));
 			so_unlock_single(so, SOASYNC_UNBIND);
 			mutex_exit(&so->so_lock);
 			freemsg(mp);
@@ -2631,8 +2627,8 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 	default:
 #ifdef DEBUG
 		zcmn_err(getzoneid(), CE_WARN,
-			"sockfs: unknown TPI primitive %d received\n",
-			tpr->type);
+		    "sockfs: unknown TPI primitive %d received\n",
+		    tpr->type);
 #endif /* DEBUG */
 		freemsg(mp);
 		return (NULL);
@@ -2659,7 +2655,7 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("strsock_misc(%p, %p, 0x%x)\n",
-			vp, mp, DB_TYPE(mp)));
+	    vp, mp, DB_TYPE(mp)));
 
 	/* Set default return values */
 	*wakeups = *allmsgsigs = *firstmsgsigs = *pollwakeups = 0;
@@ -2678,17 +2674,17 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 		if (*mp->b_rptr == SIGURG) {
 			mutex_enter(&so->so_lock);
 			dprintso(so, 1,
-				("SIGURG(%p): counts %d/%d state %s\n",
-				vp, so->so_oobsigcnt,
-				so->so_oobcnt,
-				pr_state(so->so_state, so->so_mode)));
+			    ("SIGURG(%p): counts %d/%d state %s\n",
+			    vp, so->so_oobsigcnt,
+			    so->so_oobcnt,
+			    pr_state(so->so_state, so->so_mode)));
 			so_oob_sig(so, 1, allmsgsigs, pollwakeups);
 			dprintso(so, 1,
-				("after SIGURG(%p): counts %d/%d "
-				" poll 0x%x sig 0x%x state %s\n",
-				vp, so->so_oobsigcnt,
-				so->so_oobcnt, *pollwakeups, *allmsgsigs,
-				pr_state(so->so_state, so->so_mode)));
+			    ("after SIGURG(%p): counts %d/%d "
+			    " poll 0x%x sig 0x%x state %s\n",
+			    vp, so->so_oobsigcnt,
+			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    pr_state(so->so_state, so->so_mode)));
 			mutex_exit(&so->so_lock);
 		}
 		freemsg(mp);

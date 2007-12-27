@@ -85,9 +85,7 @@ typedef struct fpollinfo {
 #define	FNDELAY		0x04
 #define	FAPPEND		0x08
 #define	FSYNC		0x10	/* file (data+inode) integrity while writing */
-#ifdef C2_AUDIT
-#define	FREVOKED	0x20	/* C2 Security - Revoke Subsystem */
-#endif
+#define	FREVOKED	0x20	/* Object reuse Revoked file */
 #define	FDSYNC		0x40	/* file data only integrity while writing */
 #define	FNONBLOCK	0x80
 

@@ -451,11 +451,9 @@ main(void)
 	swaploaded = 1;
 
 	/*
-	 * Initial C2 audit system
+	 * Initialize Solaris Audit Subsystem
 	 */
-#ifdef C2_AUDIT
-	audit_init();	/* C2 hook */
-#endif
+	audit_init();
 
 	/*
 	 * Plumb the protocol modules and drivers only if we are not

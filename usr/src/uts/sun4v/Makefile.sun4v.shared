@@ -291,13 +291,6 @@ $(IF_TRAPTRACE_OBJ)x_call.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 #$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_DEBUG
 
 #
-#	Build `options'. These are mostly historical and the need for these
-#	is largely removed by the module technology. However, the static
-#	build will continue to require these.
-#
-OPTION_DEFS	 = -DC2_AUDIT
-
-#
 #	Collect the preprocessor definitions to be associated with *all*
 #	files.
 #

@@ -862,21 +862,21 @@ strinit(void)
 	int ncpus = ((boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus);
 
 	stream_head_cache = kmem_cache_create("stream_head_cache",
-		sizeof (stdata_t), 0,
-		stream_head_constructor, stream_head_destructor, NULL,
-		NULL, NULL, 0);
+	    sizeof (stdata_t), 0,
+	    stream_head_constructor, stream_head_destructor, NULL,
+	    NULL, NULL, 0);
 
 	queue_cache = kmem_cache_create("queue_cache", sizeof (queinfo_t), 0,
-		queue_constructor, queue_destructor, NULL, NULL, NULL, 0);
+	    queue_constructor, queue_destructor, NULL, NULL, NULL, 0);
 
 	syncq_cache = kmem_cache_create("syncq_cache", sizeof (syncq_t), 0,
-		syncq_constructor, syncq_destructor, NULL, NULL, NULL, 0);
+	    syncq_constructor, syncq_destructor, NULL, NULL, NULL, 0);
 
 	qband_cache = kmem_cache_create("qband_cache",
-		sizeof (qband_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	    sizeof (qband_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	linkinfo_cache = kmem_cache_create("linkinfo_cache",
-		sizeof (linkinfo_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+	    sizeof (linkinfo_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
 
 	n_ciputctrl = ncpus;
 	n_ciputctrl = 1 << highbit(n_ciputctrl - 1);
@@ -884,9 +884,9 @@ strinit(void)
 	n_ciputctrl = MIN(n_ciputctrl, max_n_ciputctrl);
 	if (n_ciputctrl >= min_n_ciputctrl) {
 		ciputctrl_cache = kmem_cache_create("ciputctrl_cache",
-			sizeof (ciputctrl_t) * n_ciputctrl,
-			sizeof (ciputctrl_t), ciputctrl_constructor,
-			ciputctrl_destructor, NULL, NULL, NULL, 0);
+		    sizeof (ciputctrl_t) * n_ciputctrl,
+		    sizeof (ciputctrl_t), ciputctrl_constructor,
+		    ciputctrl_destructor, NULL, NULL, NULL, 0);
 	}
 
 	streams_taskq = system_taskq;
@@ -966,7 +966,7 @@ dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
 		info->si_code = POLL_ERR;
 		info->si_errno = error;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 		info->si_errno = 0;
 	}
@@ -974,14 +974,14 @@ dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
 		sevent &= ~S_HANGUP;
 		info->si_code = POLL_HUP;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 	}
 	if (sevent & S_HIPRI) {
 		sevent &= ~S_HIPRI;
 		info->si_code = POLL_PRI;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 	}
 	if (sevent & S_RDBAND) {
@@ -1000,7 +1000,7 @@ dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
 		info->si_code = POLL_IN;
 		info->si_band = band;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 		info->si_band = 0;
 	}
@@ -1009,7 +1009,7 @@ dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
 		info->si_code = POLL_OUT;
 		info->si_band = band;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 		info->si_band = 0;
 	}
@@ -1018,7 +1018,7 @@ dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
 		info->si_code = POLL_MSG;
 		info->si_band = band;
 		TRACE_2(TR_FAC_STREAMS_FR, TR_STRSENDSIG,
-			"strsendsig:proc %p info %p", proc, info);
+		    "strsendsig:proc %p info %p", proc, info);
 		sigaddq(proc, NULL, info, KM_NOSLEEP);
 		info->si_band = 0;
 	}
@@ -1088,7 +1088,7 @@ strsendsig(strsig_t *siglist, int event, uchar_t band, int error)
 			mutex_enter(&proc->p_lock);
 			mutex_exit(&pidlock);
 			dosendsig(proc, ssp->ss_events, sevent, &info,
-				band, error);
+			    band, error);
 			mutex_exit(&proc->p_lock);
 		} else {
 			/*
@@ -1102,7 +1102,7 @@ strsendsig(strsig_t *siglist, int event, uchar_t band, int error)
 			while (proc != NULL) {
 				mutex_enter(&proc->p_lock);
 				dosendsig(proc, ssp->ss_events, sevent,
-					&info, band, error);
+				    &info, band, error);
 				mutex_exit(&proc->p_lock);
 				proc = proc->p_pglink;
 			}
@@ -1307,8 +1307,8 @@ qdetach(queue_t *qp, int clmode, int flag, cred_t *crp, boolean_t is_remove)
 	ASSERT(flush_syncq(qp->q_syncq, qp) == 0);
 	ASSERT(flush_syncq(wqp->q_syncq, wqp) == 0);
 	ASSERT((qp->q_flag & QPERMOD) ||
-		((qp->q_syncq->sq_head == NULL) &&
-		(wqp->q_syncq->sq_head == NULL)));
+	    ((qp->q_syncq->sq_head == NULL) &&
+	    (wqp->q_syncq->sq_head == NULL)));
 
 	/* release any fmodsw_impl_t structure held on behalf of the queue */
 	ASSERT(qp->q_fp != NULL || qp->q_flag & QISDRV);
@@ -1452,7 +1452,7 @@ putiocd(mblk_t *bp, char *arg, int flag, cred_t *cr)
 	int error = 0;
 
 	ASSERT((flag & (U_TO_K | K_TO_K)) == U_TO_K ||
-		(flag & (U_TO_K | K_TO_K)) == K_TO_K);
+	    (flag & (U_TO_K | K_TO_K)) == K_TO_K);
 
 	if (bp->b_datap->db_type == M_IOCTL) {
 		count = ((struct iocblk *)bp->b_rptr)->ioc_count;
@@ -1755,7 +1755,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 
 	stp = vp->v_stream;
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_I_LINK, "I_LINK/I_PLINK:stp %p", stp);
+	    TR_I_LINK, "I_LINK/I_PLINK:stp %p", stp);
 	/*
 	 * Test for invalid upper stream
 	 */
@@ -1809,7 +1809,7 @@ mlink_file(vnode_t *vp, int cmd, struct file *fpdown, cred_t *crp, int *rvalp,
 		return (EINVAL);
 	}
 	TRACE_1(TR_FAC_STREAMS_FR,
-		TR_STPDOWN, "stpdown:%p", stpdown);
+	    TR_STPDOWN, "stpdown:%p", stpdown);
 	rq = getendq(stp->sd_wrq);
 	if (cmd == I_PLINK)
 		rq = NULL;
@@ -2177,8 +2177,8 @@ munlink(stdata_t *stp, linkinfo_t *linkp, int flag, cred_t *crp, int *rvalp,
 
 		wait_syncq(sq);
 		ASSERT((rq->q_flag & QPERMOD) ||
-			((rq->q_syncq->sq_head == NULL) &&
-			(_WR(rq)->q_syncq->sq_head == NULL)));
+		    ((rq->q_syncq->sq_head == NULL) &&
+		    (_WR(rq)->q_syncq->sq_head == NULL)));
 	}
 
 	/*
@@ -2541,9 +2541,9 @@ setq(queue_t *rq, struct qinit *rinit, struct qinit *winit,
 		wq->q_syncq = NULL;
 	}
 	ASSERT(rq->q_syncq == NULL || (rq->q_syncq->sq_head == NULL &&
-				rq->q_syncq->sq_tail == NULL));
+	    rq->q_syncq->sq_tail == NULL));
 	ASSERT(wq->q_syncq == NULL || (wq->q_syncq->sq_head == NULL &&
-				wq->q_syncq->sq_tail == NULL));
+	    wq->q_syncq->sq_tail == NULL));
 
 	if (!(rq->q_flag & QPERMOD) &&
 	    rq->q_syncq != NULL && rq->q_syncq->sq_ciputctrl != NULL) {
@@ -2636,9 +2636,9 @@ setq(queue_t *rq, struct qinit *rinit, struct qinit *winit,
 			outer_insert(outer, wq->q_syncq);
 	}
 	ASSERT((rq->q_syncq->sq_flags & SQ_TYPES_IN_FLAGS) ==
-		(rq->q_syncq->sq_type & SQ_TYPES_IN_FLAGS));
+	    (rq->q_syncq->sq_type & SQ_TYPES_IN_FLAGS));
 	ASSERT((wq->q_syncq->sq_flags & SQ_TYPES_IN_FLAGS) ==
-		(wq->q_syncq->sq_type & SQ_TYPES_IN_FLAGS));
+	    (wq->q_syncq->sq_type & SQ_TYPES_IN_FLAGS));
 	ASSERT((rq->q_flag & QMT_TYPEMASK) == (qflag & QMT_TYPEMASK));
 
 	/*
@@ -3089,19 +3089,19 @@ strwaitq(stdata_t *stp, int flag, ssize_t count, int fmode, clock_t timout,
 
 	stp->sd_flag |= slpflg;
 	TRACE_5(TR_FAC_STREAMS_FR, TR_STRWAITQ_WAIT2,
-		"strwaitq sleeps (2):%p, %X, %lX, %X, %p",
-		stp, flag, count, fmode, done);
+	    "strwaitq sleeps (2):%p, %X, %lX, %X, %p",
+	    stp, flag, count, fmode, done);
 
 	rval = str_cv_wait(sleepon, &stp->sd_lock, timout, flag & STR_NOSIG);
 	if (rval > 0) {
 		/* EMPTY */
 		TRACE_5(TR_FAC_STREAMS_FR, TR_STRWAITQ_WAKE2,
-			"strwaitq awakes(2):%X, %X, %X, %X, %X",
-			stp, flag, count, fmode, done);
+		    "strwaitq awakes(2):%X, %X, %X, %X, %X",
+		    stp, flag, count, fmode, done);
 	} else if (rval == 0) {
 		TRACE_5(TR_FAC_STREAMS_FR, TR_STRWAITQ_INTR2,
-			"strwaitq interrupt #2:%p, %X, %lX, %X, %p",
-			stp, flag, count, fmode, done);
+		    "strwaitq interrupt #2:%p, %X, %lX, %X, %p",
+		    stp, flag, count, fmode, done);
 		stp->sd_flag &= ~slpflg;
 		cv_broadcast(sleepon);
 		if (!(flag & NOINTR))
@@ -3113,8 +3113,8 @@ strwaitq(stdata_t *stp, int flag, ssize_t count, int fmode, clock_t timout,
 	} else {
 		/* timeout */
 		TRACE_5(TR_FAC_STREAMS_FR, TR_STRWAITQ_TIME,
-			"strwaitq timeout:%p, %X, %lX, %X, %p",
-			stp, flag, count, fmode, done);
+		    "strwaitq timeout:%p, %X, %lX, %X, %p",
+		    stp, flag, count, fmode, done);
 		*done = 1;
 		if (!(flag & NOINTR))
 			return (ETIME);
@@ -3291,9 +3291,7 @@ shalloc(queue_t *qp)
 	stp->sd_struiordq = NULL;
 	stp->sd_struiodnak = 0;
 	stp->sd_struionak = NULL;
-#ifdef C2_AUDIT
 	stp->sd_t_audit_data = NULL;
-#endif
 	stp->sd_rput_opt = 0;
 	stp->sd_wput_opt = 0;
 	stp->sd_read_opt = 0;
@@ -3639,13 +3637,13 @@ runservice(queue_t *q)
 again:
 	entersq(q->q_syncq, SQ_SVC);
 	TRACE_1(TR_FAC_STREAMS_FR, TR_QRUNSERVICE_START,
-		"runservice starts:%p", q);
+	    "runservice starts:%p", q);
 
 	if (!(q->q_flag & QWCLOSE))
 		(*q->q_qinfo->qi_srvp)(q);
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_QRUNSERVICE_END,
-		"runservice ends:(%p)", q);
+	    "runservice ends:(%p)", q);
 
 	leavesq(q->q_syncq, SQ_SVC);
 
@@ -4155,7 +4153,7 @@ void
 strsignal(stdata_t *stp, int sig, int32_t band)
 {
 	TRACE_3(TR_FAC_STREAMS_FR, TR_SENDSIG,
-		"strsignal:%p, %X, %X", stp, sig, band);
+	    "strsignal:%p, %X, %X", stp, sig, band);
 
 	mutex_enter(&stp->sd_lock);
 	switch (sig) {
@@ -4274,7 +4272,7 @@ strgeterr(stdata_t *stp, int32_t flags_to_check, int ispeek)
 			int clearerr = 0;
 
 			error = (*stp->sd_rderrfunc)(stp->sd_vnode, ispeek,
-						&clearerr);
+			    &clearerr);
 			if (clearerr) {
 				stp->sd_flag &= ~STRDERR;
 				stp->sd_rderrfunc = NULL;
@@ -4294,7 +4292,7 @@ strgeterr(stdata_t *stp, int32_t flags_to_check, int ispeek)
 			int clearerr = 0;
 
 			error = (*stp->sd_wrerrfunc)(stp->sd_vnode, ispeek,
-						&clearerr);
+			    &clearerr);
 			if (clearerr) {
 				stp->sd_flag &= ~STWRERR;
 				stp->sd_wrerrfunc = NULL;
@@ -4342,7 +4340,7 @@ strstartplumb(stdata_t *stp, int flag, int cmd)
 			}
 			while (stp->sd_flag & (STWOPEN|STRCLOSE|STRPLUMB)) {
 				if ((cmd == I_POP) &&
-					(flag & (FNDELAY|FNONBLOCK))) {
+				    (flag & (FNDELAY|FNONBLOCK))) {
 					STRUNLOCKMATES(stp);
 					return (EAGAIN);
 				}
@@ -4358,7 +4356,7 @@ strstartplumb(stdata_t *stp, int flag, int cmd)
 			}
 			if (stp->sd_flag & (STRDERR|STWRERR|STRHUP|STPLEX)) {
 				error = strgeterr(stp,
-					STRDERR|STWRERR|STRHUP|STPLEX, 0);
+				    STRDERR|STWRERR|STRHUP|STPLEX, 0);
 				if (error != 0) {
 					STRUNLOCKMATES(stp);
 					return (error);
@@ -4381,7 +4379,7 @@ strstartplumb(stdata_t *stp, int flag, int cmd)
 			}
 			if (stp->sd_flag & (STRDERR|STWRERR|STRHUP|STPLEX)) {
 				error = strgeterr(stp,
-					STRDERR|STWRERR|STRHUP|STPLEX, 0);
+				    STRDERR|STWRERR|STRHUP|STPLEX, 0);
 				if (error != 0) {
 					mutex_exit(&stp->sd_lock);
 					return (error);
@@ -4740,7 +4738,7 @@ insertq(struct stdata *stp, queue_t *new)
 	}
 
 	TRACE_2(TR_FAC_STREAMS_FR, TR_INSERTQ,
-		"insertq:%p, %p", after, new);
+	    "insertq:%p, %p", after, new);
 	ASSERT(after->q_flag & QREADR);
 	ASSERT(new->q_flag & QREADR);
 
@@ -4842,7 +4840,7 @@ removeq(queue_t *qp)
 	ASSERT(stp);
 
 	TRACE_2(TR_FAC_STREAMS_FR, TR_REMOVEQ,
-		"removeq:%p %p", qp, wqp);
+	    "removeq:%p %p", qp, wqp);
 	ASSERT(qp->q_flag&QREADR);
 
 	/*
@@ -5212,7 +5210,7 @@ sqlist_alloc(struct stdata *stp, int kmflag)
 	 * 2 for the stream head, and 2 for the driver/other stream head.
 	 */
 	sqlist_size = 2 * sizeof (syncql_t) * stp->sd_pushcnt +
-		sizeof (sqlist_t);
+	    sizeof (sqlist_t);
 	if (STRMATED(stp))
 		sqlist_size += 2 * sizeof (syncql_t) * stp->sd_mate->sd_pushcnt;
 	sqlist = kmem_alloc(sqlist_size, kmflag);
@@ -6159,9 +6157,9 @@ sq_run_events(syncq_t *sq)
 
 	ASSERT(MUTEX_HELD(SQLOCK(sq)));
 	ASSERT((sq->sq_outer == NULL && sq->sq_onext == NULL &&
-		sq->sq_oprev == NULL) ||
-		(sq->sq_outer != NULL && sq->sq_onext != NULL &&
-		sq->sq_oprev != NULL));
+	    sq->sq_oprev == NULL) ||
+	    (sq->sq_outer != NULL && sq->sq_onext != NULL &&
+	    sq->sq_oprev != NULL));
 
 	ASSERT(flags & SQ_EXCL);
 	ASSERT(sq->sq_count == 1);
@@ -6357,12 +6355,12 @@ drain_syncq(syncq_t *sq)
 	boolean_t	bg_service = sq->sq_svcflags & SQ_SERVICE;
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_DRAIN_SYNCQ_START,
-		"drain_syncq start:%p", sq);
+	    "drain_syncq start:%p", sq);
 	ASSERT(MUTEX_HELD(SQLOCK(sq)));
 	ASSERT((sq->sq_outer == NULL && sq->sq_onext == NULL &&
-		sq->sq_oprev == NULL) ||
-		(sq->sq_outer != NULL && sq->sq_onext != NULL &&
-		sq->sq_oprev != NULL));
+	    sq->sq_oprev == NULL) ||
+	    (sq->sq_outer != NULL && sq->sq_onext != NULL &&
+	    sq->sq_oprev != NULL));
 
 	/*
 	 * Drop SQ_SERVICE flag.
@@ -6509,7 +6507,7 @@ drain_syncq(syncq_t *sq)
 
 		for (qp = sq->sq_head;
 		    qp != NULL && (qp->q_draining ||
-			(qp->q_sqflags & Q_SQDRAINING));
+		    (qp->q_sqflags & Q_SQDRAINING));
 		    qp = qp->q_sqnext)
 			;
 
@@ -6558,7 +6556,7 @@ drain_syncq(syncq_t *sq)
 	 */
 
 	ASSERT((sq->sq_head == NULL) || (flags & SQ_GOAWAY) ||
-		(type & SQ_CI) || sq->sq_head->q_draining);
+	    (type & SQ_CI) || sq->sq_head->q_draining);
 
 	/* Drop SQ_EXCL for non-CIPUT perimiters */
 	if (!(type & SQ_CIPUT))
@@ -6588,7 +6586,7 @@ drain_syncq(syncq_t *sq)
 	mutex_exit(SQLOCK(sq));
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_DRAIN_SYNCQ_END,
-		"drain_syncq end:%p", sq);
+	    "drain_syncq end:%p", sq);
 }
 
 
@@ -6633,7 +6631,7 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 #endif
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_DRAIN_SYNCQ_START,
-		"drain_syncq start:%p", sq);
+	    "drain_syncq start:%p", sq);
 	ASSERT(q->q_syncq == sq);
 	ASSERT(MUTEX_HELD(QLOCK(q)));
 	ASSERT(MUTEX_NOT_HELD(SQLOCK(sq)));
@@ -6649,9 +6647,9 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	 * All outer pointers are set, or none of them are
 	 */
 	ASSERT((sq->sq_outer == NULL && sq->sq_onext == NULL &&
-		sq->sq_oprev == NULL) ||
-		(sq->sq_outer != NULL && sq->sq_onext != NULL &&
-		sq->sq_oprev != NULL));
+	    sq->sq_oprev == NULL) ||
+	    (sq->sq_outer != NULL && sq->sq_onext != NULL &&
+	    sq->sq_oprev != NULL));
 #ifdef DEBUG
 	count = sq->sq_count;
 	/*
@@ -6823,7 +6821,7 @@ qdrain_syncq(syncq_t *sq, queue_t *q)
 	mutex_exit(QLOCK(q));
 
 	TRACE_1(TR_FAC_STREAMS_FR, TR_DRAIN_SYNCQ_END,
-		"drain_syncq end:%p", sq);
+	    "drain_syncq end:%p", sq);
 }
 /* END OF QDRAIN_SYNCQ  */
 
@@ -6852,9 +6850,9 @@ qfill_syncq(syncq_t *sq, queue_t *q, mblk_t *mp)
 	ASSERT(sq->sq_count > 0);
 	ASSERT(q->q_syncq == sq);
 	ASSERT((sq->sq_outer == NULL && sq->sq_onext == NULL &&
-		sq->sq_oprev == NULL) ||
-		(sq->sq_outer != NULL && sq->sq_onext != NULL &&
-		sq->sq_oprev != NULL));
+	    sq->sq_oprev == NULL) ||
+	    (sq->sq_outer != NULL && sq->sq_onext != NULL &&
+	    sq->sq_oprev != NULL));
 
 	mutex_enter(QLOCK(q));
 
@@ -7527,7 +7525,7 @@ putnext_tail(syncq_t *sq, queue_t *qp, uint32_t passflags)
 	/* Drop the SQLOCK on exit */
 	mutex_exit(SQLOCK(sq));
 	TRACE_3(TR_FAC_STREAMS_FR, TR_PUTNEXT_END,
-		"putnext_end:(%p, %p, %p) done", NULL, qp, sq);
+	    "putnext_end:(%p, %p, %p) done", NULL, qp, sq);
 }
 
 void
@@ -8649,7 +8647,7 @@ str_stack_init(netstackid_t stackid, netstack_t *ns)
 	 */
 	ss->ss_devcnt = devcnt;	/* In case it should change before free */
 	ss->ss_mux_nodes = kmem_zalloc((sizeof (struct mux_node) *
-					    ss->ss_devcnt), KM_SLEEP);
+	    ss->ss_devcnt), KM_SLEEP);
 	for (i = 0; i < ss->ss_devcnt; i++)
 		ss->ss_mux_nodes[i].mn_imaj = i;
 	return (ss);

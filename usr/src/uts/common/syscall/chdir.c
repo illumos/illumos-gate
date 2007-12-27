@@ -216,10 +216,8 @@ chdirec(vnode_t *vp, int ischroot, int do_traverse)
 		vpp = &PTOU(pp)->u_cdir;
 	}
 
-#ifdef C2_AUDIT
 	if (audit_active)	/* update abs cwd/root path see c2audit.c */
 		audit_chdirec(vp, vpp);
-#endif
 
 	mutex_enter(&pp->p_lock);
 	/*

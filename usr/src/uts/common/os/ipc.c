@@ -536,10 +536,8 @@ ipcperm_set(ipc_service_t *service, struct cred *cr,
 	kperm->ipc_gid = gid;
 	kperm->ipc_mode = (mode & 0777) | (kperm->ipc_mode & ~0777);
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_ipcget(service->ipcs_atype, kperm);
-#endif
 
 	return (0);
 }
@@ -576,10 +574,8 @@ ipcperm_set64(ipc_service_t *service, struct cred *cr,
 	kperm->ipc_mode = (perm64->ipcx_mode & 0777) |
 	    (kperm->ipc_mode & ~0777);
 
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_ipcget(service->ipcs_atype, kperm);
-#endif
 
 	return (0);
 }
@@ -804,10 +800,8 @@ ipc_lookup(ipc_service_t *service, int id, kipc_perm_t **perm)
 	ASSERT(IPC_SEQ(id) == service->ipcs_table[index].ipct_seq);
 
 	*perm = result;
-#ifdef C2_AUDIT
 	if (audit_active)
 		audit_ipc(service->ipcs_atype, id, result);
-#endif
 
 	return (&service->ipcs_table[index].ipct_lock);
 }
@@ -928,10 +922,8 @@ ipc_keylookup(ipc_service_t *service, key_t key, int flag, kipc_perm_t **permp)
 		if ((flag & (IPC_CREAT | IPC_EXCL)) == (IPC_CREAT | IPC_EXCL))
 			return (EEXIST);
 		if ((flag & 0777) & ~perm->ipc_mode) {
-#ifdef C2_AUDIT
 			if (audit_active)
 				audit_ipcget(NULL, (void *)perm);
-#endif
 			return (EACCES);
 		}
 		*permp = perm;
