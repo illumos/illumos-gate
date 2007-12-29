@@ -805,26 +805,30 @@ SCSIGENHDRS=		\
 	mode.h		\
 	persist.h	\
 	sense.h		\
+	smp_frames.h	\
 	status.h
 
 SCSIIMPLHDRS=		\
 	commands.h	\
 	inquiry.h	\
 	mode.h		\
+	sas_transport.h	\
 	sense.h		\
 	services.h	\
 	status.h	\
 	transport.h	\
 	scsi_reset_notify.h \
 	types.h		\
-	uscsi.h
+	uscsi.h		\
+	usmp.h
 
 SCSITARGETSHDRS=	\
 	ses.h		\
 	sesio.h		\
 	sgendef.h	\
 	stdef.h		\
-	sddef.h
+	sddef.h		\
+	smp.h
 
 SCSICADHDRS=
 

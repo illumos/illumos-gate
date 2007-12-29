@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -338,6 +338,11 @@ typedef struct msg_event_ack_reply {
 #define	MPI_EVENT_IR_RESYNC_UPDATE		0x00000014
 #define	MPI_EVENT_IR2				0x00000015
 #define	MPI_EVENT_SAS_DISCOVERY			0x00000016
+#define	MPI_EVENT_SAS_BROADCAST_PRIMITIVE	0x00000017
+#define	MPI_EVENT_SAS_INIT_DEVICE_STATUS_CHANGE	0x00000018
+#define	MPI_EVENT_SAS_INIT_TABLE_OVERFLOW	0x00000019
+#define	MPI_EVENT_SAS_SMP_ERROR			0x0000001A
+#define	MPI_EVENT_SAS_EXPANDER_STATUS_CHANGE	0x0000001B
 #define	MPI_EVENT_LOG_ENTRY_ADDED		0x00000021
 
 /*
@@ -505,6 +510,54 @@ typedef struct event_data_sas_phy_link_status {
 #define	MPI_EVENT_SAS_PLS_LR_RATE_SATA_OOB_COMPLETE		0x03
 #define	MPI_EVENT_SAS_PLS_LR_RATE_1_5				0x08
 #define	MPI_EVENT_SAS_PLS_LR_RATE_3_0				0x09
+
+typedef struct event_data_sas_expander_status_change {
+	uint8_t		ReasonCode;
+	uint8_t		Reserved1;
+	uint16_t	Reserved2;
+	uint8_t		PhysicalPort;
+	uint8_t		Reserved3;
+	uint16_t	EnclosureHandle;
+	uint64_t	SASAddress;
+	uint32_t	DiscoveryStatus;
+	uint16_t	DevHandle;
+	uint16_t	ParentDevHandle;
+	uint16_t	ExpanderChangeCount;
+	uint16_t	ExpanderRouteIndexes;
+	uint8_t		NumPhys;
+	uint8_t		SASLevel;
+	uint8_t		Flags;
+	uint8_t		Reserved4;
+} event_data_sas_expander_status_change_t;
+
+/*
+ * values for ReasonCode field of SAS Expander Status Change Event data
+ */
+#define	MPI_EVENT_SAS_EXP_RC_ADDED		0x00
+#define	MPI_EVENT_SAS_EXP_RC_NOT_RESPONDING	0x01
+
+/*
+ * values for DiscoveryStatus field of SAS Expander Status Change Event data
+ */
+#define	MPI_EVENT_SAS_EXP_DS_LOOP_DETECTED		0x00000001
+#define	MPI_EVENT_SAS_EXP_DS_UNADDRESSABLE_DEVICE	0x00000002
+#define	MPI_EVENT_SAS_EXP_DS_MULTIPLE_PORTS		0x00000004
+#define	MPI_EVENT_SAS_EXP_DS_EXPANDER_ERR		0x00000008
+#define	MPI_EVENT_SAS_EXP_DS_SMP_TIMEOUT		0x00000010
+#define	MPI_EVENT_SAS_EXP_DS_OUT_ROUTE_ENTRIES		0x00000020
+#define	MPI_EVENT_SAS_EXP_DS_INDEX_NOT_EXIST		0x00000040
+#define	MPI_EVENT_SAS_EXP_DS_SMP_FUNCTION_FAILED	0x00000080
+#define	MPI_EVENT_SAS_EXP_DS_SMP_CRC_ERROR		0x00000100
+#define	MPI_EVENT_SAS_EXP_DS_SUBTRACTIVE_LINK		0x00000200
+#define	MPI_EVENT_SAS_EXP_DS_TABLE_LINK			0x00000400
+#define	MPI_EVENT_SAS_EXP_DS_UNSUPPORTED_DEVICE		0x00000800
+
+/*
+ *  values for Flags field of SAS Expander Status Change Event data
+ */
+#define	MPI_EVENT_SAS_EXP_FLAGS_ROUTE_TABLE_CONFIG	0x02
+#define	MPI_EVENT_SAS_EXP_FLAGS_CONFIG_IN_PROGRESS	0x01
+
 
 /*
  * Firmware Load Messages

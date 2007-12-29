@@ -570,6 +570,10 @@ get_device_type(di_node_t node)
 	int *inq_dtype;
 	int i;
 
+	if (di_prop_find(DDI_DEV_T_ANY, node, "smp-device") != DI_PROP_NIL) {
+		return ("smp");
+	}
+
 	/* first, derive type based on inquiry property */
 	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "inquiry-device-type",
 	    &inq_dtype) == 1) {

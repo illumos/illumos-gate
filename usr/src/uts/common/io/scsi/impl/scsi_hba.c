@@ -645,7 +645,6 @@ scsi_hba_detach(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
-
 /*
  * Called by an HBA from _fini()
  */
@@ -671,6 +670,129 @@ scsi_hba_fini(struct modlinkage *modlp)
 	hba_dev_ops->devo_bus_ops = (struct bus_ops *)NULL;
 }
 
+static int
+smp_ctlops_reportdev(dev_info_t	*dip, dev_info_t *rdip)
+{
+	scsi_hba_tran_t		*hba;
+	char			*smp_wwn;
+
+	hba = ddi_get_driver_private(dip);
+	ASSERT(hba != NULL);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, SMP_WWN, &smp_wwn)
+	    != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	cmn_err(CE_CONT,
+	    "?%s%d at %s%d: wwn %s\n",
+	    ddi_driver_name(rdip), ddi_get_instance(rdip),
+	    ddi_driver_name(dip), ddi_get_instance(dip),
+	    smp_wwn);
+
+	ddi_prop_free(smp_wwn);
+	return (DDI_SUCCESS);
+}
+
+
+static int
+smp_ctlops_initchild(dev_info_t	*dip, dev_info_t *rdip)
+{
+	struct smp_device	*smp;
+	char			name[SCSI_MAXNAMELEN];
+	scsi_hba_tran_t		*hba;
+	dev_info_t		*ndip;
+	char			*smp_wwn;
+	uint64_t		wwn;
+
+	hba = ddi_get_driver_private(dip);
+
+	if (hba == NULL)
+		return (DDI_FAILURE);
+
+	smp = kmem_zalloc(sizeof (struct smp_device), KM_SLEEP);
+
+	/*
+	 * Clone transport structure if requested, so
+	 * the HBA can maintain target-specific info, if
+	 * necessary.
+	 */
+	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+		scsi_hba_tran_t	*clone =
+		    kmem_alloc(sizeof (scsi_hba_tran_t), KM_SLEEP);
+
+		bcopy(hba, clone, sizeof (scsi_hba_tran_t));
+		hba = clone;
+	}
+
+	smp->dip = rdip;
+	smp->smp_addr.a_hba_tran = hba;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, SMP_WWN, &smp_wwn)
+	    != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	if (ddi_devid_str_to_wwn(smp_wwn, &wwn)) {
+		goto failure;
+	}
+
+	bcopy(&wwn, smp->smp_addr.a_wwn, SAS_WWN_BYTE_SIZE);
+
+	bzero(name, sizeof (SCSI_MAXNAMELEN));
+
+	(void) sprintf(name, "w%s", smp_wwn);
+
+	/*
+	 * Prevent duplicate nodes.
+	 */
+	ndip = ndi_devi_find(dip, ddi_node_name(rdip), name);
+
+	if (ndip && (ndip != rdip)) {
+		goto failure;
+	}
+
+	ddi_set_name_addr(rdip, name);
+
+	ddi_set_driver_private(rdip, smp);
+
+	ddi_prop_free(smp_wwn);
+
+	return (DDI_SUCCESS);
+
+failure:
+	kmem_free(smp, sizeof (struct smp_device));
+	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+		kmem_free(hba, sizeof (scsi_hba_tran_t));
+	}
+	ddi_prop_free(smp_wwn);
+	return (DDI_FAILURE);
+}
+
+static int
+smp_ctlops_uninitchild(dev_info_t *dip, dev_info_t *rdip)
+{
+	struct smp_device	*smp;
+	scsi_hba_tran_t		*hba;
+
+	hba = ddi_get_driver_private(dip);
+	ASSERT(hba != NULL);
+
+	smp = ddi_get_driver_private(rdip);
+	ASSERT(smp != NULL);
+
+	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+		hba = smp->smp_addr.a_hba_tran;
+		kmem_free(hba, sizeof (scsi_hba_tran_t));
+	}
+	kmem_free(smp, sizeof (*smp));
+
+	ddi_set_driver_private(rdip, NULL);
+	ddi_set_name_addr(rdip, NULL);
+
+	return (DDI_SUCCESS);
+}
 
 /*
  * Generic bus_ctl operations for SCSI HBA's,
@@ -685,7 +807,6 @@ scsi_hba_bus_ctl(
 	void			*arg,
 	void			*result)
 {
-
 	switch (op) {
 	case DDI_CTLOPS_REPORTDEV:
 	{
@@ -694,6 +815,11 @@ scsi_hba_bus_ctl(
 
 		hba = ddi_get_driver_private(dip);
 		ASSERT(hba != NULL);
+
+		if (ddi_prop_exists(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
+		    SMP_PROP)) {
+			return (smp_ctlops_reportdev(dip, rdip));
+		}
 
 		devp = ddi_get_driver_private(rdip);
 
@@ -756,6 +882,11 @@ scsi_hba_bus_ctl(
 		char			name[SCSI_MAXNAMELEN];
 		scsi_hba_tran_t		*hba;
 		dev_info_t		*ndip;
+
+		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip, DDI_PROP_DONTPASS,
+		    SMP_PROP)) {
+			return (smp_ctlops_initchild(dip, child_dip));
+		}
 
 		hba = ddi_get_driver_private(dip);
 
@@ -928,6 +1059,11 @@ failure:
 		dev_info_t		*child_dip = (dev_info_t *)arg;
 		scsi_hba_tran_t		*hba;
 
+		if (ddi_prop_exists(DDI_DEV_T_ANY, child_dip, DDI_PROP_DONTPASS,
+		    SMP_PROP)) {
+			return (smp_ctlops_uninitchild(dip, child_dip));
+		}
+
 		hba = ddi_get_driver_private(dip);
 		ASSERT(hba != NULL);
 
@@ -1019,7 +1155,34 @@ scsi_hba_tran_alloc(
 	return (hba_tran);
 }
 
+int
+scsi_tran_ext_alloc(
+	scsi_hba_tran_t		*hba_tran,
+	size_t			length,
+	int			flags)
+{
+	void	*hba_tran_ext;
+	int	ret = DDI_FAILURE;
 
+	hba_tran_ext = kmem_zalloc(length, (flags & SCSI_HBA_CANSLEEP)
+	    ? KM_SLEEP : KM_NOSLEEP);
+	if (hba_tran_ext != NULL) {
+		hba_tran->tran_extension = hba_tran_ext;
+		ret = DDI_SUCCESS;
+	}
+	return (ret);
+}
+
+void
+scsi_tran_ext_free(
+	scsi_hba_tran_t		*hba_tran,
+	size_t			length)
+{
+	if (hba_tran->tran_extension != NULL) {
+		kmem_free(hba_tran->tran_extension, length);
+		hba_tran->tran_extension = NULL;
+	}
+}
 
 /*
  * Called by an HBA to free a scsi_hba_tran structure

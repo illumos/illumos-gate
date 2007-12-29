@@ -297,6 +297,7 @@ DRV_KMODS	+= si3124
 DRV_KMODS	+= smbios
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= smbsrv
+DRV_KMODS	+= smp
 DRV_KMODS	+= sppp
 DRV_KMODS	+= sppptun
 DRV_KMODS	+= st

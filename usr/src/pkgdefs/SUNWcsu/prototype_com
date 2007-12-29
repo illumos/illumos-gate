@@ -364,6 +364,7 @@ f none usr/lib/devfsadm/linkmod/SUNW_misc_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_port_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_ramdisk_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_sgen_link.so 755 root sys
+f none usr/lib/devfsadm/linkmod/SUNW_smp_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_tape_link.so 755 root sys
 f none usr/lib/devfsadm/linkmod/SUNW_usb_link.so 755 root sys
 f none usr/lib/diffh 555 root bin

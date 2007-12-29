@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -63,6 +62,7 @@ LINK_OBJS_CMN =			\
 	ramdisk_link.o		\
 	fssnap_link.o           \
 	sgen_link.o		\
+	smp_link.o		\
 	md_link.o		\
 	dtrace_link.o		\
 	zfs_link.o

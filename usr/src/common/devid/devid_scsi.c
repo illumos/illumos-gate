@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -106,6 +108,8 @@ static void encode_sun_serialnum(int version, uchar_t *inq,
 static int devid_scsi_init(char *driver_name,
     uchar_t *raw_id, size_t raw_id_len, ushort_t raw_id_type,
     ddi_devid_t *ret_devid);
+
+static char ctoi(char c);
 
 /*
  *    Function: ddi_/devid_scsi_encode
@@ -1197,4 +1201,54 @@ devid_free_guid(char *guid)
 	if (guid != NULL) {
 		DEVID_FREE(guid, strlen(guid) + 1);
 	}
+}
+
+static char
+ctoi(char c)
+{
+	if ((c >= '0') && (c <= '9'))
+		c -= '0';
+	else if ((c >= 'A') && (c <= 'F'))
+		c = c - 'A' + 10;
+	else if ((c >= 'a') && (c <= 'f'))
+		c = c - 'a' + 10;
+	else
+		c = -1;
+	return (c);
+}
+
+/*
+ *    Function: devid_str_to_wwn
+ *
+ * Description: This routine translates wwn from string to uint64 type.
+ *
+ *   Arguments: string - the string wwn to be transformed
+ *              wwn - the pointer to 64 bit wwn
+ */
+int
+#ifdef  _KERNEL
+ddi_devid_str_to_wwn(const char *string, uint64_t *wwn)
+#else   /* !_KERNEL */
+devid_str_to_wwn(const char *string, uint64_t *wwn)
+#endif  /* _KERNEL */
+{
+	int i;
+	char cl, ch;
+	uint64_t tmp;
+
+	if (wwn == NULL || strlen(string) != 16) {
+		return (DDI_FAILURE);
+	}
+
+	*wwn = 0;
+	for (i = 0; i < 8; i++) {
+		ch = ctoi(*string++);
+		cl = ctoi(*string++);
+		if (cl == -1 || ch == -1) {
+			return (DDI_FAILURE);
+		}
+		tmp = (ch << 4) + cl;
+		*wwn = (*wwn << 8) | tmp;
+	}
+	return (DDI_SUCCESS);
 }

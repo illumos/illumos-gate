@@ -668,7 +668,7 @@ WC_OBJS += wscons.o
 SCSI_OBJS +=	scsi_capabilities.o	scsi_control.o	scsi_watch.o \
 		scsi_data.o	scsi_resource.o		scsi_subr.o	\
 		scsi_hba.o	scsi_transport.o	scsi_confsubr.o \
-		scsi_reset_notify.o
+		scsi_reset_notify.o sas_transport.o
 
 SCSI_VHCI_OBJS +=		scsi_vhci.o mpapi_impl.o
 
@@ -679,6 +679,8 @@ SCSI_VHCI_F_TPGS_OBJS +=	tpgs.o
 SCSI_VHCI_F_ASYM_SUN_OBJS +=	asym_sun.o
 
 SGEN_OBJS +=	sgen.o
+
+SMP_OBJS +=	smp.o
 
 SATA_OBJS +=	sata.o
 

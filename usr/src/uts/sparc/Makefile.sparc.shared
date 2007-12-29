@@ -285,6 +285,7 @@ DRV_KMODS	+= i8042 kb8042 mouse8042
 DRV_KMODS	+= fcode
 DRV_KMODS	+= socal
 DRV_KMODS	+= sgen
+DRV_KMODS	+= smp
 DRV_KMODS	+= dad
 DRV_KMODS	+= scsi_vhci
 

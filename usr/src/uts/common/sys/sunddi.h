@@ -191,6 +191,8 @@ extern "C" {
 
 #define	DDI_NT_UGEN	"ddi_generic:usb"	/* USB generic drv */
 
+#define	DDI_NT_SMP	"ddi_sas_smp" 		/* smp devcies */
+
 #define	DDI_NT_NEXUS	"ddi_ctl:devctl"	/* nexus drivers */
 
 #define	DDI_NT_SCSI_NEXUS	"ddi_ctl:devctl:scsi"	/* nexus drivers */
@@ -1969,6 +1971,9 @@ char
 
 void
 ddi_devid_free_guid(char *guid);
+
+int
+ddi_devid_str_to_wwn(const char *string, uint64_t *wwn);
 
 int
 ddi_lyr_get_devid(dev_t dev, ddi_devid_t *ret_devid);

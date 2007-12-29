@@ -18,41 +18,53 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_SCSI_IMPL_TYPES_H
-#define	_SYS_SCSI_IMPL_TYPES_H
+#ifndef _SYS_SCSI_TARGETS_SMP_H
+#define	_SYS_SCSI_TARGETS_SMP_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+#include <sys/scsi/scsi.h>
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#if defined(_KERNEL)
+
 /*
- * Local Types for SCSI subsystems
+ * smp_open_flag: field indicating open smp instance.
+ *	0 = closed, 1 = shared open, 2 = exclusive open.
  */
+#define	SMP_CLOSED	0
+#define	SMP_SOPENED	1
+#define	SMP_EXOPENED	2
 
-#ifdef	_KERNEL
+typedef struct smp_state {
+	struct smp_device *smp_dev;		/* pointer to smp_device */
+	kmutex_t smp_mutex;			/* mutex */
+	uint32_t smp_open_flag;		/* open flag */
+	uint32_t smp_open_ref;		/* shared open count */
+} smp_state_t;
 
-#include <sys/kmem.h>
-#include <sys/map.h>
-#include <sys/open.h>
-#include <sys/uio.h>
-#include <sys/sysmacros.h>
+#define	SMP_ESTIMATED_NUM_DEVS	4		/* for soft-state allocation */
+#define	SMP_DEFAULT_RETRY_TIMES	3
 
-#include <sys/buf.h>
-#include <sys/errno.h>
-#include <sys/fcntl.h>
-#include <sys/ioctl.h>
+#define	SMP_FLAG_REQBUF		0x1
+#define	SMP_FLAG_RSPBUF		0x2
+#define	SMP_FLAG_XFER			0x4
 
-#include <sys/conf.h>
+#endif /* defined(_KERNEL) */
 
-#include <sys/scsi/impl/services.h>
-#include <sys/scsi/impl/transport.h>
-#include <sys/scsi/impl/sas_transport.h>
 
-#endif	/* _KERNEL */
+#ifdef	__cplusplus
+}
+#endif
 
-#include <sys/scsi/impl/uscsi.h>
-
-#endif	/* _SYS_SCSI_IMPL_TYPES_H */
+#endif	/* _SYS_SCSI_TARGETS_SMP_H */

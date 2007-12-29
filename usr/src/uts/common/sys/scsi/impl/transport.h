@@ -34,7 +34,6 @@
 #include <sys/modctl.h>
 #include <sys/note.h>
 
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -274,7 +273,9 @@ struct scsi_hba_tran {
 				struct scsi_pkt		*pkt);
 	ddi_dma_attr_t	tran_dma_attr;
 
+	void		*tran_extension;
 };
+
 
 #ifdef __lock_lint
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_hba_tran::tran_sd))
@@ -328,6 +329,15 @@ extern int		scsi_hba_detach(
 extern scsi_hba_tran_t	*scsi_hba_tran_alloc(
 				dev_info_t		*hba_dip,
 				int			flags);
+
+extern int		scsi_tran_ext_alloc(
+				scsi_hba_tran_t		*hba_tran,
+				size_t			length,
+				int			flags);
+
+extern void		scsi_tran_ext_free(
+				scsi_hba_tran_t		*hba_tran,
+				size_t			length);
 
 extern void		scsi_hba_tran_free(
 				scsi_hba_tran_t		*hba_tran);

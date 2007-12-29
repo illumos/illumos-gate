@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1340,7 +1340,9 @@ typedef struct config_page_sas_io_unit_3 {
 
 typedef struct config_page_sas_expander_0 {
 	config_extended_page_header_t	Header;
-	uint32_t			Reserved1;
+	uint8_t				PhysicalPort;
+	uint8_t				Reserved1;
+	uint16_t			EnclosureHandle;
 	uint64_t			SASAddress;
 	uint32_t			Reserved2;
 	uint16_t			DevHandle;

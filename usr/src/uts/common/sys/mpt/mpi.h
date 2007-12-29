@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -596,6 +596,7 @@ typedef struct msg_default_reply {
  * SAS values
  */
 #define	MPI_IOCSTATUS_SAS_SMP_REQUEST_FAILED		0x0090
+#define	MPI_IOCSTATUS_SAS_SMP_DATA_OVERRUN		0x0091
 
 /*
  * Inband values
@@ -624,6 +625,47 @@ typedef struct msg_default_reply {
 #define	MPI_IOCLOGINFO_TYPE_SAS				0x3
 #define	MPI_IOCLOGINFO_TYPE_ISCSI			0x4
 #define	MPI_IOCLOGINFO_LOG_DATA_MASK			0x0FFFFFFF
+
+/*
+ * SMP passthrough messages
+ */
+typedef struct msg_smp_passthrough {
+	uint8_t			Flags;
+	uint8_t			PhysicalPort;
+	uint8_t			ChainOffset;
+	uint8_t			Function;
+	uint16_t		RequestDataLength;
+	uint8_t			ConnectionRate;
+	uint8_t			MsgFlags;
+	uint32_t		MsgContext;
+	uint8_t			Reserved[4];
+	uint64_t		SASAddress;
+	uint8_t			Reserved1[8];
+} msg_smp_passthrough_t;
+
+
+/* SMP passthrough Reply */
+
+typedef struct msg_smp_passthrough_reply {
+	uint8_t			Flags;
+	uint8_t			PhysicalPort;
+	uint8_t			MsgLength;
+	uint8_t			Function;
+	uint16_t		ResponseDataLength;
+	uint8_t			Reserved;
+	uint8_t			MsgFlags;
+	uint32_t		MsgContext;
+	uint8_t			Reserved1;
+	uint8_t			SASStatus;
+	uint16_t		IOCStatus;
+	uint32_t		IOCLogInfo;
+	uint8_t			Reserved2[4];
+} msg_smp_passthrough_reply_t;
+
+#define	MPI_SMP_PT_REQ_CONNECT_RATE_NEGOTIATED	(0x00)
+#define	MPI_SMP_PT_REQ_CONNECT_RATE_1_5		(0x08)
+#define	MPI_SMP_PT_REQ_CONNECT_RATE_3_0		(0x09)
+#define	MPI_SASSTATUS_SUCCESS			0
 
 #ifdef	__cplusplus
 }

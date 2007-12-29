@@ -1150,11 +1150,13 @@ f none usr/include/sys/scsi/generic/message.h 644 root bin
 f none usr/include/sys/scsi/generic/mode.h 644 root bin
 f none usr/include/sys/scsi/generic/persist.h 644 root bin
 f none usr/include/sys/scsi/generic/sense.h 644 root bin
+f none usr/include/sys/scsi/generic/smp_frames.h 644 root bin
 f none usr/include/sys/scsi/generic/status.h 644 root bin
 d none usr/include/sys/scsi/impl 755 root bin
 f none usr/include/sys/scsi/impl/commands.h 644 root bin
 f none usr/include/sys/scsi/impl/inquiry.h 644 root bin
 f none usr/include/sys/scsi/impl/mode.h 644 root bin
+f none usr/include/sys/scsi/impl/sas_transport.h 644 root bin
 f none usr/include/sys/scsi/impl/scsi_reset_notify.h 644 root bin
 f none usr/include/sys/scsi/impl/sense.h 644 root bin
 f none usr/include/sys/scsi/impl/services.h 644 root bin
@@ -1162,6 +1164,7 @@ f none usr/include/sys/scsi/impl/status.h 644 root bin
 f none usr/include/sys/scsi/impl/transport.h 644 root bin
 f none usr/include/sys/scsi/impl/types.h 644 root bin
 f none usr/include/sys/scsi/impl/uscsi.h 644 root bin
+f none usr/include/sys/scsi/impl/usmp.h 644 root bin
 f none usr/include/sys/scsi/scsi.h 644 root bin
 f none usr/include/sys/scsi/scsi_address.h 644 root bin
 f none usr/include/sys/scsi/scsi_ctl.h 644 root bin
@@ -1175,6 +1178,7 @@ f none usr/include/sys/scsi/targets/ses.h 644 root bin
 f none usr/include/sys/scsi/targets/sesio.h 644 root bin
 f none usr/include/sys/scsi/targets/sgendef.h 644 root bin
 f none usr/include/sys/scsi/targets/sddef.h 644 root bin
+f none usr/include/sys/scsi/targets/smp.h 644 root bin
 f none usr/include/sys/select.h 644 root bin
 f none usr/include/sys/sem.h 644 root bin
 f none usr/include/sys/sem_impl.h 644 root bin
