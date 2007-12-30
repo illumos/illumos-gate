@@ -1515,8 +1515,14 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	ASSERT(bp->b_cont == NULL);
 	bp->b_cont = payload;
 
-	dld_tx_single(dsp, bp);
+	/*
+	 * No lock can be held across putnext, which can be called
+	 * from here in dld_tx_single(). The config is held constant
+	 * by the DLD_ENTER done in dld_wput()/dld_wsrv until all
+	 * sending threads are done.
+	 */
 	rw_exit(&dsp->ds_lock);
+	dld_tx_single(dsp, bp);
 	return (B_TRUE);
 failed:
 	rw_exit(&dsp->ds_lock);

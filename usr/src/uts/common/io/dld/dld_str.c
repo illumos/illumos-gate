@@ -375,16 +375,25 @@ dld_wput(queue_t *wq, mblk_t *mp)
 
 	switch (DB_TYPE(mp)) {
 	case M_DATA:
+		/*
+		 * State is held constant by the DLD_ENTER done above
+		 * until all sending threads are done. Mode can change
+		 * due to ioctl, however locks must not be held across
+		 * calls to putnext(), which can be called from here
+		 * via dld_tx_single().
+		 */
 		rw_enter(&dsp->ds_lock, RW_READER);
 		if (dsp->ds_dlstate != DL_IDLE ||
 		    dsp->ds_mode == DLD_UNITDATA) {
+			rw_exit(&dsp->ds_lock);
 			freemsg(mp);
 		} else if (dsp->ds_mode == DLD_FASTPATH) {
+			rw_exit(&dsp->ds_lock);
 			str_mdata_fastpath_put(dsp, mp);
 		} else if (dsp->ds_mode == DLD_RAW) {
+			rw_exit(&dsp->ds_lock);
 			str_mdata_raw_put(dsp, mp);
 		}
-		rw_exit(&dsp->ds_lock);
 		break;
 	case M_PROTO:
 	case M_PCPROTO:
