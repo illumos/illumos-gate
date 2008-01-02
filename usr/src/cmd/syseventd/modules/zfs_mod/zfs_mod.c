@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,8 +227,7 @@ zfs_iter_vdev(zpool_handle_t *zhp, nvlist_t *nvl, void *data)
 	char *path;
 	uint_t c, children;
 	nvlist_t **child;
-	size_t len = strlen(dp->dd_compare);
-	uint64_t wholedisk = 0ULL;
+	size_t len;
 	uint64_t guid;
 
 	/*
@@ -241,14 +240,13 @@ zfs_iter_vdev(zpool_handle_t *zhp, nvlist_t *nvl, void *data)
 		return;
 	}
 
-	(void) nvlist_lookup_uint64(nvl, ZPOOL_CONFIG_WHOLE_DISK,
-	    &wholedisk);
-
 	if (dp->dd_vdev_guid != 0) {
 		if (nvlist_lookup_uint64(nvl, ZPOOL_CONFIG_GUID,
 		    &guid) != 0 || guid != dp->dd_vdev_guid)
 			return;
 	} else {
+		len = strlen(dp->dd_compare);
+
 		if (nvlist_lookup_string(nvl, dp->dd_prop, &path) != 0 ||
 		    strncmp(dp->dd_compare, path, len) != 0)
 			return;

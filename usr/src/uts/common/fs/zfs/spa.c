@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1334,7 +1334,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * unopenable vdevs so that the normal autoreplace handler can take
 	 * over.
 	 */
-	if (autoreplace)
+	if (autoreplace && state != SPA_LOAD_TRYIMPORT)
 		spa_check_removed(spa->spa_root_vdev);
 
 	/*
@@ -4344,6 +4344,10 @@ spa_event_notify(spa_t *spa, vdev_t *vd, const char *name)
 				goto done;
 		}
 	}
+
+	if (sysevent_attach_attributes(ev, attr) != 0)
+		goto done;
+	attr = NULL;
 
 	(void) log_sysevent(ev, SE_SLEEP, &eid);
 
