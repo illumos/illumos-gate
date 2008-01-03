@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -770,13 +770,14 @@ zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
 
 	while (acep = zfs_acl_next_ace(aclp, acep, &who,
 	    &access_mask, &iflags, &type)) {
-		entry_type = (iflags & ACE_TYPE_FLAGS);
 
 		/*
 		 * Skip over inherit only ACEs
 		 */
-		if (entry_type ==  ACE_INHERIT_ONLY_ACE)
+		if (iflags & ACE_INHERIT_ONLY_ACE)
 			continue;
+
+		entry_type = (iflags & ACE_TYPE_FLAGS);
 
 		if (entry_type == ACE_OWNER) {
 			if ((access_mask & ACE_READ_DATA) &&
