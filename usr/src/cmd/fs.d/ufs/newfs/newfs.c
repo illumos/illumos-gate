@@ -25,7 +25,7 @@
 /*
  * newfs: friendly front end to mkfs
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -616,12 +616,7 @@ main(int argc, char *argv[])
 		if (!yes())
 			exit(0);
 	}
-	/*
-	 * Geometry information does not make sense for removable media
-	 * anyway, so indicate mkfs to use the default parameters by passing -1.
-	 */
-	if (!Tflag && isremovable)
-		ntracks = -1;
+
 	dprintf(("DeBuG newfs : nsect=%d ntrak=%d cpg=%d\n",
 	    nsectors, ntracks, cpg));
 	/*
@@ -734,24 +729,30 @@ getdiskbydev(char *disk)
 	 */
 	actual_size = get_device_size(fd, disk);
 
-	if (ioctl(fd, DKIOCREMOVABLE, &isremovable)) {
-		(void) fprintf(stderr, gettext(
-		    "%s: Unable to find Media type. Proceeding with "
-		    "system determined parameters.\n"), disk);
-		isremovable = 0;
-	}
-
 	if (label_type == LABEL_TYPE_VTOC) {
+		/*
+		 * Geometry information does not make sense for removable media
+		 * anyway, so indicate mkfs to use EFI default parameters.
+		 */
+		if (ioctl(fd, DKIOCREMOVABLE, &isremovable)) {
+			dprintf(("DeBuG newfs : Unable to determine if %s is"
+			    " Removable Media. Proceeding with system"
+			    " determined parameters.\n", disk));
+			isremovable = 0;
+		} else if (isremovable && !Tflag)
+			use_efi_dflts = 1;
+
 		if (ioctl(fd, DKIOCGGEOM, &g))
 			fatal(gettext(
 			    "%s: Unable to read Disk geometry"), disk);
-		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d\n",
-		    g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT));
 		if (((g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect) > CHSLIMIT) &&
 		    !Tflag) {
-			dprintf(("DeBuG newfs : geom > CHSLIMIT\n"));
 			use_efi_dflts = 1;
 		}
+		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d "
+		    "isremovable = %d use_efi_dflts = %d\n",
+		    g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT,
+		    isremovable, use_efi_dflts));
 		/*
 		 * The ntracks that is passed to mkfs is decided here based
 		 * on 'use_efi_dflts' and whether ntracks was specified as a
