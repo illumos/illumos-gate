@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 #LIBRARY= libmd.a
 VERS= .1
 
-OBJECTS= md4.o md5.o sha1.o sha2.o
+OBJECTS= md4.o md5.o $(MD5_PSR_OBJECTS) sha1.o sha2.o
 
 # Use $(SRC) to include makefiles rather than ../../ because the 
 # platform subdirs are one level deeper so it would be ../../../ for them

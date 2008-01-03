@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,8 +51,14 @@
 #endif /* _KERNEL */
 
 static void Encode(uint8_t *, const uint32_t *, size_t);
+
+#if !defined(__amd64)
 static void MD5Transform(uint32_t, uint32_t, uint32_t, uint32_t, MD5_CTX *,
     const uint8_t [64]);
+#else
+void md5_block_asm_host_order(MD5_CTX *ctx, const void *inpp,
+    unsigned int input_length_in_blocks);
+#endif /* !defined(__amd64) */
 
 static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
 
@@ -243,6 +249,9 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 #ifdef	sun4v
 	uint32_t		old_asi;
 #endif	/* sun4v */
+#if defined(__amd64)
+	uint32_t		block_count;
+#endif /* !defined(__amd64) */
 	const unsigned char 	*input = (const unsigned char *)inpp;
 
 	/* compute (number of bytes computed so far) mod 64 */
@@ -250,7 +259,7 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 
 	/* update number of bits hashed into this MD5 computation so far */
 	if ((ctx->count[0] += (input_len << 3)) < (input_len << 3))
-	    ctx->count[1]++;
+		ctx->count[1]++;
 	ctx->count[1] += (input_len >> 29);
 
 	buf_len = 64 - buf_index;
@@ -282,16 +291,29 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
 		if (buf_index) {
 			bcopy(input, &ctx->buf_un.buf8[buf_index], buf_len);
 
+#if !defined(__amd64)
 			MD5Transform(ctx->state[0], ctx->state[1],
 			    ctx->state[2], ctx->state[3], ctx,
 			    ctx->buf_un.buf8);
+#else
+			md5_block_asm_host_order(ctx, ctx->buf_un.buf8, 1);
+#endif /* !defined(__amd64) */
 
 			i = buf_len;
 		}
 
+#if !defined(__amd64)
 		for (; i + 63 < input_len; i += 64)
 			MD5Transform(ctx->state[0], ctx->state[1],
 			    ctx->state[2], ctx->state[3], ctx, &input[i]);
+
+#else
+		block_count = (input_len - i) >> 6;
+		if (block_count > 0) {
+			md5_block_asm_host_order(ctx, &input[i], block_count);
+			i += block_count << 6;
+		}
+#endif /* !defined(__amd64) */
 
 
 #ifdef sun4v
@@ -367,6 +389,7 @@ md5_calc(unsigned char *output, unsigned char *input, unsigned int inlen)
 
 #endif	/* !_KERNEL */
 
+#if !defined(__amd64)
 /*
  * sparc register window optimization:
  *
@@ -635,6 +658,7 @@ MD5Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d,
 	x_0 = x_1  = x_2  = x_3  = x_4  = x_5  = x_6  = x_7 = x_8 = 0;
 	x_9 = x_10 = x_11 = x_12 = x_13 = x_14 = x_15 = 0;
 }
+#endif /* !defined(__amd64) */
 
 /*
  * Encode()

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,21 @@
 
 LIBRARY= libmd.a
 
+MD5_PSR_OBJECTS = md5_amd64.o
+
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
+CLEANFILES += md5_amd64.s
+
+# This prevents <sys/asm_linkage.h> from including C source:
+AS_CPPFLAGS += -D_ASM
+
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
+
+md5_amd64.s: $(COMDIR)/md5/amd64/md5_amd64.pl
+	$(PERL) $? $@
+
+pics/md5_amd64.o: md5_amd64.s
+	$(COMPILE.s) -o $@ md5_amd64.s
+	$(POST_PROCESS_O)

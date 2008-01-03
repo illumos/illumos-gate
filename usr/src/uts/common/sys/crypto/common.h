@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,12 +185,17 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_ECDSA			"CKM_ECDSA"
 
 /* Shared operation context format for CKM_RC4 */
+#if defined(__amd64)
+typedef uint64_t arcfour_key_int_t;
+#else
+typedef uchar_t arcfour_key_int_t;
+#endif /* __amd64 */
+
 typedef struct {
-	uchar_t arr[256];
-	uchar_t i, j;
+	arcfour_key_int_t arr[256];
+	arcfour_key_int_t i, j;
 	uint64_t pad;		/* For 64-bit alignment */
 } arcfour_state_t;
-
 
 /* Data arguments of cryptographic operations */
 

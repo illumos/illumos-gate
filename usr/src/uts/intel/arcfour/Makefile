@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ARCFOUR KEF provider.
 #
@@ -33,14 +33,17 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR = $(SRC)/common/crypto/arcfour
+COM_DIR = $(COMMONBASE)/crypto/arcfour
 
 #
 #	Define the module and object file sets.
 #
 MODULE		= arcfour
-OBJECTS		= $(ARCFOURPROV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ARCFOURPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ARCFOURPROV_OBJS_32 =
+ARCFOURPROV_OBJS_64 = arcfour_crypt_amd64.o
+ARCFOURPROV_OBJS += $(ARCFOURPROV_OBJS_$(CLASS))
+OBJECTS		= $(ARCFOURPROV_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 
 #
@@ -95,3 +98,11 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+$(OBJS_DIR)/arcfour_crypt_amd64.o: $(COM_DIR)/amd64/arcfour_crypt_amd64.s
+	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/arcfour_crypt_amd64.s
+	$(POST_PROCESS_O)
+
+$(OBJS_DIR)/arcfour_crypt_amd64.ln: $(COM_DIR)/amd64/arcfour_crypt_amd64.s
+	@($(LHEAD) $(LINT.c) $(COM_DIR)/amd64/arcfour_crypt_amd64.s $(LTAIL))
+
