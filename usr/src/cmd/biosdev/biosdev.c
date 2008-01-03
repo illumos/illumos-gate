@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -326,10 +326,16 @@ search_children_match_busaddr(di_node_t node, char *matchbusaddr)
 {
 	di_node_t cnode;
 	char *busaddr;
+	di_path_t pi = DI_PATH_NIL;
+	char pbuf[MAXPATHLEN];
 
 	if (matchbusaddr == NULL)
 		return (DI_NODE_NIL);
 
+	while ((pi = di_path_next_client(node, pi)) != DI_PATH_NIL)
+		if (strncmp(di_path_addr(pi, pbuf),  matchbusaddr, MAXPATHLEN)
+		    == 0)
+			return (di_path_client_node(pi));
 
 	for (cnode = di_child_node(node); cnode != DI_NODE_NIL;
 	    cnode = di_sibling_node(cnode)) {
