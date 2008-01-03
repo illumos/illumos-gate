@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,9 @@ extern "C" {
 
 #define	NB_5000_MAX_MEM_CONTROLLERS	2
 #define	NB_MEM_BRANCH_SELECT		3
-#define	NB_MEM_RANK_SELECT		5
+#define	NB_MAX_MEM_BRANCH_SELECT	3
+#define	NB_MEM_RANK_SELECT		(nb_chipset == INTEL_NB_7300 ? 7 : 5)
+#define	NB_MAX_MEM_RANK_SELECT		7
 #define	NB_RANKS_IN_SELECT		4
 #define	NB_PCI_DEV			8
 
@@ -60,8 +62,8 @@ extern "C" {
 
 #define	TLOW_MAX	0x100000000ULL
 
-#define	MTR_PRESENT(mtr)	((mtr) & 0x10)
-#define	MTR_ETHROTTLE(mtr)	((mtr) & 8)
+#define	MTR_PRESENT(mtr) ((mtr) & 0x0100)
+#define	MTR_ETHROTTLE(mtr) 	((mtr) & 0x0080)
 #define	MTR_WIDTH(mtr)		(((((mtr) >> 6) & 1) + 1) * 4)
 #define	MTR_NUMBANK(mtr)	(((((mtr) >> 5) & 1) + 1) * 4)
 #define	MTR_NUMRANK(mtr)	((((mtr) >> 4) & 1) + 1)
@@ -597,38 +599,74 @@ extern "C" {
 
 #define	NRECMEMA_RD()	nb_pci_getw(0, 16, 1, 0xbe, 0)
 #define	NRECMEMB_RD()	nb_pci_getl(0, 16, 1, 0xc0, 0)
-#define	NRECFGLOG_RD()	nb_pci_getl(0, 16, 1, 0xc4, 0)
-#define	NRECFBDA_RD()	nb_pci_getl(0, 16, 1, 0xc8, 0)
-#define	NRECFBDB_RD()	nb_pci_getl(0, 16, 1, 0xcc, 0)
-#define	NRECFBDC_RD()	nb_pci_getl(0, 16, 1, 0xd0, 0)
-#define	NRECFBDD_RD()	nb_pci_getl(0, 16, 1, 0xd4, 0)
-#define	NRECFBDE_RD()	nb_pci_getl(0, 16, 1, 0xd8, 0)
-#define	REDMEMB_RD()	nb_pci_getl(0, 16, 1, 0x7c, 0)
-#define	RECMEMA_RD()	nb_pci_getw(0, 16, 1, 0xe2, 0)
-#define	RECMEMB_RD()	nb_pci_getl(0, 16, 1, 0xe4, 0)
-#define	RECFGLOG_RD()	nb_pci_getl(0, 16, 1, 0xe8, 0)
-#define	RECFBDA_RD()	nb_pci_getl(0, 16, 1, 0xec, 0)
-#define	RECFBDB_RD()	nb_pci_getl(0, 16, 1, 0xf0, 0)
-#define	RECFBDC_RD()	nb_pci_getl(0, 16, 1, 0xf4, 0)
-#define	RECFBDD_RD()	nb_pci_getl(0, 16, 1, 0xf8, 0)
-#define	RECFBDE_RD()	nb_pci_getl(0, 16, 1, 0xfc, 0)
-#define	NRECMEMA_WR()	nb_pci_putw(0, 16, 1, 0xbe, 0)
-#define	NRECMEMB_WR()	nb_pci_putl(0, 16, 1, 0xc0, 0)
-#define	NRECFGLOG_WR()	nb_pci_putl(0, 16, 1, 0xc4, 0)
-#define	NRECFBDA_WR()	nb_pci_putl(0, 16, 1, 0xc8, 0)
-#define	NRECFBDB_WR()	nb_pci_putl(0, 16, 1, 0xcc, 0)
-#define	NRECFBDC_WR()	nb_pci_putl(0, 16, 1, 0xd0, 0)
-#define	NRECFBDD_WR()	nb_pci_putl(0, 16, 1, 0xd4, 0)
-#define	NRECFBDE_WR()	nb_pci_putl(0, 16, 1, 0xd8, 0)
-#define	REDMEMB_WR()	nb_pci_putl(0, 16, 1, 0x7c, 0)
-#define	RECMEMA_WR()	nb_pci_putw(0, 16, 1, 0xe2, 0)
-#define	RECMEMB_WR()	nb_pci_putl(0, 16, 1, 0xe4, 0)
-#define	RECFGLOG_WR()	nb_pci_putl(0, 16, 1, 0xe8, 0)
-#define	RECFBDA_WR()	nb_pci_putl(0, 16, 1, 0xec, 0)
-#define	RECFBDB_WR()	nb_pci_putl(0, 16, 1, 0xf0, 0)
-#define	RECFBDC_WR()	nb_pci_putl(0, 16, 1, 0xf4, 0)
-#define	RECFBDD_WR()	nb_pci_putl(0, 16, 1, 0xf8, 0)
-#define	RECFBDE_WR()	nb_pci_putl(0, 16, 1, 0xfc, 0)
+#define	NRECFGLOG_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0x74 : 0xc4, 0)
+#define	NRECFBDA_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xc4 : 0xc8, 0)
+#define	NRECFBDB_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xc8 : 0xcc, 0)
+#define	NRECFBDC_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xcc : 0xd0, 0)
+#define	NRECFBDD_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xd0 : 0xd4, 0)
+#define	NRECFBDE_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xd4 : 0xd8, 0)
+#define	NRECFBDF_RD() \
+	(nb_chipset == INTEL_NB_7300 ? nb_pci_getw(0, 16, 1, 0xd8, 0) : 0)
+#define	REDMEMB_RD() nb_pci_getl(0, 16, 1, 0x7c, 0)
+#define	RECMEMA_RD() \
+	nb_pci_getw(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xe0 : 0xe2, 0)
+#define	RECMEMB_RD() 	nb_pci_getl(0, 16, 1, 0xe4, 0)
+#define	RECFGLOG_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0x78 : 0xe8, 0)
+#define	RECFBDA_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xe8 : 0xec, 0)
+#define	RECFBDB_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xec : 0xf0, 0)
+#define	RECFBDC_RD()	 \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf0 : 0xf4, 0)
+#define	RECFBDD_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf4 : 0xf8, 0)
+#define	RECFBDE_RD() \
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf8 : 0xfc, 0)
+#define	RECFBDF_RD() \
+	(nb_chipset == INTEL_NB_7300 ? nb_pci_getw(0, 16, 1, 0xfc, 0) : 0)
+#define	NRECMEMA_WR() 	nb_pci_putw(0, 16, 1, 0xbe, 0)
+#define	NRECMEMB_WR() 	nb_pci_putl(0, 16, 1, 0xc0, 0)
+#define	NRECFGLOG_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0x74 : 0xc4, 0);
+#define	NRECFBDA_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xc4 : 0xc8, 0);
+#define	NRECFBDB_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xc8 : 0xcc, 0);
+#define	NRECFBDC_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xcc : 0xd0, 0);
+#define	NRECFBDD_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xd0 : 0xd4, 0);
+#define	NRECFBDE_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xd4 : 0xd8, 0);
+#define	NRECFBDF_WR() \
+	if (nb_chipset == INTEL_NB_7300) \
+		nb_pci_putw(0, 16, 1, 0xd8, 0);
+#define	REDMEMB_WR() 	nb_pci_putl(0, 16, 1, 0x7c, 0)
+#define	RECMEMA_WR() \
+	nb_pci_putw(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xe0 : 0xe2, 0)
+#define	RECMEMB_WR() 	nb_pci_putl(0, 16, 1, 0xe4, 0)
+#define	RECFGLOG_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0x78 : 0xe8, 0);
+#define	RECFBDA_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xe8 : 0xec, 0);
+#define	RECFBDB_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xec : 0xf0, 0);
+#define	RECFBDC_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf0 : 0xf4, 0);
+#define	RECFBDD_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf4 : 0xf8, 0);
+#define	RECFBDE_WR() \
+	nb_pci_putl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xf8 : 0xfc, 0);
+#define	RECFBDF_WR() \
+	if (nb_chipset == INTEL_NB_7300) \
+		nb_pci_putw(0, 16, 1, 0xf8, 0); \
 
 #define	MC_RD()		nb_pci_getl(0, 16, 1, 0x40, 0)
 #define	MC_WR(val)	nb_pci_putl(0, 16, 1, 0x40, val)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -646,6 +646,7 @@ log_fat_fbd_err(nb_regs_t *rp, int *interpose)
 	rp->nb.fat_fbd_regs.nrecfbdc = NRECFBDC_RD();
 	rp->nb.fat_fbd_regs.nrecfbdd = NRECFBDD_RD();
 	rp->nb.fat_fbd_regs.nrecfbde = NRECFBDE_RD();
+	rp->nb.fat_fbd_regs.nrecfbdf = NRECFBDF_RD();
 	rp->nb.fat_fbd_regs.spcps = SPCPS_RD(branch);
 	rp->nb.fat_fbd_regs.spcpc = SPCPC_RD(branch);
 	rp->nb.fat_fbd_regs.uerrcnt = UERRCNT_RD(branch);
@@ -692,6 +693,7 @@ log_nf_fbd_err(nb_regs_t *rp, int *interpose)
 	rp->nb.nf_fbd_regs.recfbdc = RECFBDC_RD();
 	rp->nb.nf_fbd_regs.recfbdd = RECFBDD_RD();
 	rp->nb.nf_fbd_regs.recfbde = RECFBDE_RD();
+	rp->nb.nf_fbd_regs.recfbdf = RECFBDF_RD();
 	rp->nb.nf_fbd_regs.spcps = SPCPS_RD(branch);
 	rp->nb.nf_fbd_regs.spcpc = SPCPC_RD(branch);
 	rp->nb.nf_fbd_regs.cerrcnt = CERRCNT_RD(branch);
@@ -974,6 +976,8 @@ nb_fat_fbd_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nrecfbdd, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECFBDE,
 	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nrecfbde, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_NRECFBDF,
+	    DATA_TYPE_UINT32, nb_regs->nb.fat_fbd_regs.nrecfbdf, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SPCPS,
 	    DATA_TYPE_UINT8, nb_regs->nb.fat_fbd_regs.spcps, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SPCPC,
@@ -1046,6 +1050,8 @@ nb_nf_fbd_err_payload(const nb_regs_t *nb_regs, nvlist_t *payload,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.recfbdd, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECFBDE,
 	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.recfbde, NULL);
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RECFBDF,
+	    DATA_TYPE_UINT32, nb_regs->nb.nf_fbd_regs.recfbdf, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SPCPS,
 	    DATA_TYPE_UINT8, nb_regs->nb.nf_fbd_regs.spcps, NULL);
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_SPCPC,

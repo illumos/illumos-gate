@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,8 +62,8 @@ nb_dimm_t **nb_dimms;
 int nb_ndimm;
 uint32_t nb_chipset;
 enum nb_memory_mode nb_mode;
-bank_select_t nb_banks[NB_MEM_BRANCH_SELECT];
-rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS][NB_MEM_RANK_SELECT];
+bank_select_t nb_banks[NB_MAX_MEM_BRANCH_SELECT];
+rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS][NB_MAX_MEM_RANK_SELECT];
 uint32_t top_of_low_memory;
 uint8_t spare_rank[NB_5000_MAX_MEM_CONTROLLERS];
 
@@ -254,8 +254,6 @@ nb_dimm_init(int channel, int dimm, uint16_t mtr)
 		spd_sz = 176;
 	else
 		spd_sz = 256;
-	if (mtr & 0x10)
-		dp->mtr_present = 1;
 	dp->manufacture_id = read_spd_eeprom(channel, dimm, 117) |
 	    (read_spd_eeprom(channel, dimm, 118) << 8);
 	dp->manufacture_location = read_spd_eeprom(channel, dimm, 119);
@@ -277,6 +275,7 @@ nb_dimm_init(int channel, int dimm, uint16_t mtr)
 			    read_spd_eeprom(channel, dimm, 146 + i);
 		}
 	}
+	dp->mtr_present = MTR_PRESENT(mtr);
 	dp->nranks = MTR_NUMRANK(mtr);
 	dp->nbanks = MTR_NUMBANK(mtr);
 	dp->ncolumn = MTR_NUMCOL(mtr);

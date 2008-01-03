@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,7 @@ typedef struct nb_fat_fbd {
 	uint32_t nrecfbdc;	/* non recoverable dimm log C */
 	uint32_t nrecfbdd;	/* non recoverable dimm log D */
 	uint32_t nrecfbde;	/* non recoverable dimm log E */
+	uint32_t nrecfbdf;	/* non recoverable dimm log F */
 	uint32_t spcpc;		/* spare copy control */
 	uint8_t spcps;		/* spare copy status */
 	uint32_t uerrcnt;	/* uncorrectable error count */
@@ -115,6 +116,7 @@ typedef struct nb_nf_fbd {
 	uint32_t recfbdc;	/* recoverable dimm log C */
 	uint32_t recfbdd;	/* recoverable dimm log D */
 	uint32_t recfbde;	/* recoverable dimm log E */
+	uint32_t recfbdf;	/* recoverable dimm log F */
 	uint32_t spcpc;		/* spare copy control */
 	uint8_t spcps;		/* spare copy status */
 	uint32_t cerrcnt;	/* correctable error count */
@@ -226,8 +228,9 @@ extern void nb_dev_reinit(void);
 extern void nb_unload(void);
 extern void nb_dev_unload(void);
 extern uint32_t top_of_low_memory;
-extern bank_select_t nb_banks[NB_MEM_BRANCH_SELECT];
-extern rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS][NB_MEM_RANK_SELECT];
+extern bank_select_t nb_banks[NB_MAX_MEM_BRANCH_SELECT];
+extern rank_select_t nb_ranks[NB_5000_MAX_MEM_CONTROLLERS]
+	[NB_MAX_MEM_RANK_SELECT];
 extern uint8_t spare_rank[NB_5000_MAX_MEM_CONTROLLERS];
 extern enum nb_memory_mode nb_mode;
 

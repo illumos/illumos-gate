@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,7 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_NRECFBDC		"nrecfbdc"
 #define	FM_EREPORT_PAYLOAD_NAME_NRECFBDD		"nrecfbdd"
 #define	FM_EREPORT_PAYLOAD_NAME_NRECFBDE		"nrecfbde"
+#define	FM_EREPORT_PAYLOAD_NAME_NRECFBDF		"nrecfbdf"
 #define	FM_EREPORT_PAYLOAD_NAME_SPCPC			"spcpc"
 #define	FM_EREPORT_PAYLOAD_NAME_SPCPS			"spcps"
 #define	FM_EREPORT_PAYLOAD_NAME_UERRCNT			"uerrcnt"
@@ -123,6 +124,7 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDC			"recfbdc"
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDD			"recfbdd"
 #define	FM_EREPORT_PAYLOAD_NAME_RECFBDE			"recfbde"
+#define	FM_EREPORT_PAYLOAD_NAME_RECFBDF			"recfbdf"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT			"cerrcnt"
 #define	FM_EREPORT_PAYLOAD_NAME_CERRCNT_LAST		"cerrcnt_last"
 #define	FM_EREPORT_PAYLOAD_NAME_PCISTS			"pcists"
