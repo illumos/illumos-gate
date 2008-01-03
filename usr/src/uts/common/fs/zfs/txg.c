@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,15 @@ txg_init(dsl_pool_t *dp, uint64_t txg)
 
 	tx->tx_cpu = kmem_zalloc(max_ncpus * sizeof (tx_cpu_t), KM_SLEEP);
 
-	for (c = 0; c < max_ncpus; c++)
+	for (c = 0; c < max_ncpus; c++) {
+		int i;
+
 		mutex_init(&tx->tx_cpu[c].tc_lock, NULL, MUTEX_DEFAULT, NULL);
+		for (i = 0; i < TXG_SIZE; i++) {
+			cv_init(&tx->tx_cpu[c].tc_cv[i], NULL, CV_DEFAULT,
+			    NULL);
+		}
+	}
 
 	rw_init(&tx->tx_suspend, NULL, RW_DEFAULT, NULL);
 	mutex_init(&tx->tx_sync_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -76,8 +83,13 @@ txg_fini(dsl_pool_t *dp)
 	rw_destroy(&tx->tx_suspend);
 	mutex_destroy(&tx->tx_sync_lock);
 
-	for (c = 0; c < max_ncpus; c++)
+	for (c = 0; c < max_ncpus; c++) {
+		int i;
+
 		mutex_destroy(&tx->tx_cpu[c].tc_lock);
+		for (i = 0; i < TXG_SIZE; i++)
+			cv_destroy(&tx->tx_cpu[c].tc_cv[i]);
+	}
 
 	kmem_free(tx->tx_cpu, max_ncpus * sizeof (tx_cpu_t));
 
@@ -307,8 +319,7 @@ txg_sync_thread(dsl_pool_t *dp)
 		rw_exit(&tx->tx_suspend);
 
 		dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
-			txg, tx->tx_quiesce_txg_waiting,
-			tx->tx_sync_txg_waiting);
+		    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);
 		mutex_exit(&tx->tx_sync_lock);
 		spa_sync(dp->dp_spa, txg);
 		mutex_enter(&tx->tx_sync_lock);

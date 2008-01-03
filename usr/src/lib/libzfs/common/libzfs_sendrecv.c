@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,7 +426,7 @@ dump_ioctl(zfs_handle_t *zhp, const char *fromsnap, boolean_t fromorigin,
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	if (fromsnap)
-		(void) strlcpy(zc.zc_value, fromsnap, sizeof (zc.zc_name));
+		(void) strlcpy(zc.zc_value, fromsnap, sizeof (zc.zc_value));
 	zc.zc_cookie = outfd;
 	zc.zc_obj = fromorigin;
 
