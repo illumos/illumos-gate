@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -41,6 +41,7 @@
 #include <sys/sockio.h>
 #include <net/if.h>
 #include <sys/systm.h>
+#include <sys/strsubr.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <net/if_dl.h>
@@ -1200,6 +1201,8 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 			mp->b_wptr += hdrsz;
 			mp->b_cont = mp_orig;
 			mp_orig->b_rptr += hdrsz;
+			if (is_system_labeled() && DB_CRED(mp_orig) != NULL)
+				mblk_setcred(mp, DB_CRED(mp_orig));
 			if (MBLKL(mp_orig) == 0) {
 				mp->b_cont = mp_orig->b_cont;
 				mp_orig->b_cont = NULL;
