@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1680,18 +1680,23 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 
 		KMEM_FREE(rx_msg_p, sizeof (rx_msg_t));
 
-		/* Decrement the receive buffer ring's reference count, too. */
-		atomic_dec_32(&ring->rbr_ref_cnt);
+		if (ring) {
+			/*
+			 * Decrement the receive buffer ring's reference
+			 * count, too.
+			 */
+			atomic_dec_32(&ring->rbr_ref_cnt);
 
-		/*
-		 * Free the receive buffer ring, iff
-		 * 1. all the receive buffers have been freed
-		 * 2. and we are in the proper state (that is,
-		 *    we are not UNMAPPING).
-		 */
-		if (ring->rbr_ref_cnt == 0 &&
-		    ring->rbr_state == RBR_UNMAPPED) {
-			KMEM_FREE(ring, sizeof (*ring));
+			/*
+			 * Free the receive buffer ring, iff
+			 * 1. all the receive buffers have been freed
+			 * 2. and we are in the proper state (that is,
+			 *    we are not UNMAPPING).
+			 */
+			if (ring->rbr_ref_cnt == 0 &&
+			    ring->rbr_state == RBR_UNMAPPED) {
+				KMEM_FREE(ring, sizeof (*ring));
+			}
 		}
 		return;
 	}
@@ -1699,7 +1704,7 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	/*
 	 * Repost buffer.
 	 */
-	if (free_state && (ref_cnt == 1)) {
+	if (free_state && (ref_cnt == 1) && ring) {
 		NXGE_DEBUG_MSG((NULL, RX_CTL,
 		    "nxge_freeb: post page $%p:", rx_msg_p));
 		if (ring->rbr_state == RBR_POSTING)

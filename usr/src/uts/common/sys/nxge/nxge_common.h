@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,11 @@ extern "C" {
 #define	NXGE_RBR_RBB_DEFAULT	512
 #define	NXGE_RBR_SPARE		0
 #else
+#if	defined(__i386)
+#define	NXGE_RBR_RBB_DEFAULT	256
+#else
 #define	NXGE_RBR_RBB_DEFAULT	(64 * 16) /* x86 hello */
+#endif
 #define	NXGE_RBR_SPARE		0
 #endif
 
@@ -104,11 +108,20 @@ extern "C" {
 #define	NXGE_RCR_DEFAULT	(NXGE_RBR_RBB_DEFAULT * 4)
 #endif
 #endif
+#if	defined(__i386)
+#define	NXGE_TX_RING_DEFAULT	(256)
+#else
 #define	NXGE_TX_RING_DEFAULT	(1024)
+#endif
 #define	NXGE_TX_RING_MAX	(64 * 128 - 1)
+#else
+#if	defined(__i386)
+#define	NXGE_RCR_DEFAULT	(256)
+#define	NXGE_TX_RING_DEFAULT	(256)
 #else
 #define	NXGE_RCR_DEFAULT	(512)
 #define	NXGE_TX_RING_DEFAULT	(512)
+#endif
 #define	NXGE_RCR_MAX		(1024)
 #define	NXGE_TX_RING_MAX	(1024)
 #endif
