@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,6 +339,11 @@ vntsd_read_data(vntsd_client_t *clientp, char *c)
 		}
 
 		if (rv == VNTSD_STATUS_CONTINUE) {
+			/*
+			 * either a daemon cmd or a telnet cmd
+			 * was processed.
+			 */
+			clientp->prev_char = 0;
 			continue;
 		}
 

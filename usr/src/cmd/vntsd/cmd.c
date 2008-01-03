@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -298,7 +298,6 @@ vntsd_process_daemon_cmd(vntsd_client_t *clientp, char c)
 	char	    prev_char;
 
 	prev_char = clientp->prev_char;
-	clientp->prev_char = c;
 
 	if (c != VNTSD_DAEMON_CMD || (prev_char != 0 && prev_char != CR)) {
 		/* not a daemon command */
@@ -322,7 +321,6 @@ vntsd_process_daemon_cmd(vntsd_client_t *clientp, char c)
 		return (exit_daemon_cmd(clientp, rv));
 	}
 
-	clientp->prev_char = c;
 	if (c == VNTSD_DAEMON_CMD) {
 		/*
 		 * received another '~'
@@ -384,8 +382,10 @@ vntsd_telnet_cmd(vntsd_client_t *clientp, char c)
 		return (rv);
 	}
 
-	if ((rv = vntsd_read_char(clientp, &c)) != VNTSD_SUCCESS) {
-		return (rv);
+	if ((uint8_t)cmd != BRK) {
+		if ((rv = vntsd_read_char(clientp, &c)) != VNTSD_SUCCESS) {
+			return (rv);
+		}
 	}
 
 

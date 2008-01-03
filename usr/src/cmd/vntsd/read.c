@@ -168,17 +168,34 @@ read_char(vntsd_client_t *clientp, char *c)
 		rv = vntsd_read_data(clientp, c);
 
 		switch (rv) {
-		case VNTSD_STATUS_CONTINUE:
-			break;
 
 		case VNTSD_STATUS_ACQUIRE_WRITER:
+			clientp->prev_char = 0;
 			rv = acquire_writer(clientp);
 			if (rv != VNTSD_SUCCESS) {
 				return (rv);
 			}
 			break;
-		default:
+
+		case VNTSD_SUCCESS:
+			/*
+			 * Based on telnet protocol, when an <eol> is entered,
+			 * vntsd receives <0x0d,0x00>. However, console expects
+			 * <0xd> only. We need to filter out <0x00>.
+			 */
+			if (clientp->prev_char == 0xd && *c == 0) {
+				clientp->prev_char = *c;
+				break;
+			}
+
+			clientp->prev_char = *c;
 			return (rv);
+
+		default:
+			assert(rv != VNTSD_STATUS_CONTINUE);
+			clientp->prev_char = 0;
+			return (rv);
+
 		}
 	}
 }
