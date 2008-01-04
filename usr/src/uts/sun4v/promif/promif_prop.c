@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +195,7 @@ promif_ldom_setprop(char *name, void *value, int valuelen)
 	 * Since we are emulating OBP, we must comply with the promif
 	 * infrastructure and execute only on the originating cpu.
 	 */
-	thread_affinity_set(curthread, CPU_CURRENT);
+	thread_affinity_set(curthread, CPU->cpu_id);
 
 	req = kmem_zalloc(sizeof (var_config_hdr_t) + paylen, KM_SLEEP);
 	req->var_config_cmd = VAR_CONFIG_SET_REQ;

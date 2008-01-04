@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,20 +289,20 @@ promif_stree_setprop(pnode_t nodeid, char *name, void *value, int len)
 	 */
 	for (prop = pnp->pn_propp; prop; prop = prop->pp_next)
 		if (prom_strcmp(prop->pp_name, name) == 0) {
+			/*
+			 * Make sure we don't get dispatched onto a
+			 * different cpu if we happen to sleep.  See
+			 * kern_postprom().
+			 */
+			thread_affinity_set(curthread, CPU->cpu_id);
 			kmem_free(prop->pp_val, prop->pp_len);
+
 			prop->pp_val = NULL;
 			if (len > 0) {
-				/*
-				 * Make sure we don't get dispatched onto a
-				 * different cpu if we happen to sleep.  See
-				 * kern_postprom().
-				 */
-				thread_affinity_set(curthread, CPU_CURRENT);
 				prop->pp_val = kmem_zalloc(len, KM_SLEEP);
-				thread_affinity_clear(curthread);
-
 				bcopy(value, prop->pp_val, len);
 			}
+			thread_affinity_clear(curthread);
 			prop->pp_len = len;
 			return (len);
 		}
@@ -385,7 +385,7 @@ create_node(prom_node_t *parent, pnode_t node)
 	 * Make sure we don't get dispatched onto a different
 	 * cpu if we happen to sleep.  See kern_postprom().
 	 */
-	thread_affinity_set(curthread, CPU_CURRENT);
+	thread_affinity_set(curthread, CPU->cpu_id);
 
 	pnp = kmem_zalloc(sizeof (prom_node_t), KM_SLEEP);
 	pnp->pn_nodeid = node;
@@ -425,7 +425,7 @@ create_prop(prom_node_t *pnp, char *name, void *val, int len)
 	 * Make sure we don't get dispatched onto a different
 	 * cpu if we happen to sleep.  See kern_postprom().
 	 */
-	thread_affinity_set(curthread, CPU_CURRENT);
+	thread_affinity_set(curthread, CPU->cpu_id);
 	newprop = kmem_zalloc(sizeof (*newprop), KM_SLEEP);
 	newprop->pp_name = kmem_zalloc(prom_strlen(name) + 1, KM_SLEEP);
 	thread_affinity_clear(curthread);
