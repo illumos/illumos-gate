@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1122,13 +1122,14 @@ xattr_dir_readdir(vnode_t *dvp, uio_t *uiop, cred_t *cr, int *eofp,
 {
 	vnode_t *pvp;
 	int error;
-	int local_eof = 0;
+	int local_eof;
 	int reset_off = 0;
 	int has_xattrs = 0;
 
 	if (eofp == NULL) {
 		eofp = &local_eof;
 	}
+	*eofp = 0;
 
 	/*
 	 * See if there is a real extended attribute directory.
