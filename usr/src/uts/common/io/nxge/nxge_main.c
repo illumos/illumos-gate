@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,12 @@ boolean_t	nxge_jumbo_enable = B_FALSE;
 uint16_t	nxge_rcr_timeout = NXGE_RDC_RCR_TIMEOUT;
 uint16_t	nxge_rcr_threshold = NXGE_RDC_RCR_THRESHOLD;
 nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
+
+/* MAX LSO size */
+#define		NXGE_LSO_MAXLEN	65535
+/* Enable Software LSO flag */
+uint32_t	nxge_lso_enable = 1;
+uint32_t	nxge_lso_max = NXGE_LSO_MAXLEN;
 
 /*
  * Debugging flags:
@@ -370,7 +376,8 @@ size_t alloc_sizes [] = {0x2000};
 #else
 size_t alloc_sizes [] = {0x1000, 0x2000, 0x4000, 0x8000,
 		0x10000, 0x20000, 0x40000, 0x80000,
-		0x100000, 0x200000, 0x400000, 0x800000, 0x1000000};
+		0x100000, 0x200000, 0x400000, 0x800000,
+		0x1000000, 0x2000000, 0x4000000};
 #endif
 
 /*
@@ -1938,6 +1945,20 @@ nxge_alloc_rx_mem_pool(p_nxge_t nxgep)
 		nxge_port_rbr_spare_size = (NXGE_RXDMA_POST_BATCH *
 			(nxge_port_rbr_spare_size / NXGE_RXDMA_POST_BATCH + 1));
 	}
+	if (nxge_port_rbr_size > RBR_DEFAULT_MAX_BLKS) {
+		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
+		    "nxge_alloc_rx_mem_pool: RBR size too high %d, "
+		    "set to default %d",
+		    nxge_port_rbr_size, RBR_DEFAULT_MAX_BLKS));
+		nxge_port_rbr_size = RBR_DEFAULT_MAX_BLKS;
+	}
+	if (nxge_port_rcr_size > RCR_DEFAULT_MAX) {
+		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
+		    "nxge_alloc_rx_mem_pool: RCR too high %d, "
+		    "set to default %d",
+		    nxge_port_rcr_size, RCR_DEFAULT_MAX));
+		nxge_port_rcr_size = RCR_DEFAULT_MAX;
+	}
 
 	/*
 	 * N2/NIU has limitation on the descriptor sizes (contiguous
@@ -2249,8 +2270,20 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 
 
 	if (allocated < total_alloc_size) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_alloc_rx_buf_dma: not enough for channe %d "
+		    "allocated 0x%x requested 0x%x",
+		    dma_channel,
+		    allocated, total_alloc_size));
+		status = NXGE_ERROR;
 		goto nxge_alloc_rx_mem_fail1;
 	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+	    "==> nxge_alloc_rx_buf_dma: Allocated for channe %d "
+	    "allocated 0x%x requested 0x%x",
+	    dma_channel,
+	    allocated, total_alloc_size));
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
 		" alloc_rx_buf_dma rdc %d allocated %d chunks",
@@ -2378,6 +2411,14 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 			KMEM_ZALLOC(sizeof (nxge_dma_pool_t), KM_SLEEP);
 	dma_cntl_p = (p_nxge_dma_common_t *)KMEM_ZALLOC(
 			sizeof (p_nxge_dma_common_t) * ndmas, KM_SLEEP);
+
+	if (nxge_tx_ring_size > TDC_DEFAULT_MAX) {
+		NXGE_DEBUG_MSG((nxgep, MEM_CTL,
+		    "nxge_alloc_tx_mem_pool: TDC too high %d, "
+		    "set to default %d",
+		    nxge_tx_ring_size, TDC_DEFAULT_MAX));
+		nxge_tx_ring_size = TDC_DEFAULT_MAX;
+	}
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 	/*
@@ -2592,8 +2633,20 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	}
 
 	if (allocated < total_alloc_size) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_alloc_tx_buf_dma: not enough channel %d: "
+		    "allocated 0x%x requested 0x%x",
+		    dma_channel,
+		    allocated, total_alloc_size));
+		status = NXGE_ERROR;
 		goto nxge_alloc_tx_mem_fail1;
 	}
+
+	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+	    "==> nxge_alloc_tx_buf_dma: Allocated for channel %d: "
+	    "allocated 0x%x requested 0x%x",
+	    dma_channel,
+	    allocated, total_alloc_size));
 
 	*num_chunks = i;
 	*dmap = tx_dmap;
@@ -3795,6 +3848,21 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 
 		mutex_exit(nxgep->genlock);
 		break;
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (nxge_lso_enable) {
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			if (nxge_lso_max > NXGE_LSO_MAXLEN) {
+				nxge_lso_max = NXGE_LSO_MAXLEN;
+			}
+			cap_lso->lso_basic_tcp_ipv4.lso_max = nxge_lso_max;
+			break;
+		} else {
+			return (B_FALSE);
+		}
+	}
+
 	default:
 		return (B_FALSE);
 	}
@@ -3870,7 +3938,6 @@ _init(void)
 			"failed to init device soft state"));
 		goto _init_exit;
 	}
-
 	status = mod_install(&modlinkage);
 	if (status != 0) {
 		ddi_soft_state_fini(&nxge_list);

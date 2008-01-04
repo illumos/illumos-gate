@@ -93,7 +93,7 @@ extern "C" {
 #define	NXGE_RCR_MIN		(NXGE_RBR_RBB_MIN * 2)
 
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
-#define	NXGE_RCR_MAX		(NXGE_NIU_CONTIG_RCR_MAX)
+#define	NXGE_RCR_MAX		(8192)
 #define	NXGE_RCR_DEFAULT	(512)
 #define	NXGE_TX_RING_DEFAULT	(512)
 #else

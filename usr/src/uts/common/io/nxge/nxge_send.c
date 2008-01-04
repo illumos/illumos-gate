@@ -19,13 +19,26 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/nxge/nxge_impl.h>
+
+/* Software LSO required header files */
+#include <netinet/tcp.h>
+#include <inet/ip_impl.h>
+#include <inet/tcp.h>
+
+static mblk_t *nxge_lso_eliminate(mblk_t *);
+static mblk_t *nxge_do_softlso(mblk_t *mp, uint32_t mss);
+static void nxge_lso_info_get(mblk_t *, uint32_t *, uint32_t *);
+static void nxge_hcksum_retrieve(mblk_t *,
+    uint32_t *, uint32_t *, uint32_t *,
+    uint32_t *, uint32_t *);
+static uint32_t nxge_csgen(uint16_t *, int);
 
 extern uint32_t		nxge_reclaim_pending;
 extern uint32_t 	nxge_bcopy_thresh;
@@ -39,6 +52,8 @@ extern uint32_t		nxge_tx_use_bcopy;
 extern uint32_t		nxge_tx_lb_policy;
 extern uint32_t		nxge_no_tx_lb;
 extern nxge_tx_mode_t	nxge_tx_scheme;
+extern uint32_t		nxge_lso_enable;
+uint32_t		nxge_lso_kick_cnt = 2;
 
 typedef struct _mac_tx_hint {
 	uint16_t	sap;
@@ -107,6 +122,13 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	int			xfer_len;
 	uint32_t		msgsize;
 #endif
+	p_mblk_t 		mp_chain = NULL;
+	boolean_t		is_lso = B_FALSE;
+	boolean_t		lso_again;
+	int			cur_index_lso;
+	p_mblk_t 		nmp_lso_save;
+	uint32_t		lso_ngathers;
+	boolean_t		lso_tail_wrap = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 		"==> nxge_start: tx dma channel %d", tx_ring_p->tdc));
@@ -125,6 +147,28 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		}
 	}
 
+	if (nxge_lso_enable) {
+		mp_chain = nxge_lso_eliminate(mp);
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "==> nxge_start(0): LSO mp $%p mp_chain $%p",
+		    mp, mp_chain));
+		if (mp_chain == NULL) {
+			NXGE_ERROR_MSG((nxgep, TX_CTL,
+			    "==> nxge_send(0): NULL mp_chain $%p != mp $%p",
+			    mp_chain, mp));
+			goto nxge_start_fail1;
+		}
+		if (mp_chain != mp) {
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "==> nxge_send(1): IS LSO mp_chain $%p != mp $%p",
+			    mp_chain, mp));
+			is_lso = B_TRUE;
+			mp = mp_chain;
+			mp_chain = mp_chain->b_next;
+			mp->b_next = NULL;
+		}
+	}
+
 	hcksum_retrieve(mp, NULL, NULL, &start_offset,
 		&stuff_offset, &end_offset, &value, &cksum_flags);
 	if (!NXGE_IS_VLAN_PACKET(mp->b_rptr)) {
@@ -137,11 +181,21 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 
 	if (cksum_flags & HCK_PARTIALCKSUM) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start: cksum_flags 0x%x (partial checksum) ",
-			cksum_flags));
+			"==> nxge_start: mp $%p len %d "
+			"cksum_flags 0x%x (partial checksum) ",
+			mp, MBLKL(mp), cksum_flags));
 		cksum_on = B_TRUE;
 	}
 
+	lso_again = B_FALSE;
+	lso_ngathers = 0;
+
+	MUTEX_ENTER(&tx_ring_p->lock);
+	cur_index_lso = tx_ring_p->wr_index;
+	lso_tail_wrap = tx_ring_p->wr_index_wrap;
+start_again:
+	ngathers = 0;
+	sop_index = tx_ring_p->wr_index;
 #ifdef	NXGE_DEBUG
 	if (tx_ring_p->descs_pending) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
@@ -163,7 +217,6 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		nxge_dump_packet((char *)mp->b_rptr, dump_len)));
 #endif
 
-	MUTEX_ENTER(&tx_ring_p->lock);
 	tdc_stats = tx_ring_p->tdc_stats;
 	mark_mode = (tx_ring_p->descs_pending &&
 		((tx_ring_p->tx_ring_size - tx_ring_p->descs_pending)
@@ -177,15 +230,28 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
 			"TX Descriptor ring is full: channel %d",
 			tx_ring_p->tdc));
-		cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
-		tdc_stats->tx_no_desc++;
-		MUTEX_EXIT(&tx_ring_p->lock);
-		if (nxgep->resched_needed && !nxgep->resched_running) {
-			nxgep->resched_running = B_TRUE;
-			ddi_trigger_softintr(nxgep->resched_id);
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			"TX Descriptor ring is full: channel %d",
+			tx_ring_p->tdc));
+		if (is_lso) {
+			/* free the current mp and mp_chain if not FULL */
+			tdc_stats->tx_no_desc++;
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "LSO packet: TX Descriptor ring is full: "
+			    "channel %d",
+			    tx_ring_p->tdc));
+			goto nxge_start_fail_lso;
+		} else {
+			cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
+			tdc_stats->tx_no_desc++;
+			MUTEX_EXIT(&tx_ring_p->lock);
+			if (nxgep->resched_needed && !nxgep->resched_running) {
+				nxgep->resched_running = B_TRUE;
+				ddi_trigger_softintr(nxgep->resched_id);
+			}
+			status = 1;
+			goto nxge_start_fail1;
 		}
-		status = 1;
-		goto nxge_start_fail1;
 	}
 
 	nmp = mp;
@@ -262,8 +328,17 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 				nmp->b_cont = t_mp;
 				len = MBLKL(nmp);
 			} else {
-				good_packet = B_FALSE;
-				goto nxge_start_fail2;
+				if (is_lso) {
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "LSO packet: dupb failed: "
+					    "channel %d",
+					    tx_ring_p->tdc));
+					mp = nmp;
+					goto nxge_start_fail_lso;
+				} else {
+					good_packet = B_FALSE;
+					goto nxge_start_fail2;
+				}
 			}
 		}
 		tx_desc.value = 0;
@@ -452,7 +527,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 					ngathers++;
 					/*
 					 * this is the fix for multiple
-					 * cookies, which are basicaly
+					 * cookies, which are basically
 					 * a descriptor entry, we don't set
 					 * SOP bit as well as related fields
 					 */
@@ -518,10 +593,18 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 				good_packet = B_FALSE;
 				tdc_stats->tx_dma_bind_fail++;
 				tx_msg_p->flags.dma_type = USE_NONE;
-				goto nxge_start_fail2;
+				if (is_lso) {
+					mp = nmp;
+					goto nxge_start_fail_lso;
+				} else {
+					goto nxge_start_fail2;
+				}
 			}
 		} /* ddi dvma */
 
+		if (is_lso) {
+			nmp_lso_save = nmp;
+		}
 		nmp = nmp->b_cont;
 nxge_start_control_header_only:
 #if defined(__i386)
@@ -599,6 +682,10 @@ nxge_start_control_header_only:
 				"len %d pkt_len %d ngathers %d",
 				len, pkt_len, ngathers));
 			/* Pull all message blocks from b_cont */
+			if (is_lso) {
+				mp = nmp_lso_save;
+				goto nxge_start_fail_lso;
+			}
 			if ((msgpullup(mp, -1)) == NULL) {
 				goto nxge_start_fail2;
 			}
@@ -792,6 +879,54 @@ nxge_start_control_header_only:
 		ngathers,
 		tx_ring_p->descs_pending));
 
+	if (is_lso) {
+		lso_ngathers += ngathers;
+		if (mp_chain != NULL) {
+			mp = mp_chain;
+			mp_chain = mp_chain->b_next;
+			mp->b_next = NULL;
+			if (nxge_lso_kick_cnt == lso_ngathers) {
+				{
+					tx_ring_kick_t		kick;
+
+					kick.value = 0;
+					kick.bits.ldw.wrap =
+					    tx_ring_p->wr_index_wrap;
+					kick.bits.ldw.tail =
+					    (uint16_t)tx_ring_p->wr_index;
+
+					/* Kick the Transmit kick register */
+					TXDMA_REG_WRITE64(
+					    NXGE_DEV_NPI_HANDLE(nxgep),
+					    TX_RING_KICK_REG,
+					    (uint8_t)tx_ring_p->tdc,
+					    kick.value);
+					tdc_stats->tx_starts++;
+					NXGE_DEBUG_MSG((nxgep, TX_CTL,
+					    "==> nxge_start: more LSO: "
+					    "LSO_CNT %d",
+					    lso_gathers));
+				}
+				lso_ngathers = 0;
+				ngathers = 0;
+				cur_index_lso = sop_index = tx_ring_p->wr_index;
+				lso_tail_wrap = tx_ring_p->wr_index_wrap;
+			}
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "==> nxge_start: lso again: "
+			    "lso_gathers %d ngathers %d cur_index_lso %d "
+			    "wr_index %d sop_index %d",
+			    lso_ngathers, ngathers, cur_index_lso,
+			    tx_ring_p->wr_index, sop_index));
+
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "==> nxge_start: next : count %d",
+			    lso_gathers));
+			lso_again = B_TRUE;
+			goto start_again;
+		}
+	}
+
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: TX KICKING: "));
 
 	{
@@ -815,6 +950,46 @@ nxge_start_control_header_only:
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_start"));
 
 	return (status);
+
+nxge_start_fail_lso:
+	status = 0;
+	good_packet = B_FALSE;
+	if (mp != NULL) {
+		freemsg(mp);
+	}
+	if (mp_chain != NULL) {
+		freemsg(mp_chain);
+	}
+	if (!lso_again && !ngathers) {
+		MUTEX_EXIT(&tx_ring_p->lock);
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "==> nxge_start: lso exit (nothing changed)"));
+		goto nxge_start_fail1;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_start (channel %d): before lso "
+	    "lso_gathers %d ngathers %d cur_index_lso %d "
+	    "wr_index %d sop_index %d lso_again %d",
+	    tx_ring_p->tdc,
+	    lso_ngathers, ngathers, cur_index_lso,
+	    tx_ring_p->wr_index, sop_index, lso_again));
+
+	if (lso_again) {
+		lso_ngathers += ngathers;
+		ngathers = lso_ngathers;
+		sop_index = cur_index_lso;
+		tx_ring_p->wr_index = sop_index;
+		tx_ring_p->wr_index_wrap = lso_tail_wrap;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_start (channel %d): after lso "
+	    "lso_gathers %d ngathers %d cur_index_lso %d "
+	    "wr_index %d sop_index %d lso_again %d",
+	    tx_ring_p->tdc,
+	    lso_ngathers, ngathers, cur_index_lso,
+	    tx_ring_p->wr_index, sop_index, lso_again));
 
 nxge_start_fail2:
 	if (good_packet == B_FALSE) {
@@ -955,6 +1130,10 @@ nxge_m_tx(void *arg, mblk_t *mp)
 		}
 
 		mp = next;
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_m_tx: (go back to loop) mp $%p next $%p",
+		    mp, next));
 	}
 
 	return (mp);
@@ -1100,4 +1279,632 @@ nxge_reschedule(caddr_t arg)
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_reschedule"));
 	return (DDI_INTR_CLAIMED);
+}
+
+
+/* Software LSO starts here */
+static void
+nxge_hcksum_retrieve(mblk_t *mp,
+    uint32_t *start, uint32_t *stuff, uint32_t *end,
+    uint32_t *value, uint32_t *flags)
+{
+	if (mp->b_datap->db_type == M_DATA) {
+		if (flags != NULL) {
+			*flags = DB_CKSUMFLAGS(mp) & (HCK_IPV4_HDRCKSUM |
+			    HCK_PARTIALCKSUM | HCK_FULLCKSUM |
+			    HCK_FULLCKSUM_OK);
+			if ((*flags & (HCK_PARTIALCKSUM |
+			    HCK_FULLCKSUM)) != 0) {
+				if (value != NULL)
+					*value = (uint32_t)DB_CKSUM16(mp);
+				if ((*flags & HCK_PARTIALCKSUM) != 0) {
+					if (start != NULL)
+						*start =
+						    (uint32_t)DB_CKSUMSTART(mp);
+					if (stuff != NULL)
+						*stuff =
+						    (uint32_t)DB_CKSUMSTUFF(mp);
+					if (end != NULL)
+						*end =
+						    (uint32_t)DB_CKSUMEND(mp);
+				}
+			}
+		}
+	}
+}
+
+static void
+nxge_lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	*mss = 0;
+	if (flags != NULL) {
+		*flags = DB_CKSUMFLAGS(mp) & HW_LSO;
+		if ((*flags != 0) && (mss != NULL)) {
+			*mss = (uint32_t)DB_LSOMSS(mp);
+		}
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_lso_info_get(flag !=NULL): mss %d *flags 0x%x",
+		    *mss, *flags));
+	}
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "<== nxge_lso_info_get: mss %d", *mss));
+}
+
+/*
+ * Do Soft LSO on the oversized packet.
+ *
+ * 1. Create a chain of message for headers.
+ * 2. Fill up header messages with proper information.
+ * 3. Copy Eithernet, IP, and TCP headers from the original message to
+ *    each new message with necessary adjustments.
+ *    * Unchange the ethernet header for DIX frames. (by default)
+ *    * IP Total Length field is updated to MSS or less(only for the last one).
+ *    * IP Identification value is incremented by one for each packet.
+ *    * TCP sequence Number is recalculated according to the payload length.
+ *    * Set FIN and/or PSH flags for the *last* packet if applied.
+ *    * TCP partial Checksum
+ * 4. Update LSO information in the first message header.
+ * 5. Release the original message header.
+ */
+static mblk_t *
+nxge_do_softlso(mblk_t *mp, uint32_t mss)
+{
+	uint32_t	hckflags;
+	int		pktlen;
+	int		hdrlen;
+	int		segnum;
+	int		i;
+	struct ether_vlan_header *evh;
+	int		ehlen, iphlen, tcphlen;
+	struct ip	*oiph, *niph;
+	struct tcphdr *otcph, *ntcph;
+	int		available, len, left;
+	uint16_t	ip_id;
+	uint32_t	tcp_seq;
+#ifdef __sparc
+	uint32_t	tcp_seq_tmp;
+#endif
+	mblk_t		*datamp;
+	uchar_t		*rptr;
+	mblk_t		*nmp;
+	mblk_t		*cmp;
+	mblk_t		*mp_chain;
+	boolean_t do_cleanup = B_FALSE;
+	t_uscalar_t start_offset = 0;
+	t_uscalar_t stuff_offset = 0;
+	t_uscalar_t value = 0;
+	uint16_t	l4_len;
+	ipaddr_t	src, dst;
+	uint32_t	cksum, sum, l4cksum;
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso"));
+	/*
+	 * check the length of LSO packet payload and calculate the number of
+	 * segments to be generated.
+	 */
+	pktlen = msgsize(mp);
+	evh = (struct ether_vlan_header *)mp->b_rptr;
+
+	/* VLAN? */
+	if (evh->ether_tpid == htons(ETHERTYPE_VLAN))
+		ehlen = sizeof (struct ether_vlan_header);
+	else
+		ehlen = sizeof (struct ether_header);
+	oiph = (struct ip *)(mp->b_rptr + ehlen);
+	iphlen = oiph->ip_hl * 4;
+	otcph = (struct tcphdr *)(mp->b_rptr + ehlen + iphlen);
+	tcphlen = otcph->th_off * 4;
+
+	l4_len = pktlen - ehlen - iphlen;
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: mss %d oiph $%p "
+	    "original ip_sum oiph->ip_sum 0x%x "
+	    "original tcp_sum otcph->th_sum 0x%x "
+	    "oiph->ip_len %d pktlen %d ehlen %d "
+	    "l4_len %d (0x%x) ip_len - iphlen %d ",
+	    mss,
+	    oiph,
+	    oiph->ip_sum,
+	    otcph->th_sum,
+	    ntohs(oiph->ip_len), pktlen,
+	    ehlen,
+	    l4_len,
+	    l4_len,
+	    ntohs(oiph->ip_len) - iphlen));
+
+	/* IPv4 + TCP */
+	if (!(oiph->ip_v == IPV4_VERSION)) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "<== nxge_do_softlso: not IPV4 "
+		    "oiph->ip_len %d pktlen %d ehlen %d tcphlen %d",
+		    ntohs(oiph->ip_len), pktlen, ehlen,
+		    tcphlen));
+		freemsg(mp);
+		return (NULL);
+	}
+
+	if (!(oiph->ip_p == IPPROTO_TCP)) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "<== nxge_do_softlso: not TCP "
+		    "oiph->ip_len %d pktlen %d ehlen %d tcphlen %d",
+		    ntohs(oiph->ip_len), pktlen, ehlen,
+		    tcphlen));
+		freemsg(mp);
+		return (NULL);
+	}
+
+	if (!(ntohs(oiph->ip_len) == pktlen - ehlen)) {
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+		    "<== nxge_do_softlso: len not matched  "
+		    "oiph->ip_len %d pktlen %d ehlen %d tcphlen %d",
+		    ntohs(oiph->ip_len), pktlen, ehlen,
+		    tcphlen));
+		freemsg(mp);
+		return (NULL);
+	}
+
+	otcph = (struct tcphdr *)(mp->b_rptr + ehlen + iphlen);
+	tcphlen = otcph->th_off * 4;
+
+	/* TCP flags can not include URG, RST, or SYN */
+	VERIFY((otcph->th_flags & (TH_SYN | TH_RST | TH_URG)) == 0);
+
+	hdrlen = ehlen + iphlen + tcphlen;
+
+	VERIFY(MBLKL(mp) >= hdrlen);
+
+	if (MBLKL(mp) > hdrlen) {
+		datamp = mp;
+		rptr = mp->b_rptr + hdrlen;
+	} else { /* = */
+		datamp = mp->b_cont;
+		rptr = datamp->b_rptr;
+	}
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "nxge_do_softlso: otcph $%p pktlen: %d, "
+	    "hdrlen %d ehlen %d iphlen %d tcphlen %d "
+	    "mblkl(mp): %d, mblkl(datamp): %d",
+	    otcph,
+	    pktlen, hdrlen, ehlen, iphlen, tcphlen,
+	    (int)MBLKL(mp), (int)MBLKL(datamp)));
+
+	hckflags = 0;
+	nxge_hcksum_retrieve(mp,
+	    &start_offset, &stuff_offset, &value, NULL, &hckflags);
+
+	dst = oiph->ip_dst.s_addr;
+	src = oiph->ip_src.s_addr;
+
+	cksum = (dst >> 16) + (dst & 0xFFFF) +
+	    (src >> 16) + (src & 0xFFFF);
+	l4cksum = cksum + IP_TCP_CSUM_COMP;
+
+	sum = l4_len + l4cksum;
+	sum = (sum & 0xFFFF) + (sum >> 16);
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: dst 0x%x src 0x%x sum 0x%x ~new 0x%x "
+	    "hckflags 0x%x start_offset %d stuff_offset %d "
+	    "value (original) 0x%x th_sum 0x%x "
+	    "pktlen %d l4_len %d (0x%x) "
+	    "MBLKL(mp): %d, MBLKL(datamp): %d dump header %s",
+	    dst, src,
+	    (sum & 0xffff), (~sum & 0xffff),
+	    hckflags, start_offset, stuff_offset,
+	    value, otcph->th_sum,
+	    pktlen,
+	    l4_len,
+	    l4_len,
+	    ntohs(oiph->ip_len) - (int)MBLKL(mp),
+	    (int)MBLKL(datamp),
+	    nxge_dump_packet((char *)evh, 12)));
+
+	/*
+	 * Start to process.
+	 */
+	available = pktlen - hdrlen;
+	segnum = (available - 1) / mss + 1;
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: pktlen %d "
+	    "MBLKL(mp): %d, MBLKL(datamp): %d "
+	    "available %d mss %d segnum %d",
+	    pktlen, (int)MBLKL(mp), (int)MBLKL(datamp),
+	    available,
+	    mss,
+	    segnum));
+
+	VERIFY(segnum >= 2);
+
+	/*
+	 * Try to pre-allocate all header messages
+	 */
+	mp_chain = NULL;
+	for (i = 0; i < segnum; i++) {
+		if ((nmp = allocb(hdrlen, 0)) == NULL) {
+			/* Clean up the mp_chain */
+			while (mp_chain != NULL) {
+				nmp = mp_chain;
+				mp_chain = mp_chain->b_next;
+				freemsg(nmp);
+			}
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "<== nxge_do_softlso: "
+			    "Could not allocate enough messages for headers!"));
+			freemsg(mp);
+			return (NULL);
+		}
+		nmp->b_next = mp_chain;
+		mp_chain = nmp;
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_do_softlso: "
+		    "mp $%p nmp $%p mp_chain $%p mp_chain->b_next $%p",
+		    mp, nmp, mp_chain, mp_chain->b_next));
+	}
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: mp $%p nmp $%p mp_chain $%p",
+	    mp, nmp, mp_chain));
+
+	/*
+	 * Associate payload with new packets
+	 */
+	cmp = mp_chain;
+	left = available;
+	while (cmp != NULL) {
+		nmp = dupb(datamp);
+		if (nmp == NULL) {
+			do_cleanup = B_TRUE;
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "==>nxge_do_softlso: "
+			    "Can not dupb(datamp), have to do clean up"));
+			goto cleanup_allocated_msgs;
+		}
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_do_softlso: (loop) before mp $%p cmp $%p "
+		    "dupb nmp $%p len %d left %d msd %d ",
+		    mp, cmp, nmp, len, left, mss));
+
+		cmp->b_cont = nmp;
+		nmp->b_rptr = rptr;
+		len = (left < mss) ? left : mss;
+		left -= len;
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_do_softlso: (loop) after mp $%p cmp $%p "
+		    "dupb nmp $%p len %d left %d mss %d ",
+		    mp, cmp, nmp, len, left, mss));
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "nxge_do_softlso: before available: %d, "
+		    "left: %d, len: %d, segnum: %d MBLK(nmp): %d",
+		    available, left, len, segnum, (int)MBLKL(nmp)));
+
+		len -= MBLKL(nmp);
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "nxge_do_softlso: after available: %d, "
+		    "left: %d, len: %d, segnum: %d MBLK(nmp): %d",
+		    available, left, len, segnum, (int)MBLKL(nmp)));
+
+		while (len > 0) {
+			mblk_t *mmp = NULL;
+
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "nxge_do_softlso: (4) len > 0 available: %d, "
+			    "left: %d, len: %d, segnum: %d MBLK(nmp): %d",
+			    available, left, len, segnum, (int)MBLKL(nmp)));
+
+			if (datamp->b_cont != NULL) {
+				datamp = datamp->b_cont;
+				rptr = datamp->b_rptr;
+				mmp = dupb(datamp);
+				if (mmp == NULL) {
+					do_cleanup = B_TRUE;
+					NXGE_DEBUG_MSG((NULL, TX_CTL,
+					    "==> nxge_do_softlso: "
+					    "Can not dupb(datamp) (1), :
+					    "have to do clean up"));
+					NXGE_DEBUG_MSG((NULL, TX_CTL,
+					    "==> nxge_do_softlso: "
+					    "available: %d, left: %d, "
+					    "len: %d, MBLKL(nmp): %d",
+					    available, left, len,
+					    (int)MBLKL(nmp)));
+					goto cleanup_allocated_msgs;
+				}
+			} else {
+				NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
+				    "==> nxge_do_softlso: "
+				    "(1)available: %d, left: %d, "
+				    "len: %d, MBLKL(nmp): %d",
+				    available, left, len,
+				    (int)MBLKL(nmp)));
+				cmn_err(CE_PANIC,
+				    "==> nxge_do_softlso: "
+				    "Pointers must have been corrupted!\n"
+				    "datamp: $%p, nmp: $%p, rptr: $%p",
+				    (void *)datamp,
+				    (void *)nmp,
+				    (void *)rptr);
+			}
+			nmp->b_cont = mmp;
+			nmp = mmp;
+			len -= MBLKL(nmp);
+		}
+		if (len < 0) {
+			nmp->b_wptr += len;
+			rptr = nmp->b_wptr;
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "(5) len < 0 (less than 0)"
+			    "available: %d, left: %d, len: %d, MBLKL(nmp): %d",
+			    available, left, len, (int)MBLKL(nmp)));
+
+		} else if (len == 0) {
+			if (datamp->b_cont != NULL) {
+				NXGE_DEBUG_MSG((NULL, TX_CTL,
+				    "(5) len == 0"
+				    "available: %d, left: %d, len: %d, "
+				    "MBLKL(nmp): %d",
+				    available, left, len, (int)MBLKL(nmp)));
+				datamp = datamp->b_cont;
+				rptr = datamp->b_rptr;
+			} else {
+				NXGE_DEBUG_MSG((NULL, TX_CTL,
+				    "(6)available b_cont == NULL : %d, "
+				    "left: %d, len: %d, MBLKL(nmp): %d",
+				    available, left, len, (int)MBLKL(nmp)));
+
+				VERIFY(cmp->b_next == NULL);
+				VERIFY(left == 0);
+				break; /* Done! */
+			}
+		}
+		cmp = cmp->b_next;
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "(7) do_softlso: "
+		    "next mp in mp_chain available len != 0 : %d, "
+		    "left: %d, len: %d, MBLKL(nmp): %d",
+		    available, left, len, (int)MBLKL(nmp)));
+	}
+
+	/*
+	 * From now, start to fill up all headers for the first message
+	 * Hardware checksum flags need to be updated separately for FULLCKSUM
+	 * and PARTIALCKSUM cases. For full checksum, copy the original flags
+	 * into every new packet is enough. But for HCK_PARTIALCKSUM, all
+	 * required fields need to be updated properly.
+	 */
+	nmp = mp_chain;
+	bcopy(mp->b_rptr, nmp->b_rptr, hdrlen);
+	nmp->b_wptr = nmp->b_rptr + hdrlen;
+	niph = (struct ip *)(nmp->b_rptr + ehlen);
+	niph->ip_len = htons(mss + iphlen + tcphlen);
+	ip_id = ntohs(niph->ip_id);
+	ntcph = (struct tcphdr *)(nmp->b_rptr + ehlen + iphlen);
+#ifdef __sparc
+	bcopy((char *)&ntcph->th_seq, &tcp_seq_tmp, 4);
+	tcp_seq = ntohl(tcp_seq_tmp);
+#else
+	tcp_seq = ntohl(ntcph->th_seq);
+#endif
+
+	ntcph->th_flags &= ~(TH_FIN | TH_PUSH | TH_RST);
+
+	DB_CKSUMFLAGS(nmp) = (uint16_t)hckflags;
+	DB_CKSUMSTART(nmp) = start_offset;
+	DB_CKSUMSTUFF(nmp) = stuff_offset;
+
+	/* calculate IP checksum and TCP pseudo header checksum */
+	niph->ip_sum = 0;
+	niph->ip_sum = (uint16_t)nxge_csgen((uint16_t *)niph, iphlen);
+
+	l4_len = mss + tcphlen;
+	sum = htons(l4_len) + l4cksum;
+	sum = (sum & 0xFFFF) + (sum >> 16);
+	ntcph->th_sum = (sum & 0xffff);
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: first mp $%p (mp_chain $%p) "
+	    "mss %d pktlen %d l4_len %d (0x%x) "
+	    "MBLKL(mp): %d, MBLKL(datamp): %d "
+	    "ip_sum 0x%x "
+	    "th_sum 0x%x sum 0x%x ) "
+	    "dump first ip->tcp %s",
+	    nmp, mp_chain,
+	    mss,
+	    pktlen,
+	    l4_len,
+	    l4_len,
+	    (int)MBLKL(mp), (int)MBLKL(datamp),
+	    niph->ip_sum,
+	    ntcph->th_sum,
+	    sum,
+	    nxge_dump_packet((char *)niph, 52)));
+
+	cmp = nmp;
+	while ((nmp = nmp->b_next)->b_next != NULL) {
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==>nxge_do_softlso: middle l4_len %d ", l4_len));
+		bcopy(cmp->b_rptr, nmp->b_rptr, hdrlen);
+		nmp->b_wptr = nmp->b_rptr + hdrlen;
+		niph = (struct ip *)(nmp->b_rptr + ehlen);
+		niph->ip_id = htons(++ip_id);
+		niph->ip_len = htons(mss + iphlen + tcphlen);
+		ntcph = (struct tcphdr *)(nmp->b_rptr + ehlen + iphlen);
+		tcp_seq += mss;
+
+		ntcph->th_flags &= ~(TH_FIN | TH_PUSH | TH_RST | TH_URG);
+
+#ifdef __sparc
+		tcp_seq_tmp = htonl(tcp_seq);
+		bcopy(&tcp_seq_tmp, (char *)&ntcph->th_seq, 4);
+#else
+		ntcph->th_seq = htonl(tcp_seq);
+#endif
+		DB_CKSUMFLAGS(nmp) = (uint16_t)hckflags;
+		DB_CKSUMSTART(nmp) = start_offset;
+		DB_CKSUMSTUFF(nmp) = stuff_offset;
+
+		/* calculate IP checksum and TCP pseudo header checksum */
+		niph->ip_sum = 0;
+		niph->ip_sum = (uint16_t)nxge_csgen((uint16_t *)niph, iphlen);
+		ntcph->th_sum = (sum & 0xffff);
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_do_softlso: middle ip_sum 0x%x "
+		    "th_sum 0x%x "
+		    " mp $%p (mp_chain $%p) pktlen %d "
+		    "MBLKL(mp): %d, MBLKL(datamp): %d ",
+		    niph->ip_sum,
+		    ntcph->th_sum,
+		    nmp, mp_chain,
+		    pktlen, (int)MBLKL(mp), (int)MBLKL(datamp)));
+	}
+
+	/* Last segment */
+	/*
+	 * Set FIN and/or PSH flags if present only in the last packet.
+	 * The ip_len could be different from prior packets.
+	 */
+	bcopy(cmp->b_rptr, nmp->b_rptr, hdrlen);
+	nmp->b_wptr = nmp->b_rptr + hdrlen;
+	niph = (struct ip *)(nmp->b_rptr + ehlen);
+	niph->ip_id = htons(++ip_id);
+	niph->ip_len = htons(msgsize(nmp->b_cont) + iphlen + tcphlen);
+	ntcph = (struct tcphdr *)(nmp->b_rptr + ehlen + iphlen);
+	tcp_seq += mss;
+#ifdef __sparc
+	tcp_seq_tmp = htonl(tcp_seq);
+	bcopy(&tcp_seq_tmp, (char *)&ntcph->th_seq, 4);
+#else
+	ntcph->th_seq = htonl(tcp_seq);
+#endif
+	ntcph->th_flags = (otcph->th_flags & ~TH_URG);
+
+	DB_CKSUMFLAGS(nmp) = (uint16_t)hckflags;
+	DB_CKSUMSTART(nmp) = start_offset;
+	DB_CKSUMSTUFF(nmp) = stuff_offset;
+
+	/* calculate IP checksum and TCP pseudo header checksum */
+	niph->ip_sum = 0;
+	niph->ip_sum = (uint16_t)nxge_csgen((uint16_t *)niph, iphlen);
+
+	l4_len = ntohs(niph->ip_len) - iphlen;
+	sum = htons(l4_len) + l4cksum;
+	sum = (sum & 0xFFFF) + (sum >> 16);
+	ntcph->th_sum = (sum & 0xffff);
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==> nxge_do_softlso: last next "
+	    "niph->ip_sum 0x%x "
+	    "ntcph->th_sum 0x%x sum 0x%x "
+	    "dump last ip->tcp %s "
+	    "cmp $%p mp $%p (mp_chain $%p) pktlen %d (0x%x) "
+	    "l4_len %d (0x%x) "
+	    "MBLKL(mp): %d, MBLKL(datamp): %d ",
+	    niph->ip_sum,
+	    ntcph->th_sum, sum,
+	    nxge_dump_packet((char *)niph, 52),
+	    cmp, nmp, mp_chain,
+	    pktlen, pktlen,
+	    l4_len,
+	    l4_len,
+	    (int)MBLKL(mp), (int)MBLKL(datamp)));
+
+cleanup_allocated_msgs:
+	if (do_cleanup) {
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==> nxge_do_softlso: "
+		    "Failed allocating messages, "
+		    "have to clean up and fail!"));
+		while (mp_chain != NULL) {
+			nmp = mp_chain;
+			mp_chain = mp_chain->b_next;
+			freemsg(nmp);
+		}
+	}
+	/*
+	 * We're done here, so just free the original message and return the
+	 * new message chain, that could be NULL if failed, back to the caller.
+	 */
+	freemsg(mp);
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "<== nxge_do_softlso:mp_chain $%p", mp_chain));
+	return (mp_chain);
+}
+
+/*
+ * Will be called before NIC driver do further operation on the message.
+ * The input message may include LSO information, if so, go to softlso logic
+ * to eliminate the oversized LSO packet for the incapable underlying h/w.
+ * The return could be the same non-LSO message or a message chain for LSO case.
+ *
+ * The driver needs to call this function per packet and process the whole chain
+ * if applied.
+ */
+static mblk_t *
+nxge_lso_eliminate(mblk_t *mp)
+{
+	uint32_t lsoflags;
+	uint32_t mss;
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "==>nxge_lso_eliminate:"));
+	nxge_lso_info_get(mp, &mss, &lsoflags);
+
+	if (lsoflags & HW_LSO) {
+		mblk_t *nmp;
+
+		NXGE_DEBUG_MSG((NULL, TX_CTL,
+		    "==>nxge_lso_eliminate:"
+		    "HW_LSO:mss %d mp $%p",
+		    mss, mp));
+		if ((nmp = nxge_do_softlso(mp, mss)) != NULL) {
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "<== nxge_lso_eliminate: "
+			    "LSO: nmp not NULL nmp $%p mss %d mp $%p",
+			    nmp, mss, mp));
+			return (nmp);
+		} else {
+			NXGE_DEBUG_MSG((NULL, TX_CTL,
+			    "<== nxge_lso_eliminate_ "
+			    "LSO: failed nmp NULL nmp $%p mss %d mp $%p",
+			    nmp, mss, mp));
+			return (NULL);
+		}
+	}
+
+	NXGE_DEBUG_MSG((NULL, TX_CTL,
+	    "<== nxge_lso_eliminate"));
+	return (mp);
+}
+
+static uint32_t
+nxge_csgen(uint16_t *adr, int len)
+{
+	int		i, odd;
+	uint32_t	sum = 0;
+	uint32_t	c = 0;
+
+	odd = len % 2;
+	for (i = 0; i < (len / 2); i++) {
+		sum += (adr[i] & 0xffff);
+	}
+	if (odd) {
+		sum += adr[len / 2] & 0xff00;
+	}
+	while ((c = ((sum & 0xffff0000) >> 16)) != 0) {
+		sum &= 0xffff;
+		sum += c;
+	}
+	return (~sum & 0xffff);
 }

@@ -1571,7 +1571,6 @@ nxge_dupb(p_rx_msg_t nxge_mp, uint_t offset, size_t size)
 		goto nxge_dupb_exit;
 	}
 	atomic_inc_32(&nxge_mp->ref_cnt);
-	atomic_inc_32(&nxge_mblks_pending);
 
 
 nxge_dupb_exit:
@@ -1607,9 +1606,6 @@ void nxge_post_page(p_nxge_t nxgep, p_rx_rbr_ring_t rx_rbr_p,
 void
 nxge_post_page(p_nxge_t nxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 {
-
-	npi_handle_t		handle;
-
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_post_page"));
 
 	/* Reuse this buffer */
@@ -1627,14 +1623,12 @@ nxge_post_page(p_nxge_t nxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	 * Get the rbr header pointer and its offset index.
 	 */
 	MUTEX_ENTER(&rx_rbr_p->post_lock);
-
-
 	rx_rbr_p->rbr_wr_index =  ((rx_rbr_p->rbr_wr_index + 1) &
 					    rx_rbr_p->rbr_wrap_mask);
 	rx_rbr_p->rbr_desc_vp[rx_rbr_p->rbr_wr_index] = rx_msg_p->shifted_addr;
 	MUTEX_EXIT(&rx_rbr_p->post_lock);
-	handle = NXGE_DEV_NPI_HANDLE(nxgep);
-	npi_rxdma_rdc_rbr_kick(handle, rx_rbr_p->rdc, 1);
+	npi_rxdma_rdc_rbr_kick(NXGE_DEV_NPI_HANDLE(nxgep),
+	    rx_rbr_p->rdc, 1);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		"<== nxge_post_page (channel %d post_next_index %d)",
@@ -1658,7 +1652,6 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 		"nxge_freeb:rx_msg_p = $%p (block pending %d)",
 		rx_msg_p, nxge_mblks_pending));
 
-	atomic_dec_32(&nxge_mblks_pending);
 	/*
 	 * First we need to get the free state, then
 	 * atomic decrement the reference count to prevent
@@ -1668,6 +1661,7 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 	free_state = rx_msg_p->free;
 	ref_cnt = atomic_add_32_nv(&rx_msg_p->ref_cnt, -1);
 	if (!ref_cnt) {
+		atomic_dec_32(&nxge_mblks_pending);
 		buffer = rx_msg_p->buffer;
 		size = rx_msg_p->block_size;
 		NXGE_DEBUG_MSG((NULL, MEM2_CTL, "nxge_freeb: "
@@ -2442,7 +2436,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 		 */
 		if (error_send_up == B_FALSE) {
 			atomic_inc_32(&rx_msg_p->ref_cnt);
-			atomic_inc_32(&nxge_mblks_pending);
 			if (buffer_free == B_TRUE) {
 				rx_msg_p->free = B_TRUE;
 			}
@@ -2513,7 +2506,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 		cmn_err(CE_WARN, "!nxge_receive_packet: "
 			"update stats (error)");
 		atomic_inc_32(&rx_msg_p->ref_cnt);
-		atomic_inc_32(&nxge_mblks_pending);
 		if (buffer_free == B_TRUE) {
 			rx_msg_p->free = B_TRUE;
 		}
@@ -2549,7 +2541,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	if (rx_msg_p->free && rx_msg_p->rx_use_bcopy) {
 		atomic_inc_32(&rx_msg_p->ref_cnt);
-		atomic_inc_32(&nxge_mblks_pending);
 		nxge_freeb(rx_msg_p);
 	}
 

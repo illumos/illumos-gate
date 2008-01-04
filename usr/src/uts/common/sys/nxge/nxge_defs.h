@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,16 +204,18 @@ extern "C" {
 /*
  * Define the Default RBR, RCR
  */
-#define	RBR_DEFAULT_MAX_BLKS	4096	/* each entry (16 blockaddr/64B) */
+#define	RBR_DEFAULT_MAX_BLKS	8192	/* each entry (16 blockaddr/64B) */
 #define	RBR_NBLK_PER_LINE	16	/* 16 block addresses per 64 B line */
 #define	RBR_DEFAULT_MAX_LEN	(RBR_DEFAULT_MAX_BLKS)
 #define	RBR_DEFAULT_MIN_LEN	1
+#define	RCR_DEFAULT_MAX		8192
 
 #define	SW_OFFSET_NO_OFFSET		0
 #define	SW_OFFSET_64			1	/* 64 bytes */
 #define	SW_OFFSET_128			2	/* 128 bytes */
 #define	SW_OFFSET_INVALID		3
 
+#define	TDC_DEFAULT_MAX		8192
 /*
  * RBR block descriptor is 32 bits (bits [43:12]
  */
