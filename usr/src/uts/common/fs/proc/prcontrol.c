@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -309,40 +309,41 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 	case PCDSTOP:	/* direct process or lwp to stop, don't wait */
 	case PCWSTOP:	/* wait for process or lwp to stop */
 	case PCTWSTOP:	/* wait for process or lwp to stop, with timeout */
-	    {
-		time_t timeo;
+		{
+			time_t timeo;
 
-		/*
-		 * Can't apply to a system process.
-		 */
-		if ((p->p_flag & SSYS) || p->p_as == &kas) {
-			error = EBUSY;
-			break;
-		}
-
-		if (cmd == PCSTOP || cmd == PCDSTOP)
-			pr_stop(pnp);
-
-		if (cmd == PCDSTOP)
-			break;
-
-		/*
-		 * If an lwp is waiting for itself or its process, don't wait.
-		 * The stopped lwp would never see the fact that it is stopped.
-		 */
-		if ((pcp->prc_flags & PRC_LWP)?
-		    (pcp->prc_thread == curthread) : (p == curproc)) {
-			if (cmd == PCWSTOP || cmd == PCTWSTOP)
+			/*
+			 * Can't apply to a system process.
+			 */
+			if ((p->p_flag & SSYS) || p->p_as == &kas) {
 				error = EBUSY;
-			break;
-		}
+				break;
+			}
+
+			if (cmd == PCSTOP || cmd == PCDSTOP)
+				pr_stop(pnp);
+
+			if (cmd == PCDSTOP)
+				break;
+
+			/*
+			 * If an lwp is waiting for itself or its process,
+			 * don't wait. The stopped lwp would never see the
+			 * fact that it is stopped.
+			 */
+			if ((pcp->prc_flags & PRC_LWP)?
+			    (pcp->prc_thread == curthread) : (p == curproc)) {
+				if (cmd == PCWSTOP || cmd == PCTWSTOP)
+					error = EBUSY;
+				break;
+			}
 
 		timeo = (cmd == PCTWSTOP)? (time_t)argp->timeo : 0;
 		if ((error = pr_wait_stop(pnp, timeo)) != 0)
 			return (error);
 
 		break;
-	    }
+		}
 
 	case PCRUN:	/* make lwp or process runnable */
 		error = pr_setrun(pnp, argp->flags);
@@ -392,20 +393,20 @@ pr_control(long cmd, arg_t *argp, prnode_t *pnp, cred_t *cr)
 		break;
 
 	case PCSREG:	/* set general registers */
-	    {
-		kthread_t *t = pr_thread(pnp);
+		{
+			kthread_t *t = pr_thread(pnp);
 
-		if (!ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t)) {
-			thread_unlock(t);
-			error = EBUSY;
-		} else {
-			thread_unlock(t);
-			mutex_exit(&p->p_lock);
-			prsetprregs(ttolwp(t), argp->prgregset, 0);
-			mutex_enter(&p->p_lock);
+			if (!ISTOPPED(t) && !VSTOPPED(t) && !DSTOPPED(t)) {
+				thread_unlock(t);
+				error = EBUSY;
+			} else {
+				thread_unlock(t);
+				mutex_exit(&p->p_lock);
+				prsetprregs(ttolwp(t), argp->prgregset, 0);
+				mutex_enter(&p->p_lock);
+			}
+			break;
 		}
-		break;
-	    }
 
 	case PCSFPREG:	/* set floating-point registers */
 		error = pr_setfpregs(pnp, &argp->prfpregset);
@@ -732,40 +733,41 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 	case PCDSTOP:	/* direct process or lwp to stop, don't wait */
 	case PCWSTOP:	/* wait for process or lwp to stop */
 	case PCTWSTOP:	/* wait for process or lwp to stop, with timeout */
-	    {
-		time_t timeo;
+		{
+			time_t timeo;
 
-		/*
-		 * Can't apply to a system process.
-		 */
-		if ((p->p_flag & SSYS) || p->p_as == &kas) {
-			error = EBUSY;
-			break;
-		}
-
-		if (cmd == PCSTOP || cmd == PCDSTOP)
-			pr_stop(pnp);
-
-		if (cmd == PCDSTOP)
-			break;
-
-		/*
-		 * If an lwp is waiting for itself or its process, don't wait.
-		 * The lwp will never see the fact that itself is stopped.
-		 */
-		if ((pcp->prc_flags & PRC_LWP)?
-		    (pcp->prc_thread == curthread) : (p == curproc)) {
-			if (cmd == PCWSTOP || cmd == PCTWSTOP)
+			/*
+			 * Can't apply to a system process.
+			 */
+			if ((p->p_flag & SSYS) || p->p_as == &kas) {
 				error = EBUSY;
+				break;
+			}
+
+			if (cmd == PCSTOP || cmd == PCDSTOP)
+				pr_stop(pnp);
+
+			if (cmd == PCDSTOP)
+				break;
+
+			/*
+			 * If an lwp is waiting for itself or its process,
+			 * don't wait. The lwp will never see the fact that
+			 * itself is stopped.
+			 */
+			if ((pcp->prc_flags & PRC_LWP)?
+			    (pcp->prc_thread == curthread) : (p == curproc)) {
+				if (cmd == PCWSTOP || cmd == PCTWSTOP)
+					error = EBUSY;
+				break;
+			}
+
+			timeo = (cmd == PCTWSTOP)? (time_t)argp->timeo : 0;
+			if ((error = pr_wait_stop(pnp, timeo)) != 0)
+				return (error);
+
 			break;
 		}
-
-		timeo = (cmd == PCTWSTOP)? (time_t)argp->timeo : 0;
-		if ((error = pr_wait_stop(pnp, timeo)) != 0)
-			return (error);
-
-		break;
-	    }
 
 	case PCRUN:	/* make lwp or process runnable */
 		error = pr_setrun(pnp, (ulong_t)argp->flags);
@@ -839,7 +841,7 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 				thread_unlock(t);
 				mutex_exit(&p->p_lock);
 				prgregset_32ton(lwp, argp->prgregset,
-					prgregset);
+				    prgregset);
 				prsetprregs(lwp, prgregset, 0);
 				mutex_enter(&p->p_lock);
 			}
@@ -933,38 +935,39 @@ pr_control32(int32_t cmd, arg32_t *argp, prnode_t *pnp, cred_t *cr)
 			    (void *)(uintptr_t)argp->priovec.pio_base;
 			priovec.pio_len = (size_t)argp->priovec.pio_len;
 			priovec.pio_offset = (off_t)
-				(uint32_t)argp->priovec.pio_offset;
+			    (uint32_t)argp->priovec.pio_offset;
 			error = pr_rdwr(p, rw, &priovec);
 		}
 		break;
 
 	case PCSCRED:	/* set the process credentials */
 	case PCSCREDX:
-	    {
-		/*
-		 * All the fields in these structures are exactly the same
-		 * and so the structures are compatible.  In case this
-		 * ever changes, we catch this with the ASSERT below.
-		 */
-		prcred_t *prcred = (prcred_t *)&argp->prcred;
+		{
+			/*
+			 * All the fields in these structures are exactly the
+			 * same and so the structures are compatible.  In case
+			 * this ever changes, we catch this with the ASSERT
+			 * below.
+			 */
+			prcred_t *prcred = (prcred_t *)&argp->prcred;
 
 #ifndef __lint
-		ASSERT(sizeof (prcred_t) == sizeof (prcred32_t));
+			ASSERT(sizeof (prcred_t) == sizeof (prcred32_t));
 #endif
 
-		error = pr_scred(p, prcred, cr, cmd == PCSCREDX);
-		break;
-	    }
+			error = pr_scred(p, prcred, cr, cmd == PCSCREDX);
+			break;
+		}
 
 	case PCSPRIV:	/* set the process privileges */
-	    {
-		error = pr_spriv(p, &argp->prpriv, cr);
-		break;
-	    }
+		{
+			error = pr_spriv(p, &argp->prpriv, cr);
+			break;
+		}
 
 	case PCSZONE:	/* set the process's zoneid */
-	    error = pr_szoneid(p, (zoneid_t)argp->przoneid, cr);
-	    break;
+		error = pr_szoneid(p, (zoneid_t)argp->przoneid, cr);
+		break;
 	}
 
 	if (error)
@@ -1922,9 +1925,8 @@ pr_watch(prnode_t *pnp, prwatch_t *pwp, int *unlocked)
 	pwa->wa_eaddr = (caddr_t)vaddr + size;
 	pwa->wa_flags = (ulong_t)wflags;
 
-	error = ((pwa->wa_flags & ~WA_TRAPAFTER) == 0)?
-		clear_watched_area(p, pwa) :
-		set_watched_area(p, pwa);
+	error = ((pwa->wa_flags & ~WA_TRAPAFTER) == 0) ?
+	    clear_watched_area(p, pwa) : set_watched_area(p, pwa);
 
 	if (p == curproc) {
 		setallwatch();
@@ -2136,13 +2138,14 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 	cred_t *newcred;
 	uid_t oldruid;
 	int error;
+	zone_t *zone = crgetzone(cr);
 
-	if (!VALID_UID(prcred->pr_euid) ||
-	    !VALID_UID(prcred->pr_ruid) ||
-	    !VALID_UID(prcred->pr_suid) ||
-	    !VALID_GID(prcred->pr_egid) ||
-	    !VALID_GID(prcred->pr_rgid) ||
-	    !VALID_GID(prcred->pr_sgid))
+	if (!VALID_UID(prcred->pr_euid, zone) ||
+	    !VALID_UID(prcred->pr_ruid, zone) ||
+	    !VALID_UID(prcred->pr_suid, zone) ||
+	    !VALID_GID(prcred->pr_egid, zone) ||
+	    !VALID_GID(prcred->pr_rgid, zone) ||
+	    !VALID_GID(prcred->pr_sgid, zone))
 		return (EINVAL);
 
 	if (dogrps) {
@@ -2153,7 +2156,7 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 			return (EINVAL);
 
 		for (i = 0; i < ngrp; i++) {
-			if (!VALID_GID(prcred->pr_groups[i]))
+			if (!VALID_GID(prcred->pr_groups[i], zone))
 				return (EINVAL);
 		}
 	}
@@ -2182,9 +2185,9 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 
 	/* Error checking done above */
 	(void) crsetresuid(newcred, prcred->pr_ruid, prcred->pr_euid,
-		prcred->pr_suid);
+	    prcred->pr_suid);
 	(void) crsetresgid(newcred, prcred->pr_rgid, prcred->pr_egid,
-		prcred->pr_sgid);
+	    prcred->pr_sgid);
 
 	if (dogrps) {
 		(void) crsetgroups(newcred, prcred->pr_ngroups,

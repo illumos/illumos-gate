@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -351,7 +351,7 @@ zfs_fuid_get_mappings(zfs_fuid_hdl_t *hdl)
 
 void
 zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *hdl,
-    uint64_t fuid, zfs_fuid_type_t type, uid_t *id)
+    uint64_t fuid, cred_t *cr, zfs_fuid_type_t type, uid_t *id)
 {
 	uint32_t index = FUID_INDEX(fuid);
 	char *domain;
@@ -365,7 +365,7 @@ zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *hdl,
 	}
 
 	if (hdl->z_hdl == NULL) {
-		hdl->z_hdl = kidmap_get_create();
+		hdl->z_hdl = kidmap_get_create(crgetzone(cr));
 		hdl->z_map_needed = B_TRUE;
 	}
 
@@ -382,7 +382,7 @@ zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *hdl,
 }
 
 void
-zfs_fuid_map_ids(znode_t *zp, uid_t *uid, uid_t *gid)
+zfs_fuid_map_ids(znode_t *zp, cred_t *cr, uid_t *uid, uid_t *gid)
 {
 	uint32_t uid_index = FUID_INDEX(zp->z_phys->zp_uid);
 	uint32_t gid_index = FUID_INDEX(zp->z_phys->zp_gid);
@@ -396,10 +396,10 @@ zfs_fuid_map_ids(znode_t *zp, uid_t *uid, uid_t *gid)
 		zfs_fuid_hdl_t hdl = { 0 };
 
 		zfs_fuid_queue_map_id(zp->z_zfsvfs, &hdl,
-		    zp->z_phys->zp_uid, ZFS_OWNER, uid);
+		    zp->z_phys->zp_uid, cr, ZFS_OWNER, uid);
 
 		zfs_fuid_queue_map_id(zp->z_zfsvfs, &hdl,
-		    zp->z_phys->zp_gid, ZFS_GROUP, gid);
+		    zp->z_phys->zp_gid, cr, ZFS_GROUP, gid);
 
 		zfs_fuid_get_mappings(&hdl);
 	}
@@ -407,7 +407,7 @@ zfs_fuid_map_ids(znode_t *zp, uid_t *uid, uid_t *gid)
 
 void
 zfs_fuid_map_id(zfsvfs_t *zfsvfs, uint64_t fuid,
-    zfs_fuid_type_t type, uid_t *id)
+    cred_t *cr, zfs_fuid_type_t type, uid_t *id)
 {
 	uint32_t index = FUID_INDEX(fuid);
 	char *domain;
@@ -421,9 +421,11 @@ zfs_fuid_map_id(zfsvfs_t *zfsvfs, uint64_t fuid,
 	ASSERT(domain != NULL);
 
 	if (type == ZFS_OWNER || type == ZFS_ACE_USER)
-		(void) kidmap_getuidbysid(domain, FUID_RID(fuid), id);
+		(void) kidmap_getuidbysid(crgetzone(cr), domain,
+		    FUID_RID(fuid), id);
 	else
-		(void) kidmap_getgidbysid(domain, FUID_RID(fuid), id);
+		(void) kidmap_getgidbysid(crgetzone(cr), domain,
+		    FUID_RID(fuid), id);
 }
 
 /*
@@ -535,7 +537,7 @@ zfs_fuid_create_cred(zfsvfs_t *zfsvfs, uint64_t id,
  * attached to the zfsvfs of the file system.
  */
 uint64_t
-zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id,
+zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
     zfs_fuid_type_t type, dmu_tx_t *tx, zfs_fuid_info_t **fuidpp)
 {
 	const char *domain;
@@ -586,9 +588,11 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id,
 		domain = fuidp->z_domain_table[idx -1];
 	} else {
 		if (type == ZFS_OWNER || type == ZFS_ACE_USER)
-			status = kidmap_getsidbyuid(id, &domain, &rid);
+			status = kidmap_getsidbyuid(crgetzone(cr), id,
+			    &domain, &rid);
 		else
-			status = kidmap_getsidbygid(id, &domain, &rid);
+			status = kidmap_getsidbygid(crgetzone(cr), id,
+			    &domain, &rid);
 
 		if (status != 0) {
 			/*
@@ -733,6 +737,6 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	/*
 	 * Not found in ksidlist, check posix groups
 	 */
-	zfs_fuid_map_id(zfsvfs, id, ZFS_GROUP, &gid);
+	zfs_fuid_map_id(zfsvfs, id, cr, ZFS_GROUP, &gid);
 	return (groupmember(gid, cr));
 }

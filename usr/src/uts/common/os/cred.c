@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,19 +64,27 @@
 #include <sys/idmap.h>
 #include <sys/varargs.h>
 
-typedef struct ephidmap_data {
-	uid_t		min_uid, last_uid;
-	gid_t		min_gid, last_gid;
-	cred_t		*nobody;
+
+/* Ephemeral IDs Zones specific data */
+typedef struct ephemeral_zsd {
+	uid_t		min_uid;
+	uid_t		last_uid;
+	gid_t		min_gid;
+	gid_t		last_gid;
 	kmutex_t	eph_lock;
-} ephidmap_data_t;
+	cred_t		*eph_nobody;
+} ephemeral_zsd_t;
+
+
+static kmutex_t		ephemeral_zone_mutex;
+static zone_key_t	ephemeral_zone_key;
 
 static struct kmem_cache *cred_cache;
-static size_t crsize = 0;
-static int audoff = 0;
-uint32_t ucredsize;
-cred_t *kcred;
-static cred_t *dummycr;
+static size_t		crsize = 0;
+static int		audoff = 0;
+uint32_t		ucredsize;
+cred_t			*kcred;
+static cred_t		*dummycr;
 
 int rstlink;		/* link(2) restricted to files owned by user? */
 
@@ -87,15 +95,59 @@ static int get_c2audit_load(void);
 
 #define	REMOTE_PEER_CRED(c)	((c)->cr_gid == -1)
 
-/*
- * XXX: should be per-zone.
- * Start with an invalid value for atomic increments.
- */
-static ephidmap_data_t ephemeral_data = {
-	MAXUID, IDMAP_WK__MAX_UID, MAXUID, IDMAP_WK__MAX_GID
-};
 
 static boolean_t hasephids = B_FALSE;
+
+static ephemeral_zsd_t *
+get_ephemeral_zsd(zone_t *zone)
+{
+	ephemeral_zsd_t *eph_zsd;
+
+	eph_zsd = zone_getspecific(ephemeral_zone_key, zone);
+	if (eph_zsd != NULL) {
+		return (eph_zsd);
+	}
+
+	mutex_enter(&ephemeral_zone_mutex);
+	eph_zsd = zone_getspecific(ephemeral_zone_key, zone);
+	if (eph_zsd == NULL) {
+		eph_zsd = kmem_zalloc(sizeof (ephemeral_zsd_t), KM_SLEEP);
+		eph_zsd->min_uid = MAXUID;
+		eph_zsd->last_uid = IDMAP_WK__MAX_UID;
+		eph_zsd->min_gid = MAXUID;
+		eph_zsd->last_gid = IDMAP_WK__MAX_GID;
+		mutex_init(&eph_zsd->eph_lock, NULL, MUTEX_DEFAULT, NULL);
+
+		/*
+		 * nobody is used to map SID containing CRs.
+		 */
+		eph_zsd->eph_nobody = crdup(zone->zone_kcred);
+		(void) crsetugid(eph_zsd->eph_nobody, UID_NOBODY, GID_NOBODY);
+		CR_FLAGS(eph_zsd->eph_nobody) = 0;
+		eph_zsd->eph_nobody->cr_zone = zone;
+
+		(void) zone_setspecific(ephemeral_zone_key, zone, eph_zsd);
+	}
+	mutex_exit(&ephemeral_zone_mutex);
+	return (eph_zsd);
+}
+
+/*
+ * This function is called when a zone is destroyed
+ */
+static void
+/* ARGSUSED */
+destroy_ephemeral_zsd(zoneid_t zone_id, void *arg)
+{
+	ephemeral_zsd_t *eph_zsd = arg;
+	if (eph_zsd != NULL) {
+		mutex_destroy(&eph_zsd->eph_lock);
+		crfree(eph_zsd->eph_nobody);
+		kmem_free(eph_zsd, sizeof (ephemeral_zsd_t));
+	}
+}
+
+
 
 /*
  * Initialize credentials data structures.
@@ -175,14 +227,10 @@ cred_init(void)
 	ttoproc(curthread)->p_cred = kcred;
 	curthread->t_cred = kcred;
 
-	/*
-	 * nobody is used to map SID containing CRs.
-	 */
-	ephemeral_data.nobody = crdup(kcred);
-	(void) crsetugid(ephemeral_data.nobody, UID_NOBODY, GID_NOBODY);
-	CR_FLAGS(ephemeral_data.nobody) = 0;
-
 	ucredsize = UCRED_SIZE;
+
+	mutex_init(&ephemeral_zone_mutex, NULL, MUTEX_DEFAULT, NULL);
+	zone_key_create(&ephemeral_zone_key, NULL, NULL, destroy_ephemeral_zsd);
 }
 
 /*
@@ -622,15 +670,17 @@ crisremote(const cred_t *cr)
 	return (REMOTE_PEER_CRED(cr));
 }
 
-#define	BADUID(x)	((x) != -1 && !VALID_UID(x))
-#define	BADGID(x)	((x) != -1 && !VALID_GID(x))
+#define	BADUID(x, zn)	((x) != -1 && !VALID_UID((x), (zn)))
+#define	BADGID(x, zn)	((x) != -1 && !VALID_GID((x), (zn)))
 
 int
 crsetresuid(cred_t *cr, uid_t r, uid_t e, uid_t s)
 {
+	zone_t	*zone = crgetzone(cr);
+
 	ASSERT(cr->cr_ref <= 2);
 
-	if (BADUID(r) || BADUID(e) || BADUID(s))
+	if (BADUID(r, zone) || BADUID(e, zone) || BADUID(s, zone))
 		return (-1);
 
 	if (r != -1)
@@ -646,9 +696,11 @@ crsetresuid(cred_t *cr, uid_t r, uid_t e, uid_t s)
 int
 crsetresgid(cred_t *cr, gid_t r, gid_t e, gid_t s)
 {
+	zone_t	*zone = crgetzone(cr);
+
 	ASSERT(cr->cr_ref <= 2);
 
-	if (BADGID(r) || BADGID(e) || BADGID(s))
+	if (BADGID(r, zone) || BADGID(e, zone) || BADGID(s, zone))
 		return (-1);
 
 	if (r != -1)
@@ -664,9 +716,11 @@ crsetresgid(cred_t *cr, gid_t r, gid_t e, gid_t s)
 int
 crsetugid(cred_t *cr, uid_t uid, gid_t gid)
 {
+	zone_t	*zone = crgetzone(cr);
+
 	ASSERT(cr->cr_ref <= 2);
 
-	if (!VALID_UID(uid) || !VALID_GID(gid))
+	if (!VALID_UID(uid, zone) || !VALID_GID(gid, zone))
 		return (-1);
 
 	cr->cr_uid = cr->cr_ruid = cr->cr_suid = uid;
@@ -970,63 +1024,128 @@ zone_kcred(void)
 }
 
 boolean_t
-valid_ephemeral_uid(uid_t id)
+valid_ephemeral_uid(zone_t *zone, uid_t id)
 {
+	ephemeral_zsd_t *eph_zsd;
+	if (id < IDMAP_WK__MAX_UID)
+		return (B_TRUE);
+
+	eph_zsd = get_ephemeral_zsd(zone);
+	ASSERT(eph_zsd != NULL);
 	membar_consumer();
-	return (id < IDMAP_WK__MAX_UID ||
-	    (id > ephemeral_data.min_uid && id <= ephemeral_data.last_uid));
+	return (id > eph_zsd->min_uid && id <= eph_zsd->last_uid);
 }
 
 boolean_t
-valid_ephemeral_gid(gid_t id)
+valid_ephemeral_gid(zone_t *zone, gid_t id)
 {
+	ephemeral_zsd_t *eph_zsd;
+	if (id < IDMAP_WK__MAX_GID)
+		return (B_TRUE);
+
+	eph_zsd = get_ephemeral_zsd(zone);
+	ASSERT(eph_zsd != NULL);
 	membar_consumer();
-	return (id < IDMAP_WK__MAX_GID ||
-	    (id > ephemeral_data.min_gid && id <= ephemeral_data.last_gid));
+	return (id > eph_zsd->min_gid && id <= eph_zsd->last_gid);
 }
 
 int
-eph_uid_alloc(int flags, uid_t *start, int count)
+eph_uid_alloc(zone_t *zone, int flags, uid_t *start, int count)
 {
-	mutex_enter(&ephemeral_data.eph_lock);
+	ephemeral_zsd_t *eph_zsd = get_ephemeral_zsd(zone);
+
+	ASSERT(eph_zsd != NULL);
+
+	mutex_enter(&eph_zsd->eph_lock);
 
 	/* Test for unsigned integer wrap around */
-	if (ephemeral_data.last_uid + count < ephemeral_data.last_uid) {
-		mutex_exit(&ephemeral_data.eph_lock);
+	if (eph_zsd->last_uid + count < eph_zsd->last_uid) {
+		mutex_exit(&eph_zsd->eph_lock);
 		return (-1);
 	}
 
 	/* first call or idmap crashed and state corrupted */
 	if (flags != 0)
-		ephemeral_data.min_uid = ephemeral_data.last_uid;
+		eph_zsd->min_uid = eph_zsd->last_uid;
 
 	hasephids = B_TRUE;
-	*start = ephemeral_data.last_uid + 1;
-	atomic_add_32(&ephemeral_data.last_uid, count);
-	mutex_exit(&ephemeral_data.eph_lock);
+	*start = eph_zsd->last_uid + 1;
+	atomic_add_32(&eph_zsd->last_uid, count);
+	mutex_exit(&eph_zsd->eph_lock);
 	return (0);
 }
 
 int
-eph_gid_alloc(int flags, gid_t *start, int count)
+eph_gid_alloc(zone_t *zone, int flags, gid_t *start, int count)
 {
-	mutex_enter(&ephemeral_data.eph_lock);
+	ephemeral_zsd_t *eph_zsd = get_ephemeral_zsd(zone);
+
+	ASSERT(eph_zsd != NULL);
+
+	mutex_enter(&eph_zsd->eph_lock);
 
 	/* Test for unsigned integer wrap around */
-	if (ephemeral_data.last_gid + count < ephemeral_data.last_gid) {
-		mutex_exit(&ephemeral_data.eph_lock);
+	if (eph_zsd->last_gid + count < eph_zsd->last_gid) {
+		mutex_exit(&eph_zsd->eph_lock);
 		return (-1);
 	}
 
 	/* first call or idmap crashed and state corrupted */
 	if (flags != 0)
-		ephemeral_data.min_gid = ephemeral_data.last_gid;
+		eph_zsd->min_gid = eph_zsd->last_gid;
 
 	hasephids = B_TRUE;
-	*start = ephemeral_data.last_gid + 1;
-	atomic_add_32(&ephemeral_data.last_gid, count);
-	mutex_exit(&ephemeral_data.eph_lock);
+	*start = eph_zsd->last_gid + 1;
+	atomic_add_32(&eph_zsd->last_gid, count);
+	mutex_exit(&eph_zsd->eph_lock);
 	return (0);
+}
+
+/*
+ * IMPORTANT.The two functions get_ephemeral_data() and set_ephemeral_data()
+ * are project private functions that are for use of the test system only and
+ * are not to be used for other purposes.
+ */
+
+void
+get_ephemeral_data(zone_t *zone, uid_t *min_uid, uid_t *last_uid,
+	gid_t *min_gid, gid_t *last_gid)
+{
+	ephemeral_zsd_t *eph_zsd = get_ephemeral_zsd(zone);
+
+	ASSERT(eph_zsd != NULL);
+
+	mutex_enter(&eph_zsd->eph_lock);
+
+	*min_uid = eph_zsd->min_uid;
+	*last_uid = eph_zsd->last_uid;
+	*min_gid = eph_zsd->min_gid;
+	*last_gid = eph_zsd->last_gid;
+
+	mutex_exit(&eph_zsd->eph_lock);
+}
+
+
+void
+set_ephemeral_data(zone_t *zone, uid_t min_uid, uid_t last_uid,
+	gid_t min_gid, gid_t last_gid)
+{
+	ephemeral_zsd_t *eph_zsd = get_ephemeral_zsd(zone);
+
+	ASSERT(eph_zsd != NULL);
+
+	mutex_enter(&eph_zsd->eph_lock);
+
+	if (min_uid != 0)
+		eph_zsd->min_uid = min_uid;
+	if (last_uid != 0)
+		eph_zsd->last_uid = last_uid;
+	if (min_gid != 0)
+		eph_zsd->min_gid = min_gid;
+	if (last_gid != 0)
+		eph_zsd->last_gid = last_gid;
+
+	mutex_exit(&eph_zsd->eph_lock);
 }
 
 /*
@@ -1036,6 +1155,7 @@ eph_gid_alloc(int flags, gid_t *start, int count)
 cred_t *
 crgetmapped(const cred_t *cr)
 {
+	ephemeral_zsd_t *eph_zsd;
 	/*
 	 * Someone incorrectly passed a NULL cred to a vnode operation
 	 * either on purpose or by calling CRED() in interrupt context.
@@ -1044,11 +1164,15 @@ crgetmapped(const cred_t *cr)
 		return (NULL);
 
 	if (cr->cr_ksid != NULL) {
-		if (cr->cr_ksid->kr_sidx[KSID_USER].ks_id > MAXUID)
-			return (ephemeral_data.nobody);
+		if (cr->cr_ksid->kr_sidx[KSID_USER].ks_id > MAXUID) {
+			eph_zsd = get_ephemeral_zsd(crgetzone(cr));
+			return (eph_zsd->eph_nobody);
+		}
 
-		if (cr->cr_ksid->kr_sidx[KSID_GROUP].ks_id > MAXUID)
-			return (ephemeral_data.nobody);
+		if (cr->cr_ksid->kr_sidx[KSID_GROUP].ks_id > MAXUID) {
+			eph_zsd = get_ephemeral_zsd(crgetzone(cr));
+			return (eph_zsd->eph_nobody);
+		}
 	}
 
 	return ((cred_t *)cr);

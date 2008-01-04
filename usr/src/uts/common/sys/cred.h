@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,16 +153,17 @@ extern boolean_t crisremote(const cred_t *);
 /*
  * Private interfaces for ephemeral uids.
  */
-#define	VALID_UID(id)					\
-	((id) <= MAXUID || valid_ephemeral_uid((id)))
-#define	VALID_GID(id)					\
-	((id) <= MAXUID || valid_ephemeral_gid((id)))
+#define	VALID_UID(id, zn)					\
+	((id) <= MAXUID || valid_ephemeral_uid((zn), (id)))
 
-extern boolean_t valid_ephemeral_uid(uid_t);
-extern boolean_t valid_ephemeral_gid(gid_t);
+#define	VALID_GID(id, zn)					\
+	((id) <= MAXUID || valid_ephemeral_gid((zn), (id)))
 
-extern int eph_uid_alloc(int, uid_t *, int);
-extern int eph_gid_alloc(int, gid_t *, int);
+extern boolean_t valid_ephemeral_uid(struct zone *, uid_t);
+extern boolean_t valid_ephemeral_gid(struct zone *, gid_t);
+
+extern int eph_uid_alloc(struct zone *, int, uid_t *, int);
+extern int eph_gid_alloc(struct zone *, int, gid_t *, int);
 
 extern void crsetsid(cred_t *, struct ksid *, int);
 extern void crsetsidlist(cred_t *, struct ksidlist *);

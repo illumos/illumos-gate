@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -564,20 +564,23 @@ ptmwput(queue_t *qp, mblk_t *mp)
 		{
 			pt_own_t *ptop;
 			int error;
+			zone_t *zone;
 
 			if ((error = miocpullup(mp, sizeof (pt_own_t))) != 0) {
 				miocnak(qp, mp, 0, error);
 				break;
 			}
 
+			zone = zone_find_by_id(ptmp->pt_zoneid);
 			ptop = (pt_own_t *)mp->b_cont->b_rptr;
 
-			if (!VALID_UID(ptop->pto_ruid) ||
-			    !VALID_GID(ptop->pto_rgid)) {
+			if (!VALID_UID(ptop->pto_ruid, zone) ||
+			    !VALID_GID(ptop->pto_rgid, zone)) {
+				zone_rele(zone);
 				miocnak(qp, mp, 0, EINVAL);
 				break;
 			}
-
+			zone_rele(zone);
 			mutex_enter(&ptmp->pt_lock);
 			ptmp->pt_ruid = ptop->pto_ruid;
 			ptmp->pt_rgid = ptop->pto_rgid;

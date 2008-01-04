@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,19 +49,20 @@
 #include <sys/sysmacros.h>
 #include <sys/disp.h>
 #include <sys/kidmap.h>
+#include <sys/zone.h>
 #include "idmap_prot.h"
 #include "kidmap_priv.h"
 
 
-static	kmutex_t	idmap_lock;
-static	idmap_cache_t	idmap_cache;
+/*
+ * Defined types
+ */
+
 
 /*
- * Used to hold RPC header, in particular the XID (not that XID matters
- * in doors RPC)
+ * This structure holds pointers for the
+ * batch mapping results.
  */
-static struct rpc_msg	call_msg;
-
 typedef struct idmap_get_res {
 	idmap_id_type	idtype;
 	uid_t		*uid;
@@ -75,169 +76,123 @@ typedef struct idmap_get_res {
 
 /* Batch mapping handle structure */
 struct idmap_get_handle {
-	idmap_cache_t	*cache;
+	struct idmap_zone_specific *zs;
 	int 		mapping_num;
 	int 		mapping_size;
 	idmap_mapping	*mapping;
 	idmap_get_res	*result;
 };
 
-static kmutex_t	idmap_mutex;
-static int	idmap_stopped = 0;
 
-struct idmap_reg {
-	door_handle_t 	idmap_door;
-	int		idmap_invalid;
-	int		idmap_invalidated;
-	int		idmap_ref;
-};
+/* Zone specific data */
+typedef struct idmap_zone_specific {
+	kmutex_t	zone_mutex;
+	idmap_cache_t	cache;
+	door_handle_t 	door_handle;
+	int		door_valid;
+	uint32_t	message_id;
+} idmap_zone_specific_t;
 
-static idmap_reg_t *idmap_ptr;
+
+
+/*
+ * Module global data
+ */
+
+static kmutex_t		idmap_zone_mutex;
+static zone_key_t	idmap_zone_key;
+
+
+/*
+ * Local function definitions
+ */
 
 
 static int
-kidmap_rpc_call(uint32_t op, xdrproc_t xdr_args, caddr_t args,
+kidmap_rpc_call(idmap_zone_specific_t *zs, uint32_t op,
+		xdrproc_t xdr_args, caddr_t args,
 		xdrproc_t xdr_res, caddr_t res);
 
-static int	kidmap_call_door(door_arg_t *arg);
+static int
+kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg);
 
-static void
-idmap_freeone(idmap_reg_t *p)
-{
-	ASSERT(p->idmap_ref == 0);
-	ASSERT(MUTEX_HELD(&idmap_mutex));
+static idmap_zone_specific_t *
+idmap_get_zone_specific(zone_t *zone);
 
-	door_ki_rele(p->idmap_door);
-	if (idmap_ptr == p)
-		idmap_ptr = NULL;
 
-	kmem_free(p, sizeof (*p));
-}
-
-void
-idmap_get_door(idmap_reg_t **state, door_handle_t *dh)
-{
-	idmap_reg_t *idmp;
-
-	*state = NULL;
-	if (dh != NULL)
-		*dh = NULL;
-
-	mutex_enter(&idmap_mutex);
-	if ((idmp = idmap_ptr) == NULL || idmp->idmap_invalid) {
-		mutex_exit(&idmap_mutex);
-		return;
-	}
-
-	idmap_ptr->idmap_ref++;
-
-	mutex_exit(&idmap_mutex);
-
-	*state = idmp;
-	if (dh != NULL)
-		*dh = idmp->idmap_door;
-}
-
-void
-idmap_release_door(idmap_reg_t *idmp)
-{
-	mutex_enter(&idmap_mutex);
-
-	/*
-	 * Note we may decrement idmap_ref twice; if we do it's because
-	 * we had EBADF, and rather than decrement the ref count where
-	 * that happens we do it here to make sure that we do both
-	 * decrements while holding idmap_mutex.
-	 */
-	if (idmp->idmap_invalid && !idmp->idmap_invalidated) {
-		idmp->idmap_invalidated = 1;
-		if (--idmp->idmap_ref == 0) {
-			idmap_freeone(idmap_ptr);
-			mutex_exit(&idmap_mutex);
-			return;
-		}
-	}
-
-	if (--idmp->idmap_ref == 0)
-		idmap_freeone(idmap_ptr);
-
-	mutex_exit(&idmap_mutex);
-}
 
 int
-idmap_reg_dh(door_handle_t dh)
+idmap_reg_dh(zone_t *zone, door_handle_t dh)
 {
-	idmap_reg_t *idmp;
+	idmap_zone_specific_t *zs;
 
-	idmp = kmem_alloc(sizeof (*idmp), KM_SLEEP);
+	zs = idmap_get_zone_specific(zone);
 
-	idmp->idmap_door = dh;
-	mutex_enter(&idmap_mutex);
+	mutex_enter(&zs->zone_mutex);
 
+	if (zs->door_valid)
+		door_ki_rele(zs->door_handle);
 
-	if (idmap_stopped) {
-		mutex_exit(&idmap_mutex);
-		/*
-		 * We're unloading the module.  Calling idmap_reg(2)
-		 * again once we're done unloading should cause the
-		 * module to be loaded again, so we return EAGAIN.
-		 */
-		return (EAGAIN);
-	}
+	zs->door_handle = dh;
+	zs->door_valid = 1;
 
-	if (idmap_ptr != NULL) {
-		if (--idmap_ptr->idmap_ref == 0)
-			idmap_freeone(idmap_ptr);
-	}
-	idmp->idmap_invalid = 0;
-	idmp->idmap_invalidated = 0;
-	idmp->idmap_ref = 1;
-	idmap_ptr = idmp;
-
-	call_msg.rm_xid = 1;
-	call_msg.rm_call.cb_prog = IDMAP_PROG;
-	call_msg.rm_call.cb_vers = IDMAP_V1;
-
-	mutex_exit(&idmap_mutex);
+	mutex_exit(&zs->zone_mutex);
 
 	return (0);
 }
 
+/*
+ * idmap_unreg_dh
+ *
+ * This routine is called by system call idmap_unreg().
+ * idmap_unreg() calls door_ki_rele() on the supplied
+ * door handle after this routine returns. We only
+ * need to perform one door release on zs->door_handle
+ */
 int
-idmap_unreg_dh(door_handle_t dh)
+idmap_unreg_dh(zone_t *zone, door_handle_t dh)
 {
-	kidmap_cache_purge(&idmap_cache);
+	idmap_zone_specific_t *zs;
 
-	mutex_enter(&idmap_mutex);
-	if (idmap_ptr == NULL || idmap_ptr->idmap_door != dh) {
-		mutex_exit(&idmap_mutex);
+	zs = idmap_get_zone_specific(zone);
+
+	kidmap_cache_purge(&zs->cache);
+
+	mutex_enter(&zs->zone_mutex);
+
+	if (!zs->door_valid) {
+		mutex_exit(&zs->zone_mutex);
 		return (EINVAL);
 	}
 
-	if (idmap_ptr->idmap_invalid) {
-		mutex_exit(&idmap_mutex);
+	if (zs->door_handle != dh) {
+		mutex_exit(&zs->zone_mutex);
 		return (EINVAL);
 	}
-	idmap_ptr->idmap_invalid = 1;
-	idmap_ptr->idmap_invalidated = 1;
-	if (--idmap_ptr->idmap_ref == 0)
-		idmap_freeone(idmap_ptr);
-	mutex_exit(&idmap_mutex);
+
+	door_ki_rele(zs->door_handle);
+
+	zs->door_valid = 0;
+	mutex_exit(&zs->zone_mutex);
+
 	return (0);
 }
 
 
 static int
-kidmap_call_door(door_arg_t *arg)
+kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg)
 {
+	door_handle_t dh;
 	int status = 0;
-	door_handle_t	dh;
-	idmap_reg_t	*reg;
 
-	idmap_get_door(&reg, &dh);
-	if (reg == NULL || dh == NULL) {
+	mutex_enter(&zs->zone_mutex);
+	if (!zs->door_valid) {
+		mutex_exit(&zs->zone_mutex);
 		return (-1);
 	}
+	dh = zs->door_handle;
+	door_ki_hold(dh);
+	mutex_exit(&zs->zone_mutex);
 
 	status = door_ki_upcall(dh, arg);
 
@@ -246,24 +201,74 @@ kidmap_call_door(door_arg_t *arg)
 		cmn_err(CE_WARN, "idmap: Door call failed %d\n", status);
 #endif	/* DEBUG */
 
+	door_ki_rele(dh);
+
 	if (status == EBADF) {
-		reg->idmap_invalid = 1;
+		/*
+		 * If we get EBADF we will most likely not get an
+		 * idmap_unreg_dh().
+		 */
+		mutex_enter(&zs->zone_mutex);
+		if (zs->door_valid) {
+			zs->door_valid = 0;
+			door_ki_rele(zs->door_handle);
+		}
+		mutex_exit(&zs->zone_mutex);
 	}
 
-	idmap_release_door(reg);
-
 	return (status);
+}
+
+
+static idmap_zone_specific_t *
+idmap_get_zone_specific(zone_t *zone)
+{
+	idmap_zone_specific_t *zs;
+
+	ASSERT(zone != NULL);
+
+	zs = zone_getspecific(idmap_zone_key, zone);
+	if (zs != NULL)
+		return (zs);
+
+	mutex_enter(&idmap_zone_mutex);
+	zs = zone_getspecific(idmap_zone_key, zone);
+	if (zs == NULL) {
+		zs = kmem_zalloc(sizeof (idmap_zone_specific_t), KM_SLEEP);
+		mutex_init(&zs->zone_mutex, NULL, MUTEX_DEFAULT, NULL);
+		kidmap_cache_create(&zs->cache);
+		(void) zone_setspecific(idmap_zone_key, zone, zs);
+		mutex_exit(&idmap_zone_mutex);
+		return (zs);
+	}
+	mutex_exit(&idmap_zone_mutex);
+
+	return (zs);
+}
+
+
+static void
+/* ARGSUSED */
+idmap_zone_destroy(zoneid_t zone_id, void *arg)
+{
+	idmap_zone_specific_t *zs = arg;
+	if (zs != NULL) {
+		kidmap_cache_delete(&zs->cache);
+		if (zs->door_valid) {
+			door_ki_rele(zs->door_handle);
+		}
+		mutex_destroy(&zs->zone_mutex);
+		kmem_free(zs, sizeof (idmap_zone_specific_t));
+	}
 }
 
 
 int
 kidmap_start(void)
 {
-	mutex_init(&idmap_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&idmap_zone_mutex, NULL, MUTEX_DEFAULT, NULL);
+	zone_key_create(&idmap_zone_key, NULL, NULL, idmap_zone_destroy);
 	kidmap_sid_prefix_store_init();
-	kidmap_cache_create(&idmap_cache);
-
-	idmap_stopped = 0;
 
 	return (0);
 }
@@ -272,22 +277,51 @@ kidmap_start(void)
 int
 kidmap_stop(void)
 {
-	mutex_enter(&idmap_mutex);
-
-	if (idmap_ptr != NULL) {
-		mutex_exit(&idmap_mutex);
-		return (EBUSY);
-	}
-
-	idmap_stopped = 1;
-
-	mutex_exit(&idmap_mutex);
-
-	kidmap_cache_delete(&idmap_cache);
-	mutex_destroy(&idmap_lock);
-
-	return (0);
+	return (EBUSY);
 }
+
+
+/*
+ * idmap_get_door
+ *
+ * This is called by the system call allocids() to get the door for the
+ * given zone.
+ */
+door_handle_t
+idmap_get_door(zone_t *zone)
+{
+	door_handle_t dh = NULL;
+	idmap_zone_specific_t *zs;
+
+	zs = idmap_get_zone_specific(zone);
+
+	mutex_enter(&zs->zone_mutex);
+	if (zs->door_valid) {
+		dh = zs->door_handle;
+		door_ki_hold(dh);
+	}
+	mutex_exit(&zs->zone_mutex);
+	return (dh);
+}
+
+
+/*
+ * idmap_purge_cache
+ *
+ * This is called by the system call allocids() to purge the cache for the
+ * given zone.
+ */
+void
+idmap_purge_cache(zone_t *zone)
+{
+	idmap_zone_specific_t *zs;
+
+	zs = idmap_get_zone_specific(zone);
+
+	kidmap_cache_purge(&zs->cache);
+}
+
+
 
 
 /*
@@ -304,8 +338,10 @@ kidmap_stop(void)
  * Success return IDMAP_SUCCESS else IDMAP error
  */
 idmap_stat
-kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid)
+kidmap_getuidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		uid_t *uid)
 {
+	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
 	idmap_mapping		mapping;
 	idmap_ids_res		results;
@@ -316,7 +352,9 @@ kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid)
 	if (sid_prefix == NULL || uid == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_uidbysid(&idmap_cache, sid_prefix, rid, uid)
+	zs = idmap_get_zone_specific(zone);
+
+	if (kidmap_cache_lookup_uidbysid(&zs->cache, sid_prefix, rid, uid)
 	    == IDMAP_SUCCESS)
 		return (IDMAP_SUCCESS);
 
@@ -331,7 +369,7 @@ kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid)
 	args.idmap_mapping_batch_len = 1;
 	args.idmap_mapping_batch_val = &mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -342,7 +380,7 @@ kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid)
 			if (status == IDMAP_SUCCESS) {
 				new_sid_prefix = kidmap_find_sid_prefix(
 				    sid_prefix);
-				kidmap_cache_add_uidbysid(&idmap_cache,
+				kidmap_cache_add_uidbysid(&zs->cache,
 				    new_sid_prefix, rid, *uid);
 			}
 		} else {
@@ -373,8 +411,10 @@ kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid)
  * Success return IDMAP_SUCCESS else IDMAP error
  */
 idmap_stat
-kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid)
+kidmap_getgidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		gid_t *gid)
 {
+	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
 	idmap_mapping		mapping;
 	idmap_ids_res		results;
@@ -385,10 +425,11 @@ kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid)
 	if (sid_prefix == NULL || gid == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_gidbysid(&idmap_cache, sid_prefix, rid, gid)
-	    == IDMAP_SUCCESS) {
+	zs = idmap_get_zone_specific(zone);
+
+	if (kidmap_cache_lookup_gidbysid(&zs->cache, sid_prefix, rid, gid)
+	    == IDMAP_SUCCESS)
 		return (IDMAP_SUCCESS);
-	}
 
 	bzero(&mapping, sizeof (idmap_mapping));
 	mapping.id1.idtype = IDMAP_SID;
@@ -401,7 +442,7 @@ kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid)
 	args.idmap_mapping_batch_len = 1;
 	args.idmap_mapping_batch_val = &mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -412,7 +453,7 @@ kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid)
 			if (status == IDMAP_SUCCESS) {
 				new_sid_prefix = kidmap_find_sid_prefix(
 				    sid_prefix);
-				kidmap_cache_add_gidbysid(&idmap_cache,
+				kidmap_cache_add_gidbysid(&zs->cache,
 				    new_sid_prefix, rid, *gid);
 			}
 		} else {
@@ -443,9 +484,10 @@ kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid)
  * Success return IDMAP_SUCCESS else IDMAP error
  */
 idmap_stat
-kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
-		int *is_user)
+kidmap_getpidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		uid_t *pid, int *is_user)
 {
+	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
 	idmap_mapping		mapping;
 	idmap_ids_res		results;
@@ -456,10 +498,11 @@ kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
 	if (sid_prefix == NULL || pid == NULL || is_user == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_pidbysid(&idmap_cache, sid_prefix, rid, pid,
-	    is_user) == IDMAP_SUCCESS) {
+	zs = idmap_get_zone_specific(zone);
+
+	if (kidmap_cache_lookup_pidbysid(&zs->cache, sid_prefix, rid, pid,
+	    is_user) == IDMAP_SUCCESS)
 		return (IDMAP_SUCCESS);
-	}
 
 	bzero(&mapping, sizeof (idmap_mapping));
 	mapping.id1.idtype = IDMAP_SID;
@@ -472,7 +515,7 @@ kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
 	args.idmap_mapping_batch_len = 1;
 	args.idmap_mapping_batch_val = &mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -490,7 +533,7 @@ kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
 			if (status == IDMAP_SUCCESS) {
 				new_sid_prefix = kidmap_find_sid_prefix(
 				    sid_prefix);
-				kidmap_cache_add_pidbysid(&idmap_cache,
+				kidmap_cache_add_pidbysid(&zs->cache,
 				    new_sid_prefix, rid, *pid,
 				    *is_user);
 			}
@@ -524,8 +567,10 @@ kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
  * Success return IDMAP_SUCCESS else IDMAP error
  */
 idmap_stat
-kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
+kidmap_getsidbyuid(zone_t *zone, uid_t uid, const char **sid_prefix,
+		uint32_t *rid)
 {
+	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
 	idmap_mapping		mapping;
 	idmap_ids_res		results;
@@ -537,7 +582,9 @@ kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
 	if (sid_prefix == NULL || rid == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_sidbyuid(&idmap_cache, sid_prefix, rid, uid)
+	zs = idmap_get_zone_specific(zone);
+
+	if (kidmap_cache_lookup_sidbyuid(&zs->cache, sid_prefix, rid, uid)
 	    == IDMAP_SUCCESS) {
 		return (IDMAP_SUCCESS);
 	}
@@ -552,7 +599,7 @@ kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
 	args.idmap_mapping_batch_len = 1;
 	args.idmap_mapping_batch_val = &mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -566,7 +613,7 @@ kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
 			    id->idmap_id_u.sid.prefix);
 			*rid = id->idmap_id_u.sid.rid;
 			if (status == IDMAP_SUCCESS) {
-				kidmap_cache_add_sidbyuid(&idmap_cache,
+				kidmap_cache_add_sidbyuid(&zs->cache,
 				    *sid_prefix, *rid, uid);
 			}
 		} else {
@@ -599,8 +646,10 @@ kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid)
  * Success return IDMAP_SUCCESS else IDMAP error
  */
 idmap_stat
-kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
+kidmap_getsidbygid(zone_t *zone, gid_t gid, const char **sid_prefix,
+		uint32_t *rid)
 {
+	idmap_zone_specific_t	*zs;
 	idmap_mapping_batch	args;
 	idmap_mapping		mapping;
 	idmap_ids_res		results;
@@ -611,7 +660,9 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
 	if (sid_prefix == NULL || rid == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_sidbygid(&idmap_cache, sid_prefix, rid, gid)
+	zs = idmap_get_zone_specific(zone);
+
+	if (kidmap_cache_lookup_sidbygid(&zs->cache, sid_prefix, rid, gid)
 	    == IDMAP_SUCCESS) {
 		return (IDMAP_SUCCESS);
 	}
@@ -626,7 +677,7 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
 	args.idmap_mapping_batch_len = 1;
 	args.idmap_mapping_batch_val = &mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -640,7 +691,7 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
 			    id->idmap_id_u.sid.prefix);
 			*rid = id->idmap_id_u.sid.rid;
 			if (status == IDMAP_SUCCESS) {
-				kidmap_cache_add_sidbygid(&idmap_cache,
+				kidmap_cache_add_sidbygid(&zs->cache,
 				    *sid_prefix, *rid, gid);
 			}
 		} else {
@@ -668,10 +719,13 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid)
  *
  */
 idmap_get_handle_t *
-kidmap_get_create(void)
+kidmap_get_create(zone_t *zone)
 {
-	idmap_get_handle_t *handle;
-#define	INIT_MAPPING_SIZE	6
+	idmap_zone_specific_t	*zs;
+	idmap_get_handle_t	*handle;
+#define	INIT_MAPPING_SIZE	32
+
+	zs = idmap_get_zone_specific(zone);
 
 	handle = kmem_zalloc(sizeof (idmap_get_handle_t), KM_SLEEP);
 
@@ -681,7 +735,7 @@ kidmap_get_create(void)
 	handle->result = kmem_zalloc((sizeof (idmap_get_res)) *
 	    INIT_MAPPING_SIZE, KM_SLEEP);
 	handle->mapping_size = INIT_MAPPING_SIZE;
-	handle->cache = &idmap_cache;
+	handle->zs = zs;
 
 	return (handle);
 }
@@ -742,7 +796,7 @@ kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 	    uid == NULL || stat == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_uidbysid(get_handle->cache, sid_prefix,
+	if (kidmap_cache_lookup_uidbysid(&get_handle->zs->cache, sid_prefix,
 	    rid, uid) == IDMAP_SUCCESS) {
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
@@ -798,7 +852,7 @@ kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 	    gid == NULL || stat == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_gidbysid(get_handle->cache, sid_prefix,
+	if (kidmap_cache_lookup_gidbysid(&get_handle->zs->cache, sid_prefix,
 	    rid, gid) == IDMAP_SUCCESS) {
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
@@ -856,7 +910,7 @@ kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 	    is_user == NULL || stat == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_pidbysid(get_handle->cache, sid_prefix,
+	if (kidmap_cache_lookup_pidbysid(&get_handle->zs->cache, sid_prefix,
 	    rid, pid, is_user) == IDMAP_SUCCESS) {
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
@@ -913,8 +967,8 @@ kidmap_batch_getsidbyuid(idmap_get_handle_t *get_handle, uid_t uid,
 	    rid == NULL || stat == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_sidbyuid(get_handle->cache, sid_prefix,
-	    rid, uid) == IDMAP_SUCCESS) {
+	if (kidmap_cache_lookup_sidbyuid(&get_handle->zs->cache,
+	    sid_prefix, rid, uid) == IDMAP_SUCCESS) {
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
 	}
@@ -968,8 +1022,8 @@ kidmap_batch_getsidbygid(idmap_get_handle_t *get_handle, gid_t gid,
 	    rid == NULL || stat == NULL)
 		return (IDMAP_ERR_ARG);
 
-	if (kidmap_cache_lookup_sidbygid(get_handle->cache, sid_prefix,
-	    rid, gid) == IDMAP_SUCCESS) {
+	if (kidmap_cache_lookup_sidbygid(&get_handle->zs->cache,
+	    sid_prefix, rid, gid) == IDMAP_SUCCESS) {
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
 	}
@@ -1021,19 +1075,21 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 	int			i;
 	const char		*sid_prefix;
 	int			is_user;
+	idmap_cache_t		*cache;
 
 	if (get_handle == NULL)
 		return (IDMAP_ERR_ARG);
 
 	if (get_handle->mapping_num == 0)
 		return (IDMAP_SUCCESS);
+	cache = &get_handle->zs->cache;
 
 	bzero(&results, sizeof (idmap_ids_res));
 
 	args.idmap_mapping_batch_len = get_handle->mapping_num;
 	args.idmap_mapping_batch_val = get_handle->mapping;
 
-	if (kidmap_rpc_call(op, xdr_idmap_mapping_batch,
+	if (kidmap_rpc_call(get_handle->zs, op, xdr_idmap_mapping_batch,
 	    (caddr_t)&args, xdr_idmap_ids_res,
 	    (caddr_t)&results) == 0) {
 		/* Door call succeded */
@@ -1074,17 +1130,17 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				if (*result->stat == IDMAP_SUCCESS &&
 				    result->uid)
 					kidmap_cache_add_uidbysid(
-					    get_handle->cache,
+					    cache,
 					    sid_prefix,
 					    mapping->id1.idmap_id_u.sid.rid,
 					    id->idmap_id_u.uid);
 				else if (*result->stat == IDMAP_SUCCESS &&
 				    result->pid)
-					kidmap_cache_add_pidbysid(
-					    get_handle->cache,
+					kidmap_cache_add_uidbysid(
+					    cache,
 					    sid_prefix,
 					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.uid, 1);
+					    id->idmap_id_u.uid);
 				break;
 
 			case IDMAP_GID:
@@ -1099,17 +1155,17 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				if (*result->stat == IDMAP_SUCCESS &&
 				    result->gid)
 					kidmap_cache_add_gidbysid(
-					    get_handle->cache,
+					    cache,
 					    sid_prefix,
 					    mapping->id1.idmap_id_u.sid.rid,
 					    id->idmap_id_u.gid);
 				else if (*result->stat == IDMAP_SUCCESS &&
 				    result->pid)
-					kidmap_cache_add_pidbysid(
-					    get_handle->cache,
+					kidmap_cache_add_gidbysid(
+					    cache,
 					    sid_prefix,
 					    mapping->id1.idmap_id_u.sid.rid,
-					    id->idmap_id_u.gid, 0);
+					    id->idmap_id_u.gid);
 				break;
 
 			case IDMAP_SID:
@@ -1124,14 +1180,14 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				if (*result->stat == IDMAP_SUCCESS &&
 				    mapping->id1.idtype == IDMAP_UID)
 					kidmap_cache_add_sidbyuid(
-					    get_handle->cache,
+					    cache,
 					    sid_prefix,
 					    id->idmap_id_u.sid.rid,
 					    mapping->id1.idmap_id_u.uid);
 				else if (*result->stat == IDMAP_SUCCESS &&
 				    mapping->id1.idtype == IDMAP_GID)
 					kidmap_cache_add_sidbygid(
-					    get_handle->cache,
+					    cache,
 					    sid_prefix,
 					    id->idmap_id_u.sid.rid,
 					    mapping->id1.idmap_id_u.gid);
@@ -1205,8 +1261,8 @@ kidmap_get_destroy(idmap_get_handle_t *get_handle)
 
 
 static int
-kidmap_rpc_call(uint32_t op, xdrproc_t xdr_args, caddr_t args,
-		xdrproc_t xdr_res, caddr_t res)
+kidmap_rpc_call(idmap_zone_specific_t *zs, uint32_t op, xdrproc_t xdr_args,
+		caddr_t args, xdrproc_t xdr_res, caddr_t res)
 {
 	XDR		xdr_ctx;
 	struct	rpc_msg reply_msg;
@@ -1218,6 +1274,7 @@ kidmap_rpc_call(uint32_t op, xdrproc_t xdr_args, caddr_t args,
 	int		status = 0;
 	door_arg_t	params;
 	int 		retry = 0;
+	struct rpc_msg	call_msg;
 
 	params.rbuf = NULL;
 	params.rsize = 0;
@@ -1227,7 +1284,11 @@ retry:
 	outbuf_ptr = kmem_alloc(outbuf_size, KM_SLEEP);
 
 	xdrmem_create(&xdr_ctx, inbuf_ptr, inbuf_size, XDR_ENCODE);
-	atomic_inc_32(&call_msg.rm_xid);
+
+	call_msg.rm_call.cb_prog = IDMAP_PROG;
+	call_msg.rm_call.cb_vers = IDMAP_V1;
+	call_msg.rm_xid = atomic_inc_32_nv(&zs->message_id);
+
 	if (!xdr_callhdr(&xdr_ctx, &call_msg)) {
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "idmap: xdr encoding header error");
@@ -1277,7 +1338,7 @@ retry:
 	params.rbuf = outbuf_ptr;
 	params.rsize = outbuf_size;
 
-	if (kidmap_call_door(&params) != 0) {
+	if (kidmap_call_door(zs, &params) != 0) {
 		status = -1;
 		goto exit;
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,12 +54,13 @@ setuid(uid_t uid)
 	uid_t oldruid = uid;
 	zoneid_t zoneid = getzoneid();
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if (!VALID_UID(uid))
+	if (!VALID_UID(uid, zone))
 		return (set_errno(EINVAL));
 
 	if (uid > MAXUID) {
-		if (ksid_lookupbyuid(uid, &ksid) != 0)
+		if (ksid_lookupbyuid(zone, uid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -173,12 +174,13 @@ seteuid(uid_t uid)
 	int do_nocd = 0;
 	cred_t	*cr, *newcr;
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if (!VALID_UID(uid))
+	if (!VALID_UID(uid, zone))
 		return (set_errno(EINVAL));
 
 	if (uid > MAXUID) {
-		if (ksid_lookupbyuid(uid, &ksid) != 0)
+		if (ksid_lookupbyuid(zone, uid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -246,13 +248,14 @@ setreuid(uid_t ruid, uid_t euid)
 	cred_t *cr, *newcr;
 	zoneid_t zoneid = getzoneid();
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if ((ruid != -1 && !VALID_UID(ruid)) ||
-	    (euid != -1 && !VALID_UID(euid)))
+	if ((ruid != -1 && !VALID_UID(ruid, zone)) ||
+	    (euid != -1 && !VALID_UID(euid, zone)))
 		return (set_errno(EINVAL));
 
 	if (euid != -1 && euid > MAXUID) {
-		if (ksid_lookupbyuid(euid, &ksid) != 0)
+		if (ksid_lookupbyuid(zone, euid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {

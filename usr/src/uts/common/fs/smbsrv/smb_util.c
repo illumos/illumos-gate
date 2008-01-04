@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1251,6 +1251,10 @@ smb_rwx_rwwait(
  * with binary SIDs understandable by CIFS clients. A layer of SMB ID
  * mapping functions are implemeted to hide the SID conversion details
  * and also hide the handling of array of batch mapping requests.
+ *
+ * IMPORTANT NOTE The Winchester API requires a zone. Because CIFS server
+ * currently only runs in the global zone the global zone is specified.
+ * This needs to be fixed when the CIFS server supports zones.
  */
 
 static int smb_idmap_batch_binsid(smb_idmap_batch_t *sib);
@@ -1275,17 +1279,17 @@ smb_idmap_getid(nt_sid_t *sid, uid_t *id, int *idtype)
 
 	switch (*idtype) {
 	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getuidbysid(sim.sim_domsid,
+		sim.sim_stat = kidmap_getuidbysid(global_zone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id);
 		break;
 
 	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getgidbysid(sim.sim_domsid,
+		sim.sim_stat = kidmap_getgidbysid(global_zone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id);
 		break;
 
 	case SMB_IDMAP_UNKNOWN:
-		sim.sim_stat = kidmap_getpidbysid(sim.sim_domsid,
+		sim.sim_stat = kidmap_getpidbysid(global_zone, sim.sim_domsid,
 		    sim.sim_rid, sim.sim_id, &sim.sim_idtype);
 		break;
 
@@ -1313,12 +1317,12 @@ smb_idmap_getsid(uid_t id, int idtype, nt_sid_t **sid)
 
 	switch (idtype) {
 	case SMB_IDMAP_USER:
-		sim.sim_stat = kidmap_getsidbyuid(id,
+		sim.sim_stat = kidmap_getsidbyuid(global_zone, id,
 		    (const char **)&sim.sim_domsid, &sim.sim_rid);
 		break;
 
 	case SMB_IDMAP_GROUP:
-		sim.sim_stat = kidmap_getsidbygid(id,
+		sim.sim_stat = kidmap_getsidbygid(global_zone, id,
 		    (const char **)&sim.sim_domsid, &sim.sim_rid);
 		break;
 
@@ -1366,9 +1370,7 @@ smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
 
 	bzero(sib, sizeof (smb_idmap_batch_t));
 
-	sib->sib_idmaph = kidmap_get_create();
-	if (sib->sib_idmaph == NULL)
-		return (IDMAP_ERR_INTERNAL);
+	sib->sib_idmaph = kidmap_get_create(global_zone);
 
 	sib->sib_flags = flags;
 	sib->sib_nmap = nmap;

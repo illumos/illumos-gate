@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,12 +48,14 @@ setgid(gid_t gid)
 	int do_nocd = 0;
 	cred_t	*cr, *newcr;
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if (!VALID_GID(gid))
+
+	if (!VALID_GID(gid, zone))
 		return (set_errno(EINVAL));
 
 	if (gid > MAXUID) {
-		if (ksid_lookupbygid(gid, &ksid) != 0)
+		if (ksid_lookupbygid(zone, gid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -132,12 +134,13 @@ setegid(gid_t gid)
 	int error = EPERM;
 	int do_nocd = 0;
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if (!VALID_GID(gid))
+	if (!VALID_GID(gid, zone))
 		return (set_errno(EINVAL));
 
 	if (gid > MAXUID) {
-		if (ksid_lookupbygid(gid, &ksid) != 0)
+		if (ksid_lookupbygid(zone, gid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -199,13 +202,14 @@ setregid(gid_t rgid, gid_t egid)
 	int do_nocd = 0;
 	cred_t *cr, *newcr;
 	ksid_t ksid, *ksp;
+	zone_t	*zone = crgetzone(CRED());
 
-	if ((rgid != -1 && !VALID_GID(rgid)) ||
-	    (egid != -1 && !VALID_GID(egid)))
+	if ((rgid != -1 && !VALID_GID(rgid, zone)) ||
+	    (egid != -1 && !VALID_GID(egid, zone)))
 		return (set_errno(EINVAL));
 
 	if (egid != -1 && egid > MAXUID) {
-		if (ksid_lookupbygid(egid, &ksid) != 0)
+		if (ksid_lookupbygid(zone, egid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {

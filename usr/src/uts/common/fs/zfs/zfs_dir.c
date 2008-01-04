@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -905,7 +905,7 @@ top:
 	va.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	va.va_type = VDIR;
 	va.va_mode = S_IFDIR | S_ISVTX | 0777;
-	zfs_fuid_map_ids(zp, &va.va_uid, &va.va_gid);
+	zfs_fuid_map_ids(zp, cr, &va.va_uid, &va.va_gid);
 
 	error = zfs_make_xattrdir(zp, &va, xvpp, cr);
 	zfs_dirent_unlock(dl);
@@ -945,8 +945,8 @@ zfs_sticky_remove_access(znode_t *zdp, znode_t *zp, cred_t *cr)
 	if ((zdp->z_phys->zp_mode & S_ISVTX) == 0)
 		return (0);
 
-	zfs_fuid_map_id(zfsvfs, zdp->z_phys->zp_uid, ZFS_OWNER, &downer);
-	zfs_fuid_map_id(zfsvfs, zp->z_phys->zp_uid, ZFS_OWNER, &fowner);
+	zfs_fuid_map_id(zfsvfs, zdp->z_phys->zp_uid, cr, ZFS_OWNER, &downer);
+	zfs_fuid_map_id(zfsvfs, zp->z_phys->zp_uid, cr, ZFS_OWNER, &fowner);
 
 	if ((uid = crgetuid(cr)) == downer || uid == fowner ||
 	    (ZTOV(zp)->v_type == VREG &&

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,9 +213,10 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (getzoneid() != GLOBAL_ZONEID) {
+	if (is_system_labeled() && getzoneid() != GLOBAL_ZONEID) {
 		(void) idmapdlog(LOG_ERR,
-		    "idmapd: idmapd runs only in the global zone");
+		    "idmapd: with Trusted Extensions idmapd runs only in the "
+		    "global zone");
 		exit(1);
 	}
 
@@ -313,7 +314,7 @@ init_idmapd() {
 	}
 	if ((error = idmap_reg(dfd)) != 0) {
 		idmapdlog(LOG_ERR, "idmapd: unable to register door (%s)",
-				strerror(error));
+				strerror(errno));
 		goto errout;
 	}
 
@@ -321,7 +322,7 @@ init_idmapd() {
 			8192, &_idmapdstate.next_uid,
 			8192, &_idmapdstate.next_gid)) != 0) {
 		idmapdlog(LOG_ERR, "idmapd: unable to allocate ephemeral IDs "
-			"(%s)", strerror(error));
+			"(%s)", strerror(errno));
 		_idmapdstate.next_uid = _idmapdstate.limit_uid = SENTINEL_PID;
 		_idmapdstate.next_gid = _idmapdstate.limit_gid = SENTINEL_PID;
 	} else {

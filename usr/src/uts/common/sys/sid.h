@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,9 @@
 
 #include <sys/types.h>
 #include <sys/avl.h>
+#ifdef _KERNEL
+#include <sys/zone.h>
+#endif
 
 /*
  * Kernel SID data structure and functions.
@@ -42,8 +45,8 @@ extern "C" {
 /* sidsys subcodes */
 #define	SIDSYS_ALLOC_IDS	0
 /* Flags for ALLOC_IDS */
-#define		SID_EXTEND_RANGE	0
-#define		SID_NEW_RANGE		1
+#define	SID_EXTEND_RANGE	0
+#define	SID_NEW_RANGE		1
 
 #define	SIDSYS_IDMAP_REG	1
 #define	SIDSYS_IDMAP_UNREG	2
@@ -97,8 +100,8 @@ typedef struct credsid {
 const char *ksid_getdomain(ksid_t *);
 uint_t ksid_getrid(ksid_t *);
 
-int ksid_lookupbyuid(uid_t, ksid_t *);
-int ksid_lookupbygid(gid_t, ksid_t *);
+int ksid_lookupbyuid(zone_t *, uid_t, ksid_t *);
+int ksid_lookupbygid(zone_t *, gid_t, ksid_t *);
 void ksid_rele(ksid_t *);
 
 credsid_t *kcrsid_alloc(void);
@@ -117,7 +120,7 @@ void ksidlist_hold(ksidlist_t *);
 
 ksiddomain_t *ksid_lookupdomain(const char *);
 
-ksidlist_t *kcrsid_gidstosids(int, gid_t *);
+ksidlist_t *kcrsid_gidstosids(zone_t *, int, gid_t *);
 
 #else
 

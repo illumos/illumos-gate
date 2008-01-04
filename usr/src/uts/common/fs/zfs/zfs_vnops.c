@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2165,7 +2165,7 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 	vap->va_type = vp->v_type;
 	vap->va_mode = pzp->zp_mode & MODEMASK;
-	zfs_fuid_map_ids(zp, &vap->va_uid, &vap->va_gid);
+	zfs_fuid_map_ids(zp, cr, &vap->va_uid, &vap->va_gid);
 	vap->va_fsid = zp->z_zfsvfs->z_vfs->vfs_dev;
 	vap->va_nodeid = zp->z_id;
 	if ((vp->v_flag & VROOT) && zfs_show_ctldir(zp))
@@ -2489,7 +2489,7 @@ top:
 
 	mutex_enter(&zp->z_lock);
 	oldva.va_mode = pzp->zp_mode;
-	zfs_fuid_map_ids(zp, &oldva.va_uid, &oldva.va_gid);
+	zfs_fuid_map_ids(zp, cr, &oldva.va_uid, &oldva.va_gid);
 	if (mask & AT_XVATTR) {
 		if ((need_policy == FALSE) &&
 		    (XVA_ISSET_REQ(xvap, XAT_APPENDONLY) &&
@@ -2639,7 +2639,7 @@ top:
 	mutex_enter(&zp->z_lock);
 
 	if (mask & AT_MODE) {
-		err = zfs_acl_chmod_setattr(zp, new_mode, tx);
+		err = zfs_acl_chmod_setattr(zp, new_mode, tx, cr);
 		ASSERT3U(err, ==, 0);
 	}
 
@@ -2648,19 +2648,19 @@ top:
 
 	if (mask & AT_UID) {
 		pzp->zp_uid = zfs_fuid_create(zfsvfs,
-		    vap->va_uid, ZFS_OWNER, tx, &fuidp);
+		    vap->va_uid, cr, ZFS_OWNER, tx, &fuidp);
 		if (attrzp) {
 			attrzp->z_phys->zp_uid = zfs_fuid_create(zfsvfs,
-			    vap->va_uid,  ZFS_OWNER, tx, &fuidp);
+			    vap->va_uid,  cr, ZFS_OWNER, tx, &fuidp);
 		}
 	}
 
 	if (mask & AT_GID) {
 		pzp->zp_gid = zfs_fuid_create(zfsvfs, vap->va_gid,
-		    ZFS_GROUP, tx, &fuidp);
+		    cr, ZFS_GROUP, tx, &fuidp);
 		if (attrzp)
 			attrzp->z_phys->zp_gid = zfs_fuid_create(zfsvfs,
-			    vap->va_gid, ZFS_GROUP, tx, &fuidp);
+			    vap->va_gid, cr, ZFS_GROUP, tx, &fuidp);
 	}
 
 	if (attrzp)
@@ -3383,7 +3383,7 @@ top:
 		return (EPERM);
 	}
 
-	zfs_fuid_map_id(zfsvfs, szp->z_phys->zp_uid, ZFS_OWNER, &owner);
+	zfs_fuid_map_id(zfsvfs, szp->z_phys->zp_uid, cr, ZFS_OWNER, &owner);
 	if (owner != crgetuid(cr) &&
 	    secpolicy_basic_link(cr) != 0) {
 		ZFS_EXIT(zfsvfs);

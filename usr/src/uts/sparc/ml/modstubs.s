@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -817,23 +817,23 @@ stubs_base:
  */
 #ifndef IDMAP_MODULE
 	MODULE(idmap,misc);
-	STUB(idmap,kidmap_batch_getgidbysid,nomod_zero);
-	STUB(idmap,kidmap_batch_getpidbysid,nomod_zero);
-	STUB(idmap,kidmap_batch_getsidbygid,nomod_zero);
-	STUB(idmap,kidmap_batch_getsidbyuid,nomod_zero);
-	STUB(idmap,kidmap_batch_getuidbysid,nomod_zero);
-	STUB(idmap,kidmap_get_create,nomod_zero);
-	STUB(idmap,kidmap_get_destroy,nomod_zero);
-	STUB(idmap,kidmap_get_mappings,nomod_zero);
-	STUB(idmap,kidmap_getgidbysid,nomod_zero);
-	STUB(idmap,kidmap_getpidbysid,nomod_zero);
-	STUB(idmap,kidmap_getsidbygid,nomod_zero);
-	STUB(idmap,kidmap_getsidbyuid,nomod_zero);
-	STUB(idmap,kidmap_getuidbysid,nomod_zero);
-	STUB(idmap,idmap_get_door,nomod_einval);
-	STUB(idmap,idmap_unreg_dh,nomod_einval);
-	STUB(idmap,idmap_reg_dh,nomod_einval);
-	STUB(idmap,idmap_release_door,nomod_einval);
+	STUB(idmap, kidmap_batch_getgidbysid,	nomod_zero);
+	STUB(idmap, kidmap_batch_getpidbysid,	nomod_zero);
+	STUB(idmap, kidmap_batch_getsidbygid,	nomod_zero);
+	STUB(idmap, kidmap_batch_getsidbyuid,	nomod_zero);
+	STUB(idmap, kidmap_batch_getuidbysid,	nomod_zero);
+	STUB(idmap, kidmap_get_create,		nomod_zero);
+	STUB(idmap, kidmap_get_destroy,		nomod_zero);
+	STUB(idmap, kidmap_get_mappings,	nomod_zero);
+	STUB(idmap, kidmap_getgidbysid,		nomod_zero);
+	STUB(idmap, kidmap_getpidbysid,		nomod_zero);
+	STUB(idmap, kidmap_getsidbygid,		nomod_zero);
+	STUB(idmap, kidmap_getsidbyuid,		nomod_zero);
+	STUB(idmap, kidmap_getuidbysid,		nomod_zero);
+	STUB(idmap, idmap_get_door,		nomod_einval);
+	STUB(idmap, idmap_unreg_dh,		nomod_einval);
+	STUB(idmap, idmap_reg_dh,		nomod_einval);
+	STUB(idmap, idmap_purge_cache,		nomod_einval);
 	END_MODULE(idmap);
 #endif
 

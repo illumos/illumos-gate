@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,9 +69,10 @@ cfchownat(int fd, char *name, int nmflag, uid_t uid, gid_t gid, int flags)
 	struct vattr 	vattr;
 	int 		error = 0;
 	char 		startchar;
+	struct zone	*zone = crgetzone(CRED());
 
-	if (uid != (uid_t)-1 && !VALID_UID(uid) ||
-	    gid != (gid_t)-1 && !VALID_GID(gid)) {
+	if (uid != (uid_t)-1 && !VALID_UID(uid, zone) ||
+	    gid != (gid_t)-1 && !VALID_GID(gid, zone)) {
 		return (set_errno(EINVAL));
 	}
 	vattr.va_uid = uid;

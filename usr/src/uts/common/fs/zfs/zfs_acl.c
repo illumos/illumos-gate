@@ -584,7 +584,8 @@ zfs_copy_ace_2_fuid(vtype_t obj_type, zfs_acl_t *aclp, void *datap,
  * Copy ZFS ACEs to fixed size ace_t layout
  */
 static void
-zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, void *datap, int filter)
+zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, cred_t *cr,
+    void *datap, int filter)
 {
 	uint64_t who;
 	uint32_t access_mask;
@@ -627,7 +628,7 @@ zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, void *datap, int filter)
 		if ((entry_type != ACE_OWNER &&
 		    entry_type != (ACE_GROUP | ACE_IDENTIFIER_GROUP) &&
 		    entry_type != ACE_EVERYONE))
-			zfs_fuid_queue_map_id(zfsvfs, &hdl, who,
+			zfs_fuid_queue_map_id(zfsvfs, &hdl, who, cr,
 			    (entry_type & ACE_IDENTIFIER_GROUP) ?
 			    ZFS_ACE_GROUP : ZFS_ACE_USER, &acep->a_who);
 		else
@@ -755,8 +756,8 @@ zfs_set_ace(zfs_acl_t *aclp, void *acep, uint32_t access_mask,
  * Also, create FUIDs for any User/Group ACEs
  */
 static uint64_t
-zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
-    dmu_tx_t *tx)
+zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, cred_t *cr,
+    zfs_fuid_info_t **fuidp, dmu_tx_t *tx)
 {
 	int		entry_type;
 	mode_t		mode;
@@ -890,7 +891,7 @@ zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
 		 */
 		if (entry_type == 0 || entry_type == ACE_IDENTIFIER_GROUP) {
 			aclp->z_ops.ace_who_set(acep,
-			    zfs_fuid_create(zp->z_zfsvfs, who,
+			    zfs_fuid_create(zp->z_zfsvfs, who, cr,
 			    entry_type == 0 ? ZFS_ACE_USER : ZFS_ACE_GROUP, tx,
 			    fuidp));
 		}
@@ -991,8 +992,8 @@ zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
  * already checked the acl and knows whether to inherit.
  */
 int
-zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
-    dmu_tx_t *tx)
+zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, cred_t *cr,
+    zfs_fuid_info_t **fuidp, dmu_tx_t *tx)
 {
 	int		error;
 	znode_phys_t	*zphys = zp->z_phys;
@@ -1008,7 +1009,7 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, zfs_fuid_info_t **fuidp,
 
 	dmu_buf_will_dirty(zp->z_dbuf, tx);
 
-	zphys->zp_mode = zfs_mode_fuid_compute(zp, aclp, fuidp, tx);
+	zphys->zp_mode = zfs_mode_fuid_compute(zp, aclp, cr, fuidp, tx);
 
 	/*
 	 * Decide which opbject type to use.  If we are forced to
@@ -1451,7 +1452,7 @@ zfs_fixup_group_entries(zfs_acl_t *aclp, void *acep, void *prevacep,
  */
 static int
 zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
-    dmu_tx_t *tx)
+    dmu_tx_t *tx, cred_t *cr)
 {
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	void		*acep = NULL, *prevacep = NULL;
@@ -1592,12 +1593,12 @@ nextace:
 
 	zfs_acl_fixup_canonical_six(aclp, mode);
 	zp->z_phys->zp_mode = mode;
-	error = zfs_aclset_common(zp, aclp, NULL, tx);
+	error = zfs_aclset_common(zp, aclp, cr, NULL, tx);
 	return (error);
 }
 
 int
-zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx)
+zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx, cred_t *cr)
 {
 	zfs_acl_t *aclp = NULL;
 	int error;
@@ -1606,7 +1607,7 @@ zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx)
 	mutex_enter(&zp->z_acl_lock);
 	error = zfs_acl_node_read(zp, &aclp, B_TRUE);
 	if (error == 0)
-		error = zfs_acl_chmod(zp, mode, aclp, tx);
+		error = zfs_acl_chmod(zp, mode, aclp, tx, cr);
 	mutex_exit(&zp->z_acl_lock);
 	if (aclp)
 		zfs_acl_free(aclp);
@@ -1786,9 +1787,9 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 	 */
 	if ((flag & (IS_ROOT_NODE | IS_REPLAY)) ||
 	    ((flag & IS_XATTR) && (vap->va_type == VDIR))) {
-		uid = zfs_fuid_create(zfsvfs, vap->va_uid,
+		uid = zfs_fuid_create(zfsvfs, vap->va_uid, cr,
 		    ZFS_OWNER, tx, fuidp);
-		gid = zfs_fuid_create(zfsvfs, vap->va_gid,
+		gid = zfs_fuid_create(zfsvfs, vap->va_gid, cr,
 		    ZFS_GROUP, tx, fuidp);
 	} else {
 		uid = zfs_fuid_create_cred(zfsvfs, crgetuid(cr),
@@ -1841,7 +1842,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 		mutex_exit(&parent->z_lock);
 		mutex_enter(&zp->z_lock);
 		mutex_enter(&zp->z_acl_lock);
-		error = zfs_acl_chmod(zp, mode, aclp, tx);
+		error = zfs_acl_chmod(zp, mode, aclp, tx, cr);
 	} else {
 		mutex_enter(&zp->z_lock);
 		mutex_enter(&zp->z_acl_lock);
@@ -1851,7 +1852,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 	if (vap->va_type == VDIR)
 		aclp->z_hints |= ZFS_ACL_AUTO_INHERIT;
 
-	error = zfs_aclset_common(zp, aclp, fuidp, tx);
+	error = zfs_aclset_common(zp, aclp, cr, fuidp, tx);
 
 	/* Set optional attributes if any */
 	if (vap->va_mask & AT_XVATTR)
@@ -1938,7 +1939,7 @@ zfs_getacl(znode_t *zp, vsecattr_t *vsecp, boolean_t skipaclchk, cred_t *cr)
 		vsecp->vsa_aclentsz = aclsz;
 
 		if (aclp->z_version == ZFS_ACL_VERSION_FUID)
-			zfs_copy_fuid_2_ace(zp->z_zfsvfs, aclp,
+			zfs_copy_fuid_2_ace(zp->z_zfsvfs, aclp, cr,
 			    vsecp->vsa_aclentp, !(mask & VSA_ACE_ALLTYPES));
 		else {
 			bcopy(aclnode->z_acldata, vsecp->vsa_aclentp,
@@ -2107,7 +2108,7 @@ top:
 		return (error);
 	}
 
-	error = zfs_aclset_common(zp, aclp, &fuidp, tx);
+	error = zfs_aclset_common(zp, aclp, cr, &fuidp, tx);
 	ASSERT(error == 0);
 
 	zfs_log_acl(zilog, tx, zp, vsecp, fuidp);
@@ -2200,7 +2201,7 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 		return (0);
 	}
 
-	zfs_fuid_map_ids(zp, &fowner, &gowner);
+	zfs_fuid_map_ids(zp, cr, &fowner, &gowner);
 
 	mutex_enter(&zp->z_acl_lock);
 
@@ -2240,7 +2241,7 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 			if (entry_type == 0) {
 				uid_t newid;
 
-				zfs_fuid_map_id(zfsvfs, who,
+				zfs_fuid_map_id(zfsvfs, who, cr,
 				    ZFS_ACE_USER, &newid);
 				if (newid != IDMAP_WK_CREATOR_OWNER_UID &&
 				    uid == newid)
@@ -2353,7 +2354,7 @@ zfs_zaccess(znode_t *zp, int mode, int flags, boolean_t skipaclchk, cred_t *cr)
 		uid_t		owner;
 		mode_t		checkmode = 0;
 
-		zfs_fuid_map_id(zfsvfs, check_zp->z_phys->zp_uid,
+		zfs_fuid_map_id(zfsvfs, check_zp->z_phys->zp_uid, cr,
 		    ZFS_OWNER, &owner);
 
 		/*
@@ -2438,7 +2439,7 @@ zfs_delete_final_check(znode_t *zp, znode_t *dzp, cred_t *cr)
 	uid_t downer;
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 
-	zfs_fuid_map_id(zfsvfs, dzp->z_phys->zp_uid, ZFS_OWNER, &downer);
+	zfs_fuid_map_id(zfsvfs, dzp->z_phys->zp_uid, cr, ZFS_OWNER, &downer);
 
 	error = secpolicy_vnode_access(cr, ZTOV(zp), downer, S_IWRITE|S_IEXEC);
 

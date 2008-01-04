@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2016,7 +2016,7 @@ secpolicy_zfs(const cred_t *cr)
 int
 secpolicy_idmap(const cred_t *cr)
 {
-	return (PRIV_POLICY(cr, PRIV_ALL, B_FALSE, EPERM, NULL));
+	return (PRIV_POLICY(cr, PRIV_FILE_SETID, B_TRUE, EPERM, NULL));
 }
 
 /*

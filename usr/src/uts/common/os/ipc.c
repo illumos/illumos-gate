@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -518,6 +518,7 @@ ipcperm_set(ipc_service_t *service, struct cred *cr,
 	uid_t uid;
 	gid_t gid;
 	mode_t mode;
+	zone_t *zone;
 
 	ASSERT(IPC_LOCKED(service, kperm));
 
@@ -529,7 +530,8 @@ ipcperm_set(ipc_service_t *service, struct cred *cr,
 	if (secpolicy_ipc_owner(cr, kperm) != 0)
 		return (EPERM);
 
-	if (!VALID_UID(uid) || !VALID_GID(gid))
+	zone = crgetzone(cr);
+	if (!VALID_UID(uid, zone) || !VALID_GID(gid, zone))
 		return (EINVAL);
 
 	kperm->ipc_uid = uid;
@@ -561,12 +563,16 @@ int
 ipcperm_set64(ipc_service_t *service, struct cred *cr,
     kipc_perm_t *kperm, ipc_perm64_t *perm64)
 {
+	zone_t *zone;
+
 	ASSERT(IPC_LOCKED(service, kperm));
 
 	if (secpolicy_ipc_owner(cr, kperm) != 0)
 		return (EPERM);
 
-	if (!VALID_UID(perm64->ipcx_uid) || !VALID_GID(perm64->ipcx_gid))
+	zone = crgetzone(cr);
+	if (!VALID_UID(perm64->ipcx_uid, zone) ||
+	    !VALID_GID(perm64->ipcx_gid, zone))
 		return (EINVAL);
 
 	kperm->ipc_uid = perm64->ipcx_uid;

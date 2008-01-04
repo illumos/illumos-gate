@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,15 +102,17 @@ typedef struct zfs_fuid_info {
 
 #ifdef _KERNEL
 struct znode;
-extern void zfs_fuid_map_id(zfsvfs_t *, uint64_t, zfs_fuid_type_t, uid_t *);
+extern void zfs_fuid_map_id(zfsvfs_t *, uint64_t, cred_t *, zfs_fuid_type_t,
+    uid_t *);
 extern void zfs_fuid_destroy(zfsvfs_t *);
 extern uint64_t zfs_fuid_create_cred(zfsvfs_t *, uint64_t, zfs_fuid_type_t,
     dmu_tx_t *, cred_t *, zfs_fuid_info_t **);
-extern uint64_t zfs_fuid_create(zfsvfs_t *, uint64_t, zfs_fuid_type_t,
+extern uint64_t zfs_fuid_create(zfsvfs_t *, uint64_t, cred_t *, zfs_fuid_type_t,
     dmu_tx_t *, zfs_fuid_info_t **);
 extern void zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *,
-    uint64_t, zfs_fuid_type_t, uid_t *);
-extern void zfs_fuid_map_ids(struct znode *zp, uid_t *uid, uid_t *gid);
+    uint64_t, cred_t *, zfs_fuid_type_t, uid_t *);
+extern void zfs_fuid_map_ids(struct znode *zp, cred_t *cr, uid_t *uid,
+    uid_t *gid);
 extern void zfs_fuid_get_mappings(zfs_fuid_hdl_t *);
 extern char *zfs_fuid_find_by_idx(zfsvfs_t *, uint64_t);
 int zfs_fuid_find_by_domain(zfsvfs_t *, const char *, char **, dmu_tx_t *);

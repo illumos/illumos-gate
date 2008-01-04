@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,11 +187,12 @@ ksid_getrid(ksid_t *ks)
 }
 
 int
-ksid_lookupbyuid(uid_t id, ksid_t *res)
+ksid_lookupbyuid(zone_t *zone, uid_t id, ksid_t *res)
 {
 	const char *sid_prefix;
 
-	if (kidmap_getsidbyuid(id, &sid_prefix, &res->ks_rid) != IDMAP_SUCCESS)
+	if (kidmap_getsidbyuid(zone, id, &sid_prefix, &res->ks_rid)
+	    != IDMAP_SUCCESS)
 		return (-1);
 
 	res->ks_domain = ksid_lookupdomain(sid_prefix);
@@ -202,11 +203,12 @@ ksid_lookupbyuid(uid_t id, ksid_t *res)
 }
 
 int
-ksid_lookupbygid(gid_t id, ksid_t *res)
+ksid_lookupbygid(zone_t *zone, gid_t id, ksid_t *res)
 {
 	const char *sid_prefix;
 
-	if (kidmap_getsidbygid(id, &sid_prefix, &res->ks_rid) != IDMAP_SUCCESS)
+	if (kidmap_getsidbygid(zone, id, &sid_prefix, &res->ks_rid)
+	    != IDMAP_SUCCESS)
 		return (-1);
 
 	res->ks_domain = ksid_lookupdomain(sid_prefix);
@@ -374,7 +376,7 @@ kcrsid_setsidlist(credsid_t *okcr, ksidlist_t *ksl)
 }
 
 ksidlist_t *
-kcrsid_gidstosids(int ngrp, gid_t *grp)
+kcrsid_gidstosids(zone_t *zone, int ngrp, gid_t *grp)
 {
 	int i;
 	ksidlist_t *list;
@@ -392,7 +394,8 @@ kcrsid_gidstosids(int ngrp, gid_t *grp)
 	for (i = 0; i < ngrp; i++) {
 		if (grp[i] > MAXUID) {
 			list->ksl_neid++;
-			if (ksid_lookupbygid(grp[i], &list->ksl_sids[i]) != 0) {
+			if (ksid_lookupbygid(zone,
+			    grp[i], &list->ksl_sids[i]) != 0) {
 				while (--i >= 0)
 					ksid_rele(&list->ksl_sids[i]);
 				cnt = 0;

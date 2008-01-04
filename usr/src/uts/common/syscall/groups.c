@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,11 +49,13 @@ setgroups(int gidsetsize, gid_t *gidset)
 	int	error;
 	int	scnt = 0;
 	ksidlist_t *ksl = NULL;
+	zone_t	*zone;
 
 	/* Perform the cheapest tests before grabbing p_crlock  */
 	if (n > ngroups_max || n < 0)
 		return (set_errno(EINVAL));
 
+	zone = crgetzone(CRED());
 	if (n != 0) {
 		groups = kmem_alloc(n * sizeof (gid_t), KM_SLEEP);
 
@@ -63,7 +65,7 @@ setgroups(int gidsetsize, gid_t *gidset)
 		}
 
 		for (i = 0; i < n; i++) {
-			if (!VALID_GID(groups[i])) {
+			if (!VALID_GID(groups[i], zone)) {
 				kmem_free(groups, n * sizeof (gid_t));
 				return (set_errno(EINVAL));
 			}
@@ -71,7 +73,7 @@ setgroups(int gidsetsize, gid_t *gidset)
 				scnt++;
 		}
 		if (scnt > 0) {
-			ksl = kcrsid_gidstosids(n, groups);
+			ksl = kcrsid_gidstosids(zone, n, groups);
 			if (ksl == NULL) {
 				kmem_free(groups, n * sizeof (gid_t));
 				return (set_errno(EINVAL));

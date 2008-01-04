@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 
 #include <sys/idmap.h>
 #include <sys/door.h>
+#include <sys/zone.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -67,20 +68,24 @@ typedef	int32_t idmap_stat;
 
 
 idmap_stat
-kidmap_getuidbysid(const char *sid_prefix, uint32_t rid, uid_t *uid);
+kidmap_getuidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		uid_t *uid);
 
 idmap_stat
-kidmap_getgidbysid(const char *sid_prefix, uint32_t rid, gid_t *gid);
+kidmap_getgidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		gid_t *gid);
 
 idmap_stat
-kidmap_getpidbysid(const char *sid_prefix, uint32_t rid, uid_t *pid,
-		int *is_user);
+kidmap_getpidbysid(zone_t *zone, const char *sid_prefix, uint32_t rid,
+		uid_t *pid, int *is_user);
 
 idmap_stat
-kidmap_getsidbyuid(uid_t uid, const char **sid_prefix, uint32_t *rid);
+kidmap_getsidbyuid(zone_t *zone, uid_t uid, const char **sid_prefix,
+		uint32_t *rid);
 
 idmap_stat
-kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid);
+kidmap_getsidbygid(zone_t *zone, gid_t gid, const char **sid_prefix,
+		uint32_t *rid);
 
 
 
@@ -92,7 +97,7 @@ kidmap_getsidbygid(gid_t gid, const char **sid_prefix, uint32_t *rid);
  * Create a batch "get mapping" handle for batch mappings.
  */
 idmap_get_handle_t *
-kidmap_get_create(void);
+kidmap_get_create(zone_t *zone);
 
 /*
  * These routines queue the request to the "get mapping" handle
@@ -139,17 +144,21 @@ kidmap_get_destroy(idmap_get_handle_t *get_handle);
  * Functions that do the hard part of door registration/unregistration
  * for the idmap_reg()/idmap_unreg() syscalls
  */
-int idmap_reg_dh(door_handle_t dh);
-int idmap_unreg_dh(door_handle_t dh);
+int idmap_reg_dh(zone_t *zone, door_handle_t dh);
+int idmap_unreg_dh(zone_t *zone, door_handle_t dh);
 
 /*
- * Functions needed by allocids() to ensure only the daemon that owns
+ * Function needed by allocids() to ensure only the daemon that owns
  * the door gets ephemeral IDS
  */
-typedef struct idmap_reg idmap_reg_t;
+door_handle_t idmap_get_door(zone_t *zone);
 
-void idmap_get_door(idmap_reg_t **state, door_handle_t *dh);
-void idmap_release_door(idmap_reg_t *idmp);
+/*
+ * Function used by system call allocids() to purge the
+ * ID mapping cache
+ */
+void idmap_purge_cache(zone_t *zone);
+
 
 #ifdef	__cplusplus
 }

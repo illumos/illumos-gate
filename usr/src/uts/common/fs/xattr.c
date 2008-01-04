@@ -307,7 +307,7 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 		if (nvlist_alloc(&nvl_sid, NV_UNIQUE_NAME, KM_SLEEP))
 			return (ENOMEM);
 
-		if (kidmap_getsidbyuid(xvattr.xva_vattr.va_uid,
+		if (kidmap_getsidbyuid(crgetzone(cr), xvattr.xva_vattr.va_uid,
 		    &domain, &rid) == 0) {
 			VERIFY(nvlist_add_string(nvl_sid,
 			    SID_DOMAIN, domain) == 0);
@@ -323,7 +323,7 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 		if (nvlist_alloc(&nvl_sid, NV_UNIQUE_NAME, KM_SLEEP))
 			return (ENOMEM);
 
-		if (kidmap_getsidbygid(xvattr.xva_vattr.va_gid,
+		if (kidmap_getsidbygid(crgetzone(cr), xvattr.xva_vattr.va_gid,
 		    &domain, &rid) == 0) {
 			VERIFY(nvlist_add_string(nvl_sid,
 			    SID_DOMAIN, domain) == 0);
@@ -647,12 +647,12 @@ xattr_file_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 			 */
 
 			if (attr == F_OWNERSID) {
-				(void) kidmap_getuidbysid(domain, rid,
-				    &xvattr.xva_vattr.va_uid);
+				(void) kidmap_getuidbysid(crgetzone(cr), domain,
+				    rid, &xvattr.xva_vattr.va_uid);
 				xvattr.xva_vattr.va_mask |= AT_UID;
 			} else {
-				(void) kidmap_getgidbysid(domain, rid,
-				    &xvattr.xva_vattr.va_gid);
+				(void) kidmap_getgidbysid(crgetzone(cr), domain,
+				    rid, &xvattr.xva_vattr.va_gid);
 				xvattr.xva_vattr.va_mask |= AT_GID;
 			}
 			break;

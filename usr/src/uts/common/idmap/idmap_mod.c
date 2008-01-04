@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,6 @@ int
 _fini()
 {
 	int i;
-	idmap_reg_t *reg;
 
 	if ((i = kidmap_stop()) != 0) {
 		return (i);

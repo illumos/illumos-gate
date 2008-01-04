@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,29 +47,34 @@ allocids(int flag, int nuids, int ngids)
 	gid_t sg = 0;
 	struct door_info di;
 	door_handle_t dh;
-	idmap_reg_t *reg;
 	int err;
+	zone_t *zone = crgetzone(CRED());
 
-	idmap_get_door(&reg, &dh);
+	dh = idmap_get_door(zone);
 
-	if (reg == NULL || dh == NULL)
+	if (dh == NULL)
 		return (set_errno(EPERM));
 
-	if ((err = door_ki_info(dh, &di)) != 0)
+	if ((err = door_ki_info(dh, &di)) != 0) {
+		door_ki_rele(dh);
 		return (set_errno(err));
+	}
+
+	door_ki_rele(dh);
 
 	if (curproc->p_pid != di.di_target)
 		return (set_errno(EPERM));
 
-	idmap_release_door(reg);
+	if (flag)
+		idmap_purge_cache(zone);
 
 	if (nuids < 0 || ngids < 0)
 		return (set_errno(EINVAL));
 
 	if (flag != 0 || nuids > 0)
-		err = eph_uid_alloc(flag, &su, nuids);
+		err = eph_uid_alloc(zone, flag, &su, nuids);
 	if (err == 0 && (flag != 0 || ngids > 0))
-		err = eph_gid_alloc(flag, &sg, ngids);
+		err = eph_gid_alloc(zone, flag, &sg, ngids);
 
 	if (err != 0)
 		return (set_errno(EOVERFLOW));
@@ -84,8 +89,9 @@ idmap_reg(int did)
 {
 	door_handle_t dh;
 	int err;
+	cred_t *cr = CRED();
 
-	if ((err = secpolicy_idmap(CRED())) != 0)
+	if ((err = secpolicy_idmap(cr)) != 0)
 		return (set_errno(err));
 
 	dh = door_ki_lookup(did);
@@ -93,9 +99,10 @@ idmap_reg(int did)
 	if (dh == NULL)
 		return (set_errno(EBADF));
 
-	err = idmap_reg_dh(dh);
+	if ((err = idmap_reg_dh(crgetzone(cr), dh)) != 0)
+		return (set_errno(err));
 
-	return (err);
+	return (0);
 }
 
 static int
@@ -103,11 +110,13 @@ idmap_unreg(int did)
 {
 	door_handle_t dh = door_ki_lookup(did);
 	int res;
+	zone_t *zone;
 
 	if (dh == NULL)
 		return (set_errno(EINVAL));
 
-	res = idmap_unreg_dh(dh);
+	zone = crgetzone(CRED());
+	res = idmap_unreg_dh(zone, dh);
 	door_ki_rele(dh);
 
 	if (res != 0)
