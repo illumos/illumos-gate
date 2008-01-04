@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
  *
  * The USB Open Host Controller driver is a software driver which interfaces
  * to the Universal Serial Bus layer (USBA) and the USB Open Host Controller.
- * The interface to USB Open Host Controller is defined by the OpenHCI  Host
+ * The interface to USB Open Host Controller is defined by the OpenHCI	Host
  * Controller Interface.
  *
  * NOTE:
@@ -319,7 +319,7 @@ static ohci_trans_wrapper_t  *ohci_create_isoc_transfer_wrapper(
 				size_t			length,
 				usb_isoc_pkt_descr_t	*descr,
 				ushort_t		pkt_count,
-				size_t 			td_count,
+				size_t			td_count,
 				uint_t			usb_flags);
 static int	ohci_allocate_tds_for_tw(
 				ohci_state_t		*ohcip,
@@ -967,40 +967,40 @@ ohci_allocate_pools(ohci_state_t	*ohcip)
 
 	/* Allocate the TD pool DMA handle */
 	if (ddi_dma_alloc_handle(ohcip->ohci_dip, &ohcip->ohci_dma_attr,
-			DDI_DMA_SLEEP, 0,
-			&ohcip->ohci_td_pool_dma_handle) != DDI_SUCCESS) {
+	    DDI_DMA_SLEEP, 0,
+	    &ohcip->ohci_td_pool_dma_handle) != DDI_SUCCESS) {
 
 		return (DDI_FAILURE);
 	}
 
 	/* Allocate the memory for the TD pool */
 	if (ddi_dma_mem_alloc(ohcip->ohci_td_pool_dma_handle,
-			ohci_td_pool_size * sizeof (ohci_td_t),
-			&dev_attr,
-			DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			0,
-			(caddr_t *)&ohcip->ohci_td_pool_addr,
-			&real_length,
-			&ohcip->ohci_td_pool_mem_handle)) {
+	    ohci_td_pool_size * sizeof (ohci_td_t),
+	    &dev_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    0,
+	    (caddr_t *)&ohcip->ohci_td_pool_addr,
+	    &real_length,
+	    &ohcip->ohci_td_pool_mem_handle)) {
 
 		return (DDI_FAILURE);
 	}
 
 	/* Map the TD pool into the I/O address space */
 	result = ddi_dma_addr_bind_handle(
-			ohcip->ohci_td_pool_dma_handle,
-			NULL,
-			(caddr_t)ohcip->ohci_td_pool_addr,
-			real_length,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&ohcip->ohci_td_pool_cookie,
-			&ccount);
+	    ohcip->ohci_td_pool_dma_handle,
+	    NULL,
+	    (caddr_t)ohcip->ohci_td_pool_addr,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &ohcip->ohci_td_pool_cookie,
+	    &ccount);
 
 	bzero((void *)ohcip->ohci_td_pool_addr,
-			ohci_td_pool_size * sizeof (ohci_td_t));
+	    ohci_td_pool_size * sizeof (ohci_td_t));
 
 	/* Process the result */
 	if (result == DDI_DMA_MAPPED) {
@@ -1035,40 +1035,40 @@ ohci_allocate_pools(ohci_state_t	*ohcip)
 
 	/* Allocate the ED pool DMA handle */
 	if (ddi_dma_alloc_handle(ohcip->ohci_dip,
-			&ohcip->ohci_dma_attr,
-			DDI_DMA_SLEEP,
-			0,
-			&ohcip->ohci_ed_pool_dma_handle) != DDI_SUCCESS) {
+	    &ohcip->ohci_dma_attr,
+	    DDI_DMA_SLEEP,
+	    0,
+	    &ohcip->ohci_ed_pool_dma_handle) != DDI_SUCCESS) {
 
 		return (DDI_FAILURE);
 	}
 
 	/* Allocate the memory for the ED pool */
 	if (ddi_dma_mem_alloc(ohcip->ohci_ed_pool_dma_handle,
-			ohci_ed_pool_size * sizeof (ohci_ed_t),
-			&dev_attr,
-			DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			0,
-			(caddr_t *)&ohcip->ohci_ed_pool_addr,
-			&real_length,
-			&ohcip->ohci_ed_pool_mem_handle) != DDI_SUCCESS) {
+	    ohci_ed_pool_size * sizeof (ohci_ed_t),
+	    &dev_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    0,
+	    (caddr_t *)&ohcip->ohci_ed_pool_addr,
+	    &real_length,
+	    &ohcip->ohci_ed_pool_mem_handle) != DDI_SUCCESS) {
 
 		return (DDI_FAILURE);
 	}
 
 	result = ddi_dma_addr_bind_handle(ohcip->ohci_ed_pool_dma_handle,
-			NULL,
-			(caddr_t)ohcip->ohci_ed_pool_addr,
-			real_length,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&ohcip->ohci_ed_pool_cookie,
-			&ccount);
+	    NULL,
+	    (caddr_t)ohcip->ohci_ed_pool_addr,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &ohcip->ohci_ed_pool_cookie,
+	    &ccount);
 
 	bzero((void *)ohcip->ohci_ed_pool_addr,
-			ohci_ed_pool_size * sizeof (ohci_ed_t));
+	    ohci_ed_pool_size * sizeof (ohci_ed_t));
 
 	/* Process the result */
 	if (result == DDI_DMA_MAPPED) {
@@ -1326,7 +1326,7 @@ ohci_add_intrs(ohci_state_t	*ohcip,
 		int		intr_type)
 {
 	int	actual, avail, intr_size, count = 0;
-	int 	i, flag, ret;
+	int	i, flag, ret;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 	    "ohci_add_intrs: interrupt type 0x%x", intr_type);
@@ -1510,8 +1510,10 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 	 */
 	Set_OpReg(hcr_cmd_status, HCR_STATUS_RESET);
 
+	mutex_exit(&ohcip->ohci_int_mutex);
 	/* Wait 10ms for reset to complete */
-	drv_usecwait(OHCI_RESET_TIMEWAIT);
+	delay(drv_usectohz(OHCI_RESET_TIMEWAIT));
+	mutex_enter(&ohcip->ohci_int_mutex);
 
 	/*
 	 * Do hard reset the host controller.
@@ -1562,7 +1564,7 @@ ohci_init_ctlr(ohci_state_t	*ohcip)
 	 * Explicitly set the registers to default value.
 	 */
 	if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
-			ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+	    ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
 		Set_OpReg(hcr_control, HCR_CONTROL_DEFAULT);
 		Set_OpReg(hcr_intr_enable, HCR_INT_ENABLE_DEFAULT);
 		Set_OpReg(hcr_HCCA, HCR_HCCA_DEFAULT);
@@ -1717,23 +1719,23 @@ ohci_init_hcca(ohci_state_t	*ohcip)
 
 	/* Create space for the HCCA block */
 	if (ddi_dma_alloc_handle(ohcip->ohci_dip, &ohcip->ohci_dma_attr,
-				DDI_DMA_SLEEP,
-				0,
-				&ohcip->ohci_hcca_dma_handle)
-				!= DDI_SUCCESS) {
+	    DDI_DMA_SLEEP,
+	    0,
+	    &ohcip->ohci_hcca_dma_handle)
+	    != DDI_SUCCESS) {
 
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_dma_mem_alloc(ohcip->ohci_hcca_dma_handle,
-				2 * sizeof (ohci_hcca_t),
-				&dev_attr,
-				DDI_DMA_CONSISTENT,
-				DDI_DMA_SLEEP,
-				0,
-				(caddr_t *)&ohcip->ohci_hccap,
-				&real_length,
-				&ohcip->ohci_hcca_mem_handle)) {
+	    2 * sizeof (ohci_hcca_t),
+	    &dev_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    0,
+	    (caddr_t *)&ohcip->ohci_hccap,
+	    &real_length,
+	    &ohcip->ohci_hcca_mem_handle)) {
 
 		return (DDI_FAILURE);
 	}
@@ -1749,10 +1751,12 @@ ohci_init_hcca(ohci_state_t	*ohcip)
 	 */
 	mask = Get_OpReg(hcr_HCCA);
 
+	mutex_exit(&ohcip->ohci_int_mutex);
 	while (mask == 0) {
-		drv_usecwait(OHCI_TIMEWAIT);
+		delay(drv_usectohz(OHCI_TIMEWAIT));
 		mask = Get_OpReg(hcr_HCCA);
 	}
+	mutex_enter(&ohcip->ohci_int_mutex);
 
 	ASSERT(mask != 0);
 
@@ -1775,13 +1779,13 @@ ohci_init_hcca(ohci_state_t	*ohcip)
 
 	/* Map the whole HCCA into the I/O address space */
 	result = ddi_dma_addr_bind_handle(ohcip->ohci_hcca_dma_handle,
-				NULL,
-				(caddr_t)ohcip->ohci_hccap,
-				real_length,
-				DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-				DDI_DMA_SLEEP, NULL,
-				&ohcip->ohci_hcca_cookie,
-				&ccount);
+	    NULL,
+	    (caddr_t)ohcip->ohci_hccap,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL,
+	    &ohcip->ohci_hcca_cookie,
+	    &ccount);
 
 	if (result == DDI_DMA_MAPPED) {
 		/* The cookie count should be 1 */
@@ -1928,12 +1932,16 @@ ohci_take_control(ohci_state_t	*ohcip)
 
 	Set_OpReg(hcr_cmd_status, hcr_cmd_status_val);
 
+
+	mutex_exit(&ohcip->ohci_int_mutex);
 	/* now wait for 5 seconds for InterruptRouting to go away */
 	for (wait = 0; wait < 5000; wait++) {
 		if ((Get_OpReg(hcr_control) & HCR_CONTROL_IR) == 0)
 			break;
-		drv_usecwait(1000);
+		delay(drv_usectohz(1000));
 	}
+	mutex_enter(&ohcip->ohci_int_mutex);
+
 	if (wait >= 5000) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 		    "ohci_take_control: couldn't take control from BIOS\n");
@@ -2006,26 +2014,26 @@ ohci_alloc_hcdi_ops(ohci_state_t	*ohcip)
 	usba_hcdi_ops->usba_hcdi_pipe_isoc_xfer = ohci_hcdi_pipe_isoc_xfer;
 
 	usba_hcdi_ops->usba_hcdi_bulk_transfer_size =
-					ohci_hcdi_bulk_transfer_size;
+	    ohci_hcdi_bulk_transfer_size;
 
 	usba_hcdi_ops->usba_hcdi_pipe_stop_intr_polling =
-					ohci_hcdi_pipe_stop_intr_polling;
+	    ohci_hcdi_pipe_stop_intr_polling;
 	usba_hcdi_ops->usba_hcdi_pipe_stop_isoc_polling =
-					ohci_hcdi_pipe_stop_isoc_polling;
+	    ohci_hcdi_pipe_stop_isoc_polling;
 
 	usba_hcdi_ops->usba_hcdi_get_current_frame_number =
-					ohci_hcdi_get_current_frame_number;
+	    ohci_hcdi_get_current_frame_number;
 	usba_hcdi_ops->usba_hcdi_get_max_isoc_pkts =
-					ohci_hcdi_get_max_isoc_pkts;
+	    ohci_hcdi_get_max_isoc_pkts;
 	usba_hcdi_ops->usba_hcdi_console_input_init =
-					ohci_hcdi_polled_input_init;
+	    ohci_hcdi_polled_input_init;
 	usba_hcdi_ops->usba_hcdi_console_input_enter =
-					ohci_hcdi_polled_input_enter;
+	    ohci_hcdi_polled_input_enter;
 	usba_hcdi_ops->usba_hcdi_console_read = ohci_hcdi_polled_read;
 	usba_hcdi_ops->usba_hcdi_console_input_exit =
-					ohci_hcdi_polled_input_exit;
+	    ohci_hcdi_polled_input_exit;
 	usba_hcdi_ops->usba_hcdi_console_input_fini =
-					ohci_hcdi_polled_input_fini;
+	    ohci_hcdi_polled_input_fini;
 
 	return (usba_hcdi_ops);
 }
@@ -2087,8 +2095,10 @@ ohci_cleanup(ohci_state_t	*ohcip)
 		Set_OpReg(hcr_control, ((Get_OpReg(hcr_control) &
 		    (~HCR_CONTROL_HCFS)) | HCR_CONTROL_RESET));
 
+		mutex_exit(&ohcip->ohci_int_mutex);
 		/* Wait for sometime */
-		drv_usecwait(OHCI_TIMEWAIT);
+		delay(drv_usectohz(OHCI_TIMEWAIT));
+		mutex_enter(&ohcip->ohci_int_mutex);
 
 		/*
 		 * Workaround for ULI1575 chipset. Following OHCI Operational
@@ -2096,16 +2106,16 @@ ohci_cleanup(ohci_state_t	*ohcip)
 		 * on reset. Explicitly set the registers to default value.
 		 */
 		if (ohcip->ohci_vendor_id == PCI_ULI1575_VENID &&
-				ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
+		    ohcip->ohci_device_id == PCI_ULI1575_DEVID) {
 			Set_OpReg(hcr_control, HCR_CONTROL_DEFAULT);
 			Set_OpReg(hcr_intr_enable, HCR_INT_ENABLE_DEFAULT);
 			Set_OpReg(hcr_HCCA, HCR_HCCA_DEFAULT);
 			Set_OpReg(hcr_ctrl_head, HCR_CONTROL_HEAD_ED_DEFAULT);
 			Set_OpReg(hcr_bulk_head, HCR_BULK_HEAD_ED_DEFAULT);
 			Set_OpReg(hcr_frame_interval,
-					HCR_FRAME_INTERVAL_DEFAULT);
+			    HCR_FRAME_INTERVAL_DEFAULT);
 			Set_OpReg(hcr_periodic_strt,
-					HCR_PERIODIC_START_DEFAULT);
+			    HCR_PERIODIC_START_DEFAULT);
 		}
 
 		mutex_exit(&ohcip->ohci_int_mutex);
@@ -2137,15 +2147,15 @@ ohci_cleanup(ohci_state_t	*ohcip)
 				mutex_enter(&ohcip->ohci_int_mutex);
 
 				tw = (ohci_trans_wrapper_t *)
-					OHCI_LOOKUP_ID((uint32_t)
-					Get_TD(td->hctd_trans_wrapper));
+				    OHCI_LOOKUP_ID((uint32_t)
+				    Get_TD(td->hctd_trans_wrapper));
 
 				/* Obtain the pipe private structure */
 				pp = tw->tw_pipe_private;
 
 				/* Stop the the transfer timer */
 				ohci_stop_xfer_timer(ohcip, tw,
-						OHCI_REMOVE_XFER_ALWAYS);
+				    OHCI_REMOVE_XFER_ALWAYS);
 
 				ohci_deallocate_tw_resources(ohcip, pp, tw);
 
@@ -2246,7 +2256,7 @@ ohci_cleanup(ohci_state_t	*ohcip)
 
 		/* Free the soft state */
 		ddi_soft_state_free(ohci_statep,
-			ddi_get_instance(ohcip->ohci_dip));
+		    ddi_get_instance(ohcip->ohci_dip));
 	}
 
 	return (DDI_SUCCESS);
@@ -2426,11 +2436,11 @@ ohci_hcdi_pipe_open(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*epdt = &ph->p_ep;
 	int			rval, error = USB_SUCCESS;
 	int			kmflag = (flags & USB_FLAGS_SLEEP) ?
-				KM_SLEEP : KM_NOSLEEP;
+	    KM_SLEEP : KM_NOSLEEP;
 	uint_t			node = 0;
 	ohci_pipe_private_t	*pp;
 
@@ -2638,7 +2648,7 @@ ohci_hcdi_pipe_close(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
@@ -2720,7 +2730,7 @@ ohci_hcdi_pipe_reset(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	int			error = USB_SUCCESS;
 
@@ -2759,7 +2769,7 @@ ohci_hcdi_pipe_ctrl_xfer(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	int			rval;
 	int			error = USB_SUCCESS;
@@ -2833,7 +2843,7 @@ ohci_hcdi_bulk_transfer_size(
 	size_t		*size)
 {
 	ohci_state_t	*ohcip = ohci_obtain_state(
-			    usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
@@ -2864,7 +2874,7 @@ ohci_hcdi_pipe_bulk_xfer(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	int			rval, error = USB_SUCCESS;
 	ohci_trans_wrapper_t	*tw;
@@ -2922,7 +2932,7 @@ ohci_hcdi_pipe_intr_xfer(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			pipe_dir, rval, error = USB_SUCCESS;
 	ohci_trans_wrapper_t	*tw;
 
@@ -2972,7 +2982,7 @@ ohci_hcdi_pipe_stop_intr_polling(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			error = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
@@ -2998,7 +3008,7 @@ static usb_frame_number_t
 ohci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	usb_frame_number_t	frame_number;
 	int			rval;
 
@@ -3034,7 +3044,7 @@ static uint_t
 ohci_hcdi_get_max_isoc_pkts(usba_device_t	*usba_device)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	uint_t			max_isoc_pkts_per_request;
 	int			rval;
 
@@ -3068,7 +3078,7 @@ ohci_hcdi_pipe_isoc_xfer(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			error = USB_SUCCESS;
 	int			pipe_dir, rval;
 	ohci_trans_wrapper_t	*tw;
@@ -3123,7 +3133,7 @@ ohci_hcdi_pipe_stop_isoc_polling(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			rval, error = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
@@ -3157,19 +3167,19 @@ ohci_hcdi_pipe_stop_isoc_polling(
  * can not be supported.
  *
  * The lattice structure looks like this with the bottom leaf actually
- * being an array.  There is a total of 63 nodes in this tree.  The lattice tree
+ * being an array.  There is a total of 63 nodes in this tree.	The lattice tree
  * itself is 0 based, while the bottom leaf array is 0 based.  The 0 bucket in
  * the bottom leaf array is used to store the smalled allocated bandwidth of all
  * the leaves.
  *
- *      0
+ *	0
  *    1   2
  *   3 4 5 6
  *   ...
- *  (32 33 ... 62 63)     <-- last row does not exist in lattice, but an array
+ *  (32 33 ... 62 63)	  <-- last row does not exist in lattice, but an array
  *   0 1 2 3 ... 30 31
  *
- * We keep track of the bandwidth that each leaf uses.  First we search for the
+ * We keep track of the bandwidth that each leaf uses.	First we search for the
  * first leaf with the smallest used bandwidth.  Based on that leaf we find the
  * parent node of that leaf based on the interval time.
  *
@@ -3598,9 +3608,9 @@ ohci_lattice_parent(uint_t node)
  *     2^H * Node + 2^H - 1 - (NUM_INTR_ED_LIST - 1) =
  *     2^H * Node + 2^H - NUM_INTR_ED_LIST =
  *     2^H * (Node + 1) - NUM_INTR_ED_LIST
- *         0
- *       1   2
- *      0 1 2 3
+ *	   0
+ *	 1   2
+ *	0 1 2 3
  */
 static uint_t
 ohci_leftmost_leaf(
@@ -4345,7 +4355,7 @@ ohci_remove_periodic_ed(
 	ohcip->ohci_open_periodic_pipe_count--;
 
 	ept_type = pp->pp_pipe_handle->
-			p_ep.bmAttributes & USB_EP_ATTR_MASK;
+	    p_ep.bmAttributes & USB_EP_ATTR_MASK;
 
 	if (ept_type == USB_EP_ATTR_ISOCH) {
 		ohcip->ohci_open_isoch_pipe_count--;
@@ -4691,12 +4701,12 @@ ohci_initialize_dummy(
  */
 static ohci_trans_wrapper_t *
 ohci_allocate_ctrl_resources(
-	ohci_state_t 		*ohcip,
+	ohci_state_t		*ohcip,
 	ohci_pipe_private_t	*pp,
 	usb_ctrl_req_t		*ctrl_reqp,
 	usb_flags_t		usb_flags)
 {
-	size_t 			td_count = 2;
+	size_t			td_count = 2;
 	size_t			ctrl_buf_size;
 	ohci_trans_wrapper_t	*tw;
 
@@ -4822,7 +4832,7 @@ ohci_insert_ctrl_req(
 		}
 
 		ctrl = (ctrl_reqp->ctrl_attributes & USB_ATTRS_SHORT_XFER_OK) ?
-			HC_TD_R : 0;
+		    HC_TD_R : 0;
 
 		/*
 		 * There is a data stage.
@@ -4875,12 +4885,12 @@ ohci_insert_ctrl_req(
  */
 static ohci_trans_wrapper_t *
 ohci_allocate_bulk_resources(
-	ohci_state_t 		*ohcip,
+	ohci_state_t		*ohcip,
 	ohci_pipe_private_t	*pp,
 	usb_bulk_req_t		*bulk_reqp,
 	usb_flags_t		usb_flags)
 {
-	size_t 			td_count = 0;
+	size_t			td_count = 0;
 	ohci_trans_wrapper_t	*tw;
 
 	/* Check the size of bulk request */
@@ -4897,7 +4907,7 @@ ohci_allocate_bulk_resources(
 	/* Get the required bulk packet size */
 	td_count = bulk_reqp->bulk_len / OHCI_MAX_TD_XFER_SIZE;
 	if (bulk_reqp->bulk_len % OHCI_MAX_TD_XFER_SIZE ||
-		bulk_reqp->bulk_len == 0) {
+	    bulk_reqp->bulk_len == 0) {
 		td_count++;
 	}
 
@@ -5148,11 +5158,11 @@ ohci_start_pipe_polling(
 		switch (eptd->bmAttributes & USB_EP_ATTR_MASK) {
 		case USB_EP_ATTR_INTR:
 			tw = ohci_allocate_intr_resources(
-				ohcip, ph, NULL, flags);
+			    ohcip, ph, NULL, flags);
 			break;
 		case USB_EP_ATTR_ISOCH:
 			tw = ohci_allocate_isoc_resources(
-				ohcip, ph, NULL, flags);
+			    ohcip, ph, NULL, flags);
 			break;
 		}
 		if (tw == NULL) {
@@ -5162,7 +5172,7 @@ ohci_start_pipe_polling(
 			while (tw != NULL) {
 				tw_list = tw->tw_next;
 				ohci_deallocate_periodic_in_resource(
-					ohcip, pp, tw);
+				    ohcip, pp, tw);
 				ohci_deallocate_tw_resources(ohcip, pp, tw);
 				tw = tw_list;
 			}
@@ -5204,7 +5214,7 @@ ohci_start_pipe_polling(
 			while (tw != NULL) {
 				tw_list = tw->tw_next;
 				ohci_deallocate_periodic_in_resource(
-					ohcip, pp, tw);
+				    ohcip, pp, tw);
 				ohci_deallocate_tw_resources(ohcip, pp, tw);
 				tw = tw_list;
 			}
@@ -5282,7 +5292,7 @@ ohci_set_periodic_pipe_polling(
 	 * done. Here we are getting only the periodic interval.
 	 */
 	interval = ohci_adjust_polling_interval(ohcip, endpoint,
-		ph->p_usba_device->usb_port_status);
+	    ph->p_usba_device->usb_port_status);
 
 	mutex_exit(&ph->p_usba_device->usb_mutex);
 
@@ -5320,7 +5330,7 @@ ohci_allocate_intr_resources(
 {
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	int			pipe_dir;
-	size_t 			td_count = 1;
+	size_t			td_count = 1;
 	size_t			tw_length;
 	ohci_trans_wrapper_t	*tw;
 
@@ -5457,7 +5467,7 @@ ohci_stop_periodic_pipe_polling(
 	    USB_EP_ATTR_INTR)) {
 
 		ohci_handle_root_hub_pipe_stop_intr_polling(
-					ph, flags);
+		    ph, flags);
 		return (USB_SUCCESS);
 	}
 
@@ -5498,7 +5508,7 @@ ohci_allocate_isoc_resources(
 	uint_t			max_isoc_xfer_size;
 	usb_isoc_pkt_descr_t	*isoc_pkt_descr, *start_isoc_pkt_descr;
 	ushort_t		isoc_pkt_count;
-	size_t 			count, td_count;
+	size_t			count, td_count;
 	size_t			tw_length;
 	size_t			isoc_pkts_length;
 	ohci_trans_wrapper_t	*tw;
@@ -5854,7 +5864,7 @@ ohci_insert_hc_td(
 			if (tw->tw_hctd_free_list != NULL) {
 				Set_TD(new_dummy->hctd_tw_next_td,
 				    ohci_td_cpu_to_iommu(ohcip,
-					tw->tw_hctd_free_list));
+				    tw->tw_hctd_free_list));
 			}
 			tw->tw_hctd_free_list = new_dummy;
 
@@ -5930,11 +5940,11 @@ ohci_allocate_td_from_pool(ohci_state_t	*ohcip)
  * Fill in the fields of a Transfer Descriptor (TD).
  *
  * hctd_dma_offs - different meanings for non-isoc and isoc TDs:
- *          starting offset into the TW buffer for a non-isoc TD
- *          and the index into the isoc TD list for an isoc TD.
- *          For non-isoc TDs, the starting offset should be 4k
- *          aligned and the TDs in one transfer must be filled in
- *          increasing order.
+ *	    starting offset into the TW buffer for a non-isoc TD
+ *	    and the index into the isoc TD list for an isoc TD.
+ *	    For non-isoc TDs, the starting offset should be 4k
+ *	    aligned and the TDs in one transfer must be filled in
+ *	    increasing order.
  */
 static void
 ohci_fill_in_td(
@@ -5960,7 +5970,7 @@ ohci_fill_in_td(
 
 	/* Update the TD special fields */
 	if ((pp->pp_pipe_handle->p_ep.bmAttributes &
-		USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH) {
+	    USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH) {
 		ohci_init_itd(ohcip, tw, hctd_ctrl, hctd_dma_offs, td);
 	} else {
 		/* Update the dummy with control information */
@@ -6189,7 +6199,7 @@ ohci_insert_td_with_frame_number(
 	ohci_td_t		*dummy_td)
 {
 	usb_isoc_req_t		*isoc_reqp =
-				    (usb_isoc_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_isoc_req_t *)tw->tw_curr_xfer_reqp;
 	usb_frame_number_t	current_frame_number, start_frame_number;
 	uint_t			ddic, ctrl, isoc_pkts;
 	ohci_ed_t		*ept = pp->pp_ept;
@@ -6538,7 +6548,7 @@ ohci_unlink_td_from_tw(
 			tw->tw_hctd_tail = NULL;
 		} else {
 			tw->tw_hctd_head = ohci_td_iommu_to_cpu(ohcip,
-				Get_TD(head->hctd_tw_next_td));
+			    Get_TD(head->hctd_tw_next_td));
 		}
 
 		return;
@@ -6549,7 +6559,7 @@ ohci_unlink_td_from_tw(
 	while (next && (old_td != next)) {
 		head = next;
 		next = ohci_td_iommu_to_cpu(ohcip,
-				Get_TD(next->hctd_tw_next_td));
+		    Get_TD(next->hctd_tw_next_td));
 	}
 
 	/* unlink the found old_td from the tw */
@@ -6585,14 +6595,14 @@ ohci_deallocate_td(
 	 * NULL for the dummy and for the reclaim TD's.
 	 */
 	if ((Get_TD(old_td->hctd_state) == HC_TD_DUMMY) ||
-		(Get_TD(old_td->hctd_state) == HC_TD_RECLAIM)) {
+	    (Get_TD(old_td->hctd_state) == HC_TD_RECLAIM)) {
 		tw = (ohci_trans_wrapper_t *)((uintptr_t)
-		Get_TD(old_td->hctd_trans_wrapper));
+		    Get_TD(old_td->hctd_trans_wrapper));
 		ASSERT(tw == NULL);
 	} else {
 		tw = (ohci_trans_wrapper_t *)
-		OHCI_LOOKUP_ID((uint32_t)
-		Get_TD(old_td->hctd_trans_wrapper));
+		    OHCI_LOOKUP_ID((uint32_t)
+		    Get_TD(old_td->hctd_trans_wrapper));
 		ASSERT(tw != NULL);
 	}
 
@@ -6727,11 +6737,11 @@ ohci_allocate_tds_for_tw(
  */
 static ohci_trans_wrapper_t *
 ohci_allocate_tw_resources(
-	ohci_state_t 		*ohcip,
+	ohci_state_t		*ohcip,
 	ohci_pipe_private_t	*pp,
 	size_t			tw_length,
 	usb_flags_t		usb_flags,
-	size_t 			td_count)
+	size_t			td_count)
 {
 	ohci_trans_wrapper_t	*tw;
 
@@ -6950,7 +6960,7 @@ ohci_create_isoc_transfer_wrapper(
 	size_t			length,
 	usb_isoc_pkt_descr_t	*descr,
 	ushort_t		pkt_count,
-	size_t 			td_count,
+	size_t			td_count,
 	uint_t			usb_flags)
 {
 	ddi_device_acc_attr_t	dev_attr;
@@ -7883,7 +7893,7 @@ ohci_check_done_head(ohci_state_t *ohcip, ohci_td_t *done_head)
 	headp = (uintptr_t)done_head;
 
 	if (headp && !(headp & ~HCCA_DONE_HEAD_MASK) &&
-		(headp >= lower) && (headp < upper)) {
+	    (headp >= lower) && (headp < upper)) {
 
 		return (USB_SUCCESS);
 	} else {
@@ -7901,7 +7911,7 @@ static void
 ohci_handle_missed_intr(ohci_state_t	*ohcip)
 {
 	ohci_save_intr_sts_t		*ohci_intr_sts =
-					    &ohcip->ohci_save_intr_sts;
+	    &ohcip->ohci_save_intr_sts;
 	ohci_td_t			*done_head;
 	uint_t				intr;
 
@@ -8466,7 +8476,7 @@ ohci_parse_isoc_error(
 			toggle = 0;
 		} else {
 			ctrl =	(psw & HC_ITD_EVEN_OFFSET) <<
-					HC_ITD_OFFSET_SHIFT;
+			    HC_ITD_OFFSET_SHIFT;
 			toggle = 1;
 		}
 
@@ -8589,7 +8599,7 @@ ohci_check_for_error(
 					/* Clear the halt bit */
 					Set_ED(pp->pp_ept->hced_headp,
 					    (Get_ED(pp->pp_ept->hced_headp) &
-						~HC_EPT_Halt));
+					    ~HC_EPT_Halt));
 				} else {
 					error = USB_CR_UNSPECIFIED_ERR;
 				}
@@ -9057,7 +9067,7 @@ ohci_handle_intr_td(
 	void			*tw_handle_callback_value)
 {
 	usb_intr_req_t		*curr_intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	usb_req_attrs_t		attrs;
@@ -9163,7 +9173,7 @@ ohci_handle_one_xfer_completion(
 	usba_pipe_handle_data_t	*ph = tw->tw_pipe_private->pp_pipe_handle;
 	ohci_pipe_private_t	*pp = tw->tw_pipe_private;
 	usb_intr_req_t		*curr_intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_handle_one_xfer_completion: tw = 0x%p", tw);
@@ -9213,7 +9223,7 @@ ohci_handle_isoc_td(
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	usb_isoc_req_t		*curr_isoc_reqp =
-				    (usb_isoc_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_isoc_req_t *)tw->tw_curr_xfer_reqp;
 	int			error = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
@@ -9605,8 +9615,8 @@ ohci_state_t *
 ohci_obtain_state(dev_info_t	*dip)
 {
 	int			instance = ddi_get_instance(dip);
-	ohci_state_t 		*state = ddi_get_soft_state(
-				    ohci_statep, instance);
+	ohci_state_t		*state = ddi_get_soft_state(
+	    ohci_statep, instance);
 
 	ASSERT(state != NULL);
 
@@ -9745,7 +9755,7 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 
 	/* Process any pending hcr_done_head value */
 	done_head = (ohci_td_t *)(uintptr_t)
-		(Get_OpReg(hcr_done_head) & HCCA_DONE_HEAD_MASK);
+	    (Get_OpReg(hcr_done_head) & HCCA_DONE_HEAD_MASK);
 	if (ohci_check_done_head(ohcip, done_head) == USB_SUCCESS) {
 
 		ohci_traverse_done_list(ohcip, done_head);
@@ -9888,7 +9898,7 @@ ohci_get_current_frame_number(ohci_state_t *ohcip)
 	usb_frame_number_t	usb_frame_number;
 	usb_frame_number_t	ohci_fno, frame_number;
 	ohci_save_intr_sts_t	*ohci_intr_sts =
-				    &ohcip->ohci_save_intr_sts;
+	    &ohcip->ohci_save_intr_sts;
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10029,7 +10039,7 @@ ohci_allocate_periodic_in_resource(
 
 			/* Get the interrupt transfer length */
 			length = ((usb_intr_req_t *)
-			client_periodic_in_reqp)->intr_len;
+			    client_periodic_in_reqp)->intr_len;
 
 			curr_intr_reqp = usba_hcdi_dup_intr_req(
 			    ph->p_dip, (usb_intr_req_t *)
@@ -10763,9 +10773,9 @@ ohci_hcdi_callback(
 	usb_cr_t		completion_reason)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	uchar_t			attributes = ph->p_ep.bmAttributes &
-							USB_EP_ATTR_MASK;
+	    USB_EP_ATTR_MASK;
 	ohci_pipe_private_t	*pp = (ohci_pipe_private_t *)ph->p_hcd_private;
 	usb_opaque_t		curr_xfer_reqp;
 	uint_t			pipe_state = 0;
@@ -10840,7 +10850,7 @@ ohci_create_stats(ohci_state_t	*ohcip)
 	char			kstatname[KSTAT_STRLEN];
 	const char		*dname = ddi_driver_name(ohcip->ohci_dip);
 	char			*usbtypes[USB_N_COUNT_KSTATS] =
-				    {"ctrl", "isoch", "bulk", "intr"};
+	    {"ctrl", "isoch", "bulk", "intr"};
 	uint_t			instance = ohcip->ohci_instance;
 	ohci_intrs_stats_t	*isp;
 	int			i;
@@ -10856,25 +10866,25 @@ ohci_create_stats(ohci_state_t	*ohcip)
 		if (OHCI_INTRS_STATS(ohcip)) {
 			isp = OHCI_INTRS_STATS_DATA(ohcip);
 			kstat_named_init(&isp->ohci_hcr_intr_total,
-			"Interrupts Total", KSTAT_DATA_UINT64);
+			    "Interrupts Total", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_not_claimed,
-			"Not Claimed", KSTAT_DATA_UINT64);
+			    "Not Claimed", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_so,
-			"Schedule Overruns", KSTAT_DATA_UINT64);
+			    "Schedule Overruns", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_wdh,
-			"Writeback Done Head", KSTAT_DATA_UINT64);
+			    "Writeback Done Head", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_sof,
-			"Start Of Frame", KSTAT_DATA_UINT64);
+			    "Start Of Frame", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_rd,
-			"Resume Detected", KSTAT_DATA_UINT64);
+			    "Resume Detected", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_ue,
-			"Unrecoverable Error", KSTAT_DATA_UINT64);
+			    "Unrecoverable Error", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_fno,
-			"Frame No. Overflow", KSTAT_DATA_UINT64);
+			    "Frame No. Overflow", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_rhsc,
-			"Root Hub Status Change", KSTAT_DATA_UINT64);
+			    "Root Hub Status Change", KSTAT_DATA_UINT64);
 			kstat_named_init(&isp->ohci_hcr_intr_oc,
-			"Change In Ownership", KSTAT_DATA_UINT64);
+			    "Change In Ownership", KSTAT_DATA_UINT64);
 
 			OHCI_INTRS_STATS(ohcip)->ks_private = ohcip;
 			OHCI_INTRS_STATS(ohcip)->ks_update = nulldev;
@@ -10987,7 +10997,7 @@ ohci_do_intrs_stats(
 			default:
 				OHCI_INTRS_STATS_DATA(ohcip)->
 				    ohci_hcr_intr_not_claimed.value.ui64++;
-				    break;
+				break;
 		}
 	}
 }
@@ -11119,7 +11129,7 @@ ohci_print_ed(
 	ohci_state_t	*ohcip,
 	ohci_ed_t	*ed)
 {
-	uint_t 		ctrl = Get_ED(ed->hced_ctrl);
+	uint_t		ctrl = Get_ED(ed->hced_ctrl);
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_print_ed: ed = 0x%p", (void *)ed);

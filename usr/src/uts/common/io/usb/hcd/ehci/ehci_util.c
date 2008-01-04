@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,7 +292,7 @@ int
 ehci_hcdi_pm_support(dev_info_t *dip)
 {
 	ehci_state_t *ehcip = ddi_get_soft_state(ehci_statep,
-				ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	if (((ehcip->ehci_vendor_id == PCI_VENDOR_NEC_COMBO) &&
 	    (ehcip->ehci_device_id == PCI_DEVICE_NEC_COMBO)) ||
@@ -381,40 +381,40 @@ ehci_allocate_pools(ehci_state_t	*ehcip)
 
 	/* Allocate the QTD pool DMA handle */
 	if (ddi_dma_alloc_handle(ehcip->ehci_dip, &ehcip->ehci_dma_attr,
-			DDI_DMA_SLEEP, 0,
-			&ehcip->ehci_qtd_pool_dma_handle) != DDI_SUCCESS) {
+	    DDI_DMA_SLEEP, 0,
+	    &ehcip->ehci_qtd_pool_dma_handle) != DDI_SUCCESS) {
 
 		goto failure;
 	}
 
 	/* Allocate the memory for the QTD pool */
 	if (ddi_dma_mem_alloc(ehcip->ehci_qtd_pool_dma_handle,
-			ehci_qtd_pool_size * sizeof (ehci_qtd_t),
-			&dev_attr,
-			DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			0,
-			(caddr_t *)&ehcip->ehci_qtd_pool_addr,
-			&real_length,
-			&ehcip->ehci_qtd_pool_mem_handle)) {
+	    ehci_qtd_pool_size * sizeof (ehci_qtd_t),
+	    &dev_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    0,
+	    (caddr_t *)&ehcip->ehci_qtd_pool_addr,
+	    &real_length,
+	    &ehcip->ehci_qtd_pool_mem_handle)) {
 
 		goto failure;
 	}
 
 	/* Map the QTD pool into the I/O address space */
 	result = ddi_dma_addr_bind_handle(
-			ehcip->ehci_qtd_pool_dma_handle,
-			NULL,
-			(caddr_t)ehcip->ehci_qtd_pool_addr,
-			real_length,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&ehcip->ehci_qtd_pool_cookie,
-			&ccount);
+	    ehcip->ehci_qtd_pool_dma_handle,
+	    NULL,
+	    (caddr_t)ehcip->ehci_qtd_pool_addr,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &ehcip->ehci_qtd_pool_cookie,
+	    &ccount);
 
 	bzero((void *)ehcip->ehci_qtd_pool_addr,
-			ehci_qtd_pool_size * sizeof (ehci_qtd_t));
+	    ehci_qtd_pool_size * sizeof (ehci_qtd_t));
 
 	/* Process the result */
 	if (result == DDI_DMA_MAPPED) {
@@ -447,40 +447,40 @@ ehci_allocate_pools(ehci_state_t	*ehcip)
 
 	/* Allocate the QTD pool DMA handle */
 	if (ddi_dma_alloc_handle(ehcip->ehci_dip,
-			&ehcip->ehci_dma_attr,
-			DDI_DMA_SLEEP,
-			0,
-			&ehcip->ehci_qh_pool_dma_handle) != DDI_SUCCESS) {
+	    &ehcip->ehci_dma_attr,
+	    DDI_DMA_SLEEP,
+	    0,
+	    &ehcip->ehci_qh_pool_dma_handle) != DDI_SUCCESS) {
 
 		goto failure;
 	}
 
 	/* Allocate the memory for the QH pool */
 	if (ddi_dma_mem_alloc(ehcip->ehci_qh_pool_dma_handle,
-			ehci_qh_pool_size * sizeof (ehci_qh_t),
-			&dev_attr,
-			DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			0,
-			(caddr_t *)&ehcip->ehci_qh_pool_addr,
-			&real_length,
-			&ehcip->ehci_qh_pool_mem_handle) != DDI_SUCCESS) {
+	    ehci_qh_pool_size * sizeof (ehci_qh_t),
+	    &dev_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    0,
+	    (caddr_t *)&ehcip->ehci_qh_pool_addr,
+	    &real_length,
+	    &ehcip->ehci_qh_pool_mem_handle) != DDI_SUCCESS) {
 
 		goto failure;
 	}
 
 	result = ddi_dma_addr_bind_handle(ehcip->ehci_qh_pool_dma_handle,
-			NULL,
-			(caddr_t)ehcip->ehci_qh_pool_addr,
-			real_length,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_SLEEP,
-			NULL,
-			&ehcip->ehci_qh_pool_cookie,
-			&ccount);
+	    NULL,
+	    (caddr_t)ehcip->ehci_qh_pool_addr,
+	    real_length,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &ehcip->ehci_qh_pool_cookie,
+	    &ccount);
 
 	bzero((void *)ehcip->ehci_qh_pool_addr,
-			ehci_qh_pool_size * sizeof (ehci_qh_t));
+	    ehci_qh_pool_size * sizeof (ehci_qh_t));
 
 	/* Process the result */
 	if (result == DDI_DMA_MAPPED) {
@@ -579,7 +579,7 @@ ehci_map_regs(ehci_state_t	*ehcip)
 
 	/* Check to make sure we have memory access */
 	if (pci_config_setup(ehcip->ehci_dip,
-		&ehcip->ehci_config_handle) != DDI_SUCCESS) {
+	    &ehcip->ehci_config_handle) != DDI_SUCCESS) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_map_regs: Config error");
@@ -808,7 +808,7 @@ ehci_add_intrs(ehci_state_t	*ehcip,
 		int		intr_type)
 {
 	int	actual, avail, intr_size, count = 0;
-	int 	i, flag, ret;
+	int	i, flag, ret;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_add_intrs: interrupt type 0x%x", intr_type);
@@ -975,9 +975,9 @@ ehci_init_hardware(ehci_state_t	*ehcip)
 
 		/* read .conf file properties */
 		abort_on_BIOS_take_over_failure =
-					ddi_prop_get_int(DDI_DEV_T_ANY,
-					ehcip->ehci_dip, DDI_PROP_DONTPASS,
-					"abort-on-BIOS-take-over-failure", 0);
+		    ddi_prop_get_int(DDI_DEV_T_ANY,
+		    ehcip->ehci_dip, DDI_PROP_DONTPASS,
+		    "abort-on-BIOS-take-over-failure", 0);
 
 		if (abort_on_BIOS_take_over_failure) {
 
@@ -1086,8 +1086,8 @@ ehci_init_workaround(ehci_state_t	*ehcip)
 	 * the presence of SOFs interrupts.
 	 */
 	if (ehcip->ehci_vendor_id == PCI_VENDOR_ALI) {
-	    /* Route all Root hub ports to EHCI host controller */
-	    Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_EHCI);
+		/* Route all Root hub ports to EHCI host controller */
+		Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_EHCI);
 	}
 
 	/*
@@ -1101,13 +1101,13 @@ ehci_init_workaround(ehci_state_t	*ehcip)
 	 */
 	if (ehcip->ehci_vendor_id == PCI_VENDOR_VIA) {
 
-	    if (ehcip->ehci_rev_id >= PCI_VIA_REVISION_6212) {
+		if (ehcip->ehci_rev_id >= PCI_VIA_REVISION_6212) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_init_workaround: Applying VIA workarounds "
 		    "for the 6212 chip.");
 
-	    } else if (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
+		} else if (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
 		"pciclass,0c0320") == 0) {
 
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
@@ -1133,11 +1133,11 @@ ehci_init_workaround(ehci_state_t	*ehcip)
 
 		return (DDI_FAILURE);
 
-	    } else if (ehci_vt62x2_workaround) {
+		} else if (ehci_vt62x2_workaround) {
 
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "Applying VIA workarounds");
-	    }
+		}
 	}
 
 	return (DDI_SUCCESS);
@@ -1270,7 +1270,7 @@ ehci_init_ctlr(ehci_state_t	*ehcip,
 	 */
 	Set_OpReg(ehci_periodic_list_base,
 	    (uint32_t)(ehcip->ehci_pflt_cookie.dmac_address &
-		EHCI_PERIODIC_LIST_BASE));
+	    EHCI_PERIODIC_LIST_BASE));
 
 	/*
 	 * Set ehci_interrupt to enable all interrupts except Root
@@ -1285,7 +1285,7 @@ ehci_init_ctlr(ehci_state_t	*ehcip,
 	 */
 	Set_OpReg(ehci_command,
 	    ((Get_OpReg(ehci_command) & ~EHCI_CMD_INTR_THRESHOLD) |
-		(EHCI_CMD_01_INTR | EHCI_CMD_HOST_CTRL_RUN)));
+	    (EHCI_CMD_01_INTR | EHCI_CMD_HOST_CTRL_RUN)));
 
 	ASSERT(Get_OpReg(ehci_command) & EHCI_CMD_HOST_CTRL_RUN);
 
@@ -1565,7 +1565,7 @@ ehci_build_interrupt_lattice(ehci_state_t	*ehcip)
 	ehci_qh_t	*list_array = ehcip->ehci_qh_pool_addr;
 	ushort_t	ehci_index[EHCI_NUM_PERIODIC_FRAME_LISTS];
 	ehci_periodic_frame_list_t *periodic_frame_list =
-			    ehcip->ehci_periodic_frame_list_tablep;
+	    ehcip->ehci_periodic_frame_list_tablep;
 	ushort_t	*temp, num_of_nodes;
 	uintptr_t	addr;
 	int		i, j, k;
@@ -1683,28 +1683,28 @@ ehci_alloc_hcdi_ops(ehci_state_t	*ehcip)
 	usba_hcdi_ops->usba_hcdi_pipe_isoc_xfer = ehci_hcdi_pipe_isoc_xfer;
 
 	usba_hcdi_ops->usba_hcdi_bulk_transfer_size =
-					ehci_hcdi_bulk_transfer_size;
+	    ehci_hcdi_bulk_transfer_size;
 
 	usba_hcdi_ops->usba_hcdi_pipe_stop_intr_polling =
-					ehci_hcdi_pipe_stop_intr_polling;
+	    ehci_hcdi_pipe_stop_intr_polling;
 	usba_hcdi_ops->usba_hcdi_pipe_stop_isoc_polling =
-					ehci_hcdi_pipe_stop_isoc_polling;
+	    ehci_hcdi_pipe_stop_isoc_polling;
 
 	usba_hcdi_ops->usba_hcdi_get_current_frame_number =
-					ehci_hcdi_get_current_frame_number;
+	    ehci_hcdi_get_current_frame_number;
 	usba_hcdi_ops->usba_hcdi_get_max_isoc_pkts =
-					ehci_hcdi_get_max_isoc_pkts;
+	    ehci_hcdi_get_max_isoc_pkts;
 
 	usba_hcdi_ops->usba_hcdi_console_input_init =
-					ehci_hcdi_polled_input_init;
+	    ehci_hcdi_polled_input_init;
 	usba_hcdi_ops->usba_hcdi_console_input_enter =
-					ehci_hcdi_polled_input_enter;
+	    ehci_hcdi_polled_input_enter;
 	usba_hcdi_ops->usba_hcdi_console_read =
-					ehci_hcdi_polled_read;
+	    ehci_hcdi_polled_read;
 	usba_hcdi_ops->usba_hcdi_console_input_exit =
-					ehci_hcdi_polled_input_exit;
+	    ehci_hcdi_polled_input_exit;
 	usba_hcdi_ops->usba_hcdi_console_input_fini =
-					ehci_hcdi_polled_input_fini;
+	    ehci_hcdi_polled_input_fini;
 	return (usba_hcdi_ops);
 }
 
@@ -1764,10 +1764,10 @@ ehci_cleanup(ehci_state_t	*ehcip)
 		Set_OpReg(ehci_command,
 		    Get_OpReg(ehci_command) & ~EHCI_CMD_HOST_CTRL_RUN);
 
-		/* Wait for sometime */
-		drv_usecwait(EHCI_TIMEWAIT);
-
 		mutex_exit(&ehcip->ehci_int_mutex);
+
+		/* Wait for sometime */
+		delay(drv_usectohz(EHCI_TIMEWAIT));
 
 		ehci_rem_intrs(ehcip);
 	}
@@ -1795,15 +1795,15 @@ ehci_cleanup(ehci_state_t	*ehcip)
 				mutex_enter(&ehcip->ehci_int_mutex);
 
 				tw = (ehci_trans_wrapper_t *)
-					EHCI_LOOKUP_ID((uint32_t)
-					Get_QTD(qtd->qtd_trans_wrapper));
+				    EHCI_LOOKUP_ID((uint32_t)
+				    Get_QTD(qtd->qtd_trans_wrapper));
 
 				/* Obtain the pipe private structure */
 				pp = tw->tw_pipe_private;
 
 				/* Stop the the transfer timer */
 				ehci_stop_xfer_timer(ehcip, tw,
-						EHCI_REMOVE_XFER_ALWAYS);
+				    EHCI_REMOVE_XFER_ALWAYS);
 
 				ehci_deallocate_tw(ehcip, pp, tw);
 
@@ -1903,7 +1903,7 @@ ehci_cleanup(ehci_state_t	*ehcip)
 
 		/* Free the soft state */
 		ddi_soft_state_free(ehci_statep,
-			ddi_get_instance(ehcip->ehci_dip));
+		    ddi_get_instance(ehcip->ehci_dip));
 	}
 
 	return (DDI_SUCCESS);
@@ -1959,7 +1959,7 @@ ehci_cpr_suspend(ehci_state_t	*ehcip)
 	if (usba_hubdi_detach(ehcip->ehci_dip, DDI_SUSPEND) != DDI_SUCCESS) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-			"ehci_cpr_suspend: root hub fails to suspend");
+		    "ehci_cpr_suspend: root hub fails to suspend");
 
 		return (DDI_FAILURE);
 	}
@@ -3096,7 +3096,7 @@ ehci_find_bestfit_hs_mask(
 		 */
 		if ((*smask != 0x00) &&
 		    ((best_smask == 0x00) ||
-			(best_node_bandwidth > node_bandwidth))) {
+		    (best_node_bandwidth > node_bandwidth))) {
 
 			best_node_bandwidth = node_bandwidth;
 			best_array_leaf = array_leaf;
@@ -3200,8 +3200,8 @@ ehci_find_bestfit_ls_intr_mask(
 		 */
 		if ((*smask != 0x00) &&
 		    ((best_smask == 0x00) ||
-			(best_node_bandwidth >
-			    (node_sbandwidth + node_cbandwidth)))) {
+		    (best_node_bandwidth >
+		    (node_sbandwidth + node_cbandwidth)))) {
 			best_node_bandwidth = node_sbandwidth + node_cbandwidth;
 			best_array_leaf = array_leaf;
 			best_smask = *smask;
@@ -3322,8 +3322,8 @@ ehci_find_bestfit_sitd_in_mask(
 		 */
 		if (found &&
 		    ((best_smask == 0x00) ||
-			(best_node_bandwidth >
-			    (node_sbandwidth + node_cbandwidth)))) {
+		    (best_node_bandwidth >
+		    (node_sbandwidth + node_cbandwidth)))) {
 			best_node_bandwidth = node_sbandwidth + node_cbandwidth;
 			best_array_leaf = array_leaf;
 			best_smask = *smask;
@@ -3426,7 +3426,7 @@ ehci_find_bestfit_sitd_out_mask(
 		 */
 		if (found &&
 		    ((best_smask == 0x00) ||
-			(best_node_bandwidth > node_sbandwidth))) {
+		    (best_node_bandwidth > node_sbandwidth))) {
 			best_node_bandwidth = node_sbandwidth;
 			best_array_leaf = array_leaf;
 			best_smask = *smask;
@@ -3685,13 +3685,13 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	 * into the current EHCI registers.
 	 */
 	Set_OpReg(ehci_ctrl_segment, (uint32_t)
-		ehci_save_regs->ehci_ctrl_segment);
+	    ehci_save_regs->ehci_ctrl_segment);
 
 	Set_OpReg(ehci_periodic_list_base, (uint32_t)
-		ehci_save_regs->ehci_periodic_list_base);
+	    ehci_save_regs->ehci_periodic_list_base);
 
 	Set_OpReg(ehci_async_list_addr, (uint32_t)
-		ehci_save_regs->ehci_async_list_addr);
+	    ehci_save_regs->ehci_async_list_addr);
 
 	/*
 	 * For some reason this register might get nulled out by
@@ -3706,7 +3706,7 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 		int retry = 0;
 
 		Set_OpRegRetry(ehci_async_list_addr, (uint32_t)
-			ehci_save_regs->ehci_async_list_addr, retry);
+		    ehci_save_regs->ehci_async_list_addr, retry);
 		if (retry >= EHCI_MAX_RETRY) {
 			USB_DPRINTF_L2(PRINT_MASK_ATTA,
 			    ehcip->ehci_log_hdl, "ehci_do_soft_reset:"
@@ -3716,11 +3716,11 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 		}
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_do_soft_reset: ASYNCLISTADDR "
-			"write failed, retry=%d", retry);
+		    "write failed, retry=%d", retry);
 	}
 
 	Set_OpReg(ehci_config_flag, (uint32_t)
-		ehci_save_regs->ehci_config_flag);
+	    ehci_save_regs->ehci_config_flag);
 
 	/* Enable both Asynchronous and Periodic Schedule if necessary */
 	ehci_toggle_scheduler(ehcip);
@@ -4263,7 +4263,7 @@ ehci_create_stats(ehci_state_t	*ehcip)
 	char			kstatname[KSTAT_STRLEN];
 	const char		*dname = ddi_driver_name(ehcip->ehci_dip);
 	char			*usbtypes[USB_N_COUNT_KSTATS] =
-				    {"ctrl", "isoch", "bulk", "intr"};
+	    {"ctrl", "isoch", "bulk", "intr"};
 	uint_t			instance = ehcip->ehci_instance;
 	ehci_intrs_stats_t	*isp;
 	int			i;
