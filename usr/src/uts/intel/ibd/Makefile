@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ MODULE		= ibd
 OBJECTS		= $(IBD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-LDFLAGS		+= -dy -Nmisc/gld -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
+LDFLAGS		+= -dy -Nmisc/mac -Nmisc/ibtl -Nmisc/ibcm -Nmisc/ibmf
 WARLOCK_OUT	= $(IBD_OBJS:%.o=%.ll)
 WARLOCK_OK	= $(MODULE).ok
 WLCMD_DIR	= $(UTSBASE)/common/io/warlock

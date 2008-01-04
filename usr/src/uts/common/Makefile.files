@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -569,6 +569,8 @@ MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
 MAC_ETHER_OBJS +=	mac_ether.o
 
 MAC_WIFI_OBJS +=	mac_wifi.o
+
+MAC_IB_OBJS +=		mac_ib.o
 
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o

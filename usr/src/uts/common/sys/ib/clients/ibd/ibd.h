@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +96,8 @@ typedef struct ipoib_pgrh {
 #include <sys/ib/ibtl/ibti.h>
 #include <sys/ib/ib_pkt_hdrs.h>
 #include <sys/list.h>
-#include <sys/gld.h>
+#include <sys/mac.h>
+#include <sys/mac_ib.h>
 #include <sys/modhash.h>
 
 #define	IBD_HIWAT	(64*1024)	/* drv flow control high water */
@@ -163,7 +163,6 @@ typedef struct ibd_swqe_s {
 	ibt_wr_ds_t		w_smblk_sgl[IBD_MAX_SQSEG];
 	ibd_mblkbuf_t		w_smblkbuf[IBD_MAX_SQSEG];
 	ibd_ace_t		*w_ahandle;
-	void			*w_mdtinfo;
 } ibd_swqe_t;
 
 #define	swqe_next		w_ibd_swqe.w_next
@@ -214,20 +213,26 @@ typedef struct ibd_state_s {
 	ibt_clnt_hdl_t		id_ibt_hdl;
 	ibt_hca_hdl_t		id_hca_hdl;
 	ibt_pd_hdl_t		id_pd_hdl;
+	kmem_cache_t		*id_req_kmc;
 
 	uint32_t		id_max_sqseg;
 	ibd_list_t		id_tx_list;
+	ddi_softintr_t		id_tx;
 	uint32_t		id_tx_sends;
 	kmutex_t		id_txcomp_lock;
 	ibt_cq_hdl_t		id_scq_hdl;
 	ibt_wc_t		*id_txwcs;
+	uint32_t		id_txwcs_size;
 
 	uint32_t		id_num_rwqe;
 	ibd_list_t		id_rx_list;
+	ddi_softintr_t		id_rx;
 	ibt_cq_hdl_t		id_rcq_hdl;
 	void			*id_fifos;
 	int			id_nfifos;
-	ibt_wc_t		*id_wcs;
+	ibt_wc_t		*id_rxwcs;
+	uint32_t		id_rxwcs_size;
+	kmutex_t		id_rx_mutex;
 
 	ibt_channel_hdl_t	id_chnl_hdl;
 	ib_pkey_t		id_pkey;
@@ -235,7 +240,7 @@ typedef struct ibd_state_s {
 	uint8_t			id_port;
 	ibt_mcg_info_t		*id_mcinfo;
 
-	gld_mac_info_t		*id_macinfo;
+	mac_handle_t		id_mh;
 	ib_gid_t		id_sgid;
 	ib_qpn_t		id_qpnum;
 	ipoib_mac_t		id_macaddr;
@@ -263,25 +268,19 @@ typedef struct ibd_state_s {
 	kmutex_t		id_mc_mutex;
 	struct list		id_mc_full;
 	struct list		id_mc_non;
-	ibd_req_t		id_multi_req;
-	ipoib_mac_t		id_multi_addr;
-	char			id_multi_op;
-	boolean_t		id_multi_queued;
 
 	kmutex_t		id_trap_lock;
 	kcondvar_t		id_trap_cv;
 	boolean_t		id_trap_stop;
 	uint32_t		id_trap_inprog;
 
-	int			id_prom_op;
-	ibd_req_t		id_prom_req;
+	char			id_prom_op;
 
 	kmutex_t		id_sched_lock;
-	boolean_t		id_sched_queued;
-	ibd_req_t		id_sched_req;
+	boolean_t		id_sched_needed;
 
 	kmutex_t		id_link_mutex;
-	int32_t			id_link_state;
+	link_state_t		id_link_state;
 	uint64_t		id_link_speed;
 
 	uint64_t		id_ah_error;
@@ -289,6 +288,15 @@ typedef struct ibd_state_s {
 	uint64_t		id_num_intrs;
 	uint64_t		id_tx_short;
 	uint32_t		id_num_swqe;
+
+	uint64_t		id_xmt_bytes;
+	uint64_t		id_recv_bytes;
+	uint64_t		id_multi_xmt;
+	uint64_t		id_brd_xmt;
+	uint64_t		id_multi_rcv;
+	uint64_t		id_brd_rcv;
+	uint64_t		id_xmt_pkt;
+	uint64_t		id_rcv_pkt;
 } ibd_state_t;
 
 #endif /* _KERNEL && !_BOOT */

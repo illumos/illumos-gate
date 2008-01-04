@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -640,6 +640,7 @@ PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe
 #
 MAC_KMODS	+= mac_ether
 MAC_KMODS	+= mac_wifi
+MAC_KMODS	+= mac_ib
 
 #
 # 'Devname' Modules (kernel/devname)

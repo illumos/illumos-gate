@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -166,6 +166,7 @@ d none boot/acpi 755 root sys
 d none boot/acpi/tables 755 root sys
 f none kernel/mac/mac_ether 755 root sys
 f none kernel/mac/mac_wifi 755 root sys
+f none kernel/mac/mac_ib 755 root sys
 d none kernel/misc/scsi_vhci 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_emc 755 root sys
 f none kernel/misc/scsi_vhci/scsi_vhci_f_asym_lsi 755 root sys
@@ -363,6 +364,7 @@ f none kernel/ipp/amd64/ipgpc 755 root sys
 d none kernel/mac/amd64 755 root sys
 f none kernel/mac/amd64/mac_ether 755 root sys
 f none kernel/mac/amd64/mac_wifi 755 root sys
+f none kernel/mac/amd64/mac_ib 755 root sys
 d none kernel/misc/scsi_vhci/amd64 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_emc 755 root sys
 f none kernel/misc/scsi_vhci/amd64/scsi_vhci_f_asym_lsi 755 root sys
