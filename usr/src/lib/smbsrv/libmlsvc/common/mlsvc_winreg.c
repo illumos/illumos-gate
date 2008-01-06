@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,11 +45,12 @@
 #include <smbsrv/ndl/winreg.ndl>
 
 /*
- * List of mlsvc handle (local handle management) keys.
+ * Local handle management keys.
  */
-#define	WINREG_HKLM		"WinregOpenHKLM"
-#define	WINREG_HKU		"WinregOpenUser"
-#define	WINREG_KEY		"WinregOpenKey"
+static int winreg_hk;
+static int winreg_hklm;
+static int winreg_hkuser;
+static int winreg_hkkey;
 
 /*
  * List of supported registry keys (case-insensitive).
@@ -62,29 +63,41 @@ static char *winreg_keys[] = {
 
 static char *winreg_lookup_value(const char *);
 
+static int winreg_s_OpenHK(void *, struct mlrpc_xaction *);
 static int winreg_s_OpenHKLM(void *, struct mlrpc_xaction *);
 static int winreg_s_OpenHKUsers(void *, struct mlrpc_xaction *);
 static int winreg_s_Close(void *, struct mlrpc_xaction *);
 static int winreg_s_CreateKey(void *, struct mlrpc_xaction *);
 static int winreg_s_DeleteKey(void *, struct mlrpc_xaction *);
 static int winreg_s_DeleteValue(void *, struct mlrpc_xaction *);
+static int winreg_s_FlushKey(void *, struct mlrpc_xaction *);
+static int winreg_s_GetKeySec(void *, struct mlrpc_xaction *);
+static int winreg_s_NotifyChange(void *, struct mlrpc_xaction *);
 static int winreg_s_OpenKey(void *, struct mlrpc_xaction *);
 static int winreg_s_QueryKey(void *, struct mlrpc_xaction *);
 static int winreg_s_QueryValue(void *, struct mlrpc_xaction *);
+static int winreg_s_SetKeySec(void *, struct mlrpc_xaction *);
 static int winreg_s_CreateValue(void *, struct mlrpc_xaction *);
 static int winreg_s_Shutdown(void *, struct mlrpc_xaction *);
 static int winreg_s_GetVersion(void *, struct mlrpc_xaction *);
 
 static mlrpc_stub_table_t winreg_stub_table[] = {
+	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKCR },
+	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKCU },
 	{ winreg_s_OpenHKLM,	WINREG_OPNUM_OpenHKLM },
+	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKPD },
 	{ winreg_s_OpenHKUsers,	WINREG_OPNUM_OpenHKUsers },
 	{ winreg_s_Close,	WINREG_OPNUM_Close },
 	{ winreg_s_CreateKey,	WINREG_OPNUM_CreateKey },
 	{ winreg_s_DeleteKey,	WINREG_OPNUM_DeleteKey },
 	{ winreg_s_DeleteValue,	WINREG_OPNUM_DeleteValue },
+	{ winreg_s_FlushKey,	WINREG_OPNUM_FlushKey },
+	{ winreg_s_GetKeySec,	WINREG_OPNUM_GetKeySec },
+	{ winreg_s_NotifyChange,	WINREG_OPNUM_NotifyChange },
 	{ winreg_s_OpenKey,	WINREG_OPNUM_OpenKey },
 	{ winreg_s_QueryKey,	WINREG_OPNUM_QueryKey },
 	{ winreg_s_QueryValue,	WINREG_OPNUM_QueryValue },
+	{ winreg_s_SetKeySec,	WINREG_OPNUM_SetKeySec },
 	{ winreg_s_CreateValue,	WINREG_OPNUM_CreateValue },
 	{ winreg_s_Shutdown,	WINREG_OPNUM_Shutdown },
 	{ winreg_s_GetVersion,	WINREG_OPNUM_GetVersion },
@@ -131,28 +144,48 @@ winreg_initialize(void)
 }
 
 /*
+ * winreg_s_OpenHK
+ *
+ * Stub.
+ */
+static int
+winreg_s_OpenHK(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct winreg_OpenHKCR *param = arg;
+	ndr_hdid_t *id;
+
+	if ((id = ndr_hdalloc(mxa, &winreg_hk)) == NULL) {
+		bzero(&param->handle, sizeof (winreg_handle_t));
+		param->status = ERROR_ACCESS_DENIED;
+	} else {
+		bcopy(id, &param->handle, sizeof (winreg_handle_t));
+		param->status = ERROR_SUCCESS;
+	}
+
+	return (MLRPC_DRC_OK);
+}
+
+/*
  * winreg_s_OpenHKLM
  *
- * This is a request to open the HKLM and get a handle. The client
- * should treat the handle as an opaque object.
+ * This is a request to open the HKLM and get a handle.
+ * The client should treat the handle as an opaque object.
  *
  * Status:
  *	ERROR_SUCCESS		Valid handle returned.
  *	ERROR_ACCESS_DENIED	Unable to allocate a handle.
  */
-/*ARGSUSED*/
 static int
 winreg_s_OpenHKLM(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_OpenHKLM *param = arg;
-	ms_handle_t *handle;
+	struct winreg_OpenHKLM *param = arg;
+	ndr_hdid_t *id;
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_WINREG, WINREG_HKLM, 0);
-	if (handle == NULL) {
-		bzero(&param->handle, sizeof (msreg_handle_t));
+	if ((id = ndr_hdalloc(mxa, &winreg_hklm)) == NULL) {
+		bzero(&param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
 	} else {
-		bcopy(handle, &param->handle, sizeof (msreg_handle_t));
+		bcopy(id, &param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_SUCCESS;
 	}
 
@@ -167,19 +200,17 @@ winreg_s_OpenHKLM(void *arg, struct mlrpc_xaction *mxa)
  * to support subsequent requests, but we may support enough now. It
  * seems okay with regedt32.
  */
-/*ARGSUSED*/
 static int
 winreg_s_OpenHKUsers(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_OpenHKUsers *param = arg;
-	ms_handle_t *handle;
+	struct winreg_OpenHKUsers *param = arg;
+	ndr_hdid_t *id;
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_WINREG, WINREG_HKU, 0);
-	if (handle == NULL) {
-		bzero(&param->handle, sizeof (msreg_handle_t));
+	if ((id = ndr_hdalloc(mxa, &winreg_hkuser)) == NULL) {
+		bzero(&param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
 	} else {
-		bcopy(handle, &param->handle, sizeof (msreg_handle_t));
+		bcopy(id, &param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_SUCCESS;
 	}
 
@@ -194,14 +225,15 @@ winreg_s_OpenHKUsers(void *arg, struct mlrpc_xaction *mxa)
  * and return MLRPC_DRC_OK. Setting the handle to zero appears to be
  * standard behaviour.
  */
-/*ARGSUSED*/
 static int
 winreg_s_Close(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_Close *param = arg;
+	struct winreg_Close *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 
-	(void) mlsvc_put_handle((ms_handle_t *)&param->handle);
-	bzero(&param->result_handle, sizeof (msreg_handle_t));
+	ndr_hdfree(mxa, id);
+
+	bzero(&param->result_handle, sizeof (winreg_handle_t));
 	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
@@ -213,7 +245,7 @@ winreg_s_Close(void *arg, struct mlrpc_xaction *mxa)
 static int
 winreg_s_CreateKey(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_CreateKey *param = arg;
+	struct winreg_CreateKey *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
 	return (MLRPC_DRC_OK);
@@ -226,7 +258,7 @@ winreg_s_CreateKey(void *arg, struct mlrpc_xaction *mxa)
 static int
 winreg_s_DeleteKey(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_DeleteKey *param = arg;
+	struct winreg_DeleteKey *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
 	return (MLRPC_DRC_OK);
@@ -239,9 +271,49 @@ winreg_s_DeleteKey(void *arg, struct mlrpc_xaction *mxa)
 static int
 winreg_s_DeleteValue(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_DeleteValue *param = arg;
+	struct winreg_DeleteValue *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
+	return (MLRPC_DRC_OK);
+}
+
+/*
+ * winreg_s_FlushKey
+ */
+/*ARGSUSED*/
+static int
+winreg_s_FlushKey(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct winreg_FlushKey *param = arg;
+
+	param->status = ERROR_SUCCESS;
+	return (MLRPC_DRC_OK);
+}
+
+/*
+ * winreg_s_GetKeySec
+ */
+/*ARGSUSED*/
+static int
+winreg_s_GetKeySec(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct winreg_GetKeySec *param = arg;
+
+	bzero(param, sizeof (struct winreg_GetKeySec));
+	param->status = ERROR_SUCCESS;
+	return (MLRPC_DRC_OK);
+}
+
+/*
+ * winreg_s_NotifyChange
+ */
+/*ARGSUSED*/
+static int
+winreg_s_NotifyChange(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct winreg_NotifyChange *param = arg;
+
+	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
 
@@ -256,33 +328,29 @@ winreg_s_DeleteValue(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_SUCCESS		Valid handle returned.
  *	ERROR_FILE_NOT_FOUND	No key or unable to allocate a handle.
  */
-/*ARGSUSED*/
 static int
 winreg_s_OpenKey(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_OpenKey *param = arg;
-	ms_handle_t *handle;
+	struct winreg_OpenKey *param = arg;
 	char *key = (char *)param->name.str;
+	ndr_hdid_t *id = NULL;
 	int i;
 
 	for (i = 0; i < sizeof (winreg_keys)/sizeof (winreg_keys[0]); ++i) {
 		if (strcasecmp(key, winreg_keys[i]) == 0) {
-			handle = mlsvc_get_handle(MLSVC_IFSPEC_WINREG,
-			    WINREG_KEY, 0);
-
-			if (handle == NULL)
-				break;
-
-			bcopy(handle, &param->result_handle,
-			    sizeof (msreg_handle_t));
-
-			param->status = ERROR_SUCCESS;
-			return (MLRPC_DRC_OK);
+			id = ndr_hdalloc(mxa, &winreg_hkkey);
+			break;
 		}
 	}
 
-	bzero(&param->result_handle, sizeof (msreg_handle_t));
-	param->status = ERROR_FILE_NOT_FOUND;
+	if (id == NULL) {
+		bzero(&param->result_handle, sizeof (winreg_handle_t));
+		param->status = ERROR_FILE_NOT_FOUND;
+	} else {
+		bcopy(id, &param->result_handle, sizeof (winreg_handle_t));
+		param->status = ERROR_SUCCESS;
+	}
+
 	return (MLRPC_DRC_OK);
 }
 
@@ -294,9 +362,9 @@ static int
 winreg_s_QueryKey(void *arg, struct mlrpc_xaction *mxa)
 {
 	static char nullstr[2] = { 0, 0 };
-	struct msreg_QueryKey *param = arg;
+	struct winreg_QueryKey *param = arg;
 
-	bzero(param, sizeof (struct msreg_QueryKey));
+	bzero(param, sizeof (struct winreg_QueryKey));
 
 	param->name.length = 2;
 	param->name.allosize = 0;
@@ -311,15 +379,15 @@ winreg_s_QueryKey(void *arg, struct mlrpc_xaction *mxa)
  * This is a request to get the value associated with a specified name.
  *
  * Returns:
- *	ERROR_SUCCESS			Value returned.
+ *	ERROR_SUCCESS		Value returned.
  *	ERROR_FILE_NOT_FOUND	PrimaryModule is not supported.
  *	ERROR_CANTREAD          No such name or memory problem.
  */
 static int
 winreg_s_QueryValue(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_QueryValue *param = arg;
-	struct msreg_value *pv;
+	struct winreg_QueryValue *param = arg;
+	struct winreg_value *pv;
 	char *name;
 	char *value;
 	DWORD slen;
@@ -338,9 +406,9 @@ winreg_s_QueryValue(void *arg, struct mlrpc_xaction *mxa)
 	}
 
 	slen = mts_wcequiv_strlen(value) + sizeof (mts_wchar_t);
-	msize = sizeof (struct msreg_value) + slen;
+	msize = sizeof (struct winreg_value) + slen;
 
-	param->value = (struct msreg_value *)MLRPC_HEAP_MALLOC(mxa, msize);
+	param->value = (struct winreg_value *)MLRPC_HEAP_MALLOC(mxa, msize);
 	param->type = MLRPC_HEAP_NEW(mxa, DWORD);
 	param->value_size = MLRPC_HEAP_NEW(mxa, DWORD);
 	param->value_size_total = MLRPC_HEAP_NEW(mxa, DWORD);
@@ -408,13 +476,26 @@ winreg_lookup_value(const char *name)
 }
 
 /*
+ * winreg_s_SetKeySec
+ */
+/*ARGSUSED*/
+static int
+winreg_s_SetKeySec(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct winreg_SetKeySec *param = arg;
+
+	param->status = ERROR_ACCESS_DENIED;
+	return (MLRPC_DRC_OK);
+}
+
+/*
  * winreg_s_CreateValue
  */
 /*ARGSUSED*/
 static int
 winreg_s_CreateValue(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_CreateValue *param = arg;
+	struct winreg_CreateValue *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
 	return (MLRPC_DRC_OK);
@@ -429,7 +510,7 @@ winreg_s_CreateValue(void *arg, struct mlrpc_xaction *mxa)
 static int
 winreg_s_Shutdown(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_Shutdown *param = arg;
+	struct winreg_Shutdown *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
 	return (MLRPC_DRC_OK);
@@ -446,7 +527,7 @@ winreg_s_Shutdown(void *arg, struct mlrpc_xaction *mxa)
 static int
 winreg_s_GetVersion(void *arg, struct mlrpc_xaction *mxa)
 {
-	struct msreg_GetVersion *param = arg;
+	struct winreg_GetVersion *param = arg;
 
 	param->version = 5;
 	param->status = ERROR_SUCCESS;

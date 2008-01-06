@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,17 +152,10 @@ char *mlsvc_ipc_name(int ipc_type, char *username);
  * the encrypted passwords.
  */
 
-int mlsvc_logon(char *domain_controller, char *domain_name,
-    char *username);
-int mlsvc_echo(char *server);
-int mlsvc_open_pipe(char *hostname, char *domain, char *username,
-    char *pipename);
-int mlsvc_close_pipe(int fid);
 void mlsvc_nt_password_hash(char *result, char *password);
 int mlsvc_encrypt_nt_password(char *password, char *key, int keylen, char *out,
     int outmax);
 DWORD mlsvc_join(char *server, char *domain, char *username, char *password);
-int mlsvc_locate_domain_controller(char *domain);
 
 /*
  * RPC request processing interface (mlsvc_server.c).
@@ -198,15 +191,7 @@ typedef struct mlsvc_pipe {
 struct mlsvc_rpc_context *mlrpc_process(int, smb_dr_user_ctx_t *);
 struct mlsvc_rpc_context *mlrpc_lookup(int fid);
 void mlrpc_release(int);
-int mlsvc_session_native_values(int fid, int *remote_os, int *remote_lm,
-    int *pdc_type);
 void mlsvc_rpc_report_status(int opnum, DWORD status);
-
-/*
- * This is a temporary location for this NETLOGON stuff.
- */
-typedef int (*mlsvc_locate_pdc_t)(char *domain);
-void mlsvc_install_pdc_cb(mlsvc_locate_pdc_t locate_pdc_cb);
 
 #ifdef __cplusplus
 }

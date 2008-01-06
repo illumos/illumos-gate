@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,10 +58,6 @@ smb_is_executable(char *path)
 
 /*
  * smbd_fs_query
- *
- * This function has been changed to return errors instead of using
- * smbsr_raise_errno to longjmp round the calling code. This allows
- * the caller to release resources when an error occurs.
  *
  * Upon success, the caller will need to call smb_node_release() on
  * fqi.last_snode (if it isn't already set to NULL by this routine) and

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,6 @@ OBJS_COMMON =		\
 	lsar_open.o	\
 	mlsvc_client.o	\
 	mlsvc_dssetup.o	\
-	mlsvc_handle.o	\
 	mlsvc_init.o	\
 	mlsvc_logr.o	\
 	mlsvc_lsa.o	\

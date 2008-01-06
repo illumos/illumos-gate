@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,8 +209,6 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 
 	inpipe = context->inpipe;
 	(void) strcpy(inpipe->sp_pipename, tmp_pipe.sp_pipename);
-	inpipe->sp_datalen = tmp_pipe.sp_datalen;
-	bcopy(bufp, inpipe->sp_data, inpipe->sp_datalen);
 
 	outpipe = context->outpipe;
 	(void) strcpy(outpipe->sp_pipename, "OUTPIPE");
@@ -227,7 +225,7 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 		if (context == NULL)
 			goto zero_exit;
 
-		context->inpipe->sp_datalen = context->inlen;
+		inpipe->sp_datalen = context->inlen;
 		context->inlen = 0;
 
 		context->outcookie = 0;
@@ -235,6 +233,9 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 	}
 
 	if (mdhin.md_call_type == SMB_RPC_TRANSACT) {
+		bcopy(bufp, inpipe->sp_data, tmp_pipe.sp_datalen);
+		inpipe->sp_datalen = tmp_pipe.sp_datalen;
+
 		context = mlrpc_process(inpipe->sp_pipeid, user_ctx);
 		if (context == NULL)
 			goto zero_exit;
@@ -246,13 +247,14 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 	}
 
 	if (mdhin.md_call_type == SMB_RPC_WRITE) {
-		bcopy(inpipe->sp_data, context->inpipe->sp_data +
-		    context->inlen, inpipe->sp_datalen);
 		/*
-		 * if we get another RPC_WRITE then we need to append
+		 * Append write data to the stream.
 		 */
-		context->inlen += inpipe->sp_datalen;
-		context->inpipe->sp_datalen = context->inlen;
+		bcopy(bufp, inpipe->sp_data + context->inlen,
+		    tmp_pipe.sp_datalen);
+		inpipe->sp_datalen += tmp_pipe.sp_datalen;
+		context->inlen += tmp_pipe.sp_datalen;
+
 		goto zero_exit;
 	}
 

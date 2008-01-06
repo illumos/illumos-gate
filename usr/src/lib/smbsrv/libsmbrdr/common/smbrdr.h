@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,16 +117,16 @@ struct sdb_session {
 	char native_lanman[SMB_PI_MAX_LANMAN];
 	int sock;
 	short port;
-	unsigned short secmode;
+	uint16_t secmode;
 	uint32_t sesskey;
 	uint32_t challenge_len;
-	unsigned char challenge_key[32];
-	unsigned char smb_flags;
-	unsigned short smb_flags2;
-	unsigned short vc;
+	uint8_t challenge_key[32];
+	uint8_t smb_flags;
+	uint16_t smb_flags2;
+	uint16_t vc;
 	uint32_t remote_caps;
-	unsigned short state;
-	unsigned int sid;	/* session id */
+	uint8_t state;
+	uint32_t sid;	/* session id */
 	int remote_os;
 	int remote_lm;
 	int pdc_type;
@@ -208,12 +208,12 @@ void smbrdr_session_unlock(struct sdb_session *);
 /*
  * smbrdr_logon.c
  */
-int smbrdr_smb_logoff(struct sdb_logon *);
+int smbrdr_logoffx(struct sdb_logon *);
 
 /* smbrdr_netuse.c */
 void smbrdr_netuse_logoff(unsigned short);
 struct sdb_netuse *smbrdr_netuse_get(int);
-unsigned short mlsvc_tree_connect(char *, char *, char *);
+unsigned short smbrdr_tree_connect(char *, char *, char *);
 int smbrdr_tree_disconnect(unsigned short);
 void smbrdr_netuse_put(struct sdb_netuse *);
 
@@ -232,8 +232,8 @@ DWORD smbrdr_rcv(smbrdr_handle_t *, int);
 DWORD smbrdr_exchange(smbrdr_handle_t *, smb_hdr_t *, long);
 void smbrdr_handle_free(smbrdr_handle_t *);
 int smbrdr_sign_init(struct sdb_session *, struct sdb_logon *);
-int smbrdr_sign_fini(struct sdb_session *);
-int smbrdr_sign_unset_key(struct sdb_session *);
+void smbrdr_sign_fini(struct sdb_session *);
+void smbrdr_sign_unset_key(struct sdb_session *);
 
 void smbrdr_lock_transport(void);
 void smbrdr_unlock_transport(void);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,6 +126,43 @@ smb_idmap_getsid(uid_t id, int idtype, nt_sid_t **sid)
 }
 
 /*
+ * smb_idmap_getid
+ *
+ * Tries to get a mapping for the given SID
+ */
+idmap_stat
+smb_idmap_getid(nt_sid_t *sid, uid_t *id, int *id_type)
+{
+	smb_idmap_batch_t sib;
+	smb_idmap_t *sim;
+	idmap_stat stat;
+
+	stat = smb_idmap_batch_create(&sib, 1, SMB_IDMAP_SID2ID);
+	if (stat != IDMAP_SUCCESS)
+		return (stat);
+
+	sim = &sib.sib_maps[0];
+	sim->sim_id = id;
+	stat = smb_idmap_batch_getid(sib.sib_idmaph, sim, sid, *id_type);
+	if (stat != IDMAP_SUCCESS) {
+		smb_idmap_batch_destroy(&sib);
+		return (stat);
+	}
+
+	stat = smb_idmap_batch_getmappings(&sib);
+
+	if (stat != IDMAP_SUCCESS) {
+		smb_idmap_batch_destroy(&sib);
+		return (stat);
+	}
+
+	*id_type = sim->sim_idtype;
+	smb_idmap_batch_destroy(&sib);
+
+	return (IDMAP_SUCCESS);
+}
+
+/*
  * smb_idmap_batch_create
  *
  * Creates and initializes the context for batch ID mapping.
@@ -163,7 +200,6 @@ void
 smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 {
 	nt_sid_t *sid;
-	char *domsid;
 	int i;
 
 	if (!sib)
@@ -177,8 +213,7 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 	if (!sib->sib_maps)
 		return;
 
-	switch (sib->sib_flags) {
-	case SMB_IDMAP_SID2ID:
+	if (sib->sib_flags & SMB_IDMAP_ID2SID) {
 		/*
 		 * SIDs are allocated only when mapping
 		 * UID/GID to SIDs
@@ -188,20 +223,6 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 			if (sid)
 				free(sid);
 		}
-		break;
-	case SMB_IDMAP_ID2SID:
-		/*
-		 * SID prefixes are allocated only when mapping
-		 * SIDs to UID/GID
-		 */
-		for (i = 0; i < sib->sib_nmap; i++) {
-			domsid = sib->sib_maps[i].sim_domsid;
-			if (domsid)
-				free(domsid);
-		}
-		break;
-	default:
-		break;
 	}
 
 	if (sib->sib_size && sib->sib_maps) {
@@ -262,9 +283,11 @@ smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 		break;
 
 	default:
+		free(sim->sim_domsid);
 		return (IDMAP_ERR_ARG);
 	}
 
+	free(sim->sim_domsid);
 	return (stat);
 }
 
@@ -371,6 +394,7 @@ smb_idmap_batch_binsid(smb_idmap_batch_t *sib)
 			return (-1);
 
 		sid = nt_sid_strtosid(sim->sim_domsid);
+		free(sim->sim_domsid);
 		if (sid == NULL)
 			return (-1);
 

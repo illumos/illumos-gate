@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,8 +105,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -176,7 +175,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	default:
-		smbsr_raise_error(sr, ERRDOS, ERRbadfile);
+		smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 		/* NOTREACHED */
 		break;
 	}
@@ -359,7 +358,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (dir_snode == NULL) {
 			kmem_free(filebuf, MAXNAMELEN+1);
 			kmem_free(mangled_name, MAXNAMELEN);
-			smbsr_raise_error(sr, ERRDOS, ERRbadfile);
+			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 			/* NOT REACHED */
 		}
 		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
@@ -386,7 +385,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	default:
 		kmem_free(filebuf, MAXNAMELEN+1);
 		kmem_free(mangled_name, MAXNAMELEN);
-		smbsr_raise_error(sr, ERRDOS, ERRunknownlevel);
+		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		/* NOTREACHED */
 		break;
 	}

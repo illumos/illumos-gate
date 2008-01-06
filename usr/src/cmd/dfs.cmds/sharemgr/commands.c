@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2973,7 +2973,7 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	int c;
 	int ret = SA_OK;
 	sa_group_t group, sharegroup;
-	sa_share_t share;
+	sa_share_t share = NULL;
 	sa_resource_t resource = NULL;
 	char *sharepath = NULL;
 	char *description = NULL;
@@ -3107,9 +3107,10 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 		share = sa_find_share(handle, sharepath);
 	} else if (rsrcname != NULL) {
 		resource = sa_find_resource(handle, rsrc);
-		if (resource != NULL) {
+		if (resource != NULL)
 			share = sa_get_resource_parent(resource);
-		}
+		else
+			ret = SA_NO_SUCH_RESOURCE;
 	}
 	if (share != NULL) {
 		sharegroup = sa_get_parent_group(share);
@@ -3191,9 +3192,22 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			break;
 		}
 	} else {
-		(void) printf(gettext("Share path \"%s\" not found\n"),
-		    sharepath);
-		ret = SA_NO_SUCH_PATH;
+		switch (ret) {
+		case SA_NO_SUCH_RESOURCE:
+			(void) printf(gettext("Resource \"%s\" not found\n"),
+			    rsrcname);
+			break;
+		default:
+			if (sharepath != NULL) {
+				(void) printf(
+				    gettext("Share path \"%s\" not found\n"),
+				    sharepath);
+				ret = SA_NO_SUCH_PATH;
+			} else {
+				(void) printf(gettext("Set failed: %s\n"),
+				    sa_errorstr(ret));
+			}
+		}
 	}
 
 	return (ret);

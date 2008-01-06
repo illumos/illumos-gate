@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,7 +341,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 	int			len;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
 		    ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -382,7 +382,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -393,7 +393,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 	smb_node_release(dir_node);
@@ -576,7 +576,7 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		smbsr_raise_error(sr, ERRDOS, ERRunknownlevel);
+		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		/* NOTREACHED */
 		break;
 	}

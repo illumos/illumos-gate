@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,11 +34,14 @@ extern "C" {
 
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include <stdlib.h>
 #include <libscf.h>
 #include <libshare.h>
+#include <sqlite/sqlite.h>
 
+#include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
 
 /*
@@ -67,7 +70,6 @@ extern "C" {
 
 /* Max value length of all SMB properties */
 #define	MAX_VALUE_BUFLEN	512
-#define	SMB_PI_MAX_DOMAIN_U	48
 
 #define	SMBD_FMRI_PREFIX		"network/smb/server"
 #define	SMBD_DEFAULT_INSTANCE_FMRI	"svc:/network/smb/server:default"
@@ -78,6 +80,7 @@ extern "C" {
 #define	SMBD_SMF_NO_MEMORY	1	/* no memory for data structures */
 #define	SMBD_SMF_SYSTEM_ERR	2	/* system error, use errno */
 #define	SMBD_SMF_NO_PERMISSION	3	/* no permission for operation */
+#define	SMBD_SMF_INVALID_ARG	4
 
 #define	SCH_STATE_UNINIT	0
 #define	SCH_STATE_INITIALIZING	1
@@ -99,72 +102,8 @@ typedef struct smb_scfhandle {
 /*
  * CIFS Configuration Management
  */
-
-/* macros for the description of all config params */
-#define	SMB_CD_RDR_IPCMODE		"rdr_ipcmode"
-#define	SMB_CD_RDR_IPCUSER 		"rdr_ipcuser"
-#define	SMB_CD_RDR_IPCPWD		"rdr_ipcpasswd"
-
-#define	SMB_CD_OPLOCK_ENABLE		"oplock_enable"
-#define	SMB_CD_OPLOCK_TIMEOUT		"oplock_timeout"
-
-#define	SMB_CD_AUTOHOME_MAP		"autohome_map"
-
-#define	SMB_CD_DOMAIN_SID		"domain_sid"
-#define	SMB_CD_DOMAIN_MEMB		"domain_member"
-#define	SMB_CD_DOMAIN_NAME		"domain_name"
-#define	SMB_CD_DOMAIN_SRV		"pdc"
-
-#define	SMB_CD_WINS_SRV1		"wins_server_1"
-#define	SMB_CD_WINS_SRV2		"wins_server_2"
-#define	SMB_CD_WINS_EXCL		"wins_exclude"
-
-#define	SMB_CD_SRVSVC_SHRSET_ENABLE	"srvsvc_sharesetinfo_enable"
-#define	SMB_CD_LOGR_ENABLE		"logr_enable"
-#define	SMB_CD_MLRPC_KALIVE		"mlrpc_keep_alive_interval"
-
-#define	SMB_CD_MAX_BUFSIZE		"max_bufsize"
-#define	SMB_CD_MAX_WORKERS		"max_workers"
-#define	SMB_CD_MAX_CONNECTIONS		"max_connections"
-#define	SMB_CD_KEEPALIVE		"keep_alive"
-#define	SMB_CD_RESTRICT_ANON		"restrict_anonymous"
-
-#define	SMB_CD_SIGNING_ENABLE		"signing_enabled"
-#define	SMB_CD_SIGNING_REQD		"signing_required"
-#define	SMB_CD_SIGNING_CHECK		"signing_check"
-
-#define	SMB_CD_FLUSH_REQUIRED		"flush_required"
-#define	SMB_CD_SYNC_ENABLE		"sync_enable"
-#define	SMB_CD_DIRSYMLINK_DISABLE	"dir_symlink_disable"
-#define	SMB_CD_ANNONCE_QUOTA		"announce_quota"
-
-#define	SMB_CD_SECURITY			"security"
-#define	SMB_CD_NBSCOPE			"netbios_scope"
-#define	SMB_CD_SYS_CMNT			"system_comment"
-#define	SMB_CD_LM_LEVEL			"lmauth_level"
-#define	SMB_CD_MSDCS_DISABLE		"msdcs_disable"
-
-#define	SMB_CD_ADS_ENABLE		"ads_enable"
-#define	SMB_CD_ADS_USER			"ads_user"
-#define	SMB_CD_ADS_PASSWD		"ads_passwd"
-#define	SMB_CD_ADS_DOMAIN		"ads_domain"
-#define	SMB_CD_ADS_USER_CONTAINER	"ads_user_container"
-#define	SMB_CD_ADS_SITE			"ads_site"
-#define	SMB_CD_ADS_IPLOOKUP		"ads_ip_lookup"
-
-#define	SMB_CD_DYNDNS_ENABLE		"ddns_enable"
-#define	SMB_CD_DYNDNS_RETRY_COUNT	"ddns_retry_cnt"
-#define	SMB_CD_DYNDNS_RETRY_SEC		"ddns_retry_sec"
-
-#define	SMB_CD_MACHINE_PASSWD		"machine_passwd"
-
-/* configuration identifier */
 typedef enum {
-	SMB_CI_RDR_IPCMODE = 0,
-	SMB_CI_RDR_IPCUSER,
-	SMB_CI_RDR_IPCPWD,
-
-	SMB_CI_OPLOCK_ENABLE,
+	SMB_CI_OPLOCK_ENABLE = 0,
 	SMB_CI_OPLOCK_TIMEOUT,
 
 	SMB_CI_AUTOHOME_MAP,
@@ -179,7 +118,6 @@ typedef enum {
 	SMB_CI_WINS_EXCL,
 
 	SMB_CI_SRVSVC_SHRSET_ENABLE,
-	SMB_CI_LOGR_ENABLE,
 	SMB_CI_MLRPC_KALIVE,
 
 	SMB_CI_MAX_BUFSIZE,
@@ -201,19 +139,10 @@ typedef enum {
 	SMB_CI_NBSCOPE,
 	SMB_CI_SYS_CMNT,
 	SMB_CI_LM_LEVEL,
-	SMB_CI_MSDCS_DISABLE,
 
-	SMB_CI_ADS_ENABLE,
-	SMB_CI_ADS_USER,
-	SMB_CI_ADS_PASSWD,
-	SMB_CI_ADS_DOMAIN,
-	SMB_CI_ADS_USER_CONTAINER,
 	SMB_CI_ADS_SITE,
-	SMB_CI_ADS_IPLOOKUP,
 
 	SMB_CI_DYNDNS_ENABLE,
-	SMB_CI_DYNDNS_RETRY_COUNT,
-	SMB_CI_DYNDNS_RETRY_SEC,
 
 	SMB_CI_MACHINE_PASSWD,
 	SMB_CI_MAX
@@ -236,41 +165,20 @@ extern int smb_smf_set_opaque_property(smb_scfhandle_t *, char *,
 extern int smb_smf_get_opaque_property(smb_scfhandle_t *, char *,
     void *, size_t);
 extern int smb_smf_create_service_pgroup(smb_scfhandle_t *, char *);
-extern int smb_smf_delete_service_pgroup(smb_scfhandle_t *, char *);
-extern int smb_smf_create_instance_pgroup(smb_scfhandle_t *, char *);
-extern int smb_smf_delete_instance_pgroup(smb_scfhandle_t *, char *);
-extern int smb_smf_delete_property(smb_scfhandle_t *, char *);
-extern int smb_smf_instance_exists(smb_scfhandle_t *, char *);
-extern int smb_smf_instance_create(smb_scfhandle_t *, char *, char *);
-extern int smb_smf_instance_delete(smb_scfhandle_t *, char *);
-extern smb_scfhandle_t *smb_smf_get_iterator(char *);
-extern int smb_smf_get_property(smb_scfhandle_t *, int, char *, char *,
-    size_t);
-extern int smb_smf_set_property(smb_scfhandle_t *, int, char *, char *);
 
 /* Configuration management functions  */
-extern int smb_config_load(void);
-extern void smb_config_rdlock(void);
-extern void smb_config_wrlock(void);
-extern void smb_config_unlock(void);
-extern char *smb_config_get(smb_cfg_id_t);
-extern char *smb_config_getstr(smb_cfg_id_t);
-extern int smb_config_getyorn(smb_cfg_id_t);
-extern uint32_t smb_config_getnum(smb_cfg_id_t);
-
-/*
- * smb_config_getenv
- *
- * Retrieves the property value from SMF.
- * Caller must free the returned buffer.
- *
- */
-extern char *smb_config_getenv(smb_cfg_id_t id);
+extern int smb_config_get(smb_cfg_id_t, char *, int);
+extern char *smb_config_getname(smb_cfg_id_t);
+extern int smb_config_getstr(smb_cfg_id_t, char *, int);
+extern int smb_config_getnum(smb_cfg_id_t, int64_t *);
+extern boolean_t smb_config_getbool(smb_cfg_id_t);
 
 extern int smb_config_set(smb_cfg_id_t, char *);
-extern int smb_config_setnum(smb_cfg_id_t, uint32_t);
+extern int smb_config_setstr(smb_cfg_id_t, char *);
+extern int smb_config_setnum(smb_cfg_id_t, int64_t);
+extern int smb_config_setbool(smb_cfg_id_t, boolean_t);
+
 extern uint8_t smb_config_get_fg_flag(void);
-extern int smb_config_setenv(smb_cfg_id_t id, char *);
 extern char *smb_config_get_localsid(void);
 extern int smb_config_secmode_fromstr(char *secmode);
 extern char *smb_config_secmode_tostr(int secmode);
@@ -283,7 +191,7 @@ extern int smb_config_refresh(void);
 
 /* smb_door_client.c */
 typedef struct smb_joininfo {
-	char domain_name[SMB_PI_MAX_DOMAIN];
+	char domain_name[MAXHOSTNAMELEN];
 	char domain_username[BUF_LEN + 1];
 	char domain_passwd[BUF_LEN + 1];
 	uint32_t mode;
@@ -293,10 +201,8 @@ typedef struct smb_joininfo {
 extern int smbd_set_param(smb_cfg_id_t, char *);
 extern int smbd_get_param(smb_cfg_id_t, char *);
 extern int smbd_get_security_mode(int *);
-extern int smb_set_machine_pwd(char *);
 extern int smbd_netbios_reconfig(void);
 extern uint32_t smb_join(smb_joininfo_t *info);
-extern int smb_ads_domain_change_notify(char *);
 
 
 #define	SMB_DOMAIN_NOMACHINE_SID	-1
@@ -317,22 +223,15 @@ extern int smb_wins_iplist(char *list, uint32_t iplist[], int max_naddr);
  * name of a controller (PDC or BDC) and it's ip address.
  */
 typedef struct smb_ntdomain {
-	char domain[SMB_PI_MAX_DOMAIN_U];
-	char server[SMB_PI_MAX_DOMAIN_U];
+	char domain[SMB_PI_MAX_DOMAIN];
+	char server[SMB_PI_MAX_DOMAIN];
 	uint32_t ipaddr;
 } smb_ntdomain_t;
 
 /* SMB domain information management functions */
-extern void smb_purge_domain_info(void);
-extern int smb_is_domain_member(void);
-extern uint8_t smb_get_fg_flag(void);
-extern void smb_set_domain_member(int set);
 extern smb_ntdomain_t *smb_getdomaininfo(uint32_t timeout);
 extern void smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr);
 extern void smb_logdomaininfo(smb_ntdomain_t *di);
-extern uint32_t smb_get_security_mode(void);
-
-extern int nt_priv_presentable_num(void);
 
 /*
  * Following set of function, handle calls to SMB Kernel driver, via
@@ -373,9 +272,12 @@ extern char *trim_whitespace(char *buf);
 extern void randomize(char *, unsigned);
 extern void rand_hash(unsigned char *, size_t, unsigned char *, size_t);
 
+extern int smb_resolve_netbiosname(char *, char *, size_t);
+extern int smb_resolve_fqdn(char *, char *, size_t);
 extern int smb_getdomainname(char *, size_t);
-extern int smb_getfqhostname(char *, size_t);
+extern int smb_getfqdomainname(char *, size_t);
 extern int smb_gethostname(char *, size_t, int);
+extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
 
 void smb_trace(const char *s);
@@ -493,14 +395,6 @@ typedef struct smb_auth_info {
 	smb_auth_data_blob_t data_blob;
 } smb_auth_info_t;
 
-extern int smb_getdomainname(char *, size_t);
-extern int smb_getfqhostname(char *, size_t);
-extern int smb_gethostname(char *, size_t, int);
-extern int smb_getnetbiosname(char *, size_t);
-
-void smb_trace(const char *s);
-void smb_tracef(const char *fmt, ...);
-
 /*
  * SMB password management
  */
@@ -567,9 +461,9 @@ extern int smb_auth_set_info(char *, char *,
 extern int smb_auth_gen_session_key(smb_auth_info_t *, unsigned char *);
 
 boolean_t smb_auth_validate_lm(unsigned char *, uint32_t, smb_passwd_t *,
-    unsigned char *, int, char *);
+    unsigned char *, int, char *, char *);
 boolean_t smb_auth_validate_nt(unsigned char *, uint32_t, smb_passwd_t *,
-    unsigned char *, int, char *);
+    unsigned char *, int, char *, char *);
 
 /*
  * SMB MAC Signing
@@ -682,97 +576,94 @@ nt_domain_t *nt_domain_lookup_sid(nt_sid_t *domain_sid);
 nt_domain_t *nt_domain_lookupbytype(nt_domain_type_t type);
 nt_sid_t *nt_domain_local_sid(void);
 
-#define	SMB_GROUP_PER_LIST	5
+typedef enum {
+	SMB_LGRP_BUILTIN = 1,
+	SMB_LGRP_LOCAL
+} smb_gdomain_t;
 
-/*
- * This structure takes different args passed from the client/server routines
- * of the SMB local group door service. Extend this structure if a new type
- * client paramater needs to be passed.
- */
-typedef struct ntgrp_dr_arg {
-	char *gname;
-	char *desc;
-	char *member;
-	char *newgname;
-	uint32_t privid;
-	uint32_t priv_attr;
-	int offset;
-	char *scope;
-	int type;
-	int count;
-	uint32_t ntstatus;
-} ntgrp_dr_arg_t;
+typedef struct smb_gsid {
+	nt_sid_t *gs_sid;
+	uint16_t gs_type;
+} smb_gsid_t;
 
-typedef struct ntgrp {
-	DWORD rid;	/* Rid of the group */
-	char *name;	/* Name of the group */
-	char *desc;	/* Desc of gruup */
-	char *type;	/* sid_name_use */
-	char *sid;	/* Sid */
-	DWORD attr;	/* Attribute */
-} ntgrp_t;
+typedef struct smb_giter {
+	sqlite_vm	*sgi_vm;
+	sqlite		*sgi_db;
+} smb_giter_t;
 
-typedef struct ntgrp_list {
-	int cnt;
-	ntgrp_t groups[SMB_GROUP_PER_LIST];
-} ntgrp_list_t;
+typedef struct smb_group {
+	char			*sg_name;
+	char			*sg_cmnt;
+	uint32_t		sg_attr;
+	uint32_t		sg_rid;
+	smb_gsid_t		sg_id;
+	smb_gdomain_t		sg_domain;
+	smb_privset_t		*sg_privs;
+	uint32_t		sg_nmembers;
+	smb_gsid_t		*sg_members;
+} smb_group_t;
 
-typedef char *members_list;
-typedef struct ntgrp_member_list {
-	DWORD rid;	/* Rid of the group in which members belong */
-	int cnt;	/* members */
-	members_list members[SMB_GROUP_PER_LIST];
-} ntgrp_member_list_t;
+int smb_lgrp_start(void);
+void smb_lgrp_stop(void);
+int smb_lgrp_add(char *, char *);
+int smb_lgrp_rename(char *, char *);
+int smb_lgrp_delete(char *);
+int smb_lgrp_setcmnt(char *, char *);
+int smb_lgrp_getcmnt(char *, char **);
+int smb_lgrp_getpriv(char *, uint8_t, boolean_t *);
+int smb_lgrp_setpriv(char *, uint8_t, boolean_t);
+int smb_lgrp_add_member(char *, nt_sid_t *, uint16_t);
+int smb_lgrp_del_member(char *, nt_sid_t *, uint16_t);
+int smb_lgrp_getbyname(char *, smb_group_t *);
+int smb_lgrp_getbyrid(uint32_t, smb_gdomain_t, smb_group_t *);
+int smb_lgrp_numbydomain(smb_gdomain_t, int *);
+int smb_lgrp_numbymember(nt_sid_t *, int *);
+void smb_lgrp_free(smb_group_t *);
+boolean_t smb_lgrp_is_member(smb_group_t *, nt_sid_t *);
+char *smb_lgrp_strerror(int);
+int smb_lgrp_iteropen(smb_giter_t *);
+void smb_lgrp_iterclose(smb_giter_t *);
+int smb_lgrp_iterate(smb_giter_t *, smb_group_t *);
 
-typedef struct ntpriv {
-	DWORD id;		/* Id of priv */
-	char *name;	/* Name of priv */
-} ntpriv_t;
-typedef ntpriv_t *privs_t;
+int smb_lookup_sid(nt_sid_t *, char *buf, int buflen);
+int smb_lookup_name(char *, smb_gsid_t *);
 
-typedef struct ntpriv_list {
-	int cnt;		/* Number of privs */
-	privs_t	privs[ANY_SIZE_ARRAY];	/* privs only presentable ones */
-} ntpriv_list_t;
+#define	SMB_LGRP_SUCCESS		0
+#define	SMB_LGRP_INVALID_ARG		1
+#define	SMB_LGRP_INVALID_MEMBER		2
+#define	SMB_LGRP_INVALID_NAME		3
+#define	SMB_LGRP_NOT_FOUND		4
+#define	SMB_LGRP_EXISTS			5
+#define	SMB_LGRP_NO_SID			6
+#define	SMB_LGRP_NO_LOCAL_SID		7
+#define	SMB_LGRP_SID_NOTLOCAL		8
+#define	SMB_LGRP_WKSID			9
+#define	SMB_LGRP_NO_MEMORY		10
+#define	SMB_LGRP_DB_ERROR		11
+#define	SMB_LGRP_DBINIT_ERROR		12
+#define	SMB_LGRP_INTERNAL_ERROR		13
+#define	SMB_LGRP_MEMBER_IN_GROUP	14
+#define	SMB_LGRP_MEMBER_NOT_IN_GROUP	15
+#define	SMB_LGRP_NO_SUCH_PRIV		16
+#define	SMB_LGRP_NO_SUCH_DOMAIN		17
+#define	SMB_LGRP_PRIV_HELD		18
+#define	SMB_LGRP_PRIV_NOT_HELD		19
+#define	SMB_LGRP_BAD_DATA		20
+#define	SMB_LGRP_NO_MORE		21
+#define	SMB_LGRP_DBOPEN_FAILED		22
+#define	SMB_LGRP_DBEXEC_FAILED		23
+#define	SMB_LGRP_DBINIT_FAILED		24
+#define	SMB_LGRP_DOMLKP_FAILED		25
+#define	SMB_LGRP_DOMINS_FAILED		26
+#define	SMB_LGRP_INSERT_FAILED		27
+#define	SMB_LGRP_DELETE_FAILED		28
+#define	SMB_LGRP_UPDATE_FAILED		29
+#define	SMB_LGRP_LOOKUP_FAILED		30
+#define	SMB_LGRP_NOT_SUPPORTED		31
 
-
-/* the xdr functions */
-extern bool_t xdr_ntgrp_dr_arg_t(XDR *, ntgrp_dr_arg_t *);
-extern bool_t xdr_ntgrp_t(XDR *, ntgrp_t *);
-extern bool_t xdr_ntgrp_list_t(XDR *, ntgrp_list_t *);
-extern bool_t xdr_members_list(XDR *, members_list *);
-extern bool_t xdr_ntgrp_member_list_t(XDR *, ntgrp_member_list_t *);
-extern bool_t xdr_ntpriv_t(XDR *, ntpriv_t *);
-extern bool_t xdr_privs_t(XDR *, privs_t *);
-extern bool_t xdr_ntpriv_list_t(XDR *, ntpriv_list_t *);
-
-extern void smb_group_free_memberlist(ntgrp_member_list_t *, int);
-extern void smb_group_free_list(ntgrp_list_t *, int);
-extern void smb_group_free_privlist(ntpriv_list_t *, int);
-
-extern uint32_t smb_group_add(char *, char *);
-extern uint32_t smb_group_modify(char *, char *, char *);
-extern uint32_t smb_group_delete(char *);
-extern uint32_t smb_group_member_remove(char *, char *);
-extern uint32_t smb_group_member_add(char *, char *);
-extern uint32_t smb_group_priv_num(int *);
-extern uint32_t smb_group_priv_list(ntpriv_list_t **);
-extern uint32_t smb_group_priv_get(char *, uint32_t, uint32_t *);
-extern uint32_t smb_group_priv_set(char *, uint32_t, uint32_t);
-extern uint32_t smb_group_count(int *);
-extern uint32_t smb_group_list(int, ntgrp_list_t **, char *, int);
-extern uint32_t smb_group_member_count(char *, int *);
-extern uint32_t smb_group_member_list(char *, int, ntgrp_member_list_t **);
-
-extern char *smb_dr_encode_grp_privlist(uint32_t, ntpriv_list_t *, size_t *);
-extern ntpriv_list_t *smb_dr_decode_grp_privlist(char *, size_t);
-
-extern char *smb_dr_encode_grp_list(uint32_t, ntgrp_list_t *, size_t *);
-extern ntgrp_list_t *smb_dr_decode_grp_list(char *, size_t);
-
-extern char *smb_dr_encode_grp_memberlist(uint32_t, ntgrp_member_list_t *,
-    size_t *);
-extern ntgrp_member_list_t *smb_dr_decode_grp_memberlist(char *buf, size_t len);
+#define	SMB_LGRP_NAME_CHAR_MAX	32
+#define	SMB_LGRP_COMMENT_MAX	256
+#define	SMB_LGRP_NAME_MAX	(SMB_LGRP_NAME_CHAR_MAX * MTS_MB_CHAR_MAX + 1)
 
 #ifdef	__cplusplus
 }

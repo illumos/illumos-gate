@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	smb_odir_t	*od;
 	smb_node_t	*node;
 	char		*last_component;
-	smb_session_t	*session = sr->session;
 	unsigned int	rc;
 	int		erc;
 
@@ -51,14 +50,14 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode,
 	    &node, last_component)) != 0) {
 		kmem_free(last_component, MAXNAMELEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
 	if ((node->vp)->v_type != VDIR) {
 		smb_node_release(node);
 		kmem_free(last_component, MAXNAMELEN);
-		smbsr_raise_error(sr, ERRDOS, ERRbadpath);
+		smbsr_error(sr, 0, ERRDOS, ERRbadpath);
 		/* NOTREACHED */
 	}
 
@@ -67,18 +66,11 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 		smb_node_release(node);
 		kmem_free(last_component, MAXNAMELEN);
 		if (sr->smb_com == SMB_COM_SEARCH) {
-			if (session->capabilities & CAP_STATUS32) {
-				smbsr_setup_nt_status(sr,
-				    ERROR_SEVERITY_WARNING,
-				    NT_STATUS_NO_MORE_FILES);
-				return (SDRC_NORMAL_REPLY);
-			} else {
-				smbsr_raise_error(sr,
-				    ERRDOS, ERROR_NO_MORE_FILES);
-				/* NOTREACHED */
-			}
+			smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+			    ERRDOS, ERROR_NO_MORE_FILES);
+			return (SDRC_NORMAL_REPLY);
 		} else {
-			smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			/* NOTREACHED */
 		}
@@ -89,7 +81,7 @@ smb_rdir_open(smb_request_t *sr, char *path, unsigned short sattr)
 	kmem_free(last_component, sizeof (od->d_pattern));
 	if (od == NULL) {
 		smb_node_release(node);
-		smbsr_raise_error(sr, ERRDOS, ERROR_NO_MORE_FILES);
+		smbsr_error(sr, 0, ERRDOS, ERROR_NO_MORE_FILES);
 		/* NOTREACHED */
 	}
 

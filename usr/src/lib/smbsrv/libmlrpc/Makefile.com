@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,13 +29,13 @@ LIBRARY =	libmlrpc.a
 VERS =		.1
 
 OBJS_COMMON = 			\
-	mlndo.o			\
-	mlndr.o			\
-	mlrpc_client.o		\
-	mlrpc_encdec.o		\
-	mlrpc_heap.o		\
-	mlrpc_server.o		\
-	mlrpc_svc.o
+	ndr_client.o		\
+	ndr_heap.o		\
+	ndr_marshal.o		\
+	ndr_ops.o		\
+	ndr_process.o		\
+	ndr_server.o		\
+	ndr_svc.o
 
 NDLLIST = rpcpdu
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,7 @@ smb_com_query_information(struct smb_request *sr)
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name))
 	    != 0) {
 		kmem_free(name, MAXNAMELEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -103,7 +103,7 @@ smb_com_query_information(struct smb_request *sr)
 	    sr->tid_tree->t_snode, dir_node, name, &node, &attr, 0, 0)) != 0) {
 		smb_node_release(dir_node);
 		kmem_free(name, MAXNAMELEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,9 @@
 #include <errno.h>
 #include <net/if.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
 #include <sys/sockio.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/netbios.h>
@@ -47,85 +50,6 @@ static mutex_t smbpdc_mtx;
 static cond_t smbpdc_cv;
 
 extern int getdomainname(char *, int);
-
-uint32_t
-smb_get_security_mode()
-{
-	uint32_t mode;
-
-	smb_config_rdlock();
-	mode = smb_config_get_secmode();
-	smb_config_unlock();
-
-	return (mode);
-}
-
-/*
- * smb_purge_domain_info
- *
- * Clean out the environment in preparation for joining a domain.
- * This ensures that we don't have any old information lying around.
- */
-void
-smb_purge_domain_info(void)
-{
-	smb_config_wrlock();
-	(void) smb_config_set(SMB_CI_DOMAIN_NAME, 0);
-	(void) smb_config_set(SMB_CI_DOMAIN_SID, 0);
-	(void) smb_config_set(SMB_CI_DOMAIN_MEMB, 0);
-	smb_config_unlock();
-}
-
-int
-smb_is_domain_member(void)
-{
-	int is_memb;
-
-	smb_config_rdlock();
-	is_memb = smb_config_getyorn(SMB_CI_DOMAIN_MEMB);
-	smb_config_unlock();
-
-	return (is_memb);
-}
-
-uint8_t
-smb_get_fg_flag(void)
-{
-	uint8_t run_fg;
-
-	smb_config_rdlock();
-	run_fg = smb_config_get_fg_flag();
-	smb_config_unlock();
-
-	return (run_fg);
-}
-
-void
-smb_set_domain_member(int set)
-{
-	char *member;
-
-	smb_config_wrlock();
-	member = (set) ? "true" : "false";
-	(void) smb_config_set(SMB_CI_DOMAIN_MEMB, member);
-	smb_config_unlock();
-}
-
-/*
- * smb_set_machine_pwd
- *
- * Returns 0 upon success.  Otherwise, returns 1.
- */
-int
-smb_set_machine_pwd(char *pwd)
-{
-	int rc;
-
-	smb_config_wrlock();
-	rc = smb_config_set(SMB_CI_MACHINE_PASSWD, pwd);
-	smb_config_unlock();
-	return (rc);
-}
 
 /*
  * smb_getdomaininfo
@@ -206,47 +130,41 @@ smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr)
 void
 smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 {
-	smb_config_rdlock();
+	int64_t citem;
+
 	bzero(kcfg, sizeof (smb_kmod_cfg_t));
 
-	kcfg->skc_maxbufsize = smb_config_getnum(SMB_CI_MAX_BUFSIZE);
-	kcfg->skc_maxworkers = smb_config_getnum(SMB_CI_MAX_WORKERS);
-	kcfg->skc_keepalive = smb_config_getnum(SMB_CI_KEEPALIVE);
+	(void) smb_config_getnum(SMB_CI_MAX_BUFSIZE, &citem);
+	kcfg->skc_maxbufsize = (uint32_t)citem;
+	(void) smb_config_getnum(SMB_CI_MAX_WORKERS, &citem);
+	kcfg->skc_maxworkers = (uint32_t)citem;
+	(void) smb_config_getnum(SMB_CI_KEEPALIVE, &citem);
+	kcfg->skc_keepalive = (uint32_t)citem;
 	if ((kcfg->skc_keepalive != 0) &&
 	    (kcfg->skc_keepalive < SMB_PI_KEEP_ALIVE_MIN))
 		kcfg->skc_keepalive = SMB_PI_KEEP_ALIVE_MIN;
-	kcfg->skc_restrict_anon = smb_config_getyorn(SMB_CI_RESTRICT_ANON);
 
-	kcfg->skc_signing_enable = smb_config_getyorn(SMB_CI_SIGNING_ENABLE);
-	kcfg->skc_signing_required = smb_config_getyorn(SMB_CI_SIGNING_REQD);
-	kcfg->skc_signing_check = smb_config_getyorn(SMB_CI_SIGNING_CHECK);
-
-	kcfg->skc_oplock_enable = smb_config_getyorn(SMB_CI_OPLOCK_ENABLE);
-	kcfg->skc_oplock_timeout = smb_config_getnum(SMB_CI_OPLOCK_TIMEOUT);
-
-	kcfg->skc_flush_required = smb_config_getyorn(SMB_CI_FLUSH_REQUIRED);
-	kcfg->skc_sync_enable = smb_config_getyorn(SMB_CI_SYNC_ENABLE);
+	(void) smb_config_getnum(SMB_CI_OPLOCK_TIMEOUT, &citem);
+	kcfg->skc_oplock_timeout = (uint32_t)citem;
+	(void) smb_config_getnum(SMB_CI_MAX_CONNECTIONS, &citem);
+	kcfg->skc_maxconnections = (uint32_t)citem;
+	kcfg->skc_restrict_anon = smb_config_getbool(SMB_CI_RESTRICT_ANON);
+	kcfg->skc_signing_enable = smb_config_getbool(SMB_CI_SIGNING_ENABLE);
+	kcfg->skc_signing_required = smb_config_getbool(SMB_CI_SIGNING_REQD);
+	kcfg->skc_signing_check = smb_config_getbool(SMB_CI_SIGNING_CHECK);
+	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
+	kcfg->skc_flush_required = smb_config_getbool(SMB_CI_FLUSH_REQUIRED);
+	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
 	kcfg->skc_dirsymlink_enable =
-	    !smb_config_getyorn(SMB_CI_DIRSYMLINK_DISABLE);
-	kcfg->skc_announce_quota = smb_config_getyorn(SMB_CI_ANNONCE_QUOTA);
-	kcfg->skc_announce_quota = smb_config_getyorn(SMB_CI_ANNONCE_QUOTA);
-
+	    !smb_config_getbool(SMB_CI_DIRSYMLINK_DISABLE);
+	kcfg->skc_announce_quota = smb_config_getbool(SMB_CI_ANNONCE_QUOTA);
 	kcfg->skc_secmode = smb_config_get_secmode();
-	kcfg->skc_lmlevel = smb_config_getnum(SMB_CI_LM_LEVEL);
-	kcfg->skc_maxconnections = smb_config_getnum(SMB_CI_MAX_CONNECTIONS);
-
-	(void) strlcpy(kcfg->skc_resource_domain,
-	    smb_config_getstr(SMB_CI_DOMAIN_NAME),
+	(void) smb_getdomainname(kcfg->skc_resource_domain,
 	    sizeof (kcfg->skc_resource_domain));
-
-	(void) smb_gethostname(kcfg->skc_hostname,
-	    sizeof (kcfg->skc_hostname), 1);
-
-	(void) strlcpy(kcfg->skc_system_comment,
-	    smb_config_getstr(SMB_CI_SYS_CMNT),
+	(void) smb_gethostname(kcfg->skc_hostname, sizeof (kcfg->skc_hostname),
+	    1);
+	(void) smb_config_getstr(SMB_CI_SYS_CMNT, kcfg->skc_system_comment,
 	    sizeof (kcfg->skc_system_comment));
-
-	smb_config_unlock();
 }
 
 /*
@@ -304,43 +222,6 @@ smb_gethostname(char *buf, size_t buflen, int upcase)
 }
 
 /*
- * The ADS domain is often the same as the DNS domain but they can be
- * different - one might be a sub-domain of the other.
- *
- * If an ADS domain name has been configured, return it.  Otherwise,
- * return the DNS domain name.
- *
- * If getdomainname fails, the returned buffer will contain an empty
- * string.
- */
-int
-smb_getdomainname(char *buf, size_t buflen)
-{
-	char *domain;
-
-	if (buf == NULL || buflen == 0)
-		return (-1);
-
-	smb_config_rdlock();
-
-	domain = smb_config_getstr(SMB_CI_ADS_DOMAIN);
-	if ((domain != NULL) && (*domain != '\0')) {
-		(void) strlcpy(buf, domain, buflen);
-		smb_config_unlock();
-		return (0);
-	}
-
-	smb_config_unlock();
-
-	if (getdomainname(buf, buflen) != 0) {
-		*buf = '\0';
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
  * Obtain the fully-qualified name for this machine.  If the
  * hostname is fully-qualified, accept it.  Otherwise, try to
  * find an appropriate domain name to append to the hostname.
@@ -357,7 +238,7 @@ smb_getfqhostname(char *buf, size_t buflen)
 	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
 
-	if (smb_getdomainname(domain, MAXHOSTNAMELEN) != 0)
+	if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0)
 		return (-1);
 
 	if (hostname[0] == '\0')
@@ -371,6 +252,169 @@ smb_getfqhostname(char *buf, size_t buflen)
 	(void) snprintf(buf, buflen, "%s.%s", hostname, domain);
 	return (0);
 }
+
+/*
+ * smb_resolve_netbiosname
+ *
+ * Convert the fully-qualified domain name (i.e. fqdn) to a NETBIOS name.
+ * Upon success, the NETBIOS name will be returned via buf parameter.
+ * Returns 0 upon success.  Otherwise, returns -1.
+ */
+int
+smb_resolve_netbiosname(char *fqdn, char *buf, size_t buflen)
+{
+	char *p;
+
+	if (!buf)
+		return (-1);
+
+	*buf = '\0';
+	if (!fqdn)
+		return (-1);
+
+	(void) strlcpy(buf, fqdn, buflen);
+	if ((p = strchr(buf, '.')) != NULL)
+		*p = 0;
+
+	if (strlen(buf) >= NETBIOS_NAME_SZ)
+		buf[NETBIOS_NAME_SZ - 1] = '\0';
+
+	return (0);
+}
+
+/*
+ * smb_getdomainname
+ *
+ * Returns NETBIOS name of the domain if the system is in domain
+ * mode. Or returns workgroup name if the system is in workgroup
+ * mode.
+ */
+int
+smb_getdomainname(char *buf, size_t buflen)
+{
+	char domain[MAXHOSTNAMELEN];
+	int rc;
+
+	if (buf == NULL || buflen == 0)
+		return (-1);
+
+	*buf = '\0';
+	rc = smb_config_getstr(SMB_CI_DOMAIN_NAME, domain,
+	    sizeof (domain));
+
+	if ((rc != SMBD_SMF_OK) || (*domain == '\0'))
+		return (-1);
+
+	(void) smb_resolve_netbiosname(domain, buf, buflen);
+	return (0);
+}
+
+/*
+ * smb_resolve_fqdn
+ *
+ * Converts the NETBIOS name of the domain (i.e. nbt_domain) to a fully
+ * qualified domain name. The domain from either the domain field or
+ * search list field of the /etc/resolv.conf will be returned via the
+ * buf parameter if the first label of the domain matches the given
+ * NETBIOS name.
+ *
+ * Returns -1 upon error. If a match is found, returns 1. Otherwise,
+ * returns 0.
+ */
+int
+smb_resolve_fqdn(char *nbt_domain, char *buf, size_t buflen)
+{
+	struct __res_state res_state;
+	int i, found = 0;
+	char *p;
+	int dlen;
+
+	if (!buf)
+		return (-1);
+
+	*buf = '\0';
+	if (!nbt_domain)
+		return (-1);
+
+	bzero(&res_state, sizeof (struct __res_state));
+	if (res_ninit(&res_state))
+		return (-1);
+
+	if (*nbt_domain == '\0') {
+		if (*res_state.defdname == '\0') {
+			res_ndestroy(&res_state);
+			return (0);
+		}
+
+		(void) strlcpy(buf, res_state.defdname, buflen);
+		res_ndestroy(&res_state);
+		return (1);
+	}
+
+	dlen = strlen(nbt_domain);
+	if (!strncasecmp(nbt_domain, res_state.defdname, dlen)) {
+		(void) strlcpy(buf, res_state.defdname, buflen);
+		res_ndestroy(&res_state);
+		return (1);
+	}
+
+	for (i = 0; (p = res_state.dnsrch[i]) != NULL; i++) {
+		if (!strncasecmp(nbt_domain, p, dlen)) {
+			(void) strlcpy(buf, p, buflen);
+			found = 1;
+			break;
+		}
+
+	}
+
+	res_ndestroy(&res_state);
+	return (found);
+}
+
+/*
+ * smb_getfqdomainname
+ *
+ * If the domain_name property value is FQDN, it will be returned.
+ * In domain mode, the domain from either the domain field or
+ * search list field of the /etc/resolv.conf will be returned via the
+ * buf parameter if the first label of the domain matches the
+ * domain_name property. In workgroup mode, it returns the local
+ * domain.
+ *
+ * Returns 0 upon success.  Otherwise, returns -1.
+ */
+int
+smb_getfqdomainname(char *buf, size_t buflen)
+{
+	char domain[MAXHOSTNAMELEN];
+	int rc = 0;
+
+	if (buf == NULL || buflen == 0)
+		return (-1);
+
+	*buf = '\0';
+	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+		rc = smb_config_getstr(SMB_CI_DOMAIN_NAME, domain,
+		    sizeof (domain));
+
+		if ((rc != SMBD_SMF_OK) || (*domain == '\0'))
+			return (-1);
+
+		if (strchr(domain, '.') == NULL) {
+			if (smb_resolve_fqdn(domain, buf, buflen) != 1)
+				rc = -1;
+		} else {
+			(void) strlcpy(buf, domain, buflen);
+		}
+	} else {
+		if (smb_resolve_fqdn("", buf, buflen) != 1)
+			rc = -1;
+	}
+
+	return (rc);
+}
+
+
 
 /*
  * Temporary fbt for dtrace until user space sdt enabled.

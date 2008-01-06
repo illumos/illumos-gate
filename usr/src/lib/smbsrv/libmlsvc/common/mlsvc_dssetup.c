@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ dssetup_DsRoleGetPrimaryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 	}
 
 	di = smb_getdomaininfo(0);
-	(void) smb_getdomainname(dns_domain, MAXHOSTNAMELEN);
+	(void) smb_getfqdomainname(dns_domain, MAXHOSTNAMELEN);
 
 	if (di == NULL) {
 		bzero(param,
@@ -122,7 +122,7 @@ dssetup_DsRoleGetPrimaryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 	    (uint8_t *)MLRPC_HEAP_STRSAVE(mxa, dns_domain);
 	param->ru.info1.forest =
 	    (uint8_t *)MLRPC_HEAP_STRSAVE(mxa, dns_domain);
-	bzero(&param->ru.info1.domain_guid, sizeof (mlrpc_uuid_t));
+	bzero(&param->ru.info1.domain_guid, sizeof (ndr_uuid_t));
 
 	if (param->ru.info1.nt_domain == NULL ||
 	    param->ru.info1.dns_domain == NULL ||

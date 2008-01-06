@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -553,7 +553,7 @@ libshare:	libscf libzfs libuuid libfsmgt libsecdb
 libexacct/demo:	libexacct libproject libsocket libnsl
 libtsalarm:	libpcp
 smbsrv:		libsocket libnsl libmd libxnet libpthread librt \
-		libshare libidmap pkcs11
+		libshare libidmap pkcs11 libsqlite
 libvscan:	libscf
 
 #

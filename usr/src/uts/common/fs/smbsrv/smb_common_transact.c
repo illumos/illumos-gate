@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -89,7 +89,7 @@ smb_com_transaction(struct smb_request *sr)
 	xa = smb_xa_create(sr->session, sr, tpscnt, tdscnt, mprcnt, mdrcnt,
 	    msrcnt, suwcnt);
 	if (xa == NULL) {
-		smbsr_raise_error(sr, ERRSRV, ERRnoroom);
+		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
 		/* NOTREACHED */
 	}
 
@@ -114,17 +114,17 @@ smb_com_transaction(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, suwcnt * 2)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -132,7 +132,7 @@ smb_com_transaction(struct smb_request *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
 		/* NOTREACHED */
 	}
 	sr->r_xa = xa;
@@ -144,7 +144,7 @@ smb_com_transaction(struct smb_request *sr)
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -161,13 +161,13 @@ smb_com_transaction_secondary(struct smb_request *sr)
 	int rc;
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		/* NOTREACHED */
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
 			/* NOTREACHED */
 		}
@@ -194,13 +194,13 @@ smb_com_transaction_secondary(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	mutex_exit(&xa->xa_mutex);
@@ -266,7 +266,7 @@ smb_com_transaction2(struct smb_request *sr)
 	xa = smb_xa_create(sr->session, sr, tpscnt, tdscnt, mprcnt, mdrcnt,
 	    msrcnt, suwcnt);
 	if (xa == 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRnoroom);
+		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
 		/* NOTREACHED */
 	}
 
@@ -278,17 +278,17 @@ smb_com_transaction2(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, suwcnt*2)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -296,7 +296,7 @@ smb_com_transaction2(struct smb_request *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
 		/* NOTREACHED */
 	}
 	sr->r_xa = xa;
@@ -308,7 +308,7 @@ smb_com_transaction2(struct smb_request *sr)
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -325,13 +325,13 @@ smb_com_transaction2_secondary(struct smb_request *sr)
 	int rc;
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		/* NOTREACHED */
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
 			/* NOTREACHED */
 		}
@@ -359,13 +359,13 @@ smb_com_transaction2_secondary(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	mutex_exit(&xa->xa_mutex);
@@ -418,15 +418,15 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 	case NT_TRANSACT_QUERY_QUOTA:
 		(void) smb_nt_transact_query_quota(sr, xa);
-		smbsr_raise_error(sr, ERRSRV, ERRaccess);
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		/* NOTREACHED */
 
 	case NT_TRANSACT_SET_QUOTA:
-		smbsr_raise_error(sr, ERRSRV, ERRaccess);
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		/* NOTREACHED */
 
 	default:
-		smbsr_raise_error(sr, ERRSRV, ERRsmbcmd);
+		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
 		/* NOTREACHED */
 	}
 
@@ -441,7 +441,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 	case SDRC_UNIMPLEMENTED:
 	case SDRC_UNSUPPORTED:
-		smbsr_raise_error(sr, ERRSRV, ERRsmbcmd);
+		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
 		/* NOTREACHED */
 
 	default:
@@ -455,7 +455,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	if (xa->smb_msrcnt < n_setup ||
 	    xa->smb_mprcnt < n_param ||
 	    xa->smb_mdrcnt < n_data) {
-		smbsr_raise_error(sr, ERRSRV, ERRsmbcmd);
+		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
 		/* NOTREACHED */
 	}
 
@@ -539,7 +539,7 @@ smb_com_nt_transact(struct smb_request *sr)
 	xa = smb_xa_create(sr->session, sr, TotalParameterCount, TotalDataCount,
 	    MaxParameterCount, MaxDataCount, MaxSetupCount, SetupCount);
 	if (xa == 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRnoroom);
+		smbsr_error(sr, 0, ERRSRV, ERRnoroom);
 		/* NOTREACHED */
 	}
 
@@ -552,17 +552,17 @@ smb_com_nt_transact(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_setup_mb, &sr->smb_vwv,
 	    sr->smb_vwv.chain_offset, SetupCount * 2)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -570,7 +570,7 @@ smb_com_nt_transact(struct smb_request *sr)
 
 	if (smb_xa_open(xa)) {
 		smb_xa_rele(sr->session, xa);
-		smbsr_raise_error(sr, ERRDOS, ERRsrverror);
+		smbsr_error(sr, 0, ERRDOS, ERRsrverror);
 		/* NOTREACHED */
 	}
 	sr->r_xa = xa;
@@ -582,7 +582,7 @@ smb_com_nt_transact(struct smb_request *sr)
 
 	if (!smb_xa_complete(xa)) {
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 
@@ -599,13 +599,13 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 	int rc;
 
 	if ((xa = smbsr_lookup_xa(sr)) == 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRsrverror);
+		smbsr_error(sr, 0, ERRSRV, ERRsrverror);
 		/* NOTREACHED */
 	}
 
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_secondary(sr, xa->reply_seqnum) != 0) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERRnoaccess);
 			/* NOTREACHED */
 		}
@@ -633,13 +633,13 @@ smb_com_nt_transact_secondary(struct smb_request *sr)
 	if (MBC_SHADOW_CHAIN(&xa->req_param_mb, &sr->command, psoff, pscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	if (MBC_SHADOW_CHAIN(&xa->req_data_mb, &sr->command, dsoff, dscnt)) {
 		mutex_exit(&xa->xa_mutex);
 		smb_xa_close(xa);
-		smbsr_raise_error(sr, ERRDOS, ERRbadformat);
+		smbsr_error(sr, 0, ERRDOS, ERRbadformat);
 		/* NOTREACHED */
 	}
 	mutex_exit(&xa->xa_mutex);
@@ -1926,8 +1926,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 			    sr->smb_fid);
 			if (sr->fid_ofile == NULL) {
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_INVALID_HANDLE,
+				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
 				/* NOTREACHED */
 			}
@@ -1942,7 +1941,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 
 		case TRANS_WAIT_NMPIPE:
 			if (is_supported_pipe(xa->xa_smb_trans_name) == 0) {
-				smbsr_raise_error(sr, ERRDOS, ERRbadfile);
+				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 				/* NOT REACHED */
 			}
 			rc = SDRC_NORMAL_REPLY;
@@ -2120,8 +2119,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		 * data back to client.
 		 */
 		if (n_data == 0) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INFO_LENGTH_MISMATCH,
+			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
 			/* NOT REACHED */
 		}
@@ -2134,8 +2132,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		 * data back to client.
 		 */
 		if (n_data == 0) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INFO_LENGTH_MISMATCH,
+			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
 			/* NOT REACHED */
 		}
@@ -2148,8 +2145,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		 * data back to client.
 		 */
 		if (n_data == 0) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INFO_LENGTH_MISMATCH,
+			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
 			/* NOT REACHED */
 		}
@@ -2162,8 +2158,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		 * data back to client.
 		 */
 		if (n_data == 0) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INFO_LENGTH_MISMATCH,
+			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
 			/* NOT REACHED */
 		}
@@ -2176,8 +2171,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		 * data back to client.
 		 */
 		if (n_data == 0) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INFO_LENGTH_MISMATCH,
+			smbsr_error(sr, NT_STATUS_INFO_LENGTH_MISMATCH,
 			    ERRDOS, ERROR_BAD_LENGTH);
 			/* NOT REACHED */
 		}

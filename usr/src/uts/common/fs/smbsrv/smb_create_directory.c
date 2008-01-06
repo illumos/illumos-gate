@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,11 +93,7 @@ smb_com_create_directory(struct smb_request *sr)
 	}
 
 	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
-		if (sr->session->capabilities & CAP_STATUS32)
-			smbsr_raise_nt_error(sr, status);
-		else
-			smbsr_raise_error(sr, ERRDOS, ERROR_INVALID_NAME);
-
+		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
 		/* NOTREACHED */
 	}
 
@@ -110,12 +106,12 @@ smb_com_create_directory(struct smb_request *sr)
 	while (smbpath_next(spp)) {
 		rc = smb_common_create_directory(sr);
 		if (rc != 0 && rc != EEXIST)
-			smbsr_raise_errno(sr, rc);
+			smbsr_errno(sr, rc);
 	}
 
 	/* We should have created one directory successfully! */
 	if (rc != 0)
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 
 	smbsr_encode_empty_result(sr);
 	return (SDRC_NORMAL_REPLY);
@@ -164,7 +160,7 @@ smb_common_create_directory(struct smb_request *sr)
 	struct smb_node *node;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}

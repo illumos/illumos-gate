@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <synch.h>
 #include <strings.h>
 #include <smbsrv/smb_common_door.h>
+#include <smbsrv/mlsvc_util.h>
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
@@ -50,33 +51,9 @@ static char *smb_dop_user_auth_logoff(char *argp, size_t arg_size,
 static char *smb_dop_user_list(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
-static char *smb_dop_group_add(char *argp, size_t arg_size,
+static char *smb_dop_lookup_sid(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_delete(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_member_add(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_member_remove(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_count(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_cachesize(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_modify(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_priv_num(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_priv_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_priv_get(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_priv_set(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_member_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
-static char *smb_dop_group_member_count(char *argp, size_t arg_size,
+static char *smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
 /* SMB daemon's door operation table */
@@ -87,20 +64,8 @@ smb_dr_op_t smb_doorsrv_optab[] =
 	smb_dop_user_nonauth_logon,
 	smb_dop_user_auth_logoff,
 	smb_dop_user_list,
-	smb_dop_group_add,
-	smb_dop_group_delete,
-	smb_dop_group_member_add,
-	smb_dop_group_member_remove,
-	smb_dop_group_count,
-	smb_dop_group_cachesize,
-	smb_dop_group_modify,
-	smb_dop_group_priv_num,
-	smb_dop_group_priv_list,
-	smb_dop_group_priv_get,
-	smb_dop_group_priv_set,
-	smb_dop_group_list,
-	smb_dop_group_member_list,
-	smb_dop_group_member_count
+	smb_dop_lookup_sid,
+	smb_dop_lookup_name,
 };
 
 /*ARGSUSED*/
@@ -330,587 +295,86 @@ smb_dop_user_list(char *argp, size_t arg_size,
 	return (rbuf);
 }
 
-/* NT Group door operations start from here */
 /*ARGSUSED*/
 static char *
-smb_dop_group_add(char *argp, size_t arg_size,
+smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
 	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
+	char *name = NULL;
+	uint32_t status;
+	nt_sid_t *sid;
+	uint16_t sid_type;
+	char strsid[NT_SID_FMTBUF_SIZE];
+	char strres[NT_SID_FMTBUF_SIZE];
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
 	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_add: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
+	if ((name = smb_dr_decode_string(argp, arg_size)) == 0) {
 		*err = SMB_DR_OP_ERR_DECODE;
 		return (NULL);
 	}
 
-	ntstatus = nt_group_add(args->gname, args->desc);
+	*strres = '\0';
+	sid_type = SidTypeUnknown;
+	status = mlsvc_lookup_name(name, &sid, &sid_type);
+	xdr_free(xdr_string, (char *)&name);
+	if (status == NT_STATUS_SUCCESS) {
+		/* pack the SID and its type in a string */
+		nt_sid_format2(sid, strsid);
+		(void) snprintf(strres, sizeof (strres), "%d-%s",
+		    sid_type, strsid);
+		free(sid);
+	}
 
 	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_delete(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *gname = NULL;
-	char *rbuf = NULL;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((gname = smb_dr_decode_string(argp, arg_size)) == 0) {
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	ntstatus = nt_group_delete(gname);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_member_add(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	nt_group_t *grp = NULL;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_member_add: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	grp = nt_group_getinfo(args->gname, RWLOCK_WRITER);
-	if (grp) {
-		ntstatus = nt_group_add_member_byname(args->gname,
-		    args->member);
-	} else {
-		ntstatus = NT_STATUS_NO_SUCH_GROUP;
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_member_remove(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	nt_group_t *grp = NULL;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_member_add: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	grp = nt_group_getinfo(args->gname, RWLOCK_WRITER);
-	if (grp) {
-		ntstatus = nt_group_del_member_byname(grp, args->member);
-	} else {
-		ntstatus = NT_STATUS_NO_SUCH_GROUP;
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_count(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	int num = 0;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	num = nt_group_num_groups();
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &num,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_cachesize(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	int num = 0;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	num = nt_group_cache_size();
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &num,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_modify(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	nt_group_t *grp = NULL;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_modify: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	grp = nt_group_getinfo(args->gname, RWLOCK_WRITER);
-	if (grp) {
-		if (!args->desc)
-			args->desc = grp->comment;
-		ntstatus = nt_group_modify(args->gname,
-		    args->newgname, args->desc);
-	} else {
-		ntstatus = NT_STATUS_NO_SUCH_GROUP;
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_priv_num(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	int num = 0;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	num = smb_priv_presentable_num();
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &num,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_priv_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	int num = 0, i, len = 0;
-	uint32_t *ids = NULL;
-	smb_privinfo_t *priv = NULL;
-	ntpriv_list_t *list;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	num = smb_priv_presentable_num();
-	if (num > 0) {
-		len = sizeof (int) + (num * sizeof (privs_t *));
-		if ((ids = malloc(num * sizeof (uint32_t))) == 0) {
-			syslog(LOG_ERR, "smb_dop_group_priv_list:"
-			    "cannot allocate memory");
-			*err = SMB_DR_OP_ERR;
-			return (NULL);
-		}
-
-		if ((list = (ntpriv_list_t *)malloc(len)) == 0) {
-			syslog(LOG_ERR, "smb_dop_group_priv_list:"
-			    "cannot allocate memory");
-			*err = SMB_DR_OP_ERR;
-			free(ids);
-			return (NULL);
-		}
-
-		list->cnt = num;
-		(void) smb_priv_presentable_ids(ids, num);
-		for (i = 0; i < num; i++) {
-			if ((list->privs[i] = malloc(sizeof (ntpriv_t))) == 0) {
-				*err = SMB_DR_OP_ERR;
-				free(ids);
-				smb_group_free_privlist(list, 1);
-				return (NULL);
-			}
-			bzero(list->privs[i], sizeof (ntpriv_t));
-			priv = smb_priv_getbyvalue(ids[i]);
-			list->privs[i]->id = priv->id;
-			list->privs[i]->name = strdup(priv->name);
-		}
-		free(ids);
-	}
-
-	if ((rbuf = smb_dr_encode_grp_privlist(SMB_DR_OP_SUCCESS, list,
+	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, strres,
 	    rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}
 
-	smb_group_free_privlist(list, 1);
-
 	return (rbuf);
 }
 
 /*ARGSUSED*/
 static char *
-smb_dop_group_priv_get(char *argp, size_t arg_size,
+smb_dop_lookup_sid(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
 	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	uint32_t priv_attr;
-	nt_group_t *grp;
-	uint32_t retval;
+	char *name = NULL;
+	uint32_t status;
+	nt_sid_t *sid;
+	char *strsid;
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
 	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_priv_get: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
+	if ((strsid = smb_dr_decode_string(argp, arg_size)) == 0) {
 		*err = SMB_DR_OP_ERR_DECODE;
 		return (NULL);
 	}
 
-	grp = nt_group_getinfo(args->gname, RWLOCK_READER);
-	if (grp) {
-		priv_attr = nt_group_getpriv(grp, args->privid);
-		retval = priv_attr;
-	} else {
-		retval = NT_STATUS_NO_SUCH_GROUP;
-		*err = SMB_DR_OP_ERR;
-	}
-	nt_group_putinfo(grp);
+	sid = nt_sid_strtosid(strsid);
+	status = mlsvc_lookup_sid(sid, &name);
+	free(sid);
+	if (status != NT_STATUS_SUCCESS)
+		name = strsid;
 
 	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &retval,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_priv_set(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-	nt_group_t *grp;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_priv_set: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	grp = nt_group_getinfo(args->gname, RWLOCK_WRITER);
-	if (grp) {
-		ntstatus = nt_group_setpriv(grp,
-		    args->privid, args->priv_attr);
-	} else {
-		ntstatus = NT_STATUS_NO_SUCH_GROUP;
-		*err = SMB_DR_OP_ERR;
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &ntstatus,
-	    xdr_uint32_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL, *scope = NULL;
-	ntgrp_dr_arg_t *args;
-	ntgrp_list_t list;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_list: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	bzero(&list, sizeof (ntgrp_list_t));
-	scope = args->scope;
-	if (scope == NULL)
-		scope = "*";
-	nt_group_list(args->offset, scope, &list);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_grp_list(SMB_DR_OP_SUCCESS, &list,
+	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, name,
 	    rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}
 
-	smb_group_free_list(&list, 1);
-	free(args);
-	return (rbuf);
-}
+	if (status == NT_STATUS_SUCCESS)
+		free(name);
 
-/*ARGSUSED*/
-static char *
-smb_dop_group_member_list(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL;
-	ntgrp_dr_arg_t *args;
-	nt_group_t *grp = NULL;
-	ntgrp_member_list_t members;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((args = (ntgrp_dr_arg_t *)malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_group_dr_listmember: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(args, sizeof (ntgrp_dr_arg_t));
-	if (smb_dr_decode_common(argp, arg_size,
-	    xdr_ntgrp_dr_arg_t, args) != 0) {
-		free(args);
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	bzero(&members, sizeof (ntgrp_member_list_t));
-	bzero(&members.members, SMB_GROUP_PER_LIST * sizeof (members_list));
-	if ((!args->gname) || (strlen(args->gname) == 0)) {
-		free(args);
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	grp = nt_group_getinfo(args->gname, RWLOCK_READER);
-	if (grp) {
-		(void) nt_group_member_list(args->offset, grp, &members);
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((rbuf = smb_dr_encode_grp_memberlist(SMB_DR_OP_SUCCESS, &members,
-	    rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-
-	smb_group_free_memberlist(&members, 1);
-	free(args);
-	return (rbuf);
-}
-
-/*ARGSUSED*/
-static char *
-smb_dop_group_member_count(char *argp, size_t arg_size,
-    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
-{
-	char *rbuf = NULL, *gname = NULL;
-	ntgrp_dr_arg_t *enc_args;
-	nt_group_t *grp = NULL;
-	int num = 0;
-	uint32_t ntstatus = NT_STATUS_UNSUCCESSFUL;
-
-	*err = SMB_DR_OP_SUCCESS;
-	*rbufsize = 0;
-
-	/* Decode */
-	if ((gname = smb_dr_decode_string(argp, arg_size)) == 0) {
-		*err = SMB_DR_OP_ERR_DECODE;
-		return (NULL);
-	}
-
-	grp = nt_group_getinfo(gname, RWLOCK_READER);
-	if (grp) {
-		num = nt_group_num_members(grp);
-		ntstatus = NT_STATUS_SUCCESS;
-	} else {
-		ntstatus = NT_STATUS_NO_SUCH_GROUP;
-	}
-	nt_group_putinfo(grp);
-
-	/* Encode the result and return */
-	if ((enc_args = (ntgrp_dr_arg_t *)
-	    malloc(sizeof (ntgrp_dr_arg_t))) == 0) {
-		syslog(LOG_ERR,
-		    "smb_dop_group_member_count: cannot allocate memory");
-		*err = SMB_DR_OP_ERR;
-		return (NULL);
-	}
-	bzero(enc_args, sizeof (ntgrp_dr_arg_t));
-	enc_args->count = num;
-	enc_args->ntstatus = ntstatus;
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, enc_args,
-	    xdr_ntgrp_dr_arg_t, rbufsize)) == NULL) {
-		*err = SMB_DR_OP_ERR_ENCODE;
-		*rbufsize = 0;
-	}
-	free(enc_args);
+	xdr_free(xdr_string, (char *)&strsid);
 	return (rbuf);
 }

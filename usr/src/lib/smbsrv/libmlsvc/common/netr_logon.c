@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <netdb.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/mlsvc.h>
@@ -94,32 +95,18 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 	DWORD status;
 	int retries = 0;
 
-	smb_config_rdlock();
-	(void) strlcpy(resource_domain, smb_config_getstr(SMB_CI_DOMAIN_NAME),
-	    sizeof (resource_domain));
-	smb_config_unlock();
+	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
-	/*
-	 * If the SMB info cache is not valid,
-	 * try to locate a domain controller.
-	 */
-	if ((di = smb_getdomaininfo(0)) == NULL) {
-		(void) mlsvc_locate_domain_controller(resource_domain);
-
-		if ((di = smb_getdomaininfo(0)) == NULL)
-			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
-	}
+	if ((di = smb_getdomaininfo(0)) == NULL)
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	if ((mlsvc_echo(di->server)) < 0) {
 		/*
 		 * We had a session to the DC but it's not responding.
-		 * So drop the credential chain and find another DC.
+		 * So drop the credential chain.
 		 */
 		netr_invalidate_chain();
-		(void) mlsvc_locate_domain_controller(resource_domain);
-
-		if ((di = smb_getdomaininfo(0)) == NULL)
-			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}
 
 	do {

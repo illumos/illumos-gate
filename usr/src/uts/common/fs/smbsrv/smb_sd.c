@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,7 +145,7 @@ smb_sd_read(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 
 	error = smb_fsop_sdread(sr, sr->user_cr, node, &fs_sd);
 	if (error) {
-		smb_errmap_unix2smb(error, &smb_err);
+		smbsr_map_errno(error, &smb_err);
 		return (smb_err.status);
 	}
 
@@ -186,7 +186,7 @@ smb_sd_write(smb_request_t *sr, smb_sd_t *sd, uint32_t secinfo)
 	smb_fssd_term(&fs_sd);
 
 	if (error) {
-		smb_errmap_unix2smb(error, &smb_err);
+		smbsr_map_errno(error, &smb_err);
 		return (smb_err.status);
 	}
 

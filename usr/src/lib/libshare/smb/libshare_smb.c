@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,17 +77,20 @@ static int string_length_check_validator(int, char *);
 static int true_false_validator(int, char *);
 static int ip_address_validator_empty_ok(int, char *);
 static int ip_address_csv_list_validator_empty_ok(int, char *);
-static int ipc_mode_validator(int, char *);
 static int path_validator(int, char *);
 
 static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
 static uint64_t smb_share_features(void);
 static int smb_list_transient(sa_handle_t);
-static int smb_domain_change_event(char *new_domain);
+
+extern void lmshrd_door_close(void);
 
 /* size of basic format allocation */
 #define	OPT_CHUNK	1024
+
+/* size of string for types - big enough to hold "dependency" */
+#define	SCFTYPE_LEN	32
 
 /*
  * Indexes of entries in smb_proto_options table.
@@ -245,6 +248,50 @@ smb_isonline(void)
 }
 
 /*
+ * smb_isdisabled()
+ *
+ * Determine if the SMF service instance is in the disabled state or
+ * not. A number of operations depend on this state.
+ */
+static boolean_t
+smb_isdisabled(void)
+{
+	char *str;
+	boolean_t ret = B_FALSE;
+
+	if ((str = smf_get_state(SMBD_DEFAULT_INSTANCE_FMRI)) != NULL) {
+		ret = (strcmp(str, SCF_STATE_STRING_DISABLED) == 0);
+		free(str);
+	}
+	return (ret);
+}
+
+/*
+ * smb_isautoenable()
+ *
+ * Determine if the SMF service instance auto_enabled set or not. A
+ * number of operations depend on this state.  The property not being
+ * set or being set to true means autoenable.  Only being set to false
+ * is not autoenabled.
+ */
+static boolean_t
+smb_isautoenable(void)
+{
+	boolean_t ret = B_TRUE;
+	scf_simple_prop_t *prop;
+	uint8_t *retstr;
+
+	prop = scf_simple_prop_get(NULL, SMBD_DEFAULT_INSTANCE_FMRI,
+	    "application", "auto_enable");
+	if (prop != NULL) {
+		retstr = scf_simple_prop_next_boolean(prop);
+		ret = *retstr != 0;
+		scf_simple_prop_free(prop);
+	}
+	return (ret);
+}
+
+/*
  * smb_enable_share tells the implementation that it is to enable the share.
  * This entails converting the path and options into the appropriate ioctl
  * calls. It is assumed that all error checking of paths, etc. were
@@ -273,7 +320,12 @@ smb_enable_share(sa_share_t share)
 	if (path == NULL)
 		return (SA_NO_SUCH_PATH);
 
+	/*
+	 * If administratively disabled, don't try to start anything.
+	 */
 	online = smb_isonline();
+	if (!online && !smb_isautoenable() && smb_isdisabled())
+		goto done;
 
 	iszfs = sa_path_is_zfs(path);
 
@@ -374,11 +426,28 @@ smb_enable_resource(sa_resource_t resource)
 	sa_optionset_t opts;
 	sa_share_t share;
 	lmshare_info_t si;
-	int ret;
+	int ret = SA_OK;
+	int err;
+	boolean_t isonline;
 
 	share = sa_get_resource_parent(resource);
 	if (share == NULL)
 		return (SA_NO_SUCH_PATH);
+
+	/*
+	 * If administratively disabled, don't try to start anything.
+	 */
+	isonline = smb_isonline();
+	if (!isonline && !smb_isautoenable() && smb_isdisabled())
+		goto done;
+
+	if (!isonline)
+		ret = smb_enable_service();
+	if (!smb_isonline()) {
+		ret = SA_OK;
+		goto done;
+	}
+
 	path = sa_get_share_attr(share, "path");
 	if (path == NULL)
 		return (SA_SYSTEM_ERR);
@@ -388,21 +457,25 @@ smb_enable_resource(sa_resource_t resource)
 		return (SA_NO_SUCH_RESOURCE);
 	}
 
-	ret = smb_enable_service();
-
-	if (!smb_isonline()) {
-		ret = SA_OK;
-		goto done;
-	}
-
 	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
 	smb_build_lmshare_info(rname, path, opts, &si);
 	sa_free_attr_string(path);
 	sa_free_attr_string(rname);
 	sa_free_derived_optionset(opts);
-	if (lmshrd_add(&si) != NERR_Success)
+
+	/*
+	 * Attempt to add the share. Any error that occurs if it was
+	 * online is an error but don't count NERR_DuplicateName if
+	 * smb/server had to be brought online since bringing the
+	 * service up will enable the share that was just added prior
+	 * to the attempt to enable.
+	 */
+
+	err = lmshrd_add(&si);
+	if (err == NERR_Success || !(!isonline && err == NERR_DuplicateName))
+		(void) sa_update_sharetab(share, "smb");
+	else
 		return (SA_NOT_SHARED);
-	(void) sa_update_sharetab(share, "smb");
 
 done:
 	return (ret);
@@ -670,84 +743,43 @@ smb_validate_property(sa_property_t property, sa_optionset_t parent)
  */
 
 struct smb_proto_option_defs {
-	char *name;	/* display name -- remove protocol identifier */
 	int smb_index;
 	int32_t minval;
 	int32_t maxval; /* In case of length of string this should be max */
 	int (*validator)(int, char *);
 	int32_t	refresh;
 } smb_proto_options[] = {
-	{ SMB_CD_SYS_CMNT,
-	    SMB_CI_SYS_CMNT, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_MAX_WORKERS,
-	    SMB_CI_MAX_WORKERS, 64, 1024, range_check_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_NBSCOPE,
-	    SMB_CI_NBSCOPE, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_RDR_IPCMODE,
-	    SMB_CI_RDR_IPCMODE, 0, 0, ipc_mode_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_LM_LEVEL,
-	    SMB_CI_LM_LEVEL, 2, 5, range_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_KEEPALIVE,
-	    SMB_CI_KEEPALIVE, 20, 5400, range_check_validator_zero_ok,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_WINS_SRV1,
-	    SMB_CI_WINS_SRV1, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH},
-	{ SMB_CD_WINS_SRV2,
-	    SMB_CI_WINS_SRV2, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH},
-	{ SMB_CD_WINS_EXCL,
-	    SMB_CI_WINS_EXCL, 0, MAX_VALUE_BUFLEN,
-	    ip_address_csv_list_validator_empty_ok, SMB_REFRESH_REFRESH},
-	{ SMB_CD_SIGNING_ENABLE,
-	    SMB_CI_SIGNING_ENABLE, 0, 0, true_false_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_SIGNING_REQD,
-	    SMB_CI_SIGNING_REQD, 0, 0, true_false_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_RESTRICT_ANON,
-	    SMB_CI_RESTRICT_ANON, 0, 0, true_false_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_DOMAIN_SRV,
-	    SMB_CI_DOMAIN_SRV, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_ENABLE,
-	    SMB_CI_ADS_ENABLE, 0, 0, true_false_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_USER,
-	    SMB_CI_ADS_USER, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_USER_CONTAINER,
-	    SMB_CI_ADS_USER_CONTAINER, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_DOMAIN,
-	    SMB_CI_ADS_DOMAIN, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_PASSWD,
-	    SMB_CI_ADS_PASSWD, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_IPLOOKUP,
-	    SMB_CI_ADS_IPLOOKUP, 0, 0, true_false_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_ADS_SITE,
-	    SMB_CI_ADS_SITE, 0, MAX_VALUE_BUFLEN,
-	    string_length_check_validator, SMB_REFRESH_REFRESH},
-	{ SMB_CD_DYNDNS_ENABLE,
-	    SMB_CI_DYNDNS_ENABLE, 0, 0, true_false_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_DYNDNS_RETRY_SEC,
-	    SMB_CI_DYNDNS_RETRY_SEC, 0, 20, range_check_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_DYNDNS_RETRY_COUNT,
-	    SMB_CI_DYNDNS_RETRY_COUNT, 3, 5, range_check_validator,
-	    SMB_REFRESH_REFRESH},
-	{ SMB_CD_AUTOHOME_MAP,
-	    SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN,
-	    path_validator},
-	{NULL, -1, 0, 0, NULL}
+	{ SMB_CI_SYS_CMNT, 0, MAX_VALUE_BUFLEN,
+	    string_length_check_validator, SMB_REFRESH_REFRESH },
+	{ SMB_CI_MAX_WORKERS, 64, 1024, range_check_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_NBSCOPE, 0, MAX_VALUE_BUFLEN,
+	    string_length_check_validator, 0 },
+	{ SMB_CI_LM_LEVEL, 2, 5, range_check_validator, 0 },
+	{ SMB_CI_KEEPALIVE, 20, 5400, range_check_validator_zero_ok,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_WINS_SRV1, 0, MAX_VALUE_BUFLEN,
+	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH },
+	{ SMB_CI_WINS_SRV2, 0, MAX_VALUE_BUFLEN,
+	    ip_address_validator_empty_ok, SMB_REFRESH_REFRESH },
+	{ SMB_CI_WINS_EXCL, 0, MAX_VALUE_BUFLEN,
+	    ip_address_csv_list_validator_empty_ok, SMB_REFRESH_REFRESH },
+	{ SMB_CI_SIGNING_ENABLE, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_SIGNING_REQD, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_RESTRICT_ANON, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
+	{ SMB_CI_DOMAIN_SRV, 0, MAX_VALUE_BUFLEN,
+	    ip_address_validator_empty_ok, 0 },
+	{ SMB_CI_ADS_SITE, 0, MAX_VALUE_BUFLEN,
+	    string_length_check_validator, SMB_REFRESH_REFRESH },
+	{ SMB_CI_DYNDNS_ENABLE, 0, 0, true_false_validator, 0 },
+	{ SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN, path_validator, 0 },
 };
+
+#define	SMB_OPT_NUM \
+	(sizeof (smb_proto_options) / sizeof (smb_proto_options[0]))
 
 /*
  * Check the range of value as int range.
@@ -884,22 +916,6 @@ ip_address_csv_list_validator_empty_ok(int index, char *value)
 }
 
 /*
- * Check IPC mode
- */
-/*ARGSUSED*/
-static int
-ipc_mode_validator(int index, char *value)
-{
-	if (value == NULL)
-		return (SA_BAD_VALUE);
-	if (strcasecmp(value, "anon") == 0)
-		return (SA_OK);
-	if (strcasecmp(value, "auth") == 0)
-		return (SA_OK);
-	return (SA_BAD_VALUE);
-}
-
-/*
  * Check path
  */
 /*ARGSUSED*/
@@ -937,10 +953,14 @@ static int
 findprotoopt(char *name)
 {
 	int i;
-	for (i = 0; smb_proto_options[i].name != NULL; i++) {
-		if (strcasecmp(smb_proto_options[i].name, name) == 0)
+	char *sc_name;
+
+	for (i = 0; i < SMB_OPT_NUM; i++) {
+		sc_name = smb_config_getname(smb_proto_options[i].smb_index);
+		if (strcasecmp(sc_name, name) == 0)
 			return (i);
 	}
+
 	return (-1);
 }
 
@@ -954,21 +974,22 @@ static int
 smb_load_proto_properties()
 {
 	sa_property_t prop;
+	char value[MAX_VALUE_BUFLEN];
+	char *name;
 	int index;
-	char *value;
+	int rc;
 
 	protoset = sa_create_protocol_properties(SMB_PROTOCOL_NAME);
 	if (protoset == NULL)
 		return (SA_NO_MEMORY);
 
-	if (smb_config_load() != 0)
-		return (SA_CONFIG_ERR);
-	for (index = 0; smb_proto_options[index].name != NULL; index++) {
-		value = smb_config_getenv(smb_proto_options[index].smb_index);
-		prop = sa_create_property(
-		    smb_proto_options[index].name, value != NULL ? value : "");
-		if (value != NULL)
-			free(value);
+	for (index = 0; index < SMB_OPT_NUM; index++) {
+		rc = smb_config_get(smb_proto_options[index].smb_index,
+		    value, sizeof (value));
+		if (rc != SMBD_SMF_OK)
+			continue;
+		name = smb_config_getname(smb_proto_options[index].smb_index);
+		prop = sa_create_property(name, value);
 		if (prop != NULL)
 			(void) sa_add_protocol_property(protoset, prop);
 	}
@@ -1004,6 +1025,8 @@ smb_share_fini(void)
 {
 	xmlFreeNode(protoset);
 	protoset = NULL;
+
+	(void) lmshrd_door_close();
 }
 
 /*
@@ -1016,6 +1039,140 @@ static sa_protocol_properties_t
 smb_get_proto_set(void)
 {
 	return (protoset);
+}
+
+/*
+ * smb_enable_dependencies()
+ *
+ * SMBD_DEFAULT_INSTANCE_FMRI may have some dependencies that aren't
+ * enabled. This will attempt to enable all of them.
+ */
+static void
+smb_enable_dependencies(const char *fmri)
+{
+	scf_handle_t *handle;
+	scf_service_t *service;
+	scf_instance_t *inst = NULL;
+	scf_iter_t *iter;
+	scf_property_t *prop;
+	scf_value_t *value;
+	scf_propertygroup_t *pg;
+	scf_scope_t *scope;
+	char type[SCFTYPE_LEN];
+	char *dependency;
+	char *servname;
+	int maxlen;
+
+	/*
+	 * Get all required handles and storage.
+	 */
+	handle = scf_handle_create(SCF_VERSION);
+	if (handle == NULL)
+		return;
+
+	if (scf_handle_bind(handle) != 0) {
+		scf_handle_destroy(handle);
+		return;
+	}
+
+	maxlen = scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
+	if (maxlen == (ssize_t)-1)
+		maxlen = MAXPATHLEN;
+
+	dependency = malloc(maxlen);
+
+	service = scf_service_create(handle);
+
+	iter = scf_iter_create(handle);
+
+	pg = scf_pg_create(handle);
+
+	prop = scf_property_create(handle);
+
+	value = scf_value_create(handle);
+
+	scope = scf_scope_create(handle);
+
+	if (service == NULL || iter == NULL || pg == NULL || prop == NULL ||
+	    value == NULL || scope == NULL || dependency == NULL)
+		goto done;
+
+	/*
+	 *  We passed in the FMRI for the default instance but for
+	 *  some things we need the simple form so construct it. Since
+	 *  we reuse the storage that dependency points to, we need to
+	 *  use the servname early.
+	 */
+	(void) snprintf(dependency, maxlen, "%s", fmri + sizeof ("svc:"));
+	servname = strrchr(dependency, ':');
+	if (servname == NULL)
+		goto done;
+	*servname = '\0';
+	servname = dependency;
+
+	/*
+	 * Setup to iterate over the service property groups, only
+	 * looking at those that are "dependency" types. The "entity"
+	 * property will have the FMRI of the service we are dependent
+	 * on.
+	 */
+	if (scf_handle_get_scope(handle, SCF_SCOPE_LOCAL, scope) != 0)
+		goto done;
+
+	if (scf_scope_get_service(scope, servname, service) != 0)
+		goto done;
+
+	if (scf_iter_service_pgs(iter, service) != 0)
+		goto done;
+
+	while (scf_iter_next_pg(iter, pg) > 0) {
+		char *services[2];
+		/*
+		 * Have a property group for the service. See if it is
+		 * a dependency pg and only do operations on those.
+		 */
+		if (scf_pg_get_type(pg, type, SCFTYPE_LEN) <= 0)
+			continue;
+
+		if (strncmp(type, SCF_GROUP_DEPENDENCY, SCFTYPE_LEN) != 0)
+			continue;
+		/*
+		 * Have a dependency.  Attempt to enable it.
+		 */
+		if (scf_pg_get_property(pg, SCF_PROPERTY_ENTITIES, prop) != 0)
+			continue;
+
+		if (scf_property_get_value(prop, value) != 0)
+			continue;
+
+		services[1] = NULL;
+
+		if (scf_value_get_as_string(value, dependency, maxlen) > 0) {
+			services[0] = dependency;
+			_check_services(services);
+		}
+	}
+
+done:
+	if (dependency != NULL)
+		free(dependency);
+	if (value != NULL)
+		scf_value_destroy(value);
+	if (prop != NULL)
+		scf_property_destroy(prop);
+	if (pg != NULL)
+		scf_pg_destroy(pg);
+	if (iter != NULL)
+		scf_iter_destroy(iter);
+	if (scope != NULL)
+		scf_scope_destroy(scope);
+	if (inst != NULL)
+		scf_instance_destroy(inst);
+	if (service != NULL)
+		scf_service_destroy(service);
+
+	(void) scf_handle_unbind(handle);
+	scf_handle_destroy(handle);
 }
 
 /*
@@ -1032,21 +1189,25 @@ smb_enable_service(void)
 {
 	int i;
 	int ret = SA_OK;
+	char *service[] = { SMBD_DEFAULT_INSTANCE_FMRI, NULL };
 
 	if (!smb_isonline()) {
-		if (smf_enable_instance(SMBD_DEFAULT_INSTANCE_FMRI, 0) != 0) {
-			(void) fprintf(stderr,
-			    dgettext(TEXT_DOMAIN,
-			    "%s failed to restart: %s\n"),
-			    SMBD_DEFAULT_INSTANCE_FMRI,
-			    scf_strerror(scf_error()));
-			return (SA_CONFIG_ERR);
-		}
+		/*
+		 * Attempt to start the idmap, and other dependent
+		 * services, first.  If it fails, the SMB service will
+		 * ultimately fail so we use that as the error.  If we
+		 * don't try to enable idmap, smb won't start the
+		 * first time unless the admin has done it
+		 * manually. The service could be administratively
+		 * disabled so we won't always get started.
+		 */
+		smb_enable_dependencies(SMBD_DEFAULT_INSTANCE_FMRI);
+		_check_services(service);
 
 		/* Wait for service to come online */
 		for (i = 0; i < WAIT_FOR_SERVICE; i++) {
 			if (smb_isonline()) {
-				ret = SA_OK;
+				ret =  SA_OK;
 				break;
 			} else {
 				ret = SA_BUSY;
@@ -1079,45 +1240,6 @@ smb_validate_proto_prop(int index, char *name, char *value)
 }
 
 /*
- * smb_domain_change_event
- *
- * This function is called whenever ads_domain is changed via sharectl.
- * It will make a door call to trigger the ADS domain change event.
- */
-static int
-smb_domain_change_event(char *new_domain)
-{
-	char *orig_domain;
-	int rc = SA_OK;
-
-	orig_domain = smb_config_getenv(SMB_CI_ADS_DOMAIN);
-	if (orig_domain == NULL)
-		return (rc);
-
-	if (strcasecmp(orig_domain, new_domain) == 0) {
-		free(orig_domain);
-		return (rc);
-	}
-
-	if (!smb_isonline()) {
-		free(orig_domain);
-		return (SA_NO_SERVICE);
-	}
-
-	/*
-	 * Clear the ADS_HOST_INFO cache
-	 * and remove old keys from the
-	 * Kerberos keytab.
-	 */
-	if (smb_ads_domain_change_notify(orig_domain) != 0)
-		rc = SA_KRB_KEYTAB_ERR;
-
-	free(orig_domain);
-	return (rc);
-}
-
-
-/*
  * smb_set_proto_prop(prop)
  *
  * check that prop is valid.
@@ -1141,13 +1263,9 @@ smb_set_proto_prop(sa_property_t prop)
 			ret = smb_validate_proto_prop(index, name, value);
 			if (ret == SA_OK) {
 				opt = &smb_proto_options[index];
-				if ((opt->smb_index == SMB_CI_ADS_DOMAIN) &&
-				    (ret = smb_domain_change_event(value))
-				    != SA_OK)
-						goto cleanup;
 
 				/* Save to SMF */
-				smb_config_setenv(opt->smb_index, value);
+				(void) smb_config_set(opt->smb_index, value);
 				/*
 				 * Specialized refresh mechanisms can
 				 * be flagged in the proto_options and
@@ -1162,7 +1280,6 @@ smb_set_proto_prop(sa_property_t prop)
 		}
 	}
 
-cleanup:
 	if (name != NULL)
 		sa_free_attr_string(name);
 	if (value != NULL)

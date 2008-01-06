@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,9 +100,10 @@ smb_com_tree_disconnect(struct smb_request *sr)
 		    sr->smb_tid);
 
 	if (sr->uid_user == NULL || sr->tid_tree == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRinvnid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRinvnid);
+		/* NOTREACHED */
 	}
+
 	smbsr_rq_notify(sr, sr->session, sr->tid_tree);
 	smb_tree_disconnect(sr->tid_tree);
 	smbsr_encode_empty_result(sr);

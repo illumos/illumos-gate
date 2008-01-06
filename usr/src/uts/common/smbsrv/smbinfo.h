@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,18 +127,17 @@ typedef struct smb_kmod_cfg {
 	uint32_t skc_maxworkers;
 	uint32_t skc_maxconnections;
 	uint32_t skc_keepalive;
-	uint32_t skc_restrict_anon;
-	uint32_t skc_signing_enable;
-	uint32_t skc_signing_required;
-	uint32_t skc_signing_check;
-	uint32_t skc_oplock_enable;
 	uint32_t skc_oplock_timeout;
-	uint32_t skc_flush_required;
-	uint32_t skc_sync_enable;
-	uint32_t skc_dirsymlink_enable;
-	uint32_t skc_announce_quota;
-	uint32_t skc_secmode;
-	uint32_t skc_lmlevel;
+	int32_t skc_restrict_anon;
+	int32_t skc_signing_enable;
+	int32_t skc_signing_required;
+	int32_t skc_signing_check;
+	int32_t skc_oplock_enable;
+	int32_t skc_flush_required;
+	int32_t skc_sync_enable;
+	int32_t skc_dirsymlink_enable;
+	int32_t skc_announce_quota;
+	int32_t skc_secmode;
 
 	char skc_resource_domain[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];
@@ -173,7 +172,6 @@ int smbnative_pdc_value(char *native_lm);
 #define	SMBD_DOOR_PARAM_GET			2
 #define	SMBD_DOOR_PARAM_SET			3
 #define	SMBD_DOOR_NETBIOS_RECONFIG		4
-#define	SMBD_DOOR_ADS_DOMAIN_CHANGED		5
 
 #ifdef __cplusplus
 }

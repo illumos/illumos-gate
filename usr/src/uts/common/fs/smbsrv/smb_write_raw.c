@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,6 +216,7 @@ smb_com_write_raw(struct smb_request *sr)
 	unsigned int		stability;
 	struct mbuf_chain	reply;
 	smb_node_t		*fnode;
+	smb_error_t		err;
 
 	if (sr->session->s_state != SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
 		return (SDRC_DROP_VC);
@@ -244,8 +245,7 @@ smb_com_write_raw(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -260,10 +260,9 @@ smb_com_write_raw(struct smb_request *sr)
 		 */
 		if (fnode->attr.sa_vattr.va_type != VDIR) {
 			rc = smb_lock_range_access(sr, fnode, off,
-			    count, FILE_WRITE_DATA);
+			    count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
-				smbsr_raise_cifs_error(sr, rc,
-				    ERRSRV, ERRaccess);
+				smbsr_error(sr, rc, ERRSRV, ERRaccess);
 				/* NOTREACHED */
 			}
 		}
@@ -440,8 +439,10 @@ notify_write_raw_complete:
 	 * If we had an error fill in the appropriate error code
 	 */
 	if (rc != 0) {
-		(void) smbsr_set_errno(sr, rc);
+		smbsr_map_errno(rc, &err);
+		smbsr_set_error(sr, &err);
 	}
+
 	/*
 	 * Free raw write buffer if present (from smb_transfer_write_raw_data)
 	 */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,7 +292,6 @@ netr_gen_session_key(netr_info_t *netr_info)
 	DWORD *client_challenge;
 	DWORD *server_challenge;
 	int rc;
-	char *machine_passwd;
 	DWORD le_data[2];
 
 	client_challenge = (DWORD *)(uintptr_t)&netr_info->client_challenge;
@@ -304,20 +303,15 @@ netr_gen_session_key(netr_info_t *netr_info)
 	 * the appropriate password but it isn't working yet.  So we
 	 * always use the default one for now.
 	 */
-	smb_config_rdlock();
-	machine_passwd = smb_config_getstr(SMB_CI_MACHINE_PASSWD);
+	bzero(netr_info->password, sizeof (netr_info->password));
+	rc = smb_config_getstr(SMB_CI_MACHINE_PASSWD,
+	    (char *)netr_info->password, sizeof (netr_info->password));
 
-	if (!machine_passwd || *machine_passwd == 0) {
-		smb_config_unlock();
+	if ((rc != SMBD_SMF_OK) || *netr_info->password == '\0') {
 		return (-1);
 	}
 
-	bzero(netr_info->password, sizeof (netr_info->password));
-	(void) strlcpy((char *)netr_info->password, (char *)machine_passwd,
-	    sizeof (netr_info->password));
-
-	rc = smb_auth_ntlm_hash((char *)machine_passwd, md4hash);
-	smb_config_unlock();
+	rc = smb_auth_ntlm_hash((char *)netr_info->password, md4hash);
 
 	if (rc != SMBAUTH_SUCCESS)
 		return (SMBAUTH_FAILURE);

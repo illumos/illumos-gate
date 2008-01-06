@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <strings.h>
 #include <syslog.h>
 #include <synch.h>
+#include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -44,10 +45,10 @@
 #include <smbrdr_ipc_util.h>
 #include <smbrdr.h>
 
-static int mlsvc_anonymous_logon(char *domain_controller, char *domain_name);
-static int mlsvc_auth_logon(char *domain_controller, char *domain_name,
-    char *username, unsigned char *pwd_hash);
-static int smbrdr_smb_session_setupandx(struct sdb_logon *logon);
+static int smbrdr_anonymous_logon(char *domain_controller, char *domain_name);
+static int smbrdr_auth_logon(char *domain_controller, char *domain_name,
+    char *username);
+static int smbrdr_session_setupx(struct sdb_logon *logon);
 static boolean_t smbrdr_logon_validate(char *server, char *username);
 static struct sdb_logon *smbrdr_logon_init(struct sdb_session *session,
     char *username, unsigned char *pwd);
@@ -58,7 +59,7 @@ static int smbrdr_authenticate(char *primary_domain, char *account_name,
 /*
  * mlsvc_logon
  *
- * If the username is NULL, an anonymous session will be established.
+ * If the username is MLSVC_ANON_USER, an anonymous session will be established.
  * Otherwise, an authenticated session will be established based on the
  * specified credentials.
  */
@@ -66,48 +67,39 @@ int
 mlsvc_logon(char *domain_controller, char *domain, char *username)
 {
 	int rc;
-	unsigned char *pwd_hash = NULL;
 
-	if (username) {
-		pwd_hash = smbrdr_ipc_get_passwd();
-		rc = mlsvc_auth_logon(domain_controller, domain, username,
-		    pwd_hash);
-	} else {
-		rc = mlsvc_anonymous_logon(domain_controller, domain);
-	}
+	if (strcmp(username, MLSVC_ANON_USER) == 0)
+		rc = smbrdr_anonymous_logon(domain_controller, domain);
+	else
+		rc = smbrdr_auth_logon(domain_controller, domain, username);
 
 	return (rc);
 }
 
 /*
- * mlsvc_anonymous_logon
+ * smbrdr_anonymous_logon
  *
  * Set up an anonymous session. If the session to the resource domain
  * controller appears to be okay we shouldn't need to do anything here.
  * Otherwise we clean up the stale session and create a new one.
  */
 static int
-mlsvc_anonymous_logon(char *domain_controller, char *domain_name)
+smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
 {
-	int rc = 0;
-
 	if (smbrdr_logon_validate(domain_controller, MLSVC_ANON_USER))
-		/* session & user are good use them */
 		return (0);
 
-
 	if (smbrdr_negotiate(domain_name) != 0) {
-		syslog(LOG_ERR, "smbrdr: (anon logon) negotiate <%s> failed",
-		    (domain_name ? domain_name : "NoName"));
+		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: negotiate failed");
 		return (-1);
 	}
 
 	if (smbrdr_logon_user(domain_controller, MLSVC_ANON_USER, 0) < 0) {
-		syslog(LOG_ERR, "smbrdr: (anon logon) logon failed");
-		rc = -1;
+		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: logon failed");
+		return (-1);
 	}
 
-	return (rc);
+	return (0);
 }
 
 int
@@ -131,7 +123,7 @@ mlsvc_user_getauth(char *domain_controller, char *username,
 }
 
 /*
- * mlsvc_auth_logon
+ * smbrdr_auth_logon
  *
  * Set up a user session. If the session to the resource domain controller
  * appears to be okay we shouldn't need to do anything here. Otherwise we
@@ -140,18 +132,19 @@ mlsvc_user_getauth(char *domain_controller, char *username,
  * due to an inactivity timeout or a domain controller reset.
  */
 static int
-mlsvc_auth_logon(char *domain_controller, char *domain_name, char *username,
-    unsigned char *pwd_hash)
+smbrdr_auth_logon(char *domain_controller, char *domain_name, char *username)
 {
 	int erc;
+	unsigned char *pwd_hash = NULL;
 
 	if (username == NULL || *username == 0) {
-		syslog(LOG_ERR, "smbrdr: auth logon (no username)");
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: no username");
 		return (-1);
 	}
 
+	pwd_hash = smbrdr_ipc_get_passwd();
 	if (!pwd_hash || *pwd_hash == 0) {
-		syslog(LOG_ERR, "smbrdr: auth logon (no password)");
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: no password");
 		return (-1);
 	}
 
@@ -159,7 +152,7 @@ mlsvc_auth_logon(char *domain_controller, char *domain_name, char *username,
 		return (0);
 
 	if (smbrdr_negotiate(domain_name) != 0) {
-		syslog(LOG_ERR, "smbrdr: admin logon (negotiate failed)");
+		syslog(LOG_DEBUG, "smbrdr_auth_logon: negotiate failed");
 		return (-1);
 	}
 
@@ -189,7 +182,7 @@ smbrdr_authenticate(char *primary_domain, char *account_name,
 
 
 	if ((di = smb_getdomaininfo(0)) == 0) {
-		syslog(LOG_ERR, "MlsvcAuthenticate[%s]: %s", account_name,
+		syslog(LOG_DEBUG, "smbrdr_authenticate[%s]: %s", account_name,
 		    xlate_nt_status(NT_STATUS_CANT_ACCESS_DOMAIN_INFO));
 		return (-1);
 	}
@@ -211,7 +204,7 @@ smbrdr_authenticate(char *primary_domain, char *account_name,
 	 * to the resource domain.
 	 */
 	if (strcasecmp(di->domain, primary_domain)) {
-		syslog(LOG_ERR, "MlsvcAuthenticate: %s\\%s: not account domain",
+		syslog(LOG_DEBUG, "smbrdr_authenticate: %s\\%s: invalid domain",
 		    primary_domain, account_name);
 		return (-2);
 	}
@@ -225,9 +218,9 @@ smbrdr_authenticate(char *primary_domain, char *account_name,
  * This is the entry point for logging  a user onto the domain. The
  * session structure should have been obtained via a successful call
  * to smbrdr_smb_connect. We allocate a logon structure to hold the
- * user details and attempt to logon using smbrdr_smb_session_setupandx. Note
- * that we expect the password fields to have been encrypted before
- * this call.
+ * user details and attempt to logon using smbrdr_session_setupx.
+ * Note that we expect the password fields to have been encrypted
+ * before this call.
  *
  * On success, the logon structure will be returned. Otherwise a null
  * pointer will be returned.
@@ -245,8 +238,8 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 	}
 
 	session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE);
-	if (session == 0) {
-		syslog(LOG_ERR, "smbrdr: (logon[%s]) no session with %s",
+	if (session == NULL) {
+		syslog(LOG_DEBUG, "smbrdr_logon_user: %s: no session with %s",
 		    username, server);
 		return (-1);
 	}
@@ -267,14 +260,14 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 
 	logon = smbrdr_logon_init(session, username, pwd);
 
-	if (logon == 0) {
-		syslog(LOG_ERR, "smbrdr: (logon[%s]) resource shortage",
-		    username);
+	if (logon == NULL) {
+		syslog(LOG_DEBUG, "smbrdr_logon_user: %s: %s",
+		    username, strerror(ENOMEM));
 		smbrdr_session_unlock(session);
 		return (-1);
 	}
 
-	if (smbrdr_smb_session_setupandx(logon) < 0) {
+	if (smbrdr_session_setupx(logon) < 0) {
 		free(logon);
 		smbrdr_session_unlock(session);
 		return (-1);
@@ -284,7 +277,7 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 	free(logon);
 
 	if (old_logon.type != SDB_LOGON_NONE) {
-		(void) smbrdr_smb_logoff(&old_logon);
+		(void) smbrdr_logoffx(&old_logon);
 	}
 
 	smbrdr_session_unlock(session);
@@ -294,7 +287,7 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 
 
 /*
- * smbrdr_smb_session_setupandx
+ * smbrdr_session_setupx
  *
  * Build and send an SMB session setup command. This is used to log a
  * user onto the domain. See CIFS section 4.1.2.
@@ -302,7 +295,7 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
 static int
-smbrdr_smb_session_setupandx(struct sdb_logon *logon)
+smbrdr_session_setupx(struct sdb_logon *logon)
 {
 	struct sdb_session *session;
 	smb_hdr_t smb_hdr;
@@ -322,10 +315,8 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 	 * Paranoia check - we should never get this
 	 * far without a valid session structure.
 	 */
-	if ((session = logon->session) == 0) {
-		syslog(LOG_ERR, "smbrdr_smb_session_setupandx: no data");
+	if ((session = logon->session) == NULL)
 		return (-1);
-	}
 
 	if (session->remote_caps & CAP_UNICODE) {
 		strlen_fn = mts_wcequiv_strlen;
@@ -336,15 +327,18 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 		null_size = sizeof (char);
 	}
 
-	if (smbrdr_sign_init(session, logon) < 0)
+	if (smbrdr_sign_init(session, logon) < 0) {
+		syslog(LOG_DEBUG,
+		    "smbrdr_session_setupx: smbrdr_sign_init failed");
 		return (-1);
+	}
 
 	status = smbrdr_request_init(&srh, SMB_COM_SESSION_SETUP_ANDX,
 	    session, 0, 0);
 
 	if (status != NT_STATUS_SUCCESS) {
-		(void) smbrdr_sign_fini(session);
-		syslog(LOG_ERR, "SmbrdrSessionSetup: %s",
+		smbrdr_sign_fini(session);
+		syslog(LOG_DEBUG, "smbrdr_session_setupx: %s",
 		    xlate_nt_status(status));
 		return (-1);
 	}
@@ -415,18 +409,18 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 	}
 
 	if (rc <= 0) {
-		syslog(LOG_ERR, "smbrdr_smb_session_setupandx: encode failed");
+		syslog(LOG_DEBUG, "smbrdr_session_setupx: encode failed");
 		smbrdr_handle_free(&srh);
-		(void) smbrdr_sign_fini(session);
+		smbrdr_sign_fini(session);
 		return (-1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrSessionSetup: %s",
+		syslog(LOG_DEBUG, "smbrdr_session_setupx: %s",
 		    xlate_nt_status(status));
 		smbrdr_handle_free(&srh);
-		(void) smbrdr_sign_fini(session);
+		smbrdr_sign_fini(session);
 		return (-1);
 	}
 
@@ -461,9 +455,9 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 	}
 
 	if (rc <= 0) {
-		syslog(LOG_ERR, "RdrSessionSetup: decode failed");
+		syslog(LOG_DEBUG, "smbrdr_session_setupx: decode failed");
 		smbrdr_handle_free(&srh);
-		(void) smbrdr_sign_fini(session);
+		smbrdr_sign_fini(session);
 		return (-1);
 	}
 
@@ -476,7 +470,7 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 		logon->type = SDB_LOGON_GUEST;
 
 	smbrdr_handle_free(&srh);
-	(void) smbrdr_sign_unset_key(session);
+	smbrdr_sign_unset_key(session);
 
 	logon->state = SDB_LSTATE_SETUP;
 
@@ -484,7 +478,7 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
 }
 
 /*
- * smbrdr_smb_logoff
+ * smbrdr_logoffx
  *
  * Build and send an SMB session logoff (SMB_COM_LOGOFF_ANDX) command.
  * This is the inverse of an SMB_COM_SESSION_SETUP_ANDX. See CIFS
@@ -494,7 +488,7 @@ smbrdr_smb_session_setupandx(struct sdb_logon *logon)
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
 int
-smbrdr_smb_logoff(struct sdb_logon *logon)
+smbrdr_logoffx(struct sdb_logon *logon)
 {
 	struct sdb_session *session;
 	smbrdr_handle_t srh;
@@ -527,7 +521,7 @@ smbrdr_smb_logoff(struct sdb_logon *logon)
 
 	if (status != NT_STATUS_SUCCESS) {
 		logon->state = SDB_LSTATE_SETUP;
-		syslog(LOG_ERR, "smbrdr: logoff %s (%s)", logon->username,
+		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: %s", logon->username,
 		    xlate_nt_status(status));
 		return (-1);
 	}
@@ -536,14 +530,14 @@ smbrdr_smb_logoff(struct sdb_logon *logon)
 	if (rc < 0) {
 		logon->state = SDB_LSTATE_SETUP;
 		smbrdr_handle_free(&srh);
-		syslog(LOG_ERR, "smbrdr: logoff %s (encode failed)",
+		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: encode failed",
 		    logon->username);
 		return (rc);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "smbrdr: logoff %s (%s)", logon->username,
+		syslog(LOG_DEBUG, "smbrdr_logoffx: %s: %s", logon->username,
 		    xlate_nt_status(status));
 		rc = -1;
 	} else {
@@ -570,7 +564,7 @@ smbrdr_logon_init(struct sdb_session *session, char *username,
     unsigned char *pwd)
 {
 	struct sdb_logon *logon;
-	int smbrdr_lmcompl;
+	int64_t smbrdr_lmcompl;
 	int rc;
 
 	logon = (struct sdb_logon *)malloc(sizeof (sdb_logon_t));
@@ -580,9 +574,7 @@ smbrdr_logon_init(struct sdb_session *session, char *username,
 	bzero(logon, sizeof (struct sdb_logon));
 	logon->session = session;
 
-	smb_config_rdlock();
-	smbrdr_lmcompl = smb_config_getnum(SMB_CI_LM_LEVEL);
-	smb_config_unlock();
+	(void) smb_config_getnum(SMB_CI_LM_LEVEL, &smbrdr_lmcompl);
 
 	if (strcmp(username, "IPC$") == 0) {
 		logon->type = SDB_LOGON_ANONYMOUS;
@@ -625,7 +617,8 @@ smbrdr_logon_validate(char *server, char *username)
 			valid = B_TRUE;
 		} else {
 			session->state = SDB_SSTATE_STALE;
-			syslog(LOG_DEBUG, "smbrdr: (logon) stale session");
+			syslog(LOG_DEBUG,
+			    "smbrdr_logon_validate: stale session");
 		}
 
 		smbrdr_session_unlock(session);

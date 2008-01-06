@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,8 +70,8 @@ static void mlrpc_reply_fault(struct mlrpc_xaction *, unsigned long);
 static int mlrpc_build_reply(struct mlrpc_xaction *);
 
 /*
- * The is the RPC service server-side entry point. All MSRPC encoded
- * messages should be passed through here. We use the same context
+ * This is the RPC service server-side entry point.  All MSRPC encoded
+ * messages should be passed through here.  We use the same context
  * structure as the client side but we don't need to set up the client
  * side info.
  */
@@ -98,6 +98,7 @@ mlrpc_process(int fid, smb_dr_user_ctx_t *user_ctx)
 		return (NULL);
 
 	bzero(mxa, sizeof (struct mlrpc_xaction));
+	mxa->fid = fid;
 	mxa->context = context;
 	mxa->binding_list = context->binding;
 
@@ -177,6 +178,8 @@ mlrpc_lookup(int fid)
 			return (NULL);
 		}
 
+		bzero(available->inpipe, sizeof (smb_pipe_t));
+		bzero(available->outpipe, sizeof (smb_pipe_t));
 		available->fid = fid;
 		available->inpipe->sp_pipeid = fid;
 		available->outpipe->sp_pipeid = fid;
@@ -205,6 +208,7 @@ mlrpc_release(int fid)
 		context = &context_table[i];
 
 		if (context->fid == fid) {
+			ndr_hdclose(fid);
 			free(context->inpipe);
 			free(context->outpipe);
 			bzero(context, sizeof (struct mlsvc_rpc_context));
@@ -267,8 +271,8 @@ mlrpc_s_bind(struct mlrpc_xaction *mxa)
 	mlrpc_p_result_t	*result;
 	unsigned		p_cont_id;
 	struct mlrpc_binding	*mbind;
-	mlrpc_uuid_t		*as_uuid;
-	mlrpc_uuid_t		*ts_uuid;
+	ndr_uuid_t		*as_uuid;
+	ndr_uuid_t		*ts_uuid;
 	char			as_buf[64];
 	char			ts_buf[64];
 	int			as_vers;
@@ -414,8 +418,8 @@ mlrpc_s_alter_context(struct mlrpc_xaction *mxa)
 	struct mlrpc_binding *mbind;
 	struct mlrpc_service *msvc;
 	unsigned p_cont_id;
-	mlrpc_uuid_t *as_uuid;
-	mlrpc_uuid_t *ts_uuid;
+	ndr_uuid_t *as_uuid;
+	ndr_uuid_t *ts_uuid;
 	int as_vers;
 	int ts_vers;
 	mlrpc_port_any_t *sec_addr;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,7 +195,6 @@ typedef struct {
 } read_data_t;
 
 static char logr_sysname[SYS_NMLN];
-static char hostname[MAXHOSTNAMELEN];
 static mts_wchar_t wcs_hostname[MAXHOSTNAMELEN];
 static int hostname_len = 0;
 static mts_wchar_t wcs_srcname[MAX_SRCNAME_LEN];
@@ -231,26 +230,25 @@ logr_initialize(void)
 /*
  * logr_s_EventLogClose
  *
- * This is a request to close the LOGR interface specified by the
- * handle. Free the handle and its associated resources and zero out
- * the result handle for the client.
+ * This is a request to close the LOGR interface specified by handle.
+ * Free the handle and associated resources, and zero out the result
+ * handle for the client.
  */
-/*ARGSUSED*/
 static int
 logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct logr_EventLogClose *param = arg;
-	ms_handle_desc_t *desc;
-	read_data_t *data;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 
-	if ((desc = mlsvc_lookup_handle((ms_handle_t *)&param->handle)) == 0) {
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
+		bzero(&param->result_handle, sizeof (logr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
 
-	data = (read_data_t *)(uintptr_t)(desc->discrim);
-	free(data);
-	(void) mlsvc_put_handle((ms_handle_t *)&param->handle);
+	free(hd->nh_data);
+	ndr_hdfree(mxa, id);
 
 	bzero(&param->result_handle, sizeof (logr_handle_t));
 	param->status = NT_STATUS_SUCCESS;
@@ -260,40 +258,16 @@ logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
 /*
  * logr_s_EventLogOpen
  *
- * This is a request to open the event log.
- *
- * Return a handle for use with subsequent event log requests.
+ * Open the event log. Not supported yet.
  */
 /*ARGSUSED*/
 static int
 logr_s_EventLogOpen(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct logr_EventLogOpen *param = arg;
-	ms_handle_t *handle;
-	int log_enable = 0;
-	int len;
-	int rc;
 
-	smb_config_rdlock();
-	log_enable = smb_config_getyorn(SMB_CI_LOGR_ENABLE);
-	smb_config_unlock();
-
-	rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-
-	if (log_enable == 0 || rc != 0) {
-		bzero(&param->handle, sizeof (logr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-		return (MLRPC_DRC_OK);
-	}
-
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_LOGR, LOGR_KEY, 0);
-	bcopy(handle, &param->handle, sizeof (logr_handle_t));
-
-	len = strlen(hostname) + 1;
-	(void) mts_mbstowcs(wcs_hostname, hostname, len);
-	hostname_len = len * sizeof (mts_wchar_t);
-
-	param->status = NT_STATUS_SUCCESS;
+	bzero(&param->handle, sizeof (logr_handle_t));
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 }
 
@@ -316,15 +290,15 @@ logr_get_snapshot(void)
  * return number of log entries in the snapshot as result of RPC
  * call.
  */
-/*ARGSUSED*/
 static int
 logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct logr_EventLogQueryCount *param = arg;
-	ms_handle_desc_t *desc;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 	read_data_t *data;
 
-	if ((desc = mlsvc_lookup_handle((ms_handle_t *)&param->handle)) == 0) {
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
@@ -334,7 +308,7 @@ logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	desc->discrim = (DWORD)(uintptr_t)data;
+	hd->nh_data = data;
 	param->rec_num = data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
 	return (MLRPC_DRC_OK);
@@ -345,21 +319,20 @@ logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
  *
  * Return oldest record number in the snapshot as result of RPC call.
  */
-/*ARGSUSED*/
 static int
 logr_s_EventLogGetOldestRec(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct logr_EventLogGetOldestRec *param = arg;
-	ms_handle_desc_t *desc;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 	read_data_t *data;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->handle);
-	if (desc == NULL) {
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
 
-	data = (read_data_t *)(uintptr_t)desc->discrim;
+	data = (read_data_t *)hd->nh_data;
 	param->oldest_rec = data->log.ix - data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
 	return (MLRPC_DRC_OK);
@@ -452,12 +425,12 @@ set_logrec(log_entry_t *le, DWORD recno, logr_record_t *rec)
  * Reads a whole number of entries from system log. The function can
  * read log entries in chronological or reverse chronological order.
  */
-/*ARGSUSED*/
 static int
 logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct logr_EventLogRead *param = arg;
-	ms_handle_desc_t *desc;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 	read_data_t *rdata;
 	log_entry_t *le;
 	DWORD ent_no, ent_num, ent_remain;
@@ -465,20 +438,19 @@ logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 	BYTE *buf;
 	int dir, ent_per_req;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->handle);
-	if (desc == NULL) {
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
 
-	rdata = (read_data_t *)(uintptr_t)(desc->discrim);
-	if (rdata == 0) {
+	rdata = (read_data_t *)hd->nh_data;
+	if (rdata == NULL) {
 		if ((rdata = logr_get_snapshot()) == NULL) {
 			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 			return (MLRPC_DRC_OK);
 		}
 
-		desc->discrim = (DWORD)(uintptr_t)rdata;
+		hd->nh_data = rdata;
 	}
 
 	dir = (param->read_flags & EVENTLOG_FORWARDS_READ) ? FWD : REW;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,13 +75,12 @@ smb_com_read(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -123,7 +122,7 @@ smb_com_lock_and_read(struct smb_request *sr)
 	int rc;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
-		smbsr_raise_error(sr, ERRDOS, ERRnoaccess);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		/* NOTREACHED */
 	}
 
@@ -139,19 +138,18 @@ smb_com_lock_and_read(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 	result = smb_lock_range(sr, sr->fid_ofile, param.r_offset,
 	    (uint64_t)param.r_count, UINT_MAX, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
-		smb_lock_range_raise_error(sr, result);
+		smb_lock_range_error(sr, result);
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -214,7 +212,7 @@ smb_com_read_raw(struct smb_request *sr)
 		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 		    sr->smb_fid);
 		if (sr->fid_ofile == NULL) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
+			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
 			/* NOTREACHED */
 		}
@@ -301,13 +299,12 @@ smb_com_read_andx(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 	if ((rc = smb_common_read(sr, &param)) != 0) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -379,7 +376,7 @@ smb_common_read(struct smb_request *sr, smb_read_param_t *param)
 
 		if (node->attr.sa_vattr.va_type != VDIR) {
 			rc = smb_lock_range_access(sr, node, param->r_offset,
-			    param->r_count, FILE_READ_DATA);
+			    param->r_count, B_FALSE);
 			if (rc != NT_STATUS_SUCCESS) {
 				rc = ERANGE;
 				break;

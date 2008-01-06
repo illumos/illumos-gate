@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,18 @@
  *  trace:entry MO 02 .. sec_addr.port_spec[11]  put 1@37  =   0 {00}
  */
 
+BEGIN
+{
+	printf("MSRPC Trace Started");
+	printf("\n\n");
+}
+
+END
+{
+	printf("MSRPC Trace Ended");
+	printf("\n\n");
+}
+
 /*
  * SmbSessionSetupX, SmbLogoffX
  * SmbTreeConnect, SmbTreeDisconnect
@@ -97,16 +109,24 @@ smb_com_session_setup_andx:entry,
 smb_com_logoff_andx:entry,
 smb_tree_connect:return,
 smb_tree_disconnect:entry,
-smb_tree_disconnect:return
+smb_tree_disconnect:return,
+smb_winpipe_open:entry,
+smb_winpipe_call:entry,
+smb_winpipe_upcall:entry,
+door_ki_upcall:entry
 {
 }
 
 smb_com_session_setup_andx:return,
 smb_session*:return,
 smb_user*:return,
-smb_tree*:return
+smb_tree*:return,
+smb_winpipe_open:return,
+smb_winpipe_call:return,
+smb_winpipe_upcall:return,
+door_ki_upcall:return
 {
-	printf("rc=%d", arg1);
+	printf("rc=0x%08x", arg1);
 }
 
 sdt:smbsrv::smb-sessionsetup-clntinfo
@@ -131,22 +151,12 @@ smb_com_logoff_andx:return
 /*
  * Raise error functions (no return).
  */
-smbsr_raise_error:entry
-{
-        printf("class=%d code=%d", arg1, arg2);
-}
-
-smbsr_raise_cifs_error:entry
+smbsr_error:entry
 {
     printf("status=0x%08x class=%d, code=%d", arg1, arg2, arg3);
 }
 
-smbsr_raise_nt_error:entry
-{
-    printf("error=0x%08x", arg1);
-}
-
-smbsr_raise_errno:entry
+smbsr_errno:entry
 {
     printf("errno=%d", arg1);
 }
@@ -356,7 +366,7 @@ pid$target::smbrdr_*:return
 {
 }
 
-pid$target::mlsvc_tree_connect:entry
+pid$target::smbrdr_tree_connect:entry
 {
 	printf("%s %s %s",
 	    copyinstr(arg0),
@@ -377,7 +387,7 @@ pid$target::mlsvc_close_pipe:entry
 {
 }
 
-pid$target::mlsvc_tree_connect:return,
+pid$target::smbrdr_tree_connect:return,
 pid$target::mlsvc_open_pipe:return,
 pid$target::mlsvc_close_pipe:return
 {

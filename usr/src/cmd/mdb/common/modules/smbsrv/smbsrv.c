@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,7 +203,6 @@ smb_information(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%sAnnounce Quota\n",
 		    (smb_info.si.skc_announce_quota) ? "" : "Do Not ");
 		mdb_printf("Security Mode %d\n", smb_info.si.skc_secmode);
-		mdb_printf("LM Level %d\n", smb_info.si.skc_lmlevel);
 		mdb_printf("Domain %s\n", smb_info.si.skc_resource_domain);
 		mdb_printf("Hostname %s\n", smb_info.si.skc_hostname);
 		mdb_printf("Comment %s\n", smb_info.si.skc_system_comment);

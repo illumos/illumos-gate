@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,10 +36,14 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smbvar.h>
+#include <sys/callb.h>
+#include <sys/flock.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+extern caller_context_t smb_ct;
 
 int smb_fsop_open(smb_ofile_t *of);
 
@@ -119,7 +123,13 @@ int smb_fsop_sdread(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);
 int smb_fsop_sdwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *,
     int);
 
-void smb_get_caller_context(smb_request_t *sr, caller_context_t *ct);
+uint32_t smb_fsop_shrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid,
+    uint32_t desired_access, uint32_t share_access);
+
+void smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid);
+
+int smb_fsop_frlock(smb_request_t *sr, smb_node_t *node, smb_lock_t *lock,
+    boolean_t unlock);
 
 /*
  * Lookup-related flags

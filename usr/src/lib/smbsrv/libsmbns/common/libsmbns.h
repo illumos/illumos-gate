@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,8 @@ typedef enum adjoin_status {
 } adjoin_status_t;
 
 /* ADS functions */
+extern void ads_init(void);
+extern void ads_refresh(void);
 extern ADS_HANDLE *ads_open(void);
 extern void ads_close(ADS_HANDLE *);
 extern int ads_publish_share(ADS_HANDLE *, const char *, const char *,
@@ -84,11 +86,12 @@ extern int ads_build_unc_name(char *, int, const char *, const char *);
 extern int ads_lookup_share(ADS_HANDLE *, const char *, const char *, char *);
 extern int ads_add_share(ADS_HANDLE *, const char *, const char *,
     const char *);
-extern int ads_domain_change_notify_handler(char *);
-extern adjoin_status_t ads_join(char *, char *, char *, int);
+extern adjoin_status_t ads_join(char *, char *, char *, char *, int);
 extern char *adjoin_report_err(adjoin_status_t status);
+extern int ads_domain_change_cleanup(char *);
 
 /* DYNDNS functions */
+extern int dns_msgid_init(void);
 extern int dyndns_update(void);
 extern int dyndns_clear_rev_zone(void);
 
@@ -97,8 +100,8 @@ extern int smb_kinit(char *user, char *passwd);
 
 
 /* NETBIOS Functions */
-extern int msdcs_lookup_ads(void);
-extern void smb_netbios_start(void);
+extern int msdcs_lookup_ads(char *);
+extern int smb_netbios_start(void);
 extern void smb_netbios_shutdown(void);
 extern void smb_netbios_name_reconfig(void);
 
@@ -142,10 +145,7 @@ struct ip_alias {
 #define	GATEWAY_FILE	"/etc/defaultrouter"
 
 /* NIC Config functions */
-extern void smb_resolver_init(void);
-extern void smb_resolver_close(void);
 extern int smb_get_nameservers(struct in_addr *, int);
-extern uint16_t smb_get_next_resid(void);
 extern void smb_nic_lock(void);
 extern void smb_nic_unlock(void);
 extern int smb_nic_init(void);

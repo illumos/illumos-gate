@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,9 @@
 #include <sys/pathname.h>
 #include <sys/cred.h>
 #include <sys/extdirent.h>
+#include <sys/nbmlock.h>
+#include <sys/share.h>
+#include <sys/fcntl.h>
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/string.h>
@@ -43,21 +46,22 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_incl.h>
 
+void
+smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
 
 static int
 smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
-    cred_t *cr, caller_context_t *ct, int flags);
+    cred_t *cr, int flags);
 
 static int
 smb_vop_readdir_entry(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
     ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr,
-    caller_context_t *ct, char *dirbuf, int num_bytes);
+    char *dirbuf, int num_bytes);
 
 static int
 smb_vop_getdents_entries(smb_node_t *dir_snode, uint32_t *cookiep,
     int32_t *dircountp, char *arg, uint32_t flags, struct smb_request *sr,
-    cred_t *cr, caller_context_t *ct, char *dirbuf, int *maxentries,
-    int num_bytes, char *);
+    cred_t *cr, char *dirbuf, int *maxentries, int num_bytes, char *);
 
 extern int
 smb_gather_dents_info(char *args, ino_t fileid, int namelen,
@@ -67,6 +71,8 @@ smb_gather_dents_info(char *args, ino_t fileid, int namelen,
 
 static void
 smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
+
+extern sysid_t lm_alloc_sysidt();
 
 #define	SMB_AT_MAX	16
 static uint_t smb_attrmap[SMB_AT_MAX] = {
@@ -88,16 +94,45 @@ static uint_t smb_attrmap[SMB_AT_MAX] = {
 	AT_SEQ
 };
 
-int
-smb_vop_open(vnode_t **vpp, int mode, cred_t *cred, caller_context_t *ct)
+/*
+ * The smb_ct will be used primarily for range locking.
+ * Since the CIFS server is mapping its locks to POSIX locks,
+ * only one pid is used for operations originating from the
+ * CIFS server (to represent CIFS in the VOP_FRLOCK routines).
+ */
+
+caller_context_t smb_ct;
+
+/*
+ * smb_vop_start()
+ *
+ * Initialize the smb caller context.  This function must be called
+ * before any other smb_vop calls.
+ */
+
+void
+smb_vop_start(void)
 {
-	return (VOP_OPEN(vpp, mode, cred, ct));
+	static boolean_t initialized = B_FALSE;
+
+	if (!initialized) {
+		smb_ct.cc_caller_id = fs_new_caller_id();
+		smb_ct.cc_pid = ttoproc(curthread)->p_pid;
+		smb_ct.cc_sysid = lm_alloc_sysidt();
+		initialized = B_TRUE;
+	}
 }
 
 int
-smb_vop_close(vnode_t *vp, int mode, cred_t *cred, caller_context_t *ct)
+smb_vop_open(vnode_t **vpp, int mode, cred_t *cred)
 {
-	return (VOP_CLOSE(vp, mode, 1, (offset_t)0, cred, ct));
+	return (VOP_OPEN(vpp, mode, cred, &smb_ct));
+}
+
+int
+smb_vop_close(vnode_t *vp, int mode, cred_t *cred)
+{
+	return (VOP_CLOSE(vp, mode, 1, (offset_t)0, cred, &smb_ct));
 }
 
 /*
@@ -115,19 +150,19 @@ smb_vop_close(vnode_t *vp, int mode, cred_t *cred, caller_context_t *ct)
  */
 
 int
-smb_vop_read(vnode_t *vp, uio_t *uiop, cred_t *cr, caller_context_t *ct)
+smb_vop_read(vnode_t *vp, uio_t *uiop, cred_t *cr)
 {
 	int error;
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
-	error = VOP_READ(vp, uiop, 0, cr, ct);
+	error = VOP_READ(vp, uiop, 0, cr, &smb_ct);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 	return (error);
 }
 
 int
 smb_vop_write(vnode_t *vp, uio_t *uiop, uint32_t *flag, uint32_t *lcount,
-    cred_t *cr, caller_context_t *ct)
+    cred_t *cr)
 {
 	int error;
 	int ioflag = 0;
@@ -140,7 +175,7 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, uint32_t *flag, uint32_t *lcount,
 	uiop->uio_llimit = MAXOFFSET_T;
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
-	error = VOP_WRITE(vp, uiop, ioflag, cr, ct);
+	error = VOP_WRITE(vp, uiop, ioflag, cr, &smb_ct);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
 	*lcount -= uiop->uio_resid;
@@ -168,7 +203,7 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, uint32_t *flag, uint32_t *lcount,
 
 int
 smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
-    int flags, cred_t *cr, caller_context_t *ct)
+    int flags, cred_t *cr)
 {
 	int error;
 	vnode_t *use_vp;
@@ -197,7 +232,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
 
 		if ((error = VOP_GETATTR(use_vp, (vattr_t *)&tmp_xvattr, flags,
-		    cr, ct)) != 0)
+		    cr, &smb_ct)) != 0)
 			return (error);
 
 		ret_attr->sa_vattr = tmp_xvattr.xva_vattr;
@@ -250,7 +285,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 			tmp_xvattr.xva_vattr.va_mask = AT_SIZE;
 
 			if ((error = VOP_GETATTR(vp, (vattr_t *)&tmp_xvattr,
-			    flags, cr, ct)) != 0)
+			    flags, cr, &smb_ct)) != 0)
 				return (error);
 
 			ret_attr->sa_vattr.va_size =
@@ -272,7 +307,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 	smb_sa_to_va_mask(ret_attr->sa_mask,
 	    &ret_attr->sa_vattr.va_mask);
 
-	error = VOP_GETATTR(use_vp, &ret_attr->sa_vattr, flags, cr, ct);
+	error = VOP_GETATTR(use_vp, &ret_attr->sa_vattr, flags, cr, &smb_ct);
 
 	if (error != 0)
 		return (error);
@@ -297,7 +332,7 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		 */
 
 		tmp_attr.sa_vattr.va_mask = AT_SIZE;
-		error = VOP_GETATTR(vp, &tmp_attr.sa_vattr, flags, cr, ct);
+		error = VOP_GETATTR(vp, &tmp_attr.sa_vattr, flags, cr, &smb_ct);
 
 		if (error != 0)
 			return (error);
@@ -326,14 +361,13 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 
 int
 smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
-    int flags, cred_t *cr, boolean_t no_xvattr, caller_context_t *ct)
+    int flags, cred_t *cr, boolean_t no_xvattr)
 {
 	int error = 0;
 	int at_size = 0;
 	vnode_t *use_vp;
-	xvattr_t tmp_xvattr;
-	xoptattr_t *xoap = NULL;
-	uint_t xva_mask;
+	xvattr_t xvattr;
+	vattr_t *vap;
 
 	if (unnamed_vp) {
 		use_vp = unnamed_vp;
@@ -354,115 +388,23 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 
 	if ((no_xvattr == B_FALSE) &&
 	    vfs_has_feature(use_vp->v_vfsp, VFSFT_XVATTR)) {
-		/*
-		 * Initialize xvattr, including bzero
-		 */
-		xva_init(&tmp_xvattr);
-		xoap = xva_getxoptattr(&tmp_xvattr);
 
-		ASSERT(xoap);
-
-		/*
-		 * Copy caller-specified classic attributes to tmp_xvattr.
-		 * First save tmp_xvattr's mask (set in xva_init()), which
-		 * contains AT_XVATTR.  This is |'d in later if needed.
-		 */
-
-		xva_mask = tmp_xvattr.xva_vattr.va_mask;
-		tmp_xvattr.xva_vattr = set_attr->sa_vattr;
-
+		smb_vop_setup_xvattr(set_attr, &xvattr);
+		vap = (vattr_t *)&xvattr;
+	} else {
 		smb_sa_to_va_mask(set_attr->sa_mask,
-		    &tmp_xvattr.xva_vattr.va_mask);
-
-		/*
-		 * Do not set ctime (only the file system can do it)
-		 */
-
-		tmp_xvattr.xva_vattr.va_mask &= ~AT_CTIME;
-
-		if (set_attr->sa_mask & SMB_AT_DOSATTR) {
-
-			/*
-			 * "|" in the original xva_mask, which contains
-			 * AT_XVATTR
-			 */
-
-			tmp_xvattr.xva_vattr.va_mask |= xva_mask;
-
-			XVA_SET_REQ(&tmp_xvattr, XAT_ARCHIVE);
-			XVA_SET_REQ(&tmp_xvattr, XAT_SYSTEM);
-			XVA_SET_REQ(&tmp_xvattr, XAT_READONLY);
-			XVA_SET_REQ(&tmp_xvattr, XAT_HIDDEN);
-
-			/*
-			 * set_attr->sa_dosattr: If a given bit is not set,
-			 * that indicates that the corresponding field needs
-			 * to be updated with a "0" value.  This is done
-			 * implicitly as the xoap->xoa_* fields were bzero'd.
-			 */
-
-			if (set_attr->sa_dosattr & FILE_ATTRIBUTE_ARCHIVE)
-				xoap->xoa_archive = 1;
-
-			if (set_attr->sa_dosattr & FILE_ATTRIBUTE_SYSTEM)
-				xoap->xoa_system = 1;
-
-			if (set_attr->sa_dosattr & FILE_ATTRIBUTE_READONLY)
-				xoap->xoa_readonly = 1;
-
-			if (set_attr->sa_dosattr & FILE_ATTRIBUTE_HIDDEN)
-				xoap->xoa_hidden = 1;
-		}
-
-		if (set_attr->sa_mask & SMB_AT_CRTIME) {
-			/*
-			 * "|" in the original xva_mask, which contains
-			 * AT_XVATTR
-			 */
-
-			tmp_xvattr.xva_vattr.va_mask |= xva_mask;
-			XVA_SET_REQ(&tmp_xvattr, XAT_CREATETIME);
-			xoap->xoa_createtime = set_attr->sa_crtime;
-		}
-
-		if ((error = VOP_SETATTR(use_vp, (vattr_t *)&tmp_xvattr, flags,
-		    cr, ct)) != 0)
-			return (error);
-
-		/*
-		 * If the size of the stream needs to be set, set it on
-		 * the stream file directly.  (All other indicated attributes
-		 * are set on the stream's unnamed stream, above.)
-		 */
-
-		if (at_size) {
-			/*
-			 * set_attr->sa_vattr.va_size already contains the
-			 * size as set by the caller
-			 *
-			 * Note that vp is used here, and not use_vp.
-			 * Also, only AT_SIZE is needed.
-			 */
-
-			set_attr->sa_vattr.va_mask = AT_SIZE;
-			error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags,
-			    cr, ct);
-		}
-		return (error);
+		    &set_attr->sa_vattr.va_mask);
+		vap = &set_attr->sa_vattr;
 	}
-	/*
-	 * Support for file systems without VFSFT_XVATTR or no_xvattr == B_TRUE
-	 */
-	smb_sa_to_va_mask(set_attr->sa_mask, &set_attr->sa_vattr.va_mask);
-	/*
-	 * set_attr->sa_vattr already contains new values
-	 * as set by the caller
-	 */
 
-	error = VOP_SETATTR(use_vp, &set_attr->sa_vattr, flags, cr, ct);
-
-	if (error != 0)
+	if ((error = VOP_SETATTR(use_vp, vap, flags, cr, &smb_ct)) != 0)
 		return (error);
+
+	/*
+	 * If the size of the stream needs to be set, set it on
+	 * the stream file directly.  (All other indicated attributes
+	 * are set on the stream's unnamed stream, above.)
+	 */
 
 	if (at_size) {
 		/*
@@ -474,8 +416,10 @@ smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *set_attr,
 		 */
 
 		set_attr->sa_vattr.va_mask = AT_SIZE;
-		error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags, cr, ct);
+		error = VOP_SETATTR(vp, &set_attr->sa_vattr, flags, cr,
+		    &smb_ct);
 	}
+
 	return (error);
 }
 
@@ -531,7 +475,7 @@ smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp, cred_t *cr)
 
 int
 smb_vop_lookup(vnode_t *dvp, char *name, vnode_t **vpp, char *od_name,
-    int flags, vnode_t *rootvp, cred_t *cr, caller_context_t *ct)
+    int flags, vnode_t *rootvp, cred_t *cr)
 {
 	int error = 0;
 	int option_flags = 0;
@@ -578,7 +522,7 @@ smb_vop_lookup(vnode_t *dvp, char *name, vnode_t **vpp, char *od_name,
 	pn_alloc(&rpn);
 
 	error = VOP_LOOKUP(dvp, name, vpp, NULL, option_flags, NULL, cr,
-	    ct, NULL, &rpn);
+	    &smb_ct, NULL, &rpn);
 
 	if ((error == 0) && od_name) {
 		bzero(od_name, MAXNAMELEN);
@@ -594,25 +538,34 @@ smb_vop_lookup(vnode_t *dvp, char *name, vnode_t **vpp, char *od_name,
 
 int
 smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
-    int flags, cred_t *cr, caller_context_t *ct, vsecattr_t *vsap)
+    int flags, cred_t *cr, vsecattr_t *vsap)
 {
 	int error;
 	int option_flags = 0;
+	xvattr_t xvattr;
+	vattr_t *vap;
 
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
-	smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
+	attr->sa_vattr.va_mask = 0;
 
-	error = VOP_CREATE(dvp, name, &attr->sa_vattr, EXCL,
-	    attr->sa_vattr.va_mode, vpp, cr, option_flags, ct, vsap);
+	if (vfs_has_feature(dvp->v_vfsp, VFSFT_XVATTR)) {
+		smb_vop_setup_xvattr(attr, &xvattr);
+		vap = (vattr_t *)&xvattr;
+	} else {
+		smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
+		vap = &attr->sa_vattr;
+	}
+
+	error = VOP_CREATE(dvp, name, vap, EXCL, attr->sa_vattr.va_mode,
+	    vpp, cr, option_flags, &smb_ct, vsap);
 
 	return (error);
 }
 
 int
-smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr,
-    caller_context_t *ct)
+smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
@@ -620,7 +573,7 @@ smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr,
 	if (flags & SMB_IGNORE_CASE)
 		option_flags = FIGNORECASE;
 
-	error = VOP_REMOVE(dvp, name, cr, ct, option_flags);
+	error = VOP_REMOVE(dvp, name, cr, &smb_ct, option_flags);
 
 	return (error);
 }
@@ -633,7 +586,7 @@ smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr,
 
 int
 smb_vop_rename(vnode_t *from_dvp, char *from_name, vnode_t *to_dvp,
-    char *to_name, int flags, cred_t *cr, caller_context_t *ct)
+    char *to_name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
@@ -643,14 +596,14 @@ smb_vop_rename(vnode_t *from_dvp, char *from_name, vnode_t *to_dvp,
 		option_flags = FIGNORECASE;
 
 	error = VOP_RENAME(from_dvp, from_name, to_dvp, to_name, cr,
-	    ct, option_flags);
+	    &smb_ct, option_flags);
 
 	return (error);
 }
 
 int
 smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
-    int flags, cred_t *cr, caller_context_t *ct, vsecattr_t *vsap)
+    int flags, cred_t *cr, vsecattr_t *vsap)
 {
 	int error;
 	int option_flags = 0;
@@ -662,7 +615,7 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 
 	smb_sa_to_va_mask(attr->sa_mask, &attr->sa_vattr.va_mask);
 
-	error = VOP_MKDIR(dvp, name, &attr->sa_vattr, vpp, cr, ct,
+	error = VOP_MKDIR(dvp, name, &attr->sa_vattr, vpp, cr, &smb_ct,
 	    option_flags, vsap);
 
 	return (error);
@@ -677,8 +630,7 @@ smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
  */
 
 int
-smb_vop_rmdir(vnode_t *dvp, char *name, int flags, cred_t *cr,
-    caller_context_t *ct)
+smb_vop_rmdir(vnode_t *dvp, char *name, int flags, cred_t *cr)
 {
 	int error;
 	int option_flags = 0;
@@ -698,15 +650,93 @@ smb_vop_rmdir(vnode_t *dvp, char *name, int flags, cred_t *cr,
 	 * remove.
 	 */
 
-	error = VOP_RMDIR(dvp, name, rootdir, cr, ct, option_flags);
+	error = VOP_RMDIR(dvp, name, rootdir, cr, &smb_ct, option_flags);
 	return (error);
 }
 
 int
-smb_vop_commit(vnode_t *vp, cred_t *cr, caller_context_t *ct)
+smb_vop_commit(vnode_t *vp, cred_t *cr)
 {
-	return (VOP_FSYNC(vp, 1, cr, ct));
+	return (VOP_FSYNC(vp, 1, cr, &smb_ct));
 }
+
+void
+smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
+{
+	xoptattr_t *xoap = NULL;
+	uint_t xva_mask;
+
+	/*
+	 * Initialize xvattr, including bzero
+	 */
+	xva_init(xvattr);
+	xoap = xva_getxoptattr(xvattr);
+
+	ASSERT(xoap);
+
+	/*
+	 * Copy caller-specified classic attributes to xvattr.
+	 * First save xvattr's mask (set in xva_init()), which
+	 * contains AT_XVATTR.  This is |'d in later if needed.
+	 */
+
+	xva_mask = xvattr->xva_vattr.va_mask;
+	xvattr->xva_vattr = smb_attr->sa_vattr;
+
+	smb_sa_to_va_mask(smb_attr->sa_mask, &xvattr->xva_vattr.va_mask);
+
+	/*
+	 * Do not set ctime (only the file system can do it)
+	 */
+
+	xvattr->xva_vattr.va_mask &= ~AT_CTIME;
+
+	if (smb_attr->sa_mask & SMB_AT_DOSATTR) {
+
+		/*
+		 * "|" in the original xva_mask, which contains
+		 * AT_XVATTR
+		 */
+
+		xvattr->xva_vattr.va_mask |= xva_mask;
+
+		XVA_SET_REQ(xvattr, XAT_ARCHIVE);
+		XVA_SET_REQ(xvattr, XAT_SYSTEM);
+		XVA_SET_REQ(xvattr, XAT_READONLY);
+		XVA_SET_REQ(xvattr, XAT_HIDDEN);
+
+		/*
+		 * smb_attr->sa_dosattr: If a given bit is not set,
+		 * that indicates that the corresponding field needs
+		 * to be updated with a "0" value.  This is done
+		 * implicitly as the xoap->xoa_* fields were bzero'd.
+		 */
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_ARCHIVE)
+			xoap->xoa_archive = 1;
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_SYSTEM)
+			xoap->xoa_system = 1;
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_READONLY)
+			xoap->xoa_readonly = 1;
+
+		if (smb_attr->sa_dosattr & FILE_ATTRIBUTE_HIDDEN)
+			xoap->xoa_hidden = 1;
+	}
+
+	if (smb_attr->sa_mask & SMB_AT_CRTIME) {
+		/*
+		 * "|" in the original xva_mask, which contains
+		 * AT_XVATTR
+		 */
+
+		xvattr->xva_vattr.va_mask |= xva_mask;
+		XVA_SET_REQ(xvattr, XAT_CREATETIME);
+		xoap->xoa_createtime = smb_attr->sa_crtime;
+	}
+}
+
 
 /*
  * smb_vop_readdir()
@@ -724,8 +754,7 @@ smb_vop_commit(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 
 int
 smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
-    ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr,
-    caller_context_t *ct)
+    ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr)
 {
 	int num_bytes;
 	int error = 0;
@@ -737,7 +766,6 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 	ASSERT(namelen);
 	ASSERT(inop);
 	ASSERT(cr);
-	ASSERT(ct);
 
 	if (dvp->v_type != VDIR) {
 		*namelen = 0;
@@ -759,7 +787,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 	 */
 
 	while ((error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-	    &num_bytes, cr, ct, flags)) == 0) {
+	    &num_bytes, cr, flags)) == 0) {
 
 		if (num_bytes <= 0)
 			break;
@@ -767,7 +795,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 		name[0] = '\0';
 
 		error = smb_vop_readdir_entry(dvp, cookiep, name, namelen,
-		    inop, vpp, od_name, flags, cr, ct, dirbuf,
+		    inop, vpp, od_name, flags, cr, dirbuf,
 		    num_bytes);
 
 		if (error)
@@ -815,7 +843,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 
 static int
 smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
-    cred_t *cr, caller_context_t *ct, int flags)
+    cred_t *cr, int flags)
 {
 	int error = 0;
 	int rdirent_flags = 0;
@@ -856,7 +884,7 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 	auio.uio_fmode = 0;
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
-	error = VOP_READDIR(vp, &auio, cr, &sink, ct, rdirent_flags);
+	error = VOP_READDIR(vp, &auio, cr, &sink, &smb_ct, rdirent_flags);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
 
 	if (error) {
@@ -900,7 +928,7 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 static int
 smb_vop_readdir_entry(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
     ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr,
-    caller_context_t *ct, char *dirbuf, int num_bytes)
+    char *dirbuf, int num_bytes)
 {
 	uint32_t next_cookie;
 	int ebufsize;
@@ -969,7 +997,7 @@ smb_vop_readdir_entry(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 		 */
 
 		error = smb_vop_lookup(dvp, edp->ed_name, vpp ? vpp : &vp,
-		    od_name, 0, NULL, cr, ct);
+		    od_name, 0, NULL, cr);
 
 		if (error) {
 			if (error == ENOENT) {
@@ -1080,8 +1108,7 @@ smb_vop_getdents(
     char		*pattern,
     uint32_t		flags,
     smb_request_t	*sr,
-    cred_t		*cr,
-    caller_context_t	*ct)
+    cred_t		*cr)
 {
 	int		error = 0;
 	int		maxentries;
@@ -1107,13 +1134,13 @@ smb_vop_getdents(
 
 		num_bytes = SMB_MINLEN_RDDIR_BUF;
 		error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-		    &num_bytes, cr, ct, flags);
+		    &num_bytes, cr, flags);
 
 		if (error || (num_bytes <= 0))
 			break;
 
 		error = smb_vop_getdents_entries(dir_snode, cookiep, dircountp,
-		    arg, flags, sr, cr, ct, dirbuf, &maxentries, num_bytes,
+		    arg, flags, sr, cr, dirbuf, &maxentries, num_bytes,
 		    pattern);
 
 		if (error)
@@ -1158,7 +1185,6 @@ smb_vop_getdents_entries(
     uint32_t		flags,
     struct smb_request	*sr,
     cred_t		*cr,
-    caller_context_t	*ct,
     char		*dirbuf,
     int			*maxentries,
     int			num_bytes,
@@ -1219,7 +1245,7 @@ smb_vop_getdents_entries(
 		}
 
 		error = smb_vop_lookup(dvp, edp->ed_name, &fvp,
-		    NULL, 0, NULL, cr, ct);
+		    NULL, 0, NULL, cr);
 
 		if (error) {
 			if (error == ENOENT) {
@@ -1335,14 +1361,14 @@ smb_vop_getdents_entries(
 int
 smb_vop_stream_lookup(vnode_t *fvp, char *stream_name, vnode_t **vpp,
     char *od_name, vnode_t **xattrdirvpp, int flags, vnode_t *rootvp,
-    cred_t *cr, caller_context_t *ct)
+    cred_t *cr)
 {
 	char *solaris_stream_name;
 	char *name;
 	int error;
 
 	if ((error = smb_vop_lookup_xattrdir(fvp, xattrdirvpp,
-	    LOOKUP_XATTR | CREATE_XATTR_DIR, cr, ct)) != 0)
+	    LOOKUP_XATTR | CREATE_XATTR_DIR, cr)) != 0)
 		return (error);
 
 	/*
@@ -1361,7 +1387,7 @@ smb_vop_stream_lookup(vnode_t *fvp, char *stream_name, vnode_t **vpp,
 	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 
 	if ((error = smb_vop_lookup(*xattrdirvpp, solaris_stream_name, vpp,
-	    name, flags, rootvp, cr, ct)) != 0) {
+	    name, flags, rootvp, cr)) != 0) {
 		VN_RELE(*xattrdirvpp);
 	} else {
 		(void) strlcpy(od_name, &(name[SMB_STREAM_PREFIX_LEN]),
@@ -1376,14 +1402,13 @@ smb_vop_stream_lookup(vnode_t *fvp, char *stream_name, vnode_t **vpp,
 
 int
 smb_vop_stream_create(vnode_t *fvp, char *stream_name, smb_attr_t *attr,
-    vnode_t **vpp, vnode_t **xattrdirvpp, int flags, cred_t *cr,
-    caller_context_t *ct)
+    vnode_t **vpp, vnode_t **xattrdirvpp, int flags, cred_t *cr)
 {
 	char *solaris_stream_name;
 	int error;
 
 	if ((error = smb_vop_lookup_xattrdir(fvp, xattrdirvpp,
-	    LOOKUP_XATTR | CREATE_XATTR_DIR, cr, ct)) != 0)
+	    LOOKUP_XATTR | CREATE_XATTR_DIR, cr)) != 0)
 		return (error);
 
 	/*
@@ -1395,7 +1420,7 @@ smb_vop_stream_create(vnode_t *fvp, char *stream_name, smb_attr_t *attr,
 	    stream_name);
 
 	if ((error = smb_vop_create(*xattrdirvpp, solaris_stream_name, attr,
-	    vpp, flags, cr, ct, NULL)) != 0)
+	    vpp, flags, cr, NULL)) != 0)
 		VN_RELE(*xattrdirvpp);
 
 	kmem_free(solaris_stream_name, MAXNAMELEN);
@@ -1404,15 +1429,14 @@ smb_vop_stream_create(vnode_t *fvp, char *stream_name, smb_attr_t *attr,
 }
 
 int
-smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr,
-    caller_context_t *ct)
+smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 {
 	char *solaris_stream_name;
 	vnode_t *xattrdirvp;
 	int error;
 
-	if ((error = smb_vop_lookup_xattrdir(vp, &xattrdirvp, LOOKUP_XATTR, cr,
-	    ct)) != 0)
+	if ((error = smb_vop_lookup_xattrdir(vp, &xattrdirvp, LOOKUP_XATTR, cr))
+	    != 0)
 		return (error);
 
 	/*
@@ -1424,7 +1448,7 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr,
 	    stream_name);
 
 	/* XXX might have to use kcred */
-	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr, ct);
+	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr);
 
 	kmem_free(solaris_stream_name, MAXNAMELEN);
 
@@ -1444,7 +1468,7 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr,
 int
 smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
     struct fs_stream_info *stream_info, vnode_t **vpp, vnode_t **xattrdirvpp,
-    int flags, cred_t *cr, caller_context_t *ct)
+    int flags, cred_t *cr)
 {
 	int nsize = MAXNAMELEN-1;
 	int error = 0;
@@ -1454,7 +1478,7 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 	vnode_t *vp;
 
 	if ((error = smb_vop_lookup_xattrdir(fvp, &xattrdirvp, LOOKUP_XATTR,
-	    cr, ct)) != 0)
+	    cr)) != 0)
 		return (error);
 
 	bzero(stream_info->name, sizeof (stream_info->name));
@@ -1464,7 +1488,7 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 
 	for (;;) {
 		error = smb_vop_readdir(xattrdirvp, cookiep, tmp_name, &nsize,
-		    &ino, &vp, NULL, flags | SMB_STREAM_RDDIR, cr, ct);
+		    &ino, &vp, NULL, flags | SMB_STREAM_RDDIR, cr);
 
 		if (error || (*cookiep == SMB_EOF))
 			break;
@@ -1504,12 +1528,12 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 
 int
 smb_vop_lookup_xattrdir(vnode_t *fvp, vnode_t **xattrdirvpp, int flags,
-    cred_t *cr, caller_context_t *ct)
+    cred_t *cr)
 {
 	int error;
 
-	error = VOP_LOOKUP(fvp, "", xattrdirvpp, NULL, flags, NULL, cr, ct,
-	    NULL, NULL);
+	error = VOP_LOOKUP(fvp, "", xattrdirvpp, NULL, flags, NULL, cr,
+	    &smb_ct, NULL, NULL);
 	return (error);
 }
 
@@ -1560,7 +1584,7 @@ smb_vop_statfs(vnode_t *vp, struct statvfs64 *statp, cred_t *cr)
  */
 int
 smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
-    cred_t *cr, caller_context_t *ct)
+    cred_t *cr)
 {
 	int error;
 	vsecattr_t vsecattr;
@@ -1585,7 +1609,7 @@ smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
 		return (EINVAL);
 	}
 
-	if (error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, ct))
+	if (error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, &smb_ct))
 		return (error);
 
 	*aclp = smb_fsacl_from_vsa(&vsecattr, acl_type);
@@ -1601,8 +1625,7 @@ smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
  * Writes the given ACL in aclp for the specified file.
  */
 int
-smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr,
-    caller_context_t *ct)
+smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr)
 {
 	int error;
 	vsecattr_t vsecattr;
@@ -1615,7 +1638,7 @@ smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr,
 
 	if (error == 0) {
 		(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);
-		error = VOP_SETSECATTR(vp, &vsecattr, flags, cr, ct);
+		error = VOP_SETSECATTR(vp, &vsecattr, flags, cr, &smb_ct);
 		VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 	}
 
@@ -1712,4 +1735,94 @@ smb_vop_eaccess(vnode_t *vp, int *mode, int flags, vnode_t *dir_vp, cred_t *cr)
 				*mode |= unix_perms[i];
 		}
 	}
+}
+
+/*
+ * smb_vop_shrlock()
+ *
+ * See comments for smb_fsop_shrlock()
+ */
+
+int
+smb_vop_shrlock(vnode_t *vp, uint32_t uniq_fid, uint32_t desired_access,
+    uint32_t share_access, cred_t *cr)
+{
+	struct shrlock shr;
+	struct shr_locowner shr_own;
+	short new_access = 0;
+	short deny = 0;
+	int flag = 0;
+	int cmd;
+
+	cmd = (nbl_need_check(vp)) ? F_SHARE_NBMAND : F_SHARE;
+
+	/*
+	 * Check if this is a metadata access
+	 */
+
+	if ((desired_access & FILE_DATA_ALL) == 0) {
+		new_access |= F_MDACC;
+	} else {
+		if (desired_access & (ACE_READ_DATA | ACE_EXECUTE)) {
+			new_access |= F_RDACC;
+			flag |= FREAD;
+		}
+
+		if (desired_access & (ACE_WRITE_DATA | ACE_APPEND_DATA |
+		    ACE_ADD_FILE)) {
+			new_access |= F_WRACC;
+			flag |= FWRITE;
+		}
+
+		if (SMB_DENY_READ(share_access)) {
+			deny |= F_RDDNY;
+		}
+
+		if (SMB_DENY_WRITE(share_access)) {
+			deny |= F_WRDNY;
+		}
+
+		if (cmd == F_SHARE_NBMAND) {
+			if (desired_access & ACE_DELETE)
+				new_access |= F_RMACC;
+
+			if (SMB_DENY_DELETE(share_access)) {
+				deny |= F_RMDNY;
+			}
+		}
+	}
+
+	shr.s_access = new_access;
+	shr.s_deny = deny;
+	shr.s_sysid = smb_ct.cc_sysid;
+	shr.s_pid = uniq_fid;
+	shr.s_own_len = sizeof (shr_own);
+	shr.s_owner = (caddr_t)&shr_own;
+	shr_own.sl_id = shr.s_sysid;
+	shr_own.sl_pid = shr.s_pid;
+
+	return (VOP_SHRLOCK(vp, cmd, &shr, flag, cr, NULL));
+}
+
+int
+smb_vop_unshrlock(vnode_t *vp, uint32_t uniq_fid, cred_t *cr)
+{
+	struct shrlock shr;
+	struct shr_locowner shr_own;
+
+	/*
+	 * For s_access and s_deny, we do not need to pass in the original
+	 * values.
+	 */
+
+	shr.s_access = 0;
+	shr.s_deny = 0;
+	shr.s_sysid = smb_ct.cc_sysid;
+	shr.s_pid = uniq_fid;
+	shr.s_own_len = sizeof (shr_own);
+	shr.s_owner = (caddr_t)&shr_own;
+	shr_own.sl_id = shr.s_sysid;
+	shr_own.sl_pid = shr.s_pid;
+
+	return (VOP_SHRLOCK(vp, F_UNSHARE, &shr, 0, cr, NULL));
 }

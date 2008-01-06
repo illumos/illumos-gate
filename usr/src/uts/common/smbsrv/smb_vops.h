@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,67 +318,53 @@ struct fs_stream_info {
 
 int fhopen(const struct smb_node *, int);
 
-extern int smb_vop_open(vnode_t **vpp, int mode, cred_t *cred,
-    caller_context_t *ct);
-extern int smb_vop_close(vnode_t *vp, int flag, cred_t *cred,
-    caller_context_t *ct);
-extern int smb_vop_read(vnode_t *vp, uio_t *uiop, cred_t *cr,
-    caller_context_t *ct);
-extern int smb_vop_write(vnode_t *vp, uio_t *uiop, unsigned int *flag,
-    uint32_t *lcount, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp,
-    smb_attr_t *ret_attr, int flags, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_setattr(vnode_t *vp, vnode_t *unnamed_vp,
-    smb_attr_t *set_attr, int flags, cred_t *cr, boolean_t no_xvattr,
-    caller_context_t *ct);
-extern int smb_vop_access(vnode_t *vp, int mode, int flags, vnode_t *dir_vp,
-    cred_t *cr);
-extern void smb_vop_eaccess(vnode_t *vp, int *mode, int flags, vnode_t *dir_vp,
-    cred_t *cr);
-extern int smb_vop_lookup(vnode_t *dvp, char *name, vnode_t **vpp,
-    char *od_name, int flags, vnode_t *rootvp, cred_t *cr,
-    caller_context_t *ct);
-extern int smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr,
-    vnode_t **vpp, int flags, cred_t *cr, caller_context_t *ct,
-    vsecattr_t *vsap);
-extern int smb_vop_remove(vnode_t *dvp, char *name, int flags, cred_t *cr,
-    caller_context_t *ct);
-extern int smb_vop_rename(vnode_t *from_dvp, char *from_name, vnode_t *to_dvp,
-    char *to_name, int flags, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_mkdir(vnode_t *dvp, char *name, smb_attr_t *attr,
-    vnode_t **vpp, int flags, cred_t *cr, caller_context_t *ct,
-    vsecattr_t *vsap);
-extern int smb_vop_rmdir(vnode_t *dvp, char *name, int flags, cred_t *cr,
-    caller_context_t *ct);
-extern int smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name,
-    int *namelen, ino64_t *inop, vnode_t **vpp, char *od_name, int flags,
-    cred_t *cr, caller_context_t *ct);
-extern int smb_vop_commit(vnode_t *vp, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_getdents(struct smb_node *dir_snode, uint32_t *cookiep,
-    uint64_t *verifierp, int32_t *dircountp, char *arg, char *pattern,
-    uint32_t flags, struct smb_request *sr, cred_t *cr,
-    caller_context_t *ct);
-extern int smb_vop_statfs(vnode_t *vp, struct statvfs64 *statp, cred_t *cr);
-extern int smb_vop_stream_lookup(vnode_t *fvp, char *stream_name,
-    vnode_t **vpp, char *name, vnode_t **xattrdirvpp, int flags,
-    vnode_t *rootvp, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_stream_create(vnode_t *fvp, char *stream_name,
-    smb_attr_t *attr, vnode_t **vpp, vnode_t **xattrdirvpp, int flags,
-    cred_t *cr, caller_context_t *ct);
-extern int smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags,
-    cred_t *cr, caller_context_t *ct);
-extern int smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
-    struct fs_stream_info *stream_info, vnode_t **vpp, vnode_t **xattrdirvp,
-    int flags, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_lookup_xattrdir(vnode_t *fvp, vnode_t **xattrdirvpp,
-    int flags, cred_t *cr, caller_context_t *ct);
-extern int smb_vop_traverse_check(vnode_t **vpp);
+extern void smb_vop_start(void);
+extern int smb_vop_open(vnode_t **, int, cred_t *);
+extern int smb_vop_close(vnode_t *, int, cred_t *);
+extern int smb_vop_read(vnode_t *, uio_t *, cred_t *);
+extern int smb_vop_write(vnode_t *, uio_t *, unsigned int *,
+    uint32_t *, cred_t *);
+extern int smb_vop_getattr(vnode_t *, vnode_t *,
+    smb_attr_t *, int, cred_t *);
+extern int smb_vop_setattr(vnode_t *, vnode_t *,
+    smb_attr_t *, int, cred_t *, boolean_t);
+extern int smb_vop_access(vnode_t *, int, int, vnode_t *,
+    cred_t *);
+extern void smb_vop_eaccess(vnode_t *, int *, int, vnode_t *,
+    cred_t *);
+extern int smb_vop_lookup(vnode_t *, char *, vnode_t **,
+    char *, int, vnode_t *, cred_t *);
+extern int smb_vop_create(vnode_t *, char *, smb_attr_t *,
+    vnode_t **, int, cred_t *, vsecattr_t *);
+extern int smb_vop_remove(vnode_t *, char *, int, cred_t *);
+extern int smb_vop_rename(vnode_t *, char *, vnode_t *,
+    char *, int, cred_t *);
+extern int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *,
+    vnode_t **, int, cred_t *, vsecattr_t *);
+extern int smb_vop_rmdir(vnode_t *, char *, int, cred_t *);
+extern int smb_vop_readdir(vnode_t *, uint32_t *, char *,
+    int *, ino64_t *, vnode_t **, char *, int, cred_t *);
+extern int smb_vop_commit(vnode_t *, cred_t *);
+extern int smb_vop_getdents(struct smb_node *, uint32_t *,
+    uint64_t *, int32_t *, char *, char *,
+    uint32_t, struct smb_request *, cred_t *);
+extern int smb_vop_statfs(vnode_t *, struct statvfs64 *, cred_t *);
+extern int smb_vop_stream_lookup(vnode_t *, char *,
+    vnode_t **, char *, vnode_t **, int, vnode_t *, cred_t *);
+extern int smb_vop_stream_create(vnode_t *, char *,
+    smb_attr_t *, vnode_t **, vnode_t **, int, cred_t *);
+extern int smb_vop_stream_remove(vnode_t *, char *, int, cred_t *);
+extern int smb_vop_stream_readdir(vnode_t *, uint32_t *,
+    struct fs_stream_info *, vnode_t **, vnode_t **, int, cred_t *);
+extern int smb_vop_lookup_xattrdir(vnode_t *, vnode_t **, int, cred_t *);
+extern int smb_vop_traverse_check(vnode_t **);
 
-int smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
-    cred_t *cr, caller_context_t *ct);
-int smb_vop_acl_write(vnode_t *vp, acl_t *aclp, int flags, cred_t *cr,
-    caller_context_t *ct);
-acl_type_t smb_vop_acl_type(vnode_t *vp);
+int smb_vop_acl_read(vnode_t *, acl_t **, int, acl_type_t, cred_t *);
+int smb_vop_acl_write(vnode_t *, acl_t *, int, cred_t *);
+acl_type_t smb_vop_acl_type(vnode_t *);
+
+int smb_vop_shrlock(vnode_t *, uint32_t, uint32_t, uint32_t, cred_t *);
+int smb_vop_unshrlock(vnode_t *, uint32_t, cred_t *);
 
 #ifdef __cplusplus
 }

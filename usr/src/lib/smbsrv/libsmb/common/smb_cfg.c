@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,27 +40,20 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <libscf.h>
+#include <assert.h>
 #include <smbsrv/libsmb.h>
 
 typedef struct smb_cfg_param {
-	char *sc_pg;
+	smb_cfg_id_t sc_id;
 	char *sc_name;
 	int sc_type;
-	char *sc_value;
 	uint32_t sc_flags;
 } smb_cfg_param_t;
 
 /*
  * config parameter flags
  */
-#define	SMB_CF_NOTINIT		0x00	/* Not initialized yet */
-#define	SMB_CF_DEFINED		0x01	/* Defined/read from env */
-#define	SMB_CF_MODIFIED		0x02	/* Has been modified */
-#define	SMB_CF_SYSTEM		0x04    /* system; not part of cifs config */
-
-#define	SMB_CL_NONE	0
-#define	SMB_CL_READ	1
-#define	SMB_CL_WRITE    2
+#define	SMB_CF_PROTECTED	0x01
 
 /* idmap SMF fmri and Property Group */
 #define	IDMAP_FMRI_PREFIX		"system/idmap"
@@ -77,115 +70,79 @@ typedef struct smb_cfg_param {
 static char *b64_data =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-static rwlock_t smb_cfg_rwlk;
-static int lock_type = SMB_CL_NONE;
-
-/*
- * IMPORTANT: any changes to the order of this table's entries
- * need to be reflected in smb_cfg_id_t enum in libsmb.h
- */
 static smb_cfg_param_t smb_cfg_table[] =
 {
-	/* Redirector configuration, User space */
-	{SMBD_PG_NAME, SMB_CD_RDR_IPCMODE, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PROTECTED_PG_NAME, SMB_CD_RDR_IPCUSER,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PROTECTED_PG_NAME, SMB_CD_RDR_IPCPWD,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-
 	/* Oplock configuration, Kernel Only */
-	{SMBD_PG_NAME, SMB_CD_OPLOCK_ENABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_OPLOCK_TIMEOUT,
-	    SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
+	{SMB_CI_OPLOCK_ENABLE, "oplock_enable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_OPLOCK_TIMEOUT, "oplock_timeout", SCF_TYPE_INTEGER, 0},
 
 	/* Autohome configuration */
-	{SMBD_PG_NAME, SMB_CD_AUTOHOME_MAP,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
+	{SMB_CI_AUTOHOME_MAP, "autohome_map", SCF_TYPE_ASTRING, 0},
 
 	/* Domain/PDC configuration */
-	{SMBD_PG_NAME, SMB_CD_DOMAIN_SID, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DOMAIN_MEMB, SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DOMAIN_NAME, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DOMAIN_SRV, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
+	{SMB_CI_DOMAIN_SID, "domain_sid", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_DOMAIN_MEMB, "domain_member", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_DOMAIN_NAME, "domain_name", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_DOMAIN_SRV, "pdc", SCF_TYPE_ASTRING, 0},
 
 	/* WINS configuration */
-	{SMBD_PG_NAME, SMB_CD_WINS_SRV1, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_WINS_SRV2, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_WINS_EXCL, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
+	{SMB_CI_WINS_SRV1, "wins_server_1", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_WINS_SRV2, "wins_server_2", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_WINS_EXCL, "wins_exclude", SCF_TYPE_ASTRING, 0},
 
 	/* RPC services configuration */
-	{SMBD_PG_NAME, SMB_CD_SRVSVC_SHRSET_ENABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_LOGR_ENABLE, SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_MLRPC_KALIVE,
-	    SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
+	{SMB_CI_SRVSVC_SHRSET_ENABLE, "srvsvc_sharesetinfo_enable",
+	    SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_MLRPC_KALIVE, "mlrpc_keep_alive_interval",
+	    SCF_TYPE_INTEGER, 0},
 
 	/* Kmod specific configuration */
-	{SMBD_PG_NAME, SMB_CD_MAX_BUFSIZE, SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_MAX_WORKERS, SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_MAX_CONNECTIONS,
-	    SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_KEEPALIVE, SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_RESTRICT_ANON,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
+	{SMB_CI_MAX_BUFSIZE, "max_bufsize", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_MAX_WORKERS, "max_workers", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_MAX_CONNECTIONS, "max_connections", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_KEEPALIVE, "keep_alive", SCF_TYPE_INTEGER, 0},
+	{SMB_CI_RESTRICT_ANON, "restrict_anonymous", SCF_TYPE_BOOLEAN, 0},
 
-	{SMBD_PG_NAME, SMB_CD_SIGNING_ENABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_SIGNING_REQD,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_SIGNING_CHECK,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
+	{SMB_CI_SIGNING_ENABLE, "signing_enabled", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_SIGNING_REQD, "signing_required", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_SIGNING_CHECK, "signing_check", SCF_TYPE_BOOLEAN, 0},
 
 	/* Kmod tuning configuration */
-	{SMBD_PG_NAME, SMB_CD_FLUSH_REQUIRED,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_SYNC_ENABLE, SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DIRSYMLINK_DISABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_ANNONCE_QUOTA,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
+	{SMB_CI_FLUSH_REQUIRED, "flush_required", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_SYNC_ENABLE, "sync_enable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_DIRSYMLINK_DISABLE, "dir_symlink_disable", SCF_TYPE_BOOLEAN, 0},
+	{SMB_CI_ANNONCE_QUOTA, "announce_quota", SCF_TYPE_BOOLEAN, 0},
 
 	/* SMBd configuration */
-	{SMBD_PG_NAME, SMB_CD_SECURITY,	SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_NBSCOPE, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_SYS_CMNT,	SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_LM_LEVEL,	SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_MSDCS_DISABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
+	{SMB_CI_SECURITY, "security", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_NBSCOPE, "netbios_scope", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_SYS_CMNT, "system_comment", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_LM_LEVEL, "lmauth_level", SCF_TYPE_INTEGER, 0},
 
 	/* ADS Configuration */
-	{SMBD_PG_NAME, SMB_CD_ADS_ENABLE, SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PROTECTED_PG_NAME, SMB_CD_ADS_USER,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PROTECTED_PG_NAME, SMB_CD_ADS_PASSWD,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_ADS_DOMAIN, SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_ADS_USER_CONTAINER,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_ADS_SITE,	SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_ADS_IPLOOKUP,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
+	{SMB_CI_ADS_SITE, "ads_site", SCF_TYPE_ASTRING, 0},
 
 	/* Dynamic DNS */
-	{SMBD_PG_NAME, SMB_CD_DYNDNS_ENABLE,
-	    SCF_TYPE_BOOLEAN, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DYNDNS_RETRY_COUNT,
-	    SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
-	{SMBD_PG_NAME, SMB_CD_DYNDNS_RETRY_SEC,
-	    SCF_TYPE_INTEGER, 0, SMB_CF_NOTINIT},
+	{SMB_CI_DYNDNS_ENABLE, "ddns_enable", SCF_TYPE_BOOLEAN, 0},
 
-	{SMBD_PROTECTED_PG_NAME, SMB_CD_MACHINE_PASSWD,
-	    SCF_TYPE_ASTRING, 0, SMB_CF_NOTINIT}
+	{SMB_CI_MACHINE_PASSWD, "machine_passwd", SCF_TYPE_ASTRING,
+	    SMB_CF_PROTECTED}
 	/* SMB_CI_MAX */
 };
+
+static smb_cfg_param_t *smb_config_getent(smb_cfg_id_t);
 
 static boolean_t smb_is_base64(unsigned char c);
 static char *smb_base64_encode(char *str_to_encode);
 static char *smb_base64_decode(char *encoded_str);
-static int smb_config_update(smb_cfg_param_t *cfg, char *value);
-static int smb_config_save_all();
-static int smb_config_save(char *pgname);
+
+char *
+smb_config_getname(smb_cfg_id_t id)
+{
+	smb_cfg_param_t *cfg;
+	cfg = smb_config_getent(id);
+	return (cfg->sc_name);
+}
 
 static boolean_t
 smb_is_base64(unsigned char c)
@@ -321,105 +278,6 @@ smb_base64_decode(char *encoded_str)
 	return (ret);
 }
 
-/*
- * Basically commit the transaction.
- */
-static int
-smb_config_saveenv(smb_scfhandle_t *handle)
-{
-	int ret = 0;
-
-	ret = smb_smf_end_transaction(handle);
-
-	smb_smf_scf_fini(handle);
-	return (ret);
-}
-
-/*
- * smb_config_getenv
- *
- * Get the property value from SMF.
- */
-char *
-smb_config_getenv(smb_cfg_id_t id)
-{
-	smb_scfhandle_t *handle;
-	char *value;
-
-	if ((value = malloc(MAX_VALUE_BUFLEN * sizeof (char))) == NULL)
-		return (NULL);
-
-	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
-	if (handle == NULL) {
-		free(value);
-		return (NULL);
-	}
-
-	(void) smb_smf_create_service_pgroup(handle, smb_cfg_table[id].sc_pg);
-
-	if (smb_smf_get_property(handle, smb_cfg_table[id].sc_type,
-	    smb_cfg_table[id].sc_name, value,
-	    sizeof (char) * MAX_VALUE_BUFLEN) != 0) {
-		smb_smf_scf_fini(handle);
-		free(value);
-		return (NULL);
-	}
-
-	smb_smf_scf_fini(handle);
-	return (value);
-}
-
-/*
- * smb_config_getenv_dec
- *
- * For protected property, the value obtained from SMF will be decoded.
- * The decoded property value will be returned.
- *
- * This function should only be called by smb_config_load to populate
- * the SMB config cache.
- */
-static char *
-smb_config_getenv_dec(smb_cfg_id_t id)
-{
-	smb_scfhandle_t *handle;
-	char *value;
-	char *dec;
-
-	if ((value = malloc(MAX_VALUE_BUFLEN * sizeof (char))) == NULL)
-		return (NULL);
-
-	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
-	if (handle == NULL) {
-		free(value);
-		return (NULL);
-	}
-
-	(void) smb_smf_create_service_pgroup(handle, smb_cfg_table[id].sc_pg);
-
-	if (smb_smf_get_property(handle, smb_cfg_table[id].sc_type,
-	    smb_cfg_table[id].sc_name, value,
-	    sizeof (char) * MAX_VALUE_BUFLEN) != 0) {
-		smb_smf_scf_fini(handle);
-		free(value);
-		return (NULL);
-	}
-	smb_smf_scf_fini(handle);
-	if (strcmp(smb_cfg_table[id].sc_pg, SMBD_PROTECTED_PG_NAME))
-		return (value);
-
-	if (!value)
-		return (NULL);
-
-	if (*value == '\0') {
-		free(value);
-		return (NULL);
-	}
-
-	dec = smb_base64_decode(value);
-	free(value);
-	return (dec);
-}
-
 static char *
 smb_config_getenv_generic(char *name, char *svc_fmri_prefix, char *svc_propgrp)
 {
@@ -449,7 +307,7 @@ smb_config_getenv_generic(char *name, char *svc_fmri_prefix, char *svc_propgrp)
 
 }
 
-int
+static int
 smb_config_setenv_generic(char *svc_fmri_prefix, char *svc_propgrp,
     char *name, char *value)
 {
@@ -480,495 +338,302 @@ smb_config_setenv_generic(char *svc_fmri_prefix, char *svc_propgrp,
 }
 
 /*
- * smb_config_setenv
- *
- * For protected properties, the value will be encoded using base64
- * algorithm. The encoded string will be stored in SMF.
- */
-int
-smb_config_setenv(smb_cfg_id_t id, char *value)
-{
-	smb_scfhandle_t *handle = NULL;
-	char *enc = NULL;
-	int is_protected = 0;
-
-	if ((id >= SMB_CI_MAX) || (id < 0)) {
-		return (1);
-	}
-
-	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
-	if (handle == NULL) {
-		return (1);
-	}
-
-	(void) smb_smf_create_service_pgroup(handle, smb_cfg_table[id].sc_pg);
-
-	if (smb_smf_start_transaction(handle) != SMBD_SMF_OK) {
-		smb_smf_scf_fini(handle);
-		return (1);
-	}
-
-	if (strcmp(smb_cfg_table[id].sc_pg, SMBD_PROTECTED_PG_NAME) == 0) {
-		if ((value == NULL) || (*value == '\0')) {
-			(void) smb_smf_end_transaction(handle);
-			smb_smf_scf_fini(handle);
-			return (1);
-		}
-
-		if ((enc = smb_base64_encode(value)) == NULL) {
-			(void) smb_smf_end_transaction(handle);
-			smb_smf_scf_fini(handle);
-			return (1);
-		}
-
-		is_protected = 1;
-	}
-
-	if (smb_smf_set_property(handle, smb_cfg_table[id].sc_type,
-	    smb_cfg_table[id].sc_name, is_protected ? enc : value)
-	    != SMBD_SMF_OK) {
-		if (enc)
-			free(enc);
-		(void) smb_smf_end_transaction(handle);
-		smb_smf_scf_fini(handle);
-		return (1);
-	}
-
-	if (enc)
-		free(enc);
-
-	if (smb_smf_end_transaction(handle) != SMBD_SMF_OK) {
-		smb_smf_scf_fini(handle);
-		return (1);
-	}
-
-	smb_smf_scf_fini(handle);
-	return (0);
-}
-
-static void
-smb_config_setenv_trans(smb_scfhandle_t *handle, int type,
-    char *name, char *value)
-{
-	if (smb_smf_set_property(handle, type, name, value) != SMBD_SMF_OK) {
-		syslog(LOG_ERR, "Failed to save service property %s", name);
-	}
-}
-
-/*
- * smb_config_setenv_trans_protected
- *
- * This function should only be called to set protected properties
- * in SMF. The argument 'value' will be encoded using base64 algorithm.
- * The encoded string will be stored in SMF.
- */
-static void
-smb_config_setenv_trans_protected(smb_scfhandle_t *handle, char *name,
-    char *value)
-{
-	char *enc;
-
-	if ((value == NULL) || (*value == '\0'))
-		return;
-
-	if ((enc = smb_base64_encode(value)) == NULL)
-		return;
-
-	if (smb_smf_set_string_property(handle, name, enc) != SMBD_SMF_OK) {
-		syslog(LOG_ERR, "Failed to save service protected property"
-		    " %s", name);
-	}
-
-	free(enc);
-}
-
-int
-smb_config_unsetenv(smb_cfg_id_t id)
-{
-	smb_scfhandle_t *handle = NULL;
-	int ret = 1;
-
-	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
-	if (handle == NULL) {
-		return (ret);
-	}
-
-	(void) smb_smf_create_service_pgroup(handle, smb_cfg_table[id].sc_pg);
-	if (smb_smf_start_transaction(handle) != SMBD_SMF_OK) {
-		smb_smf_scf_fini(handle);
-		return (ret);
-	}
-	ret = smb_smf_delete_property(handle, smb_cfg_table[id].sc_name);
-	(void) smb_smf_end_transaction(handle);
-
-	smb_smf_scf_fini(handle);
-	return (ret);
-}
-
-static int
-smb_config_unsetenv_trans(smb_scfhandle_t *handle, char *name)
-{
-	return (smb_smf_delete_property(handle, name));
-}
-
-/*
- * smb_config_load
- *
- * Loads all the CIFS configuration parameters and sets up the
- * config table.
- */
-int
-smb_config_load()
-{
-	smb_cfg_id_t id;
-	smb_cfg_param_t *cfg;
-	char *value;
-
-	(void) rw_rdlock(&smb_cfg_rwlk);
-	for (id = 0; id < SMB_CI_MAX; id++) {
-		value = smb_config_getenv_dec(id);
-		cfg = &smb_cfg_table[id];
-		/*
-		 * enval == 0 could mean two things, either the
-		 * config param is not defined, or it has been
-		 * removed. If the variable has already been defined
-		 * and now enval is 0, it should be removed, otherwise
-		 * we don't need to do anything in this case.
-		 */
-		if ((cfg->sc_flags & SMB_CF_DEFINED) || value) {
-			if (smb_config_update(cfg, value) != 0) {
-				(void) rw_unlock(&smb_cfg_rwlk);
-				if (value)
-					free(value);
-				return (1);
-			}
-		}
-		if (value) {
-			free(value);
-		}
-	}
-
-	(void) rw_unlock(&smb_cfg_rwlk);
-
-	return (0);
-}
-
-/*
- * smb_config_get
- *
- * Returns value of the specified config param.
- * The return value is a string pointer to the locally
- * allocated memory if the config param is defined
- * otherwise it would be NULL.
- *
- * This function MUST be called after a smb_config_rd/wrlock
- * function. Caller MUST NOT modify the returned buffer directly.
- */
-char *
-smb_config_get(smb_cfg_id_t id)
-{
-	if (id < SMB_CI_MAX)
-		return (smb_cfg_table[id].sc_value);
-
-	return (0);
-}
-
-/*
  * smb_config_getstr
  *
- * Returns value of the specified config param.
- * The returned pointer never will be NULL if the given
- * 'id' is valid. If the config param is not defined its
- * default value will be returned.
- *
- * This function MUST be called after a smb_config_rd/wrlock
- * function. Caller MUST NOT modify the returned buffer directly.
+ * Fetch the specified string configuration item from SMF
  */
-char *
-smb_config_getstr(smb_cfg_id_t id)
+int
+smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 {
+	smb_scfhandle_t *handle;
 	smb_cfg_param_t *cfg;
+	int rc = SMBD_SMF_OK;
 
-	if (id < SMB_CI_MAX) {
-		cfg = &smb_cfg_table[id];
-		if (cfg->sc_value)
-			return (cfg->sc_value);
+	*cbuf = '\0';
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_ASTRING);
+
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+
+	if (cfg->sc_flags & SMB_CF_PROTECTED) {
+		char protbuf[SMB_ENC_LEN];
+		char *tmp;
+
+		if ((rc = smb_smf_create_service_pgroup(handle,
+		    SMBD_PROTECTED_PG_NAME)) != SMBD_SMF_OK)
+			goto error;
+
+		if ((rc = smb_smf_get_string_property(handle, cfg->sc_name,
+		    protbuf, sizeof (protbuf))) != SMBD_SMF_OK)
+			goto error;
+
+		if (*protbuf != '\0') {
+			tmp = smb_base64_decode(protbuf);
+			(void) strlcpy(cbuf, tmp, bufsz);
+			free(tmp);
+		}
+	} else {
+		rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+		if (rc == SMBD_SMF_OK)
+			rc = smb_smf_get_string_property(handle, cfg->sc_name,
+			    cbuf, bufsz);
 	}
 
-	return (NULL);
+error:
+	smb_smf_scf_fini(handle);
+	return (rc);
 }
 
 /*
  * smb_config_getnum
  *
  * Returns the value of a numeric config param.
- * If the config param is not defined it'll return the
- * default value.
- *
- * This function MUST be called after a smb_config_rd/wrlock
- * function.
  */
-uint32_t
-smb_config_getnum(smb_cfg_id_t id)
+int
+smb_config_getnum(smb_cfg_id_t id, int64_t *cint)
 {
+	smb_scfhandle_t *handle;
 	smb_cfg_param_t *cfg;
-	char *strval = NULL;
+	int rc = SMBD_SMF_OK;
 
-	if (id < SMB_CI_MAX) {
-		cfg = &smb_cfg_table[id];
-		if (cfg->sc_value)
-			strval = cfg->sc_value;
+	*cint = 0;
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_INTEGER);
 
-		if (strval)
-			return (strtol(strval, 0, 10));
-	}
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
 
-	return (0);
+	rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_get_integer_property(handle, cfg->sc_name, cint);
+	smb_smf_scf_fini(handle);
+
+	return (rc);
 }
 
 /*
- * smb_config_getyorn
+ * smb_config_getbool
  *
- * Returns the value of a yes/no config param.
- * Returns 1 is config is set to "yes", otherwise 0.
- *
- * This function MUST be called after a smb_config_rd/wrlock
- * function.
+ * Returns the value of a boolean config param.
  */
-int
-smb_config_getyorn(smb_cfg_id_t id)
+boolean_t
+smb_config_getbool(smb_cfg_id_t id)
 {
-	char *val;
+	smb_scfhandle_t *handle;
+	smb_cfg_param_t *cfg;
+	int rc = SMBD_SMF_OK;
+	uint8_t vbool;
 
-	val = smb_config_get(id);
-	if (val) {
-		if (strcasecmp(val, "true") == 0)
-			return (1);
-	}
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_BOOLEAN);
 
-	return (0);
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return (B_FALSE);
+
+	rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_get_boolean_property(handle, cfg->sc_name, &vbool);
+	smb_smf_scf_fini(handle);
+
+	return ((rc == SMBD_SMF_OK) ? (vbool == 1) : B_FALSE);
 }
 
 /*
- * smb_config_set
+ * smb_config_get
  *
- * Set/update the specified config param with the given
- * value. If the value is NULL the config param will be
- * unset as if it is not defined.
- *
- * This function MUST be called after a smb_config_wrlock
- * function.
+ * This function returns the value of the requested config
+ * iterm regardless of its type in string format. This should
+ * be used when the config item type is not known by the caller.
  */
 int
-smb_config_set(smb_cfg_id_t id, char *value)
+smb_config_get(smb_cfg_id_t id, char *cbuf, int bufsz)
 {
 	smb_cfg_param_t *cfg;
-	int rc = 0;
+	int64_t cint;
+	int rc;
 
-	if (id < SMB_CI_MAX) {
-		cfg = &smb_cfg_table[id];
-		rc = smb_config_update(cfg, value);
-		if (rc == 0)
-			cfg->sc_flags |= SMB_CF_MODIFIED;
+	cfg = smb_config_getent(id);
+	switch (cfg->sc_type) {
+	case SCF_TYPE_ASTRING:
+		return (smb_config_getstr(id, cbuf, bufsz));
+
+	case SCF_TYPE_INTEGER:
+		rc = smb_config_getnum(id, &cint);
+		if (rc == SMBD_SMF_OK)
+			(void) snprintf(cbuf, bufsz, "%lld", cint);
+		return (rc);
+
+	case SCF_TYPE_BOOLEAN:
+		if (smb_config_getbool(id))
+			(void) strlcpy(cbuf, "true", bufsz);
+		else
+			(void) strlcpy(cbuf, "false", bufsz);
+		return (SMBD_SMF_OK);
+	}
+
+	return (SMBD_SMF_INVALID_ARG);
+}
+
+/*
+ * smb_config_setstr
+ *
+ * Set the specified config param with the given
+ * value.
+ */
+int
+smb_config_setstr(smb_cfg_id_t id, char *value)
+{
+	smb_scfhandle_t *handle;
+	smb_cfg_param_t *cfg;
+	int rc = SMBD_SMF_OK;
+	boolean_t protected;
+	char *tmp = NULL;
+	char *pg;
+
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_ASTRING);
+
+	if (cfg->sc_flags & SMB_CF_PROTECTED) {
+		pg = SMBD_PROTECTED_PG_NAME;
+		protected = B_TRUE;
+	} else {
+		pg = SMBD_PG_NAME;
+		protected = B_FALSE;
+	}
+
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+
+	rc = smb_smf_create_service_pgroup(handle, pg);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_start_transaction(handle);
+
+	if (rc != SMBD_SMF_OK) {
+		smb_smf_scf_fini(handle);
 		return (rc);
 	}
 
-	return (1);
+	if (protected && value && (*value != '\0')) {
+		if ((tmp = smb_base64_encode(value)) == NULL) {
+			(void) smb_smf_end_transaction(handle);
+			smb_smf_scf_fini(handle);
+			return (SMBD_SMF_NO_MEMORY);
+		}
+
+		value = tmp;
+	}
+
+	rc = smb_smf_set_string_property(handle, cfg->sc_name, value);
+
+	free(tmp);
+	(void) smb_smf_end_transaction(handle);
+	smb_smf_scf_fini(handle);
+	return (rc);
 }
 
 /*
  * smb_config_setnum
  *
- * Set/update the specified config param with the given
- * value. This is used for numeric config params. The given
- * number will be converted to string before setting the
- * config param.
- *
- * This function MUST be called after a smb_config_wrlock
- * function.
+ * Sets a numeric configuration iterm
  */
 int
-smb_config_setnum(smb_cfg_id_t id, uint32_t num)
+smb_config_setnum(smb_cfg_id_t id, int64_t value)
 {
+	smb_scfhandle_t *handle;
 	smb_cfg_param_t *cfg;
-	char value[32];
-	int rc = 0;
+	int rc = SMBD_SMF_OK;
 
-	if (id < SMB_CI_MAX) {
-		cfg = &smb_cfg_table[id];
-		(void) snprintf(value, sizeof (value), "%u", num);
-		rc = smb_config_update(cfg, value);
-		if (rc == 0)
-			cfg->sc_flags |= SMB_CF_MODIFIED;
-		return (rc);
-	}
-
-	return (1);
-}
-
-/*
- * smb_config_rdlock
- *
- * Lock the config table for read access.
- * This function MUST be called before any kind of
- * read access to the config table i.e. all flavors of
- * smb_config_get function
- */
-void
-smb_config_rdlock()
-{
-	(void) rw_rdlock(&smb_cfg_rwlk);
-	lock_type = SMB_CL_READ;
-}
-
-/*
- * smb_config_wrlock
- *
- * Lock the config table for write access.
- * This function MUST be called before any kind of
- * write access to the config table i.e. all flavors of
- * smb_config_set function
- */
-void
-smb_config_wrlock()
-{
-	(void) rw_wrlock(&smb_cfg_rwlk);
-	lock_type = SMB_CL_WRITE;
-}
-
-/*
- * smb_config_wrlock
- *
- * Unlock the config table.
- * If the config table has been locked for write access
- * smb_config_save_all() will be called to save the changes
- * before unlocking the table.
- *
- * This function MUST be called after smb_config_rd/wrlock
- */
-void
-smb_config_unlock()
-{
-	if (lock_type == SMB_CL_WRITE)
-		(void) smb_config_save_all();
-	(void) rw_unlock(&smb_cfg_rwlk);
-}
-
-/*
- * smb_config_save_all
- *
- * Save all modified parameters to SMF.
- */
-static int
-smb_config_save_all()
-{
-	int rc;
-
-	if ((rc = smb_config_save(SMBD_PG_NAME)) != 0)
-		return (rc);
-
-	return (smb_config_save(SMBD_PROTECTED_PG_NAME));
-}
-
-/*
- * smb_config_save
- *
- * Scan the config table and call smb_config_setenv/smb_config_unsetenv
- * for params in the specified property group that has been modified.
- * When the scan is finished, smb_config_saveenv() will be called to
- * make the changes persistent.
- */
-static int
-smb_config_save(char *pgname)
-{
-	smb_cfg_id_t id;
-	smb_cfg_param_t *cfg;
-	smb_scfhandle_t *handle = NULL;
-	int dorefresh = 0;
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_INTEGER);
 
 	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
-	if (handle == NULL) {
-		syslog(LOG_ERR, "smbd: cannot save configuration");
-		return (1);
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+
+	rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_start_transaction(handle);
+
+	if (rc != SMBD_SMF_OK) {
+		smb_smf_scf_fini(handle);
+		return (rc);
 	}
 
-	(void) smb_smf_create_service_pgroup(handle, pgname);
-	if (smb_smf_start_transaction(handle) != SMBD_SMF_OK) {
-		syslog(LOG_ERR, "smbd: cannot save configuration");
-		return (1);
-	}
+	rc = smb_smf_set_integer_property(handle, cfg->sc_name, value);
 
-	for (id = 0; id < SMB_CI_MAX; id++) {
-		cfg = &smb_cfg_table[id];
-		if (strcmp(cfg->sc_pg, pgname))
-			continue;
-
-		if (cfg->sc_flags & SMB_CF_MODIFIED) {
-			if (cfg->sc_value) {
-				if (strcmp(pgname, SMBD_PG_NAME) == 0)
-					smb_config_setenv_trans(handle,
-					    cfg->sc_type, cfg->sc_name,
-					    cfg->sc_value);
-				else
-					smb_config_setenv_trans_protected(
-					    handle, cfg->sc_name,
-					    cfg->sc_value);
-			} else {
-				(void) smb_config_unsetenv_trans(handle,
-				    cfg->sc_name);
-			}
-			cfg->sc_flags &= ~SMB_CF_MODIFIED;
-			dorefresh = 1;
-		}
-	}
-
-	if (smb_config_saveenv(handle) != 0) {
-		syslog(LOG_ERR, "smbd: cannot save configuration");
-		return (1);
-	}
-	if (dorefresh)
-		(void) smf_refresh_instance(SMBD_DEFAULT_INSTANCE_FMRI);
-	return (0);
-}
-
-/*
- * smb_config_update
- *
- * Updates the specified config param with the given value.
- * This function is called both on (re)load and set.
- */
-static int
-smb_config_update(smb_cfg_param_t *cfg, char *value)
-{
-	char *curval;
-	int rc = 0;
-	int len;
-
-	if (value) {
-		len = strlen(value);
-		if (cfg->sc_value) {
-			curval = (char *)realloc(cfg->sc_value,
-			    (len + 1));
-		} else {
-			curval = (char *)malloc(len + 1);
-		}
-
-		if (curval) {
-			cfg->sc_value = curval;
-			(void) strcpy(cfg->sc_value, value);
-			cfg->sc_flags |= SMB_CF_DEFINED;
-		} else {
-			rc = 1;
-		}
-	} else if (cfg->sc_value) {
-		free(cfg->sc_value);
-		cfg->sc_value = NULL;
-		cfg->sc_flags &= ~SMB_CF_DEFINED;
-	}
-
+	(void) smb_smf_end_transaction(handle);
+	smb_smf_scf_fini(handle);
 	return (rc);
 }
 
+/*
+ * smb_config_setbool
+ *
+ * Sets a boolean configuration iterm
+ */
+int
+smb_config_setbool(smb_cfg_id_t id, boolean_t value)
+{
+	smb_scfhandle_t *handle;
+	smb_cfg_param_t *cfg;
+	int rc = SMBD_SMF_OK;
+
+	cfg = smb_config_getent(id);
+	assert(cfg->sc_type == SCF_TYPE_BOOLEAN);
+
+	handle = smb_smf_scf_init(SMBD_FMRI_PREFIX);
+	if (handle == NULL)
+		return (SMBD_SMF_SYSTEM_ERR);
+
+	rc = smb_smf_create_service_pgroup(handle, SMBD_PG_NAME);
+	if (rc == SMBD_SMF_OK)
+		rc = smb_smf_start_transaction(handle);
+
+	if (rc != SMBD_SMF_OK) {
+		smb_smf_scf_fini(handle);
+		return (rc);
+	}
+
+	rc = smb_smf_set_boolean_property(handle, cfg->sc_name, value);
+
+	(void) smb_smf_end_transaction(handle);
+	smb_smf_scf_fini(handle);
+	return (rc);
+}
+
+/*
+ * smb_config_set
+ *
+ * This function sets the value of the specified config
+ * iterm regardless of its type in string format. This should
+ * be used when the config item type is not known by the caller.
+ */
+int
+smb_config_set(smb_cfg_id_t id, char *value)
+{
+	smb_cfg_param_t *cfg;
+	int64_t cint;
+
+	cfg = smb_config_getent(id);
+	switch (cfg->sc_type) {
+	case SCF_TYPE_ASTRING:
+		return (smb_config_setstr(id, value));
+
+	case SCF_TYPE_INTEGER:
+		cint = atoi(value);
+		return (smb_config_setnum(id, cint));
+
+	case SCF_TYPE_BOOLEAN:
+		return (smb_config_setbool(id, strcasecmp(value, "true") == 0));
+	}
+
+	return (SMBD_SMF_INVALID_ARG);
+}
 uint8_t
 smb_config_get_fg_flag()
 {
@@ -1072,9 +737,9 @@ smb_config_secmode_tostr(int secmode)
 int
 smb_config_get_secmode()
 {
-	char *p;
+	char p[16];
 
-	p = smb_config_getstr(SMB_CI_SECURITY);
+	(void) smb_config_getstr(SMB_CI_SECURITY, p, sizeof (p));
 	return (smb_config_secmode_fromstr(p));
 }
 
@@ -1084,5 +749,18 @@ smb_config_set_secmode(int secmode)
 	char *p;
 
 	p = smb_config_secmode_tostr(secmode);
-	return (smb_config_set(SMB_CI_SECURITY, p));
+	return (smb_config_setstr(SMB_CI_SECURITY, p));
+}
+
+static smb_cfg_param_t *
+smb_config_getent(smb_cfg_id_t id)
+{
+	int i;
+
+	for (i = 0; i < SMB_CI_MAX; i++)
+		if (smb_cfg_table[i].sc_id == id)
+			return (&smb_cfg_table[id]);
+
+	assert(0);
+	return (NULL);
 }

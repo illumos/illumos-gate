@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,8 +66,7 @@ int
 smb_com_logoff_andx(struct smb_request *sr)
 {
 	if (sr->uid_user == NULL) {
-		cmn_err(CE_WARN, "SmbLogoffAndX: bad uid");
-		smbsr_raise_error(sr, ERRSRV, ERRbaduid);
+		smbsr_error(sr, 0, ERRSRV, ERRbaduid);
 		/* NOTREACHED */
 	}
 

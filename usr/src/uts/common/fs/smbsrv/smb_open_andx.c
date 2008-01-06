@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,7 +245,7 @@ smb_com_open(struct smb_request *sr)
 
 	if ((op->desired_access == ((uint32_t)SMB_INVALID_AMASK)) ||
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_PARAMETER,
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		/* NOTREACHED */
 	}
@@ -266,11 +266,10 @@ smb_com_open(struct smb_request *sr)
 
 	if ((status = smb_open_subr(sr)) != NT_STATUS_SUCCESS) {
 		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_SHARING_VIOLATION,
+			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 		else
-			smbsr_raise_nt_error(sr, status);
+			smbsr_error(sr, status, 0, 0);
 
 		/* NOTREACHED */
 	}
@@ -281,7 +280,7 @@ smb_com_open(struct smb_request *sr)
 	}
 
 	if (op->dsize > UINT_MAX)
-		smbsr_raise_error(sr, ERRDOS, ERRbadfunc);
+		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
 
 	file_attr = op->dattr  & FILE_ATTRIBUTE_MASK;
 
@@ -330,7 +329,7 @@ smb_com_open_andx(struct smb_request *sr)
 
 	if ((op->desired_access == ((uint32_t)SMB_INVALID_AMASK)) ||
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_PARAMETER,
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		/* NOTREACHED */
 	}
@@ -338,7 +337,7 @@ smb_com_open_andx(struct smb_request *sr)
 	op->dattr = file_attr;
 	op->create_disposition = smb_ofun_to_crdisposition(ofun);
 	if (op->create_disposition == ((uint32_t)SMB_INVALID_CRDISPOSITION)) {
-		smbsr_raise_error(sr, ERRDOS, ERROR_INVALID_PARAMETER);
+		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_PARAMETER);
 		/* NOTREACHED */
 	}
 
@@ -376,17 +375,16 @@ smb_com_open_andx(struct smb_request *sr)
 
 	if (status != NT_STATUS_SUCCESS) {
 		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_SHARING_VIOLATION,
+			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 		else
-			smbsr_raise_nt_error(sr, status);
+			smbsr_error(sr, status, 0, 0);
 
 		/* NOTREACHED */
 	}
 
 	if (op->dsize > UINT_MAX)
-		smbsr_raise_error(sr, ERRDOS, ERRbadfunc);
+		smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
 
 	if (MYF_OPLOCK_TYPE(op->my_flags) != MYF_OPLOCK_NONE) {
 		op->action_taken |= SMB_OACT_LOCK;

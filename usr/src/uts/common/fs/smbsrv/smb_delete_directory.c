@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,7 @@ smb_com_delete_directory(struct smb_request *sr)
 	int rc;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -77,7 +77,7 @@ smb_com_delete_directory(struct smb_request *sr)
 
 	rc = smbd_fs_query(sr, &sr->arg.dirop.fqi, FQM_PATH_MUST_EXIST);
 	if (rc) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -88,7 +88,7 @@ smb_com_delete_directory(struct smb_request *sr)
 		smb_node_release(sr->arg.dirop.fqi.dir_snode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
 
-		smbsr_raise_cifs_error(sr, NT_STATUS_CANNOT_DELETE,
+		smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -102,7 +102,7 @@ smb_com_delete_directory(struct smb_request *sr)
 	if (rc != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 

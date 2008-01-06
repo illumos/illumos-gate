@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +29,11 @@
 #include <sys/synch.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <sys/nbmlock.h>
 
 static int smb_do_rename(struct smb_request *sr,
 				struct smb_fqi *src_fqi,
 				struct smb_fqi *dst_fqi);
-
 
 /*
  * smb_com_rename
@@ -63,7 +63,7 @@ smb_com_rename(struct smb_request *sr)
 	int rc;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -99,19 +99,18 @@ smb_com_rename(struct smb_request *sr)
 		 * NT and W2K client behaviour.
 		 */
 		if (rc == EEXIST) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_OBJECT_NAME_COLLISION,
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
 			    ERRDOS, ERROR_ALREADY_EXISTS);
 			/* NOTREACHED */
 		}
 
 		if (rc == EPIPE) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_SHARING_VIOLATION,
+			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 			/* NOTREACHED */
 		}
 
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -134,48 +133,6 @@ smb_com_rename(struct smb_request *sr)
 
 	return (SDRC_NORMAL_REPLY);
 }
-
-/*
- * smb_rename_share_check
- *
- * An open file can be renamed if
- *
- *      1. isn't opened for data writing or deleting
- *
- *  2. Opened with "Deny Delete" share mode
- *         But not opened for data reading or executing
- *         (opened for accessing meta data)
- */
-DWORD
-smb_rename_share_check(struct smb_node *node)
-{
-	struct smb_ofile *open;
-
-	if (node == 0 || node->n_refcnt <= 1)
-		return (NT_STATUS_SUCCESS);
-
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	open = smb_llist_head(&node->n_ofile_list);
-	while (open) {
-		if (open->f_granted_access &
-		    (FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE)) {
-			smb_llist_exit(&node->n_ofile_list);
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
-
-		if ((open->f_share_access & FILE_SHARE_DELETE) == 0) {
-			if (open->f_granted_access &
-			    (FILE_READ_DATA | FILE_EXECUTE)) {
-				smb_llist_exit(&node->n_ofile_list);
-				return (NT_STATUS_SHARING_VIOLATION);
-			}
-		}
-		open = smb_llist_next(&node->n_ofile_list, open);
-	}
-	smb_llist_exit(&node->n_ofile_list);
-	return (NT_STATUS_SUCCESS);
-}
-
 
 /*
  * smb_do_rename
@@ -228,8 +185,37 @@ smb_do_rename(
 		}
 	}
 
-	status = smb_lock_range_access(sr, src_node, 0, 0, FILE_WRITE_DATA);
+	for (count = 0; count <= 3; count++) {
+		if (count) {
+			smb_node_end_crit(src_node);
+			delay(MSEC_TO_TICK(400));
+		}
+
+		smb_node_start_crit(src_node, RW_READER);
+
+		status = smb_node_rename_check(src_node);
+
+		if (status != NT_STATUS_SHARING_VIOLATION)
+			break;
+	}
+
+	if (status == NT_STATUS_SHARING_VIOLATION) {
+		smb_node_end_crit(src_node);
+
+		smb_node_release(src_node);
+		smb_node_release(src_fqi->dir_snode);
+
+		SMB_NULL_FQI_NODES(*src_fqi);
+		SMB_NULL_FQI_NODES(*dst_fqi);
+		return (EPIPE); /* = ERRbadshare */
+	}
+
+	status = smb_range_check(sr, sr->user_cr, src_node, 0, UINT64_MAX,
+	    B_TRUE);
+
 	if (status != NT_STATUS_SUCCESS) {
+		smb_node_end_crit(src_node);
+
 		smb_node_release(src_node);
 		smb_node_release(src_fqi->dir_snode);
 
@@ -238,27 +224,11 @@ smb_do_rename(
 		return (EACCES);
 	}
 
-
-	for (count = 0; count <= 3; count++) {
-		if (count)
-			delay(MSEC_TO_TICK(400));
-		status = smb_rename_share_check(src_node);
-		if (status != NT_STATUS_SHARING_VIOLATION)
-			break;
-	}
-
-	smb_node_release(src_node);
-
-	if (status == NT_STATUS_SHARING_VIOLATION) {
-		smb_node_release(src_fqi->dir_snode);
-
-		SMB_NULL_FQI_NODES(*src_fqi);
-		SMB_NULL_FQI_NODES(*dst_fqi);
-		return (EPIPE); /* = ERRbadshare */
-	}
-
 	if (utf8_strcasecmp(src_fqi->path, dst_fqi->path) == 0) {
 		if ((rc = smbd_fs_query(sr, dst_fqi, 0)) != 0) {
+			smb_node_end_crit(src_node);
+
+			smb_node_release(src_node);
 			smb_node_release(src_fqi->dir_snode);
 
 			SMB_NULL_FQI_NODES(*src_fqi);
@@ -276,6 +246,9 @@ smb_do_rename(
 
 		rc = strcmp(src_fqi->last_comp_od, dst_fqi->last_comp);
 		if (rc == 0) {
+			smb_node_end_crit(src_node);
+
+			smb_node_release(src_node);
 			smb_node_release(src_fqi->dir_snode);
 			smb_node_release(dst_fqi->dir_snode);
 
@@ -297,11 +270,18 @@ smb_do_rename(
 			SMB_NULL_FQI_NODES(*src_fqi);
 			SMB_NULL_FQI_NODES(*dst_fqi);
 		}
+
+		smb_node_end_crit(src_node);
+
+		smb_node_release(src_node);
 		return (rc);
 	}
 
 	rc = smbd_fs_query(sr, dst_fqi, FQM_PATH_MUST_NOT_EXIST);
 	if (rc != 0) {
+		smb_node_end_crit(src_node);
+
+		smb_node_release(src_node);
 		smb_node_release(src_fqi->dir_snode);
 
 		SMB_NULL_FQI_NODES(*src_fqi);
@@ -342,6 +322,10 @@ smb_do_rename(
 		SMB_NULL_FQI_NODES(*src_fqi);
 		SMB_NULL_FQI_NODES(*dst_fqi);
 	}
+
+	smb_node_end_crit(src_node);
+
+	smb_node_release(src_node);
 
 	return (rc);
 }

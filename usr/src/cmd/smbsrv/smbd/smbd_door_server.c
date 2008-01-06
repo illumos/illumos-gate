@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <errno.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <varargs.h>
 #include <stdio.h>
 #include <synch.h>
 #include <string.h>
@@ -179,25 +178,17 @@ smb_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	switch (req_type) {
 	case SMBD_DOOR_PARAM_GET: {
 		smb_cfg_id_t id;
-		char *value = NULL;
-		char *empty = "";
+		char value[MAX_VALUE_BUFLEN];
 
 		id = smb_dr_get_uint32(dec_ctx);
 
 		dec_status = smb_dr_decode_finish(dec_ctx);
-		if (dec_status != 0) {
+		if (dec_status != 0)
 			goto decode_error;
-		}
 
-		smb_config_rdlock();
-		value = smb_config_getstr(id);
+		(void) smb_config_getstr(id, value, sizeof (value));
 		smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_SUCCESS);
-
-		if (value)
-			smb_dr_put_string(enc_ctx, value);
-		else
-			smb_dr_put_string(enc_ctx, empty);
-		smb_config_unlock();
+		smb_dr_put_string(enc_ctx, value);
 		break;
 	}
 
@@ -214,13 +205,10 @@ smb_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		smb_config_wrlock();
-		if (smb_config_set(id, value) == 0) {
+		if (smb_config_setstr(id, value) == SMBD_SMF_OK)
 			smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_SUCCESS);
-		} else {
+		else
 			smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_ERROR);
-		}
-		smb_config_unlock();
 		smb_dr_free_string(value);
 		break;
 	}
@@ -260,20 +248,6 @@ smb_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		rc = smbd_join(&jdi);
 		smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_SUCCESS);
 		smb_dr_put_int32(enc_ctx, rc);
-		break;
-
-	case SMBD_DOOR_ADS_DOMAIN_CHANGED:
-		domain = smb_dr_get_string(dec_ctx);
-		dec_status = smb_dr_decode_finish(dec_ctx);
-		if (dec_status != 0) {
-			smb_dr_free_string(domain);
-			goto decode_error;
-		}
-
-		rc = ads_domain_change_notify_handler(domain);
-		smb_dr_put_int32(enc_ctx, SMBD_DOOR_SRV_SUCCESS);
-		smb_dr_put_int32(enc_ctx, rc);
-		smb_dr_free_string(domain);
 		break;
 
 	default:

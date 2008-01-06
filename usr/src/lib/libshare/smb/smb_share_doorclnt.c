@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +37,20 @@
 #include <errno.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
+#include <thread.h>
+#include <synch.h>
 
 #include <smbsrv/libsmb.h>
-
 #include <smbsrv/lmshare.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/lmshare_door.h>
 #include <smbsrv/cifs.h>
 
-int lmshrd_fildes = -1;
+static int lmshrd_fildes = -1;
+static uint64_t lmshrd_door_ncall = 0;
+static mutex_t lmshrd_mutex;
+static cond_t lmshrd_cv;
 
 char *lmshrd_desc[] = {
 	"",
@@ -72,116 +77,150 @@ char *lmshrd_desc[] = {
 };
 
 /*
- * Returns 0 on success. Otherwise, -1.
+ * Open the lmshrd door.  This is a private call for use by
+ * lmshrd_door_enter() and must be called with lmshrd_mutex held.
+ *
+ * Returns the door fd on success.  Otherwise, -1.
  */
 static int
-lmshrd_door_open(int opcode)
+lmshrd_door_open(void)
 {
-	int rc = 0;
-
-	if (lmshrd_fildes == -1 &&
-	    (lmshrd_fildes = open(LMSHR_DOOR_NAME, O_RDONLY)) < 0) {
-		syslog(LOG_DEBUG, "%s: open %s failed %s", lmshrd_desc[opcode],
-		    LMSHR_DOOR_NAME, strerror(errno));
-		rc = -1;
+	if (lmshrd_fildes == -1) {
+		if ((lmshrd_fildes = open(LMSHR_DOOR_NAME, O_RDONLY)) < 0)
+			lmshrd_fildes = -1;
+		else
+			lmshrd_door_ncall = 0;
 	}
-	return (rc);
+
+	return (lmshrd_fildes);
+}
+
+/*
+ * Close the lmshrd door.
+ */
+void
+lmshrd_door_close(void)
+{
+	(void) mutex_lock(&lmshrd_mutex);
+
+	if (lmshrd_fildes != -1) {
+		while (lmshrd_door_ncall > 0)
+			(void) cond_wait(&lmshrd_cv, &lmshrd_mutex);
+
+		if (lmshrd_fildes != -1) {
+			(void) close(lmshrd_fildes);
+			lmshrd_fildes = -1;
+		}
+	}
+
+	(void) mutex_unlock(&lmshrd_mutex);
+}
+
+/*
+ * Entry handler for lmshrd door calls.
+ */
+static door_arg_t *
+lmshrd_door_enter(void)
+{
+	door_arg_t *arg;
+	char *buf;
+
+	(void) mutex_lock(&lmshrd_mutex);
+
+	if (lmshrd_door_open() == -1) {
+		(void) mutex_unlock(&lmshrd_mutex);
+		return (NULL);
+	}
+
+	if ((arg = malloc(sizeof (door_arg_t) + LMSHR_DOOR_SIZE)) != NULL) {
+		buf = ((char *)arg) + sizeof (door_arg_t);
+		bzero(arg, sizeof (door_arg_t));
+		arg->data_ptr = buf;
+		arg->rbuf = buf;
+		arg->rsize = LMSHR_DOOR_SIZE;
+
+		++lmshrd_door_ncall;
+	}
+
+	(void) mutex_unlock(&lmshrd_mutex);
+	return (arg);
+}
+
+/*
+ * Exit handler for lmshrd door calls.
+ */
+static void
+lmshrd_door_exit(door_arg_t *arg, char *errmsg)
+{
+	if (errmsg)
+		syslog(LOG_DEBUG, "lmshrd_door: %s", errmsg);
+
+	(void) mutex_lock(&lmshrd_mutex);
+	free(arg);
+	--lmshrd_door_ncall;
+	(void) cond_signal(&lmshrd_cv);
+	(void) mutex_unlock(&lmshrd_mutex);
 }
 
 /*
  * Return 0 upon success. Otherwise, -1.
  */
 static int
-lmshrd_door_check_srv_status(int opcode, smb_dr_ctx_t *dec_ctx)
+lmshrd_door_check_status(smb_dr_ctx_t *dec_ctx)
 {
 	int status = smb_dr_get_int32(dec_ctx);
-	int err;
-	int rc = -1;
 
-	switch (status) {
-	case LMSHR_DOOR_SRV_SUCCESS:
-		rc = 0;
-		break;
-
-	case LMSHR_DOOR_SRV_ERROR:
-		err = smb_dr_get_uint32(dec_ctx);
-		syslog(LOG_ERR, "%s: Encountered door server error %s",
-		    lmshrd_desc[opcode], strerror(err));
-		break;
-
-	default:
-		syslog(LOG_ERR, "%s: Unknown door server status",
-		    lmshrd_desc[opcode]);
+	if (status != LMSHR_DOOR_SRV_SUCCESS) {
+		if (status == LMSHR_DOOR_SRV_ERROR)
+			(void) smb_dr_get_uint32(dec_ctx);
+		return (-1);
 	}
 
-	if (rc != 0) {
-		if ((err = smb_dr_decode_finish(dec_ctx)) != 0)
-			syslog(LOG_ERR, "%s: Decode error %s",
-			    lmshrd_desc[opcode], strerror(err));
-	}
-
-	return (rc);
+	return (0);
 }
 
 uint64_t
 lmshrd_open_iterator(int mode)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	unsigned int status = 0;
 	uint64_t lmshr_iter = 0;
-	int opcode = LMSHR_DOOR_OPEN_ITERATOR;
+	int rc;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (lmshr_iter);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (lmshr_iter);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_OPEN_ITERATOR);
 	smb_dr_put_int32(enc_ctx, mode);
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (lmshr_iter);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (lmshr_iter);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (lmshr_iter);
 	}
 
 	lmshr_iter = smb_dr_get_lmshr_iterator(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (lmshr_iter);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (lmshr_iter);
 }
 
@@ -189,312 +228,221 @@ lmshrd_open_iterator(int mode)
 DWORD
 lmshrd_close_iterator(uint64_t iterator)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	unsigned int status = 0;
-	int opcode = LMSHR_DOOR_CLOSE_ITERATOR;
+	int rc;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_CLOSE_ITERATOR);
 	smb_dr_put_lmshr_iterator(enc_ctx, iterator);
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (NERR_Success);
 }
 
 DWORD
 lmshrd_iterate(uint64_t iterator, lmshare_info_t *si)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	unsigned int status = 0;
-	int opcode = LMSHR_DOOR_ITERATE;
+	int rc;
 
-	if (lmshrd_door_open(opcode) == -1)
-		return (NERR_InternalError);
-
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
 	bzero(si, sizeof (lmshare_info_t));
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_ITERATE);
 	smb_dr_put_lmshr_iterator(enc_ctx, iterator);
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	smb_dr_get_lmshare(dec_ctx, si);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (NERR_Success);
 }
 
 DWORD
 lmshrd_list(int offset, lmshare_list_t *list)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_LIST;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_LIST);
 	smb_dr_put_int32(enc_ctx, offset);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	smb_dr_get_lmshr_list(dec_ctx, list);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
-
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
 int
 lmshrd_num_shares(void)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	unsigned int status = 0;
 	DWORD num_shares;
-	int opcode = LMSHR_DOOR_NUM_SHARES;
+	int rc;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (-1);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (-1);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
 	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_NUM_SHARES);
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (-1);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (-1);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (-1);
 	}
 
 	num_shares = smb_dr_get_uint32(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (-1);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (num_shares);
 }
 
 DWORD
 lmshrd_delete(char *share_name)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_DELETE;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
 	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_DELETE);
 	smb_dr_put_string(enc_ctx, share_name);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 
 }
@@ -502,316 +450,223 @@ lmshrd_delete(char *share_name)
 DWORD
 lmshrd_rename(char *from, char *to)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_RENAME;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
 	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_RENAME);
 	smb_dr_put_string(enc_ctx, from);
 	smb_dr_put_string(enc_ctx, to);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
 DWORD
 lmshrd_getinfo(char *share_name, lmshare_info_t *si)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_GETINFO;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
 	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_GETINFO);
 	smb_dr_put_string(enc_ctx, share_name);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	smb_dr_get_lmshare(dec_ctx, si);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
 DWORD
 lmshrd_add(lmshare_info_t *si)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_ADD;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_ADD);
 	smb_dr_put_lmshare(enc_ctx, si);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	smb_dr_get_lmshare(dec_ctx, si);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
 DWORD
 lmshrd_setinfo(lmshare_info_t *si)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status;
 	DWORD rc;
-	int opcode = LMSHR_DOOR_SETINFO;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
+	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_SETINFO);
 	smb_dr_put_lmshare(enc_ctx, si);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
 static int
 lmshrd_check(char *share_name, int opcode)
 {
-	door_arg_t arg;
-	char *buf;
-	unsigned int used;
+	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	int status, rc;
+	int rc;
 
-	if (lmshrd_door_open(opcode) == -1)
+	if ((arg = lmshrd_door_enter()) == NULL)
 		return (NERR_InternalError);
 
-	buf = malloc(LMSHR_DOOR_SIZE);
-	if (!buf)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
 	smb_dr_put_uint32(enc_ctx, opcode);
 	smb_dr_put_string(enc_ctx, share_name);
 
-	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		syslog(LOG_ERR, "%s: Encode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
+	if (rc != 0) {
+		lmshrd_door_exit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	arg.data_ptr = buf;
-	arg.data_size = used;
-	arg.desc_ptr = NULL;
-	arg.desc_num = 0;
-	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
-
-	if (door_call(lmshrd_fildes, &arg) < 0) {
-		syslog(LOG_DEBUG, "%s: Door call failed %s",
-		    lmshrd_desc[opcode], strerror(errno));
-		(void) free(buf);
-		lmshrd_fildes = -1;
+	if (door_call(lmshrd_fildes, arg) < 0) {
+		lmshrd_door_exit(arg, "door call error");
+		lmshrd_door_close();
 		return (NERR_InternalError);
 	}
 
-	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
-	if (lmshrd_door_check_srv_status(opcode, dec_ctx) != 0) {
-		(void) free(buf);
+	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
+	if (lmshrd_door_check_status(dec_ctx) != 0) {
+		(void) smb_dr_decode_finish(dec_ctx);
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_int32(dec_ctx);
-	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
-		syslog(LOG_ERR, "%s: Decode error %s",
-		    lmshrd_desc[opcode], strerror(status));
-		(void) free(buf);
+	if (smb_dr_decode_finish(dec_ctx) != 0) {
+		lmshrd_door_exit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	(void) free(buf);
+	lmshrd_door_exit(arg, NULL);
 	return (rc);
 }
 
@@ -849,103 +704,4 @@ int
 lmshrd_is_dir(char *path)
 {
 	return (lmshrd_check(path, LMSHR_DOOR_IS_DIR));
-}
-
-static char *
-lmshare_decode_type(unsigned int stype)
-{
-	switch (stype) {
-	case STYPE_DISKTREE:
-		return ("Disk");
-	case STYPE_PRINTQ:
-		return ("Print Queue");
-	case STYPE_DEVICE:
-		return ("Device");
-	case STYPE_IPC:
-		return ("IPC");
-	case STYPE_DFS:
-		return ("DFS");
-	case STYPE_SPECIAL:
-		return ("Special");
-	default:
-		return ("Unknown");
-	};
-}
-
-
-static void
-lmshare_loginfo(FILE *fp, lmshare_info_t *si)
-{
-	if (!si) {
-		return;
-	}
-
-	(void) fprintf(fp, "\n%s Information:\n", si->share_name);
-	(void) fprintf(fp, "\tFolder: %s\n", si->directory);
-	(void) fprintf(fp, "\tType: %s\n", lmshare_decode_type(si->stype));
-	(void) fprintf(fp, "\tComment: %s\n", si->comment);
-
-	(void) fprintf(fp, "\tStatus: %s\n",
-	    ((si->mode & LMSHRM_TRANS) ? "Transient" : "Permanent"));
-
-	(void) fprintf(fp, "\tContainer: %s\n", si->container);
-}
-
-int
-lmshrd_dump_hash(char *logfname)
-{
-	lmshare_info_t si;
-	uint64_t it;
-	FILE *fp;
-
-	if ((logfname == 0) || (*logfname == 0))
-		fp = stdout;
-	else {
-		fp = fopen(logfname, "w");
-		if (fp == 0) {
-			syslog(LOG_WARNING, "LmshareDump [%s]:"
-			    " cannot create logfile", logfname);
-			syslog(LOG_WARNING, "LmshareDump:"
-			    " output will be written on screen");
-		}
-	}
-
-	it = lmshrd_open_iterator(LMSHRM_PERM);
-	if (it == NULL) {
-		syslog(LOG_ERR, "LmshareDump: resource shortage");
-		if (fp && fp != stdout) {
-			(void) fclose(fp);
-		}
-		return (1);
-	}
-
-	if (lmshrd_iterate(it, &si) != NERR_Success) {
-		syslog(LOG_ERR, "LmshareDump: Iterator iterate failed");
-		if (fp && fp != stdout) {
-			(void) fclose(fp);
-		}
-		return (1);
-	}
-	while (*si.share_name != 0) {
-		lmshare_loginfo(fp, &si);
-		if (lmshrd_iterate(it, &si) != NERR_Success) {
-			syslog(LOG_ERR, "LmshareDump: Iterator iterate failed");
-			if (fp && fp != stdout) {
-				(void) fclose(fp);
-			}
-			return (1);
-		}
-	}
-
-	if (lmshrd_close_iterator(it) != NERR_Success) {
-		syslog(LOG_ERR, "LmshareDump: Iterator close failed");
-		if (fp && fp != stdout) {
-			(void) fclose(fp);
-		}
-		return (1);
-	}
-	if (fp && fp != stdout) {
-		(void) fclose(fp);
-	}
-	return (0);
 }

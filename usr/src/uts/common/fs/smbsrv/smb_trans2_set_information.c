@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,7 +228,7 @@ smb_set_standard_info(
 	smb_node_set_time(node, &crtime, &mtime, &atime, 0, what);
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);
 	if (rc) {
-		smb_errmap_unix2smb(rc, smberr);
+		smbsr_map_errno(rc, smberr);
 		status = NT_STATUS_UNSUCCESSFUL;
 	}
 
@@ -295,7 +295,7 @@ smb_set_basic_info(
 	smb_node_set_time(node, &crtime, &mtime, &atime, &ctime, what);
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);
 	if (rc) {
-		smb_errmap_unix2smb(rc, smberr);
+		smbsr_map_errno(rc, smberr);
 		status = NT_STATUS_UNSUCCESSFUL;
 	}
 
@@ -339,7 +339,7 @@ smb_set_alloc_info(
 		 * write requests without the inode ever being updated.
 		 */
 		if ((rc = smb_set_file_size(sr)) != 0) {
-			smb_errmap_unix2smb(rc, smberr);
+			smbsr_map_errno(rc, smberr);
 			status = NT_STATUS_UNSUCCESSFUL;
 		}
 	}

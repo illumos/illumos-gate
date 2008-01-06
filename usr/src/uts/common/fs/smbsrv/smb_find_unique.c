@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,13 +264,13 @@ smb_com_find_unique(struct smb_request *sr)
 	if ((rc != 0) && (rc != ENOENT)) {
 		/* returned error by smb_rdir_next() */
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
 	if (count == 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_raise_error(sr, ERRDOS, ERRnofiles);
+		smbsr_error(sr, 0, ERRDOS, ERRnofiles);
 		/* NOTREACHED */
 	}
 

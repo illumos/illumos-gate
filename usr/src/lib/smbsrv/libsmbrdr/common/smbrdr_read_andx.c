@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <strings.h>
 
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbsrv/netbios.h>
 #include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
@@ -46,15 +45,13 @@
 static int smbrdr_decode_readx_rsp(smb_msgbuf_t *, char *, unsigned,
     smb_read_andx_rsp_t *);
 
-static void smbrdr_dump_readx_rsp(smb_read_andx_rsp_t *);
-
 /*
- * smbrdr_rpc_readx
+ * smbrdr_readx
  *
  * Send SMB_COM_READ_ANDX request.
  */
 int
-smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
+smbrdr_readx(int fid, char *in_buf, int in_len)
 {
 	struct sdb_netuse *netuse;
 	struct sdb_ofile *ofile;
@@ -64,7 +61,7 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 	DWORD status;
 	int rc, max_return;
 
-	if ((ofile = smbrdr_ofile_get(fid)) == 0)
+	if ((ofile = smbrdr_ofile_get(fid)) == NULL)
 		return (-1);
 
 	netuse = ofile->netuse;
@@ -73,7 +70,7 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 	    netuse->session, &netuse->session->logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrReadAndx: %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_readx: %s", xlate_nt_status(status));
 		smbrdr_ofile_put(ofile);
 		return (-1);
 	}
@@ -104,7 +101,7 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 	    0);		/* Count of data bytes = 0 */
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "SmbrdrReadAndx: smbrdr_prep_readx_req failed");
+		syslog(LOG_DEBUG, "smbrdr_readx: prep failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
 		return (rc);
@@ -117,14 +114,14 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
-		syslog(LOG_ERR, "SmbrdrReadAndx: send failed");
+		syslog(LOG_DEBUG, "smbrdr_readx: send failed");
 		return (-1);
 	}
 
 	status = smbrdr_rcv(&srh, 1);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrReadAndx: nb_rcv failed");
+		syslog(LOG_DEBUG, "smbrdr_readx: nb_rcv failed");
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
@@ -134,7 +131,7 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 	rc = smbrdr_decode_readx_rsp(mb, in_buf, in_len, &rsp);
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "SmbrdrReadAndx: read decode failure!");
+		syslog(LOG_DEBUG, "smbrdr_readx: decode failed");
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
@@ -146,20 +143,6 @@ smbrdr_rpc_readx(int fid, char *in_buf, int in_len)
 	smbrdr_ofile_put(ofile);
 
 	return ((rc < 0) ? rc : rsp.DataLength);
-}
-
-static void
-smbrdr_dump_readx_rsp(smb_read_andx_rsp_t *rsp)
-{
-
-	syslog(LOG_DEBUG, "[SmbReadX Rsp] WordCount:%x,AndXCmd:%x,"
-	    " AndXReserved:%x, AndXOffset:%d",
-	    rsp->WordCount, rsp->AndXCmd, rsp->AndXReserved, rsp->AndXOffset);
-
-	syslog(LOG_DEBUG, "[SmbReadX Rsp] Remaining:%d, Mode:%d, Reserved:%x, "
-	    "DataLen:%d, DataOffset:%d, ByteCount: %d",
-	    rsp->Remaining, rsp->DataCompactionMode, rsp->Reserved,
-	    rsp->DataLength, rsp->DataOffset, rsp->ByteCount);
 }
 
 /*
@@ -198,9 +181,6 @@ smbrdr_decode_readx_rsp(smb_msgbuf_t *mb,
 	if (rc <= 0)
 		return (-1);
 
-	smbrdr_dump_readx_rsp(rsp);
-
-	/* it should never happen, but check anyway */
 	if (rsp->DataLength > in_len)
 		return (-1);
 

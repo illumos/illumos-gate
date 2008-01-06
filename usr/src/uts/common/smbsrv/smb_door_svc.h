@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,20 +82,8 @@ enum smb_dr_opcode_t {
 	SMB_DR_USER_NONAUTH_LOGON,
 	SMB_DR_USER_AUTH_LOGOFF,
 	SMB_DR_USER_LIST,
-	SMB_DR_GROUP_ADD,
-	SMB_DR_GROUP_DELETE,
-	SMB_DR_GROUP_MEMBER_ADD,
-	SMB_DR_GROUP_MEMBER_REMOVE,
-	SMB_DR_GROUP_COUNT,
-	SMB_DR_GROUP_CACHE_SIZE,
-	SMB_DR_GROUP_MODIFY,
-	SMB_DR_GROUP_PRIV_NUM,
-	SMB_DR_GROUP_PRIV_LIST,
-	SMB_DR_GROUP_PRIV_GET,
-	SMB_DR_GROUP_PRIV_SET,
-	SMB_DR_GROUP_LIST,
-	SMB_DR_GROUP_MEMBER_LIST,
-	SMB_DR_GROUP_MEMBER_COUNT
+	SMB_DR_LOOKUP_SID,
+	SMB_DR_LOOKUP_NAME
 };
 
 enum smb_kdr_opcode_t {

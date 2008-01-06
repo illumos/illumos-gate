@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -283,14 +283,14 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 
 	snode = sr->tid_tree->t_snode;
 	if (fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr) != 0) {
-		smbsr_raise_errno(sr, ESTALE);
+		smbsr_errno(sr, ESTALE);
 		/* NOTREACHED */
 	}
 
 	switch (infolev) {
 	case SMB_INFO_ALLOCATION:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
-			smbsr_raise_errno(sr, rc);
+			smbsr_errno(sr, rc);
 			/* NOTREACHED */
 		}
 
@@ -365,7 +365,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_QUERY_FS_SIZE_INFO:
 		if ((rc = smb_fsop_statfs(sr->user_cr, snode, &df)) != 0) {
-			smbsr_raise_errno(sr, rc);
+			smbsr_errno(sr, rc);
 			/* NOTREACHED */
 		}
 
@@ -425,7 +425,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	default:
-		smbsr_raise_error(sr, ERRDOS, ERRunknownlevel);
+		smbsr_error(sr, 0, ERRDOS, ERRunknownlevel);
 		/* NOTREACHED */
 		break;
 	}

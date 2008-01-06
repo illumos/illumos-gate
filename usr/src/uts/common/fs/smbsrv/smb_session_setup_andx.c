@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -370,7 +370,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 			kmem_free(ci_password, ci_pwlen + 1);
 		if (cs_password)
 			kmem_free(cs_password, cs_pwlen + 1);
-		smbsr_raise_error(sr, ERRSRV, ERRaccess);
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		/* NOTREACHED */
 	} else if (utf8_strcasecmp(primary_domain, hostname) == 0) {
 		/*
@@ -384,8 +384,6 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	} else if (security == SMB_SECMODE_WORKGRP) {
 		clnt_info.flags |= NETR_CFLG_LOCAL;
 	}
-
-	(void) utf8_strupr(primary_domain);
 
 	/*
 	 * If this is an additional setup for an existing user
@@ -431,7 +429,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 				kmem_free(ci_password, ci_pwlen + 1);
 			if (cs_password)
 				kmem_free(cs_password, cs_pwlen + 1);
-			smbsr_raise_error(sr, ERRSRV, ERRbadpw);
+			smbsr_error(sr, 0, ERRSRV, ERRbadpw);
 			/* NOTREACHED */
 		}
 
@@ -463,7 +461,7 @@ smb_com_session_setup_andx(struct smb_request *sr)
 	if (user == NULL) {
 		if (session_key)
 			kmem_free(session_key, sizeof (smb_session_key_t));
-		smbsr_raise_error(sr, ERRDOS, ERROR_INVALID_HANDLE);
+		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
 		/* no return */
 	}
 

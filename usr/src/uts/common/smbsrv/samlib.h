@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ DWORD sam_create_trust_account(char *server, char *domain,
     smb_auth_info_t *auth);
 
 DWORD sam_create_account(char *server, char *domain_name, char *account_name,
-    smb_auth_info_t *auth, DWORD account_flags, smb_userinfo_t *user_info);
+    smb_auth_info_t *auth, DWORD account_flags);
 
 DWORD sam_remove_trust_account(char *server, char *domain);
 

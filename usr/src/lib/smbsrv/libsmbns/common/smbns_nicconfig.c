@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,41 +57,22 @@ static void smb_nic_clear_if_list(struct if_list *);
 /* This is the list we will monitor */
 static net_cfg_list_t smb_nic_list = { NULL, 0 };
 static pthread_mutex_t smb_nic_mutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t smb_ns_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-/* Nameserver information */
-static struct __res_state smb_res;
-
-void
-smb_resolver_init(void)
-{
-	int ret;
-	(void) pthread_mutex_lock(&smb_ns_mutex);
-	ret = res_ninit(&smb_res);
-	(void) pthread_mutex_unlock(&smb_ns_mutex);
-	if (ret < 0) {
-		syslog(LOG_ERR, "Failed to initialize resolver lib");
-	}
-}
-
-void
-smb_resolver_close(void)
-{
-	(void) pthread_mutex_lock(&smb_ns_mutex);
-	res_nclose(&smb_res);
-	(void) pthread_mutex_unlock(&smb_ns_mutex);
-}
 
 int
 smb_get_nameservers(struct in_addr *ips, int sz)
 {
 	union res_sockaddr_union set[MAXNS];
 	int i, cnt;
+	struct __res_state res_state;
 
 	if (ips == NULL)
 		return (0);
-	(void) pthread_mutex_lock(&smb_ns_mutex);
-	cnt = res_getservers(&smb_res, set, MAXNS);
+
+	bzero(&res_state, sizeof (struct __res_state));
+	if (res_ninit(&res_state) < 0)
+		return (0);
+
+	cnt = res_getservers(&res_state, set, MAXNS);
 	for (i = 0; i < cnt; i++) {
 		if (i >= sz)
 			break;
@@ -100,18 +81,8 @@ smb_get_nameservers(struct in_addr *ips, int sz)
 		    inet_ntoa(ips[i]));
 	}
 	syslog(LOG_DEBUG, "NS Found %d name servers\n", i);
-	(void) pthread_mutex_unlock(&smb_ns_mutex);
+	res_nclose(&res_state);
 	return (i);
-}
-
-uint16_t
-smb_get_next_resid(void)
-{
-	uint16_t id;
-	(void) pthread_mutex_lock(&smb_ns_mutex);
-	id = ++smb_res.id;
-	(void) pthread_mutex_unlock(&smb_ns_mutex);
-	return (id);
 }
 
 /*
@@ -651,7 +622,6 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 	char excludestr[MAX_EXCLUDE_LIST_LEN];
 	ipaddr_t exclude[SMB_PI_MAX_NETWORKS];
 	int nexclude;
-	char *winsexclude;
 
 	*number = 0;
 	numnics = smb_nic_build_if_name(&names);
@@ -662,12 +632,8 @@ smb_nic_build_network_structures(net_cfg_t **nc, int *number)
 	}
 	bzero(nc_array, sizeof (net_cfg_t) * numnics);
 
-	smb_config_rdlock();
-	excludestr[0] = '\0';
-	winsexclude = smb_config_getstr(SMB_CI_WINS_EXCL);
-	if (winsexclude != NULL)
-		(void) strlcpy(excludestr, winsexclude, sizeof (excludestr));
-	smb_config_unlock();
+	(void) smb_config_getstr(SMB_CI_WINS_EXCL, excludestr,
+	    sizeof (excludestr));
 	nexclude = smb_wins_iplist(excludestr, exclude, SMB_PI_MAX_NETWORKS);
 
 	for (i = 0; i < numnics; i++) {

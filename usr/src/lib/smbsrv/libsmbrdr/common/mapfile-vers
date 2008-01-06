@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,12 +27,9 @@
 
 SUNWprivate {
     global:
-	mlsvc_check_sessions;
 	mlsvc_close_pipe;
 	mlsvc_disconnect;
 	mlsvc_echo;
-	mlsvc_install_pdc_cb;
-	mlsvc_locate_domain_controller;
 	mlsvc_logon;
 	mlsvc_open_pipe;
 	mlsvc_session_native_values;
@@ -47,8 +44,8 @@ SUNWprivate {
 	smbrdr_ipc_set;
 	smbrdr_ipc_skip_lsa_query;
 	smbrdr_ipc_get_passwd;
-	smbrdr_rpc_readx;
-	smbrdr_rpc_transact;
+	smbrdr_readx;
+	smbrdr_transact;
     local:
 	*;
 };

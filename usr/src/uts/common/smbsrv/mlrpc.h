@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,6 +213,21 @@ typedef struct mlrpc_service {
 } mlrpc_service_t;
 
 /*
+ * 20-byte opaque id used by various RPC services.
+ */
+typedef struct ndr_hdid {
+	uint32_t data[5];
+} ndr_hdid_t;
+
+typedef struct ndr_handle {
+	struct ndr_handle *nh_next;
+	ndr_hdid_t nh_id;
+	int nh_fid;
+	const mlrpc_service_t *nh_svc;
+	void *nh_data;
+} ndr_handle_t;
+
+/*
  * The list of bindings is anchored at a connection.  Nothing in the
  * RPC mechanism allocates them.  Binding elements which have service==0
  * indicate free elements.  When a connection is instantiated, at least
@@ -342,7 +357,8 @@ int mlrpc_heap_avail(mlrpc_heap_t *);
 #define	MLRPC_HEAP_STRSAVE(MXA, STR) \
 	mlrpc_heap_strsave((MXA)->heap, (STR))
 
-struct mlrpc_xaction {
+typedef struct mlrpc_xaction {
+	int			fid;
 	unsigned short		ptype;		/* just handy, hi bits spcl */
 	unsigned short		opnum;		/* for requests */
 	struct mlndr_stream	recv_mlnds;
@@ -353,7 +369,7 @@ struct mlrpc_xaction {
 	struct mlrpc_binding	*binding_list;	/* from connection */
 	mlrpc_heap_t		*heap;
 	struct mlsvc_rpc_context *context;
-};
+} ndr_xa_t;
 
 struct mlrpc_client {
 	int (*xa_init)(struct mlrpc_client *, struct mlrpc_xaction *,
@@ -371,16 +387,16 @@ struct mlrpc_client {
 	unsigned next_p_cont_id;
 };
 
-/* mlndo.c */
+/* ndr_ops.c */
 int mlnds_initialize(struct mlndr_stream *, unsigned, int, mlrpc_heap_t *);
 void mlnds_destruct(struct mlndr_stream *);
 
-/* mlrpc_client.c */
+/* ndr_client.c */
 int mlrpc_c_bind(struct mlrpc_client *, char *, struct mlrpc_binding **);
 int mlrpc_c_call(struct mlrpc_binding *, int, void *, mlrpc_heapref_t *);
 void mlrpc_c_free_heap(struct mlrpc_binding *, mlrpc_heapref_t *);
 
-/* mlrpc_encdec.c */
+/* ndr_marshal.c */
 int mlrpc_encode_decode_common(struct mlrpc_xaction *, int, unsigned,
     struct ndr_typeinfo *, void *);
 int mlrpc_decode_call(struct mlrpc_xaction *, void *);
@@ -392,23 +408,29 @@ int mlrpc_encode_pdu_hdr(struct mlrpc_xaction *);
 void mlrpc_decode_frag_hdr(struct mlndr_stream *, mlrpcconn_common_header_t *);
 unsigned mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *);
 
-/* mlrpc_server.c */
+/* ndr_server.c */
 int mlrpc_generic_call_stub(struct mlrpc_xaction *);
 
-/* mlrpc_svc.c */
-struct mlrpc_stub_table *mlrpc_find_stub_in_svc(struct mlrpc_service *, int);
-struct mlrpc_service *mlrpc_find_service_by_name(const char *);
-struct mlrpc_service *mlrpc_find_service_by_uuids(mlrpc_uuid_t *, int,
-    mlrpc_uuid_t *, int);
-int mlrpc_register_service(struct mlrpc_service *);
-void mlrpc_unregister_service(struct mlrpc_service *);
-void mlrpc_uuid_to_str(mlrpc_uuid_t *, char *);
-int mlrpc_str_to_uuid(char *, mlrpc_uuid_t *);
+/* ndr_svc.c */
+struct mlrpc_stub_table *mlrpc_find_stub_in_svc(mlrpc_service_t *, int);
+mlrpc_service_t *mlrpc_find_service_by_name(const char *);
+mlrpc_service_t *mlrpc_find_service_by_uuids(ndr_uuid_t *, int,
+    ndr_uuid_t *, int);
+int mlrpc_register_service(mlrpc_service_t *);
+void mlrpc_unregister_service(mlrpc_service_t *);
+void mlrpc_uuid_to_str(ndr_uuid_t *, char *);
+int mlrpc_str_to_uuid(char *, ndr_uuid_t *);
 void mlrpc_binding_pool_initialize(struct mlrpc_binding **,
     struct mlrpc_binding pool[], unsigned);
 struct mlrpc_binding *mlrpc_find_binding(struct mlrpc_xaction *,
     mlrpc_p_context_id_t);
 struct mlrpc_binding *mlrpc_new_binding(struct mlrpc_xaction *);
+
+ndr_hdid_t *ndr_hdalloc(const ndr_xa_t *, const void *);
+void ndr_hdfree(const ndr_xa_t *, const ndr_hdid_t *);
+ndr_handle_t *ndr_hdlookup(const ndr_xa_t *, const ndr_hdid_t *);
+void ndr_hdclose(int fid);
+
 
 #ifdef __cplusplus
 }

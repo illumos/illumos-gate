@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,14 +115,14 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		/* NOTREACHED */
 	}
 
 	if (sd_len) {
 		status = smb_decode_sd(xa, &sd);
 		if (status != NT_STATUS_SUCCESS) {
-			smbsr_raise_nt_error(sr, status);
+			smbsr_error(sr, status, 0, 0);
 			/* NOTREACHED */
 		}
 		op->sd = &sd;
@@ -177,11 +177,10 @@ smb_nt_transact_create(struct smb_request *sr, struct smb_xa *xa)
 
 	if (status != NT_STATUS_SUCCESS) {
 		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_SHARING_VIOLATION,
+			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 		else
-			smbsr_raise_nt_error(sr, status);
+			smbsr_error(sr, status, 0, 0);
 
 		/* NOTREACHED */
 	}

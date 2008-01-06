@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,7 +318,7 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 {
 	struct samr_Connect4 arg;
 	mlrpc_heapref_t heapref;
-	char *dns_name;
+	char dns_name[MAXHOSTNAMELEN];
 	int len;
 	int opnum;
 	DWORD status;
@@ -327,9 +327,10 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 	opnum = SAMR_OPNUM_Connect;
 	status = NT_STATUS_SUCCESS;
 
+	if (smb_resolve_fqdn(domain, dns_name, MAXHOSTNAMELEN) != 1)
+		return (NT_STATUS_UNSUCCESSFUL);
+
 	(void) mlsvc_rpc_init(&heapref);
-	dns_name = mlrpc_heap_malloc(heapref.heap, MAXHOSTNAMELEN);
-	(void) smb_getdomainname(dns_name, MAXHOSTNAMELEN);
 
 	if (strlen(dns_name) > 0) {
 		len = strlen(server) + strlen(dns_name) + 4;

@@ -19,19 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stdio.h>
 #include <unistd.h>
-
-#include <smbsrv/libsmb.h>
+#include <pthread.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/mlsvc_util.h>
-#include <smbsrv/lsalib.h>
 
 void dssetup_initialize(void);
 void srvsvc_initialize(void);
@@ -42,6 +38,12 @@ void netr_initialize(void);
 void samr_initialize(void);
 void svcctl_initialize(void);
 void winreg_initialize(void);
+int srvsvc_gettime(unsigned long *);
+
+static void *mlsvc_keepalive(void *);
+
+static pthread_t mlsvc_keepalive_thr;
+#define	MLSVC_KEEPALIVE_INTERVAL	(10 * 60)	/* 10 minutes */
 
 /*
  * All mlrpc initialization is invoked from here.
@@ -50,6 +52,9 @@ void winreg_initialize(void);
 int
 mlsvc_init(void)
 {
+	pthread_attr_t tattr;
+	int rc;
+
 	srvsvc_initialize();
 	wkssvc_initialize();
 	lsarpc_initialize();
@@ -60,6 +65,35 @@ mlsvc_init(void)
 	winreg_initialize();
 	logr_initialize();
 
-	(void) sam_init();
-	return (0);
+	(void) lsa_query_primary_domain_info();
+
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&mlsvc_keepalive_thr, &tattr,
+	    mlsvc_keepalive, 0);
+	(void) pthread_attr_destroy(&tattr);
+	return (rc);
+}
+
+/*ARGSUSED*/
+static void *
+mlsvc_keepalive(void *arg)
+{
+	unsigned long t;
+	nt_domain_t *domain;
+
+	for (;;) {
+		(void) sleep(MLSVC_KEEPALIVE_INTERVAL);
+
+		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+			domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY);
+			if (domain == NULL)
+				(void) lsa_query_primary_domain_info();
+		}
+
+		(void) srvsvc_gettime(&t);
+	}
+
+	/*NOTREACHED*/
+	return (NULL);
 }

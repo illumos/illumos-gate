@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@
 
 #include <string.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <synch.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -128,8 +127,6 @@ nb_keep_alive(int fd)
 	(void) mutex_lock(&nb_mutex);
 
 	rc = nb_write_msg(fd, (unsigned char *)&nothing, 0, SESSION_KEEP_ALIVE);
-	if (rc < 0)
-		syslog(LOG_ERR, "nb_keep_alive: write failed");
 
 	(void) mutex_unlock(&nb_mutex);
 	return (rc);
@@ -145,9 +142,7 @@ nb_send(int fd, unsigned char *send_buf, unsigned send_cnt)
 {
 	int rc;
 
-	if ((rc = nb_write_msg(fd, send_buf, send_cnt, SESSION_MESSAGE)) < 0)
-		syslog(LOG_ERR, "nb_send: write failed: rc=%d", rc);
-
+	rc = nb_write_msg(fd, send_buf, send_cnt, SESSION_MESSAGE);
 	return (rc);
 }
 
@@ -166,16 +161,12 @@ nb_rcv(int fd, unsigned char *recv_buf, unsigned recv_max, long timeout)
 
 	do {
 		rc = nb_read_msg(fd, recv_buf, recv_max, &type, timeout);
-		if (rc < 0) {
-			syslog(LOG_ERR, "nb_rcv: read failed: rc=%d", rc);
+		if (rc < 0)
 			return (rc);
-		}
 	} while (type == SESSION_KEEP_ALIVE);
 
-	if (type != SESSION_MESSAGE) {
-		syslog(LOG_ERR, "nb_rcv: invalid type: %d", type);
+	if (type != SESSION_MESSAGE)
 		return (NB_RCV_MSG_ERR_INVTYPE);
-	}
 
 	return (rc);
 }
@@ -236,8 +227,6 @@ nb_session_request(int fd, char *called_name, char *called_scope,
 
 	rc = nb_write_msg(fd, (unsigned char *)sr_buf, len, SESSION_REQUEST);
 	if (rc < 0) {
-		syslog(LOG_ERR, "nb_session_request: write failed:"
-		    " rc=%d", rc);
 		(void) mutex_unlock(&nb_mutex);
 		return (rc);
 	}
@@ -287,7 +276,6 @@ nb_write_msg(int fd, unsigned char *buf, unsigned count, int type)
 		/*
 		 * We should never see descriptor 0 (stdin).
 		 */
-		syslog(LOG_ERR, "nb_write_msg: invalid descriptor (%d)", fd);
 		return (-1);
 	}
 
@@ -310,7 +298,6 @@ nb_write_msg(int fd, unsigned char *buf, unsigned count, int type)
 
 	rc = writev(fd, iov, 2);
 	if (rc != 4 + count) {
-		syslog(LOG_ERR, "nb_write_msg: writev rc=%d", rc);
 		return (-3);		/* error */
 	}
 
@@ -340,7 +327,6 @@ nb_read_msg(int fd, unsigned char *buf, unsigned max_buf,
 		/*
 		 * We should never see descriptor 0 (stdin).
 		 */
-		syslog(LOG_ERR, "nb_write_msg: invalid descriptor (%d)", fd);
 		return (NB_READ_MSG_ERR);
 	}
 
@@ -350,7 +336,6 @@ nb_read_msg(int fd, unsigned char *buf, unsigned max_buf,
 	tval.tv_usec = 0;
 
 	if ((rc = select(fd + 1, &readfds, 0, 0, &tval)) <= 0) {
-		syslog(LOG_ERR, "nb_read_msg: select: %d", rc);
 		return (NB_READ_MSG_ERR);
 	}
 

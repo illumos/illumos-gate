@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,15 +76,13 @@ smb_com_query_information2(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 
 	if (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK) {
-		cmn_err(CE_NOTE, "SmbQueryInfo2: access denied");
-		smbsr_raise_error(sr, ERRDOS, ERRnoaccess);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		/* NOTREACHED */
 	}
 

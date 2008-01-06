@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ extern unsigned char *smbrdr_ipc_get_passwd(void);
 /* Redirector LOGON function */
 extern int mlsvc_logon(char *, char *, char *);
 
-extern int smbrdr_rpc_readx(int, char *, int);
+extern int smbrdr_readx(int, char *, int);
 
 
 /* Redirector rpcpipe functions */
@@ -62,14 +62,12 @@ extern int mlsvc_close_pipe(int);
 
 /* Redirector session functions */
 extern void smbrdr_init(void);
-extern int mlsvc_locate_domain_controller(char *);
 extern int mlsvc_session_native_values(int, int *, int *, int *);
-extern void mlsvc_check_sessions(void);
 extern int mlsvc_echo(char *);
 extern void mlsvc_disconnect(char *);
 
 
-extern int smbrdr_rpc_transact(int, char *, int, char *, int);
+extern int smbrdr_transact(int, char *, int, char *, int);
 
 
 /* DEBUG functions */

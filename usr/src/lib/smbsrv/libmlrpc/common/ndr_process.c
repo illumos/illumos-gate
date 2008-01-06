@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1321,9 +1321,9 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 		myref.inner_flags = NDR_F_NONE;
 
 		/*
-		 * Set up strlen_is so that we know what to
-		 * expect later (see mlndr_s_wchar).
+		 * Set up size_is and strlen_is for mlndr_s_wchar.
 		 */
+		myref.size_is = size_is;
 		myref.strlen_is = length_is;
 	}
 
@@ -1933,6 +1933,9 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
 			if (count < 0) {
 				return (0);
 			} else if (count == 0) {
+				if (encl_ref->strlen_is != encl_ref->size_is)
+					break;
+
 				/*
 				 * If the input char is 0, mbtowc
 				 * returns 0 without setting wide_char.

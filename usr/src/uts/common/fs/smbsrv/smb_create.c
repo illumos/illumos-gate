@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,13 +62,13 @@ smb_com_create(struct smb_request *sr)
 		break;
 
 	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_raise_cifs_error(sr, NT_STATUS_SHARING_VIOLATION,
+		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
 		/* NOTREACHED */
 		break;
 
 	default:
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 		break;
 	}
@@ -107,13 +107,13 @@ smb_com_create_new(struct smb_request *sr)
 		break;
 
 	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_raise_cifs_error(sr, NT_STATUS_SHARING_VIOLATION,
+		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
 		/* NOTREACHED */
 		break;
 
 	default:
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 		break;
 	}
@@ -165,13 +165,13 @@ smb_com_create_temporary(struct smb_request *sr)
 		break;
 
 	case NT_STATUS_SHARING_VIOLATION:
-		smbsr_raise_cifs_error(sr, NT_STATUS_SHARING_VIOLATION,
+		smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
 		/* NOTREACHED */
 		break;
 
 	default:
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 		break;
 	}
@@ -198,7 +198,7 @@ smb_common_create(struct smb_request *sr)
 
 	if ((op->desired_access == ((uint32_t)SMB_INVALID_AMASK)) ||
 	    (op->share_access == ((uint32_t)SMB_INVALID_SHAREMODE))) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_PARAMETER,
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		/* NOTREACHED */
 	}

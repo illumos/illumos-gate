@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,8 +239,7 @@ smb_com_locking_andx(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -275,7 +274,7 @@ smb_com_locking_andx(struct smb_request *sr)
 	 * implement this)
 	 */
 	if (lock_type & LOCKING_ANDX_CHANGE_LOCK_TYPE) {
-		smbsr_raise_error(sr, ERRDOS, ERRnoatomiclocks);
+		smbsr_error(sr, 0, ERRDOS, ERRnoatomiclocks);
 		/* NOT REACHED */
 	}
 
@@ -283,8 +282,7 @@ smb_com_locking_andx(struct smb_request *sr)
 	 * No support for cancel lock (smbtorture expects this)
 	 */
 	if (lock_type & LOCKING_ANDX_CANCEL_LOCK) {
-		smbsr_raise_cifs_error(sr,
-		    NT_STATUS_INVALID_PARAMETER,
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 		    ERRDOS, ERROR_INVALID_PARAMETER);
 		/* NOT REACHED */
 	}
@@ -294,8 +292,7 @@ smb_com_locking_andx(struct smb_request *sr)
 		 * negotiated protocol should be NT LM 0.12 or later
 		 */
 		if (sr->session->dialect < NT_LM_0_12) {
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_INVALID_PARAMETER,
+			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 			    ERRDOS, ERROR_INVALID_PARAMETER);
 			/* NOT REACHED */
 		}
@@ -305,17 +302,18 @@ smb_com_locking_andx(struct smb_request *sr)
 			    &sr->smb_pid, &offset64, &length64);
 			if (rc) {
 				/*
-				 * This is the error returned by a W2K system
-				 * even when NT Status is negotiated.
+				 * This is the error returned by Windows 2000
+				 * even when STATUS32 has been negotiated.
 				 */
-				smbsr_raise_error(sr, ERRSRV, ERRerror);
+				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				/* NOT REACHED */
 			}
 
 			result = smb_unlock_range(sr, sr->fid_ofile->f_node,
 			    offset64, length64);
 			if (result != NT_STATUS_SUCCESS) {
-				smb_unlock_range_raise_error(sr, result);
+				smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
+				    ERRDOS, ERRnotlocked);
 				/* NOT REACHED */
 			}
 		}
@@ -324,14 +322,14 @@ smb_com_locking_andx(struct smb_request *sr)
 			rc = smb_decode_mbc(&sr->smb_data, "w2.QQ",
 			    &sr->smb_pid, &offset64, &length64);
 			if (rc) {
-				smbsr_raise_error(sr, ERRSRV, ERRerror);
+				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				/* NOT REACHED */
 			}
 
 			result = smb_lock_range(sr, sr->fid_ofile,
 			    offset64, length64, timeout, ltype);
 			if (result != NT_STATUS_SUCCESS) {
-				smb_lock_range_raise_error(sr, result);
+				smb_lock_range_error(sr, result);
 				/* NOT REACHED */
 			}
 		}
@@ -340,14 +338,15 @@ smb_com_locking_andx(struct smb_request *sr)
 			rc = smb_decode_mbc(&sr->smb_data, "wll", &sr->smb_pid,
 			    &offset32, &length32);
 			if (rc) {
-				smbsr_raise_error(sr, ERRSRV, ERRerror);
+				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				/* NOT REACHED */
 			}
 
 			result = smb_unlock_range(sr, sr->fid_ofile->f_node,
 			    (uint64_t)offset32, (uint64_t)length32);
 			if (result != NT_STATUS_SUCCESS) {
-				smb_unlock_range_raise_error(sr, result);
+				smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
+				    ERRDOS, ERRnotlocked);
 				/* NOT REACHED */
 			}
 		}
@@ -356,7 +355,7 @@ smb_com_locking_andx(struct smb_request *sr)
 			rc = smb_decode_mbc(&sr->smb_data, "wll", &sr->smb_pid,
 			    &offset32, &length32);
 			if (rc) {
-				smbsr_raise_error(sr, ERRSRV, ERRerror);
+				smbsr_error(sr, 0, ERRSRV, ERRerror);
 				/* NOT REACHED */
 			}
 
@@ -365,7 +364,7 @@ smb_com_locking_andx(struct smb_request *sr)
 			    (uint64_t)length32,
 			    timeout, ltype);
 			if (result != NT_STATUS_SUCCESS) {
-				smb_lock_range_raise_error(sr, result);
+				smb_lock_range_error(sr, result);
 				/* NOT REACHED */
 			}
 		}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,8 +224,9 @@ void
 smb_autohome_setent(void)
 {
 	smb_autohome_info_t *si;
-	char *mappath;
+	char path[MAXNAMELEN];
 	char filename[MAXNAMELEN];
+	int rc;
 
 	if ((si = smb_autohome_getinfo()) != 0) {
 		(void) fseek(si->fp, 0L, SEEK_SET);
@@ -236,12 +237,12 @@ smb_autohome_setent(void)
 	if ((si = &smb_ai) == 0)
 		return;
 
-	smb_config_rdlock();
-	if ((mappath = smb_config_get(SMB_CI_AUTOHOME_MAP)) == NULL)
-		mappath = SMB_AUTOHOME_PATH;
-	(void) snprintf(filename, MAXNAMELEN, "%s/%s", mappath,
+	rc = smb_config_getstr(SMB_CI_AUTOHOME_MAP, path, sizeof (path));
+	if (rc != SMBD_SMF_OK)
+		return;
+
+	(void) snprintf(filename, MAXNAMELEN, "%s/%s", path,
 	    SMB_AUTOHOME_FILE);
-	smb_config_unlock();
 
 	if ((si->fp = fopen(filename, "r")) == NULL)
 		return;

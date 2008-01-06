@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <syslog.h>
 #include <sys/varargs.h>
 #include <sys/types.h>
 #include <smbsrv/string.h>
+#include <smbsrv/libsmb.h>
 
 #define	C2H(c)		"0123456789ABCDEF"[(c)]
 #define	H2C(c)    (((c) >= '0' && (c) <= '9') ? ((c) - '0') :     \
@@ -56,7 +56,7 @@
  *
  */
 void
-hexdump_offset(unsigned char *buffer, int nbytes, unsigned long *start, int log)
+hexdump_offset(unsigned char *buffer, int nbytes, unsigned long *start)
 {
 	static char *hex = "0123456789ABCDEF";
 	int i, count;
@@ -67,13 +67,8 @@ hexdump_offset(unsigned char *buffer, int nbytes, unsigned long *start, int log)
 	char *ap = ascbuf;
 	char *hp = hexbuf;
 
-	if ((p = buffer) == 0) {
-		if (log)
-			syslog(LOG_DEBUG, "hexdump: (null)");
-		else
-			(void) printf("hexdump: (null)\n");
+	if ((p = buffer) == NULL)
 		return;
-	}
 
 	offset = *start;
 
@@ -83,12 +78,7 @@ hexdump_offset(unsigned char *buffer, int nbytes, unsigned long *start, int log)
 
 	for (i = 0; i < nbytes; ++i) {
 		if (i && (i % 16) == 0) {
-			if (log)
-				syslog(LOG_DEBUG,
-				    "%06X %s  %s", offset, hexbuf, ascbuf);
-			else
-				(void) printf("%06X %s  %s\n",
-				    offset, hexbuf, ascbuf);
+			smb_tracef("%06X %s  %s", offset, hexbuf, ascbuf);
 			ap = ascbuf;
 			hp = hexbuf;
 			count = 0;
@@ -104,13 +94,7 @@ hexdump_offset(unsigned char *buffer, int nbytes, unsigned long *start, int log)
 	}
 
 	if (count) {
-		if (log)
-			syslog(LOG_DEBUG,
-			    "%06X %-48s  %s", offset, hexbuf, ascbuf);
-		else
-			(void) printf("%06X %-48s  %s\n",
-			    offset, hexbuf, ascbuf);
-
+		smb_tracef("%06X %-48s  %s", offset, hexbuf, ascbuf);
 		offset += count;
 	}
 
@@ -122,7 +106,7 @@ hexdump(unsigned char *buffer, int nbytes)
 {
 	unsigned long start = 0;
 
-	hexdump_offset(buffer, nbytes, &start, 1);
+	hexdump_offset(buffer, nbytes, &start);
 }
 
 /*
@@ -213,8 +197,8 @@ trim_whitespace(char *buf)
 	char *p = buf;
 	char *q = buf;
 
-	if (buf == 0)
-		return (0);
+	if (buf == NULL)
+		return (NULL);
 
 	while (*p && isspace(*p))
 		++p;

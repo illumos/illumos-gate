@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,8 +135,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -144,10 +143,9 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	if (node->attr.sa_vattr.va_type != VDIR) {
 		/*
-		 * notify change requests are only valid for
-		 * directories
+		 * Notify change requests are only valid on directories.
 		 */
-		smbsr_raise_nt_error(sr, NT_STATUS_NOT_A_DIRECTORY);
+		smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY, 0, 0);
 		/* NOTREACHED */
 	}
 
@@ -192,7 +190,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_REQ_STATE_CANCELED:
 		mutex_exit(&sr->sr_mutex);
-		smbsr_raise_nt_error(sr, NT_STATUS_CANCELLED);
+		smbsr_error(sr, NT_STATUS_CANCELLED, 0, 0);
 		/* NOTREACHED */
 	default:
 		ASSERT(0);
@@ -211,13 +209,13 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
  * is sent in reply.
  */
 int
-smb_reply_notify_change_request(
-    smb_request_t	*sr)
+smb_reply_notify_change_request(smb_request_t *sr)
 {
 	smb_node_t	*node;
 	int		total_bytes, n_setup, n_param, n_data;
 	int		param_off, param_pad, data_off, data_pad;
 	struct		smb_xa *xa;
+	smb_error_t	err;
 
 	xa = sr->r_xa;
 	node = sr->sr_ncr.nc_node;
@@ -273,12 +271,12 @@ smb_reply_notify_change_request(
 		break;
 
 	case SMB_REQ_STATE_CANCELED:
-		/*
-		 * an STATUS should be sent,
-		 * we need an implementation of nt_raise_error
-		 * but without long jump.
-		 */
-		smbsr_setup_nt_status(sr, 0xc0000000, NT_STATUS_CANCELLED);
+		err.severity = ERROR_SEVERITY_ERROR;
+		err.status   = NT_STATUS_CANCELLED;
+		err.errcls   = ERRDOS;
+		err.errcode  = ERROR_OPERATION_ABORTED;
+		smbsr_set_error(sr, &err);
+
 		(void) smb_encode_mbc(&sr->reply, "bwbw",
 		    (short)0, 0L, (short)0, 0L);
 		sr->smb_wct = 0;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,17 +36,12 @@
 #include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
 
-static DWORD smbrdr_handle_setup(smbrdr_handle_t *srh, unsigned char cmd,
-    struct sdb_session *session, struct sdb_logon *logon,
-    struct sdb_netuse *netuse);
-
-static int smbrdr_hdr_setup(smbrdr_handle_t *srh);
-
-static DWORD smbrdr_hdr_process(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr);
-
-static int smbrdr_sign(smb_sign_ctx_t *sign_ctx, smb_msgbuf_t *mb);
-static int smbrdr_sign_chk(smb_sign_ctx_t *sign_ctx, smb_msgbuf_t *mb,
-    unsigned char *signature);
+static DWORD smbrdr_handle_setup(smbrdr_handle_t *, unsigned char,
+    struct sdb_session *, struct sdb_logon *, struct sdb_netuse *);
+static int smbrdr_hdr_setup(smbrdr_handle_t *);
+static DWORD smbrdr_hdr_process(smbrdr_handle_t *, smb_hdr_t *);
+static int smbrdr_sign(smb_sign_ctx_t *, smb_msgbuf_t *);
+static int smbrdr_sign_chk(smb_sign_ctx_t *, smb_msgbuf_t *, unsigned char *);
 
 void smbrdr_lock_transport() { nb_lock(); }
 void smbrdr_unlock_transport() { nb_unlock(); }
@@ -73,13 +68,10 @@ smbrdr_request_init(smbrdr_handle_t *srh,
 	DWORD status;
 
 	status = smbrdr_handle_setup(srh, cmd, session, logon, netuse);
-	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_DEBUG, "Smbrdr[%d]: initialization failed", cmd);
+	if (status != NT_STATUS_SUCCESS)
 		return (status);
-	}
 
 	if (smbrdr_hdr_setup(srh) < SMB_HEADER_LEN) {
-		syslog(LOG_DEBUG, "Smbrdr[%d]: cannot setup header", cmd);
 		smbrdr_handle_free(srh);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
@@ -105,8 +97,11 @@ smbrdr_send(smbrdr_handle_t *srh)
 	int rc;
 
 	if (smbrdr_sign(&srh->srh_session->sign_ctx, &srh->srh_mbuf) !=
-	    SMBAUTH_SUCCESS)
+	    SMBAUTH_SUCCESS) {
+		syslog(LOG_DEBUG, "smbrdr_send[%d]: signing failed",
+		    srh->srh_cmd);
 		return (NT_STATUS_INTERNAL_ERROR);
+	}
 
 	rc = nb_send(srh->srh_session->sock, srh->srh_buf,
 	    smb_msgbuf_used(&srh->srh_mbuf));
@@ -163,7 +158,6 @@ smbrdr_rcv(smbrdr_handle_t *srh, int is_first_rsp)
 		return (NT_STATUS_UNEXPECTED_NETWORK_ERROR);
 	}
 
-	/* initialize for processing response */
 	smb_msgbuf_init(&srh->srh_mbuf, srh->srh_buf, rc, srh->srh_mbflags);
 
 	status = smbrdr_hdr_process(srh, &smb_hdr);
@@ -177,7 +171,7 @@ smbrdr_rcv(smbrdr_handle_t *srh, int is_first_rsp)
 
 	if (!smbrdr_sign_chk(sign_ctx,
 	    &srh->srh_mbuf, smb_hdr.extra.extra.security_sig)) {
-		syslog(LOG_ERR, "SmbrdrExchange[%d]: bad signature",
+		syslog(LOG_DEBUG, "smbrdr_rcv[%d]: bad signature",
 		    srh->srh_cmd);
 		return (NT_STATUS_INVALID_NETWORK_RESPONSE);
 	}
@@ -217,15 +211,18 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 	mb = &srh->srh_mbuf;
 	sign_ctx = &srh->srh_session->sign_ctx;
 
-	if (smbrdr_sign(sign_ctx, mb) != SMBAUTH_SUCCESS)
+	if (smbrdr_sign(sign_ctx, mb) != SMBAUTH_SUCCESS) {
+		syslog(LOG_DEBUG, "smbrdr_exchange[%d]: signing failed",
+		    srh->srh_cmd);
 		return (NT_STATUS_INTERNAL_ERROR);
+	}
 
 	rc = nb_exchange(srh->srh_session->sock,
 	    srh->srh_buf, smb_msgbuf_used(mb),
 	    srh->srh_buf, SMBRDR_REQ_BUFSZ, timeout);
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "SmbrdrExchange[%d]: failed (%d)",
+		syslog(LOG_DEBUG, "smbrdr_exchange[%d]: failed (%d)",
 		    srh->srh_cmd, rc);
 
 		if (srh->srh_cmd != SMB_COM_ECHO) {
@@ -251,7 +248,7 @@ smbrdr_exchange(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr, long timeout)
 
 	/* Signature validation */
 	if (!smbrdr_sign_chk(sign_ctx, mb, smb_hdr->extra.extra.security_sig)) {
-		syslog(LOG_ERR, "SmbrdrExchange[%d]: bad signature",
+		syslog(LOG_DEBUG, "smbrdr_exchange[%d]: bad signature",
 		    srh->srh_cmd);
 		return (NT_STATUS_INVALID_NETWORK_RESPONSE);
 	}
@@ -313,14 +310,12 @@ smbrdr_sign_init(struct sdb_session *session, struct sdb_logon *logon)
 	if ((sign_ctx->ssc_flags & SMB_SCF_REQUIRED) &&
 	    !(sign_ctx->ssc_flags & SMB_SCF_STARTED) &&
 	    (logon->type != SDB_LOGON_ANONYMOUS)) {
-		if (smb_mac_init(sign_ctx, &logon->auth) != SMBAUTH_SUCCESS) {
-			syslog(LOG_DEBUG, "SmbrdrSignInit: mac_init failed");
+		if (smb_mac_init(sign_ctx, &logon->auth) != SMBAUTH_SUCCESS)
 			return (-1);
-		}
+
 		sign_ctx->ssc_flags |=
 		    (SMB_SCF_STARTED | SMB_SCF_KEY_ISSET_THIS_LOGON);
 		session->smb_flags2 |= SMB_FLAGS2_SMB_SECURITY_SIGNATURE;
-		syslog(LOG_DEBUG, "SmbrdrSignInit: mac key is set");
 		rc = 1;
 	}
 
@@ -333,23 +328,16 @@ smbrdr_sign_init(struct sdb_session *session, struct sdb_logon *logon)
  * Invalidate the MAC key if the first non-anonymous/non-guest user logon
  * fail.
  */
-int
+void
 smbrdr_sign_fini(struct sdb_session *session)
 {
-	smb_sign_ctx_t *sign_ctx;
-	int rc = 0;
-
-	sign_ctx = &session->sign_ctx;
+	smb_sign_ctx_t *sign_ctx = &session->sign_ctx;
 
 	if (sign_ctx->ssc_flags & SMB_SCF_KEY_ISSET_THIS_LOGON) {
 		sign_ctx->ssc_flags &= ~SMB_SCF_STARTED;
 		sign_ctx->ssc_flags &= ~SMB_SCF_KEY_ISSET_THIS_LOGON;
 		sign_ctx->ssc_seqnum = 0;
-		syslog(LOG_DEBUG, "SmbrdrSignFini: packet signing stopped");
-		rc = 1;
 	}
-
-	return (rc);
 }
 
 /*
@@ -359,21 +347,12 @@ smbrdr_sign_fini(struct sdb_session *session)
  * SmbSessionSetupAndX request for the first non-anonymous/non-guest
  * logon.
  */
-int
+void
 smbrdr_sign_unset_key(struct sdb_session *session)
 {
-	smb_sign_ctx_t *sign_ctx;
-	int rc = 0;
+	smb_sign_ctx_t *sign_ctx = &session->sign_ctx;
 
-	sign_ctx = &session->sign_ctx;
-
-	if (sign_ctx->ssc_flags & SMB_SCF_KEY_ISSET_THIS_LOGON) {
-		sign_ctx->ssc_flags &= ~SMB_SCF_KEY_ISSET_THIS_LOGON;
-		syslog(LOG_DEBUG, "SmbrdrSignUnsetKey: unset KEY_ISSET flag");
-		rc = 1;
-	}
-
-	return (rc);
+	sign_ctx->ssc_flags &= ~SMB_SCF_KEY_ISSET_THIS_LOGON;
 }
 
 /*
@@ -396,10 +375,9 @@ smbrdr_handle_setup(smbrdr_handle_t *srh,
 			struct sdb_netuse *netuse)
 {
 	srh->srh_buf = (unsigned char *)malloc(SMBRDR_REQ_BUFSZ);
-	if (srh->srh_buf == 0) {
-		syslog(LOG_ERR, "Smbrdr[%d]: resource shortage", cmd);
+	if (srh->srh_buf == NULL)
 		return (NT_STATUS_NO_MEMORY);
-	}
+
 	bzero(srh->srh_buf, SMBRDR_REQ_BUFSZ);
 
 	srh->srh_mbflags = (session->remote_caps & CAP_UNICODE)
@@ -468,6 +446,10 @@ smb_decode_nt_hdr(smb_msgbuf_t *mb, smb_hdr_t *hdr)
  * Assuming 'srh->srh_mbuf' contains a response from a Windows client,
  * decodes the 32 bytes SMB header.
  *
+ * Buffer overflow typically means that the server has more data than
+ * it could fit in the response buffer.  The client can use subsequent
+ * SmbReadX requests to obtain the remaining data (KB 193839).
+ *
  * Returns:
  *
  *  NT_STATUS_INVALID_NETWORK_RESPONSE	error decoding the header
@@ -480,43 +462,26 @@ smbrdr_hdr_process(smbrdr_handle_t *srh, smb_hdr_t *smb_hdr)
 {
 	int rc;
 
-	/*
-	 * Returns the number of decoded bytes on success
-	 * or some negative MSGBUF_XXX error code on failure
-	 */
 	rc = smb_decode_nt_hdr(&srh->srh_mbuf, smb_hdr);
-
 	if (rc < SMB_HEADER_LEN) {
-		syslog(LOG_ERR, "Smbrdr[%d]: bad SMB header (%d)",
+		syslog(LOG_DEBUG, "smbrdr[%d]: invalid header (%d)",
 		    srh->srh_cmd, rc);
 		return (NT_STATUS_INVALID_NETWORK_RESPONSE);
 	}
 
-	if (smb_hdr->status.ntstatus != 0) {
-		/*
-		 * MSDN article: 193839
-		 * "The buffer overflow status is usually returned by a Windows
-		 * server to inform the client that there is more data in its
-		 * buffer than it could put in the packet.
-		 *
-		 * The buffer overflow should not be considered as an error.
-		 * Subsequent SmbReadX request is required to obtain the
-		 * remaining data in the server's buffer.
-		 */
-		if (NT_SC_VALUE(smb_hdr->status.ntstatus)
-		    == NT_STATUS_BUFFER_OVERFLOW) {
-			syslog(LOG_DEBUG, "Smbrdr[%d]: %s", srh->srh_cmd,
-			    xlate_nt_status(smb_hdr->status.ntstatus));
-		} else {
-			syslog(LOG_ERR, "Smbrdr[%d]: request failed (%s)",
-			    srh->srh_cmd,
-			    xlate_nt_status(smb_hdr->status.ntstatus));
-			return (smb_hdr->status.ntstatus);
-		}
+	switch (NT_SC_VALUE(smb_hdr->status.ntstatus)) {
+	case NT_STATUS_SUCCESS:
+	case NT_STATUS_BUFFER_OVERFLOW:
+		break;
+
+	default:
+		syslog(LOG_DEBUG, "smbrdr[%d]: request failed (%s)",
+		    srh->srh_cmd, xlate_nt_status(smb_hdr->status.ntstatus));
+		return (smb_hdr->status.ntstatus);
 	}
 
 	if (smb_hdr->command != srh->srh_cmd) {
-		syslog(LOG_ERR, "Smbrdr[%d]: reply mismatch (%d)",
+		syslog(LOG_DEBUG, "smbrdr[%d]: reply mismatch (%d)",
 		    srh->srh_cmd, smb_hdr->command);
 		return (NT_STATUS_REPLY_MESSAGE_MISMATCH);
 	}
@@ -551,8 +516,7 @@ smbrdr_sign(smb_sign_ctx_t *sign_ctx, smb_msgbuf_t *mb)
 {
 	if (sign_ctx->ssc_flags & SMB_SCF_STARTED) {
 		if (sign_ctx->ssc_seqnum % 2) {
-			syslog(LOG_DEBUG, "SmbrdrSign: even sequence number"
-			    " is expected(%d)",
+			syslog(LOG_DEBUG, "smbrdr_sign: invalid sequence (%d)",
 			    sign_ctx->ssc_seqnum);
 		}
 		if (smb_mac_sign(sign_ctx, smb_msgbuf_base(mb),

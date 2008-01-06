@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +134,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type) ||
 	    SMB_TREE_IS_READ_ONLY(sr)) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -145,7 +145,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -157,7 +157,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 	}
 
 	info->node = ret_snode;
@@ -170,8 +170,7 @@ smb_com_trans2_set_path_information(struct smb_request *sr, struct smb_xa *xa)
 		/* NOTREACHED */
 	} else if (status == NT_STATUS_UNSUCCESSFUL) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
-		smbsr_raise_cifs_error(sr, smberr.status,
-		    smberr.errcls, smberr.errcode);
+		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
 		/* NOTREACHED */
 	}
 	kmem_free(info, sizeof (smb_trans2_setinfo_t));

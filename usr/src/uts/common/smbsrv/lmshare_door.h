@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,9 +70,9 @@ extern "C" {
 
 #define	SMB_GET_KCONFIG			17
 
-void smb_load_kconfig(smb_kmod_cfg_t *cfg);
-void smb_dr_get_kconfig(smb_dr_ctx_t *ctx, smb_kmod_cfg_t *cfg);
-void smb_dr_put_kconfig(smb_dr_ctx_t *ctx, smb_kmod_cfg_t *cfg);
+void smb_load_kconfig(smb_kmod_cfg_t *);
+void smb_dr_get_kconfig(smb_dr_ctx_t *, smb_kmod_cfg_t *);
+void smb_dr_put_kconfig(smb_dr_ctx_t *, smb_kmod_cfg_t *);
 
 /*
  * Door server status
@@ -97,17 +97,16 @@ void smb_dr_put_kconfig(smb_dr_ctx_t *ctx, smb_kmod_cfg_t *cfg);
  *	};
  */
 
-void		smb_dr_get_lmshare(smb_dr_ctx_t *ctx, lmshare_info_t *si);
-void		smb_dr_put_lmshare(smb_dr_ctx_t *ctx, lmshare_info_t *si);
+void smb_dr_get_lmshare(smb_dr_ctx_t *, lmshare_info_t *);
+void smb_dr_put_lmshare(smb_dr_ctx_t *, lmshare_info_t *);
 
-uint64_t smb_dr_get_lmshr_iterator(smb_dr_ctx_t *ctx);
-void		smb_dr_put_lmshr_iterator(smb_dr_ctx_t *ctx,
-    uint64_t lmshr_iter);
-void		smb_dr_free_lmshr_iterator(smb_dr_ctx_t *ctx);
-void		smb_dr_get_lmshr_list(smb_dr_ctx_t *ctx,
-    lmshare_list_t *shrlist);
-void		smb_dr_put_lmshr_list(smb_dr_ctx_t *ctx,
-    lmshare_list_t *shrlist);
+uint64_t smb_dr_get_lmshr_iterator(smb_dr_ctx_t *);
+void smb_dr_put_lmshr_iterator(smb_dr_ctx_t *, uint64_t);
+void smb_dr_free_lmshr_iterator(smb_dr_ctx_t *);
+void smb_dr_get_lmshr_list(smb_dr_ctx_t *, lmshare_list_t *);
+void smb_dr_put_lmshr_list(smb_dr_ctx_t *, lmshare_list_t *);
+
+void lmshrd_door_close(void);
 
 #ifdef __cplusplus
 }

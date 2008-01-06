@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,15 +175,15 @@ lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass)
  * If the lookup fails, the status will typically be
  * NT_STATUS_NONE_MAPPED.
  */
-int
+uint32_t
 lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
     smb_userinfo_t *user_info)
 {
 	struct mlsvc_rpc_context *context;
 	mlrpc_heapref_t heap;
 	int opnum;
-	int rc;
 	int index;
+	uint32_t status;
 	struct mslsa_LookupNames arg;
 	size_t length;
 	lookup_name_table_t name_table;
@@ -192,7 +192,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	char *p;
 
 	if (lsa_handle == NULL || name == NULL || user_info == NULL)
-		return (-1);
+		return (NT_STATUS_INVALID_PARAMETER);
 
 	bzero(user_info, sizeof (smb_userinfo_t));
 	user_info->sid_name_use = SidTypeUnknown;
@@ -239,35 +239,39 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	name_table.name[0].str = (unsigned char *)name;
 
 	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
-			rc = -1;
-		} else if (arg.mapped_count == 0) {
-			rc = -1;
-		} else {
-			rid_entry = &arg.translated_sids.rids[0];
-			user_info->sid_name_use = rid_entry->sid_name_use;
-			user_info->rid = rid_entry->rid;
-			user_info->name = MEM_STRDUP("mlrpc", name);
+	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+		status = NT_STATUS_INVALID_PARAMETER;
+	} else if (arg.status != 0) {
+		mlsvc_rpc_report_status(opnum, arg.status);
+		status = NT_SC_VALUE(arg.status);
+	} else if (arg.mapped_count == 0) {
+		user_info->sid_name_use = SidTypeInvalid;
+		status = NT_STATUS_NONE_MAPPED;
+	} else {
+		rid_entry = &arg.translated_sids.rids[0];
+		user_info->sid_name_use = rid_entry->sid_name_use;
+		user_info->rid = rid_entry->rid;
+		user_info->name = MEM_STRDUP("mlrpc", name);
 
-			if ((index = rid_entry->domain_index) == -1) {
-				user_info->domain_sid = 0;
-				user_info->domain_name = 0;
-			} else {
-				domain_entry =
-				    &arg.domain_table->entries[index];
-				user_info->domain_sid = nt_sid_dup(
-				    (nt_sid_t *)domain_entry->domain_sid);
-				user_info->domain_name = MEM_STRDUP("mlrpc",
-				    (const char *)
-				    domain_entry->domain_name.str);
-			}
+		if ((index = rid_entry->domain_index) == -1) {
+			user_info->domain_sid = 0;
+			user_info->domain_name = 0;
+		} else {
+			domain_entry =
+			    &arg.domain_table->entries[index];
+			user_info->domain_sid = nt_sid_dup(
+			    (nt_sid_t *)domain_entry->domain_sid);
+			user_info->domain_name = MEM_STRDUP("mlrpc",
+			    (const char *)
+			    domain_entry->domain_name.str);
+			user_info->user_sid = nt_sid_splice(
+			    user_info->domain_sid, user_info->rid);
 		}
+		status = NT_STATUS_SUCCESS;
 	}
 
 	mlsvc_rpc_free(context, &heap);
-	return (rc);
+	return (status);
 }
 
 /*
@@ -279,7 +283,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
  * level 2 but for now we want to restrict it to level 1 so that we
  * don't crash the PDC when we get things wrong.
  */
-int
+uint32_t
 lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
     smb_userinfo_t *user_info)
 {
@@ -290,11 +294,11 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	struct mlsvc_rpc_context *context;
 	mlrpc_heapref_t heap;
 	int opnum;
-	int rc;
 	int index;
+	uint32_t status;
 
 	if (lsa_handle == NULL || sid == NULL || user_info == NULL)
-		return (-1);
+		return (NT_STATUS_INVALID_PARAMETER);
 
 	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupSids;
@@ -308,45 +312,48 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	arg.lup_sid_table.entries = &sid_entry;
 
 	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.mapped_count == 0) {
-			user_info->sid_name_use = SidTypeInvalid;
-			rc = 1;
-		} else {
-			name_entry = &arg.name_table.entries[0];
-			user_info->sid_name_use = name_entry->sid_name_use;
+	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+		status = NT_STATUS_INVALID_PARAMETER;
+	} else if (arg.mapped_count == 0) {
+		user_info->sid_name_use = SidTypeInvalid;
+		status = NT_STATUS_NONE_MAPPED;
+	} else if (arg.status != 0) {
+		mlsvc_rpc_report_status(opnum, arg.status);
+		status = NT_SC_VALUE(arg.status);
+	} else {
+		name_entry = &arg.name_table.entries[0];
+		user_info->sid_name_use = name_entry->sid_name_use;
 
-			if (user_info->sid_name_use == SidTypeUser ||
-			    user_info->sid_name_use == SidTypeGroup ||
-			    user_info->sid_name_use == SidTypeAlias) {
+		if (user_info->sid_name_use == SidTypeUser ||
+		    user_info->sid_name_use == SidTypeGroup ||
+		    user_info->sid_name_use == SidTypeAlias) {
 
-				user_info->rid =
-				    sid->SubAuthority[sid->SubAuthCount - 1];
+			user_info->rid =
+			    sid->SubAuthority[sid->SubAuthCount - 1];
 
-				user_info->name = MEM_STRDUP("mlrpc",
-				    (const char *)name_entry->name.str);
-			}
-
-			if ((index = name_entry->domain_ix) == -1) {
-				user_info->domain_sid = 0;
-				user_info->domain_name = 0;
-			} else {
-				domain_entry =
-				    &arg.domain_table->entries[index];
-
-				user_info->domain_sid = nt_sid_dup(
-				    (nt_sid_t *)domain_entry->domain_sid);
-
-				user_info->domain_name = MEM_STRDUP("mlrpc",
-				    (const char *)
-				    domain_entry->domain_name.str);
-			}
+			user_info->name = MEM_STRDUP("mlrpc",
+			    (const char *)name_entry->name.str);
 		}
+
+		if ((index = name_entry->domain_ix) == -1) {
+			user_info->domain_sid = 0;
+			user_info->domain_name = 0;
+		} else {
+			domain_entry =
+			    &arg.domain_table->entries[index];
+
+			user_info->domain_sid = nt_sid_dup(
+			    (nt_sid_t *)domain_entry->domain_sid);
+
+			user_info->domain_name = MEM_STRDUP("mlrpc",
+			    (const char *)
+			    domain_entry->domain_name.str);
+		}
+		status = NT_STATUS_SUCCESS;
 	}
 
 	mlsvc_rpc_free(context, &heap);
-	return (rc);
+	return (status);
 }
 
 /*
@@ -728,8 +735,6 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 		mlsvc_rpc_report_status(opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
-		status = 0;
-
 		name_entry = &arg.name_table.entries[0];
 		user_info->sid_name_use = name_entry->sid_name_use;
 
@@ -757,6 +762,7 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (char const *)domain_entry->domain_name.str);
 		}
+		status = NT_STATUS_SUCCESS;
 	}
 
 	mlsvc_rpc_free(context, &heap);
@@ -780,7 +786,7 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
  *
  * It should be okay to lookup DOMAIN\Administrator in this function.
  */
-DWORD
+uint32_t
 lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
     smb_userinfo_t *user_info)
 {
@@ -793,7 +799,7 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 	lookup_name_table_t name_table;
 	struct lsar_rid_entry2 *rid_entry;
 	struct mslsa_domain_entry *domain_entry;
-	DWORD status;
+	uint32_t status;
 
 	if (lsa_handle == NULL || name == NULL || user_info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
@@ -831,8 +837,6 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 		user_info->sid_name_use = SidTypeInvalid;
 		status = NT_STATUS_NONE_MAPPED;
 	} else {
-		status = 0;
-
 		rid_entry = &arg.translated_sids.rids[0];
 		user_info->sid_name_use = rid_entry->sid_name_use;
 		user_info->rid = rid_entry->rid;
@@ -849,7 +853,10 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 
 			user_info->domain_name = MEM_STRDUP("mlrpc",
 			    (char const *)domain_entry->domain_name.str);
+			user_info->user_sid = nt_sid_splice(
+			    user_info->domain_sid, user_info->rid);
 		}
+		status = NT_STATUS_SUCCESS;
 	}
 
 	mlsvc_rpc_free(context, &heap);

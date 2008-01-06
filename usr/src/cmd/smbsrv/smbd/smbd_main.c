@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,7 +333,6 @@ smbd_service_init(void)
 
 	int door_id;
 	int rc;
-	int ddns_enabled;
 	uint32_t mode;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	int i;
@@ -364,35 +363,28 @@ smbd_service_init(void)
 		return (1);
 	}
 
-	/*
-	 * Need to load the configuration data prior to getting the
-	 * interface information.
-	 */
-	if (smb_config_load() != 0) {
-		smbd_report("failed to load configuration data");
+	(void) smb_nicmon_start();
+	if (dns_msgid_init() != 0) {
+		smbd_report("DNS message id initialization failed");
 		return (1);
 	}
 
-	smb_resolver_init();
-	(void) smb_nicmon_start();
-
 	smbrdr_init();
 
-	smb_netbios_start();
+	if (smb_netbios_start() != 0)
+		smbd_report("NetBIOS services failed to start");
+	else
+		smbd_report("NetBIOS services started");
+
 	if (smb_netlogon_init() != 0) {
 		smbd_report("netlogon initialization failed");
 		return (1);
 	}
 
-	smb_config_rdlock();
-	resource_domain[0] = '\0';
-	(void) strlcpy(resource_domain,
-	    smb_config_getstr(SMB_CI_DOMAIN_NAME), SMB_PI_MAX_DOMAIN);
+	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 	(void) utf8_strupr(resource_domain);
-	smb_config_unlock();
 
-	mode = smb_get_security_mode();
-
+	mode = smb_config_get_secmode();
 	if (mode == SMB_SECMODE_DOMAIN)
 		(void) locate_resource_pdc(resource_domain);
 
@@ -403,21 +395,14 @@ smbd_service_init(void)
 	}
 
 	if ((rc = nt_domain_init(resource_domain, mode)) != 0) {
-		if (rc == SMB_DOMAIN_NOMACHINE_SID)
-			smbd_report("No Security Identifier (SID) has been "
-			    "generated for this system.\n"
-			    "Check idmap service configuration.");
-
-		if (rc == SMB_DOMAIN_NODOMAIN_SID) {
-			/* Get the domain sid from domain controller */
-			if ((rc = lsa_query_primary_domain_info()) != 0)
-				smbd_report("Failed to get the Security "
-				    "Identifier (SID) of domain %s",
-				    resource_domain);
-			}
-		return (rc);
+		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
+			smbd_report(
+			    "no machine SID: check idmap configuration");
+			return (rc);
+		}
 	}
 
+	ads_init();
 	if ((rc = mlsvc_init()) != 0) {
 		smbd_report("msrpc initialization failed");
 		return (rc);
@@ -436,12 +421,8 @@ smbd_service_init(void)
 		return (rc);
 
 	/* Call dyndns update - Just in case its configured to refresh DNS */
-	smb_config_rdlock();
-	ddns_enabled = smb_config_getyorn(SMB_CI_DYNDNS_ENABLE);
-	smb_config_unlock();
-	if (ddns_enabled) {
+	if (smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		(void) dyndns_update();
-	}
 
 	if ((rc = smbd_kernel_bind()) != 0)
 		smbd_report("kernel bind error: %s", strerror(errno));
@@ -457,6 +438,7 @@ smbd_service_init(void)
 			smbd_report("winpipe ioctl: %s", strerror(errno));
 	}
 
+	(void) smb_lgrp_start();
 	return (lmshare_start());
 }
 
@@ -484,8 +466,8 @@ smbd_service_fini(void)
 	smb_lmshrd_srv_stop();
 	lmshare_stop();
 	smb_nicmon_stop();
-	smb_resolver_close();
 	smb_idmap_stop();
+	smb_lgrp_stop();
 	smbd_remove_ccache();
 
 }
@@ -551,7 +533,7 @@ smbd_refresh_monitor(void *arg)
 		 * We've been woken up by a refresh event so go do
 		 * what is necessary.
 		 */
-		(void) smb_config_load();
+		ads_refresh();
 		smb_nic_build_info();
 		(void) smb_netbios_name_reconfig();
 		(void) smb_browser_config();
@@ -705,7 +687,7 @@ smbd_setup_options(int argc, char *argv[])
 	if ((grp = getgrnam("sys")) != NULL)
 		smbd.s_gid = grp->gr_gid;
 
-	smbd.s_fg = smb_get_fg_flag();
+	smbd.s_fg = smb_config_get_fg_flag();
 
 	while ((c = getopt(argc, argv, ":f")) != -1) {
 		switch (c) {

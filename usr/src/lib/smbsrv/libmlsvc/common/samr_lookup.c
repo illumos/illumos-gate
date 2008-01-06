@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -473,7 +473,7 @@ samr_set_user_unknowns(struct samr_SetUserInfo23 *info)
 	info->sd.length = 0;
 	info->sd.data = 0;
 	info->user_rid = 0;
-	info->group_rid = MLSVC_DOMAIN_GROUP_RID_USERS;
+	info->group_rid = DOMAIN_GROUP_RID_USERS;
 
 	/*
 	 * The trust account value used here should probably

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,7 @@ smb_com_write(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -104,7 +103,7 @@ smb_com_write(struct smb_request *sr)
 
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -151,8 +150,7 @@ smb_com_write_and_close(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -180,13 +178,13 @@ smb_com_write_and_close(struct smb_request *sr)
 
 	if (rc != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
 	if ((rc = smb_common_close(sr, last_write)) != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -219,7 +217,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	int rc = 0;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
-		smbsr_raise_error(sr, ERRDOS, ERRnoaccess);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		/* NOTREACHED */
 	}
 
@@ -236,8 +234,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -259,7 +256,7 @@ smb_com_write_and_unlock(struct smb_request *sr)
 
 	if ((rc = smb_write_common(sr, param)) != 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -267,7 +264,8 @@ smb_com_write_and_unlock(struct smb_request *sr)
 	    (uint64_t)param->w_count);
 	if (result != NT_STATUS_SUCCESS) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smb_unlock_range_raise_error(sr, result);
+		smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
+		    ERRDOS, ERRnotlocked);
 		/* NOTREACHED */
 	}
 
@@ -324,15 +322,14 @@ smb_com_write_andx(struct smb_request *sr)
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 	if (SMB_WRMODE_IS_STABLE(param->w_mode) &&
 	    STYPE_ISDSK(sr->tid_tree->t_res_type) == 0) {
 		kmem_free(param, sizeof (smb_write_param_t));
-		smbsr_raise_error(sr, ERRSRV, ERRaccess);
+		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		/* NOTREACHED */
 	}
 
@@ -349,7 +346,7 @@ smb_com_write_andx(struct smb_request *sr)
 	if (param->w_count != 0) {
 		if ((rc = smb_write_common(sr, param)) != 0) {
 			kmem_free(param, sizeof (smb_write_param_t));
-			smbsr_raise_errno(sr, rc);
+			smbsr_errno(sr, rc);
 			/* NOTREACHED */
 		}
 	}
@@ -381,10 +378,9 @@ smb_write_common(struct smb_request *sr, smb_write_param_t *param)
 
 		if (node->attr.sa_vattr.va_type != VDIR) {
 			rc = smb_lock_range_access(sr, node, param->w_offset,
-			    param->w_count, FILE_WRITE_DATA);
+			    param->w_count, B_TRUE);
 			if (rc != NT_STATUS_SUCCESS) {
-				smbsr_raise_cifs_error(sr, rc,
-				    ERRSRV, ERRaccess);
+				smbsr_error(sr, rc, ERRSRV, ERRaccess);
 				/* NOTREACHED */
 			}
 		}
@@ -444,34 +440,48 @@ smb_write_truncate(struct smb_request *sr, smb_write_param_t *param)
 {
 	struct smb_ofile *ofile = sr->fid_ofile;
 	smb_node_t *node = ofile->f_node;
+	boolean_t append_only = B_FALSE;
 	int rc;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type) == 0)
 		return (0);
 
+	rc = smb_ofile_access(sr->fid_ofile, sr->user_cr, FILE_WRITE_DATA);
+	if (rc != NT_STATUS_SUCCESS) {
+		rc = smb_ofile_access(sr->fid_ofile, sr->user_cr,
+		    FILE_APPEND_DATA);
+		if (rc != NT_STATUS_SUCCESS) {
+			smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS,
+			    ERROR_ACCESS_DENIED);
+			/* NOTREACHED */
+		} else {
+			append_only = B_TRUE;
+		}
+	}
+
+	smb_rwx_xenter(&node->n_lock);
+
+	if (append_only && (param->w_offset < node->n_size)) {
+		smb_rwx_xexit(&node->n_lock);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+		    ERRDOS, ERRnoaccess);
+		/* NOTREACHED */
+	}
+
 	if (node->attr.sa_vattr.va_type != VDIR) {
 		rc = smb_lock_range_access(sr, node, param->w_offset,
-		    param->w_count, FILE_WRITE_DATA);
+		    param->w_count, B_TRUE);
 		if (rc != NT_STATUS_SUCCESS) {
-			smbsr_raise_cifs_error(sr, rc,
-			    ERRSRV, ERRaccess);
+			smb_rwx_xexit(&node->n_lock);
+			smbsr_error(sr, rc, ERRSRV, ERRaccess);
 			/* NOTREACHED */
 		}
 	}
 
-	/*
-	 * XXX what if the file has been opened only with
-	 * FILE_APPEND_DATA?
-	 */
-	rc = smb_ofile_access(ofile, sr->user_cr, FILE_WRITE_DATA);
-	if (rc != NT_STATUS_SUCCESS) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
-		    ERRDOS, ERROR_ACCESS_DENIED);
-		/* NOTREACHED */
-	}
-
 	node->flags |= NODE_FLAGS_SET_SIZE;
 	node->n_size = param->w_offset;
+
+	smb_rwx_xexit(&node->n_lock);
 
 	if ((rc = smb_set_file_size(sr)) != 0)
 		return (rc);

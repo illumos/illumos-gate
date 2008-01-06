@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -987,55 +987,6 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 	}
 
 	return (res);
-}
-
-/*
- * lmshare_decode_type
- *
- * Gets a SMB share type as an integer value and return
- * a string name for it.
- */
-static char *
-lmshare_decode_type(uint_t stype)
-{
-	switch (stype) {
-	case STYPE_DISKTREE:
-		return ("Disk");
-	case STYPE_PRINTQ:
-		return ("Print Queue");
-	case STYPE_DEVICE:
-		return ("Device");
-	case STYPE_IPC:
-		return ("IPC");
-	case STYPE_DFS:
-		return ("DFS");
-	case STYPE_SPECIAL:
-		return ("Special");
-	default:
-		return ("Unknown");
-	/* NOTREACHED */
-	};
-}
-
-/*
- * lmshare_loginfo
- *
- * Decodes and writes the information of the given
- * share to the specified file.
- */
-void
-lmshare_loginfo(FILE *fp, lmshare_info_t *si)
-{
-	(void) fprintf(fp, "\n%s Information:\n", si->share_name);
-	(void) fprintf(fp, "\tFolder: %s\n", si->directory);
-	(void) fprintf(fp, "\tType: %s\n",
-	    lmshare_decode_type((uint_t)si->stype));
-	(void) fprintf(fp, "\tComment: %s\n", si->comment);
-
-	(void) fprintf(fp, "\tStatus: %s\n",
-	    ((si->mode & LMSHRM_TRANS) ? "Transient" : "Permanent"));
-
-	(void) fprintf(fp, "\tContainer: %s\n", si->container);
 }
 
 DWORD

@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +48,8 @@ include $(SRC)/lib/Makefile.lib
 
 SRCDIR = ../src
 TOOLDIR = ../tool
-LIBS = $(RELOC) $(LINTLIB)
+$(DYNLIB) := LDLIBS += -lc
+LIBS = $(RELOC) $(LINTLIB) $(DYNLIB)
 
 $(LINTLIB) :=	SRCS = $(LINTSRC)
 
@@ -88,7 +89,7 @@ SRCS = \
 MYCPPFLAGS = -D_REENTRANT -DTHREADSAFE=1 -DHAVE_USLEEP=1 -I. -I.. -I$(SRCDIR)
 CPPFLAGS += $(MYCPPFLAGS)
 
-MAPFILE = ../mapfile-sqlite
+MAPFILES = ../mapfile-sqlite
 
 # Header files used by all library source files.
 #
@@ -198,11 +199,11 @@ $(OBJS) $(OBJS:%.o=%-native.o): $(HDR)
 native: $(NATIVERELOC)
 
 $(RELOC): objs .WAIT $(OBJS)
-	$(LD) -r $(MAPFILE:%=-M%) -o $(RELOC) $(OBJS)
+	$(LD) -r $(MAPFILES:%=-M%) -o $(RELOC) $(OBJS)
 	$(CTFMERGE) -t -f -L VERSION -o $(RELOC) $(OBJS)
 
 $(NATIVERELOC):	objs .WAIT $(OBJS:%.o=%-native.o)
-	$(LD) -r $(MAPFILE:%=-M%) -o $(NATIVERELOC) $(OBJS:%.o=%-native.o)
+	$(LD) -r $(MAPFILES:%=-M%) -o $(NATIVERELOC) $(OBJS:%.o=%-native.o)
 
 opcodes.h: $(SRCDIR)/vdbe.c
 	@echo "Generating $@"; \

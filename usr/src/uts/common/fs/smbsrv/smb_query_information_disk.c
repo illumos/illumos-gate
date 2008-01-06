@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,7 @@ smb_com_query_information_disk(struct smb_request *sr)
 
 	if ((rc = smb_fsop_statfs(sr->user_cr, sr->tid_tree->t_snode, &df))
 	    != 0)
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 
 	unit_size = 1;
 	block_size = df.f_frsize;

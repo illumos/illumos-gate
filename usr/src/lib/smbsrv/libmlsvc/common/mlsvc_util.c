@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <stdlib.h>
-#include <pwd.h>
-#include <grp.h>
 
 #include <sys/time.h>
 #include <sys/systm.h>
@@ -53,14 +51,13 @@
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/mlsvc.h>
 
+/* Domain join support (using MS-RPC) */
+static boolean_t mlsvc_ntjoin_support = B_FALSE;
+
 extern int netr_open(char *, char *, mlsvc_handle_t *);
 extern int netr_close(mlsvc_handle_t *);
 extern DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 extern int mlsvc_user_getauth(char *, char *, smb_auth_info_t *);
-
-static int mlsvc_lookup_local_name(char *name, nt_sid_t **sid);
-static int mlsvc_lookup_nt_name(char *name, nt_sid_t **sid);
-static int mlsvc_lookup_nt_sid(nt_sid_t *sid, char *buf, int bufsize);
 
 /*
  * Compare the supplied domain name with the local hostname.
@@ -77,8 +74,10 @@ int
 mlsvc_is_local_domain(const char *domain)
 {
 	char hostname[MAXHOSTNAMELEN];
-	uint32_t mode;
 	int rc;
+
+	if (smb_config_get_secmode() == SMB_SECMODE_WORKGRP)
+		return (1);
 
 	if (strchr(domain, '.') != NULL)
 		rc = smb_getfqhostname(hostname, MAXHOSTNAMELEN);
@@ -88,10 +87,7 @@ mlsvc_is_local_domain(const char *domain)
 	if (rc != 0)
 		return (-1);
 
-	rc = strcasecmp(domain, hostname);
-	mode = smb_get_security_mode();
-
-	if ((rc == 0) || (mode == SMB_SECMODE_WORKGRP))
+	if (strcasecmp(domain, hostname) == 0)
 		return (1);
 
 	return (0);
@@ -100,163 +96,62 @@ mlsvc_is_local_domain(const char *domain)
 /*
  * mlsvc_lookup_name
  *
- * Lookup a name in the specified domain and translate it to a SID.
- * If the name is in the NT domain, it may refer to a user, group or
- * alias. Otherwise it must refer to a UNIX username. The memory for
- * the sid is allocated using malloc so the caller should call free
- * when it is no longer required.
+ * This is just a wrapper for lsa_lookup_name.
  *
- * On success, 0 will be returned and sid will point to a local domain
- * user SID. Otherwise -1 will be returned.
+ * The memory for the sid is allocated using malloc so the caller should
+ * call free when it is no longer required.
  */
-int
-mlsvc_lookup_name(char *domain, char *name, nt_sid_t **sid)
+uint32_t
+mlsvc_lookup_name(char *account, nt_sid_t **sid, uint16_t *sid_type)
 {
-	if (domain == NULL || name == NULL || sid == NULL)
-		return (-1);
+	smb_userinfo_t *ainfo;
+	uint32_t status;
 
-	if (mlsvc_is_local_domain(domain) == 1)
-		return (mlsvc_lookup_local_name(name, sid));
-	else
-		return (mlsvc_lookup_nt_name(name, sid));
-}
+	if ((ainfo = mlsvc_alloc_user_info()) == NULL)
+		return (NT_STATUS_NO_MEMORY);
 
-/*
- * mlsvc_lookup_local_name
- *
- * Lookup a name in the local password file and translate it to a SID.
- * The name must refer to a user. This is a private function intended
- * to support mlsvc_lookup_name so it doesn't perform any parameter
- * validation. The memory for the sid is allocated using malloc so the
- * caller must call free when it is no longer required.
- *
- * On success, 0 will be returned and sid will point to a local domain
- * user SID. Otherwise -1 will be returned.
- */
-static int
-mlsvc_lookup_local_name(char *name, nt_sid_t **sid)
-{
-	struct passwd *pw;
-	nt_sid_t *domain_sid;
+	status = lsa_lookup_name(NULL, account, *sid_type, ainfo);
+	if (status == NT_STATUS_SUCCESS) {
+		*sid = ainfo->user_sid;
+		ainfo->user_sid = NULL;
+		*sid_type = ainfo->sid_name_use;
+	}
 
-	if ((pw = getpwnam(name)) == NULL)
-		return (-1);
-
-	if ((domain_sid = nt_domain_local_sid()) == NULL)
-		return (-1);
-
-	*sid = nt_sid_splice(domain_sid, pw->pw_uid);
-	return (0);
-}
-
-/*
- * mlsvc_lookup_nt_name
- *
- * Lookup a name in the specified NT domain and translate it to a SID.
- * The name may refer to a user, group or alias. This is a private
- * function intended to support mlsvc_lookup_name so it doesn't do any
- * parameter validation. The memory for the sid is allocated using
- * malloc so the caller should call free when it is no longer required.
- *
- * On success, 0 will be returned and sid will point to an NT domain
- * user SID. Otherwise -1 will be returned.
- */
-static int
-mlsvc_lookup_nt_name(char *name, nt_sid_t **sid)
-{
-	smb_userinfo_t *user_info;
-
-	if ((user_info = mlsvc_alloc_user_info()) == NULL)
-		return (-1);
-
-	if (lsa_lookup_name(0, 0, name, user_info) != 0)
-		return (-1);
-
-	*sid = nt_sid_splice(user_info->domain_sid, user_info->rid);
-	mlsvc_free_user_info(user_info);
-	return (0);
+	mlsvc_free_user_info(ainfo);
+	return (status);
 }
 
 /*
  * mlsvc_lookup_sid
  *
- * Lookup a SID and translate it to a name. The name returned may refer
- * to a domain, user, group or alias dependent on the SID. On success 0
- * will be returned. Otherwise -1 will be returned.
+ * This is just a wrapper for lsa_lookup_sid.
+ *
+ * The allocated memory for the returned name must be freed by caller upon
+ * successful return.
  */
-int
-mlsvc_lookup_sid(nt_sid_t *sid, char *buf, int bufsize)
+uint32_t
+mlsvc_lookup_sid(nt_sid_t *sid, char **name)
 {
-	struct passwd *pw;
-	struct group *gr;
-	nt_group_t *grp;
-	DWORD rid;
+	smb_userinfo_t *ainfo;
+	uint32_t status;
+	int namelen;
 
-	if (sid == NULL || buf == NULL)
-		return (-1);
+	if ((ainfo = mlsvc_alloc_user_info()) == NULL)
+		return (NT_STATUS_NO_MEMORY);
 
-	if (nt_sid_is_local(sid)) {
-		(void) nt_sid_get_rid(sid, &rid);
-
-		switch (SAM_RID_TYPE(rid)) {
-		case SAM_RT_NT_UID:
-			break;
-
-		case SAM_RT_NT_GID:
-			if ((grp = nt_groups_lookup_rid(rid)) == NULL)
-				return (-1);
-
-			(void) strlcpy(buf, grp->name, bufsize);
-			break;
-
-		case SAM_RT_UNIX_UID:
-			if ((pw = getpwuid(SAM_DECODE_RID(rid))) == NULL)
-				return (-1);
-
-			(void) strlcpy(buf, pw->pw_name, bufsize);
-			break;
-
-		case SAM_RT_UNIX_GID:
-			if ((gr = getgrgid(SAM_DECODE_RID(rid))) == NULL)
-				return (-1);
-
-			(void) strlcpy(buf, gr->gr_name, bufsize);
-			break;
+	status = lsa_lookup_sid(sid, ainfo);
+	if (status == NT_STATUS_SUCCESS) {
+		namelen = strlen(ainfo->domain_name) + strlen(ainfo->name) + 2;
+		if ((*name = malloc(namelen)) == NULL) {
+			mlsvc_free_user_info(ainfo);
+			return (NT_STATUS_NO_MEMORY);
 		}
-
-		return (0);
+		(void) snprintf(*name, namelen, "%s\\%s",
+		    ainfo->domain_name, ainfo->name);
 	}
 
-	return (mlsvc_lookup_nt_sid(sid, buf, bufsize));
-}
-
-/*
- * mlsvc_lookup_nt_sid
- *
- * Lookup an NT SID and translate it to a name. This is a private
- * function intended to support mlsvc_lookup_sid so it doesn't do any
- * parameter validation. The input account_name specifies the logon/
- * session to be used for the lookup. It doesn't need to have any
- * association with the SID being looked up. The name returned may
- * refer to a domain, user, group or alias dependent on the SID.
- *
- * On success the name will be copied into buf and 0 will be returned.
- * Otherwise -1 will be returned.
- */
-static int
-mlsvc_lookup_nt_sid(nt_sid_t *sid, char *buf, int bufsize)
-{
-	smb_userinfo_t *user_info;
-	int rc;
-
-	if ((user_info = mlsvc_alloc_user_info()) == NULL)
-		return (-1);
-
-	if ((rc = lsa_lookup_sid(sid, user_info)) == 0)
-		(void) strlcpy(buf, user_info->name, bufsize);
-
-	mlsvc_free_user_info(user_info);
-	return (rc);
+	mlsvc_free_user_info(ainfo);
+	return (status);
 }
 
 /*
@@ -337,8 +232,8 @@ void
 mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
 {
 	nt_domain_t *domain;
-	nt_group_t *grp;
-	int i;
+	smb_group_t grp;
+	int rc, i;
 
 	if ((domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY)) == NULL)
 		return;
@@ -356,12 +251,11 @@ mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
 				user_info->flags |= SMB_UINFO_FLAG_DADMIN;
 	}
 
-	grp = nt_group_getinfo("Administrators", RWLOCK_READER);
-	if (grp) {
-		i = nt_group_is_member(grp, user_info->user_sid);
-		nt_group_putinfo(grp);
-		if (i)
+	rc = smb_lgrp_getbyname("Administrators", &grp);
+	if (rc == SMB_LGRP_SUCCESS) {
+		if (smb_lgrp_is_member(&grp, user_info->user_sid))
 			user_info->flags |= SMB_UINFO_FLAG_LADMIN;
+		smb_lgrp_free(&grp);
 	}
 }
 
@@ -447,6 +341,7 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 	DWORD status;
 	mlsvc_handle_t netr_handle;
 	char machine_passwd[MLSVC_MACHINE_ACCT_PASSWD_MAX];
+	char fqdn[MAXHOSTNAMELEN];
 
 	machine_passwd[0] = '\0';
 
@@ -472,14 +367,13 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 	erc = mlsvc_logon(server, domain, plain_user);
 
 	if (erc == AUTH_USER_GRANT) {
-		int isenabled;
+		if (mlsvc_ntjoin_support == B_FALSE) {
+			if (smb_resolve_fqdn(domain, fqdn, MAXHOSTNAMELEN) != 1)
+				return (NT_STATUS_INVALID_PARAMETER);
 
-		smb_config_rdlock();
-		isenabled = smb_config_getyorn(SMB_CI_ADS_ENABLE);
-		smb_config_unlock();
-		if (isenabled) {
-			if (ads_join(plain_user, plain_text, machine_passwd,
-			    sizeof (machine_passwd)) == ADJOIN_SUCCESS)
+			if (ads_join(fqdn, plain_user, plain_text,
+			    machine_passwd, sizeof (machine_passwd))
+			    == ADJOIN_SUCCESS)
 				status = NT_STATUS_SUCCESS;
 			else
 				status = NT_STATUS_UNSUCCESSFUL;
@@ -500,7 +394,9 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 		}
 
 		if (status == NT_STATUS_SUCCESS) {
-			if (smb_set_machine_pwd(machine_passwd) != 0)
+			erc = smb_config_setstr(SMB_CI_MACHINE_PASSWD,
+			    machine_passwd);
+			if (erc != SMBD_SMF_OK)
 				return (NT_STATUS_UNSUCCESSFUL);
 
 			/*
@@ -509,7 +405,7 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 			 * that we use the SAMLOGON version of the NETLOGON
 			 * PDC location protocol.
 			 */
-			smb_set_domain_member(1);
+			(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_TRUE);
 
 			if (netr_open(server, domain, &netr_handle) == 0) {
 				status = netlogon_auth(server, &netr_handle,
@@ -524,198 +420,4 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 	}
 
 	return (status);
-}
-
-/*ARGSUSED*/
-void
-nt_group_ht_lock(krwmode_t locktype)
-{
-}
-
-void
-nt_group_ht_unlock(void)
-{
-}
-
-int
-nt_group_num_groups(void)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_add(char *gname, char *comment)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_modify(char *gname, char *new_gname, char *comment)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_delete(char *gname)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-nt_group_t *
-nt_group_getinfo(char *gname, krwmode_t locktype)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-void
-nt_group_putinfo(nt_group_t *grp)
-{
-}
-
-/*ARGSUSED*/
-int
-nt_group_getpriv(nt_group_t *grp, uint32_t priv_id)
-{
-	return (SE_PRIVILEGE_DISABLED);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_setpriv(nt_group_t *grp, uint32_t priv_id, uint32_t new_attr)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-int
-nt_group_is_member(nt_group_t *grp, nt_sid_t *sid)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_add_member(nt_group_t *grp, nt_sid_t *msid, uint16_t sid_name_use,
-    char *account)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_del_member(nt_group_t *grp, void *key, int keytype)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-int
-nt_group_num_members(nt_group_t *grp)
-{
-	return (0);
-}
-
-nt_group_iterator_t *
-nt_group_open_iterator(void)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-void
-nt_group_close_iterator(nt_group_iterator_t *gi)
-{
-}
-
-/*ARGSUSED*/
-nt_group_t *
-nt_group_iterate(nt_group_iterator_t *gi)
-{
-	return (NULL);
-}
-
-int
-nt_group_cache_size(void)
-{
-	return (0);
-}
-
-uint32_t
-sam_init(void)
-{
-	return (NT_STATUS_SUCCESS);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_add_member_byname(char *gname, char *account)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_group_del_member_byname(nt_group_t *grp, char *member_name)
-{
-	return (NT_STATUS_NOT_SUPPORTED);
-}
-
-/*ARGSUSED*/
-void
-nt_group_add_groupprivs(nt_group_t *grp, smb_privset_t *priv)
-{
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_groups_member_privs(nt_sid_t *sid, smb_privset_t *priv)
-{
-	return (NT_STATUS_SUCCESS);
-}
-
-/*ARGSUSED*/
-int
-nt_groups_member_ngroups(nt_sid_t *sid)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-uint32_t
-nt_groups_member_groups(nt_sid_t *sid, smb_id_t *grps, int ngrps)
-{
-	return (NT_STATUS_SUCCESS);
-}
-
-/*ARGSUSED*/
-nt_group_t *
-nt_groups_lookup_rid(uint32_t rid)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-int
-nt_groups_count(int cnt_opt)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-int
-nt_group_member_list(int offset, nt_group_t *grp,
-    ntgrp_member_list_t *rmembers)
-{
-	return (0);
-}
-
-/*ARGSUSED*/
-void
-nt_group_list(int offset, char *pattern, ntgrp_list_t *list)
-{
 }

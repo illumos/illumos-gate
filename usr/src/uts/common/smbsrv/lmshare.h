@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,7 +163,6 @@ extern DWORD lmshrd_iterate(uint64_t iterator, lmshare_info_t *si);
 extern DWORD lmshrd_list(int offset, lmshare_list_t *list);
 extern DWORD lmshrd_list_transient(int offset, lmshare_list_t *list);
 extern DWORD lmshrd_num_transient(void);
-extern int lmshrd_dump_hash(char *logfname);
 #endif
 extern int lmshrd_num_shares(void);
 extern DWORD lmshrd_delete(char *share_name);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,11 +111,9 @@ smb_netbios_cache_lookup(struct name_entry *name)
 
 	if (NETBIOS_NAME_IS_STAR(name->name)) {
 		/* Return our address */
-		smb_config_rdlock();
-		(void) strlcpy((char *)scope,
-		    smb_config_getstr(SMB_CI_NBSCOPE), sizeof (scope));
+		(void) smb_config_getstr(SMB_CI_NBSCOPE, (char *)scope,
+		    sizeof (scope));
 		(void) utf8_strupr((char *)scope);
-		smb_config_unlock();
 
 		if (smb_getnetbiosname((char *)hostname, MAXHOSTNAMELEN) != 0)
 			return (NULL);

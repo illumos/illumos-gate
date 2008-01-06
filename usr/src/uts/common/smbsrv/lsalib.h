@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,31 +50,8 @@ extern "C" {
 /*
  * lsalib.c
  */
-int lsa_lookup_builtin_name(char *account_name,
-    smb_userinfo_t *user_info);
-
-int lsa_lookup_local_sam(char *domain,
-    char *account_name,
-    smb_userinfo_t *user_info);
-
-int lsa_lookup_local(char *name,
-    smb_userinfo_t *user_info);
-
-int lsa_lookup_name(char *server,
-    char *domain,
-    char *account_name,
-    smb_userinfo_t *user_info);
-
-DWORD lsa_lookup_name2(char *server,
-    char *domain,
-    char *account_name,
-    smb_userinfo_t *user_info);
-
-int lsa_lookup_sid(nt_sid_t *sid,
-    smb_userinfo_t *user_info);
-
-DWORD lsa_lookup_sid2(nt_sid_t *sid,
-    smb_userinfo_t *user_info);
+uint32_t lsa_lookup_name(char *, char *, uint16_t, smb_userinfo_t *);
+uint32_t lsa_lookup_sid(nt_sid_t *, smb_userinfo_t *);
 
 int lsa_lookup_privs(char *server,
     char *account_name,
@@ -111,11 +88,11 @@ int lsar_query_security_desc(mlsvc_handle_t *lsa_handle);
 
 DWORD lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass);
 
-int lsar_lookup_names(mlsvc_handle_t *lsa_handle,
+uint32_t lsar_lookup_names(mlsvc_handle_t *lsa_handle,
     char *name,
     smb_userinfo_t *user_info);
 
-int lsar_lookup_sids(mlsvc_handle_t *lsa_handle,
+uint32_t lsar_lookup_sids(mlsvc_handle_t *lsa_handle,
     struct mslsa_sid *sid,
     smb_userinfo_t *user_info);
 
@@ -145,11 +122,11 @@ DWORD lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle,
     char *display_name,
     int display_len);
 
-DWORD lsar_lookup_sids2(mlsvc_handle_t *lsa_handle,
+uint32_t lsar_lookup_sids2(mlsvc_handle_t *lsa_handle,
     struct mslsa_sid *sid,
     smb_userinfo_t *user_info);
 
-DWORD lsar_lookup_names2(mlsvc_handle_t *lsa_handle,
+uint32_t lsar_lookup_names2(mlsvc_handle_t *lsa_handle,
     char *name,
     smb_userinfo_t *user_info);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,6 +186,7 @@ smb_ofile_open(
     uint16_t		ftype,
     char		*pipe_name,
     uint32_t		rpc_fid,
+    uint32_t		uniqid,
     smb_error_t		*err)
 {
 	smb_ofile_t	*of;
@@ -203,6 +204,7 @@ smb_ofile_open(
 	of->f_magic = SMB_OFILE_MAGIC;
 	of->f_refcnt = 1;
 	of->f_fid = fid;
+	of->f_uniqid = uniqid;
 	of->f_opened_by_pid = pid;
 	of->f_granted_access = access_granted;
 	of->f_share_access = share_access;
@@ -271,7 +273,6 @@ smb_ofile_close(
 {
 	int	rc = 0;
 
-
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 
@@ -286,9 +287,6 @@ smb_ofile_close(
 		if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
 			smb_rpc_close(of);
 		} else {
-			if (of->f_node->vp->v_type == VREG)
-				(void) smb_fsop_close(of);
-
 			if (of->f_node->flags & NODE_CREATED_READONLY) {
 				smb_node_set_dosattr(of->f_node,
 				    of->f_node->attr.sa_dosattr |
@@ -300,12 +298,20 @@ smb_ofile_close(
 			rc = smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			smb_commit_delete_on_close(of);
 			smb_release_oplock(of, OPLOCK_RELEASE_FILE_CLOSED);
-			smb_commit_delete_on_close(of);
+
 			/*
-			 * if there is any notify change request for
-			 * this file then see if any of them is related
-			 * to this open instance. If there is any then
-			 * cancel them.
+			 * Share reservations cannot be removed until the
+			 * readonly bit has been set (if needed), above.
+			 * See comments in smb_open_subr().
+			 */
+			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
+
+			if (of->f_node->vp->v_type == VREG)
+				(void) smb_fsop_close(of);
+
+			/*
+			 * Cancel any notify change requests related
+			 * to this open instance.
 			 */
 			if (of->f_node->flags & NODE_FLAGS_NOTIFY_CHANGE)
 				smb_process_file_notify_change_queue(of);

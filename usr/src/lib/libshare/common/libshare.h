@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,8 +85,6 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_MULTIPLE_ERROR	26	/* multiple protocols reported error */
 #define	SA_PATH_IS_SUBDIR	27	/* check_path found path is subdir */
 #define	SA_PATH_IS_PARENTDIR	28	/* check_path found path is parent */
-#define	SA_KRB_KEYTAB_ERR	29	/* fail to delete old keytab entries */
-#define	SA_NO_SERVICE		30	/* service isn't running */
 
 /* API Initialization */
 #define	SA_INIT_SHARE_API	0x0001	/* init share specific interface */

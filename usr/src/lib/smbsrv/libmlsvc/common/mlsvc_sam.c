@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,28 +47,31 @@
 #include <smbsrv/samlib.h>
 
 /*
- * The keys associated with the various handles dispensed
- * by the SAMR server. These keys can be used to validate
- * client activity. These values are never passed over
- * the network so security shouldn't be an issue.
+ * The keys associated with the various handles dispensed by the SAMR
+ * server.  These keys can be used to validate client activity.
+ * These values are never passed over the wire so security shouldn't
+ * be an issue.
  */
-#define	SAMR_CONNECT_KEY	"SamrConnect"
-#define	SAMR_DOMAIN_KEY		"SamrDomain"
-#define	SAMR_USER_KEY		"SamrUser"
-#define	SAMR_GROUP_KEY		"SamrGroup"
-#define	SAMR_ALIAS_KEY		"SamrAlias"
+typedef enum {
+	SAMR_KEY_NULL = 0,
+	SAMR_KEY_CONNECT,
+	SAMR_KEY_DOMAIN,
+	SAMR_KEY_USER,
+	SAMR_KEY_GROUP,
+	SAMR_KEY_ALIAS
+} samr_key_t;
 
-/*
- * Domain discriminator values. Set the top bit to try
- * to distinguish these values from user and group ids.
- */
-#define	SAMR_DATABASE_DOMAIN	0x80000001
-#define	SAMR_LOCAL_DOMAIN	0x80000002
-#define	SAMR_BUILTIN_DOMAIN	0x80000003
-#define	SAMR_PRIMARY_DOMAIN	0x80000004
+typedef struct samr_keydata {
+	samr_key_t kd_key;
+	nt_domain_type_t kd_type;
+	DWORD kd_rid;
+} samr_keydata_t;
 
+static ndr_hdid_t *samr_hdalloc(ndr_xa_t *, samr_key_t, nt_domain_type_t,
+    DWORD);
+static void samr_hdfree(ndr_xa_t *, ndr_hdid_t *);
+static ndr_handle_t *samr_hdlookup(ndr_xa_t *, ndr_hdid_t *, samr_key_t);
 static int samr_call_stub(struct mlrpc_xaction *mxa);
-
 static DWORD samr_s_enum_local_domains(struct samr_EnumLocalDomain *,
     struct mlrpc_xaction *);
 
@@ -115,6 +118,60 @@ samr_call_stub(struct mlrpc_xaction *mxa)
 }
 
 /*
+ * Handle allocation wrapper to setup the local context.
+ */
+static ndr_hdid_t *
+samr_hdalloc(ndr_xa_t *mxa, samr_key_t key, nt_domain_type_t domain_type,
+    DWORD rid)
+{
+	samr_keydata_t *data;
+
+	if ((data = malloc(sizeof (samr_keydata_t))) == NULL)
+		return (NULL);
+
+	data->kd_key = key;
+	data->kd_type = domain_type;
+	data->kd_rid = rid;
+
+	return (ndr_hdalloc(mxa, data));
+}
+
+/*
+ * Handle deallocation wrapper to free the local context.
+ */
+static void
+samr_hdfree(ndr_xa_t *mxa, ndr_hdid_t *id)
+{
+	ndr_handle_t *hd;
+
+	if ((hd = ndr_hdlookup(mxa, id)) != NULL) {
+		free(hd->nh_data);
+		ndr_hdfree(mxa, id);
+	}
+}
+
+/*
+ * Handle lookup wrapper to validate the local context.
+ */
+static ndr_handle_t *
+samr_hdlookup(ndr_xa_t *mxa, ndr_hdid_t *id, samr_key_t key)
+{
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL)
+		return (NULL);
+
+	if ((data = (samr_keydata_t *)hd->nh_data) == NULL)
+		return (NULL);
+
+	if (data->kd_key != key)
+		return (NULL);
+
+	return (hd);
+}
+
+/*
  * samr_s_ConnectAnon
  *
  * This is a request to connect to the local SAM database. We don't
@@ -124,44 +181,38 @@ samr_call_stub(struct mlrpc_xaction *mxa)
  *
  * Return a handle for use with subsequent SAM requests.
  */
-/*ARGSUSED*/
 static int
 samr_s_ConnectAnon(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_ConnectAnon *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id;
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_CONNECT_KEY,
-	    SAMR_DATABASE_DOMAIN);
-	bcopy(handle, &param->handle, sizeof (samr_handle_t));
+	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, NT_DOMAIN_NULL, 0);
+	if (id) {
+		bcopy(id, &param->handle, sizeof (samr_handle_t));
+		param->status = 0;
+	} else {
+		bzero(&param->handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	}
 
-	param->status = 0;
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_CloseHandle
  *
- * This is a request to close the SAM interface specified by the handle.
+ * Close the SAM interface specified by the handle.
  * Free the handle and zero out the result handle for the client.
- *
- * We could do some checking here but it probably doesn't matter.
  */
-/*ARGSUSED*/
 static int
 samr_s_CloseHandle(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_CloseHandle *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 
-#ifdef SAMR_S_DEBUG
-	if (mlsvc_lookup_handle((ms_handle_t *)&param->handle) == 0) {
-		bzero(&param->result_handle, sizeof (samr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
-	}
-#endif /* SAMR_S_DEBUG */
+	samr_hdfree(mxa, id);
 
-	(void) mlsvc_put_handle((ms_handle_t *)&param->handle);
 	bzero(&param->result_handle, sizeof (samr_handle_t));
 	param->status = 0;
 	return (MLRPC_DRC_OK);
@@ -179,9 +230,8 @@ static int
 samr_s_LookupDomain(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_LookupDomain *param = arg;
-	char resource_domain[MAXHOSTNAMELEN];
+	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char *domain_name;
-	char *p;
 	nt_sid_t *sid = NULL;
 
 	if ((domain_name = (char *)param->domain_name.str) == NULL) {
@@ -190,11 +240,7 @@ samr_s_LookupDomain(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	smb_config_rdlock();
-	p = smb_config_getstr(SMB_CI_DOMAIN_NAME);
-	(void) strlcpy(resource_domain, p, MAXHOSTNAMELEN);
-	smb_config_unlock();
-
+	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 	if (mlsvc_is_local_domain(domain_name) == 1) {
 		sid = nt_sid_dup(nt_domain_local_sid());
 	} else if (strcasecmp(resource_domain, domain_name) == 0) {
@@ -237,12 +283,10 @@ static int
 samr_s_EnumLocalDomains(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_EnumLocalDomain *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	DWORD status;
 
-	handle = (ms_handle_t *)&param->handle;
-
-	if (mlsvc_validate_handle(handle, SAMR_CONNECT_KEY) == 0)
+	if (samr_hdlookup(mxa, id, SAMR_KEY_CONNECT) == NULL)
 		status = NT_STATUS_ACCESS_DENIED;
 	else
 		status = samr_s_enum_local_domains(param, mxa);
@@ -308,52 +352,42 @@ samr_s_enum_local_domains(struct samr_EnumLocalDomain *param,
  * samr_s_OpenDomain
  *
  * This is a request to open a domain within the local SAM database.
- * The caller must supply a valid handle obtained via a successful
- * connect. We return a handle to be used to access objects within
- * this domain.
+ * The caller must supply a valid connect handle.
+ * We return a handle to be used to access objects within this domain.
  */
-/*ARGSUSED*/
 static int
 samr_s_OpenDomain(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_OpenDomain *param = arg;
-	ms_handle_t *handle = 0;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	nt_domain_t *domain;
 
-	if (!mlsvc_validate_handle(
-	    (ms_handle_t *)&param->handle, SAMR_CONNECT_KEY)) {
+	if (samr_hdlookup(mxa, id, SAMR_KEY_CONNECT) == NULL) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 		return (MLRPC_DRC_OK);
 	}
 
-	domain = nt_domain_lookup_sid((nt_sid_t *)param->sid);
-	if (domain == NULL) {
+	if ((domain = nt_domain_lookup_sid((nt_sid_t *)param->sid)) == NULL) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (MLRPC_DRC_OK);
 	}
 
-	switch (domain->type) {
-	case NT_DOMAIN_BUILTIN:
-		handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR,
-		    SAMR_DOMAIN_KEY, SAMR_BUILTIN_DOMAIN);
-
-		bcopy(handle, &param->domain_handle, sizeof (samr_handle_t));
-		param->status = 0;
-		break;
-
-	case NT_DOMAIN_LOCAL:
-		handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR,
-		    SAMR_DOMAIN_KEY, SAMR_LOCAL_DOMAIN);
-
-		bcopy(handle, &param->domain_handle, sizeof (samr_handle_t));
-		param->status = 0;
-		break;
-
-	default:
+	if ((domain->type != NT_DOMAIN_BUILTIN) &&
+	    (domain->type != NT_DOMAIN_LOCAL)) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+		return (MLRPC_DRC_OK);
+	}
+
+	id = samr_hdalloc(mxa, SAMR_KEY_DOMAIN, domain->type, 0);
+	if (id) {
+		bcopy(id, &param->domain_handle, sizeof (samr_handle_t));
+		param->status = 0;
+	} else {
+		bzero(&param->domain_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 	}
 
 	return (MLRPC_DRC_OK);
@@ -373,13 +407,38 @@ static int
 samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryDomainInfo *param = arg;
-	ms_handle_desc_t *desc;
-	char *hostname;
-	char *domain_str = "";
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	char *domain;
+	int alias_cnt;
 	int rc;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == NULL || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0)) {
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
+		bzero(param, sizeof (struct samr_QueryDomainInfo));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+
+	switch (data->kd_type) {
+	case NT_DOMAIN_BUILTIN:
+		domain = "Builtin";
+		break;
+
+	case NT_DOMAIN_LOCAL:
+		domain = MLRPC_HEAP_MALLOC(mxa, MAXHOSTNAMELEN);
+		rc = smb_gethostname(domain, MAXHOSTNAMELEN, 1);
+
+		if (rc != 0 || domain == NULL) {
+			bzero(param, sizeof (struct samr_QueryDomainInfo));
+			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+			return (MLRPC_DRC_OK);
+		}
+		break;
+
+	default:
 		bzero(param, sizeof (struct samr_QueryDomainInfo));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
@@ -401,21 +460,13 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case SAMR_QUERY_DOMAIN_INFO_2:
-		if (desc->discrim == SAMR_LOCAL_DOMAIN) {
-			hostname = MLRPC_HEAP_MALLOC(mxa, MAXHOSTNAMELEN);
-			rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-			if (rc != 0 || hostname == NULL) {
-				bzero(param,
-				    sizeof (struct samr_QueryDomainInfo));
-				param->status =
-				    NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-				return (MLRPC_DRC_OK);
-			}
-
-			domain_str = hostname;
-		} else {
-			if (desc->discrim == SAMR_BUILTIN_DOMAIN)
-				domain_str = "Builtin";
+		rc = (data->kd_type == NT_DOMAIN_BUILTIN)
+		    ? smb_lgrp_numbydomain(SMB_LGRP_BUILTIN, &alias_cnt)
+		    : smb_lgrp_numbydomain(SMB_LGRP_LOCAL, &alias_cnt);
+		if (rc != SMB_LGRP_SUCCESS) {
+			bzero(param, sizeof (struct samr_QueryDomainInfo));
+			param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
+			return (MLRPC_DRC_OK);
 		}
 
 		param->ru.info2.unknown1 = 0x00000000;
@@ -425,7 +476,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		    "", mxa);
 
 		(void) mlsvc_string_save(
-		    (ms_string_t *)&(param->ru.info2.domain), domain_str, mxa);
+		    (ms_string_t *)&(param->ru.info2.domain), domain, mxa);
 
 		(void) mlsvc_string_save((ms_string_t *)&(param->ru.info2.s2),
 		    "", mxa);
@@ -437,11 +488,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		param->ru.info2.unknown6 = 0x00000001;
 		param->ru.info2.num_users = 0;
 		param->ru.info2.num_groups = 0;
-		param->ru.info2.num_aliases =
-		    (desc->discrim == SAMR_BUILTIN_DOMAIN) ?
-		    nt_groups_count(NT_GROUP_CNT_BUILTIN) :
-		    nt_groups_count(NT_GROUP_CNT_LOCAL);
-
+		param->ru.info2.num_aliases = alias_cnt;
 		param->status = NT_STATUS_SUCCESS;
 		break;
 
@@ -466,83 +513,85 @@ static int
 samr_s_LookupNames(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_LookupNames *param = arg;
-	ms_handle_desc_t *desc;
-	struct passwd *pw;
-	struct group *gr;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	well_known_account_t *wka;
+	smb_group_t grp;
+	smb_passwd_t smbpw;
 	nt_sid_t *sid;
-	nt_group_t *grp;
-	WORD rid_type;
+	uint32_t status = NT_STATUS_SUCCESS;
+	int rc;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->handle);
-	if (desc == 0 || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0)) {
-		bzero(param, sizeof (struct samr_LookupNames));
-		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
-	}
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL)
+		status = NT_STATUS_INVALID_HANDLE;
 
-	if (param->n_entry != 1) {
-		bzero(param, sizeof (struct samr_LookupNames));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-		return (MLRPC_DRC_OK);
-	}
+	if (param->n_entry != 1)
+		status = NT_STATUS_ACCESS_DENIED;
 
 	if (param->name.str == NULL) {
-		bzero(param, sizeof (struct samr_LookupNames));
 		/*
-		 * Windows NT returns NT_STATUS_NONE_MAPPED when the
-		 * name is NULL.
+		 * Windows NT returns NT_STATUS_NONE_MAPPED.
 		 * Windows 2000 returns STATUS_INVALID_ACCOUNT_NAME.
 		 */
-		param->status = NT_SC_ERROR(NT_STATUS_NONE_MAPPED);
+		status = NT_STATUS_NONE_MAPPED;
+	}
+
+	if (status != NT_STATUS_SUCCESS) {
+		bzero(param, sizeof (struct samr_LookupNames));
+		param->status = NT_SC_ERROR(status);
 		return (MLRPC_DRC_OK);
 	}
 
 	param->rids.rid = MLRPC_HEAP_NEW(mxa, DWORD);
 	param->rid_types.rid_type = MLRPC_HEAP_NEW(mxa, DWORD);
 
-	if (desc->discrim == SAMR_BUILTIN_DOMAIN) {
-		sid = nt_builtin_lookup_name((char *)param->name.str,
-		    &rid_type);
+	data = (samr_keydata_t *)hd->nh_data;
 
-		if (sid != 0) {
+	switch (data->kd_type) {
+	case NT_DOMAIN_BUILTIN:
+		wka = nt_builtin_lookup((char *)param->name.str);
+		if (wka != NULL) {
 			param->rids.n_entry = 1;
-			(void) nt_sid_get_rid(sid, &param->rids.rid[0]);
+			(void) nt_sid_get_rid(wka->binsid, &param->rids.rid[0]);
 			param->rid_types.n_entry = 1;
-			param->rid_types.rid_type[0] = rid_type;
-			param->status = NT_STATUS_SUCCESS;
-			free(sid);
-			return (MLRPC_DRC_OK);
-		}
-	} else if (desc->discrim == SAMR_LOCAL_DOMAIN) {
-		grp = nt_group_getinfo((char *)param->name.str, RWLOCK_READER);
-
-		if (grp != NULL) {
-			param->rids.n_entry = 1;
-			(void) nt_sid_get_rid(grp->sid, &param->rids.rid[0]);
-			param->rid_types.n_entry = 1;
-			param->rid_types.rid_type[0] = *grp->sid_name_use;
-			param->status = NT_STATUS_SUCCESS;
-			nt_group_putinfo(grp);
-			return (MLRPC_DRC_OK);
-		}
-
-		if ((pw = getpwnam((const char *)param->name.str)) != NULL) {
-			param->rids.n_entry = 1;
-			param->rids.rid[0] = SAM_ENCODE_UXUID(pw->pw_uid);
-			param->rid_types.n_entry = 1;
-			param->rid_types.rid_type[0] = SidTypeUser;
+			param->rid_types.rid_type[0] = wka->sid_name_use;
 			param->status = NT_STATUS_SUCCESS;
 			return (MLRPC_DRC_OK);
 		}
+		break;
 
-		if ((gr = getgrnam((const char *)param->name.str)) != NULL) {
+	case NT_DOMAIN_LOCAL:
+		rc = smb_lgrp_getbyname((char *)param->name.str, &grp);
+		if (rc == SMB_LGRP_SUCCESS) {
 			param->rids.n_entry = 1;
-			param->rids.rid[0] = SAM_ENCODE_UXGID(gr->gr_gid);
+			param->rids.rid[0] = grp.sg_rid;
 			param->rid_types.n_entry = 1;
-			param->rid_types.rid_type[0] = SidTypeAlias;
+			param->rid_types.rid_type[0] = grp.sg_id.gs_type;
 			param->status = NT_STATUS_SUCCESS;
+			smb_lgrp_free(&grp);
 			return (MLRPC_DRC_OK);
 		}
+
+		if (smb_pwd_getpasswd((const char *)param->name.str,
+		    &smbpw) != NULL) {
+			if (smb_idmap_getsid(smbpw.pw_uid, SMB_IDMAP_USER,
+			    &sid) == IDMAP_SUCCESS) {
+				param->rids.n_entry = 1;
+				(void) nt_sid_get_rid(sid, &param->rids.rid[0]);
+				param->rid_types.n_entry = 1;
+				param->rid_types.rid_type[0] = SidTypeUser;
+				param->status = NT_STATUS_SUCCESS;
+				free(sid);
+				return (MLRPC_DRC_OK);
+			}
+		}
+		break;
+
+	default:
+		bzero(param, sizeof (struct samr_LookupNames));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
 	}
 
 	param->rids.n_entry = 0;
@@ -559,38 +608,44 @@ samr_s_LookupNames(void *arg, struct mlrpc_xaction *mxa)
  * obtained via a successful domain open request. The user is
  * specified by the rid in the request.
  */
-/*ARGSUSED*/
 static int
 samr_s_OpenUser(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_OpenUser *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
 
-	if (!mlsvc_validate_handle(
-	    (ms_handle_t *)&param->handle, SAMR_DOMAIN_KEY)) {
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
 		bzero(&param->user_handle, sizeof (samr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_USER_KEY,
-	    param->rid);
-	bcopy(handle, &param->user_handle, sizeof (samr_handle_t));
+	data = (samr_keydata_t *)hd->nh_data;
 
-	/*
-	 * Need QueryUserInfo(level 21).
-	 */
-	bzero(&param->user_handle, sizeof (samr_handle_t));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	id = samr_hdalloc(mxa, SAMR_KEY_USER, data->kd_type, param->rid);
+	if (id == NULL) {
+		bzero(&param->user_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	} else {
+		bcopy(id, &param->user_handle, sizeof (samr_handle_t));
+		/*
+		 * Need QueryUserInfo(level 21).
+		 */
+		samr_hdfree(mxa, id);
+		bzero(&param->user_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	}
+
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_DeleteUser
  *
- * This is a request to delete a user within a specified domain in the
- * local SAM database. The caller should supply a valid user handle but
- * we deny access regardless.
+ * Request to delete a user within a specified domain in the local
+ * SAM database.  The caller should supply a valid user handle.
  */
 /*ARGSUSED*/
 static int
@@ -598,12 +653,15 @@ samr_s_DeleteUser(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_DeleteUser *param = arg;
 
+	bzero(param, sizeof (struct samr_DeleteUser));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_QueryUserInfo
+ *
+ * The caller should provide a valid user key.
  *
  * Returns:
  * NT_STATUS_SUCCESS
@@ -616,60 +674,108 @@ samr_s_QueryUserInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryUserInfo *param = arg;
 
-	if (!mlsvc_validate_handle(
-	    (ms_handle_t *)&param->user_handle, SAMR_USER_KEY)) {
-		bzero(param, sizeof (struct samr_QueryUserInfo));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-		return (MLRPC_DRC_OK);
-	}
-
 	bzero(param, sizeof (struct samr_QueryUserInfo));
-	param->status = 0;
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_QueryUserGroups
  *
- * This is a request to obtain a list of groups of which a user is a
- * member. The user is identified from the handle, which contains an
- * encoded uid in the discriminator field.
- *
- * Get complete list of groups and check for builtin domain.
+ * Request the list of groups of which a user is a member.
+ * The user is identified from the handle, which contains an
+ * rid in the discriminator field. Note that this is a local user.
  */
 static int
 samr_s_QueryUserGroups(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryUserGroups *param = arg;
 	struct samr_UserGroupInfo *info;
-	ms_handle_desc_t *desc;
-	struct passwd *pw;
-	DWORD uid;
+	struct samr_UserGroups *group;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->user_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	well_known_account_t *wka;
+	nt_sid_t *user_sid = NULL;
+	nt_sid_t *dom_sid;
+	smb_group_t grp;
+	smb_giter_t gi;
+	uint32_t status;
+	int size;
+	int ngrp_max;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->user_handle);
-	if (desc == 0 || strcmp(desc->key, SAMR_USER_KEY)) {
-		bzero(param, sizeof (struct samr_QueryUserGroups));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-		return (MLRPC_DRC_OK);
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_USER)) == NULL) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto query_error;
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+	switch (data->kd_type) {
+	case NT_DOMAIN_BUILTIN:
+		wka = nt_builtin_lookup("builtin");
+		if (wka == NULL) {
+			status = NT_STATUS_INTERNAL_ERROR;
+			goto query_error;
+		}
+		dom_sid = wka->binsid;
+		break;
+	case NT_DOMAIN_LOCAL:
+		dom_sid = nt_domain_local_sid();
+		break;
+	default:
+		status = NT_STATUS_INVALID_HANDLE;
+		goto query_error;
+	}
+
+	user_sid = nt_sid_splice(dom_sid, data->kd_rid);
+	if (user_sid == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto query_error;
 	}
 
 	info = MLRPC_HEAP_NEW(mxa, struct samr_UserGroupInfo);
-	info->groups = MLRPC_HEAP_NEW(mxa, struct samr_UserGroups);
+	if (info == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto query_error;
+	}
+	bzero(info, sizeof (struct samr_UserGroupInfo));
 
-	uid = SAM_DECODE_RID(desc->discrim);
+	size = 32 * 1024;
+	info->groups = MLRPC_HEAP_MALLOC(mxa, size);
+	if (info->groups == NULL) {
+		status = NT_STATUS_NO_MEMORY;
+		goto query_error;
+	}
+	ngrp_max = size / sizeof (struct samr_UserGroups);
 
-	if ((pw = getpwuid(uid)) != 0) {
-		info->n_entry = 1;
-		info->groups->rid = SAM_ENCODE_UXGID(pw->pw_gid);
-		info->groups->attr = SE_GROUP_MANDATORY
-		    | SE_GROUP_ENABLED_BY_DEFAULT | SE_GROUP_ENABLED;
-		param->info = info;
-		param->status = 0;
-	} else {
-		bzero(param, sizeof (struct samr_QueryUserGroups));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS) {
+		status = NT_STATUS_INTERNAL_ERROR;
+		goto query_error;
 	}
 
+	info->n_entry = 0;
+	group = info->groups;
+	while ((info->n_entry < ngrp_max) &&
+	    (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS)) {
+		if (smb_lgrp_is_member(&grp, user_sid)) {
+			group->rid = grp.sg_rid;
+			group->attr = grp.sg_attr;
+			group++;
+			info->n_entry++;
+		}
+		smb_lgrp_free(&grp);
+	}
+	smb_lgrp_iterclose(&gi);
+
+	free(user_sid);
+	param->info = info;
+	param->status = NT_STATUS_SUCCESS;
+	return (MLRPC_DRC_OK);
+
+query_error:
+	free(user_sid);
+	bzero(param, sizeof (struct samr_QueryUserGroups));
+	param->status = NT_SC_ERROR(status);
 	return (MLRPC_DRC_OK);
 }
 
@@ -684,50 +790,59 @@ samr_s_QueryUserGroups(void *arg, struct mlrpc_xaction *mxa)
  *
  * We return a handle to be used to access information about this group.
  */
-/*ARGSUSED*/
 static int
 samr_s_OpenGroup(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_OpenGroup *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
 
-	if (!mlsvc_validate_handle(
-	    (ms_handle_t *)&param->handle, SAMR_DOMAIN_KEY)) {
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
 		bzero(&param->group_handle, sizeof (samr_handle_t));
-		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (MLRPC_DRC_OK);
 	}
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_GROUP_KEY,
-	    param->rid);
-	bcopy(handle, &param->group_handle, sizeof (samr_handle_t));
+	data = (samr_keydata_t *)hd->nh_data;
+	id = samr_hdalloc(mxa, SAMR_KEY_GROUP, data->kd_type, param->rid);
 
-	param->status = 0;
+	if (id) {
+		bcopy(id, &param->group_handle, sizeof (samr_handle_t));
+		param->status = 0;
+	} else {
+		bzero(&param->group_handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	}
+
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_Connect
  *
- * This is a request to connect to the local SAM database. We don't
- * support any form of update request and our database doesn't
- * contain any private information, so there is little point in
- * doing any access access checking here.
+ * This is a request to connect to the local SAM database.
+ * We don't support any form of update request and our database doesn't
+ * contain any private information, so there is little point in doing
+ * any access access checking here.
  *
  * Return a handle for use with subsequent SAM requests.
  */
-/*ARGSUSED*/
 static int
 samr_s_Connect(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_Connect *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id;
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR,
-	    SAMR_CONNECT_KEY, SAMR_DATABASE_DOMAIN);
-	bcopy(handle, &param->handle, sizeof (samr_handle_t));
+	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, NT_DOMAIN_NULL, 0);
+	if (id) {
+		bcopy(id, &param->handle, sizeof (samr_handle_t));
+		param->status = 0;
+	} else {
+		bzero(&param->handle, sizeof (samr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+	}
 
-	param->status = 0;
 	return (MLRPC_DRC_OK);
 }
 
@@ -741,24 +856,14 @@ static int
 samr_s_GetUserPwInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_GetUserPwInfo *param = arg;
-	ms_handle_t *handle;
-	DWORD status = 0;
-
-	handle = (ms_handle_t *)&param->user_handle;
-
-	if (!mlsvc_validate_handle(handle, SAMR_USER_KEY))
-		status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 
 	bzero(param, sizeof (struct samr_GetUserPwInfo));
-	param->status = status;
+	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * samr_s_CreateUser
- *
- * This is a request to create a user within a specified domain in the
- * local SAM database.  We always deny access.
  */
 /*ARGSUSED*/
 static int
@@ -816,25 +921,25 @@ samr_s_SetUserInfo(void *arg, struct mlrpc_xaction *mxa)
 /*
  * samr_s_QueryDispInfo
  *
- * This function is supposed to return local users' information.
+ * This function is supposed to return local user information.
  * As we don't support local users, this function dosen't send
  * back any information.
  *
- * I added a peice of code that returns information for Administrator
- * and Guest builtin users. All information are hard-coded which I get
- * from packet captures. Currently, this peice of code is opt-out.
+ * Added template that returns information for Administrator and Guest
+ * builtin users.  All information is hard-coded from packet captures.
  */
-/*ARGSUSED*/
 static int
 samr_s_QueryDispInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryDispInfo *param = arg;
-	ms_handle_desc_t *desc;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
 	DWORD status = 0;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == NULL || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0))
-		status = NT_STATUS_INVALID_HANDLE;
+	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) == NULL) {
+		bzero(param, sizeof (struct samr_QueryDispInfo));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
 
 #ifdef SAMR_SUPPORT_USER
 	if ((desc->discrim != SAMR_LOCAL_DOMAIN) || (param->start_idx != 0)) {
@@ -897,24 +1002,21 @@ samr_s_QueryDispInfo(void *arg, struct mlrpc_xaction *mxa)
  * samr_s_EnumDomainGroups
  *
  *
- * This function is supposed to return local users' information.
+ * This function is supposed to return local group information.
  * As we don't support local users, this function dosen't send
  * back any information.
  *
- * I added a peice of code that returns information for a
- * domain group as None. All information are hard-coded which I get
- * from packet captures. Currently, this peice of code is opt-out.
+ * Added template that returns information for a domain group as None.
+ * All information is hard-coded from packet captures.
  */
-/*ARGSUSED*/
 static int
 samr_s_EnumDomainGroups(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_EnumDomainGroups *param = arg;
-	ms_handle_desc_t *desc;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
 	DWORD status = NT_STATUS_SUCCESS;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == NULL || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0))
+	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) == NULL)
 		status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 
 	param->total_size = 0;
@@ -964,18 +1066,17 @@ samr_s_EnumDomainGroups(void *arg, struct mlrpc_xaction *mxa)
  * for that alias. The alias domain sid should match with
  * the passed domain handle.
  */
-/*ARGSUSED*/
 static int
 samr_s_OpenAlias(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_OpenAlias *param = arg;
-	ms_handle_desc_t *desc = 0;
-	ms_handle_t *handle;
-	nt_group_t *grp;
-	DWORD status = NT_STATUS_SUCCESS;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
+	ndr_handle_t *hd;
+	uint32_t status;
+	samr_keydata_t *data;
+	int rc;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == 0 || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0)) {
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
 		status = NT_STATUS_INVALID_HANDLE;
 		goto open_alias_err;
 	}
@@ -985,25 +1086,21 @@ samr_s_OpenAlias(void *arg, struct mlrpc_xaction *mxa)
 		goto open_alias_err;
 	}
 
-	grp = nt_groups_lookup_rid(param->rid);
-	if (grp == 0) {
+	data = (samr_keydata_t *)hd->nh_data;
+	rc = smb_lgrp_getbyrid(param->rid, (smb_gdomain_t)data->kd_type, NULL);
+	if (rc != SMB_LGRP_SUCCESS) {
 		status = NT_STATUS_NO_SUCH_ALIAS;
 		goto open_alias_err;
 	}
 
-	if (((desc->discrim == SAMR_LOCAL_DOMAIN) &&
-	    !nt_sid_is_local(grp->sid)) ||
-	    ((desc->discrim == SAMR_BUILTIN_DOMAIN) &&
-	    !nt_sid_is_builtin(grp->sid))) {
-		status = NT_STATUS_NO_SUCH_ALIAS;
-		goto open_alias_err;
+	id = samr_hdalloc(mxa, SAMR_KEY_ALIAS, data->kd_type, param->rid);
+	if (id) {
+		bcopy(id, &param->alias_handle, sizeof (samr_handle_t));
+		param->status = NT_STATUS_SUCCESS;
+		return (MLRPC_DRC_OK);
 	}
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SAMR, SAMR_ALIAS_KEY,
-	    param->rid);
-	bcopy(handle, &param->alias_handle, sizeof (samr_handle_t));
-	param->status = 0;
-	return (MLRPC_DRC_OK);
+	status = NT_STATUS_NO_MEMORY;
 
 open_alias_err:
 	bzero(&param->alias_handle, sizeof (samr_handle_t));
@@ -1025,30 +1122,26 @@ static int
 samr_s_CreateDomainAlias(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_CreateDomainAlias *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
 
-#ifdef SAMR_SUPPORT_ADD_ALIAS
-	DWORD status = NT_STATUS_SUCCESS;
-	ms_handle_desc_t *desc = 0;
-	ms_handle_t *handle;
-	nt_group_t *grp;
-	char *alias_name;
-#endif
-	bzero(&param->alias_handle, sizeof (samr_handle_t));
+	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) == NULL) {
+		bzero(param, sizeof (struct samr_CreateDomainAlias));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
+
+	bzero(param, sizeof (struct samr_CreateDomainAlias));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 
 #ifdef SAMR_SUPPORT_ADD_ALIAS
+	DWORD status = NT_STATUS_SUCCESS;
+	nt_group_t *grp;
+	char *alias_name;
+
 	alias_name = param->alias_name.str;
 	if (alias_name == 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
-		goto create_alias_err;
-	}
-
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == 0 ||
-	    (desc->discrim != SAMR_LOCAL_DOMAIN) ||
-	    (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0)) {
-		status = NT_STATUS_INVALID_HANDLE;
 		goto create_alias_err;
 	}
 
@@ -1087,19 +1180,17 @@ create_alias_err:
 /*
  * samr_s_SetAliasInfo
  *
- * For more information you can look at MSDN page for NetLocalGroupSetInfo.
+ * Similar to NetLocalGroupSetInfo.
  */
-/*ARGSUSED*/
 static int
 samr_s_SetAliasInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_SetAliasInfo *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
 	DWORD status = NT_STATUS_SUCCESS;
 
-	if (!mlsvc_validate_handle(
-	    (ms_handle_t *)&param->alias_handle, SAMR_ALIAS_KEY)) {
+	if (samr_hdlookup(mxa, id, SAMR_KEY_ALIAS) == NULL)
 		status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-	}
 
 	param->status = status;
 	return (MLRPC_DRC_OK);
@@ -1115,18 +1206,22 @@ static int
 samr_s_QueryAliasInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryAliasInfo *param = arg;
-	ms_handle_desc_t *desc;
-	nt_group_t *grp;
-	DWORD status;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	smb_group_t grp;
+	uint32_t status;
+	int rc;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->alias_handle);
-	if (desc == NULL || (strcmp(desc->key, SAMR_ALIAS_KEY) != 0)) {
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_ALIAS)) == NULL) {
 		status = NT_STATUS_INVALID_HANDLE;
 		goto query_alias_err;
 	}
 
-	grp = nt_groups_lookup_rid(desc->discrim);
-	if (grp == NULL) {
+	data = (samr_keydata_t *)hd->nh_data;
+	rc = smb_lgrp_getbyrid(data->kd_rid, (smb_gdomain_t)data->kd_type,
+	    &grp);
+	if (rc != SMB_LGRP_SUCCESS) {
 		status = NT_STATUS_NO_SUCH_ALIAS;
 		goto query_alias_err;
 	}
@@ -1135,10 +1230,10 @@ samr_s_QueryAliasInfo(void *arg, struct mlrpc_xaction *mxa)
 	case SAMR_QUERY_ALIAS_INFO_1:
 		param->ru.info1.level = param->level;
 		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->ru.info1.name, grp->name, mxa);
+		    (ms_string_t *)&param->ru.info1.name, grp.sg_name, mxa);
 
 		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->ru.info1.desc, grp->comment, mxa);
+		    (ms_string_t *)&param->ru.info1.desc, grp.sg_cmnt, mxa);
 
 		param->ru.info1.unknown = 1;
 		break;
@@ -1146,15 +1241,16 @@ samr_s_QueryAliasInfo(void *arg, struct mlrpc_xaction *mxa)
 	case SAMR_QUERY_ALIAS_INFO_3:
 		param->ru.info3.level = param->level;
 		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->ru.info3.desc, grp->comment, mxa);
-
+		    (ms_string_t *)&param->ru.info3.desc, grp.sg_cmnt, mxa);
 		break;
 
 	default:
+		smb_lgrp_free(&grp);
 		status = NT_STATUS_INVALID_INFO_CLASS;
 		goto query_alias_err;
 	};
 
+	smb_lgrp_free(&grp);
 	param->address = (DWORD)(uintptr_t)&param->ru;
 	param->status = 0;
 	return (MLRPC_DRC_OK);
@@ -1176,28 +1272,26 @@ query_alias_err:
  * This RPC is used by CMC and right now it returns access denied.
  * The peice of code that removes a local group doesn't get compiled.
  */
-/*ARGSUSED*/
 static int
 samr_s_DeleteDomainAlias(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_DeleteDomainAlias *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->alias_handle;
 
-#ifdef SAMR_SUPPORT_DEL_ALIAS
-	ms_handle_desc_t *desc = 0;
-	nt_group_t *grp;
-	char *alias_name;
-	DWORD status;
-#endif
+	if (samr_hdlookup(mxa, id, SAMR_KEY_ALIAS) == NULL) {
+		bzero(param, sizeof (struct samr_DeleteDomainAlias));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
 
+	bzero(param, sizeof (struct samr_DeleteDomainAlias));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	return (MLRPC_DRC_OK);
 
 #ifdef SAMR_SUPPORT_DEL_ALIAS
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->alias_handle);
-	if (desc == 0 || (strcmp(desc->key, SAMR_ALIAS_KEY) != 0)) {
-		status = NT_STATUS_INVALID_HANDLE;
-		goto delete_alias_err;
-	}
+	nt_group_t *grp;
+	char *alias_name;
+	DWORD status;
 
 	grp = nt_groups_lookup_rid(desc->discrim);
 	if (grp == 0) {
@@ -1234,77 +1328,65 @@ static int
 samr_s_EnumDomainAliases(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_EnumDomainAliases *param = arg;
-	ms_handle_desc_t *desc;
-	nt_group_t *grp = NULL;
-	DWORD status;
-	nt_group_iterator_t *gi;
-	nt_sid_t *local_sid;
-	nt_sid_t *builtin_sid;
-	nt_sid_t *sid;
-	DWORD cnt, skip;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	smb_group_t grp;
+	smb_giter_t gi;
+	int cnt, skip, i;
 	struct name_rid *info;
 
-	desc = mlsvc_lookup_handle((ms_handle_t *)&param->domain_handle);
-	if (desc == NULL || (strcmp(desc->key, SAMR_DOMAIN_KEY) != 0)) {
-		status = NT_STATUS_INVALID_HANDLE;
-		goto enum_alias_err;
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
+		bzero(param, sizeof (struct samr_EnumDomainAliases));
+		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
 	}
 
-	local_sid = nt_domain_local_sid();
-	builtin_sid = nt_builtin_lookup_name("BUILTIN", 0);
+	data = (samr_keydata_t *)hd->nh_data;
 
-	if (desc->discrim == SAMR_LOCAL_DOMAIN) {
-		sid = local_sid;
-	} else if (desc->discrim == SAMR_BUILTIN_DOMAIN) {
-		sid = builtin_sid;
-	} else {
-		status = NT_STATUS_INVALID_HANDLE;
-		goto enum_alias_err;
+	(void) smb_lgrp_numbydomain((smb_gdomain_t)data->kd_type, &cnt);
+	if (cnt <= param->resume_handle) {
+		param->aliases = (struct aliases_info *)MLRPC_HEAP_MALLOC(mxa,
+		    sizeof (struct aliases_info));
+
+		bzero(param->aliases, sizeof (struct aliases_info));
+		param->out_resume = 0;
+		param->entries = 0;
+		param->status = NT_STATUS_SUCCESS;
+		return (MLRPC_DRC_OK);
 	}
 
-	cnt = skip = 0;
-	gi = nt_group_open_iterator();
-	nt_group_ht_lock(RWLOCK_READER);
-	while ((grp = nt_group_iterate(gi)) != 0) {
-		if (skip++ < param->resume_handle)
-			continue;
-		if (nt_sid_is_indomain(sid, grp->sid))
-			cnt++;
-	}
-	nt_group_ht_unlock();
-	nt_group_close_iterator(gi);
-
+	cnt -= param->resume_handle;
 	param->aliases = (struct aliases_info *)MLRPC_HEAP_MALLOC(mxa,
 	    sizeof (struct aliases_info) + (cnt-1) * sizeof (struct name_rid));
 
-	param->aliases->count = cnt;
-	param->aliases->address = cnt;
-	info = param->aliases->info;
+	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS) {
+		bzero(param, sizeof (struct samr_EnumDomainAliases));
+		param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
+		return (MLRPC_DRC_OK);
+	}
 
-	skip = 0;
-	gi = nt_group_open_iterator();
-	nt_group_ht_lock(RWLOCK_READER);
-	while ((grp = nt_group_iterate(gi)) != NULL) {
-		if (skip++ < param->resume_handle)
-			continue;
-		if (nt_sid_is_indomain(sid, grp->sid)) {
-			(void) nt_sid_get_rid(grp->sid, &info->rid);
+	skip = i = 0;
+	info = param->aliases->info;
+	while (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS) {
+		if ((skip++ >= param->resume_handle) &&
+		    (grp.sg_domain == data->kd_type) && (i++ < cnt)) {
+			info->rid = grp.sg_rid;
 			(void) mlsvc_string_save((ms_string_t *)&info->name,
-			    grp->name, mxa);
+			    grp.sg_name, mxa);
 
 			info++;
 		}
+		smb_lgrp_free(&grp);
 	}
-	nt_group_ht_unlock();
-	nt_group_close_iterator(gi);
+	smb_lgrp_iterclose(&gi);
 
-	param->out_resume = cnt;
-	param->entries = cnt;
+	param->aliases->count = i;
+	param->aliases->address = i;
+
+	param->out_resume = i;
+	param->entries = i;
 	param->status = 0;
-	return (MLRPC_DRC_OK);
-
-enum_alias_err:
-	param->status = NT_SC_ERROR(status);
 	return (MLRPC_DRC_OK);
 }
 

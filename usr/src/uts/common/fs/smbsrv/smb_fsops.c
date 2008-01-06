@@ -19,25 +19,30 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sid.h>
+#include <sys/nbmlock.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbvar.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
+#include <smbsrv/smb_incl.h>
 #include <acl/acl_common.h>
-
-u_longlong_t smb_caller_id;
+#include <sys/fcntl.h>
+#include <sys/flock.h>
+#include <fs/fs_subr.h>
 
 static int smb_fsop_amask_to_omode(uint32_t granted_access);
 static int smb_fsop_sdinherit(smb_request_t *sr, smb_node_t *dnode,
     smb_fssd_t *fs_sd);
+
+static callb_cpr_t *smb_fsop_frlock_callback(flk_cb_when_t when, void *error);
 
 /*
  * The smb_fsop_* functions have knowledge of CIFS semantics.
@@ -65,7 +70,8 @@ smb_fsop_start()
 {
 	int error;
 
-	smb_caller_id = fs_new_caller_id();
+	smb_vop_start();
+
 	error = smb_node_root_init();
 
 	if (error == 0)
@@ -85,32 +91,26 @@ smb_fsop_stop()
 int
 smb_fsop_open(smb_ofile_t *of)
 {
-	caller_context_t ct;
 	int mode;
 
 	mode = smb_fsop_amask_to_omode(of->f_granted_access);
-
-	smb_get_caller_context(NULL, &ct);
 
 	/*
 	 * Assuming that same vnode is returned as we had before
 	 * (i.e. no special vnodes)
 	 */
 
-	return (smb_vop_open(&of->f_node->vp, mode, of->f_cr, &ct));
+	return (smb_vop_open(&of->f_node->vp, mode, of->f_cr));
 }
 
 int
 smb_fsop_close(smb_ofile_t *of)
 {
-	caller_context_t ct;
 	int mode;
 
 	mode = smb_fsop_amask_to_omode(of->f_granted_access);
 
-	smb_get_caller_context(NULL, &ct);
-
-	return (smb_vop_close(of->f_node->vp, mode, of->f_cr, &ct));
+	return (smb_vop_close(of->f_node->vp, mode, of->f_cr));
 }
 
 static int
@@ -141,7 +141,6 @@ smb_fsop_create_with_sd(
 	smb_attr_t *ret_attr,
 	smb_fssd_t *fs_sd)
 {
-	caller_context_t ct;
 	vsecattr_t *vsap;
 	vsecattr_t vsecattr;
 	acl_t *acl, *dacl, *sacl;
@@ -159,7 +158,6 @@ smb_fsop_create_with_sd(
 		flags = SMB_IGNORE_CASE;
 
 	ASSERT(cr);
-	smb_get_caller_context(sr, &ct);
 
 	is_dir = ((fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR) != 0);
 
@@ -191,10 +189,10 @@ smb_fsop_create_with_sd(
 
 		if (is_dir) {
 			rc = smb_vop_mkdir(snode->vp, name, attr, &vp, flags,
-			    cr, &ct, vsap);
+			    cr, vsap);
 		} else {
 			rc = smb_vop_create(snode->vp, name, attr, &vp, flags,
-			    cr, &ct, vsap);
+			    cr, vsap);
 		}
 
 		if (vsap != NULL)
@@ -226,7 +224,7 @@ smb_fsop_create_with_sd(
 				if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
 					no_xvattr = B_TRUE;
 			rc = smb_vop_setattr(snode->vp, NULL, &set_attr,
-			    0, kcred, no_xvattr, &ct);
+			    0, kcred, no_xvattr);
 		}
 
 	} else {
@@ -241,10 +239,10 @@ smb_fsop_create_with_sd(
 
 		if (is_dir) {
 			rc = smb_vop_mkdir(snode->vp, name, attr, &vp, flags,
-			    cr, &ct, NULL);
+			    cr, NULL);
 		} else {
 			rc = smb_vop_create(snode->vp, name, attr, &vp, flags,
-			    cr, &ct, NULL);
+			    cr, NULL);
 		}
 
 		if (rc != 0)
@@ -266,9 +264,9 @@ smb_fsop_create_with_sd(
 
 	if (rc != 0) {
 		if (is_dir) {
-			(void) smb_vop_rmdir(snode->vp, name, flags, cr, &ct);
+			(void) smb_vop_rmdir(snode->vp, name, flags, cr);
 		} else {
-			(void) smb_vop_remove(snode->vp, name, flags, cr, &ct);
+			(void) smb_vop_remove(snode->vp, name, flags, cr);
 		}
 	}
 
@@ -303,7 +301,6 @@ smb_fsop_create(
 	struct open_param *op = &sr->arg.open;
 	smb_node_t *fnode;
 	smb_attr_t file_attr;
-	caller_context_t ct;
 	vnode_t *xattrdirvp;
 	vnode_t *vp;
 	char *longname = NULL;
@@ -397,10 +394,8 @@ smb_fsop_create(
 			return (rc);
 		}
 
-		smb_get_caller_context(sr, &ct);
-
 		rc = smb_vop_stream_create(fnode->vp, sname, attr, &vp,
-		    &xattrdirvp, flags, cr, &ct);
+		    &xattrdirvp, flags, cr);
 
 		if (rc != 0) {
 			smb_node_release(fnode);
@@ -457,9 +452,8 @@ smb_fsop_create(
 			 * No incoming SD and filesystem is not ZFS
 			 * let the filesystem handles the inheritance.
 			 */
-			smb_get_caller_context(sr, &ct);
 			rc = smb_vop_create(dir_snode->vp, name, attr, &vp,
-			    flags, cr, &ct, NULL);
+			    flags, cr, NULL);
 
 			if (rc == 0) {
 				*ret_snode = smb_node_lookup(sr, op, cr, vp,
@@ -503,7 +497,6 @@ smb_fsop_mkdir(
     smb_attr_t *ret_attr)
 {
 	struct open_param *op = &sr->arg.open;
-	caller_context_t ct;
 	char *longname;
 	vnode_t *vp;
 	int flags = 0;
@@ -511,7 +504,6 @@ smb_fsop_mkdir(
 	uint32_t secinfo;
 	uint32_t status;
 	int rc;
-
 	ASSERT(cr);
 	ASSERT(dir_snode);
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
@@ -557,8 +549,6 @@ smb_fsop_mkdir(
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	if (op->sd) {
 		/*
 		 * SD sent by client in Windows format. Needs to be
@@ -592,7 +582,7 @@ smb_fsop_mkdir(
 
 	} else {
 		rc = smb_vop_mkdir(dir_snode->vp, name, attr, &vp, flags, cr,
-		    &ct, NULL);
+		    NULL);
 
 		if (rc == 0) {
 			*ret_snode = smb_node_lookup(sr, op, cr, vp, name,
@@ -632,7 +622,6 @@ smb_fsop_remove(
 {
 	smb_node_t *fnode;
 	smb_attr_t file_attr;
-	caller_context_t ct;
 	char *longname;
 	char *fname;
 	char *sname;
@@ -653,8 +642,6 @@ smb_fsop_remove(
 
 	if (SMB_TREE_IS_READ_ONLY(sr))
 		return (EROFS);
-
-	smb_get_caller_context(sr, &ct);
 
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -687,7 +674,7 @@ smb_fsop_remove(
 		 * Need to find out what permission is required by NTFS
 		 * to remove a stream.
 		 */
-		rc = smb_vop_stream_remove(fnode->vp, sname, flags, cr, &ct);
+		rc = smb_vop_stream_remove(fnode->vp, sname, flags, cr);
 
 		smb_node_release(fnode);
 	} else {
@@ -705,7 +692,7 @@ smb_fsop_remove(
 		if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
 			flags = SMB_IGNORE_CASE;
 
-		rc = smb_vop_remove(dir_snode->vp, name, flags, cr, &ct);
+		rc = smb_vop_remove(dir_snode->vp, name, flags, cr);
 
 		if (rc == ENOENT) {
 			if (smb_maybe_mangled_name(name) == 0) {
@@ -729,7 +716,7 @@ smb_fsop_remove(
 				 */
 				flags &= ~SMB_IGNORE_CASE;
 				rc = smb_vop_remove(dir_snode->vp, longname,
-				    flags, cr, &ct);
+				    flags, cr);
 			}
 
 			kmem_free(longname, MAXNAMELEN);
@@ -754,7 +741,6 @@ smb_fsop_remove_streams(struct smb_request *sr, cred_t *cr,
     smb_node_t *fnode)
 {
 	struct fs_stream_info stream_info;
-	caller_context_t ct;
 	uint32_t cookie = 0;
 	int flags = 0;
 	int rc;
@@ -773,17 +759,15 @@ smb_fsop_remove_streams(struct smb_request *sr, cred_t *cr,
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	for (;;) {
 		rc = smb_vop_stream_readdir(fnode->vp, &cookie, &stream_info,
-		    NULL, NULL, flags, cr, &ct);
+		    NULL, NULL, flags, cr);
 
 		if ((rc != 0) || (cookie == SMB_EOF))
 			break;
 
 		(void) smb_vop_stream_remove(fnode->vp, stream_info.name, flags,
-		    cr, &ct);
+		    cr);
 	}
 	return (rc);
 }
@@ -809,7 +793,6 @@ smb_fsop_rmdir(
     char *name,
     int od)
 {
-	caller_context_t ct;
 	int rc;
 	int flags = 0;
 	char *longname;
@@ -843,9 +826,7 @@ smb_fsop_rmdir(
 	if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
-	rc = smb_vop_rmdir(dir_snode->vp, name, flags, cr, &ct);
+	rc = smb_vop_rmdir(dir_snode->vp, name, flags, cr);
 
 	if (rc == ENOENT) {
 		if (smb_maybe_mangled_name(name) == 0)
@@ -867,8 +848,7 @@ smb_fsop_rmdir(
 			 * a unique directory.
 			 */
 			flags &= ~SMB_IGNORE_CASE;
-			rc = smb_vop_rmdir(dir_snode->vp, longname, flags, cr,
-			    &ct);
+			rc = smb_vop_rmdir(dir_snode->vp, longname, flags, cr);
 		}
 
 		kmem_free(longname, MAXNAMELEN);
@@ -893,10 +873,10 @@ smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
-	caller_context_t ct;
 	uint32_t status;
 	uint32_t access = 0;
 	int flags = 0;
+	int rc;
 
 	ASSERT(cr);
 	ASSERT(snode);
@@ -923,8 +903,6 @@ smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
 			flags = ATTR_NOACLCHECK;
 	}
 
-	smb_get_caller_context(sr, &ct);
-
 	unnamed_node = SMB_IS_STREAM(snode);
 
 	if (unnamed_node) {
@@ -933,7 +911,11 @@ smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
 		unnamed_vp = unnamed_node->vp;
 	}
 
-	return (smb_vop_getattr(snode->vp, unnamed_vp, attr, flags, cr, &ct));
+	rc = smb_vop_getattr(snode->vp, unnamed_vp, attr, flags, cr);
+	if (rc == 0)
+		snode->attr = *attr;
+
+	return (rc);
 }
 
 /*
@@ -959,7 +941,6 @@ smb_fsop_readdir(
     smb_node_t **ret_snode,
     smb_attr_t *ret_attr)
 {
-	caller_context_t ct;
 	smb_node_t *ret_snodep;
 	smb_node_t *fnode;
 	smb_attr_t tmp_attr;
@@ -986,13 +967,11 @@ smb_fsop_readdir(
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	if (stream_info) {
 		rc = smb_vop_lookup(dir_snode->vp, name, &fvp, od_name,
-		    SMB_FOLLOW_LINKS, sr->tid_tree->t_snode->vp, cr, &ct);
+		    SMB_FOLLOW_LINKS, sr->tid_tree->t_snode->vp, cr);
 
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
@@ -1017,7 +996,7 @@ smb_fsop_readdir(
 		 * Might have to use kcred.
 		 */
 		rc = smb_vop_stream_readdir(fvp, cookie, stream_info, &vp,
-		    &xattrdirvp, flags, cr, &ct);
+		    &xattrdirvp, flags, cr);
 
 		if ((rc != 0) || (*cookie == SMB_EOF)) {
 			smb_node_release(fnode);
@@ -1047,7 +1026,7 @@ smb_fsop_readdir(
 
 	} else {
 		rc = smb_vop_readdir(dir_snode->vp, cookie, name, namelen,
-		    fileid, &vp, od_name, flags, cr, &ct);
+		    fileid, &vp, od_name, flags, cr);
 
 		if (rc != 0) {
 			kmem_free(od_name, MAXNAMELEN);
@@ -1104,7 +1083,6 @@ smb_fsop_getdents(
     char *args,
     char *pattern)
 {
-	caller_context_t ct;
 	int flags = 0;
 
 	ASSERT(cr);
@@ -1118,10 +1096,8 @@ smb_fsop_getdents(
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	return (smb_vop_getdents(dir_snode, cookie, 0, maxcnt, args, pattern,
-	    flags, sr, cr, &ct));
+	    flags, sr, cr));
 }
 
 /*
@@ -1145,7 +1121,6 @@ smb_fsop_rename(
     char *to_name)
 {
 	smb_node_t *from_snode;
-	caller_context_t ct;
 	smb_attr_t tmp_attr;
 	vnode_t *from_vp;
 	int flags = 0;
@@ -1188,16 +1163,14 @@ smb_fsop_rename(
 	 * XXX: Lock required through smb_node_release() below?
 	 */
 
-	smb_get_caller_context(sr, &ct);
-
 	rc = smb_vop_lookup(from_dir_snode->vp, from_name, &from_vp, NULL, 0,
-	    NULL, cr, &ct);
+	    NULL, cr);
 
 	if (rc != 0)
 		return (rc);
 
 	rc = smb_vop_rename(from_dir_snode->vp, from_name, to_dir_snode->vp,
-	    to_name, flags, cr, &ct);
+	    to_name, flags, cr);
 
 	if (rc == 0) {
 		from_snode = smb_node_lookup(sr, NULL, cr, from_vp, from_name,
@@ -1242,7 +1215,6 @@ smb_fsop_setattr(
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
-	caller_context_t ct;
 	uint32_t status;
 	uint32_t access = 0;
 	int rc = 0;
@@ -1278,8 +1250,6 @@ smb_fsop_setattr(
 			flags = ATTR_NOACLCHECK;
 	}
 
-	smb_get_caller_context(sr, &ct);
-
 	unnamed_node = SMB_IS_STREAM(snode);
 
 	if (unnamed_node) {
@@ -1291,18 +1261,18 @@ smb_fsop_setattr(
 		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
 			no_xvattr = B_TRUE;
 
-	rc = smb_vop_setattr(snode->vp, unnamed_vp,
-	    set_attr, flags, cr, no_xvattr, &ct);
+	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr,
+	    no_xvattr);
 
 	if ((rc == 0) && ret_attr) {
 		/*
-		 * This is an operation on behalf of CIFS service (to update
-		 * smb node's attr) not on behalf of the user so it's done
-		 * using kcred and the return value is intentionally ignored.
+		 * Use kcred to update the node attr because this
+		 * call is not being made on behalf of the user.
 		 */
 		ret_attr->sa_mask = SMB_AT_ALL;
-		(void) smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
-		    kcred, &ct);
+		rc = smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0, kcred);
+		if (rc == 0)
+			snode->attr = *ret_attr;
 	}
 
 	return (rc);
@@ -1328,7 +1298,7 @@ smb_fsop_read(
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
-	caller_context_t ct;
+	int svmand;
 	int rc;
 
 	ASSERT(cr);
@@ -1360,19 +1330,35 @@ smb_fsop_read(
 		cr = kcred;
 	}
 
-	smb_get_caller_context(sr, &ct);
-	rc = smb_vop_read(snode->vp, uio, cr, &ct);
+	smb_node_start_crit(snode, RW_READER);
+	rc = nbl_svmand(snode->vp, cr, &svmand);
+	if (rc) {
+		smb_node_end_crit(snode);
+		return (rc);
+	}
 
-	if (rc == 0) {
+	rc = nbl_lock_conflict(snode->vp, NBL_READ, uio->uio_loffset,
+	    uio->uio_iov->iov_len, svmand, &smb_ct);
+
+	if (rc) {
+		smb_node_end_crit(snode);
+		return (rc);
+	}
+	rc = smb_vop_read(snode->vp, uio, cr);
+
+	if (rc == 0 && ret_attr) {
 		/*
-		 * This is an operation on behalf of CIFS service (to update
-		 * smb node's attr) not on behalf of the user so it's done
-		 * using kcred and the return value is intentionally ignored.
+		 * Use kcred to update the node attr because this
+		 * call is not being made on behalf of the user.
 		 */
 		ret_attr->sa_mask = SMB_AT_ALL;
-		(void) smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
-		    kcred, &ct);
+		if (smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
+		    kcred) == 0) {
+			snode->attr = *ret_attr;
+		}
 	}
+
+	smb_node_end_crit(snode);
 
 	return (rc);
 }
@@ -1396,7 +1382,7 @@ smb_fsop_write(
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
-	caller_context_t ct;
+	int svmand;
 	int rc;
 
 	ASSERT(cr);
@@ -1410,15 +1396,13 @@ smb_fsop_write(
 
 	if (SMB_TREE_IS_READ_ONLY(sr))
 		return (EROFS);
-	/*
-	 * XXX what if the file has been opened only with
-	 * FILE_APPEND_DATA?
-	 */
-	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_WRITE_DATA);
-	if (rc != NT_STATUS_SUCCESS)
-		return (EACCES);
 
-	smb_get_caller_context(sr, &ct);
+	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_WRITE_DATA);
+	if (rc != NT_STATUS_SUCCESS) {
+		rc = smb_ofile_access(sr->fid_ofile, cr, FILE_APPEND_DATA);
+		if (rc != NT_STATUS_SUCCESS)
+			return (EACCES);
+	}
 
 	unnamed_node = SMB_IS_STREAM(snode);
 
@@ -1435,18 +1419,34 @@ smb_fsop_write(
 		cr = kcred;
 	}
 
-	rc = smb_vop_write(snode->vp, uio, flag, lcount, cr, &ct);
+	smb_node_start_crit(snode, RW_READER);
+	rc = nbl_svmand(snode->vp, cr, &svmand);
+	if (rc) {
+		smb_node_end_crit(snode);
+		return (rc);
+	}
+	rc = nbl_lock_conflict(snode->vp, NBL_WRITE, uio->uio_loffset,
+	    uio->uio_iov->iov_len, svmand, &smb_ct);
 
-	if (rc == 0) {
+	if (rc) {
+		smb_node_end_crit(snode);
+		return (rc);
+	}
+	rc = smb_vop_write(snode->vp, uio, flag, lcount, cr);
+
+	if (rc == 0 && ret_attr) {
 		/*
-		 * This is an operation on behalf of CIFS service (to update
-		 * smb node's attr) not on behalf of the user so it's done
-		 * using kcred and the return value is intentionally ignored.
+		 * Use kcred to update the node attr because this
+		 * call is not being made on behalf of the user.
 		 */
 		ret_attr->sa_mask = SMB_AT_ALL;
-		(void) smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
-		    kcred, &ct);
+		if (smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0,
+		    kcred) == 0) {
+			snode->attr = *ret_attr;
+		}
 	}
+
+	smb_node_end_crit(snode);
 
 	return (rc);
 }
@@ -1577,7 +1577,6 @@ smb_fsop_lookup_name(
 {
 	smb_node_t *fnode;
 	smb_attr_t file_attr;
-	caller_context_t ct;
 	vnode_t *xattrdirvp;
 	vnode_t *vp;
 	char *od_name;
@@ -1627,7 +1626,7 @@ smb_fsop_lookup_name(
 		 * What permissions NTFS requires for stream lookup if any?
 		 */
 		rc = smb_vop_stream_lookup(fnode->vp, sname, &vp, od_name,
-		    &xattrdirvp, flags, root_node->vp, cr, &ct);
+		    &xattrdirvp, flags, root_node->vp, cr);
 
 		if (rc != 0) {
 			smb_node_release(fnode);
@@ -1707,7 +1706,6 @@ smb_fsop_lookup(
 {
 	smb_node_t *lnk_target_node;
 	smb_node_t *lnk_dnode;
-	caller_context_t ct;
 	char *longname;
 	char *od_name;
 	vnode_t *vp;
@@ -1727,12 +1725,10 @@ smb_fsop_lookup(
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags |= SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	rc = smb_vop_lookup(dir_snode->vp, name, &vp, od_name, flags,
-	    root_node ? root_node->vp : NULL, cr, &ct);
+	    root_node ? root_node->vp : NULL, cr);
 
 	if (rc != 0) {
 		if (smb_maybe_mangled_name(name) == 0) {
@@ -1764,7 +1760,7 @@ smb_fsop_lookup(
 			flags &= ~SMB_IGNORE_CASE;
 
 		rc = smb_vop_lookup(dir_snode->vp, longname, &vp, od_name,
-		    flags, root_node ? root_node->vp : NULL, cr, &ct);
+		    flags, root_node ? root_node->vp : NULL, cr);
 
 		kmem_free(longname, MAXNAMELEN);
 
@@ -1871,7 +1867,6 @@ smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
     smb_node_t **ret_snode, smb_attr_t *ret_attr)
 {
 	smb_node_t *ret_snodep = NULL;
-	caller_context_t ct;
 	smb_attr_t tmp_attr;
 	vnode_t *xattrdirvp;
 	vnode_t *vp;
@@ -1889,10 +1884,8 @@ smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
 	if (SMB_TREE_CASE_INSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
-	smb_get_caller_context(sr, &ct);
-
 	rc = smb_vop_stream_readdir(fnode->vp, cookiep, stream_info, &vp,
-	    &xattrdirvp, flags, cr, &ct);
+	    &xattrdirvp, flags, cr);
 
 	if ((rc != 0) || *cookiep == SMB_EOF)
 		return (rc);
@@ -1922,8 +1915,6 @@ smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
 int /*ARGSUSED*/
 smb_fsop_commit(smb_request_t *sr, cred_t *cr, smb_node_t *snode)
 {
-	caller_context_t ct;
-
 	ASSERT(cr);
 	ASSERT(snode);
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
@@ -1934,9 +1925,7 @@ smb_fsop_commit(smb_request_t *sr, cred_t *cr, smb_node_t *snode)
 	if (SMB_TREE_IS_READ_ONLY(sr))
 		return (EROFS);
 
-	smb_get_caller_context(sr, &ct);
-
-	return (smb_vop_commit(snode->vp, cr, &ct));
+	return (smb_vop_commit(snode->vp, cr));
 }
 
 /*
@@ -1961,7 +1950,6 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	int flags = 0;
 	int access = 0;
 	acl_t *acl;
-	caller_context_t ct;
 	smb_node_t *unnamed_node;
 
 	ASSERT(cr);
@@ -1993,9 +1981,8 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
 		flags = ATTR_NOACLCHECK;
 
-	smb_get_caller_context(sr, &ct);
 	error = smb_vop_acl_read(snode->vp, &acl, flags,
-	    sr->tid_tree->t_acltype, cr, &ct);
+	    sr->tid_tree->t_acltype, cr);
 	if (error != 0) {
 		return (error);
 	}
@@ -2025,7 +2012,6 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	int error = 0;
 	int flags = 0;
 	int access = 0;
-	caller_context_t ct;
 	acl_t *acl, *dacl, *sacl;
 	smb_node_t *unnamed_node;
 
@@ -2088,11 +2074,10 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	error = acl_translate(acl, target_flavor, (snode->vp->v_type == VDIR),
 	    fs_sd->sd_uid, fs_sd->sd_gid);
 	if (error == 0) {
-		smb_get_caller_context(sr, &ct);
 		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
 			flags = ATTR_NOACLCHECK;
 
-		error = smb_vop_acl_write(snode->vp, acl, flags, cr, &ct);
+		error = smb_vop_acl_write(snode->vp, acl, flags, cr);
 	}
 
 	if (dacl && sacl)
@@ -2474,11 +2459,131 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		    FILE_WRITE_EA | FILE_APPEND_DATA | FILE_DELETE_CHILD;
 }
 
-/*ARGSUSED*/
-void
-smb_get_caller_context(smb_request_t *sr, caller_context_t *ct)
+/*
+ * smb_fsop_shrlock
+ *
+ * For the current open request, check file sharing rules
+ * against existing opens.
+ *
+ * Returns NT_STATUS_SHARING_VIOLATION if there is any
+ * sharing conflict.  Returns NT_STATUS_SUCCESS otherwise.
+ *
+ * Full system-wide share reservation synchronization is available
+ * when the nbmand (non-blocking mandatory) mount option is set
+ * (i.e. nbl_need_crit() is true) and nbmand critical regions are used.
+ * This provides synchronization with NFS and local processes.  The
+ * critical regions are entered in VOP_SHRLOCK()/fs_shrlock() (called
+ * from smb_open_subr()/smb_fsop_shrlock()/smb_vop_shrlock()) as well
+ * as the CIFS rename and delete paths.
+ *
+ * The CIFS server will also enter the nbl critical region in the open,
+ * rename, and delete paths when nbmand is not set.  There is limited
+ * coordination with local and VFS share reservations in this case.
+ * Note that when the nbmand mount option is not set, the VFS layer
+ * only processes advisory reservations and the delete mode is not checked.
+ *
+ * Whether or not the nbmand mount option is set, intra-CIFS share
+ * checking is done in the open, delete, and rename paths using a CIFS
+ * critical region (node->n_share_lock).
+ */
+
+uint32_t
+smb_fsop_shrlock(cred_t *cr, struct smb_node *node, uint32_t uniq_fid,
+    uint32_t desired_access, uint32_t share_access)
 {
-	ct->cc_caller_id = smb_caller_id;
-	ct->cc_pid = 0;			/* TBD */
-	ct->cc_sysid = 0;		/* TBD */
+	int rc;
+
+	if (node->attr.sa_vattr.va_type == VDIR)
+		return (NT_STATUS_SUCCESS);
+
+	/* Allow access if the request is just for meta data */
+	if ((desired_access & FILE_DATA_ALL) == 0)
+		return (NT_STATUS_SUCCESS);
+
+	rc = smb_node_open_check(node, cr, desired_access, share_access);
+	if (rc)
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	rc = smb_vop_shrlock(node->vp, uniq_fid, desired_access, share_access,
+	    cr);
+	if (rc)
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	return (NT_STATUS_SUCCESS);
+}
+
+void
+smb_fsop_unshrlock(cred_t *cr, smb_node_t *node, uint32_t uniq_fid)
+{
+	if (node->attr.sa_vattr.va_type == VDIR)
+		return;
+
+	(void) smb_vop_unshrlock(node->vp, uniq_fid, cr);
+}
+
+/*
+ * smb_fsop_frlock_callback
+ *
+ * smb wrapper function for fs_frlock
+ * this should never happen, as we are not attempting
+ * to set Mandatory Locks, cmd = F_SETLK_NBMAND
+ *
+ */
+
+static callb_cpr_t *
+/* ARGSUSED */
+smb_fsop_frlock_callback(flk_cb_when_t when, void *error)
+{
+	return (0);
+}
+
+/*
+ * smb_fs_frlock
+ *
+ * smb wrapper function for fs_frlock
+ */
+
+int
+smb_fsop_frlock(smb_request_t *sr, smb_node_t *node, smb_lock_t *lock,
+    boolean_t unlock)
+{
+	vnode_t *vp;
+	flock64_t bf;
+	cred_t *cr;
+	caller_context_t *ct;
+	int cmd;
+	flk_callback_t flk_cb;
+	offset_t offset = 0;
+	int flag;
+	int error;
+	int i;
+
+	flk_init_callback(&flk_cb, smb_fsop_frlock_callback, &error);
+	cr = sr->user_cr;
+	ct = &smb_ct;
+	vp = node->vp;
+	cmd = F_SETLK;
+
+	if (unlock == B_TRUE) {
+		bf.l_type = F_UNLCK;
+		flag = 0;
+	} else if (lock->l_type == SMB_LOCK_TYPE_READONLY) {
+		bf.l_type = F_RDLCK;
+		flag = FREAD;
+	} else if (lock->l_type == SMB_LOCK_TYPE_READWRITE) {
+		bf.l_type = F_WRLCK;
+		flag = FWRITE;
+	}
+
+	bf.l_start = lock->l_start;
+	bf.l_len = lock->l_length;
+	bf.l_whence = 0;  /* SEEK_SET */
+	bf.l_pid = lock->l_pid;
+	bf.l_sysid = 0;
+
+	for (i = 0; i < 4; i++)
+		bf.l_pad[i] = 0;
+
+	error = fs_frlock(vp, cmd, &bf, flag, offset, &flk_cb, cr, ct);
+	return (error);
 }

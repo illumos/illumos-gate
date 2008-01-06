@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,7 @@ extern "C" {
 #define	BUFLEN_TCP(x, y) (MAX_TCP_SIZE-(x-y))
 #define	BUFLEN_UDP(x, y) (NS_PACKETSZ-(x-y))
 
+extern int dns_get_msgid(void);
 extern char *dyndns_get_nshort(char *, uint16_t *);
 extern char *dyndns_get_int(char *, int *);
 extern int dyndns_build_header(char **, int, uint16_t, int,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -338,23 +338,36 @@ static smb_privset_t *
 smb_token_create_privs(smb_userinfo_t *user_info)
 {
 	smb_privset_t *privs;
-	nt_group_t *grp;
+	smb_giter_t gi;
+	smb_group_t grp;
+	int rc;
 
 	privs = smb_privset_new();
 	if (privs == NULL)
 		return (NULL);
 
-	(void) nt_groups_member_privs(user_info->user_sid, privs);
+	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS) {
+		smb_privset_free(privs);
+		return (NULL);
+	}
+
+	while (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS) {
+		if (smb_lgrp_is_member(&grp, user_info->user_sid)) {
+			smb_privset_merge(privs, grp.sg_privs);
+		}
+		smb_lgrp_free(&grp);
+	}
+	smb_lgrp_iterclose(&gi);
 
 	if (user_info->flags & SMB_UINFO_FLAG_ADMIN) {
-		grp = nt_group_getinfo("Administrators", RWLOCK_READER);
-		if (grp) {
-			nt_group_add_groupprivs(grp, privs);
-			nt_group_putinfo(grp);
+		rc = smb_lgrp_getbyname("Administrators", &grp);
+		if (rc == SMB_LGRP_SUCCESS) {
+			smb_privset_merge(privs, grp.sg_privs);
+			smb_lgrp_free(&grp);
 		}
 
 		/*
-		 * This privilege is required for view/edit of SACL
+		 * This privilege is required to view/edit SACL
 		 */
 		smb_privset_enable(privs, SE_SECURITY_LUID);
 	}
@@ -513,6 +526,8 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	smb_rid_attrs_t *g_grps;
 	smb_sid_attrs_t *grp;
 	nt_sid_t *builtin_sid;
+	smb_giter_t gi;
+	smb_group_t lgrp;
 	uint32_t n_gg, n_lg, n_dlg, n_wg;
 	uint32_t i, j;
 	int size, count;
@@ -524,7 +539,7 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	n_dlg = user_info->n_other_grps;	/* Domain Local Groups */
 
 	/* Local Groups */
-	n_lg = nt_groups_member_ngroups(user_info->user_sid);
+	(void) smb_lgrp_numbymember(user_info->user_sid, (int *)&n_lg);
 
 	/* Well known Groups */
 	if ((user_info->flags & SMB_UINFO_FLAG_ADMIN) == SMB_UINFO_FLAG_DADMIN)
@@ -538,20 +553,18 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 	count = n_gg + n_dlg + n_lg + n_wg;
 	size = sizeof (smb_win_grps_t) + (count * sizeof (smb_id_t));
 
-	tkn_grps = (smb_win_grps_t *)malloc(size);
-	if (tkn_grps == NULL) {
+	if ((tkn_grps = malloc(size)) == NULL)
 		return (NULL);
-	}
 	bzero(tkn_grps, size);
-
-	tkn_grps->wg_count = count;
 
 	/* Add global groups */
 	g_grps = user_info->groups;
-	for (i = 0; i < n_gg; ++i) {
+	for (i = 0; i < n_gg; i++) {
 		grp = &tkn_grps->wg_groups[i].i_sidattr;
-		grp->attrs = g_grps[i].attributes;
 		grp->sid = nt_sid_splice(user_info->domain_sid, g_grps[i].rid);
+		if (grp->sid == NULL)
+			break;
+		grp->attrs = g_grps[i].attributes;
 	}
 
 	if (n_gg == 0) {
@@ -559,34 +572,55 @@ smb_token_create_wingrps(smb_userinfo_t *user_info)
 		 * if there's no global group should add the
 		 * primary group.
 		 */
-		grp = &tkn_grps->wg_groups[i++].i_sidattr;
-		grp->attrs = 0x7;
+		grp = &tkn_grps->wg_groups[i].i_sidattr;
 		grp->sid = nt_sid_dup(user_info->pgrp_sid);
-		tkn_grps->wg_count++;
+		if (grp->sid != NULL) {
+			grp->attrs = 0x7;
+			i++;
+		}
 	}
 
 	/* Add domain local groups */
 	dlg_grps = user_info->other_grps;
-	for (j = 0; j < n_dlg; ++j, ++i) {
+	for (j = 0; j < n_dlg; j++, i++) {
 		grp = &tkn_grps->wg_groups[i].i_sidattr;
-		grp->attrs = dlg_grps[j].attrs;
 		grp->sid = nt_sid_dup(dlg_grps[j].sid);
+		if (grp->sid == NULL)
+			break;
+		grp->attrs = dlg_grps[j].attrs;
 	}
 
-	if (n_lg) {
-		/* Add local groups */
-		(void) nt_groups_member_groups(user_info->user_sid,
-		    &tkn_grps->wg_groups[i], n_lg);
-		i += n_lg;
+	/* Add local groups */
+	if (n_lg && (smb_lgrp_iteropen(&gi) == SMB_LGRP_SUCCESS)) {
+		j = 0;
+		while (smb_lgrp_iterate(&gi, &lgrp) == SMB_LGRP_SUCCESS) {
+			if ((j < n_lg) &&
+			    smb_lgrp_is_member(&lgrp, user_info->user_sid)) {
+				grp = &tkn_grps->wg_groups[i].i_sidattr;
+				grp->sid = nt_sid_dup(lgrp.sg_id.gs_sid);
+				if (grp->sid == NULL) {
+					smb_lgrp_free(&lgrp);
+					break;
+				}
+				grp->attrs = lgrp.sg_attr;
+				i++;
+				j++;
+			}
+			smb_lgrp_free(&lgrp);
+		}
+		smb_lgrp_iterclose(&gi);
 	}
 
 	/* Add well known groups */
-	for (j = 0; j < n_wg; ++j, ++i) {
+	for (j = 0; j < n_wg; j++, i++) {
 		builtin_sid = nt_builtin_lookup_name(wk_grps[j], NULL);
+		if (builtin_sid == NULL)
+			break;
 		tkn_grps->wg_groups[i].i_sidattr.sid = builtin_sid;
 		tkn_grps->wg_groups[i].i_sidattr.attrs = 0x7;
 	}
 
+	tkn_grps->wg_count = i;
 	return (tkn_grps);
 }
 
@@ -698,6 +732,7 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 		    &smbpw,
 		    clnt->lm_password.lm_password_val,
 		    clnt->lm_password.lm_password_len,
+		    clnt->domain,
 		    clnt->username);
 	}
 
@@ -708,6 +743,7 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 		    &smbpw,
 		    clnt->nt_password.nt_password_val,
 		    clnt->nt_password.nt_password_len,
+		    clnt->domain,
 		    clnt->username);
 	}
 
@@ -747,7 +783,7 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 	idmap_stat stat;
 	smb_idmap_batch_t sib;
 	smb_idmap_t *umap, *gmap;
-	nt_group_t *grp;
+	smb_group_t grp;
 	struct passwd pw;
 	char pwbuf[1024];
 
@@ -820,11 +856,10 @@ smb_setup_luinfo(smb_userinfo_t *lui, netr_client_t *clnt, uid_t uid)
 	if ((lui->user_sid == NULL) || (lui->pgrp_sid == NULL))
 		return (NT_STATUS_NO_MEMORY);
 
-	grp = nt_group_getinfo("Administrators", RWLOCK_READER);
-	if (grp) {
-		if (nt_group_is_member(grp, lui->user_sid))
+	if (smb_lgrp_getbyname("Administrators", &grp) == SMB_LGRP_SUCCESS) {
+		if (smb_lgrp_is_member(&grp, lui->user_sid))
 			lui->flags = SMB_UINFO_FLAG_LADMIN;
-		nt_group_putinfo(grp);
+		smb_lgrp_free(&grp);
 	}
 
 	return (NT_STATUS_SUCCESS);

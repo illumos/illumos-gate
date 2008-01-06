@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,11 +56,10 @@ OBJS_COMMON = 			\
 	smb_door_encdec.o	\
 	smb_doorclnt.o		\
 	smb_downcalls.o		\
-	smb_group_door_encdec.o	\
-	smb_group_xdr.o		\
 	smb_ht.o		\
 	smb_idmap.o		\
 	smb_info.o		\
+	smb_lgrp.o		\
 	smb_mac.o		\
 	smb_pwdutil.o		\
 	smb_privilege.o		\
@@ -77,7 +76,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lidmap
+LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lresolv -lidmap
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

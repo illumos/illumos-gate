@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,17 +43,10 @@
 #include <smbsrv/ndl/svcctl.ndl>
 
 /*
- * SVCCTL diagnostics flag: set to 1 to enable verbose logging.
+ * The handle keys for this interface.
  */
-int svcctl_debug = 0;
-
-/*
- * The handle keys for the various types of handles returned
- * by this interface.
- */
-#define	SVCCTL_MANAGER_KEY	"svcctlManager"
-#define	SVCCTL_SERVICE_KEY	"svcctlService"
-
+static int svcctl_key_manager;
+static int svcctl_key_service;
 
 typedef struct {
 	char *svc_name;
@@ -93,8 +86,6 @@ static svc_info_t svc_info[] = {
 
 static DWORD svcctl_get_status(const char *);
 static DWORD svcctl_validate_service(char *);
-static DWORD svcctl_validate_handle(char *, ms_handle_t *, char *,
-    struct mlrpc_xaction *);
 static int svcctl_is_admin(struct mlrpc_xaction *);
 
 static int svcctl_s_Close(void *, struct mlrpc_xaction *);
@@ -157,60 +148,51 @@ static int
 svcctl_s_Close(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_Close *param = arg;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
-	ms_handle_t *handle;
-	DWORD status;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 
-	if (svcctl_debug)
-		smb_token_log(LOG_DEBUG, user_ctx, "(SvcctlClose)");
-
-	handle = (ms_handle_t *)&param->handle;
-	status = svcctl_validate_handle("SvcctlClose", handle, 0, mxa);
-
-	if (status == ERROR_SUCCESS)
-		(void) mlsvc_put_handle((ms_handle_t *)&param->handle);
+	ndr_hdfree(mxa, id);
 
 	bzero(&param->result_handle, sizeof (svcctl_handle_t));
-	param->status = status;
+	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
 
 /*
  * svcctl_s_OpenManager
  *
- * This is a request to open the service control manager. Dependent
- * on the desired access we either generate a handle to be used on
- * subsequent requests or deny access.
+ * Request to open the service control manager.
+ * The caller must have administrator rights in order to open this
+ * interface.  We don't support write access.
  *
  * Returns:
  *	ERROR_SUCCESS
  *	ERROR_ACCESS_DENIED
  *
- * Return a handle for use with subsequent svcctl requests.
+ * On success, returns a handle for use with subsequent svcctl requests.
  */
 static int
 svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_OpenManager *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id;
 	int rc;
 
 	rc = svcctl_is_admin(mxa);
 
 	if ((rc == 0) || (param->desired_access & SC_MANAGER_LOCK) != 0) {
-		/*
-		 * The user doesn't have Administrator rights
-		 * or wants a write lock on the Services DB.
-		 */
 		bzero(&param->handle, sizeof (svcctl_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
 	}
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SVCCTL, SVCCTL_MANAGER_KEY, 0);
-	bcopy(handle, &param->handle, sizeof (svcctl_handle_t));
+	if ((id = ndr_hdalloc(mxa, &svcctl_key_manager)) != NULL) {
+		bcopy(id, &param->handle, sizeof (svcctl_handle_t));
+		param->status = ERROR_SUCCESS;
+	} else {
+		bzero(&param->handle, sizeof (svcctl_handle_t));
+		param->status = ERROR_ACCESS_DENIED;
+	}
 
-	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
 
@@ -228,15 +210,14 @@ static int
 svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_OpenService *param = arg;
-	ms_handle_t *handle;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->manager_handle;
+	ndr_handle_t *hd;
 	DWORD status;
 
-	status = svcctl_validate_handle("SvcctlOpenService",
-	    (ms_handle_t *)&param->manager_handle, SVCCTL_MANAGER_KEY, mxa);
-
-	if (status != ERROR_SUCCESS) {
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_manager)) {
 		bzero(&param->service_handle, sizeof (svcctl_handle_t));
-		param->status = status;
+		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
 
@@ -247,10 +228,14 @@ svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	handle = mlsvc_get_handle(MLSVC_IFSPEC_SVCCTL, SVCCTL_SERVICE_KEY, 0);
-	bcopy(handle, &param->service_handle, sizeof (svcctl_handle_t));
+	if ((id = ndr_hdalloc(mxa, &svcctl_key_service)) != NULL) {
+		bcopy(id, &param->service_handle, sizeof (svcctl_handle_t));
+		param->status = ERROR_SUCCESS;
+	} else {
+		bzero(&param->service_handle, sizeof (svcctl_handle_t));
+		param->status = ERROR_ACCESS_DENIED;
+	}
 
-	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
 
@@ -265,14 +250,13 @@ static int
 svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_QueryServiceStatus *param = arg;
-	DWORD status;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
+	ndr_handle_t *hd;
 
-	status = svcctl_validate_handle("SvcctlQueryServiceStatus",
-	    (ms_handle_t *)&param->service_handle, SVCCTL_SERVICE_KEY, mxa);
-
-	if (status != ERROR_SUCCESS) {
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
 		bzero(&param, sizeof (struct svcctl_QueryServiceStatus));
-		param->status = status;
+		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
 
@@ -303,19 +287,19 @@ static int
 svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_EnumServicesStatus *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->manager_handle;
+	ndr_handle_t *hd;
 	svc_enum_status_t *service_table;
 	svc_enum_status_t *svc;
 	mts_wchar_t *wide_name;
 	char *name;
 	int i, namelen;
 	int offs;
-	DWORD status;
 
-	status = svcctl_validate_handle("SvcctlEnumServicesStatus",
-	    (ms_handle_t *)&param->manager_handle, SVCCTL_MANAGER_KEY, mxa);
-
-	if (status != ERROR_SUCCESS) {
-		param->status = status;
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_manager)) {
+		bzero(&param, sizeof (struct svcctl_EnumServicesStatus));
+		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
 
@@ -382,14 +366,13 @@ static int
 svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct svcctl_QueryServiceConfig *param = arg;
-	DWORD status;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
+	ndr_handle_t *hd;
 
-	status = svcctl_validate_handle("SvcctlQueryServiceConfig",
-	    (ms_handle_t *)&param->service_handle, SVCCTL_SERVICE_KEY, mxa);
-
-	if (status != ERROR_SUCCESS) {
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
 		bzero(&param, sizeof (struct svcctl_QueryServiceConfig));
-		param->status = status;
+		param->status = ERROR_INVALID_HANDLE;
 		return (MLRPC_DRC_OK);
 	}
 
@@ -431,30 +414,6 @@ svcctl_validate_service(char *svc_name)
 	}
 
 	return (ERROR_SERVICE_DOES_NOT_EXIST);
-}
-
-/*
- * Check whether or not the svcctl module allocated this handle.
- *
- * Returns:
- *	ERROR_SUCCESS
- *	ERROR_INVALID_HANDLE.
- */
-/*ARGSUSED*/
-static DWORD
-svcctl_validate_handle(char *name, ms_handle_t *handle, char *key,
-    struct mlrpc_xaction *mxa)
-{
-	int mgr_erc;
-	int svc_erc;
-
-	mgr_erc = mlsvc_validate_handle(handle, SVCCTL_MANAGER_KEY);
-	svc_erc = mlsvc_validate_handle(handle, SVCCTL_SERVICE_KEY);
-
-	if (mgr_erc == 0 && svc_erc == 0)
-		return (ERROR_INVALID_HANDLE);
-
-	return (ERROR_SUCCESS);
 }
 
 /*

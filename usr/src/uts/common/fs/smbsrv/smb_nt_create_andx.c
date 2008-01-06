@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +206,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 	}
 
 	if (NameLength >= MAXPATHLEN) {
-		smbsr_raise_nt_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND);
+		smbsr_error(sr, NT_STATUS_OBJECT_PATH_NOT_FOUND, 0, 0);
 		/* NOTREACHED */
 	}
 
@@ -217,7 +217,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 
 	if ((op->create_options & FILE_DELETE_ON_CLOSE) &&
 	    !(op->desired_access & DELETE)) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		/* NOTREACHED */
 	}
 
@@ -253,7 +253,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree,
 		    sr->smb_fid);
 		if (sr->fid_ofile == NULL) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
+			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
 			/* NOTREACHED */
 		}
@@ -284,11 +284,10 @@ smb_com_nt_create_andx(struct smb_request *sr)
 
 	if (status != NT_STATUS_SUCCESS) {
 		if (status == NT_STATUS_SHARING_VIOLATION)
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_SHARING_VIOLATION,
+			smbsr_error(sr, NT_STATUS_SHARING_VIOLATION,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 		else
-			smbsr_raise_nt_error(sr, status);
+			smbsr_error(sr, status, 0, 0);
 
 		/* NOTREACHED */
 	}

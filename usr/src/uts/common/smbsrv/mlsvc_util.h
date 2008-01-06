@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,72 +48,12 @@
 extern "C" {
 #endif
 
-/*
- * Predefined global RIDs.
- */
-#define	MLSVC_DOMAIN_GROUP_RID_ADMINS		0x00000200L
-#define	MLSVC_DOMAIN_GROUP_RID_USERS		0x00000201L
-#define	MLSVC_DOMAIN_GROUP_RID_GUESTS		0x00000202L
-#define	MLSVC_DOMAIN_GROUP_RID_COMPUTERS	0x00000203L
-#define	MLSVC_DOMAIN_GROUP_RID_CONTROLLERS	0x00000204L
-#define	MLSVC_DOMAIN_GROUP_RID_CERT_ADMINS	0x00000205L
-#define	MLSVC_DOMAIN_GROUP_RID_SCHEMA_ADMINS	0x00000206L
-
-/*
- * Predefined local alias RIDs.
- */
-#define	MLSVC_LOCAL_GROUP_RID_ADMINS		0x00000220L
-#define	MLSVC_LOCAL_GROUP_RID_USERS		0x00000221L
-#define	MLSVC_LOCAL_GROUP_RID_GUESTS		0x00000222L
-#define	MLSVC_LOCAL_GROUP_RID_POWER_USERS	0x00000223L
-#define	MLSVC_LOCAL_GROUP_RID_ACCOUNT_OPS	0x00000224L
-#define	MLSVC_LOCAL_GROUP_RID_SERVER_OPS	0x00000225L
-#define	MLSVC_LOCAL_GROUP_RID_PRINT_OPS		0x00000226L
-#define	MLSVC_LOCAL_GROUP_RID_BACKUP_OPS	0x00000227L
-#define	MLSVC_LOCAL_GROUP_RID_REPLICATOR	0x00000228L
-
-/*
- * All predefined local group RIDs belong
- * to a special domain called BUILTIN.
- */
-#define	MLSVC_BUILTIN_DOMAIN_NAME		"BUILTIN"
-#define	MLSVC_BUILTIN_DOMAIN_SIDSTRLEN		8
-
-/*
- * Universal and NT well-known SIDs
- */
-#define	MLSVC_NULL_SIDSTR			"S-1-0-0"
-#define	MSLVC_WORLD_SIDSTR			"S-1-1-0"
-#define	MSLVC_LOCAL_SIDSTR			"S-1-2-0"
-#define	MSLVC_CREATOR_OWNER_ID_SIDSTR		"S-1-3-0"
-#define	MSLVC_CREATOR_GROUP_ID_SIDSTR		"S-1-3-1"
-#define	MSLVC_CREATOR_OWNER_SERVER_ID_SIDSTR	"S-1-3-2"
-#define	MSLVC_CREATOR_GROUP_SERVER_ID_SIDSTR	"S-1-3-3"
-#define	MSLVC_NON_UNIQUE_IDS_SIDSTR		"S-1-4"
-#define	MLSVC_NT_AUTHORITY_SIDSTR		"S-1-5"
-#define	MLSVC_DIALUP_SIDSTR			"S-1-5-1"
-#define	MLSVC_NETWORK_SIDSTR			"S-1-5-2"
-#define	MLSVC_BATCH_SIDSTR			"S-1-5-3"
-#define	MLSVC_INTERACTIVE_SIDSTR		"S-1-5-4"
-#define	MLSVC_SERVICE_SIDSTR			"S-1-5-6"
-#define	MLSVC_ANONYMOUS_LOGON_SIDSTR		"S-1-5-7"
-#define	MLSVC_PROXY_SIDSTR			"S-1-5-8"
-#define	MLSVC_SERVER_LOGON_SIDSTR		"S-1-5-9"
-#define	MLSVC_SELF_SIDSTR			"S-1-5-10"
-#define	MLSVC_AUTHENTICATED_USER_SIDSTR		"S-1-5-11"
-#define	MLSVC_RESTRICTED_CODE_SIDSTR		"S-1-5-12"
-#define	MLSVC_NT_LOCAL_SYSTEM_SIDSTR		"S-1-5-18"
-#define	MLSVC_NT_NON_UNIQUE_SIDSTR		"S-1-5-21"
-#define	MLSVC_BUILTIN_DOMAIN_SIDSTR		"S-1-5-32"
-
-int mlsvc_lookup_name(char *domain, char *name, nt_sid_t **sid);
-int mlsvc_lookup_sid(nt_sid_t *sid, char *buf, int bufsize);
-
 smb_userinfo_t *mlsvc_alloc_user_info(void);
 void mlsvc_free_user_info(smb_userinfo_t *user_info);
 void mlsvc_release_user_info(smb_userinfo_t *user_info);
 void mlsvc_setadmin_user_info(smb_userinfo_t *user_info);
 char *mlsvc_sid_name_use(unsigned int snu_id);
+extern int mlsvc_is_local_domain(const char *);
 
 /*
  * The definition of a local unique id (LUID). This is an opaque id
@@ -146,38 +86,6 @@ nt_sid_t *mlsvc_sid_save(nt_sid_t *sid, struct mlrpc_xaction *mxa);
 typedef struct ms_handle {
 	DWORD handle[5];
 } ms_handle_t;
-
-/*
- * List of interface specifications: can be used to identify the
- * sub-system to which a handle is assigned. The handle management
- * library doesn't check or care about the ifspec value.
- */
-typedef enum ms_ifspec {
-	MLSVC_IFSPEC_NULL,
-	MLSVC_IFSPEC_LSAR,
-	MLSVC_IFSPEC_SAMR,
-	MLSVC_IFSPEC_WINREG,
-	MLSVC_IFSPEC_SVCCTL,
-	MLSVC_IFSPEC_SPOOLSS,
-	MLSVC_IFSPEC_LOGR,
-	MLSVC_IFSPEC_LLSR,
-	MLSVC_NUM_IFSPECS
-} ms_ifspec_t;
-
-#define	MLSVC_HANDLE_KEY_MAX	32
-
-typedef struct ms_handle_desc {
-	struct ms_handle_desc *next;
-	ms_handle_t handle;
-	ms_ifspec_t ifspec;
-	char key[MLSVC_HANDLE_KEY_MAX];
-	DWORD discrim;
-} ms_handle_desc_t;
-
-ms_handle_t *mlsvc_get_handle(ms_ifspec_t ifspec, char *key, DWORD discrim);
-int mlsvc_put_handle(ms_handle_t *handle);
-int mlsvc_validate_handle(ms_handle_t *handle, char *key);
-ms_handle_desc_t *mlsvc_lookup_handle(ms_handle_t *handle);
 
 /*
  * The mlsvc_rpc_context structure provides the connection binding context
@@ -217,11 +125,6 @@ struct mlsvc_rpc_context {
  * The context contains a pointer to the top level handle for the
  * interface, which is assigned during the bind. It's used when closing
  * to detect when to free the context.
- *
- * I know this is really tacky but the elements in the descriptor are
- * arranged so that a handle can be overlaid directly onto a descriptor.
- * I probably won't do this but now you know - just in case you see it
- * in the code.
  */
 typedef struct mlsvc_rpc_desc {
 	ms_handle_t handle;

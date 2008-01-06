@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
  * Specification (December 19, 1997).
  */
 
+#include <sys/errno.h>
 #include <string.h>
 #include <strings.h>
 #include <syslog.h>
@@ -38,7 +39,6 @@
 #include <pthread.h>
 
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbrdr.h>
 #include <smbsrv/ntstatus.h>
 
@@ -48,12 +48,12 @@
  */
 static struct sdb_netuse netuse_table[N_NETUSE_TABLE];
 
-static int smbrdr_smb_tcon(struct sdb_session *session,
+static int smbrdr_tree_connectx(struct sdb_session *session,
     struct sdb_netuse *netuse, char *path, int path_len);
 
 static struct sdb_netuse *smbrdr_netuse_alloc(struct sdb_session *session,
     char *sharename);
-static int smbrdr_smb_tdcon(struct sdb_netuse *netuse);
+static int smbrdr_tdcon(struct sdb_netuse *netuse);
 
 static void
 smbrdr_netuse_clear(struct sdb_netuse *netuse)
@@ -69,19 +69,19 @@ smbrdr_netuse_free(struct sdb_netuse *netuse)
 }
 
 /*
- * mlsvc_tree_connect
+ * smbrdr_tree_connect
  *
  * Establish a share (tree connect). We need to retrieve the session
  * for the specified host and allocate a netuse structure. We set up
  * the path here (UNC encoded) to make handling the malloc/free easier
- * and pass everything on to smbrdr_smb_tcon where, if everything goes well,
- * a valid tid will be stored in the netuse structure.
+ * and pass everything on to smbrdr_tree_connectx where.  If everything
+ * goes well, a valid tid will be stored in the netuse structure.
  *
  * On success, a pointer to the netuse is returned. Otherwise the
  * netuse is cleared and a null pointer is returned.
  */
 unsigned short
-mlsvc_tree_connect(char *hostname, char *username, char *sharename)
+smbrdr_tree_connect(char *hostname, char *username, char *sharename)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
@@ -92,15 +92,15 @@ mlsvc_tree_connect(char *hostname, char *username, char *sharename)
 	 * Make sure there is a session & logon for given info
 	 */
 	session = smbrdr_session_lock(hostname, username, SDB_SLCK_READ);
-	if (session == 0) {
-		syslog(LOG_ERR, "smbrdr: (tcon) no session for %s@%s",
+	if (session == NULL) {
+		syslog(LOG_DEBUG, "smbrdr_tree_connect: no session for %s@%s",
 		    username, hostname);
 		return (0);
 	}
 
 
 	if ((netuse = smbrdr_netuse_alloc(session, sharename)) == 0) {
-		syslog(LOG_ERR, "smbrdr: (tcon) init failed");
+		syslog(LOG_DEBUG, "smbrdr_tree_connect: init failed");
 		smbrdr_session_unlock(session);
 		return (0);
 	}
@@ -114,7 +114,7 @@ mlsvc_tree_connect(char *hostname, char *username, char *sharename)
 	if ((path = (char *)malloc(path_len)) == 0) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
-		syslog(LOG_ERR, "smbrdr: (tcon) resource shortage");
+		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s", strerror(ENOMEM));
 		return (0);
 	}
 
@@ -125,11 +125,11 @@ mlsvc_tree_connect(char *hostname, char *username, char *sharename)
 	else
 		path_len = strlen(path);
 
-	if (smbrdr_smb_tcon(session, netuse, path, path_len) < 0) {
+	if (smbrdr_tree_connectx(session, netuse, path, path_len) < 0) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
 		free(path);
-		syslog(LOG_ERR, "smbrdr: (tcon) failed connecting to %s", path);
+		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s failed", path);
 		return (0);
 	}
 
@@ -141,7 +141,7 @@ mlsvc_tree_connect(char *hostname, char *username, char *sharename)
 
 
 /*
- * smbrdr_smb_tcon
+ * smbrdr_tree_connectx
  *
  * This message requests a share (tree connect) request to the server
  * associated with the session. The password is not relevant here if
@@ -151,7 +151,7 @@ mlsvc_tree_connect(char *hostname, char *username, char *sharename)
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
 static int
-smbrdr_smb_tcon(struct sdb_session *session, struct sdb_netuse *netuse,
+smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
     char *path, int path_len)
 {
 	smb_hdr_t smb_hdr;
@@ -170,7 +170,8 @@ smbrdr_smb_tcon(struct sdb_session *session, struct sdb_netuse *netuse,
 	    session, &session->logon, 0);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrTcon: %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
+		    xlate_nt_status(status));
 		return (-1);
 	}
 
@@ -202,25 +203,24 @@ smbrdr_smb_tcon(struct sdb_session *session, struct sdb_netuse *netuse,
 	    service);			/* Service */
 
 	if (rc <= 0) {
-		syslog(LOG_ERR, "smbrdr_smb_tcon: encode failed");
+		syslog(LOG_DEBUG, "smbrdr_tree_connectx: encode failed");
 		smbrdr_handle_free(&srh);
 		return (-1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrTcon: %s", xlate_nt_status(status));
-		rc = -1;
-	} else {
-		rc = 0;
+		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
+		    xlate_nt_status(status));
+		smbrdr_handle_free(&srh);
+		return (-1);
 	}
 
 	netuse->tid = smb_hdr.tid;
 	netuse->state = SDB_NSTATE_CONNECTED;
 	smbrdr_handle_free(&srh);
-	return (rc);
+	return (0);
 }
-
 
 /*
  * smbrdr_netuse_logoff
@@ -242,7 +242,7 @@ smbrdr_netuse_logoff(unsigned short uid)
 		netuse = &netuse_table[i];
 		(void) mutex_lock(&netuse->mtx);
 		if (netuse->uid == uid)
-			(void) smbrdr_smb_tdcon(netuse);
+			(void) smbrdr_tdcon(netuse);
 		(void) mutex_unlock(&netuse->mtx);
 	}
 }
@@ -255,7 +255,7 @@ smbrdr_tree_disconnect(unsigned short tid)
 
 	netuse = smbrdr_netuse_get(tid);
 	if (netuse) {
-		(void) smbrdr_smb_tdcon(netuse);
+		(void) smbrdr_tdcon(netuse);
 		smbrdr_netuse_put(netuse);
 		rc = 0;
 	}
@@ -264,17 +264,17 @@ smbrdr_tree_disconnect(unsigned short tid)
 }
 
 /*
- * smbrdr_smb_tdcon
+ * smbrdr_tdcon
  *
  * Disconnect a share. This message informs the server that we no longer
  * wish to access the resource specified by tid, obtained via a prior
- * mlsvc_tree_connect. The tid is passed in the SMB header so the setup
+ * smbrdr_tree_connect. The tid is passed in the SMB header so the setup
  * for this call is very straightforward.
  *
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
 static int
-smbrdr_smb_tdcon(struct sdb_netuse *netuse)
+smbrdr_tdcon(struct sdb_netuse *netuse)
 {
 	struct sdb_session *session;
 	smbrdr_handle_t srh;
@@ -285,7 +285,7 @@ smbrdr_smb_tdcon(struct sdb_netuse *netuse)
 	netuse->state = SDB_NSTATE_DISCONNECTING;
 	smbrdr_ofile_end_of_share(netuse->tid);
 
-	if ((session = netuse->session) == 0) {
+	if ((session = netuse->session) == NULL) {
 		smbrdr_netuse_clear(netuse);
 		return (0);
 	}
@@ -300,7 +300,7 @@ smbrdr_smb_tdcon(struct sdb_netuse *netuse)
 	    session, &session->logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "smbrdr: (tdcon) %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_tdcon: %s", xlate_nt_status(status));
 		/* should we clear here? */
 		smbrdr_netuse_clear(netuse);
 		return (-1);
@@ -308,7 +308,7 @@ smbrdr_smb_tdcon(struct sdb_netuse *netuse)
 
 	rc = smb_msgbuf_encode(&srh.srh_mbuf, "bw.", 0, 0);
 	if (rc < 0) {
-		syslog(LOG_ERR, "smbrdr: (tdcon) encode failed");
+		syslog(LOG_DEBUG, "smbrdr_tdcon: encode failed");
 		smbrdr_handle_free(&srh);
 		/* should we clear here? */
 		smbrdr_netuse_clear(netuse);
@@ -317,7 +317,7 @@ smbrdr_smb_tdcon(struct sdb_netuse *netuse)
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "smbrdr: (tdcon) %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_tdcon: %s", xlate_nt_status(status));
 		rc = -1;
 	} else {
 		rc = 0;
@@ -347,10 +347,8 @@ smbrdr_netuse_alloc(struct sdb_session *session, char *sharename)
 	struct sdb_netuse *netuse;
 	int i;
 
-	if (session == 0 || sharename == 0) {
-		syslog(LOG_ERR, "smbrdr: (tcon) invalid arg");
-		return (0);
-	}
+	if (session == NULL || sharename == NULL)
+		return (NULL);
 
 	for (i = 0; i < N_NETUSE_TABLE; ++i) {
 		netuse = &netuse_table[i];
@@ -369,7 +367,7 @@ smbrdr_netuse_alloc(struct sdb_session *session, char *sharename)
 		(void) mutex_unlock(&netuse->mtx);
 	}
 
-	syslog(LOG_WARNING, "smbrdr: (tcon) table full");
+	syslog(LOG_DEBUG, "smbrdr_netuse_alloc: table full");
 	return (0);
 }
 
@@ -431,7 +429,7 @@ smbrdr_netuse_get(int tid)
 		(void) mutex_unlock(&netuse->mtx);
 	}
 
-	syslog(LOG_WARNING, "smbrdr: (lookup) no such TID %d", tid);
+	syslog(LOG_DEBUG, "smbrdr_netuse_get: %d: no such TID", tid);
 	return (0);
 }
 

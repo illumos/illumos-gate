@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,10 +28,10 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
+#include <sys/nbmlock.h>
 
-static DWORD smb_delete_check(struct smb_request *sr, struct smb_node *node,
-    uint16_t dattr, smb_error_t *smberr);
-static DWORD smb_delete_share_check(struct smb_node *node);
+static uint32_t smb_delete_check(smb_request_t *sr, smb_node_t *node,
+    smb_error_t *smberr);
 
 /*
  * smb_com_delete
@@ -104,31 +104,21 @@ smb_com_delete(struct smb_request *sr)
 	int is_stream;
 	smb_odir_context_t *pc;
 
-	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
-	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	fullname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
 	if (smbsr_decode_vwv(sr, "w", &sattr) != 0) {
-		kmem_free(pc, sizeof (*pc));
-		kmem_free(name, MAXNAMELEN);
-		kmem_free(fname, MAXNAMELEN);
-		kmem_free(sname, MAXNAMELEN);
-		kmem_free(fullname, MAXPATHLEN);
 		smbsr_decode_error(sr);
 		/* NOTREACHED */
 	}
 
 	if (smbsr_decode_data(sr, "%S", sr, &path) != 0) {
-		kmem_free(pc, sizeof (*pc));
-		kmem_free(name, MAXNAMELEN);
-		kmem_free(fname, MAXNAMELEN);
-		kmem_free(sname, MAXNAMELEN);
-		kmem_free(fullname, MAXPATHLEN);
 		smbsr_decode_error(sr);
 		/* NOTREACHED */
 	}
+
+	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
+	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	fullname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 	is_stream = smb_stream_parse_name(path, fname, sname);
 
@@ -145,14 +135,50 @@ smb_com_delete(struct smb_request *sr)
 	while ((rc = smb_rdir_next(sr, &node, pc)) == 0) {
 		(void) strlcpy(name, pc->dc_name, MAXNAMELEN);
 
-		if (smb_delete_check(sr, node, pc->dc_dattr, &smberr)
-		    != NT_STATUS_SUCCESS) {
+		if (pc->dc_dattr & SMB_FA_DIRECTORY) {
+			smberr.errcls = ERRDOS;
+			smberr.errcode = ERROR_ACCESS_DENIED;
+			smberr.status = NT_STATUS_FILE_IS_A_DIRECTORY;
 			smb_node_release(node);
 			goto delete_error;
 		}
 
-		smb_node_release(node);
-		node = NULL;
+		if ((pc->dc_dattr & SMB_FA_READONLY) ||
+		    (node->flags & NODE_CREATED_READONLY)) {
+			smberr.errcls = ERRDOS;
+			smberr.errcode = ERROR_ACCESS_DENIED;
+			smberr.status = NT_STATUS_CANNOT_DELETE;
+			smb_node_release(node);
+			goto delete_error;
+		}
+
+		/*
+		 * NT does not always close a file immediately, which
+		 * can cause the share and access checking to fail
+		 * (the node refcnt is greater than one), and the file
+		 * doesn't get deleted. Breaking the oplock before
+		 * share and access checking gives the client a chance
+		 * to close the file.
+		 */
+
+		if (OPLOCKS_IN_FORCE(node)) {
+			smberr.status = smb_break_oplock(sr, node);
+
+			if (smberr.status != NT_STATUS_SUCCESS) {
+				smberr.errcls = ERRDOS;
+				smberr.errcode = ERROR_VC_DISCONNECTED;
+				smb_node_release(node);
+				goto delete_error;
+			}
+		}
+
+		smb_node_start_crit(node, RW_READER);
+
+		if (smb_delete_check(sr, node, &smberr)) {
+			smb_node_end_crit(node);
+			smb_node_release(node);
+			goto delete_error;
+		}
 
 		if (is_stream) {
 			/*
@@ -177,6 +203,10 @@ smb_com_delete(struct smb_request *sr)
 			    name, od);
 		}
 
+		smb_node_end_crit(node);
+		smb_node_release(node);
+		node = NULL;
+
 		if (rc != 0) {
 			if (rc != ENOENT) {
 				smb_rdir_close(sr);
@@ -185,7 +215,7 @@ smb_com_delete(struct smb_request *sr)
 				kmem_free(fname, MAXNAMELEN);
 				kmem_free(sname, MAXNAMELEN);
 				kmem_free(fullname, MAXPATHLEN);
-				smbsr_raise_errno(sr, rc);
+				smbsr_errno(sr, rc);
 				/* NOTREACHED */
 			}
 		} else {
@@ -201,7 +231,7 @@ smb_com_delete(struct smb_request *sr)
 		kmem_free(fname, MAXNAMELEN);
 		kmem_free(sname, MAXNAMELEN);
 		kmem_free(fullname, MAXPATHLEN);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -231,57 +261,20 @@ delete_error:
 	kmem_free(fname, MAXNAMELEN);
 	kmem_free(sname, MAXNAMELEN);
 	kmem_free(fullname, MAXPATHLEN);
-	smbsr_raise_cifs_error(sr,
-	    smberr.status, smberr.errcls, smberr.errcode);
+	smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
 	/* NOTREACHED */
 	return (SDRC_NORMAL_REPLY); /* compiler complains otherwise */
 }
 
-static DWORD
-smb_delete_check(
-    struct smb_request *sr,
-    struct smb_node *node,
-    uint16_t dattr,
-    smb_error_t *smberr)
+uint32_t
+smb_delete_check(smb_request_t *sr, smb_node_t *node, smb_error_t *smberr)
 {
-	if (dattr & SMB_FA_DIRECTORY) {
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_ACCESS_DENIED;
-		smberr->status = NT_STATUS_FILE_IS_A_DIRECTORY;
-		return (NT_STATUS_UNSUCCESSFUL);
-	}
+	smberr->status = smb_node_delete_check(node);
 
-	if ((dattr & SMB_FA_READONLY) ||
-	    (node->flags & NODE_CREATED_READONLY)) {
-		smberr->errcls = ERRDOS;
-		smberr->errcode = ERROR_ACCESS_DENIED;
-		smberr->status = NT_STATUS_CANNOT_DELETE;
-		return (NT_STATUS_UNSUCCESSFUL);
-	}
-
-	/*
-	 * NT does not always close a file immediately, which
-	 * can cause the share and access checking to fail
-	 * (the node refcnt is greater than one), and the file
-	 * doesn't get deleted. Breaking the oplock before
-	 * share and access checking gives the client a chance
-	 * to close the file.
-	 */
-	if (OPLOCKS_IN_FORCE(node)) {
-		smberr->status = smb_break_oplock(sr, node);
-
-		if (smberr->status != NT_STATUS_SUCCESS) {
-			smberr->errcls = ERRDOS;
-			smberr->errcode = ERROR_VC_DISCONNECTED;
-			return (NT_STATUS_UNSUCCESSFUL);
-		}
-	}
-
-	smberr->status = smb_delete_share_check(node);
 	if (smberr->status == NT_STATUS_SHARING_VIOLATION) {
 		smberr->errcls = ERRDOS;
 		smberr->errcode = ERROR_SHARING_VIOLATION;
-		return (NT_STATUS_UNSUCCESSFUL);
+		return (smberr->status);
 	}
 
 	/*
@@ -294,61 +287,15 @@ smb_delete_check(
 	 * W2K rejects lock requests on open files which are opened
 	 * with Metadata open modes. The error is STATUS_ACCESS_DENIED.
 	 */
-	if (smb_lock_range_access(sr, node, 0, 0, FILE_WRITE_DATA) !=
-	    NT_STATUS_SUCCESS) {
+
+	smberr->status = smb_range_check(sr, sr->user_cr, node, 0,
+	    UINT64_MAX, B_TRUE);
+
+	if (smberr->status != NT_STATUS_SUCCESS) {
 		smberr->errcls = ERRDOS;
 		smberr->errcode = ERROR_ACCESS_DENIED;
 		smberr->status = NT_STATUS_ACCESS_DENIED;
-		return (NT_STATUS_UNSUCCESSFUL);
 	}
 
-
-	return (NT_STATUS_SUCCESS);
-}
-
-/*
- * smb_delete_share_check
- *
- * An open file can be deleted only if opened for
- * accessing meta data. Share modes aren't important
- * in this case.
- *
- * NOTE: there is another mechanism for deleting an
- * open file that NT clients usually use this method.
- * That's setting "Delete on close" flag for an open
- * file, in this way the file will be deleted after
- * last close. This flag can be set by SmbTrans2SetFileInfo
- * with FILE_DISPOSITION_INFO information level.
- * For setting this flag file should be opened by
- * DELETE access in the FID that is passed in the Trans2
- * request.
- */
-static DWORD
-smb_delete_share_check(struct smb_node *node)
-{
-	smb_ofile_t	*file;
-
-	if (node == 0 || node->n_refcnt <= 1)
-		return (NT_STATUS_SUCCESS);
-
-	if (node->attr.sa_vattr.va_type == VDIR)
-		return (NT_STATUS_SUCCESS);
-
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	file = smb_llist_head(&node->n_ofile_list);
-	while (file) {
-		ASSERT(file->f_magic == SMB_OFILE_MAGIC);
-		if (file->f_granted_access &
-		    (FILE_READ_DATA |
-		    FILE_WRITE_DATA |
-		    FILE_APPEND_DATA |
-		    FILE_EXECUTE |
-		    DELETE)) {
-			smb_llist_exit(&node->n_ofile_list);
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
-		file = smb_llist_next(&node->n_ofile_list, file);
-	}
-	smb_llist_exit(&node->n_ofile_list);
-	return (NT_STATUS_SUCCESS);
+	return (smberr->status);
 }

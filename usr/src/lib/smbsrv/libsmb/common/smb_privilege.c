@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,9 +40,6 @@
 #include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/smb_privilege.h>
-
-#define	SMB_PRIV_MIN	2
-#define	SMB_PRIV_MAX	24
 
 static char *smb_priv_getname(uint32_t id);
 
@@ -98,7 +95,7 @@ smb_priv_presentable_num()
 	int i, num;
 
 	num = 0;
-	for (i = SMB_PRIV_MIN; i <= SMB_PRIV_MAX; i++)
+	for (i = SE_MIN_LUID; i <= SE_MAX_LUID; i++)
 		if (priv_table[i].flags == PF_PRESENTABLE)
 			num++;
 
@@ -119,7 +116,7 @@ smb_priv_presentable_ids(uint32_t *ids, int num)
 	if (ids == NULL || num <= 0)
 		return (0);
 
-	for (i = SMB_PRIV_MIN, j = 0; i <= SMB_PRIV_MAX; i++)
+	for (i = SE_MIN_LUID, j = 0; i <= SE_MAX_LUID; i++)
 		if (priv_table[i].flags == PF_PRESENTABLE)
 			ids[j++] = priv_table[i].id;
 
@@ -135,7 +132,7 @@ smb_priv_presentable_ids(uint32_t *ids, int num)
 smb_privinfo_t *
 smb_priv_getbyvalue(uint32_t id)
 {
-	if (id < SMB_PRIV_MIN || id > SMB_PRIV_MAX)
+	if (id < SE_MIN_LUID || id > SE_MAX_LUID)
 		return (0);
 
 	return (&priv_table[id]);
@@ -157,7 +154,7 @@ smb_priv_getbyname(char *name)
 	if (name == 0)
 		return (0);
 
-	for (i = SMB_PRIV_MIN; i <= SMB_PRIV_MAX; ++i) {
+	for (i = SE_MIN_LUID; i <= SE_MAX_LUID; ++i) {
 		entry = &priv_table[i];
 
 		if (utf8_strcasecmp(name, entry->name) == 0)
@@ -176,7 +173,7 @@ smb_priv_getbyname(char *name)
 int
 smb_privset_size()
 {
-	int pcnt = SMB_PRIV_MAX - SMB_PRIV_MIN + 1;
+	int pcnt = SE_MAX_LUID - SE_MIN_LUID + 1;
 
 	return (2 * sizeof (uint32_t) +
 	    pcnt * sizeof (smb_luid_attrs_t));
@@ -198,7 +195,7 @@ smb_privset_validate(smb_privset_t *privset)
 		return (0);
 	}
 
-	count = SMB_PRIV_MAX - SMB_PRIV_MIN + 1;
+	count = SE_MAX_LUID - SE_MIN_LUID + 1;
 
 	if (privset->priv_cnt != count) {
 		return (0);
@@ -210,7 +207,7 @@ smb_privset_validate(smb_privset_t *privset)
 		}
 
 		if (privset->priv[i].luid.lo_part !=
-		    i + SMB_PRIV_MIN) {
+		    i + SE_MIN_LUID) {
 			return (0);
 		}
 	}
@@ -232,13 +229,13 @@ smb_privset_init(smb_privset_t *privset)
 	if (privset == 0)
 		return;
 
-	count = SMB_PRIV_MAX - SMB_PRIV_MIN + 1;
+	count = SE_MAX_LUID - SE_MIN_LUID + 1;
 
 	privset->priv_cnt = count;
 	privset->control = 0;
 	for (i = 0; i < count; i++) {
 		privset->priv[i].luid.hi_part = 0;
-		privset->priv[i].luid.lo_part = i + SMB_PRIV_MIN;
+		privset->priv[i].luid.lo_part = i + SE_MIN_LUID;
 		privset->priv[i].attrs = 0;
 	}
 }
@@ -277,6 +274,25 @@ smb_privset_copy(smb_privset_t *dst, smb_privset_t *src)
 		return;
 
 	(void) memcpy(dst, src, smb_privset_size());
+}
+
+/*
+ * smb_privset_merge
+ *
+ * Enable the privileges that are enabled in src in dst
+ */
+void
+smb_privset_merge(smb_privset_t *dst, smb_privset_t *src)
+{
+	int i;
+
+	if (src == NULL || dst == NULL)
+		return;
+
+	for (i = 0; i < src->priv_cnt; i++) {
+		if (src->priv[i].attrs == SE_PRIVILEGE_ENABLED)
+			smb_privset_enable(dst, src->priv[i].luid.lo_part);
+	}
 }
 
 /*
@@ -354,7 +370,7 @@ smb_privset_query(smb_privset_t *privset, uint32_t id)
 static char *
 smb_priv_getname(uint32_t id)
 {
-	if (id < SMB_PRIV_MIN || id > SMB_PRIV_MAX)
+	if (id < SE_MIN_LUID || id > SE_MAX_LUID)
 		return ("Unknown Privilege");
 
 	return (priv_table[id].name);

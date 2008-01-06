@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,8 +173,7 @@ smb_pwd_update(const char *name, const char *password, int control)
 	boolean_t user_disable = B_FALSE;
 	char uxbuf[1024];
 	struct passwd uxpw;
-	int lm_level;
-	char *lm_str;
+	int64_t lm_level;
 
 	err = smb_pwd_lock();
 	if (err != SMB_PWE_SUCCESS)
@@ -202,13 +201,8 @@ smb_pwd_update(const char *name, const char *password, int control)
 		goto passwd_exit;
 	}
 
-	lm_str = smb_config_getenv(SMB_CI_LM_LEVEL);
-	if (lm_str) {
-		lm_level = strtoul(lm_str, 0, 10);
-		free(lm_str);
-	} else {
+	if (smb_config_getnum(SMB_CI_LM_LEVEL, &lm_level) != SMBD_SMF_OK)
 		lm_level = 4;
-	}
 
 	if (lm_level >= 4)
 		control |= SMB_PWC_NOLM;

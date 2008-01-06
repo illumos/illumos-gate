@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,8 +67,8 @@ extern int smb_common_create_directory(struct smb_request *sr);
 int
 smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 {
-	int			rc;
-	DWORD status;
+	int	rc;
+	DWORD	status;
 
 	if (smb_decode_mbc(&xa->req_param_mb, "%4.s",
 	    sr, &sr->arg.dirop.fqi.path) != 0) {
@@ -77,16 +77,12 @@ smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	if ((status = smb_validate_dirname(sr->arg.dirop.fqi.path)) != 0) {
-		if (sr->session->capabilities & CAP_STATUS32)
-			smbsr_raise_nt_error(sr, status);
-		else
-			smbsr_raise_error(sr, ERRDOS, ERROR_INVALID_NAME);
-
+		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
 		/* NOTREACHED */
 	}
 
 	if ((rc = smb_common_create_directory(sr)) != 0) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,17 @@
  */
 
 #include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_fsops.h>
+#include <sys/nbmlock.h>
+#include <sys/param.h>
+
+static void
+smb_unlock_to_posix_unlock(smb_request_t *sr, smb_node_t *node,
+    smb_lock_t *lock, boolean_t unlock);
+
+static boolean_t
+smb_is_range_unlocked(uint64_t start, uint64_t end, smb_llist_t *llist_head,
+    uint64_t *new_mark);
 
 static int
 smb_lock_range_overlap(struct smb_lock *lock, uint64_t start, uint64_t length);
@@ -367,6 +378,9 @@ smb_unlock_range(
 	}
 
 	smb_llist_remove(&node->n_lock_list, lock);
+
+	smb_unlock_to_posix_unlock(sr, node, lock, B_TRUE);
+
 	smb_llist_exit(&node->n_lock_list);
 
 	smb_lock_destroy(lock);
@@ -481,7 +495,14 @@ smb_lock_range(
 
 		smb_lock_free(lock);
 	} else {
-		smb_llist_insert_tail(&node->n_lock_list, lock);
+		/*
+		 * don't insert into the CIFS lock list unless the
+		 * posix lock worked
+		 */
+		if (smb_fsop_frlock(sr, node, lock, B_FALSE))
+			result = NT_STATUS_FILE_LOCK_CONFLICT;
+		else
+			smb_llist_insert_tail(&node->n_lock_list, lock);
 	}
 	smb_llist_exit(&node->n_lock_list);
 
@@ -506,14 +527,11 @@ smb_lock_range_access(
     struct smb_node *node,
     uint64_t start,
     uint64_t length,
-    uint32_t desired_access)
+    boolean_t will_write)
 {
 	smb_lock_t	*lock;
 	smb_llist_t	*llist;
 	int		status = NT_STATUS_SUCCESS;
-
-	ASSERT((desired_access & ~(FILE_READ_DATA | FILE_WRITE_DATA)) == 0);
-	ASSERT((desired_access & (FILE_READ_DATA | FILE_WRITE_DATA)) != 0);
 
 	llist = &node->n_lock_list;
 	smb_llist_enter(llist, RW_READER);
@@ -526,8 +544,7 @@ smb_lock_range_access(
 			/* Lock does not overlap */
 			continue;
 
-		if (lock->l_type == SMB_LOCK_TYPE_READONLY &&
-		    desired_access == FILE_READ_DATA)
+		if (lock->l_type == SMB_LOCK_TYPE_READONLY && !will_write)
 			continue;
 
 		if (lock->l_type == SMB_LOCK_TYPE_READWRITE &&
@@ -664,46 +681,196 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 }
 
 void
-smb_lock_range_raise_error(smb_request_t *sr, uint32_t ntstatus)
+smb_lock_range_error(smb_request_t *sr, uint32_t status32)
 {
-	switch (ntstatus) {
-	case NT_STATUS_CANCELLED:
-		/*
-		 * XXX What is the proper error here?
-		 */
-		smbsr_raise_error(sr, ERRDOS, ERRlock);
-		/* NOTREACHED */
-	case NT_STATUS_FILE_LOCK_CONFLICT:
-		smbsr_raise_cifs_error(sr, NT_STATUS_FILE_LOCK_CONFLICT,
-		    ERRDOS, ERRlock);
-		/* NOTREACHED */
-	case NT_STATUS_LOCK_NOT_GRANTED:
-		smbsr_raise_cifs_error(sr, NT_STATUS_LOCK_NOT_GRANTED,
-		    ERRDOS, ERRlock);
-		/* NOTREACHED */
-	case NT_STATUS_RANGE_NOT_LOCKED:
-		smbsr_raise_cifs_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
-		    ERRDOS, ERRlock);
-		/* NOTREACHED */
-	default:
-		ASSERT(0);
-		smbsr_raise_error(sr, ERRDOS, ntstatus);
-		/* NOTREACHED */
+	uint16_t errcode;
+
+	if (status32 == NT_STATUS_CANCELLED)
+		errcode = ERROR_OPERATION_ABORTED;
+	else
+		errcode = ERRlock;
+
+	smbsr_error(sr, status32, ERRDOS, errcode);
+	/* NOTREACHED */
+}
+
+/*
+ * smb_range_check()
+ *
+ * Perform range checking.  First check for internal CIFS range conflicts
+ * and then check for external conflicts, for example, with NFS or local
+ * access.
+ *
+ * If nbmand is enabled, this function must be called from within an nbmand
+ * critical region
+ */
+
+DWORD
+smb_range_check(smb_request_t *sr, cred_t *cr, smb_node_t *node, uint64_t start,
+    uint64_t length, boolean_t will_write)
+{
+	smb_error_t smberr;
+	int svmand;
+	int nbl_op;
+	int rc;
+
+	ASSERT(node);
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+
+	ASSERT(smb_node_in_crit(node));
+
+	if (node->attr.sa_vattr.va_type == VDIR)
+		return (NT_STATUS_SUCCESS);
+
+	rc = smb_lock_range_access(sr, node, start, length, will_write);
+	if (rc)
+		return (NT_STATUS_UNSUCCESSFUL);
+
+	if ((rc = nbl_svmand(node->vp, cr, &svmand)) != 0) {
+		smbsr_map_errno(rc, &smberr);
+		return (smberr.status);
+	}
+
+	if (will_write)
+		nbl_op = NBL_WRITE;
+	else
+		nbl_op = NBL_READ;
+
+	if (nbl_lock_conflict(node->vp, nbl_op, start, length,
+	    svmand, &smb_ct))
+		return (NT_STATUS_UNSUCCESSFUL);
+
+	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_unlock_to_posix_unlock
+ *
+ * checks if the current unlock request is in another lock
+ * and repeatedly calls smb_is_range_unlocked on a sliding basis to
+ * to unlock all bits of the lock that are not in other locks
+ *
+ */
+
+void
+smb_unlock_to_posix_unlock(smb_request_t *sr, smb_node_t *node,
+    smb_lock_t *lock, boolean_t unlock)
+{
+	uint64_t new_mark;
+	uint64_t unlock_start;
+	uint64_t unlock_end;
+	boolean_t unlocked;
+	smb_lock_t new_unlock;
+	smb_llist_t *llist_head;
+	int cnt = 1;
+
+	new_mark = 0;
+	unlock_start = lock->l_start;
+	unlock_end = unlock_start + lock->l_length;
+	llist_head = &node->n_lock_list;
+
+	while (cnt) {
+		if ((unlocked = smb_is_range_unlocked(unlock_start, unlock_end,
+		    llist_head, &new_mark)) == B_TRUE) {
+			if (new_mark) {
+				new_unlock = *lock;
+				new_unlock.l_start = unlock_start;
+				new_unlock.l_length = new_mark - unlock_start;
+				(void) smb_fsop_frlock(sr, node,
+				    &new_unlock, unlock);
+				unlock_start = new_mark;
+			} else {
+				new_unlock = *lock;
+				new_unlock.l_start = unlock_start;
+				new_unlock.l_length = unlock_end - unlock_start;
+				(void) smb_fsop_frlock(sr, node,
+				    &new_unlock, unlock);
+				break;
+			}
+		} else if ((unlocked == B_FALSE) && new_mark) {
+			unlock_start = new_mark;
+		} else {
+			break;
+		}
 	}
 }
 
+/*
+ * smb_is_range_unlocked
+ *
+ * Checks if the current unlock byte range request overlaps another lock
+ * The return code and the value of new_mark must be interpreted as
+ * follows:
+ *
+ * B_TRUE and (new_mark == 0):
+ *   This is the last or only lock left to be unlocked
+ *
+ * B_TRUE and (new_mark > 0):
+ *   The range from start to new_mark can be unlocked
+ *
+ * B_FALSE and (new_mark == 0):
+ *   The unlock can't be performed and we are done
+ *
+ * B_FALSE and (new_mark > 0),
+ *   The range from start to new_mark can't be unlocked
+ *   Start should be reset to new_mark for the next pass
+ */
 
-void
-smb_unlock_range_raise_error(smb_request_t *sr, uint32_t ntstatus)
+static boolean_t
+smb_is_range_unlocked(uint64_t start, uint64_t end, smb_llist_t *llist_head,
+    uint64_t *new_mark)
 {
-	switch (ntstatus) {
-	case NT_STATUS_RANGE_NOT_LOCKED:
-		smbsr_raise_cifs_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
-		    ERRDOS, ERRnotlocked);
-		/* NOTREACHED */
-	default:
-		ASSERT(0);
-		smbsr_raise_error(sr, ERRDOS, ntstatus);
-		/* NOTREACHED */
+	struct smb_lock *lk = 0;
+	uint64_t low_water_mark = MAXOFFSET_T;
+	uint64_t lk_start;
+	uint64_t lk_end;
+
+	*new_mark = 0;
+	lk = smb_llist_head(llist_head);
+	while (lk) {
+
+		lk_end = lk->l_start + lk->l_length - 1;
+		lk_start = lk->l_start;
+
+		/*
+		 * there is no overlap for the first 2 cases
+		 * check next node
+		 */
+		if (lk_end < start) {
+			lk = smb_llist_next(llist_head, lk);
+			continue;
+		}
+		if (lk_start > end) {
+			lk = smb_llist_next(llist_head, lk);
+			continue;
+		}
+
+		/* this range is completely locked */
+		if ((lk_start <= start) && (lk_end >= end)) {
+			return (B_FALSE);
+		}
+
+		/* the first part of this range is locked */
+		if ((start >= lk_start) && (start <= lk_end)) {
+			if (end > lk_end)
+				*new_mark = lk_end + 1;
+			return (B_FALSE);
+		}
+
+		/* this piece is unlocked */
+		if ((lk_start >= start) && (lk_start <= end)) {
+			if (low_water_mark > lk_start)
+				low_water_mark  = lk_start;
+		}
+
+		lk = smb_llist_next(llist_head, lk);
 	}
+
+	if (low_water_mark != MAXOFFSET_T) {
+		*new_mark = low_water_mark;
+		return (B_TRUE);
+	}
+	/* the range is completely unlocked */
+	return (B_TRUE);
 }

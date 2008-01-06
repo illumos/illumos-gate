@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,6 @@
 #include <libgen.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlsvc.h>
 
 typedef enum {
 	HELP_ADD_MEMBER,
@@ -403,9 +402,7 @@ smbadm_list(int argc, char **argv)
 		return (1);
 	}
 
-	(void) printf(gettext("%s name: %s\n"),
-	    modename, resource_domain);
-
+	(void) printf(gettext("%s name: %s\n"), modename, resource_domain);
 	return (0);
 }
 
@@ -420,7 +417,7 @@ smbadm_group_create(int argc, char **argv)
 	char *gname = NULL;
 	char *desc = NULL;
 	char option;
-	uint32_t status;
+	int status;
 
 	while ((option = getopt(argc, argv, "d:")) != -1) {
 		switch (option) {
@@ -441,19 +438,19 @@ smbadm_group_create(int argc, char **argv)
 
 	if (getgrnam(gname) == NULL) {
 		(void) fprintf(stderr,
-		    gettext("failed to get the Solaris group\n"));
+		    gettext("failed to get the Solaris group '%s'\n"), gname);
 		(void) fprintf(stderr,
-		    gettext("use 'groupadd' to add the Solaris group\n"));
+		    gettext("use 'groupadd' to add '%s'\n"), gname);
 		return (1);
 	}
 
-	status = smb_group_add(gname, desc);
-	if (status != NT_STATUS_SUCCESS) {
+	status = smb_lgrp_add(gname, desc);
+	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("failed to create the group (%s)\n"),
-		    xlate_nt_status(status));
+		    smb_lgrp_strerror(status));
 	} else {
-		(void) printf(gettext("Successfully created group '%s'\n"),
+		(void) printf(gettext("'%s' created.\n"),
 		    gname);
 	}
 
@@ -466,38 +463,21 @@ smbadm_group_create(int argc, char **argv)
  * Dump group members details.
  */
 static void
-smbadm_group_dump_members(char *gname)
+smbadm_group_dump_members(smb_gsid_t *members, int num)
 {
-	ntgrp_member_list_t *members = NULL;
-	int mem_cnt = 0;
-	int offset = 0;
-	uint32_t status;
+	char sidstr[NT_SID_FMTBUF_SIZE];
 	int i;
 
-	status = smb_group_member_count(gname, &mem_cnt);
-	if (mem_cnt < 0) {
-		(void) fprintf(stderr,
-		    gettext("failed to get the group members (%s)\n"),
-		    xlate_nt_status(status));
-	}
-
-	if (mem_cnt == 0) {
+	if (num == 0) {
 		(void) printf(gettext("\tNo members\n"));
 		return;
 	}
 
 	(void) printf(gettext("\tMembers:\n"));
-	while (smb_group_member_list(gname, offset, &members) == 0) {
-		if (members == NULL)
-			break;
-
-		for (i = 0; i < members->cnt; i++)
-			(void) printf(gettext("\t\t%s\n"), members->members[i]);
-
-		offset += members->cnt;
-		smb_group_free_memberlist(members, 0);
-		if (offset >= mem_cnt)
-			break;
+	for (i = 0; i < num; i++) {
+		(void) smb_lookup_sid(members[i].gs_sid, sidstr,
+		    sizeof (sidstr));
+		(void) printf(gettext("\t\t%s\n"), sidstr);
 	}
 }
 
@@ -507,39 +487,34 @@ smbadm_group_dump_members(char *gname)
  * Dump group privilege details.
  */
 static void
-smbadm_group_dump_privs(char *gname, ntpriv_list_t *privs)
+smbadm_group_dump_privs(smb_privset_t *privs)
 {
-	int privcnt = 0;
-	uint32_t privval;
-	char *name = NULL;
+	smb_privinfo_t *pinfo;
+	char *pstatus;
 	int i;
 
 	(void) printf(gettext("\tPrivileges: \n"));
 
-	for (i = 0; i < privs->cnt; i++) {
-		name = privs->privs[i]->name;
-		if (name == NULL)
+	for (i = 0; i < privs->priv_cnt; i++) {
+		pinfo = smb_priv_getbyvalue(privs->priv[i].luid.lo_part);
+		if ((pinfo == NULL) || (pinfo->flags & PF_PRESENTABLE) == 0)
 			continue;
 
-		if (smb_group_priv_get(gname, privs->privs[i]->id,
-		    &privval) != 0) {
-			continue;
+		switch (privs->priv[i].attrs) {
+		case SE_PRIVILEGE_ENABLED:
+			pstatus = "On";
+			break;
+		case SE_PRIVILEGE_DISABLED:
+			pstatus = "Off";
+			break;
+		default:
+			pstatus = "Unknown";
+			break;
 		}
-
-		if (privval == SE_PRIVILEGE_ENABLED) {
-			(void) printf(gettext("\t\t%s: On\n"), name);
-		} else if (privval == SE_PRIVILEGE_DISABLED) {
-			(void) printf(gettext("\t\t%s: Off\n"), name);
-		} else {
-			(void) printf(gettext("\t\t%s: %d\n"),
-			    name, privval);
-		}
-
-		name = NULL;
-		privcnt++;
+		(void) printf(gettext("\t\t%s: %s\n"), pinfo->name, pstatus);
 	}
 
-	if (privcnt == 0)
+	if (privs->priv_cnt == 0)
 		(void) printf(gettext("\t\tNo privileges\n"));
 }
 
@@ -548,41 +523,21 @@ smbadm_group_dump_privs(char *gname, ntpriv_list_t *privs)
  *
  * Dump group details.
  */
-static int
-smbadm_group_dump(ntgrp_list_t *list, boolean_t show_mem, boolean_t show_privs)
+static void
+smbadm_group_dump(smb_group_t *grp, boolean_t show_mem, boolean_t show_privs)
 {
-	ntpriv_list_t *privs = NULL;
-	char *gname;
-	uint32_t status;
-	int i;
+	char sidstr[NT_SID_FMTBUF_SIZE];
 
-	if (show_privs) {
-		if ((status = smb_group_priv_list(&privs)) != 0) {
-			(void) fprintf(stderr,
-			    gettext("failed to get privileges (%s)\n"),
-			    xlate_nt_status(status));
-			return (1);
-		}
-	}
+	(void) printf(gettext("%s (%s)\n"), grp->sg_name, grp->sg_cmnt);
 
-	for (i = 0; i < list->cnt; i++) {
-		gname = list->groups[i].name;
+	nt_sid_format2(grp->sg_id.gs_sid, sidstr);
+	(void) printf(gettext("\tSID: %s\n"), sidstr);
 
-		(void) printf(gettext("%s (%s)\n"), gname,
-		    list->groups[i].desc);
-		(void) printf(gettext("\tType: %s, Attr: %X\n"),
-		    list->groups[i].type, list->groups[i].attr);
-		(void) printf(gettext("\tSID: %s\n"),
-		    list->groups[i].sid);
+	if (show_privs)
+		smbadm_group_dump_privs(grp->sg_privs);
 
-		if (show_privs)
-			smbadm_group_dump_privs(gname, privs);
-
-		if (show_mem)
-			smbadm_group_dump_members(list->groups[i].name);
-	}
-
-	return (0);
+	if (show_mem)
+		smbadm_group_dump_members(grp->sg_members, grp->sg_nmembers);
 }
 
 /*
@@ -593,14 +548,12 @@ static int
 smbadm_group_show(int argc, char **argv)
 {
 	char *gname = NULL;
-	int cnt = 0;
-	int offset = 0;
 	boolean_t show_privs;
 	boolean_t show_members;
 	char option;
-	uint32_t status;
-	ntgrp_list_t *list = NULL;
-	int ret = 0;
+	int status;
+	smb_group_t grp;
+	smb_giter_t gi;
 
 	show_privs = show_members = B_FALSE;
 
@@ -622,47 +575,44 @@ smbadm_group_show(int argc, char **argv)
 	if (optind >= argc || gname == NULL || *gname == '\0')
 		gname = "*";
 
-	status = smb_group_count(&cnt);
-	if ((status != NT_STATUS_SUCCESS) || (cnt < 0)) {
-		(void) fprintf(stderr,
-		    gettext("failed to get the number of group(s) (%s)\n"),
-		    xlate_nt_status(status));
-		return (1);
-	}
-
-	while ((offset < cnt)) {
-		status = smb_group_list(offset, &list, gname, 0);
-		if (status != NT_STATUS_SUCCESS) {
+	if (strcmp(gname, "*")) {
+		status = smb_lgrp_getbyname(gname, &grp);
+		if (status == SMB_LGRP_SUCCESS) {
+			smbadm_group_dump(&grp, show_members, show_privs);
+			smb_lgrp_free(&grp);
+		} else {
 			(void) fprintf(stderr,
-			    gettext("failed to get the group(s) (%s)\n"),
-			    xlate_nt_status(status));
-			return (1);
+			    gettext("failed to find '%s' (%s)\n"),
+			    gname, smb_lgrp_strerror(status));
 		}
-
-		if ((list == NULL) || (list->cnt <= 0))
-			break;
-
-		ret = smbadm_group_dump(list, show_members, show_privs);
-		if (ret)
-			break;
-
-		offset += list->cnt;
-		smb_group_free_list(list, 0);
-		list = NULL;
+		return (status);
 	}
 
-	return (ret);
+	status = smb_lgrp_iteropen(&gi);
+	if (status != SMB_LGRP_SUCCESS) {
+		(void) fprintf(stderr,
+		    gettext("failed to list groups (%s)\n"),
+		    smb_lgrp_strerror(status));
+		return (status);
+	}
+
+	while (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS) {
+		smbadm_group_dump(&grp, show_members, show_privs);
+		smb_lgrp_free(&grp);
+	}
+	smb_lgrp_iterclose(&gi);
+
+	return (0);
 }
 
 /*
  * smbadm_group_delete
- *
  */
 static int
 smbadm_group_delete(int argc, char **argv)
 {
-	uint32_t status;
 	char *gname = NULL;
+	int status;
 
 	gname = argv[optind];
 	if (optind >= argc || gname == NULL || *gname == '\0') {
@@ -670,13 +620,13 @@ smbadm_group_delete(int argc, char **argv)
 		smbadm_usage(B_FALSE);
 	}
 
-	status = smb_group_delete(gname);
-	if (status != NT_STATUS_SUCCESS) {
+	status = smb_lgrp_delete(gname);
+	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("failed to delete the group (%s)\n"),
-		    xlate_nt_status(status));
+		    smb_lgrp_strerror(status));
 	} else {
-		(void) printf(gettext("Successfully deleted group '%s'\n"),
+		(void) printf(gettext("'%s' deleted.\n"),
 		    gname);
 	}
 
@@ -685,14 +635,13 @@ smbadm_group_delete(int argc, char **argv)
 
 /*
  * smbadm_group_rename
- *
  */
 static int
 smbadm_group_rename(int argc, char **argv)
 {
 	char *gname = NULL;
 	char *ngname = NULL;
-	uint32_t status;
+	int status;
 
 	gname = argv[optind];
 	if (optind++ >= argc || gname == NULL || *gname == '\0') {
@@ -706,22 +655,26 @@ smbadm_group_rename(int argc, char **argv)
 		smbadm_usage(B_FALSE);
 	}
 
-	if (getgrnam(gname) == NULL) {
+	if (getgrnam(ngname) == NULL) {
 		(void) fprintf(stderr,
-		    gettext("failed to get the Solaris group\n"));
+		    gettext("failed to get the Solaris group '%s'\n"), ngname);
 		(void) fprintf(stderr,
-		    gettext("use 'groupadd' to add the Solaris group\n"));
+		    gettext("use 'groupadd' to add '%s'\n"), ngname);
 		return (1);
 	}
 
-	status = smb_group_modify(gname, ngname, NULL);
-	if (status != NT_STATUS_SUCCESS) {
-		(void) fprintf(stderr,
-		    gettext("failed to modify the group (%s)\n"),
-		    xlate_nt_status(status));
+	status = smb_lgrp_rename(gname, ngname);
+	if (status != SMB_LGRP_SUCCESS) {
+		if (status == SMB_LGRP_EXISTS)
+			(void) fprintf(stderr,
+			    gettext("failed to rename '%s' (%s already "
+			    "exists)\n"), gname, ngname);
+		else
+			(void) fprintf(stderr,
+			    gettext("failed to rename '%s' (%s)\n"), gname,
+			    smb_lgrp_strerror(status));
 	} else {
-		(void) printf(gettext("Successfully modified "
-		    "group '%s'\n"), gname);
+		(void) printf(gettext("'%s' renamed to '%s'\n"), gname, ngname);
 	}
 
 	return (status);
@@ -755,14 +708,8 @@ smbadm_group_setprop(int argc, char **argv)
 				smbadm_usage(B_FALSE);
 			}
 
-			ret = smbadm_prop_parse(optarg, &props[pcnt++]);
-			if (ret) {
-				if (ret == 1)
-					exit(1);
-
-				if (ret == 2)
-					smbadm_usage(B_FALSE);
-			}
+			if (smbadm_prop_parse(optarg, &props[pcnt++]) != 0)
+				smbadm_usage(B_FALSE);
 			break;
 
 		default:
@@ -821,14 +768,8 @@ smbadm_group_getprop(int argc, char **argv)
 				smbadm_usage(B_FALSE);
 			}
 
-			ret = smbadm_prop_parse(optarg, &props[pcnt++]);
-			if (ret) {
-				if (ret == 1)
-					exit(1);
-
-				if (ret == 2)
-					smbadm_usage(B_FALSE);
-			}
+			if (smbadm_prop_parse(optarg, &props[pcnt++]) != 0)
+				smbadm_usage(B_FALSE);
 			break;
 
 		default:
@@ -873,7 +814,8 @@ smbadm_group_addmember(int argc, char **argv)
 	char *gname = NULL;
 	char **mname;
 	char option;
-	uint32_t status;
+	smb_gsid_t msid;
+	int status;
 	int mcnt = 0;
 	int ret = 0;
 	int i;
@@ -916,16 +858,25 @@ smbadm_group_addmember(int argc, char **argv)
 		if (mname[i] == NULL)
 			continue;
 
-		status = smb_group_member_add(gname, mname[i]);
-		if (status != NT_STATUS_SUCCESS) {
+		if (smb_lookup_name(mname[i], &msid) != NT_STATUS_SUCCESS) {
+			(void) fprintf(stderr,
+			    gettext("failed to add %s "
+			    "(could not obtain the SID)\n"),
+			    mname[i]);
+			continue;
+		}
+
+		status = smb_lgrp_add_member(gname, msid.gs_sid, msid.gs_type);
+		free(msid.gs_sid);
+		if (status != SMB_LGRP_SUCCESS) {
 			(void) fprintf(stderr,
 			    gettext("failed to add %s (%s)\n"),
-			    mname[i], xlate_nt_status(status));
+			    mname[i], smb_lgrp_strerror(status));
 			ret = 1;
-		}
-		else
-			(void) printf(gettext("Successfully added %s to %s\n"),
+		} else {
+			(void) printf(gettext("'%s' is now a member of '%s'\n"),
 			    mname[i], gname);
+		}
 	}
 
 	free(mname);
@@ -941,7 +892,8 @@ smbadm_group_delmember(int argc, char **argv)
 	char *gname = NULL;
 	char **mname;
 	char option;
-	uint32_t status;
+	smb_gsid_t msid;
+	int status;
 	int mcnt = 0;
 	int ret = 0;
 	int i;
@@ -983,15 +935,24 @@ smbadm_group_delmember(int argc, char **argv)
 		if (mname[i] == NULL)
 			continue;
 
-		status = smb_group_member_remove(gname, mname[i]);
-		if (status != NT_STATUS_SUCCESS) {
+		if (smb_lookup_name(mname[i], &msid) != NT_STATUS_SUCCESS) {
+			(void) fprintf(stderr,
+			    gettext("failed to remove %s "
+			    "(could not obtain the SID)\n"),
+			    mname[i]);
+			continue;
+		}
+
+		status = smb_lgrp_del_member(gname, msid.gs_sid, msid.gs_type);
+		free(msid.gs_sid);
+		if (status != SMB_LGRP_SUCCESS) {
 			(void) fprintf(stderr,
 			    gettext("failed to remove %s (%s)\n"),
-			    mname[i], xlate_nt_status(status));
+			    mname[i], smb_lgrp_strerror(status));
 			ret = 1;
 		} else {
 			(void) printf(
-			    gettext("Successfully removed %s from %s\n"),
+			    gettext("'%s' has been removed from %s\n"),
 			    mname[i], gname);
 		}
 	}
@@ -1045,6 +1006,7 @@ smbadm_user_enable(int argc, char **argv)
 int
 main(int argc, char **argv)
 {
+	int ret;
 	int i;
 
 	(void) malloc(0);	/* satisfy libumem dependency */
@@ -1087,7 +1049,24 @@ main(int argc, char **argv)
 					smbadm_usage(B_TRUE);
 			}
 
-			return (curcmd->func(argc - 1, &argv[1]));
+			if (smb_idmap_start() != 0) {
+				(void) fprintf(stderr,
+				    gettext("failed to contact idmap service"));
+				return (1);
+			}
+
+			if ((ret = smb_lgrp_start()) != SMB_LGRP_SUCCESS) {
+				(void) fprintf(stderr,
+				    gettext("failed to initialize (%s)"),
+				    smb_lgrp_strerror(ret));
+				smb_idmap_stop();
+				return (1);
+			}
+
+			ret = curcmd->func(argc - 1, &argv[1]);
+			smb_lgrp_stop();
+			smb_idmap_stop();
+			return (ret);
 		}
 	}
 
@@ -1167,13 +1146,13 @@ smbadm_prop_gethandle(char *pname)
 static int
 smbadm_setprop_desc(char *gname, smbadm_prop_t *prop)
 {
-	uint32_t status;
+	int status;
 
-	status = smb_group_modify(gname, gname, prop->p_value);
-	if (status != NT_STATUS_SUCCESS) {
+	status = smb_lgrp_setcmnt(gname, prop->p_value);
+	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
 		    gettext("failed to modify the group description (%s)\n"),
-		    xlate_nt_status(status));
+		    smb_lgrp_strerror(status));
 		return (1);
 	}
 
@@ -1186,50 +1165,44 @@ smbadm_setprop_desc(char *gname, smbadm_prop_t *prop)
 static int
 smbadm_getprop_desc(char *gname, smbadm_prop_t *prop)
 {
-	uint32_t status;
-	ntgrp_list_t *list = NULL;
+	char *cmnt = NULL;
+	int status;
 
-	status = smb_group_list(0, &list, gname, 0);
-	if (status != NT_STATUS_SUCCESS) {
+	status = smb_lgrp_getcmnt(gname, &cmnt);
+	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr,
-		    gettext("failed to get the %s (%s)\n"),
-		    prop->p_name, xlate_nt_status(status));
+		    gettext("failed to get the group description (%s)\n"),
+		    smb_lgrp_strerror(status));
 		return (1);
 	}
 
-	if ((list == NULL) || (list->cnt <= 0)) {
-		(void) fprintf(stderr, gettext("%s: no such group\n"), gname);
-		return (1);
-	}
-
-	(void) printf(gettext("\t%s: %s\n"), prop->p_name,
-	    list->groups[0].desc);
-	smb_group_free_list(list, 0);
+	(void) printf(gettext("\t%s: %s\n"), prop->p_name, cmnt);
+	free(cmnt);
 	return (0);
 }
 
 static int
-smbadm_group_setpriv(char *gname, uint32_t priv_id, smbadm_prop_t *prop)
+smbadm_group_setpriv(char *gname, uint8_t priv_id, smbadm_prop_t *prop)
 {
-	uint32_t priv_attr;
-	uint32_t status;
+	boolean_t enable;
+	int status;
 	int ret;
 
 	if (strcasecmp(prop->p_value, "on") == 0) {
 		(void) printf(gettext("Enabling %s privilege "), prop->p_name);
-		priv_attr = SE_PRIVILEGE_ENABLED;
+		enable = B_TRUE;
 	} else {
 		(void) printf(gettext("Disabling %s privilege "), prop->p_name);
-		priv_attr = SE_PRIVILEGE_DISABLED;
+		enable = B_FALSE;
 	}
 
-	status = smb_group_priv_set(gname, priv_id, priv_attr);
-
-	if (status == NT_STATUS_SUCCESS) {
+	status = smb_lgrp_setpriv(gname, priv_id, enable);
+	if (status == SMB_LGRP_SUCCESS) {
 		(void) printf(gettext("succeeded\n"));
 		ret = 0;
 	} else {
-		(void) printf(gettext("failed: %s\n"), xlate_nt_status(status));
+		(void) printf(gettext("failed: %s\n"),
+		    smb_lgrp_strerror(status));
 		ret = 1;
 	}
 
@@ -1237,24 +1210,20 @@ smbadm_group_setpriv(char *gname, uint32_t priv_id, smbadm_prop_t *prop)
 }
 
 static int
-smbadm_group_getpriv(char *gname, uint32_t priv_id, smbadm_prop_t *prop)
+smbadm_group_getpriv(char *gname, uint8_t priv_id, smbadm_prop_t *prop)
 {
-	uint32_t priv_attr;
-	uint32_t status;
+	boolean_t enable;
+	int status;
 
-	status = smb_group_priv_get(gname, priv_id, &priv_attr);
-	if (status != NT_STATUS_SUCCESS) {
+	status = smb_lgrp_getpriv(gname, priv_id, &enable);
+	if (status != SMB_LGRP_SUCCESS) {
 		(void) fprintf(stderr, gettext("failed to get %s (%s)\n"),
-		    prop->p_name, xlate_nt_status(status));
+		    prop->p_name, smb_lgrp_strerror(status));
 		return (1);
 	}
 
-	if (priv_attr == SE_PRIVILEGE_ENABLED)
-		(void) printf(gettext("\t%s: %s\n"), prop->p_name, "On");
-	else if (priv_attr == SE_PRIVILEGE_DISABLED)
-		(void) printf(gettext("\t%s: %s\n"), prop->p_name, "Off");
-	else
-		(void) printf(gettext("\t%s: %s\n"), prop->p_name, "Unknown");
+	(void) printf(gettext("\t%s: %s\n"), prop->p_name,
+	    (enable) ? "On" : "Off");
 
 	return (0);
 }

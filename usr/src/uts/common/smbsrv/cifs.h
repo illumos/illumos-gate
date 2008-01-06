@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -419,6 +419,23 @@ extern "C" {
 #define	SMB_LR_MASK			0x0F00
 
 #define	SMB_DA_WRITE_THROUGH		0x4000
+
+/*
+ * Macros used for share reservation rule checking
+ */
+
+#define	SMB_DENY_READ(share_access) ((share_access & FILE_SHARE_READ) == 0)
+
+#define	SMB_DENY_WRITE(share_access) ((share_access & FILE_SHARE_WRITE) == 0)
+
+#define	SMB_DENY_DELETE(share_access) ((share_access & FILE_SHARE_DELETE) == 0)
+
+#define	SMB_DENY_RW(share_access) \
+	((share_access & (FILE_SHARE_READ | FILE_SHARE_WRITE)) == 0)
+
+#define	SMB_DENY_ALL(share_access) (share_access == 0)
+
+#define	SMB_DENY_NONE(share_access) (share_access == FILE_SHARE_ALL)
 
 /*
  * The SMB open function determines what action should be taken depending

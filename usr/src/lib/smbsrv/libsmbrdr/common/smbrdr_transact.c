@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <strings.h>
 
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr.h>
@@ -54,13 +53,12 @@ static int decode_smb_transact(smb_msgbuf_t *, char *, unsigned,
     smb_transact_rsp_t *);
 
 /*
- * smbrdr_rpc_transact
+ * smbrdr_transact
  *
  * Send a SMB_COM_TRANSACTION request.
  */
 int
-smbrdr_rpc_transact(int fid, char *out_buf, int out_len,
-    char *in_buf, int in_len)
+smbrdr_transact(int fid, char *out_buf, int out_len, char *in_buf, int in_len)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
@@ -86,7 +84,8 @@ smbrdr_rpc_transact(int fid, char *out_buf, int out_len,
 	    session, logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrTransact: %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_transact: %s",
+		    xlate_nt_status(status));
 		smbrdr_ofile_put(ofile);
 		return (-1);
 	}
@@ -96,8 +95,7 @@ smbrdr_rpc_transact(int fid, char *out_buf, int out_len,
 	rc = prep_smb_transact(mb, ofile->fid, out_buf, out_len, in_len,
 	    session->remote_caps & CAP_UNICODE);
 	if (rc < 0) {
-		syslog(LOG_ERR,
-		    "smbrdr_rpc_transact: prep_smb_transact failed");
+		syslog(LOG_DEBUG, "smbrdr_transact: prep failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
 		return (rc);
@@ -110,7 +108,7 @@ smbrdr_rpc_transact(int fid, char *out_buf, int out_len,
 		smbrdr_unlock_transport();
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_put(ofile);
-		syslog(LOG_ERR, "smbrdr_rpc_transact: send failed");
+		syslog(LOG_DEBUG, "smbrdr_transact: send failed");
 		return (-1);
 	}
 
@@ -120,15 +118,15 @@ smbrdr_rpc_transact(int fid, char *out_buf, int out_len,
 
 	do {
 		if (smbrdr_rcv(&srh, first_rsp) != NT_STATUS_SUCCESS) {
-			syslog(LOG_ERR, "smbrdr_rpc_transact: nb_rcv failed");
+			syslog(LOG_DEBUG, "smbrdr_transact: nb_rcv failed");
 			rc = -1;
 			break;
 		}
 
 		rc = decode_smb_transact(mb, in_buf, cur_inlen, &rsp);
 		if (rc < 0 || rsp.TotalDataCount > in_len) {
-			syslog(LOG_ERR,
-			    "SmbTransact: transact decode failure!");
+			syslog(LOG_DEBUG,
+			    "smbrdr_transact: decode failed");
 			rc = -1;
 			break;
 		}
@@ -222,7 +220,6 @@ decode_smb_transact(smb_msgbuf_t *mb, char *in, unsigned in_len,
 
 	rc = smb_msgbuf_decode(mb, "b", &rsp->WordCount);
 	if (rc <= 0 || rsp->WordCount < 10) {
-		syslog(LOG_ERR, "SmbTransact: invalid word count");
 		return (-1);
 	}
 

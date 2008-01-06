@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,11 +179,9 @@ smb_setup_eventpipe(int *read_pipe, int *write_pipe)
 static void
 smb_process_nic_change()
 {
-	int ddns_enabled;
+	boolean_t ddns_enabled;
 
-	smb_config_rdlock();
-	ddns_enabled = smb_config_getyorn(SMB_CI_DYNDNS_ENABLE);
-	smb_config_unlock();
+	ddns_enabled = smb_config_getbool(SMB_CI_DYNDNS_ENABLE);
 
 	/* Clear rev zone before creating if list */
 	if (ddns_enabled) {

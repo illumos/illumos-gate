@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,6 +389,7 @@ typedef enum {
 typedef struct smb_node {
 	uint32_t		n_magic;
 	smb_rwx_t		n_lock;
+	krwlock_t		n_share_lock;
 	list_node_t		n_lnd;
 	smb_node_state_t	n_state;
 	uint32_t		n_refcnt;
@@ -835,6 +836,7 @@ typedef struct smb_ofile {
 
 	mlsvc_pipe_t		*f_pipe_info;
 
+	uint32_t		f_uniqid;
 	uint32_t		f_refcnt;
 	uint64_t		f_seek_pos;
 	uint32_t		f_flags;
@@ -1198,10 +1200,7 @@ struct smb_request {
 
 	label_t			exjb;
 	cred_t			*user_cr;
-	caller_context_t	ct;
 };
-
-caller_context_t local_ct;
 
 #define	SMB_READ_PROTOCOL(smb_nh_ptr) \
 	LE_IN32(((smb_nethdr_t *)(smb_nh_ptr))->sh_protocol)
@@ -1317,6 +1316,7 @@ typedef struct smb_info {
 
 	volatile uint64_t	si_global_kid;
 	volatile uint32_t	si_gmtoff;
+	volatile uint32_t	si_uniq_fid;
 
 	smb_thread_t		si_nbt_daemon;
 	smb_thread_t		si_tcp_daemon;
@@ -1354,11 +1354,13 @@ typedef struct smb_info {
 #define	SMB_INFO_ENCRYPT_PASSWORDS		0x80000000
 
 #define	SMB_NEW_KID() atomic_inc_64_nv(&smb_info.si_global_kid)
+#define	SMB_UNIQ_FID() atomic_inc_32_nv(&smb_info.si_uniq_fid)
 
 typedef struct {
+	uint32_t severity;
+	uint32_t status;
 	uint16_t errcls;
 	uint16_t errcode;
-	DWORD	status;
 } smb_error_t;
 
 /*

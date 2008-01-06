@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,7 @@ extern "C" {
 #define	SE_CHANGE_NOTIFY_NAME		"SeChangeNotifyPrivilege"
 #define	SE_REMOTE_SHUTDOWN_NAME		"SeRemoteShutdownPrivilege"
 
+#define	SE_MIN_LUID			2
 #define	SE_CREATE_TOKEN_LUID		2
 #define	SE_ASSIGNPRIMARYTOKEN_LUID	3
 #define	SE_LOCK_MEMORY_LUID		4
@@ -121,6 +122,7 @@ extern "C" {
 #define	SE_SYSTEM_ENVIRONMENT_LUID	22
 #define	SE_CHANGE_NOTIFY_LUID		23
 #define	SE_REMOTE_SHUTDOWN_LUID		24
+#define	SE_MAX_LUID			24
 
 /*
  * Privilege attributes
@@ -181,6 +183,7 @@ int smb_privset_size();
 void smb_privset_init(smb_privset_t *privset);
 void smb_privset_free(smb_privset_t *privset);
 void smb_privset_copy(smb_privset_t *dst, smb_privset_t *src);
+void smb_privset_merge(smb_privset_t *dst, smb_privset_t *src);
 void smb_privset_enable(smb_privset_t *privset, uint32_t id);
 int smb_privset_query(smb_privset_t *privset, uint32_t id);
 void smb_privset_log(smb_privset_t *privset);

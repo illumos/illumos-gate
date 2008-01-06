@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,14 +38,12 @@
 #include <synch.h>
 
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
 
-static int smbrdr_smb_close(struct sdb_ofile *ofile);
-static DWORD smbrdr_smb_ntcreate(struct sdb_ofile *ofile);
-static struct sdb_ofile *smbrdr_ofile_alloc(struct sdb_netuse *netuse,
-    char *name);
+static int smbrdr_close(struct sdb_ofile *);
+static DWORD smbrdr_ntcreatex(struct sdb_ofile *);
+static struct sdb_ofile *smbrdr_ofile_alloc(struct sdb_netuse *, char *);
 
 static void
 smbrdr_ofile_clear(struct sdb_ofile *ofile)
@@ -86,24 +84,24 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	int retry;
 	struct timespec st;
 
-	tid = mlsvc_tree_connect(hostname, username, "IPC$");
+	tid = smbrdr_tree_connect(hostname, username, "IPC$");
 	if (tid == 0) {
-		syslog(LOG_ERR, "smbrdr: (open) %s %s %s %s %s",
+		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_UNEXPECTED_NETWORK_ERROR));
 		return (-1);
 	}
 
 	netuse = smbrdr_netuse_get(tid);
-	if (netuse == 0) {
-		syslog(LOG_ERR, "smbrdr: (open) %s %s %s %s %s",
+	if (netuse == NULL) {
+		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_CONNECTION_INVALID));
 		return (-1);
 	}
 
 	if ((ofile = smbrdr_ofile_alloc(netuse, pipename)) == 0) {
-		syslog(LOG_ERR, "smbrdr: (open) %s %s %s %s %s",
+		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
 		    hostname, domain, username, pipename,
 		    xlate_nt_status(NT_STATUS_INSUFFICIENT_RESOURCES));
 		smbrdr_netuse_put(netuse);
@@ -113,7 +111,7 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	status = NT_STATUS_OPEN_FAILED;
 
 	for (retry = 0; retry < mlsvc_pipe_recon_tries; retry++) {
-		status = smbrdr_smb_ntcreate(ofile);
+		status = smbrdr_ntcreatex(ofile);
 
 		switch (status) {
 		case NT_STATUS_SUCCESS:
@@ -163,13 +161,11 @@ mlsvc_close_pipe(int fid)
 	unsigned short tid;
 	int rc;
 
-	if ((ofile = smbrdr_ofile_get(fid)) == 0) {
-		syslog(LOG_ERR, "mlsvc_close_pipe: unknown file (%d)", fid);
+	if ((ofile = smbrdr_ofile_get(fid)) == NULL)
 		return (-1);
-	}
 
 	tid = ofile->tid;
-	rc = smbrdr_smb_close(ofile);
+	rc = smbrdr_close(ofile);
 	smbrdr_ofile_put(ofile);
 
 	if (rc == 0)
@@ -238,8 +234,7 @@ smbrdr_ofile_get(int fid)
 		(void) mutex_unlock(&ofile->mtx);
 	}
 
-	syslog(LOG_WARNING, "smbrdr: (lookup) no such FID %d", fid);
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -261,7 +256,7 @@ smbrdr_ofile_end_of_share(unsigned short tid)
 		ofile = &ofile_table[i];
 		(void) mutex_lock(&ofile->mtx);
 		if (ofile->tid == tid)
-			(void) smbrdr_smb_close(ofile);
+			(void) smbrdr_close(ofile);
 		(void) mutex_unlock(&ofile->mtx);
 	}
 }
@@ -300,12 +295,12 @@ smbrdr_dump_ofiles()
  */
 
 /*
- * smbrdr_smb_close
+ * smbrdr_close
  *
  * Send SMBClose request for the given open file.
  */
 static int
-smbrdr_smb_close(struct sdb_ofile *ofile)
+smbrdr_close(struct sdb_ofile *ofile)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
@@ -316,12 +311,12 @@ smbrdr_smb_close(struct sdb_ofile *ofile)
 	int fid;
 	int rc;
 
-	if (ofile == 0)
+	if (ofile == NULL)
 		return (0);
 
 	ofile->state = SDB_FSTATE_CLOSING;
 
-	if ((session = ofile->session) == 0) {
+	if ((session = ofile->session) == NULL) {
 		smbrdr_ofile_clear(ofile);
 		return (0);
 	}
@@ -341,20 +336,12 @@ smbrdr_smb_close(struct sdb_ofile *ofile)
 	    session, logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrClose: %s", xlate_nt_status(status));
 		smbrdr_ofile_clear(ofile);
 		return (-1);
 	}
 
-	rc = smb_msgbuf_encode(&srh.srh_mbuf,
-	    "(wct)b (fid)w (lwrtm)l (bcc)w (pad).",
-	    3,			/* WordCount */
-	    fid,		/* Fid */
-	    0x00000000ul,	/* LastWriteTime */
-	    0);			/* ByteCount */
-
+	rc = smb_msgbuf_encode(&srh.srh_mbuf, "bwlw.", 3, fid, 0x00000000ul, 0);
 	if (rc <= 0) {
-		syslog(LOG_ERR, "SmbrdrClose: encode failed");
 		smbrdr_handle_free(&srh);
 		smbrdr_ofile_clear(ofile);
 		return (-1);
@@ -362,7 +349,7 @@ smbrdr_smb_close(struct sdb_ofile *ofile)
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS)
-		syslog(LOG_ERR, "SmbrdrClose: %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_close: %s", xlate_nt_status(status));
 
 	smbrdr_handle_free(&srh);
 	smbrdr_ofile_clear(ofile);
@@ -405,19 +392,18 @@ smbrdr_ofile_alloc(struct sdb_netuse *netuse, char *name)
 		(void) mutex_unlock(&ofile->mtx);
 	}
 
-	syslog(LOG_WARNING, "smbrdr: (open) table full");
-	return (0);
+	return (NULL);
 }
 
 /*
- * smbrdr_smb_ntcreate
+ * smbrdr_ntcreatex
  *
  * This will do an SMB_COM_NT_CREATE_ANDX with lots of default values.
  * All of the underlying session and share data should already be set
  * up before we get here. If everything works we'll get a valid fid.
  */
 static DWORD
-smbrdr_smb_ntcreate(struct sdb_ofile *ofile)
+smbrdr_ntcreatex(struct sdb_ofile *ofile)
 {
 	struct sdb_logon *logon;
 	struct sdb_netuse *netuse;
@@ -458,13 +444,14 @@ smbrdr_smb_ntcreate(struct sdb_ofile *ofile)
 		null_size = sizeof (char);
 	}
 
-	syslog(LOG_DEBUG, "SmbRdrNtCreate: %d %s", path_len, path);
+	syslog(LOG_DEBUG, "smbrdr_ntcreatex: %d %s", path_len, path);
 
 	status = smbrdr_request_init(&srh, SMB_COM_NT_CREATE_ANDX,
 	    sess, logon, netuse);
 
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrNtCreate: %s", xlate_nt_status(status));
+		syslog(LOG_DEBUG, "smbrdr_ntcreatex: %s",
+		    xlate_nt_status(status));
 		return (NT_STATUS_INVALID_PARAMETER_1);
 	}
 

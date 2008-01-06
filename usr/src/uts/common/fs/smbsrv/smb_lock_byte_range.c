@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ smb_com_lock_byte_range(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
@@ -90,7 +90,7 @@ smb_com_lock_byte_range(struct smb_request *sr)
 	result = smb_lock_range(sr, sr->fid_ofile,
 	    (u_offset_t)off, (uint64_t)count,  0, SMB_LOCK_TYPE_READWRITE);
 	if (result != NT_STATUS_SUCCESS) {
-		smb_lock_range_raise_error(sr, result);
+		smb_lock_range_error(sr, result);
 		/* NOT REACHED */
 	}
 

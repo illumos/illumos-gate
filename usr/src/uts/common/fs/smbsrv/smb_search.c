@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ smb_com_search(struct smb_request *sr)
 	}
 
 	if ((rc = fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr)) != 0) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -212,8 +212,7 @@ smb_com_search(struct smb_request *sr)
 			sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
 			    sr->smb_sid);
 			if (sr->sid_odir == NULL) {
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_INVALID_HANDLE,
+				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
 				/* NOTREACHED */
 			}
@@ -270,13 +269,13 @@ smb_com_search(struct smb_request *sr)
 		if ((rc != 0) && (rc != ENOENT)) {
 			/* returned error by smb_rdir_next() */
 			smb_rdir_close(sr);
-			smbsr_raise_errno(sr, rc);
+			smbsr_errno(sr, rc);
 			/* NOTREACHED */
 		}
 
 		if (count == 0) {
 			smb_rdir_close(sr);
-			smbsr_raise_error(sr, ERRDOS, ERRnofiles);
+			smbsr_error(sr, 0, ERRDOS, ERRnofiles);
 			/* NOTREACHED */
 		}
 	}

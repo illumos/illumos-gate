@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,10 +77,11 @@ int
 nt_domain_init(char *resource_domain, uint32_t secmode)
 {
 	nt_domain_t *domain;
-	nt_sid_t *sid;
-	char *sidstr;
+	nt_sid_t *sid = NULL;
+	char sidstr[128];
 	char *lsidstr;
 	char hostname[MAXHOSTNAMELEN];
+	int rc;
 
 	if (rwlock_init(&nt_domain_lock, USYNC_THREAD, NULL))
 		return (SMB_DOMAIN_NODOMAIN_SID);
@@ -112,17 +113,18 @@ nt_domain_init(char *resource_domain, uint32_t secmode)
 		(void) nt_domain_add(domain);
 		free(sid);
 
-		smb_config_rdlock();
-		sidstr = smb_config_get(SMB_CI_DOMAIN_SID);
-		if (sidstr) {
+		sid = NULL;
+		rc = smb_config_getstr(SMB_CI_DOMAIN_SID, sidstr,
+		    sizeof (sidstr));
+		if (rc == SMBD_SMF_OK)
 			sid = nt_sid_strtosid(sidstr);
-			smb_config_unlock();
+		if (nt_sid_is_valid(sid)) {
 			domain = nt_domain_new(NT_DOMAIN_PRIMARY,
 			    resource_domain, sid);
 			(void) nt_domain_add(domain);
 			free(sid);
 		} else {
-			smb_config_unlock();
+			free(sid);
 			(void) rwlock_destroy(&nt_domain_lock);
 			return (SMB_DOMAIN_NODOMAIN_SID);
 		}
@@ -198,9 +200,7 @@ nt_domain_add(nt_domain_t *new_domain)
 
 	if (new_domain->type == NT_DOMAIN_PRIMARY) {
 		sidstr = nt_sid_format(new_domain->sid);
-		smb_config_wrlock();
-		(void) smb_config_set(SMB_CI_DOMAIN_SID, sidstr);
-		smb_config_unlock();
+		(void) smb_config_setstr(SMB_CI_DOMAIN_SID, sidstr);
 		free(sidstr);
 	}
 	(void) rw_unlock(&nt_domain_lock);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,16 +52,39 @@
 #define	DEL_NONE		2
 /* Maximum retires if not authoritative */
 #define	MAX_AUTH_RETRIES 3
+/* Number of times to retry a DNS query */
+#define	DYNDNS_MAX_QUERY_RETRIES 3
+/* Timeout value, in seconds, for DNS query responses */
+#define	DYNDNS_QUERY_TIMEOUT 2
 
-static int
-dyndns_enabled(void)
+static uint16_t dns_msgid;
+mutex_t dns_msgid_mtx;
+
+int
+dns_msgid_init(void)
 {
-	int enabled;
+	struct __res_state res;
 
-	smb_config_rdlock();
-	enabled = smb_config_getyorn(SMB_CI_DYNDNS_ENABLE);
-	smb_config_unlock();
-	return (enabled);
+	bzero(&res, sizeof (struct __res_state));
+	if (res_ninit(&res) < 0)
+		return (-1);
+
+	(void) mutex_lock(&dns_msgid_mtx);
+	dns_msgid = res.id;
+	(void) mutex_unlock(&dns_msgid_mtx);
+	res_nclose(&res);
+	return (0);
+}
+
+int
+dns_get_msgid(void)
+{
+	uint16_t id;
+
+	(void) mutex_lock(&dns_msgid_mtx);
+	id = ++dns_msgid;
+	(void) mutex_unlock(&dns_msgid_mtx);
+	return (id);
 }
 
 /*
@@ -651,7 +674,7 @@ dyndns_build_tkey_msg(char *buf, char *key_name, uint16_t *id,
 
 	(void) memset(buf, 0, MAX_TCP_SIZE);
 	bufptr = buf;
-	*id = smb_get_next_resid();
+	*id = dns_get_msgid();
 
 	/* add TCP length info that follows this field */
 	bufptr = dyndns_put_nshort(bufptr,
@@ -931,7 +954,7 @@ dyndns_build_add_remove_msg(char *buf, int update_zone, const char *hostname,
 	bufptr = buf;
 
 	if (*id == 0)
-		*id = smb_get_next_resid();
+		*id = dns_get_msgid();
 
 	if (dyndns_build_header(&bufptr, BUFLEN_UDP(bufptr, buf), *id, queryReq,
 	    zoneCount, preqCount, updateCount, additionalCount, 0) == -1) {
@@ -1114,13 +1137,7 @@ dyndns_build_signed_tsig_msg(char *buf, int update_zone, const char *hostname,
 
 /*
  * dyndns_udp_send_recv
- * This routine sends and receives UDP DNS request and reply messages.  Time
- * out value and retry count is indicated by two environment variables:
- * lookup_dns_retry_cnt
- * lookup_dns_retry_sec
- * If either of these two variables are undefined or their value exceed the
- * value of 10 then a default value of 3 retry and/or a default value of 3
- * secs are used.
+ * This routine sends and receives UDP DNS request and reply messages.
  *
  * Pre-condition: Caller must call dyndns_open_init_socket() before calling
  * this function.
@@ -1137,34 +1154,15 @@ dyndns_build_signed_tsig_msg(char *buf, int update_zone, const char *hostname,
 int
 dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 {
-	int i, retval, addr_len, max_retries;
+	int i, retval, addr_len;
 	struct timeval tv, timeout;
 	fd_set rfds;
 	struct sockaddr_in from_addr;
-	char *p;
 
-	smb_config_rdlock();
-	p = smb_config_getstr(SMB_CI_DYNDNS_RETRY_COUNT);
-	if (p == NULL || *p == 0) {
-		max_retries = 3;
-	} else {
-		max_retries = atoi(p);
-		if (max_retries < 1 || max_retries > 10)
-			max_retries = 3;
-	}
-
-	p = smb_config_getstr(SMB_CI_DYNDNS_RETRY_SEC);
 	timeout.tv_usec = 0;
-	if (p == NULL || *p == 0) {
-		timeout.tv_sec = 3;
-	} else {
-		timeout.tv_sec = atoi(p);
-		if (timeout.tv_sec < 1 || timeout.tv_sec > 10)
-			timeout.tv_sec = 3;
-	}
-	smb_config_unlock();
+	timeout.tv_sec = DYNDNS_QUERY_TIMEOUT;
 
-	for (i = 0; i < max_retries + 1; i++) {
+	for (i = 0; i <= DYNDNS_MAX_QUERY_RETRIES; i++) {
 		if (send(s, buf, buf_sz, 0) == -1) {
 			syslog(LOG_ERR, "dyndns: UDP send error (%s)\n",
 			    strerror(errno));
@@ -1193,7 +1191,8 @@ dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 		}
 	}
 
-	if (i == (max_retries + 1)) { /* did not receive anything */
+	/* did not receive anything */
+	if (i == (DYNDNS_MAX_QUERY_RETRIES + 1)) {
 		syslog(LOG_ERR, "dyndns: max retries for UDP recv reached\n");
 		return (-1);
 	}
@@ -1506,7 +1505,7 @@ retry_higher:
 		return (-1);
 	}
 
-	if (smb_get_security_mode() == SMB_SECMODE_DOMAIN)
+	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)
 		ret = dyndns_sec_add_remove_entry(update_zone, hostname,
 		    ip_addr, life_time, update_type, del_type, dns_str);
 
@@ -1679,7 +1678,7 @@ dyndns_update(void)
 	struct in_addr addr;
 	int rc;
 
-	if (!dyndns_enabled())
+	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (-1);
 
 	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)
@@ -1760,7 +1759,7 @@ dyndns_clear_rev_zone(void)
 	struct in_addr addr;
 	int rc;
 
-	if (!dyndns_enabled())
+	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (-1);
 
 	if (smb_getfqhostname(fqdn, MAXHOSTNAMELEN) != 0)

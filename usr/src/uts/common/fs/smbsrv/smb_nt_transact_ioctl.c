@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	    &fid,
 	    &is_fsctl,
 	    &is_flags) != 0) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 	}
 
 	for (i = 0;
@@ -103,7 +103,7 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	if (status != NT_STATUS_SUCCESS)
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 
 	(void) smb_encode_mbc(&xa->rep_param_mb, "l", 0);
 	return (SDRC_NORMAL_REPLY);

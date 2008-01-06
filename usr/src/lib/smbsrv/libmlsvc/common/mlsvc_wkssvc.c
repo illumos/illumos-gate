@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,7 @@ wkssvc_s_NetWkstaGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mslm_NetWkstaGetInfo *param = arg;
 	mslm_NetWkstaGetInfo_rb *rb;
 	char hostname[MAXHOSTNAMELEN];
-	char *resource_domain;
+	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char *p;
 	DWORD status;
 	int rc;
@@ -113,16 +113,12 @@ wkssvc_s_NetWkstaGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		}
 		rb->buf100.wki100_computername = (unsigned char *)p;
 
-		smb_config_rdlock();
-		resource_domain = smb_config_getstr(SMB_CI_DOMAIN_NAME);
-
+		(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 		if ((p = MLRPC_HEAP_STRSAVE(mxa, resource_domain)) == NULL) {
-			smb_config_unlock();
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
-		smb_config_unlock();
 		rb->buf100.wki100_langroup = (unsigned char *)p;
 		status = ERROR_SUCCESS;
 		break;

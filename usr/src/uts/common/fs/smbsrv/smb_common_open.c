@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,21 +37,9 @@
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
 #include <sys/fcntl.h>
+#include <sys/nbmlock.h>
 
 extern uint32_t smb_is_executable(char *path);
-
-#define	DENY_READ(share_access) ((share_access & FILE_SHARE_READ) == 0)
-
-#define	DENY_WRITE(share_access) ((share_access & FILE_SHARE_WRITE) == 0)
-
-#define	DENY_DELETE(share_access) ((share_access & FILE_SHARE_DELETE) == 0)
-
-#define	DENY_RW(share_access) \
-	((share_access & (FILE_SHARE_READ | FILE_SHARE_WRITE)) == 0)
-
-#define	DENY_ALL(share_access) (share_access == 0)
-
-#define	DENY_NONE(share_access) (share_access == FILE_SHARE_ALL)
 
 /*
  * The default stability mode is to perform the write-through
@@ -219,130 +207,6 @@ smb_ofun_to_crdisposition(uint16_t  ofun)
 }
 
 /*
- * smb_open_share_check
- *
- * check file sharing rules for current open request
- * against the given existing open.
- *
- * Returns NT_STATUS_SHARING_VIOLATION if there is any
- * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
- */
-uint32_t
-smb_open_share_check(struct smb_request *sr,
-    struct smb_node *node,
-    struct smb_ofile *open)
-{
-	uint32_t desired_access;
-	uint32_t share_access;
-
-	desired_access = sr->arg.open.desired_access;
-	share_access   = sr->arg.open.share_access;
-
-	/*
-	 * As far as I can tell share modes are not relevant to
-	 * directories. The check for exclusive access (Deny RW)
-	 * remains because I don't know whether or not it was here
-	 * for a reason.
-	 */
-	if (node->attr.sa_vattr.va_type == VDIR) {
-		if (DENY_RW(open->f_share_access) &&
-		    (node->n_orig_uid != crgetuid(sr->user_cr))) {
-			return (NT_STATUS_SHARING_VIOLATION);
-		}
-
-		return (NT_STATUS_SUCCESS);
-	}
-
-	/* if it's just meta data */
-	if ((open->f_granted_access & FILE_DATA_ALL) == 0)
-		return (NT_STATUS_SUCCESS);
-
-	/*
-	 * Check requested share access against the
-	 * open granted (desired) access
-	 */
-	if (DENY_DELETE(share_access) && (open->f_granted_access & DELETE))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (DENY_READ(share_access) &&
-	    (open->f_granted_access & (FILE_READ_DATA | FILE_EXECUTE)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (DENY_WRITE(share_access) &&
-	    (open->f_granted_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	/* check requested desired access against the open share access */
-	if (DENY_DELETE(open->f_share_access) && (desired_access & DELETE))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (DENY_READ(open->f_share_access) &&
-	    (desired_access & (FILE_READ_DATA | FILE_EXECUTE)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	if (DENY_WRITE(open->f_share_access) &&
-	    (desired_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
-		return (NT_STATUS_SHARING_VIOLATION);
-
-	return (NT_STATUS_SUCCESS);
-}
-
-/*
- * smb_file_share_check
- *
- * check file sharing rules for current open request
- * against all existing opens for a file.
- *
- * Returns NT_STATUS_SHARING_VIOLATION if there is any
- * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
- */
-uint32_t
-smb_file_share_check(struct smb_request *sr, struct smb_node *node)
-{
-	struct smb_ofile *open;
-	uint32_t status;
-
-	if (node == 0 || node->n_refcnt <= 1)
-		return (NT_STATUS_SUCCESS);
-
-	/* if it's just meta data */
-	if ((sr->arg.open.desired_access & FILE_DATA_ALL) == 0)
-		return (NT_STATUS_SUCCESS);
-
-	smb_llist_enter(&node->n_ofile_list, RW_READER);
-	open = smb_llist_head(&node->n_ofile_list);
-	while (open) {
-		status = smb_open_share_check(sr, node, open);
-		if (status == NT_STATUS_SHARING_VIOLATION) {
-			smb_llist_exit(&node->n_ofile_list);
-			return (status);
-		}
-		open = smb_llist_next(&node->n_ofile_list, open);
-	}
-	smb_llist_exit(&node->n_ofile_list);
-
-	return (NT_STATUS_SUCCESS);
-}
-
-/*
- * smb_amask_to_amode
- * Converts specific read/write access rights of access mask to access
- * mode flags.
- */
-int
-smb_amask_to_amode(unsigned long amask)
-{
-	if ((amask & FILE_READ_DATA) &&
-	    (amask & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
-		return (O_RDWR);
-
-	if (amask & (FILE_WRITE_DATA | FILE_APPEND_DATA))
-		return (O_WRONLY);
-
-	return (O_RDONLY);
-}
-
-/*
  * smb_open_subr
  *
  * Notes on write-through behaviour. It looks like pre-LM0.12 versions
@@ -364,6 +228,7 @@ smb_amask_to_amode(unsigned long amask)
  * in which case it won't return to the caller. Be careful how you
  * handle things in here.
  */
+
 uint32_t
 smb_open_subr(struct smb_request *sr)
 {
@@ -385,6 +250,8 @@ smb_open_subr(struct smb_request *sr)
 	int			is_stream;
 	int			lookup_flags = SMB_FOLLOW_LINKS;
 	uint32_t		daccess;
+	uint32_t		share_access = op->share_access;
+	uint32_t		uniq_fid;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 
@@ -397,7 +264,7 @@ smb_open_subr(struct smb_request *sr)
 		if ((op->create_disposition != FILE_CREATE) &&
 		    (op->create_disposition != FILE_OPEN_IF) &&
 		    (op->create_disposition != FILE_OPEN)) {
-			smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_PARAMETER,
+			smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
 			    ERRDOS, ERROR_INVALID_ACCESS);
 			/* invalid open mode */
 			/* NOTREACHED */
@@ -417,7 +284,7 @@ smb_open_subr(struct smb_request *sr)
 		    sr->uid_user->u_name,
 		    xlate_nt_status(NT_STATUS_TOO_MANY_OPENED_FILES));
 
-		smbsr_raise_cifs_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
+		smbsr_error(sr, NT_STATUS_TOO_MANY_OPENED_FILES,
 		    ERRDOS, ERROR_TOO_MANY_OPEN_FILES);
 		/* NOTREACHED */
 	}
@@ -437,7 +304,7 @@ smb_open_subr(struct smb_request *sr)
 		 * raise an exception or return success here.
 		 */
 		if ((rc = smb_rpc_open(sr)) != 0) {
-			smbsr_raise_nt_error(sr, rc);
+			smbsr_error(sr, rc, 0, 0);
 			/* NOTREACHED */
 		} else {
 			return (NT_STATUS_SUCCESS);
@@ -445,13 +312,13 @@ smb_open_subr(struct smb_request *sr)
 		break;
 
 	default:
-		smbsr_raise_error(sr, ERRSRV, ERRinvdevice);
+		smbsr_error(sr, 0, ERRSRV, ERRinvdevice);
 		/* NOTREACHED */
 		break;
 	}
 
 	if ((pathlen = strlen(op->fqi.path)) >= MAXPATHLEN) {
-		smbsr_raise_error(sr, ERRSRV, ERRfilespecs);
+		smbsr_error(sr, 0, ERRSRV, ERRfilespecs);
 		/* NOTREACHED */
 	}
 
@@ -466,7 +333,7 @@ smb_open_subr(struct smb_request *sr)
 	op->fqi.srch_attr = op->fqi.srch_attr;
 
 	if ((status = smb_validate_object_name(op->fqi.path, is_dir)) != 0) {
-		smbsr_raise_cifs_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
+		smbsr_error(sr, status, ERRDOS, ERROR_INVALID_NAME);
 		/* NOTREACHED */
 	}
 
@@ -476,7 +343,7 @@ smb_open_subr(struct smb_request *sr)
 	if (rc = smb_pathname_reduce(sr, sr->user_cr, op->fqi.path,
 	    sr->tid_tree->t_snode, cur_node, &op->fqi.dir_snode,
 	    op->fqi.last_comp)) {
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
 
@@ -508,13 +375,28 @@ smb_open_subr(struct smb_request *sr)
 	} else {
 		smb_node_release(op->fqi.dir_snode);
 		SMB_NULL_FQI_NODES(op->fqi);
-		smbsr_raise_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		/* NOTREACHED */
 	}
+
+	/*
+	 * The uniq_fid is a CIFS-server-wide unique identifier for an ofile
+	 * which is used to uniquely identify open instances for the
+	 * VFS share reservation mechanism (accessed via smb_fsop_shrlock()).
+	 */
+
+	uniq_fid = SMB_UNIQ_FID();
 
 	if (op->fqi.last_comp_was_found) {
 		node = op->fqi.last_snode;
 		dnode = op->fqi.dir_snode;
+
+		/*
+		 * Enter critical region for share reservations.
+		 * (See comments above smb_fsop_shrlock().)
+		 */
+
+		rw_enter(&node->n_share_lock, RW_WRITER);
 
 		/*
 		 * Reject this request if the target is a directory
@@ -523,11 +405,11 @@ smb_open_subr(struct smb_request *sr)
 		 */
 		if ((op->create_options & FILE_NON_DIRECTORY_FILE) &&
 		    (op->fqi.last_attr.sa_vattr.va_type == VDIR)) {
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_FILE_IS_A_DIRECTORY,
+			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			/* NOTREACHED */
 		}
@@ -539,19 +421,20 @@ smb_open_subr(struct smb_request *sr)
 				 * Directories cannot be opened
 				 * with the above commands
 				 */
+				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_FILE_IS_A_DIRECTORY,
+				smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 				    ERRDOS, ERROR_ACCESS_DENIED);
 				/* NOTREACHED */
 			}
 		} else if (op->my_flags & MYF_MUST_BE_DIRECTORY) {
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_raise_cifs_error(sr, NT_STATUS_NOT_A_DIRECTORY,
+			smbsr_error(sr, NT_STATUS_NOT_A_DIRECTORY,
 			    ERRDOS, ERROR_DIRECTORY);
 			/* NOTREACHED */
 		}
@@ -561,10 +444,11 @@ smb_open_subr(struct smb_request *sr)
 		 * flag is set.
 		 */
 		if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_raise_cifs_error(sr, NT_STATUS_DELETE_PENDING,
+			smbsr_error(sr, NT_STATUS_DELETE_PENDING,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			/* NOTREACHED */
 		}
@@ -573,12 +457,12 @@ smb_open_subr(struct smb_request *sr)
 		 * Specified file already exists so the operation should fail.
 		 */
 		if (op->create_disposition == FILE_CREATE) {
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
-			smbsr_raise_cifs_error(sr,
-			    NT_STATUS_OBJECT_NAME_COLLISION, ERRDOS,
-			    ERROR_ALREADY_EXISTS);
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_COLLISION,
+			    ERRDOS, ERROR_ALREADY_EXISTS);
 			/* NOTREACHED */
 		}
 
@@ -591,18 +475,42 @@ smb_open_subr(struct smb_request *sr)
 			if (node->attr.sa_vattr.va_type != VDIR) {
 				if (op->desired_access & (FILE_WRITE_DATA |
 				    FILE_APPEND_DATA)) {
+					rw_exit(&node->n_share_lock);
 					smb_node_release(node);
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
-					smbsr_raise_error(sr, ERRDOS,
-					    ERRnoaccess);
+					smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+					    ERRDOS, ERRnoaccess);
 					/* NOTREACHED */
 				}
 			}
 		}
 
-		status = smb_file_share_check(sr, node);
+		/*
+		 * The following check removes the need to check share
+		 * reservations again when a truncate is done.
+		 */
+
+		if ((op->create_disposition == FILE_SUPERSEDE) ||
+		    (op->create_disposition == FILE_OVERWRITE_IF) ||
+		    (op->create_disposition == FILE_OVERWRITE)) {
+
+			if (!(op->desired_access &
+			    (FILE_WRITE_DATA | FILE_APPEND_DATA))) {
+				rw_exit(&node->n_share_lock);
+				smb_node_release(node);
+				smb_node_release(dnode);
+				SMB_NULL_FQI_NODES(op->fqi);
+				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+				    ERRDOS, ERRnoaccess);
+			}
+		}
+
+		status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
+		    op->desired_access, share_access);
+
 		if (status == NT_STATUS_SHARING_VIOLATION) {
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
@@ -613,19 +521,19 @@ smb_open_subr(struct smb_request *sr)
 		    op->desired_access);
 
 		if (status != NT_STATUS_SUCCESS) {
+			smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+
+			rw_exit(&node->n_share_lock);
 			smb_node_release(node);
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
+
 			if (status == NT_STATUS_PRIVILEGE_NOT_HELD) {
-				smbsr_raise_cifs_error(sr,
-				    status,
-				    ERRDOS,
-				    ERROR_PRIVILEGE_NOT_HELD);
+				smbsr_error(sr, status,
+				    ERRDOS, ERROR_PRIVILEGE_NOT_HELD);
 			} else {
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_ACCESS_DENIED,
-				    ERRDOS,
-				    ERROR_ACCESS_DENIED);
+				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+				    ERRDOS, ERROR_ACCESS_DENIED);
 			}
 		}
 
@@ -634,14 +542,16 @@ smb_open_subr(struct smb_request *sr)
 		 * has the file open, this will force a flush or close,
 		 * which may affect the outcome of any share checking.
 		 */
+
 		if (OPLOCKS_IN_FORCE(node)) {
 			status = smb_break_oplock(sr, node);
 
 			if (status != NT_STATUS_SUCCESS) {
+				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_raise_cifs_error(sr, status,
+				smbsr_error(sr, status,
 				    ERRDOS, ERROR_VC_DISCONNECTED);
 				/* NOTREACHED */
 			}
@@ -652,29 +562,37 @@ smb_open_subr(struct smb_request *sr)
 		case FILE_OVERWRITE_IF:
 		case FILE_OVERWRITE:
 			if (node->attr.sa_vattr.va_type == VDIR) {
+				smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_ACCESS_DENIED, ERRDOS,
-				    ERROR_ACCESS_DENIED);
+				smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
+				    ERRDOS, ERROR_ACCESS_DENIED);
 				/* NOTREACHED */
 			}
 
 			if (node->attr.sa_vattr.va_size != op->dsize) {
 				node->flags &= ~NODE_FLAGS_SET_SIZE;
+				bzero(&new_attr, sizeof (new_attr));
 				new_attr.sa_vattr.va_size = op->dsize;
 				new_attr.sa_mask = SMB_AT_SIZE;
-				if ((rc = smb_fsop_setattr(sr, sr->user_cr,
-				    (&op->fqi)->last_snode, &new_attr,
-				    &op->fqi.last_attr)) != 0) {
+
+				rc = smb_fsop_setattr(sr, sr->user_cr,
+				    node, &new_attr, &op->fqi.last_attr);
+
+				if (rc) {
+					smb_fsop_unshrlock(sr->user_cr,
+					    node, uniq_fid);
+					rw_exit(&node->n_share_lock);
 					smb_node_release(node);
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
-					smbsr_raise_errno(sr, rc);
+					smbsr_errno(sr, rc);
 					/* NOTREACHED */
 				}
 
+				op->dsize = op->fqi.last_attr.sa_vattr.va_size;
 			}
 
 			/*
@@ -712,11 +630,10 @@ smb_open_subr(struct smb_request *sr)
 			 * fail with these two dispositions
 			 */
 			if (is_stream)
-				smbsr_raise_cifs_error(sr,
-				    NT_STATUS_OBJECT_NAME_NOT_FOUND,
+				smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 				    ERRDOS, ERROR_FILE_NOT_FOUND);
 			else
-				smbsr_raise_error(sr, ERRDOS, ERRbadfile);
+				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 			/* NOTREACHED */
 		}
 
@@ -731,32 +648,93 @@ smb_open_subr(struct smb_request *sr)
 			new_attr.sa_vattr.va_type = VREG;
 			new_attr.sa_vattr.va_mode = 0666;
 			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
+
+			/*
+			 * A problem with setting the readonly bit at
+			 * create time is that this bit will prevent
+			 * writes to the file from the same fid (which
+			 * should be allowed).
+			 *
+			 * The solution is to set the bit at close time.
+			 * Meanwhile, to prevent racing opens from being
+			 * able to write to the file, the bit is set at
+			 * create time until share reservations can be set
+			 * to prevent write and delete access.  At that point,
+			 * the bit can be turned off until close (so as to
+			 * allow writes from the same fid to the file).
+			 */
+
+			if (op->dattr & SMB_FA_READONLY) {
+				new_attr.sa_dosattr = FILE_ATTRIBUTE_READONLY;
+				new_attr.sa_mask |= SMB_AT_DOSATTR;
+			}
+
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
 			    op->fqi.last_comp, &new_attr,
 			    &op->fqi.last_snode, &op->fqi.last_attr);
+
 			if (rc != 0) {
 				smb_rwx_rwexit(&dnode->n_lock);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_raise_errno(sr, rc);
+				smbsr_errno(sr, rc);
 				/* NOTREACHED */
+			}
+
+			if (op->dattr & SMB_FA_READONLY) {
+				share_access &= ~(FILE_SHARE_WRITE |
+				    FILE_SHARE_DELETE);
+			}
+
+			node = op->fqi.last_snode;
+
+			rw_enter(&node->n_share_lock, RW_WRITER);
+
+			status = smb_fsop_shrlock(sr->user_cr, node,
+			    uniq_fid, op->desired_access,
+			    share_access);
+
+			if (status == NT_STATUS_SHARING_VIOLATION) {
+				rw_exit(&node->n_share_lock);
+				smb_node_release(node);
+				smb_node_release(dnode);
+				SMB_NULL_FQI_NODES(op->fqi);
+				return (status);
+			}
+
+			new_attr = op->fqi.last_attr;
+			new_attr.sa_mask = 0;
+
+			if (op->dattr & SMB_FA_READONLY) {
+				new_attr.sa_dosattr &= ~FILE_ATTRIBUTE_READONLY;
+				new_attr.sa_mask |= SMB_AT_DOSATTR;
 			}
 
 			if (op->dsize) {
 				new_attr.sa_vattr.va_size = op->dsize;
-				new_attr.sa_mask = SMB_AT_SIZE;
-				rc = smb_fsop_setattr(sr, sr->user_cr,
-				    op->fqi.last_snode, &new_attr,
-				    &op->fqi.last_attr);
+				new_attr.sa_mask |= SMB_AT_SIZE;
+			}
+
+			if (new_attr.sa_mask) {
+				node->attr = new_attr;
+				node->what = new_attr.sa_mask;
+				rc = smb_sync_fsattr(sr, sr->user_cr, node);
+
 				if (rc != 0) {
-					smb_node_release(op->fqi.last_snode);
+					smb_fsop_unshrlock(sr->user_cr, node,
+					    uniq_fid);
+
+					rw_exit(&node->n_share_lock);
+					smb_node_release(node);
 					(void) smb_fsop_remove(sr, sr->user_cr,
 					    dnode, op->fqi.last_comp, 0);
 					smb_rwx_rwexit(&dnode->n_lock);
 					smb_node_release(dnode);
 					SMB_NULL_FQI_NODES(op->fqi);
-					smbsr_raise_errno(sr, rc);
+					smbsr_errno(sr, rc);
 					/* NOTREACHED */
+				} else {
+					op->fqi.last_attr = node->attr;
 				}
 			}
 
@@ -772,30 +750,33 @@ smb_open_subr(struct smb_request *sr)
 				smb_rwx_rwexit(&dnode->n_lock);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
-				smbsr_raise_errno(sr, rc);
+				smbsr_errno(sr, rc);
 				/* NOTREACHED */
 			}
+
+			node = op->fqi.last_snode;
+			rw_enter(&node->n_share_lock, RW_WRITER);
 		}
 
 		created = 1;
 		op->action_taken = SMB_OACT_CREATED;
 	}
 
-	if (node == 0) {
-		node = op->fqi.last_snode;
-	}
-
 	if ((op->fqi.last_attr.sa_vattr.va_type != VREG) &&
 	    (op->fqi.last_attr.sa_vattr.va_type != VDIR) &&
 	    (op->fqi.last_attr.sa_vattr.va_type != VLNK)) {
 		/* not allowed to do this */
+
+		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+
 		SMB_DEL_NEWOBJ(op->fqi);
+		rw_exit(&node->n_share_lock);
 		smb_node_release(node);
 		if (created)
 			smb_rwx_rwexit(&dnode->n_lock);
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
-		smbsr_raise_error(sr, ERRDOS, ERRnoaccess);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		/* NOTREACHED */
 	}
 
@@ -811,17 +792,20 @@ smb_open_subr(struct smb_request *sr)
 	 */
 
 	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op->desired_access,
-	    op->create_options, op->share_access, SMB_FTYPE_DISK, NULL, 0,
-	    &err);
+	    op->create_options, share_access, SMB_FTYPE_DISK, NULL, 0,
+	    uniq_fid, &err);
 
 	if (of == NULL) {
+		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
+
 		SMB_DEL_NEWOBJ(op->fqi);
+		rw_exit(&node->n_share_lock);
 		smb_node_release(node);
 		if (created)
 			smb_rwx_rwexit(&dnode->n_lock);
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(op->fqi);
-		smbsr_raise_cifs_error(sr, err.status, err.errcls, err.errcode);
+		smbsr_error(sr, err.status, err.errcls, err.errcode);
 		/* NOTREACHED */
 	}
 
@@ -847,14 +831,20 @@ smb_open_subr(struct smb_request *sr)
 		op->my_flags &= ~MYF_OPLOCK_MASK;
 
 		if (status != NT_STATUS_SUCCESS) {
+			rw_exit(&node->n_share_lock);
+			/*
+			 * smb_fsop_unshrlock() and smb_fsop_close()
+			 * are called from smb_ofile_close()
+			 */
 			(void) smb_ofile_close(of, 0);
 			smb_ofile_release(of);
 			if (created)
 				smb_rwx_rwexit(&dnode->n_lock);
+
 			smb_node_release(dnode);
 			SMB_NULL_FQI_NODES(op->fqi);
 
-			smbsr_raise_cifs_error(sr, status,
+			smbsr_error(sr, status,
 			    ERRDOS, ERROR_SHARING_VIOLATION);
 			/* NOTREACHED */
 		}
@@ -868,11 +858,15 @@ smb_open_subr(struct smb_request *sr)
 		/*
 		 * Clients may set the DOS readonly bit on create but they
 		 * expect subsequent write operations on the open fid to
-		 * succeed.  Thus the DOS readonly bit is not set until the
-		 * file is closed.  The NODE_CREATED_READONLY flag will
-		 * inhibit other attempts to open the file with write access
-		 * and act as the indicator to set the DOS readonly bit on
+		 * succeed.  Thus the DOS readonly bit is not set permanently
+		 * until the file is closed.  The NODE_CREATED_READONLY flag
+		 * will act as the indicator to set the DOS readonly bit on
 		 * close.
+		 *	Above, the readonly bit is set on create, share
+		 * reservations are set, and then the bit is unset.
+		 * These actions allow writes to the open fid to succeed
+		 * until the file is closed while preventing write access
+		 * from other opens while this fid is active.
 		 */
 		if (op->dattr & SMB_FA_READONLY) {
 			node->flags |= NODE_CREATED_READONLY;
@@ -913,9 +907,11 @@ smb_open_subr(struct smb_request *sr)
 	sr->smb_fid = of->f_fid;
 	sr->fid_ofile = of;
 
-	if (created) {
+	rw_exit(&node->n_share_lock);
+
+	if (created)
 		smb_rwx_rwexit(&dnode->n_lock);
-	}
+
 	smb_node_release(dnode);
 	SMB_NULL_FQI_NODES(op->fqi);
 

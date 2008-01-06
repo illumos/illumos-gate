@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,11 +34,9 @@
 
 #include <string.h>
 #include <strings.h>
-#include <syslog.h>
 #include <synch.h>
 
 #include <smbsrv/libsmbrdr.h>
-
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbrdr.h>
@@ -53,20 +51,17 @@ static smbrdr_ipc_t	orig_ipc_info;
 static int
 smbrdr_get_machine_pwd_hash(unsigned char *hash)
 {
-	char *pwd;
+	char pwd[SMB_PI_MAX_PASSWD];
 	int rc = 0;
 
-	smb_config_rdlock();
-	pwd = smb_config_getstr(SMB_CI_MACHINE_PASSWD);
-	if (!pwd || *pwd == 0) {
-		smb_config_unlock();
+	rc = smb_config_getstr(SMB_CI_MACHINE_PASSWD, pwd, sizeof (pwd));
+	if ((rc != SMBD_SMF_OK) || *pwd == '\0') {
 		return (-1);
 	}
 
-	if (smb_auth_ntlm_hash((char *)pwd, hash) != 0)
+	if (smb_auth_ntlm_hash(pwd, hash) != 0)
 		rc = -1;
 
-	smb_config_unlock();
 	return (rc);
 }
 

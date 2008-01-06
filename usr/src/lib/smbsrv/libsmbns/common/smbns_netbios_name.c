@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2126,7 +2126,8 @@ static int
 smb_send_node_status_response(struct addr_entry *addr,
     struct name_packet *original_packet)
 {
-	uint32_t		net_ipaddr, max_connections;
+	uint32_t		net_ipaddr;
+	int64_t			max_connections;
 	struct arpreq 		arpreq;
 	struct name_packet	packet;
 	struct resource_record	answer;
@@ -2166,9 +2167,8 @@ smb_send_node_status_response(struct addr_entry *addr,
 	else
 		net_ipaddr = cfg.ip;
 
-	smb_config_rdlock();
-	max_connections = smb_config_getnum(SMB_CI_MAX_CONNECTIONS);
-	smb_config_unlock();
+	(void) smb_config_getnum(SMB_CI_MAX_CONNECTIONS, &max_connections);
+
 	while (!scan_done) {
 		if ((scan + 6) >= scan_end) {
 			packet.info |= NAME_NM_FLAGS_TC;
@@ -4489,10 +4489,6 @@ smb_netbios_wins_config(char *ip)
 {
 	uint32_t ipaddr;
 
-	/* Return if ip == NULL since this is the same as "" */
-	if (ip == NULL)
-		return;
-
 	ipaddr = inet_addr(ip);
 	if (ipaddr != INADDR_NONE) {
 		smb_nbns[nbns_num].flags = ADDR_FLAG_VALID;
@@ -4511,9 +4507,10 @@ smb_netbios_name_config(void)
 	uint32_t ipaddr;
 	struct name_entry name;
 	char myname[MAXHOSTNAMELEN];
-	int	i;
+	int i;
 	int smb_nc_cnt;
 	net_cfg_t cfg;
+	char wins_ip[16];
 
 	if (smb_getnetbiosname(myname, MAXHOSTNAMELEN) != 0)
 		return;
@@ -4544,10 +4541,10 @@ smb_netbios_name_config(void)
 	bzero(smb_nbns, sizeof (addr_entry_t) * SMB_PI_MAX_WINS);
 
 	/* add any configured WINS */
-	smb_config_rdlock();
-	smb_netbios_wins_config(smb_config_getstr(SMB_CI_WINS_SRV1));
-	smb_netbios_wins_config(smb_config_getstr(SMB_CI_WINS_SRV2));
-	smb_config_unlock();
+	(void) smb_config_getstr(SMB_CI_WINS_SRV1, wins_ip, sizeof (wins_ip));
+	smb_netbios_wins_config(wins_ip);
+	(void) smb_config_getstr(SMB_CI_WINS_SRV2, wins_ip, sizeof (wins_ip));
+	smb_netbios_wins_config(wins_ip);
 
 	for (i = 0; i < smb_nc_cnt; i++) {
 		if (smb_nic_get_byind(i, &cfg) == NULL) {

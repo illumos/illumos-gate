@@ -19,26 +19,44 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
+#include <synch.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <strings.h>
+#include <assert.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
+#include <smbsrv/ntsid.h>
 
+
+/*
+ * Global list of allocated handles.  Handles are used in various
+ * server-side RPC functions: typically, issued when a service is
+ * opened and obsoleted when it is closed.  Clients should treat
+ * handles as opaque data.
+ */
+static ndr_handle_t *ndr_handle_list;
+static mutex_t ndr_handle_lock;
+
+/*
+ * Table of registered services.
+ */
 #define	NDL_MAX_SERVICES	32
-static struct mlrpc_service *mlrpc_services[NDL_MAX_SERVICES];
+static mlrpc_service_t *mlrpc_services[NDL_MAX_SERVICES];
+
 
 struct mlrpc_stub_table *
-mlrpc_find_stub_in_svc(struct mlrpc_service *msvc, int opnum)
+mlrpc_find_stub_in_svc(mlrpc_service_t *msvc, int opnum)
 {
 	struct mlrpc_stub_table *ste;
 
@@ -50,10 +68,10 @@ mlrpc_find_stub_in_svc(struct mlrpc_service *msvc, int opnum)
 	return (NULL);
 }
 
-struct mlrpc_service *
+mlrpc_service_t *
 mlrpc_find_service_by_name(const char *name)
 {
-	struct mlrpc_service 	*msvc;
+	mlrpc_service_t 	*msvc;
 	int			i;
 
 	for (i = 0; i < NDL_MAX_SERVICES; i++) {
@@ -70,11 +88,11 @@ mlrpc_find_service_by_name(const char *name)
 	return (NULL);
 }
 
-struct mlrpc_service *
-mlrpc_find_service_by_uuids(mlrpc_uuid_t *as_uuid, int as_vers,
-    mlrpc_uuid_t *ts_uuid, int ts_vers)
+mlrpc_service_t *
+mlrpc_find_service_by_uuids(ndr_uuid_t *as_uuid, int as_vers,
+    ndr_uuid_t *ts_uuid, int ts_vers)
 {
-	struct mlrpc_service *msvc;
+	mlrpc_service_t *msvc;
 	char abstract_syntax[128];
 	char transfer_syntax[128];
 	int i;
@@ -130,9 +148,9 @@ mlrpc_find_service_by_uuids(mlrpc_uuid_t *as_uuid, int as_vers,
  *	-3	Table overflow
  */
 int
-mlrpc_register_service(struct mlrpc_service *msvc)
+mlrpc_register_service(mlrpc_service_t *msvc)
 {
-	struct mlrpc_service 	*p;
+	mlrpc_service_t 	*p;
 	int			free_slot = -1;
 	int			i;
 
@@ -158,7 +176,7 @@ mlrpc_register_service(struct mlrpc_service *msvc)
 }
 
 void
-mlrpc_unregister_service(struct mlrpc_service *msvc)
+mlrpc_unregister_service(mlrpc_service_t *msvc)
 {
 	int i;
 
@@ -171,7 +189,7 @@ mlrpc_unregister_service(struct mlrpc_service *msvc)
 int
 mlrpc_list_services(char *buffer, int bufsize)
 {
-	struct mlrpc_service *msvc;
+	mlrpc_service_t *msvc;
 	smb_ctxbuf_t ctx;
 	int i;
 
@@ -187,8 +205,144 @@ mlrpc_list_services(char *buffer, int bufsize)
 	return (smb_ctxbuf_len(&ctx));
 }
 
+/*
+ * Allocate a handle for use with the server-side RPC functions.
+ * The handle contains the machine SID and an incrementing counter,
+ * which should make each handle unique.
+ *
+ * An arbitrary caller context can be associated with the handle
+ * via data; it will not be dereferenced by the handle API.
+ *
+ * The uuid for the new handle is returned after it has been added
+ * to the global handle list.
+ */
+ndr_hdid_t *
+ndr_hdalloc(const ndr_xa_t *xa, const void *data)
+{
+	static ndr_hdid_t uuid;
+	ndr_handle_t *hd;
+	nt_sid_t *sid;
+
+	if ((hd = malloc(sizeof (ndr_handle_t))) == NULL)
+		return (NULL);
+
+	if (uuid.data[1] == 0) {
+		if ((sid = nt_domain_local_sid()) == NULL)
+			return (NULL);
+
+		uuid.data[0] = 0;
+		uuid.data[1] = 0;
+		uuid.data[2] = sid->SubAuthority[1];
+		uuid.data[3] = sid->SubAuthority[2];
+		uuid.data[4] = sid->SubAuthority[3];
+	}
+
+	++uuid.data[1];
+
+	bcopy(&uuid, &hd->nh_id, sizeof (ndr_hdid_t));
+	hd->nh_fid = xa->fid;
+	hd->nh_svc = xa->binding->service;
+	hd->nh_data = (void *)data;
+
+	(void) mutex_lock(&ndr_handle_lock);
+	hd->nh_next = ndr_handle_list;
+	ndr_handle_list = hd;
+	(void) mutex_unlock(&ndr_handle_lock);
+
+	return (&hd->nh_id);
+}
+
+/*
+ * Remove a handle from the global list and free it.
+ */
 void
-mlrpc_uuid_to_str(mlrpc_uuid_t *uuid, char *str)
+ndr_hdfree(const ndr_xa_t *xa, const ndr_hdid_t *id)
+{
+	mlrpc_service_t *svc = xa->binding->service;
+	ndr_handle_t *hd;
+	ndr_handle_t **pphd;
+
+	assert(id);
+
+	(void) mutex_lock(&ndr_handle_lock);
+	pphd = &ndr_handle_list;
+
+	while (*pphd) {
+		hd = *pphd;
+
+		if (bcmp(&hd->nh_id, id, sizeof (ndr_hdid_t)) == 0) {
+			if (hd->nh_svc == svc) {
+				*pphd = hd->nh_next;
+				free(hd);
+			}
+			break;
+		}
+
+		pphd = &(*pphd)->nh_next;
+	}
+
+	(void) mutex_unlock(&ndr_handle_lock);
+}
+
+/*
+ * Lookup a handle by id.  If the handle is in the list and it matches
+ * the specified service, a pointer to it is returned.  Otherwise a null
+ * pointer is returned.
+ */
+ndr_handle_t *
+ndr_hdlookup(const ndr_xa_t *xa, const ndr_hdid_t *id)
+{
+	mlrpc_service_t *svc = xa->binding->service;
+	ndr_handle_t *hd;
+
+	assert(id);
+	(void) mutex_lock(&ndr_handle_lock);
+	hd = ndr_handle_list;
+
+	while (hd) {
+		if (bcmp(&hd->nh_id, id, sizeof (ndr_hdid_t)) == 0) {
+			if (hd->nh_svc != svc)
+				break;
+			(void) mutex_unlock(&ndr_handle_lock);
+			return (hd);
+		}
+
+		hd = hd->nh_next;
+	}
+
+	(void) mutex_unlock(&ndr_handle_lock);
+	return (NULL);
+}
+
+/*
+ * Called when a pipe is closed to release any associated handles.
+ */
+void
+ndr_hdclose(int fid)
+{
+	ndr_handle_t *hd;
+	ndr_handle_t **pphd;
+
+	(void) mutex_lock(&ndr_handle_lock);
+	pphd = &ndr_handle_list;
+
+	while (*pphd) {
+		hd = *pphd;
+
+		if (hd->nh_fid == fid) {
+			*pphd = hd->nh_next;
+			free(hd);
+			continue;
+		}
+
+		pphd = &(*pphd)->nh_next;
+	}
+
+	(void) mutex_unlock(&ndr_handle_lock);
+}
+
+void
+mlrpc_uuid_to_str(ndr_uuid_t *uuid, char *str)
 {
 	(void) sprintf(str, "%08x-%04x-%04x-%02x%02x%02x%02x%02x%02x%02x%02x",
 	    uuid->data1, uuid->data2, uuid->data3,
@@ -199,7 +353,7 @@ mlrpc_uuid_to_str(mlrpc_uuid_t *uuid, char *str)
 }
 
 int
-mlrpc_str_to_uuid(char *str, mlrpc_uuid_t *uuid)
+mlrpc_str_to_uuid(char *str, ndr_uuid_t *uuid)
 {
 	char 		*p = str;
 	char 		*q;

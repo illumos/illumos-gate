@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,12 +109,20 @@ smbd_join(smb_joininfo_t *info)
 	unsigned char passwd_hash[SMBAUTH_HASH_SZ];
 	char plain_passwd[PASS_LEN + 1];
 	char plain_user[PASS_LEN + 1];
+	char nbt_domain[SMB_PI_MAX_DOMAIN];
+	char fqdn[MAXHOSTNAMELEN];
 
 	if (info->mode == SMB_SECMODE_WORKGRP) {
-		smb_config_wrlock();
+		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
+			if (ads_domain_change_cleanup("") != 0) {
+				syslog(LOG_ERR, "smbd: unable to remove the"
+				    " old keys from the Kerberos keytab. "
+				    "Please remove the old keys for your "
+				    "host principal.");
+			}
+		}
 		(void) smb_config_set_secmode(info->mode);
-		(void) smb_config_set(SMB_CI_DOMAIN_NAME, info->domain_name);
-		smb_config_unlock();
+		(void) smb_config_setstr(SMB_CI_DOMAIN_NAME, info->domain_name);
 		return (NT_STATUS_SUCCESS);
 	}
 
@@ -124,10 +132,25 @@ smbd_join(smb_joininfo_t *info)
 	 * will ensure that we don't attempt a NETLOGON_SAMLOGON
 	 * when attempting to find the PDC.
 	 */
-	smb_set_domain_member(0);
+	(void) smb_config_setbool(SMB_CI_DOMAIN_MEMB, B_FALSE);
 
-	(void) strcpy(plain_user, info->domain_username);
-	(void) strcpy(plain_passwd, info->domain_passwd);
+	(void) strlcpy(plain_user, info->domain_username, sizeof (plain_user));
+	(void) strlcpy(plain_passwd, info->domain_passwd,
+	    sizeof (plain_passwd));
+	(void) smb_resolve_netbiosname(info->domain_name, nbt_domain,
+	    sizeof (nbt_domain));
+
+	if (smb_resolve_fqdn(info->domain_name, fqdn, sizeof (fqdn)) != 1) {
+		syslog(LOG_ERR, "smbd: fully-qualified domain name is unknown");
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
+
+	if (ads_domain_change_cleanup(fqdn)) {
+		syslog(LOG_ERR, "smbd: unable to remove the old keys from the"
+		    " Kerberos keytab. Please remove the old keys for your "
+		    "host principal.");
+		return (NT_STATUS_INTERNAL_ERROR);
+	}
 
 	if (smb_auth_ntlm_hash(plain_passwd, passwd_hash) != SMBAUTH_SUCCESS) {
 		status = NT_STATUS_INTERNAL_ERROR;
@@ -138,7 +161,7 @@ smbd_join(smb_joininfo_t *info)
 
 	smbrdr_ipc_set(plain_user, passwd_hash);
 
-	if (locate_resource_pdc(info->domain_name)) {
+	if (locate_resource_pdc(nbt_domain)) {
 		if ((pi = smb_getdomaininfo(0)) == 0) {
 			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
 			syslog(LOG_ERR, "smbd: could not get domain controller"
@@ -155,11 +178,9 @@ smbd_join(smb_joininfo_t *info)
 		    plain_user, plain_passwd);
 
 		if (status == NT_STATUS_SUCCESS) {
-			smb_config_wrlock();
 			(void) smb_config_set_secmode(SMB_SECMODE_DOMAIN);
-			(void) smb_config_set(SMB_CI_DOMAIN_NAME,
+			(void) smb_config_setstr(SMB_CI_DOMAIN_NAME,
 			    info->domain_name);
-			smb_config_unlock();
 			smbrdr_ipc_commit();
 			return (status);
 		}
@@ -296,8 +317,8 @@ smb_netlogon_dc_browser(void *arg)
 		    SMB_PI_MAX_DOMAIN);
 
 		smb_setdomaininfo(NULL, NULL, 0);
-		if (msdcs_lookup_ads() == 0) {
-			if (smb_is_domain_member())
+		if (msdcs_lookup_ads(resource_domain) == 0) {
+			if (smb_config_getbool(SMB_CI_DOMAIN_MEMB))
 				protocol = NETLOGON_PROTO_SAMLOGON;
 			else
 				protocol = NETLOGON_PROTO_NETLOGON;

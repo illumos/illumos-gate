@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,25 +74,24 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	uint32_t secinfo;
 	uint32_t sdlen;
 	uint32_t status;
-
+	smb_error_t err;
 
 	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		/* NOTREACHED */
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 
 	if ((sr->fid_ofile->f_node == NULL) ||
 	    (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK)) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
 		/* NOTREACHED */
 	}
@@ -107,14 +106,14 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 
 	status = smb_sd_read(sr, &sd, secinfo);
 	if (status != NT_STATUS_SUCCESS) {
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 	}
 
 	sdlen = smb_sd_len(&sd, secinfo);
 	if (sdlen == 0) {
 		smb_sd_term(&sd);
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_SECURITY_DESCR);
+		smbsr_error(sr, NT_STATUS_INVALID_SECURITY_DESCR, 0, 0);
 		/* NOTREACHED */
 	}
 
@@ -126,8 +125,11 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 		 * should provide a buffer size hint for the client.
 		 */
 		(void) smb_encode_mbc(&xa->rep_param_mb, "l", sdlen);
-		smbsr_setup_nt_status(sr, ERROR_SEVERITY_ERROR,
-		    NT_STATUS_BUFFER_TOO_SMALL);
+		err.severity = ERROR_SEVERITY_ERROR;
+		err.status   = NT_STATUS_BUFFER_TOO_SMALL;
+		err.errcls   = ERRDOS;
+		err.errcode  = ERROR_INSUFFICIENT_BUFFER;
+		smbsr_set_error(sr, &err);
 		smb_sd_term(&sd);
 		return (SDRC_NORMAL_REPLY);
 	}
@@ -166,25 +168,24 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 
 	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		/* NOTREACHED */
 	}
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
 	if ((sr->fid_ofile->f_node == NULL) ||
 	    (sr->fid_ofile->f_ftype != SMB_FTYPE_DISK)) {
-		smbsr_raise_nt_error(sr, NT_STATUS_ACCESS_DENIED);
+		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, 0, 0);
 		/* NOTREACHED */
 	}
 
 	if (sr->fid_ofile->f_node->flags & NODE_READ_ONLY) {
-		smbsr_raise_nt_error(sr, NT_STATUS_MEDIA_WRITE_PROTECTED);
+		smbsr_error(sr, NT_STATUS_MEDIA_WRITE_PROTECTED, 0, 0);
 		/* NOTREACHED */
 	}
 
@@ -202,20 +203,20 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 
 	status = smb_decode_sd(xa, &sd);
 	if (status != NT_STATUS_SUCCESS) {
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 	}
 
 	if (((secinfo & SMB_OWNER_SECINFO) && (sd.sd_owner == NULL)) ||
 	    ((secinfo & SMB_GROUP_SECINFO) && (sd.sd_group == NULL))) {
-		smbsr_raise_nt_error(sr, NT_STATUS_INVALID_PARAMETER);
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		/* NOTREACHED */
 	}
 
 	status = smb_sd_write(sr, &sd, secinfo);
 	smb_sd_term(&sd);
 	if (status != NT_STATUS_SUCCESS) {
-		smbsr_raise_nt_error(sr, status);
+		smbsr_error(sr, status, 0, 0);
 		/* NOTREACHED */
 	}
 

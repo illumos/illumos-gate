@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@ smbsr_connect_tree(struct smb_request *sr)
 	char *sharename;
 	char *access_msg;
 	int32_t stype;
+	DWORD status;
 	int rc;
 
 	errmsg[0] = '\0';
@@ -77,12 +78,12 @@ smbsr_connect_tree(struct smb_request *sr)
 		 * Looks like a UNC path, make sure the format is correct.
 		 */
 		if (sharename[1] != '\\') {
-			smbsr_raise_error(sr, ERRSRV, ERRinvnetname);
+			smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 			/* NOTREACHED */
 		}
 
 		if ((sharename = strchr(sharename+2, '\\')) == 0) {
-			smbsr_raise_error(sr, ERRSRV, ERRinvnetname);
+			smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 			/* NOTREACHED */
 		}
 
@@ -91,12 +92,12 @@ smbsr_connect_tree(struct smb_request *sr)
 		/*
 		 * This should be a sharename: no embedded '\' allowed.
 		 */
-		smbsr_raise_error(sr, ERRSRV, ERRinvnetname);
+		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		/* NOTREACHED */
 	}
 
 	if (smb_get_stype(sharename, sr->arg.tcon.service, &stype) != 0) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
+		smbsr_error(sr, NT_STATUS_BAD_DEVICE_TYPE,
 		    ERRDOS, ERROR_BAD_DEV_TYPE);
 		/* NOTREACHED */
 	}
@@ -106,14 +107,11 @@ smbsr_connect_tree(struct smb_request *sr)
 		smbsr_share_report(sr, sharename, access_msg, errmsg);
 
 		/*
-		 * W2K sometimes tries to connect to user shares using an
-		 * anonymous IPC connection. NT returns access denied.
+		 * Windows 2000 may try to connect to user shares using
+		 * an anonymous IPC connection.  NT returns access denied.
 		 */
-		if (rc == ERRaccess)
-			smbsr_raise_cifs_error(sr, NT_STATUS_ACCESS_DENIED,
-			    ERRSRV, ERRaccess);
-		else
-			smbsr_raise_error(sr, ERRSRV, rc);
+		status = (rc == ERRaccess) ? NT_STATUS_ACCESS_DENIED : 0;
+		smbsr_error(sr, status, ERRSRV, rc);
 		/* NOTREACHED */
 	}
 
@@ -167,11 +165,11 @@ smbsr_share_report(struct smb_request *sr, char *sharename,
 /*
  * smbsr_setup_share
  *
- * This is where the real of setting up share is done. The main thing
- * to note is that we resolve ambiguities by assuming that a directory is
- * being requested. This function returns error codes, rather than calling
- * smbsr_raise_error. We return 0 on success or a non-zero error code if
- * there is a problem.
+ * This is where the real of setting up share is done.
+ * Note that ambiguities are resolved by assuming that a directory
+ * is being requested.
+ *
+ * Returns 0 on success or a non-zero error code on failure.
  */
 int
 smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,

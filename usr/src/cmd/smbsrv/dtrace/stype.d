@@ -22,7 +22,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,22 +60,12 @@ smb_com_logoff_andx:return
 /*
  * Raise error functions (no return).
  */
-smbsr_raise_error:entry
-{
-	printf("class=%d code=%d", arg1, arg2);
-}
-
-smbsr_raise_cifs_error:entry
+smbsr_error:entry
 {
     printf("status=0x%08x class=%d, code=%d", arg1, arg2, arg3);
 }
 
-smbsr_raise_nt_error:entry
-{
-    printf("error=0x%08x", arg1);
-}
-
-smbsr_raise_errno:entry
+smbsr_errno:entry
 {
     printf("errno=%d", arg1);
 }

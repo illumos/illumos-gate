@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@
 #include <smbsrv/smb_fsops.h>
 #include <sys/pathname.h>
 #include <sys/sdt.h>
+#include <sys/nbmlock.h>
 
 uint32_t smb_is_executable(char *path);
 static void smb_node_delete_on_close(smb_node_t *node);
@@ -138,7 +139,6 @@ smb_node_lookup(
 	fs_desc_t		fsd;
 	int			error;
 	krw_t			lock_mode;
-	caller_context_t 	ct;
 	vnode_t			*unnamed_vp = NULL;
 
 	/*
@@ -154,9 +154,8 @@ smb_node_lookup(
 	 * This getattr is performed on behalf of the server
 	 * that's why kcred is used not the user's cred
 	 */
-	smb_get_caller_context(sr, &ct);
 	attr->sa_mask = SMB_AT_ALL;
-	error = smb_vop_getattr(vp, unnamed_vp, attr, 0, kcred, &ct);
+	error = smb_vop_getattr(vp, unnamed_vp, attr, 0, kcred);
 	if (error)
 		return (NULL);
 
@@ -208,6 +207,7 @@ smb_node_lookup(
 						smb_node_ref(dir_snode);
 					}
 					node->attr = *attr;
+					node->n_size = attr->sa_vattr.va_size;
 
 					smb_audit_node(node);
 					smb_rwx_xexit(&node->n_lock);
@@ -767,4 +767,253 @@ smb_node_reset_delete_on_close(smb_node_t *node)
 		node->delete_on_close_cred = NULL;
 	}
 	smb_rwx_xexit(&node->n_lock);
+}
+
+/*
+ * smb_node_share_check
+ *
+ * check file sharing rules for current open request
+ * against all existing opens for a file.
+ *
+ * Returns NT_STATUS_SHARING_VIOLATION if there is any
+ * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
+ */
+uint32_t
+smb_node_open_check(struct smb_node *node, cred_t *cr,
+    uint32_t desired_access, uint32_t share_access)
+{
+	smb_ofile_t *of;
+	uint32_t status;
+
+	ASSERT(node);
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	of = smb_llist_head(&node->n_ofile_list);
+	while (of) {
+		status = smb_node_share_check(node, cr, desired_access,
+		    share_access, of);
+		if (status == NT_STATUS_SHARING_VIOLATION) {
+			smb_llist_exit(&node->n_ofile_list);
+			return (status);
+		}
+		of = smb_llist_next(&node->n_ofile_list, of);
+	}
+	smb_llist_exit(&node->n_ofile_list);
+
+	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_open_share_check
+ *
+ * check file sharing rules for current open request
+ * against the given existing open.
+ *
+ * Returns NT_STATUS_SHARING_VIOLATION if there is any
+ * sharing conflict, otherwise returns NT_STATUS_SUCCESS.
+ */
+uint32_t
+smb_node_share_check(
+    struct smb_node *node,
+    cred_t *cr,
+    uint32_t desired_access,
+    uint32_t share_access,
+    smb_ofile_t *of)
+{
+	/*
+	 * It appears that share modes are not relevant to
+	 * directories, but this check will remain as it is not
+	 * clear whether it was originally put here for a reason.
+	 */
+	if (node->attr.sa_vattr.va_type == VDIR) {
+		if (SMB_DENY_RW(of->f_share_access) &&
+		    (node->n_orig_uid != crgetuid(cr))) {
+			return (NT_STATUS_SHARING_VIOLATION);
+		}
+
+		return (NT_STATUS_SUCCESS);
+	}
+
+	/* if it's just meta data */
+	if ((of->f_granted_access & FILE_DATA_ALL) == 0)
+		return (NT_STATUS_SUCCESS);
+
+	/*
+	 * Check requested share access against the
+	 * open granted (desired) access
+	 */
+	if (SMB_DENY_DELETE(share_access) && (of->f_granted_access & DELETE))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	if (SMB_DENY_READ(share_access) &&
+	    (of->f_granted_access & (FILE_READ_DATA | FILE_EXECUTE)))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	if (SMB_DENY_WRITE(share_access) &&
+	    (of->f_granted_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	/* check requested desired access against the open share access */
+	if (SMB_DENY_DELETE(of->f_share_access) && (desired_access & DELETE))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	if (SMB_DENY_READ(of->f_share_access) &&
+	    (desired_access & (FILE_READ_DATA | FILE_EXECUTE)))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	if (SMB_DENY_WRITE(of->f_share_access) &&
+	    (desired_access & (FILE_WRITE_DATA | FILE_APPEND_DATA)))
+		return (NT_STATUS_SHARING_VIOLATION);
+
+	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_rename_share_check
+ *
+ * An open file can be renamed if
+ *
+ *  1. isn't opened for data writing or deleting
+ *
+ *  2. Opened with "Deny Delete" share mode
+ *         But not opened for data reading or executing
+ *         (opened for accessing meta data)
+ */
+
+DWORD
+smb_node_rename_check(struct smb_node *node)
+{
+	struct smb_ofile *open;
+
+	ASSERT(node);
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+
+	/*
+	 * Intra-CIFS check
+	 */
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	open = smb_llist_head(&node->n_ofile_list);
+	while (open) {
+		if (open->f_granted_access &
+		    (FILE_WRITE_DATA | FILE_APPEND_DATA | DELETE)) {
+			smb_llist_exit(&node->n_ofile_list);
+			return (NT_STATUS_SHARING_VIOLATION);
+		}
+
+		if ((open->f_share_access & FILE_SHARE_DELETE) == 0) {
+			if (open->f_granted_access &
+			    (FILE_READ_DATA | FILE_EXECUTE)) {
+				smb_llist_exit(&node->n_ofile_list);
+				return (NT_STATUS_SHARING_VIOLATION);
+			}
+		}
+		open = smb_llist_next(&node->n_ofile_list, open);
+	}
+	smb_llist_exit(&node->n_ofile_list);
+
+	/*
+	 * system-wide share check
+	 */
+
+	if (nbl_share_conflict(node->vp, NBL_RENAME, NULL))
+		return (NT_STATUS_SHARING_VIOLATION);
+	else
+		return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_node_delete_check
+ *
+ * An open file can be deleted only if opened for
+ * accessing meta data. Share modes aren't important
+ * in this case.
+ *
+ * NOTE: there is another mechanism for deleting an
+ * open file that NT clients usually use.
+ * That's setting "Delete on close" flag for an open
+ * file.  In this way the file will be deleted after
+ * last close. This flag can be set by SmbTrans2SetFileInfo
+ * with FILE_DISPOSITION_INFO information level.
+ * For setting this flag, the file should be opened by
+ * DELETE access in the FID that is passed in the Trans2
+ * request.
+ */
+DWORD
+smb_node_delete_check(smb_node_t *node)
+{
+	smb_ofile_t *file;
+
+	ASSERT(node);
+	ASSERT(node->n_magic == SMB_NODE_MAGIC);
+	ASSERT(node->n_state == SMB_NODE_STATE_AVAILABLE);
+
+	if (node->attr.sa_vattr.va_type == VDIR)
+		return (NT_STATUS_SUCCESS);
+
+	/*
+	 * intra-CIFS check
+	 */
+
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	file = smb_llist_head(&node->n_ofile_list);
+	while (file) {
+		ASSERT(file->f_magic == SMB_OFILE_MAGIC);
+		if (file->f_granted_access &
+		    (FILE_READ_DATA |
+		    FILE_WRITE_DATA |
+		    FILE_APPEND_DATA |
+		    FILE_EXECUTE |
+		    DELETE)) {
+			smb_llist_exit(&node->n_ofile_list);
+			return (NT_STATUS_SHARING_VIOLATION);
+		}
+		file = smb_llist_next(&node->n_ofile_list, file);
+	}
+	smb_llist_exit(&node->n_ofile_list);
+
+	/*
+	 * system-wide share check
+	 */
+
+	if (nbl_share_conflict(node->vp, NBL_REMOVE, NULL))
+		return (NT_STATUS_SHARING_VIOLATION);
+	else
+		return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * smb_node_start_crit()
+ *
+ * Enter critical region for share reservations.
+ * See comments above smb_fsop_shrlock().
+ */
+
+void
+smb_node_start_crit(smb_node_t *node, krw_t mode)
+{
+	rw_enter(&node->n_share_lock, mode);
+	nbl_start_crit(node->vp, mode);
+}
+
+/*
+ * smb_node_end_crit()
+ *
+ * Exit critical region for share reservations.
+ */
+
+void
+smb_node_end_crit(smb_node_t *node)
+{
+	nbl_end_crit(node->vp);
+	rw_exit(&node->n_share_lock);
+}
+
+int
+smb_node_in_crit(smb_node_t *node)
+{
+	return (nbl_in_crit(node->vp) && RW_LOCK_HELD(&node->n_share_lock));
 }

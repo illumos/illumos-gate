@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -261,7 +261,7 @@ smb_com_negotiate(struct smb_request *sr)
 
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
 		/* The protocol has already been negotiated. */
-		smbsr_raise_error(sr, ERRSRV, ERRerror);
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
 		/* NOTREACHED */
 	}
 
@@ -269,7 +269,7 @@ smb_com_negotiate(struct smb_request *sr)
 	    sr->smb_data.chain_offset < sr->smb_data.max_bytes;
 	    pos++) {
 		if (smb_decode_mbc(&sr->smb_data, "%L", sr, &p) != 0) {
-			smbsr_raise_error(sr, ERRSRV, ERRerror);
+			smbsr_error(sr, 0, ERRSRV, ERRerror);
 			/* NOTREACHED */
 		}
 
@@ -284,7 +284,7 @@ smb_com_negotiate(struct smb_request *sr)
 		}
 	}
 	if (sel_pos < 0) {
-		smbsr_raise_error(sr, ERRSRV, ERRerror);
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
 		/* NOTREACHED */
 	}
 
@@ -435,9 +435,7 @@ smb_com_negotiate(struct smb_request *sr)
 		break;
 
 	default:
-		/* Just to make sure. */
-		ASSERT(0);
-		smbsr_raise_error(sr, ERRSRV, ERRerror);
+		smbsr_error(sr, 0, ERRSRV, ERRerror);
 		/* NOTREACHED */
 	}
 

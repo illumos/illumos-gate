@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -145,7 +145,6 @@
 
 #define	SMB_ALL_DISPATCH_STAT_INCR(stat)	atomic_inc_64(&stat);
 
-int smb_dispatch_diags = 0;
 static kstat_t *smb_dispatch_ksp = NULL;
 static kstat_named_t *smb_dispatch_kstat_data = NULL;
 static int smb_dispatch_kstat_size = 0;
@@ -773,6 +772,7 @@ smb_dispatch_request(struct smb_request *sr)
 {
 	int			rc;
 	smb_dispatch_table_t	*sdd;
+	smb_error_t		err;
 
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
@@ -834,20 +834,16 @@ smb_dispatch_request(struct smb_request *sr)
 	sr->first_smb_com = sr->smb_com;
 
 	/*
-	 * Verify SMB signature if signing is enabled,
-	 * dialiect is NT LM 0.12,
+	 * Verify SMB signature if signing is enabled, dialect is NT LM 0.12,
 	 * signing was negotiated and authentication has occurred.
 	 */
 	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_request(sr) != 0) {
-			/* Reply with ACCESS_DENIED */
-			if (sr->session->capabilities & CAP_STATUS32)
-				smbsr_setup_nt_status(sr, ERROR_SEVERITY_ERROR,
-				    NT_STATUS_ACCESS_DENIED);
-			else {
-				sr->smb_rcls = ERRDOS;
-				sr->smb_err  = ERRnoaccess;
-			}
+			err.severity = ERROR_SEVERITY_ERROR;
+			err.status = NT_STATUS_ACCESS_DENIED;
+			err.errcls = ERRDOS;
+			err.errcode = ERROR_ACCESS_DENIED;
+			smbsr_set_error(sr, &err);
 			rc = -1;
 			smb_rwx_rwenter(&sr->session->s_lock, RW_READER);
 			goto reply_error;
@@ -956,15 +952,14 @@ andx_more:
 			sr->uid_user = smb_user_lookup_by_uid(sr->session,
 			    &sr->user_cr, sr->smb_uid);
 			if (sr->uid_user == NULL) {
-				smbsr_raise_error(sr, ERRSRV, ERRbaduid);
+				smbsr_error(sr, 0, ERRSRV, ERRbaduid);
 				/* NOTREACHED */
 			}
 			if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID)) {
 				sr->tid_tree = smb_tree_lookup_by_tid(
 				    sr->uid_user, sr->smb_tid);
 				if (sr->tid_tree == NULL) {
-					smbsr_raise_error(sr, ERRSRV,
-					    ERRinvnid);
+					smbsr_error(sr, 0, ERRSRV, ERRinvnid);
 					/* NOTREACHED */
 				}
 			}
@@ -1274,78 +1269,15 @@ smbsr_encode_empty_result(struct smb_request *sr)
 }
 
 /*
- * cifs_raise_error
- *
- * Temporary workaround to the NT status versus Win32/SMB error codes
- * decision: just report them both here.
- */
-void
-smbsr_raise_cifs_error(struct smb_request *sr,
-				DWORD status,
-				int error_class,
-				int error_code)
-{
-	if (sr->session->capabilities & CAP_STATUS32)
-		smbsr_raise_nt_error(sr, status);
-	else
-		smbsr_raise_error(sr, error_class, error_code);
-
-	/* NOTREACHED */
-}
-
-void
-smbsr_raise_error(struct smb_request *sr, int errcls, int errcod)
-{
-	sr->smb_rcls = (unsigned char)errcls;
-	sr->smb_err  = (uint16_t)errcod;
-	longjmp(&sr->exjb);
-}
-
-/*
- * smbsr_setup_nt_status
- *
- * Set up an NT status in the smb_request but don't long jump or try
- * to do any error handling. There are times when we need a status set
- * up in the response to indicate that the request has either failed
- * or, at least, is only partially complete (possibly indicated by the
- * severity) but we also need to return some information to the client.
- */
-void
-smbsr_setup_nt_status(struct smb_request *sr,
-					uint32_t severity,
-					uint32_t nt_status)
-{
-	nt_status |= severity;
-	sr->smb_rcls = nt_status & 0xff;
-	sr->smb_reh = (nt_status >> 8) & 0xff;
-	sr->smb_err  = nt_status >> 16;
-	sr->smb_flg2 |= SMB_FLAGS2_NT_STATUS;
-}
-
-void
-smbsr_raise_nt_error(struct smb_request *sr, uint32_t errcod)
-{
-	errcod |= 0xc0000000;
-	sr->smb_rcls = errcod & 0xff;
-	sr->smb_reh = (errcod >> 8) & 0xff;
-	sr->smb_err  = errcod >> 16;
-	sr->smb_flg2 |= SMB_FLAGS2_NT_STATUS;
-	longjmp(&sr->exjb);
-}
-
-
-/*
- * Attempt to map errno values to SMB and NT status values.
- * Note: ESRCH is used as special case to handle a lookup
- * failure on streams.
+ * Map errno values to SMB and NT status values.
+ * Note: ESRCH is a special case to handle a streams lookup failure.
  */
 static struct {
-	int unix_errno;
-	int smb_error_class;
-	int smb_error_value;
-	DWORD nt_status;
-}
-smb_errno_map[] = {
+	int errnum;
+	int errcls;
+	int errcode;
+	DWORD status32;
+} smb_errno_map[] = {
 	{ ENOSPC,	ERRDOS, ERROR_DISK_FULL, NT_STATUS_DISK_FULL },
 	{ EDQUOT,	ERRDOS, ERROR_DISK_FULL, NT_STATUS_DISK_FULL },
 	{ EPERM,	ERRSRV, ERRaccess, NT_STATUS_ACCESS_DENIED },
@@ -1375,74 +1307,115 @@ smb_errno_map[] = {
 };
 
 void
-smb_errmap_unix2smb(int en, smb_error_t *smberr)
+smbsr_map_errno(int errnum, smb_error_t *err)
 {
 	int i;
 
-	smberr->status  = NT_STATUS_UNSUCCESSFUL;
-	smberr->errcls  = ERRDOS;
-	smberr->errcode = ERROR_GEN_FAILURE;
-
 	for (i = 0; i < sizeof (smb_errno_map)/sizeof (smb_errno_map[0]); ++i) {
-		if (smb_errno_map[i].unix_errno == en) {
-			smberr->status  = smb_errno_map[i].nt_status;
-			smberr->errcls  = smb_errno_map[i].smb_error_class;
-			smberr->errcode = smb_errno_map[i].smb_error_value;
+		if (smb_errno_map[i].errnum == errnum) {
+			err->severity = ERROR_SEVERITY_ERROR;
+			err->status   = smb_errno_map[i].status32;
+			err->errcls   = smb_errno_map[i].errcls;
+			err->errcode  = smb_errno_map[i].errcode;
 			return;
 		}
 	}
-}
 
-int
-smbsr_set_errno(struct smb_request *sr, int en)
-{
-	int i;
-
-	ASSERT(en != -1);
-
-	/*
-	 * If the client supports 32-bit NT status values, check for
-	 * an appropriate mapping and raise an NT error, control won't
-	 * return here due to the longjmp in smbsr_raise_nt_error.
-	 */
-	if (sr->session->capabilities & CAP_STATUS32) {
-		for (i = 0;
-		    i < sizeof (smb_errno_map)/sizeof (smb_errno_map[0]);
-		    ++i) {
-			if (smb_errno_map[i].unix_errno == en) {
-				smbsr_raise_nt_error(sr,
-				    smb_errno_map[i].nt_status);
-				/* NOTREACHED */
-			}
-		}
-	} else {
-		for (i = 0;
-		    i < sizeof (smb_errno_map)/sizeof (smb_errno_map[0]);
-		    ++i) {
-			if (smb_errno_map[i].unix_errno == en) {
-				sr->smb_rcls = smb_errno_map[i].smb_error_class;
-				sr->smb_err  = smb_errno_map[i].smb_error_value;
-				return (0);
-			}
-		}
-	}
-
-	sr->smb_rcls = ERRSRV;
-	sr->smb_err  = ERRerror;
-	return (-1);
+	err->severity = ERROR_SEVERITY_ERROR;
+	err->status   = NT_STATUS_INTERNAL_ERROR;
+	err->errcls   = ERRDOS;
+	err->errcode  = ERROR_INTERNAL_ERROR;
 }
 
 void
-smbsr_raise_errno(struct smb_request *sr, int en)
+smbsr_errno(struct smb_request *sr, int errnum)
 {
-	if (smbsr_set_errno(sr, en) != 0) {
-		if (smb_dispatch_diags) {
-			cmn_err(CE_NOTE, "SmbErrno: errno=%d", en);
-		}
+	smb_error_t err;
+
+	smbsr_map_errno(errnum, &err);
+	smbsr_set_error(sr, &err);
+	longjmp(&sr->exjb);
+	/* NOTREACHED */
+}
+
+/*
+ * Report a request processing warning.
+ */
+void
+smbsr_warn(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
+{
+	smb_error_t err;
+
+	err.severity = ERROR_SEVERITY_WARNING;
+	err.status   = status;
+	err.errcls   = errcls;
+	err.errcode  = errcode;
+
+	smbsr_set_error(sr, &err);
+}
+
+/*
+ * Report a request processing error.  This function will not return.
+ */
+void
+smbsr_error(smb_request_t *sr, DWORD status, uint16_t errcls, uint16_t errcode)
+{
+	smb_error_t err;
+
+	err.severity = ERROR_SEVERITY_ERROR;
+	err.status   = status;
+	err.errcls   = errcls;
+	err.errcode  = errcode;
+
+	smbsr_set_error(sr, &err);
+	longjmp(&sr->exjb);
+	/* NOTREACHED */
+}
+
+/*
+ * Setup a request processing error.  This function can be used to
+ * report 32-bit status codes or DOS errors.  Set the status code
+ * to 0 (NT_STATUS_SUCCESS) to explicitly report a DOS error,
+ * regardless of the client capabilities.
+ *
+ * If status is non-zero and the client supports 32-bit status
+ * codes, report the status.  Otherwise, report the DOS error.
+ */
+void
+smbsr_set_error(smb_request_t *sr, smb_error_t *err)
+{
+	uint32_t status;
+	uint32_t severity;
+	uint32_t capabilities;
+
+	ASSERT(sr);
+	ASSERT(err);
+
+	status = err->status;
+	severity = (err->severity == 0) ? ERROR_SEVERITY_ERROR : err->severity;
+	capabilities = sr->session->capabilities;
+
+	if ((err->errcls == 0) && (err->errcode == 0)) {
+		capabilities |= CAP_STATUS32;
+		if (status == 0)
+			status = NT_STATUS_INTERNAL_ERROR;
 	}
 
-	longjmp(&sr->exjb);
-	/* no return */
+	if ((capabilities & CAP_STATUS32) && (status != 0)) {
+		status |= severity;
+		sr->smb_rcls = status & 0xff;
+		sr->smb_reh = (status >> 8) & 0xff;
+		sr->smb_err  = status >> 16;
+		sr->smb_flg2 |= SMB_FLAGS2_NT_STATUS;
+	} else {
+		if ((err->errcls == 0) || (err->errcode == 0)) {
+			sr->smb_rcls = ERRSRV;
+			sr->smb_err  = ERRerror;
+		} else {
+			sr->smb_rcls = (uint8_t)err->errcls;
+			sr->smb_err  = (uint16_t)err->errcode;
+		}
+	}
 }
 
 smb_xa_t *

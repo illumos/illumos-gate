@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 
 #include <smbsrv/cifs.h>
@@ -852,13 +853,9 @@ smb_browser_send_HostAnnouncement(int net, int32_t next_announcement,
 	uint32_t type;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 
-	syslog(LOG_DEBUG, "smb_browse: send_HostAnnouncement(%d)", net);
-
-	smb_config_rdlock();
-	(void) strlcpy(resource_domain,
-	    smb_config_getstr(SMB_CI_DOMAIN_NAME), SMB_PI_MAX_DOMAIN);
+	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
+		return;
 	(void) utf8_strupr(resource_domain);
-	smb_config_unlock();
 
 	if (addr == 0) {
 		/* Local master Browser */
@@ -1134,15 +1131,10 @@ smb_browser_config(void)
 	int net;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 
-	syslog(LOG_DEBUG, "smb_browse: reconfigure");
-
 	smb_browser_init();
-
-	smb_config_rdlock();
-	(void) strlcpy(resource_domain,
-	    smb_config_getstr(SMB_CI_DOMAIN_NAME), SMB_PI_MAX_DOMAIN);
+	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
+		return;
 	(void) utf8_strupr(resource_domain);
-	smb_config_unlock();
 
 	/* domain<00> */
 	smb_init_name_struct((unsigned char *)resource_domain, 0x00,
@@ -1201,11 +1193,7 @@ smb_browser_init()
 	net_cfg_t cfg;
 
 	(void) smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-
-	smb_config_rdlock();
-	(void) strlcpy(cmnt, smb_config_getstr(SMB_CI_SYS_CMNT),
-	    sizeof (cmnt));
-	smb_config_unlock();
+	(void) smb_config_getstr(SMB_CI_SYS_CMNT, cmnt, sizeof (cmnt));
 
 	smb_nc_cnt = smb_nic_get_num();
 	for (i = 0; i < smb_nc_cnt; i++) {
@@ -1281,12 +1269,10 @@ smb_browser_non_master_duties(int net)
 	smb_browser_putnet(subnet);
 
 	smb_browser_send_HostAnnouncement(net, interval, 0, 0x1D);
+	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
+		return;
 
-	smb_config_rdlock();
-	(void) strlcpy(resource_domain,
-	    smb_config_getstr(SMB_CI_DOMAIN_NAME), SMB_PI_MAX_DOMAIN);
 	(void) utf8_strupr(resource_domain);
-	smb_config_unlock();
 
 	smb_init_name_struct((unsigned char *)resource_domain, 0x1D,
 	    0, 0, 0, 0, 0, &name);

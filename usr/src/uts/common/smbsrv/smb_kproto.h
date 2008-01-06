@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,10 +101,12 @@ void smb_release_oplock(struct smb_ofile *file, int reason);
 
 uint32_t smb_unlock_range(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t);
-void smb_unlock_range_raise_error(smb_request_t *sr, uint32_t ntstatus);
 uint32_t smb_lock_range(struct smb_request *, struct smb_ofile *,
     uint64_t, uint64_t, uint32_t, uint32_t);
-void smb_lock_range_raise_error(smb_request_t *sr, uint32_t ntstatus);
+void smb_lock_range_error(smb_request_t *, uint32_t);
+
+DWORD smb_range_check(smb_request_t *, cred_t *, smb_node_t *,
+    uint64_t, uint64_t, boolean_t);
 
 int smb_mangle_name(ino64_t fileid, char *name, char *shortname,
     char *name83, int force);
@@ -149,31 +151,17 @@ void	smbsr_decode_error(struct smb_request *);
 void	smbsr_encode_error(struct smb_request *);
 void	smbsr_encode_empty_result(struct smb_request *sr);
 
-#pragma does_not_return(smbsr_decode_error)
-#pragma does_not_return(smbsr_encode_error)
-
 int	smbsr_decode_vwv(struct smb_request *sr, char *fmt, ...);
 int	smbsr_decode_data(struct smb_request *sr, char *fmt, ...);
 void	smbsr_encode_result(struct smb_request *, int, int, char *, ...);
 smb_xa_t *smbsr_lookup_xa(smb_request_t *sr);
 void	smbsr_send_reply(struct smb_request *);
 
-void smbsr_raise_cifs_error(struct smb_request *sr, DWORD status,
-    int error_class, int error_code);
-
-int	smbsr_set_errno(struct smb_request *, int);
-void	smbsr_raise_errno(struct smb_request *, int);
-void	smbsr_raise_error(struct smb_request *, int, int);
-void	smbsr_raise_nt_error(struct smb_request *sr, uint32_t);
-
-#pragma does_not_return(smbsr_raise_cifs_error)
-#pragma does_not_return(smbsr_raise_error)
-#pragma does_not_return(smbsr_raise_nt_error)
-#pragma does_not_return(smbsr_raise_errno)
-
-void	smbsr_setup_nt_status(struct smb_request *sr,
-    uint32_t severity,
-    uint32_t nt_status);
+void	smbsr_map_errno(int, smb_error_t *);
+void	smbsr_set_error(smb_request_t *, smb_error_t *);
+void	smbsr_errno(struct smb_request *, int);
+void	smbsr_warn(struct smb_request *, DWORD, uint16_t, uint16_t);
+void	smbsr_error(struct smb_request *, DWORD, uint16_t, uint16_t);
 
 int	smb_mbc_encode(struct mbuf_chain *mbc, char *fmt, va_list ap);
 int	smb_mbc_decode(struct mbuf_chain *mbc, char *fmt, va_list ap);
@@ -202,7 +190,7 @@ int smb_component_match(struct smb_request *sr, ino64_t fileid,
     struct smb_odir *od, smb_odir_context_t *pc);
 
 int smb_lock_range_access(struct smb_request *, struct smb_node *,
-    uint64_t, uint64_t, uint32_t desired_access);
+    uint64_t, uint64_t, boolean_t);
 
 uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 
@@ -247,6 +235,17 @@ void smb_node_root_fini();
 void smb_node_add_lock(smb_node_t *node, smb_lock_t *lock);
 void smb_node_destroy_lock(smb_node_t *node, smb_lock_t *lock);
 void smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file);
+void smb_node_start_crit(smb_node_t *node, krw_t mode);
+void smb_node_end_crit(smb_node_t *node);
+int smb_node_in_crit(smb_node_t *node);
+
+uint32_t smb_node_open_check(smb_node_t *, cred_t *,
+    uint32_t, uint32_t);
+uint32_t smb_node_share_check(smb_node_t *, cred_t *,
+    uint32_t, uint32_t, smb_ofile_t *);
+DWORD smb_node_rename_check(smb_node_t *);
+DWORD smb_node_delete_check(smb_node_t *);
+
 uint64_t smb_node_get_size(smb_node_t *node, smb_attr_t *attr);
 void smb_node_set_time(struct smb_node *node, timestruc_t *crtime,
     timestruc_t *mtime, timestruc_t *atime,
@@ -359,7 +358,6 @@ int smb_stream_parse_name(char *name, char *u_stream_name,
 uint32_t smb_get_gmtoff(void);
 void smb_set_gmtoff(uint32_t);
 
-void smb_errmap_unix2smb(int en, smb_error_t *smberr);
 DWORD smb_trans2_set_information(struct smb_request *sr,
     smb_trans2_setinfo_t *info,
     smb_error_t *smberr);
@@ -398,7 +396,8 @@ void smb_session_disconnect_volume(fs_desc_t *);
 smb_ofile_t *smb_ofile_lookup_by_fid(smb_tree_t *tree, uint16_t fid);
 smb_ofile_t *smb_ofile_open(smb_tree_t *tree, smb_node_t *node, uint16_t pid,
     uint32_t access_granted, uint32_t create_options, uint32_t share_access,
-    uint16_t ftype, char *pipe_name, uint32_t rpc_fid, smb_error_t *err);
+    uint16_t ftype, char *pipe_name, uint32_t rpc_fid, uint32_t uniqid,
+    smb_error_t *err);
 int smb_ofile_close(smb_ofile_t *ofile, uint32_t last_wtime);
 uint32_t smb_ofile_access(smb_ofile_t *ofile, cred_t *cr, uint32_t access);
 int smb_ofile_seek(smb_ofile_t *of, ushort_t mode, int32_t off,

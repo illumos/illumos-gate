@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,7 @@ mlsvc_xa_exchange(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
 	struct mlndr_stream *send_mlnds = &mxa->send_mlnds;
 	int rc;
 
-	rc = smbrdr_rpc_transact(context->fid,
+	rc = smbrdr_transact(context->fid,
 	    (char *)send_mlnds->pdu_base_offset, send_mlnds->pdu_size,
 	    (char *)recv_mlnds->pdu_base_offset, recv_mlnds->pdu_max_size);
 
@@ -228,7 +228,7 @@ mlsvc_xa_read(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
 	if ((len = (mlnds->pdu_max_size - mlnds->pdu_size)) < 0)
 		return (-1);
 
-	rc = smbrdr_rpc_readx(context->fid,
+	rc = smbrdr_readx(context->fid,
 	    (char *)mlnds->pdu_base_offset + mlnds->pdu_size, len);
 
 	if (rc < 0)

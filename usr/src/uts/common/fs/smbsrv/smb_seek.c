@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,8 +94,7 @@ smb_com_seek(struct smb_request *sr)
 
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
-		    ERRDOS, ERRbadfid);
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		/* NOTREACHED */
 	}
 
@@ -103,27 +102,16 @@ smb_com_seek(struct smb_request *sr)
 		(void) smb_set_file_size(sr);
 	}
 
-	rc = smb_ofile_seek(sr->fid_ofile, mode, off, &off_ret);
-	if (rc == 0) {
-		smbsr_encode_result(sr, 2, 0, "blw", 2, off_ret, 0);
-		return (SDRC_NORMAL_REPLY);
+	if ((rc = smb_ofile_seek(sr->fid_ofile, mode, off, &off_ret)) != 0) {
+		if (rc == EINVAL) {
+			smbsr_error(sr, 0, ERRDOS, ERRbadfunc);
+			/* NOTREACHED */
+		} else {
+			smbsr_error(sr, 0, ERRSRV, ERRerror);
+			/* NOTREACHED */
+		}
 	}
-	if (rc == EINVAL) {
-		smbsr_raise_error(sr, ERRDOS, ERRbadfunc);
-		/* NOTREACHED */
-	}
-	if (rc == EOVERFLOW) {
-		smbsr_raise_error(sr, ERRSRV, ERRerror);
-		/* NOTREACHED */
-	}
-	ASSERT(0);
-	smbsr_raise_error(sr, ERRSRV, ERRerror);
-	/* NOTREACHED */
 
-	/*
-	 * Although smbsr_raise_error() doesn't return and the compiler is
-	 * told so in smb_kproto.h it still has a problem if it doesn't
-	 * find here a return instruction with a value.
-	 */
-	return (0);
+	smbsr_encode_result(sr, 2, 0, "blw", 2, off_ret, 0);
+	return (SDRC_NORMAL_REPLY);
 }

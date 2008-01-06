@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +205,8 @@ smb_rpc_initialize(struct smb_request *sr, char *pipe_name)
 	op = &sr->arg.open;
 	of = smb_ofile_open(sr->tid_tree, NULL, sr->smb_pid,
 	    op->desired_access, 0, op->share_access,
-	    SMB_FTYPE_MESG_PIPE, pipe_name, smb_rpc_fid(), &err);
+	    SMB_FTYPE_MESG_PIPE, pipe_name, smb_rpc_fid(),
+	    SMB_UNIQ_FID(), &err);
 	if (of == NULL)
 		return (err.status);
 
@@ -267,7 +268,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 
 	if (pipe_info->fid == 0) {
 		smb_rpc_exit(pipe_info);
-		smbsr_raise_cifs_error(sr, NT_STATUS_INVALID_HANDLE,
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 		    ERRDOS, ERROR_INVALID_HANDLE);
 		/* NOTREACHED */
 	}
@@ -286,8 +287,8 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 
 	if (rc != 0) {
 		smb_rpc_exit(pipe_info);
-		smbsr_raise_nt_error(sr,
-		    NT_STATUS_CLIENT_SERVER_PARAMETERS_INVALID);
+		smbsr_error(sr, NT_STATUS_CLIENT_SERVER_PARAMETERS_INVALID,
+		    0, 0);
 		/* NOTREACHED */
 	}
 
@@ -310,13 +311,8 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 		xa->rep_data_mb.max_bytes = mdrcnt;
 		MBC_ATTACH_MBUF(&xa->rep_data_mb, mhead);
 
-		if (sr->session->capabilities & CAP_STATUS32)
-			smbsr_setup_nt_status(sr, ERROR_SEVERITY_WARNING,
-			    NT_STATUS_BUFFER_OVERFLOW);
-		else {
-			sr->smb_rcls = ERRDOS;
-			sr->smb_err  = ERRmoredata;
-		}
+		smbsr_warn(sr, NT_STATUS_BUFFER_OVERFLOW,
+		    ERRDOS, ERROR_MORE_DATA);
 	} else {
 		/*
 		 * The client has provided enough buffer space, all

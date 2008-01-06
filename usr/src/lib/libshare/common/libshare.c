@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,15 +216,6 @@ sa_errorstr(int err)
 		break;
 	case SA_PATH_IS_PARENTDIR:
 		ret = dgettext(TEXT_DOMAIN, "path is parent of a share");
-		break;
-	case SA_KRB_KEYTAB_ERR:
-		ret = dgettext(TEXT_DOMAIN, "unable to remove the old keys"
-		    " from the Kerberos keytab. Please manually remove"
-		    " the old keys for your host principal prior to setting"
-		    " the ads_domain property");
-		break;
-	case SA_NO_SERVICE:
-		ret = dgettext(TEXT_DOMAIN, "service is not running");
 		break;
 	default:
 		(void) snprintf(errstr, sizeof (errstr),

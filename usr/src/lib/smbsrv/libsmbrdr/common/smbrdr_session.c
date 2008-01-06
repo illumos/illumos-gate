@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,70 +61,22 @@ static uint16_t smbrdr_ports[] = {
 
 static int smbrdr_nports = sizeof (smbrdr_ports) / sizeof (smbrdr_ports[0]);
 
-/*
- * Pointer to the PDC location interface.
- * To be set up by SMB when it loads.
- */
-static mlsvc_locate_pdc_t mlsvc_locate_pdc;
-
-/*
- * This is a temporary hack to stop the DC from closing a session
- * due to inactivity.
- */
-#define	MLSVC_SESSION_FORCE_KEEPALIVE	10
-
-/*
- * This is the session data table.
- *
- * The rwlock synchronizes access to the session table
- *
- * The mutex is to make session lookup and create atomic
- * so we don't end up with two sessions with the same
- * system.
- */
 static struct sdb_session session_table[MLSVC_DOMAIN_MAX];
 static mutex_t smbrdr_screate_mtx;
-static unsigned int session_id = 0;
+static uint32_t session_id = 0;
 
-static struct sdb_session *smbrdr_session_init(smb_ntdomain_t *di);
+static struct sdb_session *smbrdr_session_init(smb_ntdomain_t *);
 static int smbrdr_trnsprt_connect(struct sdb_session *, uint16_t);
-static int smbrdr_session_connect(smb_ntdomain_t *di);
-static int smbrdr_smb_negotiate(struct sdb_session *session);
-static int smbrdr_smb_echo(struct sdb_session *session);
-static void smbrdr_session_disconnect(struct sdb_session *session, int cleanup);
-static int smbrdr_locate_dc(char *domain);
+static int smbrdr_session_connect(smb_ntdomain_t *);
+static int smbrdr_smb_negotiate(struct sdb_session *);
+static int smbrdr_echo(struct sdb_session *);
+static void smbrdr_session_disconnect(struct sdb_session *, int);
+
 
 static void
 smbrdr_session_clear(struct sdb_session *session)
 {
 	bzero(session, sizeof (struct sdb_session) - sizeof (rwlock_t));
-}
-
-/*
- * mlsvc_install_pdc_cb
- *
- * Function to be called by SMB initialization code to set up a
- * callback to the PDC location interface.
- */
-void
-mlsvc_install_pdc_cb(mlsvc_locate_pdc_t locate_pdc_cb)
-{
-	mlsvc_locate_pdc = locate_pdc_cb;
-}
-
-/*
- * mlsvc_locate_domain_controller
- *
- * Locate a domain controller. Note that this may close an existing
- * connection to the current domain controller.
- */
-int
-mlsvc_locate_domain_controller(char *domain)
-{
-	if (mlsvc_locate_pdc)
-		return (mlsvc_locate_pdc(domain));
-
-	return (0);
 }
 
 /*
@@ -168,25 +120,17 @@ mlsvc_disconnect(char *server)
  *
  * Returns 0 on success, otherwise -1.
  */
+/*ARGSUSED*/
 int
-smbrdr_negotiate(char *domain_name)
+smbrdr_negotiate(char *domain)
 {
 	struct sdb_session *session = 0;
 	smb_ntdomain_t *di;
 	int retry = 1;
 	int res = 0;
 
-	if ((di = smb_getdomaininfo(0)) == 0) {
-		/*
-		 * Attempting to locate a domain controller
-		 * will shutdown an existing PDC connection.
-		 */
-		(void) smbrdr_locate_dc(domain_name);
-		di = smb_getdomaininfo(0);
-	}
-
-	if (di == 0) {
-		syslog(LOG_ERR, "smbrdr: negotiate (cannot access domain)");
+	if ((di = smb_getdomaininfo(0)) == NULL) {
+		syslog(LOG_DEBUG, "smbrdr_negotiate: cannot access domain");
 		return (-1);
 	}
 
@@ -198,7 +142,7 @@ smbrdr_negotiate(char *domain_name)
 	(void) mutex_lock(&smbrdr_screate_mtx);
 	while (retry > 0) {
 		session = smbrdr_session_lock(di->server, 0, SDB_SLCK_WRITE);
-		if (session  != 0) {
+		if (session != 0) {
 			if (nb_keep_alive(session->sock) == 0) {
 				/* session is good, use it */
 				smbrdr_session_unlock(session);
@@ -212,12 +156,8 @@ smbrdr_negotiate(char *domain_name)
 
 		if (smbrdr_session_connect(di) != 0) {
 			if (retry > 0) {
-				/* Do we really need to do this here? */
-				(void) smbrdr_locate_dc(domain_name);
 				di = smb_getdomaininfo(0);
-				if (di == 0) {
-					syslog(LOG_ERR, "smbrdr: negotiate"
-					    " (cannot access domain)");
+				if (di == NULL) {
 					res = -1;
 					break;
 				}
@@ -230,6 +170,8 @@ smbrdr_negotiate(char *domain_name)
 	}
 	(void) mutex_unlock(&smbrdr_screate_mtx);
 
+	if (di == NULL)
+		syslog(LOG_DEBUG, "smbrdr_negotiate: cannot access domain");
 	return (res);
 }
 
@@ -254,8 +196,8 @@ smbrdr_session_connect(smb_ntdomain_t *di)
 	 * be accessible until it's established otherwise another thread
 	 * might get access to a session which is not fully established.
 	 */
-	if ((session = smbrdr_session_init(di)) == 0) {
-		syslog(LOG_ERR, "smbrdr: session init failed");
+	if ((session = smbrdr_session_init(di)) == NULL) {
+		syslog(LOG_DEBUG, "smbrdr_session_init failed");
 		return (-1);
 	}
 
@@ -275,7 +217,7 @@ smbrdr_session_connect(smb_ntdomain_t *di)
 	if (rc < 0) {
 		smbrdr_session_clear(session);
 		smbrdr_session_unlock(session);
-		syslog(LOG_ERR, "smbrdr: NBT/TCP connect failed");
+		syslog(LOG_DEBUG, "smbrdr: connect failed");
 		return (-1);
 	}
 
@@ -283,7 +225,7 @@ smbrdr_session_connect(smb_ntdomain_t *di)
 		(void) close(session->sock);
 		smbrdr_session_clear(session);
 		smbrdr_session_unlock(session);
-		syslog(LOG_ERR, "smbrdr: SMB negotiate failed");
+		syslog(LOG_DEBUG, "smbrdr: negotiate failed");
 		return (-1);
 	}
 
@@ -313,11 +255,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	unsigned int cpid = oem_get_smb_cpid();
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
-		/*
-		 * We should never see descriptor 0 (stdin).
-		 */
-		syslog(LOG_ERR, "smbrdr: socket(%d) failed (%s)", sock,
-		    strerror(errno));
+		syslog(LOG_DEBUG, "smbrdr: socket failed: %s", strerror(errno));
 		return (-1);
 	}
 
@@ -327,7 +265,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	sin.sin_port = htons(port);
 
 	if ((rc = connect(sock, (struct sockaddr *)&sin, sizeof (sin))) < 0) {
-		syslog(LOG_ERR, "smbrdr: connect failed (%s)", strerror(errno));
+		syslog(LOG_DEBUG, "smbrdr: connect failed: %s",
+		    strerror(errno));
 		if (sock != 0)
 			(void) close(sock);
 		return (-1);
@@ -338,7 +277,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	rc = unicodestooems(server_name, unicode_server_name,
 	    SMB_PI_MAX_DOMAIN, cpid);
 	if (rc == 0) {
-		syslog(LOG_ERR, "smbrdr: unicode conversion failed");
+		syslog(LOG_DEBUG, "smbrdr: unicode conversion failed");
 		if (sock != 0)
 			(void) close(sock);
 		return (-1);
@@ -352,7 +291,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	 */
 	if (port == SSN_SRVC_TCP_PORT) {
 		if (smb_getnetbiosname(hostname, MAXHOSTNAMELEN) != 0) {
-			syslog(LOG_ERR, "smbrdr: no hostname");
+			syslog(LOG_DEBUG, "smbrdr: no hostname");
 			if (sock != 0)
 				(void) close(sock);
 			return (-1);
@@ -362,7 +301,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 		    server_name, sess->scope, hostname, sess->scope);
 
 		if (rc != 0) {
-			syslog(LOG_ERR,
+			syslog(LOG_DEBUG,
 			    "smbrdr: NBT session request to %s failed %d",
 			    server_name, rc);
 			if (sock != 0)
@@ -404,28 +343,19 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 
 	status = smbrdr_request_init(&srh, SMB_COM_NEGOTIATE, sess, 0, 0);
 
-	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "smbrdr: negotiate (%s)",
-		    xlate_nt_status(status));
+	if (status != NT_STATUS_SUCCESS)
 		return (-1);
-	}
 
 	mb = &srh.srh_mbuf;
-	rc = smb_msgbuf_encode(mb, "(wct)b (bcc)w (dialect)bs",
-	    0,			/* smb_wct */
-	    12,			/* smb_bcc */
-	    0x02,		/* dialect marker */
-	    "NT LM 0.12");	/* only dialect we care about */
-
+	rc = smb_msgbuf_encode(mb, "bwbs", 0, 12, 0x02, "NT LM 0.12");
 	if (rc <= 0) {
-		syslog(LOG_ERR, "smbrdr: negotiate (encode failed)");
 		smbrdr_handle_free(&srh);
 		return (-1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
 	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "smbrdr: negotiate (%s)",
+		syslog(LOG_DEBUG, "smbrdr: negotiate: %s",
 		    xlate_nt_status(status));
 		smbrdr_handle_free(&srh);
 		return (-1);
@@ -436,12 +366,11 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 	sess->challenge_len = 0;
 
 	rc = smb_msgbuf_decode(mb,
-	    "(wordcnt)1.(dialect)w(secm)b12.(skey)l(cap)l10.(klen)b2.",
+	    "1.(dialect)w(mode)b12.(key)l(cap)l10.(keylen)b2.",
 	    &dialect, &tmp_secmode, &sess->sesskey, &sess->remote_caps,
 	    &tmp_clen);
 
 	if (rc <= 0 || dialect != 0) {
-		syslog(LOG_ERR, "smbrdr: negotiate (response error)");
 		smbrdr_handle_free(&srh);
 		return (-1);
 	}
@@ -451,7 +380,6 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 	rc = smb_msgbuf_decode(mb, "#c",
 	    sess->challenge_len, sess->challenge_key);
 	if (rc <= 0) {
-		syslog(LOG_ERR, "smbrdr: negotiate (decode error)");
 		smbrdr_handle_free(&srh);
 		return (-1);
 	}
@@ -461,7 +389,7 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 	if ((sess->secmode & NEGOTIATE_SECURITY_SIGNATURES_REQUIRED) &&
 	    (sess->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED)) {
 		sess->sign_ctx.ssc_flags |= SMB_SCF_REQUIRED;
-		syslog(LOG_DEBUG, "smbrdr: %s requires signing",
+		syslog(LOG_DEBUG, "smbrdr: %s: signing required",
 		    sess->di.server);
 	}
 
@@ -482,12 +410,11 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 static struct sdb_session *
 smbrdr_session_init(smb_ntdomain_t *di)
 {
-	struct sdb_session *session = 0;
+	struct sdb_session *session = NULL;
 	int i;
-	char *p;
 
-	if (di == 0)
-		return (0);
+	if (di == NULL)
+		return (NULL);
 
 	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
@@ -499,10 +426,8 @@ smbrdr_session_init(smb_ntdomain_t *di)
 			(void) utf8_strupr(session->di.domain);
 			(void) utf8_strupr(session->di.server);
 
-			smb_config_rdlock();
-			p = smb_config_getstr(SMB_CI_NBSCOPE);
-			(void) strlcpy(session->scope, p, SMB_PI_MAX_SCOPE);
-			smb_config_unlock();
+			(void) smb_config_getstr(SMB_CI_NBSCOPE, session->scope,
+			    sizeof (session->scope));
 
 			(void) strlcpy(session->native_os,
 			    "Solaris", SMB_PI_MAX_NATIVE_OS);
@@ -530,8 +455,8 @@ smbrdr_session_init(smb_ntdomain_t *di)
 		(void) rw_unlock(&session->rwl);
 	}
 
-	syslog(LOG_WARNING, "smbrdr: no session available");
-	return (0);
+	syslog(LOG_DEBUG, "smbrdr: no session available");
+	return (NULL);
 }
 
 /*
@@ -550,10 +475,8 @@ smbrdr_session_disconnect(struct sdb_session *session, int cleanup)
 {
 	int state;
 
-	if (session == 0) {
-		syslog(LOG_ERR, "smbrdr: (disconnect) null session");
+	if (session == NULL)
 		return;
-	}
 
 	state = session->state;
 	if ((state != SDB_SSTATE_DISCONNECTING) &&
@@ -567,7 +490,7 @@ smbrdr_session_disconnect(struct sdb_session *session, int cleanup)
 			 */
 			session->state = (state == SDB_SSTATE_STALE)
 			    ? SDB_SSTATE_CLEANING : SDB_SSTATE_DISCONNECTING;
-			(void) smbrdr_smb_logoff(&session->logon);
+			(void) smbrdr_logoffx(&session->logon);
 			nb_close(session->sock);
 			smbrdr_session_clear(session);
 		}
@@ -605,10 +528,8 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 	struct sdb_session *session;
 	int i;
 
-	if (server == 0) {
-		syslog(LOG_ERR, "smbrdr: (lookup) no server specified");
-		return (0);
-	}
+	if (server == NULL)
+		return (NULL);
 
 	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
@@ -624,7 +545,7 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 					return (session);
 
 				(void) rw_unlock(&session->rwl);
-				return (0);
+				return (NULL);
 			}
 			return (session);
 		}
@@ -632,7 +553,7 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 		(void) rw_unlock(&session->rwl);
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -649,13 +570,11 @@ mlsvc_session_native_values(int fid, int *remote_os,
 	struct sdb_netuse *netuse;
 	struct sdb_ofile *ofile;
 
-	if (remote_os == 0 || remote_lm == 0) {
-		syslog(LOG_ERR, "mlsvc_session_native_values: null");
+	if (remote_os == NULL || remote_lm == NULL)
 		return (-1);
-	}
 
 	if ((ofile = smbrdr_ofile_get(fid)) == 0) {
-		syslog(LOG_ERR,
+		syslog(LOG_DEBUG,
 		    "mlsvc_session_native_values: unknown file (%d)", fid);
 		return (-1);
 	}
@@ -669,96 +588,6 @@ mlsvc_session_native_values(int fid, int *remote_os,
 		*pdc_type = session->pdc_type;
 	smbrdr_ofile_put(ofile);
 	return (0);
-}
-
-/*
- * smbrdr_disconnect_sessions
- *
- * Disconnects/cleanups all the sessions
- */
-static void
-smbrdr_disconnect_sessions(int cleanup)
-{
-	struct sdb_session *session;
-	int i;
-
-	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
-		session = &session_table[i];
-		(void) rw_wrlock(&session->rwl);
-		smbrdr_session_disconnect(&session_table[i], cleanup);
-		(void) rw_unlock(&session->rwl);
-	}
-}
-
-
-/*
- * mlsvc_check_sessions
- *
- * This function should be run in an independent thread. At the time of
- * writing it is called periodically from an infinite loop in the start
- * up thread once initialization is complete. It sends a NetBIOS keep-
- * alive message on each active session and handles cleanup if a session
- * is closed from the remote end. Testing demonstrated that the domain
- * controller will close a session after 15 minutes of inactivity. Note
- * that neither NetBIOS keep-alive nor SMB echo is deemed as activity
- * in this case, however, RPC requests appear to reset the timeout and
- * keep the session open. Note that the NetBIOS request does stop the
- * remote NetBIOS layer from timing out the connection.
- */
-void
-mlsvc_check_sessions(void)
-{
-	static int session_keep_alive;
-	struct sdb_session *session;
-	smb_ntdomain_t di;
-	int i;
-
-	++session_keep_alive;
-
-	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
-		session = &session_table[i];
-
-		(void) rw_wrlock(&session->rwl);
-
-		if (session->state < SDB_SSTATE_CONNECTED) {
-			(void) rw_unlock(&session->rwl);
-			continue;
-		}
-
-		/*
-		 * NetBIOS is only used on with port 139. The keep alive
-		 * is not relevant over NetBIOS-less SMB over port 445.
-		 * This is just to see if the socket is still alive.
-		 */
-		if (session->port == SSN_SRVC_TCP_PORT) {
-			if (nb_keep_alive(session->sock) != 0) {
-				session->state = SDB_SSTATE_STALE;
-				(void) rw_unlock(&session->rwl);
-				continue;
-			}
-		}
-
-		if (session_keep_alive >= MLSVC_SESSION_FORCE_KEEPALIVE) {
-			if (smbrdr_smb_echo(session) != 0) {
-				syslog(LOG_WARNING,
-				    "smbrdr: monitor[%s] cannot contact %s",
-				    session->di.domain, session->di.server);
-				(void) memcpy(&di, &session->di,
-				    sizeof (smb_ntdomain_t));
-				session->state = SDB_SSTATE_STALE;
-				(void) rw_unlock(&session->rwl);
-				if (smb_getdomaininfo(0) == 0)
-					(void) smbrdr_locate_dc(di.domain);
-			}
-		} else
-			(void) rw_unlock(&session->rwl);
-	}
-
-	if (session_keep_alive >= MLSVC_SESSION_FORCE_KEEPALIVE) {
-		session_keep_alive = 0;
-		/* cleanup */
-		smbrdr_disconnect_sessions(1);
-	}
 }
 
 /*
@@ -812,7 +641,7 @@ mlsvc_echo(char *server)
 	if ((session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE)) == 0)
 		return (1);
 
-	if (smbrdr_smb_echo(session) != 0) {
+	if (smbrdr_echo(session) != 0) {
 		session->state = SDB_SSTATE_STALE;
 		res = -1;
 	}
@@ -822,7 +651,7 @@ mlsvc_echo(char *server)
 }
 
 /*
- * smbrdr_smb_echo
+ * smbrdr_echo
  *
  * This request can be used to test the connection to the server. The
  * server should echo the data sent. The server should ignore the tid
@@ -832,7 +661,7 @@ mlsvc_echo(char *server)
  * Return 0 on success. Otherwise return a -ve error code.
  */
 static int
-smbrdr_smb_echo(struct sdb_session *session)
+smbrdr_echo(struct sdb_session *session)
 {
 	static char *echo_str = "smbrdr";
 	smbrdr_handle_t srh;
@@ -847,43 +676,21 @@ smbrdr_smb_echo(struct sdb_session *session)
 	}
 
 	status = smbrdr_request_init(&srh, SMB_COM_ECHO, session, 0, 0);
-
-	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrEcho: %s", xlate_nt_status(status));
+	if (status != NT_STATUS_SUCCESS)
 		return (-1);
-	}
 
 	rc = smb_msgbuf_encode(&srh.srh_mbuf, "bwws", 1, 1,
 	    strlen(echo_str), echo_str);
 	if (rc <= 0) {
-		syslog(LOG_ERR, "SmbrdrEcho: encode failed");
 		smbrdr_handle_free(&srh);
 		return (-1);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 10);
-	if (status != NT_STATUS_SUCCESS) {
-		syslog(LOG_ERR, "SmbrdrEcho: %s", xlate_nt_status(status));
-		rc = -1;
-	} else {
-		rc = 0;
-	}
-
 	smbrdr_handle_free(&srh);
-	return (rc);
-}
 
-/*
- * smbrdr_locate_dc
- *
- * Locate a domain controller. Note that this may close an existing
- * connection to the current domain controller.
- */
-static int
-smbrdr_locate_dc(char *domain)
-{
-	if (mlsvc_locate_pdc)
-		return (mlsvc_locate_pdc(domain));
+	if (status != NT_STATUS_SUCCESS)
+		return (-1);
 
 	return (0);
 }

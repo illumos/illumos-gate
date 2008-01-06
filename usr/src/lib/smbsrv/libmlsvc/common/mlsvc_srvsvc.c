@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,21 +98,6 @@ static mlrpc_service_t srvsvc_service = {
 	&TYPEINFO(srvsvc_interface),	/* interface ti */
 	srvsvc_stub_table		/* stub_table */
 };
-
-/*
- * srvsvc_fix_comment
- *
- * The parser sometimes has problems with empty strings so we
- * need to ensure that the comment field has something in it.
- */
-static inline char *
-srvsvc_fix_comment(char *original, char *alternative)
-{
-	if (original == 0 || strlen(original) == 0)
-		return (alternative);
-
-	return (original);
-}
 
 /*
  * srvsvc_share_mkpath
@@ -516,12 +501,10 @@ srvsvc_s_NetShareSetInfo(void *arg, struct mlrpc_xaction *mxa)
 	    sizeof (DWORD));
 	param->parm_err = 0;
 
-	smb_config_rdlock();
-	if (smb_config_getyorn(SMB_CI_SRVSVC_SHRSET_ENABLE) != 0)
+	if (!smb_config_getbool(SMB_CI_SRVSVC_SHRSET_ENABLE))
 		param->status = ERROR_SUCCESS;
 	else
 		param->status = ERROR_ACCESS_DENIED;
-	smb_config_unlock();
 
 	return (MLRPC_DRC_OK);
 }
@@ -805,7 +788,7 @@ srvsvc_s_NetServerGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mslm_SERVER_INFO_100 *info100;
 	struct mslm_SERVER_INFO_101 *info101;
 	struct mslm_SERVER_INFO_102 *info102;
-	char *sys_comment;
+	char sys_comment[SMB_PI_MAX_COMMENT];
 	char hostname[MAXHOSTNAMELEN];
 
 	if (smb_gethostname(hostname, MAXHOSTNAMELEN, 1) != 0) {
@@ -814,10 +797,10 @@ netservergetinfo_no_memory:
 		return (ERROR_NOT_ENOUGH_MEMORY);
 	}
 
-	smb_config_rdlock();
-	sys_comment = smb_config_getstr(SMB_CI_SYS_CMNT);
-	sys_comment = srvsvc_fix_comment(sys_comment, " ");
-	smb_config_unlock();
+	(void) smb_config_getstr(SMB_CI_SYS_CMNT, sys_comment,
+	    sizeof (sys_comment));
+	if (*sys_comment == '\0')
+		(void) strcpy(sys_comment, " ");
 
 	switch (param->level) {
 	case 100:

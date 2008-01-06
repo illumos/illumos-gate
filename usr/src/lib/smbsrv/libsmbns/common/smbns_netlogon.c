@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -478,27 +478,22 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 	uint32_t prefer_ipaddr = 0;
 	char ipstr[16];
 	char srcip[16];
-	char *p;
 	int rc;
 
 	(void) inet_ntop(AF_INET, (const void *)(&src_ipaddr),
 	    srcip, sizeof (srcip));
 
-	smb_config_rdlock();
-	if ((p = smb_config_get(SMB_CI_DOMAIN_SRV)) != 0) {
-		rc = inet_pton(AF_INET, p, &prefer_ipaddr);
+	rc = smb_config_getstr(SMB_CI_DOMAIN_SRV, ipstr, sizeof (ipstr));
+	if (rc == SMBD_SMF_OK) {
+		rc = inet_pton(AF_INET, ipstr, &prefer_ipaddr);
 		if (rc == 0)
 			prefer_ipaddr = 0;
 
 		if (!initialized) {
-			(void) inet_ntop(AF_INET,
-			    (const void *)(&prefer_ipaddr),
-			    ipstr, sizeof (ipstr));
 			syslog(LOG_DEBUG, "SMB DC Preference: %s", ipstr);
 			initialized = 1;
 		}
 	}
-	smb_config_unlock();
 
 	syslog(LOG_DEBUG, "DC Offer [%s]: %s [%s]",
 	    resource_domain, src_name, srcip);
@@ -553,49 +548,35 @@ better_dc(uint32_t cur_ip, uint32_t new_ip)
  * best way. The IP address isn't set up in the ADS_HANDLE so we need to
  * make the ads_find_host call. This will only succeed if ADS is enabled.
  *
+ * Parameter:
+ *    nbt_domain - NETBIOS name of the domain
+ *
  * Returns 1 if a domain controller was found and its name and IP address
  * have been updated. Otherwise returns 0.
  */
 int
-msdcs_lookup_ads(void)
+msdcs_lookup_ads(char *nbt_domain)
 {
 	ADS_HOST_INFO *hinfo = 0;
 	int ads_port = 0;
 	char ads_domain[MAXHOSTNAMELEN];
 	char site_service[MAXHOSTNAMELEN];
 	char service[MAXHOSTNAMELEN];
-	char *site;
+	char site[MAXHOSTNAMELEN];
 	char *p;
 	char *ip_addr;
 	struct in_addr ns_list[MAXNS];
 	int i, cnt, go_next;
 
-	if (smb_getdomainname(ads_domain, MAXHOSTNAMELEN) != 0)
+	if (!nbt_domain)
 		return (0);
 
-	/*
-	 * Initialize the NT domain name.
-	 */
-	(void) strlcpy(resource_domain, ads_domain, SMB_PI_MAX_DOMAIN);
-	if ((p = strchr(resource_domain, '.')) != 0)
-		*p = '\0';
-
-	smb_config_rdlock();
-	if (smb_config_getyorn(SMB_CI_MSDCS_DISABLE) != 0) {
-		/*
-		 * The system administrator doesn't
-		 * want to use ADS to find the PDC.
-		 */
-		syslog(LOG_DEBUG, "msdcsLookupADS: disabled");
-		smb_config_unlock();
+	(void) strlcpy(resource_domain, nbt_domain, SMB_PI_MAX_DOMAIN);
+	if (smb_resolve_fqdn(nbt_domain, ads_domain, MAXHOSTNAMELEN) != 1)
 		return (0);
-	}
-	site = smb_config_getstr(SMB_CI_ADS_SITE);
-	smb_config_unlock();
 
-	syslog(LOG_DEBUG, "msdcsLookupADS %s, MAXHOSTNAMELEN=%d",
-	    ads_domain, MAXHOSTNAMELEN);
-	if (site && *site != 0) {
+	(void) smb_config_getstr(SMB_CI_ADS_SITE, site, sizeof (site));
+	if (*site != '\0') {
 		(void) snprintf(site_service, MAXHOSTNAMELEN,
 		    "_ldap._tcp.%s._sites.dc._msdcs.%s",
 		    site, ads_domain);

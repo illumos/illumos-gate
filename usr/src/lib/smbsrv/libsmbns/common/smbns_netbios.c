@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,8 @@ smb_netbios_shutdown(void)
 	nb_status.state = NETBIOS_SHUT_DOWN;
 }
 
-void
-smb_netbios_start()
+int
+smb_netbios_start(void)
 {
 	int rc;
 	mutex_t *mp;
@@ -84,13 +84,12 @@ smb_netbios_start()
 	rc = pthread_create(&smb_nbns_thr, 0,
 	    smb_netbios_name_service_daemon, 0);
 	if (rc)
-		return;
+		return (-1);
 
 	mp = &nb_status.mtx;
 	cvp = &nb_status.cv;
 
 	(void) mutex_lock(mp);
-
 	while (!(nb_status.state & (NETBIOS_NAME_SVC_RUNNING |
 	    NETBIOS_NAME_SVC_FAILED))) {
 		(void) cond_wait(cvp, mp);
@@ -98,71 +97,62 @@ smb_netbios_start()
 
 	if (nb_status.state & NETBIOS_NAME_SVC_FAILED) {
 		(void) mutex_unlock(mp);
-		(void) fprintf(stderr,
-		    "smbd: Netbios Name service startup failed!");
 		smb_netbios_shutdown();
-		return;
+		return (-1);
 	}
 	(void) mutex_unlock(mp);
 
-	(void) fprintf(stderr, "smbd: Netbios Name service started.");
 	smb_netbios_name_config();
 
 	/* Startup Netbios datagram service; port 138 */
 	rc = pthread_create(&smb_nbds_thr, 0,
 	    smb_netbios_datagram_service_daemon, 0);
-	if (rc == 0) {
-		(void) mutex_lock(mp);
-		while (!(nb_status.state & (NETBIOS_DATAGRAM_SVC_RUNNING |
-		    NETBIOS_DATAGRAM_SVC_FAILED))) {
-			(void) cond_wait(cvp, mp);
-		}
-
-		if (nb_status.state & NETBIOS_DATAGRAM_SVC_FAILED) {
-			(void) mutex_unlock(mp);
-			(void) fprintf(stderr, "smbd: Netbios Datagram service "
-			    "startup failed!");
-			smb_netbios_shutdown();
-			return;
-		}
-		(void) mutex_unlock(mp);
-	} else {
+	if (rc != 0) {
 		smb_netbios_shutdown();
-		return;
+		return (-1);
 	}
 
-	(void) fprintf(stderr, "smbd: Netbios Datagram service started.");
+	(void) mutex_lock(mp);
+	while (!(nb_status.state & (NETBIOS_DATAGRAM_SVC_RUNNING |
+	    NETBIOS_DATAGRAM_SVC_FAILED))) {
+		(void) cond_wait(cvp, mp);
+	}
+
+	if (nb_status.state & NETBIOS_DATAGRAM_SVC_FAILED) {
+		(void) mutex_unlock(mp);
+		smb_netbios_shutdown();
+		return (-1);
+	}
+	(void) mutex_unlock(mp);
 
 	/* Startup Netbios browser service */
 	rc = pthread_create(&smb_nbbs_thr, 0, smb_browser_daemon, 0);
 	if (rc) {
 		smb_netbios_shutdown();
-		return;
+		return (-1);
 	}
-
-	(void) fprintf(stderr, "smbd: Netbios Browser client started.");
 
 	/* Startup Our internal, 1 second resolution, timer */
 	rc = pthread_create(&smb_nbts_thr, 0, smb_netbios_timer, 0);
-	if (rc == 0) {
-		(void) mutex_lock(mp);
-		while (!(nb_status.state & (NETBIOS_TIMER_RUNNING |
-		    NETBIOS_TIMER_FAILED))) {
-			(void) cond_wait(cvp, mp);
-		}
-
-		if (nb_status.state & NETBIOS_TIMER_FAILED) {
-			(void) mutex_unlock(mp);
-			smb_netbios_shutdown();
-			return;
-		}
-		(void) mutex_unlock(mp);
-	} else {
+	if (rc != 0) {
 		smb_netbios_shutdown();
-		return;
+		return (-1);
 	}
 
-	(void) fprintf(stderr, "smbd: Netbios Timer service started.");
+	(void) mutex_lock(mp);
+	while (!(nb_status.state & (NETBIOS_TIMER_RUNNING |
+	    NETBIOS_TIMER_FAILED))) {
+		(void) cond_wait(cvp, mp);
+	}
+
+	if (nb_status.state & NETBIOS_TIMER_FAILED) {
+		(void) mutex_unlock(mp);
+		smb_netbios_shutdown();
+		return (-1);
+	}
+	(void) mutex_unlock(mp);
+
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -253,10 +243,8 @@ smb_encode_netbios_name(unsigned char *name, char suffix, unsigned char *scope,
 	dest->name[NETBIOS_NAME_SZ - 1] = suffix;
 
 	if (scope == NULL) {
-		smb_config_rdlock();
-		(void) strlcpy((char *)dest->scope,
-		    smb_config_getstr(SMB_CI_NBSCOPE), NETBIOS_DOMAIN_NAME_MAX);
-		smb_config_unlock();
+		(void) smb_config_getstr(SMB_CI_NBSCOPE, (char *)dest->scope,
+		    NETBIOS_DOMAIN_NAME_MAX);
 	} else {
 		(void) strlcpy((char *)dest->scope, (const char *)scope,
 		    NETBIOS_DOMAIN_NAME_MAX);

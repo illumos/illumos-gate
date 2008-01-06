@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@
  * UUID (Universal Unique IDentifier)
  */
 /* (X/Open CAE Spec Appendix A) */
-struct mlrpc_uuid_dce {
+struct ndr_dce_uuid {
 	DWORD		time_low;
 	WORD		time_mid;
 	WORD		time_hi_and_version;
@@ -55,13 +55,13 @@ struct mlrpc_uuid_dce {
 	BYTE		node[6];
 };
 
-struct mlrpc_uuid {
+struct ndr_uuid {
 	DWORD		data1;
 	WORD		data2;
 	WORD		data3;
 	BYTE		data4[8];
 };
-typedef struct mlrpc_uuid	mlrpc_uuid_t;
+typedef struct ndr_uuid ndr_uuid_t;
 
 /*
  * Representation label -- needed for RPC header
@@ -171,7 +171,7 @@ typedef WORD	mlrpc_p_context_id_t;
 
 _NO_REORDER_
 struct mlrpc_p_syntax_id {
-	mlrpc_uuid_t	if_uuid;
+	ndr_uuid_t	if_uuid;
 	DWORD		if_version;
 };
 typedef struct mlrpc_p_syntax_id	mlrpc_p_syntax_id_t;
@@ -182,7 +182,7 @@ struct mlrpc_p_cont_elem {
 	BYTE			n_transfer_syn;
 	BYTE			_reserved;
 	mlrpc_p_syntax_id_t	abstract_syntax;
-  /*SIZE_IS(n_transfer_syn)*/
+    /*SIZE_IS(n_transfer_syn)*/
 	mlrpc_p_syntax_id_t	transfer_syntaxes[1];
 };
 typedef struct mlrpc_p_cont_elem	mlrpc_p_cont_elem_t;
@@ -193,7 +193,7 @@ struct mlrpc_p_cont_list {
 	BYTE		n_context_elem;
 	BYTE		_reserved;
 	WORD		_reserved2;
-  /*SIZE_IS(n_context_elem)*/
+    /*SIZE_IS(n_context_elem)*/
 	mlrpc_p_cont_elem_t p_cont_elem[1];
 };
 typedef struct mlrpc_p_cont_list	mlrpc_p_cont_list_t;
@@ -226,7 +226,7 @@ struct mlrpc_p_result_list {
 	BYTE		n_results;
 	BYTE		reserved;
 	WORD		reserved2;
-  /*SIZE_IS(n_results)*/
+    /*SIZE_IS(n_results)*/
 	mlrpc_p_result_t p_results[1];
 };
 typedef struct mlrpc_p_result_list	mlrpc_p_result_list_t;
@@ -236,10 +236,10 @@ EXTERNTYPEINFO(mlrpc_p_result_list)
 _NO_REORDER_
 struct mlrpc_port_any {
 	WORD		length;		/* always 18 */
-  /*SIZE_IS(length)*/
+    /*SIZE_IS(length)*/
 	BYTE		port_spec[MLRPC_PORT_ANY_MAX_PORT_SPEC];
-						/* \PIPE\ntsvcs */
-  /* We cheat by using 18, and pad on the right with zeroes */
+					/* \PIPE\ntsvcs */
+	/* We cheat by using 18, and pad on the right with zeroes */
 };
 typedef struct mlrpc_port_any		mlrpc_port_any_t;
 EXTERNTYPEINFO(mlrpc_port_any)
@@ -377,15 +377,15 @@ _NO_REORDER_
 struct mlrpcconn_request_hdr {
 	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
 
-  /* needed for request, response, or fault */
+	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
 	mlrpc_p_context_id_t
 			p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
-    /* optional field if PFC_OBJECT_UUID, not present */
-	/* mlrpc_uuid_t	object; */
+	/* optional field if PFC_OBJECT_UUID, not present */
+	/* ndr_uuid_t	object; */
 
 	/* stub-data, 8-octet aligned */ /* 24:nn */
 	/* nn = frag_len - sizeof(common_header) - auth_len */
@@ -399,19 +399,19 @@ _NO_REORDER_
 struct mlrpcconn_request_hdr_with_object {
 	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
 
-  /* needed for request, response, or fault */
+	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
 	mlrpc_p_context_id_t
 			p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
-    /* optional field if PFC_OBJECT_UUID, is present */
-	mlrpc_uuid_t	object;		/* 24:16 object UUID, unknown purpose*/
+	/* optional field if PFC_OBJECT_UUID, is present */
+	ndr_uuid_t	object;		/* 24:16 object UUID, unknown purpose*/
 
 	/* stub-data, 8-octet aligned */ /* 28:nn */
 	/* nn = frag_len - sizeof(common_header) - auth_len */
-	/* nn -= sizeof(mlrpc_uuid_t); */
+	/* nn -= sizeof(ndr_uuid_t); */
 
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */
@@ -435,12 +435,12 @@ _NO_REORDER_
 struct mlrpcconn_response_hdr {
 	mlrpcconn_common_header_t	common_hdr; /* 00:16 (see above) */
 
-  /* needed for request, response, or fault */
+	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
 	mlrpc_p_context_id_t
 			p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
-  /* needed for response or fault */
+	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
 	BYTE		reserved;	/* 23:01 mbz */
 
@@ -467,17 +467,17 @@ struct mlrpcconn_fault_hdr {
 	mlrpc_p_context_id_t
 			p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
-  /* needed for response or fault */
+	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
 	BYTE		reserved;	/* 23:01 mbz */
 
-  /* fault code */
+	/* fault code */
 	DWORD		status;		/* 24:04 run-time fault code or 0 */
 
-  /* pad to 8-byte alignment */
+	/* pad to 8-byte alignment */
 	BYTE		reserved2[4];	/* 28:04 must-be-zero */
 
-  /* stub-data here if status==0. We do not use this mode. */
+	/* stub-data here if status==0. We do not use this mode. */
 
 	/* optional authentication verifier iff auth_length != 0 */
 	/* auth_verifier_co_t	auth_verifier; */

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,18 +31,20 @@ SUNWprivate {
 	ads_add_share;
 	ads_build_unc_name;
 	ads_close;
-	ads_domain_change_notify_handler;
+	ads_domain_change_cleanup;
+	ads_init;
 	ads_join;
 	ads_lookup_share;
 	ads_open;
 	ads_publish_share;
+	ads_refresh;
 	ads_remove_share;
+	dns_msgid_init;
 	dyndns_clear_rev_zone;
 	dyndns_update;
 	msdcs_lookup_ads;
 	smb_browser_config;
 	smb_get_nameservers;
-	smb_get_next_resid;
 	smb_kinit;
 	smb_netbios_name_reconfig;
 	smb_netbios_start;
@@ -75,8 +77,6 @@ SUNWprivate {
 	smb_nic_status;
 	smb_nic_unlock;
 	smb_nic_validate_ip_address;
-	smb_resolver_close;
-	smb_resolver_init;
     local:
 	*;
 };
