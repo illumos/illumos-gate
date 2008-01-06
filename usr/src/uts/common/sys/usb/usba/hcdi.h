@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,12 +139,13 @@ typedef struct usba_hcdi_ops {
 		usb_flags_t		usb_flags);
 
 	/* utility isoc functions */
-	usb_frame_number_t
-		(*usba_hcdi_get_current_frame_number)(
-		usba_device_t		*usba_device);
+	int	(*usba_hcdi_get_current_frame_number)(
+		usba_device_t		*usba_device,
+		usb_frame_number_t	*frame_number);
 
-	uint_t	(*usba_hcdi_get_max_isoc_pkts)(
-		usba_device_t		*usba_device);
+	int	(*usba_hcdi_get_max_isoc_pkts)(
+		usba_device_t		*usba_device,
+		uint_t			*max_isoc_pkts_per_request);
 
 	/*
 	 * Initialize OBP support for input

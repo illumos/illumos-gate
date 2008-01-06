@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,8 +123,8 @@ typedef struct uhci_state {
 
 	uint_t			uhci_dma_addr_bind_flag;
 
-	/* Flag of uhci controller initialization */
-	boolean_t		uhci_ctlr_init_flag;
+	/* UHCI Host Controller Software State information */
+	uint_t			uhci_hc_soft_state;
 
 	hc_regs_t		*uhci_regsp;		/* Host ctlr regs */
 	ddi_acc_handle_t	uhci_regs_handle;	/* Reg handle */
@@ -540,6 +540,36 @@ typedef struct uhci_intrs_stats {
 #define	UHCI_PERIODIC_ENDPOINT(ept) \
 	(((((ept)->bmAttributes) & USB_EP_ATTR_MASK) == USB_EP_ATTR_INTR) || \
 	((((ept)->bmAttributes) & USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH))
+
+/*
+ * Host Contoller Software States
+ *
+ * UHCI_CTLR_INIT_STATE:
+ *      The host controller soft state will be set to this during the
+ *      uhci_attach.
+ *
+ * UHCI_CTLR_SUSPEND_STATE:
+ *      The host controller soft state will be set to this during the
+ *      uhci_cpr_suspend.
+ *
+ * UHCI_CTLR_OPERATIONAL_STATE:
+ *      The host controller soft state will be set to this after moving
+ *      host controller to operational state and host controller start
+ *      generating SOF successfully.
+ *
+ * UHCI_CTLR_ERROR_STATE:
+ *      The host controller soft state will be set to this during the
+ *      hardware error or no SOF conditions.
+ *
+ *      Under non-operational state, only pipe stop polling, pipe reset
+ *      and pipe close are allowed. But all other entry points like pipe
+ *      open, get/set pipe policy, cotrol send/receive, bulk send/receive
+ *      isoch send/receive, start polling etc. will fail.
+ */
+#define	UHCI_CTLR_INIT_STATE		0	/* Initilization state */
+#define	UHCI_CTLR_SUSPEND_STATE		1	/* Suspend state */
+#define	UHCI_CTLR_OPERATIONAL_STATE	2	/* Operational state */
+#define	UHCI_CTLR_ERROR_STATE		3	/* Hardware error */
 
 /*
  * Debug printing Masks

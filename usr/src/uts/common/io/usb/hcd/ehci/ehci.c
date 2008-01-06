@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -593,6 +593,13 @@ ehci_intr(caddr_t arg1, caddr_t arg2)
 	/* Get the ehci global mutex */
 	mutex_enter(&ehcip->ehci_int_mutex);
 
+	/* Any interrupt is not handled for the suspended device. */
+	if (ehcip->ehci_hc_soft_state == EHCI_CTLR_SUSPEND_STATE) {
+		mutex_exit(&ehcip->ehci_int_mutex);
+
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	/*
 	 * Now process the actual ehci interrupt events  that caused
 	 * invocation of this ehci interrupt handler.
@@ -744,11 +751,11 @@ ehci_hcdi_pipe_open(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*epdt = &ph->p_ep;
 	int			rval, error = USB_SUCCESS;
 	int			kmflag = (flags & USB_FLAGS_SLEEP) ?
-				KM_SLEEP : KM_NOSLEEP;
+	    KM_SLEEP : KM_NOSLEEP;
 	uchar_t			smask = 0;
 	uchar_t			cmask = 0;
 	uint_t			pnode = 0;
@@ -969,7 +976,7 @@ ehci_hcdi_pipe_close(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
@@ -1052,7 +1059,7 @@ ehci_hcdi_pipe_reset(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	int			error = USB_SUCCESS;
 
@@ -1090,7 +1097,7 @@ ehci_hcdi_pipe_ctrl_xfer(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	int			rval;
 	int			error = USB_SUCCESS;
@@ -1164,7 +1171,7 @@ ehci_hcdi_bulk_transfer_size(
 	size_t		*size)
 {
 	ehci_state_t	*ehcip = ehci_obtain_state(
-			    usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,
@@ -1201,7 +1208,7 @@ ehci_hcdi_pipe_bulk_xfer(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	int			rval, error = USB_SUCCESS;
 	ehci_trans_wrapper_t	*tw;
@@ -1259,7 +1266,7 @@ ehci_hcdi_pipe_intr_xfer(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			pipe_dir, rval, error = USB_SUCCESS;
 	ehci_trans_wrapper_t	*tw;
 
@@ -1309,7 +1316,7 @@ ehci_hcdi_pipe_stop_intr_polling(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			error = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,
@@ -1329,14 +1336,16 @@ ehci_hcdi_pipe_stop_intr_polling(
 /*
  * ehci_hcdi_get_current_frame_number:
  *
- * Return the current usb frame number
+ * Get the current usb frame number.
+ * Return whether the request is handled successfully.
  */
-usb_frame_number_t
-ehci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
+int
+ehci_hcdi_get_current_frame_number(
+	usba_device_t		*usba_device,
+	usb_frame_number_t	*frame_number)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-		usba_device->usb_root_hub_dip);
-	usb_frame_number_t	frame_number;
+	    usba_device->usb_root_hub_dip);
 	int			rval;
 
 	ehcip = ehci_obtain_state(usba_device->usb_root_hub_dip);
@@ -1350,7 +1359,7 @@ ehci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
 		return (rval);
 	}
 
-	frame_number = ehci_get_current_frame_number(ehcip);
+	*frame_number = ehci_get_current_frame_number(ehcip);
 
 	mutex_exit(&ehcip->ehci_int_mutex);
 
@@ -1358,21 +1367,23 @@ ehci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
 	    "ehci_hcdi_get_current_frame_number: "
 	    "Current frame number 0x%llx", frame_number);
 
-	return (frame_number);
+	return (rval);
 }
 
 
 /*
  * ehci_hcdi_get_max_isoc_pkts:
  *
- * Return maximum isochronous packets per usb isochronous request
+ * Get maximum isochronous packets per usb isochronous request.
+ * Return whether the request is handled successfully.
  */
-uint_t
-ehci_hcdi_get_max_isoc_pkts(usba_device_t	*usba_device)
+int
+ehci_hcdi_get_max_isoc_pkts(
+	usba_device_t	*usba_device,
+	uint_t		*max_isoc_pkts_per_request)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-		usba_device->usb_root_hub_dip);
-	uint_t			max_isoc_pkts_per_request;
+	    usba_device->usb_root_hub_dip);
 	int			rval;
 
 	mutex_enter(&ehcip->ehci_int_mutex);
@@ -1384,14 +1395,14 @@ ehci_hcdi_get_max_isoc_pkts(usba_device_t	*usba_device)
 		return (rval);
 	}
 
-	max_isoc_pkts_per_request = EHCI_MAX_ISOC_PKTS_PER_XFER;
+	*max_isoc_pkts_per_request = EHCI_MAX_ISOC_PKTS_PER_XFER;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,
 	    "ehci_hcdi_get_max_isoc_pkts: maximum isochronous"
 	    "packets per usb isochronous request = 0x%x",
 	    max_isoc_pkts_per_request);
 
-	return (max_isoc_pkts_per_request);
+	return (rval);
 }
 
 
@@ -1405,7 +1416,7 @@ ehci_hcdi_pipe_isoc_xfer(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 
 	int			pipe_dir, rval;
 	ehci_isoc_xwrapper_t	*itw;
@@ -1457,7 +1468,7 @@ ehci_hcdi_pipe_stop_isoc_polling(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	int			rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,9 +59,10 @@ int	uhci_hcdi_pipe_stop_intr_polling(
 		    usba_pipe_handle_data_t *pipe_handle, usb_flags_t flags);
 int	uhci_hcdi_pipe_stop_isoc_polling(usba_pipe_handle_data_t *ph,
 		    usb_flags_t flags);
-usb_frame_number_t uhci_hcdi_get_current_frame_number(
-		    usba_device_t *usba_device);
-uint_t	uhci_hcdi_get_max_isoc_pkts(usba_device_t *usba_device);
+int	uhci_hcdi_get_current_frame_number(usba_device_t *usba_device,
+		    usb_frame_number_t	*frame_number);
+int	uhci_hcdi_get_max_isoc_pkts(usba_device_t *usba_device,
+		    uint_t	*max_isoc_pkts_per_request);
 
 /* Root hub prototypes */
 int	uhci_handle_root_hub_request(
@@ -125,6 +126,7 @@ void	uhci_deallocate_tw(uhci_state_t *uhcip, uhci_pipe_private_t *pp,
 /* other generic global prototypes */
 uhci_state_t	*uhci_obtain_state(dev_info_t *dip);
 queue_head_t	*uhci_alloc_queue_head(uhci_state_t *uhcip);
+int	uhci_state_is_operational(uhci_state_t *uhcip);
 void	uhci_save_data_toggle(uhci_pipe_private_t *pp);
 int	uhci_wait_for_sof(uhci_state_t *uhcip);
 void	uhci_modify_td_active_bits(uhci_state_t *uhcip,
@@ -178,8 +180,8 @@ void	uhci_create_stats(uhci_state_t *uhcip);
 void	uhci_destroy_stats(uhci_state_t *uhcip);
 
 /* arithmetic goodies */
-uint_t  pow_2(unsigned int x);
-uint_t  log_2(unsigned int x);
+uint_t	pow_2(unsigned int x);
+uint_t	log_2(unsigned int x);
 
 #ifdef __cplusplus
 }

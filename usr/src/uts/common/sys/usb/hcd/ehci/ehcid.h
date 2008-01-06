@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1117,10 +1117,12 @@ int		ehci_hcdi_pipe_intr_xfer(
 int		ehci_hcdi_pipe_stop_intr_polling(
 				usba_pipe_handle_data_t	*ph,
 				usb_flags_t		usb_flags);
-usb_frame_number_t ehci_hcdi_get_current_frame_number(
-				usba_device_t		*usba_device);
-uint_t		ehci_hcdi_get_max_isoc_pkts(
-				usba_device_t		*usba_device);
+int		ehci_hcdi_get_current_frame_number(
+				usba_device_t		*usba_device,
+				usb_frame_number_t	*frame_number);
+int		ehci_hcdi_get_max_isoc_pkts(
+				usba_device_t		*usba_device,
+				uint_t		*max_isoc_pkts_per_request);
 int		ehci_hcdi_pipe_isoc_xfer(
 				usba_pipe_handle_data_t	*ph,
 				usb_isoc_req_t		*isoc_reqp,

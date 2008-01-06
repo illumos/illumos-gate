@@ -1103,40 +1103,40 @@ ehci_init_workaround(ehci_state_t	*ehcip)
 
 		if (ehcip->ehci_rev_id >= PCI_VIA_REVISION_6212) {
 
-		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "ehci_init_workaround: Applying VIA workarounds "
-		    "for the 6212 chip.");
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "ehci_init_workaround: Applying VIA workarounds "
+			    "for the 6212 chip.");
 
 		} else if (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
-		"pciclass,0c0320") == 0) {
+		    "pciclass,0c0320") == 0) {
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "Due to recently discovered incompatibilities");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "with this USB controller, USB2.x transfer");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "support has been disabled. This device will");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "continue to function as a USB1.x controller.");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "If you are interested in enabling USB2.x");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "support please, refer to the ehci(7D) man page.");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "Please also refer to www.sun.com/io for");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "Solaris Ready products and to");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "www.sun.com/bigadmin/hcl for additional");
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "compatible USB products.");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "Due to recently discovered incompatibilities");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "with this USB controller, USB2.x transfer");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "support has been disabled. This device will");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "continue to function as a USB1.x controller.");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "If you are interested in enabling USB2.x");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "support please, refer to the ehci(7D) man page.");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "Please also refer to www.sun.com/io for");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "Solaris Ready products and to");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "www.sun.com/bigadmin/hcl for additional");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "compatible USB products.");
 
-		return (DDI_FAILURE);
+			return (DDI_FAILURE);
 
-		} else if (ehci_vt62x2_workaround) {
+			} else if (ehci_vt62x2_workaround) {
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "Applying VIA workarounds");
+			USB_DPRINTF_L1(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+			    "Applying VIA workarounds");
 		}
 	}
 
@@ -1264,6 +1264,9 @@ ehci_init_ctlr(ehci_state_t	*ehcip,
 	/* Turn on/off the schedulers */
 	ehci_toggle_scheduler(ehcip);
 
+	/* Set host controller soft state to operational */
+	ehcip->ehci_hc_soft_state = EHCI_CTLR_OPERATIONAL_STATE;
+
 	/*
 	 * Set the Periodic Frame List Base Address register with the
 	 * starting physical address of the Periodic Frame List.
@@ -1293,10 +1296,16 @@ ehci_init_ctlr(ehci_state_t	*ehcip,
 
 		if (ehci_init_workaround(ehcip) != DDI_SUCCESS) {
 
+			/* Set host controller soft state to error */
+			ehcip->ehci_hc_soft_state = EHCI_CTLR_ERROR_STATE;
+
 			return (DDI_FAILURE);
 		}
 
 		if (ehci_init_check_status(ehcip) != DDI_SUCCESS) {
+
+			/* Set host controller soft state to error */
+			ehcip->ehci_hc_soft_state = EHCI_CTLR_ERROR_STATE;
 
 			return (DDI_FAILURE);
 		}
@@ -1307,9 +1316,6 @@ ehci_init_ctlr(ehci_state_t	*ehcip,
 
 	/* Route all Root hub ports to EHCI host controller */
 	Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_EHCI);
-
-	/* Set host controller soft state to operational */
-	ehcip->ehci_hc_soft_state = EHCI_CTLR_OPERATIONAL_STATE;
 
 	return (DDI_SUCCESS);
 }

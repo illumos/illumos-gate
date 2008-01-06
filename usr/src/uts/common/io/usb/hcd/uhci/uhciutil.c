@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,7 +128,7 @@ uhci_build_interrupt_lattice(uhci_state_t *uhcip)
 	queue_head_t		*list_array = uhcip->uhci_qh_pool_addr;
 	queue_head_t		*tmp_qh;
 	frame_lst_table_t	*frame_lst_tablep =
-					uhcip->uhci_frame_lst_tablep;
+	    uhcip->uhci_frame_lst_tablep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "uhci_build_interrupt_lattice:");
@@ -179,7 +179,7 @@ uhci_build_interrupt_lattice(uhci_state_t *uhcip)
 	tmp_qh = uhcip->uhci_ctrl_xfers_q_tail = uhcip->uhci_ctrl_xfers_q_head;
 
 	SetQH32(uhcip, list_array[0].link_ptr,
-		(QH_PADDR(tmp_qh) | HC_QUEUE_HEAD));
+	    (QH_PADDR(tmp_qh) | HC_QUEUE_HEAD));
 
 	uhcip->uhci_bulk_xfers_q_head = uhci_alloc_queue_head(uhcip);
 	uhcip->uhci_bulk_xfers_q_tail = uhcip->uhci_bulk_xfers_q_head;
@@ -212,7 +212,7 @@ uhci_build_interrupt_lattice(uhci_state_t *uhcip)
 	    GetFL32(uhcip, uhcip->uhci_frame_lst_tablep[MAX_FRAME_NUM]));
 	SetQH32(uhcip, uhcip->uhci_isoc_qh->element_ptr, TD_PADDR(isoc_td));
 	SetFL32(uhcip, uhcip->uhci_frame_lst_tablep[MAX_FRAME_NUM],
-			QH_PADDR(uhcip->uhci_isoc_qh) | HC_QUEUE_HEAD);
+	    QH_PADDR(uhcip->uhci_isoc_qh) | HC_QUEUE_HEAD);
 }
 
 
@@ -356,7 +356,7 @@ uhci_free_pools(uhci_state_t *uhcip)
 	uhci_trans_wrapper_t	*tw;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-						"uhci_free_pools:");
+	    "uhci_free_pools:");
 
 	if (uhcip->uhci_td_pool_addr && uhcip->uhci_td_pool_mem_handle) {
 		for (i = 0; i < uhci_td_pool_size; i ++) {
@@ -373,7 +373,7 @@ uhci_free_pools(uhci_state_t *uhcip)
 
 		if (uhcip->uhci_dma_addr_bind_flag & UHCI_TD_POOL_BOUND) {
 			rval = ddi_dma_unbind_handle(
-					uhcip->uhci_td_pool_dma_handle);
+			    uhcip->uhci_td_pool_dma_handle);
 			ASSERT(rval == DDI_SUCCESS);
 		}
 
@@ -388,7 +388,7 @@ uhci_free_pools(uhci_state_t *uhcip)
 	if (uhcip->uhci_qh_pool_addr && uhcip->uhci_qh_pool_mem_handle) {
 		if (uhcip->uhci_dma_addr_bind_flag & UHCI_QH_POOL_BOUND) {
 			rval = ddi_dma_unbind_handle(
-					uhcip->uhci_qh_pool_dma_handle);
+			    uhcip->uhci_qh_pool_dma_handle);
 			ASSERT(rval == DDI_SUCCESS);
 		}
 		ddi_dma_mem_free(&uhcip->uhci_qh_pool_mem_handle);
@@ -403,7 +403,7 @@ uhci_free_pools(uhci_state_t *uhcip)
 	if (uhcip->uhci_frame_lst_tablep && uhcip->uhci_flt_mem_handle) {
 		if (uhcip->uhci_dma_addr_bind_flag & UHCI_FLA_POOL_BOUND) {
 			rval = ddi_dma_unbind_handle(
-					uhcip->uhci_flt_dma_handle);
+			    uhcip->uhci_flt_dma_handle);
 			ASSERT(rval == DDI_SUCCESS);
 		}
 		ddi_dma_mem_free(&uhcip->uhci_flt_mem_handle);
@@ -499,11 +499,13 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	/* Set the frame number to zero */
 	Set_OpReg16(FRNUM, 0);
 
-	/* Initialize the Frame list base address area */
-	if (uhci_init_frame_lst_table(dip, uhcip) != USB_SUCCESS) {
-		mutex_exit(&uhcip->uhci_int_mutex);
+	if (uhcip->uhci_hc_soft_state == UHCI_CTLR_INIT_STATE) {
+		/* Initialize the Frame list base address area */
+		if (uhci_init_frame_lst_table(dip, uhcip) != USB_SUCCESS) {
+			mutex_exit(&uhcip->uhci_int_mutex);
 
-		return (USB_FAILURE);
+			return (USB_FAILURE);
+		}
 	}
 
 	/* Save the contents of the Frame Interval Registers */
@@ -520,10 +522,9 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	 */
 	cmd_reg = Get_OpReg16(USBCMD);
 	cmd_reg |= (USBCMD_REG_HC_RUN | USBCMD_REG_MAXPKT_64 |
-				USBCMD_REG_CONFIG_FLAG);
+	    USBCMD_REG_CONFIG_FLAG);
 
 	Set_OpReg16(USBCMD, cmd_reg);
-	mutex_exit(&uhcip->uhci_int_mutex);
 
 	/*
 	 * Verify the Command and interrupt enable registers,
@@ -535,6 +536,7 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	    USBCMD_REG_CONFIG_FLAG))) {
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_init_ctlr: Controller initialization failed");
+		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (USB_FAILURE);
 	}
@@ -545,8 +547,9 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 	 */
 	SetTD_ioc(uhcip, uhcip->uhci_isoc_td, 1);
 
-	/* Set the flag that uhci controller has been initialized. */
-	uhcip->uhci_ctlr_init_flag = B_TRUE;
+	/* Set host controller soft state to operational */
+	uhcip->uhci_hc_soft_state = UHCI_CTLR_OPERATIONAL_STATE;
+	mutex_exit(&uhcip->uhci_int_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "uhci_init_ctlr: Completed");
@@ -801,12 +804,12 @@ uhci_alloc_hcdi_ops(uhci_state_t *uhcip)
 
 	hcdi_ops->usba_hcdi_bulk_transfer_size = uhci_hcdi_bulk_transfer_size;
 	hcdi_ops->usba_hcdi_pipe_stop_intr_polling =
-					uhci_hcdi_pipe_stop_intr_polling;
+	    uhci_hcdi_pipe_stop_intr_polling;
 	hcdi_ops->usba_hcdi_pipe_stop_isoc_polling =
-					uhci_hcdi_pipe_stop_isoc_polling;
+	    uhci_hcdi_pipe_stop_isoc_polling;
 
 	hcdi_ops->usba_hcdi_get_current_frame_number =
-					uhci_hcdi_get_current_frame_number;
+	    uhci_hcdi_get_current_frame_number;
 	hcdi_ops->usba_hcdi_get_max_isoc_pkts = uhci_hcdi_get_max_isoc_pkts;
 
 	hcdi_ops->usba_hcdi_console_input_init = uhci_hcdi_polled_input_init;
@@ -922,7 +925,7 @@ uhci_alloc_queue_head(uhci_state_t *uhcip)
 	if ((dummy_td = uhci_allocate_td_from_pool(uhcip)) == NULL) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ALLOC,  uhcip->uhci_log_hdl,
-		"uhci_alloc_queue_head: allocate td from pool failed");
+		    "uhci_alloc_queue_head: allocate td from pool failed");
 
 		return (NULL);
 	}
@@ -1001,7 +1004,7 @@ uhci_allocate_bandwidth(
 	mutex_enter(&pipe_handle->p_usba_device->usb_mutex);
 
 	length = uhci_compute_total_bandwidth(endpoint,
-			pipe_handle->p_usba_device->usb_port_status);
+	    pipe_handle->p_usba_device->usb_port_status);
 	mutex_exit(&pipe_handle->p_usba_device->usb_mutex);
 
 	/*
@@ -1009,7 +1012,7 @@ uhci_allocate_bandwidth(
 	 * the maximum, return bandwidth allocation failure.
 	 */
 	if ((length + uhcip->uhci_bandwidth_intr_min +
-		uhcip->uhci_bandwidth_isoch_sum) > (MAX_PERIODIC_BANDWIDTH)) {
+	    uhcip->uhci_bandwidth_isoch_sum) > (MAX_PERIODIC_BANDWIDTH)) {
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 		    "uhci_allocate_bandwidth: "
 		    "Reached maximum bandwidth value and cannot allocate "
@@ -1033,7 +1036,7 @@ uhci_allocate_bandwidth(
 	 */
 	mutex_enter(&pipe_handle->p_usba_device->usb_mutex);
 	bandwidth = uhci_bandwidth_adjust(uhcip, endpoint,
-			pipe_handle->p_usba_device->usb_port_status);
+	    pipe_handle->p_usba_device->usb_port_status);
 	mutex_exit(&pipe_handle->p_usba_device->usb_mutex);
 
 	/*
@@ -1076,10 +1079,10 @@ uhci_allocate_bandwidth(
 	/* check if there are isocs TDs scheduled for this frame */
 	if (uhcip->uhci_isoc_q_tailp[*node]) {
 		paddr = (uhcip->uhci_isoc_q_tailp[*node]->link_ptr &
-						FRAME_LST_PTR_MASK);
+		    FRAME_LST_PTR_MASK);
 	} else {
 		paddr = (uhcip->uhci_frame_lst_tablep[*node] &
-						FRAME_LST_PTR_MASK);
+		    FRAME_LST_PTR_MASK);
 	}
 
 	tmp_qh = QH_VADDR(paddr);
@@ -1102,7 +1105,7 @@ uhci_allocate_bandwidth(
 	    (NUM_FRAME_LST_ENTRIES/bandwidth); i ++) {
 
 		if ((length + uhcip->uhci_bandwidth_isoch_sum +
-		uhcip->uhci_bandwidth[i]) > MAX_PERIODIC_BANDWIDTH) {
+		    uhcip->uhci_bandwidth[i]) > MAX_PERIODIC_BANDWIDTH) {
 
 			USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 			    "uhci_allocate_bandwidth: "
@@ -1156,7 +1159,7 @@ uhci_deallocate_bandwidth(uhci_state_t *uhcip,
 	usb_ep_descr_t	*endpoint = &pipe_handle->p_ep;
 	uint_t		node, length;
 	uhci_pipe_private_t *pp =
-			(uhci_pipe_private_t *)pipe_handle->p_hcd_private;
+	    (uhci_pipe_private_t *)pipe_handle->p_hcd_private;
 
 	/* This routine is protected by the uhci_int_mutex */
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
@@ -1164,7 +1167,7 @@ uhci_deallocate_bandwidth(uhci_state_t *uhcip,
 	/* Obtain the length */
 	mutex_enter(&pipe_handle->p_usba_device->usb_mutex);
 	length = uhci_compute_total_bandwidth(endpoint,
-			pipe_handle->p_usba_device->usb_port_status);
+	    pipe_handle->p_usba_device->usb_port_status);
 	mutex_exit(&pipe_handle->p_usba_device->usb_mutex);
 
 	/*
@@ -1183,7 +1186,7 @@ uhci_deallocate_bandwidth(uhci_state_t *uhcip,
 	/* Adjust bandwidth to be a power of 2 */
 	mutex_enter(&pipe_handle->p_usba_device->usb_mutex);
 	bandwidth = uhci_bandwidth_adjust(uhcip, endpoint,
-			pipe_handle->p_usba_device->usb_port_status);
+	    pipe_handle->p_usba_device->usb_port_status);
 	mutex_exit(&pipe_handle->p_usba_device->usb_mutex);
 
 	/* Find the height in the tree */
@@ -1257,8 +1260,8 @@ uhci_compute_total_bandwidth(usb_ep_descr_t *endpoint,
 	if (port_status == USBA_LOW_SPEED_DEV) {
 		/* Low Speed interrupt transaction */
 		bandwidth += (LOW_SPEED_PROTO_OVERHEAD +
-				HUB_LOW_SPEED_PROTO_OVERHEAD +
-				(LOW_SPEED_CLOCK * MaxPacketSize));
+		    HUB_LOW_SPEED_PROTO_OVERHEAD +
+		    (LOW_SPEED_CLOCK * MaxPacketSize));
 	} else {
 		/* Full Speed transaction */
 		bandwidth += MaxPacketSize;
@@ -1388,7 +1391,7 @@ static uint_t
 uhci_leftmost_leaf(uint_t node, uint_t height)
 {
 	node = pow_2(height + VIRTUAL_TREE_HEIGHT) * (node+1) -
-			NUM_FRAME_LST_ENTRIES;
+	    NUM_FRAME_LST_ENTRIES;
 	return (node);
 }
 
@@ -1420,7 +1423,7 @@ uhci_insert_qh(uhci_state_t *uhcip, usba_pipe_handle_data_t *ph)
 		break;
 	case USB_EP_ATTR_ISOCH:
 			USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "uhci_insert_qh: Illegal request");
+			    "uhci_insert_qh: Illegal request");
 		break;
 	}
 }
@@ -1448,7 +1451,7 @@ uhci_insert_ctrl_qh(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 	    GetQH32(uhcip, uhcip->uhci_ctrl_xfers_q_tail->link_ptr));
 	qh->prev_qh = uhcip->uhci_ctrl_xfers_q_tail;
 	SetQH32(uhcip, uhcip->uhci_ctrl_xfers_q_tail->link_ptr,
-				QH_PADDR(qh) | HC_QUEUE_HEAD);
+	    QH_PADDR(qh) | HC_QUEUE_HEAD);
 	uhcip->uhci_ctrl_xfers_q_tail = qh;
 
 }
@@ -1471,7 +1474,7 @@ uhci_insert_bulk_qh(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 	if (uhcip->uhci_bulk_xfers_q_head == uhcip->uhci_bulk_xfers_q_tail) {
 		uhcip->uhci_bulk_xfers_q_head->prev_qh = UHCI_INVALID_PTR;
 	} else if (uhcip->uhci_bulk_xfers_q_head->link_ptr ==
-		    uhcip->uhci_bulk_xfers_q_tail->link_ptr) {
+	    uhcip->uhci_bulk_xfers_q_tail->link_ptr) {
 
 		/* If there is already a loop, we should keep the loop. */
 		qh->link_ptr = uhcip->uhci_bulk_xfers_q_tail->link_ptr;
@@ -1479,7 +1482,7 @@ uhci_insert_bulk_qh(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 
 	qh->prev_qh = uhcip->uhci_bulk_xfers_q_tail;
 	SetQH32(uhcip, uhcip->uhci_bulk_xfers_q_tail->link_ptr,
-		QH_PADDR(qh) | HC_QUEUE_HEAD);
+	    QH_PADDR(qh) | HC_QUEUE_HEAD);
 	uhcip->uhci_bulk_xfers_q_tail = qh;
 }
 
@@ -1562,7 +1565,7 @@ uhci_insert_intr_td(
 		    "uhci_insert_intr_td: Intr request size 0x%lx is "
 		    "more than 0x%x", length, UHCI_MAX_TD_XFER_SIZE);
 
-	    return (USB_INVALID_REQUEST);
+		return (USB_INVALID_REQUEST);
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
@@ -1585,7 +1588,7 @@ uhci_insert_intr_td(
 	tw->tw_handle_td = uhci_handle_intr_td;
 	tw->tw_handle_callback_value = NULL;
 	tw->tw_direction = (pipe_dir == USB_EP_DIR_OUT) ?
-							PID_OUT : PID_IN;
+	    PID_OUT : PID_IN;
 	tw->tw_curr_xfer_reqp = (usb_opaque_t)req;
 
 	/*
@@ -1617,7 +1620,7 @@ uhci_insert_intr_td(
 	if (tw->tw_direction == PID_IN) {
 		/* Insert the td onto the queue head */
 		error = uhci_insert_hc_td(uhcip, 0,
-			length, pp, tw, PID_IN, intr_reqp->intr_attributes);
+		    length, pp, tw, PID_IN, intr_reqp->intr_attributes);
 
 		if (error != USB_SUCCESS) {
 
@@ -1638,7 +1641,7 @@ uhci_insert_intr_td(
 
 		/* Copy the data into the message */
 		ddi_rep_put8(tw->tw_accesshandle, req->intr_data->b_rptr,
-			(uint8_t *)tw->tw_buf, req->intr_len, DDI_DEV_AUTOINCR);
+		    (uint8_t *)tw->tw_buf, req->intr_len, DDI_DEV_AUTOINCR);
 	}
 
 	/* set tw->tw_claim flag, so that nobody else works on this tw. */
@@ -1651,9 +1654,9 @@ uhci_insert_intr_td(
 	while (length > 0) {
 
 		error = uhci_insert_hc_td(uhcip, buf_offs,
-				(length > mps) ? mps : length,
-				pp, tw, PID_OUT,
-				intr_reqp->intr_attributes);
+		    (length > mps) ? mps : length,
+		    pp, tw, PID_OUT,
+		    intr_reqp->intr_attributes);
 
 		if (error != USB_SUCCESS) {
 			/* no resource. */
@@ -1979,7 +1982,7 @@ uhci_fill_in_td(
 
 	SetTD_c_err(uhcip, current_dummy, UHCI_MAX_ERR_COUNT);
 	SetTD_mlen(uhcip, current_dummy,
-			(length == 0) ? ZERO_LENGTH : (length - 1));
+	    (length == 0) ? ZERO_LENGTH : (length - 1));
 	SetTD_dtogg(uhcip, current_dummy, pp->pp_data_toggle);
 
 	/* Adjust the data toggle bit */
@@ -1987,7 +1990,7 @@ uhci_fill_in_td(
 
 	SetTD_devaddr(uhcip, current_dummy,  ph->p_usba_device->usb_addr);
 	SetTD_endpt(uhcip, current_dummy,
-		ph->p_ep.bEndpointAddress & END_POINT_ADDRESS_MASK);
+	    ph->p_ep.bEndpointAddress & END_POINT_ADDRESS_MASK);
 	SetTD_PID(uhcip, current_dummy, PID);
 	SetTD_ioc(uhcip, current_dummy, INTERRUPT_ON_COMPLETION);
 
@@ -2006,8 +2009,8 @@ uhci_fill_in_td(
  *	the device address used for a TD.
  *
  * buffer_offset - the starting offset into the TW buffer, where the
- *                 TD should transfer from. When a TW has more than
- *                 one TD, the TDs must be filled in increasing order.
+ *		   TD should transfer from. When a TW has more than
+ *		   one TD, the TDs must be filled in increasing order.
  */
 static uint32_t
 uhci_get_tw_paddr_by_offs(
@@ -2216,7 +2219,7 @@ uhci_create_setup_pkt(
 
 	/* Create the first four bytes of the setup packet */
 	sdata = (req->ctrl_bmRequestType | (req->ctrl_bRequest << 8) |
-			(req->ctrl_wValue << 16));
+	    (req->ctrl_wValue << 16));
 	ddi_put32(tw->tw_accesshandle, (uint_t *)tw->tw_buf, sdata);
 
 	/* Create the second four bytes */
@@ -2273,7 +2276,7 @@ uhci_create_stats(uhci_state_t *uhcip)
 	int			i;
 	char			kstatname[KSTAT_STRLEN];
 	char			*usbtypes[USB_N_COUNT_KSTATS] =
-				    {"ctrl", "isoch", "bulk", "intr"};
+	    {"ctrl", "isoch", "bulk", "intr"};
 	uint_t			instance = uhcip->uhci_instance;
 	const char		*dname = ddi_driver_name(uhcip->uhci_dip);
 	uhci_intrs_stats_t	*isp;
@@ -2382,26 +2385,26 @@ uhci_do_intrs_stats(uhci_state_t *uhcip, int val)
 		break;
 	case USBSTS_REG_HC_PROCESS_ERR:
 		UHCI_INTRS_STATS_DATA(uhcip)->
-			uhci_intrs_hc_process_err.value.ui64++;
+		    uhci_intrs_hc_process_err.value.ui64++;
 		break;
 	case USBSTS_REG_HOST_SYS_ERR:
 		UHCI_INTRS_STATS_DATA(uhcip)->
-			uhci_intrs_host_sys_err.value.ui64++;
+		    uhci_intrs_host_sys_err.value.ui64++;
 		break;
 	case USBSTS_REG_RESUME_DETECT:
 		UHCI_INTRS_STATS_DATA(uhcip)->
-			uhci_intrs_resume_detected.value.ui64++;
+		    uhci_intrs_resume_detected.value.ui64++;
 		break;
 	case USBSTS_REG_USB_ERR_INTR:
 		UHCI_INTRS_STATS_DATA(uhcip)->
-			uhci_intrs_usb_err_intr.value.ui64++;
+		    uhci_intrs_usb_err_intr.value.ui64++;
 		break;
 	case USBSTS_REG_USB_INTR:
 		UHCI_INTRS_STATS_DATA(uhcip)->uhci_intrs_usb_intr.value.ui64++;
 		break;
 	default:
 		UHCI_INTRS_STATS_DATA(uhcip)->
-			uhci_intrs_not_claimed.value.ui64++;
+		    uhci_intrs_not_claimed.value.ui64++;
 		break;
 	}
 }
@@ -2669,7 +2672,7 @@ uhci_remove_intr_qh(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 {
 	queue_head_t   *qh = pp->pp_qh;
 	queue_head_t   *next_lattice_qh =
-		    QH_VADDR(GetQH32(uhcip, qh->link_ptr) & QH_LINK_PTR_MASK);
+	    QH_VADDR(GetQH32(uhcip, qh->link_ptr) & QH_LINK_PTR_MASK);
 
 	qh->prev_qh->link_ptr	 = qh->link_ptr;
 	next_lattice_qh->prev_qh = qh->prev_qh;
@@ -2819,7 +2822,7 @@ uhci_insert_bulk_td(
 
 	/* Get the bulk pipe direction */
 	tw->tw_direction = (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_OUT) ?
-							PID_OUT : PID_IN;
+	    PID_OUT : PID_IN;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_insert_bulk_td: direction: 0x%x", tw->tw_direction);
@@ -2831,9 +2834,9 @@ uhci_insert_bulk_td(
 
 			/* Copy the data into the message */
 			ddi_rep_put8(tw->tw_accesshandle,
-				req->bulk_data->b_rptr,
-				(uint8_t *)tw->tw_buf,
-				req->bulk_len, DDI_DEV_AUTOINCR);
+			    req->bulk_data->b_rptr,
+			    (uint8_t *)tw->tw_buf,
+			    req->bulk_len, DDI_DEV_AUTOINCR);
 		}
 	}
 
@@ -2931,7 +2934,7 @@ uhci_insert_bulk_td(
 	 */
 	if (uhcip->uhci_pending_bulk_cmds++ == 0) {
 		uhcip->uhci_bulk_xfers_q_tail->link_ptr =
-			uhcip->uhci_bulk_xfers_q_head->link_ptr;
+		    uhcip->uhci_bulk_xfers_q_head->link_ptr;
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_insert_bulk_td: count = %d no tds  %d",
 		    uhcip->uhci_pending_bulk_cmds, num_bulk_tds);
@@ -2950,8 +2953,8 @@ uhci_insert_bulk_td(
  *     Fills the bulk/isoc TD
  *
  * offset - different meanings for bulk and isoc TDs:
- *          starting offset into the TW buffer for a bulk TD
- *          and the index into the isoc packet list for an isoc TD
+ *	    starting offset into the TW buffer for a bulk TD
+ *	    and the index into the isoc packet list for an isoc TD
  */
 void
 uhci_fill_in_bulk_isoc_td(uhci_state_t *uhcip, uhci_td_t *current_td,
@@ -2994,11 +2997,11 @@ uhci_fill_in_bulk_isoc_td(uhci_state_t *uhcip, uhci_td_t *current_td,
 	SetTD_status(uhcip, current_td, UHCI_TD_ACTIVE);
 	SetTD_ioc(uhcip, current_td, INTERRUPT_ON_COMPLETION);
 	SetTD_mlen(uhcip, current_td,
-			(length == 0) ? ZERO_LENGTH : (length - 1));
+	    (length == 0) ? ZERO_LENGTH : (length - 1));
 	SetTD_dtogg(uhcip, current_td, pp->pp_data_toggle);
 	SetTD_devaddr(uhcip, current_td, ph->p_usba_device->usb_addr);
 	SetTD_endpt(uhcip, current_td, ph->p_ep.bEndpointAddress &
-							END_POINT_ADDRESS_MASK);
+	    END_POINT_ADDRESS_MASK);
 	SetTD_PID(uhcip, current_td, tw->tw_direction);
 
 	/* Get the right buffer address for the current TD */
@@ -3349,7 +3352,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 			paddr = GetQH32(uhcip, qh->link_ptr) & QH_LINK_PTR_MASK;
 			if (GetQH32(uhcip, qh->link_ptr) !=
 			    GetQH32(uhcip,
-				uhcip->uhci_bulk_xfers_q_head->link_ptr)) {
+			    uhcip->uhci_bulk_xfers_q_head->link_ptr)) {
 				next_qh = QH_VADDR(paddr);
 				SetQH32(uhcip, qh->prev_qh->link_ptr,
 				    paddr|(0x2));
@@ -3369,11 +3372,11 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 				num_bulk_tds = MAX_NUM_BULK_TDS_PER_XFER;
 			} else {
 				num_bulk_tds =
-					(tw->tw_bytes_pending / MaxPacketSize);
+				    (tw->tw_bytes_pending / MaxPacketSize);
 				if (tw->tw_bytes_pending % MaxPacketSize) {
 					num_bulk_tds++;
 					length = (tw->tw_bytes_pending %
-							MaxPacketSize);
+					    MaxPacketSize);
 				}
 			}
 
@@ -3435,7 +3438,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 			if (tw->tw_bytes_pending) {
 				/* Update the element pointer */
 				SetQH32(uhcip, pp->pp_qh->element_ptr,
-						TD_PADDR(pp->pp_qh->td_tailp));
+				    TD_PADDR(pp->pp_qh->td_tailp));
 
 				/* Remove all the tds */
 				td_head = tw->tw_hctd_head;
@@ -3447,7 +3450,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 
 			if (tw->tw_direction == PID_IN) {
 				usb_req_attrs_t	attrs = ((usb_bulk_req_t *)
-					tw->tw_curr_xfer_reqp)->bulk_attributes;
+				    tw->tw_curr_xfer_reqp)->bulk_attributes;
 
 				error = USB_CR_OK;
 
@@ -3467,7 +3470,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 				if (tw->tw_bytes_pending) {
 
 					tw->tw_data->b_rptr +=
-						tw->tw_bytes_xfered;
+					    tw->tw_bytes_xfered;
 
 					USB_DPRINTF_L2(PRINT_MASK_ATTA,
 					    uhcip->uhci_log_hdl,
@@ -4016,7 +4019,7 @@ uhci_insert_isoc_td(
 	tw->tw_handle_td		= uhci_handle_isoc_td;
 	tw->tw_handle_callback_value	= NULL;
 	tw->tw_direction = (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_OUT) ?
-							PID_OUT : PID_IN;
+	    PID_OUT : PID_IN;
 
 	/*
 	 * If the transfer isoc send, then copy the data from the request
@@ -4125,9 +4128,9 @@ uhci_insert_isoc_td(
 				if ((current_frame + FRNUM_OFFSET) <
 				    end_frame) {
 					expired_frames = current_frame +
-						FRNUM_OFFSET - start_frame;
+					    FRNUM_OFFSET - start_frame;
 					start_frame = current_frame +
-							FRNUM_OFFSET;
+					    FRNUM_OFFSET;
 				} else {
 					rval = USB_INVALID_START_FRAME;
 				}
@@ -4184,9 +4187,9 @@ uhci_insert_isoc_td(
 
 	for (i = 0; i < expired_frames; i++) {
 		isoc_req->isoc_pkt_descr[i].isoc_pkt_status =
-							USB_CR_NOT_ACCESSED;
+		    USB_CR_NOT_ACCESSED;
 		isoc_req->isoc_pkt_descr[i].isoc_pkt_actual_length =
-				isoc_req->isoc_pkt_descr[i].isoc_pkt_length;
+		    isoc_req->isoc_pkt_descr[i].isoc_pkt_length;
 		uhci_get_isoc_td_by_index(uhcip, isoc_xfer_info, i,
 		    &td_ptr, &td_pool_ptr);
 		uhci_delete_td(uhcip, td_ptr);
@@ -4202,12 +4205,12 @@ uhci_insert_isoc_td(
 		    &td_ptr, &td_pool_ptr);
 		if (uhcip->uhci_isoc_q_tailp[start_frame]) {
 			td_ptr->isoc_prev =
-					uhcip->uhci_isoc_q_tailp[start_frame];
+			    uhcip->uhci_isoc_q_tailp[start_frame];
 			td_ptr->isoc_next = NULL;
 			td_ptr->link_ptr =
 			    uhcip->uhci_isoc_q_tailp[start_frame]->link_ptr;
 			uhcip->uhci_isoc_q_tailp[start_frame]->isoc_next =
-								    td_ptr;
+			    td_ptr;
 			SetTD32(uhcip,
 			    uhcip->uhci_isoc_q_tailp[start_frame]->link_ptr,
 			    ISOCTD_PADDR(td_pool_ptr, td_ptr));
@@ -4218,7 +4221,7 @@ uhci_insert_isoc_td(
 			td_ptr->isoc_prev = NULL;
 			SetTD32(uhcip, td_ptr->link_ptr,
 			    GetFL32(uhcip,
-				uhcip->uhci_frame_lst_tablep[start_frame]));
+			    uhcip->uhci_frame_lst_tablep[start_frame]));
 			SetFL32(uhcip,
 			    uhcip->uhci_frame_lst_tablep[start_frame],
 			    ISOCTD_PADDR(td_pool_ptr, td_ptr));
@@ -4246,7 +4249,7 @@ uhci_insert_isoc_td(
  *
  * tdpp - pointer to the address of the TD at the isoc packet index
  * td_pool_pp - pointer to the address of the TD pool containing
- *              the specified TD
+ *		the specified TD
  */
 /* ARGSUSED */
 static void
@@ -4319,8 +4322,8 @@ uhci_handle_isoc_td(uhci_state_t *uhcip, uhci_td_t *td)
 	if (isoc_req != NULL) {
 		isoc_req->isoc_pkt_descr[pkt_index].isoc_pkt_status = cr;
 		isoc_req->isoc_pkt_descr[pkt_index].isoc_pkt_actual_length =
-				(GetTD_alen(uhcip, td) == ZERO_LENGTH) ? 0 :
-				GetTD_alen(uhcip, td) + 1;
+		    (GetTD_alen(uhcip, td) == ZERO_LENGTH) ? 0 :
+		    GetTD_alen(uhcip, td) + 1;
 	}
 
 	uhci_delete_isoc_td(uhcip, td);
@@ -4412,7 +4415,7 @@ uhci_delete_isoc_td(uhci_state_t *uhcip, uhci_td_t *td)
 
 	if ((td->isoc_next == NULL) && (td->isoc_prev == NULL)) {
 		SetFL32(uhcip, uhcip->uhci_frame_lst_tablep[starting_frame],
-			GetTD32(uhcip, td->link_ptr));
+		    GetTD32(uhcip, td->link_ptr));
 		uhcip->uhci_isoc_q_tailp[starting_frame] = 0;
 	} else if (td->isoc_next == NULL) {
 		td->isoc_prev->link_ptr = td->link_ptr;
@@ -4464,11 +4467,11 @@ uhci_start_isoc_receive_polling(
 		isoc_pkts_length = isoc_req->isoc_pkts_length;
 	} else {
 		isoc_pkt_descr = ((usb_isoc_req_t *)
-			pp->pp_client_periodic_in_reqp)->isoc_pkt_descr;
+		    pp->pp_client_periodic_in_reqp)->isoc_pkt_descr;
 		isoc_pkt_count = ((usb_isoc_req_t *)
-			pp->pp_client_periodic_in_reqp)->isoc_pkts_count;
+		    pp->pp_client_periodic_in_reqp)->isoc_pkts_count;
 		isoc_pkts_length = ((usb_isoc_req_t *)
-			pp->pp_client_periodic_in_reqp)->isoc_pkts_length;
+		    pp->pp_client_periodic_in_reqp)->isoc_pkts_length;
 	}
 
 	for (ii = 0, length = 0; ii < isoc_pkt_count; ii++) {
@@ -4529,7 +4532,7 @@ uhci_remove_isoc_tds_tws(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 		td_head = tmp_tw->tw_hctd_head;
 		if (tmp_tw->tw_direction == PID_IN) {
 			uhci_deallocate_periodic_in_resource(uhcip, pp,
-								tmp_tw);
+			    tmp_tw);
 		} else if (tmp_tw->tw_direction == PID_OUT) {
 			uhci_hcdi_callback(uhcip, pp, pp->pp_pipe_handle,
 			    tmp_tw, USB_CR_FLUSHED);
@@ -4702,7 +4705,7 @@ uhci_cmd_timeout_hdlr(void *arg)
 			tmp_td = head->tw->tw_hctd_head;
 			while (tmp_td) {
 				SetTD_status(uhcip, tmp_td,
-						UHCI_TD_CRC_TIMEOUT);
+				    UHCI_TD_CRC_TIMEOUT);
 				tmp_td = tmp_td->tw_td_next;
 			}
 		}
@@ -4742,7 +4745,7 @@ uhci_cmd_timeout_hdlr(void *arg)
 int
 uhci_wait_for_sof(uhci_state_t *uhcip)
 {
-	int	n;
+	int	n, error;
 	ushort_t    cmd_reg;
 	usb_frame_number_t	before_frame_number, after_frame_number;
 	clock_t	time, rval;
@@ -4750,6 +4753,14 @@ uhci_wait_for_sof(uhci_state_t *uhcip)
 	    "uhci_wait_for_sof: uhcip = %p", uhcip);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
+
+	error = uhci_state_is_operational(uhcip);
+
+	if (error != USB_SUCCESS) {
+
+		return (error);
+	}
+
 	before_frame_number =  uhci_get_sw_frame_number(uhcip);
 	for (n = 0; n < MAX_SOF_WAIT_COUNT; n++) {
 		SetTD_ioc(uhcip, uhcip->uhci_sof_td, 1);
@@ -4757,7 +4768,7 @@ uhci_wait_for_sof(uhci_state_t *uhcip)
 
 		time = ddi_get_lbolt() + UHCI_ONE_SECOND;
 		rval = cv_timedwait(&uhcip->uhci_cv_SOF,
-			&uhcip->uhci_int_mutex, time);
+		    &uhcip->uhci_int_mutex, time);
 
 		after_frame_number = uhci_get_sw_frame_number(uhcip);
 		if ((rval == -1) &&
@@ -4822,7 +4833,7 @@ uhci_allocate_periodic_in_resource(
 	if (UHCI_XFER_TYPE(&ph->p_ep) == USB_EP_ATTR_INTR) {
 		/* Get the interrupt transfer length */
 		length = ((usb_intr_req_t *)client_periodic_in_reqp)->
-				intr_len;
+		    intr_len;
 
 		cur_intr_req = usba_hcdi_dup_intr_req(ph->p_dip,
 		    (usb_intr_req_t *)client_periodic_in_reqp, length, flags);
@@ -4858,7 +4869,7 @@ uhci_allocate_periodic_in_resource(
 		 * The dup'ed request is saved in pp_client_periodic_in_reqp
 		 */
 		tw->tw_curr_xfer_reqp =
-				(usb_opaque_t)pp->pp_client_periodic_in_reqp;
+		    (usb_opaque_t)pp->pp_client_periodic_in_reqp;
 		pp->pp_client_periodic_in_reqp = (usb_opaque_t)curr_isoc_reqp;
 	}
 
@@ -4949,6 +4960,38 @@ uhci_hcdi_callback(uhci_state_t *uhcip, uhci_pipe_private_t *pp,
 	mutex_exit(&uhcip->uhci_int_mutex);
 	usba_hcdi_cb(ph, curr_xfer_reqp, cr);
 	mutex_enter(&uhcip->uhci_int_mutex);
+}
+
+
+/*
+ * uhci_state_is_operational:
+ *
+ * Check the Host controller state and return proper values.
+ */
+int
+uhci_state_is_operational(uhci_state_t	*uhcip)
+{
+	int	val;
+
+	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
+
+	switch (uhcip->uhci_hc_soft_state) {
+	case UHCI_CTLR_INIT_STATE:
+	case UHCI_CTLR_SUSPEND_STATE:
+		val = USB_FAILURE;
+		break;
+	case UHCI_CTLR_OPERATIONAL_STATE:
+		val = USB_SUCCESS;
+		break;
+	case UHCI_CTLR_ERROR_STATE:
+		val = USB_HC_HARDWARE_ERROR;
+		break;
+	default:
+		val = USB_FAILURE;
+		break;
+	}
+
+	return (val);
 }
 
 

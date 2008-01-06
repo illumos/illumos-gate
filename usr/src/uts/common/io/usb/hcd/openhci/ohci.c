@@ -110,10 +110,12 @@ static int	ohci_hcdi_pipe_intr_xfer(
 static int	ohci_hcdi_pipe_stop_intr_polling(
 				usba_pipe_handle_data_t	*ph,
 				usb_flags_t		usb_flags);
-static usb_frame_number_t ohci_hcdi_get_current_frame_number(
-				usba_device_t		*usba_device);
-static uint_t	ohci_hcdi_get_max_isoc_pkts(
-				usba_device_t		*usba_device);
+static int	ohci_hcdi_get_current_frame_number(
+				usba_device_t		*usba_device,
+				usb_frame_number_t	*frame_number);
+static int	ohci_hcdi_get_max_isoc_pkts(
+				usba_device_t		*usba_device,
+				uint_t		*max_isoc_pkts_per_request);
 static int	ohci_hcdi_pipe_isoc_xfer(
 				usba_pipe_handle_data_t	*ph,
 				usb_isoc_req_t		*isoc_reqp,
@@ -3002,14 +3004,16 @@ ohci_hcdi_pipe_stop_intr_polling(
 /*
  * ohci_hcdi_get_current_frame_number:
  *
- * Return the current usb frame number
+ * Get the current usb frame number.
+ * Return whether the request is handled successfully.
  */
-static usb_frame_number_t
-ohci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
+static int
+ohci_hcdi_get_current_frame_number(
+	usba_device_t		*usba_device,
+	usb_frame_number_t	*frame_number)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
 	    usba_device->usb_root_hub_dip);
-	usb_frame_number_t	frame_number;
 	int			rval;
 
 	ohcip = ohci_obtain_state(usba_device->usb_root_hub_dip);
@@ -3023,7 +3027,7 @@ ohci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
 		return (rval);
 	}
 
-	frame_number = ohci_get_current_frame_number(ohcip);
+	*frame_number = ohci_get_current_frame_number(ohcip);
 
 	mutex_exit(&ohcip->ohci_int_mutex);
 
@@ -3031,21 +3035,23 @@ ohci_hcdi_get_current_frame_number(usba_device_t	*usba_device)
 	    "ohci_hcdi_get_current_frame_number:"
 	    "Current frame number 0x%llx", frame_number);
 
-	return (frame_number);
+	return (rval);
 }
 
 
 /*
  * ohci_hcdi_get_max_isoc_pkts:
  *
- * Return maximum isochronous packets per usb isochronous request
+ * Get maximum isochronous packets per usb isochronous request.
+ * Return whether the request is handled successfully.
  */
-static uint_t
-ohci_hcdi_get_max_isoc_pkts(usba_device_t	*usba_device)
+static int
+ohci_hcdi_get_max_isoc_pkts(
+	usba_device_t	*usba_device,
+	uint_t		*max_isoc_pkts_per_request)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
 	    usba_device->usb_root_hub_dip);
-	uint_t			max_isoc_pkts_per_request;
 	int			rval;
 
 	mutex_enter(&ohcip->ohci_int_mutex);
@@ -3057,14 +3063,14 @@ ohci_hcdi_get_max_isoc_pkts(usba_device_t	*usba_device)
 		return (rval);
 	}
 
-	max_isoc_pkts_per_request = OHCI_MAX_ISOC_PKTS_PER_XFER;
+	*max_isoc_pkts_per_request = OHCI_MAX_ISOC_PKTS_PER_XFER;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_get_max_isoc_pkts: maximum isochronous"
 	    "packets per usb isochronous request = 0x%x",
 	    max_isoc_pkts_per_request);
 
-	return (max_isoc_pkts_per_request);
+	return (rval);
 }
 
 
@@ -7635,6 +7641,13 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 	    "ohci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
+
+	/* Any interrupt is not handled for the suspended device. */
+	if (ohcip->ohci_hc_soft_state == OHCI_CTLR_SUSPEND_STATE) {
+		mutex_exit(&ohcip->ohci_int_mutex);
+
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	/*
 	 * Suppose if we switched to the polled mode from the normal

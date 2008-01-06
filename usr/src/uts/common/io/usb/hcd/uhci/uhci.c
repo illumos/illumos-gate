@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@
  * Prototype Declarations for cb_ops and dev_ops
  */
 static	int uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
-static  int uhci_add_intrs(uhci_state_t *uhcip, int	intr_type);
+static	int uhci_add_intrs(uhci_state_t *uhcip, int	intr_type);
 static	int uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static void uhci_rem_intrs(uhci_state_t	*uhcip);
 static	int uhci_open(dev_t *devp, int flags, int otyp, cred_t *credp);
@@ -52,6 +52,9 @@ static	int uhci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 static	int uhci_reset(dev_info_t *dip, ddi_reset_cmd_t cmd);
 static	int uhci_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
+
+/* extern */
+int usba_hubdi_root_hub_power(dev_info_t *dip, int comp, int level);
 
 static struct cb_ops uhci_cb_ops = {
 	uhci_open,			/* Open */
@@ -82,7 +85,7 @@ static struct dev_ops uhci_ops = {
 	uhci_reset,			/* Reset */
 	&uhci_cb_ops,			/* Driver operations */
 	&usba_hubdi_busops,		/* Bus operations */
-	NULL				/* Power */
+	usba_hubdi_root_hub_power	/* Power */
 };
 
 static struct modldrv modldrv = {
@@ -118,7 +121,7 @@ boolean_t uhci_enable_msi = B_TRUE;
 /*
  * tunable, delay during attach in seconds
  */
-int 		uhci_attach_wait = 0;
+int		uhci_attach_wait = 0;
 
 /* function prototypes */
 static void	uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,
@@ -127,6 +130,8 @@ static void	uhci_handle_one_xfer_completion(uhci_state_t *uhcip,
 			usb_cr_t usb_err, uhci_td_t *td);
 static uint_t	uhci_intr(caddr_t arg1, caddr_t arg2);
 static int	uhci_cleanup(uhci_state_t *uhcip);
+static int	uhci_cpr_suspend(uhci_state_t *uhcip);
+static int	uhci_cpr_resume(uhci_state_t *uhcip);
 
 
 int
@@ -251,11 +256,13 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		break;
 	case DDI_RESUME:
+		uhcip = uhci_obtain_state(dip);
+
+		return (uhci_cpr_resume(uhcip));
 	default:
 
 		return (DDI_FAILURE);
 	}
-
 
 	/* Get the instance and create soft state */
 	instance = ddi_get_instance(dip);
@@ -273,6 +280,9 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	uhcip->uhci_log_hdl = usb_alloc_log_hdl(dip, "uhci", &uhci_errlevel,
 	    &uhci_errmask, &uhci_instance_debug, 0);
+
+	/* Set host controller soft state to initialization */
+	uhcip->uhci_hc_soft_state = UHCI_CTLR_INIT_STATE;
 
 	/* Save the dip and instance */
 	uhcip->uhci_dip		= dip;
@@ -355,9 +365,6 @@ skip_intr:
 
 		goto fail;
 	}
-
-	/* Set the flag that uhci controller has not been initialized. */
-	uhcip->uhci_ctlr_init_flag = B_FALSE;
 
 	/* Enable all interrupts */
 	if (polled) {
@@ -478,7 +485,7 @@ uhci_add_intrs(uhci_state_t	*uhcip,
 		int		intr_type)
 {
 	int	actual, avail, intr_size, count = 0;
-	int 	i, flag, ret;
+	int	i, flag, ret;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "uhci_add_intrs: interrupt type 0x%x", intr_type);
@@ -638,10 +645,8 @@ uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (uhci_cleanup(uhcip) == USB_SUCCESS ?
 		    DDI_SUCCESS : DDI_FAILURE);
 	case DDI_SUSPEND:
-		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "uhci_detach: Suspend not supported");
 
-		return (DDI_FAILURE);
+		return (uhci_cpr_suspend(uhcip));
 	default:
 
 		return (DDI_FAILURE);
@@ -809,6 +814,107 @@ uhci_cleanup(uhci_state_t *uhcip)
 
 
 /*
+ * uhci_cpr_suspend
+ */
+static int
+uhci_cpr_suspend(uhci_state_t	*uhcip)
+{
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_cpr_suspend:");
+
+	/* Call into the root hub and suspend it */
+	if (usba_hubdi_detach(uhcip->uhci_dip, DDI_SUSPEND) != DDI_SUCCESS) {
+
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+
+	/* Disable interrupts */
+	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	/* Wait for SOF time to handle the scheduled interrupt */
+	delay(drv_usectohz(UHCI_TIMEWAIT));
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+	/* Stop the Host Controller */
+	Set_OpReg16(USBCMD, 0);
+
+	/* Set Global Suspend bit */
+	Set_OpReg16(USBCMD, USBCMD_REG_ENER_GBL_SUSPEND);
+
+	/* Set host controller soft state to suspend */
+	uhcip->uhci_hc_soft_state = UHCI_CTLR_SUSPEND_STATE;
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	return (USB_SUCCESS);
+}
+
+
+/*
+ * uhci_cpr_cleanup:
+ *
+ * Cleanup uhci specific information across resuming.
+ */
+static void
+uhci_cpr_cleanup(uhci_state_t	*uhcip)
+{
+	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
+
+	/* Reset software part of usb frame number */
+	uhcip->uhci_sw_frnum = 0;
+}
+
+
+/*
+ * uhci_cpr_resume
+ */
+static int
+uhci_cpr_resume(uhci_state_t	*uhcip)
+{
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_cpr_resume: Restart the controller");
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+
+	/* Cleanup uhci specific information across cpr */
+	uhci_cpr_cleanup(uhcip);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	/* Restart the controller */
+	if (uhci_init_ctlr(uhcip) != DDI_SUCCESS) {
+
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_cpr_resume: uhci host controller resume failed ");
+
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+
+	/*
+	 * Set HcInterruptEnable to enable all interrupts except Root
+	 * Hub Status change and SOF interrupts.
+	 */
+	Set_OpReg16(USBINTR, ENABLE_ALL_INTRS);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	/* Now resume the root hub */
+	if (usba_hubdi_attach(uhcip->uhci_dip, DDI_RESUME) != DDI_SUCCESS) {
+
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
  * uhci_intr:
  *	uhci interrupt handling routine.
  */
@@ -822,6 +928,13 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 	    "uhci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
+
+	/* Any interrupt is not handled for the suspended device. */
+	if (uhcip->uhci_hc_soft_state == UHCI_CTLR_SUSPEND_STATE) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	/* Get the status of the interrupts */
 	intr_status = Get_OpReg16(USBSTS);
@@ -851,11 +964,11 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 	 * If uhci controller has not been initialized, just clear the
 	 * interrupter status and return claimed.
 	 */
-	if (uhcip->uhci_ctlr_init_flag != B_TRUE) {
+	if (uhcip->uhci_hc_soft_state != UHCI_CTLR_OPERATIONAL_STATE) {
 
 		USB_DPRINTF_L2(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
-		    "uhci_intr: uhci controller has not been fully"
-		    "initialized");
+		    "uhci_intr: uhci controller is not in the operational"
+		    "state");
 		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (DDI_INTR_CLAIMED);
@@ -868,6 +981,8 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 		USB_DPRINTF_L2(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
 		    "uhci_intr: Sys Err Disabling Interrupt");
 		Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
+		uhcip->uhci_hc_soft_state = UHCI_CTLR_ERROR_STATE;
+
 		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (DDI_INTR_CLAIMED);

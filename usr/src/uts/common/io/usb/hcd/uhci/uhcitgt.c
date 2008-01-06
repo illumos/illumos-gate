@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 	usb_addr_t		usb_addr;
 	uhci_state_t		*uhcip;
 	uhci_pipe_private_t	*pp;
-	int			error = USB_SUCCESS;
+	int			rval, error = USB_SUCCESS;
 
 	ASSERT(ph);
 
@@ -84,6 +84,16 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 	    ph->p_ep.bEndpointAddress & USB_EP_NUM_MASK);
 
 	sema_p(&uhcip->uhci_ocsem);
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+	rval = uhci_state_is_operational(uhcip);
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	if (rval != USB_SUCCESS) {
+		sema_v(&uhcip->uhci_ocsem);
+
+		return (rval);
+	}
 
 	/*
 	 * Return failure immediately for any other pipe open on the root hub
@@ -106,7 +116,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 			 * pipe as IDLE.
 			 */
 			uhcip->uhci_root_hub.rh_pipe_state =
-						UHCI_PIPE_STATE_IDLE;
+			    UHCI_PIPE_STATE_IDLE;
 
 			ASSERT(uhcip->uhci_root_hub.rh_client_intr_req == NULL);
 			uhcip->uhci_root_hub.rh_client_intr_req = NULL;
@@ -189,6 +199,15 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 	}
 
 	mutex_enter(&uhcip->uhci_int_mutex);
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		kmem_free(ph, sizeof (uhci_pipe_private_t));
+		mutex_exit(&uhcip->uhci_int_mutex);
+		sema_v(&uhcip->uhci_ocsem);
+
+		return (rval);
+	}
 	pp->pp_node = node;	/* Store the node in the interrupt lattice */
 
 	/* Initialize frame number */
@@ -228,7 +247,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 			 * of the pipe handle.
 			 */
 			kmem_free(ph->p_hcd_private,
-				sizeof (uhci_pipe_private_t));
+			    sizeof (uhci_pipe_private_t));
 
 			/*
 			 * Set the private structure in the
@@ -260,7 +279,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 		mutex_enter(&ph->p_mutex);
 
 		pp->pp_data_toggle = usba_hcdi_get_data_toggle(
-			ph->p_usba_device, ph->p_ep.bEndpointAddress);
+		    ph->p_usba_device, ph->p_ep.bEndpointAddress);
 		mutex_exit(&ph->p_mutex);
 	}
 
@@ -313,17 +332,14 @@ uhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 			break;
 		case USB_EP_ATTR_INTR:
 			ASSERT((eptd->bEndpointAddress &
-				USB_EP_NUM_MASK) == 1);
-
-			ASSERT(uhcip->uhci_root_hub.rh_pipe_state ==
-					UHCI_PIPE_STATE_ACTIVE);
+			    USB_EP_NUM_MASK) == 1);
 
 			/* Do interrupt pipe cleanup */
 			uhci_root_hub_intr_pipe_cleanup(uhcip,
-						USB_CR_PIPE_CLOSING);
+			    USB_CR_PIPE_CLOSING);
 
 			ASSERT(uhcip->uhci_root_hub.rh_pipe_state ==
-					UHCI_PIPE_STATE_IDLE);
+			    UHCI_PIPE_STATE_IDLE);
 
 			uhcip->uhci_root_hub.rh_intr_pipe_handle = NULL;
 
@@ -332,11 +348,10 @@ uhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 			    "pipe close succeeded");
 
 			uhcip->uhci_root_hub.rh_pipe_state =
-					UHCI_PIPE_STATE_IDLE;
+			    UHCI_PIPE_STATE_IDLE;
 
 			mutex_exit(&uhcip->uhci_int_mutex);
 			sema_v(&uhcip->uhci_ocsem);
-
 			return (USB_SUCCESS);
 		}
 	} else {
@@ -437,7 +452,7 @@ int
 uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 {
 	uhci_state_t		*uhcip = uhci_obtain_state(
-					ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
@@ -459,11 +474,11 @@ uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 		case USB_EP_ATTR_INTR:
 			mutex_enter(&uhcip->uhci_int_mutex);
 			uhcip->uhci_root_hub.rh_pipe_state =
-							UHCI_PIPE_STATE_IDLE;
+			    UHCI_PIPE_STATE_IDLE;
 
 			/* Do interrupt pipe cleanup */
 			uhci_root_hub_intr_pipe_cleanup(uhcip,
-						USB_CR_PIPE_RESET);
+			    USB_CR_PIPE_RESET);
 
 			USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 			    "uhci_hcdi_pipe_reset: Pipe reset for "
@@ -473,7 +488,7 @@ uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 			break;
 		default:
 			USB_DPRINTF_L2(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-			    "uhci_hcdi_pipe_close: Root hub pipe reset failed");
+			    "uhci_hcdi_pipe_reset: Root hub pipe reset failed");
 
 			return (USB_FAILURE);
 		}
@@ -552,15 +567,22 @@ uhci_hcdi_pipe_ctrl_xfer(
 	usb_flags_t		flags)
 {
 	uhci_state_t *uhcip = uhci_obtain_state(
-				ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	uhci_pipe_private_t *pp = (uhci_pipe_private_t *)ph->p_hcd_private;
-	int error = USB_SUCCESS;
+	int error;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_ctrl_xfer: req=0x%p, ph=0x%p, flags=0x%x",
 	    ctrl_reqp, ph, flags);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
+	error = uhci_state_is_operational(uhcip);
+
+	if (error != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (error);
+	}
 
 	ASSERT(pp->pp_state == UHCI_PIPE_STATE_IDLE);
 
@@ -612,6 +634,13 @@ uhci_hcdi_pipe_bulk_xfer(usba_pipe_handle_data_t *pipe_handle,
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 
+	error = uhci_state_is_operational(uhcip);
+
+	if (error != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (error);
+	}
 	/* Add the TD into the Host Controller's bulk list */
 	if ((error = uhci_insert_bulk_td(uhcip, pipe_handle, bulk_reqp,
 	    usb_flags)) != USB_SUCCESS) {
@@ -633,12 +662,24 @@ uhci_hcdi_bulk_transfer_size(
 	usba_device_t	*usba_device,
 	size_t		*size)
 {
-	uhci_state_t *uhcip = uhci_obtain_state(usba_device->usb_root_hub_dip);
+	uhci_state_t	*uhcip = uhci_obtain_state(
+	    usba_device->usb_root_hub_dip);
+	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_bulk_transfer_size:");
 
+	mutex_enter(&uhcip->uhci_int_mutex);
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (rval);
+	}
+
 	*size = uhci_bulk_transfer_size;
+	mutex_exit(&uhcip->uhci_int_mutex);
 
 	return (USB_SUCCESS);
 }
@@ -654,7 +695,7 @@ uhci_hcdi_pipe_intr_xfer(
 	usb_flags_t		flags)
 {
 	uhci_state_t	*uhcip = uhci_obtain_state(
-					ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_intr_xfer: req=0x%p, uf=0x%x", req, flags);
@@ -662,7 +703,7 @@ uhci_hcdi_pipe_intr_xfer(
 	if (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_IN) {
 
 		return (uhci_start_periodic_pipe_polling(uhcip, ph,
-					(usb_opaque_t)req, flags));
+		    (usb_opaque_t)req, flags));
 	} else {
 
 		return (uhci_send_intr_data(uhcip, ph, req, flags));
@@ -681,12 +722,20 @@ uhci_send_intr_data(
 	usb_intr_req_t		*req,
 	usb_flags_t		flags)
 {
-	int	rval = USB_SUCCESS;
+	int	rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_send_intr_data:");
 
 	mutex_enter(&uhcip->uhci_int_mutex);
+
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (rval);
+	}
 
 	/* Add the TD into the Host Controller's interrupt list */
 	if ((rval = uhci_insert_intr_td(uhcip, pipe_handle, req, flags)) !=
@@ -709,50 +758,83 @@ uhci_hcdi_pipe_stop_intr_polling(
 	usb_flags_t		flags)
 {
 	uhci_state_t *uhcip =
-		uhci_obtain_state(pipe_handle->p_usba_device->usb_root_hub_dip);
+	    uhci_obtain_state(pipe_handle->p_usba_device->usb_root_hub_dip);
+	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_stop_intr_polling: ph = 0x%p fl = 0x%x",
 	    (void *)pipe_handle, flags);
+	mutex_enter(&uhcip->uhci_int_mutex);
 
-	return (uhci_stop_periodic_pipe_polling(uhcip, pipe_handle, flags));
+	rval = uhci_stop_periodic_pipe_polling(uhcip, pipe_handle, flags);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	return (rval);
 }
 
 
 /*
  * uhci_hcdi_get_current_frame_number
- *	Returns the current frame number
+ *	Get the current frame number.
+ *	Return whether the request is handled successfully.
  */
-usb_frame_number_t
-uhci_hcdi_get_current_frame_number(usba_device_t *usba_device)
+int
+uhci_hcdi_get_current_frame_number(
+	usba_device_t		*usba_device,
+	usb_frame_number_t	*frame_number)
 {
 	uhci_state_t *uhcip = uhci_obtain_state(usba_device->usb_root_hub_dip);
-	usb_frame_number_t frame_number;
+	int		rval;
 
 	mutex_enter(&uhcip->uhci_int_mutex);
-	frame_number = uhci_get_sw_frame_number(uhcip);
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (rval);
+	}
+
+	*frame_number = uhci_get_sw_frame_number(uhcip);
 	mutex_exit(&uhcip->uhci_int_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_get_current_frame_number: %llx", frame_number);
 
-	return (frame_number);
+	return (rval);
 }
 
 
 /*
  * uhci_hcdi_get_max_isoc_pkts
- *	Returns the maximum number of isoc packets per USB Isoch request
+ *	Get the maximum number of isoc packets per USB Isoch request.
+ *	Return whether the request is handled successfully.
  */
-uint_t
-uhci_hcdi_get_max_isoc_pkts(usba_device_t *usba_device)
+int
+uhci_hcdi_get_max_isoc_pkts(
+	usba_device_t	*usba_device,
+	uint_t		*max_isoc_pkts_per_request)
 {
 	uhci_state_t *uhcip = uhci_obtain_state(usba_device->usb_root_hub_dip);
+	int		rval;
+
+	mutex_enter(&uhcip->uhci_int_mutex);
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (rval);
+	}
+
+	*max_isoc_pkts_per_request = UHCI_MAX_ISOC_PKTS;
+	mutex_exit(&uhcip->uhci_int_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_get_max_isoc_pkts: 0x%x", UHCI_MAX_ISOC_PKTS);
 
-	return (UHCI_MAX_ISOC_PKTS);
+	return (rval);
 }
 
 
@@ -774,7 +856,7 @@ uhci_hcdi_pipe_isoc_xfer(
 	if (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_IN) {
 
 		return (uhci_start_periodic_pipe_polling(uhcip, ph,
-					(usb_opaque_t)isoc_reqp, flags));
+		    (usb_opaque_t)isoc_reqp, flags));
 	} else {
 
 		return (uhci_pipe_send_isoc_data(uhcip, ph, isoc_reqp, flags));
@@ -791,13 +873,27 @@ uhci_hcdi_pipe_stop_isoc_polling(
 	usb_flags_t		flags)
 {
 	uhci_state_t *uhcip =
-		uhci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
+	    uhci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
+	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_stop_isoc_polling: ph = 0x%p fl = 0x%x",
 	    (void *)ph, flags);
 
-	return (uhci_stop_periodic_pipe_polling(uhcip, ph, flags));
+	mutex_enter(&uhcip->uhci_int_mutex);
+	rval = uhci_state_is_operational(uhcip);
+
+	if (rval != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (rval);
+	}
+
+	rval = uhci_stop_periodic_pipe_polling(uhcip, ph, flags);
+
+	mutex_exit(&uhcip->uhci_int_mutex);
+
+	return (rval);
 }
 
 
@@ -812,7 +908,7 @@ uhci_start_periodic_pipe_polling(
 	usb_flags_t		flags)
 {
 	int			n, num_tds;
-	int			error = USB_SUCCESS;
+	int			error;
 	usb_intr_req_t		*intr_reqp = (usb_intr_req_t *)in_reqp;
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	uhci_pipe_private_t	*pp = (uhci_pipe_private_t *)ph->p_hcd_private;
@@ -822,6 +918,14 @@ uhci_start_periodic_pipe_polling(
 	    flags, eptd->bEndpointAddress);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
+
+	error = uhci_state_is_operational(uhcip);
+
+	if (error != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (error);
+	}
 
 	if (ph->p_usba_device->usb_addr == ROOT_HUB_ADDR) {
 		uint_t	pipe_state = uhcip->uhci_root_hub.rh_pipe_state;
@@ -940,18 +1044,18 @@ uhci_stop_periodic_pipe_polling(uhci_state_t *uhcip,
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_stop_periodic_pipe_polling: flags = 0x%x", flags);
 
+	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 	if (ph->p_usba_device->usb_addr == ROOT_HUB_ADDR) {
 		ASSERT(UHCI_XFER_DIR(eptd) == USB_EP_DIR_IN);
 
-		mutex_enter(&uhcip->uhci_int_mutex);
 		if (uhcip->uhci_root_hub.rh_pipe_state ==
 		    UHCI_PIPE_STATE_ACTIVE) {
 			uhcip->uhci_root_hub.rh_pipe_state =
-				UHCI_PIPE_STATE_IDLE;
+			    UHCI_PIPE_STATE_IDLE;
 
 			/* Do interrupt pipe cleanup */
 			uhci_root_hub_intr_pipe_cleanup(uhcip,
-						USB_CR_STOPPED_POLLING);
+			    USB_CR_STOPPED_POLLING);
 
 			USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 			    "uhci_stop_periodic_pipe_polling: Stop intr "
@@ -962,17 +1066,13 @@ uhci_stop_periodic_pipe_polling(uhci_state_t *uhcip,
 			    "uhci_stop_periodic_pipe_polling: "
 			    "Intr polling for root hub is already stopped");
 		}
-		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (USB_SUCCESS);
 	}
 
-	mutex_enter(&uhcip->uhci_int_mutex);
-
 	if (pp->pp_state != UHCI_PIPE_STATE_ACTIVE) {
 		USB_DPRINTF_L2(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
 		    "uhci_stop_periodic_pipe_polling: Polling already stopped");
-		mutex_exit(&uhcip->uhci_int_mutex);
 
 		return (USB_SUCCESS);
 	}
@@ -1001,7 +1101,6 @@ uhci_stop_periodic_pipe_polling(uhci_state_t *uhcip,
 	if (pp->pp_client_periodic_in_reqp) {
 		uhci_hcdi_callback(uhcip, pp, ph, NULL, USB_CR_STOPPED_POLLING);
 	}
-	mutex_exit(&uhcip->uhci_int_mutex);
 
 	return (USB_SUCCESS);
 }
@@ -1059,6 +1158,14 @@ uhci_pipe_send_isoc_data(
 	/* Add the TD into the Host Controller's isoc list */
 	mutex_enter(&uhcip->uhci_int_mutex);
 
+	error = uhci_state_is_operational(uhcip);
+
+	if (error != USB_SUCCESS) {
+		mutex_exit(&uhcip->uhci_int_mutex);
+
+		return (error);
+	}
+
 	if ((error = uhci_insert_isoc_td(uhcip, ph, isoc_req,
 	    length, usb_flags)) != USB_SUCCESS) {
 
@@ -1084,7 +1191,7 @@ uhci_update_intr_td_data_toggle(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 
 	/* Find the next td that would have been executed */
 	element_ptr = GetQH32(uhcip, pp->pp_qh->element_ptr) &
-						QH_ELEMENT_PTR_MASK;
+	    QH_ELEMENT_PTR_MASK;
 	next_td = TD_VADDR(element_ptr);
 	paddr_tail = TD_PADDR(pp->pp_qh->td_tailp);
 

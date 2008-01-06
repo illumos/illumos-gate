@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,32 +31,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/*
- * Universal Host Controller Driver (UHCI)
- *
- * Declarations, prototypes for talking to HCDI
- *
- *   Function prototypes
- */
-int		uhci_hcdi_pipe_open(usba_pipe_handle_data_t *, usb_flags_t);
-int		uhci_hcdi_pipe_close(usba_pipe_handle_data_t *, usb_flags_t);
-int		uhci_hcdi_pipe_reset(usba_pipe_handle_data_t *, usb_flags_t);
-int		uhci_hcdi_pipe_ctrl_xfer(usba_pipe_handle_data_t *,
-			usb_ctrl_req_t *, usb_flags_t);
-int		uhci_hcdi_pipe_bulk_xfer(usba_pipe_handle_data_t *,
-			usb_bulk_req_t *, usb_flags_t);
-int		uhci_hcdi_pipe_isoc_xfer(usba_pipe_handle_data_t *,
-			usb_isoc_req_t *, usb_flags_t);
-int		uhci_hcdi_pipe_intr_xfer(usba_pipe_handle_data_t *,
-			usb_intr_req_t *, usb_flags_t);
-int		uhci_hcdi_pipe_stop_intr_polling(usba_pipe_handle_data_t *,
-			usb_flags_t);
-int		uhci_hcdi_pipe_stop_isoc_polling(usba_pipe_handle_data_t *,
-			usb_flags_t);
-int		uhci_hcdi_bulk_transfer_size(usba_device_t *, size_t *);
-usb_frame_number_t uhci_hcdi_get_current_frame_number(usba_device_t *);
-uint_t		uhci_hcdi_get_max_isoc_pkts(usba_device_t *);
 
 /*
  *  Shared function declarations

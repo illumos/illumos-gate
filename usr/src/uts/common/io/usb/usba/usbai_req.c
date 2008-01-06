@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,9 +116,9 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 	usb_opaque_t		cb, exc_cb;
 	uint_t			timeout = 0;
 	uchar_t			direction = ph_data->p_ep.bEndpointAddress &
-							USB_EP_DIR_MASK;
+	    USB_EP_DIR_MASK;
 	uchar_t			ep_attrs = ph_data->p_ep.bmAttributes &
-							USB_EP_ATTR_MASK;
+	    USB_EP_ATTR_MASK;
 	int			n;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
@@ -425,13 +425,13 @@ usba_flags_attr_check(usba_pipe_handle_data_t *ph_data,
 	 */
 	for (i = 0; i < N_INVALID_FLAGS_ATTRS; i++) {
 		if (((ep_dir == usb_invalid_flags_attrs[i].ep_dir) ||
-			(usb_invalid_flags_attrs[i].ep_dir == X)) &&
+		    (usb_invalid_flags_attrs[i].ep_dir == X)) &&
 		    ((ep_attr == usb_invalid_flags_attrs[i].ep_attr) ||
-			(usb_invalid_flags_attrs[i].ep_attr == X)) &&
+		    (usb_invalid_flags_attrs[i].ep_attr == X)) &&
 		    ((flags & usb_invalid_flags_attrs[i].usb_flags) ||
-			(usb_invalid_flags_attrs[i].usb_flags == X)) &&
+		    (usb_invalid_flags_attrs[i].usb_flags == X)) &&
 		    ((attrs & usb_invalid_flags_attrs[i].attrs) ||
-			(usb_invalid_flags_attrs[i].attrs == X))) {
+		    (usb_invalid_flags_attrs[i].attrs == X))) {
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 			    "invalid (%d) : flags = 0x%x, attrs = 0x%x",
 			    i, flags, attrs);
@@ -502,7 +502,7 @@ usba_start_next_req(usba_pipe_handle_data_t *ph_data)
 	usb_bulk_req_t		*bulk_req;
 	usba_req_wrapper_t	*wrp;
 	uchar_t			ep_attrs = ph_data->p_ep.bmAttributes &
-							USB_EP_ATTR_MASK;
+	    USB_EP_ATTR_MASK;
 	int			rval;
 	usb_pipe_state_t	state;
 
@@ -634,8 +634,8 @@ usba_req_wrapper_alloc(dev_info_t	*dip,
 	usba_req_wrapper_t *wrp;
 	size_t		wr_length = sizeof (usba_req_wrapper_t) + req_len;
 	ddi_iblock_cookie_t iblock_cookie =
-		usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip)->
-		hcdi_iblock_cookie;
+	    usba_hcdi_get_hcdi(usba_device->usb_root_hub_dip)->
+	    hcdi_iblock_cookie;
 
 	if (servicing_interrupt() && (flags & USB_FLAGS_SLEEP)) {
 
@@ -653,9 +653,9 @@ usba_req_wrapper_alloc(dev_info_t	*dip,
 
 		/* initialize mutex for the queue */
 		usba_init_list(&wrp->wr_queue, (usb_opaque_t)wrp,
-						iblock_cookie);
+		    iblock_cookie);
 		usba_init_list(&wrp->wr_allocated_list, (usb_opaque_t)wrp,
-						iblock_cookie);
+		    iblock_cookie);
 
 		usba_add_to_list(&usba_device->usb_allocated,
 		    &wrp->wr_allocated_list);
@@ -689,7 +689,7 @@ usba_req_wrapper_free(usba_req_wrapper_t *wrp)
 		ph_data = USBA_WRP2PH_DATA(wrp);
 		if (ph_data) {
 			(void) usba_rm_from_list(&ph_data->p_queue,
-							&wrp->wr_queue);
+			    &wrp->wr_queue);
 		}
 		usba_device = usba_get_usba_device(wrp->wr_dip);
 		if (usba_rm_from_list(&usba_device->usb_allocated,
@@ -730,7 +730,7 @@ usba_req_normal_cb(usba_req_wrapper_t *req_wrp)
 	usba_pipe_handle_data_t	*ph_data = req_wrp->wr_ph_data;
 	usb_pipe_handle_t	pipe_handle;
 	uint_t			direction = ph_data->p_ep.bEndpointAddress &
-							USB_EP_DIR_MASK;
+	    USB_EP_DIR_MASK;
 	usb_pipe_state_t	pipe_state;
 
 	pipe_handle = usba_get_pipe_handle(ph_data);
@@ -793,22 +793,22 @@ usba_req_normal_cb(usba_req_wrapper_t *req_wrp)
 		    USB_EP_ATTR_MASK) {
 		case USB_EP_ATTR_CONTROL:
 			USBA_WRP2CTRL_REQ(req_wrp)->ctrl_cb(pipe_handle,
-						USBA_WRP2CTRL_REQ(req_wrp));
+			    USBA_WRP2CTRL_REQ(req_wrp));
 			mutex_enter(&ph_data->p_mutex);
 			ph_data->p_active_cntrl_req_wrp = NULL;
 			mutex_exit(&ph_data->p_mutex);
 			break;
 		case USB_EP_ATTR_INTR:
 			USBA_WRP2INTR_REQ(req_wrp)->intr_cb(pipe_handle,
-						USBA_WRP2INTR_REQ(req_wrp));
+			    USBA_WRP2INTR_REQ(req_wrp));
 			break;
 		case USB_EP_ATTR_BULK:
 			USBA_WRP2BULK_REQ(req_wrp)->bulk_cb(pipe_handle,
-						USBA_WRP2BULK_REQ(req_wrp));
+			    USBA_WRP2BULK_REQ(req_wrp));
 			break;
 		case USB_EP_ATTR_ISOCH:
 			USBA_WRP2ISOC_REQ(req_wrp)->isoc_cb(pipe_handle,
-						USBA_WRP2ISOC_REQ(req_wrp));
+			    USBA_WRP2ISOC_REQ(req_wrp));
 			break;
 		}
 	}
@@ -850,7 +850,7 @@ usba_req_exc_cb(usba_req_wrapper_t *req_wrp, usb_cr_t cr,
 	/* if there was no CR set already, set it now */
 	if (req_wrp->wr_cr == USB_CR_OK) {
 		req_wrp->wr_cr = (cr != USB_CR_OK)  ?
-				cr : USB_CR_UNSPECIFIED_ERR;
+		    cr : USB_CR_UNSPECIFIED_ERR;
 	}
 
 	ASSERT(req_wrp->wr_done == B_FALSE);
@@ -900,7 +900,7 @@ usba_req_exc_cb(usba_req_wrapper_t *req_wrp, usb_cr_t cr,
 		    USB_EP_ATTR_MASK) {
 		case USB_EP_ATTR_CONTROL:
 			USBA_WRP2CTRL_REQ(req_wrp)->ctrl_exc_cb(pipe_handle,
-						USBA_WRP2CTRL_REQ(req_wrp));
+			    USBA_WRP2CTRL_REQ(req_wrp));
 			mutex_enter(&ph_data->p_mutex);
 			if (ph_data->p_active_cntrl_req_wrp ==
 			    (usb_opaque_t)req_wrp) {
@@ -910,15 +910,15 @@ usba_req_exc_cb(usba_req_wrapper_t *req_wrp, usb_cr_t cr,
 			break;
 		case USB_EP_ATTR_INTR:
 			USBA_WRP2INTR_REQ(req_wrp)->intr_exc_cb(pipe_handle,
-						USBA_WRP2INTR_REQ(req_wrp));
+			    USBA_WRP2INTR_REQ(req_wrp));
 			break;
 		case USB_EP_ATTR_BULK:
 			USBA_WRP2BULK_REQ(req_wrp)->bulk_exc_cb(pipe_handle,
-						USBA_WRP2BULK_REQ(req_wrp));
+			    USBA_WRP2BULK_REQ(req_wrp));
 			break;
 		case USB_EP_ATTR_ISOCH:
 			USBA_WRP2ISOC_REQ(req_wrp)->isoc_exc_cb(pipe_handle,
-						USBA_WRP2ISOC_REQ(req_wrp));
+			    USBA_WRP2ISOC_REQ(req_wrp));
 			break;
 		}
 	}
@@ -1055,7 +1055,7 @@ usb_alloc_ctrl_req(dev_info_t	*dip,
 		if (len) {
 			if (flags & USB_FLAGS_SLEEP) {
 				ctrl_req->ctrl_data = allocb_wait(len, BPRI_LO,
-							STR_NOSIG, NULL);
+				    STR_NOSIG, NULL);
 			} else	if ((ctrl_req->ctrl_data =
 			    allocb(len, BPRI_HI)) == NULL) {
 				usba_req_wrapper_free(wrp);
@@ -1334,8 +1334,7 @@ usb_pipe_sync_ctrl_xfer(dev_info_t *dip,
 	ctrl_req->ctrl_wIndex		= wIndex;
 	ctrl_req->ctrl_wLength		= wLength;
 	ctrl_req->ctrl_data		= ctrl_req->ctrl_data ?
-						ctrl_req->ctrl_data :
-						((data) ? *data : NULL);
+	    ctrl_req->ctrl_data : ((data) ? *data : NULL);
 	ctrl_req->ctrl_timeout		= USB_PIPE_TIMEOUT;
 	ctrl_req->ctrl_attributes	= attributes | USB_ATTRS_AUTOCLEARING;
 
@@ -1405,18 +1404,18 @@ usb_pipe_ctrl_xfer_wait(
 		usb_flags_t		flags)
 {
 	return (usb_pipe_sync_ctrl_xfer(
-				usba_get_dip(pipe_handle),
-				pipe_handle,
-				setup->bmRequestType,
-				setup->bRequest,
-				setup->wValue,
-				setup->wIndex,
-				setup->wLength,
-				data,
-				setup->attrs,
-				completion_reason,
-				cb_flags,
-				flags));
+	    usba_get_dip(pipe_handle),
+	    pipe_handle,
+	    setup->bmRequestType,
+	    setup->bRequest,
+	    setup->wValue,
+	    setup->wIndex,
+	    setup->wLength,
+	    data,
+	    setup->attrs,
+	    completion_reason,
+	    cb_flags,
+	    flags));
 }
 
 
@@ -1693,7 +1692,7 @@ usb_alloc_intr_req(dev_info_t	*dip,
 		if (len) {
 			if (flags & USB_FLAGS_SLEEP) {
 				intr_req->intr_data = allocb_wait(len, BPRI_LO,
-							STR_NOSIG, NULL);
+				    STR_NOSIG, NULL);
 			} else	if ((intr_req->intr_data =
 			    allocb(len, BPRI_HI)) == NULL) {
 				usba_req_wrapper_free(wrp);
@@ -1984,7 +1983,7 @@ usba_pipe_sync_stop_intr_polling(dev_info_t	*dip,
 
 	for (;;) {
 		rval = usba_device->usb_hcdi_ops->
-			usba_hcdi_pipe_stop_intr_polling(ph_data, flags);
+		    usba_hcdi_pipe_stop_intr_polling(ph_data, flags);
 
 		/*
 		 * The host controller has stopped polling of the endpoint.
@@ -2000,7 +1999,7 @@ usba_pipe_sync_stop_intr_polling(dev_info_t	*dip,
 			 * have to let the stop polling win)
 			 */
 			rval = usba_drain_cbs(ph_data, 0,
-						USB_CR_STOPPED_POLLING);
+			    USB_CR_STOPPED_POLLING);
 			mutex_exit(&ph_data->p_mutex);
 			if (rval != USB_SUCCESS) {
 
@@ -2128,7 +2127,7 @@ usb_alloc_isoc_req(dev_info_t		*dip,
 	usb_isoc_req_t		*isoc_req = NULL;
 	usba_req_wrapper_t	*wrp;
 	size_t			length = sizeof (*isoc_req) +
-			(sizeof (usb_isoc_pkt_descr_t) * isoc_pkts_count);
+	    (sizeof (usb_isoc_pkt_descr_t) * isoc_pkts_count);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_alloc_isoc_req: dip=0x%p pkt_cnt=%d len=%lu flags=0x%x",
@@ -2225,7 +2224,7 @@ usba_hcdi_dup_isoc_req(
 
 		for (count = 0; count < isoc_pkts_count; count++) {
 			isoc_reqp->isoc_pkt_descr[count].isoc_pkt_length =
-				reqp->isoc_pkt_descr[count].isoc_pkt_length;
+			    reqp->isoc_pkt_descr[count].isoc_pkt_length;
 		}
 	}
 
@@ -2276,12 +2275,17 @@ usb_get_current_frame_number(dev_info_t	*dip)
 
 	if (dip) {
 		usba_device_t	*usba_device = usba_get_usba_device(dip);
+		usb_frame_number_t	frame_number;
 
 		if (usba_device->usb_hcdi_ops->
 		    usba_hcdi_get_current_frame_number) {
 
-			return (usba_device->usb_hcdi_ops->
-			    usba_hcdi_get_current_frame_number(usba_device));
+			if (usba_device->usb_hcdi_ops->
+			    usba_hcdi_get_current_frame_number(usba_device,
+			    &frame_number) == USB_SUCCESS) {
+
+				return (frame_number);
+			}
 		}
 	}
 
@@ -2312,14 +2316,19 @@ usb_get_max_pkts_per_isoc_request(dev_info_t *dip)
 {
 	if (dip) {
 		usba_device_t	*usba_device = usba_get_usba_device(dip);
+		uint_t		max_isoc_pkts_per_request;
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_get_max_isoc_pkts: usba_device=0x%p", usba_device);
 
 		if (usba_device->usb_hcdi_ops->usba_hcdi_get_max_isoc_pkts) {
 
-			return (usba_device->usb_hcdi_ops->
-			    usba_hcdi_get_max_isoc_pkts(usba_device));
+			if (usba_device->usb_hcdi_ops->
+			    usba_hcdi_get_max_isoc_pkts(usba_device,
+			    &max_isoc_pkts_per_request) == USB_SUCCESS) {
+
+				return (max_isoc_pkts_per_request);
+			}
 		}
 	}
 
@@ -2452,7 +2461,7 @@ usba_pipe_sync_stop_isoc_polling(dev_info_t	*dip,
 {
 	int rval;
 	usba_pipe_handle_data_t *ph_data = usba_get_ph_data(
-					(usb_pipe_handle_t)ph_impl);
+	    (usb_pipe_handle_t)ph_impl);
 	usba_device_t	*usba_device;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
@@ -2496,7 +2505,7 @@ usba_pipe_sync_stop_isoc_polling(dev_info_t	*dip,
 
 	for (;;) {
 		rval = usba_device->usb_hcdi_ops->
-			usba_hcdi_pipe_stop_isoc_polling(ph_data, flags);
+		    usba_hcdi_pipe_stop_isoc_polling(ph_data, flags);
 
 		/*
 		 * The host controller has stopped polling of the endpoint.
@@ -2512,7 +2521,7 @@ usba_pipe_sync_stop_isoc_polling(dev_info_t	*dip,
 			 * let the stop polling win
 			 */
 			rval = usba_drain_cbs(ph_data, 0,
-						USB_CR_STOPPED_POLLING);
+			    USB_CR_STOPPED_POLLING);
 			mutex_exit(&ph_data->p_mutex);
 			if (rval != USB_SUCCESS) {
 
