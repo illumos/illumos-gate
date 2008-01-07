@@ -2,7 +2,7 @@
  *
  * probe-volume.c : probe volumes
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -513,7 +513,11 @@ main (int argc, char *argv[])
 	if (ioctl(rfd, DKIOCGMEDIAINFO, &mi) != -1) {
 		block_size = mi.dki_lbsize;
 		vol_size = mi.dki_capacity * block_size;
+	} else if (errno == ENXIO) {
+		/* driver supports ioctl, but media is not available */
+		goto out;
 	} else {
+		/* driver does not support ioctl, e.g. lofi */
 		block_size = 512;
 		vol_size = 0;
 	}
