@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4836,7 +4836,16 @@ check_commands:
 		} else {
 			mtget->mt_fileno = -1;
 		}
-		mtget->mt_blkno = un->un_err_pos.blkno;
+		/*
+		 * If the value is positive fine.
+		 * If its negative we need to return a value based on the
+		 * old way if counting backwards from INF (1,000,000,000).
+		 */
+		if (un->un_err_pos.blkno >= 0) {
+			mtget->mt_blkno = un->un_err_pos.blkno;
+		} else {
+			mtget->mt_blkno = INF + 1 - (-un->un_err_pos.blkno);
+		}
 		mtget->mt_type = un->un_dp->type;
 		mtget->mt_flags = MTF_SCSI | MTF_ASF;
 		if (un->un_read_pos_type != NO_POS) {
@@ -11173,7 +11182,7 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 				un->un_running.blkno = 0;
 			} else if (attrib->chg_tape_direction == DIR_REVC) {
 				un->un_running.fileno--;
-				un->un_running.blkno = INF;
+				un->un_running.blkno = LASTBLK;
 			}
 		}
 	}
@@ -11344,7 +11353,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 					un->un_pos.blkno = 0;
 				} else {
 					un->un_pos.fileno -= done;
-					un->un_pos.blkno = INF;
+					un->un_pos.blkno = LASTBLK;
 					un->un_running.pmode = invalid;
 				}
 				break;
@@ -11368,7 +11377,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 						un->un_pos.blkno = 0;
 					} else {
 						un->un_pos.fileno--;
-						un->un_pos.blkno = INF;
+						un->un_pos.blkno = LASTBLK;
 						un->un_running.pmode = invalid;
 					}
 				} else {
@@ -15254,7 +15263,7 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 			if ((un->un_dp->options & ST_BSF) == 0) {
 				un->un_pos.eof = ST_EOF_PENDING;
 				un->un_pos.fileno -= 1;
-				un->un_pos.blkno = INF;
+				un->un_pos.blkno = LASTBLK;
 				un->un_running.pmode = invalid;
 			}
 		}
@@ -16622,8 +16631,9 @@ st_add_recovery_info_to_pkt(struct scsi_tape *un, buf_t *bp,
 			 * Always should be more logical blocks then
 			 * data blocks and files marks.
 			 */
-			ASSERT(rinfo->pos.lgclblkno >= rinfo->pos.blkno +
-			    rinfo->pos.fileno);
+			ASSERT((rinfo->pos.blkno >= 0) ?
+			    rinfo->pos.lgclblkno >=
+			    (rinfo->pos.blkno + rinfo->pos.fileno) : 1);
 		}
 	}
 
@@ -17266,6 +17276,8 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 
 	newpkt->pkt_state = 0;
 	newpkt->pkt_statistics = 0;
+
+	oldpkt = BP_PKT(bp);
 
 	SET_BP_PKT(bp, newpkt);
 

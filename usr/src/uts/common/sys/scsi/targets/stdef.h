@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,8 @@ extern "C" {
 #define	ST_MAXRECSIZE_VARIABLE_LIMIT	65534
 
 #define	ST_MAXRECSIZE_FIXED	(63<<10)	/* maximum fixed record size */
-#define	INF 1000000000
+#define	INF 1000000000	/* old external count backwards from this from EOF */
+#define	LASTBLK (-1)	/* new internal count backwards from EOF */
 
 /*
  * Supported tape device types plus default type for opening.
