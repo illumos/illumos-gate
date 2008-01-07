@@ -1543,6 +1543,15 @@ E1000G_OBJS +=	e1000_80003es2lan.o e1000_82540.o e1000_82541.o e1000_82542.o \
 		e1000_mac.o e1000_manage.o e1000_nvm.o e1000_osdep.o \
 		e1000_phy.o e1000g_debug.o e1000g_main.o e1000g_alloc.o \
 		e1000g_tx.o e1000g_rx.o e1000g_stat.o e1000g_ndd.o
+
+#
+#	Intel 82575 1G NIC driver module
+#
+IGB_OBJS =	igb_82575.o igb_api.o igb_mac.o igb_manage.o \
+		igb_nvm.o igb_osdep.o igb_phy.o igb_buf.o \
+		igb_debug.o igb_gld.o igb_log.o igb_main.o \
+		igb_ndd.o igb_rx.o igb_stat.o igb_tx.o
+
 #
 #	NIU 10G/1G driver module
 #

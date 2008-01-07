@@ -262,6 +262,7 @@ DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
 DRV_KMODS	+= sfe
 DRV_KMODS	+= aac
+DRV_KMODS	+= igb
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
 #
