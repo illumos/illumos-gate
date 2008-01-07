@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2378,6 +2378,9 @@ data_copy(int ifd, int ofd, int rw_sysattr, uint_t bytes,
 				}
 				free(buf);
 				return (1);
+			} else if (Args & OCp) {
+				Blocks += (u_longlong_t)((cnt +
+				    (Bufsize - 1)) / Bufsize);
 			}
 		}
 		bytes -= maxwrite;
