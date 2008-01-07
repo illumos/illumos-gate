@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5044,6 +5044,7 @@ again:
 				return (-1);
 
 			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INTERNAL:
 			case SCF_ERROR_INVALID_ARGUMENT:
 			case SCF_ERROR_HANDLE_MISMATCH:
 				bad_error("_scf_snapshot_take_new",
@@ -5525,6 +5526,7 @@ nosnap:
 				goto deltemp;
 
 			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INTERNAL:
 			case SCF_ERROR_INVALID_ARGUMENT:
 			case SCF_ERROR_HANDLE_MISMATCH:
 				bad_error("_scf_snapshot_take_new",
@@ -6717,6 +6719,7 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 	int r;
 	pgroup_t *old_dpt;
 	void *cookie;
+	int annotation_set = 0;
 
 	const char * const emsg_nomem = gettext("Out of memory.\n");
 	const char * const emsg_nores =
@@ -6800,6 +6803,35 @@ lscf_bundle_import(bundle_t *bndl, const char *filename, uint_t flags)
 		case SCF_ERROR_HANDLE_MISMATCH:
 		default:
 			bad_error("scf_handle_get_scope", scf_error());
+		}
+	}
+
+	/* Set up the auditing annotation. */
+	if (_scf_set_annotation(g_hndl, "svccfg import", filename) == 0) {
+		annotation_set = 1;
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			warn(gettext("Repository connection broken.\n"));
+			repository_teardown();
+			result = -1;
+			goto out;
+
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NO_RESOURCES:
+		case SCF_ERROR_INTERNAL:
+			bad_error("_scf_set_annotation", scf_error());
+			/* NOTREACHED */
+
+		default:
+			/*
+			 * Do not terminate import because of inability to
+			 * generate annotation audit event.
+			 */
+			warn(gettext("_scf_set_annotation() unexpectedly "
+			    "failed with return code of %d\n"), scf_error());
+			break;
 		}
 	}
 
@@ -6954,6 +6986,10 @@ progress:
 	result = -1;
 
 out:
+	if (annotation_set != 0) {
+		/* Turn off annotation.  It is no longer needed. */
+		(void) _scf_set_annotation(g_hndl, NULL, NULL);
+	}
 	load_fini();
 
 	free(ud_ctarg);
@@ -7033,12 +7069,13 @@ out:
  *   -1 - lscf_import_instance_pgs() failed.
  */
 int
-lscf_bundle_apply(bundle_t *bndl)
+lscf_bundle_apply(bundle_t *bndl, const char *file)
 {
 	entity_t *svc, *inst;
 	scf_scope_t *rscope;
 	scf_service_t *rsvc;
 	scf_instance_t *rinst;
+	int annotation_set = 0;
 	int r;
 
 	lscf_prep_hndl();
@@ -7052,6 +7089,36 @@ lscf_bundle_apply(bundle_t *bndl)
 
 	if (scf_handle_get_scope(g_hndl, SCF_SCOPE_LOCAL, rscope) != 0)
 		scfdie();
+
+	/*
+	 * Set the strings to be used for the security audit annotation
+	 * event.
+	 */
+	if (_scf_set_annotation(g_hndl, "svccfg apply", file) == 0) {
+		annotation_set = 1;
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			warn(gettext("Repository connection broken.\n"));
+			goto out;
+
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NO_RESOURCES:
+		case SCF_ERROR_INTERNAL:
+			bad_error("_scf_set_annotation", scf_error());
+			/* NOTREACHED */
+
+		default:
+			/*
+			 * Do not abort apply operation because of
+			 * inability to create annotation audit event.
+			 */
+			warn(gettext("_scf_set_annotation() unexpectedly "
+			    "failed with return code of %d\n"), scf_error());
+			break;
+		}
+	}
 
 	for (svc = uu_list_first(bndl->sc_bundle_services);
 	    svc != NULL;
@@ -7148,6 +7215,11 @@ lscf_bundle_apply(bundle_t *bndl)
 	}
 
 out:
+	if (annotation_set) {
+		/* Remove security audit annotation strings. */
+		(void) _scf_set_annotation(g_hndl, NULL, NULL);
+	}
+
 	scf_transaction_destroy(imp_tx);
 	imp_tx = NULL;
 	scf_pg_destroy(imp_pg);

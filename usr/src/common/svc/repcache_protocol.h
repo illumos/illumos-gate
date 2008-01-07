@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -353,6 +353,12 @@
  *
  * BACKUP(name) -> result
  *	Backs up the persistant repository with a particular name.
+ *
+ * SET_ANNOTATION(operation, file)
+ *	Set up a security audit annotation event.  operation is the name of
+ *	the operation that is being annotated, and file is the file being
+ *	processed.  This will be used to mark operations which comprise
+ *	multiple primitive operations such as svccfg import.
  */
 
 #include <door.h>
@@ -376,7 +382,7 @@ extern "C" {
  * This value should be incremented any time the protocol changes.  When in
  * doubt, bump it.
  */
-#define	REPOSITORY_DOOR_VERSION			(19 + REPOSITORY_DOOR_BASEVER)
+#define	REPOSITORY_DOOR_VERSION			(20 + REPOSITORY_DOOR_BASEVER)
 
 /*
  * flags for rdr_flags
@@ -469,6 +475,8 @@ enum rep_protocol_requestid {
 	REP_PROTOCOL_CLIENT_WAIT,
 
 	REP_PROTOCOL_BACKUP,
+
+	REP_PROTOCOL_SET_AUDIT_ANNOTATION,
 
 	REP_PROTOCOL_MAX_REQUEST
 };
@@ -806,6 +814,12 @@ struct rep_protocol_backup_request {
 	enum rep_protocol_requestid rpr_request;	/* BACKUP */
 	uint32_t rpr_changeid;
 	char rpr_name[REP_PROTOCOL_NAME_LEN];
+};
+
+struct rep_protocol_annotation {
+	enum rep_protocol_requestid rpr_request;	/* SET_ANNOTATION */
+	char rpr_operation[REP_PROTOCOL_NAME_LEN];
+	char rpr_file[MAXPATHLEN];
 };
 
 /*

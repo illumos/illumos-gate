@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,9 @@ extern "C" {
 #define	SCF_PG_RESTARTER_ACTIONS_TYPE	SCF_GROUP_FRAMEWORK
 #define	SCF_PG_RESTARTER_ACTIONS_FLAGS	SCF_PG_FLAG_NONPERSISTENT
 
+#define	SCF_PROPERTY_CLEAR		((const char *)"maint_off")
+#define	SCF_PROPERTY_MAINTENANCE	((const char *)"maint_on")
+
 #define	SCF_PROPERTY_LOGFILE		((const char *)"logfile")
 #define	SCF_PROPERTY_ALT_LOGFILE	((const char *)"alt_logfile")
 
@@ -71,6 +74,19 @@ extern "C" {
 
 #define	SCF_FMRI_TYPE_SVC		0x1
 #define	SCF_FMRI_TYPE_FILE		0x2
+
+/*
+ * Strings for use in constructing FMRIs
+ */
+#define	SCF_FMRI_SVC_PREFIX		"svc:"
+#define	SCF_FMRI_FILE_PREFIX		"file:"
+#define	SCF_FMRI_SCOPE_PREFIX		"//"
+#define	SCF_FMRI_LOCAL_SCOPE		"localhost"
+#define	SCF_FMRI_SCOPE_SUFFIX		"@localhost"
+#define	SCF_FMRI_SERVICE_PREFIX		"/"
+#define	SCF_FMRI_INSTANCE_PREFIX	":"
+#define	SCF_FMRI_PROPERTYGRP_PREFIX	"/:properties/"
+#define	SCF_FMRI_PROPERTY_PREFIX	"/"
 
 typedef struct scf_decoration_info {
 	const char *sdi_name;
@@ -302,6 +318,16 @@ int _scf_request_backup(scf_handle_t *, const char *);
  *	_NO_RESOURCES, _CONSTRAINT_VIOLATED, _DELETED.
  */
 int _scf_pg_is_read_protected(const scf_propertygroup_t *, boolean_t *);
+
+/*
+ * Sets annotation data for SMF audit logging.  Once this function has been
+ * set, the next audit record will be preceded by an ADT_smf_annotation
+ * with the information provided in this function.  This function is used
+ * to mark operations which comprise multiple primitive operations such as
+ * svccfg import.
+ */
+int _scf_set_annotation(scf_handle_t *h, const char *operation,
+    const char *file);
 
 /*
  * scf_pattern_t

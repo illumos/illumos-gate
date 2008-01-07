@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -153,6 +153,7 @@ SUNWprivate_1.1 {
 	adt_get_mask;
 	adt_get_session_id;
 	adt_get_termid;
+	adt_get_unique_id;
 	adt_import_proc;
 	adt_load_hostname;
 	adt_load_termid;

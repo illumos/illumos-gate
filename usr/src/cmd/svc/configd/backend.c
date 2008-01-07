@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1891,6 +1892,9 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 	}
 	if (db_file == NULL)
 		db_file = REPOSITORY_DB;
+	if (strcmp(db_file, REPOSITORY_DB) != 0) {
+		is_main_repository = 0;
+	}
 
 	r = backend_create(BACKEND_TYPE_NORMAL, db_file, &be);
 	switch (r) {

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -327,7 +327,7 @@ void lscf_cleanup(void);
 void lscf_prep_hndl(void);
 void lscf_init(void);
 int lscf_bundle_import(bundle_t *, const char *, uint_t);
-int lscf_bundle_apply(bundle_t *);
+int lscf_bundle_apply(bundle_t *, const char *);
 void lscf_delete(const char *, int);
 void lscf_list(const char *);
 void lscf_select(const char *);

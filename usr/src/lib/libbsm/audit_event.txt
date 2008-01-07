@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -452,6 +452,42 @@
 6249:AUE_ndmp_backup:ndmp backup:na
 6250:AUE_ndmp_restore:ndmp restore:na
 #
+# SMF(5) svc.configd events (svcadm(1M) related)
+#
+6260:AUE_smf_enable:persistently enable service instance:ss
+6261:AUE_smf_tmp_enable:temporarily enable service instance:ss
+6262:AUE_smf_disable:persistently disable service instance:ss
+6263:AUE_smf_tmp_disable:temporarily disable service instance:ss
+6264:AUE_smf_restart:restart service instance:ss
+6265:AUE_smf_refresh:refresh service instance:ss
+6266:AUE_smf_clear:clear service instance state:ss
+6267:AUE_smf_degrade:set service instance degraded state:ss
+6268:AUE_smf_immediate_degrade:immediately set service instance degraded state:ss
+6269:AUE_smf_maintenance:set service instance persistent maintenance state:ss
+6270:AUE_smf_immediate_maintenance:immediately set service instance persistent maintenance state:ss
+6271:AUE_smf_immtmp_maintenance:immediately set service instance temporary maintenance state:ss
+6272:AUE_smf_tmp_maintenance:set service instance maintenance temporary state:ss
+6273:AUE_smf_milestone:set service management facility milestone:ss
+#
+# SMF(5) svc.configd miscellaneous events
+#
+6275:AUE_smf_read_prop:read restricted access property value:as
+#
+# SMF(5) svc.configd events (svccfg(1M) related)
+#
+6280:AUE_smf_create:create service instance object:as
+6281:AUE_smf_delete:delete service instance object:as
+6282:AUE_smf_create_pg:create persistent service property group:as
+6283:AUE_smf_create_npg:create non-persistent service property group:as
+6284:AUE_smf_delete_pg:delete persistent service property group:as
+6285:AUE_smf_delete_npg:delete non-persistent service property group:as
+6286:AUE_smf_create_snap:create repository snapshot:as
+6287:AUE_smf_delete_snap:delete repository snapshot:as
+6288:AUE_smf_attach_snap:attach repository snapshot:as
+6289:AUE_smf_annotation:annotate transaction:as,ss
+6290:AUE_smf_create_prop:create service instance property:as
+6291:AUE_smf_change_prop:change service instance property:as
+6292:AUE_smf_delete_prop:delete service instance property:as
 #
 # Trusted Extensions events:
 #

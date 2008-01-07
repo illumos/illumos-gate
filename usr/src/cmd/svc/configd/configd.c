@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,10 @@ thread_self(void)
 	return (pthread_getspecific(thread_info_key));
 }
 
+/*
+ * get_ucred() returns NULL if it was unable to get the credential
+ * information.
+ */
 ucred_t *
 get_ucred(void)
 {
@@ -232,6 +236,21 @@ ucred_is_privileged(ucred_t *uc)
 	}
 
 	return (0);
+}
+
+/*
+ * The purpose of this function is to get the audit session data for use in
+ * generating SMF audit events.  We use a single audit session per client.
+ *
+ * get_audit_session() may return NULL.  It is legal to use a NULL pointer
+ * in subsequent calls to adt_* functions.
+ */
+adt_session_data_t *
+get_audit_session(void)
+{
+	thread_info_t	*ti = thread_self();
+
+	return (ti->ti_active_client->rc_adt_session);
 }
 
 static void *
@@ -534,12 +553,10 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			doorpath = regularize_path(curdir, optarg, doortmp);
-			is_main_repository = 0;
 			have_npdb = 0;		/* default to no non-persist */
 			break;
 		case 'p':
 			log_to_syslog = 0;	/* don't use syslog */
-			is_main_repository = 0;
 
 			/*
 			 * If our parent exits while we're opening its /proc
