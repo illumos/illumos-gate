@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,7 +209,7 @@ int __incr_failed_count(char *, char *, int);
 int __rst_failed_count(char *, char *);
 
 /*
- * Error codes
+ * Error / return codes
  */
 #define	PWU_SUCCESS		 0	/* update succeeded */
 #define	PWU_BUSY		-1	/* Password database busy */
@@ -246,6 +245,7 @@ int __rst_failed_count(char *, char *);
 #define	PWU_PWD_IN_HISTORY	-25	/* new passwd in history list */
 #define	PWU_CHANGE_NOT_ALLOWED	-26	/* change not allowed */
 #define	PWU_WITHIN_MIN_AGE	-27	/* change not allowed, within min age */
+#define	PWU_ACCOUNT_LOCKED	-28	/* account successfully locked */
 
 #ifdef __cplusplus
 }

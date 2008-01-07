@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -287,15 +287,15 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (strcmp(repository_name, "nisplus") == 0 &&
 	    strcmp(rep_passwd, "*NP*") == 0) {
 		syslog(LOG_ERR, "pam_unix_auth: NIS+ permissions require that"
-			"the pam_dhkeys module is on the PAM stack before "
-			"pam_unix_auth");
+		    "the pam_dhkeys module is on the PAM stack before "
+		    "pam_unix_auth");
 		if (nowarn == 0) {
 			(void) snprintf(messages[0], sizeof (messages[0]),
 			    dgettext(TEXT_DOMAIN,
-				"NIS+ permissions are too tight. "
-				"Please inform your administrator."));
+			    "NIS+ permissions are too tight. "
+			    "Please inform your administrator."));
 			(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 1,
-						messages, NULL);
+			    messages, NULL);
 		}
 		result = PAM_USER_UNKNOWN;
 		goto out;
@@ -336,9 +336,11 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			display_warning(pamh, old_failed_count, homedir);
 	} else if (dolock && result == PAM_AUTH_ERR) {
 		int max_failed = get_max_failed(user);
-		if (max_failed != 0)
-			(void) __incr_failed_count(user, repository_name,
-			    max_failed);
+		if (max_failed != 0) {
+			if (__incr_failed_count(user, repository_name,
+			    max_failed) == PWU_ACCOUNT_LOCKED)
+				result = PAM_MAXTRIES;
+		}
 	}
 out:
 	if (rep_passwd)

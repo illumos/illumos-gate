@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,10 @@ __incr_failed_count(char *username, char *repname, int max_failures)
 		if ((ret = ops->update(items, NULL, buf)) != PWU_SUCCESS)
 			goto out;
 	}
-	ret = ops->putpwnam(username, NULL, NULL, NULL, buf);
+	if (((ret = ops->putpwnam(username, NULL, NULL, NULL, buf)) ==
+	    PWU_SUCCESS) &&
+	    (items[0].type == ATTR_LOCK_ACCOUNT))
+		ret = PWU_ACCOUNT_LOCKED;
 
 out:
 	ops->unlock();
