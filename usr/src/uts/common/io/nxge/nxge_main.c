@@ -250,11 +250,6 @@ void 			*nxge_list = NULL;
 void			*nxge_hw_list = NULL;
 nxge_os_mutex_t 	nxge_common_lock;
 
-nxge_os_mutex_t		nxge_mii_lock;
-static uint32_t		nxge_mii_lock_init = 0;
-nxge_os_mutex_t		nxge_mdio_lock;
-static uint32_t		nxge_mdio_lock_init = 0;
-
 extern uint64_t 	npi_debug_level;
 
 extern nxge_status_t	nxge_ldgv_init(p_nxge_t, int *, int *);
@@ -757,14 +752,14 @@ nxge_unattach(p_nxge_t nxgep)
 
 	nxgep->nxge_magic = 0;
 
-	if (nxgep->nxge_hw_p) {
-		nxge_uninit_common_dev(nxgep);
-		nxgep->nxge_hw_p = NULL;
-	}
-
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
+	}
+
+	if (nxgep->nxge_hw_p) {
+		nxge_uninit_common_dev(nxgep);
+		nxgep->nxge_hw_p = NULL;
 	}
 
 #if	defined(sun4v)
@@ -1151,21 +1146,6 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 		goto nxge_setup_mutexes_exit;
 	}
 
-	/* Initialize global mutex */
-
-	if (nxge_mdio_lock_init == 0) {
-		MUTEX_INIT(&nxge_mdio_lock, NULL, MUTEX_DRIVER, NULL);
-	}
-	atomic_add_32(&nxge_mdio_lock_init, 1);
-
-	if (nxge_mii_lock_init == 0) {
-		MUTEX_INIT(&nxge_mii_lock, NULL, MUTEX_DRIVER, NULL);
-	}
-	atomic_add_32(&nxge_mii_lock_init, 1);
-
-	nxgep->drv_state |= STATE_MDIO_LOCK_INIT;
-	nxgep->drv_state |= STATE_MII_LOCK_INIT;
-
 	cv_init(&nxgep->poll_cv, NULL, CV_DRIVER, NULL);
 	MUTEX_INIT(&nxgep->poll_lock, NULL,
 	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
@@ -1235,18 +1215,6 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 		for (partition = 0; partition < MAX_PARTITION; partition++) {
 			MUTEX_DESTROY(&classify_ptr->hash_lock[partition]);
 		}
-	}
-	if (nxgep->drv_state & STATE_MDIO_LOCK_INIT) {
-		if (nxge_mdio_lock_init == 1) {
-			MUTEX_DESTROY(&nxge_mdio_lock);
-		}
-		atomic_add_32(&nxge_mdio_lock_init, -1);
-	}
-	if (nxgep->drv_state & STATE_MII_LOCK_INIT) {
-		if (nxge_mii_lock_init == 1) {
-			MUTEX_DESTROY(&nxge_mii_lock);
-		}
-		atomic_add_32(&nxge_mii_lock_init, -1);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_destroy_mutexes"));

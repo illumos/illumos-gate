@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,6 @@
 extern uint32_t nxge_no_link_notify;
 extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
-extern nxge_os_mutex_t	nxge_mdio_lock;
-extern nxge_os_mutex_t	nxge_mii_lock;
 extern boolean_t nxge_jumbo_enable;
 
 typedef enum {
@@ -3517,7 +3515,7 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mii_read: xcvr_port<%d>"
 			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 
-	MUTEX_ENTER(&nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
@@ -3532,14 +3530,14 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	} else
 		goto fail;
 
-	MUTEX_EXIT(&nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_read: xcvr_port<%d>"
 			"xcvr_reg<%d> value=0x%x",
 			xcvr_portn, xcvr_reg, *value));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mii_read: Failed to read mii on xcvr %d",
 			xcvr_portn));
@@ -3559,7 +3557,7 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 			"xcvr_reg<%d> value=0x%x", xcvr_portn, xcvr_reg,
 			value));
 
-	MUTEX_ENTER(&nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
@@ -3574,13 +3572,13 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	} else
 		goto fail;
 
-	MUTEX_EXIT(&nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_write: xcvr_port<%d>"
 			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mii_write: Failed to write mii on xcvr %d",
@@ -3600,19 +3598,19 @@ nxge_mdio_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mdio_read: xcvr_port<%d>",
 			xcvr_portn));
 
-	MUTEX_ENTER(&nxge_mdio_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((rs = npi_mac_mif_mdio_read(nxgep->npi_handle,
 			xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
 		goto fail;
 
-	MUTEX_EXIT(&nxge_mdio_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mdio_read: xcvr_port<%d>",
 			xcvr_portn));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxge_mdio_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mdio_read: Failed to read mdio on xcvr %d",
@@ -3632,19 +3630,19 @@ nxge_mdio_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mdio_write: xcvr_port<%d>",
 			xcvr_portn));
 
-	MUTEX_ENTER(&nxge_mdio_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((rs = npi_mac_mif_mdio_write(nxgep->npi_handle,
 			xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
 		goto fail;
 
-	MUTEX_EXIT(&nxge_mdio_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mdio_write: xcvr_port<%d>",
 			xcvr_portn));
 	return (NXGE_OK);
 fail:
-	MUTEX_EXIT(&nxge_mdio_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"nxge_mdio_write: Failed to write mdio on xcvr %d",
@@ -5168,10 +5166,12 @@ nxge_get_cl45_pma_pmd_id(p_nxge_t nxgep, int phy_port)
 	uint32_t	pma_pmd_dev_id = 0;
 	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	(void) npi_mac_mif_mdio_read(handle, phy_port, NXGE_PMA_PMD_DEV_ADDR,
 	    NXGE_DEV_ID_REG_1, &val1);
 	(void) npi_mac_mif_mdio_read(handle, phy_port, NXGE_PMA_PMD_DEV_ADDR,
 	    NXGE_DEV_ID_REG_2, &val2);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	pma_pmd_dev_id = val1;
 	pma_pmd_dev_id = (pma_pmd_dev_id << 16);
@@ -5191,10 +5191,12 @@ nxge_get_cl45_pcs_id(p_nxge_t nxgep, int phy_port)
 	uint32_t	pcs_dev_id = 0;
 	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	(void) npi_mac_mif_mdio_read(handle, phy_port, NXGE_PCS_DEV_ADDR,
 	    NXGE_DEV_ID_REG_1, &val1);
 	(void) npi_mac_mif_mdio_read(handle, phy_port, NXGE_PCS_DEV_ADDR,
 	    NXGE_DEV_ID_REG_2, &val2);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	pcs_dev_id = val1;
 	pcs_dev_id = (pcs_dev_id << 16);
@@ -5215,6 +5217,7 @@ nxge_get_cl22_phy_id(p_nxge_t nxgep, int phy_port)
 	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	npi_status_t	npi_status = NPI_SUCCESS;
 
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
 	npi_status = npi_mac_mif_mii_read(handle, phy_port, NXGE_PHY_ID_REG_1,
 	    &val1);
 	if (npi_status != NPI_SUCCESS) {
@@ -5234,7 +5237,7 @@ nxge_get_cl22_phy_id(p_nxge_t nxgep, int phy_port)
 	phy_id |= val2;
 
 exit:
-
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID [0x%llx]",
 	    phy_port, phy_id));
 
@@ -5689,14 +5692,14 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
 		break;
 	}
 
-	MUTEX_ENTER(&nxge_mii_lock);
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mii_lock);
 	rs = npi_mac_mif_mii_write(nxgep->npi_handle,
 	    xcvr_portn, BCM5464R_MISC, 0xb4ee);
 	if (rs != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<== nxge_bcm5464_link_led_off: npi_mac_mif_mii_write "
 		    "returned error 0x[%x]", rs));
-		MUTEX_EXIT(&nxge_mii_lock);
+		MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 		return;
 	}
 
@@ -5706,11 +5709,9 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "<== nxge_bcm5464_link_led_off: npi_mac_mif_mii_write "
 		    "returned error 0x[%x]", rs));
-		MUTEX_EXIT(&nxge_mii_lock);
-		return;
 	}
 
-	MUTEX_EXIT(&nxge_mii_lock);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mii_lock);
 }
 
 static nxge_status_t
