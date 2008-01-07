@@ -1519,6 +1519,8 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 		else
 			VN_RELE(xattrdirvp);
 
+	} else {
+		VN_RELE(xattrdirvp);
 	}
 
 	kmem_free(tmp_name, MAXNAMELEN);
