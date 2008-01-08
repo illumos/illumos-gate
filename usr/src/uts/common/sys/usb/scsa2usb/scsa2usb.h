@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,9 @@ extern "C" {
 
 #define	MS_SCANLOGIC_VID	0x04ce	/* VendorID of ScanLogic */
 #define	MS_SCANLOGIC_PID1	0x0002	/* SL USB Storage Device */
+
+#define	MS_SUPERTOP_VID		0x14cd	/* Super Top USB 2.0 IDE enclosure */
+#define	MS_SUPERTOP_DEVICE_6600	0x6600
 
 /*
  * The AMI virtual floppy device is not a real USB storage device, but

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -676,9 +676,10 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 	if (residue || cmd->cmd_resid_xfercount) {
 		USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 		    scsa2usbp->scsa2usb_log_handle,
-		    "total=0x%lx cmd_xfercount=0x%lx residue=0x%x",
+		    "total=0x%lx cmd_xfercount=0x%lx residue=0x%x "
+		    "cmd_offset=0x%lx",
 		    cmd->cmd_total_xfercount, cmd->cmd_xfercount,
-		    residue);
+		    residue, cmd->cmd_offset);
 
 		/*
 		 * we need to adjust using the residue and
@@ -688,6 +689,13 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 		 * first adjust back the total_xfercount
 		 */
 		cmd->cmd_total_xfercount += cmd->cmd_xfercount -
+		    cmd->cmd_resid_xfercount;
+		/*
+		 * we need to adjust cmd_offset as well, or the data
+		 * buffer for subsequent transfer may exceed the buffer
+		 * boundary
+		 */
+		cmd->cmd_offset -= cmd->cmd_xfercount -
 		    cmd->cmd_resid_xfercount;
 
 		/*
@@ -708,11 +716,29 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 			/* some devices lie about the resid, ignore */
 			cmd->cmd_total_xfercount -=
 			    cmd->cmd_xfercount - cmd->cmd_resid_xfercount;
+			cmd->cmd_offset +=
+			    cmd->cmd_xfercount - cmd->cmd_resid_xfercount;
 		} else {
 			cmd->cmd_total_xfercount -=
 			    cmd->cmd_xfercount -
 			    max(min(residue, cmd->cmd_xfercount),
 			    cmd->cmd_resid_xfercount);
+			cmd->cmd_offset +=
+			    cmd->cmd_xfercount -
+			    max(min(residue, cmd->cmd_xfercount),
+			    cmd->cmd_resid_xfercount);
+			/*
+			 * if HCD does not report residue while the device
+			 * reports a residue equivalent to the xfercount,
+			 * it is very likely the device lies about the
+			 * residue. we need to stop the command, or we'll
+			 * get into an infinite retry loop.
+			 */
+			if ((cmd->cmd_resid_xfercount == 0) &&
+			    (residue == cmd->cmd_xfercount)) {
+				cmd->cmd_xfercount = 0;
+				cmd->cmd_done = 1;
+			}
 		}
 
 		pkt->pkt_resid = cmd->cmd_total_xfercount;

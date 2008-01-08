@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -350,7 +350,11 @@ static struct blacklist {
 
 	/* ScanLogic USB Storage Device */
 	{MS_SCANLOGIC_VID, MS_SCANLOGIC_PID1, 0,
-	    SCSA2USB_ATTRS_NO_CAP_ADJUST}
+	    SCSA2USB_ATTRS_NO_CAP_ADJUST},
+
+	/* Super Top USB 2.0 IDE Device */
+	{MS_SUPERTOP_VID, MS_SUPERTOP_DEVICE_6600, 0,
+	    SCSA2USB_ATTRS_USE_CSW_RESIDUE}
 };
 
 
@@ -5027,7 +5031,7 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 			cmd->cmd_done = 1;
 			/* FALLTHROUGH */
 
-			default:
+		default:
 handle_data:
 			if (bp && len && (cmd->cmd_dir == USB_EP_DIR_IN)) {
 				/*
@@ -5041,8 +5045,8 @@ handle_data:
 
 			USB_DPRINTF_L3(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
-			    "len = 0x%x total = 0x%lx",
-			    len, cmd->cmd_total_xfercount);
+			    "len = 0x%x total = 0x%lx offset = 0x%lx",
+			    len, cmd->cmd_total_xfercount, cmd->cmd_offset);
 
 			/*
 			 * update total_xfercount now but it may be

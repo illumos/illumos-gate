@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,17 +519,6 @@ ehci_check_for_error(
 		    "ehci_check_for_error: Halted");
 		error = USB_CR_STALL;
 		break;
-	case EHCI_QTD_CTRL_DATA_BUFFER_ERROR:
-		if (tw->tw_direction == EHCI_QTD_CTRL_IN_PID) {
-			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-			    "ehci_check_for_error: Buffer Overrun");
-			error = USB_CR_BUFFER_OVERRUN;
-		} else	{
-			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-			    "ehci_check_for_error: Buffer Underrun");
-			error = USB_CR_BUFFER_UNDERRUN;
-		}
-		break;
 	case EHCI_QTD_CTRL_BABBLE_DETECTED:
 		USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_check_for_error: Babble Detected");
@@ -554,6 +543,31 @@ ehci_check_for_error(
 			USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 			    "ehci_check_for_error: No Error");
 			error = USB_CR_OK;
+		}
+		break;
+	case EHCI_QTD_CTRL_DATA_BUFFER_ERROR:
+		/*
+		 * Data buffer error is not necessarily an error,
+		 * the transaction might have completed successfully
+		 * after some retries. It can be ignored if the
+		 * queue is not halted.
+		 */
+		if (!(ctrl & EHCI_QTD_CTRL_HALTED_XACT)) {
+			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_check_for_error: Data buffer overrun or "
+			    "underrun ignored");
+			error = USB_CR_OK;
+			break;
+		}
+
+		if (tw->tw_direction == EHCI_QTD_CTRL_IN_PID) {
+			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_check_for_error: Buffer Overrun");
+			error = USB_CR_BUFFER_OVERRUN;
+		} else	{
+			USB_DPRINTF_L2(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+			    "ehci_check_for_error: Buffer Underrun");
+			error = USB_CR_BUFFER_UNDERRUN;
 		}
 		break;
 	case EHCI_QTD_CTRL_MISSED_uFRAME:
