@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -748,7 +748,8 @@ ufs_trans_trunc_resv(
 {
 	ulong_t		resv;
 	u_offset_t	size, offset, resid;
-	int		nchunks;
+	int		nchunks, incr;
+	int		is_sparse = 0;
 
 	/*
 	 *    *resvp is the amount of log space to reserve (in bytes).
@@ -767,17 +768,41 @@ ufs_trans_trunc_resv(
 		goto done;
 	}
 
+	/*
+	 * There is no need to split sparse file truncation into
+	 * as many chunks as that of regular files.
+	 */
+	is_sparse = bmap_has_holes(ip);
+
 	offset = length;
 	resid = size;
 	nchunks = 1;
-	for (; (resv = ufs_log_amt(ip, offset, resid, 1)) > ufs_trans_max_resv;
-	    offset = length + (nchunks - 1) * resid) {
-		nchunks++;
+	incr = 0;
+
+	do {
+		resv = ufs_log_amt(ip, offset, resid, 1);
+		/*
+		 * If this is the first iteration, set "incr".
+		 */
+		if (!incr) {
+			/*
+			 * If this request takes too much log space,
+			 * it will be split into "nchunks". If this split
+			 * is not enough, linearly increment the nchunks in
+			 * the next iteration.
+			 */
+			if (resv > ufs_trans_max_resv && !is_sparse) {
+				nchunks = MAX(size/ufs_trans_max_resv, 1);
+				incr = nchunks;
+			} else {
+				incr = 1;
+			}
+		} else
+			nchunks += incr;
 		resid = size / nchunks;
-	}
-	/*
-	 * If this request takes too much log space, it will be split
-	 */
+		offset = length + (nchunks - 1) * resid;
+	} while (resv > ufs_trans_max_resv);
+
 	if (nchunks > 1) {
 		*residp = resid;
 	}
