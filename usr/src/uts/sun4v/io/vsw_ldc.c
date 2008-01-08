@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3646,7 +3646,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
 	ldcp = ldcl->head;
 	if (ldcp == NULL) {
 		DERR(port->p_vswp, "vsw_portsend: no ldc: dropping packet\n");
-		freemsg(mp);
+		freemsgchain(mp);
 		RW_EXIT(&ldcl->lockrw);
 		return (1);
 	}

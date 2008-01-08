@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1272,7 +1272,7 @@ vsw_rx_queue_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 	mutex_enter(&vqp->vq_lock);
 
 	if (vqp->vq_state != VSW_QUEUE_RUNNING) {
-		freemsg(mp);
+		freemsgchain(mp);
 		mutex_exit(&vqp->vq_lock);
 		goto vsw_rx_queue_cb_exit;
 	}
