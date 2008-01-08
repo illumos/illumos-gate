@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -1035,7 +1035,7 @@ P_FLAG=n
 p_FLAG=n
 r_FLAG=n
 T_FLAG=n
-t_FLAG=n
+t_FLAG=y
 U_FLAG=n
 u_FLAG=n
 V_FLAG=n
@@ -1097,7 +1097,7 @@ do
 	  S )
 		set_S_flag $OPTARG
 		;;
-	  t )	t_FLAG=y
+	 +t )	t_FLAG=n
 		;;
 	  V )	V_FLAG=y
 		V_ARG="$OPTARG"
@@ -1293,7 +1293,7 @@ do
 		;;
 	  T )	T_FLAG=y
 		;; # obsolete
-	  t )	t_FLAG=y
+	 +t )	t_FLAG=n
 		;;
 	  U )
 		if [ -z "${PARENT_ROOT}" ]; then
@@ -1559,9 +1559,7 @@ fi
 #
 
 logshuffle() {
-    	LLOG="$ATLOG/log.`date '+%F'`"
-	rm -rf $ATLOG/log.??`date '+%d'`
-	rm -rf $ATLOG/log.????-??-`date '+%d'`
+    	LLOG="$ATLOG/log.`date '+%F.%H:%M'`"
 	if [ -f $LLOG -o -d $LLOG ]; then
 	    	LLOG=$LLOG.$$
 	fi
@@ -2056,9 +2054,12 @@ if [ "$n_FLAG" = "n" ]; then
 		sleep 120
 	done
 
+	if [[ -z $BRINGOVER ]]; then
+		BRINGOVER=$TEAMWARE/bin/bringover
+	fi
 	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
 
-	(staffer $TEAMWARE/bin/bringover -c "nightly update" -p $BRINGOVER_WS \
+	(staffer $BRINGOVER -c "nightly update" -p $BRINGOVER_WS \
 	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 ||
 		touch $TMPDIR/bringover_failed
 

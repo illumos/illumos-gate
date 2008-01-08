@@ -18,9 +18,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2007 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "21 Mar 2007"
+.TH nightly 1 "06 Jan 2008"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -120,10 +120,11 @@ although it may also be used to build other consolidations.
 The environment variable NIGHTLY_OPTIONS controls the actions
 .I nightly
 will take as it proceeds.
-The -i, -n and -V options may also be used from the command line to
-control the actions without editing your environment file.  The
--i and -n each make the build complete more quickly by bypassing
-some actions.  If NIGHTLY_OPTIONS is not set, "-aBm" is used.
+The -i, -n, +t and -V options may also be used from the command
+line to control the actions without editing your environment file.
+The -i and -n options complete the build more quickly by bypassing
+some actions. If NIGHTLY_OPTIONS is not set, then "-aBmt" build
+options will be used.
 
 .B Basic action options
 .TP 10
@@ -172,7 +173,10 @@ parent.
 Send mail to $MAILTO at end of build
 .TP
 .B \-t
-Build and use the tools in $SRC/tools.
+Build and use the tools in $SRC/tools (default setting).
+.TP
+.B \+t
+Use the build tools in "$ONBLD_TOOLS/bin".
 
 .LP
 .B Code checking options
