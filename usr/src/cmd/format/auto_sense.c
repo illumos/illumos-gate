@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -878,13 +878,15 @@ generic_disk_sense(
 	char			*disk_name)
 {
 	struct disk_type		*disk;
-	int				pcyl;
-	int				ncyl;
-	int				acyl;
-	int				nhead;
-	int				nsect;
-	int				rpm;
-	long				nblocks;
+	int				i;
+	int				setdefault = 0;
+	int				pcyl = 0;
+	int				ncyl = 0;
+	int				acyl = 0;
+	int				nhead = 0;
+	int				nsect = 0;
+	int				rpm = 0;
+	long				nblocks = 0;
 	union {
 		struct mode_format	page3;
 		uchar_t			buf3[MAX_MODE_SENSE_SIZE];
@@ -897,6 +899,19 @@ generic_disk_sense(
 	struct mode_format		*page3 = &u_page3.page3;
 	struct mode_geometry		*page4 = &u_page4.page4;
 	struct scsi_ms_header		header;
+	/* refer cmlb_convert_geometry in cmlb.c */
+	static const struct chs_values {
+		uint_t max_cap;		/* Max Capacity for this HS. */
+		uint_t nhead;		/* Heads to use. */
+		uint_t nsect;		/* SPT to use. */
+	} CHS_values[] = {
+		{0x00200000,  64, 32},		/* 1GB or smaller disk. */
+		{0x01000000, 128, 32},		/* 8GB or smaller disk. */
+		{MAXBLKS(255,  63)},		/* 502.02GB or smaller disk. */
+		{MAXBLKS(255, 126)},		/* .98TB or smaller disk. */
+		{INFINITY, 255, 189}		/* Max size is just under 1TB */
+	};
+
 
 	/*
 	 * If the name of this disk appears to be "SUN", use it,
@@ -943,11 +958,17 @@ generic_disk_sense(
 	}
 
 	/*
+	 * Get the number of blocks from Read Capacity data. Note that
+	 * the logical block address range from 0 to capacity->sc_capacity.
+	 */
+	nblocks = (long)(capacity->sc_capacity + 1);
+
+	/*
 	 * Get current Page 3 - Format Parameters page
 	 */
 	if (uscsi_mode_sense(fd, DAD_MODE_FORMAT, MODE_SENSE_PC_CURRENT,
 			(caddr_t)&u_page3, MAX_MODE_SENSE_SIZE, &header)) {
-		goto err;
+		setdefault = 1;
 	}
 
 	/*
@@ -955,43 +976,75 @@ generic_disk_sense(
 	 */
 	if (uscsi_mode_sense(fd, DAD_MODE_GEOMETRY, MODE_SENSE_PC_CURRENT,
 			(caddr_t)&u_page4, MAX_MODE_SENSE_SIZE, &header)) {
-		goto err;
+		setdefault = 1;
 	}
 
-	/*
-	 * Correct for byte order if necessary
-	 */
-	page4->rpm = BE_16(page4->rpm);
-	page4->step_rate = BE_16(page4->step_rate);
-	page3->tracks_per_zone = BE_16(page3->tracks_per_zone);
-	page3->alt_sect_zone = BE_16(page3->alt_sect_zone);
-	page3->alt_tracks_zone = BE_16(page3->alt_tracks_zone);
-	page3->alt_tracks_vol = BE_16(page3->alt_tracks_vol);
-	page3->sect_track = BE_16(page3->sect_track);
-	page3->data_bytes_sect = BE_16(page3->data_bytes_sect);
-	page3->interleave = BE_16(page3->interleave);
-	page3->track_skew = BE_16(page3->track_skew);
-	page3->cylinder_skew = BE_16(page3->cylinder_skew);
+	if (setdefault != 1) {
+		/* The inquiry of mode page 3 & page 4 are successful */
+		/*
+		 * Correct for byte order if necessary
+		 */
+		page4->rpm = BE_16(page4->rpm);
+		page4->step_rate = BE_16(page4->step_rate);
+		page3->tracks_per_zone = BE_16(page3->tracks_per_zone);
+		page3->alt_sect_zone = BE_16(page3->alt_sect_zone);
+		page3->alt_tracks_zone = BE_16(page3->alt_tracks_zone);
+		page3->alt_tracks_vol = BE_16(page3->alt_tracks_vol);
+		page3->sect_track = BE_16(page3->sect_track);
+		page3->data_bytes_sect = BE_16(page3->data_bytes_sect);
+		page3->interleave = BE_16(page3->interleave);
+		page3->track_skew = BE_16(page3->track_skew);
+		page3->cylinder_skew = BE_16(page3->cylinder_skew);
 
 
-	/*
-	 * Construct a new label out of the sense data,
-	 * Inquiry and Capacity.
-	 */
-	pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) + page4->cyl_lb;
-	nhead = page4->heads;
-	nsect = page3->sect_track;
-	rpm = page4->rpm;
+		/*
+		 * Construct a new label out of the sense data,
+		 * Inquiry and Capacity.
+		 */
+		pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) + page4->cyl_lb;
+		nhead = page4->heads;
+		nsect = page3->sect_track;
+		rpm = page4->rpm;
 
-	/*
-	 * If the number of physical cylinders reported is less
-	 * the SUN_MIN_CYL(3) then try to adjust the geometry so that
-	 * we have atleast SUN_MIN_CYL cylinders.
-	 */
-	if (pcyl < SUN_MIN_CYL) {
-		if (adjust_disk_geometry((int)(capacity->sc_capacity + 1),
-		    &pcyl, &nhead, &nsect)) {
-			goto err;
+		/*
+		 * If the number of physical cylinders reported is less
+		 * the SUN_MIN_CYL(3) then try to adjust the geometry so that
+		 * we have atleast SUN_MIN_CYL cylinders.
+		 */
+		if (pcyl < SUN_MIN_CYL) {
+			if (nhead <= 0 || nsect <= 0) {
+				setdefault = 1;
+			} else if (adjust_disk_geometry((int)(capacity->sc_capacity + 1),
+			    &pcyl, &nhead, &nsect)) {
+				setdefault = 1;
+			}
+		}
+	}
+
+	if (setdefault == 1) {
+		/*
+		 * If the number of cylinders or the number of heads reported
+		 * is zero, we think the inquiry of page 3 and page 4 failed.
+		 * We will set the geometry infomation by ourselves.
+		 */
+		err_print("\nThe device does not support mode page 3 or page 4,");
+		err_print("\nor the reported geometry info is invalid.");
+		err_print("\nWARNING: Disk geometry is based on capacity data.\n\n");
+
+		/* convert capacity to nsect * nhead * pcyl */
+		/* Unlabeled SCSI floppy device */
+		if (nblocks <= 0x1000) {
+			nhead = 2;
+			pcyl = 80;
+			nsect = nblocks / (nhead * pcyl);
+		} else {
+			for (i = 0; CHS_values[i].max_cap < nblocks &&
+			    CHS_values[i].max_cap != INFINITY; i++)
+				;
+
+			nhead = CHS_values[i].nhead;
+			nsect = CHS_values[i].nsect;
+			pcyl = nblocks / (nhead * nsect);
 		}
 	}
 
@@ -1018,19 +1071,14 @@ generic_disk_sense(
 	}
 
 	/*
-	 * Some drives report 0 for page4->rpm, adjust it to AVG_RPM, 3600.
+	 * Some drives do not support page4 or report 0 for page4->rpm,
+	 * adjust it to AVG_RPM, 3600.
 	 */
 	if (rpm < MIN_RPM || rpm > MAX_RPM) {
-		err_print("Mode sense page(4) reports rpm value as %d,"
+		err_print("The current rpm value %d is invalid,"
 			" adjusting it to %d\n", rpm, AVG_RPM);
 		rpm = AVG_RPM;
 	}
-
-	/*
-	 * Get the number of blocks from Read Capacity data. Note that
-	 * the logical block address range from 0 to capacity->sc_capacity.
-	 */
-	nblocks = (long)(capacity->sc_capacity + 1);
 
 	/*
 	 * Some drives report 0 for nsect (page 3, byte 10 and 11) if they
@@ -2192,7 +2240,7 @@ adjust_disk_geometry(int capacity, int *cyl, int *nhead, int *nsect)
 	 * no of heads.
 	 */
 	while (lnhead > MINIMUM_NO_HEADS &&
-			(lcyl < MINIMUM_NO_CYLINDERS)) {
+			lcyl < MINIMUM_NO_CYLINDERS) {
 		lnhead = max(MINIMUM_NO_HEADS, lnhead / 2);
 		lcyl =  (capacity) / (lnhead * lnsect);
 	}
