@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,17 +214,9 @@ get_start_sector(int fd)
 				(void) fprintf(stderr, BAD_PART, i);
 				exit(-1);
 			}
-			if (part->relsect == dkpi.p_start) {
+			if (dkpi.p_start >= part->relsect &&
+			    dkpi.p_start < (part->relsect + part->numsect)) {
 				/* Found the partition */
-				break;
-			} else if (part->relsect > dkpi.p_start) {
-				/*
-				 * The next fdisk partition starts beyond
-				 * offset of Solaris partition.
-				 * So the previous partition is the right one.
-				 */
-				i--;
-				part = (struct ipart *)mboot->parts + i;
 				break;
 			}
 		}
