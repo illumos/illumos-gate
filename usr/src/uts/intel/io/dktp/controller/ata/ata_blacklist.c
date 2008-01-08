@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,22 @@ pcibl_t	ata_pciide_blacklist[] = {
 	{ 0x8086, 0xffff, 0x27df, 0xffff, ATA_BL_NO_SIMPLEX},
 	{ 0x8086, 0xffff, 0x27c0, 0xffff, ATA_BL_NO_SIMPLEX},
 	{ 0x8086, 0xffff, 0x27c4, 0xffff, ATA_BL_NO_SIMPLEX},
+
+	/*
+	 * On Intel ICH8 (IDE and SATA(Non-AHCI/Non-RAID, desktop and
+	 * mobile)), the simplex bit lies
+	 */
+	{ 0x8086, 0xffff, 0x2820, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2825, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2828, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2850, 0xffff, ATA_BL_NO_SIMPLEX},
+
+	/*
+	 * On Intel ICH9 SATA(Non-AHCI/Non-RAID), the simplex bit lies
+	 */
+	{ 0x8086, 0xffff, 0x2920, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2921, 0xffff, ATA_BL_NO_SIMPLEX},
+	{ 0x8086, 0xffff, 0x2926, 0xffff, ATA_BL_NO_SIMPLEX},
 
 	{ 0, 0, 0, 0, 0 }
 };
