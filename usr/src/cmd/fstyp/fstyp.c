@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,8 @@
 #include <dlfcn.h>
 #include <sys/wait.h>
 #include <sys/fstyp.h>
+#include <sys/dkio.h>
+#include <sys/param.h>
 #include <libfstyp.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/fs/pc_label.h>
@@ -50,8 +52,7 @@ static const char *getmodfsname();
 static char *getexecpathname();
 static void dump_nvlist(nvlist_t *list, int indent);
 static boolean_t dos_to_dev(char *path, char **devpath, int *num);
-static boolean_t find_dos_drive(int fd, int num, int *relsect, int *numsect,
-    int *systid);
+static boolean_t find_dos_drive(int fd, int num, off_t *offset);
 static void run_legacy_cmds(int fd, char *device, int vflag);
 static int run_cmd(char *path, char *arg0, char *arg1, char *arg2);
 
@@ -73,7 +74,7 @@ main(int argc, char **argv)
 	int		indent = 0;
 	char		*devpath;
 	boolean_t	is_dos;
-	int		dos_num, systid, relsect, numsect;
+	int		dos_num;
 	off_t		offset = 0;
 	nvlist_t	*attr = NULL;
 	fstyp_handle_t	h = NULL;
@@ -122,9 +123,7 @@ main(int argc, char **argv)
 		goto out;
 	}
 	if (is_dos) {
-		if (find_dos_drive(fd, dos_num, &relsect, &numsect, &systid)) {
-			offset = (off_t)relsect * 512;
-		} else {
+		if (!find_dos_drive(fd, dos_num, &offset)) {
 			error = FSTYP_ERR_NO_PARTITION;
 			goto out;
 		}
@@ -447,8 +446,8 @@ enum { WALK_CONTINUE, WALK_TERMINATE };
  * Walk partition tables and invoke a callback for each.
  */
 static void
-walk_partitions(int fd, int startsec, int (*f)(void *, int, int, int),
-    void *arg)
+walk_partitions(int fd, int startsec, off_t secsz,
+    int (*f)(void *, int, int, int), void *arg)
 {
 	uint32_t buf[1024/4];
 	int bufsize = 1024;
@@ -463,7 +462,7 @@ walk_partitions(int fd, int startsec, int (*f)(void *, int, int, int),
 	int i;
 
 	while (sec != lastsec) {
-		if (pread(fd, buf, bufsize, (off_t)sec * 512) != bufsize) {
+		if (pread(fd, buf, bufsize, (off_t)sec * secsz) != bufsize) {
 			break;
 		}
 		lastsec = sec;
@@ -513,22 +512,31 @@ find_dos_drive_cb(void *arg, int systid, int relsect, int numsect)
 }
 
 /*
- * Given a dos drive number, return its relative sector number,
- * number of sectors in partition and the system id.
+ * Given a dos drive number, return its relative offset in the drive.
  */
 static boolean_t
-find_dos_drive(int fd, int num, int *relsect, int *numsect, int *systid)
+find_dos_drive(int fd, int num, off_t *offset)
 {
+	struct dk_minfo mi;
+	off_t secsz;
 	struct part_find_s p = { 0, 0, 0, 0, 0, 0 };
 
 	p.num = num;
 
+	/*
+	 * It is possible that the media we are dealing with can have different
+	 * sector size than the default 512 bytes. Query the driver and check
+	 * whether the media has different sector size.
+	 */
+	if (ioctl(fd, DKIOCGMEDIAINFO, &mi) < 0)
+		secsz = DEV_BSIZE;
+	else
+		secsz = mi.dki_lbsize;
+
 	if (num > 0) {
-		walk_partitions(fd, 0, find_dos_drive_cb, &p);
+		walk_partitions(fd, 0, secsz, find_dos_drive_cb, &p);
 		if (p.count == num) {
-			*relsect = p.r_relsect;
-			*numsect = p.r_numsect;
-			*systid = p.r_systid;
+			*offset = secsz * (off_t)p.r_relsect;
 			return (B_TRUE);
 		}
 	}
