@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -355,6 +355,17 @@ proc_exit(int why, int what)
 	proc_is_exiting(p);
 	if (exitlwps(0) != 0)
 		return (1);
+
+	mutex_enter(&p->p_lock);
+	if (p->p_ttime > 0) {
+		/*
+		 * Account any remaining ticks charged to this process
+		 * on its way out.
+		 */
+		(void) task_cpu_time_incr(p->p_task, p->p_ttime);
+		p->p_ttime = 0;
+	}
+	mutex_exit(&p->p_lock);
 
 	DTRACE_PROC(lwp__exit);
 	DTRACE_PROC1(exit, int, why);

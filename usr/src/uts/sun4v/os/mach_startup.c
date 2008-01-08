@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,12 @@ extern void sfmmu_set_tsbs(void);
  * CPU IDLE optimization variables/routines
  */
 static int enable_halt_idle_cpus = 1;
+
+#define	SUN4V_CLOCK_TICK_THRESHOLD	64
+#define	SUN4V_CLOCK_TICK_NCPUS		64
+
+extern int	clock_tick_threshold;
+extern int	clock_tick_ncpus;
 
 void
 setup_trap_table(void)
@@ -296,6 +302,10 @@ void
 startup_platform(void)
 {
 	ip_squeue_soft_ring = B_TRUE;
+	if (clock_tick_threshold == 0)
+		clock_tick_threshold = SUN4V_CLOCK_TICK_THRESHOLD;
+	if (clock_tick_ncpus == 0)
+		clock_tick_ncpus = SUN4V_CLOCK_TICK_NCPUS;
 }
 
 /*

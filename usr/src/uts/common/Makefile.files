@@ -67,7 +67,8 @@ COMMON_CORE_OBJS +=		\
 		thread_intr.o	\
 		vm_page.o	\
 		vm_pagelist.o	\
-		zlib_obj.o
+		zlib_obj.o	\
+		clock_tick.o
 
 CORE_OBJS +=	$(COMMON_CORE_OBJS) $($(MACH)_CORE_OBJS)
 

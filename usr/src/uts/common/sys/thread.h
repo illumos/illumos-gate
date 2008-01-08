@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -515,10 +515,22 @@ extern	struct _kthread	t0;		/* the scheduler thread */
 extern	kmutex_t	pidlock;	/* global process lock */
 
 /*
- * thread_free_lock is used by the clock thread to keep a thread
+ * thread_free_lock is used by the tick accounting thread to keep a thread
  * from being freed while it is being examined.
  */
-extern	kmutex_t	thread_free_lock;
+#define	THREAD_FREE_NUM		1024
+#define	THREAD_FREE_MASK	(THREAD_FREE_NUM - 1)
+#define	THREAD_FREE_SHIFT_BITS	5
+#define	THREAD_FREE_SHIFT(t)	((uintptr_t)t >> THREAD_FREE_SHIFT_BITS)
+#define	THREAD_FREE_HASH(t)	(THREAD_FREE_SHIFT(t) & THREAD_FREE_MASK)
+
+typedef struct thread_free_lock {
+	kmutex_t	tf_lock;
+	uchar_t		tf_pad[64 - sizeof (kmutex_t)];
+} thread_free_lock_t;
+
+extern void	thread_free_prevent(kthread_t *);
+extern void	thread_free_allow(kthread_t *);
 
 /*
  * Routines to change the priority and effective priority

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1785,9 +1785,6 @@ cpu_del_unit(int cpuid)
 	cp->cpu_next->cpu_prev = cp->cpu_prev;
 	if (cp == cpu_list)
 		cpu_list = cpnext;
-	if (cp == clock_cpu_list)
-		clock_cpu_list = cpnext;
-
 
 	/*
 	 * Signals that the cpu has been deleted (see above).
@@ -1881,6 +1878,9 @@ cpu_remove_active(cpu_t *cp)
 	pg_cpu_inactive(cp);
 
 	lgrp_config(LGRP_CONFIG_CPU_OFFLINE, (uintptr_t)cp, 0);
+
+	if (cp == clock_cpu_list)
+		clock_cpu_list = cp->cpu_next_onln;
 
 	cp->cpu_prev_onln->cpu_next_onln = cp->cpu_next_onln;
 	cp->cpu_next_onln->cpu_prev_onln = cp->cpu_prev_onln;
@@ -2796,7 +2796,6 @@ cpu_destroy_bound_threads(cpu_t *cp)
 		} while ((t = tnext) != curthread);
 
 		mutex_exit(&pidlock);
-
 
 		for (t = tlist; t != NULL; t = tnext) {
 			tnext = t->t_next;

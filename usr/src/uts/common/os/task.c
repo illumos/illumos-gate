@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,7 +202,39 @@ task_cpu_time_usage(rctl_t *r, proc_t *p)
 	task_t *t = p->p_task;
 
 	ASSERT(MUTEX_HELD(&p->p_lock));
-	return (t->tk_cpu_time / hz);
+	return (t->tk_cpu_time);
+}
+
+/*
+ * int task_cpu_time_incr(task_t *t, rctl_qty_t incr)
+ *
+ * Overview
+ *   task_cpu_time_incr() increments the amount of CPU time used
+ *   by this task.
+ *
+ * Return values
+ *   1   if a second or more time is accumulated
+ *   0   otherwise
+ *
+ * Caller's context
+ *   This is called by the clock tick accounting function to charge
+ *   CPU time to a task.
+ */
+rctl_qty_t
+task_cpu_time_incr(task_t *t, rctl_qty_t incr)
+{
+	rctl_qty_t ret = 0;
+
+	mutex_enter(&t->tk_cpu_time_lock);
+	t->tk_cpu_ticks += incr;
+	if (t->tk_cpu_ticks >= hz) {
+		t->tk_cpu_time += t->tk_cpu_ticks / hz;
+		t->tk_cpu_ticks = t->tk_cpu_ticks % hz;
+		ret = t->tk_cpu_time;
+	}
+	mutex_exit(&t->tk_cpu_time_lock);
+
+	return (ret);
 }
 
 /*
@@ -224,15 +256,12 @@ static int
 task_cpu_time_test(rctl_t *r, proc_t *p, rctl_entity_p_t *e,
     struct rctl_val *rcntl, rctl_qty_t incr, uint_t flags)
 {
-	task_t *t;
-
 	ASSERT(MUTEX_HELD(&p->p_lock));
 	ASSERT(e->rcep_t == RCENTITY_TASK);
 	if (e->rcep_p.task == NULL)
 		return (0);
 
-	t = e->rcep_p.task;
-	if ((t->tk_cpu_time + incr) / hz >= rcntl->rcv_value)
+	if (incr >= rcntl->rcv_value)
 		return (1);
 
 	return (0);

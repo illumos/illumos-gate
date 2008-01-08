@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,8 @@ typedef struct task {
 	task_usage_t	*tk_inherited;	/* task resource usage		*/
 					/* inherited with the first	*/
 					/* member process		*/
+	rctl_qty_t	tk_cpu_ticks;	/* accumulated CPU ticks	*/
+	kmutex_t	tk_cpu_time_lock; /* accumulated CPU seconds lock */
 } task_t;
 
 extern task_t *task0p;
@@ -91,6 +93,7 @@ extern task_t *task_hold_by_id_zone(taskid_t, zoneid_t);
 extern void task_rele(task_t *);
 extern void task_hold(task_t *);
 extern void task_end(task_t *);
+extern rctl_qty_t task_cpu_time_incr(task_t *, rctl_qty_t);
 
 #else /* _KERNEL */
 

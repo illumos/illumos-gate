@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -348,6 +348,7 @@ typedef struct	proc {
 					/* protected by p_lock */
 	rctl_qty_t	p_crypto_mem;	/* /dev/crypto memory charged to proc */
 					/* protected by p_lock */
+	clock_t	p_ttime;		/* buffered task time */
 } proc_t;
 
 #define	PROC_T				/* headers relying on proc_t are OK */

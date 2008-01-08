@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,9 @@ extern "C" {
  * interrupts.
  *
  * NOTE: Need two single target software interrupts per cpu for cyclics.
+ *       Need one single target software interrupt per cpu for tick accounting.
  */
-#define	MAX_RSVD_IV	((NCPU * 2) + 256) /* HW and Single target SW intrs */
+#define	MAX_RSVD_IV	((NCPU * 3) + 256) /* HW and Single target SW intrs */
 #define	MAX_RSVD_IVX	32		/* Multi target software intrs */
 
 #ifndef _ASM

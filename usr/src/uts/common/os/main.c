@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,6 +360,8 @@ main(void)
 	extern int	netboot;
 	extern void	vm_init(void);
 	extern void	cbe_init(void);
+	extern void	clock_tick_init_pre(void);
+	extern void	clock_tick_init_post(void);
 	extern void	clock_init(void);
 	extern void	physio_bufs_init(void);
 	extern void	pm_cfb_setup_intr(void);
@@ -399,6 +401,7 @@ main(void)
 	callout_init();	/* callout table MUST be init'd before clock starts */
 	timer_init();	/* timer must be initialized before cyclic starts */
 	cbe_init();
+	clock_tick_init_pre();
 	clock_init();
 
 	/*
@@ -543,6 +546,8 @@ main(void)
 	 */
 	kmem_mp_init();
 	vmem_update(NULL);
+
+	clock_tick_init_post();
 
 	for (initptr = &mp_init_tbl[0]; *initptr; initptr++)
 		(**initptr)();

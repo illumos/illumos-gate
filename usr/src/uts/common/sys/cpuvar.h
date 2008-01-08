@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,6 +519,7 @@ extern cpuset_t cpu_seqid_inuse;
 
 extern struct cpu	*cpu[];		/* indexed by CPU number */
 extern cpu_t		*cpu_list;	/* list of CPUs */
+extern cpu_t		*cpu_active;	/* list of active CPUs */
 extern int		ncpus;		/* number of CPUs present */
 extern int		ncpus_online;	/* number of CPUs not quiesced */
 extern int		max_ncpus;	/* max present before ncpus is known */

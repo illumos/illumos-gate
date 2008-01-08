@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -812,4 +812,38 @@ intr_dist_cpuid_rem_device_weight(uint32_t cpuid, dev_info_t *dip)
 	if (cp->cpu_intr_weight < 0)
 		cp->cpu_intr_weight = 0;	/* sanity */
 	mutex_exit(&intr_dist_cpu_lock);
+}
+
+ulong_t
+create_softint(uint_t pil, uint_t (*func)(caddr_t, caddr_t), caddr_t arg1)
+{
+	uint64_t inum;
+
+	inum = add_softintr(pil, func, arg1, SOFTINT_ST);
+	return ((ulong_t)inum);
+}
+
+void
+invoke_softint(processorid_t cpuid, ulong_t hdl)
+{
+	uint64_t inum = hdl;
+
+	if (cpuid == CPU->cpu_id)
+		setsoftint(inum);
+	else
+		xt_one(cpuid, setsoftint_tl1, inum, 0);
+}
+
+void
+remove_softint(ulong_t hdl)
+{
+	uint64_t inum = hdl;
+
+	(void) rem_softintr(inum);
+}
+
+void
+sync_softint(cpuset_t set)
+{
+	xt_sync(set);
 }

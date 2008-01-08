@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1278,6 +1278,10 @@ lockstat_hot_patch(void)
 /* XX64 membar_*() should be inlines */
 
 void
+membar_sync(void)
+{}
+
+void
 membar_enter(void)
 {}
 
@@ -1299,8 +1303,10 @@ membar_consumer(void)
 
 	ENTRY(membar_enter)
 	ALTENTRY(membar_exit)
+	ALTENTRY(membar_sync)
 	mfence			/* lighter weight than lock; xorq $0,(%rsp) */
 	ret
+	SET_SIZE(membar_sync)
 	SET_SIZE(membar_exit)
 	SET_SIZE(membar_enter)
 
@@ -1318,9 +1324,11 @@ membar_consumer(void)
 
 	ENTRY(membar_enter)
 	ALTENTRY(membar_exit)
+	ALTENTRY(membar_sync)
 	lock
 	xorl	$0, (%esp)
 	ret
+	SET_SIZE(membar_sync)
 	SET_SIZE(membar_exit)
 	SET_SIZE(membar_enter)
 

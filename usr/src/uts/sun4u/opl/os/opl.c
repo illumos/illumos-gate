@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,6 +115,12 @@ static void pass2xscf_thread();
 #define	OPL_BOFF_CAP2 60
 #define	OPL_BOFF_MAX (40 * OPL_BOFF_SLEEP)
 #define	OPL_BOFF_TM 1500
+
+#define	OPL_CLOCK_TICK_THRESHOLD	128
+#define	OPL_CLOCK_TICK_NCPUS		64
+
+extern int	clock_tick_threshold;
+extern int	clock_tick_ncpus;
 
 int
 set_platform_max_ncpus(void)
@@ -943,6 +949,10 @@ plat_startup_memlist(caddr_t alloc_base)
 void
 startup_platform(void)
 {
+	if (clock_tick_threshold == 0)
+		clock_tick_threshold = OPL_CLOCK_TICK_THRESHOLD;
+	if (clock_tick_ncpus == 0)
+		clock_tick_ncpus = OPL_CLOCK_TICK_NCPUS;
 }
 
 void

@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,6 +253,8 @@ cyclic_id_t clock_cyclic;	/* clock()'s cyclic_id */
 cyclic_id_t deadman_cyclic;	/* deadman()'s cyclic_id */
 cyclic_id_t ddi_timer_cyclic;	/* cyclic_timer()'s cyclic_id */
 
+extern void	clock_tick_schedule(int);
+
 static int lgrp_ticks;		/* counter to schedule lgrp load calcs */
 
 /*
@@ -306,7 +308,6 @@ static int	adj_hist_entry;
 
 int64_t clock_adj_hist[CLOCK_ADJ_HIST_SIZE];
 
-static void clock_tick(kthread_t *);
 static void calcloadavg(int, uint64_t *);
 static int genloadavg(struct loadavg_s *);
 static void loadavg_update();
@@ -314,17 +315,16 @@ static void loadavg_update();
 void (*cmm_clock_callout)() = NULL;
 void (*cpucaps_clock_callout)() = NULL;
 
+extern clock_t clock_tick_proc_max;
+
 static void
 clock(void)
 {
 	kthread_t	*t;
-	kmutex_t	*plockp;	/* pointer to thread's process lock */
-	int	pinned_intr = 0;
-	uint_t	nrunnable, nrunning;
+	uint_t	nrunnable;
 	uint_t	w_io;
 	cpu_t	*cp;
 	cpupart_t *cpupart;
-	int	exiting;
 	extern void set_anoninfo();
 	extern	void	set_freemem();
 	void	(*funcp)();
@@ -379,22 +379,7 @@ clock(void)
 	 * every timer interrupt.
 	 *
 	 * Continue with the interrupt processing as scheduled.
-	 *
-	 * Did we pin another interrupt thread?  Need to check this before
-	 * grabbing any adaptive locks, since if we block on a lock the
-	 * pinned thread could escape.  Note that this is just a heuristic;
-	 * if we take multiple laps though clock() without returning from
-	 * the interrupt because we have another clock tick pending, then
-	 * the pinned interrupt could be released by one of the previous
-	 * laps.  The only consequence is that the CPU will be counted as
-	 * in idle (or wait) state once the pinned interrupt is released.
-	 * Since this accounting is inaccurate by nature, this isn't a big
-	 * deal --- but we should try to get it right in the common case
-	 * where we only call clock() once per interrupt.
 	 */
-	if (curthread->t_intr != NULL)
-		pinned_intr = (curthread->t_intr->t_flag & T_INTR_THREAD);
-
 	/*
 	 * Count the number of runnable threads and the number waiting
 	 * for some form of I/O to complete -- gets added to
@@ -447,6 +432,10 @@ clock(void)
 		cpupart->cp_nrunnable_cum += cpu_nrunnable;
 		if (one_sec) {
 			cpupart->cp_nrunnable += cpu_nrunnable;
+			/*
+			 * Update user, system, and idle cpu times.
+			 */
+			cpupart->cp_nrunning++;
 			/*
 			 * w_io is used to update sysinfo.waiting during
 			 * one_second processing below.  Only gather w_io
@@ -547,150 +536,7 @@ clock(void)
 		}
 	} while ((cp = cp->cpu_next) != cpu_list);
 
-	/*
-	 * Do tick processing for all the active threads running in
-	 * the system.  We're trying to be more fair by walking the
-	 * list of CPUs starting from a different CPUs each time.
-	 */
-	cp = clock_cpu_list;
-	nrunning = 0;
-	do {
-		klwp_id_t lwp;
-		int intr;
-		int thread_away;
-
-		/*
-		 * Don't do any tick processing on CPUs that
-		 * aren't even in the system or aren't up yet.
-		 */
-		if ((cp->cpu_flags & CPU_EXISTS) == 0) {
-			continue;
-		}
-
-		/*
-		 * The locking here is rather tricky.  We use
-		 * thread_free_lock to keep the currently running
-		 * thread from being freed or recycled while we're
-		 * looking at it.  We can then check if the thread
-		 * is exiting and get the appropriate p_lock if it
-		 * is not.  We have to be careful, though, because
-		 * the _process_ can still be freed while we're
-		 * holding thread_free_lock.  To avoid touching the
-		 * proc structure we put a pointer to the p_lock in the
-		 * thread structure.  The p_lock is persistent so we
-		 * can acquire it even if the process is gone.  At that
-		 * point we can check (again) if the thread is exiting
-		 * and either drop the lock or do the tick processing.
-		 */
-		mutex_enter(&thread_free_lock);
-		/*
-		 * We cannot hold the cpu_lock to prevent the
-		 * cpu_list from changing in the clock interrupt.
-		 * As long as we don't block (or don't get pre-empted)
-		 * the cpu_list will not change (all threads are paused
-		 * before list modification). If the list does change
-		 * any deleted cpu structures will remain with cpu_next
-		 * set to NULL, hence the following test.
-		 */
-		if (cp->cpu_next == NULL) {
-			mutex_exit(&thread_free_lock);
-			break;
-		}
-		t = cp->cpu_thread;	/* Current running thread */
-		if (CPU == cp) {
-			/*
-			 * 't' will be the clock interrupt thread on this
-			 * CPU.  Use the pinned thread (if any) on this CPU
-			 * as the target of the clock tick.  If we pinned
-			 * an interrupt, though, just keep using the clock
-			 * interrupt thread since the formerly pinned one
-			 * may have gone away.  One interrupt thread is as
-			 * good as another, and this means we don't have
-			 * to continue to check pinned_intr in subsequent
-			 * code.
-			 */
-			ASSERT(t == curthread);
-			if (t->t_intr != NULL && !pinned_intr)
-				t = t->t_intr;
-		}
-
-		intr = t->t_flag & T_INTR_THREAD;
-		lwp = ttolwp(t);
-		if (lwp == NULL || (t->t_proc_flag & TP_LWPEXIT) || intr) {
-			/*
-			 * Thread is exiting (or uninteresting) so don't
-			 * do tick processing or grab p_lock.  Once we
-			 * drop thread_free_lock we can't look inside the
-			 * thread or lwp structure, since the thread may
-			 * have gone away.
-			 */
-			exiting = 1;
-		} else {
-			/*
-			 * OK, try to grab the process lock.  See
-			 * comments above for why we're not using
-			 * ttoproc(t)->p_lockp here.
-			 */
-			plockp = t->t_plockp;
-			mutex_enter(plockp);
-			/* See above comment. */
-			if (cp->cpu_next == NULL) {
-				mutex_exit(plockp);
-				mutex_exit(&thread_free_lock);
-				break;
-			}
-			/*
-			 * The thread may have exited between when we
-			 * checked above, and when we got the p_lock.
-			 */
-			if (t->t_proc_flag & TP_LWPEXIT) {
-				mutex_exit(plockp);
-				exiting = 1;
-			} else {
-				exiting = 0;
-			}
-		}
-		/*
-		 * Either we have the p_lock for the thread's process,
-		 * or we don't care about the thread structure any more.
-		 * Either way we can drop thread_free_lock.
-		 */
-		mutex_exit(&thread_free_lock);
-
-		/*
-		 * Update user, system, and idle cpu times.
-		 */
-		if (one_sec) {
-			nrunning++;
-			cp->cpu_part->cp_nrunning++;
-		}
-		/*
-		 * If we haven't done tick processing for this
-		 * lwp, then do it now. Since we don't hold the
-		 * lwp down on a CPU it can migrate and show up
-		 * more than once, hence the lbolt check.
-		 *
-		 * Also, make sure that it's okay to perform the
-		 * tick processing before calling clock_tick.
-		 * Setting thread_away to a TRUE value (ie. not 0)
-		 * results in tick processing not being performed for
-		 * that thread.  Or, in other words, keeps the thread
-		 * away from clock_tick processing.
-		 */
-		thread_away = ((cp->cpu_flags & CPU_QUIESCED) ||
-		    CPU_ON_INTR(cp) || intr ||
-		    (cp->cpu_dispthread == cp->cpu_idle_thread) || exiting);
-
-		if ((!thread_away) && (lbolt - t->t_lbolt != 0)) {
-			t->t_lbolt = lbolt;
-			clock_tick(t);
-		}
-
-		if (!exiting)
-			mutex_exit(plockp);
-	} while ((cp = cp->cpu_next) != clock_cpu_list);
-
-	clock_cpu_list = clock_cpu_list->cpu_next;
+	clock_tick_schedule(one_sec);
 
 	/*
 	 * bump time in ticks
@@ -1522,16 +1368,19 @@ ddi_hardpps(struct timeval *tvp, int usec)
  * Check for timer action, enforce CPU rlimit, do profiling etc.
  */
 void
-clock_tick(kthread_t *t)
+clock_tick(kthread_t *t, int pending)
 {
 	struct proc *pp;
 	klwp_id_t    lwp;
 	struct as *as;
-	clock_t	utime;
-	clock_t	stime;
+	clock_t	ticks;
 	int	poke = 0;		/* notify another CPU */
 	int	user_mode;
 	size_t	 rss;
+	int i, total_usec, usec;
+	rctl_qty_t secs;
+
+	ASSERT(pending > 0);
 
 	/* Must be operating on a lwp/thread */
 	if ((lwp = ttolwp(t)) == NULL) {
@@ -1539,8 +1388,10 @@ clock_tick(kthread_t *t)
 		/*NOTREACHED*/
 	}
 
-	CL_TICK(t);	/* Class specific tick processing */
-	DTRACE_SCHED1(tick, kthread_t *, t);
+	for (i = 0; i < pending; i++) {
+		CL_TICK(t);	/* Class specific tick processing */
+		DTRACE_SCHED1(tick, kthread_t *, t);
+	}
 
 	pp = ttoproc(t);
 
@@ -1549,17 +1400,18 @@ clock_tick(kthread_t *t)
 
 	user_mode = (lwp->lwp_state == LWP_USER);
 
+	ticks = (pp->p_utime + pp->p_stime) % hz;
 	/*
 	 * Update process times. Should use high res clock and state
 	 * changes instead of statistical sampling method. XXX
 	 */
 	if (user_mode) {
-		pp->p_utime++;
-		pp->p_task->tk_cpu_time++;
+		pp->p_utime += pending;
 	} else {
-		pp->p_stime++;
-		pp->p_task->tk_cpu_time++;
+		pp->p_stime += pending;
 	}
+
+	pp->p_ttime += pending;
 	as = pp->p_as;
 
 	/*
@@ -1567,45 +1419,73 @@ clock_tick(kthread_t *t)
 	 * lwp when the AST happens.
 	 */
 	if (pp->p_prof.pr_scale) {
-		atomic_add_32(&lwp->lwp_oweupc, 1);
+		atomic_add_32(&lwp->lwp_oweupc, (int32_t)pending);
 		if (user_mode) {
 			poke = 1;
 			aston(t);
 		}
 	}
 
-	utime = pp->p_utime;
-	stime = pp->p_stime;
-
 	/*
 	 * If CPU was in user state, process lwp-virtual time
-	 * interval timer.
+	 * interval timer. The value passed to itimerdecr() has to be
+	 * in microseconds and has to be less than one second. Hence
+	 * this loop.
 	 */
-	if (user_mode &&
-	    timerisset(&lwp->lwp_timer[ITIMER_VIRTUAL].it_value) &&
-	    itimerdecr(&lwp->lwp_timer[ITIMER_VIRTUAL], usec_per_tick) == 0) {
-		poke = 1;
-		sigtoproc(pp, t, SIGVTALRM);
+	total_usec = usec_per_tick * pending;
+	while (total_usec > 0) {
+		usec = MIN(total_usec, (MICROSEC - 1));
+		if (user_mode &&
+		    timerisset(&lwp->lwp_timer[ITIMER_VIRTUAL].it_value) &&
+		    itimerdecr(&lwp->lwp_timer[ITIMER_VIRTUAL], usec) == 0) {
+			poke = 1;
+			sigtoproc(pp, t, SIGVTALRM);
+		}
+		total_usec -= usec;
 	}
 
-	if (timerisset(&lwp->lwp_timer[ITIMER_PROF].it_value) &&
-	    itimerdecr(&lwp->lwp_timer[ITIMER_PROF], usec_per_tick) == 0) {
-		poke = 1;
-		sigtoproc(pp, t, SIGPROF);
+	/*
+	 * If CPU was in user state, process lwp-profile
+	 * interval timer.
+	 */
+	total_usec = usec_per_tick * pending;
+	while (total_usec > 0) {
+		usec = MIN(total_usec, (MICROSEC - 1));
+		if (timerisset(&lwp->lwp_timer[ITIMER_PROF].it_value) &&
+		    itimerdecr(&lwp->lwp_timer[ITIMER_PROF], usec) == 0) {
+			poke = 1;
+			sigtoproc(pp, t, SIGPROF);
+		}
+		total_usec -= usec;
 	}
 
 	/*
 	 * Enforce CPU resource controls:
 	 *   (a) process.max-cpu-time resource control
+	 *
+	 * Perform the check only if we have accumulated more a second.
 	 */
-	(void) rctl_test(rctlproc_legacy[RLIMIT_CPU], pp->p_rctls, pp,
-	    (utime + stime)/hz, RCA_UNSAFE_SIGINFO);
+	if ((ticks + pending) >= hz) {
+		(void) rctl_test(rctlproc_legacy[RLIMIT_CPU], pp->p_rctls, pp,
+		    (pp->p_utime + pp->p_stime)/hz, RCA_UNSAFE_SIGINFO);
+	}
 
 	/*
 	 *   (b) task.max-cpu-time resource control
+	 *
+	 * If we have accumulated enough ticks, increment the task CPU
+	 * time usage and test for the resource limit. This minimizes the
+	 * number of calls to the rct_test(). The task CPU time mutex
+	 * is highly contentious as many processes can be sharing a task.
 	 */
-	(void) rctl_test(rc_task_cpu_time, pp->p_task->tk_rctls, pp, 1,
-	    RCA_UNSAFE_SIGINFO);
+	if (pp->p_ttime >= clock_tick_proc_max) {
+		secs = task_cpu_time_incr(pp->p_task, pp->p_ttime);
+		pp->p_ttime = 0;
+		if (secs) {
+			(void) rctl_test(rc_task_cpu_time, pp->p_task->tk_rctls,
+			    pp, secs, RCA_UNSAFE_SIGINFO);
+		}
+	}
 
 	/*
 	 * Update memory usage for the currently running process.

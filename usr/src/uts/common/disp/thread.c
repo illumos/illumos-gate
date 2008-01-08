@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,10 +89,12 @@ static kcondvar_t reaper_cv;		/* synchronization var */
 kthread_t	*thread_deathrow;	/* circular list of reapable threads */
 kthread_t	*lwp_deathrow;		/* circular list of reapable threads */
 kmutex_t	reaplock;		/* protects lwp and thread deathrows */
-kmutex_t	thread_free_lock;	/* protects clock from reaper */
 int	thread_reapcnt = 0;		/* number of threads on deathrow */
 int	lwp_reapcnt = 0;		/* number of lwps on deathrow */
 int	reaplimit = 16;			/* delay reaping until reaplimit */
+
+thread_free_lock_t	*thread_free_lock;
+					/* protects tick thread from reaper */
 
 extern int nthread;
 
@@ -152,8 +154,16 @@ thread_init(void)
 	extern char sys_name[];
 	extern void idle();
 	struct cpu *cpu = CPU;
+	int i;
+	kmutex_t *lp;
 
 	mutex_init(&reaplock, NULL, MUTEX_SPIN, (void *)ipltospl(DISP_LEVEL));
+	thread_free_lock =
+	    kmem_alloc(sizeof (thread_free_lock_t) * THREAD_FREE_NUM, KM_SLEEP);
+	for (i = 0; i < THREAD_FREE_NUM; i++) {
+		lp = &thread_free_lock[i].tf_lock;
+		mutex_init(lp, NULL, MUTEX_DEFAULT, NULL);
+	}
 
 #if defined(__i386) || defined(__amd64)
 	thread_cache = kmem_cache_create("thread_cache", sizeof (kthread_t),
@@ -663,6 +673,34 @@ thread_join(kt_did_t tid)
 }
 
 void
+thread_free_prevent(kthread_t *t)
+{
+	kmutex_t *lp;
+
+	lp = &thread_free_lock[THREAD_FREE_HASH(t)].tf_lock;
+	mutex_enter(lp);
+}
+
+void
+thread_free_allow(kthread_t *t)
+{
+	kmutex_t *lp;
+
+	lp = &thread_free_lock[THREAD_FREE_HASH(t)].tf_lock;
+	mutex_exit(lp);
+}
+
+static void
+thread_free_barrier(kthread_t *t)
+{
+	kmutex_t *lp;
+
+	lp = &thread_free_lock[THREAD_FREE_HASH(t)].tf_lock;
+	mutex_enter(lp);
+	mutex_exit(lp);
+}
+
+void
 thread_free(kthread_t *t)
 {
 	ASSERT(t != &t0 && t->t_state == TS_FREE);
@@ -714,11 +752,11 @@ thread_free(kthread_t *t)
 	free_afd(&t->t_activefd);
 
 	/*
-	 * Barrier for clock thread.  The clock holds this lock to
-	 * keep the thread from going away while it's looking at it.
+	 * Barrier for the tick accounting code.  The tick accounting code
+	 * holds this lock to keep the thread from going away while it's
+	 * looking at it.
 	 */
-	mutex_enter(&thread_free_lock);
-	mutex_exit(&thread_free_lock);
+	thread_free_barrier(t);
 
 	ASSERT(ttoproj(t) == proj0p);
 	project_rele(ttoproj(t));

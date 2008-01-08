@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,6 +194,7 @@ extern void clock_highres_init(void);
 extern void pg_init(void);
 extern void pg_cmt_class_init(void);
 extern void pg_cpu0_init(void);
+extern void clock_tick_mp_init(void);
 
 void	(*init_tbl[])(void) = {
 	system_taskq_init,
@@ -238,6 +239,7 @@ void	(*mp_init_tbl[])(void) = {
 #if defined(__sparc)
 	siron_mp_init,
 #endif
+	clock_tick_mp_init,
 	0
 };
 
