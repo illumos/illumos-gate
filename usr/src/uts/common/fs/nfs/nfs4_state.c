@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3456,6 +3456,7 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 		ct->cc_sysid = 0;
 		ct->cc_pid = 0;
 		ct->cc_caller_id = nfs4_srv_caller_id;
+		ct->cc_flags = CC_DONTBLOCK;
 	}
 
 	if (ISSPECIAL(stateid)) {

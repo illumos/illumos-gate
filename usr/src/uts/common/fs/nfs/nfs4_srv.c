@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4899,6 +4899,7 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 		ct.cc_sysid = 0;
 		ct.cc_pid = 0;
 		ct.cc_caller_id = nfs4_srv_caller_id;
+		ct.cc_flags = CC_DONTBLOCK;
 	}
 
 	/* XXX start of possible race with delegations */
@@ -5011,7 +5012,11 @@ do_rfs4_op_setattr(bitmap4 *resp, fattr4 *fattrp, struct compound_state *cs,
 	}
 
 	if (error) {
-		status = puterrno4(error);
+		/* check if a monitor detected a delegation conflict */
+		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
+			status = NFS4ERR_DELAY;
+		else
+			status = puterrno4(error);
 
 		/*
 		 * Set the response bitmap when setattr failed.
@@ -6288,6 +6293,7 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 			ct.cc_sysid = 0;
 			ct.cc_pid = 0;
 			ct.cc_caller_id = nfs4_srv_caller_id;
+			ct.cc_flags = CC_DONTBLOCK;
 
 			cva.va_mask = AT_SIZE;
 			cva.va_size = reqsize;
@@ -6485,6 +6491,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		ct.cc_sysid = sysid;
 		ct.cc_pid = shr.s_pid;
 		ct.cc_caller_id = nfs4_srv_caller_id;
+		ct.cc_flags = CC_DONTBLOCK;
 		err = VOP_OPEN(&cs->vp, fflags, cs->cr, &ct);
 		if (err) {
 			rfs4_dbe_unlock(file->dbe);
