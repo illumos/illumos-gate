@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -21537,24 +21537,23 @@ int
 ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *if_req)
 {
-	int	err;
-	ill_t	*ill;
-	struct lifreq *lifr = (struct lifreq *)if_req;
+	ill_t	*ill = q->q_ptr;
+	phyint_t *phyi;
+	ip_stack_t *ipst;
+	struct lifreq *lifr = if_req;
 
 	ASSERT(ipif != NULL);
 	ip1dbg(("ip_sioctl_slifname %s\n", lifr->lifr_name));
 
 	if (q->q_next == NULL) {
-		ip1dbg((
-		    "if_sioctl_slifname: SIOCSLIFNAME: no q_next\n"));
+		ip1dbg(("if_sioctl_slifname: SIOCSLIFNAME: no q_next\n"));
 		return (EINVAL);
 	}
 
-	ill = (ill_t *)q->q_ptr;
 	/*
 	 * If we are not writer on 'q' then this interface exists already
-	 * and previous lookups (ipif_extract_lifreq()) found this ipif.
-	 * So return EALREADY
+	 * and previous lookups (ip_extract_lifreq()) found this ipif --
+	 * so return EALREADY.
 	 */
 	if (ill != ipif->ipif_ill)
 		return (EALREADY);
@@ -21573,6 +21572,30 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ip1dbg(("ip_setname: EINVAL 1\n"));
 		return (EINVAL);
 	}
+
+	/*
+	 * If there's another ill already with the requested name, ensure
+	 * that it's of the same type.	Otherwise, ill_phyint_reinit() will
+	 * fuse together two unrelated ills, which will cause chaos.
+	 */
+	ipst = ill->ill_ipst;
+	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
+	    lifr->lifr_name, NULL);
+	if (phyi != NULL) {
+		ill_t *ill_mate = phyi->phyint_illv4;
+
+		if (ill_mate == NULL)
+			ill_mate = phyi->phyint_illv6;
+		ASSERT(ill_mate != NULL);
+
+		if (ill_mate->ill_media->ip_m_mac_type !=
+		    ill->ill_media->ip_m_mac_type) {
+			ip1dbg(("if_sioctl_slifname: SIOCSLIFNAME: attempt to "
+			    "use the same ill name on differing media\n"));
+			return (EINVAL);
+		}
+	}
+
 	/*
 	 * For a DL_STYLE2 driver (ill_needs_attach), we would not have the
 	 * ill_bcast_addr_length info.
@@ -21624,8 +21647,7 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * This ill has not been inserted into the global list.
 	 * So we are still single threaded and don't need any lock
 	 */
-	ipif->ipif_flags = lifr->lifr_flags & IFF_LOGINT_FLAGS &
-	    ~IFF_DUPLICATE;
+	ipif->ipif_flags = lifr->lifr_flags & IFF_LOGINT_FLAGS & ~IFF_DUPLICATE;
 	ill->ill_flags = lifr->lifr_flags & IFF_PHYINTINST_FLAGS;
 	ill->ill_phyint->phyint_flags = lifr->lifr_flags & IFF_PHYINT_FLAGS;
 
@@ -21634,8 +21656,8 @@ ip_sioctl_slifname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		ill->ill_phyint->phyint_illv6 = ill;
 		ill->ill_phyint->phyint_illv4 = NULL;
 	}
-	err = ipif_set_values(q, mp, lifr->lifr_name, &lifr->lifr_ppa);
-	return (err);
+
+	return (ipif_set_values(q, mp, lifr->lifr_name, &lifr->lifr_ppa));
 }
 
 /* ARGSUSED */
