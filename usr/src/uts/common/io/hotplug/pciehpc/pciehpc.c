@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -245,6 +245,9 @@ pciehpc_init(dev_info_t *dip, pciehpc_regops_t *regops)
 	(void) (ctrl_p->ops.enable_hpc_intr)(ctrl_p);
 
 	pciehpc_init_count++;
+
+	(void) ddi_prop_update_int(DDI_DEV_T_NONE, dip, "pcie-hotplug-mode",
+	    ctrl_p->hp_mode);
 
 	mutex_exit(&pciehpc_init_mutex);
 

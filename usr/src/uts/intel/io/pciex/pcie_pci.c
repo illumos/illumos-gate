@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,12 +48,13 @@
 #include <sys/pcie_impl.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/hotplug/pci/pciehpc.h>
+#include <sys/hotplug/pci/pciehpc_impl.h>
 #include <io/pciex/pcie_error.h>
 #include <io/pciex/pcie_nvidia.h>
 #include <io/pciex/pcie_nb5000.h>
 
-#ifdef DEBUG
-static int pepb_debug = 0;
+#ifdef	DEBUG
+int pepb_debug = 0;
 #define	PEPB_DEBUG(args)	if (pepb_debug) cmn_err args
 #else
 #define	PEPB_DEBUG(args)
@@ -138,7 +139,6 @@ struct cb_ops pepb_cb_ops = {
 static int	pepb_probe(dev_info_t *);
 static int	pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int	pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
-static int	pepb_check_slot_disabled(dev_info_t *dip);
 
 struct dev_ops pepb_ops = {
 	DEVO_REV,		/* devo_rev */
@@ -177,6 +177,9 @@ static void *pepb_state;
 
 typedef struct {
 	dev_info_t *dip;
+	ddi_acc_handle_t	config_handle;
+	int			port_type;
+	int			inband_hpc;
 
 	/*
 	 * cpr support:
@@ -193,43 +196,25 @@ typedef struct {
 	} config_state[PCI_MAX_CHILDREN];
 
 	/*
-	 * hot plug support
-	 */
-	int			inband_hpc;	/* inband HPC type */
-
-	/*
 	 * interrupt support
 	 */
-	ddi_intr_handle_t	*htable;	/* interrupt handles */
-	int			htable_size;	/* htable size */
-	int			intr_count;	/* Num of Intr */
-	uint_t			intr_priority;	/* Intr Priority */
-	int			intr_type;	/* (MSI | FIXED) */
-	uint32_t		soft_state;	/* soft state flags */
-	kmutex_t		pepb_mutex;	/* Mutex for this ctrl */
+	pcie_bridge_intr_state_t	istate;
+
 	kmutex_t		pepb_err_mutex;	/* Error handling mutex */
 	kmutex_t		pepb_peek_poke_mutex;
 	int			pepb_fmcap;
 	ddi_iblock_cookie_t	pepb_fm_ibc;
-	int			port_type;
 } pepb_devstate_t;
 
-/* soft state flags */
-#define	PEPB_SOFT_STATE_INIT_HTABLE	0x01	/* htable kmem_alloced */
-#define	PEPB_SOFT_STATE_INIT_ALLOC	0x02	/* ddi_intr_alloc called */
-#define	PEPB_SOFT_STATE_INIT_HANDLER	0x04	/* ddi_intr_add_handler done */
-#define	PEPB_SOFT_STATE_INIT_ENABLE	0x08	/* ddi_intr_enable called */
-#define	PEPB_SOFT_STATE_INIT_BLOCK	0x10	/* ddi_intr_block_enable done */
-#define	PEPB_SOFT_STATE_INIT_MUTEX	0x20	/* mutex initialized */
 
-/* default interrupt priority for all interrupts (hotplug or non-hotplug */
-#define	PEPB_INTR_PRI	1
+/* undefined port_type; cannot be 0 or a valid PCIE device type value */
+#define	PEPB_PORT_TYPE_NULL	-1
 
-/* flag to turn on MSI support */
-static int pepb_enable_msi = 1;
+
 /* panic on unknown flag, defaulted to on */
 int pepb_panic_unknown = 1;
 int pepb_panic_fatal = 1;
+
 
 extern errorq_t *pci_target_queue;
 
@@ -240,17 +225,9 @@ static void	pepb_uninitchild(dev_info_t *);
 static int 	pepb_initchild(dev_info_t *child);
 static void 	pepb_save_config_regs(pepb_devstate_t *pepb_p);
 static void	pepb_restore_config_regs(pepb_devstate_t *pepb_p);
-static int	pepb_pcie_device_type(dev_info_t *dip, int *port_type);
-static int	pepb_pcie_port_type(dev_info_t *dip,
-			ddi_acc_handle_t config_handle);
+static int	pepb_pcie_device_type(pepb_devstate_t *pepb_p);
+static uint_t	pepb_intr_handler(caddr_t arg1, caddr_t arg2);
 
-/* interrupt related declarations */
-static uint_t	pepb_intx_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2);
-static uint_t	pepb_err_msi_intr(caddr_t arg, caddr_t arg2);
-static int	pepb_intr_on_root_port(dev_info_t *);
-static int	pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type);
-static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 
 int
 _init(void)
@@ -297,10 +274,15 @@ static int
 pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	int			instance;
-	int			intr_types;
-	char			device_type[8];
+	const char		*drvnm;
+	int			rv;
+	char			*device_type;
 	pepb_devstate_t		*pepb;
 	ddi_acc_handle_t	config_handle;
+	pciehpc_hp_mode_t	hp_mode;
+
+	drvnm = ddi_driver_name(devi);
+	instance = ddi_get_instance(devi);
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -308,8 +290,13 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		/*
 		 * Get the soft state structure for the bridge.
 		 */
-		pepb = ddi_get_soft_state(pepb_state, ddi_get_instance(devi));
+		pepb = ddi_get_soft_state(pepb_state, instance);
 		pepb_restore_config_regs(pepb);
+
+		if (pcie_bridge_intr_reinit(&pepb->istate) != DDI_SUCCESS)
+			cmn_err(CE_CONT, "?%s%d: Failed to reinitialize "
+			    "interrupts on resume\n", drvnm, instance);
+
 		return (DDI_SUCCESS);
 
 	default:
@@ -319,25 +306,35 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		break;
 	}
 
-	/*
-	 * If PCIE_LINKCTL_LINK_DISABLE bit in the PCIe Config
-	 * Space (PCIe Capability Link Control Register) is set,
-	 * then do not bind the driver.
-	 */
-	if (pepb_check_slot_disabled(devi) == 1)
+	if (pci_config_setup(devi, &config_handle) != DDI_SUCCESS) {
+		PEPB_DEBUG((CE_WARN, "%s%d: pci_config_setup() failed",
+		    drvnm, instance));
 		return (DDI_FAILURE);
+	}
+
+	/*
+	 * If the link is disabled then there is no need to attach
+	 */
+	if (pcie_bridge_is_link_disabled(devi, config_handle)) {
+		PEPB_DEBUG((CE_NOTE, "%s%d: link disabled",
+		    drvnm, instance));
+		pci_config_teardown(&config_handle);
+		return (DDI_FAILURE);
+	}
 
 	/*
 	 * Allocate and get soft state structure.
 	 */
-	instance = ddi_get_instance(devi);
-	if (ddi_soft_state_zalloc(pepb_state, instance) != DDI_SUCCESS)
+	if (ddi_soft_state_zalloc(pepb_state, instance) != DDI_SUCCESS) {
+		pci_config_teardown(&config_handle);
 		return (DDI_FAILURE);
+	}
 	pepb = ddi_get_soft_state(pepb_state, instance);
 	pepb->dip = devi;
+	pepb->config_handle = config_handle;
 
 	/*
-	 * initalise fma support before we start accessing config space
+	 * initialize fma support
 	 */
 	pci_targetq_init();
 	pepb->pepb_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
@@ -349,67 +346,43 @@ pepb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	mutex_init(&pepb->pepb_peek_poke_mutex, NULL, MUTEX_DRIVER,
 	    (void *)pepb->pepb_fm_ibc);
 
-	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE|DDI_FM_EREPORT_CAPABLE))
+	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE | DDI_FM_EREPORT_CAPABLE))
 		pci_ereport_setup(devi);
 
 	if (pepb->pepb_fmcap & DDI_FM_ERRCB_CAPABLE)
 		ddi_fm_handler_register(devi, pepb_fm_callback, NULL);
 
 	/*
-	 * Make sure the "device_type" property exists.
+	 * Property setup
+	 * - device_type: IEEE1275 prop denoting type of child/secondary bus
+	 * - pci-hotplug-type: type of hotplug potentially supported derived
+	 *   from bridge config regs
 	 */
-	if (pepb_pcie_device_type(devi, &pepb->port_type) == DDI_SUCCESS)
-		(void) strcpy(device_type, "pciex");
+	if (pepb_pcie_device_type(pepb) == DDI_SUCCESS)
+		device_type = "pciex";
 	else
-		(void) strcpy(device_type, "pci");
+		device_type = "pci";
+
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
 	    "device_type", device_type);
 
-	/* probe for inband HPC */
 	pepb->inband_hpc = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
 	    DDI_PROP_DONTPASS, "pci-hotplug-type", INBAND_HPC_NONE);
 
 	/*
 	 * Initialize interrupt handlers.
+	 * Failure means no PCIE advanced error reporting and partial native
+	 * hotplug functionality
 	 */
-	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS)
-		goto next_step;
+	pepb->istate.dip = pepb->dip;
+	pepb->istate.cfghdl = pepb->config_handle;
+	pepb->istate.datap = pepb;
 
-	PEPB_DEBUG((CE_NOTE, "%s#%d: intr_types = 0x%x\n",
-	    ddi_driver_name(devi), ddi_get_instance(devi), intr_types));
+	rv = pcie_bridge_intr_init(&pepb->istate, pepb_intr_handler);
+	if (rv != DDI_SUCCESS && rv != DDI_ENOTSUP)
+		cmn_err(CE_CONT, "?%s%d: Failed to initialize interrupts\n",
+		    drvnm, instance);
 
-	if (pepb_enable_msi && (intr_types & DDI_INTR_TYPE_MSI) &&
-	    pepb_intr_on_root_port(devi) == DDI_SUCCESS) {
-		if (pepb_intr_init(pepb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
-			goto next_step;
-		else
-			PEPB_DEBUG((CE_WARN,
-			    "%s#%d: Unable to attach MSI handler",
-			    ddi_driver_name(devi), ddi_get_instance(devi)));
-	}
-
-	/*
-	 * Only register hotplug interrupts for now.
-	 * Check if device supports PCIe hotplug or not?
-	 * If yes, register fixed interrupts if ILINE is valid.
-	 */
-	if (pepb->inband_hpc == INBAND_HPC_PCIE) {
-		uint8_t iline;
-
-		(void) pci_config_setup(devi, &config_handle);
-		iline = pci_config_get8(config_handle, PCI_CONF_ILINE);
-		pci_config_teardown(&config_handle);
-
-		if (iline == 0 || iline > 15)
-			goto next_step;
-
-		if (pepb_intr_init(pepb, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS)
-			PEPB_DEBUG((CE_WARN,
-			    "%s#%d: Unable to attach INTx handler",
-			    ddi_driver_name(devi), ddi_get_instance(devi)));
-	}
-
-next_step:
 	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
@@ -417,19 +390,49 @@ next_step:
 	 * to this bus.
 	 */
 	if (pcihp_init(devi) != DDI_SUCCESS)
-		cmn_err(CE_WARN, "Failed to setup hotplug framework");
+		cmn_err(CE_WARN, "%s%d: Failed to setup hotplug framework",
+		    drvnm, instance);
 	else {
+		/*
+		 * grab istate lock if interrupts are enabled to update
+		 * inband_hpc after HP framework initializes
+		 */
+		if (pepb->istate.iflags & PCIE_BRIDGE_INTR_INIT_ENABLE)
+			mutex_enter(&pepb->istate.ilock);
+
 		/*
 		 * If there is an inband PCI-E HPC then initialize it.
 		 * The failure is not considered fatal for the system
 		 * so log the message and ignore the failure.
+		 *
+		 * Also optimize intr handling where if we are not using
+		 * native hotplug mode, we do not ask the hotplug
+		 * framework to check interrupt status.  Note that in
+		 * this case, istate.inband_hpc will differ from
+		 * pepb->inband_hpc.
 		 */
 		if (pepb->inband_hpc == INBAND_HPC_PCIE &&
-		    pciehpc_init(devi, NULL) != DDI_SUCCESS) {
+		    pciehpc_init(devi, NULL) == DDI_SUCCESS) {
+
+			hp_mode = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
+			    DDI_PROP_DONTPASS, "pcie-hotplug-mode", -1);
+
+			if (hp_mode != PCIEHPC_NATIVE_HP_MODE) {
+				PEPB_DEBUG((CE_NOTE, "%s%d: not native "
+				    "hotplug mode; disabling hp intr checking",
+				    drvnm, instance));
+				pepb->istate.inband_hpc = INBAND_HPC_NONE;
+			}
+
+		} else if (pepb->inband_hpc == INBAND_HPC_PCIE) {
 			pepb->inband_hpc = INBAND_HPC_NONE;
-			cmn_err(CE_CONT, "!Failed to initialize inband hotplug "
-			    "controller");
+			pepb->istate.inband_hpc = INBAND_HPC_NONE;
+			cmn_err(CE_CONT, "!%s%d: Failed to initialize inband "
+			"hotplug controller\n", drvnm, instance);
 		}
+
+		if (pepb->istate.iflags & PCIE_BRIDGE_INTR_INIT_ENABLE)
+			mutex_exit(&pepb->istate.ilock);
 	}
 
 	ddi_report_dev(devi);
@@ -458,7 +461,7 @@ pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	pepb = ddi_get_soft_state(pepb_state, ddi_get_instance(devi));
 
 	/* remove interrupt handlers */
-	pepb_intr_fini(pepb);
+	pcie_bridge_intr_fini(&pepb->istate);
 
 	/* uninitialize inband PCI-E HPC if present */
 	if (pepb->inband_hpc == INBAND_HPC_PCIE)
@@ -471,12 +474,14 @@ pepb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	if (pepb->pepb_fmcap & DDI_FM_ERRCB_CAPABLE)
 		ddi_fm_handler_unregister(devi);
 
-	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE|DDI_FM_EREPORT_CAPABLE))
+	if (pepb->pepb_fmcap & (DDI_FM_ERRCB_CAPABLE | DDI_FM_EREPORT_CAPABLE))
 		pci_ereport_teardown(devi);
 
 	mutex_destroy(&pepb->pepb_err_mutex);
 	mutex_destroy(&pepb->pepb_peek_poke_mutex);
 	ddi_fm_fini(devi);
+
+	pci_config_teardown(&pepb->config_handle);
 
 	/*
 	 * And finally free the per-pci soft state.
@@ -732,19 +737,10 @@ pepb_save_config_regs(pepb_devstate_t *pepb_p)
 {
 	int i;
 	dev_info_t *dip;
-	ddi_acc_handle_t config_handle;
+	ddi_acc_handle_t config_handle = pepb_p->config_handle;
 
 	for (i = 0, dip = ddi_get_child(pepb_p->dip); dip != NULL;
 	    i++, dip = ddi_get_next_sibling(dip)) {
-
-		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "%s%d: can't config space for %s%d\n",
-			    ddi_driver_name(pepb_p->dip),
-			    ddi_get_instance(pepb_p->dip),
-			    ddi_driver_name(dip),
-			    ddi_get_instance(dip));
-			continue;
-		}
 
 		pepb_p->config_state[i].dip = dip;
 		pepb_p->config_state[i].command =
@@ -768,7 +764,6 @@ pepb_save_config_regs(pepb_devstate_t *pepb_p)
 			    pci_config_get8(config_handle,
 			    PCI_BCNF_LATENCY_TIMER);
 
-		pci_config_teardown(&config_handle);
 	}
 	pepb_p->config_state_index = i;
 }
@@ -790,19 +785,9 @@ static void
 pepb_restore_config_regs(pepb_devstate_t *pepb_p)
 {
 	int i;
-	dev_info_t *dip;
-	ddi_acc_handle_t config_handle;
+	ddi_acc_handle_t config_handle = pepb_p->config_handle;
 
 	for (i = 0; i < pepb_p->config_state_index; i++) {
-		dip = pepb_p->config_state[i].dip;
-		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "%s%d: can't config space for %s%d\n",
-			    ddi_driver_name(pepb_p->dip),
-			    ddi_get_instance(pepb_p->dip),
-			    ddi_driver_name(dip),
-			    ddi_get_instance(dip));
-			continue;
-		}
 		pci_config_put16(config_handle, PCI_CONF_COMM,
 		    pepb_p->config_state[i].command);
 		if ((pepb_p->config_state[i].header_type & PCI_HEADER_TYPE_M) ==
@@ -819,306 +804,161 @@ pepb_restore_config_regs(pepb_devstate_t *pepb_p)
 		    PCI_HEADER_TYPE_M) == PCI_HEADER_ONE)
 			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
 			    pepb_p->config_state[i].sec_latency_timer);
-
-		pci_config_teardown(&config_handle);
 	}
 }
 
-static int
-pepb_pcie_device_type(dev_info_t *dip, int *port_type)
-{
-	ddi_acc_handle_t handle;
-
-	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-	*port_type = pepb_pcie_port_type(dip, handle);
-	pci_config_teardown(&handle);
-
-	/* No PCIe CAP regs, we are not PCIe device_type */
-	if (*port_type < 0)
-		return (DDI_FAILURE);
-
-	/* check for all PCIe device_types */
-	if ((*port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
-	    (*port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
-		return (DDI_SUCCESS);
-
-	return (DDI_FAILURE);
-
-}
-
 /*
- * This function initializes internally generated interrupts only.
- * It does not affect any interrupts generated by downstream devices
- * or the forwarding of them.
- *
- * Enable Device Specific Interrupts or Hotplug features here.
- * Enabling features may change how many interrupts are requested
- * by the device.  If features are not enabled first, the
- * device might not ask for any interrupts.
+ * sets pepb_p->port_type to a PCIE defined device type
+ * and returns DDI_SUCCESS if the downstream/secondary side is a PCIE bus
  */
 static int
-pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
+pepb_pcie_device_type(pepb_devstate_t *pepb_p)
 {
-	dev_info_t	*dip = pepb_p->dip;
-	int		request = 1, count, x;
-	int		ret;
-	int		intr_cap = 0;
-	int		inum = 0;
-	ddi_intr_handler_t	**isr_tab = NULL;
-	int		isr_tab_size = 0;
+	int pcie_loc;
+	dev_info_t *dip = pepb_p->dip;
+	ddi_acc_handle_t cfghdl = pepb_p->config_handle;
 
-	PEPB_DEBUG((CE_NOTE, "pepb_intr_init: Attaching %s handler\n",
-	    (intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx"));
+	pepb_p->port_type = PEPB_PORT_TYPE_NULL;
+
+	pcie_loc = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "pcie-capid-pointer", 0);
+	if (pcie_loc == 0)
+		return (DDI_FAILURE);
+
+	pepb_p->port_type = pci_config_get16(cfghdl, pcie_loc + PCIE_PCIECAP) &
+	    PCIE_PCIECAP_DEV_TYPE_MASK;
+
+	switch (pepb_p->port_type) {
+	case PCIE_PCIECAP_DEV_TYPE_UP:
+	case PCIE_PCIECAP_DEV_TYPE_DOWN:
+	case PCIE_PCIECAP_DEV_TYPE_ROOT:
+	case PCIE_PCIECAP_DEV_TYPE_PCI2PCIE:
+		return (DDI_SUCCESS);
+	default:
+		break;
+	}
+	return (DDI_FAILURE);
+}
+
+
+/*
+ * <arg1> contains the softstate while <arg2> contains the inum
+ * responsible for the invocation
+ */
+static uint_t
+pepb_intr_handler(caddr_t arg1, caddr_t arg2)
+{
+	pcie_bridge_intr_state_t *istatep =
+	    (pcie_bridge_intr_state_t *)(uintptr_t)arg1;
+	int isrc = istatep->isrc_tab[(int)(uintptr_t)arg2];
+
+	dev_info_t *dip = istatep->dip;
+	ddi_acc_handle_t cfghdl = istatep->cfghdl;
+	pepb_devstate_t *pepb = (pepb_devstate_t *)istatep->datap;
+	int pcie_loc = istatep->pcie_loc;
+
+	int ret = DDI_INTR_UNCLAIMED;
+	ddi_fm_error_t derr;
+
+#ifdef	DEBUG
+	int inst = ddi_get_instance(dip);
+	const char *drvnm = ddi_driver_name(dip);
+#endif
+
+	if (!(istatep->iflags & PCIE_BRIDGE_INTR_INIT_ENABLE))
+		return (DDI_INTR_UNCLAIMED);
+
+	if (istatep->itype == DDI_INTR_TYPE_FIXED &&
+	    !(pci_config_get16(cfghdl, PCI_CONF_STAT) & PCI_STAT_INTR))
+		return (DDI_INTR_UNCLAIMED);
 
 	/*
-	 * Get number of requested interrupts.	If none requested or DDI_FAILURE
-	 * just return DDI_SUCCESS.
-	 *
-	 * Several Bridges/Switches will not have this property set, resulting
-	 * in a FAILURE, if the device is not configured in a way that
-	 * interrupts are needed. (eg. hotplugging)
+	 * We must check all interrupt sources associated with this vector.
+	 * We cannot expect to be interrupted again for each unacknowleged
+	 * source.
 	 */
-	ret = ddi_intr_get_nintrs(dip, intr_type, &request);
-	if ((ret != DDI_SUCCESS) || (request == 0)) {
-		PEPB_DEBUG((CE_NOTE, "ddi_intr_get_nintrs ret:%d req:%d\n",
-		    ret, request));
-		return (DDI_FAILURE);
+	PEPB_DEBUG((CE_NOTE, "%s%d: Checking interrupt sources: 0x%x",
+	    drvnm, inst, isrc));
+
+	if (isrc == PCIE_BRIDGE_INTR_SRC_UNKNOWN)
+		goto OUT;
+
+	mutex_enter(&istatep->ilock);
+
+	/*
+	 * if HPC is initialized then call the hotplug interrupt handler
+	 */
+	if ((isrc & PCIE_BRIDGE_INTR_SRC_HP) &&
+	    istatep->inband_hpc == INBAND_HPC_PCIE) {
+		if (pciehpc_intr(dip) == DDI_INTR_CLAIMED) {
+			ret = DDI_INTR_CLAIMED;
+			PEPB_DEBUG((CE_NOTE, "%s%d: Got hotplug interrupt",
+			    drvnm, inst));
+		}
 	}
 
-	PEPB_DEBUG((CE_NOTE, "ddi_intr_get_nintrs: NINTRS = %x\n", request));
+	/*
+	 * PME: just check and clear status
+	 */
+	if (isrc & PCIE_BRIDGE_INTR_SRC_PME &&
+	    istatep->port_type == PCIE_PCIECAP_DEV_TYPE_ROOT) {
+		uint32_t sts;
 
-	/* Allocate an array of interrupt handlers */
-	pepb_p->htable_size = sizeof (ddi_intr_handle_t) * request;
-	pepb_p->htable = kmem_zalloc(pepb_p->htable_size, KM_SLEEP);
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_HTABLE;
+		sts = pci_config_get32(cfghdl, pcie_loc + PCIE_ROOTSTS);
+		if (sts & PCIE_ROOTSTS_PME_STATUS) {
+			pci_config_put32(cfghdl, pcie_loc + PCIE_ROOTSTS, sts);
 
-	ret = ddi_intr_alloc(dip, pepb_p->htable, intr_type, inum, request,
-	    &count, DDI_INTR_ALLOC_NORMAL);
-	if ((ret != DDI_SUCCESS) || (count == 0)) {
-		PEPB_DEBUG((CE_NOTE, "ddi_intr_alloc() ret: %d ask: %d"
-		    " actual: %d\n", ret, request, count));
-		goto fail;
+			ret = DDI_INTR_CLAIMED;
+			PEPB_DEBUG((CE_NOTE, "%s%d: Got PME interrupt",
+			    drvnm, inst));
+		}
 	}
 
-	/* Save the actual number of interrupts allocated */
-	pepb_p->intr_count = count;
+	mutex_exit(&istatep->ilock);
+
+	/*
+	 * AER
+	 */
+	if (isrc & PCIE_BRIDGE_INTR_SRC_AER) {
+		bzero(&derr, sizeof (ddi_fm_error_t));
+		derr.fme_version = DDI_FME_VERSION;
+
+		mutex_enter(&pepb->pepb_peek_poke_mutex);
+		mutex_enter(&pepb->pepb_err_mutex);
+
+		if (pepb->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
+			pci_ereport_post(dip, &derr, NULL);
+
+		if (derr.fme_status != DDI_FM_OK) {
+			ret = DDI_INTR_CLAIMED;
+			PEPB_DEBUG((CE_NOTE, "%s%d: Got error interrupt",
+			    drvnm, inst));
+		}
+
+		if ((pepb_panic_fatal && derr.fme_status == DDI_FM_FATAL) ||
+		    (pepb_panic_unknown && derr.fme_status == DDI_FM_UNKNOWN))
+			fm_panic("%s-%d: PCI(-X) Express Fatal Error",
+			    ddi_driver_name(dip),
+			    ddi_get_instance(dip));
+
+		mutex_exit(&pepb->pepb_err_mutex);
+		mutex_exit(&pepb->pepb_peek_poke_mutex);
+	}
+
+OUT:
 #ifdef	DEBUG
-	if (count < request)
-		PEPB_DEBUG((CE_WARN, "Requested Intr: %d Received: %d\n",
-		    request, count));
-#endif	/* DEBUG */
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_ALLOC;
+	if (ret != DDI_INTR_CLAIMED)
+		PEPB_DEBUG((CE_NOTE, "%s%d: Got unknown interrupt",
+		    drvnm, inst));
+#endif
 
-	/* Get interrupt priority */
-	ret = ddi_intr_get_pri(pepb_p->htable[0], &pepb_p->intr_priority);
-	if (ret != DDI_SUCCESS) {
-		PEPB_DEBUG((CE_WARN, "ddi_intr_get_pri() ret: %d\n", ret));
-		goto fail;
-	}
-
-	/* initialize the interrupt mutex */
-	mutex_init(&pepb_p->pepb_mutex, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(pepb_p->intr_priority));
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_MUTEX;
-
-	isr_tab_size = sizeof (*isr_tab) * pepb_p->intr_count;
-	isr_tab = kmem_alloc(isr_tab_size, KM_SLEEP);
-	if (pepb_enable_msi && pepb_p->intr_count == 2 &&
-	    intr_type == DDI_INTR_TYPE_MSI &&
-	    pepb_intr_on_root_port(dip) == DDI_SUCCESS) {
-		isr_tab[0] = pepb_pwr_msi_intr;
-		isr_tab[1] = pepb_err_msi_intr;
-	} else
-		isr_tab[0] = pepb_intx_intr;
-
-	for (count = 0; count < pepb_p->intr_count; count++) {
-		ret = ddi_intr_add_handler(pepb_p->htable[count],
-		    isr_tab[count], (caddr_t)pepb_p,
-		    (caddr_t)(uintptr_t)(inum + count));
-
-		if (ret != DDI_SUCCESS) {
-			PEPB_DEBUG((CE_WARN, "Cannot add interrupt(%d)\n",
-			    ret));
-			break;
-		}
-	}
-
-	kmem_free(isr_tab, isr_tab_size);
-
-	/* If unsucessful, remove the added handlers */
-	if (ret != DDI_SUCCESS) {
-		for (x = 0; x < count; x++) {
-			(void) ddi_intr_remove_handler(pepb_p->htable[x]);
-		}
-		goto fail;
-	}
-
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_HANDLER;
-
-	(void) ddi_intr_get_cap(pepb_p->htable[0], &intr_cap);
-
-	if (intr_cap & DDI_INTR_FLAG_BLOCK) {
-		(void) ddi_intr_block_enable(pepb_p->htable,
-		    pepb_p->intr_count);
-		pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_BLOCK;
-	} else {
-		for (count = 0; count < pepb_p->intr_count; count++) {
-			(void) ddi_intr_enable(pepb_p->htable[count]);
-		}
-	}
-	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_ENABLE;
-
-	/* Save the interrupt type */
-	pepb_p->intr_type = intr_type;
-
-	return (DDI_SUCCESS);
-
-fail:
-	pepb_intr_fini(pepb_p);
-
-	return (DDI_FAILURE);
-}
-
-static void
-pepb_intr_fini(pepb_devstate_t *pepb_p)
-{
-	int x;
-	int count = pepb_p->intr_count;
-	int flags = pepb_p->soft_state;
-
-	if ((flags & PEPB_SOFT_STATE_INIT_ENABLE) &&
-	    (flags & PEPB_SOFT_STATE_INIT_BLOCK)) {
-		(void) ddi_intr_block_disable(pepb_p->htable, count);
-		flags &= ~(PEPB_SOFT_STATE_INIT_ENABLE |
-		    PEPB_SOFT_STATE_INIT_BLOCK);
-	}
-
-	if (flags & PEPB_SOFT_STATE_INIT_MUTEX) {
-		/* destroy the mutex */
-		mutex_destroy(&pepb_p->pepb_mutex);
-	}
-
-	for (x = 0; x < count; x++) {
-		if (flags & PEPB_SOFT_STATE_INIT_ENABLE)
-			(void) ddi_intr_disable(pepb_p->htable[x]);
-
-		if (flags & PEPB_SOFT_STATE_INIT_HANDLER)
-			(void) ddi_intr_remove_handler(pepb_p->htable[x]);
-
-		if (flags & PEPB_SOFT_STATE_INIT_ALLOC)
-			(void) ddi_intr_free(pepb_p->htable[x]);
-	}
-
-	flags &= ~(PEPB_SOFT_STATE_INIT_ENABLE |
-	    PEPB_SOFT_STATE_INIT_HANDLER |
-	    PEPB_SOFT_STATE_INIT_ALLOC | PEPB_SOFT_STATE_INIT_MUTEX);
-
-	if (flags & PEPB_SOFT_STATE_INIT_HTABLE)
-		kmem_free(pepb_p->htable, pepb_p->htable_size);
-
-	flags &= ~PEPB_SOFT_STATE_INIT_HTABLE;
-
-	pepb_p->soft_state &= flags;
-}
-
-/*
- * pepb_intx_intr()
- *
- * This is the common interrupt handler for both hotplug and non-hotplug
- * interrupts. For handling hot plug interrupts it calls pciehpc_intr().
- *
- * NOTE: Currently only hot plug interrupts are enabled so it simply
- * calls pciehpc_intr(). This is for INTx interrupts *ONLY*.
- */
-/*ARGSUSED*/
-static uint_t
-pepb_intx_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg;
-	int ret = DDI_INTR_UNCLAIMED;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_mutex);
-
-	/* if HPC is initialized then call the interrupt handler */
-	if (pepb_p->inband_hpc == INBAND_HPC_PCIE)
-		ret =  pciehpc_intr(pepb_p->dip);
-
-	mutex_exit(&pepb_p->pepb_mutex);
-
+	ret = DDI_INTR_CLAIMED;
 	return (ret);
 }
 
-/*
- * pepb_intr_on_root_port()
- *
- * This helper function checks if the device is a Nvidia RC, Intel 5000 or 7300
- * or not
- */
-static int
-pepb_intr_on_root_port(dev_info_t *dip)
-{
-	int ret = DDI_FAILURE;
-	ddi_acc_handle_t handle;
-	uint16_t vendor_id, device_id;
-
-	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
-		return (ret);
-
-	vendor_id = pci_config_get16(handle, PCI_CONF_VENID);
-	device_id = pci_config_get16(handle, PCI_CONF_DEVID);
-	if ((vendor_id == NVIDIA_VENDOR_ID) && NVIDIA_PCIE_RC_DEV_ID(device_id))
-		ret = DDI_SUCCESS;
-	else if ((vendor_id == INTEL_VENDOR_ID) &&
-	    INTEL_NB5000_PCIE_DEV_ID(device_id) && !pcie_intel_error_disable)
-		ret = DDI_SUCCESS;
-
-	pci_config_teardown(&handle);
-	return (ret);
-}
-
-/*
- * pepb_pwr_msi_intr()
- *
- * This is the MSI interrupt handler for PM related events.
- */
-/*ARGSUSED*/
-static uint_t
-pepb_pwr_msi_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t	*pepb_p = (pepb_devstate_t *)arg;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_mutex);
-	PEPB_DEBUG((CE_NOTE, "pepb_pwr_msi_intr: received intr number %d\n",
-	    (int)(uintptr_t)arg2));
-	mutex_exit(&pepb_p->pepb_mutex);
-	return (DDI_INTR_CLAIMED);
-}
-
-static int
-pepb_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
-{
-	uint_t cap_loc;
-
-	/* Need to look at the port type information here */
-	cap_loc = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-
-	return (cap_loc == PCI_CAP_NEXT_PTR_NULL ? -1 :
-	    pci_config_get16(handle, cap_loc + PCIE_PCIECAP) &
-	    PCIE_PCIECAP_DEV_TYPE_MASK);
-}
 
 /*ARGSUSED*/
-int
+static int
 pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
     ddi_iblock_cookie_t *ibc)
 {
@@ -1132,7 +972,7 @@ pepb_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 }
 
 /*ARGSUSED*/
-int
+static int
 pepb_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
 {
 	pepb_devstate_t *pepb_p = (pepb_devstate_t *)
@@ -1142,63 +982,6 @@ pepb_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
 	pci_ereport_post(dip, derr, NULL);
 	mutex_exit(&pepb_p->pepb_err_mutex);
 	return (derr->fme_status);
-}
-
-/*ARGSUSED*/
-static uint_t
-pepb_err_msi_intr(caddr_t arg, caddr_t arg2)
-{
-	pepb_devstate_t *pepb_p = (pepb_devstate_t *)arg;
-	ddi_fm_error_t derr;
-
-	bzero(&derr, sizeof (ddi_fm_error_t));
-	derr.fme_version = DDI_FME_VERSION;
-
-	if (!(pepb_p->soft_state & PEPB_SOFT_STATE_INIT_ENABLE))
-		return (DDI_INTR_UNCLAIMED);
-
-	mutex_enter(&pepb_p->pepb_peek_poke_mutex);
-	mutex_enter(&pepb_p->pepb_err_mutex);
-	PEPB_DEBUG((CE_NOTE, "pepb_err_msi_intr: received intr number %d\n",
-	    (int)(uintptr_t)arg2));
-
-	/* if HPC is initialized then call the interrupt handler */
-	if (pepb_p->pepb_fmcap & DDI_FM_EREPORT_CAPABLE)
-		pci_ereport_post(pepb_p->dip, &derr, NULL);
-
-	if ((pepb_panic_fatal && derr.fme_status == DDI_FM_FATAL) ||
-	    (pepb_panic_unknown && derr.fme_status == DDI_FM_UNKNOWN))
-		fm_panic("%s-%d: PCI(-X) Express Fatal Error",
-		    ddi_driver_name(pepb_p->dip),
-		    ddi_get_instance(pepb_p->dip));
-
-	mutex_exit(&pepb_p->pepb_err_mutex);
-	mutex_exit(&pepb_p->pepb_peek_poke_mutex);
-
-	return (DDI_INTR_CLAIMED);
-}
-
-static int
-pepb_check_slot_disabled(dev_info_t *dip)
-{
-	int			rval = 0;
-	uint8_t			pcie_cap_ptr;
-	ddi_acc_handle_t	config_handle;
-
-	if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS)
-		return (rval);
-
-	pcie_cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "pcie-capid-pointer", PCI_CAP_NEXT_PTR_NULL);
-
-	if (pcie_cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		if (pci_config_get16(config_handle,
-		    pcie_cap_ptr + PCIE_LINKCTL) & PCIE_LINKCTL_LINK_DISABLE)
-			rval = 1;
-	}
-
-	pci_config_teardown(&config_handle);
-	return (rval);
 }
 
 static int
