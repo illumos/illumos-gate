@@ -1001,7 +1001,8 @@ generic_disk_sense(
 		 * Construct a new label out of the sense data,
 		 * Inquiry and Capacity.
 		 */
-		pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) + page4->cyl_lb;
+		pcyl = (page4->cyl_ub << 16) + (page4->cyl_mb << 8) +
+		    page4->cyl_lb;
 		nhead = page4->heads;
 		nsect = page3->sect_track;
 		rpm = page4->rpm;
@@ -1014,7 +1015,8 @@ generic_disk_sense(
 		if (pcyl < SUN_MIN_CYL) {
 			if (nhead <= 0 || nsect <= 0) {
 				setdefault = 1;
-			} else if (adjust_disk_geometry((int)(capacity->sc_capacity + 1),
+			} else if (adjust_disk_geometry(
+			    (int)(capacity->sc_capacity + 1),
 			    &pcyl, &nhead, &nsect)) {
 				setdefault = 1;
 			}
@@ -1027,9 +1029,11 @@ generic_disk_sense(
 		 * is zero, we think the inquiry of page 3 and page 4 failed.
 		 * We will set the geometry infomation by ourselves.
 		 */
-		err_print("\nThe device does not support mode page 3 or page 4,");
+		err_print("\nThe device does not support mode page 3 "
+		    "or page 4,");
 		err_print("\nor the reported geometry info is invalid.");
-		err_print("\nWARNING: Disk geometry is based on capacity data.\n\n");
+		err_print("\nWARNING: Disk geometry is based on "
+		    "capacity data.\n\n");
 
 		/* convert capacity to nsect * nhead * pcyl */
 		/* Unlabeled SCSI floppy device */
@@ -1076,7 +1080,7 @@ generic_disk_sense(
 	 */
 	if (rpm < MIN_RPM || rpm > MAX_RPM) {
 		err_print("The current rpm value %d is invalid,"
-			" adjusting it to %d\n", rpm, AVG_RPM);
+		    " adjusting it to %d\n", rpm, AVG_RPM);
 		rpm = AVG_RPM;
 	}
 
@@ -2227,7 +2231,7 @@ adjust_disk_geometry(int capacity, int *cyl, int *nhead, int *nsect)
 	 * the number of cylinders.
 	 */
 	while (lnsect > MINIMUM_NO_SECTORS &&
-			lcyl < MINIMUM_NO_CYLINDERS) {
+	    lcyl < MINIMUM_NO_CYLINDERS) {
 		/*
 		 * make sure that we do not go below MINIMUM_NO_SECTORS.
 		 */
@@ -2240,7 +2244,7 @@ adjust_disk_geometry(int capacity, int *cyl, int *nhead, int *nsect)
 	 * no of heads.
 	 */
 	while (lnhead > MINIMUM_NO_HEADS &&
-			lcyl < MINIMUM_NO_CYLINDERS) {
+	    lcyl < MINIMUM_NO_CYLINDERS) {
 		lnhead = max(MINIMUM_NO_HEADS, lnhead / 2);
 		lcyl =  (capacity) / (lnhead * lnsect);
 	}
