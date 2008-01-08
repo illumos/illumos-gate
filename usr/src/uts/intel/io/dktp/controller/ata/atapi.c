@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +136,7 @@ atapi_attach(ata_ctl_t *ata_ctlp)
 	tran->tran_sync_pkt = atapi_tran_sync_pkt;
 
 	if (scsi_hba_attach_setup(ata_ctlp->ac_dip, &ata_pciide_dma_attr, tran,
-		SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
+	    SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
 		ADBG_WARN(("atapi_init: scsi_hba_attach_setup failed\n"));
 		goto errout;
 	}
@@ -243,7 +243,7 @@ atapi_id(
 	ADBG_TRACE(("atapi_id entered\n"));
 
 	rc = ata_id_common(ATC_ID_PACKET_DEVICE, FALSE, io_hdl1, ioaddr1,
-		io_hdl2, ioaddr2, ata_idp);
+	    io_hdl2, ioaddr2, ata_idp);
 
 	if (!rc)
 		return (FALSE);
@@ -278,7 +278,7 @@ atapi_signature(
 	ADBG_TRACE(("atapi_signature entered\n"));
 
 	if (ddi_get8(io_hdl, (uchar_t *)ioaddr + AT_HCYL) == ATAPI_SIG_HI &&
-		ddi_get8(io_hdl, (uchar_t *)ioaddr + AT_LCYL) != ATAPI_SIG_LO)
+	    ddi_get8(io_hdl, (uchar_t *)ioaddr + AT_LCYL) != ATAPI_SIG_LO)
 		rc = TRUE;
 
 	/*
@@ -399,7 +399,7 @@ atapi_tran_tgt_free(
 	ADBG_TRACE(("atapi_tran_tgt_free entered\n"));
 
 	ghd_target_free(hba_dip, tgt_dip, &TRAN2ATAP(hba_tran)->ac_ccc,
-		TRAN2GTGTP(hba_tran));
+	    TRAN2GTGTP(hba_tran));
 	hba_tran->tran_tgt_private = NULL;
 }
 
@@ -421,11 +421,11 @@ atapi_tran_abort(
 
 	if (spktp) {
 		return (ghd_tran_abort(&ADDR2CTL(ap)->ac_ccc, PKTP2GCMDP(spktp),
-			ADDR2GTGTP(ap), NULL));
+		    ADDR2GTGTP(ap), NULL));
 	}
 
 	return (ghd_tran_abort_lun(&ADDR2CTL(ap)->ac_ccc, ADDR2GTGTP(ap),
-		NULL));
+	    NULL));
 }
 
 
@@ -549,7 +549,7 @@ atapi_tran_getcap(
 		 * retrieve the current IDENTIFY PACKET DEVICE info
 		 */
 		if (!ata_queue_cmd(atapi_id_update, &ata_id, ata_ctlp,
-			ata_drvp, gtgtp)) {
+		    ata_drvp, gtgtp)) {
 			ADBG_TRACE(("atapi_tran_getcap geometry failed"));
 			return (0);
 		}
@@ -567,7 +567,7 @@ atapi_tran_getcap(
 		case DTYPE_DIRECT:
 		case DTYPE_OPTICAL:
 			rval = (ata_idp->ai_curheads << 16) |
-				ata_idp->ai_cursectrk;
+			    ata_idp->ai_cursectrk;
 			break;
 		default:
 			rval = 0;
@@ -667,14 +667,17 @@ skip_dma_setup:
 	 */
 
 	new_spktp = ghd_tran_init_pkt_attr(&ata_ctlp->ac_ccc, ap, spktp, bp,
-		cmdlen, statuslen, tgtlen, flags,
-		callback, arg, sizeof (ata_pkt_t), sg_attrp);
+	    cmdlen, statuslen, tgtlen, flags,
+	    callback, arg, sizeof (ata_pkt_t), sg_attrp);
 
 	if (new_spktp == NULL)
 		return (NULL);
 
 	ata_pktp = SPKT2APKT(new_spktp);
 	ata_pktp->ap_cdbp = new_spktp->pkt_cdbp;
+	if (statuslen > 255) {
+		statuslen = sizeof (struct scsi_arq_status);
+	}
 	ata_pktp->ap_statuslen = (uchar_t)statuslen;
 
 	/* reset data direction flags */
@@ -685,8 +688,8 @@ skip_dma_setup:
 	 * check for ARQ mode
 	 */
 	if (atapi_arq_enable == TRUE &&
-		ata_tgtp->at_arq == TRUE &&
-		ata_pktp->ap_statuslen >= sizeof (struct scsi_arq_status)) {
+	    ata_tgtp->at_arq == TRUE &&
+	    ata_pktp->ap_statuslen >= sizeof (struct scsi_arq_status)) {
 		ADBG_TRACE(("atapi_tran_init_pkt ARQ\n"));
 		ata_pktp->ap_scbp =
 		    (struct scsi_arq_status *)new_spktp->pkt_scbp;
@@ -1001,7 +1004,7 @@ atapi_tran_start(
 	/* call common transport routine */
 
 	rc = ghd_transport(&ata_ctlp->ac_ccc, gcmdp, gcmdp->cmd_gtgtp,
-		spktp->pkt_time, polled, NULL);
+	    spktp->pkt_time, polled, NULL);
 
 	/* see if pkt was not accepted */
 
@@ -1036,7 +1039,7 @@ atapi_complete(
 
 	if (ata_pktp->ap_flags & AP_SENT_CMD) {
 		spktp->pkt_state |=
-			STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD;
+		    STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD;
 	}
 	if (ata_pktp->ap_flags & AP_XFERRED_DATA) {
 		spktp->pkt_state |= STATE_XFERRED_DATA;
@@ -1122,7 +1125,7 @@ atapi_id_update(
 	 * select the appropriate drive and LUN
 	 */
 	ddi_put8(io_hdl1, (uchar_t *)ioaddr1 + AT_DRVHD,
-		ata_drvp->ad_drive_bits);
+	    ata_drvp->ad_drive_bits);
 	ata_nsecwait(400);
 
 	/*
@@ -1135,8 +1138,8 @@ atapi_id_update(
 	}
 
 	rc = atapi_id(ata_ctlp->ac_iohandle1, ata_ctlp->ac_ioaddr1,
-		ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
-		(struct ata_id *)ata_pktp->ap_v_addr);
+	    ata_ctlp->ac_iohandle2, ata_ctlp->ac_ioaddr2,
+	    (struct ata_id *)ata_pktp->ap_v_addr);
 
 	if (!rc) {
 		ata_pktp->ap_flags |= AP_ERROR;
