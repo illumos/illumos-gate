@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,6 +322,9 @@ struct ofl_desc {
 
 #define	FLG_OF_MAPSYMB	0x000100000000	/* symbolic scope definition seen */
 #define	FLG_OF_MAPGLOB	0x000200000000	/* global scope definition seen */
+#define	FLG_OF_COMREL	0x000400000000	/* -z combreloc set, which enables */
+					/*	DT_RELACNT tracking, */
+#define	FLG_OF_NOCOMREL	0x000800000000	/* -z nocombreloc set */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -345,7 +348,7 @@ struct ofl_desc {
 #define	FLG_OF1_AUTOELM	0x00000400	/* automatically eliminate  */
 					/*	unspecified global symbols */
 #define	FLG_OF1_IGNORE	0x00000800	/* ignore unused dependencies */
-#define	FLG_OF1_RELCNT	0x00001000	/* enable DT_RELACNT tracking */
+
 #define	FLG_OF1_TEXTOFF 0x00002000	/* text relocations are ok */
 #define	FLG_OF1_ABSEXEC	0x00004000	/* -zabsexec set */
 #define	FLG_OF1_LAZYLD	0x00008000	/* lazy loading of objects enabled */

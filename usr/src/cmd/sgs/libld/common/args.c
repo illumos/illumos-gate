@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -206,13 +206,24 @@ check_flags(Ofl_desc * ofl, int argc)
 	if (rflag) {
 		if (dflag == SET_UNKNOWN)
 			dflag = SET_FALSE;
-		if (ofl->ofl_flags1 & FLG_OF1_RELCNT) {
+		if (ofl->ofl_flags & FLG_OF_COMREL) {
+			/*
+			 * Combining relocations when building a relocatable
+			 * object isn't allowed.  Warn the user, but proceed.
+			 */
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_ARG_INCOMP), MSG_ORIG(MSG_ARG_R),
 			    MSG_ORIG(MSG_ARG_ZCOMBRELOC));
-			ofl->ofl_flags1 &= ~FLG_OF1_RELCNT;
+			ofl->ofl_flags &= ~FLG_OF_COMREL;
 		}
 		ofl->ofl_flags |= FLG_OF_RELOBJ;
+	} else {
+		/*
+		 * If the user hasn't explicitly requested that relocations
+		 * not be combined, combine them by default.
+		 */
+		if ((ofl->ofl_flags & FLG_OF_NOCOMREL) == 0)
+			ofl->ofl_flags |= FLG_OF_COMREL;
 	}
 
 	if (zdflag == SET_TRUE)
@@ -1075,7 +1086,10 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				ofl->ofl_flags |= FLG_OF_VERBOSE;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_COMBRELOC)) == 0) {
-				ofl->ofl_flags1 |= FLG_OF1_RELCNT;
+				ofl->ofl_flags |= FLG_OF_COMREL;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NOCOMBRELOC)) == 0) {
+				ofl->ofl_flags |= FLG_OF_NOCOMREL;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOCOMPSTRTAB)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_NCSTTAB;

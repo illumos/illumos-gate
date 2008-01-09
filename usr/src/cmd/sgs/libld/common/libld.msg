@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -131,8 +131,8 @@
 			 \t\t\tarchive members to resolvetweak references from \
 			 \n\t\t\t\archive files\n"
 @ MSG_ARG_DETAIL_ZAL	"\t[-z altexec64]\texecute the 64-bit link-editor\n"
-@ MSG_ARG_DETAIL_ZC	"\t[-z combreloc]\tcombine multiple relocation \
-			 sections\n"
+@ MSG_ARG_DETAIL_ZC	"\t[-z combreloc | nocombreloc]\n\
+			 combine|do not combine multiple relocation sections\n"
 @ MSG_ARG_DETAIL_ZNC	"\t[-z nocompstrtab]\n\t\t\tdisable compression of \
 			 string tables\n"
 @ MSG_ARG_DETAIL_ZDFS	"\t[-z defs]\tdisallow undefined symbol references\n"
@@ -1114,6 +1114,7 @@
 @ MSG_ARG_ALLEXTRT	"allextract"
 @ MSG_ARG_DFLEXTRT	"defaultextract"
 @ MSG_ARG_COMBRELOC	"combreloc"
+@ MSG_ARG_NOCOMBRELOC	"nocombreloc"
 @ MSG_ARG_NODEFAULTLIB	"nodefaultlib"
 @ MSG_ARG_ENDFILTEE	"endfiltee"
 @ MSG_ARG_LD32		"ld32="

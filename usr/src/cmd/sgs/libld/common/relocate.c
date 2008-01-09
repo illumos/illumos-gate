@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -2212,7 +2212,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	if (ld_do_activerelocs(ofl) == S_ERROR)
 		return (S_ERROR);
 
-	if ((ofl->ofl_flags1 & FLG_OF1_RELCNT) == 0) {
+	if ((ofl->ofl_flags & FLG_OF_COMREL) == 0) {
 		/*
 		 * Process the relocation sections:
 		 *

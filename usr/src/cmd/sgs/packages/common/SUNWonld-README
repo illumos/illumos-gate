@@ -1,6 +1,6 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -1167,7 +1167,7 @@ releases:
 --------------------------------------------------------------------------------
 
 -------------------------------------
-Solaris 10 TBD (5th Q-update - s10u5)
+Solaris 10 508 (5th Q-update - s10u5)
 -------------------------------------
 Bugid   Risk Synopsis
 ================================================================================
@@ -1303,3 +1303,5 @@ Bugid   Risk Synopsis
 6629404 ld with -z ignore doesn't scale
 6626135 elfedit capabilities str->value mapping should come from
 	usr/src/common/elfcap
+6642769 ld(1) -z combreloc should become default behavior (D)
+	PSARC/2008/006: make ld(1) -z combreloc become default behavior

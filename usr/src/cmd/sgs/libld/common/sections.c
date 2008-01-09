@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -960,9 +960,8 @@ make_dynamic(Ofl_desc *ofl)
 		    FLG_OF_VERNEED)
 			cnt += 2;		/* DT_VERNEED & DT_VERNEEDNUM */
 
-		if ((ofl->ofl_flags1 & FLG_OF1_RELCNT) &&
-		    ofl->ofl_relocrelcnt)	/* RELACOUNT */
-			cnt++;
+		if ((ofl->ofl_flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt)
+			cnt++;			/* RELACOUNT */
 
 		if (flags & FLG_OF_TEXTREL)	/* TEXTREL */
 			cnt++;
@@ -1762,7 +1761,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 			return (S_ERROR);
 		(void) strcpy(sectname, rel_prefix);
 		(void) strcat(sectname, osp->os_name);
-	} else if (ofl->ofl_flags1 & FLG_OF1_RELCNT) {
+	} else if (ofl->ofl_flags & FLG_OF_COMREL) {
 		size = (ofl->ofl_reloccnt - ofl->ofl_reloccntsub) * relsize;
 		sh_flags = SHF_ALLOC;
 		sectname = (char *)MSG_ORIG(MSG_SCN_SUNWRELOC);
@@ -2147,7 +2146,7 @@ ld_make_sections(Ofl_desc *ofl)
 			return (S_ERROR);
 	}
 
-	if (ofl->ofl_flags1 & FLG_OF1_RELCNT) {
+	if (ofl->ofl_flags & FLG_OF_COMREL) {
 		/*
 		 * If -zcombreloc is enabled then all relocations (except for
 		 * the PLT's) are coalesced into a single relocation section.

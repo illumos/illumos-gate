@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -2227,8 +2227,7 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 
-		if ((ofl->ofl_flags1 & FLG_OF1_RELCNT) &&
-		    ofl->ofl_relocrelcnt) {
+		if ((ofl->ofl_flags & FLG_OF_COMREL) && ofl->ofl_relocrelcnt) {
 			dyn->d_tag = M_REL_DT_COUNT;
 			dyn->d_un.d_val = ofl->ofl_relocrelcnt;
 			dyn++;
