@@ -607,19 +607,33 @@ smb_resource_changed(sa_resource_t resource)
 }
 
 /*
- * smb_disable_share(sa_share_t share)
+ * smb_disable_share(sa_share_t share, char *path)
  *
- * Unshare the specified share.
+ * Unshare the specified share. Note that "path" is the same
+ * path as what is in the "share" object. It is passed in to avoid an
+ * additional lookup. A missing "path" value makes this a no-op
+ * function.
  */
 static int
 smb_disable_share(sa_share_t share, char *path)
 {
 	char *rname;
 	sa_resource_t resource;
+	sa_group_t parent;
 	boolean_t iszfs;
 	int err = SA_OK;
 
-	iszfs = sa_path_is_zfs(path);
+	if (path == NULL)
+		return (err);
+
+	/*
+	 * If the share is in a ZFS group we need to handle it
+	 * differently.  Just being on a ZFS file system isn't
+	 * enough since we may be in a legacy share case.
+	 */
+	parent = sa_get_parent_group(share);
+	iszfs = sa_group_is_zfs(parent);
+
 	if (!smb_isonline())
 		goto done;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1897,10 +1897,12 @@ out:
 }
 
 /*
- * nfs_disable_share(share)
+ * nfs_disable_share(share, path)
  *
- * Unshare the specified share.  How much error checking should be
- * done? We only do basic errors for now.
+ * Unshare the specified share. Note that "path" is the same path as
+ * what is in the "share" object. It is passed in to avoid an
+ * additional lookup. A missing "path" value makes this a no-op
+ * function.
  */
 static int
 nfs_disable_share(sa_share_t share, char *path)
@@ -1908,53 +1910,58 @@ nfs_disable_share(sa_share_t share, char *path)
 	int err;
 	int ret = SA_OK;
 	int iszfs;
+	sa_group_t parent;
 
+	if (path == NULL)
+		return (ret);
 
-	if (path != NULL) {
-		iszfs = sa_path_is_zfs(path);
+	/*
+	 * If the share is in a ZFS group we need to handle it
+	 * differently.  Just being on a ZFS file system isn't
+	 * enough since we may be in a legacy share case.
+	 */
+	parent = sa_get_parent_group(share);
+	iszfs = sa_group_is_zfs(parent);
+	if (iszfs) {
+		struct exportfs_args ea;
+		share_t sh = { 0 };
+		ea.dname = path;
+		ea.uex = NULL;
+		sh.sh_path = path;
+		sh.sh_fstype = "nfs";
 
-		if (iszfs) {
-			struct exportfs_args ea;
-			share_t sh = { 0 };
-
-			ea.dname = path;
-			ea.uex = NULL;
-			sh.sh_path = path;
-			sh.sh_fstype = "nfs";
-
-			err = sa_share_zfs(share, path, &sh,
-			    &ea, ZFS_UNSHARE_NFS);
-		} else
-			err = exportfs(path, NULL);
-		if (err < 0) {
-			/*
-			 * TBD: only an error in some
-			 * cases - need better analysis
-			 */
-
-			switch (errno) {
-			case EPERM:
-			case EACCES:
-				ret = SA_NO_PERMISSION;
-				if (getzoneid() != GLOBAL_ZONEID) {
-					ret = SA_NOT_SUPPORTED;
-				}
-				break;
-			case EINVAL:
-			case ENOENT:
-				ret = SA_NO_SUCH_PATH;
+		err = sa_share_zfs(share, path, &sh,
+		    &ea, ZFS_UNSHARE_NFS);
+	} else {
+		err = exportfs(path, NULL);
+	}
+	if (err < 0) {
+		/*
+		 * TBD: only an error in some
+		 * cases - need better analysis
+		 */
+		switch (errno) {
+		case EPERM:
+		case EACCES:
+			ret = SA_NO_PERMISSION;
+			if (getzoneid() != GLOBAL_ZONEID) {
+				ret = SA_NOT_SUPPORTED;
+			}
+			break;
+		case EINVAL:
+		case ENOENT:
+			ret = SA_NO_SUCH_PATH;
 			break;
 			default:
 				ret = SA_SYSTEM_ERR;
 			break;
-			}
 		}
-		if (ret == SA_OK || ret == SA_NO_SUCH_PATH) {
-			if (!iszfs)
-				(void) sa_delete_sharetab(path, "nfs");
-			/* just in case it was logged */
-			(void) nfslogtab_deactivate(path);
-		}
+	}
+	if (ret == SA_OK || ret == SA_NO_SUCH_PATH) {
+		if (!iszfs)
+			(void) sa_delete_sharetab(path, "nfs");
+		/* just in case it was logged */
+		(void) nfslogtab_deactivate(path);
 	}
 	return (ret);
 }
