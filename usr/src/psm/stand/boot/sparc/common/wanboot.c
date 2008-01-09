@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1533,7 +1533,7 @@ init_netdev(char *bpath)
 				 * initialize the hardware and return success.
 				 */
 				netdev_path = netalias;
-				mac_init(netalias);
+				mac_init(bpath);
 				return (B_TRUE);
 			}
 
