@@ -1,5 +1,5 @@
 /*
- * Copyright 1994,1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,8 +161,6 @@ ntp_adjtime(struct timex *tp)
 		return (set_errno(EINVAL));
 
 	mutex_enter(&tod_lock);
-	if (modes & MOD_FREQUENCY)
-		time_freq = ntv.freq - pps_freq;
 	if (modes & MOD_MAXERROR)
 		time_maxerror = ntv.maxerror;
 	if (modes & MOD_ESTERROR)
@@ -173,10 +171,10 @@ ntp_adjtime(struct timex *tp)
 	}
 	if (modes & MOD_TIMECONST)
 		time_constant = ntv.constant;
-
 	if (modes & MOD_OFFSET)
 		clock_update(ntv.offset);
-
+	if (modes & MOD_FREQUENCY)
+		time_freq = ntv.freq - pps_freq;
 	/*
 	 * Retrieve all clock variables
 	 */
