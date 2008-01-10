@@ -33,13 +33,16 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
+#include <gfx_private.h>
+#include "drm_io32.h"
+
 
 #define	PAGE_MASK	(PAGE_SIZE-1)
 #define	round_page(x)	(((x) + PAGE_MASK) & ~PAGE_MASK)
@@ -50,10 +53,11 @@
 int
 drm_order(unsigned long size)
 {
-	int order;
-	unsigned long tmp;
+	int order = 0;
+	unsigned long tmp = size;
 
-	for (order = 0, tmp = size; tmp >>= 1; ++order);
+	while (tmp >>= 1)
+		order ++;
 
 	if (size & ~(1 << order))
 		++order;
@@ -61,145 +65,141 @@ drm_order(unsigned long size)
 	return (order);
 }
 
+static inline drm_local_map_t *
+drm_find_map(drm_device_t *dev, u_offset_t offset, int type)
+{
+	drm_local_map_t		*map;
 
-int
-drm_addmap(drm_device_t *dev, unsigned long long offset, unsigned long size,
-    drm_map_type_t type, drm_map_flags_t flags, drm_local_map_t **map_ptr)
+	TAILQ_FOREACH(map, &dev->maplist, link) {
+		if ((map->type == type) && ((map->offset == offset) ||
+		    (map->flags == _DRM_CONTAINS_LOCK) &&
+		    (map->type == _DRM_SHM)))
+			return (map);
+	}
+
+	return (NULL);
+}
+
+int drm_addmap(drm_device_t *dev, unsigned long offset,
+    unsigned long size, drm_map_type_t type,
+    drm_map_flags_t flags, drm_local_map_t **map_ptr)
 {
 	drm_local_map_t *map;
-
-	DRM_DEBUG("drm_addmap: offset = 0x%08llx, size = 0x%08lx, type = %d\n",
-	    offset, size, type);
+	caddr_t		kva;
+	int		retval;
 
 	if (!(dev->flags & (FREAD|FWRITE)))
-		return (DRM_ERR(EACCES)); /* Require read/write */
+		return (EACCES); /* Require read/write */
 
 	/*
-	 * Only allow shared memory to be removable since we only keep enough
-	 * book keeping information about shared memory to allow for removal
-	 * when processes fork.
+	 * Only allow shared memory to be removable since we only keep
+	 * enough book keeping information about shared memory to allow
+	 * for removal when processes fork.
 	 */
 	if ((flags & _DRM_REMOVABLE) && type != _DRM_SHM)
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	if ((offset & PAGE_MASK) || (size & PAGE_MASK))
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	if (offset + size < offset)
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 
 	/*
-	 * Check if this is just another version of a kernel-allocated map, and
-	 * just hand that back if so.
+	 * Check if this is just another version of a kernel-allocated
+	 * map, and just hand that back if so.
 	 */
-	if (type == _DRM_REGISTERS || type == _DRM_FRAME_BUFFER ||
-	    type == _DRM_SHM) {
-		DRM_LOCK();
-		TAILQ_FOREACH(map, &dev->maplist, link) {
-			if (map->type == type &&
-			    map->offset.off == (u_offset_t)offset) {
-				map->size = size;
-				DRM_DEBUG("drm_addmap: Found kernel map %d\n",
-						type);
-				goto done;
-			}
-		}
-		DRM_UNLOCK();
+	map = drm_find_map(dev, offset, type);
+	if (map != NULL) {
+		goto done;
 	}
 
 	/*
-	 * Allocate a new map structure, fill it in, and do any type-specific
-	 * initialization necessary.
+	 * Allocate a new map structure, fill it in, and do any
+	 * type-specific initialization necessary.
 	 */
 	map = drm_alloc(sizeof (*map), DRM_MEM_MAPS);
 	if (!map)
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 
-	map->offset.off = (u_offset_t)offset;
+	map->offset = offset;
 	map->size = size;
 	map->type = type;
 	map->flags = flags;
 
-	DRM_DEBUG("drm_addmap: map->type = %x", map->type);
-	DRM_DEBUG("drm_addmap: map->size = %lx", map->size);
-	DRM_DEBUG("drm_addmap: map->offset.off = %llx", map->offset.off);
 	switch (map->type) {
 	case _DRM_REGISTERS:
-		DRM_DEBUG("drm_addmap: map the Registers");
-		(void) drm_ioremap(dev, map);
-		if (!(map->flags & _DRM_WRITE_COMBINING))
-			break;
-		/* FALLTHROUGH */
 	case _DRM_FRAME_BUFFER:
-		(void) drm_ioremap(dev, map);
+		retval = drm_ioremap(dev, map);
+		if (retval)
+			return (retval);
 		break;
+
 	case _DRM_SHM:
-		map->handle = ddi_umem_alloc(map->size, DDI_UMEM_NOSLEEP,
-				&map->drm_umem_cookie);
-		DRM_DEBUG("drm_addmap: size=0x%lx drm_order(size)=%d "
-			"handle=0x%p\n",
-			(unsigned long) map->size,
-			drm_order(map->size), map->handle);
+		/*
+		 * ddi_umem_alloc() grants page-aligned memory. We needn't
+		 * handle alignment issue here.
+		 */
+		map->handle = ddi_umem_alloc(map->size,
+		    DDI_UMEM_NOSLEEP, &map->drm_umem_cookie);
 		if (!map->handle) {
 			DRM_ERROR("drm_addmap: ddi_umem_alloc failed");
-			ddi_umem_free(map->drm_umem_cookie);
 			drm_free(map, sizeof (*map), DRM_MEM_MAPS);
-			return (DRM_ERR(ENOMEM));
+			return (ENOMEM);
 		}
 		/*
-		 * record only low 32-bit of this handle, since 32-bit user
-		 * app is incapable of passing in 64bit offset when doing mmap.
+		 * record only low 32-bit of this handle, since 32-bit
+		 * user app is incapable of passing in 64bit offset when
+		 * doing mmap.
 		 */
-		map->offset.ptr = map->handle;
-		map->offset.off &= 0xffffffffUL;
-		DRM_DEBUG("drm_addmap: offset=0x%llx", map->offset);
+		map->offset = (uintptr_t)map->handle;
+		map->offset &= 0xffffffffUL;
 		if (map->flags & _DRM_CONTAINS_LOCK) {
 			/* Prevent a 2nd X Server from creating a 2nd lock */
-			DRM_LOCK();
 			if (dev->lock.hw_lock != NULL) {
-				DRM_UNLOCK();
 				ddi_umem_free(map->drm_umem_cookie);
 				drm_free(map, sizeof (*map), DRM_MEM_MAPS);
-				return (DRM_ERR(EBUSY));
+				return (EBUSY);
 			}
-			DRM_DEBUG("drm_addmap: map shm to hw_lock");
 			dev->lock.hw_lock = map->handle; /* Pointer to lock */
-			DRM_UNLOCK();
 		}
+		map->dev_addr = map->handle;
 		break;
 	case _DRM_SCATTER_GATHER:
 		if (!dev->sg) {
 			drm_free(map, sizeof (*map), DRM_MEM_MAPS);
-			return (DRM_ERR(EINVAL));
+			return (EINVAL);
 		}
-		map->offset.off = map->offset.off + dev->sg->handle;
-		map->drm_umem_cookie = dev->sg->sg_umem_cookie;
+		map->offset += (uintptr_t)dev->sg->virtual;
+		map->handle = (void *)(uintptr_t)map->offset;
+		map->dev_addr = dev->sg->virtual;
+		map->dev_handle = dev->sg->dmah_sg->acc_hdl;
 		break;
+
 	case _DRM_CONSISTENT:
-		break;
+		cmn_err(CE_WARN, "%d DRM_AGP_CONSISTENT", __LINE__);
+		return (ENOTSUP);
 	case _DRM_AGP:
-		break;
-	case _DRM_AGP_UMEM:
-		map->offset.off += dev->agp->base;
+		map->offset += dev->agp->base;
+		kva = gfxp_map_kernel_space(map->offset, map->size,
+		    GFXP_MEMORY_WRITECOMBINED);
+		if (kva == 0) {
+			drm_free(map, sizeof (*map), DRM_MEM_MAPS);
+			cmn_err(CE_WARN,
+			    "drm_addmap: failed to map AGP aperture");
+			return (ENOMEM);
+		}
+		map->handle = (void *)(uintptr_t)kva;
+		map->dev_addr = kva;
 		break;
 	default:
 		drm_free(map, sizeof (*map), DRM_MEM_MAPS);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
-	DRM_LOCK();
 	TAILQ_INSERT_TAIL(&dev->maplist, map, link);
 
 done:
 	/* Jumped to, with lock held, when a kernel map is found. */
-	DRM_UNLOCK();
-
-	DRM_DEBUG("drm_addmap: Added map %d 0x%llx/0x%x\n",
-		map->type, map->offset, map->size);
-
 	*map_ptr = map;
-	TAILQ_FOREACH(map, &dev->maplist, link) {
-		DRM_DEBUG("type=%x, offset=%llx, size=%x",
-			map->type, map->offset, map->size);
-	}
 
 	return (0);
 }
@@ -214,56 +214,51 @@ drm_addmap_ioctl(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 
 	if (!(dev->flags & (FREAD|FWRITE)))
-		return (DRM_ERR(EACCES)); /* Require read/write */
+		return (EACCES); /* Require read/write */
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_map32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_map32_t *)data,
-			sizeof (drm_map32_t));
+		drm_map_32_t request32;
+		DRM_COPYFROM_WITH_RETURN(&request32,
+		    (void *)data, sizeof (request32));
 		request.offset = request32.offset;
 		request.size = request32.size;
 		request.type = request32.type;
 		request.flags = request32.flags;
-		request.handle = request32.handle;
 		request.mtrr = request32.mtrr;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_map_t *)data,
-			sizeof (drm_map_t));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
-	DRM_DEBUG("drm_addmap: request.offset=%llx, request.size=%lx,"
-	    "request.type=%x", request.offset, request.size, request.type);
 	err = drm_addmap(dev, request.offset, request.size, request.type,
 	    request.flags, &map);
 
 	if (err != 0)
 		return (err);
 
-	request.offset = map->offset.off;
+	request.offset = map->offset;
 	request.size = map->size;
 	request.type = map->type;
 	request.flags = map->flags;
 	request.mtrr   = map->mtrr;
-	request.handle = (unsigned long long)(uintptr_t)map->handle;
+	request.handle = (uintptr_t)map->handle;
 
-	if (request.type != _DRM_SHM) {
-		request.handle = request.offset;
-	}
-
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_map32_t request32;
+		drm_map_32_t request32;
 		request32.offset = request.offset;
-		request32.size = request.size;
+		request32.size = (uint32_t)request.size;
 		request32.type = request.type;
 		request32.flags = request.flags;
 		request32.handle = request.handle;
 		request32.mtrr = request.mtrr;
-		DRM_COPY_TO_USER_IOCTL((drm_map32_t *)data,
-			request32,
-			sizeof (drm_map32_t));
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request32, sizeof (request32));
 	} else
-		DRM_COPY_TO_USER_IOCTL((drm_map_t *)data, request,
-		    sizeof (drm_map_t));
+#endif
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request, sizeof (request));
 
 	return (0);
 }
@@ -287,12 +282,18 @@ drm_rmmap(drm_device_t *dev, drm_local_map_t *map)
 		ddi_umem_free(map->drm_umem_cookie);
 		break;
 	case _DRM_AGP:
+		/*
+		 * we mapped AGP aperture into kernel space in drm_addmap,
+		 * here, unmap them and release kernel virtual address space
+		 */
+		gfxp_unmap_kernel_space(map->dev_addr, map->size);
+		break;
+
 	case _DRM_SCATTER_GATHER:
 		break;
 	case _DRM_CONSISTENT:
 		break;
 	default:
-		DRM_ERROR("Bad map type %d\n", map->type);
 		break;
 	}
 
@@ -300,8 +301,8 @@ drm_rmmap(drm_device_t *dev, drm_local_map_t *map)
 }
 
 /*
- *  Remove a map private from list and deallocate resources if the mapping
- * isn't in use.
+ * Remove a map private from list and deallocate resources if the
+ * mapping isn't in use.
  */
 /*ARGSUSED*/
 int
@@ -311,11 +312,11 @@ drm_rmmap_ioctl(DRM_IOCTL_ARGS)
 	drm_local_map_t *map;
 	drm_map_t request;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_map32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_map32_t *)data,
-			sizeof (drm_map32_t));
+		drm_map_32_t request32;
+		DRM_COPYFROM_WITH_RETURN(&request32,
+		    (void *)data, sizeof (drm_map_32_t));
 		request.offset = request32.offset;
 		request.size = request32.size;
 		request.type = request32.type;
@@ -323,25 +324,24 @@ drm_rmmap_ioctl(DRM_IOCTL_ARGS)
 		request.handle = request32.handle;
 		request.mtrr = request32.mtrr;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_map_t *)data,
-		    sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
 	DRM_LOCK();
 	TAILQ_FOREACH(map, &dev->maplist, link) {
-		if (((unsigned long long)(uintptr_t)map->handle ==
-			request.handle) &&
-			(map->flags & _DRM_REMOVABLE))
+	if (((uintptr_t)map->handle == (request.handle & 0xffffffff)) &&
+	    (map->flags & _DRM_REMOVABLE))
 			break;
 	}
 
 	/* No match found. */
 	if (map == NULL) {
 		DRM_UNLOCK();
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	drm_rmmap(dev, map);
-
 	DRM_UNLOCK();
 
 	return (0);
@@ -377,6 +377,7 @@ drm_cleanup_buf_error(drm_device_t *dev, drm_buf_entry_t *entry)
 		drm_free(entry->buflist,
 		    entry->buf_count *
 		    sizeof (*entry->buflist), DRM_MEM_BUFS);
+		entry->buflist = NULL;
 		entry->buf_count = 0;
 	}
 }
@@ -386,7 +387,7 @@ int
 drm_markbufs(DRM_IOCTL_ARGS)
 {
 	DRM_DEBUG("drm_markbufs");
-	return (DRM_ERR(EINVAL));
+	return (EINVAL);
 }
 
 /*ARGSUSED*/
@@ -394,7 +395,7 @@ int
 drm_infobufs(DRM_IOCTL_ARGS)
 {
 	DRM_DEBUG("drm_infobufs");
-	return (DRM_ERR(EINVAL));
+	return (EINVAL);
 }
 
 static int
@@ -402,6 +403,7 @@ drm_do_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 {
 	drm_device_dma_t *dma = dev->dma;
 	drm_buf_entry_t *entry;
+	drm_buf_t **temp_buflist;
 	drm_buf_t *buf;
 	unsigned long offset;
 	unsigned long agp_offset;
@@ -410,40 +412,34 @@ drm_do_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 	int size;
 	int alignment;
 	int page_order;
-	int total;
 	int byte_count;
 	int i;
-	drm_buf_t **temp_buflist;
 
 	if (!dma)
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 
 	count = request->count;
 	order = drm_order(request->size);
 	size = 1 << order;
 
 	alignment  = (request->flags & _DRM_PAGE_ALIGN)
-		? round_page(size) : size;
+	    ? round_page(size) : size;
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
-	total = PAGE_SIZE << page_order;
 
 	byte_count = 0;
 	agp_offset = dev->agp->base + request->agp_start;
 
-	DRM_DEBUG("drm_do_addbufs_agp: count:      %d\n",  count);
-	DRM_DEBUG("drm_do_addbufs_agp: order:      %d\n",  order);
-	DRM_DEBUG("drm_do_addbufs_agp: size:       %d\n",  size);
-	DRM_DEBUG("drm_do_addbufs_agp: agp_offset: 0x%lx\n", agp_offset);
-	DRM_DEBUG("drm_do_addbufs_agp: alignment:  %d\n",  alignment);
-	DRM_DEBUG("drm_do_addbufs_agp: page_order: %d\n",  page_order);
-	DRM_DEBUG("drm_do_addbufs_agp: total:      %d\n",  total);
-
 	entry = &dma->bufs[order];
+
+	/* No more than one allocation per order */
+	if (entry->buf_count) {
+		return (ENOMEM);
+	}
 
 	entry->buflist = drm_alloc(count * sizeof (*entry->buflist),
 	    DRM_MEM_BUFS);
 	if (!entry->buflist) {
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 	entry->buf_size = size;
 	entry->page_order = page_order;
@@ -464,22 +460,19 @@ drm_do_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 		buf->pending	= 0;
 		buf->filp	= NULL;
 
-		buf->dev_priv_size = dev->dev_priv_size;
-		buf->dev_private = drm_alloc(count * sizeof (*entry->buflist),
-				DRM_MEM_BUFS);
+		buf->dev_priv_size = dev->driver->buf_priv_size;
+		buf->dev_private = drm_alloc(buf->dev_priv_size, DRM_MEM_BUFS);
 		if (buf->dev_private == NULL) {
 			/* Set count correctly so we free the proper amount. */
 			entry->buf_count = count;
 			drm_cleanup_buf_error(dev, entry);
-			return (DRM_ERR(ENOMEM));
+			return (ENOMEM);
 		}
 
 		offset += alignment;
 		entry->buf_count++;
 		byte_count += PAGE_SIZE << page_order;
 	}
-
-	DRM_DEBUG("drm_do_addbufs_agp: byte_count: %d\n", byte_count);
 
 	temp_buflist = drm_alloc(
 	    (dma->buf_count + entry->buf_count) * sizeof (*dma->buflist),
@@ -489,7 +482,7 @@ drm_do_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 		/* Free the entry because it isn't valid */
 		drm_cleanup_buf_error(dev, entry);
 		DRM_ERROR(" temp_buflist is NULL");
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 
 	bcopy(temp_buflist, dma->buflist,
@@ -503,17 +496,14 @@ drm_do_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 
 	dma->buf_count += entry->buf_count;
 	dma->byte_count += byte_count;
-
-	DRM_DEBUG("drm_do_addbufs_agp: dma->buf_count : %d\n", dma->buf_count);
-	DRM_DEBUG("drm_do_addbufs_agp: entry->buf_count : %d\n",
-	    entry->buf_count);
+	dma->seg_count += entry->seg_count;
+	dma->page_count += byte_count >> PAGE_SHIFT;
 
 	request->count = entry->buf_count;
 	request->size = size;
 
 	dma->flags = _DRM_DMA_USE_AGP;
 
-	DRM_DEBUG("drm_do_addbufs_agp: add bufs succesfful.");
 	return (0);
 }
 
@@ -530,7 +520,6 @@ drm_do_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 	int size;
 	int alignment;
 	int page_order;
-	int total;
 	int byte_count;
 	int i;
 	drm_buf_t **temp_buflist;
@@ -540,27 +529,17 @@ drm_do_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 	size = 1 << order;
 
 	alignment  = (request->flags & _DRM_PAGE_ALIGN)
-		? round_page(size) : size;
+	    ? round_page(size) : size;
 	page_order = order - PAGE_SHIFT > 0 ? order - PAGE_SHIFT : 0;
-	total = PAGE_SIZE << page_order;
 
 	byte_count = 0;
 	agp_offset = request->agp_start;
-
-	DRM_DEBUG("count:      %d\n",  count);
-	DRM_DEBUG("order:      %d\n",  order);
-	DRM_DEBUG("size:       %d\n",  size);
-	DRM_DEBUG("agp_offset: %ld\n", agp_offset);
-	DRM_DEBUG("alignment:  %d\n",  alignment);
-	DRM_DEBUG("page_order: %d\n",  page_order);
-	DRM_DEBUG("total:      %d\n",  total);
-
 	entry = &dma->bufs[order];
 
 	entry->buflist = drm_alloc(count * sizeof (*entry->buflist),
 	    DRM_MEM_BUFS);
 	if (entry->buflist == NULL)
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 
 	entry->buf_size = size;
 	entry->page_order = page_order;
@@ -581,23 +560,20 @@ drm_do_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 		buf->pending	= 0;
 		buf->filp	= NULL;
 
-		buf->dev_priv_size = dev->dev_priv_size;
+		buf->dev_priv_size = dev->driver->buf_priv_size;
 		buf->dev_private = drm_alloc(buf->dev_priv_size,
 		    DRM_MEM_BUFS);
 		if (buf->dev_private == NULL) {
 			/* Set count correctly so we free the proper amount. */
 			entry->buf_count = count;
 			drm_cleanup_buf_error(dev, entry);
-			return (DRM_ERR(ENOMEM));
+			return (ENOMEM);
 		}
 
-		DRM_DEBUG("drm_do_addbufs_sg: buffer %d @ %p\n",
-		    entry->buf_count, buf->address);
 		offset += alignment;
 		entry->buf_count++;
 		byte_count += PAGE_SIZE << page_order;
 	}
-	DRM_DEBUG("drm_do_addbufs_sg: byte_count %d\n", byte_count);
 
 	temp_buflist = drm_realloc(dma->buflist,
 	    dma->buf_count * sizeof (*dma->buflist),
@@ -605,7 +581,7 @@ drm_do_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 	    * sizeof (*dma->buflist), DRM_MEM_BUFS);
 	if (!temp_buflist) {
 		drm_cleanup_buf_error(dev, entry);
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 	dma->buflist = temp_buflist;
 
@@ -615,13 +591,8 @@ drm_do_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 
 	dma->buf_count += entry->buf_count;
 	dma->byte_count += byte_count;
-
-	DRM_DEBUG("drm_do_addbufs_sg: dma->buf_count: %d\n", dma->buf_count);
-	DRM_DEBUG("drm_do_addbufs_sg: entry->buf_count: %d\n",
-	    entry->buf_count);
 	request->count = entry->buf_count;
 	request->size = size;
-
 	dma->flags = _DRM_DMA_USE_SG;
 
 	return (0);
@@ -636,24 +607,24 @@ drm_addbufs_agp(drm_device_t *dev, drm_buf_desc_t *request)
 
 	if (request->count < 0 || request->count > 4096) {
 		DRM_SPINLOCK(&dev->dma_lock);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	order = drm_order(request->size);
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER) {
 		DRM_SPINLOCK(&dev->dma_lock);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	/* No more allocations after first buffer-using ioctl. */
 	if (dev->buf_use != 0) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(EBUSY));
+		return (EBUSY);
 	}
 	/* No more than one allocation per order */
 	if (dev->dma->bufs[order].buf_count != 0) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 
 	ret = drm_do_addbufs_agp(dev, request);
@@ -672,25 +643,25 @@ drm_addbufs_sg(drm_device_t *dev, drm_buf_desc_t *request)
 
 	if (request->count < 0 || request->count > 4096) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	order = drm_order(request->size);
 	if (order < DRM_MIN_ORDER || order > DRM_MAX_ORDER) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	/* No more allocations after first buffer-using ioctl. */
 	if (dev->buf_use != 0) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(EBUSY));
+		return (EBUSY);
 	}
 
 	/* No more than one allocation per order */
 	if (dev->dma->bufs[order].buf_count != 0) {
 		DRM_SPINUNLOCK(&dev->dma_lock);
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 
 	ret = drm_do_addbufs_sg(dev, request);
@@ -706,11 +677,11 @@ drm_addbufs_ioctl(DRM_IOCTL_ARGS)
 	drm_buf_desc_t request;
 	int err;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_buf_desc32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_buf_desc32_t *)data,
-			sizeof (drm_buf_desc32_t));
+		drm_buf_desc_32_t request32;
+		DRM_COPYFROM_WITH_RETURN(&request32,
+		    (void *)data, sizeof (request32));
 		request.count = request32.count;
 		request.size = request32.size;
 		request.low_mark = request32.low_mark;
@@ -718,28 +689,30 @@ drm_addbufs_ioctl(DRM_IOCTL_ARGS)
 		request.flags = request32.flags;
 		request.agp_start = request32.agp_start;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_buf_desc_t *)data,
-			sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
 	if (request.flags & _DRM_AGP_BUFFER)
 		err = drm_addbufs_agp(dev, &request);
 	else if (request.flags & _DRM_SG_BUFFER)
 		err = drm_addbufs_sg(dev, &request);
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_buf_desc32_t request32;
+		drm_buf_desc_32_t request32;
 		request32.count = request.count;
 		request32.size = request.size;
 		request32.low_mark = request.low_mark;
 		request32.high_mark = request.high_mark;
 		request32.flags = request.flags;
-		request32.agp_start = request.agp_start;
-		DRM_COPY_TO_USER_IOCTL((drm_buf_desc32_t *)data,
-			request32,
-			sizeof (drm_buf_desc32_t));
+		request32.agp_start = (uint32_t)request.agp_start;
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request32, sizeof (request32));
 	} else
-		DRM_COPY_TO_USER_IOCTL((drm_buf_desc_t *)data, request,
-			sizeof (request));
+#endif
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request, sizeof (request));
 
 	return (err);
 }
@@ -756,35 +729,35 @@ drm_freebufs(DRM_IOCTL_ARGS)
 	drm_buf_t *buf;
 	int retcode = 0;
 
-	DRM_DEBUG("drm_freebufs: ");
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_buf_free32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_buf_free32_t *)data,
-			sizeof (drm_buf_free32_t));
+		drm_buf_free_32_t request32;
+		DRM_COPYFROM_WITH_RETURN(&request32,
+		    (void*)data, sizeof (request32));
 		request.count = request32.count;
-		request.list = (int __user *)(uintptr_t)request32.list;
+		request.list = (int *)(uintptr_t)request32.list;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_buf_free_t *)data,
-			sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
 	for (i = 0; i < request.count; i++) {
 		if (DRM_COPY_FROM_USER(&idx, &request.list[i], sizeof (idx))) {
-			retcode = DRM_ERR(EFAULT);
+			retcode = EFAULT;
 			break;
 		}
 		if (idx < 0 || idx >= dma->buf_count) {
 			DRM_ERROR("drm_freebufs: Index %d (of %d max)\n",
 			    idx, dma->buf_count - 1);
-			retcode = DRM_ERR(EINVAL);
+			retcode = EINVAL;
 			break;
 		}
 		buf = dma->buflist[idx];
-		if (buf->filp != filp) {
+		if (buf->filp != fpriv) {
 			DRM_ERROR(
 			    "drm_freebufs: process %d not owning the buffer.\n",
 			    DRM_CURRENTPID);
-			retcode = DRM_ERR(EINVAL);
+			retcode = EINVAL;
 			break;
 		}
 		drm_free_buffer(dev, buf);
@@ -793,92 +766,139 @@ drm_freebufs(DRM_IOCTL_ARGS)
 	return (retcode);
 }
 
+#ifdef _LP64
+extern caddr_t smmap64(caddr_t, size_t, int, int, int, off_t);
+#define	drm_smmap	smmap64
+#else
+#if defined(_SYSCALL32_IMPL) || defined(_ILP32)
+extern caddr_t smmap32(caddr32_t, size32_t, int, int, int, off32_t);
+#define	drm_smmap smmap32
+#else
+#error "No define for _LP64, _SYSCALL32_IMPL or _ILP32"
+#endif
+#endif
+
+
 /*ARGSUSED*/
 int
 drm_mapbufs(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 	drm_buf_map_t request;
-	int i;
-	int retcode = 0;
 	const int zero = 0;
-	unsigned long vaddr;
+	unsigned long	vaddr;
 	unsigned long address;
 	drm_device_dma_t *dma = dev->dma;
-	int ret_tmp;
+	uint_t	size;
+	uint_t	foff;
+	int		ret_tmp;
+	int 	i;
+
+#ifdef	_MULTI_DATAMODEL
+	drm_buf_map_32_t request32;
+	drm_buf_pub_32_t	*list32;
+	uint_t		address32;
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_buf_map32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_buf_map32_t *)data,
-			sizeof (drm_buf_map32_t));
+		DRM_COPYFROM_WITH_RETURN(&request32,
+		    (void *)data, sizeof (request32));
 		request.count = request32.count;
-		request.virtual = (void __user *)(uintptr_t)request32.virtual;
-		request.list = (drm_buf_pub_t __user *)
-			(uintptr_t)request32.list;
+		request.virtual = (void *)(uintptr_t)request32.virtual;
+		request.list = (drm_buf_pub_t *)(uintptr_t)request32.list;
+		request.fd = request32.fd;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_buf_map_t *)data,
-			sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
 	dev->buf_use++;
 
 	if (request.count < dma->buf_count)
 		goto done;
 
+	if ((dev->driver->use_agp && (dma->flags & _DRM_DMA_USE_AGP)) ||
+	    (dev->driver->use_sg && (dma->flags & _DRM_DMA_USE_SG))) {
+		drm_local_map_t *map = dev->agp_buffer_map;
+		if (map == NULL)
+			return (EINVAL);
+		size = round_page(map->size);
+		foff = (uintptr_t)map->handle;
+	} else {
+		size = round_page(dma->byte_count);
+		foff = 0;
+	}
+	request.virtual = drm_smmap(NULL, size, PROT_READ | PROT_WRITE,
+	    MAP_SHARED, request.fd, foff);
 	if (request.virtual == NULL) {
 		DRM_ERROR("drm_mapbufs: request.virtual is NULL");
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
-	vaddr = (unsigned long) request.virtual;
 
+	vaddr = (unsigned long) request.virtual;
+#ifdef	_MULTI_DATAMODEL
+	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		list32 = (drm_buf_pub_32_t *)(uintptr_t)request32.list;
+		for (i = 0; i < dma->buf_count; i++) {
+			if (DRM_COPY_TO_USER(&list32[i].idx,
+			    &dma->buflist[i]->idx, sizeof (list32[0].idx))) {
+				return (EFAULT);
+			}
+			if (DRM_COPY_TO_USER(&list32[i].total,
+			    &dma->buflist[i]->total,
+			    sizeof (list32[0].total))) {
+				return (EFAULT);
+			}
+			if (DRM_COPY_TO_USER(&list32[i].used,
+			    &zero, sizeof (zero))) {
+				return (EFAULT);
+			}
+			address32 = vaddr + dma->buflist[i]->offset; /* *** */
+			ret_tmp = DRM_COPY_TO_USER(&list32[i].address,
+			    &address32, sizeof (list32[0].address));
+			if (ret_tmp)
+				return (EFAULT);
+		}
+		goto done;
+	}
+#endif
+
+	ASSERT(ddi_model_convert_from(mode & FMODELS) != DDI_MODEL_ILP32);
 	for (i = 0; i < dma->buf_count; i++) {
 		if (DRM_COPY_TO_USER(&request.list[i].idx,
 		    &dma->buflist[i]->idx, sizeof (request.list[0].idx))) {
-			retcode = EFAULT;
-			goto done;
+			return (EFAULT);
 		}
 		if (DRM_COPY_TO_USER(&request.list[i].total,
 		    &dma->buflist[i]->total, sizeof (request.list[0].total))) {
-			retcode = EFAULT;
-			goto done;
+			return (EFAULT);
 		}
 		if (DRM_COPY_TO_USER(&request.list[i].used, &zero,
 		    sizeof (zero))) {
-			retcode = EFAULT;
-			goto done;
+			return (EFAULT);
 		}
 		address = vaddr + dma->buflist[i]->offset; /* *** */
 
-		if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-			caddr32_t address32;
-			address32 = address;
-			ret_tmp = DRM_COPY_TO_USER(&request.list[i].address,
-				&address32,
-				sizeof (caddr32_t));
-		} else
-			ret_tmp = DRM_COPY_TO_USER(&request.list[i].address,
-				&address, sizeof (address));
-
+		ret_tmp = DRM_COPY_TO_USER(&request.list[i].address,
+		    &address, sizeof (address));
 		if (ret_tmp) {
-			retcode = EFAULT;
-			goto done;
+			return (EFAULT);
 		}
 	}
 
 done:
-	request.count = dma->buf_count;
-	DRM_DEBUG("drm_mapbufs: %d buffers, retcode = %d\n",
-	    request.count, retcode);
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_buf_map32_t request32;
-		request32.count = request.count;
+		request32.count = dma->buf_count;
 		request32.virtual = (caddr32_t)(uintptr_t)request.virtual;
-		request32.list = (caddr32_t)(uintptr_t)request.list;
-		DRM_COPY_TO_USER_IOCTL((drm_buf_map32_t *)data,
-			request32, sizeof (drm_buf_map32_t));
-	} else
-		DRM_COPY_TO_USER_IOCTL((drm_buf_map_t *)data, request,
-			sizeof (request));
-
-	return (DRM_ERR(retcode));
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request32, sizeof (request32));
+	} else {
+#endif
+		request.count = dma->buf_count;
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request, sizeof (request));
+#ifdef	_MULTI_DATAMODEL
+	}
+#endif
+	return (0);
 }

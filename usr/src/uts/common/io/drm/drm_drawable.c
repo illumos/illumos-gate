@@ -31,6 +31,10 @@
  *    Gareth Hughes <gareth@valinux.com>
  *
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -45,7 +49,7 @@ drm_adddraw(DRM_IOCTL_ARGS)
 	draw.handle = 0;	/* NOOP */
 	DRM_DEBUG("draw.handle = %d\n", draw.handle);
 
-	DRM_COPY_TO_USER_IOCTL((drm_draw_t *)data, draw, sizeof (draw));
+	DRM_COPYTO_WITH_RETURN((void *)data, &draw, sizeof (draw));
 
 	return (0);
 }

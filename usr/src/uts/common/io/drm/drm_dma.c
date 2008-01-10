@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,16 +45,16 @@ int
 drm_dma_setup(drm_device_t *dev)
 {
 	int i;
+	drm_buf_entry_t *pbuf;
 
 	dev->dma = drm_calloc(1, sizeof (*dev->dma), DRM_MEM_DMA);
 	if (dev->dma == NULL)
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 
 	mutex_init(&dev->dma_lock, NULL, MUTEX_DRIVER, NULL);
-
-	for (i = 0; i <= DRM_MAX_ORDER; i++)
-		(void) memset(&dev->dma->bufs[i], 0,
-			    sizeof (dev->dma->bufs[0]));
+	pbuf = &(dev->dma->bufs[0]);
+	for (i = 0; i <= DRM_MAX_ORDER; i++, pbuf++)
+		bzero(pbuf, sizeof (drm_buf_entry_t));
 
 	return (0);
 }
@@ -71,31 +71,23 @@ drm_dma_takedown(drm_device_t *dev)
 	/* Clear dma buffers */
 	for (i = 0; i <= DRM_MAX_ORDER; i++) {
 		if (dma->bufs[i].seg_count) {
-			DRM_DEBUG("drm_dma_takedown: order %d: buf_count = %d,"
-			    " seg_count = %d\n",
-			    i,
-			    dma->bufs[i].buf_count,
-			    dma->bufs[i].seg_count);
 			drm_free(dma->bufs[i].seglist,
 			    dma->bufs[i].seg_count *
 			    sizeof (*dma->bufs[0].seglist), DRM_MEM_SEGS);
 		}
 
-		if (dma->bufs[i].buf_count) {
-			for (j = 0; j < dma->bufs[i].buf_count; j++) {
-				if (dma->bufs[i].buflist[j].dev_private) {
-					drm_free(dma->bufs[i].buflist[j].
-					    dev_private,
-					    dma->bufs[i].buflist[j].
-					    dev_priv_size, DRM_MEM_BUFS);
-				}
+		for (j = 0; j < dma->bufs[i].buf_count; j++) {
+			if (dma->bufs[i].buflist[j].dev_private) {
+				drm_free(dma->bufs[i].buflist[j].dev_private,
+				    dma->bufs[i].buflist[j].dev_priv_size,
+				    DRM_MEM_BUFS);
 			}
+		}
+		if (dma->bufs[i].buf_count)
 			drm_free(dma->bufs[i].buflist,
 			    dma->bufs[i].buf_count *
 			    sizeof (*dma->bufs[0].buflist), DRM_MEM_BUFS);
-		}
 	}
-	DRM_DEBUG("drm_dma_takedown: free buflist");
 	if (dma->buflist) {
 		drm_free(dma->buflist,
 		    dma->buf_count *sizeof (*dma->buflist),
@@ -127,7 +119,7 @@ drm_free_buffer(drm_device_t *dev, drm_buf_t *buf)
 }
 
 void
-drm_reclaim_buffers(drm_device_t *dev, DRMFILE filp)
+drm_reclaim_buffers(drm_device_t *dev, drm_file_t *fpriv)
 {
 	drm_device_dma_t *dma = dev->dma;
 	int i;
@@ -135,7 +127,7 @@ drm_reclaim_buffers(drm_device_t *dev, DRMFILE filp)
 	if (!dma)
 		return;
 	for (i = 0; i < dma->buf_count; i++) {
-		if (dma->buflist[i]->filp == filp) {
+		if (dma->buflist[i]->filp == fpriv) {
 			switch (dma->buflist[i]->list) {
 			case DRM_LIST_NONE:
 				drm_free_buffer(dev, dma->buflist[i]);
@@ -157,11 +149,9 @@ drm_dma(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
 
-	if (dev->dma_ioctl) {
-		return (dev->dma_ioctl(kdev, dev, data, mode,
-					    credp, rvalp, filp));
+	if (dev->driver->dma_ioctl) {
+		return (dev->driver->dma_ioctl(dev, data, fpriv, mode));
 	} else {
-		DRM_DEBUG("drm_dma: DMA ioctl on driver with no dma handler\n");
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 }

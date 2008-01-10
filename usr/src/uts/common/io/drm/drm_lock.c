@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,24 +42,19 @@
 #include "drmP.h"
 
 int
-drm_lock_held(void *info)
+drm_lock_take(drm_lock_data_t *lock_data, unsigned int context)
 {
-	__volatile__ unsigned int *lock;
-
-	lock = (__volatile__ unsigned int *)info;
-	return (_DRM_LOCK_IS_HELD(*lock));
-}
-
-int
-drm_lock_take(__volatile__ unsigned int *lock, unsigned int context)
-{
-	unsigned int old, new;
+	unsigned int old, new, prev;
+	volatile unsigned int *lock = &lock_data->hw_lock->lock;
 
 	do {
 		old = *lock;
-		if (old & _DRM_LOCK_HELD) new = old | _DRM_LOCK_CONT;
-		else			  new = context | _DRM_LOCK_HELD;
-	} while (!atomic_cmpset_int(lock, old, new));
+		if (old & _DRM_LOCK_HELD)
+			new = old | _DRM_LOCK_CONT;
+		else
+			new = context | _DRM_LOCK_HELD;
+		prev = atomic_cas_uint(lock, old, new);
+	} while (prev != old);
 
 	if (_DRM_LOCKING_CONTEXT(old) == context) {
 		if (old & _DRM_LOCK_HELD) {
@@ -70,7 +65,8 @@ drm_lock_take(__volatile__ unsigned int *lock, unsigned int context)
 			return (0);
 		}
 	}
-	if (new == (context | _DRM_LOCK_HELD)) {
+	if ((_DRM_LOCKING_CONTEXT(new)) == context &&
+	    _DRM_LOCK_IS_HELD(new)) {
 				/* Have lock */
 		return (1);
 	}
@@ -82,36 +78,40 @@ drm_lock_take(__volatile__ unsigned int *lock, unsigned int context)
  * inside *_unlock to give lock to kernel before calling *_dma_schedule.
  */
 int
-drm_lock_transfer(drm_device_t *dev, __volatile__ unsigned int *lock,
+drm_lock_transfer(drm_device_t *dev, volatile unsigned int *lock,
     unsigned int context)
 {
-	unsigned int old, new;
+	unsigned int old, new, prev;
 
 	dev->lock.filp = NULL;
 	do {
 		old  = *lock;
 		new  = context | _DRM_LOCK_HELD;
-	} while (!atomic_cmpset_int(lock, old, new));
+		prev = atomic_cas_uint(lock, old, new);
+	} while (prev != old);
 
 	return (1);
 }
 
 int
-drm_lock_free(drm_device_t *dev, __volatile__ unsigned int *lock,
+drm_lock_free(drm_device_t *dev, volatile unsigned int *lock,
     unsigned int context)
 {
-	unsigned int old, new;
+	unsigned int old, new, prev;
 
 	mutex_enter(&(dev->lock.lock_mutex));
 	dev->lock.filp = NULL;
 	do {
 		old  = *lock;
-		new  = 0;
-	} while (!atomic_cmpset_int(lock, old, new));
+		new = 0;
+		prev = atomic_cas_uint(lock, old, new);
+	} while (prev != old);
 
-	if (_DRM_LOCK_IS_HELD(old) && _DRM_LOCKING_CONTEXT(old) != context) {
+	if (_DRM_LOCK_IS_HELD(old) &&
+	    (_DRM_LOCKING_CONTEXT(old) != context)) {
 		DRM_ERROR("%d freed heavyweight lock held by %d\n",
 		    context, _DRM_LOCKING_CONTEXT(old));
+		mutex_exit(&(dev->lock.lock_mutex));
 		return (1);
 	}
 	cv_broadcast(&(dev->lock.lock_cv));
@@ -127,45 +127,35 @@ drm_lock(DRM_IOCTL_ARGS)
 	drm_lock_t lock;
 	int ret = 0;
 
-	DRM_COPY_FROM_USER_IOCTL(lock, (drm_lock_t *)data, sizeof (lock));
+	DRM_COPYFROM_WITH_RETURN(&lock, (void *)data, sizeof (lock));
 
 	if (lock.context == DRM_KERNEL_CONTEXT) {
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
-	DRM_DEBUG("%d (pid %d) requests lock (0x%08x), flags = 0x%08x\n",
-	    lock.context, DRM_CURRENTPID, dev->lock.hw_lock->lock, lock.flags);
-
-	if (dev->use_dma_queue && lock.context < 0)
-		return (DRM_ERR(EINVAL));
+	if (dev->driver->use_dma_queue && lock.context < 0)
+		return (EINVAL);
 
 	mutex_enter(&(dev->lock.lock_mutex));
-	DRM_DEBUG("mutex enter\n");
 	for (;;) {
-		if (drm_lock_take(&dev->lock.hw_lock->lock, lock.context)) {
-			DRM_DEBUG("drm_lock_take enter\n");
-			dev->lock.filp = (void *)(uintptr_t)DRM_CURRENTPID;
+		if (drm_lock_take(&dev->lock, lock.context)) {
+			dev->lock.filp = fpriv;
 			dev->lock.lock_time = jiffies;
-			atomic_inc_32(&dev->counts[_DRM_STAT_LOCKS]);
 			break;  /* Got lock */
 		}
-		DRM_DEBUG("Drm_lock: cv_wait\n");
 		ret = cv_wait_sig(&(dev->lock.lock_cv),
 		    &(dev->lock.lock_mutex));
 
 		if (ret == 0) {
 			mutex_exit(&(dev->lock.lock_mutex));
-			return (-1);
+			return (EINTR);
 		}
 	}
-	DRM_DEBUG("before mutex_exit\n");
 	mutex_exit(&(dev->lock.lock_mutex));
-	DRM_DEBUG("drm_lock: %d %s\n", lock.context,
-	    ret ? "interrupted" : "has lock");
 
-	if (dev->dma_quiescent != NULL &&
+	if (dev->driver->dma_quiescent != NULL &&
 	    (lock.flags & _DRM_LOCK_QUIESCENT))
-		dev->dma_quiescent(dev);
+		dev->driver->dma_quiescent(dev);
 
 	return (0);
 }
@@ -177,24 +167,19 @@ drm_unlock(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_lock_t lock;
 
-	DRM_COPY_FROM_USER_IOCTL(lock, (drm_lock_t *)data, sizeof (lock));
+	DRM_COPYFROM_WITH_RETURN(&lock, (void *)data, sizeof (lock));
 
 	if (lock.context == DRM_KERNEL_CONTEXT) {
 		DRM_ERROR("Process %d using kernel context %d\n",
 		    DRM_CURRENTPID, lock.context);
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
-
 	atomic_inc_32(&dev->counts[_DRM_STAT_UNLOCKS]);
 
 	DRM_LOCK();
-	(void) drm_lock_transfer(dev, &dev->lock.hw_lock->lock,
-	    DRM_KERNEL_CONTEXT);
-
-	if (drm_lock_free(dev, &dev->lock.hw_lock->lock, DRM_KERNEL_CONTEXT)) {
+	if (drm_lock_free(dev, &dev->lock.hw_lock->lock, lock.context)) {
 		DRM_ERROR("drm_unlock\n");
 	}
 	DRM_UNLOCK();
-
 	return (0);
 }

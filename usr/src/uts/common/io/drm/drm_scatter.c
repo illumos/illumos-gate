@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,26 +40,43 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
+#include <gfx_private.h>
+#include "drm_io32.h"
 
 #define	DEBUG_SCATTER 0
 
+#ifdef	_LP64
+#define	ScatterHandle(x) (unsigned int)((x >> 32) + (x & ((1L << 32) - 1)))
+#else
+#define	ScatterHandle(x) (unsigned int)(x)
+#endif
+
 void
-drm_sg_cleanup(drm_sg_mem_t *entry)
+drm_sg_cleanup(drm_device_t *dev, drm_sg_mem_t *entry)
 {
+	int	pages = entry->pages;
+
 	if (entry->busaddr) {
-		drm_free(entry->busaddr,
-		    entry->pages * sizeof (entry->busaddr),
-		    DRM_MEM_PAGES);
+		kmem_free(entry->busaddr, sizeof (*entry->busaddr) * pages);
 		entry->busaddr = NULL;
 	}
-	if (entry->virtual) {
-		ddi_umem_free(entry->sg_umem_cookie);
-		entry->virtual = NULL;
-	}
-	if (entry) {
-		drm_free(entry, sizeof (drm_sg_mem_t), DRM_MEM_SGLISTS);
+
+	ASSERT(entry->umem_cookie == NULL);
+
+	if (entry->dmah_sg) {
+		drm_pci_free(dev, entry->dmah_sg);
+		entry->dmah_sg = NULL;
 	}
 
+	if (entry->dmah_gart) {
+		drm_pci_free(dev, entry->dmah_gart);
+		entry->dmah_gart = NULL;
+	}
+
+	if (entry) {
+		drm_free(entry, sizeof (drm_sg_mem_t), DRM_MEM_SGLISTS);
+		entry = NULL;
+	}
 }
 
 /*ARGSUSED*/
@@ -67,84 +84,71 @@ int
 drm_sg_alloc(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
-	drm_scatter_gather_t request;
-	drm_sg_mem_t *entry;
 	unsigned long pages;
+	drm_sg_mem_t		*entry;
+	drm_dma_handle_t	*dmah;
+	drm_scatter_gather_t request;
 
 	DRM_DEBUG("%s\n", "drm_sg_alloc");
 
 	if (dev->sg)
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_scatter_gather32_t request32;
+		drm_scatter_gather_32_t request32;
 
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_scatter_gather32_t *)data,
-			sizeof (drm_scatter_gather32_t));
+		DRM_COPYFROM_WITH_RETURN(&request32, (void *)data,
+		    sizeof (request32));
 		request.size = request32.size;
 		request.handle = request32.handle;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_scatter_gather_t *)data,
-			sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request, (void *)data,
+		    sizeof (request));
 
-	entry = drm_alloc(sizeof (*entry), DRM_MEM_SGLISTS);
-	if (!entry)
-		return (DRM_ERR(ENOMEM));
-
-	pages = (request.size + PAGE_SIZE - 1) / PAGE_SIZE;
+	pages = btopr(request.size);
 	DRM_DEBUG("sg size=%ld pages=%ld\n", request.size, pages);
+	entry = kmem_zalloc(sizeof (*entry), KM_SLEEP);
+	entry->pages = (int)pages;
+	dmah = drm_pci_alloc(dev, ptob(pages), 4096, 0xfffffffful, pages);
+	if (dmah == NULL)
+		goto err_exit;
+	entry->busaddr = (void *)kmem_zalloc(sizeof (*entry->busaddr) *
+	    pages, KM_SLEEP);
 
-	entry->pages = pages;
-
-	entry->busaddr = drm_alloc(pages * sizeof (*entry->busaddr),
-			DRM_MEM_PAGES);
-
-	if (!entry->busaddr) {
-		drm_sg_cleanup(entry);
-		return (DRM_ERR(ENOMEM));
-	}
-
-	(void) memset((void *)entry->busaddr, 0,
-	    pages * sizeof (*entry->busaddr));
-
-	entry->virtual = ddi_umem_alloc((size_t)(pages << PAGE_SHIFT),
-			DDI_UMEM_SLEEP, &entry->sg_umem_cookie);
-	if (!entry->virtual) {
-		drm_sg_cleanup(entry);
-		return (DRM_ERR(ENOMEM));
-	}
-
-	entry->handle = (unsigned long)entry->virtual;
-
-	DRM_DEBUG("drm_sg_alloc: handle  = %08lx\n", entry->handle);
-	DRM_DEBUG("drm_sg_alloc: virtual = %p\n", entry->virtual);
-
+	entry->handle = ScatterHandle((unsigned long)dmah->vaddr);
+	entry->virtual = (void *)dmah->vaddr;
 	request.handle = entry->handle;
-
+	entry->dmah_sg = dmah;
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_scatter_gather32_t data32;
+		drm_scatter_gather_32_t data32;
 
-		data32.size = request.size;
-		data32.handle = request.handle;
+		data32.size = (uint32_t)request.size;
+		data32.handle = (uint32_t)request.handle;
 
-		DRM_COPY_TO_USER_IOCTL((drm_scatter_gather32_t *)data,
-			data32,	sizeof (drm_scatter_gather32_t));
+		DRM_COPYTO_WITH_RETURN((void *)data, &data32,
+		    sizeof (data32));
 	} else
-		DRM_COPY_TO_USER_IOCTL((drm_scatter_gather_t *)data,
-			request,
-			sizeof (request));
+#endif
+		DRM_COPYTO_WITH_RETURN((void *)data, &request,
+		    sizeof (request));
 
 	DRM_LOCK();
 	if (dev->sg) {
 		DRM_UNLOCK();
-		drm_sg_cleanup(entry);
-		return (DRM_ERR(EINVAL));
+		drm_sg_cleanup(dev, entry);
+		return (EINVAL);
 	}
 	dev->sg = entry;
 	DRM_UNLOCK();
 
 	return (0);
+
+err_exit:
+	drm_sg_cleanup(dev, entry);
+	return (ENOMEM);
 }
 
 /*ARGSUSED*/
@@ -155,17 +159,18 @@ drm_sg_free(DRM_IOCTL_ARGS)
 	drm_scatter_gather_t request;
 	drm_sg_mem_t *entry;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_scatter_gather32_t request32;
+		drm_scatter_gather_32_t request32;
 
-		DRM_COPY_FROM_USER_IOCTL(request32,
-			(drm_scatter_gather32_t *)data,
-			sizeof (drm_scatter_gather32_t));
+		DRM_COPYFROM_WITH_RETURN(&request32, (void *)data,
+		    sizeof (request32));
 		request.size = request32.size;
 		request.handle = request32.handle;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_scatter_gather_t *)data,
-			sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request, (void *)data,
+		    sizeof (request));
 
 	DRM_LOCK();
 	entry = dev->sg;
@@ -173,11 +178,9 @@ drm_sg_free(DRM_IOCTL_ARGS)
 	DRM_UNLOCK();
 
 	if (!entry || entry->handle != request.handle)
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 
-	DRM_DEBUG("drm_sg_free: virtual  = %p\n", entry->virtual);
-
-	drm_sg_cleanup(entry);
+	drm_sg_cleanup(dev, entry);
 
 	return (0);
 }

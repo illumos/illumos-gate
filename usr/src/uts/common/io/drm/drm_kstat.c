@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  * All rights reserved.  Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@ static char *drmkstat_name[] = {
 static int
 drm_kstat_update(kstat_t *ksp, int flag)
 {
-	drm_softstate_t *sc;
+	drm_device_t *sc;
 	kstat_named_t *knp;
 	int tmp;
 
@@ -61,7 +61,7 @@ drm_kstat_update(kstat_t *ksp, int flag)
 }
 
 int
-drm_init_kstats(drm_softstate_t *sc)
+drm_init_kstats(drm_device_t *sc)
 {
 	int instance;
 	kstat_t *ksp;
@@ -90,8 +90,10 @@ drm_init_kstats(drm_softstate_t *sc)
 }
 
 void
-drm_fini_kstats(drm_softstate_t *sc)
+drm_fini_kstats(drm_device_t *sc)
 {
-	ASSERT(sc->asoft_ksp);
-	kstat_delete(sc->asoft_ksp);
+	if (sc->asoft_ksp)
+		kstat_delete(sc->asoft_ksp);
+	else
+		cmn_err(CE_WARN, "attempt to delete null kstat");
 }

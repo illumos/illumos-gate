@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,11 +347,11 @@ static int i915_wait_irq(drm_device_t * dev, int irq_nr)
 	dev_priv->sarea_priv->perf_boxes |= I915_BOX_WAIT;
 
 	i915_user_irq_on(dev_priv);
-	DRM_WAIT_ON(ret, dev_priv->irq_queue, 3 * DRM_HZ,
+	DRM_WAIT_ON(ret, &dev_priv->irq_queue, 3 * DRM_HZ,
 		    READ_BREADCRUMB(dev_priv) >= irq_nr);
 	i915_user_irq_off(dev_priv);
 
-	if (ret == DRM_ERR(EBUSY)) {
+	if (ret == EBUSY) {
 		DRM_ERROR("%s: EBUSY -- rec: %d emitted: %d\n",
 			  __FUNCTION__,
 			  READ_BREADCRUMB(dev_priv), (int)dev_priv->counter);
@@ -370,10 +370,10 @@ static int i915_driver_vblank_do_wait(drm_device_t *dev, unsigned int *sequence,
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
-	DRM_WAIT_ON(ret, dev->vbl_queue, 3 * DRM_HZ,
+	DRM_WAIT_ON(ret, &dev->vbl_queue, 3 * DRM_HZ,
 		    (((cur_vblank = atomic_read(counter))
 			- *sequence) <= (1<<23)));
 	
@@ -402,29 +402,29 @@ int i915_irq_emit(DRM_IOCTL_ARGS)
 	drm_i915_irq_emit_t emit;
 	int result;
 
-	LOCK_TEST_WITH_RETURN(dev, filp);
+	LOCK_TEST_WITH_RETURN(dev, fpriv);
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		drm_i915_irq_emit32_t irq_emit32;
 
-		DRM_COPY_FROM_USER_IOCTL(irq_emit32,
+		DRM_COPYFROM_WITH_RETURN(&irq_emit32,
 			(drm_i915_irq_emit32_t __user *) data,
 			sizeof (drm_i915_irq_emit32_t));
 		emit.irq_seq = (int __user *)(uintptr_t)irq_emit32.irq_seq;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(emit, (drm_i915_irq_emit_t __user *) data,
-			sizeof(emit));
+		DRM_COPYFROM_WITH_RETURN(&emit,
+		    (drm_i915_irq_emit_t __user *) data, sizeof(emit));
 
 	result = i915_emit_irq(dev);
 
 	if (DRM_COPY_TO_USER(emit.irq_seq, &result, sizeof(int))) {
 		DRM_ERROR("copy_to_user\n");
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 	}
 
 	return 0;
@@ -441,11 +441,11 @@ int i915_irq_wait(DRM_IOCTL_ARGS)
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL(irqwait, (drm_i915_irq_wait_t __user *) data,
-				 sizeof(irqwait));
+	DRM_COPYFROM_WITH_RETURN(&irqwait,
+	    (drm_i915_irq_wait_t __user *) data, sizeof(irqwait));
 
 	return i915_wait_irq(dev, irqwait.irq_seq);
 }
@@ -491,8 +491,11 @@ void i915_driver_irq_postinstall(drm_device_t * dev)
 
 	if (!dev_priv->vblank_pipe)
 		dev_priv->vblank_pipe = DRM_I915_VBLANK_PIPE_A;
+
+	DRM_INIT_WAITQUEUE(&dev_priv->irq_queue, DRM_INTR_PRI(dev));
+
 	i915_enable_interrupt(dev);
-	DRM_INIT_WAITQUEUE(&dev_priv->irq_queue);
+
 
 	/*
 	 * Initialize the hardware status page IRQ location.
@@ -515,9 +518,9 @@ void i915_driver_irq_uninstall(drm_device_t * dev)
 
 	temp = I915_READ16(I915REG_INT_IDENTITY_R);
 	I915_WRITE16(I915REG_INT_IDENTITY_R, temp);
-#if defined(__SVR4) && defined(__sun)
-        cv_destroy(&dev_priv->irq_queue);
+
+	DRM_FINI_WAITQUEUE(&dev_priv->irq_queue);
 	mutex_destroy(&dev_priv->swaps_lock);
 	mutex_destroy(&dev_priv->user_irq_lock);
-#endif
+
 }

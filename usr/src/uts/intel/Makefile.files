@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -137,7 +137,7 @@ FD_OBJS += fd.o
 GDA_OBJS += gda.o
 GHD_OBJS += ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
 	ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
-I915_OBJS += i915_sundrv.o i915_dma.o i915_drv.o i915_irq.o i915_mem.o
+I915_OBJS += i915_dma.o i915_drv.o i915_irq.o i915_mem.o
 LOGI_OBJS += logi.o
 MSMOUSE_OBJS += msm.o
 MSCSI_OBJS += mscsi.o

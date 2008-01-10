@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,9 +130,9 @@ drm_get_pci_index_reg(dev_info_t *devi, uint_t physical, uint_t size,
 		regsize = (uint_t)regs[i].pci_size_low;
 		if ((uint_t)physical >= base &&
 		    (uint_t)physical < (base + regsize)) {
-		    regnum = i + 1;
-		    *off = (off_t)(physical - base);
-		    break;
+			regnum = i + 1;
+			*off = (off_t)(physical - base);
+			break;
 		}
 	}
 	kmem_free(regs, (size_t)length);
@@ -152,16 +152,16 @@ static ddi_device_acc_attr_t dev_attr = {
 int
 do_ioremap(dev_info_t *devi, drm_device_iomap_t *iomap)
 {
-	uint_t regnum;
+	int regnum;
 	off_t offset;
 	int ret;
-
 
 	regnum =  drm_get_pci_index_reg(devi, iomap->physical,
 	    iomap->size, &offset);
 	if (regnum < 0) {
-		DRM_ERROR("do_ioremap: can not find regster entry");
-		return (DRM_ERR(ENXIO));
+		DRM_ERROR("do_ioremap: can not find regster entry,"
+		    " start=0x%x, size=0x%x", iomap->physical, iomap->size);
+		return (ENXIO);
 	}
 
 	iomap->drm_regnum = regnum;
@@ -170,16 +170,17 @@ do_ioremap(dev_info_t *devi, drm_device_iomap_t *iomap)
 	    (caddr_t *)&(iomap->drm_base), (offset_t)offset,
 	    (offset_t)iomap->size, &dev_attr, &iomap->drm_handle);
 	if (ret < 0) {
-		DRM_ERROR("do_ioremap: cannot iomap pci space");
+		DRM_ERROR("do_ioremap: failed to map regs: regno=%d,"
+		    " offset=0x%x", regnum, offset);
 		iomap->drm_handle = NULL;
-		return (DRM_ERR(EFAULT));
+		return (EFAULT);
 	}
 
 	return (0);
 }
 
 int
-drm_ioremap(drm_softstate_t *softstate, drm_local_map_t *map)
+drm_ioremap(drm_device_t *softstate, drm_local_map_t *map)
 {
 	drm_device_iomap_t iomap;
 	int ret;
@@ -187,23 +188,26 @@ drm_ioremap(drm_softstate_t *softstate, drm_local_map_t *map)
 	DRM_DEBUG("drm_ioremap called\n");
 
 	bzero(&iomap, sizeof (drm_device_iomap_t));
-	iomap.physical = map->offset.off;
+	iomap.physical = map->offset;
 	iomap.size = map->size;
 	ret = do_ioremap(softstate->dip, &iomap);
 
 	if (ret) {
-		DRM_ERROR("drm_ioremap: drm_ioremap failed");
-		return (DDI_FAILURE);
+		DRM_ERROR("drm_ioremap: failed, physaddr=0x%x, size=0x%x",
+		    map->offset, map->size);
+		return (ret);
 	}
-	map->handle = (void *)iomap.drm_handle;
-	map->dev_handle = iomap.drm_handle;
 
+	/* ddi_acc_handle_t */
+	map->dev_handle = iomap.drm_handle;
+	map->handle = (void *)iomap.drm_base;
 	map->dev_addr = iomap.drm_base;
+
 	DRM_DEBUG(
 	    "map->handle is %p map->dev_addr is %lx",
 	    (void *)map->handle, (unsigned long)map->dev_addr);
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 void

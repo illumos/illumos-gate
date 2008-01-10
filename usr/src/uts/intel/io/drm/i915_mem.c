@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,8 +98,7 @@ void mark_block(drm_device_t * dev, struct mem_block *p, int in_use)
  * already mapped into each client's address space.
  */
 
-static struct mem_block *split_block(struct mem_block *p, int start, int size,
-				     DRMFILE filp)
+static struct mem_block *split_block(struct mem_block *p, int start, int size, drm_file_t *fpriv)
 {
 	/* Maybe cut off the start of an existing block */
 	if (start > p->start) {
@@ -136,12 +135,12 @@ static struct mem_block *split_block(struct mem_block *p, int start, int size,
 
       out:
 	/* Our block is in the middle */
-	p->filp = filp;
+	p->filp = fpriv;
 	return (p);
 }
 
 static struct mem_block *alloc_block(struct mem_block *heap, int size,
-				     int align2, DRMFILE filp)
+				     int align2, drm_file_t *fpriv)
 {
 	struct mem_block *p;
 	int mask = (1 << align2) - 1;
@@ -149,7 +148,7 @@ static struct mem_block *alloc_block(struct mem_block *heap, int size,
 	for (p = heap->next; p != heap; p = p->next) {
 		int start = (p->start + mask) & ~mask;
 		if (p->filp == NULL && start + size <= p->start + p->size)
-			return split_block(p, start, size, filp);
+			return split_block(p, start, size, fpriv);
 	}
 
 	return NULL;
@@ -166,12 +165,12 @@ static struct mem_block *find_block(struct mem_block *heap, int start)
 	return (NULL);
 }
 
-struct mem_block *find_block_by_proc(struct mem_block *heap, DRMFILE filp)
+struct mem_block *find_block_by_proc(struct mem_block *heap, drm_file_t *fpriv)
 {
 	struct mem_block *p;
 
 	for (p = heap->next; p != heap; p = p->next)
-		if (p->filp == filp)
+		if (p->filp == fpriv)
 			return (p);
 
 	return (NULL);
@@ -208,12 +207,12 @@ static int init_heap(struct mem_block **heap, int start, int size)
 	struct mem_block *blocks = drm_alloc(sizeof(*blocks), DRM_MEM_BUFLISTS);
 
 	if (!blocks)
-		return DRM_ERR(ENOMEM);
+		return (ENOMEM);
 
 	*heap = drm_alloc(sizeof(**heap), DRM_MEM_BUFLISTS);
 	if (!*heap) {
 		drm_free(blocks, sizeof(*blocks), DRM_MEM_BUFLISTS);
-		return DRM_ERR(ENOMEM);
+		return (ENOMEM);
 	}
 
 	blocks->start = start;
@@ -222,14 +221,14 @@ static int init_heap(struct mem_block **heap, int start, int size)
 	blocks->next = blocks->prev = *heap;
 
 	(void) memset(*heap, 0, sizeof(**heap));
-	(*heap)->filp = (DRMFILE) - 1;
+	(*heap)->filp = (drm_file_t *) - 1;
 	(*heap)->next = (*heap)->prev = blocks;
 	return (0);
 }
 
 /* Free all blocks associated with the releasing file.
  */
-void i915_mem_release(drm_device_t * dev, DRMFILE filp, struct mem_block *heap)
+void i915_mem_release(drm_device_t * dev, drm_file_t *fpriv, struct mem_block *heap)
 {
 	struct mem_block *p;
 
@@ -237,7 +236,7 @@ void i915_mem_release(drm_device_t * dev, DRMFILE filp, struct mem_block *heap)
 		return;
 
 	for (p = heap->next; p != heap; p = p->next) {
-		if (p->filp == filp) {
+		if (p->filp == fpriv) {
 			p->filp = NULL;
 			mark_block(dev, p, 0);
 		}
@@ -298,26 +297,23 @@ int i915_mem_alloc(DRM_IOCTL_ARGS)
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
 		drm_i915_mem_alloc32_t	alloc32;
 
-		DRM_COPY_FROM_USER_IOCTL(alloc32,
-			(drm_i915_mem_alloc32_t __user *) data,
-			sizeof (alloc32));
+		DRM_COPYFROM_WITH_RETURN(&alloc32, (void *)data, sizeof (alloc32));
 		alloc.region = alloc32.region;
 		alloc.alignment = alloc32.alignment;
 		alloc.size = alloc32.size;
-		alloc.region_offset = (int __user *)(uintptr_t)alloc32.region_offset;
+		alloc.region_offset = (int *)(uintptr_t)alloc32.region_offset;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(alloc, (drm_i915_mem_alloc_t __user *) data,
-			sizeof(alloc));
+		DRM_COPYFROM_WITH_RETURN(&alloc, (void *) data, sizeof(alloc));
 
 	heap = get_heap(dev_priv, alloc.region);
 	if (!heap || !*heap)
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 
 	/* Make things easier on ourselves: all allocations at least
 	 * 4k aligned.
@@ -325,16 +321,16 @@ int i915_mem_alloc(DRM_IOCTL_ARGS)
 	if (alloc.alignment < 12)
 		alloc.alignment = 12;
 
-	block = alloc_block(*heap, alloc.size, alloc.alignment, filp);
+	block = alloc_block(*heap, alloc.size, alloc.alignment, fpriv);
 
 	if (!block)
-		return DRM_ERR(ENOMEM);
+		return (ENOMEM);
 
 	mark_block(dev, block, 1);
 
 	if (DRM_COPY_TO_USER(alloc.region_offset, &block->start, sizeof(int))) {
 		DRM_ERROR("copy_to_user\n");
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 	}
 
 	return (0);
@@ -350,22 +346,21 @@ int i915_mem_free(DRM_IOCTL_ARGS)
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL(memfree, (drm_i915_mem_free_t __user *) data,
-				 sizeof(memfree));
+	DRM_COPYFROM_WITH_RETURN(&memfree, (void *)data, sizeof(memfree));
 
 	heap = get_heap(dev_priv, memfree.region);
 	if (!heap || !*heap)
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 
 	block = find_block(*heap, memfree.region_offset);
 	if (!block)
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 
-	if (block->filp != filp)
-		return DRM_ERR(EPERM);
+	if (block->filp != fpriv)
+		return (EPERM);
 
 	mark_block(dev, block, 0);
 	free_block(block);
@@ -382,20 +377,18 @@ int i915_mem_init_heap(DRM_IOCTL_ARGS)
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL(initheap,
-				 (drm_i915_mem_init_heap_t __user *) data,
-				 sizeof(initheap));
+	DRM_COPYFROM_WITH_RETURN(&initheap, (void *)data, sizeof(initheap));
 
 	heap = get_heap(dev_priv, initheap.region);
 	if (!heap)
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 
 	if (*heap) {
 		DRM_ERROR("heap already initialized?");
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 	}
 
 	return init_heap(heap, initheap.start, initheap.size);
@@ -411,21 +404,20 @@ int i915_mem_destroy_heap(DRM_IOCTL_ARGS)
 
 	if (!dev_priv) {
 		DRM_ERROR("%s called with no initialization\n", __FUNCTION__);
-		return DRM_ERR(EINVAL);
+		return (EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL(destroyheap, (drm_i915_mem_destroy_heap_t *)data,
-				  sizeof(destroyheap));
+	DRM_COPYFROM_WITH_RETURN(&destroyheap, (void *)data, sizeof(destroyheap));
 
 	heap = get_heap(dev_priv, destroyheap.region);
 	if (!heap) {
 		DRM_ERROR("get_heap failed");
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 	}
 	
 	if (!*heap) {
 		DRM_ERROR("heap not initialized?");
-		return DRM_ERR(EFAULT);
+		return (EFAULT);
 	}
 
 	i915_mem_takedown(heap);

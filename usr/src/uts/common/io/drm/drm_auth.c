@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,15 +55,13 @@ drm_find_file(drm_device_t *dev, drm_magic_t magic)
 	int		  hash;
 
 	hash = drm_hash_magic(magic);
-
-	DRM_LOCK();
 	for (pt = dev->magiclist[hash].head; pt; pt = pt->next) {
 		if (pt->magic == magic) {
 			retval = pt->priv;
 			break;
 		}
 	}
-	DRM_UNLOCK();
+
 	return (retval);
 }
 
@@ -73,12 +71,10 @@ drm_add_magic(drm_device_t *dev, drm_file_t *priv, drm_magic_t magic)
 	int		  hash;
 	drm_magic_entry_t *entry;
 
-	DRM_DEBUG("drm_add_magic: %d", magic);
-
 	hash = drm_hash_magic(magic);
 	entry = drm_alloc(sizeof (*entry), DRM_MEM_MAGIC);
 	if (!entry)
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	entry->magic = magic;
 	entry->priv  = priv;
 	entry->next  = NULL;
@@ -125,7 +121,7 @@ drm_remove_magic(drm_device_t *dev, drm_magic_t magic)
 	}
 	DRM_UNLOCK();
 
-	return (DRM_ERR(EINVAL));
+	return (EINVAL);
 }
 
 /*ARGSUSED*/
@@ -135,19 +131,10 @@ drm_getmagic(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	static drm_magic_t sequence = 0;
 	drm_auth_t auth;
-	drm_file_t *priv;
-
-	DRM_LOCK();
-	priv = drm_find_file_by_proc(dev, credp);
-	DRM_UNLOCK();
-	if (priv == NULL) {
-		DRM_ERROR("drm_getmagic: can't find authenticator");
-		return (DRM_ERR(EINVAL));
-	}
 
 	/* Find unique magic */
-	if (priv->magic) {
-		auth.magic = priv->magic;
+	if (fpriv->magic) {
+		auth.magic = fpriv->magic;
 	} else {
 		do {
 			int old = sequence;
@@ -155,13 +142,14 @@ drm_getmagic(DRM_IOCTL_ARGS)
 			if (!atomic_cmpset_int(&sequence, old, auth.magic))
 				continue;
 		} while (drm_find_file(dev, auth.magic));
-		priv->magic = auth.magic;
-		(void) drm_add_magic(dev, priv, auth.magic);
+		fpriv->magic = auth.magic;
+		(void) drm_add_magic(dev, fpriv, auth.magic);
 	}
+
 
 	DRM_DEBUG("drm_getmagic: %u", auth.magic);
 
-	DRM_COPY_TO_USER_IOCTL((drm_auth_t *)data, auth, sizeof (auth));
+	DRM_COPYTO_WITH_RETURN((void *)data, &auth, sizeof (auth));
 
 	return (0);
 }
@@ -174,14 +162,12 @@ drm_authmagic(DRM_IOCTL_ARGS)
 	drm_file_t	   *file;
 	DRM_DEVICE;
 
-	DRM_COPY_FROM_USER_IOCTL(auth, (drm_auth_t *)data, sizeof (auth));
-
-	DRM_DEBUG("drm_authmagic %u", auth.magic);
+	DRM_COPYFROM_WITH_RETURN(&auth, (void *)data, sizeof (auth));
 
 	if ((file = drm_find_file(dev, auth.magic))) {
 		file->authenticated = 1;
 		(void) drm_remove_magic(dev, auth.magic);
 		return (0);
 	}
-	return (DRM_ERR(EINVAL));
+	return (EINVAL);
 }

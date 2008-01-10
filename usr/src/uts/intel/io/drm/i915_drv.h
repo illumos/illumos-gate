@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +85,7 @@ struct mem_block {
 	struct mem_block *prev;
 	int start;
 	int size;
-	DRMFILE filp;		/* 0: free, -1: heap, other: real files */
+	drm_file_t *filp;		/* 0: free, -1: heap, other: real files */
 };
 
 typedef struct _drm_i915_vbl_swap {
@@ -102,9 +102,7 @@ typedef struct drm_i915_private {
 	drm_i915_sarea_t *sarea_priv;
 	drm_i915_ring_buffer_t ring;
 
-#if !defined(__SOLARIS__) && !defined(sun)
  	drm_dma_handle_t *status_page_dmah;
-#endif
 	void *hw_status_page;
 	dma_addr_t dma_status_page;
 	uint32_t counter;
@@ -159,7 +157,7 @@ extern int i915_max_ioctl;
 extern void i915_kernel_lost_context(drm_device_t * dev);
 extern int i915_driver_load(struct drm_device *, unsigned long flags);
 extern void i915_driver_lastclose(drm_device_t * dev);
-extern void i915_driver_preclose(drm_device_t * dev, DRMFILE filp);
+extern void i915_driver_preclose(drm_device_t * dev, drm_file_t *filp);
 extern int i915_driver_device_is_agp(drm_device_t * dev);
 extern long i915_compat_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
@@ -187,9 +185,9 @@ extern int i915_mem_init_heap(DRM_IOCTL_ARGS);
 extern int i915_mem_destroy_heap(DRM_IOCTL_ARGS);
 extern void i915_mem_takedown(struct mem_block **heap);
 extern void i915_mem_release(drm_device_t * dev,
-			     DRMFILE filp, struct mem_block *heap);
+			     drm_file_t *filp, struct mem_block *heap);
 extern struct mem_block **get_heap(drm_i915_private_t *, int);
-extern struct mem_block *find_block_by_proc(struct mem_block *, DRMFILE);
+extern struct mem_block *find_block_by_proc(struct mem_block *, drm_file_t *);
 extern void mark_block(drm_device_t *, struct mem_block *, int);
 extern void free_block(struct mem_block *);
 
@@ -305,6 +303,9 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define ADPA_DPMS_STANDBY	(2<<10)
 #define ADPA_DPMS_OFF		(3<<10)
 
+#ifdef NOPID
+#undef NOPID
+#endif
 #define NOPID                   0x2094
 #define LP_RING     		0x2030
 #define HP_RING     		0x2040

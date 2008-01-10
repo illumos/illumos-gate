@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,28 +47,28 @@
 
 /*ARGSUSED*/
 drm_file_t *
-drm_find_file_by_proc(drm_device_t *dev, cred_t *p)
+drm_find_file_by_proc(drm_device_t *dev, cred_t *credp)
 {
 	pid_t pid = ddi_get_pid();
 	drm_file_t *priv;
 
 	TAILQ_FOREACH(priv, &dev->files, link)
-		if (priv->pid == pid)
-			return (priv);
+	if (priv->pid == pid)
+		return (priv);
 	return (NULL);
 }
 
 /* drm_open_helper is called whenever a process opens /dev/drm. */
 /*ARGSUSED*/
 int
-drm_open_helper(drm_softstate_t *dev, int flags, int otyp, cred_t *credp)
+drm_open_helper(drm_device_t *dev, int flags, int otyp, cred_t *credp)
 {
 	drm_file_t   *priv;
 	pid_t pid;
 	int retcode;
 
 	if (flags & FEXCL)
-		return (DRM_ERR(EBUSY)); /* No exclusive opens */
+		return (EBUSY); /* No exclusive opens */
 	dev->flags = flags;
 
 	pid = ddi_get_pid();
@@ -82,11 +82,11 @@ drm_open_helper(drm_softstate_t *dev, int flags, int otyp, cred_t *credp)
 		priv = drm_alloc(sizeof (*priv), DRM_MEM_FILES);
 		if (priv == NULL) {
 			DRM_UNLOCK();
-			return (DRM_ERR(ENOMEM));
+			return (ENOMEM);
 		}
 		bzero(priv, sizeof (*priv));
 
-		priv->uid		= crgetuid(credp);
+		priv->uid		= crgetsuid(credp);
 		priv->pid		= pid;
 
 		priv->refs		= 1;
@@ -96,8 +96,8 @@ drm_open_helper(drm_softstate_t *dev, int flags, int otyp, cred_t *credp)
 		/* for compatibility root is always authenticated */
 		priv->authenticated	= DRM_SUSER(credp);
 
-		if (dev->open) {
-			retcode = dev->open(dev, priv);
+		if (dev->driver->open) {
+			retcode = dev->driver->open(dev, priv);
 			if (retcode != 0) {
 				drm_free(priv, sizeof (*priv), DRM_MEM_FILES);
 				DRM_UNLOCK();

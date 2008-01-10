@@ -34,389 +34,274 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*
+ * I915 DRM Driver for Solaris
+ *
+ * This driver provides the hardware 3D acceleration support for Intel
+ * integrated video devices (e.g. i8xx/i915/i945 series chipsets), under the
+ * DRI (Direct Rendering Infrastructure). DRM (Direct Rendering Manager) here
+ * means the kernel device driver in DRI.
+ *
+ * I915 driver is a device dependent driver only, it depends on a misc module
+ * named drm for generic DRM operations.
+ */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
-#include "drm.h"
 #include "i915_drm.h"
 #include "i915_drv.h"
 #include "drm_pciids.h"
 
 #define	i915_max_ioctl  15
 
-/* drv_PCI_IDs comes from drm_pciids.h, generated from drm_pciids.txt. */
+
+/*
+ * cb_ops entrypoint
+ */
+extern struct cb_ops drm_cb_ops;
+
+/*
+ * module entrypoint
+ */
+static int i915_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int i915_attach(dev_info_t *, ddi_attach_cmd_t);
+static int i915_detach(dev_info_t *, ddi_detach_cmd_t);
+
+
+/* drv_PCI_IDs comes from drm_pciids.h */
 static drm_pci_id_list_t i915_pciidlist[] = {
 	i915_PCI_IDS
 };
 
 drm_ioctl_desc_t i915_ioctls[i915_max_ioctl];
 
-extern drm_ioctl_desc_t drm_ioctls[];
 extern void i915_init_ioctl_arrays(void);
-extern uint_t i915_driver_irq_handler(caddr_t);
-extern int drm_get_pci_index_reg(dev_info_t *devi, uint_t physical,
-    uint_t size, off_t *off);
 
-static void i915_configure(drm_device_t *dev)
-{
-	i915_init_ioctl_arrays();
+/*
+ * Local routines
+ */
+static void i915_configure(drm_driver_t *);
 
-	dev->dev_priv_size		= 1;	/* No dev_priv */
+/*
+ * DRM driver
+ */
+static drm_driver_t	i915_driver = {0};
 
-	dev->irq_preinstall		= i915_driver_irq_preinstall;
-	dev->irq_postinstall		= i915_driver_irq_postinstall;
-	dev->irq_uninstall		= i915_driver_irq_uninstall;
-	dev->irq_handler 		= i915_driver_irq_handler;
 
-	dev->driver_ioctls		= i915_ioctls;
-	dev->max_driver_ioctl		= i915_max_ioctl;
+static struct dev_ops i915_dev_ops = {
+	DEVO_REV,			/* devo_rev */
+	0,				/* devo_refcnt */
+	i915_info,			/* devo_getinfo */
+	nulldev,			/* devo_identify */
+	nulldev,			/* devo_probe */
+	i915_attach,			/* devo_attach */
+	i915_detach,			/* devo_detach */
+	nodev,				/* devo_reset */
+	&drm_cb_ops,		/* devo_cb_ops */
+	NULL,				/* devo_bus_ops */
+	NULL				/* power */
+};
 
-	dev->driver_name		= DRIVER_NAME;
-	dev->driver_desc		= DRIVER_DESC;
-	dev->driver_date		= DRIVER_DATE;
-	dev->driver_major		= DRIVER_MAJOR;
-	dev->driver_minor		= DRIVER_MINOR;
-	dev->driver_patchlevel		= DRIVER_PATCHLEVEL;
+static struct modldrv modldrv = {
+	&mod_driverops,			/* drv_modops */
+	"I915 DRM driver 1.2",	/* drv_linkinfo */
+	&i915_dev_ops,			/* drv_dev_ops */
+};
 
-	dev->use_agp			= 0;
-	dev->use_irq			= 1;
-}
+static struct modlinkage modlinkage = {
+	MODREV_1, (void *) &modldrv, NULL
+};
 
-extern int
-i915_open(dev_t *dev, int openflags, int otyp, cred_t *credp,
-    struct drm_softstate *softc)
-{
-	int minor;
-	struct minordev *mp, *newp;
-	int cloneminor, cleanpass;
 
-	if (softc == NULL) {
-		DRM_ERROR("i915_open: NULL soft state");
-		return (ENXIO);
-	}
-
-	if (softc->drm_supported == DRM_UNSUPPORT) {
-		if (drm_probe(softc, i915_pciidlist) !=
-		    DDI_SUCCESS) {
-			DRM_ERROR("i915_open: "
-			    "DRM current don't support this graphics card");
-			return (ENXIO);
-		}
-		softc->drm_supported = DRM_SUPPORT;
-
-	}
-
-	minor = (getminor(*dev));
-
-	newp = kmem_zalloc(sizeof (struct minordev), KM_SLEEP);
-
-	mutex_enter(&softc->dev_lock);
-
-	for (cloneminor = minor; ; cloneminor += 1) {
-		cleanpass = 1;
-		for (mp = softc->minordevs; mp != NULL; mp = mp->next) {
-			if (mp->cloneminor == cloneminor) {
-				cleanpass = 0;
-				break;
-			}
-		}
-		if (cleanpass) {
-			goto gotminor;
-		}
-	}
-
-gotminor:
-	newp->next = softc->minordevs;
-	newp->cloneminor = cloneminor;
-	softc->minordevs = newp;
-	softc->cloneopens++;
-	mutex_exit(&softc->dev_lock);
-
-	*dev = makedevice(getmajor(*dev), cloneminor);
-
-	return (drm_open(softc, dev, openflags, otyp, credp));
-
-}
-
-extern int
-i915_close(dev_t dev, int flag, int otyp, cred_t *credp,
-    struct drm_softstate *softc)
-{
-	struct minordev *lastp, *mp;
-	int minor;
-	DRMFILE filp = (void *)(uintptr_t)(DRM_CURRENTPID);
-	drm_i915_private_t *dev_priv;
-	struct mem_block *block, **heap;
-
-	block = NULL;
-	heap = NULL;
-	dev_priv = NULL;
-
-	if (softc == NULL) {
-		DRM_ERROR("i915_close: NULL soft state");
-		return (ENXIO);
-	}
-
-	dev_priv = softc->dev_private;
-
-	if (dev_priv) {
-		heap = get_heap(dev_priv, I915_MEM_REGION_AGP);
-		if (heap == NULL || *heap == NULL)
-			return DRM_ERR(EFAULT);
-
-		block = find_block_by_proc(*heap, filp);
-		if (block != NULL)
-		{
-			mark_block(softc, block, 0);
-			free_block(block);
-		}
-	}
-
-	if ((minor = getminor(dev)) < 0) {
-		return (ENXIO);
-	}
-
-	mutex_enter(&softc->dev_lock);
-
-	lastp = NULL;
-	for (mp = softc->minordevs; mp != NULL; mp = mp->next) {
-		if (mp->cloneminor == minor) {
-			if (lastp == NULL) {
-				softc->minordevs = mp->next;
-			} else {
-				lastp->next = mp->next;
-			}
-
-			softc->cloneopens--;
-			(void) kmem_free(mp, sizeof (struct minordev));
-			break;
-		} else {
-			lastp = mp;
-		}
-	}
-
-	mutex_exit(&softc->dev_lock);
-
-	return (drm_close(softc, dev, flag, otyp, credp));
-}
+/*
+ * softstate head
+ */
+static void 	*i915_statep;
 
 int
-i915_ioctl(dev_t kdev, int cmd, intptr_t intarg, int flags, cred_t *credp,
-    int *rvalp, struct drm_softstate *dev)
+_init(void)
 {
-	int retcode = ENXIO;
-	drm_ioctl_desc_t *ioctl;
-	drm_ioctl_t *func;
-	int nr = DRM_IOCTL_NR(cmd);
-	drm_file_t *priv;
-	DRMFILE filp;
+	int error;
 
-	DRM_LOCK();
-	priv = drm_find_file_by_proc(dev, credp);
-	DRM_UNLOCK();
-	if (priv == NULL) {
-		DRM_ERROR("i915_ioctl : can't find authenticator");
-		return (EINVAL);
+	i915_configure(&i915_driver);
+
+	if ((error = ddi_soft_state_init(&i915_statep,
+	    sizeof (drm_device_t), DRM_MAX_INSTANCES)) != 0)
+		return (error);
+
+	if ((error = mod_install(&modlinkage)) != 0) {
+		ddi_soft_state_fini(&i915_statep);
+		return (error);
 	}
 
-	atomic_inc_32(&dev->counts[_DRM_STAT_IOCTLS]);
-	++priv->ioctl_count;
+	return (error);
 
-	ioctl = &drm_ioctls[nr];
-	/* It's not a core DRM ioctl, try driver-specific. */
-	if (ioctl->func == NULL && nr >= DRM_COMMAND_BASE) {
-		/* The array entries begin at DRM_COMMAND_BASE ioctl nr */
-		nr -= DRM_COMMAND_BASE;
-		if (nr > dev->max_driver_ioctl) {
-			DRM_ERROR("Bad driver ioctl number, 0x%x (of 0x%x)",
-			    nr, dev->max_driver_ioctl);
-			return (EINVAL);
-		}
-		ioctl = &dev->driver_ioctls[nr];
-	}
-
-	func = ioctl->func;
-	if ((ioctl->root_only && !DRM_SUSER(credp)) || (ioctl->auth_needed &&
-	    !priv->authenticated))
-		return (EACCES);
-
-	if (func == NULL) {
-		DRM_ERROR("i915_ioctl: no function ");
-		return (EINVAL);
-	}
-	filp = (void *)(uintptr_t)(DRM_CURRENTPID);
-	retcode = func(kdev, dev, intarg, flags, credp, rvalp, filp);
-
-	return (retcode);
-}
-
-/*ARGSUSED*/
-int
-i915_devmap(dev_t kdev, devmap_cookie_t cookie, offset_t offset, size_t len,
-    size_t *maplen, uint_t model, struct drm_softstate *dev,
-    ddi_device_acc_attr_t *accattrp)
-{
-	drm_local_map_t *map;
-	offset_t koff;
-	size_t length;
-	int ret;
-
-	if (dev == NULL) {
-		DRM_ERROR("i915_devmap: NULL soft state");
-		return (EINVAL);
-	}
-
-	DRM_LOCK();
-	TAILQ_FOREACH(map, &dev->maplist, link) {
-		DRM_DEBUG("i915_devmap: offset is 0x%llx map->offset is 0x%llx",
-		    offset, map->offset);
-		/*
-		 * use low 32-bit to search only, since 32-bit user app is
-		 * incapable of passing in 64-bit offset when doing mmap.
-		 */
-		if ((u_offset_t)(unsigned int)offset >=  map->offset.off &&
-		    (u_offset_t)(unsigned int)offset
-		    	< (u_offset_t)map->offset.off + map->size)
-			break;
-	}
-
-	if (map == NULL) {
-		DRM_UNLOCK();
-		DRM_ERROR("can't find map\n");
-		return (-1);
-	}
-	if (map->flags&_DRM_RESTRICTED) {
-		DRM_UNLOCK();
-		DRM_ERROR("restricted map\n");
-		return (-1);
-	}
-
-	DRM_UNLOCK();
-
-	switch (map->type) {
-	case _DRM_FRAME_BUFFER:
-	case _DRM_REGISTERS:
-	case _DRM_AGP:
-		{
-			int	err;
-			int	regno;
-			off_t	regoff;
-
-			regno = drm_get_pci_index_reg(dev->dip,
-			    offset, (uint_t)len, &regoff);
-
-			err = devmap_devmem_setup(cookie, dev->dip, NULL,
-			    regno, (offset_t)regoff, len, PROT_ALL,
-			    0, accattrp);
-			if (err != 0) {
-				*maplen = 0;
-				DRM_ERROR("i915_devmap: devmap failed");
-				return (err);
-			}
-			*maplen = len;
-			return (err);
-		}
-
-	case _DRM_SHM:
-		{
-			DRM_DEBUG("i915_devmap: map type is _DRM_SHM");
-			if (map->drm_umem_cookie == NULL) {
-				DRM_ERROR("i915_devmap: "
-				    "Fatal error! sarea_cookie is NULL");
-				return (EINVAL);
-			}
-			koff = 0;
-			length = ptob(btopr(map->size));
-			ret = devmap_umem_setup(cookie, dev->dip, NULL,
-			    map->drm_umem_cookie, koff, length,
-			    PROT_ALL, DEVMAP_DEFAULTS, NULL);
-			if (ret != 0) {
-				*maplen = 0;
-				return (ret);
-			}
-			*maplen = length;
-
-			return (DDI_SUCCESS);
-		}
-	default:
-		return (DDI_FAILURE);
-	}
-}
+}	/* _init() */
 
 int
-i915_attach(dev_info_t *dip,
-    ddi_attach_cmd_t cmd,
-    struct drm_softstate **drm_softcp,
-    ddi_acc_handle_t pci_cfg_hdl,
-    minor_t minor)
+_fini(void)
 {
-	int instance;
-	drm_softstate_t *softc;
-	int ret;
-	char buf[80];
+	int error;
+
+	if ((error = mod_remove(&modlinkage)) != 0)
+		return (error);
+
+	(void) ddi_soft_state_fini(&i915_statep);
+	
+	return (0);
+
+}	/* _fini() */
+
+int
+_info(struct modinfo *modinfop)
+{
+	return (mod_info(&modlinkage, modinfop));
+
+}	/* _info() */
+
+static int
+i915_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{	
+	drm_device_t		*statep;
+	void		*handle;
+	int			unit;
 
 	if (cmd != DDI_ATTACH) {
-		DRM_ERROR(
-		    "i915_attach: only attach op supported");
+		DRM_ERROR("i915_attach: only attach op supported");
 		return (DDI_FAILURE);
 	}
 
-	softc = (drm_softstate_t *)
-	    kmem_zalloc(sizeof (drm_softstate_t), KM_SLEEP);
+	unit =  ddi_get_instance(dip);
+	if (ddi_soft_state_zalloc(i915_statep, unit) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "i915_attach: failed to alloc softstate");
+		return (DDI_FAILURE);
+	}
+	statep = ddi_get_soft_state(i915_statep, unit);
+	statep->dip = dip;
+	statep->driver = &i915_driver;
 
-	softc->dip = dip;
-	softc->pci_cfg_hdl = pci_cfg_hdl;
-	softc->drm_supported = DRM_UNSUPPORT;
-	i915_configure(softc);
+	/*
+	 * Call drm_supp_register to create minor nodes for us
+	 */
+	handle = drm_supp_register(dip, statep);
+	if ( handle == NULL) {
+		DRM_ERROR("i915_attach: drm_supp_register failed");
+		goto err_exit1;
+	}
+	statep->drm_handle = handle;
+
+	/*
+	 * After drm_supp_register, we can call drm_xxx routine
+	 */
+	statep->drm_supported = DRM_UNSUPPORT;
+	if (drm_probe(statep, i915_pciidlist) != DDI_SUCCESS) {
+		DRM_ERROR("i915_open: "
+		    "DRM current don't support this graphics card");
+		goto err_exit2;
+	}
+	statep->drm_supported = DRM_SUPPORT;
 
 	/* call common attach code */
-	ret = drm_attach(softc);
-	if (ret != DDI_SUCCESS) {
-		DRM_ERROR(
-		    "i915_attach: drm attach ops failed");
-		goto err1;
+	if (drm_attach(statep) != DDI_SUCCESS) {
+		DRM_ERROR("i915_attach: drm_attach failed");
+		goto err_exit2;
 	}
-
-	/* create minor node for DRM access */
-	instance = ddi_get_instance(dip);
-
-	(void) sprintf(buf, "%s%d", DRM_DEVNODE, instance);
-	if (ddi_create_minor_node(dip, buf, S_IFCHR,
-	    minor, DDI_NT_DISPLAY_DRM, 0)) {
-		DRM_ERROR("i915_attach: create minor node failed");
-		goto err2;
-	}
-
-	*drm_softcp = softc;
-
 	return (DDI_SUCCESS);
-err2:
-	ddi_remove_minor_node(dip, DRM_DEVNODE);
-err1:
-	kmem_free(softc, sizeof (drm_softstate_t));
-	*drm_softcp = NULL;
+	
+err_exit2:
+	(void) drm_supp_unregister(handle);
+err_exit1:
+	(void) ddi_soft_state_free(i915_statep, unit);
 	return (DDI_FAILURE);
 
-}
+}	/* i915_attach() */
 
-int
-i915_detach(dev_info_t *dip, ddi_detach_cmd_t cmd,
-    drm_softstate_t **drm_softcp)
+static int
+i915_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)    
 {
-	drm_softstate_t *softc = *drm_softcp;
+	drm_device_t		*statep;
+	int		unit;
 
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	(void) drm_detach(softc);
+	unit =  ddi_get_instance(dip);
+	statep = ddi_get_soft_state(i915_statep, unit);
+	if (statep == NULL)
+		return (DDI_FAILURE);
 
-	ddi_remove_minor_node(dip, DRM_DEVNODE);
-	kmem_free(softc, sizeof (drm_softstate_t));
-	*drm_softcp = NULL;
+	(void) drm_detach(statep);
+	(void) drm_supp_unregister(statep->drm_handle);
+	(void) ddi_soft_state_free(i915_statep, unit);
 
 	return (DDI_SUCCESS);
+
+}	/* i915_detach() */
+
+
+/*ARGSUSED*/
+static int
+i915_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+{
+	drm_device_t		*statep;
+	int 	error = DDI_SUCCESS;
+	int 	unit;
+
+	unit = drm_dev_to_instance((dev_t)arg);
+	switch (infocmd) {
+	case DDI_INFO_DEVT2DEVINFO:
+		statep = ddi_get_soft_state(i915_statep, unit);
+		if (statep == NULL || statep->dip == NULL) {
+			error = DDI_FAILURE;
+		} else {
+			*result = (void *) statep->dip;
+			error = DDI_SUCCESS;
+		}
+		break;
+	case DDI_INFO_DEVT2INSTANCE:
+		*result = (void *)(uintptr_t)unit;
+		error = DDI_SUCCESS;
+		break;
+	default:
+		error = DDI_FAILURE;
+		break;
+	}
+	return (error);
+
+}	/* i915_info() */
+
+
+static void i915_configure(drm_driver_t *driver)
+{
+	i915_init_ioctl_arrays();
+
+	driver->buf_priv_size	=	1;	/* No dev_priv */
+	driver->load	=	i915_driver_load;
+	driver->preclose	=	i915_driver_preclose;
+	driver->lastclose	=	i915_driver_lastclose;
+	driver->device_is_agp	=	i915_driver_device_is_agp;
+	driver->vblank_wait		=	i915_driver_vblank_wait;
+	driver->irq_preinstall	=	i915_driver_irq_preinstall;
+	driver->irq_postinstall	=	i915_driver_irq_postinstall;
+	driver->irq_uninstall	=	i915_driver_irq_uninstall;
+	driver->irq_handler 		=	i915_driver_irq_handler;
+
+	driver->driver_ioctls	=	i915_ioctls;
+	driver->max_driver_ioctl	=	i915_max_ioctl;
+
+	driver->driver_name	=	DRIVER_NAME;
+	driver->driver_desc	=	DRIVER_DESC;
+	driver->driver_date	=	DRIVER_DATE;
+	driver->driver_major	=	DRIVER_MAJOR;
+	driver->driver_minor	=	DRIVER_MINOR;
+	driver->driver_patchlevel	=	DRIVER_PATCHLEVEL;
+
+	driver->use_agp	=	1;
+	driver->require_agp	=	1;
+	driver->use_irq	=	1;
+	driver->use_vbl_irq	=	1;
 }

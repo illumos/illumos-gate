@@ -815,7 +815,8 @@ BL_OBJS += bl.o
 DRM_OBJS += drm_sunmod.o drm_kstat.o drm_agpsupport.o \
 	    drm_auth.o drm_bufs.o drm_context.o drm_dma.o \
 	    drm_drawable.o drm_drv.o drm_fops.o drm_ioctl.o drm_irq.o \
-	    drm_lock.o drm_memory.o drm_msg.o drm_pci.o drm_scatter.o
+	    drm_lock.o drm_memory.o drm_msg.o drm_pci.o drm_scatter.o \
+	    ati_pcigart.o
 
 #
 #			exec modules

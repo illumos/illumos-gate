@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -60,19 +60,33 @@ typedef uint32_t	atomic_t;
 #define	atomic_dec(p)		atomic_dec_uint(p, 1)
 #define	atomic_add(n, p)	atomic_add_int(p, n)
 #define	atomic_sub(n, p)	atomic_dec_uint(p, n)
-#define	atomic_set_int(p, bits)	atomic_or_ulong(p, bits)
-#define	atomic_clear_int(p, bits)	atomic_and_ulong(p, ~(bits))
+#define	atomic_set_int(p, bits)	atomic_or_uint(p, bits)
+#define	atomic_clear_int(p, bits)	atomic_and_uint(p, ~(bits))
 #define	atomic_cmpset_int(p, c, n) \
 	((c == atomic_cas_uint(p, c, n)) ? 1 : 0)
 
-#define	set_bit(b, p)	\
-	atomic_set_int(((ulong_t *)(void *)p) + (b >> 5), 1 << (b & 0x1f))
+#define	set_bit(b, p) \
+	atomic_set_int(((volatile uint_t *)(void *)p) + (b >> 5), \
+	1 << (b & 0x1f))
 
 #define	clear_bit(b, p) \
-	atomic_clear_int(((ulong_t *)(void *)p) + (b >> 5), 1 << (b & 0x1f))
+	atomic_clear_int(((volatile uint_t *)(void *)p) + (b >> 5), \
+	1 << (b & 0x1f))
 
 #define	test_bit(b, p) \
-	(((volatile int *)(void *)p)[b >> 5] & (1 << (b & 0x1f)))
+	(((volatile uint_t *)(void *)p)[b >> 5] & (1 << (b & 0x1f)))
+
+/*
+ * Note: this routine doesn't return old value. It return
+ * 0 when succeeds, or -1 when fails.
+ */
+#ifdef _LP64
+#define	test_and_set_bit(b, p) \
+	atomic_set_long_excl(((ulong_t *)(void *)p) + (b >> 6), (b & 0x3f))
+#else
+#define	test_and_set_bit(b, p) \
+	atomic_set_long_excl(((ulong_t *)(void *)p) + (b >> 5), (b & 0x1f))
+#endif
 
 #ifdef	__cplusplus
 }

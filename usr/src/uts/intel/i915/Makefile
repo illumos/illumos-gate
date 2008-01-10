@@ -20,12 +20,12 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# uts/intel/drm_i915/Makefile
+# uts/intel/drm/Makefile
 #
 #	This makefile drives the production of i915 graphics device driver,
 #	which supports the DRI (Direct Rendering Infrastructure), with the help
@@ -44,25 +44,13 @@ MODULE		= i915
 OBJECTS		= $(I915_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(I915_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-I915_DRV_O	= $(OBJS_DIR)/i915_drv.o
-I915_DRV_C	= $(PSM_DRM_SRC)/i915_drv.c
-DRM_PCIIDS_H	= $(CMN_DRM_SRC)/drm_pciids.h
-DRM_PCIIDS_TXT	= $(CMN_DRM_SRC)/drm_pciids.txt
-CREATE_SUNOS_PCI_LISTS_SH	= $(CMN_DRM_SRC)/create_sunos_pci_lists.sh
 
 # i915 driver depends on drm, agpmaster and gfx_private misc modules
-INC_PATH        += -I$(UTSBASE)/intel/io/drm \
-		   -I$(UTSBASE)/common/io/drm \
-		   -I$(UTSBASE)/intel/io/agpmaster \
-		   -I$(UTSBASE)/i86pc/io/gfx_private
-
-PSM_DRM_SRC	= $(UTSBASE)/intel/io/drm
-CMN_DRM_SRC	= $(UTSBASE)/common/io/drm
+INC_PATH        += -I$(UTSBASE)/intel/io/drm -I$(UTSBASE)/common/io/drm
 
 #
 #	dependency
-LDFLAGS	+= -dy -Nmisc/drm -Nmisc/agpmaster -Nmisc/gfx_private \
-	   -Nmisc/pci_autoconfig
+LDFLAGS	+= -dy -Nmisc/drm
 
 #
 #	Include common rules.
@@ -70,13 +58,11 @@ LDFLAGS	+= -dy -Nmisc/drm -Nmisc/agpmaster -Nmisc/gfx_private \
 include $(UTSBASE)/intel/Makefile.intel
 
 #
-#	Re-define targets to add drm_pciids.h dependency
+#	Re-define targets
 #
-ALL_TARGET	= $(DRM_PCIIDS_H) $(BINARY)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-CLEANFILES	+= $(DRM_PCIIDS_H)
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -107,13 +93,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
-
-$(I915_DRV_O):	$(DRM_PCIIDS_H)
-
-$(I915_DRV_C):	$(DRM_PCIIDS_H)
-
-$(DRM_PCIIDS_H):	$(DRM_PCIIDS_TXT)
-	/bin/sh $(CREATE_SUNOS_PCI_LISTS_SH) $(DRM_PCIIDS_TXT) > $@
 
 #
 #	Include common targets.

@@ -20,7 +20,7 @@
 #
 # uts/intel/drm/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,11 +38,14 @@ UTSBASE	= ../..
 MODULE		= drm
 OBJECTS		= $(DRM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DRM_OBJS:%.o=$(LINTS_DIR)/%.ln)
-DRM_SRC		= $(UTSBASE)/intel/io/drm
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-INC_PATH        += -I$(DRM_SRC)
-CMN_DRM_SRC	= $(UTSBASE)/common/io/drm
-CONF_SRCDIR     = $(UTSBASE)/common/io/drm
+DRM_SRC		= $(UTSBASE)/i86pc/io/drm
+GFX_DIR		= $(UTSBASE)/i86pc/io/gfx_private
+
+INC_PATH	+= -I$(DRM_SRC) -I$(GFX_DIR)
+
+# Dependency
+LDFLAGS		+= -dy -Nmisc/agpmaster -Nmisc/gfx_private
 
 #
 #	Include common rules.
@@ -55,14 +58,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 
 #
 #	Default build targets.

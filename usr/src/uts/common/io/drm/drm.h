@@ -58,7 +58,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,9 +71,6 @@
 
 #ifndef __user
 #define __user
-#endif
-#ifndef __iomem
-#define __iomem
 #endif
 
 #ifdef __GNUC__
@@ -210,14 +207,10 @@ typedef unsigned long long drm_u64_t;
 #endif
 
 typedef unsigned int drm_handle_t;
-#elif defined(__SVR4) && defined(__sun)
+#else
 #include <sys/types.h>
 typedef uint64_t drm_u64_t;
 typedef unsigned long long drm_handle_t;	/**< To mapped regions */
-#else
-#include <sys/types.h>
-typedef u_int64_t drm_u64_t;
-typedef unsigned long drm_handle_t;	/**< To mapped regions */
 #endif
 typedef unsigned int drm_context_t;	/**< GLXContext handle */
 typedef unsigned int drm_drawable_t;
@@ -305,20 +298,6 @@ typedef struct drm_version {
 	char __user *desc;		  /**< User-space buffer to hold desc */
 } drm_version_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_version32 {
-	int version_major;		/* Major version */
-	int version_minor;		/* Minor version */
-	int version_patchlevel;	  	/* Patch level */
-	uint32_t name_len;		/* Length of name buffer */
-	caddr32_t name;			/* Name of driver */
-	uint32_t date_len;		/* Length of date buffer */
-	caddr32_t date;			/* User-space buffer to hold date */
-	uint32_t desc_len;		/* Length of desc buffer */
-	caddr32_t desc;			/* User-space buffer to hold desc */
-} drm_version32_t;
-#endif
-
 /**
  * DRM_IOCTL_GET_UNIQUE ioctl argument type.
  *
@@ -328,13 +307,6 @@ typedef struct drm_unique {
 	DRM_SIZE_T unique_len;	  /**< Length of unique */
 	char __user *unique;	  /**< Unique name for driver instantiation */
 } drm_unique_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_unique32 {
-	uint32_t unique_len;	/* Length of unique */
-	caddr32_t unique;	/* Unique name for driver instantiation */
-} drm_unique32_t;
-#endif
 
 #undef DRM_SIZE_T
 
@@ -372,7 +344,7 @@ typedef enum drm_map_type {
 	_DRM_AGP = 3,		  /**< AGP/GART */
 	_DRM_SCATTER_GATHER = 4,  /**< Scatter/gather memory for PCI DMA */
 	_DRM_CONSISTENT = 5,	  /**< Consistent memory for PCI DMA */
-	_DRM_AGP_UMEM	= 6
+	_DRM_TTM	= 6
 } drm_map_type_t;
 
 /**
@@ -393,13 +365,6 @@ typedef struct drm_ctx_priv_map {
 	void *handle;		 /**< Handle of map */
 } drm_ctx_priv_map_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_ctx_priv_map32 {
-	unsigned int ctx_id;	 /* Context requesting private mapping */
-	caddr32_t handle;	 /* Handle of map */
-} drm_ctx_priv_map32_t;
-#endif
-
 /**
  * DRM_IOCTL_GET_MAP, DRM_IOCTL_ADD_MAP and DRM_IOCTL_RM_MAP ioctls
  * argument type.
@@ -418,17 +383,6 @@ typedef struct drm_map {
 	/*   Private data */
 } drm_map_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_map32 {
-	unsigned long long offset;
-	unsigned long long handle;
-	uint32_t size;
-	drm_map_type_t type;
-	drm_map_flags_t flags;
-	int mtrr;
-} drm_map32_t;
-#endif
-
 /**
  * DRM_IOCTL_GET_CLIENT ioctl argument type.
  */
@@ -440,17 +394,6 @@ typedef struct drm_client {
 	unsigned long magic;	/**< Magic */
 	unsigned long iocs;	/**< Ioctl count */
 } drm_client_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_client32 {
-	int idx;		/**< Which client desired? */
-	int auth;		/**< Is client authenticated? */
-	uint32_t pid;	/**< Process ID */
-	uint32_t uid;	/**< User ID */
-	uint32_t magic;	/**< Magic */
-	uint32_t iocs;	/**< Ioctl count */
-} drm_client32_t;
-#endif
 
 typedef enum {
 	_DRM_STAT_LOCK,
@@ -482,16 +425,6 @@ typedef struct drm_stats {
 		drm_stat_type_t type;
 	} data[15];
 } drm_stats_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_stats32 {
-	uint32_t count;
-	struct {
-		uint32_t value;
-		drm_stat_type_t type;
-	} data[15];
-} drm_stats32_t;
-#endif
 
 /**
  * Hardware locking flags.
@@ -556,7 +489,8 @@ typedef enum {
 	_DRM_PAGE_ALIGN = 0x01,	/**< Align on page boundaries for DMA */
 	_DRM_AGP_BUFFER = 0x02,	/**< Buffer is in AGP space */
 	_DRM_SG_BUFFER  = 0x04,	/**< Scatter/gather memory buffer */
-	_DRM_FB_BUFFER  = 0x08  /**< Buffer is in frame buffer */
+	_DRM_FB_BUFFER  = 0x08,  /**< Buffer is in frame buffer */
+	_DRM_PCI_BUFFER_RO = 0x10 /**< Map PCI DMA buffer read-only */
 } drm_buf_flag;
 typedef struct drm_buf_desc {
 	int count;		 /**< Number of buffers of this size */
@@ -569,20 +503,6 @@ typedef struct drm_buf_desc {
 				  * in the AGP aperture
 				  */
 } drm_buf_desc_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_buf_desc32 {
-	int count;		 /**< Number of buffers of this size */
-	int size;		 /**< Size in bytes */
-	int low_mark;		 /**< Low water mark */
-	int high_mark;		 /**< High water mark */
-	drm_buf_flag flags;
-	uint32_t agp_start; /**<
-				  * Start address of where the AGP buffers are
-				  * in the AGP aperture
-				  */
-} drm_buf_desc32_t;
-#endif
 
 /**
  * DRM_IOCTL_INFO_BUFS ioctl argument type.
@@ -599,13 +519,6 @@ typedef struct drm_buf_free {
 	int count;
 	int __user *list;
 } drm_buf_free_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_buf_free32 {
-	int count;
-	caddr32_t list;
-} drm_buf_free32_t;
-#endif
 
 /**
  * Buffer information
@@ -630,19 +543,8 @@ typedef struct drm_buf_map {
 	void __user *virtual;		/**< Mmap'd area in user-virtual */
 #endif
 	drm_buf_pub_t __user *list;	/**< Buffer information */
+	int	fd;
 } drm_buf_map_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_buf_map32 {
-	int count;		/**< Length of the buffer list */
-#if defined(__cplusplus)
-	caddr32_t c_virtual;
-#else
-	caddr32_t virtual;		/**< Mmap'd area in user-virtual */
-#endif
-	caddr32_t list;	/**< Buffer information */
-} drm_buf_map32_t;
-#endif
 
 /**
  * DRM_IOCTL_DMA ioctl argument type.
@@ -687,12 +589,6 @@ typedef struct drm_ctx_res {
 	drm_ctx_t __user *contexts;
 } drm_ctx_res_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_ctx_res32 {
-	int count;
-	caddr32_t contexts;
-} drm_ctx_res32_t;
-#endif
 
 /**
  * DRM_IOCTL_ADD_DRAW and DRM_IOCTL_RM_DRAW ioctl argument type.
@@ -700,6 +596,20 @@ typedef struct drm_ctx_res32 {
 typedef struct drm_draw {
 	drm_drawable_t handle;
 } drm_draw_t;
+
+/**
+ * DRM_IOCTL_UPDATE_DRAW ioctl argument type.
+ */
+typedef enum {
+         DRM_DRAWABLE_CLIPRECTS,
+} drm_drawable_info_type_t;
+ 
+typedef struct drm_update_draw {
+	drm_drawable_t handle;
+	unsigned int type;
+	unsigned int num;
+	unsigned long long data;
+} drm_update_draw_t;
 
 /**
  * DRM_IOCTL_GET_MAGIC and DRM_IOCTL_AUTH_MAGIC ioctl argument type.
@@ -723,10 +633,14 @@ typedef struct drm_irq_busid {
 typedef enum {
 	_DRM_VBLANK_ABSOLUTE = 0x0,	/**< Wait for specific vblank sequence number */
 	_DRM_VBLANK_RELATIVE = 0x1,	/**< Wait for given number of vblanks */
+	_DRM_VBLANK_NEXTONMISS = 0x10000000,    /**< If missed, wait for next vblank */
+	_DRM_VBLANK_SECONDARY = 0x20000000,     /**< Secondary display controller */
 	_DRM_VBLANK_SIGNAL = 0x40000000	/**< Send signal instead of blocking */
 } drm_vblank_seq_type_t;
 
-#define _DRM_VBLANK_FLAGS_MASK _DRM_VBLANK_SIGNAL
+#define _DRM_VBLANK_TYPES_MASK (_DRM_VBLANK_ABSOLUTE | _DRM_VBLANK_RELATIVE) 
+#define _DRM_VBLANK_FLAGS_MASK (_DRM_VBLANK_SIGNAL | _DRM_VBLANK_SECONDARY | \
+	_DRM_VBLANK_NEXTONMISS) 
 
 struct drm_wait_vblank_request {
 	drm_vblank_seq_type_t type;
@@ -760,12 +674,6 @@ typedef struct drm_agp_mode {
 	unsigned long mode;	/**< AGP mode */
 } drm_agp_mode_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_agp_mode32 {
-	uint32_t mode;	/**< AGP mode */
-} drm_agp_mode32_t;
-#endif
-
 /**
  * DRM_IOCTL_AGP_ALLOC and DRM_IOCTL_AGP_FREE ioctls argument type.
  *
@@ -778,15 +686,6 @@ typedef struct drm_agp_buffer {
 	unsigned long physical;	/**< Physical used by i810 */
 } drm_agp_buffer_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_agp_buffer32 {
-	uint32_t size;	/**< In bytes -- will round to page boundary */
-	uint32_t handle;	/**< Used for binding / unbinding */
-	uint32_t type;	/**< Type of memory to allocate */
-	uint32_t physical;	/**< Physical used by i810 */
-} drm_agp_buffer32_t;
-#endif
-
 /**
  * DRM_IOCTL_AGP_BIND and DRM_IOCTL_AGP_UNBIND ioctls argument type.
  *
@@ -796,13 +695,6 @@ typedef struct drm_agp_binding {
 	unsigned long handle;	/**< From drm_agp_buffer */
 	unsigned long offset;	/**< In bytes -- will round to page boundary */
 } drm_agp_binding_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_agp_binding32 {
-	uint32_t handle;	/**< From drm_agp_buffer */
-	uint32_t offset;	/**< In bytes -- will round to page boundary */
-} drm_agp_binding32_t;
-#endif
 
 /**
  * DRM_IOCTL_AGP_INFO ioctl argument type.
@@ -827,20 +719,6 @@ typedef struct drm_agp_info {
 	/*@} */
 } drm_agp_info_t;
 
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_agp_info32 {
-	int agp_version_major;
-	int agp_version_minor;
-	uint32_t mode;
-	uint32_t aperture_base;
-	uint32_t aperture_size;
-	uint32_t memory_allowed;
-	uint32_t memory_used;
-	unsigned short id_vendor;
-	unsigned short id_device;
-} drm_agp_info32_t;
-#endif
-
 /**
  * DRM_IOCTL_SG_ALLOC ioctl argument type.
  */
@@ -848,13 +726,6 @@ typedef struct drm_scatter_gather {
 	unsigned long size;	/**< In bytes -- will round to page boundary */
 	unsigned long handle;	/**< Used for mapping / unmapping */
 } drm_scatter_gather_t;
-
-#if defined(__sun) && defined(_KERNEL)
-typedef struct drm_scatter_gather32 {
-	uint32_t size;		/* In bytes -- will round to page boundary */
-	uint32_t handle;	/* Used for mapping / unmapping */
-} drm_scatter_gather32_t;
-#endif
 
 /**
  * DRM_IOCTL_SET_VERSION ioctl argument type.

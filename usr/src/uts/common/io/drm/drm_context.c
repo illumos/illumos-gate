@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
+#include "drm_io32.h"
 
 static inline int
 find_first_zero_bit(volatile void *p, int max)
@@ -58,18 +59,6 @@ find_first_zero_bit(volatile void *p, int max)
 	}
 	return (max);
 }
-
-static inline atomic_t
-test_and_set_bit(int b, volatile void *p)
-{
-	int s = splhigh();
-	unsigned int m = 1<<b;
-	unsigned int r = *(volatile int *)p & m;
-	*(volatile int *)p |= m;
-	splx(s);
-	return ((atomic_t)r);
-}
-
 
 /*
  * Context bitmap support
@@ -153,7 +142,7 @@ drm_ctxbitmap_init(drm_device_t *dev)
 	dev->ctx_bitmap = drm_calloc(1, DRM_PAGE_SIZE, DRM_MEM_CTXBITMAP);
 	if (dev->ctx_bitmap == NULL) {
 		DRM_UNLOCK();
-		return (DRM_ERR(ENOMEM));
+		return (ENOMEM);
 	}
 	dev->context_sareas = NULL;
 	dev->max_context = -1;
@@ -190,38 +179,44 @@ drm_getsareactx(DRM_IOCTL_ARGS)
 	drm_ctx_priv_map_t request;
 	drm_local_map_t *map;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_ctx_priv_map32_t request32;
-		DRM_COPY_FROM_USER_IOCTL(request32,
-		    (drm_ctx_priv_map32_t *)data,
-		    sizeof (drm_ctx_priv_map32_t));
+		drm_ctx_priv_map_32_t request32;
+		DRM_COPYFROM_WITH_RETURN(&request32, (void *)data,
+		    sizeof (drm_ctx_priv_map_32_t));
 		request.ctx_id = request32.ctx_id;
 		request.handle = (void *)(uintptr_t)request32.handle;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_ctx_priv_map_t *)data,
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request, (void *)data,
 		    sizeof (request));
 
 	DRM_LOCK();
 	if (dev->max_context < 0 || request.ctx_id >= (unsigned)
 	    dev->max_context) {
 		DRM_UNLOCK();
-		return (DRM_ERR(EINVAL));
+		return (EINVAL);
 	}
 
 	map = dev->context_sareas[request.ctx_id];
 	DRM_UNLOCK();
 
+	if (!map)
+		return (EINVAL);
+
 	request.handle = map->handle;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_ctx_priv_map32_t request32;
+		drm_ctx_priv_map_32_t request32;
 		request32.ctx_id = request.ctx_id;
 		request32.handle = (caddr32_t)(uintptr_t)request.handle;
-		DRM_COPY_TO_USER_IOCTL((drm_ctx_priv_map32_t *)data,
-		    request32, sizeof (drm_ctx_priv_map32_t));
+		DRM_COPYTO_WITH_RETURN((void *)data, &request32,
+		    sizeof (drm_ctx_priv_map_32_t));
 	} else
-		DRM_COPY_TO_USER_IOCTL((drm_ctx_priv_map_t *)data, request,
-		    sizeof (request));
+#endif
+		DRM_COPYTO_WITH_RETURN((void *)data,
+		    &request, sizeof (request));
 
 	return (0);
 }
@@ -234,17 +229,18 @@ drm_setsareactx(DRM_IOCTL_ARGS)
 	drm_ctx_priv_map_t request;
 	drm_local_map_t *map = NULL;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_ctx_priv_map32_t request32;
+		drm_ctx_priv_map_32_t request32;
 
-		DRM_COPY_FROM_USER_IOCTL(request32,
-		    (drm_ctx_priv_map32_t *)data,
-		    sizeof (drm_ctx_priv_map32_t));
+		DRM_COPYFROM_WITH_RETURN(&request32, (void *)data,
+		    sizeof (drm_ctx_priv_map_32_t));
 		request.ctx_id = request32.ctx_id;
 		request.handle = (void *)(uintptr_t)request32.handle;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(request, (drm_ctx_priv_map_t *)data,
-		    sizeof (request));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&request,
+		    (void *)data, sizeof (request));
 
 	DRM_LOCK();
 	TAILQ_FOREACH(map, &dev->maplist, link) {
@@ -261,7 +257,7 @@ drm_setsareactx(DRM_IOCTL_ARGS)
 
 bad:
 	DRM_UNLOCK();
-	return (DRM_ERR(EINVAL));
+	return (EINVAL);
 }
 
 /*
@@ -272,7 +268,7 @@ drm_context_switch(drm_device_t *dev, int old, int new)
 {
 	if (test_and_set_bit(0, &dev->context_flag)) {
 		DRM_ERROR("drm_context_switch: Reentering -- FIXME");
-		return (DRM_ERR(EBUSY));
+		return (EBUSY);
 	}
 
 	DRM_DEBUG("drm_context_switch: Context switch from %d to %d",
@@ -313,39 +309,37 @@ drm_resctx(DRM_IOCTL_ARGS)
 	drm_ctx_t ctx;
 	int i;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_ctx_res32_t res32;
-		DRM_COPY_FROM_USER_IOCTL(res32,
-		    (drm_ctx_res32_t *)data,
-		    sizeof (drm_ctx_res32_t));
+		drm_ctx_res_32_t res32;
+		DRM_COPYFROM_WITH_RETURN(&res32, (void *)data, sizeof (res32));
 		res.count = res32.count;
-		res.contexts = (drm_ctx_t __user *)(uintptr_t)res32.contexts;
+		res.contexts = (drm_ctx_t *)(uintptr_t)res32.contexts;
 	} else
-		DRM_COPY_FROM_USER_IOCTL(res,
-		    (drm_ctx_res_t *)data,
-		    sizeof (res));
+#endif
+		DRM_COPYFROM_WITH_RETURN(&res, (void *)data, sizeof (res));
 
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		bzero(&ctx, sizeof (ctx));
 		for (i = 0; i < DRM_RESERVED_CONTEXTS; i++) {
 			ctx.handle = i;
-			if (DRM_COPY_TO_USER(&res.contexts[i],
-			    &ctx, sizeof (ctx)))
-				return (DRM_ERR(EFAULT));
+			DRM_COPYTO_WITH_RETURN(&res.contexts[i],
+			    &ctx, sizeof (ctx));
 		}
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
 
+#ifdef	_MULTI_DATAMODEL
 	if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
-		drm_ctx_res32_t res32;
+		drm_ctx_res_32_t res32;
 		res32.count = res.count;
 		res32.contexts = (caddr32_t)(uintptr_t)res.contexts;
 
-		DRM_COPY_TO_USER_IOCTL((drm_ctx_res32_t *)data,
-		    res32, sizeof (drm_ctx_res32_t));
+		DRM_COPYTO_WITH_RETURN((void *)data, &res32,
+		    sizeof (drm_ctx_res_32_t));
 	} else
-		DRM_COPY_TO_USER_IOCTL((drm_ctx_res_t *)data,
-		    res, sizeof (res));
+#endif
+		DRM_COPYTO_WITH_RETURN((void *)data, &res, sizeof (res));
 
 	return (0);
 }
@@ -357,28 +351,22 @@ drm_addctx(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_ctx_t ctx;
 
-	DRM_COPY_FROM_USER_IOCTL(ctx, (drm_ctx_t *)data, sizeof (ctx));
+	DRM_COPYFROM_WITH_RETURN(&ctx, (void *)data, sizeof (ctx));
 
 	ctx.handle = drm_ctxbitmap_next(dev);
-	DRM_DEBUG("drm_addctx: ctx.handle 1:%d\n", (int)ctx.handle);
 	if (ctx.handle == DRM_KERNEL_CONTEXT) {
 		/* Skip kernel's context and get a new one. */
-		DRM_DEBUG("drm_addctx: ctx.handle 2:%d\n", (int)ctx.handle);
 		ctx.handle = drm_ctxbitmap_next(dev);
 	}
-	DRM_DEBUG("drm_addctx :%d\n", ctx.handle);
-	if (ctx.handle == -1) {
-		DRM_DEBUG("drm_addctx: Not enough free contexts.");
-		return (DRM_ERR(ENOMEM));
+	if (ctx.handle == (drm_context_t)-1) {
+		return (ENOMEM);
 	}
 
-	if (dev->context_ctor && ctx.handle != DRM_KERNEL_CONTEXT) {
-		DRM_LOCK();
-		dev->context_ctor(dev, ctx.handle);
-		DRM_UNLOCK();
+	if (dev->driver->context_ctor && ctx.handle != DRM_KERNEL_CONTEXT) {
+		dev->driver->context_ctor(dev, ctx.handle);
 	}
 
-	DRM_COPY_TO_USER_IOCTL((drm_ctx_t *)data, ctx, sizeof (ctx));
+	DRM_COPYTO_WITH_RETURN((void *)data, &ctx, sizeof (ctx));
 
 	return (0);
 }
@@ -397,12 +385,12 @@ drm_getctx(DRM_IOCTL_ARGS)
 {
 	drm_ctx_t ctx;
 
-	DRM_COPY_FROM_USER_IOCTL(ctx, (drm_ctx_t *)data, sizeof (ctx));
+	DRM_COPYFROM_WITH_RETURN(&ctx, (void *)data, sizeof (ctx));
 
 	/* This is 0, because we don't handle any context flags */
 	ctx.flags = 0;
 
-	DRM_COPY_TO_USER_IOCTL((drm_ctx_t *)data, ctx, sizeof (ctx));
+	DRM_COPYTO_WITH_RETURN((void *)data, &ctx, sizeof (ctx));
 
 	return (0);
 }
@@ -414,7 +402,7 @@ drm_switchctx(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_ctx_t ctx;
 
-	DRM_COPY_FROM_USER_IOCTL(ctx, (drm_ctx_t *)data, sizeof (ctx));
+	DRM_COPYFROM_WITH_RETURN(&ctx, (void *)data, sizeof (ctx));
 
 	DRM_DEBUG("drm_switchctx: %d", ctx.handle);
 	return (drm_context_switch(dev, dev->last_context, ctx.handle));
@@ -427,7 +415,7 @@ drm_newctx(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_ctx_t ctx;
 
-	DRM_COPY_FROM_USER_IOCTL(ctx, (drm_ctx_t *)data, sizeof (ctx));
+	DRM_COPYFROM_WITH_RETURN(&ctx, (void *)data, sizeof (ctx));
 
 	DRM_DEBUG("drm_newctx: %d", ctx.handle);
 	(void) drm_context_switch_complete(dev, ctx.handle);
@@ -442,13 +430,13 @@ drm_rmctx(DRM_IOCTL_ARGS)
 	DRM_DEVICE;
 	drm_ctx_t ctx;
 
-	DRM_COPY_FROM_USER_IOCTL(ctx, (drm_ctx_t *)data, sizeof (ctx));
+	DRM_COPYFROM_WITH_RETURN(&ctx, (void *)data, sizeof (ctx));
 
 	DRM_DEBUG("drm_rmctx : %d", ctx.handle);
 	if (ctx.handle != DRM_KERNEL_CONTEXT) {
-		if (dev->context_dtor) {
+		if (dev->driver->context_dtor) {
 			DRM_LOCK();
-			dev->context_dtor(dev, ctx.handle);
+			dev->driver->context_dtor(dev, ctx.handle);
 			DRM_UNLOCK();
 		}
 
