@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,6 @@ typedef struct smp_state {
 	struct smp_device *smp_dev;		/* pointer to smp_device */
 	kmutex_t smp_mutex;			/* mutex */
 	uint32_t smp_open_flag;		/* open flag */
-	uint32_t smp_open_ref;		/* shared open count */
 } smp_state_t;
 
 #define	SMP_ESTIMATED_NUM_DEVS	4		/* for soft-state allocation */

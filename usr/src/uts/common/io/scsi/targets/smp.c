@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,19 +215,8 @@ smp_do_attach(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * driver handles kernel-issued IOCTLs
-	 */
-	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-	    DDI_KERNEL_IOCTL, NULL, 0) != DDI_PROP_SUCCESS) {
-		ddi_remove_minor_node(dip, NULL);
-		ddi_soft_state_free(smp_soft_state, instance);
-		return (DDI_FAILURE);
-	}
-
 	mutex_init(&smp_state->smp_mutex, NULL, MUTEX_DRIVER, NULL);
 	smp_state->smp_open_flag = SMP_CLOSED;
-	smp_state->smp_open_ref = 0;
 
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
@@ -349,14 +338,12 @@ smp_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 			rv = EBUSY;
 		} else {
 			smp_state->smp_open_flag = SMP_EXOPENED;
-			smp_state->smp_open_ref++;
 		}
 	} else {
 		if (smp_state->smp_open_flag == SMP_EXOPENED) {
 			rv = EBUSY;
 		} else {
 			smp_state->smp_open_flag = SMP_SOPENED;
-			smp_state->smp_open_ref++;
 		}
 	}
 	mutex_exit(&smp_state->smp_mutex);
@@ -379,8 +366,9 @@ smp_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	}
 
 	mutex_enter(&smp_state->smp_mutex);
-	smp_state->smp_open_ref--;
-	if (smp_state->smp_open_ref == 0) {
+	if (smp_state->smp_open_flag == SMP_CLOSED) {
+		smp_log(smp_state, CE_NOTE, "!smp device is already in close");
+	} else {
 		smp_state->smp_open_flag = SMP_CLOSED;
 	}
 	mutex_exit(&smp_state->smp_mutex);
@@ -496,15 +484,15 @@ smp_handle_func(dev_t dev,
 				continue;
 			} else {
 				smp_log(smp_state, CE_NOTE,
-				    "!smp%d: sas_smp_transport failed",
-				    instance);
+				    "!sas_smp_transport failed, pkt_reason %d",
+				    smp_pkt->pkt_reason);
 				rval = smp_pkt->pkt_reason;
 				goto copyout;
 			}
 		default:
 			smp_log(smp_state, CE_NOTE,
-			    "!smp%d: sas_smp_transport failed",
-			    instance);
+			    "!sas_smp_transport failed, pkt_reason %d",
+			    smp_pkt->pkt_reason);
 			rval = smp_pkt->pkt_reason;
 			goto copyout;
 		}

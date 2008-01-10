@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +85,16 @@ sas_hba_probe_smp(struct smp_device *smp_devp)
 	smp_pkt->pkt_timeout = SMP_DEFAULT_TIMEOUT;
 
 	if (sas_smp_transport(smp_pkt) != DDI_SUCCESS) {
-		rval = DDI_PROBE_FAILURE;
+		/*
+		 * The EOVERFLOW should be excluded here, because it indicates
+		 * the buffer (defined according to SAS1.1 Spec) to store
+		 * response is shorter than transferred message frame.
+		 * In this case, the smp device is alive and should be
+		 * enumerated.
+		 */
+		if (smp_pkt->pkt_reason != EOVERFLOW) {
+			rval = DDI_PROBE_FAILURE;
+		}
 	}
 
 	return (rval);
