@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,13 +91,19 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 	char		msgbuf[80];
 	char		*reply_msg	= NULL;
 
-	if (check_auth_addremove(cred) != True) {
-		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
-	} else if (p->x_child == NULL) {
-		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
-	} else {
-		x = p->x_child;
+	x = p->x_child;
 
+	/*
+	 * create_zfs() does not affect SMF data
+	 * therefore it is not covered by auth check
+	 */
+	if (x == NULL) {
+		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
+	} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
+		reply_msg = create_zfs(x, cred);
+	} else if (check_auth_addremove(cred) != True) {
+		xml_rtn_msg(&reply_msg, ERR_NO_PERMISSION);
+	} else {
 		if (x->x_name == NULL) {
 			xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TARG) == 0) {
@@ -106,8 +112,6 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 			reply_msg = create_initiator(x);
 		} else if (strcmp(x->x_name, XML_ELEMENT_TPGT) == 0) {
 			reply_msg = create_tpgt(x);
-		} else if (strcmp(x->x_name, XML_ELEMENT_ZFS) == 0) {
-			reply_msg = create_zfs(x, cred);
 		} else {
 			(void) snprintf(msgbuf, sizeof (msgbuf),
 			    "Unknown object '%s' for create element",
