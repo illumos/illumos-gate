@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -318,9 +318,9 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		return (-1);
 	}
 
-
 	switch (error) {
 	case ENXIO:
+	case ENODEV:
 		zfs_verror(hdl, EZFS_IO, fmt, ap);
 		break;
 
