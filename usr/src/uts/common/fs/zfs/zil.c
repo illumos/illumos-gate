@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -479,7 +479,12 @@ zil_rollback_destroy(zilog_t *zilog, dmu_tx_t *tx)
 	zilog->zl_destroy_txg = txg;
 	zilog->zl_keep_first = B_FALSE;
 
-	ASSERT(list_is_empty(&zilog->zl_lwb_list));
+	/*
+	 * Ensure there's no outstanding ZIL IO.  No lwbs or just the
+	 * unused one that allocated in advance is ok.
+	 */
+	ASSERT(zilog->zl_lwb_list.list_head.list_next ==
+	    zilog->zl_lwb_list.list_head.list_prev);
 	(void) zil_parse(zilog, zil_free_log_block, zil_free_log_record,
 	    tx, zh->zh_claim_txg);
 }
