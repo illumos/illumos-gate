@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,14 +225,27 @@ out:
 	return (CRYPTO_SUCCESS);
 }
 
+static boolean_t
+duplicate(char *name, crypto_mech_name_t *array, int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		if (strncmp(name, &array[i][0],
+		    sizeof (crypto_mech_name_t)) == 0)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 /* called from the CRYPTO_GET_DEV_INFO ioctl */
 int
 crypto_get_dev_info(char *name, uint_t instance, uint_t *count,
     crypto_mech_name_t **array)
 {
 	int rv;
-	crypto_mech_name_t *mech_names;
-	int i, j, k, all_count;
+	crypto_mech_name_t *mech_names, *resized_array;
+	int i, j, k = 0, max_count;
 	uint_t provider_count;
 	kcf_provider_desc_t **provider_array;
 	kcf_provider_desc_t *pd;
@@ -251,31 +264,48 @@ crypto_get_dev_info(char *name, uint_t instance, uint_t *count,
 	if (provider_count == 0)
 		return (CRYPTO_ARGUMENTS_BAD);
 
-	/* Get count */
-	all_count = 0;
+	/* Count all mechanisms supported by all providers */
+	max_count = 0;
 	for (i = 0; i < provider_count; i++)
-		all_count += provider_array[i]->pd_mech_list_count;
+		max_count += provider_array[i]->pd_mech_list_count;
 
-	if (all_count == 0) {
+	if (max_count == 0) {
 		mech_names = NULL;
 		goto out;
 	}
 
 	/* Allocate space and copy mech names */
-	mech_names = kmem_alloc(all_count * sizeof (crypto_mech_name_t),
+	mech_names = kmem_alloc(max_count * sizeof (crypto_mech_name_t),
 	    KM_SLEEP);
 
 	k = 0;
 	for (i = 0; i < provider_count; i++) {
 		pd = provider_array[i];
-		for (j = 0; j < pd->pd_mech_list_count; j++, k++)
+		for (j = 0; j < pd->pd_mech_list_count; j++) {
+			/* check for duplicate */
+			if (duplicate(&pd->pd_mechanisms[j].cm_mech_name[0],
+			    mech_names, k))
+				continue;
 			bcopy(&pd->pd_mechanisms[j].cm_mech_name[0],
 			    &mech_names[k][0], sizeof (crypto_mech_name_t));
+			k++;
+		}
+	}
+
+	/* resize */
+	if (k != max_count) {
+		resized_array =
+		    kmem_alloc(k * sizeof (crypto_mech_name_t), KM_SLEEP);
+		bcopy(mech_names, resized_array,
+		    k * sizeof (crypto_mech_name_t));
+		kmem_free(mech_names,
+		    max_count * sizeof (crypto_mech_name_t));
+		mech_names = resized_array;
 	}
 
 out:
 	kcf_free_provider_tab(provider_count, provider_array);
-	*count = all_count;
+	*count = k;
 	*array = mech_names;
 
 	return (CRYPTO_SUCCESS);

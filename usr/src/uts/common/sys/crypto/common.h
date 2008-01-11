@@ -66,11 +66,13 @@ typedef struct crypto_mechanism32 {
 
 #endif  /* _SYSCALL32 */
 
+#ifdef _KERNEL
 /* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
 typedef struct CK_AES_CTR_PARAMS {
 	ulong_t	ulCounterBits;
 	uint8_t cb[16];
 } CK_AES_CTR_PARAMS;
+#endif
 
 /* CK_AES_CCM_PARAMS provides parameters to the CKM_AES_CCM mechanism */
 typedef struct CK_AES_CCM_PARAMS {

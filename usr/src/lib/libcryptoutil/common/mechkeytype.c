@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,8 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_SHA256_RSA_PKCS_PSS:
 	case CKM_SHA384_RSA_PKCS_PSS:
 	case CKM_SHA512_RSA_PKCS_PSS:
+	case CKM_SHA224_RSA_PKCS:
+	case CKM_SHA224_RSA_PKCS_PSS:
 	case CKM_RIPEMD128_RSA_PKCS:
 	case CKM_RIPEMD160_RSA_PKCS:
 	case CKM_RSA_PKCS_OAEP:
@@ -113,6 +114,9 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_SHA256:
 	case CKM_SHA256_HMAC:
 	case CKM_SHA256_HMAC_GENERAL:
+	case CKM_SHA224:
+	case CKM_SHA224_HMAC:
+	case CKM_SHA224_HMAC_GENERAL:
 	case CKM_SHA384:
 	case CKM_SHA384_HMAC:
 	case CKM_SHA384_HMAC_GENERAL:
@@ -155,6 +159,7 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_SHA256_KEY_DERIVATION:
 	case CKM_SHA384_KEY_DERIVATION:
 	case CKM_SHA512_KEY_DERIVATION:
+	case CKM_SHA224_KEY_DERIVATION:
 	case CKM_MD5_KEY_DERIVATION:
 	case CKM_MD2_KEY_DERIVATION:
 	/* not sure the following 2 should be CKK_DES or not */
@@ -312,6 +317,7 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_AES_MAC:
 	case CKM_AES_MAC_GENERAL:
 	case CKM_AES_CBC_PAD:
+	case CKM_AES_CTR:
 	case CKM_AES_ECB_ENCRYPT_DATA:
 	case CKM_AES_CBC_ENCRYPT_DATA:
 		*ktype = CKK_AES;
@@ -325,6 +331,44 @@ pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type, CK_KEY_TYPE *ktype)
 	case CKM_TWOFISH_KEY_GEN:
 	case CKM_TWOFISH_CBC:
 		*ktype = CKK_TWOFISH;
+		break;
+
+	case CKM_SECURID_KEY_GEN:
+	case CKM_SECURID:
+		*ktype = CKK_SECURID;
+		break;
+
+	case CKM_HOTP_KEY_GEN:
+	case CKM_HOTP:
+		*ktype = CKK_HOTP;
+		break;
+
+	case CKM_ACTI:
+	case CKM_ACTI_KEY_GEN:
+		*ktype = CKK_ACTI;
+		break;
+
+	case CKM_CAMELLIA_KEY_GEN:
+	case CKM_CAMELLIA_ECB:
+	case CKM_CAMELLIA_CBC:
+	case CKM_CAMELLIA_MAC:
+	case CKM_CAMELLIA_MAC_GENERAL:
+	case CKM_CAMELLIA_CBC_PAD:
+	case CKM_CAMELLIA_ECB_ENCRYPT_DATA:
+	case CKM_CAMELLIA_CBC_ENCRYPT_DATA:
+	case CKM_CAMELLIA_CTR:
+		*ktype = CKK_CAMELLIA;
+		break;
+
+	case CKM_ARIA_KEY_GEN:
+	case CKM_ARIA_ECB:
+	case CKM_ARIA_CBC:
+	case CKM_ARIA_MAC:
+	case CKM_ARIA_MAC_GENERAL:
+	case CKM_ARIA_CBC_PAD:
+	case CKM_ARIA_ECB_ENCRYPT_DATA:
+	case CKM_ARIA_CBC_ENCRYPT_DATA:
+		*ktype = CKK_ARIA;
 		break;
 
 	default:

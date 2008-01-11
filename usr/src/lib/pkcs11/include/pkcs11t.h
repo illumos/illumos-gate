@@ -1,5 +1,5 @@
 /* pkcs11t.h include file for PKCS #11. */
-/* $Revision: 1.6 $ */
+/* $Revision: 1.10 $ */
 
 /* License to copy and use this software is granted provided that it is
  * identified as "RSA Security Inc. PKCS #11 Cryptographic Token Interface
@@ -22,6 +22,10 @@
 
 #ifndef _PKCS11T_H_
 #define _PKCS11T_H_ 1
+
+#define CRYPTOKI_VERSION_MAJOR 2
+#define CRYPTOKI_VERSION_MINOR 20
+#define CRYPTOKI_VERSION_AMENDMENT 3
 
 #define CK_TRUE 1
 #define CK_FALSE 0
@@ -108,6 +112,9 @@ typedef CK_INFO CK_PTR    CK_INFO_PTR;
  * for v2.0 */
 typedef CK_ULONG CK_NOTIFICATION;
 #define CKN_SURRENDER       0
+
+/* The following notification is new for PKCS #11 v2.20 amendment 3 */
+#define CKN_OTP_CHANGED     1
 
 
 typedef CK_ULONG          CK_SLOT_ID;
@@ -336,6 +343,10 @@ typedef CK_ULONG          CK_OBJECT_CLASS;
 #define CKO_HW_FEATURE        0x00000005
 #define CKO_DOMAIN_PARAMETERS 0x00000006
 #define CKO_MECHANISM         0x00000007
+
+/* CKO_OTP_KEY is new for PKCS #11 v2.20 amendment 1 */
+#define CKO_OTP_KEY           0x00000008
+
 #define CKO_VENDOR_DEFINED    0x80000000
 
 typedef CK_OBJECT_CLASS CK_PTR CK_OBJECT_CLASS_PTR;
@@ -393,6 +404,17 @@ typedef CK_ULONG          CK_KEY_TYPE;
 #define CKK_BLOWFISH        0x00000020
 #define CKK_TWOFISH         0x00000021
 
+/* SecurID, HOTP, and ACTI are new for PKCS #11 v2.20 amendment 1 */
+#define CKK_SECURID         0x00000022
+#define CKK_HOTP            0x00000023
+#define CKK_ACTI            0x00000024
+
+/* Camellia is new for PKCS #11 v2.20 amendment 3 */
+#define CKK_CAMELLIA                   0x00000025
+/* ARIA is new for PKCS #11 v2.20 amendment 3 */
+#define CKK_ARIA                       0x00000026
+
+
 #define CKK_VENDOR_DEFINED  0x80000000
 
 
@@ -420,6 +442,19 @@ typedef CK_ULONG          CK_ATTRIBUTE_TYPE;
 /* The CKF_ARRAY_ATTRIBUTE flag identifies an attribute which
    consists of an array of values. */
 #define CKF_ARRAY_ATTRIBUTE    0x40000000
+
+/* The following OTP-related defines are new for PKCS #11 v2.20 amendment 1
+   and relates to the CKA_OTP_FORMAT attribute */
+#define CK_OTP_FORMAT_DECIMAL      0
+#define CK_OTP_FORMAT_HEXADECIMAL  1
+#define CK_OTP_FORMAT_ALPHANUMERIC 2
+#define CK_OTP_FORMAT_BINARY       3
+
+/* The following OTP-related defines are new for PKCS #11 v2.20 amendment 1
+   and relates to the CKA_OTP_..._REQUIREMENT attributes */
+#define CK_OTP_PARAM_IGNORED       0
+#define CK_OTP_PARAM_OPTIONAL      1
+#define CK_OTP_PARAM_MANDATORY     2
 
 /* The following attribute types are defined: */
 #define CKA_CLASS              0x00000000
@@ -524,6 +559,23 @@ typedef CK_ULONG          CK_ATTRIBUTE_TYPE;
 #define CKA_WRAP_TEMPLATE        (CKF_ARRAY_ATTRIBUTE|0x00000211)
 #define CKA_UNWRAP_TEMPLATE      (CKF_ARRAY_ATTRIBUTE|0x00000212)
 
+/* CKA_OTP... atttributes are new for PKCS #11 v2.20 amendment 3. */
+#define CKA_OTP_FORMAT                0x00000220
+#define CKA_OTP_LENGTH                0x00000221
+#define CKA_OTP_TIME_INTERVAL         0x00000222
+#define CKA_OTP_USER_FRIENDLY_MODE    0x00000223
+#define CKA_OTP_CHALLENGE_REQUIREMENT 0x00000224
+#define CKA_OTP_TIME_REQUIREMENT      0x00000225
+#define CKA_OTP_COUNTER_REQUIREMENT   0x00000226
+#define CKA_OTP_PIN_REQUIREMENT       0x00000227
+#define CKA_OTP_COUNTER               0x0000022E
+#define CKA_OTP_TIME                  0x0000022F
+#define CKA_OTP_USER_IDENTIFIER       0x0000022A
+#define CKA_OTP_SERVICE_IDENTIFIER    0x0000022B
+#define CKA_OTP_SERVICE_LOGO          0x0000022C
+#define CKA_OTP_SERVICE_LOGO_TYPE     0x0000022D
+
+
 /* CKA_HW_FEATURE_TYPE, CKA_RESET_ON_INIT, and CKA_HAS_RESET
  * are new for v2.10 */
 #define CKA_HW_FEATURE_TYPE    0x00000300
@@ -548,7 +600,6 @@ typedef CK_ULONG          CK_ATTRIBUTE_TYPE;
 #define CKA_ALLOWED_MECHANISMS          (CKF_ARRAY_ATTRIBUTE|0x00000600)
 
 #define CKA_VENDOR_DEFINED     0x80000000
-
 
 /* CK_ATTRIBUTE is a structure that includes the type, length
  * and value of an attribute */
@@ -624,6 +675,10 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
 #define CKM_SHA256_RSA_PKCS_PSS        0x00000043
 #define CKM_SHA384_RSA_PKCS_PSS        0x00000044
 #define CKM_SHA512_RSA_PKCS_PSS        0x00000045
+
+/* SHA-224 RSA mechanisms are new for PKCS #11 v2.20 amendment 3 */
+#define CKM_SHA224_RSA_PKCS            0x00000046
+#define CKM_SHA224_RSA_PKCS_PSS        0x00000047
 
 #define CKM_RC2_KEY_GEN                0x00000100
 #define CKM_RC2_ECB                    0x00000101
@@ -701,12 +756,30 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
 #define CKM_SHA256                     0x00000250
 #define CKM_SHA256_HMAC                0x00000251
 #define CKM_SHA256_HMAC_GENERAL        0x00000252
+
+/* SHA-224 is new for PKCS #11 v2.20 amendment 3 */
+#define CKM_SHA224                     0x00000255
+#define CKM_SHA224_HMAC                0x00000256
+#define CKM_SHA224_HMAC_GENERAL        0x00000257
+
 #define CKM_SHA384                     0x00000260
 #define CKM_SHA384_HMAC                0x00000261
 #define CKM_SHA384_HMAC_GENERAL        0x00000262
 #define CKM_SHA512                     0x00000270
 #define CKM_SHA512_HMAC                0x00000271
 #define CKM_SHA512_HMAC_GENERAL        0x00000272
+
+/* SecurID is new for PKCS #11 v2.20 amendment 1 */
+#define CKM_SECURID_KEY_GEN            0x00000280
+#define CKM_SECURID                    0x00000282
+
+/* HOTP is new for PKCS #11 v2.20 amendment 1 */
+#define CKM_HOTP_KEY_GEN    0x00000290
+#define CKM_HOTP            0x00000291
+
+/* ACTI is new for PKCS #11 v2.20 amendment 1 */
+#define CKM_ACTI            0x000002A0
+#define CKM_ACTI_KEY_GEN    0x000002A1
 
 /* All of the following mechanisms are new for v2.0 */
 /* Note that CAST128 and CAST5 are the same algorithm */
@@ -779,6 +852,9 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
 #define CKM_SHA384_KEY_DERIVATION      0x00000394
 #define CKM_SHA512_KEY_DERIVATION      0x00000395
 
+/* SHA-224 key derivation is new for PKCS #11 v2.20 amendment 3 */
+#define CKM_SHA224_KEY_DERIVATION      0x00000396
+
 #define CKM_PBE_MD2_DES_CBC            0x000003A0
 #define CKM_PBE_MD5_DES_CBC            0x000003A1
 #define CKM_PBE_MD5_CAST_CBC           0x000003A2
@@ -812,6 +888,32 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
 
 /* CKM_CMS_SIG is new for v2.20 */
 #define CKM_CMS_SIG                    0x00000500
+
+/* CKM_KIP mechanisms are new for PKCS #11 v2.20 amendment 2 */
+#define CKM_KIP_DERIVE                 0x00000510
+#define CKM_KIP_WRAP                   0x00000511
+#define CKM_KIP_MAC                    0x00000512
+
+/* Camellia is new for PKCS #11 v2.20 amendment 3 */
+#define CKM_CAMELLIA_KEY_GEN           0x00000550
+#define CKM_CAMELLIA_ECB               0x00000551
+#define CKM_CAMELLIA_CBC               0x00000552
+#define CKM_CAMELLIA_MAC               0x00000553
+#define CKM_CAMELLIA_MAC_GENERAL       0x00000554
+#define CKM_CAMELLIA_CBC_PAD           0x00000555
+#define CKM_CAMELLIA_ECB_ENCRYPT_DATA  0x00000556
+#define CKM_CAMELLIA_CBC_ENCRYPT_DATA  0x00000557
+#define CKM_CAMELLIA_CTR               0x00000558
+
+/* ARIA is new for PKCS #11 v2.20 amendment 3 */
+#define CKM_ARIA_KEY_GEN               0x00000560
+#define CKM_ARIA_ECB                   0x00000561
+#define CKM_ARIA_CBC                   0x00000562
+#define CKM_ARIA_MAC                   0x00000563
+#define CKM_ARIA_MAC_GENERAL           0x00000564
+#define CKM_ARIA_CBC_PAD               0x00000565
+#define CKM_ARIA_ECB_ENCRYPT_DATA      0x00000566
+#define CKM_ARIA_CBC_ENCRYPT_DATA      0x00000567
 
 /* Fortezza mechanisms */
 #define CKM_SKIPJACK_KEY_GEN           0x00001000
@@ -868,6 +970,9 @@ typedef CK_ULONG          CK_MECHANISM_TYPE;
 #define CKM_AES_MAC                    0x00001083
 #define CKM_AES_MAC_GENERAL            0x00001084
 #define CKM_AES_CBC_PAD                0x00001085
+
+/* AES counter mode is new for PKCS #11 v2.20 amendment 3 */
+#define CKM_AES_CTR                    0x00001086
 
 /* BlowFish and TwoFish are new for v2.20 */
 #define CKM_BLOWFISH_KEY_GEN           0x00001090
@@ -1085,6 +1190,10 @@ typedef CK_ULONG          CK_RV;
 #define CKR_MUTEX_BAD                         0x000001A0
 #define CKR_MUTEX_NOT_LOCKED                  0x000001A1
 
+/* The following return values are new for PKCS #11 v2.20 amendment 3 */
+#define CKR_NEW_PIN_MODE                      0x000001B0
+#define CKR_NEXT_OTP                          0x000001B1
+
 /* This is new to v2.20 */
 #define CKR_FUNCTION_REJECTED                 0x00000200
 
@@ -1178,6 +1287,8 @@ typedef CK_RSA_PKCS_MGF_TYPE CK_PTR CK_RSA_PKCS_MGF_TYPE_PTR;
 #define CKG_MGF1_SHA256       0x00000002
 #define CKG_MGF1_SHA384       0x00000003
 #define CKG_MGF1_SHA512       0x00000004
+/* SHA-224 is new for PKCS #11 v2.20 amendment 3 */
+#define CKG_MGF1_SHA224       0x00000005
 
 /* CK_RSA_PKCS_OAEP_SOURCE_TYPE is new for v2.10.
  * CK_RSA_PKCS_OAEP_SOURCE_TYPE  is used to indicate the source
@@ -1681,5 +1792,94 @@ typedef struct CK_PKCS5_PBKD2_PARAMS {
 } CK_PKCS5_PBKD2_PARAMS;
 
 typedef CK_PKCS5_PBKD2_PARAMS CK_PTR CK_PKCS5_PBKD2_PARAMS_PTR;
+
+/* All CK_OTP structs are new for PKCS #11 v2.20 amendment 3 */
+
+typedef CK_ULONG CK_OTP_PARAM_TYPE;
+typedef CK_OTP_PARAM_TYPE CK_PARAM_TYPE; /* B/w compatibility */
+
+typedef struct CK_OTP_PARAM {
+    CK_OTP_PARAM_TYPE type;
+    CK_VOID_PTR pValue;
+    CK_ULONG ulValueLen;
+} CK_OTP_PARAM;
+
+typedef CK_OTP_PARAM CK_PTR CK_OTP_PARAM_PTR;
+
+typedef struct CK_OTP_PARAMS {
+    CK_OTP_PARAM_PTR pParams;
+    CK_ULONG ulCount;
+} CK_OTP_PARAMS;
+
+typedef CK_OTP_PARAMS CK_PTR CK_OTP_PARAMS_PTR;
+
+typedef struct CK_OTP_SIGNATURE_INFO {
+    CK_OTP_PARAM_PTR pParams;
+    CK_ULONG ulCount;
+} CK_OTP_SIGNATURE_INFO;
+
+typedef CK_OTP_SIGNATURE_INFO CK_PTR CK_OTP_SIGNATURE_INFO_PTR;
+
+/* The following OTP-related defines are new for PKCS #11 v2.20 amendment 1 */
+#define CK_OTP_VALUE          0
+#define CK_OTP_PIN            1
+#define CK_OTP_CHALLENGE      2
+#define CK_OTP_TIME           3
+#define CK_OTP_COUNTER        4
+#define CK_OTP_FLAGS          5
+#define CK_OTP_OUTPUT_LENGTH  6
+#define CK_OTP_OUTPUT_FORMAT  7
+
+/* The following OTP-related defines are new for PKCS #11 v2.20 amendment 1 */
+#define CKF_NEXT_OTP          0x00000001
+#define CKF_EXCLUDE_TIME      0x00000002
+#define CKF_EXCLUDE_COUNTER   0x00000004
+#define CKF_EXCLUDE_CHALLENGE 0x00000008
+#define CKF_EXCLUDE_PIN       0x00000010
+#define CKF_USER_FRIENDLY_OTP 0x00000020
+
+/* CK_KIP_PARAMS is new for PKCS #11 v2.20 amendment 2 */
+typedef struct CK_KIP_PARAMS {
+    CK_MECHANISM_PTR  pMechanism;
+    CK_OBJECT_HANDLE  hKey;
+    CK_BYTE_PTR       pSeed;
+    CK_ULONG          ulSeedLen;
+} CK_KIP_PARAMS;
+
+typedef CK_KIP_PARAMS CK_PTR CK_KIP_PARAMS_PTR;
+
+/* CK_AES_CTR_PARAMS is new for PKCS #11 v2.20 amendment 3 */
+typedef struct CK_AES_CTR_PARAMS {
+    CK_ULONG ulCounterBits;
+    CK_BYTE cb[16];
+} CK_AES_CTR_PARAMS;
+
+typedef CK_AES_CTR_PARAMS CK_PTR CK_AES_CTR_PARAMS_PTR;
+
+/* CK_CAMELLIA_CTR_PARAMS is new for PKCS #11 v2.20 amendment 3 */
+typedef struct CK_CAMELLIA_CTR_PARAMS {
+    CK_ULONG ulCounterBits;
+    CK_BYTE cb[16];
+} CK_CAMELLIA_CTR_PARAMS;
+
+typedef CK_CAMELLIA_CTR_PARAMS CK_PTR CK_CAMELLIA_CTR_PARAMS_PTR;
+
+/* CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS is new for PKCS #11 v2.20 amendment 3 */
+typedef struct CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS {
+    CK_BYTE      iv[16];
+    CK_BYTE_PTR  pData;
+    CK_ULONG     length;
+} CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS;
+
+typedef CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS CK_PTR CK_CAMELLIA_CBC_ENCRYPT_DATA_PARAMS_PTR;
+
+/* CK_ARIA_CBC_ENCRYPT_DATA_PARAMS is new for PKCS #11 v2.20 amendment 3 */
+typedef struct CK_ARIA_CBC_ENCRYPT_DATA_PARAMS {
+    CK_BYTE      iv[16];
+    CK_BYTE_PTR  pData;
+    CK_ULONG     length;
+} CK_ARIA_CBC_ENCRYPT_DATA_PARAMS;
+
+typedef CK_ARIA_CBC_ENCRYPT_DATA_PARAMS CK_PTR CK_ARIA_CBC_ENCRYPT_DATA_PARAMS_PTR;
 
 #endif
