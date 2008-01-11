@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,6 +226,8 @@ files_getpwnam(char *name, attrlist *items, pwu_repository_t *rep, void **buf)
 
 	*buf = calloc(1, sizeof (struct pwbuf));
 	pwbuf = (struct pwbuf *)*buf;
+	if (pwbuf == NULL)
+		return (PWU_NOMEM);
 
 	/*
 	 * determine which password structure (/etc/passwd or /etc/shadow)
