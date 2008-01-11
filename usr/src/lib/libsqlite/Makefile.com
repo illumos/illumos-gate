@@ -46,6 +46,10 @@ OBJECTS = \
 
 include $(SRC)/lib/Makefile.lib
 
+# The shared object install target directory is usr/lib/smbsrv.
+SMBSRVLIBDIR=   $(ROOTLIBDIR)/smbsrv
+SMBSRVLINK=     $(SMBSRVLIBDIR)/$(LIBLINKS)
+
 SRCDIR = ../src
 TOOLDIR = ../tool
 $(DYNLIB) := LDLIBS += -lc
@@ -185,14 +189,24 @@ LINTSRC=    ../llib-lsqlite
 #
 all:		$(LIBS)
 install:	all $(ROOTLIBDIR)/$(RELOC) $(ROOTLIBDIR)/$(NATIVERELOC) \
-		$(ROOTLIBDIR)/llib-lsqlite.ln
+		$(ROOTLIBDIR)/llib-lsqlite.ln $(SMBSRVLIBDIR)/$(DYNLIB)
 
 $(ROOTLIBDIR)/$(RELOC)		:= FILEMODE= 644
 $(ROOTLIBDIR)/$(NATIVERELOC)	:= FILEMODE= 644
 $(ROOTLIBDIR)/llib-lsqlite.ln	:= FILEMODE= 644
+$(SMBSRVLIBDIR)/$(DYNLIB)	:= FILEMODE= 755
 
 $(ROOTLIBDIR)/%: %
 	$(INS.file)
+
+$(SMBSRVLIBDIR): $(ROOTLIBDIR)
+	$(INS.dir)
+
+$(SMBSRVLIBDIR)/%: % $(SMBSRVLIBDIR)
+	$(INS.file)
+
+$(SMBSRVLINK): $(SMBSRVLIBDIR) $(SMBSRVLIBDIR)/$(DYNLIB)
+	$(INS.liblink)
 
 $(OBJS) $(OBJS:%.o=%-native.o): $(HDR)
 

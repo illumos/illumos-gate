@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -967,11 +967,12 @@ usr/lib/sparcv9/llib-lpri.ln		sparc
 #
 usr/include/sys/u8_textprep_data.h	sparc
 #
-# SQLite is private, used by SMF (svc.configd) and idmapd
+# SQLite is private, used by SMF (svc.configd), idmapd and libsmb.
 #
 usr/lib/libsqlite-native.o		sparc
 usr/lib/libsqlite.o			sparc
 usr/lib/llib-lsqlite.ln			sparc
+usr/lib/smbsrv/libsqlite.so		sparc
 usr/include/sqlite			sparc
 usr/include/sqlite/sqlite-misc.h	sparc
 usr/include/sqlite/sqlite.h		sparc

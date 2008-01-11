@@ -55,6 +55,7 @@ f none usr/lib/smbsrv/libsmbrdr.so.1 755 root bin
 s none usr/lib/smbsrv/libsmbrdr.so=libsmbrdr.so.1
 f none usr/lib/smbsrv/llib-lsmbrdr 644 root bin
 f none usr/lib/smbsrv/llib-lsmbrdr.ln 644 root bin
+f none usr/lib/smbsrv/libsqlite.so.1 755 root bin
 f none usr/lib/smbsrv/smbd 555 root bin
 d none usr/sbin 755 root bin
 f none usr/sbin/smbadm 555 root bin
@@ -64,8 +65,6 @@ d none usr/lib/mdb/kvm 755 root sys
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/smb 755 root sys
 f none usr/lib/fs/smb/libshare_smb.so.1 755 root bin
-f none usr/lib/libsqlite.so.1 755 root bin
-s none usr/lib/libsqlite.so=libsqlite.so.1
 d none usr/lib/security 755 root bin
 f none usr/lib/security/pam_smb_passwd.so.1 755 root bin
 s none usr/lib/security/pam_smb_passwd.so=pam_smb_passwd.so.1

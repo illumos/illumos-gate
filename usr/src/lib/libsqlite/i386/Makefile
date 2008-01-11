@@ -27,6 +27,6 @@
 
 include ../Makefile.com
 
-install: $(ROOTLIBDIR)/$(RELOC) $(ROOTLIBS) $(ROOTLINKS)
+install: $(ROOTLIBDIR)/$(RELOC) $(SMBSRVLIBDIR)/$(DYNLIB) $(SMBSRVLINK)
 
 $(ROOTLIBDIR)/$(RELOC): all

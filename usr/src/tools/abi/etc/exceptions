@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -247,6 +247,7 @@ PSARC 2004/619: RULE W1: usr/lib/iconv/amd64/geniconvtbl.so
 PSARC 1997/015: RULE W2: usr/lib/watchmalloc.so.1
 PSARC 1997/015: RULE W2: usr/lib/sparcv9/watchmalloc.so.1
 PSARC 2004/619: RULE W2: usr/lib/amd64/watchmalloc.so.1
+PSARC 2006/715: RULE W2: usr/lib/smbsrv/libsqlite.so.1
 
 #############################################
 # WARNINGs exempted from RULE W3 (See RULES section of intf_check manpage)
