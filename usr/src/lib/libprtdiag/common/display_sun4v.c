@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,8 +59,6 @@
 
 #define	MOTHERBOARD			"MB"
 #define	NETWORK				"network"
-#define	PCIE_COMPATIBLE_STR		"pciex"
-#define	PCIX_COMPATIBLE_STR		"pci"
 #define	SUN4V_MACHINE			"sun4v"
 #define	PARENT_NAMES			10
 
@@ -194,48 +192,150 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int log,
 	return (exit_code);
 }
 
+/*
+ * The binding-name property encodes the bus type.
+ */
 static void
 get_bus_type(picl_nodehdl_t nodeh, struct io_card *card)
 {
-	char *compatible;
+	char val[PICL_PROPNAMELEN_MAX], *p, *q;
 
-	(void) strlcpy(card->bus_type, "PCIX", sizeof (card->bus_type));
-	if (sun4v_get_first_compatible_value(nodeh, &compatible)
-	    == PICL_SUCCESS) {
-		if (strncmp(compatible, PCIE_COMPATIBLE_STR,
-		    strlen(PCIE_COMPATIBLE_STR)) == 0)
+	card->bus_type[0] = '\0';
+
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_BINDING_NAME, val,
+	    sizeof (val)) == PICL_SUCCESS) {
+		if (strstr(val, PICL_CLASS_PCIEX))
 			(void) strlcpy(card->bus_type, "PCIE",
 			    sizeof (card->bus_type));
-		free(compatible);
+		else if (strstr(val, PICL_CLASS_PCI))
+			(void) strlcpy(card->bus_type, "PCIX",
+			    sizeof (card->bus_type));
+		else {
+			/*
+			 * Not perfect: process the binding-name until
+			 * we encounter something that we don't think would
+			 * be part of a bus type.  This may get confused a bit
+			 * if a device or vendor id is encoded right after
+			 * the bus class since there's no delimiter.  If the
+			 * id number begins with a hex digit [abcdef] then
+			 * this will become part of the bus type string
+			 * reported by prtdiag.  This is all an effort to
+			 * print something potentially useful for bus types
+			 * other than PCI/PCIe.
+			 *
+			 * We do this because this code will get called for
+			 * non-PCI class devices like the xaui (class sun4v.)
+			 */
+			if (strstr(val, "SUNW,") != NULL)
+				p = strchr(val, ',') + 1;
+			else
+				p = val;
+			q = p;
+			while (*p != '\0') {
+				if (isdigit((char)*p) || ispunct((char)*p)) {
+					*p = '\0';
+					break;
+				}
+				*p = (char)_toupper((int)*p);
+				++p;
+			}
+			(void) strlcpy(card->bus_type, q,
+			    sizeof (card->bus_type));
+		}
 	}
 }
 
+/*
+ * Fetch the Label property for this device.  If none is found then
+ * search all the siblings with the same device ID for a
+ * Label and return that Label.  The plug-in can only match the canonical
+ * path from the PRI with a specific devfs path.  So we take care of
+ * devices with multiple functions here.  A leaf device downstream of
+ * a bridge should fall out of here with PICL_PROPNOTFOUND, and the
+ * caller can walk back up the tree in search of the slot's Label.
+ */
 static picl_errno_t
 get_slot_label(picl_nodehdl_t nodeh, struct io_card *card)
 {
 	char val[PICL_PROPNAMELEN_MAX];
 	picl_errno_t err;
 	picl_nodehdl_t pnodeh;
+	uint32_t devid, sib_devid;
+	int32_t instance;
 
 	/*
-	 * Look for a Label first in the node corresponding to the IO
-	 * device.  If there's no Label then we might be on the downstream
-	 * side of a bridge (i.e. the IO device/card has a bridge on it).
-	 * So look at the parent and see if it has a Label.
+	 * If there's a Label at this node then return it - we're
+	 * done.
 	 */
 	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
 	    sizeof (val));
-	if (err == PICL_PROPNOTFOUND) {
-		if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
-		    sizeof (pnodeh)) == PICL_SUCCESS)
-			err = picl_get_propval_by_name(pnodeh, PICL_PROP_LABEL,
-			    val, sizeof (val));
-	}
-
-	if (err == PICL_SUCCESS)
+	if (err == PICL_SUCCESS) {
 		(void) strlcpy(card->slot_str, val, sizeof (card->slot_str));
+		return (err);
+	} else if (err != PICL_PROPNOTFOUND)
+		return (err);
 
-	card->slot = -1;
+	/*
+	 * At this point we're starting to extrapolate what the Label
+	 * should be since there is none at this specific node.
+	 * Note that until the value of "err" is overwritten in the
+	 * loop below, its value should be PICL_PROPNOTFOUND.
+	 */
+
+	/*
+	 * The device must be attached, and we can figure that out if
+	 * the instance number is present and is not equal to -1.
+	 * This will prevent is from returning a Label for a sibling
+	 * node when the node passed in would have a unique Label if the
+	 * device were attached.  But if the device is downstream of a
+	 * node with a Label then pci_callback() will still find that
+	 * and use it.
+	 */
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_INSTANCE, &instance,
+	    sizeof (instance)) != PICL_SUCCESS)
+		return (err);
+	if (instance == -1)
+		return (err);
+
+	/*
+	 * Narrow the search to just the one device ID.
+	 */
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_DEVICE_ID, &devid,
+	    sizeof (devid)) != PICL_SUCCESS)
+		return (err);
+
+	/*
+	 * Go find the first child of the parent so we can search
+	 * all of the siblings.
+	 */
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
+	    sizeof (pnodeh)) != PICL_SUCCESS)
+		return (err);
+	if (picl_get_propval_by_name(pnodeh, PICL_PROP_CHILD, &pnodeh,
+	    sizeof (pnodeh)) != PICL_SUCCESS)
+		return (err);
+
+	/*
+	 * If the child's device ID matches, then fetch the Label and
+	 * return it.  The first child/device ID should have a Label
+	 * associated with it.
+	 */
+	do {
+		if (picl_get_propval_by_name(pnodeh, PICL_PROP_DEVICE_ID,
+		    &sib_devid, sizeof (sib_devid)) == PICL_SUCCESS) {
+			if (sib_devid == devid) {
+				if ((err = picl_get_propval_by_name(pnodeh,
+				    PICL_PROP_LABEL, val, sizeof (val))) ==
+				    PICL_SUCCESS) {
+					(void) strlcpy(card->slot_str, val,
+					    sizeof (card->slot_str));
+					break;
+				}
+			}
+		}
+	} while (picl_get_propval_by_name(pnodeh, PICL_PROP_PEER, &pnodeh,
+	    sizeof (pnodeh)) == PICL_SUCCESS);
+
 	return (err);
 }
 
@@ -251,8 +351,6 @@ get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
 	char uaddr[MAXSTRLEN];
 	int i;
 
-	if (get_slot_label(nodeh, card) == PICL_SUCCESS)
-		return;
 	err = PICL_SUCCESS;
 	while (err == PICL_SUCCESS) {
 		if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
@@ -340,7 +438,7 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 	char val[PICL_PROPNAMELEN_MAX];
 	char *compatible;
 	picl_errno_t err;
-	picl_nodehdl_t nodeh;
+	picl_nodehdl_t nodeh, pnodeh;
 	struct io_card pci_card;
 
 	/* Walk through the children */
@@ -383,8 +481,47 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 
 		(void) strlcpy(pci_card.notes, path, sizeof (pci_card.notes));
 
-		get_bus_type(nodeh, &pci_card);
-		get_slot_number(nodeh, &pci_card);
+		pnodeh = nodeh;
+		err = get_slot_label(nodeh, &pci_card);
+
+		/*
+		 * No Label at this node, maybe we're looking at a device
+		 * downstream of a bridge.  Walk back up and find a Label and
+		 * record that node in "pnodeh".
+		 */
+		while (err != PICL_SUCCESS) {
+			if (err != PICL_PROPNOTFOUND)
+				break;
+			else if (picl_get_propval_by_name(pnodeh,
+			    PICL_PROP_PARENT, &pnodeh, sizeof (pnodeh)) ==
+			    PICL_SUCCESS)
+				err = get_slot_label(pnodeh, &pci_card);
+			else
+				break;
+		}
+
+		/*
+		 * Can't find a Label for this device in the PCI heirarchy.
+		 * Try to synthesize a slot name from atoms.  This depends
+		 * on the OBP slot_names property being implemented, and this
+		 * so far doesn't seem to be on sun4v.  But just in case that
+		 * is resurrected, the code is here.
+		 */
+		if (err != PICL_SUCCESS) {
+			pnodeh = nodeh;
+			get_slot_number(nodeh, &pci_card);
+		}
+
+		/*
+		 * Passing in pnodeh instead of nodeh will cause prtdiag
+		 * to display the type of IO slot for the leaf node.  For
+		 * built-in devices and a lot of IO cards these will be
+		 * the same thing.  But for IO cards with bridge chips or
+		 * for things like expansion chassis, prtdiag will report
+		 * the bus type of the IO slot and not the leaf, which
+		 * could be different things.
+		 */
+		get_bus_type(pnodeh, &pci_card);
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, name,
 		    sizeof (name));
