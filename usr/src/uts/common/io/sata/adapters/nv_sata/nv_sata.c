@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -406,6 +406,7 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_acc_handle_t pci_conf_handle;
 	nv_ctl_t *nvc;
 	uint8_t subclass;
+	uint32_t reg32;
 
 	switch (cmd) {
 
@@ -600,11 +601,40 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		NVLOG((NVDBG_INIT, nvc, NULL,
 		    "nv_attach(): DDI_RESUME inst %d", inst));
 
+		if (pci_config_setup(dip, &pci_conf_handle) != DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+
+		/*
+		 * If a device is attached after a suspend/resume, sometimes
+		 * the command register is zero, as it might not be set by
+		 * BIOS or a parent.  Set it again here.
+		 */
+		command = pci_config_get16(pci_conf_handle, PCI_CONF_COMM);
+
+		if (command == 0) {
+			pci_config_put16(pci_conf_handle, PCI_CONF_COMM,
+			    PCI_COMM_IO|PCI_COMM_MAE|PCI_COMM_ME);
+		}
+
+		/*
+		 * Need to set bit 2 to 1 at config offset 0x50
+		 * to enable access to the bar5 registers.
+		 */
+		reg32 = pci_config_get32(pci_conf_handle, NV_SATA_CFG_20);
+
+		if ((reg32 & NV_BAR5_SPACE_EN) != NV_BAR5_SPACE_EN) {
+			pci_config_put32(pci_conf_handle, NV_SATA_CFG_20,
+			    reg32 | NV_BAR5_SPACE_EN);
+		}
+
 		nvc->nvc_state &= ~NV_CTRL_SUSPEND;
 
 		for (i = 0; i < NV_MAX_PORTS(nvc); i++) {
 			nv_resume(&(nvc->nvc_port[i]));
 		}
+
+		pci_config_teardown(&pci_conf_handle);
 
 		return (DDI_SUCCESS);
 

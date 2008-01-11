@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,7 @@ static int i_cpr_platform_alloc(psm_state_request_t *req);
 static void i_cpr_platform_free(psm_state_request_t *req);
 static int i_cpr_save_apic(psm_state_request_t *req);
 static int i_cpr_restore_apic(psm_state_request_t *req);
+static int wait_for_set(cpuset_t *set, int who);
 
 #if defined(__amd64)
 static void restore_stack(wc_cpu_t *cpup);
@@ -260,8 +261,7 @@ i_cpr_pre_resume_cpus()
 	 * just do the initialization to wake the other cpus
 	 */
 	unsigned who;
-	int cpuid = i_cpr_bootcpuid();
-	int started_cpu;
+	int boot_cpuid = i_cpr_bootcpuid();
 	uint32_t		code_length = 0;
 	caddr_t			wakevirt = rm_platter_va;
 	/*LINTED*/
@@ -292,14 +292,17 @@ i_cpr_pre_resume_cpus()
 
 	affinity_set(CPU_CURRENT);
 
-	cpu_ready_set = 0;
+	/*
+	 * mark the boot cpu as being ready, since we are running on that cpu
+	 */
+	CPUSET_ONLY(cpu_ready_set, boot_cpuid);
 
 	for (who = 0; who < ncpus; who++) {
 
 		wc_cpu_t	*cpup = wc_other_cpus + who;
 		wc_desctbr_t	gdt;
 
-		if (who == cpuid)
+		if (who == boot_cpuid)
 			continue;
 
 		if (!CPU_IN_SET(mp_cpus, who))
@@ -320,8 +323,6 @@ i_cpr_pre_resume_cpus()
 
 		init_real_mode_platter(who, code_length, cpup->wc_cr4, gdt);
 
-		started_cpu = 1;
-
 		if ((err = mach_cpuid_start(who, rm_platter_va)) != 0) {
 			cmn_err(CE_WARN, "cpu%d: failed to start during "
 			    "suspend/resume error %d", who, err);
@@ -331,56 +332,17 @@ i_cpr_pre_resume_cpus()
 		PMD(PMD_SX, ("%s() #1 waiting for procset 0x%lx\n", str,
 		    (ulong_t)procset))
 
-/*
- * This conditional compile only affects the MP case.
- */
-#ifdef	MP_PM
-		for (delays = 0; !CPU_IN_SET(procset, who); delays++) {
-			if (delays == 500) {
-				/*
-				 * After five seconds, things are probably
-				 * looking a bit bleak - explain the hang.
-				 */
-				cmn_err(CE_NOTE, "cpu%d: started, "
-				    "but not running in the kernel yet", who);
-				PMD(PMD_SX, ("%s() %d cpu started "
-				    "but not running in the kernel yet\n",
-				    str, who))
-			} else if (delays > 2000) {
-				/*
-				 * We waited at least 20 seconds, bail ..
-				 */
-				cmn_err(CE_WARN, "cpu%d: timed out", who);
-				PMD(PMD_SX, ("%s() %d cpu timed out\n",
-				    str, who))
-				started_cpu = 0;
-			}
-
-			/*
-			 * wait at least 10ms, then check again..
-			 */
-			delay(USEC_TO_TICK_ROUNDUP(10000));
-		}
-#else
-		while (!CPU_IN_SET(procset, who)) {
-			;
-		}
-
-#endif	/*	MP_PM	*/
+		if (!wait_for_set(&procset, who))
+			continue;
 
 		PMD(PMD_SX, ("%s() %d cpu started\n", str, who))
 
-		if (!started_cpu)
-			continue;
-
-		PMD(PMD_SX, ("%s() tsc_ready = %d\n", str,
-		    get_tsc_ready()))
+		PMD(PMD_SX, ("%s() tsc_ready = %d\n", str, get_tsc_ready()))
 
 		if (tsc_gethrtime_enable) {
 			PMD(PMD_SX, ("%s() calling tsc_sync_master\n", str))
 			tsc_sync_master(who);
 		}
-
 
 		PMD(PMD_SX, ("%s() waiting for cpu_ready_set %ld\n", str,
 		    cpu_ready_set))
@@ -389,11 +351,8 @@ i_cpr_pre_resume_cpus()
 		 * cpus to start serially instead of in parallel, so that
 		 * they do not contend with each other in wc_rm_start()
 		 */
-		while (!CPU_IN_SET(cpu_ready_set, who)) {
-			PMD(PMD_SX, ("%s() waiting for "
-			    "cpu_ready_set %ld\n", str, cpu_ready_set))
-			;
-		}
+		if (!wait_for_set(&cpu_ready_set, who))
+			continue;
 
 		/*
 		 * do not need to re-initialize dtrace using dtrace_cpu_init
@@ -405,6 +364,7 @@ i_cpr_pre_resume_cpus()
 	affinity_clear();
 
 	PMD(PMD_SX, ("%s() all cpus now ready\n", str))
+
 }
 
 static void
@@ -1093,4 +1053,40 @@ void
 i_cpr_restore_configuration(dev_info_t *dip)
 {
 	acpica_ddi_restore_resources(dip);
+}
+
+static int
+wait_for_set(cpuset_t *set, int who)
+{
+	int delays;
+	char *str = "wait_for_set";
+
+	for (delays = 0; !CPU_IN_SET(*set, who); delays++) {
+		if (delays == 500) {
+			/*
+			 * After five seconds, things are probably
+			 * looking a bit bleak - explain the hang.
+			 */
+			cmn_err(CE_NOTE, "cpu%d: started, "
+			    "but not running in the kernel yet", who);
+			PMD(PMD_SX, ("%s() %d cpu started "
+			    "but not running in the kernel yet\n",
+			    str, who))
+		} else if (delays > 2000) {
+			/*
+			 * We waited at least 20 seconds, bail ..
+			 */
+			cmn_err(CE_WARN, "cpu%d: timed out", who);
+			PMD(PMD_SX, ("%s() %d cpu timed out\n",
+			    str, who))
+			return (0);
+		}
+
+		/*
+		 * wait at least 10ms, then check again..
+		 */
+		drv_usecwait(10000);
+	}
+
+	return (1);
 }

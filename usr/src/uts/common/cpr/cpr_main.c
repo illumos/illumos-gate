@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,21 +380,15 @@ cpr_lock_mgr(void (*service)(void))
 int
 cpr_suspend_cpus(void)
 {
-	cpu_t *bootcpu;
 	int	ret = 0;
 	extern void *i_cpr_save_context(void *arg);
 
 	mutex_enter(&cpu_lock);
 
 	/*
-	 * if bootcpu is offline bring it back online
-	 */
-	bootcpu = i_cpr_bootcpu();
-
-	/*
 	 * the machine could not have booted without a bootcpu
 	 */
-	ASSERT(bootcpu != NULL);
+	ASSERT(i_cpr_bootcpu() != NULL);
 
 	/*
 	 * bring all the offline cpus online
@@ -789,11 +783,6 @@ cpr_resume_cpus(void)
 	start_cpus();
 	mutex_exit(&cpu_lock);
 
-	/*
-	 * clear the affinity set in cpr_suspend_cpus()
-	 */
-	affinity_clear();
-
 	i_cpr_post_resume_cpus();
 
 	mutex_enter(&cpu_lock);
@@ -804,14 +793,14 @@ cpr_resume_cpus(void)
 	cpu_pause_func = NULL;
 
 	/*
-	 * offline all the cpus that were brought online during suspend
-	 */
-	cpr_restore_offline();
-
-	/*
 	 * clear the affinity set in cpr_suspend_cpus()
 	 */
 	affinity_clear();
+
+	/*
+	 * offline all the cpus that were brought online during suspend
+	 */
+	cpr_restore_offline();
 
 	mutex_exit(&cpu_lock);
 }
@@ -839,14 +828,14 @@ cpr_unpause_cpus(void)
 	start_cpus();
 
 	/*
-	 * offline all the cpus that were brought online during suspend
-	 */
-	cpr_restore_offline();
-
-	/*
 	 * clear the affinity set in cpr_suspend_cpus()
 	 */
 	affinity_clear();
+
+	/*
+	 * offline all the cpus that were brought online during suspend
+	 */
+	cpr_restore_offline();
 
 	mutex_exit(&cpu_lock);
 }

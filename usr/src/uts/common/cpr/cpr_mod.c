@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,14 +190,7 @@ cpr(int fcn, void *mdep)
 	case AD_LOOPBACK_SUSPEND_TO_RAM_FAIL:
 	case AD_FORCE_SUSPEND_TO_RAM:
 	case AD_DEVICE_SUSPEND_TO_RAM:
-		/*
-		 * if MP then do not support suspend to RAM, however override
-		 * the MP restriction if cpr_mp_enable has been set
-		 */
-		if (ncpus > 1 && cpr_mp_enable == 0)
-			return (ENOTSUP);
-		else
-			cpr_sleeptype = CPR_TORAM;
+		cpr_sleeptype = CPR_TORAM;
 		break;
 #endif
 	}

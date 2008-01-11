@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 	
@@ -282,8 +282,8 @@ wc_rm_end(void)
 / using the following value blows up machines! - DO NOT USE
 /	D16 movl	0xffc, %esp
 
-#define LED     1
-#define SERIAL  1
+#define LED     0
+#define SERIAL  0
 
 #if     LED
 	D16 movl        $0x80, %edx
@@ -717,7 +717,13 @@ kernel_wc_code:
 	pushq   $0              /* null frame pointer terminates stack trace */
 	movq    %rsp, %rbp      /* stack aligned on 16-byte boundary */
 
-	call    *ap_mlsetup
+	/*
+	 * skip iff function pointer is NULL
+	 */
+	cmpq	$0, ap_mlsetup
+	je	2f
+	call	*ap_mlsetup
+2:
 
 	call    *cpr_start_cpu_func
 
@@ -976,10 +982,18 @@ kernel_wc_code:
 	movb	$0xdc, %al
 	outb	$0x80
 
-	movl	$MSR_AMD_EFER, %ecx	/ re-enable NX bit
+	/*
+	 * Before proceeding, enable usage of the page table NX bit if
+	 * that's how the page tables are set up.
+	 */
+	movl    x86_feature, %ecx
+	andl   	 $X86_NX, %ecx
+	jz      1f
+	movl    $MSR_AMD_EFER, %ecx
 	rdmsr
-	orl	$AMD_EFER_NXE, %eax
+	orl     $AMD_EFER_NXE, %eax
 	wrmsr
+1:
 
 	movl	WC_CR4(%ebx), %eax	/ restore full cr4 (with Global Enable)
 	movl	%eax, %cr4
@@ -1003,9 +1017,12 @@ kernel_wc_code:
 	movw	WC_GS(%ebx), %gs
 
 	/*
-	 * APIC initialization 
+	 * APIC initialization, skip iff function pointer is NULL
 	 */
-	call    *ap_mlsetup
+	cmpl	$0, ap_mlsetup
+	je	2f
+	call	*ap_mlsetup
+2:
 
 	call    *cpr_start_cpu_func
 
