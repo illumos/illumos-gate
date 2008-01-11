@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1491,9 +1491,7 @@ udp_close(queue_t *q)
 	 * future.
 	 */
 	ASSERT(connp->conn_ref == 1);
-
-	inet_minor_free(ip_minor_arena, connp->conn_dev);
-
+	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 	connp->conn_ref--;
 	ipcl_conn_destroy(connp);
 
@@ -2378,13 +2376,14 @@ static int
 udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
     boolean_t isv6)
 {
-	int	err;
-	udp_t	*udp;
-	conn_t *connp;
-	dev_t	conn_dev;
-	zoneid_t zoneid;
-	netstack_t *ns;
-	udp_stack_t *us;
+	int		err;
+	udp_t		*udp;
+	conn_t		*connp;
+	dev_t		conn_dev;
+	zoneid_t	zoneid;
+	netstack_t	*ns;
+	udp_stack_t	*us;
+	vmem_t		*minor_arena;
 
 	TRACE_1(TR_FAC_UDP, TR_UDP_OPEN, "udp_open: q %p", q);
 
@@ -2409,14 +2408,27 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	else
 		zoneid = crgetzoneid(credp);
 
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
-		netstack_rele(ns);
-		return (EBUSY);
+	if ((ip_minor_arena_la != NULL) && (flag & SO_SOCKSTR) &&
+	    ((conn_dev = inet_minor_alloc(ip_minor_arena_la)) != 0)) {
+		minor_arena = ip_minor_arena_la;
+	} else {
+		/*
+		 * Either minor numbers in the large arena were exhausted
+		 * or a non socket application is doing the open.
+		 * Try to allocate from the small arena.
+		 */
+		if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
+			netstack_rele(ns);
+			return (EBUSY);
+		}
+		minor_arena = ip_minor_arena_sa;
 	}
+
 	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
 
 	connp = ipcl_conn_create(IPCL_UDPCONN, KM_SLEEP, ns);
 	connp->conn_dev = conn_dev;
+	connp->conn_minor_arena = minor_arena;
 	udp = connp->conn_udp;
 
 	/*

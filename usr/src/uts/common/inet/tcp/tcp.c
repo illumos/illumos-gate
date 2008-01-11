@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2428,6 +2428,8 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	ASSERT(eager->tcp_ack_tid == 0);
 
 	econnp->conn_dev = aconnp->conn_dev;
+	econnp->conn_minor_arena = aconnp->conn_minor_arena;
+	ASSERT(econnp->conn_minor_arena != NULL);
 	if (eager->tcp_cred != NULL)
 		crfree(eager->tcp_cred);
 	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
@@ -4101,7 +4103,7 @@ tcp_close(queue_t *q, int flags)
 		conn_ioctl_cleanup(connp);
 
 	qprocsoff(q);
-	inet_minor_free(ip_minor_arena, connp->conn_dev);
+	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 
 	tcp->tcp_cpid = -1;
 
@@ -4125,6 +4127,9 @@ tcp_close(queue_t *q, int flags)
 static int
 tcpclose_accept(queue_t *q)
 {
+	vmem_t	*minor_arena;
+	dev_t	conn_dev;
+
 	ASSERT(WR(q)->q_qinfo == &tcp_acceptor_winit);
 
 	/*
@@ -4132,7 +4137,12 @@ tcpclose_accept(queue_t *q)
 	 * now being closed due to some error.
 	 */
 	qprocsoff(q);
-	inet_minor_free(ip_minor_arena, (dev_t)q->q_ptr);
+
+	minor_arena = (vmem_t *)WR(q)->q_ptr;
+	conn_dev = (dev_t)RD(q)->q_ptr;
+	ASSERT(minor_arena != NULL);
+	ASSERT(conn_dev != 0);
+	inet_minor_free(minor_arena, conn_dev);
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	return (0);
 }
@@ -9614,6 +9624,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	tcp_t		*tcp = NULL;
 	conn_t		*connp;
 	int		err;
+	vmem_t		*minor_arena = NULL;
 	dev_t		conn_dev;
 	zoneid_t	zoneid;
 	tcp_stack_t	*tcps = NULL;
@@ -9664,11 +9675,23 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		}
 	}
 
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
-		if (tcps != NULL)
-			netstack_rele(tcps->tcps_netstack);
-		return (EBUSY);
+	if ((ip_minor_arena_la != NULL) && (flag & SO_SOCKSTR) &&
+	    ((conn_dev = inet_minor_alloc(ip_minor_arena_la)) != 0)) {
+		minor_arena = ip_minor_arena_la;
+	} else {
+		/*
+		 * Either minor numbers in the large arena were exhausted
+		 * or a non socket application is doing the open.
+		 * Try to allocate from the small arena.
+		 */
+		if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
+			if (tcps != NULL)
+				netstack_rele(tcps->tcps_netstack);
+			return (EBUSY);
+		}
+		minor_arena = ip_minor_arena_sa;
 	}
+	ASSERT(minor_arena != NULL);
 
 	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
 
@@ -9676,9 +9699,14 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		/* No netstack_find_by_cred, hence no netstack_rele needed */
 		ASSERT(tcps == NULL);
 		q->q_qinfo = &tcp_acceptor_rinit;
-		q->q_ptr = (void *)conn_dev;
+		/*
+		 * the conn_dev and minor_arena will be subsequently used by
+		 * tcp_wput_accept() and tcpclose_accept() to figure out the
+		 * minor device number for this connection from the q_ptr.
+		 */
+		RD(q)->q_ptr = (void *)conn_dev;
 		WR(q)->q_qinfo = &tcp_acceptor_winit;
-		WR(q)->q_ptr = (void *)conn_dev;
+		WR(q)->q_ptr = (void *)minor_arena;
 		qprocson(q);
 		return (0);
 	}
@@ -9690,7 +9718,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 */
 	netstack_rele(tcps->tcps_netstack);
 	if (connp == NULL) {
-		inet_minor_free(ip_minor_arena, conn_dev);
+		inet_minor_free(minor_arena, conn_dev);
 		q->q_ptr = NULL;
 		return (ENOSR);
 	}
@@ -9740,6 +9768,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		connp->conn_mac_exempt = B_TRUE;
 
 	connp->conn_dev = conn_dev;
+	connp->conn_minor_arena = minor_arena;
 
 	ASSERT(q->q_qinfo == &tcp_rinitv4 || q->q_qinfo == &tcp_rinitv6);
 	ASSERT(WR(q)->q_qinfo == &tcp_winit);
@@ -9768,7 +9797,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 
 	err = tcp_init(tcp, q);
 	if (err != 0) {
-		inet_minor_free(ip_minor_arena, connp->conn_dev);
+		inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 		tcp_acceptor_hash_remove(tcp);
 		CONN_DEC_REF(connp);
 		q->q_ptr = WR(q)->q_ptr = NULL;
@@ -18265,7 +18294,8 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 		ok->PRIM_type = T_OK_ACK;
 		ok->CORRECT_prim = PRIM_type;
 		econnp = eager->tcp_connp;
-		econnp->conn_dev = (dev_t)q->q_ptr;
+		econnp->conn_dev = (dev_t)RD(q)->q_ptr;
+		econnp->conn_minor_arena = (vmem_t *)(WR(q)->q_ptr);
 		eager->tcp_rq = rq;
 		eager->tcp_wq = q;
 		rq->q_ptr = econnp;

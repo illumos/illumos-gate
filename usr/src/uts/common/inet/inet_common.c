@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,16 +43,13 @@ typedef struct inet_arena {
 	minor_t ineta_maxminor;	/* max minor number in the arena */
 } inet_arena_t;
 
-/* Maximum minor number to use */
-static minor_t inet_maxminor = INET_MAXMINOR;
-
 void *
-inet_minor_create(char *name, dev_t min_dev, int kmflags)
+inet_minor_create(char *name, dev_t min_dev, dev_t max_dev, int kmflags)
 {
 	inet_arena_t *arena = kmem_alloc(sizeof (inet_arena_t), kmflags);
 
 	if (arena != NULL) {
-		arena->ineta_maxminor = MIN(MAXMIN32, inet_maxminor);
+		arena->ineta_maxminor = max_dev;
 		arena->ineta_arena = vmem_create(name,
 		    (void *)min_dev, arena->ineta_maxminor - min_dev + 1,
 		    1, NULL, NULL, NULL, 1, kmflags | VMC_IDENTIFIER);
@@ -79,29 +75,17 @@ inet_minor_destroy(void *a)
 }
 
 dev_t
-inet_minor_alloc(void *a)
+inet_minor_alloc(void *arena)
 {
-	inet_arena_t *arena = (inet_arena_t *)a;
-	dev_t dev;
-
-	while ((dev = (dev_t)vmem_alloc(arena->ineta_arena, 1,
-		    VM_NOSLEEP)) == 0) {
-		if (arena->ineta_maxminor >= inet_maxminor)
-			return (0);
-		if (vmem_add(arena->ineta_arena,
-		    (void *)(uintptr_t)(arena->ineta_maxminor + 1),
-		    inet_maxminor - arena->ineta_maxminor, VM_NOSLEEP) == NULL)
-			return (0);
-		arena->ineta_maxminor = inet_maxminor;
-	}
-	return (dev);
+	return ((dev_t)vmem_alloc(((inet_arena_t *)arena)->ineta_arena,
+	    1, VM_NOSLEEP));
 }
 
 void
-inet_minor_free(void *a, dev_t dev)
+inet_minor_free(void *arena, dev_t dev)
 {
-	ASSERT((dev != OPENFAIL) && (dev != 0) && (dev <= inet_maxminor));
-	vmem_free(((inet_arena_t *)a)->ineta_arena, (void *)dev, 1);
+	ASSERT((dev != OPENFAIL) && (dev != 0) && (dev <= MAXMIN));
+	vmem_free(((inet_arena_t *)arena)->ineta_arena, (void *)dev, 1);
 }
 
 /*

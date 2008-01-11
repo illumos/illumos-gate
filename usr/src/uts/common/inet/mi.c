@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -830,7 +830,7 @@ mi_open_link(void **mi_headp, IDP ptr, dev_t *devp, int flag, int sflag,
 		mi_head->mh_o.mi_o_prev = &mi_head->mh_o;
 		mi_head->mh_o.mi_o_dev = 0;	/* For asserts only */
 		mi_head->mh_arena = (vmem_t *)inet_minor_create(arena_name,
-		    INET_MIN_DEV, KM_SLEEP);
+		    INET_MIN_DEV, MAXMIN, KM_SLEEP);
 	}
 	ASSERT(ptr != NULL);
 	mi_o = (MI_OP)ptr;
@@ -1513,7 +1513,7 @@ mi_tpi_extconn_ind(MBLKP trailer_mp, char *src, t_scalar_t src_length,
 		mi_tpi_addr_and_opt(mp, src, src_length, opt, opt_length);
 		((struct T_extconn_ind *)mp->b_rptr)->DEST_length = dst_length;
 		((struct T_extconn_ind *)mp->b_rptr)->DEST_offset =
-			(t_scalar_t)(mp->b_wptr - mp->b_rptr);
+		    (t_scalar_t)(mp->b_wptr - mp->b_rptr);
 		if (dst_length > 0) {
 			bcopy(dst, (char *)mp->b_wptr, dst_length);
 			mp->b_wptr += dst_length;

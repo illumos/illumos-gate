@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -785,7 +785,8 @@ int	ip_wput_frag_mdt_min = IP_WPUT_FRAG_MDT_MIN;
 static long ip_rput_pullups;
 int	dohwcksum = 1;	/* use h/w cksum if supported by the hardware */
 
-vmem_t *ip_minor_arena;
+vmem_t *ip_minor_arena_sa; /* for minor nos. from INET_MIN_DEV+2 thru 2^^18-1 */
+vmem_t *ip_minor_arena_la; /* for minor nos. from 2^^18 thru 2^^32-1 */
 
 int	ip_debug;
 
@@ -5628,7 +5629,7 @@ ip_close(queue_t *q, int flags)
 	 */
 	ASSERT(connp->conn_ref == 1);
 
-	inet_minor_free(ip_minor_arena, connp->conn_dev);
+	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 
 	connp->conn_ref--;
 	ipcl_conn_destroy(connp);
@@ -5694,7 +5695,10 @@ ip_ddi_destroy(void)
 	ipcl_g_destroy();
 	ip_net_g_destroy();
 	ip_ire_g_fini();
-	inet_minor_destroy(ip_minor_arena);
+	inet_minor_destroy(ip_minor_arena_sa);
+#if defined(_LP64)
+	inet_minor_destroy(ip_minor_arena_la);
+#endif
 
 #ifdef DEBUG
 	list_destroy(&ip_thread_list);
@@ -5861,12 +5865,31 @@ ip_ddi_init(void)
 	 * For IP and TCP the minor numbers should start from 2 since we have 4
 	 * initial devices: ip, ip6, tcp, tcp6.
 	 */
-	if ((ip_minor_arena = inet_minor_create("ip_minor_arena",
-	    INET_MIN_DEV + 2, KM_SLEEP)) == NULL) {
+	/*
+	 * If this is a 64-bit kernel, then create two separate arenas -
+	 * one for TLIs in the range of INET_MIN_DEV+2 through 2^^18-1, and the
+	 * other for socket apps in the range 2^^18 through 2^^32-1.
+	 */
+	ip_minor_arena_la = NULL;
+	ip_minor_arena_sa = NULL;
+#if defined(_LP64)
+	if ((ip_minor_arena_sa = inet_minor_create("ip_minor_arena_sa",
+	    INET_MIN_DEV + 2, MAXMIN32, KM_SLEEP)) == NULL) {
 		cmn_err(CE_PANIC,
-		    "ip_ddi_init: ip_minor_arena creation failed\n");
+		    "ip_ddi_init: ip_minor_arena_sa creation failed\n");
 	}
-
+	if ((ip_minor_arena_la = inet_minor_create("ip_minor_arena_la",
+	    MAXMIN32 + 1, MAXMIN64, KM_SLEEP)) == NULL) {
+		cmn_err(CE_PANIC,
+		    "ip_ddi_init: ip_minor_arena_la creation failed\n");
+	}
+#else
+	if ((ip_minor_arena_sa = inet_minor_create("ip_minor_arena_sa",
+	    INET_MIN_DEV + 2, MAXMIN, KM_SLEEP)) == NULL) {
+		cmn_err(CE_PANIC,
+		    "ip_ddi_init: ip_minor_arena_sa creation failed\n");
+	}
+#endif
 	ip_poll_normal_ticks = MSEC_TO_TICK_ROUNDUP(ip_poll_normal_ms);
 
 	ipcl_g_init();
@@ -9847,11 +9870,23 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		connp->conn_pkt_isv6 = B_FALSE;
 	}
 
-	if ((connp->conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
-		/* CONN_DEC_REF takes care of netstack_rele() */
-		q->q_ptr = WR(q)->q_ptr = NULL;
-		CONN_DEC_REF(connp);
-		return (EBUSY);
+	if ((ip_minor_arena_la != NULL) && (flag & SO_SOCKSTR) &&
+	    ((connp->conn_dev = inet_minor_alloc(ip_minor_arena_la)) != 0)) {
+		connp->conn_minor_arena = ip_minor_arena_la;
+	} else {
+		/*
+		 * Either minor numbers in the large arena were exhausted
+		 * or a non socket application is doing the open.
+		 * Try to allocate from the small arena.
+		 */
+		if ((connp->conn_dev =
+		    inet_minor_alloc(ip_minor_arena_sa)) == 0) {
+			/* CONN_DEC_REF takes care of netstack_rele() */
+			q->q_ptr = WR(q)->q_ptr = NULL;
+			CONN_DEC_REF(connp);
+			return (EBUSY);
+		}
+		connp->conn_minor_arena = ip_minor_arena_sa;
 	}
 
 	maj = getemajor(*devp);

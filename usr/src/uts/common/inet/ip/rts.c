@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,7 @@ rts_close(queue_t *q)
 	 */
 	ASSERT(connp->conn_ref == 1);
 
-	inet_minor_free(ip_minor_arena, connp->conn_dev);
+	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 
 	connp->conn_ref--;
 	ipcl_conn_destroy(connp);
@@ -270,7 +270,11 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	else
 		zoneid = crgetzoneid(credp);
 
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
+	/*
+	 * Since RTS is not used so heavily, allocating from the small
+	 * arena should be sufficient.
+	 */
+	if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
 		netstack_rele(ns);
 		return (EBUSY);
 	}
@@ -278,6 +282,7 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	connp = ipcl_conn_create(IPCL_RTSCONN, KM_SLEEP, ns);
 	connp->conn_dev = conn_dev;
+	connp->conn_minor_arena = ip_minor_arena_sa;
 	rts = connp->conn_rts;
 
 	/*

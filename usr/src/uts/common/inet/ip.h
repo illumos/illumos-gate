@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2803,7 +2803,8 @@ extern ipaddr_t	ip_g_all_ones;
 
 extern	uint_t	ip_loopback_mtu;	/* /etc/system */
 
-extern vmem_t *ip_minor_arena;
+extern vmem_t *ip_minor_arena_sa;
+extern vmem_t *ip_minor_arena_la;
 
 /*
  * ip_g_forward controls IP forwarding.  It takes two values:

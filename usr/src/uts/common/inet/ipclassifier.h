@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,6 +234,7 @@ struct conn_s {
 	queue_t		*conn_rq;		/* Read queue */
 	queue_t		*conn_wq;		/* Write queue */
 	dev_t		conn_dev;		/* Minor number */
+	vmem_t		*conn_minor_arena;	/* Minor arena */
 
 	cred_t		*conn_cred;		/* Credentials */
 	connf_t		*conn_g_fanout;		/* Global Hash bucket head */

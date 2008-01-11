@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,7 +80,6 @@ ill_no_arena
 ill_null
 inet_dev_info
 inet_devops
-inet_maxminor
 ip6_area_template
 ip6_ared_template
 ip6_cache_table_size
@@ -117,7 +116,8 @@ ip_m_tbl
 ip_max_cache_table_size
 ip_max_frag_dups
 ip_min_frag_prune_time
-ip_minor_arena
+ip_minor_arena_sa
+ip_minor_arena_la
 ip_misc_ioctl_count
 ip_misc_ioctl_table
 ip_mod_info

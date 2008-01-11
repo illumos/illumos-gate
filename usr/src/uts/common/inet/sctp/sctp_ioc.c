@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,7 @@ sctp_str_close(queue_t *q)
 
 	ASSERT(connp->conn_ref == 1);
 
-	inet_minor_free(ip_minor_arena, connp->conn_dev);
+	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	CONN_DEC_REF(connp);
@@ -244,11 +244,22 @@ sctp_str_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp->conn_wq = WR(q);
 	q->q_ptr = WR(q)->q_ptr = connp;
 
-	if ((connp->conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
-		/* CONN_DEC_REF takes care of netstack_rele() */
-		q->q_ptr = WR(q)->q_ptr = NULL;
-		CONN_DEC_REF(connp);
-		return (EBUSY);
+	if ((ip_minor_arena_la != NULL) &&
+	    (connp->conn_dev = inet_minor_alloc(ip_minor_arena_la)) != 0) {
+		connp->conn_minor_arena = ip_minor_arena_la;
+	} else {
+		/*
+		 * Minor numbers in the large arena are exhausted.
+		 * Try to allocate from the small arena.
+		 */
+		if ((connp->conn_dev = inet_minor_alloc(ip_minor_arena_sa))
+		    == 0) {
+			/* CONN_DEC_REF takes care of netstack_rele() */
+			q->q_ptr = WR(q)->q_ptr = NULL;
+			CONN_DEC_REF(connp);
+			return (EBUSY);
+		}
+		connp->conn_minor_arena = ip_minor_arena_sa;
 	}
 
 	maj = getemajor(*devp);
