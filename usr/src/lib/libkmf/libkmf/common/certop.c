@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1350,6 +1350,48 @@ out:
 }
 
 static KMF_RETURN
+check_crl_validity(KMF_HANDLE_T handle, KMF_KEYSTORE_TYPE kstype,
+	char *crlfilename, KMF_DATA *issuer_cert)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_POLICY_RECORD *policy;
+
+	if (handle == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	policy = handle->policy;
+
+	/*
+	 * NSS CRL is not file based, and its signature
+	 * has been verified during CRL import.
+	 * We only check CRL validity for file-based CRLs,
+	 * NSS handles these checks internally.
+	 */
+	if (kstype == KMF_KEYSTORE_NSS)
+		return (KMF_OK);
+
+	/*
+	 * Check the CRL signature if needed.
+	 */
+	if (!policy->validation_info.crl_info.ignore_crl_sign) {
+		ret = kmf_verify_crl_file(handle, crlfilename,
+		    issuer_cert);
+		if (ret != KMF_OK)
+			return (ret);
+	}
+	/*
+	 * Check the CRL validity if needed.
+	 */
+	if (!policy->validation_info.crl_info.ignore_crl_date) {
+		ret = kmf_check_crl_date(handle, crlfilename);
+		if (ret != KMF_OK)
+			return (ret);
+	}
+
+	return (ret);
+}
+
+static KMF_RETURN
 cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 	KMF_DATA *user_cert, KMF_DATA *issuer_cert)
 {
@@ -1357,6 +1399,7 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 	KMF_RETURN ret = KMF_OK;
 	KMF_ATTRIBUTE attrlist[16];
 	int numattr = 0;
+	int fd;
 	boolean_t crlchk;
 	char user_certfile[MAXPATHLEN];
 	char crlfile_tmp[MAXPATHLEN];
@@ -1392,6 +1435,31 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 	dir = policy->validation_info.crl_info.directory;
 	if (policy->validation_info.crl_info.get_crl_uri) {
 		/*
+		 * Check to see if we already have this CRL.
+		 */
+		if (basefilename == NULL)
+			basefilename = basename(uri);
+
+		crlfilename = get_fullpath(dir == NULL ? "./" : dir,
+		    basefilename);
+		if (crlfilename == NULL) {
+			ret = KMF_ERR_BAD_CRLFILE;
+			goto cleanup;
+		}
+
+		/*
+		 * If this file already exists and is valid, we don't need to
+		 * download a new one.
+		 */
+		if ((fd = open(crlfilename, O_RDONLY)) != -1) {
+			close(fd);
+			if ((ret = check_crl_validity(handle, *kstype,
+			    crlfilename, issuer_cert)) == KMF_OK) {
+				goto checkcrl;
+			}
+		}
+
+		/*
 		 * Create a temporary file to hold the new CRL file initially.
 		 */
 		(void) strlcpy(crlfile_tmp, CRLFILE_TEMPNAME,
@@ -1412,6 +1480,12 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 			(void) unlink(crlfile_tmp);
 			goto cleanup;
 		}
+		/*
+		 * If we just downloaded one, make sure it is OK.
+		 */
+		if ((ret = check_crl_validity(handle, *kstype, crlfile_tmp,
+		    issuer_cert)) != KMF_OK)
+			return (ret);
 
 		/* Cache the CRL file. */
 		if (*kstype == KMF_KEYSTORE_NSS) {
@@ -1439,22 +1513,6 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 			if (ret != KMF_OK)
 				goto cleanup;
 		} else {
-			/*
-			 * For File-based CRL plugin's, find the cache
-			 * location from the CRL policy's attributes and
-			 * cache it.
-			 */
-			if (basefilename == NULL)
-				basefilename = basename(uri);
-
-			crlfilename = get_fullpath(dir == NULL ? "./" : dir,
-			    basefilename);
-			if (crlfilename == NULL) {
-				(void) unlink(crlfile_tmp);
-				ret = KMF_ERR_BAD_CRLFILE;
-				goto cleanup;
-			}
-
 			if (rename(crlfile_tmp, crlfilename) == -1) {
 				(void) unlink(crlfile_tmp);
 				ret = KMF_ERR_WRITE_FILE;
@@ -1478,41 +1536,16 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 				ret = KMF_ERR_BAD_CRLFILE;
 				goto cleanup;
 			}
-		}
-	}
-
-	/*
-	 * Check the CRL signature if needed.
-	 */
-	if (!policy->validation_info.crl_info.ignore_crl_sign) {
-		/*
-		 * NSS CRL is not file based, and its signature
-		 * has been verified during CRL import.
-		 */
-		if (*kstype != KMF_KEYSTORE_NSS) {
-			ret = kmf_verify_crl_file(handle, crlfilename,
-			    issuer_cert);
-			if (ret != KMF_OK)  {
-				goto cleanup;
+			/*
+			 * Make sure this CRL is still valid.
+			 */
+			if ((ret = check_crl_validity(handle, *kstype,
+			    crlfilename, issuer_cert)) != KMF_OK)
+				return (ret);
 			}
-		}
 	}
 
-	/*
-	 * Check the CRL validity if needed.
-	 */
-	if (!policy->validation_info.crl_info.ignore_crl_date) {
-		/*
-		 * This is for file-based CRL, but not for NSS CRL.
-		 */
-		if (*kstype != KMF_KEYSTORE_NSS) {
-			ret = kmf_check_crl_date(handle, crlfilename);
-			if (ret != KMF_OK)  {
-				goto cleanup;
-			}
-		}
-	}
-
+checkcrl:
 	/*
 	 * Check the CRL revocation for the certificate.
 	 */

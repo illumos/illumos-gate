@@ -21,7 +21,7 @@
 /*
  * PKCS11 token KMF Plugin
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3811,7 +3811,7 @@ KMFPK11_StoreKey(KMF_HANDLE_T handle,
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	KMF_CREDENTIAL cred = {NULL, 0};
 	KMF_KEY_HANDLE *key;
-	KMF_RAW_KEY_DATA *rawkey;
+	KMF_RAW_KEY_DATA *rawkey = NULL;
 	CK_BBOOL btrue = TRUE;
 	CK_ATTRIBUTE tokenattr[1];
 	CK_OBJECT_HANDLE newobj;
