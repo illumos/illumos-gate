@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,7 @@ ds_snmp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	ds_snmp_instance = ddi_get_instance(dip);
 	if (ddi_create_minor_node(dip, DS_SNMP_NAME, S_IFCHR, ds_snmp_instance,
-		DDI_PSEUDO, 0) != DDI_SUCCESS) {
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s@%d: Unable to create minor node",
 		    DS_SNMP_NAME, ds_snmp_instance);
 		return (DDI_FAILURE);
@@ -587,7 +587,7 @@ ds_snmp_read(dev_t dev, struct uio *uiop, cred_t *credp)
 			return (EAGAIN);
 		}
 		while (sp->state != DS_SNMP_DATA_AVL &&
-			sp->state != DS_SNMP_DATA_ERR) {
+		    sp->state != DS_SNMP_DATA_ERR) {
 			if (cv_wait_sig(&sp->state_cv, &sp->lock) == 0) {
 				mutex_exit(&sp->lock);
 				return (EINTR);
@@ -799,6 +799,7 @@ ds_snmp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			DS_SNMP_DBG("ds_snmp_ioctl: state=%d, sc_reset=%d, "
 			    "waiting for data\n", sp->state, sp->sc_reset);
 			if (cv_wait_sig(&sp->state_cv, &sp->lock) == 0) {
+				sp->state = DS_SNMP_READY;
 				mutex_exit(&sp->lock);
 				return (EINTR);
 			}
@@ -966,11 +967,11 @@ ds_snmp_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 
 	/*
 	 * If there is no pending SNMP request, then we've received
-	 * bogus data or an SNMP trap. Since we don't yet support SNMP
-	 * traps, ignore it.
+	 * bogus data or an SNMP trap or the reader was interrupted.
+	 * Since we don't yet support SNMP traps, ignore it.
 	 */
 	if (sp->state != DS_SNMP_REQUESTED) {
-		cmn_err(CE_WARN, "Received SNMP data without request");
+		DS_SNMP_DBG("Received SNMP data without request");
 		mutex_exit(&sp->lock);
 		return;
 	}
