@@ -1452,7 +1452,7 @@ cert_crl_check(KMF_HANDLE_T handle,  KMF_KEYSTORE_TYPE *kstype,
 		 * download a new one.
 		 */
 		if ((fd = open(crlfilename, O_RDONLY)) != -1) {
-			close(fd);
+			(void) close(fd);
 			if ((ret = check_crl_validity(handle, *kstype,
 			    crlfilename, issuer_cert)) == KMF_OK) {
 				goto checkcrl;
