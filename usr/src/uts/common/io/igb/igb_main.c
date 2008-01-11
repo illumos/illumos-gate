@@ -30,7 +30,7 @@
 
 #include "igb_sw.h"
 
-static char ident[] = "Intel 1Gb Ethernet 1.1.0";
+static char ident[] = "Intel 1Gb Ethernet 1.1.1";
 
 /*
  * Local function protoypes
@@ -1660,11 +1660,6 @@ igb_setup_rx(igb_t *igb)
 	uint32_t reg_val;
 	int i;
 
-	for (i = 0; i < igb->num_rx_rings; i++) {
-		rx_ring = &igb->rx_rings[i];
-		igb_setup_rx_ring(rx_ring);
-	}
-
 	/*
 	 * Setup the Receive Control Register (RCTL), and ENABLE the
 	 * receiver. The initial configuration is to: Enable the receiver,
@@ -1682,6 +1677,14 @@ igb_setup_rx(igb_t *igb)
 	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
 
 	E1000_WRITE_REG(hw, E1000_RCTL, reg_val);
+
+	/*
+	 * igb_setup_rx_ring must be called after configuring RCTL
+	 */
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		rx_ring = &igb->rx_rings[i];
+		igb_setup_rx_ring(rx_ring);
+	}
 
 	/*
 	 * Setup the Rx Long Packet Max Length register
@@ -2170,7 +2173,7 @@ igb_get_conf(igb_t *igb)
 	 * 3 = force interrupt type Legacy
 	 */
 	igb->intr_force = igb_get_prop(igb, PROP_INTR_FORCE,
-	    IGB_INTR_NONE, IGB_INTR_LEGACY, IGB_INTR_MSI);
+	    IGB_INTR_NONE, IGB_INTR_LEGACY, IGB_INTR_NONE);
 
 	igb->tx_hcksum_enable = igb_get_prop(igb, PROP_TX_HCKSUM_ENABLE,
 	    0, 1, 1);

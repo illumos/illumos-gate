@@ -26,6 +26,8 @@
  * Use is subject to license terms of the CDDL.
  */
 
+/* IntelVersion: 1.15 v2007-12-10_dragonlake5 */
+
 #ifndef _IGB_MANAGE_H
 #define	_IGB_MANAGE_H
 

@@ -26,6 +26,8 @@
  * Use is subject to license terms of the CDDL.
  */
 
+/* IntelVersion: 1.19 v2007-12-10_dragonlake5 */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "igb_api.h"
