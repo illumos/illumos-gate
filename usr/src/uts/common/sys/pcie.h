@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,8 +72,7 @@ extern "C" {
 #define	PCIE_PCIECAP_DEV_TYPE_PCI2PCIE	0x80	/* PCI to PCI-E Bridge */
 #define	PCIE_PCIECAP_DEV_TYPE_MASK	0xF0	/* Device/Port Type Mask */
 #define	PCIE_PCIECAP_SLOT_IMPL		0x100	/* Slot Impl vs Integrated */
-#define	PCIE_PCIECAP_INT_MSG_NUM_SHIFT	9	/* Intr Msg Num Bit Offset */
-#define	PCIE_PCIECAP_INT_MSG_NUM_MASK	0x1F	/* Intr Msg Number Mask */
+#define	PCIE_PCIECAP_INT_MSG_NUM	0x3700	/* Interrupt Message Number */
 
 /*
  * Device Capabilities Register (4 bytes)

@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ pciehpc_acpi_hotplug_enabled(dev_info_t *dip)
 	int status = AE_ERROR;
 	ACPI_HANDLE osc_hdl;
 	int use_native_hotplug = 0;
-	uint32_t hp_mode = ACPI_HP_MODE;
+	uint32_t hp_mode;
 
 	/*
 	 * (1)  Find the ACPI device node for this bus node.
@@ -148,15 +148,12 @@ pciehpc_acpi_hotplug_enabled(dev_info_t *dip)
 		if (use_native_hotplug) {
 			PCIEHPC_DEBUG((CE_NOTE,
 			    "Assuming native Hot-Plug mode\n"));
-			/* assume native hot plug mode */
-			hp_mode = NATIVE_HP_MODE;
+			return (0); /* assume native hot plug mode */
 		} else {
 			PCIEHPC_DEBUG((CE_NOTE,
 			    "Assuming legacy ACPI Hot-Plug mode\n"));
-			/* assume ACPI hot plug mode */
-			hp_mode = ACPI_HP_MODE;
+			return (1); /* assume ACPI hot plug mode */
 		}
-		goto OUT;
 	}
 
 	/*
@@ -169,9 +166,8 @@ pciehpc_acpi_hotplug_enabled(dev_info_t *dip)
 		/* failed to evaluate _OSC method; assume ACPI hot plug */
 		PCIEHPC_DEBUG((CE_NOTE, "Failed to evaluate _OSC; "
 		    "Assuming legacy ACPI Hot-Plug mode\n"));
-		hp_mode = ACPI_HP_MODE;
+		return (1);
 	}
-OUT:
 
 #ifdef DEBUG
 	if (pciehpc_debug > 1)
