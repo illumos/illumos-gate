@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -328,6 +328,11 @@ socksctpv_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 	}
 
 	msglen = count = uiop->uio_resid;
+	/* Don't allow sending a message larger than the send buffer size. */
+	if (msglen > so->so_sndbuf) {
+		mutex_exit(&so->so_lock);
+		return (EMSGSIZE);
+	}
 	ss->ss_txqueued += msglen;
 
 	mutex_exit(&so->so_lock);
@@ -401,7 +406,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 
 	case FIOASYNC:
 		if (so_copyin((void *)arg, &value, sizeof (int32_t),
-			(mode & (int)FKIOCTL))) {
+		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		mutex_enter(&so->so_lock);
@@ -419,7 +424,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 	case SIOCSPGRP:
 	case FIOSETOWN:
 		if (so_copyin((void *)arg, &pid, sizeof (pid_t),
-			(mode & (int)FKIOCTL))) {
+		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		mutex_enter(&so->so_lock);
@@ -431,7 +436,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 	case SIOCGPGRP:
 	case FIOGETOWN:
 		if (so_copyout(&so->so_pgrp, (void *)arg,
-			sizeof (pid_t), (mode & (int)FKIOCTL)))
+		    sizeof (pid_t), (mode & (int)FKIOCTL)))
 			return (EFAULT);
 		return (0);
 
@@ -442,7 +447,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		intval = 0;
 
 		if (so_copyout(&intval, (void *)arg, sizeof (int),
-			(mode & (int)FKIOCTL)))
+		    (mode & (int)FKIOCTL)))
 			return (EFAULT);
 		return (0);
 
@@ -457,7 +462,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		intval = (so->so_state & SS_ACCEPTCONN) ? 0 :
 		    MIN(ss->ss_rxqueued, INT_MAX);
 		if (so_copyout(&intval, (void *)arg, sizeof (intval),
-			(mode & (int)FKIOCTL)))
+		    (mode & (int)FKIOCTL)))
 			return (EFAULT);
 		return (0);
 
@@ -465,7 +470,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		STRUCT_INIT(opt, mode);
 
 		if (so_copyin((void *)arg, STRUCT_BUF(opt), STRUCT_SIZE(opt),
-			(mode & (int)FKIOCTL))) {
+		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		if ((optlen = STRUCT_FGET(opt, sopt_len)) > SO_MAXARGSIZE)
@@ -533,7 +538,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		STRUCT_INIT(opt, mode);
 
 		if (so_copyin((void *)arg, STRUCT_BUF(opt), STRUCT_SIZE(opt),
-			(mode & (int)FKIOCTL))) {
+		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		if ((optlen = STRUCT_FGET(opt, sopt_len)) > SO_MAXARGSIZE)
@@ -594,7 +599,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 			return (EOPNOTSUPP);
 		}
 		if (so_copyin((void *)arg, &intval, sizeof (intval),
-			(mode & (int)FKIOCTL))) {
+		    (mode & (int)FKIOCTL))) {
 			return (EFAULT);
 		}
 		if (intval == 0) {
