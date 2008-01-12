@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,19 +69,12 @@ cleanup()
 	rm -f "$TMR.gz"
 }
 
-archive_Gnome()
+preload_Gnome()
 {
 	MEDIA="$1"
 	MINIROOT="$2"
 
-	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
-	RELEASE=`basename "$RELEASE"`
-
-	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
 	
-
-	# Create the gnome archive
-	#
 	(
 		# Prepopulate the gconf database. This needs to be done and
 		# done first for several reasons. 1) Archiving out the gnome
@@ -107,7 +100,21 @@ archive_Gnome()
 		xml:readwrite:/tmp/root/.gconf
 		xml:readonly:/etc/gconf/gconf.xml.defaults
 		' > /"$MINIROOT"/.tmp_proto/root/etc/gconf/2/path
+	)
+}
 
+archive_Gnome()
+{
+	MEDIA="$1"
+	MINIROOT="$2"
+
+	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
+	RELEASE=`basename "$RELEASE"`
+	CPIO_DIR="$MEDIA/$RELEASE/Tools/Boot"
+
+	# Create the gnome archive
+	#
+	(
 		# usr/share gnome stuff
 		cd "$MINIROOT"
 		find usr/share/GConf usr/share/application-registry \
@@ -415,6 +422,7 @@ packmedia()
 
 	RELEASE=`/bin/ls -d "$MEDIA/Solaris_"*`
 	RELEASE=`basename "$RELEASE"`
+	ARCHIVES="X X_small perl lpmisc javaui gnome"
 
 	mkdir -p "$MEDIA/$RELEASE/Tools/Boot"
 
@@ -490,10 +498,35 @@ packmedia()
 	# and start the installers.
 
 	if [ -d "$MINIROOT/platform/i86pc" ] ; then
+		preload_Gnome "$MEDIA" "$MINIROOT"
 		archive_Gnome "$MEDIA" "$MINIROOT"
 		archive_JavaGUI "$MEDIA" "$MINIROOT"
 		archive_Misc "$MEDIA" "$MINIROOT"
 		archive_Perl "$MEDIA" "$MINIROOT"
+		MR="$MEDIA/boot/amd64/x86.miniroot"
+		pack
+
+        	# Now that the 64-bit archives & miniroot have been created,
+        	# restore the files from archives and save the 64-bit
+        	# archives. Strip the 64-bit objects and create the
+		# 32-bit archives and miniroot
+
+		unpackmedia "$MEDIA" "$MINIROOT"
+		mkdir -p "$MEDIA/$RELEASE/Tools/Boot/amd64"
+		for i in $ARCHIVES; do
+			mv "$MEDIA/$RELEASE/Tools/Boot/${i}.cpio.bz2" \
+				"$MEDIA/$RELEASE/Tools/Boot/amd64"
+		done
+		if [ -z "$STRIP_AMD64" ]; then
+			strip_amd64
+		fi
+
+		archive_X "$MEDIA" "$MINIROOT"
+		archive_Gnome "$MEDIA" "$MINIROOT"
+		archive_JavaGUI "$MEDIA" "$MINIROOT"
+		archive_Perl "$MEDIA" "$MINIROOT"
+		archive_Misc "$MEDIA" "$MINIROOT"
+		MR="$MEDIA/boot/x86.miniroot"
 	fi
 
 	# copy the install menu to menu.lst so we have a menu
@@ -817,22 +850,12 @@ case $1 in
 		if [ -d "$UNPACKED_ROOT/kernel/drv/sparcv9" ] ; then
 			ARCHIVE=sparc.miniroot
 		else
-			ARCHIVE=amd64/x86.miniroot
+			ARCHIVE=x86.miniroot
 		fi
 		MR="$MEDIA/boot/$ARCHIVE"
 
 		packmedia "$MEDIA" "$UNPACKED_ROOT"
 		pack
-
-		if [ -d "$MINIROOT/platform/i86pc" ] ; then
-			if [ "$STRIP_AMD64" = false ] ; then
-				ln $MR $MEDIA/boot/x86.miniroot
-			else
-				MR="$MEDIA/boot/x86.miniroot"
-				strip_amd64
-				pack
-			fi
-		fi
 
 		;;
 	unpackmedia)
