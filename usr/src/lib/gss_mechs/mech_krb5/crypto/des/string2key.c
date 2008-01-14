@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,15 +74,24 @@ mit_des_string_to_key_int (krb5_context context,
     keyblock->length = sizeof(mit_des_cblock);
     key = keyblock->contents;
 
-    if (salt) {
-      if (salt->length == -1) {
-	/* cheat and do AFS string2key instead */
-	return mit_afs_string_to_key (context, keyblock, data, salt);
-      } else
-	length = data->length + salt->length;
-      }
-    else
-	length = data->length;
+    if (salt
+	&& (salt->length == SALT_TYPE_AFS_LENGTH
+	    /* XXX  Yuck!  Aren't we done with this yet?  */
+	    || salt->length == (unsigned) -1)) {
+	krb5_data afssalt;
+	char *at;
+
+	afssalt.data = salt->data;
+	at = strchr(afssalt.data, '@');
+	if (at) {
+	    *at = 0;
+	    afssalt.length = at - afssalt.data;
+	} else
+	    afssalt.length = strlen(afssalt.data);
+	return mit_afs_string_to_key(context, keyblock, data, &afssalt);
+    }
+
+    length = data->length + (salt ? salt->length : 0);
 
     copystr = malloc((size_t) length);
     if (!copystr) {

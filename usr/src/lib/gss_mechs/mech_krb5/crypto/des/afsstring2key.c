@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,9 @@ mit_afs_string_to_key (krb5_context context,
       mit_des_fixup_key_parity(key);
       /* clean & free the input string */
       memset(password, 0, (size_t) sizeof(password));
+
+      /* Solaris Kerberos: Success */
+      retval = 0;
     } else {
       /* Multiple blocks.  Do a CBC checksum, twice, and use the
 	 result as the new key.  */
