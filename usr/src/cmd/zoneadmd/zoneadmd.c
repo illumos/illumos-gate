@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -446,7 +446,7 @@ mkzonedir(zlog_t *zlogp)
  * subcommand.
  */
 static int
-zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
+zone_ready(zlog_t *zlogp, zone_mnt_t mount_cmd)
 {
 	int err;
 
@@ -464,7 +464,7 @@ zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 	if (vplat_bringup(zlogp, mount_cmd, zone_id) != 0) {
 		bringup_failure_recovery = B_TRUE;
-		(void) vplat_teardown(NULL, mount_cmd, B_FALSE);
+		(void) vplat_teardown(NULL, (mount_cmd != Z_MNT_BOOT), B_FALSE);
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
@@ -1032,14 +1032,14 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_INSTALLED:
 		switch (cmd) {
 		case Z_READY:
-			rval = zone_ready(zlogp, B_FALSE);
+			rval = zone_ready(zlogp, Z_MNT_BOOT);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
 		case Z_FORCEBOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT)) == 0)
 				rval = zone_bootup(zlogp, zargp->bootbuf);
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
@@ -1089,7 +1089,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				break;
 			}
 
-			rval = zone_ready(zlogp, B_TRUE);
+			rval = zone_ready(zlogp,
+			    strcmp(zargp->bootbuf, "-U") == 0 ?
+			    Z_MNT_UPDATE : Z_MNT_SCRATCH);
 			if (rval != 0)
 				break;
 
@@ -1209,7 +1211,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_READY:
 			if ((rval = zone_halt(zlogp, B_FALSE, B_TRUE)) != 0)
 				break;
-			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			else
 				eventstream_write(Z_EVT_ZONE_HALTED);
@@ -1238,7 +1240,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 				boot_args[0] = '\0';
 				break;
 			}
-			if ((rval = zone_ready(zlogp, B_FALSE)) != 0) {
+			if ((rval = zone_ready(zlogp, Z_MNT_BOOT)) != 0) {
 				eventstream_write(Z_EVT_ZONE_BOOTFAILED);
 				boot_args[0] = '\0';
 				break;

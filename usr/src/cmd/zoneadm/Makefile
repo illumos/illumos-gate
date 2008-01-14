@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,8 @@ SRCS = $(OBJS:.o=.c)
 POFILE=zoneadm_all.po
 POFILES= $(OBJS:%.o=%.po)
 
-LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs -luuid -lnvpair -lbrand -ldlpi
+LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs -luuid -lnvpair -lbrand \
+	-ldlpi -luutil
 
 .KEEP_STATE:
 

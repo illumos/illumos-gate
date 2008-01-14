@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,10 +111,23 @@ extern int eventstream_init();
 extern void eventstream_write(zone_evt_t evt);
 
 /*
+ * Zone mount styles.  Boot is the standard mount we do when booting the zone,
+ * scratch is the standard scratch zone mount for upgrade and update is a
+ * variation on the scratch zone where we don't lofs mount the zone's /etc
+ * and /var back into the scratch zone so that we can then do an
+ * 'update on attach' within the scratch zone.
+ */
+typedef enum {
+	Z_MNT_BOOT = 0,
+	Z_MNT_SCRATCH,
+	Z_MNT_UPDATE
+} zone_mnt_t;
+
+/*
  * Virtual platform interfaces.
  */
-extern zoneid_t vplat_create(zlog_t *, boolean_t);
-extern int vplat_bringup(zlog_t *, boolean_t, zoneid_t);
+extern zoneid_t vplat_create(zlog_t *, zone_mnt_t);
+extern int vplat_bringup(zlog_t *, zone_mnt_t, zoneid_t);
 extern int vplat_teardown(zlog_t *, boolean_t, boolean_t);
 
 /*

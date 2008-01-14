@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,8 +80,6 @@ SUNWprivate_1.1 {
 	zonecfg_endfsent;
 	zonecfg_endipdent;
 	zonecfg_endnwifent;
-	zonecfg_endpatchent;
-	zonecfg_endpkgent;
 	zonecfg_endrctlent;
 	zonecfg_find_mounts;
 	zonecfg_find_scratch;
@@ -112,8 +110,7 @@ SUNWprivate_1.1 {
 	zonecfg_get_name;
 	zonecfg_get_name_by_uuid;
 	zonecfg_getnwifent;
-	zonecfg_getpatchent;
-	zonecfg_getpkgent;
+	zonecfg_getpkgdata;
 	zonecfg_get_pool;
 	zonecfg_get_privset;
 	zonecfg_getpsetent;
@@ -178,8 +175,6 @@ SUNWprivate_1.1 {
 	zonecfg_set_limitpriv;
 	zonecfg_set_name;
 	zonecfg_setnwifent;
-	zonecfg_setpatchent;
-	zonecfg_setpkgent;
 	zonecfg_set_pool;
 	zonecfg_setrctlent;
 	zonecfg_set_root;

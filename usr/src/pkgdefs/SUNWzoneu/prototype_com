@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,6 +52,7 @@ d none usr/kernel/drv 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/brand 755 root bin
 d none usr/lib/brand/native 755 root sys
+f none usr/lib/brand/native/attach_update 755 root bin
 f none usr/lib/brand/native/config.xml 444 root bin
 f none usr/lib/brand/native/platform.xml 444 root bin
 f none usr/lib/brand/native/postclone 755 root bin

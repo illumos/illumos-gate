@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,8 @@
 
 #define	DFSTYPES	"/etc/dfs/fstypes"
 #define	MAXTNZLEN	2048
+
+#define	ALT_MOUNT(mount_cmd) 	((mount_cmd) != Z_MNT_BOOT)
 
 /* for routing socket */
 static int rts_seqno = 0;
@@ -1322,6 +1324,10 @@ free_fs_data(struct zone_fstab *fsarray, uint_t nelem)
  *	So mounting of localdirs[](/etc and /var) have been moved to the
  * 	build_mounted_post_var() which gets called only after the zone
  * 	specific filesystems are mounted.
+ *
+ * Note that the scratch zone we set up for updating the zone (Z_MNT_UPDATE)
+ * does not loopback mount the zone's own /etc and /var into the root of the
+ * scratch zone.
  */
 static boolean_t
 build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
@@ -1405,41 +1411,60 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 
 
 static boolean_t
-build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *luroot)
+build_mounted_post_var(zlog_t *zlogp, zone_mnt_t mount_cmd, char *rootpath,
+    const char *luroot)
 {
 	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
 	const char **cpp;
+	const char **loopdirs;
+	const char **tmpdirs;
 	static const char *localdirs[] = {
 		"/etc", "/var", NULL
 	};
-	static const char *loopdirs[] = {
+	static const char *scr_loopdirs[] = {
 		"/etc/lib", "/etc/fs", "/lib", "/sbin", "/platform",
 		"/usr", NULL
 	};
-	static const char *tmpdirs[] = {
+	static const char *upd_loopdirs[] = {
+		"/etc", "/kernel", "/lib", "/opt", "/platform", "/sbin",
+		"/usr", "/var", NULL
+	};
+	static const char *scr_tmpdirs[] = {
 		"/tmp", "/var/run", NULL
+	};
+	static const char *upd_tmpdirs[] = {
+		"/tmp", "/var/run", "/var/tmp", NULL
 	};
 	struct stat st;
 
-	/*
-	 * These are mounted read-write from the zone undergoing upgrade.  We
-	 * must be careful not to 'leak' things from the main system into the
-	 * zone, and this accomplishes that goal.
-	 */
-	for (cpp = localdirs; *cpp != NULL; cpp++) {
-		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
-		(void) snprintf(fromdir, sizeof (fromdir), "%s%s", rootpath,
-		    *cpp);
-		if (mkdir(tmp, 0755) != 0) {
-			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
-			return (B_FALSE);
-		}
-		if (domount(zlogp, MNTTYPE_LOFS, "", fromdir, tmp) != 0) {
-			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
+	if (mount_cmd == Z_MNT_SCRATCH) {
+		/*
+		 * These are mounted read-write from the zone undergoing
+		 * upgrade.  We must be careful not to 'leak' things from the
+		 * main system into the zone, and this accomplishes that goal.
+		 */
+		for (cpp = localdirs; *cpp != NULL; cpp++) {
+			(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot,
 			    *cpp);
-			return (B_FALSE);
+			(void) snprintf(fromdir, sizeof (fromdir), "%s%s",
+			    rootpath, *cpp);
+			if (mkdir(tmp, 0755) != 0) {
+				zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+				return (B_FALSE);
+			}
+			if (domount(zlogp, MNTTYPE_LOFS, "", fromdir, tmp)
+			    != 0) {
+				zerror(zlogp, B_TRUE, "cannot mount %s on %s",
+				    tmp, *cpp);
+				return (B_FALSE);
+			}
 		}
 	}
+
+	if (mount_cmd == Z_MNT_UPDATE)
+		loopdirs = upd_loopdirs;
+	else
+		loopdirs = scr_loopdirs;
 
 	/*
 	 * These are things mounted read-only from the running system because
@@ -1473,12 +1498,18 @@ build_mounted_post_var(zlog_t *zlogp, char *rootpath, const char *luroot)
 		}
 	}
 
+	if (mount_cmd == Z_MNT_UPDATE)
+		tmpdirs = upd_tmpdirs;
+	else
+		tmpdirs = scr_tmpdirs;
+
 	/*
 	 * These are things with tmpfs mounted inside.
 	 */
 	for (cpp = tmpdirs; *cpp != NULL; cpp++) {
 		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
-		if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+		if (mount_cmd == Z_MNT_SCRATCH && mkdir(tmp, 0755) != 0 &&
+		    errno != EEXIST) {
 			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
 			return (B_FALSE);
 		}
@@ -1595,7 +1626,7 @@ mount_filesystems_ipdent(zone_dochandle_t handle, zlog_t *zlogp,
 
 static int
 mount_filesystems_fsent(zone_dochandle_t handle, zlog_t *zlogp,
-    struct zone_fstab **fs_tabp, int *num_fsp, int mount_cmd)
+    struct zone_fstab **fs_tabp, int *num_fsp, zone_mnt_t mount_cmd)
 {
 	struct zone_fstab *tmp_ptr, *fs_ptr, *fsp, fstab;
 	int num_fs;
@@ -1613,7 +1644,8 @@ mount_filesystems_fsent(zone_dochandle_t handle, zlog_t *zlogp,
 		 * root, since the pool will not be known.  Ignore them in this
 		 * case.
 		 */
-		if (mount_cmd && strcmp(fstab.zone_fs_type, MNTTYPE_ZFS) == 0)
+		if (ALT_MOUNT(mount_cmd) &&
+		    strcmp(fstab.zone_fs_type, MNTTYPE_ZFS) == 0)
 			continue;
 
 		num_fs++;
@@ -1660,7 +1692,7 @@ mount_filesystems_fsent(zone_dochandle_t handle, zlog_t *zlogp,
 }
 
 static int
-mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
+mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 {
 	char rootpath[MAXPATHLEN];
 	char zonepath[MAXPATHLEN];
@@ -1774,15 +1806,14 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 	 *   3) Set up the rest of the scratch zone environment
 	 *	(build_mounted_post_var()).
 	 */
-	if (mount_cmd &&
-	    !build_mounted_pre_var(zlogp,
+	if (ALT_MOUNT(mount_cmd) && !build_mounted_pre_var(zlogp,
 	    rootpath, sizeof (rootpath), zonepath, luroot, sizeof (luroot)))
 		goto bad;
 
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
 
 	for (i = 0; i < num_fs; i++) {
-		if (mount_cmd &&
+		if (ALT_MOUNT(mount_cmd) &&
 		    strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
 			size_t slen = strlen(rootpath) - 2;
 
@@ -1802,14 +1833,15 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
-	if (mount_cmd &&
-	    !build_mounted_post_var(zlogp, rootpath, luroot))
+	if (ALT_MOUNT(mount_cmd) &&
+	    !build_mounted_post_var(zlogp, mount_cmd, rootpath, luroot))
 		goto bad;
 
 	/*
 	 * For Trusted Extensions cross-mount each lower level /export/home
 	 */
-	if (!mount_cmd && tsol_mounts(zlogp, zone_name, rootpath) != 0)
+	if (mount_cmd == Z_MNT_BOOT &&
+	    tsol_mounts(zlogp, zone_name, rootpath) != 0)
 		goto bad;
 
 	free_fs_data(fs_ptr, num_fs);
@@ -2907,7 +2939,7 @@ tcp_abort_connections(zlog_t *zlogp, zoneid_t zoneid)
 }
 
 static int
-get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
+get_privset(zlog_t *zlogp, priv_set_t *privs, zone_mnt_t mount_cmd)
 {
 	int error = -1;
 	zone_dochandle_t handle;
@@ -2923,7 +2955,7 @@ get_privset(zlog_t *zlogp, priv_set_t *privs, boolean_t mount_cmd)
 		return (-1);
 	}
 
-	if (mount_cmd) {
+	if (ALT_MOUNT(mount_cmd)) {
 		zone_iptype_t	iptype;
 		const char	*curr_iptype;
 
@@ -4010,7 +4042,7 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 }
 
 zoneid_t
-vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
+vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 {
 	zoneid_t rval = -1;
 	priv_set_t *privs;
@@ -4060,7 +4092,8 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (get_privset(zlogp, privs, mount_cmd) != 0)
 		goto error;
 
-	if (!mount_cmd && get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
+	if (mount_cmd == Z_MNT_BOOT &&
+	    get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of rctls");
 		goto error;
 	}
@@ -4070,7 +4103,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		goto error;
 	}
 
-	if (!mount_cmd && is_system_labeled()) {
+	if (mount_cmd == Z_MNT_BOOT && is_system_labeled()) {
 		zcent = get_zone_label(zlogp, privs);
 		if (zcent != NULL) {
 			match = zcent->zc_match;
@@ -4094,7 +4127,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	if (duplicate_reachable_path(zlogp, rootpath))
 		goto error;
 
-	if (mount_cmd) {
+	if (ALT_MOUNT(mount_cmd)) {
 		assert(zone_isnative || zone_iscluster);
 		root_to_lu(zlogp, rootpath, sizeof (rootpath), B_TRUE);
 
@@ -4222,7 +4255,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	 * The following actions are not performed when merely mounting a zone
 	 * for administrative use.
 	 */
-	if (!mount_cmd) {
+	if (mount_cmd == Z_MNT_BOOT) {
 		if (setup_zone_rm(zlogp, zone_name, zoneid) != Z_OK) {
 			(void) zone_shutdown(zoneid);
 			goto error;
@@ -4325,11 +4358,11 @@ write_index_file(zoneid_t zoneid)
 }
 
 int
-vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
+vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 {
 	char zonepath[MAXPATHLEN];
 
-	if (!mount_cmd && validate_datasets(zlogp) != 0) {
+	if (mount_cmd == Z_MNT_BOOT && validate_datasets(zlogp) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}
@@ -4356,7 +4389,7 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 		return (-1);
 	}
 
-	if (!mount_cmd) {
+	if (mount_cmd == Z_MNT_BOOT) {
 		zone_iptype_t iptype;
 
 		if (get_iptype(zlogp, &iptype) < 0) {

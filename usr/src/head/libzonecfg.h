@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern "C" {
 #include <zone.h>
 #include <libbrand.h>
 #include <sys/uuid.h>
+#include <libuutil.h>
 
 #define	ZONE_ID_UNDEFINED	-1
 
@@ -238,6 +239,13 @@ struct zone_devpermtab {
 	mode_t	zone_devperm_mode;
 	char	*zone_devperm_acl;
 };
+
+typedef struct {
+	uu_avl_node_t	zpe_entry;
+	char		*zpe_name;
+	char		*zpe_vers;
+	uu_avl_t	*zpe_patches_avl;
+} zone_pkg_entry_t;
 
 typedef enum zone_iptype {
 	ZS_SHARED,
@@ -457,12 +465,8 @@ extern	int	zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *);
 extern	int	zonecfg_enddsent(zone_dochandle_t);
 extern	int	zonecfg_getpsetent(zone_dochandle_t, struct zone_psettab *);
 extern	int	zonecfg_getmcapent(zone_dochandle_t, struct zone_mcaptab *);
-extern	int	zonecfg_setpkgent(zone_dochandle_t);
-extern	int	zonecfg_getpkgent(zone_dochandle_t, struct zone_pkgtab *);
-extern	int	zonecfg_endpkgent(zone_dochandle_t);
-extern	int	zonecfg_setpatchent(zone_dochandle_t);
-extern	int	zonecfg_getpatchent(zone_dochandle_t, struct zone_patchtab *);
-extern	int	zonecfg_endpatchent(zone_dochandle_t);
+extern	int	zonecfg_getpkgdata(zone_dochandle_t, uu_avl_pool_t *,
+    uu_avl_t *);
 extern	int	zonecfg_setdevperment(zone_dochandle_t);
 extern	int	zonecfg_getdevperment(zone_dochandle_t,
     struct zone_devpermtab *);

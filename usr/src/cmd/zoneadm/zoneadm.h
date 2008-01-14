@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@
 
 #define	Z_ERR		1
 #define	Z_USAGE		2
+#define	Z_FATAL		3
 
 #define	SW_CMP_NONE	0x0
 #define	SW_CMP_SRC	0x01
@@ -90,5 +91,7 @@ extern int init_zfs(void);
  */
 extern int sw_cmp(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
     uint_t flag);
+extern int sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
+    char *zonepath);
 
 #endif	/* _ZONEADM_H */

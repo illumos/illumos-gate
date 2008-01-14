@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@
 #define	DTD_ELEM_MCAP		(const xmlChar *) "mcap"
 #define	DTD_ELEM_PACKAGE	(const xmlChar *) "package"
 #define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
+#define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
 #define	DTD_ELEM_DEV_PERM	(const xmlChar *) "dev-perm"
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
@@ -226,7 +227,13 @@ typedef struct {
 	uu_avl_node_t	patch_node;
 	char		*patch_num;
 	char		*patch_vers;
+	uu_list_t	*obs_patches;
 } patch_node_t;
+
+typedef struct {
+	uu_list_node_t	link;
+	char		*patch_num;
+} obs_patch_node_t;
 
 typedef struct {
 	uu_avl_t	*obs_patches_avl;
@@ -6504,94 +6511,214 @@ zonecfg_getmcapent(zone_dochandle_t handle, struct zone_mcaptab *tabptr)
 	return (err);
 }
 
+/*
+ * Get the full tree of pkg/patch metadata in a set of nested AVL trees.
+ * pkgs_avl is an AVL tree of pkgs.  Each pkg element contains a
+ * zpe_patches_avl member which holds an AVL tree of patches for that pkg.
+ * The patch elements have the same zpe_patches_avl member, each of which can
+ * hold an AVL tree of patches that are obsoleted by the patch.
+ *
+ * The zone xml data contains DTD_ELEM_PACKAGE elements, followed by
+ * DTD_ELEM_PATCH elements.  The DTD_ELEM_PATCH patch element applies to the
+ * DTD_ELEM_PACKAGE that precedes it.  The DTD_ELEM_PATCH element may have
+ * child DTD_ELEM_OBSOLETES nodes associated with it.  The DTD_ELEM_PACKAGE
+ * really should have had the DTD_ELEM_PATCH elements as children but it
+ * was not defined that way initially so we are stuck with the DTD definition
+ * now.  However, we can safely assume the ordering for compatibility.
+ */
 int
-zonecfg_setpkgent(zone_dochandle_t handle)
-{
-	return (zonecfg_setent(handle));
-}
-
-int
-zonecfg_getpkgent(zone_dochandle_t handle, struct zone_pkgtab *tabptr)
+zonecfg_getpkgdata(zone_dochandle_t handle, uu_avl_pool_t *pkg_pool,
+    uu_avl_t *pkgs_avl)
 {
 	xmlNodePtr cur;
-	int err;
+	int res;
+	zone_pkg_entry_t *pkg;
+	char name[MAXNAMELEN];
+	char version[ZONE_PKG_VERSMAX];
 
 	if (handle == NULL)
 		return (Z_INVAL);
 
-	if ((cur = handle->zone_dh_cur) == NULL)
-		return (Z_NO_ENTRY);
+	if ((res = zonecfg_setent(handle)) != Z_OK)
+		return (res);
 
-	for (; cur != NULL; cur = cur->next)
-		if (!xmlStrcmp(cur->name, DTD_ELEM_PACKAGE))
-			break;
-	if (cur == NULL) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (Z_NO_ENTRY);
+	if ((cur = handle->zone_dh_cur) == NULL) {
+		res = Z_NO_ENTRY;
+		goto done;
 	}
 
-	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_pkg_name,
-	    sizeof (tabptr->zone_pkg_name))) != Z_OK) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (err);
+	for (; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_PACKAGE) == 0) {
+			uu_avl_index_t where;
+
+			if ((res = fetchprop(cur, DTD_ATTR_NAME, name,
+			    sizeof (name))) != Z_OK)
+				goto done;
+
+			if ((res = fetchprop(cur, DTD_ATTR_VERSION, version,
+			    sizeof (version))) != Z_OK)
+				goto done;
+
+			if ((pkg = (zone_pkg_entry_t *)
+			    malloc(sizeof (zone_pkg_entry_t))) == NULL) {
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			if ((pkg->zpe_name = strdup(name)) == NULL) {
+				free(pkg);
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			if ((pkg->zpe_vers = strdup(version)) == NULL) {
+				free(pkg->zpe_name);
+				free(pkg);
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			pkg->zpe_patches_avl = NULL;
+
+			uu_avl_node_init(pkg, &pkg->zpe_entry, pkg_pool);
+			if (uu_avl_find(pkgs_avl, pkg, NULL, &where) != NULL) {
+				free(pkg->zpe_name);
+				free(pkg->zpe_vers);
+				free(pkg);
+			} else {
+				uu_avl_insert(pkgs_avl, pkg, where);
+			}
+
+		} else if (xmlStrcmp(cur->name, DTD_ELEM_PATCH) == 0) {
+			zone_pkg_entry_t *patch;
+			uu_avl_index_t where;
+			char *p;
+			char *dashp = NULL;
+			xmlNodePtr child;
+
+			if ((res = fetchprop(cur, DTD_ATTR_ID, name,
+			    sizeof (name))) != Z_OK)
+				goto done;
+
+			if ((patch = (zone_pkg_entry_t *)
+			    malloc(sizeof (zone_pkg_entry_t))) == NULL) {
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			if ((p = strchr(name, '-')) != NULL) {
+				dashp = p;
+				*p++ = '\0';
+			} else {
+				p = "";
+			}
+
+			if ((patch->zpe_name = strdup(name)) == NULL) {
+				free(patch);
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			if ((patch->zpe_vers = strdup(p)) == NULL) {
+				free(patch->zpe_name);
+				free(patch);
+				res = Z_NOMEM;
+				goto done;
+			}
+
+			if (dashp != NULL)
+				*dashp = '-';
+
+			patch->zpe_patches_avl = NULL;
+
+			if (pkg->zpe_patches_avl == NULL) {
+				pkg->zpe_patches_avl = uu_avl_create(pkg_pool,
+				    NULL, UU_DEFAULT);
+				if (pkg->zpe_patches_avl == NULL) {
+					free(patch->zpe_name);
+					free(patch->zpe_vers);
+					free(patch);
+					res = Z_NOMEM;
+					goto done;
+				}
+			}
+
+			uu_avl_node_init(patch, &patch->zpe_entry, pkg_pool);
+			if (uu_avl_find(pkg->zpe_patches_avl, patch, NULL,
+			    &where) != NULL) {
+				free(patch->zpe_name);
+				free(patch->zpe_vers);
+				free(patch);
+			} else {
+				uu_avl_insert(pkg->zpe_patches_avl, patch,
+				    where);
+			}
+
+			/* Add any patches this patch obsoletes. */
+			for (child = cur->xmlChildrenNode; child != NULL;
+			    child = child->next) {
+				zone_pkg_entry_t *obs;
+
+				if (xmlStrcmp(child->name, DTD_ELEM_OBSOLETES)
+				    != 0)
+					continue;
+
+				if ((res = fetchprop(child, DTD_ATTR_ID,
+				    name, sizeof (name))) != Z_OK)
+					goto done;
+
+				if ((obs = (zone_pkg_entry_t *)malloc(
+				    sizeof (zone_pkg_entry_t))) == NULL) {
+					res = Z_NOMEM;
+					goto done;
+				}
+
+				if ((obs->zpe_name = strdup(name)) == NULL) {
+					free(obs);
+					res = Z_NOMEM;
+					goto done;
+				}
+				/*
+				 * The version doesn't matter for obsoleted
+				 * patches.
+				 */
+				obs->zpe_vers = NULL;
+				obs->zpe_patches_avl = NULL;
+
+				/*
+				 * If this is the first obsolete patch, add an
+				 * AVL tree to the parent patch element.
+				 */
+				if (patch->zpe_patches_avl == NULL) {
+					patch->zpe_patches_avl =
+					    uu_avl_create(pkg_pool, NULL,
+					    UU_DEFAULT);
+					if (patch->zpe_patches_avl == NULL) {
+						free(obs->zpe_name);
+						free(obs);
+						res = Z_NOMEM;
+						goto done;
+					}
+				}
+
+				/* Insert obsolete patch into the AVL tree. */
+				uu_avl_node_init(obs, &obs->zpe_entry,
+				    pkg_pool);
+				if (uu_avl_find(patch->zpe_patches_avl, obs,
+				    NULL, &where) != NULL) {
+					free(obs->zpe_name);
+					free(obs);
+				} else {
+					uu_avl_insert(patch->zpe_patches_avl,
+					    obs, where);
+				}
+			}
+		}
 	}
 
-	if ((err = fetchprop(cur, DTD_ATTR_VERSION, tabptr->zone_pkg_version,
-	    sizeof (tabptr->zone_pkg_version))) != Z_OK) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (err);
-	}
-
-	handle->zone_dh_cur = cur->next;
-	return (Z_OK);
-}
-
-int
-zonecfg_endpkgent(zone_dochandle_t handle)
-{
-	return (zonecfg_endent(handle));
-}
-
-int
-zonecfg_setpatchent(zone_dochandle_t handle)
-{
-	return (zonecfg_setent(handle));
-}
-
-int
-zonecfg_getpatchent(zone_dochandle_t handle, struct zone_patchtab *tabptr)
-{
-	xmlNodePtr cur;
-	int err;
-
-	if (handle == NULL)
-		return (Z_INVAL);
-
-	if ((cur = handle->zone_dh_cur) == NULL)
-		return (Z_NO_ENTRY);
-
-	for (; cur != NULL; cur = cur->next)
-		if (!xmlStrcmp(cur->name, DTD_ELEM_PATCH))
-			break;
-	if (cur == NULL) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (Z_NO_ENTRY);
-	}
-
-	if ((err = fetchprop(cur, DTD_ATTR_ID, tabptr->zone_patch_id,
-	    sizeof (tabptr->zone_patch_id))) != Z_OK) {
-		handle->zone_dh_cur = handle->zone_dh_top;
-		return (err);
-	}
-
-	handle->zone_dh_cur = cur->next;
-	return (Z_OK);
-}
-
-int
-zonecfg_endpatchent(zone_dochandle_t handle)
-{
-	return (zonecfg_endent(handle));
+done:
+	(void) zonecfg_endent(handle);
+	return (res);
 }
 
 int
@@ -7065,13 +7192,43 @@ dir_pkg(char *pkg_name, char **pkg_list, int cnt)
 }
 
 /*
+ * Keep track of obsoleted patches for this specific patch.  We don't need to
+ * keep track of the patch version since once a patch is obsoleted, all prior
+ * versions are also obsolete and there won't be any new versions.
+ */
+static int
+add_obs_patch(patch_node_t *patch, char *num, uu_list_pool_t *patches_pool)
+{
+	obs_patch_node_t *obs;
+
+	if (patch->obs_patches == NULL) {
+		if ((patch->obs_patches = uu_list_create(patches_pool, NULL,
+		    0)) == NULL)
+			return (Z_NOMEM);
+	}
+
+	if ((obs = (obs_patch_node_t *)malloc(sizeof (obs_patch_node_t)))
+	    == NULL)
+		return (Z_NOMEM);
+
+	if ((obs->patch_num = strdup(num)) == NULL) {
+		free(obs);
+		return (Z_NOMEM);
+	}
+
+	uu_list_node_init(obs, &obs->link, patches_pool);
+	(void) uu_list_insert_before(patch->obs_patches, NULL, obs);
+
+	return (Z_OK);
+}
+
+/*
  * Keep track of obsoleted patches.  We don't need to keep track of the patch
  * version since once a patch is obsoleted, all prior versions are also
  * obsolete and there won't be any new versions.
  */
 static int
-save_obs_patch(char *num, uu_avl_pool_t *patches_pool,
-    uu_avl_t *obs_patches_avl)
+save_obs_patch(char *num, uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches)
 {
 	patch_node_t	*patch;
 	uu_avl_index_t where;
@@ -7085,15 +7242,17 @@ save_obs_patch(char *num, uu_avl_pool_t *patches_pool,
 	}
 
 	patch->patch_vers = NULL;
+	patch->obs_patches = NULL;
+
 	uu_avl_node_init(patch, &patch->patch_node, patches_pool);
 
-	if (uu_avl_find(obs_patches_avl, patch, NULL, &where) != NULL) {
+	if (uu_avl_find(obs_patches, patch, NULL, &where) != NULL) {
 		free(patch->patch_num);
 		free(patch);
 		return (Z_OK);
 	}
 
-	uu_avl_insert(obs_patches_avl, patch, where);
+	uu_avl_insert(obs_patches, patch, where);
 	return (Z_OK);
 }
 
@@ -7134,11 +7293,11 @@ save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
  * are also obsolete and there won't be any new versions.
  */
 static boolean_t
-obsolete_patch(patch_node_t *patch, uu_avl_t *obs_patches_avl)
+obsolete_patch(patch_node_t *patch, uu_avl_t *obs_patches)
 {
 	uu_avl_index_t	where;
 
-	if (uu_avl_find(obs_patches_avl, patch, NULL, &where) != NULL)
+	if (uu_avl_find(obs_patches, patch, NULL, &where) != NULL)
 		return (B_TRUE);
 
 	return (B_FALSE);
@@ -7172,12 +7331,13 @@ patch_node_compare(const void *l_arg, const void *r_arg, void *private)
  *	119255-06 Incompatibles:
  *
  * A backed out patch will have "backed out\n" as the status.  We should
- * skip these patches.  We also also ignore any entries that seem to be
- * corrupted.
+ * skip these patches.  We also ignore any entries that seem to be
+ * corrupted.  Obsolete patches are saved in the obs_patches parameter
+ * AVL list.
  */
 static int
 parse_info(char *patchinfo, uu_avl_pool_t *patches_pool, uu_avl_t *patches_avl,
-    uu_avl_t *obs_patches_avl)
+    uu_avl_t *obs_patches, uu_list_pool_t *list_pool)
 {
 	char		*p;
 	char		*lastp;
@@ -7222,6 +7382,7 @@ parse_info(char *patchinfo, uu_avl_pool_t *patches_pool, uu_avl_t *patches_avl,
 		free(patch);
 		return (Z_NOMEM);
 	}
+	patch->obs_patches = NULL;
 
 	uu_avl_node_init(patch, &patch->patch_node, patches_pool);
 	save_patch(patch, patches_avl);
@@ -7251,7 +7412,17 @@ parse_info(char *patchinfo, uu_avl_pool_t *patches_pool, uu_avl_t *patches_avl,
 		if ((pvers = strchr(p, '-')) != NULL)
 			*pvers = '\0';
 
-		if (save_obs_patch(p, patches_pool, obs_patches_avl) != Z_OK)
+		/*
+		 * We save all of the obsolete patches in one big list in the
+		 * obs_patches AVL tree so that we know not to output those as
+		 * part of the sw dependencies.  However, we also need to save
+		 * the obsolete patch information for this sepcific patch so
+		 * so that we can do the cross manifest patch checking
+		 * correctly.
+		 */
+		if (save_obs_patch(p, patches_pool, obs_patches) != Z_OK)
+			return (Z_NOMEM);
+		if (add_obs_patch(patch, p, list_pool) != Z_OK)
 			return (Z_NOMEM);
 	} while ((p = strtok_r(NULL, " ", &lastp)) != NULL);
 
@@ -7294,6 +7465,21 @@ add_patch(void *e, void *p)
 	if ((args->res = newprop(node, DTD_ATTR_ID, id)) != Z_OK)
 		return (UU_WALK_DONE);
 
+	if (patch->obs_patches != NULL) {
+		obs_patch_node_t *op;
+		xmlNodePtr	node2;
+
+		for (op = uu_list_first(patch->obs_patches); op != NULL;
+		    op = uu_list_next(patch->obs_patches, op)) {
+			(void) snprintf(id, sizeof (id), "%s", op->patch_num);
+			node2 = xmlNewTextChild(node, NULL, DTD_ELEM_OBSOLETES,
+			    NULL);
+			if ((args->res = newprop(node2, DTD_ATTR_ID, id))
+			    != Z_OK)
+				return (UU_WALK_DONE);
+		}
+	}
+
 	return (UU_WALK_NEXT);
 }
 
@@ -7308,6 +7494,19 @@ patch_avl_delete(uu_avl_t *patches_avl)
 		    &cookie)) != NULL) {
 			free(p->patch_num);
 			free(p->patch_vers);
+
+			if (p->obs_patches != NULL) {
+				obs_patch_node_t *op;
+				void *cookie2 = NULL;
+
+				while ((op = uu_list_teardown(p->obs_patches,
+				    &cookie2)) != NULL) {
+					free(op->patch_num);
+					free(op);
+				}
+				uu_list_destroy(p->obs_patches);
+			}
+
 			free(p);
 		}
 
@@ -7321,7 +7520,8 @@ patch_avl_delete(uu_avl_t *patches_avl)
  */
 static int
 add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop,
-    uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches_avl)
+    uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches,
+    uu_list_pool_t *list_pool)
 {
 	int		i;
 	int		res;
@@ -7334,13 +7534,13 @@ add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop,
 
 	for (i = 0; i < infop->zpi_patch_cnt; i++) {
 		if ((res = parse_info(infop->zpi_patchinfo[i], patches_pool,
-		    patches_avl, obs_patches_avl)) != Z_OK) {
+		    patches_avl, obs_patches, list_pool)) != Z_OK) {
 			patch_avl_delete(patches_avl);
 			return (res);
 		}
 	}
 
-	args.obs_patches_avl = obs_patches_avl;
+	args.obs_patches_avl = obs_patches;
 	args.handle = handle;
 	args.res = Z_OK;
 
@@ -7348,6 +7548,44 @@ add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop,
 
 	patch_avl_delete(patches_avl);
 	return (args.res);
+}
+
+/*
+ * Keep track of the pkgs we have already processed so that we can quickly
+ * skip those pkgs while recursively doing dependents.
+ */
+static boolean_t
+pkg_in_manifest(uu_avl_t *saw_pkgs, char *pname, uu_avl_pool_t *pkgs_pool)
+{
+	uu_avl_index_t where;
+
+	if (uu_avl_find(saw_pkgs, pname, NULL, &where) == NULL) {
+		zone_pkg_entry_t *pkg;
+
+		/*
+		 * We need to add it.  If we don't have memory we just skip
+		 * this pkg since this routine improves performance but the
+		 * algorithm is still correct without it.
+		 */
+		if ((pkg = (zone_pkg_entry_t *)
+		    malloc(sizeof (zone_pkg_entry_t))) == NULL)
+			return (B_FALSE);
+
+		if ((pkg->zpe_name = strdup(pname)) == NULL) {
+			free(pkg);
+			return (B_FALSE);
+		}
+
+		pkg->zpe_vers = NULL;
+		pkg->zpe_patches_avl = NULL;
+
+		/* Insert pkg into the AVL tree. */
+		uu_avl_node_init(pkg, &pkg->zpe_entry, pkgs_pool);
+		uu_avl_insert(saw_pkgs, pkg, where);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }
 
 /*
@@ -7462,6 +7700,114 @@ get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
 }
 
 /*
+ * Add any dependent pkgs to the list.  The pkg depend file lists pkg
+ * dependencies, one per line with an entry that looks like:
+ *	P SUNWcar       Core Architecture, (Root)
+ * See the depend(4) man page.
+ */
+static int
+add_dependents(zone_dochandle_t handle, char *pname,
+    uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches,
+    uu_list_pool_t *list_pool, uu_avl_t *saw_pkgs, uu_avl_pool_t *pkgs_pool)
+{
+	int		res = Z_OK;
+	FILE		*fp;
+	char		depend[MAXPATHLEN];
+	char		*buf;
+	struct stat	sbuf;
+
+	(void) snprintf(depend, sizeof (depend), "%s/%s/install/depend",
+	    PKG_PATH, pname);
+
+	if (stat(depend, &sbuf) == -1 || !S_ISREG(sbuf.st_mode))
+		return (Z_OK);
+
+	if ((fp = fopen(depend, "r")) == NULL)
+		return (Z_OK);
+
+	while ((buf = read_pkg_data(fp)) != NULL) {
+		char *deppkg;
+		char *delims = " \t";
+		char pkginfo[MAXPATHLEN];
+		struct zone_pkginfo info;
+
+		if (*buf != 'P') {
+			free(buf);
+			continue;
+		}
+
+		/* Skip past the leading 'P '. */
+		if ((deppkg = strtok(buf + 2, delims)) == NULL) {
+			free(buf);
+			continue;
+		}
+
+		/* If the pkg is already in the manifest don't add it again. */
+		if (pkg_in_manifest(saw_pkgs, deppkg, pkgs_pool)) {
+			free(buf);
+			continue;
+		}
+
+		(void) snprintf(pkginfo, sizeof (pkginfo), "%s/%s/pkginfo",
+		    PKG_PATH, deppkg);
+
+		if (stat(pkginfo, &sbuf) == -1 || !S_ISREG(sbuf.st_mode)) {
+			free(buf);
+			continue;
+		}
+
+		if (get_pkginfo(pkginfo, &info) != 0) {
+			res = Z_NOMEM;
+			free(buf);
+			break;
+		}
+
+		if ((res = add_dependents(handle, deppkg, patches_pool,
+		    obs_patches, list_pool, saw_pkgs, pkgs_pool)) == Z_OK &&
+		    (res = add_pkg(handle, deppkg, info.zpi_version)) == Z_OK) {
+			if (info.zpi_patch_cnt > 0)
+				res = add_patches(handle, &info, patches_pool,
+				    obs_patches, list_pool);
+		}
+
+		free(buf);
+		free_pkginfo(&info);
+
+		if (res != Z_OK)
+			break;
+	}
+
+	(void) fclose(fp);
+	return (res);
+}
+
+/* ARGSUSED */
+static int
+pkg_entry_compare(const void *l_arg, const void *r_arg, void *private)
+{
+	zone_pkg_entry_t *pkg = (zone_pkg_entry_t *)l_arg;
+	char *name = (char *)r_arg;
+
+	return (strcmp(pkg->zpe_name, name));
+}
+
+static void
+pkg_avl_delete(uu_avl_t *pavl)
+{
+	if (pavl != NULL) {
+		zone_pkg_entry_t *p;
+		void *cookie = NULL;
+
+		while ((p = uu_avl_teardown(pavl, &cookie)) != NULL) {
+			free(p->zpe_name);
+			free(p);
+		}
+
+		uu_avl_destroy(pavl);
+	}
+}
+
+/*
  * Take a software inventory of the global zone.  We need to get the set of
  * packages and patches that are on the global zone that the specified
  * non-global zone depends on.  The packages we need in the inventory are:
@@ -7477,7 +7823,13 @@ get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
  * then (b) will be skipped.
  *
  * For each of the packages that is being added to the inventory, we will also
+ * add its dependent packages to the inventory.
+ *
+ * For each of the packages that is being added to the inventory, we will also
  * add all of the associated, unique patches to the inventory.
+ *
+ * See the comment for zonecfg_getpkgdata() for compatability restrictions on
+ * how we must save the XML representation of the software inventory.
  */
 static int
 zonecfg_sw_inventory(zone_dochandle_t handle)
@@ -7490,32 +7842,56 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 	struct zone_pkginfo	info;
 	int		pkg_cnt = 0;
 	char		**pkgs = NULL;
-	uu_avl_pool_t 	*patches_pool;
-	uu_avl_t 	*obs_patches_avl;
+	uu_avl_pool_t 	*pkgs_pool = NULL;
+	uu_avl_pool_t 	*patches_pool = NULL;
+	uu_list_pool_t 	*list_pool = NULL;
+	uu_avl_t	*saw_pkgs = NULL;
+	uu_avl_t 	*obs_patches = NULL;
+
+	if ((pkgs_pool = uu_avl_pool_create("pkgs_pool",
+	    sizeof (zone_pkg_entry_t), offsetof(zone_pkg_entry_t, zpe_entry),
+	    pkg_entry_compare, UU_DEFAULT)) == NULL) {
+		res = Z_NOMEM;
+		goto done;
+	}
+
+	if ((saw_pkgs = uu_avl_create(pkgs_pool, NULL, UU_DEFAULT)) == NULL) {
+		res = Z_NOMEM;
+		goto done;
+	}
 
 	if ((patches_pool = uu_avl_pool_create("patches_pool",
 	    sizeof (patch_node_t), offsetof(patch_node_t, patch_node),
 	    patch_node_compare, UU_DEFAULT)) == NULL) {
-		return (Z_NOMEM);
+		res = Z_NOMEM;
+		goto done;
 	}
 
-	if ((obs_patches_avl = uu_avl_create(patches_pool, NULL, UU_DEFAULT))
+	if ((list_pool = uu_list_pool_create("list_pool",
+	    sizeof (obs_patch_node_t), offsetof(obs_patch_node_t, link), NULL,
+	    UU_DEFAULT)) == NULL) {
+		res = Z_NOMEM;
+		goto done;
+	}
+
+	/*
+	 * The obs_patches AVL tree saves all of the obsolete patches so
+	 * that we know not to output those as part of the sw dependencies.
+	 */
+	if ((obs_patches = uu_avl_create(patches_pool, NULL, UU_DEFAULT))
 	    == NULL) {
-		uu_avl_pool_destroy(patches_pool);
-		return (Z_NOMEM);
+		res = Z_NOMEM;
+		goto done;
 	}
 
 	if ((res = get_ipd_pkgs(handle, &pkgs, &pkg_cnt)) != Z_OK) {
-		patch_avl_delete(obs_patches_avl);
-		uu_avl_pool_destroy(patches_pool);
-		return (res);
+		res = Z_NOMEM;
+		goto done;
 	}
 
 	if ((dirp = opendir(PKG_PATH)) == NULL) {
-		patch_avl_delete(obs_patches_avl);
-		uu_avl_pool_destroy(patches_pool);
-		free_ipd_pkgs(pkgs, pkg_cnt);
-		return (Z_OK);
+		res = Z_NOMEM;
+		goto done;
 	}
 
 	while ((dp = readdir(dirp)) != (struct dirent *)0) {
@@ -7536,12 +7912,21 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 
 		if (!info.zpi_this_zone &&
 		    (info.zpi_all_zones ||
-		    dir_pkg(dp->d_name, pkgs, pkg_cnt))) {
-			if ((res = add_pkg(handle, dp->d_name,
+		    dir_pkg(dp->d_name, pkgs, pkg_cnt)) &&
+		    !pkg_in_manifest(saw_pkgs, dp->d_name, pkgs_pool)) {
+			/*
+			 * Add dependents first so any patches will get
+			 * associated with the right pkg in the xml file.
+			 */
+			if ((res = add_dependents(handle, dp->d_name,
+			    patches_pool, obs_patches, list_pool, saw_pkgs,
+			    pkgs_pool)) == Z_OK &&
+			    (res = add_pkg(handle, dp->d_name,
 			    info.zpi_version)) == Z_OK) {
 				if (info.zpi_patch_cnt > 0)
 					res = add_patches(handle, &info,
-					    patches_pool, obs_patches_avl);
+					    patches_pool, obs_patches,
+					    list_pool);
 			}
 		}
 
@@ -7553,8 +7938,15 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 
 	(void) closedir(dirp);
 
-	patch_avl_delete(obs_patches_avl);
-	uu_avl_pool_destroy(patches_pool);
+done:
+	pkg_avl_delete(saw_pkgs);
+	patch_avl_delete(obs_patches);
+	if (pkgs_pool != NULL)
+		uu_avl_pool_destroy(pkgs_pool);
+	if (patches_pool != NULL)
+		uu_avl_pool_destroy(patches_pool);
+	if (list_pool != NULL)
+		uu_list_pool_destroy(list_pool);
 	free_ipd_pkgs(pkgs, pkg_cnt);
 
 	if (res == Z_OK)

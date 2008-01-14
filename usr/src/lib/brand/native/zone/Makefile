@@ -20,14 +20,14 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 BRAND=		native
-PROGS=		postclone
+PROGS=		postclone attach_update
 XMLDOCS=	config.xml platform.xml
 TEMPLATES=	SUNWdefault.xml SUNWblank.xml
 
