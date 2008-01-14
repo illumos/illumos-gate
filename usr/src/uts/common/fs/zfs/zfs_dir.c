@@ -817,13 +817,17 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
-	if (zfsvfs->z_fuid_obj == 0) {
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, SPA_MAXBLOCKSIZE);
-		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-	} else {
-		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0, SPA_MAXBLOCKSIZE);
+	if (IS_EPHEMERAL(crgetuid(cr)) || IS_EPHEMERAL(crgetgid(cr))) {
+		if (zfsvfs->z_fuid_obj == 0) {
+			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+		} else {
+			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+		}
 	}
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {

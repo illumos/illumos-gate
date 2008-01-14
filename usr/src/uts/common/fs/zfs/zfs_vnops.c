@@ -1214,15 +1214,18 @@ top:
 
 		tx = dmu_tx_create(os);
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		if (zfsvfs->z_fuid_obj == 0) {
-			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-			    SPA_MAXBLOCKSIZE);
-			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-		} else {
-			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-			    SPA_MAXBLOCKSIZE);
+		if (aclp && aclp->z_has_fuids) {
+			if (zfsvfs->z_fuid_obj == 0) {
+				dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+				dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+				    FUID_SIZE_ESTIMATE(zfsvfs));
+				dmu_tx_hold_zap(tx, MASTER_NODE_OBJ,
+				    FALSE, NULL);
+			} else {
+				dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+				dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+				    FUID_SIZE_ESTIMATE(zfsvfs));
+			}
 		}
 		dmu_tx_hold_bonus(tx, dzp->z_id);
 		dmu_tx_hold_zap(tx, dzp->z_id, TRUE, name);
@@ -1632,15 +1635,17 @@ top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, dirname);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
-	if (zfsvfs->z_fuid_obj == 0) {
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-		    SPA_MAXBLOCKSIZE);
-		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-	} else {
-		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-		    SPA_MAXBLOCKSIZE);
+	if (aclp && aclp->z_has_fuids) {
+		if (zfsvfs->z_fuid_obj == 0) {
+			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+		} else {
+			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+		}
 	}
 	if ((dzp->z_phys->zp_flags & ZFS_INHERIT_ACE) || aclp)
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
@@ -2338,6 +2343,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	zfs_fuid_info_t *fuidp = NULL;
 	xvattr_t *xvap = (xvattr_t *)vap;	/* vap may be an xvattr_t * */
 	xoptattr_t	*xoap;
+	zfs_acl_t	*aclp = NULL;
 	boolean_t skipaclchk = (flags & ATTR_NOACLCHECK) ? B_TRUE : B_FALSE;
 
 	if (mask == 0)
@@ -2565,15 +2571,18 @@ top:
 
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
-	if (zfsvfs->z_fuid_obj == 0) {
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-		    SPA_MAXBLOCKSIZE);
-		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-	} else {
-		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-		    SPA_MAXBLOCKSIZE);
+	if (((mask & AT_UID) && IS_EPHEMERAL(vap->va_uid)) ||
+	    ((mask & AT_GID) && IS_EPHEMERAL(vap->va_gid))) {
+		if (zfsvfs->z_fuid_obj == 0) {
+			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+		} else {
+			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+		}
 	}
 
 	if (mask & AT_MODE) {
@@ -2581,6 +2590,11 @@ top:
 
 		new_mode = (pmode & S_IFMT) | (vap->va_mode & ~S_IFMT);
 
+		if (err = zfs_acl_chmod_setattr(zp, &aclp, new_mode)) {
+			dmu_tx_abort(tx);
+			ZFS_EXIT(zfsvfs);
+			return (err);
+		}
 		if (pzp->zp_acl.z_acl_extern_obj) {
 			/* Are we upgrading ACL from old V0 format to new V1 */
 			if (zfsvfs->z_version <= ZPL_VERSION_FUID &&
@@ -2590,15 +2604,17 @@ top:
 				    pzp->zp_acl.z_acl_extern_obj, 0,
 				    DMU_OBJECT_END);
 				dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
-				    0, sizeof (zfs_object_ace_t) * 2048 + 6);
+				    0, aclp->z_acl_bytes);
 			} else {
 				dmu_tx_hold_write(tx,
 				    pzp->zp_acl.z_acl_extern_obj, 0,
-				    SPA_MAXBLOCKSIZE);
+				    aclp->z_acl_bytes);
 			}
-		} else {
-			dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
-			    0, sizeof (zfs_object_ace_t) * 2048 + 6);
+		} else if (!(pzp->zp_flags & ZFS_ACL_TRIVIAL)) {
+			if (aclp->z_acl_bytes > ZFS_ACE_SPACE) {
+				dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
+				    0, aclp->z_acl_bytes);
+			}
 		}
 	}
 
@@ -2607,6 +2623,8 @@ top:
 		if (err) {
 			dmu_tx_abort(tx);
 			ZFS_EXIT(zfsvfs);
+			if (aclp)
+				zfs_acl_free(aclp);
 			return (err);
 		}
 		dmu_tx_hold_bonus(tx, attrzp->z_id);
@@ -2616,6 +2634,12 @@ top:
 	if (err) {
 		if (attrzp)
 			VN_RELE(ZTOV(attrzp));
+
+		if (aclp) {
+			zfs_acl_free(aclp);
+			aclp = NULL;
+		}
+
 		if (err == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			dmu_tx_wait(tx);
 			dmu_tx_abort(tx);
@@ -2639,8 +2663,11 @@ top:
 	mutex_enter(&zp->z_lock);
 
 	if (mask & AT_MODE) {
-		err = zfs_acl_chmod_setattr(zp, new_mode, tx, cr);
+		mutex_enter(&zp->z_acl_lock);
+		zp->z_phys->zp_mode = new_mode;
+		err = zfs_aclset_common(zp, aclp, cr, &fuidp, tx);
 		ASSERT3U(err, ==, 0);
+		mutex_exit(&zp->z_acl_lock);
 	}
 
 	if (attrzp)
@@ -2662,6 +2689,9 @@ top:
 			attrzp->z_phys->zp_gid = zfs_fuid_create(zfsvfs,
 			    vap->va_gid, cr, ZFS_GROUP, tx, &fuidp);
 	}
+
+	if (aclp)
+		zfs_acl_free(aclp);
 
 	if (attrzp)
 		mutex_exit(&attrzp->z_lock);
@@ -3177,15 +3207,17 @@ top:
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, name);
 	if (dzp->z_phys->zp_flags & ZFS_INHERIT_ACE)
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, SPA_MAXBLOCKSIZE);
-	if (zfsvfs->z_fuid_obj == 0) {
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-		    SPA_MAXBLOCKSIZE);
-		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-	} else {
-		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-		    SPA_MAXBLOCKSIZE);
+	if (IS_EPHEMERAL(crgetuid(cr)) || IS_EPHEMERAL(crgetgid(cr))) {
+		if (zfsvfs->z_fuid_obj == 0) {
+			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+		} else {
+			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+		}
 	}
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {

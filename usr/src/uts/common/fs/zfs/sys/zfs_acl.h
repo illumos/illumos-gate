@@ -165,6 +165,7 @@ typedef struct zfs_acl {
 	zfs_acl_node_t	*z_curr_node;	/* current node iterator is handling */
 	list_t		z_acl;		/* chunks of ACE data */
 	acl_ops_t	z_ops;		/* ACL operations */
+	boolean_t	z_has_fuids;	/* FUIDs present in ACL? */
 } zfs_acl_t;
 
 #define	ACL_DATA_ALLOCED	0x1
@@ -185,6 +186,7 @@ typedef struct zfs_acl {
 
 struct znode;
 struct zfsvfs;
+struct zfs_fuid_info;
 
 #ifdef _KERNEL
 void zfs_perm_init(struct znode *, struct znode *, int, vattr_t *,
@@ -198,12 +200,14 @@ extern int zfs_zaccess(struct znode *, int, int, boolean_t, cred_t *);
 extern int zfs_zaccess_rwx(struct znode *, mode_t, int, cred_t *);
 extern int zfs_zaccess_unix(struct znode *, mode_t, cred_t *);
 extern int zfs_acl_access(struct znode *, int, cred_t *);
-int zfs_acl_chmod_setattr(struct znode *, uint64_t, dmu_tx_t *, cred_t *);
+int zfs_acl_chmod_setattr(struct znode *, zfs_acl_t **, uint64_t);
 int zfs_zaccess_delete(struct znode *, struct znode *, cred_t *);
 int zfs_zaccess_rename(struct znode *, struct znode *,
     struct znode *, struct znode *, cred_t *cr);
 void zfs_acl_free(zfs_acl_t *);
 int zfs_vsec_2_aclp(struct zfsvfs *, vtype_t, vsecattr_t *, zfs_acl_t **);
+int zfs_aclset_common(struct znode *, zfs_acl_t *, cred_t *,
+    struct zfs_fuid_info **, dmu_tx_t *);
 
 #endif
 

@@ -53,6 +53,11 @@ typedef enum {
 
 #endif
 
+/*
+ * Estimate space needed for one more fuid table entry.
+ * for now assume its current size + 1K
+ */
+#define	FUID_SIZE_ESTIMATE(z) (z->z_fuid_size + (SPA_MINBLOCKSIZE << 1))
 
 #define	FUID_INDEX(x)	(x >> 32)
 #define	FUID_RID(x)	(x & 0xffffffff)

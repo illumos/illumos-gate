@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ struct zfsvfs {
 	uint64_t	z_max_blksz;	/* maximum block size for files */
 	uint64_t	z_assign;	/* TXG_NOWAIT or set by zil_replay() */
 	uint64_t	z_fuid_obj;	/* fuid table object number */
+	uint64_t	z_fuid_size;	/* fuid table size */
 	avl_tree_t	z_fuid_idx;	/* fuid tree keyed by index */
 	avl_tree_t	z_fuid_domain;	/* fuid tree keyed by domain */
 	krwlock_t	z_fuid_lock;	/* fuid lock */

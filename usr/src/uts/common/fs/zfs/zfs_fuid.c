@@ -111,7 +111,6 @@ zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 {
 	dmu_buf_t *db;
 	char *packed;
-	size_t nvsize = 0;
 	int error = 0;
 	int i;
 
@@ -146,21 +145,23 @@ zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 	if (zfsvfs->z_fuid_obj) {
 		VERIFY(0 == dmu_bonus_hold(zfsvfs->z_os, zfsvfs->z_fuid_obj,
 		    FTAG, &db));
-		nvsize = *(uint64_t *)db->db_data;
+		zfsvfs->z_fuid_size = *(uint64_t *)db->db_data;
 		dmu_buf_rele(db, FTAG);
 	}
 
-	if (nvsize == 0)
+	if (zfsvfs->z_fuid_size == 0)
 		goto initialized;
 
-	packed = kmem_alloc(nvsize, KM_SLEEP);
-	error = dmu_read(zfsvfs->z_os, zfsvfs->z_fuid_obj, 0, nvsize, packed);
+	packed = kmem_alloc(zfsvfs->z_fuid_size, KM_SLEEP);
+	error = dmu_read(zfsvfs->z_os, zfsvfs->z_fuid_obj, 0,
+	    zfsvfs->z_fuid_size, packed);
 	if (error == 0)  {
 		nvlist_t **fuidnvp;
 		nvlist_t *nvp = NULL;
 		uint_t count;
 
-		VERIFY(nvlist_unpack(packed, nvsize, &nvp, 0) == 0);
+		VERIFY(nvlist_unpack(packed, zfsvfs->z_fuid_size,
+		    &nvp, 0) == 0);
 		VERIFY((error = nvlist_lookup_nvlist_array(nvp, FUID_NVP_ARRAY,
 		    &fuidnvp, &count)) == 0);
 
@@ -197,7 +198,7 @@ zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 		}
 		nvlist_free(nvp);
 	}
-	kmem_free(packed, nvsize);
+	kmem_free(packed, zfsvfs->z_fuid_size);
 
 initialized:
 	zfsvfs->z_fuid_loaded = B_TRUE;
@@ -293,13 +294,14 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 		VERIFY(nvlist_pack(nvp, &packed, &nvsize,
 		    NV_ENCODE_XDR, KM_SLEEP) == 0);
 		nvlist_free(nvp);
-		dmu_write(zfsvfs->z_os, zfsvfs->z_fuid_obj, 0, nvsize,
-		    packed, tx);
-		kmem_free(packed, nvsize);
+		zfsvfs->z_fuid_size = nvsize;
+		dmu_write(zfsvfs->z_os, zfsvfs->z_fuid_obj, 0,
+		    zfsvfs->z_fuid_size, packed, tx);
+		kmem_free(packed, zfsvfs->z_fuid_size);
 		VERIFY(0 == dmu_bonus_hold(zfsvfs->z_os, zfsvfs->z_fuid_obj,
 		    FTAG, &db));
 		dmu_buf_will_dirty(db, tx);
-		*(uint64_t *)db->db_data = nvsize;
+		*(uint64_t *)db->db_data = zfsvfs->z_fuid_size;
 		dmu_buf_rele(db, FTAG);
 
 		rw_exit(&zfsvfs->z_fuid_lock);

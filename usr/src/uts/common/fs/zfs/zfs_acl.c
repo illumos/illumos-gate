@@ -543,8 +543,13 @@ zfs_copy_ace_2_fuid(vtype_t obj_type, zfs_acl_t *aclp, void *datap,
 		aceptr->z_hdr.z_type = acep->a_type;
 		entry_type = aceptr->z_hdr.z_flags & ACE_TYPE_FLAGS;
 		if (entry_type != ACE_OWNER && entry_type != OWNING_GROUP &&
-		    entry_type != ACE_EVERYONE)
+		    entry_type != ACE_EVERYONE) {
+			if (!aclp->z_has_fuids)
+				aclp->z_has_fuids = IS_EPHEMERAL(acep->a_who) ?
+				    B_TRUE : B_FALSE;
 			aceptr->z_fuid = (uint64_t)acep->a_who;
+		}
+
 		/*
 		 * Make sure ACE is valid
 		 */
@@ -1450,15 +1455,13 @@ zfs_fixup_group_entries(zfs_acl_t *aclp, void *acep, void *prevacep,
  * Apply the chmod algorithm as described
  * in PSARC/2002/240
  */
-static int
-zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
-    dmu_tx_t *tx, cred_t *cr)
+static void
+zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp)
 {
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	void		*acep = NULL, *prevacep = NULL;
 	uint64_t	who;
 	int 		i;
-	int		error;
 	int 		entry_type;
 	int 		reuse_deny;
 	int 		need_canonical_six = 1;
@@ -1592,25 +1595,21 @@ nextace:
 	}
 
 	zfs_acl_fixup_canonical_six(aclp, mode);
-	zp->z_phys->zp_mode = mode;
-	error = zfs_aclset_common(zp, aclp, cr, NULL, tx);
-	return (error);
 }
 
 int
-zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx, cred_t *cr)
+zfs_acl_chmod_setattr(znode_t *zp, zfs_acl_t **aclp, uint64_t mode)
 {
-	zfs_acl_t *aclp = NULL;
 	int error;
 
-	ASSERT(MUTEX_HELD(&zp->z_lock));
+	mutex_enter(&zp->z_lock);
 	mutex_enter(&zp->z_acl_lock);
-	error = zfs_acl_node_read(zp, &aclp, B_TRUE);
+	*aclp = NULL;
+	error = zfs_acl_node_read(zp, aclp, B_TRUE);
 	if (error == 0)
-		error = zfs_acl_chmod(zp, mode, aclp, tx, cr);
+		zfs_acl_chmod(zp, mode, *aclp);
 	mutex_exit(&zp->z_acl_lock);
-	if (aclp)
-		zfs_acl_free(aclp);
+	mutex_exit(&zp->z_lock);
 	return (error);
 }
 
@@ -1842,7 +1841,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 		mutex_exit(&parent->z_lock);
 		mutex_enter(&zp->z_lock);
 		mutex_enter(&zp->z_acl_lock);
-		error = zfs_acl_chmod(zp, mode, aclp, tx, cr);
+		zfs_acl_chmod(zp, mode, aclp);
 	} else {
 		mutex_enter(&zp->z_lock);
 		mutex_enter(&zp->z_acl_lock);
@@ -2073,7 +2072,7 @@ top:
 			    zp->z_phys->zp_acl.z_acl_extern_obj,
 			    0, DMU_OBJECT_END);
 			dmu_tx_hold_write(tx, DMU_NEW_OBJECT,
-			    0, sizeof (zfs_object_ace_t) * 2048 + 6);
+			    0, aclp->z_acl_bytes);
 		} else {
 			dmu_tx_hold_write(tx,
 			    zp->z_phys->zp_acl.z_acl_extern_obj,
@@ -2082,15 +2081,17 @@ top:
 	} else if (aclp->z_acl_bytes > ZFS_ACE_SPACE) {
 		dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0, aclp->z_acl_bytes);
 	}
-	if (zfsvfs->z_fuid_obj == 0) {
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
+	if (aclp->z_has_fuids) {
+		if (zfsvfs->z_fuid_obj == 0) {
+			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
-			    SPA_MAXBLOCKSIZE);
-		dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
-	} else {
-		dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
-		dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
-		    SPA_MAXBLOCKSIZE);
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+			dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, FALSE, NULL);
+		} else {
+			dmu_tx_hold_bonus(tx, zfsvfs->z_fuid_obj);
+			dmu_tx_hold_write(tx, zfsvfs->z_fuid_obj, 0,
+			    FUID_SIZE_ESTIMATE(zfsvfs));
+		}
 	}
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
