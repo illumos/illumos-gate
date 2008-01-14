@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,9 +675,13 @@ ipf_stack_t *ifs;
 		MUTEX_ENTER(&ifs->ifs_ipf_natio);
 		for (np = &ifs->ifs_nat_list; ((n = *np) != NULL);
 		     np = &n->in_next)
-			if (!bcmp((char *)&nat->in_flags, (char *)&n->in_flags,
-					IPN_CMPSIZ))
+			if (bcmp((char *)&nat->in_flags, (char *)&n->in_flags,
+			    IPN_CMPSIZ) == 0) {
+				if (nat->in_redir == NAT_REDIRECT &&
+				    nat->in_pnext != n->in_pnext)
+					continue;
 				break;
+			}
 	}
 
 	switch (cmd)
@@ -2025,10 +2029,12 @@ nat_t *nat;
 natinfo_t *ni;
 {
 	u_short nport, dport, sport;
-	struct in_addr in;
+	struct in_addr in, inb;
+	u_short sp, dp;
 	hostmap_t *hm;
 	u_32_t flags;
 	ipnat_t *np;
+	nat_t *natl;
 	int move;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
@@ -2139,6 +2145,23 @@ natinfo_t *ni;
 			return -1;
 		in.s_addr = ntohl(fin->fin_daddr);
 	}
+
+	/*
+	 * Check to see if this redirect mapping already exists and if
+	 * it does, return "failure" (allowing it to be created will just
+	 * cause one or both of these "connections" to stop working.)
+	 */
+	inb.s_addr = htonl(in.s_addr);
+	sp = fin->fin_data[0];
+	dp = fin->fin_data[1];
+	fin->fin_data[1] = fin->fin_data[0];
+	fin->fin_data[0] = ntohs(nport);
+	natl = nat_outlookup(fin, flags & ~(SI_WILDP|NAT_SEARCH),
+		    (u_int)fin->fin_p, inb, fin->fin_src);
+	fin->fin_data[0] = sp;
+	fin->fin_data[1] = dp;
+	if (natl != NULL)
+		return (-1);
 
 	nat->nat_inip.s_addr = htonl(in.s_addr);
 	nat->nat_outip = fin->fin_dst;
