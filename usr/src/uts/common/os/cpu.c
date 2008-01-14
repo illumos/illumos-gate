@@ -58,7 +58,7 @@
 #include <sys/msacct.h>
 #include <sys/time.h>
 #include <sys/archsystm.h>
-#if defined(__x86)
+#if defined(__x86) || defined(__amd64)
 #include <sys/x86_archext.h>
 #endif
 
@@ -726,6 +726,11 @@ weakbinding_start(void)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	weakbindingbarrier = 0;
+}
+
+void
+null_xcall(void)
+{
 }
 
 /*
@@ -2797,6 +2802,7 @@ cpu_destroy_bound_threads(cpu_t *cp)
 
 		mutex_exit(&pidlock);
 
+		mutex_sync();
 		for (t = tlist; t != NULL; t = tnext) {
 			tnext = t->t_next;
 			thread_free(t);

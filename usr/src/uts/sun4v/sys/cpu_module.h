@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,8 @@ void	cpu_trapstat_data(void *buf, uint_t pgszs);
 					    | (1 << TTE4M))
 
 void	cpu_setup_common(char **);
+int	l2_cache_node_count(void);
+
 void	fill_cpu(md_t *, mde_cookie_t);
 int	setup_cpu_common(int);
 int	cleanup_cpu_common(int);

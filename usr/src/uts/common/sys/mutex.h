@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,16 @@ extern	int	mutex_tryenter(kmutex_t *);
 extern	void	mutex_exit(kmutex_t *);
 extern	int	mutex_owned(kmutex_t *);
 extern	struct _kthread *mutex_owner(kmutex_t *);
-extern	void	plat_lock_delay(int *);
+
+extern  ushort_t mutex_backoff_base;
+extern  uint_t mutex_backoff_cap;
+extern  ushort_t mutex_cap_factor;
+extern  uchar_t mutex_backoff_shift;
+extern  void (*mutex_lock_delay)(uint_t);
+extern  uint_t (*mutex_lock_backoff)(uint_t);
+extern  void (*mutex_delay)(void);
+extern  void mutex_delay_default(void);
+extern  void mutex_sync(void);
 
 #endif	/* _KERNEL */
 

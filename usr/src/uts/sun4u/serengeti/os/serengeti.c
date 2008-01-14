@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1297,6 +1297,9 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 void
 startup_platform(void)
 {
+	/* set per-platform constants for mutex backoff */
+	mutex_backoff_base = 1;
+	mutex_cap_factor = 32;
 }
 
 /*

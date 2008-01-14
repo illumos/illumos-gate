@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -801,6 +801,23 @@ rtt_ctx_end:
 	cmp	%l6, %o0		!   with current pil level
 	movg	%xcc, %o0, %l6		! if current is lower, drop old pil
 1:
+	!
+	! If we interrupted the mutex_owner_running() critical region we
+	! must reset the PC and nPC back to the beginning to prevent missed
+	! wakeups. See the comments in mutex_owner_running() for details.
+	!
+	ldn	[%l7 + PC_OFF], %l0
+	set	mutex_owner_running_critical_start, %l1
+	sub	%l0, %l1, %l0
+	cmp	%l0, mutex_owner_running_critical_size
+	bgeu,pt	%xcc, 2f
+	mov	THREAD_REG, %l0
+	stn	%l1, [%l7 + PC_OFF]	! restart mutex_owner_running()
+	add	%l1, 4, %l1
+	ba,pt	%xcc, common_rtt
+	stn	%l1, [%l7 + nPC_OFF]
+
+2:
 	!
 	! If we interrupted the mutex_exit() critical region we must reset
 	! the PC and nPC back to the beginning to prevent missed wakeups.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,6 +376,11 @@ void
 mutex_exit(kmutex_t *lp)
 {}
 
+/* ARGSUSED */
+void *
+mutex_owner_running(mutex_impl_t *lp)
+{ return (NULL); }
+
 #else
 	.align	32
 	ENTRY(mutex_enter)
@@ -419,8 +423,12 @@ mutex_exit(kmutex_t *lp)
 	mov	%g0, %o0
 	SET_SIZE(mutex_adaptive_tryenter)
 
+	! these need to be together and cache aligned for performance.
+	.align 64
 	.global	mutex_exit_critical_size
 	.global	mutex_exit_critical_start
+	.global mutex_owner_running_critical_size
+	.global mutex_owner_running_critical_start
 
 mutex_exit_critical_size = .mutex_exit_critical_end - mutex_exit_critical_start
 
@@ -440,6 +448,30 @@ mutex_exit_critical_start:		! If we are interrupted, restart here
 	retl
 	nop
 	SET_SIZE(mutex_exit)
+
+mutex_owner_running_critical_size = .mutex_owner_running_critical_end - mutex_owner_running_critical_start
+
+	.align  32
+
+	ENTRY(mutex_owner_running)
+mutex_owner_running_critical_start:	! If interrupted restart here
+	ldn	[%o0], %o1		! get the owner field
+	and	%o1, MUTEX_THREAD, %o1	! remove the waiters bit if any
+	brz,pn	%o1, 1f			! if so, drive on ...
+	nop
+	ldn	[%o1+T_CPU], %o2	! get owner->t_cpu
+	ldn	[%o2+CPU_THREAD], %o3	! get owner->t_cpu->cpu_thread
+.mutex_owner_running_critical_end:	! for pil_interrupt() hook
+	cmp	%o1, %o3		! owner == running thread?
+	be,a,pt	%xcc, 2f		! yes, go return cpu
+	nop
+1:
+	retl
+	mov	%g0, %o0		! return 0 (owner not running)
+2:
+	retl
+	mov	%o2, %o0		! owner running, return cpu
+	SET_SIZE(mutex_owner_running)
 
 #endif	/* lint */
 
@@ -729,3 +761,60 @@ thread_onproc(kthread_id_t t, cpu_t *cp)
 	SET_SIZE(thread_onproc)
 
 #endif	/* lint */
+
+/* delay function used in some mutex code - just do 3 nop cas ops */
+#if defined(lint)
+
+/* ARGSUSED */
+void
+cas_delay(void *addr)
+{}
+#else	/* lint */
+	ENTRY(cas_delay)
+	casx [%o0], %g0, %g0
+	casx [%o0], %g0, %g0
+	retl
+	casx [%o0], %g0, %g0
+	SET_SIZE(cas_delay)
+#endif	/* lint */
+
+#if defined(lint)
+
+/*
+ * alternative delay function for some niagara processors.   The rd
+ * instruction uses less resources than casx on those cpus.
+ */
+/* ARGSUSED */
+void
+rdccr_delay(void)
+{}
+#else	/* lint */
+	ENTRY(rdccr_delay)
+	rd	%ccr, %g0
+	rd	%ccr, %g0
+	retl
+	rd	%ccr, %g0
+	SET_SIZE(rdccr_delay)
+#endif	/* lint */
+
+/*
+ * mutex_delay_default(void)
+ * Spins for approx a few hundred processor cycles and returns to caller.
+ */
+#if defined(lint)
+
+void
+mutex_delay_default(void)
+{}
+
+#else	/* lint */
+
+	ENTRY(mutex_delay_default)
+	mov	72,%o0
+1:	brgz	%o0, 1b
+	dec	%o0
+	retl
+	nop
+	SET_SIZE(mutex_delay_default)
+
+#endif  /* lint */

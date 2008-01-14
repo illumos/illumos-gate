@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,8 @@
 #include <sys/brand.h>
 
 void *segkp_lwp;		/* cookie for pool of segkp resources */
+extern void reapq_move_lq_to_tq(kthread_t *);
+extern void freectx_ctx(struct ctxop *);
 
 /*
  * Create a thread that appears to be stopped at sys_rtt.
@@ -88,6 +90,7 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 	int i;
 	int rctlfail = 0;
 	boolean_t branded = 0;
+	struct ctxop *ctx = NULL;
 
 	mutex_enter(&p->p_lock);
 	mutex_enter(&p->p_zone->zone_nlwps_lock);
@@ -136,14 +139,18 @@ lwp_create(void (*proc)(), caddr_t arg, size_t len, proc_t *p,
 				lwp_reapcnt--;
 				lwpdata = t->t_swap;
 				lwp = t->t_lwp;
+				ctx = t->t_ctx;
+				t->t_swap = NULL;
+				t->t_lwp = NULL;
+				t->t_ctx = NULL;
+				reapq_move_lq_to_tq(t);
 			}
 			mutex_exit(&reaplock);
-			if (t) {
-				t->t_swap = NULL;
-				lwp_stk_fini(t->t_lwp);
-				t->t_lwp = NULL;
-				t->t_forw = NULL;
-				thread_free(t);
+			if (lwp != NULL) {
+				lwp_stk_fini(lwp);
+			}
+			if (ctx != NULL) {
+				freectx_ctx(ctx);
 			}
 		}
 		if (lwpdata == NULL &&
@@ -250,7 +257,7 @@ grow:
 			ldp->ld_next = ldp + 1;
 		new_hashsz = (new_dirsz + 2) / 2;
 		new_hash = kmem_zalloc(new_hashsz * sizeof (lwpdir_t *),
-			KM_SLEEP);
+		    KM_SLEEP);
 
 		mutex_enter(&p->p_lock);
 		if (p == curproc)

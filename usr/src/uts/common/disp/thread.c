@@ -842,6 +842,21 @@ thread_zone_destroy(zoneid_t zoneid, void *unused)
 	mutex_exit(&reaplock);
 
 	/*
+	 * Guard against race condition in mutex_owner_running:
+	 * 	thread=owner(mutex)
+	 * 	<interrupt>
+	 * 				thread exits mutex
+	 * 				thread exits
+	 * 				thread reaped
+	 * 				thread struct freed
+	 * cpu = thread->t_cpu <- BAD POINTER DEREFERENCE.
+	 * A cross call to all cpus will cause the interrupt handler
+	 * to reset the PC if it is in mutex_owner_running, refreshing
+	 * stale thread pointers.
+	 */
+	mutex_sync();   /* sync with mutex code */
+
+	/*
 	 * Reap threads
 	 */
 	thread_reap_list(t);
@@ -874,6 +889,12 @@ thread_reaper()
 			cv_wait(&reaper_cv, &reaplock);
 			CALLB_CPR_SAFE_END(&cprinfo, &reaplock);
 		}
+		/*
+		 * mutex_sync() needs to be called when reaping, but
+		 * not too often.  We limit reaping rate to once
+		 * per second.  Reaplimit is max rate at which threads can
+		 * be freed. Does not impact thread destruction/creation.
+		 */
 		t = thread_deathrow;
 		l = lwp_deathrow;
 		thread_deathrow = NULL;
@@ -883,6 +904,20 @@ thread_reaper()
 		mutex_exit(&reaplock);
 
 		/*
+		 * Guard against race condition in mutex_owner_running:
+		 * 	thread=owner(mutex)
+		 * 	<interrupt>
+		 * 				thread exits mutex
+		 * 				thread exits
+		 * 				thread reaped
+		 * 				thread struct freed
+		 * cpu = thread->t_cpu <- BAD POINTER DEREFERENCE.
+		 * A cross call to all cpus will cause the interrupt handler
+		 * to reset the PC if it is in mutex_owner_running, refreshing
+		 * stale thread pointers.
+		 */
+		mutex_sync();   /* sync with mutex code */
+		/*
 		 * Reap threads
 		 */
 		thread_reap_list(t);
@@ -891,13 +926,32 @@ thread_reaper()
 		 * Reap lwps
 		 */
 		thread_reap_list(l);
+		delay(hz);
 	}
+}
+
+/*
+ * This is called by lwpcreate, etc.() to put a lwp_deathrow thread onto
+ * thread_deathrow. The thread's state is changed already TS_FREE to indicate
+ * that is reapable. The thread already holds the reaplock, and was already
+ * freed.
+ */
+void
+reapq_move_lq_to_tq(kthread_t *t)
+{
+	ASSERT(t->t_state == TS_FREE);
+	ASSERT(MUTEX_HELD(&reaplock));
+	t->t_forw = thread_deathrow;
+	thread_deathrow = t;
+	thread_reapcnt++;
+	if (lwp_reapcnt + thread_reapcnt > reaplimit)
+		cv_signal(&reaper_cv);  /* wake the reaper */
 }
 
 /*
  * This is called by resume() to put a zombie thread onto deathrow.
  * The thread's state is changed to TS_FREE to indicate that is reapable.
- * This is called from the idle thread so it must not block (just spin).
+ * This is called from the idle thread so it must not block - just spin.
  */
 void
 reapq_add(kthread_t *t)
@@ -1115,6 +1169,28 @@ freectx(kthread_t *t, int isexec)
 			(ctx->free_op)(ctx->arg, isexec);
 		kmem_free(ctx, sizeof (struct ctxop));
 	}
+}
+
+/*
+ * freectx_ctx is called from lwp_create() when lwp is reused from
+ * lwp_deathrow and its thread structure is added to thread_deathrow.
+ * The thread structure to which this ctx was attached may be already
+ * freed by the thread reaper so free_op implementations shouldn't rely
+ * on thread structure to which this ctx was attached still being around.
+ */
+void
+freectx_ctx(struct ctxop *ctx)
+{
+	struct ctxop *nctx;
+
+	ASSERT(ctx != NULL);
+
+	do {
+		nctx = ctx->next;
+		if (ctx->free_op != NULL)
+			(ctx->free_op)(ctx->arg, 0);
+		kmem_free(ctx, sizeof (struct ctxop));
+	} while ((ctx = nctx) != NULL);
 }
 
 /*

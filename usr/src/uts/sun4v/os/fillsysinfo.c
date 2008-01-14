@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,9 +74,12 @@ static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
 static void get_q_sizes(md_t *, mde_cookie_t);
 static void get_va_bits(md_t *, mde_cookie_t);
 static size_t get_ra_limit(md_t *);
+static int get_l2_cache_node_count(md_t *);
 
 uint64_t	system_clock_freq;
 uint_t		niommu_tsbs = 0;
+
+static int n_l2_caches = 0;
 
 /* prevent compilation with VAC defined */
 #ifdef VAC
@@ -401,6 +404,9 @@ cpu_setup_common(char **cpu_module_isa_set)
 
 	for (i = 0; i < nocpus; i++)
 		fill_cpu(mdp, cpulist[i]);
+
+	/* setup l2 cache count. */
+	n_l2_caches = get_l2_cache_node_count(mdp);
 
 	setup_chip_mappings(mdp);
 	setup_exec_unit_mappings(mdp);
@@ -790,6 +796,37 @@ get_va_bits(md_t *mdp, mde_cookie_t cpu_node_cookie)
 	 */
 	if (broken_md_flag)
 		va_bits = DEFAULT_VA_ADDRESS_SPACE_BITS;
+}
+
+int
+l2_cache_node_count(void)
+{
+	return (n_l2_caches);
+}
+
+/*
+ * count the number of l2 caches.
+ */
+int
+get_l2_cache_node_count(md_t *mdp)
+{
+	int i;
+	mde_cookie_t *cachenodes;
+	uint64_t level;
+	int n_cachenodes = md_alloc_scan_dag(mdp, md_root_node(mdp),
+	    "cache", "fwd", &cachenodes);
+	int l2_caches = 0;
+
+	for (i = 0; i < n_cachenodes; i++) {
+		if (md_get_prop_val(mdp, cachenodes[i], "level", &level) != 0) {
+			level = 0;
+		}
+		if (level == 2) {
+			l2_caches++;
+		}
+	}
+	md_free_scan_dag(mdp, &cachenodes);
+	return (l2_caches);
 }
 
 /*

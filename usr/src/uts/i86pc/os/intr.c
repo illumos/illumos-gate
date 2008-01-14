@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -999,6 +999,8 @@ sys_rtt_common(struct regs *rp)
 	kthread_t *tp;
 	extern void mutex_exit_critical_start();
 	extern long mutex_exit_critical_size;
+	extern void mutex_owner_running_critical_start();
+	extern long mutex_owner_running_critical_size;
 
 loop:
 
@@ -1076,6 +1078,19 @@ loop:
 	    mutex_exit_critical_size) {
 		rp->r_pc = (greg_t)mutex_exit_critical_start;
 	}
+
+	/*
+	 * If we interrupted the mutex_owner_running() critical region we
+	 * must reset the PC back to the beginning to prevent dereferencing
+	 * of a freed thread pointer. See the comments in mutex_owner_running
+	 * for details.
+	 */
+	if ((uintptr_t)rp->r_pc -
+	    (uintptr_t)mutex_owner_running_critical_start <
+	    mutex_owner_running_critical_size) {
+		rp->r_pc = (greg_t)mutex_owner_running_critical_start;
+	}
+
 	return (0);
 }
 

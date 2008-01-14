@@ -30,11 +30,11 @@
 #include <sys/thread.h>
 #include <sys/cpuvar.h>
 #include <vm/page.h>
-#include <sys/mutex_impl.h>
 #else	/* __lint */
 #include "assym.h"
 #endif	/* __lint */
 
+#include <sys/mutex_impl.h>
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -665,6 +665,34 @@ mutex_exit(kmutex_t *lp)
 	ret
 	SET_SIZE(mutex_adaptive_tryenter)
 
+	.globl	mutex_owner_running_critical_start
+
+	ENTRY(mutex_owner_running)
+mutex_owner_running_critical_start:
+	movq	(%rdi), %r11		/* get owner field */
+	andq	$MUTEX_THREAD, %r11	/* remove waiters bit */
+	cmpq	$0, %r11		/* if free, skip */
+	je	1f			/* go return 0 */
+	movq	T_CPU(%r11), %r8	/* get owner->t_cpu */
+	movq	CPU_THREAD(%r8), %r9	/* get t_cpu->cpu_thread */
+.mutex_owner_running_critical_end:
+	cmpq	%r11, %r9	/* owner == running thread? */
+	je	2f		/* yes, go return cpu */
+1:
+	xorq	%rax, %rax	/* return 0 */
+	ret
+2:
+	movq	%r8, %rax		/* return cpu */
+	ret
+	SET_SIZE(mutex_owner_running)
+
+	.globl	mutex_owner_running_critical_size
+	.type	mutex_owner_running_critical_size, @object
+	.align	CPTRSIZE
+mutex_owner_running_critical_size:
+	.quad	.mutex_owner_running_critical_end - mutex_owner_running_critical_start
+	SET_SIZE(mutex_owner_running_critical_size)
+
 	.globl	mutex_exit_critical_start
 
 	ENTRY(mutex_exit)
@@ -806,7 +834,36 @@ mutex_exit_critical_size:
 	ret
 	SET_SIZE(mutex_adaptive_tryenter)
 
-	.globl	mutex_exit_critical_size
+	.globl	mutex_owner_running_critical_start
+
+	ENTRY(mutex_owner_running)
+mutex_owner_running_critical_start:
+	movl	4(%esp), %eax		/* get owner field */
+	movl	(%eax), %eax
+	andl	$MUTEX_THREAD, %eax	/* remove waiters bit */
+	cmpl	$0, %eax		/* if free, skip */
+	je	1f			/* go return 0 */
+	movl	T_CPU(%eax), %ecx	/* get owner->t_cpu */
+	movl	CPU_THREAD(%ecx), %edx	/* get t_cpu->cpu_thread */
+.mutex_owner_running_critical_end:
+	cmpl	%eax, %edx	/* owner == running thread? */
+	je	2f		/* yes, go return cpu */
+1:
+	xorl	%eax, %eax	/* return 0 */
+	ret
+2:
+	movl	%ecx, %eax	/* return cpu */
+	ret
+
+	SET_SIZE(mutex_owner_running)
+
+	.globl	mutex_owner_running_critical_size
+	.type	mutex_owner_running_critical_size, @object
+	.align	CPTRSIZE
+mutex_owner_running_critical_size:
+	.long	.mutex_owner_running_critical_end - mutex_owner_running_critical_start
+	SET_SIZE(mutex_owner_running_critical_size)
+
 	.globl	mutex_exit_critical_start
 
 	ENTRY(mutex_exit)
@@ -1397,4 +1454,44 @@ thread_onproc(kthread_id_t t, cpu_t *cp)
 
 #endif	/* !__amd64 */
 
+#endif	/* __lint */
+
+/*
+ * mutex_delay_default(void)
+ * Spins for approx a few hundred processor cycles and returns to caller.
+ */
+
+#if defined(lint) || defined(__lint)
+
+void
+mutex_delay_default(void)
+{}
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY(mutex_delay_default)
+	movq	$92,%r11
+0:	decq	%r11
+	jg	0b
+	ret
+	SET_SIZE(mutex_delay_default)
+
+#else
+
+	ENTRY(mutex_delay_default)
+	push	%ebp
+	movl	%esp,%ebp
+	andl	$-16,%esp
+	push	%ebx
+	movl	$93,%ebx
+0:	decl	%ebx
+	jg	0b
+	pop	%ebx
+	leave
+	ret
+	SET_SIZE(mutex_delay_default)
+
+#endif	/* !__amd64 */
 #endif	/* __lint */

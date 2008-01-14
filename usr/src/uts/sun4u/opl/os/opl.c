@@ -102,19 +102,17 @@ static void pass2xscf_thread();
  * Note FF/DC out-of-order instruction engine takes only a
  * single cycle to execute each spin loop
  * for comparison, Panther takes 6 cycles for same loop
- * 1500 approx nsec for OPL sleep instruction
- * if spin count = OPL_BOFF_SLEEP*OPL_BOFF_SPIN then
- * spin time should be equal to OPL_BOFF_TM nsecs
- * Listed values tuned for 2.15GHz to 2.4GHz systems
+ * OPL_BOFF_SPIN = base spin loop, roughly one memory reference time
+ * OPL_BOFF_TM = approx nsec for OPL sleep instruction (1600 for OPL-C)
+ * OPL_BOFF_SLEEP = approx number of SPIN iterations to equal one sleep
+ * OPL_BOFF_MAX_SCALE - scaling factor for max backoff based on active cpus
+ * Listed values tuned for 2.15GHz to 2.64GHz systems
  * Value may change for future systems
  */
-#define	OPL_BOFF_SPIN 720
-#define	OPL_BOFF_BASE 1
-#define	OPL_BOFF_SLEEP 5
-#define	OPL_BOFF_CAP1 20
-#define	OPL_BOFF_CAP2 60
-#define	OPL_BOFF_MAX (40 * OPL_BOFF_SLEEP)
-#define	OPL_BOFF_TM 1500
+#define	OPL_BOFF_SPIN 7
+#define	OPL_BOFF_SLEEP 4
+#define	OPL_BOFF_TM 1600
+#define	OPL_BOFF_MAX_SCALE 8
 
 #define	OPL_CLOCK_TICK_THRESHOLD	128
 #define	OPL_CLOCK_TICK_NCPUS		64
@@ -946,6 +944,9 @@ plat_startup_memlist(caddr_t alloc_base)
 	return (tmp_alloc_base);
 }
 
+/* need to forward declare these */
+static void plat_lock_delay(uint_t);
+
 void
 startup_platform(void)
 {
@@ -953,6 +954,8 @@ startup_platform(void)
 		clock_tick_threshold = OPL_CLOCK_TICK_THRESHOLD;
 	if (clock_tick_ncpus == 0)
 		clock_tick_ncpus = OPL_CLOCK_TICK_NCPUS;
+	mutex_lock_delay = plat_lock_delay;
+	mutex_cap_factor = OPL_BOFF_MAX_SCALE;
 }
 
 void
@@ -997,13 +1000,12 @@ plat_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
 }
 
 void
-plat_lock_delay(int *backoff)
+plat_lock_delay(uint_t backoff)
 {
 	int i;
-	int cnt;
-	int flag;
+	uint_t cnt, remcnt;
 	int ctr;
-	hrtime_t delay_start;
+	hrtime_t delay_start, rem_delay;
 	/*
 	 * Platform specific lock delay code for OPL
 	 *
@@ -1012,32 +1014,26 @@ plat_lock_delay(int *backoff)
 	 * but is too large of granularity for the initial backoff.
 	 */
 
-	if (*backoff == 0) *backoff = OPL_BOFF_BASE;
-
-	flag = !*backoff;
-
-	if (*backoff < OPL_BOFF_CAP1) {
+	if (backoff < 100) {
 		/*
 		 * If desired backoff is long enough,
 		 * use sleep for most of it
 		 */
-		for (cnt = *backoff; cnt >= OPL_BOFF_SLEEP;
+		for (cnt = backoff;
+		    cnt >= OPL_BOFF_SLEEP;
 		    cnt -= OPL_BOFF_SLEEP) {
 			cpu_smt_pause();
 		}
 		/*
 		 * spin for small remainder of backoff
-		 *
-		 * fake call to nulldev included to prevent
-		 * compiler from optimizing out the spin loop
 		 */
 		for (ctr = cnt * OPL_BOFF_SPIN; ctr; ctr--) {
-			if (flag) (void) nulldev();
+			mutex_delay_default();
 		}
 	} else {
-		/* backoff is very large.  Fill it by sleeping */
+		/* backoff is large.  Fill it by sleeping */
 		delay_start = gethrtime();
-		cnt = *backoff/OPL_BOFF_SLEEP;
+		cnt = backoff / OPL_BOFF_SLEEP;
 		/*
 		 * use sleep instructions for delay
 		 */
@@ -1050,40 +1046,19 @@ plat_lock_delay(int *backoff)
 		 * then the sleep ends immediately with a minimum time of
 		 * 42 clocks.  We check gethrtime to insure we have
 		 * waited long enough.  And we include both a short
-		 * spin loop and a sleep for any final delay time.
+		 * spin loop and a sleep for repeated delay times.
 		 */
 
-		while ((gethrtime() - delay_start) < cnt * OPL_BOFF_TM) {
-			cpu_smt_pause();
-			for (ctr = OPL_BOFF_SPIN; ctr; ctr--) {
-				if (flag) (void) nulldev();
+		rem_delay = gethrtime() - delay_start;
+		while (rem_delay < cnt * OPL_BOFF_TM) {
+			remcnt = cnt - (rem_delay / OPL_BOFF_TM);
+			for (i = 0; i < remcnt; i++) {
+				cpu_smt_pause();
+				for (ctr = OPL_BOFF_SPIN; ctr; ctr--) {
+					mutex_delay_default();
+				}
 			}
-		}
-	}
-
-	/*
-	 * We adjust the backoff in three linear stages
-	 * The initial stage has small increases as this phase is
-	 * usually handle locks with light contention.  We don't want
-	 * to have a long backoff on a lock that is available.
-	 *
-	 * In the second stage, we are in transition, unsure whether
-	 * the lock is under heavy contention.  As the failures to
-	 * obtain the lock increase, we back off further.
-	 *
-	 * For the final stage, we are in a heavily contended or
-	 * long held long so we want to reduce the number of tries.
-	 */
-	if (*backoff < OPL_BOFF_CAP1) {
-		*backoff += 1;
-	} else {
-		if (*backoff < OPL_BOFF_CAP2) {
-			*backoff += OPL_BOFF_SLEEP;
-		} else {
-			*backoff += 2 * OPL_BOFF_SLEEP;
-		}
-		if (*backoff > OPL_BOFF_MAX) {
-			*backoff = OPL_BOFF_MAX;
+			rem_delay = gethrtime() - delay_start;
 		}
 	}
 }

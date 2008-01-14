@@ -39,6 +39,8 @@
 #include <sys/traptrace.h>
 #include <sys/modctl.h>
 #include <sys/ldoms.h>
+#include <sys/cpu_module.h>
+#include <sys/mutex_impl.h>
 #include <vm/vm_dep.h>
 
 #ifdef TRAPTRACE
@@ -306,6 +308,14 @@ startup_platform(void)
 		clock_tick_threshold = SUN4V_CLOCK_TICK_THRESHOLD;
 	if (clock_tick_ncpus == 0)
 		clock_tick_ncpus = SUN4V_CLOCK_TICK_NCPUS;
+	/* set per-platform constants for mutex_backoff */
+	mutex_backoff_base = 1;
+	mutex_cap_factor = 4;
+	if (l2_cache_node_count() > 1) {
+		/* VF for example */
+		mutex_backoff_base = 2;
+		mutex_cap_factor = 16;
+	}
 }
 
 /*

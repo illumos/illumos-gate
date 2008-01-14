@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@
 #include <sys/niagararegs.h>
 #include <sys/trapstat.h>
 #include <sys/hsvc.h>
+#include <sys/mutex_impl.h>
 
 #define	NI_MMU_PAGESIZE_MASK	((1 << TTE8K) | (1 << TTE64K) | (1 << TTE4M) \
 				    | (1 << TTE256M))
@@ -199,6 +200,24 @@ cpu_map_exec_units(struct cpu *cp)
 	cp->cpu_m.cpu_mpipe = 0;
 }
 
+void
+cpu_mutex_delay(void)
+{
+	/*
+	 * Dummy is the thread-private target of the cas.  If multiple strands
+	 * have the same kernel call stack, dummy could fall at the same VA and
+	 * hence the same L2 cache bank.  To avoid this, create multiple dummy
+	 * words spread across several cache lines.
+	 */
+	struct {
+		long val;
+		long pad[7];
+	} dummy[4];
+
+	long *ptr = &(dummy[CPU->cpu_seqid & 0x03].val);
+	cas_delay(ptr);
+}
+
 static int niagara_cpucnt;
 
 void
@@ -212,6 +231,8 @@ cpu_init_private(struct cpu *cp)
 
 	if ((niagara_cpucnt++ == 0) && (niagara_hsvc_available == B_TRUE))
 		niagara_kstat_init();
+
+	mutex_delay = cpu_mutex_delay;
 }
 
 /*ARGSUSED*/

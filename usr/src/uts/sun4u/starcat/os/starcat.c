@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1271,6 +1271,9 @@ starcat_dr_name(char *name)
 void
 startup_platform(void)
 {
+	/* set per platform constants for mutex backoff */
+	mutex_backoff_base = 2;
+	mutex_cap_factor = 64;
 }
 
 /*

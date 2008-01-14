@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@
 #include <sys/niagara2regs.h>
 #include <sys/hsvc.h>
 #include <sys/trapstat.h>
+#include <sys/mutex_impl.h>
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 #if defined(NIAGARA2_IMPL)
@@ -226,6 +227,8 @@ cpu_init_private(struct cpu *cp)
 
 	if ((cpucnt++ == 0) && (cpu_hsvc_available == B_TRUE))
 		(void) niagara_kstat_init();
+
+	mutex_delay = rdccr_delay;
 }
 
 /*ARGSUSED*/

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,8 @@
  *
  *			set waiters bit
  *			membar #StoreLoad (via membar_enter())
- *			check CPU_THREAD for each CPU; abort if owner running
+ *			check CPU_THREAD for owner's t_cpu
+ *				continue if owner running
  *			membar #LoadLoad (via membar_consumer())
  *			check owner and waiters bit; abort if either changed
  *			block
@@ -133,7 +134,9 @@
  *
  * The only requirements of code outside the mutex implementation are
  * (1) mutex_exit() preemption fixup in interrupt handlers or trap return,
- * and (2) a membar #StoreLoad after setting CPU_THREAD in resume().
+ * (2) a membar #StoreLoad after setting CPU_THREAD in resume(),
+ * (3) mutex_owner_running() preemption fixup in interrupt handlers
+ * or trap returns.
  * Note: idle threads cannot grab adaptive locks (since they cannot block),
  * so the membar may be safely omitted when resuming an idle thread.
  *
@@ -199,26 +202,8 @@
  * much reduction in memory traffic, but reduces the potential idle time.
  * The theory of the exponential delay code is to start with a short
  * delay loop and double the waiting time on each iteration, up to
- * a preselected maximum.  The BACKOFF_BASE provides the equivalent
- * of 2 to 3 memory references delay for US-III+ and US-IV architectures.
- * The BACKOFF_CAP is the equivalent of 50 to 100 memory references of
- * time (less than 12 microseconds for a 1000 MHz system).
- *
- * To determine appropriate BACKOFF_BASE and BACKOFF_CAP values,
- * studies on US-III+ and US-IV systems using 1 to 66 threads were
- * done.  A range of possible values were studied.
- * Performance differences below 10 threads were not large.  For
- * systems with more threads, substantial increases in total lock
- * throughput was observed with the given values.  For cases where
- * more than 20 threads were waiting on the same lock, lock throughput
- * increased by a factor of 5 or more using the backoff algorithm.
- *
- * Some platforms may provide their own platform specific delay code,
- * using plat_lock_delay(backoff).  If it is available, plat_lock_delay
- * is executed instead of the default delay code.
+ * a preselected maximum.
  */
-
-#pragma weak plat_lock_delay
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -236,9 +221,8 @@
 #include <sys/cpu.h>
 #include <sys/stack.h>
 #include <sys/archsystm.h>
-
-#define	BACKOFF_BASE	50
-#define	BACKOFF_CAP 	1600
+#include <sys/machsystm.h>
+#include <sys/x_call.h>
 
 /*
  * The sobj_ops vector exports a set of functions needed when a thread
@@ -268,6 +252,89 @@ mutex_panic(char *msg, mutex_impl_t *lp)
 	    msg, lp, MUTEX_OWNER(&panic_mutex), curthread);
 }
 
+/* "tunables" for per-platform backoff constants. */
+uint_t mutex_backoff_cap = 0;
+ushort_t mutex_backoff_base = MUTEX_BACKOFF_BASE;
+ushort_t mutex_cap_factor = MUTEX_CAP_FACTOR;
+uchar_t mutex_backoff_shift = MUTEX_BACKOFF_SHIFT;
+
+void
+mutex_sync(void)
+{
+	MUTEX_SYNC();
+}
+
+/* calculate the backoff interval */
+static uint_t
+default_lock_backoff(uint_t backoff)
+{
+	uint_t cap;		/* backoff cap calculated */
+
+	if (backoff == 0) {
+		backoff = mutex_backoff_base;
+		/* first call just sets the base */
+		return (backoff);
+	}
+
+	/* set cap */
+	if (mutex_backoff_cap == 0) {
+		/*
+		 * For a contended lock, in the worst case a load + cas may
+		 * be queued  at the controller for each contending CPU.
+		 * Therefore, to avoid queueing, the accesses for all CPUS must
+		 * be spread out in time over an interval of (ncpu *
+		 * cap-factor).  Maximum backoff is set to this value, and
+		 * actual backoff is a random number from 0 to the current max.
+		 */
+		cap = ncpus_online * mutex_cap_factor;
+	} else {
+		cap = mutex_backoff_cap;
+	}
+
+	/* calculate new backoff value */
+	backoff <<= mutex_backoff_shift;	/* increase backoff */
+	if (backoff > cap) {
+		if (cap < mutex_backoff_base)
+			backoff = mutex_backoff_base;
+		else
+			backoff = cap;
+	}
+
+	return (backoff);
+}
+
+/*
+ * default delay function for mutexes.
+ */
+static void
+default_lock_delay(uint_t backoff)
+{
+	ulong_t rnd;		/* random factor */
+	uint_t cur_backoff;	/* calculated backoff */
+	uint_t backctr;
+
+	/*
+	 * Modify backoff by a random amount to avoid lockstep, and to
+	 * make it probable that some thread gets a small backoff, and
+	 * re-checks quickly
+	 */
+	rnd = (((long)curthread >> PTR24_LSB) ^ (long)MUTEX_GETTICK());
+	cur_backoff = (uint_t)(rnd % (backoff - mutex_backoff_base + 1)) +
+	    mutex_backoff_base;
+
+	/*
+	 * Delay before trying
+	 * to touch the mutex data structure.
+	 */
+	for (backctr = cur_backoff; backctr; backctr--) {
+		MUTEX_DELAY();
+	};
+}
+
+uint_t (*mutex_lock_backoff)(uint_t) = default_lock_backoff;
+void (*mutex_lock_delay)(uint_t) = default_lock_delay;
+void (*mutex_delay)(void) = mutex_delay_default;
+
 /*
  * mutex_vector_enter() is called from the assembly mutex_enter() routine
  * if the lock is held or is not of type MUTEX_ADAPTIVE.
@@ -276,15 +343,15 @@ void
 mutex_vector_enter(mutex_impl_t *lp)
 {
 	kthread_id_t	owner;
+	kthread_id_t	lastowner = MUTEX_NO_OWNER; /* track owner changes */
 	hrtime_t	sleep_time = 0;	/* how long we slept */
 	uint_t		spin_count = 0;	/* how many times we spun */
-	cpu_t 		*cpup, *last_cpu;
-	extern cpu_t	*cpu_list;
+	cpu_t 		*cpup;
 	turnstile_t	*ts;
 	volatile mutex_impl_t *vlp = (volatile mutex_impl_t *)lp;
-	int		backoff;	/* current backoff */
-	int		backctr;	/* ctr for backoff */
+	uint_t		backoff = 0;	/* current backoff */
 	int		sleep_count = 0;
+	int		changecnt = 0;	/* count of owner changes */
 
 	ASSERT_STACK_ALIGNED();
 
@@ -314,42 +381,31 @@ mutex_vector_enter(mutex_impl_t *lp)
 
 	CPU_STATS_ADDQ(cpup, sys, mutex_adenters, 1);
 
-	if (&plat_lock_delay) {
-		backoff = 0;
-	} else {
-		backoff = BACKOFF_BASE;
-	}
-
+	backoff = mutex_lock_backoff(0);	/* set base backoff */
 	for (;;) {
-spin:
 		spin_count++;
-		/*
-		 * Add an exponential backoff delay before trying again
-		 * to touch the mutex data structure.
-		 * the spin_count test and call to nulldev are to prevent
-		 * the compiler optimizer from eliminating the delay loop.
-		 */
-		if (&plat_lock_delay) {
-			plat_lock_delay(&backoff);
-		} else {
-			for (backctr = backoff; backctr; backctr--) {
-				if (!spin_count) (void) nulldev();
-			};    /* delay */
-			backoff = backoff << 1;			/* double it */
-			if (backoff > BACKOFF_CAP) {
-				backoff = BACKOFF_CAP;
-			}
-
-			SMT_PAUSE();
-		}
+		mutex_lock_delay(backoff); /* backoff delay */
 
 		if (panicstr)
 			return;
 
 		if ((owner = MUTEX_OWNER(vlp)) == NULL) {
-			if (mutex_adaptive_tryenter(lp))
+			if (mutex_adaptive_tryenter(lp)) {
 				break;
+			}
+			/* increase backoff only on failed attempt. */
+			backoff = mutex_lock_backoff(backoff);
+			changecnt++;
 			continue;
+		} else if (lastowner != owner) {
+			lastowner = owner;
+			backoff = mutex_lock_backoff(backoff);
+			changecnt++;
+		}
+
+		if (changecnt >= ncpus_online) {
+			backoff = mutex_lock_backoff(0);
+			changecnt = 0;
 		}
 
 		if (owner == curthread)
@@ -362,26 +418,9 @@ spin:
 		if (owner == MUTEX_NO_OWNER)
 			continue;
 
-		/*
-		 * When searching the other CPUs, start with the one where
-		 * we last saw the owner thread.  If owner is running, spin.
-		 *
-		 * We must disable preemption at this point to guarantee
-		 * that the list doesn't change while we traverse it
-		 * without the cpu_lock mutex.  While preemption is
-		 * disabled, we must revalidate our cached cpu pointer.
-		 */
-		kpreempt_disable();
-		if (cpup->cpu_next == NULL)
-			cpup = cpu_list;
-		last_cpu = cpup;	/* mark end of search */
-		do {
-			if (cpup->cpu_thread == owner) {
-				kpreempt_enable();
-				goto spin;
-			}
-		} while ((cpup = cpup->cpu_next) != last_cpu);
-		kpreempt_enable();
+		if (mutex_owner_running(lp) != NULL)  {
+			continue;
+		}
 
 		/*
 		 * The owner appears not to be running, so block.
@@ -394,19 +433,11 @@ spin:
 		/*
 		 * Recheck whether owner is running after waiters bit hits
 		 * global visibility (above).  If owner is running, spin.
-		 *
-		 * Since we are at ipl DISP_LEVEL, kernel preemption is
-		 * disabled, however we still need to revalidate our cached
-		 * cpu pointer to make sure the cpu hasn't been deleted.
 		 */
-		if (cpup->cpu_next == NULL)
-			last_cpu = cpup = cpu_list;
-		do {
-			if (cpup->cpu_thread == owner) {
-				turnstile_exit(lp);
-				goto spin;
-			}
-		} while ((cpup = cpup->cpu_next) != last_cpu);
+		if (mutex_owner_running(lp) != NULL) {
+			turnstile_exit(lp);
+			continue;
+		}
 		membar_consumer();
 
 		/*
@@ -418,6 +449,8 @@ spin:
 			    &mutex_sobj_ops, NULL, NULL);
 			sleep_time += gethrtime();
 			sleep_count++;
+			/* reset backoff after turnstile */
+			backoff = mutex_lock_backoff(0);
 		} else {
 			turnstile_exit(lp);
 		}
@@ -436,9 +469,10 @@ spin:
 	/*
 	 * We do not count a sleep as a spin.
 	 */
-	if (spin_count > sleep_count)
+	if (spin_count > sleep_count) {
 		LOCKSTAT_RECORD(LS_MUTEX_ENTER_SPIN, lp,
 		    spin_count - sleep_count);
+	}
 
 	LOCKSTAT_RECORD0(LS_MUTEX_ENTER_ACQUIRE, lp);
 }
@@ -585,8 +619,8 @@ void
 lock_set_spin(lock_t *lp)
 {
 	int spin_count = 1;
-	int backoff;	/* current backoff */
-	int backctr;	/* ctr for backoff */
+	int loop_count = 0;
+	uint_t backoff = 0;	/* current backoff */
 
 	if (panicstr)
 		return;
@@ -594,36 +628,19 @@ lock_set_spin(lock_t *lp)
 	if (ncpus == 1)
 		panic("lock_set: %p lock held and only one CPU", lp);
 
-	if (&plat_lock_delay) {
-		backoff = 0;
-	} else {
-		backoff = BACKOFF_BASE;
-	}
-
 	while (LOCK_HELD(lp) || !lock_spin_try(lp)) {
 		if (panicstr)
 			return;
 		spin_count++;
-		/*
-		 * Add an exponential backoff delay before trying again
-		 * to touch the mutex data structure.
-		 * the spin_count test and call to nulldev are to prevent
-		 * the compiler optimizer from eliminating the delay loop.
-		 */
-		if (&plat_lock_delay) {
-			plat_lock_delay(&backoff);
-		} else {
-			/* delay */
-			for (backctr = backoff; backctr; backctr--) {
-				if (!spin_count) (void) nulldev();
-			}
+		loop_count++;
 
-			backoff = backoff << 1;		/* double it */
-			if (backoff > BACKOFF_CAP) {
-				backoff = BACKOFF_CAP;
-			}
-			SMT_PAUSE();
+		if (ncpus_online == loop_count) {
+			backoff = mutex_lock_backoff(0);
+			loop_count = 0;
+		} else {
+			backoff = mutex_lock_backoff(backoff);
 		}
+		mutex_lock_delay(backoff);
 	}
 
 	if (spin_count) {
@@ -637,8 +654,8 @@ void
 lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 {
 	int spin_count = 1;
-	int backoff;	/* current backoff */
-	int backctr;	/* ctr for backoff */
+	int loop_count = 0;
+	uint_t backoff = 0;	/* current backoff */
 
 	if (panicstr)
 		return;
@@ -648,38 +665,23 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 
 	ASSERT(new_pil > LOCK_LEVEL);
 
-	if (&plat_lock_delay) {
-		backoff = 0;
-	} else {
-		backoff = BACKOFF_BASE;
-	}
 	do {
 		splx(old_pil);
 		while (LOCK_HELD(lp)) {
+			spin_count++;
+			loop_count++;
+
 			if (panicstr) {
 				*old_pil_addr = (ushort_t)splr(new_pil);
 				return;
 			}
-			spin_count++;
-			/*
-			 * Add an exponential backoff delay before trying again
-			 * to touch the mutex data structure.
-			 * spin_count test and call to nulldev are to prevent
-			 * compiler optimizer from eliminating the delay loop.
-			 */
-			if (&plat_lock_delay) {
-				plat_lock_delay(&backoff);
+			if (ncpus_online == loop_count) {
+				backoff = mutex_lock_backoff(0);
+				loop_count = 0;
 			} else {
-				for (backctr = backoff; backctr; backctr--) {
-					if (!spin_count) (void) nulldev();
-				}
-				backoff = backoff << 1;		/* double it */
-				if (backoff > BACKOFF_CAP) {
-					backoff = BACKOFF_CAP;
-				}
-
-				SMT_PAUSE();
+				backoff = mutex_lock_backoff(backoff);
 			}
+			mutex_lock_delay(backoff);
 		}
 		old_pil = splr(new_pil);
 	} while (!lock_spin_try(lp));

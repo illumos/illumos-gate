@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1998,2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 extern "C" {
 #endif
 
+#define	MUTEX_THREAD	(-0x8)
 #ifndef	_ASM
 
 /*
@@ -96,7 +96,23 @@ typedef union mutex_impl {
 #define	MUTEX_DESTROY(lp)	\
 	(lp)->m_owner = ((uintptr_t)curthread | MUTEX_DEAD)
 
+#define	MUTEX_BACKOFF_BASE	1
+#define	MUTEX_BACKOFF_SHIFT	1
+#define	MUTEX_CAP_FACTOR	8
+#define	MUTEX_DELAY()	{ \
+				mutex_delay(); \
+			}
+
+/* low-overhead clock read */
+extern u_longlong_t gettick(void);
+#define	MUTEX_GETTICK()	gettick()
+extern void null_xcall(void);
+#define	MUTEX_SYNC()	xc_all((xcfunc_t *)null_xcall, 0, 0)
+
+extern void cas_delay(void *);
+extern void rdccr_delay(void);
 extern int mutex_adaptive_tryenter(mutex_impl_t *);
+extern void *mutex_owner_running(mutex_impl_t *);
 
 #endif	/* _ASM */
 
