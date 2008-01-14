@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,11 @@ include ../../Makefile.lib
 
 CPPFLAGS +=     -D_REENTRANT -I$(SRC)/uts/common/gssapi/include  \
 		-I$(SRC)/uts/common
-CFLAGS += $(XFFLAG)
+ 
+CFLAGS +=	$(XFFLAG)
+CFLAGS64 +=	$(XFFLAG)
+
+DYNFLAGS +=	$(ZIGNORE)
 
 LINTSRC=	$(LINTLIB:%.ln=%)
 

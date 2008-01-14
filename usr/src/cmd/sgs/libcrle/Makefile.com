@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,8 +46,8 @@ SRCDIR =	../common
 DLLIB =		$(VAR_DL_LIB)
 package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
-ZIGNORE =
-LDLIBS +=	-lmapmalloc $(DLLIB) -lc
+lint :=		ZRECORD =
+LDLIBS +=	$(ZRECORD) -lmapmalloc $(DLLIB) -lc
 
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u

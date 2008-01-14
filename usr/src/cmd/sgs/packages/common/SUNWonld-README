@@ -1194,10 +1194,12 @@ All the above changes are incorporated in the following patches:
 6568745 segfault when using LD_DEBUG with bit_audit library when instrumenting
 	mozilla (D)
 	PSARC/2007/413 Add -zglobalaudit option to ld
+6602294 ps_pbrandname breaks apps linked directly against librtld_db
+	(link-editor components only) 
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T127111-XX
-    Solaris/SunOS 5.10_x86	patch T127112-XX
+    Solaris/SunOS 5.10_sparc	patch T127111-07
+    Solaris/SunOS 5.10_x86	patch T127112-07
 --------------------------------------------------------------------------------
 
 --------------
@@ -1277,8 +1279,6 @@ Bugid   Risk Synopsis
 	shared object reference
 6595139 various applications should export yy* global variables for libl
 6597841 gelf_getdyn() reads one too many dynamic entries
-6602294 ps_pbrandname breaks apps linked directly against librtld_db
-	(link-editor components only)
 6603313 dlclose() can fail to unload objects after fix for 6573641
 6234471 need a way to edit ELF objects (D)
 	PSARC/2007/509 elfedit
@@ -1305,3 +1305,4 @@ Bugid   Risk Synopsis
 	usr/src/common/elfcap
 6642769 ld(1) -z combreloc should become default behavior (D)
 	PSARC/2008/006: make ld(1) -z combreloc become default behavior
+6634436 XFFLAG should be updated.  (link-editor components only)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +56,8 @@ $(PICS) := 	CFLAGS += $(XFFLAG)
 $(PICS) := 	CCFLAGS += $(XFFLAG)
 $(PICS) :=	CFLAGS64 += $(XFFLAG)
 $(PICS) :=	CCFLAGS64 += $(XFFLAG)
+
+DYNFLAGS +=	$(ZIGNORE)
 
 LIBS = $(DYNLIB)
 LIBNAME = $(LIBRARY:%.a=%)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,8 +33,6 @@ OBJECTS=	$(COMOBJS) $(BLTOBJ)
 
 include		../../../../lib/Makefile.lib
 include		../../Makefile.com
-
-ZIGNORE=
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/link_audit
 
@@ -59,7 +57,9 @@ CPPFLAGS=	-I. -I../common -I../../include \
 		-I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master)
 CFLAGS +=	$(C_PICFLAGS)
-LDLIBS +=	-lmapmalloc -lc $(DLLIB)
+
+lint :=		ZRECORD =
+LDLIBS +=	$(ZRECORD) -lmapmalloc -lc $(DLLIB)
 
 LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2

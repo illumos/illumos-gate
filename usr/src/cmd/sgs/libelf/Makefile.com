@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,11 +59,6 @@ ROOTDEMODIRBASE=$(ROOT)/usr/demo/ELF
 ROOTDEMODIRS=   $(ROOTDEMODIRBASE)
 
 include $(SRC)/cmd/sgs/Makefile.com
-
-#
-# Do not compile the libelf.a objects with the -xF flag
-#
-$(OBJS) :=	XFFLAG=
 
 WARLOCKFILES=	$(OBJECTS:%.o=wlocks/%.ll)
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -109,7 +109,6 @@
 # Common Macro definitions
 #
 VAR_CPPFLAGS=
-VAR_XFFLAG=		-xF=%all
 
 VAR_LINTFLAGS64=	-Xarch=$(MACH64:sparcv9=v9)
 VAR_I386_ARCH=		intel

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -355,7 +355,7 @@ STAND_FLAGS_64 = $($(MACH64)_STAND_FLAGS)
 ILDOFF=			-xildoff
 #
 XDEPEND=		-xdepend
-XFFLAG=			-xF
+XFFLAG=			-xF=%all
 XESS=			-xs
 XSTRCONST=		-xstrconst 
 
@@ -762,6 +762,7 @@ ZNODUMP=	-znodump
 ZNOLAZYLOAD=	-znolazyload
 ZNORELOC=	-znoreloc
 ZNOVERSION=	-znoversion
+ZRECORD=	-zrecord
 ZREDLOCSYM=	-zredlocsym
 ZTEXT=		-ztext
 ZVERBOSE=	-zverbose

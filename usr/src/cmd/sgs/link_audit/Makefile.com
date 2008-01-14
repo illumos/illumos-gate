@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,8 +29,6 @@ include		../../../../lib/Makefile.lib
 include		../../Makefile.com
 
 NO_ASM_WARN=	-erroff=E_ASM_DISABLES_OPTIMIZATION
-
-ZIGNORE=
 
 SGSPROTO=	../../proto/$(MACH)
 
@@ -82,11 +80,11 @@ $(WHOLIB):=	PICS = $(WHOPICS)
 $(SYMBINDREP):=	PICS = $(SYMBINDREPPICS)
 $(BINDLIB):=	PICS = $(BINDPICS)
 
-$(TRUSSLIB):=	LDLIBS += -lmapmalloc -lc
-$(PERFLIB):=	LDLIBS += -lmapmalloc -lc
-$(WHOLIB):=	LDLIBS += $(ELFLIBDIR) -lelf -lmapmalloc $(DLLIB) -lc
-$(SYMBINDREP):=	LDLIBS += -lmapmalloc -lc
-$(BINDLIB):=	LDLIBS += -lmapmalloc -lc
+$(TRUSSLIB):=	LDLIBS += $(ZRECORD) -lmapmalloc -lc
+$(PERFLIB):=	LDLIBS += $(ZRECORD) -lmapmalloc -lc
+$(WHOLIB):=	LDLIBS += $(ELFLIBDIR) -lelf $(ZRECORD) -lmapmalloc $(DLLIB) -lc
+$(SYMBINDREP):=	LDLIBS += $(ZRECORD) -lmapmalloc -lc
+$(BINDLIB):=	LDLIBS += $(ZRECORD) -lmapmalloc -lc
 
 $(TRUSSLIB):=	SONAME = $(TRUSSLIB)
 $(PERFLIB):=	SONAME = $(PERFLIB)
