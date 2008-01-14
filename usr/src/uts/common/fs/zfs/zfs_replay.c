@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,13 +339,14 @@ zfs_replay_create_acl(zfsvfs_t *zfsvfs,
 		vsec.vsa_aclcnt = lracl->lr_aclcnt;
 		vsec.vsa_aclentsz = lracl->lr_acl_bytes;
 		vsec.vsa_aclflags = lracl->lr_acl_flags;
-		if (zfsvfs->z_fuid_replay == NULL)
+		if (zfsvfs->z_fuid_replay == NULL) {
 			fuidstart = (caddr_t)(lracl + 1) + xvatlen +
 			    ZIL_ACE_LENGTH(lracl->lr_acl_bytes);
 			zfsvfs->z_fuid_replay =
 			    zfs_replay_fuids(fuidstart,
 			    (void *)&name, lracl->lr_fuidcnt, lracl->lr_domcnt,
 			    lr->lr_uid, lr->lr_gid);
+		}
 
 		error = VOP_CREATE(ZTOV(dzp), name, &xva.xva_vattr,
 		    0, 0, &vp, kcred, vflg, NULL, &vsec);
@@ -369,13 +370,14 @@ zfs_replay_create_acl(zfsvfs_t *zfsvfs,
 		vsec.vsa_aclcnt = lracl->lr_aclcnt;
 		vsec.vsa_aclentsz = lracl->lr_acl_bytes;
 		vsec.vsa_aclflags = lracl->lr_acl_flags;
-		if (zfsvfs->z_fuid_replay == NULL)
+		if (zfsvfs->z_fuid_replay == NULL) {
 			fuidstart = (caddr_t)(lracl + 1) + xvatlen +
 			    ZIL_ACE_LENGTH(lracl->lr_acl_bytes);
 			zfsvfs->z_fuid_replay =
 			    zfs_replay_fuids(fuidstart,
 			    (void *)&name, lracl->lr_fuidcnt, lracl->lr_domcnt,
 			    lr->lr_uid, lr->lr_gid);
+		}
 		error = VOP_MKDIR(ZTOV(dzp), name, &xva.xva_vattr,
 		    &vp, kcred, NULL, vflg, &vsec);
 		break;
