@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4563,7 +4563,7 @@ parse_media_block(struct dnetinstance *dnetp, media_block_t *block, uchar_t *vi)
 			block->gprseq[1]  = *vi++;
 			block->gprseq[1] |= *vi++ << 8;
 			block->command = *vi++;
-			block->command = *vi++ << 8;
+			block->command |= *vi++ << 8;
 			break;
 
 		case 5: /* GPR reset sequence:  Section 4.5.2.1.4 */
