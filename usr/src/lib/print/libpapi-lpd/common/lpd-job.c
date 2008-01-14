@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -284,6 +284,45 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	return (status);
 }
 
+static char *
+unused_attributes(papi_attribute_t **list, papi_attribute_t **used)
+{
+	char *result = NULL;
+	char **names = NULL;
+	int i;
+
+	if ((list == NULL) || (used == NULL))
+		return (NULL);
+
+	for (i = 0; used[i] != NULL; i++)
+		list_append(&names, used[i]->name);
+
+	if (names != NULL) {
+		papi_attribute_t **unused = NULL;
+
+		/* add these to the list of things to ignore */
+		list_append(&names, "document-format");
+		list_append(&names, "copies");
+
+		split_and_copy_attributes(names, list, NULL, &unused);
+		if (unused != NULL) {
+			size_t size = 0;
+
+			do {
+				size += 1024;
+				if (result != NULL)
+					free(result);
+				result = calloc(1, size);
+			} while (papiAttributeListToString(unused, " ",
+					result, size) != PAPI_OK);
+			papiAttributeListFree(unused);
+		}
+		free(names);
+	}
+
+	return (result);
+}
+
 /*
  * lpd_add_svr4_attributes
  *	Solaris 2.x LP - BSD protocol extensions
@@ -362,13 +401,10 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 				"lp-modes", s);
 	}
 
-	/* Options lp -o */
-	s = NULL;
-	papiAttributeListGetString(attributes, NULL, "lp-options", &s);
-	if (s != NULL) {
-		add_svr4_control_line(metadata, 'o', s);
-		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"lp-options", s);
+	/* Options lp -o are handled elsewhere */
+	if ((s = unused_attributes(attributes, *used)) != NULL) {
+		add_lpd_control_line(metadata, 'O', s);
+		free(s);
 	}
 
 	return (PAPI_OK);
@@ -381,12 +417,9 @@ lpd_add_hpux_attributes(service_t *svc, papi_attribute_t **attributes,
 	char *s = NULL;
 
 	/* Options lp -o */
-	s = NULL;
-	papiAttributeListGetString(attributes, NULL, "lp-options", &s);
-	if (s != NULL) {
+	if ((s = unused_attributes(attributes, *used)) != NULL) {
 		add_hpux_control_line(metadata, s);
-		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"lp-options", s);
+		free(s);
 	}
 
 	return (PAPI_OK);
@@ -401,6 +434,7 @@ lpd_job_add_attributes(service_t *svc, papi_attribute_t **attributes,
 
 	lpd_add_rfc1179_attributes(svc, attributes, metadata, used);
 
+	/* add protocol extensions if applicable */
 	if (svc->uri->fragment != NULL) {
 		if ((strcasecmp(svc->uri->fragment, "solaris") == 0) ||
 		    (strcasecmp(svc->uri->fragment, "svr4") == 0))
