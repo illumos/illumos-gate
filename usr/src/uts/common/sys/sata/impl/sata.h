@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,6 +362,7 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_EVNT_INPROC_DEVICE_RESET	0x08000000
 #define	SATA_EVNT_CLEAR_DEVICE_RESET	0x04000000
 #define	SATA_EVNT_TARGET_NODE_CLEANUP	0x00000100
+#define	SATA_EVNT_AUTOONLINE_DEVICE	0x00000200
 
 /*
  * Lock flags - used to serialize configuration operations
@@ -380,19 +381,20 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 					SATA_EVNT_LINK_LOST | \
 					SATA_EVNT_LINK_ESTABLISHED | \
 					SATA_EVNT_PORT_FAILED | \
-					SATA_EVNT_TARGET_NODE_CLEANUP)
+					SATA_EVNT_TARGET_NODE_CLEANUP | \
+					SATA_EVNT_AUTOONLINE_DEVICE)
 /* Mask for drive events */
 #define	SATA_EVNT_DRIVE_EVENTS		(SATA_EVNT_DEVICE_RESET | \
 					SATA_EVNT_INPROC_DEVICE_RESET)
 #define	SATA_EVNT_CONTROLLER_EVENTS	SATA_EVNT_PWR_LEVEL_CHANGED
 
-/* Delays and timeounts definitions */
+/* Delays and timeout duration definitions */
 #define	SATA_EVNT_DAEMON_SLEEP_TIME	50000	/* 50 ms */
 #define	SATA_EVNT_DAEMON_TERM_TIMEOUT	100000	/* 100 ms */
 #define	SATA_EVNT_DAEMON_TERM_WAIT	60000000 /* 60 s */
 #define	SATA_EVNT_LINK_LOST_TIMEOUT	1000000	/* 1 s */
 #define	SATA_DEV_IDENTIFY_TIMEOUT	60000000 /* 60 s */
-#define	SATA_DEV_IDENTIFY_RETRY_DELAY	10000	/* 10 ms */
+#define	SATA_DEV_IDENTIFY_RTR_DLY	10000	/* 10 ms */
 
 /* DEVICE IDENTIFY and device initialization retry delay */
 #define	SATA_DEV_IDENTIFY_RETRY		1
@@ -450,8 +452,8 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
  */
 #define	SD_SCSI_ASC_NO_ADD_SENSE			0x00
 #define	SD_SCSI_ASC_LU_NOT_READY			0x04
-#define	SD_SCSI_ASC_WRITE_ERROR				0x0c
-#define	SD_SCSI_ASC_UNREC_READ_ERROR			0x11
+#define	SD_SCSI_ASC_WRITE_ERR				0x0c
+#define	SD_SCSI_ASC_UNREC_READ_ERR			0x11
 #define	SD_SCSI_ASC_INVALID_COMMAND_CODE		0x20
 #define	SD_SCSI_ASC_LBA_OUT_OF_RANGE			0x21
 #define	SD_SCSI_ASC_INVALID_FIELD_IN_CDB		0x24
@@ -575,6 +577,12 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_PMPORT_DEV_TYPE(sata_hba_inst, cport, pmport) \
 	sata_hba_inst->satahba_dev_port[cport]->\
 	cport_devp.cport_sata_pmult->pmult_dev_port[pmport]->pmport_dev_type
+
+#define	SATA_PMPORTINFO_DRV_TYPE(pmportinfo) \
+	pmportinfo->pmport_dev_type
+
+#define	SATA_PMPORTINFO_DRV_INFO(pmportinfo) \
+	pmportinfo->pmport_sata_drive
 
 #define	SATA_TXLT_HBA_INST(spx) \
 	spx->txlt_sata_hba_inst

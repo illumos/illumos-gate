@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,16 @@ int sata_max_queue_depth = SATA_MAX_QUEUE_DEPTH; /* max NCQ/TCQ queue depth */
  * if queueing is enabled.
  */
 static	int sata_current_max_qdepth;
+
+/*
+ * Global variable determining the default behavior after device hotpluggin.
+ * If non-zero, the hotplugged device is onlined (if possible) without explicit
+ * IOCTL request (AP_CONFIGURE).
+ * If zero, hotplugged device is identified, but not onlined.
+ * Enabling (AP_CONNECT) device port with an attached device does not result
+ * in device onlining regardless of the flag setting
+ */
+int sata_auto_online = 0;
 
 #ifdef SATA_DEBUG
 
@@ -149,7 +159,8 @@ static	void sata_process_port_pwr_change(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_cntrl_pwr_level_change(sata_hba_inst_t *);
 static	void sata_process_target_node_cleanup(sata_hba_inst_t *,
     sata_address_t *);
-
+static	void sata_process_device_autoonline(sata_hba_inst_t *,
+    sata_address_t *saddr);
 
 /*
  * Local translation functions
@@ -190,7 +201,28 @@ static	int32_t sata_get_port_num(sata_hba_inst_t *,  struct devctl_iocdata *);
 static	void sata_cfgadm_state(sata_hba_inst_t *, int32_t,
     devctl_ap_state_t *);
 static	dev_info_t *sata_get_target_dip(dev_info_t *, int32_t);
+static	dev_info_t *sata_get_scsi_target_dip(dev_info_t *, sata_address_t *);
 static	dev_info_t *sata_devt_to_devinfo(dev_t);
+static	int sata_ioctl_connect(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_disconnect(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_configure(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_unconfigure(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_activate(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_deactivate(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_reset_port(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_reset_device(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_reset_all(sata_hba_inst_t *);
+static	int sata_ioctl_port_self_test(sata_hba_inst_t *, sata_device_t *);
+static	int sata_ioctl_get_device_path(sata_hba_inst_t *, sata_device_t *,
+    sata_ioctl_data_t *, int mode);
+static	int sata_ioctl_get_ap_type(sata_hba_inst_t *, sata_device_t *,
+    sata_ioctl_data_t *, int mode);
+static	int sata_ioctl_get_model_info(sata_hba_inst_t *, sata_device_t *,
+    sata_ioctl_data_t *, int mode);
+static	int sata_ioctl_get_revfirmware_info(sata_hba_inst_t *, sata_device_t *,
+    sata_ioctl_data_t *, int mode);
+static	int sata_ioctl_get_serialnumber_info(sata_hba_inst_t *,
+    sata_device_t *, sata_ioctl_data_t *, int mode);
 
 /*
  * Local functions
@@ -275,7 +307,7 @@ static	void sata_decode_device_error(sata_pkt_txlate_t *,
     struct scsi_extended_sense *);
 static	void sata_set_device_removed(dev_info_t *);
 static	boolean_t sata_check_device_removed(dev_info_t *);
-static	void sata_set_target_node_cleanup(sata_hba_inst_t *, int cport);
+static	void sata_set_target_node_cleanup(sata_hba_inst_t *, sata_address_t *);
 static	int sata_ncq_err_ret_cmd_setup(sata_pkt_txlate_t *,
     sata_drive_info_t *);
 static	int sata_atapi_err_ret_cmd_setup(sata_pkt_txlate_t *,
@@ -457,6 +489,9 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_cport_info::cport_dev_type))
 _NOTE(MUTEX_PROTECTS_DATA(sata_cport_info::cport_mutex, \
     sata_cport_info::cport_state))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_cport_info::cport_state))
+_NOTE(MUTEX_PROTECTS_DATA(sata_cport_info::cport_mutex, \
+    sata_pmport_info::pmport_state))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmport_info::pmport_state))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmport_info::pmport_dev_type))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmport_info::pmport_sata_drive))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sata_pmult_info::pmult_dev_port))
@@ -1119,13 +1154,12 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 #endif
 	int rv = 0;
 	int32_t	comp_port = -1;
-	dev_info_t *dip, *tdip;
+	dev_info_t *dip;
 	devctl_ap_state_t ap_state;
 	struct devctl_iocdata *dcp = NULL;
 	scsi_hba_tran_t *scsi_hba_tran;
 	sata_hba_inst_t *sata_hba_inst;
 	sata_device_t sata_device;
-	sata_drive_info_t *sdinfo;
 	sata_cport_info_t *cportinfo;
 	int cport, pmport, qual;
 	int rval = SATA_SUCCESS;
@@ -1198,13 +1232,14 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		sata_device.satadev_addr.cport = cport;
 		sata_device.satadev_addr.pmport = pmport;
-		sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
+		sata_device.satadev_addr.qual = qual;
 		sata_device.satadev_rev = SATA_DEVICE_REV;
 	}
 
 	switch (cmd) {
 
 	case DEVCTL_AP_DISCONNECT:
+
 		/*
 		 * Normally, cfgadm sata plugin will try to offline
 		 * (unconfigure) device before this request. Nevertheless,
@@ -1213,152 +1248,9 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * deactivate the port regardless of the unconfigure
 		 * operation results.
 		 *
-		 * DEVCTL_AP_DISCONNECT invokes
-		 * sata_hba_inst->satahba_tran->
-		 * sata_tran_hotplug_ops->sata_tran_port_deactivate().
-		 * If successful, the device structure (if any) attached
-		 * to a port is removed and state of the port marked
-		 * appropriately.
-		 * Failure of the port_deactivate may keep port in
-		 * the active state, or may fail the port.
 		 */
+		rv = sata_ioctl_disconnect(sata_hba_inst, &sata_device);
 
-		/* Check the current state of the port */
-		rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
-		    (dip, &sata_device);
-		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-		    cport_mutex);
-		sata_update_port_info(sata_hba_inst, &sata_device);
-		if (rval != SATA_SUCCESS ||
-		    (sata_device.satadev_state & SATA_PSTATE_FAILED)) {
-			cportinfo->cport_state = SATA_PSTATE_FAILED;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			rv = EIO;
-			break;
-		}
-		/* Sanity check */
-		if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* No physical port deactivation supported. */
-			break;
-		}
-
-		/*
-		 * set port's dev_state to not ready - this will disable
-		 * an access to an attached device.
-		 */
-		cportinfo->cport_state &= ~SATA_STATE_READY;
-
-		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
-			sdinfo = cportinfo->cport_devp.cport_sata_drive;
-			ASSERT(sdinfo != NULL);
-			if ((sdinfo->satadrv_type &
-			    (SATA_VALID_DEV_TYPE))) {
-				/*
-				 * If a target node exists, try to offline
-				 * a device and remove target node.
-				 */
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				tdip = sata_get_target_dip(dip, comp_port);
-				if (tdip != NULL && ndi_devi_offline(tdip,
-				    NDI_DEVI_REMOVE) != NDI_SUCCESS) {
-					/*
-					 * Problem
-					 * A target node remained
-					 * attached. This happens when
-					 * the file was open or a node
-					 * was waiting for resources.
-					 * Cannot do anything about it.
-					 */
-					SATA_LOG_D((sata_hba_inst, CE_WARN,
-					    "sata_hba_ioctl: "
-					    "disconnect: could not "
-					    "unconfigure device before "
-					    "disconnecting the SATA "
-					    "port %d", cport));
-
-					/*
-					 * Set DEVICE REMOVED state
-					 * in the target node. It
-					 * will prevent access to
-					 * the device even when a
-					 * new device is attached,
-					 * until the old target node
-					 * is released, removed and
-					 * recreated for a new
-					 * device.
-					 */
-					sata_set_device_removed(tdip);
-					/*
-					 * Instruct event daemon to
-					 * try the target node cleanup
-					 * later.
-					 */
-					sata_set_target_node_cleanup(
-					    sata_hba_inst, cport);
-				}
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				/*
-				 * Remove and release sata_drive_info
-				 * structure.
-				 */
-				if (SATA_CPORTINFO_DRV_INFO(cportinfo) !=
-				    NULL) {
-					SATA_CPORTINFO_DRV_INFO(cportinfo) =
-					    NULL;
-					(void) kmem_free((void *)sdinfo,
-					    sizeof (sata_drive_info_t));
-					cportinfo->cport_dev_type =
-					    SATA_DTYPE_NONE;
-				}
-			}
-			/*
-			 * Note: PMult info requires different handling.
-			 * Put PMult handling code here, when PMult is
-			 * supported.
-			 */
-
-		}
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-		/* Just ask HBA driver to deactivate port */
-		sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-
-		rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
-		    (dip, &sata_device);
-
-		/*
-		 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
-		 * without the hint.
-		 */
-		sata_gen_sysevent(sata_hba_inst,
-		    &sata_device.satadev_addr, SE_NO_HINT);
-
-		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-		    cport_mutex);
-		sata_update_port_info(sata_hba_inst, &sata_device);
-
-		if (rval != SATA_SUCCESS) {
-			/*
-			 * Port deactivation failure - do not
-			 * change port state unless the state
-			 * returned by HBA indicates a port failure.
-			 */
-			if (sata_device.satadev_state & SATA_PSTATE_FAILED)
-				cportinfo->cport_state = SATA_PSTATE_FAILED;
-			rv = EIO;
-		} else {
-			/*
-			 * Deactivation succeded. From now on the framework
-			 * will not know what is happening to the device, until
-			 * the port is activated again.
-			 */
-			cportinfo->cport_state |= SATA_PSTATE_SHUTDOWN;
-		}
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 		break;
 
 	case DEVCTL_AP_UNCONFIGURE:
@@ -1369,36 +1261,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * and obviously sata_drive_info attached as well, because
 		 * from the hardware point of view nothing has changed.
 		 */
-		if ((tdip = sata_get_target_dip(dip, comp_port)) != NULL) {
-
-			if (ndi_devi_offline(tdip, NDI_UNCONFIG) !=
-			    NDI_SUCCESS) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: unconfigure: "
-				    "failed to unconfigure "
-				    "device at SATA port %d", cport));
-				rv = EIO;
-			}
-			/*
-			 * The target node devi_state should be marked with
-			 * DEVI_DEVICE_OFFLINE by ndi_devi_offline().
-			 * This would be the indication for cfgadm that
-			 * the AP node occupant state is 'unconfigured'.
-			 */
-
-		} else {
-			/*
-			 * This would indicate a failure on the part of cfgadm
-			 * to detect correct state of the node prior to this
-			 * call - one cannot unconfigure non-existing device.
-			 */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_hba_ioctl: unconfigure: "
-			    "attempt to unconfigure non-existing device "
-			    "at SATA port %d", cport));
-			rv = ENXIO;
-		}
-
+		rv = sata_ioctl_unconfigure(sata_hba_inst, &sata_device);
 		break;
 
 	case DEVCTL_AP_CONNECT:
@@ -1407,281 +1270,34 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * The sata cfgadm pluging will invoke this operation only if
 		 * port was found in the disconnect state (failed state
 		 * is also treated as the disconnected state).
-		 * DEVCTL_AP_CONNECT would invoke
-		 * sata_hba_inst->satahba_tran->
-		 * sata_tran_hotplug_ops->sata_tran_port_activate().
-		 * If successful and a device is found attached to the port,
-		 * the initialization sequence is executed to attach
+		 * If port activation is successful and a device is found
+		 * attached to the port, the initialization sequence is
+		 * executed to probe the port and attach
 		 * a device structure to a port structure. The device is not
 		 * set in configured state (system-wise) by this operation.
-		 * The state of the port and a device would be set
-		 * appropriately.
-		 *
-		 * Note, that activating the port may generate link events,
-		 * so is is important that following processing and the
-		 * event processing does not interfere with each other!
-		 *
-		 * This operation may remove port failed state and will
-		 * try to make port active and in good standing.
 		 */
 
-		/* We only care about host sata cport for now */
+		rv = sata_ioctl_connect(sata_hba_inst, &sata_device);
 
-		if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) != NULL) {
-			/* Just let HBA driver to activate port */
-
-			if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
-			    (dip, &sata_device) != SATA_SUCCESS) {
-				/*
-				 * Port activation failure.
-				 */
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				sata_update_port_info(sata_hba_inst,
-				    &sata_device);
-				if (sata_device.satadev_state &
-				    SATA_PSTATE_FAILED) {
-					cportinfo->cport_state =
-					    SATA_PSTATE_FAILED;
-				}
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: connect: "
-				    "failed to activate SATA port %d",
-				    cport));
-				rv = EIO;
-				break;
-			}
-		}
-		/* Virgin port state - will be updated by the port re-probe. */
-		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-		    cport)->cport_mutex);
-		cportinfo->cport_state = 0;
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-		    cport)->cport_mutex);
-
-		/*
-		 * Probe the port to find its state and attached device.
-		 */
-		if (sata_reprobe_port(sata_hba_inst, &sata_device,
-		    SATA_DEV_IDENTIFY_RETRY) == SATA_FAILURE)
-			rv = EIO;
-		/*
-		 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
-		 * without the hint
-		 */
-		sata_gen_sysevent(sata_hba_inst,
-		    &sata_device.satadev_addr, SE_NO_HINT);
-		/*
-		 * If there is a device attached to the port, emit
-		 * a message.
-		 */
-		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
-			sata_log(sata_hba_inst, CE_WARN,
-			    "SATA device detected at port %d", cport);
-		}
 		break;
 	}
 
 	case DEVCTL_AP_CONFIGURE:
 	{
-		boolean_t target = TRUE;
-
 		/*
 		 * A port may be in an active or shutdown state.
-		 * If port is in a failed state, operation is aborted - one
-		 * has to use explicit connect or port activate request
-		 * to try to get a port into non-failed mode.
+		 * If port is in a failed state, operation is aborted.
+		 * If a port is in a shutdown state, sata_tran_port_activate()
+		 * is invoked prior to any other operation.
 		 *
-		 * If a port is in a shutdown state, arbitrarily invoke
-		 * sata_tran_port_activate() prior to any other operation.
-		 *
-		 * Verify that port state is READY and there is a device
-		 * of a supported type attached to this port.
-		 * If target node exists, a device was most likely offlined.
-		 * If target node does not exist, create a target node an
-		 * attempt to online it.
-		 *		 *
-		 * NO PMult or devices beyond PMult are supported yet.
+		 * Onlining the device involves creating a new target node.
+		 * If there is an old target node present (belonging to
+		 * previously removed device), the operation is aborted - the
+		 * old node has to be released and removed before configure
+		 * operation is attempted.
 		 */
 
-		/* We only care about host controller's sata cport for now. */
-		if (cportinfo->cport_state & SATA_PSTATE_FAILED) {
-			rv = ENXIO;
-			break;
-		}
-		/* Check the current state of the port */
-		sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-
-		rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
-		    (dip, &sata_device);
-		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-		    cport_mutex);
-		sata_update_port_info(sata_hba_inst, &sata_device);
-		if (rval != SATA_SUCCESS ||
-		    (sata_device.satadev_state & SATA_PSTATE_FAILED)) {
-			cportinfo->cport_state = SATA_PSTATE_FAILED;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			rv = EIO;
-			break;
-		}
-		if (cportinfo->cport_state & SATA_PSTATE_SHUTDOWN) {
-			target = FALSE;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) != NULL) {
-				/* Just let HBA driver to activate port */
-				if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
-				    (dip, &sata_device) != SATA_SUCCESS) {
-					/*
-					 * Port activation failure - do not
-					 * change port state unless the state
-					 * returned by HBA indicates a port
-					 * failure.
-					 */
-					mutex_enter(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-					sata_update_port_info(sata_hba_inst,
-					    &sata_device);
-					if (sata_device.satadev_state &
-					    SATA_PSTATE_FAILED) {
-						cportinfo->cport_state =
-						    SATA_PSTATE_FAILED;
-					}
-					mutex_exit(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-					SATA_LOG_D((sata_hba_inst, CE_WARN,
-					    "sata_hba_ioctl: configure: "
-					    "failed to activate SATA port %d",
-					    cport));
-					rv = EIO;
-					break;
-				}
-			}
-			/*
-			 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
-			 * without the hint.
-			 */
-			sata_gen_sysevent(sata_hba_inst,
-			    &sata_device.satadev_addr, SE_NO_HINT);
-
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* Virgin port state */
-			cportinfo->cport_state = 0;
-		}
-		/*
-		 * Always reprobe port, to get current device info.
-		 */
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-		if (sata_reprobe_port(sata_hba_inst, &sata_device,
-		    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS) {
-			rv = EIO;
-			break;
-		}
-		if (target == FALSE &&
-		    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
-			/*
-			 * That's the transition from "inactive" port
-			 * to active one with device attached.
-			 */
-			sata_log(sata_hba_inst, CE_WARN,
-			    "SATA device detected at port %d",
-			    cport);
-		}
-
-		/*
-		 * This is where real configure starts.
-		 * Change following check for PMult support.
-		 */
-		if (!(sata_device.satadev_type & SATA_VALID_DEV_TYPE)) {
-			/* No device to configure */
-			rv = ENXIO; /* No device to configure */
-			break;
-		}
-
-		/*
-		 * Here we may have a device in reset condition,
-		 * but because we are just configuring it, there is
-		 * no need to process the reset other than just
-		 * to clear device reset condition in the HBA driver.
-		 * Setting the flag SATA_EVNT_CLEAR_DEVICE_RESET will
-		 * cause a first command sent the HBA driver with the request
-		 * to clear device reset condition.
-		 */
-		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-		    cport_mutex);
-		sdinfo = sata_get_device_info(sata_hba_inst, &sata_device);
-		if (sdinfo == NULL) {
-			rv = ENXIO;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			break;
-		}
-		if (sdinfo->satadrv_event_flags &
-		    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET))
-			sdinfo->satadrv_event_flags = 0;
-		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-
-		if ((tdip = sata_get_target_dip(dip, comp_port)) != NULL) {
-			/*
-			 * Target node exists. Verify, that it belongs
-			 * to existing, attached device and not to
-			 * a removed device.
-			 */
-			if (sata_check_device_removed(tdip) == B_FALSE) {
-				if (ndi_devi_online(tdip, 0) != NDI_SUCCESS) {
-					SATA_LOG_D((sata_hba_inst, CE_WARN,
-					    "sata_hba_ioctl: configure: "
-					    "onlining device at SATA port %d "
-					    "failed", cport));
-					rv = EIO;
-					break;
-				} else {
-					mutex_enter(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-					SATA_CPORT_INFO(sata_hba_inst, cport)->
-					    cport_tgtnode_clean = B_TRUE;
-					mutex_exit(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-				}
-			} else {
-				sata_log(sata_hba_inst, CE_WARN,
-				    "SATA device at port %d cannot be "
-				    "configured. "
-				    "Application(s) accessing previously "
-				    "attached device "
-				    "have to release it before newly inserted "
-				    "device can be made accessible.",
-				    cport);
-				break;
-			}
-		} else {
-			/*
-			 * No target node - need to create a new target node.
-			 */
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_tgtnode_clean = B_TRUE;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			tdip = sata_create_target_node(dip, sata_hba_inst,
-			    &sata_device.satadev_addr);
-			if (tdip == NULL) {
-				/* configure failed */
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: configure: "
-				    "configuring SATA device at port %d "
-				    "failed", cport));
-				rv = EIO;
-				break;
-			}
-		}
+		rv = sata_ioctl_configure(sata_hba_inst, &sata_device);
 
 		break;
 	}
@@ -1776,771 +1392,93 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 		sata_device.satadev_addr.cport = cport;
 		sata_device.satadev_addr.pmport = pmport;
+		sata_device.satadev_addr.qual = qual;
 		sata_device.satadev_rev = SATA_DEVICE_REV;
 
 		switch (ioc.cmd) {
 
 		case SATA_CFGA_RESET_PORT:
 			/*
-			 * There is no protection here for configured
-			 * device.
+			 * There is no protection for configured device.
 			 */
-
-			/* Sanity check */
-			if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: "
-				    "sata_hba_tran missing required "
-				    "function sata_tran_reset_dport"));
-				rv = EINVAL;
-				break;
-			}
-
-			/* handle cport only for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-			if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
-			    (dip, &sata_device) != SATA_SUCCESS) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: reset port: "
-				    "failed cport %d pmport %d",
-				    cport, pmport));
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				sata_update_port_info(sata_hba_inst,
-				    &sata_device);
-				SATA_CPORT_STATE(sata_hba_inst, cport) =
-				    SATA_PSTATE_FAILED;
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EIO;
-			}
-			/*
-			 * Since the port was reset, it should be probed and
-			 * attached device reinitialized. At this point the
-			 * port state is unknown - it's state is HBA-specific.
-			 * Re-probe port to get its state.
-			 */
-			if (sata_reprobe_port(sata_hba_inst, &sata_device,
-			    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS) {
-				rv = EIO;
-				break;
-			}
+			rv = sata_ioctl_reset_port(sata_hba_inst, &sata_device);
 			break;
 
 		case SATA_CFGA_RESET_DEVICE:
 			/*
-			 * There is no protection here for configured
-			 * device.
+			 * There is no protection for configured device.
 			 */
-
-			/* Sanity check */
-			if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: "
-				    "sata_hba_tran missing required "
-				    "function sata_tran_reset_dport"));
-				rv = EINVAL;
-				break;
-			}
-
-			/* handle only device attached to cports, for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			sdinfo = sata_get_device_info(sata_hba_inst,
+			rv = sata_ioctl_reset_device(sata_hba_inst,
 			    &sata_device);
-			if (sdinfo == NULL) {
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EINVAL;
-				break;
-			}
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			/* only handle cport for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-			if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
-			    (dip, &sata_device) != SATA_SUCCESS) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: reset device: failed "
-				    "cport %d pmport %d", cport, pmport));
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				sata_update_port_info(sata_hba_inst,
-				    &sata_device);
-				/*
-				 * Device info structure remains
-				 * attached. Another device reset or
-				 * port disconnect/connect and re-probing is
-				 * needed to change it's state
-				 */
-				sdinfo->satadrv_state &= ~SATA_STATE_READY;
-				sdinfo->satadrv_state |=
-				    SATA_DSTATE_FAILED;
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EIO;
-			}
-			/*
-			 * Since the device was reset, we expect reset event
-			 * to be reported and processed.
-			 */
 			break;
 
 		case SATA_CFGA_RESET_ALL:
-		{
-			int tcport;
-
 			/*
-			 * There is no protection here for configured
-			 * devices.
+			 * There is no protection for configured devices.
 			 */
-			/* Sanity check */
-			if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: "
-				    "sata_hba_tran missing required "
-				    "function sata_tran_reset_dport"));
-				rv = EINVAL;
-				break;
-			}
-
+			rv = sata_ioctl_reset_all(sata_hba_inst);
 			/*
-			 * Need to lock all ports, not just one.
-			 * If any port is locked by event processing, fail
-			 * the whole operation.
-			 * One port is already locked, but for simplicity
-			 * lock it again.
-			 */
-			for (tcport = 0;
-			    tcport < SATA_NUM_CPORTS(sata_hba_inst);
-			    tcport++) {
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    tcport)->cport_mutex);
-				if (((SATA_CPORT_INFO(sata_hba_inst, tcport)->
-				    cport_event_flags) &
-				    SATA_EVNT_LOCK_PORT_BUSY) != 0) {
-					rv = EBUSY;
-					mutex_exit(
-					    &SATA_CPORT_INFO(sata_hba_inst,
-					    tcport)->cport_mutex);
-					break;
-				} else {
-					SATA_CPORT_INFO(sata_hba_inst,
-					    tcport)->cport_event_flags |=
-					    SATA_APCTL_LOCK_PORT_BUSY;
-				}
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    tcport)->cport_mutex);
-			}
-
-			if (rv == 0) {
-				/*
-				 * All cports successfully locked.
-				 * Reset main SATA controller only for now -
-				 * no PMult.
-				 */
-				sata_device.satadev_addr.qual =
-				    SATA_ADDR_CNTRL;
-
-				if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
-				    (dip, &sata_device) != SATA_SUCCESS) {
-					SATA_LOG_D((sata_hba_inst, CE_WARN,
-					    "sata_hba_ioctl: reset controller "
-					    "failed"));
-					rv = EIO;
-				}
-
-				/*
-				 * Since ports were reset, they should be
-				 * re-probed and attached devices
-				 * reinitialized.
-				 * At this point port states are unknown,
-				 * Re-probe ports to get their state -
-				 * cports only for now.
-				 */
-				for (tcport = 0;
-				    tcport < SATA_NUM_CPORTS(sata_hba_inst);
-				    tcport++) {
-					sata_device.satadev_addr.cport =
-					    tcport;
-					sata_device.satadev_addr.qual =
-					    SATA_ADDR_CPORT;
-
-					if (sata_reprobe_port(sata_hba_inst,
-					    &sata_device,
-					    SATA_DEV_IDENTIFY_RETRY) !=
-					    SATA_SUCCESS)
-						rv = EIO;
-
-				}
-			}
-			/*
-			 * Unlock all ports
-			 */
-			for (tcport = 0;
-			    tcport < SATA_NUM_CPORTS(sata_hba_inst);
-			    tcport++) {
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    tcport)->cport_mutex);
-				SATA_CPORT_INFO(sata_hba_inst, tcport)->
-				    cport_event_flags &=
-				    ~SATA_APCTL_LOCK_PORT_BUSY;
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    tcport)->cport_mutex);
-			}
-
-			/*
-			 * This operation returns EFAULT if either reset
-			 * controller failed or a re-probing of any ports
-			 * failed.
 			 * We return here, because common return is for
-			 * a single cport operation.
+			 * a single port operation - we have already unlocked
+			 * all ports and no dc handle was allocated.
 			 */
 			return (rv);
-		}
 
 		case SATA_CFGA_PORT_DEACTIVATE:
-			/* Sanity check */
-			if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
-				rv = ENOTSUP;
-				break;
-			}
 			/*
 			 * Arbitrarily unconfigure attached device, if any.
 			 * Even if the unconfigure fails, proceed with the
 			 * port deactivation.
 			 */
-
-			/* Handle only device attached to cports, for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			cportinfo->cport_state &= ~SATA_STATE_READY;
-			if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
-				/*
-				 * Handle only device attached to cports,
-				 * for now
-				 */
-				sata_device.satadev_addr.qual =
-				    SATA_ADDR_DCPORT;
-				sdinfo = sata_get_device_info(sata_hba_inst,
-				    &sata_device);
-				if (sdinfo != NULL &&
-				    (sdinfo->satadrv_type &
-				    SATA_VALID_DEV_TYPE)) {
-					/*
-					 * If a target node exists, try to
-					 * offline a device and remove target
-					 * node.
-					 */
-					mutex_exit(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-					tdip = sata_get_target_dip(dip, cport);
-					if (tdip != NULL) {
-						/* target node exist */
-						SATADBG1(SATA_DBG_IOCTL_IF,
-						    sata_hba_inst,
-						    "sata_hba_ioctl: "
-						    "port deactivate: "
-						    "target node exists.",
-						    NULL);
-
-						if (ndi_devi_offline(tdip,
-						    NDI_DEVI_REMOVE) !=
-						    NDI_SUCCESS) {
-							SATA_LOG_D((
-							    sata_hba_inst,
-							    CE_WARN,
-							    "sata_hba_ioctl:"
-							    "port deactivate: "
-							    "failed to "
-							    "unconfigure "
-							    "device at port "
-							    "%d before "
-							    "deactivating "
-							    "the port", cport));
-							/*
-							 * Set DEVICE REMOVED
-							 * state in the target
-							 * node. It will
-							 * prevent access to
-							 * the device even when
-							 * a new device is
-							 * attached, until the
-							 * old target node is
-							 * released, removed and
-							 * recreated for a new
-							 * device.
-							 */
-							sata_set_device_removed
-							    (tdip);
-							/*
-							 * Instruct event
-							 * daemon to try the
-							 * target node cleanup
-							 * later.
-							 */
-						sata_set_target_node_cleanup(
-						    sata_hba_inst, cport);
-						}
-					}
-					mutex_enter(&SATA_CPORT_INFO(
-					    sata_hba_inst, cport)->cport_mutex);
-					/*
-					 * In any case,
-					 * remove and release sata_drive_info
-					 * structure.
-					 * (cport attached device ony, for now)
-					 */
-					SATA_CPORTINFO_DRV_INFO(cportinfo) =
-					    NULL;
-					(void) kmem_free((void *)sdinfo,
-					    sizeof (sata_drive_info_t));
-					cportinfo->cport_dev_type =
-					    SATA_DTYPE_NONE;
-				}
-				/*
-				 * Note: PMult info requires different
-				 * handling. This comment is a placeholder for
-				 * a code handling PMult, to be implemented
-				 * in phase 2.
-				 */
-			}
-			cportinfo->cport_state &= ~(SATA_STATE_PROBED |
-			    SATA_STATE_PROBING);
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* handle cport only for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-			/* Just let HBA driver to deactivate port */
-			rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
-			    (dip, &sata_device);
-			/*
-			 * Generate sysevent -
-			 * EC_DR / ESC_DR_AP_STATE_CHANGE
-			 * without the hint
-			 */
-			sata_gen_sysevent(sata_hba_inst,
-			    &sata_device.satadev_addr, SE_NO_HINT);
-
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			sata_update_port_info(sata_hba_inst, &sata_device);
-			if (rval != SATA_SUCCESS) {
-				/*
-				 * Port deactivation failure - do not
-				 * change port state unless the state
-				 * returned by HBA indicates a port failure.
-				 */
-				if (sata_device.satadev_state &
-				    SATA_PSTATE_FAILED) {
-					SATA_CPORT_STATE(sata_hba_inst,
-					    cport) = SATA_PSTATE_FAILED;
-				}
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: port deactivate: "
-				    "cannot deactivate SATA port %d",
-				    cport));
-				rv = EIO;
-			} else {
-				cportinfo->cport_state |= SATA_PSTATE_SHUTDOWN;
-			}
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
+			rv = sata_ioctl_deactivate(sata_hba_inst, &sata_device);
 
 			break;
 
 		case SATA_CFGA_PORT_ACTIVATE:
-		{
-			boolean_t dev_existed = TRUE;
 
-			/* Sanity check */
-			if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL) {
-				rv = ENOTSUP;
-				break;
-			}
-			/* handle cport only for now */
-			if (cportinfo->cport_state & SATA_PSTATE_SHUTDOWN ||
-			    cportinfo->cport_dev_type == SATA_DTYPE_NONE)
-				dev_existed = FALSE;
-
-			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-			/* Just let HBA driver to activate port */
-			if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
-			    (dip, &sata_device) != SATA_SUCCESS) {
-				/*
-				 * Port activation failure - do not
-				 * change port state unless the state
-				 * returned by HBA indicates a port failure.
-				 */
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				sata_update_port_info(sata_hba_inst,
-				    &sata_device);
-				if (sata_device.satadev_state &
-				    SATA_PSTATE_FAILED) {
-					SATA_CPORT_STATE(sata_hba_inst,
-					    cport) = SATA_PSTATE_FAILED;
-				}
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: port activate: "
-				    "cannot activate SATA port %d",
-				    cport));
-				rv = EIO;
-				break;
-			}
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			cportinfo->cport_state &= ~SATA_PSTATE_SHUTDOWN;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			/*
-			 * Re-probe port to find its current state and
-			 * possibly attached device.
-			 * Port re-probing may change the cportinfo device
-			 * type if device is found attached.
-			 * If port probing failed, the device type would be
-			 * set to SATA_DTYPE_NONE.
-			 */
-			(void) sata_reprobe_port(sata_hba_inst, &sata_device,
-			    SATA_DEV_IDENTIFY_RETRY);
-
-			/*
-			 * Generate sysevent -
-			 * EC_DR / ESC_DR_AP_STATE_CHANGE
-			 * without the hint.
-			 */
-			sata_gen_sysevent(sata_hba_inst,
-			    &sata_device.satadev_addr, SE_NO_HINT);
-
-			if (dev_existed == FALSE &&
-			    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
-				/*
-				 * That's the transition from "inactive" port
-				 * state or active port without a device
-				 * attached to the active port state with
-				 * a device attached.
-				 */
-				sata_log(sata_hba_inst, CE_WARN,
-				    "SATA device detected at port %d", cport);
-			}
-
+			rv = sata_ioctl_activate(sata_hba_inst, &sata_device);
 			break;
-		}
 
 		case SATA_CFGA_PORT_SELF_TEST:
 
-			/* Sanity check */
-			if (SATA_SELFTEST_FUNC(sata_hba_inst) == NULL) {
-				rv = ENOTSUP;
-				break;
-			}
-			/*
-			 * There is no protection here for a configured
-			 * device attached to this port.
-			 */
-
-			/* only handle cport for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
-
-			if ((*SATA_SELFTEST_FUNC(sata_hba_inst))
-			    (dip, &sata_device) != SATA_SUCCESS) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: port selftest: "
-				    "failed cport %d pmport %d",
-				    cport, pmport));
-				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				sata_update_port_info(sata_hba_inst,
-				    &sata_device);
-				SATA_CPORT_STATE(sata_hba_inst, cport) =
-				    SATA_PSTATE_FAILED;
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EIO;
-				break;
-			}
-			/*
-			 * Since the port was reset, it should be probed and
-			 * attached device reinitialized. At this point the
-			 * port state is unknown - it's state is HBA-specific.
-			 * Force port re-probing to get it into a known state.
-			 */
-			if (sata_reprobe_port(sata_hba_inst, &sata_device,
-			    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS) {
-				rv = EIO;
-				break;
-			}
+			rv = sata_ioctl_port_self_test(sata_hba_inst,
+			    &sata_device);
 			break;
 
 		case SATA_CFGA_GET_DEVICE_PATH:
-		{
-			char		path[MAXPATHLEN];
-			uint32_t	size;
-
-			(void) strcpy(path, "/devices");
-			if ((tdip = sata_get_target_dip(dip, ioc.port)) ==
-			    NULL) {
-
-				/*
-				 * No such device.
-				 * If this is a request for a size, do not
-				 * return EINVAL for non-exisiting target,
-				 * because cfgadm will indicate a meaningless
-				 * ioctl failure.
-				 * If this is a real request for a path,
-				 * indicate invalid argument.
-				 */
-				if (!ioc.get_size) {
-					rv = EINVAL;
-					break;
-				}
-			} else {
-				(void) ddi_pathname(tdip, path + strlen(path));
-			}
-			size = strlen(path) + 1;
-
-			if (ioc.get_size) {
-				if (ddi_copyout((void *)&size,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-				}
-			} else {
-				if (ioc.bufsiz != size) {
-					rv = EINVAL;
-				} else if (ddi_copyout((void *)&path,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-				}
-			}
+			if (qual == SATA_ADDR_CPORT)
+				sata_device.satadev_addr.qual =
+				    SATA_ADDR_DCPORT;
+			else
+				sata_device.satadev_addr.qual =
+				    SATA_ADDR_DPMPORT;
+			rv = sata_ioctl_get_device_path(sata_hba_inst,
+			    &sata_device, &ioc, mode);
 			break;
-		}
 
 		case SATA_CFGA_GET_AP_TYPE:
-		{
-			uint32_t	type_len;
-			const char	*ap_type;
 
-			/* cport only, no port multiplier support */
-			switch (SATA_CPORT_DEV_TYPE(sata_hba_inst, cport)) {
-			case SATA_DTYPE_NONE:
-				ap_type = "port";
-				break;
-
-			case SATA_DTYPE_ATADISK:
-				ap_type = "disk";
-				break;
-
-			case SATA_DTYPE_ATAPICD:
-				ap_type = "cd/dvd";
-				break;
-
-			case SATA_DTYPE_PMULT:
-				ap_type = "pmult";
-				break;
-
-			case SATA_DTYPE_UNKNOWN:
-				ap_type = "unknown";
-				break;
-
-			default:
-				ap_type = "unsupported";
-				break;
-
-			} /* end of dev_type switch */
-
-			type_len = strlen(ap_type) + 1;
-
-			if (ioc.get_size) {
-				if (ddi_copyout((void *)&type_len,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			} else {
-				if (ioc.bufsiz != type_len) {
-					rv = EINVAL;
-					break;
-				}
-				if (ddi_copyout((void *)ap_type, ioc.buf,
-				    ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			}
-
+			rv = sata_ioctl_get_ap_type(sata_hba_inst,
+			    &sata_device, &ioc, mode);
 			break;
-		}
 
 		case SATA_CFGA_GET_MODEL_INFO:
-		{
-			uint32_t info_len;
-			char ap_info[sizeof (sdinfo->satadrv_id.ai_model) + 1];
 
-			/*
-			 * This operation should return to cfgadm the
-			 * device model information string
-			 */
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* only handle device connected to cport for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    &sata_device);
-			if (sdinfo == NULL) {
-				rv = EINVAL;
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				break;
-			}
-			bcopy(sdinfo->satadrv_id.ai_model, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_model));
-			swab(ap_info, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_model));
-			ap_info[sizeof (sdinfo->satadrv_id.ai_model)] = '\0';
-
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			info_len = strlen(ap_info) + 1;
-
-			if (ioc.get_size) {
-				if (ddi_copyout((void *)&info_len,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			} else {
-				if (ioc.bufsiz < info_len) {
-					rv = EINVAL;
-					break;
-				}
-				if (ddi_copyout((void *)ap_info, ioc.buf,
-				    ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			}
-
+			rv = sata_ioctl_get_model_info(sata_hba_inst,
+			    &sata_device, &ioc, mode);
 			break;
-		}
 
 		case SATA_CFGA_GET_REVFIRMWARE_INFO:
-		{
-			uint32_t info_len;
-			char ap_info[
-			    sizeof (sdinfo->satadrv_id.ai_fw) + 1];
 
-			/*
-			 * This operation should return to cfgadm the
-			 * device firmware revision information string
-			 */
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* only handle device connected to cport for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    &sata_device);
-			if (sdinfo == NULL) {
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EINVAL;
-				break;
-			}
-			bcopy(sdinfo->satadrv_id.ai_fw, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_fw));
-			swab(ap_info, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_fw));
-			ap_info[sizeof (sdinfo->satadrv_id.ai_fw)] = '\0';
-
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			info_len = strlen(ap_info) + 1;
-
-			if (ioc.get_size) {
-				if (ddi_copyout((void *)&info_len,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			} else {
-				if (ioc.bufsiz < info_len) {
-					rv = EINVAL;
-					break;
-				}
-				if (ddi_copyout((void *)ap_info, ioc.buf,
-				    ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			}
-
+			rv = sata_ioctl_get_revfirmware_info(sata_hba_inst,
+			    &sata_device, &ioc, mode);
 			break;
-		}
 
 		case SATA_CFGA_GET_SERIALNUMBER_INFO:
-		{
-			uint32_t info_len;
-			char ap_info[
-			    sizeof (sdinfo->satadrv_id.ai_drvser) + 1];
 
-			/*
-			 * This operation should return to cfgadm the
-			 * device serial number information string
-			 */
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-			/* only handle device connected to cport for now */
-			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
-
-			sdinfo = sata_get_device_info(sata_hba_inst,
-			    &sata_device);
-			if (sdinfo == NULL) {
-				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-				    cport)->cport_mutex);
-				rv = EINVAL;
-				break;
-			}
-			bcopy(sdinfo->satadrv_id.ai_drvser, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_drvser));
-			swab(ap_info, ap_info,
-			    sizeof (sdinfo->satadrv_id.ai_drvser));
-			ap_info[sizeof (sdinfo->satadrv_id.ai_drvser)] = '\0';
-
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
-			    cport_mutex);
-
-			info_len = strlen(ap_info) + 1;
-
-			if (ioc.get_size) {
-				if (ddi_copyout((void *)&info_len,
-				    ioc.buf, ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			} else {
-				if (ioc.bufsiz < info_len) {
-					rv = EINVAL;
-					break;
-				}
-				if (ddi_copyout((void *)ap_info, ioc.buf,
-				    ioc.bufsiz, mode) != 0) {
-					rv = EFAULT;
-					break;
-				}
-			}
-
+			rv = sata_ioctl_get_serialnumber_info(sata_hba_inst,
+			    &sata_device, &ioc, mode);
 			break;
-		}
 
 		default:
 			rv = EINVAL;
@@ -2861,11 +1799,7 @@ sata_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 */
 	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device.satadev_addr.cport)));
-	if (ndi_prop_remove(DDI_DEV_T_NONE, tgt_dip, "pm-capable") !=
-	    DDI_PROP_SUCCESS)
-		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_scsi_tgt_free: pm-capable "
-		    "property could not be removed"));
+	(void) ndi_prop_remove(DDI_DEV_T_NONE, tgt_dip, "pm-capable");
 
 	/*
 	 * If devid was previously created but not freed up from
@@ -5066,7 +4000,13 @@ done:
 	 */
 	if (dmod != 0) {
 		sata_drive_info_t new_sdinfo, *sdinfo;
-		int rv;
+		int rv = 0;
+
+		/*
+		 * Following statement has to be changed if this function is
+		 * used for devices other than SATA hard disks.
+		 */
+		new_sdinfo.satadrv_type = SATA_DTYPE_ATADISK;
 
 		new_sdinfo.satadrv_addr =
 		    spx->txlt_sata_pkt->satapkt_device.satadev_addr;
@@ -6737,7 +5677,7 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 					case SATAC_READ_FPDMA_QUEUED:
 						/* Unrecovered read error */
 						sense->es_add_code =
-						SD_SCSI_ASC_UNREC_READ_ERROR;
+						    SD_SCSI_ASC_UNREC_READ_ERR;
 						break;
 					case SATAC_WRITE_DMA:
 					case SATAC_WRITE_DMA_EXT:
@@ -6746,7 +5686,7 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 					case SATAC_WRITE_FPDMA_QUEUED:
 						/* Write error */
 						sense->es_add_code =
-						    SD_SCSI_ASC_WRITE_ERROR;
+						    SD_SCSI_ASC_WRITE_ERR;
 						break;
 					default:
 						/* Internal error */
@@ -9083,7 +8023,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 				    drv_usectohz(SATA_DEV_IDENTIFY_TIMEOUT)) {
 					/* sleep for a while */
 					delay(drv_usectohz(
-					    SATA_DEV_IDENTIFY_RETRY_DELAY));
+					    SATA_DEV_IDENTIFY_RTR_DLY));
 					goto reprobe_cport;
 				}
 			}
@@ -9209,7 +8149,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 					    SATA_DEV_IDENTIFY_TIMEOUT)) {
 						/* sleep for a while */
 						delay(drv_usectohz(
-						SATA_DEV_IDENTIFY_RETRY_DELAY));
+						    SATA_DEV_IDENTIFY_RTR_DLY));
 						goto reprobe_pmport;
 					}
 				}
@@ -9768,7 +8708,7 @@ retry_probe:
 		if ((cur_time - start_time) <
 		    drv_usectohz(SATA_DEV_IDENTIFY_TIMEOUT)) {
 			/* sleep for a while */
-			delay(drv_usectohz(SATA_DEV_IDENTIFY_RETRY_DELAY));
+			delay(drv_usectohz(SATA_DEV_IDENTIFY_RTR_DLY));
 			goto retry_probe;
 		}
 	}
@@ -11212,8 +10152,11 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	rval = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt);
 	if (rval == SATA_TRAN_ACCEPTED &&
 	    spkt->satapkt_reason == SATA_PKT_COMPLETED) {
-		if ((sdinfo->satadrv_id.ai_config & SATA_INCOMPLETE_DATA) ==
-		    SATA_INCOMPLETE_DATA) {
+		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
+		    DDI_DMA_SYNC_FORKERNEL);
+		ASSERT(rval == DDI_SUCCESS);
+		if ((((sata_id_t *)(bp->b_un.b_addr))->ai_config &
+		    SATA_INCOMPLETE_DATA) == SATA_INCOMPLETE_DATA) {
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			    "SATA disk device at port %d - "
 			    "partial Identify Data",
@@ -11222,9 +10165,6 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 			goto fail;
 		}
 		/* Update sata_drive_info */
-		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-		    DDI_DMA_SYNC_FORKERNEL);
-		ASSERT(rval == DDI_SUCCESS);
 		bcopy(bp->b_un.b_addr, &sdinfo->satadrv_id,
 		    sizeof (sata_id_t));
 
@@ -11758,6 +10698,1284 @@ sata_get_target_dip(dev_info_t *dip, int32_t port)
 	return (cdip);
 }
 
+/*
+ * Get dev_info_t pointer to the device node pointed to by port argument.
+ * NOTE: target argument is a value used in ioctls to identify
+ * the AP - it is not a sata_address.
+ * It is a combination of cport, pmport and address qualifier, encoded same
+ * way as a scsi target number.
+ * At this moment it carries only cport number.
+ *
+ * No PMult hotplug support.
+ *
+ * Returns dev_info_t pointer if target device was found, NULL otherwise.
+ */
+
+static dev_info_t *
+sata_get_scsi_target_dip(dev_info_t *dip, sata_address_t *saddr)
+{
+	dev_info_t	*cdip = NULL;
+	int		target, tgt;
+	int 		circ;
+
+	target = SATA_TO_SCSI_TARGET(saddr->cport, saddr->pmport, saddr->qual);
+
+	ndi_devi_enter(dip, &circ);
+	for (cdip = ddi_get_child(dip); cdip != NULL; ) {
+		dev_info_t *next = ddi_get_next_sibling(cdip);
+
+		tgt = ddi_prop_get_int(DDI_DEV_T_ANY, cdip,
+		    DDI_PROP_DONTPASS, "target", -1);
+		if (tgt == -1) {
+			/*
+			 * This is actually an error condition, but not
+			 * a fatal one. Just continue the search.
+			 */
+			cdip = next;
+			continue;
+		}
+
+		if (tgt == target)
+			break;
+
+		cdip = next;
+	}
+	ndi_devi_exit(dip, circ);
+
+	return (cdip);
+}
+
+/*
+ * Process sata port disconnect request.
+ * Normally, cfgadm sata plugin will try to offline (unconfigure) the device
+ * before this request. Nevertheless, if a device is still configured,
+ * we need to attempt to offline and unconfigure device.
+ * Regardless of the unconfigure operation results the port is marked as
+ * deactivated and no access to the attached device is possible.
+ * If the target node remains because unconfigure operation failed, its state
+ * will be set to DEVICE_REMOVED, preventing it to be used again when a device
+ * is inserted/re-inserted. The event daemon will repeatedly try to unconfigure
+ * the device and remove old target node.
+ *
+ * This function invokes sata_hba_inst->satahba_tran->
+ * sata_tran_hotplug_ops->sata_tran_port_deactivate().
+ * If successful, the device structure (if any) attached to the specified port
+ * is removed and state of the port marked appropriately.
+ * Failure of the port_deactivate may keep port in the physically active state,
+ * or may fail the port.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+
+static int
+sata_ioctl_disconnect(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	sata_drive_info_t *sdinfo = NULL;
+	sata_cport_info_t *cportinfo = NULL;
+	sata_pmport_info_t *pmportinfo = NULL;
+	sata_pmult_info_t *pmultinfo = NULL;
+	dev_info_t *tdip;
+	int cport, pmport, qual;
+	int rval = SATA_SUCCESS;
+	int rv = 0;
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	ASSERT(qual == SATA_ADDR_CPORT || qual == SATA_ADDR_PMPORT);
+
+	/*
+	 * DEVCTL_AP_DISCONNECT invokes sata_hba_inst->satahba_tran->
+	 * sata_tran_hotplug_ops->sata_tran_port_deactivate().
+	 * Do the sanity check.
+	 */
+	if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
+		/* No physical port deactivation supported. */
+		return (EINVAL);
+	}
+
+	/* Check the current state of the port */
+	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device);
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	sata_update_port_info(sata_hba_inst, sata_device);
+	if (rval != SATA_SUCCESS ||
+	    (sata_device->satadev_state & SATA_PSTATE_FAILED) != 0) {
+		/* Device port status is unknown or it is in failed state */
+		if (qual == SATA_ADDR_PMPORT) {
+			SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) =
+			    SATA_PSTATE_FAILED;
+			SATADBG1(SATA_DBG_IOCTL_IF, sata_hba_inst,
+			    "sata_hba_ioctl: connect: failed to deactivate "
+			    "SATA port %d", cport);
+		} else {
+			SATA_CPORT_STATE(sata_hba_inst, cport) =
+			    SATA_PSTATE_FAILED;
+			SATADBG2(SATA_DBG_IOCTL_IF, sata_hba_inst,
+			    "sata_hba_ioctl: connect: failed to deactivate "
+			    "SATA port %d:%d", cport, pmport);
+		}
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    cport)->cport_mutex);
+		return (EIO);
+	}
+	/*
+	 * Set port's dev_state to not ready - this will disable
+	 * an access to a potentially attached device.
+	 */
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
+	if (qual == SATA_ADDR_PMPORT) {
+		pmportinfo = SATA_PMPORT_INFO(sata_hba_inst, cport, pmport);
+		if (pmportinfo->pmport_dev_type != SATA_DTYPE_NONE) {
+			sdinfo = pmportinfo->pmport_sata_drive;
+			ASSERT(sdinfo != NULL);
+		}
+		pmportinfo->pmport_state &= ~SATA_STATE_READY;
+	} else {
+		/* Assuming cport */
+
+		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
+			if (cportinfo->cport_dev_type == SATA_DTYPE_PMULT) {
+				pmultinfo =
+				    cportinfo->cport_devp.cport_sata_pmult;
+				ASSERT(pmultinfo != NULL);
+			} else if (cportinfo->cport_dev_type &
+			    SATA_VALID_DEV_TYPE) {
+				sdinfo = cportinfo->cport_devp.cport_sata_drive;
+				ASSERT(sdinfo != NULL);
+			}
+		}
+		cportinfo->cport_state &= ~SATA_STATE_READY;
+	}
+	if (sdinfo != NULL) {
+		if ((sdinfo->satadrv_type & (SATA_VALID_DEV_TYPE)) != 0) {
+			/*
+			 * If a target node exists, try to offline
+			 * a device and remove target node.
+			 */
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+			    cport)->cport_mutex);
+			/* We are addressing attached device, not a port */
+			sata_device->satadev_addr.qual =
+			    sdinfo->satadrv_addr.qual;
+			tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
+			    &sata_device->satadev_addr);
+			if (tdip != NULL && ndi_devi_offline(tdip,
+			    NDI_DEVI_REMOVE) != NDI_SUCCESS) {
+				/*
+				 * Problem
+				 * The target node remained attached.
+				 * This happens when the device file was open
+				 * or a node was waiting for resources.
+				 * Cannot do anything about it.
+				 */
+				if (qual == SATA_ADDR_CPORT) {
+					SATA_LOG_D((sata_hba_inst, CE_WARN,
+					    "sata_hba_ioctl: disconnect: could "
+					    "not unconfigure device before "
+					    "disconnecting the SATA port %d",
+					    cport));
+				} else {
+					SATA_LOG_D((sata_hba_inst, CE_WARN,
+					    "sata_hba_ioctl: disconnect: could "
+					    "not unconfigure device before "
+					    "disconnecting the SATA port %d:%d",
+					    cport, pmport));
+				}
+				/*
+				 * Set DEVICE REMOVED state in the target
+				 * node. It will prevent access to the device
+				 * even when a new device is attached, until
+				 * the old target node is released, removed and
+				 * recreated for a new  device.
+				 */
+				sata_set_device_removed(tdip);
+
+				/*
+				 * Instruct event daemon to try the target
+				 * node cleanup later.
+				 */
+				sata_set_target_node_cleanup(
+				    sata_hba_inst, &sata_device->satadev_addr);
+			}
+			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+			    cport)->cport_mutex);
+		}
+
+		/* Remove and release sata_drive info structure. */
+		if (pmportinfo != NULL) {
+			SATA_PMPORT_DRV_INFO(sata_hba_inst, cport, pmport) =
+			    NULL;
+			pmportinfo->pmport_dev_type = SATA_DTYPE_NONE;
+		} else {
+			SATA_CPORTINFO_DRV_INFO(cportinfo) = NULL;
+			cportinfo->cport_dev_type = SATA_DTYPE_NONE;
+		}
+		(void) kmem_free((void *)sdinfo, sizeof (sata_drive_info_t));
+	}
+#if 0
+	else if (pmultinfo != NULL) {
+		/*
+		 * Port Multiplier itself needs special handling.
+		 * All device ports need to be processed here!
+		 */
+	}
+#endif
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	/* Just ask HBA driver to deactivate port */
+	/*	sata_device->satadev_addr.qual = SATA_ADDR_DCPORT; */
+
+	rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device);
+
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * without the hint (to force listener to investivate the state).
+	 */
+	sata_gen_sysevent(sata_hba_inst, &sata_device->satadev_addr,
+	    SE_NO_HINT);
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	sata_update_port_info(sata_hba_inst, sata_device);
+
+	if (rval != SATA_SUCCESS) {
+		/*
+		 * Port deactivation failure - do not
+		 * change port state unless the state
+		 * returned by HBA indicates a port failure.
+		 * NOTE: device structures were released, so devices now are
+		 * invisible! Port reset is needed to re-enumerate devices.
+		 */
+		if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+			if (pmportinfo != NULL)
+				pmportinfo->pmport_state = SATA_PSTATE_FAILED;
+			else
+				cportinfo->cport_state = SATA_PSTATE_FAILED;
+			rv = EIO;
+		}
+	} else {
+		/*
+		 * Deactivation succeded. From now on the sata framework
+		 * will not care what is happening to the device, until
+		 * the port is activated again.
+		 */
+		cportinfo->cport_state |= SATA_PSTATE_SHUTDOWN;
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	return (rv);
+}
+
+
+
+/*
+ * Process sata port connect request
+ * The sata cfgadm pluging will invoke this operation only if port was found
+ * in the disconnect state (failed state is also treated as the disconnected
+ * state).
+ * DEVCTL_AP_CONNECT would invoke  sata_hba_inst->satahba_tran->
+ * sata_tran_hotplug_ops->sata_tran_port_activate().
+ * If successful and a device is found attached to the port,
+ * the initialization sequence is executed to attach a device structure to
+ * a port structure. The state of the port and a device would be set
+ * appropriately.
+ * The device is not set in configured state (system-wise) by this operation.
+ *
+ * Note, that activating the port may generate link events,
+ * so it is important that following processing and the
+ * event processing does not interfere with each other!
+ *
+ * This operation may remove port failed state and will
+ * try to make port active and in good standing.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+
+static int
+sata_ioctl_connect(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	int rv = 0;
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	ASSERT(qual == SATA_ADDR_CPORT || qual == SATA_ADDR_PMPORT);
+
+	/*
+	 * DEVCTL_AP_CONNECT would invoke sata_hba_inst->
+	 * satahba_tran->sata_tran_hotplug_ops->sata_tran_port_activate().
+	 * Perform sanity check now.
+	 */
+	if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL) {
+		/* No physical port activation supported. */
+		return (EINVAL);
+	}
+
+	/* Just ask HBA driver to activate port */
+	if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device) != SATA_SUCCESS) {
+		/*
+		 * Port activation failure.
+		 */
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    cport)->cport_mutex);
+		sata_update_port_info(sata_hba_inst, sata_device);
+		if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+			if (qual == SATA_ADDR_DCPORT) {
+				SATA_CPORT_STATE(sata_hba_inst, cport) =
+				    SATA_PSTATE_FAILED;
+				SATADBG1(SATA_DBG_IOCTL_IF, sata_hba_inst,
+				    "sata_hba_ioctl: connect: failed to "
+				    "activate SATA port %d", cport);
+			} else { /* port multiplier device port */
+				SATA_PMPORT_STATE(sata_hba_inst, cport,
+				    pmport) = SATA_PSTATE_FAILED;
+				SATADBG2(SATA_DBG_IOCTL_IF, sata_hba_inst,
+				    "sata_hba_ioctl: connect: failed to "
+				    "activate SATA port %d:%d", cport, pmport);
+
+			}
+		}
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    cport)->cport_mutex);
+		SATADBG2(SATA_DBG_IOCTL_IF, sata_hba_inst,
+		    "sata_hba_ioctl: connect: failed to activate SATA "
+		    "port %d:%d", cport, pmport);
+		return (EIO);
+	}
+
+	/* Virgin port state - will be updated by the port re-probe. */
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	if (qual == SATA_ADDR_CPORT)
+		SATA_CPORT_STATE(sata_hba_inst, cport) = 0;
+	else /* port multiplier device port */
+		SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) = 0;
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	/*
+	 * Probe the port to find its state and attached device.
+	 */
+	if (sata_reprobe_port(sata_hba_inst, sata_device,
+	    SATA_DEV_IDENTIFY_RETRY) == SATA_FAILURE)
+		rv = EIO;
+
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * without the hint
+	 */
+	sata_gen_sysevent(sata_hba_inst, &sata_device->satadev_addr,
+	    SE_NO_HINT);
+
+	/*
+	 * If there is a device attached to the port, emit
+	 * a message.
+	 */
+	if (qual == SATA_ADDR_CPORT) {
+		if (SATA_CPORT_DEV_TYPE(sata_hba_inst, cport) !=
+		    SATA_DTYPE_NONE)
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device detected at port %d", cport);
+	} else { /* port multiplier device port */
+		if (SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) !=
+		    SATA_DTYPE_NONE)
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device detected at port %d:%d",
+			    cport, pmport);
+	}
+
+	return (rv);
+}
+
+
+/*
+ * Process sata device unconfigure request.
+ * The unconfigure operation uses generic nexus operation to
+ * offline a device. It leaves a target device node attached.
+ * and obviously sata_drive_info attached as well, because
+ * from the hardware point of view nothing has changed.
+ */
+static int
+sata_ioctl_unconfigure(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int rv = 0;
+	dev_info_t *tdip;
+
+	/* We are addressing attached device, not a port */
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	else if (sata_device->satadev_addr.qual == SATA_ADDR_PMPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+
+	if ((tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
+	    &sata_device->satadev_addr)) != NULL) {
+
+		if (ndi_devi_offline(tdip, NDI_UNCONFIG) != NDI_SUCCESS) {
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: unconfigure: "
+			    "failed to unconfigure device at SATA port %d:%d",
+			    sata_device->satadev_addr.cport,
+			    sata_device->satadev_addr.pmport));
+			rv = EIO;
+		}
+		/*
+		 * The target node devi_state should be marked with
+		 * DEVI_DEVICE_OFFLINE by ndi_devi_offline().
+		 * This would be the indication for cfgadm that
+		 * the AP node occupant state is 'unconfigured'.
+		 */
+
+	} else {
+		/*
+		 * This would indicate a failure on the part of cfgadm
+		 * to detect correct state of the node prior to this
+		 * call - one cannot unconfigure non-existing device.
+		 */
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: unconfigure: "
+		    "attempt to unconfigure non-existing device "
+		    "at SATA port %d:%d",
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport));
+		rv = ENXIO;
+	}
+	return (rv);
+}
+
+/*
+ * Process sata device configure request
+ * If port is in a failed state, operation is aborted - one has to use
+ * an explicit connect or port activate request to try to get a port into
+ * non-failed mode. Port reset wil also work in such situation.
+ * If the port is in disconnected (shutdown) state, the connect operation is
+ * attempted prior to any other action.
+ * When port is in the active state, there is a device attached and the target
+ * node exists, a device was most likely offlined.
+ * If target node does not exist, a new target node is created. In both cases
+ * an attempt is made to online (configure) the device.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_configure(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	int rval;
+	boolean_t target = TRUE;
+	sata_cport_info_t *cportinfo;
+	sata_pmport_info_t *pmportinfo = NULL;
+	dev_info_t *tdip;
+	sata_drive_info_t *sdinfo;
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	/* Get current port state */
+	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device);
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	sata_update_port_info(sata_hba_inst, sata_device);
+
+	if (rval != SATA_SUCCESS ||
+	    (sata_device->satadev_state & SATA_PSTATE_FAILED) != 0) {
+		/* Obviously, device on a failed port is not visible */
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+		return (ENXIO);
+	}
+
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
+	if (qual == SATA_ADDR_PMPORT)
+		pmportinfo = SATA_PMPORT_INFO(sata_hba_inst, cport, pmport);
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	if ((sata_device->satadev_state & SATA_PSTATE_SHUTDOWN) != 0) {
+		/* need to activate port */
+		target = FALSE;
+
+		/* Sanity check */
+		if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL)
+			return (ENXIO);
+
+		/* Just let HBA driver to activate port */
+		if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
+		    (SATA_DIP(sata_hba_inst), sata_device) != SATA_SUCCESS) {
+			/*
+			 * Port activation failure - do not change port state
+			 * unless the state returned by HBA indicates a port
+			 * failure.
+			 */
+			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+			    cport)->cport_mutex);
+			sata_update_port_info(sata_hba_inst, sata_device);
+			if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+				if (qual == SATA_ADDR_PMPORT)
+					pmportinfo->pmport_state =
+					    SATA_PSTATE_FAILED;
+				else
+					cportinfo->cport_state =
+					    SATA_PSTATE_FAILED;
+			}
+			mutex_exit(&SATA_CPORT_INFO(
+			    sata_hba_inst, cport)->cport_mutex);
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: configure: "
+			    "failed to activate SATA port %d:%d",
+			    cport, pmport));
+			return (EIO);
+		}
+		/*
+		 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+		 * without the hint.
+		 */
+		sata_gen_sysevent(sata_hba_inst,
+		    &sata_device->satadev_addr, SE_NO_HINT);
+
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		/* Virgin port state */
+		if (qual == SATA_ADDR_PMPORT)
+			pmportinfo->pmport_state = 0;
+		else
+			cportinfo->cport_state = 0;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	}
+	/*
+	 * Always reprobe port, to get current device info.
+	 */
+	if (sata_reprobe_port(sata_hba_inst, sata_device,
+	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
+		return (EIO);
+
+	if (qual == SATA_ADDR_PMPORT) {
+		if (pmportinfo->pmport_dev_type != SATA_DTYPE_NONE &&
+		    target == FALSE) {
+			/*
+			 * That's the transition from "inactive" port
+			 * to active one with device attached.
+			 */
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device detected at port %d:%d",
+			    cport, pmport);
+		}
+	} else {
+		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE &&
+		    target == FALSE) {
+			/*
+			 * When PM is attached to the cport and cport is
+			 * activated, every PM device port needs to be reprobed.
+			 * We need to emit message for all devices detected
+			 * at port multiplier's device ports.
+			 * Add such code here.
+			 * For now, just inform about device attached to
+			 * cport.
+			 */
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device detected at port %d", cport);
+		}
+	}
+
+	/*
+	 * This is where real configuration operation starts.
+	 *
+	 * When PM is attached to the cport and cport is activated,
+	 * devices attached PM device ports may have to be configured
+	 * explicitly. This may change when port multiplier is supported.
+	 * For now, configure only disks and other valid target devices.
+	 */
+	if (!(sata_device->satadev_type & SATA_VALID_DEV_TYPE)) {
+		return (ENXIO);		/* No device to configure */
+	}
+
+	/*
+	 * Here we may have a device in reset condition,
+	 * but because we are just configuring it, there is
+	 * no need to process the reset other than just
+	 * to clear device reset condition in the HBA driver.
+	 * Setting the flag SATA_EVNT_CLEAR_DEVICE_RESET will
+	 * cause a first command sent the HBA driver with the request
+	 * to clear device reset condition.
+	 */
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	if (qual == SATA_ADDR_PMPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+	else
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sdinfo == NULL) {
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+		return (ENXIO);
+	}
+	if (sdinfo->satadrv_event_flags &
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) {
+		sdinfo->satadrv_event_flags = 0;
+		sdinfo->satadrv_event_flags |= SATA_EVNT_CLEAR_DEVICE_RESET;
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	if ((tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
+	    &sata_device->satadev_addr)) != NULL) {
+		/*
+		 * Target node exists. Verify, that it belongs
+		 * to existing, attached device and not to
+		 * a removed device.
+		 */
+		if (sata_check_device_removed(tdip) == B_TRUE) {
+			if (qual == SATA_ADDR_DPMPORT)
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d cannot be "
+				    "configured. "
+				    "Application(s) accessing "
+				    "previously attached device "
+				    "have to release it before newly "
+				    "inserted device can be made accessible.",
+				    cport);
+			else
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d:%d cannot be"
+				    "configured. "
+				    "Application(s) accessing "
+				    "previously attached device "
+				    "have to release it before newly "
+				    "inserted device can be made accessible.",
+				    cport, pmport);
+			return (EIO);
+		}
+		/*
+		 * Device was not removed and re-inserted.
+		 * Try to online it.
+		 */
+		if (ndi_devi_online(tdip, 0) != NDI_SUCCESS) {
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: configure: "
+			    "onlining device at SATA port "
+			    "%d:%d failed", cport, pmport));
+			return (EIO);
+		}
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    cport)->cport_mutex);
+
+		if (qual == SATA_ADDR_DPMPORT)
+			pmportinfo->pmport_tgtnode_clean = B_TRUE;
+		else
+			cportinfo-> cport_tgtnode_clean = B_TRUE;
+
+		mutex_exit(&SATA_CPORT_INFO(
+		    sata_hba_inst, cport)->cport_mutex);
+	} else {
+		/*
+		 * No target node - need to create a new target node.
+		 */
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		if (qual == SATA_ADDR_DPMPORT)
+			pmportinfo->pmport_tgtnode_clean = B_TRUE;
+		else
+			cportinfo-> cport_tgtnode_clean = B_TRUE;
+
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		tdip = sata_create_target_node(SATA_DIP(sata_hba_inst),
+		    sata_hba_inst, &sata_device->satadev_addr);
+		if (tdip == NULL) {
+			/* Configure operation failed */
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: configure: "
+			    "configuring SATA device at port %d:%d "
+			    "failed", cport, pmport));
+			return (EIO);
+		}
+	}
+	return (0);
+}
+
+
+/*
+ * Process ioctl deactivate port request.
+ * Arbitrarily unconfigure attached device, if any.
+ * Even if the unconfigure fails, proceed with the
+ * port deactivation.
+ *
+ * NOTE: Port Multiplier code is not completed and tested.
+ */
+
+static int
+sata_ioctl_deactivate(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	int rval, rv = 0;
+	sata_cport_info_t *cportinfo;
+	sata_pmport_info_t *pmportinfo = NULL;
+	dev_info_t *tdip;
+	sata_drive_info_t *sdinfo = NULL;
+
+	/* Sanity check */
+	if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL)
+		return (ENOTSUP);
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
+	if (qual == SATA_ADDR_CPORT) {
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
+			/*
+			 * For now, assume that port multiplier is not
+			 * supported, i.e. deal only with valid devices
+			 */
+			if ((cportinfo->cport_dev_type &
+			    SATA_VALID_DEV_TYPE) != 0)
+				sdinfo = sata_get_device_info(sata_hba_inst,
+				    sata_device);
+			/*
+			 * If attached device is a port multiplier, we will
+			 * have to unconfigure all devices attached to the
+			 * port multiplier. Add this code here.
+			 */
+		}
+		cportinfo->cport_state &= ~SATA_STATE_READY;
+	} else {
+		/* Port multiplier device port */
+		pmportinfo = SATA_PMPORT_INFO(sata_hba_inst, cport, pmport);
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+		if (pmportinfo->pmport_dev_type != SATA_DTYPE_NONE &&
+		    (pmportinfo->pmport_dev_type & SATA_VALID_DEV_TYPE) != 0)
+			sdinfo = sata_get_device_info(sata_hba_inst,
+			    sata_device);
+		pmportinfo->pmport_state &= ~SATA_STATE_READY;
+	}
+
+	if (sdinfo != NULL) {
+		/*
+		 * If a target node exists, try to offline a device and
+		 * to remove a target node.
+		 */
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
+		    &sata_device->satadev_addr);
+		if (tdip != NULL) {
+			/* target node exist */
+			SATADBG1(SATA_DBG_IOCTL_IF, sata_hba_inst,
+			    "sata_hba_ioctl: port deactivate: "
+			    "target node exists.", NULL);
+
+			if (ndi_devi_offline(tdip, NDI_DEVI_REMOVE) !=
+			    NDI_SUCCESS) {
+				SATA_LOG_D((sata_hba_inst, CE_WARN,
+				    "sata_hba_ioctl: port deactivate: "
+				    "failed to unconfigure device at port "
+				    "%d:%d before deactivating the port",
+				    cport, pmport));
+				/*
+				 * Set DEVICE REMOVED state in the target
+				 * node. It will prevent an access to
+				 * the device even when a new device is
+				 * attached, until the old target node is
+				 * released, removed and recreated for a new
+				 * device.
+				 */
+				sata_set_device_removed(tdip);
+
+				/*
+				 * Instruct the event daemon to try the
+				 * target node cleanup later.
+				 */
+				sata_set_target_node_cleanup(sata_hba_inst,
+				    &sata_device->satadev_addr);
+			}
+		}
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		/*
+		 * In any case, remove and release sata_drive_info
+		 * structure.
+		 */
+		if (qual == SATA_ADDR_CPORT) {
+			SATA_CPORTINFO_DRV_INFO(cportinfo) = NULL;
+			cportinfo->cport_dev_type = SATA_DTYPE_NONE;
+		} else { /* port multiplier device port */
+			SATA_PMPORTINFO_DRV_INFO(pmportinfo) = NULL;
+			pmportinfo->pmport_dev_type = SATA_DTYPE_NONE;
+		}
+		(void) kmem_free((void *)sdinfo, sizeof (sata_drive_info_t));
+	}
+	if (qual == SATA_ADDR_CPORT) {
+		cportinfo->cport_state &= ~(SATA_STATE_PROBED |
+		    SATA_STATE_PROBING);
+	} else { /* port multiplier device port */
+		pmportinfo->pmport_state &= ~(SATA_STATE_PROBED |
+		    SATA_STATE_PROBING);
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	/* Just let HBA driver to deactivate port */
+	sata_device->satadev_addr.qual = qual;
+	rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device);
+
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * without the hint
+	 */
+	sata_gen_sysevent(sata_hba_inst, &sata_device->satadev_addr,
+	    SE_NO_HINT);
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	sata_update_port_info(sata_hba_inst, sata_device);
+	if (qual == SATA_ADDR_CPORT) {
+		if (rval != SATA_SUCCESS) {
+			/*
+			 * Port deactivation failure - do not change port state
+			 * unless the state returned by HBA indicates a port
+			 * failure.
+			 */
+			if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+				SATA_CPORT_STATE(sata_hba_inst, cport) =
+				    SATA_PSTATE_FAILED;
+			}
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: port deactivate: "
+			    "cannot deactivate SATA port %d", cport));
+			rv = EIO;
+		} else {
+			cportinfo->cport_state |= SATA_PSTATE_SHUTDOWN;
+		}
+	} else {
+		if (rval != SATA_SUCCESS) {
+			if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+				SATA_PMPORT_STATE(sata_hba_inst, cport,
+				    pmport) = SATA_PSTATE_FAILED;
+			}
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: port deactivate: "
+			    "cannot deactivate SATA port %d:%d",
+			    cport, pmport));
+			rv = EIO;
+		} else {
+			pmportinfo->pmport_state |= SATA_PSTATE_SHUTDOWN;
+		}
+	}
+
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	return (rv);
+}
+
+/*
+ * Process ioctl port activate request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_activate(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	sata_cport_info_t *cportinfo;
+	sata_pmport_info_t *pmportinfo = NULL;
+	boolean_t dev_existed = TRUE;
+
+	/* Sanity check */
+	if (SATA_PORT_ACTIVATE_FUNC(sata_hba_inst) == NULL)
+		return (ENOTSUP);
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
+	if (qual == SATA_ADDR_PMPORT) {
+		pmportinfo = SATA_PMPORT_INFO(sata_hba_inst, cport, pmport);
+		if (pmportinfo->pmport_state & SATA_PSTATE_SHUTDOWN ||
+		    pmportinfo->pmport_dev_type == SATA_DTYPE_NONE)
+			dev_existed = FALSE;
+	} else { /* cport */
+		if (cportinfo->cport_state & SATA_PSTATE_SHUTDOWN ||
+		    cportinfo->cport_dev_type == SATA_DTYPE_NONE)
+			dev_existed = FALSE;
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	/* Just let HBA driver to activate port, if necessary */
+	if ((*SATA_PORT_ACTIVATE_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device) != SATA_SUCCESS) {
+		/*
+		 * Port activation failure - do not change port state unless
+		 * the state returned by HBA indicates a port failure.
+		 */
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    cport)->cport_mutex);
+		sata_update_port_info(sata_hba_inst, sata_device);
+		if (sata_device->satadev_state & SATA_PSTATE_FAILED) {
+			if (qual == SATA_ADDR_PMPORT)
+				pmportinfo->pmport_state = SATA_PSTATE_FAILED;
+			else
+				cportinfo->cport_state = SATA_PSTATE_FAILED;
+
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+			    cport)->cport_mutex);
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: port activate: cannot activate "
+			    "SATA port %d:%d", cport, pmport));
+			return (EIO);
+		}
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	}
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	if (qual == SATA_ADDR_PMPORT)
+		pmportinfo->pmport_state &= ~SATA_PSTATE_SHUTDOWN;
+	else
+		cportinfo->cport_state &= ~SATA_PSTATE_SHUTDOWN;
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	/*
+	 * Re-probe port to find its current state and possibly attached device.
+	 * Port re-probing may change the cportinfo device type if device is
+	 * found attached.
+	 * If port probing failed, the device type would be set to
+	 * SATA_DTYPE_NONE.
+	 */
+	(void) sata_reprobe_port(sata_hba_inst, sata_device,
+	    SATA_DEV_IDENTIFY_RETRY);
+
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * without the hint.
+	 */
+	sata_gen_sysevent(sata_hba_inst, &sata_device->satadev_addr,
+	    SE_NO_HINT);
+
+	if (dev_existed == FALSE) {
+		if (qual == SATA_ADDR_PMPORT &&
+		    pmportinfo->pmport_dev_type != SATA_DTYPE_NONE) {
+			/*
+			 * That's the transition from the "inactive" port state
+			 * or the active port without a device attached to the
+			 * active port state with a device attached.
+			 */
+			sata_log(sata_hba_inst, CE_WARN,
+			    "SATA device detected at port %d:%d",
+			    cport, pmport);
+		} else if (qual == SATA_ADDR_CPORT &&
+		    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
+			/*
+			 * That's the transition from the "inactive" port state
+			 * or the active port without a device attached to the
+			 * active port state with a device attached.
+			 */
+			if (cportinfo->cport_dev_type != SATA_DTYPE_PMULT) {
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device detected at port %d", cport);
+			} else {
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA port multiplier detected at port %d",
+				    cport);
+				/*
+				 * Because the detected device is a port
+				 * multiplier, we need to reprobe every device
+				 * port on the port multiplier and show every
+				 * device found attached.
+				 * Add this code here.
+				 */
+			}
+		}
+	}
+	return (0);
+}
+
+
+
+/*
+ * Process ioctl reset port request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_reset_port(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	int rv = 0;
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	/* Sanity check */
+	if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: sata_hba_tran missing required "
+		    "function sata_tran_reset_dport"));
+		return (ENOTSUP);
+	}
+
+	/* Ask HBA to reset port */
+	if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst),
+	    sata_device) != SATA_SUCCESS) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: reset port: failed %d:%d",
+		    cport, pmport));
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		sata_update_port_info(sata_hba_inst, sata_device);
+		if (qual == SATA_ADDR_CPORT)
+			SATA_CPORT_STATE(sata_hba_inst, cport) =
+			    SATA_PSTATE_FAILED;
+		else
+			SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) =
+			    SATA_PSTATE_FAILED;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		rv = EIO;
+	}
+	/*
+	 * Beacuse the port was reset, it should be probed and
+	 * attached device reinitialized. At this point the
+	 * port state is unknown - it's state is HBA-specific.
+	 * Re-probe port to get its state.
+	 */
+	if (sata_reprobe_port(sata_hba_inst, sata_device,
+	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS) {
+		rv = EIO;
+	}
+	return (rv);
+}
+
+/*
+ * Process ioctl reset device request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_reset_device(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	sata_drive_info_t *sdinfo;
+	int cport, pmport, qual;
+	int rv = 0;
+
+	/* Sanity check */
+	if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: sata_hba_tran missing required "
+		    "function sata_tran_reset_dport"));
+		return (ENOTSUP);
+	}
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	if (qual == SATA_ADDR_CPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	else
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sdinfo == NULL) {
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+		return (EINVAL);
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+
+	/* Ask HBA to reset device */
+	if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device) != SATA_SUCCESS) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: reset device: failed at port %d:%d",
+		    cport, pmport));
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		sata_update_port_info(sata_hba_inst, sata_device);
+		/*
+		 * Device info structure remains attached. Another device reset
+		 * or port disconnect/connect and re-probing is
+		 * needed to change it's state
+		 */
+		sdinfo->satadrv_state &= ~SATA_STATE_READY;
+		sdinfo->satadrv_state |= SATA_DSTATE_FAILED;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+		rv = EIO;
+	}
+	/*
+	 * If attached device was a port multiplier, some extra processing
+	 * may be needed, to bring it back (if port re-probing did not handle
+	 * it). Add such code here.
+	 */
+	return (rv);
+}
+
+
+/*
+ * Process ioctl reset all request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_reset_all(sata_hba_inst_t *sata_hba_inst)
+{
+	sata_device_t sata_device;
+	int rv = 0;
+	int tcport;
+	int tpmport = 0;
+
+	sata_device.satadev_rev = SATA_DEVICE_REV;
+
+	/*
+	 * There is no protection here for configured devices.
+	 */
+	/* Sanity check */
+	if (SATA_RESET_DPORT_FUNC(sata_hba_inst) == NULL) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: sata_hba_tran missing required "
+		    "function sata_tran_reset_dport"));
+		return (ENOTSUP);
+	}
+
+	/*
+	 * Need to lock all ports, not just one.
+	 * If any port is locked by event processing, fail the whole operation.
+	 * One port is already locked, but for simplicity lock it again.
+	 */
+	for (tcport = 0; tcport < SATA_NUM_CPORTS(sata_hba_inst); tcport++) {
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_mutex);
+		if (((SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_event_flags) & SATA_EVNT_LOCK_PORT_BUSY) != 0) {
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, tcport)->
+			    cport_mutex);
+			rv = EBUSY;
+			break;
+		} else {
+			SATA_CPORT_INFO(sata_hba_inst, tcport)->
+			    cport_event_flags |= SATA_APCTL_LOCK_PORT_BUSY;
+			/*
+			 * If there is a port multiplier attached, we may need
+			 * to lock its port as well. If so, add such code here.
+			 */
+		}
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_mutex);
+	}
+
+	if (rv == 0) {
+		/*
+		 * All cports were successfully locked.
+		 * Reset main SATA controller only for now - no PMult.
+		 */
+		sata_device.satadev_addr.qual = SATA_ADDR_CNTRL;
+
+		if ((*SATA_RESET_DPORT_FUNC(sata_hba_inst))
+		    (SATA_DIP(sata_hba_inst), &sata_device) != SATA_SUCCESS) {
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
+			    "sata_hba_ioctl: reset controller failed"));
+			return (EIO);
+		}
+		/*
+		 * Because ports were reset, port states are unknown.
+		 * They should be re-probed to get their state and
+		 * attached devices should be reinitialized.
+		 * Add code here to re-probe port multiplier device ports.
+		 */
+		for (tcport = 0; tcport < SATA_NUM_CPORTS(sata_hba_inst);
+		    tcport++) {
+			sata_device.satadev_addr.cport = tcport;
+			sata_device.satadev_addr.pmport = tpmport;
+			sata_device.satadev_addr.qual = SATA_ADDR_CPORT;
+
+			if (sata_reprobe_port(sata_hba_inst, &sata_device,
+			    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
+				rv = EIO;
+		}
+	}
+	/*
+	 * Unlock all ports
+	 */
+	for (tcport = 0; tcport < SATA_NUM_CPORTS(sata_hba_inst); tcport++) {
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_mutex);
+		SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_event_flags &= ~SATA_APCTL_LOCK_PORT_BUSY;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, tcport)->
+		    cport_mutex);
+	}
+
+	/*
+	 * This operation returns EFAULT if either reset
+	 * controller failed or a re-probing of any ports failed.
+	 */
+	return (rv);
+}
+
+
+/*
+ * Process ioctl port self test request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_port_self_test(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device)
+{
+	int cport, pmport, qual;
+	int rv = 0;
+
+	/* Sanity check */
+	if (SATA_SELFTEST_FUNC(sata_hba_inst) == NULL)
+		return (ENOTSUP);
+
+	cport = sata_device->satadev_addr.cport;
+	pmport = sata_device->satadev_addr.pmport;
+	qual = sata_device->satadev_addr.qual;
+
+	/*
+	 * There is no protection here for a configured
+	 * device attached to this port.
+	 */
+
+	if ((*SATA_SELFTEST_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), sata_device) != SATA_SUCCESS) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_hba_ioctl: port selftest: "
+		    "failed port %d:%d", cport, pmport));
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		sata_update_port_info(sata_hba_inst, sata_device);
+		if (qual == SATA_ADDR_CPORT)
+			SATA_CPORT_STATE(sata_hba_inst, cport) =
+			    SATA_PSTATE_FAILED;
+		else /* port ultiplier device port */
+			SATA_PMPORT_STATE(sata_hba_inst, cport, pmport) =
+			    SATA_PSTATE_FAILED;
+
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+		    cport_mutex);
+		return (EIO);
+	}
+	/*
+	 * Beacuse the port was reset in the course of testing, it should be
+	 * re-probed and attached device state should be restored. At this
+	 * point the port state is unknown - it's state is HBA-specific.
+	 * Force port re-probing to get it into a known state.
+	 */
+	if (sata_reprobe_port(sata_hba_inst, sata_device,
+	    SATA_DEV_IDENTIFY_RETRY) != SATA_SUCCESS)
+		rv = EIO;
+	return (rv);
+}
+
 
 /*
  * sata_cfgadm_state:
@@ -11868,6 +12086,287 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		    "unknown device type"));
 		break;
 	}
+}
+
+
+/*
+ * Process ioctl get device path request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static int
+sata_ioctl_get_device_path(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device, sata_ioctl_data_t *ioc, int mode)
+{
+	char path[MAXPATHLEN];
+	uint32_t size;
+	dev_info_t *tdip;
+
+	(void) strcpy(path, "/devices");
+	if ((tdip = sata_get_scsi_target_dip(SATA_DIP(sata_hba_inst),
+	    &sata_device->satadev_addr)) == NULL) {
+		/*
+		 * No such device. If this is a request for a size, do not
+		 * return EINVAL for non-existing target, because cfgadm
+		 * will then indicate a meaningless ioctl failure.
+		 * If this is a request for a path, indicate invalid
+		 * argument.
+		 */
+		if (ioc->get_size == 0)
+			return (EINVAL);
+	} else {
+		(void) ddi_pathname(tdip, path + strlen(path));
+	}
+	size = strlen(path) + 1;
+
+	if (ioc->get_size != 0) {
+		if (ddi_copyout((void *)&size, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	} else {
+		if (ioc->bufsiz != size)
+			return (EINVAL);
+
+		else if (ddi_copyout((void *)&path, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	}
+	return (0);
+}
+
+/*
+ * Process ioctl get attachment point type request.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static	int
+sata_ioctl_get_ap_type(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device, sata_ioctl_data_t *ioc, int mode)
+{
+	uint32_t	type_len;
+	const char	*ap_type;
+	int		dev_type;
+
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
+		dev_type = SATA_CPORT_DEV_TYPE(sata_hba_inst,
+		    sata_device->satadev_addr.cport);
+	else /* pmport */
+		dev_type = SATA_PMPORT_DEV_TYPE(sata_hba_inst,
+		    sata_device->satadev_addr.cport,
+		    sata_device->satadev_addr.pmport);
+
+	switch (dev_type) {
+	case SATA_DTYPE_NONE:
+		ap_type = "port";
+		break;
+
+	case SATA_DTYPE_ATADISK:
+		ap_type = "disk";
+		break;
+
+	case SATA_DTYPE_ATAPICD:
+		ap_type = "cd/dvd";
+		break;
+
+	case SATA_DTYPE_PMULT:
+		ap_type = "pmult";
+		break;
+
+	case SATA_DTYPE_UNKNOWN:
+		ap_type = "unknown";
+		break;
+
+	default:
+		ap_type = "unsupported";
+		break;
+
+	} /* end of dev_type switch */
+
+	type_len = strlen(ap_type) + 1;
+
+	if (ioc->get_size) {
+		if (ddi_copyout((void *)&type_len, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	} else {
+		if (ioc->bufsiz != type_len)
+			return (EINVAL);
+
+		if (ddi_copyout((void *)ap_type, ioc->buf,
+		    ioc->bufsiz, mode) != 0)
+			return (EFAULT);
+	}
+	return (0);
+
+}
+
+/*
+ * Process ioctl get device model info request.
+ * This operation should return to cfgadm the device model
+ * information string
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static	int
+sata_ioctl_get_model_info(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device, sata_ioctl_data_t *ioc, int mode)
+{
+	sata_drive_info_t *sdinfo;
+	uint32_t info_len;
+	char ap_info[SATA_ID_MODEL_LEN + 1];
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	else /* port multiplier */
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sdinfo == NULL) {
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport)->cport_mutex);
+		return (EINVAL);
+	}
+
+#ifdef	_LITTLE_ENDIAN
+	swab(sdinfo->satadrv_id.ai_model, ap_info, SATA_ID_MODEL_LEN);
+#else	/* _LITTLE_ENDIAN */
+	bcopy(sdinfo->satadrv_id.ai_model, ap_info, SATA_ID_MODEL_LEN);
+#endif	/* _LITTLE_ENDIAN */
+
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+
+	ap_info[SATA_ID_MODEL_LEN] = '\0';
+
+	info_len = strlen(ap_info) + 1;
+
+	if (ioc->get_size) {
+		if (ddi_copyout((void *)&info_len, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	} else {
+		if (ioc->bufsiz < info_len)
+			return (EINVAL);
+		if (ddi_copyout((void *)ap_info, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	}
+	return (0);
+}
+
+
+/*
+ * Process ioctl get device firmware revision info request.
+ * This operation should return to cfgadm the device firmware revision
+ * information string
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static	int
+sata_ioctl_get_revfirmware_info(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device, sata_ioctl_data_t *ioc, int mode)
+{
+	sata_drive_info_t *sdinfo;
+	uint32_t info_len;
+	char ap_info[SATA_ID_FW_LEN + 1];
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	else /* port multiplier */
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sdinfo == NULL) {
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport)->cport_mutex);
+		return (EINVAL);
+	}
+
+#ifdef	_LITTLE_ENDIAN
+	swab(sdinfo->satadrv_id.ai_fw, ap_info, SATA_ID_FW_LEN);
+#else	/* _LITTLE_ENDIAN */
+	bcopy(sdinfo->satadrv_id.ai_fw, ap_info, SATA_ID_FW_LEN);
+#endif	/* _LITTLE_ENDIAN */
+
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+
+	ap_info[SATA_ID_FW_LEN] = '\0';
+
+	info_len = strlen(ap_info) + 1;
+
+	if (ioc->get_size) {
+		if (ddi_copyout((void *)&info_len, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	} else {
+		if (ioc->bufsiz < info_len)
+			return (EINVAL);
+		if (ddi_copyout((void *)ap_info, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	}
+	return (0);
+}
+
+
+/*
+ * Process ioctl get device serial number info request.
+ * This operation should return to cfgadm the device serial number string.
+ *
+ * NOTE: Port multiplier code is not completed nor tested.
+ */
+static	int
+sata_ioctl_get_serialnumber_info(sata_hba_inst_t *sata_hba_inst,
+    sata_device_t *sata_device, sata_ioctl_data_t *ioc, int mode)
+{
+	sata_drive_info_t *sdinfo;
+	uint32_t info_len;
+	char ap_info[SATA_ID_SERIAL_LEN + 1];
+
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+	if (sata_device->satadev_addr.qual == SATA_ADDR_CPORT)
+		sata_device->satadev_addr.qual = SATA_ADDR_DCPORT;
+	else /* port multiplier */
+		sata_device->satadev_addr.qual = SATA_ADDR_DPMPORT;
+
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	if (sdinfo == NULL) {
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    sata_device->satadev_addr.cport)->cport_mutex);
+		return (EINVAL);
+	}
+
+#ifdef	_LITTLE_ENDIAN
+	swab(sdinfo->satadrv_id.ai_drvser, ap_info, SATA_ID_SERIAL_LEN);
+#else	/* _LITTLE_ENDIAN */
+	bcopy(sdinfo->satadrv_id.ai_drvser, ap_info, SATA_ID_SERIAL_LEN);
+#endif	/* _LITTLE_ENDIAN */
+
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+	    sata_device->satadev_addr.cport)->cport_mutex);
+
+	ap_info[SATA_ID_SERIAL_LEN] = '\0';
+
+	info_len = strlen(ap_info) + 1;
+
+	if (ioc->get_size) {
+		if (ddi_copyout((void *)&info_len, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	} else {
+		if (ioc->bufsiz < info_len)
+			return (EINVAL);
+		if (ddi_copyout((void *)ap_info, ioc->buf, ioc->bufsiz,
+		    mode) != 0)
+			return (EFAULT);
+	}
+	return (0);
 }
 
 
@@ -13506,6 +14005,10 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 				sata_process_target_node_cleanup(
 				    sata_hba_inst, saddr);
 			}
+			if (event_flags & SATA_EVNT_AUTOONLINE_DEVICE) {
+				sata_process_device_autoonline(
+				    sata_hba_inst, saddr);
+			}
 		}
 		if (SATA_CPORT_DEV_TYPE(sata_hba_inst, ncport) !=
 		    SATA_DTYPE_NONE) {
@@ -14122,7 +14625,7 @@ sata_process_device_detached(sata_hba_inst_t *sata_hba_inst,
 				 * cleanup later.
 				 */
 				sata_set_target_node_cleanup(sata_hba_inst,
-				    saddr->cport);
+				    &sata_device.satadev_addr);
 			}
 		}
 	}
@@ -14302,9 +14805,13 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 			}
 		} else {
 			/*
-			 * If device was successfully attached, an explicit
-			 * 'configure' command will be needed to configure it.
-			 * Log the message indicating that a device
+			 * If device was successfully attached, the subsequent
+			 * action depends on a state of the
+			 * sata_auto_online variable. If it is set to zero.
+			 * an explicit 'configure' command will be needed to
+			 * configure it. If its value is non-zero, we will
+			 * attempt to online (configure) the device.
+			 * First, log the message indicating that a device
 			 * was attached.
 			 */
 			cportinfo->cport_dev_attach_time = 0;
@@ -14383,6 +14890,10 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 					cportinfo->cport_tgtnode_clean =
 					    B_FALSE;
 				}
+			}
+			if (sata_auto_online != 0) {
+				cportinfo->cport_event_flags |=
+				    SATA_EVNT_AUTOONLINE_DEVICE;
 			}
 
 		}
@@ -14473,6 +14984,127 @@ sata_process_target_node_cleanup(sata_hba_inst_t *sata_hba_inst,
 	}
 }
 
+/*
+ * Device AutoOnline Event processing.
+ * If attached device is to be onlined, an attempt is made to online this
+ * device, but only if there is no lingering (old) target node present.
+ * If the device cannot be onlined, the event flag is left intact,
+ * so that event daemon may re-run this function later.
+ *
+ * This function cannot be called in interrupt context (it may sleep).
+ *
+ * NOTE: Processes cport events only, not port multiplier ports.
+ */
+static void
+sata_process_device_autoonline(sata_hba_inst_t *sata_hba_inst,
+    sata_address_t *saddr)
+{
+	sata_cport_info_t *cportinfo;
+	sata_drive_info_t *sdinfo;
+	sata_device_t sata_device;
+	dev_info_t *tdip;
+
+	SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+	    "Processing port %d attached device auto-onlining", saddr->cport);
+
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, saddr->cport);
+
+	/*
+	 * Check if device is present and recognized. If not, reset event.
+	 */
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	if ((cportinfo->cport_dev_type & SATA_VALID_DEV_TYPE) == 0) {
+		/* Nothing to online */
+		cportinfo->cport_event_flags &= ~SATA_EVNT_AUTOONLINE_DEVICE;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    saddr->cport)->cport_mutex);
+		return;
+	}
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+
+	/*
+	 * Check if there is target node for this device and if it is in the
+	 * DEVI_DEVICE_REMOVED state. If so, abort onlining but keep
+	 * the event for later processing.
+	 */
+	tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst), saddr->cport);
+	if (tdip != NULL) {
+		/*
+		 * target node exists - check if it is target node of
+		 * a removed device.
+		 */
+		if (sata_check_device_removed(tdip) == B_TRUE) {
+			SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+			    "sata_process_device_autoonline: "
+			    "old device target node exists!", NULL);
+			/*
+			 * Event daemon will retry device onlining later.
+			 */
+			mutex_enter(&sata_hba_inst->satahba_mutex);
+			sata_hba_inst->satahba_event_flags |= SATA_EVNT_MAIN;
+			mutex_exit(&sata_hba_inst->satahba_mutex);
+			mutex_enter(&sata_mutex);
+			sata_event_pending |= SATA_EVNT_MAIN;
+			mutex_exit(&sata_mutex);
+			return;
+		}
+		/*
+		 * If the target node is not in the 'removed" state, assume
+		 * that it belongs to this device. There is nothing more to do,
+		 * but reset the event.
+		 */
+	} else {
+
+		/*
+		 * Try to online the device
+		 * If there is any reset-related event, remove it. We are
+		 * configuring the device and no state restoring is needed.
+		 */
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    saddr->cport)->cport_mutex);
+		sata_device.satadev_addr = *saddr;
+		if (saddr->qual == SATA_ADDR_CPORT)
+			sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
+		else
+			sata_device.satadev_addr.qual = SATA_ADDR_DPMPORT;
+		sdinfo = sata_get_device_info(sata_hba_inst, &sata_device);
+		if (sdinfo != NULL) {
+			if (sdinfo->satadrv_event_flags &
+			    (SATA_EVNT_DEVICE_RESET |
+			    SATA_EVNT_INPROC_DEVICE_RESET))
+				sdinfo->satadrv_event_flags = 0;
+			sdinfo->satadrv_event_flags |=
+			    SATA_EVNT_CLEAR_DEVICE_RESET;
+
+			/* Need to create a new target node. */
+			cportinfo->cport_tgtnode_clean = B_TRUE;
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+			    saddr->cport)->cport_mutex);
+			tdip = sata_create_target_node(SATA_DIP(sata_hba_inst),
+			    sata_hba_inst, &sata_device.satadev_addr);
+			if (tdip == NULL) {
+				/*
+				 * Configure (onlining) failed.
+				 * We will NOT retry
+				 */
+				SATA_LOG_D((sata_hba_inst, CE_WARN,
+				    "sata_process_device_autoonline: "
+				    "configuring SATA device at port %d failed",
+				    saddr->cport));
+			}
+		} else {
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+			    saddr->cport)->cport_mutex);
+		}
+
+	}
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	cportinfo->cport_event_flags &= ~SATA_EVNT_AUTOONLINE_DEVICE;
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+	    saddr->cport)->cport_mutex);
+}
+
+
 static void
 sata_gen_sysevent(sata_hba_inst_t *sata_hba_inst, sata_address_t *saddr,
     int hint)
@@ -14555,13 +15187,15 @@ sata_set_device_removed(dev_info_t *tdip)
  * to perform the target node cleanup.
  */
 static void
-sata_set_target_node_cleanup(sata_hba_inst_t *sata_hba_inst, int cport)
+sata_set_target_node_cleanup(sata_hba_inst_t *sata_hba_inst,
+    sata_address_t *saddr)
 {
-	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-	SATA_CPORT_EVENT_FLAGS(sata_hba_inst, cport) |=
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	SATA_CPORT_EVENT_FLAGS(sata_hba_inst, saddr->cport) |=
 	    SATA_EVNT_TARGET_NODE_CLEANUP;
-	SATA_CPORT_INFO(sata_hba_inst, cport)->cport_tgtnode_clean = B_FALSE;
-	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_tgtnode_clean =
+	    B_FALSE;
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 	mutex_enter(&sata_hba_inst->satahba_mutex);
 	sata_hba_inst->satahba_event_flags |= SATA_EVNT_MAIN;
 	mutex_exit(&sata_hba_inst->satahba_mutex);
