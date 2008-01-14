@@ -31,6 +31,11 @@
  * *Hobbit* <hobbit@avian.org>.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -106,6 +111,7 @@ int	unix_listen(char *);
 void	set_common_sockopts(int);
 int	parse_iptos(char *);
 void	usage(int);
+char	*print_addr(char *, size_t, struct sockaddr *, int, int);
 
 int
 main(int argc, char *argv[])
@@ -331,6 +337,14 @@ main(int argc, char *argv[])
 				len = sizeof (cliaddr);
 				connfd = accept(s, (struct sockaddr *)&cliaddr,
 				    &len);
+				if ((connfd != -1) && vflag) {
+					char ntop[NI_MAXHOST + NI_MAXSERV];
+					(void) fprintf(stderr,
+					    "Received connection from %s\n",
+					    print_addr(ntop, sizeof (ntop),
+					    (struct sockaddr *)&cliaddr, len,
+					    nflag ? NI_NUMERICHOST : 0));
+				}
 			}
 
 			readwrite(connfd);
@@ -392,7 +406,7 @@ main(int argc, char *argv[])
 					    uflag ? "udp" : "tcp");
 				}
 
-				(void) printf("Connection to %s %s "
+				(void) fprintf(stderr, "Connection to %s %s "
 				    "port [%s/%s] succeeded!\n",
 				    host, portlist[i], uflag ? "udp" : "tcp",
 				    sv ? sv->s_name : "*");
@@ -406,6 +420,26 @@ main(int argc, char *argv[])
 		(void) close(s);
 
 	return (ret);
+}
+
+/*
+ * print IP address and (optionally) a port
+ */
+char *
+print_addr(char *ntop, size_t ntlen, struct sockaddr *addr, int len, int flags)
+{
+	char port[NI_MAXSERV];
+	int e;
+
+	/* print port always as number */
+	if ((e = getnameinfo(addr, len, ntop, ntlen,
+	    port, sizeof (port), flags|NI_NUMERICSERV)) != 0) {
+		return ((char *)gai_strerror(e));
+	}
+
+	(void) snprintf(ntop, ntlen, "%s port %s", ntop, port);
+
+	return (ntop);
 }
 
 /*
@@ -511,15 +545,29 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 			    ares->ai_addrlen) < 0)
 				errx(1, "bind failed: %s", strerror(errno));
 			freeaddrinfo(ares);
+
+			if (vflag && !lflag) {
+				if (sflag != NULL)
+					(void) fprintf(stderr,
+					    "Using source address: %s\n",
+					    sflag);
+				if (pflag != NULL)
+					(void) fprintf(stderr,
+					    "Using source port: %s\n", pflag);
+			}
 		}
 
 		set_common_sockopts(s);
 
 		if (connect(s, res0->ai_addr, res0->ai_addrlen) == 0)
 			break;
-		else if (vflag)
-			warn("connect to %s port %s (%s) failed", host, port,
-			    uflag ? "udp" : "tcp");
+		else if (vflag) {
+			char ntop[NI_MAXHOST + NI_MAXSERV];
+			warn("connect to %s [host %s] (%s) failed",
+			    print_addr(ntop, sizeof (ntop),
+			    res0->ai_addr, res0->ai_addrlen, NI_NUMERICHOST),
+			    host, uflag ? "udp" : "tcp");
+		}
 
 		(void) close(s);
 		s = -1;
@@ -544,13 +592,6 @@ local_listen(char *host, char *port, struct addrinfo hints)
 
 	/* Allow nodename to be null. */
 	hints.ai_flags |= AI_PASSIVE;
-
-	/*
-	 * In the case of binding to a wildcard address
-	 * default to binding to an ipv4 address.
-	 */
-	if (host == NULL && hints.ai_family == AF_UNSPEC)
-		hints.ai_family = AF_INET;
 
 	if ((error = getaddrinfo(host, port, &hints, &res)))
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
