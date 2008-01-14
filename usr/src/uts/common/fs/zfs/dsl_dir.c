@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -687,6 +687,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	int enospc = EDQUOT;
 	int txgidx = txg & TXG_MASK;
 	int i;
+	uint64_t ref_rsrv = 0;
 
 	ASSERT3U(txg, !=, 0);
 	ASSERT3S(asize, >, 0);
@@ -707,10 +708,10 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	 */
 	if (list_head(tr_list) == NULL && tx->tx_objset) {
 		int error;
-
 		dsl_dataset_t *ds = tx->tx_objset->os->os_dsl_dataset;
+
 		error = dsl_dataset_check_quota(ds, checkrefquota,
-		    asize, est_inflight, &used_on_disk);
+		    asize, est_inflight, &used_on_disk, &ref_rsrv);
 		if (error) {
 			mutex_exit(&dd->dd_lock);
 			return (error);
@@ -763,7 +764,8 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	/* We need to up our estimated delta before dropping dd_lock */
 	dd->dd_tempreserved[txgidx] += asize;
 
-	parent_rsrv = parent_delta(dd, used_on_disk + est_inflight, asize);
+	parent_rsrv = parent_delta(dd, used_on_disk + est_inflight,
+	    asize - ref_rsrv);
 	mutex_exit(&dd->dd_lock);
 
 	tr = kmem_alloc(sizeof (struct tempreserve), KM_SLEEP);

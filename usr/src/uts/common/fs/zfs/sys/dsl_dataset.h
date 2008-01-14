@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,8 @@ void dsl_dataset_create_root(struct dsl_pool *dp, uint64_t *ddobjp,
 int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
 
 int dsl_dataset_check_quota(dsl_dataset_t *ds, boolean_t check_quota,
-    uint64_t asize, uint64_t inflight, uint64_t *used);
+    uint64_t asize, uint64_t inflight, uint64_t *used,
+    uint64_t *ref_rsrv);
 int dsl_dataset_set_quota(const char *dsname, uint64_t quota);
 void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
     dmu_tx_t *tx);
