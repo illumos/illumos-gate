@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2286,6 +2286,28 @@ ipw2100_getset(struct ipw2100_softc *sc, mblk_t *m, uint32_t cmd,
 		 *	case WL_SCAN:
 		 *	case WL_LOAD_DEFAULTS:
 		 */
+
+		/*
+		 * When radio is off, need to ignore all ioctl.  What need to
+		 * do is to check radio status firstly.  If radio is ON, pass
+		 * it to net80211, otherwise, return to upper layer directly.
+		 *
+		 * Considering the WL_SUCCESS also means WL_CONNECTED for
+		 * checking linkstatus, one exception for WL_LINKSTATUS is to
+		 * let net80211 handle it.
+		 */
+		if ((ipw2100_get_radio(sc) == 0) &&
+		    (id != WL_LINKSTATUS)) {
+
+			IPW2100_REPORT((sc->sc_dip, CE_WARN,
+			    "ipw: RADIO is OFF\n"));
+
+			outfp->wldp_length = WIFI_BUF_OFFSET;
+			outfp->wldp_result = WL_SUCCESS;
+			ret = 0;
+			break;
+		}
+
 		*need_net80211 = B_TRUE; /* let net80211 do the rest */
 		return (0);
 	}
@@ -2545,6 +2567,11 @@ ipw2100_intr(caddr_t arg)
 						ieee80211_new_state(ic,
 						    IEEE80211_S_INIT, -1);
 						break;
+					/*
+					 * When radio is OFF, need a better
+					 * scan approach to ensure scan
+					 * result correct.
+					 */
 					case IPW2100_STATE_RADIO_DISABLED:
 						IPW2100_REPORT((sc->sc_dip,
 						    CE_WARN,

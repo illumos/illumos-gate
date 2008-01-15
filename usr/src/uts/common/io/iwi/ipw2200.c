@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2388,6 +2388,28 @@ ipw2200_getset(struct ipw2200_softc *sc, mblk_t *m, uint32_t cmd,
 		 *	case WL_LOAD_DEFAULTS:
 		 *	case WL_DISASSOCIATE:
 		 */
+
+		/*
+		 * When radio is off, need to ignore all ioctl.  What need to
+		 * do is to check radio status firstly.  If radio is ON, pass
+		 * it to net80211, otherwise, return to upper layer directly.
+		 *
+		 * Considering the WL_SUCCESS also means WL_CONNECTED for
+		 * checking linkstatus, one exception for WL_LINKSTATUS is to
+		 * let net80211 handle it.
+		 */
+		if ((ipw2200_radio_status(sc) == 0) &&
+		    (id != WL_LINKSTATUS)) {
+
+			IPW2200_REPORT((sc->sc_dip, CE_CONT,
+			    "iwi: radio is OFF\n"));
+
+			outfp->wldp_length = WIFI_BUF_OFFSET;
+			outfp->wldp_result = WL_SUCCESS;
+			ret = 0;
+			break;
+		}
+
 		*need_net80211 = B_TRUE; /* let net80211 do the rest */
 		return (0);
 	}
@@ -2673,8 +2695,11 @@ ipw2200_intr(caddr_t arg)
 		if (ireg & IPW2200_INTR_RADIO_OFF) {
 			IPW2200_REPORT((sc->sc_dip, CE_CONT,
 			    "ipw2200_intr(): radio is OFF\n"));
+
 			/*
-			 * Stop hardware, will notify LINK is down
+			 * Stop hardware, will notify LINK is down.
+			 * Need a better scan solution to ensure
+			 * table has right value.
 			 */
 			ipw2200_stop(sc);
 		}
