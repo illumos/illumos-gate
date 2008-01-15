@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2207,7 +2207,7 @@ long contig_search_failed;	/* count of contig alloc failures */
  * contiguous free pages.  Return a list of the found pages or NULL.
  */
 page_t *
-find_contig_free(uint_t bytes, uint_t flags)
+find_contig_free(uint_t npages, uint_t flags)
 {
 	page_t *pp, *plist = NULL;
 	mfn_t mfn, prev_mfn;
@@ -2232,7 +2232,7 @@ retry:
 	 * Search contiguous pfn list for physically contiguous pages not in
 	 * the io_pool.  Start the search where the last search left off.
 	 */
-	pages_requested = pages_needed = mmu_btop(bytes);
+	pages_requested = pages_needed = npages;
 	search_start = next_alloc_pfn;
 	prev_mfn = 0;
 	while (pages_needed) {
@@ -2279,81 +2279,31 @@ retry:
 }
 
 /*
- * Allocator for domain 0 I/O pages. We match the required
- * DMA attributes and contiguity constraints.
+ * Search the reserved io pool pages for a page range with the
+ * desired characteristics.
  */
-/*ARGSUSED*/
 page_t *
-page_create_io(
-	struct vnode	*vp,
-	u_offset_t	off,
-	uint_t		bytes,
-	uint_t		flags,
-	struct as	*as,
-	caddr_t		vaddr,
-	ddi_dma_attr_t	*mattr)
+page_io_pool_alloc(ddi_dma_attr_t *mattr, int contig, pgcnt_t minctg)
 {
-	mfn_t	max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
-	page_t	*pp_first;	/* list to return */
-	page_t	*pp_last;	/* last in list to return */
-	page_t	*pp, **poolp, **pplist = NULL, *expp;
-	int	i, extpages = 0, npages = 0, contig, anyaddr, extra;
-	mfn_t	lo_mfn;
-	mfn_t	hi_mfn;
-	mfn_t	mfn, tmfn;
-	mfn_t	*mfnlist = 0;
-	pgcnt_t	pfnalign = 0;
-	int	align, order, nbits, extents;
+	page_t *pp_first, *pp_last;
+	page_t *pp, **poolp;
+	pgcnt_t nwanted, pfnalign;
 	uint64_t pfnseg;
-	int	attempt = 0, is_domu = 0;
-	int	asked_hypervisor = 0;
-	uint_t	kflags;
+	mfn_t mfn, tmfn, hi_mfn, lo_mfn;
+	int align, attempt = 0;
 
-	ASSERT(mattr != NULL);
+	if (minctg == 1)
+		contig = 0;
 	lo_mfn = mmu_btop(mattr->dma_attr_addr_lo);
 	hi_mfn = mmu_btop(mattr->dma_attr_addr_hi);
+	pfnseg = mmu_btop(mattr->dma_attr_seg);
 	align = maxbit(mattr->dma_attr_align, mattr->dma_attr_minxfer);
 	if (align > MMU_PAGESIZE)
 		pfnalign = mmu_btop(align);
-	pfnseg = mmu_btop(mattr->dma_attr_seg);
+	else
+		pfnalign = 0;
 
-	/*
-	 * Clear the contig flag if only one page is needed.
-	 */
-	contig = (flags & PG_PHYSCONTIG);
-	flags &= ~PG_PHYSCONTIG;
-	bytes = P2ROUNDUP(bytes, MMU_PAGESIZE);
-	if (bytes == MMU_PAGESIZE)
-		contig = 0;
-
-	/*
-	 * Check if any old page in the system is fine.
-	 * DomU should always go down this path.
-	 */
-	is_domu = !DOMAIN_IS_INITDOMAIN(xen_info);
-	anyaddr = lo_mfn == 0 && hi_mfn >= max_mfn && !pfnalign;
-	if ((!contig && anyaddr) || is_domu) {
-		pp = page_create_va(vp, off, bytes, flags, &kvseg, vaddr);
-		if (pp)
-			return (pp);
-		else if (is_domu)
-			return (NULL); /* no memory available */
-	}
-	/*
-	 * DomU should never reach here
-	 */
 try_again:
-	/*
-	 * We could just want unconstrained but contig pages.
-	 */
-	if (anyaddr && contig && pfnseg >= max_mfn) {
-		/*
-		 * Look for free contig pages to satisfy the request.
-		 */
-		pp_first = find_contig_free(bytes, flags);
-		if (pp_first != NULL)
-			goto done;
-	}
 	/*
 	 * See if we want pages for a legacy device
 	 */
@@ -2363,13 +2313,13 @@ try_again:
 		poolp = &io_pool_4g;
 try_smaller:
 	/*
-	 * Take pages from I/O pool. We'll use pages from the highest MFN
-	 * range possible.
+	 * Take pages from I/O pool. We'll use pages from the highest
+	 * MFN range possible.
 	 */
 	pp_first = pp_last = NULL;
-	npages = mmu_btop(bytes);
 	mutex_enter(&io_pool_lock);
-	for (pp = *poolp; pp && npages > 0; ) {
+	nwanted = minctg;
+	for (pp = *poolp; pp && nwanted > 0; ) {
 		pp = pp->p_prev;
 
 		/*
@@ -2389,21 +2339,19 @@ restart:
 			/*
 			 * Check alignment
 			 */
-			tmfn = mfn - (npages - 1);
-			if (pfnalign) {
-				if (tmfn != P2ROUNDUP(tmfn, pfnalign))
-					goto skip; /* not properly aligned */
-			}
+			tmfn = mfn - (minctg - 1);
+			if (pfnalign && tmfn != P2ROUNDUP(tmfn, pfnalign))
+				goto skip; /* not properly aligned */
 			/*
 			 * Check segment
 			 */
 			if ((mfn & pfnseg) < (tmfn & pfnseg))
-				goto skip; /* crosses segment boundary */
+				goto skip; /* crosses seg boundary */
 			/*
 			 * Start building page list
 			 */
 			pp_first = pp_last = pp;
-			npages--;
+			nwanted--;
 		} else {
 			/*
 			 * check physical contiguity if required
@@ -2414,11 +2362,11 @@ restart:
 				 * not a contiguous page, restart list.
 				 */
 				pp_last = NULL;
-				npages = mmu_btop(bytes);
+				nwanted = minctg;
 				goto restart;
 			} else { /* add page to list */
 				pp_first = pp;
-				--npages;
+				nwanted--;
 			}
 		}
 skip:
@@ -2428,14 +2376,13 @@ skip:
 
 	/*
 	 * If we didn't find memory. Try the more constrained pool, then
-	 * sweep free pages into the DMA pool and try again. If we fail
-	 * repeatedly, ask the Hypervisor for help.
+	 * sweep free pages into the DMA pool and try again.
 	 */
-	if (npages != 0) {
+	if (nwanted != 0) {
 		mutex_exit(&io_pool_lock);
 		/*
-		 * If we were looking in the less constrained pool and didn't
-		 * find pages, try the more constrained pool.
+		 * If we were looking in the less constrained pool and
+		 * didn't find pages, try the more constrained pool.
 		 */
 		if (poolp == &io_pool_4g) {
 			poolp = &io_pool_16m;
@@ -2447,133 +2394,121 @@ skip:
 			 * Grab some more io_pool pages
 			 */
 			(void) populate_io_pool();
-			goto try_again;
+			goto try_again; /* go around and retry */
 		}
-
-		if (asked_hypervisor++)
-			return (NULL);	/* really out of luck */
-		/*
-		 * Hypervisor exchange doesn't handle segment or alignment
-		 * constraints
-		 */
-		if (mattr->dma_attr_seg < mattr->dma_attr_addr_hi || pfnalign)
-			return (NULL);
-		/*
-		 * Try exchanging pages with the hypervisor.
-		 */
-		npages = mmu_btop(bytes);
-		kflags = flags & PG_WAIT ? KM_SLEEP : KM_NOSLEEP;
-		/*
-		 * Hypervisor will allocate extents, if we want contig pages
-		 * extent must be >= npages
-		 */
-		if (contig) {
-			order = highbit(npages) - 1;
-			if (npages & ((1 << order) - 1))
-				order++;
-			extpages = 1 << order;
-		} else {
-			order = 0;
-			extpages = npages;
-		}
-		if (extpages > npages) {
-			extra = extpages - npages;
-			if (!page_resv(extra, kflags))
-				return (NULL);
-		}
-		pplist = kmem_alloc(extpages * sizeof (page_t *), kflags);
-		if (pplist == NULL)
-			goto fail;
-		mfnlist = kmem_alloc(extpages * sizeof (mfn_t), kflags);
-		if (mfnlist == NULL)
-			goto fail;
-		pp = page_create_va(vp, off, npages * PAGESIZE, flags,
-		    &kvseg, vaddr);
-		if (pp == NULL)
-			goto fail;
-		pp_first = pp;
-		if (extpages > npages) {
-			/*
-			 * fill out the rest of extent pages to swap with the
-			 * hypervisor
-			 */
-			for (i = 0; i < extra; i++) {
-				expp = page_create_va(vp,
-				    (u_offset_t)(uintptr_t)io_pool_kva,
-				    PAGESIZE, flags, &kvseg, io_pool_kva);
-				if (expp == NULL)
-					goto balloon_fail;
-				(void) hat_pageunload(expp, HAT_FORCE_PGUNLOAD);
-				page_io_unlock(expp);
-				page_hashout(expp, NULL);
-				page_io_lock(expp);
-				/*
-				 * add page to end of list
-				 */
-				expp->p_prev = pp_first->p_prev;
-				expp->p_next = pp_first;
-				expp->p_prev->p_next = expp;
-				pp_first->p_prev = expp;
-			}
-
-		}
-		for (i = 0; i < extpages; i++) {
-			pplist[i] = pp;
-			pp = pp->p_next;
-		}
-		nbits = highbit(mattr->dma_attr_addr_hi);
-		extents = contig ? 1 : npages;
-		if (balloon_replace_pages(extents, pplist, nbits, order,
-		    mfnlist) != extents) {
-			if (ioalloc_dbg)
-				cmn_err(CE_NOTE, "request to hypervisor for"
-				    " %d pages, maxaddr %" PRIx64 " failed",
-				    extpages, mattr->dma_attr_addr_hi);
-			goto balloon_fail;
-		}
-
-		kmem_free(pplist, extpages * sizeof (page_t *));
-		kmem_free(mfnlist, extpages * sizeof (mfn_t));
-		/*
-		 * Return any excess pages to free list
-		 */
-		if (extpages > npages) {
-			for (i = 0; i < extra; i++) {
-				pp = pp_first->p_prev;
-				page_sub(&pp_first, pp);
-				page_io_unlock(pp);
-				page_unresv(1);
-				page_free(pp, 1);
-			}
-		}
-		check_dma(mattr, pp_first, mmu_btop(bytes));
-		return (pp_first);
+		return (NULL);
 	}
-
 	/*
 	 * Found the pages, now snip them from the list
 	 */
 	page_io_pool_sub(poolp, pp_first, pp_last);
-	io_pool_cnt -= mmu_btop(bytes);
+	io_pool_cnt -= minctg;
+	/*
+	 * reset low water mark
+	 */
 	if (io_pool_cnt < io_pool_cnt_lowater)
-		io_pool_cnt_lowater = io_pool_cnt; /* io pool low water mark */
+		io_pool_cnt_lowater = io_pool_cnt;
 	mutex_exit(&io_pool_lock);
-done:
-	check_dma(mattr, pp_first, mmu_btop(bytes));
-	pp = pp_first;
-	do {
-		if (!page_hashin(pp, vp, off, NULL)) {
-			panic("pg_create_io: hashin failed pp %p, vp %p,"
-			    " off %llx",
-			    (void *)pp, (void *)vp, off);
+	return (pp_first);
+}
+
+page_t *
+page_swap_with_hypervisor(struct vnode *vp, u_offset_t off, caddr_t vaddr,
+    ddi_dma_attr_t *mattr, uint_t flags, pgcnt_t minctg)
+{
+	uint_t kflags;
+	int order, extra, extpages, i, contig, nbits, extents;
+	page_t *pp, *expp, *pp_first, **pplist = NULL;
+	mfn_t *mfnlist = NULL;
+
+	contig = flags & PG_PHYSCONTIG;
+	if (minctg == 1)
+		contig = 0;
+	flags &= ~PG_PHYSCONTIG;
+	kflags = flags & PG_WAIT ? KM_SLEEP : KM_NOSLEEP;
+	/*
+	 * Hypervisor will allocate extents, if we want contig
+	 * pages extent must be >= minctg
+	 */
+	if (contig) {
+		order = highbit(minctg) - 1;
+		if (minctg & ((1 << order) - 1))
+			order++;
+		extpages = 1 << order;
+	} else {
+		order = 0;
+		extpages = minctg;
+	}
+	if (extpages > minctg) {
+		extra = extpages - minctg;
+		if (!page_resv(extra, kflags))
+			return (NULL);
+	}
+	pp_first = NULL;
+	pplist = kmem_alloc(extpages * sizeof (page_t *), kflags);
+	if (pplist == NULL)
+		goto balloon_fail;
+	mfnlist = kmem_alloc(extpages * sizeof (mfn_t), kflags);
+	if (mfnlist == NULL)
+		goto balloon_fail;
+	pp = page_create_va(vp, off, minctg * PAGESIZE, flags, &kvseg, vaddr);
+	if (pp == NULL)
+		goto balloon_fail;
+	pp_first = pp;
+	if (extpages > minctg) {
+		/*
+		 * fill out the rest of extent pages to swap
+		 * with the hypervisor
+		 */
+		for (i = 0; i < extra; i++) {
+			expp = page_create_va(vp,
+			    (u_offset_t)(uintptr_t)io_pool_kva,
+			    PAGESIZE, flags, &kvseg, io_pool_kva);
+			if (expp == NULL)
+				goto balloon_fail;
+			(void) hat_pageunload(expp, HAT_FORCE_PGUNLOAD);
+			page_io_unlock(expp);
+			page_hashout(expp, NULL);
+			page_io_lock(expp);
+			/*
+			 * add page to end of list
+			 */
+			expp->p_prev = pp_first->p_prev;
+			expp->p_next = pp_first;
+			expp->p_prev->p_next = expp;
+			pp_first->p_prev = expp;
 		}
-		off += MMU_PAGESIZE;
-		PP_CLRFREE(pp);
-		PP_CLRAGED(pp);
-		page_set_props(pp, P_REF);
-		page_io_lock(pp);
+
+	}
+	for (i = 0; i < extpages; i++) {
+		pplist[i] = pp;
 		pp = pp->p_next;
-	} while (pp != pp_first);
+	}
+	nbits = highbit(mattr->dma_attr_addr_hi);
+	extents = contig ? 1 : minctg;
+	if (balloon_replace_pages(extents, pplist, nbits, order,
+	    mfnlist) != extents) {
+		if (ioalloc_dbg)
+			cmn_err(CE_NOTE, "request to hypervisor"
+			    " for %d pages, maxaddr %" PRIx64 " failed",
+			    extpages, mattr->dma_attr_addr_hi);
+		goto balloon_fail;
+	}
+
+	kmem_free(pplist, extpages * sizeof (page_t *));
+	kmem_free(mfnlist, extpages * sizeof (mfn_t));
+	/*
+	 * Return any excess pages to free list
+	 */
+	if (extpages > minctg) {
+		for (i = 0; i < extra; i++) {
+			pp = pp_first->p_prev;
+			page_sub(&pp_first, pp);
+			page_io_unlock(pp);
+			page_unresv(1);
+			page_free(pp, 1);
+		}
+	}
 	return (pp_first);
 balloon_fail:
 	/*
@@ -2587,12 +2522,239 @@ balloon_fail:
 			page_hashout(pp, NULL);
 		page_free(pp, 1);
 	}
-fail:
 	if (pplist)
 		kmem_free(pplist, extpages * sizeof (page_t *));
 	if (mfnlist)
 		kmem_free(mfnlist, extpages * sizeof (mfn_t));
-	page_unresv(extpages - npages);
+	page_unresv(extpages - minctg);
+	return (NULL);
+}
+
+static void
+return_partial_alloc(page_t *plist)
+{
+	page_t *pp;
+
+	while (plist != NULL) {
+		pp = plist;
+		page_sub(&plist, pp);
+		page_destroy_io(pp);
+	}
+}
+
+static page_t *
+page_get_contigpages(
+	struct vnode	*vp,
+	u_offset_t	off,
+	int		*npagesp,
+	uint_t		flags,
+	caddr_t		vaddr,
+	ddi_dma_attr_t	*mattr)
+{
+	mfn_t	max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
+	page_t	*plist;	/* list to return */
+	page_t	*pp, *mcpl;
+	int	contig, anyaddr, npages, getone = 0;
+	mfn_t	lo_mfn;
+	mfn_t	hi_mfn;
+	pgcnt_t	pfnalign = 0;
+	int	align, sgllen;
+	uint64_t pfnseg;
+	pgcnt_t	minctg;
+
+	npages = *npagesp;
+	ASSERT(mattr != NULL);
+	lo_mfn = mmu_btop(mattr->dma_attr_addr_lo);
+	hi_mfn = mmu_btop(mattr->dma_attr_addr_hi);
+	sgllen = mattr->dma_attr_sgllen;
+	pfnseg = mmu_btop(mattr->dma_attr_seg);
+	align = maxbit(mattr->dma_attr_align, mattr->dma_attr_minxfer);
+	if (align > MMU_PAGESIZE)
+		pfnalign = mmu_btop(align);
+
+	/*
+	 * Clear the contig flag if only one page is needed.
+	 */
+	contig = flags & PG_PHYSCONTIG;
+	if (npages == 1) {
+		getone = 1;
+		contig = 0;
+	}
+
+	/*
+	 * Check if any page in the system is fine.
+	 */
+	anyaddr = lo_mfn == 0 && hi_mfn >= max_mfn && !pfnalign;
+	if (!contig && anyaddr) {
+		flags &= ~PG_PHYSCONTIG;
+		plist = page_create_va(vp, off, npages * MMU_PAGESIZE,
+		    flags, &kvseg, vaddr);
+		if (plist != NULL) {
+			*npagesp = 0;
+			return (plist);
+		}
+	}
+	plist = NULL;
+	minctg = howmany(npages, sgllen);
+	mcpl = NULL;
+	while (npages > sgllen || getone) {
+		/*
+		 * We could just want unconstrained but contig pages.
+		 */
+		if (anyaddr && contig && pfnseg >= max_mfn) {
+			/*
+			 * Look for free contig pages to satisfy the request.
+			 */
+			mcpl = find_contig_free(minctg, flags);
+		}
+		/*
+		 * Try the reserved io pools next
+		 */
+		if (mcpl == NULL)
+			mcpl = page_io_pool_alloc(mattr, contig, minctg);
+		if (mcpl != NULL) {
+			pp = mcpl;
+			do {
+				if (!page_hashin(pp, vp, off, NULL)) {
+					panic("page_get_contigpages:"
+					    " hashin failed"
+					    " pp %p, vp %p, off %llx",
+					    (void *)pp, (void *)vp, off);
+				}
+				off += MMU_PAGESIZE;
+				PP_CLRFREE(pp);
+				PP_CLRAGED(pp);
+				page_set_props(pp, P_REF);
+				page_io_lock(pp);
+				pp = pp->p_next;
+			} while (pp != mcpl);
+		} else {
+			/*
+			 * Hypervisor exchange doesn't handle segment or
+			 * alignment constraints
+			 */
+			if (mattr->dma_attr_seg < mattr->dma_attr_addr_hi ||
+			    pfnalign)
+				goto fail;
+			/*
+			 * Try exchanging pages with the hypervisor
+			 */
+			mcpl = page_swap_with_hypervisor(vp, off, vaddr, mattr,
+			    flags, minctg);
+			if (mcpl == NULL)
+				goto fail;
+			off += minctg * MMU_PAGESIZE;
+		}
+		check_dma(mattr, mcpl, minctg);
+		/*
+		 * Here with a minctg run of contiguous pages, add them to the
+		 * list we will return for this request.
+		 */
+		page_list_concat(&plist, &mcpl);
+		getone = 0;
+		npages -= minctg;
+		*npagesp = npages;
+		sgllen--;
+	}
+	return (plist);
+fail:
+	return_partial_alloc(plist);
+	return (NULL);
+}
+
+/*
+ * Allocator for domain 0 I/O pages. We match the required
+ * DMA attributes and contiguity constraints.
+ */
+/*ARGSUSED*/
+page_t *
+page_create_io(
+	struct vnode	*vp,
+	u_offset_t	off,
+	uint_t		bytes,
+	uint_t		flags,
+	struct as	*as,
+	caddr_t		vaddr,
+	ddi_dma_attr_t	*mattr)
+{
+	page_t	*plist = NULL, *pp;
+	int	npages = 0, contig, anyaddr, pages_req;
+	mfn_t	lo_mfn;
+	mfn_t	hi_mfn;
+	pgcnt_t	pfnalign = 0;
+	int	align;
+	int	is_domu = 0;
+	int	dummy, bytes_got;
+	mfn_t	max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page, NULL);
+
+	ASSERT(mattr != NULL);
+	lo_mfn = mmu_btop(mattr->dma_attr_addr_lo);
+	hi_mfn = mmu_btop(mattr->dma_attr_addr_hi);
+	align = maxbit(mattr->dma_attr_align, mattr->dma_attr_minxfer);
+	if (align > MMU_PAGESIZE)
+		pfnalign = mmu_btop(align);
+
+	/*
+	 * Clear the contig flag if only one page is needed or the scatter
+	 * gather list length is >= npages.
+	 */
+	pages_req = npages = mmu_btopr(bytes);
+	contig = (flags & PG_PHYSCONTIG);
+	bytes = P2ROUNDUP(bytes, MMU_PAGESIZE);
+	if (bytes == MMU_PAGESIZE || mattr->dma_attr_sgllen >= npages)
+		contig = 0;
+
+	/*
+	 * Check if any old page in the system is fine.
+	 * DomU should always go down this path.
+	 */
+	is_domu = !DOMAIN_IS_INITDOMAIN(xen_info);
+	anyaddr = lo_mfn == 0 && hi_mfn >= max_mfn && !pfnalign;
+	if ((!contig && anyaddr) || is_domu) {
+		flags &= ~PG_PHYSCONTIG;
+		plist = page_create_va(vp, off, bytes, flags, &kvseg, vaddr);
+		if (plist != NULL)
+			return (plist);
+		else if (is_domu)
+			return (NULL); /* no memory available */
+	}
+	/*
+	 * DomU should never reach here
+	 */
+	if (contig) {
+		plist = page_get_contigpages(vp, off, &npages, flags, vaddr,
+		    mattr);
+		if (plist == NULL)
+			goto fail;
+		bytes_got = (pages_req - npages) << MMU_PAGESHIFT;
+		vaddr += bytes_got;
+		off += bytes_got;
+		/*
+		 * We now have all the contiguous pages we need, but
+		 * we may still need additional non-contiguous pages.
+		 */
+	}
+	/*
+	 * now loop collecting the requested number of pages, these do
+	 * not have to be contiguous pages but we will use the contig
+	 * page alloc code to get the pages since it will honor any
+	 * other constraints the pages may have.
+	 */
+	while (npages--) {
+		dummy = 1;
+		pp = page_get_contigpages(vp, off, &dummy, flags, vaddr, mattr);
+		if (pp == NULL)
+			goto fail;
+		page_add(&plist, pp);
+		vaddr += MMU_PAGESIZE;
+		off += MMU_PAGESIZE;
+	}
+	return (plist);
+fail:
+	/*
+	 * Failed to get enough pages, return ones we did get
+	 */
+	return_partial_alloc(plist);
 	return (NULL);
 }
 
