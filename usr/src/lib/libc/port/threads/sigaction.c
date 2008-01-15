@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -236,8 +236,20 @@ take_deferred_signal(int sig)
 	 * the kernel has reset the handler to SIG_DFL, so we have
 	 * to reestablish the handler now so that it will be entered
 	 * again when we call __sigresend(), below.
+	 *
+	 * Logically, we should acquire and release the signal's
+	 * sig_lock around this operation to protect the integrity
+	 * of the signal action while we copy it, as is done below
+	 * in _libc_sigaction().  However, we may be on a user-level
+	 * sleep queue at this point and lrw_wrlock(&suap->sig_lock)
+	 * might attempt to sleep on a different sleep queue and
+	 * that would corrupt the entire sleep queue mechanism.
+	 *
+	 * If we are on a sleep queue we will remove ourself from
+	 * it in call_user_handler(), called from sigacthandler(),
+	 * before entering the application's signal handler.
+	 * In the meantime, we must not acquire any locks.
 	 */
-	lrw_wrlock(&suap->sig_lock);
 	if (suap->sig_uaction.sa_flags & SA_RESETHAND) {
 		struct sigaction tact = suap->sig_uaction;
 		tact.sa_flags &= ~SA_NODEFER;
@@ -245,7 +257,6 @@ take_deferred_signal(int sig)
 		tact.sa_mask = maskset;
 		(void) __sigaction(sig, &tact, NULL);
 	}
-	lrw_unlock(&suap->sig_lock);
 
 	if (self->ul_siginfo.si_signo == 0)
 		sip = NULL;
