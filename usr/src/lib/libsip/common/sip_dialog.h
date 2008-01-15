@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,8 @@ typedef struct sip_dialog
 	boolean_t		sip_dlg_on_fork;
 	sip_method_t		sip_dlg_method;
 	void			*sip_dlg_ctxt;	/* currently unused */
+	int			sip_dlg_msgcnt;
+	sip_log_t		sip_dlg_log[SIP_DLG_DESTROYED + 1];
 } _sip_dialog_t;
 
 void			sip_dialog_init(void (*sip_ulp_dlg_del)(sip_dialog_t,
@@ -103,6 +105,7 @@ sip_dialog_t		sip_seed_dialog(sip_conn_object_t, _sip_msg_t *,
 			    boolean_t, int);
 char			*sip_dialog_req_uri(sip_dialog_t);
 void			sip_dialog_delete(_sip_dialog_t *);
+extern char		*sip_get_dialog_state_str(int);
 extern boolean_t	sip_incomplete_dialog(sip_dialog_t);
 
 #ifdef	__cplusplus

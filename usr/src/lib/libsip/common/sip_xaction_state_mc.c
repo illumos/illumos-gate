@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,8 +173,20 @@ sip_xaction_output(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 	sip_message_type_t	*sip_msg_info;
 	int			ret;
 
+	if (conn_obj == NULL) {
+		(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+		sip_write_to_log((void *)sip_trans, SIP_TRANSACTION_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		(void) pthread_mutex_unlock(&sip_trans->sip_xaction_mutex);
+	}
 	assert(conn_obj != NULL);
 	sip_msg_info = msg->sip_msg_req_res;
+
+	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+	sip_trans->sip_xaction_msgcnt++;
+	sip_add_log(&sip_trans->sip_xaction_log[sip_trans->sip_xaction_state],
+	    (sip_msg_t)msg, sip_trans->sip_xaction_msgcnt, SIP_TRANSACTION_LOG);
+	(void) pthread_mutex_unlock(&sip_trans->sip_xaction_mutex);
 
 	if (sip_msg_info->is_request)
 		return (sip_clnt_xaction_output(conn_obj, sip_trans, msg));
@@ -202,6 +214,10 @@ sip_clnt_xaction_output(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 
 	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
 	prev_state = sip_trans->sip_xaction_state;
+	if (msg->sip_msg_req_res == NULL) {
+		sip_write_to_log((void *)sip_trans, SIP_TRANSACTION_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(msg->sip_msg_req_res != NULL);
 	sip_msg_info = msg->sip_msg_req_res;
 	isreliable = sip_is_conn_reliable(conn_obj);
@@ -587,6 +603,14 @@ sip_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 	int			ret;
 
 	sip_msg_info = (*sip_msg)->sip_msg_req_res;
+
+	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+	sip_trans->sip_xaction_msgcnt++;
+	sip_add_log(&sip_trans->sip_xaction_log[sip_trans->sip_xaction_state],
+	    (sip_msg_t)*sip_msg, sip_trans->sip_xaction_msgcnt,
+	    SIP_TRANSACTION_LOG);
+	(void) pthread_mutex_unlock(&sip_trans->sip_xaction_mutex);
+
 	if (sip_msg_info->is_request)
 		ret = sip_srv_xaction_input(conn_obj, sip_trans, sip_msg);
 	else
@@ -647,7 +671,7 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 		}
 		if (resp_to_tag->sip_str_len != req_to_tag->sip_str_len ||
 		    strncmp(resp_to_tag->sip_str_ptr, req_to_tag->sip_str_ptr,
-			req_to_tag->sip_str_len) != 0) {
+		    req_to_tag->sip_str_len) != 0) {
 			(void) pthread_mutex_unlock(
 			    &sip_trans->sip_xaction_mutex);
 			return (0);
@@ -715,6 +739,11 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 	}
 	if (sip_msg_info->sip_req_method == INVITE) {
 		(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+		if (sip_trans->sip_xaction_method != INVITE) {
+			sip_write_to_log((void *)sip_trans,
+			    SIP_TRANSACTION_LOG | SIP_ASSERT_ERROR, __FILE__,
+			    __LINE__);
+		}
 		assert(sip_trans->sip_xaction_method == INVITE);
 		/*
 		 * Retransmitted invite
@@ -723,10 +752,32 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 			case SIP_SRV_INV_PROCEEDING:
 			case SIP_SRV_INV_COMPLETED:
 				if (sip_trans->sip_xaction_last_msg != NULL) {
-					_sip_msg_t	*new_msg;
+					_sip_msg_t		*new_msg;
+					sip_message_type_t	*msg_info;
+					int			resp;
 
 					new_msg =
 					    sip_trans->sip_xaction_last_msg;
+					msg_info = new_msg->sip_msg_req_res;
+					if (msg_info == NULL || msg_info->
+					    is_request) {
+						sip_write_to_log((void *)
+						    sip_trans,
+						    SIP_TRANSACTION_LOG |
+						    SIP_ASSERT_ERROR, __FILE__,
+						    __LINE__);
+					}
+					assert(msg_info != NULL && !msg_info->
+					    is_request);
+					resp = msg_info->sip_resp_code;
+					SIP_UPDATE_COUNTERS(B_FALSE, 0, resp,
+					    B_TRUE, new_msg->sip_msg_len);
+					++sip_trans->sip_xaction_msgcnt;
+					sip_add_log(&sip_trans->sip_xaction_log[
+					    sip_trans->sip_xaction_state],
+					    new_msg, sip_trans->
+					    sip_xaction_msgcnt,
+					    SIP_TRANSACTION_LOG);
 					(void) sip_stack_send(conn_obj,
 					    new_msg->sip_msg_buf,
 					    new_msg->sip_msg_len);
@@ -738,6 +789,12 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 				return (EPROTO);
 		}
 		(void) pthread_mutex_unlock(&sip_trans->sip_xaction_mutex);
+		/*
+		 * We need to account for this invite received by the stack
+		 * before we free that message.
+		 */
+		SIP_UPDATE_COUNTERS(B_TRUE, INVITE, 0, B_FALSE,
+		    msg->sip_msg_len);
 		sip_free_msg((sip_msg_t)msg);
 		*sip_msg = NULL;
 		return (0);
@@ -745,15 +802,38 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 	/*
 	 * Retransmitted request
 	 */
-	assert(sip_trans->sip_xaction_method != INVITE);
 	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+	if (sip_trans->sip_xaction_method == INVITE) {
+		sip_write_to_log((void *)sip_trans, SIP_TRANSACTION_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
+	assert(sip_trans->sip_xaction_method != INVITE);
 	switch (sip_trans->sip_xaction_state) {
 		case SIP_SRV_NONINV_PROCEEDING:
 		case SIP_SRV_NONINV_COMPLETED:
 			if (sip_trans->sip_xaction_last_msg != NULL) {
-				_sip_msg_t	*new_msg;
+				_sip_msg_t		*new_msg;
+				sip_message_type_t	*msg_info;
+				int			resp;
 
 				new_msg = sip_trans->sip_xaction_last_msg;
+				msg_info = new_msg->sip_msg_req_res;
+				if (msg_info == NULL || msg_info->is_request) {
+					sip_write_to_log((void *)sip_trans,
+					    SIP_TRANSACTION_LOG |
+					    SIP_ASSERT_ERROR, __FILE__,
+					    __LINE__);
+					}
+				assert(msg_info != NULL && !msg_info->
+				    is_request);
+				resp = msg_info->sip_resp_code;
+				SIP_UPDATE_COUNTERS(B_FALSE, 0, resp, B_TRUE,
+				    new_msg->sip_msg_len);
+				++sip_trans->sip_xaction_msgcnt;
+				sip_add_log(&sip_trans->sip_xaction_log[
+				    sip_trans->sip_xaction_state], new_msg,
+				    sip_trans->sip_xaction_msgcnt,
+				    SIP_TRANSACTION_LOG);
 				(void) sip_stack_send(conn_obj,
 				    new_msg->sip_msg_buf, new_msg->sip_msg_len);
 			}
@@ -764,6 +844,13 @@ sip_srv_xaction_input(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 			return (EPROTO);
 	}
 	(void) pthread_mutex_unlock(&sip_trans->sip_xaction_mutex);
+	/*
+	 * We need to account for the retransmitted non-INVITE request here.
+	 * When we return from here the msg will be freed and we will not
+	 * be able to capture the details at sip_process_new_packet()
+	 */
+	SIP_UPDATE_COUNTERS(B_TRUE, sip_msg_info->sip_req_method, 0, B_FALSE,
+	    msg->sip_msg_len);
 	sip_free_msg((sip_msg_t)msg);
 	*sip_msg = NULL;
 	return (0);
@@ -802,6 +889,10 @@ sip_create_send_nonOKack(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 		sip_free_msg((sip_msg_t)ack_msg);
 		return (ret);
 	}
+	SIP_UPDATE_COUNTERS(B_TRUE, ACK, 0, B_TRUE, ack_msg->sip_msg_len);
+	++sip_trans->sip_xaction_msgcnt;
+	sip_add_log(&sip_trans->sip_xaction_log[sip_trans->sip_xaction_state],
+	    ack_msg, sip_trans->sip_xaction_msgcnt, SIP_TRANSACTION_LOG);
 	if ((ret = sip_stack_send(conn_obj, ack_msg->sip_msg_buf,
 	    ack_msg->sip_msg_len)) != 0) {
 		sip_free_msg((sip_msg_t)ack_msg);
@@ -833,13 +924,17 @@ sip_clnt_xaction_inv_res(sip_conn_object_t conn_obj, sip_xaction_t *sip_trans,
 	int			prev_state;
 	boolean_t		isreliable;
 
+	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
+	if (msg->sip_msg_req_res == NULL) {
+		sip_write_to_log((void *)sip_trans, SIP_TRANSACTION_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(msg->sip_msg_req_res != NULL);
 
 	sip_msg_info = msg->sip_msg_req_res;
 	resp_code = sip_msg_info->sip_resp_code;
 	isreliable = sip_is_conn_reliable(conn_obj);
 
-	(void) pthread_mutex_lock(&sip_trans->sip_xaction_mutex);
 	prev_state = sip_trans->sip_xaction_state;
 	switch (sip_trans->sip_xaction_state) {
 		case SIP_CLNT_CALLING:
@@ -1026,6 +1121,10 @@ sip_clnt_xaction_noninv_res(sip_conn_object_t conn_obj,
 	_sip_msg_t		*msg = *sip_msg;
 	boolean_t		isreliable;
 
+	if (msg->sip_msg_req_res == NULL || sip_trans == NULL) {
+		sip_write_to_log((void *)sip_trans, SIP_TRANSACTION_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(msg->sip_msg_req_res != NULL);
 	assert(sip_trans != NULL);
 
@@ -1182,6 +1281,9 @@ sip_xaction_state_timer_fire(void *args)
 	boolean_t		destroy_trans = B_FALSE;
 	sip_conn_object_t	conn_obj;
 	int			prev_state;
+	sip_message_type_t	*msg_info;
+	int			resp;
+	sip_method_t		method;
 
 	assert(time_obj != NULL);
 
@@ -1200,6 +1302,13 @@ sip_xaction_state_timer_fire(void *args)
 				break;
 			new_msg = sip_trans->sip_xaction_last_msg;
 			conn_obj = sip_trans->sip_xaction_conn_obj;
+			/* timer A is for INVITE-RETRANSMIT only */
+			SIP_UPDATE_COUNTERS(B_TRUE, INVITE, 0, B_TRUE, new_msg->
+			    sip_msg_len);
+			++sip_trans->sip_xaction_msgcnt;
+			sip_add_log(&sip_trans->sip_xaction_log[sip_trans->
+			    sip_xaction_state], new_msg, sip_trans->
+			    sip_xaction_msgcnt, SIP_TRANSACTION_LOG);
 			if (sip_stack_send(conn_obj, new_msg->sip_msg_buf,
 			    new_msg->sip_msg_len) != 0) {
 				sip_del_conn_obj_cache(
@@ -1210,9 +1319,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1238,9 +1348,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1261,9 +1372,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1302,6 +1414,22 @@ sip_xaction_state_timer_fire(void *args)
 				break;
 			conn_obj = sip_trans->sip_xaction_conn_obj;
 			new_msg = sip_trans->sip_xaction_last_msg;
+			/* Timer E is for non-INVITE request */
+
+			msg_info = new_msg->sip_msg_req_res;
+			if (msg_info == NULL || !msg_info->is_request) {
+				(void) sip_write_to_log((void *) sip_trans,
+				    SIP_TRANSACTION_LOG | SIP_ASSERT_ERROR,
+				    __FILE__, __LINE__);
+			}
+			assert(msg_info != NULL && msg_info->is_request);
+			method = msg_info->sip_req_method;
+			SIP_UPDATE_COUNTERS(B_TRUE, method, 0, B_TRUE, new_msg->
+			    sip_msg_len);
+			++sip_trans->sip_xaction_msgcnt;
+			sip_add_log(&sip_trans->sip_xaction_log[sip_trans->
+			    sip_xaction_state], new_msg, sip_trans->
+			    sip_xaction_msgcnt, SIP_TRANSACTION_LOG);
 			if (sip_stack_send(conn_obj, new_msg->sip_msg_buf,
 			    new_msg->sip_msg_len) != 0) {
 				sip_del_conn_obj_cache(
@@ -1312,9 +1440,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1341,9 +1470,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1366,9 +1496,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1393,6 +1524,20 @@ sip_xaction_state_timer_fire(void *args)
 			}
 			new_msg = sip_trans->sip_xaction_last_msg;
 			conn_obj = sip_trans->sip_xaction_conn_obj;
+			msg_info = new_msg->sip_msg_req_res;
+			if (msg_info == NULL || msg_info->is_request) {
+				(void) sip_write_to_log((void *) sip_trans,
+				    SIP_TRANSACTION_LOG | SIP_ASSERT_ERROR,
+				    __FILE__, __LINE__);
+			}
+			assert(msg_info != NULL && !msg_info->is_request);
+			resp = msg_info->sip_resp_code;
+			SIP_UPDATE_COUNTERS(B_FALSE, 0, resp, B_TRUE, new_msg->
+			    sip_msg_len);
+			++sip_trans->sip_xaction_msgcnt;
+			sip_add_log(&sip_trans->sip_xaction_log[sip_trans->
+			    sip_xaction_state], new_msg, sip_trans->
+			    sip_xaction_msgcnt, SIP_TRANSACTION_LOG);
 			if (sip_stack_send(conn_obj, new_msg->sip_msg_buf,
 			    new_msg->sip_msg_len) != 0) {
 				sip_del_conn_obj_cache(
@@ -1403,9 +1548,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1429,9 +1575,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,
@@ -1453,9 +1600,10 @@ sip_xaction_state_timer_fire(void *args)
 				(void) pthread_mutex_unlock(
 				    &sip_trans->sip_xaction_mutex);
 				if (sip_xaction_ulp_state_cb != NULL) {
-				    sip_xaction_ulp_state_cb(
-				    (sip_transaction_t)sip_trans, NULL,
-				    prev_state, sip_trans->sip_xaction_state);
+					sip_xaction_ulp_state_cb(
+					    (sip_transaction_t)sip_trans, NULL,
+					    prev_state, sip_trans->
+					    sip_xaction_state);
 				}
 				if (sip_xaction_ulp_trans_err != NULL) {
 					sip_xaction_ulp_trans_err(sip_trans, 0,

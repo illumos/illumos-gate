@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,6 +531,28 @@ sip_get_dialog_type(sip_dialog_t dialog, int *error)
 	return (type);
 }
 
+/*
+ * Return the number of messages exchanged within a dialog.
+ */
+int
+sip_get_dialog_msgcnt(sip_dialog_t dialog, int *error)
+{
+	_sip_dialog_t	*_dialog;
+	int		nmsgs;
+
+	if (error != NULL)
+		*error = 0;
+	if (!sip_manage_dialog || dialog == NULL) {
+		if (error != NULL)
+			*error = EINVAL;
+		return (-1);
+	}
+	_dialog = (_sip_dialog_t *)dialog;
+	(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
+	nmsgs = _dialog->sip_dlg_msgcnt;
+	(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+	return (nmsgs);
+}
 
 /*
  * Partial dialog ?

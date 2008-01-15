@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -484,6 +484,9 @@ boolean_t
 sip_xaction_remove(void *obj, void *hindex, int *found)
 {
 	sip_xaction_t	*tmp = (sip_xaction_t *)obj;
+	int		count = 0;
+	sip_msg_chain_t	*msg_chain;
+	sip_msg_chain_t	*nmsg_chain;
 
 	*found = 0;
 	tmp = (sip_xaction_t *)obj;
@@ -506,6 +509,7 @@ sip_xaction_remove(void *obj, void *hindex, int *found)
 		SIP_CANCEL_TIMER(tmp->sip_xaction_TI);
 		SIP_CANCEL_TIMER(tmp->sip_xaction_TJ);
 		SIP_CANCEL_TIMER(tmp->sip_xaction_TK);
+		sip_write_to_log((void *)tmp, SIP_TRANSACTION_LOG, NULL, 0);
 		free(tmp->sip_xaction_branch_id);
 		if (tmp->sip_xaction_last_msg != NULL) {
 			SIP_MSG_REFCNT_DECR(tmp->sip_xaction_last_msg);
@@ -518,6 +522,21 @@ sip_xaction_remove(void *obj, void *hindex, int *found)
 		if (tmp->sip_xaction_conn_obj != NULL) {
 			sip_del_conn_obj_cache(tmp->sip_xaction_conn_obj,
 			    (void *)tmp);
+		}
+		/*
+		 * If the transaction logging is disabled before we could
+		 * write the captured messages into the transaction log, then
+		 * we need to free those captured messsages
+		 */
+		for (count = 0; count <= SIP_SRV_NONINV_TERMINATED; count++) {
+			msg_chain = tmp->sip_xaction_log[count].sip_msgs;
+			while (msg_chain != NULL) {
+				nmsg_chain = msg_chain->next;
+				if (msg_chain->sip_msg != NULL)
+					free(msg_chain->sip_msg);
+				free(msg_chain);
+				msg_chain = nmsg_chain;
+			}
 		}
 		free(tmp);
 		return (B_TRUE);
@@ -577,6 +596,8 @@ char *
 sip_get_xaction_state(int state)
 {
 	switch (state) {
+		case SIP_NEW_TRANSACTION:
+			return ("SIP_NEW_TRANSACTION");
 		case SIP_CLNT_CALLING:
 			return ("SIP_CLNT_CALLING");
 		case SIP_CLNT_INV_PROCEEDING:
@@ -610,7 +631,7 @@ sip_get_xaction_state(int state)
 		case SIP_SRV_NONINV_TERMINATED:
 			return ("SIP_SRV_NONINV_TERMINATED");
 		default :
-			return ("unknown");
+			return ("UNKNOWN");
 	}
 }
 

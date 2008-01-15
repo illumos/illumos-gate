@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@ OBJECTS = sip_headers.o sip_msg.o sip_gids.o \
 	sip_hash.o sip_itf.o sip_ui.o sip_reass.o sip_dialog.o \
 	sip_dialog_ui.o sip_xaction_ui.o sip_parse_generic.o \
 	sip_parse_uri.o sip_uri_ui.o sip_parse_hdrs.o \
-	sip_add_hdrs.o sip_hdrs_ui.o
+	sip_add_hdrs.o sip_hdrs_ui.o sip_logging.o
 
 include ../../Makefile.lib
 

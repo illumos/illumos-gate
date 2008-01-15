@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
@@ -40,9 +40,6 @@
 #include "sip_xaction.h"
 #include "sip_dialog.h"
 #include "sip_parse_generic.h"
-
-#define	SIP_MSG_BUF_SZ	100
-
 
 void		(*sip_ulp_recv)(const sip_conn_object_t, sip_msg_t,
 		    const sip_dialog_t) = NULL;
@@ -108,6 +105,9 @@ sip_send_resp(sip_conn_object_t conn_obj, _sip_msg_t *sip_msg, int resp)
 		sip_free_msg((sip_msg_t)sip_msg_resp);
 		return;
 	}
+
+	SIP_UPDATE_COUNTERS(B_FALSE, 0, resp, B_TRUE, sip_msg_resp->
+	    sip_msg_len);
 	(void) sip_stack_send(conn_obj, sip_msg_resp->sip_msg_buf,
 	    sip_msg_resp->sip_msg_len);
 	sip_free_msg((sip_msg_t)sip_msg_resp);
@@ -312,12 +312,37 @@ sip_sendmsg(sip_conn_object_t obj, sip_msg_t sip_msg, sip_dialog_t dialog,
 		} else if (dialog != NULL && (!sip_msg_info->is_request ||
 		    sip_msg_info->sip_req_method == NOTIFY)) {
 			(void) sip_update_dialog(dialog, _sip_msg);
-		} else if (dialog != NULL && sip_msg_info->is_request &&
-		    sip_msg_info->sip_req_method == INVITE) {
-			(void) sip_dialog_add_new_contact(dialog, _sip_msg);
+		} else if (dialog != NULL) {
+			/*
+			 * Dialog is in CONFIRMED state. If logging is enabled
+			 * track the SIP message sent within a dialog.
+			 */
+			(void) pthread_mutex_lock(&dialog->sip_dlg_mutex);
+			dialog->sip_dlg_msgcnt++;
+			sip_add_log(&dialog->sip_dlg_log[dialog->sip_dlg_state],
+			    (sip_msg_t)sip_msg, dialog->sip_dlg_msgcnt,
+			    SIP_DIALOG_LOG);
+			(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
+
+			if (sip_msg_info->is_request && sip_msg_info->
+			    sip_req_method == INVITE) {
+				(void) sip_dialog_add_new_contact(dialog,
+				    _sip_msg);
+			}
 		}
 	}
-
+	/*
+	 * if measure sip traffic is enabled, capture the measurements
+	 * Is this the right place to measure or should I put this after
+	 * the call to sip_stack_send()
+	 */
+	if (sip_msg_info->is_request) {
+		SIP_UPDATE_COUNTERS(B_TRUE, sip_msg_info->sip_req_method, 0,
+		    B_TRUE, _sip_msg->sip_msg_len);
+	} else {
+		SIP_UPDATE_COUNTERS(B_FALSE, 0, sip_msg_info->sip_resp_code,
+		    B_TRUE, _sip_msg->sip_msg_len);
+	}
 	if ((ret = sip_stack_send(obj, _sip_msg->sip_msg_buf,
 	    _sip_msg->sip_msg_len)) != 0) {
 		if (sip_trans != NULL) {
@@ -528,6 +553,13 @@ next_msg:
 			return;
 		}
 	}
+	if (sip_msg_info->is_request) {
+		SIP_UPDATE_COUNTERS(B_TRUE, sip_msg_info->sip_req_method, 0,
+		    B_FALSE, sip_msg->sip_msg_len);
+	} else {
+		SIP_UPDATE_COUNTERS(B_FALSE, 0, sip_msg_info->sip_resp_code,
+		    B_FALSE, sip_msg->sip_msg_len);
+	}
 	sip_ulp_recv(conn_object, (sip_msg_t)sip_msg, dialog);
 	sip_free_msg((sip_msg_t)sip_msg);
 	if (dialog != NULL && !dialog_created)
@@ -634,6 +666,17 @@ sip_stack_init(sip_stack_init_t *stack_val)
 	}
 	sip_xaction_init(stack_val->sip_ulp_pointers->sip_ulp_trans_error,
 	    stack_val->sip_ulp_pointers->sip_ulp_trans_state_cb);
+
+	/*
+	 * Initialize SIP traffic counter mutex
+	 */
+	(void) pthread_mutex_init(&sip_counters.sip_counter_mutex, NULL);
+
+	/*
+	 * Initialize SIP logfile structures mutex
+	 */
+	(void) pthread_mutex_init(&trans_log.sip_logfile_mutex, NULL);
+	(void) pthread_mutex_init(&dialog_log.sip_logfile_mutex, NULL);
 
 #ifdef	__linux__
 	if (clock_gettime(CLOCK_REALTIME, &tspec) != 0)

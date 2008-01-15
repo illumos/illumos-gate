@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,14 @@ typedef struct sip_dialog_timer_obj_s {
 static void
 sip_release_dialog_res(_sip_dialog_t *dialog)
 {
+	int			count = 0;
+	sip_msg_chain_t		*msg_chain;
+	sip_msg_chain_t		*nmsg_chain;
 
+	if (dialog->sip_dlg_ref_cnt != 0) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__,  __LINE__);
+	}
 	assert(dialog->sip_dlg_ref_cnt == 0);
 	if (SIP_IS_TIMER_RUNNING(dialog->sip_dlg_timer))
 		SIP_CANCEL_TIMER(dialog->sip_dlg_timer);
@@ -137,6 +144,16 @@ sip_release_dialog_res(_sip_dialog_t *dialog)
 		free(dialog->sip_dlg_rset.sip_str_ptr);
 		dialog->sip_dlg_rset.sip_str_len = 0;
 		dialog->sip_dlg_rset.sip_str_ptr = NULL;
+	}
+	for (count = 0; count <= SIP_DLG_DESTROYED; count++) {
+		msg_chain = dialog->sip_dlg_log[count].sip_msgs;
+		while (msg_chain != NULL) {
+			nmsg_chain = msg_chain->next;
+			if (msg_chain->sip_msg != NULL)
+				free(msg_chain->sip_msg);
+			free(msg_chain);
+			msg_chain = nmsg_chain;
+		}
 	}
 	(void) pthread_mutex_destroy(&dialog->sip_dlg_mutex);
 	free(dialog);
@@ -312,6 +329,10 @@ sip_dialog_set_route_hdr(_sip_dialog_t *dialog, sip_dlg_route_set_t *rset_head,
 	int			rspl;
 	int			rpl;
 
+	if (rcnt <= 0) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(rcnt > 0);
 
 	dialog->sip_dlg_rset.sip_str_len = rlen + rcnt - 1;
@@ -416,6 +437,11 @@ sip_dialog_set_route_hdr(_sip_dialog_t *dialog, sip_dlg_route_set_t *rset_head,
 		}
 		route = route->sip_dlg_route_next;
 	}
+	if (rsp > dialog->sip_dlg_rset.sip_str_ptr +
+	    dialog->sip_dlg_rset.sip_str_len) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(rsp <= dialog->sip_dlg_rset.sip_str_ptr +
 	    dialog->sip_dlg_rset.sip_str_len);
 	dialog->sip_dlg_rset.sip_str_ptr[dialog->sip_dlg_rset.sip_str_len] =
@@ -431,6 +457,10 @@ sip_dialog_set_route_hdr(_sip_dialog_t *dialog, sip_dlg_route_set_t *rset_head,
 		rp += count;
 		rpl -= count;
 		free(uri);
+	}
+	if (rp > rset + rset_len) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
 	}
 	assert(rp <= rset + rset_len);
 	(void) snprintf(rhdr->sip_hdr_start, rset_len + strlen(SIP_CRLF) + 1,
@@ -496,6 +526,11 @@ sip_dialog_get_route_set(_sip_dialog_t *dialog, _sip_msg_t *sip_msg, int what)
 				crlf -= strlen(SIP_CRLF);
 			}
 			if (rset_head == NULL) {
+				if (rset_tail != NULL) {
+					sip_write_to_log((void *)dialog,
+					    SIP_DIALOG_LOG | SIP_ASSERT_ERROR,
+					    __FILE__, __LINE__);
+				}
 				assert(rset_tail == NULL);
 				rset_head = rset_tail = rset;
 			} else if (what == SIP_UAS_DIALOG) {
@@ -505,6 +540,9 @@ sip_dialog_get_route_set(_sip_dialog_t *dialog, _sip_msg_t *sip_msg, int what)
 				rset->sip_dlg_route_next = rset_head;
 				rset_head = rset;
 			} else {
+				sip_write_to_log((void *)dialog,
+				    SIP_DIALOG_LOG | SIP_ASSERT_ERROR,
+				    __FILE__, __LINE__);
 				assert(0);
 			}
 			value = (sip_hdr_value_t *)sip_get_next_value(
@@ -724,6 +762,10 @@ sip_seed_dialog(sip_conn_object_t obj, _sip_msg_t *sip_msg,
 		const sip_str_t	*local_tag;
 
 		local_tag = sip_get_from_tag((sip_msg_t)sip_msg, NULL);
+		if (local_tag == NULL) {
+			sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(local_tag != NULL);
 		sip_md5_hash(local_tag->sip_str_ptr, local_tag->sip_str_len,
 		    callid->sip_str_ptr, callid->sip_str_len,
@@ -739,6 +781,11 @@ sip_seed_dialog(sip_conn_object_t obj, _sip_msg_t *sip_msg,
 			goto dia_err;
 		}
 	}
+
+	dialog->sip_dlg_msgcnt = 1;
+	sip_add_log(&dialog->sip_dlg_log[dialog->sip_dlg_state],
+	    (sip_msg_t)sip_msg, dialog->sip_dlg_msgcnt, SIP_DIALOG_LOG);
+
 	SIP_DLG_REFCNT_INCR(dialog);
 	return ((sip_dialog_t)dialog);
 dia_err:
@@ -975,8 +1022,17 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 	} else {
 		resp_code = sip_get_response_code((sip_msg_t)sip_msg, &error);
 		(void) pthread_mutex_lock(&dialog->sip_dlg_mutex);
+		if (dialog->sip_dlg_state != SIP_DLG_NEW) {
+			sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(dialog->sip_dlg_state == SIP_DLG_NEW);
 		if (dialog->sip_dlg_remote_target == NULL && chdr != NULL) {
+			if (dialog->sip_dlg_type != SIP_UAC_DIALOG) {
+				sip_write_to_log((void *)dialog,
+				    SIP_DIALOG_LOG | SIP_ASSERT_ERROR,
+				    __FILE__, __LINE__);
+			}
 			assert(dialog->sip_dlg_type == SIP_UAC_DIALOG);
 			if ((dialog->sip_dlg_remote_target =
 			    sip_dup_header(chdr)) == NULL) {
@@ -1071,6 +1127,10 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 	} else {
 		val =  sip_get_header_value(dialog->sip_dlg_remote_uri_tag,
 		    &error);
+	}
+	if (val == NULL || error != 0) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
 	}
 	assert(val != NULL && error == 0);
 	remtag = sip_get_param_value((sip_header_value_t)val, "tag", &error);
@@ -1186,11 +1246,16 @@ sip_dialog_free(void *obj, void *hindex, int *found)
 	if (bcmp(dialog->sip_dlg_id, hindex, sizeof (dialog->sip_dlg_id))
 	    == 0) {
 		*found = 1;
+		if (dialog->sip_dlg_state != SIP_DLG_DESTROYED) {
+			sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(dialog->sip_dlg_state == SIP_DLG_DESTROYED);
 		if (dialog->sip_dlg_ref_cnt != 0) {
 			(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
 			return (B_FALSE);
 		}
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG, NULL, 0);
 		sip_release_dialog_res(dialog);
 		return (B_TRUE);
 	}
@@ -1264,6 +1329,10 @@ sip_dlg_self_destruct(void *args)
 	int			index;
 
 	(void) pthread_mutex_lock(&dialog->sip_dlg_mutex);
+	if (dialog->sip_dlg_state != SIP_DLG_NEW) {
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+		    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+	}
 	assert(dialog->sip_dlg_state == SIP_DLG_NEW);
 	dialog->sip_dlg_state = SIP_DLG_DESTROYED;
 	if (dialog->sip_dlg_type == SIP_UAC_DIALOG) {
@@ -1317,6 +1386,7 @@ sip_dialog_delete(_sip_dialog_t *dialog)
 		 */
 		if (SIP_IS_TIMER_RUNNING(dialog->sip_dlg_timer))
 			SIP_CANCEL_TIMER(dialog->sip_dlg_timer);
+		sip_write_to_log((void *)dialog, SIP_DIALOG_LOG, NULL, 0);
 		sip_release_dialog_res(dialog);
 		return;
 	}
@@ -1358,10 +1428,17 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 	_sip_dialog_t	*_dialog;
 	int		error;
 
+	_dialog = (_sip_dialog_t *)*sip_dialog;
+
+	(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
+	_dialog->sip_dlg_msgcnt++;
+	sip_add_log(&_dialog->sip_dlg_log[_dialog->sip_dlg_state],
+	    (sip_msg_t)sip_msg, _dialog->sip_dlg_msgcnt, SIP_DIALOG_LOG);
+	(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+
 	request = sip_msg_is_request((sip_msg_t)sip_msg, &error);
 	if (error != 0)
 		return (EINVAL);
-	_dialog = (_sip_dialog_t *)*sip_dialog;
 	if (request) {
 		uint32_t	cseq;
 		sip_method_t	method;
@@ -1432,6 +1509,11 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 			return (0);
 		}
+		if (_dialog->sip_dlg_state != SIP_DLG_EARLY &&
+		    _dialog->sip_dlg_state != SIP_DLG_CONFIRMED) {
+			sip_write_to_log((void *)_dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(_dialog->sip_dlg_state == SIP_DLG_EARLY ||
 		    _dialog->sip_dlg_state == SIP_DLG_CONFIRMED);
 		/*
@@ -1455,10 +1537,10 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 				if (_dialog->sip_dlg_state == SIP_DLG_EARLY) {
 					_dialog->sip_dlg_state =
 					    SIP_DLG_CONFIRMED;
-					(void) pthread_mutex_unlock(
-					    &_dialog->sip_dlg_mutex);
 					(void) sip_dlg_recompute_rset(_dialog,
 					    sip_msg, SIP_UAC_DIALOG);
+					(void) pthread_mutex_unlock(
+					    &_dialog->sip_dlg_mutex);
 					if (sip_dlg_ulp_state_cb != NULL) {
 						sip_dlg_ulp_state_cb(
 						    (sip_dialog_t)_dialog,
@@ -1468,6 +1550,13 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 					return (0);
 				} else if (_dialog->sip_dlg_new_local_contact
 				    != NULL) {
+					if (_dialog->sip_dlg_local_contact ==
+					    NULL) {
+						(void) sip_write_to_log((void *)
+						    _dialog, SIP_DIALOG_LOG |
+						    SIP_ASSERT_ERROR,  __FILE__,
+						    __LINE__);
+					}
 					assert(_dialog->sip_dlg_local_contact
 					    != NULL);
 					sip_free_header(_dialog->
@@ -1511,6 +1600,10 @@ sip_copy_partial_dialog(_sip_dialog_t *dialog)
 		    dialog->sip_dlg_req_uri.sip_str_len;
 	}
 	if (dialog->sip_dlg_route_set != NULL) {
+		if (dialog->sip_dlg_rset.sip_str_ptr == NULL) {
+			sip_write_to_log((void *)dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(dialog->sip_dlg_rset.sip_str_ptr != NULL);
 		new_dlg->sip_dlg_rset.sip_str_ptr =
 		    malloc(dialog->sip_dlg_rset.sip_str_len + 1);
@@ -1578,10 +1671,16 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 	boolean_t	decr_ref = B_FALSE;
 	int		error;
 
+	_dialog = (_sip_dialog_t *)dialog;
+	(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
+	_dialog->sip_dlg_msgcnt++;
+	sip_add_log(&_dialog->sip_dlg_log[_dialog->sip_dlg_state],
+	    (sip_msg_t)sip_msg, _dialog->sip_dlg_msgcnt, SIP_DIALOG_LOG);
+	(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+
 	isreq = sip_msg_is_request((sip_msg_t)sip_msg, &error);
 	if (error != 0)
 		return (dialog);
-	_dialog = (_sip_dialog_t *)dialog;
 	(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
 	if (isreq) {
 		method = sip_get_request_method((sip_msg_t)sip_msg, &error);
@@ -1610,6 +1709,10 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 		 * Let the user delete the dialog if it is not a 1XX/2XX resp
 		 * for an early dialog.
 		 */
+		if (isreq) {
+			sip_write_to_log((void *)_dialog, SIP_DIALOG_LOG |
+			    SIP_ASSERT_ERROR, __FILE__, __LINE__);
+		}
 		assert(!isreq);
 		if (SIP_OK_RESP(resp_code)) {
 			_dialog->sip_dlg_state = SIP_DLG_CONFIRMED;
@@ -1633,9 +1736,9 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 					    NULL;
 				}
 			}
-			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 			(void) sip_dlg_recompute_rset(_dialog, sip_msg,
 			    SIP_UAS_DIALOG);
+			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 			if (sip_dlg_ulp_state_cb != NULL) {
 				sip_dlg_ulp_state_cb(dialog, (sip_msg_t)sip_msg,
 				    prev_state, dialog->sip_dlg_state);
@@ -1779,4 +1882,24 @@ sip_dialog_add_new_contact(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 		dialog->sip_dlg_new_local_contact = nhdr;
 	}
 	(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
+}
+
+/*
+ * Given a state, return the  string - This is mostly for debug purposes
+ */
+char *
+sip_get_dialog_state_str(int state)
+{
+	switch (state) {
+		case SIP_DLG_NEW:
+			return ("SIP_DLG_NEW");
+		case SIP_DLG_EARLY:
+			return ("SIP_DLG_EARLY");
+		case SIP_DLG_CONFIRMED:
+			return ("SIP_DLG_CONFIRMED");
+		case SIP_DLG_DESTROYED:
+			return ("SIP_DLG_DESTROYED");
+		default:
+			return ("UNKNOWN");
+	}
 }

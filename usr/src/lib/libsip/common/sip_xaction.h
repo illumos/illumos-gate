@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,8 @@ typedef struct sip_xaction {
 	sip_timer_t		sip_xaction_TJ;
 	sip_timer_t		sip_xaction_TK;
 	void			*sip_xaction_ctxt;	/* currently unused */
+	int			sip_xaction_msgcnt;
+	sip_log_t		sip_xaction_log[SIP_SRV_NONINV_TERMINATED + 1];
 } sip_xaction_t;
 
 extern void		sip_xaction_init(int (*ulp_trans_err)(sip_transaction_t,

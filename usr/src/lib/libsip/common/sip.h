@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <stdio.h>
 
 /* Send a SIP message statefully */
 #define	SIP_SEND_STATEFUL	0x0001
@@ -231,6 +232,60 @@ typedef enum dialog_state {
 #define	SIP_URIERR_REGNAME	0x00000400 /* reg-name specific error */
 #define	SIP_URIERR_NOURI	0x00000800 /* No URI */
 #define	SIP_URIERR_MEMORY	0x00001000 /* out of memory */
+
+/* SIP traffic counters */
+typedef enum sip_traffic_counter_names {
+	SIP_TOTAL_BYTES_RCVD = 0,
+	SIP_TOTAL_BYTES_SENT,
+	SIP_TOTAL_REQ_RCVD,
+	SIP_TOTAL_REQ_SENT,
+	SIP_TOTAL_RESP_RCVD,
+	SIP_TOTAL_RESP_SENT,
+	SIP_ACK_REQ_RCVD,
+	SIP_ACK_REQ_SENT,
+	SIP_BYE_REQ_RCVD,
+	SIP_BYE_REQ_SENT,
+	SIP_CANCEL_REQ_RCVD,
+	SIP_CANCEL_REQ_SENT,
+	SIP_INFO_REQ_RCVD,
+	SIP_INFO_REQ_SENT,
+	SIP_INVITE_REQ_RCVD,
+	SIP_INVITE_REQ_SENT,
+	SIP_NOTIFY_REQ_RCVD,
+	SIP_NOTIFY_REQ_SENT,
+	SIP_OPTIONS_REQ_RCVD,
+	SIP_OPTIONS_REQ_SENT,
+	SIP_PRACK_REQ_RCVD,
+	SIP_PRACK_REQ_SENT,
+	SIP_REFER_REQ_RCVD,
+	SIP_REFER_REQ_SENT,
+	SIP_REGISTER_REQ_RCVD,
+	SIP_REGISTER_REQ_SENT,
+	SIP_SUBSCRIBE_REQ_RCVD,
+	SIP_SUBSCRIBE_REQ_SENT,
+	SIP_UPDATE_REQ_RCVD,
+	SIP_UPDATE_REQ_SENT,
+	SIP_1XX_RESP_RCVD,
+	SIP_1XX_RESP_SENT,
+	SIP_2XX_RESP_RCVD,
+	SIP_2XX_RESP_SENT,
+	SIP_3XX_RESP_RCVD,
+	SIP_3XX_RESP_SENT,
+	SIP_4XX_RESP_RCVD,
+	SIP_4XX_RESP_SENT,
+	SIP_5XX_RESP_RCVD,
+	SIP_5XX_RESP_SENT,
+	SIP_6XX_RESP_RCVD,
+	SIP_6xx_RESP_SENT,
+	SIP_COUNTER_START_TIME,
+	SIP_COUNTER_STOP_TIME
+} sip_traffic_counter_names_t;
+
+/* SIP Traffic counter group */
+#define	SIP_TRAFFIC_COUNTERS	0x0001	/* measures end to end SIP traffic */
+
+/* SIP Logging Levels */
+#define	SIP_DETAIL_LOGGING	0x0001	/* logs the entire sip message */
 
 #ifdef		__linux__
 #define		B_FALSE		0
@@ -629,9 +684,9 @@ extern sip_msg_t	sip_create_dialog_req(sip_method_t, sip_dialog_t,
 extern sip_msg_t	sip_create_dialog_req_nocontact(sip_method_t,
 			    sip_dialog_t, char *, char *, int, char *,
 			    uint32_t, int);
-
 extern int			sip_get_dialog_state(sip_dialog_t, int *);
 extern int			sip_get_dialog_method(sip_dialog_t, int *);
+extern int			sip_get_dialog_msgcnt(sip_dialog_t, int *);
 extern const sip_str_t		*sip_get_dialog_callid(sip_dialog_t, int *);
 extern const sip_str_t		*sip_get_dialog_local_tag(sip_dialog_t, int *);
 extern const sip_str_t		*sip_get_dialog_remote_tag(sip_dialog_t, int *);
@@ -699,6 +754,19 @@ extern void			sip_hold_trans(sip_transaction_t);
 extern void			sip_release_trans(sip_transaction_t);
 extern const struct sip_conn_object	*sip_get_trans_conn_obj(
 					    sip_transaction_t, int *);
+
+/* Logging functions */
+extern int			sip_enable_trans_logging(FILE *, int);
+extern int			sip_enable_dialog_logging(FILE *, int);
+extern void			sip_disable_trans_logging();
+extern void			sip_disable_dialog_logging();
+
+/* Traffic measurement functions */
+extern int		sip_get_counter_value(int, int, void *, size_t);
+extern int		sip_enable_counters(int);
+extern int		sip_disable_counters(int);
+
+
 #ifdef	__cplusplus
 }
 #endif
