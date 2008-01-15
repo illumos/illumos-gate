@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,6 @@ devinfo_help(void)
 	    "  -s   print summary of dev_info structures\n");
 }
 
-uintptr_t devinfo_root;		/* Address of root of devinfo tree */
 
 /*
  * Devinfo walker.
@@ -144,7 +143,13 @@ devinfo_parents_walk_init(mdb_walk_state_t *wsp)
 {
 	devinfo_parents_walk_data_t *dip;
 	uintptr_t addr;
+	uintptr_t devinfo_root;		/* Address of root of devinfo tree */
 	int i;
+
+	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
+		mdb_warn("failed to read 'top_devinfo'");
+		return (NULL);
+	}
 
 	if (wsp->walk_addr == NULL)
 		wsp->walk_addr = devinfo_root;
@@ -234,6 +239,12 @@ int
 devinfo_children_walk_init(mdb_walk_state_t *wsp)
 {
 	devinfo_children_walk_data_t *dic;
+	uintptr_t devinfo_root;		/* Address of root of devinfo tree */
+
+	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
+		mdb_warn("failed to read 'top_devinfo'");
+		return (NULL);
+	}
 
 	if (wsp->walk_addr == NULL)
 		wsp->walk_addr = devinfo_root;
@@ -790,7 +801,7 @@ devinfo_print_props(char *name, ddi_prop_t *p)
 		if (prop.prop_len > 0) {
 			prop_value = mdb_alloc(prop.prop_len, UM_SLEEP|UM_GC);
 			if (mdb_vread(prop_value, prop.prop_len,
-				    (uintptr_t)prop.prop_val) == -1) {
+			    (uintptr_t)prop.prop_val) == -1) {
 				mdb_warn("could not read property value at "
 				    "0x%p", prop.prop_val);
 				goto next;
@@ -972,7 +983,7 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 	if (dev->devi_global_prop_list != NULL) {
 		ddi_prop_list_t	plist;
 		if (mdb_vread((void*)&plist, sizeof (plist),
-			    (uintptr_t)dev->devi_global_prop_list) == -1) {
+		    (uintptr_t)dev->devi_global_prop_list) == -1) {
 			mdb_warn("failed to read global prop_list at %p",
 			    (uintptr_t)dev->devi_global_prop_list);
 			return (WALK_ERR);
@@ -1019,6 +1030,7 @@ int
 prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	devinfo_cb_data_t data;
+	uintptr_t devinfo_root;		/* Address of root of devinfo tree */
 	int status;
 
 	data.di_flags = DEVINFO_PARENT | DEVINFO_CHILD;
@@ -1028,6 +1040,11 @@ prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'p', MDB_OPT_CLRBITS, DEVINFO_CHILD, &data.di_flags,
 	    'c', MDB_OPT_CLRBITS, DEVINFO_PARENT, &data.di_flags, NULL) != argc)
 		return (DCMD_USAGE);
+
+	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
+		mdb_warn("failed to read 'top_devinfo'");
+		return (NULL);
+	}
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {
 		addr = devinfo_root;

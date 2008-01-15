@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3906,11 +3906,6 @@ static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
-		mdb_warn("failed to read 'top_devinfo'");
-		return (NULL);
-	}
-
 	if (findstack_init() != DCMD_OK)
 		return (NULL);
 
