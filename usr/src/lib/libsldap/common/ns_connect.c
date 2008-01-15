@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -896,8 +896,13 @@ findConnection(int flags, const char *serverAddr,
 		return (-1);
 	*conp = NULL;
 
-	/* if a new connection is requested, no need to continue */
-	if (flags & NS_LDAP_NEW_CONN)
+	/*
+	 * If a new connection is requested, no need to continue.
+	 * If the process is not nscd and is not requesting keep connections
+	 * alive, no need to continue.
+	 */
+	if ((flags & NS_LDAP_NEW_CONN) || (!__s_api_nscd_proc() &&
+	    !(flags & NS_LDAP_KEEP_CONN)))
 		return (-1);
 
 #ifdef DEBUG
