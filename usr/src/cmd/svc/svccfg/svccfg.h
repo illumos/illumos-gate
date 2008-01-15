@@ -343,6 +343,7 @@ void lscf_delprop(char *);
 void lscf_listsnap();
 void lscf_selectsnap(const char *);
 void lscf_revert(const char *);
+void lscf_refresh();
 char *filename_to_propname(const char *);
 int lscf_retrieve_hash(const char *, unsigned char *);
 int lscf_store_hash(const char *, unsigned char *);

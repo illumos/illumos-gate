@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ extern int yyerror(const char *);
 <INITIAL>listsnap	{ BEGIN WORD; return (SCC_LISTSNAP); }
 <INITIAL>selectsnap	{ BEGIN WORD; return (SCC_SELECTSNAP); }
 <INITIAL>revert		{ BEGIN WORD; return (SCC_REVERT); }
+<INITIAL>refresh	{ BEGIN WORD; return (SCC_REFRESH); }
 
 [^ \t\n">=()]+		{
 				if ((yylval.str = strdup(yytext)) == NULL) {

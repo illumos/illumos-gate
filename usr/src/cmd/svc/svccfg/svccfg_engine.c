@@ -223,6 +223,7 @@ static struct cmd_info {
 	{ "listsnap", CS_INST | CS_SNAP, NULL },
 	{ "selectsnap", CS_INST | CS_SNAP, NULL },
 	{ "revert", CS_INST | CS_SNAP, NULL },
+	{ "refresh", CS_INST, NULL },
 	{ NULL }
 };
 
@@ -732,6 +733,7 @@ help(int com)
 		    "Profile commands:	 apply extract\n"
 		    "Entity commands:	 list select unselect add delete\n"
 		    "Snapshot commands:	 listsnap selectsnap revert\n"
+		    "Instance commands:	 refresh\n"
 		    "Property group commands: listpg addpg delpg\n"
 		    "Property commands:	 listprop setprop delprop editprop\n"
 		    "Property value commands: addpropvalue delpropvalue "

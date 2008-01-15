@@ -4983,7 +4983,7 @@ upgrade_props(void *ent, scf_snaplevel_t *running, scf_snaplevel_t *snpl,
 }
 
 /*
- * Create or update a snapshot of inst.  Uses imp_snap.
+ * Create or update a snapshot of inst.  snap is a required scratch object.
  *
  * Returns
  *   0 - success
@@ -4994,11 +4994,11 @@ upgrade_props(void *ent, scf_snaplevel_t *running, scf_snaplevel_t *snpl,
  *   -1 - unknown libscf error (message printed)
  */
 static int
-take_snap(scf_instance_t *inst, const char *name)
+take_snap(scf_instance_t *inst, const char *name, scf_snapshot_t *snap)
 {
 again:
-	if (scf_instance_get_snapshot(inst, name, imp_snap) == 0) {
-		if (_scf_snapshot_take_attach(inst, imp_snap) != 0) {
+	if (scf_instance_get_snapshot(inst, name, snap) == 0) {
+		if (_scf_snapshot_take_attach(inst, snap) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_CONNECTION_BROKEN:
 			case SCF_ERROR_PERMISSION_DENIED:
@@ -5029,7 +5029,7 @@ again:
 			bad_error("scf_instance_get_snapshot", scf_error());
 		}
 
-		if (_scf_snapshot_take_new(inst, name, imp_snap) != 0) {
+		if (_scf_snapshot_take_new(inst, name, snap) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_EXISTS:
 				goto again;
@@ -5592,7 +5592,7 @@ nosnap:
 		if (g_verbose)
 			warn(gettext("Taking \"%s\" snapshot for %s.\n"),
 			    snap_initial, inst->sc_fmri);
-		r = take_snap(imp_inst, snap_initial);
+		r = take_snap(imp_inst, snap_initial, imp_snap);
 		switch (r) {
 		case 0:
 			break;
@@ -6090,7 +6090,7 @@ lscf_service_import(void *v, void *pvt)
 			    "Taking \"%s\" snapshot for svc:/%s:%s.\n"),
 			    snap_previous, s->sc_name, imp_str);
 
-		r = take_snap(imp_inst, snap_previous);
+		r = take_snap(imp_inst, snap_previous, imp_snap);
 		switch (r) {
 		case 0:
 			break;
@@ -6184,7 +6184,7 @@ lscf_service_import(void *v, void *pvt)
 		if (g_verbose)
 			warn(gettext("Taking \"%s\" snapshot for "
 			    "new service %s.\n"), snap_previous, inst->sc_fmri);
-		r = take_snap(imp_inst, snap_previous);
+		r = take_snap(imp_inst, snap_previous, imp_snap);
 		switch (r) {
 		case 0:
 			break;
@@ -12321,6 +12321,105 @@ out:
 	scf_snapshot_destroy(prev);
 	if (snap != cur_snap)
 		scf_snapshot_destroy(snap);
+}
+
+void
+lscf_refresh(void)
+{
+	ssize_t fmrilen;
+	size_t bufsz;
+	char *fmribuf;
+	int r;
+	scf_snapshot_t *snap;
+
+	lscf_prep_hndl();
+
+	if (cur_inst == NULL) {
+		semerr(gettext("Instance not selected.\n"));
+		return;
+	}
+
+	bufsz = max_scf_fmri_len + 1;
+	fmribuf = safe_malloc(bufsz);
+	fmrilen = scf_instance_to_fmri(cur_inst, fmribuf, bufsz);
+	if (fmrilen < 0) {
+		free(fmribuf);
+		if (scf_error() != SCF_ERROR_DELETED)
+			scfdie();
+		scf_instance_destroy(cur_inst);
+		cur_inst = NULL;
+		warn(emsg_deleted);
+		return;
+	}
+	assert(fmrilen < bufsz);
+
+	/*
+	 * If the repository is the active one, a refresh of the instance is
+	 * requested.  For alternate repositories, the refresh command simply
+	 * takes a new 'running' snapshot, so the refresh method is not run.
+	 */
+	if (est->sc_repo_filename == NULL) {
+		r = refresh_entity(0, cur_inst, fmribuf, NULL, NULL, NULL);
+
+		switch (r) {
+		case 0:
+			break;
+
+		case ECONNABORTED:
+			warn(gettext("Could not refresh %s "
+			    "(repository connection broken).\n"), fmribuf);
+			break;
+
+		case ECANCELED:
+			warn(emsg_deleted);
+			break;
+
+		case EPERM:
+			warn(gettext("Could not refresh %s "
+			    "(permission denied).\n"), fmribuf);
+			break;
+
+		case EACCES:
+		default:
+			bad_error("refresh_entity", scf_error());
+		}
+
+	} else {
+		if ((snap = scf_snapshot_create(g_hndl)) == NULL)
+			scfdie();
+		r = take_snap(cur_inst, snap_running, snap);
+		scf_snapshot_destroy(snap);
+
+		switch (r) {
+		case 0:
+			break;
+
+		case ECONNABORTED:
+			warn(gettext("Could not refresh %s "
+			    "(repository connection broken).\n"), fmribuf);
+			break;
+
+		case ECANCELED:
+			warn(emsg_deleted);
+			break;
+
+		case EPERM:
+			warn(gettext("Could not refresh %s "
+			    "(permission denied).\n"), fmribuf);
+			break;
+
+		case ENOSPC:
+			warn(gettext("Could not refresh %s "
+			    "(repository server out of resources).\n"),
+			    fmribuf);
+			break;
+
+		default:
+			bad_error("take_snap", scf_error());
+		}
+	}
+
+	free(fmribuf);
 }
 
 #ifndef NATIVE_BUILD

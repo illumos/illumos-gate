@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ uu_list_pool_t *string_pool;
 %token SCC_LISTPG SCC_ADDPG SCC_DELPG
 %token SCC_LISTPROP SCC_SETPROP SCC_DELPROP SCC_EDITPROP
 %token SCC_ADDPROPVALUE SCC_DELPROPVALUE SCC_SETENV SCC_UNSETENV
-%token SCC_LISTSNAP SCC_SELECTSNAP SCC_REVERT
+%token SCC_LISTSNAP SCC_SELECTSNAP SCC_REVERT SCC_REFRESH
 %token SCS_REDIRECT SCS_NEWLINE SCS_EQUALS SCS_LPAREN SCS_RPAREN
 %token SCV_WORD SCV_STRING
 
@@ -103,6 +103,7 @@ command : terminator
 	| listsnap_cmd
 	| selectsnap_cmd
 	| revert_cmd
+	| refresh_cmd
 	| unknown_cmd
 	| error terminator	{ semerr(gettext("Syntax error.\n")); }
 
@@ -462,6 +463,8 @@ selectsnap_cmd : SCC_SELECTSNAP opt_word terminator
 revert_cmd: SCC_REVERT opt_word terminator	{ lscf_revert($2); free ($2); }
 	| SCC_REVERT error terminator		{ synerr(SCC_REVERT); return(0); }
 
+refresh_cmd: SCC_REFRESH terminator	{ lscf_refresh(); }
+	| SCC_REFRESH error terminator	{ synerr(SCC_REFRESH); return(0); }
 
 terminator : SCS_NEWLINE
 
@@ -535,3 +538,4 @@ command_token : SCC_VALIDATE	{ $$ = SCC_VALIDATE; }
 	| SCC_LISTSNAP		{ $$ = SCC_LISTSNAP; }
 	| SCC_SELECTSNAP	{ $$ = SCC_SELECTSNAP; }
 	| SCC_REVERT		{ $$ = SCC_REVERT; }
+	| SCC_REFRESH		{ $$ = SCC_REFRESH; }

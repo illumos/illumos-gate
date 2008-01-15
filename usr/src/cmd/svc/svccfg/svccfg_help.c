@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,13 @@ struct help_message help_messages[] = {
 	{ SCC_REVERT, "revert [snapshot]\n\n"
 "Change the properties of the currently selected instance and its ancestors\n"
 "to those in a snapshot, or the currently selected snapshot by default."
+	},
+	{ SCC_REFRESH, "refresh\n\n"
+"Commit the values from the current configuration to the running\n"
+"snapshot, making them available for use by the currently selected\n"
+"instance.  If the repository subcommand has not been used to select\n"
+"a repository, inform the instance's restarter to re-read the updated\n"
+"configuration."
 	},
 	{ 0, NULL }
 };
