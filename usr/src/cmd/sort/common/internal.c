@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,8 +359,6 @@ internal_sort(sort_t *S)
 
 		sort_mem = S->m_memory_available - input_mem;
 
-		memory_left = ST_MEM_AVAIL;
-
 		currently_primed = SOP_PRIME(cur_stream);
 
 		sort_stream = safe_realloc(sort_stream, sizeof (stream_t));
@@ -375,10 +372,14 @@ internal_sort(sort_t *S)
 		prev_sort_buf = sort_stream->s_buffer;
 		prev_sort_mem = sort_stream->s_buffer_size;
 
-		while (memory_left == ST_MEM_AVAIL) {
-			if (currently_primed == PRIME_SUCCEEDED)
-				memory_left = stream_insert(S, cur_stream,
-				    sort_stream);
+		for (;;) {
+			if (currently_primed == PRIME_SUCCEEDED) {
+				memory_left =
+				    stream_insert(S, cur_stream, sort_stream);
+
+				if (memory_left != ST_MEM_AVAIL)
+					break;
+			}
 
 			if (SOP_EOS(cur_stream)) {
 				if (cur_stream->s_consumer == NULL) {
@@ -408,12 +409,28 @@ internal_sort(sort_t *S)
 		radix_quicksort(sort_stream, coll_flags);
 
 #ifndef DEBUG_NO_CACHE_TEMP
-		if ((cur_stream == NULL ||
-		    ((cur_stream->s_status & STREAM_OPEN) &&
-		    (SOP_EOS(cur_stream) && cur_stream->s_next == NULL)))) {
+		/*
+		 * cur_stream is set to NULL only when memory isn't filled and
+		 * no more input streams remain.  In this case, we can safely
+		 * cache the sort results.
+		 *
+		 * Otherwise, we have either exhausted available memory or
+		 * available file descriptors.  If we've use all the available
+		 * file descriptors, we aren't able to open the next input file.
+		 * In this case, we can't cache the sort results, because more
+		 * input files remain.
+		 *
+		 * If memory was filled, then there must be at least one
+		 * leftover line unprocessed in the input stream, even though
+		 * stream will indicated EOS if asked. We can't cache in this
+		 * case, as we need one more round for the pending line or
+		 * lines.
+		 */
+		if (cur_stream == NULL) {
 			(void) stream_push_to_temporary(&S->m_temporary_streams,
 			    sort_stream, ST_CACHE |
 			    (S->m_single_byte_locale ? 0 : ST_WIDE));
+			break;
 		} else {
 #endif
 			release_file_descriptor();
@@ -432,18 +449,6 @@ internal_sort(sort_t *S)
 #ifndef DEBUG_NO_CACHE_TEMP
 		}
 #endif
-		if (cur_stream == NULL)
-			break;
-
-		if (cur_stream->s_status & STREAM_OPEN &&
-		    SOP_EOS(cur_stream)) {
-			if (cur_stream->s_consumer == NULL) {
-				(void) SOP_FREE(cur_stream);
-				(void) SOP_CLOSE(cur_stream);
-			}
-
-			cur_stream = cur_stream->s_next;
-		}
 	}
 
 	release_file_descriptor();
