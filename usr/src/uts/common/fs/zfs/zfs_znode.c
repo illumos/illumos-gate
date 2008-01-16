@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -844,6 +844,7 @@ zfs_rezget(znode_t *zp)
 
 	zfs_znode_dmu_init(zp, db);
 	zp->z_unlinked = (zp->z_phys->zp_links == 0);
+	zp->z_blksz = doi.doi_data_block_size;
 
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 
