@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -180,11 +180,11 @@ extern page_t *page_get_mnode_cachelist(uint_t, uint_t, int, int);
  * color using color equivalency mask
  */
 #define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask, it)    \
-	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
 	{								      \
 		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
 		pfn_t	spfn = pfn >> pfn_shift;                              \
 		pfn_t	stride = (ceq_mask) + 1;                              \
+		ASSERT(((color) & ~(ceq_mask)) == 0);                         \
 		ASSERT((((ceq_mask) + 1) & (ceq_mask)) == 0);                 \
 		if (((spfn ^ (color)) & (ceq_mask)) == 0) {                   \
 			pfn += stride << pfn_shift;                           \

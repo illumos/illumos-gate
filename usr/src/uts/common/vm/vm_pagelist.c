@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3452,9 +3452,10 @@ page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
 		randpfn = ((randpfn % (hi - lo)) + lo) & ~(skip - 1);
 		MEM_NODE_ITERATOR_INIT(randpfn, mnode, &it);
 		if (ceq_mask || interleaved_mnodes) {
-			if (randpfn != (pfn_t)-1)
+			if (randpfn != (pfn_t)-1) {
 				PAGE_NEXT_PFN_FOR_COLOR(randpfn, szc, bin,
 				    ceq_mask, color_mask, &it);
+			}
 			if (randpfn >= hi) {
 				randpfn = lo;
 				MEM_NODE_ITERATOR_INIT(randpfn, mnode, &it);

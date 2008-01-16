@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,22 +245,25 @@ extern uint_t  page_pfn_2_color_cpu(pfn_t, uchar_t, void *);
  * This macro calculates the next sequential pfn with the specified
  * color using color equivalency mask
  */
-#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask, it)    \
-	ASSERT(((color) & ~(ceq_mask)) == 0);                                 \
-	if (&page_next_pfn_for_color_cpu == NULL) {                           \
-		uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);                     \
-		pfn_t	spfn = pfn >> pfn_shift;                              \
-		pfn_t	stride = (ceq_mask) + 1;                              \
-		ASSERT((((ceq_mask) + 1) & (ceq_mask)) == 0);                 \
-		if (((spfn ^ (color)) & (ceq_mask)) == 0) {                   \
-			pfn += stride << pfn_shift;                           \
-		} else {                                                      \
-			pfn = (spfn & ~(pfn_t)(ceq_mask)) | (color);          \
-			pfn = (pfn > spfn ? pfn : pfn + stride) << pfn_shift; \
-		}                                                             \
-	} else {                                                              \
-	    pfn = page_next_pfn_for_color_cpu(pfn, szc, color,		      \
-		ceq_mask, color_mask, it);				      \
+#define	PAGE_NEXT_PFN_FOR_COLOR(pfn, szc, color, ceq_mask, color_mask, it)   \
+	{                                                                    \
+		ASSERT(((color) & ~(ceq_mask)) == 0);                        \
+		if (&page_next_pfn_for_color_cpu == NULL) {                  \
+			uint_t	pfn_shift = PAGE_BSZS_SHIFT(szc);            \
+			pfn_t	spfn = pfn >> pfn_shift;                     \
+			pfn_t	stride = (ceq_mask) + 1;                     \
+			ASSERT((((ceq_mask) + 1) & (ceq_mask)) == 0);        \
+			if (((spfn ^ (color)) & (ceq_mask)) == 0) {          \
+				pfn += stride << pfn_shift;                  \
+			} else {                                             \
+				pfn = (spfn & ~(pfn_t)(ceq_mask)) | (color); \
+				pfn = (pfn > spfn ? pfn : pfn + stride) <<   \
+				    pfn_shift;                               \
+			}                                                    \
+		} else {                                                     \
+		    pfn = page_next_pfn_for_color_cpu(pfn, szc, color,	     \
+			ceq_mask, color_mask, it);			     \
+		}                                                            \
 	}
 
 /* get the color equivalency mask for the next szc */
