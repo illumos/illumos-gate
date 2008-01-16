@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +92,7 @@ strsave(char *instring)
 {
 	char	*outstring;
 	(void) strcpy(outstring = Calloc(1, strlen(instring) + 1),
-		instring);
+	    instring);
 	return (outstring);
 }
 /*
@@ -258,9 +257,9 @@ printerrors(boolean look_at_subclass, int errorc, Eptr errorv[])
 		if (look_at_subclass && errorp->error_s_class == C_DUPL)
 			continue;
 		(void) printf("Error %d, (%s error) [%s], text = \"",
-			i,
-			class_table[errorp->error_e_class],
-			lang_table[errorp->error_language].lang_name);
+		    i,
+		    class_table[errorp->error_e_class],
+		    lang_table[errorp->error_language].lang_name);
 		wordvprint(stdout, errorp->error_lgtext, errorp->error_text);
 		(void) printf("\"\n");
 	}
@@ -287,18 +286,16 @@ void
 wordvbuild(char *string, int *r_wordc, char ***r_wordv)
 {
 	char 	*cp;
-		char	*saltedbuffer;
-		char	**wordv;
-		int	wordcount;
-		int	wordindex;
+	char	*saltedbuffer;
+	char	**wordv;
+	int	wordcount;
+	int	wordindex;
 
 	saltedbuffer = strsave(string);
 	for (wordcount = 0, cp = saltedbuffer; *cp; wordcount++) {
 		while (*cp && isspace(*cp))
 			cp++;
-		if (*cp == 0)
-			break;
-		while (!isspace(*cp))
+		while (*cp && !isspace(*cp))
 			cp++;
 	}
 	wordv = Calloc(wordcount + 1, sizeof (char *));
@@ -309,7 +306,7 @@ wordvbuild(char *string, int *r_wordc, char ***r_wordv)
 		if (*cp == 0)
 			break;
 		wordv[wordindex] = cp;
-		while (!isspace(*cp))
+		while (*cp && !isspace(*cp))
 			cp++;
 		*cp++ = '\0';
 	}
