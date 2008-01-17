@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
-#include <sys/cmn_err.h>
 #include <sys/kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/atomic.h>
@@ -369,6 +368,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 	mutex_enter(&ssl->kssl_lock);
 
 	if (ssl->close_notify == B_TRUE) {
+		DTRACE_PROBE(kssl_err__close_notify);
 		goto sendnewalert;
 	}
 
@@ -390,6 +390,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 	if ((!ssl->activeinput) && (ssl->rec_ass_head == NULL) &&
 	    ((mp != NULL) && (mplen = MBLKL(mp)) > SSL3_HDR_LEN)) {
 
+		DTRACE_PROBE1(kssl_mblk__fast_path, mblk_t *, mp);
 		content_type = (SSL3ContentType)mp->b_rptr[0];
 
 		if ((content_type == content_application_data) &&
@@ -418,6 +419,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 	if (recmp == NULL) {
 		ssl->activeinput = B_FALSE;
 		if (ssl->alert_sendbuf != NULL) {
+			DTRACE_PROBE(kssl_err__alert_to_send);
 			goto sendalert;
 		}
 		/* Not even a complete header yet. wait for the rest */
@@ -426,6 +428,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 	}
 
 	do {
+		DTRACE_PROBE1(kssl_mblk__kssl_input_cycle, mblk_t *, recmp);
 		content_type = (SSL3ContentType)recmp->b_rptr[0];
 
 		switch (content_type) {
@@ -440,6 +443,7 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 			 */
 			ssl->activeinput = B_FALSE;
 			if (ssl->hs_waitstate != idle_handshake) {
+				DTRACE_PROBE(kssl_err__waitstate_not_idle);
 				goto sendnewalert;
 			}
 			outmp = recmp;
@@ -468,11 +472,13 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 			break;
 		default:
 			ssl->activeinput = B_FALSE;
+			DTRACE_PROBE(kssl_err__invalid_content_type);
 			goto sendnewalert;
 		}
 
 		/* Priority to Alert messages */
 		if (ssl->alert_sendbuf != NULL) {
+			DTRACE_PROBE(kssl_err__alert_to_send_cycle);
 			goto sendalert;
 		}
 
@@ -532,12 +538,22 @@ sendalert:
 }
 
 /*
- * Decrypt and verify the MAC of an incoming chain of application_data record.
- * Each block has exactly one SSL record.
- * This routine recycles its incoming mblk, and flags it as DBLK_COOKED
+ * Process mblk b_cont chain returned from stream head. The chain could
+ * contain a mixture (albeit continuous) of processed and unprocessed
+ * mblks. This situation could happen when more data was available in
+ * stream head queue than requested. In such case the rest of processed
+ * data would be putback().
+ *
+ * Processed mblks in this function contain either a full or partial portion
+ * of a decrypted and verified SSL record. The former case is produced
+ * by the function itself, the latter case is explained above.
+ *
+ * In case of unprocessed mblks, decrypt and verify the MAC of an incoming
+ * chain of application_data record. Each block has exactly one SSL record.
+ * This routine recycles incoming mblks, and flags them as DBLK_COOKED.
  */
 kssl_cmd_t
-kssl_handle_record(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
+kssl_handle_mblk(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 {
 	uchar_t *recend, *rec_sz_p;
 	uchar_t *real_recend;
@@ -561,9 +577,22 @@ kssl_handle_record(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 	mp = firstmp = *mpp;
 	*outmp = NULL;
 
+	/*
+	 * Skip over already processed mblks. This prevents a case where
+	 * struiocopyout() copies unprocessed data to userland.
+	 */
+	while ((mp != NULL) && (DB_FLAGS(mp) & DBLK_COOKED)) {
+		ASSERT(DB_TYPE(mp) == M_DATA);
+		DTRACE_PROBE1(kssl_mblk__already_processed_mblk, mblk_t *, mp);
+		mp = mp->b_cont;
+	}
+
 more:
 
 	while (mp != NULL) {
+		/* only unprocessed mblks should reach us */
+		ASSERT(DB_TYPE(mp) == M_DATA);
+		ASSERT(!(DB_FLAGS(mp) & DBLK_COOKED));
 
 		if (DB_REF(mp) > 1) {
 			/*
@@ -584,6 +613,7 @@ more:
 			mp = copybp;
 		}
 
+		DTRACE_PROBE1(kssl_mblk__handle_record_cycle, mblk_t *, mp);
 		content_type = (SSL3ContentType)mp->b_rptr[0];
 
 		switch (content_type) {
@@ -614,6 +644,7 @@ more:
 
 			if (ssl->alert_sendbuf != NULL) {
 				mp = nextmp;
+				DTRACE_PROBE(kssl_err__alert_after_handle_any);
 				goto sendalert;
 			}
 			mutex_exit(&ssl->kssl_lock);
@@ -627,6 +658,7 @@ more:
 		default:
 			desc = decode_error;
 			KSSL_COUNTER(internal_errors, 1);
+			DTRACE_PROBE(kssl_err__decode_error);
 			goto makealert;
 		}
 
@@ -647,6 +679,7 @@ more:
 		if (recend != mp->b_wptr) {
 			desc = decode_error;
 			KSSL_COUNTER(internal_errors, 1);
+			DTRACE_PROBE(kssl_err__not_complete_record);
 			goto makealert;
 		}
 
@@ -661,10 +694,9 @@ more:
 			 */
 			if ((spec->cipher_type == type_block) &&
 			    ((rec_sz & (spec->cipher_bsize - 1)) != 0)) {
-#ifdef	DEBUG
-				cmn_err(CE_WARN, "kssl_handle_record: "
-				    "bad record size");
-#endif	/* DEBUG */
+				DTRACE_PROBE2(kssl_err__bad_record_size,
+				    uint16_t, rec_sz,
+				    int, spec->cipher_bsize);
 				KSSL_COUNTER(record_decrypt_failure, 1);
 				mp->b_rptr = recend;
 				desc = decrypt_error;
@@ -680,11 +712,9 @@ more:
 			error = crypto_decrypt_update(spec->cipher_ctx,
 			    &cipher_data, NULL, NULL);
 			if (CRYPTO_ERR(error)) {
-#ifdef	DEBUG
-				cmn_err(CE_WARN, "kssl_handle_record: "
-				    "crypto_decrypt_update failed: 0x%02X",
-				    error);
-#endif	/* DEBUG */
+				DTRACE_PROBE1(
+				    kssl_err__crypto_decrypt_update_failed,
+				    int, error);
 				KSSL_COUNTER(record_decrypt_failure, 1);
 				mp->b_rptr = recend;
 				desc = decrypt_error;
@@ -695,6 +725,7 @@ more:
 			uint_t pad_sz = recend[-1];
 			pad_sz++;
 			if (pad_sz + mac_sz > rec_sz) {
+				DTRACE_PROBE(kssl_err__pad_mac_bigger);
 				mp->b_rptr = recend;
 				desc = bad_record_mac;
 				goto makealert;
@@ -705,6 +736,7 @@ more:
 		if (mac_sz != 0) {
 			uchar_t hash[MAX_HASH_LEN];
 			if (rec_sz < mac_sz) {
+				DTRACE_PROBE(kssl_err__pad_smaller_mac);
 				mp->b_rptr = real_recend;
 				desc = bad_record_mac;
 				goto makealert;
@@ -712,16 +744,15 @@ more:
 			rec_sz -= mac_sz;
 			recend -= mac_sz;
 			ret = kssl_compute_record_mac(ssl, KSSL_READ,
-				ssl->seq_num[KSSL_READ], content_type,
-				version, mp->b_rptr, rec_sz, hash);
+			    ssl->seq_num[KSSL_READ], content_type,
+			    version, mp->b_rptr, rec_sz, hash);
 			if (ret != CRYPTO_SUCCESS ||
 			    bcmp(hash, recend, mac_sz)) {
+				DTRACE_PROBE1(kssl_mblk__MACmismatch_handlerec,
+				    mblk_t *, mp);
 				mp->b_rptr = real_recend;
 				desc = bad_record_mac;
-#ifdef	DEBUG
-				cmn_err(CE_WARN, "kssl_handle_record: "
-					"msg MAC mismatch");
-#endif	/* DEBUG */
+				DTRACE_PROBE(kssl_err__msg_MAC_mismatch);
 				KSSL_COUNTER(verify_mac_failure, 1);
 				goto makealert;
 			}
@@ -729,6 +760,8 @@ more:
 		}
 
 		if (ssl->hs_waitstate != idle_handshake) {
+			DTRACE_PROBE1(kssl_err__unexpected_msg,
+			    SSL3WaitState, ssl->hs_waitstate);
 			mp->b_rptr = real_recend;
 			desc = unexpected_message;
 			goto makealert;
@@ -736,6 +769,7 @@ more:
 		mp->b_wptr = recend;
 
 		DB_FLAGS(mp) |= DBLK_COOKED;
+		DTRACE_PROBE1(kssl_mblk__dblk_cooked, mblk_t *, mp);
 		KSSL_COUNTER(appdata_record_ins, 1);
 
 		prevmp = mp;
@@ -753,10 +787,7 @@ makealert:
 
 	if (ssl->alert_sendbuf == NULL) {
 		/* internal memory allocation failure. just return. */
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "kssl_handle_record: "
-		    "alert message allocation failed");
-#endif	/* DEBUG */
+		DTRACE_PROBE(kssl_err__alert_msg_alloc_failed);
 		mutex_exit(&ssl->kssl_lock);
 
 		if (mp) {
@@ -830,11 +861,12 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			/* V2 compatible ClientHello */
 			if (mp->b_rptr[3] == 0x03 &&
 			    (mp->b_rptr[4] == 0x01 ||
-				mp->b_rptr[4] == 0x00)) {
+			    mp->b_rptr[4] == 0x00)) {
 				ssl->major_version = version[0] = mp->b_rptr[3];
 				ssl->minor_version = version[1] = mp->b_rptr[4];
 			} else {
 			/* We don't support "pure" SSLv2 */
+				DTRACE_PROBE(kssl_err__no_SSLv2);
 				desc = protocol_version;
 				goto sendalert;
 			}
@@ -858,6 +890,9 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 	 */
 	ASSERT(recend == mp->b_wptr);
 	if (recend != mp->b_wptr) {
+		DTRACE_PROBE3(kssl_mblk__handle_any_record_recszerr,
+		    mblk_t *, mp, int, rhsz, int, rec_sz);
+		DTRACE_PROBE(kssl_err__record_size);
 		desc = decode_error;
 		KSSL_COUNTER(internal_errors, 1);
 		goto sendalert;
@@ -872,10 +907,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 		 */
 		if ((spec->cipher_type == type_block) &&
 		    ((rec_sz & (spec->cipher_bsize - 1)) != 0)) {
-#ifdef	DEBUG
-			cmn_err(CE_WARN, "kssl_handle_any_record: "
-			    "bad record size");
-#endif	/* DEBUG */
+			DTRACE_PROBE2(kssl_err__bad_record_size,
+			    uint16_t, rec_sz, int, spec->cipher_bsize);
 			KSSL_COUNTER(record_decrypt_failure, 1);
 			mp->b_rptr = recend;
 			desc = decrypt_error;
@@ -888,11 +921,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 		error = crypto_decrypt_update(spec->cipher_ctx,
 		    &spec->cipher_data, NULL, NULL);
 		if (CRYPTO_ERR(error)) {
-#ifdef	DEBUG
-			cmn_err(CE_WARN,
-				"kssl_handle_any_record: crypto_decrypt_update "
-				"failed: 0x%02X", error);
-#endif	/* DEBUG */
+			DTRACE_PROBE1(kssl_err__crypto_decrypt_update_failed,
+			    int, error);
 			KSSL_COUNTER(record_decrypt_failure, 1);
 			mp->b_rptr = recend;
 			desc = decrypt_error;
@@ -903,6 +933,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 		uint_t pad_sz = recend[-1];
 		pad_sz++;
 		if (pad_sz + mac_sz > rec_sz) {
+			DTRACE_PROBE2(kssl_err__pad_mac_mismatch,
+			    int, pad_sz, int, mac_sz);
 			mp->b_rptr = recend;
 			desc = bad_record_mac;
 			goto sendalert;
@@ -913,6 +945,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 	if (mac_sz != 0) {
 		uchar_t hash[MAX_HASH_LEN];
 		if (rec_sz < mac_sz) {
+			DTRACE_PROBE1(kssl_err__mac_size_too_big,
+			    int, mac_sz);
 			mp->b_rptr = real_recend;
 			desc = bad_record_mac;
 			goto sendalert;
@@ -920,25 +954,28 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 		rec_sz -= mac_sz;
 		recend -= mac_sz;
 		ret = kssl_compute_record_mac(ssl, KSSL_READ,
-			ssl->seq_num[KSSL_READ], content_type,
-			version, mp->b_rptr, rec_sz, hash);
+		    ssl->seq_num[KSSL_READ], content_type,
+		    version, mp->b_rptr, rec_sz, hash);
 		if (ret != CRYPTO_SUCCESS ||
 		    bcmp(hash, recend, mac_sz)) {
+			DTRACE_PROBE1(kssl_mblk__MACmismatch_anyrecord,
+			    mblk_t *, mp);
 			mp->b_rptr = real_recend;
 			desc = bad_record_mac;
-#ifdef	DEBUG
-			cmn_err(CE_WARN, "kssl_handle_any_record: "
-				"msg MAC mismatch");
-#endif	/* DEBUG */
+			DTRACE_PROBE(kssl_err__msg_MAC_mismatch);
 			KSSL_COUNTER(verify_mac_failure, 1);
 			goto sendalert;
 		}
 		ssl->seq_num[KSSL_READ]++;
+		DTRACE_PROBE1(kssl_mblk__after_compute_MAC,
+		    mblk_t *, mp);
 	}
 
 	switch (content_type) {
 	case content_handshake:
 		do {
+			DTRACE_PROBE1(kssl_mblk__content_handshake_cycle,
+			    mblk_t *, mp);
 			if (error != 0 ||
 			    /* ignore client renegotiation for now */
 			    ssl->hs_waitstate == idle_handshake) {
@@ -1038,7 +1075,9 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			return (KSSL_CMD_NONE);
 		}
 	case content_alert:
+		DTRACE_PROBE1(kssl_mblk__content_alert, mblk_t *, mp);
 		if (rec_sz != 2) {
+			DTRACE_PROBE(kssl_err__illegal_param);
 			mp->b_rptr = real_recend;
 			desc = illegal_parameter;
 			goto sendalert;
@@ -1052,6 +1091,9 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 					    ssl->kssl_entry);
 					ssl->sid.cached = B_FALSE;
 				}
+				DTRACE_PROBE2(kssl_err__bad_content_alert,
+				    SSL3AlertLevel, level,
+				    SSL3AlertDescription, desc);
 				ssl->fatal_alert = B_TRUE;
 				error = EBADMSG;
 				goto error;
@@ -1063,6 +1105,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			}
 		}
 	case content_change_cipher_spec:
+		DTRACE_PROBE1(kssl_mblk__change_cipher_spec,
+		    mblk_t *, mp);
 		if (ssl->hs_waitstate != wait_change_cipher) {
 			desc = unexpected_message;
 		} else if (rec_sz != 1 || *mp->b_rptr != 1) {
@@ -1072,11 +1116,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			ssl->hs_waitstate = wait_finished;
 			ssl->seq_num[KSSL_READ] = 0;
 			if ((error = kssl_spec_init(ssl, KSSL_READ)) != 0) {
-#ifdef	DEBUG
-				cmn_err(CE_WARN,
-					"kssl_spec_init returned error "
-					"0x%02X", error);
-#endif	/* DEBUG */
+				DTRACE_PROBE1(kssl_err__kssl_spec_init_error,
+				    int, error);
 				goto error;
 			}
 			ssl->activeinput = B_FALSE;
@@ -1084,10 +1125,14 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			return (KSSL_CMD_NONE);
 		}
 		mp->b_rptr = real_recend;
+		DTRACE_PROBE(kssl_err__change_cipher_spec);
 		goto sendalert;
 
 	case content_application_data:
+		DTRACE_PROBE1(kssl_mblk__content_app_data,
+		    mblk_t *, mp);
 		if (ssl->hs_waitstate != idle_handshake) {
+			DTRACE_PROBE(kssl_err__content_app_data);
 			mp->b_rptr = real_recend;
 			desc = unexpected_message;
 			goto sendalert;
@@ -1098,6 +1143,8 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 		return (KSSL_CMD_DELIVER_PROXY);
 
 	case content_handshake_v2:
+		DTRACE_PROBE1(kssl_mblk__content_handshake_v2,
+		    mblk_t *, mp);
 		error = kssl_handle_v2client_hello(ssl, mp, rec_sz);
 		if (error == SSL_MISS) {
 			mp->b_rptr = save_rptr;
@@ -1105,11 +1152,14 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 			KSSL_COUNTER(fallback_connections, 1);
 			return (KSSL_CMD_NOT_SUPPORTED);
 		} else if (error != 0) {
+			DTRACE_PROBE(kssl_err__v2client_hello_failed);
 			goto error;
 		}
 		freeb(mp);
 		return (KSSL_CMD_SEND);
 	default:
+		DTRACE_PROBE1(kssl_mblk__unexpected_msg,
+		    mblk_t *, mp);
 		mp->b_rptr = real_recend;
 		desc = unexpected_message;
 		break;

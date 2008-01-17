@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -625,6 +625,7 @@ kssl_prov_evnt(uint32_t event, void *event_arg)
 			continue;
 
 		s = ep->ke_sessinfo;
+		DTRACE_PROBE1(kssl_entry_cycle, kssl_entry_t *, ep);
 		switch (event) {
 		case CRYPTO_EVENT_PROVIDER_UNREGISTERED:
 			if (s->is_valid_handle && s->prov == prov) {

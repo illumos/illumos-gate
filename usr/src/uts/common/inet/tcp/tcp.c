@@ -102,7 +102,6 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <inet/kssl/ksslapi.h>
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
-#include <sys/sdt.h>
 #include <rpc/pmap_prot.h>
 
 /*
@@ -11718,7 +11717,9 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 		cnt += msgdsize(mp);
 #endif
 		/* Does this need SSL processing first? */
-		if ((tcp->tcp_kssl_ctx  != NULL) && (DB_TYPE(mp) == M_DATA)) {
+		if ((tcp->tcp_kssl_ctx != NULL) && (DB_TYPE(mp) == M_DATA)) {
+			DTRACE_PROBE1(kssl_mblk__ksslinput_rcvdrain,
+			    mblk_t *, mp);
 			tcp_kssl_input(tcp, mp);
 			continue;
 		}
@@ -14982,6 +14983,8 @@ est:
 		 */
 
 		if (tcp->tcp_kssl_pending) {
+			DTRACE_PROBE1(kssl_mblk__ksslinput_pending,
+			    mblk_t *, mp);
 			tcp_kssl_input(tcp, mp);
 		} else {
 			tcp_rcv_enqueue(tcp, mp, seg_len);
@@ -15006,8 +15009,10 @@ est:
 			}
 
 			/* Does this need SSL processing first? */
-			if ((tcp->tcp_kssl_ctx  != NULL) &&
+			if ((tcp->tcp_kssl_ctx != NULL) &&
 			    (DB_TYPE(mp) == M_DATA)) {
+				DTRACE_PROBE1(kssl_mblk__ksslinput_data1,
+				    mblk_t *, mp);
 				tcp_kssl_input(tcp, mp);
 			} else {
 				putnext(tcp->tcp_rq, mp);
@@ -15034,8 +15039,11 @@ est:
 				flags |= tcp_rcv_drain(tcp->tcp_rq, tcp);
 			} else {
 				/* Does this need SSL processing first? */
-				if ((tcp->tcp_kssl_ctx  != NULL) &&
+				if ((tcp->tcp_kssl_ctx != NULL) &&
 				    (DB_TYPE(mp) == M_DATA)) {
+					DTRACE_PROBE1(
+					    kssl_mblk__ksslinput_data2,
+					    mblk_t *, mp);
 					tcp_kssl_input(tcp, mp);
 				} else {
 					putnext(tcp->tcp_rq, mp);
@@ -15052,6 +15060,8 @@ est:
 			 */
 			if ((tcp->tcp_kssl_ctx != NULL) &&
 			    (DB_TYPE(mp) == M_DATA)) {
+				DTRACE_PROBE1(kssl_mblk__tcpksslin3,
+				    mblk_t *, mp);
 				tcp_kssl_input(tcp, mp);
 			} else {
 				tcp_rcv_enqueue(tcp, mp, seg_len);
@@ -18072,7 +18082,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	 * encrypting multiple MSS-size records (12 of them with Ethernet),
 	 * instead of a single contiguous one by the stream head
 	 * largely outweighs the statistical reduction of ACKs, when
-	 * applicable. The peer will also save on decyption and verification
+	 * applicable. The peer will also save on decryption and verification
 	 * costs.
 	 */
 	if (tcp->tcp_kssl_ctx != NULL) {

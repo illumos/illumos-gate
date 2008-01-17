@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 
 		switch (kssl_cmd) {
 		case KSSL_CMD_SEND:
+			DTRACE_PROBE(kssl_cmd_send);
 			/*
 			 * We need to increment tcp_squeue_bytes to account
 			 * for the extra bytes internally injected to the
@@ -146,6 +147,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 
 		/* FALLTHROUGH */
 		case KSSL_CMD_NONE:
+			DTRACE_PROBE(kssl_cmd_none);
 			if (tcp->tcp_kssl_pending) {
 				mblk_t *ctxmp;
 
@@ -216,6 +218,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 			break;
 
 		case KSSL_CMD_QUEUED:
+			DTRACE_PROBE(kssl_cmd_queued);
 			/*
 			 * We hold the conn_t here because an asynchronous
 			 * request have been queued and
@@ -227,12 +230,17 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 
 		case KSSL_CMD_DELIVER_PROXY:
 		case KSSL_CMD_DELIVER_SSL:
+			DTRACE_PROBE(kssl_cmd_proxy__ssl);
 			/*
 			 * Keep accumulating if not yet accepted.
 			 */
 			if (tcp->tcp_listener != NULL) {
+				DTRACE_PROBE1(kssl_mblk__input_rcv_enqueue,
+				    mblk_t *, outmp);
 				tcp_rcv_enqueue(tcp, outmp, msgdsize(outmp));
 			} else {
+				DTRACE_PROBE1(kssl_mblk__input_putnext,
+				    mblk_t *, outmp);
 				putnext(tcp->tcp_rq, outmp);
 			}
 			/*
@@ -243,6 +251,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 			break;
 
 		case KSSL_CMD_NOT_SUPPORTED:
+			DTRACE_PROBE(kssl_cmd_not_supported);
 			/*
 			 * Stop the SSL processing by the proxy, and
 			 * switch to the userland SSL
@@ -252,6 +261,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 				tcp->tcp_kssl_pending = B_FALSE;
 
 no_can_do:
+				DTRACE_PROBE1(kssl_no_can_do, tcp_t *, tcp);
 				listener = tcp->tcp_listener;
 				ind_mp = tcp->tcp_conn.tcp_eager_conn_ind;
 				ASSERT(ind_mp != NULL);
@@ -370,12 +380,9 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 		CONN_INC_REF(connp);
 		squeue_fill(connp->conn_sqp, sqmp, tcp_kssl_input_asynch,
 		    connp, SQTAG_TCP_KSSL_INPUT);
+	} else {
+		DTRACE_PROBE(kssl_err__allocb_failed);
 	}
-#ifdef	DEBUG
-	else {
-		cmn_err(CE_WARN, "tcp_kssl_input_callback: alloc failure");
-	}
-#endif	/* DEBUG */
 	CONN_DEC_REF(connp);
 }
 

@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7168,17 +7168,31 @@ retry:
 	stp->sd_flag |= STRGETINPROG;
 	mutex_exit(&stp->sd_lock);
 
-	if ((stp->sd_rputdatafunc != NULL) && (DB_TYPE(bp) == M_DATA) &&
-	    (!(DB_FLAGS(bp) & DBLK_COOKED))) {
+	if ((stp->sd_rputdatafunc != NULL) && (DB_TYPE(bp) == M_DATA)) {
+		mblk_t *tmp, *prevmp;
 
-		bp = (stp->sd_rputdatafunc)(
-		    stp->sd_vnode, bp, NULL,
-		    NULL, NULL, NULL);
+		/*
+		 * Put first non-data mblk back to stream head and
+		 * cut the mblk chain so sd_rputdatafunc only sees
+		 * M_DATA mblks. We can skip the first mblk since it
+		 * is M_DATA according to the condition above.
+		 */
+		for (prevmp = bp, tmp = bp->b_cont; tmp != NULL;
+		    prevmp = tmp, tmp = tmp->b_cont) {
+			if (DB_TYPE(tmp) != M_DATA) {
+				prevmp->b_cont = NULL;
+				mutex_enter(&stp->sd_lock);
+				putback(stp, q, tmp, tmp->b_band);
+				mutex_exit(&stp->sd_lock);
+				break;
+			}
+		}
+
+		bp = (stp->sd_rputdatafunc)(stp->sd_vnode, bp,
+		    NULL, NULL, NULL, NULL);
 
 		if (bp == NULL)
 			goto retry;
-
-		DB_FLAGS(bp) |= DBLK_COOKED;
 	}
 
 	if (STREAM_NEEDSERVICE(stp))

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #define	_SUN_TPI_VERSION 2
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/vtrace.h>
 #include <sys/kmem.h>
@@ -55,7 +54,6 @@
 #include "ksslimpl.h"
 #include "ksslapi.h"
 #include "ksslproto.h"
-#include "kssldebug.h"
 
 static ssl3CipherSuiteDef cipher_suite_defs[] = {
 	{SSL_RSA_WITH_RC4_128_SHA,	cipher_rc4,	mac_sha,	72},
@@ -101,7 +99,6 @@ static uchar_t kssl_pad_2[60] = {
     0x5c, 0x5c, 0x5c, 0x5c
 };
 
-int kssl_debug;
 int kssl_cache_count;
 static boolean_t kssl_synchronous = B_FALSE;
 
@@ -242,10 +239,8 @@ kssl_compute_record_mac(
 			hash_use_ok = (rv == CRYPTO_MECH_NOT_SUPPORTED &&
 			    !IS_TLS(ssl));
 			if (!hash_use_ok) {
-#ifdef	DEBUG
-				cmn_err(CE_WARN, "kssl_compute_record_mac - "
-				    "crypto_mac error 0x%0x", rv);
-#endif	/* DEBUG */
+				DTRACE_PROBE1(kssl_err__crypto_mac_error,
+				    int, rv);
 				KSSL_COUNTER(compute_mac_failure, 1);
 			}
 		}
@@ -254,13 +249,13 @@ kssl_compute_record_mac(
 
 	if (hash_use_ok) {
 		bcopy(&(ssl->mac_ctx[direction][0]), ctx,
-			sizeof (KSSL_HASHCTX));
+		    sizeof (KSSL_HASHCTX));
 		spec->MAC_HashUpdate((void *)ctx, temp, p - temp);
 		spec->MAC_HashUpdate((void *)ctx, buf, len);
 		spec->MAC_HashFinal(digest, (void *)ctx);
 
 		bcopy(&(ssl->mac_ctx[direction][1]), ctx,
-			sizeof (KSSL_HASHCTX));
+		    sizeof (KSSL_HASHCTX));
 		spec->MAC_HashUpdate((void *)ctx, digest, spec->mac_hashsz);
 		spec->MAC_HashFinal(digest, (void *)ctx);
 	}
@@ -342,7 +337,7 @@ kssl_handle_handshake_message(ssl_t *ssl, mblk_t *mp, int *err,
 	case finished:
 		if (ssl->hs_waitstate != wait_finished) {
 			kssl_send_alert(ssl, alert_fatal,
-				unexpected_message);
+			    unexpected_message);
 			*err = EBADMSG;
 			ssl->activeinput = B_FALSE;
 			return (1);
@@ -395,10 +390,11 @@ kssl_compute_handshake_hashes(
 			label = TLS_SERVER_FINISHED_LABEL;
 
 		return (kssl_tls_PRF(ssl,
-			ssl->sid.master_secret, (size_t)SSL3_MASTER_SECRET_LEN,
-			(uchar_t *)label, strlen(label),
-			seed, (size_t)(MD5_HASH_LEN + SHA1_HASH_LEN),
-			hashes->tlshash, (size_t)TLS_FINISHED_SIZE));
+		    ssl->sid.master_secret,
+		    (size_t)SSL3_MASTER_SECRET_LEN,
+		    (uchar_t *)label, strlen(label),
+		    seed, (size_t)(MD5_HASH_LEN + SHA1_HASH_LEN),
+		    hashes->tlshash, (size_t)TLS_FINISHED_SIZE));
 	} else {
 		uchar_t s[4];
 		s[0] = (sender >> 24) & 0xff;
@@ -464,11 +460,10 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 
 	/* Support SSLv3 (version == 3.0) or TLS (version == 3.1) */
 	if (ssl->major_version != 3 || (ssl->major_version == 3 &&
-		ssl->minor_version != 0 && ssl->minor_version != 1)) {
-		KSSL_DEBUG3_IF(kssl_debug,
-			"HandleClientHello: handshake failure - "
-			"SSL version not supported (%d %d)",
-			ssl->major_version, ssl->minor_version);
+	    ssl->minor_version != 0 && ssl->minor_version != 1)) {
+		DTRACE_PROBE2(kssl_err__SSL_version_not_supported,
+		    uchar_t, ssl->major_version,
+		    uchar_t, ssl->minor_version);
 		desc = handshake_failure;
 		goto falert;
 	}
@@ -535,8 +530,7 @@ kssl_handle_client_hello(ssl_t *ssl, mblk_t *mp, int msglen)
 			return (SSL_MISS);
 		}
 		desc = handshake_failure;
-		KSSL_DEBUG1_IF(kssl_debug,
-			"kssl_handle_client_hello: no cipher suites found");
+		DTRACE_PROBE(kssl_err__no_cipher_suites_found);
 		goto falert;
 	}
 
@@ -545,8 +539,7 @@ suite_found:
 	mp->b_rptr += nsuites;
 	if (*mp->b_rptr++ != 1 || *mp->b_rptr++ != 0) {
 		desc = handshake_failure;
-		KSSL_DEBUG1_IF(kssl_debug,
-			"kssl_handle_client_hello: handshake failure");
+		DTRACE_PROBE(kssl_err__handshake_failure);
 		goto falert;
 	}
 
@@ -585,7 +578,7 @@ suite_found:
 			return (err);
 
 		err = kssl_compute_handshake_hashes(ssl, &ssl->hs_hashes,
-			sender_client);
+		    sender_client);
 		if (err != 0)
 			return (err);
 
@@ -883,9 +876,7 @@ kssl_tls_P_hash(crypto_mechanism_t *mech, crypto_key_t *key,
 	}
 end:
 	if (CRYPTO_ERR(rv)) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "kssl_P_hash: crypto_mac error 0x%02X", rv);
-#endif	/* DEBUG */
+		DTRACE_PROBE1(kssl_err__crypto_mac_error, int, rv);
 		KSSL_COUNTER(compute_mac_failure, 1);
 	}
 	return (rv);
@@ -916,8 +907,8 @@ kssl_tls_PRF(ssl_t *ssl,
 	size_t slen = roundup(secret_len, 2) / 2;
 
 	if (prfresult_len > MAX_TLS_KEYBLOCK_SIZE) {
-		KSSL_DEBUG2_IF(kssl_debug, "kssl_tls_PRF: unexpected keyblock "
-			"size (%lu)", prfresult_len);
+		DTRACE_PROBE1(kssl_err__unexpected_keyblock_size,
+		    size_t, prfresult_len);
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
 
@@ -934,16 +925,16 @@ kssl_tls_PRF(ssl_t *ssl,
 	S2.ck_format = CRYPTO_KEY_RAW;
 
 	rv = kssl_tls_P_hash(&hmac_md5_mech, &S1, MD5_HASH_LEN,
-			label, label_len,
-			seed, seed_len,
-			prfresult, prfresult_len);
+	    label, label_len,
+	    seed, seed_len,
+	    prfresult, prfresult_len);
 	if (CRYPTO_ERR(rv))
 		goto end;
 
 	rv = kssl_tls_P_hash(&hmac_sha1_mech, &S2, SHA1_HASH_LEN,
-			label, label_len,
-			seed, seed_len,
-			psha1, prfresult_len);
+	    label, label_len,
+	    seed, seed_len,
+	    psha1, prfresult_len);
 	if (CRYPTO_ERR(rv))
 		goto end;
 
@@ -984,23 +975,21 @@ kssl_generate_tls_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 	 */
 	bcopy(ssl->client_random, seed, SSL3_RANDOM_LENGTH);
 	bcopy(ssl->server_random, seed + SSL3_RANDOM_LENGTH,
-		SSL3_RANDOM_LENGTH);
+	    SSL3_RANDOM_LENGTH);
 
 	/* if pms is bad fake it to thwart Bleichenbacher attack */
 	if (IS_BAD_PRE_MASTER_SECRET(pms, pmslen, ssl)) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "Under Bleichenbacher attack");
-#endif	/* DEBUG */
+		DTRACE_PROBE(kssl_err__under_Bleichenbacher_attack);
 		FAKE_PRE_MASTER_SECRET(pms, pmslen, ssl, buf);
 	}
 
 	return (kssl_tls_PRF(ssl,
-		pms, pmslen,
-		(uchar_t *)TLS_MASTER_SECRET_LABEL,
-		(size_t)strlen(TLS_MASTER_SECRET_LABEL),
-		seed, sizeof (seed),
-		ssl->sid.master_secret,
-		(size_t)sizeof (ssl->sid.master_secret)));
+	    pms, pmslen,
+	    (uchar_t *)TLS_MASTER_SECRET_LABEL,
+	    (size_t)strlen(TLS_MASTER_SECRET_LABEL),
+	    seed, sizeof (seed),
+	    ssl->sid.master_secret,
+	    (size_t)sizeof (ssl->sid.master_secret)));
 }
 
 
@@ -1015,9 +1004,7 @@ kssl_generate_ssl_ms(ssl_t *ssl, uchar_t *pms, size_t pmslen)
 
 	/* if pms is bad fake it to thwart Bleichenbacher attack */
 	if (IS_BAD_PRE_MASTER_SECRET(pms, pmslen, ssl)) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "Under Bleichenbacher attack");
-#endif	/* DEBUG */
+		DTRACE_PROBE(kssl_err__under_Bleichenbacher_attack);
 		FAKE_PRE_MASTER_SECRET(pms, pmslen, ssl, buf);
 	}
 
@@ -1034,15 +1021,15 @@ kssl_generate_tls_keyblock(ssl_t *ssl)
 
 	bcopy(ssl->server_random, seed, SSL3_RANDOM_LENGTH);
 	bcopy(ssl->client_random, seed + SSL3_RANDOM_LENGTH,
-		SSL3_RANDOM_LENGTH);
+	    SSL3_RANDOM_LENGTH);
 
 	return (kssl_tls_PRF(ssl, ssl->sid.master_secret,
-		(size_t)SSL3_MASTER_SECRET_LEN,
-		(uchar_t *)TLS_KEY_EXPANSION_LABEL,
-		(size_t)strlen(TLS_KEY_EXPANSION_LABEL),
-		seed, (size_t)sizeof (seed),
-		ssl->pending_keyblock,
-		(size_t)ssl->pending_keyblksz));
+	    (size_t)SSL3_MASTER_SECRET_LEN,
+	    (uchar_t *)TLS_KEY_EXPANSION_LABEL,
+	    (size_t)strlen(TLS_KEY_EXPANSION_LABEL),
+	    seed, (size_t)sizeof (seed),
+	    ssl->pending_keyblock,
+	    (size_t)ssl->pending_keyblksz));
 
 }
 
@@ -1123,7 +1110,7 @@ kssl_send_certificate_and_server_hello_done(ssl_t *ssl)
 
 	cert = ssl->kssl_entry->ke_server_certificate;
 	if (cert == NULL) {
-	    return (ENOENT);
+		return (ENOENT);
 	}
 	cert_buf = cert->msg;
 	cert_len = cert->len;
@@ -1265,14 +1252,14 @@ kssl_spec_init(ssl_t *ssl, int dir)
 		spec->MAC_HashUpdate((void *)ctx, ssl->mac_secret[dir],
 		    spec->mac_hashsz);
 		spec->MAC_HashUpdate((void *)ctx, kssl_pad_1,
-			spec->mac_padsz);
+		    spec->mac_padsz);
 
 		ctx = &ssl->mac_ctx[dir][1];
 		spec->MAC_HashInit((void *)ctx);
 		spec->MAC_HashUpdate((void *)ctx, ssl->mac_secret[dir],
 		    spec->mac_hashsz);
 		spec->MAC_HashUpdate((void *)ctx, kssl_pad_2,
-			spec->mac_padsz);
+		    spec->mac_padsz);
 	}
 
 	spec->cipher_type = cipher_defs[ssl->pending_calg].type;
@@ -1346,13 +1333,11 @@ kssl_spec_init(ssl_t *ssl, int dir)
 		    &(ssl->pending_keyblock[2 * spec->mac_hashsz]);
 
 		ret = crypto_decrypt_init(&(spec->cipher_mech),
-			&(spec->cipher_key), NULL, &spec->cipher_ctx, NULL);
-#ifdef	DEBUG
+		    &(spec->cipher_key), NULL, &spec->cipher_ctx, NULL);
 		if (CRYPTO_ERR(ret)) {
-			cmn_err(CE_WARN, "kssl_spec_init: "
-				"crypto_decrypt_init error 0x%02X", ret);
+			DTRACE_PROBE1(kssl_err__crypto_decrypt_init_read,
+			    int, ret);
 		}
-#endif	/* DEBUG */
 	} else {
 		if (cipher_defs[ssl->pending_calg].bsize > 0) {
 			spec->cipher_mech.cm_param += spec->cipher_bsize;
@@ -1363,12 +1348,10 @@ kssl_spec_init(ssl_t *ssl, int dir)
 		    spec->cipher_keysz]);
 
 		ret = crypto_encrypt_init(&(spec->cipher_mech),
-			&(spec->cipher_key), NULL, &spec->cipher_ctx, NULL);
-#ifdef	DEBUG
+		    &(spec->cipher_key), NULL, &spec->cipher_ctx, NULL);
 		if (CRYPTO_ERR(ret))
-			cmn_err(CE_WARN, "kssl_spec_init: "
-				"crypto_encrypt_init error 0x%02X", ret);
-#endif	/* DEBUG */
+			DTRACE_PROBE1(kssl_err__crypto_encrypt_init_non_read,
+			    int, ret);
 	}
 	return (ret);
 }
@@ -1417,9 +1400,9 @@ kssl_send_finished(ssl_t *ssl, int update_hsh)
 
 	if (IS_TLS(ssl)) {
 		bcopy(ssl->hs_hashes.md5, ssl3hashes.md5,
-			sizeof (ssl3hashes.md5));
+		    sizeof (ssl3hashes.md5));
 		bcopy(ssl->hs_hashes.sha1, ssl3hashes.sha1,
-			sizeof (ssl3hashes.sha1));
+		    sizeof (ssl3hashes.sha1));
 	}
 
 	/* Compute hashes for the SENDER side */
@@ -1509,13 +1492,10 @@ kssl_mac_encrypt_record(ssl_t *ssl,
 	/* One record at a time. Otherwise, gotta allocate the crypt_data_t */
 	ret = crypto_encrypt_update(spec->cipher_ctx, &spec->cipher_data,
 	    NULL, NULL);
-#ifdef	DEBUG
 	if (CRYPTO_ERR(ret)) {
-		cmn_err(CE_WARN,
-			"kssl_mac_encrypt_record: crypto_encrypt_update "
-			"error 0x%02X", ret);
+		DTRACE_PROBE1(kssl_err__crypto_encrypt_update,
+		    int, ret);
 	}
-#endif	/* DEBUG */
 	return (ret);
 }
 
@@ -1532,10 +1512,8 @@ kssl_send_alert(ssl_t *ssl, SSL3AlertLevel level, SSL3AlertDescription desc)
 	ssl->sendalert_desc = desc;
 
 	if (level == alert_fatal) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "sending an alert %d %d from %p\n", level,
-		    desc, (void *)caller());
-#endif	/* DEBUG */
+		DTRACE_PROBE2(kssl_sending_alert,
+		    SSL3AlertLevel, level, SSL3AlertDescription, desc);
 		if (ssl->sid.cached == B_TRUE) {
 			kssl_uncache_sid(&ssl->sid, ssl->kssl_entry);
 			ssl->sid.cached = B_FALSE;
@@ -1709,10 +1687,7 @@ kssl_handle_client_key_exchange(ssl_t *ssl, mblk_t *mp, int msglen,
 		ssl->hs_waitstate = wait_client_key_done;
 		return (0);
 	default:
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "kssl_handle_client_key_exchange: "
-			"crypto_decrypt error 0x%02X", err);
-#endif	/* DEBUG */
+		DTRACE_PROBE1(kssl_err__crypto_decrypt, int, err);
 		kmem_free(buf, allocated);
 		return (rverr);
 	}
@@ -1762,7 +1737,7 @@ kssl_handle_finished(ssl_t *ssl, mblk_t *mp, int msglen)
 
 	if (IS_TLS(ssl)) {
 		hashcompare = bcmp(mp->b_rptr, ssl->hs_hashes.tlshash,
-			finish_len);
+		    finish_len);
 	} else {
 		hashcompare = bcmp(mp->b_rptr, &ssl->hs_hashes, finish_len);
 	}
@@ -1846,16 +1821,13 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 	sidlen = ((uint_t)mp->b_rptr[2] << 8) + (uint_t)mp->b_rptr[3];
 	randlen = ((uint_t)mp->b_rptr[4] << 8) + (uint_t)mp->b_rptr[5];
 	if (nsuites % 3 != 0) {
-		KSSL_DEBUG2_IF(kssl_debug,
-			"kssl_handle_v2client_hello nsuites = %d, error.",
-			nsuites);
+		DTRACE_PROBE1(kssl_err__nsuites_error, uint_t, nsuites);
 		goto falert;
 	}
 	if (randlen < SSL_MIN_CHALLENGE_BYTES ||
 	    randlen > SSL_MAX_CHALLENGE_BYTES) {
-		KSSL_DEBUG2_IF(kssl_debug,
-			"kssl_handle_v2client_hello randlen out of range: %d",
-			randlen);
+		DTRACE_PROBE1(kssl_err__randlen_out_of_range,
+		    uint_t, randlen);
 		goto falert;
 	}
 	mp->b_rptr += 6;
@@ -1888,8 +1860,7 @@ kssl_handle_v2client_hello(ssl_t *ssl, mblk_t *mp, int recsz)
 		}
 	}
 	if (i == ssl->kssl_entry->kssl_cipherSuites_nentries) {
-		KSSL_DEBUG1_IF(kssl_debug, "kssl_handle_v2client_hello - "
-			"cannot find SSLv2 cipher suite");
+		DTRACE_PROBE(kssl_err__no_SSLv2_cipher_suite);
 		ssl->activeinput = B_FALSE;
 		return (SSL_MISS);
 	}
@@ -2043,6 +2014,8 @@ kssl_get_next_record(ssl_t *ssl)
 
 	/* Fast path: when mp has at least a complete record */
 	if (MBLKL(mp) < rhsz) {
+		DTRACE_PROBE1(kssl_mblk__incomplete_header,
+		    mblk_t *, mp);
 		/* Not even a complete header in there yet */
 		if (msgdsize(mp) < rhsz) {
 			return (NULL);
@@ -2057,9 +2030,11 @@ kssl_get_next_record(ssl_t *ssl)
 	}
 	content_type = (SSL3ContentType)mp->b_rptr[0];
 	if (content_type == content_handshake_v2) {
+		DTRACE_PROBE1(kssl_mblk__ssl_v2, mblk_t *, mp);
 		rec_sz = (uint16_t)mp->b_rptr[1];
 		rhsz = 2;
 	} else {
+		DTRACE_PROBE1(kssl_mblk__ssl_v3, mblk_t *, mp);
 		uint8_t *rec_sz_p = (uint8_t *)mp->b_rptr + 3;
 		rec_sz = BE16_TO_U16(rec_sz_p);
 	}
@@ -2076,6 +2051,8 @@ kssl_get_next_record(ssl_t *ssl)
 	 * MAX record length.
 	 */
 	if (MBLKL(mp) < total_size) {
+		DTRACE_PROBE2(kssl_mblk__smaller_than_total_size,
+		    mblk_t *, mp, int, total_size);
 		/* Not a complete record yet. Keep accumulating */
 		if (msgdsize(mp) < total_size) {
 			return (NULL);
@@ -2091,6 +2068,8 @@ kssl_get_next_record(ssl_t *ssl)
 	mpsz = MBLKL(mp);	/* could've changed after the pullup */
 
 	if (mpsz > total_size) {
+		DTRACE_PROBE2(kssl_mblk__bigger_than_total_size,
+		    mblk_t *, mp, int, total_size);
 		/* gotta allocate a new block */
 		if ((retmp = dupb(mp)) == NULL) {
 			kssl_send_alert(ssl, alert_fatal, internal_error);
@@ -2103,6 +2082,8 @@ kssl_get_next_record(ssl_t *ssl)
 		mp->b_rptr += total_size;
 		ssl->rec_ass_head = mp;
 	} else {
+		DTRACE_PROBE2(kssl_mblk__equal_to_total_size,
+		    mblk_t *, mp, int, total_size);
 		ASSERT(mpsz == total_size);
 		ssl->rec_ass_head = mp->b_cont;
 		mp->b_cont = NULL;

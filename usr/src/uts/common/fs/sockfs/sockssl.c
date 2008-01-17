@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,9 +67,7 @@ strsock_kssl_input(vnode_t *vp, mblk_t *mp,
 
 	dprintso(so, 1, ("strsock_kssl_input(%p, %p)\n", vp, mp));
 
-	ASSERT(!(DB_FLAGS(mp) & DBLK_COOKED));
-
-	kssl_cmd = kssl_handle_record(kssl_ctx, &mp, &out);
+	kssl_cmd = kssl_handle_mblk(kssl_ctx, &mp, &out);
 
 	switch (kssl_cmd) {
 	case KSSL_CMD_NONE:
@@ -84,7 +81,7 @@ strsock_kssl_input(vnode_t *vp, mblk_t *mp,
 
 		putnext(vp->v_stream->sd_wrq, out);
 	}
-	/* FALLTHU */
+	/* FALLTHRU */
 	default:
 		/* transient error. */
 		return (NULL);
@@ -94,7 +91,7 @@ strsock_kssl_input(vnode_t *vp, mblk_t *mp,
 /*
  * This routine is registered with the stream head be called by
  * kstrmakedata() with every packet sent downstreams.
- * If the message is successfully procssed, then it is returned.
+ * If the message is successfully processed, then it is returned.
  */
 /* ARGSUSED */
 mblk_t *

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/mutex.h>
 #include <sys/crypto/common.h>
 #include <sys/kstat.h>
+#include <sys/sdt.h>
 #include <inet/kssl/ksslapi.h>
 #include <inet/kssl/ksslproto.h>
 
@@ -154,12 +155,22 @@ typedef struct mech_to_cipher_s {
 
 #define	CRYPTO_ERR(r) ((r) != CRYPTO_SUCCESS && (r) != CRYPTO_QUEUED)
 
+/*
+ * Enqueue mblk into KSSL input queue. Watch for mblk b_cont chains
+ * returned by tcp_reass() and enqueue them properly. Caller should
+ * be aware that mp is modified by this macro.
+ */
 #define	KSSL_ENQUEUE_MP(ssl, mp)					\
+	DTRACE_PROBE1(kssl_mblk__enqueue_mp, mblk_t *, mp);		\
 	if ((ssl)->rec_ass_tail == NULL) {				\
 		(ssl)->rec_ass_head = (mp);				\
+		while (mp->b_cont)					\
+			mp = mp->b_cont;				\
 		(ssl)->rec_ass_tail = (mp);				\
 	} else {							\
 		(ssl)->rec_ass_tail->b_cont = (mp);			\
+		while (mp->b_cont)					\
+			mp = mp->b_cont;				\
 		(ssl)->rec_ass_tail = (mp);				\
 	}
 

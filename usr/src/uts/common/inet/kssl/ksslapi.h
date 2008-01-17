@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,7 +96,7 @@ typedef void (*kssl_callback_t)(void *arg, mblk_t *mp, kssl_cmd_t cmd);
 kssl_cmd_t kssl_input(kssl_ctx_t, mblk_t *, mblk_t **, boolean_t *,
     kssl_callback_t cbfn, void *arg);
 
-kssl_cmd_t kssl_handle_record(kssl_ctx_t, mblk_t **, mblk_t **);
+kssl_cmd_t kssl_handle_mblk(kssl_ctx_t, mblk_t **, mblk_t **);
 
 mblk_t *kssl_build_record(kssl_ctx_t, mblk_t *);
 
