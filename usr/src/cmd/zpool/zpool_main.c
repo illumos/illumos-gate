@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1174,7 +1174,7 @@ show_import(nvlist_t *config)
 			    "but can be imported using the '-Df' flags.\n"));
 		else if (pool_state != POOL_STATE_EXPORTED)
 			(void) printf(gettext("\tThe pool may be active on "
-			    "on another system, but can be imported using\n\t"
+			    "another system, but can be imported using\n\t"
 			    "the '-f' flag.\n"));
 	}
 
@@ -2581,7 +2581,7 @@ print_scrub_status(nvlist_t *nvroot)
 	uint_t vsc;
 	time_t start, end, now;
 	double fraction_done;
-	uint64_t examined, total, minutes_left;
+	uint64_t examined, total, minutes_left, minutes_taken;
 	char *scrub_type;
 
 	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_STATS,
@@ -2605,8 +2605,13 @@ print_scrub_status(nvlist_t *nvroot)
 	total = vs->vs_alloc;
 
 	if (end != 0) {
-		(void) printf(gettext("%s %s with %llu errors on %s"),
+		minutes_taken = (uint64_t)((end - start) / 60);
+
+		(void) printf(gettext("%s %s after %lluh%um with %llu errors "
+		    "on %s"),
 		    scrub_type, vs->vs_scrub_complete ? "completed" : "stopped",
+		    (u_longlong_t)(minutes_taken / 60),
+		    (uint_t)(minutes_taken % 60),
 		    (u_longlong_t)vs->vs_scrub_errors, ctime(&end));
 		return;
 	}
@@ -2619,9 +2624,12 @@ print_scrub_status(nvlist_t *nvroot)
 	fraction_done = (double)examined / total;
 	minutes_left = (uint64_t)((now - start) *
 	    (1 - fraction_done) / fraction_done / 60);
+	minutes_taken = (uint64_t)((now - start) / 60);
 
-	(void) printf(gettext("%s in progress, %.2f%% done, %lluh%um to go\n"),
-	    scrub_type, 100 * fraction_done,
+	(void) printf(gettext("%s in progress for %lluh%um, %.2f%% done, "
+	    "%lluh%um to go\n"),
+	    scrub_type, (u_longlong_t)(minutes_taken / 60),
+	    (uint_t)(minutes_taken % 60), 100 * fraction_done,
 	    (u_longlong_t)(minutes_left / 60), (uint_t)(minutes_left % 60));
 }
 
