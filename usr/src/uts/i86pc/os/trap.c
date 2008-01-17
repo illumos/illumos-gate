@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -561,6 +561,10 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	}
 
 	switch (type) {
+	case T_SIMDFPE:
+		/* Make sure we enable interrupts before die()ing */
+		sti();	/* The SIMD exception comes in via cmninttrap */
+		/*FALLTHROUGH*/
 	default:
 		if (type & USER) {
 			if (tudebug)
@@ -946,8 +950,10 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		/* check if we took a kernel trap on behalf of user */
 		{
 			extern  void ndptrap_frstor(void);
-			if (rp->r_pc != (uintptr_t)ndptrap_frstor)
+			if (rp->r_pc != (uintptr_t)ndptrap_frstor) {
+				sti(); /* T_EXTOVRFLT comes in via cmninttrap */
 				(void) die(type, rp, addr, cpuid);
+			}
 			type |= USER;
 		}
 		/*FALLTHROUGH*/
@@ -966,8 +972,10 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		/* check if we took a kernel trap on behalf of user */
 		{
 			extern  void ndptrap_frstor(void);
-			if (rp->r_pc != (uintptr_t)ndptrap_frstor)
+			if (rp->r_pc != (uintptr_t)ndptrap_frstor) {
+				sti(); /* T_EXTERRFLT comes in via cmninttrap */
 				(void) die(type, rp, addr, cpuid);
+			}
 			type |= USER;
 		}
 		/*FALLTHROUGH*/
@@ -1003,6 +1011,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 			siginfo.si_addr = (caddr_t)rp->r_pc;
 			fault = FLTFPE;
 		}
+
+		sti();	/* The SIMD exception comes in via cmninttrap */
 		break;
 
 	case T_BPTFLT:	/* breakpoint trap */

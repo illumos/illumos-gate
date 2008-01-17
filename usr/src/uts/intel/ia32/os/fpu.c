@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,43 +426,60 @@ fpextovrflt(struct regs *rp)
 int
 fpexterrflt(struct regs *rp)
 {
-	uint32_t fpcwsw;
+	uint32_t fpcw, fpsw;
 	fpu_ctx_t *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
 
 	ASSERT(fp_kind != FP_NO);
 
-	fpcwsw = fpgetcwsw();
 	/*
 	 * Now we can enable the interrupts.
 	 * (NOTE: x87 fp exceptions come thru interrupt gate)
 	 */
 	sti();
 
-	if ((fpcwsw & FPS_ES) == 0)
-		return (0);	/* No exception */
+	if (!fpu_exists)
+		return (FPE_FLTINV);
 
-	if (fpu_exists) {
-		fp_save(fp);
-		/* clear exception flags in saved state, as if by fnclex */
+	/*
+	 * Do an unconditional save of the FP state.  If it's dirty (TS=0),
+	 * it'll be saved into the fpu context area passed in (that of the
+	 * current thread).  If it's not dirty (it may not be, due to
+	 * an intervening save due to a context switch between the sti(),
+	 * above and here, then it's safe to just use the stored values in
+	 * the context save area to determine the cause of the fault.
+	 */
+	fp_save(fp);
+
+	/* clear exception flags in saved state, as if by fnclex */
 #if defined(__amd64)
-		fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
+	fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
+	fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
+	fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
 #else
 		switch (fp_kind) {
 		case __FP_SSE:
+			fpsw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
+			fpcw = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fcw;
 			fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw &= ~FPS_SW_EFLAGS;
 			break;
 		default:
+			fpsw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw;
+			fpcw = fp->fpu_regs.kfpu_u.kfpu_fn.f_fcw;
 			fp->fpu_regs.kfpu_u.kfpu_fn.f_fsw &= ~FPS_SW_EFLAGS;
 			break;
 		}
 #endif
-	}
-	fp->fpu_regs.kfpu_status = fpcwsw & 0xffff;
+
+	fp->fpu_regs.kfpu_status = fpsw;
+
+	if ((fpsw & FPS_ES) == 0)
+		return (0);		/* No exception */
+
 	/*
 	 * "and" the exception flags with the complement of the mask
 	 * bits to determine which exception occurred
 	 */
-	return (fpe_sicode(fpcwsw & ~(fpcwsw >> 16) & 0x3f));
+	return (fpe_sicode(fpsw & ~fpcw & 0x3f));
 }
 
 /*
@@ -478,13 +495,32 @@ fpsimderrflt(struct regs *rp)
 
 	ASSERT(fp_kind == __FP_SSE);
 
-	mxcsr = fpgetmxcsr();
-	if (fpu_exists) {
-		fp_save(fp); 		/* save the FPU state */
-		fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
-	} else {
-		fp->fpu_regs.kfpu_status = fpgetcwsw() & 0xffff;
-	}
+	/*
+	 * NOTE: Interrupts are disabled during execution of this
+	 * function.  They are enabled by the caller in trap.c.
+	 */
+
+	/*
+	 * The only way we could have gotten here if there is no FP unit
+	 * is via a user executing an INT $19 instruction, so there is
+	 * no fault in that case.
+	 */
+	if (!fpu_exists)
+		return (0);
+
+	/*
+	 * Do an unconditional save of the FP state.  If it's dirty (TS=0),
+	 * it'll be saved into the fpu context area passed in (that of the
+	 * current thread).  If it's not dirty, then it's safe to just use
+	 * the stored values in the context save area to determine the
+	 * cause of the fault.
+	 */
+	fp_save(fp); 		/* save the FPU state */
+
+	mxcsr = fp->fpu_regs.kfpu_u.kfpu_fx.fx_mxcsr;
+
+	fp->fpu_regs.kfpu_status = fp->fpu_regs.kfpu_u.kfpu_fx.fx_fsw;
+
 	fp->fpu_regs.kfpu_xstatus = mxcsr;
 
 	/*
