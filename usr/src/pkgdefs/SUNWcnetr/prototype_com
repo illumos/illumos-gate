@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,7 +67,7 @@ d none etc/inet/ike/publickeys 755 root sys
 e ipsecalgsbase etc/inet/ipsecalgs 444 root sys
 f none etc/inet/ipsecinit.sample 444 root sys
 d none etc/inet/secret 700 root sys
-f none etc/inet/secret/ike.preshared 600 root sys
+e preserve etc/inet/secret/ike.preshared 600 root sys
 d none etc/inet/secret/ike.privatekeys 700 root sys
 f none etc/inet/secret/ipseckeys.sample 600 root sys
 e sock2path etc/inet/sock2path 444 root sys
