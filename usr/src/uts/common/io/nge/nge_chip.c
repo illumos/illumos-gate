@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -436,13 +436,12 @@ nge_init_dev_spec_param(nge_t *ngep)
 	switch (infop->device) {
 	case DEVICE_ID_NF3_E6:
 	case DEVICE_ID_NF3_DF:
-	case DEVICE_ID_MCP61_3EE:
-	case DEVICE_ID_MCP61_3EF:
 	case DEVICE_ID_MCP04_37:
 	case DEVICE_ID_MCP04_38:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -460,6 +459,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi = B_TRUE;
 		dev_param_p->msi_x = B_TRUE;
 		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_TRUE;
 		dev_param_p->jumbo = B_TRUE;
@@ -472,11 +472,14 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->nge_split = NGE_SPLIT_96;
 		break;
 
+	case DEVICE_ID_MCP61_3EE:
+	case DEVICE_ID_MCP61_3EF:
 	case DEVICE_ID_MCP51_268:
 	case DEVICE_ID_MCP51_269:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_TRUE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -494,6 +497,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi = B_TRUE;
 		dev_param_p->msi_x = B_TRUE;
 		dev_param_p->vlan = B_TRUE;
+		dev_param_p->advanced_pm = B_TRUE;
 		dev_param_p->tx_pause_frame = B_TRUE;
 		dev_param_p->rx_pause_frame = B_TRUE;
 		dev_param_p->jumbo = B_TRUE;
@@ -510,6 +514,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -630,7 +635,6 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 	int err;
 	uint32_t reg_val;
 	uint32_t	tries;
-	nge_intr_src intr_src;
 	nge_mintr_src mintr_src;
 	nge_mii_cs mii_cs;
 	nge_rx_poll rx_poll;
@@ -645,9 +649,8 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 	NGE_TRACE(("nge_chip_stop($%p, %d)", (void *)ngep, fault));
 
 	err = DDI_SUCCESS;
-	/* Clear all pending  interrupts */
-	intr_src.intr_val = nge_reg_get32(ngep, NGE_INTR_SRC);
-	nge_reg_put32(ngep, NGE_INTR_SRC, intr_src.intr_val);
+
+	/* Clear any pending PHY interrupt */
 	mintr_src.src_val = nge_reg_get8(ngep, NGE_MINTR_SRC);
 	nge_reg_put8(ngep, NGE_MINTR_SRC, mintr_src.src_val);
 
@@ -663,20 +666,10 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 
 	/* Reset buffer management & DMA */
 	mode.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
-	mode.mode_bits.bm_reset = NGE_SET;
 	mode.mode_bits.dma_dis = NGE_SET;
 	mode.mode_bits.desc_type = ngep->desc_mode;
 	nge_reg_put32(ngep, NGE_MODE_CNTL, mode.mode_val);
 
-	drv_usecwait(50000);
-
-	/* Restore buffer management */
-	mode.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
-	mode.mode_bits.bm_reset = NGE_CLEAR;
-	mode.mode_bits.tx_rcom_en = NGE_SET;
-	nge_reg_put32(ngep, NGE_MODE_CNTL, mode.mode_val);
-
-	nge_reg_put32(ngep, NGE_MODE_CNTL, mode.mode_val);
 	for (tries = 0; tries < 5000; tries++) {
 		drv_usecwait(10);
 		mode.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
@@ -716,19 +709,6 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		nge_reg_put8(ngep, NGE_TX_EN, tx_en.val);
 	}
 
-	/* Disable auto-poll of rx's state machine */
-	rx_poll.poll_val = nge_reg_get32(ngep, NGE_RX_POLL);
-	rx_poll.poll_bits.rpen = NGE_CLEAR;
-	rx_poll.poll_bits.rpi = NGE_CLEAR;
-	nge_reg_put32(ngep, NGE_RX_POLL, rx_poll.poll_val);
-
-	/* Disable auto-polling of tx's  state machine */
-	tx_poll.poll_val = nge_reg_get32(ngep, NGE_TX_POLL);
-	tx_poll.poll_bits.tpen = NGE_CLEAR;
-	tx_poll.poll_bits.tpi = NGE_CLEAR;
-	nge_reg_put32(ngep, NGE_TX_POLL, tx_poll.poll_val);
-
-
 	/*
 	 * Clean the status of tx's state machine
 	 * and Make assure the tx's channel is idle
@@ -761,8 +741,25 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 	}
 	nge_reg_put32(ngep, NGE_RX_STA, rx_sta.sta_val);
 
-	if (ngep->chipinfo.device == DEVICE_ID_MCP51_269 ||
-	    ngep->chipinfo.device == DEVICE_ID_MCP51_268) {
+	/* Disable auto-poll of rx's state machine */
+	rx_poll.poll_val = nge_reg_get32(ngep, NGE_RX_POLL);
+	rx_poll.poll_bits.rpen = NGE_CLEAR;
+	rx_poll.poll_bits.rpi = NGE_CLEAR;
+	nge_reg_put32(ngep, NGE_RX_POLL, rx_poll.poll_val);
+
+	/* Disable auto-polling of tx's  state machine */
+	tx_poll.poll_val = nge_reg_get32(ngep, NGE_TX_POLL);
+	tx_poll.poll_bits.tpen = NGE_CLEAR;
+	tx_poll.poll_bits.tpi = NGE_CLEAR;
+	nge_reg_put32(ngep, NGE_TX_POLL, tx_poll.poll_val);
+
+	/* Restore buffer management */
+	mode.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
+	mode.mode_bits.bm_reset = NGE_SET;
+	mode.mode_bits.tx_rcom_en = NGE_SET;
+	nge_reg_put32(ngep, NGE_MODE_CNTL, mode.mode_val);
+
+	if (ngep->dev_spec_param.advanced_pm) {
 
 		nge_reg_put32(ngep, NGE_PMU_CIDLE_LIMIT, 0);
 		nge_reg_put32(ngep, NGE_PMU_DIDLE_LIMIT, 0);
@@ -1021,14 +1018,8 @@ nge_chip_reset(nge_t *ngep)
 	pci_config_put8(ngep->cfg_handle, PCI_CONF_LATENCY_TIMER,
 	    ngep->chipinfo.latency);
 
-	/*
-	 * Stop the chipset and clear buffer management
-	 */
-	err = nge_chip_stop(ngep, B_FALSE);
-	if (err == DDI_FAILURE)
-		return (err);
-	if (ngep->chipinfo.device == DEVICE_ID_MCP51_269 ||
-	    ngep->chipinfo.device == DEVICE_ID_MCP51_268) {
+
+	if (ngep->dev_spec_param.advanced_pm) {
 
 		/* Program software misc register */
 		soft_misc.misc_val = nge_reg_get32(ngep, NGE_SOFT_MISC);
@@ -1042,8 +1033,8 @@ nge_chip_reset(nge_t *ngep)
 		soft_misc.misc_bits.rst_ex_m2pintf = NGE_SET;
 		nge_reg_put32(ngep, NGE_SOFT_MISC, soft_misc.misc_val);
 
-		/* wait for 4 us */
-		drv_usecwait(4);
+		/* wait for 32 us */
+		drv_usecwait(32);
 
 		soft_misc.misc_val = nge_reg_get32(ngep, NGE_SOFT_MISC);
 		soft_misc.misc_bits.rx_clk_vx_rst = NGE_CLEAR;
@@ -1090,7 +1081,12 @@ nge_chip_reset(nge_t *ngep)
 		pmu_cntl2.cntl2_bits.dev_enable = NGE_SET;
 		nge_reg_put32(ngep, NGE_PMU_CNTL2, pmu_cntl2.cntl2_val);
 	}
-
+	/*
+	 * Stop the chipset and clear buffer management
+	 */
+	err = nge_chip_stop(ngep, B_FALSE);
+	if (err == DDI_FAILURE)
+		return (err);
 	/*
 	 * Clear the power state bits for phy since interface no longer
 	 * works after rebooting from Windows on a multi-boot machine

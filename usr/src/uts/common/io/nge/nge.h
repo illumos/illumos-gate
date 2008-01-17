@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -747,6 +747,7 @@ typedef struct nge_dev_spec_param {
 	boolean_t	msi;		/* specifies msi support */
 	boolean_t	msi_x;		/* specifies msi_x support */
 	boolean_t	vlan;		/* specifies vlan support */
+	boolean_t	advanced_pm;	/* advanced power management support */
 	boolean_t	tx_pause_frame;	/* specifies tx pause frame support */
 	boolean_t	rx_pause_frame;	/* specifies rx pause frame support */
 	boolean_t	jumbo;		/* jumbo frame support */
