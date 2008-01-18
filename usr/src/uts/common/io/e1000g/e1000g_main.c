@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -3752,8 +3752,6 @@ e1000g_set_loopback_mode(struct e1000g *Adapter, uint32_t mode)
 
 again:
 
-	(void) e1000g_reset(Adapter);
-
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
 	switch (mode) {
@@ -3780,9 +3778,13 @@ again:
 
 	times++;
 
+	rw_exit(&Adapter->chip_lock);
+
 	/* Wait for link up */
 	for (i = (PHY_FORCE_LIMIT * 2); i > 0; i--)
 		msec_delay(100);
+
+	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
 	link_up = e1000g_link_up(Adapter);
 
