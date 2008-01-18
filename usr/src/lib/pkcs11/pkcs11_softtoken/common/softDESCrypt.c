@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,55 +92,60 @@ soft_des_crypt_init_common(soft_session_t *session_p,
 	 * extra key schedule expansion operation.
 	 */
 	if (!(key_p->bool_attr_mask & SENSITIVE_BOOL_ON)) {
-		if (OBJ_SEC(key_p)->key_sched == NULL) {
+		if (OBJ_KEY_SCHED(key_p) == NULL) {
 			void *ks;
-			/* allocate a key schedule for the key object */
-			if (key_p->key_type == CKK_DES)
-				ks = des_alloc_keysched(&size, DES, 0);
-			else
-				ks = des_alloc_keysched(&size, DES3, 0);
-			if (ks != NULL) {
-				OBJ_SEC(key_p)->key_sched = ks;
-				OBJ_SEC(key_p)->keysched_len = size;
-			} else {
-				free(soft_des_ctx);
-				return (CKR_HOST_MEMORY);
+			(void) pthread_mutex_lock(&key_p->object_mutex);
+			if (OBJ_KEY_SCHED(key_p) == NULL) {
+				if (key_p->key_type == CKK_DES)
+					ks = des_alloc_keysched(&size, DES, 0);
+				else
+					ks = des_alloc_keysched(&size, DES3, 0);
+				if (ks == NULL) {
+					(void) pthread_mutex_unlock(
+					    &key_p->object_mutex);
+					free(soft_des_ctx);
+					return (CKR_HOST_MEMORY);
+				}
+				/* Initialize key schedule for DES or DES3. */
+				if (key_p->key_type == CKK_DES)
+					des_init_keysched(
+					    OBJ_SEC(key_p)->sk_value, DES, ks);
+				else if (key_p->key_type == CKK_DES2)
+					/*
+					 * DES3 encryption/decryption needs to
+					 * support a DES2 key.
+					 */
+					des_init_keysched(
+					    OBJ_SEC(key_p)->sk_value, DES2, ks);
+				else
+					des_init_keysched(
+					    OBJ_SEC(key_p)->sk_value, DES3, ks);
+
+				OBJ_KEY_SCHED_LEN(key_p) = size;
+				OBJ_KEY_SCHED(key_p) = ks;
 			}
-			/* Initialize key schedule for DES or DES3. */
-			if (key_p->key_type == CKK_DES)
-				des_init_keysched(OBJ_SEC(key_p)->sk_value,
-					DES, OBJ_SEC(key_p)->key_sched);
-			else if (key_p->key_type == CKK_DES2)
-				/*
-				 * DES3 encryption/decryption needs to
-				 * support a DES2 key.
-				 */
-				des_init_keysched(OBJ_SEC(key_p)->sk_value,
-					DES2, OBJ_SEC(key_p)->key_sched);
-			else
-				des_init_keysched(OBJ_SEC(key_p)->sk_value,
-					DES3, OBJ_SEC(key_p)->key_sched);
+			(void) pthread_mutex_unlock(&key_p->object_mutex);
 		}
 
 		/* Copy the pre-expanded key schedule from the key object */
 		(void) memcpy(soft_des_ctx->key_sched, OBJ_KEY_SCHED(key_p),
-			OBJ_KEY_SCHED_LEN(key_p));
+		    OBJ_KEY_SCHED_LEN(key_p));
 		soft_des_ctx->keysched_len = OBJ_KEY_SCHED_LEN(key_p);
 	} else {
 		/* for sensitive keys, we cannot cache the key schedule */
 		if (key_p->key_type == CKK_DES)
 			des_init_keysched(OBJ_SEC(key_p)->sk_value,
-				DES, soft_des_ctx->key_sched);
+			    DES, soft_des_ctx->key_sched);
 		else if (key_p->key_type == CKK_DES2)
 			/*
 			 * DES3 encryption/decryption needs to
 			 * support a DES2 key.
 			 */
 			des_init_keysched(OBJ_SEC(key_p)->sk_value,
-				DES2, soft_des_ctx->key_sched);
+			    DES2, soft_des_ctx->key_sched);
 		else
 			des_init_keysched(OBJ_SEC(key_p)->sk_value,
-				DES3, soft_des_ctx->key_sched);
+			    DES3, soft_des_ctx->key_sched);
 	}
 
 	return (CKR_OK);
@@ -220,7 +224,7 @@ soft_des_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 * be rounded up to the next multiple of blocksize.
 			 */
 			out_len = DES_BLOCK_LEN *
-				(ulDataLen / DES_BLOCK_LEN + 1);
+			    (ulDataLen / DES_BLOCK_LEN + 1);
 		} else {
 			/*
 			 * For non-padding mode, the output length will
@@ -405,10 +409,10 @@ soft_des_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 */
 			CK_BYTE tmpblock[DES_BLOCK_LEN];
 			(void) memcpy(tmpblock, in_buf + out_len,
-				ulDataLen - out_len);
+			    ulDataLen - out_len);
 			soft_add_pkcs7_padding(tmpblock +
-				(ulDataLen - out_len),
-				DES_BLOCK_LEN, ulDataLen - out_len);
+			    (ulDataLen - out_len),
+			    DES_BLOCK_LEN, ulDataLen - out_len);
 
 			out.cd_offset = out_len;
 			out.cd_length = DES_BLOCK_LEN;
@@ -731,7 +735,7 @@ soft_des_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 			if (rv == CKR_OK) {
 				if (rem_len != 0)
 					(void) memcpy(out_buf + out_len,
-						last_block, rem_len);
+					    last_block, rem_len);
 				*pulDataLen = out_len + rem_len;
 			} else {
 				*pulDataLen = 0;
@@ -827,8 +831,7 @@ soft_des_sign_verify_init_common(soft_session_t *session_p,
 	CK_MECHANISM	encrypt_mech;
 	CK_RV rv;
 
-	if ((key_p->class != CKO_SECRET_KEY) ||
-		(key_p->key_type != CKK_DES)) {
+	if ((key_p->class != CKO_SECRET_KEY) || (key_p->key_type != CKK_DES)) {
 		return (CKR_KEY_TYPE_INCONSISTENT);
 	}
 
@@ -848,19 +851,19 @@ soft_des_sign_verify_init_common(soft_session_t *session_p,
 	case CKM_DES_MAC_GENERAL:
 
 		if (pMechanism->ulParameterLen !=
-			sizeof (CK_MAC_GENERAL_PARAMS)) {
+		    sizeof (CK_MAC_GENERAL_PARAMS)) {
 			free(soft_des_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
 
 		if (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			DES_BLOCK_LEN) {
+		    DES_BLOCK_LEN) {
 			free(soft_des_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
 
 		soft_des_ctx->mac_len = *((CK_MAC_GENERAL_PARAMS_PTR)
-			pMechanism->pParameter);
+		    pMechanism->pParameter);
 
 		/*FALLTHRU*/
 	case CKM_DES_MAC:
@@ -878,7 +881,7 @@ soft_des_sign_verify_init_common(soft_session_t *session_p,
 		encrypt_mech.pParameter = (void *)soft_des_ctx->ivec;
 		encrypt_mech.ulParameterLen = DES_BLOCK_LEN;
 		rv = soft_encrypt_init_internal(session_p, &encrypt_mech,
-			key_p);
+		    key_p);
 		if (rv != CKR_OK) {
 			free(soft_des_ctx);
 			return (rv);
@@ -892,7 +895,7 @@ soft_des_sign_verify_init_common(soft_session_t *session_p,
 		} else {
 			session_p->verify.context = soft_des_ctx;
 			session_p->verify.mech.mechanism =
-				pMechanism->mechanism;
+			    pMechanism->mechanism;
 		}
 
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
@@ -922,7 +925,7 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	if (sign_op) {
 		soft_des_ctx_sign_verify =
-			(soft_des_ctx_t *)session_p->sign.context;
+		    (soft_des_ctx_t *)session_p->sign.context;
 
 		if (soft_des_ctx_sign_verify->mac_len == 0) {
 			*pulSignedLen = 0;
@@ -942,12 +945,12 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		}
 	} else {
 		soft_des_ctx_sign_verify =
-			(soft_des_ctx_t *)session_p->verify.context;
+		    (soft_des_ctx_t *)session_p->verify.context;
 	}
 
 	if (Final) {
 		soft_des_ctx_encrypt =
-			(soft_des_ctx_t *)session_p->encrypt.context;
+		    (soft_des_ctx_t *)session_p->encrypt.context;
 
 		/*
 		 * If there is data left in the buffer from a previous
@@ -964,7 +967,7 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 * and encrypt it.
 			 */
 			rv = soft_encrypt_final(session_p, last_block,
-				&ulEncryptedLen);
+			    &ulEncryptedLen);
 			if (rv != CKR_OK) {
 				goto clean_exit;
 			}
@@ -975,17 +978,17 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 * Copy that data to last_block
 			 */
 			soft_des_ctx_encrypt =
-				(soft_des_ctx_t *)session_p->encrypt.context;
+			    (soft_des_ctx_t *)session_p->encrypt.context;
 			des_ctx = (des_ctx_t *)soft_des_ctx_encrypt->des_cbc;
 			(void) memcpy(last_block, des_ctx->dc_lastp,
-				DES_BLOCK_LEN);
+			    DES_BLOCK_LEN);
 
 			/*
 			 * Passing a NULL output buffer here
 			 * forces the routine to just return.
 			 */
 			rv = soft_encrypt_final(session_p, NULL,
-				&ulEncryptedLen);
+			    &ulEncryptedLen);
 		}
 
 	} else {
@@ -1000,8 +1003,7 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		 * be padded to the next 8 byte boundary.
 		 * Adjust the length fields here accordingly.
 		 */
-		ulEncryptedLen = ulDataLen +
-			(DES_BLOCK_LEN - remainder);
+		ulEncryptedLen = ulDataLen + (DES_BLOCK_LEN - remainder);
 
 		pEncrypted = malloc(sizeof (CK_BYTE) * ulEncryptedLen);
 		if (pEncrypted == NULL) {
@@ -1017,10 +1019,9 @@ soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		(void) memcpy(pEncrypted, pData, ulDataLen);
 
 		rv = soft_encrypt(session_p, pEncrypted, ulDataLen,
-			pEncrypted, &ulEncryptedLen);
+		    pEncrypted, &ulEncryptedLen);
 		(void) memcpy(last_block,
-			&pEncrypted[ulEncryptedLen - DES_BLOCK_LEN],
-			DES_BLOCK_LEN);
+		    &pEncrypted[ulEncryptedLen - DES_BLOCK_LEN], DES_BLOCK_LEN);
 	}
 
 	if (rv == CKR_OK) {
@@ -1085,7 +1086,7 @@ soft_des_mac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 
 	if (total_len < DES_BLOCK_LEN) {
 		rv = soft_encrypt_update(session_p, pPart, ulPartLen, NULL,
-			&ulEncryptedLen);
+		    &ulEncryptedLen);
 	} else {
 		remainder = ulPartLen % DES_BLOCK_LEN;
 
@@ -1095,7 +1096,7 @@ soft_des_mac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 
 		if (pEncrypted != NULL) {
 			rv = soft_encrypt_update(session_p, pPart, ulPartLen,
-				pEncrypted, &ulEncryptedLen);
+			    pEncrypted, &ulEncryptedLen);
 			free(pEncrypted);
 		} else {
 			rv = CKR_HOST_MEMORY;

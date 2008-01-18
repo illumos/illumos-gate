@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,20 +80,26 @@ soft_blowfish_crypt_init_common(soft_session_t *session_p,
 	 * extra key schedule expansion operation.
 	 */
 	if (!(key_p->bool_attr_mask & SENSITIVE_BOOL_ON)) {
-		if (OBJ_SEC(key_p)->key_sched == NULL) {
+		if (OBJ_KEY_SCHED(key_p) == NULL) {
 			void *ks;
-			ks = blowfish_alloc_keysched(&size, 0);
-			if (ks == NULL) {
-				free(soft_blowfish_ctx);
-				return (CKR_HOST_MEMORY);
+
+			(void) pthread_mutex_lock(&key_p->object_mutex);
+			if (OBJ_KEY_SCHED(key_p) == NULL) {
+				ks = blowfish_alloc_keysched(&size, 0);
+				if (ks == NULL) {
+					(void) pthread_mutex_unlock(
+					    &key_p->object_mutex);
+					free(soft_blowfish_ctx);
+					return (CKR_HOST_MEMORY);
+				}
+
+				blowfish_init_keysched(OBJ_SEC_VALUE(key_p),
+				    (OBJ_SEC_VALUE_LEN(key_p) * 8), ks);
+
+				OBJ_KEY_SCHED_LEN(key_p) = size;
+				OBJ_KEY_SCHED(key_p) = ks;
 			}
-
-			OBJ_SEC(key_p)->key_sched = ks;
-			OBJ_SEC(key_p)->keysched_len = size;
-
-			blowfish_init_keysched(OBJ_SEC_VALUE(key_p),
-			    (OBJ_SEC_VALUE_LEN(key_p) * 8),
-				OBJ_KEY_SCHED(key_p));
+			(void) pthread_mutex_unlock(&key_p->object_mutex);
 		}
 		(void) memcpy(soft_blowfish_ctx->key_sched,
 		    OBJ_KEY_SCHED(key_p), OBJ_KEY_SCHED_LEN(key_p));

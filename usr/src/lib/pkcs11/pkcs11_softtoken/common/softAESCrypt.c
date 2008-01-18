@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,29 +84,33 @@ soft_aes_crypt_init_common(soft_session_t *session_p,
 	 * extra key schedule expansion operation.
 	 */
 	if (!(key_p->bool_attr_mask & SENSITIVE_BOOL_ON)) {
-		if (OBJ_SEC(key_p)->key_sched == NULL) {
+		if (OBJ_KEY_SCHED(key_p) == NULL) {
 			void *ks;
-			ks = aes_alloc_keysched(&size, 0);
-			if (ks != NULL) {
-				OBJ_SEC(key_p)->key_sched = ks;
-				OBJ_SEC(key_p)->keysched_len = size;
-			} else {
-				free(soft_aes_ctx);
-				return (CKR_HOST_MEMORY);
-			}
+
+			(void) pthread_mutex_lock(&key_p->object_mutex);
+			if (OBJ_KEY_SCHED(key_p) == NULL) {
+				ks = aes_alloc_keysched(&size, 0);
+				if (ks == NULL) {
+					(void) pthread_mutex_unlock(
+					    &key_p->object_mutex);
+					free(soft_aes_ctx);
+					return (CKR_HOST_MEMORY);
+				}
 #ifdef	__sparcv9
-			/* LINTED */
-			aes_init_keysched(OBJ_SEC_VALUE(key_p), (uint_t)
-				(OBJ_SEC_VALUE_LEN(key_p) * 8),
-				OBJ_KEY_SCHED(key_p));
+				/* LINTED */
+				aes_init_keysched(OBJ_SEC_VALUE(key_p), (uint_t)
+				    (OBJ_SEC_VALUE_LEN(key_p) * 8), ks);
 #else	/* !__sparcv9 */
-			aes_init_keysched(OBJ_SEC_VALUE(key_p),
-				(OBJ_SEC_VALUE_LEN(key_p) * 8),
-				OBJ_KEY_SCHED(key_p));
+				aes_init_keysched(OBJ_SEC_VALUE(key_p),
+				    (OBJ_SEC_VALUE_LEN(key_p) * 8), ks);
 #endif	/* __sparcv9 */
+				OBJ_KEY_SCHED_LEN(key_p) = size;
+				OBJ_KEY_SCHED(key_p) = ks;
+			}
+			(void) pthread_mutex_unlock(&key_p->object_mutex);
 		}
 		(void) memcpy(soft_aes_ctx->key_sched, OBJ_KEY_SCHED(key_p),
-			OBJ_KEY_SCHED_LEN(key_p));
+		    OBJ_KEY_SCHED_LEN(key_p));
 		soft_aes_ctx->keysched_len = OBJ_KEY_SCHED_LEN(key_p);
 	} else {
 		/*
@@ -117,12 +120,10 @@ soft_aes_crypt_init_common(soft_session_t *session_p,
 #ifdef	__sparcv9
 		/* LINTED */
 		aes_init_keysched(OBJ_SEC_VALUE(key_p), (uint_t)
-		    (OBJ_SEC_VALUE_LEN(key_p) * 8),
-		    soft_aes_ctx->key_sched);
+		    (OBJ_SEC_VALUE_LEN(key_p) * 8), soft_aes_ctx->key_sched);
 #else	/* !__sparcv9 */
 		aes_init_keysched(OBJ_SEC_VALUE(key_p),
-			(OBJ_SEC_VALUE_LEN(key_p) * 8),
-			soft_aes_ctx->key_sched);
+		    (OBJ_SEC_VALUE_LEN(key_p) * 8), soft_aes_ctx->key_sched);
 #endif	/* __sparcv9 */
 	}
 	return (CKR_OK);
@@ -379,10 +380,10 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			 */
 			CK_BYTE tmpblock[AES_BLOCK_LEN];
 			(void) memcpy(tmpblock, in_buf + out_len,
-				ulDataLen - out_len);
+			    ulDataLen - out_len);
 			soft_add_pkcs7_padding(tmpblock +
-				(ulDataLen - out_len),
-				AES_BLOCK_LEN, ulDataLen - out_len);
+			    (ulDataLen - out_len),
+			    AES_BLOCK_LEN, ulDataLen - out_len);
 
 			out.cd_offset = out_len;
 			out.cd_length = AES_BLOCK_LEN;
