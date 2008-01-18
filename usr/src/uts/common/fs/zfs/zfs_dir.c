@@ -505,7 +505,9 @@ zfs_unlinked_drain(zfsvfs_t *zfsvfs)
 
 /*
  * Delete the entire contents of a directory.  Return a count
- * of the number of entries that could not be deleted.
+ * of the number of entries that could not be deleted. If we encounter
+ * an error, return a count of at least one so that the directory stays
+ * in the unlinked set.
  *
  * NOTE: this function assumes that the directory is inactive,
  *	so there is no need to lock its entries before deletion.
@@ -529,7 +531,10 @@ zfs_purgedir(znode_t *dzp)
 	    zap_cursor_advance(&zc)) {
 		error = zfs_zget(zfsvfs,
 		    ZFS_DIRENT_OBJ(zap.za_first_integer), &xzp);
-		ASSERT3U(error, ==, 0);
+		if (error) {
+			skipped += 1;
+			continue;
+		}
 
 		ASSERT((ZTOV(xzp)->v_type == VREG) ||
 		    (ZTOV(xzp)->v_type == VLNK));
@@ -551,13 +556,15 @@ zfs_purgedir(znode_t *dzp)
 		dl.dl_name = zap.za_name;
 
 		error = zfs_link_destroy(&dl, xzp, tx, 0, NULL);
-		ASSERT3U(error, ==, 0);
+		if (error)
+			skipped += 1;
 		dmu_tx_commit(tx);
 
 		VN_RELE(ZTOV(xzp));
 	}
 	zap_cursor_fini(&zc);
-	ASSERT(error == ENOENT);
+	if (error != ENOENT)
+		skipped += 1;
 	return (skipped);
 }
 
