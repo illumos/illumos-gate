@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/systm.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sdt.h>
 
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
@@ -532,6 +533,12 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 		mutex_exit(&cpudsp->lock);
 		return (DDI_FAILURE);
 	}
+
+	/*
+	 * DTrace probe point for CPU speed change transition
+	 */
+	DTRACE_PROBE3(cpu__change__speed, cpudrv_devstate_t *, cpudsp,
+	    cpudrv_pm_t *, cpupm, cpudrv_pm_spd_t *, new_spd);
 
 	/*
 	 * Reset idle threshold time for the new power level.

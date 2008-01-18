@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <sys/mach_intr.h>
 #include <vm/hat_i86.h>
 #include <sys/kdi_machimpl.h>
+#include <sys/sdt.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -567,9 +568,13 @@ cpu_idle_mwait(void)
 	 */
 	i86_monitor(mcpu_mwait, 0, 0);
 	if (*mcpu_mwait == MWAIT_HALTED) {
+		DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C1);
+
 		tlb_going_idle();
 		i86_mwait(0, 0);
 		tlb_service();
+
+		DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C0);
 	}
 
 	/*

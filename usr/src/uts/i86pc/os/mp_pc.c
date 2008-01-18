@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/mach_mmu.h>
 #include <sys/promif.h>
 #include <sys/cpu.h>
+#include <sys/sdt.h>
 #include <vm/hat_i86.h>
 
 extern void real_mode_start(void);
@@ -257,9 +258,13 @@ mach_cpu_halt(char *msg)
 void
 mach_cpu_idle(void)
 {
+	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C1);
+
 	tlb_going_idle();
 	i86_halt();
 	tlb_service();
+
+	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C0);
 }
 
 void

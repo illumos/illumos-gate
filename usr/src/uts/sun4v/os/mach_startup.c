@@ -42,6 +42,7 @@
 #include <sys/cpu_module.h>
 #include <sys/mutex_impl.h>
 #include <vm/vm_dep.h>
+#include <sys/sdt.h>
 
 #ifdef TRAPTRACE
 int mach_htraptrace_enable = 1;
@@ -58,6 +59,17 @@ extern void sfmmu_set_tsbs(void);
  * CPU IDLE optimization variables/routines
  */
 static int enable_halt_idle_cpus = 1;
+
+/*
+ * Defines for the idle_state_transition DTrace probe
+ *
+ * The probe fires when the CPU undergoes an idle state change (e.g. hv yield)
+ * The agument passed is the state to which the CPU is transitioning.
+ *
+ * The states are defined here.
+ */
+#define	IDLE_STATE_NORMAL 0
+#define	IDLE_STATE_YIELDED 1
 
 #define	SUN4V_CLOCK_TICK_THRESHOLD	64
 #define	SUN4V_CLOCK_TICK_NCPUS		64
@@ -170,7 +182,13 @@ cpu_halt(void)
 	while (*p == 0 &&
 	    ((hset_update && CPU_IN_SET(cp->cp_mach->mc_haltset, cpun)) ||
 	    (!hset_update && (CPU->cpu_flags & CPU_OFFLINE)))) {
+
+		DTRACE_PROBE1(idle__state__transition,
+		    uint_t, IDLE_STATE_YIELDED);
 		(void) hv_cpu_yield();
+		DTRACE_PROBE1(idle__state__transition,
+		    uint_t, IDLE_STATE_NORMAL);
+
 		enable_vec_intr(s);
 		s = disable_vec_intr();
 	}

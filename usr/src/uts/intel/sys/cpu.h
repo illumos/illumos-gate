@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,18 @@ extern int xpv_panicking;
 #else
 #define	SMT_PAUSE()		ht_pause()
 #endif
+
+/*
+ *
+ * C-state defines for the idle_state_transition DTrace probe
+ *
+ * The probe fires when the CPU undergoes an idle state change (e.g. C-state)
+ * The agument passed is the C-state to which the CPU is transitioning.
+ *
+ * The states are defined here.
+ */
+#define	IDLE_STATE_C0 0
+#define	IDLE_STATE_C1 1
 
 #endif	/* _KERNEL */
 

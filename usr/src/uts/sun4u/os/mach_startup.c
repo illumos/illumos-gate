@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,17 @@ int64_t fpras_interval = -1;
  */
 #pragma weak	cpu_halt_cpu
 extern void	cpu_halt_cpu();
+
+/*
+ * Defines for the idle_state_transition DTrace probe
+ *
+ * The probe fires when the CPU undergoes an idle state change (e.g. halting)
+ * The agument passed is the state to which the CPU is transitioning.
+ *
+ * The states are defined here.
+ */
+#define	IDLE_STATE_NORMAL 0
+#define	IDLE_STATE_HALTED 1
 
 int		enable_halt_idle_cpus = 1; /* global switch */
 
@@ -300,8 +311,15 @@ cpu_halt(void)
 	/*
 	 * Halt the strand.
 	 */
-	if (&cpu_halt_cpu)
+	if (&cpu_halt_cpu) {
+		DTRACE_PROBE1(idle__state__transition,
+		    uint_t, IDLE_STATE_HALTED);
+
 		cpu_halt_cpu();
+
+		DTRACE_PROBE1(idle__state__transition,
+		    uint_t, IDLE_STATE_NORMAL);
+	}
 
 	/*
 	 * We're no longer halted
