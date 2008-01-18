@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,14 +123,40 @@ meta_operation_init(CK_FLAGS optype, meta_session_t *session,
 	 * and start a new one.
 	 */
 	if (session->op1.type != 0) {
-		meta_operation_cleanup(session, session->op1.type, B_FALSE);
+		CK_MECHANISM mech;
 		if ((optype == CKF_ENCRYPT) || (optype == CKF_DECRYPT) ||
 		    (optype == CKF_DIGEST)) {
+			mech = *pMechanism;
+
+			if ((pMechanism->ulParameterLen > 0) &&
+			    (pMechanism->pParameter != NULL)) {
+				mech.pParameter =
+				    malloc(pMechanism->ulParameterLen);
+				if (mech.pParameter == NULL) {
+					return (CKR_HOST_MEMORY);
+				}
+				(void) memcpy(mech.pParameter,
+				    pMechanism->pParameter,
+				    pMechanism->ulParameterLen);
+			} else {
+				mech.pParameter = NULL;
+				mech.ulParameterLen = 0;
+			}
+
+			meta_operation_cleanup(session, session->op1.type,
+			    B_FALSE);
 			rv = meta_operation_init_defer(optype, session,
-			    pMechanism, key);
+			    &mech, key);
+			if (mech.pParameter != NULL) {
+				free(mech.pParameter);
+			}
 			if (rv != CKR_OK)
 				return (rv);
+		} else {
+			meta_operation_cleanup(session, session->op1.type,
+			    B_FALSE);
 		}
+
 	}
 
 	mech_info.flags = optype;
@@ -314,9 +340,29 @@ meta_operation_init_softtoken(CK_FLAGS optype, meta_session_t *session,
 	 * and start a new one.
 	 */
 	if (session->op1.type != 0) {
+		CK_MECHANISM mech;
+		mech = *pMechanism;
+
+		if ((pMechanism->ulParameterLen > 0) &&
+		    (pMechanism->pParameter != NULL)) {
+			mech.pParameter =
+			    malloc(pMechanism->ulParameterLen);
+			if (mech.pParameter == NULL) {
+				return (CKR_HOST_MEMORY);
+			}
+			(void) memcpy(mech.pParameter,
+			    pMechanism->pParameter, pMechanism->ulParameterLen);
+		} else {
+			mech.pParameter = NULL;
+			mech.ulParameterLen = 0;
+		}
+
 		meta_operation_cleanup(session, session->op1.type, B_FALSE);
-		rv = meta_operation_init_defer(optype, session, pMechanism,
+		rv = meta_operation_init_defer(optype, session, &mech,
 		    key);
+		if (mech.pParameter != NULL) {
+			free(mech.pParameter);
+		}
 		if (rv != CKR_OK)
 			return (rv);
 	}
