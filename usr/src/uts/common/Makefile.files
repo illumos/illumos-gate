@@ -1254,7 +1254,7 @@ ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 		ecp_384.o ecp_jac.o ec2_193.o ecl.o ecp_192.o ecp_521.o \
 		ecp_jm.o ec2_233.o ecl_curve.o ecp_224.o ecp_aff.o \
 		ecp_mont.o ec2_aff.o ec_naf.o ecl_gf.o ecp_256.o mp_gf2m.o \
-		mpi.o mpcpucache.o mplogic.o mpmontg.o mpprime.o oid.o \
+		mpi.o mplogic.o mpmontg.o mpprime.o oid.o \
 		secitem.o ec2_test.o ecp_test.o
 
 COMMON_RSAPROV_OBJS += rsa.o bignumimpl.o rsa_impl.o

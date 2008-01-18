@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,7 +77,7 @@ ECC_COBJECTS = \
 	ec2_aff.o ec_naf.o ecl_gf.o ecp_256.o oid.o secitem.o \
 	ec2_test.o ecp_test.o
 
-MPI_COBJECTS = mp_gf2m.o mpi.o mpcpucache.o mplogic.o mpmontg.o mpprime.o
+MPI_COBJECTS = mp_gf2m.o mpi.o mplogic.o mpmontg.o mpprime.o
 
 RSA_COBJECTS = rsa_impl.o
 BIGNUM_COBJECTS = bignumimpl.o
