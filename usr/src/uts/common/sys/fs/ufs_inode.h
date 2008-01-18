@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -965,6 +965,7 @@ extern int ufs_fiolfss(struct vnode *, struct lockfs *);
 extern int ufs_fioffs(struct vnode *, char *, struct cred *);
 extern int ufs_check_lockfs(struct ufsvfs *, struct ulockfs *, ulong_t);
 extern int ufs_lockfs_begin(struct ufsvfs *, struct ulockfs **, ulong_t);
+extern int ufs_lockfs_trybegin(struct ufsvfs *, struct ulockfs **, ulong_t);
 extern int ufs_lockfs_begin_getpage(struct ufsvfs *, struct ulockfs **,
 		struct seg *, int, uint_t *);
 extern void ufs_lockfs_end(struct ulockfs *);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5554,6 +5554,9 @@ out_trace:
 	return (err);
 }
 
+uint64_t ufs_map_alock_retry_cnt;
+uint64_t ufs_map_lockfs_retry_cnt;
+
 /* ARGSUSED */
 static int
 ufs_map(struct vnode *vp,
@@ -5570,34 +5573,31 @@ ufs_map(struct vnode *vp,
 	struct segvn_crargs vn_a;
 	struct ufsvfs *ufsvfsp = VTOI(vp)->i_ufsvfs;
 	struct ulockfs *ulp;
-	int error;
-
-retry_map:
-	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_MAP_MASK);
-	if (error)
-		goto out;
+	int error, sig;
+	k_sigset_t smask;
 
 	if (vp->v_flag & VNOMAP) {
 		error = ENOSYS;
-		goto unlock;
+		goto out;
 	}
 
 	if (off < (offset_t)0 || (offset_t)(off + len) < (offset_t)0) {
 		error = ENXIO;
-		goto unlock;
+		goto out;
 	}
 
 	if (vp->v_type != VREG) {
 		error = ENODEV;
-		goto unlock;
+		goto out;
 	}
 
+retry_map:
 	/*
 	 * If file is being locked, disallow mapping.
 	 */
 	if (vn_has_mandatory_locks(vp, VTOI(vp)->i_mode)) {
 		error = EAGAIN;
-		goto unlock;
+		goto out;
 	}
 
 	as_rangelock(as);
@@ -5606,13 +5606,65 @@ retry_map:
 		if (*addrp == NULL) {
 			as_rangeunlock(as);
 			error = ENOMEM;
-			goto unlock;
+			goto out;
 		}
 	} else {
 		/*
-		 * User specified address - blow away any previous mappings
+		 * User specified address - blow away any previous mappings.
+		 * If we are retrying (because ufs_lockfs_trybegin failed in
+		 * the previous attempt), some other thread could have grabbed
+		 * the same VA range. In that case, we would unmap the valid
+		 * VA range, that is ok.
 		 */
 		(void) as_unmap(as, *addrp, len);
+	}
+
+	/*
+	 * a_lock has to be acquired before entering the lockfs protocol
+	 * because that is the order in which pagefault works. Also we cannot
+	 * block on a_lock here because this waiting writer will prevent
+	 * further readers like ufs_read from progressing and could cause
+	 * deadlock between ufs_read/ufs_map/pagefault when a quiesce is
+	 * pending.
+	 */
+	while (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_WRITER)) {
+		ufs_map_alock_retry_cnt++;
+		delay(RETRY_LOCK_DELAY);
+	}
+
+	/*
+	 * We can't hold as->a_lock and wait for lockfs to succeed because
+	 * the proc tools might hang on a_lock, so call ufs_lockfs_trybegin()
+	 * instead.
+	 */
+	if (error = ufs_lockfs_trybegin(ufsvfsp, &ulp, ULOCKFS_MAP_MASK)) {
+		/*
+		 * ufs_lockfs_trybegin() did not succeed. It is safer to give up
+		 * as->a_lock and wait for ulp->ul_fs_lock status to change.
+		 */
+		ufs_map_lockfs_retry_cnt++;
+		AS_LOCK_EXIT(as, &as->a_lock);
+		as_rangeunlock(as);
+		if (error == EIO)
+			goto out;
+
+		mutex_enter(&ulp->ul_lock);
+		while (ulp->ul_fs_lock & ULOCKFS_MAP_MASK) {
+			if (ULOCKFS_IS_SLOCK(ulp) || ufsvfsp->vfs_nointr) {
+				cv_wait(&ulp->ul_cv, &ulp->ul_lock);
+			} else {
+				sigintr(&smask, 1);
+				sig = cv_wait_sig(&ulp->ul_cv, &ulp->ul_lock);
+				sigunintr(&smask);
+				if (((ulp->ul_fs_lock & ULOCKFS_MAP_MASK) &&
+				    !sig) || ufsvfsp->vfs_dontblock) {
+					mutex_exit(&ulp->ul_lock);
+					return (EINTR);
+				}
+			}
+		}
+		mutex_exit(&ulp->ul_lock);
+		goto retry_map;
 	}
 
 	vn_a.vp = vp;
@@ -5626,34 +5678,10 @@ retry_map:
 	vn_a.szc = 0;
 	vn_a.lgrp_mem_policy_flags = 0;
 
-retry_lock:
-	if (!AS_LOCK_TRYENTER(ias, &as->a_lock, RW_WRITER)) {
-		/*
-		 * We didn't get the lock. Check if the SLOCK is set in the
-		 * ufsvfs. If yes, we might be in a deadlock. Safer to give up
-		 * and wait for SLOCK to be cleared.
-		 */
-
-		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
-			as_rangeunlock(as);
-			ufs_lockfs_end(ulp);
-			goto retry_map;
-		} else {
-			/*
-			 * SLOCK isn't set so this is a genuine synchronization
-			 * case. Let's try again after giving them a breather.
-			 */
-			delay(RETRY_LOCK_DELAY);
-			goto  retry_lock;
-		}
-	}
 	error = as_map_locked(as, *addrp, len, segvn_create, &vn_a);
-	as_rangeunlock(as);
-
-unlock:
-	if (ulp) {
+	if (ulp)
 		ufs_lockfs_end(ulp);
-	}
+	as_rangeunlock(as);
 out:
 	return (error);
 }

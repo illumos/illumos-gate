@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1457,6 +1457,116 @@ ufs_lockfs_end(struct ulockfs *ulp)
 		cv_broadcast(&ulp->ul_cv);
 
 	mutex_exit(&ulp->ul_lock);
+}
+
+/*
+ * ufs_lockfs_trybegin - try to start the lockfs locking protocol without
+ * blocking.
+ */
+int
+ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
+{
+	int 		error = 0;
+	int		rec_vop;
+	struct ulockfs *ulp;
+	ulockfs_info_t	*ulockfs_info;
+	ulockfs_info_t	*ulockfs_info_free;
+	ulockfs_info_t	*ulockfs_info_temp;
+
+	/*
+	 * file system has been forcibly unmounted
+	 */
+	if (ufsvfsp == NULL)
+		return (EIO);
+
+	*ulpp = ulp = &ufsvfsp->vfs_ulockfs;
+
+	/*
+	 * Do lockfs protocol
+	 */
+	ulockfs_info = (ulockfs_info_t *)tsd_get(ufs_lockfs_key);
+	IS_REC_VOP(rec_vop, ulockfs_info, ulp, ulockfs_info_free);
+
+	/*
+	 * Detect recursive VOP call or handcrafted internal lockfs protocol
+	 * path and bail out in that case.
+	 */
+	if (rec_vop || ufs_lockfs_is_under_rawlockfs(ulp)) {
+		*ulpp = NULL;
+		return (0);
+	} else {
+		if (ulockfs_info_free == NULL) {
+			if ((ulockfs_info_temp = (ulockfs_info_t *)
+			    kmem_zalloc(sizeof (ulockfs_info_t),
+			    KM_NOSLEEP)) == NULL) {
+				*ulpp = NULL;
+				return (ENOMEM);
+			}
+		}
+	}
+
+	/*
+	 * First time VOP call
+	 */
+	mutex_enter(&ulp->ul_lock);
+	if (ULOCKFS_IS_JUSTULOCK(ulp)) {
+		/*
+		 * This is the common case of file system in a
+		 * unlocked state.
+		 */
+		if (mask & ULOCKFS_FWLOCK) {
+			atomic_add_long(&ulp->ul_falloc_cnt, 1);
+			ULOCKFS_SET_FALLOC(ulp);
+		} else {
+			atomic_add_long(&ulp->ul_vnops_cnt, 1);
+		}
+	} else {
+		/*
+		 * Non-blocking version of ufs_check_lockfs() code.
+		 *
+		 * If the file system is not hard locked or error locked
+		 * and if ulp->ul_fs_lock allows this operation, increment
+		 * the appropriate counter and proceed (For eg., In case the
+		 * file system is delete locked, a mmap can still go through).
+		 */
+		if (ULOCKFS_IS_HLOCK(ulp) ||
+		    (ULOCKFS_IS_ELOCK(ulp) && ufsvfsp->vfs_dontblock))
+			error = EIO;
+		else if (ulp->ul_fs_lock & mask)
+			error = EAGAIN;
+
+		if (error) {
+			mutex_exit(&ulp->ul_lock);
+			if (ulockfs_info_free == NULL)
+				kmem_free(ulockfs_info_temp,
+				    sizeof (ulockfs_info_t));
+			return (error);
+		} else {
+			if (mask & ULOCKFS_FWLOCK) {
+				atomic_add_long(&ulp->ul_falloc_cnt, 1);
+				ULOCKFS_SET_FALLOC(ulp);
+			} else {
+				atomic_add_long(&ulp->ul_vnops_cnt, 1);
+			}
+		}
+	}
+	mutex_exit(&ulp->ul_lock);
+
+	if (ulockfs_info_free != NULL) {
+		ulockfs_info_free->ulp = ulp;
+		if (mask & ULOCKFS_FWLOCK)
+			ulockfs_info_free->flags |= ULOCK_INFO_FALLOCATE;
+	} else {
+		ulockfs_info_temp->ulp = ulp;
+		ulockfs_info_temp->next = ulockfs_info;
+		if (mask & ULOCKFS_FWLOCK)
+			ulockfs_info_temp->flags |= ULOCK_INFO_FALLOCATE;
+		ASSERT(ufs_lockfs_key != 0);
+		(void) tsd_set(ufs_lockfs_key, (void *)ulockfs_info_temp);
+	}
+
+	curthread->t_flag |= T_DONTBLOCK;
+	return (0);
 }
 
 /*
