@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -435,7 +435,7 @@ label/**/_tsbreg_vamask:						;\
 #define	RESV_OFFSET(tsbinfo, resva, tmp1, label)			\
 	/* BEGIN CSTYLED */						\
 	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1			;\
-	brgz,pn	tmp1, 9f						;\
+	brgz,pn	tmp1, label/**/9	 				;\
 	  nop								;\
 	ldx	[tsbinfo + TSBINFO_VADDR], tmp1				;\
 	.global	label/**/_resv_offset					;\
@@ -443,7 +443,8 @@ label/**/_resv_offset:							;\
 	sllx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	srlx	tmp1, (64 - MMU_PAGESHIFT4M), tmp1			;\
 	or	tmp1, resva, resva					;\
-9:	/* END CSTYLED */
+label/**/9:								\
+	/* END CSTYLED */
 
 /*
  * Determine the pointer of the entry in the first TSB to probe given
