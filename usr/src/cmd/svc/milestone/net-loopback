@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,3 +58,11 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 
 # IPv6 loopback
 /sbin/ifconfig lo0 inet6 plumb ::1 up
+
+# Trusted Extensions shares the loopback interface with all zones
+if (smf_is_system_labeled); then
+	if smf_is_globalzone; then
+		 /sbin/ifconfig lo0 all-zones
+		 /sbin/ifconfig lo0 inet6 all-zones
+	fi
+fi

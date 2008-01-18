@@ -2540,6 +2540,13 @@ configure_shared_network_interfaces(zlog_t *zlogp)
 		(void) zonecfg_endnwifent(handle);
 	}
 	zonecfg_fini_handle(handle);
+	if (is_system_labeled()) {
+		/*
+		 * Labeled zones share the loopback interface
+		 * so it is not plumbed for shared stack instances.
+		 */
+		return (0);
+	}
 	(void) strlcpy(loopback_iftab.zone_nwif_physical, "lo0",
 	    sizeof (loopback_iftab.zone_nwif_physical));
 	(void) strlcpy(loopback_iftab.zone_nwif_address, "127.0.0.1",
