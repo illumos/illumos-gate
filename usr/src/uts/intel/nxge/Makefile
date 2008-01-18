@@ -18,9 +18,9 @@
 #
 # CDDL HEADER END
 #
-# uts/i86pc/nxge/Makefile
+# uts/intel/nxge/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -41,13 +41,13 @@ MODULE		= nxge
 NXGE_OBJECTS =	$(NXGE_OBJS) $(NXGE_NPI_OBJS)
 OBJECTS		=  $(NXGE_OBJECTS:%=$(OBJS_DIR)/%)
 LINTS		= $(NXGE_OBJECTS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/nxge
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Override defaults to build a unique, local modstubs.o.
@@ -121,4 +121,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ

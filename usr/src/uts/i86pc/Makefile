@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,10 +42,9 @@ INTEL_LIB_DIR	 = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
 
 INTEL_LINTS	 = genunix
 
-LINT_PARALLEL_KMODS	= $(PARALLEL_KMODS:nxge=)
 LINT_LIBS	 = $(LINT_LIB) \
 		   $(GENUNIX_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
-		   $(LINT_PARALLEL_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		   $(PARALLEL_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
 

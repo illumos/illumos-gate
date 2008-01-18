@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,6 +61,9 @@ else
         #
         ADD_DRV="add_drv -b ${BASEDIR}"
 fi
+
+removef $PKGINST /platform/i86pc/kernel/drv/nxge.conf >/dev/null 2>&1
+removef -f $PKGINST >/dev/null 2>&1
 
 #
 # Make sure add_drv has *not* been previously executed

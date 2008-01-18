@@ -22,7 +22,7 @@
 #
 # uts/i86pc/Makefile.i86pc
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -241,7 +241,6 @@ DRV_KMODS	+= pcplusmp
 DRV_KMODS	+= cpc
 DRV_KMODS	+= pci
 DRV_KMODS	+= npe
-DRV_KMODS	+= nxge
 DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
 DRV_KMODS	+= mc-amd

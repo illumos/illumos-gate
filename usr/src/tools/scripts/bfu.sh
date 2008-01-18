@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -6954,6 +6954,17 @@ mondo_loop() {
 	if [ $target_isa = i386 ]; then
 		rm -f $root/kernel/misc/acpi_intp
 		rm -f $root/kernel/misc/amd64/acpi_intp
+	fi
+
+	#
+	# Remove nxge module (moved to a generic location to support xVM)
+	#
+	if [ $target_isa = i386 ]; then
+		rm -f $root/platform/i86pc/kernel/drv/nxge
+		rm -f $root/platform/i86pc/kernel/drv/amd64/nxge
+		# We're doing a backward bfu.
+		rm -f $root/kernel/drv/nxge
+		rm -f $root/kernel/drv/amd64/nxge
 	fi
 
 	#
