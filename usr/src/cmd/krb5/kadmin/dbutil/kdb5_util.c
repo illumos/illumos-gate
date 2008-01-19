@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,14 +231,19 @@ int main(argc, argv)
 	Err_no_master_msg = gettext("Master key not entered!\n");
 	Err_no_database = gettext("Database not currently opened!\n");
 
+	/*
+	 * Solaris Kerberos:
+	 * Ensure that "progname" is set before calling com_err.
+	 */
+	progname = (strrchr(argv[0], '/') ?
+		    strrchr(argv[0], '/') + 1 : argv[0]);
+
     retval = kadm5_init_krb5_context(&util_context);
     if (retval) {
 	    com_err (progname, retval, 
 		gettext("while initializing Kerberos code"));
 	    exit(1);
     }
-	progname = (strrchr(argv[0], '/') ?
-		    strrchr(argv[0], '/') + 1 : argv[0]);
 
     cmd_argv = (char **) malloc(sizeof(char *)*argc);
     if (cmd_argv == NULL) {

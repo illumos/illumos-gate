@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -316,6 +316,12 @@ int main(argc, argv)
     krb5_boolean realm_name_required = TRUE;
     krb5_boolean print_help_message = FALSE;
 
+    /*
+     * Solaris Kerberos:
+     * Ensure that "progname" is set before calling com_err.
+     */
+    progname = (strrchr(argv[0], '/') ? strrchr(argv[0], '/')+1 : argv[0]);
+
     retval = krb5_init_context(&util_context);
     set_com_err_hook(extended_com_err_fn);
     if (retval) {
@@ -323,8 +329,6 @@ int main(argc, argv)
 	exit_status++;
 	goto cleanup;
     }
-
-    progname = (strrchr(argv[0], '/') ? strrchr(argv[0], '/')+1 : argv[0]);
 
     cmd_argv = (char **) malloc(sizeof(char *)*argc);
     if (cmd_argv == NULL) {

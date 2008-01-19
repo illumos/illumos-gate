@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -936,10 +936,9 @@ main(int argc, char *argv[])
 				"plugin does not support iprop, continuing "
 				"with iprop disabled\n"), whoami);
 			krb5_klog_syslog(LOG_WARNING,
-				gettext("%s Warning, current KDB "
+				gettext("Warning, current KDB "
 				"plugin does not support iprop, continuing "
 				"with iprop disabled"));
-			krb5_klog_close(ctx);
 
 			ulog_set_role(ctx, IPROP_NULL);
 		} else
