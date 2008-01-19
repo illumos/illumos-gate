@@ -20,14 +20,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# Remove the TX tsoljds-tstripe s10u4 workaround entry in pam.conf if found.
-# (The entry was added in previous SUNWtsr postinstall and is not needed now.)
+# Remove the TX tsoljds-tstripe s10u4 workaround in pam.conf if found.
+# (This was added in previous SUNWtsr postinstall and is not needed now.)
+# Use a new stack that will be correct whether TX is enabled or not.
 
 PAM_DEST=$BASEDIR/etc/pam.conf
 TMPFILE=/tmp/pam_conf.$$
@@ -51,8 +52,18 @@ if [ $? -ne 0 ]; then
 	exit 0
 fi
 
+# First remove old entries
 grep -v '^tsoljds-tstripe.*account' $PAM_DEST > $TMPFILE
-echo "$0: $PAM_DEST "tsoljds-tstripe" entries removed"
+
+# Append correct new stack
+# No comments or blank lines allowed in entries below.
+cat >> $TMPFILE << EOF
+tsoljds-tstripe		account		requisite	pam_roles.so.1
+tsoljds-tstripe		account		required	pam_unix_account.so.1
+EOF
+
+echo "$0: $PAM_DEST "tsoljds-tstripe" entries corrected"
+
 cp $TMPFILE $PAM_DEST
 rm -f $TMPFILE
 
