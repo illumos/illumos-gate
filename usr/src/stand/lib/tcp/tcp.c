@@ -6044,6 +6044,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 #ifdef DEBUG
 		printf("Multiple mblk %d\n", msgdsize(mp1));
 #endif
+		mp2 = mp1;
 		new_mp = allocb(msgdsize(mp1) + tcp_wroff_xtra, 0);
 		new_mp->b_rptr += tcp_wroff_xtra;
 		new_mp->b_wptr = new_mp->b_rptr;
@@ -6053,7 +6054,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			new_mp->b_wptr += mp_size;
 			mp1 = mp1->b_cont;
 		}
-		freemsg(mp1);
+		freemsg(mp2);
 		mp1 = new_mp;
 	}
 	tcp_set_cksum(mp1);
