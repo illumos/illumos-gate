@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,8 @@ extern void kcage_tick(void);
 /* Called from vm_pagelist.c */
 extern int kcage_next_range(int incage,
     pfn_t lo, pfn_t hi, pfn_t *nlo, pfn_t *nhi);
+
+extern kcage_dir_t kcage_startup_dir;
 
 #endif /* _KERNEL */
 

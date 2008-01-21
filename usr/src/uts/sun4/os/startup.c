@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -894,6 +894,7 @@ install_kmem64_tte()
  */
 #define	MINMOVE_RAM_MB	((size_t)1900)
 #define	MB_TO_BYTES(mb)	((mb) * 1048576ul)
+#define	BYTES_TO_MB(b) ((b) / 1048576ul)
 
 pgcnt_t	tune_npages = (pgcnt_t)
 	(MB_TO_BYTES(MINMOVE_RAM_MB)/ (size_t)MMU_PAGESIZE);
@@ -902,6 +903,10 @@ pgcnt_t	tune_npages = (pgcnt_t)
 extern void page_set_colorequiv_arr_cpu(void);
 extern void page_set_colorequiv_arr(void);
 
+static pgcnt_t ramdisk_npages;
+static struct memlist *old_phys_avail;
+
+kcage_dir_t kcage_startup_dir = KCAGE_DOWN;
 
 static void
 startup_memlist(void)
@@ -1138,7 +1143,14 @@ startup_memlist(void)
 	 * ... and divy it up
 	 */
 	alloc_base = kmem64_base;
-	npages -= kmem64_sz / (PAGESIZE + sizeof (struct page));
+
+	if (kpm_smallpages == 0) {
+		npages -= kmem64_sz / (PAGESIZE + sizeof (struct page));
+	} else {
+		npages -= kmem64_sz / (PAGESIZE + sizeof (struct page) +
+		    sizeof (kpm_spage_t));
+	}
+
 	pp_base = (page_t *)alloc_base;
 	pp_sz = npages * sizeof (struct page);
 	alloc_base += pp_sz;
@@ -1216,8 +1228,10 @@ startup_memlist(void)
 	 * to the size of the ramdisk (in Kb) in /etc/system at the
 	 * time the miniroot archive is constructed.
 	 */
-	if (root_is_ramdisk == B_TRUE)
-		physmem -= (ramdisk_size * 1024) / PAGESIZE;
+	if (root_is_ramdisk == B_TRUE) {
+		ramdisk_npages = (ramdisk_size * 1024) / PAGESIZE;
+		physmem -= ramdisk_npages;
+	}
 
 	if (kpm_enable && (ndata_alloc_kpm(&ndata, kpm_npages) != 0))
 		cmn_err(CE_PANIC, "no more nucleus memory after kpm alloc");
@@ -1665,9 +1679,30 @@ startup_fixup_physavail(void)
 	sync_memlists(phys_avail, cur);
 
 	ASSERT(phys_avail != NULL);
-	memlist_free_list(phys_avail);
-	phys_avail = cur;
 
+	old_phys_avail = phys_avail;
+	phys_avail = cur;
+}
+
+void
+update_kcage_ranges(uint64_t addr, uint64_t len)
+{
+	pfn_t base = btop(addr);
+	pgcnt_t num = btop(len);
+	int rv;
+
+	rv = kcage_range_add(base, num, kcage_startup_dir);
+
+	if (rv == ENOMEM) {
+		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
+		    (len == 0 ? 0 : BYTES_TO_MB(len)));
+	} else if (rv != 0) {
+		/* catch this in debug kernels */
+		ASSERT(0);
+
+		cmn_err(CE_WARN, "unexpected kcage_range_add"
+		    " return value %d", rv);
+	}
 }
 
 static void
@@ -1726,6 +1761,12 @@ startup_vm(void)
 	 */
 	kvm_init();
 
+	ASSERT(old_phys_avail != NULL && phys_avail != NULL);
+	if (kernel_cage_enable) {
+		diff_memlists(phys_avail, old_phys_avail, update_kcage_ranges);
+	}
+	memlist_free_list(old_phys_avail);
+
 	/*
 	 * If the following is true, someone has patched
 	 * phsymem to be less than the number of pages that
@@ -1736,7 +1777,7 @@ startup_vm(void)
 	 * by the size of the memory used to hold page structures
 	 * for the non-used pages.
 	 */
-	if (physmem < npages) {
+	if (physmem + ramdisk_npages < npages) {
 		pgcnt_t diff, off;
 		struct page *pp;
 		struct seg kseg;
@@ -1744,7 +1785,7 @@ startup_vm(void)
 		cmn_err(CE_WARN, "limiting physmem to %ld pages", physmem);
 
 		off = 0;
-		diff = npages - physmem;
+		diff = npages - (physmem + ramdisk_npages);
 		diff -= mmu_btopr(diff * sizeof (struct page));
 		kseg.s_as = &kas;
 		while (diff--) {

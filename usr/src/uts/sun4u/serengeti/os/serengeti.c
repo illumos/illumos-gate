@@ -278,6 +278,8 @@ set_platform_cage_params(void)
 		kcage_range_init(phys_avail, KCAGE_UP, preferred_cage_size);
 	}
 
+	kcage_startup_dir = KCAGE_UP;
+
 	/* Only note when the cage is off since it should always be on. */
 	if (!kcage_on)
 		cmn_err(CE_NOTE, "!DR Kernel Cage is DISABLED");

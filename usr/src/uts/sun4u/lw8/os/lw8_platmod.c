@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -284,6 +284,8 @@ set_platform_cage_params(void)
 		 */
 		kcage_range_init(phys_avail, KCAGE_UP, preferred_cage_size);
 	}
+
+	kcage_startup_dir = KCAGE_UP;
 
 	/* Only note when the cage is off since it should always be on. */
 	if (!kcage_on)
