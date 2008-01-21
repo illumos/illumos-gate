@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ extern "C" {
  */
 #define	CPU_CHIP_ID	"chip_id"
 #define	CPU_CORE_ID	"core_id"
+#define	CPU_PKG_CORE_ID	"pkg_core_id"
 #define	CPU_CLOG_ID	"clog_id"
 
 /*

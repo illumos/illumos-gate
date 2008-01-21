@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,8 @@ struct cpuid_info {
 	uint8_t cpi_pabits;		/* fn 0x80000006: %eax */
 	uint8_t cpi_vabits;		/* fn 0x80000006: %eax */
 	struct cpuid_regs cpi_extd[NMAX_CPI_EXTD]; /* 0x8000000[0-8] */
-	id_t cpi_coreid;
+	id_t cpi_coreid;		/* same coreid => strands share core */
+	int cpi_pkgcoreid;		/* core number within single package */
 	uint_t cpi_ncore_per_chip;	/* AMD: fn 0x80000008: %ecx[7-0] */
 					/* Intel: fn 4: %eax[31-26] */
 	/*
@@ -1149,6 +1150,14 @@ cpuid_pass1(cpu_t *cpu)
 				cpi->cpi_ncore_per_chip = 1;
 				break;
 			} else {
+				/*
+				 * On family 0xf cpuid fn 2 ECX[7:0] "NC" is
+				 * 1 less than the number of physical cores on
+				 * the chip.  In family 0x10 this value can
+				 * be affected by "downcoring" - it reflects
+				 * 1 less than the number of cores actually
+				 * enabled on this node.
+				 */
 				cpi->cpi_ncore_per_chip =
 				    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
 			}
@@ -1181,6 +1190,7 @@ cpuid_pass1(cpu_t *cpu)
 		cpi->cpi_chipid = -1;
 		cpi->cpi_clogid = 0;
 		cpi->cpi_coreid = cpu->cpu_id;
+		cpi->cpi_pkgcoreid = 0;
 	} else if (cpi->cpi_ncpu_per_chip > 1) {
 		uint_t i;
 		uint_t chipid_shift = 0;
@@ -1214,6 +1224,8 @@ cpuid_pass1(cpu_t *cpu)
 				 * <------- chipid -------->
 				 * <------- coreid --------------->
 				 *			   <--- clogid -->
+				 *			   <------>
+				 *			   pkgcoreid
 				 *
 				 * Where the number of bits necessary to
 				 * represent MC and HT fields together equals
@@ -1226,26 +1238,63 @@ cpuid_pass1(cpu_t *cpu)
 				for (i = 1; i < ncpu_per_core; i <<= 1)
 					coreid_shift++;
 				cpi->cpi_coreid = apic_id >> coreid_shift;
+				cpi->cpi_pkgcoreid = cpi->cpi_clogid >>
+				    coreid_shift;
 			} else if (feature & X86_HTT) {
 				/*
 				 * Single-core multi-threaded processors.
 				 */
 				cpi->cpi_coreid = cpi->cpi_chipid;
+				cpi->cpi_pkgcoreid = 0;
 			}
 		} else if (cpi->cpi_vendor == X86_VENDOR_AMD) {
 			/*
-			 * AMD currently only has dual-core processors with
-			 * single-threaded cores.  If they ever release
-			 * multi-threaded processors, then this code
-			 * will have to be updated.
+			 * AMD CMP chips currently have a single thread per
+			 * core, with 2 cores on family 0xf and 2, 3 or 4
+			 * cores on family 0x10.
+			 *
+			 * Since no two cpus share a core we must assign a
+			 * distinct coreid per cpu, and we do this by using
+			 * the cpu_id.  This scheme does not, however,
+			 * guarantee that sibling cores of a chip will have
+			 * sequential coreids starting at a multiple of the
+			 * number of cores per chip - that is usually the
+			 * case, but if the ACPI MADT table is presented
+			 * in a different order then we need to perform a
+			 * few more gymnastics for the pkgcoreid.
+			 *
+			 * In family 0xf CMPs there are 2 cores on all nodes
+			 * present - no mixing of single and dual core parts.
+			 *
+			 * In family 0x10 CMPs cpuid fn 2 ECX[15:12]
+			 * "ApicIdCoreIdSize[3:0]" tells us how
+			 * many least-significant bits in the ApicId
+			 * are used to represent the core number
+			 * within the node.  Cores are always
+			 * numbered sequentially from 0 regardless
+			 * of how many or which are disabled, and
+			 * there seems to be no way to discover the
+			 * real core id when some are disabled.
 			 */
 			cpi->cpi_coreid = cpu->cpu_id;
+
+			if (cpi->cpi_family == 0x10 &&
+			    cpi->cpi_xmaxeax >= 0x80000008) {
+				int coreidsz =
+				    BITX((cpi)->cpi_extd[8].cp_ecx, 15, 12);
+
+				cpi->cpi_pkgcoreid =
+				    apic_id & ((1 << coreidsz) - 1);
+			} else {
+				cpi->cpi_pkgcoreid = cpi->cpi_clogid;
+			}
 		} else {
 			/*
 			 * All other processors are currently
 			 * assumed to have single cores.
 			 */
 			cpi->cpi_coreid = cpi->cpi_chipid;
+			cpi->cpi_pkgcoreid = 0;
 		}
 	}
 
@@ -2462,6 +2511,13 @@ cpuid_get_coreid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_coreid);
+}
+
+int
+cpuid_get_pkgcoreid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_pkgcoreid);
 }
 
 int

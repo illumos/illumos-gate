@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,7 +218,7 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 
 		if (add_kstat_longprops(mod, cnode, chip->chip_cpustats[cpuid],
 		    PGNAME(CPU), NULL, CPU_CHIP_ID, CPU_CORE_ID, CPU_CLOG_ID,
-		    NULL) != 0)
+		    CPU_PKG_CORE_ID, NULL) != 0)
 			nerr++;		/* have whinged elsewhere */
 	}
 

@@ -2113,6 +2113,7 @@ static struct {
 	kstat_named_t ci_model;
 	kstat_named_t ci_step;
 	kstat_named_t ci_clogid;
+	kstat_named_t ci_pkg_core_id;
 	kstat_named_t ci_ncpuperchip;
 	kstat_named_t ci_ncoreperchip;
 #endif
@@ -2138,8 +2139,9 @@ static struct {
 	{ "model",			KSTAT_DATA_INT32 },
 	{ "stepping",			KSTAT_DATA_INT32 },
 	{ "clog_id",			KSTAT_DATA_INT32 },
+	{ "pkg_core_id",		KSTAT_DATA_LONG },
 	{ "ncpu_per_chip",		KSTAT_DATA_INT32 },
-	{ "ncore_per_chip", 		KSTAT_DATA_INT32 },
+	{ "ncore_per_chip",		KSTAT_DATA_INT32 },
 #endif
 };
 
@@ -2208,6 +2210,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_ncpuperchip.value.l = cpuid_get_ncpu_per_chip(cp);
 	cpu_info_template.ci_ncoreperchip.value.l =
 	    cpuid_get_ncore_per_chip(cp);
+	cpu_info_template.ci_pkg_core_id.value.l = cpuid_get_pkgcoreid(cp);
 #endif
 
 	return (0);

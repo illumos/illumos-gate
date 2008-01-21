@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -750,8 +750,6 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_HWOK | CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_HWOK | CMI_MSR_FLAG_WR_INTERPOSEOK;
 
-	ASSERT(hdl->cmih_cmi == NULL && hdl->cmih_cmidata == NULL);
-
 	if (cmi_hdl_hash == NULL) {
 		size_t sz = CMI_HDL_HASHSZ * sizeof (struct cmi_hdl_hashent);
 		void *hash = kmem_zalloc(sz, KM_SLEEP);
@@ -761,8 +759,22 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	}
 
 	idx = CMI_HDL_HASHIDX(chipid, coreid, strandid);
-	ASSERT(cmi_hdl_hash[idx].cmhe_refcnt == 0 &&
-	    cmi_hdl_hash[idx].cmhe_hdlp == NULL);
+	if (cmi_hdl_hash[idx].cmhe_refcnt != 0 ||
+	    cmi_hdl_hash[idx].cmhe_hdlp != NULL) {
+		/*
+		 * Somehow this (chipid, coreid, strandid) id tuple has
+		 * already been assigned!  This indicates that the
+		 * callers logic in determining these values is busted,
+		 * or perhaps undermined by bad BIOS setup.  Complain,
+		 * and refuse to initialize this tuple again as bad things
+		 * will happen.
+		 */
+		cmn_err(CE_NOTE, "cmi_hdl_create: chipid %d coreid %d "
+		    "strandid %d handle already allocated!",
+		    chipid, coreid, strandid);
+		kmem_free(hdl, sizeof (*hdl));
+		return (NULL);
+	}
 
 	/*
 	 * Once we store a nonzero reference count others can find this
@@ -993,14 +1005,12 @@ cmi_ntv_hwchipid(cpu_t *cp)
 }
 
 /*
- * Return core instance within a single chip.  cpuid_get_coreid numbers cores
- * across all chips with the same number of cores on each chip and counting
- * all cores of chip N before moving on to count the cores of chip N + 1.
+ * Return core instance within a single chip.
  */
 uint_t
 cmi_ntv_hwcoreid(cpu_t *cp)
 {
-	return (cpuid_get_coreid(cp) % cpuid_get_ncore_per_chip(cp));
+	return (cpuid_get_pkgcoreid(cp));
 }
 
 /*
