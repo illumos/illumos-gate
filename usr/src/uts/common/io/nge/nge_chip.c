@@ -951,15 +951,12 @@ nge_chip_reset(nge_t *ngep)
 	uint32_t regno;
 	uint64_t mac;
 	nge_uni_addr1 uaddr1;
-	nge_mul_addr1 maddr1;
 	nge_cp_cntl ee_cntl;
 	nge_soft_misc soft_misc;
 	nge_pmu_cntl0 pmu_cntl0;
 	nge_pmu_cntl2 pmu_cntl2;
 	nge_pm_cntl2 pm_cntl2;
 	const nge_ksindex_t *ksip;
-	nge_sw_statistics_t *sw_stp;
-	sw_stp = &ngep->statistics.sw_statistics;
 
 	NGE_TRACE(("nge_chip_reset($%p)", (void *)ngep));
 
@@ -970,19 +967,6 @@ nge_chip_reset(nge_t *ngep)
 		regno = KS_BASE + ksip->index * sizeof (uint32_t);
 		(void) nge_reg_get32(ngep, regno);
 	}
-	/* Clear the software statistics */
-	sw_stp->recv_count = 0;
-	sw_stp->xmit_count = 0;
-	sw_stp->rbytes = 0;
-	sw_stp->obytes = 0;
-
-	/*
-	 * Clear the Multicast mac address table
-	 */
-	nge_reg_put32(ngep, NGE_MUL_ADDR0, 0);
-	maddr1.addr_val = nge_reg_get32(ngep, NGE_MUL_ADDR1);
-	maddr1.addr_bits.addr = 0;
-	nge_reg_put32(ngep, NGE_MUL_ADDR1, maddr1.addr_val);
 
 	/*
 	 * Setup seeprom control
@@ -1774,6 +1758,11 @@ nge_chip_intr(caddr_t arg1, caddr_t arg2)
 	nge_intr_mask intr_mask;
 
 	mutex_enter(ngep->genlock);
+
+	if (ngep->suspended) {
+		mutex_exit(ngep->genlock);
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	/*
 	 * Check whether chip's says it's asserting #INTA;

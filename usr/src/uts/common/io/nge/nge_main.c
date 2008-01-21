@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1029,6 +1029,9 @@ static int
 nge_reset(nge_t *ngep)
 {
 	int err;
+	nge_mul_addr1 maddr1;
+	nge_sw_statistics_t *sw_stp;
+	sw_stp = &ngep->statistics.sw_statistics;
 	send_ring_t *srp = ngep->send;
 
 	ASSERT(mutex_owned(ngep->genlock));
@@ -1043,6 +1046,14 @@ nge_reset(nge_t *ngep)
 		return (err);
 	}
 	err = nge_chip_reset(ngep);
+	/*
+	 * Clear the Multicast mac address table
+	 */
+	nge_reg_put32(ngep, NGE_MUL_ADDR0, 0);
+	maddr1.addr_val = nge_reg_get32(ngep, NGE_MUL_ADDR1);
+	maddr1.addr_bits.addr = 0;
+	nge_reg_put32(ngep, NGE_MUL_ADDR1, maddr1.addr_val);
+
 	mutex_exit(srp->tx_lock);
 	mutex_exit(srp->tc_lock);
 	if (err == DDI_FAILURE)
@@ -1057,6 +1068,13 @@ nge_reset(nge_t *ngep)
 	ngep->max_sdu = ngep->default_mtu + ETHER_HEAD_LEN + ETHERFCSL;
 	ngep->max_sdu += VTAG_SIZE;
 	ngep->rx_def = 0x16;
+
+	/* Clear the software statistics */
+	sw_stp->recv_count = 0;
+	sw_stp->xmit_count = 0;
+	sw_stp->rbytes = 0;
+	sw_stp->obytes = 0;
+
 	return (DDI_SUCCESS);
 }
 
@@ -1068,17 +1086,15 @@ nge_m_stop(void *arg)
 	NGE_TRACE(("nge_m_stop($%p)", arg));
 
 	/*
-	 * If suspended, adapter is already stopped, just return.
-	 */
-	if (ngep->suspended) {
-		ASSERT(ngep->nge_mac_state == NGE_MAC_STOPPED);
-		return;
-	}
-
-	/*
 	 * Just stop processing, then record new MAC state
 	 */
 	mutex_enter(ngep->genlock);
+	/* If suspended, the adapter is already stopped, just return. */
+	if (ngep->suspended) {
+		ASSERT(ngep->nge_mac_state == NGE_MAC_STOPPED);
+		mutex_exit(ngep->genlock);
+		return;
+	}
 	rw_enter(ngep->rwlock, RW_WRITER);
 
 	(void) nge_chip_stop(ngep, B_FALSE);
@@ -1103,16 +1119,19 @@ nge_m_start(void *arg)
 	nge_t *ngep = arg;
 
 	NGE_TRACE(("nge_m_start($%p)", arg));
-	/*
-	 * If suspended, don't start, as the resume processing
-	 * will recall this function with the suspended flag off.
-	 */
-	if (ngep->suspended)
-		return (DDI_FAILURE);
+
 	/*
 	 * Start processing and record new MAC state
 	 */
 	mutex_enter(ngep->genlock);
+	/*
+	 * If suspended, don't start, as the resume processing
+	 * will recall this function with the suspended flag off.
+	 */
+	if (ngep->suspended) {
+		mutex_exit(ngep->genlock);
+		return (DDI_FAILURE);
+	}
 	rw_enter(ngep->rwlock, RW_WRITER);
 	err = nge_alloc_bufs(ngep);
 	if (err != DDI_SUCCESS) {
@@ -1155,9 +1174,10 @@ nge_m_unicst(void *arg, const uint8_t *macaddr)
 	 * the chip.  Doing so might put it in a bad state, but the
 	 * resume will get the unicast address installed.
 	 */
-	if (ngep->suspended)
+	if (ngep->suspended) {
+		mutex_exit(ngep->genlock);
 		return (DDI_SUCCESS);
-
+	}
 	nge_chip_sync(ngep);
 
 	NGE_DEBUG(("nge_m_unicst($%p) done", arg));
@@ -1172,17 +1192,20 @@ nge_m_promisc(void *arg, boolean_t on)
 	nge_t *ngep = arg;
 
 	NGE_TRACE(("nge_m_promisc($%p)", arg));
-	/*
-	 * If suspended, we don't do anything, even record the promiscuious
-	 * mode, as we won't properly set it on resume.  Just fail.
-	 */
-	if (ngep->suspended)
-		return (DDI_FAILURE);
 
 	/*
 	 * Store specified mode and pass to chip layer to update h/w
 	 */
 	mutex_enter(ngep->genlock);
+	/*
+	 * If suspended, there is no need to do anything, even
+	 * recording the promiscuious mode is not neccessary, as
+	 * it won't be properly set on resume.  Just return failing.
+	 */
+	if (ngep->suspended) {
+		mutex_exit(ngep->genlock);
+		return (DDI_FAILURE);
+	}
 	if (ngep->promisc == on) {
 		mutex_exit(ngep->genlock);
 		NGE_DEBUG(("nge_m_promisc($%p) done", arg));
@@ -1286,7 +1309,7 @@ nge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		}
 	}
 
-	if (update || !ngep->suspended) {
+	if (update && !ngep->suspended) {
 		nge_mulparam(ngep);
 		nge_chip_sync(ngep);
 	}
@@ -1312,10 +1335,13 @@ nge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	 * without actually putting the hardware in an undesireable
 	 * state.  So just NAK it.
 	 */
+	mutex_enter(ngep->genlock);
 	if (ngep->suspended) {
 		miocnak(wq, mp, 0, EINVAL);
+		mutex_exit(ngep->genlock);
 		return;
 	}
+	mutex_exit(ngep->genlock);
 
 	/*
 	 * Validate the command before bothering with the mutex ...
@@ -1497,8 +1523,9 @@ int
 nge_restart(nge_t *ngep)
 {
 	int err = 0;
-	err += nge_reset(ngep);
-	err += nge_chip_start(ngep);
+	err = nge_reset(ngep);
+	if (!err)
+		err = nge_chip_start(ngep);
 
 	if (err) {
 		ngep->nge_mac_state = NGE_MAC_STOPPED;
@@ -1623,10 +1650,13 @@ nge_resume(dev_info_t *devinfo)
 {
 	nge_t		*ngep;
 	chip_info_t	*infop;
+	int 		err;
 
 	ASSERT(devinfo != NULL);
 
 	ngep = ddi_get_driver_private(devinfo);
+	err = 0;
+
 	/*
 	 * If there are state inconsistancies, this is bad.  Returning
 	 * DDI_FAILURE here will eventually cause the machine to panic,
@@ -1640,9 +1670,10 @@ nge_resume(dev_info_t *devinfo)
 
 	if (ngep->devinfo != devinfo)
 		cmn_err(CE_PANIC,
-		    "nge: passed devinfo not the same as saved definfo");
+		    "nge: passed devinfo not the same as saved devinfo");
 
-	ngep->suspended = B_FALSE;
+	mutex_enter(ngep->genlock);
+	rw_enter(ngep->rwlock, RW_WRITER);
 
 	/*
 	 * Fetch the config space.  Even though we have most of it cached,
@@ -1651,16 +1682,37 @@ nge_resume(dev_info_t *devinfo)
 	nge_chip_cfg_init(ngep, infop, B_FALSE);
 
 	/*
-	 * Start the controller.  In this case (and probably most GLDv3
-	 * devices), it is sufficient to call nge_m_start().
+	 * Only in one case, this conditional branch can be executed: the port
+	 * hasn't been plumbed.
 	 */
-	if (nge_m_start((void *)ngep) != DDI_SUCCESS) {
+	if (ngep->suspended == B_FALSE) {
+		rw_exit(ngep->rwlock);
+		mutex_exit(ngep->genlock);
+		return (DDI_SUCCESS);
+	}
+
+	nge_tx_recycle_all(ngep);
+	err = nge_reinit_ring(ngep);
+	if (!err) {
+		err = nge_chip_reset(ngep);
+		if (!err)
+			err = nge_chip_start(ngep);
+	}
+
+	if (err) {
 		/*
 		 * We note the failure, but return success, as the
 		 * system is still usable without this controller.
 		 */
 		cmn_err(CE_WARN, "nge: resume: failed to restart controller");
+	} else {
+		ngep->nge_mac_state = NGE_MAC_STARTED;
 	}
+	ngep->suspended = B_FALSE;
+
+	rw_exit(ngep->rwlock);
+	mutex_exit(ngep->genlock);
+
 	return (DDI_SUCCESS);
 }
 
@@ -1811,6 +1863,27 @@ attach_fail:
 	return (DDI_FAILURE);
 }
 
+static int
+nge_suspend(nge_t *ngep)
+{
+	mutex_enter(ngep->genlock);
+	rw_enter(ngep->rwlock, RW_WRITER);
+
+	/* if the port hasn't been plumbed, just return */
+	if (ngep->nge_mac_state != NGE_MAC_STARTED) {
+		rw_exit(ngep->rwlock);
+		mutex_exit(ngep->genlock);
+		return (DDI_SUCCESS);
+	}
+	ngep->suspended = B_TRUE;
+	(void) nge_chip_stop(ngep, B_FALSE);
+	ngep->nge_mac_state = NGE_MAC_STOPPED;
+
+	rw_exit(ngep->rwlock);
+	mutex_exit(ngep->genlock);
+	return (DDI_SUCCESS);
+}
+
 /*
  * detach(9E) -- Detach a device from the system
  */
@@ -1834,19 +1907,12 @@ nge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		/*
 		 * Stop the NIC
-		 * I suspect that we can actually suspend if the stop
-		 * routine returns a failure, as the resume will
-		 * effectively fully reset the hardware (i.e. we don't
-		 * really save any hardware state).  However, nge_m_stop
-		 * doesn't return an error code.
 		 * Note: This driver doesn't currently support WOL, but
 		 *	should it in the future, it is important to
 		 *	make sure the PHY remains powered so that the
 		 *	wakeup packet can actually be recieved.
 		 */
-		nge_m_stop(ngep);
-		ngep->suspended = B_TRUE;
-		return (DDI_SUCCESS);
+		return (nge_suspend(ngep));
 
 	case DDI_DETACH:
 		break;
