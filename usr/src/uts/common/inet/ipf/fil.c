@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2350,8 +2350,8 @@ ipf_stack_t *ifs;
 	bzero((char *)fin, sizeof(*fin));
 
 # ifdef MENTAT
-	if (qpi->qpi_flags & QPI_NOCKSUM)
-		fin->fin_flx |= FI_NOCKSUM;
+	fin->fin_flx = qpi->qpi_flags & (FI_NOCKSUM|FI_MBCAST|FI_MULTICAST|
+					 FI_BROADCAST);
 	m = qpi->qpi_m;
 	fin->fin_qfm = m;
 	fin->fin_qpi = qpi;

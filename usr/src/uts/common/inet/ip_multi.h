@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -75,6 +75,7 @@ extern	ilg_t		*ilg_lookup_ill_withsrc_v6(conn_t *, const in6_addr_t *,
 
 extern void		ill_leave_multicast(ill_t *);
 extern void		ill_recover_multicast(ill_t *);
+extern int		ip_get_dlpi_mbcast(ill_t *, mblk_t *);
 
 extern	void		ilm_free(ipif_t *);
 extern	ilm_t		*ilm_lookup_ill(ill_t *, ipaddr_t, zoneid_t);

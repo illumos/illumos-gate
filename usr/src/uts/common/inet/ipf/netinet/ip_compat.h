@@ -6,7 +6,7 @@
  * @(#)ip_compat.h	1.8 1/14/96
  * $Id: ip_compat.h,v 2.142.2.30 2005/08/11 15:13:49 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,10 +217,8 @@ typedef	struct	qpktinfo	{
 	mblk_t		*qpi_m;
 	void		*qpi_data;	/* where layer 3 header starts */
 	size_t		qpi_off;
-	int		qpi_flags;
+	int		qpi_flags;	/* Uses FI_* flags */
 } qpktinfo_t;
-
-#define	QPI_NOCKSUM	0x01
 
 extern void mb_copydata __P((mblk_t *, size_t , size_t, char *));
 extern void mb_copyback __P((mblk_t *, size_t , size_t, char *));

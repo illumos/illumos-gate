@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1925,10 +1925,13 @@ int ipf_hook(hook_data_t info, int out, int loopback, netstack_t *ns)
 	qpi.qpi_data = fw->hpe_hdr;
 	qpi.qpi_off = (char *)qpi.qpi_data - (char *)fw->hpe_mb->b_rptr;
 	qpi.qpi_ill = (void *)phy;
+	qpi.qpi_flags = 0;
+	if (fw->hpe_flags & HPE_MULTICAST)
+		qpi.qpi_flags |= FI_MBCAST|FI_MULTICAST;
+	else if (fw->hpe_flags & HPE_BROADCAST)
+		qpi.qpi_flags = FI_MBCAST|FI_BROADCAST;
 	if (loopback)
-		qpi.qpi_flags = QPI_NOCKSUM;
-	else
-		qpi.qpi_flags = 0;
+		qpi.qpi_flags |= FI_NOCKSUM;
 
 	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out,
 	    &qpi, fw->hpe_mp, ns->netstack_ipf);

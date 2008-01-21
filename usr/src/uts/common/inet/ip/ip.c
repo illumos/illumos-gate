@@ -56,6 +56,7 @@
 #include <sys/socket.h>
 #include <sys/vtrace.h>
 #include <sys/isa_defs.h>
+#include <sys/mac.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/route.h>
@@ -14015,7 +14016,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 	FW_HOOKS(ipst->ips_ip4_forwarding_event,
 	    ipst->ips_ipv4firewall_forwarding,
-	    ill, stq_ill, ipha, mp, mp, ipst);
+	    ill, stq_ill, ipha, mp, mp, 0, ipst);
 
 	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
 
@@ -14061,7 +14062,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		    ipha_t *, ipha, mblk_t *, mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, stq_ill, ipha, mp, mp, ipst);
+		    NULL, stq_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp == NULL)
 			goto drop;
@@ -14538,6 +14539,57 @@ drop_pkt:
 	return (B_TRUE);
 }
 
+/*
+ * This function is used to both return an indication of whether or not
+ * the packet received is a non-unicast packet (by way of the DL_UNITDATA_IND)
+ * and in doing so, determine whether or not it is broadcast vs multicast.
+ * For it to be a broadcast packet, we must have the appropriate mblk_t
+ * hanging off the ill_t.  If this is either not present or doesn't match
+ * the destination mac address in the DL_UNITDATA_IND, the packet is deemed
+ * to be multicast.  Thus NICs that have no broadcast address (or no
+ * capability for one, such as point to point links) cannot return as
+ * the packet being broadcast.  The use of HPE_BROADCAST/HPE_MULTICAST as
+ * the return values simplifies the current use of the return value of this
+ * function, which is to pass through the multicast/broadcast characteristic
+ * to consumers of the netinfo/pfhooks API.  While this is not cast in stone,
+ * changing the return value to some other symbol demands the appropriate
+ * "translation" when hpe_flags is set prior to calling hook_run() for
+ * packet events.
+ */
+int
+ip_get_dlpi_mbcast(ill_t *ill, mblk_t *mb)
+{
+	dl_unitdata_ind_t *ind = (dl_unitdata_ind_t *)mb->b_rptr;
+	mblk_t *bmp;
+
+	if (ind->dl_group_address) {
+		if (ind->dl_dest_addr_offset > sizeof (*ind) &&
+		    ind->dl_dest_addr_offset + ind->dl_dest_addr_length <
+		    MBLKL(mb) &&
+		    (bmp = ill->ill_bcast_mp) != NULL) {
+			dl_unitdata_req_t *dlur;
+			uint8_t *bphys_addr;
+
+			dlur = (dl_unitdata_req_t *)bmp->b_rptr;
+			if (ill->ill_sap_length < 0)
+				bphys_addr = (uchar_t *)dlur +
+				    dlur->dl_dest_addr_offset;
+			else
+				bphys_addr = (uchar_t *)dlur +
+				    dlur->dl_dest_addr_offset +
+				    ill->ill_sap_length;
+
+			if (bcmp(mb->b_rptr + ind->dl_dest_addr_offset,
+			    bphys_addr, ind->dl_dest_addr_length) == 0) {
+				return (HPE_BROADCAST);
+			}
+			return (HPE_MULTICAST);
+		}
+		return (HPE_MULTICAST);
+	}
+	return (0);
+}
+
 static boolean_t
 ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
     int *ll_multicast, mblk_t **mpp)
@@ -14622,7 +14674,8 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 			ip_rput_dlpi(q, mp);
 			return (B_TRUE);
 		}
-		*ll_multicast = ((dl_unitdata_ind_t *)rptr)->dl_group_address;
+
+		*ll_multicast = ip_get_dlpi_mbcast(ill, mp);
 		/* Ditch the DLPI header. */
 		mp1 = mp->b_cont;
 		ASSERT(first_mp == mp);
@@ -14975,6 +15028,23 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			 * the leading M_PROTO or M_CTL.
 			 */
 			ASSERT(first_mp != NULL);
+		} else if (mhip != NULL) {
+			/*
+			 * ll_multicast is set here so that it is ready
+			 * for easy use with FW_HOOKS().  ip_get_dlpi_mbcast
+			 * manipulates ll_multicast in the same fashion when
+			 * called from ip_rput_process_notdata.
+			 */
+			switch (mhip->mhi_dsttype) {
+			case MAC_ADDRTYPE_MULTICAST :
+				ll_multicast = HPE_MULTICAST;
+				break;
+			case MAC_ADDRTYPE_BROADCAST :
+				ll_multicast = HPE_BROADCAST;
+				break;
+			default :
+				break;
+			}
 		}
 
 		/* Make sure its an M_DATA and that its aligned */
@@ -15049,7 +15119,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		FW_HOOKS(ipst->ips_ip4_physical_in_event,
 		    ipst->ips_ipv4firewall_physical_in,
-		    ill, NULL, ipha, first_mp, mp, ipst);
+		    ill, NULL, ipha, first_mp, mp, ll_multicast, ipst);
 
 		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, first_mp);
 
@@ -16519,7 +16589,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 
 	FW_HOOKS(ipst->ips_ip4_forwarding_event,
 	    ipst->ips_ipv4firewall_forwarding,
-	    in_ill, out_ill, ipha, mp, mp, ipst);
+	    in_ill, out_ill, ipha, mp, mp, 0, ipst);
 
 	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
 
@@ -16599,7 +16669,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 	    ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
 	FW_HOOKS(ipst->ips_ip4_physical_out_event,
 	    ipst->ips_ipv4firewall_physical_out,
-	    NULL, out_ill, ipha, mp, mp, ipst);
+	    NULL, out_ill, ipha, mp, mp, 0, ipst);
 	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 	if (mp == NULL)
 		return;
@@ -22573,7 +22643,7 @@ another:;
 		    mblk_t *, mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp, ipst);
+		    NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp == NULL)
 			goto release_ire_and_ill;
@@ -23179,7 +23249,7 @@ checksumoptions:
 				    ipha_t *, ipha, mblk_t *, mp);
 				FW_HOOKS(ipst->ips_ip4_physical_out_event,
 				    ipst->ips_ipv4firewall_physical_out,
-				    NULL, out_ill, ipha, mp, mp, ipst);
+				    NULL, out_ill, ipha, mp, mp, 0, ipst);
 				DTRACE_PROBE1(ip4__physical__out__end,
 				    mblk_t *, mp);
 				if (mp == NULL)
@@ -23380,7 +23450,7 @@ nullstq:
 
 			FW_HOOKS(ipst->ips_ip4_loopback_out_event,
 			    ipst->ips_ipv4firewall_loopback_out,
-			    NULL, out_ill, ipha, first_mp, mp, ipst);
+			    NULL, out_ill, ipha, first_mp, mp, 0, ipst);
 
 			DTRACE_PROBE1(ip4__loopback__out_end,
 			    mblk_t *, first_mp);
@@ -23406,7 +23476,7 @@ nullstq:
 
 		FW_HOOKS(ipst->ips_ip4_loopback_out_event,
 		    ipst->ips_ipv4firewall_loopback_out,
-		    NULL, out_ill, ipha, first_mp, mp, ipst);
+		    NULL, out_ill, ipha, first_mp, mp, 0, ipst);
 
 		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, first_mp);
 
@@ -24470,7 +24540,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, xmit_mp, mp, ipst);
+		    NULL, out_ill, ipha, xmit_mp, mp, 0, ipst);
 
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, xmit_mp);
 
@@ -24769,7 +24839,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 			FW_HOOKS(ipst->ips_ip4_physical_out_event,
 			    ipst->ips_ipv4firewall_physical_out,
-			    NULL, out_ill, ipha, xmit_mp, mp, ipst);
+			    NULL, out_ill, ipha, xmit_mp, mp, 0, ipst);
 
 			DTRACE_PROBE1(ip4__physical__out__end,
 			    mblk_t *, xmit_mp);
@@ -24990,7 +25060,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 
 	FW_HOOKS(ipst->ips_ip4_loopback_in_event,
 	    ipst->ips_ipv4firewall_loopback_in,
-	    ill, NULL, ipha, first_mp, mp, ipst);
+	    ill, NULL, ipha, first_mp, mp, 0, ipst);
 
 	DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, first_mp);
 
@@ -25719,7 +25789,7 @@ send:
 
 		FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
 		    ipst->ips_ipv6firewall_loopback_out,
-		    NULL, out_ill, ip6h1, ipsec_mp, mp, ipst);
+		    NULL, out_ill, ip6h1, ipsec_mp, mp, 0, ipst);
 
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, ipsec_mp);
 
@@ -26055,7 +26125,7 @@ send:
 
 		FW_HOOKS(ipst->ips_ip4_loopback_out_event,
 		    ipst->ips_ipv4firewall_loopback_out,
-		    NULL, out_ill, ipha1, ipsec_mp, mp, ipst);
+		    NULL, out_ill, ipha1, ipsec_mp, mp, 0, ipst);
 
 		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
 
@@ -26270,8 +26340,8 @@ send:
 		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha1,
 		    mblk_t *, ipsec_mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, ire->ire_ipif->ipif_ill, ipha1, ipsec_mp, mp, ipst);
+		    ipst->ips_ipv4firewall_physical_out, NULL,
+		    ire->ire_ipif->ipif_ill, ipha1, ipsec_mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, ipsec_mp);
 		if (ipsec_mp == NULL)
 			goto drop_pkt;

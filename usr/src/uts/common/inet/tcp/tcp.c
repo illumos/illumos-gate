@@ -19111,7 +19111,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		    ipha_t *, ipha, mblk_t *, mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp, ipst);
+		    NULL, out_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);
@@ -20686,7 +20686,7 @@ legacy_send_no_md:
 					FW_HOOKS(
 					    ipst->ips_ip4_physical_out_event,
 					    ipst->ips_ipv4firewall_physical_out,
-					    NULL, ill, ipha, mp, mp, ipst);
+					    NULL, ill, ipha, mp, mp, 0, ipst);
 					DTRACE_PROBE1(
 					    ip4__physical__out__end,
 					    mblk_t *, mp);
@@ -20700,7 +20700,7 @@ legacy_send_no_md:
 					FW_HOOKS6(
 					    ipst->ips_ip6_physical_out_event,
 					    ipst->ips_ipv6firewall_physical_out,
-					    NULL, ill, ip6h, mp, mp, ipst);
+					    NULL, ill, ip6h, mp, mp, 0, ipst);
 					DTRACE_PROBE1(
 					    ip6__physical__out__end,
 					    mblk_t *, mp);
@@ -21057,7 +21057,7 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		    ipha_t *, ipha, mblk_t *, mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp, ipst);
+		    NULL, out_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp != NULL)
 			putnext(ire->ire_stq, mp);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -6695,9 +6695,8 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			ip_rput_dlpi(q, mp);
 			return;
 		}
-#define	dlur	((dl_unitdata_ind_t *)mp->b_rptr)
-		ll_multicast = dlur->dl_group_address;
-#undef	dlur
+		ll_multicast = ip_get_dlpi_mbcast(ill, mp);
+
 		/* Save the DLPI header. */
 		dl_mp = mp;
 		mp = mp->b_cont;
@@ -6816,7 +6815,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 
 	FW_HOOKS6(ipst->ips_ip6_physical_in_event,
 	    ipst->ips_ipv6firewall_physical_in,
-	    ill, NULL, ip6h, first_mp, mp, ipst);
+	    ill, NULL, ip6h, first_mp, mp, ll_multicast, ipst);
 
 	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
 
@@ -7565,7 +7564,7 @@ forward:
 
 		FW_HOOKS6(ipst->ips_ip6_forwarding_event,
 		    ipst->ips_ipv6firewall_forwarding,
-		    inill, outill, ip6h, mp, mp, ipst);
+		    inill, outill, ip6h, mp, mp, 0, ipst);
 
 		DTRACE_PROBE1(ip6__forwarding__end, mblk_t *, mp);
 
@@ -10496,7 +10495,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 
 	FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
 	    ipst->ips_ipv6firewall_loopback_in,
-	    ill, NULL, ip6h, first_mp, mp, ipst);
+	    ill, NULL, ip6h, first_mp, mp, 0, ipst);
 
 	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
 
@@ -10911,7 +10910,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 					    ipst->ips_ip6_loopback_out_event,
 					    ipst->ips_ipv6firewall_loopback_out,
 					    NULL, ill, nip6h, nmp, mp_ip6h,
-					    ipst);
+					    0, ipst);
 
 					DTRACE_PROBE1(
 					    ip6__loopback__out__end,
@@ -11347,7 +11346,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		    ip6_t *, ip6h, mblk_t *, first_mp);
 		FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
 		    ipst->ips_ipv6firewall_loopback_out,
-		    NULL, ill, ip6h, first_mp, mp, ipst);
+		    NULL, ill, ip6h, first_mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
 		if (first_mp != NULL)
 			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0);
@@ -12198,7 +12197,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 
 			FW_HOOKS6(ipst->ips_ip6_physical_out_event,
 			    ipst->ips_ipv6firewall_physical_out,
-			    NULL, out_ill, ip6h, mp, mp_ip6h, ipst);
+			    NULL, out_ill, ip6h, mp, mp_ip6h, 0, ipst);
 
 			DTRACE_PROBE1(ip6__physical__out__end, mblk_t *, mp);
 

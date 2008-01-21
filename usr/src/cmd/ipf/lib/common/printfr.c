@@ -5,7 +5,7 @@
  *
  * $Id: printfr.c,v 1.43.2.12 2005/06/12 07:18:42 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,7 +388,7 @@ ioctlfunc_t	iocfunc;
 			fputs(comma, stdout);
 			if (!(fp->fr_flx & FI_MULTICAST))
 				printf("not ");
-			printf("multicast");
+			printf("mcast");
 			comma = ",";
 		}
 		if (fp->fr_mflx & FI_BROADCAST) {

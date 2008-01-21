@@ -4,7 +4,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ static  int             ruleopts = 0;
 static	int		*yycont = 0;
 static	ioctlfunc_t	ipfioctl[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[95];
+static	struct	wordtab ipfwords[96];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -1547,7 +1547,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[95] = {
+static	struct	wordtab ipfwords[96] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1597,6 +1597,7 @@ static	struct	wordtab ipfwords[95] = {
 	{ "mask",			IPFY_MASK },
 	{ "match-tag",			IPFY_MATCHTAG },
 	{ "mbcast",			IPFY_MBCAST },
+	{ "mcast",			IPFY_MULTICAST },
 	{ "multicast",			IPFY_MULTICAST },
 	{ "nat",			IPFY_NAT },
 	{ "ne",				YY_CMP_NE },

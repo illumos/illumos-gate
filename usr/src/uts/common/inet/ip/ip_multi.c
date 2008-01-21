@@ -1233,7 +1233,7 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 
 	FW_HOOKS(ipst->ips_ip4_loopback_out_event,
 	    ipst->ips_ipv4firewall_loopback_out,
-	    NULL, ill, iph, ipsec_mp, mp, ipst);
+	    NULL, ill, iph, ipsec_mp, mp, HPE_MULTICAST, ipst);
 
 	DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
 

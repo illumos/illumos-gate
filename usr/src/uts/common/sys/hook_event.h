@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,11 @@ typedef struct hook_pkt_event {
 	void			*hpe_hdr;
 	mblk_t			**hpe_mp;
 	mblk_t			*hpe_mb;
+	int			hpe_flags;
 } hook_pkt_event_t;
+
+#define	HPE_MULTICAST	0x01
+#define	HPE_BROADCAST	0x02
 
 /*
  * NIC events hook provider

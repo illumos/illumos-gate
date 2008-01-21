@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -577,7 +577,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ipha_t *, ipha, mblk_t *, mp1);
 			FW_HOOKS(ipst->ips_ip4_loopback_out_event,
 			    ipst->ips_ipv4firewall_loopback_out,
-			    NULL, olp, ipha, mp1, mp1, ipst);
+			    NULL, olp, ipha, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, mp1);
 		} else {
 			ip6h = (ip6_t *)mp1->b_rptr;
@@ -587,7 +587,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ip6_t *, ip6h, mblk_t *, mp1);
 			FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
 			    ipst->ips_ipv6firewall_loopback_out,
-			    NULL, olp, ip6h, mp1, mp1, ipst);
+			    NULL, olp, ip6h, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
 		}
 		if (mp1 == NULL)
@@ -604,7 +604,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ipha_t *, ipha, mblk_t *, mp1);
 			FW_HOOKS(ipst->ips_ip4_loopback_in_event,
 			    ipst->ips_ipv4firewall_loopback_in,
-			    ilp, NULL, ipha, mp1, mp1, ipst);
+			    ilp, NULL, ipha, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;
@@ -616,7 +616,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			    ip6_t *, ip6h, mblk_t *, mp1);
 			FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
 			    ipst->ips_ipv6firewall_loopback_in,
-			    ilp, NULL, ip6h, mp1, mp1, ipst);
+			    ilp, NULL, ip6h, mp1, mp1, 0, ipst);
 			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
 			if (mp1 == NULL)
 				goto unfuse;

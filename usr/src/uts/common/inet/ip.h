@@ -2918,7 +2918,7 @@ extern struct module_info ip_mod_info;
  */
 #define	IPHA_VHL	ipha_version_and_hdr_length
 
-#define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m, ipst)	\
+#define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m, _llm, ipst)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\
@@ -2944,6 +2944,7 @@ extern struct module_info ip_mod_info;
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
+		info.hpe_flags = _llm;					\
 		if (hook_run(_event, (hook_data_t)&info,		\
 		    ipst->ips_netstack) != 0) {				\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
@@ -2960,7 +2961,7 @@ extern struct module_info ip_mod_info;
 		}							\
 	}
 
-#define	FW_HOOKS6(_hook, _event, _ilp, _olp, _iph, _fm, _m, ipst)	\
+#define	FW_HOOKS6(_hook, _event, _ilp, _olp, _iph, _fm, _m, _llm, ipst)	\
 									\
 	if ((_hook).he_interested) {	\
 		hook_pkt_event_t info;					\
@@ -2986,6 +2987,7 @@ extern struct module_info ip_mod_info;
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
+		info.hpe_flags = _llm;					\
 		if (hook_run(_event, (hook_data_t)&info,		\
 		    ipst->ips_netstack) != 0) {				\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
