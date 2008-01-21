@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,7 +367,6 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 		fep = fcp->fc_free;
 	}
 	fcp->fc_free = fep->fce_prev;
-	mutex_exit(&fcp->fc_free_lock);
 
 	/*
 	 * Set-up the handle resource and bus_specific information.
@@ -384,6 +383,7 @@ ndi_fmc_insert(dev_info_t *dip, int flag, void *resource, void *bus_specific)
 	fcp->fc_tail->fce_next = fep;
 	fcp->fc_tail = fep;
 	mutex_exit(&fcp->fc_lock);
+	mutex_exit(&fcp->fc_free_lock);
 }
 
 /*
@@ -507,9 +507,9 @@ ndi_fmc_entry_error(dev_info_t *dip, int flag, ddi_fm_error_t *derr,
 			 */
 			compare_func = (flag == ACC_HANDLE) ?
 			    i_ddi_fm_acc_err_cf_get((ddi_acc_handle_t)
-				fep->fce_resource) :
+			    fep->fce_resource) :
 			    i_ddi_fm_dma_err_cf_get((ddi_dma_handle_t)
-				fep->fce_resource);
+			    fep->fce_resource);
 
 			status = compare_func(dip, fep->fce_resource,
 			    bus_err_state, fep->fce_bus_specific);
