@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,9 +92,6 @@ lockstat_enable(void *arg, dtrace_id_t id, void *parg)
 	ASSERT(!lockstat_probemap[probe->lsp_probe]);
 
 	lockstat_probemap[probe->lsp_probe] = id;
-	membar_producer();
-
-	lockstat_probe = dtrace_probe;
 	membar_producer();
 
 	lockstat_hot_patch();
@@ -253,6 +250,9 @@ lockstat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
+
+	lockstat_probe = dtrace_probe;
+	membar_producer();
 
 	ddi_report_dev(devi);
 	lockstat_devi = devi;
