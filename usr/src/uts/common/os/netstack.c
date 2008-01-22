@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,16 +106,22 @@ static void	*netstack_zone_create(zoneid_t zoneid);
 static void	netstack_zone_shutdown(zoneid_t zoneid, void *arg);
 static void	netstack_zone_destroy(zoneid_t zoneid, void *arg);
 
-static void	netstack_do_create(netstack_t *ns, int moduleid);
-static void	netstack_do_shutdown(netstack_t *ns, int moduleid);
-static void	netstack_do_destroy(netstack_t *ns, int moduleid);
-
 static void	netstack_shared_zone_add(zoneid_t zoneid);
 static void	netstack_shared_zone_remove(zoneid_t zoneid);
 static void	netstack_shared_kstat_add(kstat_t *ks);
 static void	netstack_shared_kstat_remove(kstat_t *ks);
 
 typedef boolean_t applyfn_t(kmutex_t *, netstack_t *, int);
+
+static void	apply_all_netstacks(int, applyfn_t *);
+static void	apply_all_modules(netstack_t *, applyfn_t *);
+static void	apply_all_modules_reverse(netstack_t *, applyfn_t *);
+static boolean_t netstack_apply_create(kmutex_t *, netstack_t *, int);
+static boolean_t netstack_apply_shutdown(kmutex_t *, netstack_t *, int);
+static boolean_t netstack_apply_destroy(kmutex_t *, netstack_t *, int);
+static boolean_t wait_for_zone_creator(netstack_t *, kmutex_t *);
+static boolean_t wait_for_nms_inprogress(netstack_t *, nm_state_t *,
+    kmutex_t *);
 
 void
 netstack_init(void)
@@ -156,6 +162,10 @@ netstack_register(int moduleid,
 	ASSERT(moduleid >= 0 && moduleid < NS_MAX);
 	ASSERT(module_create != NULL);
 
+	/*
+	 * Make instances created after this point in time run the create
+	 * callback.
+	 */
 	mutex_enter(&netstack_g_lock);
 	ASSERT(ns_reg[moduleid].nr_create == NULL);
 	ASSERT(ns_reg[moduleid].nr_flags == 0);
@@ -166,15 +176,17 @@ netstack_register(int moduleid,
 
 	/*
 	 * Determine the set of stacks that exist before we drop the lock.
-	 * Set CREATE_NEEDED for each of those.
+	 * Set NSS_CREATE_NEEDED for each of those.
 	 * netstacks which have been deleted will have NSS_CREATE_COMPLETED
 	 * set, but check NSF_CLOSING to be sure.
 	 */
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		nm_state_t *nms = &ns->netstack_m_state[moduleid];
+
 		mutex_enter(&ns->netstack_lock);
 		if (!(ns->netstack_flags & NSF_CLOSING) &&
-		    (ns->netstack_m_state[moduleid] & NSS_CREATE_ALL) == 0) {
-			ns->netstack_m_state[moduleid] |= NSS_CREATE_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_ALL) == 0) {
+			nms->nms_flags |= NSS_CREATE_NEEDED;
 			DTRACE_PROBE2(netstack__create__needed,
 			    netstack_t *, ns, int, moduleid);
 		}
@@ -183,12 +195,12 @@ netstack_register(int moduleid,
 	mutex_exit(&netstack_g_lock);
 
 	/*
-	 * Call the create function for each stack that has CREATE_NEEDED
-	 * for this moduleid.
-	 * Set CREATE_INPROGRESS, drop lock, and after done,
-	 * set CREATE_COMPLETE
+	 * At this point in time a new instance can be created or an instance
+	 * can be destroyed, or some other module can register or unregister.
+	 * Make sure we either run all the create functions for this moduleid
+	 * or we wait for any other creators for this moduleid.
 	 */
-	netstack_do_create(NULL, moduleid);
+	apply_all_netstacks(moduleid, netstack_apply_create);
 }
 
 void
@@ -204,41 +216,57 @@ netstack_unregister(int moduleid)
 	mutex_enter(&netstack_g_lock);
 	/*
 	 * Determine the set of stacks that exist before we drop the lock.
-	 * Set SHUTDOWN_NEEDED and DESTROY_NEEDED for each of those.
+	 * Set NSS_SHUTDOWN_NEEDED and NSS_DESTROY_NEEDED for each of those.
+	 * That ensures that when we return all the callbacks for existing
+	 * instances have completed. And since we set NRF_DYING no new
+	 * instances can use this module.
 	 */
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		nm_state_t *nms = &ns->netstack_m_state[moduleid];
+
 		mutex_enter(&ns->netstack_lock);
 		if (ns_reg[moduleid].nr_shutdown != NULL &&
-		    (ns->netstack_m_state[moduleid] & NSS_CREATE_COMPLETED) &&
-		    (ns->netstack_m_state[moduleid] & NSS_SHUTDOWN_ALL) == 0) {
-			ns->netstack_m_state[moduleid] |= NSS_SHUTDOWN_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    (nms->nms_flags & NSS_SHUTDOWN_ALL) == 0) {
+			nms->nms_flags |= NSS_SHUTDOWN_NEEDED;
 			DTRACE_PROBE2(netstack__shutdown__needed,
 			    netstack_t *, ns, int, moduleid);
 		}
 		if ((ns_reg[moduleid].nr_flags & NRF_REGISTERED) &&
 		    ns_reg[moduleid].nr_destroy != NULL &&
-		    (ns->netstack_m_state[moduleid] & NSS_CREATE_COMPLETED) &&
-		    (ns->netstack_m_state[moduleid] & NSS_DESTROY_ALL) == 0) {
-			ns->netstack_m_state[moduleid] |= NSS_DESTROY_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    (nms->nms_flags & NSS_DESTROY_ALL) == 0) {
+			nms->nms_flags |= NSS_DESTROY_NEEDED;
 			DTRACE_PROBE2(netstack__destroy__needed,
 			    netstack_t *, ns, int, moduleid);
 		}
 		mutex_exit(&ns->netstack_lock);
 	}
+	/*
+	 * Prevent any new netstack from calling the registered create
+	 * function, while keeping the function pointers in place until the
+	 * shutdown and destroy callbacks are complete.
+	 */
+	ns_reg[moduleid].nr_flags |= NRF_DYING;
 	mutex_exit(&netstack_g_lock);
 
-	netstack_do_shutdown(NULL, moduleid);
-	netstack_do_destroy(NULL, moduleid);
+	apply_all_netstacks(moduleid, netstack_apply_shutdown);
+	apply_all_netstacks(moduleid, netstack_apply_destroy);
 
 	/*
-	 * Clear the netstack_m_state so that we can handle this module
+	 * Clear the nms_flags so that we can handle this module
 	 * being loaded again.
+	 * Also remove the registered functions.
 	 */
 	mutex_enter(&netstack_g_lock);
+	ASSERT(ns_reg[moduleid].nr_flags & NRF_REGISTERED);
+	ASSERT(ns_reg[moduleid].nr_flags & NRF_DYING);
 	for (ns = netstack_head; ns != NULL; ns = ns->netstack_next) {
+		nm_state_t *nms = &ns->netstack_m_state[moduleid];
+
 		mutex_enter(&ns->netstack_lock);
-		if (ns->netstack_m_state[moduleid] & NSS_DESTROY_COMPLETED) {
-			ns->netstack_m_state[moduleid] = 0;
+		if (nms->nms_flags & NSS_DESTROY_COMPLETED) {
+			nms->nms_flags = 0;
 			DTRACE_PROBE2(netstack__destroy__done,
 			    netstack_t *, ns, int, moduleid);
 		}
@@ -304,6 +332,7 @@ netstack_zone_create(zoneid_t zoneid)
 	}
 	/* Not found */
 	mutex_init(&ns->netstack_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ns->netstack_cv, NULL, CV_DEFAULT, NULL);
 	ns->netstack_stackid = zoneid;
 	ns->netstack_numzones = 1;
 	ns->netstack_refcnt = 1; /* Decremented by netstack_zone_destroy */
@@ -311,26 +340,44 @@ netstack_zone_create(zoneid_t zoneid)
 	*nsp = ns;
 	zone->zone_netstack = ns;
 
+	mutex_enter(&ns->netstack_lock);
+	/*
+	 * Mark this netstack as having a CREATE running so
+	 * any netstack_register/netstack_unregister waits for
+	 * the existing create callbacks to complete in moduleid order
+	 */
+	ns->netstack_flags |= NSF_ZONE_CREATE;
+
 	/*
 	 * Determine the set of module create functions that need to be
 	 * called before we drop the lock.
+	 * Set NSS_CREATE_NEEDED for each of those.
+	 * Skip any with NRF_DYING set, since those are in the process of
+	 * going away, by checking for flags being exactly NRF_REGISTERED.
 	 */
 	for (i = 0; i < NS_MAX; i++) {
-		mutex_enter(&ns->netstack_lock);
-		if ((ns_reg[i].nr_flags & NRF_REGISTERED) &&
-		    (ns->netstack_m_state[i] & NSS_CREATE_ALL) == 0) {
-			ns->netstack_m_state[i] |= NSS_CREATE_NEEDED;
+		nm_state_t *nms = &ns->netstack_m_state[i];
+
+		cv_init(&nms->nms_cv, NULL, CV_DEFAULT, NULL);
+
+		if ((ns_reg[i].nr_flags == NRF_REGISTERED) &&
+		    (nms->nms_flags & NSS_CREATE_ALL) == 0) {
+			nms->nms_flags |= NSS_CREATE_NEEDED;
 			DTRACE_PROBE2(netstack__create__needed,
 			    netstack_t *, ns, int, i);
 		}
-		mutex_exit(&ns->netstack_lock);
 	}
+	mutex_exit(&ns->netstack_lock);
 	mutex_exit(&netstack_g_lock);
 
-	netstack_do_create(ns, NS_ALL);
+	apply_all_modules(ns, netstack_apply_create);
 
+	/* Tell any waiting netstack_register/netstack_unregister to proceed */
 	mutex_enter(&ns->netstack_lock);
 	ns->netstack_flags &= ~NSF_UNINIT;
+	ASSERT(ns->netstack_flags & NSF_ZONE_CREATE);
+	ns->netstack_flags &= ~NSF_ZONE_CREATE;
+	cv_broadcast(&ns->netstack_cv);
 	mutex_exit(&ns->netstack_lock);
 
 	return (ns);
@@ -356,29 +403,46 @@ netstack_zone_shutdown(zoneid_t zoneid, void *arg)
 	mutex_exit(&ns->netstack_lock);
 
 	mutex_enter(&netstack_g_lock);
+	mutex_enter(&ns->netstack_lock);
+	/*
+	 * Mark this netstack as having a SHUTDOWN running so
+	 * any netstack_register/netstack_unregister waits for
+	 * the existing create callbacks to complete in moduleid order
+	 */
+	ASSERT(!(ns->netstack_flags & NSF_ZONE_INPROGRESS));
+	ns->netstack_flags |= NSF_ZONE_SHUTDOWN;
+
 	/*
 	 * Determine the set of stacks that exist before we drop the lock.
-	 * Set SHUTDOWN_NEEDED for each of those.
+	 * Set NSS_SHUTDOWN_NEEDED for each of those.
 	 */
 	for (i = 0; i < NS_MAX; i++) {
-		mutex_enter(&ns->netstack_lock);
+		nm_state_t *nms = &ns->netstack_m_state[i];
+
 		if ((ns_reg[i].nr_flags & NRF_REGISTERED) &&
 		    ns_reg[i].nr_shutdown != NULL &&
-		    (ns->netstack_m_state[i] & NSS_CREATE_COMPLETED) &&
-		    (ns->netstack_m_state[i] & NSS_SHUTDOWN_ALL) == 0) {
-			ns->netstack_m_state[i] |= NSS_SHUTDOWN_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    (nms->nms_flags & NSS_SHUTDOWN_ALL) == 0) {
+			nms->nms_flags |= NSS_SHUTDOWN_NEEDED;
 			DTRACE_PROBE2(netstack__shutdown__needed,
 			    netstack_t *, ns, int, i);
 		}
-		mutex_exit(&ns->netstack_lock);
 	}
+	mutex_exit(&ns->netstack_lock);
 	mutex_exit(&netstack_g_lock);
 
 	/*
 	 * Call the shutdown function for all registered modules for this
 	 * netstack.
 	 */
-	netstack_do_shutdown(ns, NS_ALL);
+	apply_all_modules(ns, netstack_apply_shutdown);
+
+	/* Tell any waiting netstack_register/netstack_unregister to proceed */
+	mutex_enter(&ns->netstack_lock);
+	ASSERT(ns->netstack_flags & NSF_ZONE_SHUTDOWN);
+	ns->netstack_flags &= ~NSF_ZONE_SHUTDOWN;
+	cv_broadcast(&ns->netstack_cv);
+	mutex_exit(&ns->netstack_lock);
 }
 
 /*
@@ -429,195 +493,81 @@ netstack_stack_inactive(netstack_t *ns)
 	int i;
 
 	mutex_enter(&netstack_g_lock);
+	mutex_enter(&ns->netstack_lock);
+	/*
+	 * Mark this netstack as having a DESTROY running so
+	 * any netstack_register/netstack_unregister waits for
+	 * the existing destroy callbacks to complete in reverse moduleid order
+	 */
+	ASSERT(!(ns->netstack_flags & NSF_ZONE_INPROGRESS));
+	ns->netstack_flags |= NSF_ZONE_DESTROY;
 	/*
 	 * If the shutdown callback wasn't called earlier (e.g., if this is
-	 * a netstack shared between multiple zones), then we call it now.
+	 * a netstack shared between multiple zones), then we schedule it now.
+	 *
+	 * Determine the set of stacks that exist before we drop the lock.
+	 * Set NSS_DESTROY_NEEDED for each of those. That
+	 * ensures that when we return all the callbacks for existing
+	 * instances have completed.
 	 */
 	for (i = 0; i < NS_MAX; i++) {
-		mutex_enter(&ns->netstack_lock);
+		nm_state_t *nms = &ns->netstack_m_state[i];
+
 		if ((ns_reg[i].nr_flags & NRF_REGISTERED) &&
 		    ns_reg[i].nr_shutdown != NULL &&
-		    (ns->netstack_m_state[i] & NSS_CREATE_COMPLETED) &&
-		    (ns->netstack_m_state[i] & NSS_SHUTDOWN_ALL) == 0) {
-			ns->netstack_m_state[i] |= NSS_SHUTDOWN_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    (nms->nms_flags & NSS_SHUTDOWN_ALL) == 0) {
+			nms->nms_flags |= NSS_SHUTDOWN_NEEDED;
 			DTRACE_PROBE2(netstack__shutdown__needed,
 			    netstack_t *, ns, int, i);
 		}
-		mutex_exit(&ns->netstack_lock);
-	}
-	/*
-	 * Determine the set of stacks that exist before we drop the lock.
-	 * Set DESTROY_NEEDED for each of those.
-	 */
-	for (i = 0; i < NS_MAX; i++) {
-		mutex_enter(&ns->netstack_lock);
+
 		if ((ns_reg[i].nr_flags & NRF_REGISTERED) &&
 		    ns_reg[i].nr_destroy != NULL &&
-		    (ns->netstack_m_state[i] & NSS_CREATE_COMPLETED) &&
-		    (ns->netstack_m_state[i] & NSS_DESTROY_ALL) == 0) {
-			ns->netstack_m_state[i] |= NSS_DESTROY_NEEDED;
+		    (nms->nms_flags & NSS_CREATE_COMPLETED) &&
+		    (nms->nms_flags & NSS_DESTROY_ALL) == 0) {
+			nms->nms_flags |= NSS_DESTROY_NEEDED;
 			DTRACE_PROBE2(netstack__destroy__needed,
 			    netstack_t *, ns, int, i);
 		}
-		mutex_exit(&ns->netstack_lock);
 	}
+	mutex_exit(&ns->netstack_lock);
 	mutex_exit(&netstack_g_lock);
 
 	/*
 	 * Call the shutdown and destroy functions for all registered modules
 	 * for this netstack.
+	 *
+	 * Since there are some ordering dependencies between the modules we
+	 * tear them down in the reverse order of what was used to create them.
+	 *
+	 * Since a netstack_t is never reused (when a zone is rebooted it gets
+	 * a new zoneid == netstackid i.e. a new netstack_t is allocated) we
+	 * leave nms_flags the way it is i.e. with NSS_DESTROY_COMPLETED set.
+	 * That is different than in the netstack_unregister() case.
 	 */
-	netstack_do_shutdown(ns, NS_ALL);
-	netstack_do_destroy(ns, NS_ALL);
-}
+	apply_all_modules(ns, netstack_apply_shutdown);
+	apply_all_modules_reverse(ns, netstack_apply_destroy);
 
-/*
- * Call the create function for the ns and moduleid if CREATE_NEEDED
- * is set.
- * When it calls it, it drops the netstack_lock held by the caller,
- * and returns true to tell the caller it needs to re-evalute the
- * state..
- */
-static boolean_t
-netstack_apply_create(kmutex_t *lockp, netstack_t *ns, int moduleid)
-{
-	void *result;
-	netstackid_t stackid;
-
-	ASSERT(MUTEX_HELD(lockp));
+	/* Tell any waiting netstack_register/netstack_unregister to proceed */
 	mutex_enter(&ns->netstack_lock);
-	if (ns->netstack_m_state[moduleid] & NSS_CREATE_NEEDED) {
-		ns->netstack_m_state[moduleid] &= ~NSS_CREATE_NEEDED;
-		ns->netstack_m_state[moduleid] |= NSS_CREATE_INPROGRESS;
-		DTRACE_PROBE2(netstack__create__inprogress,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		mutex_exit(lockp);
-
-		ASSERT(ns_reg[moduleid].nr_create != NULL);
-		stackid = ns->netstack_stackid;
-		DTRACE_PROBE2(netstack__create__start,
-		    netstackid_t, stackid,
-		    netstack_t *, ns);
-		result = (ns_reg[moduleid].nr_create)(stackid, ns);
-		DTRACE_PROBE2(netstack__create__end,
-		    void *, result, netstack_t *, ns);
-
-		ASSERT(result != NULL);
-		mutex_enter(&ns->netstack_lock);
-		ns->netstack_modules[moduleid] = result;
-		ns->netstack_m_state[moduleid] &= ~NSS_CREATE_INPROGRESS;
-		ns->netstack_m_state[moduleid] |= NSS_CREATE_COMPLETED;
-		DTRACE_PROBE2(netstack__create__completed,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		return (B_TRUE);
-	} else {
-		mutex_exit(&ns->netstack_lock);
-		return (B_FALSE);
-	}
-}
-
-/*
- * Call the shutdown function for the ns and moduleid if SHUTDOWN_NEEDED
- * is set.
- * When it calls it, it drops the netstack_lock held by the caller,
- * and returns true to tell the caller it needs to re-evalute the
- * state..
- */
-static boolean_t
-netstack_apply_shutdown(kmutex_t *lockp, netstack_t *ns, int moduleid)
-{
-	netstackid_t stackid;
-	void * netstack_module;
-
-	ASSERT(MUTEX_HELD(lockp));
-	mutex_enter(&ns->netstack_lock);
-	if (ns->netstack_m_state[moduleid] & NSS_SHUTDOWN_NEEDED) {
-		ns->netstack_m_state[moduleid] &= ~NSS_SHUTDOWN_NEEDED;
-		ns->netstack_m_state[moduleid] |= NSS_SHUTDOWN_INPROGRESS;
-		DTRACE_PROBE2(netstack__shutdown__inprogress,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		mutex_exit(lockp);
-
-		ASSERT(ns_reg[moduleid].nr_shutdown != NULL);
-		stackid = ns->netstack_stackid;
-		netstack_module = ns->netstack_modules[moduleid];
-		DTRACE_PROBE2(netstack__shutdown__start,
-		    netstackid_t, stackid,
-		    void *, netstack_module);
-		(ns_reg[moduleid].nr_shutdown)(stackid, netstack_module);
-		DTRACE_PROBE1(netstack__shutdown__end,
-		    netstack_t *, ns);
-
-		mutex_enter(&ns->netstack_lock);
-		ns->netstack_m_state[moduleid] &= ~NSS_SHUTDOWN_INPROGRESS;
-		ns->netstack_m_state[moduleid] |= NSS_SHUTDOWN_COMPLETED;
-		DTRACE_PROBE2(netstack__shutdown__completed,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		return (B_TRUE);
-	} else {
-		mutex_exit(&ns->netstack_lock);
-		return (B_FALSE);
-	}
-}
-
-/*
- * Call the destroy function for the ns and moduleid if DESTROY_NEEDED
- * is set.
- * When it calls it, it drops the netstack_lock held by the caller,
- * and returns true to tell the caller it needs to re-evalute the
- * state..
- */
-static boolean_t
-netstack_apply_destroy(kmutex_t *lockp, netstack_t *ns, int moduleid)
-{
-	netstackid_t stackid;
-	void * netstack_module;
-
-	ASSERT(MUTEX_HELD(lockp));
-	mutex_enter(&ns->netstack_lock);
-	if (ns->netstack_m_state[moduleid] & NSS_DESTROY_NEEDED) {
-		ns->netstack_m_state[moduleid] &= ~NSS_DESTROY_NEEDED;
-		ns->netstack_m_state[moduleid] |= NSS_DESTROY_INPROGRESS;
-		DTRACE_PROBE2(netstack__destroy__inprogress,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		mutex_exit(lockp);
-
-		/* XXX race against unregister? */
-		ASSERT(ns_reg[moduleid].nr_destroy != NULL);
-		stackid = ns->netstack_stackid;
-		netstack_module = ns->netstack_modules[moduleid];
-		DTRACE_PROBE2(netstack__destroy__start,
-		    netstackid_t, stackid,
-		    void *, netstack_module);
-		(ns_reg[moduleid].nr_destroy)(stackid, netstack_module);
-		DTRACE_PROBE1(netstack__destroy__end,
-		    netstack_t *, ns);
-
-		mutex_enter(&ns->netstack_lock);
-		ns->netstack_modules[moduleid] = NULL;
-		ns->netstack_m_state[moduleid] &= ~NSS_DESTROY_INPROGRESS;
-		ns->netstack_m_state[moduleid] |= NSS_DESTROY_COMPLETED;
-		DTRACE_PROBE2(netstack__destroy__completed,
-		    netstack_t *, ns, int, moduleid);
-		mutex_exit(&ns->netstack_lock);
-		return (B_TRUE);
-	} else {
-		mutex_exit(&ns->netstack_lock);
-		return (B_FALSE);
-	}
+	ASSERT(ns->netstack_flags & NSF_ZONE_DESTROY);
+	ns->netstack_flags &= ~NSF_ZONE_DESTROY;
+	cv_broadcast(&ns->netstack_cv);
+	mutex_exit(&ns->netstack_lock);
 }
 
 /*
  * Apply a function to all netstacks for a particular moduleid.
  *
+ * If there is any zone activity (due to a zone being created, shutdown,
+ * or destroyed) we wait for that to complete before we proceed. This ensures
+ * that the moduleids are processed in order when a zone is created or
+ * destroyed.
+ *
  * The applyfn has to drop netstack_g_lock if it does some work.
- * In that case we don't follow netstack_next after reacquiring the
- * lock, even if it is possible to do so without any hazards. This is
+ * In that case we don't follow netstack_next,
+ * even if it is possible to do so without any hazards. This is
  * because we want the design to allow for the list of netstacks threaded
  * by netstack_next to change in any arbitrary way during the time the
  * lock was dropped.
@@ -635,14 +585,11 @@ apply_all_netstacks(int moduleid, applyfn_t *applyfn)
 	mutex_enter(&netstack_g_lock);
 	ns = netstack_head;
 	while (ns != NULL) {
-		if ((applyfn)(&netstack_g_lock, ns, moduleid)) {
+		if (wait_for_zone_creator(ns, &netstack_g_lock)) {
 			/* Lock dropped - restart at head */
-#ifdef NS_DEBUG
-			(void) printf("apply_all_netstacks: "
-			    "LD for %p/%d, %d\n",
-			    (void *)ns, ns->netstack_stackid, moduleid);
-#endif
-			mutex_enter(&netstack_g_lock);
+			ns = netstack_head;
+		} else if ((applyfn)(&netstack_g_lock, ns, moduleid)) {
+			/* Lock dropped - restart at head */
 			ns = netstack_head;
 		} else {
 			ns = ns->netstack_next;
@@ -664,13 +611,11 @@ apply_all_modules(netstack_t *ns, applyfn_t *applyfn)
 
 	mutex_enter(&netstack_g_lock);
 	for (i = 0; i < NS_MAX; i++) {
-		if ((applyfn)(&netstack_g_lock, ns, i)) {
-			/*
-			 * Lock dropped but since we are not iterating over
-			 * netstack_head we can just reacquire the lock.
-			 */
-			mutex_enter(&netstack_g_lock);
-		}
+		/*
+		 * We don't care whether the lock was dropped
+		 * since we are not iterating over netstack_head.
+		 */
+		(void) (applyfn)(&netstack_g_lock, ns, i);
 	}
 	mutex_exit(&netstack_g_lock);
 }
@@ -683,92 +628,255 @@ apply_all_modules_reverse(netstack_t *ns, applyfn_t *applyfn)
 
 	mutex_enter(&netstack_g_lock);
 	for (i = NS_MAX-1; i >= 0; i--) {
-		if ((applyfn)(&netstack_g_lock, ns, i)) {
-			/*
-			 * Lock dropped but since we are not iterating over
-			 * netstack_head we can just reacquire the lock.
-			 */
-			mutex_enter(&netstack_g_lock);
-		}
+		/*
+		 * We don't care whether the lock was dropped
+		 * since we are not iterating over netstack_head.
+		 */
+		(void) (applyfn)(&netstack_g_lock, ns, i);
 	}
 	mutex_exit(&netstack_g_lock);
 }
 
 /*
- * Apply a function to a subset of all module/netstack combinations.
+ * Call the create function for the ns and moduleid if CREATE_NEEDED
+ * is set.
+ * If some other thread gets here first and sets *_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all netstacks/moduleids.
  *
- * If ns is non-NULL we restrict it to that particular instance.
- * If moduleid is a particular one (not NS_ALL), then we restrict it
- * to that particular moduleid.
- * When walking the moduleid, the reverse argument specifies that they
- * should be walked in reverse order.
- * The applyfn returns true if it had dropped the locks.
+ * When we call the create function, we temporarily drop the netstack_lock
+ * held by the caller, and return true to tell the caller it needs to
+ * re-evalute the state.
  */
-static void
-netstack_do_apply(netstack_t *ns, int moduleid, boolean_t reverse,
-    applyfn_t *applyfn)
+static boolean_t
+netstack_apply_create(kmutex_t *lockp, netstack_t *ns, int moduleid)
 {
-	if (ns != NULL) {
-		ASSERT(moduleid == NS_ALL);
-		if (reverse)
-			apply_all_modules_reverse(ns, applyfn);
-		else
-			apply_all_modules(ns, applyfn);
-	} else {
-		ASSERT(moduleid != NS_ALL);
+	void *result;
+	netstackid_t stackid;
+	nm_state_t *nms = &ns->netstack_m_state[moduleid];
+	boolean_t dropped = B_FALSE;
 
-		apply_all_netstacks(moduleid, applyfn);
+	ASSERT(MUTEX_HELD(lockp));
+	mutex_enter(&ns->netstack_lock);
+
+	if (wait_for_nms_inprogress(ns, nms, lockp))
+		dropped = B_TRUE;
+
+	if (nms->nms_flags & NSS_CREATE_NEEDED) {
+		nms->nms_flags &= ~NSS_CREATE_NEEDED;
+		nms->nms_flags |= NSS_CREATE_INPROGRESS;
+		DTRACE_PROBE2(netstack__create__inprogress,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		mutex_exit(lockp);
+		dropped = B_TRUE;
+
+		ASSERT(ns_reg[moduleid].nr_create != NULL);
+		stackid = ns->netstack_stackid;
+		DTRACE_PROBE2(netstack__create__start,
+		    netstackid_t, stackid,
+		    netstack_t *, ns);
+		result = (ns_reg[moduleid].nr_create)(stackid, ns);
+		DTRACE_PROBE2(netstack__create__end,
+		    void *, result, netstack_t *, ns);
+
+		ASSERT(result != NULL);
+		mutex_enter(lockp);
+		mutex_enter(&ns->netstack_lock);
+		ns->netstack_modules[moduleid] = result;
+		nms->nms_flags &= ~NSS_CREATE_INPROGRESS;
+		nms->nms_flags |= NSS_CREATE_COMPLETED;
+		cv_broadcast(&nms->nms_cv);
+		DTRACE_PROBE2(netstack__create__completed,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
+	} else {
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
 	}
 }
 
 /*
- * Run the create function for all modules x stack combinations
- * that have NSS_CREATE_NEEDED set.
+ * Call the shutdown function for the ns and moduleid if SHUTDOWN_NEEDED
+ * is set.
+ * If some other thread gets here first and sets *_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all netstacks/moduleids.
  *
- * Call the create function for each stack that has CREATE_NEEDED.
- * Set CREATE_INPROGRESS, drop lock, and after done,
- * set CREATE_COMPLETE
+ * When we call the shutdown function, we temporarily drop the netstack_lock
+ * held by the caller, and return true to tell the caller it needs to
+ * re-evalute the state.
  */
-static void
-netstack_do_create(netstack_t *ns, int moduleid)
+static boolean_t
+netstack_apply_shutdown(kmutex_t *lockp, netstack_t *ns, int moduleid)
 {
-	netstack_do_apply(ns, moduleid, B_FALSE, netstack_apply_create);
+	netstackid_t stackid;
+	void * netstack_module;
+	nm_state_t *nms = &ns->netstack_m_state[moduleid];
+	boolean_t dropped = B_FALSE;
+
+	ASSERT(MUTEX_HELD(lockp));
+	mutex_enter(&ns->netstack_lock);
+
+	if (wait_for_nms_inprogress(ns, nms, lockp))
+		dropped = B_TRUE;
+
+	if (nms->nms_flags & NSS_SHUTDOWN_NEEDED) {
+		nms->nms_flags &= ~NSS_SHUTDOWN_NEEDED;
+		nms->nms_flags |= NSS_SHUTDOWN_INPROGRESS;
+		DTRACE_PROBE2(netstack__shutdown__inprogress,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		mutex_exit(lockp);
+		dropped = B_TRUE;
+
+		ASSERT(ns_reg[moduleid].nr_shutdown != NULL);
+		stackid = ns->netstack_stackid;
+		netstack_module = ns->netstack_modules[moduleid];
+		DTRACE_PROBE2(netstack__shutdown__start,
+		    netstackid_t, stackid,
+		    void *, netstack_module);
+		(ns_reg[moduleid].nr_shutdown)(stackid, netstack_module);
+		DTRACE_PROBE1(netstack__shutdown__end,
+		    netstack_t *, ns);
+
+		mutex_enter(lockp);
+		mutex_enter(&ns->netstack_lock);
+		nms->nms_flags &= ~NSS_SHUTDOWN_INPROGRESS;
+		nms->nms_flags |= NSS_SHUTDOWN_COMPLETED;
+		cv_broadcast(&nms->nms_cv);
+		DTRACE_PROBE2(netstack__shutdown__completed,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
+	} else {
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
+	}
 }
 
 /*
- * Run the shutdown function for all modules x stack combinations
- * that have NSS_SHUTDOWN_NEEDED set.
+ * Call the destroy function for the ns and moduleid if DESTROY_NEEDED
+ * is set.
+ * If some other thread gets here first and sets *_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all netstacks/moduleids.
  *
- * Call the shutdown function for each stack that has SHUTDOWN_NEEDED.
- * Set SHUTDOWN_INPROGRESS, drop lock, and after done,
- * set SHUTDOWN_COMPLETE
+ * When we call the destroy function, we temporarily drop the netstack_lock
+ * held by the caller, and return true to tell the caller it needs to
+ * re-evalute the state.
  */
-static void
-netstack_do_shutdown(netstack_t *ns, int moduleid)
+static boolean_t
+netstack_apply_destroy(kmutex_t *lockp, netstack_t *ns, int moduleid)
 {
-	netstack_do_apply(ns, moduleid, B_FALSE, netstack_apply_shutdown);
+	netstackid_t stackid;
+	void * netstack_module;
+	nm_state_t *nms = &ns->netstack_m_state[moduleid];
+	boolean_t dropped = B_FALSE;
+
+	ASSERT(MUTEX_HELD(lockp));
+	mutex_enter(&ns->netstack_lock);
+
+	if (wait_for_nms_inprogress(ns, nms, lockp))
+		dropped = B_TRUE;
+
+	if (nms->nms_flags & NSS_DESTROY_NEEDED) {
+		nms->nms_flags &= ~NSS_DESTROY_NEEDED;
+		nms->nms_flags |= NSS_DESTROY_INPROGRESS;
+		DTRACE_PROBE2(netstack__destroy__inprogress,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		mutex_exit(lockp);
+		dropped = B_TRUE;
+
+		ASSERT(ns_reg[moduleid].nr_destroy != NULL);
+		stackid = ns->netstack_stackid;
+		netstack_module = ns->netstack_modules[moduleid];
+		DTRACE_PROBE2(netstack__destroy__start,
+		    netstackid_t, stackid,
+		    void *, netstack_module);
+		(ns_reg[moduleid].nr_destroy)(stackid, netstack_module);
+		DTRACE_PROBE1(netstack__destroy__end,
+		    netstack_t *, ns);
+
+		mutex_enter(lockp);
+		mutex_enter(&ns->netstack_lock);
+		ns->netstack_modules[moduleid] = NULL;
+		nms->nms_flags &= ~NSS_DESTROY_INPROGRESS;
+		nms->nms_flags |= NSS_DESTROY_COMPLETED;
+		cv_broadcast(&nms->nms_cv);
+		DTRACE_PROBE2(netstack__destroy__completed,
+		    netstack_t *, ns, int, moduleid);
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
+	} else {
+		mutex_exit(&ns->netstack_lock);
+		return (dropped);
+	}
 }
 
 /*
- * Run the destroy function for all modules x stack combinations
- * that have NSS_DESTROY_NEEDED set.
- *
- * Call the destroy function for each stack that has DESTROY_NEEDED.
- * Set DESTROY_INPROGRESS, drop lock, and after done,
- * set DESTROY_COMPLETE
- *
- * Since a netstack_t is never reused (when a zone is rebooted it gets
- * a new zoneid == netstackid i.e. a new netstack_t is allocated) we leave
- * netstack_m_state the way it is i.e. with NSS_DESTROY_COMPLETED set.
+ * If somebody  is creating the netstack (due to a new zone being created)
+ * then we wait for them to complete. This ensures that any additional
+ * netstack_register() doesn't cause the create functions to run out of
+ * order.
+ * Note that we do not need such a global wait in the case of the shutdown
+ * and destroy callbacks, since in that case it is sufficient for both
+ * threads to set NEEDED and wait for INPROGRESS to ensure ordering.
+ * Returns true if lockp was temporarily dropped while waiting.
  */
-static void
-netstack_do_destroy(netstack_t *ns, int moduleid)
+static boolean_t
+wait_for_zone_creator(netstack_t *ns, kmutex_t *lockp)
 {
-	/*
-	 * Have to walk the moduleids in reverse order since some
-	 * modules make implicit assumptions about the order
-	 */
-	netstack_do_apply(ns, moduleid, B_TRUE, netstack_apply_destroy);
+	boolean_t dropped = B_FALSE;
+
+	mutex_enter(&ns->netstack_lock);
+	while (ns->netstack_flags & NSF_ZONE_CREATE) {
+		DTRACE_PROBE1(netstack__wait__zone__inprogress,
+		    netstack_t *, ns);
+		if (lockp != NULL) {
+			dropped = B_TRUE;
+			mutex_exit(lockp);
+		}
+		cv_wait(&ns->netstack_cv, &ns->netstack_lock);
+		if (lockp != NULL) {
+			/* First drop netstack_lock to preserve order */
+			mutex_exit(&ns->netstack_lock);
+			mutex_enter(lockp);
+			mutex_enter(&ns->netstack_lock);
+		}
+	}
+	mutex_exit(&ns->netstack_lock);
+	return (dropped);
+}
+
+/*
+ * Wait for any INPROGRESS flag to be cleared for the netstack/moduleid
+ * combination.
+ * Returns true if lockp was temporarily dropped while waiting.
+ */
+static boolean_t
+wait_for_nms_inprogress(netstack_t *ns, nm_state_t *nms, kmutex_t *lockp)
+{
+	boolean_t dropped = B_FALSE;
+
+	while (nms->nms_flags & NSS_ALL_INPROGRESS) {
+		DTRACE_PROBE2(netstack__wait__nms__inprogress,
+		    netstack_t *, ns, nm_state_t *, nms);
+		if (lockp != NULL) {
+			dropped = B_TRUE;
+			mutex_exit(lockp);
+		}
+		cv_wait(&nms->nms_cv, &ns->netstack_lock);
+		if (lockp != NULL) {
+			/* First drop netstack_lock to preserve order */
+			mutex_exit(&ns->netstack_lock);
+			mutex_enter(lockp);
+			mutex_enter(&ns->netstack_lock);
+		}
+	}
+	return (dropped);
 }
 
 /*
@@ -845,7 +953,10 @@ netstack_find_by_zoneid(zoneid_t zoneid)
 }
 
 /*
- * Find a stack instance given the zoneid.
+ * Find a stack instance given the zoneid. Can only be called from
+ * the create callback. See the comments in zone_find_by_id_nolock why
+ * that limitation exists.
+ *
  * Increases the reference count if found; caller must do a
  * netstack_rele().
  *
@@ -853,8 +964,6 @@ netstack_find_by_zoneid(zoneid_t zoneid)
  * matches.
  *
  * Skip the unitialized ones.
- *
- * NOTE: The caller must hold zonehash_lock.
  */
 netstack_t *
 netstack_find_by_zoneid_nolock(zoneid_t zoneid)
@@ -875,7 +984,7 @@ netstack_find_by_zoneid_nolock(zoneid_t zoneid)
 	else
 		netstack_hold(ns);
 
-	zone_rele(zone);
+	/* zone_find_by_id_nolock does not have a hold on the zone */
 	return (ns);
 }
 
@@ -913,6 +1022,7 @@ netstack_rele(netstack_t *ns)
 	netstack_t **nsp;
 	boolean_t found;
 	int refcnt, numzones;
+	int i;
 
 	mutex_enter(&ns->netstack_lock);
 	ASSERT(ns->netstack_refcnt > 0);
@@ -959,6 +1069,14 @@ netstack_rele(netstack_t *ns)
 		ASSERT(ns->netstack_numzones == 0);
 
 		ASSERT(ns->netstack_flags & NSF_CLOSING);
+
+		for (i = 0; i < NS_MAX; i++) {
+			nm_state_t *nms = &ns->netstack_m_state[i];
+
+			cv_destroy(&nms->nms_cv);
+		}
+		mutex_destroy(&ns->netstack_lock);
+		cv_destroy(&ns->netstack_cv);
 		kmem_free(ns, sizeof (*ns));
 	}
 }
@@ -996,7 +1114,7 @@ kstat_create_netstack(char *ks_module, int ks_instance, char *ks_name,
 		zoneid_t zoneid = ks_netstackid;
 
 		return (kstat_create_zone(ks_module, ks_instance, ks_name,
-			ks_class, ks_type, ks_ndata, ks_flags, zoneid));
+		    ks_class, ks_type, ks_ndata, ks_flags, zoneid));
 	}
 }
 
@@ -1144,7 +1262,9 @@ netstack_find_shared_zoneid(zoneid_t zoneid)
 /*
  * Hide the fact that zoneids and netstackids are allocated from
  * the same space in the current implementation.
- * XXX could add checks that the stackid/zoneids are valid...
+ * We currently do not check that the stackid/zoneids are valid, since there
+ * is no need for that. But this should only be done for ids that are
+ * valid.
  */
 zoneid_t
 netstackid_to_zoneid(netstackid_t stackid)

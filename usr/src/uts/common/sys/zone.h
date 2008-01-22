@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,7 @@ extern "C" {
 #define	ZONE_EVENT_STATUS_SUBCLASS	"change"
 
 #define	ZONE_EVENT_UNINITIALIZED	"uninitialized"
+#define	ZONE_EVENT_INITIALIZED		"initialized"
 #define	ZONE_EVENT_READY		"ready"
 #define	ZONE_EVENT_RUNNING		"running"
 #define	ZONE_EVENT_SHUTTING_DOWN	"shutting_down"
@@ -201,6 +202,7 @@ typedef struct {
 /* zone_status */
 typedef enum {
 	ZONE_IS_UNINITIALIZED = 0,
+	ZONE_IS_INITIALIZED,
 	ZONE_IS_READY,
 	ZONE_IS_BOOTING,
 	ZONE_IS_RUNNING,
@@ -268,7 +270,6 @@ typedef struct zone_cmd_rval {
 #define	ZONE_DOOR_PATH		ZONES_TMPDIR "/%s.zoneadmd_door"
 
 /* zone_flags */
-#define	ZF_DESTROYED		0x1	/* ZSD destructor callbacks run */
 #define	ZF_HASHED_LABEL		0x2	/* zone has a unique label */
 #define	ZF_IS_SCRATCH		0x4	/* scratch zone */
 #define	ZF_NET_EXCL		0x8	/* Zone has an exclusive IP stack */
@@ -476,6 +477,13 @@ extern int	zone_setspecific(zone_key_t, zone_t *, const void *);
 /*
  * The definition of a zsd_entry is truly private to zone.c and is only
  * placed here so it can be shared with mdb.
+ *
+ * State maintained for each zone times each registered key, which tracks
+ * the state of the create, shutdown and destroy callbacks.
+ *
+ * zsd_flags is used to keep track of pending actions to avoid holding locks
+ * when calling the create/shutdown/destroy callbacks, since doing so
+ * could lead to deadlocks.
  */
 struct zsd_entry {
 	zone_key_t		zsd_key;	/* Key used to lookup value */
@@ -488,7 +496,32 @@ struct zsd_entry {
 	void			(*zsd_shutdown)(zoneid_t, void *);
 	void			(*zsd_destroy)(zoneid_t, void *);
 	list_node_t		zsd_linkage;
+	uint16_t 		zsd_flags;	/* See below */
+	kcondvar_t		zsd_cv;
 };
+
+/*
+ * zsd_flags
+ */
+#define	ZSD_CREATE_NEEDED	0x0001
+#define	ZSD_CREATE_INPROGRESS	0x0002
+#define	ZSD_CREATE_COMPLETED	0x0004
+#define	ZSD_SHUTDOWN_NEEDED	0x0010
+#define	ZSD_SHUTDOWN_INPROGRESS	0x0020
+#define	ZSD_SHUTDOWN_COMPLETED	0x0040
+#define	ZSD_DESTROY_NEEDED	0x0100
+#define	ZSD_DESTROY_INPROGRESS	0x0200
+#define	ZSD_DESTROY_COMPLETED	0x0400
+
+#define	ZSD_CREATE_ALL	\
+	(ZSD_CREATE_NEEDED|ZSD_CREATE_INPROGRESS|ZSD_CREATE_COMPLETED)
+#define	ZSD_SHUTDOWN_ALL	\
+	(ZSD_SHUTDOWN_NEEDED|ZSD_SHUTDOWN_INPROGRESS|ZSD_SHUTDOWN_COMPLETED)
+#define	ZSD_DESTROY_ALL	\
+	(ZSD_DESTROY_NEEDED|ZSD_DESTROY_INPROGRESS|ZSD_DESTROY_COMPLETED)
+
+#define	ZSD_ALL_INPROGRESS \
+	(ZSD_CREATE_INPROGRESS|ZSD_SHUTDOWN_INPROGRESS|ZSD_DESTROY_INPROGRESS)
 
 /*
  * Macros to help with zone visibility restrictions.

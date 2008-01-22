@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,10 @@
  *   ZONE_IS_UNINITIALIZED: primordial state for a zone. The partially
  *   initialized zone is added to the list of active zones on the system but
  *   isn't accessible.
+ *
+ *   ZONE_IS_INITIALIZED: Initialization complete except the ZSD callbacks are
+ *   not yet completed. Not possible to enter the zone, but attributes can
+ *   be retrieved.
  *
  *   ZONE_IS_READY: zsched (the kernel dummy process for a zone) is
  *   ready.  The zone is made visible after the ZSD constructor callbacks are
@@ -228,6 +232,7 @@
 
 #include <sys/door.h>
 #include <sys/cpuvar.h>
+#include <sys/sdt.h>
 
 #include <sys/uadmin.h>
 #include <sys/session.h>
@@ -313,6 +318,7 @@ evchan_t *zone_event_chan;
  */
 const char  *zone_status_table[] = {
 	ZONE_EVENT_UNINITIALIZED,	/* uninitialized */
+	ZONE_EVENT_INITIALIZED,		/* initialized */
 	ZONE_EVENT_READY,		/* ready */
 	ZONE_EVENT_READY,		/* booting */
 	ZONE_EVENT_RUNNING,		/* running */
@@ -350,6 +356,19 @@ static int zone_add_datalink(zoneid_t, char *);
 static int zone_remove_datalink(zoneid_t, char *);
 static int zone_check_datalink(zoneid_t *, char *);
 static int zone_list_datalink(zoneid_t, int *, char *);
+
+typedef boolean_t zsd_applyfn_t(kmutex_t *, boolean_t, zone_t *, zone_key_t);
+
+static void zsd_apply_all_zones(zsd_applyfn_t *, zone_key_t);
+static void zsd_apply_all_keys(zsd_applyfn_t *, zone_t *);
+static boolean_t zsd_apply_create(kmutex_t *, boolean_t, zone_t *, zone_key_t);
+static boolean_t zsd_apply_shutdown(kmutex_t *, boolean_t, zone_t *,
+    zone_key_t);
+static boolean_t zsd_apply_destroy(kmutex_t *, boolean_t, zone_t *, zone_key_t);
+static boolean_t zsd_wait_for_creator(zone_t *, struct zsd_entry *,
+    kmutex_t *);
+static boolean_t zsd_wait_for_inprogress(zone_t *, struct zsd_entry *,
+    kmutex_t *);
 
 /*
  * Bump this number when you alter the zone syscall interfaces; this is
@@ -485,71 +504,30 @@ mount_completed(void)
  * The locking strategy and overall picture is as follows:
  *
  * When someone calls zone_key_create(), a template ZSD entry is added to the
- * global list "zsd_registered_keys", protected by zsd_key_lock.  The
- * constructor callback is called immediately on all existing zones, and a
- * copy of the ZSD entry added to the per-zone zone_zsd list (protected by
- * zone_lock).  As this operation requires the list of zones, the list of
- * registered keys, and the per-zone list of ZSD entries to remain constant
- * throughout the entire operation, it must grab zonehash_lock, zone_lock for
- * all existing zones, and zsd_key_lock, in that order.  Similar locking is
- * needed when zone_key_delete() is called.  It is thus sufficient to hold
- * zsd_key_lock *or* zone_lock to prevent additions to or removals from the
- * per-zone zone_zsd list.
+ * global list "zsd_registered_keys", protected by zsd_key_lock.  While
+ * holding that lock all the existing zones are marked as
+ * ZSD_CREATE_NEEDED and a copy of the ZSD entry added to the per-zone
+ * zone_zsd list (protected by zone_lock). The global list is updated first
+ * (under zone_key_lock) to make sure that newly created zones use the
+ * most recent list of keys. Then under zonehash_lock we walk the zones
+ * and mark them.  Similar locking is used in zone_key_delete().
  *
- * Note that this implementation does not make a copy of the ZSD entry if a
- * constructor callback is not provided.  A zone_getspecific() on such an
- * uninitialized ZSD entry will return NULL.
+ * The actual create, shutdown, and destroy callbacks are done without
+ * holding any lock. And zsd_flags are used to ensure that the operations
+ * completed so that when zone_key_create (and zone_create) is done, as well as
+ * zone_key_delete (and zone_destroy) is done, all the necessary callbacks
+ * are completed.
  *
  * When new zones are created constructor callbacks for all registered ZSD
- * entries will be called.
+ * entries will be called. That also uses the above two phases of marking
+ * what needs to be done, and then running the callbacks without holding
+ * any locks.
  *
  * The framework does not provide any locking around zone_getspecific() and
  * zone_setspecific() apart from that needed for internal consistency, so
  * callers interested in atomic "test-and-set" semantics will need to provide
  * their own locking.
  */
-void
-zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
-    void (*shutdown)(zoneid_t, void *), void (*destroy)(zoneid_t, void *))
-{
-	struct zsd_entry *zsdp;
-	struct zsd_entry *t;
-	struct zone *zone;
-
-	zsdp = kmem_alloc(sizeof (*zsdp), KM_SLEEP);
-	zsdp->zsd_data = NULL;
-	zsdp->zsd_create = create;
-	zsdp->zsd_shutdown = shutdown;
-	zsdp->zsd_destroy = destroy;
-
-	mutex_enter(&zonehash_lock);	/* stop the world */
-	for (zone = list_head(&zone_active); zone != NULL;
-	    zone = list_next(&zone_active, zone))
-		mutex_enter(&zone->zone_lock);	/* lock all zones */
-
-	mutex_enter(&zsd_key_lock);
-	*keyp = zsdp->zsd_key = ++zsd_keyval;
-	ASSERT(zsd_keyval != 0);
-	list_insert_tail(&zsd_registered_keys, zsdp);
-	mutex_exit(&zsd_key_lock);
-
-	if (create != NULL) {
-		for (zone = list_head(&zone_active); zone != NULL;
-		    zone = list_next(&zone_active, zone)) {
-			t = kmem_alloc(sizeof (*t), KM_SLEEP);
-			t->zsd_key = *keyp;
-			t->zsd_data = (*create)(zone->zone_id);
-			t->zsd_create = create;
-			t->zsd_shutdown = shutdown;
-			t->zsd_destroy = destroy;
-			list_insert_tail(&zone->zone_zsd, t);
-		}
-	}
-	for (zone = list_head(&zone_active); zone != NULL;
-	    zone = list_next(&zone_active, zone))
-		mutex_exit(&zone->zone_lock);
-	mutex_exit(&zonehash_lock);
-}
 
 /*
  * Helper function to find the zsd_entry associated with the key in the
@@ -557,6 +535,23 @@ zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
  */
 static struct zsd_entry *
 zsd_find(list_t *l, zone_key_t key)
+{
+	struct zsd_entry *zsd;
+
+	for (zsd = list_head(l); zsd != NULL; zsd = list_next(l, zsd)) {
+		if (zsd->zsd_key == key) {
+			return (zsd);
+		}
+	}
+	return (NULL);
+}
+
+/*
+ * Helper function to find the zsd_entry associated with the key in the
+ * given list. Move it to the front of the list.
+ */
+static struct zsd_entry *
+zsd_find_mru(list_t *l, zone_key_t key)
 {
 	struct zsd_entry *zsd;
 
@@ -575,9 +570,88 @@ zsd_find(list_t *l, zone_key_t key)
 	return (NULL);
 }
 
+void
+zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
+    void (*shutdown)(zoneid_t, void *), void (*destroy)(zoneid_t, void *))
+{
+	struct zsd_entry *zsdp;
+	struct zsd_entry *t;
+	struct zone *zone;
+	zone_key_t  key;
+
+	zsdp = kmem_zalloc(sizeof (*zsdp), KM_SLEEP);
+	zsdp->zsd_data = NULL;
+	zsdp->zsd_create = create;
+	zsdp->zsd_shutdown = shutdown;
+	zsdp->zsd_destroy = destroy;
+
+	/*
+	 * Insert in global list of callbacks. Makes future zone creations
+	 * see it.
+	 */
+	mutex_enter(&zsd_key_lock);
+	*keyp = key = zsdp->zsd_key = ++zsd_keyval;
+	ASSERT(zsd_keyval != 0);
+	list_insert_tail(&zsd_registered_keys, zsdp);
+	mutex_exit(&zsd_key_lock);
+
+	/*
+	 * Insert for all existing zones and mark them as needing
+	 * a create callback.
+	 */
+	mutex_enter(&zonehash_lock);	/* stop the world */
+	for (zone = list_head(&zone_active); zone != NULL;
+	    zone = list_next(&zone_active, zone)) {
+		zone_status_t status;
+
+		mutex_enter(&zone->zone_lock);
+
+		/* Skip zones that are on the way down or not yet up */
+		status = zone_status_get(zone);
+		if (status >= ZONE_IS_DOWN ||
+		    status == ZONE_IS_UNINITIALIZED) {
+			mutex_exit(&zone->zone_lock);
+			continue;
+		}
+
+		t = zsd_find_mru(&zone->zone_zsd, key);
+		if (t != NULL) {
+			/*
+			 * A zsd_configure already inserted it after
+			 * we dropped zsd_key_lock above.
+			 */
+			mutex_exit(&zone->zone_lock);
+			continue;
+		}
+		t = kmem_zalloc(sizeof (*t), KM_SLEEP);
+		t->zsd_key = key;
+		t->zsd_create = create;
+		t->zsd_shutdown = shutdown;
+		t->zsd_destroy = destroy;
+		if (create != NULL) {
+			t->zsd_flags = ZSD_CREATE_NEEDED;
+			DTRACE_PROBE2(zsd__create__needed,
+			    zone_t *, zone, zone_key_t, key);
+		}
+		list_insert_tail(&zone->zone_zsd, t);
+		mutex_exit(&zone->zone_lock);
+	}
+	mutex_exit(&zonehash_lock);
+
+	if (create != NULL) {
+		/* Now call the create callback for this key */
+		zsd_apply_all_zones(zsd_apply_create, key);
+	}
+}
+
 /*
  * Function called when a module is being unloaded, or otherwise wishes
  * to unregister its ZSD key and callbacks.
+ *
+ * Remove from the global list and determine the functions that need to
+ * be called under a global lock. Then call the functions without
+ * holding any locks. Finally free up the zone_zsd entries. (The apply
+ * functions need to access the zone_zsd entries to find zsd_data etc.)
  */
 int
 zone_key_delete(zone_key_t key)
@@ -585,65 +659,88 @@ zone_key_delete(zone_key_t key)
 	struct zsd_entry *zsdp = NULL;
 	zone_t *zone;
 
-	mutex_enter(&zonehash_lock);	/* Zone create/delete waits for us */
-	for (zone = list_head(&zone_active); zone != NULL;
-	    zone = list_next(&zone_active, zone))
-		mutex_enter(&zone->zone_lock);	/* lock all zones */
-
 	mutex_enter(&zsd_key_lock);
-	zsdp = zsd_find(&zsd_registered_keys, key);
-	if (zsdp == NULL)
-		goto notfound;
+	zsdp = zsd_find_mru(&zsd_registered_keys, key);
+	if (zsdp == NULL) {
+		mutex_exit(&zsd_key_lock);
+		return (-1);
+	}
 	list_remove(&zsd_registered_keys, zsdp);
 	mutex_exit(&zsd_key_lock);
 
+	mutex_enter(&zonehash_lock);
 	for (zone = list_head(&zone_active); zone != NULL;
 	    zone = list_next(&zone_active, zone)) {
 		struct zsd_entry *del;
-		void *data;
 
-		if (!(zone->zone_flags & ZF_DESTROYED)) {
-			del = zsd_find(&zone->zone_zsd, key);
-			if (del != NULL) {
-				data = del->zsd_data;
-				ASSERT(del->zsd_shutdown == zsdp->zsd_shutdown);
-				ASSERT(del->zsd_destroy == zsdp->zsd_destroy);
-				list_remove(&zone->zone_zsd, del);
-				kmem_free(del, sizeof (*del));
-			} else {
-				data = NULL;
-			}
-			if (zsdp->zsd_shutdown)
-				zsdp->zsd_shutdown(zone->zone_id, data);
-			if (zsdp->zsd_destroy)
-				zsdp->zsd_destroy(zone->zone_id, data);
+		mutex_enter(&zone->zone_lock);
+		del = zsd_find_mru(&zone->zone_zsd, key);
+		if (del == NULL) {
+			/*
+			 * Somebody else got here first e.g the zone going
+			 * away.
+			 */
+			mutex_exit(&zone->zone_lock);
+			continue;
+		}
+		ASSERT(del->zsd_shutdown == zsdp->zsd_shutdown);
+		ASSERT(del->zsd_destroy == zsdp->zsd_destroy);
+		if (del->zsd_shutdown != NULL &&
+		    (del->zsd_flags & ZSD_SHUTDOWN_ALL) == 0) {
+			del->zsd_flags |= ZSD_SHUTDOWN_NEEDED;
+			DTRACE_PROBE2(zsd__shutdown__needed,
+			    zone_t *, zone, zone_key_t, key);
+		}
+		if (del->zsd_destroy != NULL &&
+		    (del->zsd_flags & ZSD_DESTROY_ALL) == 0) {
+			del->zsd_flags |= ZSD_DESTROY_NEEDED;
+			DTRACE_PROBE2(zsd__destroy__needed,
+			    zone_t *, zone, zone_key_t, key);
 		}
 		mutex_exit(&zone->zone_lock);
 	}
 	mutex_exit(&zonehash_lock);
 	kmem_free(zsdp, sizeof (*zsdp));
-	return (0);
 
-notfound:
-	mutex_exit(&zsd_key_lock);
+	/* Now call the shutdown and destroy callback for this key */
+	zsd_apply_all_zones(zsd_apply_shutdown, key);
+	zsd_apply_all_zones(zsd_apply_destroy, key);
+
+	/* Now we can free up the zsdp structures in each zone */
+	mutex_enter(&zonehash_lock);
 	for (zone = list_head(&zone_active); zone != NULL;
-	    zone = list_next(&zone_active, zone))
+	    zone = list_next(&zone_active, zone)) {
+		struct zsd_entry *del;
+
+		mutex_enter(&zone->zone_lock);
+		del = zsd_find(&zone->zone_zsd, key);
+		if (del != NULL) {
+			list_remove(&zone->zone_zsd, del);
+			ASSERT(!(del->zsd_flags & ZSD_ALL_INPROGRESS));
+			kmem_free(del, sizeof (*del));
+		}
 		mutex_exit(&zone->zone_lock);
+	}
 	mutex_exit(&zonehash_lock);
-	return (-1);
+
+	return (0);
 }
 
 /*
  * ZSD counterpart of pthread_setspecific().
+ *
+ * Since all zsd callbacks, including those with no create function,
+ * have an entry in zone_zsd, if the key is registered it is part of
+ * the zone_zsd list.
+ * Return an error if the key wasn't registerd.
  */
 int
 zone_setspecific(zone_key_t key, zone_t *zone, const void *data)
 {
 	struct zsd_entry *t;
-	struct zsd_entry *zsdp = NULL;
 
 	mutex_enter(&zone->zone_lock);
-	t = zsd_find(&zone->zone_zsd, key);
+	t = zsd_find_mru(&zone->zone_zsd, key);
 	if (t != NULL) {
 		/*
 		 * Replace old value with new
@@ -652,36 +749,8 @@ zone_setspecific(zone_key_t key, zone_t *zone, const void *data)
 		mutex_exit(&zone->zone_lock);
 		return (0);
 	}
-	/*
-	 * If there was no previous value, go through the list of registered
-	 * keys.
-	 *
-	 * We avoid grabbing zsd_key_lock until we are sure we need it; this is
-	 * necessary for shutdown callbacks to be able to execute without fear
-	 * of deadlock.
-	 */
-	mutex_enter(&zsd_key_lock);
-	zsdp = zsd_find(&zsd_registered_keys, key);
-	if (zsdp == NULL) { 	/* Key was not registered */
-		mutex_exit(&zsd_key_lock);
-		mutex_exit(&zone->zone_lock);
-		return (-1);
-	}
-
-	/*
-	 * Add a zsd_entry to this zone, using the template we just retrieved
-	 * to initialize the constructor and destructor(s).
-	 */
-	t = kmem_alloc(sizeof (*t), KM_SLEEP);
-	t->zsd_key = key;
-	t->zsd_data = (void *)data;
-	t->zsd_create = zsdp->zsd_create;
-	t->zsd_shutdown = zsdp->zsd_shutdown;
-	t->zsd_destroy = zsdp->zsd_destroy;
-	list_insert_tail(&zone->zone_zsd, t);
-	mutex_exit(&zsd_key_lock);
 	mutex_exit(&zone->zone_lock);
-	return (0);
+	return (-1);
 }
 
 /*
@@ -694,7 +763,7 @@ zone_getspecific(zone_key_t key, zone_t *zone)
 	void *data;
 
 	mutex_enter(&zone->zone_lock);
-	t = zsd_find(&zone->zone_zsd, key);
+	t = zsd_find_mru(&zone->zone_zsd, key);
 	data = (t == NULL ? NULL : t->zsd_data);
 	mutex_exit(&zone->zone_lock);
 	return (data);
@@ -703,42 +772,41 @@ zone_getspecific(zone_key_t key, zone_t *zone)
 /*
  * Function used to initialize a zone's list of ZSD callbacks and data
  * when the zone is being created.  The callbacks are initialized from
- * the template list (zsd_registered_keys), and the constructor
- * callback executed (if one exists).
- *
- * This is called before the zone is made publicly available, hence no
- * need to grab zone_lock.
- *
- * Although we grab and release zsd_key_lock, new entries cannot be
- * added to or removed from the zsd_registered_keys list until we
- * release zonehash_lock, so there isn't a window for a
- * zone_key_create() to come in after we've dropped zsd_key_lock but
- * before the zone is added to the zone list, such that the constructor
- * callbacks aren't executed for the new zone.
+ * the template list (zsd_registered_keys). The constructor callback is
+ * executed later (once the zone exists and with locks dropped).
  */
 static void
 zone_zsd_configure(zone_t *zone)
 {
 	struct zsd_entry *zsdp;
 	struct zsd_entry *t;
-	zoneid_t zoneid = zone->zone_id;
 
 	ASSERT(MUTEX_HELD(&zonehash_lock));
 	ASSERT(list_head(&zone->zone_zsd) == NULL);
+	mutex_enter(&zone->zone_lock);
 	mutex_enter(&zsd_key_lock);
 	for (zsdp = list_head(&zsd_registered_keys); zsdp != NULL;
 	    zsdp = list_next(&zsd_registered_keys, zsdp)) {
+		/*
+		 * Since this zone is ZONE_IS_UNCONFIGURED, zone_key_create
+		 * should not have added anything to it.
+		 */
+		ASSERT(zsd_find(&zone->zone_zsd, zsdp->zsd_key) == NULL);
+
+		t = kmem_zalloc(sizeof (*t), KM_SLEEP);
+		t->zsd_key = zsdp->zsd_key;
+		t->zsd_create = zsdp->zsd_create;
+		t->zsd_shutdown = zsdp->zsd_shutdown;
+		t->zsd_destroy = zsdp->zsd_destroy;
 		if (zsdp->zsd_create != NULL) {
-			t = kmem_alloc(sizeof (*t), KM_SLEEP);
-			t->zsd_key = zsdp->zsd_key;
-			t->zsd_create = zsdp->zsd_create;
-			t->zsd_data = (*t->zsd_create)(zoneid);
-			t->zsd_shutdown = zsdp->zsd_shutdown;
-			t->zsd_destroy = zsdp->zsd_destroy;
-			list_insert_tail(&zone->zone_zsd, t);
+			t->zsd_flags = ZSD_CREATE_NEEDED;
+			DTRACE_PROBE2(zsd__create__needed,
+			    zone_t *, zone, zone_key_t, zsdp->zsd_key);
 		}
+		list_insert_tail(&zone->zone_zsd, t);
 	}
 	mutex_exit(&zsd_key_lock);
+	mutex_exit(&zone->zone_lock);
 }
 
 enum zsd_callback_type { ZSD_CREATE, ZSD_SHUTDOWN, ZSD_DESTROY };
@@ -749,70 +817,47 @@ enum zsd_callback_type { ZSD_CREATE, ZSD_SHUTDOWN, ZSD_DESTROY };
 static void
 zone_zsd_callbacks(zone_t *zone, enum zsd_callback_type ct)
 {
-	struct zsd_entry *zsdp;
 	struct zsd_entry *t;
-	zoneid_t zoneid = zone->zone_id;
 
 	ASSERT(ct == ZSD_SHUTDOWN || ct == ZSD_DESTROY);
 	ASSERT(ct != ZSD_SHUTDOWN || zone_status_get(zone) >= ZONE_IS_EMPTY);
 	ASSERT(ct != ZSD_DESTROY || zone_status_get(zone) >= ZONE_IS_DOWN);
 
+	/*
+	 * Run the callback solely based on what is registered for the zone
+	 * in zone_zsd. The global list can change independently of this
+	 * as keys are registered and unregistered and we don't register new
+	 * callbacks for a zone that is in the process of going away.
+	 */
 	mutex_enter(&zone->zone_lock);
-	if (ct == ZSD_DESTROY) {
-		if (zone->zone_flags & ZF_DESTROYED) {
-			/*
-			 * Make sure destructors are only called once.
-			 */
-			mutex_exit(&zone->zone_lock);
-			return;
+	for (t = list_head(&zone->zone_zsd); t != NULL;
+	    t = list_next(&zone->zone_zsd, t)) {
+		zone_key_t key = t->zsd_key;
+
+		/* Skip if no callbacks registered */
+
+		if (ct == ZSD_SHUTDOWN) {
+			if (t->zsd_shutdown != NULL &&
+			    (t->zsd_flags & ZSD_SHUTDOWN_ALL) == 0) {
+				t->zsd_flags |= ZSD_SHUTDOWN_NEEDED;
+				DTRACE_PROBE2(zsd__shutdown__needed,
+				    zone_t *, zone, zone_key_t, key);
+			}
+		} else {
+			if (t->zsd_destroy != NULL &&
+			    (t->zsd_flags & ZSD_DESTROY_ALL) == 0) {
+				t->zsd_flags |= ZSD_DESTROY_NEEDED;
+				DTRACE_PROBE2(zsd__destroy__needed,
+				    zone_t *, zone, zone_key_t, key);
+			}
 		}
-		zone->zone_flags |= ZF_DESTROYED;
 	}
 	mutex_exit(&zone->zone_lock);
 
-	/*
-	 * Both zsd_key_lock and zone_lock need to be held in order to add or
-	 * remove a ZSD key, (either globally as part of
-	 * zone_key_create()/zone_key_delete(), or on a per-zone basis, as is
-	 * possible through zone_setspecific()), so it's sufficient to hold
-	 * zsd_key_lock here.
-	 *
-	 * This is a good thing, since we don't want to recursively try to grab
-	 * zone_lock if a callback attempts to do something like a crfree() or
-	 * zone_rele().
-	 */
-	mutex_enter(&zsd_key_lock);
-	for (zsdp = list_head(&zsd_registered_keys); zsdp != NULL;
-	    zsdp = list_next(&zsd_registered_keys, zsdp)) {
-		zone_key_t key = zsdp->zsd_key;
+	/* Now call the shutdown and destroy callback for this key */
+	zsd_apply_all_keys(zsd_apply_shutdown, zone);
+	zsd_apply_all_keys(zsd_apply_destroy, zone);
 
-		/* Skip if no callbacks registered */
-		if (ct == ZSD_SHUTDOWN && zsdp->zsd_shutdown == NULL)
-			continue;
-		if (ct == ZSD_DESTROY && zsdp->zsd_destroy == NULL)
-			continue;
-		/*
-		 * Call the callback with the zone-specific data if we can find
-		 * any, otherwise with NULL.
-		 */
-		t = zsd_find(&zone->zone_zsd, key);
-		if (t != NULL) {
-			if (ct == ZSD_SHUTDOWN) {
-				t->zsd_shutdown(zoneid, t->zsd_data);
-			} else {
-				ASSERT(ct == ZSD_DESTROY);
-				t->zsd_destroy(zoneid, t->zsd_data);
-			}
-		} else {
-			if (ct == ZSD_SHUTDOWN) {
-				zsdp->zsd_shutdown(zoneid, NULL);
-			} else {
-				ASSERT(ct == ZSD_DESTROY);
-				zsdp->zsd_destroy(zoneid, NULL);
-			}
-		}
-	}
-	mutex_exit(&zsd_key_lock);
 }
 
 /*
@@ -827,12 +872,379 @@ zone_free_zsd(zone_t *zone)
 	/*
 	 * Free all the zsd_entry's we had on this zone.
 	 */
+	mutex_enter(&zone->zone_lock);
 	for (t = list_head(&zone->zone_zsd); t != NULL; t = next) {
 		next = list_next(&zone->zone_zsd, t);
 		list_remove(&zone->zone_zsd, t);
+		ASSERT(!(t->zsd_flags & ZSD_ALL_INPROGRESS));
 		kmem_free(t, sizeof (*t));
 	}
 	list_destroy(&zone->zone_zsd);
+	mutex_exit(&zone->zone_lock);
+
+}
+
+/*
+ * Apply a function to all zones for particular key value.
+ *
+ * The applyfn has to drop zonehash_lock if it does some work, and
+ * then reacquire it before it returns.
+ * When the lock is dropped we don't follow list_next even
+ * if it is possible to do so without any hazards. This is
+ * because we want the design to allow for the list of zones
+ * to change in any arbitrary way during the time the
+ * lock was dropped.
+ *
+ * It is safe to restart the loop at list_head since the applyfn
+ * changes the zsd_flags as it does work, so a subsequent
+ * pass through will have no effect in applyfn, hence the loop will terminate
+ * in at worst O(N^2).
+ */
+static void
+zsd_apply_all_zones(zsd_applyfn_t *applyfn, zone_key_t key)
+{
+	zone_t *zone;
+
+	mutex_enter(&zonehash_lock);
+	zone = list_head(&zone_active);
+	while (zone != NULL) {
+		if ((applyfn)(&zonehash_lock, B_FALSE, zone, key)) {
+			/* Lock dropped - restart at head */
+			zone = list_head(&zone_active);
+		} else {
+			zone = list_next(&zone_active, zone);
+		}
+	}
+	mutex_exit(&zonehash_lock);
+}
+
+/*
+ * Apply a function to all keys for a particular zone.
+ *
+ * The applyfn has to drop zonehash_lock if it does some work, and
+ * then reacquire it before it returns.
+ * When the lock is dropped we don't follow list_next even
+ * if it is possible to do so without any hazards. This is
+ * because we want the design to allow for the list of zsd callbacks
+ * to change in any arbitrary way during the time the
+ * lock was dropped.
+ *
+ * It is safe to restart the loop at list_head since the applyfn
+ * changes the zsd_flags as it does work, so a subsequent
+ * pass through will have no effect in applyfn, hence the loop will terminate
+ * in at worst O(N^2).
+ */
+static void
+zsd_apply_all_keys(zsd_applyfn_t *applyfn, zone_t *zone)
+{
+	struct zsd_entry *t;
+
+	mutex_enter(&zone->zone_lock);
+	t = list_head(&zone->zone_zsd);
+	while (t != NULL) {
+		if ((applyfn)(NULL, B_TRUE, zone, t->zsd_key)) {
+			/* Lock dropped - restart at head */
+			t = list_head(&zone->zone_zsd);
+		} else {
+			t = list_next(&zone->zone_zsd, t);
+		}
+	}
+	mutex_exit(&zone->zone_lock);
+}
+
+/*
+ * Call the create function for the zone and key if CREATE_NEEDED
+ * is set.
+ * If some other thread gets here first and sets CREATE_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all zones/keys.
+ *
+ * When we call the create function, we drop the global held by the
+ * caller, and return true to tell the caller it needs to re-evalute the
+ * state.
+ * If the caller holds zone_lock then zone_lock_held is set, and zone_lock
+ * remains held on exit.
+ */
+static boolean_t
+zsd_apply_create(kmutex_t *lockp, boolean_t zone_lock_held,
+    zone_t *zone, zone_key_t key)
+{
+	void *result;
+	struct zsd_entry *t;
+	boolean_t dropped;
+
+	if (lockp != NULL) {
+		ASSERT(MUTEX_HELD(lockp));
+	}
+	if (zone_lock_held) {
+		ASSERT(MUTEX_HELD(&zone->zone_lock));
+	} else {
+		mutex_enter(&zone->zone_lock);
+	}
+
+	t = zsd_find(&zone->zone_zsd, key);
+	if (t == NULL) {
+		/*
+		 * Somebody else got here first e.g the zone going
+		 * away.
+		 */
+		if (!zone_lock_held)
+			mutex_exit(&zone->zone_lock);
+		return (B_FALSE);
+	}
+	dropped = B_FALSE;
+	if (zsd_wait_for_inprogress(zone, t, lockp))
+		dropped = B_TRUE;
+
+	if (t->zsd_flags & ZSD_CREATE_NEEDED) {
+		t->zsd_flags &= ~ZSD_CREATE_NEEDED;
+		t->zsd_flags |= ZSD_CREATE_INPROGRESS;
+		DTRACE_PROBE2(zsd__create__inprogress,
+		    zone_t *, zone, zone_key_t, key);
+		mutex_exit(&zone->zone_lock);
+		if (lockp != NULL)
+			mutex_exit(lockp);
+
+		dropped = B_TRUE;
+		ASSERT(t->zsd_create != NULL);
+		DTRACE_PROBE2(zsd__create__start,
+		    zone_t *, zone, zone_key_t, key);
+
+		result = (*t->zsd_create)(zone->zone_id);
+
+		DTRACE_PROBE2(zsd__create__end,
+		    zone_t *, zone, voidn *, result);
+
+		ASSERT(result != NULL);
+		if (lockp != NULL)
+			mutex_enter(lockp);
+		mutex_enter(&zone->zone_lock);
+		t->zsd_data = result;
+		t->zsd_flags &= ~ZSD_CREATE_INPROGRESS;
+		t->zsd_flags |= ZSD_CREATE_COMPLETED;
+		cv_broadcast(&t->zsd_cv);
+		DTRACE_PROBE2(zsd__create__completed,
+		    zone_t *, zone, zone_key_t, key);
+	}
+	if (!zone_lock_held)
+		mutex_exit(&zone->zone_lock);
+	return (dropped);
+}
+
+/*
+ * Call the shutdown function for the zone and key if SHUTDOWN_NEEDED
+ * is set.
+ * If some other thread gets here first and sets *_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all zones/keys.
+ *
+ * When we call the shutdown function, we drop the global held by the
+ * caller, and return true to tell the caller it needs to re-evalute the
+ * state.
+ * If the caller holds zone_lock then zone_lock_held is set, and zone_lock
+ * remains held on exit.
+ */
+static boolean_t
+zsd_apply_shutdown(kmutex_t *lockp, boolean_t zone_lock_held,
+    zone_t *zone, zone_key_t key)
+{
+	struct zsd_entry *t;
+	void *data;
+	boolean_t dropped;
+
+	if (lockp != NULL) {
+		ASSERT(MUTEX_HELD(lockp));
+	}
+	if (zone_lock_held) {
+		ASSERT(MUTEX_HELD(&zone->zone_lock));
+	} else {
+		mutex_enter(&zone->zone_lock);
+	}
+
+	t = zsd_find(&zone->zone_zsd, key);
+	if (t == NULL) {
+		/*
+		 * Somebody else got here first e.g the zone going
+		 * away.
+		 */
+		if (!zone_lock_held)
+			mutex_exit(&zone->zone_lock);
+		return (B_FALSE);
+	}
+	dropped = B_FALSE;
+	if (zsd_wait_for_creator(zone, t, lockp))
+		dropped = B_TRUE;
+
+	if (zsd_wait_for_inprogress(zone, t, lockp))
+		dropped = B_TRUE;
+
+	if (t->zsd_flags & ZSD_SHUTDOWN_NEEDED) {
+		t->zsd_flags &= ~ZSD_SHUTDOWN_NEEDED;
+		t->zsd_flags |= ZSD_SHUTDOWN_INPROGRESS;
+		DTRACE_PROBE2(zsd__shutdown__inprogress,
+		    zone_t *, zone, zone_key_t, key);
+		mutex_exit(&zone->zone_lock);
+		if (lockp != NULL)
+			mutex_exit(lockp);
+		dropped = B_TRUE;
+
+		ASSERT(t->zsd_shutdown != NULL);
+		data = t->zsd_data;
+
+		DTRACE_PROBE2(zsd__shutdown__start,
+		    zone_t *, zone, zone_key_t, key);
+
+		(t->zsd_shutdown)(zone->zone_id, data);
+		DTRACE_PROBE2(zsd__shutdown__end,
+		    zone_t *, zone, zone_key_t, key);
+
+		if (lockp != NULL)
+			mutex_enter(lockp);
+		mutex_enter(&zone->zone_lock);
+		t->zsd_flags &= ~ZSD_SHUTDOWN_INPROGRESS;
+		t->zsd_flags |= ZSD_SHUTDOWN_COMPLETED;
+		cv_broadcast(&t->zsd_cv);
+		DTRACE_PROBE2(zsd__shutdown__completed,
+		    zone_t *, zone, zone_key_t, key);
+	}
+	if (!zone_lock_held)
+		mutex_exit(&zone->zone_lock);
+	return (dropped);
+}
+
+/*
+ * Call the destroy function for the zone and key if DESTROY_NEEDED
+ * is set.
+ * If some other thread gets here first and sets *_INPROGRESS, then
+ * we wait for that thread to complete so that we can ensure that
+ * all the callbacks are done when we've looped over all zones/keys.
+ *
+ * When we call the destroy function, we drop the global held by the
+ * caller, and return true to tell the caller it needs to re-evalute the
+ * state.
+ * If the caller holds zone_lock then zone_lock_held is set, and zone_lock
+ * remains held on exit.
+ */
+static boolean_t
+zsd_apply_destroy(kmutex_t *lockp, boolean_t zone_lock_held,
+    zone_t *zone, zone_key_t key)
+{
+	struct zsd_entry *t;
+	void *data;
+	boolean_t dropped;
+
+	if (lockp != NULL) {
+		ASSERT(MUTEX_HELD(lockp));
+	}
+	if (zone_lock_held) {
+		ASSERT(MUTEX_HELD(&zone->zone_lock));
+	} else {
+		mutex_enter(&zone->zone_lock);
+	}
+
+	t = zsd_find(&zone->zone_zsd, key);
+	if (t == NULL) {
+		/*
+		 * Somebody else got here first e.g the zone going
+		 * away.
+		 */
+		if (!zone_lock_held)
+			mutex_exit(&zone->zone_lock);
+		return (B_FALSE);
+	}
+	dropped = B_FALSE;
+	if (zsd_wait_for_creator(zone, t, lockp))
+		dropped = B_TRUE;
+
+	if (zsd_wait_for_inprogress(zone, t, lockp))
+		dropped = B_TRUE;
+
+	if (t->zsd_flags & ZSD_DESTROY_NEEDED) {
+		t->zsd_flags &= ~ZSD_DESTROY_NEEDED;
+		t->zsd_flags |= ZSD_DESTROY_INPROGRESS;
+		DTRACE_PROBE2(zsd__destroy__inprogress,
+		    zone_t *, zone, zone_key_t, key);
+		mutex_exit(&zone->zone_lock);
+		if (lockp != NULL)
+			mutex_exit(lockp);
+		dropped = B_TRUE;
+
+		ASSERT(t->zsd_destroy != NULL);
+		data = t->zsd_data;
+		DTRACE_PROBE2(zsd__destroy__start,
+		    zone_t *, zone, zone_key_t, key);
+
+		(t->zsd_destroy)(zone->zone_id, data);
+		DTRACE_PROBE2(zsd__destroy__end,
+		    zone_t *, zone, zone_key_t, key);
+
+		if (lockp != NULL)
+			mutex_enter(lockp);
+		mutex_enter(&zone->zone_lock);
+		t->zsd_data = NULL;
+		t->zsd_flags &= ~ZSD_DESTROY_INPROGRESS;
+		t->zsd_flags |= ZSD_DESTROY_COMPLETED;
+		cv_broadcast(&t->zsd_cv);
+		DTRACE_PROBE2(zsd__destroy__completed,
+		    zone_t *, zone, zone_key_t, key);
+	}
+	if (!zone_lock_held)
+		mutex_exit(&zone->zone_lock);
+	return (dropped);
+}
+
+/*
+ * Wait for any CREATE_NEEDED flag to be cleared.
+ * Returns true if lockp was temporarily dropped while waiting.
+ */
+static boolean_t
+zsd_wait_for_creator(zone_t *zone, struct zsd_entry *t, kmutex_t *lockp)
+{
+	boolean_t dropped = B_FALSE;
+
+	while (t->zsd_flags & ZSD_CREATE_NEEDED) {
+		DTRACE_PROBE2(zsd__wait__for__creator,
+		    zone_t *, zone, struct zsd_entry *, t);
+		if (lockp != NULL) {
+			dropped = B_TRUE;
+			mutex_exit(lockp);
+		}
+		cv_wait(&t->zsd_cv, &zone->zone_lock);
+		if (lockp != NULL) {
+			/* First drop zone_lock to preserve order */
+			mutex_exit(&zone->zone_lock);
+			mutex_enter(lockp);
+			mutex_enter(&zone->zone_lock);
+		}
+	}
+	return (dropped);
+}
+
+/*
+ * Wait for any INPROGRESS flag to be cleared.
+ * Returns true if lockp was temporarily dropped while waiting.
+ */
+static boolean_t
+zsd_wait_for_inprogress(zone_t *zone, struct zsd_entry *t, kmutex_t *lockp)
+{
+	boolean_t dropped = B_FALSE;
+
+	while (t->zsd_flags & ZSD_ALL_INPROGRESS) {
+		DTRACE_PROBE2(zsd__wait__for__inprogress,
+		    zone_t *, zone, struct zsd_entry *, t);
+		if (lockp != NULL) {
+			dropped = B_TRUE;
+			mutex_exit(lockp);
+		}
+		cv_wait(&t->zsd_cv, &zone->zone_lock);
+		if (lockp != NULL) {
+			/* First drop zone_lock to preserve order */
+			mutex_exit(&zone->zone_lock);
+			mutex_enter(lockp);
+			mutex_enter(&zone->zone_lock);
+		}
+	}
+	return (dropped);
 }
 
 /*
@@ -2960,10 +3372,15 @@ zsched(void *arg)
 	/*
 	 * Tell the world that we're done setting up.
 	 *
-	 * At this point we want to set the zone status to ZONE_IS_READY
+	 * At this point we want to set the zone status to ZONE_IS_INITIALIZED
 	 * and atomically set the zone's processor set visibility.  Once
 	 * we drop pool_lock() this zone will automatically get updated
 	 * to reflect any future changes to the pools configuration.
+	 *
+	 * Note that after we drop the locks below (zonehash_lock in
+	 * particular) other operations such as a zone_getattr call can
+	 * now proceed and observe the zone. That is the reason for doing a
+	 * state transition to the INITIALIZED state.
 	 */
 	pool_lock();
 	mutex_enter(&cpu_lock);
@@ -2974,11 +3391,20 @@ zsched(void *arg)
 		zone_pset_set(zone, pool_default->pool_pset->pset_id);
 	mutex_enter(&zone_status_lock);
 	ASSERT(zone_status_get(zone) == ZONE_IS_UNINITIALIZED);
-	zone_status_set(zone, ZONE_IS_READY);
+	zone_status_set(zone, ZONE_IS_INITIALIZED);
 	mutex_exit(&zone_status_lock);
 	mutex_exit(&zonehash_lock);
 	mutex_exit(&cpu_lock);
 	pool_unlock();
+
+	/* Now call the create callback for this key */
+	zsd_apply_all_keys(zsd_apply_create, zone);
+
+	/* The callbacks are complete. Mark ZONE_IS_READY */
+	mutex_enter(&zone_status_lock);
+	ASSERT(zone_status_get(zone) == ZONE_IS_INITIALIZED);
+	zone_status_set(zone, ZONE_IS_READY);
+	mutex_exit(&zone_status_lock);
 
 	/*
 	 * Once we see the zone transition to the ZONE_IS_BOOTING state,
@@ -4071,7 +4497,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		return (set_errno(EINVAL));
 	}
 	zone_status = zone_status_get(zone);
-	if (zone_status < ZONE_IS_READY) {
+	if (zone_status < ZONE_IS_INITIALIZED) {
 		mutex_exit(&zonehash_lock);
 		return (set_errno(EINVAL));
 	}
@@ -5698,21 +6124,28 @@ zone_list_datalink(zoneid_t zoneid, int *nump, char *buf)
 
 /*
  * Public interface for looking up a zone by zoneid. It's a customized version
- * for netstack_zone_create(), it:
- * 1. Doesn't acquire the zonehash_lock, since it is called from
- *    zone_key_create() or zone_zsd_configure(), lock already held.
- * 2. Doesn't check the status of the zone.
- * 3. It will be called even before zone_init is called, in that case the
+ * for netstack_zone_create(). It can only be called from the zsd create
+ * callbacks, since it doesn't have reference on the zone structure hence if
+ * it is called elsewhere the zone could disappear after the zonehash_lock
+ * is dropped.
+ *
+ * Furthermore it
+ * 1. Doesn't check the status of the zone.
+ * 2. It will be called even before zone_init is called, in that case the
  *    address of zone0 is returned directly, and netstack_zone_create()
  *    will only assign a value to zone0.zone_netstack, won't break anything.
+ * 3. Returns without the zone being held.
  */
 zone_t *
 zone_find_by_id_nolock(zoneid_t zoneid)
 {
-	ASSERT(MUTEX_HELD(&zonehash_lock));
+	zone_t *zone;
 
+	mutex_enter(&zonehash_lock);
 	if (zonehashbyid == NULL)
-		return (&zone0);
+		zone = &zone0;
 	else
-		return (zone_find_all_by_id(zoneid));
+		zone = zone_find_all_by_id(zoneid);
+	mutex_exit(&zonehash_lock);
+	return (zone);
 }

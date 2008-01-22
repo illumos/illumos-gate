@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SYS_NETSTACK_H
@@ -84,6 +84,46 @@ typedef id_t	netstackid_t;
 #define	NS_MAX		(NS_STR+1)
 
 /*
+ * State maintained for each module which tracks the state of
+ * the create, shutdown and destroy callbacks.
+ *
+ * Keeps track of pending actions to avoid holding locks when
+ * calling into the create/shutdown/destroy functions in the module.
+ */
+#ifdef _KERNEL
+typedef struct {
+	uint16_t 	nms_flags;
+	kcondvar_t	nms_cv;
+} nm_state_t;
+
+/*
+ * nms_flags
+ */
+#define	NSS_CREATE_NEEDED	0x0001
+#define	NSS_CREATE_INPROGRESS	0x0002
+#define	NSS_CREATE_COMPLETED	0x0004
+#define	NSS_SHUTDOWN_NEEDED	0x0010
+#define	NSS_SHUTDOWN_INPROGRESS	0x0020
+#define	NSS_SHUTDOWN_COMPLETED	0x0040
+#define	NSS_DESTROY_NEEDED	0x0100
+#define	NSS_DESTROY_INPROGRESS	0x0200
+#define	NSS_DESTROY_COMPLETED	0x0400
+
+#define	NSS_CREATE_ALL	\
+	(NSS_CREATE_NEEDED|NSS_CREATE_INPROGRESS|NSS_CREATE_COMPLETED)
+#define	NSS_SHUTDOWN_ALL	\
+	(NSS_SHUTDOWN_NEEDED|NSS_SHUTDOWN_INPROGRESS|NSS_SHUTDOWN_COMPLETED)
+#define	NSS_DESTROY_ALL	\
+	(NSS_DESTROY_NEEDED|NSS_DESTROY_INPROGRESS|NSS_DESTROY_COMPLETED)
+
+#define	NSS_ALL_INPROGRESS	\
+	(NSS_CREATE_INPROGRESS|NSS_SHUTDOWN_INPROGRESS|NSS_DESTROY_INPROGRESS)
+#else
+/* User-level compile like IP Filter needs a netstack_t. Dummy */
+typedef uint_t nm_state_t;
+#endif /* _KERNEL */
+
+/*
  * One for every netstack in the system.
  * We use a union so that the compilar and lint can provide type checking -
  * in principle we could have
@@ -136,7 +176,7 @@ struct netstack {
 #define	netstack_ipf		netstack_u.nu_s.nu_ipf
 #define	netstack_str		netstack_u.nu_s.nu_str
 
-	uint16_t	netstack_m_state[NS_MAX]; /* module state */
+	nm_state_t	netstack_m_state[NS_MAX]; /* module state */
 
 	kmutex_t	netstack_lock;
 	struct netstack *netstack_next;
@@ -144,34 +184,23 @@ struct netstack {
 	int		netstack_numzones;	/* Number of zones using this */
 	int		netstack_refcnt;	/* Number of hold-rele */
 	int		netstack_flags;	/* See below */
+
+#ifdef _KERNEL
+	/* Needed to ensure that we run the callback functions in order */
+	kcondvar_t	netstack_cv;
+#endif
 };
 typedef struct netstack netstack_t;
 
 /* netstack_flags values */
-#define	NSF_UNINIT	0x01		/* Not initialized */
-#define	NSF_CLOSING	0x02		/* Going away */
+#define	NSF_UNINIT		0x01		/* Not initialized */
+#define	NSF_CLOSING		0x02		/* Going away */
+#define	NSF_ZONE_CREATE		0x04		/* create callbacks inprog */
+#define	NSF_ZONE_SHUTDOWN	0x08		/* shutdown callbacks */
+#define	NSF_ZONE_DESTROY	0x10		/* destroy callbacks */
 
-/*
- * State for each module for each stack - netstack_m_state[moduleid]
- * Keeps track of pending actions to avoid holding looks when
- * calling into the create/shutdown/destroy functions in the module.
- */
-#define	NSS_CREATE_NEEDED	0x0001
-#define	NSS_CREATE_INPROGRESS	0x0002
-#define	NSS_CREATE_COMPLETED	0x0004
-#define	NSS_SHUTDOWN_NEEDED	0x0010
-#define	NSS_SHUTDOWN_INPROGRESS	0x0020
-#define	NSS_SHUTDOWN_COMPLETED	0x0040
-#define	NSS_DESTROY_NEEDED	0x0100
-#define	NSS_DESTROY_INPROGRESS	0x0200
-#define	NSS_DESTROY_COMPLETED	0x0400
-
-#define	NSS_CREATE_ALL	\
-	(NSS_CREATE_NEEDED|NSS_CREATE_INPROGRESS|NSS_CREATE_COMPLETED)
-#define	NSS_SHUTDOWN_ALL	\
-	(NSS_SHUTDOWN_NEEDED|NSS_SHUTDOWN_INPROGRESS|NSS_SHUTDOWN_COMPLETED)
-#define	NSS_DESTROY_ALL	\
-	(NSS_DESTROY_NEEDED|NSS_DESTROY_INPROGRESS|NSS_DESTROY_COMPLETED)
+#define	NSF_ZONE_INPROGRESS	\
+	(NSF_ZONE_CREATE|NSF_ZONE_SHUTDOWN|NSF_ZONE_DESTROY)
 
 /*
  * One for each of the NS_* values.
@@ -185,6 +214,7 @@ struct netstack_registry {
 
 /* nr_flags values */
 #define	NRF_REGISTERED	0x01
+#define	NRF_DYING	0x02	/* No new creates */
 
 /*
  * To support kstat_create_netstack() using kstat_add_zone we need

@@ -5107,6 +5107,8 @@ kernel_state_to_user_state(zoneid_t zoneid, zone_status_t kernel_state)
 	assert(kernel_state <= ZONE_MAX_STATE);
 	switch (kernel_state) {
 		case ZONE_IS_UNINITIALIZED:
+		case ZONE_IS_INITIALIZED:
+			/* The kernel will not return these two states */
 			return (ZONE_STATE_READY);
 		case ZONE_IS_READY:
 			/*
