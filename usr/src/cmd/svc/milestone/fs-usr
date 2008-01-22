@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -111,13 +111,6 @@ fi
 readvfstab /dev/fd < $vfstab
 if [ "$mountp" -a -d /dev/fd ]; then
 	mountfs - /dev/fd - - - || exit $SMF_EXIT_ERR_FATAL
-fi
-
-# Clean up existing /etc/dfs/sharetab as there are no shared file systems
-# at this point. This also takes care of a corrupt sharetab.
-
-if [ -f /etc/dfs/sharetab ]; then
-	> /etc/dfs/sharetab
 fi
 
 exit $SMF_EXIT_OK
