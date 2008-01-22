@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -337,9 +337,10 @@ main(int argc, char *argv[])
 			}
 
 		}
-		if (update_conf && (i_flag || policy != NULL))
+		if (update_conf && (i_flag || policy != NULL)) {
 			/* load the driver */
 			load_driver(driver_name, verbose_flag);
+		}
 
 		exit_unlock();
 
@@ -471,10 +472,9 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, gettext(DRVCONF_UPDATED),
 			    driver_name);
 		}
+		load_driver(driver_name, verbose_flag);
 	}
 
-	/* rebuild /devices & /dev */
-	load_driver(driver_name, verbose_flag);
 
 	exit_unlock();
 
