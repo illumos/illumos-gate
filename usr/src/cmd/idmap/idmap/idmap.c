@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1055,7 +1055,7 @@ usermap_cfg_string(char *in)
 	if (out == NULL)
 		return (NULL);
 
-	(void) snprintf(out, len + 3, "\"%s\"");
+	(void) snprintf(out, len + 3, "\"%s\"", in);
 	return (out);
 }
 
