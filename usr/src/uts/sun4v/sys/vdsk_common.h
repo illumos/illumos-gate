@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,6 +215,14 @@ typedef struct vd_dring_entry {
 	vio_dring_entry_hdr_t		hdr;		/* common header */
 	vd_dring_payload_t		payload;	/* disk specific data */
 } vd_dring_entry_t;
+
+/*
+ * vDisk logical partition
+ */
+typedef struct vd_slice {
+	daddr_t	start;		/* block number of slice start */
+	daddr_t nblocks;	/* number of blocks in the slice */
+} vd_slice_t;
 
 
 /*
@@ -493,22 +501,28 @@ typedef struct vd_scsi {
  * The EFI alloc_and_read() function will use some ioctls to get EFI data
  * but the device reference we will use is different depending if the command
  * is issued from the vDisk server side (vds) or from the vDisk client side
- * (vdc). From the server side (vds), we will have a layered device reference
- * (ldi_handle_t) while on the client side (vdc) we will have a regular device
- * reference (dev_t).
+ * (vdc). The vd_efi_dev structure is filled by vdc/vds to indicate the ioctl
+ * function to call back and to provide information about the virtual disk.
  */
-#ifdef _SUN4V_VDS
-int vds_efi_alloc_and_read(ldi_handle_t dev, struct dk_gpt **vtoc,
-    size_t *vtoc_len);
-#else
-void vdc_efi_init(int (*func)(dev_t, int, caddr_t, int));
-void vdc_efi_fini(void);
-int vdc_efi_alloc_and_read(dev_t dev, struct dk_gpt **vtoc,
-    size_t *vtoc_len);
-#endif
+typedef int (*vd_efi_ioctl_func)(void *, int, uintptr_t);
 
-void vd_efi_free(struct dk_gpt *ptr, size_t length);
-void vd_efi_to_vtoc(struct dk_gpt *efi, struct vtoc *vtoc);
+typedef	struct vd_efi_dev {
+	void *vdisk;			/* opaque pointer to the vdisk */
+	size_t block_size;		/* vdisk block size */
+	size_t disk_size;		/* vdisk size in blocks */
+	vd_efi_ioctl_func vdisk_ioctl;	/* vdisk ioctl function */
+} vd_efi_dev_t;
+
+#define	VD_EFI_DEV_SET(efi_dev, vdsk, ioctl)		\
+	(efi_dev).vdisk = vdsk;				\
+	(efi_dev).vdisk_ioctl = ioctl;			\
+	(efi_dev).block_size = (vdsk)->block_size;	\
+	(efi_dev).disk_size = (vdsk)->vdisk_size;
+
+
+int vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **gpt, efi_gpe_t **gpe);
+void vd_efi_free(vd_efi_dev_t *dev, efi_gpt_t *gpt, efi_gpe_t *gpe);
+
 
 #ifdef	__cplusplus
 }

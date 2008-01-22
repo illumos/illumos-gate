@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,6 +263,7 @@ typedef struct vdc {
 	vd_disk_label_t vdisk_label; 	/* label type of device/disk imported */
 	struct vtoc	*vtoc;		/* structure to store VTOC data */
 	struct dk_geom	*geom;		/* structure to store geometry data */
+	vd_slice_t	slice[V_NUMPAR]; /* logical partitions */
 
 	kthread_t	*msg_proc_thr;	/* main msg processing thread */
 

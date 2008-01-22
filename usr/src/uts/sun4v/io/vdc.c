@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,7 +137,7 @@ static void	vdc_terminate_ldc(vdc_t *vdc);
 static int	vdc_init_descriptor_ring(vdc_t *vdc);
 static void	vdc_destroy_descriptor_ring(vdc_t *vdc);
 static int	vdc_setup_devid(vdc_t *vdc);
-static void	vdc_store_label_efi(vdc_t *vdc, struct dk_gpt *efi);
+static void	vdc_store_label_efi(vdc_t *, efi_gpt_t *, efi_gpe_t *);
 static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *, struct vtoc *);
 static void	vdc_store_label_unk(vdc_t *vdc);
 static boolean_t vdc_is_opened(vdc_t *vdc);
@@ -182,7 +182,7 @@ static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
 /* dkio */
 static int	vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode,
 		    int *rvalp);
-static int	vd_process_efi_ioctl(dev_t dev, int cmd, caddr_t arg, int mode);
+static int	vd_process_efi_ioctl(void *vdisk, int cmd, uintptr_t arg);
 static void	vdc_create_fake_geometry(vdc_t *vdc);
 static int	vdc_validate_geometry(vdc_t *vdc);
 static void	vdc_validate(vdc_t *vdc);
@@ -327,7 +327,6 @@ _init(void)
 		return (status);
 	if ((status = mod_install(&modlinkage)) != 0)
 		ddi_soft_state_fini(&vdc_state);
-	vdc_efi_init(vd_process_efi_ioctl);
 	return (status);
 }
 
@@ -344,7 +343,6 @@ _fini(void)
 
 	if ((status = mod_remove(&modlinkage)) != 0)
 		return (status);
-	vdc_efi_fini();
 	ddi_soft_state_fini(&vdc_state);
 	return (0);
 }
@@ -1023,7 +1021,6 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 	int		i;
 
 	ASSERT(vdc != NULL);
-	ASSERT(vdc->vtoc != NULL);
 
 	instance = vdc->instance;
 	dip = vdc->dip;
@@ -1055,10 +1052,10 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 		dev = makedevice(ddi_driver_major(dip),
 		    VD_MAKE_DEV(instance, i));
 
-		size = vdc->vtoc->v_part[i].p_size * vdc->vtoc->v_sectorsz;
+		size = vdc->slice[i].nblocks * vdc->block_size;
 		DMSG(vdc, 0, "[%d] sz %ld (%ld Mb)  p_size %lx\n",
 		    instance, size, size / (1024 * 1024),
-		    vdc->vtoc->v_part[i].p_size);
+		    vdc->slice[i].nblocks);
 
 		rv = ddi_prop_update_int64(dev, dip, VDC_SIZE_PROP_NAME, size);
 		if (rv != DDI_PROP_SUCCESS) {
@@ -1247,7 +1244,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	mutex_enter(&vdc->lock);
 
 	if (vdc->vdisk_label == VD_DISK_LABEL_UNK ||
-	    vdc->vtoc->v_part[slice].p_size == 0) {
+	    vdc->slice[slice].nblocks == 0) {
 		vdc_mark_closed(vdc, slice, flag, otyp);
 		status = EIO;
 	}
@@ -6185,18 +6182,20 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 };
 
 /*
- * The signature of vd_process_ioctl() has changed to include the return value
- * pointer. However we don't want to change vd_efi_* functions now so we add
- * this wrapper function so that we can use it with vdc_efi_init().
- *
- * vd_efi_* functions need some changes to fix 6528974 and so we will eventually
- * remove this function when fixing that bug.
+ * This function handles ioctl requests from the vd_efi_alloc_and_read()
+ * function and forward them to the vdisk.
  */
 static int
-vd_process_efi_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
+vd_process_efi_ioctl(void *vdisk, int cmd, uintptr_t arg)
 {
+	vdc_t *vdc = (vdc_t *)vdisk;
+	dev_t dev;
 	int rval;
-	return (vd_process_ioctl(dev, cmd, arg, mode, &rval));
+
+	dev = makedevice(ddi_driver_major(vdc->dip),
+	    VD_MAKE_DEV(vdc->instance, 0));
+
+	return (vd_process_ioctl(dev, cmd, (caddr_t)arg, FKIOCTL, &rval));
 }
 
 /*
@@ -7116,6 +7115,9 @@ vdc_validate_geometry(vdc_t *vdc)
 	struct dk_label label;
 	struct dk_geom geom;
 	struct vtoc vtoc;
+	efi_gpt_t *gpt;
+	efi_gpe_t *gpe;
+	vd_efi_dev_t edev;
 
 	ASSERT(vdc != NULL);
 	ASSERT(vdc->vtoc != NULL && vdc->geom != NULL);
@@ -7135,11 +7137,21 @@ vdc_validate_geometry(vdc_t *vdc)
 		/*
 		 * If the device does not support VTOC then we try
 		 * to read an EFI label.
+		 *
+		 * We need to know the block size and the disk size to
+		 * be able to read an EFI label.
 		 */
-		struct dk_gpt *efi;
-		size_t efi_len;
+		if (vdc->vdisk_size == 0) {
+			if ((rv = vdc_check_capacity(vdc)) != 0) {
+				mutex_enter(&vdc->lock);
+				vdc_store_label_unk(vdc);
+				return (rv);
+			}
+		}
 
-		rv = vdc_efi_alloc_and_read(dev, &efi, &efi_len);
+		VD_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);
+
+		rv = vd_efi_alloc_and_read(&edev, &gpt, &gpe);
 
 		if (rv) {
 			DMSG(vdc, 0, "[%d] Failed to get EFI (err=%d)",
@@ -7150,8 +7162,8 @@ vdc_validate_geometry(vdc_t *vdc)
 		}
 
 		mutex_enter(&vdc->lock);
-		vdc_store_label_efi(vdc, efi);
-		vd_efi_free(efi, efi_len);
+		vdc_store_label_efi(vdc, gpt, gpe);
+		vd_efi_free(&edev, gpt, gpe);
 		return (ENOTSUP);
 	}
 
@@ -7258,7 +7270,7 @@ static void
 vdc_validate(vdc_t *vdc)
 {
 	vd_disk_label_t old_label;
-	struct vtoc old_vtoc;
+	vd_slice_t old_slice[V_NUMPAR];
 	int rv;
 
 	ASSERT(!MUTEX_HELD(&vdc->lock));
@@ -7267,7 +7279,7 @@ vdc_validate(vdc_t *vdc)
 
 	/* save the current label and vtoc */
 	old_label = vdc->vdisk_label;
-	bcopy(vdc->vtoc, &old_vtoc, sizeof (struct vtoc));
+	bcopy(vdc->slice, &old_slice, sizeof (vd_slice_t) * V_NUMPAR);
 
 	/* check the geometry */
 	(void) vdc_validate_geometry(vdc);
@@ -7287,7 +7299,7 @@ vdc_validate(vdc_t *vdc)
 	}
 
 	/* if the vtoc has changed, update device nodes properties */
-	if (bcmp(vdc->vtoc, &old_vtoc, sizeof (struct vtoc)) != 0) {
+	if (bcmp(vdc->slice, &old_slice, sizeof (vd_slice_t) * V_NUMPAR) != 0) {
 
 		if (vdc_create_device_nodes_props(vdc) != 0) {
 			DMSG(vdc, 0, "![%d] Failed to update device nodes"
@@ -7414,39 +7426,54 @@ vdc_setup_devid(vdc_t *vdc)
 }
 
 static void
-vdc_store_label_efi(vdc_t *vdc, struct dk_gpt *efi)
+vdc_store_label_efi(vdc_t *vdc, efi_gpt_t *gpt, efi_gpe_t *gpe)
 {
-	struct vtoc *vtoc = vdc->vtoc;
+	int i, nparts;
 
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	vdc->vdisk_label = VD_DISK_LABEL_EFI;
+	bzero(vdc->vtoc, sizeof (struct vtoc));
 	bzero(vdc->geom, sizeof (struct dk_geom));
-	vd_efi_to_vtoc(efi, vtoc);
-	if (vdc->vdisk_type == VD_DISK_TYPE_SLICE) {
-		/*
-		 * vd_efi_to_vtoc() will store information about the EFI Sun
-		 * reserved partition (representing the entire disk) into
-		 * partition 7. However single-slice device will only have
-		 * that single partition and the vdc driver expects to find
-		 * information about that partition in slice 0. So we need
-		 * to copy information from slice 7 to slice 0.
-		 */
-		vtoc->v_part[0].p_tag = vtoc->v_part[VD_EFI_WD_SLICE].p_tag;
-		vtoc->v_part[0].p_flag = vtoc->v_part[VD_EFI_WD_SLICE].p_flag;
-		vtoc->v_part[0].p_start = vtoc->v_part[VD_EFI_WD_SLICE].p_start;
-		vtoc->v_part[0].p_size =  vtoc->v_part[VD_EFI_WD_SLICE].p_size;
+	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
+
+	nparts = gpt->efi_gpt_NumberOfPartitionEntries;
+
+	for (i = 0; i < nparts && i < VD_EFI_WD_SLICE; i++) {
+
+		if (gpe[i].efi_gpe_StartingLBA == 0 ||
+		    gpe[i].efi_gpe_EndingLBA == 0) {
+			continue;
+		}
+
+		vdc->slice[i].start = gpe[i].efi_gpe_StartingLBA;
+		vdc->slice[i].nblocks = gpe[i].efi_gpe_EndingLBA -
+		    gpe[i].efi_gpe_StartingLBA + 1;
 	}
+
+	ASSERT(vdc->vdisk_size != 0);
+	vdc->slice[VD_EFI_WD_SLICE].start = 0;
+	vdc->slice[VD_EFI_WD_SLICE].nblocks = vdc->vdisk_size;
+
 }
 
 static void
 vdc_store_label_vtoc(vdc_t *vdc, struct dk_geom *geom, struct vtoc *vtoc)
 {
+	int i;
+
 	ASSERT(MUTEX_HELD(&vdc->lock));
+	ASSERT(vdc->block_size == vtoc->v_sectorsz);
 
 	vdc->vdisk_label = VD_DISK_LABEL_VTOC;
 	bcopy(vtoc, vdc->vtoc, sizeof (struct vtoc));
 	bcopy(geom, vdc->geom, sizeof (struct dk_geom));
+	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
+
+	for (i = 0; i < vtoc->v_nparts; i++) {
+		vdc->slice[i].start = vtoc->v_part[i].p_start;
+		vdc->slice[i].nblocks = vtoc->v_part[i].p_size;
+	}
 }
 
 static void
@@ -7457,4 +7484,5 @@ vdc_store_label_unk(vdc_t *vdc)
 	vdc->vdisk_label = VD_DISK_LABEL_UNK;
 	bzero(vdc->vtoc, sizeof (struct vtoc));
 	bzero(vdc->geom, sizeof (struct dk_geom));
+	bzero(vdc->slice, sizeof (vd_slice_t) * V_NUMPAR);
 }
