@@ -531,8 +531,8 @@ zil_claim(char *osname, void *txarg)
 static int
 zil_vdev_compare(const void *x1, const void *x2)
 {
-	const uint64_t *v1 = x1;
-	const uint64_t *v2 = x2;
+	uint64_t v1 = ((zil_vdev_node_t *)x1)->zv_vdev;
+	uint64_t v2 = ((zil_vdev_node_t *)x2)->zv_vdev;
 
 	if (v1 < v2)
 		return (-1);
