@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,22 +39,15 @@ static struct flock flock = { 0, 0, 0, 0, 0, 0 };
 
 char dblock[PATH_MAX];
 
-#define	LOCK_WAIT 60
-static int timedout = 0;
-
-/*ARGSUSED*/
-void
-alarm_handler(int sig)
-{
-	timedout = 1;
-}
+#define	LOCK_WAIT	1000000
+#define	LOCK_RETRIES	60
 
 /*
  * lock_db()
  *
  * Create a lockfile to prevent simultaneous access to the database
  * creation routines. We set a timeout to LOCK_WAIT seconds. If we
- * haven't obtained a lock by that time, we bail out.
+ * haven't obtained a lock after LOCK_RETIRES attempts, we bail out.
  *
  * returns 0 on succes, -1 on (lock) failure.
  * side effect: the directory "path" will be created if it didn't exist.
@@ -63,9 +55,9 @@ alarm_handler(int sig)
 int
 lock_db(char *path)
 {
-	void (*oldhandler)(int);
 	int retval;
 	struct stat st;
+	int retries = 0;
 
 	/* create directory "path" if it doesn't exist */
 	if (stat(path, &st) == -1) {
@@ -88,17 +80,18 @@ lock_db(char *path)
 		}
 	}
 
-	flock.l_type = F_WRLCK;
-	oldhandler = sigset(SIGALRM, alarm_handler);
-	(void) alarm(LOCK_WAIT);
-	retval = fcntl(lockfd, F_SETLKW, &flock);
-	(void) alarm(0);
-	(void) sigset(SIGALRM, oldhandler);
+	do {
+		flock.l_type = F_WRLCK;
+		retval = fcntl(lockfd, F_SETLK, &flock);
+		if (retval == -1)
+			(void) usleep(LOCK_WAIT);
+	} while (retval == -1 && ++retries < LOCK_RETRIES);
 
-	if (timedout) {
+	if (retval == -1) {
+		int errno_saved = errno;
 		syslog(LOG_ERR, "pam_authtok_check::pam_sm_chauthtok: timeout "
 		    "waiting for dictionary lock.");
-		timedout = 0;
+		errno = errno_saved;
 	}
 
 	return (retval);

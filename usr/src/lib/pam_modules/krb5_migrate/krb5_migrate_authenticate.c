@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 {
 	char *user = NULL;
 	char *userdata = NULL;
+	char *olduserdata = NULL;
 	char *password = NULL;
 	int err, i;
 	time_t now;
@@ -85,13 +86,12 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		} else if (strcmp(argv[i], "expire_pw") == 0) {
 			expire_pw = 1;
 		} else if ((strstr(argv[i], "client_service=") != NULL) &&
-			    (strcmp((strstr(argv[i], "=") + 1), "") != 0)) {
-			service = (char *)strdup(strstr(argv[i], "=") + 1);
+		    (strcmp((strstr(argv[i], "=") + 1), "") != 0)) {
+			service = strdup(strstr(argv[i], "=") + 1);
 		} else {
 			__pam_log(LOG_AUTH | LOG_ERR,
-				"PAM-KRB5-AUTOMIGRATE (auth): unrecognized "
-				"option %s",
-				argv[i]);
+			    "PAM-KRB5-AUTOMIGRATE (auth): unrecognized "
+			    "option %s", argv[i]);
 		}
 	}
 
@@ -109,8 +109,17 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	if (user == NULL || (user[0] == '\0')) {
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5-AUTOMIGRATE (auth): "
-				"user empty or null");
+			    "PAM-KRB5-AUTOMIGRATE (auth): user empty or null");
+		goto cleanup;
+	}
+
+	/*
+	 * Can't tolerate memory failure later on. Get a copy
+	 * before any work is done.
+	 */
+	if ((userdata = strdup(user)) == NULL) {
+		__pam_log(LOG_AUTH | LOG_ERR,
+		    "PAM-KRB5-AUTOMIGRATE (auth): Out of memory");
 		goto cleanup;
 	}
 
@@ -125,8 +134,8 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	if (password == NULL || (password[0] == '\0')) {
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5-AUTOMIGRATE (auth): "
-				"authentication token is empty or null");
+			    "PAM-KRB5-AUTOMIGRATE (auth): "
+			    "authentication token is empty or null");
 		goto cleanup;
 	}
 
@@ -136,9 +145,8 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	 */
 	if (retval = krb5_init_context(&context)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error initializing "
-			"krb5: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error initializing "
+		    "krb5: %s", error_message(retval));
 		goto cleanup;
 	}
 
@@ -147,8 +155,8 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (def_realm == NULL && krb5_get_default_realm(context, &def_realm)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
-			"default krb5 realm");
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
+		    "default krb5 realm");
 		goto cleanup;
 	}
 
@@ -156,30 +164,27 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	params.realm = def_realm;
 
 	if (kadm5_get_adm_host_srv_name(context, def_realm,
-					&kadmin_princ)) {
+	    &kadmin_princ)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
-			"host based service name for realm %s\n", def_realm);
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while obtaining "
+		    "host based service name for realm %s\n", def_realm);
 		goto cleanup;
 	}
 
 	if (retval = krb5_sname_to_principal(context, NULL,
-				(service != NULL)?service:"host",
-				KRB5_NT_SRV_HST,
-				&svcprinc)) {
+	    (service != NULL) ? service : "host", KRB5_NT_SRV_HST, &svcprinc)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while creating "
-			"krb5 host service principal: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while creating "
+		    "krb5 host service principal: %s",
+		    error_message(retval));
 		goto cleanup;
 	}
 
 	if (retval = krb5_unparse_name(context, svcprinc,
-				&svcprincstr)) {
+	    &svcprincstr)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"unparsing principal name: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while "
+		    "unparsing principal name: %s", error_message(retval));
 		krb5_free_principal(context, svcprinc);
 		goto cleanup;
 	}
@@ -190,17 +195,12 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	 * Initialize the kadm5 connection using the default keytab
 	 */
 	retval = kadm5_init_with_skey(svcprincstr, NULL,
-					kadmin_princ,
-					&params,
-					KADM5_STRUCT_VERSION,
-					KADM5_API_VERSION_2,
-					NULL,
-					&handle);
+	    kadmin_princ, &params, KADM5_STRUCT_VERSION, KADM5_API_VERSION_2,
+	    NULL, &handle);
 	if (retval) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"doing kadm5_init_with_skey: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while "
+		    "doing kadm5_init_with_skey: %s", error_message(retval));
 		goto cleanup;
 	}
 
@@ -212,23 +212,24 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 	 */
 
 	strlength = strlen(user) + strlen(def_realm) + 2;
-	userprincstr = (char *)malloc(strlength);
+	if ((userprincstr = malloc(strlength)) == NULL)
+		goto cleanup;
 	(void) strlcpy(userprincstr, user, strlength);
 	(void) strlcat(userprincstr, "@", strlength);
 	(void) strlcat(userprincstr, def_realm, strlength);
 
 
 	if (retval = krb5_parse_name(context, userprincstr,
-				&userprinc)) {
+	    &userprinc)) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"parsing user principal name: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while "
+		    "parsing user principal name: %s",
+		    error_message(retval));
 		goto cleanup;
 	}
 
 	retval = kadm5_get_principal(handle, userprinc, &kadm5_userprinc,
-				KADM5_PRINCIPAL_NORMAL_MASK);
+	    KADM5_PRINCIPAL_NORMAL_MASK);
 
 	krb5_free_principal(context, userprinc);
 
@@ -257,20 +258,20 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		 */
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
-				"PAM-KRB5-AUTOMIGRATE (auth): Principal %s "
-				"already exists in Kerberos KDC database",
-				userprincstr);
+			    "PAM-KRB5-AUTOMIGRATE (auth): Principal %s "
+			    "already exists in Kerberos KDC database",
+			    userprincstr);
 		goto cleanup;
 	}
 
 
 
 	if (retval = krb5_parse_name(context, userprincstr,
-				&(kadm5_userprinc.principal))) {
+	    &(kadm5_userprinc.principal))) {
 		__pam_log(LOG_AUTH | LOG_ERR,
-			"PAM-KRB5-AUTOMIGRATE (auth): Error while "
-			"parsing user principal name: %s",
-			error_message(retval));
+		    "PAM-KRB5-AUTOMIGRATE (auth): Error while "
+		    "parsing user principal name: %s",
+		    error_message(retval));
 		goto cleanup;
 	}
 
@@ -289,7 +290,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	mask |= KADM5_PRINCIPAL;
 	retval = kadm5_create_principal(handle, &kadm5_userprinc,
-						mask, password);
+	    mask, password);
 	if (retval) {
 		switch (retval) {
 		case KADM5_AUTH_ADD:
@@ -303,9 +304,9 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 		default:
 			__pam_log(LOG_AUTH | LOG_ERR,
-				"PAM-KRB5-AUTOMIGRATE (auth): Generic error"
-				"while doing kadm5_create_principal: %s",
-				error_message(retval));
+			    "PAM-KRB5-AUTOMIGRATE (auth): Generic error"
+			    "while doing kadm5_create_principal: %s",
+			    error_message(retval));
 			break;
 		}
 		goto cleanup;
@@ -318,38 +319,36 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 		char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
 
 		(void) snprintf(messages[0], sizeof (messages[0]),
-			dgettext(TEXT_DOMAIN, "\nUser `%s' has been "
-			"automatically migrated to the Kerberos realm %s\n"),
-			user, def_realm);
+		    dgettext(TEXT_DOMAIN, "\nUser `%s' has been "
+		    "automatically migrated to the Kerberos realm %s\n"),
+		    user, def_realm);
 		(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1,
-				messages, NULL);
+		    messages, NULL);
 	}
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
-			"PAM-KRB5-AUTOMIGRATE (auth): User %s "
-			"has been added to the Kerberos KDC database",
-			userprincstr);
+		    "PAM-KRB5-AUTOMIGRATE (auth): User %s "
+		    "has been added to the Kerberos KDC database",
+		    userprincstr);
 
 	/*
 	 * Since this is a new krb5 principal, do a pam_set_data()
 	 * for possible use by the acct_mgmt routine of pam_krb5(5)
 	 */
 	if (pam_get_data(pamh, KRB5_AUTOMIGRATE_DATA,
-			(const void **)&userdata) == PAM_SUCCESS) {
+	    (const void **)&olduserdata) == PAM_SUCCESS) {
 		/*
 		 * We created a princ in a previous run on the same handle and
 		 * it must have been for a different PAM_USER / princ name,
 		 * otherwise we couldn't succeed here, unless that princ
 		 * got deleted.
 		 */
-		if (userdata != NULL)
-			free(userdata);
+		if (olduserdata != NULL)
+			free(olduserdata);
 	}
-	userdata = (char *)strdup(user);
 	if (pam_set_data(pamh, KRB5_AUTOMIGRATE_DATA, userdata,
-			krb5_migrate_cleanup) != PAM_SUCCESS) {
-		if (userdata != NULL)
-			free(userdata);
+	    krb5_migrate_cleanup) != PAM_SUCCESS) {
+		free(userdata);
 	}
 
 cleanup:

@@ -327,6 +327,7 @@ error:
  * 	PWU_NOT_FOUND
  *	PWU_SUCCESS	and (auth_user == NULL || auth_user = user)
  *	PWU_DENIED
+ *	PWU_NOMEM
  */
 /*ARGSUSED*/
 int
@@ -349,8 +350,11 @@ files_user_to_authenticate(char *user, pwu_repository_t *rep,
 	} else {
 		*privileged = 0;
 		if (getuid() == pwbuf->pwd->pw_uid) {
-			*auth_user = strdup(user);
-			res = PWU_SUCCESS;
+			if ((*auth_user = strdup(user)) == NULL) {
+				res = PWU_NOMEM;
+			} else {
+				res = PWU_SUCCESS;
+			}
 		} else {
 			res = PWU_DENIED;
 		}

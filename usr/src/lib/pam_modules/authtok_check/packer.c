@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -286,8 +286,10 @@ error:
 /*
  * We merge the temporary files created by previous calls to sort_file()
  * and insert the thus sorted words into the cracklib database
+ *
+ * returns 0 on success, -1 on failure.
  */
-void
+int
 merge_files(PWDICT *pwp)
 {
 	int ti;
@@ -298,7 +300,12 @@ merge_files(PWDICT *pwp)
 	lastword[0] = '\0';
 
 	for (ti = 0; ti < tmpfp_idx; ti++)
-		words[ti] = malloc(MAXWORDLEN);
+		if ((words[ti] = malloc(MAXWORDLEN)) == NULL) {
+			while (--ti >= 0)
+				free(words[ti]);
+			return (-1);
+		}
+
 	/*
 	 * we read the first word of each of the temp-files into words[].
 	 */
@@ -337,6 +344,7 @@ merge_files(PWDICT *pwp)
 		} else
 			words[choice][MAXWORDLEN-1] = '\0';
 	}
+	return (0);
 }
 
 /*
@@ -370,7 +378,7 @@ packer(char *list, char *path)
 	free(listcopy);
 
 	if (ret == 0)
-		merge_files(pwp);
+		ret = merge_files(pwp);
 
 	(void) PWClose(pwp);
 
