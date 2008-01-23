@@ -62,7 +62,6 @@
 #include <sys/sunddi.h>
 
 #include "zfs_prop.h"
-#include "zfs_util.h"
 
 int zio_taskq_threads = 8;
 
@@ -1933,7 +1932,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	ASSERT(error != 0 || rvd != NULL);
 	ASSERT(error != 0 || spa->spa_root_vdev == rvd);
 
-	if (error == 0 && !zfs_allocatable_devs(nvroot))
+	if (error == 0 && rvd->vdev_children == 0)
 		error = EINVAL;
 
 	if (error == 0 &&
