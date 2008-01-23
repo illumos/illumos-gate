@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,6 +380,9 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ushort_t venid;
 	uint8_t revision;
 	int i;
+	pci_regspec_t *regs;
+	int regs_length;
+	int rnumber;
 #if AHCI_DEBUG
 	int speed;
 #endif
@@ -421,9 +424,40 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Now map the AHCI base address; which includes global
 	 * registers and port control registers
+	 *
+	 * According to the spec, the AHCI Base Address is BAR5,
+	 * but we found JMicron JMB363 PATA-SATA chipset doesn't
+	 * follow this, so we need to check which rnumber is used
 	 */
+
+	/*
+	 * search through DDI "reg" property for the AHCI register set
+	 */
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "reg", (int **)&regs,
+	    (uint_t *)&regs_length) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "!Cannot lookup reg property");
+		goto err_out;
+	}
+
+	/* AHCI Base Address is located at 0x24 offset */
+	for (rnumber = 0; rnumber < regs_length; ++rnumber) {
+		if ((regs[rnumber].pci_phys_hi & PCI_REG_REG_M)
+		    == AHCI_PCI_RNUM)
+			break;
+	}
+
+	ddi_prop_free(regs);
+
+	if (rnumber == regs_length) {
+		cmn_err(CE_WARN, "!Cannot find AHCI register set");
+		goto err_out;
+	}
+
+	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "rnumber = %d", rnumber);
+
 	status = ddi_regs_map_setup(dip,
-	    AHCI_BASE_REG,
+	    rnumber,
 	    (caddr_t *)&ahci_ctlp->ahcictl_ahci_addr,
 	    0,
 	    0,
@@ -2948,7 +2982,6 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 		 * HBA doesn't support stagger spin-up, force it
 		 * to do normal COMRESET
 		 */
-		ASSERT(port_cmd_status & AHCI_CMD_STATUS_SUD);
 		if (ahci_portp->ahciport_flags &
 		    AHCI_PORT_FLAG_SPINUP) {
 			AHCIDBG0(AHCIDBG_INIT, ahci_ctlp,
@@ -2964,7 +2997,16 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
 		    "ahci_port_reset: do normal COMRESET", port);
 
-		ASSERT(port_cmd_status & AHCI_CMD_STATUS_SUD);
+		/*
+		 * According to the spec, SUD bit should be set here,
+		 * but JMicron JMB363 doesn't follow it, so remove
+		 * the assertion, and just print a debug message.
+		 */
+#if AHCI_DEBUG
+		if (!(port_cmd_status & AHCI_CMD_STATUS_SUD))
+			AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
+			    "port %d SUD bit not set", port)
+#endif
 
 		port_scontrol = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 		    (uint32_t *)AHCI_PORT_PxSCTL(ahci_ctlp, port));
@@ -3101,16 +3143,23 @@ ahci_port_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 		goto out;
 	}
 
-	/* PxTFD.STS.BSY is supposed to be set */
+	/*
+	 * According to the spec, when PxSCTL.DET is set to 0h, upon
+	 * receiving a COMINIT from the attached device, PxTFD.STS.BSY
+	 * shall be set to '1' by the HBA.
+	 *
+	 * However, we found JMicron JMB363 doesn't follow this, so
+	 * remove this check, and just print a debug message.
+	 */
+#if AHCI_DEBUG
 	port_task_file = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
 	    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
 	if (!(port_task_file & AHCI_TFD_STS_BSY)) {
-		cmn_err(CE_WARN, "ahci_port_reset: port %d BSY bit "
-		    "is not set after COMINIT signal is received", port);
-		ahci_portp->ahciport_port_state |= SATA_PSTATE_FAILED;
-		rval = AHCI_FAILURE;
-		goto out;
+		AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp, "ahci_port_reset: "
+		    "port %d BSY bit is not set after COMINIT signal "
+		    "is received", port);
 	}
+#endif
 
 	/*
 	 * PxSERR.DIAG.X has to be cleared in order to update PxTFD with

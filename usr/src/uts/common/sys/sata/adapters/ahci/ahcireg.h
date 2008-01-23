@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,8 @@ extern "C" {
  */
 #define	AHCI_PRDT_NUMBER	257
 
-/* AHCI base address */
-#define	AHCI_BASE_REG	6	/* BAR5 is the only useful register */
+/* PCI header offset for AHCI Base Address */
+#define	AHCI_PCI_RNUM		0x24
 
 /* various global HBA capability bits */
 #define	AHCI_HBA_CAP_NP		(0x1f << 0) /* number of ports */
