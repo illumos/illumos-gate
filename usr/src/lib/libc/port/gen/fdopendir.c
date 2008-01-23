@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,8 +47,6 @@
 #include <errno.h>
 #include "libc.h"
 
-extern int __fcntl(int fd, int cmd, intptr_t arg);
-
 DIR *
 fdopendir(int fd)
 {
@@ -64,7 +62,7 @@ fdopendir(int fd)
 	 * POSIX mandated behavior
 	 * close on exec if using file descriptor
 	 */
-	if (__fcntl(fd, F_SETFD, FD_CLOEXEC) < 0)
+	if (fcntl(fd, F_SETFD, FD_CLOEXEC) < 0)
 		goto fail;
 	if (fstat64(fd, &sbuf) < 0)
 		goto fail;

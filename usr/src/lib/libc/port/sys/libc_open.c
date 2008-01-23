@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,21 +40,29 @@
 #include <sys/stropts.h>
 #include <sys/stream.h>
 #include <sys/ptms.h>
+#include "libc.h"
 
 #if !defined(_LP64)
-extern int __open64(const char *fname, int oflag, mode_t mode);
+extern int __open64_syscall(const char *fname, int oflag, mode_t mode);
 #endif
 
-extern	int __xpg4; /* defined in port/gen/xpg4.c; 0 if not xpg4/xpg4v2 */
-
-extern int __open(const char *fname, int oflag, mode_t mode);
+extern int __open_syscall(const char *fname, int oflag, mode_t mode);
 
 static void push_module(int fd);
 static int isptsfd(int fd);
 static void itoa(int i, char *ptr);
 
+/*
+ * We must be careful to call only functions that are private
+ * to libc here, to avoid invoking the dynamic linker.
+ * This is important because _private_open() and _private_open64()
+ * are called from posix_spawn() after vfork() and we must never
+ * invoke the dynamic linker in a vfork() child.
+ */
+
+#pragma weak _private_open = __open
 int
-_open(const char *fname, int oflag, ...)
+__open(const char *fname, int oflag, ...)
 {
 	mode_t mode;
 	int fd;
@@ -71,8 +78,8 @@ _open(const char *fname, int oflag, ...)
 	 * the terminal interface. For a more detailed discussion,
 	 * see bugid 4025044.
 	 */
-	fd = __open(fname, oflag, mode);
-	if (__xpg4 != 0 && fd >= 0 && isptsfd(fd))
+	fd = __open_syscall(fname, oflag, mode);
+	if (libc__xpg4 != 0 && fd >= 0 && isptsfd(fd))
 		push_module(fd);
 	return (fd);
 }
@@ -80,10 +87,11 @@ _open(const char *fname, int oflag, ...)
 #if !defined(_LP64)
 /*
  * The 32-bit APIs to large files require this interposition.
- * The 64-bit APIs just fall back to _open() above.
+ * The 64-bit APIs just fall back to __open() above.
  */
+#pragma weak _private_open64 = __open64
 int
-_open64(const char *fname, int oflag, ...)
+__open64(const char *fname, int oflag, ...)
 {
 	mode_t mode;
 	int fd;
@@ -99,8 +107,8 @@ _open64(const char *fname, int oflag, ...)
 	 * the terminal interface. For a more detailed discussion,
 	 * see bugid 4025044.
 	 */
-	fd = __open64(fname, oflag, mode);
-	if (__xpg4 != 0 && fd >= 0 && isptsfd(fd))
+	fd = __open64_syscall(fname, oflag, mode);
+	if (libc__xpg4 != 0 && fd >= 0 && isptsfd(fd))
 		push_module(fd);
 	return (fd);
 }
@@ -113,15 +121,31 @@ _open64(const char *fname, int oflag, ...)
 static int
 isptsfd(int fd)
 {
+#if defined(_LP64)
+#define	_private_stat64 _private_stat
+#define	_private_fstat64 _private_fstat
+#endif
+	extern int _private_stat64(const char *, struct stat64 *);
+	extern int _private_fstat64(int, struct stat64 *);
 	char buf[TTYNAME_MAX];
+	char *str1 = buf;
+	const char *str2 = "/dev/pts/";
 	struct stat64 fsb, stb;
 	int oerrno = errno;
 	int rval = 0;
 
-	if (fstat64(fd, &fsb) == 0 && S_ISCHR(fsb.st_mode)) {
-		(void) strcpy(buf, "/dev/pts/");
-		itoa(minor(fsb.st_rdev), buf+strlen(buf));
-		if (stat64(buf, &stb) == 0)
+	if (_private_fstat64(fd, &fsb) == 0 && S_ISCHR(fsb.st_mode)) {
+		/*
+		 * Do this without strcpy() or strlen(),
+		 * to avoid invoking the dynamic linker.
+		 */
+		while (*str2 != '\0')
+			*str1++ = *str2++;
+		/*
+		 * Inline version of minor(dev), to avoid the dynamic linker.
+		 */
+		itoa(fsb.st_rdev & MAXMIN, str1);
+		if (_private_stat64(buf, &stb) == 0)
 			rval = (stb.st_rdev == fsb.st_rdev);
 	}
 	errno = oerrno;
@@ -157,6 +181,7 @@ itoa(int i, char *ptr)
 static void
 push_module(int fd)
 {
+	extern int _private_ioctl(int, int, ...);
 	struct strioctl istr;
 	int oerrno = errno;
 
@@ -164,15 +189,15 @@ push_module(int fd)
 	istr.ic_len = 0;
 	istr.ic_timout = 0;
 	istr.ic_dp = NULL;
-	if (ioctl(fd, I_STR, &istr) != -1) {
-		(void) ioctl(fd, __I_PUSH_NOCTTY, "ptem");
-		(void) ioctl(fd, __I_PUSH_NOCTTY, "ldterm");
-		(void) ioctl(fd, __I_PUSH_NOCTTY, "ttcompat");
+	if (_private_ioctl(fd, I_STR, &istr) != -1) {
+		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ptem");
+		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ldterm");
+		(void) _private_ioctl(fd, __I_PUSH_NOCTTY, "ttcompat");
 		istr.ic_cmd = PTSSTTY;
 		istr.ic_len = 0;
 		istr.ic_timout = 0;
 		istr.ic_dp = NULL;
-		(void) ioctl(fd, I_STR, &istr);
+		(void) _private_ioctl(fd, I_STR, &istr);
 	}
 	errno = oerrno;
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +31,11 @@
 
 	.file	"%M%"
 
-/* C library -- _so_accept						*/
-/* int _so_accept (int socket, struct sockaddr *name, int *namelen,	*/
-/*			int vers);					*/
+/* C library -- __so_accept						*/
+/* int __so_accept(int sock, struct sockaddr *addr, int *addrlen, int vers) */
 
 #include "SYS.h"
 
-	SYSCALL2_RVAL1(_so_accept,accept)
+	SYSCALL2_RVAL1(__so_accept,accept)
 	RET
-	SET_SIZE(_so_accept)
+	SET_SIZE(__so_accept)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4954,7 +4954,7 @@ expound(private_t *pri, long r0, int raw)
 		if (!err && pri->sys_nargs > 1)
 			show_sigset(pri, (long)pri->sys_args[1], "sigmask");
 		break;
-	case SYS_waitsys:
+	case SYS_waitid:
 		if (!err && pri->sys_nargs > 2)
 			show_siginfo(pri, (long)pri->sys_args[2]);
 		break;

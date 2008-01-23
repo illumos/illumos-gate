@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,15 +62,21 @@ typedef struct sc_public {
 /*
  * The private portion of the sc_shared data is for
  * use by user-level threading support code in libc.
+ * Java has a contract to look at sc_state and sc_cpu (PSARC/2005/351).
  */
 typedef struct sc_shared {
 	volatile ushort_t sc_state;	/* current LWP state */
 	volatile char	sc_sigblock;	/* all signals blocked */
-	volatile char	sc_park;	/* calling lwp_park() */
+	volatile uchar_t sc_flgs;	/* set only by curthread; see below */
 	volatile processorid_t sc_cpu;	/* last CPU on which LWP ran */
 	int		sc_pad;
 	sc_public_t	sc_preemptctl;	/* preemption control data */
 } sc_shared_t;
+
+/* sc_flgs */
+#define	SC_PARK_FLG	0x01	/* calling lwp_park() */
+#define	SC_CANCEL_FLG	0x02	/* cancel pending and not disabled */
+#define	SC_EINTR_FLG	0x04	/* EINTR returned due to SC_CANCEL_FLG */
 
 /*
  * Possible state settings.  These are same as the kernel thread states
@@ -95,6 +102,8 @@ void	schedctl_set_nopreempt(kthread_t *, short);
 void	schedctl_set_yield(kthread_t *, short);
 int	schedctl_sigblock(kthread_t *);
 void	schedctl_finish_sigblock(kthread_t *);
+int	schedctl_cancel_pending(void);
+void	schedctl_cancel_eintr(void);
 int	schedctl_is_park(void);
 void	schedctl_set_park(void);
 void	schedctl_unpark(void);

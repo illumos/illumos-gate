@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <pthread.h>
 #include <limits.h>
 #include <signal.h>
 #include <spawn.h>
@@ -508,6 +509,7 @@ invoke_utmp_update(const struct utmpx *entryx)
 
 	posix_spawnattr_t attr;
 	int status;
+	int cancel_state;
 	pid_t child;
 	pid_t w;
 	int i;
@@ -587,9 +589,11 @@ invoke_utmp_update(const struct utmpx *entryx)
 		goto out;
 	}
 
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	do {
 		w = waitpid(child, &status, 0);
 	} while (w == -1 && errno == EINTR);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 	/*
 	 * We can get ECHILD if the process is ignoring SIGCLD.

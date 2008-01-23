@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,9 +229,9 @@ mq_init(mqhdr_t *mqhp, size_t msgsize, ssize_t maxmsg)
 	 */
 	mqhp->mq_headpp = sizeof (mqhdr_t);
 	mqhp->mq_tailpp = mqhp->mq_headpp +
-		mqhp->mq_maxprio * sizeof (uint64_t);
+	    mqhp->mq_maxprio * sizeof (uint64_t);
 	mqhp->mq_freep = mqhp->mq_tailpp +
-		mqhp->mq_maxprio * sizeof (uint64_t);
+	    mqhp->mq_maxprio * sizeof (uint64_t);
 
 	currentp = mqhp->mq_freep;
 	MQ_PTR(mqhp, currentp)->msg_next = 0;
@@ -412,8 +412,8 @@ _mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 		temp = (msgsize + MQ_ALIGNSIZE - 1) & ~(MQ_ALIGNSIZE - 1);
 
 		total_size = sizeof (mqhdr_t) +
-			maxmsg * (temp + sizeof (msghdr_t)) +
-			2 * _MQ_PRIO_MAX * sizeof (uint64_t);
+		    maxmsg * (temp + sizeof (msghdr_t)) +
+		    2 * _MQ_PRIO_MAX * sizeof (uint64_t);
 
 		if (total_size > SSIZE_MAX) {
 			errno = ENOSPC;
@@ -734,7 +734,7 @@ int
 _mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, uint_t msg_prio)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
-		NULL, ABS_TIME));
+	    NULL, ABS_TIME));
 }
 
 int
@@ -742,7 +742,7 @@ _mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	uint_t msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
-		abs_timeout, ABS_TIME));
+	    abs_timeout, ABS_TIME));
 }
 
 int
@@ -750,18 +750,18 @@ _mq_reltimedsend_np(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	uint_t msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
-		rel_timeout, REL_TIME));
+	    rel_timeout, REL_TIME));
 }
 
 static void
 decrement_rblocked(mqhdr_t *mqhp)
 {
-	int canstate;
+	int cancel_state;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (sem_wait(&mqhp->mq_rblocked) == -1)
 		continue;
-	(void) pthread_setcancelstate(canstate, NULL);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 }
 
 static ssize_t
@@ -846,7 +846,7 @@ ssize_t
 _mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint_t *msg_prio)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
-		NULL, ABS_TIME));
+	    NULL, ABS_TIME));
 }
 
 ssize_t
@@ -854,7 +854,7 @@ _mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 	uint_t *msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
-		abs_timeout, ABS_TIME));
+	    abs_timeout, ABS_TIME));
 }
 
 ssize_t
@@ -862,7 +862,7 @@ _mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 	uint_t *msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
-		rel_timeout, REL_TIME));
+	    rel_timeout, REL_TIME));
 }
 
 /*
@@ -875,7 +875,7 @@ cancel_if_necessary(thread_communication_data_t *tcdp,
 	const struct sigevent *sigevp)
 {
 	int do_cancel = !_pthread_attr_equal(tcdp->tcd_attrp,
-			    sigevp->sigev_notify_attributes);
+	    sigevp->sigev_notify_attributes);
 
 	if (do_cancel) {
 		/*
@@ -891,7 +891,7 @@ cancel_if_necessary(thread_communication_data_t *tcdp,
 		tcdp->tcd_notif.sigev_signo = 0;
 		tcdp->tcd_notif.sigev_value = sigevp->sigev_value;
 		tcdp->tcd_notif.sigev_notify_function =
-			sigevp->sigev_notify_function;
+		    sigevp->sigev_notify_function;
 	}
 
 	return (do_cancel);

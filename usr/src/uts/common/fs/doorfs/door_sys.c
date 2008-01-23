@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -514,6 +514,7 @@ door_call(int did, void *args)
 	void		*destarg;
 	model_t		datamodel;
 	int		gotresults = 0;
+	int		cancel_pending;
 
 	lwp = ttolwp(curthread);
 	datamodel = lwp_getdatamodel(lwp);
@@ -689,10 +690,14 @@ shuttle_return:
 		 * Premature wakeup. Find out why (stop, forkall, sig, exit ...)
 		 */
 		mutex_exit(&door_knob);		/* May block in ISSIG */
-		if (ISSIG(curthread, FORREAL) ||
-		    lwp->lwp_sysabort || MUSTRETURN(curproc, curthread)) {
+		cancel_pending = 0;
+		if (ISSIG(curthread, FORREAL) || lwp->lwp_sysabort ||
+		    MUSTRETURN(curproc, curthread) ||
+		    (cancel_pending = schedctl_cancel_pending()) != 0) {
 			/* Signal, forkall, ... */
 			lwp->lwp_sysabort = 0;
+			if (cancel_pending)
+				schedctl_cancel_eintr();
 			mutex_enter(&door_knob);
 			error = EINTR;
 			/*
@@ -1322,6 +1327,7 @@ door_return(caddr_t data_ptr, size_t data_size,
 	door_node_t	*dp;
 	door_server_t	*st;		/* curthread door_data */
 	door_client_t	*ct;		/* caller door_data */
+	int		cancel_pending;
 
 	st = door_my_server(1);
 
@@ -1469,8 +1475,12 @@ out:
 		st->d_caller = NULL;
 		door_server_exit(curproc, curthread);
 		mutex_exit(&door_knob);
-		if (ISSIG(curthread, FORREAL) ||
-		    lwp->lwp_sysabort || MUSTRETURN(curproc, curthread)) {
+		cancel_pending = 0;
+		if (ISSIG(curthread, FORREAL) || lwp->lwp_sysabort ||
+		    MUSTRETURN(curproc, curthread) ||
+		    (cancel_pending = schedctl_cancel_pending()) != 0) {
+			if (cancel_pending)
+				schedctl_cancel_eintr();
 			lwp->lwp_asleep = 0;
 			lwp->lwp_sysabort = 0;
 			return (set_errno(EINTR));
@@ -3008,6 +3018,7 @@ door_upcall(vnode_t *vp, door_arg_t *param)
 	door_client_t	*ct;		/* curthread door_data */
 	door_server_t	*st;		/* server thread door_data */
 	int		gotresults = 0;
+	int		cancel_pending;
 
 	if (vp->v_type != VDOOR) {
 		if (param->desc_num)
@@ -3105,9 +3116,13 @@ shuttle_return:
 		 * Premature wakeup. Find out why (stop, forkall, sig, exit ...)
 		 */
 		mutex_exit(&door_knob);		/* May block in ISSIG */
-		if (lwp && (ISSIG(curthread, FORREAL) ||
-		    lwp->lwp_sysabort || MUSTRETURN(curproc, curthread))) {
+		cancel_pending = 0;
+		if (lwp && (ISSIG(curthread, FORREAL) || lwp->lwp_sysabort ||
+		    MUSTRETURN(curproc, curthread) ||
+		    (cancel_pending = schedctl_cancel_pending()) != 0)) {
 			/* Signal, forkall, ... */
+			if (cancel_pending)
+				schedctl_cancel_eintr();
 			lwp->lwp_sysabort = 0;
 			mutex_enter(&door_knob);
 			error = EINTR;

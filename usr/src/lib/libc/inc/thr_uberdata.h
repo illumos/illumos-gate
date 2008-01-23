@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,7 +508,8 @@ typedef struct ulwp {
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
 	char		ul_error_detection;	/* thread_error_detection */
 	char		ul_async_safe;		/* thread_async_safe */
-	char		ul_pad1[2];
+	char		ul_pad1;
+	char		ul_save_state;	/* bind_guard() interface to ld.so.1 */
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	volatile int	ul_critical;	/* non-zero == in a critical region */
@@ -529,7 +530,7 @@ typedef struct ulwp {
 	uberflags_t *volatile ul_schedctl_called; /* ul_schedctl is set up */
 	volatile sc_shared_t *volatile ul_schedctl;	/* schedctl data */
 	int		ul_bindflags;	/* bind_guard() interface to ld.so.1 */
-	int		ul_pad2;
+	uint_t		ul_libc_locks;	/* count of cancel_safe_mutex_lock()s */
 	tsd_t		*ul_stsd;	/* slow TLS for keys >= TSD_NFAST */
 	void		*ul_ftsd[TSD_NFAST]; /* fast TLS for keys < TSD_NFAST */
 	td_evbuf_t	ul_td_evbuf;	/* event buffer */
@@ -905,7 +906,8 @@ typedef struct ulwp32 {
 	char		ul_cond_wait_defer;	/* thread_cond_wait_defer */
 	char		ul_error_detection;	/* thread_error_detection */
 	char		ul_async_safe;		/* thread_async_safe */
-	char		ul_pad1[2];
+	char		ul_pad1;
+	char		ul_save_state;	/* bind_guard() interface to ld.so.1 */
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	int		ul_critical;	/* non-zero == in a critical region */
@@ -926,7 +928,7 @@ typedef struct ulwp32 {
 	caddr32_t	ul_schedctl_called; /* ul_schedctl is set up */
 	caddr32_t	ul_schedctl;	/* schedctl data */
 	int		ul_bindflags;	/* bind_guard() interface to ld.so.1 */
-	int		ul_pad2;
+	uint_t		ul_libc_locks;	/* count of cancel_safe_mutex_lock()s */
 	caddr32_t	ul_stsd;	/* slow TLS for keys >= TSD_NFAST */
 	caddr32_t	ul_ftsd[TSD_NFAST]; /* fast TLS for keys < TSD_NFAST */
 	td_evbuf32_t	ul_td_evbuf;	/* event buffer */
@@ -1203,7 +1205,10 @@ extern	void	block_all_signals(ulwp_t *self);
 	(ASSERT((self)->ul_critical + (self)->ul_sigdefer != 0), 0) :	\
 	__lwp_sigmask(SIG_SETMASK, &(self)->ul_sigmask, NULL)))
 
+extern	void	set_cancel_pending_flag(ulwp_t *, int);
+extern	void	set_cancel_eintr_flag(ulwp_t *);
 extern	void	set_parking_flag(ulwp_t *, int);
+extern	int	cancel_active(void);
 
 extern	void	*_thr_setup(ulwp_t *);
 extern	void	_fpinherit(ulwp_t *);
@@ -1219,6 +1224,9 @@ extern	void	sig_mutex_unlock(mutex_t *);
 extern	int	sig_mutex_trylock(mutex_t *);
 extern	int	sig_cond_wait(cond_t *, mutex_t *);
 extern	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	void	cancel_safe_mutex_lock(mutex_t *);
+extern	void	cancel_safe_mutex_unlock(mutex_t *);
+extern	int	cancel_safe_mutex_trylock(mutex_t *);
 extern	void	_prefork_handler(void);
 extern	void	_postfork_parent_handler(void);
 extern	void	_postfork_child_handler(void);
@@ -1253,10 +1261,10 @@ extern	pid_t	__forkallx(int);
 extern	pid_t	_private_getpid(void);
 extern	uid_t	_private_geteuid(void);
 extern	int	_kill(pid_t, int);
-extern	int	_open(const char *, int, ...);
-extern	int	_close(int);
-extern	ssize_t	_read(int, void *, size_t);
-extern	ssize_t	_write(int, const void *, size_t);
+extern	int	_private_open(const char *, int, ...);
+extern	int	_private_close(int);
+extern	ssize_t	__read(int, void *, size_t);
+extern	ssize_t	__write(int, const void *, size_t);
 extern	void	*_memcpy(void *, const void *, size_t);
 extern	void	*_memset(void *, int, size_t);
 extern	int	_memcmp(const void *, const void *, size_t);
@@ -1303,6 +1311,7 @@ extern	void	_siglongjmp(sigjmp_buf, int);
 extern	int	_pthread_setspecific(pthread_key_t, const void *);
 extern	void	*_pthread_getspecific(pthread_key_t);
 extern	void	_pthread_exit(void *);
+extern	int	_pthread_setcancelstate(int, int *);
 extern	void	_private_testcancel(void);
 
 /* belongs in <pthread.h> */
@@ -1333,14 +1342,19 @@ extern	int	__mutex_unlock(mutex_t *);
 extern	int	mutex_is_held(mutex_t *);
 
 extern	int	_cond_init(cond_t *, int, void *);
-extern	int	_cond_wait(cond_t *, mutex_t *);
-extern	int	_cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
-extern	int	_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 extern	int	_cond_signal(cond_t *);
 extern	int	_cond_broadcast(cond_t *);
 extern	int	_cond_destroy(cond_t *);
 extern	int	cond_signal_internal(cond_t *);
 extern	int	cond_broadcast_internal(cond_t *);
+/* cancellation points: */
+extern	int	_cond_wait(cond_t *, mutex_t *);
+extern	int	_cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	int	_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+/* not cancellation points: */
+extern	int	__cond_wait(cond_t *, mutex_t *);
+extern	int	__cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	int	__cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 
 extern	int	__rwlock_init(rwlock_t *, int, void *);
 extern	int	rw_read_is_held(rwlock_t *);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,9 +237,9 @@ syslist(char *str,			/* string of syscall names */
 				goto def;
 
 			case SYS_wait:		/* set both if either */
-			case SYS_waitsys:
+			case SYS_waitid:
 				sysx = SYS_wait;
-				sys = SYS_waitsys;
+				sys = SYS_waitid;
 				goto def;
 
 			case SYS_lseek:		/* set both if either */
@@ -290,8 +290,8 @@ syslist(char *str,			/* string of syscall names */
 			}
 		} else {
 			(void) fprintf(stderr,
-				"%s: unrecognized syscall: %s\n",
-				command, name);
+			    "%s: unrecognized syscall: %s\n",
+			    command, name);
 			rc = -1;
 		}
 	}
@@ -365,8 +365,8 @@ siglist(private_t *pri,
 			}
 		} else {
 			(void) fprintf(stderr,
-				"%s: unrecognized signal name/number: %s\n",
-				command, name);
+			    "%s: unrecognized signal name/number: %s\n",
+			    command, name);
 			rc = -1;
 		}
 	}
@@ -442,8 +442,8 @@ fltlist(char *str,			/* string of fault names */
 			}
 		} else {
 			(void) fprintf(stderr,
-				"%s: unrecognized fault name/number: %s\n",
-				command, name);
+			    "%s: unrecognized fault name/number: %s\n",
+			    command, name);
 			rc = -1;
 		}
 	}
@@ -501,8 +501,8 @@ fdlist(char *str,		/* string of filedescriptors */
 			}
 		} else {
 			(void) fprintf(stderr,
-				"%s: filedescriptor not in range[0..%d]: %s\n",
-				command, NOFILES_MAX-1, name);
+			    "%s: filedescriptor not in range[0..%d]: %s\n",
+			    command, NOFILES_MAX-1, name);
 			rc = -1;
 		}
 	}
@@ -595,7 +595,7 @@ liblist(char *arg, int hang)
 			if (Dyp->nlibpat == maxpat) {
 				maxpat *= 2;
 				Dyp->libpat = my_realloc(Dyp->libpat,
-					maxpat * sizeof (char *), NULL);
+				    maxpat * sizeof (char *), NULL);
 			}
 			Dyp->libpat[Dyp->nlibpat++] = pat;
 		}
@@ -646,7 +646,7 @@ liblist(char *arg, int hang)
 			if (Dyp->nsympat == maxpat) {
 				maxpat *= 2;
 				Dyp->sympat = my_realloc(Dyp->sympat,
-					maxpat * sizeof (char *), NULL);
+				    maxpat * sizeof (char *), NULL);
 			}
 			Dyp->sympat[Dyp->nsympat++] = pat;
 		}

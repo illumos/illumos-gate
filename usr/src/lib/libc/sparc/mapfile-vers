@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -961,7 +961,6 @@ SUNWprivate_1.1 {
 	_sys_index;
 	_sys_nerr = NODYNSORT;
 	_sys_num_err;
-	_syssun;
 	__ucmpdi2;
 	__udivdi3;
 	__umoddi3;
@@ -988,6 +987,8 @@ SUNWprivate_1.1 {
     local:
 	__cerror =		NODYNSORT;
 	__cerror64 =		NODYNSORT;
+	_private_fstat64 =	NODYNSORT;
+	_private_stat64 =	NODYNSORT;
 	_seekdir64 =		NODYNSORT;
 	_telldir64 =		NODYNSORT;
 };

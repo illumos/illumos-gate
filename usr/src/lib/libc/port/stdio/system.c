@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,11 +73,14 @@ void *
 reapchild(void *arg)
 {
 	pid_t pid = (pid_t)(uintptr_t)arg;
+	int cancel_state;
 
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (waitpid(pid, NULL, 0) == -1) {
 		if (errno != EINTR)
 			break;
 	}
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	return (NULL);
 }
 
@@ -225,7 +228,7 @@ system(const char *cmd)
 	argv[3] = NULL;
 	if (error == 0)
 		error = posix_spawn(&cu.pid, shpath, NULL, &attr,
-			(char *const *)argv, (char *const *)environ);
+		    (char *const *)argv, (char *const *)environ);
 
 	(void) posix_spawnattr_destroy(&attr);
 
@@ -234,13 +237,11 @@ system(const char *cmd)
 		status = -1;
 	} else {
 		/*
-		 * system() is a cancellation point.
-		 * Call waitpid_cancel() rather than _waitpid() to make
-		 * sure that we actually perform the cancellation logic.
+		 * system() is a cancellation point and so is waitpid().
 		 */
 		pthread_cleanup_push(cleanup, &cu);
 		do {
-			w = waitpid_cancel(cu.pid, &status, 0);
+			w = waitpid(cu.pid, &status, 0);
 		} while (w == -1 && errno == EINTR);
 		pthread_cleanup_pop(0);
 		if (w == -1)

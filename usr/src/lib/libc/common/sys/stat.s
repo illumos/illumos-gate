@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +46,7 @@
 
 #if !defined(_LARGEFILE_SOURCE)
 	
+	ANSI_PRAGMA_WEAK2(_private_stat,stat,function)
 	SYSCALL_RVAL1(stat)
 	RETC
 	SET_SIZE(stat)
@@ -56,6 +56,7 @@
 /* C library -- stat64 - transitional API			*/
 /* int stat64 (const char *path, struct stat64 *buf);		*/
 
+	ANSI_PRAGMA_WEAK2(_private_stat64,stat64,function)
 	SYSCALL_RVAL1(stat64)
 	RETC
 	SET_SIZE(stat64)

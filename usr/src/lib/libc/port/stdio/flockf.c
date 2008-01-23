@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,11 +48,8 @@
 #include "stdiom.h"
 
 /*
- * The rmutex_lock/unlock routines are only called (for stdio FILE
- * locking in libc) by _flockget, _flockrel, flockfile, ftrylockfile,
- * and funlockfile.  _flockget and _flockrel are only called by the
- * FLOCKFILE/FUNLOCKFILE macros in mtlib.h.  rmutex_trylock(), as a
- * special case, is called from GETIOP()/getiop() in _findiop().
+ * _flockget and _flockrel are only called by the
+ * FLOCKFILE/FUNLOCKFILE macros in mtlib.h.
  */
 
 /*
@@ -65,7 +62,7 @@ _flockget(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		rmutex_lock(rl);
+		cancel_safe_mutex_lock(rl);
 	return (rl);
 }
 
@@ -75,7 +72,7 @@ ftrylockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		return (rmutex_trylock(rl));
+		return (_private_mutex_trylock(rl));
 	return (0);	/* can't happen? */
 }
 
@@ -85,7 +82,7 @@ flockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		rmutex_lock(rl);
+		_private_mutex_lock(rl);
 }
 
 void
@@ -94,7 +91,7 @@ funlockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		rmutex_unlock(rl);
+		_private_mutex_unlock(rl);
 }
 
 int

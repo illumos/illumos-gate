@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,9 +28,11 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
+#include <pthread.h>
 #include <procfs.h>
 #include <sys/uio.h>
 #include <ctype.h>
+#include "libc.h"
 
 #undef errno
 extern int errno;
@@ -204,68 +206,26 @@ hash_out(ulwp_t *ulwp, uberdata_t *udp)
 	}
 }
 
+/*
+ * Retain stack information for thread structures that are being recycled for
+ * new threads.  All other members of the thread structure should be zeroed.
+ */
 static void
 ulwp_clean(ulwp_t *ulwp)
 {
-	ulwp->ul_self = NULL;
-	ulwp->ul_rval = NULL;
-	ulwp->ul_lwpid = 0;
-	ulwp->ul_pri = 0;
-	ulwp->ul_mappedpri = 0;
-	ulwp->ul_policy = 0;
-	ulwp->ul_pri_mapped = 0;
-	ulwp->ul_mutator = 0;
-	ulwp->ul_pleasestop = 0;
-	ulwp->ul_stop = 0;
-	ulwp->ul_dead = 0;
-	ulwp->ul_unwind = 0;
-	ulwp->ul_detached = 0;
-	ulwp->ul_stopping = 0;
-	ulwp->ul_sp = 0;
-	ulwp->ul_critical = 0;
-	ulwp->ul_cancelable = 0;
-	ulwp->ul_preempt = 0;
-	ulwp->ul_sigsuspend = 0;
-	ulwp->ul_cancel_pending = 0;
-	ulwp->ul_cancel_disabled = 0;
-	ulwp->ul_cancel_async = 0;
-	ulwp->ul_save_async = 0;
-	ulwp->ul_cursig = 0;
-	ulwp->ul_created = 0;
-	ulwp->ul_replace = 0;
-	ulwp->ul_schedctl_called = NULL;
-	ulwp->ul_errno = 0;
-	ulwp->ul_errnop = NULL;
-	ulwp->ul_clnup_hdr = NULL;
-	ulwp->ul_schedctl = NULL;
-	ulwp->ul_bindflags = 0;
-	(void) _private_memset(&ulwp->ul_td_evbuf, 0,
-	    sizeof (ulwp->ul_td_evbuf));
-	ulwp->ul_td_events_enable = 0;
-	ulwp->ul_qtype = 0;
-	ulwp->ul_usropts = 0;
-	ulwp->ul_startpc = NULL;
-	ulwp->ul_startarg = NULL;
-	ulwp->ul_wchan = NULL;
-	ulwp->ul_link = NULL;
-	ulwp->ul_sleepq = NULL;
-	ulwp->ul_mxchain = NULL;
-	ulwp->ul_epri = 0;
-	ulwp->ul_emappedpri = 0;
-	/* PROBE_SUPPORT begin */
-	ulwp->ul_tpdp = NULL;
-	/* PROBE_SUPPORT end */
-	ulwp->ul_siglink = NULL;
-	(void) _private_memset(ulwp->ul_ftsd, 0,
-	    sizeof (void *) * TSD_NFAST);
-	ulwp->ul_stsd = NULL;
-	(void) _private_memset(&ulwp->ul_spinlock, 0,
-	    sizeof (ulwp->ul_spinlock));
-	ulwp->ul_spin_lock_spin = 0;
-	ulwp->ul_spin_lock_spin2 = 0;
-	ulwp->ul_spin_lock_sleep = 0;
-	ulwp->ul_spin_lock_wakeup = 0;
-	ulwp->ul_ex_unwind = NULL;
+	caddr_t stk = ulwp->ul_stk;
+	size_t mapsiz = ulwp->ul_mapsiz;
+	size_t guardsize = ulwp->ul_guardsize;
+	uintptr_t stktop = ulwp->ul_stktop;
+	size_t stksiz = ulwp->ul_stksiz;
+
+	(void) _private_memset(ulwp, 0, sizeof (*ulwp));
+
+	ulwp->ul_stk = stk;
+	ulwp->ul_mapsiz = mapsiz;
+	ulwp->ul_guardsize = guardsize;
+	ulwp->ul_stktop = stktop;
+	ulwp->ul_stksiz = stksiz;
 }
 
 static int stackprot;
@@ -700,7 +660,6 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 		return (error);
 	}
 	self->ul_nocancel = 0;	/* cancellation is now possible */
-	ulwp->ul_nocancel = 0;
 	udp->uberflags.uf_mt = 1;
 	if (new_thread)
 		*new_thread = tid;
@@ -942,6 +901,7 @@ _thr_exit_common(void *status, int unwind)
 	self->ul_save_async = 0;
 	self->ul_cancelable = 0;
 	self->ul_cancel_pending = 0;
+	set_cancel_pending_flag(self, 1);
 	if (cancelled && cleanuphndlr != NULL)
 		(*cleanuphndlr)();
 
@@ -1341,8 +1301,7 @@ libc_init(void)
 	self->ul_dreturn = 0x81ca0000;	/* return %o0 */
 #endif
 
-	self->ul_stktop =
-	    (uintptr_t)uc.uc_stack.ss_sp + uc.uc_stack.ss_size;
+	self->ul_stktop = (uintptr_t)uc.uc_stack.ss_sp + uc.uc_stack.ss_size;
 	(void) _private_getrlimit(RLIMIT_STACK, &rl);
 	self->ul_stksiz = rl.rlim_cur;
 	self->ul_stk = (caddr_t)(self->ul_stktop - self->ul_stksiz);
@@ -1483,6 +1442,13 @@ libc_init(void)
 	sigon(self);
 	if (setmask)
 		(void) restore_signals(self);
+
+	/*
+	 * Make private copies of __xpg4 and __xpg6 so libc can test
+	 * them after this point without invoking the dynamic linker.
+	 */
+	libc__xpg4 = __xpg4;
+	libc__xpg6 = __xpg6;
 
 	/* PROBE_SUPPORT begin */
 	if (self->ul_primarymap && __tnf_probe_notify != NULL)
@@ -1879,7 +1845,7 @@ top:
 		 */
 		while (ulwp && !ulwp->ul_dead && !ulwp->ul_stop &&
 		    (ulwp->ul_pleasestop & whystopped)) {
-			(void) _cond_wait(cvp, mp);
+			(void) __cond_wait(cvp, mp);
 			for (ulwp = udp->thr_hash_table[ix].hash_bucket;
 			    ulwp != NULL; ulwp = ulwp->ul_hash) {
 				if (ulwp->ul_lwpid == tid)
@@ -2223,6 +2189,15 @@ do_exit_critical()
 	ASSERT(self->ul_critical == 0);
 }
 
+/*
+ * _ti_bind_guard() and _ti_bind_clear() are called by the dynamic linker
+ * (ld.so.1) when it has do do something, like resolve a symbol to be called
+ * by the application or one of its libraries.  _ti_bind_guard() is called
+ * on entry to ld.so.1, _ti_bind_clear() on exit from ld.so.1 back to the
+ * application.  The dynamic linker gets special dispensation from libc to
+ * run in a critical region (all signals deferred and no thread suspension
+ * or forking allowed), and to be immune from cancellation for the duration.
+ */
 int
 _ti_bind_guard(int bindflag)
 {
@@ -2231,6 +2206,9 @@ _ti_bind_guard(int bindflag)
 	if ((self->ul_bindflags & bindflag) == bindflag)
 		return (0);
 	enter_critical(self);
+	self->ul_save_state = self->ul_cancel_disabled;
+	self->ul_cancel_disabled = 1;
+	set_cancel_pending_flag(self, 0);
 	self->ul_bindflags |= bindflag;
 	return (1);
 }
@@ -2243,6 +2221,8 @@ _ti_bind_clear(int bindflag)
 	if ((self->ul_bindflags & bindflag) == 0)
 		return (self->ul_bindflags);
 	self->ul_bindflags &= ~bindflag;
+	self->ul_cancel_disabled = self->ul_save_state;
+	set_cancel_pending_flag(self, 0);
 	exit_critical(self);
 	return (self->ul_bindflags);
 }
@@ -2443,7 +2423,7 @@ _thr_setstate(thread_t tid, int flag, gregset_t rs)
 int
 getlwpstatus(thread_t tid, struct lwpstatus *sp)
 {
-	extern ssize_t _pread(int, void *, size_t, off_t);
+	extern ssize_t __pread(int, void *, size_t, off_t);
 	char buf[100];
 	int fd;
 
@@ -2451,15 +2431,15 @@ getlwpstatus(thread_t tid, struct lwpstatus *sp)
 	(void) strcpy(buf, "/proc/self/lwp/");
 	ultos((uint64_t)tid, 10, buf + strlen(buf));
 	(void) strcat(buf, "/lwpstatus");
-	if ((fd = _open(buf, O_RDONLY, 0)) >= 0) {
-		while (_pread(fd, sp, sizeof (*sp), 0) == sizeof (*sp)) {
+	if ((fd = _private_open(buf, O_RDONLY, 0)) >= 0) {
+		while (__pread(fd, sp, sizeof (*sp), 0) == sizeof (*sp)) {
 			if (sp->pr_flags & PR_STOPPED) {
-				(void) _close(fd);
+				(void) _private_close(fd);
 				return (0);
 			}
 			lwp_yield();	/* give him a chance to stop */
 		}
-		(void) _close(fd);
+		(void) _private_close(fd);
 	}
 	return (-1);
 }
@@ -2467,7 +2447,7 @@ getlwpstatus(thread_t tid, struct lwpstatus *sp)
 int
 putlwpregs(thread_t tid, prgregset_t prp)
 {
-	extern ssize_t _writev(int, const struct iovec *, int);
+	extern ssize_t __writev(int, const struct iovec *, int);
 	char buf[100];
 	int fd;
 	long dstop_sreg[2];
@@ -2478,7 +2458,7 @@ putlwpregs(thread_t tid, prgregset_t prp)
 	(void) strcpy(buf, "/proc/self/lwp/");
 	ultos((uint64_t)tid, 10, buf + strlen(buf));
 	(void) strcat(buf, "/lwpctl");
-	if ((fd = _open(buf, O_WRONLY, 0)) >= 0) {
+	if ((fd = _private_open(buf, O_WRONLY, 0)) >= 0) {
 		dstop_sreg[0] = PCDSTOP;	/* direct it to stop */
 		dstop_sreg[1] = PCSREG;		/* set the registers */
 		iov[0].iov_base = (caddr_t)dstop_sreg;
@@ -2489,11 +2469,11 @@ putlwpregs(thread_t tid, prgregset_t prp)
 		run_null[1] = 0;
 		iov[2].iov_base = (caddr_t)run_null;
 		iov[2].iov_len = sizeof (run_null);
-		if (_writev(fd, iov, 3) >= 0) {
-			(void) _close(fd);
+		if (__writev(fd, iov, 3) >= 0) {
+			(void) _private_close(fd);
 			return (0);
 		}
-		(void) _close(fd);
+		(void) _private_close(fd);
 	}
 	return (-1);
 }
@@ -2558,8 +2538,9 @@ _thr_setmutator(thread_t tid, int enabled)
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
 	int error;
+	int cancel_state;
 
-	enabled = enabled?1:0;
+	enabled = enabled? 1 : 0;
 top:
 	if (tid == 0) {
 		ulwp = self;
@@ -2579,8 +2560,11 @@ top:
 		lmutex_lock(&mutatorslock);
 		if (mutatorsbarrier) {
 			ulwp_unlock(ulwp, udp);
+			(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+			    &cancel_state);
 			while (mutatorsbarrier)
 				(void) _cond_wait(&mutatorscv, &mutatorslock);
+			(void) _pthread_setcancelstate(cancel_state, NULL);
 			lmutex_unlock(&mutatorslock);
 			goto top;
 		}
@@ -2601,14 +2585,17 @@ void
 _thr_mutators_barrier(int enabled)
 {
 	int oldvalue;
+	int cancel_state;
 
 	lmutex_lock(&mutatorslock);
 
 	/*
 	 * Wait if trying to set the barrier while it is already set.
 	 */
+	(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (mutatorsbarrier && enabled)
 		(void) _cond_wait(&mutatorscv, &mutatorslock);
+	(void) _pthread_setcancelstate(cancel_state, NULL);
 
 	oldvalue = mutatorsbarrier;
 	mutatorsbarrier = enabled;
@@ -2751,11 +2738,15 @@ _thr_wait_mutator(thread_t tid, int dontwait)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	ulwp_t *ulwp;
+	int cancel_state;
 	int error = 0;
 
+	(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 top:
-	if ((ulwp = find_lwp(tid)) == NULL)
+	if ((ulwp = find_lwp(tid)) == NULL) {
+		(void) _pthread_setcancelstate(cancel_state, NULL);
 		return (ESRCH);
+	}
 
 	if (!ulwp->ul_mutator)
 		error = EINVAL;
@@ -2772,6 +2763,7 @@ top:
 	}
 
 	ulwp_unlock(ulwp, udp);
+	(void) _pthread_setcancelstate(cancel_state, NULL);
 	return (error);
 }
 

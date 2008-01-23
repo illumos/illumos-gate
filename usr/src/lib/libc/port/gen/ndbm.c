@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include <ndbm.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 
 /* add support for batched writing for NIS */
 
@@ -452,10 +453,22 @@ loop:
 datum
 dbm_firstkey(DBM *db)
 {
+	/*
+	 * For some reason, the Posix specification (SUSv3)
+	 * says that dbm_firstkey() is not a cancellation point.
+	 * It really should be, but in order to pass the SUSv3
+	 * test suite we make it not a cancellation point.
+	 * XXX: fix me when the SUSv3 specification gets fixed.
+	 */
+	int cancel_state;
+	datum rval;
 
 	db->dbm_blkptr = 0L;
 	db->dbm_keyptr = 0;
-	return (dbm_firsthash(db, 0L));
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	rval = dbm_firsthash(db, 0L);
+	(void) pthread_setcancelstate(cancel_state, NULL);
+	return (rval);
 }
 
 datum
@@ -496,7 +509,7 @@ dbm_slow_nextkey(DBM *db)
 			where = (((off64_t)db->dbm_blkptr) * PBLKSIZ);
 			if ((lseek64(db->dbm_pagf, where, L_SET) != where) ||
 			    (read(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) !=
-				PBLKSIZ))
+			    PBLKSIZ))
 				(void) memset(db->dbm_pagbuf, 0, PBLKSIZ);
 #ifdef DEBUG
 			else if (chkblk(db->dbm_pagbuf) < 0)
@@ -557,7 +570,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 		/* is this a manual firstkey request? */
 
 		if (db->dbm_blkptr == 0L &&
-			db->dbm_keyptr == 0)
+		    db->dbm_keyptr == 0)
 			return (dbm_firsthash(db, 0L));
 
 		/* no -- get lastkey this is like dbm_access by blkptr */
@@ -569,7 +582,7 @@ dbm_do_nextkey(DBM *db, datum inkey)
 			where = (((off64_t)db->dbm_blkptr) * PBLKSIZ);
 			if ((lseek64(db->dbm_pagf, where, L_SET) != where) ||
 			    (read(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) !=
-				PBLKSIZ))
+			    PBLKSIZ))
 				(void) memset(db->dbm_pagbuf, 0, PBLKSIZ);
 #ifdef DEBUG
 			else if (chkblk(db->dbm_pagbuf) < 0)
@@ -727,7 +740,7 @@ dbm_access(DBM *db, unsigned long hash)
 			where = (((off64_t)b) * DBLKSIZ);
 			if ((lseek64(db->dbm_dirf, where, L_SET) != where) ||
 			    (read(db->dbm_dirf, db->dbm_dirbuf, DBLKSIZ) !=
-				DBLKSIZ))
+			    DBLKSIZ))
 				(void) memset(db->dbm_dirbuf, 0, DBLKSIZ);
 		}
 		if ((db->dbm_dirbuf[i] & (1<<n)) == 0) break;
@@ -747,7 +760,7 @@ dbm_access(DBM *db, unsigned long hash)
 			where = (((off64_t)db->dbm_pagbno) * PBLKSIZ);
 			if ((lseek64(db->dbm_pagf, where, L_SET) != where) ||
 			    (write(db->dbm_pagf, db->dbm_pagbuf, PBLKSIZ) !=
-				PBLKSIZ)) {
+			    PBLKSIZ)) {
 				db->dbm_flags |= _DBM_IOERR;
 			}
 		dbm_clrdirty(db);

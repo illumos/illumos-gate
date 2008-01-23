@@ -18,22 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "c_synonyms.h"
 #include "umem_base.h"
 #include "vmem_base.h"
 
 #include <signal.h>
-
-/*
- * we use the _ version, since we don't want to be cancelled.
- */
-extern int _cond_timedwait(cond_t *cv, mutex_t *mutex, const timespec_t *delay);
 
 /*ARGSUSED*/
 static void *
@@ -105,12 +102,16 @@ umem_update_thread(void *arg)
 		 * next update, or someone wakes us.
 		 */
 		if (umem_null_cache.cache_unext == &umem_null_cache) {
+			int cancel_state;
 			timespec_t abs_time;
 			abs_time.tv_sec = umem_update_next.tv_sec;
 			abs_time.tv_nsec = umem_update_next.tv_usec * 1000;
 
-			(void) _cond_timedwait(&umem_update_cv,
+			(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+			    &cancel_state);
+			(void) cond_timedwait(&umem_update_cv,
 			    &umem_update_lock, &abs_time);
+			(void) pthread_setcancelstate(cancel_state, NULL);
 		}
 	}
 	/* LINTED no return statement */

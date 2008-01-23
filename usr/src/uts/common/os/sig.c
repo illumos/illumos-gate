@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1376,6 +1376,14 @@ psig(void)
 			sip = &lwp->lwp_siginfo;
 			if (sqp) {
 				bcopy(&sqp->sq_info, sip, sizeof (*sip));
+				/*
+				 * If we were interrupted out of a system call
+				 * due to pthread_cancel(), inform libc.
+				 */
+				if (sig == SIGCANCEL &&
+				    sip->si_code == SI_LWP &&
+				    t->t_sysnum != 0)
+					schedctl_cancel_eintr();
 			} else if (sig == SIGPROF && sip->si_signo == SIGPROF &&
 			    t->t_rprof != NULL && t->t_rprof->rp_anystate) {
 				/* EMPTY */;

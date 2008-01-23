@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,24 +31,24 @@
 
 	.file	"%M%"
 
-/* C library -- pread						*/
-/* int pread (int fildes, void *buf, unsigned nbyte, off_t offset);	*/
+/* C library -- pread					*/
+/* ssize_t __pread(int, void *, size_t, off_t);		*/
 
 #include "SYS.h"
 
 #if !defined(_LARGEFILE_SOURCE)
 
-	SYSCALL_RESTART_RVAL1(pread)
+	SYSCALL2_RESTART_RVAL1(__pread,pread)
 	RET
-	SET_SIZE(pread)
+	SET_SIZE(__pread)
 
 #else
 
 /* C library -- pread64 transitional large file API	*/
-/* ssize_t pread(int, void *, size_t, off64_t);		*/
+/* ssize_t __pread(int, void *, size_t, off64_t);	*/
 
-	SYSCALL_RESTART_RVAL1(pread64)
+	SYSCALL2_RESTART_RVAL1(__pread64,pread64)
 	RET
-	SET_SIZE(pread64)
+	SET_SIZE(__pread64)
 
 #endif

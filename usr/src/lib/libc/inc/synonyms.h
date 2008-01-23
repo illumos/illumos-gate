@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -860,6 +860,7 @@ extern "C" {
 #define	regfree			_regfree
 #define	remque			_remque
 #define	renameat		_renameat
+#define	rename			_rename
 #define	resetmnttab		_resetmnttab
 #define	resolvepath		_resolvepath
 #define	rmdir			_rmdir
@@ -942,7 +943,6 @@ extern "C" {
 #define	s_fcntl			_s_fcntl
 #define	sfconvert		_sfconvert
 #define	sgconvert		_sgconvert
-#define	_sharefs		__sharefs
 #define	shmat			_shmat
 #define	shmctl64		_shmctl64
 #define	shmctl			_shmctl
@@ -1146,6 +1146,7 @@ extern "C" {
 #define	vwarn			_vwarn
 #define	vwarnx			_vwarnx
 #define	wait3			_wait3
+#define	wait4			_wait4
 #define	waitid			_waitid
 #define	waitpid			_waitpid
 #define	wait			_wait

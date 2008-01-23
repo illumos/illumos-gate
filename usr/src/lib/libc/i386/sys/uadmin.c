@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +45,7 @@
 #include <sys/uadmin.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 #include <zone.h>
 
 static int
@@ -101,6 +103,10 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 				break;	/* no args */
 			if (legal_arg(bargs) < 0)
 				break;	/* bad args */
+
+			/* avoid cancellation in system() */
+			(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+			    NULL);
 
 			/* check for /stubboot */
 			if (stat("/stubboot/boot/grub/menu.lst", &sbuf) == 0) {

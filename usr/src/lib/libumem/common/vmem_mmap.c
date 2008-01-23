@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,17 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "c_synonyms.h"
+#include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
 #include <sys/sysmacros.h>
-
 #include "vmem_base.h"
 
 #define	ALLOC_PROT	PROT_READ | PROT_WRITE | PROT_EXEC
@@ -116,7 +117,7 @@ vmem_mmap_top_alloc(vmem_t *src, size_t size, int vmflags)
 vmem_t *
 vmem_mmap_arena(vmem_alloc_t **a_out, vmem_free_t **f_out)
 {
-	size_t pagesize = _sysconf(_SC_PAGESIZE);
+	size_t pagesize = sysconf(_SC_PAGESIZE);
 
 	if (mmap_heap == NULL) {
 		mmap_heap = vmem_init("mmap_top", CHUNKSIZE,

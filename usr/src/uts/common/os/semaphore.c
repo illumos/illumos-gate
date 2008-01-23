@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/schedctl.h>
 #include <sys/semaphore.h>
 #include <sys/sema_impl.h>
 #include <sys/t_lock.h>
@@ -253,6 +255,8 @@ sema_p_sig(ksema_t *sp)
 {
 	kthread_t	*t = curthread;
 	klwp_t		*lwp = ttolwp(t);
+	int		cancel_pending;
+	int		cancelled = 0;
 	sema_impl_t	*s;
 	disp_lock_t	*sqlp;
 
@@ -261,6 +265,7 @@ sema_p_sig(ksema_t *sp)
 		return (0);
 	}
 
+	cancel_pending = schedctl_cancel_pending();
 	s = (sema_impl_t *)sp;
 	sqlp = &SQHASH(s)->sq_lock;
 	disp_lock_enter(sqlp);
@@ -273,12 +278,12 @@ sema_p_sig(ksema_t *sp)
 		lwp->lwp_asleep = 1;
 		lwp->lwp_sysabort = 0;
 		thread_unlock_nopreempt(t);
-		if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t))
+		if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending)
 			setrun(t);
 		swtch();
 		t->t_flag &= ~T_WAKEABLE;
-		if (ISSIG(t, FORREAL) ||
-		    lwp->lwp_sysabort || MUSTRETURN(p, t)) {
+		if (ISSIG(t, FORREAL) || lwp->lwp_sysabort ||
+		    MUSTRETURN(p, t) || (cancelled = cancel_pending) != 0) {
 			kthread_t *sq, *tp;
 			lwp->lwp_asleep = 0;
 			lwp->lwp_sysabort = 0;
@@ -305,6 +310,8 @@ sema_p_sig(ksema_t *sp)
 			} else {
 				disp_lock_exit(sqlp);
 			}
+			if (cancelled)
+				schedctl_cancel_eintr();
 			return (1);
 		}
 		lwp->lwp_asleep = 0;

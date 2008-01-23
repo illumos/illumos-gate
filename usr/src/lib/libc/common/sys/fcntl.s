@@ -19,9 +19,6 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved	*/
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -31,34 +28,12 @@
 
 	.file	"%M%"
 
-/* C library -- fstat						*/
-/* int fstat (int fildes, struct stat *buf)			*/
-
-#include <sys/asm_linkage.h>
-
-#if !defined(_LARGEFILE_SOURCE)
-	ANSI_PRAGMA_WEAK(fstat,function)
-#else
-	ANSI_PRAGMA_WEAK(fstat64,function)
-#endif
+/*
+ * int __fcntl_syscall(int fildes, int cmd [, arg])
+ */
 
 #include "SYS.h"
 
-#if !defined(_LARGEFILE_SOURCE)
-	
-	ANSI_PRAGMA_WEAK2(_private_fstat,fstat,function)
-	SYSCALL_RVAL1(fstat)
-	RETC
-	SET_SIZE(fstat)
-
-#else
-
-/* C library -- fstat64 transitional large file API		*/
-/* int fstat64 (int fildes, struct stat64 *buf)			*/
-
-	ANSI_PRAGMA_WEAK2(_private_fstat64,fstat64,function)
-	SYSCALL_RVAL1(fstat64)
-	RETC
-	SET_SIZE(fstat64)
-
-#endif
+	SYSCALL2_RESTART_RVAL1(__fcntl_syscall,fcntl)
+	RET
+	SET_SIZE(__fcntl_syscall)

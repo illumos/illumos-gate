@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +55,6 @@
 #include <vm/seg_vn.h>
 #include <vm/as.h>
 #include <fs/fs_subr.h>
-
 
 /*
  * Page handling structures.  This is set up as a list of per-page
@@ -165,12 +165,13 @@ schedctl_lwp_cleanup(kthread_t *t)
 	mutex_exit(&p->p_sc_lock);
 }
 
+
 /*
  * Cleanup the list of schedctl shared pages for the process.
  * Called from exec() and exit() system calls.
  */
 void
-schedctl_proc_cleanup()
+schedctl_proc_cleanup(void)
 {
 	proc_t *p = curproc;
 	sc_page_ctl_t *pagep;
@@ -197,6 +198,7 @@ schedctl_proc_cleanup()
 		pagep = next;
 	}
 }
+
 
 /*
  * Called by resume just before switching away from the current thread.
@@ -247,6 +249,7 @@ schedctl_fork(kthread_t *pt, kthread_t *ct)
 		(void) as_unmap(cp->p_as, pagep->spc_uaddr, PAGESIZE);
 	mutex_exit(&pp->p_sc_lock);
 }
+
 
 /*
  * Returns non-zero if the specified thread shouldn't be preempted at this time.
@@ -326,16 +329,54 @@ schedctl_finish_sigblock(kthread_t *t)
 
 
 /*
- * Return non-zero if the current thread has declared that
- * it is calling into the kernel to park, else return zero.
+ * Return non-zero if the current thread has declared that it has
+ * a cancellation pending and that cancellation is not disabled.
+ * If SIGCANCEL is blocked, we must be going over the wire in an
+ * NFS transaction (sigintr() was called); return zero in this case.
  */
 int
-schedctl_is_park()
+schedctl_cancel_pending(void)
+{
+	sc_shared_t *tdp = curthread->t_schedctl;
+
+	if (tdp != NULL &&
+	    (tdp->sc_flgs & SC_CANCEL_FLG) &&
+	    !tdp->sc_sigblock &&
+	    !sigismember(&curthread->t_hold, SIGCANCEL))
+		return (1);
+	return (0);
+}
+
+
+/*
+ * Inform libc that the kernel returned EINTR from some system call
+ * due to there being a cancellation pending (SC_CANCEL_FLG set or
+ * we received an SI_LWP SIGCANCEL while in a system call), rather
+ * than because of some other signal.  User-level code can try to
+ * recover from receiving other signals, but it can't recover from
+ * being cancelled.
+ */
+void
+schedctl_cancel_eintr(void)
 {
 	sc_shared_t *tdp = curthread->t_schedctl;
 
 	if (tdp != NULL)
-		return (tdp->sc_park);
+		tdp->sc_flgs |= SC_EINTR_FLG;
+}
+
+
+/*
+ * Return non-zero if the current thread has declared that
+ * it is calling into the kernel to park, else return zero.
+ */
+int
+schedctl_is_park(void)
+{
+	sc_shared_t *tdp = curthread->t_schedctl;
+
+	if (tdp != NULL)
+		return ((tdp->sc_flgs & SC_PARK_FLG) != 0);
 	/*
 	 * If we're here and there is no shared memory (how could
 	 * that happen?) then just assume we really are here to park.
@@ -343,39 +384,40 @@ schedctl_is_park()
 	return (1);
 }
 
+
 /*
  * Declare thread is parking.
  *
- * libc will set "sc_park = 1" before calling lwpsys_park(0, tid) in order
- * to declare that the thread is calling into the kernel to park.
+ * libc will set "sc_flgs |= SC_PARK_FLG" before calling lwpsys_park(0, tid)
+ * in order to declare that the thread is calling into the kernel to park.
  *
  * This interface exists ONLY to support older versions of libthread which
- * are not aware of the sc_park flag.
+ * are not aware of the SC_PARK_FLG flag.
  *
- * Older versions of libthread which are not aware of the sc_park flag need to
- * be modified or emulated to call lwpsys_park(4, ...) instead of
+ * Older versions of libthread which are not aware of the SC_PARK_FLG flag
+ * need to be modified or emulated to call lwpsys_park(4, ...) instead of
  * lwpsys_park(0, ...).  This will invoke schedctl_set_park() before
  * lwp_park() to declare that the thread is parking.
  */
 void
-schedctl_set_park()
+schedctl_set_park(void)
 {
 	sc_shared_t *tdp = curthread->t_schedctl;
-
 	if (tdp != NULL)
-		tdp->sc_park = 1;
+		tdp->sc_flgs |= SC_PARK_FLG;
 }
 
+
 /*
- * Clear the shared sc_park flag on return from parking in the kernel.
+ * Clear the parking flag on return from parking in the kernel.
  */
 void
-schedctl_unpark()
+schedctl_unpark(void)
 {
 	sc_shared_t *tdp = curthread->t_schedctl;
 
 	if (tdp != NULL)
-		tdp->sc_park = 0;
+		tdp->sc_flgs &= ~SC_PARK_FLG;
 }
 
 
@@ -384,7 +426,7 @@ schedctl_unpark()
  */
 
 void
-schedctl_init()
+schedctl_init(void)
 {
 	/*
 	 * Amount of page that can hold sc_shared_t structures.  If
@@ -399,6 +441,7 @@ schedctl_init()
 	sc_bitmap_len = sc_pagesize / sizeof (sc_shared_t);
 	sc_bitmap_words = howmany(sc_bitmap_len, BT_NBIPUL);
 }
+
 
 int
 schedctl_shared_alloc(sc_shared_t **kaddrp, uintptr_t *uaddrp)

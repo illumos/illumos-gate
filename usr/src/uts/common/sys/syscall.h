@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,12 +128,10 @@ extern "C" {
 	 *	msgsnap(...) :: msgsys(5, ...)
 	 *	see <sys/msg.h>
 	 */
-#define	SYS_syssun	50
 #define	SYS_sysi86	50
 	/*
 	 * subcodes:
-	 *	syssun(code, ...)
-	 *	see <sys/sys3b.h>
+	 *	sysi86(code, ...)
 	 */
 #define	SYS_acct	51
 #define	SYS_shmsys	52
@@ -301,7 +299,8 @@ extern "C" {
 #define	SYS_fstatvfs	104
 #define	SYS_getloadavg	105
 #define	SYS_nfssys	106
-#define	SYS_waitsys	107
+#define	SYS_waitid	107
+#define	SYS_waitsys	SYS_waitid	/* historical */
 #define	SYS_sigsendsys	108
 #define	SYS_hrtsys	109
 #define	SYS_sigresend	111

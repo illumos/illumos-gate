@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef NATIVE_BUILD
+#include "c_synonyms.h"
+#endif
+
 #include <repcache_protocol.h>
 #include "scf_type.h"
-
 #include <errno.h>
 #include <libgen.h>
 #include <libscf_priv.h>
@@ -195,7 +198,7 @@ valid_uri(const char *str)
 		return (0);
 
 	if (regex(exp, str, uri[URI_SCHEME], uri[URI_AUTHORITY], uri[URI_PATH],
-		uri[URI_QUERY], uri[URI_FRAGMENT]) == NULL) {
+	    uri[URI_QUERY], uri[URI_FRAGMENT]) == NULL) {
 		return (0);
 	}
 	/*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #pragma weak _flsbuf = __flsbuf
 #include "synonyms.h"
@@ -71,17 +70,20 @@ _flsbuf(int ch, FILE *iop)	/* flush (write) buffer, save ch, */
 		case _IONBF | _IOWRT:	/* okay to do no-buffered case */
 			iop->_cnt = 0;
 			uch = (unsigned char)ch;
-			if (write(GET_FD(iop), (char *)&uch, 1) != 1)
-				iop->_flag |= _IOERR;
+			if (write(GET_FD(iop), (char *)&uch, 1) != 1) {
+				if (!cancel_active())
+					iop->_flag |= _IOERR;
+				return (EOF);
+			}
 			goto out;
 		}
 		if (_wrtchk(iop) != 0)	/* check, correct permissions */
 			return (EOF);
 	} while (iop->_flag & (_IOLBF | _IONBF));
-flush_putc:;
+flush_putc:
 	(void) _xflsbuf(iop);
 	(void) PUTC(ch, iop); /*  recursive call */
-out:;
-		/* necessary for putc() */
+out:
+	/* necessary for putc() */
 	return ((iop->_flag & _IOERR) ? EOF : (unsigned char)ch);
 }

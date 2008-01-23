@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2000,6 +2000,17 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	return (mutex_lock_internal(mp, tsp, MUTEX_LOCK));
 }
 
+/*
+ * Of the following function names (all the same function, of course),
+ * only _private_mutex_lock() is not exported from libc.  This means
+ * that calling _private_mutex_lock() within libc will not invoke the
+ * dynamic linker.  This is critical for any code called in the child
+ * of vfork() (via posix_spawn()) because invoking the dynamic linker
+ * in such a case would corrupt the parent's address space.  There are
+ * other places in libc where avoiding the dynamic linker is necessary.
+ * Of course, _private_mutex_lock() can be called in cases not requiring
+ * the avoidance of the dynamic linker too, and often is.
+ */
 #pragma weak _private_mutex_lock = __mutex_lock
 #pragma weak mutex_lock = __mutex_lock
 #pragma weak _mutex_lock = __mutex_lock
@@ -2389,7 +2400,7 @@ sig_cond_wait(cond_t *cv, mutex_t *mp)
 
 	ASSERT(curthread->ul_sigdefer != 0);
 	_private_testcancel();
-	error = _cond_wait(cv, mp);
+	error = __cond_wait(cv, mp);
 	if (error == EINTR && curthread->ul_cursig) {
 		sig_mutex_unlock(mp);
 		/* take the deferred signal here */
@@ -2409,7 +2420,7 @@ sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
 
 	ASSERT(curthread->ul_sigdefer != 0);
 	_private_testcancel();
-	error = _cond_reltimedwait(cv, mp, ts);
+	error = __cond_reltimedwait(cv, mp, ts);
 	if (error == EINTR && curthread->ul_cursig) {
 		sig_mutex_unlock(mp);
 		/* take the deferred signal here */
@@ -2417,6 +2428,52 @@ sig_cond_reltimedwait(cond_t *cv, mutex_t *mp, const timespec_t *ts)
 	}
 	_private_testcancel();
 	return (error);
+}
+
+/*
+ * For specialized code in libc, like the stdio code.
+ * the following cancel_safe_*() locking primitives are used in
+ * order to make the code cancellation-safe.  Cancellation is
+ * deferred while locks acquired by these functions are held.
+ */
+void
+cancel_safe_mutex_lock(mutex_t *mp)
+{
+	(void) _private_mutex_lock(mp);
+	curthread->ul_libc_locks++;
+}
+
+int
+cancel_safe_mutex_trylock(mutex_t *mp)
+{
+	int error;
+
+	if ((error = _private_mutex_trylock(mp)) == 0)
+		curthread->ul_libc_locks++;
+	return (error);
+}
+
+void
+cancel_safe_mutex_unlock(mutex_t *mp)
+{
+	ulwp_t *self = curthread;
+
+	ASSERT(self->ul_libc_locks != 0);
+
+	(void) _private_mutex_unlock(mp);
+
+	/*
+	 * Decrement the count of locks held by cancel_safe_mutex_lock().
+	 * If we are then in a position to terminate cleanly and
+	 * if there is a pending cancellation and cancellation
+	 * is not disabled and we received EINTR from a recent
+	 * system call then perform the cancellation action now.
+	 */
+	if (--self->ul_libc_locks == 0 &&
+	    !(self->ul_vfork | self->ul_nocancel |
+	    self->ul_critical | self->ul_sigdefer) &&
+	    cancel_active())
+		_pthread_exit(PTHREAD_CANCELED);
 }
 
 static int
@@ -3093,12 +3150,13 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 }
 
 /*
- * cond_wait() is a cancellation point but _cond_wait() is not.
- * System libraries call the non-cancellation version.
- * It is expected that only applications call the cancellation version.
+ * cond_wait() and _cond_wait() are cancellation points but __cond_wait()
+ * is not.  Internally, libc calls the non-cancellation version.
+ * Other libraries need to use pthread_setcancelstate(), as appropriate,
+ * since __cond_wait() is not exported from libc.
  */
 int
-_cond_wait(cond_t *cvp, mutex_t *mp)
+__cond_wait(cond_t *cvp, mutex_t *mp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -3120,13 +3178,14 @@ _cond_wait(cond_t *cvp, mutex_t *mp)
 	return (cond_wait_common(cvp, mp, NULL));
 }
 
+#pragma weak cond_wait = _cond_wait
 int
-cond_wait(cond_t *cvp, mutex_t *mp)
+_cond_wait(cond_t *cvp, mutex_t *mp)
 {
 	int error;
 
 	_cancelon();
-	error = _cond_wait(cvp, mp);
+	error = __cond_wait(cvp, mp);
 	if (error == EINTR)
 		_canceloff();
 	else
@@ -3134,23 +3193,25 @@ cond_wait(cond_t *cvp, mutex_t *mp)
 	return (error);
 }
 
+/*
+ * pthread_cond_wait() is a cancellation point.
+ */
 #pragma weak pthread_cond_wait = _pthread_cond_wait
 int
 _pthread_cond_wait(cond_t *cvp, mutex_t *mp)
 {
 	int error;
 
-	error = cond_wait(cvp, mp);
+	error = _cond_wait(cvp, mp);
 	return ((error == EINTR)? 0 : error);
 }
 
 /*
- * cond_timedwait() is a cancellation point but _cond_timedwait() is not.
- * System libraries call the non-cancellation version.
- * It is expected that only applications call the cancellation version.
+ * cond_timedwait() and _cond_timedwait() are cancellation points
+ * but __cond_timedwait() is not.
  */
 int
-_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+__cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 {
 	clockid_t clock_id = cvp->cond_clockid;
 	timespec_t reltime;
@@ -3174,13 +3235,14 @@ _cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	return (error);
 }
 
+#pragma weak cond_timedwait = _cond_timedwait
 int
-cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 {
 	int error;
 
 	_cancelon();
-	error = _cond_timedwait(cvp, mp, abstime);
+	error = __cond_timedwait(cvp, mp, abstime);
 	if (error == EINTR)
 		_canceloff();
 	else
@@ -3188,13 +3250,16 @@ cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	return (error);
 }
 
+/*
+ * pthread_cond_timedwait() is a cancellation point.
+ */
 #pragma weak pthread_cond_timedwait = _pthread_cond_timedwait
 int
 _pthread_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 {
 	int error;
 
-	error = cond_timedwait(cvp, mp, abstime);
+	error = _cond_timedwait(cvp, mp, abstime);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	else if (error == EINTR)
@@ -3203,26 +3268,25 @@ _pthread_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 }
 
 /*
- * cond_reltimedwait() is a cancellation point but _cond_reltimedwait()
- * is not.  System libraries call the non-cancellation version.
- * It is expected that only applications call the cancellation version.
+ * cond_reltimedwait() and _cond_reltimedwait() are cancellation points
+ * but __cond_reltimedwait() is not.
  */
 int
-_cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
+__cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 {
 	timespec_t tslocal = *reltime;
 
 	return (cond_wait_common(cvp, mp, &tslocal));
 }
 
-#pragma weak cond_reltimedwait = _cond_reltimedwait_cancel
+#pragma weak cond_reltimedwait = _cond_reltimedwait
 int
-_cond_reltimedwait_cancel(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
+_cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 {
 	int error;
 
 	_cancelon();
-	error = _cond_reltimedwait(cvp, mp, reltime);
+	error = __cond_reltimedwait(cvp, mp, reltime);
 	if (error == EINTR)
 		_canceloff();
 	else
@@ -3237,7 +3301,7 @@ _pthread_cond_reltimedwait_np(cond_t *cvp, mutex_t *mp,
 {
 	int error;
 
-	error = _cond_reltimedwait_cancel(cvp, mp, reltime);
+	error = _cond_reltimedwait(cvp, mp, reltime);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	else if (error == EINTR)

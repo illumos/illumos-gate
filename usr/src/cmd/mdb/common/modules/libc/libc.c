@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -520,15 +520,15 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		ulwp.ul_max_spinners,
 		ulwp.ul_door_noreserve);
 
-	HD("queue_fifo c'w'defer  e'detect'  async_safe pad1[0]    pad1[1]");
+	HD("queue_fifo c'w'defer  e'detect'  async_safe pad1       save_state");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
 		OFFSET(ul_queue_fifo),
 		ulwp.ul_queue_fifo,
 		ulwp.ul_cond_wait_defer,
 		ulwp.ul_error_detection,
 		ulwp.ul_async_safe,
-		ulwp.ul_pad1[0],
-		ulwp.ul_pad1[1]);
+		ulwp.ul_pad1,
+		ulwp.ul_save_state);
 
 	HD("adapt'spin queue_spin critical   sigdefer   vfork");
 	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %d\n",
@@ -565,12 +565,12 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(ulwp.ul_schedctl_called, 1),
 		prt_addr((void *)ulwp.ul_schedctl, 0));
 
-	HD("bindflags  pad2       stsd                  &ftsd");
+	HD("bindflags  libc_locks stsd                  &ftsd");
 	mdb_printf(OFFSTR,
 		OFFSET(ul_bindflags));
 	mdb_printf(ulwp.ul_bindflags? "0x%-8x " : "%-10d ",
 		ulwp.ul_bindflags);
-	mdb_printf("%-10d ", ulwp.ul_pad2);
+	mdb_printf("%-10d ", ulwp.ul_libc_locks);
 	mdb_printf("%s %s\n",
 		prt_addr(ulwp.ul_stsd, 1),
 		prt_addr((void *)(addr + OFFSET(ul_ftsd[0])), 0));

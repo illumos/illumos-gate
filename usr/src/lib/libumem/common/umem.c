@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -603,12 +603,6 @@ caddr_t			umem_min_stack;
 caddr_t			umem_max_stack;
 
 
-/*
- * we use the _ versions, since we don't want to be cancelled.
- * Actually, this is automatically taken care of by including "mtlib.h".
- */
-extern int _cond_wait(cond_t *cv, mutex_t *mutex);
-
 #define	UMERR_MODIFIED	0	/* buffer modified while on freelist */
 #define	UMERR_REDZONE	1	/* redzone violation (write past end of buf) */
 #define	UMERR_DUPFREE	2	/* freed a buffer twice */
@@ -735,6 +729,8 @@ umem_remove_updates(umem_cache_t *cp)
 	 * Get it out of the active state
 	 */
 	while (cp->cache_uflags & UMU_ACTIVE) {
+		int cancel_state;
+
 		ASSERT(cp->cache_unext == NULL);
 
 		cp->cache_uflags |= UMU_NOTIFY;
@@ -746,7 +742,10 @@ umem_remove_updates(umem_cache_t *cp)
 		ASSERT(umem_update_thr != thr_self() &&
 		    umem_st_update_thr != thr_self());
 
-		(void) _cond_wait(&umem_update_cv, &umem_update_lock);
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+		    &cancel_state);
+		(void) cond_wait(&umem_update_cv, &umem_update_lock);
+		(void) pthread_setcancelstate(cancel_state, NULL);
 	}
 	/*
 	 * Get it out of the Work Requested state
@@ -3047,9 +3046,16 @@ umem_init(void)
 			 * someone else beat us to initializing umem.  Wait
 			 * for them to complete, then return.
 			 */
-			while (umem_ready == UMEM_READY_INITING)
-				(void) _cond_wait(&umem_init_cv,
+			while (umem_ready == UMEM_READY_INITING) {
+				int cancel_state;
+
+				(void) pthread_setcancelstate(
+				    PTHREAD_CANCEL_DISABLE, &cancel_state);
+				(void) cond_wait(&umem_init_cv,
 				    &umem_init_lock);
+				(void) pthread_setcancelstate(
+				    cancel_state, NULL);
+			}
 			ASSERT(umem_ready == UMEM_READY ||
 			    umem_ready == UMEM_READY_INIT_FAILED);
 			(void) mutex_unlock(&umem_init_lock);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,11 @@ cleanup(void *arg)
 	extern const sigset_t maskset;
 	extern void *reapchild(void *);		/* see port/stdio/system.c */
 
+	/*
+	 * We have been cancelled.  There is no need to restore
+	 * the original sigmask after blocking all signals because
+	 * pthread_exit() will block all signals while we exit.
+	 */
 	(void) thr_sigsetmask(SIG_SETMASK, &maskset, NULL);
 	(void) thr_create(NULL, 0, reapchild, arg, THR_DAEMON, NULL);
 }
@@ -156,8 +161,8 @@ popen(const char *cmd, const char *mode)
 		/*
 		 * These conditions may apply if a previous iob returned
 		 * by popen() was closed with fclose() rather than pclose(),
-		 * or if close(fileno(iob)) was called.
-		 * Accommodate these programming error.
+		 * or if close(fileno(iob)) was called.  Don't let these
+		 * programming errors cause us to malfunction here.
 		 */
 		if ((fd = curr->fd) != myside && fd != yourside &&
 		    fcntl(fd, F_GETFD) >= 0)
@@ -168,10 +173,10 @@ popen(const char *cmd, const char *mode)
 	if (yourside != stdio) {
 		if (error == 0)
 			error = posix_spawn_file_actions_adddup2(&fact,
-				yourside, stdio);
+			    yourside, stdio);
 		if (error == 0)
 			error = posix_spawn_file_actions_addclose(&fact,
-				yourside);
+			    yourside);
 	}
 	if (error == 0)
 		error = posix_spawnattr_setflags(&attr,
@@ -191,7 +196,7 @@ popen(const char *cmd, const char *mode)
 	argvec[2] = (char *)cmd;
 	argvec[3] = NULL;
 	error = posix_spawn(&pid, shpath, &fact, &attr,
-		(char *const *)argvec, (char *const *)environ);
+	    (char *const *)argvec, (char *const *)environ);
 	(void) posix_spawnattr_destroy(&attr);
 	(void) posix_spawn_file_actions_destroy(&fact);
 	(void) close(yourside);
@@ -211,6 +216,9 @@ popen(const char *cmd, const char *mode)
 	return (iop);
 }
 
+/*
+ * pclose() is a cancellation point.
+ */
 int
 pclose(FILE *ptr)
 {
@@ -228,9 +236,8 @@ pclose(FILE *ptr)
 	}
 
 	/*
-	 * pclose() is a cancellation point.
-	 * Call waitpid_cancel() rather than _waitpid() to make
-	 * sure that we actually perform the cancellation logic.
+	 * waitpid() is a cancellation point.
+	 * This causes pclose() to be a cancellation point.
 	 *
 	 * If we have already been cancelled (pclose() was called from
 	 * a cancellation cleanup handler), attempt to reap the process
@@ -238,6 +245,7 @@ pclose(FILE *ptr)
 	 */
 
 	if (_thrp_cancelled()) {
+		/* waitpid(..., WNOHANG) is not a cancellation point */
 		if (waitpid(pid, &status, WNOHANG) == pid)
 			return (status);
 		cleanup((void *)(uintptr_t)pid);
@@ -246,7 +254,7 @@ pclose(FILE *ptr)
 	}
 
 	pthread_cleanup_push(cleanup, (void *)(uintptr_t)pid);
-	while (waitpid_cancel(pid, &status, 0) < 0) {
+	while (waitpid(pid, &status, 0) < 0) {
 		if (errno != EINTR) {
 			status = -1;
 			break;
@@ -268,10 +276,11 @@ _insert_nolock(pid_t pid, int fd, node_t *new)
 		/*
 		 * curr->fd can equal fd if a previous iob returned by
 		 * popen() was closed with fclose() rather than pclose(),
-		 * or if close(fileno(iob)) was called.
-		 * Accommodate this programming error.
+		 * or if close(fileno(iob)) was called.  Don't let these
+		 * programming errors cause us to malfunction here.
 		 */
 		if (curr->fd == fd) {
+			/* make a lame attempt to reap the forgotten child */
 			(void) waitpid(curr->pid, NULL, WNOHANG);
 			curr->pid = pid;
 			lfree(new, sizeof (node_t));

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -139,7 +139,6 @@ SYSOBJS64=
 
 COMSYSOBJS=			\
 	__clock_timer.o		\
-	__fcntl.o		\
 	__getloadavg.o		\
 	__rusagesys.o		\
 	__signotify.o		\
@@ -150,7 +149,6 @@ COMSYSOBJS=			\
 	_nfssys.o		\
 	_portfs.o		\
 	_pset.o			\
-	_rename.o		\
 	_rpcsys.o		\
 	_sigaction.o		\
 	_so_accept.o		\
@@ -192,6 +190,7 @@ COMSYSOBJS=			\
 	fchmod.o		\
 	fchown.o		\
 	fchroot.o		\
+	fcntl.o			\
 	fdsync.o		\
 	fpathconf.o		\
 	fstat.o			\
@@ -250,6 +249,7 @@ COMSYSOBJS=			\
 	read.o			\
 	readlink.o		\
 	readv.o			\
+	rename.o		\
 	resolvepath.o		\
 	rmdir.o			\
 	seteguid.o		\
@@ -503,13 +503,12 @@ PORTGEN=			\
 	realpath.o		\
 	reboot.o		\
 	regexpr.o		\
-	rename.o		\
+	remove.o		\
 	rewinddir.o		\
 	rindex.o		\
 	scandir.o		\
 	seekdir.o		\
 	select.o		\
-	select_large_fdset.o	\
 	setlabel.o		\
 	setpriority.o		\
 	settimeofday.o		\
@@ -572,8 +571,6 @@ PORTGEN=			\
 	valloc.o		\
 	vlfmt.o			\
 	vpfmt.o			\
-	wait3.o			\
-	wait4.o			\
 	waitpid.o		\
 	walkstack.o		\
 	wdata.o			\
@@ -793,15 +790,14 @@ PORTSYS=			\
 	execle.o		\
 	execv.o			\
 	faccessat.o		\
-	fcntl.o			\
 	fsmisc.o		\
 	fstatat.o		\
-	fsync.o			\
 	getpagesizes.o		\
 	getpeerucred.o		\
 	inst_sync.o		\
 	issetugid.o		\
 	label.o			\
+	libc_fcntl.o		\
 	libc_link.o		\
 	libc_open.o		\
 	lockf.o			\

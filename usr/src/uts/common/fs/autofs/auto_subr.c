@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +52,7 @@
 #include <rpcsvc/autofs_prot.h>
 #include <nfs/rnode.h>
 #include <sys/utsname.h>
+#include <sys/schedctl.h>
 
 /*
  * Autofs and Zones:
@@ -479,7 +481,14 @@ auto_calldaemon(
 			 * handle, sleep and try again, if still
 			 * revoked we will get EBADF next time
 			 * through.
+			 *
+			 * If we have a pending cancellation and we don't
+			 * have cancellation disabled, we will get EINTR
+			 * forever, no matter how many times we retry,
+			 * so just get out now if this is the case.
 			 */
+			if (schedctl_cancel_pending())
+				break;
 			/* FALLTHROUGH */
 		case EAGAIN:    /* process may be forking */
 			/*

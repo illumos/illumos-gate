@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,12 +217,6 @@ vmem_free_t *vmem_heap_free;
 
 uint32_t vmem_mtbf;		/* mean time between failures [default: off] */
 size_t vmem_seg_size = sizeof (vmem_seg_t);
-
-/*
- * we use the _ version, since we don't want to be cancelled.
- * Actually, this is automatically taken care of by including "mtlib.h".
- */
-extern int _cond_wait(cond_t *cv, mutex_t *mutex);
 
 /*
  * Insert/delete from arena list (type 'a') or next-of-kin list (type 'k').
@@ -763,6 +757,8 @@ vmem_nextfit_alloc(vmem_t *vmp, size_t size, int vmflag)
 			break;
 		vsp = vsp->vs_anext;
 		if (vsp == rotor) {
+			int cancel_state;
+
 			/*
 			 * We've come full circle.  One possibility is that the
 			 * there's actually enough space, but the rotor itself
@@ -787,7 +783,10 @@ vmem_nextfit_alloc(vmem_t *vmp, size_t size, int vmflag)
 				    0, 0, NULL, NULL, vmflag & VM_UMFLAGS));
 			}
 			vmp->vm_kstat.vk_wait++;
-			(void) _cond_wait(&vmp->vm_cv, &vmp->vm_lock);
+			(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+			    &cancel_state);
+			(void) cond_wait(&vmp->vm_cv, &vmp->vm_lock);
+			(void) pthread_setcancelstate(cancel_state, NULL);
 			vsp = rotor->vs_anext;
 		}
 	}
@@ -855,6 +854,8 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 
 	(void) mutex_lock(&vmp->vm_lock);
 	for (;;) {
+		int cancel_state;
+
 		if (vmp->vm_nsegfree < VMEM_MINFREE &&
 		    !vmem_populate(vmp, vmflag))
 			break;
@@ -974,7 +975,10 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 		if (vmflag & VM_NOSLEEP)
 			break;
 		vmp->vm_kstat.vk_wait++;
-		(void) _cond_wait(&vmp->vm_cv, &vmp->vm_lock);
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+		    &cancel_state);
+		(void) cond_wait(&vmp->vm_cv, &vmp->vm_lock);
+		(void) pthread_setcancelstate(cancel_state, NULL);
 	}
 	if (vbest != NULL) {
 		ASSERT(vbest->vs_type == VMEM_FREE);

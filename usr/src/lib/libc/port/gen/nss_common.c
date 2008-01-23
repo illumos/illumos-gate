@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <thread.h>
+#include <synch.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <errno.h>
@@ -145,24 +147,24 @@ void				_nss_db_state_destr(struct nss_db_state *);
 
 /* ==== null definitions if !MTSAFE?  Ditto lock field in nss_db_root_t */
 
-#define	NSS_ROOTLOCK(r, sp)	((void) _private_mutex_lock(&(r)->lock), \
+#define	NSS_ROOTLOCK(r, sp)	(cancel_safe_mutex_lock(&(r)->lock), \
 				*(sp) = (r)->s)
 
-#define	NSS_UNLOCK(r)		((void) _private_mutex_unlock(&(r)->lock))
+#define	NSS_UNLOCK(r)		(cancel_safe_mutex_unlock(&(r)->lock))
 
 #define	NSS_CHECKROOT(rp, s)	((s) != (*(rp))->s &&			\
-			((void) _private_mutex_unlock(&(*(rp))->lock),	\
-			(void) _private_mutex_lock(&(s)->orphan_root.lock), \
+			(cancel_safe_mutex_unlock(&(*(rp))->lock),	\
+			cancel_safe_mutex_lock(&(s)->orphan_root.lock), \
 			*(rp) = &(s)->orphan_root))
 
-#define	NSS_RELOCK(rp, s)	((void) _private_mutex_lock(&(*(rp))->lock), \
+#define	NSS_RELOCK(rp, s)	(cancel_safe_mutex_lock(&(*(rp))->lock), \
 			NSS_CHECKROOT(rp, s))
 
 #define	NSS_STATE_REF_u(s)	(++(s)->refcount)
 
 #define	NSS_UNREF_UNLOCK(r, s)	(--(s)->refcount != 0			\
 			? ((void)NSS_UNLOCK(r))				\
-			: (NSS_UNLOCK(r), (void)_nss_db_state_destr(s)))
+			: ((void)NSS_UNLOCK(r), (void)_nss_db_state_destr(s)))
 
 #define	NSS_LOCK_CHECK(r, f, sp)    (NSS_ROOTLOCK((r), (sp)),	\
 				    *(sp) == 0 &&		\
@@ -752,6 +754,7 @@ nss_get_backend_u(nss_db_root_t **rootpp, struct nss_db_state *s, int n_src)
 {
 	struct nss_src_state	*src = &s->src[n_src];
 	nss_backend_t		*be;
+	int cancel_state;
 
 	for (;;) {
 		if (src->n_dormant > 0) {
@@ -810,7 +813,10 @@ nss_get_backend_u(nss_db_root_t **rootpp, struct nss_db_state *s, int n_src)
 		}
 
 		src->n_waiting++;
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+		    &cancel_state);
 		(void) cond_wait(&src->wanna_be, &(*rootpp)->lock);
+		(void) pthread_setcancelstate(cancel_state, NULL);
 		NSS_CHECKROOT(rootpp, s);
 		src->n_waiting--;
 
@@ -1290,9 +1296,9 @@ nss_setent(nss_db_root_t *rootp, nss_db_initf_t initf, nss_getent_t *contextpp)
 	if (contextpp == 0) {
 		return;
 	}
-	(void) _private_mutex_lock(&contextpp->lock);
+	cancel_safe_mutex_lock(&contextpp->lock);
 	nss_setent_u(rootp, initf, contextpp);
-	(void) _private_mutex_unlock(&contextpp->lock);
+	cancel_safe_mutex_unlock(&contextpp->lock);
 }
 
 nss_status_t
@@ -1304,9 +1310,9 @@ nss_getent(nss_db_root_t *rootp, nss_db_initf_t initf, nss_getent_t *contextpp,
 	if (contextpp == 0) {
 		return (NSS_UNAVAIL);
 	}
-	(void) _private_mutex_lock(&contextpp->lock);
+	cancel_safe_mutex_lock(&contextpp->lock);
 	status = nss_getent_u(rootp, initf, contextpp, args);
-	(void) _private_mutex_unlock(&contextpp->lock);
+	cancel_safe_mutex_unlock(&contextpp->lock);
 	return (status);
 }
 
@@ -1316,9 +1322,9 @@ nss_endent(nss_db_root_t *rootp, nss_db_initf_t initf, nss_getent_t *contextpp)
 	if (contextpp == 0) {
 		return;
 	}
-	(void) _private_mutex_lock(&contextpp->lock);
+	cancel_safe_mutex_lock(&contextpp->lock);
 	nss_endent_u(rootp, initf, contextpp);
-	(void) _private_mutex_unlock(&contextpp->lock);
+	cancel_safe_mutex_unlock(&contextpp->lock);
 }
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,7 +188,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) _private_mutex_lock(&_first_link_lock);
+		cancel_safe_mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 	do {
@@ -204,14 +204,14 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 			    (_IOLBF | _IOWRT)) {
 				if (threaded) {
 					rmutex_t *lk = FPLOCK(fp);
-					if (rmutex_trylock(lk) != 0)
+					if (cancel_safe_mutex_trylock(lk) != 0)
 						continue;
 					/* Recheck after locking */
 					if ((fp->_flag & (_IOLBF | _IOWRT)) ==
 					    (_IOLBF | _IOWRT)) {
 						(void) _fflush_u(fp);
 					}
-					(void) rmutex_unlock(lk);
+					cancel_safe_mutex_unlock(lk);
 				} else {
 					(void) _fflush_u(fp);
 				}
@@ -220,7 +220,7 @@ _flushlbf(void)		/* fflush() all line-buffered streams */
 	} while ((lp = lp->next) != NULL);
 
 	if (threaded)
-		(void) _private_mutex_unlock(&_first_link_lock);
+		cancel_safe_mutex_unlock(&_first_link_lock);
 }
 
 /* allocate an unused stream; NULL if cannot */
@@ -255,7 +255,7 @@ _findiop(void)
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) _private_mutex_lock(&_first_link_lock);
+		cancel_safe_mutex_lock(&_first_link_lock);
 
 	if (lastlink == NULL) {
 rescan:
@@ -283,7 +283,7 @@ rescan:
 			if (threaded) {
 				ret = getiop(fp, FPLOCK(fp), FPSTATE(fp));
 				if (ret != NULL) {
-					(void) _private_mutex_unlock(
+					cancel_safe_mutex_unlock(
 					    &_first_link_lock);
 					return (ret);
 				}
@@ -316,7 +316,7 @@ rescan:
 	 */
 	if ((pkgp = malloc(sizeof (Pkg))) == NULL) {
 		if (threaded)
-			(void) _private_mutex_unlock(&_first_link_lock);
+			cancel_safe_mutex_unlock(&_first_link_lock);
 		return (NULL);
 	}
 
@@ -346,9 +346,9 @@ rescan:
 	 *	we need to use the reverse structure.
 	 */
 	if ((delta = 0x1000 - ((uintptr_t)pkgp & 0xfff)) <=
-				offsetof(Pkg, Pkgn.iob[FILE_ARY_SZ-1].xmagic) &&
+	    offsetof(Pkg, Pkgn.iob[FILE_ARY_SZ-1].xmagic) &&
 	    delta % sizeof (struct xFILE) ==
-		    offsetof(Pkg, Pkgn.iob[0].xmagic)) {
+	    offsetof(Pkg, Pkgn.iob[0].xmagic)) {
 		/* Use reversed structure */
 		hdr = &pkgp->Pkgr.hdr;
 		hdr->iobp = &pkgp->Pkgr.iob[0];
@@ -366,7 +366,7 @@ rescan:
 	fp = hdr->iobp;
 	for (i = 0; i < FILE_ARY_SZ; i++)
 		_private_mutex_init(&fp[i]._lock,
-			USYNC_THREAD|LOCK_RECURSIVE, NULL);
+		    USYNC_THREAD|LOCK_RECURSIVE, NULL);
 #else
 	xfp = hdr->iobp;
 	fp = &xfp->_iob;
@@ -374,7 +374,7 @@ rescan:
 	for (i = 0; i < FILE_ARY_SZ; i++) {
 		xfp[i].xmagic = XMAGIC(&xfp[i]);
 		_private_mutex_init(&xfp[i].xlock,
-			USYNC_THREAD|LOCK_RECURSIVE, NULL);
+		    USYNC_THREAD|LOCK_RECURSIVE, NULL);
 	}
 #endif	/*	_LP64	*/
 
@@ -383,7 +383,7 @@ rescan:
 	fp->_base = 0;
 	fp->_flag = 0377; /* claim the fp by setting low 8 bits */
 	if (threaded)
-		(void) _private_mutex_unlock(&_first_link_lock);
+		cancel_safe_mutex_unlock(&_first_link_lock);
 
 	return (fp);
 }
@@ -551,10 +551,10 @@ _xflsbuf(FILE *iop)
 
 	if (n > 0) {
 		int fd = GET_FD(iop);
-		while ((num_wrote =
-			write(fd, base, (size_t)n)) != n) {
+		while ((num_wrote = write(fd, base, (size_t)n)) != n) {
 			if (num_wrote <= 0) {
-				iop->_flag |= _IOERR;
+				if (!cancel_active())
+					iop->_flag |= _IOERR;
 				return (EOF);
 			}
 			n -= num_wrote;
@@ -594,7 +594,7 @@ _fflush_l_iops(void)		/* flush all buffers */
 	int threaded = __libc_threaded;
 
 	if (threaded)
-		(void) _private_mutex_lock(&_first_link_lock);
+		cancel_safe_mutex_lock(&_first_link_lock);
 
 	lp = &__first_link;
 
@@ -627,7 +627,7 @@ _fflush_l_iops(void)		/* flush all buffers */
 
 			if (threaded) {
 				lk = FPLOCK(iop);
-				if (rmutex_trylock(lk) != 0)
+				if (cancel_safe_mutex_trylock(lk) != 0)
 					continue;
 			}
 
@@ -651,11 +651,11 @@ _fflush_l_iops(void)		/* flush all buffers */
 				}
 			}
 			if (threaded)
-				(void) rmutex_unlock(lk);
+				cancel_safe_mutex_unlock(lk);
 		}
 	} while ((lp = lp->next) != NULL);
 	if (threaded)
-		(void) _private_mutex_unlock(&_first_link_lock);
+		cancel_safe_mutex_unlock(&_first_link_lock);
 	return (res);
 }
 
@@ -717,10 +717,10 @@ fclose(FILE *iop)
 	FUNLOCKFILE(lk);
 
 	if (__libc_threaded)
-		(void) _private_mutex_lock(&_first_link_lock);
+		cancel_safe_mutex_lock(&_first_link_lock);
 	fcloses++;
 	if (__libc_threaded)
-		(void) _private_mutex_unlock(&_first_link_lock);
+		cancel_safe_mutex_unlock(&_first_link_lock);
 
 	return (res);
 }
@@ -755,7 +755,7 @@ close_fd(FILE *iop)
 static FILE *
 getiop(FILE *fp, rmutex_t *lk, mbstate_t *mb)
 {
-	if (lk != NULL && rmutex_trylock(lk))
+	if (lk != NULL && cancel_safe_mutex_trylock(lk) != 0)
 		return (NULL);	/* locked: fp in use */
 
 	if (fp->_flag == 0) {	/* unused */

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -2241,6 +2241,7 @@ SUNWprivate_1.1 {
 	_vwarnx;
 	_vwarnxfp;
 	_wait3;
+	_wait4;
 	_walkcontext;
 	_warn;
 	_warnfp;
@@ -2311,14 +2312,17 @@ SUNWprivate_1.1 {
 	__imax_lldiv =			NODYNSORT;
 	_private_execve =		NODYNSORT;
 	_private_exit =			NODYNSORT;
+	_private_fcntl =		NODYNSORT;
 	_private_forkallx =		NODYNSORT;
 	_private_forkx =		NODYNSORT;
+	_private_fstat =		NODYNSORT;
 	_private_geteuid =		NODYNSORT;
 	_private_getcontext =		NODYNSORT;
 	_private_getgid =		NODYNSORT;
 	_private_getpid =		NODYNSORT;
 	_private_getrlimit =		NODYNSORT;
 	_private_getuid =		NODYNSORT;
+	_private_ioctl =		NODYNSORT;
 	_private_lwp_mutex_lock =	NODYNSORT;
 	_private_lwp_mutex_unlock =	NODYNSORT;
 	_private_mmap =			NODYNSORT;
@@ -2341,6 +2345,7 @@ SUNWprivate_1.1 {
 	_private_sigemptyset =		NODYNSORT;
 	_private_sigfillset =		NODYNSORT;
 	_private_sigismember =		NODYNSORT;
+	_private_stat =			NODYNSORT;
 	_private_testcancel =		NODYNSORT;
 	_ti_thr_self  =			NODYNSORT;
 	rw_read_is_held =		NODYNSORT;

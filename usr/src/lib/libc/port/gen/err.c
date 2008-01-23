@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +36,8 @@
 #pragma weak vwarnx = _vwarnx
 
 #include "synonyms.h"
+#include "file64.h"
+#include "mtlib.h"
 #include <sys/types.h>
 #include <err.h>
 #include <stdio.h>
@@ -42,6 +45,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
+#include "stdiom.h"
 
 /* Function exit/warning functions and global variables. */
 
@@ -51,12 +55,14 @@ static const char *progname;
  * warncore() is the workhorse of these functions.  Everything else has
  * a warncore() component in it.
  */
-static void
+static rmutex_t *
 warncore(FILE *fp, const char *fmt, va_list args)
 {
 	const char *execname;
+	rmutex_t *lk;
 
-	flockfile(fp);
+	FLOCKFILE(lk, fp);
+
 	if (progname == NULL) {
 		execname = getexecname();
 		if ((execname != NULL) &&
@@ -72,22 +78,26 @@ warncore(FILE *fp, const char *fmt, va_list args)
 	if (fmt != NULL) {
 		(void) vfprintf(fp, fmt, args);
 	}
+
+	return (lk);
 }
 
 /* Finish a warning with a newline and a flush of stderr. */
 static void
-warnfinish(FILE *fp)
+warnfinish(FILE *fp, rmutex_t *lk)
 {
 	(void) fputc('\n', fp);
 	(void) fflush(fp);
-	funlockfile(fp);
+	FUNLOCKFILE(lk);
 }
 
 void
 _vwarnxfp(FILE *fp, const char *fmt, va_list args)
 {
-	warncore(fp, fmt, args);
-	warnfinish(fp);
+	rmutex_t *lk;
+
+	lk = warncore(fp, fmt, args);
+	warnfinish(fp, lk);
 }
 
 void
@@ -100,14 +110,15 @@ void
 _vwarnfp(FILE *fp, const char *fmt, va_list args)
 {
 	int tmperr = errno;	/* Capture errno now. */
+	rmutex_t *lk;
 
-	warncore(fp, fmt, args);
+	lk = warncore(fp, fmt, args);
 	if (fmt != NULL) {
 		(void) fputc(':', fp);
 		(void) fputc(' ', fp);
 	}
 	(void) fputs(strerror(tmperr), fp);
-	warnfinish(fp);
+	warnfinish(fp, lk);
 }
 
 void

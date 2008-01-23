@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,10 +152,13 @@ __uaio_init(void)
 {
 	int ret = -1;
 	int i;
+	int cancel_state;
 
 	lmutex_lock(&__aio_initlock);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (__aio_initbusy)
-		(void) _cond_wait(&__aio_initcv, &__aio_initlock);
+		(void) cond_wait(&__aio_initcv, &__aio_initlock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	if (__uaio_ok) {	/* already initialized */
 		lmutex_unlock(&__aio_initlock);
 		return (0);
@@ -271,10 +274,13 @@ _kaio_init()
 {
 	int error;
 	sigset_t oset;
+	int cancel_state;
 
 	lmutex_lock(&__aio_initlock);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (__aio_initbusy)
-		(void) _cond_wait(&__aio_initcv, &__aio_initlock);
+		(void) cond_wait(&__aio_initcv, &__aio_initlock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	if (_kaio_ok) {		/* already initialized */
 		lmutex_unlock(&__aio_initlock);
 		return;
@@ -488,8 +494,17 @@ aiocancel(aio_result_t *resultp)
 	return (ret);
 }
 
+/* ARGSUSED */
+static void
+_aiowait_cleanup(void *arg)
+{
+	sig_mutex_lock(&__aio_mutex);
+	_aiowait_flag--;
+	sig_mutex_unlock(&__aio_mutex);
+}
+
 /*
- * This must be asynch safe
+ * This must be asynch safe and cancel safe
  */
 aio_result_t *
 aiowait(struct timeval *uwait)
@@ -570,8 +585,12 @@ aiowait(struct timeval *uwait)
 			kaio_errno = EINVAL;
 		} else {
 			sig_mutex_unlock(&__aio_mutex);
+			pthread_cleanup_push(_aiowait_cleanup, NULL);
+			_cancel_prologue();
 			kresultp = (aio_result_t *)_kaio(AIOWAIT,
 			    wait, dontblock);
+			_cancel_epilogue();
+			pthread_cleanup_pop(0);
 			sig_mutex_lock(&__aio_mutex);
 			kaio_errno = errno;
 		}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,13 +121,14 @@ fputs(const char *ptr, FILE *iop)
 		int fd = GET_FD(iop);
 
 		while ((num_wrote = write(fd, ptr, (size_t)count)) != count) {
-				if (num_wrote <= 0) {
+			if (num_wrote <= 0) {
+				if (!cancel_active())
 					iop->_flag |= _IOERR;
-					FUNLOCKFILE(lk);
-					return (EOF);
-				}
-				count -= num_wrote;
-				ptr += num_wrote;
+				FUNLOCKFILE(lk);
+				return (EOF);
+			}
+			count -= num_wrote;
+			ptr += num_wrote;
 		}
 		FUNLOCKFILE(lk);
 		if (ptrlen <= INT_MAX)

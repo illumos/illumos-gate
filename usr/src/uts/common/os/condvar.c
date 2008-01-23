@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,6 +250,7 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
+	int cancel_pending;
 	int rval = 1;
 	int signalled = 0;
 
@@ -265,13 +267,14 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 	}
 
 	ASSERT(curthread->t_schedflag & TS_DONT_SWAP);
+	cancel_pending = schedctl_cancel_pending();
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
 	thread_lock(t);
 	cv_block_sig(t, (condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
-	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t))
+	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending)
 		setrun(t);
 	/* ASSERT(no locks are held) */
 	swtch();
@@ -286,6 +289,10 @@ cv_wait_sig(kcondvar_t *cvp, kmutex_t *mp)
 	}
 	if (lwp->lwp_sysabort || MUSTRETURN(p, t))
 		rval = 0;
+	if (rval != 0 && cancel_pending) {
+		schedctl_cancel_eintr();
+		rval = 0;
+	}
 	lwp->lwp_asleep = 0;
 	lwp->lwp_sysabort = 0;
 	if (rval == 0 && signalled)	/* avoid consuming the cv_signal() */
@@ -309,6 +316,7 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
+	int cancel_pending = 0;
 	timeout_id_t id;
 	clock_t rval = 1;
 	clock_t timeleft;
@@ -343,6 +351,7 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	/*
 	 * Set the timeout and wait.
 	 */
+	cancel_pending = schedctl_cancel_pending();
 	id = realtime_timeout((void (*)(void *))setrun, t, timeleft);
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
@@ -350,7 +359,8 @@ cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	cv_block_sig(t, (condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
-	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || (tim - lbolt <= 0))
+	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending ||
+	    (tim - lbolt <= 0))
 		setrun(t);
 	/* ASSERT(no locks are held) */
 	swtch();
@@ -383,6 +393,10 @@ out:
 	}
 	if (lwp->lwp_sysabort || MUSTRETURN(p, t))
 		rval = 0;
+	if (rval != 0 && cancel_pending) {
+		schedctl_cancel_eintr();
+		rval = 0;
+	}
 	lwp->lwp_asleep = 0;
 	lwp->lwp_sysabort = 0;
 	if (rval <= 0 && signalled)	/* avoid consuming the cv_signal() */
@@ -404,6 +418,7 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
 	klwp_t *lwp = ttolwp(t);
+	int cancel_pending;
 	int rval = 1;
 	int signalled = 0;
 
@@ -419,6 +434,7 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 		return (rval);
 	}
 
+	cancel_pending = schedctl_cancel_pending();
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
 	thread_lock(t);
@@ -428,7 +444,7 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 	curthread->t_schedflag &= ~TS_DONT_SWAP;
 	thread_unlock_nopreempt(t);
 	mutex_exit(mp);
-	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t))
+	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending)
 		setrun(t);
 	/* ASSERT(no locks are held) */
 	swtch();
@@ -445,6 +461,10 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 	}
 	if (lwp->lwp_sysabort || MUSTRETURN(p, t))
 		rval = 0;
+	if (rval != 0 && cancel_pending) {
+		schedctl_cancel_eintr();
+		rval = 0;
+	}
 	lwp->lwp_asleep = 0;
 	lwp->lwp_sysabort = 0;
 	if (rval == 0) {
@@ -646,7 +666,7 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
 	} else {
 		if (timecheck == timechanged) {
 			rval = cv_timedwait_sig(cvp, mp,
-				lbolt + timespectohz_adj(when, now));
+			    lbolt + timespectohz_adj(when, now));
 		} else {
 			/*
 			 * Someone reset the system time;

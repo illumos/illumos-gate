@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,8 @@ static	long int	name_max = 0;
 int
 __open_nc(const char *path, int oflag, mode_t mode)
 {
-	int		canstate, val;
+	int		cancel_state;
+	int		val;
 	struct stat64	statbuf;
 
 	/*
@@ -70,9 +71,9 @@ __open_nc(const char *path, int oflag, mode_t mode)
 		}
 	}
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	val = open64(path, oflag, mode);
-	(void) pthread_setcancelstate(canstate, &canstate);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 	return (val);
 }
@@ -80,11 +81,12 @@ __open_nc(const char *path, int oflag, mode_t mode)
 int
 __close_nc(int fildes)
 {
-	int	canstate, val;
+	int	cancel_state;
+	int	val;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &canstate);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	val = close(fildes);
-	(void) pthread_setcancelstate(canstate, &canstate);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 	return (val);
 }

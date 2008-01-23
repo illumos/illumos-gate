@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,10 +67,9 @@ extern	caddr_t	_getfp(void);
  * that the registered functions actually return (no longjmp()s).
  *
  * Because exitfns_lock is declared to be a recursive mutex, we
- * cannot use it with lmutex_lock()/lmutex_unlock() and we must use
- * rmutex_lock()/rmutex_unlock() (which are defined to be simply
- * mutex_lock()/mutex_unlock()).  This means that atexit() and
- * exit() are not async-signal-safe.  We make them fork1-safe
+ * cannot use it with lmutex_lock()/lmutex_unlock() and we must
+ * use mutex_lock()/mutex_unlock().  This means that atexit()
+ * and exit() are not async-signal-safe.  We make them fork1-safe
  * via the atexit_locks()/atexit_unlocks() functions, called from
  * libc_prepare_atfork()/libc_child_atfork()/libc_parent_atfork()
  */
@@ -82,13 +81,13 @@ extern	caddr_t	_getfp(void);
 void
 atexit_locks()
 {
-	(void) rmutex_lock(&__uberdata.atexit_root.exitfns_lock);
+	(void) _private_mutex_lock(&__uberdata.atexit_root.exitfns_lock);
 }
 
 void
 atexit_unlocks()
 {
-	(void) rmutex_unlock(&__uberdata.atexit_root.exitfns_lock);
+	(void) _private_mutex_unlock(&__uberdata.atexit_root.exitfns_lock);
 }
 
 /*
@@ -109,13 +108,13 @@ _atexit(void (*func)(void))
 		arp = &__uberdata.atexit_root;
 	else {
 		arp = &self->ul_uberdata->atexit_root;
-		(void) rmutex_lock(&arp->exitfns_lock);
+		(void) _private_mutex_lock(&arp->exitfns_lock);
 	}
 	p->hdlr = func;
 	p->next = arp->head;
 	arp->head = p;
 	if (self != NULL)
-		(void) rmutex_unlock(&arp->exitfns_lock);
+		(void) _private_mutex_unlock(&arp->exitfns_lock);
 	return (0);
 }
 
@@ -125,7 +124,7 @@ _exithandle(void)
 	atexit_root_t *arp = &curthread->ul_uberdata->atexit_root;
 	_exthdlr_t *p;
 
-	(void) rmutex_lock(&arp->exitfns_lock);
+	(void) _private_mutex_lock(&arp->exitfns_lock);
 	arp->exit_frame_monitor = _getfp() + STACK_BIAS;
 	p = arp->head;
 	while (p != NULL) {
@@ -134,7 +133,7 @@ _exithandle(void)
 		lfree(p, sizeof (_exthdlr_t));
 		p = arp->head;
 	}
-	(void) rmutex_unlock(&arp->exitfns_lock);
+	(void) _private_mutex_unlock(&arp->exitfns_lock);
 }
 
 /*
@@ -288,7 +287,7 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 	_exthdlr_t *o;		/* previous node */
 	_exthdlr_t *p;		/* this node */
 
-	(void) rmutex_lock(&arp->exitfns_lock);
+	(void) _private_mutex_lock(&arp->exitfns_lock);
 	o = NULL;
 	p = arp->head;
 	while (p != NULL) {
@@ -307,7 +306,7 @@ _preexec_exit_handlers(Lc_addr_range_t range[], uint_t count)
 			p = p->next;
 		}
 	}
-	(void) rmutex_unlock(&arp->exitfns_lock);
+	(void) _private_mutex_unlock(&arp->exitfns_lock);
 
 	_preexec_tsd_unload(range, count);
 	_preexec_atfork_unload(range, count);

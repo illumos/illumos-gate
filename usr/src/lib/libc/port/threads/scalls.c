@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,11 @@
 #include <poll.h>
 #include <stropts.h>
 #include <dlfcn.h>
+#include <wait.h>
+#include <sys/socket.h>
 #include <sys/uio.h>
+#include <sys/file.h>
+#include <sys/door.h>
 
 /*
  * atfork_lock protects the pthread_atfork() data structures.
@@ -76,18 +80,24 @@ fork_lock_exit(void)
 	(void) _private_mutex_unlock(&curthread->ul_uberdata->fork_lock);
 }
 
+/*
+ * Use cancel_safe_mutex_lock() to protect against being cancelled while
+ * holding callout_lock and calling outside of libc (via L10N plugins).
+ * We will honor a pending cancellation request when callout_lock_exit()
+ * is called, by calling cancel_safe_mutex_unlock().
+ */
 void
 callout_lock_enter(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_lock(&curthread->ul_uberdata->callout_lock);
+	cancel_safe_mutex_lock(&curthread->ul_uberdata->callout_lock);
 }
 
 void
 callout_lock_exit(void)
 {
 	ASSERT(curthread->ul_critical == 0);
-	(void) _private_mutex_unlock(&curthread->ul_uberdata->callout_lock);
+	cancel_safe_mutex_unlock(&curthread->ul_uberdata->callout_lock);
 }
 
 #pragma weak forkx = _private_forkx
@@ -281,13 +291,15 @@ _forkall(void)
 }
 
 /*
- * Hacks for system calls to provide cancellation
- * and improve java garbage collection.
+ * For the implementation of cancellation at cancellation points.
  */
 #define	PROLOGUE							\
 {									\
 	ulwp_t *self = curthread;					\
-	int nocancel = (self->ul_vfork | self->ul_nocancel);		\
+	int nocancel =							\
+	    (self->ul_vfork | self->ul_nocancel | self->ul_libc_locks |	\
+	    self->ul_critical | self->ul_sigdefer);			\
+	int abort = 0;							\
 	if (nocancel == 0) {						\
 		self->ul_save_async = self->ul_cancel_async;		\
 		if (!self->ul_cancel_disabled) {			\
@@ -296,6 +308,10 @@ _forkall(void)
 				_pthread_exit(PTHREAD_CANCELED);	\
 		}							\
 		self->ul_sp = stkptr();					\
+	} else if (self->ul_cancel_pending &&				\
+	    !self->ul_cancel_disabled) {				\
+		set_cancel_eintr_flag(self);				\
+		abort = 1;						\
 	}
 
 #define	EPILOGUE							\
@@ -314,6 +330,10 @@ _forkall(void)
  */
 #define	PERFORM(function_call)						\
 	PROLOGUE							\
+	if (abort) {							\
+		*self->ul_errnop = EINTR;				\
+		return (-1);						\
+	}								\
 	if (nocancel)							\
 		return (function_call);					\
 	rv = function_call;						\
@@ -336,7 +356,9 @@ _forkall(void)
 #define	PROLOGUE_MASK(sigmask)						\
 {									\
 	ulwp_t *self = curthread;					\
-	int nocancel = (self->ul_vfork | self->ul_nocancel);		\
+	int nocancel =							\
+	    (self->ul_vfork | self->ul_nocancel | self->ul_libc_locks |	\
+	    self->ul_critical | self->ul_sigdefer);			\
 	if (!self->ul_vfork) {						\
 		if (sigmask) {						\
 			block_all_signals(self);			\
@@ -387,7 +409,9 @@ _cancel_prologue(void)
 {
 	ulwp_t *self = curthread;
 
-	self->ul_cancel_prologue = (self->ul_vfork | self->ul_nocancel);
+	self->ul_cancel_prologue =
+	    (self->ul_vfork | self->ul_nocancel | self->ul_libc_locks |
+	    self->ul_critical | self->ul_sigdefer) != 0;
 	if (self->ul_cancel_prologue == 0) {
 		self->ul_save_async = self->ul_cancel_async;
 		if (!self->ul_cancel_disabled) {
@@ -396,6 +420,9 @@ _cancel_prologue(void)
 				_pthread_exit(PTHREAD_CANCELED);
 		}
 		self->ul_sp = stkptr();
+	} else if (self->ul_cancel_pending &&
+	    !self->ul_cancel_disabled) {
+		set_cancel_eintr_flag(self);
 	}
 }
 
@@ -419,93 +446,101 @@ lwp_wait(thread_t tid, thread_t *found)
 	int error;
 
 	PROLOGUE
-	while ((error = __lwp_wait(tid, found)) == EINTR)
-		;
+	if (abort)
+		return (EINTR);
+	while ((error = __lwp_wait(tid, found)) == EINTR && !cancel_active())
+		continue;
 	EPILOGUE
 	return (error);
 }
 
+#pragma weak read = _read
 ssize_t
-read(int fd, void *buf, size_t size)
+_read(int fd, void *buf, size_t size)
 {
-	extern ssize_t _read(int, void *, size_t);
+	extern ssize_t __read(int, void *, size_t);
 	ssize_t rv;
 
-	PERFORM(_read(fd, buf, size))
+	PERFORM(__read(fd, buf, size))
 }
 
+#pragma weak write = _write
 ssize_t
-write(int fd, const void *buf, size_t size)
+_write(int fd, const void *buf, size_t size)
 {
-	extern ssize_t _write(int, const void *, size_t);
+	extern ssize_t __write(int, const void *, size_t);
 	ssize_t rv;
 
-	PERFORM(_write(fd, buf, size))
+	PERFORM(__write(fd, buf, size))
 }
 
+#pragma weak getmsg = _getmsg
 int
-getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
+_getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	int *flagsp)
 {
-	extern int _getmsg(int, struct strbuf *, struct strbuf *, int *);
+	extern int __getmsg(int, struct strbuf *, struct strbuf *, int *);
 	int rv;
 
-	PERFORM(_getmsg(fd, ctlptr, dataptr, flagsp))
+	PERFORM(__getmsg(fd, ctlptr, dataptr, flagsp))
 }
 
+#pragma weak getpmsg = _getpmsg
 int
-getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
+_getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	int *bandp, int *flagsp)
 {
-	extern int _getpmsg(int, struct strbuf *, struct strbuf *,
+	extern int __getpmsg(int, struct strbuf *, struct strbuf *,
 	    int *, int *);
 	int rv;
 
-	PERFORM(_getpmsg(fd, ctlptr, dataptr, bandp, flagsp))
+	PERFORM(__getpmsg(fd, ctlptr, dataptr, bandp, flagsp))
 }
 
+#pragma weak putmsg = _putmsg
 int
-putmsg(int fd, const struct strbuf *ctlptr,
+_putmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int flags)
 {
-	extern int _putmsg(int, const struct strbuf *,
+	extern int __putmsg(int, const struct strbuf *,
 	    const struct strbuf *, int);
 	int rv;
 
-	PERFORM(_putmsg(fd, ctlptr, dataptr, flags))
+	PERFORM(__putmsg(fd, ctlptr, dataptr, flags))
 }
 
 int
 __xpg4_putmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int flags)
 {
-	extern int _putmsg(int, const struct strbuf *,
+	extern int __putmsg(int, const struct strbuf *,
 	    const struct strbuf *, int);
 	int rv;
 
-	PERFORM(_putmsg(fd, ctlptr, dataptr, flags|MSG_XPG4))
+	PERFORM(__putmsg(fd, ctlptr, dataptr, flags|MSG_XPG4))
 }
 
+#pragma weak putpmsg = _putpmsg
 int
-putpmsg(int fd, const struct strbuf *ctlptr,
+_putpmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int band, int flags)
 {
-	extern int _putpmsg(int, const struct strbuf *,
+	extern int __putpmsg(int, const struct strbuf *,
 	    const struct strbuf *, int, int);
 	int rv;
 
-	PERFORM(_putpmsg(fd, ctlptr, dataptr, band, flags))
+	PERFORM(__putpmsg(fd, ctlptr, dataptr, band, flags))
 }
 
 int
 __xpg4_putpmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int band, int flags)
 {
-	extern int _putpmsg(int, const struct strbuf *,
+	extern int __putpmsg(int, const struct strbuf *,
 	    const struct strbuf *, int, int);
 	int rv;
 
-	PERFORM(_putpmsg(fd, ctlptr, dataptr, band, flags|MSG_XPG4))
+	PERFORM(__putpmsg(fd, ctlptr, dataptr, band, flags|MSG_XPG4))
 }
 
 #pragma weak nanosleep = _nanosleep
@@ -515,7 +550,7 @@ _nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 	int error;
 
 	PROLOGUE
-	error = __nanosleep(rqtp, rmtp);
+	error = abort? EINTR : __nanosleep(rqtp, rmtp);
 	EPILOGUE
 	if (error) {
 		errno = error;
@@ -556,7 +591,7 @@ _clock_nanosleep(clockid_t clock_id, int flags,
 	}
 restart:
 	PROLOGUE
-	error = __nanosleep(&reltime, rmtp);
+	error = abort? EINTR : __nanosleep(&reltime, rmtp);
 	EPILOGUE
 	if (error == 0 && clock_id == CLOCK_HIGHRES) {
 		/*
@@ -606,16 +641,12 @@ unsigned int
 _sleep(unsigned int sec)
 {
 	unsigned int rem = 0;
-	int error;
 	timespec_t ts;
 	timespec_t tsr;
 
 	ts.tv_sec = (time_t)sec;
 	ts.tv_nsec = 0;
-	PROLOGUE
-	error = __nanosleep(&ts, &tsr);
-	EPILOGUE
-	if (error == EINTR) {
+	if (_nanosleep(&ts, &tsr) == -1 && errno == EINTR) {
 		rem = (unsigned int)tsr.tv_sec;
 		if (tsr.tv_nsec >= NANOSEC / 2)
 			rem++;
@@ -631,47 +662,59 @@ _usleep(useconds_t usec)
 
 	ts.tv_sec = usec / MICROSEC;
 	ts.tv_nsec = (long)(usec % MICROSEC) * 1000;
-	PROLOGUE
-	(void) __nanosleep(&ts, NULL);
-	EPILOGUE
+	(void) _nanosleep(&ts, NULL);
 	return (0);
 }
 
+#pragma weak close = _close
 int
-close(int fildes)
+_close(int fildes)
 {
 	extern void _aio_close(int);
-	extern int _close(int);
+	extern int __close(int);
 	int rv;
 
 	_aio_close(fildes);
-	PERFORM(_close(fildes))
+	PERFORM(__close(fildes))
 }
 
+#pragma weak creat = _creat
 int
-creat(const char *path, mode_t mode)
+_creat(const char *path, mode_t mode)
 {
-	extern int _creat(const char *, mode_t);
+	extern int __creat(const char *, mode_t);
 	int rv;
 
-	PERFORM(_creat(path, mode))
+	PERFORM(__creat(path, mode))
 }
 
 #if !defined(_LP64)
+#pragma weak creat64 = _creat64
 int
-creat64(const char *path, mode_t mode)
+_creat64(const char *path, mode_t mode)
 {
-	extern int _creat64(const char *, mode_t);
+	extern int __creat64(const char *, mode_t);
 	int rv;
 
-	PERFORM(_creat64(path, mode))
+	PERFORM(__creat64(path, mode))
 }
 #endif	/* !_LP64 */
 
+#pragma weak door_call = _door_call
 int
-fcntl(int fildes, int cmd, ...)
+_door_call(int d, door_arg_t *params)
 {
-	extern int _fcntl(int, int, ...);
+	extern int __door_call(int, door_arg_t *);
+	int rv;
+
+	PERFORM(__door_call(d, params))
+}
+
+#pragma weak fcntl = _fcntl
+int
+_fcntl(int fildes, int cmd, ...)
+{
+	extern int __fcntl(int, int, ...);
 	intptr_t arg;
 	int rv;
 	va_list ap;
@@ -680,79 +723,87 @@ fcntl(int fildes, int cmd, ...)
 	arg = va_arg(ap, intptr_t);
 	va_end(ap);
 	if (cmd != F_SETLKW)
-		return (_fcntl(fildes, cmd, arg));
-	PERFORM(_fcntl(fildes, cmd, arg))
+		return (__fcntl(fildes, cmd, arg));
+	PERFORM(__fcntl(fildes, cmd, arg))
 }
 
+#pragma weak fdatasync = _fdatasync
 int
-fdatasync(int fildes)
+_fdatasync(int fildes)
 {
-	extern int _fdatasync(int);
+	extern int __fdsync(int, int);
 	int rv;
 
-	PERFORM(_fdatasync(fildes))
+	PERFORM(__fdsync(fildes, FDSYNC))
 }
 
+#pragma weak fsync = _fsync
 int
-fsync(int fildes)
+_fsync(int fildes)
 {
-	extern int _fsync(int);
+	extern int __fdsync(int, int);
 	int rv;
 
-	PERFORM(_fsync(fildes))
+	PERFORM(__fdsync(fildes, FSYNC))
 }
 
+#pragma weak lockf = _lockf
 int
-lockf(int fildes, int function, off_t size)
+_lockf(int fildes, int function, off_t size)
 {
-	extern int _lockf(int, int, off_t);
+	extern int __lockf(int, int, off_t);
 	int rv;
 
-	PERFORM(_lockf(fildes, function, size))
+	PERFORM(__lockf(fildes, function, size))
 }
 
 #if !defined(_LP64)
+#pragma weak lockf64 = _lockf64
 int
-lockf64(int fildes, int function, off64_t size)
+_lockf64(int fildes, int function, off64_t size)
 {
-	extern int _lockf64(int, int, off64_t);
+	extern int __lockf64(int, int, off64_t);
 	int rv;
 
-	PERFORM(_lockf64(fildes, function, size))
+	PERFORM(__lockf64(fildes, function, size))
 }
 #endif	/* !_LP64 */
 
+#pragma weak msgrcv = _msgrcv
 ssize_t
-msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
+_msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
 {
-	extern ssize_t _msgrcv(int, void *, size_t, long, int);
+	extern ssize_t __msgrcv(int, void *, size_t, long, int);
 	ssize_t rv;
 
-	PERFORM(_msgrcv(msqid, msgp, msgsz, msgtyp, msgflg))
+	PERFORM(__msgrcv(msqid, msgp, msgsz, msgtyp, msgflg))
 }
 
+#pragma weak msgsnd = _msgsnd
 int
-msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
+_msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
 {
-	extern int _msgsnd(int, const void *, size_t, int);
+	extern int __msgsnd(int, const void *, size_t, int);
 	int rv;
 
-	PERFORM(_msgsnd(msqid, msgp, msgsz, msgflg))
+	PERFORM(__msgsnd(msqid, msgp, msgsz, msgflg))
 }
 
+#pragma weak msync = _msync
 int
-msync(caddr_t addr, size_t len, int flags)
+_msync(caddr_t addr, size_t len, int flags)
 {
-	extern int _msync(caddr_t, size_t, int);
+	extern int __msync(caddr_t, size_t, int);
 	int rv;
 
-	PERFORM(_msync(addr, len, flags))
+	PERFORM(__msync(addr, len, flags))
 }
 
+#pragma weak open = _open
 int
-open(const char *path, int oflag, ...)
+_open(const char *path, int oflag, ...)
 {
-	extern int _open(const char *, int, ...);
+	extern int __open(const char *, int, ...);
 	mode_t mode;
 	int rv;
 	va_list ap;
@@ -760,14 +811,14 @@ open(const char *path, int oflag, ...)
 	va_start(ap, oflag);
 	mode = va_arg(ap, mode_t);
 	va_end(ap);
-	PERFORM(_open(path, oflag, mode))
+	PERFORM(__open(path, oflag, mode))
 }
 
-#if !defined(_LP64)
+#pragma weak openat = _openat
 int
-open64(const char *path, int oflag, ...)
+_openat(int fd, const char *path, int oflag, ...)
 {
-	extern int _open64(const char *, int, ...);
+	extern int __openat(int, const char *, int, ...);
 	mode_t mode;
 	int rv;
 	va_list ap;
@@ -775,75 +826,113 @@ open64(const char *path, int oflag, ...)
 	va_start(ap, oflag);
 	mode = va_arg(ap, mode_t);
 	va_end(ap);
-	PERFORM(_open64(path, oflag, mode))
-}
-#endif	/* !_LP64 */
-
-int
-pause(void)
-{
-	extern int _pause(void);
-	int rv;
-
-	PERFORM(_pause())
-}
-
-ssize_t
-pread(int fildes, void *buf, size_t nbyte, off_t offset)
-{
-	extern ssize_t _pread(int, void *, size_t, off_t);
-	ssize_t rv;
-
-	PERFORM(_pread(fildes, buf, nbyte, offset))
+	PERFORM(__openat(fd, path, oflag, mode))
 }
 
 #if !defined(_LP64)
-ssize_t
-pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
+#pragma weak open64 = _open64
+int
+_open64(const char *path, int oflag, ...)
 {
-	extern ssize_t _pread64(int, void *, size_t, off64_t);
-	ssize_t rv;
+	extern int __open64(const char *, int, ...);
+	mode_t mode;
+	int rv;
+	va_list ap;
 
-	PERFORM(_pread64(fildes, buf, nbyte, offset))
+	va_start(ap, oflag);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	PERFORM(__open64(path, oflag, mode))
+}
+
+#pragma weak openat64 = _openat64
+int
+_openat64(int fd, const char *path, int oflag, ...)
+{
+	extern int __openat64(int, const char *, int, ...);
+	mode_t mode;
+	int rv;
+	va_list ap;
+
+	va_start(ap, oflag);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	PERFORM(__openat64(fd, path, oflag, mode))
 }
 #endif	/* !_LP64 */
 
-ssize_t
-pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
+#pragma weak pause = _pause
+int
+_pause(void)
 {
-	extern ssize_t _pwrite(int, const void *, size_t, off_t);
+	extern int __pause(void);
+	int rv;
+
+	PERFORM(__pause())
+}
+
+#pragma weak pread = _pread
+ssize_t
+_pread(int fildes, void *buf, size_t nbyte, off_t offset)
+{
+	extern ssize_t __pread(int, void *, size_t, off_t);
 	ssize_t rv;
 
-	PERFORM(_pwrite(fildes, buf, nbyte, offset))
+	PERFORM(__pread(fildes, buf, nbyte, offset))
 }
 
 #if !defined(_LP64)
+#pragma weak pread64 = _pread64
 ssize_t
-pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
+_pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
 {
-	extern ssize_t _pwrite64(int, const void *, size_t, off64_t);
+	extern ssize_t __pread64(int, void *, size_t, off64_t);
 	ssize_t rv;
 
-	PERFORM(_pwrite64(fildes, buf, nbyte, offset))
+	PERFORM(__pread64(fildes, buf, nbyte, offset))
 }
 #endif	/* !_LP64 */
 
+#pragma weak pwrite = _pwrite
 ssize_t
-readv(int fildes, const struct iovec *iov, int iovcnt)
+_pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
 {
-	extern ssize_t _readv(int, const struct iovec *, int);
+	extern ssize_t __pwrite(int, const void *, size_t, off_t);
 	ssize_t rv;
 
-	PERFORM(_readv(fildes, iov, iovcnt))
+	PERFORM(__pwrite(fildes, buf, nbyte, offset))
 }
 
-int
-sigpause(int sig)
+#if !defined(_LP64)
+#pragma weak pwrite64 = _pwrite64
+ssize_t
+_pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
 {
-	extern int _sigpause(int);
+	extern ssize_t __pwrite64(int, const void *, size_t, off64_t);
+	ssize_t rv;
+
+	PERFORM(__pwrite64(fildes, buf, nbyte, offset))
+}
+#endif	/* !_LP64 */
+
+#pragma weak readv = _readv
+ssize_t
+_readv(int fildes, const struct iovec *iov, int iovcnt)
+{
+	extern ssize_t __readv(int, const struct iovec *, int);
+	ssize_t rv;
+
+	PERFORM(__readv(fildes, iov, iovcnt))
+}
+
+#pragma weak sigpause = _sigpause
+int
+_sigpause(int sig)
+{
+	extern int __sigpause(int);
 	int rv;
 
-	PERFORM(_sigpause(sig))
+	PERFORM(__sigpause(sig))
 }
 
 #pragma weak sigsuspend = _sigsuspend
@@ -883,12 +972,17 @@ _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 	int sig;
 
 	PROLOGUE
-	sig = __sigtimedwait(set, &info, timeout);
-	if (sig == SIGCANCEL &&
-	    (SI_FROMKERNEL(&info) || info.si_code == SI_LWP)) {
-		do_sigcancel();
-		errno = EINTR;
+	if (abort) {
+		*self->ul_errnop = EINTR;
 		sig = -1;
+	} else {
+		sig = __sigtimedwait(set, &info, timeout);
+		if (sig == SIGCANCEL &&
+		    (SI_FROMKERNEL(&info) || info.si_code == SI_LWP)) {
+			do_sigcancel();
+			*self->ul_errnop = EINTR;
+			sig = -1;
+		}
 	}
 	EPILOGUE
 	if (sig != -1 && infop)
@@ -920,60 +1014,109 @@ _sigqueue(pid_t pid, int signo, const union sigval value)
 }
 
 int
-tcdrain(int fildes)
+_so_accept(int sock, struct sockaddr *addr, uint_t *addrlen, int version)
 {
-	extern int _tcdrain(int);
+	extern int __so_accept(int, struct sockaddr *, uint_t *, int);
 	int rv;
 
-	PERFORM(_tcdrain(fildes))
-}
-
-pid_t
-wait(int *stat_loc)
-{
-	extern pid_t _wait(int *);
-	pid_t rv;
-
-	PERFORM(_wait(stat_loc))
-}
-
-pid_t
-wait3(int *statusp, int options, struct rusage *rusage)
-{
-	extern pid_t _wait3(int *, int, struct rusage *);
-	pid_t rv;
-
-	PERFORM(_wait3(statusp, options, rusage))
+	PERFORM(__so_accept(sock, addr, addrlen, version))
 }
 
 int
-waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
+_so_connect(int sock, struct sockaddr *addr, uint_t addrlen, int version)
 {
-	extern int _waitid(idtype_t, id_t, siginfo_t *, int);
+	extern int __so_connect(int, struct sockaddr *, uint_t, int);
 	int rv;
 
-	PERFORM(_waitid(idtype, id, infop, options))
+	PERFORM(__so_connect(sock, addr, addrlen, version))
 }
 
-/*
- * waitpid_cancel() is a libc-private symbol for internal use
- * where cancellation semantics is desired (see system()).
- */
-#pragma weak waitpid_cancel = waitpid
-pid_t
-waitpid(pid_t pid, int *stat_loc, int options)
+int
+_so_recv(int sock, void *buf, size_t len, int flags)
 {
-	extern pid_t _waitpid(pid_t, int *, int);
-	pid_t rv;
+	extern int __so_recv(int, void *, size_t, int);
+	int rv;
 
-	PERFORM(_waitpid(pid, stat_loc, options))
+	PERFORM(__so_recv(sock, buf, len, flags))
 }
 
+int
+_so_recvfrom(int sock, void *buf, size_t len, int flags,
+    struct sockaddr *addr, int *addrlen)
+{
+	extern int __so_recvfrom(int, void *, size_t, int,
+	    struct sockaddr *, int *);
+	int rv;
+
+	PERFORM(__so_recvfrom(sock, buf, len, flags, addr, addrlen))
+}
+
+int
+_so_recvmsg(int sock, struct msghdr *msg, int flags)
+{
+	extern int __so_recvmsg(int, struct msghdr *, int);
+	int rv;
+
+	PERFORM(__so_recvmsg(sock, msg, flags))
+}
+
+int
+_so_send(int sock, const void *buf, size_t len, int flags)
+{
+	extern int __so_send(int, const void *, size_t, int);
+	int rv;
+
+	PERFORM(__so_send(sock, buf, len, flags))
+}
+
+int
+_so_sendmsg(int sock, const struct msghdr *msg, int flags)
+{
+	extern int __so_sendmsg(int, const struct msghdr *, int);
+	int rv;
+
+	PERFORM(__so_sendmsg(sock, msg, flags))
+}
+
+int
+_so_sendto(int sock, const void *buf, size_t len, int flags,
+    const struct sockaddr *addr, int *addrlen)
+{
+	extern int __so_sendto(int, const void *, size_t, int,
+	    const struct sockaddr *, int *);
+	int rv;
+
+	PERFORM(__so_sendto(sock, buf, len, flags, addr, addrlen))
+}
+
+#pragma weak tcdrain = _tcdrain
+int
+_tcdrain(int fildes)
+{
+	extern int __tcdrain(int);
+	int rv;
+
+	PERFORM(__tcdrain(fildes))
+}
+
+#pragma weak waitid = _waitid
+int
+_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
+{
+	extern int __waitid(idtype_t, id_t, siginfo_t *, int);
+	int rv;
+
+	if (options & WNOHANG)
+		return (__waitid(idtype, id, infop, options));
+	PERFORM(__waitid(idtype, id, infop, options))
+}
+
+#pragma weak writev = _writev
 ssize_t
-writev(int fildes, const struct iovec *iov, int iovcnt)
+_writev(int fildes, const struct iovec *iov, int iovcnt)
 {
-	extern ssize_t _writev(int, const struct iovec *, int);
+	extern ssize_t __writev(int, const struct iovec *, int);
 	ssize_t rv;
 
-	PERFORM(_writev(fildes, iov, iovcnt))
+	PERFORM(__writev(fildes, iov, iovcnt))
 }

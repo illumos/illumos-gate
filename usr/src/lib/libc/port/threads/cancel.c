@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,17 +55,21 @@ _pthread_cancel(thread_t tid)
 		/*
 		 * Unlock self before cancelling.
 		 */
-		ulwp_unlock(ulwp, udp);
-		ulwp->ul_nocancel = 0;	/* cancellation is now possible */
-		if (ulwp->ul_sigdefer)
-			ulwp->ul_cancel_pending = 1;
-		else
+		ulwp_unlock(self, udp);
+		self->ul_nocancel = 0;	/* cancellation is now possible */
+		if (self->ul_sigdefer == 0)
 			do_sigcancel();
+		else {
+			self->ul_cancel_pending = 1;
+			set_cancel_pending_flag(self, 0);
+		}
 	} else if (ulwp->ul_cancel_disabled) {
 		/*
 		 * Don't send SIGCANCEL if cancellation is disabled;
 		 * just set the thread's ulwp->ul_cancel_pending flag.
 		 * This avoids a potential EINTR for the target thread.
+		 * We don't call set_cancel_pending_flag() here because
+		 * we cannot modify another thread's schedctl data.
 		 */
 		ulwp->ul_cancel_pending = 1;
 		ulwp_unlock(ulwp, udp);
@@ -81,11 +85,11 @@ _pthread_cancel(thread_t tid)
 }
 
 /*
- * pthread_setcancelstate: sets the state ENABLED or DISABLED
- * If the state is being set as ENABLED, then it becomes
- * a cancellation point only if the type of cancellation is
- * ASYNCHRONOUS and a cancel request is pending.
- * Disabling cancellation is not a cancellation point.
+ * pthread_setcancelstate: sets the state ENABLED or DISABLED.
+ * If the state is already ENABLED or is being set to ENABLED,
+ * the type of cancellation is ASYNCHRONOUS, and a cancel request
+ * is pending, then the thread is cancelled right here.
+ * Otherwise, pthread_setcancelstate() is not a cancellation point.
  */
 #pragma weak pthread_setcancelstate = _pthread_setcancelstate
 int
@@ -117,6 +121,7 @@ _pthread_setcancelstate(int state, int *oldstate)
 		ulwp_unlock(self, udp);
 		return (EINVAL);
 	}
+	set_cancel_pending_flag(self, 0);
 
 	/*
 	 * If this thread has been requested to be canceled and
@@ -298,4 +303,120 @@ __pthread_cleanup_pop(int ex, _cleanup_t *clnup_info)
 	self->ul_clnup_hdr = infop->next;
 	if (ex)
 		(*infop->func)(infop->arg);
+}
+
+/*
+ * Called when either self->ul_cancel_disabled or self->ul_cancel_pending
+ * is modified.  Setting SC_CANCEL_FLG informs the kernel that we have
+ * a pending cancellation and we do not have cancellation disabled.
+ * In this situation, we will not go to sleep on any system call but
+ * will instead return EINTR immediately on any attempt to sleep,
+ * with SC_EINTR_FLG set in sc_flgs.  Clearing SC_CANCEL_FLG rescinds
+ * this condition, but SC_EINTR_FLG never goes away until the thread
+ * terminates (indicated by clear_flags != 0).
+ */
+void
+set_cancel_pending_flag(ulwp_t *self, int clear_flags)
+{
+	volatile sc_shared_t *scp;
+
+	if (self->ul_vfork | self->ul_nocancel)
+		return;
+	enter_critical(self);
+	if ((scp = self->ul_schedctl) != NULL ||
+	    (scp = setup_schedctl()) != NULL) {
+		if (clear_flags)
+			scp->sc_flgs &= ~(SC_CANCEL_FLG | SC_EINTR_FLG);
+		else if (self->ul_cancel_pending && !self->ul_cancel_disabled)
+			scp->sc_flgs |= SC_CANCEL_FLG;
+		else
+			scp->sc_flgs &= ~SC_CANCEL_FLG;
+	}
+	exit_critical(self);
+}
+
+/*
+ * Called from the PROLOGUE macro in scalls.c to inform subsequent
+ * code that a cancellation point has been called and that the
+ * current thread should cancel itself as soon as all of its locks
+ * have been dropped (see safe_mutex_unlock()).
+ */
+void
+set_cancel_eintr_flag(ulwp_t *self)
+{
+	volatile sc_shared_t *scp;
+
+	if (self->ul_vfork | self->ul_nocancel)
+		return;
+	enter_critical(self);
+	if ((scp = self->ul_schedctl) != NULL ||
+	    (scp = setup_schedctl()) != NULL)
+		scp->sc_flgs |= SC_EINTR_FLG;
+	exit_critical(self);
+}
+
+/*
+ * Calling set_parking_flag(curthread, 1) informs the kernel that we are
+ * calling __lwp_park or ___lwp_cond_wait().  If we take a signal in
+ * the unprotected (from signals) interval before reaching the kernel,
+ * sigacthandler() will call set_parking_flag(curthread, 0) to inform
+ * the kernel to return immediately from these system calls, giving us
+ * a spurious wakeup but not a deadlock.
+ */
+void
+set_parking_flag(ulwp_t *self, int park)
+{
+	volatile sc_shared_t *scp;
+
+	enter_critical(self);
+	if ((scp = self->ul_schedctl) != NULL ||
+	    (scp = setup_schedctl()) != NULL) {
+		if (park) {
+			scp->sc_flgs |= SC_PARK_FLG;
+			/*
+			 * We are parking; allow the __lwp_park() call to
+			 * block even if we have a pending cancellation.
+			 */
+			scp->sc_flgs &= ~SC_CANCEL_FLG;
+		} else {
+			scp->sc_flgs &= ~(SC_PARK_FLG | SC_CANCEL_FLG);
+			/*
+			 * We are no longer parking; restore the
+			 * pending cancellation flag if necessary.
+			 */
+			if (self->ul_cancel_pending &&
+			    !self->ul_cancel_disabled)
+				scp->sc_flgs |= SC_CANCEL_FLG;
+		}
+	} else if (park == 0) {	/* schedctl failed, do it the long way */
+		__lwp_unpark(self->ul_lwpid);
+	}
+	exit_critical(self);
+}
+
+/*
+ * Test if the current thread is due to exit because of cancellation.
+ */
+int
+cancel_active(void)
+{
+	ulwp_t *self = curthread;
+	volatile sc_shared_t *scp;
+	int exit_soon;
+
+	/*
+	 * If there is a pending cancellation and cancellation
+	 * is not disabled (SC_CANCEL_FLG) and we received
+	 * EINTR from a recent system call (SC_EINTR_FLG),
+	 * then we will soon be exiting.
+	 */
+	enter_critical(self);
+	exit_soon =
+	    (((scp = self->ul_schedctl) != NULL ||
+	    (scp = setup_schedctl()) != NULL) &&
+	    (scp->sc_flgs & (SC_CANCEL_FLG | SC_EINTR_FLG)) ==
+	    (SC_CANCEL_FLG | SC_EINTR_FLG));
+	exit_critical(self);
+
+	return (exit_soon);
 }

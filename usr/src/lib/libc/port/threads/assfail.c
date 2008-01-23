@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,7 @@ common_panic(const char *head, const char *why)
 	len1 = strlen(msg);
 	if (msg[len1 - 1] != '\n')
 		msg[len1++] = '\n';
-	(void) _write(2, msg, len1);
+	(void) __write(2, msg, len1);
 	Abort(msg);
 }
 
@@ -228,7 +228,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 		ultos((uint64_t)mcopy.mutex_ownerpid, 10, buf + strlen(buf));
 	}
 	(void) strcat(buf, "\n\n");
-	(void) _write(2, buf, strlen(buf));
+	(void) __write(2, buf, strlen(buf));
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
@@ -312,7 +312,7 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 	if (rwstate & URW_HAS_WAITERS)
 		(void) strcat(buf, "\nand the lock appears to have waiters");
 	(void) strcat(buf, "\n\n");
-	(void) _write(2, buf, strlen(buf));
+	(void) __write(2, buf, strlen(buf));
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
@@ -352,7 +352,7 @@ thread_error(const char *msg)
 	}
 
 	(void) strcpy(buf, "\n*** _THREAD_ERROR_DETECTION: "
-		"thread usage error detected ***\n*** ");
+	    "thread usage error detected ***\n*** ");
 	(void) strcat(buf, msg);
 
 	(void) strcat(buf, "\n*** calling thread is ");
@@ -360,7 +360,7 @@ thread_error(const char *msg)
 	(void) strcat(buf, " thread-id ");
 	ultos((uint64_t)lwpid, 10, buf + strlen(buf));
 	(void) strcat(buf, "\n\n");
-	(void) _write(2, buf, strlen(buf));
+	(void) __write(2, buf, strlen(buf));
 	if (udp->uberflags.uf_thread_error_detection >= 2)
 		Abort(buf);
 	assert_thread = NULL;
@@ -409,7 +409,7 @@ __assfail(const char *assertion, const char *filename, int line_num)
 	(void) strcat(buf, ", line ");
 	ultos((uint64_t)line_num, 10, buf + strlen(buf));
 	(void) strcat(buf, "\n");
-	(void) _write(2, buf, strlen(buf));
+	(void) __write(2, buf, strlen(buf));
 	/*
 	 * We could replace the call to Abort() with the following code
 	 * if we want just to issue a warning message and not die.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,6 @@ extern	pid_t	_vforkx(int);
 #pragma unknown_control_flow(_vforkx)
 extern	void	*_private_memset(void *, int, size_t);
 extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
-extern	int	__open(const char *, int, mode_t);
 extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
 extern	int	_private_close(int);
 extern	int	_private_execve(const char *, char *const *, char *const *);
@@ -239,7 +238,8 @@ perform_file_actions(file_attr_t *fap)
 	do {
 		switch (fap->fa_type) {
 		case FA_OPEN:
-			fd = __open(fap->fa_path, fap->fa_oflag, fap->fa_mode);
+			fd = _private_open(fap->fa_path,
+			    fap->fa_oflag, fap->fa_mode);
 			if (fd < 0)
 				return (errno);
 			if (fd != fap->fa_filedes) {
@@ -255,7 +255,7 @@ perform_file_actions(file_attr_t *fap)
 			break;
 		case FA_DUP2:
 			fd = _private_fcntl(fap->fa_filedes, F_DUP2FD,
-				fap->fa_newfiledes);
+			    fap->fa_newfiledes);
 			if (fd < 0)
 				return (errno);
 			break;
@@ -359,7 +359,7 @@ _posix_spawn(
  * Much of posix_spawnp() blatently stolen from execvp() (port/gen/execvp.c).
  */
 
-extern int __xpg4;	/* defined in xpg4.c; 0 if not xpg4-compiled program */
+extern int libc__xpg4;
 
 static const char *
 execat(const char *s1, const char *s2, char *si)
@@ -400,7 +400,7 @@ _posix_spawnp(
 	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
 	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
 	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
-	int xpg4 = __xpg4;
+	int xpg4 = libc__xpg4;
 	int error;		/* this will be set by the child */
 	char path[PATH_MAX+4];
 	const char *cp;

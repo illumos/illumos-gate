@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,13 +121,11 @@ _filbuf(FILE *iop)
 		iop->_cnt = res - 1;
 		return (*iop->_ptr++);
 	}
-	else
-	{
-		iop->_cnt = 0;
-		if (res == 0)
-			iop->_flag |= _IOEOF;
-		else
-			iop->_flag |= _IOERR;
-		return (EOF);
-	}
+
+	iop->_cnt = 0;
+	if (res == 0)
+		iop->_flag |= _IOEOF;
+	else if (!cancel_active())
+		iop->_flag |= _IOERR;
+	return (EOF);
 }

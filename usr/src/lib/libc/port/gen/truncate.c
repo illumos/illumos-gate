@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/types.h>
 
 int
@@ -76,17 +77,19 @@ int
 _truncate(const char *path, off_t len)
 {
 
+	int rval = 0;
+	int cancel_state;
 	int fd;
 
-	if ((fd = open(path, O_WRONLY)) == -1) {
-		return (-1);
-	}
-
-	if (ftruncate(fd, len) == -1) {
+	/*
+	 * truncate() is not a cancellation point,
+	 * even though it calls open() and close().
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	if ((fd = open(path, O_WRONLY)) == -1 || ftruncate(fd, len) == -1)
+		rval = -1;
+	if (fd >= 0)
 		(void) close(fd);
-		return (-1);
-	}
-
-	(void) close(fd);
-	return (0);
+	(void) pthread_setcancelstate(cancel_state, NULL);
+	return (rval);
 }

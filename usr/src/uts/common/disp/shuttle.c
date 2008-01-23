@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +37,7 @@
 #include <sys/debug.h>
 #include <sys/sobject.h>
 #include <sys/cpuvar.h>
+#include <sys/schedctl.h>
 #include <sys/sdt.h>
 
 static	disp_lock_t	shuttle_lock;	/* lock on shuttle objects */
@@ -159,8 +161,8 @@ shuttle_resume(kthread_t *t, kmutex_t *l)
 	 * Make sure we didn't receive any important events while
 	 * we weren't looking
 	 */
-	if (lwp &&
-	    (ISSIG(curthread, JUSTLOOKING) || MUSTRETURN(curproc, curthread)))
+	if (lwp && (ISSIG(curthread, JUSTLOOKING) ||
+	    MUSTRETURN(curproc, curthread) || schedctl_cancel_pending()))
 		setrun(curthread);
 
 	swtch_to(t);
@@ -194,7 +196,8 @@ shuttle_swtch(kmutex_t *l)
 	(void) new_mstate(curthread, LMS_SLEEP);
 	disp_lock_exit_high(&shuttle_lock);
 	mutex_exit(l);
-	if (ISSIG(curthread, JUSTLOOKING) || MUSTRETURN(curproc, curthread))
+	if (ISSIG(curthread, JUSTLOOKING) ||
+	    MUSTRETURN(curproc, curthread) || schedctl_cancel_pending())
 		setrun(curthread);
 	swtch();
 	/*

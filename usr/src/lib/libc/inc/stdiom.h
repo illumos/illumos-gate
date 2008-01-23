@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@
 
 typedef unsigned char	Uchar;
 
-#define	_flockrel(rl)		rmutex_unlock(rl)
+#define	_flockrel(rl)		cancel_safe_mutex_unlock(rl)
 
 #define	MAXVAL	(MAXINT - (MAXINT % BUFSIZ))
 

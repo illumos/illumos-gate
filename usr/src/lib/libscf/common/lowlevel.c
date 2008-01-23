@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -76,14 +77,6 @@ struct _lwp_mutex;
 extern int _mutex_held(struct _lwp_mutex *);
 #define	MUTEX_HELD(m)		_mutex_held((struct _lwp_mutex *)(m))
 
-/*
- * no cancellation, please
- */
-struct _lwp_cond;
-extern int _cond_wait(struct _lwp_cond *, struct _lwp_mutex *);
-#define	PTHREAD_COND_WAIT(cv, mx) \
-	    _cond_wait((struct _lwp_cond *)(cv), (struct _lwp_mutex *)(mx))
-
 #ifdef lint
 #define	assert_nolint(x) (void)0
 #else
@@ -108,8 +101,14 @@ handle_hold_subhandles(scf_handle_t *h, int mask)
 	assert(mask != 0 && (mask & ~RH_HOLD_ALL) == 0);
 
 	(void) pthread_mutex_lock(&h->rh_lock);
-	while (h->rh_hold_flags != 0 && h->rh_holder != pthread_self())
-		(void) PTHREAD_COND_WAIT(&h->rh_cv, &h->rh_lock);
+	while (h->rh_hold_flags != 0 && h->rh_holder != pthread_self()) {
+		int cancel_state;
+
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+		    &cancel_state);
+		(void) pthread_cond_wait(&h->rh_cv, &h->rh_lock);
+		(void) pthread_setcancelstate(cancel_state, NULL);
+	}
 	if (h->rh_hold_flags == 0)
 		h->rh_holder = pthread_self();
 	assert(!(h->rh_hold_flags & mask));
@@ -1029,8 +1028,14 @@ scf_handle_bind(scf_handle_t *handle)
 	}
 
 	/* wait until any active fd users have cleared out */
-	while (handle->rh_fd_users > 0)
-		(void) PTHREAD_COND_WAIT(&handle->rh_cv, &handle->rh_lock);
+	while (handle->rh_fd_users > 0) {
+		int cancel_state;
+
+		(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+		    &cancel_state);
+		(void) pthread_cond_wait(&handle->rh_cv, &handle->rh_lock);
+		(void) pthread_setcancelstate(cancel_state, NULL);
+	}
 
 	/* check again, since we had to drop the lock */
 	if (handle_is_bound(handle)) {

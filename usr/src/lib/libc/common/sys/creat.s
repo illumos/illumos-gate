@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,18 +35,18 @@
 
 #if !defined(_LARGEFILE_SOURCE)
 /* C library -- creat						*/
-/* int creat(char *path, mode_t mode)				*/
+/* int __creat(char *path, mode_t mode)				*/
 
-	SYSCALL_RVAL1(creat)
+	SYSCALL2_RVAL1(__creat,creat)
 	RET
-	SET_SIZE(creat)
+	SET_SIZE(__creat)
 
 #else
 /* C library -- creat64						*/
-/* int creat64(char *path, mode_t mode)				*/
+/* int __creat64(char *path, mode_t mode)			*/
 
-	SYSCALL_RVAL1(creat64)
+	SYSCALL2_RVAL1(__creat64,creat64)
 	RET
-	SET_SIZE(creat64)
+	SET_SIZE(__creat64)
 
 #endif

@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -163,19 +164,19 @@
  *	Solaris 10	CI_ATEXIT and CI_LCMESSAGES via _ld_libc()
  *			CI_* via RTLDINFO and _ld_libc()  - new libthread
  */
-#include	"_synonyms.h"
 
-#include	<sys/debug.h>
-#include	<synch.h>
-#include	<signal.h>
-#include	<thread.h>
-#include	<synch.h>
-#include	<strings.h>
-#include	<stdio.h>
-#include	<debug.h>
-#include	<libc_int.h>
-#include	"_elf.h"
-#include	"_rtld.h"
+#include "_synonyms.h"
+#include <sys/debug.h>
+#include <synch.h>
+#include <signal.h>
+#include <thread.h>
+#include <synch.h>
+#include <strings.h>
+#include <stdio.h>
+#include <debug.h>
+#include <libc_int.h>
+#include "_elf.h"
+#include "_rtld.h"
 
 /*
  * This interface provides the unified process model communication between
@@ -542,6 +543,81 @@ _thr_min_stack()
 #else
 	return (4 * 1024);
 #endif
+}
+
+/*
+ * The following functions are cancellation points in libc.
+ * They are called from other functions in libc that we extract
+ * and use directly.  We don't do cancellation while we are in
+ * the dynamic linker, so we redefine these to call the primitive,
+ * non-cancellation interfaces.
+ */
+
+#pragma weak close = _close
+int
+_close(int fildes)
+{
+	extern int __close(int);
+
+	return (__close(fildes));
+}
+
+#pragma weak fcntl = _fcntl
+int
+_fcntl(int fildes, int cmd, ...)
+{
+	extern int __fcntl(int, int, ...);
+	intptr_t arg;
+	va_list ap;
+
+	va_start(ap, cmd);
+	arg = va_arg(ap, intptr_t);
+	va_end(ap);
+	return (__fcntl(fildes, cmd, arg));
+}
+
+#pragma weak open = _open
+int
+_open(const char *path, int oflag, ...)
+{
+	extern int __open(const char *, int, ...);
+	mode_t mode;
+	va_list ap;
+
+	va_start(ap, oflag);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	return (__open(path, oflag, mode));
+}
+
+#pragma weak openat = _openat
+int
+_openat(int fd, const char *path, int oflag, ...)
+{
+	extern int __openat(int, const char *, int, ...);
+	mode_t mode;
+	va_list ap;
+
+	va_start(ap, oflag);
+	mode = va_arg(ap, mode_t);
+	va_end(ap);
+	return (__openat(fd, path, oflag, mode));
+}
+
+#pragma weak read = _read
+ssize_t
+_read(int fd, void *buf, size_t size)
+{
+	extern ssize_t __read(int, void *, size_t);
+	return (__read(fd, buf, size));
+}
+
+#pragma weak write = _write
+ssize_t
+_write(int fd, const void *buf, size_t size)
+{
+	extern ssize_t __write(int, const void *, size_t);
+	return (__write(fd, buf, size));
 }
 
 #endif	/* EXPAND_RELATIVE */

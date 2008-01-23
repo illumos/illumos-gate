@@ -109,7 +109,8 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 		rwlock_t *rwlp = &udp->siguaction[sig].sig_lock;
 		lrw_rdlock(rwlp);
 		(void) _private_memcpy(&uact, (void *)sap, sizeof (uact));
-		if (sig == SIGCANCEL && (sap->sa_flags & SA_RESETHAND))
+		if ((sig == SIGCANCEL || sig == SIGAIOCANCEL) &&
+		    (sap->sa_flags & SA_RESETHAND))
 			sap->sa_sigaction = SIG_DFL;
 		lrw_unlock(rwlp);
 	}
@@ -388,7 +389,8 @@ _libc_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 				tact.sa_flags = SA_SIGINFO;
 			else {
 				tact.sa_flags |= SA_SIGINFO;
-				tact.sa_flags &= ~(SA_NODEFER | SA_RESETHAND);
+				tact.sa_flags &=
+				    ~(SA_NODEFER | SA_RESETHAND | SA_RESTART);
 			}
 			tact.sa_sigaction = udp->sigacthandler;
 			tact.sa_mask = maskset;
@@ -434,28 +436,6 @@ setsigacthandler(void (*nsigacthandler)(int, siginfo_t *, void *),
 		*osigacthandler = udp->sigacthandler;
 
 	udp->sigacthandler = nsigacthandler;
-}
-
-/*
- * Calling set_parking_flag(curthread, 1) informs the kernel that we are
- * calling __lwp_park or ___lwp_cond_wait().  If we take a signal in
- * the unprotected (from signals) interval before reaching the kernel,
- * sigacthandler() will call set_parking_flag(curthread, 0) to inform
- * the kernel to return immediately from these system calls, giving us
- * a spurious wakeup but not a deadlock.
- */
-void
-set_parking_flag(ulwp_t *self, int park)
-{
-	volatile sc_shared_t *scp;
-
-	enter_critical(self);
-	if ((scp = self->ul_schedctl) != NULL ||
-	    (scp = setup_schedctl()) != NULL)
-		scp->sc_park = park;
-	else if (park == 0)	/* schedctl failed, do it the long way */
-		__lwp_unpark(self->ul_lwpid);
-	exit_critical(self);
 }
 
 /*
@@ -688,12 +668,15 @@ signal_init()
 
 /*
  * Common code for cancelling self in _sigcancel() and pthread_cancel().
- * If the thread is at a cancellation point (ul_cancelable) then just
- * return and let _canceloff() do the exit, else exit immediately if
- * async mode is in effect.
+ * First record the fact that a cancellation is pending.
+ * Then, if cancellation is disabled or if we are holding unprotected
+ * libc locks, just return to defer the cancellation.
+ * Then, if we are at a cancellation point (ul_cancelable) just
+ * return and let _canceloff() do the exit.
+ * Else exit immediately if async mode is in effect.
  */
 void
-do_sigcancel()
+do_sigcancel(void)
 {
 	ulwp_t *self = curthread;
 
@@ -702,8 +685,10 @@ do_sigcancel()
 	self->ul_cancel_pending = 1;
 	if (self->ul_cancel_async &&
 	    !self->ul_cancel_disabled &&
+	    self->ul_libc_locks == 0 &&
 	    !self->ul_cancelable)
 		_pthread_exit(PTHREAD_CANCELED);
+	set_cancel_pending_flag(self, 0);
 }
 
 /*
@@ -728,7 +713,7 @@ setup_cancelsig(int sig)
 		act.sa_flags = SA_SIGINFO;
 	else {
 		act.sa_flags |= SA_SIGINFO;
-		act.sa_flags &= ~(SA_NODEFER | SA_RESETHAND);
+		act.sa_flags &= ~(SA_NODEFER | SA_RESETHAND | SA_RESTART);
 	}
 	act.sa_sigaction = udp->sigacthandler;
 	act.sa_mask = maskset;

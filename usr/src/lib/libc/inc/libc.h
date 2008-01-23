@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,7 +238,14 @@ extern int64_t _portfs(int, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 /*
  * defined in xpg4.c
  */
-extern int __xpg4;
+extern int __xpg4;		/* global */
+extern int libc__xpg4;		/* copy of __xpg4, private to libc */
+
+/*
+ * defined in xpg6.c
+ */
+extern uint_t __xpg6;		/* global */
+extern uint_t libc__xpg6;	/* copy of __xpg6, private to libc */
 
 /*
  * i18n prototypes - strong symbols (weak symbols are in libintl.h)
@@ -343,7 +350,7 @@ extern int _doscan(FILE *, const char *, va_list);
 extern int _wcscoll(const wchar_t *, const wchar_t *);
 extern size_t _wcsxfrm(wchar_t *, const wchar_t *, size_t);
 extern wint_t _fputwc(wint_t, FILE *);
-extern pid_t waitpid_cancel(pid_t, int *, int);
+
 #ifdef	__cplusplus
 }
 #endif

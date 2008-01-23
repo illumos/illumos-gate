@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,10 @@ dprintf(const char *format, ...)
 
 		va_start(alist, format);
 		flockfile(stderr);
+		pthread_cleanup_push(funlockfile, stderr);
 		(void) fputs("DEBUG: ", stderr);
 		(void) vfprintf(stderr, format, alist);
-		funlockfile(stderr);
+		pthread_cleanup_pop(1);		/* funlockfile(stderr) */
 		va_end(alist);
 	}
 }
@@ -317,24 +318,24 @@ aio_spawner(void *arg)
 		case AIOAREAD:
 		case AIOAWRITE:
 		case AIOFSYNC:
-		    {
+			{
 			aiocb_t *aiocbp =
 			    (aiocb_t *)port_event.portev_object;
 			function = aiocbp->aio_sigevent.sigev_notify_function;
 			attrp = aiocbp->aio_sigevent.sigev_notify_attributes;
 			break;
-		    }
+			}
 #if !defined(_LP64)
 		case AIOAREAD64:
 		case AIOAWRITE64:
 		case AIOFSYNC64:
-		    {
+			{
 			aiocb64_t *aiocbp =
 			    (aiocb64_t *)port_event.portev_object;
 			function = aiocbp->aio_sigevent.sigev_notify_function;
 			attrp = aiocbp->aio_sigevent.sigev_notify_attributes;
 			break;
-		    }
+			}
 #endif
 		default:
 			function = NULL;
@@ -472,7 +473,7 @@ setup_sigev_handler(const struct sigevent *sigevp, subsystem_t caller)
 		 */
 		tcdp->tcd_attrp = &tcdp->tcd_user_attr;
 		error = _pthread_attr_clone(tcdp->tcd_attrp,
-			    sigevp->sigev_notify_attributes);
+		    sigevp->sigev_notify_attributes);
 		if (error) {
 			tcdp->tcd_attrp = NULL;
 			free_sigev_handler(tcdp);
@@ -629,6 +630,7 @@ _aio_sigev_thread_init(struct sigevent *sigevp)
 
 	thread_communication_data_t *tcdp;
 	int port;
+	int cancel_state;
 	int rc = 0;
 
 	if (sigevp == NULL ||
@@ -637,8 +639,10 @@ _aio_sigev_thread_init(struct sigevent *sigevp)
 		return (0);
 
 	lmutex_lock(&sigev_aio_lock);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (sigev_aio_busy)
-		(void) _cond_wait(&sigev_aio_cv, &sigev_aio_lock);
+		(void) cond_wait(&sigev_aio_cv, &sigev_aio_lock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	if ((tcdp = sigev_aio_tcd) != NULL)
 		port = tcdp->tcd_port;
 	else {

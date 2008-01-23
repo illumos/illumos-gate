@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -807,7 +807,6 @@ SUNWprivate_1.1 {
 	_Q_cplx_lr_mul;
 	_Q_cplx_mul;
 	_QgetRD;
-	_syssun;
 	_xregs_clrptr;
 	__yday_to_month;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,6 @@ extern	int	_private_mutex_destroy(mutex_t *);
 extern	int	_private_mutex_lock(mutex_t *);
 extern	int	_private_mutex_trylock(mutex_t *);
 extern	int	_private_mutex_unlock(mutex_t *);
-#define	rmutex_lock	_private_mutex_lock
-#define	rmutex_trylock	_private_mutex_trylock
-#define	rmutex_unlock	_private_mutex_unlock
 extern	void	lmutex_lock(mutex_t *);
 extern	void	lmutex_unlock(mutex_t *);
 extern	int	__rwlock_init(rwlock_t *, int, void *);
@@ -62,6 +59,10 @@ extern	void	sig_mutex_unlock(mutex_t *);
 extern	int	sig_mutex_trylock(mutex_t *);
 extern	int	sig_cond_wait(cond_t *, mutex_t *);
 extern	int	sig_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	void	cancel_safe_mutex_lock(mutex_t *);
+extern	void	cancel_safe_mutex_unlock(mutex_t *);
+extern	int	cancel_safe_mutex_trylock(mutex_t *);
+extern	int	cancel_active(void);
 
 /* the private libc thread-safe allocator */
 extern	void	*lmalloc(size_t);
@@ -81,9 +82,9 @@ extern	int	__mutex_unlock(mutex_t *);
 
 extern	int	_cond_init(cond_t *, int, void *);
 extern	int	_cond_destroy(cond_t *);
-extern	int	_cond_wait(cond_t *, mutex_t *);
-extern	int	_cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
-extern	int	_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	int	__cond_wait(cond_t *, mutex_t *);
+extern	int	__cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
+extern	int	__cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 extern	int	_cond_signal(cond_t *);
 extern	int	_cond_broadcast(cond_t *);
 

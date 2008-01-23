@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1050,22 +1050,11 @@ int usleep(unsigned n);
 /* valloc.c */
 void *valloc(size_t size);
 
-/* values-Xa.c */
-
-/* values-Xc.c */
-
-/* values-Xs.c */
-
-/* values-Xt.c */
-
-/* wait3.c */
-pid_t wait3(int *status, int options, struct rusage *rp);
-
-/* wait4.c */
-pid_t wait4(pid_t pid, int *status, int options, struct rusage *rusage);
-
 /* waitpid.c */
+pid_t wait(int *stat_loc);
 pid_t waitpid(pid_t pid, int *stat_loc, int options);
+pid_t wait3(int *status, int options, struct rusage *rp);
+pid_t wait4(pid_t pid, int *status, int options, struct rusage *rusage);
 
 /* wcstombs.c */
 size_t wcstombs(char *_RESTRICT_KYWD s, const wchar_t *_RESTRICT_KYWD pwcs,

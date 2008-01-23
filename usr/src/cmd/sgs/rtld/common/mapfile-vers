@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -93,18 +93,15 @@ SUNWprivate_1.2 {
 		_environ;		# PLT tracing getenv() support.
 		 environ;
 
-		_open;			# Some routines are useful for support
-		_close;			# libraries such as liblddbg (this
-		 memcpy;		# reduces the cost of debugging as the
-		 snprintf;		# library doesn't have its own
-		 sprintf;		# dependency on libc).
-		 strcat;
-		 strcmp;
-		 strcpy;		# Note that some of these functions
-		 strlen;		# (like sprintf) may have reduced
-		 strrchr;		# functionality over libc, as a simpler
-		 strtok_r;		# implementation is provided in ld.so.1.
-		_write;
+		 memcpy;		# Some routines are useful for support
+		 snprintf;		# libraries such as liblddbg.
+		 sprintf;		# Note that some of these functions
+		 strcat;		# (like sprintf) may have reduced
+		 strcmp;		# functionality over libc, as a simpler
+		 strcpy;		# implementation is provided in ld.so.1.
+		 strlen;
+		 strrchr;
+		 strtok_r;
 	      ___errno;
 		 qsort;
 	local:

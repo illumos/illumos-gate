@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@
 #endif /* WORDEXP_KSH93 */
 #include <string.h>
 #include <sys/wait.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <wordexp.h>
 #include <stdio.h>
@@ -113,6 +114,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	int pv[2];		/* pipe from shell stdout */
 	FILE *fp;		/* pipe read stream */
 	int serrno, tmpalloc;
+	int cancel_state;
 
 	/*
 	 * Do absolute minimum necessary for the REUSE flag. Eventually
@@ -291,10 +293,12 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	(void) fclose(fp);	/* kill shell if still writing */
 
 wait_cleanup:
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	if (waitpid(pid, &status, 0) == -1)
 		rv = WRDE_ERRNO;
 	else if (rv == 0)
 		rv = WEXITSTATUS(status); /* shell WRDE_* status */
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 cleanup:
 	if (rv == 0)
@@ -357,6 +361,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	posix_spawnattr_t attr;
 	posix_spawn_file_actions_t fact;
 	int error;
+	int cancel_state;
 
 	static const char *sun_path = "/bin/ksh";
 	static const char *xpg4_path = "/usr/xpg4/bin/sh";
@@ -544,6 +549,7 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	(void) fclose(fp);	/* kill shell if still writing */
 
 wait_cleanup:
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (waitpid(pid, &status, 0) == -1) {
 		if (errno != EINTR) {
 			if (rv == 0)
@@ -551,6 +557,7 @@ wait_cleanup:
 			break;
 		}
 	}
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	if (rv == 0)
 		rv = WEXITSTATUS(status); /* shell WRDE_* status */
 

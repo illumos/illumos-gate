@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,6 @@ extern int _so_sendto();
 extern int _so_getpeername();
 extern int _so_getsockopt();
 extern int _so_setsockopt();
-extern int _so_setsockname();
 extern int _so_getsockname();
 
 /*
@@ -119,7 +118,7 @@ _recvfrom(int sock, char *buf, int len, int flags,
 	struct sockaddr *addr, int *addrlen)
 {
 	return (_so_recvfrom(sock, buf, len, flags & ~MSG_XPG4_2,
-		addr, addrlen));
+	    addr, addrlen));
 }
 
 int
@@ -145,7 +144,7 @@ _sendto(int sock, char *buf, int len, int flags,
 	struct sockaddr *addr, int *addrlen)
 {
 	return (_so_sendto(sock, buf, len, flags & ~MSG_XPG4_2,
-		addr, addrlen));
+	    addr, addrlen));
 }
 
 int
@@ -184,7 +183,7 @@ _getsockopt(int sock, int level, int optname, char *optval, int *optlen)
 			break;
 		case SCTP_DEFAULT_SEND_PARAM:
 			bcopy(&((struct sctp_sndrcvinfo *)
-				optval)->sinfo_assoc_id, &id, sizeof (id));
+			    optval)->sinfo_assoc_id, &id, sizeof (id));
 			break;
 		}
 
@@ -200,7 +199,7 @@ _getsockopt(int sock, int level, int optname, char *optval, int *optlen)
 		return (err);
 	} else {
 		return (_so_getsockopt(sock, level, optname, optval, optlen,
-			    SOV_DEFAULT));
+		    SOV_DEFAULT));
 	}
 }
 
@@ -208,7 +207,7 @@ int
 _setsockopt(int sock, int level, int optname, char *optval, int optlen)
 {
 	return (_so_setsockopt(sock, level, optname, optval, optlen,
-		SOV_DEFAULT));
+	    SOV_DEFAULT));
 }
 
 int
@@ -247,7 +246,7 @@ __xnet_sendto(int sock, const void *buf, size_t len, int flags,
 	const struct sockaddr *addr, socklen_t addrlen)
 {
 	return (_so_sendto(sock, buf, len, flags | MSG_XPG4_2,
-		addr, addrlen));
+	    addr, addrlen));
 }
 
 int
@@ -256,9 +255,9 @@ __xnet_getsockopt(int sock, int level, int option_name,
 {
 	if (level == IPPROTO_SCTP) {
 		return (_getsockopt(sock, level, option_name, option_value,
-			    (int *)option_lenp));
+		    (int *)option_lenp));
 	} else {
 		return (_so_getsockopt(sock, level, option_name, option_value,
-			    option_lenp, SOV_XPG4_2));
+		    option_lenp, SOV_XPG4_2));
 	}
 }
