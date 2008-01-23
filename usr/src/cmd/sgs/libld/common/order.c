@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,13 +280,11 @@ ld_sec_validate(Ofl_desc *ofl)
 	int 		key = 1;
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Sec_order	**scopp;
-		Os_desc		**ospp;
-		Aliste		off;
+		Sec_order	*scop;
+		Os_desc		*osp;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
-			Sec_order	*scop = *scopp;
-
+		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop)) {
 			if ((scop->sco_flags & FLG_SGO_USED) == 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_MAP_SECORDER),
@@ -296,10 +294,9 @@ ld_sec_validate(Ofl_desc *ofl)
 		if ((sgp->sg_flags & FLG_SG_KEY) == 0)
 			continue;
 
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 			Listnode	*lnp2;
 			Is_desc		*isp;
-			Os_desc		*osp = *ospp;
 
 			if ((osp->os_flags & FLG_OS_ORDER_KEY) == 0)
 				continue;
@@ -428,14 +425,13 @@ ld_sort_ordered(Ofl_desc *ofl)
 		 */
 		if (st->st_ordercnt != 0)
 			qsort((char *)st->st_order, st->st_ordercnt,
-				sizeof (Is_desc *), comp);
+			    sizeof (Is_desc *), comp);
 
 		/*
 		 * Place SHN_BEFORE at head of list
 		 */
 		for (i = 0; i < st->st_beforecnt; i++) {
-			if (list_appendc(&(osp->os_isdescs),
-			    st->st_before[i]) == 0)
+			if (ld_append_isp(ofl, osp, st->st_before[i], 0) == 0)
 				return (S_ERROR);
 		}
 
@@ -443,14 +439,17 @@ ld_sort_ordered(Ofl_desc *ofl)
 		 * Next come 'linked' ordered sections
 		 */
 		for (i = 0; i < st->st_ordercnt; i++) {
-			if (list_appendc(&(osp->os_isdescs),
-			    st->st_order[i]) == 0)
+			if (ld_append_isp(ofl, osp, st->st_order[i], 0) == 0)
 				return (S_ERROR);
 		}
 
 		/*
 		 * Now we list any sections which have no sorting
 		 * specifications - in the order they were input.
+		 *
+		 * We use list_appendc() here instead of ld_append_isp(),
+		 * because these items have already been inserted once, and
+		 * we don't want any duplicate entries in osp->os_mstridescs.
 		 */
 		for (LIST_TRAVERSE(&islist, lnp2, isp)) {
 			if (isp->is_flags & FLG_IS_ORDERED)
@@ -464,8 +463,7 @@ ld_sort_ordered(Ofl_desc *ofl)
 		 * And the end of the list are the SHN_AFTER sections.
 		 */
 		for (i = 0; i < st->st_aftercnt; i++) {
-			if (list_appendc(&(osp->os_isdescs),
-			    st->st_after[i]) == 0)
+			if (ld_append_isp(ofl, osp, st->st_after[i], 0) == 0)
 				return (S_ERROR);
 		}
 	}

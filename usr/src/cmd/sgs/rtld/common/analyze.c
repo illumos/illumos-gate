@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,7 +113,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 	 * are added to a new link-map control list.
 	 */
 	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 	if (nlmc->lc_flags & LMC_FLG_ANALYZING)
 		return (1);
 
@@ -184,7 +184,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 		 * dependencies.
 		 */
 		/* LINTED */
-		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+		nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 		if (nlmc->lc_flags & LMC_FLG_REANALYZE) {
 			nlmc->lc_flags &= ~LMC_FLG_REANALYZE;
 			lmp = nlmc->lc_head;
@@ -192,7 +192,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 	}
 
 	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 	nlmc->lc_flags &= ~LMC_FLG_ANALYZING;
 
 	return (ret);
@@ -307,21 +307,23 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 	 * Perform special copy relocations.  These are only meaningful for
 	 * dynamic executables (fixed and head of their link-map list).  If
 	 * this ever has to change then the infrastructure of COPY() has to
-	 * change as presently this element is used to capture both receiver
-	 * and supplier of copy data.
+	 * change. Presently, a given link map can only have a receiver or
+	 * supplier of copy data, so a union is used to overlap the storage
+	 * for the COPY_R() and COPY_S() lists. These lists would need to
+	 * be separated.
 	 */
 	if ((FLAGS(nlmp) & FLG_RT_FIXED) && (nlmp == LIST(nlmp)->lm_head) &&
 	    (((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0) ||
 	    (lml->lm_flags & LML_FLG_TRC_WARN))) {
-		Rt_map **	lmpp;
-		Aliste		off1;
+		Rt_map		*lmp;
+		Aliste		idx1;
 		Word		tracing;
 
 #if	defined(__i386)
 		if (elf_copy_gen(nlmp) == 0)
 			return (0);
 #endif
-		if (COPY(nlmp) == 0)
+		if (COPY_S(nlmp) == NULL)
 			return (1);
 
 		if ((LIST(nlmp)->lm_flags & LML_FLG_TRC_ENABLE) &&
@@ -333,12 +335,11 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 
 		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
-		for (ALIST_TRAVERSE(COPY(nlmp), off1, lmpp)) {
-			Rt_map *	lmp = *lmpp;
+		for (APLIST_TRAVERSE(COPY_S(nlmp), idx1, lmp)) {
 			Rel_copy *	rcp;
-			Aliste		off2;
+			Aliste		idx2;
 
-			for (ALIST_TRAVERSE(COPY(lmp), off2, rcp)) {
+			for (ALIST_TRAVERSE(COPY_R(lmp), idx2, rcp)) {
 				int zero;
 
 				/*
@@ -365,8 +366,8 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 
 		DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
-		free(COPY(nlmp));
-		COPY(nlmp) = 0;
+		free(COPY_S(nlmp));
+		COPY_S(nlmp) = 0;
 	}
 	return (1);
 }
@@ -375,7 +376,7 @@ int
 relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 {
 	int	lret = 1, pret = 1;
-	Alist	*alp;
+	APlist	*alp;
 	Aliste	plmco;
 	Lm_cntl	*plmc, *nlmc;
 
@@ -388,7 +389,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 	 * are added to a new link-map control list.
 	 */
 	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 
 	if (nlmc->lc_flags & LMC_FLG_RELOCATING)
 		return (1);
@@ -427,7 +428,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 		 * are demoted to standard objects.  Their interposition can't
 		 * be guaranteed once relocations have been carried out.
 		 */
-		if (nlmco == ALO_DATA)
+		if (nlmco == ALIST_OFF_DATA)
 			lml->lm_flags |= LML_FLG_STARTREL;
 
 		/*
@@ -439,7 +440,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 		 * failed objects now.
 		 */
 		lret = _relocate_lmc(lml, nlmp, &relocated);
-		if ((lret == 0) && (nlmco != ALO_DATA))
+		if ((lret == 0) && (nlmco != ALIST_OFF_DATA))
 			remove_lmc(lml, clmp, nlmc, nlmco, NAME(nlmp));
 	}
 
@@ -447,14 +448,14 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 	 * Determine the new, and previous link-map control lists.
 	 */
 	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
-	if (nlmco == ALO_DATA) {
+	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
+	if (nlmco == ALIST_OFF_DATA) {
 		plmco = nlmco;
 		plmc = nlmc;
 	} else {
 		plmco = nlmco - lml->lm_lists->al_size;
 		/* LINTED */
-		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
+		plmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, plmco);
 	}
 
 	/*
@@ -465,7 +466,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 	 * be moved up one control list so as to preserve the link-map order
 	 * that may have already been traversed in search of symbols.
 	 */
-	if (lret && (nlmco != ALO_DATA) && nlmc->lc_head)
+	if (lret && (nlmco != ALIST_OFF_DATA) && nlmc->lc_head)
 		lm_move(lml, nlmco, plmco, nlmc, plmc);
 
 	/*
@@ -477,20 +478,18 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 	 * prevents relocations from being bound to objects that might yet fail
 	 * to relocate themselves.
 	 */
-	while ((alp = plmc->lc_now) != 0) {
-		Aliste	off;
-		Rt_map	**lmpp;
+	while ((alp = plmc->lc_now) != NULL) {
+		Aliste	idx;
+		Rt_map	*lmp;
 
 		/*
 		 * Remove the relocation promotion list, as performing more
 		 * relocations may result in discovering more objects that need
 		 * promotion.
 		 */
-		plmc->lc_now = 0;
+		plmc->lc_now = NULL;
 
-		for (ALIST_TRAVERSE(alp, off, lmpp)) {
-			Rt_map	*lmp = *lmpp;
-
+		for (APLIST_TRAVERSE(alp, idx, lmp)) {
 			/*
 			 * If the original relocation of the link-map control
 			 * list failed, or one of the relocation promotions of
@@ -526,10 +525,10 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 		 * link-map control list.
 		 */
 		/* LINTED */
-		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+		nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 		/* LINTED */
-		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
-		if ((nlmco != ALO_DATA) && nlmc->lc_head)
+		plmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, plmco);
+		if ((nlmco != ALIST_OFF_DATA) && nlmc->lc_head)
 			lm_move(lml, nlmco, plmco, nlmc, plmc);
 		free(alp);
 	}
@@ -542,7 +541,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 	 */
 	if (lret && pret) {
 		/* LINTED */
-		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+		nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 		nlmc->lc_flags &= ~LMC_FLG_RELOCATING;
 
 		return (1);
@@ -741,8 +740,8 @@ _is_so_matched(const char *name, const char *str, int path)
 static Rt_map *
 is_so_matched(Rt_map *lmp, const char *name, int path)
 {
-	Aliste		off;
-	const char	**cpp;
+	Aliste		idx;
+	const char	*cp;
 
 	/*
 	 * A pathname is typically going to match a NAME() or PATHNAME(), so
@@ -767,12 +766,12 @@ is_so_matched(Rt_map *lmp, const char *name, int path)
 	 * If this is a simple filename, or a pathname has failed to match the
 	 * NAME() and PATHNAME() check above, look through the ALIAS() list.
 	 */
-	for (ALIST_TRAVERSE(ALIAS(lmp), off, cpp)) {
+	for (APLIST_TRAVERSE(ALIAS(lmp), idx, cp)) {
 		/*
 		 * If we're looking for a simple filename, _is_so_matched()
 		 * will reduce the ALIAS name to its simple name.
 		 */
-		if (_is_so_matched(name, *cpp, path) == 0)
+		if (_is_so_matched(name, cp, path) == 0)
 			return (lmp);
 	}
 
@@ -823,7 +822,7 @@ is_so_loaded(Lm_list *lml, const char *name)
 	Rt_map		*lmp;
 	avl_index_t	where;
 	Lm_cntl		*lmc;
-	Aliste		off;
+	Aliste		idx;
 	int		path = 0;
 
 	/*
@@ -844,7 +843,7 @@ is_so_loaded(Lm_list *lml, const char *name)
 	/*
 	 * Loop through the callers link-map lists.
 	 */
-	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
+	for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 		for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
 			if (FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE))
 				continue;
@@ -978,9 +977,9 @@ update_mode(Rt_map *lmp, int omode, int nmode)
 		Lm_cntl	*lmc;
 
 		/* LINTED */
-		lmc = (Lm_cntl *)((char *)(LIST(lmp)->lm_lists) + CNTL(lmp));
-		(void) alist_append(&(lmc->lc_now), &lmp, sizeof (Rt_map *),
-		    AL_CNT_LMNOW);
+		lmc = (Lm_cntl *)alist_item_by_offset(LIST(lmp)->lm_lists,
+		    CNTL(lmp));
+		(void) aplist_append(&lmc->lc_now, lmp, AL_CNT_LMNOW);
 	}
 
 #ifdef	SIEBEL_DISABLE
@@ -1028,14 +1027,14 @@ update_mode(Rt_map *lmp, int omode, int nmode)
 int
 append_alias(Rt_map *lmp, const char *str, int *added)
 {
-	Aliste	off;
-	char	**cpp, *cp;
+	Aliste	idx;
+	char	*cp;
 
 	/*
 	 * Determine if this filename is already on the alias list.
 	 */
-	for (ALIST_TRAVERSE(ALIAS(lmp), off, cpp)) {
-		if (strcmp(*cpp, str) == 0)
+	for (APLIST_TRAVERSE(ALIAS(lmp), idx, cp)) {
+		if (strcmp(cp, str) == 0)
 			return (1);
 	}
 
@@ -1045,8 +1044,7 @@ append_alias(Rt_map *lmp, const char *str, int *added)
 	if ((cp = strdup(str)) == NULL)
 		return (0);
 
-	if (alist_append(&ALIAS(lmp), &cp, sizeof (char *),
-	    AL_CNT_ALIAS) == 0) {
+	if (aplist_append(&ALIAS(lmp), cp, AL_CNT_ALIAS) == NULL) {
 		free(cp);
 		return (0);
 	}
@@ -1064,7 +1062,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
     uint_t flags)
 {
 	Lm_cntl	*lmc;
-	Aliste	off;
+	Aliste	idx;
 
 	/*
 	 * If this is an auditor, it will have been opened on a new link-map.
@@ -1093,7 +1091,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 	 * information if this file is actually linked to one we already have
 	 * mapped.  This catches symlink names not caught by is_so_loaded().
 	 */
-	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
+	for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 		Rt_map	*nlmp;
 
 		for (nlmp = lmc->lc_head; nlmp; nlmp = (Rt_map *)NEXT(nlmp)) {
@@ -1945,8 +1943,8 @@ static int
 load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
     uint_t flags, Grp_hdl **hdl, Rt_map *nlmp)
 {
-	Aliste		off;
-	Grp_hdl		*ghp, **ghpp;
+	Aliste		idx;
+	Grp_hdl		*ghp;
 	int		promote;
 
 	/*
@@ -2096,7 +2094,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	/*
 	 * If the caller isn't part of a group we're done.
 	 */
-	if (GROUPS(clmp) == 0)
+	if (GROUPS(clmp) == NULL)
 		return (1);
 
 	/*
@@ -2106,21 +2104,19 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 * new link-map to those groups.
 	 */
 	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-	for (ALIST_TRAVERSE(GROUPS(clmp), off, ghpp)) {
-		Aliste		off1;
+	for (APLIST_TRAVERSE(GROUPS(clmp), idx, ghp)) {
+		Aliste		idx1;
 		Grp_desc	*gdp;
 		int		exist;
-		Rt_map		**lmpp;
-		Alist		*lmalp = 0;
-
-		ghp = *ghpp;
+		Rt_map		*dlmp1;
+		APlist		*lmalp = NULL;
 
 		/*
 		 * If the caller doesn't indicate that its dependencies should
 		 * be added to a handle, ignore it.  This case identifies a
 		 * parent of a dlopen(RTLD_PARENT) request.
 		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, off1, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx1, gdp)) {
 			if (gdp->gd_depend == clmp)
 				break;
 		}
@@ -2145,35 +2141,32 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		 * dependencies we're also done.
 		 */
 		if (((FLAGS(nlmp) & FLG_RT_ANALYZED) == 0) ||
-		    (DEPENDS(nlmp) == 0))
+		    (DEPENDS(nlmp) == NULL))
 			continue;
 
 		/*
 		 * Otherwise, this object exists and has dependencies, so add
 		 * all of its dependencies to the handle were operating on.
 		 */
-		if (alist_append(&lmalp, &nlmp, sizeof (Rt_map *),
-		    AL_CNT_DEPCLCT) == 0)
+		if (aplist_append(&lmalp, nlmp, AL_CNT_DEPCLCT) == 0)
 			return (0);
 
-		for (ALIST_TRAVERSE(lmalp, off1, lmpp)) {
-			Rt_map *	dlmp1 = *lmpp;
-			Aliste		off2;
-			Bnd_desc **	bdpp;
+		for (APLIST_TRAVERSE(lmalp, idx1, dlmp1)) {
+			Aliste		idx2;
+			Bnd_desc 	*bdp;
 
 			/*
 			 * Add any dependencies of this dependency to the
 			 * dynamic dependency list so they can be further
 			 * processed.
 			 */
-			for (ALIST_TRAVERSE(DEPENDS(dlmp1), off2, bdpp)) {
-				Bnd_desc *	bdp = *bdpp;
+			for (APLIST_TRAVERSE(DEPENDS(dlmp1), idx2, bdp)) {
 				Rt_map *	dlmp2 = bdp->b_depend;
 
 				if ((bdp->b_flags & BND_NEEDED) == 0)
 					continue;
 
-				if (alist_test(&lmalp, dlmp2, sizeof (Rt_map *),
+				if (aplist_test(&lmalp, dlmp2,
 				    AL_CNT_DEPCLCT) == 0) {
 					free(lmalp);
 					return (0);
@@ -2454,9 +2447,9 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 	 */
 	if (FLAGS1(*dlmp) & FL1_RT_COPYTOOK) {
 		Rel_copy	*rcp;
-		Aliste		off;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(COPY(*dlmp), off, rcp)) {
+		for (ALIST_TRAVERSE(COPY_R(*dlmp), idx, rcp)) {
 			if ((sym == rcp->r_dsym) || (sym->st_value &&
 			    (sym->st_value == rcp->r_dsym->st_value))) {
 				*dlmp = rcp->r_rlmp;
@@ -2564,16 +2557,16 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 	sym = 0;
 
 	if (sip->si_boundto == SYMINFO_BT_PARENT) {
-		Aliste		off1;
-		Bnd_desc	**bdpp;
-		Grp_hdl		**ghpp;
+		Aliste		idx1;
+		Bnd_desc	*bdp;
+		Grp_hdl		*ghp;
 
 		/*
 		 * Determine the parent of this explicit dependency from its
 		 * CALLERS()'s list.
 		 */
-		for (ALIST_TRAVERSE(CALLERS(clmp), off1, bdpp)) {
-			sl.sl_imap = lmp = (*bdpp)->b_caller;
+		for (APLIST_TRAVERSE(CALLERS(clmp), idx1, bdp)) {
+			sl.sl_imap = lmp = bdp->b_caller;
 			if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != 0)
 				goto found;
 		}
@@ -2585,12 +2578,11 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 		 * explicit dependencies of the dlopen()'ed object, and the
 		 * calling parent.
 		 */
-		for (ALIST_TRAVERSE(HANDLES(clmp), off1, ghpp)) {
-			Grp_hdl		*ghp = *ghpp;
+		for (APLIST_TRAVERSE(HANDLES(clmp), idx1, ghp)) {
 			Grp_desc	*gdp;
-			Aliste		off2;
+			Aliste		idx2;
 
-			for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 				if ((gdp->gd_flags & GPD_PARENT) == 0)
 					continue;
 				sl.sl_imap = lmp = gdp->gd_depend;
@@ -2641,7 +2633,7 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 	 * Copy relocations should start their search after the head of the
 	 * main link-map control list.
 	 */
-	if ((off == ALO_DATA) && (slp->sl_flags & LKUP_COPY) && ilmp)
+	if ((off == ALIST_OFF_DATA) && (slp->sl_flags & LKUP_COPY) && ilmp)
 		lmp = (Rt_map *)NEXT(ilmp);
 	else
 		lmp = ilmp;
@@ -2813,14 +2805,14 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 
 		sym = NULL;
 
-		for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, off, lmc)) {
+		for (ALIST_TRAVERSE_BY_OFFSET(LIST(clmp)->lm_lists, off, lmc)) {
 			if (((sym = core_lookup_sym(lmc->lc_head, &sl, dlmp,
 			    binfo, off)) != NULL) ||
 			    (*binfo & BINFO_REJSINGLE))
 				break;
 		}
 	} else
-		sym = core_lookup_sym(ilmp, &sl, dlmp, binfo, ALO_DATA);
+		sym = core_lookup_sym(ilmp, &sl, dlmp, binfo, ALIST_OFF_DATA);
 
 	/*
 	 * If a symbol binding was rejected, because a binding occurred to a
@@ -2854,10 +2846,10 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		if (sl.sl_flags & LKUP_NEXT)
 			sym = _lazy_find_sym(clmp, &sl, dlmp, binfo);
 		else {
-			Aliste	off;
+			Aliste	idx;
 			Lm_cntl	*lmc;
 
-			for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, off, lmc)) {
+			for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, idx, lmc)) {
 				sl.sl_flags |= LKUP_NOFALBACK;
 				if ((sym = _lazy_find_sym(lmc->lc_head, &sl,
 				    dlmp, binfo)) != 0)
@@ -2969,17 +2961,15 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 int
 bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
 {
-	Bnd_desc	**bdpp, *bdp;
-	Aliste		off;
+	Bnd_desc	*bdp;
+	Aliste		idx;
 	int		found = ALE_CREATE;
 
 	/*
 	 * Determine whether a binding descriptor already exists between the
 	 * two objects.
 	 */
-	for (ALIST_TRAVERSE(DEPENDS(clmp), off, bdpp)) {
-		bdp = *bdpp;
-
+	for (APLIST_TRAVERSE(DEPENDS(clmp), idx, bdp)) {
 		if (bdp->b_depend == dlmp) {
 			found = ALE_EXISTS;
 			break;
@@ -3001,12 +2991,10 @@ bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
 		 * Append the binding descriptor to the caller and the
 		 * dependency.
 		 */
-		if (alist_append(&DEPENDS(clmp), &bdp,
-		    sizeof (Bnd_desc *), AL_CNT_DEPENDS) == 0)
+		if (aplist_append(&DEPENDS(clmp), bdp, AL_CNT_DEPENDS) == 0)
 			return (0);
 
-		if (alist_append(&CALLERS(dlmp), &bdp,
-		    sizeof (Bnd_desc *), AL_CNT_CALLERS) == 0)
+		if (aplist_append(&CALLERS(dlmp), bdp, AL_CNT_CALLERS) == 0)
 			return (0);
 	}
 
@@ -3025,7 +3013,7 @@ bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
  * Cleanup after relocation processing.
  */
 int
-relocate_finish(Rt_map *lmp, Alist *bound, int textrel, int ret)
+relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
 {
 	DBG_CALL(Dbg_reloc_run(lmp, 0, ret, DBG_REL_FINISH));
 
@@ -3033,12 +3021,12 @@ relocate_finish(Rt_map *lmp, Alist *bound, int textrel, int ret)
 	 * Establish bindings to all objects that have been bound to.
 	 */
 	if (bound) {
-		Aliste	off;
-		Rt_map	**lmpp;
+		Aliste	idx;
+		Rt_map	*_lmp;
 
 		if (ret) {
-			for (ALIST_TRAVERSE(bound, off, lmpp)) {
-				if (bind_one(lmp, *lmpp, BND_REFER) == 0) {
+			for (APLIST_TRAVERSE(bound, idx, _lmp)) {
+				if (bind_one(lmp, _lmp, BND_REFER) == 0) {
 					ret = 0;
 					break;
 				}

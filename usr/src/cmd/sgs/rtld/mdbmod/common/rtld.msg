@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,7 @@
 @ MSG_STR_LDSO1		"ld.so.1"
 @ MSG_STR_DYNLMLIST	"dynlm_list"
 @ MSG_STR_ALIST		"Alist"
+@ MSG_STR_APLIST	"APlist"
 @ MSG_STR_LISTNODE	"Listnode"
 @ MSG_STR_EMPTY		""
 @ MSG_STR_ORPHANED	"<orphaned>"
@@ -552,20 +553,20 @@
 @ MSG_DEPENDS_DCD	"Display Rt_map DEPENDS binding descriptors"
 
 @ MSG_DEPENDS_LINE1	"DEPENDS for %s\n"
-@ MSG_DEPENDS_LINE2	"  Depends: 0x%0?p Alist[used %u: total %u]\n"
+@ MSG_DEPENDS_LINE2	"  Depends: 0x%0?p APlist[used %u: total %u]\n"
 
 @ MSG_DEPENDS_HELP	"\
    Display the binding descriptor list of DEPENDS() of the Rt_map\n\
-   specified by addr.  A DEPENDS() entry consists of an Alist\n\
+   specified by addr.  A DEPENDS() entry consists of an APlist\n\
    defining each dependency.\n\
    \n\
-   The -v option walks the Alist descriptor displaying each dependency.\n\
+   The -v option walks the APlist descriptor displaying each dependency.\n\
    \n\
    Example:\n\n\
    \t> 0xff3b0554::Depends -v\n\
    \tDEPENDS for /lib/libc.so.1\n\
    \t----------------------------------------------\n\
-   \t  Depends: 0xff3b0bc4 Alist[used 2: total 4]\n\
+   \t  Depends: 0xff3b0bc4 APlist[used 2: total 4]\n\
    \t    ----------------------------------------------\n\
    \t    Binding descriptor located at: 0xff3b08f8\n\
    \t       caller: 0xff3b0554    /lib/libc.so.1\n\
@@ -586,20 +587,20 @@
 @ MSG_CALLERS_DCD	"Display Rt_map CALLERS binding descriptors"
 
 @ MSG_CALLERS_LINE1	"CALLERS for %s\n"
-@ MSG_CALLERS_LINE2	"  Callers: 0x%0?p Alist[used %u: total %u]\n"
+@ MSG_CALLERS_LINE2	"  Callers: 0x%0?p APlist[used %u: total %u]\n"
 
 @ MSG_CALLERS_HELP	"\
    Display the binding descriptor list of CALLERS() of the Rt_map\n\
-   specified by addr.  A CALLERS() entry consists of an Alist\n\
+   specified by addr.  A CALLERS() entry consists of an APlist\n\
    defining each caller.\n\
    \n\
-   The -v option walks the Alist descriptor displaying each caller.\n\
+   The -v option walks the APlist descriptor displaying each caller.\n\
    \n\
    Example:\n\n\
    \t> 0xff3b0554::Callers -v\n\
    \tCALLERS for /lib/libc.so.1\n\
    \t----------------------------------------------\n\
-   \t  Callers: 0xff3b08cc Alist[used 1: total 4]\n\
+   \t  Callers: 0xff3b08cc APlist[used 1: total 4]\n\
    \t    ----------------------------------------------\n\
    \t    Binding descriptor located at: 0xff3b0514\n\
    \t       caller: 0xff3b0214    a.out\n\
@@ -616,21 +617,21 @@
 @ MSG_HANDLES_DCD	"Display Rt_map HANDLES group descriptors"
 
 @ MSG_HANDLES_LINE1	"HANDLES for %s\n"
-@ MSG_HANDLES_LINE2	"  HANDLE: 0x%0?p Alist[used %u: total %u]\n"
+@ MSG_HANDLES_LINE2	"  HANDLE: 0x%0?p APlist[used %u: total %u]\n"
 
 @ MSG_HANDLES_HELP	"\
    Display the list of HANDLES() that the Rt_map, specified by addr, is the\n\
-   owner of.  A HANDLES() entry consists of an Alist of Grp_hdl descriptors.\n\
-   See GrpHdl.  Each Grp_hdl() consists of an Alist of Grp_desc descriptors\n\
+   owner of.  A HANDLES() entry consists of an APlist of Grp_hdl descriptors.\n\
+   See GrpHdl.  Each Grp_hdl() consists of an APlist of Grp_desc descriptors\n\
    that define each caller.  See GrpDesc.\n\
    \n\
-   The -v option walks all Alists displaying each member of the handle.\n\
+   The -v option walks all APlists displaying each member of the handle.\n\
    \n\
    Example:\n\n\
    \t> 0xff3b0f6c::Handles -v\n\
    \tHANDLES for ./sub.so\n\
    \t----------------------------------------------\n\
-   \t  HANDLE: 0xff3b1310 Alist[used 1: total 1]\n\
+   \t  HANDLE: 0xff3b1310 APlist[used 1: total 1]\n\
    \t    ----------------------------------------------\n\
    \t    Group Handle located at: 0xff3b1270\n\
    \t    ----------------------------------------------\n\
@@ -659,21 +660,21 @@
 @ MSG_GROUPS_DCD	"Display Rt_map GROUPS group handles"
 
 @ MSG_GROUPS_LINE1	"GROUPS for %s\n"
-@ MSG_GROUPS_LINE2	"  Groups: 0x%0?p Alist[used %u: total %u]\n"
+@ MSG_GROUPS_LINE2	"  Groups: 0x%0?p APlist[used %u: total %u]\n"
 
 @ MSG_GROUPS_HELP	"\
    Display the list of GROUPS() that the Rt_map, specified by addr, is a \
-   member\nof.  A GROUPS() entry consists of an Alist of Grp_hdl entries.  \
+   member\nof.  A GROUPS() entry consists of an APlist of Grp_hdl entries.  \
    See GrpHdl.\n\
    \n\
-   The -v option walks the Alist descriptor displaying each member of the\n\
+   The -v option walks the APlist descriptor displaying each member of the\n\
    handle.\n\
    \n\
    Example:\n\n\
    \t> 0xff3b0f6c::Groups -v\n\
    \tGROUPS for ./sub.so\n\
    \t----------------------------------------------\n\
-   \t  Groups: 0xff3b12a8 Alist[used 1: total 1]\n\
+   \t  Groups: 0xff3b12a8 APlist[used 1: total 1]\n\
    \t    ----------------------------------------------\n\
    \t    Group Handle located at: 0xff3b1270\n\
    \t    ----------------------------------------------\n\

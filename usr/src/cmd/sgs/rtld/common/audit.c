@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
@@ -222,8 +222,8 @@ _audit_activity(List *list, Rt_map *clmp, uint_t flags)
 			if (alml->lm_flags & LML_FLG_AUDITNOTIFY)
 				continue;
 
-			if (alist_append(&(clml->lm_actaudit), &clmp,
-			    sizeof (Rt_map *), AL_CNT_ACTAUDIT) == 0)
+			if (aplist_append(&clml->lm_actaudit, clmp,
+			    AL_CNT_ACTAUDIT) == NULL)
 				return;
 
 			alml->lm_flags |= LML_FLG_AUDITNOTIFY;
@@ -749,7 +749,7 @@ audit_desc_cleanup(Rt_map *clmp)
 	Audit_desc	*adp = AUDITORS(clmp);
 	Audit_list	*alp;
 	Listnode	*lnp, *olnp;
-	Alist		*ghalp = 0;
+	APlist		*ghalp = NULL;
 
 	if (adp == 0)
 		return;
@@ -758,8 +758,7 @@ audit_desc_cleanup(Rt_map *clmp)
 
 	olnp = 0;
 	for (LIST_TRAVERSE(&(adp->ad_list), lnp, alp)) {
-		(void) alist_append(&ghalp, &(alp->al_ghp), sizeof (Grp_hdl *),
-		    AL_CNT_GROUPS);
+		(void) aplist_append(&ghalp, alp->al_ghp, AL_CNT_GROUPS);
 
 		if (olnp)
 			free(olnp);
@@ -772,11 +771,11 @@ audit_desc_cleanup(Rt_map *clmp)
 	AUDITORS(clmp) = 0;
 
 	if (ghalp) {
-		Grp_hdl **	ghpp;
-		Aliste		off;
+		Grp_hdl		*ghp;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(ghalp, off, ghpp)) {
-			(void) dlclose_intn(*ghpp, clmp);
+		for (APLIST_TRAVERSE(ghalp, idx, ghp)) {
+			(void) dlclose_intn(ghp, clmp);
 		}
 		free(ghalp);
 	}

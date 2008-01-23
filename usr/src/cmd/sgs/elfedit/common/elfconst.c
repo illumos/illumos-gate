@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1196,6 +1196,15 @@ static elfedit_atoui_sym_t sym_shf[] = {
 
 	{ MSG_ORIG(MSG_SHF_TLS),		SHF_TLS },
 	{ MSG_ORIG(MSG_SHF_TLS_ALT1),		SHF_TLS },
+
+	{ MSG_ORIG(MSG_SHF_AMD64_LARGE),	SHF_AMD64_LARGE },
+	{ MSG_ORIG(MSG_SHF_AMD64_LARGE_ALT1),	SHF_AMD64_LARGE },
+
+	{ MSG_ORIG(MSG_SHF_ORDERED),		SHF_ORDERED },
+	{ MSG_ORIG(MSG_SHF_ORDERED_ALT1),	SHF_ORDERED },
+
+	{ MSG_ORIG(MSG_SHF_EXCLUDE),		SHF_EXCLUDE },
+	{ MSG_ORIG(MSG_SHF_EXCLUDE_ALT1),	SHF_EXCLUDE },
 
 	{ NULL }
 };

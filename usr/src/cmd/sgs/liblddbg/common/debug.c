@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -244,15 +244,15 @@ Dbg_setup(const char *string, Dbg_desc *dbp)
 					continue;
 
 				if (set == TRUE) {
-				    if (opt->o_class)
-					dbp->d_class |= opt->o_class;
-				    if (opt->o_extra)
-					dbp->d_extra |= opt->o_extra;
+					if (opt->o_class)
+						dbp->d_class |= opt->o_class;
+					if (opt->o_extra)
+						dbp->d_extra |= opt->o_extra;
 				} else {
-				    if (opt->o_class)
-					dbp->d_class &= ~(opt->o_class);
-				    if (opt->o_extra)
-					dbp->d_extra &= ~(opt->o_extra);
+					if (opt->o_class)
+						dbp->d_class &= ~(opt->o_class);
+					if (opt->o_extra)
+						dbp->d_extra &= ~(opt->o_extra);
 				}
 				found = TRUE;
 				break;
@@ -286,8 +286,8 @@ Dbg_setup(const char *string, Dbg_desc *dbp)
 				 * been reallocated, so these names will remain
 				 * once this routine returns.
 				 */
-				if (alist_append(&(dbp->d_list), &name,
-				    sizeof (char *), AL_CNT_DEBUG) == 0)
+				if (aplist_append(&dbp->d_list, name,
+				    AL_CNT_DEBUG) == 0)
 					return (S_ERROR);
 
 				found = TRUE;

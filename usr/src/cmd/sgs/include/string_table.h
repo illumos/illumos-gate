@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,12 +44,12 @@ typedef struct str_tbl	Str_tbl;
  */
 extern int		st_delstring(Str_tbl *, const char *);
 extern void		st_destroy(Str_tbl *);
-extern uint_t		st_getstrtab_sz(Str_tbl *);
+extern size_t		st_getstrtab_sz(Str_tbl *);
 extern const char	*st_getstrbuf(Str_tbl *);
 extern int		st_insert(Str_tbl *, const char *);
 extern Str_tbl		*st_new(uint_t);
-extern int		st_setstrbuf(Str_tbl *, char *, uint_t);
-extern int		st_setstring(Str_tbl *, const char *, uint_t *);
+extern int		st_setstrbuf(Str_tbl *, char *, size_t);
+extern int		st_setstring(Str_tbl *, const char *, size_t *);
 
 /*
  * Exported flags values for st_new().

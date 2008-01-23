@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <rtld.h>
 #include <conv.h>
 #include <msg.h>
+#include <sys/debug.h>
 
 /*
  * Get the Elf32 side to think that the _ELF64 side
@@ -56,3 +57,9 @@
 #endif
 
 void	Dbg_reloc_doactiverel(void);
+
+void
+foo()
+{
+	assfail3(NULL, 0, NULL, 0, NULL, 0);
+}

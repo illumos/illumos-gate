@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -444,8 +444,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 	fpnp->fpn_hash = sgs_str_hash(name);
 	fpnp->fpn_lmp = lmp;
 
-	if (alist_append(&FPNODE(lmp), &fpnp, sizeof (FullpathNode *),
-	    AL_CNT_FPNODE) == 0) {
+	if (aplist_append(&FPNODE(lmp), fpnp, AL_CNT_FPNODE) == NULL) {
 		free(fpnp);
 		return (0);
 	}
@@ -463,17 +462,15 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 void
 fpavl_remove(Rt_map *lmp)
 {
-	FullpathNode	**fpnpp;
-	Aliste		off;
+	FullpathNode	*fpnp;
+	Aliste		idx;
 
-	for (ALIST_TRAVERSE(FPNODE(lmp), off, fpnpp)) {
-		FullpathNode	*fpnp = *fpnpp;
-
+	for (APLIST_TRAVERSE(FPNODE(lmp), idx, fpnp)) {
 		avl_remove(LIST(lmp)->lm_fpavl, fpnp);
 		free(fpnp);
 	}
 	free(FPNODE(lmp));
-	FPNODE(lmp) = 0;
+	FPNODE(lmp) = NULL;
 }
 
 
@@ -646,8 +643,8 @@ call_init(Rt_map ** tobj, int flag)
 			rtld_flags |= RT_FL_INITFIRST;
 
 		if (INITARRAY(lmp) || iptr) {
-			Aliste		off;
-			Bnd_desc **	bdpp;
+			Aliste		idx;
+			Bnd_desc 	*bdp;
 
 			/*
 			 * Make sure that all dependencies that have been
@@ -656,9 +653,7 @@ call_init(Rt_map ** tobj, int flag)
 			 * on an external item that must first be initialized
 			 * by its associated object is satisfied.
 			 */
-			for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
-				Bnd_desc *	bdp = *bdpp;
-
+			for (APLIST_TRAVERSE(DEPENDS(lmp), idx, bdp)) {
 				if ((bdp->b_flags & BND_REFER) == 0)
 					continue;
 				is_dep_ready(bdp->b_depend, lmp, DBG_WAIT_INIT);
@@ -735,9 +730,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 	Rt_map **_tobj;
 
 	for (_tobj = tobj; *_tobj != NULL; _tobj++) {
-		Rt_map *	clmp, * lmp = *_tobj;
-		Aliste		off;
-		Bnd_desc **	bdpp;
+		Rt_map		*clmp, * lmp = *_tobj;
+		Aliste		idx;
+		Bnd_desc	*bdp;
 
 		/*
 		 * If concurrency checking isn't enabled only fire .fini if
@@ -795,9 +790,7 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		if (FLAGS1(lmp) & LML_TFLG_AUD_OBJCLOSE)
 			_audit_objclose(&(AUDITORS(lmp)->ad_list), lmp);
 
-		for (ALIST_TRAVERSE(CALLERS(lmp), off, bdpp)) {
-			Bnd_desc *	bdp = *bdpp;
-
+		for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
 			clmp = bdp->b_caller;
 
 			if (FLAGS1(clmp) & LML_TFLG_AUD_OBJCLOSE) {
@@ -1099,11 +1092,12 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 	 * are loaded.  Individual objects are also loaded on the main link-map
 	 * control list of new alternative link-map control lists.
 	 */
-	if ((lmco == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if ((lmco == ALIST_OFF_DATA) &&
+	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
 		rd_event(lml, RD_DLACTIVITY, RT_ADD);
 
 	/* LINTED */
-	lmc = (Lm_cntl *)((char *)lml->lm_lists + lmco);
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
 
 	/*
 	 * A link-map list header points to one of more link-map control lists
@@ -1197,7 +1191,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 	 * For backward compatibility with debuggers, the link-map list contains
 	 * pointers to the main control list.
 	 */
-	if (lmco == ALO_DATA) {
+	if (lmco == ALIST_OFF_DATA) {
 		lml->lm_head = lmc->lc_head;
 		lml->lm_tail = lmc->lc_tail;
 	}
@@ -1222,11 +1216,12 @@ lm_delete(Lm_list *lml, Rt_map *lmp)
 	 * If we're about to delete an object from the main link-map control
 	 * list, alert the debuggers that we are about to mess with this list.
 	 */
-	if ((CNTL(lmp) == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if ((CNTL(lmp) == ALIST_OFF_DATA) &&
+	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
 		rd_event(lml, RD_DLACTIVITY, RT_DELETE);
 
 	/* LINTED */
-	lmc = (Lm_cntl *)((char *)lml->lm_lists + CNTL(lmp));
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(lmp));
 
 	if (lmc->lc_head == lmp)
 		lmc->lc_head = (Rt_map *)NEXT(lmp);
@@ -1242,7 +1237,7 @@ lm_delete(Lm_list *lml, Rt_map *lmp)
 	 * For backward compatibility with debuggers, the link-map list contains
 	 * pointers to the main control list.
 	 */
-	if (lmc == (Lm_cntl *)&(lml->lm_lists->al_data)) {
+	if (lmc == (Lm_cntl *)&lml->lm_lists->al_data) {
 		lml->lm_head = lmc->lc_head;
 		lml->lm_tail = lmc->lc_tail;
 	}
@@ -1270,7 +1265,8 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * list.  Additions of object families to the main link-map control
 	 * list occur during lazy loading, filtering and dlopen().
 	 */
-	if ((plmco == ALO_DATA) && ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
+	if ((plmco == ALIST_OFF_DATA) &&
+	    ((lml->lm_flags & LML_FLG_DBNOTIF) == 0))
 		rd_event(lml, RD_DLACTIVITY, RT_ADD);
 
 	DBG_CALL(Dbg_file_cntl(lml, nlmco, plmco));
@@ -1301,7 +1297,7 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * For backward compatibility with debuggers, the link-map list contains
 	 * pointers to the main control list.
 	 */
-	if (plmco == ALO_DATA) {
+	if (plmco == ALIST_OFF_DATA) {
 		lml->lm_head = plmc->lc_head;
 		lml->lm_tail = plmc->lc_tail;
 	}
@@ -3136,11 +3132,10 @@ unused(Lm_list *lml)
 		 * referenced it.
 		 */
 		if ((tracing & LML_FLG_TRC_UNREF) || DBG_ENABLED) {
-			Bnd_desc **	bdpp;
-			Aliste		off;
+			Bnd_desc	*bdp;
+			Aliste		idx;
 
-			for (ALIST_TRAVERSE(CALLERS(lmp), off, bdpp)) {
-				Bnd_desc *	bdp = *bdpp;
+			for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
 				Rt_map *	clmp;
 
 				if (bdp->b_flags & BND_REFER)
@@ -3250,8 +3245,8 @@ void
 leave(Lm_list *lml)
 {
 	Lm_list	*elml = lml;
-	Rt_map	**clmpp;
-	Aliste	off;
+	Rt_map	*clmp;
+	Aliste	idx;
 
 	/*
 	 * Alert the debuggers that the link-maps are consistent.  Note, in the
@@ -3266,10 +3261,10 @@ leave(Lm_list *lml)
 	/*
 	 * Alert any auditors that the link-maps are consistent.
 	 */
-	for (ALIST_TRAVERSE(elml->lm_actaudit, off, clmpp)) {
-		audit_activity(*clmpp, LA_ACT_CONSISTENT);
+	for (APLIST_TRAVERSE(elml->lm_actaudit, idx, clmp)) {
+		audit_activity(clmp, LA_ACT_CONSISTENT);
 
-		(void) alist_delete(elml->lm_actaudit, 0, &off);
+		aplist_delete(elml->lm_actaudit, &idx);
 	}
 
 	if (dz_fd != FD_UNAVAIL) {
@@ -3316,9 +3311,9 @@ leave(Lm_list *lml)
 int
 callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 {
-	Alist		*calp, *dalp;
-	Aliste		off1, off2;
-	Grp_hdl		**ghpp1, **ghpp2;
+	APlist		*calp, *dalp;
+	Aliste		idx1, idx2;
+	Grp_hdl		*ghp1, *ghp2;
 
 	/*
 	 * An object can always find symbols within itself.
@@ -3352,28 +3347,28 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 	 * member of the same group.
 	 */
 	if (((MODE(clmp) & RTLD_GROUP) == 0) ||
-	    ((calp = GROUPS(clmp)) == 0) || ((dalp = GROUPS(dlmp)) == 0))
+	    ((calp = GROUPS(clmp)) == NULL) || ((dalp = GROUPS(dlmp)) == NULL))
 		return (0);
 
 	/*
 	 * Traverse the list of groups the caller is a part of.
 	 */
-	for (ALIST_TRAVERSE(calp, off1, ghpp1)) {
+	for (APLIST_TRAVERSE(calp, idx1, ghp1)) {
 		/*
 		 * If we're testing for the ability of two objects to bind to
 		 * each other regardless of a specific group, ignore that group.
 		 */
-		if (ghp && (*ghpp1 == ghp))
+		if (ghp && (ghp1 == ghp))
 			continue;
 
 		/*
 		 * Traverse the list of groups the destination is a part of.
 		 */
-		for (ALIST_TRAVERSE(dalp, off2, ghpp2)) {
+		for (APLIST_TRAVERSE(dalp, idx2, ghp2)) {
 			Grp_desc	*gdp;
-			Aliste		off3;
+			Aliste		idx3;
 
-			if (*ghpp1 != *ghpp2)
+			if (ghp1 != ghp2)
 				continue;
 
 			/*
@@ -3384,7 +3379,7 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 			 * parent doesn't provide symbols for the destination
 			 * to relocate against.
 			 */
-			for (ALIST_TRAVERSE((*ghpp2)->gh_depends, off3, gdp)) {
+			for (ALIST_TRAVERSE(ghp2->gh_depends, idx3, gdp)) {
 				if (dlmp != gdp->gd_depend)
 					continue;
 

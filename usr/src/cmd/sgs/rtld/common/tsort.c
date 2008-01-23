@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,8 +58,8 @@ typedef struct {
 	Rt_map		**s_lmpa;	/* link-map[] (returned to caller) */
 	Rt_map		*s_lmp;		/* originating link-map */
 	Rt_map		**s_stack;	/* strongly connected component stack */
-	Alist 		*s_scc;		/* cyclic list */
-	Alist		*s_queue;	/* depth queue for cyclic components */
+	APlist 		*s_scc;		/* cyclic list */
+	APlist		*s_queue;	/* depth queue for cyclic components */
 	int		s_sndx;		/* present stack index */
 	int 		s_lndx;		/* present link-map index */
 	int		s_num;		/* number of objects to sort */
@@ -107,25 +107,24 @@ sort_scc(Sort * sort, int fndx, int flag)
 	 * of the number of objects that will be inspected (logic matches that
 	 * used by dlsym() to traverse lazy dependencies).
 	 */
-	if (sort->s_queue == 0) {
-		Aliste	off;
-		Rt_map	*lmp, **lmpp;
+	if (sort->s_queue == NULL) {
+		Aliste	idx1;
+		Rt_map	*lmp, *lmp2;
 
 		lmp = sort->s_lmp;
 		ndx = 1;
 
-		if (alist_append(&(sort->s_queue), &lmp, sizeof (Rt_map *),
-		    sort->s_num) == 0)
+		if (aplist_append(&sort->s_queue, lmp, sort->s_num) == NULL)
 			return (0);
 
 		IDX(lmp) = ndx++;
 
-		for (ALIST_TRAVERSE(sort->s_queue, off, lmpp)) {
-			Bnd_desc	**bdpp;
-			Aliste		off;
+		for (APLIST_TRAVERSE(sort->s_queue, idx1, lmp2)) {
+			Bnd_desc	*bdp;
+			Aliste		idx2;
 
-			for (ALIST_TRAVERSE(DEPENDS(*lmpp), off, bdpp)) {
-				Rt_map	*lmp = (*bdpp)->b_depend;
+			for (APLIST_TRAVERSE(DEPENDS(lmp2), idx2, bdp)) {
+				Rt_map	*lmp = bdp->b_depend;
 
 				if (IDX(lmp))
 					continue;
@@ -138,8 +137,8 @@ sort_scc(Sort * sort, int fndx, int flag)
 				    (FLAGS(lmp) & FLG_RT_INITCALL))
 					continue;
 
-				if (alist_append(&(sort->s_queue), &lmp,
-				    sizeof (Rt_map *), sort->s_num) == 0)
+				if (aplist_append(&sort->s_queue, lmp,
+				    sort->s_num) == NULL)
 					return (0);
 
 				IDX(lmp) = ndx++;
@@ -199,10 +198,9 @@ sort_scc(Sort * sort, int fndx, int flag)
 	 * cyclic components are referenced from outside of the cycle.
 	 */
 	if (unref || DBG_ENABLED) {
-		Bnd_desc **	bdpp;
-
 		for (ndx = fndx; ndx < sort->s_lndx; ndx++) {
-			Aliste	off;
+			Bnd_desc	*bdp;
+			Aliste		idx;
 
 			lmp = sort->s_lmpa[ndx];
 
@@ -217,8 +215,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 			 * Traverse this objects callers looking for outside
 			 * references.
 			 */
-			for (ALIST_TRAVERSE(CALLERS(lmp), off, bdpp)) {
-				Bnd_desc	*bdp = *bdpp;
+			for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
 				Rt_map		*clmp = bdp->b_caller;
 
 				if ((bdp->b_flags & BND_REFER) == 0)
@@ -251,7 +248,7 @@ sort_scc(Sort * sort, int fndx, int flag)
 static int
 visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 {
-	Alist		*alpp = 0;
+	APlist		*alp = NULL;
 	int		num = sort->s_lndx;
 	Word		tracing = lml->lm_flags & LML_FLG_TRC_ENABLE;
 	Rt_map		*tlmp;
@@ -285,7 +282,7 @@ visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 		/*
 		 * If tracing, save the strongly connected component.
 		 */
-		if (tracing && (alist_append(&alpp, &tlmp, sizeof (Rt_map *),
+		if (tracing && (aplist_append(&alp, tlmp,
 		    AL_CNT_SCC) == 0))
 			return (0);
 	} while (tlmp != lmp);
@@ -298,11 +295,11 @@ visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 		if (sort_scc(sort, num, flag) == 0)
 			return (0);
 
-		if (tracing && (alist_append(&(sort->s_scc), &alpp,
-		    sizeof (Alist *), AL_CNT_SCC) == 0))
+		if (tracing && (aplist_append(&sort->s_scc, alp,
+		    AL_CNT_SCC) == 0))
 			return (0);
-	} else if (alpp)
-		free(alpp);
+	} else if (alp)
+		free(alp);
 
 	return (1);
 }
@@ -397,8 +394,8 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
     int flag)
 {
 	int 		min;
-	Aliste		off;
-	Bnd_desc	**bdpp;
+	Aliste		idx;
+	Bnd_desc	*bdp;
 	Dyninfo		*dip;
 
 	min = SORTVAL(lmp) = sort->s_sndx;
@@ -412,9 +409,9 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
 	/*
 	 * Traverse both explicit and implicit dependencies.
 	 */
-	for (ALIST_TRAVERSE(DEPENDS(lmp), off, bdpp)) {
-		if ((min = _dep_visit(lml, min, lmp, (*bdpp)->b_depend,
-		    (*bdpp)->b_flags, sort, flag)) == -1)
+	for (APLIST_TRAVERSE(DEPENDS(lmp), idx, bdp)) {
+		if ((min = _dep_visit(lml, min, lmp, bdp->b_depend,
+		    bdp->b_flags, sort, flag)) == -1)
 			return (-1);
 	}
 
@@ -439,7 +436,7 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
 				    ((ghp = (Grp_hdl *)pnp->p_info) == 0))
 					continue;
 
-				for (ALIST_TRAVERSE(ghp->gh_depends, off,
+				for (ALIST_TRAVERSE(ghp->gh_depends, idx,
 				    gdp)) {
 
 					if (gdp->gd_depend == lmp)
@@ -521,19 +518,19 @@ fb_visit(Rt_map * lmp, Sort * sort, int flag)
 /*
  * Find corresponding strongly connected component structure.
  */
-static Alist *
-trace_find_scc(Sort * sort, Rt_map * lmp)
+static APlist *
+trace_find_scc(Sort *sort, Rt_map *lmp)
 {
-	Alist		**alpp;
-	Aliste		off1;
+	APlist		*alp;
+	Aliste		idx1;
 
-	for (ALIST_TRAVERSE(sort->s_scc, off1, alpp)) {
-		Rt_map	**lmpp;
-		Aliste	off2;
+	for (APLIST_TRAVERSE(sort->s_scc, idx1, alp)) {
+		Rt_map	*lmp2;
+		Aliste	idx2;
 
-		for (ALIST_TRAVERSE(*alpp, off2, lmpp)) {
-			if (lmp == *lmpp)
-				return (*alpp);
+		for (APLIST_TRAVERSE(alp, idx2, lmp2)) {
+			if (lmp == lmp2)
+				return (alp);
 		}
 	}
 	return (NULL);
@@ -546,15 +543,15 @@ static void
 trace_sort(Sort * sort)
 {
 	int 		ndx = 0;
-	Alist		*alp;
+	APlist		*alp;
 	Rt_map		*lmp1;
 
 	(void) printf(MSG_ORIG(MSG_STR_NL));
 
 	while ((lmp1 = sort->s_lmpa[ndx++]) != NULL) {
 		static const char	*ffmt, *cfmt = 0, *sfmt = 0;
-		Bnd_desc **		bdpp;
-		Aliste			off1;
+		Bnd_desc		*bdp;
+		Aliste			idx1;
 
 		if ((INIT(lmp1) == 0) || (FLAGS(lmp1) & FLG_RT_INITCALL))
 			continue;
@@ -587,15 +584,15 @@ trace_sort(Sort * sort)
 
 		(void) printf(cfmt, NAME(lmp1), CYCGROUP(lmp1));
 
-		for (ALIST_TRAVERSE(CALLERS(lmp1), off1, bdpp)) {
-			Rt_map	**lmpp3, *lmp2 = (*bdpp)->b_caller;
-			Aliste	off2;
+		for (APLIST_TRAVERSE(CALLERS(lmp1), idx1, bdp)) {
+			Rt_map	*lmp3, *lmp2 = bdp->b_caller;
+			Aliste	idx2;
 
-			for (ALIST_TRAVERSE(alp, off2, lmpp3)) {
-				if (lmp2 != *lmpp3)
+			for (APLIST_TRAVERSE(alp, idx2, lmp3)) {
+				if (lmp2 != lmp3)
 					continue;
 
-				(void) printf(ffmt, NAME(*lmpp3));
+				(void) printf(ffmt, NAME(lmp3));
 			}
 		}
 	}
@@ -910,8 +907,8 @@ tsort(Rt_map *lmp, int num, int flag)
 		free(sort.s_stack);
 
 	if (sort.s_queue) {
-		Aliste	off;
-		Rt_map	**lmpp;
+		Aliste idx;
+		Rt_map	*lmp2;
 
 		/*
 		 * Traverse the link-maps collected on the sort queue and
@@ -919,18 +916,18 @@ tsort(Rt_map *lmp, int num, int flag)
 		 * again to sort other components either for inits, and almost
 		 * certainly for .finis.
 		 */
-		for (ALIST_TRAVERSE(sort.s_queue, off, lmpp))
-			IDX(*lmpp) = 0;
+		for (APLIST_TRAVERSE(sort.s_queue, idx, lmp2))
+			IDX(lmp2) = 0;
 
 		free(sort.s_queue);
 	}
 
 	if (sort.s_scc) {
-		Aliste	off;
-		Alist	**alpp;
+		Aliste	idx;
+		APlist	*alp;
 
-		for (ALIST_TRAVERSE(sort.s_scc, off, alpp))
-			free(*alpp);
+		for (APLIST_TRAVERSE(sort.s_scc, idx, alp))
+			free(alp);
 		free(sort.s_scc);
 	}
 

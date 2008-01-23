@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -469,7 +469,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 	int		relacount = RELACOUNT(lmp), plthint = 0;
 	Rela		*rel;
 	uint_t		binfo, pbinfo;
-	Alist		*bound = 0;
+	APlist		*bound = NULL;
 
 	/*
 	 * Although only necessary for lazy binding, initialize the first
@@ -854,8 +854,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 */
 					if ((lmp != _lmp) && ((FLAGS1(_lmp) &
 					    FL1_RT_NOINIFIN) == 0)) {
-						if (alist_test(&bound, _lmp,
-						    sizeof (Rt_map *),
+						if (aplist_test(&bound, _lmp,
 						    AL_CNT_RELBIND) == 0) {
 							ret = 0;
 							break;

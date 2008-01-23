@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,7 +246,7 @@ typedef struct {
 typedef struct {
 	Rt_map		*lc_head;
 	Rt_map		*lc_tail;
-	Alist		*lc_now;	/* pending promoted bind-now objects */
+	APlist		*lc_now;	/* pending promoted bind-now objects */
 	uint_t		lc_flags;
 } Lm_cntl;
 
@@ -261,7 +261,7 @@ struct lm_list {
 	 */
 	Rt_map		*lm_head;	/* linked list pointers to active */
 	Rt_map		*lm_tail;	/*	link-map list */
-	Alist		*lm_handle;	/* not used by rtld_db - but spacing */
+	APlist		*lm_handle;	/* not used by rtld_db - but spacing */
 					/*	is required for flags */
 	Word		lm_flags;
 	/*
@@ -279,7 +279,7 @@ struct lm_list {
 	uint_t		lm_tls;		/* new obj that require TLS */
 	uint_t		lm_lmid;	/* unique link-map list identifier, */
 	char		*lm_lmidstr;	/* and associated diagnostic string */
-	Alist		*lm_actaudit;	/* list of pending audit activity */
+	APlist		*lm_actaudit;	/* list of pending audit activity */
 	Lc_desc		lm_lcs[CI_MAX];	/* external libc functions */
 };
 
@@ -527,6 +527,17 @@ typedef struct {
 } Mmap;
 
 /*
+ * A given link-map can hold either a supplier or receiver copy
+ * relocation list, but not both. This union is used to overlap
+ * the space used for the two lists.
+ */
+typedef union {
+	Alist	*rtc_r;		/* receiver list (Rel_copy) */
+	APlist	*rtc_s;		/* supplier list (Rt_map *) */
+} Rt_map_copy;
+
+
+/*
  * Link-map definition.
  */
 struct rt_map {
@@ -544,16 +555,16 @@ struct rt_map {
 	/*
 	 * END: Exposed to rtld_db - don't move, don't delete
 	 */
-	Alist		*rt_alias;	/* list of linked file names */
-	Alist		*rt_fpnode;	/* list of FullpathNode AVL nodes */
+	APlist		*rt_alias;	/* list of linked file names */
+	APlist		*rt_fpnode;	/* list of FullpathNode AVL nodes */
 	void		(*rt_init)();	/* address of _init */
 	void		(*rt_fini)();	/* address of _fini */
 	char		*rt_runpath;	/* LD_RUN_PATH and its equivalent */
 	Pnode		*rt_runlist;	/*	Pnode structures */
-	Alist		*rt_depends;	/* list of dependencies */
-	Alist		*rt_callers;	/* list of callers */
-	Alist		*rt_handles;	/* dlopen handles */
-	Alist		*rt_groups;	/* groups we're a member of */
+	APlist		*rt_depends;	/* list of dependencies */
+	APlist		*rt_callers;	/* list of callers */
+	APlist		*rt_handles;	/* dlopen handles */
+	APlist		*rt_groups;	/* groups we're a member of */
 	ulong_t		rt_etext;	/* etext address */
 	struct fct	*rt_fct;	/* file class table for this object */
 	Sym		*(*rt_symintp)(); /* link map symbol interpreter */
@@ -569,7 +580,7 @@ struct rt_map {
 	ino_t		rt_stino;	/*	multiple inclusion checks */
 	char		*rt_origname;	/* original pathname of loaded object */
 	size_t		rt_dirsz;	/*	and its size */
-	Alist		*rt_copy;	/* list of copy relocations */
+	Rt_map_copy	rt_copy;	/* list of copy relocations */
 	Audit_desc	*rt_auditors;	/* audit descriptor array */
 	Audit_info	*rt_audinfo;	/* audit information descriptor */
 	Syminfo		*rt_syminfo;	/* elf .syminfo section - here */
@@ -600,6 +611,11 @@ struct rt_map {
 /*
  * Structure to allow 64-bit rtld_db to read 32-bit processes out of procfs.
  */
+typedef union {
+	uint32_t	rtc_r;
+	uint32_t	rtc_s;
+} Rt_map_copy32;
+
 typedef struct rt_map32 {
 	/*
 	 * BEGIN: Exposed to rtld_db - don't move, don't delete
@@ -640,7 +656,7 @@ typedef struct rt_map32 {
 	uint32_t	rt_stino;
 	uint32_t	rt_origname;
 	uint32_t	rt_dirsz;
-	uint32_t	rt_copy;
+	Rt_map_copy32	rt_copy;
 	uint32_t 	rt_auditors;
 	uint32_t 	rt_audinfo;
 	uint32_t	rt_syminfo;
@@ -796,7 +812,8 @@ typedef struct rt_map32 {
 #define	STINO(X)	((X)->rt_stino)
 #define	ORIGNAME(X)	((X)->rt_origname)
 #define	DIRSZ(X)	((X)->rt_dirsz)
-#define	COPY(X)		((X)->rt_copy)
+#define	COPY_R(X)	((X)->rt_copy.rtc_r)
+#define	COPY_S(X)	((X)->rt_copy.rtc_s)
 #define	AUDITORS(X)	((X)->rt_auditors)
 #define	AUDINFO(X)	((X)->rt_audinfo)
 #define	SYMINFO(X)	((X)->rt_syminfo)

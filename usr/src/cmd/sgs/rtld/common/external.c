@@ -367,10 +367,10 @@ int
 rt_get_extern(Lm_list *lml, Rt_map *lmp)
 {
 	if (lml->lm_rti) {
-		Aliste		off;
+		Aliste		idx;
 		Rti_desc	*rti;
 
-		for (ALIST_TRAVERSE(lml->lm_rti, off, rti))
+		for (ALIST_TRAVERSE(lml->lm_rti, idx, rti))
 			get_lcinterface(rti->rti_lmp, rti->rti_info);
 
 		free(lml->lm_rti);

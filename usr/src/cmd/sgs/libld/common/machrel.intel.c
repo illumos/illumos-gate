@@ -24,7 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -272,6 +272,24 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 			ndx = ofl->ofl_sunwdata1ndx;
 	} else
 		ndx = sdp->sd_symndx;
+
+	/*
+	 * If we have a replacement value for the relocation
+	 * target, put it in place now.
+	 */
+	if (orsp->rel_flags & FLG_REL_NADDEND) {
+		Xword	addend = orsp->rel_raddend;
+		uchar_t	*addr;
+
+		/*
+		 * Get the address of the data item we need to modify.
+		 */
+		addr = (uchar_t *)((uintptr_t)orsp->rel_roffset +
+		    (uintptr_t)_elf_getxoff(orsp->rel_isdesc->is_indata));
+		addr += (uintptr_t)orsp->rel_osdesc->os_outdata->d_buf;
+		if (ld_reloc_targval_set(ofl, orsp, addr, addend) == 0)
+			return (S_ERROR);
+	}
 
 	relbits = (char *)relosp->os_outdata->d_buf;
 
@@ -985,6 +1003,18 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 */
 			if (moved)
 				value -= *addr;
+
+			/*
+			 * If we have a replacement value for the relocation
+			 * target, put it in place now.
+			 */
+			if (arsp->rel_flags & FLG_REL_NADDEND) {
+				Xword addend = arsp->rel_raddend;
+
+				if (ld_reloc_targval_set(ofl, arsp,
+				    addr, addend) == 0)
+					return (S_ERROR);
+			}
 
 			/*
 			 * If '-z noreloc' is specified - skip the do_reloc_ld

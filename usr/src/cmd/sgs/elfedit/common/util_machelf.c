@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -310,6 +310,29 @@ elfedit_shndx_to_name(elfedit_obj_state_t *obj_state, Word shndx)
 	(void) snprintf(buf, sizeof (buf1),
 	    MSG_ORIG(MSG_FMT_WORDVAL), shndx);
 	return (buf);
+}
+
+
+/*
+ * Locate the arbitrary section specified by shndx for this object.
+ *
+ * exit:
+ *	Returns section descriptor on success. On failure, does not return.
+ */
+elfedit_section_t *
+elfedit_sec_get(elfedit_obj_state_t *obj_state, Word shndx)
+{
+	elfedit_section_t *sec;
+
+	if ((shndx == 0) || (shndx >= obj_state->os_shnum))
+		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_BADSECNDX),
+		    EC_WORD(shndx), EC_WORD(obj_state->os_shnum - 1));
+
+	sec = &obj_state->os_secarr[shndx];
+
+	elfedit_msg(ELFEDIT_MSG_DEBUG, MSG_INTL(MSG_DEBUG_FNDSEC),
+	    EC_WORD(shndx), sec->sec_name);
+	return (sec);
 }
 
 
@@ -706,8 +729,7 @@ elfedit_sec_getstr(elfedit_obj_state_t *obj_state, Word shndx)
 
 	if ((shndx == 0) || (shndx >= obj_state->os_shnum))
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_STRSHNDX),
-		    EC_WORD(shndx), EC_WORD(1),
-		    EC_WORD(obj_state->os_shnum - 1));
+		    EC_WORD(shndx), EC_WORD(obj_state->os_shnum - 1));
 
 	strsec = &obj_state->os_secarr[shndx];
 	if (strsec->sec_shdr->sh_type != SHT_STRTAB)

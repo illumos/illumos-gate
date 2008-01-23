@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -225,9 +225,9 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp)
 	 */
 	NEXT((Rt_map *)PREV(nlmp)) = 0;
 	/* LINTED */
-	lmc = (Lm_cntl *)((char *)lml->lm_lists + CNTL(nlmp));
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(nlmp));
 	lmc->lc_tail = (Rt_map *)PREV(nlmp);
-	if (CNTL(nlmp) == ALO_DATA)
+	if (CNTL(nlmp) == ALIST_OFF_DATA)
 		lml->lm_tail = (Rt_map *)PREV(nlmp);
 	lml->lm_obj--;
 

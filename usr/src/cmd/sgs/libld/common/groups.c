@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,13 +119,13 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 	Elf		*elf = ifl->ifl_elf;
 	uint_t		scnndx = isp->is_scnndx;
 	Group_desc	*gdp;
-	Aliste		off;
+	Aliste		idx;
 
 	/*
 	 * If this is the first SHF_GROUP section encountered for this file,
 	 * establish what group sections exist.
 	 */
-	if (ifl->ifl_groups == 0) {
+	if (ifl->ifl_groups == NULL) {
 		Elf_Scn	*scn = 0;
 
 		while (scn = elf_nextscn(elf, scn)) {
@@ -211,7 +211,7 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 				return ((Group_desc *)S_ERROR);
 
 			if (alist_append(&(ifl->ifl_groups),
-			    &gd, sizeof (Group_desc), AL_CNT_GROUP) == 0)
+			    &gd, sizeof (Group_desc), AL_CNT_IFL_GROUPS) == 0)
 				return ((Group_desc *)S_ERROR);
 		}
 	}
@@ -220,7 +220,7 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 	 * Scan the GROUP sections associated with this file to find the
 	 * matching group section.
 	 */
-	for (ALIST_TRAVERSE(ifl->ifl_groups, off, gdp)) {
+	for (ALIST_TRAVERSE(ifl->ifl_groups, idx, gdp)) {
 		size_t	ndx;
 		Word *	data;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -308,7 +308,7 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 				    (FLAGS(_lmp) & FLG_RT_PRELOAD)) ||
 				    ((flags & RTLD_REL_SELF) &&
 				    (lmp == _lmp))) {
-					Aliste	off;
+					Aliste	idx;
 					Word	*ndx;
 
 					_bound = 1;
@@ -318,7 +318,7 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 					 * as nodirect, don't allow any local
 					 * binding.
 					 */
-					for (ALIST_TRAVERSE(nodirect, off,
+					for (ALIST_TRAVERSE(nodirect, idx,
 					    ndx)) {
 						if (*ndx == rsymndx) {
 							_bound = 0;

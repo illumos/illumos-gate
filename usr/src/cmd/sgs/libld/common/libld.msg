@@ -556,6 +556,8 @@
 @ MSG_STR_TLSREL	"(internal TLS relocation requirement)"
 @ MSG_STR_SIZES		"sizes"
 @ MSG_STR_UNKNOWN       "<unknown>"
+@ MSG_STR_SECTION	"%s (section)"
+@ MSG_STR_SECTION_MSTR	"%s (merged string section)"
 
 #
 # TRANSLATION_NOTE

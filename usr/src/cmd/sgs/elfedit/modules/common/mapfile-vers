@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +56,8 @@ SUNWprivate_1.1 {
 		elfedit_pager_init =		PARENT;
 		elfedit_printf =		PARENT;
 		elfedit_realloc =		PARENT;
+		elfedit_str_to_c_literal =	PARENT;
+		elfedit_write =			PARENT;
 
 
 
@@ -146,6 +148,9 @@ SUNWprivate_1.1 {
 
 		elfedit32_sec_findstr =		PARENT;
 		elfedit64_sec_findstr =		PARENT;
+
+		elfedit32_sec_get =		PARENT;
+		elfedit64_sec_get =		PARENT;
 
 		elfedit32_sec_getcap =		PARENT;
 		elfedit64_sec_getcap =		PARENT;

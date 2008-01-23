@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -89,6 +89,7 @@
 @ MSG_DEBUG_READONLY	"session is readonly\n";
 @ MSG_DEBUG_NOFILE	"no ELF object specified. Limited functionalty is available\n";
 @ MSG_DEBUG_DIRTYEXIT	"discarding unsaved edits\n";
+@ MSG_DEBUG_FNDSEC	"[%d: %s]: section\n"
 @ MSG_DEBUG_FNDCAP	"[%d: %s]: capabilities section\n"
 @ MSG_DEBUG_FNDDYN	"[%d: %s]: dynamic section\n"
 @ MSG_DEBUG_FNDSTR	"[%d: %s][%d]: string: %s\n"
@@ -133,6 +134,9 @@
 @ MSG_ERR_PATHTOOLONG	"path too long: %s/%s.so\n"
 @ MSG_ERR_CNTDLOPEN	"unable to load module sharable object %s: %s\n"
 @ MSG_ERR_CNTDLCLOSE	"unable to unload module sharable object %s: %s\n"
+@ MSG_ERR_ESCEOL	"backslash escape cannot be used at end of line\n"
+@ MSG_ERR_BADCESC	"unrecognized escape in double quoted token: \\%c\n"
+@ MSG_ERR_UNTERMQUOTE	"command is missing closing quote: %c\n"
 @ MSG_ERR_UNRECMOD	"no such module: %s\n"
 @ MSG_ERR_UNRECCMD	"no such command: %s:%s\n"
 @ MSG_ERR_SONOTMOD	"sharable object is not a valid elfedit module: %s\n"
@@ -192,7 +196,7 @@
 @ MSG_ERR_NOSYMINFO	"ELF object does not have a syminfo section\n"
 @ MSG_ERR_NOTSYMTAB	"[%d: %s]: section is not a symbol table\n"
 @ MSG_ERR_STRSHNDX	"string section index %d is outside expected \
-			 range %d - %d\n"
+			 range 1 - %d\n"
 @ MSG_ERR_NOTSTRSH	"[%d: %s]: Section is not a string table as expected\n"
 @ MSG_ERR_NOSTRPAD	"[%d: %s]: String table does not have room to add \
 			 string\n"
@@ -1281,6 +1285,12 @@
 @ MSG_SHF_GROUP_ALT1		"group"
 @ MSG_SHF_TLS			"SHF_TLS"		# 0x400
 @ MSG_SHF_TLS_ALT1		"tls"
+@ MSG_SHF_AMD64_LARGE		"SHF_AMD64_LARGE"	# 0x10000000
+@ MSG_SHF_AMD64_LARGE_ALT1	"amd64_large"
+@ MSG_SHF_ORDERED		"SHF_ORDERED"		# 0x40000000
+@ MSG_SHF_ORDERED_ALT1		"ordered"
+@ MSG_SHF_EXCLUDE		"SHF_EXCLUDE"		# 0x80000000
+@ MSG_SHF_EXCLUDE_ALT1		"exclude"
 
 
 # Names of st_info ELF_ST_BIND symbol binding constants
@@ -1379,6 +1389,7 @@
 @ MSG_FMT_WORDVAL	"%u"
 @ MSG_FMT_WRAPUSAGE	"\n%s"
 @ MSG_FMT_SECMSGPRE	"[%d: %s]"
+@ MSG_FMT_OCTCONST	"\\%03o"
 
 # Miscellaneous clutter
 

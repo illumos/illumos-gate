@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +221,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 	Rt_map *	_lmp;		/* lm which holds symbol definition */
 	Sym *		sym;		/* symbol definition */
 	int		textrel = 0, ret = 1;
-	Alist		*bound = 0;
+	APlist		*bound = NULL;
 	Lm_list		*lml = LIST(lmp);
 
 	DBG_CALL(Dbg_reloc_run(lmp, SHT_RELA, plt, DBG_REL_START));
@@ -312,7 +312,7 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			 */
 			if ((lmp != _lmp) &&
 			    ((FLAGS1(_lmp) & FL1_RT_NOINIFIN) == 0)) {
-				if (alist_test(&bound, _lmp, sizeof (Rt_map *),
+				if (aplist_test(&bound, _lmp,
 				    AL_CNT_RELBIND) == 0) {
 					ret = 0;
 					break;

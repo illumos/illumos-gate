@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -302,8 +302,8 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 
 	/* LINTED */
 	for (tlmp = lmp; tlmp; tlmp = (Rt_map *)NEXT(tlmp)) {
-		Bnd_desc	**bdpp;
-		Aliste		off;
+		Bnd_desc	*bdp;
+		Aliste		idx;
 
 		/*
 		 * For .init processing, only collect objects that have been
@@ -330,15 +330,15 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 		if (next++)
 			Dbg_util_nl(lml, DBG_NL_STD);
 
-		if (DEPENDS(tlmp) == 0)
+		if (DEPENDS(tlmp) == NULL)
 			dbg_print(lml, MSG_INTL(MSG_FIL_DEP_NONE), NAME(tlmp));
 		else {
 			dbg_print(lml, MSG_INTL(MSG_FIL_DEP_ENT), NAME(tlmp));
 
-			for (ALIST_TRAVERSE(DEPENDS(tlmp), off, bdpp)) {
+			for (APLIST_TRAVERSE(DEPENDS(tlmp), idx, bdp)) {
 				dbg_print(lml, MSG_INTL(MSG_FIL_BND_FILE),
-				    NAME((*bdpp)->b_depend),
-				    conv_bnd_type((*bdpp)->b_flags,
+				    NAME(bdp->b_depend),
+				    conv_bnd_type(bdp->b_flags,
 				    &bnd_type_buf));
 			}
 		}
@@ -602,7 +602,7 @@ Dbg_file_cntl(Lm_list *lml, Aliste flmco, Aliste tlmco)
 	dbg_print(lml, MSG_INTL(MSG_CNTL_TITLE), EC_XWORD(flmco),
 	    EC_XWORD(tlmco));
 
-	for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
+	for (ALIST_TRAVERSE_BY_OFFSET(lml->lm_lists, off, lmc)) {
 		Rt_map	*lmp;
 
 		/* LINTED */

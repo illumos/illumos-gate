@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
@@ -107,6 +107,7 @@ foo()
 	(void) elfedit_name_to_shndx(NULL, NULL);
 	(void) elfedit_name_to_symndx(NULL, NULL, NULL, ELFEDIT_MSG_ERR, NULL);
 	(void) elfedit_outstyle();
+	(void) elfedit_sec_get(NULL, NULL);
 	(void) elfedit_sec_getcap(NULL, NULL, NULL);
 	(void) elfedit_sec_getdyn(NULL, NULL, NULL);
 	(void) elfedit_sec_getstr(NULL, 0);
@@ -116,6 +117,7 @@ foo()
 	(void) elfedit_sec_getxshndx(NULL, NULL, NULL, NULL);
 	(void) elfedit_sec_msgprefix(NULL);
 	(void) elfedit_shndx_to_name(NULL, NULL);
+	elfedit_str_to_c_literal(NULL, NULL);
 	(void) elfedit_strtab_insert(NULL, NULL, NULL, NULL);
 	(void) elfedit_strtab_insert_test(NULL, NULL, NULL, NULL);
 	(void) elfedit_type_to_shndx(NULL, 0);

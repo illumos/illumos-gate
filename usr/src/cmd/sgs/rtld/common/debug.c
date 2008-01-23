@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,11 +132,11 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 static int
 dbg_lmid(Lm_list *lml)
 {
-	const char	**str;
-	Aliste		off;
+	const char	*str;
+	Aliste		idx;
 
-	for (ALIST_TRAVERSE(dbg_desc->d_list, off, str)) {
-		if (strcmp(lml->lm_lmidstr, *str) == 0)
+	for (APLIST_TRAVERSE(dbg_desc->d_list, idx, str)) {
+		if (strcmp(lml->lm_lmidstr, str) == 0)
 			return (1);
 	}
 	return (0);

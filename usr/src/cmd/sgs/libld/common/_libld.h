@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,17 +146,20 @@ typedef struct {
  */
 typedef struct {
 	Sym_desc	*sft_sdp;	/* symbol descriptor */
-	Aliste		sft_off;	/* offset into dtstr descriptor */
+	Aliste		sft_idx;	/* index into dtstr descriptor */
 } Sfltr_desc;
 
 /*
  * Define Alist initialization sizes.
  */
-#define	AL_CNT_DFLTR	4		/* ofl_dtsfltrs initial alist count */
-#define	AL_CNT_GROUP	20		/* ifl_groups initial alist count */
-#define	AL_CNT_SFLTR	20		/* ofl_symfltrs initial alist count */
-#define	AL_CNT_OSDESC	40		/* sg_osdescs initial alist count */
-#define	AL_CNT_SECORDER	40		/* sg_secorder initial alist count */
+#define	AL_CNT_IFL_GROUPS	20	/* ifl_groups initial alist count */
+#define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs initial alist count */
+#define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs initial alist count */
+#define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
+#define	AL_CNT_SG_OSDESC	40	/* sg_osdescs initial alist count */
+#define	AL_CNT_SG_SECORDER	40	/* sg_secorder initial alist count */
+#define	AL_CNT_STRMRGREL	500	/* ld_make_strmerge() reloc alist cnt */
+#define	AL_CNT_STRMRGSYM	20	/* ld_make_strmerge() sym alist cnt */
 
 /*
  * Return codes for {tls|got}_fixups() routines
@@ -320,12 +323,13 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_add_libdir		ld64_add_libdir
 #define	ld_add_outrel		ld64_add_outrel
 #define	ld_adj_movereloc	ld64_adj_movereloc
-#define	ld_am_I_partial		ld64_am_I_partial
-#define	ld_ar_member		ld64_ar_member
-#define	ld_ar_setup		ld64_ar_setup
 #if	defined(__sparc)
 #define	ld_allocate_got		ld64_allocate_got
 #endif
+#define	ld_am_I_partial		ld64_am_I_partial
+#define	ld_append_isp		ld64_append_isp
+#define	ld_ar_member		ld64_ar_member
+#define	ld_ar_setup		ld64_ar_setup
 #define	ld_assign_got		ld64_assign_got
 #define	ld_assign_got_ndx	ld64_assign_got_ndx
 #define	ld_assign_got_TLS	ld64_assign_got_TLS
@@ -376,10 +380,13 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_reloc_register	ld64_reloc_register
 #define	ld_reloc_remain_entry	ld64_reloc_remain_entry
 #define	ld_reloc_TLS		ld64_reloc_TLS
+#define	ld_reloc_targval_get	ld64_reloc_targval_get
+#define	ld_reloc_targval_set	ld64_reloc_targval_set
 #define	ld_reg_check		ld64_reg_check
 #define	ld_reg_enter		ld64_reg_enter
 #define	ld_reg_find		ld64_reg_find
 #define	ld_sec_validate		ld64_sec_validate
+#define	ld_section_reld_name	ld64_section_reld_name
 #define	ld_sort_ordered		ld64_sort_ordered
 #define	ld_sort_seg_list	ld64_sort_seg_list
 #define	ld_sunwmove_preprocess	ld64_sunwmove_preprocess
@@ -418,12 +425,13 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_add_libdir		ld32_add_libdir
 #define	ld_add_outrel		ld32_add_outrel
 #define	ld_adj_movereloc	ld32_adj_movereloc
-#define	ld_am_I_partial		ld32_am_I_partial
-#define	ld_ar_member		ld32_ar_member
-#define	ld_ar_setup		ld32_ar_setup
 #if	defined(__sparc)
 #define	ld_allocate_got		ld32_allocate_got
 #endif
+#define	ld_am_I_partial		ld32_am_I_partial
+#define	ld_append_isp		ld32_append_isp
+#define	ld_ar_member		ld32_ar_member
+#define	ld_ar_setup		ld32_ar_setup
 #define	ld_assign_got		ld32_assign_got
 #define	ld_assign_got_ndx	ld32_assign_got_ndx
 #define	ld_assign_got_TLS	ld32_assign_got_TLS
@@ -439,6 +447,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_find_gotndx		ld32_find_gotndx
 #define	ld_find_library		ld32_find_library
 #define	ld_finish_libs		ld32_finish_libs
+#define	ld_section_reld_name	ld32_section_reld_name
 #define	ld_get_group		ld32_get_group
 #define	ld_lib_setup		ld32_lib_setup
 #define	ld_init			ld32_init
@@ -474,6 +483,8 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_reloc_register	ld32_reloc_register
 #define	ld_reloc_remain_entry	ld32_reloc_remain_entry
 #define	ld_reloc_TLS		ld32_reloc_TLS
+#define	ld_reloc_targval_get	ld32_reloc_targval_get
+#define	ld_reloc_targval_set	ld32_reloc_targval_set
 #define	ld_reg_check		ld32_reg_check
 #define	ld_reg_enter		ld32_reg_enter
 #define	ld_reg_find		ld32_reg_find
@@ -519,6 +530,7 @@ extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
 extern uintptr_t	ld_add_outrel(Word, Rel_desc *, Ofl_desc *);
 extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
 extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
+extern int		ld_append_isp(Ofl_desc *, Os_desc *, Is_desc *, int);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
 			    Ar_mem *);
 extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
@@ -548,7 +560,9 @@ extern Gotndx *		ld_find_gotndx(List *, Gotref, Ofl_desc *, Rel_desc *);
 extern uintptr_t	ld_find_library(const char *, Ofl_desc *);
 extern uintptr_t	ld_finish_libs(Ofl_desc *);
 
-extern Group_desc *	ld_get_group(Ofl_desc *, Is_desc *);
+extern const char	*ld_section_reld_name(Sym_desc *, Is_desc *);
+
+extern Group_desc	*ld_get_group(Ofl_desc *, Is_desc *);
 
 extern uintptr_t	ld_lib_setup(Ofl_desc *);
 
@@ -596,7 +610,10 @@ extern uintptr_t	ld_reloc_register(Rel_desc *, Is_desc *, Ofl_desc *);
 extern void		ld_reloc_remain_entry(Rel_desc *, Os_desc *,
 			    Ofl_desc *);
 extern uintptr_t	ld_reloc_TLS(Boolean, Rel_desc *, Ofl_desc *);
-
+extern int		ld_reloc_targval_get(Ofl_desc *, Rel_desc *,
+			    uchar_t *, Xword *);
+extern int		ld_reloc_targval_set(Ofl_desc *, Rel_desc *,
+			    uchar_t *, Xword);
 extern int		ld_reg_check(Sym_desc *, Sym *, const char *,
 			    Ifl_desc *, Ofl_desc *);
 extern int		ld_reg_enter(Sym_desc *, Ofl_desc *);
@@ -646,7 +663,6 @@ extern int		ld_vers_sym_process(Lm_list *, Is_desc *, Ifl_desc *);
 extern int		ld_vers_verify(Ofl_desc *);
 
 extern uintptr_t	add_regsym(Sym_desc *, Ofl_desc *);
-extern void		*alist_append(Alist **, const void *, size_t, int);
 extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern Listnode *	list_where(List *, Word);

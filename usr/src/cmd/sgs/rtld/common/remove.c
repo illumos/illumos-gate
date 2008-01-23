@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Remove objects.  Objects need removal from a process as part of:
@@ -291,11 +291,11 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	 * Remove any alias names.
 	 */
 	if (ALIAS(lmp)) {
-		Aliste	off;
-		char	**cpp;
+		Aliste	idx;
+		char	*cp;
 
-		for (ALIST_TRAVERSE(ALIAS(lmp), off, cpp))
-			free(*cpp);
+		for (APLIST_TRAVERSE(ALIAS(lmp), idx, cp))
+			free(cp);
 		free(ALIAS(lmp));
 	}
 
@@ -331,8 +331,14 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 
 	if (CONDVAR(lmp))
 		free(CONDVAR(lmp));
-	if (COPY(lmp))
-		free(COPY(lmp));
+	/*
+	 * Note that COPY_R() and COPY_S() reference the same memory
+	 * location, and that we want to release the memory referenced
+	 * without regard to which list it logically belongs to. We can
+	 * use either pointer to do this.
+	 */
+	if (COPY_R(lmp))
+		free(COPY_R(lmp));
 	if (MMAPS(lmp))
 		free(MMAPS(lmp));
 
@@ -343,20 +349,19 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	 * Therefore if this object indicates that its part of a group tear
 	 * these associations down.
 	 */
-	if (GROUPS(lmp)) {
-		Aliste	off1;
-		Grp_hdl	**ghpp;
+	if (GROUPS(lmp) != NULL) {
+		Aliste	idx1;
+		Grp_hdl	*ghp;
 
-		for (ALIST_TRAVERSE(GROUPS(lmp), off1, ghpp)) {
-			Grp_hdl		*ghp = *ghpp;
+		for (APLIST_TRAVERSE(GROUPS(lmp), idx1, ghp)) {
 			Grp_desc	*gdp;
-			Aliste		off2;
+			Aliste		idx2;
 
-			for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 				if (gdp->gd_depend != lmp)
 					continue;
 
-				(void) alist_delete(ghp->gh_depends, 0, &off2);
+				alist_delete(ghp->gh_depends, &idx2);
 				break;
 			}
 		}
@@ -424,32 +429,30 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 void
 remove_lists(Rt_map *lmp, int lazy)
 {
-	Aliste		off1;
-	Bnd_desc	**bdpp;
+	Aliste		idx1;
+	Bnd_desc	*bdp;
 
 	/*
 	 * First, traverse this objects dependencies.
 	 */
-	for (ALIST_TRAVERSE(DEPENDS(lmp), off1, bdpp)) {
-		Bnd_desc	*bdp = *bdpp;
+	for (APLIST_TRAVERSE(DEPENDS(lmp), idx1, bdp)) {
 		Rt_map		*dlmp = bdp->b_depend;
 
 		/*
 		 * Remove this object from the dependencies callers.
 		 */
-		(void) alist_delete(CALLERS(dlmp), &bdp, 0);
+		(void) aplist_delete_value(CALLERS(dlmp), bdp);
 		free(bdp);
 	}
 	if (DEPENDS(lmp)) {
 		free(DEPENDS(lmp));
-		DEPENDS(lmp) = 0;
+		DEPENDS(lmp) = NULL;
 	}
 
 	/*
 	 * Second, traverse this objects callers.
 	 */
-	for (ALIST_TRAVERSE(CALLERS(lmp), off1,  bdpp)) {
-		Bnd_desc	*bdp = *bdpp;
+	for (APLIST_TRAVERSE(CALLERS(lmp), idx1,  bdp)) {
 		Rt_map		*clmp = bdp->b_caller;
 
 		/*
@@ -482,12 +485,12 @@ remove_lists(Rt_map *lmp, int lazy)
 			}
 		}
 
-		(void) alist_delete(DEPENDS(clmp), &bdp, 0);
+		(void) aplist_delete_value(DEPENDS(clmp), bdp);
 		free(bdp);
 	}
 	if (CALLERS(lmp)) {
 		free(CALLERS(lmp));
-		CALLERS(lmp) = 0;
+		CALLERS(lmp) = NULL;
 	}
 }
 
@@ -497,17 +500,19 @@ remove_lists(Rt_map *lmp, int lazy)
 void
 remove_cntl(Lm_list *lml, Aliste lmco)
 {
-	if (lmco && (lmco != ALO_DATA)) {
+	if (lmco && (lmco != ALIST_OFF_DATA)) {
 		Aliste	_lmco = lmco;
 #if	DEBUG
-		Lm_cntl	*lmc = (Lm_cntl *)((char *)lml->lm_lists + lmco);
+		Lm_cntl	*lmc;
+
+		lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
 
 		/*
 		 * This element should be empty.
 		 */
 		ASSERT(lmc->lc_head == 0);
 #endif
-		(void) alist_delete(lml->lm_lists, 0, &_lmco);
+		alist_delete_by_offset(lml->lm_lists, &_lmco);
 	}
 }
 
@@ -523,7 +528,7 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 	Lm_cntl	*lmc;
 
 	/* LINTED */
-	lmc = (Lm_cntl *)((char *)lml->lm_lists + lmco);
+	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, lmco);
 
 	/*
 	 * First, remove any lists that may point between objects.
@@ -545,12 +550,12 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 /*
  * Determine whether an object is deletable.
  */
-int
-is_deletable(Alist **lmalp, Alist **ghalp, Rt_map *lmp)
+static int
+is_deletable(APlist **lmalp, APlist **ghalp, Rt_map *lmp)
 {
-	Aliste		off;
-	Bnd_desc	**bdpp;
-	Grp_hdl		**ghpp;
+	Aliste		idx;
+	Bnd_desc	*bdp;
+	Grp_hdl		*ghp;
 
 	/*
 	 * If the object hasn't yet been relocated take this as a sign that
@@ -559,7 +564,7 @@ is_deletable(Alist **lmalp, Alist **ghalp, Rt_map *lmp)
 	 * and exists on the main link-map control list.
 	 */
 	if ((FLAGS(lmp) & FLG_RT_RELOCED) &&
-	    (MODE(lmp) & RTLD_NODELETE) && (CNTL(lmp) == ALO_DATA))
+	    (MODE(lmp) & RTLD_NODELETE) && (CNTL(lmp) == ALIST_OFF_DATA))
 		return (0);
 
 	/*
@@ -573,9 +578,8 @@ is_deletable(Alist **lmalp, Alist **ghalp, Rt_map *lmp)
 	 * callers registered for itself.  Thus, but looking for objects with
 	 * handles we can ferret out these outsiders.
 	 */
-	for (ALIST_TRAVERSE(HANDLES(lmp), off, ghpp)) {
-		if (alist_test(ghalp, *ghpp,
-		    sizeof (Grp_hdl *), 0) != ALE_EXISTS)
+	for (APLIST_TRAVERSE(HANDLES(lmp), idx, ghp)) {
+		if (aplist_test(ghalp, ghp, 0) != ALE_EXISTS)
 			return (0);
 	}
 
@@ -583,9 +587,9 @@ is_deletable(Alist **lmalp, Alist **ghalp, Rt_map *lmp)
 	 * If this object is called by any object outside of the family of
 	 * objects selected for deletion, it can't be deleted.
 	 */
-	for (ALIST_TRAVERSE(CALLERS(lmp), off, bdpp)) {
-		if (alist_test(lmalp, (*bdpp)->b_caller,
-		    sizeof (Rt_map *), 0) != ALE_EXISTS)
+	for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
+		if (aplist_test(lmalp, bdp->b_caller, 0) !=
+		    ALE_EXISTS)
 			return (0);
 	}
 
@@ -601,9 +605,9 @@ is_deletable(Alist **lmalp, Alist **ghalp, Rt_map *lmp)
  * enced from the objects within the groups that are candidates for deletion.
  */
 static int
-gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
+gdp_collect(APlist **ghalpp, APlist **lmalpp, Grp_hdl *ghp1)
 {
-	Aliste		off;
+	Aliste		idx;
 	Grp_desc	*gdp;
 	int		action;
 
@@ -611,15 +615,15 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 	 * Add this group to our group collection.  If it isn't added either an
 	 * allocation has failed, or it already exists.
 	 */
-	if ((action = alist_test(ghalpp, ghp1, sizeof (Grp_hdl *),
-	    AL_CNT_GRPCLCT)) != ALE_CREATE)
+	if ((action = aplist_test(ghalpp, ghp1, AL_CNT_GRPCLCT)) !=
+	    ALE_CREATE)
 		return (action);
 
 	/*
 	 * Traverse the dependencies of the group and collect the associated
 	 * objects.
 	 */
-	for (ALIST_TRAVERSE(ghp1->gh_depends, off, gdp)) {
+	for (ALIST_TRAVERSE(ghp1->gh_depends, idx, gdp)) {
 		Rt_map	*lmp = gdp->gd_depend;
 
 		/*
@@ -632,8 +636,8 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 		    ((gdp->gd_flags & GPD_ADDEPS) == 0))
 			continue;
 
-		if ((action = alist_test(lmalpp, lmp, sizeof (Rt_map *),
-		    AL_CNT_GRPCLCT)) == 0)
+		if ((action = aplist_test(lmalpp, lmp, AL_CNT_GRPCLCT)) ==
+		    ALE_ALLOCFAIL)
 			return (0);
 		if (action == ALE_EXISTS)
 			continue;
@@ -653,7 +657,7 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 		 *  .   the object isn't tagged as non-deletable.
 		 */
 		if ((((FLAGS(lmp) & FLG_RT_RELOCED) == 0) ||
-		    (CNTL(lmp) != ALO_DATA) ||
+		    (CNTL(lmp) != ALIST_OFF_DATA) ||
 		    ((MODE(lmp) & RTLD_NODELETE) == 0)) &&
 		    (FLAGS1(lmp) & MSK_RT_FILTER)) {
 			Dyninfo	*dip = DYNINFO(lmp);
@@ -691,16 +695,15 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
  * any deletions pending we can discontinue any further processing.
  */
 static int
-remove_rescan(Alist *lmalp, Alist *ghalp, int *delcnt)
+remove_rescan(APlist *lmalp, APlist *ghalp, int *delcnt)
 {
-	Aliste		off1;
-	Rt_map		**lmpp;
+	Aliste		idx1;
+	Rt_map		*lmp;
 	int		rescan = 0;
 
-	for (ALIST_TRAVERSE(lmalp, off1, lmpp)) {
-		Aliste		off2;
-		Bnd_desc	**bdpp;
-		Rt_map		*lmp = *lmpp;
+	for (APLIST_TRAVERSE(lmalp, idx1, lmp)) {
+		Aliste		idx2;
+		Bnd_desc	*bdp;
 		Dyninfo		*dip;
 		uint_t		cnt, max;
 
@@ -711,8 +714,8 @@ remove_rescan(Alist *lmalp, Alist *ghalp, int *delcnt)
 		 * As this object can't be deleted, make sure its dependencies
 		 * aren't deleted either.
 		 */
-		for (ALIST_TRAVERSE(DEPENDS(lmp), off2, bdpp)) {
-			Rt_map	*dlmp = (*bdpp)->b_depend;
+		for (APLIST_TRAVERSE(DEPENDS(lmp), idx2, bdp)) {
+			Rt_map	*dlmp = bdp->b_depend;
 
 			if (FLAGS(dlmp) & FLG_RT_DELETE) {
 				FLAGS(dlmp) &= ~FLG_RT_DELETE;
@@ -748,11 +751,11 @@ remove_rescan(Alist *lmalp, Alist *ghalp, int *delcnt)
 				    ((ghp = (Grp_hdl *)pnp->p_info) == 0))
 					continue;
 
-				if (alist_test(&ghalp, ghp,
-				    sizeof (Grp_hdl *), 0) == ALE_EXISTS)
+				if (aplist_test(&ghalp, ghp, 0) ==
+				    ALE_EXISTS)
 					continue;
 
-				for (ALIST_TRAVERSE(ghp->gh_depends, off2,
+				for (ALIST_TRAVERSE(ghp->gh_depends, idx2,
 				    gdp)) {
 					Rt_map	*dlmp = gdp->gd_depend;
 
@@ -768,7 +771,7 @@ remove_rescan(Alist *lmalp, Alist *ghalp, int *delcnt)
 				 * Remove this group handle from our dynamic
 				 * deletion list.
 				 */
-				(void) alist_delete(ghalp, &ghp, 0);
+				(void) aplist_delete_value(ghalp, ghp);
 			}
 		}
 	}
@@ -779,7 +782,7 @@ remove_rescan(Alist *lmalp, Alist *ghalp, int *delcnt)
  * Cleanup any collection alists we've created.
  */
 static void
-remove_collect(Alist *ghalp, Alist *lmalp)
+remove_collect(APlist *ghalp, APlist *lmalp)
 {
 	if (ghalp)
 		free(ghalp);
@@ -799,17 +802,17 @@ void
 free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
 {
 	Grp_desc	*gdp;
-	Aliste		off;
+	Aliste		idx;
 
 	if (--(ghp->gh_refcnt) == 0) {
 		uintptr_t	ndx;
 
-		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 			Rt_map	*lmp = gdp->gd_depend;
 
 			if (ghp->gh_ownlmp == lmp)
-				(void) alist_delete(HANDLES(lmp), &ghp, 0);
-			(void) alist_delete(GROUPS(lmp), &ghp, 0);
+				(void) aplist_delete_value(HANDLES(lmp), ghp);
+			(void) aplist_delete_value(GROUPS(lmp), ghp);
 		}
 		(void) free(ghp->gh_depends);
 
@@ -827,15 +830,15 @@ free_hdl(Grp_hdl *ghp, Rt_map *clmp, uint_t cdflags)
 		 * from the handle, or if the caller is used for any other
 		 * reason, clear the promotion flag.
 		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 			Rt_map	*lmp = gdp->gd_depend;
 
 			if (lmp != clmp)
 				continue;
 
 			if (gdp->gd_flags == cdflags) {
-				(void) alist_delete(ghp->gh_depends, 0, &off);
-				(void) alist_delete(GROUPS(lmp), &ghp, 0);
+				alist_delete(ghp->gh_depends, &idx);
+				(void) aplist_delete_value(GROUPS(lmp), ghp);
 			} else {
 				gdp->gd_flags &= ~cdflags;
 			}
@@ -874,7 +877,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 {
 	Grp_hdl		*ghp;
 	Grp_desc	*gdp;
-	Aliste		off;
+	Aliste		idx;
 	Rt_map		*lmp;
 
 	DBG_CALL(Dbg_file_cleanup(lml, name, lmco));
@@ -886,7 +889,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 	 */
 	lmp = lmc->lc_head;
 	if (HANDLES(lmp)) {
-		ghp = (Grp_hdl *)HANDLES(lmp)->al_data[0];
+		ghp = (Grp_hdl *)HANDLES(lmp)->apl_data[0];
 
 	} else if (lmc->lc_flags & LMC_FLG_RELOCATING) {
 		/*
@@ -933,7 +936,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 	 * must be broken to allow the objects on this link-map list to be
 	 * removed.
 	 */
-	for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+	for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 		Rt_map	*lmp = gdp->gd_depend;
 
 		/*
@@ -966,8 +969,8 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 				}
 			}
 		}
-		(void) alist_delete(GROUPS(lmp), &ghp, 0);
-		(void) alist_delete(ghp->gh_depends, 0, &off);
+		(void) aplist_delete_value(GROUPS(lmp), ghp);
+		alist_delete(ghp->gh_depends, &idx);
 	}
 
 	/*
@@ -988,7 +991,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 
 		plmco = lmco - lml->lm_lists->al_size;
 		/* LINTED */
-		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
+		plmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, plmco);
 
 		lm_move(lml, lmco, plmco, lmc, plmc);
 	}
@@ -1025,14 +1028,14 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 int
 remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 {
-	Rt_map		*lmp, **lmpp;
+	Rt_map		*lmp;
 	int		rescan = 0;
 	int		delcnt = 0, rmcnt = 0, error = 0, orphans;
-	Alist		*lmalp = 0, *ghalp = 0;
-	Aliste		off1, off2;
-	Grp_hdl		**ghpp;
+	APlist		*lmalp = NULL, *ghalp = NULL;
+	Aliste		idx1, idx2;
+	Grp_hdl		*ghp2;
 	Grp_desc	*gdp;
-	Lm_list		*lml = 0;
+	Lm_list		*lml = NULL;
 
 	/*
 	 * Generate the family of groups and objects that are candidates for
@@ -1053,8 +1056,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * of the family of objects collected for this deletion, it can not be
 	 * removed.
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		Grp_hdl	*ghp = *ghpp;
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		Grp_hdl	*ghp = ghp2;
 
 		DBG_CALL(Dbg_file_hdl_collect(ghp, 0));
 
@@ -1070,13 +1073,13 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		if (ghp->gh_flags & GPH_LDSO) {
 			DBG_CALL(Dbg_file_hdl_collect(ghp,
 			    NAME(lml_rtld.lm_head)));
-			(void) alist_delete(ghalp, 0, &off1);
+			aplist_delete(ghalp, &idx1);
 			continue;
 		}
 
-		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
-			Grp_hdl	**ghpp3;
-			Aliste	off3;
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+			Grp_hdl	*ghp3;
+			Aliste	idx3;
 
 			/*
 			 * Determine whether this dependency is the filtee's
@@ -1088,8 +1091,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			    (GPD_FILTER | GPD_ADDEPS)) != GPD_FILTER)
 				continue;
 
-			if (alist_test(&lmalp, gdp->gd_depend,
-			    sizeof (Rt_map *), 0) == ALE_EXISTS)
+			if (aplist_test(&lmalp, gdp->gd_depend, 0) ==
+			    ALE_EXISTS)
 				continue;
 
 			/*
@@ -1100,21 +1103,20 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			 */
 			DBG_CALL(Dbg_file_hdl_collect(ghp,
 			    NAME(gdp->gd_depend)));
-			(void) alist_delete(ghalp, 0, &off1);
+			aplist_delete(ghalp, &idx1);
 
 			free(lmalp);
-			lmalp = 0;
-			for (ALIST_TRAVERSE(ghalp, off3, ghpp3)) {
-				Aliste		off4;
+			lmalp = NULL;
+			for (APLIST_TRAVERSE(ghalp, idx3, ghp3)) {
+				Aliste		idx4;
 				Grp_desc	*gdp4;
 
-				for (ALIST_TRAVERSE((*ghpp3)->gh_depends,
-				    off4, gdp4))  {
+				for (ALIST_TRAVERSE(ghp3->gh_depends,
+				    idx4, gdp4))  {
 					if ((gdp4->gd_flags & GPD_ADDEPS) == 0)
 						continue;
-					if (alist_test(&lmalp, gdp4->gd_depend,
-					    sizeof (Rt_map *),
-					    AL_CNT_GRPCLCT) == 0) {
+					if (aplist_test(&lmalp, gdp4->gd_depend,
+					    AL_CNT_GRPCLCT) == ALE_ALLOCFAIL) {
 						remove_collect(ghalp, lmalp);
 						return (0);
 					}
@@ -1128,9 +1130,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * Now that we've collected all the handles dependencies, traverse the
 	 * collection determining whether they are a candidate for deletion.
 	 */
-	for (ALIST_TRAVERSE(lmalp, off1, lmpp)) {
-		lmp = *lmpp;
-
+	for (APLIST_TRAVERSE(lmalp, idx1, lmp)) {
 		/*
 		 * Establish which link-map list we're dealing with for later
 		 * .fini processing.
@@ -1161,8 +1161,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * for removal, mark each group descriptor as a candidate for removal
 	 * from the group.
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		for (ALIST_TRAVERSE((*ghpp)->gh_depends, off2, gdp))
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		for (ALIST_TRAVERSE(ghp2->gh_depends, idx2, gdp))
 			gdp->gd_flags |= GPD_REMOVE;
 	}
 
@@ -1171,22 +1171,22 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * determine whether they still need to remain identified as belonging
 	 * to this group to be able to continue binding to one another.
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		Grp_hdl	*ghp = *ghpp;
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		Grp_hdl	*ghp = ghp2;
 
-		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
-			Aliste		off3;
-			Bnd_desc	**bdpp;
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+			Aliste		idx3;
+			Bnd_desc	*bdp;
 
 			lmp = gdp->gd_depend;
 
 			if (FLAGS(lmp) & FLG_RT_DELETE)
 				continue;
 
-			for (ALIST_TRAVERSE(DEPENDS(lmp), off3, bdpp)) {
-				Aliste 		off4;
+			for (APLIST_TRAVERSE(DEPENDS(lmp), idx3, bdp)) {
+				Aliste 		idx4;
 				Grp_desc	*gdp4;
-				Rt_map		*dlmp = (*bdpp)->b_depend;
+				Rt_map		*dlmp = bdp->b_depend;
 
 				/*
 				 * If this dependency (dlmp) can be referenced
@@ -1209,7 +1209,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 					gdp->gd_flags &= ~GPD_REMOVE;
 
 				for (ALIST_TRAVERSE(ghp->gh_depends,
-				    off4, gdp4)) {
+				    idx4, gdp4)) {
 					if (gdp4->gd_depend != dlmp)
 						continue;
 
@@ -1230,8 +1230,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * list, so that it can be re-associated to the owner if a dlopen()
 	 * of this object reoccurs.
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		Grp_hdl	*ghp = *ghpp;
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		Grp_hdl	*ghp = ghp2;
 
 		/*
 		 * If this handle is already an orphan, or if it's owner is
@@ -1245,7 +1245,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * Make sure all handle dependencies aren't removed or the
 		 * dependencies themselves aren't deleted.
 		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 			lmp = gdp->gd_depend;
 
 			/*
@@ -1273,12 +1273,12 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * performed on the collected handles before firing .fini's (which
 	 * produces additional diagnostics).
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		Grp_hdl	*ghp = *ghpp;
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		Grp_hdl	*ghp = ghp2;
 
 		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_DELETE));
 
-		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 			int	flag;
 
 			lmp = gdp->gd_depend;
@@ -1351,8 +1351,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * call_fini(), but as the link-maps CALLERS was removed
 		 * already we do the local auditors explicitly.
 		 */
-		for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-			Grp_hdl	*ghp = *ghpp;
+		for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+			Grp_hdl	*ghp = ghp2;
 			Rt_map	*dlmp = ghp->gh_ownlmp;
 
 			if (clmp && dlmp &&
@@ -1368,11 +1368,9 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * is complete, remove all inter-dependency lists from those objects
 	 * selected for deletion.
 	 */
-	for (ALIST_TRAVERSE(lmalp, off1, lmpp)) {
+	for (APLIST_TRAVERSE(lmalp, idx1, lmp)) {
 		Dyninfo	*dip;
 		uint_t	cnt, max;
-
-		lmp = *lmpp;
 
 		if (FLAGS(lmp) & FLG_RT_DELETE)
 			remove_lists(lmp, 0);
@@ -1406,8 +1404,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 				 * Determine whether this filtee's handle is a
 				 * part of the list of handles being deleted.
 				 */
-				if (alist_test(&ghalp, ghp,
-				    sizeof (Grp_hdl *), 0) == ALE_EXISTS) {
+				if (aplist_test(&ghalp, ghp, 0) == ALE_EXISTS) {
 					/*
 					 * If this handle exists on the deletion
 					 * list, then it has been removed.  If
@@ -1448,8 +1445,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	 * Finally remove any handle infrastructure and remove any objects
 	 * marked for deletion.
 	 */
-	for (ALIST_TRAVERSE(ghalp, off1, ghpp)) {
-		Grp_hdl	*ghp = *ghpp;
+	for (APLIST_TRAVERSE(ghalp, idx1, ghp2)) {
+		Grp_hdl	*ghp = ghp2;
 
 		/*
 		 * If we're not dealing with orphaned handles remove this handle
@@ -1469,7 +1466,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * information is deleted as part of the alist removal that
 		 * occurs before we inspect the object for deletion).
 		 */
-		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
 			uint_t	flags = gdp->gd_flags;
 
 			if ((flags & GPD_REMOVE) == 0)
@@ -1483,12 +1480,12 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			 * association in case the handle is retained.
 			 */
 			if (ghp->gh_ownlmp == lmp) {
-				(void) alist_delete(HANDLES(lmp), &ghp, 0);
+				(void) aplist_delete_value(HANDLES(lmp), ghp);
 				ghp->gh_ownlmp = 0;
 			}
 
-			(void) alist_delete(GROUPS(lmp), &ghp, 0);
-			(void) alist_delete(ghp->gh_depends, 0, &off2);
+			(void) aplist_delete_value(GROUPS(lmp), ghp);
+			alist_delete(ghp->gh_depends, &idx2);
 
 			/*
 			 * Complete the link-map deletion if appropriate.
@@ -1517,7 +1514,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * handles are re-examined to determine if their deletion can
 		 * be completed.
 		 */
-		if (ghp->gh_depends->al_data[0] == 0) {
+		if (ghp->gh_depends->al_nitems == 0) {
 			free(ghp->gh_depends);
 			free(ghp);
 
@@ -1530,7 +1527,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 
 			if (DBG_ENABLED) {
 				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ORPHAN));
-				for (ALIST_TRAVERSE(ghp->gh_depends, off1, gdp))
+				for (ALIST_TRAVERSE(ghp->gh_depends, idx1, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
 					    gdp->gd_depend, DBG_DEP_ORPHAN, 0));
 			}

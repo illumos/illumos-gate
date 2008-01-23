@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,3 +32,11 @@
 #include <debug.h>
 #include <elfcap.h>
 #include <_libld.h>
+#include <sys/debug.h>
+
+
+void
+foo()
+{
+	assfail3(NULL, 0, NULL, 0, NULL, 0);
+}

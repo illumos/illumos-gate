@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -96,12 +96,13 @@ mod_i18nhdl_to_str(elfedit_i18nhdl_t hdl)
  * argument allowed by a command in this module.
  */
 typedef enum {
-	STR_OPT_F_END =		1,	/* -end: zero to end of strtab */
-	STR_OPT_F_NOTERM =	2,	/* -noterm: str:set won't term string */
-	STR_OPT_F_SHNAME =	4,	/* -shnam name: section spec. by name */
-	STR_OPT_F_SHNDX =	8,	/* -shndx ndx: strtab spec. by index */
-	STR_OPT_F_SHTYP =	16,	/* -shtyp type: section spec. by type */
-	STR_OPT_F_STRNDX =	32,	/* -strndx: String specified by index */
+	STR_OPT_F_ANY =		1,	/* -any: treat any sec. as strtab */
+	STR_OPT_F_END =		2,	/* -end: zero to end of strtab */
+	STR_OPT_F_NOTERM =	4,	/* -noterm: str:set won't term string */
+	STR_OPT_F_SHNAME =	8,	/* -shnam name: section spec. by name */
+	STR_OPT_F_SHNDX =	16,	/* -shndx ndx: strtab spec. by index */
+	STR_OPT_F_SHTYP =	32,	/* -shtyp type: section spec. by type */
+	STR_OPT_F_STRNDX =	64,	/* -strndx: String specified by index */
 } str_opt_t;
 
 
@@ -131,7 +132,7 @@ typedef struct {
 
 
 /*
- * Given an ELF SHT_ section type constant, shdr_to_strtab() returns
+ * Given an ELF SHT_ section type constant, shndx_to_strtab() returns
  * one of the following
  */
 
@@ -313,19 +314,25 @@ process_args(elfedit_obj_state_t *obj_state, int argc, const char *argv[],
 	argstate->argc = argc;
 	argstate->argv = argv;
 
-	/*
-	 * Locate and validate the string table. In the case where
-	 * a non-string table section is given that references a string
-	 * table, we will use the referenced table.
-	 */
-	ndx = shndx_to_strtab(obj_state, ndx);
+	if (argstate->optmask & STR_OPT_F_ANY) {
+		/* Take the arbitrary section */
+		argstate->str.sec = elfedit_sec_get(obj_state, ndx);
 
-	/*
-	 * If ndx is a string table, the following will issue the
-	 * proper debug messages. If it is out of range, or of any
-	 * other type, an error is issued and it doesn't return.
-	 */
-	argstate->str.sec = elfedit_sec_getstr(obj_state, ndx);
+	} else {
+		/*
+		 * Locate and validate the string table. In the case where
+		 * a non-string table section is given that references a string
+		 * table, we will use the referenced table.
+		 */
+		ndx = shndx_to_strtab(obj_state, ndx);
+
+		/*
+		 * If ndx is a string table, the following will issue the
+		 * proper debug messages. If it is out of range, or of any
+		 * other type, an error is issued and it doesn't return.
+		 */
+		argstate->str.sec = elfedit_sec_getstr(obj_state, ndx);
+	}
 
 	/*
 	 * If there is a dynamic section, check its sh_link to the
@@ -479,7 +486,12 @@ print_strtab(int autoprint, ARGSTATE *argstate)
 			(void) snprintf(index, sizeof (index),
 			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(ndx));
 		}
-		elfedit_printf(MSG_ORIG(MSG_FMT_DUMPENTRY), index, str);
+		elfedit_printf(MSG_ORIG(MSG_FMT_DUMPENTRY), index);
+		elfedit_write(MSG_ORIG(MSG_STR_DQUOTE), MSG_STR_DQUOTE_SIZE);
+		if (start_ndx == ndx)
+			elfedit_str_to_c_literal(str, elfedit_write);
+		elfedit_write(MSG_ORIG(MSG_STR_DQUOTENL),
+		    MSG_STR_DQUOTENL_SIZE);
 		str += skip;
 		ndx += skip;
 	}
@@ -925,6 +937,10 @@ elfedit_init(elfedit_module_version_t version)
 	    NULL
 	};
 	static elfedit_cmd_optarg_t opt_dump[] = {
+		{ MSG_ORIG(MSG_STR_MINUS_ANY),
+		    /* MSG_INTL(MSG_OPTDESC_ANY) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_ANY), 0,
+		    STR_OPT_F_ANY, 0 },
 		{ ELFEDIT_STDOA_OPT_O, NULL,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNAM),
@@ -960,6 +976,10 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_set[] = {
 	    MSG_ORIG(MSG_CMD_SET), NULL };
 	static elfedit_cmd_optarg_t opt_set[] = {
+		{ MSG_ORIG(MSG_STR_MINUS_ANY),
+		    /* MSG_INTL(MSG_OPTDESC_ANY) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_ANY), 0,
+		    STR_OPT_F_ANY, 0 },
 		{ ELFEDIT_STDOA_OPT_O, NULL,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_NOTERM),
@@ -1034,6 +1054,10 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_zero[] = {
 	    MSG_ORIG(MSG_CMD_ZERO), NULL };
 	static elfedit_cmd_optarg_t opt_zero[] = {
+		{ MSG_ORIG(MSG_STR_MINUS_ANY),
+		    /* MSG_INTL(MSG_OPTDESC_ANY) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_ANY), 0,
+		    STR_OPT_F_ANY, 0 },
 		{ ELFEDIT_STDOA_OPT_O, NULL,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNAM),

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,13 +55,13 @@ extern "C" {
 typedef struct {
 	avl_node_t	sn_avlnode;	/* AVL book-keeping */
 	const char	*sn_str;	/* string */
-	uint_t		sn_refcnt;	/* reference count */
+	size_t		sn_refcnt;	/* reference count */
 } StrNode;
 
 typedef struct {
 	avl_node_t	ln_avlnode;	/* AVL book-keeping */
 	avl_tree_t	*ln_strtree;	/* AVL tree of associated strings */
-	uint_t		ln_strlen;	/* length of associated strings */
+	size_t		ln_strlen;	/* length of associated strings */
 } LenNode;
 
 /*
@@ -74,9 +74,9 @@ typedef	struct str_master	Str_master;
 struct str_master {
 	const char	*sm_str;	/* pointer to master string */
 	Str_master	*sm_next;	/* used for tracking master strings */
-	uint_t		sm_strlen;	/* length of master string */
+	size_t		sm_strlen;	/* length of master string */
 	uint_t		sm_hashval;	/* hashval of master string */
-	uint_t		sm_stroff;	/* offset into destination strtab */
+	size_t		sm_stroff;	/* offset into destination strtab */
 };
 
 /*
@@ -87,8 +87,8 @@ struct str_master {
 typedef	struct str_hash	Str_hash;
 
 struct str_hash {
-	uint_t		hi_strlen;	/* string length */
-	uint_t		hi_refcnt;	/* number of references to str */
+	size_t		hi_strlen;	/* string length */
+	size_t		hi_refcnt;	/* number of references to str */
 	uint_t		hi_hashval;	/* hash for string */
 	Str_master	*hi_mstr;	/* pointer to master string */
 	Str_hash	*hi_next;	/* next entry in hash bucket */
@@ -102,10 +102,10 @@ struct str_tbl {
 	char		*st_strbuf;		/* string buffer */
 	Str_hash	**st_hashbcks;		/* hash buckets */
 	Str_master	*st_mstrlist;		/* list of all master strings */
-	uint_t		st_fullstrsize;		/* uncompressed table size */
-	uint_t		st_nextoff;		/* next available string */
-	uint_t		st_strsize;		/* compressed size */
-	uint_t		st_strcnt;		/* number of strings */
+	size_t		st_fullstrsize;		/* uncompressed table size */
+	size_t		st_nextoff;		/* next available string */
+	size_t		st_strsize;		/* compressed size */
+	size_t		st_strcnt;		/* number of strings */
 	uint_t		st_hbckcnt;		/* number of buckets in */
 						/*    hashlist */
 	uint_t		st_flags;

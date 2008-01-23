@@ -285,7 +285,8 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 	 * if the reference symbol is included in the target symbol.
 	 */
 	value = rsym->st_value;
-	value += rld->rel_raddend;
+	if ((rld->rel_flags & FLG_REL_RELA) == FLG_REL_RELA)
+		value += rld->rel_raddend;
 
 	if ((rld->rel_roffset >= value) &&
 	    (rld->rel_roffset < (value + rsym->st_size)))
@@ -1472,6 +1473,71 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	return (NULL);
 }
 
+
+/*
+ * Generate a name for a relocation descriptor that has an STT_SECTION
+ * symbol associated with it. If it is a regular input section, it will
+ * look like:
+ *
+ *	"XXX (section)"
+ *
+ * If it is a generated section created to receive the strings from
+ * input SHF_MERGE|SHF_STRINGS sections, then it will look like:
+ *
+ *	"XXX (merged string section)"
+ *
+ * STT_SECTION relocations to the same section tend to come in clusters,
+ * so we use a static variable to retain the last string we generate. If
+ * another one comes along for the same section before some other section
+ * intervenes, we will reuse the string.
+ *
+ * entry:
+ *	sdp - STT_SECTION symbol for which a relocation descriptor name
+ *		should be generated.
+ *	sd_isc - NULL, or input section that should be used instead of
+ *		the input section already assocated with the symbol
+ *		(sdp->sd_isc). This value is set to a non-NULL value when
+ *		a transition from the old input section to a new one is
+ *		being made, but the symbol has not yet been updated.
+ */
+const const char *
+ld_section_reld_name(Sym_desc *sdp, Is_desc *sd_isc)
+{
+	static Is_desc	*last_sd_isc = NULL;
+	static char	*namestr;
+
+	const char	*fmt;
+	size_t		len;
+
+	/*
+	 * If caller didn't supply a replacement input section,
+	 * use the one referenced by the symbol.
+	 */
+	if (sd_isc == NULL)
+		sd_isc = sdp->sd_isc;
+
+	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
+	    (sd_isc != NULL) && (sd_isc->is_name != NULL)) {
+		if (last_sd_isc != sd_isc) {
+			fmt = (sd_isc->is_flags & FLG_IS_GNSTRMRG) ?
+			    MSG_INTL(MSG_STR_SECTION_MSTR) :
+			    MSG_INTL(MSG_STR_SECTION);
+			len = strlen(fmt) +
+			    strlen(sd_isc->is_name) + 1;
+
+			if ((namestr = libld_malloc(len)) == 0)
+				return (NULL);
+			(void) snprintf(namestr, len, fmt,
+			    sd_isc->is_name);
+			last_sd_isc = sd_isc;	/* Remember for next time */
+		}
+		return (namestr);
+	}
+
+	return (NULL);
+}
+
+
 /*
  * Generate relocation descriptor and dispatch
  */
@@ -1511,15 +1577,24 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 	}
 
 	/*
-	 * Determine whether we're dealing with a named symbol.  Note, bogus
-	 * relocations can result in a null symbol descriptor (sdp), the error
-	 * condition should be caught below after determining whether a valid
-	 * symbol name exists.
+	 * Come up with a descriptive name for the symbol:
+	 *	- If it is a named symbol, use the name as is
+	 *	- If it is an STT_SECTION symbol, generate a descriptive
+	 *		string that incorporates the section name.
+	 *	- Otherwise, supply an "unknown" string.
+	 * Note that bogus relocations can result in a null symbol descriptor
+	 * (sdp), the error condition should be caught below after determining
+	 * whether a valid symbol name exists.
 	 */
 	sdp = ifl->ifl_oldndx[rsndx];
-	if (sdp != NULL && sdp->sd_name && *sdp->sd_name)
+	if ((sdp != NULL) && sdp->sd_name && *sdp->sd_name) {
 		reld->rel_sname = sdp->sd_name;
-	else {
+	} else if ((sdp != NULL) &&
+	    (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) &&
+	    (sdp->sd_isc != NULL) && (sdp->sd_isc->is_name != NULL)) {
+		if ((reld->rel_sname = ld_section_reld_name(sdp, NULL)) == NULL)
+			return (S_ERROR);
+	} else {
 		static char *strunknown;
 
 		if (strunknown == 0)
@@ -1724,16 +1799,15 @@ reloc_segments(int wr_flag, Ofl_desc *ofl)
 	Is_desc		*isp;
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Os_desc	**ospp;
-		Aliste	off;
+		Os_desc	*osp;
+		Aliste	idx;
 
 		if ((sgp->sg_phdr.p_flags & PF_W) != wr_flag)
 			continue;
 
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 			Is_desc		*risp;
 			Listnode	*lnp3;
-			Os_desc		*osp = *ospp;
 
 			osp->os_szoutrels = 0;
 			for (LIST_TRAVERSE(&(osp->os_relisdescs), lnp3, risp)) {
@@ -2172,7 +2246,7 @@ do_sorted_outrelocs(Ofl_desc *ofl)
 
 /*
  * Process relocations.  Finds every input relocation section for each output
- * section and invokes reloc_sec() to relocate that section.
+ * section and invokes reloc_section() to relocate that section.
  */
 uintptr_t
 ld_reloc_process(Ofl_desc *ofl)
@@ -2222,12 +2296,10 @@ ld_reloc_process(Ofl_desc *ofl)
 		 *	which the relocation must be applied (sh_info).
 		 */
 		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-			Os_desc **ospp;
-			Aliste	off;
+			Os_desc *osp;
+			Aliste	idx;
 
-			for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-				osp = *ospp;
-
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 				if (osp->os_relosdesc == 0)
 					continue;
 
@@ -2517,6 +2589,115 @@ ld_am_I_partial(Rel_desc *reld, Xword val)
 	}
 	return ((Sym_desc *) 0);
 }
+
+
+/*
+ * Obtain the current value at the given relocation target.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	rsp - Relocation record
+ *	data - Pointer to relocation target
+ *	value - Address of variable to recieve value
+ *
+ * exit:
+ *	The value of the data at the relocation target has
+ *	been stored in value.
+ */
+int
+ld_reloc_targval_get(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword *value)
+{
+	const Rel_entry	*rep;
+
+	/* We do not currently support running as a cross linker */
+	if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+		REL_ERR_NOSWAP(ofl->ofl_lml,
+		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
+		    rsp->rel_rtype);
+		return (0);
+	}
+
+	rep = &reloc_table[rsp->rel_rtype];
+
+	switch (rep->re_fsize) {
+	case 1:
+		/* LINTED */
+		*value = (Xword) *((uchar_t *)data);
+		break;
+	case 2:
+		/* LINTED */
+		*value = (Xword) *((Half *)data);
+		break;
+	case 4:
+		/* LINTED */
+		*value = *((Xword *)data);
+		break;
+	default:
+		/*
+		 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
+		 */
+		REL_ERR_UNSUPSZ(ofl->ofl_lml,
+		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
+		    rsp->rel_rtype, rep->re_fsize);
+		return (0);
+	}
+	return (1);
+}
+
+
+/*
+ * Set the value at the given relocation target.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	rsp - Relocation record
+ *	data - Pointer to relocation target
+ *	value - Address of variable to recieve value
+ *
+ * exit:
+ *	The value of the data at the relocation target has
+ *	been stored in value.
+ */
+int
+ld_reloc_targval_set(Ofl_desc *ofl, Rel_desc *rsp, uchar_t *data, Xword value)
+{
+	const Rel_entry	*rep;
+
+	/* We do not currently support running as a cross linker */
+	if (OFL_SWAP_RELOC_DATA(ofl, rsp)) {
+		REL_ERR_NOSWAP(ofl->ofl_lml,
+		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
+		    rsp->rel_rtype);
+		return (0);
+	}
+
+	rep = &reloc_table[rsp->rel_rtype];
+
+	switch (rep->re_fsize) {
+	case 1:
+		/* LINTED */
+		*((uchar_t *)data) = (uchar_t)value;
+		break;
+	case 2:
+		/* LINTED */
+		*((Half *)data) = (Half)value;
+		break;
+	case 4:
+		/* LINTED */
+		*((Xword *)data) = value;
+		break;
+	default:
+		/*
+		 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
+		 */
+		REL_ERR_UNSUPSZ(ofl->ofl_lml,
+		    rsp->rel_isdesc->is_file->ifl_name, rsp->rel_sname,
+		    rsp->rel_rtype, rep->re_fsize);
+		return (0);
+	}
+	return (1);
+}
+
 
 /*
  * Because of the combinations of 32-bit lib providing 64-bit support, and

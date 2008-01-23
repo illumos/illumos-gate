@@ -330,7 +330,7 @@ ignore_section_processing(Ofl_desc *ofl)
  * exit:
  *	On error, returns S_ERROR. On success, returns (1), and the
  *	ret_ pointers have been updated to point at the new structures,
- *	which has been filled in. To finish the task, the caller must
+ *	which have been filled in. To finish the task, the caller must
  *	update any fields within the supplied descriptors that differ
  *	from its needs, and then call ld_place_section().
  */
@@ -533,6 +533,69 @@ new_section(Ofl_desc *ofl, Word shtype, const char *shname, Xword entcnt,
 	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
 		return (S_ERROR);
 	isec->is_name = shname;
+	isec->is_shdr = shdr;
+	isec->is_indata = data;
+
+
+	*ret_isec = isec;
+	*ret_shdr = shdr;
+	*ret_data = data;
+	return (1);
+}
+
+/*
+ * Use an existing input section as a template to create a new
+ * input section with the same values as the original, other than
+ * the size of the data area which is supplied by the caller.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	ifl - Input file section to use as a template
+ *	size - Size of data area for new section
+ *	ret_isec, ret_shdr, ret_data - Address of pointers to
+ *		receive address of newly allocated structs.
+ *
+ * exit:
+ *	On error, returns S_ERROR. On success, returns (1), and the
+ *	ret_ pointers have been updated to point at the new structures,
+ *	which have been filled in. To finish the task, the caller must
+ *	update any fields within the supplied descriptors that differ
+ *	from its needs, and then call ld_place_section().
+ */
+static uintptr_t
+new_section_from_template(Ofl_desc *ofl, Is_desc *tmpl_isp, size_t size,
+	Is_desc **ret_isec, Shdr **ret_shdr, Elf_Data **ret_data)
+{
+	Shdr		*shdr;
+	Elf_Data	*data;
+	Is_desc		*isec;
+
+	/*
+	 * Allocate and initialize the Elf_Data structure.
+	 */
+	if ((data = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+		return (S_ERROR);
+	data->d_type = tmpl_isp->is_indata->d_type;
+	data->d_size = size;
+	data->d_align = tmpl_isp->is_shdr->sh_addralign;
+	data->d_version = ofl->ofl_dehdr->e_version;
+
+	/*
+	 * Allocate and initialize the Shdr structure.
+	 */
+	if ((shdr = libld_malloc(sizeof (Shdr))) == 0)
+		return (S_ERROR);
+	*shdr = *tmpl_isp->is_shdr;
+	shdr->sh_addr = 0;
+	shdr->sh_offset = 0;
+	shdr->sh_size = size;
+
+	/*
+	 * Allocate and initialize the Is_desc structure.
+	 */
+	if ((isec = libld_calloc(1, sizeof (Is_desc))) == 0)
+		return (S_ERROR);
+	isec->is_name = tmpl_isp->is_name;
 	isec->is_shdr = shdr;
 	isec->is_indata = data;
 
@@ -836,14 +899,7 @@ make_dynamic(Ofl_desc *ofl)
 	/*
 	 * Reserve entries for any per-symbol auxiliary/filter strings.
 	 */
-	if (ofl->ofl_dtsfltrs) {
-		/* LINTED */
-		Dfltr_desc *	dftp;
-		Aliste		off;
-
-		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, off, dftp))
-			cnt++;
-	}
+	cnt += alist_nitems(ofl->ofl_dtsfltrs);
 
 	/*
 	 * Reserve entries for any _init() and _fini() section addresses.
@@ -1693,11 +1749,11 @@ make_dynstr(Ofl_desc *ofl)
 	/*
 	 * Reserve entries for any per-symbol auxiliary/filter strings.
 	 */
-	if (ofl->ofl_dtsfltrs) {
-		Dfltr_desc *	dftp;
-		Aliste		off;
+	if (ofl->ofl_dtsfltrs != NULL) {
+		Dfltr_desc	*dftp;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, off, dftp))
+		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, idx, dftp))
 			if (st_insert(ofl->ofl_dynstrtab, dftp->dft_str) == -1)
 				return (S_ERROR);
 	}
@@ -2062,6 +2118,405 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 
 
 /*
+ * Given a relocation descriptor that references a string table
+ * input section, locate the string referenced and return a pointer
+ * to it.
+ */
+static const char *
+strmerge_get_reloc_str(Ofl_desc *ofl, Rel_desc *rsp)
+{
+	Sym_desc *sdp = rsp->rel_sym;
+	Xword	 str_off;
+
+	/*
+	 * In the case of an STT_SECTION symbol, the addend of the
+	 * relocation gives the offset into the string section. For
+	 * other symbol types, the symbol value is the offset.
+	 */
+
+	if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_SECTION) {
+		str_off = sdp->sd_sym->st_value;
+	} else if ((rsp->rel_flags & FLG_REL_RELA) == FLG_REL_RELA) {
+		/*
+		 * For SHT_RELA, the addend value is found in the
+		 * rel_raddend field of the relocation.
+		 */
+		str_off = rsp->rel_raddend;
+	} else {	/* REL and STT_SECTION */
+		/*
+		 * For SHT_REL, the "addend" is not part of the relocation
+		 * record. Instead, it is found at the relocation target
+		 * address.
+		 */
+		uchar_t *addr = (uchar_t *)((uintptr_t)rsp->rel_roffset +
+		    (uintptr_t)rsp->rel_isdesc->is_indata->d_buf);
+
+		if (ld_reloc_targval_get(ofl, rsp, addr, &str_off) == 0)
+			return (0);
+	}
+
+	return (str_off + (char *)sdp->sd_isc->is_indata->d_buf);
+}
+
+/*
+ * First pass over the relocation records for string table merging.
+ * Build lists of relocations and symbols that will need modification,
+ * and insert the strings they reference into the mstrtab string table.
+ *
+ * entry:
+ *	ofl, osp - As passed to ld_make_strmerge().
+ *	mstrtab - String table to receive input strings. This table
+ *		must be in its first (initialization) pass and not
+ *		yet cooked (st_getstrtab_sz() not yet called).
+ *	rel_aplist - APlist to receive pointer to any relocation
+ *		descriptors with STT_SECTION symbols that reference
+ *		one of the input sections being merged.
+ *	sym_aplist - APlist to receive pointer to any symbols that reference
+ *		one of the input sections being merged.
+ *	reloc_list - List of relocation descriptors to examine.
+ *		Either ofl->&ofl->ofl_actrels (active relocations)
+ *		or &ofl->ofl_outrels (output relocations).
+ *
+ * exit:
+ *	On success, rel_aplist and sym_aplist are updated, and
+ *	any strings in the mergable input sections referenced by
+ *	a relocation has been entered into mstrtab. True (1) is returned.
+ *
+ *	On failure, False (0) is returned.
+ */
+static int
+strmerge_pass1(Ofl_desc *ofl, Os_desc *osp, Str_tbl *mstrtab,
+    APlist **rel_aplist, APlist **sym_aplist, List *reloc_list)
+{
+	Listnode	*lnp;
+	Rel_cache	*rcp;
+	Sym_desc	*sdp;
+	Sym_desc	*last_sdp = NULL;
+	Rel_desc	*rsp;
+	const char	*name;
+
+	for (LIST_TRAVERSE(reloc_list, lnp, rcp)) {
+		/* LINTED */
+		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
+			sdp = rsp->rel_sym;
+			if ((sdp->sd_isc == NULL) ||
+			    ((sdp->sd_isc->is_flags &
+			    (FLG_IS_DISCARD | FLG_IS_INSTRMRG)) !=
+			    FLG_IS_INSTRMRG) ||
+			    (sdp->sd_isc->is_osdesc != osp))
+				continue;
+
+			/*
+			 * Remember symbol for use in the third pass.
+			 * There is no reason to save a given symbol more
+			 * than once, so we take advantage of the fact that
+			 * relocations to a given symbol tend to cluster
+			 * in the list. If this is the same symbol we saved
+			 * last time, don't bother.
+			 */
+			if (last_sdp != sdp) {
+				if (aplist_append(sym_aplist, sdp,
+				    AL_CNT_STRMRGSYM) == 0)
+					return (0);
+				last_sdp = sdp;
+			}
+
+			/* Enter the string into our new string table */
+			name = strmerge_get_reloc_str(ofl, rsp);
+			if (st_insert(mstrtab, name) == -1)
+				return (0);
+
+			/*
+			 * If this is an STT_SECTION symbol, then the
+			 * second pass will need to modify this relocation,
+			 * so hang on to it.
+			 */
+			if ((ELF_ST_TYPE(sdp->sd_sym->st_info) ==
+			    STT_SECTION) &&
+			    (aplist_append(rel_aplist, rsp,
+			    AL_CNT_STRMRGREL) == 0))
+				return (0);
+		}
+	}
+
+	return (1);
+}
+
+/*
+ * If the output section has any SHF_MERGE|SHF_STRINGS input sections,
+ * replace them with a single merged/compressed input section.
+ *
+ * entry:
+ *	ofl - Output file descriptor
+ *	osp - Output section descriptor
+ *	rel_aplist, sym_aplist, - Address of 2 APlists, to be used
+ *		for internal processing. On the initial call to
+ *		ld_make_strmerge, these list pointers must be NULL.
+ *		The caller is encouraged to pass the same lists back for
+ *		successive calls to this function without freeing
+ *		them in between calls. This causes a single pair of
+ *		memory allocations to be reused multiple times.
+ *
+ * exit:
+ *	If section merging is possible, it is done. If no errors are
+ *	encountered, True (1) is returned. On error, S_ERROR.
+ *
+ *	The contents of rel_aplist and sym_aplist on exit are
+ *	undefined. The caller can free them, or pass them back to a subsequent
+ *	call to this routine, but should not examine their contents.
+ */
+static uintptr_t
+ld_make_strmerge(Ofl_desc *ofl, Os_desc *osp, APlist **rel_aplist,
+    APlist **sym_aplist)
+{
+	Str_tbl		*mstrtab;	/* string table for string merge secs */
+	Is_desc		*mstrsec;	/* Generated string merge section */
+	Is_desc		*isp;
+	Shdr		*mstr_shdr;
+	Elf_Data	*mstr_data;
+	Sym_desc	*sdp;
+	Rel_desc	*rsp;
+	Aliste		idx;
+	size_t		data_size;
+	int		st_setstring_status;
+	size_t		stoff;
+
+	/* If string table compression is disabled, there's nothing to do */
+	if ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) != 0)
+		return (1);
+
+	/*
+	 * Pass over the mergeable input sections, and if they haven't
+	 * all been discarded, create a string table.
+	 */
+	mstrtab = NULL;
+	for (APLIST_TRAVERSE(osp->os_mstrisdescs, idx, isp)) {
+		if (isp->is_flags & FLG_IS_DISCARD)
+			continue;
+
+		/*
+		 * We have at least one non-discarded section.
+		 * Create a string table descriptor.
+		 */
+		if ((mstrtab = st_new(FLG_STNEW_COMPRESS)) == NULL)
+			return (S_ERROR);
+		break;
+	}
+
+	/* If no string table was created, we have no mergeable sections */
+	if (mstrtab == NULL)
+		return (1);
+
+	/*
+	 * This routine has to make 3 passes:
+	 *
+	 *	1) Examine all relocations, insert strings from relocations
+	 *		to the mergable input sections into the string table.
+	 *	2) Modify the relocation values to be correct for the
+	 *		new merged section.
+	 *	3) Modify the symbols used by the relocations to reference
+	 *		the new section.
+	 *
+	 * These passes cannot be combined:
+	 *	- The string table code works in two passes, and all
+	 *		strings have to be loaded in pass one before the
+	 *		offset of any strings can be determined.
+	 *	- Multiple relocations reference a single symbol, so the
+	 *		symbol cannot be modified until all relocations are
+	 *		fixed.
+	 *
+	 * The number of relocations related to section merging is usually
+	 * a mere fraction of the overall active and output relocation lists,
+	 * and the number of symbols is usually a fraction of the number
+	 * of related relocations. We therefore build APlists for the
+	 * relocations and symbols in the first pass, and then use those
+	 * lists to accelerate the operation of pass 2 and 3.
+	 *
+	 * Reinitialize the lists to a completely empty state.
+	 */
+	aplist_reset(*rel_aplist);
+	aplist_reset(*sym_aplist);
+
+	/*
+	 * Pass 1:
+	 *
+	 * Every relocation related to this output section (and the input
+	 * sections that make it up) is found in either the active, or the
+	 * output relocation list, depending on whether the relocation is to
+	 * be processed by this invocation of the linker, or inserted into the
+	 * output object.
+	 *
+	 * Build lists of relocations and symbols that will need modification,
+	 * and insert the strings they reference into the mstrtab string table.
+	 */
+	if (strmerge_pass1(ofl, osp, mstrtab, rel_aplist, sym_aplist,
+	    &ofl->ofl_actrels) == 0)
+		goto return_s_error;
+	if (strmerge_pass1(ofl, osp, mstrtab, rel_aplist, sym_aplist,
+	    &ofl->ofl_outrels) == 0)
+		goto return_s_error;
+
+	/*
+	 * Get the size of the new input section. Requesting the
+	 * string table size "cooks" the table, and finalizes its contents.
+	 */
+	data_size = st_getstrtab_sz(mstrtab);
+
+	/* Create a new input section to hold the merged strings */
+	if (new_section_from_template(ofl, isp, data_size,
+	    &mstrsec, &mstr_shdr, &mstr_data) == S_ERROR)
+		goto return_s_error;
+	mstrsec->is_flags |= FLG_IS_GNSTRMRG;
+
+	/*
+	 * Allocate a data buffer for the new input section.
+	 * Then, associate the buffer with the string table descriptor.
+	 */
+	if ((mstr_data->d_buf = libld_malloc(data_size)) == 0)
+		goto return_s_error;
+	if (st_setstrbuf(mstrtab, mstr_data->d_buf, data_size) == -1)
+		goto return_s_error;
+
+	/* Add the new section to the output image */
+	if (ld_place_section(ofl, mstrsec, osp->os_scnsymndx, 0) ==
+	    (Os_desc *)S_ERROR)
+		goto return_s_error;
+
+	/*
+	 * Pass 2:
+	 *
+	 * Revisit the relocation descriptors with STT_SECTION symbols
+	 * that were saved by the first pass. Update each relocation
+	 * record so that the offset it contains is for the new section
+	 * instead of the original.
+	 */
+	for (APLIST_TRAVERSE(*rel_aplist, idx, rsp)) {
+		const char	*name;
+
+		/* Put the string into the merged string table */
+		name = strmerge_get_reloc_str(ofl, rsp);
+		st_setstring_status = st_setstring(mstrtab, name, &stoff);
+		if (st_setstring_status == -1) {
+			/*
+			 * A failure to insert at this point means that
+			 * something is corrupt. This isn't a resource issue.
+			 */
+			assert(st_setstring_status != -1);
+			goto return_s_error;
+		}
+
+		/*
+		 * Alter the relocation to access the string at the
+		 * new offset in our new string table.
+		 *
+		 * For SHT_RELA platforms, it suffices to simply
+		 * update the rel_raddend field of the relocation.
+		 *
+		 * For SHT_REL platforms, the new "addend" value
+		 * needs to be written at the address being relocated.
+		 * However, we can't alter the input sections which
+		 * are mapped readonly, and the output image has not
+		 * been created yet. So, we defer this operation,
+		 * using the rel_raddend field of the relocation
+		 * which is normally 0 on a REL platform, to pass the
+		 * new "addend" value to ld_perform_outreloc() or
+		 * ld_do_activerelocs(). The FLG_REL_NADDEND flag
+		 * tells them that this is the case.
+		 */
+		if ((rsp->rel_flags & FLG_REL_RELA) == 0)   /* REL */
+			rsp->rel_flags |= FLG_REL_NADDEND;
+		rsp->rel_raddend = (Sxword)stoff;
+
+		/*
+		 * Change the descriptor name to reflect the fact that it
+		 * points at our merged section. This shows up in debug
+		 * output and helps show how the relocation has changed
+		 * from its original input section to our merged one.
+		 */
+		rsp->rel_sname = ld_section_reld_name(rsp->rel_sym, mstrsec);
+		if (rsp->rel_sname == NULL)
+			goto return_s_error;
+	}
+
+	/*
+	 * Pass 3:
+	 *
+	 * Modify the symbols referenced by the relocation descriptors
+	 * so that they reference the new input section containing the
+	 * merged strings instead of the original input sections.
+	 */
+	for (APLIST_TRAVERSE(*sym_aplist, idx, sdp)) {
+		/*
+		 * If we've already processed this symbol, don't do it
+		 * twice. strmerge_pass1() uses a heuristic (relocations to
+		 * the same symbol clump together) to avoid inserting a
+		 * given symbol more than once, but repeat symbols in
+		 * the list can occur.
+		 */
+		if ((sdp->sd_isc->is_flags & FLG_IS_INSTRMRG) == 0)
+			continue;
+
+		if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_SECTION) {
+			/*
+			 * This is not an STT_SECTION symbol, so its
+			 * value is the offset of the string within the
+			 * input section. Update the address to reflect
+			 * the address in our new merged section.
+			 */
+			const char *name = sdp->sd_sym->st_value +
+			    (char *)sdp->sd_isc->is_indata->d_buf;
+
+			st_setstring_status =
+			    st_setstring(mstrtab, name, &stoff);
+			if (st_setstring_status == -1) {
+				/*
+				 * A failure to insert at this point means
+				 * something is corrupt. This isn't a
+				 * resource issue.
+				 */
+				assert(st_setstring_status != -1);
+				goto return_s_error;
+			}
+
+			if (ld_sym_copy(sdp) == S_ERROR)
+				goto return_s_error;
+			sdp->sd_sym->st_value = (Word)stoff;
+		}
+
+		/* Redirect the symbol to our new merged section */
+		sdp->sd_isc = mstrsec;
+	}
+
+	/*
+	 * There are no references left to the original input string sections.
+	 * Mark them as discarded so they don't go into the output image.
+	 * At the same time, add up the sizes of the replaced sections.
+	 */
+	data_size = 0;
+	for (APLIST_TRAVERSE(osp->os_mstrisdescs, idx, isp)) {
+		if (isp->is_flags & (FLG_IS_DISCARD | FLG_IS_GNSTRMRG))
+			continue;
+
+		data_size += isp->is_indata->d_size;
+
+		isp->is_flags |= FLG_IS_DISCARD;
+		DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml, isp, mstrsec));
+	}
+
+	/* Report how much space we saved in the output section */
+	Dbg_sec_genstr_compress(ofl->ofl_lml, osp->os_name, data_size,
+	    mstr_data->d_size);
+
+	st_destroy(mstrtab);
+	return (1);
+
+return_s_error:
+	st_destroy(mstrtab);
+	return (S_ERROR);
+}
+
+
+/*
  * The following sections are built after all input file processing and symbol
  * validation has been carried out.  The order is important (because the
  * addition of a section adds a new symbol there is a chicken and egg problem
@@ -2121,6 +2576,44 @@ ld_make_sections(Ofl_desc *ofl)
 	}
 
 	/*
+	 * Do any of the output sections contain input sections that
+	 * are candidates for string table merging? For each such case,
+	 * we create a replacement section, insert it, and discard the
+	 * originals.
+	 *
+	 * rel_aplist and sym_aplist are used by ld_make_strmerge()
+	 * for its internal processing. We are responsible for the
+	 * initialization and cleanup, and ld_make_strmerge() handles the rest.
+	 * This allows us to reuse a single pair of memory buffers allocatated
+	 * for this processing for all the output sections.
+	 */
+	if ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) == 0) {
+		int error_seen = 0;
+		APlist *rel_aplist = NULL;
+		APlist *sym_aplist = NULL;
+
+		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+			Os_desc	*osp;
+			Aliste	idx;
+
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp))
+				if ((osp->os_mstrisdescs != NULL) &&
+				    (ld_make_strmerge(ofl, osp,
+				    &rel_aplist, &sym_aplist) ==
+				    S_ERROR)) {
+					error_seen = 1;
+					break;
+				}
+		}
+		if (rel_aplist != NULL)
+			free(rel_aplist);
+		if (sym_aplist != NULL)
+			free(sym_aplist);
+		if (error_seen != 0)
+			return (S_ERROR);
+	}
+
+	/*
 	 * Add any necessary versioning information.
 	 */
 	if ((flags & (FLG_OF_VERNEED | FLG_OF_NOVERSEC)) == FLG_OF_VERNEED) {
@@ -2165,12 +2658,10 @@ ld_make_sections(Ofl_desc *ofl)
 		 * insuring that this pointer isn't re-examined.
 		 */
 		for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-			Os_desc	**ospp, *posp = 0;
-			Aliste	off;
+			Os_desc	*osp, *posp = 0;
+			Aliste	idx;
 
-			for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-				Os_desc	*osp = *ospp;
-
+			for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 				if ((osp != posp) && osp->os_szoutrels &&
 				    (osp != ofl->ofl_osplt)) {
 					if (make_reloc(ofl, osp) == S_ERROR)

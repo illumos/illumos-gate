@@ -594,7 +594,7 @@ check_flags(Ofl_desc * ofl, int argc)
 	 * object, or are set on a per-symbol basis from a mapfile.
 	 */
 	if (zlflag) {
-		if ((ofl->ofl_filtees == 0) && (ofl->ofl_dtsfltrs == 0)) {
+		if ((ofl->ofl_filtees == NULL) && (ofl->ofl_dtsfltrs == NULL)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_ARG_NOFLTR),
 			    MSG_ORIG(MSG_ARG_ZLOADFLTR));

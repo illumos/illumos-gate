@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,7 +113,7 @@ preload(const char *str, Rt_map *lmp)
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 |= RT_FL2_FTL2WARN;
 		if ((pnp = expand_paths(clmp, ptr, PN_SER_EXTLOAD, 0)) != 0)
-			nlmp = load_one(&lml_main, ALO_DATA, pnp, clmp,
+			nlmp = load_one(&lml_main, ALIST_OFF_DATA, pnp, clmp,
 			    MODE(lmp), flags, 0);
 		if (pnp)
 			remove_pnode(pnp);
@@ -354,8 +354,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Create a link map structure for ld.so.1.
 	 */
 	if ((rlmp = elf_new_lm(&lml_rtld, _rtldname, rtldname, dyn_ptr, ld_base,
-	    (ulong_t)&_etext, ALO_DATA, (ulong_t)(eaddr - ld_base), 0, ld_base,
-	    (ulong_t)(eaddr - ld_base), mmaps, 2)) == 0) {
+	    (ulong_t)&_etext, ALIST_OFF_DATA, (ulong_t)(eaddr - ld_base), 0,
+	    ld_base, (ulong_t)(eaddr - ld_base), mmaps, 2)) == 0) {
 		return (0);
 	}
 
@@ -425,8 +425,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		/*
 		 * Map in object.
 		 */
-		if ((mlmp = (ftp->fct_map_so)(&lml_main, ALO_DATA, execname,
-		    argvname, fd)) == 0)
+		if ((mlmp = (ftp->fct_map_so)(&lml_main, ALIST_OFF_DATA,
+		    execname, argvname, fd)) == 0)
 			return (0);
 
 		/*
@@ -494,7 +494,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		if (aoutdyn) {
 #ifdef A_OUT
 			if ((mlmp = aout_new_lm(&lml_main, execname, argvname,
-			    aoutdyn, 0, 0, ALO_DATA)) == 0)
+			    aoutdyn, 0, 0, ALIST_OFF_DATA)) == 0)
 				return (0);
 
 			/*
@@ -637,8 +637,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 				entry += (ulong_t)ehdr;
 
 			if ((mlmp = elf_new_lm(&lml_main, execname, argvname,
-			    dyn, (Addr)ehdr, etext, ALO_DATA, memsize, entry,
-			    (ulong_t)ehdr, memsize, mmaps, mmapcnt)) == 0) {
+			    dyn, (Addr)ehdr, etext, ALIST_OFF_DATA, memsize,
+			    entry, (ulong_t)ehdr, memsize, mmaps,
+			    mmapcnt)) == 0) {
 				return (0);
 			}
 			if (tlsphdr &&
@@ -858,17 +859,18 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	if (DBG_ENABLED) {
 		DBG_CALL(Dbg_file_ldso(rlmp, envp, auxv,
-		    LIST(rlmp)->lm_lmidstr, ALO_DATA));
+		    LIST(rlmp)->lm_lmidstr, ALIST_OFF_DATA));
 
 		if (FCT(mlmp) == &elf_fct) {
 			DBG_CALL(Dbg_file_elf(&lml_main, PATHNAME(mlmp),
 			    (ulong_t)DYN(mlmp), ADDR(mlmp), MSIZE(mlmp),
-			    ENTRY(mlmp), LIST(mlmp)->lm_lmidstr, ALO_DATA));
+			    ENTRY(mlmp), LIST(mlmp)->lm_lmidstr,
+			    ALIST_OFF_DATA));
 		} else {
 			DBG_CALL(Dbg_file_aout(&lml_main, PATHNAME(mlmp),
 			    (ulong_t)AOUTDYN(mlmp), (ulong_t)ADDR(mlmp),
 			    (ulong_t)MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
-			    ALO_DATA));
+			    ALIST_OFF_DATA));
 		}
 	}
 
@@ -967,7 +969,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Load all dependent (needed) objects.
 	 */
-	if (analyze_lmc(&lml_main, ALO_DATA, mlmp) == 0)
+	if (analyze_lmc(&lml_main, ALIST_OFF_DATA, mlmp) == 0)
 		return (0);
 
 	/*
@@ -988,7 +990,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 		DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
-		if (relocate_lmc(&lml_main, ALO_DATA, mlmp, mlmp) == 0)
+		if (relocate_lmc(&lml_main, ALIST_OFF_DATA, mlmp, mlmp) == 0)
 			return (0);
 
 		/*

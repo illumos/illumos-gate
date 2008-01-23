@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,7 @@
 static int
 avl_len_compare(const void *n1, const void *n2)
 {
-	uint_t	len1, len2;
+	size_t	len1, len2;
 
 	len1 = ((LenNode *)n1)->ln_strlen;
 	len2 = ((LenNode *)n2)->ln_strlen;
@@ -197,7 +197,7 @@ st_new(uint_t flags)
 int
 st_insert(Str_tbl *stp, const char *str)
 {
-	uint_t		len;
+	size_t		len;
 	StrNode		*snp, sn = { 0 };
 	LenNode		*lnp, ln = { 0 };
 	avl_index_t	where;
@@ -211,7 +211,7 @@ st_insert(Str_tbl *stp, const char *str)
 	 * Null strings always point to the head of the string
 	 * table - no reason to keep searching.
 	 */
-	if ((len = (uint_t)strlen(str)) == 0)
+	if ((len = strlen(str)) == 0)
 		return (0);
 
 	stp->st_fullstrsize += len + 1;
@@ -262,7 +262,7 @@ st_insert(Str_tbl *stp, const char *str)
 int
 st_delstring(Str_tbl *stp, const char *str)
 {
-	uint_t		len;
+	size_t		len;
 	LenNode		*lnp, ln = { 0 };
 	StrNode		*snp, sn = { 0 };
 
@@ -271,7 +271,7 @@ st_delstring(Str_tbl *stp, const char *str)
 	 */
 	assert((stp->st_flags & FLG_STTAB_COOKED) == 0);
 
-	len = (uint_t)strlen(str);
+	len = strlen(str);
 	stp->st_fullstrsize -= len + 1;
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0)
@@ -347,9 +347,9 @@ st_destroy(Str_tbl *stp)
  * the Str_tbl.
  */
 int
-st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
+st_setstring(Str_tbl *stp, const char *str, size_t *stoff)
 {
-	uint_t		stlen;
+	size_t		stlen;
 	uint_t		hashval;
 	Str_hash	*sthash;
 	Str_master	*mstr;
@@ -361,7 +361,7 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 	assert(stp->st_strbuf);
 
 	assert(stp->st_flags & FLG_STTAB_COOKED);
-	stlen = (uint_t)strlen(str);
+	stlen = strlen(str);
 	/*
 	 * Null string always points to head of string table
 	 */
@@ -371,7 +371,7 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 	}
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
-		uint_t		_stoff;
+		size_t		_stoff;
 
 		stlen++;	/* count for trailing '\0' */
 		_stoff = stp->st_nextoff;
@@ -419,7 +419,7 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 	 */
 	mstr = sthash->hi_mstr;
 	if (mstr->sm_stroff == 0) {
-		uint_t	mstrlen = mstr->sm_strlen + 1;
+		size_t	mstrlen = mstr->sm_strlen + 1;
 
 		mstr->sm_stroff = stp->st_nextoff;
 
@@ -444,7 +444,7 @@ st_setstring(Str_tbl *stp, const char *str, uint_t *stoff)
 
 
 static int
-st_hash_insert(Str_tbl *stp, const char *str, uint_t len)
+st_hash_insert(Str_tbl *stp, const char *str, size_t len)
 {
 	int		i;
 	uint_t		hashval = HASHSEED;
@@ -549,7 +549,7 @@ st_hash_insert(Str_tbl *stp, const char *str, uint_t len)
 /*
  * Return amount of space required for the string table.
  */
-uint_t
+size_t
 st_getstrtab_sz(Str_tbl *stp)
 {
 	assert(stp->st_fullstrsize > 0);
@@ -657,7 +657,7 @@ st_getstrbuf(Str_tbl *stp)
 }
 
 int
-st_setstrbuf(Str_tbl *stp, char *stbuf, uint_t bufsize)
+st_setstrbuf(Str_tbl *stp, char *stbuf, size_t bufsize)
 {
 	assert(stp->st_flags & FLG_STTAB_COOKED);
 

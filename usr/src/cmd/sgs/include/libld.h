@@ -74,23 +74,21 @@ extern "C" {
  * order to tell the linker that:
  *
  *      1) There is nothing in the section except null terminated strings.
- *      2) If two compatible sections both have these flags set, it is
- *		OK to combine identical strings into single instances.
- *		In this case, the two sections would be modified to both
- *		reference a single string copy.
+ *	2) Those strings do not contain NULL bytes, except as termination.
+ *	3) All references to these strings occur via standard relocation
+ *		records.
+ *
+ * As a result, if two compatible sections both have these flags set, it is
+ * OK to combine the strings they contain into a single merged string table
+ * with duplicates removed and tail strings merged.
  *
  * This is a different meaning than the simple concatenating of sections
  * that the linker always does. It is a hint that an additional optimization
  * is possible, but not required. This means that sections that do not
- * share the same SHF_MERGE|SHF_STRINGS values can be merged (concatenated),
- * but cannot have their duplicate strings combined. Hence, the values
- * of SHF_MERGE|SHF_STRINGS should be ignored when deciding whether two
- * sections can be merged (concatenated).
- *
- * We do not currently implement the SHF_MERGE|SHF_STRINGS optimization,
- * but it is possible to add it. If we did, the procedure would be to
- * first combine the compatible sections that have these flag bits set,
- * and then to concatenate any others to the result.
+ * share the same SHF_MERGE|SHF_STRINGS values can be concatenated,
+ * but cannot have their duplicate strings combined. Hence, the
+ * SHF_MERGE|SHF_STRINGS flags should be ignored when deciding whether
+ * two sections can be concatenated.
  */
 #define	ALL_SHF_IGNORE	(ALL_SHF_ORDER | SHF_GROUP | SHF_MERGE | SHF_STRINGS)
 
@@ -412,6 +410,11 @@ struct ofl_desc {
 /*
  * Relocation (active & output) processing structure - transparent to common
  * code.
+ *
+ * Note that rel_raddend is primarily only of interest to RELA relocations,
+ * and is set to 0 for REL. However, there is an exception: If FLG_REL_NADDEND
+ * is set, then rel_raddend contains a replacement value for the implicit
+ * addend found in the relocation target.
  */
 struct rel_desc {
 	Os_desc		*rel_osdesc;	/* output section reloc is against */
@@ -466,6 +469,10 @@ struct rel_desc {
 #define	FLG_REL_RELA	0x00100000	/* descripter captures a Rela */
 #define	FLG_REL_GOTFIX	0x00200000	/* relocation points to GOTOP instr. */
 					/*	which needs updating */
+#define	FLG_REL_NADDEND	0x00400000	/* Replace implicit addend in dest */
+					/*	with value in rel_raddend */
+					/*	Relevant to REL (i386) */
+					/*	relocations, not to RELA. */
 
 /*
  * Structure to hold a cache of Relocations.
@@ -576,6 +583,8 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_SECTREF	0x0010		/* section has been referenced */
 #define	FLG_IS_GDATADEF	0x0020		/* section contains global data sym */
 #define	FLG_IS_EXTERNAL	0x0040		/* isp from an user file */
+#define	FLG_IS_INSTRMRG	0x0080		/* Usable SHF_MERGE|SHF_STRINGS sec */
+#define	FLG_IS_GNSTRMRG	0x0100		/* Generated mergeable string section */
 
 
 /*
@@ -589,6 +598,7 @@ struct os_desc {			/* Output section descriptor */
 	List		os_relisdescs;	/* reloc input section descriptors */
 					/*	for this output section */
 	List		os_isdescs;	/* list of input sections in output */
+	APlist		*os_mstrisdescs; /* FLG_IS_INSTRMRG input sections */
 	Sort_desc	*os_sort;	/* used for sorting sections */
 	Sg_desc		*os_sgdesc;	/* segment os_desc is placed on */
 	Elf_Data	*os_outdata;	/* output sections raw data */
@@ -626,8 +636,8 @@ struct sg_desc {			/* output segment descriptor */
 	Xword		sg_round;	/* data rounding required (mapfile) */
 	Xword		sg_length;	/* maximum segment length; if 0 */
 					/*	segment is not specified */
-	Alist		*sg_osdescs;	/* list of output section descriptors */
-	Alist		*sg_secorder;	/* list specifying section ordering */
+	APlist		*sg_osdescs;	/* list of output section descriptors */
+	APlist		*sg_secorder;	/* list specifying section ordering */
 					/*	for the segment */
 	Half		sg_flags;
 	Sym_desc	*sg_sizesym;	/* size symbol for this segment */

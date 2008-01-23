@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,10 +67,10 @@ _caller(caddr_t cpc, int flags)
 	Listnode *	lnp;
 
 	for (LIST_TRAVERSE(&dynlm_list, lnp, lml)) {
-		Aliste	off;
+		Aliste	idx;
 		Lm_cntl	*lmc;
 
-		for (ALIST_TRAVERSE(lml->lm_lists, off, lmc)) {
+		for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 			Rt_map	*lmp;
 
 			for (lmp = lmc->lc_head; lmp;
@@ -134,14 +134,14 @@ int
 hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 {
 	Grp_desc	*gdp;
-	Aliste		off;
+	Aliste		idx;
 	int		found = ALE_CREATE;
 	uint_t		oflags;
 
 	/*
 	 * Make sure this dependency hasn't already been recorded.
 	 */
-	for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+	for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 		if (gdp->gd_depend == lmp) {
 			found = ALE_EXISTS;
 			break;
@@ -160,14 +160,14 @@ hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 		/*
 		 * Indicate this object is a part of this handles group.
 		 */
-		if (alist_append(&GROUPS(lmp), &ghp,
-		    sizeof (Grp_hdl *), AL_CNT_GROUPS) == 0)
+		if (aplist_append(&GROUPS(lmp), ghp,
+		    AL_CNT_GROUPS) == 0)
 			return (0);
 
 		/*
 		 * Append the new dependency to this handle.
 		 */
-		if ((gdp = alist_append(&(ghp->gh_depends), &gd,
+		if ((gdp = alist_append(&ghp->gh_depends, &gd,
 		    sizeof (Grp_desc), AL_CNT_DEPENDS)) == 0)
 			return (0);
 	}
@@ -216,9 +216,9 @@ Grp_hdl *
 hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
     uint_t ndflags, uint_t cdflags)
 {
-	Grp_hdl	*ghp = 0, **ghpp;
-	Alist	**alpp;
-	Aliste	off;
+	Grp_hdl	*ghp = 0, *_ghp;
+	APlist	**alpp;
+	Aliste	idx;
 
 	/*
 	 * For dlopen(0) the handle is maintained as part of the link-map list,
@@ -238,9 +238,9 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 	 * sense for RTLD_FIRST.  Determine if an appropriate handle already
 	 * exists.
 	 */
-	for (ALIST_TRAVERSE(*alpp, off, ghpp)) {
-		if (((*ghpp)->gh_flags & GPH_FIRST) == (hflags & GPH_FIRST)) {
-			ghp = *ghpp;
+	for (APLIST_TRAVERSE(*alpp, idx, _ghp)) {
+		if ((_ghp->gh_flags & GPH_FIRST) == (hflags & GPH_FIRST)) {
+			ghp = _ghp;
 			break;
 		}
 	}
@@ -255,8 +255,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 		if ((ghp = hdl_alloc()) == 0)
 			return (0);
 
-		if (alist_append(alpp, &ghp, sizeof (Grp_hdl *),
-		    AL_CNT_GROUPS) == 0)
+		if (aplist_append(alpp, ghp, AL_CNT_GROUPS) == 0)
 			return (0);
 
 		/*
@@ -323,11 +322,11 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 			(void) list_append(&hdl_list[ndx], ghp);
 
 			if (DBG_ENABLED) {
-				Aliste		off;
+				Aliste		idx;
 				Grp_desc	*gdp;
 
 				DBG_CALL(Dbg_file_hdl_title(DBG_HDL_REINST));
-				for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp))
+				for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
 					    gdp->gd_depend, DBG_DEP_REINST, 0));
 			}
@@ -355,7 +354,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 int
 hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 {
-	Aliste		off;
+	Aliste		idx;
 	Grp_desc	*gdp;
 
 	/*
@@ -374,10 +373,10 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 	}
 
 	DBG_CALL(Dbg_file_hdl_title(DBG_HDL_ADD));
-	for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+	for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 		Rt_map *	lmp = gdp->gd_depend;
-		Aliste		off1;
-		Bnd_desc **	bdpp;
+		Aliste		idx1;
+		Bnd_desc	*bdp;
 
 		/*
 		 * If this dependency doesn't indicate that its dependencies
@@ -387,8 +386,7 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 		if ((gdp->gd_flags & GPD_ADDEPS) == 0)
 			continue;
 
-		for (ALIST_TRAVERSE(DEPENDS(lmp), off1, bdpp)) {
-			Bnd_desc	*bdp = *bdpp;
+		for (APLIST_TRAVERSE(DEPENDS(lmp), idx1, bdp)) {
 			Rt_map		*dlmp = bdp->b_depend;
 
 			if ((bdp->b_flags & BND_NEEDED) == 0)
@@ -661,7 +659,8 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 				promote = 1;
 		}
 		if (promote)
-			(void) relocate_lmc(lml, ALO_DATA, clmp, lml->lm_head);
+			(void) relocate_lmc(lml, ALIST_OFF_DATA, clmp,
+			    lml->lm_head);
 
 		return (ghp);
 	}
@@ -688,7 +687,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * Create a new link-map control list for this request, and load the
 	 * associated object.
 	 */
-	if ((lmc = alist_append(&(lml->lm_lists), 0, sizeof (Lm_cntl),
+	if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS)) == 0) {
 		remove_pnode(pnp);
 		return (0);
@@ -720,7 +719,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		remove_cntl(lml, olmco);
 		lml = LIST(nlmp);
 		olmco = 0;
-		nlmco = ALO_DATA;
+		nlmco = ALIST_OFF_DATA;
 	}
 
 	/*
@@ -1064,9 +1063,9 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 		 * link-maps.
 		 */
 		Grp_desc	*gdp;
-		Aliste		off;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 			if ((gdp->gd_flags & GPD_DLSYM) == 0)
 				continue;
 
@@ -1089,7 +1088,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 
 			DBG_CALL(Dbg_syms_lazy_rescan(LIST(lmp), name));
 
-			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 				nlmp = gdp->gd_depend;
 
 				if (((gdp->gd_flags & GPD_DLSYM) == 0) ||
@@ -1301,7 +1300,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 {
 	Rt_map		*llmp = 0;
 	void		*error;
-	Aliste		off;
+	Aliste		idx;
 	Grp_desc	*gdp;
 
 	/*
@@ -1319,7 +1318,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		if (ghp->gh_ownlmp)
 			llmp = LIST(ghp->gh_ownlmp)->lm_tail;
 		else {
-			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 				if ((llmp = LIST(gdp->gd_depend)->lm_tail) != 0)
 					break;
 			}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -591,6 +591,104 @@ elfedit_write(const void *ptr, size_t size)
 		err = errno;
 		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_FWRITE),
 		    strerror(err));
+	}
+}
+
+
+/*
+ * Convert the NULL terminated string to the form used by the C
+ * language to represent literal strings:
+ *	- Printable characters are shown as themselves
+ *	- Convert special characters to their 2-character escaped forms:
+ *		alert (bell)	\a
+ *		backspace	\b
+ *		formfeed	\f
+ *		newline		\n
+ *		return		\r
+ *		horizontal tab	\t
+ *		vertical tab	\v
+ *		backspace	\\
+ *		single quote	\'
+ *		double quote	\"
+ *	- Display other non-printable characters as 4-character escaped
+ *		octal constants.
+ *
+ * entry:
+ *	str - String to be processed
+ *	outfunc - Function to be called to move output characters. Note
+ *		that this function has the same signature as elfedit_write(),
+ *		and that function can be used to write the characters to
+ *		the output.
+ *
+ * exit:
+ *	The string has been processed, with the resulting data passed
+ *	to outfunc for processing.
+ */
+void
+elfedit_str_to_c_literal(const char *str, elfedit_write_func_t *outfunc)
+{
+	char		bs_buf[2];	/* For two-character backslash codes */
+	char		octal_buf[10];	/* For \000 style octal constants */
+
+	bs_buf[0] = '\\';
+	while (*str != '\0') {
+		switch (*str) {
+		case '\a':
+			bs_buf[1] = 'a';
+			break;
+		case '\b':
+			bs_buf[1] = 'b';
+			break;
+		case '\f':
+			bs_buf[1] = 'f';
+			break;
+		case '\n':
+			bs_buf[1] = 'n';
+			break;
+		case '\r':
+			bs_buf[1] = 'r';
+			break;
+		case '\t':
+			bs_buf[1] = 't';
+			break;
+		case '\v':
+			bs_buf[1] = 'v';
+			break;
+		case '\\':
+			bs_buf[1] = '\\';
+			break;
+		case '\'':
+			bs_buf[1] = '\'';
+			break;
+		case '"':
+			bs_buf[1] = '"';
+			break;
+		default:
+			bs_buf[1] = '\0';
+		}
+
+		if (bs_buf[1] != '\0') {
+			(*outfunc)(bs_buf, 2);
+			str++;
+		} else if (isprint(*str)) {
+			/*
+			 * Output the entire sequence of printable
+			 * characters in a single shot.
+			 */
+			const char	*tail;
+			size_t		outlen = 0;
+
+			for (tail = str; isprint(*tail); tail++)
+				outlen++;
+			(*outfunc)(str, outlen);
+			str = tail;
+		} else {
+			/* Generic unprintable character: Use octal notation */
+			(void) snprintf(octal_buf, sizeof (octal_buf),
+			    MSG_ORIG(MSG_FMT_OCTCONST), *str);
+			(*outfunc)(octal_buf, strlen(octal_buf));
+			str++;
+		}
 	}
 }
 
@@ -1259,7 +1357,7 @@ init_obj_state(const char *file)
 }
 
 
-#if 0
+#ifdef DEBUG_MODULE_LIST
 /*
  * Debug routine. Dump the module list to stdout.
  */
@@ -2181,6 +2279,90 @@ dispatch_user_cmds()
 
 
 /*
+ * Given the pointer to the character following a '\' character in
+ * a C style literal, return the ASCII character code it represents,
+ * and advance the string pointer to the character following the last
+ * character in the escape sequence.
+ *
+ * entry:
+ *	str - Address of string pointer to first character following
+ *		the backslash.
+ *
+ * exit:
+ *	If the character is not valid, an error is thrown and this routine
+ *	does not return to its caller. Otherwise, it returns the ASCII
+ *	code for the translated character, and *str has been advanced.
+ */
+static int
+translate_c_esc(char **str)
+{
+	char *s = *str;
+	int	ch;
+	int	i;
+
+	ch = *s++;
+	switch (ch) {
+	case 'a':
+		ch = '\a';
+		break;
+	case 'b':
+		ch = '\b';
+		break;
+	case 'f':
+		ch = '\f';
+		break;
+	case 'n':
+		ch = '\n';
+		break;
+	case 'r':
+		ch = '\r';
+		break;
+	case 't':
+		ch = '\t';
+		break;
+	case 'v':
+		ch = '\v';
+		break;
+
+	case '0':
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+		/* Octal constant: There can be up to 3 digits */
+		ch -= '0';
+		for (i = 0; i < 2; i++) {
+			if ((*s < '0') || (*s > '7'))
+				break;
+			ch = (ch << 3) + (*s++ - '0');
+		}
+		break;
+
+	/*
+	 * There are some cases where ch already has the desired value.
+	 * These cases exist simply to remove the special meaning that
+	 * character would otherwise have. We need to match them to
+	 * prevent them from falling into the default error case.
+	 */
+	case '\\':
+	case '\'':
+	case '"':
+		break;
+
+	default:
+		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_BADCESC), ch);
+		break;
+	}
+
+	*str = s;
+	return (ch);
+}
+
+
+/*
  * Prepare a GETTOK_STATE struct for gettok().
  *
  * entry:
@@ -2275,16 +2457,50 @@ gettok(GETTOK_STATE *gettok_state)
 				break;
 		}
 
+		/*
+		 * The semantics of the backslash character depends on
+		 * the quote style in use:
+		 *	- Within single quotes, backslash is not
+		 *		an escape character, and is taken literally.
+		 *	- If outside of quotes, the backslash is an escape
+		 *		character. The backslash is ignored and the
+		 *		following character is taken literally, losing
+		 *		any special properties it normally has.
+		 *	- Within double quotes, backslash works like a
+		 *		backslash escape within a C literal. Certain
+		 *		escapes are recognized and replaced with their
+		 *		special character. Any others are an error.
+		 */
 		if (*look == '\\') {
+			if (quote_ch == '\'') {
+				*str++ = *look;
+				continue;
+			}
+
 			look++;
-			if (*look == '\0')	/* Esc applied to NULL term? */
-				break;
+			if (*look == '\0') {	/* Esc applied to NULL term? */
+				elfedit_msg(ELFEDIT_MSG_ERR,
+				    MSG_INTL(MSG_ERR_ESCEOL));
+				/*NOTREACHED*/
+			}
+
+			if (quote_ch == '"') {
+				*str++ = translate_c_esc(&look);
+				look--;		/* for() will advance by 1 */
+				continue;
+			}
 		}
 
 		if (look != str)
 			*str = *look;
 		str++;
 	}
+
+	/* Don't allow unterminated quoted tokens */
+	if (quote_ch != '\0')
+		elfedit_msg(ELFEDIT_MSG_ERR, MSG_INTL(MSG_ERR_UNTERMQUOTE),
+		    quote_ch);
+
 	gettok_state->gtok_last_token.tok_len = str -
 	    gettok_state->gtok_last_token.tok_str;
 	gettok_state->gtok_null_seen = *look == '\0';
@@ -2293,9 +2509,11 @@ gettok(GETTOK_STATE *gettok_state)
 	*str = '\0';
 	gettok_state->gtok_cur_buf = look;
 
-#if 0
-	printf("GETTOK >%s< len(%d) offset(%d)\n",
-	    gettok_state->gtok_last_token.tok_str,
+#ifdef DEBUG_GETTOK
+	printf("GETTOK >");
+	elfedit_str_to_c_literal(gettok_state->gtok_last_token.tok_str,
+	    elfedit_write);
+	printf("< \tlen(%d) offset(%d)\n",
 	    gettok_state->gtok_last_token.tok_len,
 	    gettok_state->gtok_last_token.tok_line_off);
 #endif
@@ -3044,7 +3262,7 @@ cmd_match_fcn(WordCompletion *cpl, void *data, const char *line, int word_end)
 	 * It will put the tty back into normal mode, and it will cause
 	 * tecla to redraw the current input line when it gets control back.
 	 */
-#if 0
+#ifdef DEBUG_CMD_MATCH
 	gl_normal_io(state.input.gl);
 #endif
 
@@ -3175,8 +3393,8 @@ cmd_match_fcn(WordCompletion *cpl, void *data, const char *line, int word_end)
 		}
 	}
 
-#if 0
-	printf("NDX(%d) NUM_OPT(%d) ostyle_ndx(%d)\n", ndx, num_opt,
+#ifdef DEBUG_CMD_MATCH
+	(void) printf("NDX(%d) NUM_OPT(%d) ostyle_ndx(%d)\n", ndx, num_opt,
 	    ostyle_ndx);
 #endif
 

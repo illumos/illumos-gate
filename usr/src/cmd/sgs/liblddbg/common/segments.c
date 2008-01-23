@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,16 +58,13 @@ Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 		    Dbg_demangle_name(sgp->sg_sizesym->sd_name));
 
 	if (sgp->sg_secorder) {
-		Aliste		off;
-		Sec_order	**scopp;
+		Aliste		idx;
+		Sec_order	*scop;
 
 		dbg_print(lml, MSG_ORIG(MSG_SEG_ORDER));
-		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
-			Sec_order	*scop = *scopp;
-
+		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop))
 			dbg_print(lml, MSG_ORIG(MSG_SEG_SECTION),
 			    scop->sco_secname, EC_WORD(scop->sco_index));
-		}
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
 }

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -272,6 +272,8 @@ SUNWprivate_4.61 {
 		Dbg64_sec_created;
 		Dbg32_sec_discarded;
 		Dbg64_sec_discarded;
+		Dbg32_sec_genstr_compress;
+		Dbg64_sec_genstr_compress;
 		Dbg32_sec_group;
 		Dbg64_sec_group;
 		Dbg32_sec_in;
@@ -282,6 +284,8 @@ SUNWprivate_4.61 {
 		Dbg64_sec_order_list;
 		Dbg32_sec_strtab;
 		Dbg64_sec_strtab;
+		Dbg32_sec_unsup_strmerge;
+		Dbg64_sec_unsup_strmerge;
 
 		Dbg32_seg_entry;
 		Dbg64_seg_entry;

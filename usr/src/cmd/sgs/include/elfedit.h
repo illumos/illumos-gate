@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -593,6 +593,11 @@ typedef struct {
 typedef elfedit_module_t *elfedit_init_func_t(elfedit_module_version_t version);
 
 
+/*
+ * Prototype for elfedit_write(), and for outfunc argument
+ * to elfedit_str_to_c_literal().
+ */
+typedef void elfedit_write_func_t(const void *ptr, size_t size);
 
 
 /*
@@ -609,7 +614,9 @@ extern elfedit_outstyle_t elfedit_outstyle(void);
 extern void elfedit_pager_init(void);
 extern void elfedit_printf(const char *format, ...);
 extern void *elfedit_realloc(const char *item_name, void *ptr, size_t size);
-extern void elfedit_write(const void *ptr, size_t size);
+extern void elfedit_str_to_c_literal(const char *str,
+    elfedit_write_func_t *outfunc);
+extern elfedit_write_func_t elfedit_write;
 
 /*
  * Core elfedit functions exported for use by sys: module only
@@ -924,6 +931,11 @@ extern int elfedit32_sec_findstr(elfedit32_section_t *sec, Elf32_Word tail_ign,
 extern int elfedit64_sec_findstr(elfedit64_section_t *sec, Elf64_Word tail_ign,
     const char *str, Elf64_Word *ret_offset);
 
+extern elfedit32_section_t *elfedit32_sec_get(
+    elfedit32_obj_state_t *obj_state, Elf32_Word shndx);
+extern elfedit64_section_t *elfedit64_sec_get(
+    elfedit64_obj_state_t *obj_state, Elf64_Word shndx);
+
 extern elfedit32_section_t *elfedit32_sec_getcap(
     elfedit32_obj_state_t *obj_state, Elf32_Cap **cap, Elf32_Word *num);
 extern elfedit64_section_t *elfedit64_sec_getcap(
@@ -1015,6 +1027,7 @@ extern Elf64_Word elfedit64_type_to_shndx(elfedit64_obj_state_t *obj_state,
 #define	elfedit_name_to_symndx		elfedit64_name_to_symndx
 #define	elfedit_offset_to_str		elfedit64_offset_to_str
 #define	elfedit_sec_findstr		elfedit64_sec_findstr
+#define	elfedit_sec_get			elfedit64_sec_get
 #define	elfedit_sec_getcap		elfedit64_sec_getcap
 #define	elfedit_sec_getdyn		elfedit64_sec_getdyn
 #define	elfedit_sec_getstr		elfedit64_sec_getstr
@@ -1042,6 +1055,7 @@ extern Elf64_Word elfedit64_type_to_shndx(elfedit64_obj_state_t *obj_state,
 #define	elfedit_name_to_symndx		elfedit32_name_to_symndx
 #define	elfedit_offset_to_str		elfedit32_offset_to_str
 #define	elfedit_sec_findstr		elfedit32_sec_findstr
+#define	elfedit_sec_get			elfedit32_sec_get
 #define	elfedit_sec_getcap		elfedit32_sec_getcap
 #define	elfedit_sec_getdyn		elfedit32_sec_getdyn
 #define	elfedit_sec_getstr		elfedit32_sec_getstr

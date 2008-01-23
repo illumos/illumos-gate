@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,6 +87,17 @@
 @ MSG_OPTDESC_NAME_OFFSET	"\
    Interpret the name argument as a string table offset rather\n\
    than as a string.\n"
+
+@ MSG_OPTDESC_VALUE_SHNAM	"\
+   Interpret the value argument as a section name rather than\n\
+   as an integer. The index of the first section with the\n\
+   specified name will be used as the value.\n"
+
+@ MSG_OPTDESC_VALUE_SHTYP	"\
+   Interpret the value argument as a section type rather than\n\
+   as an integer. The index of the first section of the specified\n\
+   type will be used as the value. value can be one of the well\n\
+   known SHT_ symbolic constants, or any integer.\n"
 
 
 # Command argument descriptions
@@ -347,6 +358,8 @@
 @ MSG_STR_MINUS_SHNDX		"-shndx"
 @ MSG_STR_MINUS_SHTYP		"-shtyp"
 @ MSG_STR_MINUS_NAME_OFFSET	"-name_offset"
+@ MSG_STR_MINUS_VALUE_SHNAM	"-value_shnam"
+@ MSG_STR_MINUS_VALUE_SHTYP	"-value_shtyp"
 @ MSG_STR_NAME			"name"
 @ MSG_STR_SEC			"sec"
 @ MSG_STR_VALUE			"value"

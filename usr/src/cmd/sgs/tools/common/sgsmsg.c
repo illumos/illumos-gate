@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * sgsmsg generates several message files from an input template file.  Messages
@@ -320,12 +320,12 @@ dump_stringtab(Str_tbl *stp)
 	uint_t	cnt;
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
-		(void) printf("string table full size: %d: uncompressed\n",
+		(void) printf("string table full size: %ld: uncompressed\n",
 		    stp->st_fullstrsize);
 		return;
 	}
 
-	(void) printf("string table full size: %d compressed down to: %d\n\n",
+	(void) printf("string table full size: %ld compressed down to: %ld\n\n",
 	    stp->st_fullstrsize, stp->st_strsize);
 	(void) printf("string table compression information [%d buckets]:\n",
 	    stp->st_hbckcnt);
@@ -339,14 +339,14 @@ dump_stringtab(Str_tbl *stp)
 		(void) printf(" bucket: [%d]\n", cnt);
 
 		while (sthash) {
-			uint_t	stroff = sthash->hi_mstr->sm_strlen -
+			size_t	stroff = sthash->hi_mstr->sm_strlen -
 			    sthash->hi_strlen;
 
 			if (stroff == 0) {
-				(void) printf("  [%d]: '%s'  <master>\n",
+				(void) printf("  [%ld]: '%s'  <master>\n",
 				    sthash->hi_refcnt, sthash->hi_mstr->sm_str);
 			} else {
-				(void) printf("  [%d]: '%s'  <suffix of: "
+				(void) printf("  [%ld]: '%s'  <suffix of: "
 				    "'%s'>\n", sthash->hi_refcnt,
 				    &sthash->hi_mstr->sm_str[stroff],
 				    sthash->hi_mstr->sm_str);
@@ -533,7 +533,7 @@ static int
 output_defs(void)
 {
 	msg_string	*msg;
-	uint_t		stbufsize;
+	size_t		stbufsize;
 	char		*stbuf;
 
 	stbufsize = st_getstrtab_sz(stp);
@@ -543,12 +543,12 @@ output_defs(void)
 	}
 	(void) st_setstrbuf(stp, stbuf, stbufsize);
 	for (msg = msg_head; msg; msg = msg->ms_next) {
-		uint_t	stoff;
+		size_t	stoff;
 		if ((st_setstring(stp, msg->ms_message, &stoff)) == -1) {
 			(void) fprintf(stderr, Errmsg_mnfn, msg->ms_message);
 			return (1);
 		}
-		if (fprintf(fddefs, "\n#define\t%s\t%d\n",
+		if (fprintf(fddefs, "\n#define\t%s\t%ld\n",
 		    msg->ms_defn, stoff) < 0) {
 			(void) fprintf(stderr, Errmsg_wrte,
 			    fldefs, strerror(errno));
@@ -571,9 +571,9 @@ output_defs(void)
 static int
 output_data(void)
 {
-	uint_t		stbufsize;
-	uint_t		ndx;
-	uint_t		column = 1;
+	size_t		stbufsize;
+	size_t		ndx;
+	size_t		column = 1;
 	const char	*stbuf;
 	const char	*fmtstr;
 
@@ -591,7 +591,7 @@ output_data(void)
 	else
 		fmtstr = (const char *)"const";
 
-	if (fprintf(fddata, "\n%s char __%s[%d] = { ",
+	if (fprintf(fddata, "\n%s char __%s[%ld] = { ",
 	    fmtstr, interface, stbufsize) < 0) {
 		(void) fprintf(stderr, Errmsg_wrte, fldata, strerror(errno));
 		return (1);
@@ -600,7 +600,7 @@ output_data(void)
 	for (ndx = 0; ndx < (stbufsize - 1); ndx++) {
 		if (column == 1) {
 			if (fddata && fprintf(fddata,
-			    "\n/* %4d */ 0x%.2x,", ndx,
+			    "\n/* %4ld */ 0x%.2x,", ndx,
 			    (unsigned char)stbuf[ndx]) < 0) {
 				(void) fprintf(stderr, Errmsg_wrte,
 				    fldata, strerror(errno));

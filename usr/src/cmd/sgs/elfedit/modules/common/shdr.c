@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -107,7 +107,11 @@ typedef enum {
 					/*	 ofset rather than string */
 	SHDR_OPT_F_OR =		8,	/* -or: OR (|) values to dest */
 	SHDR_OPT_F_SHNDX =	16,	/* -shndx: Section by index, not name */
-	SHDR_OPT_F_SHTYP =	32	/* -shtyp: Section by type, not name */
+	SHDR_OPT_F_SHTYP =	32,	/* -shtyp: Section by type, not name */
+	SHDR_OPT_F_VALUE_SHNAM = 64,	/* -value_shnam: Value of sh_info or */
+					/*	sh_link given as section name */
+	SHDR_OPT_F_VALUE_SHTYP = 128	/* -value_shtyp: Value of sh_info or */
+					/*	sh_link given as section type */
 } shdr_opt_t;
 
 
@@ -546,7 +550,17 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case SHDR_CMD_T_SH_INFO:
 		{
-			Word sh_info = elfedit_atoui(argstate.argv[1], NULL);
+			Word sh_info;
+
+			if (argstate.optmask & SHDR_OPT_F_VALUE_SHNAM)
+				sh_info = elfedit_name_to_shndx(obj_state,
+				    argstate.argv[1]);
+			else if (argstate.optmask & SHDR_OPT_F_VALUE_SHTYP)
+				sh_info = elfedit_type_to_shndx(obj_state,
+				    elfedit_atoconst(argstate.argv[1],
+				    ELFEDIT_CONST_SHT));
+			else
+				sh_info = elfedit_atoui(argstate.argv[1], NULL);
 
 			if (shdr->sh_info == sh_info) {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
@@ -568,7 +582,17 @@ cmd_body(SHDR_CMD_T cmd, elfedit_obj_state_t *obj_state,
 
 	case SHDR_CMD_T_SH_LINK:
 		{
-			Word sh_link = elfedit_atoui(argstate.argv[1], NULL);
+			Word sh_link;
+
+			if (argstate.optmask & SHDR_OPT_F_VALUE_SHNAM)
+				sh_link = elfedit_name_to_shndx(obj_state,
+				    argstate.argv[1]);
+			else if (argstate.optmask & SHDR_OPT_F_VALUE_SHTYP)
+				sh_link = elfedit_type_to_shndx(obj_state,
+				    elfedit_atoconst(argstate.argv[1],
+				    ELFEDIT_CONST_SHT));
+			else
+				sh_link = elfedit_atoui(argstate.argv[1], NULL);
 
 			if (shdr->sh_link == sh_link) {
 				elfedit_msg(ELFEDIT_MSG_DEBUG,
@@ -786,6 +810,49 @@ cpl_sh_flags(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
 		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_SHF);
 }
 
+/*
+ * For shdr:sh_info and shdr:sh_link: The value argument can be an
+ * integer, section name, or section type.
+ */
+/*ARGSUSED*/
+static void
+cpl_sh_infolink(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
+    const char *argv[], int num_opt)
+{
+	elfedit_section_t *sec;
+	enum { NAME, INTVAL, TYPE } op;
+	Word ndx;
+
+	/* Handle -shXXX options */
+	cpl_1starg_sec(obj_state, cpldata, argc, argv, num_opt);
+
+	if (argc != (num_opt + 2))
+		return;
+
+	op = INTVAL;
+	for (ndx = 0; ndx < num_opt; ndx++) {
+		if (strcmp(argv[ndx], MSG_ORIG(MSG_STR_MINUS_VALUE_SHNAM)) == 0)
+			op = NAME;
+		else if (strcmp(argv[ndx],
+		    MSG_ORIG(MSG_STR_MINUS_VALUE_SHTYP)) == 0)
+			op = TYPE;
+	}
+
+	switch (op) {
+	case NAME:
+		if (obj_state == NULL)
+			break;
+		sec = obj_state->os_secarr;
+		for (ndx = 0; ndx < obj_state->os_shnum; ndx++, sec++)
+			elfedit_cpl_match(cpldata, sec->sec_name, 0);
+		break;
+
+	case TYPE:
+		elfedit_cpl_atoconst(cpldata, ELFEDIT_CONST_SHT);
+		break;
+	}
+}
+
 /*ARGSUSED*/
 static void
 cpl_sh_type(elfedit_obj_state_t *obj_state, void *cpldata, int argc,
@@ -891,6 +958,32 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), 0,
 		    SHDR_OPT_F_SHTYP, SHDR_OPT_F_SHNDX },
+		{ NULL }
+	};
+
+	/*
+	 * sh_info and sh_link accept the standard options above,
+	 * plus -value_shnam and -value_shtyp.
+	 */
+	static elfedit_cmd_optarg_t opt_infolink[] = {
+		{ ELFEDIT_STDOA_OPT_O, NULL,
+		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
+		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
+		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHNDX), 0,
+		    SHDR_OPT_F_SHNDX, SHDR_OPT_F_SHTYP },
+		{ MSG_ORIG(MSG_STR_MINUS_SHTYP),
+		    /* MSG_INTL(MSG_OPTDESC_SHTYP) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_SHTYP), 0,
+		    SHDR_OPT_F_SHTYP, SHDR_OPT_F_SHNDX },
+		{ MSG_ORIG(MSG_STR_MINUS_VALUE_SHNAM),
+		    /* MSG_INTL(MSG_OPTDESC_VALUE_SHNAM) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_VALUE_SHNAM), 0,
+		    SHDR_OPT_F_VALUE_SHNAM, SHDR_OPT_F_VALUE_SHNAM },
+		{ MSG_ORIG(MSG_STR_MINUS_VALUE_SHTYP),
+		    /* MSG_INTL(MSG_OPTDESC_VALUE_SHTYP) */
+		    ELFEDIT_I18NHDL(MSG_OPTDESC_VALUE_SHTYP), 0,
+		    SHDR_OPT_F_VALUE_SHTYP, SHDR_OPT_F_VALUE_SHTYP },
 		{ NULL }
 	};
 
@@ -1147,20 +1240,20 @@ elfedit_init(elfedit_module_version_t version)
 		    opt_sh_flags, arg_sh_flags },
 
 		/* shdr:sh_info */
-		{ cmd_sh_info, cpl_1starg_sec, name_sh_info,
+		{ cmd_sh_info, cpl_sh_infolink, name_sh_info,
 		    /* MSG_INTL(MSG_DESC_SH_INFO) */
 		    ELFEDIT_I18NHDL(MSG_DESC_SH_INFO),
 		    /* MSG_INTL(MSG_HELP_SH_INFO) */
 		    ELFEDIT_I18NHDL(MSG_HELP_SH_INFO),
-		    opt_std, arg_sh_info },
+		    opt_infolink, arg_sh_info },
 
 		/* shdr:sh_link */
-		{ cmd_sh_link, cpl_1starg_sec, name_sh_link,
+		{ cmd_sh_link, cpl_sh_infolink, name_sh_link,
 		    /* MSG_INTL(MSG_DESC_SH_LINK) */
 		    ELFEDIT_I18NHDL(MSG_DESC_SH_LINK),
 		    /* MSG_INTL(MSG_HELP_SH_LINK) */
 		    ELFEDIT_I18NHDL(MSG_HELP_SH_LINK),
-		    opt_std, arg_sh_link },
+		    opt_infolink, arg_sh_link },
 
 		/* shdr:sh_name */
 		{ cmd_sh_name, cpl_1starg_sec, name_sh_name,

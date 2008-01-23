@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -275,34 +275,31 @@ static int
 Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
     uint_t flg, const char *msg)
 {
-	Alist		al;
-	uintptr_t	listcalc, listnext;
-	size_t		ucnt, tcnt;
+	APlist		apl;
+	uintptr_t	listcalc, listndx;
 	Bnd_desc *	bdp;
 
 	/*
-	 * Obtain the Alist and determine its number of elements and those
+	 * Obtain the APlist and determine its number of elements and those
 	 * that are in use.
 	 */
-	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+	if (mdb_vread(&apl, sizeof (APlist), addr) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
+		    addr);
 		return (DCMD_ERR);
 	}
 
-	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	mdb_printf(msg, addr, ucnt, tcnt);
+	mdb_printf(msg, addr, (size_t)apl.apl_nitems,
+	    (size_t)apl.apl_arritems);
 
-	if (((flg & RTLD_FLG_VERBOSE) == 0) || (ucnt == 0))
+	if (((flg & RTLD_FLG_VERBOSE) == 0) || (apl.apl_nitems == 0))
 		return (DCMD_OK);
 
 	/*
-	 * Under verbose mode print the name of each dependency.  An Alist can
+	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = (uintptr_t)(&(al.al_data[0]));
-	listcalc -= (uintptr_t)(&al);
-	listcalc += addr;
+	listcalc = APLIST_OFF_DATA + (uintptr_t)addr;
 	if (mdb_vread(&bdp, sizeof (Bnd_desc *), listcalc) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
 		    MSG_ORIG(MSG_BNDDESC_STR), listcalc);
@@ -317,9 +314,8 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		return (DCMD_ERR);
 	}
 
-	listnext = (uintptr_t)(al.al_next + addr);
-	for (listcalc += al.al_size; listcalc < listnext;
-	    listcalc += al.al_size) {
+	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
+		listcalc += sizeof (void *);
 		if (mdb_vread(&bdp, sizeof (Bnd_desc *), listcalc) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
 			    MSG_ORIG(MSG_BNDDESC_STR), listcalc);
@@ -368,7 +364,7 @@ dcmd_Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf(MSG_ORIG(MSG_DEPENDS_LINE1), str);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-	if (DEPENDS(&rtmap) == 0)
+	if (DEPENDS(&rtmap) == NULL)
 		return (DCMD_OK);
 
 	return (Depends((uintptr_t)DEPENDS(&rtmap), flags, argc, argv, flg,
@@ -413,7 +409,7 @@ dcmd_Callers(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf(MSG_ORIG(MSG_CALLERS_LINE1), str);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-	if (CALLERS(&rtmap) == 0)
+	if (CALLERS(&rtmap) == NULL)
 		return (DCMD_OK);
 
 	return (Depends((uintptr_t)CALLERS(&rtmap), flags, argc, argv, flg,
@@ -869,7 +865,6 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (lml.lm_lists) {
 		Alist		al;
-		size_t		ucnt, tcnt;
 		Lm_cntl		lmc;
 		uintptr_t	listcalc;
 
@@ -884,18 +879,11 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * Determine whether the Alist has been populated.  Note, the
 		 * implementation first reserves an alist entry, and initializes
 		 * this element when the first link-map is processed.  Thus,
-		 * there's a window when ucnt is updated, but before the next
+		 * there's a window when nitems is updated, but before the next
 		 * element has been initialized.
 		 */
-		ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) /
-		    al.al_size;
-		tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) /
-		    al.al_size;
-
-		if (ucnt && (flg & RTLD_FLG_VERBOSE)) {
-			listcalc = (uintptr_t)(&(al.al_data[0]));
-			listcalc -= (uintptr_t)(&al);
-			listcalc += addr;
+		if (al.al_nitems && (flg & RTLD_FLG_VERBOSE)) {
+			listcalc = ALIST_OFF_DATA + (uintptr_t)addr;
 
 			if (mdb_vread(&lmc, sizeof (Lm_cntl),
 			    listcalc) == -1) {
@@ -905,12 +893,13 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			}
 		}
 
-		mdb_printf(MSG_ORIG(MSG_LMLIST_LINE0), addr, ucnt, tcnt);
+		mdb_printf(MSG_ORIG(MSG_LMLIST_LINE0), addr,
+		    (size_t)al.al_nitems, (size_t)al.al_arritems);
 		mdb_inc_indent(2);
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-		if (ucnt && (flg & RTLD_FLG_VERBOSE)) {
-			uintptr_t	listnext;
+		if (al.al_nitems && (flg & RTLD_FLG_VERBOSE)) {
+			uintptr_t	listndx;
 
 			mdb_inc_indent(2);
 			mdb_printf(MSG_ORIG(MSG_LMC_LINE1), listcalc);
@@ -937,9 +926,8 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
-			listnext = (uintptr_t)(al.al_next + addr);
-			for (listcalc += al.al_size; listcalc < listnext;
-			    listcalc += al.al_size) {
+			for (listndx = 1; listndx < al.al_nitems; listndx++) {
+				listcalc += al.al_size;
 				if (mdb_vread(&lmc, sizeof (Lm_cntl),
 				    listcalc) == -1) {
 					mdb_warn(MSG_ORIG(MSG_ERR_READ),
@@ -1100,10 +1088,9 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	Grp_hdl		gh;
 	Alist		al;
-	uintptr_t	listcalc, listnext;
+	uintptr_t	listcalc, listidx;
 	char		*str;
 	uint_t		flg = 0;
-	size_t		ucnt, tcnt;
 
 	/*
 	 * Insure we have a valid address, and provide for a -v option.
@@ -1150,11 +1137,10 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	mdb_printf(MSG_ORIG(MSG_GRPHDL_LINE5), gh.gh_refcnt, addr, ucnt, tcnt);
+	mdb_printf(MSG_ORIG(MSG_GRPHDL_LINE5), gh.gh_refcnt, addr,
+	    (size_t)al.al_nitems, (size_t)al.al_arritems);
 
-	if (((flg & RTLD_FLG_VERBOSE) == 0) || (ucnt == 0))
+	if (((flg & RTLD_FLG_VERBOSE) == 0) || (al.al_nitems == 0))
 		return (DCMD_OK);
 
 	mdb_inc_indent(4);
@@ -1164,17 +1150,14 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Under verbose mode print the name of each dependency.  An Alist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = (uintptr_t)(&(al.al_data[0]));
-	listcalc -= (uintptr_t)(&al);
-	listcalc += addr;
+	listcalc = ALIST_OFF_DATA + (uintptr_t)addr;
 	if (dcmd_GrpDesc(listcalc, flags, argc, argv) == DCMD_ERR) {
 		mdb_dec_indent(4);
 		return (DCMD_ERR);
 	}
 
-	listnext = (uintptr_t)(al.al_next + addr);
-	for (listcalc += al.al_size; listcalc < listnext;
-	    listcalc += al.al_size) {
+	for (listidx = 1; listidx < al.al_nitems; listidx++) {
+		listcalc += al.al_size;
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		if (dcmd_GrpDesc(listcalc, flags, argc, argv) == DCMD_ERR) {
 			mdb_dec_indent(4);
@@ -1198,9 +1181,8 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	Rt_map		rtmap;
 	char		*str;
 	uint_t		flg = 0;
-	Alist		al;
-	uintptr_t	listcalc, listnext;
-	size_t		ucnt, tcnt;
+	APlist		apl;
+	uintptr_t	listcalc, listndx;
 	Grp_hdl *	ghp;
 
 	/*
@@ -1232,25 +1214,23 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 
 	addr = (uintptr_t)HANDLES(&rtmap);
-	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+	if (mdb_vread(&apl, sizeof (APlist), addr) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
+		    addr);
 		return (DCMD_ERR);
 	}
 
-	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	mdb_printf(MSG_ORIG(MSG_HANDLES_LINE2), addr, ucnt, tcnt);
+	mdb_printf(MSG_ORIG(MSG_HANDLES_LINE2), addr, (size_t)apl.apl_nitems,
+	    (size_t)apl.apl_arritems);
 
-	if (((flg & RTLD_FLG_VERBOSE) == 0) || (ucnt == 0))
+	if (((flg & RTLD_FLG_VERBOSE) == 0) || (apl.apl_nitems == 0))
 		return (DCMD_OK);
 
 	/*
-	 * Under verbose mode print the name of each dependency.  An Alist can
+	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = (uintptr_t)(&(al.al_data[0]));
-	listcalc -= (uintptr_t)(&al);
-	listcalc += addr;
+	listcalc = addr + APLIST_OFF_DATA;
 	if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
 		    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
@@ -1265,9 +1245,9 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	listnext = (uintptr_t)(al.al_next + addr);
-	for (listcalc += al.al_size; listcalc < listnext;
-	    listcalc += al.al_size) {
+	listndx = 1;
+	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
+		listcalc += sizeof (void *);
 		if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
 			    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
@@ -1297,10 +1277,9 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	Rt_map		rtmap;
 	char		*str;
-	Alist		al;
+	APlist		apl;
 	uint_t		flg = 0;
-	uintptr_t	listcalc, listnext;
-	size_t		ucnt, tcnt;
+	uintptr_t	listcalc, listndx;
 	Grp_hdl *	ghp;
 
 	/*
@@ -1332,25 +1311,23 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 
 	addr = (uintptr_t)GROUPS(&rtmap);
-	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+	if (mdb_vread(&apl, sizeof (APlist), addr) == -1) {
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_APLIST),
+		    addr);
 		return (DCMD_ERR);
 	}
 
-	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) / al.al_size;
-	mdb_printf(MSG_ORIG(MSG_GROUPS_LINE2), addr, ucnt, tcnt);
+	mdb_printf(MSG_ORIG(MSG_GROUPS_LINE2), addr, (size_t)apl.apl_nitems,
+	    (size_t)apl.apl_arritems);
 
-	if (((flg & RTLD_FLG_VERBOSE) == 0) || (ucnt == 0))
+	if (((flg & RTLD_FLG_VERBOSE) == 0) || (apl.apl_nitems == 0))
 		return (DCMD_OK);
 
 	/*
-	 * Under verbose mode print the name of each dependency.  An Alist can
+	 * Under verbose mode print the name of each dependency.  An APlist can
 	 * have a variable number of data items, so read each individual entry.
 	 */
-	listcalc = (uintptr_t)(&(al.al_data[0]));
-	listcalc -= (uintptr_t)(&al);
-	listcalc += addr;
+	listcalc = addr + APLIST_OFF_DATA;
 	if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
 		    MSG_ORIG(MSG_GRPHDL_STR), listcalc);
@@ -1365,9 +1342,8 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	listnext = (uintptr_t)(al.al_next + addr);
-	for (listcalc += al.al_size; listcalc < listnext;
-	    listcalc += al.al_size) {
+	for (listndx = 1; listndx < apl.apl_nitems; listndx++) {
+		listcalc += sizeof (void *);
 		if (mdb_vread(&ghp, sizeof (Grp_hdl *), listcalc) == -1) {
 			mdb_warn(MSG_ORIG(MSG_ERR_READ),
 			    MSG_ORIG(MSG_GRPHDL_STR), listcalc);

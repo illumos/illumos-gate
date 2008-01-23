@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,7 +85,7 @@ ld_open_outfile(Ofl_desc * ofl)
 	 * are creating.
 	 */
 	mode = (ofl->ofl_flags & (FLG_OF_EXEC | FLG_OF_SHAROBJ))
-		? 0777 : 0666;
+	    ? 0777 : 0666;
 
 	/* Determine if the output file already exists */
 	if (stat(ofl->ofl_name, &status) == 0) {
@@ -142,8 +142,8 @@ ld_open_outfile(Ofl_desc * ofl)
 				int err = errno;
 
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-					MSG_INTL(MSG_SYS_UNLINK),
-					ofl->ofl_name, strerror(err));
+				    MSG_INTL(MSG_SYS_UNLINK),
+				    ofl->ofl_name, strerror(err));
 				return (S_ERROR);
 			}
 		}
@@ -215,8 +215,8 @@ pad_outfile(Ofl_desc *ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp, sgp)) {
 		Phdr	*phdr = &(sgp->sg_phdr);
-		Os_desc	**ospp, *osp;
-		Aliste	off;
+		Os_desc	*osp;
+		Aliste	idx;
 
 		/*
 		 * If we've already processed a loadable segment, the `scn'
@@ -251,11 +251,8 @@ pad_outfile(Ofl_desc *ofl)
 		 * offset of each section. Retain the final section descriptor
 		 * as this will be where any padding buffer will be added.
 		 */
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-			Shdr	*shdr;
-
-			osp = *ospp;
-			shdr = osp->os_shdr;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			Shdr	*shdr = osp->os_shdr;
 
 			offset = (off_t)S_ROUND(offset, shdr->sh_addralign);
 			offset += shdr->sh_size;
@@ -366,10 +363,10 @@ ld_create_outfile(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Sg_desc		*sgp;
-	Os_desc		**ospp;
+	Os_desc		*osp;
 	Is_desc		*isp;
 	Elf_Data	*tlsdata = 0;
-	Aliste		off;
+	Aliste		idx;
 	Word		flags = ofl->ofl_flags;
 	Word		flags1 = ofl->ofl_flags1;
 	size_t		ndx = 0, fndx = 0;
@@ -498,9 +495,8 @@ ld_create_outfile(Ofl_desc *ofl)
 		}
 
 		shidx = 0;
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 			Listnode	*lnp2;
-			Os_desc		*osp = *ospp;
 
 			dataidx = 0;
 			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
@@ -531,11 +527,14 @@ ld_create_outfile(Ofl_desc *ofl)
 					Lm_list	*lml = ofl->ofl_lml;
 
 					if (ifl->ifl_flags & FLG_IF_IGNORE) {
-					    isp->is_flags |= FLG_IS_DISCARD;
-					    DBG_CALL(Dbg_unused_sec(lml, isp));
-					    continue;
-					} else
-					    DBG_CALL(Dbg_unused_sec(lml, isp));
+						isp->is_flags |= FLG_IS_DISCARD;
+						DBG_CALL(Dbg_unused_sec(lml,
+						    isp));
+						continue;
+					} else {
+						DBG_CALL(Dbg_unused_sec(lml,
+						    isp));
+					}
 				}
 
 				/*
@@ -743,13 +742,11 @@ ld_create_outfile(Ofl_desc *ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
 		Phdr	*_phdr = &(sgp->sg_phdr);
-		Os_desc	**ospp;
-		Aliste	off;
+		Os_desc	*osp;
+		Aliste	idx;
 		Boolean	recorded = FALSE;
 
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-			Os_desc	*osp = *ospp;
-
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 			/*
 			 * Make sure that an output section was originally
 			 * created.  Input sections that had been marked as
@@ -759,7 +756,7 @@ ld_create_outfile(Ofl_desc *ofl)
 			 * have to compensate for this empty section.
 			 */
 			if (osp->os_scn == NULL) {
-				(void) alist_delete(sgp->sg_osdescs, 0, &off);
+				aplist_delete(sgp->sg_osdescs, &idx);
 				continue;
 			}
 

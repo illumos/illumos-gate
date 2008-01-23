@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,6 +73,79 @@ set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 }
 
 /*
+ * Append an input section to an output section
+ *
+ * entry:
+ *	ofl - File descriptor
+ *	isp - Input section descriptor
+ *	osp - Output section descriptor
+ *	mstr_only - True if should only append to the merge string section
+ *		list.
+ *
+ * exit:
+ *	- If mstr_only is not true, the input section is appended to the
+ *		end of the output section's list of input sections (os_isdescs).
+ *	- If the input section is a candidate for string table merging,
+ *		then it is appended to the output section's list of merge
+ *		candidates (os_mstridescs).
+ *
+ *	On success, returns True (1). On failure, False (0).
+ */
+int
+ld_append_isp(Ofl_desc * ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
+{
+	if (!mstr_only && (list_appendc(&(osp->os_isdescs), isp) == 0))
+		return (0);
+
+	/*
+	 * To be mergeable:
+	 *	- The SHF_MERGE|SHF_STRINGS flags must be set
+	 *	- String table compression must not be disabled (-znocompstrtab)
+	 *	- It must not be the generated section being built to
+	 *		replace the sections on this list.
+	 */
+	if (((isp->is_shdr->sh_flags & (SHF_MERGE | SHF_STRINGS)) !=
+	    (SHF_MERGE | SHF_STRINGS)) ||
+	    ((ofl->ofl_flags1 & FLG_OF1_NCSTTAB) != 0) ||
+	    ((isp->is_flags & FLG_IS_GNSTRMRG) != 0))
+		return (1);
+
+	/*
+	 * Skip sections with (sh_entsize > 1) or (sh_addralign > 1).
+	 *
+	 * sh_entsize:
+	 *	We are currently only able to merge string tables containing
+	 *	strings with 1-byte (char) characters. Support for wide
+	 *	characters will require our string table compression code
+	 *	to be extended to handle larger character sizes.
+	 *
+	 * sh_addralign:
+	 *	Alignments greater than 1 would require our string table
+	 *	compression code to insert null bytes to move each
+	 *	string to the required alignment.
+	 */
+	if ((isp->is_shdr->sh_entsize > 1) ||
+	    (isp->is_shdr->sh_addralign > 1)) {
+		DBG_CALL(Dbg_sec_unsup_strmerge(ofl->ofl_lml, isp));
+		return (1);
+	}
+
+	if (aplist_append(&osp->os_mstrisdescs, isp,
+	    AL_CNT_OS_MSTRISDESCS) == NULL)
+		return (0);
+
+	/*
+	 * The SHF_MERGE|SHF_STRINGS flags tell us that the program that
+	 * created the section intended it to be mergeable. The
+	 * FLG_IS_INSTRMRG flag says that we have done validity testing
+	 * and decided that it is safe to act on that hint.
+	 */
+	isp->is_flags |= FLG_IS_INSTRMRG;
+
+	return (1);
+}
+
+/*
  * Place a section into the appropriate segment.
  */
 Os_desc *
@@ -81,8 +154,8 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	Listnode *	lnp1, * lnp2;
 	Ent_desc *	enp;
 	Sg_desc	*	sgp;
-	Os_desc		**ospp, *osp;
-	Aliste		off1, off2;
+	Os_desc		*osp;
+	Aliste		idx1, idx2;
 	int		os_ndx;
 	Shdr *		shdr = isp->is_shdr;
 	Xword		shflagmask, shflags = shdr->sh_flags;
@@ -288,7 +361,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		 */
 		set_addralign(ofl, osp, isp);
 
-		if (list_appendc(&(osp->os_isdescs), isp) == 0)
+		if (ld_append_isp(ofl, osp, isp, 0) == 0)
 			return ((Os_desc *)S_ERROR);
 
 		isp->is_osdesc = osp;
@@ -305,12 +378,10 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 */
 	os_ndx = 0;
 	if (sgp->sg_secorder) {
-		Aliste		off;
-		Sec_order	**scopp;
+		Aliste		idx;
+		Sec_order	*scop;
 
-		for (ALIST_TRAVERSE(sgp->sg_secorder, off, scopp)) {
-			Sec_order	*scop = *scopp;
-
+		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop)) {
 			if (strcmp(scop->sco_secname, isp->is_name) == 0) {
 				scop->sco_flags |= FLG_SGO_USED;
 				os_ndx = scop->sco_index;
@@ -331,18 +402,15 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 * flags that do not prevent a merge.
 	 */
 	shflagmask = (ofl->ofl_flags & FLG_OF_RELOBJ)
-		? ALL_SHF_ORDER : ALL_SHF_IGNORE;
+	    ? ALL_SHF_ORDER : ALL_SHF_IGNORE;
 
 	/*
 	 * Traverse the input section list for the output section we have been
 	 * assigned. If we find a matching section simply add this new section.
 	 */
-	off2 = 0;
-	for (ALIST_TRAVERSE(sgp->sg_osdescs, off1, ospp)) {
-		Shdr	*_shdr;
-
-		osp = *ospp;
-		_shdr = osp->os_shdr;
+	idx2 = 0;
+	for (APLIST_TRAVERSE(sgp->sg_osdescs, idx1, osp)) {
+		Shdr	*_shdr = osp->os_shdr;
 
 		if ((ident == osp->os_scnsymndx) && (ident != M_ID_REL) &&
 		    (isp->is_namehash == osp->os_namehash) &&
@@ -416,9 +484,12 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 					    isp) == 0)
 						return ((Os_desc *)S_ERROR);
 				}
-			} else
+			} else {
 				if (list_appendc(&(osp->os_isdescs), isp) == 0)
 					return ((Os_desc *)S_ERROR);
+			}
+			if (ld_append_isp(ofl, osp, isp, 1) == 0)
+				return ((Os_desc *)S_ERROR);
 
 			isp->is_osdesc = osp;
 
@@ -452,7 +523,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 					/* insert section here. */
 					break;
 				else {
-					off2 = off1;
+					idx2 = idx1 + 1;
 					continue;
 				}
 			} else {
@@ -460,7 +531,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 				break;
 			}
 		} else if (osp->os_txtndx) {
-			off2 = off1;
+			idx2 = idx1 + 1;
 			continue;
 		}
 
@@ -472,7 +543,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		if (ident < osp->os_scnsymndx)
 			break;
 
-		off2 = off1;
+		idx2 = idx1 + 1;
 	}
 
 	/*
@@ -595,27 +666,21 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 */
 	set_addralign(ofl, osp, isp);
 
-	if (list_appendc(&(osp->os_isdescs), isp) == 0)
+	if (ld_append_isp(ofl, osp, isp, 0) == 0)
 		return ((Os_desc *)S_ERROR);
 
 	DBG_CALL(Dbg_sec_created(ofl->ofl_lml, osp, sgp));
 	isp->is_osdesc = osp;
 
-	if (off2) {
-		/*
-		 * Insert the new section after the section identified by off2.
-		 */
-		off2 += sizeof (Os_desc *);
-		if (alist_insert(&(sgp->sg_osdescs), &osp,
-		    sizeof (Os_desc *), AL_CNT_OSDESC, off2) == 0)
-			return ((Os_desc *)S_ERROR);
-	} else {
-		/*
-		 * Prepend this section to the section list.
-		 */
-		if (alist_insert(&(sgp->sg_osdescs), &osp,
-		    sizeof (Os_desc *), AL_CNT_OSDESC, ALO_DATA) == 0)
-			return ((Os_desc *)S_ERROR);
-	}
+	/*
+	 * Insert the new section at the offset given by idx2. If no
+	 * position for it was identified above, this will be index 0,
+	 * causing the new section to be prepended to the beginning of
+	 * the section list. Otherwise, it is the index following the section
+	 * that was identified.
+	 */
+	if (aplist_insert(&sgp->sg_osdescs, osp, AL_CNT_SG_OSDESC,
+	    idx2) == NULL)
+		return ((Os_desc *)S_ERROR);
 	return (osp);
 }

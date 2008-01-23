@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,10 +44,10 @@ Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	if (stp->st_flags & FLG_STTAB_COMPRESS)
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_COMP), osp->os_name,
-		    stp->st_fullstrsize, stp->st_strsize);
+		    EC_XWORD(stp->st_fullstrsize), EC_XWORD(stp->st_strsize));
 	else
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_STND), osp->os_name,
-		    stp->st_fullstrsize);
+		    EC_XWORD(stp->st_fullstrsize));
 
 	if ((DBG_NOTDETAIL()) ||
 	    ((stp->st_flags & FLG_STTAB_COMPRESS) == 0))
@@ -66,22 +66,57 @@ Dbg_sec_strtab(Lm_list *lml, Os_desc *osp, Str_tbl *stp)
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_BCKT), cnt);
 
 		while (strhash) {
-			uint_t	stroff = strhash->hi_mstr->sm_strlen -
+			size_t	stroff = strhash->hi_mstr->sm_strlen -
 			    strhash->hi_strlen;
 
 			if (stroff == 0) {
 				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_MSTR),
-				    strhash->hi_refcnt,
+				    EC_XWORD(strhash->hi_refcnt),
 				    strhash->hi_mstr->sm_str);
 			} else {
 				dbg_print(lml, MSG_INTL(MSG_SEC_STRTAB_SUFSTR),
-				    strhash->hi_refcnt,
+				    EC_XWORD(strhash->hi_refcnt),
 				    &strhash->hi_mstr->sm_str[stroff],
 				    strhash->hi_mstr->sm_str);
 			}
 
 			strhash = strhash->hi_next;
 		}
+	}
+}
+
+void
+Dbg_sec_genstr_compress(Lm_list *lml, const char *os_name,
+    Xword raw_size, Xword merge_size)
+{
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SEC_GENSTR_COMP), os_name,
+	    EC_XWORD(raw_size), EC_XWORD(merge_size));
+}
+
+void
+Dbg_sec_unsup_strmerge(Lm_list *lml, Is_desc *isp)
+{
+	const char *str;
+
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+		return;
+
+	/*
+	 * We can only merge string table sections with single byte
+	 * (char) characters. For any other (wide) character types,
+	 * issue a message so the user will understand why these
+	 * sections are not being picked up.
+	 */
+	if ((isp->is_shdr->sh_entsize > 1) ||
+	    (isp->is_shdr->sh_addralign > 1)) {
+		str = (isp->is_file != NULL) ? isp->is_file->ifl_name :
+		    MSG_INTL(MSG_STR_NULL);
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRMERGE_UNSUP),
+		    isp->is_basename, str, EC_XWORD(isp->is_shdr->sh_addralign),
+		    EC_XWORD(isp->is_shdr->sh_entsize));
 	}
 }
 
@@ -93,12 +128,22 @@ Dbg_sec_in(Lm_list *lml, Is_desc *isp)
 	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
-	if (isp->is_file != NULL)
-		str = isp->is_file->ifl_name;
-	else
-		str = MSG_INTL(MSG_STR_NULL);
-
-	dbg_print(lml, MSG_INTL(MSG_SEC_INPUT), isp->is_name, str);
+	if (isp->is_flags & FLG_IS_GNSTRMRG) {
+		/*
+		 * This section was generated because we have 1 or
+		 * more SHF_MERGE|SHF_STRINGS input sections that we
+		 * wish to merge. This new section will ultimately
+		 * end up replacing those sections once it has been filled
+		 * with their strings (merged and compressed) and relocations
+		 * have been redirected.
+		 */
+		dbg_print(lml, MSG_INTL(MSG_SEC_INPUT_GENSTR), isp->is_name);
+	} else {
+		/* Standard input section */
+		str = (isp->is_file != NULL) ? isp->is_file->ifl_name :
+		    MSG_INTL(MSG_STR_NULL);
+		dbg_print(lml, MSG_INTL(MSG_SEC_INPUT), isp->is_name, str);
+	}
 }
 
 void
@@ -139,9 +184,20 @@ Dbg_sec_discarded(Lm_list *lml, Is_desc *isp, Is_desc *disp)
 	if (DBG_NOTCLASS(DBG_C_SECTIONS | DBG_C_UNUSED))
 		return;
 
-	dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
-	    isp->is_file->ifl_name, disp->is_basename,
-	    disp->is_file->ifl_name);
+	if ((isp->is_flags & FLG_IS_INSTRMRG) &&
+	    (disp->is_flags & FLG_IS_GNSTRMRG)) {
+		/*
+		 * This SHF_MERGE|SHF_STRINGS input section is being
+		 * discarded in favor of the generated merged string section.
+		 */
+		dbg_print(lml, MSG_INTL(MSG_SEC_STRMERGE_DISCARDED),
+		    isp->is_basename, isp->is_file->ifl_name);
+	} else {
+		/* Generic section discard */
+		dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
+		    isp->is_file->ifl_name, disp->is_basename,
+		    disp->is_file->ifl_name);
+	}
 }
 
 void

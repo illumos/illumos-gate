@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -250,7 +250,7 @@ elf_rtld_load()
 	 * As we need to refer to the DYNINFO() information, insure that it has
 	 * been initialized.
 	 */
-	if (elf_needed(lml, ALO_DATA, lmp) == 0)
+	if (elf_needed(lml, ALIST_OFF_DATA, lmp) == 0)
 		return (0);
 
 #if	defined(__i386)
@@ -320,7 +320,7 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 */
 	hlmp = lml->lm_head;
 	if (FLAGS(hlmp) & FLG_RT_RELOCED) {
-		if ((lmc = alist_append(&(lml->lm_lists), 0, sizeof (Lm_cntl),
+		if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
 		    AL_CNT_LMLISTS)) == 0) {
 			remove_pnode(pnp);
 			return (0);
@@ -328,7 +328,7 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 		lmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
 	} else {
 		lmc = 0;
-		lmco = ALO_DATA;
+		lmco = ALIST_OFF_DATA;
 	}
 
 	/*
@@ -1350,15 +1350,13 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED));
 
 		if (tracing || DBG_ENABLED) {
-			Bnd_desc **	bdpp;
-			Aliste		off;
+			Bnd_desc 	*bdp;
+			Aliste		idx;
 
 			FLAGS1(ilmp) |= FL1_RT_USED;
 
 			if ((tracing & LML_FLG_TRC_UNREF) || DBG_ENABLED) {
-				for (ALIST_TRAVERSE(CALLERS(ilmp), off, bdpp)) {
-					Bnd_desc *	bdp = *bdpp;
-
+				for (APLIST_TRAVERSE(CALLERS(ilmp), idx, bdp)) {
 					if (bdp->b_caller == clmp) {
 						bdp->b_flags |= BND_REFER;
 						break;
@@ -1437,14 +1435,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			Aliste	lmco;
 
 			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
-				if ((lmc = alist_append(&(lml->lm_lists), 0,
+				if ((lmc = alist_append(&lml->lm_lists, 0,
 				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0)
 					return ((Sym *)0);
 				lmco = (Aliste)((char *)lmc -
 				    (char *)lml->lm_lists);
 			} else {
 				lmc = 0;
-				lmco = ALO_DATA;
+				lmco = ALIST_OFF_DATA;
 			}
 
 			pnp = hwcap_filtees(pnpp, lmco, lmc, dip, ilmp, filtees,
@@ -1527,7 +1525,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 */
 				if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
 					if ((lmc =
-					    alist_append(&(lml->lm_lists), 0,
+					    alist_append(&lml->lm_lists, 0,
 					    sizeof (Lm_cntl),
 					    AL_CNT_LMLISTS)) == 0)
 						return ((Sym *)0);
@@ -1535,7 +1533,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 					    (char *)lml->lm_lists);
 				} else {
 					lmc = 0;
-					lmco = ALO_DATA;
+					lmco = ALIST_OFF_DATA;
 				}
 
 				/*
@@ -1642,7 +1640,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 		if (name) {
 			Grp_desc	*gdp;
 			Sym		*sym = 0;
-			Aliste		off;
+			Aliste		idx;
 			Slookup		sl = *slp;
 
 			sl.sl_flags |= LKUP_FIRST;
@@ -1651,7 +1649,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			/*
 			 * Look for the symbol in the handles dependencies.
 			 */
-			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
+			for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
 				if ((gdp->gd_flags & GPD_DLSYM) == 0)
 					continue;
 
@@ -2988,7 +2986,7 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 	else
 		rc.r_size = (size_t)rsym->st_size;
 
-	if (alist_append(&COPY(dlmp), &rc, sizeof (Rel_copy),
+	if (alist_append(&COPY_R(dlmp), &rc, sizeof (Rel_copy),
 	    AL_CNT_COPYREL) == 0) {
 		if (!(lml->lm_flags & LML_FLG_TRC_WARN))
 			return (0);
@@ -2996,8 +2994,8 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 			return (1);
 	}
 	if (!(FLAGS1(dlmp) & FL1_RT_COPYTOOK)) {
-		if (alist_append(&COPY(rlmp), &dlmp,
-		    sizeof (Rt_map *), AL_CNT_COPYREL) == 0) {
+		if (aplist_append(&COPY_S(rlmp), dlmp,
+		    AL_CNT_COPYREL) == NULL) {
 			if (!(lml->lm_flags & LML_FLG_TRC_WARN))
 				return (0);
 			else
@@ -3238,16 +3236,16 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 }
 
 static void
-elf_lazy_cleanup(Alist *alp)
+elf_lazy_cleanup(APlist *alp)
 {
-	Rt_map	**lmpp;
-	Aliste	off;
+	Rt_map	*lmp;
+	Aliste	idx;
 
 	/*
 	 * Cleanup any link-maps added to this dynamic list and free it.
 	 */
-	for (ALIST_TRAVERSE(alp, off, lmpp))
-		FLAGS(*lmpp) &= ~FLG_RT_DLSYM;
+	for (APLIST_TRAVERSE(alp, idx, lmp))
+		FLAGS(lmp) &= ~FLG_RT_DLSYM;
 	free(alp);
 }
 
@@ -3270,16 +3268,16 @@ Sym *
 elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 {
 	Sym		*sym = 0;
-	Alist *		alist = 0;
-	Aliste		off;
-	Rt_map **	lmpp, *	lmp = slp->sl_imap;
+	APlist		*alist = NULL;
+	Aliste		idx;
+	Rt_map		*lmp1, *lmp = slp->sl_imap;
 	const char	*name = slp->sl_name;
 
-	if (alist_append(&alist, &lmp, sizeof (Rt_map *), AL_CNT_LAZYFIND) == 0)
-		return (0);
+	if (aplist_append(&alist, lmp, AL_CNT_LAZYFIND) == NULL)
+		return (NULL);
 	FLAGS(lmp) |= FLG_RT_DLSYM;
 
-	for (ALIST_TRAVERSE(alist, off, lmpp)) {
+	for (APLIST_TRAVERSE(alist, idx, lmp1)) {
 		uint_t	cnt = 0;
 		Slookup	sl = *slp;
 		Dyninfo	*dip;
@@ -3290,7 +3288,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 		 * added to the alist, so that its DT_NEEDED entires may be
 		 * examined.
 		 */
-		lmp = *lmpp;
+		lmp = lmp1;
 		for (dip = DYNINFO(lmp); cnt < DYNINFOCNT(lmp); cnt++, dip++) {
 			Rt_map *nlmp;
 
@@ -3335,8 +3333,8 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 			 * build our own dynamic dependency list.
 			 */
 			if ((sl.sl_flags & LKUP_NODESCENT) == 0) {
-				if (alist_append(&alist, &nlmp,
-				    sizeof (Rt_map *), AL_CNT_LAZYFIND) == 0) {
+				if (aplist_append(&alist, nlmp,
+				    AL_CNT_LAZYFIND) == 0) {
 					elf_lazy_cleanup(alist);
 					return (0);
 				}

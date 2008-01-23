@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,7 +143,7 @@ remove_fdesc(Fdesc *fdp)
  * When $HWCAP is used to represent dependencies, take the associated directory
  * and analyze all the files it contains.
  */
-int
+static int
 hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
     uint_t flags, Rej_desc *rej)
 {
@@ -151,8 +151,8 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 	const char	*src;
 	DIR		*dir;
 	struct dirent	*dirent;
-	Aliste		off;
-	Alist		*fdalp = 0;
+	Aliste		idx;
+	Alist		*fdalp = NULL;
 	Fdesc		*fdp;
 	int		error = 0;
 
@@ -259,9 +259,9 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 	 * error occurred while processing any object, remove any objects that
 	 * had already been added to the list and return.
 	 */
-	if ((fdalp == 0) || error) {
+	if ((fdalp == NULL) || error) {
 		if (fdalp) {
-			for (ALIST_TRAVERSE(fdalp, off, fdp))
+			for (ALIST_TRAVERSE(fdalp, idx, fdp))
 				remove_fdesc(fdp);
 			free(fdalp);
 		}
@@ -272,8 +272,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 	 * Having processed and retained all candidates from this directory,
 	 * sort them, based on the precedence of their hardware capabilities.
 	 */
-	qsort(&(fdalp->al_data[0]), ((fdalp->al_next - (sizeof (Alist) -
-	    sizeof (void *))) / fdalp->al_size), fdalp->al_size, compare);
+	qsort(fdalp->al_data, fdalp->al_nitems, fdalp->al_size, compare);
 
 	*fdalpp = fdalp;
 	return (1);
@@ -283,8 +282,8 @@ static Pnode *
 _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
     const char *ref, const char *dir, int mode, uint_t flags)
 {
-	Alist		*fdalp = 0;
-	Aliste		off;
+	Alist		*fdalp = NULL;
+	Aliste		idx;
 	Pnode		*fpnp = 0, *lpnp, *npnp = (*pnpp)->p_next;
 	Fdesc		*fdp;
 	Lm_list		*lml = LIST(flmp);
@@ -300,7 +299,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 	 * Now complete the mapping of each of the ordered objects, adding
 	 * each object to a new Pnode.
 	 */
-	for (ALIST_TRAVERSE(fdalp, off, fdp)) {
+	for (ALIST_TRAVERSE(fdalp, idx, fdp)) {
 		Rt_map	*nlmp;
 		Grp_hdl	*ghp = 0;
 		Pnode	*pnp;
@@ -475,8 +474,8 @@ Rt_map *
 load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
     uint_t mode, uint_t flags, Grp_hdl **hdl, Rej_desc *rej)
 {
-	Alist		*fdalp = 0;
-	Aliste		off;
+	Alist		*fdalp = NULL;
+	Aliste		idx;
 	Fdesc		*fdp;
 	int		found = 0;
 	Rt_map		*lmp = 0;
@@ -491,7 +490,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 	 * From the list of hardware capability objects, use the first and
 	 * discard the rest.
 	 */
-	for (ALIST_TRAVERSE(fdalp, off, fdp)) {
+	for (ALIST_TRAVERSE(fdalp, idx, fdp)) {
 		if ((found == 0) && ((lmp = load_path(lml, lmco, &fdp->fd_nname,
 		    clmp, mode, flags, hdl, fdp, rej)) != 0))
 			found++;

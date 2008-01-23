@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,13 @@
 
 
 # Command option description strings
+
+@ MSG_OPTDESC_ANY		"\
+   Normally, only string table sections (section type SHT_STRTAB)\n\
+   are allowed. If -any is set, then the specified section is\n\
+   used without checking its section type, and will be treated as\n\
+   if it is a string table. This can be used to examine sections\n\
+   that are known to be in string table format (i.e. SHT_PROGBITS).\n"
 
 @ MSG_OPTDESC_END		"\
    Zero to the end of the string table. The count argument\n\
@@ -146,7 +153,26 @@
    \n\
    If str:dump is called without arguments, every string in the\n\
    string table is shown. If called with the string argument,\n\
-   the information for that string is displayed.\n"
+   the information for that string is displayed.\n\
+   \n\
+   The strings are displayed within double quotes. These quotes are\n\
+   not part of the actual string, and serve to visually delimit the\n\
+   actual string. Printable characters are shown as themselves, while\n\
+   non-printable characters are shown using the same notation used\n\
+   by the C programming language for literal string constants:\n\
+   \n\
+   \t\\a\talert (bell)\n\
+   \t\\b\tbackspace\n\
+   \t\\f\tform feed\n\
+   \t\\n\tnewline\n\
+   \t\\r\treturn\n\
+   \t\\t\thorizontal tab\n\
+   \t\\v\tvertical tab\n\
+   \t\\\\\tbackslash\n\
+   \t\\'\tsingle quote\n\
+   \t\\\"\tdouble quote\n\
+   \t\\ooo\tAn octal constant, where ooo is one to three\n\
+   \t\t\toctal digits (0..7)\n"
 
 @ MSG_HELP_SET	"   \
    The str:set command is used to display or alter the existing\n\
@@ -260,6 +286,7 @@
 
 # Miscellaneous clutter
 @ MSG_STR_EMPTY			""
+@ MSG_STR_MINUS_ANY		"-any"
 @ MSG_STR_MINUS_END		"-end"
 @ MSG_STR_MINUS_NOTERM		"-noterm"
 @ MSG_STR_MINUS_SHNAM		"-shnam"
@@ -272,6 +299,8 @@
 @ MSG_STR_NEWSTRING		"new-string"
 @ MSG_STR_STRING		"string"
 @ MSG_STR_TYPE			"type"
+@ MSG_STR_DQUOTE		"\""
+@ MSG_STR_DQUOTENL		"\"\n"
 
 
 # Format strings
@@ -279,7 +308,7 @@
 @ MSG_FMT_STRNL			"%s\n"
 @ MSG_FMT_INDEX			"[%lld]"
 @ MSG_FMT_INDEXRANGE		"[%lld-%lld]"
-@ MSG_FMT_DUMPENTRY		"%15s  %s\n"
+@ MSG_FMT_DUMPENTRY		"%15s  "
 @ MSG_FMT_WORDVAL		"%u"
 
 

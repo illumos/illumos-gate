@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Update any dynamic entry offsets.  One issue with dynamic entries is that
@@ -72,15 +72,15 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 				 */
 				if (dlmp = is_so_loaded(LIST(lmp),
 				    (strs + dyn->d_un.d_val))) {
-					Bnd_desc	**bdpp;
-					Aliste		off;
+					Bnd_desc	*bdp;
+					Aliste		idx;
 
-					for (ALIST_TRAVERSE(DEPENDS(lmp), off,
-					    bdpp)) {
-						if (dlmp == (*bdpp)->b_depend) {
-						    posdyn->d_un.d_val &=
-							~DF_P1_LAZYLOAD;
-						    break;
+					for (APLIST_TRAVERSE(DEPENDS(lmp), idx,
+					    bdp)) {
+						if (dlmp == bdp->b_depend) {
+							posdyn->d_un.d_val &=
+							    ~DF_P1_LAZYLOAD;
+							break;
 						}
 					}
 				}
@@ -167,7 +167,7 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 
 		case DT_JMPREL:
 			dyn->d_un.d_ptr = (addr + off +
-				((null + data) * entsize));
+			    ((null + data) * entsize));
 			break;
 
 		/*

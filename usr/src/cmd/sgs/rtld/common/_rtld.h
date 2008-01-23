@@ -23,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,12 +391,6 @@ typedef struct {
 #define	TKN_DOTSLASH	0x00000002	/* path contains a "./" */
 
 /*
- * Define alist descriptor addition return values (see hdl_add()).
- */
-#define	ALE_EXISTS	1		/* alist entry already exists */
-#define	ALE_CREATE	2		/* alist entry created */
-
-/*
  * Define _caller flags.
  */
 #define	CL_NONE		0
@@ -504,9 +498,6 @@ extern ulong_t		sfcap;		/* software capabilities */
  * Function declarations.
  */
 extern void		addfree(void *, size_t);
-extern void *		alist_append(Alist **, const void *, size_t, int);
-extern int		alist_delete(Alist *, const void *, Aliste *);
-extern int		alist_test(Alist **, void *, size_t, int);
 extern int		append_alias(Rt_map *, const char *, int *);
 extern int		analyze_lmc(Lm_list *, Aliste, Rt_map *);
 extern Am_ret		anon_map(Lm_list *, caddr_t *, size_t, int, int);
@@ -605,7 +596,7 @@ extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
 extern void		rejection_inherit(Rej_desc *, Rej_desc *);
 extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *);
-extern int		relocate_finish(Rt_map *, Alist *, int, int);
+extern int		relocate_finish(Rt_map *, APlist *, int, int);
 extern void		remove_cntl(Lm_list *, Aliste);
 extern int		remove_hdl(Grp_hdl *, Rt_map *, int *);
 extern void		remove_lmc(Lm_list *, Rt_map *, Lm_cntl *, Aliste,

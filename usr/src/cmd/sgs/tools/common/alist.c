@@ -20,173 +20,477 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Alist manipulation.  An Alist is a list of elements formed into an array.
- * Traversal of the list is an array scan, which because of the locality of
- * each reference is probably more efficient than a link-list traversal.
- *
- * The elements of an Alist are variable length.  They can be pointers to
- * other data structures, or data structures themselves.  Traversal of an Alist
- * thus returns a pointer to each data element.
- *
- * Alist elements can be deleted.  This involve sliding any following elements
- * over the element being deleted.  ALIST_TRAVERSE() may be employed to traverse
- * the list, at the same time elements are being deleted.  Therefore, the next
- * element is always determined as an offset from the beginning of the list.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sgs.h>
 #include <string.h>
+#include <stdio.h>
+#include <sys/debug.h>
+
+
 
 /*
- * Insert a value into an Alist.  An offset of 0 indicates that the value should
- * be appended to the Alist.  A non-zero offset indicates the position at which
- * the value should be inserted.
+ * Alist manipulation.  An Alist is a list of elements formed into an array.
+ * Traversal of the list is an array scan, which because of the locality of
+ * each reference is probably more efficient than a link-list traversal.
+ *
+ * See alist.h for more background information about array lists.
+ */
+
+
+
+/*
+ * Insert a value into an array at a specified index:
+ *
+ *	alist_insert(): Insert an item into an Alist at the specified index
+ *	alist_insert_by_offset(): Insert an item into an Alist at the
+ *		specified offset relative to the list address.
+ *	aplist_insert() Insert a pointer into an APlist at the specified index
+ *
+ * entry:
+ *	Note: All the arguments for all three routines are listed here.
+ *	The routine to which a given argument applies is given with
+ *	each description.
+ *
+ *	llp [all] - Address of a pointer to an Alist/APlist. The pointer should
+ *		be initialized to NULL before its first use.
+ *	datap [alist_insert / aplist_insert] - Pointer to item data, or
+ *		NULL. If non-null the data referenced is copied into the
+ *		Alist item. Otherwise, the list item is zeroed, and
+ *		further initialization is left to the caller.
+ *	ptr [aplist_insert] - Pointer to be inserted.
+ *	size [alist_insert / alist_insert_by_offset] - Size of an item
+ *		in the array list, in bytes. As with any array, A given
+ *		Alist can support any item size, but every item in that
+ *		list must have the same size.
+ *	init_arritems [all] - Initial allocation size: On the first insertion
+ *		into the array list, room for init_arritems items is allocated.
+ *	idx [alist_insert / aplist_insert] - Index at which to insert the
+ *		new item. This index must lie within the existing list,
+ *		or be the next index following.
+ *	off [alist_insert_by_offset] - Offset at which  to insert the new
+ *		item, based from the start of the Alist. The offset of
+ *		the first item is ALIST_OFF_DATA.
+ *
+ * exit:
+ *	The item is inserted at the specified position. This operation
+ *	can cause memory for the list to be allocated, or reallocated,
+ *	either of which will cause the value of the list pointer
+ *	to change.
+ *
+ *	These routines can only fail if unable to allocate memory,
+ *	in which case NULL is returned.
+ *
+ *	If a pointer list (aplist_insert), then the pointer
+ *	is stored in the requested index. On success, the address
+ *	of the pointer within the list is returned.
+ *
+ *	If the list contains arbitrary data (not aplist_insert): If datap
+ *	is non-NULL, the data it references is copied into the item at
+ *	the index. If datap is NULL, the specified item is zeroed.
+ *	On success, a pointer to the inserted item is returned.
+ *
+ *	The  caller must not retain the returned pointer from this
+ *	routine across calls to the list module. It is only safe to use
+ *	it until the next call to this module for the given list.
+ *
  */
 void *
-alist_insert(Alist **alpp, const void *item, size_t size, int cnt, Aliste off)
+alist_insert(Alist **lpp, const void *datap, size_t size,
+    Aliste init_arritems, Aliste idx)
 {
-	Alist	*alp = *alpp;
-	void	*new;
+	Alist	*lp = *lpp;
+	char	*addr;
 
-	if (alp == 0) {
-		Aliste	bsize, esize = (Aliste)S_ROUND(size, sizeof (void *));
+	/* The size and initial array count need to be non-zero */
+	ASSERT(init_arritems != 0);
+	ASSERT(size != 0);
+
+	if (lp == NULL) {
+		Aliste bsize;
 
 		/*
-		 * First time here, allocate a new Alist.  Note that the Alist
-		 * al_desc[] entry accounts for one void * already.
+		 * First time here, allocate a new Alist.  Note that the
+		 * Alist al_desc[] entry is defined for 1 element,
+		 * but we actually allocate the number we need.
 		 */
-		bsize = (Aliste)(sizeof (Alist) - sizeof (void *) +
-		    (size * cnt));
-		if ((alp = malloc((size_t)bsize)) == 0)
-			return (0);
-		alp->al_next = sizeof (Alist) - sizeof (void *);
-		alp->al_end = bsize;
-		alp->al_size = esize;
-
-	} else if (alp->al_next == alp->al_end) {
-		Aliste	bsize;
-
-		/*
-		 * The list is full, add another block of elements.  Determine
-		 * the present number of elements and double them.
-		 */
-		bsize = (Aliste)((alp->al_end * 2) - sizeof (Alist) +
-		    sizeof (void *));
-		if ((alp = realloc((void *)alp, (size_t)bsize)) == 0)
-			return (0);
-		alp->al_end = bsize;
-	}
-
-	/*
-	 * An appended item is added to the next available array element.
-	 * An inserted item requires that the data items that exist at the point
-	 * of insertion be shifted prior to the insertion.
-	 */
-	if ((off == 0) || (off == alp->al_next)) {
-		new = (void *)((char *)alp + alp->al_next);
+		bsize = size * init_arritems;
+		bsize = S_ROUND(bsize, sizeof (void *));
+		bsize = ALIST_OFF_DATA + bsize;
+		if ((lp = malloc((size_t)bsize)) == NULL)
+			return (NULL);
+		lp->al_arritems = init_arritems;
+		lp->al_nitems = 0;
+		lp->al_next = ALIST_OFF_DATA;
+		lp->al_size = size;
+		*lpp = lp;
 	} else {
-		new = (void *)((char *)alp + off);
-		(void) memmove((void *)((char *)new + alp->al_size), new,
-		    (alp->al_next - off));
-	}
-	alp->al_next += alp->al_size;
+		/* We must get the same value for size every time */
+		ASSERT(size == lp->al_size);
 
-	/*
-	 * If a data item has been provided, initialize the current alist entry
-	 * with this item.  Otherwise, initialize the entry to zero, presumably
-	 * the caller will fill this in.
-	 */
-	if (item)
-		(void) memcpy(new, item, alp->al_size);
-	else
-		(void) memset(new, 0, alp->al_size);
+		if (lp->al_nitems >= lp->al_arritems) {
+			/*
+			 * The list is full: Increase the memory allocation
+			 * by doubling it.
+			 */
+			Aliste	bsize;
 
-	*alpp = alp;
-	return (new);
-}
-
-/*
- * Append a value to an Alist.
- */
-void *
-alist_append(Alist **alpp, const void *item, size_t size, int cnt)
-{
-	return (alist_insert(alpp, item, size, cnt, 0));
-}
-
-/*
- * Delete an element from an Alist.  If a count is provided then the caller
- * already knows what element to remove.  Return a decremented count value so
- * that the caller can continue an ALIST_TRAVERSE scan.
- */
-int
-alist_delete(Alist *alp, const void *item, Aliste *offp)
-{
-	void	*addr;
-	Aliste	off;
-
-	if (offp) {
-		off = *offp;
-		addr = (void *)((char *)alp + off);
-	} else {
-		for (ALIST_TRAVERSE(alp, off, addr)) {
-			if (memcmp(addr, item, alp->al_size) == 0)
-				break;
+			bsize = lp->al_size * lp->al_arritems * 2;
+			bsize = S_ROUND(bsize, sizeof (void *));
+			bsize = ALIST_OFF_DATA + bsize;
+			if ((lp = realloc((void *)lp, (size_t)bsize)) == 0)
+				return (NULL);
+			lp->al_arritems *= 2;
+			*lpp = lp;
 		}
 	}
 
-	if (off >= alp->al_next)
-		return (0);
+	/*
+	 * The caller is not supposed to use an index that
+	 * would introduce a "hole" in the array.
+	 */
+	ASSERT(idx <= lp->al_nitems);
+
+	addr = (idx * lp->al_size) + (char *)lp->al_data;
+
+	/*
+	 * An appended item is added to the next available array element.
+	 * An insert at any other spot requires that the data items that
+	 * exist at the point of insertion be shifted down to open a slot.
+	 */
+	if (idx < lp->al_nitems)
+		(void) memmove(addr + lp->al_size, addr,
+		    (lp->al_nitems - idx) * lp->al_size);
+
+	lp->al_nitems++;
+	lp->al_next += lp->al_size;
+	if (datap != NULL)
+		(void) memcpy(addr, datap, lp->al_size);
+	else
+		(void) memset(addr, 0, lp->al_size);
+	return (addr);
+}
+
+void *
+alist_insert_by_offset(Alist **lpp, const void *datap, size_t size,
+    Aliste init_arritems, Aliste off)
+{
+	Aliste idx;
+
+	if (*lpp == NULL) {
+		ASSERT(off == ALIST_OFF_DATA);
+		idx = 0;
+	} else {
+		idx = (off - ALIST_OFF_DATA) / (*lpp)->al_size;
+	}
+
+	return (alist_insert(lpp, datap, size, init_arritems, idx));
+}
+
+void *
+aplist_insert(APlist **lpp, const void *ptr, Aliste init_arritems, Aliste idx)
+{
+	APlist	*lp = *lpp;
+
+	/* The initial array count needs to be non-zero */
+	ASSERT(init_arritems != 0);
+
+	if (lp == NULL) {
+		Aliste bsize;
+
+		/*
+		 * First time here, allocate a new APlist.  Note that the
+		 * APlist apl_desc[] entry is defined for 1 element,
+		 * but we actually allocate the number we need.
+		 */
+		bsize = APLIST_OFF_DATA + (sizeof (void *) * init_arritems);
+		if ((lp = malloc((size_t)bsize)) == NULL)
+			return (NULL);
+		lp->apl_arritems = init_arritems;
+		lp->apl_nitems = 0;
+		*lpp = lp;
+	} else if (lp->apl_nitems >= lp->apl_arritems) {
+		/*
+		 * The list is full: Increase the memory allocation
+		 * by doubling it.
+		 */
+		Aliste	bsize;
+
+		bsize = APLIST_OFF_DATA +
+		    (2 * sizeof (void *) * lp->apl_arritems);
+		if ((lp = realloc((void *)lp, (size_t)bsize)) == 0)
+			return (NULL);
+		lp->apl_arritems *= 2;
+		*lpp = lp;
+	}
+
+	/*
+	 * The caller is not supposed to use an index that
+	 * would introduce a "hole" in the array.
+	 */
+	ASSERT(idx <= lp->apl_nitems);
+
+	/*
+	 * An appended item is added to the next available array element.
+	 * An insert at any other spot requires that the data items that
+	 * exist at the point of insertion be shifted down to open a slot.
+	 */
+	if (idx < lp->apl_nitems)
+		(void) memmove((char *)&lp->apl_data[idx + 1],
+		    (char *)&lp->apl_data[idx],
+		    (lp->apl_nitems - idx) * sizeof (void *));
+
+	lp->apl_nitems++;
+	lp->apl_data[idx] = (void *)ptr;
+	return (&lp->apl_data[idx]);
+}
+
+
+
+
+
+/*
+ * Append a value to a list. These are convenience wrappers on top
+ * of the insert operation. See the decription of those routine above
+ * for details.
+ */
+void *
+alist_append(Alist **lpp, const void *datap, size_t size,
+    Aliste init_arritems)
+{
+	Aliste ndx = ((*lpp) == NULL) ? 0 : (*lpp)->al_nitems;
+
+	return (alist_insert(lpp, datap, size, init_arritems, ndx));
+}
+
+void *
+aplist_append(APlist **lpp, const void *ptr, Aliste init_arritems)
+{
+	Aliste ndx = ((*lpp) == NULL) ? 0 : (*lpp)->apl_nitems;
+
+	return (aplist_insert(lpp, ptr, init_arritems, ndx));
+}
+
+
+
+
+
+/*
+ * Delete the item at a specified index/offset, and decrement the variable
+ * containing the index:
+ *
+ *	alist_delete - Delete an item from an Alist at the specified
+ *		index.
+ *	alist_delete_by_offset - Delete an item from an Alist at the
+ *		specified offset from the list pointer.
+ *	aplist_delete - Delete a pointer from an APlist at the specified
+ *		index.
+ *
+ * entry:
+ *	alp - List to delete item from
+ *	idxp - Address of variable containing the index of the
+ *		item to delete.
+ *	offp - Address of variable containing the offset of the
+ *		item to delete.
+ *
+ * exit:
+ *	The item at the position given by (*idxp) or (*offp), depending
+ *	on the routine, is removed from the list. Then, the position
+ *	variable (*idxp or *offp) is decremented by one item. This is done
+ *	to facilitate use of this routine within a TRAVERSE loop.
+ *
+ * note:
+ *	Deleting the last element in an array list is cheap, but
+ *	deleting any other item causes a memory copy to occur to
+ *	move the following items up. If you intend to traverse the
+ *	entire list, deleting every item as you go, it will be cheaper
+ *	to omit the delete within the traverse, and then call
+ *	the reset function reset() afterwards.
+ */
+void
+alist_delete(Alist *lp, Aliste *idxp)
+{
+	Aliste	idx = *idxp;
+
+
+	/* The list must be allocated and the index in range */
+	ASSERT(lp != NULL);
+	ASSERT(idx < lp->al_nitems);
 
 	/*
 	 * If the element to be removed is not the last entry of the array,
 	 * slide the following elements over the present element.
 	 */
-	if (off < (alp->al_next -= alp->al_size)) {
-		(void) memmove((void *)addr, (void *)((char *)addr +
-		    alp->al_size), (alp->al_next - off));
+	if (idx < --lp->al_nitems) {
+		char *addr = (idx * lp->al_size) + (char *)lp->al_data;
+
+		(void) memmove(addr, addr + lp->al_size,
+		    (lp->al_nitems - idx) * lp->al_size);
 	}
+	lp->al_next -= lp->al_size;
 
-	/*
-	 * Reset the new offset, and decrement the callers count control
-	 * variable if necessary.  Null out the old tail element.
-	 */
-	addr = (void *)((char *)alp + alp->al_next);
-	(void) memset(addr, 0, alp->al_size);
-
-	if (offp)
-		*offp -= alp->al_size;
-
-	return (1);
+	/* Decrement the callers index variable */
+	(*idxp)--;
 }
 
+void
+alist_delete_by_offset(Alist *lp, Aliste *offp)
+{
+	Aliste idx;
+
+	ASSERT(lp != NULL);
+	idx = (*offp - ALIST_OFF_DATA) / lp->al_size;
+
+	alist_delete(lp, &idx);
+	*offp -= lp->al_size;
+}
+
+void
+aplist_delete(APlist *lp, Aliste *idxp)
+{
+	Aliste	idx = *idxp;
+
+
+	/* The list must be allocated and the index in range */
+	ASSERT(lp != NULL);
+	ASSERT(idx < lp->apl_nitems);
+
+	/*
+	 * If the element to be removed is not the last entry of the array,
+	 * slide the following elements over the present element.
+	 */
+	if (idx < --lp->apl_nitems)
+		(void) memmove(&lp->apl_data[idx], &lp->apl_data[idx + 1],
+		    (lp->apl_nitems - idx) * sizeof (void *));
+
+	/* Decrement the callers index variable */
+	(*idxp)--;
+}
+
+
+
+
+
 /*
- * Generic alist test and append routine.
+ * Delete the pointer with a specified value from the APlist.
+ *
+ * entry:
+ *	lp - Initialized APlist to delete item from
+ *	ptr - Pointer to be deleted.
+ *
+ * exit:
+ *	The list is searched for an item containing the given pointer,
+ *	and if a match is found, that item is delted and True (1) returned.
+ *	If no match is found, then False (0) is returned.
+ *
+ * note:
+ *	See note for delete operation, above.
  */
 int
-alist_test(Alist ** alpp, void * ip, size_t size, int cnt)
+aplist_delete_value(APlist *lp, const void *ptr)
 {
-	Aliste	off;
-	void **	ipp;
+	size_t	idx;
 
-	for (ALIST_TRAVERSE(*alpp, off, ipp)) {
-		if (size == sizeof (uintptr_t)) {
-			if (ip == *ipp)
-				return (ALE_EXISTS);
-		} else {
-			if (memcmp(ip, *ipp, size) == 0)
-				return (ALE_EXISTS);
+	/*
+	 * If the pointer is found in the list, use aplist_delete to
+	 * remove it, and we're done.
+	 */
+	for (idx = 0; idx < lp->apl_nitems; idx++)
+		if (ptr == lp->apl_data[idx]) {
+			aplist_delete(lp, &idx);
+			return (1);
 		}
-	}
 
-	if (cnt) {
-		if (alist_append(alpp, &ip, size, cnt) == 0)
-			return (0);
-	}
+	/* If we get here, the item was not in the list */
+	return (0);
+}
+
+
+
+
+
+
+
+/*
+ * Search the APlist for an element with a given value, and
+ * if not found, optionally append the element to the end of the list.
+ *
+ * entry:
+ *	lpp, ptr - As per aplist_insert().
+ *	init_arritems - As per aplist_insert() if a non-zero value.
+ *		A value of zero is special, and is taken to indicate
+ *		that no insert operation should be performed if
+ *		the item is not found in the list.
+ *
+ * exit
+ *	The given item is compared to every item in the given APlist.
+ *	If it is found, ALE_EXISTS is returned.
+ *
+ *	If it is not found: If init_arr_items is False (0), then
+ *	ALE_NOTFOUND is returned. If init_arr_items is True, then
+ *	the item is appended to the list, and ALE_CREATE returned on success.
+ *
+ *	On failure, which can only occur due to memory allocation failure,
+ *	ALE_ALLOCFAIL is returned.
+ *
+ * note:
+ *	The test operation used by this routine is a linear
+ *	O(N) operation, and is not efficient for more than a
+ *	few items.
+ */
+aplist_test_t
+aplist_test(APlist **lpp, const void *ptr, Aliste init_arritems)
+{
+	APlist	*lp = *lpp;
+	size_t	idx;
+
+	/* Is the pointer already in the list? */
+	if (lp != NULL)
+		for (idx = 0; idx < lp->apl_nitems; idx++)
+			if (ptr == lp->apl_data[idx])
+				return (ALE_EXISTS);
+
+	/* Is this a no-insert case? If so, report that the item is not found */
+	if (init_arritems == 0)
+		return (ALE_NOTFND);
+
+	/* Add it to the end of the list */
+	if (aplist_append(lpp, ptr, init_arritems) == NULL)
+		return (ALE_ALLOCFAIL);
 	return (ALE_CREATE);
+}
+
+
+
+
+
+
+
+/*
+ * Reset the given list to its empty state. Any memory allocated by the
+ * list is preserved, ready for reuse, but the list is set to its
+ * empty state, equivalent to having called the delete operation for
+ * every item.
+ *
+ * Note that no cleanup of the discarded items is done. The caller must
+ * take care of any necessary cleanup before calling aplist_reset().
+ */
+void
+alist_reset(Alist *lp)
+{
+	if (lp != NULL) {
+		lp->al_nitems = 0;
+		lp->al_next = ALIST_OFF_DATA;
+	}
+}
+
+void
+aplist_reset(APlist *lp)
+{
+	if (lp != NULL)
+		lp->apl_nitems = 0;
 }

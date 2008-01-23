@@ -222,7 +222,7 @@ update_osym(Ofl_desc *ofl)
 	Sym_s_list	*sorted_syms;	/* table to hold sorted symbols */
 	Word		ssndx;		/* global index into sorted_syms */
 	Word		scndx;		/* scoped index into sorted_syms */
-	uint_t		stoff;		/* string offset */
+	size_t		stoff;		/* string offset */
 
 	/*
 	 * Initialize pointers to the symbol table entries and the symbol
@@ -375,8 +375,8 @@ update_osym(Ofl_desc *ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
 		Phdr	*phd = &(sgp->sg_phdr);
-		Os_desc	**ospp;
-		Aliste	off;
+		Os_desc	*osp;
+		Aliste	idx;
 
 		if (phd->p_type == PT_LOAD) {
 			if (sgp->sg_osdescs != NULL) {
@@ -393,10 +393,8 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Generate a section symbol for each output section.
 		 */
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 			Word	sectndx;
-
-			osp = *ospp;
 
 			sym = &_sym;
 			sym->st_value = osp->os_shdr->sh_addr;
@@ -572,17 +570,14 @@ update_osym(Ofl_desc *ofl)
 			 * it as an absolute.
 			 */
 			if (sgp->sg_osdescs != NULL) {
-				Os_desc	**ospp;
-				Alist	*alp = sgp->sg_osdescs;
-				Aliste	last = alp->al_next - alp->al_size;
-
 				/*
 				 * Determine the last section for this segment.
 				 */
+				Os_desc	*osp = sgp->sg_osdescs->apl_data
+				    [sgp->sg_osdescs->apl_nitems - 1];
+
 				/* LINTED */
-				ospp = (Os_desc **)((char *)alp + last);
-				/* LINTED */
-				end_ndx = elf_ndxscn((*ospp)->os_scn);
+				end_ndx = elf_ndxscn(osp->os_scn);
 			} else {
 				end_ndx = SHN_ABS;
 				end_abs = 1;
@@ -1971,7 +1966,7 @@ update_odynamic(Ofl_desc *ofl)
 	Dyn		*_dyn = (Dyn *)ofl->ofl_osdynamic->os_outdata->d_buf;
 	Dyn		*dyn;
 	Str_tbl		*dynstr;
-	uint_t		stoff;
+	size_t		stoff;
 	Word		flags = ofl->ofl_flags;
 	Word		cnt;
 
@@ -2013,11 +2008,11 @@ update_odynamic(Ofl_desc *ofl)
 		dyn++;
 	}
 
-	if (ofl->ofl_dtsfltrs) {
-		Dfltr_desc *	dftp;
-		Aliste		off;
+	if (ofl->ofl_dtsfltrs != NULL) {
+		Dfltr_desc	*dftp;
+		Aliste		idx;
 
-		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, off, dftp)) {
+		for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, idx, dftp)) {
 			if (dftp->dft_flag == FLG_SY_AUXFLTR)
 				dyn->d_tag = DT_SUNW_AUXILIARY;
 			else
@@ -2457,7 +2452,7 @@ update_overdef(Ofl_desc *ofl)
 
 		if (vdp->vd_flags & VER_FLG_BASE) {
 			const char	*name = vdp->vd_name;
-			uint_t		stoff;
+			size_t		stoff;
 
 			/*
 			 * Create a new string table entry to represent the base
@@ -2468,12 +2463,12 @@ update_overdef(Ofl_desc *ofl)
 				(void) st_setstring(ofl->ofl_strtab,
 				    name, &stoff);
 				/* LINTED */
-				vdp->vd_name = (const char *)(uintptr_t)stoff;
+				vdp->vd_name = (const char *)stoff;
 			} else {
 				(void) st_setstring(ofl->ofl_dynstrtab,
 				    name, &stoff);
 				/* LINTED */
-				vdp->vd_name = (const char *)(uintptr_t)stoff;
+				vdp->vd_name = (const char *)stoff;
 			}
 		} else {
 			sdp = ld_sym_find(vdp->vd_name, vdp->vd_hash, 0, ofl);
@@ -2592,7 +2587,7 @@ update_overneed(Ofl_desc *ofl)
 		Half		_cnt;
 		Vernaux		*_vnap, *vnap;
 		Sdf_desc	*sdf = ifl->ifl_sdfdesc;
-		uint_t		stoff;
+		size_t		stoff;
 
 		if (!(ifl->ifl_flags & FLG_IF_VERNEED))
 			continue;
@@ -2712,7 +2707,7 @@ update_osyminfo(Ofl_desc * ofl)
 	char		*strtab;
 	Listnode *	lnp;
 	Sym_desc *	sdp;
-	Aliste		off;
+	Aliste		idx;
 	Sfltr_desc *	sftp;
 
 	if (ofl->ofl_flags & FLG_OF_RELOBJ) {
@@ -2745,12 +2740,10 @@ update_osyminfo(Ofl_desc * ofl)
 	/*
 	 * Update any filtee references with the index into the dynamic table.
 	 */
-	for (ALIST_TRAVERSE(ofl->ofl_symfltrs, off, sftp)) {
-		Dfltr_desc *	dftp;
+	for (ALIST_TRAVERSE(ofl->ofl_symfltrs, idx, sftp)) {
+		Dfltr_desc	*dftp;
 
-		/* LINTED */
-		dftp = (Dfltr_desc *)((char *)ofl->ofl_dtsfltrs +
-		    sftp->sft_off);
+		dftp = alist_item(ofl->ofl_dtsfltrs, sftp->sft_idx);
 		sip[sftp->sft_sdp->sd_symndx].si_boundto = dftp->dft_ndx;
 	}
 
@@ -3109,7 +3102,7 @@ update_ostrtab(Os_desc *osp, Str_tbl *stp, uint_t extra)
 
 	data = osp->os_outdata;
 	assert(data->d_size == (st_getstrtab_sz(stp) + extra));
-	(void) st_setstrbuf(stp, data->d_buf, (uint_t)data->d_size - extra);
+	(void) st_setstrbuf(stp, data->d_buf, data->d_size - extra);
 	/* If leaving an extra hole at the end, zero it */
 	if (extra > 0)
 		(void) memset((char *)data->d_buf + data->d_size - extra,
@@ -3191,7 +3184,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	Addr		size, etext, vaddr = ofl->ofl_segorigin;
 	Listnode	*lnp1, *lnp2;
 	Sg_desc		*sgp, *dtracesgp = 0, *capsgp = 0;
-	Os_desc		**ospp, *osp;
+	Os_desc		*osp;
 	int		phdrndx = 0, segndx = -1, secndx;
 	int		dtracepndx, dtracesndx, cappndx, capsndx;
 	Ehdr		*ehdr = ofl->ofl_nehdr;
@@ -3201,7 +3194,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	Word		flags = ofl->ofl_flags, ehdrsz = ehdr->e_ehsize;
 	Boolean		nobits;
 	Off		offset;
-	Aliste		off;
+	Aliste		idx;
 
 	/*
 	 * Loop through the segment descriptors and pick out what we need.
@@ -3437,7 +3430,7 @@ ld_update_outfile(Ofl_desc *ofl)
 		 * information provided from elf_update().
 		 * Allow for multiple NOBITS sections.
 		 */
-		osp = (Os_desc *)sgp->sg_osdescs->al_data[0];
+		osp = sgp->sg_osdescs->apl_data[0];
 		hshdr = osp->os_shdr;
 
 		phdr->p_filesz = 0;
@@ -3447,11 +3440,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		nobits = ((hshdr->sh_type == SHT_NOBITS) &&
 		    ((sgp->sg_flags & FLG_SG_PHREQ) == 0));
 
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-			Shdr	*shdr;
-
-			osp = *ospp;
-			shdr = osp->os_shdr;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			Shdr	*shdr = osp->os_shdr;
 
 			p_align = 0;
 			if (shdr->sh_addralign > p_align)
@@ -3605,11 +3595,8 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		secndx = 0;
 		hshdr = 0;
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-			Shdr	*shdr;
-
-			osp = *ospp;
-			shdr = osp->os_shdr;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			Shdr	*shdr = osp->os_shdr;
 
 			if (shdr->sh_link)
 				shdr->sh_link = translate_link(ofl, osp,

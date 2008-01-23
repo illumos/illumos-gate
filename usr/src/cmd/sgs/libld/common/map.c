@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1123,8 +1123,8 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 	sc_order->sco_secname = sec_name;
 	sc_order->sco_index = ++index;
 
-	if (alist_append(&(sgp->sg_secorder), &sc_order,
-	    sizeof (Sec_order *), AL_CNT_SECORDER) == 0)
+	if (aplist_append(&sgp->sg_secorder, sc_order,
+	    AL_CNT_SG_SECORDER) == NULL)
 		return (S_ERROR);
 
 	DBG_CALL(Dbg_map_pipe(ofl->ofl_lml, sgp, sec_name, index));
@@ -2035,36 +2035,39 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			if (filtee) {
 				Dfltr_desc *	dftp;
 				Sfltr_desc	sft;
-				Aliste		off = 0, _off;
+				Aliste		idx, _idx, nitems;
 
 				/*
 				 * Make sure we don't duplicate any filtee
 				 * strings, and create a new descriptor if
 				 * necessary.
 				 */
-				for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, _off,
+				idx = nitems = alist_nitems(ofl->ofl_dtsfltrs);
+				for (ALIST_TRAVERSE(ofl->ofl_dtsfltrs, _idx,
 				    dftp)) {
 					if ((dftflag != dftp->dft_flag) ||
 					    (strcmp(dftp->dft_str, filtee)))
 						continue;
-					off = _off;
+					idx = _idx;
 					break;
 				}
-				if (off == 0) {
+				if (idx == nitems) {
 					Dfltr_desc	dft;
 
 					dft.dft_str = filtee;
 					dft.dft_flag = dftflag;
 					dft.dft_ndx = 0;
 
-					if ((dftp =
-					    alist_append(&(ofl->ofl_dtsfltrs),
+					/*
+					 * The following append puts the new
+					 * item at the offset contained in
+					 * idx, because we know idx contains
+					 * the index of the next available slot.
+					 */
+					if (alist_append(&ofl->ofl_dtsfltrs,
 					    &dft, sizeof (Dfltr_desc),
-					    AL_CNT_DFLTR)) == 0)
+					    AL_CNT_OFL_DTSFLTRS) == NULL)
 						return (S_ERROR);
-
-					off = (Aliste)((char *)dftp -
-					    (char *)ofl->ofl_dtsfltrs);
 				}
 
 				/*
@@ -2072,11 +2075,11 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * symbol.
 				 */
 				sft.sft_sdp = sdp;
-				sft.sft_off = off;
+				sft.sft_idx = idx;
 
-				if (alist_append(&(ofl->ofl_symfltrs),
+				if (alist_append(&ofl->ofl_symfltrs,
 				    &sft, sizeof (Sfltr_desc),
-				    AL_CNT_SFLTR) == 0)
+				    AL_CNT_OFL_SYMFLTRS) == NULL)
 					return (S_ERROR);
 			}
 			break;

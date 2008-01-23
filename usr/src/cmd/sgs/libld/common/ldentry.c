@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,11 +44,11 @@ static void
 sym_muldef_title()
 {
 	(void) printf(MSG_INTL(MSG_ENT_MUL_FMT_TIL_0),
-		MSG_INTL(MSG_ENT_MUL_TIL_0));
+	    MSG_INTL(MSG_ENT_MUL_TIL_0));
 	(void) printf(MSG_INTL(MSG_ENT_MUL_FMT_TIL_1),
-		MSG_INTL(MSG_ENT_MUL_ITM_SYM),
-		MSG_INTL(MSG_ENT_MUL_ITM_DEF_0),
-		MSG_INTL(MSG_ENT_MUL_ITM_DEF_1));
+	    MSG_INTL(MSG_ENT_MUL_ITM_SYM),
+	    MSG_INTL(MSG_ENT_MUL_ITM_DEF_0),
+	    MSG_INTL(MSG_ENT_MUL_ITM_DEF_1));
 	symbol_title = FALSE;
 }
 
@@ -61,35 +61,34 @@ ld_map_out(Ofl_desc * ofl)
 	Sym_avlnode	*sav;
 
 	(void) printf(MSG_INTL(MSG_ENT_MAP_FMT_TIL_1),
-		MSG_INTL(MSG_ENT_MAP_TITLE_1));
+	    MSG_INTL(MSG_ENT_MAP_TITLE_1));
 	if (ofl->ofl_flags & FLG_OF_RELOBJ)
 		(void) printf(MSG_INTL(MSG_ENT_MAP_FMT_TIL_2),
-			MSG_INTL(MSG_ENT_ITM_OUTPUT),
-			MSG_INTL(MSG_ENT_ITM_INPUT),
-			MSG_INTL(MSG_ENT_ITM_NEW),
-			MSG_INTL(MSG_ENT_ITM_SECTION),
-			MSG_INTL(MSG_ENT_ITM_SECTION),
-			MSG_INTL(MSG_ENT_ITM_DISPMNT),
-			MSG_INTL(MSG_ENT_ITM_SIZE));
+		    MSG_INTL(MSG_ENT_ITM_OUTPUT),
+		    MSG_INTL(MSG_ENT_ITM_INPUT),
+		    MSG_INTL(MSG_ENT_ITM_NEW),
+		    MSG_INTL(MSG_ENT_ITM_SECTION),
+		    MSG_INTL(MSG_ENT_ITM_SECTION),
+		    MSG_INTL(MSG_ENT_ITM_DISPMNT),
+		    MSG_INTL(MSG_ENT_ITM_SIZE));
 	else
 		(void) printf(MSG_INTL(MSG_ENT_MAP_FMT_TIL_3),
-			MSG_INTL(MSG_ENT_ITM_OUTPUT),
-			MSG_INTL(MSG_ENT_ITM_INPUT),
-			MSG_INTL(MSG_ENT_ITM_VIRTUAL),
-			MSG_INTL(MSG_ENT_ITM_SECTION),
-			MSG_INTL(MSG_ENT_ITM_SECTION),
-			MSG_INTL(MSG_ENT_ITM_ADDRESS),
-			MSG_INTL(MSG_ENT_ITM_SIZE));
+		    MSG_INTL(MSG_ENT_ITM_OUTPUT),
+		    MSG_INTL(MSG_ENT_ITM_INPUT),
+		    MSG_INTL(MSG_ENT_ITM_VIRTUAL),
+		    MSG_INTL(MSG_ENT_ITM_SECTION),
+		    MSG_INTL(MSG_ENT_ITM_SECTION),
+		    MSG_INTL(MSG_ENT_ITM_ADDRESS),
+		    MSG_INTL(MSG_ENT_ITM_SIZE));
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Os_desc	**ospp;
-		Aliste	off;
+		Os_desc	*osp;
+		Aliste	idx;
 
 		if (sgp->sg_phdr.p_type != PT_LOAD)
 			continue;
 
-		for (ALIST_TRAVERSE(sgp->sg_osdescs, off, ospp)) {
-			Os_desc *osp = *ospp;
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
 
 			(void) printf(MSG_INTL(MSG_ENT_MAP_ENTRY_1),
 			    osp->os_name, EC_ADDR(osp->os_shdr->sh_addr),
@@ -111,13 +110,14 @@ ld_map_out(Ofl_desc * ofl)
 				 * sections (ie. .text) existing in the
 				 * load-map output.
 				 */
-				if (isp->is_flags & FLG_IS_DISCARD)
-				    addr = 0;
-				else {
-				    addr = (Addr)_elf_getxoff(isp->is_indata);
-				    if (!(ofl->ofl_flags & FLG_OF_RELOBJ))
-					addr +=
-					    isp->is_osdesc->os_shdr->sh_addr;
+				if (isp->is_flags & FLG_IS_DISCARD) {
+					addr = 0;
+				} else {
+					addr = (Addr)
+					    _elf_getxoff(isp->is_indata);
+					if (!(ofl->ofl_flags & FLG_OF_RELOBJ))
+						addr += isp->is_osdesc->
+						    os_shdr->sh_addr;
 				}
 
 				(void) printf(MSG_INTL(MSG_ENT_MAP_ENTRY_2),
@@ -178,7 +178,8 @@ ld_map_out(Ofl_desc * ofl)
 			 * Ignore the referenced symbol.
 			 */
 			if (strcmp(adcp, ducp) != 0)
-			    (void) printf(MSG_INTL(MSG_ENT_MUL_ENTRY_2), adcp);
+				(void) printf(MSG_INTL(MSG_ENT_MUL_ENTRY_2),
+				    adcp);
 		}
 	}
 }
