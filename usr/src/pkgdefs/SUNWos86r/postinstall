@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -187,10 +187,13 @@ check_rem_drv()
 case "${ARCH}" in
 i386)
 	check_add_drv -b "${BASEDIR}" \
-		-i '"pci1011,2" "pci1011,9" "pci1011,14" "pci1011,19" "pci1109,1400" "pci1109,2400" "pci10b8,2001" "pci2646,1"' \
+		-i '"pci1011,2" "pci1011,9" "pci1011,14" "pci1011,19"
+		"pci1109,1400" "pci1109,2400" "pci10b8,2001" "pci2646,1"' \
 		dnet
 	check_add_drv -b "${BASEDIR}" -i \
-		'"pci10b7,9000" "pci10b7,9001" "pci10b7,9004" "pci10b7,9005" "pci10b7,9006" "pci10b7,9050" "pci10b7,9051" "pci10b7,9055" "pci10b7,9056" "pci10b7,9200" "pci10b7,9800" "pci10b7,9805"' \
+		'"pci10b7,9000" "pci10b7,9001" "pci10b7,9004" "pci10b7,9005"
+		"pci10b7,9006" "pci10b7,9050" "pci10b7,9051" "pci10b7,9055"
+		"pci10b7,9056" "pci10b7,9200" "pci10b7,9800" "pci10b7,9805"' \
 		elxl
 	check_add_drv -b "${BASEDIR}" \
 		-i '"pci1022,2000" "pci103c,104c"' \
@@ -200,10 +203,18 @@ i386)
 		pci_pci
 	check_add_drv -b "${BASEDIR}" \
 		-c scsi \
-		-i '"pci1000,1" "pci1000,2" "pci1000,3" "pci1000,4" "pci1000,6" "pci1000,c" "pci1000,f" "pci1000,8f" ' \
+		-i '"pci1000,1" "pci1000,2" "pci1000,3" "pci1000,4"
+		"pci1000,6" "pci1000,c" "pci1000,f" "pci1000,8f" ' \
 		ncrs
 	check_add_drv -b "${BASEDIR}" \
-		-i '"pci8086,1029" "pci8086,1229" "pci8086,1229.8086.1009" "pci8086,1229.8086.100c" "pci8086,1229.8086.1012" "pci8086,1229.8086.1013" "pci8086,1229.8086.1015"	"pci8086,1229.8086.1016" "pci8086,1229.8086.1017" "pci8086,1030" "pci8086,1031" "pci8086,1032" "pci8086,1038" "pci8086,1039" "pci8086,103d" "pci8086,1050" "pci8086,1059" "pci8086,1068" "pci8086,1069" "pci8086,1092" "pci8086,1209" "pci8086,2449" "pci8086,27dc"' \
+		-i '"pci8086,1029" "pci8086,1229" "pci8086,1229.8086.1009"
+		"pci8086,1229.8086.100c" "pci8086,1229.8086.1012"
+		"pci8086,1229.8086.1013" "pci8086,1229.8086.1015"
+		"pci8086,1229.8086.1016" "pci8086,1229.8086.1017"
+		"pci8086,1030" "pci8086,1031" "pci8086,1032" "pci8086,1038"
+		"pci8086,1039" "pci8086,103d" "pci8086,1050" "pci8086,1059"
+		"pci8086,1068" "pci8086,1069" "pci8086,1092" "pci8086,1209"
+		"pci8086,2449" "pci8086,27dc"' \
 		iprb
 	check_add_drv -b "${BASEDIR}" \
 		-i '"pci10b8,5"' \
