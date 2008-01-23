@@ -1121,6 +1121,7 @@ ZFS_SHARED_OBJS +=		\
 	zfs_namecheck.o		\
 	zfs_deleg.o		\
 	zfs_prop.o		\
+	zfs_util.o		\
 	zpool_prop.o		\
 	zprop_common.o
 

@@ -1215,6 +1215,9 @@ zil_alloc(objset_t *os, zil_header_t *zh_phys)
 	avl_create(&zilog->zl_vdev_tree, zil_vdev_compare,
 	    sizeof (zil_vdev_node_t), offsetof(zil_vdev_node_t, zv_node));
 
+	cv_init(&zilog->zl_cv_writer, NULL, CV_DEFAULT, NULL);
+	cv_init(&zilog->zl_cv_suspend, NULL, CV_DEFAULT, NULL);
+
 	return (zilog);
 }
 
@@ -1239,6 +1242,9 @@ zil_free(zilog_t *zilog)
 	ASSERT(list_head(&zilog->zl_itx_list) == NULL);
 	list_destroy(&zilog->zl_itx_list);
 	mutex_destroy(&zilog->zl_lock);
+
+	cv_destroy(&zilog->zl_cv_writer);
+	cv_destroy(&zilog->zl_cv_suspend);
 
 	kmem_free(zilog, sizeof (zilog_t));
 }

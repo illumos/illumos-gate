@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,8 @@
 LIBRARY= libzfs.a
 VERS= .1
 
-OBJS_SHARED= zfs_namecheck.o zprop_common.o zfs_prop.o zpool_prop.o zfs_deleg.o
+OBJS_SHARED= zfs_namecheck.o zprop_common.o zfs_prop.o zpool_prop.o \
+	zfs_deleg.o zfs_util.o
 OBJS_COMMON= libzfs_dataset.o libzfs_util.o libzfs_graph.o libzfs_mount.o \
 	libzfs_pool.o libzfs_changelist.o libzfs_config.o libzfs_import.o \
 	libzfs_status.o libzfs_sendrecv.o
