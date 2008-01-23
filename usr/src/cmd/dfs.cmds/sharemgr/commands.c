@@ -216,11 +216,23 @@ conv_from_utf8(char *input)
 	return (output);
 }
 
+/*
+ * print_rsrc_desc(resource, sharedesc)
+ *
+ * Print the resource description string after converting from UTF8 to
+ * the current locale. If sharedesc is not NULL and there is no
+ * description on the resource, use sharedesc. sharedesc will already
+ * be converted to UTF8.
+ */
+
 static void
-print_rsrc_desc(char *resource)
+print_rsrc_desc(sa_resource_t resource, char *sharedesc)
 {
 	char *description;
 	char *desc;
+
+	if (resource == NULL)
+		return;
 
 	description = sa_get_resource_description(resource);
 	if (description != NULL) {
@@ -229,10 +241,41 @@ print_rsrc_desc(char *resource)
 			sa_free_share_description(description);
 			description = desc;
 		}
+	} else if (sharedesc != NULL) {
+		description = strdup(sharedesc);
+	}
+	if (description != NULL) {
 		(void) printf("\t\"%s\"", description);
 		sa_free_share_description(description);
 	}
 }
+
+/*
+ * set_resource_desc(share, description)
+ *
+ * Set the share description value after converting the description
+ * string to UTF8 from the current locale.
+ */
+
+static int
+set_resource_desc(sa_share_t share, char *description)
+{
+	char *desc;
+	int ret;
+
+	desc = conv_to_utf8(description);
+	ret = sa_set_resource_description(share, desc);
+	if (description != desc)
+		sa_free_share_description(desc);
+	return (ret);
+}
+
+/*
+ * set_share_desc(share, description)
+ *
+ * Set the resource description value after converting the description
+ * string to UTF8 from the current locale.
+ */
 
 static int
 set_share_desc(sa_share_t share, char *description)
@@ -1575,6 +1618,12 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 		}
 	}
 
+	if (optind != argc) {
+		(void) printf(gettext("usage: %s\n"),
+		    sa_get_usage(USAGE_LIST));
+		return (SA_SYNTAX_ERR);
+	}
+
 	for (group = sa_get_group(handle, NULL);
 	    group != NULL;
 	    group = sa_get_next_group(group)) {
@@ -1797,11 +1846,10 @@ has_resource_with_opt(sa_share_t share)
 /*
  * has_multiple_resource(share)
  *
- * Check to see if the share has any resource names with optionsets
- * set. Also indicate if multiple resource names since the syntax
- * would be about the same.
+ * Check to see if the share has multiple resource names since
+ * the syntax would be about the same.
  */
-static int
+static boolean_t
 has_multiple_resource(sa_share_t share)
 {
 	sa_resource_t resource;
@@ -1833,10 +1881,9 @@ show_share(sa_share_t share, int verbose, int properties, char *proto,
 	char *exclude;
 	sa_resource_t resource = NULL;
 	char *description;
-	char *desc;
 	char *rsrcname;
 	int rsrcwithopt;
-	int multiple;
+	boolean_t multiple;
 	char *type;
 
 	rsrcwithopt = has_resource_with_opt(share);
@@ -1859,6 +1906,17 @@ show_share(sa_share_t share, int verbose, int properties, char *proto,
 		 */
 		multiple = has_multiple_resource(share);
 
+		/*
+		 * if there is a description on the share and there
+		 * are resources, treat as multiple resources in order
+		 * to get all descriptions displayed.
+		 */
+		description = sa_get_share_description(share);
+		resource = sa_get_share_resource(share, NULL);
+
+		if (description != NULL && resource != NULL)
+			multiple = B_TRUE;
+
 		/* Next, if not multiple follow old model */
 		if (!multiple && !rsrcwithopt) {
 			rsrcname = get_resource(share);
@@ -1869,6 +1927,8 @@ show_share(sa_share_t share, int verbose, int properties, char *proto,
 			}
 			if (rsrcname != NULL)
 				sa_free_attr_string(rsrcname);
+			/* Print the description string if there is one. */
+			print_rsrc_desc(resource, description);
 		} else {
 			/* Treat as simple and then resources come later */
 			(void) printf("%s", sharepath);
@@ -1888,19 +1948,10 @@ show_share(sa_share_t share, int verbose, int properties, char *proto,
 			    exclude);
 			sa_free_attr_string(exclude);
 		}
-		description = sa_get_share_description(share);
-		if (description != NULL) {
-			if (strlen(description) > 0) {
-				desc = conv_from_utf8(description);
-				if (desc != description) {
-					sa_free_share_description(description);
-					description = desc;
-				}
-				(void) printf("\t\"%s\"", description);
-			}
-			sa_free_share_description(description);
-		}
 
+		if (description != NULL) {
+			print_rsrc_desc((sa_resource_t)share, description);
+		}
 		/*
 		 * If there are resource names with options, show them
 		 * here, with one line per resource. Resource specific
@@ -1936,9 +1987,11 @@ show_share(sa_share_t share, int verbose, int properties, char *proto,
 					show_properties(resource, proto, "\t");
 
 				/* Get description string if any */
-				print_rsrc_desc(resource);
+				print_rsrc_desc(resource, description);
 			}
 		}
+		if (description != NULL)
+			sa_free_share_description(description);
 	} else {
 		(void) printf("\t  %s", sharepath);
 		if (properties)
@@ -2487,12 +2540,16 @@ sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 					}
 					if (ret == SA_OK &&
 					    description != NULL) {
-						if (description != NULL) {
+						if (resource != NULL)
+							ret =
+							    set_resource_desc(
+							    resource,
+							    description);
+						else
 							ret =
 							    set_share_desc(
 							    share,
 							    description);
-						}
 					}
 					if (ret == SA_OK) {
 						/* now enable the share(s) */
@@ -2569,6 +2626,7 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 	char *rsrcname = NULL;
 	char *sharepath = NULL;
 	int authsrc = 0, authdst = 0;
+	char dir[MAXPATHLEN];
 
 	while ((c = getopt(argc, argv, "?hvnr:s:")) != EOF) {
 		switch (c) {
@@ -2641,12 +2699,27 @@ sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 			return (SA_NO_SUCH_GROUP);
 		}
 		share = sa_find_share(handle, sharepath);
-		authdst = check_authorizations(argv[optind], flags);
+		/*
+		 * If a share wasn't found, it may have been a symlink
+		 * or has a trailing '/'. Try again after resolving
+		 * with realpath().
+		 */
+		if (share == NULL) {
+			if (realpath(sharepath, dir) == NULL) {
+				(void) printf(gettext("Path "
+				    "is not valid: %s\n"),
+				    sharepath);
+				return (SA_BAD_PATH);
+			}
+			sharepath = dir;
+			share = sa_find_share(handle, sharepath);
+		}
 		if (share == NULL) {
 			(void) printf(gettext("Share not found: %s\n"),
 			    sharepath);
 			return (SA_NO_SUCH_PATH);
 		}
+		authdst = check_authorizations(argv[optind], flags);
 
 		parent = sa_get_parent_group(share);
 		if (parent != NULL) {
@@ -2977,7 +3050,6 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 	sa_resource_t resource = NULL;
 	char *sharepath = NULL;
 	char *description = NULL;
-	char *desc;
 	char *rsrcname = NULL;
 	char *rsrc = NULL;
 	char *newname = NULL;
@@ -3158,15 +3230,12 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			 * must be on the share.
 			 */
 			if (ret == SA_OK && description != NULL) {
-				desc = conv_to_utf8(description);
 				if (resource != NULL)
-					ret = sa_set_resource_description(
-					    resource, desc);
+					ret = set_resource_desc(resource,
+					    description);
 				else
-					ret = sa_set_share_description(share,
-					    desc);
-				if (desc != description)
-					sa_free_share_description(desc);
+					ret = set_share_desc(share,
+					    description);
 			}
 		}
 		if (!dryrun && ret == SA_OK) {

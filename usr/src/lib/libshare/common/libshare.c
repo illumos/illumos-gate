@@ -2072,12 +2072,14 @@ sa_set_group_attr(sa_group_t group, char *tag, char *value)
 				ret = sa_set_property(impl_handle->scfhandle,
 				    tag, value);
 				if (ret == SA_OK)
-					(void) sa_end_transaction(
+					ret = sa_end_transaction(
 					    impl_handle->scfhandle);
 				else
 					sa_abort_transaction(
 					    impl_handle->scfhandle);
 			}
+			if (ret == SA_SYSTEM_ERR)
+				ret = SA_NO_PERMISSION;
 		}
 		if (groupname != NULL)
 			sa_free_attr_string(groupname);
