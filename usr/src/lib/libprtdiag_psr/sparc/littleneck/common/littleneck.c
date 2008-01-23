@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Littleneck Platform specific functions.
@@ -127,14 +126,14 @@ display_cpu_devices(Sys_tree *tree)
 	 * frequency, cache size, and processor revision of all cpus.
 	 */
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n"
-		"========================= CPUs "
-		"==============================================="
-		"\n"
-		"\n"
-		"          Run    E$    CPU     CPU  \n"
-		"Brd  CPU  MHz    MB   Impl.    Mask \n"
-		"---  ---  ----  ----  -------  ---- \n"));
+	    "\n"
+	    "========================= CPUs "
+	    "==============================================="
+	    "\n"
+	    "\n"
+	    "          Run    E$    CPU     CPU  \n"
+	    "Brd  CPU  MHz    MB   Impl.    Mask \n"
+	    "---  ---  ----  ----  -------  ---- \n"));
 
 	/* Now display all of the cpus on each board */
 	bnode = tree->bd_list;
@@ -163,7 +162,7 @@ display_cpus(Board_node *board)
 
 	for (cpu = dev_find_type(board->nodes, cpu_name); cpu != NULL;
 	    cpu = dev_next_type(cpu, cpu_name)) {
-		int freq;	 /* CPU clock frequency */
+		uint_t freq;	 /* CPU clock frequency */
 		int ecache_size; /* External cache size */
 		int *mid;
 		int *impl;
@@ -197,14 +196,14 @@ display_cpus(Board_node *board)
 			/* Module number */
 
 			/* Running frequency */
-			log_printf("%4d  ", freq);
+			log_printf("%4u  ", freq);
 
 			/* Ecache size */
 			if (ecache_size == 0)
 				log_printf("N/A  ");
 			else
 				log_printf("%4.1f  ",
-					(float)ecache_size / (float)(1<<20));
+				    (float)ecache_size / (float)(1<<20));
 
 			/* Implementation */
 			if (impl == NULL) {
@@ -239,15 +238,15 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	Board_node	*bnode = tree->bd_list;
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"========================= Memory Configuration"
-		" ===============================\n"
-		"\n           Logical  Logical  Logical "
-		"\n      MC   Bank     Bank     Bank         DIMM    "
-		"Interleave  Interleaved"
-		"\n Brd  ID   num      size     Status       Size    "
-		"Factor      with"
-		"\n----  ---  ----     ------   -----------  ------  "
-		"----------  -----------"));
+	    "========================= Memory Configuration"
+	    " ===============================\n"
+	    "\n           Logical  Logical  Logical "
+	    "\n      MC   Bank     Bank     Bank         DIMM    "
+	    "Interleave  Interleaved"
+	    "\n Brd  ID   num      size     Status       Size    "
+	    "Factor      with"
+	    "\n----  ---  ----     ------   -----------  ------  "
+	    "----------  -----------"));
 
 	while (bnode != NULL) {
 		if (get_us3_mem_regs(bnode)) {
@@ -321,23 +320,23 @@ display_pci(Board_node *board)
 	 * each instance node found.
 	 */
 	for (pci = dev_find_node_by_compat(board->nodes, SCHIZO_COMPAT_PROP);
-		pci != NULL;
-		pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
+	    pci != NULL;
+	    pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
 		(void) snprintf(card.bus_type, MAXSTRLEN,
-			dgettext(TEXT_DOMAIN, "PCI"));
+		    dgettext(TEXT_DOMAIN, "PCI"));
 		/*
 		 * Get slot-name properties from parent node and
 		 * store them in an array.
 		 */
 		value = (char *)get_prop_val(
-			find_prop(pci, "slot-names"));
+		    find_prop(pci, "slot-names"));
 
 		if (value != NULL) {
 			/* array starts after first int */
 			slot_name_arr[0] = (char *)value + sizeof (int);
 			for (i = 1; i < LNECK_MAX_SLOTS_PER_IO_BD; i++) {
 				slot_name_arr[i] = (char *)slot_name_arr[i - 1]
-					+ strlen(slot_name_arr[i - 1]) +1;
+				    + strlen(slot_name_arr[i - 1]) +1;
 			}
 		}
 		/*
@@ -349,7 +348,7 @@ display_pci(Board_node *board)
 		card_node = pci->child;
 		/* Generate the list of pci cards on pci instance: pci */
 		fill_pci_card_list(pci, card_node, &card, &card_list,
-			slot_name_arr);
+		    slot_name_arr);
 	} /* end-for */
 
 	display_io_cards(card_list);
@@ -373,23 +372,24 @@ display_io_cards(struct io_card *list)
 
 	if (banner == FALSE) {
 		log_printf(dgettext(TEXT_DOMAIN,
-		"                         Bus  Max\n"
-		"     IO   Port Bus       Freq Bus  Dev,\n"
-		"Brd  Type  ID  Side Slot MHz  Freq Func State "
-		"Name                              "
+		    "                         Bus  Max\n"
+		    "     IO   Port Bus       Freq Bus  Dev,\n"
+		    "Brd  Type  ID  Side Slot MHz  Freq Func State "
+		    "Name                              "));
 #ifdef DEBUG
-			"Model                   Notes\n"));
+		log_printf(dgettext(TEXT_DOMAIN,
+		    "Model                   Notes\n"));
 #else
-			"Model\n"));
+		log_printf(dgettext(TEXT_DOMAIN, "Model\n"));
 #endif
 		/* ---------Node Brd  IO   Port Bus  Slot Bus  Max  Dev  Stat */
 		log_printf(dgettext(TEXT_DOMAIN,
-		"---- ---- ---- ---- ---- ---- ---- ---- ----- "
-		"--------------------------------  "
+		    "---- ---- ---- ---- ---- ---- ---- ---- ----- "
+		    "--------------------------------  "
 #ifdef DEBUG
-		"----------------------  "
+		    "----------------------  "
 #endif
-		"----------------------\n"));
+		    "----------------------\n"));
 		banner = TRUE;
 	}
 
@@ -397,7 +397,7 @@ display_io_cards(struct io_card *list)
 		log_printf(dgettext(TEXT_DOMAIN, "I/O   "));
 		log_printf(dgettext(TEXT_DOMAIN, "%-4s  "), p->bus_type);
 		log_printf(dgettext(TEXT_DOMAIN, "%-3d  "),
-			p->schizo_portid);
+		    p->schizo_portid);
 		log_printf(dgettext(TEXT_DOMAIN, "%c    "), p->pci_bus);
 		log_printf(dgettext(TEXT_DOMAIN, "%-1s    "), p->slot_str);
 		log_printf(dgettext(TEXT_DOMAIN, "%-3d "), p->freq);
@@ -476,9 +476,9 @@ disp_fail_parts(Sys_tree *tree)
 			}
 			log_printf("\n");
 			log_printf(dgettext(TEXT_DOMAIN, "Failed Field "
-				"Replaceable Units (FRU) in System:\n"));
+			    "Replaceable Units (FRU) in System:\n"));
 			log_printf("=========================="
-				"====================\n");
+			    "====================\n");
 		}
 		while (pnode != NULL) {
 			void *value;
@@ -503,14 +503,14 @@ disp_fail_parts(Sys_tree *tree)
 			}
 
 			log_printf(dgettext(TEXT_DOMAIN, "%s unavailable "
-				"on %s Board #%d\n"), name, board_type,
-				bnode->board_num);
+			    "on %s Board #%d\n"), name, board_type,
+			    bnode->board_num);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tPROM fault string: %s\n"), value);
+			    "\tPROM fault string: %s\n"), value);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tFailed Field Replaceable Unit is "));
+			    "\tFailed Field Replaceable Unit is "));
 
 			/*
 			 * Determine whether FRU is CPU module, system
@@ -519,27 +519,27 @@ disp_fail_parts(Sys_tree *tree)
 			if ((name != NULL) && (strstr(name, "sbus"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-						"SBus Card %d\n"),
-						get_sbus_slot(pnode));
+				    "SBus Card %d\n"),
+				    get_sbus_slot(pnode));
 
 			} else if (((name = get_node_name(pnode->parent)) !=
-				NULL) && (strstr(name, "pci"))) {
+			    NULL) && (strstr(name, "pci"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-						"PCI Card %d"),
-						get_pci_device(pnode));
+				    "PCI Card %d"),
+				    get_pci_device(pnode));
 
 			} else if (((type = get_node_type(pnode)) != NULL) &&
-				(strstr(type, "cpu"))) {
+			    (strstr(type, "cpu"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN, "UltraSPARC "
-					"module Board %d Module %d\n"), 0,
-					get_id(pnode));
+				    "module Board %d Module %d\n"), 0,
+				    get_id(pnode));
 
 			} else {
 				log_printf(dgettext(TEXT_DOMAIN,
-						"%s board %d\n"), board_type,
-						bnode->board_num);
+				    "%s board %d\n"), board_type,
+				    bnode->board_num);
 			}
 			pnode = next_failed_node(pnode);
 		}
@@ -548,7 +548,7 @@ disp_fail_parts(Sys_tree *tree)
 
 	if (!system_failed) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"No failures found in System\n"));
+		    "No failures found in System\n"));
 		log_printf("===========================\n\n");
 		return (0);
 	} else {
@@ -573,14 +573,14 @@ disp_envc_status(void)
 
 	log_printf("\n");
 	log_printf(dgettext(TEXT_DOMAIN, "========================="
-		" Environmental Status =========================\n\n"));
+	    " Environmental Status =========================\n\n"));
 
 	err = picl_initialize();
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"Cannot print environmental information\n"
-			"picl_initialize failed\n"
-			"%s\n"), picl_strerror(err));
+		    "Cannot print environmental information\n"
+		    "picl_initialize failed\n"
+		    "%s\n"), picl_strerror(err));
 	}
 
 	if (err == PICL_SUCCESS) {
@@ -588,47 +588,47 @@ disp_envc_status(void)
 		err = find_child_device(root, system, &system_node);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Cannot print environmental information\n"
-				"find_child_device for the SYSTEM node "
-				"failed\n"
-				"%s\n"), picl_strerror(err));
+			    "Cannot print environmental information\n"
+			    "find_child_device for the SYSTEM node "
+			    "failed\n"
+			    "%s\n"), picl_strerror(err));
 		}
 
 		if ((err = lneck_env_print_temps(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Temperature Checking failed: %s\n"),
-				picl_strerror(err));
+			    "Temperature Checking failed: %s\n"),
+			    picl_strerror(err));
 		}
 		if ((err = lneck_env_print_keyswitch(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Keyswitch information checking failed: %s\n"),
-				picl_strerror(err));
+			    "Keyswitch information checking failed: %s\n"),
+			    picl_strerror(err));
 		}
 		if ((err = lneck_env_print_FSP_LEDS(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"FSP LED information checking failed: %s\n"),
-				picl_strerror(err));
+			    "FSP LED information checking failed: %s\n"),
+			    picl_strerror(err));
 		}
 		if ((err = lneck_env_print_disk(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Disk information checking failed: %s\n"),
-				picl_strerror(err));
+			    "Disk information checking failed: %s\n"),
+			    picl_strerror(err));
 		}
 		if ((err = lneck_env_print_fans(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Fan information checking failed: %s\n"),
-				picl_strerror(err));
+			    "Fan information checking failed: %s\n"),
+			    picl_strerror(err));
 		}
 		if ((err = lneck_env_print_ps(system_node)) !=
 		    PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Power Supply information checking failed: "
-				"%s\n"), picl_strerror(err));
+			    "Power Supply information checking failed: "
+			    "%s\n"), picl_strerror(err));
 		} else if (ps_failure != 0)
 			err = PICL_FAILURE;
 	}
@@ -647,28 +647,28 @@ lneck_env_print_ps(picl_nodehdl_t system_node)
 	char		fault_state[PICL_PROPNAMELEN_MAX];
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Power Supplies:\n"
-		"---------------\n"
-		"Supply     Status         PS Type\n"
-		"------     ------      ---------------\n"));
+	    "Power Supplies:\n"
+	    "---------------\n"
+	    "Supply     Status         PS Type\n"
+	    "------     ------      ---------------\n"));
 	err = fill_device_array_from_id(system_node, "PSVC_PS", &number,
-		&ps);
+	    &ps);
 	if (err != PICL_SUCCESS) {
 		return (err);
 	}
 
 	for (i = 0; i < LNECK_MAX_PS; i++) {
 		err = picl_get_propval_by_name(ps[i], PICL_PROP_NAME, name,
-			PICL_PROPNAMELEN_MAX);
+		    PICL_PROPNAMELEN_MAX);
 		if (err == PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN, "%6-s"), name);
 		} else continue;
 
 		err = picl_get_propval_by_name(ps[i], "FaultInformation",
-			fault_state, PICL_PROPNAMELEN_MAX);
+		    fault_state, PICL_PROPNAMELEN_MAX);
 		if (err == PICL_SUCCESS) {
 			if ((strlen(fault_state) == 0) ||
-				(strcmp(fault_state, "NO_FAULT") == 0)) {
+			    (strcmp(fault_state, "NO_FAULT") == 0)) {
 				strcpy(fault_state, "OK");
 			} else
 				/*
@@ -677,30 +677,30 @@ lneck_env_print_ps(picl_nodehdl_t system_node)
 				ps_failure++;
 
 			log_printf(dgettext(TEXT_DOMAIN, "    [%-6s] "),
-				fault_state);
+			    fault_state);
 		} else {
 			return (err);
 		}
 
 		err = fill_device_from_id(ps[i], "PSVC_DEV_FAULT_SENSOR",
-			&ps_fail[i]);
+		    &ps_fail[i]);
 		if (err != PICL_SUCCESS) {
 			return (err);
 		}
 
 		err = fill_device_from_id(ps[i], "PSVC_DEV_TYPE_SENSOR",
-			&ps_type[i]);
+		    &ps_type[i]);
 		if (err != PICL_SUCCESS) {
 			return (err);
 		}
 		err = picl_get_propval_by_name(ps_type[i], "Gpio-value", &type,
-			sizeof (boolean_t));
+		    sizeof (boolean_t));
 		if (err == PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN, "    [%13s]"),
-				type == 0 ? "Quahog/Razor" : "Sun-Fire-280R");
+			    type == 0 ? "Quahog/Razor" : "Sun-Fire-280R");
 			if (type == 0) {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"WARNING: PS is of the wrong type\n"));
+				    "WARNING: PS is of the wrong type\n"));
 			} else log_printf("\n");
 		} else {
 			return (err);
@@ -709,10 +709,10 @@ lneck_env_print_ps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n"
-		"================================="
-		"\n"
-		"\n"));
+	    "\n"
+	    "================================="
+	    "\n"
+	    "\n"));
 
 	/*
 	 * Do not display an error message just because PS1 is
@@ -946,25 +946,25 @@ lneck_display_hw_revisions(Prom_node *root, Board_node *bdlist)
 	char		*value;
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n"
-		"========================= HW Revisions "
-		"=======================================\n\n"));
+	    "========================= HW Revisions "
+	    "=======================================\n\n"));
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System PROM revisions:\n"
-		"----------------------\n"));
+	    "System PROM revisions:\n"
+	    "----------------------\n"));
 
 	pnode = dev_find_node(root, "openprom");
 	if (pnode != NULL) {
-	    value = (char *)get_prop_val(find_prop(pnode, "version"));
-	    log_printf(value);
+		value = (char *)get_prop_val(find_prop(pnode, "version"));
+		log_printf(value);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n\n"
-		"IO ASIC revisions:\n"
-		"------------------\n"
-		"                     Port\n"
-		"Model     ID  Status Version\n"
-		"-------- ---- ------ -------\n"));
+	    "IO ASIC revisions:\n"
+	    "------------------\n"
+	    "                     Port\n"
+	    "Model     ID  Status Version\n"
+	    "-------- ---- ------ -------\n"));
 
 	display_schizo_revisions(bdlist);
 }
@@ -992,9 +992,9 @@ display_schizo_revisions(Board_node *bdlist)
 		 */
 
 		for (pnode = dev_find_node_by_compat(bnode->nodes,
-			SCHIZO_COMPAT_PROP); pnode != NULL;
-			pnode = dev_next_node_by_compat(pnode,
-			    SCHIZO_COMPAT_PROP)) {
+		    SCHIZO_COMPAT_PROP); pnode != NULL;
+		    pnode = dev_next_node_by_compat(pnode,
+		    SCHIZO_COMPAT_PROP)) {
 
 			/*
 			 * get the reg property to determine
@@ -1002,7 +1002,7 @@ display_schizo_revisions(Board_node *bdlist)
 			 */
 
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "reg"));
+			    (find_prop(pnode, "reg"));
 			if (int_val != NULL) {
 				int_val ++; /* second integer in array */
 				pci_bus = ((*int_val) & 0x7f0000);
@@ -1010,7 +1010,7 @@ display_schizo_revisions(Board_node *bdlist)
 
 			/* get portid */
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "portid"));
+			    (find_prop(pnode, "portid"));
 			if (int_val == NULL)
 				continue;
 
@@ -1042,14 +1042,14 @@ display_schizo_revisions(Board_node *bdlist)
 			prev_portid = portid;
 
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "version#"));
+			    (find_prop(pnode, "version#"));
 			if (int_val != NULL)
 				revision = *int_val;
 			else
 				revision = -1;
 
 			status_a = (char *)get_prop_val(find_prop
-				(pnode, "status"));
+			    (pnode, "status"));
 
 			log_printf(dgettext(TEXT_DOMAIN, "Schizo    "));
 
@@ -1057,8 +1057,8 @@ display_schizo_revisions(Board_node *bdlist)
 
 
 			log_printf((status_a == NULL && status_b == NULL) ?
-				dgettext(TEXT_DOMAIN, "  ok  ") :
-				dgettext(TEXT_DOMAIN, " fail "));
+			    dgettext(TEXT_DOMAIN, "  ok  ") :
+			    dgettext(TEXT_DOMAIN, " fail "));
 
 			log_printf(dgettext(TEXT_DOMAIN, " %4d   "),
 			    revision);

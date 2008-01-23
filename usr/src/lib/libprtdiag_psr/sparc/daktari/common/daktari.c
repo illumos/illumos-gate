@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,9 +151,9 @@ disp_fail_parts(Sys_tree *tree)
 			}
 			log_printf("\n");
 			log_printf(dgettext(TEXT_DOMAIN, "Failed Field "
-				"Replaceable Units (FRU) in System:\n"));
+			    "Replaceable Units (FRU) in System:\n"));
 			log_printf("=========================="
-				"====================\n");
+			    "====================\n");
 		}
 		while (pnode != NULL) {
 			void *value;
@@ -179,14 +178,14 @@ disp_fail_parts(Sys_tree *tree)
 			}
 
 			log_printf(dgettext(TEXT_DOMAIN, "%s unavailable "
-				"on %s Board #%d\n"), name, board_type,
-					bnode->board_num);
+			    "on %s Board #%d\n"), name, board_type,
+			    bnode->board_num);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tPROM fault string: %s\n"), value);
+			    "\tPROM fault string: %s\n"), value);
 
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\tFailed Field Replaceable Unit is "));
+			    "\tFailed Field Replaceable Unit is "));
 
 			/*
 			 * Determine whether FRU is CPU module, system
@@ -195,27 +194,27 @@ disp_fail_parts(Sys_tree *tree)
 			if ((name != NULL) && (strstr(name, "sbus"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-					"SBus Card %d\n"),
-					get_sbus_slot(pnode));
+				    "SBus Card %d\n"),
+				    get_sbus_slot(pnode));
 
 			} else if (((name = get_node_name(pnode->parent)) !=
 			    NULL) && (strstr(name, "pci"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN,
-					"PCI Card %d"),
-					get_pci_device(pnode));
+				    "PCI Card %d"),
+				    get_pci_device(pnode));
 
 			} else if (((type = get_node_type(pnode)) != NULL) &&
 			    (strstr(type, "cpu"))) {
 
 				log_printf(dgettext(TEXT_DOMAIN, "UltraSPARC "
-					"module Board %d Module %d\n"), 0,
-						get_id(pnode));
+				    "module Board %d Module %d\n"), 0,
+				    get_id(pnode));
 
 			} else {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"%s board %d\n"), board_type,
-					bnode->board_num);
+				    "%s board %d\n"), board_type,
+				    bnode->board_num);
 			}
 			pnode = next_failed_node(pnode);
 		}
@@ -224,7 +223,7 @@ disp_fail_parts(Sys_tree *tree)
 
 	if (!system_failed) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"No failures found in System\n"));
+		    "No failures found in System\n"));
 		log_printf("===========================\n\n");
 	}
 
@@ -249,23 +248,23 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	Board_node	*bnode = tree->bd_list;
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"========================= Memory Configuration"
-		" ===============================\n"
-		"\n           Logical  Logical"
-		"  Logical "
-		"\n      MC   Bank     Bank     Bank"
-		"         DIMM    Interleave  Interleaved"
-		"\n Brd  ID   num      size     "
-		"Status       Size    "
-		"Factor      with"
-		"\n----  ---  ----     ------   "
-		"-----------  ------  "
-		"----------  -----------"));
+	    "========================= Memory Configuration"
+	    " ===============================\n"
+	    "\n           Logical  Logical"
+	    "  Logical "
+	    "\n      MC   Bank     Bank     Bank"
+	    "         DIMM    Interleave  Interleaved"
+	    "\n Brd  ID   num      size     "
+	    "Status       Size    "
+	    "Factor      with"
+	    "\n----  ---  ----     ------   "
+	    "-----------  ------  "
+	    "----------  -----------"));
 
 	while (bnode != NULL) {
 		if (get_us3_mem_regs(bnode)) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"\nFailed to get memory information.\n"));
+			    "\nFailed to get memory information.\n"));
 			return;
 		}
 		bnode = bnode->next;
@@ -285,21 +284,21 @@ display_cpu_devices(Sys_tree *tree)
 	 * frequency, cache size, and processor revision of all cpus.
 	 */
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n"
-		"========================="
-		" CPUs "
-		"==============================================="
-		"\n"
-		"\n"
-		"           Run   E$  CPU    CPU  \n"
-		"Brd  CPU   MHz   MB Impl.   Mask \n"
-		"--- ----- ---- ---- ------- ---- \n"));
+	    "\n"
+	    "========================="
+	    " CPUs "
+	    "==============================================="
+	    "\n"
+	    "\n"
+	    "           Run   E$  CPU    CPU  \n"
+	    "Brd  CPU   MHz   MB Impl.   Mask \n"
+	    "--- ----- ---- ---- ------- ---- \n"));
 
 	/* Now display all of the cpus on each board */
 	bnode = tree->bd_list;
 	if (bnode == NULL) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"CPU Board list was NULL\n"));
+		    "CPU Board list was NULL\n"));
 	}
 	while (bnode != NULL) {
 		display_cpus(bnode);
@@ -316,7 +315,7 @@ void
 display_cpus(Board_node *board)
 {
 	Prom_node 	*cpu;
-	int freq;	 /* CPU clock frequency */
+	uint_t freq;	 /* CPU clock frequency */
 	int ecache_size; /* External cache size */
 	int *l3_shares;
 	int *mid;
@@ -342,8 +341,8 @@ display_cpus(Board_node *board)
 		ecache_size = get_ecache_size(cpu);
 		impl = (int *)get_prop_val(find_prop(cpu, "implementation#"));
 		mask = (int *)get_prop_val(find_prop(cpu, "mask#"));
-		l3_shares =
-			(int *)get_prop_val(find_prop(cpu, "l3-cache-sharing"));
+		l3_shares = (int *)get_prop_val(find_prop(cpu,
+		    "l3-cache-sharing"));
 
 		/* Do not display a failed CPU node */
 		if ((impl == NULL) || (freq == 0) || (node_failed(cpu)))
@@ -358,8 +357,8 @@ display_cpus(Board_node *board)
 				continue;
 			}
 			if ((fru_prev == 'X') ||
-				((fru_prev != 'X') &&
-				(fru_name != fru_prev))) {
+			    ((fru_prev != 'X') &&
+			    (fru_name != fru_prev))) {
 				fru_prev = fru_name;
 				mid_prev = *mid;
 				ecache_size_prev = ecache_size;
@@ -376,8 +375,8 @@ display_cpus(Board_node *board)
 				 * total size is equal to the core size.
 				 */
 				if ((l3_shares == NULL) ||
-					((l3_shares != NULL) &&
-					MULTIPLE_BITS_SET(*l3_shares))) {
+				    ((l3_shares != NULL) &&
+				    MULTIPLE_BITS_SET(*l3_shares))) {
 					ecache_size += ecache_size_prev;
 				}
 				ecache_size_prev = 0;
@@ -394,7 +393,7 @@ display_cpus(Board_node *board)
 			log_printf("    %d  ", *mid);
 
 		/* Running frequency */
-		log_printf(" %4d ", freq);
+		log_printf(" %4u ", freq);
 
 		/* Ecache size */
 		if (ecache_size == 0)
@@ -402,7 +401,7 @@ display_cpus(Board_node *board)
 			    "N/A");
 		else
 			log_printf("%4.1f ",
-				(float)ecache_size / (float)(1<<20));
+			    (float)ecache_size / (float)(1<<20));
 
 		/* Implementation */
 		if (impl == NULL) {
@@ -465,16 +464,16 @@ display_pci(Board_node *board)
 	 * each instance node found.
 	 */
 	for (pci = dev_find_node_by_compat(board->nodes, SCHIZO_COMPAT_PROP);
-		pci != NULL;
-		pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
+	    pci != NULL;
+	    pci = dev_next_node_by_compat(pci, SCHIZO_COMPAT_PROP)) {
 		(void) snprintf(card.bus_type, MAXSTRLEN,
-			dgettext(TEXT_DOMAIN, "PCI"));
+		    dgettext(TEXT_DOMAIN, "PCI"));
 		/*
 		 * Get slot-name properties from parent node and
 		 * store them in an array.
 		 */
 		value = (char *)get_prop_val(
-			find_prop(pci, "slot-names"));
+		    find_prop(pci, "slot-names"));
 
 		if (value != NULL) {
 #ifdef DEBUG
@@ -486,7 +485,7 @@ display_pci(Board_node *board)
 			slot_name_arr[0] = (char *)value + sizeof (int);
 			for (i = 1; i < DAK_MAX_SLOTS_PER_IO_BD; i++) {
 				slot_name_arr[i] = (char *)slot_name_arr[i - 1]
-					+ strlen(slot_name_arr[i - 1]) +1;
+				    + strlen(slot_name_arr[i - 1]) +1;
 			}
 		}
 		/*
@@ -498,7 +497,7 @@ display_pci(Board_node *board)
 		card_node = pci->child;
 		/* Generate the list of pci cards on pci instance: pci */
 		fill_pci_card_list(pci, card_node, &card, &card_list,
-			slot_name_arr);
+		    slot_name_arr);
 	} /* end-for */
 
 	display_io_cards(card_list);
@@ -521,17 +520,17 @@ display_io_cards(struct io_card *list)
 
 	if (banner == FALSE) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"                         Bus  Max\n"
-			"     IO   Port Bus       Freq Bus  Dev,"
-			"\n"
-			"Brd  Type  ID  Side Slot MHz  Freq "
-			"Func State Name                              "
-			"Model\n"
+		    "                         Bus  Max\n"
+		    "     IO   Port Bus       Freq Bus  Dev,"
+		    "\n"
+		    "Brd  Type  ID  Side Slot MHz  Freq "
+		    "Func State Name                              "
+		    "Model\n"
 		/* ---------Brd  IO   Port Bus  Slot Bus  Max  Dev  Stat */
-			"---- ---- ---- ---- ---- ---- ---- ----"
-			" ----- "
-			"--------------------------------  "
-			"----------------------\n"));
+		    "---- ---- ---- ---- ---- ---- ---- ----"
+		    " ----- "
+		    "--------------------------------  "
+		    "----------------------\n"));
 		banner = TRUE;
 	}
 
@@ -637,29 +636,29 @@ disp_envc_status()
 	err = picl_initialize();
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"picl_initialize failed\n"
-			"%s\nCannot display environmental status\n"),
-			    picl_strerror(err));
+		    "picl_initialize failed\n"
+		    "%s\nCannot display environmental status\n"),
+		    picl_strerror(err));
 		return (err);
 	}
 	err = picl_get_root(&root);
 	err = find_child_device(root, system, &system_node);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"picl_get_node_by_path for the SYSTEM node "
-			"failed\n"
-			"%s\nCannot display environmental status\n"),
-			    picl_strerror(err));
+		    "picl_get_node_by_path for the SYSTEM node "
+		    "failed\n"
+		    "%s\nCannot display environmental status\n"),
+		    picl_strerror(err));
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n"
-		"========================= "
-		"Environmental Status "
-		"========================="
-		"\n"
-		"\n"));
+	    "\n"
+	    "========================= "
+	    "Environmental Status "
+	    "========================="
+	    "\n"
+	    "\n"));
 
 	dak_env_print_temps(system_node);
 	dak_env_print_keyswitch(system_node);
@@ -683,25 +682,25 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 	picl_nodehdl_t	*ps_I_sensor[DAK_MAX_PS_VOLTAGE_SENSORS];
 	int32_t		volts[DAK_MAX_PS_VOLTAGE_SENSORS];
 	char		fault_state
-			    [DAK_MAX_PS_FAULT_SENSORS][PICL_PROPNAMELEN_MAX];
+	    [DAK_MAX_PS_FAULT_SENSORS][PICL_PROPNAMELEN_MAX];
 	char		ps_state[PICL_PROPNAMELEN_MAX];
 	/* Printing out the Power Supply Heading information */
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Power Supplies:\n"
-		"---------------\n"
-		"                                                    "
-		"Current Drain:\n"
-		"Supply     Status     Fan Fail  Temp Fail  CS Fail  "
-		"3.3V   5V   12V   48V\n"
-		"------  ------------  --------  ---------  "
-		"-------  ----   --   ---   ---\n"));
+	    "Power Supplies:\n"
+	    "---------------\n"
+	    "                                                    "
+	    "Current Drain:\n"
+	    "Supply     Status     Fan Fail  Temp Fail  CS Fail  "
+	    "3.3V   5V   12V   48V\n"
+	    "------  ------------  --------  ---------  "
+	    "-------  ----   --   ---   ---\n"));
 
 	err = fill_device_array_from_id(system_node, "PSVC_PS", &number,
 	    &ps);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"failed in fill_device_array_from_id for PS\n"
-			"%s\n"), picl_strerror(err));
+		    "failed in fill_device_array_from_id for PS\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 	/* Printing out the Power Supply Status information */
@@ -718,20 +717,20 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 			continue;
 		}
 		err = picl_get_propval_by_name(ps[i], "State", ps_state,
-			PICL_PROPNAMELEN_MAX);
+		    PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Error getting ps[%d]'s state: %s"),
-				i, picl_strerror(err));
+			    "Error getting ps[%d]'s state: %s"),
+			    i, picl_strerror(err));
 		}
 
 		err = fill_device_array_from_id(ps[i], "PSVC_DEV_FAULT_SENSOR",
-			&number, &ps_fail[i]);
+		    &number, &ps_fail[i]);
 
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed to get present PS fault sensors\n"
-				"%s\n"), picl_strerror(err));
+			    "failed to get present PS fault sensors\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 
@@ -740,8 +739,8 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 
 		if ((err != PICL_SUCCESS) && (err != PICL_INVALIDHANDLE)) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed to get present PS I sensors\n"
-				"%s\n"), picl_strerror(err));
+			    "failed to get present PS I sensors\n"
+			    "%s\n"), picl_strerror(err));
 		}
 
 		log_printf("%s", name);
@@ -759,23 +758,23 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 
 		for (r = 0; r < DAK_MAX_PS_FAULT_SENSORS; r++) {
 			err = picl_get_propval_by_name(ps_fail[i][r], "State",
-				fault_state[r], PICL_PROPNAMELEN_MAX);
+			    fault_state[r], PICL_PROPNAMELEN_MAX);
 			if (err == PICL_SUCCESS) {
 				fail =
 				    strcmp(fault_state[r], "OFF")
 				    + fail;
 			} else {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"picl_get_propval_by_name for ps "
-					"fault state failed\n"
-					"%s\n"), picl_strerror(err));
+				    "picl_get_propval_by_name for ps "
+				    "fault state failed\n"
+				    "%s\n"), picl_strerror(err));
 				return (err);
 			}
 		}
 		for (r = 0; r < DAK_MAX_PS_VOLTAGE_SENSORS; r++) {
 			err = picl_get_propval_by_name(ps_I_sensor[i][r],
-				"AtoDSensorValue", &volts[r],
-				sizeof (int32_t));
+			    "AtoDSensorValue", &volts[r],
+			    sizeof (int32_t));
 		}
 
 		if (fail != 0) {
@@ -783,7 +782,7 @@ dak_env_print_ps(picl_nodehdl_t system_node)
 			    "      FAIL      "));
 			for (r = 0; r < DAK_MAX_PS_FAULT_SENSORS; r++) {
 				log_printf(dgettext(TEXT_DOMAIN, "      %-4s"),
-					fault_state[r]);
+				    fault_state[r]);
 			}
 		} else {
 			log_printf(dgettext(TEXT_DOMAIN, "      GOOD      "));
@@ -813,25 +812,25 @@ dak_env_print_fans(picl_nodehdl_t system_node)
 	    &fans);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"failed in fill_device_array_from_id "
-			"for FAN\n"
-			"%s\n"), picl_strerror(err));
+		    "failed in fill_device_array_from_id "
+		    "for FAN\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 
 	log_printf("\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"=================================\n"));
+	    "=================================\n"));
 	log_printf("\n");
 	log_printf(dgettext(TEXT_DOMAIN, "Fan Bank :\n"));
 	log_printf(dgettext(TEXT_DOMAIN, "----------\n"));
 	log_printf("\n");
 	log_printf(dgettext(TEXT_DOMAIN, "Bank                        Speed "
-				"        Status        Fan State\n"));
+	    "        Status        Fan State\n"));
 	log_printf(dgettext(TEXT_DOMAIN, "                           ( RPMS )"
-				"	\n"));
+	    "	\n"));
 	log_printf(dgettext(TEXT_DOMAIN, "----                       --------"
-				"      ---------      ---------\n"));
+	    "      ---------      ---------\n"));
 
 
 	for (i = 0; i < DAK_MAX_FANS; i++) {
@@ -846,25 +845,25 @@ dak_env_print_fans(picl_nodehdl_t system_node)
 		}
 
 		err = picl_get_propval_by_name(fans[i], "Fan-speed",
-			&fan_speed, sizeof (int32_t));
+		    &fan_speed, sizeof (int32_t));
 		if ((err != PICL_SUCCESS) && (err != PICL_INVALIDHANDLE)) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed in picl_get_propval_by_name for "
-				"fan speed\n"
-				"%s\n"), picl_strerror(err));
+			    "failed in picl_get_propval_by_name for "
+			    "fan speed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 
 		if ((strcmp(name, "CPU0_PRIM_FAN") != 0) &&
-			(strcmp(name, "CPU1_PRIM_FAN") != 0)) {
+		    (strcmp(name, "CPU1_PRIM_FAN") != 0)) {
 			err = picl_get_propval_by_name(fans[i], "Fan-switch",
-				enabled, PICL_PROPNAMELEN_MAX);
+			    enabled, PICL_PROPNAMELEN_MAX);
 			if ((err != PICL_SUCCESS) &&
 			    (err != PICL_INVALIDHANDLE)) {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"failed in picl_get_propval_by_name for"
-					" fan enabled/disabled\n"
-					"%s\n"), picl_strerror(err));
+				    "failed in picl_get_propval_by_name for"
+				    " fan enabled/disabled\n"
+				    "%s\n"), picl_strerror(err));
 				return (err);
 			}
 			/*
@@ -873,34 +872,34 @@ dak_env_print_fans(picl_nodehdl_t system_node)
 			 */
 			if (strcmp(enabled, "ON") == 0) {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"\t     %4d        [ENABLED]"),
-					fan_speed);
+				    "\t     %4d        [ENABLED]"),
+				    fan_speed);
 			} else {
 				log_printf(dgettext(TEXT_DOMAIN,
-					"\t        0        [DISABLED]"));
+				    "\t        0        [DISABLED]"));
 			}
 
 		} else {
 			/* Display the fan's speed */
 			log_printf(dgettext(TEXT_DOMAIN, "\t     %4d"),
-				fan_speed);
+			    fan_speed);
 			log_printf(dgettext(TEXT_DOMAIN,
-				"        [ENABLED]"));
+			    "        [ENABLED]"));
 		}
 
 		err = picl_get_propval_by_name(fans[i], "State", fan_state,
-			PICL_PROPNAMELEN_MAX);
+		    PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name failed: %s"),
-				picl_strerror(err));
+			    "picl_get_propval_by_name failed: %s"),
+			    picl_strerror(err));
 			return (err);
 		}
 		log_printf(dgettext(TEXT_DOMAIN, "\t    %s\n"), fan_state);
 	}
 	log_printf("\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"=================================\n"));
+	    "=================================\n"));
 	log_printf("\n");
 
 	return (err);
@@ -919,18 +918,18 @@ dak_env_print_disk(picl_nodehdl_t system_node)
 	char		name[PICL_PROPNAMELEN_MAX];
 
 	err = fill_device_array_from_id(system_node, "PSVC_DISK", &number,
-		&disks);
+	    &disks);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"failed in fill_device_array_from_id for "
-			"DISK\n"
-			"%s\n"), picl_strerror(err));
+		    "failed in fill_device_array_from_id for "
+		    "DISK\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Disk Status:\n"
-		"	  Presence	Fault LED	Remove LED\n"));
+	    "Disk Status:\n"
+	    "	  Presence	Fault LED	Remove LED\n"));
 
 	for (i = 0; i < DAK_MAX_DISKS; i++) {
 		err = picl_get_propval_by_name(disks[i], PICL_PROP_NAME, name,
@@ -938,22 +937,22 @@ dak_env_print_disk(picl_nodehdl_t system_node)
 		switch (err) {
 		case PICL_SUCCESS:
 			log_printf(dgettext(TEXT_DOMAIN, "DISK  %2d: [%7s]"),
-				i, "PRESENT");
+			    i, "PRESENT");
 			break;
 		case PICL_INVALIDHANDLE:
 			log_printf(dgettext(TEXT_DOMAIN, "DISK  %2d: [%7s]"),
-				i, "EMPTY");
+			    i, "EMPTY");
 			log_printf("\n");
 			continue;
 		default:
 			log_printf(dgettext(TEXT_DOMAIN,
-				"Failed picl_get_propval_by_name for "
-				"disk %d with %s\n"), i, picl_strerror(err));
+			    "Failed picl_get_propval_by_name for "
+			    "disk %d with %s\n"), i, picl_strerror(err));
 			return (err);
 		}
 
 		err = fill_device_from_id(disks[i], "PSVC_PARENT",
-			&(disk_slots[i]));
+		    &(disk_slots[i]));
 		switch (err) {
 		case PICL_SUCCESS:
 			break;
@@ -961,9 +960,9 @@ dak_env_print_disk(picl_nodehdl_t system_node)
 			continue;
 		default:
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed in fill_device_from_id for disk "
-				"slot\n"
-				"%s\n"), picl_strerror(err));
+			    "failed in fill_device_from_id for disk "
+			    "slot\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 
@@ -971,43 +970,43 @@ dak_env_print_disk(picl_nodehdl_t system_node)
 		    &disk_fault_leds[i]);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed in fill_device_from_id for disk slot "
-				"fault led\n"
-				"%s\n"), picl_strerror(err));
+			    "failed in fill_device_from_id for disk slot "
+			    "fault led\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		err = picl_get_propval_by_name(disk_fault_leds[i],
-			"State", led_state, PICL_PROPNAMELEN_MAX);
+		    "State", led_state, PICL_PROPNAMELEN_MAX);
 		if (err == PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN, "	   [%3s]"),
-				led_state);
+			    led_state);
 		} else {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for fault led_state"
-				" failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for fault led_state"
+			    " failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		err = fill_device_from_id(disk_slots[i], "PSVC_SLOT_REMOVE_LED",
 		    &disk_remove_leds[i]);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"failed in fill_device_from_id for disk slot "
-				"remove led\n"
-				"%s\n"), picl_strerror(err));
+			    "failed in fill_device_from_id for disk slot "
+			    "remove led\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 
 		err = picl_get_propval_by_name(disk_remove_leds[i],
-			"State", led_state, PICL_PROPNAMELEN_MAX);
+		    "State", led_state, PICL_PROPNAMELEN_MAX);
 		if (err == PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"	   [%3s]"), led_state);
+			    "	   [%3s]"), led_state);
 		} else {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for remove"
-				" led_state failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for remove"
+			    " led_state failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		log_printf("\n");
@@ -1027,41 +1026,41 @@ dak_env_print_FSP_LEDS(picl_nodehdl_t system_node)
 	    &fsp_leds);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"failed in fill_device_array_from_id for "
-			"FSP_LED\n"
-			"%s\n"), picl_strerror(err));
+		    "failed in fill_device_array_from_id for "
+		    "FSP_LED\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System LED Status:\n"
-		"                   GEN FAULT                REMOVE\n"));
+	    "System LED Status:\n"
+	    "                   GEN FAULT                REMOVE\n"));
 	for (i = 0; i < DAK_MAX_FSP_LEDS; i++) {
 		err = picl_get_propval_by_name(fsp_leds[i], "State",
-			led_state, PICL_PROPNAMELEN_MAX);
+		    led_state, PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for led_state"
-				" failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for led_state"
+			    " failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 
 		log_printf(dgettext(TEXT_DOMAIN,
-			"                    [%3s]"), led_state);
+		    "                    [%3s]"), led_state);
 	}
 	log_printf("\n\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"                   DISK FAULT               "));
+	    "                   DISK FAULT               "));
 	log_printf(dgettext(TEXT_DOMAIN, "POWER FAULT\n"));
 	for (i = 2; i < 4; i++) {
 		err = picl_get_propval_by_name(fsp_leds[i], "State",
-			led_state, PICL_PROPNAMELEN_MAX);
+		    led_state, PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for led_state"
-				" failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for led_state"
+			    " failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		log_printf(dgettext(TEXT_DOMAIN, "                    [%3s]"),
@@ -1069,41 +1068,41 @@ dak_env_print_FSP_LEDS(picl_nodehdl_t system_node)
 	}
 	log_printf("\n\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"                   LEFT THERMAL FAULT       "
-		"RIGHT THERMAL FAULT\n"));
+	    "                   LEFT THERMAL FAULT       "
+	    "RIGHT THERMAL FAULT\n"));
 	for (i = 4; i < 6; i++) {
 		err = picl_get_propval_by_name(fsp_leds[i], "State",
 		    led_state, PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for led_state "
-				"failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for led_state "
+			    "failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		log_printf(dgettext(TEXT_DOMAIN, "                    [%3s]"),
-			led_state);
+		    led_state);
 	}
 	log_printf("\n\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"                   LEFT DOOR                "
-		"RIGHT DOOR\n"));
+	    "                   LEFT DOOR                "
+	    "RIGHT DOOR\n"));
 	for (i = 6; i < 8; i++) {
 		err = picl_get_propval_by_name(fsp_leds[i], "State",
 		    led_state, PICL_PROPNAMELEN_MAX);
 		if (err != PICL_SUCCESS) {
 			log_printf(dgettext(TEXT_DOMAIN,
-				"picl_get_propval_by_name for led_state"
-				" failed\n"
-				"%s\n"), picl_strerror(err));
+			    "picl_get_propval_by_name for led_state"
+			    " failed\n"
+			    "%s\n"), picl_strerror(err));
 			return (err);
 		}
 		log_printf(dgettext(TEXT_DOMAIN, "                    [%3s]"),
-			led_state);
+		    led_state);
 	}
 	log_printf("\n\n");
 	log_printf(dgettext(TEXT_DOMAIN,
-		"=================================\n"));
+	    "=================================\n"));
 	log_printf("\n");
 
 	return (err);
@@ -1121,27 +1120,27 @@ dak_env_print_keyswitch(picl_nodehdl_t system_node)
 	    &keyswitch);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"failed in fill_device_array_from_id for "
-			"	PSVC_KEYSWITCH\n"
-			"%s\n"), picl_strerror(err));
+		    "failed in fill_device_array_from_id for "
+		    "	PSVC_KEYSWITCH\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 
 	err = picl_get_propval_by_name(keyswitch[0], "State", ks_pos,
-		PICL_PROPNAMELEN_MAX);
+	    PICL_PROPNAMELEN_MAX);
 	if (err != PICL_SUCCESS) {
 		log_printf(dgettext(TEXT_DOMAIN,
-			"picl_get_propval_by_name for keyswitch state "
-			"failed\n"
-			"%s\n"), picl_strerror(err));
+		    "picl_get_propval_by_name for keyswitch state "
+		    "failed\n"
+		    "%s\n"), picl_strerror(err));
 		return (err);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"Front Status Panel:\n"
-		"-------------------\n"
-		"Keyswitch position: "
-		"%s\n"), ks_pos);
+	    "Front Status Panel:\n"
+	    "-------------------\n"
+	    "Keyswitch position: "
+	    "%s\n"), ks_pos);
 	log_printf("\n");
 
 	return (err);
@@ -1166,10 +1165,10 @@ dak_env_print_temps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System Temperatures (Celsius):\n"
-		"-------------------------------\n"
-		"Device\t\tTemperature\tStatus\n"
-		"---------------------------------------\n"));
+	    "System Temperatures (Celsius):\n"
+	    "-------------------------------\n"
+	    "Device\t\tTemperature\tStatus\n"
+	    "---------------------------------------\n"));
 
 	for (i = 0; i < number; i++) {
 		err = picl_get_propval_by_name(system_ts_nodes[i],
@@ -1201,7 +1200,7 @@ dak_env_print_temps(picl_nodehdl_t system_node)
 			*p = '\0';
 
 		err = picl_get_propval_by_name(system_ts_nodes[i],
-				"Temperature", &temp, sizeof (temp));
+		    "Temperature", &temp, sizeof (temp));
 		if (err != PICL_SUCCESS) {
 			log_printf("%s\n", picl_strerror(err));
 			return (err);
@@ -1210,7 +1209,7 @@ dak_env_print_temps(picl_nodehdl_t system_node)
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"\n=================================\n\n"));
+	    "\n=================================\n\n"));
 
 	return (PICL_SUCCESS);
 }
@@ -1222,25 +1221,25 @@ dak_display_hw_revisions(Prom_node *root, Board_node *bdlist)
 	char		*value;
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n"
-		"========================= HW Revisions "
-		"=======================================\n\n"));
+	    "========================= HW Revisions "
+	    "=======================================\n\n"));
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System PROM revisions:\n"
-		"----------------------\n"));
+	    "System PROM revisions:\n"
+	    "----------------------\n"));
 
 	pnode = dev_find_node(root, "openprom");
 	if (pnode != NULL) {
-	    value = (char *)get_prop_val(find_prop(pnode, "version"));
-	    log_printf(value);
+		value = (char *)get_prop_val(find_prop(pnode, "version"));
+		log_printf(value);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n\n"
-		"IO ASIC revisions:\n"
-		"------------------\n"
-		"         Port\n"
-		"Model     ID  Status Version\n"
-		"-------- ---- ------ -------\n"));
+	    "IO ASIC revisions:\n"
+	    "------------------\n"
+	    "         Port\n"
+	    "Model     ID  Status Version\n"
+	    "-------- ---- ------ -------\n"));
 
 	display_schizo_revisions(bdlist);
 }
@@ -1267,16 +1266,16 @@ display_schizo_revisions(Board_node *bdlist)
 		 * search this board node for all Schizos
 		 */
 		for (pnode = dev_find_node_by_compat(bnode->nodes,
-			SCHIZO_COMPAT_PROP); pnode != NULL;
-			pnode = dev_next_node_by_compat(pnode,
-			    SCHIZO_COMPAT_PROP)) {
+		    SCHIZO_COMPAT_PROP); pnode != NULL;
+		    pnode = dev_next_node_by_compat(pnode,
+		    SCHIZO_COMPAT_PROP)) {
 
 			/*
 			 * get the reg property to determine
 			 * whether we are looking at side A or B
 			 */
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "reg"));
+			    (find_prop(pnode, "reg"));
 			if (int_val != NULL) {
 				int_val ++; /* second integer in array */
 				pci_bus = ((*int_val) & 0x7f0000);
@@ -1284,7 +1283,7 @@ display_schizo_revisions(Board_node *bdlist)
 
 			/* get portid */
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "portid"));
+			    (find_prop(pnode, "portid"));
 			if (int_val == NULL)
 				continue;
 
@@ -1316,14 +1315,14 @@ display_schizo_revisions(Board_node *bdlist)
 			prev_portid = portid;
 
 			int_val = (int *)get_prop_val
-				(find_prop(pnode, "version#"));
+			    (find_prop(pnode, "version#"));
 			if (int_val != NULL)
 				revision = *int_val;
 			else
 				revision = -1;
 
 			status_a = (char *)get_prop_val(find_prop
-				(pnode, "status"));
+			    (pnode, "status"));
 
 			log_printf(dgettext(TEXT_DOMAIN, "Schizo    "));
 
@@ -1331,8 +1330,8 @@ display_schizo_revisions(Board_node *bdlist)
 
 
 			log_printf((status_a == NULL && status_b == NULL) ?
-				dgettext(TEXT_DOMAIN, "  ok  ") :
-				dgettext(TEXT_DOMAIN, " fail "));
+			    dgettext(TEXT_DOMAIN, "  ok  ") :
+			    dgettext(TEXT_DOMAIN, " fail "));
 
 			log_printf(dgettext(TEXT_DOMAIN, " %4d   "),
 			    revision);

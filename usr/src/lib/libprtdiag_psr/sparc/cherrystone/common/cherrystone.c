@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ void
 display_cpus(Board_node *board)
 {
 	Prom_node 	*cpu;
-	int freq;
+	uint_t freq;
 	int ecache_size;
 	int *l3_shares;
 	int *mid;
@@ -192,7 +192,7 @@ display_cpus(Board_node *board)
 			log_printf("   %2d   ", *mid);
 
 		/* Running frequency */
-		log_printf("%4d", freq);
+		log_printf("%4u", freq);
 
 		if (ecache_size == 0)
 			log_printf(" N/A  ");

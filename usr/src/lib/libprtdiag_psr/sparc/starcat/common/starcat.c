@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Starcat Platform specific functions.
@@ -162,14 +161,14 @@ display_pci(Board_node *board)
 		}
 
 		if (strstr((char *)get_prop_val(
-			find_prop(pci, "compatible")), XMITS_COMPATIBLE)) {
-				sprintf(card.notes, "%s", XMITS_COMPATIBLE);
+		    find_prop(pci, "compatible")), XMITS_COMPATIBLE)) {
+			sprintf(card.notes, "%s", XMITS_COMPATIBLE);
 			/*
 			 * With XMITS 3.X and PCI-X mode, the bus speed
 			 * can be higher than 66MHZ.
 			 */
 			value = (int *)get_prop_val
-				(find_prop(pci, "module-revision#"));
+			    (find_prop(pci, "module-revision#"));
 			if (value) {
 				pversion = (int *)value;
 				version = *pversion;
@@ -177,7 +176,7 @@ display_pci(Board_node *board)
 					board_bus_max_freq = PCIX_MAX_FREQ;
 			}
 		} else if (strstr((char *)get_prop_val(
-			find_prop(pci, "compatible")), SCHIZO_COMPATIBLE))
+		    find_prop(pci, "compatible")), SCHIZO_COMPATIBLE))
 			sprintf(card.notes, "%s", SCHIZO_COMPATIBLE);
 		else
 			sprintf(card.notes, " ");
@@ -195,7 +194,7 @@ display_pci(Board_node *board)
 			 * card, so check the child node for slot-names property
 			 */
 			value = (char *)get_prop_val(
-				find_prop(pci->child, "slot-names"));
+			    find_prop(pci->child, "slot-names"));
 		}
 
 		if (value != NULL) {
@@ -234,7 +233,7 @@ display_pci(Board_node *board)
 
 			/* If it doesn't have a name, skip it */
 			name = (char *)get_prop_val(
-						find_prop(card_node, "name"));
+			    find_prop(card_node, "name"));
 			if (name == NULL) {
 				card_node = card_node->sibling;
 				continue;
@@ -245,7 +244,7 @@ display_pci(Board_node *board)
 			 * 'reg' property.
 			 */
 			int_val = (int *)get_prop_val(
-				find_prop(card_node, "reg"));
+			    find_prop(card_node, "reg"));
 			if (int_val != NULL) {
 				card.dev_no = (((*int_val) & 0xF800) >> 11);
 				card.func_no = (((*int_val) & 0x700) >> 8);
@@ -267,10 +266,10 @@ display_pci(Board_node *board)
 			 * IO Boards using the name and type properties.
 			 */
 			type = (char *)get_prop_val(
-					find_prop(card_node, "device_type"));
+			    find_prop(card_node, "device_type"));
 			if ((type != NULL) &&
-				(strncmp(name, "pci", 3) == 0) &&
-				(strcmp(type, "pci") == 0)) {
+			    (strncmp(name, "pci", 3) == 0) &&
+			    (strcmp(type, "pci") == 0)) {
 				pci_bridge_dev_no = card.dev_no;
 				pci_bridge_node = card_node;
 				pci_bridge = TRUE;
@@ -330,10 +329,10 @@ display_pci(Board_node *board)
 
 #ifdef	DEBUG
 			(void) sprintf(card.notes, "%s portid [%d]"
-				" dev_no [%d] slot_name[%s] name_bits[%#x]",
-				card.notes, portid, card.dev_no,
-				((slot_name != NULL) ? slot_name : "NULL"),
-				slot_name_bits);
+			    " dev_no [%d] slot_name[%s] name_bits[%#x]",
+			    card.notes, portid, card.dev_no,
+			    ((slot_name != NULL) ? slot_name : "NULL"),
+			    slot_name_bits);
 #endif	/* DEBUG */
 
 			/*
@@ -341,7 +340,7 @@ display_pci(Board_node *board)
 			 * using the 'reg' property.
 			 */
 			int_val = (int *)get_prop_val
-				(find_prop(pci, "reg"));
+			    (find_prop(pci, "reg"));
 
 			if (int_val != NULL) {
 				int_val ++; /* skip over first integer */
@@ -393,7 +392,7 @@ display_pci(Board_node *board)
 			 *
 			 */
 			int_val = get_prop_val(find_prop(pci,
-							"clock-frequency"));
+			    "clock-frequency"));
 			if (int_val != NULL) {
 				card.freq = HZ_TO_MHZ(*int_val);
 			} else {
@@ -404,11 +403,11 @@ display_pci(Board_node *board)
 			 * Figure out how we want to display the name
 			 */
 			value = get_prop_val(find_prop(card_node,
-							"compatible"));
+			    "compatible"));
 			if (value != NULL) {
 				/* use 'name'-'compatible' */
 				(void) sprintf(buf, "%s-%s", name,
-					(char *)value);
+				    (char *)value);
 			} else {
 				/* just use 'name' */
 				(void) sprintf(buf, "%s", name);
@@ -421,18 +420,18 @@ display_pci(Board_node *board)
 			 */
 			child_name = (char *)get_node_name(card_node->child);
 			if ((card_node->child != NULL) &&
-							(child_name != NULL)) {
+			    (child_name != NULL)) {
 				value = get_prop_val(find_prop(card_node->child,
-								"device_type"));
+				    "device_type"));
 				if (value != NULL) {
 					/* add device_type of child to name */
 					(void) sprintf(card.name, "%s/%s (%s)",
-						name, child_name,
-						(char *)value);
+					    name, child_name,
+					    (char *)value);
 				} else {
 					/* just add child's name */
 					(void) sprintf(card.name, "%s/%s",
-						name, child_name);
+					    name, child_name);
 				}
 			} else {
 				/* childless, just the card's name */
@@ -446,10 +445,10 @@ display_pci(Board_node *board)
 			if (pci_bridge) {
 				if (card.model[0] == '\0')
 					(void) sprintf(card.model,
-						"%s", "pci-bridge");
+					    "%s", "pci-bridge");
 				else
 					(void) strcat(card.model,
-							"/pci-bridge");
+					    "/pci-bridge");
 			}
 
 			/* insert this card in the list to be displayed later */
@@ -481,7 +480,7 @@ display_pci(Board_node *board)
 				 * otherwise we move onto our own sibling.
 				 */
 				if ((card_node->parent == pci_bridge_node) &&
-					(card_node->sibling == NULL))
+				    (card_node->sibling == NULL))
 					card_node =
 					    pci_bridge_node->sibling;
 				else
@@ -567,11 +566,11 @@ void
 display_io_cards(struct io_card *list)
 {
 	char	*hdrfmt = "%-10.10s  %-4.4s %-4.4s %-4.4s %-4.4s %-4.4s"
-			" %-4.4s %-5.5s %-32.32s  %-22.22s"
+	    " %-4.4s %-5.5s %-32.32s  %-22.22s"
 #ifdef	DEBUG
-			"  %-22.22s"
+	    "  %-22.22s"
 #endif	/* DEBUG */
-			"\n";
+	    "\n";
 
 	static int banner = FALSE; /* Have we printed the column headings? */
 	struct io_card *p;
@@ -656,15 +655,15 @@ display_io_slot_info(struct io_card *p)
 
 	if (p->slot_str[0] == '-') {
 		log_printf("/%-2s%02d       ",
-			SC_BOARD_TYPE(p->board),
-			PORTID_TO_EXPANDER(p->board), 0);
+		    SC_BOARD_TYPE(p->board),
+		    PORTID_TO_EXPANDER(p->board), 0);
 	} else {
 		char	c;
 		if (strcmp(p->notes, XMITS_COMPATIBLE) == 0) {
 			log_printf("/%-2s%02d/%s  ",
-				SC_BOARD_TYPE(p->board),
-				PORTID_TO_EXPANDER(p->board),
-				p->slot_str, 0);
+			    SC_BOARD_TYPE(p->board),
+			    PORTID_TO_EXPANDER(p->board),
+			    p->slot_str, 0);
 		} else {
 			if (p->pci_bus == 'A')
 				c = '3';
@@ -673,10 +672,10 @@ display_io_slot_info(struct io_card *p)
 			} else
 				c = '-';
 			log_printf("/%-2s%02d/C%cV%1d  ",
-				SC_BOARD_TYPE(p->board),
-				PORTID_TO_EXPANDER(p->board), c,
-				PORTID_TO_INSTANCE(p->schizo_portid),
-				0);
+			    SC_BOARD_TYPE(p->board),
+			    PORTID_TO_EXPANDER(p->board), c,
+			    PORTID_TO_INSTANCE(p->schizo_portid),
+			    0);
 		}
 	}
 	log_printf("%-4.4s ", gettext(p->bus_type), 0);
@@ -713,9 +712,9 @@ display_io_max_bus_speed(struct io_card *p)
 	log_printf("%-1d,%-1d  ", p->dev_no, p->func_no, 0);
 	log_printf("%-5.5s ", gettext(p->status), 0);
 	log_printf("%-32.32s%c ", p->name,
-		((strlen(p->name) > 32) ? '+' : ' '), 0);
+	    ((strlen(p->name) > 32) ? '+' : ' '), 0);
 	log_printf("%-22.22s%c", p->model,
-		((strlen(p->model) > 22) ? '+' : ' '), 0);
+	    ((strlen(p->model) > 22) ? '+' : ' '), 0);
 #ifdef	DEBUG
 	log_printf(" %s", p->notes, 0);
 #endif	/* DEBUG */
@@ -775,7 +774,7 @@ void
 display_cpus(Board_node *board)
 {
 	Prom_node *cpu;
-	int freq;		/* CPU clock frequency */
+	uint_t freq;		/* CPU clock frequency */
 	int ecache_size;	/* External cache size */
 	int *impl;
 	int *mask;
@@ -807,7 +806,7 @@ display_cpus(Board_node *board)
 
 		if (CPU_IMPL_IS_CMP(*impl)) {
 			coreid = (int *)get_prop_val(find_prop(cpu,
-				    "reg"));
+			    "reg"));
 			if (coreid == NULL) {
 				continue;
 			}
@@ -857,33 +856,33 @@ display_cpus(Board_node *board)
 			log_printf("%3d      ", *cpuid, 0);
 
 		/* Running frequency */
-		log_printf("%4d  ", freq, 0);
+		log_printf("%4u  ", freq, 0);
 
 		/* Ecache size */
 		if (ecache_size == 0)
 			log_printf("%-4.4s  ", gettext("N/A"), 0);
 		else
 			log_printf("%4.1f  ",
-				(float)ecache_size / (float)(1<<20),
-				0);
+			    (float)ecache_size / (float)(1<<20),
+			    0);
 
 		/* Implementation */
 		switch (*impl) {
 		case CHEETAH_IMPL:
 			log_printf("%-7.7s  ",
-				gettext("US-III"), 0);
+			    gettext("US-III"), 0);
 			break;
 		case CHEETAH_PLUS_IMPL:
 			log_printf("%-7.7s  ",
-				gettext("US-III+"), 0);
+			    gettext("US-III+"), 0);
 			break;
 		case JAGUAR_IMPL:
 			log_printf("%-7.7s  ",
-				gettext("US-IV"), 0);
+			    gettext("US-IV"), 0);
 			break;
 		case PANTHER_IMPL:
 			log_printf("%-7.7s  ",
-				gettext("US-IV+"), 0);
+			    gettext("US-IV+"), 0);
 			break;
 		default:
 			log_printf("%-7x  ", *impl, 0);
@@ -900,8 +899,8 @@ display_cpus(Board_node *board)
 				decoded_mask = *mask;
 
 			log_printf("%d.%d",
-				(decoded_mask >> 4) & 0xf,
-				decoded_mask & 0xf, 0);
+			    (decoded_mask >> 4) & 0xf,
+			    decoded_mask & 0xf, 0);
 		}
 
 		log_printf("\n", 0);
@@ -915,7 +914,7 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 {
 	Board_node	*bnode = tree->bd_list;
 	char	*hdrfmt = "\n%-11.11s  %-4.4s  %-7.7s  %-7.7s  %-8.8s  %-6.6s"
-			"  %-10.10s  %-10.10s";
+	    "  %-10.10s  %-10.10s";
 
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -958,9 +957,9 @@ display_memoryconf(Sys_tree *tree, struct grp_info *grps)
 	while (bnode != NULL) {
 		if (get_us3_mem_regs(bnode)) {
 			log_printf(
-				gettext(
-				    "\nFailed to get memory information.\n"),
-				    0);
+			    gettext(
+			    "\nFailed to get memory information.\n"),
+			    0);
 			return;
 		}
 		bnode = bnode->next;
@@ -1034,8 +1033,8 @@ display_diaginfo(int flag, Prom_node *root, Sys_tree *tree,
 		log_printf(gettext("For diagnostic information,"), 0);
 		log_printf("\n", 0);
 		log_printf(gettext(
-			"see /var/opt/SUNWSMS/adm/[A-R]/messages on the SC."),
-			0);
+		    "see /var/opt/SUNWSMS/adm/[A-R]/messages on the SC."),
+		    0);
 		log_printf("\n", 0);
 
 		/* Print the PROM revisions here */

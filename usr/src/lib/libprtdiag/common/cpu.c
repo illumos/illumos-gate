@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,15 +88,15 @@ get_ecache_size(Prom_node *node)
 
 	/* find the properties */
 	if (cache_size_p = (int *)get_prop_val(find_prop(node,
-		"ecache-size"))) {
+	    "ecache-size"))) {
 		return (*cache_size_p);
 	}
 	if (cache_size_p = (int *)get_prop_val(find_prop(node,
-		"l3-cache-size"))) {
+	    "l3-cache-size"))) {
 		return (*cache_size_p);
 	}
 	if (cache_size_p = (int *)get_prop_val(find_prop(node,
-		"l2-cache-size"))) {
+	    "l2-cache-size"))) {
 		return (*cache_size_p);
 	}
 
@@ -125,11 +125,11 @@ display_cpu_devices(Sys_tree *tree)
 	log_printf("\n", 0);
 	log_printf("\n", 0);
 	log_printf("                    Run   Ecache  "
-		" CPU    CPU\n", 0);
+	    " CPU    CPU\n", 0);
 	log_printf("Brd  CPU   Module   MHz     MB    "
-		"Impl.   Mask\n", 0);
+	    "Impl.   Mask\n", 0);
 	log_printf("---  ---  -------  -----  ------  "
-		"------  ----\n", 0);
+	    "------  ----\n", 0);
 
 	/* Now display all of the cpus on each board */
 	bnode = tree->bd_list;
@@ -155,7 +155,7 @@ display_cpus(Board_node *board)
 	 */
 	for (cpu = dev_find_type(board->nodes, "cpu"); cpu != NULL;
 	    cpu = dev_next_type(cpu, "cpu")) {
-		int freq;	 /* CPU clock frequency */
+		uint_t freq;	 /* CPU clock frequency */
 		int ecache_size; /* External cache size */
 		int *mid;
 		int *impl;
@@ -183,15 +183,15 @@ display_cpus(Board_node *board)
 			display_mid(*mid);
 
 			/* Running frequency */
-			log_printf(" %3d   ", freq, 0);
+			log_printf(" %3u   ", freq, 0);
 
 			/* Ecache size */
 			if (ecache_size == 0)
 				log_printf(" %3s    ", "N/A", 0);
 			else
 				log_printf(" %4.1f   ",
-					(float)ecache_size / (float)(1<<20),
-					0);
+				    (float)ecache_size / (float)(1<<20),
+				    0);
 
 			/* Implementation */
 			if (impl == NULL) {
@@ -225,12 +225,12 @@ display_cpus(Board_node *board)
 			} else {
 				if ((impl) && IS_CHEETAH(*impl))
 					decoded_mask =
-						REMAP_CHEETAH_MASK(*mask);
+					    REMAP_CHEETAH_MASK(*mask);
 				else
 					decoded_mask = *mask;
 
 				log_printf(" %d.%d", (decoded_mask >> 4) & 0xf,
-					decoded_mask & 0xf, 0);
+				    decoded_mask & 0xf, 0);
 			}
 
 			log_printf("\n", 0);
