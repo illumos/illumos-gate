@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -46,12 +46,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-#define	E1000_RX_INTPT_TIME	128
-#define	E1000_RX_PKT_CNT	8
-
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.3";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.4";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.3";
+static char e1000g_version[] = "Driver Ver. 5.2.4";
 
 /*
  * Proto types for DDI entry points
@@ -68,6 +65,8 @@ static uint_t e1000g_intr_pciexpress(caddr_t);
 static uint_t e1000g_intr(caddr_t);
 static void e1000g_intr_work(struct e1000g *, uint32_t);
 #pragma inline(e1000g_intr_work)
+static uint32_t e1000g_get_itr(uint32_t, uint32_t, uint32_t);
+#pragma inline(e1000g_get_itr)
 static int e1000g_init(struct e1000g *);
 static int e1000g_start(struct e1000g *, boolean_t);
 static void e1000g_stop(struct e1000g *, boolean_t);
@@ -81,8 +80,6 @@ static int e1000g_m_unicst_remove(void *, mac_addr_slot_t);
 static int e1000g_m_unicst_modify(void *, mac_multi_addr_t *);
 static int e1000g_m_unicst_get(void *, mac_multi_addr_t *);
 static int e1000g_m_multicst(void *, boolean_t, const uint8_t *);
-static void e1000g_m_blank(void *, time_t, uint32_t);
-static void e1000g_m_resources(void *);
 static void e1000g_m_ioctl(void *, queue_t *, mblk_t *);
 static void e1000g_init_locks(struct e1000g *);
 static void e1000g_destroy_locks(struct e1000g *);
@@ -202,7 +199,7 @@ static ddi_device_acc_attr_t e1000g_regs_acc_attr = {
 	DDI_FLAGERR_ACC
 };
 
-#define	E1000G_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+#define	E1000G_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
 
 static mac_callbacks_t e1000g_m_callbacks = {
 	E1000G_M_CALLBACK_FLAGS,
@@ -213,7 +210,7 @@ static mac_callbacks_t e1000g_m_callbacks = {
 	e1000g_m_multicst,
 	e1000g_m_unicst,
 	e1000g_m_tx,
-	e1000g_m_resources,
+	NULL,
 	e1000g_m_ioctl,
 	e1000g_m_getcapab
 };
@@ -221,7 +218,6 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
-
 uint32_t e1000g_mblks_pending = 0;
 /*
  * Workaround for Dynamic Reconfiguration support, for x86 platform only.
@@ -467,15 +463,6 @@ e1000g_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	e1000g_init_locks(Adapter);
 	Adapter->attach_progress |= ATTACH_PROGRESS_LOCKS;
-
-	Adapter->tx_softint_pri = DDI_INTR_SOFTPRI_MAX;
-	if (ddi_intr_add_softint(devinfo,
-	    &Adapter->tx_softint_handle, Adapter->tx_softint_pri,
-	    e1000g_tx_softint_worker, (caddr_t)Adapter) != DDI_SUCCESS) {
-		e1000g_log(Adapter, CE_WARN, "Add soft intr failed");
-		goto attach_fail;
-	}
-	Adapter->attach_progress |= ATTACH_PROGRESS_SOFT_INTR;
 
 	/*
 	 * Initialize Driver Counters
@@ -831,13 +818,17 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	/* The initial link state should be "unknown" */
 	Adapter->link_state = LINK_STATE_UNKNOWN;
 
+	/* Initialize rx parameters */
+	Adapter->rx_intr_delay = DEFAULT_RX_INTR_DELAY;
+	Adapter->rx_intr_abs_delay = DEFAULT_RX_INTR_ABS_DELAY;
+
 	/* Initialize tx parameters */
 	Adapter->tx_intr_enable = DEFAULT_TX_INTR_ENABLE;
 	Adapter->tx_bcopy_thresh = DEFAULT_TX_BCOPY_THRESHOLD;
+	Adapter->tx_intr_delay = DEFAULT_TX_INTR_DELAY;
+	Adapter->tx_intr_abs_delay = DEFAULT_TX_INTR_ABS_DELAY;
 
 	tx_ring = Adapter->tx_ring;
-	tx_ring->recycle_low_water = DEFAULT_TX_RECYCLE_LOW_WATER;
-	tx_ring->recycle_num = DEFAULT_TX_RECYCLE_NUM;
 	tx_ring->frags_limit =
 	    (hw->mac.max_frame_size / Adapter->tx_bcopy_thresh) + 2;
 	if (tx_ring->frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
@@ -994,10 +985,6 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 		(void) e1000g_rem_intrs(Adapter);
 	}
 
-	if (Adapter->attach_progress & ATTACH_PROGRESS_SOFT_INTR) {
-		(void) ddi_intr_remove_softint(Adapter->tx_softint_handle);
-	}
-
 	if (Adapter->attach_progress & ATTACH_PROGRESS_SETUP) {
 		(void) ddi_prop_remove_all(devinfo);
 	}
@@ -1066,13 +1053,9 @@ e1000g_init_locks(struct e1000g *Adapter)
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 	mutex_init(&tx_ring->freelist_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
-	mutex_init(&tx_ring->mblks_lock, NULL,
-	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 
 	rx_ring = Adapter->rx_ring;
 
-	mutex_init(&rx_ring->rx_lock, NULL,
-	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 	mutex_init(&rx_ring->freelist_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 }
@@ -1087,10 +1070,8 @@ e1000g_destroy_locks(struct e1000g *Adapter)
 	mutex_destroy(&tx_ring->tx_lock);
 	mutex_destroy(&tx_ring->usedlist_lock);
 	mutex_destroy(&tx_ring->freelist_lock);
-	mutex_destroy(&tx_ring->mblks_lock);
 
 	rx_ring = Adapter->rx_ring;
-	mutex_destroy(&rx_ring->rx_lock);
 	mutex_destroy(&rx_ring->freelist_lock);
 
 	mutex_destroy(&Adapter->link_lock);
@@ -1309,7 +1290,10 @@ e1000g_init(struct e1000g *Adapter)
 	e1000_reset_adaptive(hw);
 
 	/* Setup Interrupt Throttling Register */
-	E1000_WRITE_REG(hw, E1000_ITR, Adapter->intr_throttling_rate);
+	if (hw->mac.type >= e1000_82540) {
+		E1000_WRITE_REG(hw, E1000_ITR, Adapter->intr_throttling_rate);
+	} else
+		Adapter->intr_adaptive = B_FALSE;
 
 	/* Start the timer for link setup */
 	if (hw->mac.autoneg)
@@ -1466,42 +1450,6 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	}
 }
 
-static void e1000g_m_blank(void *arg, time_t ticks, uint32_t count)
-{
-	struct e1000g *Adapter;
-
-	Adapter = (struct e1000g *)arg;
-
-	/*
-	 * Adjust ITR (Interrupt Throttling Register) to coalesce
-	 * interrupts. This formula and its coefficient come from
-	 * our experiments.
-	 */
-	if (Adapter->intr_adaptive) {
-		Adapter->intr_throttling_rate = count << 5;
-		E1000_WRITE_REG(&Adapter->shared, E1000_ITR,
-		    Adapter->intr_throttling_rate);
-	}
-
-	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
-		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
-}
-
-static void
-e1000g_m_resources(void *arg)
-{
-	struct e1000g *adapter = (struct e1000g *)arg;
-	mac_rx_fifo_t mrf;
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = e1000g_m_blank;
-	mrf.mrf_arg = (void *)adapter;
-	mrf.mrf_normal_blank_time = E1000_RX_INTPT_TIME;
-	mrf.mrf_normal_pkt_count = E1000_RX_PKT_CNT;
-
-	adapter->mrh = mac_resource_add(adapter->mh, (mac_resource_t *)&mrf);
-}
-
 static int
 e1000g_m_start(void *arg)
 {
@@ -1544,8 +1492,6 @@ e1000g_start(struct e1000g *Adapter, boolean_t global)
 	msec_delay(5);
 
 	e1000g_mask_interrupt(Adapter);
-	if (Adapter->tx_intr_enable)
-		e1000g_mask_tx_interrupt(Adapter);
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		rw_exit(&Adapter->chip_lock);
@@ -1669,19 +1615,8 @@ e1000g_tx_clean(struct e1000g *Adapter)
 		    QUEUE_GET_NEXT(&tx_ring->used_list, &packet->Link);
 	}
 
-	if (mp != NULL) {
-		mutex_enter(&tx_ring->mblks_lock);
-		if (tx_ring->mblks.head == NULL) {
-			tx_ring->mblks.head = mp;
-			tx_ring->mblks.tail = nmp;
-		} else {
-			tx_ring->mblks.tail->b_next = mp;
-			tx_ring->mblks.tail = nmp;
-		}
-		mutex_exit(&tx_ring->mblks_lock);
-	}
-
-	ddi_intr_trigger_softint(Adapter->tx_softint_handle, NULL);
+	if (mp != NULL)
+		freemsgchain(mp);
 
 	if (packet_count > 0) {
 		QUEUE_APPEND(&tx_ring->free_list, &tx_ring->used_list);
@@ -1862,6 +1797,14 @@ e1000g_intr(caddr_t arg)
 static void
 e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 {
+	struct e1000_hw *hw;
+	hw = &Adapter->shared;
+	e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
+	uint32_t itr;
+
+	Adapter->rx_pkt_cnt = 0;
+	Adapter->tx_pkt_cnt = 0;
+
 	rw_enter(&Adapter->chip_lock, RW_READER);
 	/*
 	 * Here we need to check the "chip_state" flag within the chip_lock to
@@ -1876,9 +1819,7 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	if (icr & E1000_ICR_RXT0) {
 		mblk_t *mp;
 
-		mutex_enter(&Adapter->rx_ring->rx_lock);
 		mp = e1000g_receive(Adapter);
-		mutex_exit(&Adapter->rx_ring->rx_lock);
 
 		rw_exit(&Adapter->chip_lock);
 
@@ -1886,6 +1827,34 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 			mac_rx(Adapter->mh, Adapter->mrh, mp);
 	} else
 		rw_exit(&Adapter->chip_lock);
+
+	if (icr & E1000_ICR_TXDW) {
+		if (!Adapter->tx_intr_enable)
+			e1000g_clear_tx_interrupt(Adapter);
+
+		/* Recycle the tx descriptors */
+		rw_enter(&Adapter->chip_lock, RW_READER);
+		e1000g_recycle(tx_ring);
+		E1000G_DEBUG_STAT(tx_ring->stat_recycle_intr);
+		rw_exit(&Adapter->chip_lock);
+
+		/* Schedule the re-transmit */
+		if (tx_ring->resched_needed &&
+		    (tx_ring->tbd_avail > DEFAULT_TX_UPDATE_THRESHOLD)) {
+			tx_ring->resched_needed = B_FALSE;
+			mac_tx_update(Adapter->mh);
+			E1000G_STAT(tx_ring->stat_reschedule);
+		}
+	}
+
+	if (Adapter->intr_adaptive) {
+		itr = e1000g_get_itr(Adapter->rx_pkt_cnt, Adapter->tx_pkt_cnt,
+		    Adapter->intr_throttling_rate);
+		if (itr) {
+			E1000_WRITE_REG(hw, E1000_ITR, itr);
+			Adapter->intr_throttling_rate = itr;
+		}
+	}
 
 	/*
 	 * The Receive Sequence errors RXSEQ and the link status change LSC
@@ -1949,29 +1918,40 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 
 		start_watchdog_timer(Adapter);
 	}
+}
 
-	if (icr & E1000G_ICR_TX_INTR) {
-		e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
+static uint32_t
+e1000g_get_itr(uint32_t rx_packet, uint32_t tx_packet, uint32_t cur_itr)
+{
+	uint32_t new_itr;
 
-		if (!Adapter->tx_intr_enable)
-			e1000g_clear_tx_interrupt(Adapter);
-		/* Schedule the re-transmit */
-		if (tx_ring->resched_needed) {
-			E1000G_STAT(tx_ring->stat_reschedule);
-			tx_ring->resched_needed = B_FALSE;
-			mac_tx_update(Adapter->mh);
-		}
-		if (Adapter->tx_intr_enable) {
-			/* Recycle the tx descriptors */
-			rw_enter(&Adapter->chip_lock, RW_READER);
-			E1000G_DEBUG_STAT(tx_ring->stat_recycle_intr);
-			e1000g_recycle(tx_ring);
-			rw_exit(&Adapter->chip_lock);
-			/* Free the recycled messages */
-			ddi_intr_trigger_softint(Adapter->tx_softint_handle,
-			    NULL);
-		}
+	/*
+	 * Determine a propper itr according to rx/tx packet count
+	 * per interrupt, the value of itr are based on document
+	 * and testing.
+	 */
+	if ((rx_packet < DEFAULT_INTR_PACKET_LOW) ||
+	    (tx_packet < DEFAULT_INTR_PACKET_LOW)) {
+		new_itr = DEFAULT_INTR_THROTTLING_LOW;
+		goto itr_done;
 	}
+	if ((rx_packet > DEFAULT_INTR_PACKET_HIGH) ||
+	    (tx_packet > DEFAULT_INTR_PACKET_HIGH)) {
+		new_itr = DEFAULT_INTR_THROTTLING_LOW;
+		goto itr_done;
+	}
+	if (cur_itr < DEFAULT_INTR_THROTTLING_HIGH) {
+		new_itr = cur_itr + (DEFAULT_INTR_THROTTLING_HIGH >> 2);
+		if (new_itr > DEFAULT_INTR_THROTTLING_HIGH)
+			new_itr = DEFAULT_INTR_THROTTLING_HIGH;
+	} else
+		new_itr = DEFAULT_INTR_THROTTLING_HIGH;
+
+itr_done:
+	if (cur_itr == new_itr)
+		return (0);
+	else
+		return (new_itr);
 }
 
 static void
@@ -2698,6 +2678,22 @@ e1000g_get_conf(struct e1000g *Adapter)
 	Adapter->intr_adaptive =
 	    (e1000g_get_prop(Adapter, "intr_adaptive", 0, 1, 1) == 1) ?
 	    B_TRUE : B_FALSE;
+
+	/*
+	 * Tx recycle threshold
+	 */
+	Adapter->tx_recycle_thresh =
+	    e1000g_get_prop(Adapter, "tx_recycle_thresh",
+	    MIN_TX_RECYCLE_THRESHOLD, MAX_TX_RECYCLE_THRESHOLD,
+	    DEFAULT_TX_RECYCLE_THRESHOLD);
+
+	/*
+	 * Tx recycle descriptor number
+	 */
+	Adapter->tx_recycle_num =
+	    e1000g_get_prop(Adapter, "tx_recycle_num",
+	    MIN_TX_RECYCLE_NUM, MAX_TX_RECYCLE_NUM,
+	    DEFAULT_TX_RECYCLE_NUM);
 }
 
 /*
@@ -2862,8 +2858,6 @@ e1000g_local_timer(void *ws)
 			    DDI_SERVICE_LOST);
 		return;
 	}
-
-	(void) e1000g_tx_freemsg(Adapter->tx_ring);
 
 	if (e1000g_stall_check(Adapter)) {
 		E1000G_DEBUGLOG_0(Adapter, E1000G_INFO_LEVEL,
@@ -3214,7 +3208,10 @@ void
 e1000g_mask_interrupt(struct e1000g *Adapter)
 {
 	E1000_WRITE_REG(&Adapter->shared, E1000_IMS,
-	    IMS_ENABLE_MASK & ~E1000_IMS_TXDW & ~E1000_IMS_TXQE);
+	    IMS_ENABLE_MASK & ~E1000_IMS_TXDW);
+
+	if (Adapter->tx_intr_enable)
+		e1000g_mask_tx_interrupt(Adapter);
 }
 
 void
@@ -3226,13 +3223,13 @@ e1000g_clear_all_interrupts(struct e1000g *Adapter)
 void
 e1000g_mask_tx_interrupt(struct e1000g *Adapter)
 {
-	E1000_WRITE_REG(&Adapter->shared, E1000_IMS, E1000G_IMS_TX_INTR);
+	E1000_WRITE_REG(&Adapter->shared, E1000_IMS, E1000_IMS_TXDW);
 }
 
 void
 e1000g_clear_tx_interrupt(struct e1000g *Adapter)
 {
-	E1000_WRITE_REG(&Adapter->shared, E1000_IMC, E1000G_IMS_TX_INTR);
+	E1000_WRITE_REG(&Adapter->shared, E1000_IMC, E1000_IMS_TXDW);
 }
 
 static void

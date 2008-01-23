@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -61,6 +61,7 @@ extern "C" {
 #include <sys/vlan.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/disp.h>
 #include <sys/pci.h>
 #include <sys/sdt.h>
 #include <sys/ethernet.h>
@@ -107,6 +108,8 @@ extern "C" {
 #define	MAX_INTR_THROTTLING		65535
 #define	MAX_RX_BCOPY_THRESHOLD		E1000_RX_BUFFER_SIZE_2K
 #define	MAX_TX_BCOPY_THRESHOLD		E1000_TX_BUFFER_SIZE_2K
+#define	MAX_TX_RECYCLE_THRESHOLD	MAX_NUM_TX_DESCRIPTOR
+#define	MAX_TX_RECYCLE_NUM		MAX_NUM_TX_DESCRIPTOR
 
 #define	MIN_NUM_TX_DESCRIPTOR		80
 #define	MIN_NUM_RX_DESCRIPTOR		80
@@ -120,22 +123,43 @@ extern "C" {
 #define	MIN_INTR_THROTTLING		0
 #define	MIN_RX_BCOPY_THRESHOLD		0
 #define	MIN_TX_BCOPY_THRESHOLD		MINIMUM_ETHERNET_PACKET_SIZE
+#define	MIN_TX_RECYCLE_THRESHOLD	0
+#define	MIN_TX_RECYCLE_NUM		MAX_TX_DESC_PER_PACKET
 
 #define	DEFAULT_NUM_RX_DESCRIPTOR	2048
 #define	DEFAULT_NUM_TX_DESCRIPTOR	2048
 #define	DEFAULT_NUM_RX_FREELIST		4096
-#define	DEFAULT_NUM_TX_FREELIST		2048
-#define	DEFAULT_RX_LIMIT_ON_INTR	256
-#define	DEFAULT_RX_INTR_DELAY		0
-#define	DEFAULT_RX_INTR_ABS_DELAY	0
-#define	DEFAULT_TX_INTR_DELAY		300
-#define	DEFAULT_TX_INTR_ABS_DELAY	0
-#define	DEFAULT_INTR_THROTTLING		0x225
-#define	DEFAULT_RX_BCOPY_THRESHOLD	0
-#define	DEFAULT_TX_BCOPY_THRESHOLD	512
+#define	DEFAULT_NUM_TX_FREELIST		2304
+#define	DEFAULT_RX_LIMIT_ON_INTR	128
 
-#define	DEFAULT_TX_RECYCLE_LOW_WATER	64
-#define	DEFAULT_TX_RECYCLE_NUM		128
+#ifdef __sparc
+#define	MAX_INTR_PER_SEC		7100
+#define	MIN_INTR_PER_SEC		3000
+#define	DEFAULT_INTR_PACKET_LOW		5
+#define	DEFAULT_INTR_PACKET_HIGH	128
+#define	DEFAULT_TX_RECYCLE_THRESHOLD	512
+#else
+#define	MAX_INTR_PER_SEC		15000
+#define	MIN_INTR_PER_SEC		4000
+#define	DEFAULT_INTR_PACKET_LOW		10
+#define	DEFAULT_INTR_PACKET_HIGH	48
+#define	DEFAULT_TX_RECYCLE_THRESHOLD	DEFAULT_TX_NO_RESOURCE
+#endif
+
+#define	DEFAULT_RX_INTR_DELAY		0
+#define	DEFAULT_RX_INTR_ABS_DELAY	64
+#define	DEFAULT_TX_INTR_DELAY		64
+#define	DEFAULT_TX_INTR_ABS_DELAY	64
+#define	DEFAULT_INTR_THROTTLING_HIGH    1000000000/(MIN_INTR_PER_SEC*256)
+#define	DEFAULT_INTR_THROTTLING_LOW	1000000000/(MAX_INTR_PER_SEC*256)
+#define	DEFAULT_INTR_THROTTLING		DEFAULT_INTR_THROTTLING_LOW
+
+#define	DEFAULT_RX_BCOPY_THRESHOLD	128
+#define	DEFAULT_TX_BCOPY_THRESHOLD	512
+#define	DEFAULT_TX_RECYCLE_NUM		64
+#define	DEFAULT_TX_UPDATE_THRESHOLD	256
+#define	DEFAULT_TX_NO_RESOURCE		6
+
 #define	DEFAULT_TX_INTR_ENABLE		1
 #define	DEFAULT_FLOW_CONTROL		3
 #define	DEFAULT_MASTER_LATENCY_TIMER	0	/* BIOS should decide */
@@ -185,9 +209,6 @@ extern "C" {
  */
 #define	E1000G_IPALIGNROOM		6
 #define	E1000G_IPALIGNPRESERVEROOM	64
-
-#define	E1000G_IMS_TX_INTR	(E1000_IMS_TXDW | E1000_IMS_TXQE)
-#define	E1000G_ICR_TX_INTR	(E1000_ICR_TXDW | E1000_ICR_TXQE)
 
 /*
  * bit flags for 'attach_progress' which is a member variable in struct e1000g
@@ -637,7 +658,6 @@ typedef struct _e1000g_stat {
 	kstat_named_t reset_count;	/* Reset Count */
 
 	kstat_named_t rx_error;		/* Rx Error in Packet */
-	kstat_named_t rx_exceed_pkt;	/* Rx Exceed Max Pkt Count */
 	kstat_named_t rx_esballoc_fail;	/* Rx Desballoc Failure */
 	kstat_named_t rx_allocb_fail;	/* Rx Allocb Failure */
 
@@ -683,12 +703,14 @@ typedef struct _e1000g_stat {
 	kstat_named_t Xoffrxc;	/* XOFF Received Count */
 	kstat_named_t Xofftxc;	/* Xoff Xmitted Count */
 	kstat_named_t Fcruc;	/* Unknown Flow Conrol Packet Rcvd Count */
+#ifdef E1000G_DEBUG
 	kstat_named_t Prc64;	/* Packets Received - 64b */
 	kstat_named_t Prc127;	/* Packets Received - 65-127b */
 	kstat_named_t Prc255;	/* Packets Received - 127-255b */
 	kstat_named_t Prc511;	/* Packets Received - 256-511b */
 	kstat_named_t Prc1023;	/* Packets Received - 511-1023b */
 	kstat_named_t Prc1522;	/* Packets Received - 1024-1522b */
+#endif
 	kstat_named_t Gprc;	/* Good Packets Received Count */
 	kstat_named_t Bprc;	/* Broadcasts Pkts Received Count */
 	kstat_named_t Mprc;	/* Multicast Pkts Received Count */
@@ -708,12 +730,14 @@ typedef struct _e1000g_stat {
 	kstat_named_t Toth;	/* Total Octets Xmted Hi Count */
 	kstat_named_t Tpr;	/* Total Packets Received */
 	kstat_named_t Tpt;	/* Total Packets Xmitted */
+#ifdef E1000G_DEBUG
 	kstat_named_t Ptc64;	/* Packets Xmitted (64b) */
 	kstat_named_t Ptc127;	/* Packets Xmitted (64-127b) */
 	kstat_named_t Ptc255;	/* Packets Xmitted (128-255b) */
 	kstat_named_t Ptc511;	/* Packets Xmitted (255-511b) */
 	kstat_named_t Ptc1023;	/* Packets Xmitted (512-1023b) */
 	kstat_named_t Ptc1522;	/* Packets Xmitted (1024-1522b */
+#endif
 	kstat_named_t Mptc;	/* Multicast Packets Xmited Count */
 	kstat_named_t Bptc;	/* Broadcast Packets Xmited Count */
 	kstat_named_t Algnerrc;	/* Alignment Error count */
@@ -730,7 +754,6 @@ typedef struct _e1000g_tx_ring {
 	kmutex_t tx_lock;
 	kmutex_t freelist_lock;
 	kmutex_t usedlist_lock;
-	kmutex_t mblks_lock;
 	/*
 	 * Descriptor queue definitions
 	 */
@@ -762,8 +785,6 @@ typedef struct _e1000g_tx_ring {
 	 * reschedule when tx resource is available
 	 */
 	boolean_t resched_needed;
-	uint32_t recycle_low_water;
-	uint32_t recycle_num;
 	uint32_t frags_limit;
 	uint32_t stall_watchdog;
 	uint32_t recycle_fail;
@@ -880,6 +901,8 @@ typedef struct e1000g {
 
 	boolean_t intr_adaptive;
 	boolean_t tx_intr_enable;
+	uint32_t tx_recycle_thresh;
+	uint32_t tx_recycle_num;
 	uint32_t tx_intr_delay;
 	uint32_t tx_intr_abs_delay;
 	uint32_t rx_intr_delay;
@@ -894,6 +917,12 @@ typedef struct e1000g {
 
 	e1000g_rx_ring_t rx_ring[1];
 	e1000g_tx_ring_t tx_ring[1];
+
+	/*
+	 * Rx and Tx packet count for interrupt adaptive setting
+	 */
+	uint32_t rx_pkt_cnt;
+	uint32_t tx_pkt_cnt;
 
 	/*
 	 * The watchdog_lock must be held when updateing the

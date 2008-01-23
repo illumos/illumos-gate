@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -111,43 +111,6 @@ e1000g_free_tx_swpkt(register p_tx_sw_packet_t packet)
 	packet->num_desc = 0;
 }
 
-#pragma inline(e1000g_tx_freemsg)
-
-void
-e1000g_tx_freemsg(e1000g_tx_ring_t *tx_ring)
-{
-	mblk_t *mp;
-
-	if (mutex_tryenter(&tx_ring->mblks_lock) == 0)
-		return;
-
-	mp = tx_ring->mblks.head;
-
-	tx_ring->mblks.head = NULL;
-	tx_ring->mblks.tail = NULL;
-
-	mutex_exit(&tx_ring->mblks_lock);
-
-	if (mp != NULL)
-		freemsgchain(mp);
-}
-
-uint_t
-e1000g_tx_softint_worker(caddr_t arg1, caddr_t arg2)
-{
-	struct e1000g *Adapter;
-	mblk_t *mp;
-
-	Adapter = (struct e1000g *)arg1;
-
-	if (Adapter == NULL)
-		return (DDI_INTR_UNCLAIMED);
-
-	e1000g_tx_freemsg(Adapter->tx_ring);
-
-	return (DDI_INTR_CLAIMED);
-}
-
 mblk_t *
 e1000g_m_tx(void *arg, mblk_t *mp)
 {
@@ -215,12 +178,6 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		msg_size += MBLKL(nmp);
 	}
 
-	/* Empty packet */
-	if (msg_size == 0) {
-		freemsg(mp);
-		return (B_TRUE);
-	}
-
 	/* Make sure packet is less than the max frame size */
 	if (msg_size > hw->mac.max_frame_size + VLAN_TAGSZ) {
 		/*
@@ -242,15 +199,15 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * Descriptors... As you may run short of them before getting any
 	 * transmit interrupt...
 	 */
-	if ((Adapter->tx_desc_num - tx_ring->tbd_avail) >
-	    tx_ring->recycle_low_water) {
-		E1000G_DEBUG_STAT(tx_ring->stat_recycle);
+	if (tx_ring->resched_needed ||
+	    (tx_ring->tbd_avail < Adapter->tx_recycle_thresh)) {
 		(void) e1000g_recycle(tx_ring);
-	}
+		E1000G_DEBUG_STAT(tx_ring->stat_recycle);
 
-	if (tx_ring->tbd_avail < MAX_TX_DESC_PER_PACKET) {
-		E1000G_DEBUG_STAT(tx_ring->stat_lack_desc);
-		goto tx_no_resource;
+		if (tx_ring->tbd_avail < DEFAULT_TX_NO_RESOURCE) {
+			E1000G_DEBUG_STAT(tx_ring->stat_lack_desc);
+			goto tx_no_resource;
+		}
 	}
 
 	/*
@@ -314,7 +271,6 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		 * Get a new TxSwPacket to process mblk buffers.
 		 */
 		if (desc_count > 0) {
-
 			mutex_enter(&tx_ring->freelist_lock);
 			packet = (p_tx_sw_packet_t)
 			    QUEUE_POP_HEAD(&tx_ring->free_list);
@@ -388,6 +344,14 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	return (B_TRUE);
 
 tx_send_failed:
+	/*
+	 * Enable Transmit interrupts, so that the interrupt routine can
+	 * call mac_tx_update() when transmit descriptors become available.
+	 */
+	tx_ring->resched_needed = B_TRUE;
+	if (!Adapter->tx_intr_enable)
+		e1000g_mask_tx_interrupt(Adapter);
+
 	/* Free pending TxSwPackets */
 	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(&pending_list);
 	while (packet) {
@@ -404,10 +368,8 @@ tx_send_failed:
 
 	E1000G_STAT(tx_ring->stat_send_fail);
 
-	freemsg(mp);
-
-	/* Send failed, message dropped */
-	return (B_TRUE);
+	/* Message will be scheduled for re-transmit */
+	return (B_FALSE);
 
 tx_no_resource:
 	/*
@@ -724,8 +686,15 @@ e1000g_tx_setup(struct e1000g *Adapter)
 	E1000_WRITE_REG(hw, E1000_TIPG, reg_tipg);
 
 	/* Setup Transmit Interrupt Delay Value */
-	if (Adapter->tx_intr_delay) {
-		E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
+	E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
+	E1000G_DEBUGLOG_1(Adapter, E1000G_INFO_LEVEL,
+	    "E1000_TIDV: 0x%x\n", Adapter->tx_intr_delay);
+
+	if (hw->mac.type >= e1000_82540) {
+		E1000_WRITE_REG(&Adapter->shared, E1000_TADV,
+		    Adapter->tx_intr_abs_delay);
+		E1000G_DEBUGLOG_1(Adapter, E1000G_INFO_LEVEL,
+		    "E1000_TADV: 0x%x\n", Adapter->tx_intr_abs_delay);
 	}
 
 	tx_ring->tbd_avail = Adapter->tx_desc_num;
@@ -750,6 +719,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	mblk_t *nmp;
 	struct e1000_tx_desc *descriptor;
 	int desc_count;
+	int is_intr;
 
 	/*
 	 * This function will examine each TxSwPacket in the 'used' queue
@@ -759,24 +729,29 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	 */
 	Adapter = tx_ring->adapter;
 
-	desc_count = 0;
-	QUEUE_INIT_LIST(&pending_list);
-
-	mutex_enter(&tx_ring->usedlist_lock);
-
 	packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list);
 	if (packet == NULL) {
-		mutex_exit(&tx_ring->usedlist_lock);
 		tx_ring->recycle_fail = 0;
 		tx_ring->stall_watchdog = 0;
 		return (0);
 	}
+
+	is_intr = servicing_interrupt();
+
+	if (is_intr)
+		mutex_enter(&tx_ring->usedlist_lock);
+	else if (mutex_tryenter(&tx_ring->usedlist_lock) == 0)
+		return (0);
+
+	desc_count = 0;
+	QUEUE_INIT_LIST(&pending_list);
 
 	/* Sync the Tx descriptor DMA buffer */
 	(void) ddi_dma_sync(tx_ring->tbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORKERNEL);
 	if (e1000g_check_dma_handle(
 	    tx_ring->tbd_dma_handle) != DDI_FM_OK) {
+		mutex_exit(&tx_ring->usedlist_lock);
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		Adapter->chip_state = E1000G_ERROR;
 		return (0);
@@ -820,7 +795,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 
 			desc_count += packet->num_desc;
 
-			if (desc_count >= tx_ring->recycle_num)
+			if (is_intr && (desc_count >= Adapter->tx_recycle_num))
 				break;
 		} else {
 			/*
@@ -833,6 +808,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	}
 
 	tx_ring->tbd_avail += desc_count;
+	Adapter->tx_pkt_cnt += desc_count;
 
 	mutex_exit(&tx_ring->usedlist_lock);
 
@@ -871,36 +847,16 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 		    QUEUE_GET_NEXT(&pending_list, &packet->Link);
 	}
 
-	/* Save the message chain */
-	if (mp != NULL) {
-		mutex_enter(&tx_ring->mblks_lock);
-		if (tx_ring->mblks.head == NULL) {
-			tx_ring->mblks.head = mp;
-			tx_ring->mblks.tail = nmp;
-		} else {
-			tx_ring->mblks.tail->b_next = mp;
-			tx_ring->mblks.tail = nmp;
-		}
-		mutex_exit(&tx_ring->mblks_lock);
-
-		/*
-		 * If the tx interrupt is enabled, the messages will be freed
-		 * in the tx interrupt; Otherwise, they are freed here by
-		 * triggering a soft interrupt.
-		 */
-		if (!Adapter->tx_intr_enable)
-			ddi_intr_trigger_softint(Adapter->tx_softint_handle,
-			    NULL);
-	}
-
 	/* Return the TxSwPackets back to the FreeList */
 	mutex_enter(&tx_ring->freelist_lock);
 	QUEUE_APPEND(&tx_ring->free_list, &pending_list);
 	mutex_exit(&tx_ring->freelist_lock);
 
+	if (mp != NULL)
+		freemsgchain(mp);
+
 	return (desc_count);
 }
-
 /*
  * 82544 Coexistence issue workaround:
  *    There are 2 issues.

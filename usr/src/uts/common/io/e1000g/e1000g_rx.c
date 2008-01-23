@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -283,6 +283,16 @@ e1000g_rx_setup(struct e1000g *Adapter)
 			    QUEUE_GET_NEXT(&rx_ring->recv_list, &packet->Link);
 			descriptor++;
 		}
+	}
+
+	E1000_WRITE_REG(&Adapter->shared, E1000_RDTR, Adapter->rx_intr_delay);
+	E1000G_DEBUGLOG_1(Adapter, E1000G_INFO_LEVEL,
+	    "E1000_RDTR: 0x%x\n", Adapter->rx_intr_delay);
+	if (hw->mac.type >= e1000_82540) {
+		E1000_WRITE_REG(&Adapter->shared, E1000_RADV,
+		    Adapter->rx_intr_abs_delay);
+		E1000G_DEBUGLOG_1(Adapter, E1000G_INFO_LEVEL,
+		    "E1000_RADV: 0x%x\n", Adapter->rx_intr_abs_delay);
 	}
 
 	/*
@@ -799,9 +809,6 @@ rx_next_desc:
 		    &packet->Link);
 	}	/* while loop */
 
-	if (pkt_count >= Adapter->rx_limit_onintr)
-		E1000G_STAT(rx_ring->stat_exceed_pkt);
-
 	/* Sync the Rx descriptor DMA buffers */
 	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
@@ -816,6 +823,8 @@ rx_next_desc:
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		Adapter->chip_state = E1000G_ERROR;
 	}
+
+	Adapter->rx_pkt_cnt = pkt_count;
 
 	return (ret_mp);
 

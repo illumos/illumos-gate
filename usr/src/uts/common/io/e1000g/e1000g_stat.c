@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -112,6 +112,7 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 			e1000g_ksp->Roc.value.ul--;
 	}
 
+#ifdef E1000G_DEBUG
 	/*
 	 * Adjust the bin counters when the extra byte put the frame in the
 	 * wrong bin. Remember that the frame_len was adjusted above.
@@ -134,6 +135,7 @@ e1000_tbi_adjust_stats(struct e1000g *Adapter,
 	} else if (frame_len == 1522) {
 		e1000g_ksp->Prc1522.value.ul++;
 	}
+#endif
 }
 
 
@@ -175,7 +177,6 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	e1000g_ksp->rx_error.value.ul = rx_ring->stat_error;
 	e1000g_ksp->rx_esballoc_fail.value.ul = rx_ring->stat_esballoc_fail;
 	e1000g_ksp->rx_allocb_fail.value.ul = rx_ring->stat_allocb_fail;
-	e1000g_ksp->rx_exceed_pkt.value.ul = rx_ring->stat_exceed_pkt;
 
 	e1000g_ksp->tx_no_swpkt.value.ul = tx_ring->stat_no_swpkt;
 	e1000g_ksp->tx_no_desc.value.ul = tx_ring->stat_no_desc;
@@ -218,7 +219,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	    (hw->mac.type != e1000_ich9lan)) {
 		e1000g_ksp->Symerrs.value.ul +=
 		    E1000_READ_REG(hw, E1000_SYMERRS);
-
+#ifdef E1000G_DEBUG
 		e1000g_ksp->Prc64.value.ul +=
 		    E1000_READ_REG(hw, E1000_PRC64);
 		e1000g_ksp->Prc127.value.ul +=
@@ -244,6 +245,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 		    E1000_READ_REG(hw, E1000_PTC1023);
 		e1000g_ksp->Ptc1522.value.ul +=
 		    E1000_READ_REG(hw, E1000_PTC1522);
+#endif
 	}
 
 	e1000g_ksp->Gprc.value.ul += E1000_READ_REG(hw, E1000_GPRC);
@@ -721,8 +723,6 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->rx_esballoc_fail, "Rx Desballoc Failure",
 	    KSTAT_DATA_ULONG);
-	kstat_named_init(&e1000g_ksp->rx_exceed_pkt, "Rx Exceed Max Pkt Count",
-	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->rx_allocb_fail, "Rx Allocb Failure",
 	    KSTAT_DATA_ULONG);
 
@@ -753,6 +753,7 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Fcruc, "Recv_Unsupport_FC_Pkts",
 	    KSTAT_DATA_ULONG);
+#ifdef E1000G_DEBUG
 	kstat_named_init(&e1000g_ksp->Prc64, "Pkts_Recvd_(  64b)",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Prc127, "Pkts_Recvd_(  65- 127b)",
@@ -765,6 +766,7 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Prc1522, "Pkts_Recvd_(1024-1522b)",
 	    KSTAT_DATA_ULONG);
+#endif
 	kstat_named_init(&e1000g_ksp->Gprc, "Good_Pkts_Recvd",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Gptc, "Good_Pkts_Xmitd",
@@ -797,6 +799,7 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Tpt, "Total_Packets_Xmitd",
 	    KSTAT_DATA_ULONG);
+#ifdef E1000G_DEBUG
 	kstat_named_init(&e1000g_ksp->Ptc64, "Pkts_Xmitd_(  64b)",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Ptc127, "Pkts_Xmitd_(  65- 127b)",
@@ -809,6 +812,7 @@ e1000g_init_stats(struct e1000g *Adapter)
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Ptc1522, "Pkts_Xmitd_(1024-1522b)",
 	    KSTAT_DATA_ULONG);
+#endif
 	kstat_named_init(&e1000g_ksp->Tncrs, "Xmit_with_No_CRS",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&e1000g_ksp->Tsctc, "Xmit_TCP_Seg_Contexts",
