@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include	<inet/mi.h>
 #include	<inet/nd.h>
 #include	<sys/ethernet.h>
+#include	<sys/vlan.h>
 #include	<sys/policy.h>
 #include	<sys/mac.h>
 #include	<sys/mac_ether.h>
@@ -722,6 +723,7 @@ eri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_callbacks = &eri_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
 
 	/*
 	 * Map in the device registers.

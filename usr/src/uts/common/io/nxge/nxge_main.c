@@ -4655,6 +4655,7 @@ nxge_mac_register(p_nxge_t nxgep)
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = nxgep->mac.maxframesize -
 		sizeof (struct ether_header) - ETHERFCSL - 4;
+	macp->m_margin = VLAN_TAGSZ;
 
 	status = mac_register(macp, &nxgep->mach);
 	mac_free(macp);

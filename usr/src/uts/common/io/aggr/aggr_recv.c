@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@ aggr_recv_lacp(aggr_port_t *port, mblk_t *mp)
 {
 	aggr_grp_t *grp = port->lp_grp;
 
-	/* in promiscous mode, send copy of packet up */
+	/* in promiscuous mode, send copy of packet up */
 	if (grp->lg_promisc) {
 		mblk_t *nmp = copymsg(mp);
 
@@ -66,6 +66,17 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 {
 	aggr_port_t *port = (aggr_port_t *)arg;
 	aggr_grp_t *grp = port->lp_grp;
+
+	/*
+	 * If this message is looped back from the legacy devices, drop
+	 * it as the Nemo framework will be responsible for looping it
+	 * back by the mac_txloop() function.
+	 */
+	if (mp->b_flag & MSGNOLOOP) {
+		ASSERT(mp->b_next == NULL);
+		freemsg(mp);
+		return;
+	}
 
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
 		mac_rx(grp->lg_mh, mrh, mp);

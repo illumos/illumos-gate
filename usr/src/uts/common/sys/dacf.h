@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +75,7 @@ extern struct dacfsw kmod_dacfsw;	/* kernel provided module */
 
 const char *dacf_minor_name(dacf_infohdl_t);
 minor_t dacf_minor_number(dacf_infohdl_t);
+dev_t dacf_get_dev(dacf_infohdl_t);
 const char *dacf_driver_name(dacf_infohdl_t);
 dev_info_t *dacf_devinfo_node(dacf_infohdl_t);
 const char *dacf_get_arg(dacf_arghdl_t, char *);

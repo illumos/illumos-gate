@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -120,7 +120,6 @@ s none usr/lib/sparcv9/llib-lrpcsvc.ln=../../../lib/sparcv9/llib-lrpcsvc.ln
 s none usr/lib/sparcv9/llib-lrt.ln=../../../lib/sparcv9/llib-lrt.ln
 s none usr/lib/sparcv9/llib-lrtld_db.ln=../../../lib/sparcv9/llib-lrtld_db.ln
 s none usr/lib/sparcv9/llib-lposix4.ln=../../../lib/sparcv9/llib-lrt.ln
-f none usr/lib/sparcv9/llib-lrcm.ln 644 root bin
 f none usr/lib/sparcv9/llib-lsasl.ln 644 root bin
 s none usr/lib/sparcv9/llib-lscf.ln=../../../lib/sparcv9/llib-lscf.ln
 f none usr/lib/sparcv9/llib-lsched.ln 644 root bin

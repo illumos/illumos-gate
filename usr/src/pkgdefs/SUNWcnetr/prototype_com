@@ -50,9 +50,8 @@ i i.dhcpagent
 #
 d none etc 755 root sys
 d none etc/dladm 755 dladm sys
-e preserve etc/dladm/aggregation.conf 644 dladm sys
-e preserve etc/dladm/linkprop.conf 644 dladm sys
 e preserve etc/dladm/secobj.conf 600 dladm sys
+e preserve etc/dladm/datalink.conf 644 dladm sys
 d none etc/default 755 root sys
 e dhcpagent etc/default/dhcpagent 644 root sys
 e preserve etc/default/inetinit 644 root sys

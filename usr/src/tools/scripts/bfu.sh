@@ -186,7 +186,6 @@ global_zone_only_files="
 	etc/dladm/*
 	etc/bootrc
 	etc/crypto/kcf.conf
-	etc/datalink.conf
 	etc/devlink.tab
 	etc/driver_aliases
 	etc/driver_classes
@@ -494,6 +493,41 @@ enable_next_boot () {
 	fi
 }
 
+#
+# If we're in the global zone, import the manifest for the specified service.
+# Note that we will need to see whether we are in an smf root if we are using
+# an alternate root. If so, import the service directly; otherwise, print the
+# warning messages.
+#
+# $1: the path of the xml file (the related path to /var/svc/manifest)
+# $2: the service name - specified only if the service is enabled after reboot.
+#
+smf_import_service() {
+	if [[ $zone = global && -f $rootprefix/var/svc/manifest/$1 ]]; then
+		if [[ -n $rootprefix && -x /usr/sbin/svccfg ]]; then
+			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db \
+			/usr/sbin/svccfg import $rootprefix/var/svc/manifest/$1
+		elif [[ -n $rootprefix ]]; then
+			echo "Warning: This system does not have SMF, so I"
+			echo "cannot ensure the pre-import of $1. If it does"
+			echo "not work, reboot your alternate root to fix it."
+		elif [[ -x /tmp/bfubin/svccfg ]]; then
+			if [[ "${2}a" == a ]]; then
+				/tmp/bfubin/svccfg import /var/svc/manifest/$1
+			else
+				tmpfile=/tmp/`echo "$1" | tr / :`.$$
+				sed -e "s/enabled='true'/enabled='false'/" \
+				    /var/svc/manifest/$1 > "$tmpfile"
+				/tmp/bfubin/svccfg import "$tmpfile"
+				#
+				# Make sure the service is enabled after reboot.
+				#
+				enable_next_boot $2
+			fi
+		fi
+	fi
+}
+
 smf_inetd_disable() {
 	inetconf=$rootprefix/etc/inet/inetd.conf
 	inettmp=/tmp/inetd.tmp.$$
@@ -610,6 +644,97 @@ inetd_conf_svm_hack() {
 		fi
 
 		rm -f $inettmp $inetnew
+	fi
+}
+
+upgrade_aggr_and_linkprop () {
+	# Since aggregation.conf and linkprop.conf are upgraded by
+	# SUNWcnetr's postinstall script, put the relevant portions of the
+	# postinstall script here, modified to rename the old files instead
+	# of removing them.
+
+	#
+	# Convert datalink configuration into a series of dladm(1M) commands
+	# and keep them in an upgrade script. This script will then be run
+	# in the network-physical service.
+	#
+	# Note that we cannot use the /var/svc/profile/upgrade script because
+	# that script is run in the manifest-import service which is too late
+	# for the datalink configuration.
+	#
+	UPGRADE_SCRIPT=/var/svc/profile/upgrade_datalink
+
+	AGGR_CONF=/etc/aggregation.conf
+	ORIG=$rootprefix$AGGR_CONF
+	if [[ ! -f $ORIG ]]; then
+		# Try the alternate location.
+		AGGR_CONF=/etc/dladm/aggregation.conf
+		ORIG=$rootprefix$AGGR_CONF
+	fi
+
+	if [[ -f $ORIG ]]; then
+		# Strip off comments, then each remaining line defines
+		# an aggregation the administrator configured on the old
+		# system.  Each line corresponds to one dladm command
+		# that is appended to the upgrade script.
+		cat $ORIG | grep '^[^#]' | while read line; do
+			echo $line | while read aggr_index rest
+			do
+				policy=`echo $rest | /usr/bin/awk '{print $1}'`
+				nports=`echo $rest | /usr/bin/awk '{print $2}'`
+				ports=`echo $rest | /usr/bin/awk '{print $3}'`
+				mac=`echo $rest | /usr/bin/awk '{print $4}'`
+				lacp_mode=`echo $rest | /usr/bin/awk \
+				    '{print $5}'`
+				lacp_timer=`echo $rest | /usr/bin/awk \
+				    '{print $6}'`
+				dladm_string="dladm create-aggr -P $policy -l \
+				    $lacp_mode -T $lacp_timer"
+				# A fixed MAC address
+				if [[ $mac != "auto" ]]; then
+					dladm_string="$dladm_string -u $mac"
+				fi
+				i=1
+				while [ $i -le $nports ]; do
+					device=`echo $ports | cut -d, -f$i`
+					# Older aggregation.conf files have the
+					# format of device_name/port_number.
+					# We don't need the port number, so get
+					# rid of it if it is there.
+					device=`echo $device | cut -d/ -f1`
+					((i = i + 1))
+					dladm_string="$dladm_string -d \
+					    $device"
+				done
+				dladm_string="$dladm_string $aggr_index"
+				echo $dladm_string >> \
+					$rootprefix$UPGRADE_SCRIPT
+			done
+		done
+		mv $ORIG $ORIG.bak
+	fi
+
+	# Upgrade linkprop.conf
+	ORIG=$rootprefix/etc/dladm/linkprop.conf
+
+	if [[ -f $ORIG ]]; then
+		# Strip off comments, then each remaining line lists
+		# properties the administrator configured for a	
+		# particular interface.  Each line includes several
+		# properties, but we can only set one property per
+		# dladm invocation.
+		cat $ORIG | grep '^[^#]' | while read line; do
+			echo $line | while read link rest
+			do
+				while [ -n "$rest" ]; do
+					linkprop=`echo $rest | cut -d";" -f1`
+					rest=`echo $rest | cut -d";" -f2-`
+					echo dladm set-linkprop -p $linkprop \
+					    $link >> $rootprefix$UPGRADE_SCRIPT
+				done
+			done
+		done
+		mv $ORIG $ORIG.bak
 	fi
 }
 
@@ -1124,6 +1249,9 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/pfil.xml
 	var/svc/manifest/platform/sun4u/mpxio-upgrade.xml
 	var/svc/manifest/network/tname.xml
+	var/svc/manifest/network/aggregation.xml
+	var/svc/manifest/network/datalink.xml
+	var/svc/manifest/network/datalink-init.xml
 "
 
 # smf services whose manifests have been renamed
@@ -1138,6 +1266,9 @@ smf_obsolete_methods="
 	lib/svc/method/print-server
 	lib/svc/method/svc-volfs
 	lib/svc/method/pfil
+	lib/svc/method/aggregation
+	lib/svc/method/datalink
+	lib/svc/method/datalink-init
 "
 
 smf_cleanup () {
@@ -1244,52 +1375,61 @@ smf_cleanup_initd() {
 }
 
 smf_delete_manifest() {
-	(
-		mfst=$1
-		cd $root
-		[ -f $mfst ] || return;
-		if [ -r /etc/svc/volatile/repository_door ]; then
-			ENTITIES=`/tmp/bfubin/svccfg inventory $mfst`
-			for fmri in $ENTITIES; do
-				/tmp/bfubin/svccfg delete -f $fmri
-			done
-		fi
-		rm $mfst
-	)
+(
+	mfst=$1
+	cd $root
+	[[ -f $mfst ]] || return;
+	if [ -r /etc/svc/volatile/repository_door ]; then
+		ENTITIES=`/tmp/bfubin/svccfg inventory $mfst`
+		for fmri in $ENTITIES; do
+			if [[ -n $root && $root != "/" ]]; then
+				SVCCFG_REPOSITORY=$root/etc/svc/repository.db
+				export SVCCFG_REPOSITORY
+			fi
+			/tmp/bfubin/svccfg delete -f $fmri >/dev/null 2>&1
+			if [[ -n $root && $root != "/" ]]; then
+				unset SVCCFG_REPOSITORY
+			fi
+		done
+	fi
+	rm $mfst
+)
 }
 
 smf_delete_methods() {
-	(
-		cd $root;
-		rm -f $smf_obsolete_methods
-	)
+(
+	cd $root;
+	rm -f $smf_obsolete_methods
+)
 }	
 
 smf_delete_renamed_manifests() {
-	(
-		cd $root;
-		rm -f $smf_renamed_manifests
-	)
+(
+	cd $root;
+	rm -f $smf_renamed_manifests
+)
 }
 
-smf_gldv3_manifests="
-	var/svc/manifest/network/aggregation.xml
-	var/svc/manifest/network/datalink.xml
-	var/svc/manifest/network/datalink-init.xml
-"
-smf_gldv3_methods="
-	lib/svc/method/aggregation
-	lib/svc/method/datalink
-	lib/svc/method/datalink-init
-"
-smf_cleanup_gldv3() {
-	(
-		for f in $smf_gldv3_manifests; do
-			smf_delete_manifest $f
-		done
-		cd $root;
-		rm -f $smf_gldv3_methods
-	)
+smf_cleanup_dlmgmtd() {
+(
+	#
+	# Delete the service instance, then refresh all its dependents in the
+	# cases of alternative root and zones.
+	#
+	smf_delete_manifest "var/svc/manifest/network/dlmgmt.xml"
+
+	if [[ -n $root && $root != "/" ]]; then
+		export SVCCFG_REPOSITORY=$root/etc/svc/repository.db
+		/tmp/bfubin/svccfg -s svc:/network/physical:nwam refresh
+		/tmp/bfubin/svccfg -s svc:/network/physical:default refresh
+		/tmp/bfubin/svccfg -s svc:/system/device/local:default refresh
+		unset SVCCFG_REPOSITORY
+	fi
+	cd $root
+	rm -f lib/svc/method/svc-dlmgmtd
+	rm -f etc/.dlmgmt_door
+	rm -f sbin/dlmgmtd
+)
 }
 
 old_mfst_dir="var/svc/manifest.orig"
@@ -1574,8 +1714,9 @@ smf_apply_conf () {
 	done
 	smf_delete_methods
 	smf_delete_renamed_manifests
-	if [ $need_datalink = no ]; then
-		smf_cleanup_gldv3
+
+	if [[ $dlmgmtd_status = cleanup ]]; then
+		smf_cleanup_dlmgmtd
 	fi
 
 	print "Disabling unneeded inetd.conf entries ..."
@@ -1830,78 +1971,17 @@ EOFA
 		fi
 	fi
 
-	# If we're in the global zone, and using an alternate root, see if
-	# we are in an smf root.  If so, import name-service-cache. If we're
-	# not bfu'ing an alternate root, and we're post-smf, import
-	# name-service-cache.  This is to get name-service-cache(with correct
-	# dependencies) in the repository before reboot.  If we're bfu'ing
-	# from pre-smf, this isn't an issue, as name-service-cache will be
-	# installed with correct dependencies.
-	if [[ $zone = global &&
-	    -f $rootprefix/var/svc/manifest/system/name-service-cache.xml ]];
-	    then
-		if [[ -n $rootprefix ]]; then
-			if [ -x /usr/sbin/svccfg ]; then
-			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
-			/usr/sbin/svccfg import \
-		    $rootprefix/var/svc/manifest/system/name-service-cache.xml
-			else
-			echo "Warning: This system does not have SMF, so I "
-			echo "cannot ensure the pre-import of "
-			echo "name-service-cache.  If name-service-cache does "
-			echo "not work, reboot your alternate root to fix it."
-			fi
-		elif [ -x /tmp/bfubin/svccfg ]; then
-			/tmp/bfubin/svccfg import \
-			    /var/svc/manifest/system/name-service-cache.xml
-		fi
-	fi
+	#
+	# Import the name-service-cache service. This is to get the service
+	# (with correct dependencies) in the repository before reboot.
+	#
+	smf_import_service system/name-service-cache.xml
 
-	# If we're in the global zone, and using an alternate root, see if
-	# we are in an smf root.  If so, import datalink and aggregation svcs.
-	# If we're not bfu'ing an alternate root, and we're post-smf,
-	# import datalink and aggregation.  This is to get them 
-	# in the repository before reboot.  If we're bfu'ing from pre-smf,
-	# this isn't an issue, as they are in the seed repository.
-	if [[ $zone = global &&
-	    -f $rootprefix/var/svc/manifest/network/datalink.xml ]]; then
-		if [[ -n $rootprefix ]]; then
-			if [ -x /usr/sbin/svccfg ]; then
-			SVCCFG_REPOSITORY=$rootprefix/etc/svc/repository.db
-			sed -e "s/enabled='true'/enabled='false'/" \
-			 $rootprefix/var/svc/manifest/network/aggregation.xml \
-			    | svccfg import -
-			sed -e "s/enabled='true'/enabled='false'/" \
-			    $rootprefix/var/svc/manifest/network/datalink.xml \
-			    | svccfg import -
-			sed -e "s/enabled='true'/enabled='false'/" \
-		       $rootprefix/var/svc/manifest/network/datalink-init.xml \
-			    | svccfg import -
-			else
-			echo "Warning: This system does not have SMF, so I"
-			echo "cannot ensure the pre-import of datalink and"
-			echo "network aggregation.  If they do not work"
-			echo "reboot your alternate root to fix it."
-			fi
-		elif [ -x /tmp/bfubin/svccfg ]; then
-			sed -e "s/enabled='true'/enabled='false'/" \
-			    /var/svc/manifest/network/aggregation.xml | \
-			    svccfg import -
-			sed -e "s/enabled='true'/enabled='false'/" \
-			    /var/svc/manifest/network/datalink.xml | \
-			    svccfg import -
-			sed -e "s/enabled='true'/enabled='false'/" \
-			    /var/svc/manifest/network/datalink-init.xml | \
-			    svccfg import -
-		fi
-
-		#
-		# Make sure the services are enabled after reboot.
-		#
-		enable_next_boot svc:/network/aggregation:default
-		enable_next_boot svc:/network/datalink:default
-		enable_next_boot svc:/network/datalink-init:default
-	fi
+	#
+	# Import the datalink-management service.
+	#
+	smf_import_service network/dlmgmt.xml \
+	    svc:/network/datalink-management:default
 
 	# Enable new NFS status and nlockmgr services if client is enabled
 	cat >> $rootprefix/var/svc/profile/upgrade <<-EOF
@@ -2050,7 +2130,6 @@ done
 boot_is_pcfs=no
 have_realmode=no
 is_pcfs_boot=no
-need_datalink=no
 new_dladm=no
 
 # Set when moving to either directboot or multiboot
@@ -2348,9 +2427,25 @@ if [ $target_isa = i386 ] && [ $multi_or_direct = yes ] && \
 	fi
 fi
 
-if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
-    grep datalink.conf > /dev/null 2>&1 ; then
-	need_datalink=yes
+#
+# Check whether the archives have a datalink-management services; this is
+# later used to determine whether we need to upgrade the existing datalink
+# configuration and if the datalink-management service needs to be removed.
+#
+if archive_file_exists generic.sbin "sbin/dlmgmtd"; then
+	dlmgmtd_exists=true
+else
+	dlmgmtd_exists=false
+fi
+#
+# Set the value of dlmgmtd_status based on the existence of the
+# /sbin/dlmgmtd file
+#
+dlmgmtd_status=none
+if [[ -f $root/sbin/dlmgmtd ]] && ! $dlmgmtd_exists ; then
+	dlmgmtd_status=cleanup
+elif [[ ! -f $root/sbin/dlmgmtd ]] && $dlmgmtd_exists ; then
+	dlmgmtd_status=new
 fi
 
 #
@@ -2831,49 +2926,6 @@ if [ $archive_type = directboot ] && [ $diskless = no ]; then
 	fi
 	rm -f /tmp/bfubin/miniroot-unzipped
 fi
-
-create_datalink_conf()
-{
-	# /etc/datalink.conf needs to be populated.
-	drivers="bge rge xge"
-	conf=$rootprefix/etc/datalink.conf
-
-	if [ ! -f $conf ]; then
-		# nothing to do if we bfu'ed from an archive that doesn't
-		# provide /etc/datalink.conf
-		return
-	fi
-
-	ls -1 $rootprefix/etc | egrep -e '^hostname.|^hostname6.|^dhcp.' | \
-	    cut -d . -f2 | sort -u > /tmp/ifnames.$$
-
-	for driver in $drivers
-	do
-		grep $driver /tmp/ifnames.$$ | \
-		while read ifname
-		do
-			devnum=`echo $ifname | sed "s/$driver//g"`
-			if [ "$driver$devnum" != $ifname -o \
-			    -n "`echo $devnum | tr -d '[0-9]'`" ]; then
-				echo "skipping invalid interface $ifname"
-				continue
-			fi
-
-			vid=`expr $devnum / 1000`
-			inst=`expr $devnum % 1000`
-
-			awk '{ print $1 }' $conf | grep $ifname > /dev/null
-			if [ $? -ne 0 ]; then 
-				# An entry for that interface does not exist
-				printf \
-				    "$ifname\t$driver$inst\t0\t$vid\n" \
-				    >> $conf
-			fi
-		done
-	done
-
-	rm -f /tmp/ifnames.$$
-}
 
 revert_aggregation_conf()
 {
@@ -4725,8 +4777,8 @@ get_rootdev_list()
 		elif [[ $metadev = /dev/md/rdsk/* ]]; then
        		 	metavol=`echo "$metadev" | sed -e "s#/dev/md/rdsk/##"`
 			rootdevlist=`metastat -p $metavol |\
-			    grep -v "^$metavol[ 	]" |\
-			    nawk '{print $4}' | sed -e "s#/dev/rdsk/##"`
+			grep -v "^$metavol[         ]" |\
+			nawk '{print $4}' | sed -e "s#/dev/rdsk/##"`
 		fi
 		for rootdev in $rootdevlist
 		do
@@ -5114,27 +5166,27 @@ EOF
 install_sparc_failsafe()
 {
 	# check if failsafe already installed
-	if [ -f $rootprefix/platform/$karch/failsafe ]; then
-		return
-	fi
-	if [ -z "$FAILSAFE_SERVER" ]; then
-		FAILSAFE_SERVER="netinstall.sfbay"
-	fi
-	if [ -z "$FAILSAFE_IMAGE" ]; then
-		FAILSAFE_IMAGE="export/nv/s/latest"
-	fi
-	fs_wos_image="/net/${FAILSAFE_SERVER}/${FAILSAFE_IMAGE}"
-	fs_archive="${fs_wos_image}/boot/sparc.miniroot"
-	if [ ! -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
+        if [ -f $rootprefix/platform/$karch/failsafe ]; then
+                 return
+        fi
+        if [ -z "$FAILSAFE_SERVER" ]; then
+                FAILSAFE_SERVER="netinstall.sfbay"
+        fi
+        if [ -z "$FAILSAFE_IMAGE" ]; then
+                FAILSAFE_IMAGE="export/nv/s/latest"
+        fi
+        fs_wos_image="/net/${FAILSAFE_SERVER}/${FAILSAFE_IMAGE}"
+        fs_archive="${fs_wos_image}/boot/sparc.miniroot"
+        if [ ! -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
 		# XXX Remove this fallback to a known good archive once real
-		# XXX images with boot archives become available.
+                # XXX images with boot archives become available.
 		fs_wos_image="/net/netinstall.sfbay/export/setje/nbs-latest"
-		fs_archive="${fs_wos_image}/boot/sparc.miniroot"
-	fi
-	if [ -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
-		echo "Installing failsafe archive from $fs_wos_image"
-		cp $fs_archive $rootprefix/platform/$karch/failsafe
-	fi
+                fs_archive="${fs_wos_image}/boot/sparc.miniroot"
+        fi
+        if [ -d $fs_wos_image ] || [ ! -f $fs_archive ]; then
+                echo "Installing failsafe archive from $fs_wos_image"
+                cp $fs_archive $rootprefix/platform/$karch/failsafe
+        fi
 }
 
 disable_boot_service()
@@ -6415,17 +6467,17 @@ mondo_loop() {
 		print "done.";
 	fi;
 
-	# Remove pre dboot krtld as well as obsolete boot blocks
-	#
-	if [ $zone = global ]; then
-		rm -rf \
-		    $root/kernel/misc/sparcv9/krtld \
-		    $root/platform/sun4u/ufsboot \
-		    $root/platform/sun4v/ufsboot \
-		    $usr/platform/sun4c/lib/fs/ufs/bootblk \
-		    $usr/platform/sun4d/lib/fs/ufs/bootblk \
-		    $usr/platform/sun4m/lib/fs/ufs/bootblk
-	fi
+        # Remove pre dboot krtld as well as obsolete boot blocks
+        #
+        if [ $zone = global ]; then
+                rm -rf \
+                    $root/kernel/misc/sparcv9/krtld \
+                    $root/platform/sun4u/ufsboot \
+                    $root/platform/sun4v/ufsboot \
+                    $usr/platform/sun4c/lib/fs/ufs/bootblk \
+                    $usr/platform/sun4d/lib/fs/ufs/bootblk \
+                    $usr/platform/sun4m/lib/fs/ufs/bootblk
+        fi
 
 	#
 	# Remove kmdbmod from /kernel
@@ -7070,6 +7122,15 @@ mondo_loop() {
 	#
 	rm -f $usr/platform/sun4u/include/sys/us_drv.h
 
+	#
+	# Remove new files in order to go backward.
+	#
+	rm -f $root/usr/lib/rcm/modules/SUNW_vlan_rcm.so
+	rm -f $root/usr/lib/rcm/modules/SUNW_aggr_rcm.so
+	rm -f $root/kernel/drv/softmac
+	rm -f $root/kernel/drv/sparcv9/softmac
+	rm -f $root/kernel/drv/amd64/softmac
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
@@ -7084,14 +7145,14 @@ mondo_loop() {
 				print "Installing boot block on $rootslice."
 				cd $usr/platform/$karch/lib/fs/ufs
 				installboot ./bootblk $rootslice
-			elif [[ "$rootslice" = /dev/md/rdsk/* ]]; then
-				print "Detected SVM root."
-				cd $usr/platform/$karch/lib/fs/ufs
-				get_rootdev_list | while read physlice
-				do 
+                         elif [[ "$rootslice" = /dev/md/rdsk/* ]]; then
+                                print "Detected SVM root."
+                                cd $usr/platform/$karch/lib/fs/ufs
+                                get_rootdev_list | while read physlice
+                                do 
 					print "Installing bootblk on $physlice."
-					installboot ./bootblk $physlice
-				done
+                                        installboot ./bootblk $physlice
+                                done
 			fi
 			;;
 		    i386)
@@ -7119,8 +7180,8 @@ mondo_loop() {
 		extract_archives root generic $archlist
 		if [ $target_isa = i386 ]; then
 			extract_boot_archives boot $archlist
-		elif [ $newboot_sparc = yes ]; then
-			extract_boot_archives boot generic
+                elif [ $newboot_sparc = yes ]; then
+                        extract_boot_archives boot generic
 		fi
 	else
 		export PATH=/tmp/bfubin
@@ -7236,9 +7297,9 @@ mondo_loop() {
 	# Cleanup old RBAC profiles
 	rbac_cleanup
 
-	# Fix network datalink configuration
-	if [ $zone = global -a $need_datalink = yes ]; then
-		create_datalink_conf
+	# Obsolete GLDv3 /etc/datalink.conf file".
+	if [[ $zone = global && -f $rootprefix/etc/datalink.conf ]]; then
+		rm -f $rootprefix/etc/datalink.conf
 	fi
 
 	print "\nRestoring configuration files.\n"
@@ -7425,12 +7486,12 @@ mondo_loop() {
 
 		#
 		# update boot archives for new boot sparc
-		#
-		if [ $newboot_sparc = yes ] && \
+                #
+                if [ $newboot_sparc = yes ] && \
 		    [[ $rootslice = /dev/rdsk/* ||
 			$rootslice = /dev/md/rdsk/* ]]; then
 				build_boot_archive
-				install_sparc_failsafe
+                                install_sparc_failsafe
 		fi
 
 		# Check for damage due to CR 6379341.  This was actually fixed
@@ -7461,20 +7522,24 @@ mondo_loop() {
 			fi
 		fi
 
-		# Move existing /etc/aggregation.conf entries to
-		# /etc/dladm/aggregation.conf; or, if bfu'ing
-		# backwards, move aggregation.conf back to /etc
-		aggr_old=$rootprefix/etc/aggregation.conf
-		aggr_new=$rootprefix/etc/dladm/aggregation.conf
-		if [ $new_dladm = yes ]; then
-			if [ -f $aggr_old ]; then
-				# use cat instead of cp/mv to keep
-				# owner+group of dest
-				cat $aggr_old > $aggr_new
-				rm -f $aggr_old
-			fi
+		if [[ $dlmgmtd_status = new ]]; then
+			# Upgrade existing /etc/aggregation.conf (or
+			# /etc/dladm/aggregation.conf) and linkprop.conf
+			upgrade_aggr_and_linkprop
 		else
-			if [ -f $aggr_new ]; then
+			# Move existing /etc/aggregation.conf entries to
+			# /etc/dladm/aggregation.conf; or, if bfu'ing
+			# backwards, move aggregation.conf back to /etc
+			aggr_old=$rootprefix/etc/aggregation.conf
+			aggr_new=$rootprefix/etc/dladm/aggregation.conf
+			if [[ $new_dladm = yes ]]; then
+				if [[ -f $aggr_old ]]; then
+					# use cat instead of cp/mv to keep
+					# owner+group of dest
+					cat $aggr_old > $aggr_new
+					rm -f $aggr_old
+				fi
+			elif [[ -f $aggr_new ]]; then
 				cp $aggr_new $aggr_old
 				chgrp sys $aggr_old
 				rm -rf $rootprefix/etc/dladm

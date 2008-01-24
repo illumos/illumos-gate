@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,9 @@
 #define	_LIBDLADM_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/dls.h>
+#include <sys/dlpi.h>
 
 /*
  * This file includes structures, macros and common routines shared by all
@@ -38,10 +41,36 @@
 extern "C" {
 #endif
 
+#define	LINKID_STR_WIDTH	10
 #define	DLADM_STRSIZE		256
-#define	DLADM_OPT_TEMP		0x00000001
-#define	DLADM_OPT_CREATE	0x00000002
-#define	DLADM_OPT_PERSIST	0x00000004
+
+/*
+ * option flags taken by the libdladm functions
+ *
+ *  - DLADM_OPT_ACTIVE:
+ *    The function requests to bringup some configuration that only take
+ *    effect on active system (not persistent).
+ *
+ *  - DLADM_OPT_PERSIST:
+ *    The function requests to persist some configuration.
+ *
+ *  - DLADM_OPT_CREATE:
+ *    Today, only used by dladm_set_secobj() - requests to create a secobj.
+ *
+ *  - DLADM_OPT_FORCE:
+ *    The function requests to execute a specific operation forcefully.
+ *
+ *  - DLADM_OPT_PREFIX:
+ *    The function requests to generate a link name using the specified prefix.
+ */
+#define	DLADM_OPT_ACTIVE	0x00000001
+#define	DLADM_OPT_PERSIST	0x00000002
+#define	DLADM_OPT_CREATE	0x00000004
+#define	DLADM_OPT_FORCE		0x00000008
+#define	DLADM_OPT_PREFIX	0x00000010
+
+#define	DLADM_WALK_TERMINATE	0
+#define	DLADM_WALK_CONTINUE	-1
 
 typedef enum {
 	DLADM_STATUS_OK = 0,
@@ -66,23 +95,28 @@ typedef enum {
 	DLADM_STATUS_REPOSITORYINVAL,
 	DLADM_STATUS_MACADDRINVAL,
 	DLADM_STATUS_KEYINVAL,
-	DLADM_STATUS_INVALIDID,
 	DLADM_STATUS_INVALIDMACADDRLEN,
 	DLADM_STATUS_INVALIDMACADDRTYPE,
-	DLADM_STATUS_AUTOIDNOTEMP,
-	DLADM_STATUS_AUTOIDNOAVAILABLEID,
-	DLADM_STATUS_BUSY
+	DLADM_STATUS_LINKBUSY,
+	DLADM_STATUS_VIDINVAL,
+	DLADM_STATUS_NONOTIF,
+	DLADM_STATUS_TRYAGAIN
 } dladm_status_t;
 
 typedef enum {
-	DLADM_PROP_VAL_CURRENT = 1,
-	DLADM_PROP_VAL_DEFAULT,
-	DLADM_PROP_VAL_MODIFIABLE,
-	DLADM_PROP_VAL_PERSISTENT
-} dladm_prop_type_t;
+	DLADM_TYPE_STR,
+	DLADM_TYPE_BOOLEAN,
+	DLADM_TYPE_UINT64
+} dladm_datatype_t;
+
+typedef int dladm_conf_t;
+#define	DLADM_INVALID_CONF	0
 
 extern const char	*dladm_status2str(dladm_status_t, char *);
 extern dladm_status_t	dladm_set_rootdir(const char *);
+extern const char	*dladm_class2str(datalink_class_t, char *);
+extern const char	*dladm_media2str(uint32_t, char *);
+extern boolean_t	dladm_valid_linkname(const char *);
 
 #ifdef	__cplusplus
 }

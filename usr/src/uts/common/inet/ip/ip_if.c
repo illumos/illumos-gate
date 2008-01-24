@@ -18147,7 +18147,7 @@ ill_dl_down(ill_t *ill)
 	ill->ill_unbind_mp = NULL;
 	if (mp != NULL) {
 		ip1dbg(("ill_dl_down: %s (%u) for %s\n",
-		    dlpi_prim_str(*(int *)mp->b_rptr), *(int *)mp->b_rptr,
+		    dl_primstr(*(int *)mp->b_rptr), *(int *)mp->b_rptr,
 		    ill->ill_name));
 		mutex_enter(&ill->ill_lock);
 		ill->ill_state_flags |= ILL_DL_UNBIND_IN_PROGRESS;
@@ -18222,7 +18222,7 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 	prim = dlp->dl_primitive;
 
 	ip1dbg(("ill_dlpi_dispatch: sending %s (%u) to %s\n",
-	    dlpi_prim_str(prim), prim, ill->ill_name));
+	    dl_primstr(prim), prim, ill->ill_name));
 
 	switch (prim) {
 	case DL_PHYS_ADDR_REQ:
@@ -18360,11 +18360,11 @@ ill_dlpi_pending(ill_t *ill, t_uscalar_t prim)
 	if (pending == DL_PRIM_INVAL) {
 		(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
 		    "received unsolicited ack for %s on %s\n",
-		    dlpi_prim_str(prim), ill->ill_name);
+		    dl_primstr(prim), ill->ill_name);
 	} else {
 		(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
 		    "received unexpected ack for %s on %s (expecting %s)\n",
-		    dlpi_prim_str(prim), ill->ill_name, dlpi_prim_str(pending));
+		    dl_primstr(prim), ill->ill_name, dl_primstr(pending));
 	}
 	return (B_FALSE);
 }
@@ -18385,7 +18385,7 @@ ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 	ASSERT(ill->ill_dlpi_pending == prim);
 
 	ip1dbg(("ill_dlpi_done: %s has completed %s (%u)\n", ill->ill_name,
-	    dlpi_prim_str(ill->ill_dlpi_pending), ill->ill_dlpi_pending));
+	    dl_primstr(ill->ill_dlpi_pending), ill->ill_dlpi_pending));
 
 	if ((mp = ill->ill_dlpi_deferred) == NULL) {
 		ill->ill_dlpi_pending = DL_PRIM_INVAL;

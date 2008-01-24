@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,9 +54,9 @@ typedef enum {
 #define	VNIC_IOC_CREATE		VNIC_IOC(1)
 
 typedef struct vnic_ioc_create {
-	uint_t		vc_vnic_id;
+	datalink_id_t	vc_vnic_id;
+	datalink_id_t	vc_link_id;
 	uint_t		vc_mac_len;
-	uchar_t		vc_dev_name[MAXNAMELEN];
 	vnic_mac_addr_type_t vc_mac_addr_type;
 	uchar_t		vc_mac_addr[MAXMACADDRLEN];
 } vnic_ioc_create_t;
@@ -64,9 +64,9 @@ typedef struct vnic_ioc_create {
 #ifdef _SYSCALL32
 
 typedef struct vnic_ioc_create32 {
-	uint32_t	vc_vnic_id;
+	datalink_id_t	vc_vnic_id;
+	datalink_id_t	vc_link_id;
 	uint32_t	vc_mac_len;
-	uchar_t		vc_dev_name[MAXNAMELEN];
 	vnic_mac_addr_type_t vc_mac_addr_type;
 	uchar_t		vc_mac_addr[MAXMACADDRLEN];
 } vnic_ioc_create32_t;
@@ -76,13 +76,13 @@ typedef struct vnic_ioc_create32 {
 #define	VNIC_IOC_DELETE		VNIC_IOC(2)
 
 typedef struct vnic_ioc_delete {
-	uint_t		vd_vnic_id;
+	datalink_id_t	vd_vnic_id;
 } vnic_ioc_delete_t;
 
 #ifdef _SYSCALL32
 
 typedef struct vnic_ioc_delete32 {
-	uint32_t	vd_vnic_id;
+	datalink_id_t	vd_vnic_id;
 } vnic_ioc_delete32_t;
 
 #endif /* _SYSCALL32 */
@@ -90,25 +90,25 @@ typedef struct vnic_ioc_delete32 {
 #define	VNIC_IOC_INFO		VNIC_IOC(3)
 
 typedef struct vnic_ioc_info_vnic {
-	uint32_t	vn_vnic_id;
+	datalink_id_t	vn_vnic_id;
+	datalink_id_t	vn_link_id;
 	uint32_t	vn_mac_len;
 	uchar_t		vn_mac_addr[MAXMACADDRLEN];
-	char		vn_dev_name[MAXNAMELEN];
 	vnic_mac_addr_type_t vn_mac_addr_type;
 } vnic_ioc_info_vnic_t;
 
 typedef struct vnic_ioc_info {
 	uint_t		vi_nvnics;
-	uint_t		vi_vnic_id;	/* 0 returns all */
-	char		vi_dev_name[MAXNAMELEN];
+	datalink_id_t	vi_vnic_id;	/* DATALINK_ALL_LINKID returns all */
+	datalink_id_t	vi_linkid;
 } vnic_ioc_info_t;
 
 #ifdef _SYSCALL32
 
 typedef struct vnic_ioc_info32 {
 	uint32_t	vi_nvnics;
-	uint32_t	vi_vnic_id;	/* 0 returns all */
-	char		vi_dev_name[MAXNAMELEN];
+	datalink_id_t	vi_vnic_id;	/* DATALINK_ALL_LINKID returns all */
+	datalink_id_t	vi_linkid;
 } vnic_ioc_info32_t;
 
 #endif /* _SYSCALL32 */
@@ -118,7 +118,7 @@ typedef struct vnic_ioc_info32 {
 #define	VNIC_IOC_MODIFY_ADDR		0x01
 
 typedef struct vnic_ioc_modify {
-	uint_t		vm_vnic_id;
+	datalink_id_t	vm_vnic_id;
 	uint_t		vm_modify_mask;
 	uchar_t		vm_mac_addr[MAXMACADDRLEN];
 	vnic_mac_addr_type_t vm_mac_addr_type;
@@ -128,7 +128,7 @@ typedef struct vnic_ioc_modify {
 #ifdef _SYSCALL32
 
 typedef struct vnic_ioc_modify32 {
-	uint32_t	vm_vnic_id;
+	datalink_id_t	vm_vnic_id;
 	uint32_t	vm_modify_mask;
 	uchar_t		vm_mac_addr[MAXMACADDRLEN];
 	vnic_mac_addr_type_t vm_mac_addr_type;

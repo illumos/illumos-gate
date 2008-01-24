@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,8 +88,6 @@ extern void soft_ring_unbind(void *);
 extern void dls_soft_ring_fanout(void *, void *, mblk_t *, mac_header_info_t *);
 extern boolean_t dls_soft_ring_enable(dls_channel_t, dl_capab_dls_t *);
 extern void dls_soft_ring_disable(dls_channel_t);
-extern boolean_t dls_soft_ring_workers(dls_channel_t);
-extern void dls_soft_ring_rx_set(dls_channel_t, dls_rx_t, void *, int);
 
 #ifdef	__cplusplus
 }

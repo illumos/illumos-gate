@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,9 +62,9 @@ extern int lookup_count_property(const char *, const char *, uint64_t *);
 
 /* wireless.c: wifi link handling */
 extern void init_mutexes(void);
-extern boolean_t connect_chosen_lan(struct wireless_lan *, const char *);
+extern boolean_t connect_chosen_lan(struct wireless_lan *, struct interface *);
 extern struct wireless_lan *prompt_for_visited(void);
-extern boolean_t handle_wireless_lan(const char *);
+extern boolean_t handle_wireless_lan(struct interface *);
 extern boolean_t scan_wireless_nets(struct interface *);
 extern void create_known_wifi_nets_file(void);
 extern void update_known_wifi_nets_file(const char *, const char *);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stropts.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <kstat.h>
 #include <strings.h>
@@ -45,18 +46,24 @@
 #include <auth_attr.h>
 #include <auth_list.h>
 #include <libintl.h>
+#include <libdevinfo.h>
 #include <libdlpi.h>
 #include <libdllink.h>
 #include <libdlaggr.h>
 #include <libdlwlan.h>
+#include <libdlvlan.h>
+#include <libdlvnic.h>
 #include <libinetutil.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 
-#define	AGGR_DRV	"aggr"
-#define	MAXPORT		256
-#define	DUMP_LACP_FORMAT	"    %-9s %-8s %-7s %-12s "	\
-	"%-5s %-4s %-4s %-9s %-7s\n"
+#define	AGGR_DRV		"aggr"
+#define	MAXPORT			256
+#define	BUFLEN(lim, ptr)	(((lim) > (ptr)) ? ((lim) - (ptr)) : 0)
+#define	MAXLINELEN		1024
+#define	SMF_UPGRADE_FILE		"/var/svc/profile/upgrade"
+#define	SMF_UPGRADEDATALINK_FILE	"/var/svc/profile/upgrade_datalink"
+#define	SMF_DLADM_UPGRADE_MSG		" # added by dladm(1M)"
 
 typedef struct pktsum_s {
 	uint64_t	ipackets;
@@ -67,54 +74,56 @@ typedef struct pktsum_s {
 	uint32_t	oerrors;
 } pktsum_t;
 
-typedef struct show_link_state {
+typedef struct show_state {
 	boolean_t	ls_firstonly;
 	boolean_t	ls_donefirst;
-	boolean_t	ls_stats;
 	pktsum_t	ls_prevstats;
 	boolean_t	ls_parseable;
-} show_link_state_t;
+	uint32_t	ls_flags;
+	dladm_status_t	ls_status;
+} show_state_t;
 
 typedef struct show_grp_state {
-	uint32_t	gs_key;
 	boolean_t	gs_lacp;
-	boolean_t	gs_found;
+	boolean_t	gs_extended;
 	boolean_t	gs_stats;
 	boolean_t	gs_firstonly;
+	boolean_t	gs_donefirst;
 	pktsum_t	gs_prevstats[MAXPORT];
 	boolean_t	gs_parseable;
+	uint32_t	gs_flags;
+	dladm_status_t	gs_status;
 } show_grp_state_t;
 
-typedef struct show_mac_state {
-	boolean_t	ms_firstonly;
-	boolean_t	ms_donefirst;
-	pktsum_t	ms_prevstats;
-	boolean_t	ms_parseable;
-} show_mac_state_t;
+typedef void cmdfunc_t(int, char **);
 
-typedef	void cmdfunc_t(int, char **);
-
-static cmdfunc_t do_show_link, do_show_dev, do_show_wifi;
+static cmdfunc_t do_show_link, do_show_dev, do_show_wifi, do_show_phys;
 static cmdfunc_t do_create_aggr, do_delete_aggr, do_add_aggr, do_remove_aggr;
-static cmdfunc_t do_modify_aggr, do_show_aggr, do_up_aggr, do_down_aggr;
+static cmdfunc_t do_modify_aggr, do_show_aggr, do_up_aggr;
 static cmdfunc_t do_scan_wifi, do_connect_wifi, do_disconnect_wifi;
 static cmdfunc_t do_show_linkprop, do_set_linkprop, do_reset_linkprop;
 static cmdfunc_t do_create_secobj, do_delete_secobj, do_show_secobj;
 static cmdfunc_t do_init_linkprop, do_init_secobj;
+static cmdfunc_t do_create_vlan, do_delete_vlan, do_up_vlan, do_show_vlan;
+static cmdfunc_t do_rename_link, do_delete_phys, do_init_phys;
+static cmdfunc_t do_show_linkmap;
 
-static void	show_linkprop_onelink(void *, const char *);
+static void	altroot_cmd(char *, int, char **);
+static int	show_linkprop_onelink(datalink_id_t, void *);
 
-static void	link_stats(const char *, uint_t);
-static void	aggr_stats(uint32_t, uint_t);
+static void	link_stats(datalink_id_t, uint_t);
+static void	aggr_stats(datalink_id_t, show_grp_state_t *, uint_t);
 static void	dev_stats(const char *dev, uint32_t);
 
+static int	get_one_kstat(const char *, const char *, uint8_t,
+		    void *, boolean_t);
 static void	get_mac_stats(const char *, pktsum_t *);
 static void	get_link_stats(const char *, pktsum_t *);
-static uint64_t	mac_ifspeed(const char *);
+static uint64_t	get_ifspeed(const char *, boolean_t);
 static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
-static const char	*mac_link_state(const char *, char *);
-static const char	*mac_link_duplex(const char *, char *);
+static const char	*get_linkstate(const char *, boolean_t, char *);
+static const char	*get_linkduplex(const char *, boolean_t, char *);
 
 static boolean_t str2int(const char *, int *);
 static void	die(const char *, ...);
@@ -139,7 +148,6 @@ static cmd_t	cmds[] = {
 	{ "modify-aggr",	do_modify_aggr		},
 	{ "show-aggr",		do_show_aggr		},
 	{ "up-aggr",		do_up_aggr		},
-	{ "down-aggr",		do_down_aggr		},
 	{ "scan-wifi",		do_scan_wifi		},
 	{ "connect-wifi",	do_connect_wifi		},
 	{ "disconnect-wifi",	do_disconnect_wifi	},
@@ -151,50 +159,67 @@ static cmd_t	cmds[] = {
 	{ "delete-secobj",	do_delete_secobj	},
 	{ "show-secobj",	do_show_secobj		},
 	{ "init-linkprop",	do_init_linkprop	},
-	{ "init-secobj",	do_init_secobj		}
+	{ "init-secobj",	do_init_secobj		},
+	{ "create-vlan", 	do_create_vlan 		},
+	{ "delete-vlan", 	do_delete_vlan 		},
+	{ "show-vlan",		do_show_vlan		},
+	{ "up-vlan",		do_up_vlan		},
+	{ "rename-link",	do_rename_link 		},
+	{ "delete-phys",	do_delete_phys 		},
+	{ "show-phys",		do_show_phys		},
+	{ "init-phys",		do_init_phys		},
+	{ "show-linkmap",	do_show_linkmap		}
 };
 
-static const struct option longopts[] = {
-	{"vlan-id",	required_argument,	0, 'v'	},
-	{"dev",		required_argument,	0, 'd'	},
-	{"policy",	required_argument,	0, 'P'	},
-	{"lacp-mode",	required_argument,	0, 'l'	},
-	{"lacp-timer",	required_argument,	0, 'T'	},
-	{"unicast",	required_argument,	0, 'u'	},
-	{"statistics",	no_argument,		0, 's'	},
-	{"interval",	required_argument,	0, 'i'	},
-	{"lacp",	no_argument,		0, 'L'	},
-	{"temporary",	no_argument,		0, 't'	},
-	{"root-dir",	required_argument,	0, 'r'	},
-	{"parseable",	no_argument,		0, 'p'	},
+static const struct option lopts[] = {
+	{"vlan-id",	required_argument,	0, 'v'},
+	{"dev",		required_argument,	0, 'd'},
+	{"policy",	required_argument,	0, 'P'},
+	{"lacp-mode",	required_argument,	0, 'L'},
+	{"lacp-timer",	required_argument,	0, 'T'},
+	{"unicast",	required_argument,	0, 'u'},
+	{"temporary",	no_argument,		0, 't'},
+	{"root-dir",	required_argument,	0, 'R'},
+	{"link",	required_argument,	0, 'l'},
+	{"forcible",	no_argument,		0, 'f'},
+	{ 0, 0, 0, 0 }
+};
+
+static const struct option show_lopts[] = {
+	{"statistics",	no_argument,		0, 's'},
+	{"interval",	required_argument,	0, 'i'},
+	{"parseable",	no_argument,		0, 'p'},
+	{"extended",	no_argument,		0, 'x'},
+	{"persistent",	no_argument,		0, 'P'},
+	{"lacp",	no_argument,		0, 'L'},
 	{ 0, 0, 0, 0 }
 };
 
 static const struct option prop_longopts[] = {
-	{"temporary",	no_argument,		0, 't'	},
-	{"root-dir",	required_argument,	0, 'R'	},
-	{"prop",	required_argument,	0, 'p'	},
-	{"parseable",	no_argument,		0, 'c'	},
-	{"persistent",	no_argument,		0, 'P'	},
+	{"temporary",	no_argument,		0, 't'  },
+	{"root-dir",	required_argument,	0, 'R'  },
+	{"prop",	required_argument,	0, 'p'  },
+	{"parseable",	no_argument,		0, 'c'  },
+	{"persistent",	no_argument,		0, 'P'  },
 	{ 0, 0, 0, 0 }
 };
 
 static const struct option wifi_longopts[] = {
-	{"parseable",	no_argument,		0, 'p'	},
-	{"output",	required_argument,	0, 'o'	},
-	{"essid",	required_argument,	0, 'e'	},
-	{"bsstype",	required_argument,	0, 'b'	},
-	{"mode",	required_argument,	0, 'm'	},
-	{"key",		required_argument,	0, 'k'	},
-	{"sec",		required_argument,	0, 's'	},
-	{"auth",	required_argument,	0, 'a'	},
-	{"create-ibss",	required_argument,	0, 'c'	},
-	{"timeout",	required_argument,	0, 'T'	},
-	{"all-links",	no_argument,		0, 'a'	},
-	{"temporary",	no_argument,		0, 't'	},
-	{"root-dir",	required_argument,	0, 'R'	},
-	{"persistent",	no_argument,		0, 'P'	},
-	{"file",	required_argument,	0, 'f'	},
+	{"parseable",	no_argument,		0, 'p'  },
+	{"output",	required_argument,	0, 'o'  },
+	{"essid",	required_argument,	0, 'e'  },
+	{"bsstype",	required_argument,	0, 'b'  },
+	{"mode",	required_argument,	0, 'm'  },
+	{"key",		required_argument,	0, 'k'  },
+	{"sec",		required_argument,	0, 's'  },
+	{"auth",	required_argument,	0, 'a'  },
+	{"create-ibss",	required_argument,	0, 'c'  },
+	{"timeout",	required_argument,	0, 'T'  },
+	{"all-links",	no_argument,		0, 'a'  },
+	{"temporary",	no_argument,		0, 't'  },
+	{"root-dir",	required_argument,	0, 'R'  },
+	{"persistent",	no_argument,		0, 'P'  },
+	{"file",	required_argument,	0, 'f'  },
 	{ 0, 0, 0, 0 }
 };
 
@@ -205,25 +230,33 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext("usage:	dladm <subcommand> <args> ...\n"
-	    "\tshow-link       [-p] [-s [-i <interval>]] [<name>]\n"
-	    "\tshow-dev        [-p] [-s [-i <interval>]] [<dev>]\n"
+	    "\tshow-link       [-pP] [-s [-i <interval>]] [<link>]\n"
+	    "\trename-link     [-R <root-dir>] <oldlink> <newlink>\n"
 	    "\n"
-	    "\tcreate-aggr     [-t] [-R <root-dir>] [-P <policy>] [-l <mode>]\n"
-	    "\t                [-T <time>] [-u <address>] -d <dev> ... <key>\n"
-	    "\tmodify-aggr     [-t] [-R <root-dir>] [-P <policy>] [-l <mode>]\n"
-	    "\t                [-T <time>] [-u <address>] <key>\n"
-	    "\tdelete-aggr     [-t] [-R <root-dir>] <key>\n"
-	    "\tadd-aggr        [-t] [-R <root-dir>] -d <dev> ... <key>\n"
-	    "\tremove-aggr     [-t] [-R <root-dir>] -d <dev> ... <key>\n"
-	    "\tshow-aggr       [-pL][-s [-i <interval>]] [<key>]\n"
+	    "\tdelete-phys     <link>\n"
+	    "\tshow-phys       [-pP] [<link>]\n"
+	    "\tshow-dev        [-p]  [-s [-i <interval>]] [<dev>]\n"
 	    "\n"
-	    "\tscan-wifi       [-p] [-o <field>,...] [<name>]\n"
+	    "\tcreate-aggr     [-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
+	    "\t		[-T <time>] [-u <address>] [-l <link>] ... <link>\n"
+	    "\tmodify-aggr     [-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
+	    "\t		[-T <time>] [-u <address>] <link>\n"
+	    "\tdelete-aggr     [-t] [-R <root-dir>] <link>\n"
+	    "\tadd-aggr	[-t] [-R <root-dir>] [-l <link>] ... <link>\n"
+	    "\tremove-aggr     [-t] [-R <root-dir>] [-l <link>] ... <link>"
+	    "\n\tshow-aggr       [-pPLx][-s [-i <interval>]] [<link>]\n"
+	    "\n"
+	    "\tcreate-vlan     [-ft] [-R <root-dir>] -l <link> -v <vid> [link]"
+	    "\n\tdelete-vlan     [-t]  [-R <root-dir>] <link>\n"
+	    "\tshow-vlan       [-pP] [<link>]\n"
+	    "\n"
+	    "\tscan-wifi       [-p] [-o <field>,...] [<link>]\n"
 	    "\tconnect-wifi    [-e <essid>] [-i <bssid>] [-k <key>,...]"
 	    " [-s wep|wpa]\n"
 	    "\t                [-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
-	    "\t                [-T <time>] [<name>]\n"
-	    "\tdisconnect-wifi [-a] [<name>]\n"
-	    "\tshow-wifi       [-p] [-o <field>,...] [<name>]\n"
+	    "\t                [-T <time>] [<link>]\n"
+	    "\tdisconnect-wifi [-a] [<link>]\n"
+	    "\tshow-wifi       [-p] [-o <field>,...] [<link>]\n"
 	    "\n"
 	    "\tset-linkprop    [-t] [-R <root-dir>]  -p <prop>=<value>[,...]"
 	    " <name>\n"
@@ -276,36 +309,35 @@ main(int argc, char *argv[])
 static void
 do_create_aggr(int argc, char *argv[])
 {
-	char				option;
-	int				key;
-	uint32_t			policy = AGGR_POLICY_L4;
-	aggr_lacp_mode_t		lacp_mode = AGGR_LACP_OFF;
-	aggr_lacp_timer_t		lacp_timer = AGGR_LACP_TIMER_SHORT;
+	char			option;
+	int			key = 0;
+	uint32_t		policy = AGGR_POLICY_L4;
+	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
+	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
 	dladm_aggr_port_attr_db_t	port[MAXPORT];
-	uint_t				nport = 0;
-	uint8_t				mac_addr[ETHERADDRL];
-	boolean_t			mac_addr_fixed = B_FALSE;
-	boolean_t			P_arg = B_FALSE;
-	boolean_t			l_arg = B_FALSE;
-	boolean_t			t_arg = B_FALSE;
-	boolean_t			u_arg = B_FALSE;
-	boolean_t			T_arg = B_FALSE;
-	char				*altroot = NULL;
-	dladm_status_t			status;
+	uint_t			n, ndev, nlink;
+	uint8_t			mac_addr[ETHERADDRL];
+	boolean_t		mac_addr_fixed = B_FALSE;
+	boolean_t		P_arg = B_FALSE;
+	boolean_t		l_arg = B_FALSE;
+	boolean_t		u_arg = B_FALSE;
+	boolean_t		T_arg = B_FALSE;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	char			*altroot = NULL;
+	char			name[MAXLINKNAMELEN];
+	char			*devs[MAXPORT];
+	char			*links[MAXPORT];
+	dladm_status_t		status;
 
-	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":d:l:P:R:tu:T:",
-	    longopts, NULL)) != -1) {
+	ndev = nlink = opterr = 0;
+	while ((option = getopt_long(argc, argv, ":d:l:L:P:R:tfu:T:",
+	    lopts, NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT)
-				die("too many <dev> arguments");
+			if (ndev + nlink >= MAXPORT)
+				die("too many ports specified");
 
-			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN)
-				die("device name too long");
-
-			nport++;
+			devs[ndev++] = optarg;
 			break;
 		case 'P':
 			if (P_arg)
@@ -325,6 +357,19 @@ do_create_aggr(int argc, char *argv[])
 				die("invalid MAC address '%s'", optarg);
 			break;
 		case 'l':
+			if (isdigit(optarg[strlen(optarg) - 1])) {
+
+				/*
+				 * Ended with digit, possibly a link name.
+				 */
+				if (ndev + nlink >= MAXPORT)
+					die("too many ports specified");
+
+				links[nlink++] = optarg;
+				break;
+			}
+			/* FALLTHROUGH */
+		case 'L':
 			if (l_arg)
 				die_optdup(option);
 
@@ -341,7 +386,10 @@ do_create_aggr(int argc, char *argv[])
 				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
-			t_arg = B_TRUE;
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'f':
+			flags |= DLADM_OPT_FORCE;
 			break;
 		case 'R':
 			altroot = optarg;
@@ -352,37 +400,100 @@ do_create_aggr(int argc, char *argv[])
 		}
 	}
 
-	if (nport == 0)
+	if (ndev + nlink == 0)
 		usage();
 
-	/* get key value (required last argument) */
+	/* get key value or the aggregation name (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	if (!str2int(argv[optind], &key) || key < 1)
-		die("invalid key value '%s'", argv[optind]);
+	if (!str2int(argv[optind], &key)) {
+		if (strlcpy(name, argv[optind], MAXLINKNAMELEN) >=
+		    MAXLINKNAMELEN) {
+			die("link name too long '%s'", argv[optind]);
+		}
 
-	status = dladm_aggr_create(key, nport, port, policy, mac_addr_fixed,
-	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot);
-	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "create operation failed");
+		if (!dladm_valid_linkname(name))
+			die("invalid link name '%s'", argv[optind]);
+	} else {
+		(void) snprintf(name, MAXLINKNAMELEN, "aggr%d", key);
+	}
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	for (n = 0; n < ndev; n++) {
+		if (dladm_dev2linkid(devs[n], &port[n].lp_linkid) !=
+		    DLADM_STATUS_OK) {
+			die("invalid dev name '%s'", devs[n]);
+		}
+	}
+
+	for (n = 0; n < nlink; n++) {
+		if (dladm_name2info(links[n], &port[ndev + n].lp_linkid,
+		    NULL, NULL, NULL) != DLADM_STATUS_OK) {
+			die("invalid link name '%s'", links[n]);
+		}
+	}
+
+	status = dladm_aggr_create(name, key, ndev + nlink, port, policy,
+	    mac_addr_fixed, (const uchar_t *)mac_addr, lacp_mode,
+	    lacp_timer, flags);
+done:
+	if (status != DLADM_STATUS_OK) {
+		if (status == DLADM_STATUS_NONOTIF) {
+			die_dlerr(status, "not all links have link up/down "
+			    "detection; must use -f (see dladm(1M))\n");
+		} else {
+			die_dlerr(status, "create operation failed");
+		}
+	}
+}
+
+/*
+ * arg is either the key or the aggr name. Validate it and convert it to
+ * the linkid if altroot is NULL.
+ */
+static dladm_status_t
+i_dladm_aggr_get_linkid(const char *altroot, const char *arg,
+    datalink_id_t *linkidp, uint32_t flags)
+{
+	int		key = 0;
+	char		*aggr = NULL;
+	dladm_status_t	status;
+
+	if (!str2int(arg, &key))
+		aggr = (char *)arg;
+
+	if (aggr == NULL && key == 0)
+		return (DLADM_STATUS_LINKINVAL);
+
+	if (altroot != NULL)
+		return (DLADM_STATUS_OK);
+
+	if (aggr != NULL) {
+		status = dladm_name2info(aggr, linkidp, NULL, NULL, NULL);
+	} else {
+		status = dladm_key2linkid(key, linkidp, flags);
+	}
+
+	return (status);
 }
 
 static void
 do_delete_aggr(int argc, char *argv[])
 {
-	int			key;
 	char			option;
-	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
 	dladm_status_t		status;
+	datalink_id_t		linkid;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":R:t", longopts,
-	    NULL)) != -1) {
+	while ((option = getopt_long(argc, argv, ":R:t", lopts, NULL)) != -1) {
 		switch (option) {
 		case 't':
-			t_arg = B_TRUE;
+			flags &= ~DLADM_OPT_PERSIST;
 			break;
 		case 'R':
 			altroot = optarg;
@@ -393,14 +504,19 @@ do_delete_aggr(int argc, char *argv[])
 		}
 	}
 
-	/* get key value (required last argument) */
+	/* get key value or the aggregation name (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	if (!str2int(argv[optind], &key) || key < 1)
-		die("invalid key value '%s'", argv[optind]);
+	status = i_dladm_aggr_get_linkid(altroot, argv[optind], &linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-	status = dladm_aggr_delete(key, t_arg, altroot);
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_aggr_delete(linkid, flags);
+done:
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "delete operation failed");
 }
@@ -408,30 +524,37 @@ do_delete_aggr(int argc, char *argv[])
 static void
 do_add_aggr(int argc, char *argv[])
 {
-	char				option;
-	int				key;
+	char			option;
+	uint_t			n, ndev, nlink;
+	char			*altroot = NULL;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	datalink_id_t		linkid;
+	dladm_status_t		status;
 	dladm_aggr_port_attr_db_t	port[MAXPORT];
-	uint_t				nport = 0;
-	boolean_t			t_arg = B_FALSE;
-	char				*altroot = NULL;
-	dladm_status_t			status;
+	char			*devs[MAXPORT];
+	char			*links[MAXPORT];
 
-	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":d:R:t", longopts,
+	ndev = nlink = opterr = 0;
+	while ((option = getopt_long(argc, argv, ":d:l:R:tf", lopts,
 	    NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT)
-				die("too many <dev> arguments");
+			if (ndev + nlink >= MAXPORT)
+				die("too many ports specified");
 
-			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN)
-				die("device name too long");
+			devs[ndev++] = optarg;
+			break;
+		case 'l':
+			if (ndev + nlink >= MAXPORT)
+				die("too many ports specified");
 
-			nport++;
+			links[nlink++] = optarg;
 			break;
 		case 't':
-			t_arg = B_TRUE;
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'f':
+			flags |= DLADM_OPT_FORCE;
 			break;
 		case 'R':
 			altroot = optarg;
@@ -442,17 +565,38 @@ do_add_aggr(int argc, char *argv[])
 		}
 	}
 
-	if (nport == 0)
+	if (ndev + nlink == 0)
 		usage();
 
-	/* get key value (required last argument) */
+	/* get key value or the aggregation name (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	if (!str2int(argv[optind], &key) || key < 1)
-		die("invalid key value '%s'", argv[optind]);
+	if ((status = i_dladm_aggr_get_linkid(altroot, argv[optind], &linkid,
+	    flags & (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST))) !=
+	    DLADM_STATUS_OK) {
+		goto done;
+	}
 
-	status = dladm_aggr_add(key, nport, port, t_arg, altroot);
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	for (n = 0; n < ndev; n++) {
+		if (dladm_dev2linkid(devs[n], &(port[n].lp_linkid)) !=
+		    DLADM_STATUS_OK) {
+			die("invalid <dev> '%s'", devs[n]);
+		}
+	}
+
+	for (n = 0; n < nlink; n++) {
+		if (dladm_name2info(links[n], &port[n + ndev].lp_linkid,
+		    NULL, NULL, NULL) != DLADM_STATUS_OK) {
+			die("invalid <link> '%s'", links[n]);
+		}
+	}
+
+	status = dladm_aggr_add(linkid, ndev + nlink, port, flags);
+done:
 	if (status != DLADM_STATUS_OK) {
 		/*
 		 * checking DLADM_STATUS_NOTSUP is a temporary workaround
@@ -462,10 +606,14 @@ do_add_aggr(int argc, char *argv[])
 			(void) fprintf(stderr,
 			    gettext("%s: add operation failed: %s\n"),
 			    progname,
-			    gettext("device capabilities don't match"));
+			    gettext("link capabilities don't match"));
 			exit(ENOTSUP);
+		} else if (status == DLADM_STATUS_NONOTIF) {
+			die_dlerr(status, "not all links have link up/down "
+			    "detection; must use -f (see dladm(1M))\n");
+		} else {
+			die_dlerr(status, "add operation failed");
 		}
-		die_dlerr(status, "add operation failed");
 	}
 }
 
@@ -473,29 +621,34 @@ static void
 do_remove_aggr(int argc, char *argv[])
 {
 	char				option;
-	int				key;
 	dladm_aggr_port_attr_db_t	port[MAXPORT];
-	uint_t				nport = 0;
-	boolean_t			t_arg = B_FALSE;
+	uint_t				n, ndev, nlink;
+	char				*devs[MAXPORT];
+	char				*links[MAXPORT];
 	char				*altroot = NULL;
+	uint32_t			flags;
+	datalink_id_t			linkid;
 	dladm_status_t			status;
 
-	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":d:R:t",
-	    longopts, NULL)) != -1) {
+	flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	ndev = nlink = opterr = 0;
+	while ((option = getopt_long(argc, argv, ":d:l:R:t",
+	    lopts, NULL)) != -1) {
 		switch (option) {
 		case 'd':
-			if (nport >= MAXPORT)
-				die("too many <dev> arguments");
+			if (ndev + nlink >= MAXPORT)
+				die("too many ports specified");
 
-			if (strlcpy(port[nport].lp_devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN)
-				die("device name too long");
+			devs[ndev++] = optarg;
+			break;
+		case 'l':
+			if (ndev + nlink >= MAXPORT)
+				die("too many ports specified");
 
-			nport++;
+			links[nlink++] = optarg;
 			break;
 		case 't':
-			t_arg = B_TRUE;
+			flags &= ~DLADM_OPT_PERSIST;
 			break;
 		case 'R':
 			altroot = optarg;
@@ -506,17 +659,36 @@ do_remove_aggr(int argc, char *argv[])
 		}
 	}
 
-	if (nport == 0)
+	if (ndev + nlink == 0)
 		usage();
 
-	/* get key value (required last argument) */
+	/* get key value or the aggregation name (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	if (!str2int(argv[optind], &key) || key < 1)
-		die("invalid key value '%s'", argv[optind]);
+	status = i_dladm_aggr_get_linkid(altroot, argv[optind], &linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-	status = dladm_aggr_remove(key, nport, port, t_arg, altroot);
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	for (n = 0; n < ndev; n++) {
+		if (dladm_dev2linkid(devs[n], &(port[n].lp_linkid)) !=
+		    DLADM_STATUS_OK) {
+			die("invalid <dev> '%s'", devs[n]);
+		}
+	}
+
+	for (n = 0; n < nlink; n++) {
+		if (dladm_name2info(links[n], &port[n + ndev].lp_linkid,
+		    NULL, NULL, NULL) != DLADM_STATUS_OK) {
+			die("invalid <link> '%s'", links[n]);
+		}
+	}
+
+	status = dladm_aggr_remove(linkid, ndev + nlink, port, flags);
+done:
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "remove operation failed");
 }
@@ -525,19 +697,19 @@ static void
 do_modify_aggr(int argc, char *argv[])
 {
 	char			option;
-	int			key;
 	uint32_t		policy = AGGR_POLICY_L4;
 	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
 	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
 	uint8_t			mac_addr[ETHERADDRL];
 	boolean_t		mac_addr_fixed = B_FALSE;
 	uint8_t			modify_mask = 0;
-	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
+	uint32_t		flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+	datalink_id_t		linkid;
 	dladm_status_t		status;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":l:P:R:tu:T:", longopts,
+	while ((option = getopt_long(argc, argv, ":L:l:P:R:tu:T:", lopts,
 	    NULL)) != -1) {
 		switch (option) {
 		case 'P':
@@ -560,6 +732,7 @@ do_modify_aggr(int argc, char *argv[])
 				die("invalid MAC address '%s'", optarg);
 			break;
 		case 'l':
+		case 'L':
 			if (modify_mask & DLADM_AGGR_MODIFY_LACP_MODE)
 				die_optdup(option);
 
@@ -578,7 +751,7 @@ do_modify_aggr(int argc, char *argv[])
 				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
-			t_arg = B_TRUE;
+			flags &= ~DLADM_OPT_PERSIST;
 			break;
 		case 'R':
 			altroot = optarg;
@@ -592,15 +765,21 @@ do_modify_aggr(int argc, char *argv[])
 	if (modify_mask == 0)
 		die("at least one of the -PulT options must be specified");
 
-	/* get key value (required last argument) */
+	/* get key value or the aggregation name (required last argument) */
 	if (optind != (argc-1))
 		usage();
 
-	if (!str2int(argv[optind], &key) || key < 1)
-		die("invalid key value '%s'", argv[optind]);
+	status = i_dladm_aggr_get_linkid(altroot, argv[optind], &linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-	status = dladm_aggr_modify(key, modify_mask, policy, mac_addr_fixed,
-	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot);
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_aggr_modify(linkid, modify_mask, policy, mac_addr_fixed,
+	    (const uchar_t *)mac_addr, lacp_mode, lacp_timer, flags);
+
+done:
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "modify operation failed");
 }
@@ -608,21 +787,27 @@ do_modify_aggr(int argc, char *argv[])
 static void
 do_up_aggr(int argc, char *argv[])
 {
-	int		key = 0;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
 
-	/* get aggregation key (optional last argument) */
+	/*
+	 * get the key or the name of the aggregation (optional last argument)
+	 */
 	if (argc == 2) {
-		if (!str2int(argv[1], &key) || key < 1)
-			die("invalid key value '%s'", argv[1]);
+		if ((status = i_dladm_aggr_get_linkid(NULL, argv[1], &linkid,
+		    DLADM_OPT_PERSIST)) != DLADM_STATUS_OK) {
+			goto done;
+		}
 	} else if (argc > 2) {
 		usage();
 	}
 
-	if ((status = dladm_aggr_up(key, NULL)) != DLADM_STATUS_OK) {
-		if (key != 0) {
-			die_dlerr(status, "could not bring up aggregation '%u'",
-			    key);
+	status = dladm_aggr_up(linkid);
+done:
+	if (status != DLADM_STATUS_OK) {
+		if (argc == 2) {
+			die_dlerr(status,
+			    "could not bring up aggregation '%s'", argv[1]);
 		} else {
 			die_dlerr(status, "could not bring aggregations up");
 		}
@@ -630,174 +815,554 @@ do_up_aggr(int argc, char *argv[])
 }
 
 static void
-do_down_aggr(int argc, char *argv[])
+do_create_vlan(int argc, char *argv[])
 {
+	char		*link = NULL;
+	char		drv[DLPI_LINKNAME_MAX];
+	uint_t		ppa;
+	datalink_id_t	linkid;
+	int		vid = 0;
+	char		option;
+	uint32_t	flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+	char		*altroot = NULL;
+	char		vlan[MAXLINKNAMELEN];
 	dladm_status_t	status;
-	int		key = 0;
 
-	/* get aggregation key (optional last argument) */
-	if (argc == 2) {
-		if (!str2int(argv[1], &key) || key < 1)
-			die("invalid key value '%s'", argv[1]);
-	} else if (argc > 2) {
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":tfl:v:",
+	    lopts, NULL)) != -1) {
+		switch (option) {
+		case 'v':
+			if (vid != 0)
+				die_optdup(option);
+
+			if (!str2int(optarg, &vid) || vid < 1 || vid > 4094)
+				die("invalid VLAN identifier '%s'", optarg);
+
+			break;
+		case 'l':
+			if (link != NULL)
+				die_optdup(option);
+
+			link = optarg;
+			break;
+		case 'f':
+			flags |= DLADM_OPT_FORCE;
+			break;
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
+		}
+	}
+
+	/* get vlan name if there is any */
+	if ((vid == 0) || (link == NULL) || (argc - optind > 1))
 		usage();
+
+	if (optind == (argc - 1)) {
+		if (strlcpy(vlan, argv[optind], MAXLINKNAMELEN) >=
+		    MAXLINKNAMELEN) {
+			die("vlan name too long '%s'", argv[optind]);
+		}
+	} else {
+		if ((dlpi_parselink(link, drv, &ppa) != DLPI_SUCCESS) ||
+		    (ppa >= 1000) ||
+		    (dlpi_makelink(vlan, drv, vid * 1000 + ppa) !=
+		    DLPI_SUCCESS)) {
+			die("invalid link name '%s'", link);
+		}
 	}
 
-	if ((status = dladm_aggr_down(key)) != DLADM_STATUS_OK) {
-		if (key != 0) {
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	if (dladm_name2info(link, &linkid, NULL, NULL, NULL) !=
+	    DLADM_STATUS_OK) {
+		die("invalid link name '%s'", link);
+	}
+
+	if ((status = dladm_vlan_create(vlan, linkid, vid, flags)) !=
+	    DLADM_STATUS_OK) {
+		if (status == DLADM_STATUS_NOTSUP) {
+			die_dlerr(status, "VLAN over '%s' may require lowered "
+			    "MTU; must use -f (see dladm(1M))\n", link);
+		} else {
+			die_dlerr(status, "create operation failed");
+		}
+	}
+}
+
+static void
+do_delete_vlan(int argc, char *argv[])
+{
+	char		option;
+	uint32_t	flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+	char		*altroot = NULL;
+	datalink_id_t	linkid;
+	dladm_status_t	status;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":R:t", lopts, NULL)) != -1) {
+		switch (option) {
+		case 't':
+			flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
+		}
+	}
+
+	/* get VLAN link name (required last argument) */
+	if (optind != (argc - 1))
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	status = dladm_name2info(argv[optind], &linkid, NULL, NULL, NULL);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	status = dladm_vlan_delete(linkid, flags);
+done:
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "delete operation failed");
+}
+
+static void
+do_up_vlan(int argc, char *argv[])
+{
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	dladm_status_t	status;
+
+	/*
+	 * get the name of the VLAN (optional last argument)
+	 */
+	if (argc > 2)
+		usage();
+
+	if (argc == 2) {
+		status = dladm_name2info(argv[1], &linkid, NULL, NULL, NULL);
+		if (status != DLADM_STATUS_OK)
+			goto done;
+	}
+
+	status = dladm_vlan_up(linkid);
+done:
+	if (status != DLADM_STATUS_OK) {
+		if (argc == 2) {
 			die_dlerr(status,
-			    "could not bring down aggregation '%u'", key);
+			    "could not bring up VLAN '%s'", argv[1]);
 		} else {
-			die_dlerr(status, "could not bring down aggregations");
+			die_dlerr(status, "could not bring VLANs up");
 		}
 	}
 }
 
-#define	TYPE_WIDTH	10
-
 static void
-print_link_parseable(const char *name, dladm_attr_t *dap, boolean_t legacy)
+do_rename_link(int argc, char *argv[])
 {
-	char	type[TYPE_WIDTH];
+	char		option;
+	char		*link1, *link2;
+	char		*altroot = NULL;
+	dladm_status_t	status;
 
-	if (!legacy) {
-		char	drv[DLPI_LINKNAME_MAX];
-		uint_t	instance;
-
-		if (dap->da_vid != 0) {
-			(void) snprintf(type, TYPE_WIDTH, "vlan %u",
-			    dap->da_vid);
-		} else {
-			(void) snprintf(type, TYPE_WIDTH, "non-vlan");
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":R:", lopts, NULL)) != -1) {
+		switch (option) {
+		case 'R':
+			altroot = optarg;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
 		}
-
-		if (dlpi_parselink(dap->da_dev, drv, &instance) != DLPI_SUCCESS)
-			return;
-
-		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
-			(void) printf("%s type=%s mtu=%d key=%u\n",
-			    name, type, dap->da_max_sdu, instance);
-		} else {
-			(void) printf("%s type=%s mtu=%d device=%s\n",
-			    name, type, dap->da_max_sdu, dap->da_dev);
-		}
-	} else {
-		(void) printf("%s type=legacy mtu=%d device=%s\n",
-		    name, dap->da_max_sdu, name);
 	}
+
+	/* get link1 and link2 name (required the last 2 arguments) */
+	if (optind != (argc - 2))
+		usage();
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+
+	link1 = argv[optind++];
+	link2 = argv[optind];
+	if ((status = dladm_rename_link(link1, link2)) != DLADM_STATUS_OK)
+		die_dlerr(status, "rename operation failed");
 }
 
 static void
-print_link(const char *name, dladm_attr_t *dap, boolean_t legacy)
+do_delete_phys(int argc, char *argv[])
 {
-	char	type[TYPE_WIDTH];
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	dladm_status_t	status;
 
-	if (!legacy) {
-		char 	drv[DLPI_LINKNAME_MAX];
-		uint_t	instance;
+	/* get link name (required the last argument) */
+	if (argc > 2)
+		usage();
 
-		if (dap->da_vid != 0) {
-			(void) snprintf(type, TYPE_WIDTH, gettext("vlan %u"),
-			    dap->da_vid);
-		} else {
-			(void) snprintf(type, TYPE_WIDTH, gettext("non-vlan"));
-		}
-
-		if (dlpi_parselink(dap->da_dev, drv, &instance) != DLPI_SUCCESS)
-			return;
-		if (strncmp(drv, AGGR_DRV, sizeof (AGGR_DRV)) == 0) {
-			(void) printf(gettext("%-9s\ttype: %s\tmtu: %d"
-			    "\taggregation: key %u\n"), name, type,
-			    dap->da_max_sdu, instance);
-		} else {
-			(void) printf(gettext("%-9s\ttype: %s\tmtu: "
-			    "%d\tdevice: %s\n"), name, type, dap->da_max_sdu,
-			    dap->da_dev);
-		}
-	} else {
-		(void) printf(gettext("%-9s\ttype: legacy\tmtu: "
-		    "%d\tdevice: %s\n"), name, dap->da_max_sdu, name);
+	if (argc == 2) {
+		status = dladm_name2info(argv[1], &linkid, NULL, NULL, NULL);
+		if (status != DLADM_STATUS_OK)
+			die_dlerr(status, "cannot delete '%s'", argv[1]);
 	}
+
+	if ((status = dladm_phys_delete(linkid)) != DLADM_STATUS_OK) {
+		if (argc == 2)
+			die_dlerr(status, "cannot delete '%s'", argv[1]);
+		else
+			die_dlerr(status, "delete operation failed");
+	}
+}
+
+/*ARGSUSED*/
+static int
+i_dladm_walk_linkmap(datalink_id_t linkid, void *arg)
+{
+	char			name[MAXLINKNAMELEN];
+	char			mediabuf[DLADM_STRSIZE];
+	char			classbuf[DLADM_STRSIZE];
+	datalink_class_t	class;
+	uint32_t		media;
+	uint32_t		flags;
+
+	if (dladm_datalink_id2info(linkid, &flags, &class, &media, name,
+	    MAXLINKNAMELEN) == DLADM_STATUS_OK) {
+		(void) dladm_class2str(class, classbuf);
+		(void) dladm_media2str(media, mediabuf);
+		(void) printf("%-12s%8d  %-12s%-20s %6d\n", name,
+		    linkid, classbuf, mediabuf, flags);
+	}
+	return (DLADM_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+static void
+do_show_linkmap(int argc, char *argv[])
+{
+	if (argc != 1)
+		die("invalid arguments");
+
+	(void) printf("%-12s%8s  %-12s%-20s %6s\n", "NAME", "LINKID",
+	    "CLASS", "MEDIA", "FLAGS");
+	(void) dladm_walk_datalink_id(i_dladm_walk_linkmap, NULL,
+	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
+	    DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+}
+
+/*
+ * Delete inactive physical links.
+ */
+/*ARGSUSED*/
+static int
+purge_phys(datalink_id_t linkid, void *arg)
+{
+	datalink_class_t	class;
+	uint32_t		flags;
+
+	if (dladm_datalink_id2info(linkid, &flags, &class, NULL,
+	    NULL, 0) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (class == DATALINK_CLASS_PHYS && !(flags & DLADM_OPT_ACTIVE))
+		(void) dladm_phys_delete(linkid);
+
+	return (DLADM_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+static void
+do_init_phys(int argc, char *argv[])
+{
+	di_node_t devtree;
+
+	if (argc > 1)
+		usage();
+
+	/*
+	 * Force all the devices to attach, therefore all the network physical
+	 * devices can be known to the dlmgmtd daemon.
+	 */
+	if ((devtree = di_init("/", DINFOFORCE | DINFOSUBTREE)) != DI_NODE_NIL)
+		di_fini(devtree);
+
+	(void) dladm_walk_datalink_id(purge_phys, NULL,
+	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
+}
+
+static void
+print_link_head(show_state_t *state)
+{
+	if (state->ls_donefirst)
+		return;
+	state->ls_donefirst = B_TRUE;
+
+	if (state->ls_parseable)
+		return;
+
+	if (state->ls_flags & DLADM_OPT_ACTIVE) {
+		(void) printf("%-12s%-8s%6s  %-9s%s\n", "LINK", "CLASS", "MTU",
+		    "STATE", "OVER");
+	} else {
+		(void) printf("%-12s%-8s%s\n", "LINK", "CLASS", "OVER");
+	}
+}
+
+/*
+ * Print the active topology information.
+ */
+static dladm_status_t
+print_link_topology(show_state_t *state, datalink_id_t linkid,
+    datalink_class_t class, char **pptr, char *lim)
+{
+	char		*fmt;
+	char		over[MAXLINKNAMELEN];
+	uint32_t	flags = state->ls_flags;
+	dladm_status_t	status = DLADM_STATUS_OK;
+
+	if (state->ls_parseable)
+		fmt = "OVER=\"%s";
+	else
+		fmt = "%s";
+
+	if (class == DATALINK_CLASS_VLAN) {
+		dladm_vlan_attr_t	vinfo;
+
+		status = dladm_vlan_info(linkid, &vinfo, flags);
+		if (status != DLADM_STATUS_OK)
+			goto done;
+		status = dladm_datalink_id2info(vinfo.dv_linkid, NULL, NULL,
+		    NULL, over, sizeof (over));
+		if (status != DLADM_STATUS_OK)
+			goto done;
+
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, over);
+	} else if (class == DATALINK_CLASS_AGGR) {
+		dladm_aggr_grp_attr_t	ginfo;
+		int			i;
+
+		status = dladm_aggr_info(linkid, &ginfo, flags);
+		if (status != DLADM_STATUS_OK)
+			goto done;
+
+		if (ginfo.lg_nports == 0) {
+			status = DLADM_STATUS_BADVAL;
+			goto done;
+		}
+		for (i = 0; i < ginfo.lg_nports; i++) {
+			status = dladm_datalink_id2info(
+			    ginfo.lg_ports[i].lp_linkid, NULL, NULL, NULL, over,
+			    sizeof (over));
+			if (status != DLADM_STATUS_OK) {
+				free(ginfo.lg_ports);
+				goto done;
+			}
+			/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, over);
+			fmt = " %s";
+		}
+		free(ginfo.lg_ports);
+	} else if (class == DATALINK_CLASS_VNIC) {
+		dladm_vnic_attr_sys_t	vinfo;
+
+		if ((status = dladm_vnic_info(linkid, &vinfo, flags)) !=
+		    DLADM_STATUS_OK || (status = dladm_datalink_id2info(
+		    vinfo.va_link_id, NULL, NULL, NULL, over,
+		    sizeof (over))) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, over);
+	} else {
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt,
+		    state->ls_parseable ? "" : "--");
+	}
+	if (state->ls_parseable)
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "\"\n");
+	else
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "\n");
+
+done:
+	return (status);
+}
+
+static dladm_status_t
+print_link(show_state_t *state, datalink_id_t linkid, char **pptr, char *lim)
+{
+	char			link[MAXLINKNAMELEN];
+	char			buf[DLADM_STRSIZE];
+	datalink_class_t	class;
+	uint_t			mtu;
+	char			*fmt;
+	uint32_t		flags;
+	dladm_status_t		status;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, &class, NULL,
+	    link, sizeof (link))) != DLADM_STATUS_OK) {
+		goto done;
+	}
+
+	if (!(state->ls_flags & flags)) {
+		status = DLADM_STATUS_NOTFOUND;
+		goto done;
+	}
+
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		dladm_attr_t	dlattr;
+
+		if (class == DATALINK_CLASS_PHYS) {
+			dladm_phys_attr_t	dpa;
+			dlpi_handle_t		dh;
+			dlpi_info_t		dlinfo;
+
+			if ((status = dladm_phys_info(linkid, &dpa,
+			    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
+				goto done;
+			}
+
+			if (!dpa.dp_novanity)
+				goto link_mtu;
+
+			/*
+			 * This is a physical link that does not have
+			 * vanity naming support.
+			 */
+			if (dlpi_open(dpa.dp_dev, &dh, DLPI_DEVONLY) !=
+			    DLPI_SUCCESS) {
+				status = DLADM_STATUS_NOTFOUND;
+				goto done;
+			}
+
+			if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS) {
+				dlpi_close(dh);
+				status = DLADM_STATUS_BADARG;
+				goto done;
+			}
+
+			dlpi_close(dh);
+			mtu = dlinfo.di_max_sdu;
+		} else {
+link_mtu:
+			status = dladm_info(linkid, &dlattr);
+			if (status != DLADM_STATUS_OK)
+				goto done;
+			mtu = dlattr.da_max_sdu;
+		}
+	}
+
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		if (state->ls_parseable)
+			fmt = "LINK=\"%s\" CLASS=\"%s\" MTU=\"%d\" ";
+		else
+			fmt = "%-12s%-8s%6d  ";
+	} else {
+		if (state->ls_parseable)
+			fmt = "LINK=\"%s\" CLASS=\"%s\" ";
+		else
+			fmt = "%-12s%-8s";
+	}
+
+	(void) dladm_class2str(class, buf);
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, link,
+		    buf, mtu);
+	} else {
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, link, buf);
+	}
+
+	(void) get_linkstate(link, B_TRUE, buf);
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		if (state->ls_parseable) {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "STATE=\"%s\" ", buf);
+		} else {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-9s", buf);
+		}
+	}
+
+	status = print_link_topology(state, linkid, class, pptr, lim);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+done:
+	return (status);
 }
 
 static int
-get_if_info(const char *name, dladm_attr_t *dlattrp, boolean_t *legacy)
+show_link(datalink_id_t linkid, void *arg)
 {
-	int	err;
+	show_state_t	*state = arg;
+	dladm_status_t	status;
+	char		buf[MAXLINELEN];
+	char		*ptr = buf, *lim = buf + MAXLINELEN;
 
-	if ((err = dladm_info(name, dlattrp)) == 0) {
-		*legacy = B_FALSE;
-	} else if (err < 0 && errno == ENODEV) {
-		dlpi_handle_t   dh;
-		dlpi_info_t	dlinfo;
+	status = print_link(state, linkid, &ptr, lim);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	print_link_head(state);
+	(void) printf("%s", buf);
 
-		/*
-		 * A return value of ENODEV means that the specified
-		 * device is not gldv3.
-		 */
-		if (dlpi_open(name, &dh, 0) != DLPI_SUCCESS) {
-			errno = ENOENT;
-			return (-1);
-		}
-		if (dlpi_info(dh, &dlinfo, 0) != DLPI_SUCCESS) {
-			dlpi_close(dh);
-			errno = EINVAL;
-			return (-1);
-		}
-		dlpi_close(dh);
-		*legacy = B_TRUE;
-		bzero(dlattrp, sizeof (*dlattrp));
-		dlattrp->da_max_sdu = dlinfo.di_max_sdu;
-
-	} else {
-		/*
-		 * If the return value is not ENODEV, this means that
-		 * user is either passing in a bogus interface name
-		 * or a vlan interface name that doesn't exist yet.
-		 */
-		errno = ENOENT;
-		return (-1);
-	}
-	return (0);
+done:
+	state->ls_status = status;
+	return (DLADM_WALK_CONTINUE);
 }
 
-/* ARGSUSED */
-static void
-show_link(void *arg, const char *name)
+static int
+show_link_stats(datalink_id_t linkid, void *arg)
 {
-	dladm_attr_t	dlattr;
-	boolean_t	legacy = B_TRUE;
-	show_link_state_t *state = (show_link_state_t *)arg;
-
-	if (get_if_info(name, &dlattr, &legacy) < 0)
-		die("invalid link '%s'", name);
-
-	if (state->ls_parseable) {
-		print_link_parseable(name, &dlattr, legacy);
-	} else {
-		print_link(name, &dlattr, legacy);
-	}
-}
-
-static void
-show_link_stats(void *arg, const char *name)
-{
-	show_link_state_t *state = (show_link_state_t *)arg;
+	char link[MAXLINKNAMELEN];
+	datalink_class_t class;
+	show_state_t *state = arg;
 	pktsum_t stats, diff_stats;
+	dladm_phys_attr_t dpa;
 
 	if (state->ls_firstonly) {
 		if (state->ls_donefirst)
-			return;
+			return (DLADM_WALK_CONTINUE);
 		state->ls_donefirst = B_TRUE;
 	} else {
 		bzero(&state->ls_prevstats, sizeof (state->ls_prevstats));
 	}
 
-	get_link_stats(name, &stats);
+	if (dladm_datalink_id2info(linkid, NULL, &class, NULL, link,
+	    sizeof (link)) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (class == DATALINK_CLASS_PHYS) {
+		if (dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE) !=
+		    DLADM_STATUS_OK) {
+			return (DLADM_WALK_CONTINUE);
+		}
+		if (dpa.dp_novanity)
+			get_mac_stats(dpa.dp_dev, &stats);
+		else
+			get_link_stats(link, &stats);
+	} else {
+		get_link_stats(link, &stats);
+	}
 	stats_diff(&diff_stats, &stats, &state->ls_prevstats);
 
-	(void) printf("%s", name);
-	(void) printf("\t\t%-10llu", diff_stats.ipackets);
+	(void) printf("%-12s", link);
+	(void) printf("%-10llu", diff_stats.ipackets);
 	(void) printf("%-12llu", diff_stats.rbytes);
 	(void) printf("%-8u", diff_stats.ierrors);
 	(void) printf("%-10llu", diff_stats.opackets);
@@ -805,218 +1370,358 @@ show_link_stats(void *arg, const char *name)
 	(void) printf("%-8u\n", diff_stats.oerrors);
 
 	state->ls_prevstats = stats;
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
-dump_grp(dladm_aggr_grp_attr_t *grp, boolean_t parseable)
-{
-	char buf[DLADM_STRSIZE];
-	char addr_str[ETHERADDRL * 3];
-
-	if (!parseable) {
-		(void) printf(gettext("key: %d (0x%04x)"),
-		    grp->lg_key, grp->lg_key);
-
-		(void) printf(gettext("\tpolicy: %s"),
-		    dladm_aggr_policy2str(grp->lg_policy, buf));
-
-		(void) printf(gettext("\taddress: %s (%s)\n"),
-		    dladm_aggr_macaddr2str(grp->lg_mac, addr_str),
-		    (grp->lg_mac_fixed) ? gettext("fixed") : gettext("auto"));
-	} else {
-		(void) printf("aggr key=%d", grp->lg_key);
-
-		(void) printf(" policy=%s",
-		    dladm_aggr_policy2str(grp->lg_policy, buf));
-
-		(void) printf(" address=%s",
-		    dladm_aggr_macaddr2str(grp->lg_mac, addr_str));
-
-		(void) printf(" address-type=%s\n",
-		    (grp->lg_mac_fixed) ? "fixed" : "auto");
-	}
-}
-
-static void
-dump_grp_lacp(dladm_aggr_grp_attr_t *grp, boolean_t parseable)
-{
-	char lacp_mode_str[DLADM_STRSIZE];
-	char lacp_timer_str[DLADM_STRSIZE];
-
-	(void) dladm_aggr_lacpmode2str(grp->lg_lacp_mode, lacp_mode_str);
-	(void) dladm_aggr_lacptimer2str(grp->lg_lacp_timer, lacp_timer_str);
-
-	if (!parseable) {
-		(void) printf(gettext("\t\tLACP mode: %s"), lacp_mode_str);
-		(void) printf(gettext("\tLACP timer: %s\n"), lacp_timer_str);
-	} else {
-		(void) printf(" lacp-mode=%s", lacp_mode_str);
-		(void) printf(" lacp-timer=%s\n", lacp_timer_str);
-	}
-}
-
-static void
-dump_grp_stats(dladm_aggr_grp_attr_t *grp)
-{
-	(void) printf("key: %d", grp->lg_key);
-	(void) printf("\tipackets  rbytes      opackets	 obytes		 ");
-	(void) printf("%%ipkts	%%opkts\n");
-}
-
-static void
-dump_ports_lacp_head(void)
-{
-	(void) printf(DUMP_LACP_FORMAT, gettext("device"), gettext("activity"),
-	    gettext("timeout"), gettext("aggregatable"), gettext("sync"),
-	    gettext("coll"), gettext("dist"), gettext("defaulted"),
-	    gettext("expired"));
-}
-
-static void
-dump_ports_head(void)
-{
-	(void) printf(gettext("	   device\taddress\t\t	speed\t\tduplex\tlink\t"
-	    "state\n"));
-}
-
-static void
-dump_port(dladm_aggr_port_attr_t *port, boolean_t parseable)
-{
-	char *dev = port->lp_devname;
-	char mac_addr[ETHERADDRL * 3];
-	char buf[DLADM_STRSIZE];
-
-	if (!parseable) {
-		(void) printf("	   %-9s\t%s", dev, dladm_aggr_macaddr2str(
-		    port->lp_mac, mac_addr));
-		(void) printf("\t %5uMb", (int)(mac_ifspeed(dev) /
-		    1000000ull));
-		(void) printf("\t%s", mac_link_duplex(dev, buf));
-		(void) printf("\t%s", mac_link_state(dev, buf));
-		(void) printf("\t%s\n",
-		    dladm_aggr_portstate2str(port->lp_state, buf));
-
-	} else {
-		(void) printf(" device=%s address=%s", dev,
-		    dladm_aggr_macaddr2str(port->lp_mac, mac_addr));
-		(void) printf(" speed=%u", (int)(mac_ifspeed(dev) /
-		    1000000ull));
-		(void) printf(" duplex=%s", mac_link_duplex(dev, buf));
-		(void) printf(" link=%s", mac_link_state(dev, buf));
-		(void) printf(" port=%s",
-		    dladm_aggr_portstate2str(port->lp_state, buf));
-	}
-}
-
-static void
-dump_port_lacp(dladm_aggr_port_attr_t *port)
-{
-	aggr_lacp_state_t *state = &port->lp_lacp_state;
-
-	(void) printf(DUMP_LACP_FORMAT,
-	    port->lp_devname, state->bit.activity ? "active" : "passive",
-	    state->bit.timeout ? "short" : "long",
-	    state->bit.aggregation ? "yes" : "no",
-	    state->bit.sync ? "yes" : "no",
-	    state->bit.collecting ? "yes" : "no",
-	    state->bit.distributing ? "yes" : "no",
-	    state->bit.defaulted ? "yes" : "no",
-	    state->bit.expired ? "yes" : "no");
-}
-
-static void
-dump_port_stat(int index, show_grp_state_t *state, pktsum_t *port_stats,
-    pktsum_t *tot_stats)
+print_port_stat(const char *port, pktsum_t *old_stats, pktsum_t *port_stats,
+    pktsum_t *tot_stats, char **pptr, char *lim)
 {
 	pktsum_t	diff_stats;
-	pktsum_t	*old_stats = &state->gs_prevstats[index];
 
 	stats_diff(&diff_stats, port_stats, old_stats);
+	*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+	    "%-12s%-10s%8llu  %8llu  %8llu  %8llu  ", "", port,
+	    diff_stats.ipackets, diff_stats.rbytes, diff_stats.opackets,
+	    diff_stats.obytes);
 
-	(void) printf("\t%-10llu", diff_stats.ipackets);
-	(void) printf("%-12llu", diff_stats.rbytes);
-	(void) printf("%-10llu", diff_stats.opackets);
-	(void) printf("%-12llu", diff_stats.obytes);
-
-	if (tot_stats->ipackets == 0)
-		(void) printf("\t-");
-	else
-		(void) printf("\t%-6.1f", (double)diff_stats.ipackets/
+	if (tot_stats->ipackets == 0) {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%8s ", "--");
+	} else {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%7.1f%% ",
+		    (double)diff_stats.ipackets/
 		    (double)tot_stats->ipackets * 100);
+	}
 
-	if (tot_stats->opackets == 0)
-		(void) printf("\t-");
-	else
-		(void) printf("\t%-6.1f", (double)diff_stats.opackets/
+	if (tot_stats->opackets == 0) {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%8s\n", "--");
+	} else {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%7.1f%%\n",
+		    (double)diff_stats.opackets/
 		    (double)tot_stats->opackets * 100);
-
-	(void) printf("\n");
+	}
 
 	*old_stats = *port_stats;
 }
 
-static int
-show_key(void *arg, dladm_aggr_grp_attr_t *grp)
+static void
+print_aggr_head(show_grp_state_t *state)
 {
-	show_grp_state_t	*state = (show_grp_state_t *)arg;
-	int			i;
-	pktsum_t		pktsumtot, port_stat;
+	if (state->gs_donefirst)
+		return;
+	state->gs_donefirst = B_TRUE;
 
-	if (state->gs_key != 0 && state->gs_key != grp->lg_key)
-		return (0);
+	if (state->gs_parseable)
+		return;
+
+	if (state->gs_lacp) {
+		(void) printf("%-12s%-12s%-13s%-5s%-5s%-5s%-10s%s\n", "LINK",
+		    "PORT", "AGGREGATABLE", "SYNC", "COLL", "DIST",
+		    "DEFAULTED", "EXPIRED");
+	} else if (state->gs_extended) {
+		(void) printf("%-12s%-14s%6s  %-9s%-9s%-18s%s\n", "LINK",
+		    "PORT", "SPEED", "DUPLEX", "STATE", "ADDRESS", "PORTSTATE");
+	} else if (!state->gs_stats) {
+		(void) printf("%-12s%-8s%-24s%-13s%-11s%s\n", "LINK", "POLICY",
+		    "ADDRPOLICY", "LACPACTIVITY", "LACPTIMER", "FLAGS");
+	}
+}
+
+static dladm_status_t
+print_aggr_info(show_grp_state_t *state, const char *link,
+    dladm_aggr_grp_attr_t *ginfop, char **pptr, char *lim)
+{
+	char			buf[DLADM_STRSIZE];
+	char			*fmt;
+	char			addr_str[ETHERADDRL * 3];
+	char			str[ETHERADDRL * 3 + 2];
+
+	if (state->gs_parseable)
+		fmt = "LINK=\"%s\" POLICY=\"%s\" ADDRPOLICY=\"%s%s\" ";
+	else
+		fmt = "%-12s%-8s%-6s%-18s";
+
+	if (ginfop->lg_mac_fixed) {
+		(void) dladm_aggr_macaddr2str(ginfop->lg_mac, addr_str);
+		(void) snprintf(str, ETHERADDRL * 3 + 3, " (%s)", addr_str);
+	} else {
+		str[0] = '\0';
+	}
+
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+	*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, link,
+	    dladm_aggr_policy2str(ginfop->lg_policy, buf),
+	    ginfop->lg_mac_fixed ? "fixed" : "auto", str);
+
+	(void) dladm_aggr_lacpmode2str(ginfop->lg_lacp_mode, buf);
+	if (state->gs_parseable) {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+		    "LACPACTIVITY=\"%s\" ", buf);
+	} else {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%-13s", buf);
+	}
+
+	(void) dladm_aggr_lacptimer2str(ginfop->lg_lacp_timer, buf);
+	if (state->gs_parseable) {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+		    "LACPTIMER=\"%s\" FLAGS=\"%c----\"\n", buf,
+		    ginfop->lg_force ? 'f' : '-');
+	} else {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+		    "%-11s%c----\n", buf, ginfop->lg_force ? 'f' : '-');
+	}
+
+	return (DLADM_STATUS_OK);
+}
+
+static dladm_status_t
+print_aggr_extended(show_grp_state_t *state, const char *link,
+    dladm_aggr_grp_attr_t *ginfop, char **pptr, char *lim)
+{
+	char			addr_str[ETHERADDRL * 3];
+	char			port[MAXLINKNAMELEN];
+	dladm_phys_attr_t	dpa;
+	char			buf[DLADM_STRSIZE];
+	char			*fmt;
+	int			i;
+	dladm_status_t		status;
+
+	if (state->gs_parseable)
+		fmt = "LINK=\"%s\" PORT=\"%s\" SPEED=\"%uMb\" DUPLEX=\"%s\" ";
+	else
+		fmt = "%-12s%-14s%4uMb  %-9s";
+
+	(void) dladm_aggr_macaddr2str(ginfop->lg_mac, addr_str);
+
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+	*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, link,
+	    state->gs_parseable ? "" : "--",
+	    (uint_t)((get_ifspeed(link, B_TRUE)) / 1000000ull),
+	    get_linkduplex(link, B_TRUE, buf));
+
+	(void) get_linkstate(link, B_TRUE, buf);
+	if (state->gs_parseable) {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+		    "STATE=\"%s\" ADDRESS=\"%s\" PORTSTATE=\"%s\"\n", buf,
+		    addr_str, "");
+	} else {
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), "%-9s%-18s%s\n",
+		    buf, addr_str, "--");
+	}
+
+	for (i = 0; i < ginfop->lg_nports; i++) {
+		dladm_aggr_port_attr_t	*portp = &(ginfop->lg_ports[i]);
+		const char		*tmp;
+
+		if ((status = dladm_datalink_id2info(portp->lp_linkid, NULL,
+		    NULL, NULL, port, sizeof (port))) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		if ((status = dladm_phys_info(portp->lp_linkid, &dpa,
+		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		(void) dladm_aggr_macaddr2str(portp->lp_mac, addr_str);
+
+		if (state->gs_parseable)
+			tmp = link;
+		else
+			tmp = "";
+
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, tmp, port,
+		    (uint_t)((get_ifspeed(dpa.dp_dev, B_FALSE)) / 1000000ull),
+		    get_linkduplex(dpa.dp_dev, B_FALSE, buf));
+
+		(void) get_linkstate(dpa.dp_dev, B_FALSE, buf);
+		if (state->gs_parseable) {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "STATE=\"%s\" ADDRESS=\"%s\" ", buf, addr_str);
+		} else {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-9s%-18s", buf, addr_str);
+		}
+
+		(void) dladm_aggr_portstate2str(
+		    ginfop->lg_ports[i].lp_state, buf);
+		if (state->gs_parseable) {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "PORTSTATE=\"%s\"\n", buf);
+		} else {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%s\n", buf);
+		}
+	}
+
+	status = DLADM_STATUS_OK;
+done:
+	return (status);
+}
+
+static dladm_status_t
+print_aggr_lacp(show_grp_state_t *state, const char *link,
+    dladm_aggr_grp_attr_t *ginfop, char **pptr, char *lim)
+{
+	char		port[MAXLINKNAMELEN];
+	char		*fmt;
+	const char	*dlink = link;
+	int		i;
+	dladm_status_t	status;
+
+	if (state->gs_parseable) {
+		fmt = "LINK=\"%s\" PORT=\"%s\" AGGREGATABLE=\"%s\" SYNC=\"%s\" "
+		    "COLL=\"%s\" DIST=\"%s\" DEFAULTED=\"%s\" EXPITED=\"%s\"\n";
+	} else {
+		fmt = "%-12s%-12s%-13s%-5s%-5s%-5s%-10s%s\n";
+	}
+
+	for (i = 0; i < ginfop->lg_nports; i++) {
+		aggr_lacp_state_t *lstate;
+
+		status = dladm_datalink_id2info(ginfop->lg_ports[i].lp_linkid,
+		    NULL, NULL, NULL, port, sizeof (port));
+		if (status != DLADM_STATUS_OK)
+			goto done;
+
+		/*
+		 * Only display link for the first port.
+		 */
+		if ((i > 0) && !(state->gs_parseable))
+			dlink = "";
+		lstate = &(ginfop->lg_ports[i].lp_lacp_state);
+
+		/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+		*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, dlink, port,
+		    lstate->bit.aggregation ? "yes" : "no",
+		    lstate->bit.sync ? "yes" : "no",
+		    lstate->bit.collecting ? "yes" : "no",
+		    lstate->bit.distributing ? "yes" : "no",
+		    lstate->bit.defaulted ? "yes" : "no",
+		    lstate->bit.expired ? "yes" : "no");
+	}
+
+	status = DLADM_STATUS_OK;
+done:
+	return (status);
+}
+
+static dladm_status_t
+print_aggr_stats(show_grp_state_t *state, const char *link,
+    dladm_aggr_grp_attr_t *ginfop, char **pptr, char *lim)
+{
+	char			port[MAXLINKNAMELEN];
+	dladm_phys_attr_t	dpa;
+	dladm_aggr_port_attr_t	*portp;
+	pktsum_t		pktsumtot, port_stat;
+	dladm_status_t		status;
+	int			i;
+
 	if (state->gs_firstonly) {
-		if (state->gs_found)
-			return (0);
+		if (state->gs_donefirst)
+			return (DLADM_WALK_CONTINUE);
+		state->gs_donefirst = B_TRUE;
 	} else {
 		bzero(&state->gs_prevstats, sizeof (state->gs_prevstats));
 	}
 
-	state->gs_found = B_TRUE;
+	/* sum the ports statistics */
+	bzero(&pktsumtot, sizeof (pktsumtot));
 
-	if (state->gs_stats) {
-		/* show statistics */
-		dump_grp_stats(grp);
+	for (i = 0; i < ginfop->lg_nports; i++) {
 
-		/* sum the ports statistics */
-		bzero(&pktsumtot, sizeof (pktsumtot));
-		for (i = 0; i < grp->lg_nports; i++) {
-			get_mac_stats(grp->lg_ports[i].lp_devname, &port_stat);
-			stats_total(&pktsumtot, &port_stat,
-			    &state->gs_prevstats[i]);
+		portp = &(ginfop->lg_ports[i]);
+		if ((status = dladm_phys_info(portp->lp_linkid, &dpa,
+		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
+			goto done;
 		}
 
-		(void) printf("	   Total");
-		(void) printf("\t%-10llu", pktsumtot.ipackets);
-		(void) printf("%-12llu", pktsumtot.rbytes);
-		(void) printf("%-10llu", pktsumtot.opackets);
-		(void) printf("%-12llu\n", pktsumtot.obytes);
-
-		for (i = 0; i < grp->lg_nports; i++) {
-			get_mac_stats(grp->lg_ports[i].lp_devname, &port_stat);
-			(void) printf("	   %s", grp->lg_ports[i].lp_devname);
-			dump_port_stat(i, state, &port_stat, &pktsumtot);
-		}
-	} else if (state->gs_lacp) {
-		/* show LACP info */
-		dump_grp(grp, state->gs_parseable);
-		dump_grp_lacp(grp, state->gs_parseable);
-		dump_ports_lacp_head();
-		for (i = 0; i < grp->lg_nports; i++)
-			dump_port_lacp(&grp->lg_ports[i]);
-	} else {
-		dump_grp(grp, state->gs_parseable);
-		if (!state->gs_parseable)
-			dump_ports_head();
-		for (i = 0; i < grp->lg_nports; i++) {
-			if (state->gs_parseable)
-				(void) printf("dev key=%d", grp->lg_key);
-			dump_port(&grp->lg_ports[i], state->gs_parseable);
-			if (state->gs_parseable)
-				(void) printf("\n");
-		}
+		get_mac_stats(dpa.dp_dev, &port_stat);
+		stats_total(&pktsumtot, &port_stat, &state->gs_prevstats[i]);
 	}
 
-	return (0);
+	*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+	    "%-12s%-10s%8llu  %8llu  %8llu  %8llu  %8s %8s\n", link, "--",
+	    pktsumtot.ipackets, pktsumtot.rbytes, pktsumtot.opackets,
+	    pktsumtot.obytes, "--", "--");
+
+	for (i = 0; i < ginfop->lg_nports; i++) {
+		portp = &(ginfop->lg_ports[i]);
+
+		if ((status = dladm_phys_info(portp->lp_linkid, &dpa,
+		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		get_mac_stats(dpa.dp_dev, &port_stat);
+
+		if ((status = dladm_datalink_id2info(portp->lp_linkid, NULL,
+		    NULL, NULL, port, sizeof (port))) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		print_port_stat(port, &state->gs_prevstats[i], &port_stat,
+		    &pktsumtot, pptr, lim);
+	}
+
+	status = DLADM_STATUS_OK;
+done:
+	return (status);
+}
+
+static dladm_status_t
+print_aggr(show_grp_state_t *state, datalink_id_t linkid, char **pptr,
+    char *lim)
+{
+	char			link[MAXLINKNAMELEN];
+	dladm_aggr_grp_attr_t	ginfo;
+	uint32_t		flags;
+	dladm_status_t		status;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, NULL, link,
+	    sizeof (link))) != DLADM_STATUS_OK) {
+		return (status);
+	}
+
+	if (!(state->gs_flags & flags))
+		return (DLADM_STATUS_NOTFOUND);
+
+	status = dladm_aggr_info(linkid, &ginfo, state->gs_flags);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if (state->gs_lacp)
+		status = print_aggr_lacp(state, link, &ginfo, pptr, lim);
+	else if (state->gs_extended)
+		status = print_aggr_extended(state, link, &ginfo, pptr, lim);
+	else if (state->gs_stats)
+		status = print_aggr_stats(state, link, &ginfo, pptr, lim);
+	else
+		status = print_aggr_info(state, link, &ginfo, pptr, lim);
+
+done:
+	free(ginfo.lg_ports);
+	return (status);
+}
+
+static int
+show_aggr(datalink_id_t linkid, void *arg)
+{
+	show_grp_state_t	*state = arg;
+	dladm_status_t		status;
+	char			buf[MAXLINELEN];
+	char			*ptr = buf, *lim = buf + MAXLINELEN;
+
+	status = print_aggr(state, linkid, &ptr, lim);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	print_aggr_head(state);
+	(void) printf("%s", buf);
+
+done:
+	state->gs_status = status;
+	return (DLADM_WALK_CONTINUE);
 }
 
 static int
@@ -1044,83 +1749,102 @@ kstat_value(kstat_t *ksp, const char *name, uint8_t type, void *buf)
 	return (0);
 }
 
-static void
-show_dev(void *arg, const char *dev)
+static int
+show_dev(const char *dev, void *arg)
 {
-	show_mac_state_t *state = (show_mac_state_t *)arg;
-	char buf[DLADM_STRSIZE];
+	show_state_t	*state = arg;
+	char		buf[DLADM_STRSIZE];
+	char		*fmt;
 
-	(void) printf("%s", dev);
+	if (state->ls_parseable)
+		fmt = "DEV=\"%s\" STATE=\"%s\" SPEED=\"%u\" ";
+	else
+		fmt = "%-12s%-10s%4uMb  ";
 
-	if (!state->ms_parseable) {
-		(void) printf(gettext("\t\tlink: %s"),
-		    mac_link_state(dev, buf));
-		(void) printf(gettext("\tspeed: %5uMb"),
-		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
-		(void) printf(gettext("\tduplex: %s\n"),
-		    mac_link_duplex(dev, buf));
-	} else {
-		(void) printf(" link=%s", mac_link_state(dev, buf));
-		(void) printf(" speed=%u",
-		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
-		(void) printf(" duplex=%s\n", mac_link_duplex(dev, buf));
+	if (!state->ls_donefirst) {
+		if (!state->ls_parseable) {
+			(void) printf("%-12s%-10s%6s  %s\n", "DEV", "STATE",
+			    "SPEED", "DUPLEX");
+		}
+		state->ls_donefirst = B_TRUE;
 	}
+
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+	(void) printf(fmt, dev, get_linkstate(dev, B_FALSE, buf),
+	    (uint_t)(get_ifspeed(dev, B_FALSE) / 1000000ull));
+
+	(void) get_linkduplex(dev, B_FALSE, buf);
+	if (state->ls_parseable)
+		(void) printf("DUPLEX=\"%s\"\n", buf);
+	else
+		(void) printf("%s\n", buf);
+
+	return (DLADM_WALK_CONTINUE);
 }
 
-/*ARGSUSED*/
-static void
-show_dev_stats(void *arg, const char *dev)
+static int
+show_dev_stats(const char *dev, void *arg)
 {
-	show_mac_state_t *state = (show_mac_state_t *)arg;
+	show_state_t *state = arg;
 	pktsum_t stats, diff_stats;
 
-	if (state->ms_firstonly) {
-		if (state->ms_donefirst)
-			return;
-		state->ms_donefirst = B_TRUE;
+	if (state->ls_firstonly) {
+		if (state->ls_donefirst)
+			return (DLADM_WALK_CONTINUE);
+		state->ls_donefirst = B_TRUE;
 	} else {
-		bzero(&state->ms_prevstats, sizeof (state->ms_prevstats));
+		bzero(&state->ls_prevstats, sizeof (state->ls_prevstats));
 	}
 
 	get_mac_stats(dev, &stats);
-	stats_diff(&diff_stats, &stats, &state->ms_prevstats);
+	stats_diff(&diff_stats, &stats, &state->ls_prevstats);
 
-	(void) printf("%s", dev);
-	(void) printf("\t\t%-10llu", diff_stats.ipackets);
+	(void) printf("%-12s", dev);
+	(void) printf("%-10llu", diff_stats.ipackets);
 	(void) printf("%-12llu", diff_stats.rbytes);
 	(void) printf("%-8u", diff_stats.ierrors);
 	(void) printf("%-10llu", diff_stats.opackets);
 	(void) printf("%-12llu", diff_stats.obytes);
 	(void) printf("%-8u\n", diff_stats.oerrors);
 
-	state->ms_prevstats = stats;
+	state->ls_prevstats = stats;
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
 do_show_link(int argc, char *argv[])
 {
-	char		*name = NULL;
 	int		option;
 	boolean_t	s_arg = B_FALSE;
 	boolean_t	i_arg = B_FALSE;
+	uint32_t	flags = DLADM_OPT_ACTIVE;
+	boolean_t	p_arg = B_FALSE;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	int		interval = 0;
-	show_link_state_t state;
-
-	state.ls_stats = B_FALSE;
-	state.ls_parseable = B_FALSE;
+	show_state_t	state;
+	dladm_status_t	status;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":psi:",
-	    longopts, NULL)) != -1) {
+	while ((option = getopt_long(argc, argv, ":pPsi:",
+	    show_lopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			state.ls_parseable = B_TRUE;
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
 			break;
 		case 's':
 			if (s_arg)
 				die_optdup(option);
 
 			s_arg = B_TRUE;
+			break;
+		case 'P':
+			if (flags != DLADM_OPT_ACTIVE)
+				die_optdup(option);
+
+			flags = DLADM_OPT_PERSIST;
 			break;
 		case 'i':
 			if (i_arg)
@@ -1139,73 +1863,100 @@ do_show_link(int argc, char *argv[])
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
 
+	if (s_arg && (p_arg || flags != DLADM_OPT_ACTIVE))
+		die("the option -%c cannot be used with -s", p_arg ? 'p' : 'P');
+
 	/* get link name (optional last argument) */
-	if (optind == (argc-1))
-		name = argv[optind];
-	else if (optind != argc)
+	if (optind == (argc-1)) {
+		uint32_t	f;
+
+		if ((status = dladm_name2info(argv[optind], &linkid, &f,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+
+		if (!(f & flags)) {
+			die_dlerr(DLADM_STATUS_BADARG, "link %s is %s",
+			    argv[optind], flags == DLADM_OPT_PERSIST ?
+			    "a temporary link" : "temporarily removed");
+		}
+	} else if (optind != argc) {
 		usage();
+	}
 
 	if (s_arg) {
-		link_stats(name, interval);
+		link_stats(linkid, interval);
 		return;
 	}
 
-	if (name == NULL) {
-		(void) dladm_walk(show_link, &state);
+	state.ls_parseable = p_arg;
+	state.ls_flags = flags;
+	state.ls_donefirst = B_FALSE;
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_link, &state,
+		    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE, flags);
 	} else {
-		show_link(&state, name);
+		(void) show_link(linkid, &state);
+		if (state.ls_status != DLADM_STATUS_OK) {
+			die_dlerr(state.ls_status, "failed to show link %s",
+			    argv[optind]);
+		}
 	}
 }
 
 static void
 do_show_aggr(int argc, char *argv[])
 {
-	int			option;
-	int			key = 0;
 	boolean_t		L_arg = B_FALSE;
 	boolean_t		s_arg = B_FALSE;
 	boolean_t		i_arg = B_FALSE;
+	boolean_t		p_arg = B_FALSE;
+	boolean_t		x_arg = B_FALSE;
 	show_grp_state_t	state;
+	uint32_t		flags = DLADM_OPT_ACTIVE;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
+	int			option;
 	int			interval = 0;
-
-	state.gs_stats = B_FALSE;
-	state.gs_lacp = B_FALSE;
-	state.gs_parseable = B_FALSE;
+	int			key;
+	dladm_status_t		status;
 
 	opterr = 0;
-	while ((option = getopt_long(argc, argv, ":Lpsi:",
-	    longopts, NULL)) != -1) {
+	while ((option = getopt_long(argc, argv, ":LpPxsi:",
+	    show_lopts, NULL)) != -1) {
 		switch (option) {
 		case 'L':
 			if (L_arg)
 				die_optdup(option);
 
-			if (s_arg || i_arg) {
-				die("the option -L cannot be used with -i "
-				    "or -s");
-			}
-
 			L_arg = B_TRUE;
-			state.gs_lacp = B_TRUE;
 			break;
 		case 'p':
-			state.gs_parseable = B_TRUE;
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
+			break;
+		case 'x':
+			if (x_arg)
+				die_optdup(option);
+
+			x_arg = B_TRUE;
+			break;
+		case 'P':
+			if (flags != DLADM_OPT_ACTIVE)
+				die_optdup(option);
+
+			flags = DLADM_OPT_PERSIST;
 			break;
 		case 's':
 			if (s_arg)
 				die_optdup(option);
-
-			if (L_arg)
-				die("the option -s cannot be used with -L");
 
 			s_arg = B_TRUE;
 			break;
 		case 'i':
 			if (i_arg)
 				die_optdup(option);
-
-			if (L_arg)
-				die("the option -i cannot be used with -L");
 
 			i_arg = B_TRUE;
 			if (!str2int(optarg, &interval) || interval == 0)
@@ -1220,26 +1971,56 @@ do_show_aggr(int argc, char *argv[])
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
 
-	/* get aggregation key (optional last argument) */
+	if (s_arg && (L_arg || p_arg || x_arg || flags != DLADM_OPT_ACTIVE)) {
+		die("the option -%c cannot be used with -s",
+		    L_arg ? 'L' : (p_arg ? 'p' : (x_arg ? 'x' : 'P')));
+	}
+
+	if (L_arg && flags != DLADM_OPT_ACTIVE)
+		die("the option -P cannot be used with -L");
+
+	if (x_arg && (L_arg || flags != DLADM_OPT_ACTIVE))
+		die("the option -%c cannot be used with -x", L_arg ? 'L' : 'P');
+
+	/* get aggregation key or aggrname (optional last argument) */
 	if (optind == (argc-1)) {
-		if (!str2int(argv[optind], &key) || key < 1)
-			die("invalid key value '%s'", argv[optind]);
+		if (!str2int(argv[optind], &key)) {
+			status = dladm_name2info(argv[optind], &linkid, NULL,
+			    NULL, NULL);
+		} else {
+			status = dladm_key2linkid((uint16_t)key,
+			    &linkid, DLADM_OPT_ACTIVE);
+		}
+
+		if (status != DLADM_STATUS_OK)
+			die("non-existent aggregation '%s'", argv[optind]);
+
 	} else if (optind != argc) {
 		usage();
 	}
 
+	bzero(&state, sizeof (state));
+	state.gs_lacp = L_arg;
+	state.gs_stats = s_arg;
+	state.gs_flags = flags;
+	state.gs_parseable = p_arg;
+	state.gs_extended = x_arg;
+
 	if (s_arg) {
-		aggr_stats(key, interval);
+		aggr_stats(linkid, &state, interval);
 		return;
 	}
 
-	state.gs_key = key;
-	state.gs_found = B_FALSE;
-
-	(void) dladm_aggr_walk(show_key, &state);
-
-	if (key != 0 && !state.gs_found)
-		die("non-existent aggregation key '%u'", key);
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_aggr, &state,
+		    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, flags);
+	} else {
+		(void) show_aggr(linkid, &state);
+		if (state.gs_status != DLADM_STATUS_OK) {
+			die_dlerr(state.gs_status, "failed to show aggr %s",
+			    argv[optind]);
+		}
+	}
 }
 
 static void
@@ -1249,17 +2030,20 @@ do_show_dev(int argc, char *argv[])
 	char		*dev = NULL;
 	boolean_t	s_arg = B_FALSE;
 	boolean_t	i_arg = B_FALSE;
+	boolean_t	p_arg = B_FALSE;
+	datalink_id_t	linkid;
 	int		interval = 0;
-	show_mac_state_t state;
-
-	state.ms_parseable = B_FALSE;
+	show_state_t	state;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":psi:",
-	    longopts, NULL)) != -1) {
+	    show_lopts, NULL)) != -1) {
 		switch (option) {
 		case 'p':
-			state.ms_parseable = B_TRUE;
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
 			break;
 		case 's':
 			if (s_arg)
@@ -1284,26 +2068,25 @@ do_show_dev(int argc, char *argv[])
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
 
+	if (s_arg && p_arg)
+		die("the option -s cannot be used with -p");
+
 	/* get dev name (optional last argument) */
-	if (optind == (argc-1))
+	if (optind == (argc-1)) {
+		uint32_t flags;
+
 		dev = argv[optind];
-	else if (optind != argc)
+
+		if (dladm_dev2linkid(dev, &linkid) != DLADM_STATUS_OK)
+			die("invalid device %s", dev);
+
+		if ((dladm_datalink_id2info(linkid, &flags, NULL, NULL,
+		    NULL, 0) != DLADM_STATUS_OK) ||
+		    !(flags & DLADM_OPT_ACTIVE)) {
+			die("device %s has been removed", dev);
+		}
+	} else if (optind != argc) {
 		usage();
-
-	if (dev != NULL) {
-		uint_t		ppa;
-		char		drv[DLPI_LINKNAME_MAX];
-		dladm_attr_t	dlattr;
-		boolean_t	legacy;
-
-		/*
-		 * Check for invalid devices.
-		 * aggregations and vlans are not considered devices.
-		 */
-		if (dlpi_parselink(dev, drv, &ppa) != DLPI_SUCCESS ||
-		    strcmp(drv, "aggr") == 0 || ppa >= 1000 ||
-		    get_if_info(dev, &dlattr, &legacy) < 0)
-			die("invalid device '%s'", dev);
 	}
 
 	if (s_arg) {
@@ -1311,22 +2094,336 @@ do_show_dev(int argc, char *argv[])
 		return;
 	}
 
-	if (dev == NULL)
+	state.ls_donefirst = B_FALSE;
+	state.ls_parseable = p_arg;
+	if (dev == NULL) {
 		(void) dladm_mac_walk(show_dev, &state);
-	else
-		show_dev(&state, dev);
+	} else {
+		(void) show_dev(dev, &state);
+	}
 }
 
-/* ARGSUSED */
 static void
-link_stats(const char *link, uint_t interval)
+print_phys_head(show_state_t *state)
 {
-	dladm_attr_t		dlattr;
-	boolean_t		legacy;
-	show_link_state_t	state;
+	if (state->ls_donefirst)
+		return;
+	state->ls_donefirst = B_TRUE;
 
-	if (link != NULL && get_if_info(link, &dlattr, &legacy) < 0)
-		die("invalid link '%s'", link);
+	if (state->ls_parseable)
+		return;
+
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		(void) printf("%-12s%-20s%-10s%6s  %-9s%s\n", "LINK",
+		    "MEDIA", "STATE", "SPEED", "DUPLEX", "DEVICE");
+	} else {
+		(void) printf("%-12s%-12s%-20s%s\n", "LINK", "DEVICE",
+		    "MEDIA", "FLAGS");
+	}
+}
+
+static dladm_status_t
+print_phys(show_state_t *state, datalink_id_t linkid, char **pptr, char *lim)
+{
+	char			link[MAXLINKNAMELEN];
+	dladm_phys_attr_t	dpa;
+	char			buf[DLADM_STRSIZE];
+	uint32_t		flags;
+	datalink_class_t	class;
+	uint32_t		media;
+	dladm_status_t		status;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, &class, &media,
+	    link, sizeof (link))) != DLADM_STATUS_OK) {
+		goto done;
+	}
+
+	if (class != DATALINK_CLASS_PHYS) {
+		status = DLADM_STATUS_BADARG;
+		goto done;
+	}
+
+	if (!(state->ls_flags & flags)) {
+		status = DLADM_STATUS_NOTFOUND;
+		goto done;
+	}
+
+	status = dladm_phys_info(linkid, &dpa, state->ls_flags);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	if (state->ls_flags == DLADM_OPT_ACTIVE) {
+		char		name[MAXLINKNAMELEN];
+		boolean_t	islink;
+
+		if (!dpa.dp_novanity) {
+			(void) strlcpy(name, link, sizeof (name));
+			islink = B_TRUE;
+		} else {
+			/*
+			 * This is a physical link that does not have
+			 * vanity naming support.
+			 */
+			(void) strlcpy(name, dpa.dp_dev, sizeof (name));
+			islink = B_FALSE;
+		}
+
+		if (state->ls_parseable) {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "LINK=\"%s\" MEDIA=\"%s\" ", link,
+			    dladm_media2str(media, buf));
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "STATE=\"%s\" SPEED=\"%uMb\" ",
+			    get_linkstate(name, islink, buf),
+			    (uint_t)((get_ifspeed(name, islink)) / 1000000ull));
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "DUPLEX=\"%s\" DEVICE=\"%s\"\n",
+			    get_linkduplex(name, islink, buf), dpa.dp_dev);
+		} else {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-12s%-20s", link,
+			    dladm_media2str(media, buf));
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-10s%4uMb  ",
+			    get_linkstate(name, islink, buf),
+			    (uint_t)((get_ifspeed(name, islink)) / 1000000ull));
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-9s%s\n", get_linkduplex(name, islink, buf),
+			    dpa.dp_dev);
+		}
+	} else {
+		if (state->ls_parseable) {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "LINK=\"%s\" DEVICE=\"%s\" MEDIA=\"%s\" "
+			    "FLAGS=\"%c----\"\n", link, dpa.dp_dev,
+			    dladm_media2str(media, buf),
+			    flags & DLADM_OPT_ACTIVE ? '-' : 'r');
+		} else {
+			*pptr += snprintf(*pptr, BUFLEN(lim, *pptr),
+			    "%-12s%-12s%-20s%c----\n", link,
+			    dpa.dp_dev, dladm_media2str(media, buf),
+			    flags & DLADM_OPT_ACTIVE ? '-' : 'r');
+		}
+	}
+
+done:
+	return (status);
+}
+
+static int
+show_phys(datalink_id_t linkid, void *arg)
+{
+	show_state_t	*state = arg;
+	dladm_status_t	status;
+	char		buf[MAXLINELEN];
+	char		*ptr = buf, *lim = buf + MAXLINELEN;
+
+	status = print_phys(state, linkid, &ptr, lim);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	print_phys_head(state);
+	(void) printf("%s", buf);
+
+done:
+	state->ls_status = status;
+	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+print_vlan_head(show_state_t *state)
+{
+	if (state->ls_donefirst)
+		return;
+	state->ls_donefirst = B_TRUE;
+
+	if (state->ls_parseable)
+		return;
+
+	(void) printf("%-12s%5s   %-12s%s\n", "LINK", "VID", "OVER", "FLAGS");
+}
+
+/*
+ * Print the active topology information.
+ */
+static dladm_status_t
+print_vlan(show_state_t *state, datalink_id_t linkid, char **pptr, char *lim)
+{
+	char			link[MAXLINKNAMELEN];
+	char			over[MAXLINKNAMELEN];
+	char			*fmt;
+	dladm_vlan_attr_t	vinfo;
+	uint32_t		flags;
+	dladm_status_t		status;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, NULL, link,
+	    sizeof (link))) != DLADM_STATUS_OK) {
+		goto done;
+	}
+
+	if (!(state->ls_flags & flags)) {
+		status = DLADM_STATUS_NOTFOUND;
+		goto done;
+	}
+
+	if ((status = dladm_vlan_info(linkid, &vinfo, state->ls_flags)) !=
+	    DLADM_STATUS_OK || (status = dladm_datalink_id2info(
+	    vinfo.dv_linkid, NULL, NULL, NULL, over, sizeof (over))) !=
+	    DLADM_STATUS_OK) {
+		goto done;
+	}
+
+	if (state->ls_parseable)
+		fmt = "LINK=\"%s\" VID=\"%d\" OVER=\"%s\" FLAGS=\"%c%c---\"\n";
+	else
+		fmt = "%-12s%5d   %-12s%c%c---\n";
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
+	*pptr += snprintf(*pptr, BUFLEN(lim, *pptr), fmt, link,
+	    vinfo.dv_vid, over, vinfo.dv_force ? 'f' : '-',
+	    vinfo.dv_implicit ? 'i' : '-');
+
+done:
+	return (status);
+}
+
+static int
+show_vlan(datalink_id_t linkid, void *arg)
+{
+	show_state_t	*state = arg;
+	dladm_status_t	status;
+	char		buf[MAXLINELEN];
+	char		*ptr = buf, *lim = buf + MAXLINELEN;
+
+	status = print_vlan(state, linkid, &ptr, lim);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	print_vlan_head(state);
+	(void) printf("%s", buf);
+
+done:
+	state->ls_status = status;
+	return (DLADM_WALK_CONTINUE);
+}
+
+static void
+do_show_phys(int argc, char *argv[])
+{
+	int		option;
+	uint32_t	flags = DLADM_OPT_ACTIVE;
+	boolean_t	p_arg = B_FALSE;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	show_state_t	state;
+	dladm_status_t	status;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":pP",
+	    show_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
+			break;
+		case 'P':
+			if (flags != DLADM_OPT_ACTIVE)
+				die_optdup(option);
+
+			flags = DLADM_OPT_PERSIST;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
+		}
+	}
+
+	/* get link name (optional last argument) */
+	if (optind == (argc-1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
+		usage();
+	}
+
+	state.ls_parseable = p_arg;
+	state.ls_flags = flags;
+	state.ls_donefirst = B_FALSE;
+
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_phys, &state,
+		    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, flags);
+	} else {
+		(void) show_phys(linkid, &state);
+		if (state.ls_status != DLADM_STATUS_OK) {
+			die_dlerr(state.ls_status,
+			    "failed to show physical link %s", argv[optind]);
+		}
+	}
+}
+
+static void
+do_show_vlan(int argc, char *argv[])
+{
+	int		option;
+	uint32_t	flags = DLADM_OPT_ACTIVE;
+	boolean_t	p_arg = B_FALSE;
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	show_state_t	state;
+	dladm_status_t	status;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":pP",
+	    show_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'p':
+			if (p_arg)
+				die_optdup(option);
+
+			p_arg = B_TRUE;
+			break;
+		case 'P':
+			if (flags != DLADM_OPT_ACTIVE)
+				die_optdup(option);
+
+			flags = DLADM_OPT_PERSIST;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
+		}
+	}
+
+	/* get link name (optional last argument) */
+	if (optind == (argc-1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
+		usage();
+	}
+
+	state.ls_parseable = p_arg;
+	state.ls_flags = flags;
+	state.ls_donefirst = B_FALSE;
+
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_vlan, &state,
+		    DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE, flags);
+	} else {
+		(void) show_vlan(linkid, &state);
+		if (state.ls_status != DLADM_STATUS_OK) {
+			die_dlerr(state.ls_status, "failed to show vlan %s",
+			    argv[optind]);
+		}
+	}
+}
+
+static void
+link_stats(datalink_id_t linkid, uint_t interval)
+{
+	show_state_t	state;
 
 	bzero(&state, sizeof (state));
 
@@ -1337,14 +2434,18 @@ link_stats(const char *link, uint_t interval)
 	state.ls_firstonly = (interval != 0);
 
 	for (;;) {
-		(void) printf("\t\tipackets  rbytes	 ierrors ");
-		(void) printf("opackets	 obytes	     oerrors\n");
+		(void) printf("%-12s%-10s%-12s%-8s%-10s%-12s%-8s\n",
+		    "LINK", "IPACKETS", "RBYTES", "IERRORS", "OPACKETS",
+		    "OBYTES", "OERRORS");
 
 		state.ls_donefirst = B_FALSE;
-		if (link == NULL)
-			(void) dladm_walk(show_link_stats, &state);
-		else
-			show_link_stats(&state, link);
+		if (linkid == DATALINK_ALL_LINKID) {
+			(void) dladm_walk_datalink_id(show_link_stats, &state,
+			    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
+			    DLADM_OPT_ACTIVE);
+		} else {
+			(void) show_link_stats(linkid, &state);
+		}
 
 		if (interval == 0)
 			break;
@@ -1353,27 +2454,28 @@ link_stats(const char *link, uint_t interval)
 	}
 }
 
-/* ARGSUSED */
 static void
-aggr_stats(uint32_t key, uint_t interval)
+aggr_stats(datalink_id_t linkid, show_grp_state_t *state, uint_t interval)
 {
-	show_grp_state_t state;
-
-	bzero(&state, sizeof (state));
-	state.gs_stats = B_TRUE;
-	state.gs_key = key;
-
 	/*
 	 * If an interval is specified, continuously show the stats
 	 * only for the first group.
 	 */
-	state.gs_firstonly = (interval != 0);
+	state->gs_firstonly = (interval != 0);
 
 	for (;;) {
-		state.gs_found = B_FALSE;
-		(void) dladm_aggr_walk(show_key, &state);
-		if (state.gs_key != 0 && !state.gs_found)
-			die("non-existent aggregation key '%u'", key);
+
+		(void) printf("%-12s%-10s%8s  %8s  %8s  %8s  %-9s%s\n",
+		    "LINK", "PORT", "IPACKETS", "RBYTES", "OPACKETS",
+		    "OBYTES", "IPKTDIST", "OPKTDIST");
+
+		state->gs_donefirst = B_FALSE;
+		if (linkid == DATALINK_ALL_LINKID)
+			(void) dladm_walk_datalink_id(show_aggr, state,
+			    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE,
+			    DLADM_OPT_ACTIVE);
+		else
+			(void) show_aggr(linkid, state);
 
 		if (interval == 0)
 			break;
@@ -1382,11 +2484,10 @@ aggr_stats(uint32_t key, uint_t interval)
 	}
 }
 
-/* ARGSUSED */
 static void
 dev_stats(const char *dev, uint32_t interval)
 {
-	show_mac_state_t state;
+	show_state_t state;
 
 	bzero(&state, sizeof (state));
 
@@ -1394,24 +2495,28 @@ dev_stats(const char *dev, uint32_t interval)
 	 * If an interval is specified, continuously show the stats
 	 * only for the first MAC port.
 	 */
-	state.ms_firstonly = (interval != 0);
+	state.ls_firstonly = (interval != 0);
 
 	for (;;) {
 
-		(void) printf("\t\tipackets  rbytes	 ierrors ");
-		(void) printf("opackets	 obytes	     oerrors\n");
+		(void) printf("%-12s%-10s%-12s%-8s%-10s%-12s%-8s\n",
+		    "DEV", "IPACKETS", "RBYTES", "IERRORS", "OPACKETS",
+		    "OBYTES", "OERRORS");
 
-		state.ms_donefirst = B_FALSE;
+		state.ls_donefirst = B_FALSE;
 		if (dev == NULL)
 			(void) dladm_mac_walk(show_dev_stats, &state);
 		else
-			show_dev_stats(&state, dev);
+			(void) show_dev_stats(dev, &state);
 
 		if (interval == 0)
 			break;
 
 		(void) sleep(interval);
 	}
+
+	if (dev != NULL && state.ls_status != DLADM_STATUS_OK)
+		die_dlerr(state.ls_status, "cannot show device '%s'", dev);
 }
 
 /* accumulate stats (s1 += (s2 - s3)) */
@@ -1438,16 +2543,8 @@ stats_diff(pktsum_t *s1, pktsum_t *s2, pktsum_t *s3)
 	s1->oerrors = s2->oerrors - s3->oerrors;
 }
 
-/*
- * In the following routines, we do the first kstat_lookup() assuming that
- * the device is gldv3-based and that the kstat name is the one passed in
- * as the "name" argument. If the lookup fails, we redo the kstat_lookup()
- * omitting the kstat name. This second lookup is needed for getting kstats
- * from legacy devices. This can fail too if the device is not attached or
- * the device is legacy and doesn't export the kstats we need.
- */
 static void
-get_stats(char *module, int instance, char *name, pktsum_t *stats)
+get_stats(char *module, int instance, const char *name, pktsum_t *stats)
 {
 	kstat_ctl_t	*kcp;
 	kstat_t		*ksp;
@@ -1457,8 +2554,7 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 		return;
 	}
 
-	if ((ksp = kstat_lookup(kcp, module, instance, name)) == NULL &&
-	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL) {
+	if ((ksp = kstat_lookup(kcp, module, instance, (char *)name)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1494,56 +2590,45 @@ get_stats(char *module, int instance, char *name, pktsum_t *stats)
 	    &stats->oerrors) < 0)
 		goto bail;
 
+bail:
 	(void) kstat_close(kcp);
 	return;
 
-bail:
-	(void) kstat_close(kcp);
 }
 
 static void
 get_mac_stats(const char *dev, pktsum_t *stats)
 {
-	char	module[DLPI_LINKNAME_MAX];
-	uint_t	instance;
+	char module[DLPI_LINKNAME_MAX];
+	uint_t instance;
 
+	bzero(stats, sizeof (*stats));
 	if (dlpi_parselink(dev, module, &instance) != DLPI_SUCCESS)
 		return;
-	bzero(stats, sizeof (*stats));
+
 	get_stats(module, instance, "mac", stats);
 }
 
 static void
 get_link_stats(const char *link, pktsum_t *stats)
 {
-	char	module[DLPI_LINKNAME_MAX];
-	uint_t	instance;
-
-	if (dlpi_parselink(link, module, &instance) != DLPI_SUCCESS)
-		return;
 	bzero(stats, sizeof (*stats));
-	get_stats(module, instance, (char *)link, stats);
+	get_stats("link", 0, link, stats);
 }
 
 static int
-get_single_mac_stat(const char *dev, const char *name, uint8_t type,
-    void *val)
+query_kstat(char *module, int instance, const char *name, const char *stat,
+    uint8_t type, void *val)
 {
-	char		module[DLPI_LINKNAME_MAX];
-	uint_t		instance;
 	kstat_ctl_t	*kcp;
 	kstat_t		*ksp;
-
-	if (dlpi_parselink(dev, module, &instance) != DLPI_SUCCESS)
-		return (-1);
 
 	if ((kcp = kstat_open()) == NULL) {
 		warn("kstat open operation failed");
 		return (-1);
 	}
 
-	if ((ksp = kstat_lookup(kcp, module, instance, "mac")) == NULL &&
-	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL) {
+	if ((ksp = kstat_lookup(kcp, module, instance, (char *)name)) == NULL) {
 		/*
 		 * The kstat query could fail if the underlying MAC
 		 * driver was already detached.
@@ -1556,7 +2641,7 @@ get_single_mac_stat(const char *dev, const char *name, uint8_t type,
 		goto bail;
 	}
 
-	if (kstat_value(ksp, name, type, val) < 0)
+	if (kstat_value(ksp, stat, type, val) < 0)
 		goto bail;
 
 	(void) kstat_close(kcp);
@@ -1567,41 +2652,59 @@ bail:
 	return (-1);
 }
 
+static int
+get_one_kstat(const char *name, const char *stat, uint8_t type,
+    void *val, boolean_t islink)
+{
+	char		module[DLPI_LINKNAME_MAX];
+	uint_t		instance;
+
+	if (islink) {
+		return (query_kstat("link", 0, name, stat, type, val));
+	} else {
+		if (dlpi_parselink(name, module, &instance) != DLPI_SUCCESS)
+			return (-1);
+
+		return (query_kstat(module, instance, "mac", stat, type, val));
+	}
+}
+
 static uint64_t
-mac_ifspeed(const char *dev)
+get_ifspeed(const char *name, boolean_t islink)
 {
 	uint64_t ifspeed = 0;
 
-	(void) get_single_mac_stat(dev, "ifspeed", KSTAT_DATA_UINT64, &ifspeed);
+	(void) get_one_kstat(name, "ifspeed", KSTAT_DATA_UINT64,
+	    &ifspeed, islink);
+
 	return (ifspeed);
 }
 
 static const char *
-mac_link_state(const char *dev, char *buf)
+get_linkstate(const char *name, boolean_t islink, char *buf)
 {
-	link_state_t	link_state;
+	link_state_t	linkstate;
 
-	if (get_single_mac_stat(dev, "link_state", KSTAT_DATA_UINT32,
-	    &link_state) != 0) {
+	if (get_one_kstat(name, "link_state", KSTAT_DATA_UINT32,
+	    &linkstate, islink) != 0) {
 		(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
 		return (buf);
 	}
-
-	return (dladm_linkstate2str(link_state, buf));
+	return (dladm_linkstate2str(linkstate, buf));
 }
 
 static const char *
-mac_link_duplex(const char *dev, char *buf)
+get_linkduplex(const char *name, boolean_t islink, char *buf)
 {
-	link_duplex_t	link_duplex;
+	link_duplex_t	linkduplex;
 
-	if (get_single_mac_stat(dev, "link_duplex", KSTAT_DATA_UINT32,
-	    &link_duplex) != 0) {
+	if (get_one_kstat(name, "link_duplex", KSTAT_DATA_UINT32,
+	    &linkduplex, islink) != 0) {
 		(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
 		return (buf);
 	}
 
-	return (dladm_linkduplex2str(link_duplex, buf));
+	return (dladm_linkduplex2str(linkduplex, buf));
 }
 
 #define	WIFI_CMD_SCAN	0x00000001
@@ -1616,17 +2719,17 @@ typedef struct wifi_field {
 } wifi_field_t;
 
 static wifi_field_t wifi_fields[] = {
-{ "link",	"LINK",		10, 0,				WIFI_CMD_ALL},
+{ "link",	"LINK",		10, 0,			WIFI_CMD_ALL},
 { "essid",	"ESSID",	19, DLADM_WLAN_ATTR_ESSID,	WIFI_CMD_ALL},
 { "bssid",	"BSSID/IBSSID", 17, DLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
 { "ibssid",	"BSSID/IBSSID", 17, DLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
 { "mode",	"MODE",		6,  DLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
 { "speed",	"SPEED",	6,  DLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
 { "auth",	"AUTH",		8,  DLADM_WLAN_ATTR_AUTH,	WIFI_CMD_SHOW},
-{ "bsstype",	"BSSTYPE",	8,  DLADM_WLAN_ATTR_BSSTYPE,	WIFI_CMD_ALL},
-{ "sec",	"SEC",		6,  DLADM_WLAN_ATTR_SECMODE,	WIFI_CMD_ALL},
-{ "status",	"STATUS",	17, DLADM_WLAN_LINKATTR_STATUS,	WIFI_CMD_SHOW},
-{ "strength",	"STRENGTH",	10, DLADM_WLAN_ATTR_STRENGTH,	WIFI_CMD_ALL}}
+{ "bsstype",	"BSSTYPE",	8,  DLADM_WLAN_ATTR_BSSTYPE, WIFI_CMD_ALL},
+{ "sec",	"SEC",		6,  DLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
+{ "status",	"STATUS",	17, DLADM_WLAN_LINKATTR_STATUS, WIFI_CMD_SHOW},
+{ "strength",	"STRENGTH",	10, DLADM_WLAN_ATTR_STRENGTH, WIFI_CMD_ALL}}
 ;
 
 static char *all_scan_wifi_fields =
@@ -1751,7 +2854,7 @@ fail:
 }
 
 typedef struct print_wifi_state {
-	const char	*ws_link;
+	char		*ws_link;
 	boolean_t	ws_parseable;
 	boolean_t	ws_header;
 	wifi_field_t	**ws_fields;
@@ -1877,18 +2980,24 @@ print_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 	return (B_TRUE);
 }
 
-static boolean_t
-scan_wifi(void *arg, const char *link)
+static int
+scan_wifi(datalink_id_t linkid, void *arg)
 {
 	print_wifi_state_t	*statep = arg;
 	dladm_status_t		status;
+	char			link[MAXLINKNAMELEN];
+
+	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL, link,
+	    sizeof (link)) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
 
 	statep->ws_link = link;
-	status = dladm_wlan_scan(link, statep, print_scan_results);
+	status = dladm_wlan_scan(linkid, statep, print_scan_results);
 	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "cannot scan link '%s'", link);
+		die_dlerr(status, "cannot scan link '%s'", statep->ws_link);
 
-	return (B_TRUE);
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
@@ -1907,17 +3016,25 @@ print_link_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
 	print_wlan_attr(statep, wfp, &attrp->la_wlan_attr);
 }
 
-static boolean_t
-show_wifi(void *arg, const char *link)
+static int
+show_wifi(datalink_id_t linkid, void *arg)
 {
 	int			i;
 	print_wifi_state_t	*statep = arg;
 	dladm_wlan_linkattr_t	attr;
 	dladm_status_t		status;
+	char			link[MAXLINKNAMELEN];
 
-	status = dladm_wlan_get_linkattr(link, &attr);
+	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL, link,
+	    sizeof (link)) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	status = dladm_wlan_get_linkattr(linkid, &attr);
 	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "cannot get link attributes for '%s'", link);
+		die_dlerr(status, "cannot get link attributes for %s", link);
+
+	statep->ws_link = link;
 
 	if (statep->ws_header) {
 		statep->ws_header = B_FALSE;
@@ -1925,14 +3042,13 @@ show_wifi(void *arg, const char *link)
 			print_wifi_head(statep);
 	}
 
-	statep->ws_link = link;
 	statep->ws_overflow = 0;
 	for (i = 0; i < statep->ws_nfields; i++) {
 		statep->ws_lastfield = (i + 1 == statep->ws_nfields);
 		print_link_attr(statep, statep->ws_fields[i], &attr);
 	}
 	(void) putchar('\n');
-	return (B_TRUE);
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
@@ -1941,9 +3057,10 @@ do_display_wifi(int argc, char **argv, int cmd)
 	int			option;
 	char			*fields_str = NULL;
 	wifi_field_t		**fields;
-	boolean_t		(*callback)(void *, const char *);
+	int			(*callback)(datalink_id_t, void *);
 	uint_t			nfields;
 	print_wifi_state_t	state;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	dladm_status_t		status;
 
 	if (cmd == WIFI_CMD_SCAN)
@@ -1953,7 +3070,6 @@ do_display_wifi(int argc, char **argv, int cmd)
 	else
 		return;
 
-	state.ws_link = NULL;
 	state.ws_parseable = B_FALSE;
 	state.ws_header = B_TRUE;
 	opterr = 0;
@@ -1974,10 +3090,14 @@ do_display_wifi(int argc, char **argv, int cmd)
 		}
 	}
 
-	if (optind == (argc - 1))
-		state.ws_link = argv[optind];
-	else if (optind != argc)
+	if (optind == (argc - 1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
 		usage();
+	}
 
 	if (parse_wifi_fields(fields_str, &fields, &nfields, cmd) < 0)
 		die("invalid field(s) specified");
@@ -1985,12 +3105,11 @@ do_display_wifi(int argc, char **argv, int cmd)
 	state.ws_fields = fields;
 	state.ws_nfields = nfields;
 
-	if (state.ws_link == NULL) {
-		status = dladm_wlan_walk(&state, callback);
-		if (status != DLADM_STATUS_OK)
-			die_dlerr(status, "cannot walk wifi links");
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(callback, &state,
+		    DATALINK_CLASS_PHYS, DL_WIFI, DLADM_OPT_ACTIVE);
 	} else {
-		(void) (*callback)(&state, state.ws_link);
+		(void) (*callback)(linkid, &state);
 	}
 	free(fields);
 }
@@ -2009,18 +3128,18 @@ do_show_wifi(int argc, char **argv)
 
 typedef struct wlan_count_attr {
 	uint_t		wc_count;
-	const char	*wc_link;
+	datalink_id_t	wc_linkid;
 } wlan_count_attr_t;
 
-static boolean_t
-do_count_wlan(void *arg, const char *link)
+static int
+do_count_wlan(datalink_id_t linkid, void *arg)
 {
 	wlan_count_attr_t *cp = arg;
 
 	if (cp->wc_count == 0)
-		cp->wc_link = strdup(link);
+		cp->wc_linkid = linkid;
 	cp->wc_count++;
-	return (B_TRUE);
+	return (DLADM_WALK_CONTINUE);
 }
 
 static int
@@ -2086,7 +3205,7 @@ do_connect_wifi(int argc, char **argv)
 	dladm_wlan_attr_t	attr, *attrp;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	int			timeout = DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT;
-	const char		*link = NULL;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	dladm_wlan_key_t	*keys = NULL;
 	uint_t			key_count = 0;
 	uint_t			flags = 0;
@@ -2186,28 +3305,33 @@ do_connect_wifi(int argc, char **argv)
 		attr.wa_secmode = keysecmode;
 	}
 
-	if (optind == (argc - 1))
-		link = argv[optind];
-	else if (optind != argc)
+	if (optind == (argc - 1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
 		usage();
+	}
 
-	if (link == NULL) {
+	if (linkid == DATALINK_ALL_LINKID) {
 		wlan_count_attr_t wcattr;
 
-		wcattr.wc_link = NULL;
+		wcattr.wc_linkid = DATALINK_INVALID_LINKID;
 		wcattr.wc_count = 0;
-		(void) dladm_wlan_walk(&wcattr, do_count_wlan);
+		(void) dladm_walk_datalink_id(do_count_wlan, &wcattr,
+		    DATALINK_CLASS_PHYS, DL_WIFI, DLADM_OPT_ACTIVE);
 		if (wcattr.wc_count == 0) {
 			die("no wifi links are available");
 		} else if (wcattr.wc_count > 1) {
 			die("link name is required when more than one wifi "
 			    "link is available");
 		}
-		link = wcattr.wc_link;
+		linkid = wcattr.wc_linkid;
 	}
 	attrp = (attr.wa_valid == 0) ? NULL : &attr;
 again:
-	if ((status = dladm_wlan_connect(link, attrp, timeout, keys,
+	if ((status = dladm_wlan_connect(linkid, attrp, timeout, keys,
 	    key_count, flags)) != DLADM_STATUS_OK) {
 		if ((flags & DLADM_WLAN_CONNECT_NOSCAN) != 0) {
 			/*
@@ -2225,29 +3349,29 @@ again:
 				    "criteria are available");
 			}
 		}
-		die_dlerr(status, "cannot connect link '%s'", link);
+		die_dlerr(status, "cannot connect");
 	}
 	free(keys);
 }
 
 /* ARGSUSED */
-static boolean_t
-do_all_disconnect_wifi(void *arg, const char *link)
+static int
+do_all_disconnect_wifi(datalink_id_t linkid, void *arg)
 {
 	dladm_status_t	status;
 
-	status = dladm_wlan_disconnect(link);
+	status = dladm_wlan_disconnect(linkid);
 	if (status != DLADM_STATUS_OK)
-		warn_dlerr(status, "cannot disconnect link '%s'", link);
+		warn_dlerr(status, "cannot disconnect link");
 
-	return (B_TRUE);
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
 do_disconnect_wifi(int argc, char **argv)
 {
 	int			option;
-	const char		*link = NULL;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	boolean_t		all_links = B_FALSE;
 	dladm_status_t		status;
 	wlan_count_attr_t	wcattr;
@@ -2265,41 +3389,46 @@ do_disconnect_wifi(int argc, char **argv)
 		}
 	}
 
-	if (optind == (argc - 1))
-		link = argv[optind];
-	else if (optind != argc)
+	if (optind == (argc - 1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
 		usage();
+	}
 
-	if (link == NULL) {
+	if (linkid == DATALINK_ALL_LINKID) {
 		if (!all_links) {
-			wcattr.wc_link = NULL;
+			wcattr.wc_linkid = linkid;
 			wcattr.wc_count = 0;
-			(void) dladm_wlan_walk(&wcattr, do_count_wlan);
+			(void) dladm_walk_datalink_id(do_count_wlan, &wcattr,
+			    DATALINK_CLASS_PHYS, DL_WIFI, DLADM_OPT_ACTIVE);
 			if (wcattr.wc_count == 0) {
 				die("no wifi links are available");
 			} else if (wcattr.wc_count > 1) {
 				die("link name is required when more than "
 				    "one wifi link is available");
 			}
-			link = wcattr.wc_link;
+			linkid = wcattr.wc_linkid;
 		} else {
-			(void) dladm_wlan_walk(&all_links,
-			    do_all_disconnect_wifi);
+			(void) dladm_walk_datalink_id(do_all_disconnect_wifi,
+			    NULL, DATALINK_CLASS_PHYS, DL_WIFI,
+			    DLADM_OPT_ACTIVE);
 			return;
 		}
 	}
-	status = dladm_wlan_disconnect(link);
+	status = dladm_wlan_disconnect(linkid);
 	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "cannot disconnect link '%s'", link);
+		die_dlerr(status, "cannot disconnect");
 }
 
 #define	MAX_PROPS		32
-#define	MAX_PROP_VALS		32
 #define	MAX_PROP_LINE		512
 
 typedef struct prop_info {
 	char		*pi_name;
-	char		*pi_val[MAX_PROP_VALS];
+	char		*pi_val[DLADM_MAX_PROP_VALCNT];
 	uint_t		pi_count;
 } prop_info_t;
 
@@ -2310,7 +3439,7 @@ typedef struct prop_list {
 } prop_list_t;
 
 typedef struct show_linkprop_state {
-	const char	*ls_link;
+	char		ls_link[MAXLINKNAMELEN];
 	char		*ls_line;
 	char		**ls_propvals;
 	prop_list_t	*ls_proplist;
@@ -2364,7 +3493,7 @@ parse_props(char *str, prop_list_t **listp, boolean_t novalues)
 		}
 
 		if (pip != NULL && c != '=') {
-			if (pip->pi_count > MAX_PROP_VALS)
+			if (pip->pi_count > DLADM_MAX_PROP_VALCNT)
 				goto fail;
 
 			if (novalues)
@@ -2401,24 +3530,29 @@ print_linkprop_head(void)
 }
 
 static void
-print_linkprop(show_linkprop_state_t *statep, const char *propname,
-    dladm_prop_type_t type, const char *typename, const char *format,
-    char **pptr)
+print_linkprop(datalink_id_t linkid, show_linkprop_state_t *statep,
+    const char *propname, dladm_prop_type_t type, const char *typename,
+    const char *format, char **pptr)
 {
 	int		i;
 	char		*ptr, *lim;
 	char		buf[DLADM_STRSIZE];
 	char		*unknown = "?", *notsup = "";
 	char		**propvals = statep->ls_propvals;
-	uint_t		valcnt = MAX_PROP_VALS;
+	uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
 	dladm_status_t	status;
 
-	status = dladm_get_prop(statep->ls_link, type, propname,
-	    propvals, &valcnt);
+	status = dladm_get_linkprop(linkid, type, propname, propvals, &valcnt);
 	if (status != DLADM_STATUS_OK) {
 		if (status == DLADM_STATUS_TEMPONLY) {
-			statep->ls_status = status;
-			return;
+			if (type == DLADM_PROP_VAL_MODIFIABLE &&
+			    statep->ls_persist) {
+				valcnt = 1;
+				propvals = &unknown;
+			} else {
+				statep->ls_status = status;
+				return;
+			}
 		} else if (status == DLADM_STATUS_NOTSUP ||
 		    statep->ls_persist) {
 			valcnt = 1;
@@ -2428,9 +3562,11 @@ print_linkprop(show_linkprop_state_t *statep, const char *propname,
 				propvals = &notsup;
 		} else {
 			statep->ls_status = status;
-			warn_dlerr(status,
-			    "cannot get link property '%s' for %s",
-			    propname, statep->ls_link);
+			if (statep->ls_proplist) {
+				warn_dlerr(status,
+				    "cannot get link property '%s' for %s",
+				    propname, statep->ls_link);
+			}
 			return;
 		}
 	}
@@ -2457,8 +3593,8 @@ print_linkprop(show_linkprop_state_t *statep, const char *propname,
 	}
 }
 
-static boolean_t
-show_linkprop(void *arg, const char *propname)
+static int
+show_linkprop(datalink_id_t linkid, const char *propname, void *arg)
 {
 	show_linkprop_state_t	*statep = arg;
 	char			*ptr = statep->ls_line;
@@ -2475,7 +3611,7 @@ show_linkprop(void *arg, const char *propname)
 	else
 		ptr += snprintf(ptr, lim - ptr, "%-15s ", propname);
 
-	print_linkprop(statep, propname,
+	print_linkprop(linkid, statep, propname,
 	    statep->ls_persist ? DLADM_PROP_VAL_PERSISTENT :
 	    DLADM_PROP_VAL_CURRENT, "VALUE", "%-14s ", &ptr);
 
@@ -2485,17 +3621,17 @@ show_linkprop(void *arg, const char *propname)
 	 * skip the output.
 	 */
 	if (statep->ls_status != DLADM_STATUS_OK)
-		return (B_TRUE);
+		return (DLADM_WALK_CONTINUE);
 
-	print_linkprop(statep, propname, DLADM_PROP_VAL_DEFAULT,
+	print_linkprop(linkid, statep, propname, DLADM_PROP_VAL_DEFAULT,
 	    "DEFAULT", "%-14s ", &ptr);
 	if (statep->ls_status != DLADM_STATUS_OK)
-		return (B_TRUE);
+		return (DLADM_WALK_CONTINUE);
 
-	print_linkprop(statep, propname, DLADM_PROP_VAL_MODIFIABLE,
+	print_linkprop(linkid, statep, propname, DLADM_PROP_VAL_MODIFIABLE,
 	    "POSSIBLE", "%-20s ", &ptr);
 	if (statep->ls_status != DLADM_STATUS_OK)
-		return (B_TRUE);
+		return (DLADM_WALK_CONTINUE);
 
 	if (statep->ls_header) {
 		statep->ls_header = B_FALSE;
@@ -2503,7 +3639,7 @@ show_linkprop(void *arg, const char *propname)
 			print_linkprop_head();
 	}
 	(void) printf("%s\n", statep->ls_line);
-	return (B_TRUE);
+	return (DLADM_WALK_CONTINUE);
 }
 
 static void
@@ -2511,10 +3647,12 @@ do_show_linkprop(int argc, char **argv)
 {
 	int			option;
 	prop_list_t		*proplist = NULL;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	show_linkprop_state_t	state;
+	uint32_t		flags = DLADM_OPT_ACTIVE;
+	dladm_status_t		status;
 
 	opterr = 0;
-	state.ls_link = NULL;
 	state.ls_propvals = NULL;
 	state.ls_line = NULL;
 	state.ls_parseable = B_FALSE;
@@ -2532,6 +3670,7 @@ do_show_linkprop(int argc, char **argv)
 			break;
 		case 'P':
 			state.ls_persist = B_TRUE;
+			flags = DLADM_OPT_PERSIST;
 			break;
 		default:
 			die_opterr(optopt, option);
@@ -2539,40 +3678,59 @@ do_show_linkprop(int argc, char **argv)
 		}
 	}
 
-	if (optind == (argc - 1))
-		state.ls_link = argv[optind];
-	else if (optind != argc)
+	if (optind == (argc - 1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
+		    NULL, NULL)) != DLADM_STATUS_OK) {
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+		}
+	} else if (optind != argc) {
 		usage();
+	}
 
 	state.ls_proplist = proplist;
 	state.ls_status = DLADM_STATUS_OK;
 
-	if (state.ls_link == NULL) {
-		(void) dladm_walk(show_linkprop_onelink, &state);
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(show_linkprop_onelink, &state,
+		    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE, flags);
 	} else {
-		show_linkprop_onelink(&state, state.ls_link);
+		(void) show_linkprop_onelink(linkid, &state);
 	}
 	free_props(proplist);
 
-	if (state.ls_status != DLADM_STATUS_OK)
+	if (state.ls_status != DLADM_STATUS_OK) {
+		if (optind == (argc - 1)) {
+			warn_dlerr(state.ls_status,
+			    "show-linkprop failed for %s", argv[optind]);
+		}
 		exit(EXIT_FAILURE);
+	}
 }
 
-static void
-show_linkprop_onelink(void *arg, const char *link)
+static int
+show_linkprop_onelink(datalink_id_t linkid, void *arg)
 {
 	int			i;
-	int			retval;
 	char			*buf;
-	dladm_status_t		status;
+	uint32_t		flags;
 	prop_list_t		*proplist = NULL;
-	show_linkprop_state_t	*statep;
-	const char		*savep;
-	dlpi_handle_t		dh;
+	show_linkprop_state_t	*statep = arg;
+	dlpi_handle_t		dh = NULL;
 
-	statep = (show_linkprop_state_t *)arg;
-	savep = statep->ls_link;
-	statep->ls_link = link;
+	statep->ls_status = DLADM_STATUS_OK;
+
+	if (dladm_datalink_id2info(linkid, &flags, NULL, NULL, statep->ls_link,
+	    MAXLINKNAMELEN) != DLADM_STATUS_OK) {
+		statep->ls_status = DLADM_STATUS_NOTFOUND;
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	if ((statep->ls_persist && !(flags & DLADM_OPT_PERSIST)) ||
+	    (!statep->ls_persist && !(flags & DLADM_OPT_ACTIVE))) {
+		statep->ls_status = DLADM_STATUS_BADARG;
+		return (DLADM_WALK_CONTINUE);
+	}
+
 	proplist = statep->ls_proplist;
 
 	/*
@@ -2580,58 +3738,55 @@ show_linkprop_onelink(void *arg, const char *link)
 	 * automatically scans for APs and does other slow operations.	Thus,
 	 * if there are no open links, the retrieval of link properties
 	 * (below) will proceed slowly unless we hold the link open.
+	 *
+	 * Note that failure of dlpi_open() does not necessarily mean invalid
+	 * link properties, because dlpi_open() may fail because of incorrect
+	 * autopush configuration. Therefore, we ingore the return value of
+	 * dlpi_open().
 	 */
-	if ((retval = dlpi_open(link, &dh, 0)) != DLPI_SUCCESS) {
-		warn("cannot open %s: %s", link, dlpi_strerror(retval));
-		statep->ls_status = DLADM_STATUS_NOTFOUND;
-		return;
-	}
+	if (!statep->ls_persist)
+		(void) dlpi_open(statep->ls_link, &dh, 0);
 
-	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
-	    MAX_PROP_LINE);
+	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) *
+	    DLADM_MAX_PROP_VALCNT + MAX_PROP_LINE);
 	if (buf == NULL)
 		die("insufficient memory");
 
 	statep->ls_propvals = (char **)(void *)buf;
-	for (i = 0; i < MAX_PROP_VALS; i++) {
-		statep->ls_propvals[i] = buf + sizeof (char *) * MAX_PROP_VALS +
+	for (i = 0; i < DLADM_MAX_PROP_VALCNT; i++) {
+		statep->ls_propvals[i] = buf +
+		    sizeof (char *) * DLADM_MAX_PROP_VALCNT +
 		    i * DLADM_PROP_VAL_MAX;
 	}
 	statep->ls_line = buf +
-	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS;
+	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * DLADM_MAX_PROP_VALCNT;
 
 	if (proplist != NULL) {
-		for (i = 0; i < proplist->pl_count; i++)
-			(void) show_linkprop(statep,
-			    proplist->pl_info[i].pi_name);
+		for (i = 0; i < proplist->pl_count; i++) {
+			(void) show_linkprop(linkid,
+			    proplist->pl_info[i].pi_name, statep);
+		}
 	} else {
-		status = dladm_walk_prop(link, statep, show_linkprop);
-		if (status != DLADM_STATUS_OK)
-			warn_dlerr(status, "show-linkprop failed for %s", link);
+		(void) dladm_walk_linkprop(linkid, statep, show_linkprop);
 	}
-	dlpi_close(dh);
+	if (dh != NULL)
+		dlpi_close(dh);
 	free(buf);
-	statep->ls_link = savep;
+	return (DLADM_WALK_CONTINUE);
 }
 
 static dladm_status_t
-set_linkprop_persist(const char *link, const char *prop_name, char **prop_val,
-    uint_t val_cnt, boolean_t reset)
+set_linkprop_persist(datalink_id_t linkid, const char *prop_name,
+    char **prop_val, uint_t val_cnt, boolean_t reset)
 {
 	dladm_status_t	status;
-	char		*errprop;
 
-	status = dladm_set_prop(link, prop_name, prop_val, val_cnt,
-	    DLADM_OPT_PERSIST, &errprop);
+	status = dladm_set_linkprop(linkid, prop_name, prop_val, val_cnt,
+	    DLADM_OPT_PERSIST);
 
 	if (status != DLADM_STATUS_OK) {
-		if (reset) {
-			warn_dlerr(status, "cannot persistently reset link "
-			    "property '%s' on '%s'", errprop, link);
-		} else {
-			warn_dlerr(status, "cannot persistently set link "
-			    "property '%s' on '%s'", errprop, link);
-		}
+		warn_dlerr(status, "cannot persistently %s link property",
+		    reset ? "reset" : "set");
 	}
 	return (status);
 }
@@ -2641,7 +3796,8 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 {
 	int		i, option;
 	char		errmsg[DLADM_STRSIZE];
-	const char	*link = NULL;
+	char		*altroot = NULL;
+	datalink_id_t	linkid;
 	prop_list_t	*proplist = NULL;
 	boolean_t	temp = B_FALSE;
 	dladm_status_t	status = DLADM_STATUS_OK;
@@ -2658,11 +3814,7 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			temp = B_TRUE;
 			break;
 		case 'R':
-			status = dladm_set_rootdir(optarg);
-			if (status != DLADM_STATUS_OK) {
-				die_dlerr(status, "invalid directory "
-				    "specified");
-			}
+			altroot = optarg;
 			break;
 		default:
 			die_opterr(optopt, option);
@@ -2670,30 +3822,32 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 		}
 	}
 
-	if (optind == (argc - 1))
-		link = argv[optind];
-	else if (optind != argc)
+	/* get link name (required last argument) */
+	if (optind != (argc - 1))
 		usage();
 
-	if (link == NULL)
-		die("link name must be specified");
+	if (proplist == NULL && !reset)
+		die("link property must be specified");
+
+	if (altroot != NULL) {
+		free_props(proplist);
+		altroot_cmd(altroot, argc, argv);
+	}
+
+	status = dladm_name2info(argv[optind], &linkid, NULL, NULL, NULL);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "link %s is not valid", argv[optind]);
 
 	if (proplist == NULL) {
-		char *errprop;
-
-		if (!reset)
-			die("link property must be specified");
-
-		status = dladm_set_prop(link, NULL, NULL, 0, DLADM_OPT_TEMP,
-		    &errprop);
-		if (status != DLADM_STATUS_OK) {
-			warn_dlerr(status, "cannot reset link property '%s' "
-			    "on '%s'", errprop, link);
+		if ((status = dladm_set_linkprop(linkid, NULL, NULL, 0,
+		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
+			warn_dlerr(status, "cannot reset link property "
+			    "on '%s'", argv[optind]);
 		}
 		if (!temp) {
 			dladm_status_t	s;
 
-			s = set_linkprop_persist(link, NULL, NULL, 0, reset);
+			s = set_linkprop_persist(linkid, NULL, NULL, 0, reset);
 			if (s != DLADM_STATUS_OK)
 				status = s;
 		}
@@ -2719,11 +3873,11 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 				continue;
 			}
 		}
-		s = dladm_set_prop(link, pip->pi_name, val, count,
-		    DLADM_OPT_TEMP, NULL);
+		s = dladm_set_linkprop(linkid, pip->pi_name, val, count,
+		    DLADM_OPT_ACTIVE);
 		if (s == DLADM_STATUS_OK) {
 			if (!temp) {
-				s = set_linkprop_persist(link,
+				s = set_linkprop_persist(linkid,
 				    pip->pi_name, val, count, reset);
 				if (s != DLADM_STATUS_OK)
 					status = s;
@@ -2739,28 +3893,36 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			int		j;
 			char		*ptr, *lim;
 			char		**propvals = NULL;
-			uint_t		valcnt = MAX_PROP_VALS;
+			uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
 
 			ptr = malloc((sizeof (char *) +
-			    DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
+			    DLADM_PROP_VAL_MAX) * DLADM_MAX_PROP_VALCNT +
 			    MAX_PROP_LINE);
 
 			propvals = (char **)(void *)ptr;
 			if (propvals == NULL)
 				die("insufficient memory");
 
-			for (j = 0; j < MAX_PROP_VALS; j++) {
+			for (j = 0; j < DLADM_MAX_PROP_VALCNT; j++) {
 				propvals[j] = ptr + sizeof (char *) *
-				    MAX_PROP_VALS +
+				    DLADM_MAX_PROP_VALCNT +
 				    j * DLADM_PROP_VAL_MAX;
 			}
-			s = dladm_get_prop(link, DLADM_PROP_VAL_MODIFIABLE,
-			    pip->pi_name, propvals, &valcnt);
+			s = dladm_get_linkprop(linkid,
+			    DLADM_PROP_VAL_MODIFIABLE, pip->pi_name, propvals,
+			    &valcnt);
+
+			if (s != DLADM_STATUS_OK) {
+				warn_dlerr(status, "cannot set link property "
+				    "'%s' on '%s'", pip->pi_name, argv[optind]);
+				free(propvals);
+				break;
+			}
 
 			ptr = errmsg;
 			lim = ptr + DLADM_STRSIZE;
 			*ptr = '\0';
-			for (j = 0; j < valcnt && s == DLADM_STATUS_OK; j++) {
+			for (j = 0; j < valcnt; j++) {
 				ptr += snprintf(ptr, lim - ptr, "%s,",
 				    propvals[j]);
 				if (ptr >= lim)
@@ -2778,10 +3940,10 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 		default:
 			if (reset) {
 				warn_dlerr(status, "cannot reset link property "
-				    "'%s' on '%s'", pip->pi_name, link);
+				    "'%s' on '%s'", pip->pi_name, argv[optind]);
 			} else {
 				warn_dlerr(status, "cannot set link property "
-				    "'%s' on '%s'", pip->pi_name, link);
+				    "'%s' on '%s'", pip->pi_name, argv[optind]);
 			}
 			break;
 		}
@@ -3097,7 +4259,7 @@ do_create_secobj(int argc, char **argv)
 	}
 
 	status = dladm_set_secobj(obj_name, class, obj_val, obj_len,
-	    DLADM_OPT_CREATE | DLADM_OPT_TEMP);
+	    DLADM_OPT_CREATE | DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		die_dlerr(status, "could not create secure object '%s'",
 		    obj_name);
@@ -3161,7 +4323,7 @@ do_delete_secobj(int argc, char **argv)
 		die("authorization '%s' is required", LINK_SEC_AUTH);
 
 	for (i = 0; i < sp->s_nfields; i++) {
-		status = dladm_unset_secobj(sp->s_fields[i], DLADM_OPT_TEMP);
+		status = dladm_unset_secobj(sp->s_fields[i], DLADM_OPT_ACTIVE);
 		if (!temp) {
 			pstatus = dladm_unset_secobj(sp->s_fields[i],
 			    DLADM_OPT_PERSIST);
@@ -3301,15 +4463,24 @@ do_show_secobj(int argc, char **argv)
 		die_dlerr(status, "show-secobj");
 }
 
+/*ARGSUSED*/
+static int
+i_dladm_init_linkprop(datalink_id_t linkid, void *arg)
+{
+	(void) dladm_init_linkprop(linkid);
+	return (DLADM_WALK_CONTINUE);
+}
+
 /* ARGSUSED */
 static void
 do_init_linkprop(int argc, char **argv)
 {
-	dladm_status_t status;
-
-	status = dladm_init_linkprop();
-	if (status != DLADM_STATUS_OK)
-		die_dlerr(status, "link property initialization failed");
+	/*
+	 * linkprops of links of other classes have been initialized as a
+	 * part of the dladm up-xxx operation.
+	 */
+	(void) dladm_walk_datalink_id(i_dladm_init_linkprop, NULL,
+	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 }
 
 /* ARGSUSED */
@@ -3323,6 +4494,68 @@ do_init_secobj(int argc, char **argv)
 		die_dlerr(status, "secure object initialization failed");
 }
 
+/*
+ * "-R" option support. It is used for live upgrading. Append dladm commands
+ * to a upgrade script which will be run when the alternative root boots up:
+ *
+ * - If the dlmgmtd door file exists on the alternative root, append dladm
+ * commands to the <altroot>/var/svc/profile/upgrade_datalink script. This
+ * script will be run as part of the network/physical service. We cannot defer
+ * this to /var/svc/profile/upgrade because then the configuration will not
+ * be able to take effect before network/physical plumbs various interfaces.
+ *
+ * - If the dlmgmtd door file does not exist on the alternative root, append
+ * dladm commands to the <altroot>/var/svc/profile/upgrade script, which will
+ * be run in the manifest-import service.
+ *
+ * Note that the SMF team is considering to move the manifest-import service
+ * to be run at the very begining of boot. Once that is done, the need for
+ * the /var/svc/profile/upgrade_datalink script will not exist any more.
+ */
+static void
+altroot_cmd(char *altroot, int argc, char *argv[])
+{
+	char		path[MAXPATHLEN];
+	struct stat	stbuf;
+	FILE		*fp;
+	int		i;
+
+	/*
+	 * Check for the existence of the dlmgmtd door file, and determine
+	 * the name of script file.
+	 */
+	(void) snprintf(path, MAXPATHLEN, "/%s/%s", altroot, DLMGMT_DOOR);
+	if (stat(path, &stbuf) < 0) {
+		(void) snprintf(path, MAXPATHLEN, "/%s/%s", altroot,
+		    SMF_UPGRADE_FILE);
+	} else {
+		(void) snprintf(path, MAXPATHLEN, "/%s/%s", altroot,
+		    SMF_UPGRADEDATALINK_FILE);
+	}
+
+	if ((fp = fopen(path, "a+")) == NULL)
+		die("operation not supported on %s", altroot);
+
+	(void) fprintf(fp, "/sbin/dladm ");
+	for (i = 0; i < argc; i++) {
+		/*
+		 * Directly write to the file if it is not the "-R <altroot>"
+		 * option. In which case, skip it.
+		 */
+		if (strcmp(argv[i], "-R") != 0)
+			(void) fprintf(fp, "%s ", argv[i]);
+		else
+			i ++;
+	}
+	(void) fprintf(fp, "%s\n", SMF_DLADM_UPGRADE_MSG);
+	(void) fclose(fp);
+	exit(0);
+}
+
+/*
+ * Convert the string to an integer. Note that the string must not have any
+ * trailing non-integer characters.
+ */
 static boolean_t
 str2int(const char *str, int *valp)
 {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ i_dls_link_constructor(void *buf, void *arg, int kmflag)
 
 	bzero(buf, sizeof (dls_link_t));
 
-	(void) sprintf(name, "dls_link_t_%p_hash", buf);
+	(void) snprintf(name, MAXNAMELEN, "dls_link_t_%p_hash", buf);
 	dlp->dl_impl_hash = mod_hash_create_idhash(name, IMPL_HASHSZ,
 	    mod_hash_null_valdtor);
 
@@ -190,12 +190,13 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 		prevp->b_next = mp;
 
 		/*
-		 * The source, destination, sap, and vlan id must all match
-		 * in a given subchain.
+		 * The source, destination, sap, vlan id and the MSGNOLOOP
+		 * flag must all match in a given subchain.
 		 */
 		if (memcmp(mhip->mhi_daddr, cmhi.mhi_daddr, addr_size) != 0 ||
 		    memcmp(mhip->mhi_saddr, cmhi.mhi_saddr, addr_size) != 0 ||
-		    mhip->mhi_bindsap != cmhi.mhi_bindsap) {
+		    mhip->mhi_bindsap != cmhi.mhi_bindsap ||
+		    mhip->mhi_prom_looped != cmhi.mhi_prom_looped) {
 			/*
 			 * Note that we don't need to restore the padding.
 			 */
@@ -700,7 +701,7 @@ dls_link_txloop(void *arg, mblk_t *mp)
 static uint_t
 i_dls_link_walk(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 {
-	boolean_t	*promiscp = arg;
+	boolean_t 	*promiscp = arg;
 	uint32_t	sap = KEY_SAP(key);
 
 	if (sap == DLS_SAP_PROMISC) {
@@ -833,7 +834,7 @@ dls_link_hold(const char *name, dls_link_t **dlpp)
 	/*
 	 * Insert the dls_link_t.
 	 */
-	err = mod_hash_insert(i_dls_link_hash, (mod_hash_key_t)name,
+	err = mod_hash_insert(i_dls_link_hash, (mod_hash_key_t)dlp->dl_name,
 	    (mod_hash_val_t)dlp);
 	ASSERT(err == 0);
 
@@ -841,6 +842,7 @@ dls_link_hold(const char *name, dls_link_t **dlpp)
 	ASSERT(i_dls_link_count != 0);
 
 done:
+
 	/*
 	 * Bump the reference count and hand back the reference.
 	 */
@@ -884,26 +886,24 @@ done:
 int
 dls_mac_hold(dls_link_t *dlp)
 {
+	mac_handle_t mh;
 	int err = 0;
+
+	err = mac_open(dlp->dl_name, &mh);
 
 	mutex_enter(&dlp->dl_lock);
 
 	ASSERT(IMPLY(dlp->dl_macref != 0, dlp->dl_mh != NULL));
 	ASSERT(IMPLY(dlp->dl_macref == 0, dlp->dl_mh == NULL));
-
-	if (dlp->dl_macref == 0) {
-		/*
-		 * First reference; hold open the MAC interface.
-		 */
-		err = mac_open(dlp->dl_name, &dlp->dl_mh);
-		if (err != 0)
-			goto done;
-
-		dlp->dl_mip = mac_info(dlp->dl_mh);
+	if (err == 0) {
+		ASSERT(dlp->dl_mh == NULL || dlp->dl_mh == mh);
+		if (dlp->dl_mh == NULL) {
+			dlp->dl_mh = mh;
+			dlp->dl_mip = mac_info(mh);
+		}
+		dlp->dl_macref++;
 	}
 
-	dlp->dl_macref++;
-done:
 	mutex_exit(&dlp->dl_lock);
 	return (err);
 }
@@ -914,9 +914,9 @@ dls_mac_rele(dls_link_t *dlp)
 	mutex_enter(&dlp->dl_lock);
 	ASSERT(dlp->dl_mh != NULL);
 
+	mac_close(dlp->dl_mh);
+
 	if (--dlp->dl_macref == 0) {
-		mac_rx_remove_wait(dlp->dl_mh);
-		mac_close(dlp->dl_mh);
 		dlp->dl_mh = NULL;
 		dlp->dl_mip = NULL;
 	}
@@ -997,7 +997,7 @@ dls_link_add(dls_link_t *dlp, uint32_t sap, dls_impl_t *dip)
 
 	/* Replace the existing receive function if there is one. */
 	if (dlp->dl_mrh != NULL)
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
 	dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	mutex_exit(&dlp->dl_lock);
 }
@@ -1073,7 +1073,7 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 	 */
 	if (dlp->dl_impl_count == 0) {
 		rw_exit(&dlp->dl_impl_lock);
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
 		dlp->dl_mrh = NULL;
 	} else {
 		boolean_t promisc = B_FALSE;
@@ -1095,7 +1095,7 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 		else
 			rx = i_dls_link_rx;
 
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_FALSE);
+		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
 		dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
 	}
 	mutex_exit(&dlp->dl_lock);
@@ -1152,5 +1152,11 @@ dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 		mhip->mhi_istagged = B_FALSE;
 		mhip->mhi_tci = 0;
 	}
+
+	/*
+	 * The messsage is looped back from the underlying driver.
+	 */
+	mhip->mhi_prom_looped = (mp->b_flag & MSGNOLOOP);
+
 	return (0);
 }

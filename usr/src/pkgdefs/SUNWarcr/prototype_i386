@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,7 @@ f none lib/amd64/llib-lnvpair.ln 644 root bin
 f none lib/amd64/llib-lpam.ln 644 root bin
 s none lib/amd64/llib-lposix4.ln=./llib-lrt.ln
 f none lib/amd64/llib-lpthread.ln 644 root bin
+f none lib/amd64/llib-lrcm.ln 644 root bin
 f none lib/amd64/llib-lresolv.ln 644 root  bin
 f none lib/amd64/llib-lrpcsvc.ln 644 root  bin
 f none lib/amd64/llib-lrt.ln 644 root  bin

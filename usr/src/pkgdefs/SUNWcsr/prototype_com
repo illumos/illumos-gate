@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,6 +84,7 @@ i r.manifest
 i i.ttydefs
 i i.hosts
 i i.kmfconfbase
+i i.seedmanifest
 #
 # source locations relative to the prototype file
 #
@@ -127,6 +128,7 @@ d none etc/crypto/crls 755 root sys
 f none etc/datemsk 444 root sys
 s none etc/dcopy=../usr/sbin/dcopy
 d none etc/default 755 root sys
+f none etc/.dlmgmt_door 444 root sys
 e preserve etc/default/cron 644 root sys
 e preserve etc/default/devfsadm 644 root sys
 e preserve etc/default/fs 644 root sys
@@ -379,6 +381,7 @@ f none lib/svc/method/svc-consadm 0555 root bin
 f none lib/svc/method/svc-cron 0555 root bin
 f none lib/svc/method/svc-forwarding 0555 root bin
 f none lib/svc/method/svc-legacy-routing 0555 root bin
+f none lib/svc/method/svc-dlmgmtd 0555 root bin
 f none lib/svc/method/svc-nscd 0555 root bin
 f none lib/svc/method/svc-utmpd 0555 root bin
 f none lib/svc/method/system-log 0555 root bin
@@ -411,6 +414,7 @@ f none sbin/soconfig 555 root bin
 f none sbin/init 555 root sys
 s none sbin/jsh=sh
 s none sbin/pfsh=sh
+f none sbin/dlmgmtd 555 root bin
 f none sbin/mount 555 root bin
 f none sbin/mountall 555 root sys
 f none sbin/netstrategy 555 root bin
@@ -496,6 +500,7 @@ d none var/svc/manifest/network 755 root sys
 f manifest var/svc/manifest/network/forwarding.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd-upgrade.xml 0444 root sys
+f seedmanifest var/svc/manifest/network/dlmgmt.xml 0444 root sys
 f manifest var/svc/manifest/network/network-initial.xml 0444 root sys
 f manifest var/svc/manifest/network/network-loopback.xml 0444 root sys
 f manifest var/svc/manifest/network/network-physical.xml 0444 root sys

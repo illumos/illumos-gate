@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -587,6 +587,9 @@ static struct sdev_vop_table vtab[] =
 	SDEV_DYNAMIC | SDEV_VTOR },
 
 	{ "zcons", NULL, NULL, NULL, NULL, SDEV_NO_NCACHE },
+
+	{ "net", devnet_vnodeops_tbl, NULL, &devnet_vnodeops, devnet_validate,
+	SDEV_DYNAMIC | SDEV_VTOR },
 
 	{ NULL, NULL, NULL, NULL, NULL, 0}
 };
@@ -3708,4 +3711,71 @@ devname_setattr_func(struct vnode *vp, struct vattr *vap, int flags,
 	rw_exit(&dv->sdev_contents);
 	rw_exit(&parent->sdev_contents);
 	return (0);
+}
+
+/*
+ * a generic inactive() function
+ */
+void
+devname_inactive_func(struct vnode *vp, struct cred *cred,
+    void (*callback)(struct vnode *))
+{
+	int clean;
+	struct sdev_node *dv = VTOSDEV(vp);
+	struct sdev_node *ddv = dv->sdev_dotdot;
+	struct sdev_node *idv;
+	struct sdev_node *prev = NULL;
+	int state;
+	struct devname_nsmap *map = NULL;
+	struct devname_ops *dirops = NULL;
+	void (*fn)(devname_handle_t *, struct cred *) = NULL;
+
+	rw_enter(&ddv->sdev_contents, RW_WRITER);
+	state = dv->sdev_state;
+
+	mutex_enter(&vp->v_lock);
+	ASSERT(vp->v_count >= 1);
+
+	if (vp->v_count == 1 && callback != NULL)
+		callback(vp);
+
+	clean = (vp->v_count == 1) && (state == SDEV_ZOMBIE);
+
+	/*
+	 * last ref count on the ZOMBIE node is released.
+	 * clean up the sdev_node, and
+	 * release the hold on the backing store node so that
+	 * the ZOMBIE backing stores also cleaned out.
+	 */
+	if (clean) {
+		ASSERT(ddv);
+		if (SDEV_IS_GLOBAL(dv)) {
+			map = ddv->sdev_mapinfo;
+			dirops = map ? map->dir_ops : NULL;
+			if (dirops && (fn = dirops->devnops_inactive))
+				(*fn)(&(dv->sdev_handle), cred);
+		}
+
+		ddv->sdev_nlink--;
+		if (vp->v_type == VDIR) {
+			dv->sdev_nlink--;
+		}
+		for (idv = ddv->sdev_dot; idv && idv != dv;
+		    prev = idv, idv = idv->sdev_next)
+			;
+		ASSERT(idv == dv);
+		if (prev == NULL)
+			ddv->sdev_dot = dv->sdev_next;
+		else
+			prev->sdev_next = dv->sdev_next;
+		dv->sdev_next = NULL;
+		dv->sdev_nlink--;
+		--vp->v_count;
+		mutex_exit(&vp->v_lock);
+		sdev_nodedestroy(dv, 0);
+	} else {
+		--vp->v_count;
+		mutex_exit(&vp->v_lock);
+	}
+	rw_exit(&ddv->sdev_contents);
 }

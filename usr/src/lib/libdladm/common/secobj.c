@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +136,7 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 	    obj_val == NULL || obj_len == 0 || obj_len > DLD_SECOBJ_VAL_MAX)
 		return (DLADM_STATUS_BADARG);
 
-	if ((flags & DLADM_OPT_TEMP) == 0)
+	if ((flags & DLADM_OPT_ACTIVE) == 0)
 		goto persist;
 
 	bzero(&secobj_set, sizeof (secobj_set));
@@ -154,7 +154,7 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOCSECOBJSET, &secobj_set,
+	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_SET, &secobj_set,
 	    sizeof (secobj_set)) < 0) {
 		status = dladm_errno2status(errno);
 	}
@@ -198,7 +198,7 @@ dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOCSECOBJGET, &secobj_get,
+	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_GET, &secobj_get,
 	    sizeof (secobj_get)) < 0)
 		status = dladm_errno2status(errno);
 
@@ -225,7 +225,7 @@ dladm_unset_secobj(const char *obj_name, uint_t flags)
 	    flags == 0)
 		return (DLADM_STATUS_BADARG);
 
-	if ((flags & DLADM_OPT_TEMP) == 0)
+	if ((flags & DLADM_OPT_ACTIVE) == 0)
 		goto persist;
 
 	bzero(&secobj_unset, sizeof (secobj_unset));
@@ -233,7 +233,7 @@ dladm_unset_secobj(const char *obj_name, uint_t flags)
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOCSECOBJUNSET, &secobj_unset,
+	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_UNSET, &secobj_unset,
 	    sizeof (secobj_unset)) < 0)
 		status = dladm_errno2status(errno);
 
@@ -269,7 +269,7 @@ dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
 		status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOCSECOBJGET, secobj_getp,
+	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_GET, secobj_getp,
 	    SECOBJ_BUFSZ) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
@@ -400,7 +400,7 @@ process_secobj_init(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
     dladm_status_t *statusp)
 {
 	*statusp = dladm_set_secobj(sip->si_name, *sip->si_classp, sip->si_val,
-	    *sip->si_lenp, DLADM_OPT_TEMP | DLADM_OPT_CREATE);
+	    *sip->si_lenp, DLADM_OPT_ACTIVE | DLADM_OPT_CREATE);
 	return (B_TRUE);
 }
 

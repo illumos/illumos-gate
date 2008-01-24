@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +176,7 @@ typedef struct gld_mac_info {
 	uchar_t		*gldm_broadcast_addr;		/* SET BY DRIVER */
 	gld_lock_t	gldm_lock;			/* GLD PRIVATE */
 	ddi_iblock_cookie_t gldm_cookie;		/* SET BY DRIVER */
-	uint32_t	reserved3;			/* GLD PRIVATE */
+	uint32_t	gldm_margin;			/* SET BY DRIVER */
 	uint32_t	reserved4;			/* GLD PRIVATE */
 	uint32_t	gldm_maxpkt;			/* SET BY DRIVER */
 	uint32_t	gldm_minpkt;			/* SET BY DRIVER */

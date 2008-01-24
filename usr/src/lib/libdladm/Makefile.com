@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 LIBRARY = libdladm.a
 VERS    = .1
 OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
-	libdlwlan.o libdlvnic.o
+	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o
 
 include ../../Makefile.lib
 
@@ -36,7 +36,7 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-ldevinfo -ldlpi -lc -linetutil -lsocket -lscf
+LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

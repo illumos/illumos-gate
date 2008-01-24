@@ -77,8 +77,8 @@
 #include <sys/sunldi_impl.h>
 #include <sys/autoconf.h>
 #include <sys/policy.h>
+#include <sys/dld.h>
 #include <sys/zone.h>
-
 
 /*
  * This define helps improve the readability of streams code while
@@ -239,8 +239,9 @@ stropen(vnode_t *vp, dev_t *devp, int flag, cred_t *crp)
 	struct stdata *stp;
 	queue_t *qp;
 	int s;
-	dev_t dummydev;
+	dev_t dummydev, savedev;
 	struct autopush *ap;
+	struct dlautopush dlap;
 	int error = 0;
 	ssize_t	rmin, rmax;
 	int cloneopen;
@@ -439,6 +440,7 @@ ckreturn:
 	/*
 	 * Open driver and create stream to it (via qattach).
 	 */
+	savedev = *devp;
 	cloneopen = (getmajor(*devp) == clone_major);
 	if ((error = qattach(qp, devp, flag, crp, NULL, B_FALSE)) != 0) {
 		mutex_enter(&vp->v_lock);
@@ -476,15 +478,53 @@ ckreturn:
 			    " streams module");
 	}
 
+	if (!NETWORK_DRV(major)) {
+		savedev = *devp;
+	} else {
+		/*
+		 * For network devices, process differently based on the
+		 * return value from dld_autopush():
+		 *
+		 *   0: the passed-in device points to a GLDv3 datalink with
+		 *   per-link autopush configuration; use that configuration
+		 *   and ignore any per-driver autopush configuration.
+		 *
+		 *   1: the passed-in device points to a physical GLDv3
+		 *   datalink without per-link autopush configuration.  The
+		 *   passed in device was changed to refer to the actual
+		 *   physical device (if it's not already); we use that new
+		 *   device to look up any per-driver autopush configuration.
+		 *
+		 *   -1: neither of the above cases applied; use the initial
+		 *   device to look up any per-driver autopush configuration.
+		 */
+		switch (dld_autopush(&savedev, &dlap)) {
+		case 0:
+			zoneid = crgetzoneid(crp);
+			for (s = 0; s < dlap.dap_npush; s++) {
+				error = push_mod(qp, &dummydev, stp,
+				    dlap.dap_aplist[s], dlap.dap_anchor, crp,
+				    zoneid);
+				if (error != 0)
+					break;
+			}
+			goto opendone;
+		case 1:
+			break;
+		case -1:
+			savedev = *devp;
+			break;
+		}
+	}
 	/*
-	 * Check for autopush. Start with the global zone. If not found
-	 * check in the local zone.
+	 * Find the autopush configuration based on "savedev". Start with the
+	 * global zone. If not found check in the local zone.
 	 */
 	zoneid = GLOBAL_ZONEID;
 retryap:
 	ss = netstack_find_by_stackid(zoneid_to_netstackid(zoneid))->
 	    netstack_str;
-	if ((ap = sad_ap_find_by_dev(*devp, ss)) == NULL) {
+	if ((ap = sad_ap_find_by_dev(savedev, ss)) == NULL) {
 		netstack_rele(ss->ss_netstack);
 		if (zoneid == GLOBAL_ZONEID) {
 			/*
@@ -507,6 +547,8 @@ retryap:
 	sad_ap_rele(ap, ss);
 	netstack_rele(ss->ss_netstack);
 
+opendone:
+
 	/*
 	 * let specfs know that open failed part way through
 	 */
@@ -515,8 +557,6 @@ retryap:
 		stp->sd_flag |= STREOPENFAIL;
 		mutex_exit(&stp->sd_lock);
 	}
-
-opendone:
 
 	/*
 	 * Wake up others that are waiting for stream to be created.

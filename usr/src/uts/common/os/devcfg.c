@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6635,6 +6635,20 @@ i_ddi_devs_attached(major_t major)
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
 	return (error);
+}
+
+int
+i_ddi_minor_node_count(dev_info_t *ddip, const char *node_type)
+{
+	struct ddi_minor_data *dp;
+	int count = 0;
+
+	mutex_enter(&(DEVI(ddip)->devi_lock));
+	for (dp = DEVI(ddip)->devi_minor; dp != NULL; dp = dp->next)
+		if (strcmp(dp->ddm_node_type, node_type) == 0)
+			count++;
+	mutex_exit(&(DEVI(ddip)->devi_lock));
+	return (count);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -3443,7 +3443,7 @@ ar_rput_dlpi(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			return;
 		}
-		err_str = dlpi_prim_str(dlp->error_ack.dl_error_primitive);
+		err_str = dl_primstr(dlp->error_ack.dl_error_primitive);
 		DTRACE_PROBE2(rput_dl_error, arl_t *, arl,
 		    dl_error_ack_t *, &dlp->error_ack);
 		switch (dlp->error_ack.dl_error_primitive) {

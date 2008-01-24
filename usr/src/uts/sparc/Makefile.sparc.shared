@@ -223,7 +223,7 @@ DRV_KMODS	+= ipsecesp iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi
 DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
 DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad
-DRV_KMODS	+= sppp sppptun sy sysevent sysmsg 
+DRV_KMODS	+= softmac sppp sppptun sy sysevent sysmsg 
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= tcp tcp6 tl tnf ttymux udp udp6 wc winlock zcons
 DRV_KMODS	+= ippctl sctp sctp6
@@ -450,7 +450,7 @@ $(CLOSED_BUILD)CLOSED_XMODS =		\
 #
 #	'Dacf' Modules (/kernel/dacf):
 #
-DACF_KMODS	+= usb_ac_dacf
+DACF_KMODS	+= usb_ac_dacf net_dacf
 
 #
 #	MAC-Type Plugin Modules (/kernel/mac)

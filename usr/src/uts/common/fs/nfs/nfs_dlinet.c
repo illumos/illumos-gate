@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,11 +221,6 @@ static void		revarpinput(ldi_handle_t, struct netbuf *);
 static void		init_netbuf(struct netbuf *);
 static void		free_netbuf(struct netbuf *);
 static int		rtioctl(TIUSER *, int, struct rtentry *);
-static int		dl_info(ldi_handle_t, dl_info_ack_t *);
-extern int		dl_attach(ldi_handle_t, int);
-extern int		dl_bind(ldi_handle_t, uint32_t, uint32_t, uint32_t,
-			    uint32_t);
-extern int		dl_phys_addr(ldi_handle_t, struct ether_addr *);
 static void		init_config(void);
 
 static void		cacheinit(void);
@@ -1553,19 +1548,19 @@ revarp_myaddr(TIUSER *tiptr)
 		return (rc);
 	}
 
-	if (rc = dl_attach(lh, ifunit)) {
+	if (rc = dl_attach(lh, ifunit, NULL)) {
 		nfs_perror(rc, "revarp_myaddr: dl_attach failed: %m\n");
 		(void) ldi_close(lh, FREAD|FWRITE, CRED());
 		return (rc);
 	}
 
-	if (rc = dl_bind(lh, ETHERTYPE_REVARP, 0, DL_CLDLS, 0)) {
+	if (rc = dl_bind(lh, ETHERTYPE_REVARP, NULL)) {
 		nfs_perror(rc, "revarp_myaddr: dl_bind failed: %m\n");
 		(void) ldi_close(lh, FREAD|FWRITE, CRED());
 		return (rc);
 	}
 
-	if (rc = dl_info(lh, &info)) {
+	if (rc = dl_info(lh, &info, NULL, NULL, NULL)) {
 		nfs_perror(rc, "revarp_myaddr: dl_info failed: %m\n");
 		(void) ldi_close(lh, FREAD|FWRITE, CRED());
 		return (rc);
@@ -1611,8 +1606,10 @@ revarp_start(ldi_handle_t lh, struct netbuf *myaddr)
 	mblk_t *mp;
 	struct dladdr *dlsap;
 	static int done = 0;
+	size_t addrlen = ETHERADDRL;
 
-	if (dl_phys_addr(lh, &myether) != 0) {
+	if (dl_phys_addr(lh, (uchar_t *)&myether, &addrlen, NULL) != 0 ||
+	    addrlen != ETHERADDRL) {
 		/* Fallback using per-node address */
 		(void) localetheraddr((struct ether_addr *)NULL, &myether);
 		cmn_err(CE_CONT, "?DLPI failed to get Ethernet address. Using "
@@ -2092,7 +2089,6 @@ myxdr_pmap(XDR *xdrs, struct pmap *regs)
 	return (FALSE);
 }
 
-
 /*
  * From SunOS callrpc.c
  */
@@ -2119,64 +2115,6 @@ mycallrpc(struct knetconfig *knconf, struct netbuf *call_addr,
 	AUTH_DESTROY(cl->cl_auth);
 	CLNT_DESTROY(cl);
 	return (cl_stat);
-}
-
-static int
-dl_info(ldi_handle_t lh, dl_info_ack_t *info)
-{
-	dl_info_req_t *info_req;
-	dl_error_ack_t *error_ack;
-	union DL_primitives *dl_prim;
-	mblk_t *mp;
-	int error;
-
-	if ((mp = allocb(sizeof (dl_info_req_t), BPRI_MED)) == NULL) {
-		cmn_err(CE_WARN, "dl_info: allocb failed");
-		return (ENOSR);
-	}
-	mp->b_datap->db_type = M_PROTO;
-
-	info_req = (dl_info_req_t *)mp->b_wptr;
-	mp->b_wptr += sizeof (dl_info_req_t);
-	info_req->dl_primitive = DL_INFO_REQ;
-
-	(void) ldi_putmsg(lh, mp);
-	if ((error = ldi_getmsg(lh, &mp, (timestruc_t *)NULL)) != 0) {
-		nfs_perror(error, "dl_info: ldi_getmsg failed: %m\n");
-		return (error);
-	}
-
-	dl_prim = (union DL_primitives *)mp->b_rptr;
-	switch (dl_prim->dl_primitive) {
-	case DL_INFO_ACK:
-		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_info_ack_t)) {
-			printf("dl_info: DL_INFO_ACK protocol error\n");
-			break;
-		}
-		*info = *(dl_info_ack_t *)mp->b_rptr;
-		freemsg(mp);
-		return (0);
-
-	case DL_ERROR_ACK:
-		if ((mp->b_wptr-mp->b_rptr) < sizeof (dl_error_ack_t)) {
-			printf("dl_info: DL_ERROR_ACK protocol error\n");
-			break;
-		}
-
-		error_ack = (dl_error_ack_t *)dl_prim;
-		printf("dl_info: DLPI error %u\n", error_ack->dl_errno);
-		break;
-
-	default:
-		printf("dl_bind: bad ACK header %u\n", dl_prim->dl_primitive);
-		break;
-	}
-
-	/*
-	 * Error return only.
-	 */
-	freemsg(mp);
-	return (-1);
 }
 
 /*

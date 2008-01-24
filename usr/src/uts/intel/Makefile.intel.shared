@@ -296,6 +296,7 @@ DRV_KMODS	+= sd
 DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
 DRV_KMODS	+= smbios
+DRV_KMODS	+= softmac
 DRV_KMODS	+= spdsock
 DRV_KMODS	+= smbsrv
 DRV_KMODS	+= smp
@@ -654,3 +655,8 @@ DEVNAME_KMODS	+= sdev_nsconfig_mod
 #	kiconv modules (/kernel/kiconv):
 #
 KICONV_KMODS	+= kiconv_emea
+
+#
+#	'Dacf' Modules (/kernel/dacf):
+#
+DACF_KMODS	+= net_dacf

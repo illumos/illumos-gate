@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ extern "C" {
 typedef struct aggr_port_s {
 	struct aggr_port_s *lp_next;
 	struct aggr_grp_s *lp_grp;		/* back ptr to group */
-	char		lp_devname[MAXNAMELEN + 1];
+	datalink_id_t	lp_linkid;
 	uint16_t	lp_portid;
 	uint8_t		lp_addr[ETHERADDRL];	/* port MAC address */
 	uint32_t	lp_refs;		/* refcount */
@@ -64,7 +64,8 @@ typedef struct aggr_port_s {
 			lp_tx_enabled : 1,
 			lp_collector_enabled : 1,
 			lp_promisc_on : 1,
-			lp_pad_bits : 28;
+			lp_no_link_update : 1,
+			lp_pad_bits : 27;
 	uint32_t	lp_closing;
 	mac_handle_t	lp_mh;
 	const mac_info_t *lp_mip;
@@ -80,6 +81,7 @@ typedef struct aggr_port_s {
 	aggr_lacp_port_t lp_lacp;		/* LACP state */
 	lacp_stats_t	lp_lacp_stats;
 	const mac_txinfo_t *lp_txinfo;
+	uint32_t	lp_margin;
 } aggr_port_t;
 
 /*
@@ -100,6 +102,7 @@ typedef struct aggr_port_s {
  */
 typedef struct aggr_grp_s {
 	krwlock_t	lg_lock;
+	datalink_id_t	lg_linkid;
 	uint16_t	lg_key;			/* key (group port number) */
 	uint32_t	lg_refs;		/* refcount */
 	uint16_t	lg_nports;		/* number of MAC ports */
@@ -110,7 +113,10 @@ typedef struct aggr_grp_s {
 			lg_started : 1,		/* group started? */
 			lg_promisc : 1,		/* in promiscuous mode? */
 			lg_gldv3_polling : 1,
-			lg_pad_bits : 11;
+			lg_zcopy : 1,
+			lg_vlan : 1,
+			lg_force : 1,
+			lg_pad_bits : 8;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_handle_t	lg_mh;
@@ -129,6 +135,7 @@ typedef struct aggr_grp_s {
 	Agg_t		aggr;			/* 802.3ad data */
 	uint32_t	lg_hcksum_txflags;
 	uint_t		lg_max_sdu;
+	uint32_t	lg_margin;
 } aggr_grp_t;
 
 #define	AGGR_LACP_LOCK(grp)	mutex_enter(&(grp)->aggr.gl_lock);
@@ -162,36 +169,39 @@ typedef struct aggr_grp_s {
 extern dev_info_t *aggr_dip;
 extern void aggr_ioctl(queue_t *, mblk_t *);
 
-typedef int (*aggr_grp_info_new_grp_fn_t)(void *, uint32_t, uchar_t *,
-    boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t, aggr_lacp_timer_t);
-typedef int (*aggr_grp_info_new_port_fn_t)(void *, char *, uchar_t *,
+typedef int (*aggr_grp_info_new_grp_fn_t)(void *, datalink_id_t, uint32_t,
+    uchar_t *, boolean_t, boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t,
+    aggr_lacp_timer_t);
+typedef int (*aggr_grp_info_new_port_fn_t)(void *, datalink_id_t, uchar_t *,
     aggr_port_state_t, aggr_lacp_state_t *);
 
 extern void aggr_grp_init(void);
 extern void aggr_grp_fini(void);
-extern int aggr_grp_create(uint32_t, uint_t, laioc_port_t *, uint32_t,
-    boolean_t, uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
-extern int aggr_grp_delete(uint32_t);
+extern int aggr_grp_create(datalink_id_t, uint32_t, uint_t, laioc_port_t *,
+    uint32_t, boolean_t, boolean_t, uchar_t *, aggr_lacp_mode_t,
+    aggr_lacp_timer_t);
+extern int aggr_grp_delete(datalink_id_t);
 extern void aggr_grp_free(aggr_grp_t *);
 
-extern int aggr_grp_info(uint_t *, uint32_t, void *,
-    aggr_grp_info_new_grp_fn_t, aggr_grp_info_new_port_fn_t);
+extern int aggr_grp_info(datalink_id_t, void *, aggr_grp_info_new_grp_fn_t,
+    aggr_grp_info_new_port_fn_t);
 extern void aggr_grp_notify(aggr_grp_t *, uint32_t);
 extern boolean_t aggr_grp_attach_port(aggr_grp_t *, aggr_port_t *);
 extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *);
 extern void aggr_grp_port_mac_changed(aggr_grp_t *, aggr_port_t *,
     boolean_t *, boolean_t *);
-extern int aggr_grp_add_ports(uint32_t, uint_t, laioc_port_t *);
-extern int aggr_grp_rem_ports(uint32_t, uint_t, laioc_port_t *);
+extern int aggr_grp_add_ports(datalink_id_t, uint_t, boolean_t,
+    laioc_port_t *);
+extern int aggr_grp_rem_ports(datalink_id_t, uint_t, laioc_port_t *);
 extern boolean_t aggr_grp_update_ports_mac(aggr_grp_t *);
-extern int aggr_grp_modify(uint32_t, aggr_grp_t *, uint8_t, uint32_t,
+extern int aggr_grp_modify(datalink_id_t, aggr_grp_t *, uint8_t, uint32_t,
     boolean_t, const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);
 extern uint_t aggr_grp_count(void);
 
 extern void aggr_port_init(void);
 extern void aggr_port_fini(void);
-extern int aggr_port_create(const char *, aggr_port_t **);
+extern int aggr_port_create(const datalink_id_t, boolean_t, aggr_port_t **);
 extern void aggr_port_delete(aggr_port_t *);
 extern void aggr_port_free(aggr_port_t *);
 extern int aggr_port_start(aggr_port_t *);

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -125,7 +125,6 @@ s none usr/lib/amd64/llib-lrt.ln=../../../lib/amd64/llib-lrt.ln
 s none usr/lib/amd64/llib-lrtld_db.ln=../../../lib/amd64/llib-lrtld_db.ln
 f none usr/lib/amd64/llib-lpasswdutil.ln 644 root bin
 s none usr/lib/amd64/llib-lposix4.ln=../../../lib/amd64/llib-lrt.ln
-f none usr/lib/amd64/llib-lrcm.ln 644 root bin
 f none usr/lib/amd64/llib-lsasl.ln 644 root bin
 s none usr/lib/amd64/llib-lscf.ln=../../../lib/amd64/llib-lscf.ln
 f none usr/lib/amd64/llib-lsched.ln 644 root bin

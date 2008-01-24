@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -14,6 +14,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <net/wpa.h>
+#include <libdladm.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -164,7 +165,7 @@ struct wpa_supplicant {
 	struct l2_packet_data	*l2;
 	unsigned char		own_addr[IEEE80211_ADDR_LEN];
 
-	char			ifname[WPA_STRSIZE];
+	datalink_id_t		linkid;
 	char			kname[WPA_STRSIZE];
 
 	uint8_t			pmk[PMK_LEN];

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ struct np_event {
  */
 struct interface {
 	char *if_name;
+	datalink_id_t if_linkid;
 	sa_family_t if_family;
 	uint64_t if_flags;
 	uint32_t if_lflags;

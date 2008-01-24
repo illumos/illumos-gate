@@ -500,20 +500,20 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
-libdladm:	libdlpi libdevinfo libinetutil libsocket
+libdladm:	libdevinfo libinetutil libsocket
 libdll: 	libast
-libdlpi:	libinetutil
+libdlpi:	libinetutil libdladm
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
 libidmap:	libnsl
-libinetcfg:	libnsl libsocket libdevinfo
+libinetcfg:	libnsl libsocket libdlpi
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
-libuuid:	libdlpi libdladm
+libuuid:	libdlpi
 libinetutil:	libsocket
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd

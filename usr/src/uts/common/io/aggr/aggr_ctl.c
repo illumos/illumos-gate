@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,8 @@ aggr_ioc_modify(mblk_t *mp, int mode)
 	boolean_t mac_fixed;
 	uchar_t mac_addr[ETHERADDRL];
 	uint8_t modify_mask_arg, modify_mask = 0;
-	uint32_t rc, key;
+	datalink_id_t linkid;
+	uint32_t rc;
 	aggr_lacp_mode_t lacp_mode;
 	aggr_lacp_timer_t lacp_timer;
 
@@ -76,7 +77,7 @@ aggr_ioc_modify(mblk_t *mp, int mode)
 	if (MBLKL(mp->b_cont) < STRUCT_SIZE(modify_arg))
 		return (EINVAL);
 
-	key = STRUCT_FGET(modify_arg, lu_key);
+	linkid = STRUCT_FGET(modify_arg, lu_linkid);
 	modify_mask_arg = STRUCT_FGET(modify_arg, lu_modify_mask);
 
 	if (modify_mask_arg & LAIOC_MODIFY_POLICY) {
@@ -100,7 +101,7 @@ aggr_ioc_modify(mblk_t *mp, int mode)
 		lacp_timer = STRUCT_FGET(modify_arg, lu_lacp_timer);
 	}
 
-	rc = aggr_grp_modify(key, NULL, modify_mask, policy, mac_fixed,
+	rc = aggr_grp_modify(linkid, NULL, modify_mask, policy, mac_fixed,
 	    mac_addr, lacp_mode, lacp_timer);
 
 	freemsg(mp->b_cont);
@@ -119,6 +120,7 @@ aggr_ioc_create(mblk_t *mp, int mode)
 	laioc_port_t *ports = NULL;
 	uint32_t policy;
 	boolean_t mac_fixed;
+	boolean_t force;
 	uchar_t mac_addr[ETHERADDRL];
 	aggr_lacp_mode_t lacp_mode;
 	aggr_lacp_timer_t lacp_timer;
@@ -143,9 +145,11 @@ aggr_ioc_create(mblk_t *mp, int mode)
 
 	bcopy(STRUCT_FGET(create_arg, lc_mac), mac_addr, ETHERADDRL);
 	mac_fixed = STRUCT_FGET(create_arg, lc_mac_fixed);
+	force = STRUCT_FGET(create_arg, lc_force);
 
-	rc = aggr_grp_create(STRUCT_FGET(create_arg, lc_key),
-	    nports, ports, policy, mac_fixed, mac_addr, lacp_mode, lacp_timer);
+	rc = aggr_grp_create(STRUCT_FGET(create_arg, lc_linkid),
+	    STRUCT_FGET(create_arg, lc_key), nports, ports, policy,
+	    mac_fixed, force, mac_addr, lacp_mode, lacp_timer);
 
 	freemsg(mp->b_cont);
 	mp->b_cont = NULL;
@@ -162,7 +166,7 @@ aggr_ioc_delete(mblk_t *mp, int mode)
 	if (STRUCT_SIZE(delete_arg) > MBLKL(mp))
 		return (EINVAL);
 
-	rc = aggr_grp_delete(STRUCT_FGET(delete_arg, ld_key));
+	rc = aggr_grp_delete(STRUCT_FGET(delete_arg, ld_linkid));
 
 	freemsg(mp->b_cont);
 	mp->b_cont = NULL;
@@ -175,9 +179,9 @@ typedef struct aggr_ioc_info_state {
 } aggr_ioc_info_state_t;
 
 static int
-aggr_ioc_info_new_grp(void *arg, uint32_t key, uchar_t *mac,
-    boolean_t mac_fixed, uint32_t policy, uint32_t nports,
-    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
+aggr_ioc_info_new_grp(void *arg, datalink_id_t linkid, uint32_t key,
+    uchar_t *mac, boolean_t mac_fixed, boolean_t force, uint32_t policy,
+    uint32_t nports, aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
 {
 	aggr_ioc_info_state_t *state = arg;
 	laioc_info_group_t grp;
@@ -185,9 +189,11 @@ aggr_ioc_info_new_grp(void *arg, uint32_t key, uchar_t *mac,
 	if (state->bytes_left < sizeof (grp))
 		return (ENOSPC);
 
+	grp.lg_linkid = linkid;
 	grp.lg_key = key;
 	bcopy(mac, grp.lg_mac, ETHERADDRL);
 	grp.lg_mac_fixed = mac_fixed;
+	grp.lg_force = force;
 	grp.lg_policy = policy;
 	grp.lg_nports = nports;
 	grp.lg_lacp_mode = lacp_mode;
@@ -201,7 +207,7 @@ aggr_ioc_info_new_grp(void *arg, uint32_t key, uchar_t *mac,
 }
 
 static int
-aggr_ioc_info_new_port(void *arg, char *devname, uchar_t *mac,
+aggr_ioc_info_new_port(void *arg, datalink_id_t linkid, uchar_t *mac,
     aggr_port_state_t portstate, aggr_lacp_state_t *lacp_state)
 {
 	aggr_ioc_info_state_t *state = arg;
@@ -210,7 +216,7 @@ aggr_ioc_info_new_port(void *arg, char *devname, uchar_t *mac,
 	if (state->bytes_left < sizeof (port))
 		return (ENOSPC);
 
-	bcopy(devname, port.lp_devname, MAXNAMELEN + 1);
+	port.lp_linkid = linkid;
 	bcopy(mac, port.lp_mac, ETHERADDRL);
 	port.lp_state = portstate;
 	port.lp_lacp_state = *lacp_state;
@@ -227,7 +233,7 @@ static int
 aggr_ioc_info(mblk_t *mp, int mode)
 {
 	laioc_info_t *info_argp;
-	uint32_t ngroups, group_key;
+	datalink_id_t linkid;
 	int rc, len;
 	aggr_ioc_info_state_t state;
 
@@ -235,19 +241,18 @@ aggr_ioc_info(mblk_t *mp, int mode)
 		return (EINVAL);
 
 	info_argp = (laioc_info_t *)mp->b_cont->b_rptr;
+
 	/*
-	 * Key of the group to return. If zero, the call returns information
-	 * regarding all groups currently defined.
+	 * linkid of the group to return. Must not be DATALINK_INVALID_LINKID.
 	 */
-	group_key = info_argp->li_group_key;
+	if ((linkid = info_argp->li_group_linkid) == DATALINK_INVALID_LINKID)
+		return (EINVAL);
 
 	state.bytes_left = len - sizeof (laioc_info_t);
 	state.where = (uchar_t *)(info_argp + 1);
 
-	rc = aggr_grp_info(&ngroups, group_key, &state, aggr_ioc_info_new_grp,
-	    aggr_ioc_info_new_port);
-	if (rc == 0)
-		info_argp->li_ngroups = ngroups;
+	rc = aggr_grp_info(linkid, &state,
+	    aggr_ioc_info_new_grp, aggr_ioc_info_new_port);
 
 	return (rc);
 }
@@ -258,6 +263,7 @@ aggr_ioc_add(mblk_t *mp, int mode)
 	STRUCT_HANDLE(laioc_add_rem, add_arg);
 	uint32_t nports;
 	laioc_port_t *ports = NULL;
+	boolean_t force;
 	int rc, len;
 
 	STRUCT_SET_HANDLE(add_arg, mode, (void *)mp->b_cont->b_rptr);
@@ -272,9 +278,10 @@ aggr_ioc_add(mblk_t *mp, int mode)
 		return (EINVAL);
 
 	ports = (laioc_port_t *)(STRUCT_BUF(add_arg) + 1);
+	force = STRUCT_FGET(add_arg, la_force);
 
-	rc = aggr_grp_add_ports(STRUCT_FGET(add_arg, la_key),
-	    nports, ports);
+	rc = aggr_grp_add_ports(STRUCT_FGET(add_arg, la_linkid),
+	    nports, force, ports);
 
 	freemsg(mp->b_cont);
 	mp->b_cont = NULL;
@@ -302,7 +309,7 @@ aggr_ioc_remove(mblk_t *mp, int mode)
 
 	ports = (laioc_port_t *)(STRUCT_BUF(rem_arg) + 1);
 
-	rc = aggr_grp_rem_ports(STRUCT_FGET(rem_arg, la_key),
+	rc = aggr_grp_rem_ports(STRUCT_FGET(rem_arg, la_linkid),
 	    nports, ports);
 
 	freemsg(mp->b_cont);

@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= dladm
-CFGFILES= aggregation.conf linkprop.conf secobj.conf
+CFGFILES= secobj.conf
 
 ROOTFS_PROG=	$(PROG)
 ROOTCFGDIR=	$(ROOTETC)/dladm
@@ -35,12 +35,11 @@ ROOTCFGFILES=	$(CFGFILES:%=$(ROOTCFGDIR)/%)
 include ../Makefile.cmd
 
 XGETFLAGS += -a -x $(PROG).xcl
-LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil
+LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
 
 $(ROOTCFGFILES) := OWNER= dladm
 $(ROOTCFGFILES) := GROUP= sys
 
-$(ROOTCFGDIR)/aggregation.conf $(ROOTCFGDIR)/linkprop.conf := FILEMODE= 644
 $(ROOTCFGDIR)/secobj.conf := FILEMODE= 600
 
 .KEEP_STATE:

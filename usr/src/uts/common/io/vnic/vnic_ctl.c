@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,21 +54,16 @@ static int vnic_detach(dev_info_t *, ddi_detach_cmd_t);
 static int vnic_open(queue_t *, dev_t *, int, int, cred_t *);
 static int vnic_close(queue_t *);
 static void vnic_wput(queue_t *, mblk_t *);
+static void vnic_ioctl(queue_t *, mblk_t *);
 
-typedef struct vnic_taskq_args_s {
-	queue_t	*tq_vnic_q;
-	mblk_t	*tq_vnic_mp;
-	int	tq_vnic_flag;
-} vnic_taskq_args_t;
-
-static void vnic_ioc_create(vnic_taskq_args_t *);
-static void vnic_ioc_modify(vnic_taskq_args_t *);
-static void vnic_ioc_delete(vnic_taskq_args_t *);
-static void vnic_ioc_info(vnic_taskq_args_t *);
+static int vnic_ioc_create(mblk_t *, int);
+static int vnic_ioc_modify(mblk_t *, int);
+static int vnic_ioc_delete(mblk_t *, int);
+static int vnic_ioc_info(mblk_t *, int);
 
 typedef struct ioc_cmd_s {
 	int ic_cmd;
-	void (*ic_func)(vnic_taskq_args_t *);
+	int (*ic_func)(mblk_t *, int);
 } ioc_cmd_t;
 
 static ioc_cmd_t ioc_cmd[] = {
@@ -176,6 +171,12 @@ vnic_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			return (ENOSR);
 
 		/*
+		 * The ioctl handling callback to process control ioctl
+		 * messages; see comments above dld_ioctl() for details.
+		 */
+		dsp->ds_ioctl = vnic_ioctl;
+
+		/*
 		 * The VNIC control node uses its own set of entry points.
 		 */
 		WR(q)->q_qinfo = &vnic_w_ctl_qinit;
@@ -193,21 +194,21 @@ vnic_close(queue_t *q)
 
 	if (dsp->ds_type == DLD_CONTROL) {
 		qprocsoff(q);
+		dld_finish_pending_task(dsp);
+		dsp->ds_ioctl = NULL;
 		dld_str_destroy(dsp);
 		return (0);
 	}
 	return (dld_close(q));
 }
 
-void
+static void
 vnic_ioctl(queue_t *wq, mblk_t *mp)
 {
 	/* LINTED alignment */
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	int i, err = 0;
+	int i, err = EINVAL;
 	mblk_t *nmp;
-	void (*func)();
-	vnic_taskq_args_t *taskq_args;
 
 	if (mp->b_cont == NULL) {
 		err = EINVAL;
@@ -228,45 +229,29 @@ vnic_ioctl(queue_t *wq, mblk_t *mp)
 
 	for (i = 0; i < IOC_CMD_SZ; i++) {
 		if (iocp->ioc_cmd == ioc_cmd[i].ic_cmd) {
-			func = ioc_cmd[i].ic_func;
+			err = ioc_cmd[i].ic_func(mp, (int)iocp->ioc_flag);
 			break;
 		}
 	}
 
-	if (i == IOC_CMD_SZ) {
-		freemsg(mp->b_cont);
-		err = EINVAL;
-		goto done;
-	}
+	if (err == 0) {
+		int len = 0;
 
-	taskq_args = kmem_zalloc(sizeof (vnic_taskq_args_t), KM_NOSLEEP);
-	if (taskq_args == NULL) {
-		freemsg(mp->b_cont);
-		err = ENOMEM;
-		goto done;
-	}
-
-	taskq_args->tq_vnic_q = wq;
-	taskq_args->tq_vnic_mp = mp;
-	taskq_args->tq_vnic_flag = (int)iocp->ioc_flag;
-	if (taskq_dispatch(system_taskq,
-	    func, taskq_args, TQ_NOSLEEP) == NULL) {
-		kmem_free(taskq_args, sizeof (vnic_taskq_args_t));
-		freemsg(mp->b_cont);
-		err = ENOMEM;
-		goto done;
+		if (mp->b_cont != NULL)
+			len = MBLKL(mp->b_cont);
+		miocack(wq, mp, len, 0);
+		return;
 	}
 
 done:
-	if (err != 0)
-		miocnak(wq, mp, 0, err);
+	miocnak(wq, mp, 0, err);
 }
 
 static void
 vnic_wput(queue_t *q, mblk_t *mp)
 {
 	if (DB_TYPE(mp) == M_IOCTL)
-		vnic_ioctl(q, mp);
+		dld_ioctl(q, mp);
 	else
 		freemsg(mp);
 }
@@ -368,39 +353,29 @@ vnic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*
  * Process a VNICIOC_CREATE request.
  */
-static void
-vnic_ioc_create(vnic_taskq_args_t *taskq_args)
+static int
+vnic_ioc_create(mblk_t *mp, int mode)
 {
 	STRUCT_HANDLE(vnic_ioc_create, create_arg);
-	queue_t *wq = taskq_args->tq_vnic_q;
-	mblk_t *mp = taskq_args->tq_vnic_mp;
-	int mode = taskq_args->tq_vnic_flag;
 	int rc = 0;
 	int mac_len;
 	uchar_t mac_addr[MAXMACADDRLEN];
-	uint_t vnic_id;
-	char dev_name[MAXNAMELEN + 1];
+	datalink_id_t vnic_id, linkid;
 	vnic_mac_addr_type_t mac_addr_type;
 
-	kmem_free(taskq_args, sizeof (vnic_taskq_args_t));
 	STRUCT_SET_HANDLE(create_arg, mode, (void *)mp->b_cont->b_rptr);
-	if (MBLKL(mp->b_cont) < STRUCT_SIZE(create_arg)) {
-		rc = EINVAL;
-		goto bail;
-	}
+	if (MBLKL(mp->b_cont) < STRUCT_SIZE(create_arg))
+		return (EINVAL);
 
 	/*
-	 * VNIC id. For now it is specified by the user. Once we have
-	 * vanity naming, we can pick a value for the user, and let
-	 * the user assign a generic name to the VNIC (XXXND)
+	 * VNIC link id
 	 */
 	vnic_id = STRUCT_FGET(create_arg, vc_vnic_id);
 
 	/*
-	 * Device name and number of the MAC port the VNIC is defined
-	 * on top of.
+	 * Linkid of the link the VNIC is defined on top of.
 	 */
-	bcopy(STRUCT_FGET(create_arg, vc_dev_name), dev_name, MAXNAMELEN);
+	linkid = STRUCT_FGET(create_arg, vc_link_id);
 
 	/* MAC address */
 	mac_addr_type = STRUCT_FGET(create_arg, vc_mac_addr_type);
@@ -412,41 +387,27 @@ vnic_ioc_create(vnic_taskq_args_t *taskq_args)
 		    MAXMACADDRLEN);
 		break;
 	default:
-		rc = ENOTSUP;
-		goto bail;
+		return (ENOTSUP);
 	}
 
-	rc = vnic_dev_create(vnic_id, dev_name, mac_len, mac_addr);
-
-bail:
-	freemsg(mp->b_cont);
-	mp->b_cont = NULL;
-	if (rc != 0)
-		miocnak(wq, mp, 0, rc);
-	else
-		miocack(wq, mp, 0, 0);
+	rc = vnic_dev_create(vnic_id, linkid, mac_len, mac_addr);
+	return (rc);
 }
 
-static void
-vnic_ioc_modify(vnic_taskq_args_t *taskq_args)
+static int
+vnic_ioc_modify(mblk_t *mp, int mode)
 {
 	STRUCT_HANDLE(vnic_ioc_modify, modify_arg);
-	queue_t *wq = taskq_args->tq_vnic_q;
-	mblk_t *mp = taskq_args->tq_vnic_mp;
-	int mode = taskq_args->tq_vnic_flag;
 	int err = 0;
-	uint_t vnic_id;
+	datalink_id_t vnic_id;
 	uint_t modify_mask;
 	vnic_mac_addr_type_t mac_addr_type;
 	uint_t mac_len;
 	uchar_t mac_addr[MAXMACADDRLEN];
 
-	kmem_free(taskq_args, sizeof (vnic_taskq_args_t));
 	STRUCT_SET_HANDLE(modify_arg, mode, (void *)mp->b_cont->b_rptr);
-	if (MBLKL(mp->b_cont) < STRUCT_SIZE(modify_arg)) {
-		err = EINVAL;
-		goto done;
-	}
+	if (MBLKL(mp->b_cont) < STRUCT_SIZE(modify_arg))
+		return (EINVAL);
 
 	vnic_id = STRUCT_FGET(modify_arg, vm_vnic_id);
 	modify_mask = STRUCT_FGET(modify_arg, vm_modify_mask);
@@ -460,42 +421,23 @@ vnic_ioc_modify(vnic_taskq_args_t *taskq_args)
 
 	err = vnic_dev_modify(vnic_id, modify_mask, mac_addr_type,
 	    mac_len, mac_addr);
-done:
-	freemsg(mp->b_cont);
-	mp->b_cont = NULL;
-	if (err != 0)
-		miocnak(wq, mp, 0, err);
-	else
-		miocack(wq, mp, 0, 0);
+	return (err);
 }
 
-static void
-vnic_ioc_delete(vnic_taskq_args_t *taskq_args)
+static int
+vnic_ioc_delete(mblk_t *mp, int mode)
 {
 	STRUCT_HANDLE(vnic_ioc_delete, delete_arg);
-	queue_t *wq = taskq_args->tq_vnic_q;
-	mblk_t *mp = taskq_args->tq_vnic_mp;
-	int mode = taskq_args->tq_vnic_flag;
-	uint_t vnic_id;
+	datalink_id_t vnic_id;
 	int err = 0;
 
-	kmem_free(taskq_args, sizeof (vnic_taskq_args_t));
 	STRUCT_SET_HANDLE(delete_arg, mode, (void *)mp->b_cont->b_rptr);
-	if (STRUCT_SIZE(delete_arg) > MBLKL(mp)) {
-		err = EINVAL;
-		goto fail;
-	}
+	if (STRUCT_SIZE(delete_arg) > MBLKL(mp))
+		return (EINVAL);
 
 	vnic_id = STRUCT_FGET(delete_arg, vd_vnic_id);
 	err = vnic_dev_delete(vnic_id);
-
-fail:
-	freemsg(mp->b_cont);
-	mp->b_cont = NULL;
-	if (err != 0)
-		miocnak(wq, mp, 0, err);
-	else
-		miocack(wq, mp, 0, err);
+	return (err);
 }
 
 typedef struct vnic_ioc_info_state {
@@ -504,8 +446,9 @@ typedef struct vnic_ioc_info_state {
 } vnic_ioc_info_state_t;
 
 static int
-vnic_ioc_info_new_vnic(void *arg, uint32_t id, vnic_mac_addr_type_t addr_type,
-    uint_t mac_len, uint8_t *mac_addr, char *dev_name)
+vnic_ioc_info_new_vnic(void *arg, datalink_id_t id,
+    vnic_mac_addr_type_t addr_type, uint_t mac_len, uint8_t *mac_addr,
+    datalink_id_t linkid)
 {
 	vnic_ioc_info_state_t *state = arg;
 	/*LINTED*/
@@ -515,10 +458,10 @@ vnic_ioc_info_new_vnic(void *arg, uint32_t id, vnic_mac_addr_type_t addr_type,
 		return (ENOSPC);
 
 	vn->vn_vnic_id = id;
+	vn->vn_link_id = linkid;
 	vn->vn_mac_addr_type = addr_type;
 	vn->vn_mac_len = mac_len;
 	bcopy(mac_addr, &(vn->vn_mac_addr), mac_len);
-	bcopy(dev_name, &(vn->vn_dev_name), MAXNAMELEN);
 
 	state->where += sizeof (*vn);
 	state->bytes_left -= sizeof (*vn);
@@ -526,22 +469,18 @@ vnic_ioc_info_new_vnic(void *arg, uint32_t id, vnic_mac_addr_type_t addr_type,
 	return (0);
 }
 
-static void
-vnic_ioc_info(vnic_taskq_args_t *taskq_args)
+/* ARGSUSED */
+static int
+vnic_ioc_info(mblk_t *mp, int mode)
 {
-	queue_t *wq = taskq_args->tq_vnic_q;
-	mblk_t *mp = taskq_args->tq_vnic_mp;
 	vnic_ioc_info_t *info_argp;
 	int rc, len;
-	uint32_t nvnics, vnic_id;
-	char dev_name[MAXNAMELEN];
+	uint32_t nvnics;
+	datalink_id_t vnic_id, linkid;
 	vnic_ioc_info_state_t state;
 
-	kmem_free(taskq_args, sizeof (vnic_taskq_args_t));
-	if ((len = MBLKL(mp->b_cont)) < sizeof (*info_argp)) {
-		rc = EINVAL;
-		goto bail;
-	}
+	if ((len = MBLKL(mp->b_cont)) < sizeof (*info_argp))
+		return (EINVAL);
 
 	/* LINTED alignment */
 	info_argp = (vnic_ioc_info_t *)mp->b_cont->b_rptr;
@@ -552,22 +491,12 @@ vnic_ioc_info(vnic_taskq_args_t *taskq_args)
 	 * regarding all vnics currently defined.
 	 */
 	vnic_id = info_argp->vi_vnic_id;
-	if (info_argp->vi_dev_name)
-		bcopy(info_argp->vi_dev_name, dev_name, MAXNAMELEN);
+	linkid = info_argp->vi_linkid;
 
 	state.bytes_left = len - sizeof (vnic_ioc_info_t);
 	state.where = (uchar_t *)(info_argp +1);
 
-	rc = vnic_info(&nvnics, vnic_id, dev_name, &state,
+	rc = vnic_info(&nvnics, vnic_id, linkid, &state,
 	    vnic_ioc_info_new_vnic);
-
-bail:
-	if (rc == 0) {
-		info_argp->vi_nvnics = nvnics;
-		miocack(wq, mp, len, 0);
-	} else {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-		miocnak(wq, mp, 0, rc);
-	}
+	return (rc);
 }

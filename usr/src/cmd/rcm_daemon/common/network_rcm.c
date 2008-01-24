@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <libdevinfo.h>
 #include <sys/types.h>
 #include <net/if.h>
-#include <libdlaggr.h>
+#include <libdllink.h>
 #include "rcm_module.h"
 
 /*
@@ -56,6 +56,20 @@
 #define	CACHE_STALE	1	/* flags */
 #define	CACHE_NEW	2	/* flags */
 
+/* devfsadm attach nvpair values */
+#define	PROP_NV_DDI_NETWORK	"ddi_network"
+
+/*
+ * Global NIC list to be configured after DR-attach
+ */
+struct ni_list {
+	struct ni_list *next;
+	char dev[MAXNAMELEN];	/* device instance name (le0, ie0, etc.) */
+};
+
+static struct ni_list *nil_head = NULL;		/* Global new if list */
+static mutex_t nil_lock;			/* NIC list lock */
+
 /* operations */
 #define	NET_OFFLINE	1
 #define	NET_ONLINE	2
@@ -66,9 +80,7 @@
 typedef struct net_cache
 {
 	char			*resource;
-	char			*exported;
-	char			*driver;
-	int			ppa;
+	datalink_id_t		linkid;
 	int			flags;
 	struct net_cache	*next;
 	struct net_cache	*prev;
@@ -77,6 +89,13 @@ typedef struct net_cache
 static net_cache_t	cache_head;
 static net_cache_t	cache_tail;
 static mutex_t		cache_lock;
+static int		events_registered = 0;
+
+struct devfs_minor_data {
+	int32_t minor_type;
+	char *minor_name;
+	char *minor_node_type;
+};
 
 /* module interface routines */
 static int net_register(rcm_handle_t *);
@@ -93,6 +112,8 @@ static int net_online(rcm_handle_t *, char *, id_t, uint_t, char **,
     rcm_info_t **);
 static int net_remove(rcm_handle_t *, char *, id_t, uint_t, char **,
     rcm_info_t **);
+static int net_notify_event(rcm_handle_t *, char *, id_t, uint_t,
+    char **, nvlist_t *, rcm_info_t **);
 
 /* module private routines */
 static void free_cache(void);
@@ -102,7 +123,9 @@ static void cache_remove(net_cache_t *node);
 static net_cache_t *cache_lookup(const char *resource);
 static void free_node(net_cache_t *);
 static void cache_insert(net_cache_t *);
-static boolean_t is_aggregated(char *driver, int ppa);
+static int notify_new_link(rcm_handle_t *, const char *);
+static void process_minor(char *, int, struct devfs_minor_data *);
+static int process_nvlist(rcm_handle_t *, nvlist_t *);
 
 /*
  * Module-Private data
@@ -116,7 +139,10 @@ static struct rcm_mod_ops net_ops = {
 	net_resume,
 	net_offline,
 	net_online,
-	net_remove
+	net_remove,
+	NULL,
+	NULL,
+	net_notify_event
 };
 
 /*
@@ -179,6 +205,24 @@ static int
 net_register(rcm_handle_t *hd)
 {
 	update_cache(hd);
+	/*
+	 * Need to register interest in all new resources
+	 * getting attached, so we get attach event notifications
+	 */
+	if (!events_registered) {
+		if (rcm_register_event(hd, RCM_RESOURCE_NETWORK_NEW, 0, NULL)
+		    != RCM_SUCCESS) {
+			rcm_log_message(RCM_ERROR,
+			    _("NET: failed to register %s\n"),
+			    RCM_RESOURCE_NETWORK_NEW);
+			return (RCM_FAILURE);
+		} else {
+			rcm_log_message(RCM_DEBUG, _("NET: registered %s\n"),
+			    RCM_RESOURCE_NETWORK_NEW);
+			events_registered++;
+		}
+	}
+
 	return (RCM_SUCCESS);
 }
 
@@ -207,6 +251,24 @@ net_unregister(rcm_handle_t *hd)
 		probe = cache_head.next;
 	}
 	(void) mutex_unlock(&cache_lock);
+
+	/*
+	 * Need to unregister interest in all new resources
+	 */
+	if (events_registered) {
+		if (rcm_unregister_event(hd, RCM_RESOURCE_NETWORK_NEW, 0)
+		    != RCM_SUCCESS) {
+			rcm_log_message(RCM_ERROR,
+			    _("NET: failed to unregister %s\n"),
+			    RCM_RESOURCE_NETWORK_NEW);
+			return (RCM_FAILURE);
+		} else {
+			rcm_log_message(RCM_DEBUG, _("NET: unregistered %s\n"),
+			    RCM_RESOURCE_NETWORK_NEW);
+			events_registered--;
+		}
+	}
+
 	return (RCM_SUCCESS);
 }
 
@@ -221,6 +283,8 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 {
 	net_cache_t	*node;
 	char		*exported;
+	datalink_id_t	linkid;
+	int		len;
 	int		rv;
 
 	/*
@@ -237,13 +301,15 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 	}
 
 	/*
-	 * Since node->exported could be freed after we drop cache_lock,
-	 * allocate a stack-local copy.  We don't use strdup() because some of
-	 * the operations (such as NET_REMOVE) are not allowed to fail.  Note
-	 * that node->exported is never more than MAXPATHLEN bytes.
+	 * Since node could be freed after we drop cache_lock, allocate a
+	 * stack-local copy. We don't use malloc() because some of the
+	 * operations (such as NET_REMOVE) are not allowed to fail. Note
+	 * that exported is never more than MAXPATHLEN bytes.
 	 */
-	exported = alloca(strlen(node->exported) + 1);
-	(void) strlcpy(exported, node->exported, strlen(node->exported) + 1);
+	len = strlen("SUNW_datalink/") + LINKID_STR_WIDTH + 1;
+	exported = alloca(len);
+	linkid = node->linkid;
+	(void) snprintf(exported, len, "SUNW_datalink/%u", linkid);
 
 	/*
 	 * Remove notifications are unconditional in the RCM state model,
@@ -263,18 +329,6 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 		    (timespec_t *)arg, dependent_reason);
 		break;
 	case NET_OFFLINE:
-		if (is_aggregated(node->driver, node->ppa)) {
-			/* device is aggregated */
-			*reason = strdup(gettext(
-			    "Resource is in use by aggregation"));
-			if (*reason == NULL) {
-				rcm_log_message(RCM_ERROR,
-				    gettext("NET: malloc failure"));
-			}
-			errno = EBUSY;
-			return (RCM_FAILURE);
-		}
-
 		rv = rcm_request_offline(hd, exported, flag, dependent_reason);
 		break;
 	case NET_ONLINE:
@@ -282,6 +336,19 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 		break;
 	case NET_REMOVE:
 		rv = rcm_notify_remove(hd, exported, flag, dependent_reason);
+		if (rv == RCM_SUCCESS) {
+			rcm_log_message(RCM_DEBUG,
+			    _("NET: mark link %d as removed\n"), linkid);
+
+			/*
+			 * Delete active linkprop before this active link
+			 * is deleted.
+			 */
+			(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
+			    DLADM_OPT_ACTIVE);
+			(void) dladm_destroy_datalink_id(linkid,
+			    DLADM_OPT_ACTIVE);
+		}
 		break;
 	case NET_RESUME:
 		rv = rcm_notify_resume(hd, exported, flag, dependent_reason);
@@ -300,7 +367,6 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 		    exported);
 		rcm_log_message(RCM_WARNING, "NET: %s\n", format);
 	}
-
 	return (rv);
 }
 
@@ -321,7 +387,7 @@ net_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	assert(reason != NULL);
 	assert(dependent_reason != NULL);
 
-	rcm_log_message(RCM_TRACE1, "NET: offline(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: offline(%s)\n"), rsrc);
 
 	return (net_passthru(hd, NET_OFFLINE, rsrc, flags, reason,
 	    dependent_reason, NULL));
@@ -340,7 +406,7 @@ net_online(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **reason,
 	assert(rsrc != NULL);
 	assert(id == (id_t)0);
 
-	rcm_log_message(RCM_TRACE1, "NET: online(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: online(%s)\n"), rsrc);
 
 	return (net_passthru(hd, NET_ONLINE, rsrc, flag, reason,
 	    dependent_reason, NULL));
@@ -362,8 +428,10 @@ net_getinfo(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag,
     char **info, char **errstr, nvlist_t *proplist, rcm_info_t **depend_info)
 {
 	int		len;
+	dladm_status_t	status;
+	char		link[MAXLINKNAMELEN];
+	char		errmsg[DLADM_STRSIZE];
 	char		*exported;
-	char		nic[64];
 	const char	*info_fmt;
 	net_cache_t	*node;
 
@@ -373,7 +441,7 @@ net_getinfo(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag,
 	assert(info != NULL);
 	assert(depend_info != NULL);
 
-	rcm_log_message(RCM_TRACE1, "NET: getinfo(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: getinfo(%s)\n"), rsrc);
 
 	info_fmt = _("Network interface %s");
 
@@ -386,25 +454,34 @@ net_getinfo(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag,
 		errno = ENOENT;
 		return (RCM_FAILURE);
 	}
-	exported = strdup(node->exported);
-	if (!exported) {
-		rcm_log_message(RCM_ERROR, _("NET: strdup failure"));
+
+	len = strlen(info_fmt) + MAXLINKNAMELEN + 1;
+	if ((status = dladm_datalink_id2info(node->linkid, NULL, NULL, NULL,
+	    link, sizeof (link))) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_ERROR,
+		    _("NET: usage(%s) get link name failure(%s)\n"),
+		    node->resource, dladm_status2str(status, errmsg));
+		(void) mutex_unlock(&cache_lock);
+		return (RCM_FAILURE);
+	} else if ((*info = (char *)malloc(len)) == NULL) {
+		rcm_log_message(RCM_ERROR, _("NET: malloc failure"));
 		(void) mutex_unlock(&cache_lock);
 		return (RCM_FAILURE);
 	}
 
-	(void) snprintf(nic, sizeof (nic), "%s%d", node->driver, node->ppa);
-	(void) mutex_unlock(&cache_lock);
+	/* Fill in the string */
+	(void) snprintf(*info, len, info_fmt, link);
 
-	len = strlen(info_fmt) + strlen(nic) + 1;
-	if ((*info = (char *)malloc(len)) == NULL) {
-		rcm_log_message(RCM_ERROR, _("NET: malloc failure"));
-		free(exported);
+	len = strlen("SUNW_datalink/") + LINKID_STR_WIDTH + 1;
+	exported = malloc(len);
+	if (!exported) {
+		rcm_log_message(RCM_ERROR, _("NET: allocation failure"));
+		free(*info);
+		(void) mutex_unlock(&cache_lock);
 		return (RCM_FAILURE);
 	}
-
-	/* Fill in the string */
-	(void) snprintf(*info, len, info_fmt, nic);
+	(void) snprintf(exported, len, "SUNW_datalink/%u", node->linkid);
+	(void) mutex_unlock(&cache_lock);
 
 	/* Get dependent info if requested */
 	if ((flag & RCM_INCLUDE_DEPENDENT) || (flag & RCM_INCLUDE_SUBTREE)) {
@@ -439,7 +516,7 @@ net_suspend(rcm_handle_t *hd, char *rsrc, id_t id, timespec_t *interval,
 	assert(reason != NULL);
 	assert(dependent_reason != NULL);
 
-	rcm_log_message(RCM_TRACE1, "NET: suspend(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: suspend(%s)\n"), rsrc);
 
 	return (net_passthru(hd, NET_SUSPEND, rsrc, flag, reason,
 	    dependent_reason, (void *)interval));
@@ -463,7 +540,7 @@ net_resume(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **info,
 	assert(info != NULL);
 	assert(dependent_info != NULL);
 
-	rcm_log_message(RCM_TRACE1, "NET: resume(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: resume(%s)\n"), rsrc);
 
 	return (net_passthru(hd, NET_RESUME, rsrc, flag, info, dependent_info,
 	    NULL));
@@ -488,7 +565,7 @@ net_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **info,
 	assert(info != NULL);
 	assert(dependent_info != NULL);
 
-	rcm_log_message(RCM_TRACE1, "NET: remove(%s)\n", rsrc);
+	rcm_log_message(RCM_TRACE1, _("NET: remove(%s)\n"), rsrc);
 
 	return (net_passthru(hd, NET_REMOVE, rsrc, flag, info, dependent_info,
 	    NULL));
@@ -532,8 +609,6 @@ free_node(net_cache_t *node)
 {
 	if (node) {
 		free(node->resource);
-		free(node->exported);
-		free(node->driver);
 		free(node);
 	}
 }
@@ -577,12 +652,12 @@ cache_remove(net_cache_t *node)
 static int
 devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 {
-	char		ifname [MAXPATHLEN];	/* should be big enough! */
 	char		*devfspath;
 	char		resource[MAXPATHLEN];
-	char		*name;
+	char		dev[MAXNAMELEN];
+	datalink_id_t	linkid;
+	char		*drv;
 	char		*cp;
-	int		instance;
 	net_cache_t	*probe;
 
 	cp = di_minor_nodetype(minor);
@@ -591,28 +666,23 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 		return (DI_WALK_CONTINUE);
 	}
 
-	name = di_driver_name(node);
-	if (name == NULL) {
+	drv = di_driver_name(node);
+	if (drv == NULL) {
 		/* what else can we do? */
 		return (DI_WALK_CONTINUE);
 	}
 
-	instance = di_instance(node);
-
-	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%d",
-	    name, instance);
-
 	devfspath = di_devfs_path(node);
 	if (!devfspath) {
 		/* no devfs path?!? */
-		rcm_log_message(RCM_DEBUG, "NET: missing devfs path\n");
+		rcm_log_message(RCM_DEBUG, _("NET: missing devfs path\n"));
 		return (DI_WALK_CONTINUE);
 	}
 
 	if (strncmp("/pseudo", devfspath, strlen("/pseudo")) == 0) {
 		/* ignore pseudo devices, probably not really NICs */
-		rcm_log_message(RCM_DEBUG, "NET: ignoring pseudo device %s\n",
-		    devfspath);
+		rcm_log_message(RCM_DEBUG,
+		    _("NET: ignoring pseudo device %s\n"), devfspath);
 		di_devfs_path_free(devfspath);
 		return (DI_WALK_CONTINUE);
 	}
@@ -620,14 +690,24 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 	(void) snprintf(resource, sizeof (resource), "/devices%s", devfspath);
 	di_devfs_path_free(devfspath);
 
+	(void) snprintf(dev, sizeof (dev), "%s%d", drv, di_instance(node));
+	if (dladm_dev2linkid(dev, &linkid) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_DEBUG,
+		    _("NET: failed to find the linkid for %s\n"), dev);
+		return (DI_WALK_CONTINUE);
+	}
+
 	probe = cache_lookup(resource);
 	if (probe != NULL) {
-		rcm_log_message(RCM_DEBUG, "NET: %s already registered\n",
-		    resource);
+		rcm_log_message(RCM_DEBUG,
+		    _("NET: %s already registered (linkid %u)\n"),
+		    resource, linkid);
+		probe->linkid = linkid;
 		probe->flags &= ~(CACHE_STALE);
 	} else {
-		rcm_log_message(RCM_DEBUG, "NET: %s is new resource\n",
-		    resource);
+		rcm_log_message(RCM_DEBUG,
+		    _("NET: %s is new resource (linkid %u)\n"),
+		    resource, linkid);
 		probe = calloc(1, sizeof (net_cache_t));
 		if (!probe) {
 			rcm_log_message(RCM_ERROR, _("NET: malloc failure"));
@@ -635,12 +715,9 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 		}
 
 		probe->resource = strdup(resource);
-		probe->ppa = instance;
-		probe->driver = strdup(name);
-		probe->exported = strdup(ifname);
+		probe->linkid = linkid;
 
-		if ((!probe->resource) || (!probe->exported) ||
-		    (!probe->driver)) {
+		if (!probe->resource) {
 			free_node(probe);
 			return (DI_WALK_CONTINUE);
 		}
@@ -688,7 +765,7 @@ update_cache(rcm_handle_t *hd)
 		net_cache_t *freeit;
 		if (probe->flags & CACHE_STALE) {
 			(void) rcm_unregister_interest(hd, probe->resource, 0);
-			rcm_log_message(RCM_DEBUG, "NET: unregistered %s\n",
+			rcm_log_message(RCM_DEBUG, _("NET: unregistered %s\n"),
 			    probe->resource);
 			freeit = probe;
 			probe = probe->next;
@@ -702,7 +779,7 @@ update_cache(rcm_handle_t *hd)
 			continue;
 		}
 
-		rcm_log_message(RCM_DEBUG, "NET: registering %s\n",
+		rcm_log_message(RCM_DEBUG, _("NET: registering %s\n"),
 		    probe->resource);
 		rv = rcm_register_interest(hd, probe->resource, 0, NULL);
 		if (rv != RCM_SUCCESS) {
@@ -711,8 +788,8 @@ update_cache(rcm_handle_t *hd)
 			    probe->resource);
 		} else {
 			rcm_log_message(RCM_DEBUG,
-			    "NET: registered %s (as %s)\n",
-			    probe->resource, probe->exported);
+			    _("NET: registered %s as SUNW_datalink/%u\n"),
+			    probe->resource, probe->linkid);
 			probe->flags &= ~(CACHE_NEW);
 		}
 		probe = probe->next;
@@ -741,52 +818,282 @@ free_cache(void)
 }
 
 /*
- * is_aggregated() checks whether a NIC being removed is part of an
- * aggregation.
+ * net_notify_event - Project private implementation to receive new
+ *			resource events. It intercepts all new resource
+ *			events. If the new resource is a network resource,
+ *			pass up a event for the resource. The new resource
+ *			need not be cached, since it is done at register again.
  */
-
-typedef struct aggr_walker_state_s {
-	uint_t naggr;
-	char dev_name[LIFNAMSIZ];
-} aggr_walker_state_t;
-
+/*ARGSUSED*/
 static int
-aggr_walker(void *arg, dladm_aggr_grp_attr_t *grp)
+net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
+    char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
 {
-	aggr_walker_state_t *state = arg;
-	dladm_aggr_port_attr_t *port;
-	int i;
+	assert(hd != NULL);
+	assert(rsrc != NULL);
+	assert(id == (id_t)0);
+	assert(nvl != NULL);
 
-	for (i = 0; i < grp->lg_nports; i++) {
-		port = &grp->lg_ports[i];
+	rcm_log_message(RCM_TRACE1, _("NET: notify_event(%s)\n"), rsrc);
 
-		rcm_log_message(RCM_TRACE1, "MAC: aggr (%d) port %s\n",
-		    grp->lg_key, port->lp_devname);
-
-		if (strcmp(port->lp_devname, state->dev_name) != 0)
-			continue;
-
-		/* found matching MAC port */
-		state->naggr++;
+	if (strcmp(rsrc, RCM_RESOURCE_NETWORK_NEW) != 0) {
+		rcm_log_message(RCM_INFO,
+		    _("NET: unrecognized event for %s\n"), rsrc);
+		errno = EINVAL;
+		return (RCM_FAILURE);
 	}
 
+	/* Update cache to reflect latest physical links */
+	update_cache(hd);
+
+	/* Process the nvlist for the event */
+	if (process_nvlist(hd, nvl) != 0) {
+		rcm_log_message(RCM_WARNING,
+		    _("NET: Error processing resource attributes(%s)\n"), rsrc);
+		rcm_log_message(RCM_WARNING,
+		    _("NET: One or more devices may not be configured.\n"));
+	}
+
+	rcm_log_message(RCM_TRACE1,
+	    _("NET: notify_event: device configuration complete\n"));
+
+	return (RCM_SUCCESS);
+}
+
+/*
+ * process_nvlist() - Determine network interfaces on a new attach by
+ *		      processing the nvlist
+ */
+static int
+process_nvlist(rcm_handle_t *hd, nvlist_t *nvl)
+{
+	nvpair_t *nvp = NULL;
+	char *driver;
+	char *devfspath;
+	int32_t instance;
+	char *minor_byte_array; /* packed nvlist of minor_data */
+	uint_t nminor;		  /* # of minor nodes */
+	struct devfs_minor_data *mdata;
+	nvlist_t *mnvl;
+	nvpair_t *mnvp = NULL;
+	struct ni_list *nilp, *next;
+
+	rcm_log_message(RCM_TRACE1, "NET: process_nvlist\n");
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		/* Get driver name */
+		if (strcmp(nvpair_name(nvp), RCM_NV_DRIVER_NAME) == 0) {
+			if (nvpair_value_string(nvp, &driver) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: cannot get driver name\n"));
+				return (-1);
+			}
+		}
+		/* Get instance */
+		if (strcmp(nvpair_name(nvp), RCM_NV_INSTANCE) == 0) {
+			if (nvpair_value_int32(nvp, &instance) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: cannot get device instance\n"));
+				return (-1);
+			}
+		}
+		/* Get devfspath */
+		if (strcmp(nvpair_name(nvp), RCM_NV_DEVFS_PATH) == 0) {
+			if (nvpair_value_string(nvp, &devfspath) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: cannot get device path\n"));
+				return (-1);
+			}
+			if (strncmp("/pseudo", devfspath,
+			    strlen("/pseudo")) == 0) {
+				/* Ignore pseudo devices, not really NICs */
+				rcm_log_message(RCM_DEBUG,
+				    _("NET: ignoring pseudo device %s\n"),
+				    devfspath);
+				return (0);
+			}
+		}
+
+		/* Get minor data */
+		if (strcmp(nvpair_name(nvp), RCM_NV_MINOR_DATA) == 0) {
+			if (nvpair_value_byte_array(nvp,
+			    (uchar_t **)&minor_byte_array, &nminor) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: cannot get device minor data\n"));
+				return (-1);
+			}
+			if (nvlist_unpack(minor_byte_array,
+			    nminor, &mnvl, 0) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: cannot get minor node data\n"));
+				return (-1);
+			}
+			mdata = (struct devfs_minor_data *)calloc(1,
+			    sizeof (struct devfs_minor_data));
+			if (mdata == NULL) {
+				rcm_log_message(RCM_WARNING,
+				    _("NET: calloc error(%s)\n"),
+				    strerror(errno));
+				nvlist_free(mnvl);
+				return (-1);
+			}
+			/* Enumerate minor node data */
+			while ((mnvp = nvlist_next_nvpair(mnvl, mnvp)) !=
+			    NULL) {
+				/* Get minor type */
+				if (strcmp(nvpair_name(mnvp),
+				    RCM_NV_MINOR_TYPE) == 0) {
+					if (nvpair_value_int32(mnvp,
+					    &mdata->minor_type) != 0) {
+						rcm_log_message(RCM_WARNING,
+						    _("NET: cannot get minor "
+						    "type \n"));
+						nvlist_free(mnvl);
+						return (-1);
+					}
+				}
+				/* Get minor name */
+				if (strcmp(nvpair_name(mnvp),
+				    RCM_NV_MINOR_NAME) == 0) {
+					if (nvpair_value_string(mnvp,
+					    &mdata->minor_name) != 0) {
+						rcm_log_message(RCM_WARNING,
+						    _("NET: cannot get minor "
+						    "name \n"));
+						nvlist_free(mnvl);
+						return (-1);
+					}
+				}
+				/* Get minor node type */
+				if (strcmp(nvpair_name(mnvp),
+				    RCM_NV_MINOR_NODE_TYPE) == 0) {
+					if (nvpair_value_string(mnvp,
+					    &mdata->minor_node_type) != 0) {
+						rcm_log_message(RCM_WARNING,
+						    _("NET: cannot get minor "
+						    "node type \n"));
+						nvlist_free(mnvl);
+						return (-1);
+					}
+				}
+			}
+			(void) process_minor(driver, instance, mdata);
+			nvlist_free(mnvl);
+		}
+	}
+
+	(void) mutex_lock(&nil_lock);
+
+	/* Notify the event for all new devices found, then clean up the list */
+	for (nilp = nil_head; nilp != NULL; nilp = next) {
+		if (notify_new_link(hd, nilp->dev) != 0) {
+			rcm_log_message(RCM_ERROR,
+			    _(": Notify %s event failed (%s)\n"),
+			    RCM_RESOURCE_LINK_NEW, nilp->dev);
+		}
+		next = nilp->next;
+		free(nilp);
+	}
+	nil_head = NULL;
+
+	(void) mutex_unlock(&nil_lock);
+
+	rcm_log_message(RCM_TRACE1, _("NET: process_nvlist success\n"));
 	return (0);
 }
 
-static boolean_t
-is_aggregated(char *driver, int ppa)
+static void
+process_minor(char *name, int instance, struct devfs_minor_data *mdata)
 {
-	aggr_walker_state_t state;
+	char dev[MAXNAMELEN];
+	struct ni_list **pp;
+	struct ni_list *p;
 
-	state.naggr = 0;
-	(void) snprintf(state.dev_name, sizeof (state.dev_name), "%s%d",
-	    driver, ppa);
+	rcm_log_message(RCM_TRACE1, _("NET: process_minor %s%d\n"),
+	    name, instance);
 
-	if (dladm_aggr_walk(aggr_walker, &state) != 0) {
-		rcm_log_message(RCM_ERROR, gettext("NET: cannot walk "
-		    "aggregations (%s)\n"), strerror(errno));
-		return (B_FALSE);
+	if ((mdata->minor_node_type != NULL) &&
+	    strcmp(mdata->minor_node_type, PROP_NV_DDI_NETWORK) != 0) {
+		/* Process network devices only */
+		return;
 	}
 
-	return (state.naggr > 0);
+	(void) snprintf(dev, sizeof (dev), "%s%d", name, instance);
+
+	/* Add new interface to the list */
+	(void) mutex_lock(&nil_lock);
+	for (pp = &nil_head; (p = *pp) != NULL; pp = &(p->next)) {
+		if (strcmp(dev, p->dev) == 0)
+			break;
+	}
+	if (p != NULL) {
+		rcm_log_message(RCM_TRACE1,
+		    _("NET: secondary node - ignoring\n"));
+		goto done;
+	}
+
+	/* Add new device to the list */
+	if ((p = malloc(sizeof (struct ni_list))) == NULL) {
+		rcm_log_message(RCM_ERROR, _("NET: malloc failure(%s)\n"),
+		    strerror(errno));
+		goto done;
+	}
+	(void) strncpy(p->dev, dev, sizeof (p->dev));
+	p->next = NULL;
+	*pp = p;
+
+	rcm_log_message(RCM_TRACE1, _("NET: added new node %s\n"), dev);
+done:
+	(void) mutex_unlock(&nil_lock);
+}
+
+/*
+ * Notify the RCM_RESOURCE_LINK_NEW event to other modules.
+ * Return 0 on success, -1 on failure.
+ */
+static int
+notify_new_link(rcm_handle_t *hd, const char *dev)
+{
+	nvlist_t *nvl = NULL;
+	datalink_id_t linkid;
+	uint64_t id;
+	int ret = -1;
+
+	rcm_log_message(RCM_TRACE1, _("NET: notify_new_link %s\n"), dev);
+	if (dladm_dev2linkid(dev, &linkid) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_TRACE1,
+		    _("NET: new link %s has not attached yet\n"), dev);
+		ret = 0;
+		goto done;
+	}
+
+	id = linkid;
+	if ((nvlist_alloc(&nvl, 0, 0) != 0) ||
+	    (nvlist_add_uint64(nvl, RCM_NV_LINKID, id) != 0)) {
+		rcm_log_message(RCM_ERROR,
+		    _("NET: failed to construct nvlist for %s\n"), dev);
+		goto done;
+	}
+
+	/*
+	 * Reset the active linkprop of this specific link.
+	 */
+	(void) dladm_init_linkprop(linkid);
+
+	rcm_log_message(RCM_TRACE1, _("NET: notify new link %u (%s)\n"),
+	    linkid, dev);
+
+	if (rcm_notify_event(hd, RCM_RESOURCE_LINK_NEW, 0, nvl, NULL) !=
+	    RCM_SUCCESS) {
+		rcm_log_message(RCM_ERROR,
+		    _("NET: failed to notify %s event for %s\n"),
+		    RCM_RESOURCE_LINK_NEW, dev);
+		goto done;
+	}
+
+	ret = 0;
+done:
+	if (nvl != NULL)
+		nvlist_free(nvl);
+	return (ret);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,10 +152,10 @@ static dladm_wlan_key_t *retrieve_key(const char *, const char *,
 static boolean_t add_wlan_entry(struct interface *, char *, char *, char *,
     dladm_wlan_secmode_t);
 static boolean_t already_in_visited_wlan_list(const struct wireless_lan *);
-static boolean_t check_wlan(const char *, const char *);
-static boolean_t connect_or_autoconf(struct wireless_lan *, const char *);
+static boolean_t check_wlan(struct interface *, const char *);
+static boolean_t connect_or_autoconf(struct wireless_lan *, struct interface *);
 static return_vals_t connect_to_new_wlan(const struct wireless_lan *, int,
-    const char *);
+    struct interface *);
 static boolean_t find_wlan_entry(struct interface *, char *, char *);
 static void free_wireless_lan(struct wireless_lan *);
 static struct wireless_lan *get_specific_lan(void);
@@ -167,7 +167,7 @@ static void free_argv(char **);
 static char **build_wlanlist_zargv(const struct wireless_lan *, int,
     const char *, int, const char **, int);
 static char *get_zenity_response(char *const *);
-static boolean_t wlan_autoconf(const char *ifname);
+static boolean_t wlan_autoconf(struct interface *);
 static int zenity_height(int);
 static boolean_t get_scan_results(void *, dladm_wlan_attr_t *);
 static boolean_t known_wifi_nets_lookup(const char *, const char *, char *);
@@ -438,20 +438,21 @@ clear_lan_entries(void)
  *    to disassociate with it and then return false.
  */
 static boolean_t
-check_wlan(const char *intf, const char *exp_essid)
+check_wlan(struct interface *intf, const char *exp_essid)
 {
 	dladm_wlan_linkattr_t attr;
 	dladm_status_t status;
 	char cur_essid[DLADM_STRSIZE];
 	char errmsg[DLADM_STRSIZE];
 
-	status = dladm_wlan_get_linkattr(intf, &attr);
+	status = dladm_wlan_get_linkattr(intf->if_linkid, &attr);
 	if (status != DLADM_STATUS_OK) {
-		dprintf("check_wlan: dladm_wlan_get_linkattr() failed: %s",
+		dprintf("check_wlan: dladm_wlan_get_linkattr() for %s "
+		    "failed: %s", intf->if_name,
 		    dladm_status2str(status, errmsg));
 		return (B_FALSE);
 	}
-	if (attr.la_status == DLADM_WLAN_LINKSTATUS_DISCONNECTED)
+	if (attr.la_status == DLADM_WLAN_LINK_DISCONNECTED)
 		return (B_FALSE);
 	if (exp_essid == NULL)
 		return (B_TRUE);
@@ -462,8 +463,10 @@ check_wlan(const char *intf, const char *exp_essid)
 		return (B_TRUE);
 
 	/* Tell the driver to disassociate with the current AP. */
-	if (dladm_wlan_disconnect(intf) != DLADM_STATUS_OK)
-		dprintf("check_wlan: dladm_wlan_disconnect() fails");
+	if (dladm_wlan_disconnect(intf->if_linkid) != DLADM_STATUS_OK) {
+		dprintf("check_wlan: dladm_wlan_disconnect() for %s fails",
+		    intf->if_name);
+	}
 	return (B_FALSE);
 }
 
@@ -505,7 +508,7 @@ scan_wireless_nets(struct interface *intf)
 	 * a lock in checking wireless_lan_used.
 	 */
 	num_ap = wireless_lan_used;
-	status = dladm_wlan_scan(intf->if_name, intf, get_scan_results);
+	status = dladm_wlan_scan(intf->if_linkid, intf, get_scan_results);
 	if (status != DLADM_STATUS_OK)
 		syslog(LOG_NOTICE, "cannot scan link '%s'", intf->if_name);
 	else
@@ -570,6 +573,8 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 void *
 periodic_wireless_scan(void *arg)
 {
+	datalink_id_t	linkid;
+
 	/*
 	 * No periodic scan if the "-i" option is used to change the
 	 * interval to 0.
@@ -601,13 +606,18 @@ periodic_wireless_scan(void *arg)
 		 */
 		if (ret == 0) {
 			if (cur_llp != NULL) {
-				if (cur_llp->llp_type != IF_WIRELESS ||
-				    dladm_wlan_get_linkattr(cur_llp->llp_lname,
-				    &attr) != DLADM_STATUS_OK) {
+				if (cur_llp->llp_type != IF_WIRELESS)
+					continue;
+
+				if (dladm_name2info(cur_llp->llp_lname, &linkid,
+				    NULL, NULL, NULL) != DLADM_STATUS_OK ||
+				    dladm_wlan_get_linkattr(linkid, &attr) !=
+				    DLADM_STATUS_OK) {
 					continue;
 				}
+
 				if (attr.la_status ==
-				    DLADM_WLAN_LINKSTATUS_CONNECTED &&
+				    DLADM_WLAN_LINK_CONNECTED &&
 				    attr.la_wlan_attr.wa_strength >
 				    wireless_scan_level) {
 					continue;
@@ -771,7 +781,7 @@ store_key(struct wireless_lan *wlan)
 
 	status = dladm_set_secobj(obj_name, class,
 	    obj_val, obj_len,
-	    DLADM_OPT_CREATE | DLADM_OPT_PERSIST | DLADM_OPT_TEMP);
+	    DLADM_OPT_CREATE | DLADM_OPT_PERSIST | DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		syslog(LOG_ERR, "store_key: could not create secure object "
 		    "'%s' for key: %s", obj_name,
@@ -826,7 +836,7 @@ retrieve_key(const char *essid, const char *bssid, dladm_secobj_class_t req)
 	/* Try the kernel first, then fall back to persistent storage. */
 	status = dladm_get_secobj(cooked_key->wk_name, &class,
 	    cooked_key->wk_val, &cooked_key->wk_len,
-	    DLADM_OPT_TEMP);
+	    DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		dprintf("retrieve_key: dladm_get_secobj(TEMP) failed: %s",
 		    dladm_status2str(status, errmsg));
@@ -1007,7 +1017,7 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid,
  * reqlan->bssid is optional (i.e., may be NULL)
  */
 boolean_t
-connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
+connect_chosen_lan(struct wireless_lan *reqlan, struct interface *intf)
 {
 	uint_t	keycount;
 	dladm_wlan_key_t *key;
@@ -1022,17 +1032,17 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 	if (reqlan->essid == NULL)
 		return (B_FALSE);
 	dprintf("connect_chosen_lan(%s, %s, %s)", reqlan->essid,
-	    STRING(reqlan->bssid), ifname);
+	    STRING(reqlan->bssid), intf->if_name);
 
 	/* If it is already connected to the required AP, just return. */
-	if (check_wlan(ifname, reqlan->essid))
+	if (check_wlan(intf, reqlan->essid))
 		return (B_TRUE);
 
 	if (dladm_wlan_str2essid(reqlan->essid, &attr.wa_essid) !=
 	    DLADM_STATUS_OK) {
 		syslog(LOG_ERR,
 		    "connect_chosen_lan: invalid ESSID '%s' for '%s'",
-		    reqlan->essid, ifname);
+		    reqlan->essid, intf->if_name);
 		return (B_FALSE);
 	}
 	attr.wa_valid = DLADM_WLAN_ATTR_ESSID;
@@ -1041,7 +1051,7 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 		    DLADM_STATUS_OK) {
 			syslog(LOG_ERR,
 			    "connect_chosen_lan: invalid BSSID '%s' for '%s'",
-			    reqlan->bssid, ifname);
+			    reqlan->bssid, intf->if_name);
 			return (B_FALSE);
 		}
 		attr.wa_valid |= DLADM_WLAN_ATTR_BSSID;
@@ -1068,8 +1078,8 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 	 * try a second time with just the ESSID.
 	 */
 
-	status = dladm_wlan_connect(ifname, &attr, timeout, key, keycount,
-	    flags);
+	status = dladm_wlan_connect(intf->if_linkid, &attr, timeout, key,
+	    keycount, flags);
 	dprintf("connect_chosen_lan: dladm_wlan_connect returned %s",
 	    dladm_status2str(status, errmsg));
 	if (status == DLADM_STATUS_TIMEDOUT && reqlan->bssid != NULL) {
@@ -1078,13 +1088,14 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 		    reqlan->essid, reqlan->bssid, reqlan->essid);
 		attr.wa_valid &= ~DLADM_WLAN_ATTR_BSSID;
 		flags = 0;
-		status = dladm_wlan_connect(ifname, &attr, timeout, key,
-		    keycount, flags);
+		status = dladm_wlan_connect(intf->if_linkid, &attr, timeout,
+		    key, keycount, flags);
 	}
 	if (status != DLADM_STATUS_OK) {
 		syslog(LOG_ERR,
 		    "connect_chosen_lan: connect to '%s' failed on '%s': %s",
-		    reqlan->essid, ifname, dladm_status2str(status, errmsg));
+		    reqlan->essid, intf->if_name,
+		    dladm_status2str(status, errmsg));
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -1095,13 +1106,13 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
  * If that fails, attempt to connect using autoconf.
  */
 static boolean_t
-connect_or_autoconf(struct wireless_lan *reqlan, const char *ifname)
+connect_or_autoconf(struct wireless_lan *reqlan, struct interface *intf)
 {
-	if (!connect_chosen_lan(reqlan, ifname)) {
+	if (!connect_chosen_lan(reqlan, intf)) {
 		syslog(LOG_WARNING,
 		    "Could not connect to chosen WLAN %s, going to auto-conf",
 		    reqlan->essid);
-		return (wlan_autoconf(ifname));
+		return (wlan_autoconf(intf));
 	}
 	return (B_TRUE);
 }
@@ -1198,9 +1209,8 @@ build_wlanlist_zargv(const struct wireless_lan *lanlist, int nlans,
 
 static return_vals_t
 connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
-    const char *ifname)
+    struct interface *intf)
 {
-	struct interface *intf;
 	int i, dlist_cnt;
 	int rtn;
 	char **zargv;
@@ -1209,17 +1219,11 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 	struct wireless_lan *dlist, *reqlan;
 	boolean_t autoconf = B_FALSE;
 
-	dprintf("connect_to_new_wlan(..., %d, %s)", nlans, ifname);
+	dprintf("connect_to_new_wlan(..., %d, %s)", nlans, intf->if_name);
 
 	if (nlans == 0) {
 		display(gettext("No Wifi networks found; continuing in case "
 		    "you know of any which do not broadcast."));
-	}
-
-	if ((intf = get_interface(ifname)) == NULL) {
-		dprintf("connect_to_new_wlan: cannot find wireless interface: "
-		    "%s", ifname);
-		return (FAILURE);
 	}
 
 	/* build list of wlans to be displayed */
@@ -1236,10 +1240,10 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 		/*
 		 * Only use the interface which finds the AP to connect to it.
 		 */
-		if (strcmp(lanlist[i].wl_if_name, ifname) != 0) {
+		if (strcmp(lanlist[i].wl_if_name, intf->if_name) != 0) {
 			dprintf("connect_to_new_wlan: wrong interface (%s) for "
-			    "%s (should be %s)", ifname, lanlist[i].essid,
-			    lanlist[i].wl_if_name);
+			    "%s (should be %s)", intf->if_name,
+			    lanlist[i].essid, lanlist[i].wl_if_name);
 			continue;
 		}
 
@@ -1279,7 +1283,7 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 
 	if ((reqlan == NULL) || (reqlan->essid == NULL)) {
 		dprintf("did not get user preference; attempting autoconf");
-		rtn = wlan_autoconf(ifname) ? SUCCESS : FAILURE;
+		rtn = wlan_autoconf(intf) ? SUCCESS : FAILURE;
 		goto cleanup;
 	}
 	dprintf("get_user_preference() returned essid %s, bssid %s, encr %s",
@@ -1295,7 +1299,7 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 	 * now attempt to connect to selection, backing
 	 * off to autoconf if the connect fails
 	 */
-	if (connect_chosen_lan(reqlan, ifname)) {
+	if (connect_chosen_lan(reqlan, intf)) {
 		/*
 		 * Succeeded, so add entry to known_essid_list_file;
 		 * but first make sure the reqlan->bssid isn't empty.
@@ -1305,7 +1309,8 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 			dladm_wlan_linkattr_t	attr;
 			char			bssid[DLADM_STRSIZE];
 
-			status = dladm_wlan_get_linkattr(ifname, &attr);
+			status = dladm_wlan_get_linkattr(intf->if_linkid,
+			    &attr);
 
 			if (status == DLADM_STATUS_OK) {
 				(void) dladm_wlan_bssid2str(
@@ -1326,7 +1331,7 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
 	free_wireless_lan(reqlan);
 
 	if (autoconf)
-		rtn = wlan_autoconf(ifname) ? SUCCESS : FAILURE;
+		rtn = wlan_autoconf(intf) ? SUCCESS : FAILURE;
 	else
 		rtn = SUCCESS;
 
@@ -1391,7 +1396,7 @@ prompt_for_visited(void)
 }
 
 static boolean_t
-wlan_autoconf(const char *ifname)
+wlan_autoconf(struct interface *intf)
 {
 	dladm_status_t status;
 	boolean_t autoconf;
@@ -1402,7 +1407,7 @@ wlan_autoconf(const char *ifname)
 	}
 
 	/* If the NIC is already associated with something, just return. */
-	if (check_wlan(ifname, NULL))
+	if (check_wlan(intf, NULL))
 		return (B_TRUE);
 
 	/*
@@ -1410,14 +1415,14 @@ wlan_autoconf(const char *ifname)
 	 * to cycle through WLANs detected in priority order, attempting
 	 * to connect.
 	 */
-	status = dladm_wlan_connect(ifname, NULL,
+	status = dladm_wlan_connect(intf->if_linkid, NULL,
 	    DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT, NULL, 0, 0);
 	if (status != DLADM_STATUS_OK) {
 		char errmsg[DLADM_STRSIZE];
 
 		syslog(LOG_ERR,
 		    "wlan_autoconf: dladm_wlan_connect failed for '%s': %s",
-		    ifname, dladm_status2str(status, errmsg));
+		    intf->if_name, dladm_status2str(status, errmsg));
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -1720,7 +1725,7 @@ cleanup:
  * B_FALSE if we were unable to connect to anything
  */
 boolean_t
-handle_wireless_lan(const char *ifname)
+handle_wireless_lan(struct interface *intf)
 {
 	const struct wireless_lan *cur_wlans;
 	int i, num_wlans;
@@ -1839,7 +1844,7 @@ start_over:
 			if (strength < strongest)
 				goto connect_any;
 		}
-		result = connect_or_autoconf(target, ifname);
+		result = connect_or_autoconf(target, intf);
 		connect_result = result ? SUCCESS : FAILURE;
 
 	} else if (visited_wlan_list->total > 1) {
@@ -1848,21 +1853,21 @@ start_over:
 		 * prompt user for which one should we connect to
 		 */
 		if ((req_conf = prompt_for_visited()) != NULL) {
-			result = connect_or_autoconf(req_conf, ifname);
+			result = connect_or_autoconf(req_conf, intf);
 			connect_result = result ? SUCCESS : FAILURE;
 		} else {
 			/*
 			 * The user didn't make a choice; offer the full list.
 			 */
 			connect_result = connect_to_new_wlan(cur_wlans,
-			    num_wlans, ifname);
+			    num_wlans, intf);
 			result = (connect_result == SUCCESS);
 		}
 	} else {
 connect_any:
 		/* last case, no previously visited wlan found */
 		connect_result = connect_to_new_wlan(cur_wlans, num_wlans,
-		    ifname);
+		    intf);
 		result = (connect_result == SUCCESS);
 	}
 

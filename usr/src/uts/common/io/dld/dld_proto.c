@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,13 +54,10 @@ static proto_reqfunc_t proto_info_req, proto_attach_req, proto_detach_req,
     proto_bind_req, proto_unbind_req, proto_promiscon_req, proto_promiscoff_req,
     proto_enabmulti_req, proto_disabmulti_req, proto_physaddr_req,
     proto_setphysaddr_req, proto_udqos_req, proto_req, proto_capability_req,
-    proto_notify_req, proto_unitdata_req, proto_passive_req;
+    proto_notify_req, proto_passive_req;
 
 static void proto_poll_disable(dld_str_t *);
 static boolean_t proto_poll_enable(dld_str_t *, dl_capab_dls_t *);
-static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
-
-static task_func_t proto_process_unbind_req, proto_process_detach_req;
 
 static void proto_soft_ring_disable(dld_str_t *);
 static boolean_t proto_soft_ring_enable(dld_str_t *, dl_capab_dls_t *);
@@ -82,15 +79,12 @@ static void proto_change_soft_ring_fanout(dld_str_t *, int);
  * by the above primitives.
  */
 void
-dld_proto(dld_str_t *dsp, mblk_t *mp)
+dld_wput_proto_nondata(dld_str_t *dsp, mblk_t *mp)
 {
 	union DL_primitives	*udlp;
 	t_uscalar_t		prim;
 
-	if (MBLKL(mp) < sizeof (t_uscalar_t)) {
-		freemsg(mp);
-		return;
-	}
+	ASSERT(MBLKL(mp) >= sizeof (t_uscalar_t));
 
 	udlp = (union DL_primitives *)mp->b_rptr;
 	prim = udlp->dl_primitive;
@@ -104,9 +98,6 @@ dld_proto(dld_str_t *dsp, mblk_t *mp)
 		break;
 	case DL_UNBIND_REQ:
 		(void) proto_unbind_req(dsp, udlp, mp);
-		break;
-	case DL_UNITDATA_REQ:
-		(void) proto_unitdata_req(dsp, udlp, mp);
 		break;
 	case DL_UDQOS_REQ:
 		(void) proto_udqos_req(dsp, udlp, mp);
@@ -148,28 +139,6 @@ dld_proto(dld_str_t *dsp, mblk_t *mp)
 		(void) proto_req(dsp, udlp, mp);
 		break;
 	}
-}
-
-/*
- * Finish any pending operations.
- * Requests that need to be processed asynchronously will be handled
- * by a separate thread. After this function returns, other threads
- * will be allowed to enter dld; they will not be able to do anything
- * until ds_dlstate transitions to a non-pending state.
- */
-void
-dld_finish_pending_ops(dld_str_t *dsp)
-{
-	task_func_t *op = NULL;
-
-	ASSERT(MUTEX_HELD(&dsp->ds_thr_lock));
-	ASSERT(dsp->ds_thr == 0);
-
-	op = dsp->ds_pending_op;
-	dsp->ds_pending_op = NULL;
-	mutex_exit(&dsp->ds_thr_lock);
-	if (op != NULL)
-		(void) taskq_dispatch(system_taskq, op, dsp, TQ_SLEEP);
 }
 
 #define	NEG(x)	-(x)
@@ -411,30 +380,6 @@ failed:
 	return (B_FALSE);
 }
 
-/*
- * DL_DETACH_REQ
- */
-static void
-proto_process_detach_req(void *arg)
-{
-	dld_str_t	*dsp = arg;
-	mblk_t		*mp;
-
-	/*
-	 * We don't need to hold locks because no other thread
-	 * would manipulate dsp while it is in a PENDING state.
-	 */
-	ASSERT(dsp->ds_pending_req != NULL);
-	ASSERT(dsp->ds_dlstate == DL_DETACH_PENDING);
-
-	mp = dsp->ds_pending_req;
-	dsp->ds_pending_req = NULL;
-	dld_str_detach(dsp);
-	dlokack(dsp->ds_wq, mp, DL_DETACH_REQ);
-
-	DLD_WAKEUP(dsp);
-}
-
 /*ARGSUSED*/
 static boolean_t
 proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
@@ -460,18 +405,10 @@ proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	}
 
 	dsp->ds_dlstate = DL_DETACH_PENDING;
+	dld_str_detach(dsp);
 
-	/*
-	 * Complete the detach when the driver is single-threaded.
-	 */
-	mutex_enter(&dsp->ds_thr_lock);
-	ASSERT(dsp->ds_pending_req == NULL);
-	dsp->ds_pending_req = mp;
-	dsp->ds_pending_op = proto_process_detach_req;
-	dsp->ds_pending_cnt++;
-	mutex_exit(&dsp->ds_thr_lock);
 	rw_exit(&dsp->ds_lock);
-
+	dlokack(dsp->ds_wq, mp, DL_DETACH_REQ);
 	return (B_TRUE);
 failed:
 	rw_exit(&dsp->ds_lock);
@@ -493,8 +430,11 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	t_scalar_t	sap;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
+	/*
+	 * Because control message processing is serialized, we don't need
+	 * to hold any locks to read any fields of dsp; we only need ds_lock
+	 * to update the ds_dlstate, ds_sap and ds_passivestate fields.
+	 */
 	if (MBLKL(mp) < sizeof (dl_bind_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -522,7 +462,6 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	dsp->ds_dlstate = DL_BIND_PENDING;
 	/*
 	 * Set the receive callback.
 	 */
@@ -532,8 +471,8 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Bind the channel such that it can receive packets.
 	 */
-	sap = dsp->ds_sap = dlp->dl_sap;
-	err = dls_bind(dsp->ds_dc, dlp->dl_sap);
+	sap = dlp->dl_sap;
+	err = dls_bind(dsp->ds_dc, sap);
 	if (err != 0) {
 		switch (err) {
 		case EINVAL:
@@ -544,7 +483,7 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
-		dsp->ds_dlstate = DL_UNBOUND;
+
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 			dls_active_clear(dsp->ds_dc);
 
@@ -560,19 +499,27 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Copy in the SAP.
 	 */
-	*(uint16_t *)(dlsap_addr + dlsap_addr_length) = dsp->ds_sap;
+	*(uint16_t *)(dlsap_addr + dlsap_addr_length) = sap;
 	dlsap_addr_length += sizeof (uint16_t);
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	dsp->ds_dlstate = DL_IDLE;
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
+	dsp->ds_sap = sap;
+
+	if (dsp->ds_mode == DLD_FASTPATH)
+		dsp->ds_tx = str_mdata_fastpath_put;
+	else if (dsp->ds_mode == DLD_RAW)
+		dsp->ds_tx = str_mdata_raw_put;
+	dsp->ds_unitdata_tx = dld_wput_proto_data;
 
 	rw_exit(&dsp->ds_lock);
 
 	dlbindack(q, mp, sap, dlsap_addr, dlsap_addr_length, 0, 0);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_BIND_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -581,18 +528,21 @@ failed:
  * DL_UNBIND_REQ
  */
 /*ARGSUSED*/
-static void
-proto_process_unbind_req(void *arg)
+static boolean_t
+proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 {
-	dld_str_t	*dsp = arg;
-	mblk_t		*mp;
+	queue_t		*q = dsp->ds_wq;
+	t_uscalar_t	dl_err;
 
-	/*
-	 * We don't need to hold locks because no other thread
-	 * would manipulate dsp while it is in a PENDING state.
-	 */
-	ASSERT(dsp->ds_pending_req != NULL);
-	ASSERT(dsp->ds_dlstate == DL_UNBIND_PENDING);
+	if (MBLKL(mp) < sizeof (dl_unbind_req_t)) {
+		dl_err = DL_BADPRIM;
+		goto failed;
+	}
+
+	if (dsp->ds_dlstate != DL_IDLE) {
+		dl_err = DL_OUTSTATE;
+		goto failed;
+	}
 
 	/*
 	 * Flush any remaining packets scheduled for transmission.
@@ -605,9 +555,21 @@ proto_process_unbind_req(void *arg)
 	dls_unbind(dsp->ds_dc);
 
 	/*
+	 * Clear the receive callback.
+	 */
+	dls_rx_set(dsp->ds_dc, NULL, NULL);
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
+	/*
 	 * Disable polling mode, if it is enabled.
 	 */
 	proto_poll_disable(dsp);
+
+	/*
+	 * If soft rings were enabled, the workers should be quiesced.
+	 */
+	dls_soft_ring_disable(dsp->ds_dc);
 
 	/*
 	 * Clear LSO flags.
@@ -616,65 +578,17 @@ proto_process_unbind_req(void *arg)
 	dsp->ds_lso_max = 0;
 
 	/*
-	 * Clear the receive callback.
-	 */
-	dls_rx_set(dsp->ds_dc, NULL, NULL);
-
-	/*
 	 * Set the mode back to the default (unitdata).
 	 */
 	dsp->ds_mode = DLD_UNITDATA;
-
-	/*
-	 * If soft rings were enabled, the workers
-	 * should be quiesced. We cannot check for
-	 * ds_soft_ring flag because
-	 * proto_soft_ring_disable() called from
-	 * proto_capability_req() would have reset it.
-	 */
-	if (dls_soft_ring_workers(dsp->ds_dc))
-		dls_soft_ring_disable(dsp->ds_dc);
-
-	mp = dsp->ds_pending_req;
-	dsp->ds_pending_req = NULL;
 	dsp->ds_dlstate = DL_UNBOUND;
-	dlokack(dsp->ds_wq, mp, DL_UNBIND_REQ);
-
-	DLD_WAKEUP(dsp);
-}
-
-/*ARGSUSED*/
-static boolean_t
-proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
-{
-	queue_t		*q = dsp->ds_wq;
-	t_uscalar_t	dl_err;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
-	if (MBLKL(mp) < sizeof (dl_unbind_req_t)) {
-		dl_err = DL_BADPRIM;
-		goto failed;
-	}
-
-	if (dsp->ds_dlstate != DL_IDLE) {
-		dl_err = DL_OUTSTATE;
-		goto failed;
-	}
-
-	dsp->ds_dlstate = DL_UNBIND_PENDING;
-
-	mutex_enter(&dsp->ds_thr_lock);
-	ASSERT(dsp->ds_pending_req == NULL);
-	dsp->ds_pending_req = mp;
-	dsp->ds_pending_op = proto_process_unbind_req;
-	dsp->ds_pending_cnt++;
-	mutex_exit(&dsp->ds_thr_lock);
+	DLD_TX_QUIESCE(dsp);
 	rw_exit(&dsp->ds_lock);
+
+	dlokack(q, mp, DL_UNBIND_REQ);
 
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_UNBIND_REQ, dl_err, 0);
 	return (B_FALSE);
 }
@@ -688,11 +602,14 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	dl_promiscon_req_t *dlp = (dl_promiscon_req_t *)udlp;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc_saved;
+	uint32_t	promisc;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
+	/*
+	 * Because control message processing is serialized, we don't need
+	 * to hold any locks to read any fields of dsp; we only need ds_lock
+	 * to update the ds_promisc and ds_passivestate fields.
+	 */
 	if (MBLKL(mp) < sizeof (dl_promiscon_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -704,20 +621,16 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	promisc_saved = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
-		dsp->ds_promisc |= DLS_PROMISC_SAP;
+		promisc = DLS_PROMISC_SAP;
 		break;
-
 	case DL_PROMISC_MULTI:
-		dsp->ds_promisc |= DLS_PROMISC_MULTI;
+		promisc = DLS_PROMISC_MULTI;
 		break;
-
 	case DL_PROMISC_PHYS:
-		dsp->ds_promisc |= DLS_PROMISC_PHYS;
+		promisc = DLS_PROMISC_PHYS;
 		break;
-
 	default:
 		dl_err = DL_NOTSUPPORTED;
 		goto failed;
@@ -725,7 +638,6 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
 	    !dls_active_set(dsp->ds_dc)) {
-		dsp->ds_promisc = promisc_saved;
 		dl_err = DL_SYSERR;
 		err = EBUSY;
 		goto failed;
@@ -734,24 +646,24 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Adjust channel promiscuity.
 	 */
-	err = dls_promisc(dsp->ds_dc, dsp->ds_promisc);
+	promisc = (dsp->ds_promisc | promisc);
+	err = dls_promisc(dsp->ds_dc, promisc);
 	if (err != 0) {
 		dl_err = DL_SYSERR;
-		dsp->ds_promisc = promisc_saved;
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 			dls_active_clear(dsp->ds_dc);
-
 		goto failed;
 	}
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-
+	dsp->ds_promisc = promisc;
 	rw_exit(&dsp->ds_lock);
+
 	dlokack(q, mp, DL_PROMISCON_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_PROMISCON_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -765,11 +677,14 @@ proto_promiscoff_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	dl_promiscoff_req_t *dlp = (dl_promiscoff_req_t *)udlp;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc_saved;
+	uint32_t	promisc;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
+	/*
+	 * Because control messages processing is serialized, we don't need
+	 * to hold any lock to read any field of dsp; we hold ds_lock to
+	 * update the ds_promisc field.
+	 */
 	if (MBLKL(mp) < sizeof (dl_promiscoff_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -781,52 +696,40 @@ proto_promiscoff_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	promisc_saved = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
-		if (!(dsp->ds_promisc & DLS_PROMISC_SAP)) {
-			dl_err = DL_NOTENAB;
-			goto failed;
-		}
-		dsp->ds_promisc &= ~DLS_PROMISC_SAP;
+		promisc = DLS_PROMISC_SAP;
 		break;
-
 	case DL_PROMISC_MULTI:
-		if (!(dsp->ds_promisc & DLS_PROMISC_MULTI)) {
-			dl_err = DL_NOTENAB;
-			goto failed;
-		}
-		dsp->ds_promisc &= ~DLS_PROMISC_MULTI;
+		promisc = DLS_PROMISC_MULTI;
 		break;
-
 	case DL_PROMISC_PHYS:
-		if (!(dsp->ds_promisc & DLS_PROMISC_PHYS)) {
-			dl_err = DL_NOTENAB;
-			goto failed;
-		}
-		dsp->ds_promisc &= ~DLS_PROMISC_PHYS;
+		promisc = DLS_PROMISC_PHYS;
 		break;
-
 	default:
 		dl_err = DL_NOTSUPPORTED;
 		goto failed;
 	}
 
-	/*
-	 * Adjust channel promiscuity.
-	 */
-	err = dls_promisc(dsp->ds_dc, dsp->ds_promisc);
+	if (!(dsp->ds_promisc & promisc)) {
+		dl_err = DL_NOTENAB;
+		goto failed;
+	}
+
+	promisc = (dsp->ds_promisc & ~promisc);
+	err = dls_promisc(dsp->ds_dc, promisc);
 	if (err != 0) {
-		dsp->ds_promisc = promisc_saved;
 		dl_err = DL_SYSERR;
 		goto failed;
 	}
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	dsp->ds_promisc = promisc;
 	rw_exit(&dsp->ds_lock);
+
 	dlokack(q, mp, DL_PROMISCOFF_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_PROMISCOFF_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -842,8 +745,11 @@ proto_enabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
+	/*
+	 * Because control messages processing is serialized, we don't need
+	 * to hold any lock to read any field of dsp; we hold ds_lock to
+	 * update the ds_passivestate field.
+	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -879,20 +785,21 @@ proto_enabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
+
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 			dls_active_clear(dsp->ds_dc);
 
 		goto failed;
 	}
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-
 	rw_exit(&dsp->ds_lock);
+
 	dlokack(q, mp, DL_ENABMULTI_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_ENABMULTI_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -908,8 +815,10 @@ proto_disabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_READER);
-
+	/*
+	 * Because control messages processing is serialized, we don't need
+	 * to hold any lock to read any field of dsp.
+	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -925,17 +834,15 @@ proto_disabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	err = dls_multicst_remove(dsp->ds_dc, mp->b_rptr + dlp->dl_addr_offset);
 	if (err != 0) {
-	switch (err) {
+		switch (err) {
 		case EINVAL:
 			dl_err = DL_BADADDR;
 			err = 0;
 			break;
-
 		case ENOENT:
 			dl_err = DL_NOTENAB;
 			err = 0;
 			break;
-
 		default:
 			dl_err = DL_SYSERR;
 			break;
@@ -943,11 +850,9 @@ proto_disabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	rw_exit(&dsp->ds_lock);
 	dlokack(q, mp, DL_DISABMULTI_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_DISABMULTI_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -1019,8 +924,11 @@ proto_setphysaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
+	/*
+	 * Because control message processing is serialized, we don't need
+	 * to hold any locks to read any fields of dsp; we only need ds_lock
+	 * to update the ds_passivestate field.
+	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -1053,19 +961,21 @@ proto_setphysaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
+
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 			dls_active_clear(dsp->ds_dc);
 
 		goto failed;
 	}
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-
 	rw_exit(&dsp->ds_lock);
+
 	dlokack(q, mp, DL_SET_PHYS_ADDR_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_SET_PHYS_ADDR_REQ, dl_err, (t_uscalar_t)err);
 	return (B_FALSE);
 }
@@ -1085,8 +995,6 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	off = dlp->dl_qos_offset;
 	len = dlp->dl_qos_length;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
 	if (MBLKL(mp) < sizeof (dl_udqos_req_t) || !MBLKIN(mp, off, len)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -1104,13 +1012,19 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	dsp->ds_pri = selp->dl_priority;
+	if (dsp->ds_dlstate == DL_UNATTACHED ||
+	    DL_ACK_PENDING(dsp->ds_dlstate)) {
+		dl_err = DL_OUTSTATE;
+		goto failed;
+	}
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	dsp->ds_pri = selp->dl_priority;
 	rw_exit(&dsp->ds_lock);
+
 	dlokack(q, mp, DL_UDQOS_REQ);
 	return (B_TRUE);
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_UDQOS_REQ, dl_err, 0);
 	return (B_FALSE);
 }
@@ -1142,9 +1056,8 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	offset_t	off, end;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
-	boolean_t	upgraded;
 
-	rw_enter(&dsp->ds_lock, RW_READER);
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_capability_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -1180,7 +1093,6 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	/*
 	 * Walk the list of capabilities to be enabled.
 	 */
-	upgraded = B_FALSE;
 	for (end = off + len; off < end; ) {
 		sp = (dl_capability_sub_t *)(mp->b_rptr + off);
 		size = sizeof (dl_capability_sub_t) + sp->dl_length;
@@ -1239,24 +1151,6 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			 */
 			bcopy(pollp, &poll, sizeof (dl_capab_dls_t));
 
-			/*
-			 * We need to become writer before enabling and/or
-			 * disabling the polling interface.  If we couldn'
-			 * upgrade, check state again after re-acquiring the
-			 * lock to make sure we can proceed.
-			 */
-			if (!upgraded && !rw_tryupgrade(&dsp->ds_lock)) {
-				rw_exit(&dsp->ds_lock);
-				rw_enter(&dsp->ds_lock, RW_WRITER);
-
-				if (dsp->ds_dlstate == DL_UNATTACHED ||
-				    DL_ACK_PENDING(dsp->ds_dlstate)) {
-					dl_err = DL_OUTSTATE;
-					goto failed;
-				}
-			}
-			upgraded = B_TRUE;
-
 			switch (poll.dls_flags) {
 			default:
 				/*FALLTHRU*/
@@ -1273,12 +1167,15 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 				proto_poll_disable(dsp);
 
 				/*
-				 * Now attempt enable it.
+				 * Note that only IP should enable POLL.
 				 */
 				if (check_ip_above(dsp->ds_rq) &&
 				    proto_poll_enable(dsp, &poll)) {
 					bzero(&poll, sizeof (dl_capab_dls_t));
 					poll.dls_flags = POLL_ENABLE;
+				} else {
+					bzero(&poll, sizeof (dl_capab_dls_t));
+					poll.dls_flags = POLL_DISABLE;
 				}
 				break;
 			}
@@ -1298,24 +1195,6 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			bcopy(soft_ringp, &soft_ring,
 			    sizeof (dl_capab_dls_t));
 
-			/*
-			 * We need to become writer before enabling and/or
-			 * disabling the soft_ring interface.  If we couldn'
-			 * upgrade, check state again after re-acquiring the
-			 * lock to make sure we can proceed.
-			 */
-			if (!upgraded && !rw_tryupgrade(&dsp->ds_lock)) {
-				rw_exit(&dsp->ds_lock);
-				rw_enter(&dsp->ds_lock, RW_WRITER);
-
-				if (dsp->ds_dlstate == DL_UNATTACHED ||
-				    DL_ACK_PENDING(dsp->ds_dlstate)) {
-					dl_err = DL_OUTSTATE;
-					goto failed;
-				}
-			}
-			upgraded = B_TRUE;
-
 			switch (soft_ring.dls_flags) {
 			default:
 				/*FALLTHRU*/
@@ -1331,19 +1210,17 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 				proto_soft_ring_disable(dsp);
 
 				/*
-				 * Now attempt enable it.
+				 * Note that only IP can enable soft ring.
 				 */
 				if (check_ip_above(dsp->ds_rq) &&
 				    proto_soft_ring_enable(dsp, &soft_ring)) {
 					bzero(&soft_ring,
 					    sizeof (dl_capab_dls_t));
-					soft_ring.dls_flags =
-					    SOFT_RING_ENABLE;
+					soft_ring.dls_flags = SOFT_RING_ENABLE;
 				} else {
 					bzero(&soft_ring,
 					    sizeof (dl_capab_dls_t));
-					soft_ring.dls_flags =
-					    SOFT_RING_DISABLE;
+					soft_ring.dls_flags = SOFT_RING_DISABLE;
 				}
 				break;
 			}
@@ -1399,6 +1276,8 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	note &= ~(mac_no_notification(dsp->ds_mh));
+
 	/*
 	 * Cache the notifications that are being enabled.
 	 */
@@ -1428,13 +1307,13 @@ failed:
 }
 
 /*
- * DL_UINTDATA_REQ
+ * DL_UNITDATA_REQ
  */
-static boolean_t
-proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+void
+dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t			*q = dsp->ds_wq;
-	dl_unitdata_req_t	*dlp = (dl_unitdata_req_t *)udlp;
+	dl_unitdata_req_t	*dlp = (dl_unitdata_req_t *)mp->b_rptr;
 	off_t			off;
 	size_t			len, size;
 	const uint8_t		*addr;
@@ -1444,17 +1323,11 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	uint32_t		start, stuff, end, value, flags;
 	t_uscalar_t		dl_err;
 
-	rw_enter(&dsp->ds_lock, RW_READER);
-
 	if (MBLKL(mp) < sizeof (dl_unitdata_req_t) || mp->b_cont == NULL) {
 		dl_err = DL_BADPRIM;
 		goto failed;
 	}
 
-	if (dsp->ds_dlstate != DL_IDLE) {
-		dl_err = DL_OUTSTATE;
-		goto failed;
-	}
 	addr_length = dsp->ds_mip->mi_addr_length;
 
 	off = dlp->dl_dest_addr_offset;
@@ -1514,25 +1387,14 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 */
 	ASSERT(bp->b_cont == NULL);
 	bp->b_cont = payload;
-
-	/*
-	 * No lock can be held across putnext, which can be called
-	 * from here in dld_tx_single(). The config is held constant
-	 * by the DLD_ENTER done in dld_wput()/dld_wsrv until all
-	 * sending threads are done.
-	 */
-	rw_exit(&dsp->ds_lock);
 	dld_tx_single(dsp, bp);
-	return (B_TRUE);
+	return;
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_UNITDATA_REQ, dl_err, 0);
-	return (B_FALSE);
+	return;
 
 baddata:
-	rw_exit(&dsp->ds_lock);
 	dluderrorind(q, mp, (void *)addr, len, DL_BADDATA, 0);
-	return (B_FALSE);
 }
 
 /*
@@ -1544,7 +1406,12 @@ proto_passive_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 {
 	t_uscalar_t dl_err;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
+	/*
+	 * READER lock is enough because ds_passivestate can only be changed
+	 * as the result of non-data message processing.
+	 */
+	rw_enter(&dsp->ds_lock, RW_READER);
+
 	/*
 	 * If we've already become active by issuing an active primitive,
 	 * then it's too late to try to become passive.
@@ -1569,7 +1436,6 @@ failed:
 	return (B_FALSE);
 }
 
-
 /*
  * Catch-all handler.
  */
@@ -1585,7 +1451,7 @@ proto_poll_disable(dld_str_t *dsp)
 {
 	mac_handle_t	mh;
 
-	ASSERT(dsp->ds_pending_req != NULL || RW_WRITE_HELD(&dsp->ds_lock));
+	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
 
 	if (!dsp->ds_polling)
 		return;
@@ -1606,7 +1472,7 @@ proto_poll_disable(dld_str_t *dsp)
 	 * Set receive function back to default.
 	 */
 	dls_rx_set(dsp->ds_dc, (dsp->ds_mode == DLD_FASTPATH) ?
-	    dld_str_rx_fastpath : dld_str_rx_unitdata, (void *)dsp);
+	    dld_str_rx_fastpath : dld_str_rx_unitdata, dsp);
 
 	/*
 	 * Note that polling is disabled.
@@ -1636,10 +1502,11 @@ proto_poll_enable(dld_str_t *dsp, dl_capab_dls_t *pollp)
 	 */
 	mac_resource_set(mh, (mac_resource_add_t)pollp->dls_ring_add,
 	    (void *)pollp->dls_rx_handle);
+
 	mac_resources(mh);
 
 	/*
-	 * Set the receive function.
+	 * Set the upstream receive function.
 	 */
 	dls_rx_set(dsp->ds_dc, (dls_rx_t)pollp->dls_rx,
 	    (void *)pollp->dls_rx_handle);
@@ -1694,15 +1561,14 @@ proto_soft_ring_enable(dld_str_t *dsp, dl_capab_dls_t *soft_ringp)
 static void
 proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
 {
-	dls_rx_t	rx;
+	dls_channel_t	dc = dsp->ds_dc;
 
 	if (type == SOFT_RING_NONE) {
-		rx = (dsp->ds_mode == DLD_FASTPATH) ?
-		    dld_str_rx_fastpath : dld_str_rx_unitdata;
-	} else {
-		rx = (dls_rx_t)dls_soft_ring_fanout;
+		dls_rx_set(dc, (dsp->ds_mode == DLD_FASTPATH) ?
+		    dld_str_rx_fastpath : dld_str_rx_unitdata, dsp);
+	} else if (type != SOFT_RING_NONE) {
+		dls_rx_set(dc, (dls_rx_t)dls_soft_ring_fanout, dc);
 	}
-	dls_soft_ring_rx_set(dsp->ds_dc, rx, dsp, type);
 }
 
 /*
@@ -1720,14 +1586,17 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dl_capab_lso_t		lso;
 	dl_capab_zerocopy_t	zcopy;
 	uint8_t			*ptr;
-	boolean_t		cksum_cap;
-	boolean_t		poll_cap;
-	boolean_t		lso_cap;
-	mac_capab_lso_t		mac_lso;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
+	boolean_t		is_vlan = (dsp->ds_vid != VLAN_ID_NONE);
+	boolean_t		poll_capable = B_FALSE;
+	boolean_t		soft_ring_capable = B_FALSE;
+	boolean_t		hcksum_capable = B_FALSE;
+	boolean_t		zcopy_capable = B_FALSE;
+	boolean_t		lso_capable = B_FALSE;
+	mac_capab_lso_t		mac_lso;
 
-	ASSERT(RW_READ_HELD(&dsp->ds_lock));
+	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
 
 	/*
 	 * Initially assume no capabilities.
@@ -1735,10 +1604,17 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	subsize = 0;
 
 	/*
-	 * Advertize soft ring capability unless it has been explicitly
-	 * disabled.
+	 * Check if soft ring can be enabled on this interface. Note that we
+	 * do not enable softring on any legacy drivers, because doing that
+	 * would hurt the performance if the legacy driver has its own taskq
+	 * implementation. Further, most high-performance legacy drivers do
+	 * have their own taskq implementation.
+	 *
+	 * If advertising DL_CAPAB_SOFT_RING has not been explicitly disabled,
+	 * reserve space for that capability.
 	 */
-	if (!(dld_opt & DLD_OPT_NO_SOFTRING)) {
+	if (!mac_is_legacy(dsp->ds_mh) && !(dld_opt & DLD_OPT_NO_SOFTRING)) {
+		soft_ring_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_dls_t);
 	}
@@ -1748,37 +1624,48 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 * If advertising DL_CAPAB_POLL has not been explicitly disabled
 	 * then reserve space for that capability.
 	 */
-	poll_cap = (mac_capab_get(dsp->ds_mh, MAC_CAPAB_POLL, NULL) &&
-	    !(dld_opt & DLD_OPT_NO_POLL) && (dsp->ds_vid == VLAN_ID_NONE));
-	if (poll_cap) {
+	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_POLL, NULL) &&
+	    !(dld_opt & DLD_OPT_NO_POLL) && !is_vlan) {
+		poll_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_dls_t);
 	}
 
 	/*
-	 * If the MAC interface supports checksum offload then reserve
-	 * space for the DL_CAPAB_HCKSUM capability.
+	 * Check if checksum offload is supported on this MAC.  Don't
+	 * advertise DL_CAPAB_HCKSUM if the underlying MAC is VLAN incapable,
+	 * since it might not be able to do the hardware checksum offload
+	 * with the correct offset.
 	 */
-	if (cksum_cap = mac_capab_get(dsp->ds_mh, MAC_CAPAB_HCKSUM,
+	bzero(&hcksum, sizeof (dl_capab_hcksum_t));
+	if ((!is_vlan || (!mac_capab_get(dsp->ds_mh, MAC_CAPAB_NO_NATIVEVLAN,
+	    NULL))) && mac_capab_get(dsp->ds_mh, MAC_CAPAB_HCKSUM,
 	    &hcksum.hcksum_txflags)) {
-		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_hcksum_t);
+		if (hcksum.hcksum_txflags != 0) {
+			hcksum_capable = B_TRUE;
+			subsize += sizeof (dl_capability_sub_t) +
+			    sizeof (dl_capab_hcksum_t);
+		}
 	}
 
 	/*
-	 * If LSO is usable for MAC, reserve space for the DL_CAPAB_LSO
-	 * capability.
+	 * Check if LSO is supported on this MAC, then reserve space for
+	 * the DL_CAPAB_LSO capability.
 	 */
-	if (lso_cap = mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
+	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
+		lso_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_lso_t);
 	}
 
 	/*
-	 * If DL_CAPAB_ZEROCOPY has not be explicitly disabled then
-	 * reserve space for it.
+	 * Check if zerocopy is supported on this interface.
+	 * If advertising DL_CAPAB_ZEROCOPY has not been explicitly disabled
+	 * then reserve space for that capability.
 	 */
-	if (!(dld_opt & DLD_OPT_NO_ZEROCOPY)) {
+	if (!mac_capab_get(dsp->ds_mh, MAC_CAPAB_NO_ZCOPY, NULL) &&
+	    !(dld_opt & DLD_OPT_NO_ZEROCOPY)) {
+		zcopy_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_zerocopy_t);
 	}
@@ -1807,60 +1694,32 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * IP polling interface.
 	 */
-	if (poll_cap) {
+	if (poll_capable) {
 		/*
 		 * Attempt to disable just in case this is a re-negotiation;
-		 * we need to become writer before doing so.
+		 * READER lock is enough because ds_polling can only be
+		 * changed as the result of non-data message processing.
 		 */
-		if (!rw_tryupgrade(&dsp->ds_lock)) {
-			rw_exit(&dsp->ds_lock);
-			rw_enter(&dsp->ds_lock, RW_WRITER);
-		}
+		proto_poll_disable(dsp);
 
-		/*
-		 * Check if polling state has changed after we re-acquired
-		 * the lock above, so that we don't mis-advertise it.
-		 */
-		poll_cap = !(dld_opt & DLD_OPT_NO_POLL) &&
-		    (dsp->ds_vid == VLAN_ID_NONE);
+		dlsp = (dl_capability_sub_t *)ptr;
 
-		if (!poll_cap) {
-			int poll_capab_size;
+		dlsp->dl_cap = DL_CAPAB_POLL;
+		dlsp->dl_length = sizeof (dl_capab_dls_t);
+		ptr += sizeof (dl_capability_sub_t);
 
-			rw_downgrade(&dsp->ds_lock);
-
-			poll_capab_size = sizeof (dl_capability_sub_t) +
-			    sizeof (dl_capab_dls_t);
-
-			mp->b_wptr -= poll_capab_size;
-			subsize -= poll_capab_size;
-			dlap->dl_sub_length = subsize;
-		} else {
-			proto_poll_disable(dsp);
-
-			rw_downgrade(&dsp->ds_lock);
-
-			dlsp = (dl_capability_sub_t *)ptr;
-
-			dlsp->dl_cap = DL_CAPAB_POLL;
-			dlsp->dl_length = sizeof (dl_capab_dls_t);
-			ptr += sizeof (dl_capability_sub_t);
-
-			bzero(&poll, sizeof (dl_capab_dls_t));
-			poll.dls_version = POLL_VERSION_1;
-			poll.dls_flags = POLL_CAPABLE;
-			poll.dls_tx_handle = (uintptr_t)dsp;
-			poll.dls_tx = (uintptr_t)str_mdata_fastpath_put;
-
-			dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
-			bcopy(&poll, ptr, sizeof (dl_capab_dls_t));
-			ptr += sizeof (dl_capab_dls_t);
-		}
+		bzero(&poll, sizeof (dl_capab_dls_t));
+		poll.dls_version = POLL_VERSION_1;
+		poll.dls_flags = POLL_CAPABLE;
+		poll.dls_tx_handle = (uintptr_t)dsp;
+		poll.dls_tx = (uintptr_t)str_mdata_fastpath_put;
+		dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
+		bcopy(&poll, ptr, sizeof (dl_capab_dls_t));
+		ptr += sizeof (dl_capab_dls_t);
 	}
 
-	ASSERT(RW_READ_HELD(&dsp->ds_lock));
 
-	if (!(dld_opt & DLD_OPT_NO_SOFTRING)) {
+	if (soft_ring_capable) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_SOFT_RING;
@@ -1885,7 +1744,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * TCP/IP checksum offload.
 	 */
-	if (cksum_cap) {
+	if (hcksum_capable) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_HCKSUM;
@@ -1901,7 +1760,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Large segment offload. (LSO)
 	 */
-	if (lso_cap) {
+	if (lso_capable) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_LSO;
@@ -1927,7 +1786,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Zero copy
 	 */
-	if (!(dld_opt & DLD_OPT_NO_ZEROCOPY)) {
+	if (zcopy_capable) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_ZEROCOPY;

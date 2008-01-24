@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,6 +111,7 @@ f none kernel/drv/sysevent.conf 644 root sys
 f none kernel/drv/sysmsg.conf 644 root sys
 f none kernel/drv/sctp.conf 644 root sys
 f none kernel/drv/sctp6.conf 644 root sys
+f none kernel/drv/softmac.conf 644 root sys
 f none kernel/drv/tcp.conf 644 root sys
 f none kernel/drv/tcp6.conf 644 root sys
 f none kernel/drv/tl.conf 644 root sys

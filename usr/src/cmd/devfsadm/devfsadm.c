@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7822,7 +7822,7 @@ process_rcm_events(void *arg)
 static int
 rcm_init(void)
 {
-#define	LIBRCM_PATH	"/usr/lib/librcm.so"
+#define	LIBRCM_PATH	"/lib/librcm.so"
 	rcm_handle_t *hdl = NULL;
 	int err;
 

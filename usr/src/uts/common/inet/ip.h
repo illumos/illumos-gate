@@ -3069,8 +3069,6 @@ struct	ipsec_out_s;
 struct	mac_header_info_s;
 
 extern boolean_t ip_assign_ifindex(uint_t *, ip_stack_t *);
-extern const char *dlpi_prim_str(int);
-extern const char *dlpi_err_str(int);
 extern void	ill_frag_timer(void *);
 extern ill_t	*ill_first(int, int, ill_walk_context_t *, ip_stack_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);

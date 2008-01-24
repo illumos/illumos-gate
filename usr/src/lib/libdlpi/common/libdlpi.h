@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ extern "C" {
 
 /*
  * Maximum link name length, including terminating NUL, in bytes.
+ * Must be no larger than MAXLINKNAMELEN (see <sys/param.h>).
  */
 #define	DLPI_LINKNAME_MAX	32
 
@@ -55,12 +56,13 @@ extern "C" {
  * Flag values for dlpi_open(); those not documented in dlpi_open(3DLPI)
  * are Consolidation Private and subject to change or removal.
  */
-#define	DLPI_EXCL	0x0001	/* Exclusive open  */
+#define	DLPI_EXCL	0x0001	/* Exclusive open */
 #define	DLPI_PASSIVE	0x0002	/* Open DLPI link in passive mode */
 #define	DLPI_RAW	0x0004	/* Open DLPI link in raw mode */
 #define	DLPI_SERIAL	0x0008	/* Synchronous serial line interface */
 #define	DLPI_NOATTACH	0x0010	/* Do not attach PPA */
-#define	DLPI_NATIVE	0x0020	/* Open DLPI link in Native mode */
+#define	DLPI_NATIVE	0x0020	/* Open DLPI link in native mode */
+#define	DLPI_DEVONLY	0x0040	/* Open DLPI link under /dev only */
 
 /*
  * Timeout to be used in DLPI-related operations, in seconds.
@@ -74,25 +76,24 @@ extern "C" {
  * <sys/dlpi.h>.
  */
 enum {
-	DLPI_SUCCESS = 10000,		/* DLPI operation succeeded */
-	DLPI_EINVAL,			/* invalid argument */
-	DLPI_ELINKNAMEINVAL,		/* invalid DLPI linkname */
-	DLPI_ENOLINK,			/* DLPI link does not exist */
-	DLPI_EBADLINK,			/* bad DLPI link */
-	DLPI_EINHANDLE,			/* invalid DLPI handle */
-	DLPI_ETIMEDOUT,			/* DLPI operation timed out */
-	DLPI_EVERNOTSUP,		/* unsupported DLPI Version */
-	DLPI_EMODENOTSUP,		/* unsupported DLPI connection mode */
-	DLPI_EUNAVAILSAP,		/* unavailable DLPI SAP */
-	DLPI_FAILURE,			/* DLPI operation failed */
-	DLPI_ENOTSTYLE2,		/* DLPI style-2 node reports style-1 */
-	DLPI_EBADMSG,			/* bad DLPI message */
-	DLPI_ERAWNOTSUP,		/* DLPI raw mode not supported */
-	DLPI_ENOTEINVAL,		/* invalid DLPI notification type */
-	DLPI_ENOTENOTSUP,		/* DLPI notification not supported */
-					/* by link */
-	DLPI_ENOTEIDINVAL,		/* invalid DLPI notification id */
-	DLPI_ERRMAX			/* Highest + 1 libdlpi error code */
+	DLPI_SUCCESS = 10000,	/* DLPI operation succeeded */
+	DLPI_EINVAL,		/* invalid argument */
+	DLPI_ELINKNAMEINVAL,	/* invalid DLPI linkname */
+	DLPI_ENOLINK,		/* DLPI link does not exist */
+	DLPI_EBADLINK,		/* bad DLPI link */
+	DLPI_EINHANDLE,		/* invalid DLPI handle */
+	DLPI_ETIMEDOUT,		/* DLPI operation timed out */
+	DLPI_EVERNOTSUP,	/* unsupported DLPI Version */
+	DLPI_EMODENOTSUP,	/* unsupported DLPI connection mode */
+	DLPI_EUNAVAILSAP,	/* unavailable DLPI SAP */
+	DLPI_FAILURE,		/* DLPI operation failed */
+	DLPI_ENOTSTYLE2,	/* DLPI style-2 node reports style-1 */
+	DLPI_EBADMSG,		/* bad DLPI message */
+	DLPI_ERAWNOTSUP,	/* DLPI raw mode not supported */
+	DLPI_ENOTEINVAL,	/* invalid DLPI notification type */
+	DLPI_ENOTENOTSUP,	/* DLPI notification not supported by link */
+	DLPI_ENOTEIDINVAL,	/* invalid DLPI notification id */
+	DLPI_ERRMAX		/* Highest + 1 libdlpi error code */
 };
 
 /*
@@ -157,10 +158,10 @@ typedef struct {
 	} dni_data;
 } dlpi_notifyinfo_t;
 
-#define	dni_speed dni_data.dniu_speed
-#define	dni_size dni_data.dniu_size
-#define	dni_physaddr dni_data.dniu_addr.physaddr
-#define	dni_physaddrlen dni_data.dniu_addr.physaddrlen
+#define	dni_speed		dni_data.dniu_speed
+#define	dni_size		dni_data.dniu_size
+#define	dni_physaddr		dni_data.dniu_addr.physaddr
+#define	dni_physaddrlen 	dni_data.dniu_addr.physaddrlen
 
 typedef struct __dlpi_handle *dlpi_handle_t;
 
@@ -179,6 +180,9 @@ extern const char	*dlpi_mactype(uint_t);
 extern const char 	*dlpi_strerror(int);
 extern const char 	*dlpi_linkname(dlpi_handle_t);
 
+typedef boolean_t dlpi_walkfunc_t(const char *, void *);
+
+extern void dlpi_walk(dlpi_walkfunc_t *, void *, uint_t);
 extern int dlpi_open(const char *, dlpi_handle_t *, uint_t);
 extern void dlpi_close(dlpi_handle_t);
 extern int dlpi_info(dlpi_handle_t, dlpi_info_t *, uint_t);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern "C" {
 #define	DLIOC		('D' << 8)
 #define	DLIOCRAW	(DLIOC|1)	/* M_DATA "raw" mode */
 #define	DLIOCNATIVE	(DLIOC|2)	/* Native traffic mode */
+#define	DLIOCMARGININFO	(DLIOC|3)	/* margin size info */
 #define	DLIOCHDRINFO	(DLIOC|10)	/* IP fast-path */
 
 #define	DL_IOC_HDR_INFO	DLIOCHDRINFO
@@ -1663,6 +1664,26 @@ extern void	dlphysaddrack(queue_t *, mblk_t *, void *, t_uscalar_t);
 extern void	dlcapabsetqid(dl_mid_t *, const queue_t *);
 extern boolean_t dlcapabcheckqid(const dl_mid_t *, const queue_t *);
 extern void	dlnotifyack(queue_t *, mblk_t *, uint32_t);
+
+/*
+ * The ldi_handle_t typedef is in <sys/sunldi.h>, which in turn requires
+ * <sys/sunddi.h>, which pulls in <sys/cmn_err.h>, which declares kernel
+ * versions of the printf() functions that conflict with the libc ones.
+ * This causes conflicts when building MDB modules like ARP that #define
+ * _KERNEL.  So we use `struct __ldi_handle *' instead.
+ */
+struct __ldi_handle;
+extern int dl_attach(struct __ldi_handle *, int, dl_error_ack_t *);
+extern int dl_bind(struct __ldi_handle *, uint_t, dl_error_ack_t *);
+extern int dl_phys_addr(struct __ldi_handle *, uchar_t *, size_t *,
+    dl_error_ack_t *);
+extern int dl_info(struct __ldi_handle *, dl_info_ack_t *, uchar_t *, size_t *,
+    dl_error_ack_t *);
+extern int dl_notify(struct __ldi_handle *, uint32_t *, dl_error_ack_t *);
+extern const char *dl_errstr(t_uscalar_t);
+extern const char *dl_primstr(t_uscalar_t);
+extern const char *dl_mactypestr(t_uscalar_t);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

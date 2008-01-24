@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -558,7 +558,7 @@ bringupinterface(const char *ifname, const char *host, const char *ipv6addr,
 	}
 
 	if (intf->if_type == IF_WIRELESS) {
-		if (!handle_wireless_lan(ifname)) {
+		if (!handle_wireless_lan(intf)) {
 			syslog(LOG_INFO, "Could not connect to any WLAN, not "
 			    "bringing %s up", ifname);
 			return (B_FALSE);
@@ -631,8 +631,8 @@ takedowninterface(const char *ifname, boolean_t popup, boolean_t v6onlink)
 		(void) start_child(IFCONFIG, ifname, "inet6", "unplumb", NULL);
 	}
 
-	if (find_if_type(ifname) == IF_WIRELESS)
-		(void) dladm_wlan_disconnect(ifname);
+	if (ifp->if_type == IF_WIRELESS)
+		(void) dladm_wlan_disconnect(ifp->if_linkid);
 
 	dprintf("takedown interface, free cached ip address");
 	if (ifp != NULL) {
@@ -751,6 +751,7 @@ struct interface *
 add_interface(sa_family_t family, const char *name, uint64_t flags)
 {
 	struct interface *i;
+	datalink_id_t linkid = DATALINK_INVALID_LINKID;
 	enum interface_type iftype;
 
 	if (name == NULL)
@@ -800,6 +801,13 @@ add_interface(sa_family_t family, const char *name, uint64_t flags)
 	i->if_flags = flags == 0 ? get_ifflags(name, family) : flags;
 	i->if_lflags = 0;
 	i->if_timer_expire = 0;
+
+	/*
+	 * If linkid is DATALINK_INVALID_LINKID, it is an IP-layer only
+	 * interface.
+	 */
+	(void) dladm_name2info(name, &linkid, NULL, NULL, NULL);
+	i->if_linkid = linkid;
 
 	dprintf("added interface %s of type %s af %d; is %savailable",
 	    i->if_name, if_type_str(i->if_type), i->if_family,
@@ -1077,7 +1085,7 @@ initialize_interfaces(void)
 			wait_time = NWAM_IF_WAIT_DELTA_MAX;
 	}
 
-	(void) dladm_init_linkprop();
+	(void) dladm_init_linkprop(DATALINK_ALL_LINKID);
 
 	(void) icfg_iterate_if(AF_INET, ICFG_PLUMBED, NULL, do_add_interface);
 
@@ -1167,6 +1175,7 @@ check_interface_timer(struct interface *ifp, void *arg)
 enum interface_type
 find_if_type(const char *name)
 {
+	uint32_t media;
 	enum interface_type type;
 
 	if (name == NULL) {
@@ -1174,20 +1183,19 @@ find_if_type(const char *name)
 		return (IF_UNKNOWN);
 	}
 
-	if (strncmp(name, "ip.tun", 6) == 0) {
-		/*
-		 * We'll need to update our tunnel detection once
-		 * clearview/uv and clearview/tun driver projects
-		 * go back; tunnel names won't necessarily be ip.tunN
-		 */
-		type = IF_TUN;
-	} else {
-		/*
-		 * We didn't recognize it.  Try the libdladm function
-		 * to decide if it is wireless or not; if not, assume
-		 * that it's wired.
-		 */
-		type = dladm_wlan_is_valid(name) ? IF_WIRELESS : IF_WIRED;
+	type = IF_WIRED;
+	if (dladm_name2info(name, NULL, NULL, NULL, &media) !=
+	    DLADM_STATUS_OK) {
+		if (strncmp(name, "ip.tun", 6) == 0) {
+			/*
+			 * We'll need to update our tunnel detection once
+			 * clearview/uv and clearview/tun driver projects
+			 * go back; tunnel names won't necessarily be ip.tunN
+			 */
+			type = IF_TUN;
+		}
+	} else if (media == DL_WIFI) {
+		type = IF_WIRELESS;
 	}
 
 	return (type);

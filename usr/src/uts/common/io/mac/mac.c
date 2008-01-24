@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,15 +32,18 @@
 
 #include <sys/types.h>
 #include <sys/conf.h>
+#include <sys/id_space.h>
 #include <sys/stat.h>
+#include <sys/mkdev.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/dlpi.h>
+#include <sys/dls.h>
 #include <sys/modhash.h>
+#include <sys/vlan.h>
 #include <sys/mac.h>
 #include <sys/mac_impl.h>
-#include <sys/dls.h>
 #include <sys/dld.h>
 #include <sys/modctl.h>
 #include <sys/fs/dv_node.h>
@@ -58,6 +61,8 @@ static mod_hash_t	*i_mac_impl_hash;
 krwlock_t		i_mac_impl_lock;
 uint_t			i_mac_impl_count;
 static kmem_cache_t	*mac_vnic_tx_cache;
+static id_space_t	*minor_ids;
+static uint32_t		minor_count;
 
 #define	MACTYPE_KMODDIR	"mac"
 #define	MACTYPE_HASHSZ	67
@@ -87,6 +92,7 @@ i_mac_constructor(void *buf, void *arg, int kmflag)
 	mip->mi_linkstate = LINK_STATE_UNKNOWN;
 
 	rw_init(&mip->mi_state_lock, NULL, RW_DRIVER, NULL);
+	rw_init(&mip->mi_gen_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_data_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_notify_lock, NULL, RW_DRIVER, NULL);
 	rw_init(&mip->mi_rx_lock, NULL, RW_DRIVER, NULL);
@@ -107,11 +113,13 @@ i_mac_destructor(void *buf, void *arg)
 	mac_impl_t	*mip = buf;
 
 	ASSERT(mip->mi_ref == 0);
+	ASSERT(!mip->mi_exclusive);
 	ASSERT(mip->mi_active == 0);
 	ASSERT(mip->mi_linkstate == LINK_STATE_UNKNOWN);
 	ASSERT(mip->mi_devpromisc == 0);
 	ASSERT(mip->mi_promisc == 0);
 	ASSERT(mip->mi_mmap == NULL);
+	ASSERT(mip->mi_mmrp == NULL);
 	ASSERT(mip->mi_mnfp == NULL);
 	ASSERT(mip->mi_resource_add == NULL);
 	ASSERT(mip->mi_ksp == NULL);
@@ -119,6 +127,7 @@ i_mac_destructor(void *buf, void *arg)
 	ASSERT(mip->mi_notify_bits == 0);
 	ASSERT(mip->mi_notify_thread == NULL);
 
+	rw_destroy(&mip->mi_gen_lock);
 	rw_destroy(&mip->mi_state_lock);
 	rw_destroy(&mip->mi_data_lock);
 	rw_destroy(&mip->mi_notify_lock);
@@ -357,13 +366,25 @@ mac_init(void)
 	    MACTYPE_HASHSZ,
 	    mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
+
+	/*
+	 * Allocate an id space to manage minor numbers. The range of the
+	 * space will be from MAC_MAX_MINOR+1 to MAXMIN32 (maximum legal
+	 * minor number is MAXMIN, but id_t is type of integer and does not
+	 * allow MAXMIN).
+	 */
+	minor_ids = id_space_create("mac_minor_ids", MAC_MAX_MINOR+1, MAXMIN32);
+	ASSERT(minor_ids != NULL);
+	minor_count = 0;
 }
 
 int
 mac_fini(void)
 {
-	if (i_mac_impl_count > 0)
+	if (i_mac_impl_count > 0 || minor_count > 0)
 		return (EBUSY);
+
+	id_space_destroy(minor_ids);
 
 	mod_hash_destroy_hash(i_mac_impl_hash);
 	rw_destroy(&i_mac_impl_lock);
@@ -379,13 +400,9 @@ mac_fini(void)
  * Client functions.
  */
 
-int
-mac_open(const char *macname, mac_handle_t *mhp)
+static int
+mac_hold(const char *macname, mac_impl_t **pmip)
 {
-	char		driver[MAXNAMELEN];
-	uint_t		ddi_instance;
-	major_t		major;
-	dev_info_t	*dip;
 	mac_impl_t	*mip;
 	int		err;
 
@@ -397,74 +414,170 @@ mac_open(const char *macname, mac_handle_t *mhp)
 		return (EINVAL);
 
 	/*
-	 * Split the device name into driver and instance components.
-	 */
-	if (ddi_parse(macname, driver, &ddi_instance) != DDI_SUCCESS)
-		return (EINVAL);
-
-	if ((strcmp(driver, "aggr") == 0) || (strcmp(driver, "vnic") == 0))
-		ddi_instance = 0;
-
-	/*
-	 * Get the major number of the driver.
-	 */
-	if ((major = ddi_name_to_major(driver)) == (major_t)-1)
-		return (EINVAL);
-
-	/*
-	 * Hold the given instance to prevent it from being detached.
-	 * This will also attach the instance if it is not currently attached.
-	 * Currently we ensure that mac_register() (called by the driver's
-	 * attach entry point) and all code paths under it cannot possibly
-	 * call mac_open() because this would lead to a recursive attach
-	 * panic.
-	 */
-	if ((dip = ddi_hold_devi_by_instance(major, ddi_instance, 0)) == NULL)
-		return (EINVAL);
-
-	/*
 	 * Look up its entry in the global hash table.
 	 */
-again:
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	err = mod_hash_find(i_mac_impl_hash, (mod_hash_key_t)macname,
 	    (mod_hash_val_t *)&mip);
+
 	if (err != 0) {
-		err = ENOENT;
-		goto failed;
+		rw_exit(&i_mac_impl_lock);
+		return (ENOENT);
 	}
 
 	if (mip->mi_disabled) {
 		rw_exit(&i_mac_impl_lock);
-		goto again;
+		return (ENOENT);
+	}
+
+	if (mip->mi_exclusive) {
+		rw_exit(&i_mac_impl_lock);
+		return (EBUSY);
 	}
 
 	mip->mi_ref++;
 	rw_exit(&i_mac_impl_lock);
 
+	*pmip = mip;
+	return (0);
+}
+
+static void
+mac_rele(mac_impl_t *mip)
+{
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	ASSERT(mip->mi_ref != 0);
+	if (--mip->mi_ref == 0)
+		ASSERT(!mip->mi_activelink);
+	rw_exit(&i_mac_impl_lock);
+}
+
+int
+mac_hold_exclusive(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Look up its entry in the global hash table.
+	 */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	if (mip->mi_disabled) {
+		rw_exit(&i_mac_impl_lock);
+		return (ENOENT);
+	}
+
+	if (mip->mi_ref != 0) {
+		rw_exit(&i_mac_impl_lock);
+		return (EBUSY);
+	}
+
+	ASSERT(!mip->mi_exclusive);
+
+	mip->mi_ref++;
+	mip->mi_exclusive = B_TRUE;
+	rw_exit(&i_mac_impl_lock);
+	return (0);
+}
+
+void
+mac_rele_exclusive(mac_handle_t mh)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	/*
+	 * Look up its entry in the global hash table.
+	 */
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	ASSERT(mip->mi_ref == 1 && mip->mi_exclusive);
+	mip->mi_ref--;
+	mip->mi_exclusive = B_FALSE;
+	rw_exit(&i_mac_impl_lock);
+}
+
+int
+mac_open(const char *macname, mac_handle_t *mhp)
+{
+	mac_impl_t	*mip;
+	int		err;
+
+	/*
+	 * Look up its entry in the global hash table.
+	 */
+	if ((err = mac_hold(macname, &mip)) != 0)
+		return (err);
+
+	rw_enter(&mip->mi_gen_lock, RW_WRITER);
+
+	if ((mip->mi_oref != 0) ||
+	    !(mip->mi_callbacks->mc_callbacks & MC_OPEN)) {
+		goto done;
+	}
+
+	/*
+	 * Note that we do not hold i_mac_impl_lock when calling the
+	 * mc_open() callback function to avoid deadlock with the
+	 * i_mac_notify() function.
+	 */
+	if ((err = mip->mi_open(mip->mi_driver)) != 0) {
+		rw_exit(&mip->mi_gen_lock);
+		mac_rele(mip);
+		return (err);
+	}
+
+done:
+	mip->mi_oref++;
+	rw_exit(&mip->mi_gen_lock);
 	*mhp = (mac_handle_t)mip;
 	return (0);
+}
 
-failed:
-	rw_exit(&i_mac_impl_lock);
-	ddi_release_devi(dip);
+int
+mac_open_by_linkid(datalink_id_t linkid, mac_handle_t *mhp)
+{
+	dls_dl_handle_t	dlh;
+	int		err;
+
+	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
+		return (err);
+
+	if (dls_devnet_vid(dlh) != VLAN_ID_NONE) {
+		err = EINVAL;
+		goto done;
+	}
+
+	err = mac_open(dls_devnet_mac(dlh), mhp);
+
+done:
+	dls_devnet_rele_tmp(dlh);
 	return (err);
+}
+
+int
+mac_open_by_linkname(const char *link, mac_handle_t *mhp)
+{
+	datalink_id_t	linkid;
+	int		err;
+
+	if ((err = dls_mgmt_get_linkid(link, &linkid)) != 0)
+		return (err);
+	return (mac_open_by_linkid(linkid, mhp));
 }
 
 void
 mac_close(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
-	dev_info_t	*dip = mip->mi_dip;
 
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	rw_enter(&mip->mi_gen_lock, RW_WRITER);
 
-	ASSERT(mip->mi_ref != 0);
-	if (--mip->mi_ref == 0) {
-		ASSERT(!mip->mi_activelink);
+	ASSERT(mip->mi_oref != 0);
+	if (--mip->mi_oref == 0) {
+		if ((mip->mi_callbacks->mc_callbacks & MC_CLOSE))
+			mip->mi_close(mip->mi_driver);
 	}
-	ddi_release_devi(dip);
-	rw_exit(&i_mac_impl_lock);
+	rw_exit(&mip->mi_gen_lock);
+
+	mac_rele(mip);
 }
 
 const mac_info_t *
@@ -477,6 +590,18 @@ dev_info_t *
 mac_devinfo_get(mac_handle_t mh)
 {
 	return (((mac_impl_t *)mh)->mi_dip);
+}
+
+const char *
+mac_name(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_name);
+}
+
+minor_t
+mac_minor(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_minor);
 }
 
 uint64_t
@@ -751,10 +876,8 @@ mac_unicst_set(mac_handle_t mh, const uint8_t *addr)
 	 * This check is necessary otherwise it may call into mac_unicst_set
 	 * recursively.
 	 */
-	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) == 0) {
-		err = 0;
+	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) == 0)
 		goto done;
-	}
 
 	if ((err = mip->mi_unicst(mip->mi_driver, addr)) != 0)
 		goto done;
@@ -838,7 +961,6 @@ mac_promisc_set(mac_handle_t mh, boolean_t on, mac_promisc_type_t ptype)
 			err = EPROTO;
 			goto done;
 		}
-
 		/*
 		 * Disable promiscuous mode on the device if this is the last
 		 * enabling.
@@ -1248,6 +1370,59 @@ mac_free(mac_register_t *mregp)
 }
 
 /*
+ * Allocate a minor number.
+ */
+minor_t
+mac_minor_hold(boolean_t sleep)
+{
+	minor_t	minor;
+
+	/*
+	 * Grab a value from the arena.
+	 */
+	atomic_add_32(&minor_count, 1);
+
+	if (sleep)
+		minor = (uint_t)id_alloc(minor_ids);
+	else
+		minor = (uint_t)id_alloc_nosleep(minor_ids);
+
+	if (minor == 0) {
+		atomic_add_32(&minor_count, -1);
+		return (0);
+	}
+
+	return (minor);
+}
+
+/*
+ * Release a previously allocated minor number.
+ */
+void
+mac_minor_rele(minor_t minor)
+{
+	/*
+	 * Return the value to the arena.
+	 */
+	id_free(minor_ids, minor);
+	atomic_add_32(&minor_count, -1);
+}
+
+uint32_t
+mac_no_notification(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	return (mip->mi_unsup_note);
+}
+
+boolean_t
+mac_is_legacy(mac_handle_t mh)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+	return (mip->mi_legacy);
+}
+
+/*
  * mac_register() is how drivers register new MACs with the GLDv3
  * framework.  The mregp argument is allocated by drivers using the
  * mac_alloc() function, and can be freed using mac_free() immediately upon
@@ -1258,12 +1433,16 @@ mac_free(mac_register_t *mregp)
 int
 mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 {
-	mac_impl_t	*mip;
-	mactype_t	*mtype;
-	int		err = EINVAL;
-	struct devnames *dnp;
-	minor_t		minor;
-	boolean_t	style1_created = B_FALSE, style2_created = B_FALSE;
+	mac_impl_t		*mip;
+	mactype_t		*mtype;
+	int			err = EINVAL;
+	struct devnames		*dnp = NULL;
+	uint_t			instance;
+	boolean_t		style1_created = B_FALSE;
+	boolean_t		style2_created = B_FALSE;
+	mac_capab_legacy_t	legacy;
+	char			*driver;
+	minor_t			minor = 0;
 
 	/* Find the required MAC-Type plugin. */
 	if ((mtype = i_mactype_getplugin(mregp->m_type_ident)) == NULL)
@@ -1277,23 +1456,59 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 */
 	mip->mi_disabled = B_TRUE;
 
-	mip->mi_drvname = ddi_driver_name(mregp->m_dip);
 	/*
-	 * Some drivers such as aggr need to register multiple MACs.  Such
-	 * drivers must supply a non-zero "instance" argument so that each
-	 * MAC can be assigned a unique MAC name and can have unique
-	 * kstats.
+	 * When a mac is registered, the m_instance field can be set to:
+	 *
+	 *  0:	Get the mac's instance number from m_dip.
+	 *	This is usually used for physical device dips.
+	 *
+	 *  [1 .. MAC_MAX_MINOR-1]: Use the value as the mac's instance number.
+	 *	For example, when an aggregation is created with the key option,
+	 *	"key" will be used as the instance number.
+	 *
+	 *  -1: Assign an instance number from [MAC_MAX_MINOR .. MAXMIN-1].
+	 *	This is often used when a MAC of a virtual link is registered
+	 *	(e.g., aggregation when "key" is not specified, or vnic).
+	 *
+	 * Note that the instance number is used to derive the mi_minor field
+	 * of mac_impl_t, which will then be used to derive the name of kstats
+	 * and the devfs nodes.  The first 2 cases are needed to preserve
+	 * backward compatibility.
 	 */
-	mip->mi_instance = ((mregp->m_instance == 0) ?
-	    ddi_get_instance(mregp->m_dip) : mregp->m_instance);
+	switch (mregp->m_instance) {
+	case 0:
+		instance = ddi_get_instance(mregp->m_dip);
+		break;
+	case ((uint_t)-1):
+		minor = mac_minor_hold(B_TRUE);
+		if (minor == 0) {
+			err = ENOSPC;
+			goto fail;
+		}
+		instance = minor - 1;
+		break;
+	default:
+		instance = mregp->m_instance;
+		if (instance >= MAC_MAX_MINOR) {
+			err = EINVAL;
+			goto fail;
+		}
+		break;
+	}
+
+	mip->mi_minor = (minor_t)(instance + 1);
+	mip->mi_dip = mregp->m_dip;
+
+	driver = (char *)ddi_driver_name(mip->mi_dip);
 
 	/* Construct the MAC name as <drvname><instance> */
 	(void) snprintf(mip->mi_name, sizeof (mip->mi_name), "%s%d",
-	    mip->mi_drvname, mip->mi_instance);
+	    driver, instance);
 
 	mip->mi_driver = mregp->m_driver;
 
 	mip->mi_type = mtype;
+	mip->mi_margin = mregp->m_margin;
 	mip->mi_info.mi_media = mtype->mt_type;
 	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
 	mip->mi_info.mi_sdu_min = mregp->m_min_sdu;
@@ -1374,19 +1589,38 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	}
 	mip->mi_callbacks = mregp->m_callbacks;
 
-	mip->mi_dip = mregp->m_dip;
-
 	/*
 	 * Set up the possible transmit routines.
 	 */
 	mip->mi_txinfo.mt_fn = mip->mi_tx;
 	mip->mi_txinfo.mt_arg = mip->mi_driver;
 
+	mip->mi_legacy = mac_capab_get((mac_handle_t)mip,
+	    MAC_CAPAB_LEGACY, &legacy);
+
+	if (mip->mi_legacy) {
+		/*
+		 * Legacy device. Messages being sent will be looped back
+		 * by the underlying driver. Therefore the txloop function
+		 * pointer is the same as the tx function pointer.
+		 */
+		mip->mi_txloopinfo.mt_fn = mip->mi_txinfo.mt_fn;
+		mip->mi_txloopinfo.mt_arg = mip->mi_txinfo.mt_arg;
+		mip->mi_unsup_note = legacy.ml_unsup_note;
+		mip->mi_phy_dev = legacy.ml_dev;
+	} else {
+		/*
+		 * Normal device. The framework needs to do the loopback.
+		 */
+		mip->mi_txloopinfo.mt_fn = mac_txloop;
+		mip->mi_txloopinfo.mt_arg = mip;
+		mip->mi_unsup_note = 0;
+		mip->mi_phy_dev = makedevice(ddi_driver_major(mip->mi_dip),
+		    ddi_get_instance(mip->mi_dip) + 1);
+	}
+
 	mip->mi_vnic_txinfo.mt_fn = mac_vnic_tx;
 	mip->mi_vnic_txinfo.mt_arg = mip;
-
-	mip->mi_txloopinfo.mt_fn = mac_txloop;
-	mip->mi_txloopinfo.mt_arg = mip;
 
 	mip->mi_vnic_txloopinfo.mt_fn = mac_vnic_txloop;
 	mip->mi_vnic_txloopinfo.mt_arg = mip;
@@ -1404,39 +1638,31 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 */
 	mac_stat_create(mip);
 
-	err = EEXIST;
-	/* Create a style-2 DLPI device */
-	if (ddi_create_minor_node(mip->mi_dip, (char *)mip->mi_drvname,
-	    S_IFCHR, 0, DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)
-		goto fail;
-	style2_created = B_TRUE;
-
-	/* Create a style-1 DLPI device */
-	minor = (minor_t)mip->mi_instance + 1;
-	if (ddi_create_minor_node(mip->mi_dip, mip->mi_name, S_IFCHR, minor,
-	    DDI_NT_NET, 0) != DDI_SUCCESS)
-		goto fail;
-	style1_created = B_TRUE;
-
-	/*
-	 * Create a link for this MAC.  The link name will be the same as
-	 * the MAC name.
-	 */
-	err = dls_create(mip->mi_name, mip->mi_name);
-	if (err != 0)
-		goto fail;
-
 	/* set the gldv3 flag in dn_flags */
 	dnp = &devnamesp[ddi_driver_major(mip->mi_dip)];
 	LOCK_DEV_OPS(&dnp->dn_lock);
-	dnp->dn_flags |= DN_GLDV3_DRIVER;
+	dnp->dn_flags |= (DN_GLDV3_DRIVER | DN_NETWORK_DRIVER);
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
+
+	if (mip->mi_minor < MAC_MAX_MINOR + 1) {
+		/* Create a style-2 DLPI device */
+		if (ddi_create_minor_node(mip->mi_dip, driver, S_IFCHR, 0,
+		    DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)
+			goto fail;
+		style2_created = B_TRUE;
+
+		/* Create a style-1 DLPI device */
+		if (ddi_create_minor_node(mip->mi_dip, mip->mi_name, S_IFCHR,
+		    mip->mi_minor, DDI_NT_NET, 0) != DDI_SUCCESS)
+			goto fail;
+		style1_created = B_TRUE;
+	}
 
 	rw_enter(&i_mac_impl_lock, RW_WRITER);
 	if (mod_hash_insert(i_mac_impl_hash,
 	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
+
 		rw_exit(&i_mac_impl_lock);
-		VERIFY(dls_destroy(mip->mi_name) == 0);
 		err = EEXIST;
 		goto fail;
 	}
@@ -1446,15 +1672,21 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 */
 	mip->mi_disabled = B_FALSE;
 
-	cmn_err(CE_NOTE, "!%s registered", mip->mi_name);
-
 	rw_exit(&i_mac_impl_lock);
 
 	atomic_inc_32(&i_mac_impl_count);
+
+	cmn_err(CE_NOTE, "!%s registered", mip->mi_name);
 	*mhp = (mac_handle_t)mip;
 	return (0);
 
 fail:
+	if (style1_created)
+		ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
+
+	if (style2_created)
+		ddi_remove_minor_node(mip->mi_dip, driver);
+
 	/* clean up notification thread */
 	if (mip->mi_notify_thread != NULL) {
 		mutex_enter(&mip->mi_notify_bits_lock);
@@ -1470,10 +1702,6 @@ fail:
 		    mip->mi_type->mt_addr_length);
 		mip->mi_info.mi_unicst_addr = NULL;
 	}
-	if (style1_created)
-		ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
-	if (style2_created)
-		ddi_remove_minor_node(mip->mi_dip, (char *)mip->mi_drvname);
 
 	mac_stat_destroy(mip);
 
@@ -1488,6 +1716,11 @@ fail:
 		mip->mi_pdata_size = 0;
 	}
 
+	if (minor != 0) {
+		ASSERT(minor > MAC_MAX_MINOR);
+		mac_minor_rele(minor);
+	}
+
 	kmem_cache_free(i_mac_impl_cachep, mip);
 	return (err);
 }
@@ -1495,7 +1728,6 @@ fail:
 int
 mac_disable(mac_handle_t mh)
 {
-	int			err;
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 
 	/*
@@ -1510,14 +1742,6 @@ mac_disable(mac_handle_t mh)
 	}
 	mip->mi_disabled = B_TRUE;
 	rw_exit(&i_mac_impl_lock);
-
-	if ((err = dls_destroy(mip->mi_name)) != 0) {
-		rw_enter(&i_mac_impl_lock, RW_WRITER);
-		mip->mi_disabled = B_FALSE;
-		rw_exit(&i_mac_impl_lock);
-		return (err);
-	}
-
 	return (0);
 }
 
@@ -1528,6 +1752,7 @@ mac_unregister(mac_handle_t mh)
 	mac_impl_t		*mip = (mac_impl_t *)mh;
 	mod_hash_val_t		val;
 	mac_multicst_addr_t	*p, *nextp;
+	mac_margin_req_t	*mmr, *nextmmr;
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
@@ -1551,22 +1776,24 @@ mac_unregister(mac_handle_t mh)
 		cv_wait(&mip->mi_notify_cv, &mip->mi_notify_bits_lock);
 	mutex_exit(&mip->mi_notify_bits_lock);
 
-	/*
-	 * Remove both style 1 and style 2 minor nodes
-	 */
-	ddi_remove_minor_node(mip->mi_dip, (char *)mip->mi_drvname);
-	ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
+	if (mip->mi_minor < MAC_MAX_MINOR + 1) {
+		ddi_remove_minor_node(mip->mi_dip, mip->mi_name);
+		ddi_remove_minor_node(mip->mi_dip,
+		    (char *)ddi_driver_name(mip->mi_dip));
+	}
 
 	ASSERT(!mip->mi_activelink);
 
 	mac_stat_destroy(mip);
 
-	(void) mod_hash_remove(i_mac_impl_hash, (mod_hash_key_t)mip->mi_name,
-	    &val);
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	(void) mod_hash_remove(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, &val);
 	ASSERT(mip == (mac_impl_t *)val);
 
 	ASSERT(i_mac_impl_count > 0);
 	atomic_dec_32(&i_mac_impl_count);
+	rw_exit(&i_mac_impl_lock);
 
 	if (mip->mi_pdata != NULL)
 		kmem_free(mip->mi_pdata, mip->mi_pdata_size);
@@ -1582,12 +1809,24 @@ mac_unregister(mac_handle_t mh)
 	}
 	mip->mi_mmap = NULL;
 
+	/*
+	 * Free the list of margin request.
+	 */
+	for (mmr = mip->mi_mmrp; mmr != NULL; mmr = nextmmr) {
+		nextmmr = mmr->mmr_nextp;
+		kmem_free(mmr, sizeof (mac_margin_req_t));
+	}
+	mip->mi_mmrp = NULL;
+
 	mip->mi_linkstate = LINK_STATE_UNKNOWN;
 	kmem_free(mip->mi_info.mi_unicst_addr, mip->mi_type->mt_addr_length);
 	mip->mi_info.mi_unicst_addr = NULL;
 
 	atomic_dec_32(&mip->mi_type->mt_ref);
 	mip->mi_type = NULL;
+
+	if (mip->mi_minor > MAC_MAX_MINOR)
+		mac_minor_rele(mip->mi_minor);
 
 	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
 
@@ -1888,6 +2127,12 @@ mac_unicst_update(mac_handle_t mh, const uint8_t *addr)
 		return;
 
 	/*
+	 * If the address has not changed, do nothing.
+	 */
+	if (bcmp(addr, mip->mi_addr, mip->mi_type->mt_addr_length) == 0)
+		return;
+
+	/*
 	 * Save the address.
 	 */
 	bcopy(addr, mip->mi_addr, mip->mi_type->mt_addr_length);
@@ -2033,6 +2278,150 @@ mac_promisc_refresh(mac_handle_t mh, mac_setpromisc_t refresh, void *arg)
 	 * Call the refresh function with the current promiscuity.
 	 */
 	refresh(arg, (mip->mi_devpromisc != 0));
+}
+
+/*
+ * The mac client requests that the mac not to change its margin size to
+ * be less than the specified value.  If "current" is B_TRUE, then the client
+ * requests the mac not to change its margin size to be smaller than the
+ * current size. Further, return the current margin size value in this case.
+ *
+ * We keep every requested size in an ordered list from largest to smallest.
+ */
+int
+mac_margin_add(mac_handle_t mh, uint32_t *marginp, boolean_t current)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mac_margin_req_t	**pp, *p;
+	int			err = 0;
+
+	rw_enter(&(mip->mi_data_lock), RW_WRITER);
+	if (current)
+		*marginp = mip->mi_margin;
+
+	/*
+	 * If the current margin value cannot satisfy the margin requested,
+	 * return ENOTSUP directly.
+	 */
+	if (*marginp > mip->mi_margin) {
+		err = ENOTSUP;
+		goto done;
+	}
+
+	/*
+	 * Check whether the given margin is already in the list. If so,
+	 * bump the reference count.
+	 */
+	for (pp = &(mip->mi_mmrp); (p = *pp) != NULL; pp = &(p->mmr_nextp)) {
+		if (p->mmr_margin == *marginp) {
+			/*
+			 * The margin requested is already in the list,
+			 * so just bump the reference count.
+			 */
+			p->mmr_ref++;
+			goto done;
+		}
+		if (p->mmr_margin < *marginp)
+			break;
+	}
+
+
+	if ((p = kmem_zalloc(sizeof (mac_margin_req_t), KM_NOSLEEP)) == NULL) {
+		err = ENOMEM;
+		goto done;
+	}
+
+	p->mmr_margin = *marginp;
+	p->mmr_ref++;
+	p->mmr_nextp = *pp;
+	*pp = p;
+
+done:
+	rw_exit(&(mip->mi_data_lock));
+	return (err);
+}
+
+/*
+ * The mac client requests to cancel its previous mac_margin_add() request.
+ * We remove the requested margin size from the list.
+ */
+int
+mac_margin_remove(mac_handle_t mh, uint32_t margin)
+{
+	mac_impl_t		*mip = (mac_impl_t *)mh;
+	mac_margin_req_t	**pp, *p;
+	int			err = 0;
+
+	rw_enter(&(mip->mi_data_lock), RW_WRITER);
+	/*
+	 * Find the entry in the list for the given margin.
+	 */
+	for (pp = &(mip->mi_mmrp); (p = *pp) != NULL; pp = &(p->mmr_nextp)) {
+		if (p->mmr_margin == margin) {
+			if (--p->mmr_ref == 0)
+				break;
+
+			/*
+			 * There is still a reference to this address so
+			 * there's nothing more to do.
+			 */
+			goto done;
+		}
+	}
+
+	/*
+	 * We did not find an entry for the given margin.
+	 */
+	if (p == NULL) {
+		err = ENOENT;
+		goto done;
+	}
+
+	ASSERT(p->mmr_ref == 0);
+
+	/*
+	 * Remove it from the list.
+	 */
+	*pp = p->mmr_nextp;
+	kmem_free(p, sizeof (mac_margin_req_t));
+done:
+	rw_exit(&(mip->mi_data_lock));
+	return (err);
+}
+
+/*
+ * The mac client requests to get the mac's current margin value.
+ */
+void
+mac_margin_get(mac_handle_t mh, uint32_t *marginp)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	rw_enter(&(mip->mi_data_lock), RW_READER);
+	*marginp = mip->mi_margin;
+	rw_exit(&(mip->mi_data_lock));
+}
+
+boolean_t
+mac_margin_update(mac_handle_t mh, uint32_t margin)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	uint32_t	margin_needed = 0;
+
+	rw_enter(&(mip->mi_data_lock), RW_WRITER);
+
+	if (mip->mi_mmrp != NULL)
+		margin_needed = mip->mi_mmrp->mmr_margin;
+
+	if (margin_needed <= margin)
+		mip->mi_margin = margin;
+
+	rw_exit(&(mip->mi_data_lock));
+
+	if (margin_needed <= margin)
+		i_mac_notify(mip, MAC_NOTE_MARGIN);
+
+	return (margin_needed <= margin);
 }
 
 boolean_t
@@ -2427,28 +2816,4 @@ mactype_unregister(const char *ident)
 done:
 	mutex_exit(&i_mactype_lock);
 	return (err);
-}
-
-int
-mac_vlan_create(mac_handle_t mh, const char *name, minor_t minor)
-{
-	mac_impl_t		*mip = (mac_impl_t *)mh;
-
-	/* Create a style-1 DLPI device */
-	if (ddi_create_minor_node(mip->mi_dip, (char *)name, S_IFCHR, minor,
-	    DDI_NT_NET, 0) != DDI_SUCCESS) {
-		return (-1);
-	}
-	return (0);
-}
-
-void
-mac_vlan_remove(mac_handle_t mh, const char *name)
-{
-	mac_impl_t		*mip = (mac_impl_t *)mh;
-	dev_info_t		*dipp;
-
-	ddi_remove_minor_node(mip->mi_dip, (char *)name);
-	dipp = ddi_get_parent(mip->mi_dip);
-	(void) devfs_clean(dipp, NULL, 0);
 }

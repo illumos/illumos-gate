@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,57 +87,6 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 	return (err);
 }
 
-static int
-rds_dl_info(ldi_handle_t lh, dl_info_ack_t *info)
-{
-	dl_info_req_t *info_req;
-	union DL_primitives *dl_prim;
-	mblk_t *mp;
-	k_sigset_t smask;
-	int error;
-
-	if ((mp = allocb(sizeof (dl_info_req_t), BPRI_MED)) == NULL) {
-		return (ENOMEM);
-	}
-
-	mp->b_datap->db_type = M_PROTO;
-
-	info_req = (dl_info_req_t *)(uintptr_t)mp->b_wptr;
-	mp->b_wptr += sizeof (dl_info_req_t);
-	info_req->dl_primitive = DL_INFO_REQ;
-
-	sigintr(&smask, 0);
-	if ((error = ldi_putmsg(lh, mp)) != 0) {
-		sigunintr(&smask);
-		return (error);
-	}
-	if ((error = ldi_getmsg(lh, &mp, (timestruc_t *)NULL)) != 0) {
-		sigunintr(&smask);
-		return (error);
-	}
-	sigunintr(&smask);
-
-	dl_prim = (union DL_primitives *)(uintptr_t)mp->b_rptr;
-	switch (dl_prim->dl_primitive) {
-	case DL_INFO_ACK:
-		if (((uintptr_t)mp->b_wptr - (uintptr_t)mp->b_rptr) <
-		    sizeof (dl_info_ack_t)) {
-			error = -1;
-		} else {
-			*info = *(dl_info_ack_t *)(uintptr_t)mp->b_rptr;
-			error = 0;
-		}
-		break;
-	default:
-		error = -1;
-		break;
-	}
-
-	freemsg(mp);
-	return (error);
-}
-
-
 /*
  * Return 0 if the interface is IB.
  * Return error (>0) if any error is encountered during processing.
@@ -153,6 +102,7 @@ rds_is_ib_interface(char *name)
 	dl_info_ack_t	info;
 	int		ret = 0;
 	int		i;
+	k_sigset_t	smask;
 
 	/*
 	 * ibd devices are only style 2 devices
@@ -186,7 +136,9 @@ rds_is_ib_interface(char *name)
 		return (ret);
 	}
 
-	ret = rds_dl_info(lh, &info);
+	sigintr(&smask, 0);
+	ret = dl_info(lh, &info, NULL, NULL, NULL);
+	sigunintr(&smask);
 	(void) ldi_close(lh, FREAD|FWRITE, kcred);
 	if (ret != 0) {
 		return (ret);

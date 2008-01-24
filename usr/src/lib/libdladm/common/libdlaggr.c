@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,10 +34,13 @@
 #include <stropts.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <assert.h>
 #include <strings.h>
 #include <libintl.h>
 #include <net/if_types.h>
 #include <net/if_dl.h>
+#include <libdllink.h>
+#include <libdlvlan.h>
 #include <libdlaggr.h>
 #include <libdladm_impl.h>
 
@@ -46,78 +49,39 @@
  *
  * This library is used by administration tools such as dladm(1M) to
  * configure link aggregations.
- *
- * Link aggregation configuration information is saved in a text
- * file of the following format:
- *
- * <db-file>	::= <groups>*
- * <group>	::= <key> <sep> <policy> <sep> <nports> <sep> <ports> <sep>
- *		      <mac> <sep> <lacp-mode> <sep> <lacp-timer>
- * <sep>	::= ' ' | '\t'
- * <key>	::= <number>
- * <nports>	::= <number>
- * <ports>	::= <port> <m-port>*
- * <m-port>	::= ',' <port>
- * <port>	::= <devname>
- * <devname>	::= <string>
- * <port-num>	::= <number>
- * <policy>	::= <pol-level> <m-pol>*
- * <m-pol>	::= ',' <pol-level>
- * <pol-level>	::= 'L2' | 'L3' | 'L4'
- * <mac>	::= 'auto' | <mac-addr>
- * <mac-addr>	::= <hex> ':' <hex> ':' <hex> ':' <hex> ':' <hex> ':' <hex>
- * <lacp-mode>	::= 'off' | 'active' | 'passive'
- * <lacp-timer>	::= 'short' | 'long'
  */
 
-#define	DLADM_AGGR_DEV		"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
-#define	DLADM_AGGR_DB		"/etc/dladm/aggregation.conf"
-#define	DLADM_AGGR_DB_TMP	"/etc/dladm/aggregation.conf.new"
-#define	DLADM_AGGR_DB_LOCK	"/tmp/aggregation.conf.lock"
-
-#define	DLADM_AGGR_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
-#define	DLADM_AGGR_DB_OWNER	15	/* "dladm" UID */
-#define	DLADM_AGGR_DB_GROUP	3	/* "sys" GID */
-
-/*
- * The largest configurable aggregation key.  Because by default the key is
- * used as the DLPI device PPA and default VLAN PPA's are calculated as
- * ((1000 * vid) + PPA), the largest key can't be > 999.
- */
-#define	DLADM_AGGR_MAX_KEY	999
-
-#define	BLANK_LINE(s)	((s[0] == '\0') || (s[0] == '#') || (s[0] == '\n'))
+#define	DLADM_AGGR_DEV	"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
 
 /* Limits on buffer size for LAIOC_INFO request */
 #define	MIN_INFO_SIZE (4*1024)
 #define	MAX_INFO_SIZE (128*1024)
 
-#define	MAXPATHLEN	1024
-
 static uchar_t	zero_mac[] = {0, 0, 0, 0, 0, 0};
+#define	VALID_PORT_MAC(mac)						\
+	(((mac) != NULL) && (bcmp(zero_mac, (mac), ETHERADDRL) != 0) &&	\
+	(!(mac)[0] & 0x01))
 
-/* configuration database entry */
-typedef struct dladm_aggr_grp_attr_db {
-	uint32_t	lt_key;
-	uint32_t	lt_policy;
-	uint32_t	lt_nports;
-	dladm_aggr_port_attr_db_t *lt_ports;
-	boolean_t	lt_mac_fixed;
-	uchar_t		lt_mac[ETHERADDRL];
-	aggr_lacp_mode_t lt_lacp_mode;
-	aggr_lacp_timer_t lt_lacp_timer;
-} dladm_aggr_grp_attr_db_t;
+#define	PORT_DELIMITER	'.'
 
-typedef struct dladm_aggr_up {
-	uint32_t	lu_key;
-	boolean_t	lu_found;
-	int		lu_fd;
-} dladm_aggr_up_t;
+#define	WRITE_PORT(portstr, portid, size) {			\
+	char pstr[LINKID_STR_WIDTH + 2];			\
+	(void) snprintf(pstr, LINKID_STR_WIDTH + 2, "%d%c",	\
+	    (portid), PORT_DELIMITER);				\
+	(void) strlcat((portstr), pstr, (size));		\
+}
 
-typedef struct dladm_aggr_down {
-	uint32_t	ld_key;
-	boolean_t	ld_found;
-} dladm_aggr_down_t;
+#define	READ_PORT(portstr, portid, status) {			\
+	errno = 0;						\
+	(status) = DLADM_STATUS_OK;				\
+	(portid) = (int)strtol((portstr), &(portstr), 10);	\
+	if (errno != 0 || *(portstr) != PORT_DELIMITER) {	\
+		(status) = DLADM_STATUS_REPOSITORYINVAL;	\
+	} else {						\
+		/* Skip the delimiter. */			\
+		(portstr)++;					\
+	}							\
+}
 
 typedef struct dladm_aggr_modify_attr {
 	uint32_t	ld_policy;
@@ -175,106 +139,93 @@ static dladm_aggr_port_state_t port_states[] = {
 #define	NPORT_STATES	\
 	(sizeof (port_states) / sizeof (dladm_aggr_port_state_t))
 
-typedef struct delete_db_state {
-	uint32_t	ds_key;
-	boolean_t	ds_found;
-} delete_db_state_t;
+static int
+i_dladm_aggr_strioctl(int cmd, void *ptr, int ilen)
+{
+	int err, fd;
 
-typedef struct modify_db_state {
-	uint32_t		us_key;
-	uint32_t		us_mask;
-	dladm_aggr_modify_attr_t *us_attr_new;
-	dladm_aggr_modify_attr_t *us_attr_old;
-	boolean_t		us_found;
-} modify_db_state_t;
+	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
+		return (-1);
 
-typedef struct add_db_state {
-	dladm_aggr_grp_attr_db_t *as_attr;
-	boolean_t	as_found;
-} add_db_state_t;
+	err = i_dladm_ioctl(fd, cmd, ptr, ilen);
+	(void) close(fd);
 
-static int i_dladm_aggr_fput_grp(FILE *, dladm_aggr_grp_attr_db_t *);
+	return (err);
+}
 
 /*
- * Open and lock the aggregation configuration file lock. The lock is
- * acquired as a reader (F_RDLCK) or writer (F_WRLCK).
+ * Caller must free attr.lg_ports. The ptr pointer is advanced while convert
+ * the laioc_info_t to the dladm_aggr_grp_attr_t structure.
  */
 static int
-i_dladm_aggr_lock_db(short type)
+i_dladm_aggr_iocp2grpattr(void **ptr, dladm_aggr_grp_attr_t *attrp)
 {
-	int lock_fd;
-	struct flock lock;
-	int errno_save;
+	laioc_info_group_t	*grp;
+	laioc_info_port_t	*port;
+	int			i;
+	void			*where = (*ptr);
 
-	if ((lock_fd = open(DLADM_AGGR_DB_LOCK, O_RDWR | O_CREAT | O_TRUNC,
-	    DLADM_AGGR_DB_PERMS)) < 0)
-		return (-1);
+	grp = (laioc_info_group_t *)where;
 
-	lock.l_type = type;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
+	attrp->lg_linkid = grp->lg_linkid;
+	attrp->lg_key = grp->lg_key;
+	attrp->lg_nports = grp->lg_nports;
+	attrp->lg_policy = grp->lg_policy;
+	attrp->lg_lacp_mode = grp->lg_lacp_mode;
+	attrp->lg_lacp_timer = grp->lg_lacp_timer;
+	attrp->lg_force = grp->lg_force;
 
-	if (fcntl(lock_fd, F_SETLKW, &lock) < 0) {
-		errno_save = errno;
-		(void) close(lock_fd);
-		(void) unlink(DLADM_AGGR_DB_LOCK);
-		errno = errno_save;
-		return (-1);
+	bcopy(grp->lg_mac, attrp->lg_mac, ETHERADDRL);
+	attrp->lg_mac_fixed = grp->lg_mac_fixed;
+
+	if ((attrp->lg_ports = malloc(grp->lg_nports *
+	    sizeof (dladm_aggr_port_attr_t))) == NULL) {
+		errno = ENOMEM;
+		goto fail;
 	}
-	return (lock_fd);
+
+	where = (grp + 1);
+
+	/*
+	 * Go through each port that is part of the group.
+	 */
+	for (i = 0; i < grp->lg_nports; i++) {
+		port = (laioc_info_port_t *)where;
+
+		attrp->lg_ports[i].lp_linkid = port->lp_linkid;
+		bcopy(port->lp_mac, attrp->lg_ports[i].lp_mac, ETHERADDRL);
+		attrp->lg_ports[i].lp_state = port->lp_state;
+		attrp->lg_ports[i].lp_lacp_state = port->lp_lacp_state;
+
+		where = (port + 1);
+	}
+	*ptr = where;
+	return (0);
+fail:
+	return (-1);
 }
 
 /*
- * Unlock and close the specified file.
+ * Get active configuration of a specific aggregation.
+ * Caller must free attrp->la_ports.
  */
-static void
-i_dladm_aggr_unlock_db(int fd)
-{
-	struct flock lock;
-
-	if (fd < 0)
-		return;
-
-	lock.l_type = F_UNLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 0;
-	lock.l_len = 0;
-
-	(void) fcntl(fd, F_SETLKW, &lock);
-	(void) close(fd);
-	(void) unlink(DLADM_AGGR_DB_LOCK);
-}
-
-/*
- * Walk through the groups defined on the system and for each group <grp>,
- * invoke <fn>(<arg>, <grp>);
- * Terminate the walk if at any time <fn> returns non-NULL value
- */
-int
-dladm_aggr_walk(int (*fn)(void *, dladm_aggr_grp_attr_t *), void *arg)
+static dladm_status_t
+i_dladm_aggr_info_active(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 {
 	laioc_info_t *ioc;
-	laioc_info_group_t *grp;
-	laioc_info_port_t *port;
-	dladm_aggr_grp_attr_t attr;
-	int rc, i, j, bufsize, fd;
-	char *where;
-
-	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) == -1)
-		return (-1);
+	int rc, bufsize;
+	void *where;
+	dladm_status_t status = DLADM_STATUS_OK;
 
 	bufsize = MIN_INFO_SIZE;
 	ioc = (laioc_info_t *)calloc(1, bufsize);
-	if (ioc == NULL) {
-		(void) close(fd);
-		errno = ENOMEM;
-		return (-1);
-	}
+	if (ioc == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	ioc->li_group_linkid = linkid;
 
 tryagain:
-	rc = i_dladm_ioctl(fd, LAIOC_INFO, ioc, bufsize);
-
+	rc = i_dladm_aggr_strioctl(LAIOC_INFO, ioc, bufsize);
 	if (rc != 0) {
 		if (errno == ENOSPC) {
 			/*
@@ -290,6 +241,7 @@ tryagain:
 				}
 			}
 		}
+		status = dladm_errno2status(errno);
 		goto bail;
 	}
 
@@ -297,257 +249,329 @@ tryagain:
 	 * Go through each group returned by the aggregation driver.
 	 */
 	where = (char *)(ioc + 1);
-	for (i = 0; i < ioc->li_ngroups; i++) {
-		/* LINTED E_BAD_PTR_CAST_ALIGN */
-		grp = (laioc_info_group_t *)where;
-
-		attr.lg_key = grp->lg_key;
-		attr.lg_nports = grp->lg_nports;
-		attr.lg_policy = grp->lg_policy;
-		attr.lg_lacp_mode = grp->lg_lacp_mode;
-		attr.lg_lacp_timer = grp->lg_lacp_timer;
-
-		bcopy(grp->lg_mac, attr.lg_mac, ETHERADDRL);
-		attr.lg_mac_fixed = grp->lg_mac_fixed;
-
-		attr.lg_ports = malloc(grp->lg_nports *
-		    sizeof (dladm_aggr_port_attr_t));
-		if (attr.lg_ports == NULL) {
-			errno = ENOMEM;
-			goto bail;
-		}
-
-		where = (char *)(grp + 1);
-
-		/*
-		 * Go through each port that is part of the group.
-		 */
-		for (j = 0; j < grp->lg_nports; j++) {
-			/* LINTED E_BAD_PTR_CAST_ALIGN */
-			port = (laioc_info_port_t *)where;
-
-			bcopy(port->lp_devname, attr.lg_ports[j].lp_devname,
-			    MAXNAMELEN + 1);
-			bcopy(port->lp_mac, attr.lg_ports[j].lp_mac,
-			    ETHERADDRL);
-			attr.lg_ports[j].lp_state = port->lp_state;
-			attr.lg_ports[j].lp_lacp_state = port->lp_lacp_state;
-
-			where = (char *)(port + 1);
-		}
-
-		rc = fn(arg, &attr);
-		free(attr.lg_ports);
-		if (rc != 0)
-			goto bail;
+	if (i_dladm_aggr_iocp2grpattr(&where, attrp) != 0) {
+		status = dladm_errno2status(errno);
+		goto bail;
 	}
 
 bail:
 	free(ioc);
-	(void) close(fd);
-	return (rc);
-}
-
-/*
- * Parse one line of the link aggregation DB, and return the corresponding
- * group. Memory for the ports associated with the aggregation may be
- * allocated. It is the responsibility of the caller to free the lt_ports
- * aggregation group attribute.
- *
- * Returns -1 on parsing failure, or 0 on success.
- */
-static int
-i_dladm_aggr_parse_db(char *line, dladm_aggr_grp_attr_db_t *attr)
-{
-	char	*token;
-	int	i;
-	int	value;
-	char	*endp = NULL;
-	char	*lasts = NULL;
-
-	bzero(attr, sizeof (*attr));
-
-	/* key */
-	if ((token = strtok_r(line, " \t", &lasts)) == NULL)
-		goto failed;
-
-	errno = 0;
-	value = (int)strtol(token, &endp, 10);
-	if (errno != 0 || *endp != '\0')
-		goto failed;
-
-	attr->lt_key = value;
-
-	/* policy */
-	if ((token = strtok_r(NULL, " \t", &lasts)) == NULL ||
-	    !dladm_aggr_str2policy(token, &attr->lt_policy))
-		goto failed;
-
-	/* number of ports */
-	if ((token = strtok_r(NULL, " \t", &lasts)) == NULL)
-		return (-1);
-
-	errno = 0;
-	value = (int)strtol(token, &endp, 10);
-	if (errno != 0 || *endp != '\0')
-		goto failed;
-
-	attr->lt_nports = value;
-
-	/* ports */
-	if ((attr->lt_ports = malloc(attr->lt_nports *
-	    sizeof (dladm_aggr_port_attr_db_t))) == NULL)
-		goto failed;
-
-	for (i = 0; i < attr->lt_nports; i++) {
-		char *where, *devname;
-
-		/* port */
-		if ((token = strtok_r(NULL, ", \t\n", &lasts)) == NULL)
-			goto failed;
-
-		/*
-		 * device name: In a previous version of this file, a port
-		 * number could be specified using <devname>/<portnum>.
-		 * This syntax is unecessary and obsolete.
-		 */
-		if ((devname = strtok_r(token, "/", &where)) == NULL)
-			goto failed;
-		if (strlcpy(attr->lt_ports[i].lp_devname, devname,
-		    MAXNAMELEN) >= MAXNAMELEN)
-			goto failed;
-	}
-
-	/* unicast MAC address */
-	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !dladm_aggr_str2macaddr(token, &attr->lt_mac_fixed,
-	    attr->lt_mac))
-		goto failed;
-
-	/* LACP mode */
-	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !dladm_aggr_str2lacpmode(token, &attr->lt_lacp_mode))
-		attr->lt_lacp_mode = AGGR_LACP_OFF;
-
-	/* LACP timer */
-	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !dladm_aggr_str2lacptimer(token, &attr->lt_lacp_timer))
-		attr->lt_lacp_timer = AGGR_LACP_TIMER_SHORT;
-
-	return (0);
-
-failed:
-	free(attr->lt_ports);
-	attr->lt_ports = NULL;
-	return (-1);
-}
-
-/*
- * Walk through the groups defined in the DB and for each group <grp>,
- * invoke <fn>(<arg>, <grp>);
- */
-static dladm_status_t
-i_dladm_aggr_walk_db(dladm_status_t (*fn)(void *, dladm_aggr_grp_attr_db_t *),
-    void *arg, const char *root)
-{
-	FILE *fp;
-	char line[MAXLINELEN];
-	dladm_aggr_grp_attr_db_t attr;
-	char *db_file;
-	char db_file_buf[MAXPATHLEN];
-	int lock_fd;
-	dladm_status_t status = DLADM_STATUS_OK;
-
-	if (root == NULL) {
-		db_file = DLADM_AGGR_DB;
-	} else {
-		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    DLADM_AGGR_DB);
-		db_file = db_file_buf;
-	}
-
-	lock_fd = i_dladm_aggr_lock_db(F_RDLCK);
-
-	if ((fp = fopen(db_file, "r")) == NULL) {
-		status = dladm_errno2status(errno);
-		i_dladm_aggr_unlock_db(lock_fd);
-		return (status);
-	}
-
-	bzero(&attr, sizeof (attr));
-
-	while (fgets(line, MAXLINELEN, fp) != NULL) {
-		/* skip comments */
-		if (BLANK_LINE(line))
-			continue;
-
-		if (i_dladm_aggr_parse_db(line, &attr) != 0) {
-			status = DLADM_STATUS_REPOSITORYINVAL;
-			goto done;
-		}
-
-		if ((status = fn(arg, &attr)) != DLADM_STATUS_OK)
-			goto done;
-
-		free(attr.lt_ports);
-		attr.lt_ports = NULL;
-	}
-
-done:
-	free(attr.lt_ports);
-	(void) fclose(fp);
-	i_dladm_aggr_unlock_db(lock_fd);
 	return (status);
 }
 
 /*
- * Send an add or remove command to the link aggregation driver.
+ * Get configuration information of a specific aggregation.
+ * Caller must free attrp->la_ports.
  */
 static dladm_status_t
-i_dladm_aggr_add_rem_sys(dladm_aggr_grp_attr_db_t *attr, int cmd)
+i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 {
-	int i, rc, fd, len;
-	laioc_add_rem_t *iocp;
-	laioc_port_t *ports;
-	dladm_status_t status = DLADM_STATUS_OK;
+	dladm_conf_t	conf;
+	uint32_t	nports, i;
+	char		*portstr, *next;
+	dladm_status_t	status;
+	uint64_t	u64;
+	int		size;
+	char		macstr[ETHERADDRL * 3];
 
-	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
-	iocp = malloc(len);
-	if (iocp == NULL) {
-		status = DLADM_STATUS_NOMEM;
+	attrp->lg_linkid = linkid;
+	if ((status = dladm_read_conf(linkid, &conf)) != DLADM_STATUS_OK)
+		return (status);
+
+	status = dladm_get_conf_field(conf, FKEY, &u64, sizeof (u64));
+	if (status != DLADM_STATUS_OK)
 		goto done;
-	}
+	attrp->lg_key = (uint16_t)u64;
 
-	iocp->la_key = attr->lt_key;
-	iocp->la_nports = attr->lt_nports;
-	ports = (laioc_port_t *)(iocp + 1);
+	status = dladm_get_conf_field(conf, FPOLICY, &u64, sizeof (u64));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	attrp->lg_policy = (uint32_t)u64;
 
-	for (i = 0; i < attr->lt_nports; i++) {
-		if (strlcpy(ports[i].lp_devname,
-		    attr->lt_ports[i].lp_devname,
-		    MAXNAMELEN) >= MAXNAMELEN) {
-			status = DLADM_STATUS_BADARG;
+	status = dladm_get_conf_field(conf, FFIXMACADDR, &attrp->lg_mac_fixed,
+	    sizeof (boolean_t));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	if (attrp->lg_mac_fixed) {
+		boolean_t fixed;
+
+		if ((status = dladm_get_conf_field(conf, FMACADDR, macstr,
+		    sizeof (macstr))) != DLADM_STATUS_OK) {
+			goto done;
+		}
+		if (!dladm_aggr_str2macaddr(macstr, &fixed, attrp->lg_mac)) {
+			status = DLADM_STATUS_REPOSITORYINVAL;
 			goto done;
 		}
 	}
 
-	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0) {
-		status = dladm_errno2status(errno);
+	status = dladm_get_conf_field(conf, FFORCE, &attrp->lg_force,
+	    sizeof (boolean_t));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	status = dladm_get_conf_field(conf, FLACPMODE, &u64, sizeof (u64));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	attrp->lg_lacp_mode = (aggr_lacp_mode_t)u64;
+
+	status = dladm_get_conf_field(conf, FLACPTIMER, &u64, sizeof (u64));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	attrp->lg_lacp_timer = (aggr_lacp_timer_t)u64;
+
+	status = dladm_get_conf_field(conf, FNPORTS, &u64, sizeof (u64));
+	if (status != DLADM_STATUS_OK)
+		goto done;
+	nports = (uint32_t)u64;
+	attrp->lg_nports = nports;
+
+	size = nports * (LINKID_STR_WIDTH + 1) + 1;
+	if ((portstr = calloc(1, size)) == NULL) {
+		status = DLADM_STATUS_NOMEM;
 		goto done;
 	}
 
-	rc = i_dladm_ioctl(fd, cmd, iocp, len);
-	if (rc < 0) {
-		if (errno == EINVAL)
-			status = DLADM_STATUS_LINKINVAL;
-		else
-			status = dladm_errno2status(errno);
+	status = dladm_get_conf_field(conf, FPORTS, portstr, size);
+	if (status != DLADM_STATUS_OK) {
+		free(portstr);
+		goto done;
 	}
 
-	(void) close(fd);
+	if ((attrp->lg_ports = malloc(nports *
+	    sizeof (dladm_aggr_port_attr_t))) == NULL) {
+		free(portstr);
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
+
+	for (next = portstr, i = 0; i < nports; i++) {
+		READ_PORT(next, attrp->lg_ports[i].lp_linkid, status);
+		if (status != DLADM_STATUS_OK) {
+			free(portstr);
+			free(attrp->lg_ports);
+			goto done;
+		}
+	}
+	free(portstr);
+
+done:
+	dladm_destroy_conf(conf);
+	return (status);
+}
+
+dladm_status_t
+dladm_aggr_info(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp,
+    uint32_t flags)
+{
+	assert(flags == DLADM_OPT_ACTIVE || flags == DLADM_OPT_PERSIST);
+	if (flags == DLADM_OPT_ACTIVE)
+		return (i_dladm_aggr_info_active(linkid, attrp));
+	else
+		return (i_dladm_aggr_info_persist(linkid, attrp));
+}
+
+/*
+ * Add or remove one or more ports to/from an existing link aggregation.
+ */
+static dladm_status_t
+i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t flags, int cmd)
+{
+	char *orig_portstr = NULL, *portstr = NULL;
+	laioc_add_rem_t *iocp;
+	laioc_port_t *ioc_ports;
+	uint32_t orig_nports, result_nports, len, i, j;
+	dladm_conf_t conf;
+	datalink_class_t class;
+	dladm_status_t status = DLADM_STATUS_OK;
+	int size;
+	uint64_t u64;
+	uint32_t media;
+
+	if (nports == 0)
+		return (DLADM_STATUS_BADARG);
+
+	/*
+	 * Sanity check - aggregations can only be created over Ethernet
+	 * physical links.
+	 */
+	for (i = 0; i < nports; i++) {
+		if ((dladm_datalink_id2info(ports[i].lp_linkid, NULL,
+		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
+		    (class != DATALINK_CLASS_PHYS) || (media != DL_ETHER)) {
+			return (DLADM_STATUS_BADARG);
+		}
+	}
+
+	/*
+	 * First, update the persistent configuration if requested.  We only
+	 * need to update the FPORTS and FNPORTS fields of this aggregation.
+	 * Note that FPORTS is a list of port linkids separated by
+	 * PORT_DELIMITER ('.').
+	 */
+	if (flags & DLADM_OPT_PERSIST) {
+		status = dladm_read_conf(linkid, &conf);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
+		/*
+		 * Get the original configuration of FNPORTS and FPORTS.
+		 */
+		status = dladm_get_conf_field(conf, FNPORTS, &u64,
+		    sizeof (u64));
+		if (status != DLADM_STATUS_OK)
+			goto destroyconf;
+		orig_nports = (uint32_t)u64;
+
+		/*
+		 * At least one port needs to be in the aggregation.
+		 */
+		if ((cmd == LAIOC_REMOVE) && (orig_nports <= nports)) {
+			status = DLADM_STATUS_BADARG;
+			goto destroyconf;
+		}
+
+		size = orig_nports * (LINKID_STR_WIDTH + 1) + 1;
+		if ((orig_portstr = calloc(1, size)) == NULL) {
+			status = dladm_errno2status(errno);
+			goto destroyconf;
+		}
+
+		status = dladm_get_conf_field(conf, FPORTS, orig_portstr, size);
+		if (status != DLADM_STATUS_OK)
+			goto destroyconf;
+
+		result_nports = (cmd == LAIOC_ADD) ? orig_nports + nports :
+		    orig_nports;
+
+		size = result_nports * (LINKID_STR_WIDTH + 1) + 1;
+		if ((portstr = calloc(1, size)) == NULL) {
+			status = dladm_errno2status(errno);
+			goto destroyconf;
+		}
+
+		/*
+		 * get the new configuration and set to result_nports and
+		 * portstr.
+		 */
+		if (cmd == LAIOC_ADD) {
+			(void) strlcpy(portstr, orig_portstr, size);
+			for (i = 0; i < nports; i++)
+				WRITE_PORT(portstr, ports[i].lp_linkid, size);
+		} else {
+			char *next;
+			datalink_id_t portid;
+			uint32_t remove = 0;
+
+			for (next = orig_portstr, j = 0; j < orig_nports; j++) {
+				/*
+				 * Read the portids from the old configuration
+				 * one by one.
+				 */
+				READ_PORT(next, portid, status);
+				if (status != DLADM_STATUS_OK) {
+					free(portstr);
+					goto destroyconf;
+				}
+
+				/*
+				 * See whether this port is in the removal
+				 * list.  If not, copy to the new config.
+				 */
+				for (i = 0; i < nports; i++) {
+					if (ports[i].lp_linkid == portid)
+						break;
+				}
+				if (i == nports) {
+					WRITE_PORT(portstr, portid, size);
+				} else {
+					remove++;
+				}
+			}
+			if (remove != nports) {
+				status = DLADM_STATUS_LINKINVAL;
+				free(portstr);
+				goto destroyconf;
+			}
+			result_nports -= nports;
+		}
+
+		u64 = result_nports;
+		if ((status = dladm_set_conf_field(conf, FNPORTS,
+		    DLADM_TYPE_UINT64, &u64)) != DLADM_STATUS_OK) {
+			free(portstr);
+			goto destroyconf;
+		}
+
+		status = dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR,
+		    portstr);
+		free(portstr);
+		if (status != DLADM_STATUS_OK)
+			goto destroyconf;
+
+		/*
+		 * Write the new configuration to the persistent repository.
+		 */
+		status = dladm_write_conf(conf);
+
+destroyconf:
+		dladm_destroy_conf(conf);
+		if (status != DLADM_STATUS_OK) {
+			free(orig_portstr);
+			return (status);
+		}
+	}
+
+	/*
+	 * If the caller only requested to update the persistent
+	 * configuration, we are done.
+	 */
+	if (!(flags & DLADM_OPT_ACTIVE))
+		goto done;
+
+	/*
+	 * Update the active configuration.
+	 */
+	len = sizeof (*iocp) + nports * sizeof (laioc_port_t);
+	if ((iocp = malloc(len)) == NULL) {
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
+
+	iocp->la_linkid = linkid;
+	iocp->la_nports = nports;
+	if (cmd == LAIOC_ADD)
+		iocp->la_force = (flags & DLADM_OPT_FORCE);
+
+	ioc_ports = (laioc_port_t *)(iocp + 1);
+	for (i = 0; i < nports; i++)
+		ioc_ports[i].lp_linkid = ports[i].lp_linkid;
+
+	if (i_dladm_aggr_strioctl(cmd, iocp, len) < 0)
+		status = dladm_errno2status(errno);
 
 done:
 	free(iocp);
+
+	/*
+	 * If the active configuration update fails, restore the old
+	 * persistent configuration if we've changed that.
+	 */
+	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
+		if (dladm_read_conf(linkid, &conf) == DLADM_STATUS_OK) {
+			u64 = orig_nports;
+			if ((dladm_set_conf_field(conf, FNPORTS,
+			    DLADM_TYPE_UINT64, &u64) == DLADM_STATUS_OK) &&
+			    (dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR,
+			    orig_portstr) == DLADM_STATUS_OK)) {
+				(void) dladm_write_conf(conf);
+			}
+			(void) dladm_destroy_conf(conf);
+		}
+	}
+	free(orig_portstr);
 	return (status);
 }
 
@@ -555,14 +579,12 @@ done:
  * Send a modify command to the link aggregation driver.
  */
 static dladm_status_t
-i_dladm_aggr_modify_sys(uint32_t key, uint32_t mask,
+i_dladm_aggr_modify_sys(datalink_id_t linkid, uint32_t mask,
     dladm_aggr_modify_attr_t *attr)
 {
-	int rc, fd;
 	laioc_modify_t ioc;
-	dladm_status_t status = DLADM_STATUS_OK;
 
-	ioc.lu_key = key;
+	ioc.lu_linkid = linkid;
 
 	ioc.lu_modify_mask = 0;
 	if (mask & DLADM_AGGR_MODIFY_POLICY)
@@ -580,68 +602,60 @@ i_dladm_aggr_modify_sys(uint32_t key, uint32_t mask,
 	ioc.lu_lacp_mode = attr->ld_lacp_mode;
 	ioc.lu_lacp_timer = attr->ld_lacp_timer;
 
-	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
-	rc = i_dladm_ioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
-	if (rc < 0) {
+	if (i_dladm_aggr_strioctl(LAIOC_MODIFY, &ioc, sizeof (ioc)) < 0) {
 		if (errno == EINVAL)
-			status = DLADM_STATUS_MACADDRINVAL;
+			return (DLADM_STATUS_MACADDRINVAL);
 		else
-			status = dladm_errno2status(errno);
+			return (dladm_errno2status(errno));
+	} else {
+		return (DLADM_STATUS_OK);
 	}
-
-	(void) close(fd);
-	return (status);
 }
 
 /*
  * Send a create command to the link aggregation driver.
  */
 static dladm_status_t
-i_dladm_aggr_create_sys(int fd, dladm_aggr_grp_attr_db_t *attr)
+i_dladm_aggr_create_sys(datalink_id_t linkid, uint16_t key, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t policy,
+    boolean_t mac_addr_fixed, const uchar_t *mac_addr,
+    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
 	int i, rc, len;
-	laioc_create_t *iocp;
-	laioc_port_t *ports;
+	laioc_create_t *iocp = NULL;
+	laioc_port_t *ioc_ports;
 	dladm_status_t status = DLADM_STATUS_OK;
 
-	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
+	len = sizeof (*iocp) + nports * sizeof (laioc_port_t);
 	iocp = malloc(len);
 	if (iocp == NULL)
 		return (DLADM_STATUS_NOMEM);
 
-	iocp->lc_key = attr->lt_key;
-	iocp->lc_nports = attr->lt_nports;
-	iocp->lc_policy = attr->lt_policy;
-	iocp->lc_lacp_mode = attr->lt_lacp_mode;
-	iocp->lc_lacp_timer = attr->lt_lacp_timer;
+	iocp->lc_key = key;
+	iocp->lc_linkid = linkid;
+	iocp->lc_nports = nports;
+	iocp->lc_policy = policy;
+	iocp->lc_lacp_mode = lacp_mode;
+	iocp->lc_lacp_timer = lacp_timer;
+	ioc_ports = (laioc_port_t *)(iocp + 1);
+	iocp->lc_force = force;
 
-	ports = (laioc_port_t *)(iocp + 1);
+	for (i = 0; i < nports; i++)
+		ioc_ports[i].lp_linkid = ports[i].lp_linkid;
 
-	for (i = 0; i < attr->lt_nports; i++) {
-		if (strlcpy(ports[i].lp_devname,
-		    attr->lt_ports[i].lp_devname,
-		    MAXNAMELEN) >= MAXNAMELEN) {
-			free(iocp);
-			return (DLADM_STATUS_BADARG);
-		}
+	if (mac_addr_fixed && !VALID_PORT_MAC(mac_addr)) {
+		status = DLADM_STATUS_MACADDRINVAL;
+		goto done;
 	}
 
-	if (attr->lt_mac_fixed &&
-	    ((bcmp(zero_mac, attr->lt_mac, ETHERADDRL) == 0) ||
-	    (attr->lt_mac[0] & 0x01))) {
-		free(iocp);
-		return (DLADM_STATUS_MACADDRINVAL);
-	}
+	bcopy(mac_addr, iocp->lc_mac, ETHERADDRL);
+	iocp->lc_mac_fixed = mac_addr_fixed;
 
-	bcopy(attr->lt_mac, iocp->lc_mac, ETHERADDRL);
-	iocp->lc_mac_fixed = attr->lt_mac_fixed;
-
-	rc = i_dladm_ioctl(fd, LAIOC_CREATE, iocp, len);
+	rc = i_dladm_aggr_strioctl(LAIOC_CREATE, iocp, len);
 	if (rc < 0)
-		status = DLADM_STATUS_LINKINVAL;
+		status = dladm_errno2status(errno);
 
+done:
 	free(iocp);
 	return (status);
 }
@@ -649,518 +663,109 @@ i_dladm_aggr_create_sys(int fd, dladm_aggr_grp_attr_db_t *attr)
 /*
  * Invoked to bring up a link aggregation group.
  */
-static dladm_status_t
-i_dladm_aggr_up(void *arg, dladm_aggr_grp_attr_db_t *attr)
-{
-	dladm_aggr_up_t	*up = (dladm_aggr_up_t *)arg;
-	dladm_status_t	status;
-
-	if (up->lu_key != 0 && up->lu_key != attr->lt_key)
-		return (DLADM_STATUS_OK);
-
-	up->lu_found = B_TRUE;
-
-	status = i_dladm_aggr_create_sys(up->lu_fd, attr);
-	if (status != DLADM_STATUS_OK && up->lu_key != 0)
-		return (status);
-
-	return (DLADM_STATUS_OK);
-}
-
-/*
- * Bring up a link aggregation group or all of them if the key is zero.
- * If key is 0, walk may terminate early if any of the links fail
- */
-dladm_status_t
-dladm_aggr_up(uint32_t key, const char *root)
-{
-	dladm_aggr_up_t up;
-	dladm_status_t status;
-
-	if ((up.lu_fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
-	up.lu_key = key;
-	up.lu_found = B_FALSE;
-
-	status = i_dladm_aggr_walk_db(i_dladm_aggr_up, &up, root);
-	if (status != DLADM_STATUS_OK) {
-		(void) close(up.lu_fd);
-		return (status);
-	}
-	(void) close(up.lu_fd);
-
-	/*
-	 * only return error if user specified key and key was
-	 * not found
-	 */
-	if (!up.lu_found && key != 0)
-		return (DLADM_STATUS_NOTFOUND);
-
-	return (DLADM_STATUS_OK);
-}
-/*
- * Send a delete command to the link aggregation driver.
- */
 static int
-i_dladm_aggr_delete_sys(int fd, dladm_aggr_grp_attr_t *attr)
+i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 {
-	laioc_delete_t ioc;
-
-	ioc.ld_key = attr->lg_key;
-
-	return (i_dladm_ioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
-}
-
-/*
- * Invoked to bring down a link aggregation group.
- */
-static int
-i_dladm_aggr_down(void *arg, dladm_aggr_grp_attr_t *attr)
-{
-	dladm_aggr_down_t *down = (dladm_aggr_down_t *)arg;
-	int fd, errno_save;
-
-	if (down->ld_key != 0 && down->ld_key != attr->lg_key)
-		return (0);
-
-	down->ld_found = B_TRUE;
-
-	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	if (i_dladm_aggr_delete_sys(fd, attr) < 0 && down->ld_key != 0) {
-		errno_save = errno;
-		(void) close(fd);
-		errno = errno_save;
-		return (-1);
-	}
-
-	(void) close(fd);
-	return (0);
-}
-
-/*
- * Bring down a link aggregation group or all of them if the key is zero.
- * If key is 0, walk may terminate early if any of the links fail
- */
-dladm_status_t
-dladm_aggr_down(uint32_t key)
-{
-	dladm_aggr_down_t down;
-
-	down.ld_key = key;
-	down.ld_found = B_FALSE;
-
-	if (dladm_aggr_walk(i_dladm_aggr_down, &down) < 0)
-		return (dladm_errno2status(errno));
-
-	/*
-	 * only return error if user specified key and key was
-	 * not found
-	 */
-	if (!down.ld_found && key != 0)
-		return (DLADM_STATUS_NOTFOUND);
-
-	return (DLADM_STATUS_OK);
-}
-
-/*
- * For each group <grp> found in the DB, invokes <fn>(<grp>, <arg>).
- *
- * The following values can be returned by <fn>():
- *
- * -1: an error occured. This will cause the walk to be terminated,
- *     and the original DB file to be preserved.
- *
- *  0: success and write. The walker will write the contents of
- *     the attribute passed as argument to <fn>(), and continue walking
- *     the entries found in the DB.
- *
- *  1: skip. The walker should not write the contents of the current
- *     group attributes to the new DB, but should continue walking
- *     the entries found in the DB.
- */
-static dladm_status_t
-i_dladm_aggr_walk_rw_db(int (*fn)(void *, dladm_aggr_grp_attr_db_t *),
-    void *arg, const char *root)
-{
-	FILE *fp, *nfp;
-	int nfd, fn_rc, lock_fd;
-	char line[MAXLINELEN];
-	dladm_aggr_grp_attr_db_t attr;
-	char *db_file, *tmp_db_file;
-	char db_file_buf[MAXPATHLEN];
-	char tmp_db_file_buf[MAXPATHLEN];
-	dladm_status_t status;
-
-	if (root == NULL) {
-		db_file = DLADM_AGGR_DB;
-		tmp_db_file = DLADM_AGGR_DB_TMP;
-	} else {
-		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    DLADM_AGGR_DB);
-		(void) snprintf(tmp_db_file_buf, MAXPATHLEN, "%s%s", root,
-		    DLADM_AGGR_DB_TMP);
-		db_file = db_file_buf;
-		tmp_db_file = tmp_db_file_buf;
-	}
-
-	if ((lock_fd = i_dladm_aggr_lock_db(F_WRLCK)) < 0)
-		return (dladm_errno2status(errno));
-
-	if ((fp = fopen(db_file, "r")) == NULL) {
-		status = dladm_errno2status(errno);
-		i_dladm_aggr_unlock_db(lock_fd);
-		return (status);
-	}
-
-	if ((nfd = open(tmp_db_file, O_WRONLY|O_CREAT|O_TRUNC,
-	    DLADM_AGGR_DB_PERMS)) == -1) {
-		status = dladm_errno2status(errno);
-		(void) fclose(fp);
-		i_dladm_aggr_unlock_db(lock_fd);
-		return (status);
-	}
-
-	if ((nfp = fdopen(nfd, "w")) == NULL) {
-		status = dladm_errno2status(errno);
-		(void) close(nfd);
-		(void) fclose(fp);
-		(void) unlink(tmp_db_file);
-		i_dladm_aggr_unlock_db(lock_fd);
-		return (status);
-	}
-
-	attr.lt_ports = NULL;
-
-	while (fgets(line, MAXLINELEN, fp) != NULL) {
-
-		/* skip comments */
-		if (BLANK_LINE(line)) {
-			if (fputs(line, nfp) == EOF) {
-				status = dladm_errno2status(errno);
-				goto failed;
-			}
-			continue;
-		}
-
-		if (i_dladm_aggr_parse_db(line, &attr) != 0) {
-			status = DLADM_STATUS_REPOSITORYINVAL;
-			goto failed;
-		}
-
-		fn_rc = fn(arg, &attr);
-
-		switch (fn_rc) {
-		case -1:
-			/* failure, stop walking */
-			status = dladm_errno2status(errno);
-			goto failed;
-		case 0:
-			/*
-			 * Success, write group attributes, which could
-			 * have been modified by fn().
-			 */
-			if (i_dladm_aggr_fput_grp(nfp, &attr) != 0) {
-				status = dladm_errno2status(errno);
-				goto failed;
-			}
-			break;
-		case 1:
-			/* skip current group */
-			break;
-		}
-
-		free(attr.lt_ports);
-		attr.lt_ports = NULL;
-	}
-
-	if (getuid() == 0 || geteuid() == 0) {
-		if (fchmod(nfd, DLADM_AGGR_DB_PERMS) == -1) {
-			status = dladm_errno2status(errno);
-			goto failed;
-		}
-
-		if (fchown(nfd, DLADM_AGGR_DB_OWNER,
-		    DLADM_AGGR_DB_GROUP) == -1) {
-			status = dladm_errno2status(errno);
-			goto failed;
-		}
-	}
-
-	if (fflush(nfp) == EOF) {
-		status = dladm_errno2status(errno);
-		goto failed;
-	}
-
-	(void) fclose(fp);
-	(void) fclose(nfp);
-
-	if (rename(tmp_db_file, db_file) == -1) {
-		status = dladm_errno2status(errno);
-		(void) unlink(tmp_db_file);
-		i_dladm_aggr_unlock_db(lock_fd);
-		return (status);
-	}
-
-	i_dladm_aggr_unlock_db(lock_fd);
-	return (DLADM_STATUS_OK);
-
-failed:
-	free(attr.lt_ports);
-	(void) fclose(fp);
-	(void) fclose(nfp);
-	(void) unlink(tmp_db_file);
-	i_dladm_aggr_unlock_db(lock_fd);
-
-	return (status);
-}
-
-/*
- * Remove an entry from the DB.
- */
-static int
-i_dladm_aggr_del_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
-{
-	delete_db_state_t *state = arg;
-
-	if (grp->lt_key != state->ds_key)
-		return (0);
-
-	state->ds_found = B_TRUE;
-
-	/* don't save matching group */
-	return (1);
-}
-
-static dladm_status_t
-i_dladm_aggr_del_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
-{
-	delete_db_state_t state;
-	dladm_status_t status;
-
-	state.ds_key = attr->lt_key;
-	state.ds_found = B_FALSE;
-
-	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_del_db_fn, &state, root);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if (!state.ds_found)
-		return (DLADM_STATUS_NOTFOUND);
-
-	return (DLADM_STATUS_OK);
-}
-
-/*
- * Modify the properties of an existing group in the DB.
- */
-static int
-i_dladm_aggr_modify_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
-{
-	modify_db_state_t *state = arg;
-	dladm_aggr_modify_attr_t *new_attr = state->us_attr_new;
-	dladm_aggr_modify_attr_t *old_attr = state->us_attr_old;
-
-	if (grp->lt_key != state->us_key)
-		return (0);
-
-	state->us_found = B_TRUE;
-
-	if (state->us_mask & DLADM_AGGR_MODIFY_POLICY) {
-		if (old_attr != NULL)
-			old_attr->ld_policy = grp->lt_policy;
-		grp->lt_policy = new_attr->ld_policy;
-	}
-
-	if (state->us_mask & DLADM_AGGR_MODIFY_MAC) {
-		if (old_attr != NULL) {
-			old_attr->ld_mac_fixed = grp->lt_mac_fixed;
-			bcopy(grp->lt_mac, old_attr->ld_mac, ETHERADDRL);
-		}
-		grp->lt_mac_fixed = new_attr->ld_mac_fixed;
-		bcopy(new_attr->ld_mac, grp->lt_mac, ETHERADDRL);
-	}
-
-	if (state->us_mask & DLADM_AGGR_MODIFY_LACP_MODE) {
-		if (old_attr != NULL)
-			old_attr->ld_lacp_mode = grp->lt_lacp_mode;
-		grp->lt_lacp_mode = new_attr->ld_lacp_mode;
-	}
-
-	if (state->us_mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
-		if (old_attr != NULL)
-			old_attr->ld_lacp_timer = grp->lt_lacp_timer;
-		grp->lt_lacp_timer = new_attr->ld_lacp_timer;
-	}
-
-	/* save modified group */
-	return (0);
-}
-
-static dladm_status_t
-i_dladm_aggr_modify_db(uint32_t key, uint32_t mask,
-    dladm_aggr_modify_attr_t *new, dladm_aggr_modify_attr_t *old,
-    const char *root)
-{
-	modify_db_state_t state;
-	dladm_status_t status;
-
-	state.us_key = key;
-	state.us_mask = mask;
-	state.us_attr_new = new;
-	state.us_attr_old = old;
-	state.us_found = B_FALSE;
-
-	if ((status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_modify_db_fn,
-	    &state, root)) != DLADM_STATUS_OK) {
-		return (status);
-	}
-
-	if (!state.us_found)
-		return (DLADM_STATUS_NOTFOUND);
-
-	return (DLADM_STATUS_OK);
-}
-
-/*
- * Add ports to an existing group in the DB.
- */
-static int
-i_dladm_aggr_add_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
-{
-	add_db_state_t *state = arg;
-	dladm_aggr_grp_attr_db_t *attr = state->as_attr;
-	void *ports;
+	dladm_status_t *statusp = (dladm_status_t *)arg;
+	dladm_aggr_grp_attr_t attr;
+	dladm_aggr_port_attr_db_t *ports = NULL;
+	uint16_t key = 0;
 	int i, j;
-
-	if (grp->lt_key != attr->lt_key)
-		return (0);
-
-	state->as_found = B_TRUE;
-
-	/* are any of the ports to be added already members of the group? */
-	for (i = 0; i < grp->lt_nports; i++) {
-		for (j = 0; j < attr->lt_nports; j++) {
-			if (strcmp(grp->lt_ports[i].lp_devname,
-			    attr->lt_ports[j].lp_devname) == 0) {
-				errno = EEXIST;
-				return (-1);
-			}
-		}
-	}
-
-	/* add groups specified by attr to grp */
-	ports = realloc(grp->lt_ports, (grp->lt_nports +
-	    attr->lt_nports) * sizeof (dladm_aggr_port_attr_db_t));
-	if (ports == NULL)
-		return (-1);
-	grp->lt_ports = ports;
-
-	for (i = 0; i < attr->lt_nports; i++) {
-		if (strlcpy(grp->lt_ports[grp->lt_nports + i].lp_devname,
-		    attr->lt_ports[i].lp_devname, MAXNAMELEN + 1) >=
-		    MAXNAMELEN + 1)
-			return (-1);
-	}
-
-	grp->lt_nports += attr->lt_nports;
-
-	/* save modified group */
-	return (0);
-}
-
-static dladm_status_t
-i_dladm_aggr_add_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
-{
-	add_db_state_t state;
 	dladm_status_t status;
 
-	state.as_attr = attr;
-	state.as_found = B_FALSE;
+	status = dladm_aggr_info(linkid, &attr, DLADM_OPT_PERSIST);
+	if (status != DLADM_STATUS_OK) {
+		*statusp = status;
+		return (DLADM_WALK_CONTINUE);
+	}
 
-	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_add_db_fn, &state, root);
-	if (status != DLADM_STATUS_OK)
-		return (status);
+	if (attr.lg_key <= AGGR_MAX_KEY)
+		key = attr.lg_key;
 
-	if (!state.as_found)
-		return (DLADM_STATUS_NOTFOUND);
+	ports = malloc(attr.lg_nports * sizeof (dladm_aggr_port_attr_db_t));
+	if (ports == NULL) {
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
 
-	return (DLADM_STATUS_OK);
+	/*
+	 * Validate (and purge) each physical link associated with this
+	 * aggregation, if the specific hardware has been removed during
+	 * the system shutdown.
+	 */
+	for (i = 0, j = 0; i < attr.lg_nports; i++) {
+		datalink_id_t	portid = attr.lg_ports[i].lp_linkid;
+		uint32_t	flags;
+		dladm_status_t	s;
+
+		s = dladm_datalink_id2info(portid, &flags, NULL, NULL, NULL, 0);
+		if (s != DLADM_STATUS_OK || !(flags & DLADM_OPT_ACTIVE))
+			continue;
+
+		ports[j++].lp_linkid = portid;
+	}
+
+	if (j == 0) {
+		/*
+		 * All of the physical links are removed.
+		 */
+		status = DLADM_STATUS_BADARG;
+		goto done;
+	}
+
+	/*
+	 * Create active aggregation.
+	 */
+	if ((status = i_dladm_aggr_create_sys(linkid,
+	    key, j, ports, attr.lg_policy, attr.lg_mac_fixed,
+	    (const uchar_t *)attr.lg_mac, attr.lg_lacp_mode,
+	    attr.lg_lacp_timer, attr.lg_force)) != DLADM_STATUS_OK) {
+		goto done;
+	}
+
+	if ((status = dladm_up_datalink_id(linkid)) != DLADM_STATUS_OK) {
+		laioc_delete_t ioc;
+		ioc.ld_linkid = linkid;
+		(void) i_dladm_aggr_strioctl(LAIOC_DELETE, &ioc, sizeof (ioc));
+		goto done;
+	}
+
+	/*
+	 * Reset the active linkprop of this specific link.
+	 */
+	(void) dladm_init_linkprop(linkid);
+
+done:
+	free(attr.lg_ports);
+	free(ports);
+
+	*statusp = status;
+	return (DLADM_WALK_CONTINUE);
 }
 
 /*
- * Remove ports from an existing group in the DB.
+ * Bring up one aggregation, or all persistent aggregations.  In the latter
+ * case, the walk may terminate early if bringup of an aggregation fails.
  */
-
-typedef struct remove_db_state {
-	dladm_aggr_grp_attr_db_t *rs_attr;
-	boolean_t	rs_found;
-} remove_db_state_t;
-
-static int
-i_dladm_aggr_remove_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
+dladm_status_t
+dladm_aggr_up(datalink_id_t linkid)
 {
-	remove_db_state_t *state = (remove_db_state_t *)arg;
-	dladm_aggr_grp_attr_db_t *attr = state->rs_attr;
-	int i, j, k, nremoved;
-	boolean_t match;
-
-	if (grp->lt_key != attr->lt_key)
-		return (0);
-
-	state->rs_found = B_TRUE;
-
-	/* remove the ports specified by attr from the group */
-	nremoved = 0;
-	k = 0;
-	for (i = 0; i < grp->lt_nports; i++) {
-		match = B_FALSE;
-		for (j = 0; j < attr->lt_nports && !match; j++) {
-			match = (strcmp(grp->lt_ports[i].lp_devname,
-			    attr->lt_ports[j].lp_devname) == 0);
-		}
-		if (match)
-			nremoved++;
-		else
-			grp->lt_ports[k++] = grp->lt_ports[i];
-	}
-
-	if (nremoved != attr->lt_nports) {
-		errno = ENOENT;
-		return (-1);
-	}
-
-	grp->lt_nports -= nremoved;
-
-	/* save modified group */
-	return (0);
-}
-
-static dladm_status_t
-i_dladm_aggr_remove_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
-{
-	remove_db_state_t state;
 	dladm_status_t status;
 
-	state.rs_attr = attr;
-	state.rs_found = B_FALSE;
-
-	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_remove_db_fn,
-	    &state, root);
-	if (status != DLADM_STATUS_OK)
+	if (linkid == DATALINK_ALL_LINKID) {
+		(void) dladm_walk_datalink_id(i_dladm_aggr_up, &status,
+		    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE,
+		    DLADM_OPT_PERSIST);
+		return (DLADM_STATUS_OK);
+	} else {
+		(void) i_dladm_aggr_up(linkid, &status);
 		return (status);
-
-	if (!state.rs_found)
-		return (DLADM_STATUS_NOTFOUND);
-
-	return (DLADM_STATUS_OK);
+	}
 }
 
 /*
  * Given a policy string, return a policy mask. Returns B_TRUE on
- * success, or B_FALSE if an error occured during parsing.
+ * success, or B_FALSE if an error occurred during parsing.
  */
 boolean_t
 dladm_aggr_str2policy(const char *str, uint32_t *policy)
@@ -1199,6 +804,9 @@ dladm_aggr_policy2str(uint32_t policy, char *str)
 	int i, npolicies = 0;
 	policy_t *pol;
 
+	if (str == NULL)
+		return (NULL);
+
 	str[0] = '\0';
 
 	for (i = 0; i < NPOLICIES; i++) {
@@ -1206,8 +814,8 @@ dladm_aggr_policy2str(uint32_t policy, char *str)
 		if ((policy & pol->policy) != 0) {
 			npolicies++;
 			if (npolicies > 1)
-				(void) strcat(str, ",");
-			(void) strcat(str, pol->pol_name);
+				(void) strlcat(str, ",", DLADM_STRSIZE);
+			(void) strlcat(str, pol->pol_name, DLADM_STRSIZE);
 		}
 	}
 
@@ -1257,7 +865,7 @@ dladm_aggr_str2macaddr(const char *str, boolean_t *mac_fixed, uchar_t *mac_addr)
  * Returns a string containing a printable representation of a MAC address.
  */
 const char *
-dladm_aggr_macaddr2str(unsigned char *mac, char *buf)
+dladm_aggr_macaddr2str(const unsigned char *mac, char *buf)
 {
 	static char unknown_mac[] = {0, 0, 0, 0, 0, 0};
 
@@ -1265,9 +873,11 @@ dladm_aggr_macaddr2str(unsigned char *mac, char *buf)
 		return (NULL);
 
 	if (bcmp(unknown_mac, mac, ETHERADDRL) == 0)
-		return (gettext("<unknown>"));
+		(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
 	else
 		return (_link_ntoa(mac, buf, ETHERADDRL, IFT_OTHER));
+
+	return (buf);
 }
 
 /*
@@ -1301,6 +911,9 @@ dladm_aggr_lacpmode2str(aggr_lacp_mode_t mode_id, char *buf)
 {
 	int i;
 	dladm_aggr_lacpmode_t *mode;
+
+	if (buf == NULL)
+		return (NULL);
 
 	for (i = 0; i < NLACP_MODES; i++) {
 		mode = &lacp_modes[i];
@@ -1347,6 +960,9 @@ dladm_aggr_lacptimer2str(aggr_lacp_timer_t timer_id, char *buf)
 	int i;
 	dladm_aggr_lacptimer_t *timer;
 
+	if (buf == NULL)
+		return (NULL);
+
 	for (i = 0; i < NLACP_TIMERS; i++) {
 		timer = &lacp_timers[i];
 		if (timer->lt_id == timer_id) {
@@ -1364,7 +980,10 @@ const char *
 dladm_aggr_portstate2str(aggr_port_state_t state_id, char *buf)
 {
 	int			i;
-	dladm_aggr_port_state_t	*state;
+	dladm_aggr_port_state_t *state;
+
+	if (buf == NULL)
+		return (NULL);
 
 	for (i = 0; i < NPORT_STATES; i++) {
 		state = &port_states[i];
@@ -1379,123 +998,94 @@ dladm_aggr_portstate2str(aggr_port_state_t state_id, char *buf)
 	return (buf);
 }
 
-#define	FPRINTF_ERR(fcall) if ((fcall) < 0) return (-1);
-
-/*
- * Write the attribute of a group to the specified file. Returns 0 on
- * success, -1 on failure.
- */
-static int
-i_dladm_aggr_fput_grp(FILE *fp, dladm_aggr_grp_attr_db_t *attr)
-{
-	int i;
-	char addr_str[ETHERADDRL * 3];
-	char buf[DLADM_STRSIZE];
-
-	/* key, policy */
-	FPRINTF_ERR(fprintf(fp, "%d\t%s\t", attr->lt_key,
-	    dladm_aggr_policy2str(attr->lt_policy, buf)));
-
-	/* number of ports, ports */
-	FPRINTF_ERR(fprintf(fp, "%d\t", attr->lt_nports));
-	for (i = 0; i < attr->lt_nports; i++) {
-		if (i > 0)
-			FPRINTF_ERR(fprintf(fp, ","));
-		FPRINTF_ERR(fprintf(fp, "%s", attr->lt_ports[i].lp_devname));
-	}
-	FPRINTF_ERR(fprintf(fp, "\t"));
-
-	/* MAC address */
-	if (!attr->lt_mac_fixed) {
-		FPRINTF_ERR(fprintf(fp, "auto"));
-	} else {
-		FPRINTF_ERR(fprintf(fp, "%s",
-		    dladm_aggr_macaddr2str(attr->lt_mac, addr_str)));
-	}
-	FPRINTF_ERR(fprintf(fp, "\t"));
-
-	FPRINTF_ERR(fprintf(fp, "%s\t",
-	    dladm_aggr_lacpmode2str(attr->lt_lacp_mode, buf)));
-
-	FPRINTF_ERR(fprintf(fp, "%s\n",
-	    dladm_aggr_lacptimer2str(attr->lt_lacp_timer, buf)));
-
-	return (0);
-}
-
 static dladm_status_t
-i_dladm_aggr_create_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
+dladm_aggr_persist_aggr_conf(const char *link, datalink_id_t linkid,
+    uint16_t key, uint32_t nports, dladm_aggr_port_attr_db_t *ports,
+    uint32_t policy, boolean_t mac_addr_fixed, const uchar_t *mac_addr,
+    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer,
+    boolean_t force)
 {
-	FILE		*fp;
-	char		line[MAXLINELEN];
-	uint32_t	key;
-	int 		lock_fd;
-	char 		*db_file;
-	char 		db_file_buf[MAXPATHLEN];
-	char 		*endp = NULL;
-	dladm_status_t	status;
+	dladm_conf_t conf = DLADM_INVALID_CONF;
+	char *portstr = NULL;
+	char macstr[ETHERADDRL * 3];
+	dladm_status_t status;
+	int i, size;
+	uint64_t u64;
 
-	if (root == NULL) {
-		db_file = DLADM_AGGR_DB;
-	} else {
-		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    DLADM_AGGR_DB);
-		db_file = db_file_buf;
-	}
-
-	if ((lock_fd = i_dladm_aggr_lock_db(F_WRLCK)) < 0)
-		return (dladm_errno2status(errno));
-
-	if ((fp = fopen(db_file, "r+")) == NULL &&
-	    (fp = fopen(db_file, "w")) == NULL) {
-		status = dladm_errno2status(errno);
-		i_dladm_aggr_unlock_db(lock_fd);
+	if ((status = dladm_create_conf(link, linkid, DATALINK_CLASS_AGGR,
+	    DL_ETHER, &conf)) != DLADM_STATUS_OK) {
 		return (status);
 	}
 
-	/* look for existing group with same key */
-	while (fgets(line, MAXLINELEN, fp) != NULL) {
-		char *holder, *lasts;
+	u64 = key;
+	status = dladm_set_conf_field(conf, FKEY, DLADM_TYPE_UINT64, &u64);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-		/* skip comments */
-		if (BLANK_LINE(line))
-			continue;
+	u64 = nports;
+	status = dladm_set_conf_field(conf, FNPORTS, DLADM_TYPE_UINT64, &u64);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-		/* ignore corrupted lines */
-		holder = strtok_r(line, " \t", &lasts);
-		if (holder == NULL)
-			continue;
-
-		/* port number */
-		errno = 0;
-		key = (int)strtol(holder, &endp, 10);
-		if (errno != 0 || *endp != '\0') {
-			status = DLADM_STATUS_REPOSITORYINVAL;
-			goto done;
-		}
-
-		if (key == attr->lt_key) {
-			/* group with key already exists */
-			status = DLADM_STATUS_EXIST;
-			goto done;
-		}
-	}
-
-	/*
-	 * If we get here, we've verified that no existing group with
-	 * the same key already exists. It's now time to add the
-	 * new group to the DB.
-	 */
-	if (i_dladm_aggr_fput_grp(fp, attr) != 0) {
-		status = dladm_errno2status(errno);
+	size = nports * (LINKID_STR_WIDTH + 1) + 1;
+	if ((portstr = calloc(1, size)) == NULL) {
+		status = DLADM_STATUS_NOMEM;
 		goto done;
 	}
 
-	status = DLADM_STATUS_OK;
+	for (i = 0; i < nports; i++)
+		WRITE_PORT(portstr, ports[i].lp_linkid, size);
+	status = dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR, portstr);
+	free(portstr);
+
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	u64 = policy;
+	status = dladm_set_conf_field(conf, FPOLICY, DLADM_TYPE_UINT64, &u64);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	status = dladm_set_conf_field(conf, FFIXMACADDR, DLADM_TYPE_BOOLEAN,
+	    &mac_addr_fixed);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	if (mac_addr_fixed) {
+		if (!VALID_PORT_MAC(mac_addr)) {
+			status = DLADM_STATUS_MACADDRINVAL;
+			goto done;
+		}
+
+		(void) dladm_aggr_macaddr2str(mac_addr, macstr);
+		status = dladm_set_conf_field(conf, FMACADDR, DLADM_TYPE_STR,
+		    macstr);
+		if (status != DLADM_STATUS_OK)
+			goto done;
+	}
+
+	status = dladm_set_conf_field(conf, FFORCE, DLADM_TYPE_BOOLEAN, &force);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	u64 = lacp_mode;
+	status = dladm_set_conf_field(conf, FLACPMODE, DLADM_TYPE_UINT64, &u64);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	u64 = lacp_timer;
+	status = dladm_set_conf_field(conf, FLACPTIMER, DLADM_TYPE_UINT64,
+	    &u64);
+	if (status != DLADM_STATUS_OK)
+		goto done;
+
+	/*
+	 * Commit the link aggregation configuration.
+	 */
+	status = dladm_write_conf(conf);
 
 done:
-	(void) fclose(fp);
-	i_dladm_aggr_unlock_db(lock_fd);
+	dladm_destroy_conf(conf);
 	return (status);
 }
 
@@ -1504,60 +1094,168 @@ done:
  * file and bring it up.
  */
 dladm_status_t
-dladm_aggr_create(uint32_t key, uint32_t nports,
+dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
     dladm_aggr_port_attr_db_t *ports, uint32_t policy, boolean_t mac_addr_fixed,
-    uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer,
-    boolean_t tempop, const char *root)
+    const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+    aggr_lacp_timer_t lacp_timer, uint32_t flags)
 {
-	dladm_aggr_grp_attr_db_t attr;
+	datalink_id_t linkid = DATALINK_INVALID_LINKID;
+	uint32_t media;
+	uint32_t i;
+	datalink_class_t class;
 	dladm_status_t status;
+	boolean_t force = (flags & DLADM_OPT_FORCE) ? B_TRUE : B_FALSE;
 
-	if (key == 0 || key > DLADM_AGGR_MAX_KEY)
+	if (key != 0 && key > AGGR_MAX_KEY)
 		return (DLADM_STATUS_KEYINVAL);
 
-	attr.lt_key = key;
-	attr.lt_nports = nports;
-	attr.lt_ports = ports;
-	attr.lt_policy = policy;
-	attr.lt_mac_fixed = mac_addr_fixed;
-	if (attr.lt_mac_fixed)
-		bcopy(mac_addr, attr.lt_mac, ETHERADDRL);
-	else
-		bzero(attr.lt_mac, ETHERADDRL);
-	attr.lt_lacp_mode = lacp_mode;
-	attr.lt_lacp_timer = lacp_timer;
+	if (nports == 0)
+		return (DLADM_STATUS_BADARG);
 
-	/* add the link aggregation group to the DB */
-	if (!tempop) {
-		status = i_dladm_aggr_create_db(&attr, root);
-		if (status != DLADM_STATUS_OK)
-			return (status);
-	} else {
-		dladm_aggr_up_t up;
-
-		up.lu_key = key;
-		up.lu_found = B_FALSE;
-		up.lu_fd = open(DLADM_AGGR_DEV, O_RDWR);
-		if (up.lu_fd < 0)
-			return (dladm_errno2status(errno));
-
-		status = i_dladm_aggr_up((void *)&up, &attr);
-		(void) close(up.lu_fd);
-		return (status);
+	for (i = 0; i < nports; i++) {
+		if ((dladm_datalink_id2info(ports[i].lp_linkid, NULL,
+		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
+		    (class != DATALINK_CLASS_PHYS) && (media != DL_ETHER)) {
+			return (DLADM_STATUS_BADARG);
+		}
 	}
 
-	/* bring up the link aggregation group */
-	status = dladm_aggr_up(key, root);
-	/*
-	 * If the operation fails because the aggregation already exists,
-	 * then only update the persistent configuration repository and
-	 * return success.
-	 */
-	if (status == DLADM_STATUS_EXIST)
-		status = DLADM_STATUS_OK;
+	flags &= (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
+	if ((status = dladm_create_datalink_id(name, DATALINK_CLASS_AGGR,
+	    DL_ETHER, flags, &linkid)) != DLADM_STATUS_OK) {
+		goto fail;
+	}
 
-	if (status != DLADM_STATUS_OK && !tempop)
-		(void) i_dladm_aggr_del_db(&attr, root);
+	if ((flags & DLADM_OPT_PERSIST) &&
+	    (status = dladm_aggr_persist_aggr_conf(name, linkid, key, nports,
+	    ports, policy, mac_addr_fixed, mac_addr, lacp_mode, lacp_timer,
+	    force)) != DLADM_STATUS_OK) {
+		goto fail;
+	}
+
+	if (!(flags & DLADM_OPT_ACTIVE))
+		return (DLADM_STATUS_OK);
+
+	status = i_dladm_aggr_create_sys(linkid, key, nports, ports, policy,
+	    mac_addr_fixed, mac_addr, lacp_mode, lacp_timer, force);
+
+	if (status != DLADM_STATUS_OK) {
+		if (flags & DLADM_OPT_PERSIST)
+			(void) dladm_remove_conf(linkid);
+		goto fail;
+	}
+
+	return (DLADM_STATUS_OK);
+
+fail:
+	if (linkid != DATALINK_INVALID_LINKID)
+		(void) dladm_destroy_datalink_id(linkid, flags);
+
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
+    dladm_aggr_modify_attr_t *attrp)
+{
+	dladm_status_t status = DLADM_STATUS_OK;
+	char macstr[ETHERADDRL * 3];
+	uint64_t u64;
+
+	if (mask & DLADM_AGGR_MODIFY_POLICY) {
+		status = dladm_get_conf_field(conf, FPOLICY, &u64,
+		    sizeof (u64));
+		if (status != DLADM_STATUS_OK)
+			return (status);
+		attrp->ld_policy = (uint32_t)u64;
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_MAC) {
+		status = dladm_get_conf_field(conf, FFIXMACADDR,
+		    &attrp->ld_mac_fixed, sizeof (boolean_t));
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
+		if (attrp->ld_mac_fixed) {
+			boolean_t fixed;
+
+			status = dladm_get_conf_field(conf, FMACADDR,
+			    macstr, sizeof (macstr));
+			if (status != DLADM_STATUS_OK)
+				return (status);
+
+			if (!dladm_aggr_str2macaddr(macstr, &fixed,
+			    attrp->ld_mac)) {
+				return (DLADM_STATUS_REPOSITORYINVAL);
+			}
+		}
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_LACP_MODE) {
+		status = dladm_get_conf_field(conf, FLACPMODE, &u64,
+		    sizeof (u64));
+		if (status != DLADM_STATUS_OK)
+			return (status);
+		attrp->ld_lacp_mode = (aggr_lacp_mode_t)u64;
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
+		status = dladm_get_conf_field(conf, FLACPTIMER, &u64,
+		    sizeof (u64));
+		if (status != DLADM_STATUS_OK)
+			return (status);
+		attrp->ld_lacp_timer = (aggr_lacp_timer_t)u64;
+	}
+
+	return (status);
+}
+
+static dladm_status_t
+i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
+    dladm_aggr_modify_attr_t *attrp)
+{
+	dladm_status_t status = DLADM_STATUS_OK;
+	char macstr[ETHERADDRL * 3];
+	uint64_t u64;
+
+	if (mask & DLADM_AGGR_MODIFY_POLICY) {
+		u64 = attrp->ld_policy;
+		status = dladm_set_conf_field(conf, FPOLICY, DLADM_TYPE_UINT64,
+		    &u64);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_MAC) {
+		status = dladm_set_conf_field(conf, FFIXMACADDR,
+		    DLADM_TYPE_BOOLEAN, &attrp->ld_mac_fixed);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
+		if (attrp->ld_mac_fixed) {
+			(void) dladm_aggr_macaddr2str(attrp->ld_mac, macstr);
+			status = dladm_set_conf_field(conf, FMACADDR,
+			    DLADM_TYPE_STR, macstr);
+			if (status != DLADM_STATUS_OK)
+				return (status);
+		}
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_LACP_MODE) {
+		u64 = attrp->ld_lacp_mode;
+		status = dladm_set_conf_field(conf, FLACPMODE,
+		    DLADM_TYPE_UINT64, &u64);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+	}
+
+	if (mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
+		u64 = attrp->ld_lacp_timer;
+		status = dladm_set_conf_field(conf, FLACPTIMER,
+		    DLADM_TYPE_UINT64, &u64);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+	}
 
 	return (status);
 }
@@ -1567,146 +1265,211 @@ dladm_aggr_create(uint32_t key, uint32_t nports,
  * the configuration file and pass the changes to the kernel.
  */
 dladm_status_t
-dladm_aggr_modify(uint32_t key, uint32_t modify_mask, uint32_t policy,
-    boolean_t mac_fixed, uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
-    aggr_lacp_timer_t lacp_timer, boolean_t tempop, const char *root)
+dladm_aggr_modify(datalink_id_t linkid, uint32_t modify_mask, uint32_t policy,
+    boolean_t mac_fixed, const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+    aggr_lacp_timer_t lacp_timer, uint32_t flags)
 {
 	dladm_aggr_modify_attr_t new_attr, old_attr;
+	dladm_conf_t conf;
 	dladm_status_t status;
 
-	if (key == 0)
-		return (DLADM_STATUS_KEYINVAL);
+	new_attr.ld_policy = policy;
+	new_attr.ld_mac_fixed = mac_fixed;
+	new_attr.ld_lacp_mode = lacp_mode;
+	new_attr.ld_lacp_timer = lacp_timer;
+	bcopy(mac_addr, new_attr.ld_mac, ETHERADDRL);
 
-	if (modify_mask & DLADM_AGGR_MODIFY_POLICY)
-		new_attr.ld_policy = policy;
+	if (flags & DLADM_OPT_PERSIST) {
+		status = dladm_read_conf(linkid, &conf);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 
-	if (modify_mask & DLADM_AGGR_MODIFY_MAC) {
-		new_attr.ld_mac_fixed = mac_fixed;
-		bcopy(mac_addr, new_attr.ld_mac, ETHERADDRL);
+		if ((status = i_dladm_aggr_get_aggr_attr(conf, modify_mask,
+		    &old_attr)) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		if ((status = i_dladm_aggr_set_aggr_attr(conf, modify_mask,
+		    &new_attr)) != DLADM_STATUS_OK) {
+			goto done;
+		}
+
+		status = dladm_write_conf(conf);
+
+done:
+		dladm_destroy_conf(conf);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 	}
 
-	if (modify_mask & DLADM_AGGR_MODIFY_LACP_MODE)
-		new_attr.ld_lacp_mode = lacp_mode;
+	if (!(flags & DLADM_OPT_ACTIVE))
+		return (DLADM_STATUS_OK);
 
-	if (modify_mask & DLADM_AGGR_MODIFY_LACP_TIMER)
-		new_attr.ld_lacp_timer = lacp_timer;
-
-	/* update the DB */
-	if (!tempop && ((status = i_dladm_aggr_modify_db(key, modify_mask,
-	    &new_attr, &old_attr, root)) != DLADM_STATUS_OK)) {
-		return (status);
-	}
-
-	status = i_dladm_aggr_modify_sys(key, modify_mask, &new_attr);
-	if (status != DLADM_STATUS_OK && !tempop) {
-		(void) i_dladm_aggr_modify_db(key, modify_mask, &old_attr,
-		    NULL, root);
+	status = i_dladm_aggr_modify_sys(linkid, modify_mask, &new_attr);
+	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
+		if (dladm_read_conf(linkid, &conf) == DLADM_STATUS_OK) {
+			if (i_dladm_aggr_set_aggr_attr(conf, modify_mask,
+			    &old_attr) == DLADM_STATUS_OK) {
+				(void) dladm_write_conf(conf);
+			}
+			dladm_destroy_conf(conf);
+		}
 	}
 
 	return (status);
 }
 
+typedef struct aggr_held_arg_s {
+	datalink_id_t	aggrid;
+	boolean_t	isheld;
+} aggr_held_arg_t;
+
+static int
+i_dladm_aggr_is_held(datalink_id_t linkid, void *arg)
+{
+	aggr_held_arg_t		*aggr_held_arg = arg;
+	dladm_vlan_attr_t	dva;
+
+	if (dladm_vlan_info(linkid, &dva, DLADM_OPT_PERSIST) != DLADM_STATUS_OK)
+		return (DLADM_WALK_CONTINUE);
+
+	if (dva.dv_linkid == aggr_held_arg->aggrid) {
+		/*
+		 * This VLAN is created over the given aggregation.
+		 */
+		aggr_held_arg->isheld = B_TRUE;
+		return (DLADM_WALK_TERMINATE);
+	}
+	return (DLADM_WALK_CONTINUE);
+}
+
 /*
- * Delete a previously created link aggregation group.
+ * Delete a previously created link aggregation group. Either the name "aggr"
+ * or the "key" is specified.
  */
 dladm_status_t
-dladm_aggr_delete(uint32_t key, boolean_t tempop, const char *root)
+dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
 {
-	dladm_aggr_grp_attr_db_t db_attr;
+	laioc_delete_t ioc;
+	datalink_class_t class;
 	dladm_status_t status;
 
-	if (key == 0)
-		return (DLADM_STATUS_KEYINVAL);
-
-	if (tempop) {
-		dladm_aggr_down_t down;
-		dladm_aggr_grp_attr_t sys_attr;
-
-		down.ld_key = key;
-		down.ld_found = B_FALSE;
-		sys_attr.lg_key = key;
-		if (i_dladm_aggr_down((void *)&down, &sys_attr) < 0)
-			return (dladm_errno2status(errno));
-		else
-			return (DLADM_STATUS_OK);
-	} else {
-		status = dladm_aggr_down(key);
-
-		/*
-		 * Only continue to delete the configuration repository
-		 * either if we successfully delete the active aggregation
-		 * or if the aggregation is not found.
-		 */
-		if (status != DLADM_STATUS_OK &&
-		    status != DLADM_STATUS_NOTFOUND) {
-			return (status);
-		}
+	if ((dladm_datalink_id2info(linkid, NULL, &class, NULL, NULL, 0) !=
+	    DLADM_STATUS_OK) || (class != DATALINK_CLASS_AGGR)) {
+		return (DLADM_STATUS_BADARG);
 	}
 
-	if (tempop)
-		return (DLADM_STATUS_OK);
+	if (flags & DLADM_OPT_ACTIVE) {
+		ioc.ld_linkid = linkid;
+		if ((i_dladm_aggr_strioctl(LAIOC_DELETE, &ioc,
+		    sizeof (ioc)) < 0) &&
+		    ((errno != ENOENT) || !(flags & DLADM_OPT_PERSIST))) {
+			status = dladm_errno2status(errno);
+			return (status);
+		}
 
-	db_attr.lt_key = key;
-	return (i_dladm_aggr_del_db(&db_attr, root));
+		/*
+		 * Delete ACTIVE linkprop first.
+		 */
+		(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
+		    DLADM_OPT_ACTIVE);
+		(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_ACTIVE);
+	}
+
+	/*
+	 * If we reach here, it means that the active aggregation has already
+	 * been deleted, and there is no active VLANs holding this aggregation.
+	 * Now we see whether there is any persistent VLANs holding this
+	 * aggregation. If so, we fail the operation.
+	 */
+	if (flags & DLADM_OPT_PERSIST) {
+		aggr_held_arg_t arg;
+
+		arg.aggrid = linkid;
+		arg.isheld = B_FALSE;
+
+		(void) dladm_walk_datalink_id(i_dladm_aggr_is_held,
+		    &arg, DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE,
+		    DLADM_OPT_PERSIST);
+		if (arg.isheld)
+			return (DLADM_STATUS_LINKBUSY);
+
+		(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_PERSIST);
+		(void) dladm_remove_conf(linkid);
+	}
+
+	return (DLADM_STATUS_OK);
 }
 
 /*
  * Add one or more ports to an existing link aggregation.
  */
 dladm_status_t
-dladm_aggr_add(uint32_t key, uint32_t nports, dladm_aggr_port_attr_db_t *ports,
-    boolean_t tempop, const char *root)
+dladm_aggr_add(datalink_id_t linkid, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t flags)
 {
-	dladm_aggr_grp_attr_db_t attr;
-	dladm_status_t status;
-
-	if (key == 0)
-		return (DLADM_STATUS_KEYINVAL);
-
-	bzero(&attr, sizeof (attr));
-	attr.lt_key = key;
-	attr.lt_nports = nports;
-	attr.lt_ports = ports;
-
-	if (!tempop &&
-	    ((status = i_dladm_aggr_add_db(&attr, root)) != DLADM_STATUS_OK)) {
-		return (status);
-	}
-
-	status = i_dladm_aggr_add_rem_sys(&attr, LAIOC_ADD);
-	if (status != DLADM_STATUS_OK && !tempop)
-		(void) i_dladm_aggr_remove_db(&attr, root);
-
-	return (status);
+	return (i_dladm_aggr_add_rmv(linkid, nports, ports, flags, LAIOC_ADD));
 }
 
 /*
  * Remove one or more ports from an existing link aggregation.
  */
 dladm_status_t
-dladm_aggr_remove(uint32_t key, uint32_t nports,
-    dladm_aggr_port_attr_db_t *ports, boolean_t tempop, const char *root)
+dladm_aggr_remove(datalink_id_t linkid, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t flags)
 {
-	dladm_aggr_grp_attr_db_t attr;
+	return (i_dladm_aggr_add_rmv(linkid, nports, ports, flags,
+	    LAIOC_REMOVE));
+}
+
+typedef struct i_walk_key_state_s {
+	uint16_t key;
+	datalink_id_t linkid;
+	boolean_t found;
+} i_walk_key_state_t;
+
+static int
+i_dladm_walk_key2linkid(datalink_id_t linkid, void *arg)
+{
+	dladm_conf_t conf;
+	uint16_t key;
 	dladm_status_t status;
+	i_walk_key_state_t *statep = (i_walk_key_state_t *)arg;
+	uint64_t u64;
 
-	if (key == 0)
-		return (DLADM_STATUS_KEYINVAL);
+	if (dladm_read_conf(linkid, &conf) != 0)
+		return (DLADM_WALK_CONTINUE);
 
-	bzero(&attr, sizeof (attr));
-	attr.lt_key = key;
-	attr.lt_nports = nports;
-	attr.lt_ports = ports;
+	status = dladm_get_conf_field(conf, FKEY, &u64, sizeof (u64));
+	key = (uint16_t)u64;
+	dladm_destroy_conf(conf);
 
-	if (!tempop &&
-	    ((status = i_dladm_aggr_remove_db(&attr, root)) !=
-	    DLADM_STATUS_OK)) {
-		return (status);
+	if ((status == DLADM_STATUS_OK) && (key == statep->key)) {
+		statep->found = B_TRUE;
+		statep->linkid = linkid;
+		return (DLADM_WALK_TERMINATE);
 	}
 
-	status = i_dladm_aggr_add_rem_sys(&attr, LAIOC_REMOVE);
-	if (status != DLADM_STATUS_OK && !tempop)
-		(void) i_dladm_aggr_add_db(&attr, root);
+	return (DLADM_WALK_CONTINUE);
+}
 
-	return (status);
+dladm_status_t
+dladm_key2linkid(uint16_t key, datalink_id_t *linkidp, uint32_t flags)
+{
+	i_walk_key_state_t state;
+
+	if (key > AGGR_MAX_KEY)
+		return (DLADM_STATUS_NOTFOUND);
+
+	state.found = B_FALSE;
+	state.key = key;
+
+	(void) dladm_walk_datalink_id(i_dladm_walk_key2linkid, &state,
+	    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, flags);
+	if (state.found == B_TRUE) {
+		*linkidp = state.linkid;
+		return (DLADM_STATUS_OK);
+	} else {
+		return (DLADM_STATUS_NOTFOUND);
+	}
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include	<sys/strsun.h>
 #include	<sys/sysmacros.h>
 #include	<sys/atomic.h>
+#include	<sys/stat.h>
 #include	<sys/dlpi.h>
 #include	<sys/vlan.h>
 #include	<sys/ethernet.h>
@@ -52,6 +53,8 @@ struct dls_kstats dls_kstat =
 {
 	{ "soft_ring_pkt_drop", KSTAT_DATA_UINT32 },
 };
+
+static int dls_open(dls_vlan_t *, dls_dl_handle_t ddh, dls_channel_t *);
 
 /*
  * Private functions.
@@ -78,6 +81,7 @@ i_dls_destructor(void *buf, void *arg)
 	ASSERT(dip->di_dvp == NULL);
 	ASSERT(dip->di_mnh == NULL);
 	ASSERT(dip->di_dmap == NULL);
+	ASSERT(!dip->di_local);
 	ASSERT(!dip->di_bound);
 	ASSERT(dip->di_rx == NULL);
 	ASSERT(dip->di_txinfo == NULL);
@@ -164,47 +168,109 @@ dls_fini(void)
 }
 
 /*
- * Client function.
+ * Client functions.
  */
 
+/*
+ * /dev node style-2 VLAN PPA access. This might result in a newly created
+ * dls_vlan_t. Note that this dls_vlan_t is different from others, in that
+ * this VLAN might not have a link name that is managed by dlmgmtd (we cannot
+ * use its VLAN ppa hack name as it might conflict with a vanity name).
+ */
 int
-dls_create(const char *linkname, const char *macname)
+dls_open_style2_vlan(major_t major, uint_t ppa, dls_channel_t *dcp)
 {
-	return (dls_vlan_create(linkname, macname, 0));
-}
-
-int
-dls_destroy(const char *name)
-{
-	return (dls_vlan_destroy(name));
-}
-
-int
-dls_open(const char *name, dls_channel_t *dcp)
-{
-	dls_impl_t	*dip;
-	dls_vlan_t	*dvp;
-	dls_link_t	*dlp;
+	dev_t		dev = makedevice(major, DLS_PPA2INST(ppa) + 1);
+	uint_t		vid = DLS_PPA2VID(ppa);
+	dls_vlan_t	*lndvp, *dvp;
 	int		err;
 
 	/*
-	 * Get a reference to the named dls_vlan_t.
-	 * Tagged vlans get created automatically.
+	 * First find the dls_vlan_t this VLAN is created on. This must be
+	 * a GLDv3 driver based device.
 	 */
-	if ((err = dls_vlan_hold(name, &dvp, B_TRUE)) != 0)
+	if ((err = dls_vlan_hold_by_dev(dev, &lndvp)) != 0)
 		return (err);
+
+	if (vid > VLAN_ID_MAX)
+		return (ENOENT);
+
+	err = dls_vlan_hold(lndvp->dv_dlp->dl_name, vid, &dvp, B_FALSE, B_TRUE);
+	if (err != 0)
+		goto done;
+
+	if ((err = dls_open(dvp, NULL, dcp)) != 0)
+		dls_vlan_rele(dvp);
+
+done:
+	dls_vlan_rele(lndvp);
+	return (err);
+}
+
+int
+dls_open_by_dev(dev_t dev, dls_channel_t *dcp)
+{
+	dls_dl_handle_t	ddh;
+	dls_vlan_t	*dvp;
+	int		err;
+
+	/*
+	 * Get a reference to the given dls_vlan_t.
+	 */
+	if ((err = dls_devnet_open_by_dev(dev, &dvp, &ddh)) != 0)
+		return (err);
+
+	if ((err = dls_open(dvp, ddh, dcp)) != 0) {
+		if (ddh != NULL)
+			dls_devnet_close(ddh);
+		else
+			dls_vlan_rele(dvp);
+	}
+
+	return (err);
+}
+
+static int
+dls_open(dls_vlan_t *dvp, dls_dl_handle_t ddh, dls_channel_t *dcp)
+{
+	dls_impl_t	*dip;
+	dls_link_t	*dlp;
+	int		err;
+	zoneid_t	zid = getzoneid();
+	boolean_t	local;
+
+	/*
+	 * Check whether this client belongs to the zone of this dvp. Note that
+	 * a global zone client is allowed to open a local zone dvp.
+	 */
+	mutex_enter(&dvp->dv_lock);
+	if (zid != GLOBAL_ZONEID && dvp->dv_zid != zid) {
+		mutex_exit(&dvp->dv_lock);
+		return (ENOENT);
+	}
+	local = (zid == dvp->dv_zid);
+	dvp->dv_zone_ref += (local ? 1 : 0);
+	mutex_exit(&dvp->dv_lock);
+
+	dlp = dvp->dv_dlp;
+	if ((err = mac_start(dlp->dl_mh)) != 0) {
+		mutex_enter(&dvp->dv_lock);
+		dvp->dv_zone_ref -= (local ? 1 : 0);
+		mutex_exit(&dvp->dv_lock);
+		return (err);
+	}
 
 	/*
 	 * Allocate a new dls_impl_t.
 	 */
 	dip = kmem_cache_alloc(i_dls_impl_cachep, KM_SLEEP);
 	dip->di_dvp = dvp;
+	dip->di_ddh = ddh;
 
 	/*
 	 * Cache a copy of the MAC interface handle, a pointer to the
 	 * immutable MAC info and a copy of the current MAC address.
 	 */
-	dlp = dvp->dv_dlp;
 	dip->di_mh = dlp->dl_mh;
 	dip->di_mip = dlp->dl_mip;
 
@@ -216,9 +282,11 @@ dls_open(const char *name, dls_channel_t *dcp)
 	dip->di_txinfo = mac_tx_get(dip->di_mh);
 
 	/*
-	 * Add a notification function so that we get updates from the MAC.
+	 * Add a notification function so that we get updates from
+	 * the MAC.
 	 */
-	dip->di_mnh = mac_notify_add(dip->di_mh, i_dls_notify, (void *)dip);
+	dip->di_mnh = mac_notify_add(dip->di_mh, i_dls_notify,
+	    (void *)dip);
 
 	/*
 	 * Bump the kmem_cache count to make sure it is not prematurely
@@ -226,16 +294,7 @@ dls_open(const char *name, dls_channel_t *dcp)
 	 */
 	atomic_add_32(&i_dls_impl_count, 1);
 
-	/*
-	 * Set the di_zid to the zone id of current zone
-	 */
-	dip->di_zid = getzoneid();
-
-	/*
-	 * Add this dls_impl_t to the list of the "opened stream"
-	 * list of the corresponding dls_vlan_t
-	 */
-	dls_vlan_add_impl(dvp, dip);
+	dip->di_local = local;
 
 	/*
 	 * Hand back a reference to the dls_impl_t.
@@ -248,15 +307,22 @@ void
 dls_close(dls_channel_t dc)
 {
 	dls_impl_t		*dip = (dls_impl_t *)dc;
-	dls_vlan_t		*dvp;
-	dls_link_t		*dlp;
+	dls_vlan_t		*dvp = dip->di_dvp;
+	dls_link_t		*dlp = dvp->dv_dlp;
 	dls_multicst_addr_t	*p;
 	dls_multicst_addr_t	*nextp;
+	dls_dl_handle_t		ddh = dip->di_ddh;
+
+	if (dip->di_local) {
+		mutex_enter(&dvp->dv_lock);
+		dvp->dv_zone_ref--;
+		mutex_exit(&dvp->dv_lock);
+	}
+	dip->di_local = B_FALSE;
 
 	dls_active_clear(dc);
 
 	rw_enter(&(dip->di_lock), RW_WRITER);
-
 	/*
 	 * Remove the notify function.
 	 */
@@ -266,9 +332,6 @@ dls_close(dls_channel_t dc)
 	/*
 	 * If the dls_impl_t is bound then unbind it.
 	 */
-	dvp = dip->di_dvp;
-	dlp = dvp->dv_dlp;
-
 	if (dip->di_bound) {
 		rw_exit(&(dip->di_lock));
 		dls_link_remove(dlp, dip);
@@ -276,11 +339,9 @@ dls_close(dls_channel_t dc)
 		dip->di_bound = B_FALSE;
 	}
 
-	dip->di_rx = NULL;
-	dip->di_rx_arg = NULL;
-
 	/*
-	 * Walk the list of multicast addresses, disabling each at the MAC.
+	 * Walk the list of multicast addresses, disabling each at
+	 * the MAC.
 	 */
 	for (p = dip->di_dmap; p != NULL; p = nextp) {
 		(void) mac_multicst_remove(dip->di_mh, p->dma_addr);
@@ -289,23 +350,19 @@ dls_close(dls_channel_t dc)
 	}
 	dip->di_dmap = NULL;
 
-	/*
-	 * Remove this dls_impl_t from the list of the "open streams"
-	 * list of the corresponding dls_vlan_t
-	 */
-	dls_vlan_remove_impl(dvp, dip);
-
+	dip->di_rx = NULL;
+	dip->di_rx_arg = NULL;
 	rw_exit(&(dip->di_lock));
 
 	/*
 	 * If the MAC has been set in promiscuous mode then disable it.
 	 */
 	(void) dls_promisc(dc, 0);
+	dip->di_txinfo = NULL;
 
 	/*
 	 * Free the dls_impl_t back to the cache.
 	 */
-	dip->di_dvp = NULL;
 	dip->di_txinfo = NULL;
 
 	if (dip->di_soft_ring_list != NULL) {
@@ -315,20 +372,27 @@ dls_close(dls_channel_t dc)
 	}
 	dip->di_soft_ring_size = 0;
 
-	kmem_cache_free(i_dls_impl_cachep, dip);
-
 	/*
 	 * Decrement the reference count to allow the cache to be destroyed
 	 * if there are no more dls_impl_t.
 	 */
 	atomic_add_32(&i_dls_impl_count, -1);
 
+	dip->di_dvp = NULL;
+
+	kmem_cache_free(i_dls_impl_cachep, dip);
+
+	mac_stop(dvp->dv_dlp->dl_mh);
+
 	/*
 	 * Release our reference to the dls_vlan_t allowing that to be
 	 * destroyed if there are no more dls_impl_t. An unreferenced tagged
-	 * vlan gets destroyed automatically.
+	 * (non-persistent) vlan gets destroyed automatically.
 	 */
-	dls_vlan_rele(dvp);
+	if (ddh != NULL)
+		dls_devnet_close(ddh);
+	else
+		dls_vlan_rele(dvp);
 }
 
 mac_handle_t
@@ -492,6 +556,7 @@ multi:
 			err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
 			if (err != 0)
 				goto done;
+
 			dip->di_promisc |= DLS_PROMISC_PHYS;
 			dlp->dl_npromisc++;
 		}
@@ -500,6 +565,7 @@ multi:
 			err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
 			if (err != 0)
 				goto done;
+
 			dip->di_promisc &= ~DLS_PROMISC_PHYS;
 			dlp->dl_npromisc--;
 		}
@@ -753,6 +819,13 @@ dls_accept(dls_impl_t *dip, mac_header_info_t *mhip, dls_rx_t *di_rx,
 	if (dip->di_promisc & DLS_PROMISC_PHYS)
 		goto accept;
 
+	/*
+	 * For non-promiscs-phys streams, filter out the packets looped back
+	 * from the underlying driver because of promiscuous setting.
+	 */
+	if (mhip->mhi_prom_looped)
+		goto refuse;
+
 	switch (mhip->mhi_dsttype) {
 	case MAC_ADDRTYPE_UNICAST:
 		/*
@@ -839,6 +912,33 @@ accept:
 }
 
 boolean_t
+dls_mac_active_set(dls_link_t *dlp)
+{
+	mutex_enter(&dlp->dl_lock);
+
+	/*
+	 * If this is the first active client on this link, notify
+	 * the mac that we're becoming an active client.
+	 */
+	if (dlp->dl_nactive == 0 && !mac_active_shareable_set(dlp->dl_mh)) {
+		mutex_exit(&dlp->dl_lock);
+		return (B_FALSE);
+	}
+	dlp->dl_nactive++;
+	mutex_exit(&dlp->dl_lock);
+	return (B_TRUE);
+}
+
+void
+dls_mac_active_clear(dls_link_t *dlp)
+{
+	mutex_enter(&dlp->dl_lock);
+	if (--dlp->dl_nactive == 0)
+		mac_active_clear(dlp->dl_mh);
+	mutex_exit(&dlp->dl_lock);
+}
+
+boolean_t
 dls_active_set(dls_channel_t dc)
 {
 	dls_impl_t	*dip = (dls_impl_t *)dc;
@@ -852,18 +952,11 @@ dls_active_set(dls_channel_t dc)
 		return (B_TRUE);
 	}
 
-	/*
-	 * If this is the first active client on this link, notify
-	 * the mac that we're becoming an active client.
-	 */
-	if (dlp->dl_nactive == 0 && !mac_active_shareable_set(dlp->dl_mh)) {
+	if (!dls_mac_active_set(dlp)) {
 		rw_exit(&dip->di_lock);
 		return (B_FALSE);
 	}
 	dip->di_active = B_TRUE;
-	mutex_enter(&dlp->dl_lock);
-	dlp->dl_nactive++;
-	mutex_exit(&dlp->dl_lock);
 	rw_exit(&dip->di_lock);
 	return (B_TRUE);
 }
@@ -880,22 +973,8 @@ dls_active_clear(dls_channel_t dc)
 		goto out;
 	dip->di_active = B_FALSE;
 
-	mutex_enter(&dlp->dl_lock);
-	if (--dlp->dl_nactive == 0)
-		mac_active_clear(dip->di_mh);
-	mutex_exit(&dlp->dl_lock);
+	dls_mac_active_clear(dlp);
+
 out:
 	rw_exit(&dip->di_lock);
-}
-
-dev_info_t *
-dls_finddevinfo(dev_t dev)
-{
-	return (dls_vlan_finddevinfo(dev));
-}
-
-int
-dls_ppa_from_minor(minor_t minor, t_uscalar_t *ppa)
-{
-	return (dls_vlan_ppa_from_minor(minor, ppa));
 }

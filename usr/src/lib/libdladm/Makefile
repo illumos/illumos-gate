@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,8 @@
 include $(SRC)/lib/Makefile.lib
 
 HDRS =		libdladm.h libdladm_impl.h libdllink.h libdlaggr.h	\
-		libdlwlan.h libdlwlan_impl.h libdlvnic.h
+		libdlwlan.h libdlwlan_impl.h libdlvnic.h libdlvlan.h	\
+		libdlmgmt.h
 HDRDIR =	common
 
 SUBDIRS =	$(MACH)
@@ -37,7 +38,8 @@ $(BUILD64)SUBDIRS += $(MACH64)
 POFILE =	libdladm.po
 MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
 		common/libdllink.c common/libdlaggr.c	\
-		common/libdlwlan.c common/libdlvnic.c
+		common/libdlwlan.c common/libdlvnic.c	\
+		common/libdlvlan.c common/libdlmgmt.c
 XGETFLAGS =     -a -x libdladm.xcl
 
 all :=		TARGET = all

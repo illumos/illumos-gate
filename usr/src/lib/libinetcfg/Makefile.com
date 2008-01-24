@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -26,8 +26,7 @@
 
 LIBRARY = libinetcfg.a
 VERS    = .1
-OBJECTS = inetcfg.o \
-	  inetcfg_nic.o
+OBJECTS = inetcfg.o
 
 include ../../Makefile.lib
 
@@ -36,7 +35,7 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lc -lnsl -lsocket -ldevinfo
+LDLIBS +=	-lc -lnsl -lsocket -ldlpi
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

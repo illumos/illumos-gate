@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -579,4 +579,66 @@ move_addresses()
 		shift
 	done
 	echo "."
+}
+
+#
+# net_reconfigure is called from the network/physical service (by the
+# net-physical and net-nwam method scripts) to perform tasks that only
+# need to be done during a reconfigure boot.  This needs to be
+# isolated in a function since network/physical has two instances
+# (default and nwam) that have distinct method scripts that each need
+# to do these things.
+#
+net_reconfigure ()
+{
+	#
+	# Is this a reconfigure boot?  If not, then there's nothing
+	# for us to do.
+	#
+	svcprop -q -p system/reconfigure system/svc/restarter:default
+	if [ $? -ne 0 ]; then
+		return 0
+	fi
+
+	#
+	# Ensure that the datalink-management service is running since
+	# manifest-import has not yet run for a first boot after
+	# upgrade.  We wouldn't need to do that if manifest-import ran
+	# earlier in boot, since there is an explicit dependency
+	# between datalink-management and network/physical.
+	#
+	svcadm enable -ts network/datalink-management:default
+
+	#
+	# There is a bug in SMF which causes the svcadm command above
+	# to exit prematurely (with an error code of 3) before having
+	# waited for the service to come online after having enabled
+	# it.  Until that bug is fixed, we need to have the following
+	# loop to explicitly wait for the service to come online.
+	#
+	i=0
+	while [ $i -lt 30 ]; do
+		i=`expr $i + 1`
+		sleep 1
+		state=`svcprop -p restarter/state \
+		    network/datalink-management:default 2>/dev/null`
+		if [ $? -ne 0 ]; then
+			continue
+		elif [ "$state" = "online" ]; then
+			break
+		fi
+	done
+	if [ "$state" != "online" ]; then
+		echo "The network/datalink-management service \c"
+		echo "did not come online."
+		return 1
+	fi
+
+	#
+	# Initialize the set of physical links, and validate and
+	# remove all the physical links which were removed during the
+	# system shutdown.
+	#
+	/sbin/dladm init-phys
+	return 0
 }

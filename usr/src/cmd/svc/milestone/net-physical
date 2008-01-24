@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -59,6 +59,19 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 smf_netstrategy
 
 if smf_is_globalzone; then
+	net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
+
+	# 
+	# Upgrade handling. The upgrade file consists of a series of dladm(1M)
+	# commands. Note that after we are done, we cannot rename the upgrade
+	# script file as the file system is still read-only at this point.
+	# Defer this to the manifest-import service.
+	#
+	upgrade_script=/var/svc/profile/upgrade_datalink
+	if [ -f "${upgrade_script}" ]; then 
+		. "${upgrade_script}"
+	fi
+
 	#
 	# Bring up link aggregations and initialize security objects.
 	# Note that link property initialization is deferred until after
@@ -66,6 +79,7 @@ if smf_is_globalzone; then
 	# be unloaded (and the property settings lost).
 	#
 	/sbin/dladm up-aggr
+	/sbin/dladm up-vlan
 	/sbin/dladm init-secobj
 fi
 

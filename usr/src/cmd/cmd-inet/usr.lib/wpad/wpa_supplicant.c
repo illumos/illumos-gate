@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,7 +141,7 @@ wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		wpa_printf(MSG_DEBUG, "Scan SSID: %s", ssid->ssid);
 	}
 
-	if (wpa_s->driver->scan(wpa_s->ifname)) {
+	if (wpa_s->driver->scan(wpa_s->linkid)) {
 		wpa_printf(MSG_WARNING, "Failed to initiate AP scan.");
 	}
 }
@@ -213,16 +213,16 @@ wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 static void
 wpa_clear_keys(struct wpa_supplicant *wpa_s, uint8_t *addr)
 {
-	wpa_s->driver->set_key(wpa_s->ifname, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 0, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->ifname, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 1, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->ifname, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 2, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->ifname, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 3, 0, NULL, 0, NULL, 0);
 	if (addr) {
-		wpa_s->driver->set_key(wpa_s->ifname, WPA_ALG_NONE, addr,
+		wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE, addr,
 		    0, 0, NULL, 0, NULL, 0);
 	}
 }
@@ -357,7 +357,7 @@ static void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 
 	wpa_clear_keys(wpa_s, bss->we_bssid.wb_bytes);
 	wpa_s->wpa_state = WPA_ASSOCIATING;
-	wpa_s->driver->associate(wpa_s->ifname,
+	wpa_s->driver->associate(wpa_s->linkid,
 	    (const char *)bss->we_bssid.wb_bytes, wpa_ie, wpa_ie_len);
 
 	/* Timeout for IEEE 802.11 authentication and association */
@@ -371,7 +371,7 @@ wpa_supplicant_disassociate(struct wpa_supplicant *wpa_s, int reason_code)
 	wpa_s->wpa_state = WPA_DISCONNECTED;
 	if (memcmp(wpa_s->bssid, "\x00\x00\x00\x00\x00\x00",
 	    IEEE80211_ADDR_LEN) != 0) {
-		wpa_s->driver->disassociate(wpa_s->ifname, reason_code);
+		wpa_s->driver->disassociate(wpa_s->linkid, reason_code);
 		addr = wpa_s->bssid;
 	}
 	wpa_clear_keys(wpa_s, addr);
@@ -453,7 +453,7 @@ wpa_supplicant_scan_results(struct wpa_supplicant *wpa_s)
 	struct wpa_ssid *ssid;
 
 	(void) memset(results, 0, sizeof (dladm_wlan_ess_t) * MAX_SCANRESULTS);
-	num = wpa_s->driver->get_scan_results(wpa_s->ifname, results,
+	num = wpa_s->driver->get_scan_results(wpa_s->linkid, results,
 	    MAX_SCANRESULTS);
 	wpa_printf(MSG_DEBUG, "Scan results: %d", num);
 	if (num < 0)
@@ -506,7 +506,7 @@ wpa_event_handler(void *cookie, wpa_event_type event)
 		    WPA_REPLAY_COUNTER_LEN);
 		wpa_s->rx_replay_counter_set = 0;
 		wpa_s->renew_snonce = 1;
-		if (wpa_s->driver->get_bssid(wpa_s->ifname,
+		if (wpa_s->driver->get_bssid(wpa_s->linkid,
 		    (char *)bssid) >= 0 &&
 		    memcmp(bssid, wpa_s->bssid, IEEE80211_ADDR_LEN) != 0) {
 			wpa_printf(MSG_DEBUG, "Associated to a new BSS: "
@@ -550,9 +550,9 @@ wpa_supplicant_terminate(int sig, void *eloop_ctx, void *signal_ctx)
 }
 
 static int
-wpa_supplicant_driver_init(struct wpa_supplicant *wpa_s)
+wpa_supplicant_driver_init(const char *link, struct wpa_supplicant *wpa_s)
 {
-	wpa_s->l2 = l2_packet_init(wpa_s->ifname, ETHERTYPE_EAPOL,
+	wpa_s->l2 = l2_packet_init(link, ETHERTYPE_EAPOL,
 	    wpa_supplicant_rx_eapol, wpa_s);
 	if (wpa_s->l2 == NULL)
 		return (-1);
@@ -562,7 +562,7 @@ wpa_supplicant_driver_init(struct wpa_supplicant *wpa_s)
 		return (-1);
 	}
 
-	if (wpa_s->driver->set_wpa(wpa_s->ifname, 1) < 0) {
+	if (wpa_s->driver->set_wpa(wpa_s->linkid, 1) < 0) {
 		wpa_printf(MSG_ERROR, "Failed to enable WPA in the driver.");
 		return (-1);
 	}
@@ -641,6 +641,9 @@ wpa_supplicant_door_destroy(char *doorname)
 {
 	wpa_printf(MSG_DEBUG, "wpa_supplicant_door_destroy(%s)\n", doorname);
 
+	if (door_id == -1)
+		return;
+
 	if (door_revoke(door_id) == -1) {
 		wpa_printf(MSG_ERROR, "failed to door_revoke(%d) %s, exiting.",
 		    door_id, strerror(errno));
@@ -701,13 +704,13 @@ wpa_config_read_network(struct wpa_supplicant *wpa_s)
 	ssid->key_mgmt = WPA_KEY_MGMT_PSK; /* | WPA_KEY_MGMT_IEEE8021X; */
 
 	(void) memset(buf, 0, MAX_ESSID_LENGTH + 1);
-	wpa_s->driver->get_ssid(wpa_s->ifname, (char *)buf);
+	wpa_s->driver->get_ssid(wpa_s->linkid, (char *)buf);
 
 	(void) wpa_config_parse_ssid(ssid, 0, buf);
 
 	key_len = sizeof (psk);
 	(void) dladm_get_secobj((const char *)wpa_s->kname, &cl, psk, &key_len,
-	    DLADM_OPT_TEMP);
+	    DLADM_OPT_ACTIVE);
 	psk[key_len] = '\0';
 	ssid->passphrase = strdup((const char *)psk);
 
@@ -760,9 +763,11 @@ wpa_config_free(struct wpa_config *config)
 {
 	struct wpa_ssid *ssid = config->ssid;
 
-	free(ssid->ssid);
-	free(ssid->passphrase);
-	free(ssid);
+	if (ssid != NULL) {
+		free(ssid->ssid);
+		free(ssid->passphrase);
+		free(ssid);
+	}
 	free(config);
 }
 
@@ -798,13 +803,12 @@ static void
 usage(void)
 {
 	(void) printf("%s\n\n"
-		"usage:\n"
-		"  wpa_supplicant [-hv] -i<ifname> -k<keyname>"
-		"\n"
-		"options:\n"
-		"  -h = show this help text\n"
-		"  -v = show version\n",
-		wpa_supplicant_version);
+	    "usage:\n"
+	    "  wpa_supplicant [-hv] -i<ifname> -k<keyname>\n"
+	    "options:\n"
+	    "  -h = show this help text\n"
+	    "  -v = show version\n",
+	    wpa_supplicant_version);
 }
 
 int
@@ -813,11 +817,12 @@ main(int argc, char *argv[])
 	struct wpa_supplicant wpa_s;
 	char *link = NULL;
 	char *key = NULL;
+	dlpi_handle_t dh = NULL;
+	datalink_id_t linkid;
+	dladm_phys_attr_t dpa;
 	int c;
 	int exitcode;
 	char door_file[WPA_STRSIZE];
-
-	(void) memset(&wpa_s, 0, sizeof (wpa_s));
 
 	for (;;) {
 		c = getopt(argc, argv, "Dk:hi:v");
@@ -845,8 +850,6 @@ main(int argc, char *argv[])
 		}
 	}
 
-	wpa_s.driver = &wpa_driver_wifi_ops;
-	eloop_init(&wpa_s);
 	/*
 	 * key name is required to retrieve PSK value through libwdladm APIs.
 	 * key is saved by dladm command by keyname
@@ -857,22 +860,48 @@ main(int argc, char *argv[])
 		return (-1);
 	}
 
-	if ((strlen(link) >= sizeof (wpa_s.ifname)) ||
-	    (strlen(key) >= sizeof (wpa_s.kname)))  {
-		wpa_printf(MSG_ERROR, "Too long link/key name '%s', '%s'.",
-		    link, key);
+	if ((strlen(key) >= sizeof (wpa_s.kname)))  {
+		wpa_printf(MSG_ERROR, "Too long key name '%s'.", key);
 		return (-1);
 	}
 
-	(void) strlcpy(wpa_s.ifname, link, sizeof (wpa_s.ifname));
-	(void) strlcpy(wpa_s.kname, key, sizeof (wpa_s.kname));
+	if (daemon(0, 0))
+		return (-1);
 
 	/*
-	 * Setup door file to communicate with driver
-	 * Since this is multiple instance service, different instance
-	 * has different doors.
+	 * Hold this link open to prevent a link renaming operation.
 	 */
-	(void) snprintf(door_file, WPA_STRSIZE, "%s_%s", WPA_DOOR, link);
+	if (dlpi_open(link, &dh, 0) != DLPI_SUCCESS) {
+		wpa_printf(MSG_ERROR, "Failed to open link '%s'.", link);
+		return (-1);
+	}
+
+	if (dladm_name2info(link, &linkid, NULL, NULL, NULL) !=
+	    DLADM_STATUS_OK) {
+		wpa_printf(MSG_ERROR, "Invalid link name '%s'.", link);
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	/*
+	 * Get the device name of the link, which will be used as the door
+	 * file name used to communicate with the driver. Note that different
+	 * links use different doors.
+	 */
+	if (dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE) !=
+	    DLADM_STATUS_OK) {
+		wpa_printf(MSG_ERROR,
+		    "Failed to get device name of link '%s'.", link);
+		dlpi_close(dh);
+		return (-1);
+	}
+	(void) snprintf(door_file, WPA_STRSIZE, "%s_%s", WPA_DOOR, dpa.dp_dev);
+
+	(void) memset(&wpa_s, 0, sizeof (wpa_s));
+	wpa_s.driver = &wpa_driver_wifi_ops;
+	wpa_s.linkid = linkid;
+	(void) strlcpy(wpa_s.kname, key, sizeof (wpa_s.kname));
+	eloop_init(&wpa_s);
 
 	/*
 	 * Setup default WPA/WPA2 configuration
@@ -881,16 +910,15 @@ main(int argc, char *argv[])
 	wpa_s.conf = wpa_config_read(&wpa_s);
 	if (wpa_s.conf == NULL || wpa_s.conf->ssid == NULL) {
 		wpa_printf(MSG_ERROR, "\nNo networks (SSID) configured.\n");
-		return (-1);
-	}
-
-	exitcode = 0;
-
-	if (daemon(0, 0)) {
 		exitcode = -1;
 		goto cleanup;
 	}
 
+	exitcode = 0;
+
+	/*
+	 * Setup door file to communicate with driver
+	 */
 	if (wpa_supplicant_door_setup(&wpa_s, door_file) != 0) {
 		wpa_printf(MSG_ERROR, "Failed to setup door(%s)", door_file);
 		exitcode = -1;
@@ -898,10 +926,17 @@ main(int argc, char *argv[])
 	}
 
 	wpa_s.renew_snonce = 1;
-	if (wpa_supplicant_driver_init(&wpa_s) < 0) {
+	if (wpa_supplicant_driver_init(link, &wpa_s) < 0) {
 		exitcode = -1;
 		goto cleanup;
 	}
+
+	/*
+	 * This link is hold again in wpa_supplicant_driver_init(), so that
+	 * we release the first reference.
+	 */
+	dlpi_close(dh);
+	dh = NULL;
 
 	wpa_printf(MSG_DEBUG, "=> eloop_run");
 
@@ -914,14 +949,17 @@ main(int argc, char *argv[])
 	wpa_printf(MSG_DEBUG, "<= eloop_run()");
 	wpa_supplicant_disassociate(&wpa_s, REASON_DEAUTH_LEAVING);
 
-cleanup:
-	if (wpa_s.driver->set_wpa(wpa_s.ifname, 0) < 0) {
+	if (wpa_s.driver->set_wpa(wpa_s.linkid, 0) < 0) {
 		wpa_printf(MSG_ERROR, "Failed to disable WPA in the driver.\n");
 	}
 
+cleanup:
 	wpa_supplicant_door_destroy(door_file);
 	wpa_supplicant_cleanup(&wpa_s);
 	eloop_destroy();
+
+	if (dh != NULL)
+		dlpi_close(dh);
 
 	return (exitcode);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,13 +28,14 @@
 #include <unistd.h>
 #include <stropts.h>
 #include <errno.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <strings.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <libdladm.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
+#include <libdlpi.h>
 
 static char		dladm_rootdir[MAXPATHLEN] = "/";
 
@@ -127,24 +128,23 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_KEYINVAL:
 		s = "invalid key";
 		break;
-	case DLADM_STATUS_INVALIDID:
-		s = "invalid VNIC id";
-		break;
 	case DLADM_STATUS_INVALIDMACADDRLEN:
 		s = "invalid MAC address length";
 		break;
 	case DLADM_STATUS_INVALIDMACADDRTYPE:
 		s = "invalid MAC address type";
 		break;
-	case DLADM_STATUS_AUTOIDNOTEMP:
-		s = "automatic VNIC ID assigment not supported with"
-		    "persistant operations";
+	case DLADM_STATUS_LINKBUSY:
+		s = "link busy";
 		break;
-	case DLADM_STATUS_AUTOIDNOAVAILABLEID:
-		s = "no available VNIC ID for automatic assignment";
+	case DLADM_STATUS_VIDINVAL:
+		s = "invalid VLAN identifier";
 		break;
-	case DLADM_STATUS_BUSY:
-		s = "device busy";
+	case DLADM_STATUS_TRYAGAIN:
+		s = "try again later";
+		break;
+	case DLADM_STATUS_NONOTIF:
+		s = "link notification is not supported";
 		break;
 	default:
 		s = "<unknown error>";
@@ -175,12 +175,16 @@ dladm_errno2status(int err)
 		return (DLADM_STATUS_NOMEM);
 	case ENOTSUP:
 		return (DLADM_STATUS_NOTSUP);
+	case ENETDOWN:
+		return (DLADM_STATUS_NONOTIF);
 	case EACCES:
 		return (DLADM_STATUS_DENIED);
 	case EIO:
 		return (DLADM_STATUS_IOERR);
 	case EBUSY:
-		return (DLADM_STATUS_BUSY);
+		return (DLADM_STATUS_LINKBUSY);
+	case EAGAIN:
+		return (DLADM_STATUS_TRYAGAIN);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}
@@ -190,15 +194,15 @@ dladm_errno2status(int err)
  * These are the uid and gid of the user 'dladm'.
  * The directory /etc/dladm and all files under it are owned by this user.
  */
-#define	DLADM_DB_OWNER		15
-#define	DLADM_DB_GROUP		3
-#define	LOCK_DB_PERMS		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
+#define	DLADM_DB_OWNER	15
+#define	DLADM_DB_GROUP	3
+#define	LOCK_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 
 static int
 i_dladm_lock_db(const char *lock_file, short type)
 {
 	int	lock_fd;
-	struct  flock lock;
+	struct	flock lock;
 
 	if ((lock_fd = open(lock_file, O_RDWR | O_CREAT | O_TRUNC,
 	    LOCK_DB_PERMS)) < 0)
@@ -236,6 +240,135 @@ i_dladm_unlock_db(const char *lock_file, int fd)
 	(void) fcntl(fd, F_SETLKW, &lock);
 	(void) close(fd);
 	(void) unlink(lock_file);
+}
+
+/*
+ * Given a link class, returns its class string.
+ */
+const char *
+dladm_class2str(datalink_class_t class, char *buf)
+{
+	const char *s;
+
+	switch (class) {
+	case DATALINK_CLASS_PHYS:
+		s = "phys";
+		break;
+	case DATALINK_CLASS_VLAN:
+		s = "vlan";
+		break;
+	case DATALINK_CLASS_AGGR:
+		s = "aggr";
+		break;
+	case DATALINK_CLASS_VNIC:
+		s = "vnic";
+		break;
+	default:
+		s = "unknown";
+		break;
+	}
+
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", s);
+	return (buf);
+}
+
+/*
+ * Given a physical link media type, returns its media type string.
+ */
+const char *
+dladm_media2str(uint32_t media, char *buf)
+{
+	const char *s;
+
+	switch (media) {
+	case DL_ETHER:
+		s = "Ethernet";
+		break;
+	case DL_WIFI:
+		s = "WiFi";
+		break;
+	case DL_IB:
+		s = "Infiniband";
+		break;
+	case DL_IPV4:
+		s = "IPv4Tunnel";
+		break;
+	case DL_IPV6:
+		s = "IPv6Tunnel";
+		break;
+	case DL_CSMACD:
+		s = "CSMA/CD";
+		break;
+	case DL_TPB:
+		s = "TokenBus";
+		break;
+	case DL_TPR:
+		s = "TokenRing";
+		break;
+	case DL_METRO:
+		s = "MetroNet";
+		break;
+	case DL_HDLC:
+		s = "HDLC";
+		break;
+	case DL_CHAR:
+		s = "SyncCharacter";
+		break;
+	case DL_CTCA:
+		s = "CTCA";
+		break;
+	case DL_FDDI:
+		s = "FDDI";
+		break;
+	case DL_FC:
+		s = "FiberChannel";
+		break;
+	case DL_ATM:
+		s = "ATM";
+		break;
+	case DL_IPATM:
+		s = "ATM(ClassicIP)";
+		break;
+	case DL_X25:
+		s = "X.25";
+		break;
+	case DL_IPX25:
+		s = "X.25(ClassicIP)";
+		break;
+	case DL_ISDN:
+		s = "ISDN";
+		break;
+	case DL_HIPPI:
+		s = "HIPPI";
+		break;
+	case DL_100VG:
+		s = "100BaseVGEthernet";
+		break;
+	case DL_100VGTPR:
+		s = "100BaseVGTokenRing";
+		break;
+	case DL_ETH_CSMA:
+		s = "IEEE802.3";
+		break;
+	case DL_100BT:
+		s = "100BaseT";
+		break;
+	case DL_FRAME:
+		s = "FrameRelay";
+		break;
+	case DL_MPFRAME:
+		s = "MPFrameRelay";
+		break;
+	case DL_ASYNC:
+		s = "AsyncCharacter";
+		break;
+	default:
+		s = "--";
+		break;
+	}
+
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", s);
+	return (buf);
 }
 
 dladm_status_t
@@ -349,4 +482,31 @@ dladm_set_rootdir(const char *rootdir)
 	(void) strncpy(dladm_rootdir, rootdir, MAXPATHLEN);
 	(void) closedir(dp);
 	return (DLADM_STATUS_OK);
+}
+
+boolean_t
+dladm_valid_linkname(const char *link)
+{
+	size_t		len = strlen(link);
+	const char	*cp;
+
+	if (len + 1 >= MAXLINKNAMELEN)
+		return (B_FALSE);
+
+	/*
+	 * The link name cannot start with a digit and must end with a digit.
+	 */
+	if ((isdigit(link[0]) != 0) || (isdigit(link[len - 1]) == 0))
+		return (B_FALSE);
+
+	/*
+	 * The legal characters in a link name are:
+	 * alphanumeric (a-z,  A-Z,  0-9), and the underscore ('_').
+	 */
+	for (cp = link; *cp != '\0'; cp++) {
+		if ((isalnum(*cp) == 0) && (*cp != '_'))
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }

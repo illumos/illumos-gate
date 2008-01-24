@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,10 +57,9 @@ extern "C" {
 #define	DLADM_WLAN_OFDM2CHAN(mhz)		(((mhz) - 5000) / 5)
 
 #define	DLADM_WLAN_CONNECT_POLLRATE		200 /* milliseconds */
-#define	DLADM_WLAN_CONNECT_DEFAULT_CHANNEL	1
 
 #define	DLADM_WLAN_MAX_RATES	4
-typedef	struct dladm_wlan_rates {
+typedef struct dladm_wlan_rates {
 	uint8_t		wr_rates[DLADM_WLAN_MAX_RATES];
 	int		wr_cnt;
 } dladm_wlan_rates_t;
@@ -70,11 +69,19 @@ typedef enum {
 	DLADM_WLAN_RADIO_OFF
 } dladm_wlan_radio_t;
 
-typedef	enum {
+typedef enum {
 	DLADM_WLAN_PM_OFF = 1,
 	DLADM_WLAN_PM_MAX,
 	DLADM_WLAN_PM_FAST
 } dladm_wlan_powermode_t;
+
+extern dladm_status_t	i_dladm_wlan_get_ioctl(datalink_id_t, wldp_t *,
+			    uint_t);
+extern dladm_status_t	i_dladm_wlan_set_ioctl(datalink_id_t, uint_t,
+			    void *, uint_t);
+extern dladm_status_t	i_dladm_wlan_ioctl(datalink_id_t, wldp_t *, uint_t,
+			    size_t, uint_t, size_t);
+extern boolean_t	i_dladm_wlan_convert_chan(wl_phy_conf_t *, uint32_t *);
 
 #ifdef	__cplusplus
 }

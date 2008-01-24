@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <netdb.h>
 #include <inet/ip.h>
 #include <libinetutil.h>
+#include <libdllink.h>
 
 #include <ipmp_mpathd.h>
 #include "rcm_module.h"
@@ -72,8 +73,8 @@
 #define	IP_MAX_MODS		9		/* max modules pushed on intr */
 #define	MAX_RECONFIG_SIZE	1024		/* Max. reconfig string size */
 
-#define	RCM_NET_PREFIX		"SUNW_network"	/* RCM network name prefix */
-#define	RCM_NET_RESOURCE_MAX	(13 + LIFNAMSIZ) /* RCM_NET_PREFIX+LIFNAMSIZ */
+#define	RCM_LINK_PREFIX		"SUNW_datalink"	/* RCM datalink name prefix */
+#define	RCM_LINK_RESOURCE_MAX	(13 + LINKID_STR_WIDTH)
 
 #define	RCM_STR_SUNW_IP		"SUNW_ip/"	/* IP address export prefix */
 #define	RCM_SIZE_SUNW_IP	9		/* strlen("SUNW_ip/") + 1 */
@@ -133,13 +134,6 @@
 #define	MOD_INSERT		0	/* Insert a mid-stream module */
 #define	MOD_REMOVE		1	/* Remove a mid-stream module */
 #define	MOD_CHECK		2	/* Check mid-stream module safety */
-
-/* VLAN format support */
-#define	VLAN_MAX_PPA_ALLOWED	1000
-#define	VLAN_GET_PPA(ppa)	(ppa % VLAN_MAX_PPA_ALLOWED)
-
-/* devfsadm attach nvpair values */
-#define	PROP_NV_DDI_NETWORK	"ddi_network"
 
 /*
  * in.mpathd(1M) message passing formats
@@ -217,31 +211,6 @@ static mutex_t		cache_lock;
 static int		events_registered = 0;
 
 /*
- * Global NIC list to be configured after DR-attach
- */
-#define	NIL_NULL	((struct ni_list *)0)
-
-struct net_interface {
-	char *type;	/* Name of type of interface  (le, ie, etc.)    */
-	char *name;	/* Qualified name of interface (le0, ie0, etc.) */
-};
-
-struct ni_list {
-	struct net_interface *nifp;
-	struct ni_list *next;
-};
-
-static mutex_t nil_lock;	/* NIC list lock */
-static int num_ni = 0;		/* Global new interface count */
-static struct ni_list *nil_head = NIL_NULL;	/* Global new if list */
-
-struct devfs_minor_data {
-	int32_t minor_type;
-	char *minor_name;
-	char *minor_node_type;
-};
-
-/*
  * RCM module interface prototypes
  */
 static int ip_register(rcm_handle_t *);
@@ -276,7 +245,7 @@ static int	if_cfginfo(ip_cache_t *, uint_t);
 static int	if_unplumb(ip_cache_t *);
 static int	if_replumb(ip_cache_t *);
 static void 	ip_log_err(ip_cache_t *, char **, char *);
-static char	*get_physical_resource(const char *);
+static char	*get_link_resource(const char *);
 static void	clr_cfg_state(ip_pif_t *);
 static uint64_t	if_get_flags(ip_pif_t *);
 static int	mpathd_send_cmd(mpathd_cmd_t *);
@@ -291,12 +260,10 @@ static int	ip_offlinelist(rcm_handle_t *, ip_cache_t *, char **, uint_t,
 			rcm_info_t **);
 static char 	**ip_get_addrlist(ip_cache_t *);
 static void	ip_free_addrlist(char **);
-static void	ip_consumer_notify(rcm_handle_t *, char *, char **, uint_t,
-			rcm_info_t **);
+static void	ip_consumer_notify(rcm_handle_t *, datalink_id_t, char **,
+			uint_t, rcm_info_t **);
 
-static int process_nvlist(nvlist_t *);
-static void process_minor(char *, char *, int32_t, struct devfs_minor_data *);
-static int if_configure(char *);
+static int if_configure(datalink_id_t);
 static int isgrouped(char *);
 static int if_ipmp_config(char *, int, int);
 static int if_mpathd_configure(char *, char *, int, int);
@@ -335,7 +302,6 @@ rcm_mod_init(void)
 	cache_tail.ip_prev = &cache_head;
 	cache_tail.ip_next = NULL;
 	(void) mutex_init(&cache_lock, NULL, NULL);
-	(void) mutex_init(&nil_lock, NULL, NULL);
 
 	/* Return the ops vectors */
 	return (&ip_ops);
@@ -361,7 +327,6 @@ rcm_mod_fini(void)
 	rcm_log_message(RCM_TRACE1, "IP: mod_fini\n");
 
 	free_cache();
-	(void) mutex_destroy(&nil_lock);
 	(void) mutex_destroy(&cache_lock);
 	return (RCM_SUCCESS);
 }
@@ -386,15 +351,15 @@ ip_register(rcm_handle_t *hd)
 	 * getting attached, so we get attach event notifications
 	 */
 	if (!events_registered) {
-		if (rcm_register_event(hd, RCM_RESOURCE_NETWORK_NEW, 0, NULL)
+		if (rcm_register_event(hd, RCM_RESOURCE_LINK_NEW, 0, NULL)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: failed to register %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			return (RCM_FAILURE);
 		} else {
 			rcm_log_message(RCM_DEBUG, "IP: registered %s\n",
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			events_registered++;
 		}
 	}
@@ -435,15 +400,15 @@ ip_unregister(rcm_handle_t *hd)
 	 * Need to unregister interest in all new resources
 	 */
 	if (events_registered) {
-		if (rcm_unregister_event(hd, RCM_RESOURCE_NETWORK_NEW, 0)
+		if (rcm_unregister_event(hd, RCM_RESOURCE_LINK_NEW, 0)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: failed to unregister %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			return (RCM_FAILURE);
 		} else {
 			rcm_log_message(RCM_DEBUG, "IP: unregistered %s\n",
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			events_registered--;
 		}
 	}
@@ -828,9 +793,9 @@ static int
 ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 			char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
 {
-	struct ni_list	*nilp, *onilp;
-	struct net_interface *nip;
-	int		n;
+	datalink_id_t	linkid;
+	nvpair_t *nvp = NULL;
+	uint64_t id64;
 
 	assert(hd != NULL);
 	assert(rsrc != NULL);
@@ -839,7 +804,7 @@ ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 
 	rcm_log_message(RCM_TRACE1, "IP: notify_event(%s)\n", rsrc);
 
-	if (!STREQ(rsrc, RCM_RESOURCE_NETWORK_NEW)) {
+	if (!STREQ(rsrc, RCM_RESOURCE_LINK_NEW)) {
 		rcm_log_message(RCM_INFO,
 		    _("IP: unrecognized event for %s\n"), rsrc);
 		ip_log_err(NULL, errorp, "unrecognized event");
@@ -847,60 +812,36 @@ ip_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 		return (RCM_FAILURE);
 	}
 
-	/* Update cache to  reflect latest interfaces */
+	/* Update cache to reflect latest interfaces */
 	if (update_cache(hd) < 0) {
 		rcm_log_message(RCM_ERROR, _("IP: update_cache failed\n"));
 		ip_log_err(NULL, errorp, "Private Cache update failed");
 		return (RCM_FAILURE);
 	}
 
-	/* Process the nvlist for the event */
-	if (process_nvlist(nvl) != 0) {
-		rcm_log_message(RCM_WARNING,
-		    _("IP: Error processing resource attributes(%s)\n"), rsrc);
-		rcm_log_message(RCM_WARNING,
-		    _("IP: One or more devices may not be configured.\n"));
-		ip_log_err(NULL, errorp, "Error processing device properties");
-		/* Continue processing interfaces that were valid */
-	}
-
-	(void) mutex_lock(&nil_lock);
-
-	/* Configure all new interfaces found */
-	for (nilp = nil_head, n = 0; n < num_ni; nilp = nilp->next, n++) {
-		nip = nilp->nifp;
-		if (if_configure(nip->name) != 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: Configuration failed (%s)\n"), nip->name);
-			ip_log_err(NULL, errorp,
-			    "Failed configuring one or more IP addresses");
-			/* continue configuring rest of the interfaces */
-		}
-	}
-
-	/* Notify all IP address consumers and clean up interface list */
-	for (nilp = nil_head; nilp; ) {
-		nip = nilp->nifp;
-		if (nip != (struct net_interface *)0) {
-			if (nip->name != 0) {
-				ip_consumer_notify(hd, nip->name, errorp, flags,
-				    depend_info);
-				free(nip->name);
+	rcm_log_message(RCM_TRACE1, "IP: process_nvlist\n");
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		if (STREQ(nvpair_name(nvp), RCM_NV_LINKID)) {
+			if (nvpair_value_uint64(nvp, &id64) != 0) {
+				rcm_log_message(RCM_WARNING,
+				    _("IP: cannot get linkid\n"));
+				return (RCM_FAILURE);
 			}
-			if (nip->type != 0)
-				free(nip->type);
-			free((char *)nip);
+			linkid = (datalink_id_t)id64;
+			if (if_configure(linkid) != 0) {
+				rcm_log_message(RCM_ERROR,
+				    _("IP: Configuration failed (%u)\n"),
+				    linkid);
+				ip_log_err(NULL, errorp,
+				    "Failed configuring one or more IP "
+				    "addresses");
+			}
+
+			/* Notify all IP address consumers */
+			ip_consumer_notify(hd, linkid, errorp, flags,
+			    depend_info);
 		}
-
-		onilp = nilp;
-		nilp = nilp->next;
-		free((char *)onilp);
 	}
-
-	num_ni = 0;		/* reset new if count */
-	nil_head = NIL_NULL;	/* reset list head */
-
-	(void) mutex_unlock(&nil_lock);
 
 	rcm_log_message(RCM_TRACE1,
 	    "IP: notify_event: device configuration complete\n");
@@ -919,17 +860,42 @@ ip_usage(ip_cache_t *node)
 	ip_lif_t *lif;
 	int numifs;
 	char *buf;
-	char *nic;
+	char *linkidstr;
+	datalink_id_t linkid;
 	const char *fmt;
 	char *sep;
+	char link[MAXLINKNAMELEN];
 	char addrstr[INET6_ADDRSTRLEN];
+	char errmsg[DLADM_STRSIZE];
+	dladm_status_t status;
 	int offline = 0;
 	size_t bufsz;
 
 	rcm_log_message(RCM_TRACE2, "IP: usage(%s)\n", node->ip_resource);
 
-	nic = strchr(node->ip_resource, '/');
-	nic = nic ? nic + 1 : node->ip_resource;
+	/*
+	 * Note that node->ip_resource is in the form of SUNW_datalink/<linkid>
+	 */
+	linkidstr = strchr(node->ip_resource, '/');
+	assert(linkidstr != NULL);
+	linkidstr = linkidstr ? linkidstr + 1 : node->ip_resource;
+
+	errno = 0;
+	linkid = strtol(linkidstr, &buf, 10);
+	if (errno != 0 || *buf != '\0') {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: usage(%s) parse linkid failure (%s)\n"),
+		    node->ip_resource, strerror(errno));
+		return (NULL);
+	}
+
+	if ((status = dladm_datalink_id2info(linkid, NULL, NULL, NULL, link,
+	    sizeof (link))) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: usage(%s) get link name failure(%s)\n"),
+		    node->ip_resource, dladm_status2str(status, errmsg));
+		return (NULL);
+	}
 
 	/* TRANSLATION_NOTE: separator used between IP addresses */
 	sep = _(", ");
@@ -955,7 +921,7 @@ ip_usage(ip_cache_t *node)
 
 	/* space for addresses and separators, plus message */
 	bufsz = ((numifs * (INET6_ADDRSTRLEN + strlen(sep))) +
-	    strlen(fmt) + strlen(nic) + 1);
+	    strlen(fmt) + strlen(link) + 1);
 	if ((buf = malloc(bufsz)) == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: usage(%s) malloc failure(%s)\n"),
@@ -963,7 +929,7 @@ ip_usage(ip_cache_t *node)
 		return (NULL);
 	}
 	bzero(buf, bufsz);
-	(void) sprintf(buf, fmt, nic);
+	(void) sprintf(buf, fmt, link);
 
 	if (offline || (numifs == 0)) {	/* Nothing else to do */
 		rcm_log_message(RCM_TRACE2, "IP: usage (%s) info = %s\n",
@@ -1019,7 +985,7 @@ ip_usage(ip_cache_t *node)
  */
 
 /*
- * cache_lookup() - Get a cache node for a resource. Supports VLAN interfaces.
+ * cache_lookup() - Get a cache node for a resource.
  *		  Call with cache lock held.
  *
  * This ensures that the cache is consistent with the system state and
@@ -1029,7 +995,6 @@ static ip_cache_t *
 cache_lookup(rcm_handle_t *hd, char *rsrc, char options)
 {
 	ip_cache_t *probe;
-	char *resource;		/* physical resource */
 
 	rcm_log_message(RCM_TRACE2, "IP: cache lookup(%s)\n", rsrc);
 
@@ -1040,23 +1005,16 @@ cache_lookup(rcm_handle_t *hd, char *rsrc, char options)
 		(void) mutex_lock(&cache_lock);
 	}
 
-	if ((resource = get_physical_resource(rsrc)) == NULL) {
-		errno = ENOENT;
-		return (NULL);
-	}
-
 	probe = cache_head.ip_next;
 	while (probe != &cache_tail) {
 		if (probe->ip_resource &&
-		    STREQ(resource, probe->ip_resource)) {
+		    STREQ(rsrc, probe->ip_resource)) {
 			rcm_log_message(RCM_TRACE2,
 			    "IP: cache lookup success(%s)\n", rsrc);
-			free(resource);
 			return (probe);
 		}
 		probe = probe->ip_next;
 	}
-	free(resource);
 	return (NULL);
 }
 
@@ -1098,6 +1056,9 @@ free_node(ip_cache_t *node)
 static void
 cache_insert(ip_cache_t *node)
 {
+	rcm_log_message(RCM_TRACE2, "IP: cache insert(%s)\n",
+	    node->ip_resource);
+
 	/* insert at the head for best performance */
 	node->ip_next = cache_head.ip_next;
 	node->ip_prev = &cache_head;
@@ -1113,6 +1074,9 @@ cache_insert(ip_cache_t *node)
 static void
 cache_remove(ip_cache_t *node)
 {
+	rcm_log_message(RCM_TRACE2, "IP: cache remove(%s)\n",
+	    node->ip_resource);
+
 	node->ip_next->ip_prev = node->ip_prev;
 	node->ip_prev->ip_next = node->ip_next;
 	node->ip_next = NULL;
@@ -1127,7 +1091,7 @@ cache_remove(ip_cache_t *node)
 static int
 update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 {
-	char	ifname[RCM_NET_RESOURCE_MAX];
+	char *rsrc;
 	ifspec_t ifspec;
 	ushort_t ifnumber = 0;
 	ip_cache_t *probe;
@@ -1191,29 +1155,28 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	}
 	(void) memcpy(&ifaddr, &lifreq.lifr_addr, sizeof (ifaddr));
 
-	/* Search for the interface in our cache */
-	(void) snprintf(ifname, sizeof (ifname), "%s/%s", RCM_NET_PREFIX,
-	    pif.pi_ifname);
+	rsrc = get_link_resource(pif.pi_ifname);
+	if (rsrc == NULL) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: get_link_resource(%s) failed\n"),
+		    lifreq.lifr_name);
+		return (-1);
+	}
 
-	probe = cache_lookup(hd, ifname, CACHE_NO_REFRESH);
+	probe = cache_lookup(hd, rsrc, CACHE_NO_REFRESH);
 	if (probe != NULL) {
+		free(rsrc);
 		probe->ip_cachestate &= ~(CACHE_IF_STALE);
 	} else {
 		if ((probe = calloc(1, sizeof (ip_cache_t))) == NULL) {
 			/* malloc errors are bad */
+			free(rsrc);
 			rcm_log_message(RCM_ERROR, _("IP: calloc: %s\n"),
 			    strerror(errno));
 			return (-1);
 		}
 
-		probe->ip_resource = get_physical_resource(ifname);
-		if (!probe->ip_resource) {
-			rcm_log_message(RCM_ERROR, _("IP: strdup: %s\n"),
-			    strerror(errno));
-			free(probe);
-			return (-1);
-		}
-
+		probe->ip_resource = rsrc;
 		probe->ip_pif = NULL;
 		probe->ip_ifred = RCM_IPMP_MIN_REDUNDANCY;
 		probe->ip_cachestate |= CACHE_IF_NEW;
@@ -1503,21 +1466,20 @@ free_cache()
 static void
 ip_log_err(ip_cache_t *node, char **errorp, char *errmsg)
 {
-	char *nic = NULL;
+	char *ifname = NULL;
 	int len;
 	const char *errfmt;
 	char *error;
 
 	if ((node != NULL) && (node->ip_pif != NULL) &&
 	    (node->ip_pif->pi_ifname != NULL)) {
-		nic = strrchr(node->ip_pif->pi_ifname, '/');
-		nic = nic ? nic + 1 : node->ip_pif->pi_ifname;
+		ifname = node->ip_pif->pi_ifname;
 	}
 
 	if (errorp != NULL)
 		*errorp = NULL;
 
-	if (nic == NULL) {
+	if (ifname == NULL) {
 		rcm_log_message(RCM_ERROR, _("IP: %s\n"), errmsg);
 		errfmt = _("IP: %s");
 		len = strlen(errfmt) + strlen(errmsg) + 1;
@@ -1525,11 +1487,11 @@ ip_log_err(ip_cache_t *node, char **errorp, char *errmsg)
 			(void) sprintf(error, errfmt, errmsg);
 		}
 	} else {
-		rcm_log_message(RCM_ERROR, _("IP: %s(%s)\n"), errmsg, nic);
+		rcm_log_message(RCM_ERROR, _("IP: %s(%s)\n"), errmsg, ifname);
 		errfmt = _("IP: %s(%s)");
-		len = strlen(errfmt) + strlen(errmsg) + strlen(nic) + 1;
+		len = strlen(errfmt) + strlen(errmsg) + strlen(ifname) + 1;
 		if (error = (char *)calloc(1, len)) {
-			(void) sprintf(error, errfmt, errmsg, nic);
+			(void) sprintf(error, errfmt, errmsg, ifname);
 		}
 	}
 
@@ -1696,7 +1658,7 @@ if_unplumb(ip_cache_t *node)
 		} else {
 			/* Unlikely case */
 			rcm_log_message(RCM_DEBUG,
-			    _("IP: Unplumb ignored (%s:%d)\n"),
+			    "IP: Unplumb ignored (%s:%d)\n",
 			    pif->pi_ifname, lif->li_ifnum);
 			lif = lif->li_next;
 			continue;
@@ -1781,7 +1743,7 @@ if_replumb(ip_cache_t *node)
 		} else {
 			/* Unlikely case */
 			rcm_log_message(RCM_DEBUG,
-			    _("IP: Re-plumb ignored (%s:%d)\n"),
+			    "IP: Re-plumb ignored (%s:%d)\n",
 			    pif->pi_ifname, lif->li_ifnum);
 			lif = lif->li_next;
 			continue;
@@ -1958,37 +1920,46 @@ ip_ipmp_undo_offline(ip_cache_t *node)
 }
 
 /*
- * get_physical_resource() - Convert a name (e.g., "SUNW_network/hme0:1" or
- * "SUNW_network/hme1000") into a dynamically allocated string containing the
- * associated physical device resource name ("SUNW_network/hme0").  Since we
- * assume that interface names map directly to device names, this is a
- * pass-through operation, with the exception that logical interface numbers
- * and VLANs encoded in the PPA are stripped.  This logic will need to be
- * revisited to support administratively-chosen interface names.
+ * get_link_resource() - Convert a link name (e.g., net0, hme1000) into a
+ * dynamically allocated string containing the associated link resource
+ * name ("SUNW_datalink/<linkid>").
  */
 static char *
-get_physical_resource(const char *rsrc)
+get_link_resource(const char *link)
 {
-	char		*rsrc_ifname, *ifname;
-	ifspec_t	ifspec;
+	char		errmsg[DLADM_STRSIZE];
+	datalink_id_t	linkid;
+	uint32_t	flags;
+	char		*resource;
+	dladm_status_t	status;
 
-	rsrc_ifname = strchr(rsrc, '/');
-	if (rsrc_ifname == NULL || !ifparse_ifspec(rsrc_ifname + 1, &ifspec)) {
-		rcm_log_message(RCM_ERROR, _("IP: bad resource: %s\n"), rsrc);
-		return (NULL);
+	if ((status = dladm_name2info(link, &linkid, &flags, NULL, NULL))
+	    != DLADM_STATUS_OK) {
+		goto fail;
 	}
 
-	ifname = malloc(RCM_NET_RESOURCE_MAX);
-	if (ifname == NULL) {
+	if (!(flags & DLADM_OPT_ACTIVE)) {
+		status = DLADM_STATUS_FAILED;
+		goto fail;
+	}
+
+	resource = malloc(RCM_LINK_RESOURCE_MAX);
+	if (resource == NULL) {
 		rcm_log_message(RCM_ERROR, _("IP: malloc error(%s): %s\n"),
-		    strerror(errno), rsrc);
+		    strerror(errno), link);
 		return (NULL);
 	}
 
-	(void) snprintf(ifname, RCM_NET_RESOURCE_MAX, "%s/%s%d", RCM_NET_PREFIX,
-	    ifspec.ifsp_devnm, VLAN_GET_PPA(ifspec.ifsp_ppa));
+	(void) snprintf(resource, RCM_LINK_RESOURCE_MAX, "%s/%u",
+	    RCM_LINK_PREFIX, linkid);
 
-	return (ifname);
+	return (resource);
+
+fail:
+	rcm_log_message(RCM_ERROR,
+	    _("IP: get_link_resource for %s error(%s)\n"),
+	    link, dladm_status2str(status, errmsg));
+	return (NULL);
 }
 
 /*
@@ -2107,7 +2078,7 @@ mpathd_send_cmd(mpathd_cmd_t *mpd)
 			if (mpr.resp_sys_errno == EAGAIN) {
 				(void) sleep(1);
 				rcm_log_message(RCM_DEBUG,
-				    _("IP: mpathd retrying\n"));
+				    "IP: mpathd retrying\n");
 				continue;		/* Retry */
 			}
 			errno = mpr.resp_sys_errno;
@@ -2605,36 +2576,24 @@ ip_free_addrlist(char **addrlist)
  */
 
 static void
-ip_consumer_notify(rcm_handle_t *hd, char *ifinst, char **errorp, uint_t flags,
-	rcm_info_t **depend_info)
+ip_consumer_notify(rcm_handle_t *hd, datalink_id_t linkid, char **errorp,
+    uint_t flags, rcm_info_t **depend_info)
 {
-	char ifname[LIFNAMSIZ + 1];
-	char cached_name[RCM_NET_RESOURCE_MAX];
+	char cached_name[RCM_LINK_RESOURCE_MAX];
 	ip_cache_t *node;
-	char *cp;
 
-	rcm_log_message(RCM_TRACE1, "IP: ip_consumer_notify(%s)\n", ifinst);
+	assert(linkid != DATALINK_INVALID_LINKID);
 
-	if (ifinst == NULL)
-		return;
-
-	(void) memcpy(&ifname, ifinst, sizeof (ifname));
-	ifname[sizeof (ifname) - 1] = '\0';
-
-	/* remove LIF component */
-	cp = strchr(ifname, ':');
-	if (cp) {
-		*cp = 0;
-	}
+	rcm_log_message(RCM_TRACE1, _("IP: ip_consumer_notify(%u)\n"), linkid);
 
 	/* Check for the interface in the cache */
-	(void) snprintf(cached_name, sizeof (cached_name), "%s/%s",
-	    RCM_NET_PREFIX, ifname);
+	(void) snprintf(cached_name, sizeof (cached_name), "%s/%u",
+	    RCM_LINK_PREFIX, linkid);
 
 	(void) mutex_lock(&cache_lock);
 	if ((node = cache_lookup(hd, cached_name, CACHE_REFRESH)) == NULL) {
-		rcm_log_message(RCM_TRACE1, "IP: Skipping interface(%s) \n",
-		    ifname);
+		rcm_log_message(RCM_TRACE1, _("IP: Skipping interface(%u)\n"),
+		    linkid);
 		(void) mutex_unlock(&cache_lock);
 		return;
 	}
@@ -2650,280 +2609,46 @@ ip_consumer_notify(rcm_handle_t *hd, char *ifinst, char **errorp, uint_t flags,
 	return;
 
 }
-/*
- * process_nvlist() - Determine network interfaces on a new attach by
- *			processing the nvlist
- */
-/*ARGSUSED*/
-static int
-process_nvlist(nvlist_t *nvl)
-{
-	nvpair_t	*nvp = NULL;
-	char *driver_name;
-	char *devfs_path;
-	int32_t instance;
-	char *minor_byte_array;	/* packed nvlist of minor_data */
-	uint_t nminor;			/* # of minor nodes */
-	struct devfs_minor_data *mdata;
-	nvlist_t *mnvl;
-	nvpair_t *mnvp = NULL;
-
-	rcm_log_message(RCM_TRACE1, "IP: process_nvlist\n");
-
-	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
-		/* Get driver name */
-		if (STREQ(nvpair_name(nvp), RCM_NV_DRIVER_NAME)) {
-			if (nvpair_value_string(nvp, &driver_name) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: cannot get driver name\n"));
-				return (-1);
-			}
-		}
-		/* Get instance */
-		if (STREQ(nvpair_name(nvp), RCM_NV_INSTANCE)) {
-			if (nvpair_value_int32(nvp, &instance) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: cannot get device instance\n"));
-				return (-1);
-			}
-		}
-		/* Get devfs_path */
-		if (STREQ(nvpair_name(nvp), RCM_NV_DEVFS_PATH)) {
-			if (nvpair_value_string(nvp, &devfs_path) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: cannot get device path\n"));
-				return (-1);
-			}
-		}
-		/* Get minor data */
-		if (STREQ(nvpair_name(nvp), RCM_NV_MINOR_DATA)) {
-			if (nvpair_value_byte_array(nvp,
-			    (uchar_t **)&minor_byte_array, &nminor) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: cannot get device minor data\n"));
-				return (-1);
-			}
-			if (nvlist_unpack(minor_byte_array,
-			    nminor, &mnvl, 0) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: cannot get minor node data\n"));
-				return (-1);
-			}
-			mdata = (struct devfs_minor_data *)calloc(1,
-			    sizeof (struct devfs_minor_data));
-			if (mdata == NULL) {
-				rcm_log_message(RCM_WARNING,
-				    _("IP: calloc error(%s)\n"),
-				    strerror(errno));
-				nvlist_free(mnvl);
-				return (-1);
-			}
-			/* Enumerate minor node data */
-			while ((mnvp = nvlist_next_nvpair(mnvl, mnvp)) !=
-			    NULL) {
-				/* Get minor type */
-				if (STREQ(nvpair_name(mnvp),
-				    RCM_NV_MINOR_TYPE)) {
-					if (nvpair_value_int32(mnvp,
-					    &mdata->minor_type) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("IP: cannot get minor "
-						    "type \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-				/* Get minor name */
-				if (STREQ(nvpair_name(mnvp),
-				    RCM_NV_MINOR_NAME)) {
-					if (nvpair_value_string(mnvp,
-					    &mdata->minor_name) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("IP: cannot get minor "
-						    "name \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-				/* Get minor node type */
-				if (STREQ(nvpair_name(mnvp),
-				    RCM_NV_MINOR_NODE_TYPE)) {
-					if (nvpair_value_string(mnvp,
-					    &mdata->minor_node_type) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("IP: cannot get minor "
-						    "node type \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-			}
-			(void) process_minor(devfs_path, driver_name, instance,
-			    mdata);
-			nvlist_free(mnvl);
-		}
-	}
-
-	rcm_log_message(RCM_TRACE1, "IP: process_nvlist success\n");
-	return (0);
-}
-
-static void
-process_minor(char *devfs_path, char *name, int instance,
-    struct devfs_minor_data *mdata)
-{
-	struct net_interface *nip;
-	struct ni_list *nilp;
-	struct ni_list *p;
-	struct ni_list **pp;
-	char *cname;
-	size_t cnamelen;
-
-	rcm_log_message(RCM_TRACE1, "IP: process_minor\n");
-
-	if ((mdata->minor_node_type != NULL) &&
-	    !STREQ(mdata->minor_node_type, PROP_NV_DDI_NETWORK)) {
-		/* Process network devices only */
-		return;
-	}
-
-	rcm_log_message(RCM_TRACE1, "IP: Examining %s (%s)\n",
-	    devfs_path, mdata->minor_name);
-
-	/* Sanity check, instances > 999 are illegal */
-	if (instance > 999) {
-		errno = EINVAL;
-		rcm_log_message(RCM_ERROR, _("IP: invalid instance %d(%s)\n"),
-		    instance, strerror(errno));
-		return;
-	}
-
-	/* Now, let's add the node to the interface list */
-	if ((nip = malloc(sizeof (struct net_interface))) == NULL) {
-		rcm_log_message(RCM_ERROR, _("IP: malloc failure(%s)\n"),
-		    strerror(errno));
-		return;
-	}
-	(void) memset(nip, 0, sizeof (struct net_interface));
-
-	cnamelen = strlen(name) + 1;
-	/* Set NIC type */
-	if ((nip->type = (char *)malloc(cnamelen)) == NULL) {
-		free(nip);
-		rcm_log_message(RCM_ERROR, _("IP: malloc failure(%s)\n"),
-		    strerror(errno));
-		return;
-	}
-	(void) memcpy(nip->type, name, cnamelen);
-
-	cnamelen += 3;
-	if ((cname = (char *)malloc(cnamelen)) == NULL) {
-		free(nip->type);
-		free(nip);
-		rcm_log_message(RCM_ERROR, _("IP: malloc failure(%s)\n"),
-		    strerror(errno));
-		return;
-	}
-	(void) snprintf(cname, cnamelen, "%s%d", name, instance);
-
-	rcm_log_message(RCM_TRACE1, "IP: Found SUNW_network/%s%d\n", name,
-	    instance);
-
-	/* Set NIC name */
-	if ((nip->name = strdup(cname)) == NULL) {
-		free(nip->type);
-		free(nip);
-		free(cname);
-		rcm_log_message(RCM_ERROR, _("IP: strdup failure(%s)\n"),
-		    strerror(errno));
-		return;
-	}
-	free(cname);
-
-	/* Add new interface to the list */
-	(void) mutex_lock(&nil_lock);
-	for (pp = &nil_head; (p = *pp) != NULL; pp = &(p->next)) {
-		cname = p->nifp->name;
-		if (strcmp(cname, nip->name) == 0)
-			break;
-	}
-
-	if (p != NULL) {
-		(void) mutex_unlock(&nil_lock);
-		free(nip->name);
-		free(nip->type);
-		free(nip);
-		rcm_log_message(RCM_TRACE1, "IP: secondary node - ignoring\n");
-		return;
-	}
-
-	if ((nilp = malloc(sizeof (struct ni_list))) == NULL) {
-		(void) mutex_unlock(&nil_lock);
-		free(nip->name);
-		free(nip->type);
-		free(nip);
-		rcm_log_message(RCM_ERROR, _("IP: malloc failure(%s)\n"),
-		    strerror(errno));
-		return;
-	}
-
-	nilp->nifp = nip;
-	nilp->next = NULL;
-	*pp = nilp;
-
-	num_ni++;	/* Increment interface count */
-
-	(void) mutex_unlock(&nil_lock);
-	rcm_log_message(RCM_TRACE1, "IP: added new node\n");
-}
 
 /*
  * if_configure() - Configure a physical interface after attach
  */
 static int
-if_configure(char *ifinst)
+if_configure(datalink_id_t linkid)
 {
+	char ifinst[MAXLINKNAMELEN];
 	char cfgfile[MAXPATHLEN];
-	char ifname[LIFNAMSIZ + 1];
-	char cached_name[RCM_NET_RESOURCE_MAX];
+	char cached_name[RCM_LINK_RESOURCE_MAX];
 	struct stat statbuf;
 	ip_cache_t *node;
-	char *cp;
 	int af = 0;
 	int ipmp = 0;
 
-	if (ifinst == NULL)
-		return (0);
+	assert(linkid != DATALINK_INVALID_LINKID);
 
-	rcm_log_message(RCM_TRACE1, "IP: if_configure(%s)\n", ifinst);
-
-	/*
-	 * Check if the interface is already configured
-	 */
-
-	(void) memcpy(&ifname, ifinst, sizeof (ifname));
-	ifname[sizeof (ifname) - 1] = '\0';
-
-	/* remove LIF component */
-	cp = strchr(ifname, ':');
-	if (cp) {
-		*cp = 0;
-	}
+	rcm_log_message(RCM_TRACE1, _("IP: if_configure(%u)\n"), linkid);
 
 	/* Check for the interface in the cache */
-	(void) snprintf(cached_name, sizeof (cached_name), "%s/%s",
-	    RCM_NET_PREFIX, ifname);
+	(void) snprintf(cached_name, sizeof (cached_name), "%s/%u",
+	    RCM_LINK_PREFIX, linkid);
 
 	/* Check if the interface is new or was previously offlined */
 	(void) mutex_lock(&cache_lock);
 	if (((node = cache_lookup(NULL, cached_name, CACHE_REFRESH)) != NULL) &&
 	    (!(node->ip_cachestate & CACHE_IF_OFFLINED))) {
 		rcm_log_message(RCM_TRACE1,
-		    "IP: Skipping configured interface(%s) \n", ifname);
+		    _("IP: Skipping configured interface(%u)\n"), linkid);
 		(void) mutex_unlock(&cache_lock);
 		return (0);
 	}
 	(void) mutex_unlock(&cache_lock);
+
+	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL, ifinst,
+	    sizeof (ifinst)) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: get %u link name failed\n"), linkid);
+		return (-1);
+	}
 
 	/* Scan IPv4 configuration first */
 	(void) snprintf(cfgfile, MAXPATHLEN, "%s%s", CFGFILE_FMT_IPV4, ifinst);
@@ -3101,7 +2826,7 @@ if_ipmp_config(char *ifinst, int af, int ipmp)
 
 	if (stat(cfgfile, &statb) != 0) {
 		rcm_log_message(RCM_TRACE1,
-		    _("IP: No config file(%s)\n"), ifinst);
+		    "IP: No config file(%s)\n", ifinst);
 		return (0);
 	}
 
@@ -3142,7 +2867,7 @@ if_ipmp_config(char *ifinst, int af, int ipmp)
 	/* Check if config file is empty, if so, nothing else to do */
 	if (statb.st_size == 0) {
 		rcm_log_message(RCM_TRACE1,
-		    _("IP: Zero size config file(%s)\n"), ifinst);
+		    "IP: Zero size config file(%s)\n", ifinst);
 		return (0);
 	}
 
@@ -3387,7 +3112,7 @@ if_mpathd_configure(char *syscmd, char *ifinst, int af, int ipmp)
 
 	if (mpathd_send_cmd(&mpdcmd) < 0) {
 		rcm_log_message(RCM_TRACE1,
-		    _("IP: mpathd set original index unsuccessful: %s\n"),
+		    "IP: mpathd set original index unsuccessful: %s\n",
 		    strerror(errno));
 		return (-1);
 	}
@@ -3400,7 +3125,7 @@ if_mpathd_configure(char *syscmd, char *ifinst, int af, int ipmp)
 }
 
 /*
- * get_mpathd_addr() - Return current destination for lif; caller is
+ * get_mpathd_dest() - Return current destination for lif; caller is
  *		     responsible to free memory allocated for address
  */
 static char *

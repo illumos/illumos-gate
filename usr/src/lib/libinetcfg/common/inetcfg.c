@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,8 @@
 #include <inet/ip.h>
 #include <arpa/inet.h>
 #include <libintl.h>
+#include <libdlpi.h>
 #include <inetcfg.h>
-
-#include "inetcfg_nic.h"
 
 #define	ICFG_FAMILY(handle) handle->ifh_interface.if_protocol
 
@@ -1715,6 +1714,84 @@ get_plumbed_if_list(icfg_if_t **list, int *numif, int proto) {
 	return (ICFG_SUCCESS);
 }
 
+typedef struct linklist {
+	struct linklist	*ll_next;
+	char		ll_name[DLPI_LINKNAME_MAX];
+} linklist_t;
+
+typedef struct linkwalk {
+	linklist_t	*lw_list;
+	int		lw_num;
+	int		lw_err;
+} linkwalk_t;
+
+static boolean_t
+add_link_list(const char *link, void *arg)
+{
+	linkwalk_t	*lwp = (linkwalk_t *)arg;
+	linklist_t	*entry = NULL;
+
+	if ((entry = calloc(1, sizeof (linklist_t))) == NULL) {
+		lwp->lw_err = ENOMEM;
+		return (B_TRUE);
+	}
+	(void) strlcpy(entry->ll_name, link, DLPI_LINKNAME_MAX);
+
+	if (lwp->lw_list == NULL)
+		lwp->lw_list = entry;
+	else
+		lwp->lw_list->ll_next = entry;
+
+	lwp->lw_num++;
+	return (B_FALSE);
+}
+
+/*
+ * Returns a list of data links that can be plumbed. The list of interfaces is
+ * returned as an array of icfg_if_t structures. The number of interfaces in
+ * the array will be returned via the 'numif' argument.
+ *
+ * Returns: ICFG_SUCCESS or ICFG_FAILURE.
+ */
+static int
+get_link_list(icfg_if_t **listp, int *numif) {
+
+	linkwalk_t	lw = {NULL, 0, 0};
+	linklist_t	*entry, *next;
+	icfg_if_t	*list;
+	int		save_errno = 0;
+	int		ret = ICFG_FAILURE;
+
+	dlpi_walk(add_link_list, &lw, 0);
+	if (lw.lw_err != 0) {
+		errno = lw.lw_err;
+		goto done;
+	}
+
+	list = calloc(lw.lw_num, sizeof (icfg_if_t));
+	if (list == NULL)
+		goto done;
+
+	for (entry = lw.lw_list; entry != NULL; entry = entry->ll_next) {
+		(void) strlcpy(list->if_name, entry->ll_name,
+		    sizeof (list->if_name));
+		list->if_protocol = AF_UNSPEC;
+		list++;
+	}
+	*listp = list;
+	*numif = lw.lw_num;
+	ret = ICFG_SUCCESS;
+
+done:
+	save_errno = errno;
+	for (entry = lw.lw_list; entry != NULL; entry = next) {
+		next = entry->ll_next;
+		free(entry);
+	}
+	errno = save_errno;
+	return (ret);
+}
+
 /*
  * Returns a list of network interfaces. The list of
  * interfaces is returned as an array of icfg_if_t structures.
@@ -1742,7 +1819,7 @@ icfg_get_if_list(icfg_if_t **list, int *numif, int proto, int type)
 	if (type == ICFG_PLUMBED) {
 		return (get_plumbed_if_list(list, numif, proto));
 	} else if (type == ICFG_INSTALLED) {
-		return (nic_get_list(list, numif));
+		return (get_link_list(list, numif));
 	} else {
 		errno = EINVAL;
 		return (ICFG_FAILURE);

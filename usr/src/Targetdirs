@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,6 +67,7 @@ ROOT.SYS= \
 	/dev \
 	/dev/dsk \
 	/dev/fd \
+	/dev/net \
 	/dev/rdsk \
 	/dev/rmt \
 	/dev/pts \
@@ -919,10 +920,12 @@ $(ROOT)/usr/lib/libposix4.so:=		REALPATH=../../lib/librt.so.1
 $(ROOT)/usr/lib/libproc.so.1:=		REALPATH=../../lib/libproc.so.1
 $(ROOT)/usr/lib/libproc.so:=		REALPATH=../../lib/libproc.so.1
 $(ROOT)/usr/lib/libpthread.so.1:=	REALPATH=../../lib/libpthread.so.1
+$(ROOT)/usr/lib/libpthread.so:=		REALPATH=../../lib/libpthread.so.1
+$(ROOT)/usr/lib/librcm.so.1:=		REALPATH=../../lib/librcm.so.1
+$(ROOT)/usr/lib/librcm.so:=		REALPATH=../../lib/librcm.so.1
 $(ROOT)/usr/lib/libresolv.so.1:=	REALPATH=../../lib/libresolv.so.1
 $(ROOT)/usr/lib/libresolv.so.2:=	REALPATH=../../lib/libresolv.so.2
 $(ROOT)/usr/lib/libresolv.so:=		REALPATH=../../lib/libresolv.so.2
-$(ROOT)/usr/lib/libpthread.so:=		REALPATH=../../lib/libpthread.so.1
 $(ROOT)/usr/lib/librestart.so.1:=	REALPATH=../../lib/librestart.so.1
 $(ROOT)/usr/lib/librestart.so:=		REALPATH=../../lib/librestart.so.1
 $(ROOT)/usr/lib/librpcsvc.so.1:=	REALPATH=../../lib/librpcsvc.so.1
@@ -1217,6 +1220,10 @@ $(ROOT)/usr/lib/$(MACH64)/libpthread.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libpthread.so.1
 $(ROOT)/usr/lib/$(MACH64)/libpthread.so:= \
 	REALPATH=../../../lib/$(MACH64)/libpthread.so.1
+$(ROOT)/usr/lib/$(MACH64)/librcm.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/librcm.so.1
+$(ROOT)/usr/lib/$(MACH64)/librcm.so:= \
+	REALPATH=../../../lib/$(MACH64)/librcm.so.1
 $(ROOT)/usr/lib/$(MACH64)/libresolv.so.2:= \
 	REALPATH=../../../lib/$(MACH64)/libresolv.so.2
 $(ROOT)/usr/lib/$(MACH64)/libresolv.so:= \
@@ -1504,6 +1511,8 @@ SYM.USRLIB= \
 	/usr/lib/libproc.so.1 \
 	/usr/lib/libpthread.so \
 	/usr/lib/libpthread.so.1 \
+	/usr/lib/librcm.so \
+	/usr/lib/librcm.so.1 \
 	/usr/lib/libresolv.so \
 	/usr/lib/libresolv.so.1 \
 	/usr/lib/libresolv.so.2 \
@@ -1736,6 +1745,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libproc.so.1 \
 	/usr/lib/$(MACH64)/libpthread.so \
 	/usr/lib/$(MACH64)/libpthread.so.1 \
+	/usr/lib/$(MACH64)/librcm.so \
+	/usr/lib/$(MACH64)/librcm.so.1 \
 	/usr/lib/$(MACH64)/libresolv.so \
 	/usr/lib/$(MACH64)/libresolv.so.2 \
 	/usr/lib/$(MACH64)/librestart.so \

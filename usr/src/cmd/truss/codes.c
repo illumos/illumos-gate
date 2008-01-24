@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -839,8 +839,22 @@ const struct ioc {
 	{ (uint_t)LAIOC_MODIFY,		"LAIOC_MODIFY",		"laioc_modify"},
 
 	/* dld data-link ioctls */
-	{ (uint_t)DLDIOCATTR,		"DLDIOCATTR",		"dld_ioc_attr"},
-	{ (uint_t)DLDIOCVLAN,		"DLDIOCVLAN",		"dld_ioc_vlan"},
+	{ (uint_t)DLDIOC_ATTR,		"DLDIOC_ATTR",		"dld_ioc_attr"},
+	{ (uint_t)DLDIOC_PHYS_ATTR,	"DLDIOC_PHYS_ATTR",
+		"dld_ioc_phys_attr"},
+	{ (uint_t)DLDIOC_VLAN_ATTR,	"DLDIOC_VLAN_ATTR",
+		"dld_ioc_vlan_attr"},
+	{ (uint_t)DLDIOC_CREATE_VLAN,	"DLDIOC_CREATE_VLAN",
+		"dld_ioc_create_vlan"},
+	{ (uint_t)DLDIOC_DELETE_VLAN,	"DLDIOC_DELETE_VLAN",
+		"dld_ioc_delete_vlan"},
+	{ (uint_t)DLDIOC_SETAUTOPUSH,   "DLDIOC_SETAUTOPUSH", "dld_ioc_ap"},
+	{ (uint_t)DLDIOC_GETAUTOPUSH,   "DLDIOC_GETAUTOPUSH", "dld_ioc_ap"},
+	{ (uint_t)DLDIOC_CLRAUTOPUSH,   "DLDIOC_CLRAUTOPUSH", "dld_ioc_ap"},
+	{ (uint_t)DLDIOC_DOORSERVER,   "DLDIOC_DOORSERVER", "dld_ioc_door"},
+	{ (uint_t)DLDIOC_RENAME,   "DLDIOC_RENAME", "dld_ioc_rename"},
+	{ (uint_t)DLDIOC_SETZID,   "DLDIOC_SETZID", "dld_ioc_setzid"},
+	{ (uint_t)DLDIOC_GETZID,   "DLDIOC_GETZID", "dld_ioc_getzid"},
 
 	/* ZFS ioctls */
 	{ (uint_t)ZFS_IOC_POOL_CREATE,		"ZFS_IOC_POOL_CREATE",

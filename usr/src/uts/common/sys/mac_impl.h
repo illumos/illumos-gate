@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,21 +35,20 @@
 extern "C" {
 #endif
 
-/*
- * Statistics maintained internally by the mac module.
- */
-enum mac_mod_stat {
-	MAC_STAT_LINK_STATE,
-	MAC_STAT_LINK_UP,
-	MAC_STAT_PROMISC
-};
-
 typedef struct mac_multicst_addr_s	mac_multicst_addr_t;
 
 struct mac_multicst_addr_s {
 	mac_multicst_addr_t	*mma_nextp;
 	uint_t			mma_ref;
 	uint8_t			mma_addr[MAXMACADDRLEN];
+};
+
+typedef struct mac_margin_req_s	mac_margin_req_t;
+
+struct mac_margin_req_s {
+	mac_margin_req_t	*mmr_nextp;
+	uint_t			mmr_ref;
+	uint32_t		mmr_margin;
 };
 
 typedef struct mac_notify_fn_s		mac_notify_fn_t;
@@ -118,9 +117,11 @@ typedef struct mac_vnic_tx_s {
  * Each registered MAC is associated with a mac_t structure.
  */
 typedef struct mac_impl_s {
+	/*
+	 * The following fields are set in mac_register() and will not be
+	 * changed until mac_unregister(). No lock is needed to access them.
+	 */
 	char			mi_name[LIFNAMSIZ];
-	const char		*mi_drvname;
-	uint_t			mi_instance;
 	void			*mi_driver;	/* Driver private data */
 	mac_info_t		mi_info;
 	mactype_t		*mi_type;
@@ -128,10 +129,22 @@ typedef struct mac_impl_s {
 	size_t			mi_pdata_size;
 	mac_callbacks_t		*mi_callbacks;
 	dev_info_t		*mi_dip;
+	minor_t			mi_minor;
+	dev_t			mi_phy_dev;
+	kstat_t			*mi_ksp;
+	uint_t			mi_kstat_count;
+	mac_txinfo_t		mi_txinfo;
+	mac_txinfo_t		mi_txloopinfo;
+
+	krwlock_t		mi_gen_lock;
+	uint32_t		mi_oref;
 	uint32_t		mi_ref;
 	boolean_t		mi_disabled;
+	boolean_t		mi_exclusive;
+
 	krwlock_t		mi_state_lock;
 	uint_t			mi_active;
+
 	krwlock_t		mi_data_lock;
 	link_state_t		mi_linkstate;
 	link_state_t		mi_lastlinkstate;
@@ -140,25 +153,26 @@ typedef struct mac_impl_s {
 	uint8_t			mi_addr[MAXMACADDRLEN];
 	uint8_t			mi_dstaddr[MAXMACADDRLEN];
 	mac_multicst_addr_t	*mi_mmap;
+
 	krwlock_t		mi_notify_lock;
 	uint32_t		mi_notify_bits;
 	kmutex_t		mi_notify_bits_lock;
 	kthread_t		*mi_notify_thread;
 	mac_notify_fn_t		*mi_mnfp;
 	kcondvar_t		mi_notify_cv;
+
 	krwlock_t		mi_rx_lock;
 	mac_rx_fn_t		*mi_mrfp;
 	krwlock_t		mi_tx_lock;
 	mac_txloop_fn_t		*mi_mtfp;
+
 	krwlock_t		mi_resource_lock;
 	mac_resource_add_t	mi_resource_add;
 	void			*mi_resource_add_arg;
-	kstat_t			*mi_ksp;
-	uint_t			mi_kstat_count;
+
 	kmutex_t		mi_activelink_lock;
 	boolean_t		mi_activelink;
-	mac_txinfo_t		mi_txinfo;
-	mac_txinfo_t		mi_txloopinfo;
+
 	uint32_t		mi_rx_ref;	/* #threads in mac_rx() */
 	uint32_t		mi_rx_removed;	/* #callbacks marked */
 						/* for removal */
@@ -171,11 +185,23 @@ typedef struct mac_impl_s {
 	mac_txinfo_t		mi_vnic_txloopinfo;
 	mac_getcapab_t		mi_vnic_getcapab_fn;
 	void			*mi_vnic_getcapab_arg;
+
+	boolean_t		mi_legacy;
+	uint32_t		mi_unsup_note;
+	uint32_t		mi_margin;
+
+	/*
+	 * List of margin value requests added by mac clients. This list is
+	 * sorted: the first one has the greatest value.
+	 */
+	mac_margin_req_t	*mi_mmrp;
 } mac_impl_t;
 
 #define	mi_getstat	mi_callbacks->mc_getstat
 #define	mi_start	mi_callbacks->mc_start
 #define	mi_stop		mi_callbacks->mc_stop
+#define	mi_open		mi_callbacks->mc_open
+#define	mi_close	mi_callbacks->mc_close
 #define	mi_setpromisc	mi_callbacks->mc_setpromisc
 #define	mi_multicst	mi_callbacks->mc_multicst
 #define	mi_unicst	mi_callbacks->mc_unicst

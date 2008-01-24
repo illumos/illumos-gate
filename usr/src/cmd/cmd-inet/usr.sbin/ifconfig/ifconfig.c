@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -164,7 +164,7 @@ static void	in6_configinfo(int force, uint64_t flags);
 /*
  * Misc support functions
  */
-static int	devfs_entry(di_node_t node, di_minor_t minor, void *arg);
+static boolean_t	ni_entry(const char *, void *);
 static void	foreachinterface(void (*func)(), int argc, char *argv[],
 		    int af, int64_t onflags, int64_t offflags,
 		    int64_t lifc_flags);
@@ -490,7 +490,7 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 	/*
 	 * Special case:
 	 * ifconfig -a plumb should find all network interfaces
-	 * in the machine by traversing the devinfo tree for global zone.
+	 * in the machine for the global zone.
 	 * For non-global zones, only find the assigned interfaces.
 	 * Also, there is no need to  SIOCGLIF* ioctls, since
 	 * those interfaces have already been plumbed
@@ -1755,8 +1755,7 @@ updownifs(iface_t *ifs, int up)
  * static int find_all_global_interfaces(struct lifconf *lifcp, char **buf,
  *     int64_t lifc_flags)
  *
- * It finds all interfaces for the global zone, that is all
- * the physical interfaces, using the kernel's devinfo tree.
+ * It finds all data links for the global zone.
  *
  * It takes in input a pointer to struct lifconf to receive interfaces
  * informations, a **char to hold allocated buffer, and a lifc_flags.
@@ -1771,23 +1770,10 @@ find_all_global_interfaces(struct lifconf *lifcp, char **buf,
 {
 	unsigned bufsize;
 	int n;
-	di_node_t root;
 	ni_t *nip;
 	struct lifreq *lifrp;
 
-	/*
-	 * DINFOCACHE is equivalent to DINFOSUBTREE | DINFOMINOR |
-	 * DINFOPROP | DINFOFORCE.
-	 */
-	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
-		(void) fprintf(stderr, "ifconfig: di_init "
-		    "failed; check the devinfo driver.\n");
-		exit(1);
-	}
-
-	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS,
-	    NULL, devfs_entry);
-	di_fini(root);
+	(void) dlpi_walk(ni_entry, NULL, 0);
 
 	/*
 	 * Now, translate the linked list into
@@ -4516,7 +4502,7 @@ strioctl(int s, int cmd, char *buf, int buflen)
 }
 
 static void
-add_ni(char *name)
+add_ni(const char *name)
 {
 	ni_t **pp;
 	ni_t *p;
@@ -4545,35 +4531,18 @@ add_ni(char *name)
 }
 
 /* ARGSUSED2 */
-static int
-devfs_entry(di_node_t node, di_minor_t minor, void *arg)
+static boolean_t
+ni_entry(const char *linkname, void *arg)
 {
-	char 		*provider;
-	char 		linkname[DLPI_LINKNAME_MAX];
 	dlpi_handle_t	dh;
 
-	provider = di_minor_name(minor);
-	if (debug > 2)
-		(void) fprintf(stderr, "provider = %s\n", provider);
-
-	if (dlpi_makelink(linkname, provider,
-	    di_instance(node)) != DLPI_SUCCESS)
-		return (DI_WALK_CONTINUE);
-
 	if (dlpi_open(linkname, &dh, 0) != DLPI_SUCCESS)
-		return (DI_WALK_CONTINUE);
+		return (_B_FALSE);
 
-	if (di_minor_type(minor) == DDM_ALIAS) {
-		if (debug > 2)
-			(void) fprintf(stderr, "alias node, using instance\n");
-		add_ni(linkname);
-	} else {
-		if (debug > 2)
-			(void) fprintf(stderr, "non-alias node, ignoring\n");
-	}
+	add_ni(linkname);
 
 	dlpi_close(dh);
-	return (DI_WALK_CONTINUE);
+	return (_B_FALSE);
 }
 
 /*

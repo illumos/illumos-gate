@@ -6053,76 +6053,6 @@ ip_dlpi_alloc(size_t len, t_uscalar_t prim)
 	return (mp);
 }
 
-const char *
-dlpi_prim_str(int prim)
-{
-	switch (prim) {
-	case DL_INFO_REQ:	return ("DL_INFO_REQ");
-	case DL_INFO_ACK:	return ("DL_INFO_ACK");
-	case DL_ATTACH_REQ:	return ("DL_ATTACH_REQ");
-	case DL_DETACH_REQ:	return ("DL_DETACH_REQ");
-	case DL_BIND_REQ:	return ("DL_BIND_REQ");
-	case DL_BIND_ACK:	return ("DL_BIND_ACK");
-	case DL_UNBIND_REQ:	return ("DL_UNBIND_REQ");
-	case DL_OK_ACK:		return ("DL_OK_ACK");
-	case DL_ERROR_ACK:	return ("DL_ERROR_ACK");
-	case DL_ENABMULTI_REQ:	return ("DL_ENABMULTI_REQ");
-	case DL_DISABMULTI_REQ:	return ("DL_DISABMULTI_REQ");
-	case DL_PROMISCON_REQ:	return ("DL_PROMISCON_REQ");
-	case DL_PROMISCOFF_REQ:	return ("DL_PROMISCOFF_REQ");
-	case DL_UNITDATA_REQ:	return ("DL_UNITDATA_REQ");
-	case DL_UNITDATA_IND:	return ("DL_UNITDATA_IND");
-	case DL_UDERROR_IND:	return ("DL_UDERROR_IND");
-	case DL_PHYS_ADDR_REQ:	return ("DL_PHYS_ADDR_REQ");
-	case DL_PHYS_ADDR_ACK:	return ("DL_PHYS_ADDR_ACK");
-	case DL_SET_PHYS_ADDR_REQ:	return ("DL_SET_PHYS_ADDR_REQ");
-	case DL_NOTIFY_REQ:	return ("DL_NOTIFY_REQ");
-	case DL_NOTIFY_ACK:	return ("DL_NOTIFY_ACK");
-	case DL_NOTIFY_IND:	return ("DL_NOTIFY_IND");
-	case DL_CAPABILITY_REQ:	return ("DL_CAPABILITY_REQ");
-	case DL_CAPABILITY_ACK:	return ("DL_CAPABILITY_ACK");
-	case DL_CONTROL_REQ:	return ("DL_CONTROL_REQ");
-	case DL_CONTROL_ACK:	return ("DL_CONTROL_ACK");
-	default:		return ("<unknown primitive>");
-	}
-}
-
-const char *
-dlpi_err_str(int err)
-{
-	switch (err) {
-	case DL_ACCESS:		return ("DL_ACCESS");
-	case DL_BADADDR:	return ("DL_BADADDR");
-	case DL_BADCORR:	return ("DL_BADCORR");
-	case DL_BADDATA:	return ("DL_BADDATA");
-	case DL_BADPPA:		return ("DL_BADPPA");
-	case DL_BADPRIM:	return ("DL_BADPRIM");
-	case DL_BADQOSPARAM:	return ("DL_BADQOSPARAM");
-	case DL_BADQOSTYPE:	return ("DL_BADQOSTYPE");
-	case DL_BADSAP:		return ("DL_BADSAP");
-	case DL_BADTOKEN:	return ("DL_BADTOKEN");
-	case DL_BOUND:		return ("DL_BOUND");
-	case DL_INITFAILED:	return ("DL_INITFAILED");
-	case DL_NOADDR:		return ("DL_NOADDR");
-	case DL_NOTINIT:	return ("DL_NOTINIT");
-	case DL_OUTSTATE:	return ("DL_OUTSTATE");
-	case DL_SYSERR:		return ("DL_SYSERR");
-	case DL_UNSUPPORTED:	return ("DL_UNSUPPORTED");
-	case DL_UNDELIVERABLE:	return ("DL_UNDELIVERABLE");
-	case DL_NOTSUPPORTED :	return ("DL_NOTSUPPORTED ");
-	case DL_TOOMANY:	return ("DL_TOOMANY");
-	case DL_NOTENAB:	return ("DL_NOTENAB");
-	case DL_BUSY:		return ("DL_BUSY");
-	case DL_NOAUTO:		return ("DL_NOAUTO");
-	case DL_NOXIDAUTO:	return ("DL_NOXIDAUTO");
-	case DL_NOTESTAUTO:	return ("DL_NOTESTAUTO");
-	case DL_XIDAUTO:	return ("DL_XIDAUTO");
-	case DL_TESTAUTO:	return ("DL_TESTAUTO");
-	case DL_PENDING:	return ("DL_PENDING");
-	default:		return ("<unknown error>");
-	}
-}
-
 /*
  * Debug formatting routine.  Returns a character string representation of the
  * addr in buf, of the form xxx.xxx.xxx.xxx.  This routine takes the address
@@ -15443,13 +15373,13 @@ ip_dlpi_error(ill_t *ill, t_uscalar_t prim, t_uscalar_t dl_err,
 	if (dl_err == DL_SYSERR) {
 		(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
 		    "%s: %s failed: DL_SYSERR (errno %u)\n",
-		    ill->ill_name, dlpi_prim_str(prim), err);
+		    ill->ill_name, dl_primstr(prim), err);
 		return;
 	}
 
 	(void) mi_strlog(ill->ill_rq, 1, SL_CONSOLE|SL_ERROR|SL_TRACE,
-	    "%s: %s failed: %s\n", ill->ill_name, dlpi_prim_str(prim),
-	    dlpi_err_str(dl_err));
+	    "%s: %s failed: %s\n", ill->ill_name, dl_primstr(prim),
+	    dl_errstr(dl_err));
 }
 
 /*
@@ -15470,9 +15400,9 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 	if (dloa->dl_primitive == DL_ERROR_ACK) {
 		ip2dbg(("ip_rput_dlpi(%s): DL_ERROR_ACK %s (0x%x): "
 		    "%s (0x%x), unix %u\n", ill->ill_name,
-		    dlpi_prim_str(dlea->dl_error_primitive),
+		    dl_primstr(dlea->dl_error_primitive),
 		    dlea->dl_error_primitive,
-		    dlpi_err_str(dlea->dl_errno),
+		    dl_errstr(dlea->dl_errno),
 		    dlea->dl_errno,
 		    dlea->dl_unix_errno));
 	}
@@ -15532,7 +15462,7 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 
 	case DL_OK_ACK:
 		ip1dbg(("ip_rput: DL_OK_ACK for %s\n",
-		    dlpi_prim_str((int)dloa->dl_correct_primitive)));
+		    dl_primstr((int)dloa->dl_correct_primitive)));
 		switch (dloa->dl_correct_primitive) {
 		case DL_UNBIND_REQ:
 			mutex_enter(&ill->ill_lock);
@@ -15624,7 +15554,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	switch (dloa->dl_primitive) {
 	case DL_ERROR_ACK:
 		ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for %s\n",
-		    dlpi_prim_str(dlea->dl_error_primitive)));
+		    dl_primstr(dlea->dl_error_primitive)));
 
 		switch (dlea->dl_error_primitive) {
 		case DL_PROMISCON_REQ:
@@ -16254,7 +16184,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	}
 	case DL_OK_ACK:
 		ip2dbg(("DL_OK_ACK %s (0x%x)\n",
-		    dlpi_prim_str((int)dloa->dl_correct_primitive),
+		    dl_primstr((int)dloa->dl_correct_primitive),
 		    dloa->dl_correct_primitive));
 		switch (dloa->dl_correct_primitive) {
 		case DL_PROMISCON_REQ:

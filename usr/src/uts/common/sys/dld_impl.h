@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/conf.h>
 #include <sys/ethernet.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -56,6 +57,7 @@ typedef enum {
 } dld_passivestate_t;
 
 typedef struct dld_str	dld_str_t;
+typedef void		(*dld_tx_t)(struct dld_str *, mblk_t *);
 
 /*
  * dld_str_t object definition.
@@ -70,11 +72,6 @@ struct dld_str {
 	 * Ephemeral minor number for the object.
 	 */
 	minor_t			ds_minor;
-
-	/*
-	 * PPA number this stream is attached to.
-	 */
-	t_uscalar_t		ds_ppa;
 
 	/*
 	 * Read/write queues for the stream which the object represents.
@@ -200,20 +197,59 @@ struct dld_str {
 	mblk_t			*ds_tx_list_tail;
 	uint_t			ds_tx_cnt;
 	uint_t			ds_tx_msgcnt;
+	timeout_id_t		ds_tx_qdepth_tid;
 	boolean_t		ds_tx_qbusy;
 
+	dld_tx_t		ds_tx;
+	dld_tx_t		ds_unitdata_tx;
+	kmutex_t		ds_tx_lock;
+	kcondvar_t		ds_tx_cv;
+	uint32_t		ds_intx_cnt;
+	boolean_t		ds_detaching;
+
 	/*
-	 * Number of threads currently in dld.  If there is a pending
-	 * request, it is placed in ds_pending_req and the operation
-	 * will finish when dld becomes single-threaded.
+	 * Pending control messages to be processed.
 	 */
-	kmutex_t		ds_thr_lock;
-	uint_t			ds_thr;
-	uint_t			ds_pending_cnt;
-	mblk_t			*ds_pending_req;
-	task_func_t		*ds_pending_op;
-	kcondvar_t		ds_pending_cv;
+	mblk_t			*ds_pending_head;
+	mblk_t			*ds_pending_tail;
+
+	taskqid_t		ds_tid;
+	kmutex_t		ds_disp_lock;
+	kcondvar_t		ds_disp_cv;
+	boolean_t		ds_closing;
+
+	/*
+	 * Used to process ioctl message for control node. See comments
+	 * above dld_ioctl().
+	 */
+	void			(*ds_ioctl)(queue_t *, mblk_t *);
 } dld_str;
+
+#define	DLD_TX_ENTER(dsp) {					\
+	mutex_enter(&(dsp)->ds_tx_lock);			\
+	(dsp)->ds_intx_cnt++;					\
+	mutex_exit(&(dsp)->ds_tx_lock);				\
+}
+
+#define	DLD_TX_EXIT(dsp) {					\
+	mutex_enter(&(dsp)->ds_tx_lock);			\
+	if ((--(dsp)->ds_intx_cnt == 0) && (dsp)->ds_detaching)	\
+		cv_signal(&(dsp)->ds_tx_cv);			\
+	mutex_exit(&(dsp)->ds_tx_lock);				\
+}
+
+/*
+ * Quiesce the traffic.
+ */
+#define	DLD_TX_QUIESCE(dsp) {						\
+	mutex_enter(&(dsp)->ds_tx_lock);				\
+	(dsp)->ds_tx = (dsp)->ds_unitdata_tx = NULL;			\
+	(dsp)->ds_detaching = B_TRUE;					\
+	while ((dsp)->ds_intx_cnt != 0)					\
+		cv_wait(&(dsp)->ds_tx_cv, &(dsp)->ds_tx_lock);		\
+	(dsp)->ds_detaching = B_FALSE;					\
+	mutex_exit(&(dsp)->ds_tx_lock);					\
+}
 
 /*
  * dld_str.c module.
@@ -232,22 +268,26 @@ extern void		dld_str_rx_fastpath(void *, mac_resource_handle_t,
     mblk_t *, mac_header_info_t *);
 extern void		dld_str_rx_unitdata(void *, mac_resource_handle_t,
     mblk_t *, mac_header_info_t *);
+
 extern void		dld_tx_flush(dld_str_t *);
-extern void		dld_tx_enqueue(dld_str_t *, mblk_t *, boolean_t);
 extern void		dld_str_notify_ind(dld_str_t *);
-extern void		str_mdata_fastpath_put(dld_str_t *, mblk_t *);
 extern void		dld_tx_single(dld_str_t *, mblk_t *);
+extern void		str_mdata_fastpath_put(dld_str_t *, mblk_t *);
+extern void		str_mdata_raw_put(dld_str_t *, mblk_t *);
+
+extern void		dld_ioctl(queue_t *, mblk_t *);
+extern void		dld_finish_pending_task(dld_str_t *);
 
 /*
  * dld_proto.c
  */
-extern void		dld_proto(dld_str_t *, mblk_t *);
-extern void		dld_finish_pending_ops(dld_str_t *);
+extern void		dld_wput_proto_nondata(dld_str_t *, mblk_t *);
+extern void		dld_wput_proto_data(dld_str_t *, mblk_t *);
 extern void		dld_capabilities_disable(dld_str_t *);
 
 /*
  * Options: there should be a separate bit defined here for each
- *          DLD_PROP... defined in dld.h.
+ *	  DLD_PROP... defined in dld.h.
  */
 #define	DLD_OPT_NO_FASTPATH	0x00000001
 #define	DLD_OPT_NO_POLL		0x00000002
@@ -257,34 +297,23 @@ extern void		dld_capabilities_disable(dld_str_t *);
 extern uint32_t		dld_opt;
 
 /*
+ * autopush information
+ */
+typedef struct dld_ap {
+	datalink_id_t		da_linkid;
+	struct dlautopush	da_ap;
+
+#define	da_anchor		da_ap.dap_anchor
+#define	da_npush		da_ap.dap_npush
+#define	da_aplist		da_ap.dap_aplist
+
+} dld_ap_t;
+
+/*
  * Useful macros.
  */
 
 #define	IMPLY(p, c)	(!(p) || (c))
-
-#define	DLD_ENTER(dsp) {					\
-	mutex_enter(&dsp->ds_thr_lock);				\
-	++dsp->ds_thr;						\
-	ASSERT(dsp->ds_thr != 0);				\
-	mutex_exit(&dsp->ds_thr_lock);				\
-}
-
-#define	DLD_EXIT(dsp) {							\
-	mutex_enter(&dsp->ds_thr_lock);					\
-	ASSERT(dsp->ds_thr > 0);					\
-	if (--dsp->ds_thr == 0 && dsp->ds_pending_req != NULL)		\
-		dld_finish_pending_ops(dsp);				\
-	else								\
-		mutex_exit(&dsp->ds_thr_lock);				\
-}
-
-#define	DLD_WAKEUP(dsp) {						\
-	mutex_enter(&dsp->ds_thr_lock);					\
-	ASSERT(dsp->ds_pending_cnt > 0);				\
-	if (--dsp->ds_pending_cnt == 0)					\
-		cv_signal(&dsp->ds_pending_cv);				\
-	mutex_exit(&dsp->ds_thr_lock);					\
-}
 
 #ifdef DEBUG
 #define	DLD_DBG		cmn_err

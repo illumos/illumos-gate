@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,8 @@ COMMON_MOD_SRC = \
 	$(COMMON)/dump_rcm.c \
 	$(COMMON)/swap_rcm.c \
 	$(COMMON)/network_rcm.c \
+	$(COMMON)/vlan_rcm.c \
+	$(COMMON)/aggr_rcm.c \
 	$(COMMON)/ip_rcm.c \
 	$(COMMON)/cluster_rcm.c \
 	$(COMMON)/pool_rcm.c \
@@ -64,6 +66,8 @@ COMMON_MOD_OBJ = \
 	dump_rcm.o \
 	swap_rcm.o \
 	network_rcm.o \
+	vlan_rcm.o \
+	aggr_rcm.o \
 	ip_rcm.o \
 	cluster_rcm.o \
 	pool_rcm.o \
@@ -80,6 +84,8 @@ COMMON_RCM_MODS = \
 	SUNW_dump_rcm.so \
 	SUNW_swap_rcm.so \
 	SUNW_network_rcm.so \
+	SUNW_vlan_rcm.so \
+	SUNW_aggr_rcm.so \
 	SUNW_ip_rcm.so \
 	SUNW_cluster_rcm.so \
 	SUNW_pool_rcm.so \
@@ -110,7 +116,9 @@ LDLIBS_MODULES =
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
+SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
+SUNW_aggr_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
+SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 
 LDLIBS += -lgen -lelf -lrcm -lnvpair -ldevinfo -lnsl -lsocket

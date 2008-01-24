@@ -20,13 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
@@ -43,6 +44,20 @@ case "$1" in
 
 'start')
 	if smf_is_globalzone; then
+		net_reconfigure || exit $SMF_EXIT_ERR_CONFIG
+
+		#
+		# Upgrade handling. The upgrade file consists of a series
+		# of dladm(1M) commands. Note that after we are done, we
+		# cannot rename the upgrade script file as the file system
+		# is still read-only at this point. Defer this to the
+		# manifest-import service.
+		#
+		upgrade_script=/var/svc/profile/upgrade_datalink
+		if [ -f "${upgrade_script}" ]; then
+			. "${upgrade_script}"
+		fi
+
 		# Initialize security objects.
 		/sbin/dladm init-secobj
 	fi

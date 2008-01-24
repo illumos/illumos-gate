@@ -89,6 +89,8 @@ usr/include/libdlaggr.h		sparc
 usr/include/libdlwlan.h		sparc
 usr/include/libdlwlan_impl.h	sparc
 usr/include/libdlvnic.h		sparc
+usr/include/libdlvlan.h		sparc
+usr/include/libdlmgmt.h		sparc
 lib/libdladm.so			sparc
 lib/llib-ldladm.ln		sparc
 lib/sparcv9/libdladm.so		sparc

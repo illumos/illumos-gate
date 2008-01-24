@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,17 +29,18 @@ SUNWprivate_1.1 {
     global:
 	dladm_info;
 	dladm_walk;
-	dladm_hold_link;
-	dladm_rele_link;
+	dladm_setzid;
+	dladm_getzid;
 	dladm_status2str;
 	dladm_linkstate2str;
 	dladm_linkduplex2str;
 	dladm_set_rootdir;
+	dladm_valid_linkname;
 	dladm_mac_walk;
 	dladm_init_linkprop;
-	dladm_get_prop;
-	dladm_set_prop;
-	dladm_walk_prop;
+	dladm_get_linkprop;
+	dladm_set_linkprop;
+	dladm_walk_linkprop;
 	dladm_init_secobj;
 	dladm_get_secobj;
 	dladm_set_secobj;
@@ -47,9 +48,7 @@ SUNWprivate_1.1 {
 	dladm_walk_secobj;
 	dladm_secobjclass2str;
 	dladm_str2secobjclass;
-	dladm_aggr_walk;
 	dladm_aggr_up;
-	dladm_aggr_down;
 	dladm_aggr_add;
 	dladm_aggr_create;
 	dladm_aggr_delete;
@@ -64,15 +63,12 @@ SUNWprivate_1.1 {
 	dladm_aggr_str2lacptimer;
 	dladm_aggr_str2macaddr;
 	dladm_aggr_str2policy;
-	dladm_wlan_walk;
+	dladm_aggr_info;
+	dladm_key2linkid;
 	dladm_wlan_scan;
 	dladm_wlan_connect;
 	dladm_wlan_disconnect;
 	dladm_wlan_get_linkattr;
-	dladm_wlan_is_valid;
-	dladm_wlan_set_prop;
-	dladm_wlan_walk_prop;
-	dladm_wlan_get_prop;
 	dladm_wlan_essid2str;
 	dladm_wlan_bssid2str;
 	dladm_wlan_secmode2str;
@@ -91,6 +87,32 @@ SUNWprivate_1.1 {
 	dladm_wlan_str2auth;
 	dladm_wlan_str2bsstype;
 	dladm_wlan_str2linkstatus;
+	dladm_vlan_create;
+	dladm_vlan_delete;
+	dladm_vlan_up;
+	dladm_vlan_info;
+	dladm_class2str;
+	dladm_media2str;
+	dladm_rename_link;
+	dladm_phys_info;
+	dladm_phys_delete;
+	dladm_dev2linkid;
+	dladm_linkid2legacyname;
+	dladm_create_datalink_id;
+	dladm_destroy_datalink_id;
+	dladm_remap_datalink_id;
+	dladm_up_datalink_id;
+	dladm_name2info;
+	dladm_datalink_id2info;
+	dladm_walk_datalink_id;
+	dladm_create_conf;
+	dladm_read_conf;
+	dladm_write_conf;
+	dladm_remove_conf;
+	dladm_destroy_conf;
+	dladm_get_conf_field;
+	dladm_set_conf_field;
+	dladm_unset_conf_field;
 	dladm_wlan_wpa_get_sr;
 	dladm_wlan_wpa_set_ie;
 	dladm_wlan_wpa_set_wpa;
@@ -100,8 +122,8 @@ SUNWprivate_1.1 {
 	dladm_vnic_create;
 	dladm_vnic_modify;
 	dladm_vnic_delete;
-	dladm_vnic_walk_sys;
-	dladm_vnic_mac_addr_str_to_type;
+	dladm_vnic_info;
+	dladm_vnic_str2macaddrtype;
 
     local:
 	*;

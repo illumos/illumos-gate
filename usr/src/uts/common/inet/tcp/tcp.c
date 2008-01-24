@@ -20878,7 +20878,12 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 	ire->ire_last_used_time = lbolt;
 
 	/* send it down */
-	putnext(ire->ire_stq, md_mp_head);
+	if (ILL_DLS_CAPABLE(ill)) {
+		ill_dls_capab_t *ill_dls = ill->ill_dls_capab;
+		ill_dls->ill_tx(ill_dls->ill_tx_handle, md_mp_head);
+	} else {
+		putnext(ire->ire_stq, md_mp_head);
+	}
 
 	/* we're done for TCP/IPv4 */
 	if (tcp->tcp_ipversion == IPV4_VERSION)

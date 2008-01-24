@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,12 @@ aggr_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 			return (ENOSR);
 
 		/*
+		 * The ioctl handling callback to process control ioctl
+		 * messages; see comments above dld_ioctl() for details.
+		 */
+		dsp->ds_ioctl = aggr_ioctl;
+
+		/*
 		 * The aggr control node uses its own set of entry points.
 		 */
 		WR(q)->q_qinfo = &aggr_w_ctl_qinit;
@@ -177,6 +183,8 @@ aggr_close(queue_t *q)
 
 	if (dsp->ds_type == DLD_CONTROL) {
 		qprocsoff(q);
+		dld_finish_pending_task(dsp);
+		dsp->ds_ioctl = NULL;
 		dld_str_destroy(dsp);
 		return (0);
 	}
@@ -187,7 +195,7 @@ static void
 aggr_wput(queue_t *q, mblk_t *mp)
 {
 	if (DB_TYPE(mp) == M_IOCTL)
-		aggr_ioctl(q, mp);
+		dld_ioctl(q, mp);
 	else
 		freemsg(mp);
 }

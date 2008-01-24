@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,11 @@
 #include	<sys/modctl.h>
 #include	<sys/stat.h>
 #include	<sys/strsun.h>
+#include	<sys/vlan.h>
 #include	<sys/dld.h>
 #include	<sys/dld_impl.h>
 #include	<sys/dls_impl.h>
+#include	<sys/softmac.h>
 #include 	<sys/vlan.h>
 #include	<inet/common.h>
 
@@ -82,6 +84,10 @@ static void	drv_uw_srv(queue_t *);
 dev_info_t	*dld_dip;		/* dev_info_t for the driver */
 uint32_t	dld_opt = 0;		/* Global options */
 static vmem_t	*dld_ctl_vmem;		/* for control minor numbers */
+
+#define	NAUTOPUSH 32
+static mod_hash_t *dld_ap_hashp;
+static krwlock_t dld_ap_hash_lock;
 
 static	struct	module_info	drv_info = {
 	0,			/* mi_idnum */
@@ -185,18 +191,46 @@ drv_init(void)
 	    NULL, NULL, NULL, 1, VM_SLEEP | VMC_IDENTIFIER);
 	drv_secobj_init();
 	dld_str_init();
+	/*
+	 * Create a hash table for autopush configuration.
+	 */
+	dld_ap_hashp = mod_hash_create_idhash("dld_autopush_hash",
+	    NAUTOPUSH, mod_hash_null_valdtor);
+
+	ASSERT(dld_ap_hashp != NULL);
+	rw_init(&dld_ap_hash_lock, NULL, RW_DRIVER, NULL);
+}
+
+/* ARGSUSED */
+static uint_t
+drv_ap_exist(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	boolean_t *pexist = arg;
+
+	*pexist = B_TRUE;
+	return (MH_WALK_TERMINATE);
 }
 
 static int
 drv_fini(void)
 {
-	int	err;
+	int		err;
+	boolean_t	exist = B_FALSE;
+
+	rw_enter(&dld_ap_hash_lock, RW_READER);
+	mod_hash_walk(dld_ap_hashp, drv_ap_exist, &exist);
+	rw_exit(&dld_ap_hash_lock);
+
+	if (exist)
+		return (EBUSY);
 
 	if ((err = dld_str_fini()) != 0)
 		return (err);
 
 	drv_secobj_fini();
 	vmem_destroy(dld_ctl_vmem);
+	mod_hash_destroy_idhash(dld_ap_hashp);
+	rw_destroy(&dld_ap_hash_lock);
 	return (0);
 }
 
@@ -373,241 +407,472 @@ drv_close(queue_t *rq)
 }
 
 /*
- * DLDIOCATTR
+ * DLDIOC_ATTR
  */
 static void
 drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	dld_ioc_attr_t	*diap;
-	dls_vlan_t	*dvp = NULL;
-	dls_link_t	*dlp = NULL;
-	int		err;
-	queue_t		*q = ctls->cs_wq;
+	dld_ioc_attr_t		*diap;
+	dls_dl_handle_t		dlh;
+	dls_vlan_t		*dvp;
+	int			err;
+	queue_t			*q = ctls->cs_wq;
 
 	if ((err = miocpullup(mp, sizeof (dld_ioc_attr_t))) != 0)
 		goto failed;
 
 	diap = (dld_ioc_attr_t *)mp->b_cont->b_rptr;
-	diap->dia_name[IFNAMSIZ - 1] = '\0';
 
-	if (dls_vlan_hold(diap->dia_name, &dvp, B_FALSE) != 0) {
-		err = ENOENT;
+	if ((err = dls_devnet_hold_tmp(diap->dia_linkid, &dlh)) != 0)
+		goto failed;
+
+	if ((err = dls_vlan_hold(dls_devnet_mac(dlh),
+	    dls_devnet_vid(dlh), &dvp, B_FALSE, B_FALSE)) != 0) {
+		dls_devnet_rele_tmp(dlh);
 		goto failed;
 	}
 
-	dlp = dvp->dv_dlp;
-	(void) strlcpy(diap->dia_dev, dlp->dl_name, sizeof (diap->dia_dev));
-	diap->dia_vid = dvp->dv_id;
-	diap->dia_max_sdu = dlp->dl_mip->mi_sdu_max;
-
+	diap->dia_max_sdu = dvp->dv_dlp->dl_mip->mi_sdu_max;
 	dls_vlan_rele(dvp);
+	dls_devnet_rele_tmp(dlh);
+
 	miocack(q, mp, sizeof (dld_ioc_attr_t), 0);
 	return;
 
 failed:
 	ASSERT(err != 0);
-	if (err == ENOENT) {
-		char	devname[MAXNAMELEN];
-		uint_t	instance;
-		major_t	major;
-
-		/*
-		 * Try to detect if the specified device is gldv3
-		 * and return ENODEV if it is not.
-		 */
-		if (ddi_parse(diap->dia_name, devname, &instance) == 0 &&
-		    (major = ddi_name_to_major(devname)) != (major_t)-1 &&
-		    !GLDV3_DRV(major))
-			err = ENODEV;
-	}
 	miocnak(q, mp, 0, err);
 }
 
-
 /*
- * DLDIOCVLAN
+ * DLDIOC_PHYS_ATTR
  */
-typedef struct dld_ioc_vlan_state {
-	uint_t		bytes_left;
-	dld_ioc_vlan_t	*divp;
-	dld_vlan_info_t	*vlanp;
-} dld_ioc_vlan_state_t;
-
-static int
-drv_ioc_vlan_info(dls_vlan_t *dvp, void *arg)
+static void
+drv_ioc_phys_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	dld_ioc_vlan_state_t	*statep = arg;
+	dld_ioc_phys_attr_t	*dipp;
+	int			err;
+	dls_dl_handle_t		dlh;
+	dls_dev_handle_t	ddh;
+	dev_t			phydev;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_phys_attr_t))) != 0)
+		goto failed;
+
+	dipp = (dld_ioc_phys_attr_t *)mp->b_cont->b_rptr;
 
 	/*
-	 * passed buffer space is limited to 65536 bytes. So
-	 * copy only the vlans associated with the passed link.
+	 * Every physical link should have its physical dev_t kept in the
+	 * daemon. If not, it is not a valid physical link.
 	 */
-	if (strcmp(dvp->dv_dlp->dl_name, statep->divp->div_name) == 0 &&
-	    dvp->dv_id != 0) {
-		if (statep->bytes_left < sizeof (dld_vlan_info_t))
-			return (ENOSPC);
-
-		(void) strlcpy(statep->vlanp->dvi_name,
-		    dvp->dv_name, IFNAMSIZ);
-		statep->divp->div_count++;
-		statep->bytes_left -= sizeof (dld_vlan_info_t);
-		statep->vlanp += 1;
+	if (dls_mgmt_get_phydev(dipp->dip_linkid, &phydev) != 0) {
+		err = EINVAL;
+		goto failed;
 	}
-	return (0);
-}
 
-static void
-drv_ioc_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
-{
-	dld_ioc_vlan_t		*divp;
-	dld_ioc_vlan_state_t	state;
-	int			err = EINVAL;
-	queue_t			*q = ctls->cs_wq;
-	mblk_t			*bp;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_vlan_t))) != 0)
+	/*
+	 * Although this is a valid physical link, it might already be removed
+	 * by DR or during system shutdown. softmac_hold_device() would return
+	 * ENOENT in this case.
+	 */
+	if ((err = softmac_hold_device(phydev, &ddh)) != 0)
 		goto failed;
 
-	if ((bp = msgpullup(mp->b_cont, -1)) == NULL)
-		goto failed;
+	if (dls_devnet_hold_tmp(dipp->dip_linkid, &dlh) != 0) {
+		/*
+		 * Although this is an active physical link, its link type is
+		 * not supported by GLDv3, and therefore it does not have
+		 * vanity naming support.
+		 */
+		dipp->dip_novanity = B_TRUE;
+	} else {
+		dipp->dip_novanity = B_FALSE;
+		dls_devnet_rele_tmp(dlh);
+	}
+	/*
+	 * Get the physical device name from the major number and the instance
+	 * number derived from phydev.
+	 */
+	(void) snprintf(dipp->dip_dev, MAXLINKNAMELEN, "%s%d",
+	    ddi_major_to_name(getmajor(phydev)), getminor(phydev) - 1);
 
-	freemsg(mp->b_cont);
-	mp->b_cont = bp;
-	divp = (dld_ioc_vlan_t *)bp->b_rptr;
-	divp->div_count = 0;
-	state.bytes_left = MBLKL(bp) - sizeof (dld_ioc_vlan_t);
-	state.divp = divp;
-	state.vlanp = (dld_vlan_info_t *)(divp + 1);
+	softmac_rele_device(ddh);
 
-	err = dls_vlan_walk(drv_ioc_vlan_info, &state);
-	if (err != 0)
-		goto failed;
-
-	miocack(q, mp, sizeof (dld_ioc_vlan_t) +
-	    state.divp->div_count * sizeof (dld_vlan_info_t), 0);
+	miocack(q, mp, sizeof (dld_ioc_phys_attr_t), 0);
 	return;
 
 failed:
-	ASSERT(err != 0);
 	miocnak(q, mp, 0, err);
 }
 
 /*
- * DLDIOCHOLDVLAN
+ * DLDIOC_CREATE_VLAN
  */
 static void
-drv_hold_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+drv_ioc_create_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	queue_t		*q = ctls->cs_wq;
-	dld_hold_vlan_t	*dhv;
-	mblk_t		*nmp;
-	int		err = EINVAL;
-	dls_vlan_t	*dvp;
-	char		mac[MAXNAMELEN];
-	dev_info_t	*dip = NULL;
-	major_t		major;
-	uint_t		index;
+	dld_ioc_create_vlan_t	*dicp;
+	int			err;
+	queue_t			*q = ctls->cs_wq;
 
-	nmp = mp->b_cont;
-	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t))
+	if ((err = miocpullup(mp, sizeof (dld_ioc_create_vlan_t))) != 0)
 		goto failed;
 
-	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
+	dicp = (dld_ioc_create_vlan_t *)mp->b_cont->b_rptr;
 
-	/*
-	 * When a device instance without opens is detached, its
-	 * dls_vlan_t will be destroyed. A subsequent DLDIOCHOLDVLAN
-	 * invoked on this device instance will fail because
-	 * dls_vlan_hold() does not create non-tagged vlans on demand.
-	 * To handle this problem, we must force the creation of the
-	 * dls_vlan_t (if it doesn't already exist) by calling
-	 * ddi_hold_devi_by_instance() before calling dls_vlan_hold().
-	 */
-	if (ddi_parse(dhv->dhv_name, mac, &index) != DDI_SUCCESS)
+	if ((err = dls_devnet_create_vlan(dicp->dic_vlanid,
+	    dicp->dic_linkid, dicp->dic_vid, dicp->dic_force)) != 0) {
 		goto failed;
-
-	if (DLS_PPA2VID(index) == VLAN_ID_NONE && strcmp(mac, "aggr") != 0) {
-		if ((major = ddi_name_to_major(mac)) == (major_t)-1 ||
-		    (dip = ddi_hold_devi_by_instance(major,
-		    DLS_PPA2INST(index), 0)) == NULL)
-			goto failed;
 	}
 
-	err = dls_vlan_hold(dhv->dhv_name, &dvp, B_TRUE);
-	if (dip != NULL)
-		ddi_release_devi(dip);
+	miocack(q, mp, 0, 0);
+	return;
 
-	if (err != 0)
-		goto failed;
-
-	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
-	    dhv->dhv_docheck)) != 0) {
-		dls_vlan_rele(dvp);
-		goto failed;
-	} else {
-		miocack(q, mp, 0, 0);
-		return;
-	}
 failed:
 	miocnak(q, mp, 0, err);
 }
 
 /*
- * DLDIOCRELEVLAN
+ * DLDIOC_DELETE_VLAN
  */
 static void
-drv_rele_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+drv_ioc_delete_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
 {
-	queue_t		*q = ctls->cs_wq;
-	dld_hold_vlan_t	*dhv;
-	mblk_t		*nmp;
-	int		err;
+	dld_ioc_delete_vlan_t	*didp;
+	int			err;
+	queue_t			*q = ctls->cs_wq;
 
-	nmp = mp->b_cont;
-	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
-		err = EINVAL;
+	if ((err = miocpullup(mp, sizeof (dld_ioc_delete_vlan_t))) != 0)
+		goto done;
+
+	didp = (dld_ioc_delete_vlan_t *)mp->b_cont->b_rptr;
+	err = dls_devnet_destroy_vlan(didp->did_linkid);
+
+done:
+	if (err == 0)
+		miocack(q, mp, 0, 0);
+	else
 		miocnak(q, mp, 0, err);
-		return;
-	}
-	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
-
-	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
-	    dhv->dhv_docheck)) != 0) {
-		miocnak(q, mp, 0, err);
-		return;
-	}
-
-	if ((err = dls_vlan_rele_by_name(dhv->dhv_name)) != 0) {
-		miocnak(q, mp, 0, err);
-		return;
-	}
-
-	miocack(q, mp, 0, 0);
 }
 
 /*
- * DLDIOCZIDGET
+ * DLDIOC_VLAN_ATTR
  */
 static void
-drv_ioc_zid_get(dld_ctl_str_t *ctls, mblk_t *mp)
+drv_ioc_vlan_attr(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_vlan_attr_t	*divp;
+	dls_dl_handle_t		dlh;
+	uint16_t		vid;
+	dls_vlan_t		*dvp;
+	int			err;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_vlan_attr_t))) != 0)
+		goto failed;
+
+	divp = (dld_ioc_vlan_attr_t *)mp->b_cont->b_rptr;
+
+	/*
+	 * Hold this link to prevent it from being deleted.
+	 */
+	err = dls_devnet_hold_tmp(divp->div_vlanid, &dlh);
+	if (err != 0)
+		goto failed;
+
+	if ((vid = dls_devnet_vid(dlh)) == VLAN_ID_NONE) {
+		dls_devnet_rele_tmp(dlh);
+		err = EINVAL;
+		goto failed;
+	}
+
+	err = dls_vlan_hold(dls_devnet_mac(dlh), vid, &dvp, B_FALSE, B_FALSE);
+	if (err != 0) {
+		dls_devnet_rele_tmp(dlh);
+		err = EINVAL;
+		goto failed;
+	}
+
+	divp->div_linkid = dls_devnet_linkid(dlh);
+	divp->div_implicit = !dls_devnet_is_explicit(dlh);
+	divp->div_vid = vid;
+	divp->div_force = dvp->dv_force;
+
+	dls_vlan_rele(dvp);
+	dls_devnet_rele_tmp(dlh);
+	miocack(q, mp, sizeof (dld_ioc_vlan_attr_t), 0);
+	return;
+
+failed:
+	miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_RENAME.
+ *
+ * This function handles two cases of link renaming. See more in comments above
+ * dls_datalink_rename().
+ */
+static void
+drv_ioc_rename(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_rename_t	*dir;
+	mod_hash_key_t		key;
+	mod_hash_val_t		val;
+	int			err;
+	queue_t			*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_rename_t))) != 0)
+		goto done;
+
+	dir = (dld_ioc_rename_t *)mp->b_cont->b_rptr;
+	if ((err = dls_devnet_rename(dir->dir_linkid1, dir->dir_linkid2,
+	    dir->dir_link)) != 0) {
+		goto done;
+	}
+
+	if (dir->dir_linkid2 == DATALINK_INVALID_LINKID)
+		goto done;
+
+	/*
+	 * if dir_linkid2 is not DATALINK_INVALID_LINKID, it means this
+	 * renaming request is to rename a valid physical link (dir_linkid1)
+	 * to a "removed" physical link (dir_linkid2, which is removed by DR
+	 * or during system shutdown). In this case, the link (specified by
+	 * dir_linkid1) would inherit all the configuration of dir_linkid2,
+	 * and dir_linkid1 and its configuration would be lost.
+	 *
+	 * Remove per-link autopush configuration of dir_linkid1 in this case.
+	 */
+	key = (mod_hash_key_t)(uintptr_t)dir->dir_linkid1;
+	rw_enter(&dld_ap_hash_lock, RW_WRITER);
+	if (mod_hash_find(dld_ap_hashp, key, &val) != 0) {
+		rw_exit(&dld_ap_hash_lock);
+		goto done;
+	}
+
+	VERIFY(mod_hash_remove(dld_ap_hashp, key, &val) == 0);
+	kmem_free(val, sizeof (dld_ap_t));
+	rw_exit(&dld_ap_hash_lock);
+
+done:
+	if (err == 0)
+		miocack(q, mp, 0, 0);
+	else
+		miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_SETAUTOPUSH
+ */
+static void
+drv_ioc_setap(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_ap_t	*diap;
+	dld_ap_t	*dap;
+	int		i, err;
+	queue_t		*q = ctls->cs_wq;
+	mod_hash_key_t	key;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
+		goto failed;
+
+	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
+	if (diap->dia_npush == 0 || diap->dia_npush > MAXAPUSH) {
+		err = EINVAL;
+		goto failed;
+	}
+
+	/*
+	 * Validate that the specified list of modules exist.
+	 */
+	for (i = 0; i < diap->dia_npush; i++) {
+		if (fmodsw_find(diap->dia_aplist[i], FMODSW_LOAD) == NULL) {
+			err = EINVAL;
+			goto failed;
+		}
+	}
+
+	key = (mod_hash_key_t)(uintptr_t)diap->dia_linkid;
+
+	rw_enter(&dld_ap_hash_lock, RW_WRITER);
+	if (mod_hash_find(dld_ap_hashp, key, (mod_hash_val_t *)&dap) != 0) {
+		dap = kmem_zalloc(sizeof (dld_ap_t), KM_NOSLEEP);
+		if (dap == NULL) {
+			rw_exit(&dld_ap_hash_lock);
+			err = ENOMEM;
+			goto failed;
+		}
+
+		dap->da_linkid = diap->dia_linkid;
+		err = mod_hash_insert(dld_ap_hashp, key, (mod_hash_val_t)dap);
+		ASSERT(err == 0);
+	}
+
+	/*
+	 * Update the configuration.
+	 */
+	dap->da_anchor = diap->dia_anchor;
+	dap->da_npush = diap->dia_npush;
+	for (i = 0; i < diap->dia_npush; i++) {
+		(void) strlcpy(dap->da_aplist[i], diap->dia_aplist[i],
+		    FMNAMESZ + 1);
+	}
+	rw_exit(&dld_ap_hash_lock);
+
+	miocack(q, mp, 0, 0);
+	return;
+
+failed:
+	miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_GETAUTOPUSH
+ */
+static void
+drv_ioc_getap(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_ap_t	*diap;
+	dld_ap_t	*dap;
+	int		i, err;
+	queue_t		*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
+		goto failed;
+
+	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
+
+	rw_enter(&dld_ap_hash_lock, RW_READER);
+	if (mod_hash_find(dld_ap_hashp,
+	    (mod_hash_key_t)(uintptr_t)diap->dia_linkid,
+	    (mod_hash_val_t *)&dap) != 0) {
+		err = ENOENT;
+		rw_exit(&dld_ap_hash_lock);
+		goto failed;
+	}
+
+	/*
+	 * Retrieve the configuration.
+	 */
+	diap->dia_anchor = dap->da_anchor;
+	diap->dia_npush = dap->da_npush;
+	for (i = 0; i < dap->da_npush; i++) {
+		(void) strlcpy(diap->dia_aplist[i], dap->da_aplist[i],
+		    FMNAMESZ + 1);
+	}
+	rw_exit(&dld_ap_hash_lock);
+
+	miocack(q, mp, sizeof (dld_ioc_ap_t), 0);
+	return;
+
+failed:
+	miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_CLRAUTOPUSH
+ */
+static void
+drv_ioc_clrap(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	dld_ioc_ap_t	*diap;
+	mod_hash_val_t	val;
+	mod_hash_key_t	key;
+	int		err;
+	queue_t		*q = ctls->cs_wq;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
+		goto done;
+
+	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
+	key = (mod_hash_key_t)(uintptr_t)diap->dia_linkid;
+
+	rw_enter(&dld_ap_hash_lock, RW_WRITER);
+	if (mod_hash_find(dld_ap_hashp, key, &val) != 0) {
+		rw_exit(&dld_ap_hash_lock);
+		goto done;
+	}
+
+	VERIFY(mod_hash_remove(dld_ap_hashp, key, &val) == 0);
+	kmem_free(val, sizeof (dld_ap_t));
+	rw_exit(&dld_ap_hash_lock);
+
+done:
+	if (err == 0)
+		miocack(q, mp, 0, 0);
+	else
+		miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_DOORSERVER
+ */
+static void
+drv_ioc_doorserver(dld_ctl_str_t *ctls, mblk_t *mp)
 {
 	queue_t		*q = ctls->cs_wq;
-	dld_hold_vlan_t	*dhv;
-	mblk_t		*nmp;
+	dld_ioc_door_t	*did;
 	int		err;
 
-	nmp = mp->b_cont;
-	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
-		err = EINVAL;
-		miocnak(q, mp, 0, err);
-		return;
-	}
-	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
+	if ((err = miocpullup(mp, sizeof (dld_ioc_door_t))) != 0)
+		goto done;
 
-	if ((err = dls_vlan_getzoneid(dhv->dhv_name, &dhv->dhv_zid)) != 0)
-		miocnak(q, mp, 0, err);
+	did = (dld_ioc_door_t *)mp->b_cont->b_rptr;
+	err = dls_mgmt_door_set(did->did_start_door);
+
+done:
+	if (err == 0)
+		miocack(q, mp, 0, 0);
 	else
-		miocack(q, mp, sizeof (dld_hold_vlan_t), 0);
+		miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_SETZID
+ */
+static void
+drv_ioc_setzid(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	queue_t			*q = ctls->cs_wq;
+	dld_ioc_setzid_t	*dis;
+	int			err;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_setzid_t))) != 0)
+		goto done;
+
+	dis = (dld_ioc_setzid_t *)mp->b_cont->b_rptr;
+	err = dls_devnet_setzid(dis->dis_link, dis->dis_zid);
+
+done:
+	if (err == 0)
+		miocack(q, mp, 0, 0);
+	else
+		miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOC_GETZID
+ */
+static void
+drv_ioc_getzid(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	queue_t			*q = ctls->cs_wq;
+	dld_ioc_getzid_t	*dig;
+	int			err;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_getzid_t))) != 0)
+		goto done;
+
+	dig = (dld_ioc_getzid_t *)mp->b_cont->b_rptr;
+	err = dls_devnet_getzid(dig->dig_linkid, &dig->dig_zid);
+
+done:
+	if (err == 0)
+		miocack(q, mp, sizeof (dld_ioc_getzid_t), 0);
+	else
+		miocnak(q, mp, 0, err);
 }
 
 /*
@@ -620,29 +885,50 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 
 	cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
 	switch (cmd) {
-	case DLDIOCATTR:
+	case DLDIOC_ATTR:
 		drv_ioc_attr(ctls, mp);
 		return;
-	case DLDIOCVLAN:
-		drv_ioc_vlan(ctls, mp);
+	case DLDIOC_PHYS_ATTR:
+		drv_ioc_phys_attr(ctls, mp);
 		return;
-	case DLDIOCSECOBJSET:
+	case DLDIOC_SECOBJ_SET:
 		drv_ioc_secobj_set(ctls, mp);
 		return;
-	case DLDIOCSECOBJGET:
+	case DLDIOC_SECOBJ_GET:
 		drv_ioc_secobj_get(ctls, mp);
 		return;
-	case DLDIOCSECOBJUNSET:
+	case DLDIOC_SECOBJ_UNSET:
 		drv_ioc_secobj_unset(ctls, mp);
 		return;
-	case DLDIOCHOLDVLAN:
-		drv_hold_vlan(ctls, mp);
+	case DLDIOC_CREATE_VLAN:
+		drv_ioc_create_vlan(ctls, mp);
 		return;
-	case DLDIOCRELEVLAN:
-		drv_rele_vlan(ctls, mp);
+	case DLDIOC_DELETE_VLAN:
+		drv_ioc_delete_vlan(ctls, mp);
 		return;
-	case DLDIOCZIDGET:
-		drv_ioc_zid_get(ctls, mp);
+	case DLDIOC_VLAN_ATTR:
+		drv_ioc_vlan_attr(ctls, mp);
+		return;
+	case DLDIOC_SETAUTOPUSH:
+		drv_ioc_setap(ctls, mp);
+		return;
+	case DLDIOC_GETAUTOPUSH:
+		drv_ioc_getap(ctls, mp);
+		return;
+	case DLDIOC_CLRAUTOPUSH:
+		drv_ioc_clrap(ctls, mp);
+		return;
+	case DLDIOC_DOORSERVER:
+		drv_ioc_doorserver(ctls, mp);
+		return;
+	case DLDIOC_SETZID:
+		drv_ioc_setzid(ctls, mp);
+		return;
+	case DLDIOC_GETZID:
+		drv_ioc_getzid(ctls, mp);
+		return;
+	case DLDIOC_RENAME:
+		drv_ioc_rename(ctls, mp);
 		return;
 	default:
 		miocnak(ctls->cs_wq, mp, 0, ENOTSUP);
@@ -678,6 +964,55 @@ drv_uw_srv(queue_t *q)
 
 	while (mp = getq(q))
 		drv_uw_put(q, mp);
+}
+
+/*
+ * Check for GLDv3 autopush information.  There are three cases:
+ *
+ *   1. If devp points to a GLDv3 datalink and it has autopush configuration,
+ *	fill dlap in with that information and return 0.
+ *
+ *   2. If devp points to a GLDv3 datalink but it doesn't have autopush
+ *	configuration, then replace devp with the physical device (if one
+ *	exists) and return 1.  This allows stropen() to find the old-school
+ *	per-driver autopush configuration.  (For softmac, the result is that
+ *	the softmac dev_t is replaced with the legacy device's dev_t).
+ *
+ *   3. If neither of the above apply, don't touch the args and return -1.
+ */
+int
+dld_autopush(dev_t *devp, struct dlautopush *dlap)
+{
+	dld_ap_t	*dap;
+	datalink_id_t	linkid;
+	dev_t		phydev;
+
+	if (!GLDV3_DRV(getmajor(*devp)))
+		return (-1);
+
+	/*
+	 * Find the linkid by the link's dev_t.
+	 */
+	if (dls_devnet_dev2linkid(*devp, &linkid) != 0)
+		return (-1);
+
+	/*
+	 * Find the autopush configuration associated with the linkid.
+	 */
+	rw_enter(&dld_ap_hash_lock, RW_READER);
+	if (mod_hash_find(dld_ap_hashp, (mod_hash_key_t)(uintptr_t)linkid,
+	    (mod_hash_val_t *)&dap) == 0) {
+		*dlap = dap->da_ap;
+		rw_exit(&dld_ap_hash_lock);
+		return (0);
+	}
+	rw_exit(&dld_ap_hash_lock);
+
+	if (dls_devnet_phydev(linkid, &phydev) != 0)
+		return (-1);
+
+	*devp = phydev;
+	return (1);
 }
 
 /*

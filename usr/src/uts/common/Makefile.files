@@ -561,7 +561,8 @@ CN_OBJS +=	cons.o
 
 DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o
 
-DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o dls_soft_ring.o
+DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o \
+		dls_soft_ring.o dls_mgmt.o
 
 GLD_OBJS +=     gld.o gldutil.o
 
@@ -577,6 +578,9 @@ AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
 
 VNIC_OBJS +=	vnic_ctl.o vnic_dev.o vnic_bcast.o vnic_cl.o
+
+SOFTMAC_OBJS += softmac_main.o softmac_ctl.o softmac_capab.o \
+		softmac_dev.o softmac_stat.o softmac_pkt.o
 
 NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
@@ -848,7 +852,8 @@ DCFS_OBJS +=	dc_vnops.o
 DEVFS_OBJS +=	devfs_subr.o	devfs_vfsops.o	devfs_vnops.o
 
 DEV_OBJS  +=	sdev_subr.o	sdev_vfsops.o	sdev_vnops.o	\
-		sdev_ptsops.o	sdev_comm.o	sdev_profile.o	sdev_ncache.o
+		sdev_ptsops.o	sdev_comm.o	sdev_profile.o	\
+		sdev_ncache.o	sdev_netops.o
 
 CTFS_OBJS +=	ctfs_all.o ctfs_cdir.o ctfs_ctl.o ctfs_event.o \
 		ctfs_latest.o ctfs_root.o ctfs_sym.o ctfs_tdir.o ctfs_tmpl.o
@@ -1527,6 +1532,8 @@ CH_COM_OBJS =	ch_mac.o ch_subr.o cspi.o espi.o ixf1010.o mc3.o mc4.o mc5.o \
 #	PCI strings file 
 #
 PCI_STRING_OBJS = pci_strings.o
+
+NET_DACF_OBJS += net_dacf.o
 
 #
 #	Xframe 10G NIC driver module

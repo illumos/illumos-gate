@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,6 +248,7 @@ int i_ddi_attach_node_hierarchy(dev_info_t *);
 dev_info_t *i_ddi_attach_pseudo_node(char *);
 int i_ddi_attach_hw_nodes(char *);
 int i_ddi_devs_attached(major_t);
+int i_ddi_minor_node_count(dev_info_t *, const char *);
 
 /* non-DDI functions: wrapper around mod_hold/rele_dev_by_major() */
 struct dev_ops *ddi_hold_driver(major_t);

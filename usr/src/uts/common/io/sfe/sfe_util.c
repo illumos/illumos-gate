@@ -4533,6 +4533,7 @@ gem_gld3_init(struct gem_dev *dp, mac_register_t *macp)
 	macp->m_callbacks = &gem_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = dp->mtu;
+	macp->m_margin = VTAG_SIZE;
 }
 
 /* ======================================================================== */

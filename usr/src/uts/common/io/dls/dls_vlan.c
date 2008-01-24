@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,26 +31,20 @@
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
-#include <sys/atomic.h>
-#include <sys/mkdev.h>
 #include <sys/modhash.h>
+#include <sys/stat.h>
 #include <sys/kstat.h>
 #include <sys/vlan.h>
 #include <sys/mac.h>
 #include <sys/ctype.h>
 #include <sys/dls.h>
 #include <sys/dls_impl.h>
-#include <sys/dld.h>
 
 static kmem_cache_t	*i_dls_vlan_cachep;
 static mod_hash_t	*i_dls_vlan_hash;
 static mod_hash_t	*i_dls_vlan_dev_hash;
 static krwlock_t	i_dls_vlan_lock;
 static uint_t		i_dls_vlan_count;
-
-static vmem_t		*minor_arenap;
-#define	MINOR_TO_PTR(minor)	((void *)(uintptr_t)(minor))
-#define	PTR_TO_MINOR(ptr)	((minor_t)(uintptr_t)(ptr))
 
 #define	VLAN_HASHSZ	67	/* prime */
 
@@ -62,8 +56,10 @@ static vmem_t		*minor_arenap;
 static int
 i_dls_vlan_constructor(void *buf, void *arg, int kmflag)
 {
-	bzero(buf, sizeof (dls_vlan_t));
+	dls_vlan_t	*dvp = buf;
 
+	bzero(buf, sizeof (dls_vlan_t));
+	mutex_init(&dvp->dv_lock, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
@@ -71,15 +67,16 @@ i_dls_vlan_constructor(void *buf, void *arg, int kmflag)
 static void
 i_dls_vlan_destructor(void *buf, void *arg)
 {
-	dls_vlan_t	*dvp = (dls_vlan_t *)buf;
+	dls_vlan_t	*dvp = buf;
 
 	ASSERT(dvp->dv_ref == 0);
+	ASSERT(dvp->dv_zone_ref == 0);
+	mutex_destroy(&dvp->dv_lock);
 }
 
 /*
  * Module initialization functions.
  */
-
 void
 dls_vlan_init(void)
 {
@@ -92,29 +89,20 @@ dls_vlan_init(void)
 	ASSERT(i_dls_vlan_cachep != NULL);
 
 	/*
-	 * Create a hash table, keyed by name, of dls_vlan_t.
+	 * Create a hash table, keyed by dv_spa, of dls_vlan_t.
 	 */
 	i_dls_vlan_hash = mod_hash_create_extended("dls_vlan_hash",
 	    VLAN_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
-	/*
-	 * Create a second hash table, keyed by minor, of dls_vlan_t.
-	 * The number of the hash slots is the same.
-	 */
-	i_dls_vlan_dev_hash = mod_hash_create_idhash("dls_vlan_dev_hash",
-	    VLAN_HASHSZ, mod_hash_null_valdtor);
-	rw_init(&i_dls_vlan_lock, NULL, RW_DEFAULT, NULL);
-	i_dls_vlan_count = 0;
 
 	/*
-	 * Allocate a vmem arena to manage minor numbers. The range of the
-	 * arena will be from DLD_MAX_MINOR + 1 to MAXMIN (maximum legal
-	 * minor number).
+	 * Create a hash table, keyed by dv_dev, of dls_vlan_t.
 	 */
-	minor_arenap = vmem_create("dls_minor_arena",
-	    MINOR_TO_PTR(DLD_MAX_MINOR + 1), MAXMIN, 1, NULL, NULL, NULL, 0,
-	    VM_SLEEP | VMC_IDENTIFIER);
-	ASSERT(minor_arenap != NULL);
+	i_dls_vlan_dev_hash = mod_hash_create_ptrhash("dls_vlan_dev_hash",
+	    VLAN_HASHSZ, mod_hash_null_valdtor, sizeof (dev_t));
+
+	rw_init(&i_dls_vlan_lock, NULL, RW_DEFAULT, NULL);
+	i_dls_vlan_count = 0;
 }
 
 int
@@ -134,8 +122,6 @@ dls_vlan_fini(void)
 	 * Destroy the kmem_cache.
 	 */
 	kmem_cache_destroy(i_dls_vlan_cachep);
-
-	vmem_destroy(minor_arenap);
 	return (0);
 }
 
@@ -143,167 +129,268 @@ dls_vlan_fini(void)
  * Exported functions.
  */
 
+/*
+ * If vid is VLAN_ID_NONE, then the minor_t to access this dls_vlan_t is
+ * ppa + 1, otherwise, we need to allocate the minor_t in this function.
+ *
+ * If ppa is greater than DLS_MAX_PPA, it means that we do not need to create
+ * the VLAN minor node for this MAC, as this MAC is (a) a legacy device, (b)
+ * an aggr created without the "key" argument, or (c) a new type of link
+ * whose ppa is allocated by mac_minor_hold() in mac_register().
+ */
 int
-dls_vlan_create(const char *vlanname, const char *macname, uint16_t vid)
+dls_vlan_create(const char *macname, uint16_t vid, boolean_t force)
 {
+	char		node[MAXPATHLEN];
+	char		spa[MAXSPALEN];
+	char		*driver;
 	dls_link_t	*dlp;
 	dls_vlan_t	*dvp;
-	int		err;
-	uint_t		len;
+	minor_t		minor = 0;
+	mac_handle_t	mh;
+	int		ppa;
+	dev_info_t	*dip;
+	uint32_t	margin = VLAN_TAGSZ;
+	int		err = 0;
+
+	if ((err = mac_open(macname, &mh)) != 0)
+		return (err);
 
 	/*
-	 * Check to see the name is legal. It must be less than IFNAMSIZ
-	 * characters in length and must terminate with a digit (before the
-	 * NUL, of course).
+	 * First check whether VLANs are able to be created on this MAC.
 	 */
-	len = strlen(vlanname);
-	if (len == 0 || len >= IFNAMSIZ)
-		return (EINVAL);
-
-	if (!isdigit(vlanname[len - 1]))
-		return (EINVAL);
+	if (vid != VLAN_ID_NONE) {
+		if ((mac_info(mh)->mi_media != DL_ETHER) ||
+		    (mac_info(mh)->mi_nativemedia != DL_ETHER)) {
+			mac_close(mh);
+			return (EINVAL);
+		}
+		if (!force &&
+		    ((err = mac_margin_add(mh, &margin, B_FALSE)) != 0)) {
+			mac_close(mh);
+			return (err);
+		}
+	}
 
 	/*
 	 * Get a reference to a dls_link_t representing the MAC. This call
 	 * will create one if necessary.
 	 */
-	if ((err = dls_link_hold(macname, &dlp)) != 0)
+	if ((err = dls_link_hold(macname, &dlp)) != 0) {
+		if (vid != VLAN_ID_NONE && !force)
+			VERIFY(mac_margin_remove(mh, margin) == 0);
+		mac_close(mh);
 		return (err);
+	}
 
-	/*
-	 * Allocate a new dls_vlan_t.
-	 */
-	dvp = kmem_cache_alloc(i_dls_vlan_cachep, KM_SLEEP);
-	(void) strlcpy(dvp->dv_name, vlanname, sizeof (dvp->dv_name));
-	dvp->dv_id = vid;
-	dvp->dv_dlp = dlp;
-
-	/*
-	 * Insert the entry into the table.
-	 */
 	rw_enter(&i_dls_vlan_lock, RW_WRITER);
 
-	if ((err = mod_hash_insert(i_dls_vlan_hash,
-	    (mod_hash_key_t)dvp->dv_name, (mod_hash_val_t)dvp)) != 0) {
-		kmem_cache_free(i_dls_vlan_cachep, dvp);
-		dls_link_rele(dlp);
+	/*
+	 * Try to find this VLAN in i_dls_vlan_hash first. The spa
+	 * is in the <macname/vid> form.
+	 */
+	(void) snprintf(spa, MAXSPALEN, "%s/%d", macname, vid);
+	if ((err = mod_hash_find(i_dls_vlan_hash,
+	    (mod_hash_key_t)spa, (mod_hash_val_t)&dvp)) == 0) {
 		err = EEXIST;
-		goto done;
+		goto fail;
 	}
-	i_dls_vlan_count++;
 
-done:
+	ppa = mac_minor(mh) - 1;
+	dip = mac_devinfo_get(mh);
+
+	if (vid == VLAN_ID_NONE) {
+		/*
+		 * Derives minor number directly from non-VLAN link's PPA.
+		 */
+		minor = ppa + 1;
+	} else if ((minor = mac_minor_hold(B_TRUE)) == 0) {
+		/*
+		 * Allocate minor number from minor_arenap for VLANs.
+		 */
+		err = ENOMEM;
+		goto fail;
+	}
+
+	/*
+	 * First create its minor node for non-legacy links, including VLANs
+	 * and non-VLANs. This is for /dev nodes backward compatibility.
+	 */
+	if (vid != VLAN_ID_NONE && ppa < MAC_MAX_MINOR) {
+
+		driver = (char *)ddi_driver_name(dip);
+
+		/* Create a style-1 DLPI device */
+		(void) snprintf(node, MAXPATHLEN, "%s%d", driver,
+		    vid * 1000 + ppa);
+		if (ddi_create_minor_node(dip, node, S_IFCHR, minor,
+		    DDI_NT_NET, 0) != DDI_SUCCESS) {
+			err = EINVAL;
+			goto fail;
+		}
+	}
+
+	dvp = kmem_cache_alloc(i_dls_vlan_cachep, KM_SLEEP);
+	dvp->dv_id = vid;
+	dvp->dv_dlp = dlp;
+	dvp->dv_dev = makedevice(ddi_driver_major(dip), minor);
+	dvp->dv_dip = dip;
+	dvp->dv_ppa = ppa;
+	dvp->dv_force = force;
+	dvp->dv_ref = 0;
+	dvp->dv_zone_ref = 0;
+	dvp->dv_zid = GLOBAL_ZONEID;
+	(void) strlcpy(dvp->dv_spa, spa, MAXSPALEN);
+	dls_mac_stat_create(dvp);
+
+	err = mod_hash_insert(i_dls_vlan_hash,
+	    (mod_hash_key_t)dvp->dv_spa, (mod_hash_val_t)dvp);
+	ASSERT(err == 0);
+
+	err = mod_hash_insert(i_dls_vlan_dev_hash,
+	    (mod_hash_key_t)dvp->dv_dev, (mod_hash_val_t)dvp);
+	ASSERT(err == 0);
+
+	i_dls_vlan_count++;
 	rw_exit(&i_dls_vlan_lock);
+
+	/*
+	 * Hold the underlying MAC for VLANs to keep the margin request.
+	 * We cannot hold the mac for non-VLANs, because a reference would
+	 * prevent the device from detaching.
+	 */
+	if (vid != VLAN_ID_NONE)
+		VERIFY(dls_mac_hold(dvp->dv_dlp) == 0);
+
+	mac_close(mh);
+	return (0);
+
+fail:
+	rw_exit(&i_dls_vlan_lock);
+	if (vid != VLAN_ID_NONE && minor != 0)
+		mac_minor_rele(minor);
+	dls_link_rele(dlp);
+	if (vid != VLAN_ID_NONE && !force)
+		VERIFY(mac_margin_remove(mh, margin) == 0);
+	mac_close(mh);
 	return (err);
 }
 
 int
-dls_vlan_destroy(const char *name)
+dls_vlan_destroy(const char *macname, uint16_t vid)
 {
-	int		err;
+	char		spa[MAXSPALEN];
 	dls_vlan_t	*dvp;
-	dls_link_t	*dlp;
 	mod_hash_val_t	val;
+	int		err;
 
 	/*
-	 * Find the dls_vlan_t in the global hash table.
+	 * Try to find this VLAN in i_dls_vlan_hash first. The spa
+	 * is in the <macname/vid> form.
 	 */
+	(void) snprintf(spa, MAXSPALEN, "%s/%d", macname, vid);
+
 	rw_enter(&i_dls_vlan_lock, RW_WRITER);
 
-	err = mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
-	    (mod_hash_val_t *)&dvp);
-	if (err != 0) {
-		err = ENOENT;
-		goto done;
+	if ((err = mod_hash_find(i_dls_vlan_hash,
+	    (mod_hash_key_t)spa, (mod_hash_val_t)&dvp)) != 0) {
+		rw_exit(&i_dls_vlan_lock);
+		return (ENOENT);
 	}
 
 	/*
 	 * Check to see if it is referenced by any dls_impl_t.
 	 */
 	if (dvp->dv_ref != 0) {
-		err = EBUSY;
-		goto done;
+		rw_exit(&i_dls_vlan_lock);
+		return (EBUSY);
 	}
+
+	ASSERT(dvp->dv_zone_ref == 0);
 
 	/*
 	 * Remove and destroy the hash table entry.
 	 */
-	err = mod_hash_remove(i_dls_vlan_hash, (mod_hash_key_t)name,
-	    (mod_hash_val_t *)&val);
+	err = mod_hash_remove(i_dls_vlan_hash,
+	    (mod_hash_key_t)dvp->dv_spa, (mod_hash_val_t *)&val);
 	ASSERT(err == 0);
 	ASSERT(dvp == (dls_vlan_t *)val);
 
+	err = mod_hash_remove(i_dls_vlan_dev_hash,
+	    (mod_hash_key_t)dvp->dv_dev, (mod_hash_val_t *)&val);
+	ASSERT(err == 0);
+	ASSERT(dvp == (dls_vlan_t *)val);
+
+	if (vid != VLAN_ID_NONE && dvp->dv_ppa < MAC_MAX_MINOR) {
+		char		node[MAXPATHLEN];
+		char		*driver;
+
+		/*
+		 * Remove the minor nodes for this link.
+		 */
+		driver = (char *)ddi_driver_name(dvp->dv_dip);
+		(void) snprintf(node, MAXPATHLEN, "%s%d", driver,
+		    vid * 1000 + dvp->dv_ppa);
+		ddi_remove_minor_node(dvp->dv_dip, node);
+	}
+
+	dls_mac_stat_destroy(dvp);
+
 	ASSERT(i_dls_vlan_count > 0);
 	i_dls_vlan_count--;
+	rw_exit(&i_dls_vlan_lock);
+
+	if (vid != VLAN_ID_NONE) {
+		if (!dvp->dv_force) {
+			(void) mac_margin_remove(dvp->dv_dlp->dl_mh,
+			    VLAN_TAGSZ);
+		}
+		dls_mac_rele(dvp->dv_dlp);
+	}
 
 	/*
-	 * Save a reference to dv_dlp before freeing the dls_vlan_t back
-	 * to the cache.
+	 * Release minor to dls_minor_arenap for VLANs
 	 */
-	dlp = dvp->dv_dlp;
-	kmem_cache_free(i_dls_vlan_cachep, dvp);
+	if (vid != VLAN_ID_NONE)
+		mac_minor_rele(getminor(dvp->dv_dev));
 
 	/*
 	 * Release the dls_link_t. This will destroy the dls_link_t and
 	 * release the MAC if there are no more dls_vlan_t.
 	 */
-	dls_link_rele(dlp);
-done:
-	rw_exit(&i_dls_vlan_lock);
-	return (err);
+	dls_link_rele(dvp->dv_dlp);
+	kmem_cache_free(i_dls_vlan_cachep, dvp);
+	return (0);
 }
 
 int
-dls_vlan_hold(const char *name, dls_vlan_t **dvpp, boolean_t create_vlan)
+dls_vlan_hold(const char *macname, uint16_t vid, dls_vlan_t **dvpp,
+    boolean_t force, boolean_t create_vlan)
 {
-	int		err;
+	char		spa[MAXSPALEN];
 	dls_vlan_t	*dvp;
-	dls_link_t	*dlp;
-	boolean_t	vlan_created = B_FALSE;
-	uint16_t	vid;
-	uint_t		mac_ppa;
+	boolean_t	vlan_created;
+	int		err = 0;
+
+	(void) snprintf(spa, MAXSPALEN, "%s/%d", macname, vid);
 
 again:
 	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-
-	err = mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
-	    (mod_hash_val_t *)&dvp);
-	if (err != 0) {
-		char		mac[MAXNAMELEN];
-		uint_t		index, len;
+	if ((err = mod_hash_find(i_dls_vlan_hash,
+	    (mod_hash_key_t)spa, (mod_hash_val_t)&dvp)) != 0) {
 
 		ASSERT(err == MH_ERR_NOTFOUND);
 
 		vlan_created = B_FALSE;
-		if (!create_vlan) {
-			err = ENOENT;
-			goto done;
+		if (!create_vlan || vid == VLAN_ID_NONE) {
+			rw_exit(&i_dls_vlan_lock);
+			return (ENOENT);
 		}
-
-		/*
-		 * Only create tagged vlans on demand.
-		 * Note that if we get here, 'name' must be a sane
-		 * value because it must have been derived from
-		 * ddi_major_to_name().
-		 */
-		if (ddi_parse(name, mac, &index) != DDI_SUCCESS ||
-		    (vid = DLS_PPA2VID(index)) == VLAN_ID_NONE ||
-		    vid > VLAN_ID_MAX) {
-			err = EINVAL;
-			goto done;
-		}
-
-		mac_ppa = (uint_t)DLS_PPA2INST(index);
-
-		len = strlen(mac);
-		ASSERT(len < MAXNAMELEN);
-		(void) snprintf(mac + len, MAXNAMELEN - len, "%d", mac_ppa);
 		rw_exit(&i_dls_vlan_lock);
 
-		if ((err = dls_vlan_create(name, mac, vid)) != 0) {
-			rw_enter(&i_dls_vlan_lock, RW_WRITER);
-			goto done;
-		}
+		err = dls_vlan_create(macname, vid, force);
+		if ((err != 0) && (err != EEXIST))
+			return (err);
 
 		/*
 		 * At this point someone else could do a dls_vlan_hold and
@@ -311,362 +398,164 @@ again:
 		 * destroyed. This will at worst cause us to spin a few
 		 * times.
 		 */
-		vlan_created = B_TRUE;
+		vlan_created = (err != EEXIST);
 		goto again;
 	}
 
-	dlp = dvp->dv_dlp;
-
-	if ((err = dls_mac_hold(dlp)) != 0)
-		goto done;
-
-	/* Create a minor node for this VLAN */
-	if (vid != 0 && vlan_created) {
-		/* A tagged VLAN */
-		dvp->dv_minor = dls_minor_hold(B_TRUE);
-		dvp->dv_ppa = DLS_VIDINST2PPA(vid, mac_ppa);
-
-		err = mod_hash_insert(i_dls_vlan_dev_hash,
-		    (mod_hash_key_t)(uintptr_t)dvp->dv_minor,
-		    (mod_hash_val_t)dvp);
-		ASSERT(err == 0);
-
-		err = mac_vlan_create(dlp->dl_mh, name, dvp->dv_minor);
-
-		if (err != 0) {
-			mod_hash_val_t	val;
-
-			err = mod_hash_remove(i_dls_vlan_dev_hash,
-			    (mod_hash_key_t)(uintptr_t)dvp->dv_minor,
-			    (mod_hash_val_t *)&val);
-			ASSERT(err == 0);
-			ASSERT(dvp == (dls_vlan_t *)val);
-
-			dvp->dv_minor = 0;
-			dls_mac_rele(dlp);
-			goto done;
-		}
-	}
-
-	/*
-	 * Do not allow the creation of tagged VLAN interfaces on
-	 * non-Ethernet links.  Note that we cannot do this check in
-	 * dls_vlan_create() nor in this function prior to the call to
-	 * dls_mac_hold().  The reason is that before we do a
-	 * dls_mac_hold(), we may not have opened the mac, and therefore do
-	 * not know what kind of media the mac represents.  In other words,
-	 * dls_mac_hold() assigns the dl_mip of the dls_link_t we're
-	 * interested in.
-	 */
-	if (dvp->dv_id != VLAN_ID_NONE &&
-	    (dlp->dl_mip->mi_media != DL_ETHER ||
-	    dlp->dl_mip->mi_nativemedia != DL_ETHER)) {
-		dls_mac_rele(dlp);
-		err = EINVAL;
-		goto done;
-	}
-
-	if ((err = mac_start(dlp->dl_mh)) != 0) {
-		dls_mac_rele(dlp);
-		goto done;
-	}
-
-	if (dvp->dv_ref++ == 0)
-		dls_mac_stat_create(dvp);
-
-	*dvpp = dvp;
-done:
+	dvp->dv_ref++;
 	rw_exit(&i_dls_vlan_lock);
 
-	/*
-	 * We could be destroying a vlan created by another thread. This
-	 * is ok because this other thread will just loop back up and
-	 * recreate the vlan.
-	 */
-	if (err != 0 && vlan_created)
-		(void) dls_vlan_destroy(name);
-	return (err);
+	if ((err = dls_mac_hold(dvp->dv_dlp)) != 0) {
+		rw_enter(&i_dls_vlan_lock, RW_WRITER);
+		dvp->dv_ref--;
+		rw_exit(&i_dls_vlan_lock);
+		if (vlan_created)
+			(void) dls_vlan_destroy(macname, vid);
+		return (err);
+	}
+
+	*dvpp = dvp;
+	return (0);
 }
 
+int
+dls_vlan_hold_by_dev(dev_t dev, dls_vlan_t **dvpp)
+{
+	dls_vlan_t	*dvp;
+	int		err;
+
+	rw_enter(&i_dls_vlan_lock, RW_WRITER);
+	if ((err = mod_hash_find(i_dls_vlan_dev_hash, (mod_hash_key_t)dev,
+	    (mod_hash_val_t *)&dvp)) != 0) {
+		ASSERT(err == MH_ERR_NOTFOUND);
+		rw_exit(&i_dls_vlan_lock);
+		return (ENOENT);
+	}
+
+	dvp->dv_ref++;
+	rw_exit(&i_dls_vlan_lock);
+
+	if ((err = dls_mac_hold(dvp->dv_dlp)) != 0) {
+		rw_enter(&i_dls_vlan_lock, RW_WRITER);
+		dvp->dv_ref--;
+		rw_exit(&i_dls_vlan_lock);
+		return (err);
+	}
+
+	*dvpp = dvp;
+	return (0);
+}
+
+/*
+ * Free the dvp if this is a VLAN and this is the last reference.
+ */
 void
 dls_vlan_rele(dls_vlan_t *dvp)
 {
-	dls_link_t	*dlp;
-	char		name[IFNAMSIZ];
+	char		macname[MAXNAMELEN];
+	uint16_t	vid;
 	boolean_t	destroy_vlan = B_FALSE;
 
-	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-	dlp = dvp->dv_dlp;
-
-	/* a minor node has been created for this vlan */
-	if (dvp->dv_ref == 1 && dvp->dv_minor > 0) {
-		int err;
-		mod_hash_val_t val;
-
-		mac_vlan_remove(dlp->dl_mh, dvp->dv_name);
-		err = mod_hash_remove(i_dls_vlan_dev_hash,
-		    (mod_hash_key_t)(uintptr_t)dvp->dv_minor,
-		    (mod_hash_val_t *)&val);
-		ASSERT(err == 0);
-		ASSERT(dvp == (dls_vlan_t *)val);
-		dls_minor_rele(dvp->dv_minor);
-		dvp->dv_minor = 0;
-	}
-
-	mac_stop(dlp->dl_mh);
-	dls_mac_rele(dlp);
-	if (--dvp->dv_ref == 0) {
-		dls_mac_stat_destroy(dvp);
-		/*
-		 * Tagged vlans get destroyed when dv_ref drops
-		 * to 0. We need to copy dv_name here because
-		 * dvp could disappear after we drop i_dls_vlan_lock.
-		 */
-		if (dvp->dv_id != 0) {
-			(void) strlcpy(name, dvp->dv_name, IFNAMSIZ);
-			destroy_vlan = B_TRUE;
-		}
-	}
-	rw_exit(&i_dls_vlan_lock);
-	if (destroy_vlan)
-		(void) dls_vlan_destroy(name);
-}
-
-typedef struct dls_vlan_walk_state {
-	int	(*fn)(dls_vlan_t *, void *);
-	void	*arg;
-	int	rc;
-} dls_vlan_walk_state_t;
-
-/*ARGSUSED*/
-static uint_t
-dls_vlan_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
-{
-	dls_vlan_walk_state_t	*statep = arg;
-	dls_vlan_t		*dvp;
-
-	dvp = (dls_vlan_t *)val;
-	statep->rc = statep->fn(dvp, statep->arg);
-
-	return ((statep->rc == 0) ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
-}
-
-int
-dls_vlan_walk(int (*fn)(dls_vlan_t *, void *), void *arg)
-{
-	dls_vlan_walk_state_t	state;
-
-	rw_enter(&i_dls_vlan_lock, RW_READER);
-
-	state.fn = fn;
-	state.arg = arg;
-	state.rc = 0;
-	mod_hash_walk(i_dls_vlan_hash, dls_vlan_walker, (void *)&state);
-
-	rw_exit(&i_dls_vlan_lock);
-	return (state.rc);
-}
-
-int
-dls_vlan_ppa_from_minor(minor_t minor, t_uscalar_t *ppa)
-{
-	dls_vlan_t	*dvp;
-
-	if (minor <= DLD_MAX_MINOR) {
-		*ppa = (t_uscalar_t)minor - 1;
-		return (0);
-	}
+	dls_mac_rele(dvp->dv_dlp);
 
 	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-
-	if (mod_hash_find(i_dls_vlan_dev_hash, (mod_hash_key_t)(uintptr_t)minor,
-	    (mod_hash_val_t *)&dvp) != 0) {
+	if (--dvp->dv_ref != 0) {
 		rw_exit(&i_dls_vlan_lock);
-		return (ENOENT);
-	}
-	*ppa = dvp->dv_ppa;
-
-	rw_exit(&i_dls_vlan_lock);
-	return (0);
-}
-
-int
-dls_vlan_rele_by_name(const char *name)
-{
-	dls_vlan_t	*dvp;
-	dls_link_t	*dlp;
-	boolean_t	destroy_vlan = B_FALSE;
-
-	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-
-	if (mod_hash_find(i_dls_vlan_hash, (mod_hash_key_t)name,
-	    (mod_hash_val_t *)&dvp) != 0) {
-		rw_exit(&i_dls_vlan_lock);
-		return (ENOENT);
+		return;
 	}
 
-	dlp = dvp->dv_dlp;
-
-	/* a minor node has been created for this vlan */
-	if (dvp->dv_ref == 1 && dvp->dv_minor > 0) {
-		int err;
-		mod_hash_val_t val;
-
-		mac_vlan_remove(dlp->dl_mh, dvp->dv_name);
-		err = mod_hash_remove(i_dls_vlan_dev_hash,
-		    (mod_hash_key_t)(uintptr_t)dvp->dv_minor,
-		    (mod_hash_val_t *)&val);
-		ASSERT(err == 0);
-		ASSERT(dvp == (dls_vlan_t *)val);
-		dls_minor_rele(dvp->dv_minor);
-		dvp->dv_minor = 0;
-	}
-
-	mac_stop(dlp->dl_mh);
-	dls_mac_rele(dlp);
-	if (--dvp->dv_ref == 0) {
-		dls_mac_stat_destroy(dvp);
-		/* Tagged vlans get destroyed when dv_ref drops to 0. */
-		if (dvp->dv_id != 0)
-			destroy_vlan = B_TRUE;
+	if (dvp->dv_id != VLAN_ID_NONE) {
+		destroy_vlan = B_TRUE;
+		(void) strncpy(macname, dvp->dv_dlp->dl_name, MAXNAMELEN);
+		vid = dvp->dv_id;
 	}
 	rw_exit(&i_dls_vlan_lock);
+
 	if (destroy_vlan)
-		(void) dls_vlan_destroy(name);
-
-	return (0);
-}
-
-typedef struct dls_vlan_dip_state {
-	minor_t		minor;
-	dev_info_t	*dip;
-} dls_vlan_dip_k_state_t;
-
-static int
-dls_vlan_devinfo(dls_vlan_t *dvp, void *arg)
-{
-	dls_vlan_dip_k_state_t	*statep = arg;
-
-	if (dvp->dv_minor == statep->minor) {
-		dls_link_t	*dlp = dvp->dv_dlp;
-
-		if (dls_mac_hold(dlp) != 0)
-			return (0);
-		statep->dip = mac_devinfo_get(dlp->dl_mh);
-		dls_mac_rele(dlp);
-
-		return (1);
-	}
-
-	return (0);
-}
-
-dev_info_t *
-dls_vlan_finddevinfo(dev_t dev)
-{
-	dls_vlan_dip_k_state_t	vlan_state;
-
-	vlan_state.minor = getminor(dev);
-	vlan_state.dip = NULL;
-
-	(void) dls_vlan_walk(dls_vlan_devinfo, &vlan_state);
-	return (vlan_state.dip);
-}
-
-/*
- * Allocate a new minor number.
- */
-minor_t
-dls_minor_hold(boolean_t sleep)
-{
-	/*
-	 * Grab a value from the arena.
-	 */
-	return (PTR_TO_MINOR(vmem_alloc(minor_arenap, 1,
-	    (sleep) ? VM_SLEEP : VM_NOSLEEP)));
-}
-
-/*
- * Release a previously allocated minor number.
- */
-void
-dls_minor_rele(minor_t minor)
-{
-	/*
-	 * Return the value to the arena.
-	 */
-	vmem_free(minor_arenap, MINOR_TO_PTR(minor), 1);
+		(void) dls_vlan_destroy(macname, vid);
 }
 
 int
-dls_vlan_setzoneid(char *name, zoneid_t zid, boolean_t docheck)
+dls_vlan_setzid(const char *mac, uint16_t vid, zoneid_t zid)
 {
-	int 		err;
 	dls_vlan_t	*dvp;
+	int		err;
+	zoneid_t	old_zid;
 
-	if ((err = dls_vlan_hold(name, &dvp, B_TRUE)) != 0)
+	if ((err = dls_vlan_hold(mac, vid, &dvp, B_FALSE, B_TRUE)) != 0)
 		return (err);
 
-	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-	if (!docheck) {
-		dvp->dv_zid = zid;
-	} else {
-		dls_impl_t	*dip;
-
-		for (dip = dvp->dv_impl_list; dip != NULL;
-		    dip = dip->di_next_impl)
-			if (dip->di_zid != zid)
-				break;
-		if (dip == NULL)
-			dvp->dv_zid = zid;
-		else
-			err = EBUSY;
+	mutex_enter(&dvp->dv_lock);
+	if ((old_zid = dvp->dv_zid) == zid) {
+		mutex_exit(&dvp->dv_lock);
+		goto done;
 	}
-	rw_exit(&i_dls_vlan_lock);
 
+	/*
+	 * Check whether this dvp is used by its own zones, if yes,
+	 * we cannot change its zoneid.
+	 */
+	if (dvp->dv_zone_ref != 0) {
+		mutex_exit(&dvp->dv_lock);
+		err = EBUSY;
+		goto done;
+	}
+
+	if (zid == GLOBAL_ZONEID) {
+		/*
+		 * Move the link from the local zone to the global zone,
+		 * and release the reference to this link.  At the same time
+		 * reset the link's active state so that an aggregation is
+		 * allowed to be created over it.
+		 */
+		dvp->dv_zid = zid;
+		mutex_exit(&dvp->dv_lock);
+		dls_mac_active_clear(dvp->dv_dlp);
+		dls_vlan_rele(dvp);
+		goto done;
+	} else if (old_zid == GLOBAL_ZONEID) {
+		/*
+		 * Move the link from the global zone to the local zone,
+		 * and hold a reference to this link.  Also, set the link
+		 * to the "active" state so that the global zone is
+		 * not able to create an aggregation over this link.
+		 * TODO: revisit once we allow creating aggregations
+		 * within a local zone.
+		 */
+		if (!dls_mac_active_set(dvp->dv_dlp)) {
+			mutex_exit(&dvp->dv_lock);
+			err = EBUSY;
+			goto done;
+		}
+		dvp->dv_zid = zid;
+		mutex_exit(&dvp->dv_lock);
+		return (0);
+	} else {
+		/*
+		 * Move the link from a local zone to another local zone.
+		 */
+		dvp->dv_zid = zid;
+		mutex_exit(&dvp->dv_lock);
+	}
+
+done:
 	dls_vlan_rele(dvp);
 	return (err);
 }
 
-int
-dls_vlan_getzoneid(char *name, zoneid_t *zidp)
+/*
+ * Find dev_info_t based on the minor node of the link.
+ */
+dev_info_t *
+dls_finddevinfo(dev_t dev)
 {
-	int 		err;
 	dls_vlan_t	*dvp;
+	dev_info_t	*dip;
 
-	if ((err = dls_vlan_hold(name, &dvp, B_FALSE)) != 0)
-		return (err);
+	if (dls_vlan_hold_by_dev(dev, &dvp) != 0)
+		return (NULL);
 
-	*zidp = dvp->dv_zid;
-
+	dip = dvp->dv_dip;
 	dls_vlan_rele(dvp);
-
-	return (0);
-}
-
-void
-dls_vlan_add_impl(dls_vlan_t *dvp, dls_impl_t *dip)
-{
-	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-	dip->di_next_impl = dvp->dv_impl_list;
-	dvp->dv_impl_list = dip;
-	rw_exit(&i_dls_vlan_lock);
-}
-
-
-void
-dls_vlan_remove_impl(dls_vlan_t *dvp, dls_impl_t *dip)
-{
-	dls_impl_t **pp;
-	dls_impl_t *p;
-
-	rw_enter(&i_dls_vlan_lock, RW_WRITER);
-	for (pp = &dvp->dv_impl_list; (p =  *pp) != NULL;
-	    pp = &(p->di_next_impl))
-		if (p == dip)
-			break;
-	ASSERT(p != NULL);
-	*pp = p->di_next_impl;
-	p->di_next_impl = NULL;
-	rw_exit(&i_dls_vlan_lock);
+	return (dip);
 }

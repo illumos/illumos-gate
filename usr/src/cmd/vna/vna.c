@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,125 +37,162 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <sys/ethernet.h>
+#include <libdllink.h>
 #include <libdlvnic.h>
 
 /*ARGSUSED*/
-static dladm_status_t
-v_print(void *arg, dladm_vnic_attr_sys_t *attr)
+static int
+v_print(datalink_id_t vnic_id, void *arg)
 {
-	if (attr->va_mac_len != ETHERADDRL)
-		return (DLADM_STATUS_OK);
+	dladm_vnic_attr_sys_t attr;
+	char vnic[MAXLINKNAMELEN];
+	char link[MAXLINKNAMELEN];
 
-	(void) printf("%d\t%s\t%s\n", attr->va_vnic_id, attr->va_dev_name,
-	    ether_ntoa((struct ether_addr *)(attr->va_mac_addr)));
+	if (dladm_vnic_info(vnic_id, &attr, DLADM_OPT_ACTIVE) !=
+	    DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
 
-	return (DLADM_STATUS_OK);
+	if (attr.va_mac_len != ETHERADDRL)
+		return (DLADM_WALK_CONTINUE);
+
+	if (dladm_datalink_id2info(vnic_id, NULL, NULL, NULL, vnic,
+	    sizeof (vnic)) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (dladm_datalink_id2info(attr.va_link_id, NULL, NULL, NULL, link,
+	    sizeof (link)) != DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	(void) printf("%s\t%s\t%s\n", vnic, link,
+	    ether_ntoa((struct ether_addr *)(attr.va_mac_addr)));
+
+	return (DLADM_WALK_CONTINUE);
 }
 
-static int
+static void
 v_list(void)
 {
-	dladm_status_t status;
-
-	status = dladm_vnic_walk_sys(v_print, NULL);
-
-	if (status != DLADM_STATUS_OK)
-		return (-1);
-
-	return (0);
-}
-
-static dladm_status_t
-v_find(void *arg, dladm_vnic_attr_sys_t *attr)
-{
-	dladm_vnic_attr_sys_t *specp = arg;
-
-	if (strncmp(attr->va_dev_name, specp->va_dev_name,
-	    strlen(attr->va_dev_name)) != 0)
-		return (DLADM_STATUS_OK);
-
-	if (attr->va_mac_len != specp->va_mac_len)
-		return (DLADM_STATUS_OK);
-
-	if (memcmp(attr->va_mac_addr, specp->va_mac_addr,
-	    attr->va_mac_len) != 0)
-		return (DLADM_STATUS_OK);
-
-	specp->va_vnic_id = attr->va_vnic_id;
-
-	return (DLADM_STATUS_EXIST);
+	(void) dladm_walk_datalink_id(v_print, NULL, DATALINK_CLASS_VNIC,
+	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 }
 
 static int
-v_add(char *dev, char *addr)
+v_find(datalink_id_t vnic_id, void *arg)
+{
+	dladm_vnic_attr_sys_t *specp = arg;
+	dladm_vnic_attr_sys_t attr;
+
+	if (dladm_vnic_info(vnic_id, &attr, DLADM_OPT_ACTIVE) !=
+	    DLADM_STATUS_OK) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	if (attr.va_link_id != specp->va_link_id)
+		return (DLADM_WALK_CONTINUE);
+
+	if (attr.va_mac_len != specp->va_mac_len)
+		return (DLADM_WALK_CONTINUE);
+
+	if (memcmp(attr.va_mac_addr, specp->va_mac_addr,
+	    attr.va_mac_len) != 0) {
+		return (DLADM_WALK_CONTINUE);
+	}
+
+	specp->va_vnic_id = attr.va_vnic_id;
+
+	return (DLADM_WALK_TERMINATE);
+}
+
+/*
+ * Print out the link name of the VNIC.
+ */
+static int
+v_add(char *link, char *addr)
 {
 	struct ether_addr *ea;
 	dladm_vnic_attr_sys_t spec;
+	datalink_id_t vnic_id, linkid;
+	char vnic[MAXLINKNAMELEN];
 	dladm_status_t status;
-	uint_t vid;
 	char buf[DLADM_STRSIZE];
 
 	ea = ether_aton(addr);
 	if (ea == NULL) {
-		(void) fprintf(stderr, "Invalid ethernet address: %s\n",
-		    addr);
+		(void) fprintf(stderr, "Invalid ethernet address: %s\n", addr);
+		return (-1);
+	}
+
+	if (dladm_name2info(link, &linkid, NULL, NULL, NULL) !=
+	    DLADM_STATUS_OK) {
+		(void) fprintf(stderr, "Invalid link name: %s\n", link);
 		return (-1);
 	}
 
 	/*
-	 * If a VNIC already exists over the specified device
+	 * If a VNIC already exists over the specified link
 	 * with this MAC address, use it.
 	 */
-	(void) strncpy(spec.va_dev_name, dev, sizeof (spec.va_dev_name) - 1);
+	spec.va_vnic_id = DATALINK_INVALID_LINKID;
+	spec.va_link_id = linkid;
 	spec.va_mac_len = ETHERADDRL;
 	(void) memcpy(spec.va_mac_addr, (uchar_t *)ea->ether_addr_octet,
 	    spec.va_mac_len);
 
-	status = dladm_vnic_walk_sys(v_find, &spec);
-	switch (status) {
-	case DLADM_STATUS_EXIST:
-		vid = spec.va_vnic_id;
-		break;
-
-	case DLADM_STATUS_OK:
+	(void) dladm_walk_datalink_id(v_find, &spec, DATALINK_CLASS_VNIC,
+	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	if (spec.va_vnic_id == DATALINK_INVALID_LINKID) {
 		/*
 		 * None found, so create.
 		 */
-		status = dladm_vnic_create(0, dev, VNIC_MAC_ADDR_TYPE_FIXED,
-		    (uchar_t *)ea->ether_addr_octet, ETHERADDRL,
-		    &vid, DLADM_VNIC_OPT_TEMP | DLADM_VNIC_OPT_AUTOID);
+		status = dladm_vnic_create(NULL, linkid,
+		    VNIC_MAC_ADDR_TYPE_FIXED, (uchar_t *)ea->ether_addr_octet,
+		    ETHERADDRL, &vnic_id, DLADM_OPT_ACTIVE);
 		if (status != DLADM_STATUS_OK) {
 			(void) fprintf(stderr, "dladm_vnic_create: %s\n",
 			    dladm_status2str(status, buf));
 			return (-1);
 		}
-		break;
-
-	default:
-		(void) fprintf(stderr, "dladm_vnic_walk_sys: %s\n",
-		    dladm_status2str(status, buf));
-		return (-1);
-		/* NOTREACHED */
+	} else {
+		vnic_id = spec.va_vnic_id;
 	}
 
-	(void) printf("%d\n", vid);
+	if ((status = dladm_datalink_id2info(vnic_id, NULL, NULL, NULL, vnic,
+	    sizeof (vnic))) != DLADM_STATUS_OK) {
+		(void) fprintf(stderr, "dladm_datalink_id2info: %s\n",
+		    dladm_status2str(status, buf));
+		if (spec.va_vnic_id == DATALINK_INVALID_LINKID)
+			(void) dladm_vnic_delete(vnic_id, DLADM_OPT_ACTIVE);
+		return (-1);
+	}
+
+	(void) printf("%s\n", vnic);
 
 	return (0);
 }
 
+/*
+ * v_remove() takes VNIC link name as the argument.
+ */
 static int
-v_remove(char *vdev)
+v_remove(char *vnic)
 {
-	uint_t vid;
+	datalink_id_t vnic_id;
 	dladm_status_t status;
+	char buf[DLADM_STRSIZE];
 
-	vid = atoi(vdev);
+	if ((status = dladm_name2info(vnic, &vnic_id, NULL, NULL, NULL)) !=
+	    DLADM_STATUS_OK) {
+		(void) fprintf(stderr, "dladm_name2info: %s\n",
+		    dladm_status2str(status, buf));
+		return (-1);
+	}
 
-	status = dladm_vnic_delete(vid, DLADM_VNIC_OPT_TEMP);
+	status = dladm_vnic_delete(vnic_id, DLADM_OPT_ACTIVE);
 
 	if (status != DLADM_STATUS_OK) {
-		char buf[DLADM_STRSIZE];
-
 		(void) fprintf(stderr, "dladm_vnic_delete: %s\n",
 		    dladm_status2str(status, buf));
 		return (-1);
@@ -170,7 +207,8 @@ main(int argc, char *argv[])
 	switch (argc) {
 	case 1:
 		/* List operation. */
-		return (v_list());
+		v_list();
+		return (0);
 		/* NOTREACHED */
 	case 2:
 		/* Remove operation. */

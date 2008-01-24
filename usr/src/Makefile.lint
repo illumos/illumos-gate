@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -170,6 +170,7 @@ COMMON_SUBDIRS = \
 	cmd/ldapcachemgr \
 	cmd/line \
 	cmd/link \
+	cmd/dlmgmtd \
 	cmd/locator \
 	cmd/lockstat \
 	cmd/lofiadm \
@@ -382,6 +383,7 @@ COMMON_SUBDIRS = \
 	lib/libtsnet \
 	lib/libtsol \
 	lib/libumem \
+	lib/libuuid \
 	lib/libuutil \
 	lib/libwanboot \
 	lib/libwanbootutil \

@@ -18,18 +18,96 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Move existing /etc/aggregation.conf entries to /etc/dladm/aggregation.conf
-ORIG=$BASEDIR/etc/aggregation.conf
-if [ -f $ORIG ]; then
-	# use cat instead of cp/mv to keep owner+group of dest
-	cat $ORIG > $BASEDIR/etc/dladm/aggregation.conf
+
+#
+# Convert datalink configuration into a series of dladm(1M) commands and
+# keep them in an upgrade script. This script will then be run in the
+# network-physical service.
+#
+# Note that we cannot use the /var/svc/profile/upgrade script because
+# that script is run during manifest-import which is too late for
+# datalink configuration.
+#
+UPGRADE_SCRIPT=/var/svc/profile/upgrade_datalink
+
+AGGR_CONF=/etc/aggregation.conf
+ORIG=$BASEDIR/$AGGR_CONF
+if [ ! -f "${ORIG}" ]; then
+	# Try the alternate location.
+	AGGR_CONF=/etc/dladm/aggregation.conf
+	ORIG=$BASEDIR/$AGGR_CONF
+fi
+
+# Now upgrade aggregation.conf to the new format.
+if [ -f "${ORIG}" ]; then
+	# Strip off comments, then each remaining line defines an
+	# aggregation the admnistrator configured on the old system.
+	# Each line corresponds to one dladm command that is appended
+	# to the upgrade script.
+	cat $ORIG | grep '^[^#]' | while read line; do
+		echo $line | while read aggr_index rest
+		do
+			policy=`echo $rest | /usr/bin/awk '{print $1}'`
+			nports=`echo $rest | /usr/bin/awk '{print $2}'`
+			ports=`echo $rest | /usr/bin/awk '{print $3}'`
+			mac=`echo $rest | /usr/bin/awk '{print $4}'`
+			lacp_mode=`echo $rest | /usr/bin/awk '{print $5}'`
+			lacp_timer=`echo $rest | /usr/bin/awk '{print $6}'`
+			dladm_string="dladm create-aggr -P $policy -l \
+			    $lacp_mode -T $lacp_timer"
+			# A fixed MAC address
+			if [ "${mac}" != "auto" ]; then
+				dladm_string="$dladm_string -u $mac"
+			fi
+			i=1
+			while [ $i -le "${nports}" ]; do
+				device=`echo $ports | cut -d, -f$i`
+				# Older aggregation.conf files have the format
+				# of device_name/port_number.  We don't need
+				# the port number, so get rid of it if it is
+				# there.
+				device=`echo $device | cut -d/ -f1`
+				i=`expr $i + 1`
+				dladm_string="$dladm_string -d $device"
+			done
+			dladm_string="$dladm_string $aggr_index"
+			echo $dladm_string >> \
+			    ${PKG_INSTALL_ROOT}/$UPGRADE_SCRIPT
+		done
+	done
+	# no longer needed, get rid of it.
 	rm -f $ORIG
-	removef $PKGINST /etc/aggregation.conf > /dev/null
+	removef $PKGINST $AGGR_CONF > /dev/null
+	removef -f $PKGINST > /dev/null 2>&1
+fi
+
+# Upgrade linkprop.conf
+ORIG=$BASEDIR/etc/dladm/linkprop.conf
+
+if [ -f "${ORIG}" ]; then
+	# Strip off comments, then each remaining line lists properties
+	# the administrator configured for a particular interface.
+	# Each line includes several properties, but we can only set
+	# one property per dladm invocation.
+	cat $ORIG | grep '^[^#]' | while read line; do
+		echo $line | while read link rest
+		do
+			while [ -n "${rest}" ]; do
+				linkprop=`echo $rest | cut -d";" -f1`
+				rest=`echo $rest | cut -d";" -f2-`
+				echo dladm set-linkprop -p $linkprop $link >> \
+				    ${PKG_INSTALL_ROOT}/$UPGRADE_SCRIPT
+			done
+		done
+	done
+	# no longer needed, get rid of it
+	rm -f $ORIG
+	removef $PKGINST /etc/dladm/linkprop.conf > /dev/null
 	removef -f $PKGINST > /dev/null 2>&1
 fi
 

@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ CFLAGS += $(CCVERBOSE)
 LAZYLIBS = $(ZLAZYLOAD) -ltsnet -ltsol $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -ltsnet -ltsol
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
-	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ldlpi $(LAZYLIBS)
+	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm $(LAZYLIBS)
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

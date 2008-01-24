@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,6 +193,8 @@ typedef struct sdev_node {
 		struct sdev_global_data	sdev_globaldata;
 		struct sdev_local_data	sdev_localdata;
 	} sdev_instance_data;
+
+	void		*sdev_private;
 } sdev_node_t;
 
 #define	sdev_ldata sdev_instance_data.sdev_localdata
@@ -245,13 +247,16 @@ typedef enum {
 } sdev_node_state_t;
 
 /* sdev_flags */
-#define	SDEV_BUILD	0x0001	/* directory cache out-of-date */
-#define	SDEV_STALE	0x0002	/* stale sdev nodes */
-#define	SDEV_GLOBAL	0x0004	/* global /dev nodes */
-#define	SDEV_PERSIST	0x0008	/* backing store persisted node */
-#define	SDEV_NO_NCACHE	0x0010	/* do not include in neg. cache */
-#define	SDEV_DYNAMIC	0x0020	/* special-purpose vnode ops (ex: pts) */
-#define	SDEV_VTOR	0x0040	/* validate sdev_nodes during search */
+#define	SDEV_BUILD		0x0001	/* directory cache out-of-date */
+#define	SDEV_STALE		0x0002	/* stale sdev nodes */
+#define	SDEV_GLOBAL		0x0004	/* global /dev nodes */
+#define	SDEV_PERSIST		0x0008	/* backing store persisted node */
+#define	SDEV_NO_NCACHE		0x0010	/* do not include in neg. cache */
+#define	SDEV_DYNAMIC		0x0020	/* special-purpose vnode ops */
+					/* (ex: pts) */
+#define	SDEV_VTOR		0x0040	/* validate sdev_nodes during search */
+#define	SDEV_ATTR_INVALID	0x0080	/* invalid node attributes, */
+					/* need update */
 
 /* sdev_lookup_flags */
 #define	SDEV_LOOKUP	0x0001	/* node creation in progress */
@@ -337,6 +342,12 @@ extern int devname_readdir_func(vnode_t *, uio_t *, cred_t *, int *, int);
  */
 extern int devname_setattr_func(struct vnode *, struct vattr *, int,
     struct cred *, int (*)(struct sdev_node *, struct vattr *, int), int);
+
+/*
+ * devname_inactive_func()
+ */
+extern void devname_inactive_func(struct vnode *, struct cred *,
+    void (*)(struct vnode *));
 
 /*
  * /dev file system instance defines
@@ -607,6 +618,7 @@ extern int sdev_reserve_subdirs(struct sdev_node *);
 extern int prof_lookup();
 extern void prof_filldir(struct sdev_node *);
 extern int devpts_validate(struct sdev_node *dv);
+extern int devnet_validate(struct sdev_node *dv);
 extern void *sdev_get_vtor(struct sdev_node *dv);
 
 /*
@@ -615,7 +627,6 @@ extern void *sdev_get_vtor(struct sdev_node *dv);
 extern int sdev_modctl_readdir(const char *, char ***, int *, int *);
 extern void sdev_modctl_readdir_free(char **, int, int);
 extern int sdev_modctl_devexists(const char *);
-
 
 /*
  * ncache handlers
@@ -637,9 +648,11 @@ extern int devtype;
 extern kmem_cache_t *sdev_node_cache;
 extern struct vnodeops		*sdev_vnodeops;
 extern struct vnodeops		*devpts_vnodeops;
+extern struct vnodeops		*devnet_vnodeops;
 extern struct sdev_data *sdev_origins; /* mount info for global /dev instance */
 extern const fs_operation_def_t	sdev_vnodeops_tbl[];
 extern const fs_operation_def_t	devpts_vnodeops_tbl[];
+extern const fs_operation_def_t	devnet_vnodeops_tbl[];
 extern const fs_operation_def_t	devsys_vnodeops_tbl[];
 extern const fs_operation_def_t	devpseudo_vnodeops_tbl[];
 
@@ -669,6 +682,7 @@ extern int sdev_debug;
 #define	SDEV_DEBUG_PROFILE	0x200	/* trace sdev_profile */
 #define	SDEV_DEBUG_MODCTL	0x400	/* trace modctl activity */
 #define	SDEV_DEBUG_FLK		0x800	/* trace failed lookups */
+#define	SDEV_DEBUG_NET		0x1000	/* /dev/net tracing */
 
 #define	sdcmn_err(args)  if (sdev_debug & SDEV_DEBUG) printf args
 #define	sdcmn_err2(args) if (sdev_debug & SDEV_DEBUG_VOPS) printf args
@@ -681,6 +695,7 @@ extern int sdev_debug;
 #define	sdcmn_err9(args) if (sdev_debug & SDEV_DEBUG_SDEV_NODE) printf args
 #define	sdcmn_err10(args) if (sdev_debug & SDEV_DEBUG_PROFILE) printf args
 #define	sdcmn_err11(args) if (sdev_debug & SDEV_DEBUG_MODCTL) printf args
+#define	sdcmn_err12(args) if (sdev_debug & SDEV_DEBUG_NET) printf args
 #define	impossible(args) printf args
 #else
 #define	sdcmn_err(args)		/* does nothing */
@@ -694,6 +709,7 @@ extern int sdev_debug;
 #define	sdcmn_err9(args)	/* does nothing */
 #define	sdcmn_err10(args)	/* does nothing */
 #define	sdcmn_err11(args)	/* does nothing */
+#define	sdcmn_err12(args)	/* does nothing */
 #define	impossible(args)	/* does nothing */
 #endif
 

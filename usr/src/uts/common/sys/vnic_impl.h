@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ typedef struct vnic_flow_tab_s {
 typedef struct vnic_mac_s {
 	mac_handle_t		va_mh;
 	uint_t			va_refs;
-	char			va_dev_name[MAXNAMELEN];
+	datalink_id_t		va_linkid;
 	const mac_txinfo_t	*va_txinfo;
 	struct vnic_bcast_grp_s	*va_bcast_grp;
 	krwlock_t		va_bcast_grp_lock;
@@ -81,7 +81,7 @@ typedef struct vnic_mac_s {
 } vnic_mac_t;
 
 typedef struct vnic_s {
-	uint_t		vn_id;
+	datalink_id_t	vn_id;
 	uint32_t
 		vn_started : 1,
 		vn_promisc : 1,
@@ -96,6 +96,7 @@ typedef struct vnic_s {
 	vnic_mac_addr_type_t vn_addr_type;
 
 	mac_handle_t	vn_mh;
+	uint32_t	vn_margin;
 	vnic_mac_t	*vn_vnic_mac;
 	vnic_flow_t	*vn_flow_ent;
 	uint32_t	vn_hcksum_txflags;
@@ -140,20 +141,20 @@ typedef struct vnic_s {
 	mutex_exit(&(flow)->vf_lock);				\
 }
 
-extern int vnic_dev_create(uint_t, char *, int, uchar_t *);
-extern int vnic_dev_modify(uint_t, uint_t, vnic_mac_addr_type_t,
+extern int vnic_dev_create(datalink_id_t, datalink_id_t, int, uchar_t *);
+extern int vnic_dev_modify(datalink_id_t, uint_t, vnic_mac_addr_type_t,
     uint_t, uchar_t *);
-extern int vnic_dev_delete(uint_t);
+extern int vnic_dev_delete(datalink_id_t);
 
-typedef int (*vnic_info_new_vnic_fn_t)(void *, uint32_t, vnic_mac_addr_type_t,
-    uint_t, uint8_t *, char *);
+typedef int (*vnic_info_new_vnic_fn_t)(void *, datalink_id_t,
+    vnic_mac_addr_type_t, uint_t, uint8_t *, datalink_id_t);
 
 extern void vnic_dev_init(void);
 extern void vnic_dev_fini(void);
 extern uint_t vnic_dev_count(void);
 extern dev_info_t *vnic_get_dip(void);
 
-extern int vnic_info(uint_t *, uint32_t, char *, void *,
+extern int vnic_info(uint_t *, datalink_id_t, datalink_id_t, void *,
     vnic_info_new_vnic_fn_t);
 
 extern void vnic_rx(void *, void *, mblk_t *);

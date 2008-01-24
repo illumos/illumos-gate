@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -360,7 +360,6 @@ loadrootmodules(void)
 		if ((err = load_boot_driver(this)) != 0) {
 			cmn_err(CE_WARN, "Cannot load drv/%s", this);
 			return (err);
-			/* NOTREACHED */
 		}
 	}
 	/*
@@ -371,7 +370,6 @@ loadrootmodules(void)
 		if ((err = load_boot_platform_modules(this)) != 0) {
 			cmn_err(CE_WARN, "Cannot load drv/%s", this);
 			return (err);
-			/* NOTREACHED */
 		}
 	}
 
@@ -407,7 +405,6 @@ loop:
 	if (err != 0) {
 		cmn_err(CE_CONT, "Cannot load drivers for %s\n", name);
 		goto out;
-		/* NOTREACHED */
 	}
 
 	/*
@@ -474,34 +471,38 @@ loop:
 	if (strncmp(rootfs.bo_fstype, "nfs", 3) == 0) {
 		++netboot;
 
+		/*
+		 * Preload (load-only, no init) the dacf module. We cannot
+		 * init the module because one of its requisite modules is
+		 * dld whose _init function will call taskq_create(), which
+		 * will panic the system at this point.
+		 */
+		if ((err = modloadonly("dacf", "net_dacf")) < 0)  {
+			cmn_err(CE_CONT, "Cannot load dacf/net_dacf\n");
+			goto out;
+		}
 		if ((err = modload("misc", "tlimod")) < 0)  {
 			cmn_err(CE_CONT, "Cannot load misc/tlimod\n");
 			goto out;
-			/* NOTREACHED */
 		}
 		if ((err = modload("strmod", "rpcmod")) < 0)  {
 			cmn_err(CE_CONT, "Cannot load strmod/rpcmod\n");
 			goto out;
-			/* NOTREACHED */
 		}
 		if ((err = modload("misc", "nfs_dlboot")) < 0)  {
 			cmn_err(CE_CONT, "Cannot load misc/nfs_dlboot\n");
 			goto out;
-			/* NOTREACHED */
 		}
 		if ((err = modload("mac", "mac_ether")) < 0)  {
 			cmn_err(CE_CONT, "Cannot load mac/mac_ether\n");
 			goto out;
-			/* NOTREACHED */
 		}
 		if ((err = modload("misc", "strplumb")) < 0)  {
 			cmn_err(CE_CONT, "Cannot load misc/strplumb\n");
 			goto out;
-			/* NOTREACHED */
 		}
 		if ((err = strplumb_load()) < 0) {
 			goto out;
-			/* NOTREACHED */
 		}
 	}
 

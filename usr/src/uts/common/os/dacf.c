@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1181,6 +1180,19 @@ dacf_minor_number(dacf_infohdl_t info_hdl)
 }
 
 /*
+ * dacf_get_dev()
+ *	given a dacf_infohdl_t, obtain the dev_t of the instance being
+ *	configured.
+ */
+dev_t
+dacf_get_dev(dacf_infohdl_t info_hdl)
+{
+	struct ddi_minor_data *dmdp = (struct ddi_minor_data *)info_hdl;
+
+	return (dmdp->ddm_dev);
+}
+
+/*
  * dacf_driver_name()
  * 	given a dacf_infohdl_t, obtain the device driver name of the device
  * 	instance being configured.
@@ -1269,7 +1281,7 @@ dacf_retrieve_info(dacf_infohdl_t info_hdl)
 	void *data;
 
 	if (mod_hash_find(dacf_info_hash, (mod_hash_key_t)dmdp,
-		    (mod_hash_val_t *)&data) != 0) {
+	    (mod_hash_val_t *)&data) != 0) {
 		return (NULL);
 	}
 

@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -274,8 +274,8 @@ s none usr/lib/sparcv9/libproc.so.1=../../../lib/sparcv9/libproc.so.1
 s none usr/lib/sparcv9/libproc.so=../../../lib/sparcv9/libproc.so.1
 s none usr/lib/sparcv9/libpthread.so.1=../../../lib/sparcv9/libpthread.so.1
 s none usr/lib/sparcv9/libpthread.so=../../../lib/sparcv9/libpthread.so.1
-f none usr/lib/sparcv9/librcm.so.1 755 root bin
-s none usr/lib/sparcv9/librcm.so=librcm.so.1
+s none usr/lib/sparcv9/librcm.so.1=../../../lib/sparcv9/librcm.so.1
+s none usr/lib/sparcv9/librcm.so=../../../lib/sparcv9/librcm.so.1
 s none usr/lib/sparcv9/libresolv.so.2=../../../lib/sparcv9/libresolv.so.2
 s none usr/lib/sparcv9/libresolv.so=../../../lib/sparcv9/libresolv.so.2
 s none usr/lib/sparcv9/librestart.so.1=../../../lib/sparcv9/librestart.so.1

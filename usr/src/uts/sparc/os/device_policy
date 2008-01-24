@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -65,6 +65,7 @@ pcelx		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 qfe		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 aggr		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 vnic		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
+softmac		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 #
 # Virtual network interface access permission
 #

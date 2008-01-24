@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,7 @@ i_dls_mod_init(void)
 	dls_init();
 	dls_vlan_init();
 	dls_link_init();
+	dls_mgmt_init();
 }
 
 static int
@@ -67,6 +67,8 @@ i_dls_mod_fini(void)
 
 	if ((err = dls_link_fini()) != 0)
 		return (err);
+
+	dls_mgmt_fini();
 
 	err = dls_vlan_fini();
 	ASSERT(err == 0);

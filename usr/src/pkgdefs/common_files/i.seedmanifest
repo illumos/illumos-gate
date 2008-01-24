@@ -1,0 +1,68 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+# i.seedmanifest - smf(5) service manifest install class action script
+#   for services that must be in the seed repository.
+# 
+# PLEASE NOTE: Use of this CAS means that the SMF repository format cannot
+#   change, since it may need to modify an SMF repository on another system
+#   image.  As such, any use of this CAS must be cleared with the SMF team.
+#
+
+repfile=$PKG_INSTALL_ROOT/etc/svc/repository.db
+
+#
+# If the repository does not yet exist, create it from the appropriate seed.
+#
+if [ ! -f $repfile ]; then
+	if [ -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
+	    "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then
+		dbfile=nonglobal.db
+	else
+		dbfile=global.db
+	fi
+
+	if [ -f $PKG_INSTALL_ROOT/lib/svc/seed/$dbfile ]; then
+		/usr/bin/cp $PKG_INSTALL_ROOT/lib/svc/seed/$dbfile $repfile
+		/usr/bin/chmod 0600 $repfile
+		/usr/bin/chown root:sys $repfile
+	fi
+
+	#
+	# Since our service is in the seed, we're done.
+	#
+	exit 0
+fi
+
+while read src dst; do
+	/usr/bin/cp -p $src $dst
+
+	SVCCFG_REPOSITORY=$repfile SVCCFG_CHECKHASH=1 \
+	    /usr/sbin/svccfg import $dst
+done
+
+exit 0

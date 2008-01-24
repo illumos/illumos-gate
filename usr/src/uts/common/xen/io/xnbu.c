@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -432,6 +432,12 @@ xnbu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mr->m_callbacks = &xnb_callbacks;
 	mr->m_min_sdu = 0;
 	mr->m_max_sdu = XNBMAXPKT;
+	/*
+	 * xnbu is a virtual device, and it is not associated with any
+	 * physical device. Its margin size is determined by the maximum
+	 * packet size it can handle, which is PAGESIZE.
+	 */
+	mr->m_margin = PAGESIZE - XNBMAXPKT - sizeof (struct ether_header);
 
 	(void) memset(xnbp->xnb_mac_addr, 0xff, ETHERADDRL);
 	xnbp->xnb_mac_addr[0] &= 0xfe;

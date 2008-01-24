@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,6 +72,7 @@ i i.preserve
 d none dev 755 root sys
 d none dev/dsk 755 root sys
 d none dev/fd 555 root root
+d none dev/net 755 root sys
 d none dev/pts 755 root sys
 d none dev/rdsk 755 root sys
 d none dev/rmt 755 root sys

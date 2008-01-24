@@ -564,6 +564,7 @@ e1000g_register_mac(struct e1000g *Adapter)
 	    hw->mac.max_frame_size - 256 :
 	    (hw->mac.max_frame_size != ETHERMAX) ?
 	    hw->mac.max_frame_size - 24 : ETHERMTU;
+	mac->m_margin = VLAN_TAGSZ;
 
 	err = mac_register(mac, &Adapter->mh);
 	mac_free(mac);

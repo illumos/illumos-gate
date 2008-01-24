@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1993
@@ -1902,7 +1902,12 @@ get_if_kstats(struct interface *ifp, struct phyi_data *newdata)
 	if ((kc = kstat_open()) == NULL)
 		return (-1);
 
-	if ((ksp = kstat_lookup(kc, NULL, -1, phyi->phyi_name)) == NULL) {
+	/*
+	 * First we try to query the "link" kstats in case the link is renamed.
+	 * If that fails, fallback to legacy ktats for those non-GLDv3 links.
+	 */
+	if (((ksp = kstat_lookup(kc, "link", 0, phyi->phyi_name)) == NULL) &&
+	    ((ksp = kstat_lookup(kc, NULL, -1, phyi->phyi_name)) == NULL)) {
 		(void) kstat_close(kc);
 		return (-1);
 	}

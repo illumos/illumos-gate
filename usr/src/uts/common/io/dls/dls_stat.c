@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/kstat.h>
 #include <sys/vlan.h>
 #include <sys/mac.h>
+#include <sys/mac_ether.h>
 #include <sys/ctype.h>
 #include <sys/dls.h>
 #include <sys/dls_impl.h>
@@ -57,7 +58,9 @@ static mac_stat_info_t	i_dls_si[] = {
 	{ MAC_STAT_RBYTES, "rbytes64", KSTAT_DATA_UINT64, 0 },
 	{ MAC_STAT_IPACKETS, "ipackets64", KSTAT_DATA_UINT64, 0 },
 	{ MAC_STAT_OBYTES, "obytes64", KSTAT_DATA_UINT64, 0 },
-	{ MAC_STAT_OPACKETS, "opackets64", KSTAT_DATA_UINT64, 0 }
+	{ MAC_STAT_OPACKETS, "opackets64", KSTAT_DATA_UINT64, 0 },
+	{ MAC_STAT_LINK_STATE, "link_state", KSTAT_DATA_UINT32,
+	    (uint64_t)LINK_STATE_UNKNOWN}
 };
 
 #define	STAT_INFO_COUNT	(sizeof (i_dls_si) / sizeof (i_dls_si[0]))
@@ -67,9 +70,19 @@ static mac_stat_info_t	i_dls_si[] = {
  */
 
 static int
-i_dls_stat_update(kstat_t *ksp, int rw)
+i_dls_mac_stat_update(kstat_t *ksp, int rw)
 {
 	dls_vlan_t	*dvp = ksp->ks_private;
+
+	return (dls_stat_update(ksp, dvp, rw));
+}
+
+/*
+ * Exported functions.
+ */
+int
+dls_stat_update(kstat_t *ksp, dls_vlan_t *dvp, int rw)
+{
 	dls_link_t	*dlp = dvp->dv_dlp;
 	kstat_named_t	*knp;
 	uint_t		i;
@@ -100,40 +113,37 @@ i_dls_stat_update(kstat_t *ksp, int rw)
 		knp++;
 	}
 
+	/*
+	 * Ethernet specific kstat "link_duplex"
+	 */
+	if (dlp->dl_mip->mi_nativemedia != DL_ETHER) {
+		knp->value.ui32 = LINK_DUPLEX_UNKNOWN;
+	} else {
+		val = mac_stat_get(dlp->dl_mh, ETHER_STAT_LINK_DUPLEX);
+		knp->value.ui32 = (uint32_t)val;
+	}
+	knp++;
 	knp->value.ui32 = dlp->dl_unknowns;
 	dls_mac_rele(dlp);
 
 	return (0);
 }
 
-/*
- * Exported functions.
- */
-
-void
-dls_mac_stat_create(dls_vlan_t *dvp)
+int
+dls_stat_create(const char *module, int instance, const char *name,
+    int (*update)(struct kstat *, int), void *private, kstat_t **kspp)
 {
-	dls_link_t		*dlp = dvp->dv_dlp;
-	char			module[IFNAMSIZ];
-	uint_t			instance;
-	kstat_t			*ksp;
-	kstat_named_t		*knp;
-	uint_t			i;
-	int			err;
+	kstat_t		*ksp;
+	kstat_named_t	*knp;
+	uint_t		i;
 
-	if (dls_mac_hold(dlp) != 0)
-		return;
+	if ((ksp = kstat_create(module, instance, name, "net",
+	    KSTAT_TYPE_NAMED, STAT_INFO_COUNT + 2, 0)) == NULL) {
+		return (EINVAL);
+	}
 
-	err = ddi_parse(dvp->dv_name, module, &instance);
-	ASSERT(err == DDI_SUCCESS);
-
-	if ((ksp = kstat_create(module, instance, NULL, "net",
-	    KSTAT_TYPE_NAMED, STAT_INFO_COUNT + 1, 0)) == NULL)
-		goto done;
-
-	ksp->ks_update = i_dls_stat_update;
-	ksp->ks_private = (void *)dvp;
-	dvp->dv_ksp = ksp;
+	ksp->ks_update = update;
+	ksp->ks_private = private;
 
 	knp = (kstat_named_t *)ksp->ks_data;
 	for (i = 0; i < STAT_INFO_COUNT; i++) {
@@ -142,16 +152,51 @@ dls_mac_stat_create(dls_vlan_t *dvp)
 		knp++;
 	}
 
+	kstat_named_init(knp++, "link_duplex", KSTAT_DATA_UINT32);
 	kstat_named_init(knp, "unknowns", KSTAT_DATA_UINT32);
-
 	kstat_install(ksp);
-done:
-	dls_mac_rele(dlp);
+	*kspp = ksp;
+	return (0);
+}
+
+void
+dls_mac_stat_create(dls_vlan_t *dvp)
+{
+	kstat_t		*ksp = NULL;
+	major_t		major;
+
+	/*
+	 * Create the legacy kstats to provide backward compatibility.
+	 * These kstats need to be created even when this link does not
+	 * have a link name, i.e., when the VLAN is accessed using its
+	 * /dev node.
+	 *
+	 * Note that we only need to create the legacy kstats for GLDv3
+	 * physical links, aggregation links which are created using
+	 * the 'key' option, and any VLAN links created over them.
+	 * This can be determined by checking its dv_ppa.
+	 */
+	ASSERT(dvp->dv_ksp == NULL);
+	if (dvp->dv_ppa >= MAC_MAX_MINOR)
+		return;
+
+	major = getmajor(dvp->dv_dev);
+	ASSERT(GLDV3_DRV(major) && (dvp->dv_ksp == NULL));
+
+	if (dls_stat_create(ddi_major_to_name(major),
+	    dvp->dv_id * 1000 + dvp->dv_ppa, NULL,
+	    i_dls_mac_stat_update, dvp, &ksp) != 0) {
+		return;
+	}
+	ASSERT(ksp != NULL);
+	dvp->dv_ksp = ksp;
 }
 
 void
 dls_mac_stat_destroy(dls_vlan_t *dvp)
 {
-	kstat_delete(dvp->dv_ksp);
-	dvp->dv_ksp = NULL;
+	if (dvp->dv_ksp != NULL) {
+		kstat_delete(dvp->dv_ksp);
+		dvp->dv_ksp = NULL;
+	}
 }

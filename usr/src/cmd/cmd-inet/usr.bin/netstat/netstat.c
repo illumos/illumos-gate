@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2632,9 +2632,17 @@ if_report(mib_item_t *item, char *matchname,
 						continue; /* 'for' loop 2a */
 					new_ifindex =
 					    if_nametoindex(logintname);
+					/*
+					 * First lookup the "link" kstats in
+					 * case the link is renamed. Then
+					 * fallback to the legacy kstats for
+					 * those non-GLDv3 links.
+					 */
 					if (new_ifindex != ifindex_v4 &&
-					    (ksp = kstat_lookup(kc, NULL, -1,
-					    ifname)) != NULL) {
+					    (((ksp = kstat_lookup(kc, "link", 0,
+					    ifname)) != NULL) ||
+					    ((ksp = kstat_lookup(kc, NULL, -1,
+					    ifname)) != NULL))) {
 						(void) safe_kstat_read(kc, ksp,
 						    NULL);
 						stat.ipackets =
@@ -2774,11 +2782,20 @@ if_report(mib_item_t *item, char *matchname,
 						continue;
 					}
 
-					ksp = kstat_lookup(kc, NULL, -1, buf);
-					if (ksp &&
-					    ksp->ks_type == KSTAT_TYPE_NAMED)
+					/*
+					 * First lookup the "link" kstats in
+					 * case the link is renamed. Then
+					 * fallback to the legacy kstats for
+					 * those non-GLDv3 links.
+					 */
+					if (((ksp = kstat_lookup(kc, "link",
+					    0, buf)) != NULL ||
+					    (ksp = kstat_lookup(kc, NULL, -1,
+					    buf)) != NULL) && (ksp->ks_type ==
+					    KSTAT_TYPE_NAMED)) {
 						(void) safe_kstat_read(kc, ksp,
 						    NULL);
+					}
 
 					t.ipackets = kstat_named_value(ksp,
 					    "ipackets");
@@ -2926,9 +2943,18 @@ if_report(mib_item_t *item, char *matchname,
 						continue; /* 'for' loop 2d */
 					new_ifindex =
 					    if_nametoindex(logintname);
+
+					/*
+					 * First lookup the "link" kstats in
+					 * case the link is renamed. Then
+					 * fallback to the legacy kstats for
+					 * those non-GLDv3 links.
+					 */
 					if (new_ifindex != ifindex_v6 &&
+					    ((ksp = kstat_lookup(kc, "link", 0,
+					    ifname)) != NULL ||
 					    (ksp = kstat_lookup(kc, NULL, -1,
-					    ifname)) != NULL) {
+					    ifname)) != NULL)) {
 						(void) safe_kstat_read(kc, ksp,
 						    NULL);
 						stat.ipackets =
@@ -3071,11 +3097,20 @@ if_report(mib_item_t *item, char *matchname,
 						continue;
 					}
 
-					ksp = kstat_lookup(kc, NULL, -1, buf);
-					if (ksp && ksp->ks_type ==
-					    KSTAT_TYPE_NAMED)
+					/*
+					 * First lookup the "link" kstats in
+					 * case the link is renamed. Then
+					 * fallback to the legacy kstats for
+					 * those non-GLDv3 links.
+					 */
+					if (((ksp = kstat_lookup(kc, "link",
+					    0, buf)) != NULL ||
+					    (ksp = kstat_lookup(kc, NULL, -1,
+					    buf)) != NULL) && (ksp->ks_type ==
+					    KSTAT_TYPE_NAMED)) {
 						(void) safe_kstat_read(kc,
 						    ksp, NULL);
+					}
 
 					t.ipackets = kstat_named_value(ksp,
 					    "ipackets");

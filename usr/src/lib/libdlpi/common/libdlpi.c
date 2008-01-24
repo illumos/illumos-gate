@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,13 +44,15 @@
 #include <ctype.h>
 #include <net/if_types.h>
 #include <netinet/arp.h>
+#include <libdladm.h>
+#include <libdllink.h>
 #include <libdlpi.h>
 #include <libintl.h>
 #include <libinetutil.h>
 
 #include "libdlpi_impl.h"
 
-static int i_dlpi_open(const char *, int *, uint_t);
+static int i_dlpi_open(const char *, int *, uint_t, boolean_t);
 static int i_dlpi_style1_open(dlpi_impl_t *);
 static int i_dlpi_style2_open(dlpi_impl_t *);
 static int i_dlpi_checkstyle(dlpi_impl_t *, t_uscalar_t);
@@ -73,6 +75,33 @@ static void i_dlpi_writesap(void *, uint_t, uint_t);
 static int i_dlpi_notifyind_process(dlpi_impl_t *, dl_notify_ind_t *);
 static boolean_t i_dlpi_notifyidexists(dlpi_impl_t *, dlpi_notifyent_t *);
 static void i_dlpi_deletenotifyid(dlpi_impl_t *);
+
+struct i_dlpi_walklink_arg {
+	dlpi_walkfunc_t *fn;
+	void *arg;
+};
+
+static int
+i_dlpi_walk_link(const char *name, void *arg)
+{
+	struct i_dlpi_walklink_arg *warg = arg;
+
+	return ((warg->fn(name, warg->arg)) ? DLADM_WALK_TERMINATE :
+	    DLADM_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+void
+dlpi_walk(dlpi_walkfunc_t *fn, void *arg, uint_t flags)
+{
+	struct i_dlpi_walklink_arg warg;
+
+	warg.fn = fn;
+	warg.arg = arg;
+
+	(void) dladm_walk(i_dlpi_walk_link, &warg, DATALINK_CLASS_ALL,
+	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+}
 
 int
 dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
@@ -101,6 +130,8 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	dip->dli_oflags = flags;
 	dip->dli_notifylistp = NULL;
 	dip->dli_note_processing = B_FALSE;
+	if (getenv("DLPI_DEVONLY") != NULL)
+		dip->dli_oflags |= DLPI_DEVONLY;
 
 	for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
 		(void) strlcpy(dip->dli_modlist[cnt], ifsp.ifsp_mods[cnt],
@@ -133,8 +164,19 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 		return (retval);
 	}
 
-	if (i_dlpi_style1_open(dip) != DLPI_SUCCESS) {
-		if ((retval = i_dlpi_style2_open(dip)) != DLPI_SUCCESS) {
+	if ((retval = i_dlpi_style1_open(dip)) != DLPI_SUCCESS) {
+		if (retval == DLPI_ENOTSTYLE2) {
+			/*
+			 * The error code indicates not to continue the
+			 * style-2 open. Change the error code back to
+			 * DL_SYSERR, so that one would know the cause
+			 * of failure from errno.
+			 */
+			retval = DL_SYSERR;
+		} else {
+			retval = i_dlpi_style2_open(dip);
+		}
+		if (retval != DLPI_SUCCESS) {
 			free(dip);
 			return (retval);
 		}
@@ -939,35 +981,98 @@ dlpi_iftype(uint_t dlpitype)
 }
 
 /*
- * This function attempts to open linkname under the following namespaces:
- *      - /dev
- *      - /devices
- * If open doesn't succeed and link doesn't exist (ENOENT), this function
- * returns DLPI_ENOLINK, otherwise returns DL_SYSERR.
+ * This function attempts to open a device under the following namespaces:
+ *      /dev/net	- if a data-link with the specified name exists
+ *	/dev		- if DLPI_DEVONLY is specified, or if there is no
+ *			  data-link with the specified name (could be /dev/ip)
+ *
+ * In particular, this function is used to open a data-link node, or some
+ * special node, such as "/dev/ip" node. It is usually be called firstly
+ * with style1 being B_TRUE, and if that fails and the return value is not
+ * DLPI_ENOTSTYLE2, the function will again be called with style1 being
+ * B_FALSE (style-1 open attempt first, then style-2 open attempt).
+ *
+ * If DLPI_DEVONLY is specified, both attempt will try to open the /dev node
+ * directly.
+ *
+ * Otherwise, for style-1 attempt, the function will try to open the style-1
+ * /dev/net node, and perhaps fallback to open the style-1 /dev node if the
+ * give name is not a data-link name (e.g., it is /dev/ip). Note that the
+ * fallback and the subsequent style-2 attempt will not happen if:
+ * 1. style-1 opening of the /dev/net node succeeds;
+ * 2. style-1 opening of the /dev/net node fails with errno other than ENOENT,
+ *    which means that the specific /dev/net node exist, but the attempt fails
+ *    for some other reason;
+ * 3. style-1 openning of the /dev/net fails with ENOENT, but the name is
+ *    a known device name or its VLAN PPA hack name. (for example, assuming
+ *    device bge0 is renamed to net0, opening /dev/net/bge1000 would return
+ *    ENOENT, but we should not fallback to open /dev/bge1000 in this case,
+ *    as VLAN 1 over the bge0 device should be named as net1000.
+ *
+ * DLPI_ENOTSTYLE2 will be returned in case 2 and 3 to indicate not to proceed
+ * the second style-2 open attempt.
  */
 static int
-i_dlpi_open(const char *provider, int *fd, uint_t flags)
+i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 {
 	char		path[MAXPATHLEN];
 	int		oflags;
 
+	errno = ENOENT;
 	oflags = O_RDWR;
 	if (flags & DLPI_EXCL)
 		oflags |= O_EXCL;
 
+	if (style1 && !(flags & DLPI_DEVONLY)) {
+		char		driver[DLPI_LINKNAME_MAX];
+		char		device[DLPI_LINKNAME_MAX];
+		datalink_id_t	linkid;
+		uint_t		ppa;
+
+		/*
+		 * This is not a valid style-1 name. It could be "ip" module
+		 * for example. Fallback to open the /dev node.
+		 */
+		if (dlpi_parselink(provider, driver, &ppa) != DLPI_SUCCESS)
+			goto fallback;
+
+		(void) snprintf(path, sizeof (path), "/dev/net/%s", provider);
+		if ((*fd = open(path, oflags)) != -1)
+			return (DLPI_SUCCESS);
+
+		/*
+		 * We don't fallback to open the /dev node when it returns
+		 * error codes other than ENOENT. In that case, DLPI_ENOTSTYLE2
+		 * is returned to indicate not to continue the style-2 open.
+		 */
+		if (errno != ENOENT)
+			return (DLPI_ENOTSTYLE2);
+
+		/*
+		 * We didn't find the /dev/net node. Then we check whether
+		 * the given name is a device name or its VLAN PPA hack name
+		 * of a known link. If the answer is yes, and this link
+		 * supports vanity naming, then the link (or the VLAN) should
+		 * also have its /dev/net node but perhaps with another vanity
+		 * name (for example, when bge0 is renamed to net0). In this
+		 * case, although attempt to open the /dev/net/<devname> fails,
+		 * we should not fallback to open the /dev/<devname> node.
+		 */
+		(void) snprintf(device, DLPI_LINKNAME_MAX, "%s%d", driver,
+		    ppa >= 1000 ? ppa % 1000 : ppa);
+
+		if (dladm_dev2linkid(device, &linkid) == DLADM_STATUS_OK) {
+			dladm_phys_attr_t dpa;
+
+			if ((dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE)) ==
+			    DLADM_STATUS_OK && !dpa.dp_novanity) {
+				return (DLPI_ENOTSTYLE2);
+			}
+		}
+	}
+
+fallback:
 	(void) snprintf(path, sizeof (path), "/dev/%s", provider);
-
-	if ((*fd = open(path, oflags)) != -1)
-		return (DLPI_SUCCESS);
-
-	/*
-	 * On diskless boot, it's possible the /dev links have not yet
-	 * been created; fallback to /devices.  When /dev links are
-	 * created on demand, this code can be removed.
-	 */
-	(void) snprintf(path, sizeof (path), "/devices/pseudo/clone@0:%s",
-	    provider);
-
 	if ((*fd = open(path, oflags)) != -1)
 		return (DLPI_SUCCESS);
 
@@ -988,8 +1093,9 @@ i_dlpi_style1_open(dlpi_impl_t *dip)
 	 * where modules need to be pushed onto the device stream, open only
 	 * device name, otherwise open the full linkname.
 	 */
-	retval = i_dlpi_open((dip->dli_mod_cnt != 0) ? dip->dli_provider :
-	    dip->dli_linkname, &fd, dip->dli_oflags);
+	retval = i_dlpi_open((dip->dli_mod_cnt != 0) ?
+	    dip->dli_provider : dip->dli_linkname, &fd,
+	    dip->dli_oflags, B_TRUE);
 
 	if (retval != DLPI_SUCCESS) {
 		dip->dli_mod_pushed = 0;
@@ -1048,9 +1154,9 @@ i_dlpi_style2_open(dlpi_impl_t *dip)
 	 */
 	if (dip->dli_mod_pushed == 0) {
 		if ((retval = i_dlpi_open(dip->dli_provider, &fd,
-		    dip->dli_oflags)) != DLPI_SUCCESS)
+		    dip->dli_oflags, B_FALSE)) != DLPI_SUCCESS) {
 			return (retval);
-
+		}
 		dip->dli_fd = fd;
 	} else if (dip->dli_mod_pushed == dip->dli_mod_cnt) {
 		if (i_dlpi_remove_ppa(dip->dli_modlist[dip->dli_mod_cnt - 1])

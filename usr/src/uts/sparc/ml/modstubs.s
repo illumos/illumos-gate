@@ -1182,21 +1182,38 @@ stubs_base:
 
 /*
  * The following stubs are used by the mac module.
- * Since dls and dld already depend on mac, these
+ * Since dld already depends on mac, these
  * stubs are needed to avoid circular dependencies.
  */
-#ifndef DLS_MODULE
-	MODULE(dls,misc);
-	STUB(dls, dls_create, nomod_einval);
-	STUB(dls, dls_destroy, nomod_einval);
-	END_MODULE(dls);
-#endif
-
 #ifndef	DLD_MODULE
 	MODULE(dld,drv);
 	STUB(dld, dld_init_ops, nomod_void);
 	STUB(dld, dld_fini_ops, nomod_void);
+	STUB(dld, dld_autopush, nomod_minus_one);
 	END_MODULE(dld);
+#endif
+
+/*
+ * The following stubs are used by the mac module.
+ * Since dls already depends on mac, these
+ * stubs are needed to avoid circular dependencies.
+ */
+#ifndef	DLS_MODULE
+	MODULE(dls,misc);
+	STUB(dls, dls_devnet_vid, nomod_zero);
+	STUB(dls, dls_devnet_mac, nomod_zero);
+	STUB(dls, dls_devnet_hold_tmp, nomod_einval);
+	STUB(dls, dls_devnet_rele_tmp, nomod_void);
+	STUB(dls, dls_mgmt_get_linkid, nomod_einval);
+	END_MODULE(dls);
+#endif
+
+#ifndef SOFTMAC_MODULE
+	MODULE(softmac,drv);
+	STUB(softmac, softmac_hold_device, nomod_einval);
+	STUB(softmac, softmac_rele_device, nomod_void);
+	STUB(softmac, softmac_recreate, nomod_void);
+	END_MODULE(softmac);
 #endif
 
 #ifndef SDPIB_MODULE

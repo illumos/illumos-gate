@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,19 +125,12 @@ typedef enum {
 } dladm_wlan_bsstype_t;
 
 typedef enum {
-	DLADM_WLAN_LINKSTATUS_DISCONNECTED = 1,
-	DLADM_WLAN_LINKSTATUS_CONNECTED
+	DLADM_WLAN_LINK_DISCONNECTED = 1,
+	DLADM_WLAN_LINK_CONNECTED
 } dladm_wlan_linkstatus_t;
 
 typedef uint32_t dladm_wlan_speed_t;
 typedef	uint32_t dladm_wlan_channel_t;
-
-typedef enum {
-	DLADM_WLAN_SVC_SUCCESS,
-	DLADM_WLAN_SVC_FAILURE,
-	DLADM_WLAN_SVC_APP_FAILURE,
-	DLADM_WLAN_SVC_INSTANCE_EXISTS
-} dladm_wlan_svc_status_t;
 
 enum {
 	DLADM_WLAN_ATTR_ESSID	= 0x00000001,
@@ -186,33 +179,24 @@ typedef struct dladm_wlan_key {
 	uint_t		wk_class;
 } dladm_wlan_key_t;
 
-extern dladm_status_t	dladm_wlan_scan(const char *, void *,
+extern dladm_status_t	dladm_wlan_scan(datalink_id_t, void *,
 			    boolean_t (*)(void *, dladm_wlan_attr_t *));
-extern dladm_status_t	dladm_wlan_connect(const char *, dladm_wlan_attr_t *,
+extern dladm_status_t	dladm_wlan_connect(datalink_id_t, dladm_wlan_attr_t *,
 			    int, void *, uint_t, uint_t);
-extern dladm_status_t	dladm_wlan_disconnect(const char *);
-extern dladm_status_t	dladm_wlan_get_linkattr(const char *,
+extern dladm_status_t	dladm_wlan_disconnect(datalink_id_t);
+extern dladm_status_t	dladm_wlan_get_linkattr(datalink_id_t,
 			    dladm_wlan_linkattr_t *);
-extern dladm_status_t	dladm_wlan_walk(void *,
-			    boolean_t (*)(void *, const char *));
-extern boolean_t	dladm_wlan_is_valid(const char *);
-extern dladm_status_t	dladm_wlan_set_prop(const char *, const char *,
-			    char **, uint_t, char **);
-extern dladm_status_t	dladm_wlan_walk_prop(const char *, void *,
-			    boolean_t (*)(void *, const char *));
-extern dladm_status_t	dladm_wlan_get_prop(const char *, dladm_prop_type_t,
-			    const char *, char **, uint_t *);
 /* WPA support routines */
-extern dladm_status_t	dladm_wlan_wpa_get_sr(const char *,
-			    dladm_wlan_ess_t *, uint_t, uint_t *);
-extern dladm_status_t	dladm_wlan_wpa_set_ie(const char *, uint8_t *, uint_t);
-extern dladm_status_t	dladm_wlan_wpa_set_wpa(const char *, boolean_t);
-extern dladm_status_t	dladm_wlan_wpa_del_key(const char *,
-			    uint_t, const dladm_wlan_bssid_t *);
-extern dladm_status_t	dladm_wlan_wpa_set_key(const char *,
+extern dladm_status_t	dladm_wlan_wpa_get_sr(datalink_id_t, dladm_wlan_ess_t *,
+			    uint_t, uint_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_ie(datalink_id_t, uint8_t *, uint_t);
+extern dladm_status_t	dladm_wlan_wpa_set_wpa(datalink_id_t, boolean_t);
+extern dladm_status_t	dladm_wlan_wpa_del_key(datalink_id_t, uint_t,
+			    const dladm_wlan_bssid_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_key(datalink_id_t,
 			    dladm_wlan_cipher_t, const dladm_wlan_bssid_t *,
 			    boolean_t, uint64_t, uint_t, uint8_t *, uint_t);
-extern dladm_status_t	dladm_wlan_wpa_set_mlme(const char *,
+extern dladm_status_t	dladm_wlan_wpa_set_mlme(datalink_id_t,
 			    dladm_wlan_mlme_op_t,
 			    dladm_wlan_reason_t, dladm_wlan_bssid_t *);
 

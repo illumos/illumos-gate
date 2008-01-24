@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,11 @@ typedef enum {
 	LINK_DUPLEX_FULL
 } link_duplex_t;
 
+typedef uint32_t		datalink_id_t;
+#define	DATALINK_INVALID_LINKID	0
+#define	DATALINK_ALL_LINKID	0
+#define	DATALINK_MAX_LINKID	0xffffffff
+
 /*
  * Maximum MAC address length
  */
@@ -111,6 +116,16 @@ typedef struct mac_stat_info_s {
 #define	IS_MAC_STAT(stat)	\
 	(stat >= MAC_STAT_MIN && stat < MACTYPE_STAT_MIN)
 #define	IS_MACTYPE_STAT(stat)	(stat >= MACTYPE_STAT_MIN)
+
+/*
+ * Statistics maintained by the mac module, and possibly populated as link
+ * statistics.
+ */
+enum mac_mod_stat {
+	MAC_STAT_LINK_STATE,
+	MAC_STAT_LINK_UP,
+	MAC_STAT_PROMISC
+};
 
 /*
  * Do not reorder, and add only to the end of this list.
@@ -191,6 +206,20 @@ typedef	struct mac_capab_lso_s {
 } mac_capab_lso_t;
 
 /*
+ * Information for legacy devices.
+ */
+typedef struct mac_capab_legacy_s {
+	/*
+	 * Notifications that the legacy device does not support.
+	 */
+	uint32_t	ml_unsup_note;
+	/*
+	 * dev_t of the legacy device; can be held to force attach.
+	 */
+	dev_t		ml_dev;
+} mac_capab_legacy_t;
+
+/*
  * MAC layer capabilities.  These capabilities are handled by the drivers'
  * mc_capab_get() callbacks.  Some capabilities require the driver to fill
  * in a given data structure, and others are simply boolean capabilities.
@@ -199,11 +228,16 @@ typedef	struct mac_capab_lso_s {
  * care about by keeping a bitfield of these things around somewhere.
  */
 typedef enum {
-	MAC_CAPAB_HCKSUM	= 0x01,	/* data is a uint32_t for the txflags */
+	MAC_CAPAB_HCKSUM	= 0x01, /* data is a uint32_t for the txflags */
 	MAC_CAPAB_POLL		= 0x02,	/* boolean only, no data */
-	MAC_CAPAB_MULTIADDRESS	= 0x04,	/* data is multiaddress_capab_t */
-	MAC_CAPAB_LSO		= 0x08	/* data is mac_capab_lso_t */
+	MAC_CAPAB_MULTIADDRESS	= 0x04, /* data is multiaddress_capab_t */
+	MAC_CAPAB_LSO		= 0x08, /* data is mac_capab_lso_t */
+	MAC_CAPAB_NO_NATIVEVLAN	= 0x10, /* boolean only, no data */
+	MAC_CAPAB_NO_ZCOPY	= 0x20, /* boolean only, no data */
 	/* add new capabilities here */
+
+	/* The following capabilities are specific to softmac. */
+	MAC_CAPAB_LEGACY	= 0x8001, /* data is mac_capab_legacy_t */
 } mac_capab_t;
 
 typedef int mac_addr_slot_t;
@@ -256,6 +290,8 @@ typedef void		(*mac_ioctl_t)(void *, queue_t *, mblk_t *);
 typedef void		(*mac_resources_t)(void *);
 typedef mblk_t		*(*mac_tx_t)(void *, mblk_t *);
 typedef	boolean_t	(*mac_getcapab_t)(void *, mac_capab_t, void *);
+typedef	int		(*mac_open_t)(void *);
+typedef void		(*mac_close_t)(void *);
 
 /*
  * Drivers must set all of these callbacks except for mc_resources,
@@ -277,6 +313,8 @@ typedef struct mac_callbacks_s {
 	mac_resources_t	mc_resources;	/* Get the device resources */
 	mac_ioctl_t	mc_ioctl;	/* Process an unknown ioctl */
 	mac_getcapab_t	mc_getcapab;	/* Get capability information */
+	mac_open_t	mc_open;	/* Open the device */
+	mac_close_t	mc_close;	/* Close the device */
 } mac_callbacks_t;
 
 /*
@@ -288,6 +326,10 @@ typedef struct mac_callbacks_s {
 #define	MC_RESOURCES	0x001
 #define	MC_IOCTL	0x002
 #define	MC_GETCAPAB	0x004
+#define	MC_OPEN		0x008
+#define	MC_CLOSE	0x010
+
+#define	MAC_MAX_MINOR	1000
 
 typedef struct mac_register_s {
 	uint_t		m_version;	/* set by mac_alloc() */
@@ -302,6 +344,7 @@ typedef struct mac_register_s {
 	uint_t		m_max_sdu;
 	void		*m_pdata;
 	size_t		m_pdata_size;
+	uint32_t	m_margin;
 } mac_register_t;
 
 /*
@@ -325,6 +368,7 @@ typedef enum {
 	MAC_NOTE_DEVPROMISC,
 	MAC_NOTE_FASTPATH_FLUSH,
 	MAC_NOTE_VNIC,
+	MAC_NOTE_MARGIN,
 	MAC_NNOTE	/* must be the last entry */
 } mac_notify_type_t;
 
@@ -382,8 +426,9 @@ typedef struct mac_header_info_s {
 	uint32_t	mhi_origsap;
 	uint32_t	mhi_bindsap;
 	mac_addrtype_t	mhi_dsttype;
-	boolean_t	mhi_istagged;
 	uint16_t	mhi_tci;
+	uint_t		mhi_istagged:1,
+			mhi_prom_looped:1;
 } mac_header_info_t;
 
 /*
@@ -493,6 +538,10 @@ typedef struct mactype_register_s {
  * Client interface functions.
  */
 extern int			mac_open(const char *, mac_handle_t *);
+extern int			mac_open_by_linkid(datalink_id_t,
+				    mac_handle_t *);
+extern int			mac_open_by_linkname(const char *,
+				    mac_handle_t *);
 extern void			mac_close(mac_handle_t);
 extern const mac_info_t		*mac_info(mac_handle_t);
 extern boolean_t		mac_info_get(const char *, mac_info_t *);
@@ -500,14 +549,14 @@ extern uint64_t			mac_stat_get(mac_handle_t, uint_t);
 extern int			mac_start(mac_handle_t);
 extern void			mac_stop(mac_handle_t);
 extern int			mac_promisc_set(mac_handle_t, boolean_t,
-    mac_promisc_type_t);
+				    mac_promisc_type_t);
 extern boolean_t		mac_promisc_get(mac_handle_t,
-    mac_promisc_type_t);
+				    mac_promisc_type_t);
 extern int 			mac_multicst_add(mac_handle_t, const uint8_t *);
 extern int 			mac_multicst_remove(mac_handle_t,
-    const uint8_t *);
+				    const uint8_t *);
 extern boolean_t		mac_unicst_verify(mac_handle_t,
-    const uint8_t *, uint_t);
+				    const uint8_t *, uint_t);
 extern int			mac_unicst_set(mac_handle_t, const uint8_t *);
 extern void			mac_unicst_get(mac_handle_t, uint8_t *);
 extern void			mac_dest_get(mac_handle_t, uint8_t *);
@@ -517,44 +566,48 @@ extern const mac_txinfo_t	*mac_tx_get(mac_handle_t);
 extern const mac_txinfo_t	*mac_vnic_tx_get(mac_handle_t);
 extern link_state_t		mac_link_get(mac_handle_t);
 extern mac_notify_handle_t	mac_notify_add(mac_handle_t, mac_notify_t,
-    void *);
+				    void *);
 extern void			mac_notify_remove(mac_handle_t,
-    mac_notify_handle_t);
+				    mac_notify_handle_t);
 extern void			mac_notify(mac_handle_t);
 extern mac_rx_handle_t		mac_rx_add(mac_handle_t, mac_rx_t, void *);
 extern mac_rx_handle_t		mac_active_rx_add(mac_handle_t, mac_rx_t,
-    void *);
+				    void *);
 extern void			mac_rx_remove(mac_handle_t, mac_rx_handle_t,
-    boolean_t);
+				    boolean_t);
 extern void			mac_rx_remove_wait(mac_handle_t);
 extern mblk_t			*mac_txloop(void *, mblk_t *);
 extern mac_txloop_handle_t	mac_txloop_add(mac_handle_t, mac_txloop_t,
-    void *);
+				    void *);
 extern void			mac_txloop_remove(mac_handle_t,
-    mac_txloop_handle_t);
+				    mac_txloop_handle_t);
 extern boolean_t		mac_active_set(mac_handle_t);
 extern boolean_t		mac_active_shareable_set(mac_handle_t);
 extern void			mac_active_clear(mac_handle_t);
 extern void			mac_active_rx(void *, mac_resource_handle_t,
-    mblk_t *);
+				    mblk_t *);
 extern boolean_t		mac_vnic_set(mac_handle_t, mac_txinfo_t *,
-    mac_getcapab_t, void *);
+				    mac_getcapab_t, void *);
 extern void			mac_vnic_clear(mac_handle_t);
 extern void			mac_resource_set(mac_handle_t,
-    mac_resource_add_t, void *);
+				    mac_resource_add_t, void *);
 extern dev_info_t		*mac_devinfo_get(mac_handle_t);
+extern const char		*mac_name(mac_handle_t);
+extern minor_t			mac_minor(mac_handle_t);
 extern boolean_t		mac_capab_get(mac_handle_t, mac_capab_t,
-    void *);
+				    void *);
 extern boolean_t		mac_vnic_capab_get(mac_handle_t, mac_capab_t,
-    void *);
+				    void *);
 extern boolean_t		mac_sap_verify(mac_handle_t, uint32_t,
-    uint32_t *);
+				    uint32_t *);
 extern mblk_t			*mac_header(mac_handle_t, const uint8_t *,
-    uint32_t, mblk_t *, size_t);
+				    uint32_t, mblk_t *, size_t);
 extern int			mac_header_info(mac_handle_t, mblk_t *,
-    mac_header_info_t *);
+				    mac_header_info_t *);
 extern mblk_t			*mac_header_cook(mac_handle_t, mblk_t *);
 extern mblk_t			*mac_header_uncook(mac_handle_t, mblk_t *);
+extern minor_t			mac_minor_hold(boolean_t);
+extern void			mac_minor_rele(minor_t);
 
 /*
  * Driver interface functions.
@@ -565,31 +618,38 @@ extern int			mac_register(mac_register_t *, mac_handle_t *);
 extern int			mac_disable(mac_handle_t);
 extern int  			mac_unregister(mac_handle_t);
 extern void 			mac_rx(mac_handle_t, mac_resource_handle_t,
-    mblk_t *);
+				    mblk_t *);
 extern void 			mac_link_update(mac_handle_t, link_state_t);
 extern void 			mac_unicst_update(mac_handle_t,
-    const uint8_t *);
+				    const uint8_t *);
 extern void			mac_tx_update(mac_handle_t);
 extern void			mac_resource_update(mac_handle_t);
 extern mac_resource_handle_t	mac_resource_add(mac_handle_t,
-    mac_resource_t *);
+				    mac_resource_t *);
 extern int			mac_pdata_update(mac_handle_t, void *,
-    size_t);
+				    size_t);
 extern void			mac_multicst_refresh(mac_handle_t,
-    mac_multicst_t, void *, boolean_t);
+				    mac_multicst_t, void *, boolean_t);
 extern void			mac_unicst_refresh(mac_handle_t, mac_unicst_t,
-    void *);
+				    void *);
 extern void			mac_promisc_refresh(mac_handle_t,
-    mac_setpromisc_t, void *);
+				    mac_setpromisc_t, void *);
+extern boolean_t		mac_margin_update(mac_handle_t, uint32_t);
+extern void			mac_margin_get(mac_handle_t, uint32_t *);
+extern int			mac_margin_remove(mac_handle_t, uint32_t);
+extern int			mac_margin_add(mac_handle_t, uint32_t *,
+				    boolean_t);
 extern void			mac_init_ops(struct dev_ops *, const char *);
 extern void			mac_fini_ops(struct dev_ops *);
+extern uint32_t			mac_no_notification(mac_handle_t);
+extern boolean_t		mac_is_legacy(mac_handle_t);
+extern int			mac_hold_exclusive(mac_handle_t);
+extern void			mac_rele_exclusive(mac_handle_t);
+
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
 extern int			mactype_register(mactype_register_t *);
 extern int			mactype_unregister(const char *);
-extern int			mac_vlan_create(mac_handle_t, const char *,
-    minor_t);
-extern void			mac_vlan_remove(mac_handle_t, const char *);
 
 #endif	/* _KERNEL */
 

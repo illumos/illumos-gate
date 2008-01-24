@@ -63,6 +63,7 @@ f none kernel/crypto/sparcv9/sha2 755 root sys
 f none kernel/crypto/sparcv9/swrand 755 root sys
 d none kernel/dacf/sparcv9 755 root sys
 f none kernel/dacf/sparcv9/consconfig_dacf 755 root sys
+f none kernel/dacf/sparcv9/net_dacf 755 root sys
 f none kernel/drv/dad.conf 644 root sys
 f none kernel/drv/px_pci.conf 644 root sys
 f none kernel/drv/pxb_plx.conf 644 root sys
@@ -123,6 +124,7 @@ f none kernel/drv/sparcv9/sctp 755 root sys
 f none kernel/drv/sparcv9/sctp6 755 root sys
 f none kernel/drv/sparcv9/sd 755 root sys
 f none kernel/drv/sparcv9/sgen 755 root sys
+f none kernel/drv/sparcv9/softmac 755 root sys
 f none kernel/drv/sparcv9/spdsock 755 root sys
 f none kernel/drv/sparcv9/st 755 root sys
 f none kernel/drv/sparcv9/sy 755 root sys

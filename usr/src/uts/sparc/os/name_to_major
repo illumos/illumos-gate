@@ -220,3 +220,4 @@ ds_snmp 271
 ds_pri 272
 vnic 273
 vscan 274
+softmac 275

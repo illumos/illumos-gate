@@ -52,6 +52,7 @@
 #include <sys/mac_ether.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/vlan.h>
 
 #include "afe.h"
 #include "afeimpl.h"
@@ -542,6 +543,7 @@ afe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_callbacks = &afe_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
 
 	if (mac_register(macp, &afep->afe_mh) == DDI_SUCCESS) {
 		mac_free(macp);

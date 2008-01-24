@@ -59,6 +59,7 @@ f none kernel/crypto/rsa 755 root sys
 f none kernel/crypto/sha1 755 root sys
 f none kernel/crypto/sha2 755 root sys
 f none kernel/crypto/swrand 755 root sys
+f none kernel/dacf/net_dacf 755 root sys
 f none kernel/devname/sdev_nsconfig_mod 755 root sys
 f none kernel/drv/aggr 755 root sys
 f none kernel/drv/arp 755 root sys
@@ -123,6 +124,7 @@ f none kernel/drv/sctp6 755 root sys
 f none kernel/drv/sgen 755 root sys
 f none kernel/drv/smbios 755 root sys
 f none kernel/drv/smbios.conf 644 root sys
+f none kernel/drv/softmac 755 root sys
 f none kernel/drv/spdsock 755 root sys
 f none kernel/drv/st 755 root sys
 f none kernel/drv/sy 755 root sys
@@ -263,6 +265,8 @@ f none kernel/crypto/amd64/rsa 755 root sys
 f none kernel/crypto/amd64/sha1 755 root sys
 f none kernel/crypto/amd64/sha2 755 root sys
 f none kernel/crypto/amd64/swrand 755 root sys
+d none kernel/dacf/amd64 755 root sys
+f none kernel/dacf/amd64/net_dacf 755 root sys
 d none kernel/devname/amd64 755 root sys
 f none kernel/devname/amd64/sdev_nsconfig_mod 755 root sys
 d none kernel/drv/amd64 755 root sys
@@ -322,6 +326,7 @@ f none kernel/drv/amd64/sctp6 755 root sys
 f none kernel/drv/amd64/sd 755 root sys
 f none kernel/drv/amd64/sgen 755 root sys
 f none kernel/drv/amd64/smbios 755 root sys
+f none kernel/drv/amd64/softmac 755 root sys
 f none kernel/drv/amd64/spdsock 755 root sys
 f none kernel/drv/amd64/st 755 root sys
 f none kernel/drv/amd64/sy 755 root sys

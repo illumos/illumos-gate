@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -760,13 +760,13 @@ wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 	uint8_t bssid[IEEE80211_ADDR_LEN];
 
 	(void) memset(ssid, 0, MAX_ESSID_LENGTH);
-	ssid_len = wpa_s->driver->get_ssid(wpa_s->ifname, (char *)ssid);
+	ssid_len = wpa_s->driver->get_ssid(wpa_s->linkid, (char *)ssid);
 	if (ssid_len < 0) {
 		wpa_printf(MSG_WARNING, "Could not read SSID from driver.");
 		return (NULL);
 	}
 
-	if (wpa_s->driver->get_bssid(wpa_s->ifname, (char *)bssid) < 0) {
+	if (wpa_s->driver->get_bssid(wpa_s->linkid, (char *)bssid) < 0) {
 		wpa_printf(MSG_WARNING, "Could not read BSSID from driver.");
 		return (NULL);
 	}
@@ -814,7 +814,7 @@ wpa_supplicant_key_request(struct wpa_supplicant *wpa_s,
 	else
 		ver = WPA_KEY_INFO_TYPE_HMAC_MD5_RC4;
 
-	if (wpa_s->driver->get_bssid(wpa_s->ifname, (char *)bssid) < 0) {
+	if (wpa_s->driver->get_bssid(wpa_s->linkid, (char *)bssid) < 0) {
 		wpa_printf(MSG_WARNING, "Failed to read BSSID for EAPOL-Key "
 		    "request");
 		return;
@@ -838,7 +838,7 @@ wpa_supplicant_key_request(struct wpa_supplicant *wpa_s,
 
 	reply = (struct wpa_eapol_key *)(hdr + 1);
 	reply->type = wpa_s->proto == WPA_PROTO_RSN ?
-		EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
+	    EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
 	key_info = WPA_KEY_INFO_REQUEST | ver;
 	if (wpa_s->ptk_set)
 		key_info |= WPA_KEY_INFO_MIC;
@@ -849,7 +849,7 @@ wpa_supplicant_key_request(struct wpa_supplicant *wpa_s,
 	reply->key_info = BE_16(key_info);
 	reply->key_length = 0;
 	(void) memcpy(reply->replay_counter, wpa_s->request_counter,
-		WPA_REPLAY_COUNTER_LEN);
+	    WPA_REPLAY_COUNTER_LEN);
 	inc_byte_array(wpa_s->request_counter, WPA_REPLAY_COUNTER_LEN);
 
 	reply->key_data_length = BE_16(0);
@@ -908,10 +908,10 @@ wpa_supplicant_process_1_of_4(struct wpa_supplicant *wpa_s,
 				break;
 			}
 			if (pos[0] == GENERIC_INFO_ELEM &&
-				pos + 1 + RSN_SELECTOR_LEN < end &&
-				pos[1] >= RSN_SELECTOR_LEN + PMKID_LEN &&
-				memcmp(pos + 2, RSN_KEY_DATA_PMKID,
-				RSN_SELECTOR_LEN) == 0) {
+			    pos + 1 + RSN_SELECTOR_LEN < end &&
+			    pos[1] >= RSN_SELECTOR_LEN + PMKID_LEN &&
+			    memcmp(pos + 2, RSN_KEY_DATA_PMKID,
+			    RSN_SELECTOR_LEN) == 0) {
 				pmkid = pos + 2 + RSN_SELECTOR_LEN;
 				wpa_hexdump(MSG_DEBUG, "RSN: PMKID from "
 				    "Authenticator", pmkid, PMKID_LEN);
@@ -949,12 +949,11 @@ wpa_supplicant_process_1_of_4(struct wpa_supplicant *wpa_s,
 
 	reply = (struct wpa_eapol_key *)(hdr + 1);
 	reply->type = wpa_s->proto == WPA_PROTO_RSN ?
-		EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
-	reply->key_info = BE_16(ver | WPA_KEY_INFO_KEY_TYPE |
-					WPA_KEY_INFO_MIC);
+	    EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
+	reply->key_info = BE_16(ver | WPA_KEY_INFO_KEY_TYPE | WPA_KEY_INFO_MIC);
 	reply->key_length = key->key_length;
 	(void) memcpy(reply->replay_counter, key->replay_counter,
-		WPA_REPLAY_COUNTER_LEN);
+	    WPA_REPLAY_COUNTER_LEN);
 
 	reply->key_data_length = BE_16(wpa_ie_len);
 	(void) memcpy(reply + 1, wpa_ie, wpa_ie_len);
@@ -986,7 +985,7 @@ wpa_supplicant_process_1_of_4(struct wpa_supplicant *wpa_s,
 	(void) memcpy(ptk->u.auth.rx_mic_key, buf, 8);
 	wpa_s->tptk_set = 1;
 	wpa_eapol_key_mic(wpa_s->tptk.mic_key, ver, (uint8_t *)hdr,
-			rlen - sizeof (*ethhdr), reply->key_mic);
+	    rlen - sizeof (*ethhdr), reply->key_mic);
 	wpa_hexdump(MSG_DEBUG, "WPA: EAPOL-Key MIC", reply->key_mic, 16);
 
 	wpa_printf(MSG_DEBUG, "WPA: Sending EAPOL-Key 2/4");
@@ -1080,23 +1079,21 @@ wpa_supplicant_process_3_of_4_gtk(struct wpa_supplicant *wpa_s,
 		(void) memcpy(gtk + 24, tmpbuf, 8);
 	}
 	if (wpa_s->pairwise_cipher == WPA_CIPHER_NONE) {
-		if (wpa_s->driver->set_key(wpa_s->ifname, alg,
+		if (wpa_s->driver->set_key(wpa_s->linkid, alg,
 		    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 		    keyidx, 1, key->key_rsc,
 		    key_rsc_len, gtk, gtk_len) < 0)
 			wpa_printf(MSG_WARNING, "WPA: Failed to set "
 			    "GTK to the driver (Group only).");
-	} else if (wpa_s->driver->set_key(wpa_s->ifname, alg,
-		    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
-		    keyidx, tx,
-		    key->key_rsc, key_rsc_len,
-		    gtk, gtk_len) < 0) {
+	} else if (wpa_s->driver->set_key(wpa_s->linkid, alg,
+	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", keyidx, tx,
+	    key->key_rsc, key_rsc_len, gtk, gtk_len) < 0) {
 		wpa_printf(MSG_WARNING, "WPA: Failed to set GTK to "
 		    "the driver.");
 	}
 
 	wpa_printf(MSG_INFO, "WPA: Key negotiation completed with "
-		MACSTR, MAC2STR(src_addr));
+	    MACSTR, MAC2STR(src_addr));
 	eloop_cancel_timeout(wpa_supplicant_scan, wpa_s, NULL);
 	wpa_supplicant_cancel_auth_timeout(wpa_s);
 	wpa_s->wpa_state = WPA_COMPLETED;
@@ -1136,10 +1133,10 @@ wpa_supplicant_process_3_of_4(struct wpa_supplicant *wpa_s,
 				ie = pos;
 				ie_len = pos[1] + 2;
 			} else if (pos[0] == GENERIC_INFO_ELEM &&
-				    pos + 1 + RSN_SELECTOR_LEN < end &&
-				    pos[1] > RSN_SELECTOR_LEN + 2 &&
-				    memcmp(pos + 2, RSN_KEY_DATA_GROUPKEY,
-				    RSN_SELECTOR_LEN) == 0) {
+			    pos + 1 + RSN_SELECTOR_LEN < end &&
+			    pos[1] > RSN_SELECTOR_LEN + 2 &&
+			    memcmp(pos + 2, RSN_KEY_DATA_GROUPKEY,
+			    RSN_SELECTOR_LEN) == 0) {
 				if (!(key_info & WPA_KEY_INFO_ENCR_KEY_DATA)) {
 					wpa_printf(MSG_WARNING, "WPA: GTK IE "
 					    "in unencrypted key data");
@@ -1165,7 +1162,7 @@ wpa_supplicant_process_3_of_4(struct wpa_supplicant *wpa_s,
 
 	if (wpa_s->ap_wpa_ie &&
 	    (wpa_s->ap_wpa_ie_len != ie_len ||
-		memcmp(wpa_s->ap_wpa_ie, ie, ie_len) != 0)) {
+	    memcmp(wpa_s->ap_wpa_ie, ie, ie_len) != 0)) {
 		wpa_printf(MSG_WARNING, "WPA: WPA IE in 3/4 msg does not match"
 		    " with WPA IE in Beacon/ProbeResp (src=" MACSTR ")",
 		    MAC2STR(src_addr));
@@ -1222,13 +1219,12 @@ wpa_supplicant_process_3_of_4(struct wpa_supplicant *wpa_s,
 
 	reply = (struct wpa_eapol_key *)(hdr + 1);
 	reply->type = wpa_s->proto == WPA_PROTO_RSN ?
-		EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
+	    EAPOL_KEY_TYPE_RSN : EAPOL_KEY_TYPE_WPA;
 	reply->key_info = BE_16(ver | WPA_KEY_INFO_KEY_TYPE |
-					WPA_KEY_INFO_MIC |
-					(key_info & WPA_KEY_INFO_SECURE));
+	    WPA_KEY_INFO_MIC | (key_info & WPA_KEY_INFO_SECURE));
 	reply->key_length = key->key_length;
 	(void) memcpy(reply->replay_counter, key->replay_counter,
-		WPA_REPLAY_COUNTER_LEN);
+	    WPA_REPLAY_COUNTER_LEN);
 
 	reply->key_data_length = BE_16(0);
 
@@ -1279,7 +1275,7 @@ wpa_supplicant_process_3_of_4(struct wpa_supplicant *wpa_s,
 			wpa_hexdump(MSG_DEBUG, "WPA: RSC", key_rsc, rsclen);
 		}
 
-		if (wpa_s->driver->set_key(wpa_s->ifname, alg, src_addr,
+		if (wpa_s->driver->set_key(wpa_s->linkid, alg, src_addr,
 		    0, 1, key_rsc, rsclen,
 		    (uint8_t *)&wpa_s->ptk.tk1, keylen) < 0) {
 			wpa_printf(MSG_WARNING, "WPA: Failed to set PTK to the"
@@ -1342,9 +1338,9 @@ wpa_supplicant_process_1_of_2(struct wpa_supplicant *wpa_s,
 				gtk_ie = pos + 2 + RSN_SELECTOR_LEN;
 				gtk_ie_len = pos[1] - RSN_SELECTOR_LEN;
 				break;
-			} else if (pos[0] == GENERIC_INFO_ELEM &&
-				    pos[1] == 0)
+			} else if (pos[0] == GENERIC_INFO_ELEM && pos[1] == 0) {
 				break;
+			}
 
 			pos += 2 + pos[1];
 		}
@@ -1423,7 +1419,7 @@ wpa_supplicant_process_1_of_2(struct wpa_supplicant *wpa_s,
 		(void) memcpy(gtk, gtk_ie + 2, gtk_ie_len - 2);
 	} else {
 		keyidx = (key_info & WPA_KEY_INFO_KEY_INDEX_MASK) >>
-			WPA_KEY_INFO_KEY_INDEX_SHIFT;
+		    WPA_KEY_INFO_KEY_INDEX_SHIFT;
 		if (ver == WPA_KEY_INFO_TYPE_HMAC_MD5_RC4) {
 			(void) memcpy(ek, key->key_iv, 16);
 			(void) memcpy(ek + 16, wpa_s->ptk.encr_key, 16);
@@ -1436,7 +1432,7 @@ wpa_supplicant_process_1_of_2(struct wpa_supplicant *wpa_s,
 				return;
 			}
 			if (aes_unwrap(wpa_s->ptk.encr_key, maxkeylen / 8,
-					(uint8_t *)(key + 1), gtk)) {
+			    (uint8_t *)(key + 1), gtk)) {
 				wpa_printf(MSG_WARNING, "WPA: AES unwrap "
 				    "failed - could not decrypt GTK");
 				return;
@@ -1470,13 +1466,13 @@ wpa_supplicant_process_1_of_2(struct wpa_supplicant *wpa_s,
 		(void) memcpy(gtk + 24, tmpbuf, 8);
 	}
 	if (wpa_s->pairwise_cipher == WPA_CIPHER_NONE) {
-		if (wpa_s->driver->set_key(wpa_s->ifname, alg,
+		if (wpa_s->driver->set_key(wpa_s->linkid, alg,
 		    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 		    keyidx, 1, key->key_rsc,
 		    key_rsc_len, gtk, keylen) < 0)
 			wpa_printf(MSG_WARNING, "WPA: Failed to set GTK to the"
 			    " driver (Group only).");
-	} else if (wpa_s->driver->set_key(wpa_s->ifname, alg,
+	} else if (wpa_s->driver->set_key(wpa_s->linkid, alg,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 	    keyidx, tx,
 	    key->key_rsc, key_rsc_len,
@@ -1730,9 +1726,10 @@ wpa_sm_rx_eapol(struct wpa_supplicant *wpa_s,
 	}
 
 	if ((key_info & WPA_KEY_INFO_MIC) &&
-		wpa_supplicant_verify_eapol_key_mic(wpa_s, key, ver, buf,
-		    data_len))
+	    wpa_supplicant_verify_eapol_key_mic(wpa_s, key, ver, buf,
+	    data_len)) {
 		return;
+	}
 
 	extra_len = data_len - sizeof (*hdr) - sizeof (*key);
 

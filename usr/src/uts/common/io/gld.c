@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,8 +212,7 @@ extern void gld_sr_dump(gld_mac_info_t *);
 uint32_t gld_global_options = GLD_OPT_NO_ETHRXSNAP;
 
 /*
- * VLANs are only supported on ethernet devices that manipulate VLAN headers
- * themselves.
+ * The device is of DL_ETHER type and is able to support VLAN by itself.
  */
 #define	VLAN_CAPABLE(macinfo) \
 	((macinfo)->gldm_type == DL_ETHER && \
@@ -653,6 +652,12 @@ gld_register(dev_info_t *devinfo, char *devname, gld_mac_info_t *macinfo)
 		    devname);
 		goto failure;
 	}
+
+	/*
+	 * Correct margin size if it is not set.
+	 */
+	if (VLAN_CAPABLE(macinfo) && (macinfo->gldm_margin == 0))
+		macinfo->gldm_margin = VTAG_SIZE;
 
 	/*
 	 * For now, only Infiniband drivers can use MDT. Do not add
@@ -2214,7 +2219,6 @@ gld_start(queue_t *q, mblk_t *mp, int caller, uint32_t upri)
 	}
 
 	return (GLD_SUCCESS);
-
 badarg:
 	freemsg(mp);
 
@@ -3396,6 +3400,23 @@ gld_ioctl(queue_t *q, mblk_t *mp)
 		gld_fastpath(gld, q, mp);
 		break;
 
+	case DLIOCMARGININFO: {	/* margin size */
+		int err;
+
+		if ((macinfo = gld->gld_mac_info) == NULL) {
+			miocnak(q, mp, 0, EINVAL);
+			break;
+		}
+
+		if ((err = miocpullup(mp, sizeof (uint32_t))) != 0) {
+			miocnak(q, mp, 0, err);
+			break;
+		}
+
+		*((uint32_t *)mp->b_cont->b_rptr) = macinfo->gldm_margin;
+		miocack(q, mp, sizeof (uint32_t), 0);
+		break;
+	}
 	default:
 		macinfo	 = gld->gld_mac_info;
 		if (macinfo == NULL || macinfo->gldm_ioctl == NULL) {

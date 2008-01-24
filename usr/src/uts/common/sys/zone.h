@@ -455,6 +455,7 @@ extern zone_t *zone_find_by_any_path(const char *, boolean_t);
 extern zone_t *zone_find_by_path(const char *);
 extern zoneid_t getzoneid(void);
 extern zone_t *zone_find_by_id_nolock(zoneid_t);
+extern int zone_datalink_walk(zoneid_t, int (*)(const char *, void *), void *);
 
 /*
  * Zone-specific data (ZSD) APIs

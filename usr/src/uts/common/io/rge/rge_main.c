@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1758,6 +1758,7 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_callbacks = &rge_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = rgep->default_mtu;
+	macp->m_margin = VLAN_TAGSZ;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer

@@ -69,6 +69,7 @@ _init(void)
 	mtrp->mtr_ident = MAC_PLUGIN_IDENT_IB;
 	mtrp->mtr_ops = &mac_ib_type_ops;
 	mtrp->mtr_mactype = DL_IB;
+	mtrp->mtr_nativetype = DL_IB;
 	mtrp->mtr_addrlen = IPOIB_ADDRL;
 	mtrp->mtr_brdcst_addr = ib_brdcst;
 

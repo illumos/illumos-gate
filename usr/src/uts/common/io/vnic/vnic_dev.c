@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,10 +44,8 @@
 #include <sys/dlpi.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
+#include <sys/dls.h>
 #include <sys/pattr.h>
-#if 0
-#include <sys/vlan.h>
-#endif
 #include <sys/vnic.h>
 #include <sys/vnic_impl.h>
 #include <sys/gld.h>
@@ -105,8 +103,8 @@ static uchar_t vnic_brdcst_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 /* used by vnic_walker */
 typedef struct vnic_info_state {
-	uint32_t	vs_vnic_id;
-	char		vs_dev_name[MAXNAMELEN];
+	datalink_id_t	vs_vnic_id;
+	datalink_id_t	vs_linkid;
 	boolean_t	vs_vnic_found;
 	vnic_info_new_vnic_fn_t	vs_new_vnic_fn;
 	void		*vs_fn_arg;
@@ -165,7 +163,7 @@ vnic_dev_init(void)
 	vnic_hash = mod_hash_create_idhash("vnic_hash",
 	    VNIC_HASHSZ, mod_hash_null_valdtor);
 
-	vnic_mac_hash = mod_hash_create_strhash("vnic_mac_hash",
+	vnic_mac_hash = mod_hash_create_idhash("vnic_mac_hash",
 	    VNIC_MAC_HASHSZ, mod_hash_null_valdtor);
 
 	rw_init(&vnic_lock, NULL, RW_DEFAULT, NULL);
@@ -182,7 +180,7 @@ vnic_dev_fini(void)
 
 	mutex_destroy(&vnic_mac_lock);
 	rw_destroy(&vnic_lock);
-	mod_hash_destroy_strhash(vnic_mac_hash);
+	mod_hash_destroy_idhash(vnic_mac_hash);
 	mod_hash_destroy_idhash(vnic_hash);
 	kmem_cache_destroy(vnic_mac_cache);
 	kmem_cache_destroy(vnic_cache);
@@ -195,9 +193,8 @@ vnic_dev_count(void)
 }
 
 static int
-vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
+vnic_mac_open(datalink_id_t linkid, vnic_mac_t **vmp)
 {
-	char *str_key;
 	int err;
 	vnic_mac_t *vnic_mac = NULL;
 	const mac_info_t *mip;
@@ -206,7 +203,7 @@ vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
 
 	mutex_enter(&vnic_mac_lock);
 
-	err = mod_hash_find(vnic_mac_hash, (mod_hash_key_t)dev_name,
+	err = mod_hash_find(vnic_mac_hash, (mod_hash_key_t)(uintptr_t)linkid,
 	    (mod_hash_val_t *)&vnic_mac);
 	if (err == 0) {
 		/* this MAC is already opened, increment reference count */
@@ -217,9 +214,17 @@ vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
 	}
 
 	vnic_mac = kmem_cache_alloc(vnic_mac_cache, KM_SLEEP);
-
-	if ((err = mac_open(dev_name, &vnic_mac->va_mh)) != 0) {
+	if ((err = mac_open_by_linkid(linkid, &vnic_mac->va_mh)) != 0) {
 		vnic_mac->va_mh = NULL;
+		goto bail;
+	}
+
+	/*
+	 * For now, we do not support VNICs over legacy drivers.  This will
+	 * soon be changed.
+	 */
+	if (mac_is_legacy(vnic_mac->va_mh)) {
+		err = ENOTSUP;
 		goto bail;
 	}
 
@@ -234,12 +239,10 @@ vnic_mac_open(const char *dev_name, vnic_mac_t **vmp)
 		goto bail;
 	}
 
-	(void) strcpy(vnic_mac->va_dev_name, dev_name);
+	vnic_mac->va_linkid = linkid;
 
 	/* add entry to hash table */
-	str_key = kmem_alloc(strlen(dev_name) + 1, KM_SLEEP);
-	(void) strcpy(str_key, dev_name);
-	err = mod_hash_insert(vnic_mac_hash, (mod_hash_key_t)str_key,
+	err = mod_hash_insert(vnic_mac_hash, (mod_hash_key_t)(uintptr_t)linkid,
 	    (mod_hash_val_t)vnic_mac);
 	ASSERT(err == 0);
 
@@ -585,7 +588,7 @@ vnic_mac_free(vnic_mac_t *vnic_mac)
 	mac_close(vnic_mac->va_mh);
 
 	(void) mod_hash_remove(vnic_mac_hash,
-	    (mod_hash_key_t)vnic_mac->va_dev_name, &val);
+	    (mod_hash_key_t)(uintptr_t)vnic_mac->va_linkid, &val);
 	ASSERT(vnic_mac == (vnic_mac_t *)val);
 
 	kmem_cache_free(vnic_mac_cache, vnic_mac);
@@ -678,8 +681,8 @@ vnic_add_unicstaddr(vnic_t *vnic, mac_multi_addr_t *maddr)
 		 * been used up.
 		 */
 	set_promisc:
-		err = mac_promisc_set(vnic_mac->va_mh, B_TRUE, MAC_DEVPROMISC);
-		if (err != 0) {
+		if ((err = mac_promisc_set(vnic_mac->va_mh, B_TRUE,
+		    MAC_DEVPROMISC)) != 0) {
 			return (err);
 		}
 
@@ -719,7 +722,8 @@ vnic_remove_unicstaddr(vnic_t *vnic)
  * Returns 0 on success, an errno on failure.
  */
 int
-vnic_dev_create(uint_t vnic_id, char *dev_name, int mac_len, uchar_t *mac_addr)
+vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid, int mac_len,
+    uchar_t *mac_addr)
 {
 	vnic_t *vnic = NULL;
 	mac_register_t *mac;
@@ -751,7 +755,7 @@ vnic_dev_create(uint_t vnic_id, char *dev_name, int mac_len, uchar_t *mac_addr)
 	}
 
 	/* open underlying MAC */
-	err = vnic_mac_open(dev_name, &vnic_mac);
+	err = vnic_mac_open(linkid, &vnic_mac);
 	if (err != 0) {
 		kmem_cache_free(vnic_cache, vnic);
 		rw_exit(&vnic_lock);
@@ -788,7 +792,7 @@ vnic_dev_create(uint_t vnic_id, char *dev_name, int mac_len, uchar_t *mac_addr)
 	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mac->m_driver = vnic;
 	mac->m_dip = vnic_get_dip();
-	mac->m_instance = vnic_id;
+	mac->m_instance = (uint_t)-1;
 	mac->m_src_addr = vnic->vn_addr;
 	mac->m_callbacks = &vnic_m_callbacks;
 
@@ -796,10 +800,29 @@ vnic_dev_create(uint_t vnic_id, char *dev_name, int mac_len, uchar_t *mac_addr)
 	mac->m_min_sdu = lower_mac_info->mi_sdu_min;
 	mac->m_max_sdu = lower_mac_info->mi_sdu_max;
 
-	err = mac_register(mac, &vnic->vn_mh);
-	mac_free(mac);
+	/*
+	 * As the current margin size of the underlying mac is used to
+	 * determine the margin size of the VNIC itself, request the
+	 * underlying mac not to change to a smaller margin size.
+	 */
+	err = mac_margin_add(vnic_mac->va_mh, &(vnic->vn_margin), B_TRUE);
 	if (err != 0)
 		goto bail;
+	mac->m_margin = vnic->vn_margin;
+	err = mac_register(mac, &vnic->vn_mh);
+	mac_free(mac);
+	if (err != 0) {
+		VERIFY(mac_margin_remove(vnic_mac->va_mh,
+		    vnic->vn_margin) == 0);
+		goto bail;
+	}
+
+	if ((err = dls_devnet_create(vnic->vn_mh, vnic->vn_id)) != 0) {
+		VERIFY(mac_margin_remove(vnic_mac->va_mh,
+		    vnic->vn_margin) == 0);
+		(void) mac_unregister(vnic->vn_mh);
+		goto bail;
+	}
 
 	/* add new VNIC to hash table */
 	err = mod_hash_insert(vnic_hash, VNIC_HASH_KEY(vnic_id),
@@ -880,7 +903,7 @@ bail_unlocked:
  */
 /* ARGSUSED */
 int
-vnic_dev_modify(uint_t vnic_id, uint_t modify_mask,
+vnic_dev_modify(datalink_id_t vnic_id, uint_t modify_mask,
     vnic_mac_addr_type_t mac_addr_type, uint_t mac_len, uchar_t *mac_addr)
 {
 	vnic_t *vnic = NULL;
@@ -910,11 +933,12 @@ vnic_dev_modify(uint_t vnic_id, uint_t modify_mask,
 }
 
 int
-vnic_dev_delete(uint_t vnic_id)
+vnic_dev_delete(datalink_id_t vnic_id)
 {
 	vnic_t *vnic = NULL;
 	mod_hash_val_t val;
 	vnic_flow_t *flent;
+	datalink_id_t tmpid;
 	int rc;
 	vnic_mac_t *vnic_mac;
 
@@ -926,6 +950,13 @@ vnic_dev_delete(uint_t vnic_id)
 		return (ENOENT);
 	}
 
+	if ((rc = dls_devnet_destroy(vnic->vn_mh, &tmpid)) != 0) {
+		rw_exit(&vnic_lock);
+		return (rc);
+	}
+
+	ASSERT(vnic_id == tmpid);
+
 	/*
 	 * We cannot unregister the MAC yet. Unregistering would
 	 * free up mac_impl_t which should not happen at this time.
@@ -935,6 +966,7 @@ vnic_dev_delete(uint_t vnic_id)
 	 * new claims on mac_impl_t.
 	 */
 	if (mac_disable(vnic->vn_mh) != 0) {
+		(void) dls_devnet_create(vnic->vn_mh, vnic_id);
 		rw_exit(&vnic_lock);
 		return (EBUSY);
 	}
@@ -955,6 +987,8 @@ vnic_dev_delete(uint_t vnic_id)
 		vnic_classifier_flow_destroy(flent);
 	}
 
+	rc = mac_margin_remove(vnic->vn_vnic_mac->va_mh, vnic->vn_margin);
+	ASSERT(rc == 0);
 	rc = mac_unregister(vnic->vn_mh);
 	ASSERT(rc == 0);
 	(void) vnic_remove_unicstaddr(vnic);
@@ -1329,8 +1363,8 @@ vnic_m_unicst(void *arg, const uint8_t *mac_addr)
 }
 
 int
-vnic_info(uint_t *nvnics, uint32_t vnic_id, char *dev_name, void *fn_arg,
-    vnic_info_new_vnic_fn_t new_vnic_fn)
+vnic_info(uint_t *nvnics, datalink_id_t vnic_id, datalink_id_t linkid,
+    void *fn_arg, vnic_info_new_vnic_fn_t new_vnic_fn)
 {
 	vnic_info_state_t state;
 	int rc = 0;
@@ -1341,13 +1375,13 @@ vnic_info(uint_t *nvnics, uint32_t vnic_id, char *dev_name, void *fn_arg,
 
 	bzero(&state, sizeof (state));
 	state.vs_vnic_id = vnic_id;
-	bcopy(state.vs_dev_name, dev_name, MAXNAMELEN);
+	state.vs_linkid = linkid;
 	state.vs_new_vnic_fn = new_vnic_fn;
 	state.vs_fn_arg = fn_arg;
 
 	mod_hash_walk(vnic_hash, vnic_info_walker, &state);
 
-	if ((rc = state.vs_rc) == 0 && vnic_id != 0 &&
+	if ((rc = state.vs_rc) == 0 && vnic_id != DATALINK_ALL_LINKID &&
 	    !state.vs_vnic_found)
 		rc = ENOENT;
 
@@ -1371,14 +1405,16 @@ vnic_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 
 	vnic = (vnic_t *)val;
 
-	if (state->vs_vnic_id != 0 && vnic->vn_id != state->vs_vnic_id)
+	if (state->vs_vnic_id != DATALINK_ALL_LINKID &&
+	    vnic->vn_id != state->vs_vnic_id) {
 		goto bail;
+	}
 
 	state->vs_vnic_found = B_TRUE;
 
 	state->vs_rc = state->vs_new_vnic_fn(state->vs_fn_arg,
 	    vnic->vn_id, vnic->vn_addr_type, vnic->vn_vnic_mac->va_addr_len,
-	    vnic->vn_addr, vnic->vn_vnic_mac->va_dev_name);
+	    vnic->vn_addr, vnic->vn_vnic_mac->va_linkid);
 bail:
 	return ((state->vs_rc == 0) ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
 }
@@ -1473,9 +1509,10 @@ vnic_promisc_set(vnic_t *vnic, boolean_t on)
 		return (0);
 
 	if (on) {
-		r = mac_promisc_set(vnic_mac->va_mh, B_TRUE, MAC_DEVPROMISC);
-		if (r != 0)
+		if ((r = mac_promisc_set(vnic_mac->va_mh, B_TRUE,
+		    MAC_DEVPROMISC)) != 0) {
 			return (r);
+		}
 
 		rw_enter(&vnic_mac->va_promisc_lock, RW_WRITER);
 		vnic->vn_promisc_next = vnic_mac->va_promisc;

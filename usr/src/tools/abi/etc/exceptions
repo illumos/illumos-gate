@@ -280,7 +280,7 @@ PSARC 2006/715: RULE W2: usr/lib/smbsrv/libsqlite.so.1
 4480868: RULE W3: usr/lib/libpool.so.1
 PSARC 2006/744: RULE W3: usr/lib/libpri.so.1
 4480868: RULE W3: usr/lib/libprint.so.2
-4480868: RULE W3: usr/lib/librcm.so.1
+4480868: RULE W3: lib/librcm.so.1
 4480868: RULE W3: usr/lib/librsm.so.2
 4480868: RULE W3: usr/lib/libsched.so.1
 4480868: RULE W3: usr/lib/libsldap.so.1
@@ -332,8 +332,8 @@ PSARC 2004/619: RULE W3: usr/lib/amd64/liblm.so.1
 4480868: RULE W3: usr/lib/sparcv9/libpool.so.1
 PSARC 2004/619: RULE W3: usr/lib/amd64/libpool.so.1
 PSARC 2006/744: RULE W3: usr/lib/sparcv9/libpri.so.1
-4480868: RULE W3: usr/lib/sparcv9/librcm.so.1
-PSARC 2004/619: RULE W3: usr/lib/amd64/librcm.so.1
+4480868: RULE W3: lib/sparcv9/librcm.so.1
+PSARC 2004/619: RULE W3: lib/amd64/librcm.so.1
 4480868: RULE W3: usr/lib/sparcv9/librsm.so.2
 PSARC 2004/619: RULE W3: usr/lib/amd64/librsm.so.2
 4480868: RULE W3: usr/lib/sparcv9/libsched.so.1

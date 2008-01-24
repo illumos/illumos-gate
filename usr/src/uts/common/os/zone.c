@@ -6149,3 +6149,26 @@ zone_find_by_id_nolock(zoneid_t zoneid)
 	mutex_exit(&zonehash_lock);
 	return (zone);
 }
+
+/*
+ * Walk the datalinks for a given zone
+ */
+int
+zone_datalink_walk(zoneid_t zoneid, int (*cb)(const char *, void *), void *data)
+{
+	zone_t *zone;
+	struct dlnamelist *dlnl;
+	int ret = 0;
+
+	if ((zone = zone_find_by_id(zoneid)) == NULL)
+		return (ENOENT);
+
+	mutex_enter(&zone->zone_lock);
+	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
+		if ((ret = (*cb)(dlnl->dlnl_name, data)) != 0)
+			break;
+	}
+	mutex_exit(&zone->zone_lock);
+	zone_rele(zone);
+	return (ret);
+}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,7 @@
 /* include files */
 #include <sys/disp.h>
 #include <sys/atomic.h>
+#include <sys/vlan.h>
 #include "amd8111s_main.h"
 
 /* Global macro Definations */
@@ -1837,6 +1838,7 @@ amd8111s_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp->m_min_sdu = 0;
 	/* 1518 - 14 (ether header) - 4 (CRC) */
 	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer

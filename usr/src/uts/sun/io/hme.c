@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include	<sys/mac.h>
 #include	<sys/mac_ether.h>
 #include	<sys/ethernet.h>
+#include	<sys/vlan.h>
 #include	<sys/pci.h>
 #include	<sys/policy.h>
 #include	<sys/ddi.h>
@@ -3054,6 +3055,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_callbacks = &hme_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
 	if (mac_register(macp, &hmep->hme_mh) != 0) {
 		mac_free(macp);
 		goto error_intr;

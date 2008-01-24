@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,9 +31,8 @@
  * An instance of the structure aggr_grp_t is allocated for each
  * link aggregation group. When created, aggr_grp_t objects are
  * entered into the aggr_grp_hash hash table maintained by the modhash
- * module. The hash key is the port number associated with the link
- * aggregation group. The port number associated with a group corresponds
- * the key associated with the group.
+ * module. The hash key is the linkid associated with the link
+ * aggregation group.
  *
  * A set of MAC ports are associated with each association group.
  */
@@ -52,9 +51,11 @@
 #include <sys/atomic.h>
 #include <sys/stat.h>
 #include <sys/modhash.h>
+#include <sys/id_space.h>
 #include <sys/strsun.h>
 #include <sys/dlpi.h>
-
+#include <sys/dls.h>
+#include <sys/vlan.h>
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
 
@@ -67,34 +68,27 @@ static int aggr_m_stat(void *, uint_t, uint64_t *);
 static void aggr_m_resources(void *);
 static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t aggr_m_capab_get(void *, mac_capab_t, void *);
-
-static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, const char *);
+static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, datalink_id_t);
 static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
     boolean_t *);
+
 static void aggr_grp_capab_set(aggr_grp_t *);
 static boolean_t aggr_grp_capab_check(aggr_grp_t *, aggr_port_t *);
 static uint_t aggr_grp_max_sdu(aggr_grp_t *);
+static uint32_t aggr_grp_max_margin(aggr_grp_t *);
 static boolean_t aggr_grp_sdu_check(aggr_grp_t *, aggr_port_t *);
+static boolean_t aggr_grp_margin_check(aggr_grp_t *, aggr_port_t *);
 
 static kmem_cache_t	*aggr_grp_cache;
 static mod_hash_t	*aggr_grp_hash;
 static krwlock_t	aggr_grp_lock;
 static uint_t		aggr_grp_cnt;
+static id_space_t	*key_ids;
 
 #define	GRP_HASHSZ		64
-#define	GRP_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)key)
+#define	GRP_HASH_KEY(linkid)	((mod_hash_key_t)(uintptr_t)linkid)
 
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
-
-/* used by grp_info_walker */
-typedef struct aggr_grp_info_state {
-	uint32_t	ls_group_key;
-	boolean_t	ls_group_found;
-	aggr_grp_info_new_grp_fn_t ls_new_grp_fn;
-	aggr_grp_info_new_port_fn_t ls_new_port_fn;
-	void		*ls_fn_arg;
-	int		ls_rc;
-} aggr_grp_info_state_t;
 
 #define	AGGR_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
 
@@ -153,11 +147,21 @@ aggr_grp_init(void)
 	    GRP_HASHSZ, mod_hash_null_valdtor);
 	rw_init(&aggr_grp_lock, NULL, RW_DEFAULT, NULL);
 	aggr_grp_cnt = 0;
+
+	/*
+	 * Allocate an id space to manage key values (when key is not
+	 * specified). The range of the id space will be from
+	 * (AGGR_MAX_KEY + 1) to UINT16_MAX, because the LACP protocol
+	 * uses a 16-bit key.
+	 */
+	key_ids = id_space_create("aggr_key_ids", AGGR_MAX_KEY + 1, UINT16_MAX);
+	ASSERT(key_ids != NULL);
 }
 
 void
 aggr_grp_fini(void)
 {
+	id_space_destroy(key_ids);
 	rw_destroy(&aggr_grp_lock);
 	mod_hash_destroy_idhash(aggr_grp_hash);
 	kmem_cache_destroy(aggr_grp_cache);
@@ -409,7 +413,8 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
  * Add a port to a link aggregation group.
  */
 static int
-aggr_grp_add_port(aggr_grp_t *grp, const char *name, aggr_port_t **pp)
+aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t linkid, boolean_t force,
+    aggr_port_t **pp)
 {
 	aggr_port_t *port, **cport;
 	int err;
@@ -418,7 +423,7 @@ aggr_grp_add_port(aggr_grp_t *grp, const char *name, aggr_port_t **pp)
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
 
 	/* create new port */
-	err = aggr_port_create(name, &port);
+	err = aggr_port_create(linkid, force, &port);
 	if (err != 0)
 		return (err);
 
@@ -459,16 +464,17 @@ aggr_grp_add_port(aggr_grp_t *grp, const char *name, aggr_port_t **pp)
  * Add one or more ports to an existing link aggregation group.
  */
 int
-aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
+aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
+    laioc_port_t *ports)
 {
 	int rc, i, nadded = 0;
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 	boolean_t link_state_changed = B_FALSE;
 
-	/* get group corresponding to key */
+	/* get group corresponding to linkid */
 	rw_enter(&aggr_grp_lock, RW_READER);
-	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
 	    (mod_hash_val_t *)&grp) != 0) {
 		rw_exit(&aggr_grp_lock);
 		return (ENOENT);
@@ -482,8 +488,8 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	/* add the specified ports to group */
 	for (i = 0; i < nports; i++) {
 		/* add port to group */
-		if ((rc = aggr_grp_add_port(grp, ports[i].lp_devname, &port)) !=
-		    0) {
+		if ((rc = aggr_grp_add_port(grp, ports[i].lp_linkid,
+		    force, &port)) != 0) {
 			goto bail;
 		}
 		ASSERT(port != NULL);
@@ -491,7 +497,8 @@ aggr_grp_add_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 
 		/* check capabilities */
 		if (!aggr_grp_capab_check(grp, port) ||
-		    !aggr_grp_sdu_check(grp, port)) {
+		    !aggr_grp_sdu_check(grp, port) ||
+		    !aggr_grp_margin_check(grp, port)) {
 			rc = ENOTSUP;
 			goto bail;
 		}
@@ -532,7 +539,7 @@ bail:
 	if (rc != 0) {
 		/* stop and remove ports that have been added */
 		for (i = 0; i < nadded && !grp->lg_closing; i++) {
-			port = aggr_grp_port_lookup(grp, ports[i].lp_devname);
+			port = aggr_grp_port_lookup(grp, ports[i].lp_linkid);
 			ASSERT(port != NULL);
 			if (grp->lg_started) {
 				rw_enter(&port->lp_lock, RW_WRITER);
@@ -555,7 +562,7 @@ bail:
  * Update properties of an existing link aggregation group.
  */
 int
-aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
+aggr_grp_modify(datalink_id_t linkid, aggr_grp_t *grp_arg, uint8_t update_mask,
     uint32_t policy, boolean_t mac_fixed, const uchar_t *mac_addr,
     aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
 {
@@ -565,9 +572,9 @@ aggr_grp_modify(uint32_t key, aggr_grp_t *grp_arg, uint8_t update_mask,
 	boolean_t link_state_changed = B_FALSE;
 
 	if (grp_arg == NULL) {
-		/* get group corresponding to key */
+		/* get group corresponding to linkid */
 		rw_enter(&aggr_grp_lock, RW_READER);
-		if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+		if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
 		    (mod_hash_val_t *)&grp) != 0) {
 			rc = ENOENT;
 			goto bail;
@@ -660,9 +667,9 @@ bail:
  * Returns 0 on success, an errno on failure.
  */
 int
-aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
-    uint32_t policy, boolean_t mac_fixed, uchar_t *mac_addr,
-    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
+aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
+    laioc_port_t *ports, uint32_t policy, boolean_t mac_fixed, boolean_t force,
+    uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
@@ -677,8 +684,8 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 
 	rw_enter(&aggr_grp_lock, RW_WRITER);
 
-	/* does a group with the same key already exist? */
-	err = mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	/* does a group with the same linkid already exist? */
+	err = mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
 	    (mod_hash_val_t *)&grp);
 	if (err == 0) {
 		rw_exit(&aggr_grp_lock);
@@ -692,8 +699,8 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 
 	grp->lg_refs = 1;
 	grp->lg_closing = B_FALSE;
-	grp->lg_key = key;
-
+	grp->lg_force = force;
+	grp->lg_linkid = linkid;
 	grp->lg_ifspeed = 0;
 	grp->lg_link_state = LINK_STATE_UNKNOWN;
 	grp->lg_link_duplex = LINK_DUPLEX_UNKNOWN;
@@ -707,8 +714,17 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	grp->lg_nattached_ports = 0;
 	grp->lg_ntx_ports = 0;
 
+	/*
+	 * If key is not specified by the user, allocate the key.
+	 */
+	if ((key == 0) && ((key = (uint32_t)id_alloc(key_ids)) == 0)) {
+		err = ENOMEM;
+		goto bail;
+	}
+	grp->lg_key = key;
+
 	for (i = 0; i < nports; i++) {
-		err = aggr_grp_add_port(grp, ports[i].lp_devname, NULL);
+		err = aggr_grp_add_port(grp, ports[i].lp_linkid, force, NULL);
 		if (err != 0)
 			goto bail;
 	}
@@ -744,20 +760,28 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 	/* set the initial group capabilities */
 	aggr_grp_capab_set(grp);
 
-	if ((mac = mac_alloc(MAC_VERSION)) == NULL)
+	if ((mac = mac_alloc(MAC_VERSION)) == NULL) {
+		err = ENOMEM;
 		goto bail;
+	}
 	mac->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mac->m_driver = grp;
 	mac->m_dip = aggr_dip;
-	mac->m_instance = key;
+	mac->m_instance = grp->lg_key > AGGR_MAX_KEY ? (uint_t)-1 : grp->lg_key;
 	mac->m_src_addr = grp->lg_addr;
 	mac->m_callbacks = &aggr_m_callbacks;
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = grp->lg_max_sdu = aggr_grp_max_sdu(grp);
+	mac->m_margin = aggr_grp_max_margin(grp);
 	err = mac_register(mac, &grp->lg_mh);
 	mac_free(mac);
 	if (err != 0)
 		goto bail;
+
+	if ((err = dls_devnet_create(grp->lg_mh, grp->lg_linkid)) != 0) {
+		(void) mac_unregister(grp->lg_mh);
+		goto bail;
+	}
 
 	/* set LACP mode */
 	aggr_lacp_set_mode(grp, lacp_mode, lacp_timer);
@@ -774,7 +798,7 @@ aggr_grp_create(uint32_t key, uint_t nports, laioc_port_t *ports,
 		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 	/* add new group to hash table */
-	err = mod_hash_insert(aggr_grp_hash, GRP_HASH_KEY(key),
+	err = mod_hash_insert(aggr_grp_hash, GRP_HASH_KEY(linkid),
 	    (mod_hash_val_t)grp);
 	ASSERT(err == 0);
 	aggr_grp_cnt++;
@@ -800,7 +824,7 @@ bail:
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
 
-		kmem_cache_free(aggr_grp_cache, grp);
+		AGGR_GRP_REFRELE(grp);
 	}
 
 	rw_exit(&aggr_grp_lock);
@@ -808,18 +832,17 @@ bail:
 }
 
 /*
- * Return a pointer to the member of a group with specified device name
- * and port number.
+ * Return a pointer to the member of a group with specified linkid.
  */
 static aggr_port_t *
-aggr_grp_port_lookup(aggr_grp_t *grp, const char *devname)
+aggr_grp_port_lookup(aggr_grp_t *grp, datalink_id_t linkid)
 {
 	aggr_port_t *port;
 
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		if (strcmp(port->lp_devname, devname) == 0)
+		if (port->lp_linkid == linkid)
 			break;
 	}
 
@@ -909,7 +932,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 
 	/*
 	 * If the group MAC address has changed, update the MAC address of
-	 * the remaining consistuent ports according to the new MAC
+	 * the remaining constituent ports according to the new MAC
 	 * address of the group.
 	 */
 	if (mac_addr_changed && aggr_grp_update_ports_mac(grp))
@@ -928,7 +951,7 @@ done:
  * Remove one or more ports from an existing link aggregation group.
  */
 int
-aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
+aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 {
 	int rc = 0, i;
 	aggr_grp_t *grp = NULL;
@@ -936,9 +959,9 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	boolean_t mac_addr_update = B_FALSE, mac_addr_changed;
 	boolean_t link_state_update = B_FALSE, link_state_changed;
 
-	/* get group corresponding to key */
+	/* get group corresponding to linkid */
 	rw_enter(&aggr_grp_lock, RW_READER);
-	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
 	    (mod_hash_val_t *)&grp) != 0) {
 		rw_exit(&aggr_grp_lock);
 		return (ENOENT);
@@ -957,7 +980,7 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 
 	/* first verify that all the groups are valid */
 	for (i = 0; i < nports; i++) {
-		if (aggr_grp_port_lookup(grp, ports[i].lp_devname) == NULL) {
+		if (aggr_grp_port_lookup(grp, ports[i].lp_linkid) == NULL) {
 			/* port not found */
 			rc = ENOENT;
 			goto bail;
@@ -967,7 +990,7 @@ aggr_grp_rem_ports(uint32_t key, uint_t nports, laioc_port_t *ports)
 	/* remove the specified ports from group */
 	for (i = 0; i < nports && !grp->lg_closing; i++) {
 		/* lookup port */
-		port = aggr_grp_port_lookup(grp, ports[i].lp_devname);
+		port = aggr_grp_port_lookup(grp, ports[i].lp_linkid);
 		ASSERT(port != NULL);
 
 		/* stop port if group has already been started */
@@ -1002,35 +1025,49 @@ bail:
 }
 
 int
-aggr_grp_delete(uint32_t key)
+aggr_grp_delete(datalink_id_t linkid)
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port, *cport;
+	datalink_id_t tmpid;
 	mod_hash_val_t val;
 	int err;
 
 	rw_enter(&aggr_grp_lock, RW_WRITER);
 
-	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(key),
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
 	    (mod_hash_val_t *)&grp) != 0) {
 		rw_exit(&aggr_grp_lock);
 		return (ENOENT);
 	}
 
+	/*
+	 * Note that dls_devnet_destroy() must be called before lg_lock is
+	 * held. Otherwise, it will deadlock if another thread is in
+	 * aggr_m_stat() and thus has a kstat_hold() on the kstats that
+	 * dls_devnet_destroy() needs to delete.
+	 */
+	if ((err = dls_devnet_destroy(grp->lg_mh, &tmpid)) != 0) {
+		rw_exit(&aggr_grp_lock);
+		return (err);
+	}
+	ASSERT(linkid == tmpid);
+
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
-
-	grp->lg_closing = B_TRUE;
 
 	/*
 	 * Unregister from the MAC service module. Since this can
 	 * fail if a client hasn't closed the MAC port, we gracefully
 	 * fail the operation.
 	 */
+	grp->lg_closing = B_TRUE;
 	if ((err = mac_disable(grp->lg_mh)) != 0) {
 		grp->lg_closing = B_FALSE;
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
+
+		(void) dls_devnet_create(grp->lg_mh, linkid);
 		rw_exit(&aggr_grp_lock);
 		return (err);
 	}
@@ -1053,7 +1090,7 @@ aggr_grp_delete(uint32_t key)
 	rw_exit(&grp->lg_lock);
 	AGGR_LACP_UNLOCK(grp);
 
-	(void) mod_hash_remove(aggr_grp_hash, GRP_HASH_KEY(key), &val);
+	(void) mod_hash_remove(aggr_grp_hash, GRP_HASH_KEY(linkid), &val);
 	ASSERT(grp == (aggr_grp_t *)val);
 
 	ASSERT(aggr_grp_cnt > 0);
@@ -1069,84 +1106,52 @@ void
 aggr_grp_free(aggr_grp_t *grp)
 {
 	ASSERT(grp->lg_refs == 0);
+	if (grp->lg_key > AGGR_MAX_KEY) {
+		id_free(key_ids, grp->lg_key);
+		grp->lg_key = 0;
+	}
 	kmem_cache_free(aggr_grp_cache, grp);
 }
 
-/*
- * Walker invoked when building the list of configured groups and
- * their ports that must be passed up to user-space.
- */
-
-/*ARGSUSED*/
-static uint_t
-aggr_grp_info_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+int
+aggr_grp_info(datalink_id_t linkid, void *fn_arg,
+    aggr_grp_info_new_grp_fn_t new_grp_fn,
+    aggr_grp_info_new_port_fn_t new_port_fn)
 {
-	aggr_grp_t *grp;
-	aggr_port_t *port;
-	aggr_grp_info_state_t *state = arg;
+	aggr_grp_t	*grp;
+	aggr_port_t	*port;
+	int		rc = 0;
 
-	if (state->ls_rc != 0)
-		return (MH_WALK_TERMINATE);	/* terminate walk */
+	rw_enter(&aggr_grp_lock, RW_READER);
 
-	grp = (aggr_grp_t *)val;
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
+	    (mod_hash_val_t *)&grp) != 0) {
+		rw_exit(&aggr_grp_lock);
+		return (ENOENT);
+	}
 
 	rw_enter(&grp->lg_lock, RW_READER);
 
-	if (state->ls_group_key != 0 && grp->lg_key != state->ls_group_key)
-		goto bail;
-
-	state->ls_group_found = B_TRUE;
-
-	state->ls_rc = state->ls_new_grp_fn(state->ls_fn_arg, grp->lg_key,
-	    grp->lg_addr, grp->lg_addr_fixed, grp->lg_tx_policy,
+	rc = new_grp_fn(fn_arg, grp->lg_linkid,
+	    (grp->lg_key > AGGR_MAX_KEY) ? 0 : grp->lg_key, grp->lg_addr,
+	    grp->lg_addr_fixed, grp->lg_force, grp->lg_tx_policy,
 	    grp->lg_nports, grp->lg_lacp_mode, grp->aggr.PeriodicTimer);
 
-	if (state->ls_rc != 0)
+	if (rc != 0)
 		goto bail;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-
 		rw_enter(&port->lp_lock, RW_READER);
-
-		state->ls_rc = state->ls_new_port_fn(state->ls_fn_arg,
-		    port->lp_devname, port->lp_addr, port->lp_state,
-		    &port->lp_lacp.ActorOperPortState);
-
+		rc = new_port_fn(fn_arg, port->lp_linkid, port->lp_addr,
+		    port->lp_state, &port->lp_lacp.ActorOperPortState);
 		rw_exit(&port->lp_lock);
 
-		if (state->ls_rc != 0)
+		if (rc != 0)
 			goto bail;
 	}
 
 bail:
 	rw_exit(&grp->lg_lock);
-	return ((state->ls_rc == 0) ? MH_WALK_CONTINUE : MH_WALK_TERMINATE);
-}
-
-int
-aggr_grp_info(uint_t *ngroups, uint32_t group_key, void *fn_arg,
-    aggr_grp_info_new_grp_fn_t new_grp_fn,
-    aggr_grp_info_new_port_fn_t new_port_fn)
-{
-	aggr_grp_info_state_t state;
-	int rc = 0;
-
-	rw_enter(&aggr_grp_lock, RW_READER);
-
-	*ngroups = aggr_grp_cnt;
-
-	bzero(&state, sizeof (state));
-	state.ls_group_key = group_key;
-	state.ls_new_grp_fn = new_grp_fn;
-	state.ls_new_port_fn = new_port_fn;
-	state.ls_fn_arg = fn_arg;
-
-	mod_hash_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
-
-	if ((rc = state.ls_rc) == 0 && group_key != 0 &&
-	    !state.ls_group_found)
-		rc = ENOENT;
-
 	rw_exit(&aggr_grp_lock);
 	return (rc);
 }
@@ -1193,7 +1198,7 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 		*val += aggr_port_stat(port, stat);
 		/*
 		 * minus the port stat when it was added, plus any residual
-		 * ammount for the group.
+		 * amount for the group.
 		 */
 		if (IS_MAC_STAT(stat)) {
 			stat_index = stat - MAC_STAT_MIN;
@@ -1366,6 +1371,10 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		 * status for this capability.
 		 */
 		return (grp->lg_gldv3_polling);
+	case MAC_CAPAB_NO_NATIVEVLAN:
+		return (!grp->lg_vlan);
+	case MAC_CAPAB_NO_ZCOPY:
+		return (!grp->lg_zcopy);
 	default:
 		return (B_FALSE);
 	}
@@ -1442,17 +1451,24 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 
 	grp->lg_hcksum_txflags = (uint32_t)-1;
 	grp->lg_gldv3_polling = B_TRUE;
+	grp->lg_zcopy = B_TRUE;
+	grp->lg_vlan = B_TRUE;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM, &cksum))
 			cksum = 0;
 		grp->lg_hcksum_txflags &= cksum;
 
+		grp->lg_vlan &=
+		    !mac_capab_get(port->lp_mh, MAC_CAPAB_NO_NATIVEVLAN, NULL);
+
+		grp->lg_zcopy &=
+		    !mac_capab_get(port->lp_mh, MAC_CAPAB_NO_ZCOPY, NULL);
+
 		grp->lg_gldv3_polling &=
 		    mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL);
 	}
 }
-
 
 /*
  * Checks whether the capabilities of the port being added are compatible
@@ -1461,9 +1477,19 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 static boolean_t
 aggr_grp_capab_check(aggr_grp_t *grp, aggr_port_t *port)
 {
-	uint32_t	hcksum_txflags;
+	uint32_t hcksum_txflags;
 
 	ASSERT(grp->lg_ports != NULL);
+
+	if (((!mac_capab_get(port->lp_mh, MAC_CAPAB_NO_NATIVEVLAN, NULL)) &
+	    grp->lg_vlan) != grp->lg_vlan) {
+		return (B_FALSE);
+	}
+
+	if (((!mac_capab_get(port->lp_mh, MAC_CAPAB_NO_ZCOPY, NULL)) &
+	    grp->lg_zcopy) != grp->lg_zcopy) {
+		return (B_FALSE);
+	}
 
 	if (!mac_capab_get(port->lp_mh, MAC_CAPAB_HCKSUM, &hcksum_txflags)) {
 		if (grp->lg_hcksum_txflags != 0)
@@ -1513,4 +1539,47 @@ aggr_grp_sdu_check(aggr_grp_t *grp, aggr_port_t *port)
 	const mac_info_t *port_mi = mac_info(port->lp_mh);
 
 	return (port_mi->mi_sdu_max >= grp->lg_max_sdu);
+}
+
+/*
+ * Returns the maximum margin according to the margin of the constituent ports.
+ */
+static uint32_t
+aggr_grp_max_margin(aggr_grp_t *grp)
+{
+	uint32_t margin = UINT32_MAX;
+	aggr_port_t *port;
+
+	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(grp->lg_ports != NULL);
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
+		if (margin > port->lp_margin)
+			margin = port->lp_margin;
+	}
+
+	grp->lg_margin = margin;
+	return (margin);
+}
+
+/*
+ * Checks if the maximum margin of the specified port is compatible
+ * with the maximum margin of the specified aggregation group, returns
+ * B_TRUE if it is, B_FALSE otherwise.
+ */
+static boolean_t
+aggr_grp_margin_check(aggr_grp_t *grp, aggr_port_t *port)
+{
+	if (port->lp_margin >= grp->lg_margin)
+		return (B_TRUE);
+
+	/*
+	 * See whether the current margin value is allowed to be changed to
+	 * the new value.
+	 */
+	if (!mac_margin_update(grp->lg_mh, port->lp_margin))
+		return (B_FALSE);
+
+	grp->lg_margin = port->lp_margin;
+	return (B_TRUE);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +38,40 @@ extern "C" {
 #define	MAXLINELEN		1024
 #define	BUFLEN(lim, ptr)	(((lim) > (ptr)) ? ((lim) - (ptr)) : 0)
 
+typedef struct val_desc {
+	char		*vd_name;
+	uintptr_t	vd_val;
+} val_desc_t;
+
+#define	VALCNT(vals)	(sizeof ((vals)) / sizeof (val_desc_t))
+
 extern int		i_dladm_ioctl(int, int, void *, int);
 extern dladm_status_t	dladm_errno2status(int);
-extern dladm_status_t	i_dladm_rw_db(const char *, mode_t,
+extern dladm_status_t   i_dladm_rw_db(const char *, mode_t,
 			    dladm_status_t (*)(void *, FILE *, FILE *),
 			    void *, boolean_t);
+
+/*
+ * Link attributes persisted by dlmgmtd.
+ */
+/*
+ * Set for VLANs only
+ */
+#define	FVLANID		"vid"		/* uint64_t */
+#define	FLINKOVER	"linkover"	/* uint64_t */
+
+/*
+ * Set for AGGRs only
+ */
+#define	FKEY		"key"		/* uint64_t */
+#define	FNPORTS		"nports"	/* uint64_t */
+#define	FPORTS		"portnames"	/* string */
+#define	FPOLICY		"policy"	/* uint64_t */
+#define	FFIXMACADDR	"fix_macaddr"	/* boolean_t */
+#define	FMACADDR	"macaddr"	/* string */
+#define	FFORCE		"force"		/* boolean_t */
+#define	FLACPMODE	"lacp_mode"	/* uint64_t */
+#define	FLACPTIMER	"lacp_timer"	/* uint64_t */
 
 #ifdef	__cplusplus
 }

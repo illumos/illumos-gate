@@ -52,6 +52,7 @@
 #include <sys/mac_ether.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/vlan.h>
 
 #include "mxfe.h"
 #include "mxfeimpl.h"
@@ -522,6 +523,7 @@ mxfe_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_callbacks = &mxfe_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = ETHERMTU;
+	macp->m_margin = VLAN_TAGSZ;
 
 	if (mac_register(macp, &mxfep->mxfe_mh) == DDI_SUCCESS) {
 		mac_free(macp);

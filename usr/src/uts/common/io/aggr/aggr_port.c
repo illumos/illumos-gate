@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,6 @@
 #include <sys/stat.h>
 #include <sys/sdt.h>
 #include <sys/dlpi.h>
-
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
 
@@ -88,7 +87,7 @@ aggr_port_init(void)
 	/*
 	 * Allocate a id space to manage port identification. The range of
 	 * the arena will be from 1 to UINT16_MAX, because the LACP protocol
-	 * uses it to be a 16 bits unique identfication.
+	 * specifies 16-bit unique identification.
 	 */
 	aggr_portids = id_space_create("aggr_portids", 1, UINT16_MAX);
 	ASSERT(aggr_portids != NULL);
@@ -127,35 +126,67 @@ aggr_port_init_callbacks(aggr_port_t *port)
 }
 
 int
-aggr_port_create(const char *name, aggr_port_t **pp)
+aggr_port_create(const datalink_id_t linkid, boolean_t force, aggr_port_t **pp)
 {
 	int err;
 	mac_handle_t mh;
 	aggr_port_t *port;
 	uint16_t portid;
 	uint_t i;
+	boolean_t no_link_update = B_FALSE;
 	const mac_info_t *mip;
+	uint32_t note;
+	uint32_t margin;
 
 	*pp = NULL;
 
-	if ((err = mac_open(name, &mh)) != 0)
+	if ((err = mac_open_by_linkid(linkid, &mh)) != 0)
 		return (err);
 
 	mip = mac_info(mh);
 	if (mip->mi_media != DL_ETHER || mip->mi_nativemedia != DL_ETHER) {
-		mac_close(mh);
-		return (EINVAL);
+		err = EINVAL;
+		goto fail;
+	}
+
+	/*
+	 * If the underlying MAC does not support link update notification, it
+	 * can only be aggregated if `force' is set.  This is because aggr
+	 * depends on link notifications to attach ports whose link is up.
+	 */
+	note = mac_no_notification(mh);
+	if ((note & (DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN)) != 0) {
+		no_link_update = B_TRUE;
+		if (!force) {
+			/*
+			 * We borrow this error code to indicate that link
+			 * notification is not supported.
+			 */
+			err = ENETDOWN;
+			goto fail;
+		}
 	}
 
 	if ((portid = (uint16_t)id_alloc(aggr_portids)) == 0) {
-		mac_close(mh);
-		return (ENOMEM);
+		err = ENOMEM;
+		goto fail;
+	}
+
+	/*
+	 * As the underlying mac's current margin size is used to determine
+	 * the margin size of the aggregation itself, request the underlying
+	 * mac not to change to a smaller size.
+	 */
+	if ((err = mac_margin_add(mh, &margin, B_TRUE)) != 0) {
+		id_free(aggr_portids, portid);
+		goto fail;
 	}
 
 	if (!mac_active_set(mh)) {
+		VERIFY(mac_margin_remove(mh, margin) == 0);
 		id_free(aggr_portids, portid);
-		mac_close(mh);
-		return (EBUSY);
+		err = EBUSY;
+		goto fail;
 	}
 
 	port = kmem_cache_alloc(aggr_port_cache, KM_SLEEP);
@@ -164,7 +195,7 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 	port->lp_next = NULL;
 	port->lp_mh = mh;
 	port->lp_mip = mip;
-	(void) strlcpy(port->lp_devname, name, sizeof (port->lp_devname));
+	port->lp_linkid = linkid;
 	port->lp_closing = 0;
 
 	/* get the port's original MAC address */
@@ -181,12 +212,14 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 	port->lp_started = B_FALSE;
 	port->lp_tx_enabled = B_FALSE;
 	port->lp_promisc_on = B_FALSE;
+	port->lp_no_link_update = no_link_update;
 	port->lp_portid = portid;
+	port->lp_margin = margin;
 
 	/*
 	 * Save the current statistics of the port. They will be used
-	 * later by aggr_m_stats() when aggregating the stastics of
-	 * the consistituent ports.
+	 * later by aggr_m_stats() when aggregating the statistics of
+	 * the constituent ports.
 	 */
 	for (i = 0; i < MAC_NSTAT; i++) {
 		port->lp_stat[i] =
@@ -202,11 +235,16 @@ aggr_port_create(const char *name, aggr_port_t **pp)
 
 	*pp = port;
 	return (0);
+
+fail:
+	mac_close(mh);
+	return (err);
 }
 
 void
 aggr_port_delete(aggr_port_t *port)
 {
+	VERIFY(mac_margin_remove(port->lp_mh, port->lp_margin) == 0);
 	mac_rx_remove_wait(port->lp_mh);
 	mac_resource_set(port->lp_mh, NULL, NULL);
 	mac_notify_remove(port->lp_mh, port->lp_mnh);
@@ -237,7 +275,7 @@ aggr_port_free(aggr_port_t *port)
 
 /*
  * Invoked upon receiving a MAC_NOTE_LINK notification for
- * one of the consistuent ports.
+ * one of the constituent ports.
  */
 boolean_t
 aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
@@ -259,8 +297,12 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 
 	rw_enter(&port->lp_lock, RW_WRITER);
 
-	/* link state change? */
-	link_state = mac_link_get(port->lp_mh);
+	/*
+	 * link state change?  For links that do not support link state
+	 * notification, always assume the link is up.
+	 */
+	link_state = port->lp_no_link_update ? LINK_STATE_UP :
+	    mac_link_get(port->lp_mh);
 	if (port->lp_link_state != link_state) {
 		if (link_state == LINK_STATE_UP)
 			do_attach = (port->lp_link_state != LINK_STATE_UP);
@@ -303,7 +345,6 @@ aggr_port_notify_link(aggr_grp_t *grp, aggr_port_t *port, boolean_t dolock)
 		rw_exit(&grp->lg_lock);
 		AGGR_LACP_UNLOCK(grp);
 	}
-
 	return (link_state_changed);
 }
 
@@ -321,7 +362,6 @@ aggr_port_notify_unicst(aggr_grp_t *grp, aggr_port_t *port,
 
 	ASSERT(mac_addr_changedp != NULL);
 	ASSERT(link_state_changedp != NULL);
-
 	AGGR_LACP_LOCK(grp);
 	rw_enter(&grp->lg_lock, RW_WRITER);
 

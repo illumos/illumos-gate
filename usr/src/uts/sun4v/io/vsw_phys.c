@@ -328,17 +328,16 @@ vsw_mac_open(vsw_t *vswp)
 		return (EIO);
 	}
 
-	rv = mac_open(vswp->physname, &vswp->mh);
-	if (rv != 0) {
+	if ((rv = mac_open_by_linkname(vswp->physname, &vswp->mh)) != 0) {
 		/*
-		 * If mac_open() failed and the error indicates that the
-		 * device is not available yet, then, we return EAGAIN to
-		 * indicate that it needs to be retried.
-		 * For example, this may happen during boot up, as the
-		 * required link aggregation groups(devices) have not been
-		 * created yet.
+		 * If mac_open() failed and the error indicates that either
+		 * the dlmgmtd door or the device is not available yet, we
+		 * return EAGAIN to indicate that mac_open() needs to be
+		 * retried. For example, this may happen during boot up, if
+		 * the required link aggregation groups(devices) have not
+		 * been created yet.
 		 */
-		if (rv == ENOENT) {
+		if (rv == ENOENT || rv == EBADF) {
 			return (EAGAIN);
 		} else {
 			cmn_err(CE_WARN, "vsw%d: mac_open %s failed rv:%x",

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -526,33 +526,6 @@ destroy:
 		}
 		soft_ring_drain(ringp, -1);
 	}
-}
-
-void
-dls_soft_ring_rx_set(dls_channel_t dc, dls_rx_t rx, void *arg, int type)
-{
-	dls_impl_t  *dip = (dls_impl_t *)dc;
-
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	dip->di_rx = rx;
-	if (type == SOFT_RING_NONE)
-		dip->di_rx_arg = arg;
-	else
-		dip->di_rx_arg = (void *)dip;
-	rw_exit(&(dip->di_lock));
-}
-
-boolean_t
-dls_soft_ring_workers(dls_channel_t dc)
-{
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	boolean_t ret = B_FALSE;
-
-	rw_enter(&(dip->di_lock), RW_READER);
-	if (dip->di_soft_ring_list != NULL)
-		ret = B_TRUE;
-	rw_exit(&(dip->di_lock));
-	return (ret);
 }
 
 void

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <uuid/uuid.h>
 #include <sys/sockio.h>
 #include <libdlpi.h>
-#include <libdllink.h>
 #include <sys/utsname.h>
 
 #include <netdb.h>
@@ -42,12 +41,7 @@
 
 #include "etheraddr.h"
 
-/*
- * debugging flag
- */
-static	int	debug = 0;
-
-static void get_etheraddr(void *arg, const char *linkname);
+static boolean_t get_etheraddr(const char *linkname, void *arg);
 
 /*
  * get an individual arp entry
@@ -114,50 +108,35 @@ get_ethernet_address(uuid_node_t *node)
 	 * Try to get physical (ethernet) address from network interfaces.
 	 */
 	state.wa_addrvalid = B_FALSE;
-	if (dladm_walk(get_etheraddr, &state) == 0 && state.wa_addrvalid) {
+	dlpi_walk(get_etheraddr, &state, 0);
+	if (state.wa_addrvalid)
 		bcopy(state.wa_etheraddr, node, state.wa_etheraddrlen);
-	}
 
 	return (state.wa_addrvalid ? 0 : -1);
 }
 
 /*
- * Get the physical address via dlpi and update the flag to true upon success.
+ * Get the physical address via DLPI and update the flag to true upon success.
  */
-static void
-get_etheraddr(void *arg, const char *linkname)
+static boolean_t
+get_etheraddr(const char *linkname, void *arg)
 {
 	int		retval;
 	dlpi_handle_t	dh;
 	walker_arg_t	*statep = arg;
 
-	if (!(statep->wa_addrvalid)) {
-		if (debug)
-			(void) printf("get_etheraddr: opening %s\n", linkname);
-		if ((retval = dlpi_open(linkname, &dh, 0)) != DLPI_SUCCESS) {
-			if (debug) {
-				(void) fprintf(stderr, "get_etheraddr: "
-				    "cannot open link: \"%s\" %s\n",
-				    linkname, retval);
-			}
-			return;
-		}
+	if (dlpi_open(linkname, &dh, 0) != DLPI_SUCCESS)
+		return (B_FALSE);
 
-		if (debug) {
-			(void) printf("get_etheraddr: getting ethernet address"
-			    " from link: %s\n", linkname);
-		}
-		statep->wa_etheraddrlen = DLPI_PHYSADDR_MAX;
-		retval = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR,
-		    statep->wa_etheraddr, &(statep->wa_etheraddrlen));
-		if (debug) {
-			(void) fprintf(stderr, "get_etheraddr: "
-			    "dlpi_get_physaddr: \"%s\" %s\n", linkname, retval);
-		}
+	statep->wa_etheraddrlen = DLPI_PHYSADDR_MAX;
+	retval = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR,
+	    statep->wa_etheraddr, &(statep->wa_etheraddrlen));
 
-		if (retval == DLPI_SUCCESS)
-			statep->wa_addrvalid = B_TRUE;
+	dlpi_close(dh);
 
-		dlpi_close(dh);
+	if (retval == DLPI_SUCCESS) {
+		statep->wa_addrvalid = B_TRUE;
+		return (B_TRUE);
 	}
+	return (B_FALSE);
 }

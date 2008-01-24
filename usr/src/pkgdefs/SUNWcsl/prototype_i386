@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -286,8 +286,8 @@ s none usr/lib/amd64/libproc.so.1=../../../lib/amd64/libproc.so.1
 s none usr/lib/amd64/libproc.so=../../../lib/amd64/libproc.so.1
 s none usr/lib/amd64/libpthread.so.1=../../../lib/amd64/libpthread.so.1
 s none usr/lib/amd64/libpthread.so=../../../lib/amd64/libpthread.so.1
-f none usr/lib/amd64/librcm.so.1 755 root bin
-s none usr/lib/amd64/librcm.so=librcm.so.1
+s none usr/lib/amd64/librcm.so.1=../../../lib/amd64/librcm.so.1
+s none usr/lib/amd64/librcm.so=../../../lib/amd64/librcm.so.1
 s none usr/lib/amd64/libresolv.so.2=../../../lib/amd64/libresolv.so.2
 s none usr/lib/amd64/libresolv.so=../../../lib/amd64/libresolv.so.2
 s none usr/lib/amd64/librpcsvc.so.1=../../../lib/amd64/librpcsvc.so.1

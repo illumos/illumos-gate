@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -17,6 +17,7 @@
 extern "C" {
 #endif
 
+#include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,7 +25,6 @@ extern "C" {
 #include <ctype.h>
 #include <string.h>
 #include <syslog.h>
-#include <libdevinfo.h>
 #include <zone.h>
 
 #include <sys/types.h>

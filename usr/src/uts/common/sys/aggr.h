@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,8 @@
 
 #include <sys/types.h>
 #include <sys/ethernet.h>
+#include <sys/mac.h>
+#include <sys/dls.h>
 #include <sys/param.h>
 
 #ifdef	__cplusplus
@@ -74,6 +76,13 @@ typedef enum {
 #define	AGGR_MAX_PORTS	256
 
 /*
+ * The largest configurable aggregation key.  Because by default the key is
+ * used as the DLPI device PPA and default VLAN PPA's are calculated as
+ * ((1000 * vid) + PPA), the largest key can't be > 999.
+ */
+#define	AGGR_MAX_KEY	999
+
+/*
  * LACP port state.
  */
 typedef union {
@@ -107,31 +116,37 @@ typedef union {
 
 /* one of the ports of a link aggregation group */
 typedef struct laioc_port {
-	char		lp_devname[MAXNAMELEN + 1];
+	datalink_id_t	lp_linkid;
 } laioc_port_t;
 
 #define	LAIOC_CREATE		LAIOC(1)
 
 typedef struct laioc_create {
+	datalink_id_t	lc_linkid;
 	uint32_t	lc_key;
 	uint32_t	lc_nports;
 	uint32_t	lc_policy;
 	uchar_t		lc_mac[ETHERADDRL];
-	boolean_t	lc_mac_fixed;
 	aggr_lacp_mode_t lc_lacp_mode;
 	aggr_lacp_timer_t lc_lacp_timer;
+	uint32_t	lc_mac_fixed : 1,
+			lc_force : 1,
+			lc_pad_bits : 30;
 } laioc_create_t;
 
 #ifdef _SYSCALL32
 
 typedef struct laioc_create32 {
+	datalink_id_t	lc_linkid;
 	uint32_t	lc_key;
 	uint32_t	lc_nports;
 	uint32_t	lc_policy;
 	uchar_t		lc_mac[ETHERADDRL];
-	boolean_t	lc_mac_fixed;
 	aggr_lacp_mode_t lc_lacp_mode;
 	aggr_lacp_timer_t lc_lacp_timer;
+	uint32_t	lc_mac_fixed : 1,
+			lc_force : 1,
+			lc_pad_bits : 30;
 } laioc_create32_t;
 
 #endif /* _SYSCALL32 */
@@ -139,13 +154,13 @@ typedef struct laioc_create32 {
 #define	LAIOC_DELETE		LAIOC(2)
 
 typedef struct laioc_delete {
-	uint32_t	ld_key;
+	datalink_id_t	ld_linkid;
 } laioc_delete_t;
 
 #ifdef _SYSCALL32
 
 typedef struct laioc_delete32 {
-	uint32_t	ld_key;
+	datalink_id_t	ld_linkid;
 } laioc_delete32_t;
 
 #endif /* _SYSCALL32 */
@@ -165,16 +180,18 @@ typedef enum aggr_link_state {
 } aggr_link_state_t;
 
 typedef struct laioc_info_port {
-	char		lp_devname[MAXNAMELEN + 1];
+	datalink_id_t	lp_linkid;
 	uchar_t		lp_mac[ETHERADDRL];
 	aggr_port_state_t lp_state;
 	aggr_lacp_state_t lp_lacp_state;
 } laioc_info_port_t;
 
 typedef struct laioc_info_group {
+	datalink_id_t	lg_linkid;
 	uint32_t	lg_key;
 	uchar_t		lg_mac[ETHERADDRL];
 	boolean_t	lg_mac_fixed;
+	boolean_t	lg_force;
 	uint32_t	lg_policy;
 	uint32_t	lg_nports;
 	aggr_lacp_mode_t lg_lacp_mode;
@@ -182,23 +199,25 @@ typedef struct laioc_info_group {
 } laioc_info_group_t;
 
 typedef struct laioc_info {
-	uint32_t	li_ngroups;
-	uint32_t	li_group_key;	/* 0 returns all */
+	/* Must not be DLADM_INVALID_LINKID */
+	datalink_id_t	li_group_linkid;
 } laioc_info_t;
 
 #define	LAIOC_ADD		LAIOC(4)
 #define	LAIOC_REMOVE		LAIOC(5)
 
 typedef struct laioc_add_rem {
-	uint32_t	la_key;
+	datalink_id_t	la_linkid;
 	uint32_t	la_nports;
+	uint32_t	la_force;
 } laioc_add_rem_t;
 
 #ifdef _SYSCALL32
 
 typedef struct laioc_add_rem32 {
-	uint32_t	la_key;
+	datalink_id_t	la_linkid;
 	uint32_t	la_nports;
+	uint32_t	la_force;
 } laioc_add_rem32_t;
 
 #endif /* _SYSCALL32 */
@@ -211,7 +230,7 @@ typedef struct laioc_add_rem32 {
 #define	LAIOC_MODIFY_LACP_TIMER		0x08
 
 typedef struct laioc_modify {
-	uint32_t	lu_key;
+	datalink_id_t	lu_linkid;
 	uint8_t		lu_modify_mask;
 	uint32_t	lu_policy;
 	uchar_t		lu_mac[ETHERADDRL];
@@ -223,7 +242,7 @@ typedef struct laioc_modify {
 #ifdef _SYSCALL32
 
 typedef struct laioc_modify32 {
-	uint32_t	lu_key;
+	datalink_id_t	lu_linkid;
 	uint8_t		lu_modify_mask;
 	uint32_t	lu_policy;
 	uchar_t		lu_mac[ETHERADDRL];

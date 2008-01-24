@@ -633,6 +633,7 @@ igb_register_mac(igb_t *igb)
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = igb->max_frame_size -
 	    sizeof (struct ether_vlan_header) - ETHERFCSL;
+	mac->m_margin = VLAN_TAGSZ;
 
 	status = mac_register(mac, &igb->mac_hdl);
 

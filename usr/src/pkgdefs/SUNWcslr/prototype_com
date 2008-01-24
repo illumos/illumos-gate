@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,6 +113,8 @@ f none lib/libproc.so.1 755 root bin
 s none lib/libproc.so=libproc.so.1
 f none lib/libpthread.so.1 755 root bin
 s none lib/libpthread.so=libpthread.so.1
+s none lib/librcm.so=./librcm.so.1
+f none lib/librcm.so.1 755 root bin
 s none lib/libresolv.so=libresolv.so.2
 f none lib/libresolv.so.1 755 root bin
 f none lib/libresolv.so.2 755 root bin

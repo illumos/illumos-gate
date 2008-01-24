@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,6 +187,13 @@ extern "C" {
 #define	TYPICALMAXPATHLEN	64
 #define	MAXSYMLINKS	20
 #define	MAXNAMELEN	256
+
+/*
+ * MAXLINKNAMELEN defines the longest possible permitted datalink name,
+ * including the terminating NUL.  Note that this must not be larger
+ * than related networking constants such as LIFNAMSIZ.
+ */
+#define	MAXLINKNAMELEN	32
 
 #ifndef NADDR
 #define	NADDR 13

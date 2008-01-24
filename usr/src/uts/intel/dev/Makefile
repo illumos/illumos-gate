@@ -20,7 +20,7 @@
 #
 # uts/intel/dev/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Nfs/devfs
+LDFLAGS		+= -dy -Nfs/devfs -Nmisc/dls
 
 #
 #	Default build targets.

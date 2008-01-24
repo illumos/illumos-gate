@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,9 +248,9 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 
 	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 
-	if ((err = mac_open(mac, &xnbop->o_mh)) != 0) {
+	if ((err = mac_open_by_linkname(mac, &xnbop->o_mh)) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "cannot open mac device %s (%d)", mac, err);
+		    "cannot open mac for link %s (%d)", mac, err);
 		return (B_FALSE);
 	}
 	ASSERT(xnbop->o_mh != NULL);
@@ -260,13 +260,13 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 
 	if (mi->mi_media != DL_ETHER) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "mac device is not DL_ETHER (%d)", mi->mi_media);
+		    "device is not DL_ETHER (%d)", mi->mi_media);
 		xnbo_close_mac(xnbop);
 		return (B_FALSE);
 	}
 	if (mi->mi_media != mi->mi_nativemedia) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "mac device media and native media mismatch (%d != %d)",
+		    "device media and native media mismatch (%d != %d)",
 		    mi->mi_media, mi->mi_nativemedia);
 		xnbo_close_mac(xnbop);
 		return (B_FALSE);

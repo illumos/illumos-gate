@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -706,8 +706,6 @@ ip_soft_ring_assignment(ill_t *ill, ill_rx_ring_t *ip_ring,
 {
 	ip_taskq_arg_t	*taskq_arg;
 	boolean_t	refheld;
-
-	ASSERT(servicing_interrupt());
 
 	mutex_enter(&ill->ill_lock);
 	if (!(ill->ill_state_flags & ILL_SOFT_RING_ASSIGN)) {

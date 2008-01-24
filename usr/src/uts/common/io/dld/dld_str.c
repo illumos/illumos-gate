@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,8 @@
 #include	<sys/strsun.h>
 #include	<sys/strsubr.h>
 #include	<sys/atomic.h>
-#include	<sys/mkdev.h>
+#include	<sys/disp.h>
+#include	<sys/callb.h>
 #include	<sys/vlan.h>
 #include	<sys/dld.h>
 #include	<sys/dld_impl.h>
@@ -53,21 +54,34 @@ static void	str_notify_speed(dld_str_t *, uint32_t);
 static void	str_notify(void *, mac_notify_type_t);
 
 static void	ioc_native(dld_str_t *,  mblk_t *);
+static void	ioc_margin(dld_str_t *, mblk_t *);
 static void	ioc_raw(dld_str_t *, mblk_t *);
 static void	ioc_fast(dld_str_t *,  mblk_t *);
 static void	ioc(dld_str_t *, mblk_t *);
-static void	dld_ioc(dld_str_t *, mblk_t *);
-static void	str_mdata_raw_put(dld_str_t *, mblk_t *);
+static void	dld_tx_enqueue(dld_str_t *, mblk_t *, mblk_t *, boolean_t,
+		    uint_t, uint_t);
+static void	dld_wput_nondata(dld_str_t *, mblk_t *);
+static void	dld_wput_nondata_task(void *);
+static void	dld_flush_nondata(dld_str_t *);
 static mblk_t	*i_dld_ether_header_update_tag(mblk_t *, uint_t, uint16_t);
 static mblk_t	*i_dld_ether_header_strip_tag(mblk_t *);
 
 static uint32_t		str_count;
 static kmem_cache_t	*str_cachep;
-static uint32_t		minor_count;
+static taskq_t		*dld_disp_taskq = NULL;
 static mod_hash_t	*str_hashp;
 
 #define	STR_HASHSZ		64
 #define	STR_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
+
+static inline uint_t	mp_getsize(mblk_t *);
+
+/*
+ * Interval to count the TX queued depth. Default is 1s (1000000us).
+ * Count the queue depth immediately (not by timeout) if this is set to 0.
+ * See more details above dld_tx_enqueue().
+ */
+uint_t tx_qdepth_interval = 1000000;
 
 /*
  * Some notes on entry points, flow-control, queueing and locking:
@@ -162,33 +176,19 @@ i_dld_str_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	ASSERT(statep->ds_minor != 0);
 
 	/*
-	 * Access to ds_ppa and ds_mh need to be protected by ds_lock.
+	 * Access to ds_mh needs to be protected by ds_lock.
 	 */
 	rw_enter(&dsp->ds_lock, RW_READER);
-	if (statep->ds_minor <= DLD_MAX_MINOR) {
-		/*
-		 * Style 1: minor can be derived from the ppa. we
-		 * continue to walk until we find a matching stream
-		 * in attached state.
-		 */
-		if (statep->ds_minor == DLS_PPA2MINOR(dsp->ds_ppa) &&
-		    dsp->ds_mh != NULL) {
-			statep->ds_dip = mac_devinfo_get(dsp->ds_mh);
-			rw_exit(&dsp->ds_lock);
-			return (MH_WALK_TERMINATE);
-		}
-	} else {
+	if (statep->ds_minor == dsp->ds_minor) {
 		/*
 		 * Clone: a clone minor is unique. we can terminate the
 		 * walk if we find a matching stream -- even if we fail
 		 * to obtain the devinfo.
 		 */
-		if (statep->ds_minor == dsp->ds_minor) {
-			if (dsp->ds_mh != NULL)
-				statep->ds_dip = mac_devinfo_get(dsp->ds_mh);
-			rw_exit(&dsp->ds_lock);
-			return (MH_WALK_TERMINATE);
-		}
+		if (dsp->ds_mh != NULL)
+			statep->ds_dip = mac_devinfo_get(dsp->ds_mh);
+		rw_exit(&dsp->ds_lock);
+		return (MH_WALK_TERMINATE);
 	}
 	rw_exit(&dsp->ds_lock);
 	return (MH_WALK_CONTINUE);
@@ -197,21 +197,24 @@ i_dld_str_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 static dev_info_t *
 dld_finddevinfo(dev_t dev)
 {
+	dev_info_t	*dip;
 	i_dld_str_state_t	state;
+
+	if (getminor(dev) == 0)
+		return (NULL);
+
+	/*
+	 * See if it's a minor node of a link
+	 */
+	if ((dip = dls_finddevinfo(dev)) != NULL)
+		return (dip);
 
 	state.ds_minor = getminor(dev);
 	state.ds_major = getmajor(dev);
 	state.ds_dip = NULL;
 
-	if (state.ds_minor == 0)
-		return (NULL);
-
 	mod_hash_walk(str_hashp, i_dld_str_walker, &state);
-	if (state.ds_dip != NULL || state.ds_minor <= DLD_MAX_MINOR)
-		return (state.ds_dip);
-
-	/* See if it's a minor node of a VLAN */
-	return (dls_finddevinfo(dev));
+	return (state.ds_dip);
 }
 
 /*
@@ -233,10 +236,10 @@ dld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		if (minor > 0 && minor <= DLD_MAX_MINOR) {
+		if (minor > 0 && minor <= DLS_MAX_MINOR) {
 			*resp = (void *)(uintptr_t)DLS_MINOR2INST(minor);
 			rc = DDI_SUCCESS;
-		} else if (minor > DLD_MAX_MINOR &&
+		} else if (minor > DLS_MAX_MINOR &&
 		    (devinfo = dld_finddevinfo((dev_t)arg)) != NULL) {
 			*resp = (void *)(uintptr_t)ddi_get_instance(devinfo);
 			rc = DDI_SUCCESS;
@@ -286,12 +289,7 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		/*
 		 * Style 1 open
 		 */
-		t_uscalar_t ppa;
-
-		if ((err = dls_ppa_from_minor(minor, &ppa)) != 0)
-			goto failed;
-
-		if ((err = dld_str_attach(dsp, ppa)) != 0)
+		if ((err = dld_str_attach(dsp, (t_uscalar_t)minor - 1)) != 0)
 			goto failed;
 		ASSERT(dsp->ds_dlstate == DL_UNBOUND);
 	} else {
@@ -323,28 +321,11 @@ dld_close(queue_t *rq)
 	dld_str_t	*dsp = rq->q_ptr;
 
 	/*
-	 * Wait until pending requests are processed.
-	 */
-	mutex_enter(&dsp->ds_thr_lock);
-	while (dsp->ds_pending_cnt > 0)
-		cv_wait(&dsp->ds_pending_cv, &dsp->ds_thr_lock);
-	mutex_exit(&dsp->ds_thr_lock);
-
-	/*
 	 * Disable the queue srv(9e) routine.
 	 */
 	qprocsoff(rq);
 
-	/*
-	 * At this point we can not be entered by any threads via STREAMS
-	 * or the direct call interface, which is available only to IP.
-	 * After the interface is unplumbed, IP wouldn't have any reference
-	 * to this instance, and therefore we are now effectively single
-	 * threaded and don't require any lock protection.  Flush all
-	 * pending packets which are sitting in the transmit queue.
-	 */
-	ASSERT(dsp->ds_thr == 0);
-	dld_tx_flush(dsp);
+	dld_finish_pending_task(dsp);
 
 	/*
 	 * This stream was open to a provider node. Check to see
@@ -369,41 +350,57 @@ dld_close(queue_t *rq)
 void
 dld_wput(queue_t *wq, mblk_t *mp)
 {
-	dld_str_t *dsp = (dld_str_t *)wq->q_ptr;
-
-	DLD_ENTER(dsp);
+	dld_str_t	*dsp = wq->q_ptr;
 
 	switch (DB_TYPE(mp)) {
-	case M_DATA:
-		/*
-		 * State is held constant by the DLD_ENTER done above
-		 * until all sending threads are done. Mode can change
-		 * due to ioctl, however locks must not be held across
-		 * calls to putnext(), which can be called from here
-		 * via dld_tx_single().
-		 */
-		rw_enter(&dsp->ds_lock, RW_READER);
-		if (dsp->ds_dlstate != DL_IDLE ||
-		    dsp->ds_mode == DLD_UNITDATA) {
-			rw_exit(&dsp->ds_lock);
+	case M_DATA: {
+		dld_tx_t tx;
+
+		DLD_TX_ENTER(dsp);
+		if ((tx = dsp->ds_tx) != NULL)
+			tx(dsp, mp);
+		else
 			freemsg(mp);
-		} else if (dsp->ds_mode == DLD_FASTPATH) {
-			rw_exit(&dsp->ds_lock);
-			str_mdata_fastpath_put(dsp, mp);
-		} else if (dsp->ds_mode == DLD_RAW) {
-			rw_exit(&dsp->ds_lock);
-			str_mdata_raw_put(dsp, mp);
-		}
+		DLD_TX_EXIT(dsp);
 		break;
+	}
 	case M_PROTO:
-	case M_PCPROTO:
-		dld_proto(dsp, mp);
+	case M_PCPROTO: {
+		t_uscalar_t	prim;
+		dld_tx_t	tx;
+
+		if (MBLKL(mp) < sizeof (t_uscalar_t)) {
+			freemsg(mp);
+			return;
+		}
+
+		prim = ((union DL_primitives *)mp->b_rptr)->dl_primitive;
+		if (prim != DL_UNITDATA_REQ) {
+			/* Control path */
+			dld_wput_nondata(dsp, mp);
+			break;
+		}
+
+		/* Data path */
+		DLD_TX_ENTER(dsp);
+		if ((tx = dsp->ds_unitdata_tx) != NULL)
+			tx(dsp, mp);
+		else
+			dlerrorack(wq, mp, DL_UNITDATA_REQ, DL_OUTSTATE, 0);
+		DLD_TX_EXIT(dsp);
 		break;
+	}
 	case M_IOCTL:
-		dld_ioc(dsp, mp);
+	case M_IOCDATA:
+		/* Control path */
+		dld_wput_nondata(dsp, mp);
 		break;
 	case M_FLUSH:
+		/*
+		 * Flush both the data messages and the control messages.
+		 */
 		if (*mp->b_rptr & FLUSHW) {
+			dld_flush_nondata(dsp);
 			dld_tx_flush(dsp);
 			*mp->b_rptr &= ~FLUSHW;
 		}
@@ -418,8 +415,17 @@ dld_wput(queue_t *wq, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+}
 
-	DLD_EXIT(dsp);
+/*
+ * Called by GLDv3 control node to process the ioctls. It will start
+ * a taskq to allow the ioctl processing to block. This is a temporary
+ * solution, and will be replaced by a more graceful approach afterwards.
+ */
+void
+dld_ioctl(queue_t *wq, mblk_t *mp)
+{
+	dld_wput_nondata(wq->q_ptr, mp);
 }
 
 /*
@@ -428,10 +434,11 @@ dld_wput(queue_t *wq, mblk_t *mp)
 void
 dld_wsrv(queue_t *wq)
 {
-	mblk_t		*mp;
+	mblk_t		*mp, *head, *tail;
 	dld_str_t	*dsp = wq->q_ptr;
+	uint_t		cnt, msgcnt;
+	timeout_id_t	tid = 0;
 
-	DLD_ENTER(dsp);
 	rw_enter(&dsp->ds_lock, RW_READER);
 	/*
 	 * Grab all packets (chained via b_next) off our transmit queue
@@ -453,10 +460,13 @@ dld_wsrv(queue_t *wq)
 		ASSERT(dsp->ds_tx_msgcnt == 0);
 		mutex_exit(&dsp->ds_tx_list_lock);
 		rw_exit(&dsp->ds_lock);
-		DLD_EXIT(dsp);
 		return;
 	}
+	head = mp;
+	tail = dsp->ds_tx_list_tail;
 	dsp->ds_tx_list_head = dsp->ds_tx_list_tail = NULL;
+	cnt = dsp->ds_tx_cnt;
+	msgcnt = dsp->ds_tx_msgcnt;
 	dsp->ds_tx_cnt = dsp->ds_tx_msgcnt = 0;
 	mutex_exit(&dsp->ds_tx_list_lock);
 
@@ -466,7 +476,7 @@ dld_wsrv(queue_t *wq)
 	 * because regardless of the mode all transmit will end up in
 	 * dld_tx_single() where the packets may be queued.
 	 */
-	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT((DB_TYPE(mp) == M_DATA) || (DB_TYPE(mp) == M_MULTIDATA));
 	if (dsp->ds_dlstate != DL_IDLE) {
 		freemsgchain(mp);
 		goto done;
@@ -477,8 +487,27 @@ dld_wsrv(queue_t *wq)
 	 * send them all, re-queue the packet(s) at the beginning of
 	 * the transmit queue to avoid any re-ordering.
 	 */
-	if ((mp = dls_tx(dsp->ds_dc, mp)) != NULL)
-		dld_tx_enqueue(dsp, mp, B_TRUE);
+	mp = dls_tx(dsp->ds_dc, mp);
+	if (mp == head) {
+		/*
+		 * No message was sent out. Take the saved the queue depth
+		 * as the input, so that dld_tx_enqueue() need not to
+		 * calculate it again.
+		 */
+		dld_tx_enqueue(dsp, mp, tail, B_TRUE, msgcnt, cnt);
+	} else if (mp != NULL) {
+		/*
+		 * Some but not all messages were sent out. dld_tx_enqueue()
+		 * needs to start the timer to calculate the queue depth if
+		 * timer has not been started.
+		 *
+		 * Note that a timer is used to calculate the queue depth
+		 * to improve network performance, especially for TCP, in
+		 * which case packets are sent without canput() being checked,
+		 * and mostly end up in dld_tx_enqueue() under heavy load.
+		 */
+		dld_tx_enqueue(dsp, mp, tail, B_TRUE, 0, 0);
+	}
 
 done:
 	/*
@@ -492,11 +521,19 @@ done:
 		dsp->ds_tx_flow_mp = getq(wq);
 		ASSERT(dsp->ds_tx_flow_mp != NULL);
 		dsp->ds_tx_qbusy = B_FALSE;
+		if ((tid = dsp->ds_tx_qdepth_tid) != 0)
+			dsp->ds_tx_qdepth_tid = 0;
 	}
 	mutex_exit(&dsp->ds_tx_list_lock);
 
+	/*
+	 * Note that ds_tx_list_lock (which is acquired by the timeout
+	 * callback routine) cannot be held across the call to untimeout().
+	 */
+	if (tid != 0)
+		(void) untimeout(tid);
+
 	rw_exit(&dsp->ds_lock);
-	DLD_EXIT(dsp);
 }
 
 void
@@ -566,6 +603,12 @@ dld_str_init(void)
 	ASSERT(str_cachep != NULL);
 
 	/*
+	 * Create taskq to process DLPI requests.
+	 */
+	dld_disp_taskq = taskq_create("dld_disp_taskq", 1024, MINCLSYSPRI, 2,
+	    INT_MAX, TASKQ_DYNAMIC | TASKQ_PREPOPULATE);
+
+	/*
 	 * Create a hash table for maintaining dld_str_t's.
 	 * The ds_minor field (the clone minor number) of a dld_str_t
 	 * is used as a key for this hash table because this number is
@@ -587,11 +630,9 @@ dld_str_fini(void)
 	if (str_count != 0)
 		return (EBUSY);
 
-	/*
-	 * Check to see if there are any minor numbers still in use.
-	 */
-	if (minor_count != 0)
-		return (EBUSY);
+	ASSERT(dld_disp_taskq != NULL);
+	taskq_destroy(dld_disp_taskq);
+	dld_disp_taskq = NULL;
 
 	/*
 	 * Destroy object cache.
@@ -628,6 +669,7 @@ dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 	dsp->ds_type = type;
 	dsp->ds_major = major;
 	dsp->ds_style = style;
+	dsp->ds_tx = dsp->ds_unitdata_tx = NULL;
 
 	/*
 	 * Initialize the queue pointers.
@@ -647,6 +689,20 @@ dld_str_create(queue_t *rq, uint_t type, major_t major, t_uscalar_t style)
 	    (mod_hash_val_t)dsp);
 	ASSERT(err == 0);
 	return (dsp);
+}
+
+void
+dld_finish_pending_task(dld_str_t *dsp)
+{
+	/*
+	 * Wait until the pending requests are processed by the worker thread.
+	 */
+	mutex_enter(&dsp->ds_disp_lock);
+	dsp->ds_closing = B_TRUE;
+	while (dsp->ds_tid != NULL)
+		cv_wait(&dsp->ds_disp_cv, &dsp->ds_disp_lock);
+	dsp->ds_closing = B_FALSE;
+	mutex_exit(&dsp->ds_disp_lock);
 }
 
 /*
@@ -674,11 +730,14 @@ dld_str_destroy(dld_str_t *dsp)
 	ASSERT(dsp->ds_tx_list_tail == NULL);
 	ASSERT(dsp->ds_tx_cnt == 0);
 	ASSERT(dsp->ds_tx_msgcnt == 0);
+	ASSERT(dsp->ds_tx_qdepth_tid == 0);
 	ASSERT(!dsp->ds_tx_qbusy);
 
-	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
-	ASSERT(dsp->ds_thr == 0);
-	ASSERT(dsp->ds_pending_req == NULL);
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_disp_lock));
+	ASSERT(dsp->ds_pending_head == NULL);
+	ASSERT(dsp->ds_pending_tail == NULL);
+	ASSERT(dsp->ds_tx == NULL);
+	ASSERT(dsp->ds_unitdata_tx == NULL);
 
 	/*
 	 * Reinitialize all the flags.
@@ -720,22 +779,20 @@ str_constructor(void *buf, void *cdrarg, int kmflags)
 	/*
 	 * Allocate a new minor number.
 	 */
-	atomic_add_32(&minor_count, 1);
-	if ((dsp->ds_minor = dls_minor_hold(kmflags == KM_SLEEP)) == 0) {
-		atomic_add_32(&minor_count, -1);
+	if ((dsp->ds_minor = mac_minor_hold(kmflags == KM_SLEEP)) == 0)
 		return (-1);
-	}
 
 	/*
 	 * Initialize the DLPI state machine.
 	 */
 	dsp->ds_dlstate = DL_UNATTACHED;
-	dsp->ds_ppa = (t_uscalar_t)-1;
 
-	mutex_init(&dsp->ds_thr_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&dsp->ds_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&dsp->ds_tx_list_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&dsp->ds_pending_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&dsp->ds_disp_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&dsp->ds_disp_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&dsp->ds_tx_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&dsp->ds_tx_cv, NULL, CV_DRIVER, NULL);
 
 	return (0);
 }
@@ -759,6 +816,10 @@ str_destructor(void *buf, void *cdrarg)
 	 */
 	ASSERT(dsp->ds_mh == NULL);
 	ASSERT(dsp->ds_dc == NULL);
+	ASSERT(dsp->ds_tx == NULL);
+	ASSERT(dsp->ds_unitdata_tx == NULL);
+	ASSERT(dsp->ds_intx_cnt == 0);
+	ASSERT(dsp->ds_detaching == B_FALSE);
 
 	/*
 	 * Make sure enabled notifications are cleared.
@@ -773,8 +834,7 @@ str_destructor(void *buf, void *cdrarg)
 	/*
 	 * Release the minor number.
 	 */
-	dls_minor_rele(dsp->ds_minor);
-	atomic_add_32(&minor_count, -1);
+	mac_minor_rele(dsp->ds_minor);
 
 	ASSERT(!RW_LOCK_HELD(&dsp->ds_lock));
 	rw_destroy(&dsp->ds_lock);
@@ -782,27 +842,26 @@ str_destructor(void *buf, void *cdrarg)
 	ASSERT(MUTEX_NOT_HELD(&dsp->ds_tx_list_lock));
 	mutex_destroy(&dsp->ds_tx_list_lock);
 	ASSERT(dsp->ds_tx_flow_mp == NULL);
+	ASSERT(dsp->ds_pending_head == NULL);
+	ASSERT(dsp->ds_pending_tail == NULL);
+	ASSERT(!dsp->ds_closing);
 
-	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
-	mutex_destroy(&dsp->ds_thr_lock);
-	ASSERT(dsp->ds_pending_req == NULL);
-	ASSERT(dsp->ds_pending_op == NULL);
-	ASSERT(dsp->ds_pending_cnt == 0);
-	cv_destroy(&dsp->ds_pending_cv);
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_disp_lock));
+	mutex_destroy(&dsp->ds_disp_lock);
+	cv_destroy(&dsp->ds_disp_cv);
+
+	ASSERT(MUTEX_NOT_HELD(&dsp->ds_tx_lock));
+	mutex_destroy(&dsp->ds_tx_lock);
+	cv_destroy(&dsp->ds_tx_cv);
 }
 
-/*
- * M_DATA put. Note that mp is a single message, not a chained message.
- */
 void
 dld_tx_single(dld_str_t *dsp, mblk_t *mp)
 {
 	/*
-	 * This function can be called from within dld or from an upper
-	 * layer protocol (currently only tcp). If we are in the busy
-	 * mode enqueue the packet(s) and return.  Otherwise hand them
-	 * over to the MAC driver for transmission; any remaining one(s)
-	 * which didn't get sent will be queued.
+	 * If we are busy enqueue the packet and return.
+	 * Otherwise hand them over to the MAC driver for transmission.
+	 * If the message didn't get sent it will be queued.
 	 *
 	 * Note here that we don't grab the list lock prior to checking
 	 * the busy flag.  This is okay, because a missed transition
@@ -812,13 +871,14 @@ dld_tx_single(dld_str_t *dsp, mblk_t *mp)
 	 * thread to run; the flag is only cleared by the service thread
 	 * when there is no more packet to be transmitted.
 	 */
-	if (dsp->ds_tx_qbusy || (mp = dls_tx(dsp->ds_dc, mp)) != NULL)
-		dld_tx_enqueue(dsp, mp, B_FALSE);
+
+	if (dsp->ds_tx_qbusy || ((mp = dls_tx(dsp->ds_dc, mp)) != NULL))
+		dld_tx_enqueue(dsp, mp, mp, B_FALSE, 1, mp_getsize(mp));
 }
 
 /*
  * Update the priority bits and VID (may need to insert tag if mp points
- * to an untagged packet.
+ * to an untagged packet).
  * If vid is VLAN_ID_NONE, use the VID encoded in the packet.
  */
 static mblk_t *
@@ -881,7 +941,7 @@ i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid)
 
 		/*
 		 * Free the original message if it's now empty. Link the
-		 * rest of messages to the header message.
+		 * rest of the messages to the header message.
 		 */
 		if (MBLKL(mp) == 0) {
 			hmp->b_cont = mp->b_cont;
@@ -901,7 +961,11 @@ i_dld_ether_header_update_tag(mblk_t *mp, uint_t pri, uint16_t vid)
 }
 
 /*
- * M_DATA put (IP fast-path mode)
+ * M_DATA put
+ *
+ * The poll callback function for DLS clients which are not in the per-stream
+ * mode. This function is called from an upper layer protocol (currently only
+ * tcp and udp).
  */
 void
 str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp)
@@ -934,9 +998,9 @@ discard:
 }
 
 /*
- * M_DATA put (DLIOCRAW mode)
+ * M_DATA put (DLIOCRAW mode).
  */
-static void
+void
 str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 {
 	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
@@ -1032,29 +1096,50 @@ discard:
 int
 dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 {
-	int			err;
-	const char		*drvname;
-	char			name[MAXNAMELEN];
-	dls_channel_t		dc;
-	uint_t			addr_length;
+	dev_t				dev;
+	int				err;
+	const char			*drvname;
+	dls_channel_t			dc;
+	uint_t				addr_length;
+	boolean_t			qassociated = B_FALSE;
 
 	ASSERT(dsp->ds_dc == NULL);
 
 	if ((drvname = ddi_major_to_name(dsp->ds_major)) == NULL)
 		return (EINVAL);
 
-	(void) snprintf(name, MAXNAMELEN, "%s%u", drvname, ppa);
-
-	if (strcmp(drvname, "aggr") != 0 && strcmp(drvname, "vnic") != 0 &&
-	    qassociate(dsp->ds_wq, DLS_PPA2INST(ppa)) != 0)
-		return (EINVAL);
+	/*
+	 * /dev node access. This will still be supported for backward
+	 * compatibility reason.
+	 */
+	if ((dsp->ds_style == DL_STYLE2) && (strcmp(drvname, "aggr") != 0) &&
+	    (strcmp(drvname, "vnic") != 0)) {
+		if (qassociate(dsp->ds_wq, DLS_PPA2INST(ppa)) != 0)
+			return (EINVAL);
+		qassociated = B_TRUE;
+	}
 
 	/*
 	 * Open a channel.
 	 */
-	if ((err = dls_open(name, &dc)) != 0) {
-		(void) qassociate(dsp->ds_wq, -1);
-		return (err);
+	if (dsp->ds_style == DL_STYLE2 && ppa > DLS_MAX_PPA) {
+		/*
+		 * style-2 VLAN open, this is a /dev VLAN ppa open
+		 * which might result in a newly created dls_vlan_t.
+		 */
+		err = dls_open_style2_vlan(dsp->ds_major, ppa, &dc);
+		if (err != 0) {
+			if (qassociated)
+				(void) qassociate(dsp->ds_wq, -1);
+			return (err);
+		}
+	} else {
+		dev = makedevice(dsp->ds_major, (minor_t)ppa + 1);
+		if ((err = dls_open_by_dev(dev, &dc)) != 0) {
+			if (qassociated)
+				(void) qassociate(dsp->ds_wq, -1);
+			return (err);
+		}
 	}
 
 	/*
@@ -1085,7 +1170,6 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 	 */
 	dsp->ds_mnh = mac_notify_add(dsp->ds_mh, str_notify, (void *)dsp);
 
-	dsp->ds_ppa = ppa;
 	dsp->ds_dc = dc;
 	dsp->ds_dlstate = DL_UNBOUND;
 
@@ -1099,8 +1183,6 @@ dld_str_attach(dld_str_t *dsp, t_uscalar_t ppa)
 void
 dld_str_detach(dld_str_t *dsp)
 {
-	ASSERT(dsp->ds_thr == 0);
-
 	/*
 	 * Remove the notify function.
 	 */
@@ -1114,21 +1196,25 @@ dld_str_detach(dld_str_t *dsp)
 	dld_capabilities_disable(dsp);
 	dsp->ds_promisc = 0;
 
+	DLD_TX_QUIESCE(dsp);
+
+	/*
+	 * Flush all pending packets which are sitting in the transmit queue.
+	 */
+	dld_tx_flush(dsp);
+
 	/*
 	 * Clear LSO flags.
 	 */
 	dsp->ds_lso = B_FALSE;
 	dsp->ds_lso_max = 0;
 
-	/*
-	 * Close the channel.
-	 */
 	dls_close(dsp->ds_dc);
-	dsp->ds_ppa = (t_uscalar_t)-1;
 	dsp->ds_dc = NULL;
 	dsp->ds_mh = NULL;
 
-	(void) qassociate(dsp->ds_wq, -1);
+	if (dsp->ds_style == DL_STYLE2)
+		(void) qassociate(dsp->ds_wq, -1);
 
 	/*
 	 * Re-initialize the DLPI state machine.
@@ -1775,53 +1861,127 @@ str_notify(void *arg, mac_notify_type_t type)
 		str_notify_fastpath_flush(dsp);
 		break;
 
+	case MAC_NOTE_MARGIN:
+		break;
 	default:
 		ASSERT(B_FALSE);
 		break;
 	}
 }
 
-/*
- * Enqueue one or more messages to the transmit queue.
- * Caller specifies the insertion position (head/tail).
- */
-void
-dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, boolean_t head_insert)
+static inline uint_t
+mp_getsize(mblk_t *mp)
 {
-	mblk_t	*tail;
-	queue_t *q = dsp->ds_wq;
-	uint_t	cnt, msgcnt;
-	uint_t	tot_cnt, tot_msgcnt;
-
 	ASSERT(DB_TYPE(mp) == M_DATA);
-	/* Calculate total size and count of the packet(s) */
-	for (tail = mp, cnt = msgdsize(mp), msgcnt = 1;
-	    tail->b_next != NULL; tail = tail->b_next) {
-		ASSERT(DB_TYPE(tail->b_next) == M_DATA);
-		cnt += msgdsize(tail->b_next);
-		msgcnt++;
-	}
+	return ((mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp));
+}
+
+/*
+ * Calculate the dld queue depth, free the messages that exceed the threshold.
+ */
+static void
+dld_tx_qdepth_timer(void *arg)
+{
+	dld_str_t *dsp = (dld_str_t *)arg;
+	mblk_t *prev, *mp;
+	uint_t cnt, msgcnt, size;
 
 	mutex_enter(&dsp->ds_tx_list_lock);
+
+	/* Calculate total size and count of the packet(s) */
+	cnt = msgcnt = 0;
+	for (prev = NULL, mp = dsp->ds_tx_list_head; mp != NULL;
+	    prev = mp, mp = mp->b_next) {
+		size = mp_getsize(mp);
+		cnt += size;
+		msgcnt++;
+		if (cnt >= dld_max_q_count || msgcnt >= dld_max_q_count) {
+			ASSERT(dsp->ds_tx_qbusy);
+			dsp->ds_tx_list_tail = prev;
+			if (prev == NULL)
+				dsp->ds_tx_list_head = NULL;
+			else
+				prev->b_next = NULL;
+			freemsgchain(mp);
+			cnt -= size;
+			msgcnt--;
+			break;
+		}
+	}
+	dsp->ds_tx_cnt = cnt;
+	dsp->ds_tx_msgcnt = msgcnt;
+	dsp->ds_tx_qdepth_tid = 0;
+	mutex_exit(&dsp->ds_tx_list_lock);
+}
+
+/*
+ * Enqueue one or more messages on the transmit queue. Caller specifies:
+ *  - the insertion position (head/tail).
+ *  - the message count and the total message size of messages to be queued
+ *    if they are known to the caller; or 0 if they are not known.
+ *
+ * If the caller does not know the message size information, this usually
+ * means that dld_wsrv() managed to send some but not all of the queued
+ * messages. For performance reasons, we do not calculate the queue depth
+ * every time. Instead, a timer is started to calculate the queue depth
+ * every 1 second (can be changed by tx_qdepth_interval).
+ */
+static void
+dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, mblk_t *tail, boolean_t head_insert,
+    uint_t msgcnt, uint_t cnt)
+{
+	queue_t *q = dsp->ds_wq;
+	uint_t tot_cnt, tot_msgcnt;
+	mblk_t *next;
+
+	mutex_enter(&dsp->ds_tx_list_lock);
+
 	/*
+	 * Simply enqueue the message and calculate the queue depth via
+	 * timer if:
+	 *
+	 * - the current queue depth is incorrect, and the timer is already
+	 *   started; or
+	 *
+	 * - the given message size is unknown and it is allowed to start the
+	 *   timer;
+	 */
+	if ((dsp->ds_tx_qdepth_tid != 0) ||
+	    (msgcnt == 0 && tx_qdepth_interval != 0)) {
+		goto enqueue;
+	}
+
+	/*
+	 * The timer is not allowed, so calculate the message size now.
+	 */
+	if (msgcnt == 0) {
+		for (next = mp; next != NULL; next = next->b_next) {
+			cnt += mp_getsize(next);
+			msgcnt++;
+		}
+	}
+
+	/*
+	 * Grow the queue depth using the input messesge size.
+	 *
 	 * If the queue depth would exceed the allowed threshold, drop
 	 * new packet(s) and drain those already in the queue.
 	 */
 	tot_cnt = dsp->ds_tx_cnt + cnt;
 	tot_msgcnt = dsp->ds_tx_msgcnt + msgcnt;
 
-	if (!head_insert &&
-	    (tot_cnt >= dld_max_q_count || tot_msgcnt >= dld_max_q_count)) {
+	if (!head_insert && (tot_cnt >= dld_max_q_count ||
+	    tot_msgcnt >= dld_max_q_count)) {
 		ASSERT(dsp->ds_tx_qbusy);
 		mutex_exit(&dsp->ds_tx_list_lock);
 		freemsgchain(mp);
 		goto done;
 	}
-
 	/* Update the queue size parameters */
 	dsp->ds_tx_cnt = tot_cnt;
 	dsp->ds_tx_msgcnt = tot_msgcnt;
 
+enqueue:
 	/*
 	 * If the transmit queue is currently empty and we are
 	 * about to deposit the packet(s) there, switch mode to
@@ -1848,6 +2008,17 @@ dld_tx_enqueue(dld_str_t *dsp, mblk_t *mp, boolean_t head_insert)
 			dsp->ds_tx_list_tail = tail;
 		dsp->ds_tx_list_head = mp;
 	}
+
+	if (msgcnt == 0 && dsp->ds_tx_qdepth_tid == 0 &&
+	    tx_qdepth_interval != 0) {
+		/*
+		 * The message size is not given so that we need to start
+		 * the timer to calculate the queue depth.
+		 */
+		dsp->ds_tx_qdepth_tid = timeout(dld_tx_qdepth_timer, dsp,
+		    drv_usectohz(tx_qdepth_interval));
+		ASSERT(dsp->ds_tx_qdepth_tid != NULL);
+	}
 	mutex_exit(&dsp->ds_tx_list_lock);
 done:
 	/* Schedule service thread to drain the transmit queue */
@@ -1858,6 +2029,8 @@ done:
 void
 dld_tx_flush(dld_str_t *dsp)
 {
+	timeout_id_t	tid = 0;
+
 	mutex_enter(&dsp->ds_tx_list_lock);
 	if (dsp->ds_tx_list_head != NULL) {
 		freemsgchain(dsp->ds_tx_list_head);
@@ -1868,34 +2041,156 @@ dld_tx_flush(dld_str_t *dsp)
 			ASSERT(dsp->ds_tx_flow_mp != NULL);
 			dsp->ds_tx_qbusy = B_FALSE;
 		}
+		if ((tid = dsp->ds_tx_qdepth_tid) != 0)
+			dsp->ds_tx_qdepth_tid = 0;
 	}
 	mutex_exit(&dsp->ds_tx_list_lock);
+
+	/*
+	 * Note that ds_tx_list_lock (which is acquired by the timeout
+	 * callback routine) cannot be held across the call to untimeout().
+	 */
+	if (tid != 0)
+		(void) untimeout(tid);
 }
 
 /*
- * Process an M_IOCTL message.
+ * Process a non-data message.
  */
 static void
-dld_ioc(dld_str_t *dsp, mblk_t *mp)
+dld_wput_nondata(dld_str_t *dsp, mblk_t *mp)
 {
-	uint_t			cmd;
+	ASSERT((dsp->ds_type == DLD_DLPI && dsp->ds_ioctl == NULL) ||
+	    (dsp->ds_type == DLD_CONTROL && dsp->ds_ioctl != NULL));
 
-	cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
-	ASSERT(dsp->ds_type == DLD_DLPI);
+	mutex_enter(&dsp->ds_disp_lock);
 
-	switch (cmd) {
-	case DLIOCNATIVE:
-		ioc_native(dsp, mp);
-		break;
-	case DLIOCRAW:
-		ioc_raw(dsp, mp);
-		break;
-	case DLIOCHDRINFO:
-		ioc_fast(dsp, mp);
-		break;
-	default:
-		ioc(dsp, mp);
+	/*
+	 * The processing of the message might block. Enqueue the
+	 * message for later processing.
+	 */
+	if (dsp->ds_pending_head == NULL) {
+		dsp->ds_pending_head = dsp->ds_pending_tail = mp;
+	} else {
+		dsp->ds_pending_tail->b_next = mp;
+		dsp->ds_pending_tail = mp;
 	}
+
+	/*
+	 * If there is no task pending, kick off the task.
+	 */
+	if (dsp->ds_tid == NULL) {
+		dsp->ds_tid = taskq_dispatch(dld_disp_taskq,
+		    dld_wput_nondata_task, dsp, TQ_SLEEP);
+		ASSERT(dsp->ds_tid != NULL);
+	}
+	mutex_exit(&dsp->ds_disp_lock);
+}
+
+/*
+ * The worker thread which processes non-data messages. Note we only process
+ * one message at one time in order to be able to "flush" the queued message
+ * and serialize the processing.
+ */
+static void
+dld_wput_nondata_task(void *arg)
+{
+	dld_str_t	*dsp = (dld_str_t *)arg;
+	mblk_t		*mp;
+
+	mutex_enter(&dsp->ds_disp_lock);
+	ASSERT(dsp->ds_pending_head != NULL);
+	ASSERT(dsp->ds_tid != NULL);
+
+	if (dsp->ds_closing)
+		goto closing;
+
+	mp = dsp->ds_pending_head;
+	if ((dsp->ds_pending_head = mp->b_next) == NULL)
+		dsp->ds_pending_tail = NULL;
+	mp->b_next = NULL;
+
+	mutex_exit(&dsp->ds_disp_lock);
+
+	switch (DB_TYPE(mp)) {
+	case M_PROTO:
+	case M_PCPROTO:
+		ASSERT(dsp->ds_type == DLD_DLPI);
+		dld_wput_proto_nondata(dsp, mp);
+		break;
+	case M_IOCTL: {
+		uint_t cmd;
+
+		if (dsp->ds_type == DLD_CONTROL) {
+			ASSERT(dsp->ds_ioctl != NULL);
+			dsp->ds_ioctl(dsp->ds_wq, mp);
+			break;
+		}
+
+		cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
+
+		switch (cmd) {
+		case DLIOCNATIVE:
+			ioc_native(dsp, mp);
+			break;
+		case DLIOCMARGININFO:
+			ioc_margin(dsp, mp);
+			break;
+		case DLIOCRAW:
+			ioc_raw(dsp, mp);
+			break;
+		case DLIOCHDRINFO:
+			ioc_fast(dsp, mp);
+			break;
+		default:
+			ioc(dsp, mp);
+			break;
+		}
+		break;
+	}
+	case M_IOCDATA:
+		ASSERT(dsp->ds_type == DLD_DLPI);
+		ioc(dsp, mp);
+		break;
+	}
+
+	mutex_enter(&dsp->ds_disp_lock);
+
+	if (dsp->ds_closing)
+		goto closing;
+
+	if (dsp->ds_pending_head != NULL) {
+		dsp->ds_tid = taskq_dispatch(dld_disp_taskq,
+		    dld_wput_nondata_task, dsp, TQ_SLEEP);
+		ASSERT(dsp->ds_tid != NULL);
+	} else {
+		dsp->ds_tid = NULL;
+	}
+	mutex_exit(&dsp->ds_disp_lock);
+	return;
+
+	/*
+	 * If the stream is closing, flush all queued messages and inform
+	 * the stream once it is done.
+	 */
+closing:
+	freemsgchain(dsp->ds_pending_head);
+	dsp->ds_pending_head = dsp->ds_pending_tail = NULL;
+	dsp->ds_tid = NULL;
+	cv_signal(&dsp->ds_disp_cv);
+	mutex_exit(&dsp->ds_disp_lock);
+}
+
+/*
+ * Flush queued non-data messages.
+ */
+static void
+dld_flush_nondata(dld_str_t *dsp)
+{
+	mutex_enter(&dsp->ds_disp_lock);
+	freemsgchain(dsp->ds_pending_head);
+	dsp->ds_pending_head = dsp->ds_pending_tail = NULL;
+	mutex_exit(&dsp->ds_disp_lock);
 }
 
 /*
@@ -1925,6 +2220,32 @@ ioc_native(dld_str_t *dsp, mblk_t *mp)
 }
 
 /*
+ * DLIOCMARGININFO
+ */
+static void
+ioc_margin(dld_str_t *dsp, mblk_t *mp)
+{
+	queue_t *q = dsp->ds_wq;
+	uint32_t margin;
+	int err;
+
+	if (dsp->ds_dlstate == DL_UNATTACHED) {
+		err = EINVAL;
+		goto failed;
+	}
+	if ((err = miocpullup(mp, sizeof (uint32_t))) != 0)
+		goto failed;
+
+	mac_margin_get(dsp->ds_mh, &margin);
+	*((uint32_t *)mp->b_cont->b_rptr) = margin;
+	miocack(q, mp, sizeof (uint32_t), 0);
+	return;
+
+failed:
+	miocnak(q, mp, 0, err);
+}
+
+/*
  * DLIOCRAW
  */
 static void
@@ -1932,25 +2253,20 @@ ioc_raw(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t *q = dsp->ds_wq;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 	if (dsp->ds_polling || dsp->ds_soft_ring) {
-		rw_exit(&dsp->ds_lock);
 		miocnak(q, mp, 0, EPROTO);
 		return;
 	}
 
-	if (dsp->ds_mode != DLD_RAW && dsp->ds_dlstate == DL_IDLE) {
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	if ((dsp->ds_mode != DLD_RAW) && (dsp->ds_dlstate == DL_IDLE)) {
 		/*
 		 * Set the receive callback.
 		 */
-		dls_rx_set(dsp->ds_dc, dld_str_rx_raw, (void *)dsp);
+		dls_rx_set(dsp->ds_dc, dld_str_rx_raw, dsp);
+		dsp->ds_tx = str_mdata_raw_put;
 	}
-
-	/*
-	 * Note that raw mode is enabled.
-	 */
 	dsp->ds_mode = DLD_RAW;
-
 	rw_exit(&dsp->ds_lock);
 	miocack(q, mp, 0, 0);
 }
@@ -1971,7 +2287,6 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 	uint_t		addr_length;
 	queue_t		*q = dsp->ds_wq;
 	int		err;
-	dls_channel_t	dc;
 
 	if (dld_opt & DLD_OPT_NO_FASTPATH) {
 		err = ENOTSUP;
@@ -2003,62 +2318,41 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 		goto failed;
 	}
 
-	rw_enter(&dsp->ds_lock, RW_READER);
+	/*
+	 * We don't need to hold any locks to access ds_dlstate, because
+	 * control message prossessing (which updates this field) is
+	 * serialized.
+	 */
 	if (dsp->ds_dlstate != DL_IDLE) {
-		rw_exit(&dsp->ds_lock);
 		err = ENOTSUP;
 		goto failed;
 	}
 
 	addr_length = dsp->ds_mip->mi_addr_length;
 	if (len != addr_length + sizeof (uint16_t)) {
-		rw_exit(&dsp->ds_lock);
 		err = EINVAL;
 		goto failed;
 	}
 
 	addr = nmp->b_rptr + off;
 	sap = *(uint16_t *)(nmp->b_rptr + off + addr_length);
-	dc = dsp->ds_dc;
 
-	if ((hmp = dls_header(dc, addr, sap, 0, NULL)) == NULL) {
-		rw_exit(&dsp->ds_lock);
+	if ((hmp = dls_header(dsp->ds_dc, addr, sap, 0, NULL)) == NULL) {
 		err = ENOMEM;
 		goto failed;
 	}
 
-	/*
-	 * This is a performance optimization.  We originally entered
-	 * as reader and only become writer upon transitioning into
-	 * the DLD_FASTPATH mode for the first time.  Otherwise we
-	 * stay as reader and return the fast-path header to IP.
-	 */
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	ASSERT(dsp->ds_dlstate == DL_IDLE);
 	if (dsp->ds_mode != DLD_FASTPATH) {
-		if (!rw_tryupgrade(&dsp->ds_lock)) {
-			rw_exit(&dsp->ds_lock);
-			rw_enter(&dsp->ds_lock, RW_WRITER);
-
-			/*
-			 * State may have changed before we re-acquired
-			 * the writer lock in case the upgrade failed.
-			 */
-			if (dsp->ds_dlstate != DL_IDLE) {
-				rw_exit(&dsp->ds_lock);
-				err = ENOTSUP;
-				goto failed;
-			}
-		}
-
 		/*
-		 * Set the receive callback (unless polling is enabled).
-		 */
-		if (!dsp->ds_polling && !dsp->ds_soft_ring)
-			dls_rx_set(dc, dld_str_rx_fastpath, (void *)dsp);
-
-		/*
-		 * Note that fast-path mode is enabled.
+		 * Set the receive callback (unless polling or
+		 * soft-ring is enabled).
 		 */
 		dsp->ds_mode = DLD_FASTPATH;
+		if (!dsp->ds_polling && !dsp->ds_soft_ring)
+			dls_rx_set(dsp->ds_dc, dld_str_rx_fastpath, dsp);
+		dsp->ds_tx = str_mdata_fastpath_put;
 	}
 	rw_exit(&dsp->ds_lock);
 
@@ -2071,23 +2365,17 @@ failed:
 	miocnak(q, mp, 0, err);
 }
 
-/*
- * Catch-all handler.
- */
 static void
 ioc(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t	*q = dsp->ds_wq;
 	mac_handle_t mh;
 
-	rw_enter(&dsp->ds_lock, RW_READER);
 	if (dsp->ds_dlstate == DL_UNATTACHED) {
-		rw_exit(&dsp->ds_lock);
 		miocnak(q, mp, 0, EINVAL);
 		return;
 	}
 	mh = dsp->ds_mh;
 	ASSERT(mh != NULL);
-	rw_exit(&dsp->ds_lock);
 	mac_ioctl(mh, q, mp);
 }
