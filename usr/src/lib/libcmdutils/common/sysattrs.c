@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,18 +48,15 @@
 int
 sysattr_status(char *file, xattr_view_t view)
 {
-	nvlist_t	*response;
+	nvlist_t	*response = NULL;
 	int		saveerrno;
 	int		status;
-
-	if (nvlist_alloc(&response, NV_UNIQUE_NAME, 0) != 0) {
-		return (0);
-	}
 
 	status = getattrat(AT_FDCWD, view, file, &response);
 
 	saveerrno = errno;
-	(void) nvlist_free(response);
+	if (response)
+		(void) nvlist_free(response);
 	errno = saveerrno;
 
 	return (status == 0);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,17 +280,10 @@ sysattr_list(char *cmd, int fd, char *fname)
 	f_attr_t	fattr;
 	char		*name;
 
-	if (nvlist_alloc(&response, NV_UNIQUE_NAME, 0) != 0) {
-		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s: %s: nvlist_alloc failed\n"),
-		    cmd, fname);
-		return (NULL);
-	}
 	if (fgetattr(fd, XATTR_VIEW_READWRITE, &response) != 0) {
 		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 		    "%s: %s: fgetattr failed\n"),
 		    cmd, fname);
-		nvlist_free(response);
 		return (NULL);
 	}
 	pair = NULL;

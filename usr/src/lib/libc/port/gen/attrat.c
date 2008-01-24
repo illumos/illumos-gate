@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@ attrat_init()
 			if (libnvhandle)
 				dlclose(libnvhandle);
 			lmutex_unlock(&attrlock);
-			return (EINVAL);
+			return (-1);
 		}
 
 		initialized = 1;
@@ -91,14 +91,17 @@ attr_nv_pack(nvlist_t *request, void **nv_request, size_t *nv_requestlen)
 	char *packbuf = NULL;
 
 	if (nvsize(request, &bufsize, NV_ENCODE_XDR) != 0) {
-		return (EINVAL);
+		errno = EINVAL;
+		return (-1);
 	}
 
 	packbuf = malloc(bufsize);
 	if (packbuf == NULL)
-		return (EINVAL);
+		return (-1);
 	if (nvpacker(request, &packbuf, &bufsize, NV_ENCODE_XDR, 0) != 0) {
 		free(packbuf);
+		errno = EINVAL;
+		return (-1);
 	} else {
 		*nv_request = (void *)packbuf;
 		*nv_requestlen = bufsize;
@@ -129,7 +132,7 @@ xattr_openat(int basefd, xattr_view_t view, int mode)
 		oflag = mode & O_RDWR;
 		break;
 	default:
-		(void) __set_errno(EINVAL);
+		errno = EINVAL;
 		return (-1);
 	}
 	if (mode & O_XATTR)
@@ -154,20 +157,28 @@ cgetattr(int fd, nvlist_t **response)
 	struct stat buf;
 
 	if (error = attrat_init())
-		return (__set_errno(error));
+		return (error);
 	if ((error = fstat(fd, &buf)) != 0)
-		return (__set_errno(error));
+		return (error);
 	nv_responselen = buf.st_size;
 
 	if ((nv_response = malloc(nv_responselen)) == NULL)
-		return (__set_errno(ENOMEM));
+		return (-1);
 	bytesread = read(fd, nv_response, nv_responselen);
-	if (bytesread != nv_responselen)
-		return (__set_errno(EFAULT));
+	if (bytesread != nv_responselen) {
+		free(nv_response);
+		errno = EFAULT;
+		return (-1);
+	}
 
-	error = nvunpacker(nv_response, nv_responselen, response);
+	if (nvunpacker(nv_response, nv_responselen, response)) {
+		free(nv_response);
+		errno = ENOMEM;
+		return (-1);
+	}
+
 	free(nv_response);
-	return (error);
+	return (0);
 }
 
 static int
@@ -179,18 +190,17 @@ csetattr(int fd, nvlist_t *request)
 	size_t nv_requestlen;
 
 	if (error = attrat_init())
-		return (__set_errno(error));
+		return (error);
 
 	if ((error = attr_nv_pack(request, &nv_request, &nv_requestlen)) != 0)
-		return (__set_errno(error));
+		return (error);
 
-	(void) __set_errno(0);
 	byteswritten = write(fd, nv_request, nv_requestlen);
 	if (byteswritten != nv_requestlen) {
 		saveerrno = errno;
 		free(nv_request);
 		errno = saveerrno;
-		return (__set_errno(errno));
+		return (-1);
 	}
 
 	free(nv_request);

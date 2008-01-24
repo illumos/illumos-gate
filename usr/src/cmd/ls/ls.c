@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1981,14 +1981,9 @@ get_sysxattr(char *fname, struct lbuf *rep)
 	char		*name;
 	int		i;
 
-	if ((error = nvlist_alloc(&response, NV_UNIQUE_NAME, 0)) != 0) {
-		perror("ls:nvlist_alloc");
-		return (error);
-	}
 	if ((error = getattrat(AT_FDCWD, XATTR_VIEW_READWRITE, fname,
 	    &response)) != 0) {
 		perror("ls:getattrat");
-		nvlist_free(response);
 		return (error);
 	}
 
