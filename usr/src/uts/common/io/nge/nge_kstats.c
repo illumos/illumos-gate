@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,8 +87,8 @@ nge_statistics_update(kstat_t *ksp, int flag)
 	 */
 	for (ksip = nge_statistics; ksip->name != NULL; ++knp, ++ksip) {
 		regno = KS_BASE + ksip->index * sizeof (uint32_t);
-		hw_stp->a[ksip->index] = nge_reg_get32(ngep, regno);
-		knp->value.ui64 += hw_stp->a[ksip->index];
+		hw_stp->a[ksip->index] += nge_reg_get32(ngep, regno);
+		knp->value.ui64 = hw_stp->a[ksip->index];
 	}
 
 	return (0);
@@ -271,13 +271,7 @@ nge_setup_params_kstat(nge_t *ngep, int instance, char *name,
 void
 nge_init_kstats(nge_t *ngep, int instance)
 {
-	const nge_ksindex_t *ksip;
-
 	NGE_TRACE(("nge_init_kstats($%p, %d)", (void *)ngep, instance));
-	for (ksip = nge_statistics; ksip->name != NULL;  ++ksip) {
-		(void) nge_reg_get32(ngep,
-		    (nge_regno_t)(KS_BASE + sizeof (uint32_t)*ksip->index));
-	}
 
 	ngep->nge_kstats[NGE_KSTAT_STATS] = nge_setup_named_kstat(ngep,
 	    instance, "statistics", nge_statistics,
@@ -308,6 +302,7 @@ int
 nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	nge_t *ngep = arg;
+	uint32_t regno;
 	nge_statistics_t *nstp = &ngep->statistics;
 	nge_hw_statistics_t *hw_stp = &nstp->hw_statistics;
 	nge_sw_statistics_t *sw_stp = &nstp->sw_statistics;
@@ -318,10 +313,14 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_MULTIRCV:
+		regno = KS_BASE + KS_ifHInMulPksCount * sizeof (uint32_t);
+		hw_stp->s.InMulPksCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InMulPksCount;
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
+		regno = KS_BASE +  KS_ifHInBroadPksCount * sizeof (uint32_t);
+		hw_stp->s.InBroadPksCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InBroadPksCount;
 		break;
 
@@ -330,6 +329,22 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_IERRORS:
+		regno = KS_BASE + KS_ifHInFrameErrCount * sizeof (uint32_t);
+		hw_stp->s.InFrameErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInExtraOctErrCount * sizeof (uint32_t);
+		hw_stp->s.InExtraOctErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInLColErrCount * sizeof (uint32_t);
+		hw_stp->s.InLColErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInOversizeErrCount * sizeof (uint32_t);
+		hw_stp->s.InOversizeErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInFovErrCount * sizeof (uint32_t);
+		hw_stp->s.InFovErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInFCSErrCount * sizeof (uint32_t);
+		hw_stp->s.InFCSErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInAlignErrCount * sizeof (uint32_t);
+		hw_stp->s.InAlignErrCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHInLenErrCount * sizeof (uint32_t);
+		hw_stp->s.InLenErrCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InFrameErrCount +
 		    hw_stp->s.InExtraOctErrCount +
 		    hw_stp->s.InLColErrCount +
@@ -341,6 +356,14 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_OERRORS:
+		regno = KS_BASE + KS_ifHOutFifoovCount * sizeof (uint32_t);
+		hw_stp->s.OutFifoovCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHOutLOCCount * sizeof (uint32_t);
+		hw_stp->s.OutLOCCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHOutExDecCount * sizeof (uint32_t);
+		hw_stp->s.OutExDecCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHOutRetryCount * sizeof (uint32_t);
+		hw_stp->s.OutRetryCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutFifoovCount +
 		    hw_stp->s.OutLOCCount +
 		    hw_stp->s.OutExDecCount +
@@ -348,6 +371,8 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_COLLISIONS:
+		regno = KS_BASE + KS_ifHOutColCount * sizeof (uint32_t);
+		hw_stp->s.OutColCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutColCount;
 		break;
 
@@ -368,39 +393,59 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_ALIGN_ERRORS:
+		regno = KS_BASE + KS_ifHInAlignErrCount * sizeof (uint32_t);
+		hw_stp->s.InAlignErrCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InAlignErrCount;
 		break;
 
 	case ETHER_STAT_FCS_ERRORS:
+		regno = KS_BASE + KS_ifHInFCSErrCount * sizeof (uint32_t);
+		hw_stp->s.InFCSErrCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InFCSErrCount;
 		break;
 
 	case ETHER_STAT_FIRST_COLLISIONS:
+		regno = KS_BASE + KS_ifHOutZeroRetranCount * sizeof (uint32_t);
+		hw_stp->s.OutZeroRetranCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutZeroRetranCount;
 		break;
 
 	case ETHER_STAT_MULTI_COLLISIONS:
+		regno = KS_BASE + KS_ifHOutOneRetranCount * sizeof (uint32_t);
+		hw_stp->s.OutOneRetranCount += nge_reg_get32(ngep, regno);
+		regno = KS_BASE + KS_ifHOutMoreRetranCount * sizeof (uint32_t);
+		hw_stp->s.OutMoreRetranCount += nge_reg_get32(ngep, regno);
 		*val =  hw_stp->s.OutOneRetranCount +
 		    hw_stp->s.OutMoreRetranCount;
 		break;
 
 	case ETHER_STAT_DEFER_XMTS:
+		regno = KS_BASE + KS_ifHOutExDecCount * sizeof (uint32_t);
+		hw_stp->s.OutExDecCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutExDecCount;
 		break;
 
 	case ETHER_STAT_TX_LATE_COLLISIONS:
+		regno = KS_BASE + KS_ifHOutColCount * sizeof (uint32_t);
+		hw_stp->s.OutColCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutColCount;
 		break;
 
 	case ETHER_STAT_EX_COLLISIONS:
-		*val = hw_stp->s.OutRetryCount;
+		regno = KS_BASE + KS_ifHOutOneRetranCount * sizeof (uint32_t);
+		hw_stp->s.OutOneRetranCount += nge_reg_get32(ngep, regno);
+		*val = hw_stp->s.OutOneRetranCount;
 		break;
 
 	case ETHER_STAT_CARRIER_ERRORS:
+		regno = KS_BASE + KS_ifHOutLOCCount * sizeof (uint32_t);
+		hw_stp->s.OutLOCCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.OutLOCCount;
 		break;
 
 	case ETHER_STAT_TOOLONG_ERRORS:
+		regno = KS_BASE + KS_ifHInOversizeErrCount * sizeof (uint32_t);
+		hw_stp->s.InOversizeErrCount += nge_reg_get32(ngep, regno);
 		*val = hw_stp->s.InOversizeErrCount;
 		break;
 

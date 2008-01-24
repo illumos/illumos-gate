@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1267,30 +1267,30 @@ typedef enum {
  */
 
 typedef union {
-	uint32_t a[KS_STATS_SIZE];
+	uint64_t a[KS_STATS_SIZE];
 	struct {
-	uint32_t OutOctets;
-	uint32_t OutZeroRetranCount;
-	uint32_t OutOneRetranCount;
-	uint32_t OutMoreRetranCount;
-	uint32_t OutColCount;
-	uint32_t OutFifoovCount;
-	uint32_t OutLOCCount;
-	uint32_t OutExDecCount;
-	uint32_t OutRetryCount;
+	uint64_t OutOctets;
+	uint64_t OutZeroRetranCount;
+	uint64_t OutOneRetranCount;
+	uint64_t OutMoreRetranCount;
+	uint64_t OutColCount;
+	uint64_t OutFifoovCount;
+	uint64_t OutLOCCount;
+	uint64_t OutExDecCount;
+	uint64_t OutRetryCount;
 
-	uint32_t InFrameErrCount;
-	uint32_t InExtraOctErrCount;
-	uint32_t InLColErrCount;
-	uint32_t InRuntCount;
-	uint32_t InOversizeErrCount;
-	uint32_t InFovErrCount;
-	uint32_t InFCSErrCount;
-	uint32_t InAlignErrCount;
-	uint32_t InLenErrCount;
-	uint32_t InUniPktsCount;
-	uint32_t InBroadPksCount;
-	uint32_t InMulPksCount;
+	uint64_t InFrameErrCount;
+	uint64_t InExtraOctErrCount;
+	uint64_t InLColErrCount;
+	uint64_t InRuntCount;
+	uint64_t InOversizeErrCount;
+	uint64_t InFovErrCount;
+	uint64_t InFCSErrCount;
+	uint64_t InAlignErrCount;
+	uint64_t InLenErrCount;
+	uint64_t InUniPktsCount;
+	uint64_t InBroadPksCount;
+	uint64_t InMulPksCount;
 	} s;
 } nge_hw_statistics_t;
 
