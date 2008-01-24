@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <libdladm.h>
+#include <kstat.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -74,6 +75,10 @@ typedef enum {
 #define	DLADM_SECOBJ_NAME_MAX	32
 
 #define	DLADM_MAX_PROP_VALCNT	32
+/*
+ * Size of prop_val buffer passed to pd_get function must be at
+ * least DLADM_PROP_VAL_MAX
+ */
 #define	DLADM_PROP_VAL_MAX	128
 
 #define		DLADM_SECOBJ_CLASS_WEP	0
@@ -145,6 +150,11 @@ extern dladm_status_t	dladm_phys_delete(datalink_id_t);
 
 extern dladm_status_t	dladm_phys_info(datalink_id_t, dladm_phys_attr_t *,
 			    uint32_t);
+extern dladm_status_t	dladm_get_single_mac_stat(datalink_id_t, const char *,
+    uint8_t, void *);
+extern int		dladm_kstat_value(kstat_t *, const char *, uint8_t,
+    void *);
+extern dladm_status_t	dladm_parselink(const char *, char *, uint_t *);
 
 #ifdef	__cplusplus
 }

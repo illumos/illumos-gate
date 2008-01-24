@@ -32,6 +32,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/stream.h>
+#include <sys/dld.h>
 
 /*
  * MAC Services Module
@@ -84,10 +85,16 @@ typedef enum {
 	LINK_DUPLEX_FULL
 } link_duplex_t;
 
-typedef uint32_t		datalink_id_t;
 #define	DATALINK_INVALID_LINKID	0
 #define	DATALINK_ALL_LINKID	0
 #define	DATALINK_MAX_LINKID	0xffffffff
+
+typedef enum {
+	LINK_FLOWCTRL_NONE = 0,
+	LINK_FLOWCTRL_RX,
+	LINK_FLOWCTRL_TX,
+	LINK_FLOWCTRL_BI
+} link_flowctrl_t;
 
 /*
  * Maximum MAC address length
@@ -177,8 +184,6 @@ enum mac_driver_stat {
 typedef struct mac_info_s {
 	uint_t		mi_media;
 	uint_t		mi_nativemedia;
-	uint_t		mi_sdu_min;
-	uint_t		mi_sdu_max;
 	uint_t		mi_addr_length;
 	uint8_t		*mi_unicst_addr;
 	uint8_t		*mi_brdcst_addr;
@@ -292,6 +297,10 @@ typedef mblk_t		*(*mac_tx_t)(void *, mblk_t *);
 typedef	boolean_t	(*mac_getcapab_t)(void *, mac_capab_t, void *);
 typedef	int		(*mac_open_t)(void *);
 typedef void		(*mac_close_t)(void *);
+typedef	int		(*mac_set_prop_t)(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+typedef	int		(*mac_get_prop_t)(void *, const char *, mac_prop_id_t,
+    uint_t, void *);
 
 /*
  * Drivers must set all of these callbacks except for mc_resources,
@@ -315,6 +324,8 @@ typedef struct mac_callbacks_s {
 	mac_getcapab_t	mc_getcapab;	/* Get capability information */
 	mac_open_t	mc_open;	/* Open the device */
 	mac_close_t	mc_close;	/* Close the device */
+	mac_set_prop_t	mc_setprop;
+	mac_get_prop_t	mc_getprop;
 } mac_callbacks_t;
 
 /*
@@ -328,6 +339,8 @@ typedef struct mac_callbacks_s {
 #define	MC_GETCAPAB	0x004
 #define	MC_OPEN		0x008
 #define	MC_CLOSE	0x010
+#define	MC_SETPROP	0x020
+#define	MC_GETPROP	0x040
 
 #define	MAC_MAX_MINOR	1000
 
@@ -367,6 +380,7 @@ typedef enum {
 	MAC_NOTE_RESOURCE,
 	MAC_NOTE_DEVPROMISC,
 	MAC_NOTE_FASTPATH_FLUSH,
+	MAC_NOTE_SDU_SIZE,
 	MAC_NOTE_VNIC,
 	MAC_NOTE_MARGIN,
 	MAC_NNOTE	/* must be the last entry */
@@ -534,6 +548,11 @@ typedef struct mactype_register_s {
 	size_t		mtr_statcount;
 } mactype_register_t;
 
+typedef struct mac_prop_s {
+	mac_prop_id_t	mp_id;
+	char		*mp_name;
+} mac_prop_t;
+
 /*
  * Client interface functions.
  */
@@ -560,6 +579,7 @@ extern boolean_t		mac_unicst_verify(mac_handle_t,
 extern int			mac_unicst_set(mac_handle_t, const uint8_t *);
 extern void			mac_unicst_get(mac_handle_t, uint8_t *);
 extern void			mac_dest_get(mac_handle_t, uint8_t *);
+extern void			mac_sdu_get(mac_handle_t, uint_t *, uint_t *);
 extern void			mac_resources(mac_handle_t);
 extern void			mac_ioctl(mac_handle_t, queue_t *, mblk_t *);
 extern const mac_txinfo_t	*mac_tx_get(mac_handle_t);
@@ -626,6 +646,7 @@ extern void			mac_tx_update(mac_handle_t);
 extern void			mac_resource_update(mac_handle_t);
 extern mac_resource_handle_t	mac_resource_add(mac_handle_t,
 				    mac_resource_t *);
+extern int			mac_maxsdu_update(mac_handle_t, uint_t);
 extern int			mac_pdata_update(mac_handle_t, void *,
 				    size_t);
 extern void			mac_multicst_refresh(mac_handle_t,
@@ -650,6 +671,10 @@ extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
 extern int			mactype_register(mactype_register_t *);
 extern int			mactype_unregister(const char *);
+extern int			mac_set_prop(mac_handle_t, mac_prop_t *,
+    void *, uint_t);
+extern int			mac_get_prop(mac_handle_t, mac_prop_t *,
+    void *, uint_t);
 
 #endif	/* _KERNEL */
 

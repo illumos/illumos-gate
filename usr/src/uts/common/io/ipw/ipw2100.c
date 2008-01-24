@@ -51,6 +51,7 @@
 #include <sys/devops.h>
 #include <sys/dlpi.h>
 #include <sys/mac.h>
+#include <net/if.h>
 #include <sys/mac_wifi.h>
 #include <sys/varargs.h>
 #include <sys/policy.h>

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1934,8 +1934,6 @@ bge_chip_id_init(bge_t *bgep)
 	int err;
 	uint_t i;
 
-	ASSERT(bgep->bge_chip_state == BGE_CHIP_INITIAL);
-
 	sys_ok = dev_ok = B_FALSE;
 	cidp = &bgep->chipid;
 
@@ -1963,6 +1961,8 @@ bge_chip_id_init(bge_t *bgep)
 	cidp->mbuf_lo_water_rdma = bge_mbuf_lo_water_rdma;
 	cidp->mbuf_lo_water_rmac = bge_mbuf_lo_water_rmac;
 	cidp->mbuf_hi_water = bge_mbuf_hi_water;
+	cidp->rx_ticks_norm = bge_rx_ticks_norm;
+	cidp->rx_count_norm = bge_rx_count_norm;
 
 	if (cidp->rx_rings == 0 || cidp->rx_rings > BGE_RECV_RINGS_MAX)
 		cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
@@ -2649,10 +2649,10 @@ bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
  * Reprogram the Ethernet, Transmit, and Receive MAC
  * modes to match the param_* variables
  */
-static void bge_sync_mac_modes(bge_t *bgep);
+void bge_sync_mac_modes(bge_t *bgep);
 #pragma	no_inline(bge_sync_mac_modes)
 
-static void
+void
 bge_sync_mac_modes(bge_t *bgep)
 {
 	uint32_t macmode;
@@ -2741,7 +2741,7 @@ bge_chip_sync(bge_t *bgep)
 	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_sync($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -2945,7 +2945,9 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	if (fault) {
 		if (bgep->bge_chip_state != BGE_CHIP_FAULT) {
 			bgep->bge_chip_state = BGE_CHIP_FAULT;
-			ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_LOST);
+			if (!bgep->manual_reset)
+				ddi_fm_service_impact(bgep->devinfo,
+				    DDI_SERVICE_LOST);
 			if (bgep->bge_dma_error) {
 				/*
 				 * need to free buffers in case the fault was
@@ -3926,10 +3928,10 @@ bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 	return (retval);
 }
 
-static void bge_wake_factotum(bge_t *bgep);
+void bge_wake_factotum(bge_t *bgep);
 #pragma	inline(bge_wake_factotum)
 
-static void
+void
 bge_wake_factotum(bge_t *bgep)
 {
 	mutex_enter(bgep->softintrlock);
@@ -4464,8 +4466,10 @@ bge_chip_factotum(caddr_t arg)
 					bgep->asf_status = ASF_STAT_RUN;
 				}
 #endif
-				ddi_fm_service_impact(bgep->devinfo,
-				    DDI_SERVICE_RESTORED);
+				if (!bgep->manual_reset) {
+					ddi_fm_service_impact(bgep->devinfo,
+					    DDI_SERVICE_RESTORED);
+				}
 			}
 		}
 		break;
@@ -4507,6 +4511,9 @@ bge_chip_factotum(caddr_t arg)
 	 */
 	if (linkchg)
 		mac_link_update(bgep->mh, bgep->link_state);
+	if (bgep->manual_reset) {
+		bgep->manual_reset = B_FALSE;
+	}
 
 	return (result);
 }

@@ -368,16 +368,12 @@ dlpi_info(dlpi_handle_t dh, dlpi_info_t *infop, uint_t opt)
 int
 dlpi_parselink(const char *linkname, char *provider, uint_t *ppa)
 {
-	ifspec_t	ifsp;
+	dladm_status_t status;
 
-	if (linkname == NULL || !ifparse_ifspec(linkname, &ifsp))
+	status = dladm_parselink(linkname, provider, ppa);
+
+	if (status != DLADM_STATUS_OK)
 		return (DLPI_ELINKNAMEINVAL);
-
-	if (provider != NULL)
-		(void) strlcpy(provider, ifsp.ifsp_devnm, DLPI_LINKNAME_MAX);
-
-	if (ppa != NULL)
-		*ppa = ifsp.ifsp_ppa;
 
 	return (DLPI_SUCCESS);
 }

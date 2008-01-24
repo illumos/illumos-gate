@@ -1008,6 +1008,7 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	size_t size;
 	mac_header_info_t mhi;
 	uint_t pri, vid;
+	uint_t max_sdu;
 
 	/*
 	 * Certain MAC type plugins provide an illusion for raw DLPI
@@ -1042,12 +1043,13 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 	if (dls_header_info(dsp->ds_dc, mp, &mhi) != 0)
 		goto discard;
 
+	mac_sdu_get(dsp->ds_mh, NULL, &max_sdu);
 	/*
 	 * If LSO is enabled, check the size against lso_max. Otherwise,
-	 * compare the packet size with sdu_max.
+	 * compare the packet size with max_sdu.
 	 */
-	if (size > (dsp->ds_lso ? dsp->ds_lso_max : dsp->ds_mip->mi_sdu_max)
-	    + mhi.mhi_hdrsize)
+	max_sdu = dsp->ds_lso ? dsp->ds_lso_max : max_sdu;
+	if (size > max_sdu + mhi.mhi_hdrsize)
 		goto discard;
 
 	if (is_ethernet) {
@@ -1473,6 +1475,31 @@ dld_str_rx_unitdata(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 }
 
 /*
+ * DL_NOTIFY_IND: DL_NOTE_SDU_SIZE
+ */
+static void
+str_notify_sdu_size(dld_str_t *dsp, uint_t max_sdu)
+{
+	mblk_t		*mp;
+	dl_notify_ind_t *dlip;
+
+	if (!(dsp->ds_notifications & DL_NOTE_SDU_SIZE))
+		return;
+
+	if ((mp = mexchange(dsp->ds_wq, NULL, sizeof (dl_notify_ind_t),
+	    M_PROTO, 0)) == NULL)
+		return;
+
+	bzero(mp->b_rptr, sizeof (dl_notify_ind_t));
+	dlip = (dl_notify_ind_t *)mp->b_rptr;
+	dlip->dl_primitive = DL_NOTIFY_IND;
+	dlip->dl_notification = DL_NOTE_SDU_SIZE;
+	dlip->dl_data = max_sdu;
+
+	qreply(dsp->ds_wq, mp);
+}
+
+/*
  * Generate DL_NOTIFY_IND messages to notify the DLPI consumer of the
  * current state of the interface.
  */
@@ -1857,12 +1884,20 @@ str_notify(void *arg, mac_notify_type_t type)
 		str_notify_capab_reneg(dsp);
 		break;
 
+	case MAC_NOTE_SDU_SIZE: {
+		uint_t  max_sdu;
+		mac_sdu_get(dsp->ds_mh, NULL, &max_sdu);
+		str_notify_sdu_size(dsp, max_sdu);
+		break;
+	}
+
 	case MAC_NOTE_FASTPATH_FLUSH:
 		str_notify_fastpath_flush(dsp);
 		break;
 
 	case MAC_NOTE_MARGIN:
 		break;
+
 	default:
 		ASSERT(B_FALSE);
 		break;

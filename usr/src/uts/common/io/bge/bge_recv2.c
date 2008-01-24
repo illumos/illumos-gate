@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,8 +211,8 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 		ehp->ether_tpid = ntohs(ETHERTYPE_VLAN);
 		ehp->ether_tci = ntohs(hw_rbd.vlan_tci);
 		bcopy(((uchar_t *)(DMA_VPTR(srbdp->pbuf))) + 2 * ETHERADDRL,
-			dp + 2 * ETHERADDRL + VLAN_TAGSZ,
-			len - 2 * ETHERADDRL);
+		    dp + 2 * ETHERADDRL + VLAN_TAGSZ,
+		    len - 2 * ETHERADDRL);
 	} else {
 #endif
 		mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM;
@@ -312,7 +312,7 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 	slot = rrp->rx_next;
 
 	while ((slot != *rrp->prod_index_p) && /* Note: volatile	*/
-		(recv_cnt < BGE_MAXPKT_RCVED)) {
+	    (recv_cnt < BGE_MAXPKT_RCVED)) {
 		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot])) != NULL) {
 			*tail = mp;
 			tail = &mp->b_next;

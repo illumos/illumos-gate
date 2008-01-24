@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@
 
 
 #define	BGE_DBG		BGE_DBG_NDD	/* debug flag for this code	*/
-
 /*
  * Property names
  */
@@ -112,15 +111,6 @@ static const nd_param_t nd_template[] = {
 { PARAM_LINK_RX_PAUSE,	    0,	  1,	0,	"-link_rx_pause"	},
 { PARAM_LINK_TX_PAUSE,	    0,	  1,	0,	"-link_tx_pause"	},
 
-/* Loopback status */
-{ PARAM_LOOP_MODE,	    0,	  5,	0,	"-loop_mode"		},
-
-/* MSI count */
-{ PARAM_MSI_CNT,	    0,	  7,	0,	"+msi_cnt"		},
-
-/* Performance tuning */
-{ PARAM_DRAIN_MAX,	    1,	  512,	64,	"+drain_max"		},
-
 /* Terminator */
 { PARAM_COUNT,		    0,	  0,	0,	NULL			}
 };
@@ -143,6 +133,27 @@ bge_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 	(void) mi_mpprintf(mp, "%d", ndp->ndp_val);
 
 	return (0);
+}
+
+/*
+ * synchronize the  adv* and en* parameters.
+ *
+ * See comments in <sys/dld.h> for details of the *_en_*
+ * parameters.  The usage of ndd for setting adv parameters will
+ * synchronize all the en parameters with the bge parameters,
+ * implicitly disabling any settings made via dladm.
+ */
+static void
+bge_param_sync(bge_t *bgep)
+{
+	bgep->param_en_pause = bgep->param_adv_pause;
+	bgep->param_en_asym_pause = bgep->param_adv_asym_pause;
+	bgep->param_en_1000fdx = bgep->param_adv_1000fdx;
+	bgep->param_en_1000hdx = bgep->param_adv_1000hdx;
+	bgep->param_en_100fdx = bgep->param_adv_100fdx;
+	bgep->param_en_100hdx = bgep->param_adv_100hdx;
+	bgep->param_en_10fdx = bgep->param_adv_10fdx;
+	bgep->param_en_10hdx = bgep->param_adv_10hdx;
 }
 
 /*
@@ -251,7 +262,7 @@ bge_param_register(bge_t *bgep)
 
 nd_fail:
 	BGE_DEBUG(("bge_param_register: FAILED at index %d [info %d]",
-		tmplp-nd_template, tmplp->ndp_info));
+	    tmplp-nd_template, tmplp->ndp_info));
 	nd_free(nddpp);
 	return (DDI_FAILURE);
 }
@@ -280,8 +291,8 @@ bge_nd_init(bge_t *bgep)
 	 */
 	if (BGE_PROP_EXISTS(bgep->devinfo, supported_net)) {
 		if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, bgep->devinfo,
-			DDI_PROP_DONTPASS, supported_net,
-			&options, &noptions) == DDI_PROP_SUCCESS) {
+		    DDI_PROP_DONTPASS, supported_net,
+		    &options, &noptions) == DDI_PROP_SUCCESS) {
 
 			bgep->param_adv_autoneg = 0;
 			bgep->param_adv_1000fdx = 0;
@@ -342,7 +353,7 @@ bge_nd_init(bge_t *bgep)
 
 		speed = BGE_PROP_GET_INT(dip, transfer_speed_propname);
 		bge_log(bgep, "%s property is %d",
-			transfer_speed_propname, speed);
+		    transfer_speed_propname, speed);
 
 		switch (speed) {
 		case 1000:
@@ -401,9 +412,9 @@ bge_nd_init(bge_t *bgep)
 		speed = BGE_PROP_GET_INT(dip, speed_propname);
 		duplex = BGE_PROP_GET_INT(dip, duplex_propname);
 		bge_log(bgep, "%s property is %d",
-			speed_propname, speed);
+		    speed_propname, speed);
 		bge_log(bgep, "%s property is %d",
-			duplex_propname, duplex);
+		    duplex_propname, duplex);
 
 		switch (speed) {
 		case 1000:
@@ -446,15 +457,17 @@ bge_nd_init(bge_t *bgep)
 	}
 
 	BGE_DEBUG(("bge_nd_init: autoneg %d"
-			"pause %d asym_pause %d "
-			"1000fdx %d 1000hdx %d "
-			"100fdx %d 100hdx %d "
-			"10fdx %d 10hdx %d ",
-		bgep->param_adv_autoneg,
-		bgep->param_adv_pause, bgep->param_adv_asym_pause,
-		bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
-		bgep->param_adv_100fdx, bgep->param_adv_100hdx,
-		bgep->param_adv_10fdx, bgep->param_adv_10hdx));
+	    "pause %d asym_pause %d "
+	    "1000fdx %d 1000hdx %d "
+	    "100fdx %d 100hdx %d "
+	    "10fdx %d 10hdx %d ",
+	    bgep->param_adv_autoneg,
+	    bgep->param_adv_pause, bgep->param_adv_asym_pause,
+	    bgep->param_adv_1000fdx, bgep->param_adv_1000hdx,
+	    bgep->param_adv_100fdx, bgep->param_adv_100hdx,
+	    bgep->param_adv_10fdx, bgep->param_adv_10hdx));
+
+	bge_param_sync(bgep);
 
 	return (0);
 }
@@ -468,7 +481,7 @@ bge_nd_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	int cmd;
 
 	BGE_TRACE(("bge_nd_ioctl($%p, $%p, $%p, $%p)",
-		(void *)bgep, (void *)wq, (void *)mp, (void *)iocp));
+	    (void *)bgep, (void *)wq, (void *)mp, (void *)iocp));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -513,6 +526,8 @@ bge_nd_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 		info = ndp->ndp_info;
 		ok = nd_getset(wq, bgep->nd_data_p, mp);
 
+		bge_param_sync(bgep);
+
 		/*
 		 * If nd_getset() returns B_FALSE, the command was
 		 * not valid (e.g. unknown name), so we just tell
@@ -526,8 +541,8 @@ bge_nd_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 		 * So, we also drop out in that case ...
 		 */
 		BGE_DEBUG(("bge_nd_ioctl: set %s err %d autoneg %d info %d/%d",
-			ok ? "OK" : "FAIL", iocp->ioc_error,
-			ndp->ndp_val, info, ndp->ndp_info));
+		    ok ? "OK" : "FAIL", iocp->ioc_error,
+		    ndp->ndp_val, info, ndp->ndp_info));
 		if (!ok)
 			return (IOC_INVAL);
 		if (iocp->ioc_error)

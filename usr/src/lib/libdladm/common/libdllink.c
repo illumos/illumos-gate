@@ -43,6 +43,7 @@
 #include <libdllink.h>
 #include <libdlmgmt.h>
 #include <libdladm_impl.h>
+#include <libinetutil.h>
 
 /*
  * Return the attributes of the specified datalink from the DLD driver.
@@ -925,4 +926,101 @@ dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
 
 done:
 	return (status);
+}
+
+dladm_status_t
+dladm_get_single_mac_stat(datalink_id_t linkid, const char *name, uint8_t type,
+    void *val)
+{
+	char		module[DLPI_LINKNAME_MAX];
+	uint_t		instance;
+	char 		link[DLPI_LINKNAME_MAX];
+	dladm_status_t	status;
+	uint32_t	flags, media;
+	kstat_ctl_t	*kcp;
+	kstat_t		*ksp;
+	dladm_phys_attr_t dpap;
+
+	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, &media,
+	    link, DLPI_LINKNAME_MAX)) != DLADM_STATUS_OK)
+		return (status);
+
+	if (media != DL_ETHER)
+		return (DLADM_STATUS_LINKINVAL);
+
+	status = dladm_phys_info(linkid, &dpap, DLADM_OPT_PERSIST);
+
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	status = dladm_parselink(dpap.dp_dev, module, &instance);
+
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	if ((kcp = kstat_open()) == NULL)
+		return (dladm_errno2status(errno));
+
+	/*
+	 * The kstat query could fail if the underlying MAC
+	 * driver was already detached.
+	 */
+	if ((ksp = kstat_lookup(kcp, module, instance, "mac")) == NULL &&
+	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL)
+		goto bail;
+
+	if (kstat_read(kcp, ksp, NULL) == -1)
+		goto bail;
+
+	if (dladm_kstat_value(ksp, name, type, val) < 0)
+		goto bail;
+
+	(void) kstat_close(kcp);
+	return (DLADM_STATUS_OK);
+bail:
+	(void) kstat_close(kcp);
+	return (dladm_errno2status(errno));
+
+}
+
+int
+dladm_kstat_value(kstat_t *ksp, const char *name, uint8_t type, void *buf)
+{
+	kstat_named_t	*knp;
+
+	if ((knp = kstat_data_lookup(ksp, (char *)name)) == NULL)
+		return (-1);
+
+	if (knp->data_type != type)
+		return (-1);
+
+	switch (type) {
+	case KSTAT_DATA_UINT64:
+		*(uint64_t *)buf = knp->value.ui64;
+		break;
+	case KSTAT_DATA_UINT32:
+		*(uint32_t *)buf = knp->value.ui32;
+		break;
+	default:
+		return (-1);
+	}
+
+	return (0);
+}
+
+dladm_status_t
+dladm_parselink(const char *dev, char *provider, uint_t *ppa)
+{
+	ifspec_t	ifsp;
+
+	if (dev == NULL || !ifparse_ifspec(dev, &ifsp))
+		return (DLADM_STATUS_LINKINVAL);
+
+	if (provider != NULL)
+		(void) strlcpy(provider, ifsp.ifsp_devnm, DLPI_LINKNAME_MAX);
+
+	if (ppa != NULL)
+		*ppa = ifsp.ifsp_ppa;
+
+	return (DLADM_STATUS_OK);
 }

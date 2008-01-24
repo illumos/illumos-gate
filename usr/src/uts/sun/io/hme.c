@@ -2341,7 +2341,7 @@ _info(struct modinfo *modinfop)
  * Allocate and zero-out "number" structures
  * each of type "structure" in kernel memory.
  */
-#define	GETSTRUCT(structure, number)   \
+#define	HME_GETSTRUCT(structure, number)   \
 	((structure *)kmem_zalloc(\
 		(size_t)(sizeof (structure) * (number)), KM_SLEEP))
 
@@ -2763,7 +2763,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Allocate soft device data structure
 	 */
-	hmep = GETSTRUCT(struct hme, 1);
+	hmep = HME_GETSTRUCT(struct hme, 1);
 
 	/*
 	 * Might as well set up elements of data structure

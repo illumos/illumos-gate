@@ -38,6 +38,7 @@ SUNWprivate_1.1 {
 	dladm_valid_linkname;
 	dladm_mac_walk;
 	dladm_init_linkprop;
+	dladm_get_single_mac_stat;
 	dladm_get_linkprop;
 	dladm_set_linkprop;
 	dladm_walk_linkprop;
@@ -124,7 +125,8 @@ SUNWprivate_1.1 {
 	dladm_vnic_delete;
 	dladm_vnic_info;
 	dladm_vnic_str2macaddrtype;
-
+	dladm_kstat_value;
+	dladm_parselink;
     local:
 	*;
 };

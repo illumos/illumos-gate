@@ -34,11 +34,11 @@
 
 #include <sys/types.h>
 #include <sys/stream.h>
-#include <sys/mac.h>
-#include <sys/dls.h>
 #include <sys/conf.h>
 #include <sys/sad.h>
 #include <net/if.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,6 +94,8 @@ extern "C" {
 
 #define	DLDIOC_ATTR	(DLDIOC | 0x03)
 
+typedef uint32_t		datalink_id_t;
+
 typedef struct dld_ioc_attr {
 	datalink_id_t	dia_linkid;
 	uint_t		dia_max_sdu;
@@ -109,6 +111,8 @@ typedef struct dld_ioc_vlan_attr {
 } dld_ioc_vlan_attr_t;
 
 #define	DLDIOC_PHYS_ATTR	(DLDIOC | 0x05)
+#define	DLPI_LINKNAME_MAX	32
+
 typedef struct dld_ioc_phys_attr {
 	datalink_id_t	dip_linkid;
 	/*
@@ -223,7 +227,63 @@ struct dlautopush {
 	char	dap_aplist[MAXAPUSH][FMNAMESZ+1];
 };
 
+/*
+ * Encodings for public properties.
+ * A most significant bit value of 1 indicates private property, intended
+ * to allow private property implementations to use internal encodings
+ * if desired.
+ *
+ * Note that there are 2 sets of parameters: the *_EN_*
+ * values are those that the Administrator configures for autonegotiation.
+ * The _ADV_* values are those that are currently exposed over the wire.
+ */
+typedef enum {
+	DLD_PROP_DUPLEX = 0x00000001,
+	DLD_PROP_SPEED,
+	DLD_PROP_STATUS,
+	DLD_PROP_AUTONEG,
+	DLD_PROP_EN_AUTONEG,
+	DLD_PROP_DEFMTU,
+	DLD_PROP_NDD_LEGACY,
+	DLD_PROP_FLOWCTRL,
+	DLD_PROP_ADV_1000FDX_CAP,
+	DLD_PROP_EN_1000FDX_CAP,
+	DLD_PROP_ADV_1000HDX_CAP,
+	DLD_PROP_EN_1000HDX_CAP,
+	DLD_PROP_ADV_100FDX_CAP,
+	DLD_PROP_EN_100FDX_CAP,
+	DLD_PROP_ADV_100HDX_CAP,
+	DLD_PROP_EN_100HDX_CAP,
+	DLD_PROP_ADV_10FDX_CAP,
+	DLD_PROP_EN_10FDX_CAP,
+	DLD_PROP_ADV_10HDX_CAP,
+	DLD_PROP_EN_10HDX_CAP,
+	DLD_PROP_PRIVATE = -1
+} dld_prop_id_t;
+
+/*
+ * to figure out r/w status of legacy ndd props.
+ */
+#define	DLD_NDD_READ		0x01
+#define	DLD_NDD_WRITE		0x10
+
+#define	DLDIOCSETPROP		(DLDIOC | 0x14)
+#define	DLDIOCGETPROP		(DLDIOC | 0x15)
+#define	DLD_LINKPROP_NAME_MAX	256
+#define	DLD_PROP_VERSION	1
+
+typedef struct dld_ioc_prop_s {
+	int		pr_version;
+	uint_t		pr_flags;		/* private to libdladm */
+	char		pr_linkname[DLPI_LINKNAME_MAX];	/* interface name */
+	dld_prop_id_t	pr_num;
+	char    	pr_name[DLD_LINKPROP_NAME_MAX];
+	uint_t		pr_valsize;		/* sizeof pr_val */
+	char		pr_val[1];
+} dld_ioc_prop_t;
+
 #ifdef _KERNEL
+typedef	dld_prop_id_t	mac_prop_id_t;
 int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 int	dld_open(queue_t *, dev_t *, int, int, cred_t *);
 int	dld_close(queue_t *);

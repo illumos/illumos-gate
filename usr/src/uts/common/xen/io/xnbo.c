@@ -245,6 +245,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	const mac_info_t *mi;
 	char *xsname;
 	void (*rx_fn)(void *, mac_resource_handle_t, mblk_t *);
+	uint_t max_sdu;
 
 	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 
@@ -271,9 +272,11 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 		xnbo_close_mac(xnbop);
 		return (B_FALSE);
 	}
-	if (mi->mi_sdu_max > XNBMAXPKT) {
-		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "mac device SDU too big (%d)", mi->mi_sdu_max);
+
+	mac_sdu_get(xnbop->o_mh, NULL, &max_sdu);
+	if (max_sdu > XNBMAXPKT) {
+		cmn_err(CE_WARN, "xnbo_open_mac: mac device SDU too big (%d)",
+		    max_sdu);
 		xnbo_close_mac(xnbop);
 		return (B_FALSE);
 	}

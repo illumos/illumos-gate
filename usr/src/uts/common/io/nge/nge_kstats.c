@@ -243,31 +243,6 @@ nge_setup_named_kstat(nge_t *ngep, int instance, char *name,
 	return (ksp);
 }
 
-/*
- * Create kstats corresponding to NDD parameters
- */
-static kstat_t *
-nge_setup_params_kstat(nge_t *ngep, int instance, char *name,
-	int (*update)(kstat_t *, int))
-{
-	kstat_t *ksp;
-	kstat_named_t *knp;
-	int i;
-
-	ksp = kstat_create(NGE_DRIVER_NAME, instance, name, "net",
-	    KSTAT_TYPE_NAMED, PARAM_COUNT, KSTAT_FLAG_PERSISTENT);
-	if (ksp != NULL) {
-		ksp->ks_private = ngep;
-		ksp->ks_update = update;
-		for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
-			kstat_named_init(knp, ngep->nd_params[i].ndp_name+1,
-			    KSTAT_DATA_UINT64);
-		kstat_install(ksp);
-	}
-
-	return (ksp);
-}
-
 void
 nge_init_kstats(nge_t *ngep, int instance)
 {

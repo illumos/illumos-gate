@@ -53,6 +53,7 @@
 #include <sys/cpuvar.h>
 #include <sys/atomic.h>
 #include <sys/sdt.h>
+#include <inet/nd.h>
 
 #define	IMPL_HASHSZ	67	/* prime */
 
@@ -1004,6 +1005,17 @@ mac_promisc_get(mac_handle_t mh, mac_promisc_type_t ptype)
 }
 
 void
+mac_sdu_get(mac_handle_t mh, uint_t *min_sdu, uint_t *max_sdu)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (min_sdu != NULL)
+		*min_sdu = mip->mi_sdu_min;
+	if (max_sdu != NULL)
+		*max_sdu = mip->mi_sdu_max;
+}
+
+void
 mac_resources(mac_handle_t mh)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
@@ -1020,7 +1032,20 @@ void
 mac_ioctl(mac_handle_t mh, queue_t *wq, mblk_t *bp)
 {
 	mac_impl_t	*mip = (mac_impl_t *)mh;
+	int		cmd;
 
+	if (mip->mi_callbacks->mc_callbacks & (MC_SETPROP|MC_GETPROP)) {
+		cmd = ((struct iocblk *)bp->b_rptr)->ioc_cmd;
+		if (cmd == ND_SET || cmd == ND_GET) {
+			/*
+			 * ndd ioctls are Obsolete
+			 */
+			cmn_err(CE_WARN,
+			    "The ndd commands are obsolete and may be removed "
+			    "in a future release of Solaris. "
+			    "Use dladm(1M) to manage driver tunables\n");
+		}
+	}
 	/*
 	 * Call the driver to handle the ioctl.  The driver may not support
 	 * any ioctls, in which case we reply with a NAK on its behalf.
@@ -1511,10 +1536,10 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	mip->mi_margin = mregp->m_margin;
 	mip->mi_info.mi_media = mtype->mt_type;
 	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
-	mip->mi_info.mi_sdu_min = mregp->m_min_sdu;
 	if (mregp->m_max_sdu <= mregp->m_min_sdu)
 		goto fail;
-	mip->mi_info.mi_sdu_max = mregp->m_max_sdu;
+	mip->mi_sdu_min = mregp->m_min_sdu;
+	mip->mi_sdu_max = mregp->m_max_sdu;
 	mip->mi_info.mi_addr_length = mip->mi_type->mt_addr_length;
 	/*
 	 * If the media supports a broadcast address, cache a pointer to it
@@ -1666,6 +1691,9 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 		err = EEXIST;
 		goto fail;
 	}
+
+	DTRACE_PROBE2(mac__register, struct devnames *, dnp,
+	    (mac_impl_t *), mip);
 
 	/*
 	 * Mark the MAC to be ready for open.
@@ -2816,4 +2844,44 @@ mactype_unregister(const char *ident)
 done:
 	mutex_exit(&i_mactype_lock);
 	return (err);
+}
+
+int
+mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
+{
+	int err = ENOTSUP;
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (mip->mi_callbacks->mc_callbacks & MC_SETPROP) {
+		err = mip->mi_callbacks->mc_setprop(mip->mi_driver,
+		    macprop->mp_name, macprop->mp_id, valsize, val);
+	}
+	return (err);
+}
+
+int
+mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
+{
+	int err = ENOTSUP;
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	if (mip->mi_callbacks->mc_callbacks & MC_GETPROP) {
+		err = mip->mi_callbacks->mc_getprop(mip->mi_driver,
+		    macprop->mp_name, macprop->mp_id, valsize, val);
+	}
+	return (err);
+}
+
+int
+mac_maxsdu_update(mac_handle_t mh, uint_t sdu_max)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (sdu_max <= mip->mi_sdu_min)
+		return (EINVAL);
+	mip->mi_sdu_max = sdu_max;
+
+	/* Send a MAC_NOTE_SDU_SIZE notification. */
+	i_mac_notify(mip, MAC_NOTE_SDU_SIZE);
+	return (0);
 }

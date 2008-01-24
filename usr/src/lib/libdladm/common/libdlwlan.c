@@ -83,39 +83,39 @@ static dladm_status_t	dladm_wlan_wlresult2status(wldp_t *);
 static dladm_status_t	dladm_wlan_validate(datalink_id_t);
 
 static val_desc_t	linkstatus_vals[] = {
-	{ "disconnected", DLADM_WLAN_LINK_DISCONNECTED },
-	{ "connected",    DLADM_WLAN_LINK_CONNECTED }
+	{ "disconnected", DLADM_WLAN_LINK_DISCONNECTED	},
+	{ "connected",    DLADM_WLAN_LINK_CONNECTED	}
 };
 
 static val_desc_t 	secmode_vals[] = {
-	{ "none",	DLADM_WLAN_SECMODE_NONE	},
-	{ "wep",	DLADM_WLAN_SECMODE_WEP	},
-	{ "wpa",	DLADM_WLAN_SECMODE_WPA	}
+	{ "none",	DLADM_WLAN_SECMODE_NONE		},
+	{ "wep",	DLADM_WLAN_SECMODE_WEP		},
+	{ "wpa",	DLADM_WLAN_SECMODE_WPA		}
 };
 
 static val_desc_t 	strength_vals[] = {
-	{ "very weak",	DLADM_WLAN_STRENGTH_VERY_WEAK },
+	{ "very weak",	DLADM_WLAN_STRENGTH_VERY_WEAK	},
 	{ "weak",	DLADM_WLAN_STRENGTH_WEAK	},
 	{ "good",	DLADM_WLAN_STRENGTH_GOOD	},
-	{ "very good",	DLADM_WLAN_STRENGTH_VERY_GOOD},
-	{ "excellent",	DLADM_WLAN_STRENGTH_EXCELLENT}
+	{ "very good",	DLADM_WLAN_STRENGTH_VERY_GOOD	},
+	{ "excellent",	DLADM_WLAN_STRENGTH_EXCELLENT	}
 };
 
 static val_desc_t	mode_vals[] = {
-	{ "a",		DLADM_WLAN_MODE_80211A	},
-	{ "b",		DLADM_WLAN_MODE_80211B	},
-	{ "g",		DLADM_WLAN_MODE_80211G	},
+	{ "a",		DLADM_WLAN_MODE_80211A		},
+	{ "b",		DLADM_WLAN_MODE_80211B		},
+	{ "g",		DLADM_WLAN_MODE_80211G		},
 };
 
 static val_desc_t	auth_vals[] = {
 	{ "open",	DLADM_WLAN_AUTH_OPEN		},
-	{ "shared",	DLADM_WLAN_AUTH_SHARED	}
+	{ "shared",	DLADM_WLAN_AUTH_SHARED		}
 };
 
 static val_desc_t	bsstype_vals[] = {
-	{ "bss",	DLADM_WLAN_BSSTYPE_BSS	},
-	{ "ibss",	DLADM_WLAN_BSSTYPE_IBSS	},
-	{ "any",	DLADM_WLAN_BSSTYPE_ANY	}
+	{ "bss",	DLADM_WLAN_BSSTYPE_BSS		},
+	{ "ibss",	DLADM_WLAN_BSSTYPE_IBSS		},
+	{ "any",	DLADM_WLAN_BSSTYPE_ANY		}
 };
 
 #define	IS_CONNECTED(gbuf) \

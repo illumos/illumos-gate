@@ -431,8 +431,8 @@ drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 		dls_devnet_rele_tmp(dlh);
 		goto failed;
 	}
+	mac_sdu_get(dvp->dv_dlp->dl_mh, NULL, &diap->dia_max_sdu);
 
-	diap->dia_max_sdu = dvp->dv_dlp->dl_mip->mi_sdu_max;
 	dls_vlan_rele(dvp);
 	dls_devnet_rele_tmp(dlh);
 
@@ -504,6 +504,72 @@ drv_ioc_phys_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 
 failed:
 	miocnak(q, mp, 0, err);
+}
+
+/*
+ * DLDIOCSETPROP
+ */
+static void
+drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
+{
+	int		err = EINVAL, dsize;
+	queue_t		*q = ctls->cs_wq;
+	dld_ioc_prop_t	*dipp;
+	dls_dl_handle_t 	dlh;
+	dls_vlan_t		*dvp;
+	datalink_id_t 		linkid;
+	mac_prop_t		macprop;
+
+	if ((err = miocpullup(mp, sizeof (dld_ioc_prop_t))) != 0)
+		goto done;
+	dipp = (dld_ioc_prop_t *)mp->b_cont->b_rptr;
+
+	dsize = sizeof (dld_ioc_prop_t) + dipp->pr_valsize - 1;
+	if ((err = miocpullup(mp, dsize)) != 0)
+		goto done;
+	dipp = (dld_ioc_prop_t *)mp->b_cont->b_rptr;
+
+	if ((err = dls_mgmt_get_linkid(dipp->pr_linkname, &linkid)) != 0)
+		goto done;
+
+	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
+		goto done;
+
+	if ((err = dls_vlan_hold(dls_devnet_mac(dlh),
+	    dls_devnet_vid(dlh), &dvp, B_FALSE, B_FALSE)) != 0) {
+		dls_devnet_rele_tmp(dlh);
+		goto done;
+	}
+
+	macprop.mp_name = dipp->pr_name;
+	macprop.mp_id = dipp->pr_num;
+
+	if (set)
+		err = mac_set_prop(dvp->dv_dlp->dl_mh, &macprop,
+		    dipp->pr_val, dipp->pr_valsize);
+	else
+		err = mac_get_prop(dvp->dv_dlp->dl_mh, &macprop,
+		    dipp->pr_val, dipp->pr_valsize);
+
+	dls_vlan_rele(dvp);
+	dls_devnet_rele_tmp(dlh);
+done:
+	if (err == 0)
+		miocack(q, mp, dsize, 0);
+	else
+		miocnak(q, mp, 0, err);
+}
+
+static void
+drv_ioc_setprop(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	drv_ioc_prop_common(ctls, mp, B_TRUE);
+}
+
+static void
+drv_ioc_getprop(dld_ctl_str_t *ctls, mblk_t *mp)
+{
+	drv_ioc_prop_common(ctls, mp, B_FALSE);
 }
 
 /*
@@ -899,6 +965,12 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 		return;
 	case DLDIOC_SECOBJ_UNSET:
 		drv_ioc_secobj_unset(ctls, mp);
+		return;
+	case DLDIOCSETPROP:
+		drv_ioc_setprop(ctls, mp);
+		return;
+	case DLDIOCGETPROP:
+		drv_ioc_getprop(ctls, mp);
 		return;
 	case DLDIOC_CREATE_VLAN:
 		drv_ioc_create_vlan(ctls, mp);

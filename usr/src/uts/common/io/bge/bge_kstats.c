@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -596,31 +596,6 @@ bge_setup_named_kstat(bge_t *bgep, int instance, char *name,
 		kstat_named_init(knp, np, type);
 	}
 	kstat_install(ksp);
-
-	return (ksp);
-}
-
-/*
- * Create kstats corresponding to NDD parameters
- */
-static kstat_t *
-bge_setup_params_kstat(bge_t *bgep, int instance, char *name,
-	int (*update)(kstat_t *, int))
-{
-	kstat_t *ksp;
-	kstat_named_t *knp;
-	int i;
-
-	ksp = kstat_create(BGE_DRIVER_NAME, instance, name, "net",
-	    KSTAT_TYPE_NAMED, PARAM_COUNT, KSTAT_FLAG_PERSISTENT);
-	if (ksp != NULL) {
-		ksp->ks_private = bgep;
-		ksp->ks_update = update;
-		for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
-			kstat_named_init(knp, bgep->nd_params[i].ndp_name+1,
-			    KSTAT_DATA_UINT64);
-		kstat_install(ksp);
-	}
 
 	return (ksp);
 }

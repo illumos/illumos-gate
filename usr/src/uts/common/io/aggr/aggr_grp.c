@@ -1520,9 +1520,11 @@ aggr_grp_max_sdu(aggr_grp_t *grp)
 	ASSERT(grp->lg_ports != NULL);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		const mac_info_t *port_mi = mac_info(port->lp_mh);
-		if (max_sdu > port_mi->mi_sdu_max)
-			max_sdu = port_mi->mi_sdu_max;
+		uint_t port_sdu_max;
+
+		mac_sdu_get(port->lp_mh, NULL, &port_sdu_max);
+		if (max_sdu > port_sdu_max)
+			max_sdu = port_sdu_max;
 	}
 
 	return (max_sdu);
@@ -1536,9 +1538,10 @@ aggr_grp_max_sdu(aggr_grp_t *grp)
 static boolean_t
 aggr_grp_sdu_check(aggr_grp_t *grp, aggr_port_t *port)
 {
-	const mac_info_t *port_mi = mac_info(port->lp_mh);
+	uint_t port_sdu_max;
 
-	return (port_mi->mi_sdu_max >= grp->lg_max_sdu);
+	mac_sdu_get(port->lp_mh, NULL, &port_sdu_max);
+	return (port_sdu_max >= grp->lg_max_sdu);
 }
 
 /*

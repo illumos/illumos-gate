@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@ extern "C" {
 #include <sys/pattr.h>
 
 #include <sys/disp.h>
+#include <sys/cmn_err.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
@@ -616,6 +617,9 @@ typedef struct {
 	uint64_t		hw_mac_addr;	/* from chip register	*/
 	bge_mac_addr_t		vendor_addr;	/* transform of same	*/
 	boolean_t		msi_enabled;	/* default to true */
+
+	uint32_t		rx_ticks_norm;
+	uint32_t		rx_count_norm;
 } chip_id_t;
 
 #define	CHIP_FLAG_SUPPORTED	0x80
@@ -696,7 +700,6 @@ enum {
 	PARAM_LINK_RX_PAUSE,
 	PARAM_LINK_TX_PAUSE,
 
-	PARAM_LOOP_MODE,
 	PARAM_MSI_CNT,
 
 	PARAM_DRAIN_MAX,
@@ -916,6 +919,7 @@ typedef struct bge {
 	boolean_t		send_hw_tcp_csum;
 	boolean_t		recv_hw_tcp_csum;
 	boolean_t		promisc;
+	boolean_t		manual_reset;
 
 	/*
 	 * Miscellaneous operating variables (not synchronised)
@@ -960,6 +964,17 @@ typedef struct bge {
 	uint32_t		asf_status;
 	timeout_id_t		asf_timeout_id;
 #endif
+	uint32_t		param_en_pause:1,
+				param_en_asym_pause:1,
+				param_en_1000hdx:1,
+				param_en_1000fdx:1,
+				param_en_100fdx:1,
+				param_en_100hdx:1,
+				param_en_10fdx:1,
+				param_en_10hdx:1,
+				param_pad_to_32:24;
+
+	uint32_t		param_loop_mode;
 } bge_t;
 
 /*
@@ -1009,7 +1024,6 @@ typedef struct bge {
 #define	param_link_rx_pause	nd_params[PARAM_LINK_RX_PAUSE].ndp_val
 #define	param_link_tx_pause	nd_params[PARAM_LINK_TX_PAUSE].ndp_val
 
-#define	param_loop_mode		nd_params[PARAM_LOOP_MODE].ndp_val
 #define	param_msi_cnt		nd_params[PARAM_MSI_CNT].ndp_val
 #define	param_drain_max		nd_params[PARAM_DRAIN_MAX].ndp_val
 
@@ -1220,6 +1234,7 @@ void bge_chip_cyclic(void *arg);
 enum ioc_reply bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp,
 	struct iocblk *iocp);
 uint_t bge_intr(caddr_t arg1, caddr_t arg2);
+void bge_sync_mac_modes(bge_t *);
 extern uint32_t bge_rx_ticks_norm;
 extern uint32_t bge_tx_ticks_norm;
 extern uint32_t bge_rx_count_norm;
@@ -1260,6 +1275,7 @@ int bge_alloc_bufs(bge_t *bgep);
 void bge_free_bufs(bge_t *bgep);
 void bge_intr_enable(bge_t *bgep);
 void bge_intr_disable(bge_t *bgep);
+int bge_reprogram(bge_t *);
 
 /* bge_phys.c */
 int bge_phys_init(bge_t *bgep);

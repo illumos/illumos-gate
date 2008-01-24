@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,12 +166,7 @@ struct ipw2100_softc {
 	kcondvar_t		sc_scan_cv; /* used for active scan */
 	kthread_t		*sc_mf_thread;
 	uint32_t		sc_mfthread_switch; /* 0/1 indicate off/on */
-
 	int			if_flags;
-#define	IFF_DEBUG		(0x0004)
-#define	IFF_PROMISC		(0x0100)
-#define	IFF_SIMPLEX		(0x0800)
-
 };
 
 /*

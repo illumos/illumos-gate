@@ -238,6 +238,8 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		minfop = &minfo;
 	} else {
 		minfop = (mac_info_t *)dsp->ds_mip;
+		/* We can only get the sdu if we're attached. */
+		mac_sdu_get(dsp->ds_mh, &dlp->dl_min_sdu, &dlp->dl_max_sdu);
 	}
 
 	/*
@@ -254,12 +256,6 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 */
 	sap_length = sizeof (uint16_t);
 	dlp->dl_sap_length = NEG(sap_length);
-
-	/*
-	 * Set the minimum and maximum payload sizes.
-	 */
-	dlp->dl_min_sdu = minfop->mi_sdu_min;
-	dlp->dl_max_sdu = minfop->mi_sdu_max;
 
 	addr_length = minfop->mi_addr_length;
 
@@ -1322,6 +1318,7 @@ dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 	mblk_t			*bp, *payload;
 	uint32_t		start, stuff, end, value, flags;
 	t_uscalar_t		dl_err;
+	uint_t			max_sdu;
 
 	if (MBLKL(mp) < sizeof (dl_unitdata_req_t) || mp->b_cont == NULL) {
 		dl_err = DL_BADPRIM;
@@ -1358,7 +1355,8 @@ dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 		size += MBLKL(bp);
 	}
 
-	if (size > dsp->ds_mip->mi_sdu_max)
+	mac_sdu_get(dsp->ds_mh, NULL, &max_sdu);
+	if (size > max_sdu)
 		goto baddata;
 
 	/*

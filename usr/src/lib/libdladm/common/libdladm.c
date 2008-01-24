@@ -163,6 +163,8 @@ dladm_status_t
 dladm_errno2status(int err)
 {
 	switch (err) {
+	case 0:
+		return (DLADM_STATUS_OK);
 	case EINVAL:
 		return (DLADM_STATUS_BADARG);
 	case EEXIST:

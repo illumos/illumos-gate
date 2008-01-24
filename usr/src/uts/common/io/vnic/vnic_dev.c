@@ -729,7 +729,6 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid, int mac_len,
 	mac_register_t *mac;
 	int err;
 	vnic_mac_t *vnic_mac;
-	const mac_info_t *lower_mac_info;
 	mac_multi_addr_t maddr;
 	mac_txinfo_t tx_info;
 
@@ -796,9 +795,7 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid, int mac_len,
 	mac->m_src_addr = vnic->vn_addr;
 	mac->m_callbacks = &vnic_m_callbacks;
 
-	lower_mac_info = mac_info(vnic_mac->va_mh);
-	mac->m_min_sdu = lower_mac_info->mi_sdu_min;
-	mac->m_max_sdu = lower_mac_info->mi_sdu_max;
+	mac_sdu_get(vnic_mac->va_mh, &mac->m_min_sdu, &mac->m_max_sdu);
 
 	/*
 	 * As the current margin size of the underlying mac is used to

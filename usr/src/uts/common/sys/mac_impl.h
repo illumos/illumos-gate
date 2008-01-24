@@ -152,6 +152,8 @@ typedef struct mac_impl_s {
 	uint_t			mi_devpromisc;
 	uint8_t			mi_addr[MAXMACADDRLEN];
 	uint8_t			mi_dstaddr[MAXMACADDRLEN];
+	uint_t			mi_sdu_min;
+	uint_t			mi_sdu_max;
 	mac_multicst_addr_t	*mi_mmap;
 
 	krwlock_t		mi_notify_lock;

@@ -204,7 +204,7 @@ extern void gld_sr_dump(gld_mac_info_t *);
  * Allocate and zero-out "number" structures each of type "structure" in
  * kernel memory.
  */
-#define	GETSTRUCT(structure, number)   \
+#define	GLD_GETSTRUCT(structure, number)   \
 	(kmem_zalloc((uint_t)(sizeof (structure) * (number)), KM_NOSLEEP))
 
 #define	abs(a) ((a) < 0 ? -(a) : a)
@@ -574,7 +574,7 @@ gld_register(dev_info_t *devinfo, char *devname, gld_mac_info_t *macinfo)
 	 */
 	if (glddev == NULL) {
 		/* first occurrence of this device name (major number) */
-		glddev = GETSTRUCT(glddev_t, 1);
+		glddev = GLD_GETSTRUCT(glddev_t, 1);
 		if (glddev == NULL) {
 			mutex_exit(&gld_device_list.gld_devlock);
 			return (DDI_FAILURE);
@@ -584,9 +584,9 @@ gld_register(dev_info_t *devinfo, char *devname, gld_mac_info_t *macinfo)
 		glddev->gld_major = major;
 		glddev->gld_nextminor = GLD_MIN_CLONE_MINOR;
 		glddev->gld_mac_next = glddev->gld_mac_prev =
-			(gld_mac_info_t *)&glddev->gld_mac_next;
+		    (gld_mac_info_t *)&glddev->gld_mac_next;
 		glddev->gld_str_next = glddev->gld_str_prev =
-			(gld_t *)&glddev->gld_str_next;
+		    (gld_t *)&glddev->gld_str_next;
 		mutex_init(&glddev->gld_devlock, NULL, MUTEX_DRIVER, NULL);
 
 		/* allow increase of number of supported multicast addrs */
@@ -806,9 +806,9 @@ late_failure:
 	ddi_remove_minor_node(devinfo, NULL);
 	GLDM_LOCK_DESTROY(macinfo);
 	if (mac_pvt->curr_macaddr != NULL)
-	    kmem_free(mac_pvt->curr_macaddr, macinfo->gldm_addrlen);
+		kmem_free(mac_pvt->curr_macaddr, macinfo->gldm_addrlen);
 	if (mac_pvt->statistics != NULL)
-	    kmem_free(mac_pvt->statistics, sizeof (struct gld_stats));
+		kmem_free(mac_pvt->statistics, sizeof (struct gld_stats));
 	kmem_free(macinfo->gldm_mac_pvt, sizeof (gld_mac_pvt_t));
 	macinfo->gldm_mac_pvt = NULL;
 
@@ -3243,13 +3243,13 @@ gld_addudind(gld_t *gld, mblk_t *mp, pktinfo_t *pktinfo, boolean_t tagged)
 	dludindp->dl_primitive = DL_UNITDATA_IND;
 	dludindp->dl_src_addr_length =
 	    dludindp->dl_dest_addr_length = macinfo->gldm_addrlen +
-					abs(macinfo->gldm_saplen);
+	    abs(macinfo->gldm_saplen);
 	dludindp->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
 	dludindp->dl_src_addr_offset = dludindp->dl_dest_addr_offset +
-					dludindp->dl_dest_addr_length;
+	    dludindp->dl_dest_addr_length;
 
 	dludindp->dl_group_address = (pktinfo->isMulticast ||
-					pktinfo->isBroadcast);
+	    pktinfo->isBroadcast);
 
 	nmp->b_wptr = nmp->b_rptr + dludindp->dl_dest_addr_offset;
 
@@ -4001,14 +4001,14 @@ gld_notify_req(queue_t *q, mblk_t *mp)
 #ifdef GLD_DEBUG
 	if (gld_debug & GLDTRACE)
 		cmn_err(CE_NOTE, "gld_notify_req(%p %p)",
-			(void *)q, (void *)mp);
+		    (void *)q, (void *)mp);
 #endif
 
 	if (gld->gld_state == DL_UNATTACHED) {
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_NOTE, "gld_notify_req: wrong state (%d)",
-				gld->gld_state);
+			    gld->gld_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -4205,7 +4205,7 @@ gld_bind(queue_t *q, mblk_t *mp)
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_NOTE, "gld_bind: bound or not attached (%d)",
-				gld->gld_state);
+			    gld->gld_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -4285,7 +4285,7 @@ gld_unbind(queue_t *q, mblk_t *mp)
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_NOTE, "gld_unbind: wrong state (%d)",
-				gld->gld_state);
+			    gld->gld_state);
 #endif
 		return (DL_OUTSTATE);
 	}
@@ -4516,7 +4516,7 @@ gld_unitdata(queue_t *q, mblk_t *mp)
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_NOTE, "gld_unitdata: wrong state (%d)",
-				gld->gld_state);
+			    gld->gld_state);
 #endif
 		dluderrorind(q, mp, mp->b_rptr + dlp->dl_dest_addr_offset,
 		    dlp->dl_dest_addr_length, DL_OUTSTATE, 0);
@@ -4539,7 +4539,7 @@ gld_unitdata(queue_t *q, mblk_t *mp)
 #ifdef GLD_DEBUG
 		if (gld_debug & GLDERRS)
 			cmn_err(CE_NOTE, "gld_unitdata: bad msglen (%d)",
-				(int)msglen);
+			    (int)msglen);
 #endif
 		dluderrorind(q, mp, mp->b_rptr + dlp->dl_dest_addr_offset,
 		    dlp->dl_dest_addr_length, DL_BADDATA, 0);
@@ -4886,8 +4886,8 @@ gld_enable_multi(queue_t *q, mblk_t *mp)
 	/* does this address appear in current table? */
 	if (gld->gld_mcast == NULL) {
 		/* no mcast addresses -- allocate table */
-		gld->gld_mcast = GETSTRUCT(gld_mcast_t *,
-					    glddev->gld_multisize);
+		gld->gld_mcast = GLD_GETSTRUCT(gld_mcast_t *,
+		    glddev->gld_multisize);
 		if (gld->gld_mcast == NULL) {
 			GLDM_UNLOCK(macinfo);
 			dlerrorack(q, mp, DL_ENABMULTI_REQ, DL_SYSERR, ENOSR);
@@ -4898,7 +4898,7 @@ gld_enable_multi(queue_t *q, mblk_t *mp)
 		for (i = 0; i < gld->gld_multicnt; i++) {
 			if (gld->gld_mcast[i] &&
 			    mac_eq(gld->gld_mcast[i]->gldm_addr,
-				maddr, macinfo->gldm_addrlen)) {
+			    maddr, macinfo->gldm_addrlen)) {
 				/* this is a match -- just succeed */
 				ASSERT(gld->gld_mcast[i]->gldm_refcnt);
 				GLDM_UNLOCK(macinfo);
@@ -4913,8 +4913,8 @@ gld_enable_multi(queue_t *q, mblk_t *mp)
 	 */
 	mcast = NULL;
 	if (mac_pvt->mcast_table == NULL) {
-		mac_pvt->mcast_table = GETSTRUCT(gld_mcast_t,
-						glddev->gld_multisize);
+		mac_pvt->mcast_table = GLD_GETSTRUCT(gld_mcast_t,
+		    glddev->gld_multisize);
 		if (mac_pvt->mcast_table == NULL) {
 			GLDM_UNLOCK(macinfo);
 			dlerrorack(q, mp, DL_ENABMULTI_REQ, DL_SYSERR, ENOSR);
@@ -5685,7 +5685,7 @@ nextminor:
 		;
 	}
 	cmn_err(CE_WARN, "GLD ran out of minor numbers for %s",
-		device->gld_name);
+	    device->gld_name);
 	return (0);
 }
 
