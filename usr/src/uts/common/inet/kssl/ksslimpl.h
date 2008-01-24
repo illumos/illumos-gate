@@ -160,7 +160,7 @@ typedef struct mech_to_cipher_s {
  * returned by tcp_reass() and enqueue them properly. Caller should
  * be aware that mp is modified by this macro.
  */
-#define	KSSL_ENQUEUE_MP(ssl, mp)					\
+#define	KSSL_ENQUEUE_MP(ssl, mp) {					\
 	DTRACE_PROBE1(kssl_mblk__enqueue_mp, mblk_t *, mp);		\
 	if ((ssl)->rec_ass_tail == NULL) {				\
 		(ssl)->rec_ass_head = (mp);				\
@@ -172,7 +172,8 @@ typedef struct mech_to_cipher_s {
 		while (mp->b_cont)					\
 			mp = mp->b_cont;				\
 		(ssl)->rec_ass_tail = (mp);				\
-	}
+	}								\
+}
 
 #define	SSL_MISS	123	/* Internal SSL error */
 
