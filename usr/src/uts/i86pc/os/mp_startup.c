@@ -1007,7 +1007,7 @@ workaround_errata(struct cpu *cpu)
 			workaround_warning(cpu, 6336786);
 #else	/* __xpv */
 		} else if ((opteron_get_nnodes() *
-			cpuid_get_ncpu_per_chip(cpu) > 1) ||
+		    cpuid_get_ncpu_per_chip(cpu) > 1) ||
 		    opteron_workaround_6336786_UP) {
 
 			uint_t	node, nnodes;
