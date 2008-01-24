@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -616,6 +616,36 @@ msr_warning(cpu_t *cp, const char *rw, uint_t msr, int error)
 	    cp->cpu_id, rw, msr, error);
 }
 
+/*
+ * Determine the number of nodes in an Opteron / Greyhound family system.
+ */
+static uint_t
+opteron_get_nnodes(void)
+{
+	static uint_t nnodes = 0;
+
+#ifdef	DEBUG
+	uint_t family;
+
+	family = cpuid_getfamily(CPU);
+	ASSERT(family == 0xf || family == 0x10);
+#endif	/* DEBUG */
+
+	if (nnodes == 0) {
+		/*
+		 * Obtain the number of nodes in the system from
+		 * bits [6:4] of the Node ID register on node 0.
+		 *
+		 * The actual node count is NodeID[6:4] + 1
+		 *
+		 * The Node ID register is accessed via function 0,
+		 * offset 0x60. Node 0 is device 24.
+		 */
+		nnodes = ((pci_getl_func(0, 24, 0, 0x60) & 0x70) >> 4) + 1;
+	}
+	return (nnodes);
+}
+
 #if defined(__xpv)
 
 /*
@@ -839,7 +869,7 @@ workaround_errata(struct cpu *cpu)
 		if (!opteron_erratum_122 && xen_get_nphyscpus() == 1)
 			break;
 #else
-		if (!opteron_erratum_122 && lgrp_plat_node_cnt == 1 &&
+		if (!opteron_erratum_122 && opteron_get_nnodes() == 1 &&
 		    cpuid_get_ncpu_per_chip(cpu) == 1)
 			break;
 #endif
@@ -927,7 +957,7 @@ workaround_errata(struct cpu *cpu)
 		if (xen_get_nphyscpus() < 4)
 			break;
 #else
-		if (lgrp_plat_node_cnt * cpuid_get_ncpu_per_chip(cpu) < 4)
+		if (opteron_get_nnodes() * cpuid_get_ncpu_per_chip(cpu) < 4)
 			break;
 #endif
 		/*
@@ -968,7 +998,7 @@ workaround_errata(struct cpu *cpu)
 		    xen_get_nphyscpus() > 1) ||
 		    opteron_workaround_6336786_UP) {
 			/*
-			 * XXPV	Hmm.  We can't walk the set of lgrps on
+			 * XXPV	Hmm.  We can't walk the Northbridges on
 			 *	the hypervisor; so just complain and drive
 			 *	on.  This probably needs to be fixed in
 			 *	the hypervisor itself.
@@ -976,13 +1006,15 @@ workaround_errata(struct cpu *cpu)
 			opteron_workaround_6336786++;
 			workaround_warning(cpu, 6336786);
 #else	/* __xpv */
-		} else if ((lgrp_plat_node_cnt *
-		    cpuid_get_ncpu_per_chip(cpu) > 1) ||
+		} else if ((opteron_get_nnodes() *
+			cpuid_get_ncpu_per_chip(cpu) > 1) ||
 		    opteron_workaround_6336786_UP) {
-			int	node;
+
+			uint_t	node, nnodes;
 			uint8_t data;
 
-			for (node = 0; node < lgrp_plat_node_cnt; node++) {
+			nnodes = opteron_get_nnodes();
+			for (node = 0; node < nnodes; node++) {
 				/*
 				 * Clear PMM7[1:0] (function 3, offset 0x87)
 				 * Northbridge device is the node id + 24.
@@ -1037,7 +1069,7 @@ workaround_errata(struct cpu *cpu)
 				opteron_workaround_6323525++;
 			}
 #else	/* __xpv */
-		} else if ((x86_feature & X86_SSE2) && ((lgrp_plat_node_cnt *
+		} else if ((x86_feature & X86_SSE2) && ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
 			if ((xrdmsr(MSR_BU_CFG) & 0x02) == 0)
 				opteron_workaround_6323525++;
