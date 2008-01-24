@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3385,9 +3385,17 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 			break;
 	}
 	if (ret != 0) {
-		(void) fprintf(stderr, gettext("cannot %s '%s': not "
-		    "currently mounted\n"), cmdname, path);
-		return (1);
+		if (op == OP_SHARE) {
+			(void) fprintf(stderr, gettext("cannot %s '%s': not "
+			    "currently mounted\n"), cmdname, path);
+			return (1);
+		}
+		(void) fprintf(stderr, gettext("warning: %s not in mnttab\n"),
+		    path);
+		if ((ret = umount2(path, flags)) != 0)
+			(void) fprintf(stderr, gettext("%s: %s\n"), path,
+			    strerror(errno));
+		return (ret != 0);
 	}
 
 	if (strcmp(entry.mnt_fstype, MNTTYPE_ZFS) != 0) {

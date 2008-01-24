@@ -671,7 +671,7 @@ zpool_do_create(int argc, char **argv)
 	    (strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) != 0 &&
 	    strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) != 0)) {
 		char buf[MAXPATHLEN];
-		struct stat64 statbuf;
+		DIR *dirp;
 
 		if (mountpoint && mountpoint[0] != '/') {
 			(void) fprintf(stderr, gettext("invalid mountpoint "
@@ -696,18 +696,27 @@ zpool_do_create(int argc, char **argv)
 				    mountpoint);
 		}
 
-		if (stat64(buf, &statbuf) == 0 &&
-		    statbuf.st_nlink != 2) {
-			if (mountpoint == NULL)
-				(void) fprintf(stderr, gettext("default "
-				    "mountpoint '%s' exists and is not "
-				    "empty\n"), buf);
-			else
-				(void) fprintf(stderr, gettext("mountpoint "
-				    "'%s' exists and is not empty\n"), buf);
+		if ((dirp = opendir(buf)) == NULL && errno != ENOENT) {
+			(void) fprintf(stderr, gettext("mountpoint '%s' : "
+			    "%s\n"), buf, strerror(errno));
 			(void) fprintf(stderr, gettext("use '-m' "
 			    "option to provide a different default\n"));
 			goto errout;
+		} else if (dirp) {
+			int count = 0;
+
+			while (count < 3 && readdir(dirp) != NULL)
+				count++;
+			(void) closedir(dirp);
+
+			if (count > 2) {
+				(void) fprintf(stderr, gettext("mountpoint "
+				    "'%s' exists and is not empty\n"), buf);
+				(void) fprintf(stderr, gettext("use '-m' "
+				    "option to provide a "
+				    "different default\n"));
+				goto errout;
+			}
 		}
 	}
 
