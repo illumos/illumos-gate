@@ -23,7 +23,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1211,7 +1211,7 @@ mi_print(void)
 			printf(",link");
 		if (mik.mik_flags & MI_SYMLINK)
 			printf(",symlink");
-		if (mik.mik_flags & MI_READDIRONLY)
+		if (mik.mik_vers < NFS_V4 && mik.mik_flags & MI_READDIRONLY)
 			printf(",readdironly");
 		if (mik.mik_flags & MI_ACL)
 			printf(",acl");
