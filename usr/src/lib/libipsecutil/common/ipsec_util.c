@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2070,8 +2070,10 @@ print_supp(FILE *file, char *prefix, struct sadb_supported *supp)
 	numalgs = supp->sadb_supported_len - SADB_8TO64(sizeof (*supp));
 	numalgs /= SADB_8TO64(sizeof (*algs));
 	for (i = 0; i < numalgs; i++) {
+		uint16_t exttype = supp->sadb_supported_exttype;
+
 		(void) fprintf(file, "%s", prefix);
-		switch (supp->sadb_supported_exttype) {
+		switch (exttype) {
 		case SADB_EXT_SUPPORTED_AUTH:
 			(void) dump_aalg(algs[i].sadb_alg_id, file);
 			break;
@@ -2080,9 +2082,13 @@ print_supp(FILE *file, char *prefix, struct sadb_supported *supp)
 			break;
 		}
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    " minbits=%u, maxbits=%u, ivlen=%u.\n"),
+		    " minbits=%u, maxbits=%u, ivlen=%u"),
 		    algs[i].sadb_alg_minbits, algs[i].sadb_alg_maxbits,
 		    algs[i].sadb_alg_ivlen);
+		if (exttype == SADB_EXT_SUPPORTED_ENCRYPT)
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    ", increment=%u"), algs[i].sadb_x_alg_increment);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, ".\n"));
 	}
 }
 
