@@ -145,12 +145,6 @@ typedef struct softmac {
 	uint32_t	smac_attached_left;
 
 	/*
-	 * This field is set and cleared by users of softmac (who calls
-	 * softmac_hold/rele_device()). It is protected by smac_mutex.
-	 */
-	dev_info_t	*smac_udip;
-
-	/*
 	 * The remaining fields are used to register the MAC for a legacy
 	 * device.  They are set in softmac_mac_register() and do not change.
 	 * One can access them when mac_register() is done without locks.

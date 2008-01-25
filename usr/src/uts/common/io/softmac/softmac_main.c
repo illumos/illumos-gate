@@ -1154,21 +1154,13 @@ again:
 	while (!(softmac->smac_flags & SOFTMAC_ATTACH_DONE))
 		cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
 
-	if ((err = softmac->smac_attacherr) == 0) {
-		/*
-		 * If softmac is successfully attached, set smac_udip
-		 * which is used in softmac_rele_device().
-		 */
-		ASSERT(softmac->smac_udip == NULL ||
-		    softmac->smac_udip == dip);
-		softmac->smac_udip = dip;
+	if ((err = softmac->smac_attacherr) != 0)
+		softmac->smac_hold_cnt--;
+	else
 		*ddhp = (dls_dev_handle_t)softmac;
-	}
 	mutex_exit(&softmac->smac_mutex);
 
-	if (err != 0)
-		softmac_rele_device((dls_dev_handle_t)softmac);
-
+	ddi_release_devi(dip);
 	return (err);
 }
 
@@ -1176,17 +1168,12 @@ void
 softmac_rele_device(dls_dev_handle_t ddh)
 {
 	softmac_t	*softmac;
-	dev_info_t	*dip;
 
 	if (ddh == NULL)
 		return;
 
 	softmac = (softmac_t *)ddh;
 	mutex_enter(&softmac->smac_mutex);
-	dip = softmac->smac_udip;
-	if (--softmac->smac_hold_cnt == 0)
-		softmac->smac_udip = NULL;
+	softmac->smac_hold_cnt--;
 	mutex_exit(&softmac->smac_mutex);
-
-	ddi_release_devi(dip);
 }
