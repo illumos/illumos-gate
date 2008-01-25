@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@ SUN4DIR = ../../sun4/$(MODULE)
 UTILDIR = ../../common/pcibus
 HBDIR = ../../common/hostbridge
 HBSRCS = hostbridge.c hb_sun4.c did.c did_hash.c did_props.c util.c
-MODULESRCS = $(HBSRCS) hb_$(ARCH).c
+MODULESRCS = $(HBSRCS) $($(ARCH)_SRCS)
 
 include ../../Makefile.plugin
 

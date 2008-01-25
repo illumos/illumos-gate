@@ -20,11 +20,13 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4u
+
+sun4u_SRCS = hb_sun4u.c
 
 include ../../sun4/hostbridge/Makefile.hb

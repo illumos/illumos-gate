@@ -20,11 +20,16 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4v
 
+sun4v_SRCS = hb_sun4v.c hb_mdesc.c hb_rcid.c
+
 include ../../sun4/hostbridge/Makefile.hb
+
+CPPFLAGS += -I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += -lumem -lmdesc -lldom
