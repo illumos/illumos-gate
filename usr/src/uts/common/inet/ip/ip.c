@@ -13619,8 +13619,8 @@ ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
 	ipha_t	*ipha;
 	ill_t	*ill;
 	ire_t	*ire;
-	boolean_t	check_multirt = B_FALSE;
 	ip_stack_t *ipst;
+	enum	ire_forward_action ret_action;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	ill = (ill_t *)q->q_ptr;
@@ -13668,10 +13668,10 @@ ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
 	 */
 	DB_CKSUMFLAGS(mp) = 0;
 
-	ire = ire_forward(dst, &check_multirt, NULL, NULL,
+	ire = ire_forward(dst, &ret_action, NULL, NULL,
 	    MBLK_GETLABEL(mp), ipst);
 
-	if (ire == NULL && check_multirt) {
+	if (ire == NULL && ret_action == Forward_check_multirt) {
 		/* Let ip_newroute handle CGTP  */
 		ip_newroute(q, mp, dst, NULL, GLOBAL_ZONEID, ipst);
 		return (NULL);
@@ -13681,6 +13681,11 @@ ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
 		return (ire);
 
 	mp->b_prev = mp->b_next = 0;
+
+	if (ret_action == Forward_blackhole) {
+		freemsg(mp);
+		return (NULL);
+	}
 	/* send icmp unreachable */
 	q = WR(q);
 	/* Sent by forwarding path, and router is global zone */
@@ -13857,6 +13862,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	queue_t	*dev_q;
 	ip_stack_t *ipst = ill->ill_ipst;
 	mblk_t *fpmp;
+	enum	ire_forward_action ret_action;
 
 	ipha = (ipha_t *)mp->b_rptr;
 
@@ -13882,14 +13888,15 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 
 	/* No ire cache of nexthop. So first create one  */
 	if (ire == NULL) {
-		boolean_t check_multirt;
 
-		ire = ire_forward(dst, &check_multirt, NULL, NULL, NULL, ipst);
+		ire = ire_forward(dst, &ret_action, NULL, NULL,
+		    NULL, ipst);
 		/*
-		 * We only come to ip_fast_forward if ip_cgtp_filter is
-		 * is not set. So upon return from ire_forward
-		 * check_multirt should remain as false.
+		 * We only come to ip_fast_forward if ip_cgtp_filter
+		 * is not set. So ire_forward() should not return with
+		 * Forward_check_multirt as the next action.
 		 */
+		ASSERT(ret_action != Forward_check_multirt);
 		if (ire == NULL) {
 			/* An attempt was made to forward the packet */
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
@@ -13897,16 +13904,20 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 			mp->b_prev = mp->b_next = 0;
 			/* send icmp unreachable */
 			/* Sent by forwarding path, and router is global zone */
-			if (ip_source_routed(ipha, ipst)) {
-				icmp_unreachable(ill->ill_wq, mp,
-				    ICMP_SOURCE_ROUTE_FAILED, GLOBAL_ZONEID,
-				    ipst);
+			if (ret_action == Forward_ret_icmp_err) {
+				if (ip_source_routed(ipha, ipst)) {
+					icmp_unreachable(ill->ill_wq, mp,
+					    ICMP_SOURCE_ROUTE_FAILED,
+					    GLOBAL_ZONEID, ipst);
+				} else {
+					icmp_unreachable(ill->ill_wq, mp,
+					    ICMP_HOST_UNREACHABLE,
+					    GLOBAL_ZONEID, ipst);
+				}
 			} else {
-				icmp_unreachable(ill->ill_wq, mp,
-				    ICMP_HOST_UNREACHABLE, GLOBAL_ZONEID,
-				    ipst);
+				freemsg(mp);
 			}
-			return (ire);
+			return (NULL);
 		}
 	}
 

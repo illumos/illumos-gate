@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -661,7 +661,9 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * to create (what amount to) IRE_PREFIX routes with the
 		 * loopback address as the gateway.  This is primarily done to
 		 * set up prefixes with the RTF_REJECT flag set (for example,
-		 * when generating aggregate routes.)
+		 * when generating aggregate routes). We also OR in the
+		 * RTF_BLACKHOLE flag as these interface routes, by
+		 * definition, can only be that.
 		 *
 		 * If the IRE type (as defined by ipif->ipif_net_type) is
 		 * IRE_LOOPBACK, then we map the request into a
@@ -670,8 +672,10 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
 		 * routine, but rather using ire_create_v6() directly.
 		 */
-		if (ipif->ipif_net_type == IRE_LOOPBACK)
+		if (ipif->ipif_net_type == IRE_LOOPBACK) {
 			ire->ire_type = IRE_IF_NORESOLVER;
+			ire->ire_flags |= RTF_BLACKHOLE;
+		}
 		error = ire_add(&ire, q, mp, func, B_FALSE);
 		if (error == 0)
 			goto save_ire;

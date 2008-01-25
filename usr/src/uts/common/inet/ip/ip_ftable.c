@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -790,8 +790,9 @@ ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
  */
 
 ire_t *
-ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
-    ire_t *supplied_sire, const struct ts_label_s *tsl, ip_stack_t *ipst)
+ire_forward(ipaddr_t dst, enum ire_forward_action *ret_action,
+    ire_t *supplied_ire, ire_t *supplied_sire, const struct ts_label_s *tsl,
+    ip_stack_t *ipst)
 {
 	ipaddr_t gw = 0;
 	ire_t	*ire = NULL;
@@ -842,11 +843,9 @@ ire_forward(ipaddr_t dst, boolean_t *check_multirt, ire_t *supplied_ire,
 		 * Inform caller about encountering of multirt so that
 		 * ip_newroute() can be called.
 		 */
-		*check_multirt = B_TRUE;
+		*ret_action = Forward_check_multirt;
 		return (NULL);
 	}
-
-	*check_multirt = B_FALSE;
 
 	/*
 	 * Verify that the returned IRE does not have either
@@ -938,6 +937,15 @@ create_irecache:
 	switch (ire->ire_type) {
 	case IRE_IF_NORESOLVER:
 		/* create ire_cache for ire_addr endpoint */
+		if (dst_ill->ill_phys_addr_length != IP_ADDR_LEN &&
+		    dst_ill->ill_resolver_mp == NULL) {
+			ip1dbg(("ire_forward: dst_ill %p "
+			    "for IRE_IF_NORESOLVER ire %p has "
+			    "no ill_resolver_mp\n",
+			    (void *)dst_ill, (void *)ire));
+			goto icmp_err_ret;
+		}
+		/* FALLTHRU */
 	case IRE_IF_RESOLVER:
 		/*
 		 * We have the IRE_IF_RESOLVER of the nexthop gateway
@@ -961,9 +969,7 @@ create_irecache:
 		res_mp = dst_ill->ill_resolver_mp;
 		if (ire->ire_type == IRE_IF_RESOLVER &&
 		    (!OK_RESOLVER_MP(res_mp))) {
-			ire_refrele(ire);
-			ire = NULL;
-			goto out;
+			goto icmp_err_ret;
 		}
 		/*
 		 * To be at this point in the code with a non-zero gw
@@ -1058,7 +1064,7 @@ create_irecache:
 		break;
 	}
 
-out:
+	*ret_action = Forward_ok;
 	if (sire != NULL)
 		ire_refrele(sire);
 	if (dst_ill != NULL)
@@ -1067,16 +1073,18 @@ out:
 		ipif_refrele(src_ipif);
 	return (ire);
 icmp_err_ret:
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (dst_ill != NULL)
-		ill_refrele(dst_ill);
+	*ret_action = Forward_ret_icmp_err;
 	if (sire != NULL)
 		ire_refrele(sire);
+	if (dst_ill != NULL)
+		ill_refrele(dst_ill);
+	if (src_ipif != NULL)
+		ipif_refrele(src_ipif);
 	if (ire != NULL) {
+		if (ire->ire_flags & RTF_BLACKHOLE)
+			*ret_action = Forward_blackhole;
 		ire_refrele(ire);
 	}
-	/* caller needs to send icmp error message */
 	return (NULL);
 
 }
@@ -1257,12 +1265,12 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 {
 	ire_t *ire = NULL, *sire = NULL;
 	ire_t *ire_cache = NULL;
-	boolean_t   check_multirt = B_FALSE;
 	int value;
 	int match_flags;
 	ipaddr_t dst;
 	netstack_t *ns;
 	ip_stack_t *ipst;
+	enum ire_forward_action ret_action;
 
 	ASSERT(mp != NULL);
 
@@ -1407,7 +1415,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		 * the nexthop and adds this incomplete ire
 		 * to the ire cache table
 		 */
-		ire_cache = ire_forward(dst, &check_multirt, ire, sire,
+		ire_cache = ire_forward(dst, &ret_action, ire, sire,
 		    MBLK_GETLABEL(mp), ipst);
 		if (ire_cache == NULL) {
 			ip1dbg(("ipfil_sendpkt: failed to create the"

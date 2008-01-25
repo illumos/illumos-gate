@@ -7057,14 +7057,17 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		 *
 		 * If the IRE type (as defined by ipif->ipif_net_type) is
 		 * IRE_LOOPBACK, then we map the request into a
-		 * IRE_IF_NORESOLVER.
+		 * IRE_IF_NORESOLVER. We also OR in the RTF_BLACKHOLE flag as
+		 * these interface routes, by definition, can only be that.
 		 *
 		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
 		 * routine, but rather using ire_create() directly.
 		 *
 		 */
-		if (ipif->ipif_net_type == IRE_LOOPBACK)
+		if (ipif->ipif_net_type == IRE_LOOPBACK) {
 			ire->ire_type = IRE_IF_NORESOLVER;
+			ire->ire_flags |= RTF_BLACKHOLE;
+		}
 
 		error = ire_add(&ire, q, mp, func, B_FALSE);
 		if (error == 0)

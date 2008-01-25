@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1524,6 +1524,7 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
     uint32_t ihandle, uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc,
     tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
 {
+	ASSERT(type != IRE_CACHE || stq != NULL);
 	/*
 	 * Reject IRE security attribute creation/initialization
 	 * if system is not running in Trusted mode.
