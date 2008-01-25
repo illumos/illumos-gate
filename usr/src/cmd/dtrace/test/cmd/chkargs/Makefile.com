@@ -66,7 +66,7 @@ $(ROOTBIN64)/%: %
 	$(INS.file)
 
 $(ROOTISAEXEC):
-	-$(LN) $(ISAEXEC) $@
+	$(RM) $@; $(CP) -p /usr/lib/isaexec $@
 
 $(ROOTBIN)/%: $(ROOTBIN)
 	$(INS.dir)
