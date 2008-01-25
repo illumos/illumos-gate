@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,8 @@ delete_ds(ad_t *ad, const char *host, int port);
 
 /*ARGSUSED*/
 static int
-idmap_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts) {
+idmap_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts)
+{
 	sasl_interact_t	*interact;
 
 	if (prompts == NULL || flags != LDAP_SASL_INTERACTIVE)
@@ -185,7 +186,7 @@ idmap_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts) {
 
 	/* There should be no extra arguemnts for SASL/GSSAPI authentication */
 	for (interact = prompts; interact->id != SASL_CB_LIST_END;
-			interact++) {
+	    interact++) {
 		interact->result = NULL;
 		interact->len = 0;
 	}
@@ -1031,7 +1032,8 @@ idmap_lookup_batch_start(ad_t *ad, int nqueries, idmap_query_state_t **state)
  */
 void
 idmap_lookup_batch_set_unixattr(idmap_query_state_t *state,
-		const char *unixuser_attr, const char *unixgroup_attr) {
+		const char *unixuser_attr, const char *unixgroup_attr)
+{
 	state->ad_unixuser_attr = unixuser_attr;
 	state->ad_unixgroup_attr = unixgroup_attr;
 }

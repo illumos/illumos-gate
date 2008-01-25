@@ -114,7 +114,8 @@ app_krb5_user_uid(void)
 
 /*ARGSUSED*/
 static void
-hup_handler(int sig) {
+hup_handler(int sig)
+{
 	hupped = 1;
 	if (hup_ev_port >= 0)
 		(void) port_send(hup_ev_port, 1, &sig /* any ptr will do */);
@@ -123,7 +124,8 @@ hup_handler(int sig) {
 
 /*ARGSUSED*/
 static void
-term_handler(int sig) {
+term_handler(int sig)
+{
 	(void) idmapdlog(LOG_INFO, "idmapd: Terminating.");
 	fini_idmapd();
 	_exit(0);
@@ -132,7 +134,8 @@ term_handler(int sig) {
 static int pipe_fd = -1;
 
 static void
-daemonize_ready(void) {
+daemonize_ready(void)
+{
 	char data = '\0';
 	/*
 	 * wake the parent
@@ -142,7 +145,8 @@ daemonize_ready(void) {
 }
 
 static int
-daemonize_start(void) {
+daemonize_start(void)
+{
 	char	data;
 	int	status;
 	int	devnull;
@@ -258,7 +262,8 @@ main(int argc, char **argv)
 }
 
 static void
-init_idmapd() {
+init_idmapd()
+{
 	int	error;
 	int connmaxrec = IDMAP_MAX_DOOR_RPC;
 
@@ -279,24 +284,24 @@ init_idmapd() {
 	memset(&_idmapdstate, 0, sizeof (_idmapdstate));
 
 	if (sysinfo(SI_HOSTNAME, _idmapdstate.hostname,
-			sizeof (_idmapdstate.hostname)) == -1) {
+	    sizeof (_idmapdstate.hostname)) == -1) {
 		error = errno;
 		idmapdlog(LOG_ERR,
-	"idmapd: unable to determine hostname, error: %d",
-			error);
+		    "idmapd: unable to determine hostname, error: %d",
+		    error);
 		exit(1);
 	}
 
 	if ((error = init_mapping_system()) < 0) {
 		idmapdlog(LOG_ERR,
-		"idmapd: unable to initialize mapping system");
+		    "idmapd: unable to initialize mapping system");
 		exit(error < -2 ? SMF_EXIT_ERR_CONFIG : 1);
 	}
 
 	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, connmaxrec);
 	if (xprt == NULL) {
 		idmapdlog(LOG_ERR,
-		"idmapd: unable to create door RPC service");
+		    "idmapd: unable to create door RPC service");
 		goto errout;
 	}
 
@@ -314,15 +319,15 @@ init_idmapd() {
 	}
 	if ((error = idmap_reg(dfd)) != 0) {
 		idmapdlog(LOG_ERR, "idmapd: unable to register door (%s)",
-				strerror(errno));
+		    strerror(errno));
 		goto errout;
 	}
 
 	if ((error = allocids(_idmapdstate.new_eph_db,
-			8192, &_idmapdstate.next_uid,
-			8192, &_idmapdstate.next_gid)) != 0) {
+	    8192, &_idmapdstate.next_uid,
+	    8192, &_idmapdstate.next_gid)) != 0) {
 		idmapdlog(LOG_ERR, "idmapd: unable to allocate ephemeral IDs "
-			"(%s)", strerror(errno));
+		    "(%s)", strerror(errno));
 		_idmapdstate.next_uid = _idmapdstate.limit_uid = SENTINEL_PID;
 		_idmapdstate.next_gid = _idmapdstate.limit_gid = SENTINEL_PID;
 	} else {
@@ -340,7 +345,8 @@ errout:
 }
 
 static void
-fini_idmapd() {
+fini_idmapd()
+{
 	idmap_unreg(dfd);
 	fini_mapping_system();
 	if (xprt != NULL)
@@ -348,7 +354,8 @@ fini_idmapd() {
 }
 
 void
-idmapdlog(int pri, const char *format, ...) {
+idmapdlog(int pri, const char *format, ...)
+{
 	va_list args;
 
 	va_start(args, format);

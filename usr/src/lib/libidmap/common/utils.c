@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,31 +42,33 @@
 static struct timeval TIMEOUT = { 25, 0 };
 
 idmap_retcode
-_udt_extend_batch(idmap_udt_handle_t *udthandle) {
+_udt_extend_batch(idmap_udt_handle_t *udthandle)
+{
 	idmap_update_op	*tmplist;
 	size_t		nsize;
 
 	if (udthandle->next >= udthandle->batch.idmap_update_batch_len) {
 		nsize = (udthandle->batch.idmap_update_batch_len +
-				_UDT_SIZE_INCR) * sizeof (*tmplist);
+		    _UDT_SIZE_INCR) * sizeof (*tmplist);
 		tmplist = realloc(
-			udthandle->batch.idmap_update_batch_val, nsize);
+		    udthandle->batch.idmap_update_batch_val, nsize);
 		if (tmplist == NULL)
 			return (IDMAP_ERR_MEMORY);
 		(void) memset((uchar_t *)tmplist +
-			(udthandle->batch.idmap_update_batch_len *
-			sizeof (*tmplist)), 0,
-			_UDT_SIZE_INCR * sizeof (*tmplist));
+		    (udthandle->batch.idmap_update_batch_len *
+		    sizeof (*tmplist)), 0,
+		    _UDT_SIZE_INCR * sizeof (*tmplist));
 		udthandle->batch.idmap_update_batch_val = tmplist;
 		udthandle->batch.idmap_update_batch_len += _UDT_SIZE_INCR;
 	}
 	udthandle->batch.idmap_update_batch_val[udthandle->next].opnum =
-		OP_NONE;
+	    OP_NONE;
 	return (IDMAP_SUCCESS);
 }
 
 idmap_retcode
-_get_ids_extend_batch(idmap_get_handle_t *gh) {
+_get_ids_extend_batch(idmap_get_handle_t *gh)
+{
 	idmap_mapping	*t1;
 	idmap_get_res_t	*t2;
 	size_t		nsize, len;
@@ -79,7 +81,7 @@ _get_ids_extend_batch(idmap_get_handle_t *gh) {
 		if (t1 == NULL)
 			return (IDMAP_ERR_MEMORY);
 		(void) memset((uchar_t *)t1 + (len * sizeof (*t1)), 0,
-			_GET_IDS_SIZE_INCR * sizeof (*t1));
+		    _GET_IDS_SIZE_INCR * sizeof (*t1));
 		gh->batch.idmap_mapping_batch_val = t1;
 
 		/* extend the return list */
@@ -88,7 +90,7 @@ _get_ids_extend_batch(idmap_get_handle_t *gh) {
 		if (t2 == NULL)
 			return (IDMAP_ERR_MEMORY);
 		(void) memset((uchar_t *)t2 + (len * sizeof (*t2)), 0,
-			_GET_IDS_SIZE_INCR * sizeof (*t2));
+		    _GET_IDS_SIZE_INCR * sizeof (*t2));
 		gh->retlist = t2;
 
 		gh->batch.idmap_mapping_batch_len += _GET_IDS_SIZE_INCR;
@@ -99,7 +101,8 @@ _get_ids_extend_batch(idmap_get_handle_t *gh) {
 idmap_stat
 _iter_get_next_list(int type, idmap_iter_t *iter,
 		void *arg, uchar_t **list, size_t valsize,
-		xdrproc_t xdr_arg_proc, xdrproc_t xdr_res_proc) {
+		xdrproc_t xdr_arg_proc, xdrproc_t xdr_res_proc)
+{
 
 	CLIENT		*clnt;
 	enum clnt_stat	clntstat;
@@ -120,9 +123,9 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 	(void) memset(*list, 0, valsize);
 
 	clntstat = clnt_call(clnt, type,
-		xdr_arg_proc, (caddr_t)arg,
-		xdr_res_proc, (caddr_t)*list,
-		TIMEOUT);
+	    xdr_arg_proc, (caddr_t)arg,
+	    xdr_res_proc, (caddr_t)*list,
+	    TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
 		free(*list);
 		return (_idmap_rpc2stat(clnt));
@@ -132,7 +135,8 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 }
 
 idmap_stat
-_idmap_rpc2stat(CLIENT *clnt) {
+_idmap_rpc2stat(CLIENT *clnt)
+{
 	/*
 	 * We only deal with door_call(3C) errors here. We look at
 	 * r_err.re_errno instead of r_err.re_status because we need

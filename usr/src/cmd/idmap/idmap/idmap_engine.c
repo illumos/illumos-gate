@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,8 @@ options_clean()
 
 /* determine which subcommand is argv[0] and execute its handler */
 static int
-run_command(int argc, char **argv, cmd_pos_t *pos) {
+run_command(int argc, char **argv, cmd_pos_t *pos)
+{
 	int i;
 
 	if (argc == 0) {
@@ -154,7 +155,8 @@ run_command(int argc, char **argv, cmd_pos_t *pos) {
  * is quoted). Duplicate it to "to". Remove quotation, if any.
  */
 static int
-get_param(char **to, const char *from) {
+get_param(char **to, const char *from)
+{
 	int to_i, from_i;
 	char c;
 	int last_slash = 0; 	/* Preceded by a slash? */
@@ -501,7 +503,8 @@ source_interp(const char *name)
 
 int
 engine_init(int comc, cmd_ops_t *comv, int argc, char **argv,
-    int *is_batch_mode) {
+    int *is_batch_mode)
+{
 	int c;
 
 	my_comc = comc;
@@ -529,7 +532,7 @@ engine_init(int comc, cmd_ops_t *comv, int argc, char **argv,
 
 	optind = 0;
 	while ((c = getopt(argc, argv,
-		    "f:(command-file)")) != EOF) {
+	    "f:(command-file)")) != EOF) {
 		switch (c) {
 		case '?':
 			return (IDMAP_ENG_ERROR);
@@ -552,7 +555,8 @@ the_end:
 
 /* finitialize the engine */
 int
-engine_fini() {
+engine_fini()
+{
 	my_argv_clean();
 	free(my_argv);
 	return (0);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,8 @@ int hup_ev_port = -1;
 extern int hupped;
 
 static int
-generate_machine_sid(char **machine_sid) {
+generate_machine_sid(char **machine_sid)
+{
 	char *p;
 	uuid_t uu;
 	int i, j, len, rlen;
@@ -89,7 +90,7 @@ generate_machine_sid(char **machine_sid) {
 	for (i = 0; i < UUID_LEN/4; i++) {
 		j = i * 4;
 		rid = (uu[j] << 24) | (uu[j + 1] << 16) |
-			(uu[j + 2] << 8) | (uu[j + 3]);
+		    (uu[j + 2] << 8) | (uu[j + 3]);
 		rlen = snprintf(p, len, "-%u", rid);
 		p += rlen;
 		len -= rlen;
@@ -143,7 +144,8 @@ destruction:
 }
 
 static char *
-scf_value2string(scf_value_t *value) {
+scf_value2string(scf_value_t *value)
+{
 	int rc = -1;
 	char buf_size = 127;
 	int length;
@@ -167,8 +169,8 @@ scf_value2string(scf_value_t *value) {
 			}
 		} else {
 			rc = 0;
-		    break;
-	    }
+			break;
+		}
 	}
 
 destruction:
@@ -1028,7 +1030,8 @@ exit:
  * Initialize 'cfg'.
  */
 idmap_cfg_t *
-idmap_cfg_init() {
+idmap_cfg_init()
+{
 	idmap_cfg_handles_t *handles;
 
 	/* First the smf repository handles: */
@@ -1063,21 +1066,20 @@ idmap_cfg_init() {
 	}
 
 	if (scf_handle_decode_fmri(handles->main,
-		FMRI_BASE "/:properties/" CONFIG_PG,
-		NULL,				/* scope */
-		handles->service,		/* service */
-		handles->instance,		/* instance */
-		handles->config_pg,		/* pg */
-		NULL,				/* prop */
-		SCF_DECODE_FMRI_EXACT) < 0) {
+	    FMRI_BASE "/:properties/" CONFIG_PG,
+	    NULL,				/* scope */
+	    handles->service,		/* service */
+	    handles->instance,		/* instance */
+	    handles->config_pg,		/* pg */
+	    NULL,				/* prop */
+	    SCF_DECODE_FMRI_EXACT) < 0) {
 		idmapdlog(LOG_ERR, "%s: scf_handle_decode_fmri() failed: %s",
 		    me, scf_strerror(scf_error()));
 		goto error;
-
 	}
 
 	if (scf_service_get_pg(handles->service,
-		GENERAL_PG, handles->general_pg) < 0) {
+	    GENERAL_PG, handles->general_pg) < 0) {
 		idmapdlog(LOG_ERR, "%s: scf_service_get_pg() failed: %s",
 		    me, scf_strerror(scf_error()));
 		goto error;
@@ -1096,7 +1098,8 @@ error:
 }
 
 void
-idmap_cfg_unload(idmap_pg_config_t *pgcfg) {
+idmap_cfg_unload(idmap_pg_config_t *pgcfg)
+{
 
 	if (pgcfg->default_domain) {
 		free(pgcfg->default_domain);

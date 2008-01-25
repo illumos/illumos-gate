@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,8 @@
 static const char *me = "idmapd";
 
 int
-init_mapping_system() {
+init_mapping_system()
+{
 	int rc = 0;
 
 	if (rwlock_init(&_idmapdstate.rwlk_cfg, USYNC_THREAD, NULL) != 0)
@@ -64,12 +65,14 @@ init_mapping_system() {
 }
 
 void
-fini_mapping_system() {
+fini_mapping_system()
+{
 	fini_dbs();
 }
 
 int
-load_config() {
+load_config()
+{
 	int rc;
 	idmap_pg_config_t *pgcfg;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
@@ -92,7 +95,7 @@ load_config() {
 	if (rc != 0)
 		/* Partial failure */
 		idmapdlog(LOG_ERR, "%s: Various errors occurred while loading "
-			"the configuration; check the logs", me);
+		    "the configuration; check the logs", me);
 
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
@@ -110,7 +113,7 @@ load_config() {
 
 	if (idmap_cfg_start_updates(_idmapdstate.cfg) < 0)
 		idmapdlog(LOG_ERR, "%s: could not start config updater",
-			me);
+		    me);
 
 	idmapdlog(LOG_DEBUG, "%s: initial configuration loaded", me);
 
@@ -119,7 +122,8 @@ load_config() {
 
 
 int
-reload_ad() {
+reload_ad()
+{
 	int	i;
 	ad_t	*old;
 	ad_t	*new;
@@ -168,7 +172,8 @@ reload_ad() {
 
 
 void
-print_idmapdstate() {
+print_idmapdstate()
+{
 	int i;
 	idmap_pg_config_t *pgcfg;
 
@@ -226,20 +231,21 @@ print_idmapdstate() {
 }
 
 int
-create_directory(const char *path, uid_t uid, gid_t gid) {
+create_directory(const char *path, uid_t uid, gid_t gid)
+{
 	int	rc;
 
 	if ((rc = mkdir(path, 0700)) < 0 && errno != EEXIST) {
 		idmapdlog(LOG_ERR,
-			"%s: Error creating directory %s (%s)",
-			me, path, strerror(errno));
+		    "%s: Error creating directory %s (%s)",
+		    me, path, strerror(errno));
 		return (-1);
 	}
 
 	if (lchown(path, uid, gid) < 0) {
 		idmapdlog(LOG_ERR,
-			"%s: Error creating directory %s (%s)",
-			me, path, strerror(errno));
+		    "%s: Error creating directory %s (%s)",
+		    me, path, strerror(errno));
 		if (rc == 0)
 			(void) rmdir(path);
 		return (-1);

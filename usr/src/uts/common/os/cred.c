@@ -1027,7 +1027,7 @@ boolean_t
 valid_ephemeral_uid(zone_t *zone, uid_t id)
 {
 	ephemeral_zsd_t *eph_zsd;
-	if (id < IDMAP_WK__MAX_UID)
+	if (id <= IDMAP_WK__MAX_UID)
 		return (B_TRUE);
 
 	eph_zsd = get_ephemeral_zsd(zone);
@@ -1040,7 +1040,7 @@ boolean_t
 valid_ephemeral_gid(zone_t *zone, gid_t id)
 {
 	ephemeral_zsd_t *eph_zsd;
-	if (id < IDMAP_WK__MAX_GID)
+	if (id <= IDMAP_WK__MAX_GID)
 		return (B_TRUE);
 
 	eph_zsd = get_ephemeral_zsd(zone);
