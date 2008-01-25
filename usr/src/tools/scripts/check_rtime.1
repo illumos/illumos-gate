@@ -1,5 +1,5 @@
 .\" ident	"%Z%%M%	%I%	%E% SMI"
-.\" Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\" CDDL HEADER START
@@ -21,7 +21,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "23 Apr 2007"
+.TH check_rtime 1 "10 Jan 2008"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
@@ -129,20 +129,23 @@ See also the section ENVIRONMENT VARIABLES.
 uses \fBelfdump(1)\fP to look for a concatenated relocation
 section in shared objects, the existence of text relocations,
 whether debugging or symbol table information exists, whether
-applications have a non-executable stack defined, and for duplicate
-entries in the symbol sorting sections.
+applications have a non-executable stack defined, duplicate
+entries in the symbol sorting sections, and for direct bindings.
 These checks are carried out for the following reasons:
 .TP 4
 \(bu
 A concatenated relocation section (\fI.SUNW_reloc\fP)
 provides optimal symbol table
 access as runtime, and thus reduces the overhead of relocating
-the shared object.  The link-edit of a dynamic object with
-the \fB-z combreloc\fP option is required to generate a combined
-relocation section.
+the shared object.  In past releases, the link-edit of a dynamic object with
+the \fB-z combreloc\fP option was required to generate a combined
+relocation section.  However, with the integration of 6642769, this section
+combination is a default behavior of the link-editor.
 .sp
-Not inheriting \fB$(DYNFLAGS)\fP from
-\fIlib/Makefile.lib\fP is the typical reason for not having a
+In past releases, not inheriting \fB$(DYNFLAGS)\fP from
+\fIlib/Makefile.lib\fP was the typical reason for not having a
+concatenated relocation section. The misguided use of the
+\fB-z nocombreloc\fP option will also prevent the creation of a
 concatenated relocation section. A missing concatenated relocation section
 is displayed as:
 .sp
@@ -257,6 +260,24 @@ whether the section is for regular, or thread local symbols:
 foo: .SUNW_dynsymsort: duplicate ADDRESS: sym1, sym2
 .br
 foo: .SUNW_dyntlssort: duplicate OFFSET: sym1, sym2
+.RE
+.sp
+.TP
+\(bu
+\fBOSNet\fP dynamic ELF objects are expected to employ direct bindings whenever
+feasible.  This runtime binding technique helps to avoid accidental
+interposition problems, and provides a more optimal
+runtime symbol search model.
+.sp
+Not inheriting the correct \fB$(LDFLAGS)\fP from \fIcmd/Makefile.cmd\fP,
+or the correct \fB$(DYNFLAGS)\fP from \fIlib/Makefile.lib\fP, are the
+typical reasons for not enabling direct bindings. Dynamic objects that
+do not contain direct binding information are displayed as:
+.sp
+.RS 6
+foo: object has no direct bindings \\
+.br
+	<no -B direct or -z direct?>
 .RE
 
 .sp

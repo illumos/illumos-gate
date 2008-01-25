@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -178,7 +178,7 @@ SUNWprivate_1.1 {
 	_ast_procclose;
 	_ast_procfree;
 	_ast_procopen;
-	_ast_procrun;
+	_ast_procrun =		NODIRECT;	# Allow libshell to override
 	_ast_putc_unlocked;
 	_ast_putchar_unlocked;
 	_ast_putenv;

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@ OBJS =		$(BLTOBJ) $(COMOBJS)
 MAPFILES =	../common/mapfile-intf $(MAPFILE.NGB)
 MAPOPTS =	$(MAPFILES:%=-M%)
 
-LDFLAGS +=	$(VERSREF) $(LAZYLOAD) $(BDIRECT) $(USE_PROTO) $(MAPOPTS) \
+LDFLAGS +=	$(VERSREF) $(LAZYLOAD) $(USE_PROTO) $(MAPOPTS) \
 		    $(VAR_LD_LLDFLAGS)
 LDLIBS +=	$(LDLIBDIR) $(LD_LIB) $(ELFLIBDIR) -lelf \
 		    $(LDDBGLIBDIR) $(LDDBG_LIB) $(CONVLIBDIR) $(CONV_LIB)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -145,9 +145,14 @@ ZDEFS=
 LDLIBS += -lnsl -lldap -lc
 
 # A number of interfaces are interposed by numerous applications, therefore
-# prevent direct binding to anything in this shared object.  In addition,
-# libnisdb.so.1 interposes on socket().
-DYNFLAGS +=	$(BNODIRECT) $(ZINTERPOSE)
+# prevent direct binding to anything in libnisdb.  Disable libnisdb from
+# directly binding to itself, but allow libnisdb to directly bind to its
+# dependencies (ie. map -Bdirect -> -zdirect).  Ensure lazy loading is
+# established (which is enabled automatically with -Bdirect).  In addition,
+# libnisdb interposes on socket(), so tag this library as an interposer.
+# dependencies (lazyload).
+BDIRECT =
+DYNFLAGS +=	$(BNODIRECT) $(ZINTERPOSE) $(ZDIRECT) $(ZLAZYLOAD)
 
 all :=		TARGET= all
 clean :=	TARGET= clean

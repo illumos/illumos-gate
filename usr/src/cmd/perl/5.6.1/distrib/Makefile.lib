@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,6 +75,12 @@ include ../Makefile.perlcfg
 
 # There should be a mapfile here
 MAPFILES =
+
+# Disable perl from directly binding to itself, but allow perl to directly bind
+# to its dependencies (ie. map -Bdirect -> -zdirect).  Ensure lazy loading is
+# established (which is enabled automatically with -Bdirect).
+BDIRECT =	$(ZDIRECT)
+LDFLAGS +=	$(ZLAZYLOAD)
 
 # Add in the perl-specific flags (including largefile flags).
 CPPFLAGS += $(PERL_COREFLAGS) $(PERL_LFFLAGS)

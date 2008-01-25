@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,12 +59,12 @@
 
 
 # Define all global variables (required for strict)
-use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles);
+use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles $SkipDirectBindFiles);
 use vars  qw($SkipUndefDirs $SkipUndefFiles $SkipUnusedDirs $SkipUnusedFiles);
 use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
 use vars  qw($UnusedNoise $Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
 use vars  qw($UnusedFiles $UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
-use vars  qw($SkipInterps $SkipSymSort $OldDeps %opt);
+use vars  qw($SkipDirectBindDirs $SkipInterps $SkipSymSort $OldDeps %opt);
 
 use strict;
 
@@ -104,6 +104,20 @@ $SkipFiles = qr{ ^(?:
 $SkipTextrelFiles = qr{ ^(?:
 	unix |				# kernel models are non-pic
 	mdb				# relocations against __RTC (dbx)
+	)$
+}x;
+
+# Define any directories or files that are allowed to have no direct bound
+# symbols
+$SkipDirectBindDirs = qr{
+	usr/ucb
+}x;
+
+$SkipDirectBindFiles = qr{ ^(?:
+	unix |
+	sbcp |
+	libproc.so.1 |
+	libnisdb.so.2
 	)$
 }x;
 
@@ -465,6 +479,7 @@ sub ProcFile {
 	my(@Elf, @Ldd, $Dyn, $Intp, $Dll, $Ttl, $Sym, $Interp, $Stack);
 	my($Sun, $Relsz, $Pltsz, $Uns, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
 	my($Val, $Header, $SkipLdd, $IsX86, $RWX);
+	my($HasDirectBinding);
 
 	# Ignore symbolic links.
 	if (-l $FullPath) {
@@ -490,7 +505,7 @@ sub ProcFile {
 
 	# Determine whether we have a executable (static or dynamic) or a
 	# shared object.
-	@Elf = split(/\n/, `elfdump -epdic $FullPath 2>&1`);
+	@Elf = split(/\n/, `elfdump -epdicy $FullPath 2>&1`);
 
 	$Dyn = $Intp = $Dll = $Stack = $IsX86 = $RWX = 0;
 	$Interp = 1;
@@ -772,6 +787,7 @@ LDD:	foreach my $Line (@Ldd) {
 
 	$Sun = $Relsz = $Pltsz = $Dyn = $Stab = $SymSort = 0;
 	$Tex = $Strip = 1;
+	$HasDirectBinding = 0;
 
 	$Header = 'None';
 ELF:	foreach my $Line (@Elf) {
@@ -802,7 +818,30 @@ ELF:	foreach my $Line (@Elf) {
 		} elsif ($Line =~ /^Dynamic Section/) {
 			$Header = 'Dyn';
 			next;
-		} elsif ($Header ne 'Dyn') {
+		} elsif ($Line =~ /^Syminfo Section/) {
+			$Header = 'Syminfo';
+			next;
+		} elsif (($Header ne 'Dyn') && ($Header ne 'Syminfo')) {
+			next;
+		}
+
+		# Look into the Syminfo section.
+		# Does this object have at least one Directly Bound symbol?
+		if (($Header eq 'Syminfo')) {
+			my(@Symword);
+
+			if ($HasDirectBinding == 1) {
+				next;
+			}
+
+			@Symword = split(' ', $Line);
+
+			if (!defined($Symword[1])) {
+				next;
+			}
+			if ($Symword[1] =~ /B/) {
+				$HasDirectBinding = 1;
+			}
 			next;
 		}
 
@@ -854,6 +893,11 @@ ELF:	foreach my $Line (@Elf) {
 			next;
 		}
 
+		# Is this object built with -B direct flag on?
+		if ($Line =~ / DIRECT /) {
+			$HasDirectBinding = 1;
+		}
+
 		# Does this object specify a runpath.
 		if ($opt{i} && ($Line =~ /RPATH/)) {
 			my($Rpath) = (split(' ', $Line))[3];
@@ -879,6 +923,17 @@ ELF:	foreach my $Line (@Elf) {
 		}
 		OutMsg($Ttl++, $RelPath,
 		    "\tdebugging sections should be deleted\t<no strip -x?>");
+	}
+
+	# Identify an object that is not built with either -B direct or
+	# -z direct.
+	if (($RelPath =~ $SkipDirectBindDirs) ||
+	    ($File =~ $SkipDirectBindFiles)) {
+		goto DONESTAB;
+	}
+	if ($Relsz && ($HasDirectBinding == 0)) {
+		OutMsg($Ttl++, $RelPath,
+		    "\tobject has no direct bindings\t<no -B direct or -z direct?>");
 	}
 
 DONESTAB:

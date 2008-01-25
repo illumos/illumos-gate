@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,8 +55,6 @@ LDLIBS +=	-L$(SRC)/cmd/lp/lib/access -llpacc
 LDLIBS +=	-L$(SRC)/cmd/lp/lib/lp -llp
 
 MAPFILES =	mapfile
-
-DYNFLAGS +=	$(BDIRECT)
 
 LIBS = $(DYNLIB)
 SRCS= $(OBJECTS:%.o=%.c)

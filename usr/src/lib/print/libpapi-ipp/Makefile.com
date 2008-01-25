@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,8 +51,6 @@ CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 CPPFLAGS +=	-I../../libipp-core/common
 CPPFLAGS +=	-I../../libhttp-core/common
-
-DYNFLAGS +=	$(BDIRECT)
 
 MAPFILES =	$(SRCDIR)/mapfile
 

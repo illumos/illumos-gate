@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,8 +51,6 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 
-DYNFLAGS +=	$(BDIRECT)
-
 MAPFILES =	$(SRCDIR)/mapfile
 
 LDLIBS +=	-lc
@@ -77,7 +75,7 @@ PROG_OBJS = $(LPD_PORT_OBJS:%=pics/%)
 OBJS += $(PROG_OBJS)
 
 LDFLAGS.cmd = \
-        $(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) \
+        $(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) $(BDIRECT) \
         $(MAPFILE.NES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 
 $(PROG):	$(PROG_OBJS)

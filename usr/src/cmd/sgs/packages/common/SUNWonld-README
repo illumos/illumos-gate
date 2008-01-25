@@ -1307,3 +1307,4 @@ Bugid   Risk Synopsis
 	PSARC/2008/006: make ld(1) -z combreloc become default behavior
 6634436 XFFLAG should be updated.  (link-editor components only)
 6492726 Merge SHF_MERGE|SHF_STRINGS input sections
+4947191 OSNet should use direct bindings  (link-editor components only)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -82,8 +82,7 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 LINTFLAGS +=	-u -D_REENTRANT
 LINTFLAGS64 +=	-u -D_REENTRANT
 
-DYNFLAGS +=	$(BDIRECT) $(VERSREF) \
-		$(ZLAZYLOAD) $(USE_PROTO) '-R$$ORIGIN'
+DYNFLAGS +=	$(VERSREF) $(ZLAZYLOAD) $(USE_PROTO) '-R$$ORIGIN'
 
 $(VAR_POUND_3)DEFS=
 native:=	DYNFLAGS	+= $(CONVLIBDIR)

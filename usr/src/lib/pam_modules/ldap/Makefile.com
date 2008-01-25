@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/lib/pam_modules/ldap/Makefile.com
@@ -42,7 +42,6 @@ include		../../Makefile.pam_modules
 
 LDLIBS +=	-lpam -lsldap -lc
 CPPFLAGS +=	-I$(SRC)/lib/libsldap/common
-DYNFLAGS +=	$(BDIRECT)
 
 all:	$(LIBS)
 

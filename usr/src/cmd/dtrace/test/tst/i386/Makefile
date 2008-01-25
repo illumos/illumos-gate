@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,7 @@ ASFLAGS += -P -D_ASM $(CPPFLAGS)
 CLOBBER_FILES += helper_helper.o annotated_helper.o
 
 # For the helper test we require an executable data section.
-ustack/tst.helper.exe := LDFLAGS = -M$(MAPFILE.NES)
+ustack/tst.helper.exe := LDFLAGS += -M$(MAPFILE.NES)
 
 ustack/tst.helper.exe: ustack/tst.helper.o ustack/helper_helper.o
 	$(LINK.c) -o ustack/tst.helper.exe \

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,9 +94,12 @@ MAPFILES +=	mapfile-vers
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 
-# All interfaces are interposable, therefore don't allow direct binding to this
-# shared object.
-DYNFLAGS +=	$(BNODIRECT)
+# All interfaces are interposable, therefore don't allow direct binding to
+# libproc.  Disable libproc from directly binding to itself, but allow libperl
+# to directly bind to its dependencies (ie. map -Bdirect -> -zdirect).  Ensure
+# lazy loading is established (which is enabled automatically with -Bdirect).
+BDIRECT =
+DYNFLAGS +=	$(BNODIRECT) $(ZDIRECT) $(ZLAZYLOAD)
 
 .KEEP_STATE:
 

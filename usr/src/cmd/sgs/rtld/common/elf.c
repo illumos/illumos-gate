@@ -351,8 +351,8 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 * create an association between the caller and this dependency.
 	 */
 	if (nlmp && (((analyze_lmc(lml, lmco, nlmp) == 0)) ||
-	    (relocate_lmc(lml, lmco, clmp, nlmp) == 0) ||
-	    (bind_one(clmp, nlmp, BND_NEEDED) == 0)))
+	    (bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
+	    (relocate_lmc(lml, lmco, clmp, nlmp) == 0)))
 		dip->di_info = nlmp = 0;
 
 	/*
