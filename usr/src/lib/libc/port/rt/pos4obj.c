@@ -95,29 +95,31 @@ __close_nc(int fildes)
  * This is to avoid loading libmd.so.1 unless we absolutely have to.
  */
 typedef void (*md5_calc_t)(unsigned char *, unsigned char *, unsigned int);
-static void *md5_handle = NULL;
 static md5_calc_t real_md5_calc = NULL;
 static mutex_t md5_lock = DEFAULTMUTEX;
 
 static void
 load_md5_calc(void)
 {
+	void *md5_handle = dlopen("libmd.so.1", RTLD_LAZY);
+
 	lmutex_lock(&md5_lock);
 	if (real_md5_calc == NULL) {
-		md5_handle = dlopen("libmd.so.1", RTLD_LAZY);
 		if (md5_handle == NULL)
 			real_md5_calc = (md5_calc_t)(-1);
 		else {
 			real_md5_calc =
 			    (md5_calc_t)dlsym(md5_handle, "md5_calc");
-			if (real_md5_calc == NULL) {
-				(void) dlclose(md5_handle);
-				md5_handle = NULL;
+			if (real_md5_calc != NULL)	/* got it */
+				md5_handle = NULL;	/* don't dlclose it */
+			else
 				real_md5_calc = (md5_calc_t)(-1);
-			}
 		}
 	}
 	lmutex_unlock(&md5_lock);
+
+	if (md5_handle)
+		(void) dlclose(md5_handle);
 }
 
 static char *

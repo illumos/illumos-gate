@@ -56,13 +56,16 @@ static int
 attrat_init()
 {
 	if (initialized == 0) {
+		void *libnvhandle = dlopen("libnvpair.so.1", RTLD_LAZY);
+
 		lmutex_lock(&attrlock);
 		if (initialized == 1) {
 			lmutex_unlock(&attrlock);
+			if (libnvhandle)
+				dlclose(libnvhandle);
 			return (0);
 		}
 
-		void *libnvhandle = dlopen("libnvpair.so.1", RTLD_LAZY);
 		if (libnvhandle == NULL || (nvpacker = (int (*)(nvlist_t *,
 		    char **, size_t *, int, int)) dlsym(libnvhandle,
 		    "nvlist_pack")) == NULL ||
