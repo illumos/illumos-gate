@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,9 +212,11 @@ krb5_lookup_tl_kadm_data(krb5_tl_data *tl_data, osa_princ_ent_rec *princ_entry)
 }
 
 krb5_error_code
-krb5_update_tl_kadm_data(policy_dn, new_tl_data)
+krb5_update_tl_kadm_data(policy_dn, new_tl_data, old_tl_data)
     char	        * policy_dn;
     krb5_tl_data        * new_tl_data;
+    /* Solaris Kerberos: adding support for key history in LDAP KDB */
+    krb5_tl_data        * old_tl_data;
 {
     XDR xdrs;
     osa_princ_ent_t princ_entry;
@@ -225,8 +227,24 @@ krb5_update_tl_kadm_data(policy_dn, new_tl_data)
 	return ENOMEM;
 
     memset(princ_entry, 0, sizeof(osa_princ_ent_rec));
-    princ_entry->admin_history_kvno = 2;
     princ_entry->aux_attributes = KADM5_POLICY;
+
+    /* Solaris Kerberos: adding support for key history in LDAP KDB */
+    if (old_tl_data != NULL) {
+	/* get the key history from the old tl_data */
+	xdrmem_create(&xdrs, (caddr_t)old_tl_data->tl_data_contents,
+	    old_tl_data->tl_data_length, XDR_DECODE);
+	if (! ldap_xdr_osa_princ_ent_rec(&xdrs, princ_entry)) {
+	    xdr_destroy(&xdrs);
+	    free(princ_entry);
+	    return(KADM5_XDR_FAILURE);
+	}
+	xdr_destroy(&xdrs);
+	/* will set the policy field further down, avoid mem leak */
+	free(princ_entry->policy);
+    } else {
+	princ_entry->admin_history_kvno = 2;
+    }
     princ_entry->policy = policy_dn;
 
     xdralloc_create(&xdrs, XDR_ENCODE);

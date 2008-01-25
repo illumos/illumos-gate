@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1355,6 +1355,9 @@ dump_db(argc, argv)
     char		*new_mkey_file = 0;
     bool_t		dump_sno = FALSE;
     kdb_log_context	*log_ctx;
+    /* Solaris Kerberos: adding support for -rev/recurse flags */
+    int			db_arg_index = 0;
+    char		*db_args[3] = {NULL, NULL, NULL};
 	
     /*
      * Parse the arguments.
@@ -1406,11 +1409,14 @@ dump_db(argc, argv)
 	else if (!strcmp(argv[aindex], "-new_mkey_file")) {
 	    new_mkey_file = argv[++aindex];
 	    mkey_convert = 1;
-        } else if (!strcmp(argv[aindex], "-rev"))
-	    backwards = 1;
-	else if (!strcmp(argv[aindex], "-recurse"))
-	    recursive = 1;
-	else
+        } else if (!strcmp(argv[aindex], "-rev")) {
+	    /* Solaris Kerberos: adding support for -rev/recurse flags */
+	    /* hack to pass args to db specific plugin */
+	    db_args[db_arg_index++] = "rev";
+	} else if (!strcmp(argv[aindex], "-recurse")) {
+	    /* hack to pass args to db specific plugin */
+	    db_args[db_arg_index++] = "recurse";
+	} else
 	    break;
     }
 
@@ -1546,10 +1552,13 @@ dump_db(argc, argv)
 	if (dump->header[strlen(dump->header)-1] != '\n')
 	     fputc('\n', arglist.ofile);
 	
+	/* Solaris Kerberos: adding support for -rev/recurse flags */
+	/* don't pass in db_args if there aren't any */
 	if ((kret = krb5_db_iterate(util_context,
 				    NULL,
 				    dump->dump_princ,
-				    (krb5_pointer) &arglist))) { /* TBD: backwards and recursive not supported */
+				    (krb5_pointer) &arglist,
+				    db_arg_index > 0 ? (char **)&db_args : NULL))) {
 	     fprintf(stderr, dumprec_err,
 		     programname, dump->name, error_message(kret));
 	     exit_status++;

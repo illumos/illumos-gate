@@ -93,11 +93,13 @@ krb5_error_code krb5_db2_db_iterate_ext
 		   krb5_error_code (*) (krb5_pointer,
 					          krb5_db_entry *),
 	           krb5_pointer, int, int );
+/* Solaris Kerberos: adding support for db_args */
 krb5_error_code krb5_db2_db_iterate
 (krb5_context,char *,
 		   krb5_error_code (*) (krb5_pointer,
 					          krb5_db_entry *),
-	           krb5_pointer );
+	           krb5_pointer,
+		   char **db_args );
 krb5_error_code krb5_db2_db_set_nonblocking 
 	(krb5_context,
 		   krb5_boolean,

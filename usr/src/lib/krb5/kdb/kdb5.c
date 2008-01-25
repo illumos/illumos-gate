@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1103,7 +1103,9 @@ krb5_error_code
 krb5_db_iterate(krb5_context kcontext,
 		char *match_entry,
 		int (*func) (krb5_pointer, krb5_db_entry *),
-		krb5_pointer func_arg)
+		krb5_pointer func_arg,
+		/* Solaris Kerberos: adding support for db_args */
+		char **db_args)
 {
     krb5_error_code status = 0;
     kdb5_dal_handle *dal_handle;
@@ -1121,9 +1123,11 @@ krb5_db_iterate(krb5_context kcontext,
 	goto clean_n_exit;
     }
 
+    /* Solaris Kerberos: adding support for db_args */
     status = dal_handle->lib_handle->vftabl.db_iterate(kcontext,
 						       match_entry,
-						       func, func_arg);
+						       func, func_arg,
+						       db_args);
     get_errmsg(kcontext, status);
     kdb_unlock_lib_lock(dal_handle->lib_handle, FALSE);
 

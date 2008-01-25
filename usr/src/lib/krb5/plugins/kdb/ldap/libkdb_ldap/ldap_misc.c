@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #include <string.h>
@@ -2103,7 +2103,8 @@ populate_krb5_db_entry (krb5_context context,
 	if ((st = krb5_ldap_policydn_to_name (context, pwdpolicydn, &polname)) != 0)
 	    goto cleanup;
 
-	if ((st = krb5_update_tl_kadm_data(polname, &kadm_tl_data)) != 0) {
+	/* Solaris Kerberos: adding support for key history in LDAP KDB */
+	if ((st = krb5_update_tl_kadm_data(polname, &kadm_tl_data, entry->tl_data)) != 0) {
 	    goto cleanup;
 	}
 	krb5_dbe_update_tl_data(context, entry, &kadm_tl_data);

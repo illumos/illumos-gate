@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,12 +152,14 @@ WRAP_K (krb5_db2_db_delete_principal,
 	 int *nentries),
 	(context, searchfor, nentries));
 
+/* Solaris Kerberos: adding support for db_args */
 WRAP_K (krb5_db2_db_iterate,
 	(krb5_context ctx, char *s,
 	 krb5_error_code (*f) (krb5_pointer,
 			      krb5_db_entry *),
-	 krb5_pointer p),
-	(ctx, s, f, p));
+	 krb5_pointer p,
+	 char **db_args),
+	(ctx, s, f, p, db_args));
 
 WRAP_K (krb5_db2_create_policy,
 	(krb5_context context, osa_policy_ent_t entry),

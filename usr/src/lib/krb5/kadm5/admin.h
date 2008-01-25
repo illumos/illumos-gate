@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,8 @@ typedef unsigned int rpc_u_int32;
 #define KADM5_RANDKEY_USED      0x100000
 #endif
 #define KADM5_LOAD		0x200000
+/* Solaris Kerberos: adding support for key history in LDAP KDB */
+#define KADM5_KEY_HIST		0x400000
 
 /* all but KEY_DATA and TL_DATA */
 #define KADM5_PRINCIPAL_NORMAL_MASK 0x01ffff

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1314,9 +1314,37 @@ krb5_error_code
 krb5_db2_db_iterate(krb5_context context,
 		    char *match_expr,
 		    krb5_error_code(*func) (krb5_pointer, krb5_db_entry *),
-		    krb5_pointer func_arg)
+		    krb5_pointer func_arg, char **db_args)
 {
-    return krb5_db2_db_iterate_ext(context, func, func_arg, 0, 0);
+    char  **t_ptr = db_args;
+    int backwards = 0, recursive = 0;
+
+    while (t_ptr && *t_ptr) {
+	char   *opt = NULL, *val = NULL;
+
+	krb5_db2_get_db_opt(*t_ptr, &opt, &val);
+
+	/* Solaris Kerberos: adding support for -rev/recurse flags */
+	if (val && !strcmp(val, "rev"))
+	    backwards = 1;
+	else if (val && !strcmp(val, "recurse"))
+	    recursive = 1;
+	else {
+	    krb5_set_error_message(context, EINVAL,
+				   gettext("Unsupported argument \"%s\" for db2"),
+				   val);
+	    free(opt);
+	    free(val);
+	    return EINVAL;
+	}
+
+	free(opt);
+	free(val);
+	t_ptr++;
+    }
+
+    /* Solaris Kerberos: adding support for -rev/recurse flags */
+    return krb5_db2_db_iterate_ext(context, func, func_arg, backwards, recursive);
 }
 
 krb5_boolean

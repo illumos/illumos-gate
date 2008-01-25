@@ -99,9 +99,10 @@ krb5_ldap_delete_principal(krb5_context, krb5_const_principal, int *);
 krb5_error_code
 krb5_ldap_free_principal(krb5_context, krb5_db_entry *, int );
 
+/* Solaris Kerberos: adding support for db_args */
 krb5_error_code
 krb5_ldap_iterate(krb5_context, char *, krb5_error_code (*) (krb5_pointer, krb5_db_entry *),
-                  krb5_pointer/*, int */);
+                  krb5_pointer/*, int */, char **);
 
 void
 krb5_dbe_free_contents(krb5_context, krb5_db_entry *);

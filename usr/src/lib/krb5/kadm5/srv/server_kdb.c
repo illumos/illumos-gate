@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -426,7 +426,8 @@ kdb_iter_entry(kadm5_server_handle_t handle, char *match_entry,
     id.func = iter_fct;
     id.data = data;
 
-    ret = krb5_db_iterate(handle->context, match_entry, kdb_iter_func, &id);
+    /* Solaris Kerberos: added support for db_args */
+    ret = krb5_db_iterate(handle->context, match_entry, kdb_iter_func, &id, NULL);
     if (ret)
 	return(ret);
 

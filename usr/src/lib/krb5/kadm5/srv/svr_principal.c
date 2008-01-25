@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1357,7 +1357,12 @@ kadm5_chpass_principal_3(void *server_handle,
 	goto done;
 
     /* key data and attributes changed, let the database provider know */
-    kdb.mask = KADM5_KEY_DATA | KADM5_ATTRIBUTES /* | KADM5_CPW_FUNCTION */;
+    /* Solaris Kerberos: adding support for key history in LDAP KDB */
+    if (hist_added == 1)
+	kdb.mask = KADM5_KEY_DATA | KADM5_ATTRIBUTES | KADM5_KEY_HIST
+	    /* | KADM5_CPW_FUNCTION */;
+    else
+	kdb.mask = KADM5_KEY_DATA | KADM5_ATTRIBUTES /* | KADM5_CPW_FUNCTION */;
 
     if ((ret = kdb_put_entry(handle, &kdb, &adb)))
 	goto done;

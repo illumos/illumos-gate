@@ -140,11 +140,13 @@ krb5_ldap_free_principal(kcontext , entries, nentries)
 }
 
 krb5_error_code
-krb5_ldap_iterate(context, match_expr, func, func_arg)
-    krb5_context           context;
-    char                   *match_expr;
-    krb5_error_code        (*func) (krb5_pointer, krb5_db_entry *);
-    krb5_pointer           func_arg;
+krb5_ldap_iterate(
+    krb5_context           context,
+    char                   *match_expr,
+    krb5_error_code        (*func) (krb5_pointer, krb5_db_entry *),
+    krb5_pointer           func_arg,
+    /* Solaris Kerberos: adding support for -rev/recurse flags */
+    char                   **db_args)
 {
     krb5_db_entry            entry;
     krb5_principal           principal;
@@ -160,6 +162,15 @@ krb5_ldap_iterate(context, match_expr, func, func_arg)
 
     /* Clear the global error string */
     krb5_clear_error_message(context);
+
+    /* Solaris Kerberos: adding support for -rev/recurse flags */
+    if (db_args) {
+	/* LDAP does not support db_args DB arguments for krb5_ldap_iterate */
+	krb5_set_error_message(context, EINVAL,
+			       gettext("Unsupported argument \"%s\" for ldap"),
+			       db_args[0]);
+	return EINVAL;
+    }
 
     memset(&entry, 0, sizeof(krb5_db_entry));
     SETUP_CONTEXT();

@@ -30,7 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -991,9 +991,13 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 #ifdef SECURID
 		    || ptr->tl_data_type == KRB5_TL_DB_ARGS
 #endif
-		    || ptr->tl_data_type == KRB5_TL_KADM_DATA
 		    || ptr->tl_data_type == KDB_TL_USER_INFO)
 		    continue;
+
+		/* Solaris Kerberos: fix key history issue */
+		if (ptr->tl_data_type == KRB5_TL_KADM_DATA && ! entries->mask & KADM5_KEY_HIST)
+		    continue;
+		    
 		count++;
 	    }
 	    if (count != 0) {
@@ -1011,9 +1015,16 @@ krb5_ldap_put_principal(context, entries, nentries, db_args)
 #ifdef SECURID
 			|| ptr->tl_data_type == KRB5_TL_DB_ARGS
 #endif
-			|| ptr->tl_data_type == KRB5_TL_KADM_DATA
 			|| ptr->tl_data_type == KDB_TL_USER_INFO)
 			continue;
+
+		    /*
+		     * Solaris Kerberos: key history needs to be stored (it's in
+		     * the KRB5_TL_KADM_DATA).
+		     */
+		    if (ptr->tl_data_type == KRB5_TL_KADM_DATA && ! entries->mask & KADM5_KEY_HIST)
+			continue;
+
 		    if ((st = tl_data2berval (ptr, &ber_tl_data[j])) != 0)
 			break;
 		    j++;

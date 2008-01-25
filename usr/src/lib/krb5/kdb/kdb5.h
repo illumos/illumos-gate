@@ -86,10 +86,12 @@ typedef struct _kdb_vftabl{
 					    krb5_const_principal search_for,
 					    int *nentries);
 
+    /* Solaris Kerberos: adding support for db_args */
     krb5_error_code (*db_iterate) (krb5_context kcontext,
 				   char *match_entry,
 				   int (*func) (krb5_pointer, krb5_db_entry *),
-				   krb5_pointer func_arg);
+				   krb5_pointer func_arg,
+				   char **db_args);
 
     krb5_error_code (*db_create_policy) (krb5_context kcontext,
 					 osa_policy_ent_t policy);

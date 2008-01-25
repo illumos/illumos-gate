@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,8 @@ ldap_osa_free_princ_ent(osa_princ_ent_t val);
 krb5_error_code
 krb5_lookup_tl_kadm_data(krb5_tl_data *tl_data, osa_princ_ent_rec *princ_entry);
 
+/* Solaris Kerberos: adding support for key history in LDAP KDB */
 krb5_error_code
-krb5_update_tl_kadm_data(char *, krb5_tl_data *);
+krb5_update_tl_kadm_data(char *, krb5_tl_data *, krb5_tl_data *);
 
 #endif

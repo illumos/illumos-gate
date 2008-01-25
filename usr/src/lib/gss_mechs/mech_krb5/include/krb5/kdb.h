@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -277,10 +277,12 @@ krb5_error_code krb5_db_put_principal ( krb5_context kcontext,
 krb5_error_code krb5_db_delete_principal ( krb5_context kcontext,
 					   krb5_principal search_for,
 					   int *nentries );
+/* Solaris Kerberos: adding support for db_args */
 krb5_error_code krb5_db_iterate ( krb5_context kcontext,
 				  char *match_entry,
 				  int (*func) (krb5_pointer, krb5_db_entry *),
-				  krb5_pointer func_arg );
+				  krb5_pointer func_arg,
+				  char **db_args );
 krb5_error_code krb5_supported_realms ( krb5_context kcontext,
 					char **realms );
 krb5_error_code krb5_free_supported_realms ( krb5_context kcontext,
