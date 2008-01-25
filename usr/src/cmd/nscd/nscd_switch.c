@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -772,8 +772,10 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		smf_state = _nscd_get_smf_state(srci, dbi, 0);
 
 		/* stop if the source is one that should be TRYLOCAL */
-		if (initf == nscd_initf &&
-		    (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC ||
+		if (initf == nscd_initf &&	/* request is from the door */
+		    (smf_state == NSCD_SVC_STATE_UNSUPPORTED_SRC ||
+		    (smf_state == NSCD_SVC_STATE_FOREIGN_SRC &&
+		    s->be_version_p[n_src] == NULL) ||
 		    (params.privdb && try_local2(dbi, srci) == 1))) {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 			(me, "returning TRYLOCAL ... \n");
@@ -804,9 +806,11 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		if (be != NULL)
 			funcp = NSS_LOOKUP_DBOP(be, search_fnum);
 
+		/* request could be from within nscd so check states again */
 		if (be == NULL || (params.dnsi < 0 && (funcp == NULL ||
 		    (smf_state != NSCD_SVC_STATE_UNINITED &&
-		    smf_state != NSCD_SVC_STATE_UNKNOWN_SRC &&
+		    smf_state != NSCD_SVC_STATE_UNSUPPORTED_SRC &&
+		    smf_state != NSCD_SVC_STATE_FOREIGN_SRC &&
 		    smf_state < SCF_STATE_ONLINE)))) {
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
@@ -1114,10 +1118,16 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 	for (i = 0; i < s->max_src; i++) {
 		int	st, srci;
 
+		if (s->be[i] == NULL)
+			continue;
+
 		srci = (*s->nsw_cfg_p)->src_idx[i];
 		st = _nscd_get_smf_state(srci, params.dbi, 1);
-		if (st == NSCD_SVC_STATE_UNKNOWN_SRC ||
-		    st == NSCD_SVC_STATE_UNINITED || (params.privdb &&
+		if (st == NSCD_SVC_STATE_UNSUPPORTED_SRC ||
+		    (st == NSCD_SVC_STATE_FOREIGN_SRC &&
+		    s->be_version_p[i] == NULL) ||
+		    st == NSCD_SVC_STATE_UNINITED ||
+		    (params.privdb &&
 		    try_local2(params.dbi, srci) == 1)) {
 			nss_endent_u(rootp, initf, contextpp);
 
@@ -1358,10 +1368,11 @@ nss_psearch(void *buffer, size_t length)
 	errno = swret.errnum;
 
 	/*
-	 * move result/status from args to packed buffer only if
-	 * arg was being used
+	 * Move result/status from args to packed buffer only if
+	 * arg was being used and rc from the switch engine is not
+	 * NSS_TRYLOCAL.
 	 */
-	if (!swret.noarg)
+	if (!swret.noarg && status != NSS_TRYLOCAL)
 		nss_packed_set_status(buffer, length, status,  &arg);
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)

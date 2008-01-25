@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,11 @@ nscd_cfg_id_t _nscd_cfg_smf_services[] = {
 	{	4,	"svc:/network/dns/multicast:default"	},
 	{	-1,	NULL					}
 };
+
+/*
+ * default version for supported sources/backends
+ */
+void	*_nscd_be_version = NULL;
 
 /*
  * name service database table

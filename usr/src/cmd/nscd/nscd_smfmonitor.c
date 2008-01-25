@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ _nscd_alloc_service_state_table()
 	int i;
 
 	nscd_smf_service_state = calloc(NSCD_NUM_SMF_FMRI,
-		sizeof (nscd_smf_state_t));
+	    sizeof (nscd_smf_state_t));
 
 	if (nscd_smf_service_state == NULL)
 		return (NSCD_NO_MEMORY);
@@ -79,7 +79,7 @@ query_smf_state(int srci)
 
 	if (nscd_smf_service_state[srci].src_name == NULL)
 		nscd_smf_service_state[srci].src_name =
-			NSCD_NSW_SRC_NAME(srci);
+		    NSCD_NSW_SRC_NAME(srci);
 
 	if (strcmp(state, SCF_STATE_STRING_UNINIT) == 0)
 		NSCD_SMF_SVC_STATE(srci) = SCF_STATE_UNINIT;
@@ -165,9 +165,9 @@ _nscd_get_smf_state(int srci, int dbi, int recheck)
 
 	/* the files, compat, and dns backends are always available */
 	if ((*n == 'f' || *n == 'c' || *n == 'd') &&
-		(strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 ||
-		strcmp(NSCD_NSW_SRC_NAME(srci), "compat") == 0 ||
-		strcmp(NSCD_NSW_SRC_NAME(srci), "dns") == 0)) {
+	    (strcmp(NSCD_NSW_SRC_NAME(srci), "files") == 0 ||
+	    strcmp(NSCD_NSW_SRC_NAME(srci), "compat") == 0 ||
+	    strcmp(NSCD_NSW_SRC_NAME(srci), "dns") == 0)) {
 		return (SCF_STATE_ONLINE);
 	}
 
@@ -178,18 +178,20 @@ _nscd_get_smf_state(int srci, int dbi, int recheck)
 	 */
 	if (*n == 'u' && strcmp(NSCD_NSW_SRC_NAME(srci), "user") == 0) {
 		if (strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_PRINTERS) == 0)
-			return (NSCD_SVC_STATE_UNKNOWN_SRC);
+			return (NSCD_SVC_STATE_UNSUPPORTED_SRC);
 		else
 			return (SCF_STATE_ONLINE);
 	}
 
 	/*
-	 * unknown backend is not supported by nscd,
+	 * Foreign backend is not supported by nscd unless
+	 * the backend supports the nss2 interface (global
+	 * symbol _nss_<backname name>_version is present),
 	 * tell the switch engine to return NSS_TRYLOCAL
-	 * via rc NSCD_SVC_STATE_UNKNOWN_SRC
+	 * if needed via rc NSCD_SVC_STATE_FOREIGN_SRC.
 	 */
 	if (srci >= _nscd_cfg_num_nsw_src)
-		return (NSCD_SVC_STATE_UNKNOWN_SRC);
+		return (NSCD_SVC_STATE_FOREIGN_SRC);
 
 	if (recheck == 1)
 		return (query_smf_state(srci));

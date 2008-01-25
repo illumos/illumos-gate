@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,9 @@ _nscd_free_nsw_state(
 
 	if (s->be_constr != NULL)
 		free(s->be_constr);
+
+	if (s->be_version_p != NULL)
+		free(s->be_version_p);
 
 	s->base = NULL;
 
@@ -219,6 +222,18 @@ _nscd_create_nsw_state(
 		(me, "db be constructor array %p allocated\n", s->be_constr);
 	}
 
+	s->be_version_p = (void **)calloc(s->max_src, sizeof (void *));
+	if (s->be_version_p == NULL) {
+		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
+		(me, "not able to allocate s->be_version_p\n");
+
+		_nscd_free_nsw_state(s);
+		return (NULL);
+	} else {
+		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "db be version ptr array %p allocated\n", s->be_version_p);
+	}
+
 	s->be_db_pp = calloc(s->max_src, sizeof (nscd_db_t ***));
 	if (s->be_db_pp == NULL) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
@@ -303,6 +318,9 @@ _nscd_create_nsw_state(
 		}
 
 		s->be[i] = be;
+		s->be_version_p[i] = be_info->be_version;
+		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "backend version is %p\n", be_info->be_version);
 		nobe = 0;
 	}
 

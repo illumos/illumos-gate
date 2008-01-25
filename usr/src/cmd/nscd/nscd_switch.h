@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ typedef struct {
  * nscd_be_info_t is an abstraction of a NSS backend
  */
 typedef struct {
+	void			*be_version;
 	nss_backend_constr_t	be_constr;
 	nss_backend_finder_t	*finder;
 	void			*finder_priv;
@@ -103,6 +104,7 @@ typedef struct nscd_nsw_state_base {
  * nscd_nsw_state_t is an abstraction of all the data needed
  * to do lookup of NSS database (e.g. "passwd" or "hosts")
  */
+extern	void *_nscd_be_version;		/* default version for supported be */
 typedef struct nscd_nsw_state {
 	int				dbi;	/* which database? */
 	int				max_src; /* is == config->num_lookups */
@@ -115,6 +117,7 @@ typedef struct nscd_nsw_state {
 	nss_backend_t			**be; /* array of backends */
 	nss_backend_constr_t		*be_constr; /* be constructor array */
 	nscd_db_t			***be_db_pp;
+	void				**be_version_p; /* version ptr array */
 	struct nscd_nsw_state		*next;
 } nscd_nsw_state_t;
 
@@ -263,7 +266,8 @@ extern nscd_cfg_stat_switch_t	*nscd_switch_stats;
  * special service states used by the switch engine
  */
 #define	NSCD_SVC_STATE_UNINITED		-1
-#define	NSCD_SVC_STATE_UNKNOWN_SRC	-2
+#define	NSCD_SVC_STATE_FOREIGN_SRC	-2
+#define	NSCD_SVC_STATE_UNSUPPORTED_SRC	-3
 
 /*
  * prototypes

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,9 +72,9 @@ static rwlock_t nscd_nsw_config_lock = DEFAULTRWLOCK;
 
 /*
  * nsswitch source index/name array
- * (allow 16 user-defined nsswitch sources/backends)
+ * (allow 32 foreign nsswitch sources/backends)
  */
-#define		NSCD_NUM_SRC_UDEF 16
+#define		NSCD_NUM_SRC_FOREIGN 32
 nscd_cfg_id_t	*_nscd_cfg_nsw_src_all;
 int		_nscd_cfg_num_nsw_src_all;
 
@@ -129,7 +129,7 @@ _nscd_free_all_nsw_config()
 			continue;
 
 		nscd_nsw_config[i] = (nscd_nsw_config_t **)_nscd_set(
-			(nscd_acc_data_t *)nsw_cfg, NULL);
+		    (nscd_acc_data_t *)nsw_cfg, NULL);
 	}
 	(void) rw_unlock(&nscd_nsw_config_lock);
 }
@@ -170,7 +170,7 @@ _nscd_free_all_nsw_backend_info_db()
 			continue;
 
 		nscd_src_backend_db[i] = (nscd_db_t **)_nscd_set(
-			(nscd_acc_data_t *)db, NULL);
+		    (nscd_acc_data_t *)db, NULL);
 		nscd_src_backend_db_loaded[i] = 0;
 	}
 	(void) rw_unlock(&nscd_src_backend_db_lock);
@@ -193,6 +193,20 @@ _nscd_populate_nsw_backend_info_db(int srci)
 	const char		*dbn;
 	char			*me = "_nscd_populate_nsw_backend_info_db";
 	void			*handle = NULL;
+	nss_backend_constr_t	c;
+	void			*be_version = &_nscd_be_version;
+
+	/* get the version number of the backend (if available) */
+	if (srci >= _nscd_cfg_num_nsw_src) { /* a foreign backend */
+		c = _nscd_per_src_lookup(handle, NULL, src, &handle);
+		if (c == NULL)
+			be_version = NULL;
+		else
+			be_version = (void *)c;
+
+		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
+		(me, "foreign backend: _nss_%s_version = %p ", src, be_version);
+	}
 
 	for (i = 0; i < NSCD_NUM_DB; i++) {
 
@@ -206,9 +220,7 @@ _nscd_populate_nsw_backend_info_db(int srci)
 
 		(void) memset(&be_info, 0, sizeof (be_info));
 
-		for (bf = nsw_cfg->fe_params.finders;  bf != 0;
-				bf = bf->next) {
-			nss_backend_constr_t c;
+		for (bf = nsw_cfg->fe_params.finders;  bf != 0; bf = bf->next) {
 
 			c = (*bf->lookup)(handle, dbn, src, &handle);
 
@@ -216,6 +228,7 @@ _nscd_populate_nsw_backend_info_db(int srci)
 				be_info.be_constr = c;
 				be_info.finder = bf;
 				be_info.finder_priv = handle;
+				be_info.be_version = be_version;
 				break;
 			}
 		}
@@ -227,36 +240,36 @@ _nscd_populate_nsw_backend_info_db(int srci)
 			 */
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to find backend info "
-				"for <%s : %s>\n", src, dbn);
+			    "for <%s : %s>\n", src, dbn);
 		}
 
 		size = sizeof (nscd_be_info_t);
 
 		db_entry = _nscd_alloc_db_entry(NSCD_DATA_BACKEND_INFO,
-				dbn, size, 1, 1);
+		    dbn, size, 1, 1);
 
 		if (db_entry == NULL) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 			(me, "unable to allocate db entry for "
-				"<%s : %s>\n", src, dbn);
+			    "<%s : %s>\n", src, dbn);
 			return (NSCD_NO_MEMORY);
 		}
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 		(me, "adding be db entry %p for <%s : %s> to db %p: "
-			"constr = %p\n", db_entry, src, dbn,
-			*nscd_src_backend_db[srci], be_info.be_constr);
+		    "constr = %p\n", db_entry, src, dbn,
+		    *nscd_src_backend_db[srci], be_info.be_constr);
 
 		bi = (nscd_be_info_t *)*(db_entry->data_array);
 		*bi = be_info;
 
 		(void) _nscd_wrlock((nscd_acc_data_t *)
-				nscd_src_backend_db[srci]);
+		    nscd_src_backend_db[srci]);
 		nscd_src_backend_db_loaded[srci] = 1;
 		(void) _nscd_add_db_entry(*nscd_src_backend_db[srci],
-			dbn, db_entry, NSCD_ADD_DB_ENTRY_LAST);
+		    dbn, db_entry, NSCD_ADD_DB_ENTRY_LAST);
 		(void) _nscd_rw_unlock((nscd_acc_data_t *)
-				nscd_src_backend_db[srci]);
+		    nscd_src_backend_db[srci]);
 	}
 
 	return (NSCD_SUCCESS);
@@ -347,21 +360,19 @@ _nscd_create_sw_struct(
 	for (j = 0; j < maxsrc; j++) {
 		char *usrc;
 
-		for (k = 0; k < NSCD_NUM_SRC &&
-			NSCD_NSW_SRC_NAME(k) != NULL &&
-			strcmp(lkp->service_name,
-			NSCD_NSW_SRC_NAME(k)) != 0; k++);
+		for (k = 0; k < NSCD_NUM_SRC && NSCD_NSW_SRC_NAME(k) != NULL &&
+		    strcmp(lkp->service_name, NSCD_NSW_SRC_NAME(k)) != 0;
+		    k++) {
+			/* empty */
+		}
 
-		if (k < NSCD_NUM_SRC &&
-			nscd_src_backend_db_loaded[k] == 0) {
+		if (k < NSCD_NUM_SRC && nscd_src_backend_db_loaded[k] == 0) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-			(me, "unknown nsw source name %s\n",
-			lkp->service_name);
+			(me, "unknown nsw source name %s\n", lkp->service_name);
 			usrc = strdup(lkp->service_name);
 			if (usrc == NULL) {
 				rc = NSCD_NO_MEMORY;
-				_NSCD_LOG(NSCD_LOG_CONFIG,
-					NSCD_LOG_LEVEL_ERROR)
+				_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 				(me, "unable to strdup() source name\n");
 				goto error_exit;
 			}
@@ -385,8 +396,8 @@ _nscd_create_sw_struct(
 		}
 
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-			(me, "setting source index array [%d] = %d (%s)\n",
-			j, k, lkp->service_name);
+		(me, "setting source index array [%d] = %d (%s)\n",
+		    j, k, lkp->service_name);
 
 		src_idx_a[j] = k;
 
@@ -400,11 +411,9 @@ _nscd_create_sw_struct(
 	}
 
 	/* set it up to reference count the switch policy config */
-	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(
-			NSCD_DATA_NSW_CONFIG,
-			sizeof (nscd_nsw_config_t **),
-			free_nscd_nsw_config,
-			NSCD_ALLOC_RWLOCK);
+	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(NSCD_DATA_NSW_CONFIG,
+	    sizeof (nscd_nsw_config_t **), free_nscd_nsw_config,
+	    NSCD_ALLOC_RWLOCK);
 
 	if (nsw_cfg_p == NULL) {
 		rc = NSCD_NO_MEMORY;
@@ -427,7 +436,7 @@ _nscd_create_sw_struct(
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "switch policy \"%s\" for database is \"%s\"\n",
-		nsw_cfg->db_name, nsw_cfg->nsw_cfg_str);
+	    nsw_cfg->db_name, nsw_cfg->nsw_cfg_str);
 
 	nsw_cfg->nsw_config = swcfg;
 	nsw_cfg->src_idx = src_idx_a;
@@ -461,14 +470,14 @@ _nscd_create_sw_struct(
 	 * deleted eventually)
 	 */
 	nscd_nsw_config[dbi] = (nscd_nsw_config_t **)_nscd_set(
-		(nscd_acc_data_t *)nscd_nsw_config[dbi],
-		(nscd_acc_data_t *)nsw_cfg_p);
+	    (nscd_acc_data_t *)nscd_nsw_config[dbi],
+	    (nscd_acc_data_t *)nsw_cfg_p);
 
 	/*
 	 * also create a new nsw state base
 	 */
 	if ((rc = _nscd_init_nsw_state_base(dbi, compat_basei, 1)) !=
-		NSCD_SUCCESS) {
+	    NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "unable to initialize a nsw state base(%d)\n", dbi);
 		goto error_exit;
@@ -476,7 +485,7 @@ _nscd_create_sw_struct(
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "new nsw state base(%d) %p created\n", dbi,
-		nscd_nsw_state_base[dbi]);
+	    nscd_nsw_state_base[dbi]);
 
 	/*
 	 * also create a new getent context base
@@ -489,7 +498,7 @@ _nscd_create_sw_struct(
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "new getent context base(%d) %p created\n", dbi,
-	nscd_getent_ctx_base[dbi]);
+	    nscd_getent_ctx_base[dbi]);
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "new nsw config created (database = %s, "
@@ -544,11 +553,9 @@ create_nsw_config(int dbi)
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "nsw config structure %pallocated\n", nsw_cfg);
 
-	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(
-		NSCD_DATA_NSW_CONFIG,
-		sizeof (nscd_nsw_config_t **),
-		free_nscd_nsw_config,
-		NSCD_ALLOC_RWLOCK);
+	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(NSCD_DATA_NSW_CONFIG,
+	    sizeof (nscd_nsw_config_t **), free_nscd_nsw_config,
+	    NSCD_ALLOC_RWLOCK);
 
 	if (nsw_cfg_p == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
@@ -579,8 +586,8 @@ create_nsw_config(int dbi)
 	 */
 	*nsw_cfg_p = nsw_cfg;
 	nscd_nsw_config[dbi] = (nscd_nsw_config_t **)_nscd_set(
-		(nscd_acc_data_t *)nscd_nsw_config[dbi],
-		(nscd_acc_data_t *)nsw_cfg_p);
+	    (nscd_acc_data_t *)nscd_nsw_config[dbi],
+	    (nscd_acc_data_t *)nsw_cfg_p);
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "nsw config %p activated\n", nsw_cfg);
@@ -621,11 +628,9 @@ init_nsw_be_info_db(int srci)
 	}
 
 	/* set up to reference count the backend info db */
-	db_p = (nscd_db_t **)
-		_nscd_alloc(NSCD_DATA_BACKEND_INFO_DB,
-		sizeof (nscd_db_t **),
-		free_nsw_backend_info_db,
-		NSCD_ALLOC_RWLOCK);
+	db_p = (nscd_db_t **)_nscd_alloc(NSCD_DATA_BACKEND_INFO_DB,
+	    sizeof (nscd_db_t **), free_nsw_backend_info_db,
+	    NSCD_ALLOC_RWLOCK);
 
 	if (db_p == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
@@ -639,8 +644,8 @@ init_nsw_be_info_db(int srci)
 	(me, "backend database (db_p = %p, db = %p)\n", db_p, *db_p);
 
 	nscd_src_backend_db[srci] = (nscd_db_t **)_nscd_set(
-		(nscd_acc_data_t *)nscd_src_backend_db[srci],
-		(nscd_acc_data_t *)db_p);
+	    (nscd_acc_data_t *)nscd_src_backend_db[srci],
+	    (nscd_acc_data_t *)db_p);
 
 	return (NSCD_SUCCESS);
 }
@@ -680,7 +685,8 @@ _nscd_alloc_nsw_be_info_db()
 {
 	int	i;
 
-	_nscd_cfg_num_nsw_src_all = _nscd_cfg_num_nsw_src + NSCD_NUM_SRC_UDEF;
+	_nscd_cfg_num_nsw_src_all = _nscd_cfg_num_nsw_src +
+	    NSCD_NUM_SRC_FOREIGN;
 	nscd_src_backend_db = calloc(NSCD_NUM_SRC, sizeof (nscd_db_t **));
 	if (nscd_src_backend_db == NULL)
 		return (NSCD_NO_MEMORY);
@@ -692,12 +698,12 @@ _nscd_alloc_nsw_be_info_db()
 
 	/* also allocate/init the nsswitch source index/name array */
 	_nscd_cfg_nsw_src_all = (nscd_cfg_id_t *)calloc(
-		_nscd_cfg_num_nsw_src_all + 1, sizeof (nscd_cfg_id_t));
+	    _nscd_cfg_num_nsw_src_all + 1, sizeof (nscd_cfg_id_t));
 	for (i = 0; i < _nscd_cfg_num_nsw_src_all + 1; i++)
 		(_nscd_cfg_nsw_src_all + i)->index = -1;
 
 	(void) memcpy(_nscd_cfg_nsw_src_all, _nscd_cfg_nsw_src,
-			_nscd_cfg_num_nsw_src * sizeof (nscd_cfg_id_t));
+	    _nscd_cfg_num_nsw_src * sizeof (nscd_cfg_id_t));
 	return (NSCD_SUCCESS);
 }
 
@@ -730,11 +736,13 @@ static const int  dlopen_version  = 1;
 #define	NSS_DLOPEN_FORMAT "nss_%s.so.%d"
 #endif
 #ifndef NSS_DLSYM_FORMAT
-#define	NSS_DLSYM_FORMAT "_nss_%s_%s_constr"
+#define	NSS_DLSYM_FORMAT   "_nss_%s_%s_constr"
+#define	NSS_DLSYM_FORMAT_V "_nss_%s_version"
 #endif
 static const char dlopen_format[] = NSS_DLOPEN_FORMAT;
 static const char dlsym_format [] = NSS_DLSYM_FORMAT;
-static const size_t  format_maxlen   = sizeof (dlsym_format) - 4;
+static const char dlsym_format_v [] = NSS_DLSYM_FORMAT_V;
+static const size_t  format_maxlen   = sizeof (dlsym_format);
 
 /*ARGSUSED*/
 static nss_backend_constr_t
@@ -747,7 +755,9 @@ _nscd_per_src_lookup(void *handle, const char *db_name, const char *src_name,
 	size_t			len;
 	nss_backend_constr_t	res = NULL;
 
-	len = format_maxlen + strlen(db_name) + strlen(src_name);
+	len = format_maxlen + strlen(src_name);
+	if (db_name != NULL)
+		len += strlen(db_name);
 	name = alloca(len);
 	dlhandle = handle;
 	if ((dlhandle = handle) == NULL) {
@@ -756,7 +766,10 @@ _nscd_per_src_lookup(void *handle, const char *db_name, const char *src_name,
 	}
 
 	if (dlhandle != NULL) {
-		(void) sprintf(name, dlsym_format, src_name, db_name);
+		if (db_name != NULL)
+			(void) sprintf(name, dlsym_format, src_name, db_name);
+		else
+			(void) sprintf(name, dlsym_format_v, src_name);
 		if ((sym = dlsym(dlhandle, name)) == 0) {
 			if (handle == NULL)
 				(void) dlclose(dlhandle);
