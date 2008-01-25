@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +33,7 @@ SUNWprivate_1.1 {
 	libzfs_fini;
 	libzfs_init;
 	libzfs_print_on_error;
+	zfs_allocatable_devs;
 	zfs_build_perms;
 	zfs_clone;
 	zfs_close;

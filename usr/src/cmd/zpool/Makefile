@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,9 @@ include ../Makefile.cmd
 
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
 
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
+INCS += -I../../common/zfs
+
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 
 # lint complains about unused _umem_* functions
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 

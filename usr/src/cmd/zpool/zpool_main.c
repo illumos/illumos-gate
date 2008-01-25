@@ -50,6 +50,7 @@
 #include <libzfs.h>
 
 #include "zpool_util.h"
+#include "zfs_comutil.h"
 
 static int zpool_do_create(int, char **);
 static int zpool_do_destroy(int, char **);
@@ -560,8 +561,6 @@ zpool_do_create(int argc, char **argv)
 	int ret = 1;
 	char *altroot = NULL;
 	char *mountpoint = NULL;
-	nvlist_t **child;
-	uint_t children;
 	nvlist_t *props = NULL;
 	char *propval;
 
@@ -647,9 +646,7 @@ zpool_do_create(int argc, char **argv)
 		return (1);
 
 	/* make_root_vdev() allows 0 toplevel children if there are spares */
-	verify(nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
-	if (children == 0) {
+	if (!zfs_allocatable_devs(nvroot)) {
 		(void) fprintf(stderr, gettext("invalid vdev "
 		    "specification: at least one toplevel vdev must be "
 		    "specified\n"));
