@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -813,10 +813,18 @@ xvdi_create_dev(dev_info_t *parent, xendev_devclass_t devclass,
 void
 xendev_enum_class(dev_info_t *parent, xendev_devclass_t devclass)
 {
+	boolean_t dom0 = DOMAIN_IS_INITDOMAIN(xen_info);
+	boolean_t domU = !dom0;
 	i_xd_cfg_t *xdcp;
 
 	xdcp = i_xvdi_devclass2cfg(devclass);
 	ASSERT(xdcp != NULL);
+
+	if (dom0 && !(xdcp->flags & XD_DOM_ZERO))
+		return;
+
+	if (domU && !(xdcp->flags & XD_DOM_GUEST))
+		return;
 
 	if (xdcp->xsdev == NULL) {
 		int circ;
@@ -852,16 +860,8 @@ xendev_enum_all(dev_info_t *parent, boolean_t store_unavailable)
 	int i;
 	i_xd_cfg_t *xdcp;
 	boolean_t dom0 = DOMAIN_IS_INITDOMAIN(xen_info);
-	boolean_t domU = !dom0;
 
 	for (i = 0, xdcp = xdci; i < NXDC; i++, xdcp++) {
-
-		if (dom0 && !(xdcp->flags & XD_DOM_ZERO))
-			continue;
-
-		if (domU && !(xdcp->flags & XD_DOM_GUEST))
-			continue;
-
 		/*
 		 * Dom0 relies on watchpoints to create non-soft
 		 * devices - don't attempt to iterate over the store.
