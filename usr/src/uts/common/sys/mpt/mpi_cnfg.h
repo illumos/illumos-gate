@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1280,10 +1280,14 @@ typedef struct mpi_sas_io_unit1_phy_data {
 
 typedef struct config_page_sas_io_unit_1 {
 	config_extended_page_header_t	Header;
-	uint32_t			Reserved1;
+	uint16_t			ControlFlags;
+	uint16_t			MaxNumSATATargets;
+	uint16_t			AdditionalControlFlags;
+	uint16_t			Reserved1;
 	uint8_t				NumPhys;
-	uint8_t				Reserved2;
-	uint16_t			Reserved3;
+	uint8_t				SATAMaxQDepth;
+	uint8_t				ReportMissingDeviceDelay;
+	uint8_t				IODeviceMissingDelay;
 	mpi_sas_io_unit1_phy_data_t	PhyData[MPI_SAS_IOUNIT1_PHY_MAX];
 } config_page_sas_io_unit_1_t;
 
