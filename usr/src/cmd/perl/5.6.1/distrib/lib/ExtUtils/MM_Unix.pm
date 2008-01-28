@@ -1485,7 +1485,7 @@ sub init_dirscan {	# --- File and Directory Lists (.xs .pm .pod etc)
 	require File::Find;
 	File::Find::find(sub {
 	    if (-d $_){
-		if ($_ eq "CVS" || $_ eq "RCS"){
+		if ($_ eq "CVS" || $_ eq "RCS" || $_ eq ".svn"){
 		    $File::Find::prune = 1;
 		}
 		return;
@@ -2249,7 +2249,7 @@ $to: $from $self->{MAKEFILE} " . $self->catdir($todir,'.exists') . "
 
 Takes a path to a file that is found by init_dirscan and returns false
 if we don't want to include this file in the library. Mainly used to
-exclude RCS, CVS, and SCCS directories from installation.
+exclude RCS, CVS, SCCS and Subversion directories from installation.
 
 =cut
 
@@ -2257,7 +2257,7 @@ exclude RCS, CVS, and SCCS directories from installation.
 
 sub libscan {
     my($self,$path) = @_;
-    return '' if $path =~ m:\b(RCS|CVS|SCCS)\b: ;
+    return '' if $path =~ m:\b(RCS|CVS|SCCS|\.svn)\b: ;
     $path;
 }
 

@@ -657,8 +657,9 @@ sub installlib {
 
     my $name = $_;
 
-    # Ignore SCCS, RCS and CVS directories.
-    if ((($name eq 'SCCS' or $name eq 'CVS' or $name eq 'RCS') and -d $name)
+    # Ignore SCCS, RCS, CVS and Subversion directories.
+    if ((($name eq 'SCCS' or $name eq 'CVS' or $name eq 'RCS'
+	or $name eq '.svn') and -d $name)
         or ($name eq '.tstamp' and -f $name)) {
 	$File::Find::prune = 1;
 	return;
