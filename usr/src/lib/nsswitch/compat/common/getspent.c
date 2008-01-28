@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -150,23 +150,24 @@ merge_spents(be, argp, fields)
 	 */
 	if (be->return_string_data == 1) {
 		int	n;
-		char	b[16];
+		char	b[16 * 7];
 
 		/* reset the result ptr to the original value */
 		argp->buf.result = NULL;
 
-#define	printnum(num)	sprintf(b, "%d", num)) ? b : ""
+#define	printnum(i, num)	\
+    sprintf(b + (i * 16), "%d", num)) ? b + (i * 16) : ""
 
 		n = snprintf(argp->buf.buffer, argp->buf.buflen,
 			"%s:%s:%s:%s:%s:%s:%s:%s:%s", sp->sp_namp,
 			(sp->sp_pwdp ? sp->sp_pwdp : ""),
-			(sp->sp_lstchg >= 0 && printnum(sp->sp_lstchg),
-			(sp->sp_min >= 0 && printnum(sp->sp_min),
-			(sp->sp_max >= 0 && printnum(sp->sp_max),
-			(sp->sp_warn > 0 && printnum(sp->sp_warn),
-			(sp->sp_inact > 0 && printnum(sp->sp_inact),
-			(sp->sp_expire > 0 && printnum(sp->sp_expire),
-			(sp->sp_flag != 0 && printnum(sp->sp_flag));
+			(sp->sp_lstchg >= 0 && printnum(0, sp->sp_lstchg),
+			(sp->sp_min >= 0 && printnum(1, sp->sp_min),
+			(sp->sp_max >= 0 && printnum(2, sp->sp_max),
+			(sp->sp_warn > 0 && printnum(3, sp->sp_warn),
+			(sp->sp_inact > 0 && printnum(4, sp->sp_inact),
+			(sp->sp_expire > 0 && printnum(5, sp->sp_expire),
+			(sp->sp_flag != 0 && printnum(6, sp->sp_flag));
 
 		if (n > argp->buf.buflen)
 			return (NSS_STR_PARSE_ERANGE);
