@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,7 +150,7 @@ main(int argc, char **argv)
 
 		case 'p':
 			uid = getentry(optarg);
-			if (uid < 0) {
+			if (uid > MAXUID) {
 				(void) unlink(tmpfil);
 				exit(32);
 			}
@@ -161,7 +161,7 @@ main(int argc, char **argv)
 			}
 			for (i = optind; i < argc; i++) {
 				uid = getentry(argv[i]);
-				if (uid < 0) {
+				if (uid > MAXUID) {
 					(void) unlink(tmpfil);
 					exit(32);
 				}
@@ -193,7 +193,7 @@ main(int argc, char **argv)
 
 	for (i = optind; i < argc; i++) {
 		uid = getentry(argv[i]);
-		if (uid < 0)
+		if (uid > MAXUID)
 			continue;
 		getprivs(uid);
 		if (editit())
@@ -228,19 +228,6 @@ getentry(char *name)
 		uid = pw->pw_uid;
 	else {
 		(void) fprintf(stderr, "%s: no such user\n", name);
-		(void) sleep(1);
-		return (-1);
-	}
-	if ((uint64_t)uid > (UFS_MAXOFFSET_T / sizeof (struct dqblk))) {
-		/*
-		 * The 'quotas' file contains 32-byte records that are
-		 * indexed by uid. This uid is too large to have a record
-		 * in any 40-bit file.  Now that the quotas file can be
-		 * a max size of 1T, a uid would need to be
-		 * represented as a long long in order to be too large.
-		 */
-		(void) fprintf(stderr,
-			"edquota: uid %ld too large for quotas\n", uid);
 		(void) sleep(1);
 		return (-1);
 	}
