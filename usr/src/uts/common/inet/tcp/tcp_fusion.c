@@ -948,12 +948,26 @@ plugged:
 		mutex_exit(&tcp->tcp_non_sq_lock);
 		mutex_enter(&peer_tcp->tcp_non_sq_lock);
 		mutex_enter(&tcp->tcp_non_sq_lock);
-		CONN_DEC_REF(peer_tcp->tcp_connp);
-		/* This might have changed in the interim */
+		/*
+		 * This might have changed in the interim
+		 * Once read-side tcp_non_sq_lock is dropped above
+		 * anything can happen, we need to check all
+		 * known conditions again once we reaquire
+		 * read-side tcp_non_sq_lock.
+		 */
 		if (tcp->tcp_fuse_syncstr_plugged) {
 			mutex_exit(&peer_tcp->tcp_non_sq_lock);
+			CONN_DEC_REF(peer_tcp->tcp_connp);
 			goto plugged;
 		}
+		if (!tcp->tcp_direct_sockfs || tcp->tcp_fuse_syncstr_stopped) {
+			mutex_exit(&tcp->tcp_non_sq_lock);
+			mutex_exit(&peer_tcp->tcp_non_sq_lock);
+			CONN_DEC_REF(peer_tcp->tcp_connp);
+			TCP_STAT(tcps, tcp_fusion_rrw_busy);
+			return (EBUSY);
+		}
+		CONN_DEC_REF(peer_tcp->tcp_connp);
 	} else {
 		mutex_enter(&peer_tcp->tcp_non_sq_lock);
 	}
