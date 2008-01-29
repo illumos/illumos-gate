@@ -958,6 +958,20 @@ startup_platform(void)
 	mutex_cap_factor = OPL_BOFF_MAX_SCALE;
 }
 
+static uint_t
+get_mmu_id(processorid_t cpuid)
+{
+	int pb = opl_get_physical_board(LSB_ID(cpuid));
+
+	if (pb == -1) {
+		cmn_err(CE_PANIC,
+		    "opl_get_physical_board failed (cpu %d LSB %u)",
+		    cpuid, LSB_ID(cpuid));
+	}
+	return (pb * OPL_MAX_COREID_PER_BOARD) + (CHIP_ID(cpuid) *
+	    OPL_MAX_COREID_PER_CMP) + CORE_ID(cpuid);
+}
+
 void
 plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
 {
@@ -965,7 +979,7 @@ plat_cpuid_to_mmu_ctx_info(processorid_t cpuid, mmu_ctx_info_t *info)
 
 	impl = cpunodes[cpuid].implementation;
 	if (IS_OLYMPUS_C(impl) || IS_JUPITER(impl)) {
-		info->mmu_idx = MMU_ID(cpuid);
+		info->mmu_idx = get_mmu_id(cpuid);
 		info->mmu_nctxs = 8192;
 	} else {
 		cmn_err(CE_PANIC, "Unknown processor %d", impl);
