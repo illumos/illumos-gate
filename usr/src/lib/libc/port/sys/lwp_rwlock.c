@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,44 +41,69 @@
 int
 __lwp_rwlock_rdlock(rwlock_t *rwl, timespec_t *tsp)
 {
-	if (syscall(SYS_lwp_rwlock_sys,
-	    SUBSYS_lwp_rwlock_rdlock, rwl, tsp) == -1)
-		return (errno);
-	return (0);
+	sysret_t rval;
+	int error;
+
+	error = __systemcall(&rval, SYS_lwp_rwlock_sys,
+	    SUBSYS_lwp_rwlock_rdlock, rwl, tsp);
+	if (error == ERESTART)
+		error = EINTR;
+
+	return (error);
 }
 
 int
 __lwp_rwlock_wrlock(rwlock_t *rwl, timespec_t *tsp)
 {
-	if (syscall(SYS_lwp_rwlock_sys,
-	    SUBSYS_lwp_rwlock_wrlock, rwl, tsp) == -1)
-		return (errno);
-	return (0);
+	sysret_t rval;
+	int error;
+
+	error = __systemcall(&rval, SYS_lwp_rwlock_sys,
+	    SUBSYS_lwp_rwlock_wrlock, rwl, tsp);
+	if (error == ERESTART)
+		error = EINTR;
+
+	return (error);
 }
 
 int
 __lwp_rwlock_tryrdlock(rwlock_t *rwl)
 {
-	if (syscall(SYS_lwp_rwlock_sys,
-	    SUBSYS_lwp_rwlock_tryrdlock, rwl) == -1)
-		return (errno);
-	return (0);
+	sysret_t rval;
+	int error;
+
+	error = __systemcall(&rval, SYS_lwp_rwlock_sys,
+	    SUBSYS_lwp_rwlock_tryrdlock, rwl);
+	if (error == ERESTART)
+		error = EINTR;
+
+	return (error);
 }
 
 int
 __lwp_rwlock_trywrlock(rwlock_t *rwl)
 {
-	if (syscall(SYS_lwp_rwlock_sys,
-	    SUBSYS_lwp_rwlock_trywrlock, rwl) == -1)
-		return (errno);
-	return (0);
+	sysret_t rval;
+	int error;
+
+	error = __systemcall(&rval, SYS_lwp_rwlock_sys,
+	    SUBSYS_lwp_rwlock_trywrlock, rwl);
+	if (error == ERESTART)
+		error = EINTR;
+
+	return (error);
 }
 
 int
 __lwp_rwlock_unlock(rwlock_t *rwl)
 {
-	if (syscall(SYS_lwp_rwlock_sys,
-	    SUBSYS_lwp_rwlock_unlock, rwl) == -1)
-		return (errno);
-	return (0);
+	sysret_t rval;
+	int error;
+
+	error = __systemcall(&rval, SYS_lwp_rwlock_sys,
+	    SUBSYS_lwp_rwlock_unlock, rwl);
+	if (error == ERESTART)
+		error = EINTR;
+
+	return (error);
 }
