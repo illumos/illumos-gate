@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,10 +45,12 @@ extern "C" {
 #define	VS_DRV_IOCTL_DISABLE	0x0002	/* vscand shutting down */
 #define	VS_DRV_IOCTL_CONFIG	0x0004	/* vscand config data update */
 
-/* vsr_access */
-#define	VS_ACCESS_UNDEFINED	0
-#define	VS_ACCESS_ALLOW		1
-#define	VS_ACCESS_DENY		2
+/* Scan Result - vsr_result */
+#define	VS_STATUS_UNDEFINED	0
+#define	VS_STATUS_NO_SCAN	1 /* scan not required */
+#define	VS_STATUS_ERROR		2 /* scan failed */
+#define	VS_STATUS_CLEAN		3 /* scan successful, file clean */
+#define	VS_STATUS_INFECTED	4 /* scan successful, file infected */
 
 #define	VS_TYPES_LEN		4096	/* vs_config_t - types buffer */
 
@@ -68,7 +70,7 @@ typedef struct vs_scan_req {
 	uint8_t vsr_quarantined;
 	char vsr_path[MAXPATHLEN];
 	vs_scanstamp_t vsr_scanstamp;
-	uint32_t vsr_access; /* VS_ACCESS_ALLOW, VS_ACCESS_DENY */
+	uint32_t vsr_result;
 } vs_scan_req_t;
 
 
@@ -89,10 +91,25 @@ typedef struct vs_config {
  */
 #define	VS_TYPES_MAX		VS_TYPES_LEN / 2
 
+/*
+ * seconds to wait for daemon to reconnect before unregistering from VFS
+ * during this time, the kernel will:
+ * - allow access to files that have not been modified since last scanned
+ * - deny access to files which have been modified since last scanned
+ */
+#define	VS_DAEMON_WAIT_SEC	60
+
+/* access derived from scan result (VS_STATUS_XXX) and file attributes */
+#define	VS_ACCESS_UNDEFINED	0
+#define	VS_ACCESS_ALLOW		1
+#define	VS_ACCESS_DENY		2
+
 int vscan_svc_init(void);
 void vscan_svc_fini(void);
-void vscan_svc_enable(boolean_t);
+void vscan_svc_enable(void);
+void vscan_svc_disable(void);
 int vscan_svc_configure(vs_config_t *);
+boolean_t vscan_svc_is_enabled(void);
 boolean_t vscan_svc_in_use(void);
 vnode_t *vscan_svc_get_vnode(int);
 
@@ -101,6 +118,8 @@ void vscan_door_fini(void);
 int vscan_door_open(int);
 void vscan_door_close(void);
 int vscan_door_scan_file(vs_scan_req_t *);
+
+boolean_t vscan_drv_create_node(int);
 
 #endif /* _KERNEL */
 

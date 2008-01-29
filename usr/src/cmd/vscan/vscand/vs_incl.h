@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@ extern "C" {
 #include <sys/vscan.h>
 #include <libvscan.h>
 
-/* vscan result code - "scan_ret_code" field of vs_result_t */
+/* vscan result code - "vsr_rc" field of vs_result_t */
 #define	VS_RESULT_SE_ERROR    	-2 /* scan engine i/f error */
 #define	VS_RESULT_ERROR    	-1
 #define	VS_RESULT_UNDEFINED	0
@@ -99,7 +99,7 @@ typedef struct vs_eng_conn {
 	int vsc_sockfd;
 	struct vs_eng_conn *vsc_next;
 	struct vs_eng_conn *vsc_prev;
-}vs_eng_conn_t;
+} vs_eng_conn_t;
 
 
 /* file attributes used by virus scanning */
@@ -120,7 +120,7 @@ void vs_door_fini(void);
 
 void vs_svc_init(void);
 void vs_svc_fini(void);
-int vs_svc_scan_file(char *, char *, vs_attr_t *, int);
+int vs_svc_scan_file(char *, char *, vs_attr_t *, int, vs_scanstamp_t *);
 
 void vs_eng_init(void);
 void vs_eng_fini(void);

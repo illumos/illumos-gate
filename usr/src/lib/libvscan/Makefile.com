@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,46 +28,25 @@
 LIBRARY= libvscan.a
 VERS= .1
 
-OBJS_SHARED=
-OBJS_COMMON= libvscan.o
-
-OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
+OBJECTS= libvscan.o
 
 include ../../Makefile.lib
 
 LIBS=	$(DYNLIB) $(LINTLIB)
-
 SRCDIR =	../common
-SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
-	$(OBJS_SHARED:%.o=$(SRC)/common/vscan/%.c)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 # Reset the Makefile.lib macro ROOTLIBDIR to refer to usr/lib/vscan
 ROOTLIBDIR = $(ROOT)/usr/lib/vscan
-ROOTHDRDIR = $(ROOT)/usr/include
-ROOTHDRS = $(HDRS:%=$(ROOTHDRDIR)/%)
 
-$(ROOTLIBDIR):
-	$(INS.dir)
-
-LDLIBS +=	-lc -lscf -lsecdb -lnsl -lm
-CFLAGS +=   $(CCVERBOSE)
+LDLIBS += -lc -lscf -lsecdb -lnsl -lm
+CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRCDIR)
-DYNFLAGS +=	-R/usr/lib/vscan
-LDLIBS32 +=	-L$(ROOT)/usr/lib/vscan
-
-#C99MODE=	-xc99=%all
-#C99LMODE=	-Xc99=%all
+DYNFLAGS += -R/usr/lib/vscan
 
 .KEEP_STATE:
 
-install: all $(ROOTLIBDIR) install_h
-
-install_h: $(ROOTHDRDIR) $(ROOTHDRS)
-
 all: $(LIBS)
-
 lint: lintcheck
 
 include ../../Makefile.targ
-

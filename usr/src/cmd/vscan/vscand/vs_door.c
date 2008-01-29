@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,31 +111,30 @@ static void
 vs_door_scan_req(void *cookie, char *ptr, size_t size, door_desc_t *dp,
     uint_t n_desc)
 {
-	int flags = 0, access = VS_ACCESS_DENY;
+	int flags = 0;
 	vs_scan_req_t scan_rsp;
-	/* LINTED E_BAD_PTR_CAST_ALIGN - to be fixed with encoding */
-	vs_scan_req_t *scan_req = (vs_scan_req_t *)ptr;
-	char *fname = scan_req->vsr_path;
+	vs_scan_req_t *scan_req;
 	char devname[MAXPATHLEN];
-	uint64_t fsize = scan_req->vsr_size;
 	vs_attr_t fattr;
 
-	(void) snprintf(devname, MAXPATHLEN, "%s%d",
-	    VS_DRV_PATH, scan_req->vsr_id);
-	fattr.vsa_size = fsize;
-	fattr.vsa_modified = scan_req->vsr_modified;
-	fattr.vsa_quarantined = scan_req->vsr_quarantined;
-	(void) strlcpy(fattr.vsa_scanstamp, scan_req->vsr_scanstamp,
-	    sizeof (vs_scanstamp_t));
+	if (ptr == NULL) {
+		scan_rsp.vsr_result = VS_STATUS_ERROR;
+		scan_rsp.vsr_scanstamp[0] = '\0';
+	} else {
+		/* LINTED E_BAD_PTR_CAST_ALIGN - to be fixed with encoding */
+		scan_req = (vs_scan_req_t *)ptr;
+		(void) snprintf(devname, MAXPATHLEN, "%s%d",
+		    VS_DRV_PATH, scan_req->vsr_id);
 
-	access = vs_svc_scan_file(devname, fname, &fattr, flags);
+		fattr.vsa_size = scan_req->vsr_size;
+		fattr.vsa_modified = scan_req->vsr_modified;
+		fattr.vsa_quarantined = scan_req->vsr_quarantined;
+		(void) strlcpy(fattr.vsa_scanstamp, scan_req->vsr_scanstamp,
+		    sizeof (vs_scanstamp_t));
 
-	/* process result */
-	scan_rsp.vsr_access = access;
-	scan_rsp.vsr_modified = fattr.vsa_modified;
-	scan_rsp.vsr_quarantined = fattr.vsa_quarantined;
-	(void) strlcpy(scan_rsp.vsr_scanstamp, fattr.vsa_scanstamp,
-	    sizeof (vs_scanstamp_t));
+		scan_rsp.vsr_result = vs_svc_scan_file(devname,
+		    scan_req->vsr_path, &fattr, flags, &scan_rsp.vsr_scanstamp);
+	}
 
 	(void) door_return((char *)&scan_rsp, sizeof (vs_scan_req_t), NULL, 0);
 }

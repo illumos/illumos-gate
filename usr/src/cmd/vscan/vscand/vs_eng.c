@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,15 +116,11 @@ vs_eng_init()
  *
  * Configure scan engine connections.
  *
- * The enable property is the single indicator that the engine
- * configuration is valid. Configuration is guaranteed (by the
- * library) to be consistent; if the host is invalid or unconfigured,
- * the enable setting will always be false.
- *
  * If a scan engine has been reconfigured (different host or port)
- * the scan engine's error count and statitics are reset, and
+ * the scan engine's error count is reset.
+ *
  * vs_icap_config is invoked to reset engine-specific data stored
- * in vs_icap
+ * in vs_icap.
  *
  */
 void
@@ -132,6 +128,7 @@ vs_eng_config(vs_props_all_t *config)
 {
 	int i;
 	vs_props_se_t *cfg;
+	vs_engine_t *eng;
 
 	(void) pthread_mutex_lock(&vs_eng_mutex);
 
@@ -140,21 +137,20 @@ vs_eng_config(vs_props_all_t *config)
 
 	for (i = 0; i < VS_SE_MAX; i++) {
 		cfg = &config->va_se[i];
+		eng = &vs_engines[i];
 
-		if (vs_eng_compare(i, cfg->vep_host, cfg->vep_port) != 0) {
-			vs_engines[i].vse_error = 0;
-			vs_icap_config(i, cfg->vep_host, cfg->vep_port);
-		}
+		if (vs_eng_compare(i, cfg->vep_host, cfg->vep_port) != 0)
+			eng->vse_error = 0;
 
 		if (cfg->vep_enable) {
-			vs_engines[i].vse_cfg = *cfg;
+			eng->vse_cfg = *cfg;
 			vs_eng_total_maxcon += cfg->vep_maxconn;
 			vs_eng_count++;
 		} else {
-			(void) memset(&vs_engines[i].vse_cfg, 0,
-			    sizeof (vs_props_se_t));
+			(void) memset(&eng->vse_cfg, 0, sizeof (vs_props_se_t));
 		}
 
+		vs_icap_config(i, eng->vse_cfg.vep_host, eng->vse_cfg.vep_port);
 	}
 
 	if ((vs_eng_total_maxcon <= 0) || (vs_eng_count == 0))
@@ -477,6 +473,8 @@ vs_eng_connect(vs_eng_conn_t *conn)
 	    &sock_opt, sizeof (sock_opt)) < 0) ||
 	    (setsockopt(conn->vsc_sockfd, SOL_SOCKET, SO_KEEPALIVE,
 	    &sock_opt, sizeof (sock_opt)) < 0)) {
+		syslog(LOG_WARNING, "Scan Engine - connection error (%s:%d) %s",
+		    conn->vsc_host, conn->vsc_port, strerror(errno));
 		(void) close(conn->vsc_sockfd);
 		conn->vsc_sockfd = -1;
 		return (-1);
@@ -553,10 +551,11 @@ vs_eng_scanstamp_current(vs_scanstamp_t scanstamp)
 	if (scanstamp[0] == '\0')
 		return (0);
 
-	/* if scanstamp matches that of any engine with no errors */
+	/* if scanstamp matches that of any enabled engine with no errors */
 	(void) pthread_mutex_lock(&vs_eng_mutex);
 	for (i = 0; i < VS_SE_MAX; i++) {
-		if ((vs_engines[i].vse_error == 0) &&
+		if ((vs_engines[i].vse_cfg.vep_enable) &&
+		    (vs_engines[i].vse_error == 0) &&
 		    (vs_icap_compare_scanstamp(i, scanstamp) == 0))
 			break;
 	}

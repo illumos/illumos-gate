@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,8 +62,7 @@ sdt:vscan::vscan-wait-scan
 
 sdt:vscan::vscan-wait-slot
 {
-	printf("%s",
-		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path));
+	printf("%s", stringof(arg0));
 }
 
 sdt:vscan::vscan-insert
@@ -76,7 +75,7 @@ sdt:vscan::vscan-release
 	printf("idx: %d - %s", arg1, stringof(arg0));
 }
 
-sdt:vscan::vscan-attr
+sdt:vscan::vscan-getattr
 {
 	printf("%s, m: %d, q: %d, scanstamp: %s",
 		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path),
@@ -85,7 +84,47 @@ sdt:vscan::vscan-attr
 		stringof(((vscan_file_t *)arg0)->vsf_scanstamp));
 }
 
+sdt:vscan::vscan-setattr
+{
+	/* XAT_AV_QUARANTINED */
+	printf("%s", (arg1 & 0x400) == 0 ? "" :
+	    ((vscan_file_t *)arg0)->vsf_quarantined ? "q: 1, " : "q: 0, ");
 
+	/* XAT_AV_MODIFIED */
+	printf("%s", (arg1 & 0x800) == 0 ? "" :
+	    ((vscan_file_t *)arg0)->vsf_modified ? "m: 1, " : "m: 0, ");
+
+	/* XAT_AV_SCANSTAMP */
+	printf("%s", (arg1 & 0x1000) == 0 ? "" : "scanstamp: ");
+	printf("%s", (arg1 & 0x1000) == 0 ? "" :
+	    stringof(((vscan_file_t *)arg0)->vsf_scanstamp));
+}
+
+
+sdt:vscan::vscan-mtime-changed
+{
+	printf("%s",
+		stringof(((vscan_file_t *)arg0)->vsf_req.vsr_vp->v_path));
+}
+
+
+sdt:vscan::vscan-result
+{
+	printf("VS_STATUS_%s - VS_ACCESS_%s",
+	    arg0 == 0 ? "UNDEFINED" :
+	    arg0 == 1 ? "NO_SCAN" :
+	    arg0 == 2 ? "ERROR" :
+	    arg0 == 3 ? "CLEAN" :
+	    arg0 == 4 ? "INFECTED" : "XXX unknown",
+	    arg1 == 0 ? "UNDEFINED" :
+	    arg1 == 1 ? "ALLOW" : "DENY");
+}
+
+
+fbt:vscan:vscan_svc_enable:entry,
+fbt:vscan:vscan_svc_enable:return,
+fbt:vscan:vscan_svc_disable:entry,
+fbt:vscan:vscan_svc_disable:return,
 fbt:vscan:vscan_svc_configure:entry,
 fbt:vscan:vscan_svc_configure:return,
 fbt:vscan:vscan_svc_exempt_filetype:entry,
@@ -114,9 +153,15 @@ fbt:vscan:vscan_door_scan_file:entry
 }
 fbt:vscan:vscan_door_scan_file:return
 {
+	printf("%s", args[1] == 0 ? "success" : "error");
 }
 
 /* vscan_drv.c */
+
+sdt:vscan::vscan-minor-node
+{
+	printf("vscan%d %s", arg0, arg1 != 0 ? "created" : "error");
+}
 
 /*
  * unprivileged vscan driver access attempt
@@ -145,8 +190,35 @@ fbt:vscan:vscan_drv_close:entry
 fbt:vscan:vscan_drv_ioctl:entry
 / (int)args[0] == 0/
 {
-	printf("vscan daemon ioctl %d", args[1]);
+	printf("vscan daemon ioctl %d %s", args[1],
+		args[1] == 1 ? "ENABLE" :
+		args[1] == 2 ? "DISABLE" :
+		args[1] == 4 ? "CONFIG" : "unknown");
 }
+
+fbt:vscan:vscan_drv_delayed_disable:entry,
+fbt:vscan:vscan_drv_delayed_disable:return
+{
+}
+
+sdt:vscan::vscan-reconnect
+{
+}
+
+/*
+fbt:vscan:vscan_drv_attach:entry,
+fbt:vscan:vscan_drv_attach:return,
+fbt:vscan:vscan_drv_detach:entry,
+fbt:vscan:vscan_drv_detach:return
+{
+}
+
+fbt:vscan:vscan_drv_in_use:return,
+fbt:vscan:vscan_svc_in_use:return
+{
+	printf("%s", args[1] ? "in use" : "not in use");
+}
+*/
 
 
 /*
@@ -169,8 +241,6 @@ fbt:vscan:vscan_drv_read:entry
 */
 
 
-
-
 /*
  *** vscan daemon - vscand ***
  */
@@ -184,10 +254,12 @@ pid$target::vs_icap_scan_file:entry
 
 pid$target::vs_svc_scan_file:return
 {
-	printf("%s",
-	    arg1 == 0 ? "scan required" :
-	    arg1 == 1 ? "ALLOW" :
-	    arg1 == 2 ? "DENY" : "UNKNOWN");
+	printf("VS_STATUS_%s",
+	    arg1 == 0 ? "UNDEFINED" :
+	    arg1 == 1 ? "NO_SCAN" :
+	    arg1 == 2 ? "ERROR" :
+	    arg1 == 3 ? "CLEAN" :
+	    arg1 == 4 ? "INFECTED" : "XXX unknown");
 }
 
 pid$target::vs_eng_scanstamp_current:return
@@ -197,17 +269,18 @@ pid$target::vs_eng_scanstamp_current:return
 
 pid$target::vs_icap_scan_file:return
 {
-	printf("%ld %s", arg1, arg1 == 0 ? "VSCAN_UNDEFINED" :
-	    arg1 == 1 ? "VSCAN_CLEAN" :
-	    arg1 == 2 ? "VSCAN_CLEANED" :
-	    arg1 == 3 ? "VSCAN_FORBIDDEN" : "VSCAN_(SE)_ERROR");
+	printf("%ld VS_RESULT_%s", arg1,
+	    arg1 == 0 ? "UNDEFINED" :
+	    arg1 == 1 ? "CLEAN" :
+	    arg1 == 2 ? "CLEANED" :
+	    arg1 == 3 ? "FORBIDDEN" : "(SE)_ERROR");
 }
 
 pid$target::vs_stats_set:entry
 {
 	printf("%s", (arg0 == 1) ? "CLEAN" :
 		(arg0 == 2) ? "CLEANED" :
-		(arg0 == 3) ? "QUARANTINE" : "SCAN ERROR");
+		(arg0 == 3) ? "QUARANTINE" : "ERROR");
 }
 
 pid$target::vs_stats_set:return

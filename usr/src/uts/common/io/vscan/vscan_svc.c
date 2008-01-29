@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,17 +67,18 @@ typedef struct vscan_fs_req {
 typedef struct vscan_file {
 	vscan_fs_req_t vsf_req;
 	uint32_t vsf_wait_count;
+	kcondvar_t vsf_cv; /* wait for in progress scan */
 	uint8_t vsf_quarantined;
 	uint8_t vsf_modified;
 	uint64_t vsf_size;
+	timestruc_t vsf_mtime;
 	vs_scanstamp_t vsf_scanstamp;
+	uint32_t vsf_result;
 	uint32_t vsf_access;
 } vscan_file_t;
 
 static vscan_file_t vscan_svc_files[VS_DRV_MAX_FILES + 1];
-static int vscan_svc_files_idx = 0; /* idx of most recently allocated slot */
 static kcondvar_t vscan_svc_cv; /* wait for slot in vscan_svc_files */
-static kcondvar_t vscan_svc_file_cv[VS_DRV_MAX_FILES + 1]; /* wait for scan */
 static int vscan_svc_wait_count = 0; /* # waiting for slot in vscan_svc_files */
 static int vscan_svc_req_count = 0; /* # scan requests */
 
@@ -112,9 +113,10 @@ static int vscan_svc_wait_for_scan(vnode_t *);
 static int vscan_svc_insert_file(vscan_fs_req_t *);
 static void vscan_svc_release_file(int);
 static int vscan_svc_find_slot(void);
+static void vscan_svc_process_scan_result(int);
 static void vscan_svc_notify_scan_complete(int);
 static int vscan_svc_getattr(int);
-static int vscan_svc_setattr(int);
+static int vscan_svc_setattr(int, int);
 
 static vs_scan_req_t *vscan_svc_populate_req(int);
 static void vscan_svc_parse_rsp(int, vs_scan_req_t *);
@@ -126,26 +128,10 @@ static void vscan_svc_parse_rsp(int, vs_scan_req_t *);
 int
 vscan_svc_init()
 {
-	int i;
-
 	mutex_init(&vscan_svc_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vscan_svc_cfg_mutex, NULL, MUTEX_DRIVER, NULL);
-
-	/* create task queue for async requests */
-	if ((vscan_svc_taskq = taskq_create("vscan", VS_TASKQ_NUM_THREADS,
-	    MINCLSYSPRI, 1, INT_MAX, 0)) == NULL) {
-		cmn_err(CE_WARN, "All scan requests will be "
-		    "processed synchronously");
-	}
-
-	/* initialize vscan_svc_files table */
 	(void) memset(&vscan_svc_files, 0, sizeof (vscan_svc_files));
-
-	/* initialize condition variables */
 	cv_init(&vscan_svc_cv, NULL, CV_DEFAULT, NULL);
-
-	for (i = 0; i <= VS_DRV_MAX_FILES; i++)
-		cv_init(&vscan_svc_file_cv[i], NULL, CV_DEFAULT, NULL);
 
 	return (0);
 }
@@ -156,19 +142,10 @@ vscan_svc_init()
 void
 vscan_svc_fini()
 {
-	int i;
-
 	ASSERT(vscan_svc_enabled == B_FALSE);
 	ASSERT(vscan_svc_in_use() == B_FALSE);
 
-	if (vscan_svc_taskq)
-		taskq_destroy(vscan_svc_taskq);
-
 	cv_destroy(&vscan_svc_cv);
-
-	for (i = 0; i <= VS_DRV_MAX_FILES; i++)
-		cv_destroy(&vscan_svc_file_cv[i]);
-
 	mutex_destroy(&vscan_svc_mutex);
 	mutex_destroy(&vscan_svc_cfg_mutex);
 }
@@ -177,18 +154,60 @@ vscan_svc_fini()
  * vscan_svc_enable
  */
 void
-vscan_svc_enable(boolean_t enable)
+vscan_svc_enable(void)
 {
-	vscan_svc_enabled = enable;
+	mutex_enter(&vscan_svc_mutex);
+	vscan_svc_enabled = B_TRUE;
 
-	if (enable)
-		fs_vscan_register(vscan_svc_scan_file);
-	else
-		fs_vscan_register(NULL);
+	if (vscan_svc_taskq == NULL) {
+		if ((vscan_svc_taskq = taskq_create("vscan",
+		    VS_TASKQ_NUM_THREADS, MINCLSYSPRI, 1,
+		    INT_MAX, TASKQ_DYNAMIC)) == NULL) {
+			cmn_err(CE_WARN, "All scan requests "
+			    "will be processed synchronously");
+		}
+	}
+
+	fs_vscan_register(vscan_svc_scan_file);
+	mutex_exit(&vscan_svc_mutex);
 }
+
+
+/*
+ * vscan_svc_disable
+ */
+void
+vscan_svc_disable(void)
+{
+	mutex_enter(&vscan_svc_mutex);
+	vscan_svc_enabled = B_FALSE;
+	fs_vscan_register(NULL);
+
+	if (vscan_svc_taskq) {
+		taskq_destroy(vscan_svc_taskq);
+		vscan_svc_taskq = NULL;
+	}
+	mutex_exit(&vscan_svc_mutex);
+}
+
+
+
+/*
+ * vscan_svc_is_enabled
+ */
+boolean_t
+vscan_svc_is_enabled()
+{
+	return (vscan_svc_enabled);
+}
+
 
 /*
  * vscan_svc_in_use
+ *
+ * The vscan driver is considered to be in use if it is
+ * enabled or if there are in-progress scan requests.
+ * Used to determine whether the driver can be unloaded.
  */
 boolean_t
 vscan_svc_in_use()
@@ -196,7 +215,7 @@ vscan_svc_in_use()
 	boolean_t rc;
 
 	mutex_enter(&vscan_svc_mutex);
-	rc = (vscan_svc_req_count > 0) ? B_TRUE : B_FALSE;
+	rc = (vscan_svc_enabled == B_TRUE) || (vscan_svc_req_count > 0);
 	mutex_exit(&vscan_svc_mutex);
 
 	return (rc);
@@ -322,17 +341,13 @@ vscan_svc_taskq_callback(void *data)
  * Should never be called directly. Invoke via vscan_svc_scan_file()
  * If scan is in progress wait for it to complete, otherwise
  * initiate door call to scan the file.
- *
- * Currently scanstamps cannot be created on files that existed
- * prior to scanstamp being a system attribute. Thus an attempt
- * to access the scanstamp may fail. For this reason if vscan_getattr
- * or vscan_setattr fails, it is retried excluding scanstamp.
  */
 static int
 vscan_svc_do_scan(vscan_fs_req_t *req)
 {
-	int rc = 0, idx;
+	int rc = -1, idx;
 	vs_scan_req_t *scan_req;
+	vscan_file_t *svc_file;
 
 	mutex_enter(&vscan_svc_mutex);
 
@@ -341,36 +356,44 @@ vscan_svc_do_scan(vscan_fs_req_t *req)
 	 * wait for it to complete and return the idx of the scan request.
 	 * Otherwise it will return -1 and we will initiate a scan here.
 	 */
-	if ((idx = vscan_svc_wait_for_scan(req->vsr_vp)) == -1) {
+	if ((idx = vscan_svc_wait_for_scan(req->vsr_vp)) != -1) {
+		svc_file = &vscan_svc_files[idx];
+	} else {
 		/* insert the scan request into vscan_svc_files */
 		idx = vscan_svc_insert_file(req);
+		svc_file = &vscan_svc_files[idx];
 
 		if (vscan_svc_enabled) {
 			if (vscan_svc_getattr(idx) == 0) {
 				/* valid scan_req ptr guaranteed */
 				scan_req = vscan_svc_populate_req(idx);
 				mutex_exit(&vscan_svc_mutex);
-				rc = vscan_door_scan_file(scan_req);
+				if (vscan_drv_create_node(idx) == B_TRUE)
+					rc = vscan_door_scan_file(scan_req);
 				mutex_enter(&vscan_svc_mutex);
-
-				if (rc == 0) {
+				if (rc == 0)
 					vscan_svc_parse_rsp(idx, scan_req);
-					(void) vscan_svc_setattr(idx);
-				}
 				kmem_free(scan_req, sizeof (vs_scan_req_t));
+
+				/* process scan result */
+				vscan_svc_process_scan_result(idx);
+				DTRACE_PROBE2(vscan__result, int,
+				    svc_file->vsf_result, int,
+				    svc_file->vsf_access);
 			} else {
+				/* if getattr fails: log error, deny access */
 				cmn_err(CE_WARN, "Can't access xattr for %s\n",
-				    vscan_svc_files[idx].vsf_req.
-				    vsr_vp->v_path);
+				    svc_file->vsf_req.vsr_vp->v_path);
+				svc_file->vsf_access = VS_ACCESS_DENY;
 			}
 		} else {
 			/* if vscan not enabled (shutting down), allow ACCESS */
-			vscan_svc_files[idx].vsf_access = VS_ACCESS_ALLOW;
+			svc_file->vsf_access = VS_ACCESS_ALLOW;
 		}
 	}
 
 	/* When a scan completes the result is saved in vscan_svc_files */
-	rc = (vscan_svc_files[idx].vsf_access == VS_ACCESS_ALLOW) ? 0 : EACCES;
+	rc = (svc_file->vsf_access == VS_ACCESS_ALLOW) ? 0 : EACCES;
 
 	/* wake threads waiting for result, or for a slot in vscan_svc_files */
 	vscan_svc_notify_scan_complete(idx);
@@ -382,6 +405,87 @@ vscan_svc_do_scan(vscan_fs_req_t *req)
 
 	return (rc);
 }
+
+
+/*
+ * vscan_svc_process_scan_result
+ *
+ * Sets vsf_access and updates file attributes based on vsf_result,
+ * as follows:
+ *
+ * VS_STATUS_INFECTED
+ *  deny access, set quarantine attribute, clear scanstamp
+ * VS_STATUS_CLEAN
+ *  allow access, set scanstamp,
+ *  if file not modified since scan initiated, clear modified attribute
+ * VS_STATUS_NO_SCAN
+ *  deny access if file quarantined, otherwise allow access
+ * VS_STATUS_UNDEFINED, VS_STATUS_ERROR
+ *  deny access if file quarantined, modified or no scanstamp
+ *  otherwise, allow access
+ */
+static void
+vscan_svc_process_scan_result(int idx)
+{
+	struct vattr attr;
+	vnode_t *vp;
+	timestruc_t *mtime;
+	vscan_file_t *svc_file;
+
+	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
+
+	svc_file = &vscan_svc_files[idx];
+
+	switch (svc_file->vsf_result) {
+	case VS_STATUS_INFECTED:
+		svc_file->vsf_access = VS_ACCESS_DENY;
+		svc_file->vsf_quarantined = 1;
+		svc_file->vsf_scanstamp[0] = '\0';
+		(void) vscan_svc_setattr(idx,
+		    XAT_AV_QUARANTINED | XAT_AV_SCANSTAMP);
+		return;
+
+	case VS_STATUS_CLEAN:
+		svc_file->vsf_access = VS_ACCESS_ALLOW;
+
+		/* if mtime has changed, don't clear the modified attribute */
+		vp = svc_file->vsf_req.vsr_vp;
+		mtime = &(svc_file->vsf_mtime);
+		attr.va_mask = AT_MTIME;
+		if ((VOP_GETATTR(vp, &attr, 0, kcred, NULL) != 0) ||
+		    (mtime->tv_sec != attr.va_mtime.tv_sec) ||
+		    (mtime->tv_nsec != attr.va_mtime.tv_nsec)) {
+			DTRACE_PROBE1(vscan__mtime__changed, vscan_file_t *,
+			    svc_file);
+			(void) vscan_svc_setattr(idx, XAT_AV_SCANSTAMP);
+			return;
+		}
+
+		svc_file->vsf_modified = 0;
+		(void) vscan_svc_setattr(idx,
+		    XAT_AV_SCANSTAMP | XAT_AV_MODIFIED);
+		return;
+
+	case VS_STATUS_NO_SCAN:
+		if (svc_file->vsf_quarantined)
+			svc_file->vsf_access = VS_ACCESS_DENY;
+		else
+			svc_file->vsf_access = VS_ACCESS_ALLOW;
+		return;
+
+	case VS_STATUS_ERROR:
+	case VS_STATUS_UNDEFINED:
+	default:
+		if ((svc_file->vsf_quarantined) ||
+		    (svc_file->vsf_modified) ||
+		    (svc_file->vsf_scanstamp[0] == '\0'))
+			svc_file->vsf_access = VS_ACCESS_DENY;
+		else
+			svc_file->vsf_access = VS_ACCESS_ALLOW;
+		return;
+	}
+}
+
 
 /*
  * vscan_svc_wait_for_scan
@@ -397,6 +501,7 @@ static int
 vscan_svc_wait_for_scan(vnode_t *vp)
 {
 	int idx;
+	vscan_file_t *svc_file;
 
 	ASSERT(vp);
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
@@ -411,15 +516,15 @@ vscan_svc_wait_for_scan(vnode_t *vp)
 		return (-1);
 
 	/* file found - wait for scan to complete */
-	vscan_svc_files[idx].vsf_wait_count++;
+	svc_file = &vscan_svc_files[idx];
+	svc_file->vsf_wait_count++;
 
-	DTRACE_PROBE2(vscan__wait__scan, vscan_file_t *,
-	    &(vscan_svc_files[idx]), int, idx);
+	DTRACE_PROBE2(vscan__wait__scan, vscan_file_t *, svc_file, int, idx);
 
-	while (vscan_svc_files[idx].vsf_access == VS_ACCESS_UNDEFINED)
-		cv_wait(&(vscan_svc_file_cv[idx]), &vscan_svc_mutex);
+	while (svc_file->vsf_access == VS_ACCESS_UNDEFINED)
+		cv_wait(&(svc_file->vsf_cv), &vscan_svc_mutex);
 
-	vscan_svc_files[idx].vsf_wait_count--;
+	svc_file->vsf_wait_count--;
 
 	return (idx);
 }
@@ -430,34 +535,17 @@ vscan_svc_wait_for_scan(vnode_t *vp)
  *
  * Find empty slot in vscan_svc_files table.
  *
- * vscan_svc_files_idx is the most recently allocated slot,
- * start search at next slot.
- * slot 0 is reserved for control interface
- *
  * Returns idx of slot, or -1 if not found
  */
 static int
 vscan_svc_find_slot(void)
 {
-	int idx, start;
+	int idx;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
-
-	if ((start = vscan_svc_files_idx + 1) > VS_DRV_MAX_FILES)
-		start = 1;
-
-	for (idx = start; idx <= VS_DRV_MAX_FILES; idx++) {
-		if (vscan_svc_files[idx].vsf_req.vsr_vp == NULL) {
-			vscan_svc_files_idx = idx;
+	for (idx = 1; idx <= VS_DRV_MAX_FILES; idx++) {
+		if (vscan_svc_files[idx].vsf_req.vsr_vp == NULL)
 			return (idx);
-		}
-	}
-
-	for (idx = 1; idx < start; idx++) {
-		if (vscan_svc_files[idx].vsf_req.vsr_vp == NULL) {
-			vscan_svc_files_idx = idx;
-			return (idx);
-		}
 	}
 
 	return (-1);
@@ -477,21 +565,25 @@ static int
 vscan_svc_insert_file(vscan_fs_req_t *req)
 {
 	int idx;
+	vscan_file_t *svc_file;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
 	while ((idx = vscan_svc_find_slot()) == -1) {
-		DTRACE_PROBE1(vscan__wait__slot, vscan_file_t *,
-		    &(vscan_svc_files[idx]));
+		DTRACE_PROBE1(vscan__wait__slot, char *, req->vsr_vp->v_path);
 		vscan_svc_wait_count++;
 		cv_wait(&(vscan_svc_cv), &vscan_svc_mutex);
 		vscan_svc_wait_count--;
 	}
 
-	(void) memset(&vscan_svc_files[idx], 0, sizeof (vscan_file_t));
-	vscan_svc_files[idx].vsf_req = *req;
-	vscan_svc_files[idx].vsf_modified = 1;
-	vscan_svc_files[idx].vsf_access = VS_ACCESS_UNDEFINED;
+	svc_file = &vscan_svc_files[idx];
+
+	(void) memset(svc_file, 0, sizeof (vscan_file_t));
+	svc_file->vsf_req = *req;
+	svc_file->vsf_modified = 1;
+	svc_file->vsf_result = VS_STATUS_UNDEFINED;
+	svc_file->vsf_access = VS_ACCESS_UNDEFINED;
+	cv_init(&(svc_file->vsf_cv), NULL, CV_DEFAULT, NULL);
 
 	DTRACE_PROBE2(vscan__insert, char *, req->vsr_vp->v_path, int, idx);
 	return (idx);
@@ -507,17 +599,19 @@ vscan_svc_insert_file(vscan_fs_req_t *req)
 static void
 vscan_svc_release_file(int idx)
 {
-	vscan_file_t *slot;
+	vscan_file_t *svc_file;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
+	svc_file = &vscan_svc_files[idx];
 
-	if (vscan_svc_files[idx].vsf_wait_count != 0)
+	if (svc_file->vsf_wait_count != 0)
 		return;
 
-	slot = &vscan_svc_files[idx];
-	DTRACE_PROBE2(vscan__release, char *, slot->vsf_req.vsr_vp->v_path,
-	    int, idx);
-	(void) memset(slot, 0, sizeof (vscan_file_t));
+	DTRACE_PROBE2(vscan__release, char *,
+	    svc_file->vsf_req.vsr_vp->v_path, int, idx);
+
+	cv_destroy(&(svc_file->vsf_cv));
+	(void) memset(svc_file, 0, sizeof (vscan_file_t));
 }
 
 
@@ -534,20 +628,22 @@ vscan_svc_populate_req(int idx)
 {
 	vs_scan_req_t *scan_req;
 	vscan_fs_req_t *req;
+	vscan_file_t *svc_file;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
-	req = &vscan_svc_files[idx].vsf_req;
+	svc_file = &vscan_svc_files[idx];
+	req = &(svc_file->vsf_req);
 	scan_req = kmem_zalloc(sizeof (vs_scan_req_t), KM_SLEEP);
 
 	scan_req->vsr_id = idx;
 	(void) strncpy(scan_req->vsr_path, req->vsr_vp->v_path, MAXPATHLEN);
-	scan_req->vsr_size = vscan_svc_files[idx].vsf_size;
-	scan_req->vsr_modified = vscan_svc_files[idx].vsf_modified;
-	scan_req->vsr_quarantined = vscan_svc_files[idx].vsf_quarantined;
+	scan_req->vsr_size = svc_file->vsf_size;
+	scan_req->vsr_modified = svc_file->vsf_modified;
+	scan_req->vsr_quarantined = svc_file->vsf_quarantined;
 	scan_req->vsr_flags = 0;
 	(void) strncpy(scan_req->vsr_scanstamp,
-	    vscan_svc_files[idx].vsf_scanstamp, sizeof (vs_scanstamp_t));
+	    svc_file->vsf_scanstamp, sizeof (vs_scanstamp_t));
 
 	return (scan_req);
 }
@@ -561,12 +657,13 @@ vscan_svc_populate_req(int idx)
 static void
 vscan_svc_parse_rsp(int idx, vs_scan_req_t *scan_req)
 {
+	vscan_file_t *svc_file;
+
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
-	vscan_svc_files[idx].vsf_access = scan_req->vsr_access;
-	vscan_svc_files[idx].vsf_modified = scan_req->vsr_modified;
-	vscan_svc_files[idx].vsf_quarantined = scan_req->vsr_quarantined;
-	(void) strncpy(vscan_svc_files[idx].vsf_scanstamp,
+	svc_file = &vscan_svc_files[idx];
+	svc_file->vsf_result = scan_req->vsr_result;
+	(void) strncpy(svc_file->vsf_scanstamp,
 	    scan_req->vsr_scanstamp, sizeof (vs_scanstamp_t));
 }
 
@@ -574,18 +671,23 @@ vscan_svc_parse_rsp(int idx, vs_scan_req_t *scan_req)
 /*
  * vscan_svc_notify_scan_complete
  *
- * signal vscan_svc_file_cv and vscan_svc_cv to wake threads waiting
- * for the scan result for the specified file (vscan_svc_file_cv)
- * or for a slot in vscan_svc_files table (vscan_svc_cv)
+ * signal vscan_svc_files.vsf_cv and vscan_svc_cv to wake
+ * threads waiting for the scan result for the specified
+ * file (vscan_svc_files[idx].vsf_cv) or for a slot in
+ * vscan_svc_files table (vscan_svc_cv)
  */
 static void
 vscan_svc_notify_scan_complete(int idx)
 {
+	vscan_file_t *svc_file;
+
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
+	svc_file = &vscan_svc_files[idx];
+
 	/* if someone waiting for result, cv_signal */
-	if (vscan_svc_files[idx].vsf_wait_count > 0)
-		cv_signal(&vscan_svc_file_cv[idx]);
+	if (svc_file->vsf_wait_count > 0)
+		cv_signal(&(svc_file->vsf_cv));
 
 	/* signal vscan_svc_cv if any threads waiting for a slot */
 	if (vscan_svc_wait_count > 0)
@@ -596,7 +698,7 @@ vscan_svc_notify_scan_complete(int idx)
 /*
  * vscan_svc_getattr
  *
- * Get the vscan related system attributes and AT_SIZE.
+ * Get the vscan related system attributes, AT_SIZE & AT_MTIME.
  */
 static int
 vscan_svc_getattr(int idx)
@@ -604,16 +706,19 @@ vscan_svc_getattr(int idx)
 	xvattr_t xvattr;
 	xoptattr_t *xoap = NULL;
 	vnode_t *vp;
+	vscan_file_t *svc_file;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
-	if ((vp = vscan_svc_files[idx].vsf_req.vsr_vp) == NULL)
+	svc_file = &vscan_svc_files[idx];
+	if ((vp = svc_file->vsf_req.vsr_vp) == NULL)
 		return (-1);
 
 	/* get the attributes */
 	xva_init(&xvattr); /* sets AT_XVATTR */
 
 	xvattr.xva_vattr.va_mask |= AT_SIZE;
+	xvattr.xva_vattr.va_mask |= AT_MTIME;
 	XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
 	XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
 	XVA_SET_REQ(&xvattr, XAT_AV_SCANSTAMP);
@@ -627,22 +732,24 @@ vscan_svc_getattr(int idx)
 		return (-1);
 	}
 
-	vscan_svc_files[idx].vsf_size = xvattr.xva_vattr.va_size;
+	svc_file->vsf_size = xvattr.xva_vattr.va_size;
+	svc_file->vsf_mtime.tv_sec = xvattr.xva_vattr.va_mtime.tv_sec;
+	svc_file->vsf_mtime.tv_nsec = xvattr.xva_vattr.va_mtime.tv_nsec;
 
 	if (XVA_ISSET_RTN(&xvattr, XAT_AV_MODIFIED) == 0)
 		return (-1);
-	vscan_svc_files[idx].vsf_modified = xoap->xoa_av_modified;
+	svc_file->vsf_modified = xoap->xoa_av_modified;
 
 	if (XVA_ISSET_RTN(&xvattr, XAT_AV_QUARANTINED) == 0)
 		return (-1);
-	vscan_svc_files[idx].vsf_quarantined = xoap->xoa_av_quarantined;
+	svc_file->vsf_quarantined = xoap->xoa_av_quarantined;
 
 	if (XVA_ISSET_RTN(&xvattr, XAT_AV_SCANSTAMP) != 0) {
-		(void) memcpy(vscan_svc_files[idx].vsf_scanstamp,
+		(void) memcpy(svc_file->vsf_scanstamp,
 		    xoap->xoa_av_scanstamp, AV_SCANSTAMP_SZ);
 	}
 
-	DTRACE_PROBE1(vscan__attr, vscan_file_t *, &(vscan_svc_files[idx]));
+	DTRACE_PROBE1(vscan__getattr, vscan_file_t *, svc_file);
 	return (0);
 }
 
@@ -651,20 +758,20 @@ vscan_svc_getattr(int idx)
  * vscan_svc_setattr
  *
  * Set the vscan related system attributes.
- *
- * Caller must already have vscan_svc_mutex
  */
 static int
-vscan_svc_setattr(int idx)
+vscan_svc_setattr(int idx, int which)
 {
 	xvattr_t xvattr;
 	xoptattr_t *xoap = NULL;
 	vnode_t *vp;
 	int len;
+	vscan_file_t *svc_file;
 
 	ASSERT(MUTEX_HELD(&vscan_svc_mutex));
 
-	if ((vp = vscan_svc_files[idx].vsf_req.vsr_vp) == NULL)
+	svc_file = &vscan_svc_files[idx];
+	if ((vp = svc_file->vsf_req.vsr_vp) == NULL)
 		return (-1);
 
 	/* update the attributes */
@@ -672,19 +779,25 @@ vscan_svc_setattr(int idx)
 	if ((xoap = xva_getxoptattr(&xvattr)) == NULL)
 		return (-1);
 
-	XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
-	xoap->xoa_av_modified = vscan_svc_files[idx].vsf_modified;
+	if (which & XAT_AV_MODIFIED) {
+		XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
+		xoap->xoa_av_modified = svc_file->vsf_modified;
+	}
 
-	XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
-	xoap->xoa_av_quarantined = vscan_svc_files[idx].vsf_quarantined;
+	if (which & XAT_AV_QUARANTINED) {
+		XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
+		xoap->xoa_av_quarantined = svc_file->vsf_quarantined;
+	}
 
-	XVA_SET_REQ(&xvattr, XAT_AV_SCANSTAMP);
-	len = strlen(vscan_svc_files[idx].vsf_scanstamp);
-	(void) memcpy(xoap->xoa_av_scanstamp,
-	    vscan_svc_files[idx].vsf_scanstamp, len);
+	if (which & XAT_AV_SCANSTAMP) {
+		XVA_SET_REQ(&xvattr, XAT_AV_SCANSTAMP);
+		len = strlen(svc_file->vsf_scanstamp);
+		(void) memcpy(xoap->xoa_av_scanstamp,
+		    svc_file->vsf_scanstamp, len);
+	}
 
 	/* if access is denied, set mtime to invalidate client cache */
-	if (vscan_svc_files[idx].vsf_access != VS_ACCESS_ALLOW) {
+	if (svc_file->vsf_access != VS_ACCESS_ALLOW) {
 		xvattr.xva_vattr.va_mask |= AT_MTIME;
 		gethrestime(&xvattr.xva_vattr.va_mtime);
 	}
@@ -692,7 +805,9 @@ vscan_svc_setattr(int idx)
 	if (VOP_SETATTR(vp, (vattr_t *)&xvattr, 0, kcred, NULL) != 0)
 		return (-1);
 
-	DTRACE_PROBE1(vscan__attr, vscan_file_t *, &(vscan_svc_files[idx]));
+	DTRACE_PROBE2(vscan__setattr,
+	    vscan_file_t *, svc_file, int, which);
+
 	return (0);
 }
 

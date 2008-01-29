@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,7 +198,7 @@ vs_icap_fini()
 /*
  * vs_icap_config
  *
- * When a new NAS AVA configuration is specified, this will be
+ * When a new VSCAN configuration is specified, this will be
  * called per scan engine. If the scan engine host or port has
  * changed delete the vs_options entry for that scan engine.
  */
@@ -242,7 +242,7 @@ vs_icap_scan_file(vs_eng_conn_t *conn, char *devname, char *fname,
 	int fd;
 
 	if ((fd = open(devname, O_RDONLY)) == -1) {
-		syslog(LOG_ERR, "Failed to open device %s\n", devname);
+		syslog(LOG_ERR, "Failed to open device %s", devname);
 		result->vsr_rc = VS_RESULT_ERROR;
 		return (result->vsr_rc);
 	}
@@ -1271,11 +1271,15 @@ vs_icap_readline(vs_scan_ctx_t *ctx, char *buf, int buflen)
 		errno = 0;
 		retval = recv(ctx->vsc_sockfd, &c, 1, 0);
 
-		if (retval < 0 && errno != EINTR)
-			return (-1);
-
-		if (retval <= 0)
+		if (retval < 0 && errno == EINTR)
 			continue;
+
+		if (retval <= 0) {
+			syslog(LOG_ERR, "Error receiving data from Scan Engine:"
+			    " %s", retval == 0 ? "Scan Engine disconnected"
+			    : strerror(errno));
+			return (-1);
+		}
 
 		buf[i++] = c;
 		if (c == '\n')

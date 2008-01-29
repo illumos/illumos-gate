@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,6 @@
 #include "vs_incl.h"
 
 /* local functions */
-static int  vs_svc_process_scan_result(vs_attr_t *, vs_result_t *);
 static void vs_svc_vlog(char *, vs_result_t *);
 static void vs_svc_audit(char *, vs_result_t *);
 
@@ -74,25 +73,35 @@ vs_svc_fini()
  *  - updating scan statistics
  *  - logging virus information
  *
+ *
  * Returns:
- *  VS_ACCESS_ALLOW, VS_ACCESS_DENY
+ *  VS_STATUS_NO_SCAN - scan not reqd, or daemon shutting down
+ *  VS_STATUS_CLEAN - scan success. File clean.
+ *                    new scanstamp returned in scanstamp param.
+ *  VS_STATUS_INFECTED - scan success. File infected.
+ *  VS_STATUS_ERROR - scan failure either in vscand or scan engine.
  */
 int
-vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags)
+vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags,
+    vs_scanstamp_t *scanstamp)
 {
 	vs_eng_conn_t conn;
-	int access = VS_ACCESS_UNDEFINED;
-	int rc, retries;
+	int retries;
 	vs_result_t result;
 
-	/* deny access to quarantined files */
-	if (fattr->vsa_quarantined)
-		return (VS_ACCESS_DENY);
+	/* initialize response scanstamp to current scanstamp value */
+	(void) strlcpy(*scanstamp, fattr->vsa_scanstamp,
+	    sizeof (vs_scanstamp_t));
 
-	/* allow access if not modified & scanstamp current */
-	if ((fattr->vsa_modified  == 0) &&
+
+	/* No scan if file quarantined */
+	if (fattr->vsa_quarantined)
+		return (VS_STATUS_NO_SCAN);
+
+	/* No scan if file not modified AND scanstamp is current */
+	if ((fattr->vsa_modified == 0) &&
 	    vs_eng_scanstamp_current(fattr->vsa_scanstamp)) {
-		return (VS_ACCESS_ALLOW);
+		return (VS_STATUS_NO_SCAN);
 	}
 
 	(void) memset(&result, 0, sizeof (vs_result_t));
@@ -101,109 +110,67 @@ vs_svc_scan_file(char *devname, char *fname, vs_attr_t *fattr, int flags)
 	for (retries = 0; retries <= VS_MAX_RETRY; retries++) {
 		/* identify available engine connection */
 		if (vs_eng_get(&conn, retries) != 0) {
-			rc = VS_RESULT_ERROR;
+			result.vsr_rc = VS_RESULT_ERROR;
 			continue;
 		}
 
 		/* connect to engine and scan file */
-		if (vs_eng_connect(&conn) != 0)
-			rc = VS_RESULT_SE_ERROR;
-		else {
+		if (vs_eng_connect(&conn) != 0) {
+			result.vsr_rc = VS_RESULT_SE_ERROR;
+		} else {
 			if (vscand_get_state() == VS_STATE_SHUTDOWN) {
 				vs_eng_release(&conn);
-				return (VS_ACCESS_ALLOW);
+				return (VS_STATUS_NO_SCAN);
 			}
 
-			rc = vs_icap_scan_file(&conn, devname, fname,
+			(void) vs_icap_scan_file(&conn, devname, fname,
 			    fattr->vsa_size, flags, &result);
 		}
 
 		/* if no error, clear error state on engine and break */
-		if ((rc != VS_RESULT_SE_ERROR) && (rc != VS_RESULT_ERROR)) {
+		if ((result.vsr_rc != VS_RESULT_SE_ERROR) &&
+		    (result.vsr_rc != VS_RESULT_ERROR)) {
 			vs_eng_set_error(&conn, 0);
 			vs_eng_release(&conn);
 			break;
 		}
 
-		/* if scan failed due to shutdown, allow access */
+		/* treat error on shutdown as scan not required */
 		if (vscand_get_state() == VS_STATE_SHUTDOWN) {
 			vs_eng_release(&conn);
-			return (VS_ACCESS_ALLOW);
+			return (VS_STATUS_NO_SCAN);
 		}
 
 		/* set engine's error state and update engine stats */
-		if (rc == VS_RESULT_SE_ERROR) {
+		if (result.vsr_rc == VS_RESULT_SE_ERROR) {
 			vs_eng_set_error(&conn, 1);
 			vs_stats_eng_err(conn.vsc_engid);
 		}
 		vs_eng_release(&conn);
 	}
 
-	vs_stats_set(rc);
+	vs_stats_set(result.vsr_rc);
 
-	/* if file infected, update virus log and write audit record */
+	/*
+	 * VS_RESULT_CLEANED - file infected, cleaned data available
+	 * VS_RESULT_FORBIDDEN - file infected, no cleaned data
+	 * Log virus, write audit record and return INFECTED status
+	 */
 	if (result.vsr_rc == VS_RESULT_CLEANED ||
 	    result.vsr_rc == VS_RESULT_FORBIDDEN) {
 		vs_svc_vlog(fname, &result);
 		vs_svc_audit(fname, &result);
+		return (VS_STATUS_INFECTED);
 	}
 
-	access = vs_svc_process_scan_result(fattr, &result);
-
-	return (access);
-}
-
-
-/*
- * vs_svc_process_scan_result
- *
- * Translate the scan result into VS_ACCESS_ALLOW or VS_ACCESS_DENY.
- * If the scan failed (VS_RESULT_ERROR) deny access if the
- * scan was initiated because the file had been modified or
- * had never been scanned. Otherwise allow access.
- *
- *   If file has been modified or has never been scanned, it must
- *   be successfully scanned before access is allowed
- *
- *   If the file has previously been scanned and has not been
- *   modified, don't deny access if scan fail, only if the file
- *   is found to be infected.
- *
- * If the file is still infected set quarantine attribute,
- * otherwise clear modified attribute.
- *
- * Returns: VS_ACCESS_ALLOW, VS_ACCESS_DENY
- */
-static int
-vs_svc_process_scan_result(vs_attr_t *fattr, vs_result_t *result)
-{
-	int access = VS_ACCESS_DENY;
-
-	switch (result->vsr_rc) {
-	case VS_RESULT_CLEANED:
-	case VS_RESULT_FORBIDDEN:
-		fattr->vsa_scanstamp[0] = '\0';
-		fattr->vsa_quarantined = 1;
-		access = VS_ACCESS_DENY;
-		break;
-	case VS_RESULT_CLEAN:
-		(void) strlcpy(fattr->vsa_scanstamp, result->vsr_scanstamp,
+	/* VS_RESULT_CLEAN - Set the scanstamp and return CLEAN status */
+	if (result.vsr_rc == VS_RESULT_CLEAN) {
+		(void) strlcpy(*scanstamp, result.vsr_scanstamp,
 		    sizeof (vs_scanstamp_t));
-		fattr->vsa_modified = 0;
-		access = VS_ACCESS_ALLOW;
-		break;
-	case VS_RESULT_ERROR:
-	case VS_RESULT_SE_ERROR:
-	case VS_RESULT_UNDEFINED:
-	default:
-		if ((fattr->vsa_modified) || (fattr->vsa_scanstamp[0] == '\0'))
-			access = VS_ACCESS_DENY;
-		else
-			access = VS_ACCESS_ALLOW;
-		break;
+		return (VS_STATUS_CLEAN);
 	}
 
-	return (access);
+	return (VS_STATUS_ERROR);
 }
 
 
