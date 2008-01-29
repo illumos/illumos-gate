@@ -646,7 +646,7 @@ make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 				    MAXPATHLEN - strlen(zpath));
 
 				if (bufsz <= strlen(zpath)) {
-					dlclose(dlhdl);
+					(void) dlclose(dlhdl);
 					return (NULL);
 				}
 
@@ -654,7 +654,7 @@ make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 				(void) strncat(buf, objname,
 				    bufsz - strlen(zpath));
 			}
-			dlclose(dlhdl);
+			(void) dlclose(dlhdl);
 		}
 
 		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
