@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,7 +362,8 @@ pg_cmt_cpu_init(cpu_t *cp)
 			ASSERT(pg->cmt_parent == NULL ||
 			    pg->cmt_parent == cpu_cmt_hier[level + 1]);
 			ASSERT(pg->cmt_siblings == &lgrp->cl_pgs ||
-			    pg->cmt_siblings == pg->cmt_parent->cmt_children);
+			    ((pg->cmt_parent != NULL) &&
+			    pg->cmt_siblings == pg->cmt_parent->cmt_children));
 			continue;
 		}
 
