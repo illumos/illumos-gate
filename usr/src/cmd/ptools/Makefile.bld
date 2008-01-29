@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ LDLIBS_pfiles	= -lproc -lnsl
 LDLIBS_pflags	= -lproc
 LDLIBS_pldd	= -lproc
 LDLIBS_plgrp	= -lproc -llgrp
-LDLIBS_pmap	= -lproc -lzonecfg
+LDLIBS_pmap	= -lproc
 LDLIBS_pmadvise	= -lproc
 LDLIBS_ppriv	= -lproc
 LDLIBS_preap	= -lproc

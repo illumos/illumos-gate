@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -629,16 +629,32 @@ make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 		 * real path to the file.
 		 */
 		if (getzonenamebyid(pi->pr_zoneid, zname,
-		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
-		    zone_get_zonepath(zname, zpath, sizeof (zpath)) == Z_OK) {
-			(void) strncat(zpath, "/root",
-			    MAXPATHLEN - strlen(zpath));
+		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0) {
+			typedef int  (*fptr)(char *, char *, size_t);
+			fptr zone_get_zonepath;
+			void *dlhdl;
 
-			if (bufsz <= strlen(zpath))
+			if (((dlhdl =
+			    dlopen(LIBZONECFG_PATH, RTLD_LAZY)) == NULL) ||
+			    ((zone_get_zonepath =
+			    (fptr) dlsym(dlhdl, "zone_get_zonepath")) == NULL))
 				return (NULL);
 
-			(void) strncpy(buf, zpath, bufsz);
-			(void) strncat(buf, objname, bufsz - strlen(zpath));
+			if ((*zone_get_zonepath)(zname, zpath, sizeof (zpath))
+			    == Z_OK) {
+				(void) strncat(zpath, "/root",
+				    MAXPATHLEN - strlen(zpath));
+
+				if (bufsz <= strlen(zpath)) {
+					dlclose(dlhdl);
+					return (NULL);
+				}
+
+				(void) strncpy(buf, zpath, bufsz);
+				(void) strncat(buf, objname,
+				    bufsz - strlen(zpath));
+			}
+			dlclose(dlhdl);
 		}
 
 		if ((len = resolvepath(buf, buf, bufsz)) > 0) {
