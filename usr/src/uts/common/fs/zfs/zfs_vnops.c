@@ -438,6 +438,11 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	ZFS_VERIFY_ZP(zp);
 	os = zfsvfs->z_os;
 
+	if (zp->z_phys->zp_flags & ZFS_AV_QUARANTINED) {
+		ZFS_EXIT(zfsvfs);
+		return (EACCES);
+	}
+
 	/*
 	 * Validate file offset
 	 */
@@ -4061,13 +4066,21 @@ zfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	segvn_crargs_t	vn_a;
 	int		error;
 
-	if ((prot & PROT_WRITE) &&
-	    (zp->z_phys->zp_flags & (ZFS_IMMUTABLE | ZFS_READONLY |
-	    ZFS_APPENDONLY)))
-		return (EPERM);
-
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
+
+	if ((prot & PROT_WRITE) &&
+	    (zp->z_phys->zp_flags & (ZFS_IMMUTABLE | ZFS_READONLY |
+	    ZFS_APPENDONLY))) {
+		ZFS_EXIT(zfsvfs);
+		return (EPERM);
+	}
+
+	if ((prot & (PROT_READ | PROT_EXEC)) &&
+	    (zp->z_phys->zp_flags & ZFS_AV_QUARANTINED)) {
+		ZFS_EXIT(zfsvfs);
+		return (EACCES);
+	}
 
 	if (vp->v_flag & VNOMAP) {
 		ZFS_EXIT(zfsvfs);
