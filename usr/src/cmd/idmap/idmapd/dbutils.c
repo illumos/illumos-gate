@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1434,7 +1434,7 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
 	uid_t		pid;
 	time_t		curtime, exp;
 	idmap_retcode	retcode;
-	char *is_user_string;
+	char		*is_user_string, *lower_name;
 
 	/* Current time */
 	errno = 0;
@@ -1473,6 +1473,8 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
 		    is_user_string, req->id1.idmap_id_u.sid.prefix,
 		    req->id1.idmap_id_u.sid.rid, curtime);
 	} else if (req->id1name != NULL) {
+		if ((lower_name = tolower_u8(req->id1name)) == NULL)
+			lower_name = req->id1name;
 		sql = sqlite_mprintf("SELECT pid, is_user, expiration, "
 		    "unixname, u2w, is_wuser "
 		    "FROM idmap_cache WHERE is_user = %s AND "
@@ -1480,7 +1482,9 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res)
 		    "(pid >= 2147483648 OR "
 		    "(expiration = 0 OR expiration ISNULL OR "
 		    "expiration > %d));",
-		    is_user_string, req->id1name, req->id1domain, curtime);
+		    is_user_string, lower_name, req->id1domain, curtime);
+		if (lower_name != req->id1name)
+			free(lower_name);
 	} else {
 		retcode = IDMAP_ERR_ARG;
 		goto out;
