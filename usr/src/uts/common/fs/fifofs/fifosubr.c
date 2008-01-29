@@ -21,7 +21,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -363,13 +363,13 @@ fifoinit(int fstype, char *name)
 	 * vnodes are cached aligned
 	 */
 	fnode_cache = kmem_cache_create("fnode_cache",
-		sizeof (fifodata_t) - sizeof (fifonode_t), 32,
-		fnode_constructor, fnode_destructor, NULL,
-		(void *)(sizeof (fifodata_t) - sizeof (fifonode_t)), NULL, 0);
+	    sizeof (fifodata_t) - sizeof (fifonode_t), 32,
+	    fnode_constructor, fnode_destructor, NULL,
+	    (void *)(sizeof (fifodata_t) - sizeof (fifonode_t)), NULL, 0);
 
 	pipe_cache = kmem_cache_create("pipe_cache", sizeof (fifodata_t), 32,
-		pipe_constructor, pipe_destructor, NULL,
-		(void *)(sizeof (fifodata_t)), NULL, 0);
+	    pipe_constructor, pipe_destructor, NULL,
+	    (void *)(sizeof (fifodata_t)), NULL, 0);
 
 #if FIFODEBUG
 	if (Fifohiwat < FIFOHIWAT)
@@ -468,8 +468,13 @@ fifovp(vnode_t *vp, cred_t *crp)
 
 	newvp = FTOV(fnp);
 	fifo_reinit_vp(newvp);
-	newvp->v_vfsp = vp->v_vfsp;
-	newvp->v_rdev = vp->v_rdev;
+
+	/*
+	 * Store the'generic' fifovfs pointer in the fifo vnode.
+	 * It gets used in the VOPSTATS macros for accounting IO.
+	 */
+	newvp->v_vfsp = fifovfsp;
+	newvp->v_rdev = fifodev;
 	newvp->v_flag |= (vp->v_flag & VROOT);
 
 	fifoinsert(fnp);
@@ -821,7 +826,7 @@ fiforemove(fifonode_t *fnp)
 	 * fast path... only 1 FIFO in this list entry
 	 */
 	if (fnode != NULL && fnode == fnp &&
-		!fnode->fn_nextp && !fnode->fn_backp) {
+	    !fnode->fn_nextp && !fnode->fn_backp) {
 			fifoalloc[idx] = NULL;
 	} else {
 
@@ -834,10 +839,10 @@ fiforemove(fifonode_t *fnp)
 					fifoalloc[idx] = fnp->fn_nextp;
 				if (fnode->fn_nextp)
 					fnode->fn_nextp->fn_backp =
-						fnode->fn_backp;
+					    fnode->fn_backp;
 				if (fnode->fn_backp)
 					fnode->fn_backp->fn_nextp =
-						fnode->fn_nextp;
+					    fnode->fn_nextp;
 				break;
 			}
 		}
@@ -911,7 +916,7 @@ fifo_connld(struct vnode **vpp, int flag, cred_t *crp)
 	    (error = fifo_stropen(&vp2, flag, filep->f_cred, 0, 0)) != 0) {
 #if DEBUG
 		cmn_err(CE_NOTE, "fifo stropen failed error 0x%x",
-			error);
+		    error);
 #endif
 		/*
 		 * this will call fifo_close and VN_RELE on vp1
