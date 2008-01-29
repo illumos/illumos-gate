@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,21 +123,15 @@ wrtmp(
 	long oresid = uio->uio_resid;
 	timestruc_t now;
 
-	/*
-	 * tp->tn_size is incremented before the uiomove
-	 * is done on a write.  If the move fails (bad user
-	 * address) reset tp->tn_size.
-	 * The better way would be to increment tp->tn_size
-	 * only if the uiomove succeeds.
-	 */
 	long tn_size_changed = 0;
 	long old_tn_size;
+	long new_tn_size;
 
 	vp = TNTOV(tp);
 	ASSERT(vp->v_type == VREG);
 
 	TRACE_1(TR_FAC_TMPFS, TR_TMPFS_RWTMP_START,
-		"tmp_wrtmp_start:vp %p", vp);
+	    "tmp_wrtmp_start:vp %p", vp);
 
 	ASSERT(RW_WRITE_HELD(&tp->tn_contents));
 	ASSERT(RW_WRITE_HELD(&tp->tn_rwlock));
@@ -147,12 +141,12 @@ wrtmp(
 		/*
 		 * tmp_getattr ends up being called by chklock
 		 */
-		error = chklock(vp, FWRITE,
-			uio->uio_loffset, uio->uio_resid, uio->uio_fmode, ct);
+		error = chklock(vp, FWRITE, uio->uio_loffset, uio->uio_resid,
+		    uio->uio_fmode, ct);
 		rw_enter(&tp->tn_contents, RW_WRITER);
 		if (error != 0) {
 			TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-				"tmp_wrtmp_end:vp %p error %d", vp, error);
+			    "tmp_wrtmp_end:vp %p error %d", vp, error);
 			return (error);
 		}
 	}
@@ -175,13 +169,13 @@ wrtmp(
 
 	if (uio->uio_loffset >= MAXOFF_T) {
 		TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-			"tmp_wrtmp_end:vp %p error %d", vp, EINVAL);
+		    "tmp_wrtmp_end:vp %p error %d", vp, EINVAL);
 		return (EFBIG);
 	}
 
 	if (uio->uio_resid == 0) {
 		TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-			"tmp_wrtmp_end:vp %p error %d", vp, 0);
+		    "tmp_wrtmp_end:vp %p error %d", vp, 0);
 		return (0);
 	}
 
@@ -250,7 +244,11 @@ wrtmp(
 		if (offset + bytes > tp->tn_size) {
 			tn_size_changed = 1;
 			old_tn_size = tp->tn_size;
-			tp->tn_size = offset + bytes;
+			/*
+			 * Postpone updating tp->tn_size until uiomove() is
+			 * done.
+			 */
+			new_tn_size = offset + bytes;
 		}
 		if (bytes == PAGESIZE) {
 			/*
@@ -267,7 +265,7 @@ wrtmp(
 		 */
 		if (anon_get_ptr(tp->tn_anon, pagenumber) == NULL) {
 			(void) anon_set_ptr(tp->tn_anon, pagenumber,
-				anon_alloc(vp, ptob(pagenumber)), ANON_SLEEP);
+			    anon_alloc(vp, ptob(pagenumber)), ANON_SLEEP);
 			pagecreate = 1;
 			tp->tn_nblocks++;
 		}
@@ -286,13 +284,13 @@ wrtmp(
 			 * with zeros.
 			 */
 			error = vpm_data_copy(vp, offset, bytes, uio,
-				!pagecreate, &newpage, 1, S_WRITE);
+			    !pagecreate, &newpage, 1, S_WRITE);
 		} else {
 			/* Get offset within the segmap mapping */
 			segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
 			base = segmap_getmapflt(segkmap, vp,
-						(offset &  MAXBMASK),
-			    PAGESIZE, !pagecreate, S_WRITE);
+			    (offset &  MAXBMASK), PAGESIZE, !pagecreate,
+			    S_WRITE);
 		}
 
 
@@ -314,7 +312,7 @@ wrtmp(
 
 		if (!vpm_enable) {
 			error = uiomove(base + segmap_offset + pageoffset,
-			(long)bytes, UIO_WRITE, uio);
+			    (long)bytes, UIO_WRITE, uio);
 		}
 
 		if (!vpm_enable && pagecreate &&
@@ -337,7 +335,7 @@ wrtmp(
 			 */
 			if ((zoffset = pageoffset + nmoved) < PAGESIZE)
 				(void) kzero(base + segmap_offset + zoffset,
-					(size_t)PAGESIZE - zoffset);
+				    (size_t)PAGESIZE - zoffset);
 		}
 
 		/*
@@ -356,15 +354,15 @@ wrtmp(
 			 * been allocated.
 			 */
 			if (vpm_enable) {
-				(void) vpm_sync_pages(vp, offset,
-						PAGESIZE, SM_INVAL);
+				(void) vpm_sync_pages(vp, offset, PAGESIZE,
+				    SM_INVAL);
 			} else {
 				(void) segmap_release(segkmap, base, SM_INVAL);
 			}
 		} else {
 			if (vpm_enable) {
-				error = vpm_sync_pages(vp, offset,
-						PAGESIZE, 0);
+				error = vpm_sync_pages(vp, offset, PAGESIZE,
+				    0);
 			} else {
 				error = segmap_release(segkmap, base, 0);
 			}
@@ -374,6 +372,13 @@ wrtmp(
 		 * Re-acquire contents lock.
 		 */
 		rw_enter(&tp->tn_contents, RW_WRITER);
+
+		/*
+		 * Update tn_size.
+		 */
+		if (tn_size_changed)
+			tp->tn_size = new_tn_size;
+
 		/*
 		 * If the uiomove failed, fix up tn_size.
 		 */
@@ -419,7 +424,7 @@ out:
 	if (oresid != uio->uio_resid)
 		error = 0;
 	TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-		"tmp_wrtmp_end:vp %p error %d", vp, error);
+	    "tmp_wrtmp_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -446,8 +451,8 @@ rdtmp(
 #endif
 	vp = TNTOV(tp);
 
-	TRACE_1(TR_FAC_TMPFS, TR_TMPFS_RWTMP_START,
-		"tmp_rdtmp_start:vp %p", vp);
+	TRACE_1(TR_FAC_TMPFS, TR_TMPFS_RWTMP_START, "tmp_rdtmp_start:vp %p",
+	    vp);
 
 	ASSERT(RW_LOCK_HELD(&tp->tn_contents));
 
@@ -456,12 +461,12 @@ rdtmp(
 		/*
 		 * tmp_getattr ends up being called by chklock
 		 */
-		error = chklock(vp, FREAD,
-			uio->uio_loffset, uio->uio_resid, uio->uio_fmode, ct);
+		error = chklock(vp, FREAD, uio->uio_loffset, uio->uio_resid,
+		    uio->uio_fmode, ct);
 		rw_enter(&tp->tn_contents, RW_READER);
 		if (error != 0) {
 			TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-				"tmp_rdtmp_end:vp %p error %d", vp, error);
+			    "tmp_rdtmp_end:vp %p error %d", vp, error);
 			return (error);
 		}
 	}
@@ -469,14 +474,14 @@ rdtmp(
 
 	if (uio->uio_loffset >= MAXOFF_T) {
 		TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-			"tmp_rdtmp_end:vp %p error %d", vp, EINVAL);
+		    "tmp_rdtmp_end:vp %p error %d", vp, EINVAL);
 		return (0);
 	}
 	if (uio->uio_loffset < 0)
 		return (EINVAL);
 	if (uio->uio_resid == 0) {
 		TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-			"tmp_rdtmp_end:vp %p error %d", vp, 0);
+		    "tmp_rdtmp_end:vp %p error %d", vp, 0);
 		return (0);
 	}
 
@@ -500,9 +505,9 @@ rdtmp(
 			bytes = diff;
 
 		/*
-		 * We have to drop the contents lock to prevent the VM
-		 * system from trying to reacquire it in tmp_getpage()
-		 * should the uiomove cause a pagefault.
+		 * We have to drop the contents lock to allow the VM system
+		 * to reacquire it in tmp_getpage() should the uiomove cause a
+		 * pagefault.
 		 */
 		rw_exit(&tp->tn_contents);
 
@@ -510,8 +515,8 @@ rdtmp(
 			/*
 			 * Copy data.
 			 */
-			error = vpm_data_copy(vp, offset, bytes, uio,
-				1, NULL, 0, S_READ);
+			error = vpm_data_copy(vp, offset, bytes, uio, 1, NULL,
+			    0, S_READ);
 		} else {
 			segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
 			base = segmap_getmapflt(segkmap, vp, offset & MAXBMASK,
@@ -523,15 +528,14 @@ rdtmp(
 
 		if (error) {
 			if (vpm_enable) {
-				(void) vpm_sync_pages(vp, offset,
-						PAGESIZE, 0);
+				(void) vpm_sync_pages(vp, offset, PAGESIZE, 0);
 			} else {
 				(void) segmap_release(segkmap, base, 0);
 			}
 		} else {
 			if (vpm_enable) {
-				error = vpm_sync_pages(vp, offset,
-						PAGESIZE, 0);
+				error = vpm_sync_pages(vp, offset, PAGESIZE,
+				    0);
 			} else {
 				error = segmap_release(segkmap, base, 0);
 			}
@@ -555,14 +559,14 @@ out:
 		error = 0;
 
 	TRACE_2(TR_FAC_TMPFS, TR_TMPFS_RWTMP_END,
-		"tmp_rdtmp_end:vp %x error %d", vp, error);
+	    "tmp_rdtmp_end:vp %x error %d", vp, error);
 	return (error);
 }
 
 /* ARGSUSED2 */
 static int
 tmp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
@@ -591,7 +595,7 @@ tmp_read(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cred,
 
 static int
 tmp_write(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
-	struct caller_context *ct)
+    struct caller_context *ct)
 {
 	struct tmpnode *tp = (struct tmpnode *)VTOTN(vp);
 	struct tmount *tm = (struct tmount *)VTOTM(vp);
@@ -729,8 +733,8 @@ tmp_setattr(
 	 * Change file access modes. Must be owner or have sufficient
 	 * privileges.
 	 */
-	error = secpolicy_vnode_setattr(cred, vp, vap, get, flags,
-			    tmp_taccess, tp);
+	error = secpolicy_vnode_setattr(cred, vp, vap, get, flags, tmp_taccess,
+	    tp);
 
 	if (error)
 		goto out;
@@ -852,7 +856,7 @@ tmp_lookup(
 			}
 
 			xdp = tmp_memalloc(sizeof (struct tmpnode),
-				TMP_MUSTHAVE);
+			    TMP_MUSTHAVE);
 			tm = VTOTM(dvp);
 			tmpnode_init(tm, xdp, &tp->tn_attr, NULL);
 			/*
@@ -943,9 +947,9 @@ again:
 
 	/* device files not allowed in ext. attr dirs */
 	if ((parent->tn_flags & ISXATTR) &&
-		(vap->va_type == VBLK || vap->va_type == VCHR ||
-		vap->va_type == VFIFO || vap->va_type == VDOOR ||
-		vap->va_type == VSOCK || vap->va_type == VPORT))
+	    (vap->va_type == VBLK || vap->va_type == VCHR ||
+	    vap->va_type == VFIFO || vap->va_type == VDOOR ||
+	    vap->va_type == VSOCK || vap->va_type == VPORT))
 			return (EINVAL);
 
 	if (vap->va_type == VREG && (vap->va_mode & VSVTX)) {
@@ -1054,7 +1058,7 @@ again:
 		*vpp = newvp;
 	}
 	TRACE_3(TR_FAC_TMPFS, TR_TMPFS_CREATE,
-		"tmpfs create:dvp %p nm %s vpp %p", dvp, nm, vpp);
+	    "tmpfs create:dvp %p nm %s vpp %p", dvp, nm, vpp);
 	return (0);
 }
 
@@ -1089,7 +1093,7 @@ tmp_remove(
 	tmpnode_rele(tp);
 
 	TRACE_3(TR_FAC_TMPFS, TR_TMPFS_REMOVE,
-		"tmpfs remove:dvp %p nm %s error %d", dvp, nm, error);
+	    "tmpfs remove:dvp %p nm %s error %d", dvp, nm, error);
 	return (error);
 }
 
@@ -1140,7 +1144,7 @@ tmp_link(
 
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
 	error = tdirenter(tm, parent, tnm, DE_LINK, (struct tmpnode *)NULL,
-		from, NULL, (struct tmpnode **)NULL, cred, ct);
+	    from, NULL, (struct tmpnode **)NULL, cred, ct);
 	rw_exit(&parent->tn_rwlock);
 	if (error == 0) {
 		vnevent_link(srcvp, ct);
@@ -1275,8 +1279,8 @@ done:
 	mutex_exit(&tm->tm_renamelck);
 
 	TRACE_5(TR_FAC_TMPFS, TR_TMPFS_RENAME,
-		"tmpfs rename:ovp %p onm %s nvp %p nnm %s error %d",
-		odvp, onm, ndvp, nnm, error);
+	    "tmpfs rename:ovp %p onm %s nvp %p nnm %s error %d", odvp, onm,
+	    ndvp, nnm, error);
 	return (error);
 }
 
@@ -1319,9 +1323,8 @@ tmp_mkdir(
 		return (error);
 
 	rw_enter(&parent->tn_rwlock, RW_WRITER);
-	error = tdirenter(tm, parent, nm, DE_MKDIR,
-		(struct tmpnode *)NULL, (struct tmpnode *)NULL, va,
-		&self, cred, ct);
+	error = tdirenter(tm, parent, nm, DE_MKDIR, (struct tmpnode *)NULL,
+	    (struct tmpnode *)NULL, va, &self, cred, ct);
 	if (error) {
 		rw_exit(&parent->tn_rwlock);
 		if (self)
@@ -1780,8 +1783,7 @@ tmp_getpage(
 			if (anon_get_ptr(tp->tn_anon, btop(toff)) == NULL) {
 				/* XXX - may allocate mem w. write lock held */
 				(void) anon_set_ptr(tp->tn_anon, btop(toff),
-						anon_alloc(vp, toff),
-						ANON_SLEEP);
+				    anon_alloc(vp, toff), ANON_SLEEP);
 				tp->tn_nblocks++;
 			}
 		}
@@ -1925,7 +1927,7 @@ tmp_putpage(
 	 * time on the first store because this results in a call to getpage.
 	 */
 	if (flags != (B_ASYNC | B_FREE) && (flags & B_INVAL) == 0 &&
-		(flags & B_DONTNEED) == 0)
+	    (flags & B_DONTNEED) == 0)
 		return (0);
 	/*
 	 * If this thread owns the lock, i.e., this thread grabbed it

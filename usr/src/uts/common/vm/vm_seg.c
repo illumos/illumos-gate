@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +131,7 @@ static clock_t seg_preap_interval;	/* reap interval in ticks */
 
 static kmutex_t seg_pcache;	/* protects the whole pagelock cache */
 static kmutex_t seg_pmem;	/* protects window counter */
-static ksema_t seg_psaync_sem;	/* sema for reclaim thread */
+static ksema_t seg_pasync_sem;	/* sema for reclaim thread */
 static struct seg_phash *p_hashtab;
 static int p_hashsize = 0;
 
@@ -388,7 +388,7 @@ seg_ppurge_all(int force)
 		 * time in purging the cache.
 		 */
 		while ((pcp != (struct seg_pcache *)hp) &&
-				(force || (purge_count <= seg_ppcount))) {
+		    (force || (purge_count <= seg_ppcount))) {
 
 			/*
 			 * purge entries which are not active and
@@ -609,7 +609,7 @@ seg_pinit(void)
 	int i;
 	uint_t physmegs;
 
-	sema_init(&seg_psaync_sem, 0, NULL, SEMA_DEFAULT, NULL);
+	sema_init(&seg_pasync_sem, 0, NULL, SEMA_DEFAULT, NULL);
 
 	mutex_enter(&seg_pcache);
 	if (p_hashtab == NULL) {
@@ -635,8 +635,8 @@ seg_pinit(void)
 			}
 		}
 
-		p_hashtab = kmem_zalloc(
-			p_hashsize * sizeof (struct seg_phash), KM_SLEEP);
+		p_hashtab = kmem_zalloc(p_hashsize * sizeof (struct seg_phash),
+		    KM_SLEEP);
 		for (i = 0; i < p_hashsize; i++) {
 			hp = (struct seg_phash *)&p_hashtab[i];
 			hp->p_hnext = (struct seg_pcache *)hp;
@@ -673,7 +673,7 @@ seg_preap(void)
 	if (seg_plocked == 0 || seg_plazy == 0) {
 		return;
 	}
-	sema_v(&seg_psaync_sem);
+	sema_v(&seg_pasync_sem);
 }
 
 static void seg_pupdate(void *);
@@ -690,8 +690,8 @@ seg_pasync_thread(void)
 
 	mutex_init(&pasync_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	CALLB_CPR_INIT(&cpr_info, &pasync_lock,
-		callb_generic_cpr, "seg_pasync");
+	CALLB_CPR_INIT(&cpr_info, &pasync_lock, callb_generic_cpr,
+	    "seg_pasync");
 
 	if (seg_preap_interval == 0) {
 		seg_preap_interval = seg_preap_time * hz;
@@ -706,7 +706,7 @@ seg_pasync_thread(void)
 		mutex_enter(&pasync_lock);
 		CALLB_CPR_SAFE_BEGIN(&cpr_info);
 		mutex_exit(&pasync_lock);
-		sema_p(&seg_psaync_sem);
+		sema_p(&seg_pasync_sem);
 		mutex_enter(&pasync_lock);
 		CALLB_CPR_SAFE_END(&cpr_info, &pasync_lock);
 		mutex_exit(&pasync_lock);
@@ -718,7 +718,7 @@ seg_pasync_thread(void)
 static void
 seg_pupdate(void *dummy)
 {
-	sema_v(&seg_psaync_sem);
+	sema_v(&seg_pasync_sem);
 
 	if (seg_plazy && seg_pupdate_active) {
 		(void) timeout(seg_pupdate, dummy, seg_preap_interval);
@@ -735,11 +735,11 @@ seg_init(void)
 {
 	kstat_t *ksp;
 
-	seg_cache = kmem_cache_create("seg_cache", sizeof (struct seg),
-		0, NULL, NULL, NULL, NULL, NULL, 0);
+	seg_cache = kmem_cache_create("seg_cache", sizeof (struct seg), 0,
+	    NULL, NULL, NULL, NULL, NULL, 0);
 
 	ksp = kstat_create("unix", 0, "segadvstat", "vm", KSTAT_TYPE_NAMED,
-		segadvstat_ndata, KSTAT_FLAG_VIRTUAL);
+	    segadvstat_ndata, KSTAT_FLAG_VIRTUAL);
 	if (ksp) {
 		ksp->ks_data = (void *)segadvstat_ptr;
 		kstat_install(ksp);
