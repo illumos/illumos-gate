@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,15 +191,13 @@ next_fmt:
 					ADDCHAR(c);
 				break;
 			}
-			transfer_count = strlen(sp);
 			if (prec > 0) {
-				/* trim string if too long */
-				if (transfer_count > prec)
-					transfer_count = prec;
+				transfer_count = strnlen(sp, prec);
 				/* widen field if too narrow */
 				if (prec > width)
 					width = prec;
-			}
+			} else
+				transfer_count = strlen(sp);
 			if (width > transfer_count)
 				pad_count = width - transfer_count;
 			else
@@ -731,6 +729,25 @@ strlen(const char *s)
 }
 
 #endif /* _BOOT || _KMDB */
+
+/*
+ * Returns the number of non-NULL bytes in string argument,
+ * but not more than maxlen.  Does not look past str + maxlen.
+ */
+size_t
+strnlen(const char *s, size_t maxlen)
+{
+	size_t n = 0;
+
+	while (maxlen != 0 && *s != 0) {
+		s++;
+		maxlen--;
+		n++;
+	}
+
+	return (n);
+}
+
 
 #ifdef _KERNEL
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -393,6 +393,7 @@ extern void disksort(struct diskhd *, struct buf *);
 extern long strtol(const char *, char **, int);
 extern unsigned long strtoul(const char *, char **, int);
 extern size_t strlen(const char *) __PURE;
+extern size_t strnlen(const char *, size_t) __PURE;
 extern char *strcpy(char *, const char *);
 extern char *strncpy(char *, const char *, size_t);
 /* Need to be consistent with <string.h> C++ definition for strchr() */

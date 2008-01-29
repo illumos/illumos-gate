@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ extern char *strncat(char *, const char *, size_t);
 extern size_t strlcat(char *, const char *, size_t);
 extern size_t strlcpy(char *, const char *, size_t);
 extern size_t strspn(const char *, const char *);
+extern size_t strnlen(const char *, size_t);
 
 #if defined(_BOOT) || defined(_KMDB)
 
