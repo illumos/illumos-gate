@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,6 +123,7 @@ nres_gethostbyname(name, handler, info)
  *	 have already check for this kind of lookup and translated to the
  *	 proper IPv4 lookup.
  */
+/* ARGSUSED 4 : Len is not used. */
 struct nres    *
 nres_gethostbyaddr(addr, len, type, handler, info)
 	char		*addr;
@@ -138,7 +139,7 @@ nres_gethostbyaddr(addr, len, type, handler, info)
 
 	switch (type) {
 	case AF_INET:
-		(void) sprintf(qbuf, "%d.%d.%d.%d.in-addr.arpa",
+		(void) sprintf(qbuf, "%d.%d.%d.%d",
 			(uaddr[3] & 0xff), (uaddr[2] & 0xff),
 			(uaddr[1] & 0xff), (uaddr[0] & 0xff));
 		break;
@@ -148,7 +149,7 @@ nres_gethostbyaddr(addr, len, type, handler, info)
 			qp += sprintf(qp, "%x.%x.",
 				uaddr[n] & 0xf, (uaddr[n] >> 4) & 0xf);
 		}
-		strcpy(qp, "ip6.int");
+		qbuf[(qp - qbuf - 1)] = '\0'; /* Remove trailing dot. */
 		break;
 	default:
 		return ((struct nres *)0);
@@ -192,6 +193,7 @@ nres_dotimeout(as)
 {
 
 	struct nres    *temp;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	temp = (struct nres *)as->as_userptr;
 
 	/*
@@ -236,7 +238,9 @@ nres_abort_xmit(temp)
 	int		give_up;
 	prnt(P_INFO, "nres_abort().\n");
 	give_up = 0;
-	if (temp->search_index == 1) {
+	if (temp->search_index == 1 ||
+	    (temp->search_index == 0 && temp->tried_asis == 1)) {
+		/* Timeout occurred on first attempt. */
 		give_up = 1;
 		prnt(P_INFO, "Name server(s) seem to be down.\n");
 	} else if (nres_dosrch(temp) < 0)
@@ -328,6 +332,7 @@ nres_dorecv(as)
 	struct in6_addr **a6;
 	void		(*done) ();
 
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	temp = (struct nres *)as->as_userptr;
 	theans = NULL;
 	errno = 0;

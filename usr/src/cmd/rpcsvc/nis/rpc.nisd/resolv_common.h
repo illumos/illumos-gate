@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@ extern "C" {
 #define	MAX_UADDR	52
 #define	GETCALLER(xprt)	svc_getrpccaller(xprt)
 #define	SETCALLER(xprt, nbufp)	xprt->xp_rtaddr.len = nbufp->len; \
-			memcpy(xprt->xp_rtaddr.buf, nbufp->buf, nbufp->len);
+	(void) memcpy(xprt->xp_rtaddr.buf, nbufp->buf, nbufp->len);
 #define	RPC_BUF_MAX	32768
 
 struct ypfwdreq_key4 {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ xdr_ypfwdreq_key4(XDR *xdrs, struct ypfwdreq_key4 *ps)
 bool_t
 xdr_ypfwdreq_key6(XDR *xdrs, struct ypfwdreq_key6 *ps)
 {
-	u_int	addrsize = sizeof (struct in6_addr)/sizeof (uint32_t);
+	uint_t	addrsize = sizeof (struct in6_addr)/sizeof (uint32_t);
 	char	**addrp = (caddr_t *)&(ps->addr);
 
 	return (xdr_ypmap_wrap_string(xdrs, &ps->map) &&
@@ -62,9 +62,10 @@ xdr_ypfwdreq_key6(XDR *xdrs, struct ypfwdreq_key6 *ps)
 }
 
 
-u_long
+ulong_t
 svc_getxid(SVCXPRT *xprt)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	if (su == NULL)
 		return (0);

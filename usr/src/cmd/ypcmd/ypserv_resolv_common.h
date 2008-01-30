@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,13 +46,13 @@ extern "C" {
 #define	GETCALLER(xprt)	svc_getcaller(xprt)
 #define	SETCALLER(xprt, addrp)	*(svc_getcaller(xprt)) = *addrp;
 struct svc_dg_data {
-	u_int   su_iosz;
-	u_long  su_xid;
+	uint_t   su_iosz;
+	ulong_t  su_xid;
 	XDR	su_xdrs;	/* XDR handle */
 	char    su_verfbody[MAX_AUTH_BYTES];    /* verifier body */
 	char	*su_cache;	/* cached data, NULL if no cache */
 };
-#define	get_svc_dg_data(xprt) ((struct svc_dg_data *) (xprt->xp_p2))
+#define	get_svc_dg_data(xprt) ((struct svc_dg_data *)(xprt->xp_p2))
 
 #else		/* ****** 5.x ******** */
 
@@ -61,7 +61,7 @@ struct svc_dg_data {
 #define	MAX_UADDR	25
 #define	GETCALLER(xprt)	svc_getrpccaller(xprt)
 #define	SETCALLER(xprt, nbufp)	xprt->xp_rtaddr.len = nbufp->len; \
-			memcpy(xprt->xp_rtaddr.buf, nbufp->buf, nbufp->len);
+	(void) memcpy(xprt->xp_rtaddr.buf, nbufp->buf, nbufp->len);
 #define	RPC_BUF_MAX	32768
 
 #endif		/* ****** end ******** */
@@ -83,7 +83,7 @@ struct ypfwdreq_key6 {
 	in_port_t	port;
 };
 
-extern u_long svc_getxid(SVCXPRT *xprt);
+extern ulong_t svc_getxid(SVCXPRT *xprt);
 extern bool_t xdr_ypfwdreq_key4(XDR *, struct ypfwdreq_key4 *);
 extern bool_t xdr_ypfwdreq_key6(XDR *, struct ypfwdreq_key6 *);
 

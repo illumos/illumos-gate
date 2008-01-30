@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,6 @@ yp_resolv(sa_family_t af, void *req, SVCXPRT *transp)
 {
 	struct ypresp_val resp;
 	int respond = RESP_NOW;
-	int i;
 	char tmp[12]; /* max size of 9 rounded up to multiple of 4 bytes */
 	char buf[MAX_UADDR];
 	struct netbuf *nbuf;
@@ -137,6 +136,7 @@ yp_resolv(sa_family_t af, void *req, SVCXPRT *transp)
 	 * since we never did a recv on this unreg'ed xprt.
 	 */
 	if (!bd) { /* just set maxlen and buf once */
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		bd = get_svc_dg_data(transp);
 		bd->su_tudata.addr.maxlen = GETCALLER(transp)->maxlen;
 		bd->su_tudata.addr.buf = GETCALLER(transp)->buf;
@@ -375,6 +375,7 @@ svc_setxid(xprt, xid)
 	register SVCXPRT *xprt;
 	ulong_t xid;
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	ulong_t old_xid;
 	if (su == NULL)
@@ -538,6 +539,7 @@ yp_matchdns(map, keydat, valdatp, statusp, transp)
 	}
 }
 
+/* ARGSUSED 4 */
 static void
 my_done(n, h, ttl, chl, errcode)
 	void		*n;	/* opaque */

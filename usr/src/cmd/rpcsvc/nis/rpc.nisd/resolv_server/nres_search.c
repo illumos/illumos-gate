@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,46 +50,103 @@ int
 nres_search(struct nres *block)
 {
 	register char	*cp, *domain;
-	int		n;
+	int		n, trailing_dot = 0;
 
 	if ((_res.options & RES_INIT) == 0 && res_init() == -1)
 		return (-1);
 
 	block->retries = 0;	/* start clock */
+	/* Return if domain search previously exhausted. */
 	if (block->search_index < 0)
 		return (-1);
-	/* only try exact match for reverse cases */
-	if (block->reverse) {
+
+	/* Reverse lookups have limited domains. */
+	if (block->reverse == REVERSE_PTR) {
+		if (block->af_type == AF_INET6) { /* IPv6 */
+			/*
+			 * Reverse lookups strictly speaking only have
+			 * one domain. But the IPv6 one changed and so
+			 * for backward compatibility we try both of
+			 * them, using search_index to signify which
+			 * has been tried.
+			 */
+			if (block->search_index == 0) {
+				/* First pass, try RFC 3152 address. */
+				(void) nres_querydomain(block->name,
+				    "ip6.arpa", block->search_name);
+				block->search_index = 1;
+			} else {
+				/* Final pass, try RFC 1886 address. */
+				(void) nres_querydomain(block->name,
+				    "ip6.int", block->search_name);
+				block->search_index = -1;
+			}
+			return (0);
+		} else if (block->af_type == AF_INET) { /* IPv4 */
+			(void) nres_querydomain(block->name, "in-addr.arpa",
+			    block->search_name);
+			block->search_index = -1;
+			return (0);
+		}
+	} else if (block->reverse == REVERSE_A) {
+		/* We only lookup the exact name in this case. */
 		(void) nres_querydomain(block->name, (char *)NULL,
-							block->search_name);
+		    block->search_name);
 		block->search_index = -1;
 		return (0);
 	}
 
+	/* Count the number of dots and record trailing dot status. */
 	for (cp = block->name, n = 0; *cp; cp++)
 		if (*cp == '.')
 			n++;
-	/* n indicates the presence of trailing dots */
+	if (*--cp == '.')
+		trailing_dot = 1;
 
+	/* First time in search_index is zero (memory from calloc()) */
 	if (block->search_index == 0) {
+		/* If there aren't any dots, check if it's an alias. */
 		if (n == 0 && (cp = nres_hostalias(block->name))) {
+			/* It is an alias, use the substituted name only. */
 			(void) strncpy(block->search_name, cp, 2 * MAXDNAME);
 			block->search_index = -1; /* if hostalias try 1 name */
 			return (0);
 		}
 	}
-	if ((n == 0 || *--cp != '.') && (_res.options & RES_DEFNAMES)) {
+
+	/*
+	 * If there are enough dots, or a trailing dot is present then
+	 * give it a try as is.
+	 */
+	if (block->tried_asis == 0 && (n >= _res.ndots || trailing_dot)) {
+		block->tried_asis = 1; /* Don't come through here again. */
+		(void) nres_querydomain(block->name, (char *)NULL,
+		    block->search_name);
+		return (0);
+	}
+	/*
+	 * Search through domain name if:
+	 * - there is no dot and RES_DEFNAME (use default domain) is set, or
+	 * - there is at least one dot, there is no trailing dot,
+	 *   and RES_DNSRCH (search up local domain tree) is set.
+	 */
+	if ((n == 0 && (_res.options & RES_DEFNAMES)) ||
+	    (n > 0 && !trailing_dot && (_res.options & RES_DNSRCH))) {
 		domain = _res.dnsrch[block->search_index];
 		if (domain) {
 			(void) nres_querydomain(block->name, domain,
-							block->search_name);
+			    block->search_name);
 			block->search_index++;
 			return (0);
 		}
 	}
-	if (n) {
+	/*
+	 * If dots are present, and we haven't previously tried
+	 * without appending a domain name then try that now.
+	 */
+	if (n && block->tried_asis == 0) {
 		(void) nres_querydomain(block->name, (char *)NULL,
-							block->search_name);
+		    block->search_name);
 		block->search_index = -1;
 		return (0);
 	}
@@ -119,7 +175,7 @@ nres_querydomain(char *name, char *domain, char *nbuf)
 			(void) strcpy(nbuf, name);
 	} else
 		(void) sprintf(nbuf, "%.*s.%.*s",
-			MAXDNAME, name, MAXDNAME, domain);
+		    MAXDNAME, name, MAXDNAME, domain);
 
 	prnt(P_INFO, "nres_querydomain(, %s).\n", nbuf);
 }

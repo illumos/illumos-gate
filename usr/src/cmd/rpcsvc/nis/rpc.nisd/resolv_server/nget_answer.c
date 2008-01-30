@@ -19,13 +19,31 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* Taken from 4.1.3 ypserv resolver code. */
+/* Formerly taken from 4.1.3 ypserv resolver code. */
+
+/*
+ * Copyright (c) 1995,1999 by Internet Software Consortium.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
+ * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
+ * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ * SOFTWARE.
+ */
+
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -61,7 +79,10 @@ typedef union {
     char ac;
 } align;
 
-static struct hostent *getanswer(const querybuf *, int, const char *, int);
+static int makecanon(const char *, char *, size_t);
+static int samename(const char *, const char *);
+static struct hostent *getanswer(const querybuf *, int, const char *,
+    struct nres *);
 extern int lookup_AF_type(struct cache_ent *chl);
 extern uint16_t _getshort(const uchar_t *);
 extern uint32_t _getlong(const uchar_t *);
@@ -71,27 +92,29 @@ extern uint32_t _getlong(const uchar_t *);
 
 static const char AskedForGot[] =
 		"gethostby*.getanswer: asked for \"%s\", got \"%s\"";
+static const char QuestionWas[] =
+		"%s: question was \"%s\", came back as \"%s\"";
 
 static char *h_addr_ptrs[MAXADDRS + 1];
 static struct hostent host;
 static char *host_aliases[MAXALIASES];
 static char hostbuf[8*1024];
 
-
-
 struct hostent *
-nres_getanswer(temp)
-struct nres *temp;
+nres_getanswer(struct nres *temp)
 {
 	querybuf	*answer;
 	int		anslen;
 	char 		*name;
 	struct hostent	*ret;
 
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	answer = (querybuf *)temp->answer;
 	anslen = temp->answer_len;
-	name = temp->name;
-	if (ret = getanswer(answer, anslen, name, temp->qtype)) {
+	prnt(P_INFO, "nres_getanswer: name=%s search_name=%s\n",
+	    temp->name, temp->search_name);
+	name = temp->search_name;
+	if (ret = getanswer(answer, anslen, name, temp)) {
 		temp->h_errno = 0;
 		prnt(P_INFO, "nres_getanswer: return OK.\n");
 		return (ret);
@@ -104,8 +127,7 @@ struct nres *temp;
 
 
 int
-nres_chkreply(temp)
-struct nres *temp;
+nres_chkreply(struct nres *temp)
 {
 	char		*answer;
 	int		anslen;
@@ -122,10 +144,11 @@ struct nres *temp;
 		temp->h_errno = TRY_AGAIN;
 		return (anslen);
 	}
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	hp = (HEADER *) answer;
 	if (hp->rcode != NOERROR || ntohs(hp->ancount) == 0) {
 		prnt(P_INFO, "rcode = %d, ancount=%d.\n", hp->rcode,
-							ntohs(hp->ancount));
+		    ntohs(hp->ancount));
 		switch (hp->rcode) {
 		case NXDOMAIN:
 			temp->h_errno = HOST_NOT_FOUND;
@@ -148,40 +171,110 @@ struct nres *temp;
 	return (anslen);
 }
 
+/*
+ * From usr/src/lib/libresolv2/common/nameser/ns_samedomain.c
+ *
+ * int
+ * samename(a, b)
+ *	determine whether domain name "a" is the same as domain name "b"
+ * return:
+ *	-1 on error
+ *	0 if names differ
+ *	1 if names are the same
+ */
 
+static int
+samename(const char *a, const char *b) {
+	char ta[MAXDNAME], tb[MAXDNAME];
 
-
+	if (makecanon(a, ta, sizeof (ta)) < 0 ||
+	    makecanon(b, tb, sizeof (tb)) < 0)
+		return (-1);
+	if (strcasecmp(ta, tb) == 0)
+		return (1);
+	else
+		return (0);
+}
 
 /*
- * getanswer() is copied from usr/src/lib/libresolv2/common/gethnamaddr.c.
+ * From usr/src/lib/libresolv2/common/nameser/ns_samedomain.c
+ *
+ * int
+ * makecanon(src, dst, dstsize)
+ *	make a canonical copy of domain name "src"
+ * notes:
+ *	foo -> foo.
+ *	foo. -> foo.
+ *	foo.. -> foo.
+ *	foo\. -> foo\..
+ *	foo\\. -> foo\\.
+ * return:
+ *	-1 if length of src string + "." > dstsize.
+ *	0 Name canonized.
+ *
+ */
+
+static int
+makecanon(const char *src, char *dst, size_t dstsize) {
+	size_t n = strlen(src);
+
+	if (n + sizeof (".") > dstsize) {
+		errno = EMSGSIZE;
+		return (-1);
+	}
+	(void) strcpy(dst, src);
+	while (n > 0 && dst[n - 1] == '.')		/* Ends in "." */
+		if (n > 1 && dst[n - 2] == '\\' &&	/* Ends in "\." */
+		    (n <= 2 || dst[n - 3] != '\\'))	/* But not "\\." */
+			break;
+		else
+			dst[--n] = '\0';
+	dst[n++] = '.';
+	dst[n] = '\0';
+	return (0);
+}
+
+/*
+ * getanswer() formerly copied from
+ * usr/src/lib/libresolv2/common/gethnamaddr.c.
+ * Since then getanswer() has been replaced by gethostans() in
+ * usr/src/lib/libresolv2/common/irs/dns_ho.c.
+ * This function here is a mix between the old and new to maintain
+ * compatibility.
  */
 
 static struct hostent *
-getanswer(answer, anslen, qname, qtype)
-	const querybuf *answer;
-	int anslen;
-	const char *qname;
-	int qtype;
+getanswer(const querybuf *answer, int anslen, const char *qname,
+    struct nres *nres_ptr)
 {
-	const HEADER *hp;
-	const uchar_t *cp;
+	const char *iam = "getanswer";
+	const HEADER *hp;	/* Header Pointer */
+	const uchar_t *cp;	/* Current Pointer */
 	int n;
-	const uchar_t *eom;
-	char *bp, **ap, **hap;
-	int type, class, buflen, ancount, qdcount;
+	const uchar_t *eom;	/* End Of Memory */
+	const uchar_t *eor;	/* End Of Range */
+	char *bp;		/* Beginning Pointer */
+	char *ep;		/* End Pointer */
+	char **ap;		/* Alias Names */
+	char **hap;		/* Alias PTR */
+	int type, class;
+	int ancount, qdcount;	/* Answer count, Queried Count */
 	int haveanswer, had_error;
 	int toobig = 0;
 	char tbuf[MAXDNAME+1];
 	const char *tname;
 	int (*name_ok) __P((const char *));
+	int qtype = nres_ptr->qtype;
+	int ttl; 		/* Time To Live */
 
-	prnt(P_INFO, "getanswer: qname=%s\n", qname);
+	prnt(P_INFO, "%s: qname=%s\n", iam, qname);
 	tname = qname;
 	host.h_name = NULL;
 	eom = answer->buf + anslen;
 	switch (qtype) {
 	case T_A:
 	case T_AAAA:
+		host.h_name = (char *)qname; /* Maybe changed by T_CNAME */
 		name_ok = res_hnok;
 		break;
 	case T_PTR:
@@ -193,34 +286,38 @@ getanswer(answer, anslen, qname, qtype)
 	/*
 	 * find first satisfactory answer
 	 */
+	if (answer->buf + HFIXEDSZ > eom) {
+		h_errno = NO_RECOVERY;
+		return (NULL);
+	}
 	hp = &answer->hdr;
 	ancount = ntohs(hp->ancount);
 	qdcount = ntohs(hp->qdcount);
 	bp = hostbuf;
-	buflen = sizeof (hostbuf);
+	ep = hostbuf + sizeof (hostbuf);
 	cp = answer->buf + HFIXEDSZ;
 	if (qdcount != 1) {
 		h_errno = NO_RECOVERY;
 		return (NULL);
 	}
-	n = dn_expand(answer->buf, eom, cp, bp, buflen);
+	n = dn_expand(answer->buf, eom, cp, bp, ep - bp);
 	if ((n < 0) || !(*name_ok)(bp)) {
 		h_errno = NO_RECOVERY;
 		return (NULL);
 	}
 	cp += n + QFIXEDSZ;
-	if (qtype == T_A || qtype == T_AAAA) {
-		/*
-		 * res_send() has already verified that the query name is the
-		 * same as the one we sent; this just gets the expanded name
-		 * (i.e., with the succeeding search-domain tacked on).
-		 */
-		n = strlen(bp) + 1;		/* for the \0 */
-		host.h_name = bp;
-		bp += n;
-		buflen -= n;
-		/* The qname can be abbreviated, but h_name is now absolute. */
-		qname = host.h_name;
+	if (cp > eom) {
+		h_errno = NO_RECOVERY;
+		return (NULL);
+	}
+
+	/* Verify this is the name we asked for */
+	if (samename(qname, bp) != 1) {
+		syslog(LOG_NOTICE|LOG_AUTH,
+		    QuestionWas, iam, qname, bp);
+		prnt(P_INFO, (char *)QuestionWas, iam, qname, bp);
+		h_errno = NO_RECOVERY;
+		return (NULL);
 	}
 	ap = host_aliases;
 	*ap = NULL;
@@ -231,29 +328,40 @@ getanswer(answer, anslen, qname, qtype)
 	haveanswer = 0;
 	had_error = 0;
 	while (ancount-- > 0 && cp < eom && !had_error) {
-		n = dn_expand(answer->buf, eom, cp, bp, buflen);
+		n = dn_expand(answer->buf, eom, cp, bp, ep - bp);
 		if ((n < 0) || !(*name_ok)(bp)) {
 			had_error++;
 			continue;
 		}
 		cp += n;			/* name */
+		if ((cp + (3 * INT16SZ + INT32SZ)) > eom) {
+			had_error++;
+			continue;
+		}
 		type = _getshort(cp);
 		cp += INT16SZ;			/* type */
 		class = _getshort(cp);
-		cp += INT16SZ + INT32SZ;	/* class, TTL */
+		cp += INT16SZ;			/* class */
+		ttl = _getlong(cp);
+		cp += INT32SZ;			/* ttl */
 		n = _getshort(cp);
 		cp += INT16SZ;			/* len */
-		if (class != C_IN) {
-			/* XXX - debug? syslog? */
-			cp += n;
-			continue;		/* XXX - had_error++ ? */
+		if ((cp + n) > eom) {
+			had_error++;
+			continue;
 		}
+		if (class != C_IN) {
+			cp += n;
+			continue;
+		}
+		eor = cp + n;	/* limit name access to within len */
 		if ((qtype == T_A || qtype == T_AAAA) && type == T_CNAME) {
 			if (ap >= &host_aliases[MAXALIASES-1])
 				continue;
-			n = dn_expand(answer->buf, eom, cp, tbuf,
-							sizeof (tbuf));
+			n = dn_expand(answer->buf, eor, cp, tbuf,
+			    sizeof (tbuf));
 			if ((n < 0) || !(*name_ok)(tbuf)) {
+				prnt(P_INFO, "%s: CName not OK!\n", iam);
 				had_error++;
 				continue;
 			}
@@ -262,22 +370,20 @@ getanswer(answer, anslen, qname, qtype)
 			*ap++ = bp;
 			n = strlen(bp) + 1;	/* for the \0 */
 			bp += n;
-			buflen -= n;
 			/* Get canonical name. */
 			n = strlen(tbuf) + 1;	/* for the \0 */
-			if (n > buflen) {
+			if (n > (ep - bp) || n > MAXHOSTNAMELEN) {
 				had_error++;
 				continue;
 			}
-			strcpy(bp, tbuf);
+			(void) strcpy(bp, tbuf);
 			host.h_name = bp;
 			bp += n;
-			buflen -= n;
 			continue;
 		}
 		if (qtype == T_PTR && type == T_CNAME) {
-			n = dn_expand(answer->buf, eom, cp, tbuf,
-							sizeof (tbuf));
+			n = dn_expand(answer->buf, eor, cp, tbuf,
+			    sizeof (tbuf));
 			if ((n < 0) || !res_hnok(tbuf)) {
 				had_error++;
 				continue;
@@ -285,129 +391,136 @@ getanswer(answer, anslen, qname, qtype)
 			cp += n;
 			/* Get canonical name. */
 			n = strlen(tbuf) + 1;	/* for the \0 */
-			if (n > buflen) {
+			if (n > (ep - bp)) {
 				had_error++;
 				continue;
 			}
-			strcpy(bp, tbuf);
+			(void) strcpy(bp, tbuf);
 			tname = bp;
 			bp += n;
-			buflen -= n;
 			continue;
 		}
 		if (type != qtype) {
 			syslog(LOG_NOTICE|LOG_AUTH,
-		"gethostby*.getanswer: asked for \"%s %s %s\", got type \"%s\"",
-				qname, p_class(C_IN), p_type(qtype),
-				p_type(type));
+			    "gethostby*.%s: "
+			    "asked for \"%s %s %s\", got type \"%s\"",
+			    iam, qname, p_class(C_IN), p_type(qtype),
+			    p_type(type));
 			cp += n;
-			continue;		/* XXX - had_error++ ? */
+			continue;
 		}
 		switch (type) {
 		case T_PTR:
-			if (strcasecmp(tname, bp) != 0) {
+			if (samename(tname, bp) != 1) {
 				syslog(LOG_NOTICE|LOG_AUTH,
-					AskedForGot, tname, bp);
+				    AskedForGot, tname, bp);
+				prnt(P_INFO, (char *)AskedForGot, iam,
+				    tname, bp);
 				cp += n;
-				continue;	/* XXX - had_error++ ? */
+				continue;
 			}
-			n = dn_expand(answer->buf, eom, cp, bp, buflen);
-			if ((n < 0) || !res_hnok(bp)) {
+			n = dn_expand(answer->buf, eor, cp, bp, (ep - bp));
+			if ((n < 0) || !res_hnok(bp) ||
+			    n >= MAXHOSTNAMELEN) {
 				had_error++;
 				break;
 			}
-/*
- *	#if MULTI_PTRS_ARE_ALIASES
- *			cp += n;
- *			if (!haveanswer)
- *				host.h_name = bp;
- *			else if (ap < &host_aliases[MAXALIASES-1])
- *				*ap++ = bp;
- *			else
- *				n = -1;
- *			if (n != -1) {
- *				n = strlen(bp) + 1;	* for the \0 *
- *				bp += n;
- *				buflen -= n;
- *			}
- *			break;
- *	#else
- */
+#ifdef ORIGINAL_ISC_CODE	/* This isn't defined, see comment below */
+			cp += n;
+			if (!haveanswer) {
+				host.h_name = bp;
+			} else if (ap < &host_aliases[MAXALIASES-1])
+				*ap++ = bp;
+			else
+				n = -1;
+			if (n != -1) {
+				n = strlen(bp) + 1;	/* for the \0 */
+				bp += n;
+			}
+			break;
+#else
+			/*
+			 * After looking up an address (REVERSE_PTR)
+			 * nres_dorecv() immediately looks up the name
+			 * returned here (REVERSE_A) and returns that
+			 * as the result, assuming the answers match.
+			 * Thus there is no reason to store more than
+			 * one address here or the ttl.  Should that
+			 * behavior change then this code would be
+			 * removed.
+			 */
 			host.h_name = bp;
 			h_errno = NETDB_SUCCESS;
 			return (&host);
-/*
- *	#endif
- */
+#endif
 		case T_A:
 		case T_AAAA:
-			if (strcasecmp(host.h_name, bp) != 0) {
+			if (samename(host.h_name, bp) != 1) {
 				syslog(LOG_NOTICE|LOG_AUTH,
-					AskedForGot, host.h_name, bp);
+				    AskedForGot, host.h_name, bp);
+				prnt(P_INFO, (char *)AskedForGot,
+				    iam, host.h_name, bp);
 				cp += n;
-				continue;	/* XXX - had_error++ ? */
+				continue;
 			}
-#ifdef SUNW_REJECT_BOGUS_H_LENGTH
+
 			/* Don't accept unexpected address length */
 			if (n != host.h_length) {
 				cp += n;
 				continue;
 			}
 			if (!haveanswer) {
-#else
-			if (haveanswer) {
-				if (n != host.h_length) {
-					cp += n;
-					continue;
-				}
-			} else {
-#endif
 				int nn;
 
-				host.h_name = bp;
 				nn = (int)(strlen(bp) + 1);	/* for the \0 */
+				if (nn >= MAXHOSTNAMELEN) {
+					cp += n;
+					had_error++;
+					continue;
+				}
+				host.h_name = bp;
 				bp += nn;
-				buflen -= nn;
 			}
 
 			bp += sizeof (align) - ((ulong_t)bp % sizeof (align));
 
 			if (bp + n >= &hostbuf[sizeof (hostbuf)]) {
-				prnt(P_INFO, "getanswer: size (%ld) too big\n",
-					(int)n);
+				prnt(P_INFO, "%s: size (%ld) too big\n",
+				    iam, (int)n);
 				had_error++;
 				continue;
 			}
 			if (hap >= &h_addr_ptrs[MAXADDRS-1]) {
 				if (!toobig++)
 					prnt(P_INFO,
-					"getanswer: Too many addresses (%d)\n",
-					MAXADDRS);
+					"%s: Too many addresses (%d)\n",
+					    iam, MAXADDRS);
 				cp += n;
 				continue;
 			}
 			bcopy(cp, *hap++ = bp, n);
 			bp += n;
-			buflen -= n;
 			cp += n;
 			break;
 		default:
 			abort();
 		}
-		if (!had_error)
+		if (!had_error) {
 			haveanswer++;
+			if (haveanswer == 1) /* Save first TTL */
+				nres_ptr->ttl = ttl;
+		}
 	}
 	if (haveanswer) {
 		*ap = NULL;
 		*hap = NULL;
 		if (!host.h_name) {
 			n =  strlen(qname) + 1;	/* for the \0 */
-			if (n > buflen)
+			if (n > (ep - bp))
 				goto try_again;
-			strcpy(bp, qname);
+			(void) strcpy(bp, qname);
 			host.h_name = bp;
 			bp += n;
-			buflen -= n;
 		}
 		h_errno = NETDB_SUCCESS;
 		return (&host);
