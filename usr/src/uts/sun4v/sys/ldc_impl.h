@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ extern "C" {
 #define	LDC_MTU_MSGS		4
 #define	LDC_QUEUE_SIZE		(LDC_QUEUE_ENTRIES << LDC_PACKET_SHIFT)
 #define	LDC_DEFAULT_MTU		(LDC_QUEUE_SIZE / LDC_MTU_MSGS)
+#define	LDC_RXDQ_MULTIPLIER	2
 
 /*
  * LDC Reliable mode - initial packet seqid
@@ -452,6 +453,12 @@ struct ldc_chan {
 	uint64_t	rx_q_va;	/* Virtual addr of receive queue */
 	uint64_t	rx_q_ra;	/* Real addr of receive queue */
 
+	uint64_t	rx_dq_entries;	/* Num entries in the data queue */
+	uint64_t	rx_dq_va;	/* Virtual addr of the data queue */
+	uint64_t	rx_dq_head;	/* Receive data queue head */
+	uint64_t	rx_dq_tail;	/* Receive data queue tail */
+	uint64_t	rx_ack_head;	/* Receive data ACK peek head ptr */
+
 	uint64_t	link_state;	/* Underlying HV channel state */
 
 	ldc_mtbl_t	*mtbl;		/* Memory table used by channel */
@@ -479,6 +486,11 @@ struct ldc_chan {
 				size_t *sizep);
 	int		(*write_p)(ldc_chan_t *ldcp, caddr_t bufferp,
 				size_t *sizep);
+
+	uint64_t	(*readq_get_state)(ldc_chan_t *ldcp, uint64_t *head,
+				uint64_t *tail, uint64_t *link_state);
+
+	int		(*readq_set_head)(ldc_chan_t *ldcp, uint64_t head);
 };
 
 

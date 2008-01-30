@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@
 #include <sys/ldc_impl.h>
 #include <sys/cnex.h>
 #include <sys/hsvc.h>
+#include <sys/sdt.h>
 
 /* Core internal functions */
 static int i_ldc_h2v_error(int h_error);
@@ -83,9 +84,21 @@ static int i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head);
 static int i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
     uint8_t ctrlmsg);
 
+static int  i_ldc_set_rxdq_head(ldc_chan_t *ldcp, uint64_t head);
+static void i_ldc_rxdq_copy(ldc_chan_t *ldcp, uint64_t *head);
+static uint64_t i_ldc_dq_rx_get_state(ldc_chan_t *ldcp, uint64_t *head,
+    uint64_t *tail, uint64_t *link_state);
+static uint64_t i_ldc_hvq_rx_get_state(ldc_chan_t *ldcp, uint64_t *head,
+    uint64_t *tail, uint64_t *link_state);
+static int i_ldc_rx_ackpeek(ldc_chan_t *ldcp, uint64_t rx_head,
+    uint64_t rx_tail);
+static uint_t i_ldc_chkq(ldc_chan_t *ldcp);
+
 /* Interrupt handling functions */
 static uint_t i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2);
 static uint_t i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2);
+static uint_t i_ldc_rx_process_hvq(ldc_chan_t *ldcp, boolean_t *notify_client,
+    uint64_t *notify_event);
 static void i_ldc_clear_intr(ldc_chan_t *ldcp, cnex_intrtype_t itype);
 
 /* Read method functions */
@@ -123,6 +136,10 @@ static ldc_ver_t ldc_versions[] = { {1, 0} };
 
 /* number of supported versions */
 #define	LDC_NUM_VERS	(sizeof (ldc_versions) / sizeof (ldc_versions[0]))
+
+/* Invalid value for the ldc_chan_t rx_ack_head field */
+#define	ACKPEEK_HEAD_INVALID	((uint64_t)-1)
+
 
 /* Module State Pointer */
 static ldc_soft_state_t *ldcssp;
@@ -164,6 +181,19 @@ uint64_t ldc_mtu_msgs = LDC_MTU_MSGS;
  * the queue length is rounded up to 'ldc_queue_entries'.
  */
 uint64_t ldc_queue_entries = LDC_QUEUE_ENTRIES;
+
+/*
+ * The length of the reliable-mode data queue in terms of the LDC
+ * receive queue length. i.e., the number of times larger than the
+ * LDC receive queue that the data queue should be. The HV receive
+ * queue is required to be a power of 2 and this implementation
+ * assumes the data queue will also be a power of 2. By making the
+ * multiplier a power of 2, we ensure the data queue will be a
+ * power of 2. We use a multiplier because the receive queue is
+ * sized to be sane relative to the MTU and the same is needed for
+ * the data queue.
+ */
+uint64_t ldc_rxdq_multiplier = LDC_RXDQ_MULTIPLIER;
 
 /*
  * Pages exported for remote access over each channel is
@@ -235,6 +265,7 @@ ldcdebug(int64_t id, const char *fmt, ...)
 
 #define	LDC_ERR_RESET	0x1
 #define	LDC_ERR_PKTLOSS	0x2
+#define	LDC_ERR_DQFULL	0x4
 
 static boolean_t
 ldc_inject_error(ldc_chan_t *ldcp, uint64_t error)
@@ -292,6 +323,7 @@ if (ldcdbg & 0x04)	\
 
 #define	LDC_INJECT_RESET(_ldcp)	ldc_inject_error(_ldcp, LDC_ERR_RESET)
 #define	LDC_INJECT_PKTLOSS(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_PKTLOSS)
+#define	LDC_INJECT_DQFULL(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_DQFULL)
 
 #else
 
@@ -306,8 +338,37 @@ if (ldcdbg & 0x04)	\
 
 #define	LDC_INJECT_RESET(_ldcp)	(B_FALSE)
 #define	LDC_INJECT_PKTLOSS(_ldcp) (B_FALSE)
+#define	LDC_INJECT_DQFULL(_ldcp) (B_FALSE)
 
 #endif
+
+/*
+ * dtrace SDT probes to ease tracing of the rx data queue and HV queue
+ * lengths. Just pass the head, tail, and entries values so that the
+ * length can be calculated in a dtrace script when the probe is enabled.
+ */
+#define	TRACE_RXDQ_LENGTH(ldcp)						\
+	DTRACE_PROBE4(rxdq__size,					\
+	uint64_t, ldcp->id,						\
+	uint64_t, ldcp->rx_dq_head,					\
+	uint64_t, ldcp->rx_dq_tail,					\
+	uint64_t, ldcp->rx_dq_entries)
+
+#define	TRACE_RXHVQ_LENGTH(ldcp, head, tail)				\
+	DTRACE_PROBE4(rxhvq__size,					\
+	uint64_t, ldcp->id,						\
+	uint64_t, head,							\
+	uint64_t, tail,							\
+	uint64_t, ldcp->rx_q_entries)
+
+/* A dtrace SDT probe to ease tracing of data queue copy operations */
+#define	TRACE_RXDQ_COPY(ldcp, bytes)					\
+	DTRACE_PROBE2(rxdq__copy, uint64_t, ldcp->id, uint64_t, bytes)	\
+
+/* The amount of contiguous space at the tail of the queue */
+#define	Q_CONTIG_SPACE(head, tail, size)				\
+	((head) <= (tail) ? ((size) - (tail)) :				\
+	((head) - (tail) - LDC_PACKET_SIZE))
 
 #define	ZERO_PKT(p)			\
 	bzero((p), sizeof (ldc_msg_t));
@@ -596,10 +657,14 @@ i_ldc_reset_state(ldc_chan_t *ldcp)
 	ldcp->last_ack_rcd = 0;
 	ldcp->last_msg_rcd = 0;
 	ldcp->tx_ackd_head = ldcp->tx_head;
+	ldcp->stream_remains = 0;
 	ldcp->next_vidx = 0;
 	ldcp->hstate = 0;
 	ldcp->tstate = TS_OPEN;
 	ldcp->status = LDC_OPEN;
+	ldcp->rx_ack_head = ACKPEEK_HEAD_INVALID;
+	ldcp->rx_dq_head = 0;
+	ldcp->rx_dq_tail = 0;
 
 	if (ldcp->link_state == LDC_CHANNEL_UP ||
 	    ldcp->link_state == LDC_CHANNEL_RESET) {
@@ -818,6 +883,174 @@ i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail)
 		drv_usecwait(ldc_delay);
 	}
 	return (retval);
+}
+
+/*
+ * Copy a data packet from the HV receive queue to the data queue.
+ * Caller must ensure that the data queue is not already full.
+ *
+ * The *head argument represents the current head pointer for the HV
+ * receive queue. After copying a packet from the HV receive queue,
+ * the *head pointer will be updated. This allows the caller to update
+ * the head pointer in HV using the returned *head value.
+ */
+void
+i_ldc_rxdq_copy(ldc_chan_t *ldcp, uint64_t *head)
+{
+	uint64_t	q_size, dq_size;
+
+	ASSERT(MUTEX_HELD(&ldcp->lock));
+
+	q_size  = ldcp->rx_q_entries << LDC_PACKET_SHIFT;
+	dq_size = ldcp->rx_dq_entries << LDC_PACKET_SHIFT;
+
+	ASSERT(Q_CONTIG_SPACE(ldcp->rx_dq_head, ldcp->rx_dq_tail,
+	    dq_size) >= LDC_PACKET_SIZE);
+
+	bcopy((void *)(ldcp->rx_q_va + *head),
+	    (void *)(ldcp->rx_dq_va + ldcp->rx_dq_tail), LDC_PACKET_SIZE);
+	TRACE_RXDQ_COPY(ldcp, LDC_PACKET_SIZE);
+
+	/* Update rx head */
+	*head = (*head + LDC_PACKET_SIZE) % q_size;
+
+	/* Update dq tail */
+	ldcp->rx_dq_tail = (ldcp->rx_dq_tail + LDC_PACKET_SIZE) % dq_size;
+}
+
+/*
+ * Update the Rx data queue head pointer
+ */
+static int
+i_ldc_set_rxdq_head(ldc_chan_t *ldcp, uint64_t head)
+{
+	ldcp->rx_dq_head = head;
+	return (0);
+}
+
+/*
+ * Get the Rx data queue head and tail pointers
+ */
+static uint64_t
+i_ldc_dq_rx_get_state(ldc_chan_t *ldcp, uint64_t *head, uint64_t *tail,
+    uint64_t *link_state)
+{
+	_NOTE(ARGUNUSED(link_state))
+	*head = ldcp->rx_dq_head;
+	*tail = ldcp->rx_dq_tail;
+	return (0);
+}
+
+/*
+ * Wrapper for the Rx HV queue set head function. Giving the
+ * data queue and HV queue set head functions the same type.
+ */
+static uint64_t
+i_ldc_hvq_rx_get_state(ldc_chan_t *ldcp, uint64_t *head, uint64_t *tail,
+    uint64_t *link_state)
+{
+	return (i_ldc_h2v_error(hv_ldc_rx_get_state(ldcp->id, head, tail,
+	    link_state)));
+}
+
+/*
+ * LDC receive interrupt handler
+ *    triggered for channel with data pending to read
+ *    i.e. Rx queue content changes
+ */
+static uint_t
+i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
+{
+	_NOTE(ARGUNUSED(arg2))
+
+	ldc_chan_t	*ldcp;
+	boolean_t	notify;
+	uint64_t	event;
+	int		rv;
+
+	/* Get the channel for which interrupt was received */
+	if (arg1 == NULL) {
+		cmn_err(CE_WARN, "i_ldc_rx_hdlr: invalid arg\n");
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	ldcp = (ldc_chan_t *)arg1;
+
+	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) Received intr, ldcp=0x%p\n",
+	    ldcp->id, ldcp);
+	D1(ldcp->id, "i_ldc_rx_hdlr: (%llx) USR%lx/TS%lx/HS%lx, LSTATE=%lx\n",
+	    ldcp->id, ldcp->status, ldcp->tstate, ldcp->hstate,
+	    ldcp->link_state);
+
+	/* Lock channel */
+	mutex_enter(&ldcp->lock);
+
+	/* Mark the interrupt as being actively handled */
+	ldcp->rx_intr_state = LDC_INTR_ACTIVE;
+
+	(void) i_ldc_rx_process_hvq(ldcp, &notify, &event);
+
+	if (ldcp->mode != LDC_MODE_STREAM) {
+		/*
+		 * If there are no data packets on the queue, clear
+		 * the interrupt. Otherwise, the ldc_read will clear
+		 * interrupts after draining the queue. To indicate the
+		 * interrupt has not yet been cleared, it is marked
+		 * as pending.
+		 */
+		if ((event & LDC_EVT_READ) == 0) {
+			i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+		} else {
+			ldcp->rx_intr_state = LDC_INTR_PEND;
+		}
+	}
+
+	/* if callbacks are disabled, do not notify */
+	if (notify && ldcp->cb_enabled) {
+		ldcp->cb_inprogress = B_TRUE;
+		mutex_exit(&ldcp->lock);
+		rv = ldcp->cb(event, ldcp->cb_arg);
+		if (rv) {
+			DWARN(ldcp->id,
+			    "i_ldc_rx_hdlr: (0x%llx) callback failure",
+			    ldcp->id);
+		}
+		mutex_enter(&ldcp->lock);
+		ldcp->cb_inprogress = B_FALSE;
+	}
+
+	if (ldcp->mode == LDC_MODE_STREAM) {
+		/*
+		 * If we are using a secondary data queue, clear the
+		 * interrupt. We should have processed all CTRL packets
+		 * and copied all DATA packets to the secondary queue.
+		 * Even if secondary queue filled up, clear the interrupts,
+		 * this will trigger another interrupt and force the
+		 * handler to copy more data.
+		 */
+		i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
+	}
+
+	mutex_exit(&ldcp->lock);
+
+	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) exiting handler", ldcp->id);
+
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * Wrapper for the Rx HV queue processing function to be used when
+ * checking the Rx HV queue for data packets. Unlike the interrupt
+ * handler code flow, the Rx interrupt is not cleared here and
+ * callbacks are not made.
+ */
+static uint_t
+i_ldc_chkq(ldc_chan_t *ldcp)
+{
+	boolean_t	notify;
+	uint64_t	event;
+
+	return (i_ldc_rx_process_hvq(ldcp, &notify, &event));
 }
 
 /*
@@ -1893,43 +2126,45 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 }
 
 /*
- * LDC receive interrupt handler
- *    triggered for channel with data pending to read
- *    i.e. Rx queue content changes
+ * Process the Rx HV queue.
+ *
+ * Returns 0 if data packets were found and no errors were encountered,
+ * otherwise returns an error. In either case, the *notify argument is
+ * set to indicate whether or not the client callback function should
+ * be invoked. The *event argument is set to contain the callback event.
+ *
+ * Depending on the channel mode, packets are handled differently:
+ *
+ * RAW MODE
+ * For raw mode channels, when a data packet is encountered,
+ * processing stops and all packets are left on the queue to be removed
+ * and processed by the ldc_read code path.
+ *
+ * UNRELIABLE MODE
+ * For unreliable mode, when a data packet is encountered, processing
+ * stops, and all packets are left on the queue to be removed and
+ * processed by the ldc_read code path. Control packets are processed
+ * inline if they are encountered before any data packets.
+ *
+ * STEAMING MODE
+ * For streaming mode channels, all packets on the receive queue
+ * are processed: data packets are copied to the data queue and
+ * control packets are processed inline. Packets are only left on
+ * the receive queue when the data queue is full.
  */
 static uint_t
-i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
+i_ldc_rx_process_hvq(ldc_chan_t *ldcp, boolean_t *notify_client,
+    uint64_t *notify_event)
 {
-	_NOTE(ARGUNUSED(arg2))
-
 	int		rv;
 	uint64_t 	rx_head, rx_tail;
 	ldc_msg_t 	*msg;
-	ldc_chan_t 	*ldcp;
-	boolean_t 	notify_client = B_FALSE;
-	uint64_t	notify_event = 0;
 	uint64_t	link_state, first_fragment = 0;
+	boolean_t	trace_length = B_TRUE;
 
-
-	/* Get the channel for which interrupt was received */
-	if (arg1 == NULL) {
-		cmn_err(CE_WARN, "i_ldc_rx_hdlr: invalid arg\n");
-		return (DDI_INTR_UNCLAIMED);
-	}
-
-	ldcp = (ldc_chan_t *)arg1;
-
-	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) Received intr, ldcp=0x%p\n",
-	    ldcp->id, ldcp);
-	D1(ldcp->id, "i_ldc_rx_hdlr: (%llx) USR%lx/TS%lx/HS%lx, LSTATE=%lx\n",
-	    ldcp->id, ldcp->status, ldcp->tstate, ldcp->hstate,
-	    ldcp->link_state);
-
-	/* Lock channel */
-	mutex_enter(&ldcp->lock);
-
-	/* mark interrupt as pending */
-	ldcp->rx_intr_state = LDC_INTR_ACTIVE;
+	ASSERT(MUTEX_HELD(&ldcp->lock));
+	*notify_client = B_FALSE;
+	*notify_event = 0;
 
 	/*
 	 * Read packet(s) from the queue
@@ -1941,11 +2176,10 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 		    &ldcp->link_state);
 		if (rv) {
 			cmn_err(CE_WARN,
-			    "i_ldc_rx_hdlr: (0x%lx) cannot read "
+			    "i_ldc_rx_process_hvq: (0x%lx) cannot read "
 			    "queue ptrs, rv=0x%d\n", ldcp->id, rv);
 			i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
-			mutex_exit(&ldcp->lock);
-			return (DDI_INTR_CLAIMED);
+			return (EIO);
 		}
 
 		/*
@@ -1958,22 +2192,22 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 
 			switch (ldcp->link_state) {
 			case LDC_CHANNEL_DOWN:
-				D1(ldcp->id, "i_ldc_rx_hdlr: channel "
+				D1(ldcp->id, "i_ldc_rx_process_hvq: channel "
 				    "link down\n", ldcp->id);
 				mutex_enter(&ldcp->tx_lock);
 				i_ldc_reset(ldcp, B_FALSE);
 				mutex_exit(&ldcp->tx_lock);
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_DOWN;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_DOWN;
 				goto loop_exit;
 
 			case LDC_CHANNEL_UP:
-				D1(ldcp->id, "i_ldc_rx_hdlr: "
+				D1(ldcp->id, "i_ldc_rx_process_hvq: "
 				    "channel link up\n", ldcp->id);
 
 				if ((ldcp->tstate & ~TS_IN_RESET) == TS_OPEN) {
-					notify_client = B_TRUE;
-					notify_event = LDC_EVT_RESET;
+					*notify_client = B_TRUE;
+					*notify_event = LDC_EVT_RESET;
 					ldcp->tstate |= TS_LINK_READY;
 					ldcp->status = LDC_READY;
 				}
@@ -1984,13 +2218,13 @@ i_ldc_rx_hdlr(caddr_t arg1, caddr_t arg2)
 #ifdef DEBUG
 force_reset:
 #endif
-				D1(ldcp->id, "i_ldc_rx_hdlr: channel "
+				D1(ldcp->id, "i_ldc_rx_process_hvq: channel "
 				    "link reset\n", ldcp->id);
 				mutex_enter(&ldcp->tx_lock);
 				i_ldc_reset(ldcp, B_FALSE);
 				mutex_exit(&ldcp->tx_lock);
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_RESET;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
 				break;
 			}
 		}
@@ -1999,16 +2233,20 @@ force_reset:
 		if (LDC_INJECT_RESET(ldcp))
 			goto force_reset;
 #endif
+		if (trace_length) {
+			TRACE_RXHVQ_LENGTH(ldcp, rx_head, rx_tail);
+			trace_length = B_FALSE;
+		}
 
 		if (rx_head == rx_tail) {
-			D2(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) No packets\n",
-			    ldcp->id);
+			D2(ldcp->id, "i_ldc_rx_process_hvq: (0x%llx) "
+			    "No packets\n", ldcp->id);
 			break;
 		}
 
-		D2(ldcp->id, "i_ldc_rx_hdlr: head=0x%llx, tail=0x%llx\n",
-		    rx_head, rx_tail);
-		DUMP_LDC_PKT(ldcp, "i_ldc_rx_hdlr rcd",
+		D2(ldcp->id, "i_ldc_rx_process_hvq: head=0x%llx, "
+		    "tail=0x%llx\n", rx_head, rx_tail);
+		DUMP_LDC_PKT(ldcp, "i_ldc_rx_process_hvq rcd",
 		    ldcp->rx_q_va + rx_head);
 
 		/* get the message */
@@ -2016,8 +2254,8 @@ force_reset:
 
 		/* if channel is in RAW mode or data pkt, notify and return */
 		if (ldcp->mode == LDC_MODE_RAW) {
-			notify_client = B_TRUE;
-			notify_event |= LDC_EVT_READ;
+			*notify_client = B_TRUE;
+			*notify_event |= LDC_EVT_READ;
 			break;
 		}
 
@@ -2035,10 +2273,26 @@ force_reset:
 
 				continue;
 			} else {
-				if ((ldcp->tstate & TS_IN_RESET) == 0)
-					notify_client = B_TRUE;
-				notify_event |= LDC_EVT_READ;
-				break;
+				uint64_t dq_head, dq_tail;
+
+				/* process only STREAM mode data packets */
+				if (ldcp->mode != LDC_MODE_STREAM) {
+					if ((ldcp->tstate & TS_IN_RESET) == 0)
+						*notify_client = B_TRUE;
+					*notify_event |= LDC_EVT_READ;
+					break;
+				}
+
+				/* don't process packet if queue full */
+				(void) i_ldc_dq_rx_get_state(ldcp, &dq_head,
+				    &dq_tail, NULL);
+				dq_tail = (dq_tail + LDC_PACKET_SIZE) %
+				    (ldcp->rx_dq_entries << LDC_PACKET_SHIFT);
+				if (dq_tail == dq_head ||
+				    LDC_INJECT_DQFULL(ldcp)) {
+					rv = ENOSPC;
+					break;
+				}
 			}
 		}
 
@@ -2046,8 +2300,9 @@ force_reset:
 		rv = i_ldc_check_seqid(ldcp, msg);
 		if (rv != 0) {
 
-			DWARN(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) seqid error, "
-			    "q_ptrs=0x%lx,0x%lx", ldcp->id, rx_head, rx_tail);
+			DWARN(ldcp->id, "i_ldc_rx_process_hvq: (0x%llx) "
+			    "seqid error, q_ptrs=0x%lx,0x%lx", ldcp->id,
+			    rx_head, rx_tail);
 
 			/* Reset last_msg_rcd to start of message */
 			if (first_fragment != 0) {
@@ -2062,17 +2317,17 @@ force_reset:
 			    (msg->ctrl & LDC_CTRL_MASK));
 
 			if (rv) {
-				cmn_err(CE_NOTE,
-				    "i_ldc_rx_hdlr: (0x%lx) err sending "
-				    "CTRL/DATA NACK msg\n", ldcp->id);
+				cmn_err(CE_NOTE, "i_ldc_rx_process_hvq: "
+				    "(0x%lx) err sending CTRL/DATA NACK msg\n",
+				    ldcp->id);
 
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
 				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_RESET;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
 				break;
 			}
 
@@ -2095,8 +2350,8 @@ force_reset:
 				continue;
 			}
 			if (rv == ECONNRESET) {
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_RESET;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
 				break;
 			}
 
@@ -2107,39 +2362,54 @@ force_reset:
 			if (rv == 0 && ldcp->tstate == TS_UP &&
 			    (tstate & ~TS_IN_RESET) !=
 			    (ldcp->tstate & ~TS_IN_RESET)) {
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_UP;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_UP;
 			}
 		}
 
 		/* process data NACKs */
 		if ((msg->type & LDC_DATA) && (msg->stype & LDC_NACK)) {
 			DWARN(ldcp->id,
-			    "i_ldc_rx_hdlr: (0x%llx) received DATA/NACK",
+			    "i_ldc_rx_process_hvq: (0x%llx) received DATA/NACK",
 			    ldcp->id);
 			mutex_enter(&ldcp->tx_lock);
 			i_ldc_reset(ldcp, B_TRUE);
 			mutex_exit(&ldcp->tx_lock);
-			notify_client = B_TRUE;
-			notify_event = LDC_EVT_RESET;
+			*notify_client = B_TRUE;
+			*notify_event = LDC_EVT_RESET;
 			break;
 		}
 
 		/* process data ACKs */
 		if ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK)) {
 			if (rv = i_ldc_process_data_ACK(ldcp, msg)) {
-				notify_client = B_TRUE;
-				notify_event = LDC_EVT_RESET;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
 				break;
 			}
 		}
 
+		if ((msg->type & LDC_DATA) && (msg->stype & LDC_INFO)) {
+			ASSERT(ldcp->mode == LDC_MODE_STREAM);
+
+			/*
+			 * Copy the data packet to the data queue. Note
+			 * that the copy routine updates the rx_head pointer.
+			 */
+			i_ldc_rxdq_copy(ldcp, &rx_head);
+
+			if ((ldcp->tstate & TS_IN_RESET) == 0)
+				*notify_client = B_TRUE;
+			*notify_event |= LDC_EVT_READ;
+		} else {
+			rx_head = (rx_head + LDC_PACKET_SIZE) %
+			    (ldcp->rx_q_entries << LDC_PACKET_SHIFT);
+		}
+
 		/* move the head one position */
-		rx_head = (rx_head + LDC_PACKET_SIZE) %
-		    (ldcp->rx_q_entries << LDC_PACKET_SHIFT);
 		if (rv = i_ldc_set_rx_head(ldcp, rx_head)) {
-			notify_client = B_TRUE;
-			notify_event = LDC_EVT_RESET;
+			*notify_client = B_TRUE;
+			*notify_event = LDC_EVT_RESET;
 			break;
 		}
 
@@ -2147,39 +2417,82 @@ force_reset:
 
 loop_exit:
 
-	/* if callbacks are disabled, do not notify */
-	if (!ldcp->cb_enabled)
-		notify_client = B_FALSE;
+	if (ldcp->mode == LDC_MODE_STREAM) {
+		/* ACK data packets */
+		if ((*notify_event &
+		    (LDC_EVT_READ | LDC_EVT_RESET)) == LDC_EVT_READ) {
+			int ack_rv;
+			ack_rv = i_ldc_send_pkt(ldcp, LDC_DATA, LDC_ACK, 0);
+			if (ack_rv && ack_rv != EWOULDBLOCK) {
+				cmn_err(CE_NOTE,
+				    "i_ldc_rx_process_hvq: (0x%lx) cannot "
+				    "send ACK\n", ldcp->id);
 
-	/*
-	 * If there are data packets in the queue, the ldc_read will
-	 * clear interrupts after draining the queue, else clear interrupts
-	 */
-	if ((notify_event & LDC_EVT_READ) == 0) {
-		i_ldc_clear_intr(ldcp, CNEX_RX_INTR);
-	} else
-		ldcp->rx_intr_state = LDC_INTR_PEND;
+				mutex_enter(&ldcp->tx_lock);
+				i_ldc_reset(ldcp, B_FALSE);
+				mutex_exit(&ldcp->tx_lock);
 
-
-	if (notify_client) {
-		ldcp->cb_inprogress = B_TRUE;
-		mutex_exit(&ldcp->lock);
-		rv = ldcp->cb(notify_event, ldcp->cb_arg);
-		if (rv) {
-			DWARN(ldcp->id,
-			    "i_ldc_rx_hdlr: (0x%llx) callback failure",
-			    ldcp->id);
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
+				goto skip_ackpeek;
+			}
 		}
-		mutex_enter(&ldcp->lock);
-		ldcp->cb_inprogress = B_FALSE;
+
+		/*
+		 * If we have no more space on the data queue, make sure
+		 * there are no ACKs on the rx queue waiting to be processed.
+		 */
+		if (rv == ENOSPC) {
+			if (i_ldc_rx_ackpeek(ldcp, rx_head, rx_tail) != 0) {
+				ldcp->rx_ack_head = ACKPEEK_HEAD_INVALID;
+				*notify_client = B_TRUE;
+				*notify_event = LDC_EVT_RESET;
+			}
+		} else {
+			ldcp->rx_ack_head = ACKPEEK_HEAD_INVALID;
+		}
 	}
 
-	mutex_exit(&ldcp->lock);
+skip_ackpeek:
 
-	D1(ldcp->id, "i_ldc_rx_hdlr: (0x%llx) exiting handler", ldcp->id);
-	return (DDI_INTR_CLAIMED);
+	/* Return, indicating whether or not data packets were found */
+	if ((*notify_event & (LDC_EVT_READ | LDC_EVT_RESET)) == LDC_EVT_READ)
+		return (0);
+
+	return (ENOMSG);
 }
 
+/*
+ * Process any ACK packets on the HV receive queue.
+ *
+ * This function is only used by STREAMING mode channels when the
+ * secondary data queue fills up and there are packets remaining on
+ * the HV receive queue.
+ */
+int
+i_ldc_rx_ackpeek(ldc_chan_t *ldcp, uint64_t rx_head, uint64_t rx_tail)
+{
+	int		rv = 0;
+	ldc_msg_t	*msg;
+
+	if (ldcp->rx_ack_head == ACKPEEK_HEAD_INVALID)
+		ldcp->rx_ack_head = rx_head;
+
+	while (ldcp->rx_ack_head != rx_tail) {
+		msg = (ldc_msg_t *)(ldcp->rx_q_va + ldcp->rx_ack_head);
+
+		if ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK)) {
+			if (rv = i_ldc_process_data_ACK(ldcp, msg))
+				break;
+			msg->stype &= ~LDC_ACK;
+		}
+
+		ldcp->rx_ack_head =
+		    (ldcp->rx_ack_head + LDC_PACKET_SIZE) %
+		    (ldcp->rx_q_entries << LDC_PACKET_SHIFT);
+	}
+	return (rv);
+}
 
 /* -------------------------------------------------------------------------- */
 
@@ -2282,6 +2595,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	ldcp->last_msg_snt = LDC_INIT_SEQID;
 	ldcp->last_ack_rcd = 0;
 	ldcp->last_msg_rcd = 0;
+	ldcp->rx_ack_head = ACKPEEK_HEAD_INVALID;
 
 	ldcp->stream_bufferp = NULL;
 	ldcp->exp_dring_list = NULL;
@@ -2376,6 +2690,40 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	    ldcp->rx_q_va, ldcp->rx_q_ra, ldcp->rx_q_entries);
 
 	ldcp->tstate |= TS_RXQ_RDY;
+
+	/* Setup a separate read data queue */
+	if (ldcp->mode == LDC_MODE_STREAM) {
+		ldcp->readq_get_state = i_ldc_dq_rx_get_state;
+		ldcp->readq_set_head  = i_ldc_set_rxdq_head;
+
+		/* Make sure the data queue multiplier is a power of 2 */
+		if (!ISP2(ldc_rxdq_multiplier)) {
+			D1(ldcp->id, "ldc_init: (0x%llx) ldc_rxdq_multiplier "
+			    "not a power of 2, resetting", ldcp->id);
+			ldc_rxdq_multiplier = LDC_RXDQ_MULTIPLIER;
+		}
+
+		ldcp->rx_dq_entries = ldc_rxdq_multiplier * ldcp->rx_q_entries;
+		ldcp->rx_dq_va = (uint64_t)
+		    kmem_alloc(ldcp->rx_dq_entries << LDC_PACKET_SHIFT,
+		    KM_SLEEP);
+		if (ldcp->rx_dq_va == NULL) {
+			cmn_err(CE_WARN,
+			    "ldc_init: (0x%lx) RX data queue "
+			    "allocation failed\n", ldcp->id);
+			exit_val = ENOMEM;
+			goto cleanup_on_exit;
+		}
+
+		ldcp->rx_dq_head = ldcp->rx_dq_tail = 0;
+
+		D2(ldcp->id, "ldc_init: rx_dq_va=0x%llx, "
+		    "rx_dq_entries=0x%llx\n", ldcp->rx_dq_va,
+		    ldcp->rx_dq_entries);
+	} else {
+		ldcp->readq_get_state = i_ldc_hvq_rx_get_state;
+		ldcp->readq_set_head  = i_ldc_set_rx_head;
+	}
 
 	/* Init descriptor ring and memory handle list lock */
 	mutex_init(&ldcp->exp_dlist_lock, NULL, MUTEX_DRIVER, NULL);
@@ -2501,6 +2849,12 @@ ldc_fini(ldc_handle_t handle)
 	contig_mem_free((caddr_t)ldcp->rx_q_va,
 	    (ldcp->rx_q_entries << LDC_PACKET_SHIFT));
 	ldcp->tstate &= ~TS_RXQ_RDY;
+
+	/* Free the RX data queue */
+	if (ldcp->mode == LDC_MODE_STREAM) {
+		kmem_free((caddr_t)ldcp->rx_dq_va,
+		    (ldcp->rx_dq_entries << LDC_PACKET_SHIFT));
+	}
 
 	/* Free the TX queue */
 	contig_mem_free((caddr_t)ldcp->tx_q_va,
@@ -3220,6 +3574,7 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 		mutex_exit(&ldcp->lock);
 		return (EIO);
 	}
+
 	/* reset the channel state if the channel went down */
 	if (ldcp->link_state == LDC_CHANNEL_DOWN ||
 	    ldcp->link_state == LDC_CHANNEL_RESET) {
@@ -3230,12 +3585,42 @@ ldc_chkq(ldc_handle_t handle, boolean_t *hasdata)
 		return (ECONNRESET);
 	}
 
-	if ((rx_head != rx_tail) ||
-	    (ldcp->mode == LDC_MODE_STREAM && ldcp->stream_remains > 0)) {
-		D1(ldcp->id,
-		    "ldc_chkq: (0x%llx) queue has pkt(s) or buffered data\n",
-		    ldcp->id);
-		*hasdata = B_TRUE;
+	switch (ldcp->mode) {
+	case LDC_MODE_RAW:
+		/*
+		 * In raw mode, there are no ctrl packets, so checking
+		 * if the queue is non-empty is sufficient.
+		 */
+		*hasdata = (rx_head != rx_tail);
+		break;
+
+	case LDC_MODE_UNRELIABLE:
+		/*
+		 * In unreliable mode, if the queue is non-empty, we need
+		 * to check if it actually contains unread data packets.
+		 * The queue may just contain ctrl packets.
+		 */
+		if (rx_head != rx_tail)
+			*hasdata = (i_ldc_chkq(ldcp) == 0);
+		break;
+
+	case LDC_MODE_STREAM:
+		/*
+		 * In stream mode, first check for 'stream_remains' > 0.
+		 * Otherwise, if the data queue head and tail pointers
+		 * differ, there must be data to read.
+		 */
+		if (ldcp->stream_remains > 0)
+			*hasdata = B_TRUE;
+		else
+			*hasdata = (ldcp->rx_dq_head != ldcp->rx_dq_tail);
+		break;
+
+	default:
+		cmn_err(CE_WARN, "ldc_chkq: (0x%lx) unexpected channel mode "
+		    "(0x%x)", ldcp->id, ldcp->mode);
+		mutex_exit(&ldcp->lock);
+		return (EIO);
 	}
 
 	mutex_exit(&ldcp->lock);
@@ -3272,6 +3657,11 @@ ldc_read(ldc_handle_t handle, caddr_t bufp, size_t *sizep)
 		    "ldc_read: (0x%llx) channel is not in UP state\n",
 		    ldcp->id);
 		exit_val = ECONNRESET;
+	} else if (ldcp->mode == LDC_MODE_STREAM) {
+		TRACE_RXDQ_LENGTH(ldcp);
+		exit_val = ldcp->read_p(ldcp, bufp, sizep);
+		mutex_exit(&ldcp->lock);
+		return (exit_val);
 	} else {
 		exit_val = ldcp->read_p(ldcp, bufp, sizep);
 	}
@@ -3401,7 +3791,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	caddr_t 	target;
 	size_t 		len = 0, bytes_read = 0;
 	int 		retries = 0;
-	uint64_t 	q_size_mask;
+	uint64_t 	q_va, q_size_mask;
 	uint64_t	first_fragment = 0;
 
 	target = target_bufp;
@@ -3415,13 +3805,19 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		return (EINVAL);
 	}
 
-	/* compute mask for increment */
-	q_size_mask = (ldcp->rx_q_entries-1)<<LDC_PACKET_SHIFT;
+	/* Set q_va and compute increment mask for the appropriate queue */
+	if (ldcp->mode == LDC_MODE_STREAM) {
+		q_va	    = ldcp->rx_dq_va;
+		q_size_mask = (ldcp->rx_dq_entries-1)<<LDC_PACKET_SHIFT;
+	} else {
+		q_va	    = ldcp->rx_q_va;
+		q_size_mask = (ldcp->rx_q_entries-1)<<LDC_PACKET_SHIFT;
+	}
 
 	/*
 	 * Read packet(s) from the queue
 	 */
-	rv = hv_ldc_rx_get_state(ldcp->id, &curr_head, &rx_tail,
+	rv = ldcp->readq_get_state(ldcp, &curr_head, &rx_tail,
 	    &ldcp->link_state);
 	if (rv != 0) {
 		cmn_err(CE_WARN, "ldc_read: (0x%lx) unable to read queue ptrs",
@@ -3441,7 +3837,15 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	for (;;) {
 
 		if (curr_head == rx_tail) {
-			rv = hv_ldc_rx_get_state(ldcp->id,
+			/*
+			 * If a data queue is being used, check the Rx HV
+			 * queue. This will copy over any new data packets
+			 * that have arrived.
+			 */
+			if (ldcp->mode == LDC_MODE_STREAM)
+				(void) i_ldc_chkq(ldcp);
+
+			rv = ldcp->readq_get_state(ldcp,
 			    &rx_head, &rx_tail, &ldcp->link_state);
 			if (rv != 0) {
 				cmn_err(CE_WARN,
@@ -3452,6 +3856,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 				mutex_exit(&ldcp->tx_lock);
 				return (ECONNRESET);
 			}
+
 			if (ldcp->link_state != LDC_CHANNEL_UP)
 				goto channel_is_reset;
 
@@ -3467,7 +3872,9 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 						continue;
 
 					*sizep = 0;
-					ldcp->last_msg_rcd = first_fragment - 1;
+					if (ldcp->mode != LDC_MODE_STREAM)
+						ldcp->last_msg_rcd =
+						    first_fragment - 1;
 					DWARN(DBG_ALL_LDCS, "ldc_read: "
 					    "(0x%llx) read timeout", ldcp->id);
 					return (EAGAIN);
@@ -3483,85 +3890,90 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		    ldcp->id, curr_head, rx_head, rx_tail);
 
 		/* get the message */
-		msg = (ldc_msg_t *)(ldcp->rx_q_va + curr_head);
+		msg = (ldc_msg_t *)(q_va + curr_head);
 
 		DUMP_LDC_PKT(ldcp, "ldc_read received pkt",
 		    ldcp->rx_q_va + curr_head);
 
 		/* Check the message ID for the message received */
-		if ((rv = i_ldc_check_seqid(ldcp, msg)) != 0) {
+		if (ldcp->mode != LDC_MODE_STREAM) {
+			if ((rv = i_ldc_check_seqid(ldcp, msg)) != 0) {
 
-			DWARN(ldcp->id, "ldc_read: (0x%llx) seqid error, "
-			    "q_ptrs=0x%lx,0x%lx", ldcp->id, rx_head, rx_tail);
+				DWARN(ldcp->id, "ldc_read: (0x%llx) seqid "
+				    "error, q_ptrs=0x%lx,0x%lx",
+				    ldcp->id, rx_head, rx_tail);
 
-			/* throw away data */
-			bytes_read = 0;
+				/* throw away data */
+				bytes_read = 0;
 
-			/* Reset last_msg_rcd to start of message */
-			if (first_fragment != 0) {
-				ldcp->last_msg_rcd = first_fragment - 1;
-				first_fragment = 0;
-			}
-			/*
-			 * Send a NACK -- invalid seqid
-			 * get the current tail for the response
-			 */
-			rv = i_ldc_send_pkt(ldcp, msg->type, LDC_NACK,
-			    (msg->ctrl & LDC_CTRL_MASK));
-			if (rv) {
-				cmn_err(CE_NOTE,
-				    "ldc_read: (0x%lx) err sending "
-				    "NACK msg\n", ldcp->id);
+				/* Reset last_msg_rcd to start of message */
+				if (first_fragment != 0) {
+					ldcp->last_msg_rcd = first_fragment - 1;
+					first_fragment = 0;
+				}
+				/*
+				 * Send a NACK -- invalid seqid
+				 * get the current tail for the response
+				 */
+				rv = i_ldc_send_pkt(ldcp, msg->type, LDC_NACK,
+				    (msg->ctrl & LDC_CTRL_MASK));
+				if (rv) {
+					cmn_err(CE_NOTE,
+					    "ldc_read: (0x%lx) err sending "
+					    "NACK msg\n", ldcp->id);
 
-				/* if cannot send NACK - reset channel */
-				mutex_enter(&ldcp->tx_lock);
-				i_ldc_reset(ldcp, B_FALSE);
-				mutex_exit(&ldcp->tx_lock);
-				rv = ECONNRESET;
-				break;
-			}
+					/* if cannot send NACK - reset chan */
+					mutex_enter(&ldcp->tx_lock);
+					i_ldc_reset(ldcp, B_FALSE);
+					mutex_exit(&ldcp->tx_lock);
+					rv = ECONNRESET;
+					break;
+				}
 
-			/* purge receive queue */
-			rv = i_ldc_set_rx_head(ldcp, rx_tail);
-
-			break;
-		}
-
-		/*
-		 * Process any messages of type CTRL messages
-		 * Future implementations should try to pass these
-		 * to LDC link by resetting the intr state.
-		 *
-		 * NOTE: not done as a switch() as type can be both ctrl+data
-		 */
-		if (msg->type & LDC_CTRL) {
-			if (rv = i_ldc_ctrlmsg(ldcp, msg)) {
-				if (rv == EAGAIN)
-					continue;
+				/* purge receive queue */
 				rv = i_ldc_set_rx_head(ldcp, rx_tail);
-				*sizep = 0;
-				bytes_read = 0;
+
 				break;
 			}
-		}
 
-		/* process data ACKs */
-		if ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK)) {
-			if (rv = i_ldc_process_data_ACK(ldcp, msg)) {
-				*sizep = 0;
-				bytes_read = 0;
-				break;
+			/*
+			 * Process any messages of type CTRL messages
+			 * Future implementations should try to pass these
+			 * to LDC link by resetting the intr state.
+			 *
+			 * NOTE: not done as a switch() as type can be
+			 * both ctrl+data
+			 */
+			if (msg->type & LDC_CTRL) {
+				if (rv = i_ldc_ctrlmsg(ldcp, msg)) {
+					if (rv == EAGAIN)
+						continue;
+					rv = i_ldc_set_rx_head(ldcp, rx_tail);
+					*sizep = 0;
+					bytes_read = 0;
+					break;
+				}
 			}
-		}
 
-		/* process data NACKs */
-		if ((msg->type & LDC_DATA) && (msg->stype & LDC_NACK)) {
-			DWARN(ldcp->id,
-			    "ldc_read: (0x%llx) received DATA/NACK", ldcp->id);
-			mutex_enter(&ldcp->tx_lock);
-			i_ldc_reset(ldcp, B_TRUE);
-			mutex_exit(&ldcp->tx_lock);
-			return (ECONNRESET);
+			/* process data ACKs */
+			if ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK)) {
+				if (rv = i_ldc_process_data_ACK(ldcp, msg)) {
+					*sizep = 0;
+					bytes_read = 0;
+					break;
+				}
+			}
+
+			/* process data NACKs */
+			if ((msg->type & LDC_DATA) && (msg->stype & LDC_NACK)) {
+				DWARN(ldcp->id,
+				    "ldc_read: (0x%llx) received DATA/NACK",
+				    ldcp->id);
+				mutex_enter(&ldcp->tx_lock);
+				i_ldc_reset(ldcp, B_TRUE);
+				mutex_exit(&ldcp->tx_lock);
+				return (ECONNRESET);
+			}
 		}
 
 		/* process data messages */
@@ -3607,7 +4019,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 					curr_head =
 					    (curr_head + LDC_PACKET_SIZE)
 					    & q_size_mask;
-					if (rv = i_ldc_set_rx_head(ldcp,
+					if (rv = ldcp->readq_set_head(ldcp,
 					    curr_head))
 						break;
 
@@ -3631,7 +4043,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 					target = target_bufp;
 					first_fragment = msg->seqid;
 
-					if (rv = i_ldc_set_rx_head(ldcp,
+					if (rv = ldcp->readq_set_head(ldcp,
 					    curr_head))
 						break;
 				}
@@ -3658,7 +4070,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 				bytes_read = 0;
 
 				/* throw away everything received so far */
-				if (rv = i_ldc_set_rx_head(ldcp, curr_head))
+				if (rv = ldcp->readq_set_head(ldcp, curr_head))
 					break;
 
 				/* continue reading remaining pkts */
@@ -3667,7 +4079,8 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		}
 
 		/* set the message id */
-		ldcp->last_msg_rcd = msg->seqid;
+		if (ldcp->mode != LDC_MODE_STREAM)
+			ldcp->last_msg_rcd = msg->seqid;
 
 		/* move the head one position */
 		curr_head = (curr_head + LDC_PACKET_SIZE) & q_size_mask;
@@ -3681,7 +4094,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 			 */
 
 			/* set the queue head */
-			if (rv = i_ldc_set_rx_head(ldcp, curr_head))
+			if (rv = ldcp->readq_set_head(ldcp, curr_head))
 				bytes_read = 0;
 
 			*sizep = bytes_read;
@@ -3694,7 +4107,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		    ((msg->type & LDC_DATA) && (msg->stype & LDC_ACK))) {
 
 			/* set the queue head */
-			if (rv = i_ldc_set_rx_head(ldcp, curr_head)) {
+			if (rv = ldcp->readq_set_head(ldcp, curr_head)) {
 				bytes_read = 0;
 				break;
 			}
@@ -3704,24 +4117,6 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		}
 
 	} /* for (;;) */
-
-
-	/*
-	 * If useful data was read - Send msg ACK
-	 * OPTIMIZE: do not send ACK for all msgs - use some frequency
-	 */
-	if ((bytes_read > 0) && (ldcp->mode == LDC_MODE_RELIABLE ||
-	    ldcp->mode == LDC_MODE_STREAM)) {
-
-		rv = i_ldc_send_pkt(ldcp, LDC_DATA, LDC_ACK, 0);
-		if (rv && rv != EWOULDBLOCK) {
-			cmn_err(CE_NOTE,
-			    "ldc_read: (0x%lx) cannot send ACK\n", ldcp->id);
-
-			/* if cannot send ACK - reset channel */
-			goto channel_is_reset;
-		}
-	}
 
 	D2(ldcp->id, "ldc_read: (0x%llx) end size=%d", ldcp->id, *sizep);
 

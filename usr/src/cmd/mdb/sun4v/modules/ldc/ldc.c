@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,7 +175,7 @@ ldcinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 
 	if (mdb_getopts(argc, argv,
-		'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc) {
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -204,6 +204,10 @@ ldcinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    ldcp.rx_q_va, ldcp.rx_q_entries,
 		    ldcp.rx_intr_state, ldc_intrstate_bits);
 		if (ldcp.mode == LDC_MODE_STREAM) {
+			mdb_printf("Rx Dq Info: 0x%p len=0x%lx hd=0x%lx "
+			    "tl=0x%lx ackhd=0x%lx", ldcp.rx_dq_va,
+			    ldcp.rx_dq_entries, ldcp.rx_dq_head,
+			    ldcp.rx_dq_tail, ldcp.rx_ack_head);
 			mdb_printf("Stream: buf=0x%p off=0x%lx remains=0x%lx\n",
 			    ldcp.stream_bufferp, ldcp.stream_offset,
 			    ldcp.stream_remains);
@@ -380,7 +384,7 @@ ldcmtbl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    addr, mtbl.num_entries, mtbl.num_avail, mtbl.table);
 
 	if (mdb_getopts(argc, argv,
-		'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc) {
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose, NULL) != argc) {
 		return (DCMD_USAGE);
 	}
 	if (!verbose)
@@ -461,7 +465,7 @@ ldcmhdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (mhdl.memseg != NULL) {
 			if (mdb_vread(&memseg, sizeof (memseg),
-				(uintptr_t)mhdl.memseg) != sizeof (memseg)) {
+			    (uintptr_t)mhdl.memseg) != sizeof (memseg)) {
 				mdb_warn("failed to read ldc_memseg_t at %p",
 				    mhdl.memseg);
 				return (DCMD_ERR);
