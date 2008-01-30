@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2762,9 +2762,11 @@ disptbl(void)
 			type = Ostr;
 			break;
 		}
-		startcyl = lel(Table[i].relsect) / (heads * sectors);
-		length = lel(Table[i].numsect) / (long)(heads * sectors);
-		if (lel(Table[i].numsect) % (long)(heads * sectors))
+		startcyl = lel(Table[i].relsect) /
+		    (unsigned long)(heads * sectors);
+		length = lel(Table[i].numsect) /
+		    (unsigned long)(heads * sectors);
+		if (lel(Table[i].numsect) % (unsigned long)(heads * sectors))
 			length++;
 		endcyl = startcyl + length - 1;
 		percent = length * 100 / Numcyl;
