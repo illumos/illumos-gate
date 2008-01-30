@@ -44,6 +44,7 @@ static void _aio_enq_doneq(aio_req_t *);
 extern void _aio_lio_free(aio_lio_t *);
 
 extern int __fdsync(int, int);
+extern int __fcntl(int, int, ...);
 extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
 static int _aio_fsync_del(aio_worker_t *, aio_req_t *);
@@ -998,6 +999,7 @@ _aio_do_request(void *arglist)
 	struct aio_args *arg;
 	aio_req_t *reqp;		/* current AIO request */
 	ssize_t retval;
+	int append;
 	int error;
 
 	if (pthread_setspecific(_aio_key, aiowp) != 0)
@@ -1060,9 +1062,22 @@ top:
 			break;
 		case AIOWRITE:
 		case AIOAWRITE:
+			/*
+			 * The SUSv3 POSIX spec for aio_write() states:
+			 *	If O_APPEND is set for the file descriptor,
+			 *	write operations append to the file in the
+			 *	same order as the calls were made.
+			 * but, somewhat inconsistently, it requires pwrite()
+			 * to ignore the O_APPEND setting.  So we have to use
+			 * fcntl() to get the open modes and call write() for
+			 * the O_APPEND case.
+			 */
+			append = (__fcntl(arg->fd, F_GETFL) & O_APPEND);
 			sigon(self);	/* unblock SIGAIOCANCEL */
-			retval = pwrite(arg->fd, arg->buf,
-			    arg->bufsz, arg->offset);
+			retval = append?
+			    write(arg->fd, arg->buf, arg->bufsz) :
+			    pwrite(arg->fd, arg->buf, arg->bufsz,
+			    arg->offset);
 			if (retval == -1) {
 				if (errno == ESPIPE) {
 					retval = write(arg->fd,
@@ -1093,9 +1108,22 @@ top:
 			sigoff(self);	/* block SIGAIOCANCEL */
 			break;
 		case AIOAWRITE64:
+			/*
+			 * The SUSv3 POSIX spec for aio_write() states:
+			 *	If O_APPEND is set for the file descriptor,
+			 *	write operations append to the file in the
+			 *	same order as the calls were made.
+			 * but, somewhat inconsistently, it requires pwrite()
+			 * to ignore the O_APPEND setting.  So we have to use
+			 * fcntl() to get the open modes and call write() for
+			 * the O_APPEND case.
+			 */
+			append = (__fcntl(arg->fd, F_GETFL) & O_APPEND);
 			sigon(self);	/* unblock SIGAIOCANCEL */
-			retval = pwrite64(arg->fd, arg->buf,
-			    arg->bufsz, arg->offset);
+			retval = append?
+			    write(arg->fd, arg->buf, arg->bufsz) :
+			    pwrite64(arg->fd, arg->buf, arg->bufsz,
+			    arg->offset);
 			if (retval == -1) {
 				if (errno == ESPIPE) {
 					retval = write(arg->fd,

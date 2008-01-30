@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +190,7 @@ read(int fdes, void *cbuf, size_t count)
 	if (vp->v_type == VFIFO)	/* Backward compatibility */
 		fp->f_offset = cnt;
 	else if (((fp->f_flag & FAPPEND) == 0) ||
-		(vp->v_type != VREG) || (bcount != 0))	/* POSIX */
+	    (vp->v_type != VREG) || (bcount != 0))	/* POSIX */
 		fp->f_offset = auio.uio_loffset;
 	VOP_RWUNLOCK(vp, rwflag, NULL);
 
@@ -318,7 +319,7 @@ write(int fdes, void *cbuf, size_t count)
 	if (vp->v_type == VFIFO)	/* Backward compatibility */
 		fp->f_offset = cnt;
 	else if (((fp->f_flag & FAPPEND) == 0) ||
-		(vp->v_type != VREG) || (bcount != 0))	/* POSIX */
+	    (vp->v_type != VREG) || (bcount != 0))	/* POSIX */
 		fp->f_offset = auio.uio_loffset;
 	VOP_RWUNLOCK(vp, rwflag, NULL);
 
@@ -347,7 +348,7 @@ pread(int fdes, void *cbuf, size_t count, off_t offset)
 	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
 #ifdef _SYSCALL32_IMPL
 	u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 ?
-		MAXOFF32_T : MAXOFFSET_T;
+	    MAXOFF32_T : MAXOFFSET_T;
 #else
 	const u_offset_t maxoff = MAXOFF32_T;
 #endif
@@ -487,7 +488,7 @@ pwrite(int fdes, void *cbuf, size_t count, off_t offset)
 	u_offset_t fileoff = (u_offset_t)(ulong_t)offset;
 #ifdef _SYSCALL32_IMPL
 	u_offset_t maxoff = get_udatamodel() == DATAMODEL_ILP32 ?
-		MAXOFF32_T : MAXOFFSET_T;
+	    MAXOFF32_T : MAXOFFSET_T;
 #else
 	const u_offset_t maxoff = MAXOFF32_T;
 #endif
@@ -577,7 +578,14 @@ pwrite(int fdes, void *cbuf, size_t count, off_t offset)
 	auio.uio_fmode = fflag;
 	auio.uio_extflg = UIO_COPY_CACHED;
 
-	ioflag = auio.uio_fmode & (FAPPEND|FSYNC|FDSYNC|FRSYNC);
+	/*
+	 * The SUSv4 POSIX specification states:
+	 *	The pwrite() function shall be equivalent to write(), except
+	 *	that it writes into a given position and does not change
+	 *	the file offset (regardless of whether O_APPEND is set).
+	 * To make this be true, we omit the FAPPEND flag from ioflag.
+	 */
+	ioflag = auio.uio_fmode & (FSYNC|FDSYNC|FRSYNC);
 
 	error = VOP_WRITE(vp, &auio, ioflag, fp->f_cred, NULL);
 	bcount -= auio.uio_resid;
@@ -750,7 +758,7 @@ readv(int fdes, struct iovec *iovp, int iovcnt)
 	if (vp->v_type == VFIFO)	/* Backward compatibility */
 		fp->f_offset = count;
 	else if (((fp->f_flag & FAPPEND) == 0) ||
-		(vp->v_type != VREG) || (bcount != 0))	/* POSIX */
+	    (vp->v_type != VREG) || (bcount != 0))	/* POSIX */
 		fp->f_offset = auio.uio_loffset;
 
 	VOP_RWUNLOCK(vp, rwflag, NULL);
@@ -900,7 +908,7 @@ writev(int fdes, struct iovec *iovp, int iovcnt)
 	if (vp->v_type == VFIFO)	/* Backward compatibility */
 		fp->f_offset = count;
 	else if (((fp->f_flag & FAPPEND) == 0) ||
-		(vp->v_type != VREG) || (bcount != 0))	/* POSIX */
+	    (vp->v_type != VREG) || (bcount != 0))	/* POSIX */
 		fp->f_offset = auio.uio_loffset;
 	VOP_RWUNLOCK(vp, rwflag, NULL);
 
@@ -1138,7 +1146,14 @@ pwrite64(int fdes, void *cbuf, size32_t count, uint32_t offset_1,
 	auio.uio_fmode = fflag;
 	auio.uio_extflg = UIO_COPY_CACHED;
 
-	ioflag = auio.uio_fmode & (FAPPEND|FSYNC|FDSYNC|FRSYNC);
+	/*
+	 * The SUSv4 POSIX specification states:
+	 *	The pwrite() function shall be equivalent to write(), except
+	 *	that it writes into a given position and does not change
+	 *	the file offset (regardless of whether O_APPEND is set).
+	 * To make this be true, we omit the FAPPEND flag from ioflag.
+	 */
+	ioflag = auio.uio_fmode & (FSYNC|FDSYNC|FRSYNC);
 
 	error = VOP_WRITE(vp, &auio, ioflag, fp->f_cred, NULL);
 	bcount -= auio.uio_resid;
