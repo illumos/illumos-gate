@@ -4311,17 +4311,12 @@ ill_delete_interface_type(ill_if_t *interface)
 	mi_free(interface);
 }
 
-/* Defined in ip_netinfo.c */
-extern ddi_taskq_t	*eventq_queue_nic;
-
 /*
  * remove ill from the global list.
  */
 static void
 ill_glist_delete(ill_t *ill)
 {
-	char *nicname;
-	size_t nicnamelen;
 	hook_nic_event_t *info;
 	ip_stack_t	*ipst;
 
@@ -4329,17 +4324,6 @@ ill_glist_delete(ill_t *ill)
 		return;
 	ipst = ill->ill_ipst;
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
-
-	if (ill->ill_name != NULL) {
-		nicname = kmem_alloc(ill->ill_name_length, KM_NOSLEEP);
-		if (nicname != NULL) {
-			bcopy(ill->ill_name, nicname, ill->ill_name_length);
-			nicnamelen = ill->ill_name_length;
-		}
-	} else {
-		nicname = NULL;
-		nicnamelen = 0;
-	}
 
 	/*
 	 * If the ill was never inserted into the AVL tree
@@ -4376,46 +4360,16 @@ ill_glist_delete(ill_t *ill)
 	 * that the ordering of delivered events to listeners matches the
 	 * order of them in the kernel.
 	 */
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		if (info->hne_event != NE_DOWN) {
-			ip2dbg(("ill_glist_delete: unexpected nic event %d "
-			    "attached for %s\n", info->hne_event,
-			    ill->ill_name));
-			if (info->hne_data != NULL)
-				kmem_free(info->hne_data, info->hne_datalen);
-			kmem_free(info, sizeof (hook_nic_event_t));
-		} else {
-			if (ddi_taskq_dispatch(eventq_queue_nic,
-			    ip_ne_queue_func, (void *)info, DDI_SLEEP)
-			    == DDI_FAILURE) {
-				ip2dbg(("ill_glist_delete: ddi_taskq_dispatch "
-				    "failed\n"));
-				if (info->hne_data != NULL)
-					kmem_free(info->hne_data,
-					    info->hne_datalen);
-				kmem_free(info, sizeof (hook_nic_event_t));
-			}
-		}
+	info = ill->ill_nic_event_info;
+	if (info != NULL && info->hne_event == NE_DOWN) {
+		mutex_enter(&ill->ill_lock);
+		ill_nic_info_dispatch(ill);
+		mutex_exit(&ill->ill_lock);
 	}
 
 	/* Generate NE_UNPLUMB event for ill_name. */
-	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-	if (info != NULL) {
-		info->hne_nic = ill->ill_phyint->phyint_ifindex;
-		info->hne_lif = 0;
-		info->hne_event = NE_UNPLUMB;
-		info->hne_data = nicname;
-		info->hne_datalen = nicnamelen;
-		info->hne_family = ill->ill_isv6 ?
-		    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-	} else {
-		ip2dbg(("ill_glist_delete: could not attach UNPLUMB nic event "
-		    "information for %s (ENOMEM)\n", ill->ill_name));
-		if (nicname != NULL)
-			kmem_free(nicname, nicnamelen);
-	}
-
-	ill->ill_nic_event_info = info;
+	(void) ill_hook_event_create(ill, 0, NE_UNPLUMB, ill->ill_name,
+	    ill->ill_name_length);
 
 	ill_phyint_free(ill);
 	rw_exit(&ipst->ips_ill_g_lock);
@@ -10845,6 +10799,9 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				mutex_exit(&ill->ill_lock);
 				mutex_exit(&connp->conn_lock);
 				ill_delete_tail(ill);
+				mutex_enter(&ill->ill_lock);
+				ill_nic_info_dispatch(ill);
+				mutex_exit(&ill->ill_lock);
 				mi_free(ill);
 				return (0);
 			}
@@ -10983,6 +10940,9 @@ ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
 	if (ipif->ipif_id == 0 && ipif->ipif_net_type == IRE_LOOPBACK) {
 		ASSERT(ill->ill_state_flags & ILL_CONDEMNED);
 		ill_delete_tail(ill);
+		mutex_enter(&ill->ill_lock);
+		ill_nic_info_dispatch(ill);
+		mutex_exit(&ill->ill_lock);
 		mi_free(ill);
 		return (0);
 	}
@@ -11199,43 +11159,8 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * Don't attach nic event message for SIOCLIFADDIF ioctl.
 	 */
 	if (iocp != NULL && iocp->ioc_cmd != SIOCLIFADDIF) {
-		hook_nic_event_t *info;
-		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
-			ip2dbg(("ip_sioctl_addr_tail: unexpected nic event %d "
-			    "attached for %s\n", info->hne_event,
-			    ill->ill_name));
-			if (info->hne_data != NULL)
-				kmem_free(info->hne_data, info->hne_datalen);
-			kmem_free(info, sizeof (hook_nic_event_t));
-		}
-
-		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-		if (info != NULL) {
-			ip_stack_t	*ipst = ill->ill_ipst;
-
-			info->hne_nic =
-			    ipif->ipif_ill->ill_phyint->phyint_hook_ifindex;
-			info->hne_lif = MAP_IPIF_ID(ipif->ipif_id);
-			info->hne_event = NE_ADDRESS_CHANGE;
-			info->hne_family = ipif->ipif_isv6 ?
-			    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-			info->hne_data = kmem_alloc(sinlen, KM_NOSLEEP);
-			if (info->hne_data != NULL) {
-				info->hne_datalen = sinlen;
-				bcopy(sin, info->hne_data, sinlen);
-			} else {
-				ip2dbg(("ip_sioctl_addr_tail: could not attach "
-				    "address information for ADDRESS_CHANGE nic"
-				    " event of %s (ENOMEM)\n",
-				    ipif->ipif_ill->ill_name));
-				kmem_free(info, sizeof (hook_nic_event_t));
-			}
-		} else
-			ip2dbg(("ip_sioctl_addr_tail: could not attach "
-			    "ADDRESS_CHANGE nic event information for %s "
-			    "(ENOMEM)\n", ipif->ipif_ill->ill_name));
-
-		ipif->ipif_ill->ill_nic_event_info = info;
+		(void) ill_hook_event_create(ill, MAP_IPIF_ID(ipif->ipif_id),
+		    NE_ADDRESS_CHANGE, sin, sinlen);
 	}
 
 	mutex_exit(&ill->ill_lock);
@@ -18143,7 +18068,6 @@ ill_dl_down(ill_t *ill)
 	 * is brought up.
 	 */
 	mblk_t	*mp = ill->ill_unbind_mp;
-	hook_nic_event_t *info;
 
 	ip1dbg(("ill_dl_down(%s)\n", ill->ill_name));
 
@@ -18182,34 +18106,8 @@ ill_dl_down(ill_t *ill)
 	ill_leave_multicast(ill);
 
 	mutex_enter(&ill->ill_lock);
-
 	ill->ill_dl_up = 0;
-
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		ip2dbg(("ill_dl_down:unexpected nic event %d attached for %s\n",
-		    info->hne_event, ill->ill_name));
-		if (info->hne_data != NULL)
-			kmem_free(info->hne_data, info->hne_datalen);
-		kmem_free(info, sizeof (hook_nic_event_t));
-	}
-
-	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-	if (info != NULL) {
-		ip_stack_t	*ipst = ill->ill_ipst;
-
-		info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
-		info->hne_lif = 0;
-		info->hne_event = NE_DOWN;
-		info->hne_data = NULL;
-		info->hne_datalen = 0;
-		info->hne_family = ill->ill_isv6 ?
-		    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-	} else
-		ip2dbg(("ill_dl_down: could not attach DOWN nic event "
-		    "information for %s (ENOMEM)\n", ill->ill_name));
-
-	ill->ill_nic_event_info = info;
-
+	(void) ill_hook_event_create(ill, 0, NE_DOWN, NULL, 0);
 	mutex_exit(&ill->ill_lock);
 }
 
@@ -22679,30 +22577,10 @@ void
 ill_nic_info_plumb(ill_t *ill, boolean_t group)
 {
 	phyint_t	*phyi = ill->ill_phyint;
-	ip_stack_t	*ipst = ill->ill_ipst;
-	hook_nic_event_t *info;
 	char		*name;
 	int		namelen;
 
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
-
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		ip2dbg(("ill_nic_info_plumb: unexpected nic event %d "
-		    "attached for %s\n", info->hne_event,
-		    ill->ill_name));
-		if (info->hne_data != NULL)
-			kmem_free(info->hne_data, info->hne_datalen);
-		kmem_free(info, sizeof (hook_nic_event_t));
-		ill->ill_nic_event_info = NULL;
-	}
-
-	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-	if (info == NULL) {
-		ip2dbg(("ill_nic_info_plumb: could not attach PLUMB nic "
-		    "event information for %s (ENOMEM)\n",
-		    ill->ill_name));
-		return;
-	}
 
 	if (group) {
 		ASSERT(phyi->phyint_groupname_len != 0);
@@ -22713,24 +22591,7 @@ ill_nic_info_plumb(ill_t *ill, boolean_t group)
 		name = ill->ill_name;
 	}
 
-	info->hne_nic = phyi->phyint_hook_ifindex;
-	info->hne_lif = 0;
-	info->hne_event = NE_PLUMB;
-	info->hne_family = ill->ill_isv6 ?
-	    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-
-	info->hne_data = kmem_alloc(namelen, KM_NOSLEEP);
-	if (info->hne_data != NULL) {
-		info->hne_datalen = namelen;
-		bcopy(name, info->hne_data, info->hne_datalen);
-	} else {
-		ip2dbg(("ill_nic_info_plumb: could not attach "
-		    "name information for PLUMB nic event "
-		    "of %s (ENOMEM)\n", name));
-		kmem_free(info, sizeof (hook_nic_event_t));
-		info = NULL;
-	}
-	ill->ill_nic_event_info = info;
+	(void) ill_hook_event_create(ill, 0, NE_PLUMB, name, namelen);
 }
 
 /*
@@ -24353,4 +24214,93 @@ out:
 		ldi_ident_release(li);
 
 	crfree(cr);
+}
+
+/*
+ * This needs to be in-sync with nic_event_t definition
+ */
+static const char *
+ill_hook_event2str(nic_event_t event)
+{
+	switch (event) {
+	case NE_PLUMB:
+		return ("PLUMB");
+	case NE_UNPLUMB:
+		return ("UNPLUMB");
+	case NE_UP:
+		return ("UP");
+	case NE_DOWN:
+		return ("DOWN");
+	case NE_ADDRESS_CHANGE:
+		return ("ADDRESS_CHANGE");
+	default:
+		return ("UNKNOWN");
+	}
+}
+
+static void
+ill_hook_event_destroy(ill_t *ill)
+{
+	hook_nic_event_t	*info;
+
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		if (info->hne_data != NULL)
+			kmem_free(info->hne_data, info->hne_datalen);
+		kmem_free(info, sizeof (hook_nic_event_t));
+
+		ill->ill_nic_event_info = NULL;
+	}
+
+}
+
+boolean_t
+ill_hook_event_create(ill_t *ill, lif_if_t lif, nic_event_t event,
+    nic_event_data_t data, size_t datalen)
+{
+	ip_stack_t		*ipst = ill->ill_ipst;
+	hook_nic_event_t	*info;
+	const char		*str = NULL;
+
+	/* destroy nic event info if it exists */
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		str = ill_hook_event2str(info->hne_event);
+		ip2dbg(("ill_hook_event_create: unexpected nic event %s "
+		    "attached for %s\n", str, ill->ill_name));
+		ill_hook_event_destroy(ill);
+	}
+
+	/* create a new nic event info */
+	if ((info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP)) == NULL)
+		goto fail;
+
+	ill->ill_nic_event_info = info;
+
+	if (event == NE_UNPLUMB)
+		info->hne_nic = ill->ill_phyint->phyint_ifindex;
+	else
+		info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
+	info->hne_lif = lif;
+	info->hne_event = event;
+	info->hne_family = ill->ill_isv6 ?
+	    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
+	info->hne_data = NULL;
+	info->hne_datalen = 0;
+
+	if (data != NULL && datalen != 0) {
+		info->hne_data = kmem_alloc(datalen, KM_NOSLEEP);
+		if (info->hne_data != NULL) {
+			bcopy(data, info->hne_data, datalen);
+			info->hne_datalen = datalen;
+		} else {
+			ill_hook_event_destroy(ill);
+			goto fail;
+		}
+	}
+
+	return (B_TRUE);
+fail:
+	str = ill_hook_event2str(event);
+	ip2dbg(("ill_hook_event_create: could not attach %s nic event "
+	    "information for %s (ENOMEM)\n", str, ill->ill_name));
+	return (B_FALSE);
 }

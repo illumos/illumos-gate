@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -217,6 +217,8 @@ extern	void	ill_mtu_change(ire_t *, char *);
 extern void	ill_group_cleanup(ill_t *);
 extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
 extern	boolean_t ill_is_probeonly(ill_t *);
+extern	boolean_t ill_hook_event_create(ill_t *, lif_if_t, nic_event_t,
+    nic_event_data_t, size_t);
 
 extern	void	ip_loopback_cleanup(ip_stack_t *);
 extern	void	ipif_get_name(const ipif_t *, char *, int);

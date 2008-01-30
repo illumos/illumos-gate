@@ -6081,6 +6081,7 @@ static void ipftuneable_setdefs(ipf_stack_t *ifs)
 	/* from fr_stateinit() */
 	ifs->ifs_ipstate_logging = 0;
 #endif
+	ifs->ifs_ipf_loopback = 0;
 
 }
 /*
@@ -6139,11 +6140,13 @@ ipftuneable_alloc(ipf_stack_t *ifs)
     TUNE_SET(ifs, "fr_nat_maxbucket_reset", ifs_fr_nat_maxbucket_reset);
     TUNE_SET(ifs, "nat_logging", ifs_nat_logging);
     TUNE_SET(ifs, "fr_defnatage", ifs_fr_defnatage);
+    TUNE_SET(ifs, "fr_defnatipage", ifs_fr_defnatipage);
     TUNE_SET(ifs, "fr_defnaticmpage", ifs_fr_defnaticmpage);
     TUNE_SET(ifs, "nat_flush_lvl_hi", ifs_nat_flush_lvl_hi);
     TUNE_SET(ifs, "nat_flush_lvl_lo", ifs_nat_flush_lvl_lo);
     TUNE_SET(ifs, "ipfr_size", ifs_ipfr_size);
     TUNE_SET(ifs, "fr_ipfrttl", ifs_fr_ipfrttl);
+    TUNE_SET(ifs, "ipf_loopback", ifs_ipf_loopback);
 #ifdef IPFILTER_LOG
     TUNE_SET(ifs, "ipl_suppress", ifs_ipl_suppress);
     TUNE_SET(ifs, "ipl_buffer_sz", ifs_ipl_buffer_sz);

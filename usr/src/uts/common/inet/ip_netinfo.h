@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,8 @@ extern "C" {
 #endif
 
 #ifdef _KERNEL
+
+extern ddi_taskq_t *eventq_queue_nic;
 
 extern void ip_net_g_init();
 extern void ip_net_g_destroy();

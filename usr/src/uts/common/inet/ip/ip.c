@@ -1343,9 +1343,6 @@ static nv_t	ire_nv_arr[] = {
 
 nv_t	*ire_nv_tbl = ire_nv_arr;
 
-/* Defined in ip_netinfo.c */
-extern ddi_taskq_t	*eventq_queue_nic;
-
 /* Simple ICMP IP Header Template */
 static ipha_t icmp_ipha = {
 	IP_SIMPLE_HDR_VERSION, 0, 0, 0, 0, 0, IPPROTO_ICMP
@@ -15530,7 +15527,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	boolean_t	success;
 	boolean_t	ioctl_aborted = B_FALSE;
 	boolean_t	log = B_TRUE;
-	hook_nic_event_t	*info;
 	ip_stack_t		*ipst;
 
 	ip1dbg(("ip_rput_dlpi_writer .."));
@@ -15777,34 +15773,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ip1dbg(("ip_rput_dlpi: bind_ack %s\n", ill->ill_name));
 
 		mutex_enter(&ill->ill_lock);
-
 		ill->ill_dl_up = 1;
-
-		if ((info = ill->ill_nic_event_info) != NULL) {
-			ip2dbg(("ip_rput_dlpi_writer: unexpected nic event %d "
-			    "attached for %s\n", info->hne_event,
-			    ill->ill_name));
-			if (info->hne_data != NULL)
-				kmem_free(info->hne_data, info->hne_datalen);
-			kmem_free(info, sizeof (hook_nic_event_t));
-		}
-
-		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-		if (info != NULL) {
-			info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
-			info->hne_lif = 0;
-			info->hne_event = NE_UP;
-			info->hne_data = NULL;
-			info->hne_datalen = 0;
-			info->hne_family = ill->ill_isv6 ?
-			    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-		} else
-			ip2dbg(("ip_rput_dlpi_writer: could not attach UP nic "
-			    "event information for %s (ENOMEM)\n",
-			    ill->ill_name));
-
-		ill->ill_nic_event_info = info;
-
+		(void) ill_hook_event_create(ill, 0, NE_UP, NULL, 0);
 		mutex_exit(&ill->ill_lock);
 
 		/*

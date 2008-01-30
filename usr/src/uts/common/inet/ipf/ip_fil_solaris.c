@@ -266,7 +266,6 @@ netstack_t *ns;
 #else
 	ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
-	ifs->ifs_ipf_loopback = 0;
 
 	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
 	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
@@ -1491,6 +1490,7 @@ void fr_slowtimer __P((void *arg))
 	}
 	MUTEX_DOWNGRADE(&ifs->ifs_ipf_global);
 
+	ipf_expiretokens(ifs);
 	fr_fragexpire(ifs);
 	fr_timeoutstate(ifs);
 	fr_natexpire(ifs);
