@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -692,7 +692,7 @@ isns_fini()
 static int
 get_ip_addr(char *node, ip_t *sa)
 {
-	struct addrinfo		*ai, *aip;
+	struct addrinfo		*ai = NULL, *aip;
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
 
@@ -713,6 +713,7 @@ get_ip_addr(char *node, ip_t *sa)
 				sa->ip_len = sizeof (in_addr_t);
 				bcopy(&sin->sin_addr, (void *)&sa->ip_adr.in,
 				    sa->ip_len);
+				freeaddrinfo(ai);
 				return (0);
 			case PF_INET6:
 				/* LINTED */
@@ -720,12 +721,14 @@ get_ip_addr(char *node, ip_t *sa)
 				sa->ip_len = sizeof (in6_addr_t);
 				bcopy(&sin6->sin6_addr, &sa->ip_adr.in6,
 				    sa->ip_len);
+				freeaddrinfo(ai);
 				return (0);
 			default:
 				continue;
 		}
 	} while ((aip = aip->ai_next) != NULL);
 
+	freeaddrinfo(ai);
 	return (-1);
 }
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@
 #include <assert.h>
 #include <umem.h>
 #include <time.h>
+#include <syslog.h>
 
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/generic/status.h>
@@ -317,7 +318,7 @@ t10_handle_destroy(t10_targ_handle_t tp)
 					if ((c2free->c_state ==
 					    T10_Cmd_S5_Wait) ||
 					    (c2free->c_state ==
-					    T10_Cmd_S6_Freeing)) {
+					    T10_Cmd_S6_Freeing_In)) {
 						fast_free++;
 						t10_cmd_state_machine(c2free,
 						    T10_Cmd_T6);
@@ -466,27 +467,28 @@ t10_cmd_data(t10_targ_handle_t t, t10_cmd_t *cmd, size_t offset, char *data,
  *	S4: AIO		- Command has been sent to AIO subsystem for
  *			  further processing.
  *	S5: Wait	- Waiting for response from Initiator.
- *	S6: Freeing	- Someone other than the lu_runner() has requested
- *			  that the command be freed and the state was
- *			  either S2 or S4.
+ *	S6: Freeing_In	- Free command while command in lu_runner.
+ *	S7: Freeing_AIO - Free command while command is in AIO.
  *
  * The state transition table is as follows:
  *
- *	   +-----+---+---+---+---+---+
- *	   |S1   |S2 |S3 |S4 |S5 |S6 |
- *	---+-----+---+---+---+---+---+
- *	 S1|T5   |T1 | - | - | - | - |
- *	---+-----+---+---+---+---+---+
- *	 S2|T5   | - |T2 |T3 | - |T6 |
- *	---+-----+---+---+---+---+---+
- *	 S3|T5/6 |T4 | - | - |T7 |   |
- *	---+-----+---+---+---+---+---+
- *	 S4|     |T4 |   |   |   |T6 |
- *	---+-----+---+---+---+---+---+
- *	 S5|T6   | - |T4 | - | - | - |
- *	---+-----+---+---+---+---+---+
- *	 S6|T2-4 |   |   |   |   |   |
- *	---+-----+---+---+---+---+---+
+ *	   +---------+---+---+---+---+---+---+
+ *	   |S1       |S2 |S3 |S4 |S5 |S6 |S7 |
+ *	---+---------+---+---+---+---+-------+
+ *	 S1|T4/5/6   |T1 | - | - | - | - | - |
+ *	---+---------+---+---+---+---+-------+
+ *	 S2|T5       | - |T2 |T3 |T7 |T6 | - |
+ *	---+---------+---+---+---+---+-------+
+ *	 S3|T5/6     |T4 | - | - |T7 | - | - |
+ *	---+---------+---+---+---+---+-------+
+ *	 S4|T5       |T4 | - | - | - | - |T6 |
+ *	---+---------+---+---+---+---+-------+
+ *	 S5|T6       | - |T4 | - | - | - | - |
+ *	---+---------+---+---+---+---+-------+
+ *       S6|T2/6     | - | - | - | - | - |T3 |
+ *	---+---------+---+---+---+---+-------+
+ *       S7|T4       | - | - | - | - | - |T6 |
+ *	---+---------+---+---+---+---+-------+
  *
  * Events definitions:
  * -T1: Command has been placed on LU queue for exection.
@@ -507,6 +509,9 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 {
 	t10_lu_impl_t	*lu		= c->c_lu;
 
+	queue_prt(mgmtq, Q_STE_ERRS,
+	    "t10_cmd_state_machine: State %u Trans %u\n", c->c_state, e);
+
 	/* ---- Callers must already hold the mutex ---- */
 	assert(pthread_mutex_trylock(&lu->l_cmd_mutex) != 0);
 
@@ -519,7 +524,9 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			    0, msg_cmd_send, (void *)c);
 			break;
 
+		case T10_Cmd_T4:
 		case T10_Cmd_T5:
+		case T10_Cmd_T6: /* warm reset */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -551,7 +558,11 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			return (T10_Cmd_S1_Free);
 
 		case T10_Cmd_T6:
-			c->c_state = T10_Cmd_S6_Freeing;
+			c->c_state = T10_Cmd_S6_Freeing_In;
+			break;
+
+		case T10_Cmd_T7:
+			c->c_state = T10_Cmd_S5_Wait;
 			break;
 
 		default:
@@ -595,8 +606,13 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			c->c_state = T10_Cmd_S2_In;
 			break;
 
+		case T10_Cmd_T5:
+			c->c_state = T10_Cmd_S1_Free;
+			cmd_common_free(c);
+			return (T10_Cmd_S1_Free);
+
 		case T10_Cmd_T6:
-			c->c_state = T10_Cmd_S6_Freeing;
+			c->c_state = T10_Cmd_S7_Freeing_AIO;
 			break;
 
 		default:
@@ -626,14 +642,39 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		}
 		break;
 
-	case T10_Cmd_S6_Freeing:
+	case T10_Cmd_S6_Freeing_In:
 		switch (e) {
 		case T10_Cmd_T2:
+		case T10_Cmd_T6: /* warm reset */
+			c->c_state = T10_Cmd_S1_Free;
+			cmd_common_free(c);
+			return (T10_Cmd_S1_Free);
+
 		case T10_Cmd_T3:
+			c->c_state = T10_Cmd_S7_Freeing_AIO;
+			(void) sema_post(&t10_sema);
+			break;
+
+		default:
+			queue_prt(mgmtq, Q_STE_ERRS,
+			    "Illegal event %s -- %llx\n", event_to_str(e),
+			    c->c_trans_id);
+			assert(0);
+		}
+		break;
+
+	case T10_Cmd_S7_Freeing_AIO:
+		switch (e) {
 		case T10_Cmd_T4:
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
+
+		case T10_Cmd_T6: /* warm reset */
+			queue_prt(mgmtq, Q_GEN_DETAILS,
+			    "Event %s in T10_Cmd_S7_Freeing_AIO -- %llx\n",
+			    event_to_str(e), c->c_trans_id);
+			break;
 
 		default:
 			queue_prt(mgmtq, Q_STE_ERRS,
@@ -2480,7 +2521,8 @@ state_to_str(t10_cmd_state_t s)
 	case T10_Cmd_S3_Trans:		return ("TRANS");
 	case T10_Cmd_S4_AIO:		return ("AIO");
 	case T10_Cmd_S5_Wait:		return ("WAIT");
-	case T10_Cmd_S6_Freeing:	return ("FREEING");
+	case T10_Cmd_S6_Freeing_In:	return ("FREEING_IN");
+	case T10_Cmd_S7_Freeing_AIO:	return ("FREEING_AIO");
 	}
 	return ("Invalid State");
 }

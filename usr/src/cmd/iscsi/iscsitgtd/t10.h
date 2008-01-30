@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,8 @@ typedef enum {
 	T10_Cmd_S3_Trans,
 	T10_Cmd_S4_AIO,
 	T10_Cmd_S5_Wait,
-	T10_Cmd_S6_Freeing
+	T10_Cmd_S6_Freeing_In,
+	T10_Cmd_S7_Freeing_AIO
 } t10_cmd_state_t;
 
 typedef enum {
