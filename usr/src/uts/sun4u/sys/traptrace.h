@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@ extern "C" {
  * the TRAP_ENT_TT field
  */
 
-#define	TRAP_TSIZE	(2 * PAGESIZE)	/* default size is two pages */
+#define	TRAP_TPGS	(2 * PAGESIZE)	/* default size is two pages */
 
 #ifndef	_ASM
 
@@ -70,6 +70,13 @@ struct trap_trace_record {
 	uintptr_t	tt_f3;
 	uintptr_t	tt_f4;
 };
+
+#define	TRAP_TSIZE	((TRAP_TPGS / sizeof (struct trap_trace_record)) * \
+			sizeof (struct trap_trace_record))
+
+#else
+
+#define	TRAP_TSIZE	((TRAP_TPGS / TRAP_ENT_SIZE) * TRAP_ENT_SIZE)
 
 #endif
 
