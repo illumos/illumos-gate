@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -65,8 +65,6 @@
 static	ire_t	ire_null;
 
 static ire_t	*ire_ihandle_lookup_onlink_v6(ire_t *cire);
-static	void	ire_report_ftable_v6(ire_t *ire, char *mp);
-static	void	ire_report_ctable_v6(ire_t *ire, char *mp);
 static boolean_t ire_match_args_v6(ire_t *ire, const in6_addr_t *addr,
     const in6_addr_t *mask, const in6_addr_t *gateway, int type,
     const ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle,
@@ -75,187 +73,6 @@ static	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, uint_t *, queue_t *, queue_t *,
     ushort_t, ipif_t *, const in6_addr_t *, uint32_t, uint32_t, uint_t,
     const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
-
-/*
- * Named Dispatch routine to produce a formatted report on all IREs.
- * This report is accessed by using the ndd utility to "get" ND variable
- * "ip_ire_status_v6".
- */
-/* ARGSUSED */
-int
-ip_ire_report_v6(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
-{
-	zoneid_t zoneid;
-	ip_stack_t *ipst;
-
-	(void) mi_mpprintf(mp,
-	    "IRE      " MI_COL_HDRPAD_STR
-	    "rfq      " MI_COL_HDRPAD_STR
-	    "stq      " MI_COL_HDRPAD_STR
-	    " zone mxfrg rtt   rtt_sd ssthresh ref "
-	    "rtomax tstamp_ok wscale_ok ecn_ok pmtud_ok sack sendpipe recvpipe "
-	    "in/out/forward type    addr         mask         "
-	    "src             gateway");
-	/*
-	 *   01234567 01234567 01234567 12345 12345 12345 12345  12345678 123
-	 *   123456 123456789 123456789 123456 12345678 1234 12345678 12345678
-	 *   in/out/forward xxxxxxxxxx
-	 *   xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
-	 *   xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
-	 *   xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
-	 *   xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx
-	 */
-
-	/*
-	 * Because of the ndd constraint, at most we can have 64K buffer
-	 * to put in all IRE info.  So to be more efficient, just
-	 * allocate a 64K buffer here, assuming we need that large buffer.
-	 * This should be OK as only root can do ndd /dev/ip.
-	 */
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, "<< Out of buffer >>\n");
-		return (0);
-	}
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	if (zoneid == GLOBAL_ZONEID)
-		zoneid = ALL_ZONES;
-	ipst = CONNQ_TO_IPST(q);
-
-	ire_walk_v6(ire_report_ftable_v6, (char *)mp->b_cont, zoneid, ipst);
-	ire_walk_v6(ire_report_ctable_v6, (char *)mp->b_cont, zoneid, ipst);
-	return (0);
-}
-
-/*
- * ire_walk routine invoked for ip_ire_report_v6 for each IRE.
- */
-static void
-ire_report_ftable_v6(ire_t *ire, char *mp)
-{
-	char	buf1[INET6_ADDRSTRLEN];
-	char	buf2[INET6_ADDRSTRLEN];
-	char	buf3[INET6_ADDRSTRLEN];
-	char	buf4[INET6_ADDRSTRLEN];
-	uint_t	fo_pkt_count;
-	uint_t	ib_pkt_count;
-	int	ref;
-	in6_addr_t gw_addr_v6;
-	uint_t	print_len, buf_len;
-
-	ASSERT(ire->ire_ipversion == IPV6_VERSION);
-	if (ire->ire_type & IRE_CACHETABLE)
-		return;
-	buf_len = ((mblk_t *)mp)->b_datap->db_lim - ((mblk_t *)mp)->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	/* Number of active references of this ire */
-	ref = ire->ire_refcnt;
-	/* "inbound" to a non local address is a forward */
-	ib_pkt_count = ire->ire_ib_pkt_count;
-	fo_pkt_count = 0;
-	ASSERT(!(ire->ire_type & IRE_BROADCAST));
-	if (!(ire->ire_type & (IRE_LOCAL|IRE_BROADCAST))) {
-		fo_pkt_count = ib_pkt_count;
-		ib_pkt_count = 0;
-	}
-
-	mutex_enter(&ire->ire_lock);
-	gw_addr_v6 = ire->ire_gateway_addr_v6;
-	mutex_exit(&ire->ire_lock);
-
-	print_len = snprintf((char *)((mblk_t *)mp)->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR "%5d "
-	    "%05d %05ld %06ld %08d %03d %06d %09d %09d %06d %08d "
-	    "%04d %08d %08d %d/%d/%d %s\n\t%s\n\t%s\n\t%s\n\t%s\n",
-	    (void *)ire, (void *)ire->ire_rfq, (void *)ire->ire_stq,
-	    (int)ire->ire_zoneid,
-	    ire->ire_max_frag, ire->ire_uinfo.iulp_rtt,
-	    ire->ire_uinfo.iulp_rtt_sd,
-	    ire->ire_uinfo.iulp_ssthresh, ref,
-	    ire->ire_uinfo.iulp_rtomax,
-	    (ire->ire_uinfo.iulp_tstamp_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_wscale_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_ecn_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_pmtud_ok ? 1: 0),
-	    ire->ire_uinfo.iulp_sack,
-	    ire->ire_uinfo.iulp_spipe, ire->ire_uinfo.iulp_rpipe,
-	    ib_pkt_count, ire->ire_ob_pkt_count, fo_pkt_count,
-	    ip_nv_lookup(ire_nv_tbl, (int)ire->ire_type),
-	    inet_ntop(AF_INET6, &ire->ire_addr_v6, buf1, sizeof (buf1)),
-	    inet_ntop(AF_INET6, &ire->ire_mask_v6, buf2, sizeof (buf2)),
-	    inet_ntop(AF_INET6, &ire->ire_src_addr_v6, buf3, sizeof (buf3)),
-	    inet_ntop(AF_INET6, &gw_addr_v6, buf4, sizeof (buf4)));
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
-
-/* ire_walk routine invoked for ip_ire_report_v6 for each IRE. */
-static void
-ire_report_ctable_v6(ire_t *ire, char *mp)
-{
-	char	buf1[INET6_ADDRSTRLEN];
-	char	buf2[INET6_ADDRSTRLEN];
-	char	buf3[INET6_ADDRSTRLEN];
-	char	buf4[INET6_ADDRSTRLEN];
-	uint_t	fo_pkt_count;
-	uint_t	ib_pkt_count;
-	int	ref;
-	in6_addr_t gw_addr_v6;
-	uint_t	print_len, buf_len;
-
-	if ((ire->ire_type & IRE_CACHETABLE) == 0)
-		return;
-	buf_len = ((mblk_t *)mp)->b_datap->db_lim - ((mblk_t *)mp)->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	/* Number of active references of this ire */
-	ref = ire->ire_refcnt;
-	/* "inbound" to a non local address is a forward */
-	ib_pkt_count = ire->ire_ib_pkt_count;
-	fo_pkt_count = 0;
-	ASSERT(!(ire->ire_type & IRE_BROADCAST));
-	if (ire->ire_type & IRE_LOCAL) {
-		fo_pkt_count = ib_pkt_count;
-		ib_pkt_count = 0;
-	}
-
-	mutex_enter(&ire->ire_lock);
-	gw_addr_v6 = ire->ire_gateway_addr_v6;
-	mutex_exit(&ire->ire_lock);
-
-	print_len =  snprintf((char *)((mblk_t *)mp)->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR "%5d "
-	    "%05d %05ld %06ld %08d %03d %06d %09d %09d %06d %08d "
-	    "%04d %08d %08d %d/%d/%d %s\n\t%s\n\t%s\n\t%s\n\t%s\n",
-	    (void *)ire, (void *)ire->ire_rfq, (void *)ire->ire_stq,
-	    (int)ire->ire_zoneid,
-	    ire->ire_max_frag, ire->ire_uinfo.iulp_rtt,
-	    ire->ire_uinfo.iulp_rtt_sd, ire->ire_uinfo.iulp_ssthresh, ref,
-	    ire->ire_uinfo.iulp_rtomax,
-	    (ire->ire_uinfo.iulp_tstamp_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_wscale_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_ecn_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_pmtud_ok ? 1: 0),
-	    ire->ire_uinfo.iulp_sack,
-	    ire->ire_uinfo.iulp_spipe, ire->ire_uinfo.iulp_rpipe,
-	    ib_pkt_count, ire->ire_ob_pkt_count,
-	    fo_pkt_count, ip_nv_lookup(ire_nv_tbl, (int)ire->ire_type),
-	    inet_ntop(AF_INET6, &ire->ire_addr_v6, buf1, sizeof (buf1)),
-	    inet_ntop(AF_INET6, &ire->ire_mask_v6, buf2, sizeof (buf2)),
-	    inet_ntop(AF_INET6, &ire->ire_src_addr_v6, buf3, sizeof (buf3)),
-	    inet_ntop(AF_INET6, &gw_addr_v6, buf4, sizeof (buf4)));
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
 
 
 /*

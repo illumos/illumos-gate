@@ -1725,64 +1725,6 @@ ip_send_align_hcksum_flags(mblk_t *mp, ill_t *ill)
 	return (0);
 }
 
-
-/* ire_walk routine invoked for ip_ire_report for each IRE. */
-void
-ire_report_ftable(ire_t *ire, char *m)
-{
-	char	buf1[16];
-	char	buf2[16];
-	char	buf3[16];
-	char	buf4[16];
-	uint_t	fo_pkt_count;
-	uint_t	ib_pkt_count;
-	int	ref;
-	uint_t	print_len, buf_len;
-	mblk_t 	*mp = (mblk_t *)m;
-
-	if (ire->ire_type & IRE_CACHETABLE)
-		return;
-	buf_len = mp->b_datap->db_lim - mp->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	/* Number of active references of this ire */
-	ref = ire->ire_refcnt;
-	/* "inbound" to a non local address is a forward */
-	ib_pkt_count = ire->ire_ib_pkt_count;
-	fo_pkt_count = 0;
-	if (!(ire->ire_type & (IRE_LOCAL|IRE_BROADCAST))) {
-		fo_pkt_count = ib_pkt_count;
-		ib_pkt_count = 0;
-	}
-	print_len = snprintf((char *)mp->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR "%5d "
-	    "%s %s %s %s %05d %05ld %06ld %08d %03d %06d %09d %09d %06d %08d "
-	    "%04d %08d %08d %d/%d/%d %s\n",
-	    (void *)ire, (void *)ire->ire_rfq, (void *)ire->ire_stq,
-	    (int)ire->ire_zoneid,
-	    ip_dot_addr(ire->ire_addr, buf1), ip_dot_addr(ire->ire_mask, buf2),
-	    ip_dot_addr(ire->ire_src_addr, buf3),
-	    ip_dot_addr(ire->ire_gateway_addr, buf4),
-	    ire->ire_max_frag, ire->ire_uinfo.iulp_rtt,
-	    ire->ire_uinfo.iulp_rtt_sd,
-	    ire->ire_uinfo.iulp_ssthresh, ref,
-	    ire->ire_uinfo.iulp_rtomax,
-	    (ire->ire_uinfo.iulp_tstamp_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_wscale_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_ecn_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_pmtud_ok ? 1: 0),
-	    ire->ire_uinfo.iulp_sack,
-	    ire->ire_uinfo.iulp_spipe, ire->ire_uinfo.iulp_rpipe,
-	    ib_pkt_count, ire->ire_ob_pkt_count, fo_pkt_count,
-	    ip_nv_lookup(ire_nv_tbl, (int)ire->ire_type));
-	if (print_len < buf_len) {
-		mp->b_wptr += print_len;
-	} else {
-		mp->b_wptr += buf_len;
-	}
-}
-
 /*
  * callback function provided by ire_ftable_lookup when calling
  * rn_match_args(). Invoke ire_match_args on each matching leaf node in

@@ -353,7 +353,6 @@ const iulp_t	ire_uinfo_null = { 0 };
 static int	ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp,
     ipsq_func_t func, boolean_t);
 static void	ire_delete_v4(ire_t *ire);
-static void	ire_report_ctable(ire_t *ire, char *mp);
 static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
     zoneid_t zoneid, ip_stack_t *);
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
@@ -726,118 +725,6 @@ done:
 	return (0);
 }
 
-/*
- * Named Dispatch routine to produce a formatted report on all IREs.
- * This report is accessed by using the ndd utility to "get" ND variable
- * "ipv4_ire_status".
- */
-/* ARGSUSED */
-int
-ip_ire_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
-{
-	zoneid_t zoneid;
-	ip_stack_t	*ipst;
-
-	if (CONN_Q(q))
-		ipst = CONNQ_TO_IPST(q);
-	else
-		ipst = ILLQ_TO_IPST(q);
-
-	(void) mi_mpprintf(mp,
-	    "IRE      " MI_COL_HDRPAD_STR
-	/*   01234567[89ABCDEF] */
-	    "rfq      " MI_COL_HDRPAD_STR
-	/*   01234567[89ABCDEF] */
-	    "stq      " MI_COL_HDRPAD_STR
-	/*   01234567[89ABCDEF] */
-	    " zone "
-	/*   12345 */
-	    "addr            mask            "
-	/*   123.123.123.123 123.123.123.123 */
-	    "src             gateway         mxfrg rtt   rtt_sd ssthresh ref "
-	/*   123.123.123.123 123.123.123.123 12345 12345 123456 12345678 123 */
-	    "rtomax tstamp_ok wscale_ok ecn_ok pmtud_ok sack sendpipe "
-	/*   123456 123456789 123456789 123456 12345678 1234 12345678 */
-	    "recvpipe in/out/forward type");
-	/*   12345678 in/out/forward xxxxxxxxxx */
-
-	/*
-	 * Because of the ndd constraint, at most we can have 64K buffer
-	 * to put in all IRE info.  So to be more efficient, just
-	 * allocate a 64K buffer here, assuming we need that large buffer.
-	 * This should be OK as only root can do ndd /dev/ip.
-	 */
-	if ((mp->b_cont = allocb(ND_MAX_BUF_LEN, BPRI_HI)) == NULL) {
-		/* The following may work even if we cannot get a large buf. */
-		(void) mi_mpprintf(mp, "<< Out of buffer >>\n");
-		return (0);
-	}
-
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-	if (zoneid == GLOBAL_ZONEID)
-		zoneid = ALL_ZONES;
-
-	ire_walk_v4(ire_report_ftable, mp->b_cont, zoneid, ipst);
-	ire_walk_v4(ire_report_ctable, mp->b_cont, zoneid, ipst);
-
-	return (0);
-}
-
-
-/* ire_walk routine invoked for ip_ire_report for each cached IRE. */
-static void
-ire_report_ctable(ire_t *ire, char *mp)
-{
-	char	buf1[16];
-	char	buf2[16];
-	char	buf3[16];
-	char	buf4[16];
-	uint_t	fo_pkt_count;
-	uint_t	ib_pkt_count;
-	int	ref;
-	uint_t	print_len, buf_len;
-
-	if ((ire->ire_type & IRE_CACHETABLE) == 0)
-		return;
-	buf_len = ((mblk_t *)mp)->b_datap->db_lim - ((mblk_t *)mp)->b_wptr;
-	if (buf_len <= 0)
-		return;
-
-	/* Number of active references of this ire */
-	ref = ire->ire_refcnt;
-	/* "inbound" to a non local address is a forward */
-	ib_pkt_count = ire->ire_ib_pkt_count;
-	fo_pkt_count = 0;
-	if (!(ire->ire_type & (IRE_LOCAL|IRE_BROADCAST))) {
-		fo_pkt_count = ib_pkt_count;
-		ib_pkt_count = 0;
-	}
-	print_len =  snprintf((char *)((mblk_t *)mp)->b_wptr, buf_len,
-	    MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR MI_COL_PTRFMT_STR "%5d "
-	    "%s %s %s %s %05d %05ld %06ld %08d %03d %06d %09d %09d %06d %08d "
-	    "%04d %08d %08d %d/%d/%d %s\n",
-	    (void *)ire, (void *)ire->ire_rfq, (void *)ire->ire_stq,
-	    (int)ire->ire_zoneid,
-	    ip_dot_addr(ire->ire_addr, buf1), ip_dot_addr(ire->ire_mask, buf2),
-	    ip_dot_addr(ire->ire_src_addr, buf3),
-	    ip_dot_addr(ire->ire_gateway_addr, buf4),
-	    ire->ire_max_frag, ire->ire_uinfo.iulp_rtt,
-	    ire->ire_uinfo.iulp_rtt_sd, ire->ire_uinfo.iulp_ssthresh, ref,
-	    ire->ire_uinfo.iulp_rtomax,
-	    (ire->ire_uinfo.iulp_tstamp_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_wscale_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_ecn_ok ? 1: 0),
-	    (ire->ire_uinfo.iulp_pmtud_ok ? 1: 0),
-	    ire->ire_uinfo.iulp_sack,
-	    ire->ire_uinfo.iulp_spipe, ire->ire_uinfo.iulp_rpipe,
-	    ib_pkt_count, ire->ire_ob_pkt_count, fo_pkt_count,
-	    ip_nv_lookup(ire_nv_tbl, (int)ire->ire_type));
-	if (print_len < buf_len) {
-		((mblk_t *)mp)->b_wptr += print_len;
-	} else {
-		((mblk_t *)mp)->b_wptr += buf_len;
-	}
-}
 
 /*
  * ip_ire_req is called by ip_wput when an IRE_DB_REQ_TYPE message is handed

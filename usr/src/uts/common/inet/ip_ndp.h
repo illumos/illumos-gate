@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,7 +325,6 @@ extern	int	ndp_mcastreq(ill_t *, const in6_addr_t *, uint32_t, uint32_t,
 extern	int	ndp_noresolver(ill_t *, const in6_addr_t *);
 extern	void	ndp_process(nce_t *, uchar_t *, uint32_t, boolean_t);
 extern	int	ndp_query(ill_t *, lif_nd_req_t *);
-extern	int	ndp_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern	int	ndp_resolver(ill_t *, const in6_addr_t *, mblk_t *, zoneid_t);
 extern	int	ndp_sioc_update(ill_t *, lif_nd_req_t *);
 extern	boolean_t	ndp_verify_optlen(nd_opt_hdr_t *, int);

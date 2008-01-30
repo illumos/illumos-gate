@@ -901,16 +901,10 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    "ip_ill_status" },
 	{  ip_ipif_report,	NULL,		NULL,
 	    "ip_ipif_status" },
-	{  ip_ire_report,	NULL,		NULL,
-	    "ipv4_ire_status" },
-	{  ip_ire_report_v6,	NULL,		NULL,
-	    "ipv6_ire_status" },
 	{  ip_conn_report,	NULL,		NULL,
 	    "ip_conn_status" },
 	{  nd_get_long,		nd_set_long,	(caddr_t)&ip_rput_pullups,
 	    "ip_rput_pullups" },
-	{  ndp_report,		NULL,		NULL,
-	    "ip_ndp_cache_report" },
 	{  ip_srcid_report,	NULL,		NULL,
 	    "ip_srcid_status" },
 	{ ip_param_generic_get, ip_squeue_profile_set,
@@ -921,12 +915,12 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
-#define	IPNDP_CGTP_FILTER_OFFSET	14
+#define	IPNDP_CGTP_FILTER_OFFSET	11
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
 	    "ip_cgtp_filter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_soft_rings_cnt, "ip_soft_rings_cnt" },
-#define	IPNDP_IPMP_HOOK_OFFSET	16
+#define	IPNDP_IPMP_HOOK_OFFSET	13
 	{  ip_param_generic_get, ipmp_hook_emulation_set, NULL,
 	    "ipmp_hook_emulation" },
 	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,6 @@ static	void	nce_make_mapping(nce_t *nce, uchar_t *addrpos,
     uchar_t *addr);
 static	int	nce_set_multicast(ill_t *ill, const in6_addr_t *addr);
 static	void	nce_queue_mp(nce_t *nce, mblk_t *mp);
-static	void	nce_report1(nce_t *nce, uchar_t *mp_arg);
 static	mblk_t	*nce_udreq_alloc(ill_t *ill);
 static	void	nce_update(nce_t *nce, uint16_t new_state,
     uchar_t *new_ll_addr);
@@ -101,15 +100,6 @@ static	boolean_t	nce_xmit(ill_t *ill, uint32_t operation,
     const in6_addr_t *target, int flag);
 static int	ndp_add_v4(ill_t *, const in_addr_t *, uint16_t,
     nce_t **, nce_t *);
-
-/*
- * We track the time of creation of the nce in the  nce_init_time field
- * of IPv4 nce_t entries. If an nce is stuck in the ND_INITIAL state for
- * more than NCE_STUCK_TIMEOUT milliseconds, trigger the nce-stuck dtrace
- * probe to assist in debugging. This probe is fired from from nce_report1()
- * when 'ndd -get /dev/ip ip_ndp_cache_report' is invoked.
- */
-#define	NCE_STUCK_TIMEOUT	120000
 
 #ifdef DEBUG
 static void	nce_trace_cleanup(const nce_t *);
@@ -2411,132 +2401,6 @@ nce_make_mapping(nce_t *nce, uchar_t *addrpos, uchar_t *addr)
 	to = addrpos + nce->nce_ll_extract_start;
 	while (len-- > 0)
 		*to++ |= *mask++ & *addr++;
-}
-
-/*
- * Pass a cache report back out via NDD.
- */
-/* ARGSUSED */
-int
-ndp_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
-{
-	ip_stack_t	*ipst;
-
-	if (CONN_Q(q))
-		ipst = CONNQ_TO_IPST(q);
-	else
-		ipst = ILLQ_TO_IPST(q);
-
-	(void) mi_mpprintf(mp, "ifname      hardware addr    flags"
-	    "     proto addr/mask");
-	ndp_walk(NULL, (pfi_t)nce_report1, (uchar_t *)mp, ipst);
-	return (0);
-}
-
-/*
- * Add a single line to the NDP Cache Entry Report.
- */
-static void
-nce_report1(nce_t *nce, uchar_t *mp_arg)
-{
-	ill_t		*ill = nce->nce_ill;
-	char		local_buf[INET6_ADDRSTRLEN];
-	uchar_t		flags_buf[10];
-	uint32_t	flags = nce->nce_flags;
-	mblk_t		*mp = (mblk_t *)mp_arg;
-	uchar_t		*h;
-	uchar_t		*m = flags_buf;
-	in6_addr_t	v6addr;
-	uint64_t	now;
-
-	/*
-	 * Lock the nce to protect nce_res_mp from being changed
-	 * if an external resolver address resolution completes
-	 * while nce_res_mp is being accessed here.
-	 *
-	 * Deal with all address formats, not just Ethernet-specific
-	 * In addition, make sure that the mblk has enough space
-	 * before writing to it. If is doesn't, allocate a new one.
-	 */
-	if (nce->nce_ipversion == IPV4_VERSION) {
-		/*
-		 * Don't include v4 NCEs in NDP cache entry report.
-		 * But sanity check for lingering ND_INITIAL entries
-		 * when we do 'ndd -get /dev/ip ip_ndp_cache_report'
-		 */
-		if (nce->nce_state == ND_INITIAL) {
-
-			now = TICK_TO_MSEC(lbolt64);
-			if (now - nce->nce_init_time > NCE_STUCK_TIMEOUT) {
-				DTRACE_PROBE1(nce__stuck, nce_t *, nce);
-			}
-		}
-		return;
-	}
-
-	ASSERT(ill != NULL);
-	v6addr = nce->nce_mask;
-	if (flags & NCE_F_PERMANENT)
-		*m++ = 'P';
-	if (flags & NCE_F_ISROUTER)
-		*m++ = 'R';
-	if (flags & NCE_F_MAPPING)
-		*m++ = 'M';
-	*m = '\0';
-
-	if (ill->ill_net_type == IRE_IF_RESOLVER) {
-		size_t		addrlen;
-		char		*addr_buf;
-		dl_unitdata_req_t	*dl;
-
-		mutex_enter(&nce->nce_lock);
-		h = nce->nce_res_mp->b_rptr + NCE_LL_ADDR_OFFSET(ill);
-		dl = (dl_unitdata_req_t *)nce->nce_res_mp->b_rptr;
-		if (ill->ill_flags & ILLF_XRESOLV)
-			addrlen = (3 * (dl->dl_dest_addr_length));
-		else
-			addrlen = (3 * (ill->ill_nd_lla_len));
-		if (addrlen <= 0) {
-			mutex_exit(&nce->nce_lock);
-			(void) mi_mpprintf(mp,
-			    "%8s %9s %5s %s/%d",
-			    ill->ill_name,
-			    "None",
-			    (uchar_t *)&flags_buf,
-			    inet_ntop(AF_INET6, (char *)&nce->nce_addr,
-			    (char *)local_buf, sizeof (local_buf)),
-			    ip_mask_to_plen_v6(&v6addr));
-		} else {
-			/*
-			 * Convert the hardware/lla address to ascii
-			 */
-			addr_buf = kmem_zalloc(addrlen, KM_NOSLEEP);
-			if (addr_buf == NULL) {
-				mutex_exit(&nce->nce_lock);
-				return;
-			}
-			(void) mac_colon_addr((uint8_t *)h,
-			    (ill->ill_flags & ILLF_XRESOLV) ?
-			    dl->dl_dest_addr_length : ill->ill_nd_lla_len,
-			    addr_buf, addrlen);
-			mutex_exit(&nce->nce_lock);
-			(void) mi_mpprintf(mp, "%8s %17s %5s %s/%d",
-			    ill->ill_name, addr_buf, (uchar_t *)&flags_buf,
-			    inet_ntop(AF_INET6, (char *)&nce->nce_addr,
-			    (char *)local_buf, sizeof (local_buf)),
-			    ip_mask_to_plen_v6(&v6addr));
-			kmem_free(addr_buf, addrlen);
-		}
-	} else {
-		(void) mi_mpprintf(mp,
-		    "%8s %9s %5s %s/%d",
-		    ill->ill_name,
-		    "None",
-		    (uchar_t *)&flags_buf,
-		    inet_ntop(AF_INET6, (char *)&nce->nce_addr,
-		    (char *)local_buf, sizeof (local_buf)),
-		    ip_mask_to_plen_v6(&v6addr));
-	}
 }
 
 mblk_t *

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -203,10 +203,6 @@ extern	int	ip_ire_delete(queue_t *, mblk_t *, cred_t *);
 extern	boolean_t ip_ire_clookup_and_delete(ipaddr_t, ipif_t *, ip_stack_t *);
 extern	void	ip_ire_clookup_and_delete_v6(const in6_addr_t *,
     ip_stack_t *);
-
-extern	int	ip_ire_report(queue_t *, mblk_t *, caddr_t, cred_t *);
-extern	int	ip_ire_report_v6(queue_t *, mblk_t *, caddr_t, cred_t *);
-extern	void	ire_report_ftable(ire_t *, char *);
 
 extern	void	ip_ire_req(queue_t *, mblk_t *);
 
