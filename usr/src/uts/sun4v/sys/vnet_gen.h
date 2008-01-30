@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,6 +158,12 @@ typedef struct vgen_ver {
 	uint16_t	ver_minor;		/* minor version number */
 } vgen_ver_t;
 
+/*
+ * vnet-protocol-version dependent function prototypes.
+ */
+typedef int	(*vgen_ldctx_t) (void *, mblk_t *);
+typedef void	(*vgen_ldcrx_pktdata_t) (void *, void *, uint32_t);
+
 /* Channel information associated with a vgen-port */
 typedef struct vgen_ldc {
 
@@ -215,6 +221,8 @@ typedef struct vgen_ldc {
 	uint32_t		num_rxds;	/* number of rx descriptors */
 	caddr_t			tx_datap;	/* prealloc'd tx data area */
 	vio_multi_pool_t	vmp;		/* rx mblk pools */
+	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
+	uint64_t		msglen;		/* size of ldcmsg */
 
 	/* misc */
 	uint32_t		flags;		/* flags */
@@ -224,16 +232,14 @@ typedef struct vgen_ldc {
 	boolean_t		resched_peer;	/* send tx msg to peer */
 	uint32_t		resched_peer_txi; /* tx index to resched peer */
 
+	vgen_ldctx_t		tx;		/* transmit function */
+	vgen_ldcrx_pktdata_t	rx_pktdata;	/* process rx raw data msg */
+
 	/* receive thread field */
 	kthread_t		*rcv_thread;	/* receive thread */
 	uint32_t		rcv_thr_flags;	/* receive thread flags */
 	kmutex_t		rcv_thr_lock;	/* lock for receive thread */
 	kcondvar_t		rcv_thr_cv;	/* cond.var for recv thread */
-	mblk_t			*rcv_mhead;	/* received mblks head */
-	mblk_t			*rcv_mtail;	/* received mblks tail */
-	ddi_softint_handle_t	soft_handle;	/* soft intr handle */
-	int			soft_pri;	/* soft int priority */
-	kmutex_t		soft_lock;	/* lock for soft intr handler */
 
 	/* channel statistics */
 	vgen_stats_t		stats;		/* channel statistics */
@@ -268,6 +274,7 @@ typedef struct vgen_portlist {
 typedef struct vgen {
 	void			*vnetp;		/* associated vnet instance */
 	dev_info_t		*vnetdip;	/* dip of vnet */
+	uint64_t		regprop;	/* "reg" property */
 	uint8_t			macaddr[ETHERADDRL];	/* mac addr of vnet */
 	kmutex_t		lock;		/* synchornize ops */
 	int			flags;		/* flags */
@@ -280,6 +287,9 @@ typedef struct vgen {
 	uint32_t		mcsize;		/* allocated size of mctab */
 	uint32_t		mccount;	/* # of valid addrs in mctab */
 	vio_mblk_pool_t		*rmp;		/* rx mblk pools to be freed */
+	uint32_t		pri_num_types;	/* # of priority eth types */
+	uint16_t		*pri_types;	/* priority eth types */
+	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
 } vgen_t;
 
 #ifdef __cplusplus

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,8 @@ static	void vsw_mdeg_unregister(vsw_t *vswp);
 static	int vsw_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_get_initial_md_properties(vsw_t *vswp, md_t *, mde_cookie_t);
+static	void vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp,
+	mde_cookie_t node);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
 static	int vsw_read_mdprops(vsw_t *vswp);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
@@ -102,9 +104,8 @@ static int vsw_m_unicst(void *arg, const uint8_t *);
 static int vsw_m_multicst(void *arg, boolean_t, const uint8_t *);
 static int vsw_m_promisc(void *arg, boolean_t);
 static mblk_t *vsw_m_tx(void *arg, mblk_t *);
-static uint_t vsw_rx_softintr(caddr_t arg1, caddr_t arg2);
-void vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
-    mblk_t *mp, mblk_t *mpt, vsw_macrx_flags_t flags);
+void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
+    mblk_t *mp, vsw_macrx_flags_t flags);
 
 /*
  * Functions imported from other files.
@@ -144,10 +145,33 @@ int	vsw_mac_open_retries = 20;	/* max # of mac_open() retries */
 int	vsw_setup_switching_delay = 3;	/* setup sw timeout interval in sec */
 int	vsw_ldc_tx_delay = 5;		/* delay(ticks) for tx retries */
 int	vsw_ldc_tx_retries = 10;	/* # of ldc tx retries */
-int	vsw_ldc_tx_max_failures = 40;	/* Max ldc tx failures */
 boolean_t vsw_ldc_rxthr_enabled = B_TRUE;	/* LDC Rx thread enabled */
 boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
 
+/*
+ * Workaround for a version handshake bug in obp's vnet.
+ * If vsw initiates version negotiation starting from the highest version,
+ * obp sends a nack and terminates version handshake. To workaround
+ * this, we do not initiate version handshake when the channel comes up.
+ * Instead, we wait for the peer to send its version info msg and go through
+ * the version protocol exchange. If we successfully negotiate a version,
+ * before sending the ack, we send our version info msg to the peer
+ * using the <major,minor> version that we are about to ack.
+ */
+boolean_t vsw_obp_ver_proto_workaround = B_TRUE;
+
+/*
+ * In the absence of "priority-ether-types" property in MD, the following
+ * internal tunable can be set to specify a single priority ethertype.
+ */
+uint64_t vsw_pri_eth_type = 0;
+
+/*
+ * Number of transmit priority buffers that are preallocated per device.
+ * This number is chosen to be a small value to throttle transmission
+ * of priority packets. Note: Must be a power of 2 for vio_create_mblks().
+ */
+uint32_t vsw_pri_tx_nmblks = 64;
 
 /*
  * External tunables.
@@ -158,6 +182,9 @@ boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
  */
 boolean_t vsw_multi_ring_enable = B_FALSE;
 int vsw_mac_rx_rings = VSW_MAC_RX_RINGS;
+
+/* Number of transmit descriptors -  must be power of 2 */
+uint32_t vsw_ntxds = VSW_RING_NUM_EL;
 
 /*
  * Max number of mblks received in one receive operation.
@@ -174,6 +201,13 @@ uint32_t vsw_mblk_size3 = VSW_MBLK_SZ_2048;	/* size=2048 for pool3 */
 uint32_t vsw_num_mblks1 = VSW_NUM_MBLKS;	/* number of mblks for pool1 */
 uint32_t vsw_num_mblks2 = VSW_NUM_MBLKS;	/* number of mblks for pool2 */
 uint32_t vsw_num_mblks3 = VSW_NUM_MBLKS;	/* number of mblks for pool3 */
+
+/*
+ * vsw_max_tx_qcount is the maximum # of packets that can be queued
+ * before the tx worker thread begins processing the queue. Its value
+ * is chosen to be 4x the default length of tx descriptor ring.
+ */
+uint32_t vsw_max_tx_qcount = 4 * VSW_RING_NUM_EL;
 
 /*
  * MAC callbacks
@@ -265,6 +299,7 @@ static char ldcids_propname[] = "ldc-ids";
 static char chan_propname[] = "channel-endpoint";
 static char id_propname[] = "id";
 static char reg_propname[] = "reg";
+static char pri_types_propname[] = "priority-ether-types";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -403,10 +438,9 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				PROG_fdb = 0x04,
 				PROG_mfdb = 0x08,
 				PROG_taskq = 0x10,
-				PROG_rx_softint = 0x20,
-				PROG_swmode = 0x40,
-				PROG_macreg = 0x80,
-				PROG_mdreg = 0x100}
+				PROG_swmode = 0x20,
+				PROG_macreg = 0x40,
+				PROG_mdreg = 0x80}
 			progress;
 
 	progress = PROG_init;
@@ -487,37 +521,6 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	progress |= PROG_taskq;
 
-	/*
-	 * If LDC receive thread is enabled, then we need a
-	 * soft-interrupt to deliver the packets to the upper layers.
-	 * This applies only to the packets that need to be sent up
-	 * the stack, but not to the packets that are sent out via
-	 * the physical interface.
-	 */
-	if (vsw_ldc_rxthr_enabled) {
-		vswp->rx_mhead = vswp->rx_mtail = NULL;
-		vswp->soft_pri = PIL_4;
-		vswp->rx_softint = B_TRUE;
-
-		rv = ddi_intr_add_softint(vswp->dip, &vswp->soft_handle,
-		    vswp->soft_pri, vsw_rx_softintr, (void *)vswp);
-		if (rv != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "!vsw%d: add_softint failed rv(%d)",
-			    vswp->instance, rv);
-			goto vsw_attach_fail;
-		}
-
-		/*
-		 * Initialize the soft_lock with the same priority as
-		 * the soft interrupt to protect from the soft interrupt.
-		 */
-		mutex_init(&vswp->soft_lock, NULL, MUTEX_DRIVER,
-		    DDI_INTR_PRI(vswp->soft_pri));
-		progress |= PROG_rx_softint;
-	} else {
-		vswp->rx_softint = B_FALSE;
-	}
-
 	/* prevent auto-detaching */
 	if (ddi_prop_update_int(DDI_DEV_T_NONE, vswp->dip,
 	    DDI_NO_AUTODETACH, 1) != DDI_SUCCESS) {
@@ -585,11 +588,6 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 vsw_attach_fail:
 	DERR(NULL, "vsw_attach: failed");
 
-	if (progress & PROG_rx_softint) {
-		(void) ddi_intr_remove_softint(vswp->soft_handle);
-		mutex_destroy(&vswp->soft_lock);
-	}
-
 	if (progress & PROG_mdreg) {
 		vsw_mdeg_unregister(vswp);
 		(void) vsw_detach_ports(vswp);
@@ -614,6 +612,14 @@ vsw_attach_fail:
 
 	if (progress & PROG_fdb)
 		mod_hash_destroy_hash(vswp->fdb);
+
+	if (progress & PROG_readmd) {
+		if (VSW_PRI_ETH_DEFINED(vswp)) {
+			kmem_free(vswp->pri_types,
+			    sizeof (uint16_t) * vswp->pri_num_types);
+		}
+		(void) vio_destroy_mblks(vswp->pri_tx_vmp);
+	}
 
 	if (progress & PROG_locks) {
 		rw_destroy(&vswp->plist.lockrw);
@@ -662,18 +668,6 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			cmn_err(CE_WARN, "!vsw%d: Unable to detach from "
 			    "MAC layer", vswp->instance);
 			return (DDI_FAILURE);
-		}
-	}
-
-	/*
-	 * Destroy/free up the receive thread related structures.
-	 */
-	if (vswp->rx_softint == B_TRUE) {
-		(void) ddi_intr_remove_softint(vswp->soft_handle);
-		mutex_destroy(&vswp->soft_lock);
-		if (vswp->rx_mhead != NULL) {
-			freemsgchain(vswp->rx_mhead);
-			vswp->rx_mhead = vswp->rx_mtail = NULL;
 		}
 	}
 
@@ -758,6 +752,13 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vswp->mfdb = NULL;
 	RW_EXIT(&vswp->mfdbrw);
 	rw_destroy(&vswp->mfdbrw);
+
+	/* free pri_types table */
+	if (VSW_PRI_ETH_DEFINED(vswp)) {
+		kmem_free(vswp->pri_types,
+		    sizeof (uint16_t) * vswp->pri_num_types);
+		(void) vio_destroy_mblks(vswp->pri_tx_vmp);
+	}
 
 	ddi_remove_minor_node(dip, NULL);
 
@@ -1658,8 +1659,72 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		ASSERT(vswp->smode_num != 0);
 	}
 
+	vsw_read_pri_eth_types(vswp, mdp, node);
+
 	D1(vswp, "%s: exit", __func__);
 	return (0);
+}
+
+/*
+ * This function reads "priority-ether-types" property from md. This property
+ * is used to enable support for priority frames. Applications which need
+ * guaranteed and timely delivery of certain high priority frames to/from
+ * a vnet or vsw within ldoms, should configure this property by providing
+ * the ether type(s) for which the priority facility is needed.
+ * Normal data frames are delivered over a ldc channel using the descriptor
+ * ring mechanism which is constrained by factors such as descriptor ring size,
+ * the rate at which the ring is processed at the peer ldc end point, etc.
+ * The priority mechanism provides an Out-Of-Band path to send/receive frames
+ * as raw pkt data (VIO_PKT_DATA) messages over the channel, avoiding the
+ * descriptor ring path and enables a more reliable and timely delivery of
+ * frames to the peer.
+ */
+static void
+vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
+{
+	int		rv;
+	uint16_t	*types;
+	uint64_t	*data;
+	int		size;
+	int		i;
+	size_t		mblk_sz;
+
+	rv = md_get_prop_data(mdp, node, pri_types_propname,
+	    (uint8_t **)&data, &size);
+	if (rv != 0) {
+		/*
+		 * Property may not exist if we are running pre-ldoms1.1 f/w.
+		 * Check if 'vsw_pri_eth_type' has been set in that case.
+		 */
+		if (vsw_pri_eth_type != 0) {
+			size = sizeof (vsw_pri_eth_type);
+			data = &vsw_pri_eth_type;
+		} else {
+			D3(vswp, "%s: prop(%s) not found", __func__,
+			    pri_types_propname);
+			size = 0;
+		}
+	}
+
+	if (size == 0) {
+		vswp->pri_num_types = 0;
+		return;
+	}
+
+	/*
+	 * we have some priority-ether-types defined;
+	 * allocate a table of these types and also
+	 * allocate a pool of mblks to transmit these
+	 * priority packets.
+	 */
+	size /= sizeof (uint64_t);
+	vswp->pri_num_types = size;
+	vswp->pri_types = kmem_zalloc(size * sizeof (uint16_t), KM_SLEEP);
+	for (i = 0, types = vswp->pri_types; i < size; i++) {
+		types[i] = data[i] & 0xFFFF;
+	}
+	mblk_sz = (VIO_PKT_DATA_HDRSIZE + ETHERMAX + 7) & ~7;
+	(void) vio_create_mblks(vsw_pri_tx_nmblks, mblk_sz, &vswp->pri_tx_vmp);
 }
 
 /*
@@ -2024,11 +2089,9 @@ vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node)
  *	VSW_MACRX_FREEMSG -- Free if the messages cannot be sent up the stack.
  */
 void
-vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
-    mblk_t *mp, mblk_t *mpt, vsw_macrx_flags_t flags)
+vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
+    mblk_t *mp, vsw_macrx_flags_t flags)
 {
-	int trigger = 0;
-
 	D1(vswp, "%s:enter\n", __func__);
 	READ_ENTER(&vswp->if_lockrw);
 	/* Check if the interface is up */
@@ -2064,85 +2127,15 @@ vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
 	 */
 	if (flags & VSW_MACRX_COPYMSG) {
 		mp = copymsgchain(mp);
-		if (mp) {
-			mpt = mp;
-			/* find the tail */
-			while (mpt->b_next != NULL) {
-				mpt = mpt->b_next;
-			}
-		} else {
+		if (mp == NULL) {
 			D1(vswp, "%s:exit\n", __func__);
 			return;
 		}
 	}
 
-	/*
-	 * If the softint is not enabled or the packets are
-	 * passed by the physical device, then the caller
-	 * is expected to be at the interrupt context. For
-	 * this case, mac_rx() directly.
-	 */
-	if ((vswp->rx_softint == B_FALSE) || (caller == VSW_PHYSDEV)) {
-		ASSERT(servicing_interrupt());
-		D3(vswp, "%s: sending up stack", __func__);
-		mac_rx(vswp->if_mh, mrh, mp);
-		D1(vswp, "%s:exit\n", __func__);
-		return;
-	}
-
-	/*
-	 * Here we may not be at the interrupt context, so
-	 * queue the packets and trigger a softint to post
-	 * the packets up the stack.
-	 */
-	mutex_enter(&vswp->soft_lock);
-	if (vswp->rx_mhead == NULL) {
-		vswp->rx_mhead = mp;
-		vswp->rx_mtail = mpt;
-		trigger = 1;
-	} else {
-		vswp->rx_mtail->b_next = mp;
-		vswp->rx_mtail = mpt;
-	}
-	mutex_exit(&vswp->soft_lock);
-	if (trigger) {
-		D3(vswp, "%s: triggering the softint", __func__);
-		(void) ddi_intr_trigger_softint(vswp->soft_handle, NULL);
-	}
+	D2(vswp, "%s: sending up stack", __func__);
+	mac_rx(vswp->if_mh, mrh, mp);
 	D1(vswp, "%s:exit\n", __func__);
-}
-
-/*
- * vsw_rx_softintr -- vsw soft interrupt handler function.
- * Its job is to pickup the recieved packets that are queued
- * for the interface and send them up.
- *
- * NOTE: An interrupt handler is being used to handle the upper
- * layer(s) requirement to send up only at interrupt context.
- */
-/* ARGSUSED */
-static uint_t
-vsw_rx_softintr(caddr_t arg1, caddr_t arg2)
-{
-	mblk_t *mp;
-	vsw_t *vswp = (vsw_t *)arg1;
-
-	mutex_enter(&vswp->soft_lock);
-	mp = vswp->rx_mhead;
-	vswp->rx_mhead = vswp->rx_mtail = NULL;
-	mutex_exit(&vswp->soft_lock);
-	if (mp != NULL) {
-		READ_ENTER(&vswp->if_lockrw);
-		if (vswp->if_state & VSW_IF_UP) {
-			RW_EXIT(&vswp->if_lockrw);
-			mac_rx(vswp->if_mh, NULL, mp);
-		} else {
-			RW_EXIT(&vswp->if_lockrw);
-			freemsgchain(mp);
-		}
-	}
-	D1(vswp, "%s:exit\n", __func__);
-	return (DDI_INTR_CLAIMED);
 }
 
 /* copy mac address of vsw into soft state structure */

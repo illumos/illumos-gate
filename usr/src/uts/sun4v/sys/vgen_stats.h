@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,11 +53,18 @@ typedef struct vgen_stats {
 
 	/* Tx Statistics */
 	uint32_t	tx_no_desc;	/* # out of transmit descriptors */
+	uint32_t	tx_qfull;	/* pkts dropped due to qfull in vsw */
+	uint32_t	tx_pri_fail;	/* # tx priority packet failures */
+	uint64_t	tx_pri_packets;	/* # priority packets transmitted */
+	uint64_t	tx_pri_bytes;	/* # priority bytes transmitted */
 
 	/* Rx Statistics */
 	uint32_t	rx_allocb_fail;	/* # rx buf allocb() failures */
 	uint32_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
 	uint32_t	rx_lost_pkts;	/* # rx lost packets */
+	uint32_t	rx_pri_fail;	/* # rx priority packet failures */
+	uint64_t	rx_pri_packets;	/* # priority packets received */
+	uint64_t	rx_pri_bytes;	/* # priority bytes received */
 
 	/* Callback statistics */
 	uint32_t	callbacks;		/* # callbacks */
@@ -94,11 +101,18 @@ typedef struct vgen_kstats {
 
 	/* Tx Statistics */
 	kstat_named_t	tx_no_desc;	/* # out of transmit descriptors */
+	kstat_named_t	tx_qfull;	/* pkts dropped due to qfull in vsw */
+	kstat_named_t	tx_pri_fail;	/* # tx priority packet failures */
+	kstat_named_t	tx_pri_packets;	/* # priority packets transmitted */
+	kstat_named_t	tx_pri_bytes;	/* # priority bytes transmitted */
 
 	/* Rx Statistics */
 	kstat_named_t	rx_allocb_fail;	/* # rx buf allocb failures */
 	kstat_named_t	rx_vio_allocb_fail; /* # vio_allocb() failures */
 	kstat_named_t	rx_lost_pkts;	/* # rx lost packets */
+	kstat_named_t	rx_pri_fail;	/* # rx priority packet failures */
+	kstat_named_t	rx_pri_packets;	/* # priority packets received */
+	kstat_named_t	rx_pri_bytes;	/* # priority bytes received */
 
 	/* Callback statistics */
 	kstat_named_t	callbacks;		/* # callbacks */

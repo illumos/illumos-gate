@@ -1604,7 +1604,7 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	/* fill in payload */
 	pkt.max_xfer_sz = vdc->max_xfer_sz;
 	pkt.vdisk_block_size = vdc->block_size;
-	pkt.xfer_mode = VIO_DRING_MODE;
+	pkt.xfer_mode = VIO_DRING_MODE_V1_0;
 	pkt.operations = 0;	/* server will set bits of valid operations */
 	pkt.vdisk_type = 0;	/* server will set to valid device type */
 	pkt.vdisk_media = 0;	/* server will set to valid media type */
@@ -4424,7 +4424,7 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 			    " using max supported by vdc", vdc->instance);
 		}
 
-		if ((attr_msg->xfer_mode != VIO_DRING_MODE) ||
+		if ((attr_msg->xfer_mode != VIO_DRING_MODE_V1_0) ||
 		    (attr_msg->vdisk_size > INT64_MAX) ||
 		    (attr_msg->operations == 0) ||
 		    (attr_msg->vdisk_type > VD_DISK_TYPE_DISK)) {

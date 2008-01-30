@@ -89,7 +89,7 @@ int vsw_detach_ports(vsw_t *vswp);
 int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
 int vsw_port_detach(vsw_t *vswp, int p_instance);
-int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt);
+int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count);
 int vsw_port_attach(vsw_t *vswp, int p_instance,
 	uint64_t *ldcids, int nids, struct ether_addr *macaddr);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
@@ -105,10 +105,12 @@ static	void vsw_conn_task(void *);
 static	int vsw_check_flag(vsw_ldc_t *, int, uint64_t);
 static	void vsw_next_milestone(vsw_ldc_t *);
 static	int vsw_supported_version(vio_ver_msg_t *);
+static	void vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp);
+static	void vsw_reset_vnet_proto_ops(vsw_ldc_t *ldcp);
 
 /* Data processing routines */
 static void vsw_process_pkt(void *);
-static void vsw_dispatch_ctrl_task(vsw_ldc_t *, void *, vio_msg_tag_t);
+static void vsw_dispatch_ctrl_task(vsw_ldc_t *, void *, vio_msg_tag_t *);
 static void vsw_process_ctrl_pkt(void *);
 static void vsw_process_ctrl_ver_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_attr_pkt(vsw_ldc_t *, void *);
@@ -116,16 +118,21 @@ static void vsw_process_ctrl_mcst_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_dring_unreg_pkt(vsw_ldc_t *, void *);
 static void vsw_process_ctrl_rdx_pkt(vsw_ldc_t *, void *);
-static void vsw_process_data_pkt(vsw_ldc_t *, void *, vio_msg_tag_t);
+static void vsw_process_data_pkt(vsw_ldc_t *, void *, vio_msg_tag_t *,
+	uint32_t);
 static void vsw_process_data_dring_pkt(vsw_ldc_t *, void *);
-static void vsw_process_data_raw_pkt(vsw_ldc_t *, void *);
+static void vsw_process_pkt_data_nop(void *, void *, uint32_t);
+static void vsw_process_pkt_data(void *, void *, uint32_t);
 static void vsw_process_data_ibnd_pkt(vsw_ldc_t *, void *);
-static void vsw_process_err_pkt(vsw_ldc_t *, void *, vio_msg_tag_t);
+static void vsw_process_err_pkt(vsw_ldc_t *, void *, vio_msg_tag_t *);
 
 /* Switching/data transmit routines */
 static	int vsw_dringsend(vsw_ldc_t *, mblk_t *);
 static	int vsw_descrsend(vsw_ldc_t *, mblk_t *);
-static int vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, int retries);
+static void vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp);
+static int vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries);
+static int vsw_ldctx_pri(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count);
+static int vsw_ldctx(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count);
 
 /* Packet creation routines */
 static void vsw_send_ver(void *);
@@ -145,7 +152,7 @@ static dring_info_t *vsw_ident2dring(lane_t *, uint64_t);
 static int vsw_reclaim_dring(dring_info_t *dp, int start);
 
 static void vsw_set_lane_attr(vsw_t *, lane_t *);
-static int vsw_check_attr(vnet_attr_msg_t *, vsw_port_t *);
+static int vsw_check_attr(vnet_attr_msg_t *, vsw_ldc_t *);
 static int vsw_dring_match(dring_info_t *dp, vio_dring_reg_msg_t *msg);
 static int vsw_mem_cookie_match(ldc_mem_cookie_t *, ldc_mem_cookie_t *);
 static int vsw_check_dring_info(vio_dring_reg_msg_t *);
@@ -153,7 +160,6 @@ static int vsw_check_dring_info(vio_dring_reg_msg_t *);
 /* Rcv/Tx thread routines */
 static void vsw_stop_tx_thread(vsw_ldc_t *ldcp);
 static void vsw_ldc_tx_worker(void *arg);
-static uint_t vsw_rx_softintr(caddr_t arg1, caddr_t arg2);
 static void vsw_stop_rx_thread(vsw_ldc_t *ldcp);
 static void vsw_ldc_rx_worker(void *arg);
 
@@ -199,9 +205,10 @@ extern int vsw_desc_delay;
 extern int vsw_read_attempts;
 extern int vsw_ldc_tx_delay;
 extern int vsw_ldc_tx_retries;
-extern int vsw_ldc_tx_max_failures;
 extern boolean_t vsw_ldc_rxthr_enabled;
 extern boolean_t vsw_ldc_txthr_enabled;
+extern uint32_t vsw_ntxds;
+extern uint32_t vsw_max_tx_qcount;
 extern uint32_t vsw_chain_len;
 extern uint32_t vsw_mblk_size1;
 extern uint32_t vsw_mblk_size2;
@@ -209,7 +216,7 @@ extern uint32_t vsw_mblk_size3;
 extern uint32_t vsw_num_mblks1;
 extern uint32_t vsw_num_mblks2;
 extern uint32_t vsw_num_mblks3;
-
+extern boolean_t vsw_obp_ver_proto_workaround;
 
 #define	LDC_ENTER_LOCK(ldcp)	\
 				mutex_enter(&((ldcp)->ldc_cblock));\
@@ -220,9 +227,17 @@ extern uint32_t vsw_num_mblks3;
 				mutex_exit(&((ldcp)->ldc_rxlock));\
 				mutex_exit(&((ldcp)->ldc_cblock));
 
+#define	VSW_VER_EQ(ldcp, major, minor)	\
+	((ldcp)->lane_out.ver_major == (major) &&	\
+	    (ldcp)->lane_out.ver_minor == (minor))
+
+#define	VSW_VER_LT(ldcp, major, minor)	\
+	(((ldcp)->lane_out.ver_major < (major)) ||	\
+	    ((ldcp)->lane_out.ver_major == (major) &&	\
+	    (ldcp)->lane_out.ver_minor < (minor)))
 
 /* supported versions */
-static	ver_sup_t	vsw_versions[] = { {1, 0} };
+static	ver_sup_t	vsw_versions[] = { {1, 2} };
 
 /*
  * For the moment the state dump routines have their own
@@ -651,6 +666,12 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 		(void) ldc_fini(ldcp->ldc_handle);
 		goto ldc_attach_fail;
 	}
+	/*
+	 * allocate a message for ldc_read()s, big enough to hold ctrl and
+	 * data msgs, including raw data msgs used to recv priority frames.
+	 */
+	ldcp->msglen = VIO_PKT_DATA_HDRSIZE + ETHERMAX;
+	ldcp->ldcmsg = kmem_alloc(ldcp->msglen, KM_SLEEP);
 
 	progress |= PROG_callback;
 
@@ -665,6 +686,8 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	ldcp->ldc_status = istatus;
 	ldcp->ldc_port = port;
 	ldcp->ldc_vswp = vswp;
+
+	vsw_reset_vnet_proto_ops(ldcp);
 
 	(void) sprintf(kname, "%sldc0x%lx", DRV_NAME, ldcp->ldc_id);
 	ldcp->ksp = vgen_setup_kstats(DRV_NAME, vswp->instance,
@@ -688,6 +711,7 @@ ldc_attach_fail:
 
 	if (progress & PROG_callback) {
 		(void) ldc_unreg_callback(ldcp->ldc_handle);
+		kmem_free(ldcp->ldcmsg, ldcp->msglen);
 	}
 
 	if (progress & PROG_rx_thread) {
@@ -761,6 +785,7 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 		mutex_destroy(&ldcp->rx_thr_lock);
 		cv_destroy(&ldcp->rx_thr_cv);
 	}
+	kmem_free(ldcp->ldcmsg, ldcp->msglen);
 
 	/* Stop the tx thread */
 	if (ldcp->tx_thread != NULL) {
@@ -770,6 +795,7 @@ vsw_ldc_detach(vsw_port_t *port, uint64_t ldc_id)
 		if (ldcp->tx_mhead != NULL) {
 			freemsgchain(ldcp->tx_mhead);
 			ldcp->tx_mhead = ldcp->tx_mtail = NULL;
+			ldcp->tx_cnt = 0;
 		}
 	}
 
@@ -1325,7 +1351,8 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 	ldcp->session_status = 0;
 	ldcp->hcnt = 0;
 	ldcp->hphase = VSW_MILESTONE0;
-	ldcp->tx_failures = 0;
+
+	vsw_reset_vnet_proto_ops(ldcp);
 
 	D1(vswp, "%s: exit", __func__);
 }
@@ -1500,8 +1527,9 @@ vsw_conn_task(void *arg)
 			return;
 		}
 
-		if (ddi_taskq_dispatch(vswp->taskq_p, vsw_send_ver, ldcp,
-		    DDI_NOSLEEP) != DDI_SUCCESS) {
+		if (vsw_obp_ver_proto_workaround == B_FALSE &&
+		    (ddi_taskq_dispatch(vswp->taskq_p, vsw_send_ver, ldcp,
+		    DDI_NOSLEEP) != DDI_SUCCESS)) {
 			cmn_err(CE_WARN, "!vsw%d: Can't dispatch version task",
 			    vswp->instance);
 
@@ -1690,6 +1718,8 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 			D2(vswp, "%s: (chan %lld) leaving milestone 0",
 			    __func__, ldcp->ldc_id);
 
+			vsw_set_vnet_proto_ops(ldcp);
+
 			/*
 			 * Next milestone is passed when attribute
 			 * information has been successfully exchanged.
@@ -1715,8 +1745,13 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 			 * info, otherwise we just set up a private ring
 			 * which we use an internal buffer
 			 */
-			if (ldcp->lane_in.xfer_mode == VIO_DRING_MODE)
+			if ((VSW_VER_EQ(ldcp, 1, 2) &&
+			    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+			    (VSW_VER_LT(ldcp, 1, 2) &&
+			    (ldcp->lane_in.xfer_mode ==
+			    VIO_DRING_MODE_V1_0))) {
 				vsw_send_dring_info(ldcp);
+			}
 		}
 		break;
 
@@ -1730,9 +1765,14 @@ vsw_next_milestone(vsw_ldc_t *ldcp)
 		 * If peer is not using descriptor rings then just fall
 		 * through.
 		 */
-		if ((ldcp->lane_in.xfer_mode == VIO_DRING_MODE) &&
-		    (!(ldcp->lane_in.lstate & VSW_DRING_ACK_SENT)))
-			break;
+		if ((VSW_VER_EQ(ldcp, 1, 2) &&
+		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    (VSW_VER_LT(ldcp, 1, 2) &&
+		    (ldcp->lane_in.xfer_mode ==
+		    VIO_DRING_MODE_V1_0))) {
+			if (!(ldcp->lane_in.lstate & VSW_DRING_ACK_SENT))
+				break;
+		}
 
 		D2(vswp, "%s: (chan %lld) leaving milestone 2",
 		    __func__, ldcp->ldc_id);
@@ -1813,13 +1853,19 @@ vsw_supported_version(vio_ver_msg_t *vp)
 			return (0);
 		}
 
+		/*
+		 * If the message contains a higher major version number, set
+		 * the message's major/minor versions to the current values
+		 * and return false, so this message will get resent with
+		 * these values.
+		 */
 		if (vsw_versions[i].ver_major < vp->ver_major) {
-			if (vp->ver_minor > vsw_versions[i].ver_minor) {
-				D2(NULL, "%s: adjusting minor value from %d "
-				    "to %d", __func__, vp->ver_minor,
-				    vsw_versions[i].ver_minor);
-				vp->ver_minor = vsw_versions[i].ver_minor;
-			}
+			D2(NULL, "%s: adjusting major and minor "
+			    "values to %d, %d\n",
+			    __func__, vsw_versions[i].ver_major,
+			    vsw_versions[i].ver_minor);
+			vp->ver_major = vsw_versions[i].ver_major;
+			vp->ver_minor = vsw_versions[i].ver_minor;
 			return (1);
 		}
 	}
@@ -1834,6 +1880,60 @@ vsw_supported_version(vio_ver_msg_t *vp)
 }
 
 /*
+ * Set vnet-protocol-version dependent functions based on version.
+ */
+static void
+vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
+{
+	vsw_t	*vswp = ldcp->ldc_vswp;
+	lane_t	*lp = &ldcp->lane_out;
+
+	if (VSW_VER_EQ(ldcp, 1, 2)) {
+		/* Version 1.2 */
+
+		if (VSW_PRI_ETH_DEFINED(vswp)) {
+			/*
+			 * enable priority routines and pkt mode only if
+			 * at least one pri-eth-type is specified in MD.
+			 */
+			ldcp->tx = vsw_ldctx_pri;
+			ldcp->rx_pktdata = vsw_process_pkt_data;
+
+			/* set xfer mode for vsw_send_attr() */
+			lp->xfer_mode = VIO_PKT_MODE | VIO_DRING_MODE_V1_2;
+		} else {
+			/* no priority eth types defined in MD */
+
+			ldcp->tx = vsw_ldctx;
+			ldcp->rx_pktdata = vsw_process_pkt_data_nop;
+
+			/* set xfer mode for vsw_send_attr() */
+			lp->xfer_mode = VIO_DRING_MODE_V1_2;
+
+		}
+	} else {
+		/* Versions prior to 1.2  */
+
+		vsw_reset_vnet_proto_ops(ldcp);
+	}
+}
+
+/*
+ * Reset vnet-protocol-version dependent functions to v1.0.
+ */
+static void
+vsw_reset_vnet_proto_ops(vsw_ldc_t *ldcp)
+{
+	lane_t	*lp = &ldcp->lane_out;
+
+	ldcp->tx = vsw_ldctx;
+	ldcp->rx_pktdata = vsw_process_pkt_data_nop;
+
+	/* set xfer mode for vsw_send_attr() */
+	lp->xfer_mode = VIO_DRING_MODE_V1_0;
+}
+
+/*
  * Main routine for processing messages received over LDC.
  */
 static void
@@ -1842,8 +1942,8 @@ vsw_process_pkt(void *arg)
 	vsw_ldc_t	*ldcp = (vsw_ldc_t  *)arg;
 	vsw_t 		*vswp = ldcp->ldc_vswp;
 	size_t		msglen;
-	vio_msg_tag_t	tag;
-	def_msg_t	dmsg;
+	vio_msg_tag_t	*tagp;
+	uint64_t	*ldcmsg;
 	int 		rv = 0;
 
 
@@ -1851,12 +1951,13 @@ vsw_process_pkt(void *arg)
 
 	ASSERT(MUTEX_HELD(&ldcp->ldc_cblock));
 
+	ldcmsg = ldcp->ldcmsg;
 	/*
 	 * If channel is up read messages until channel is empty.
 	 */
 	do {
-		msglen = sizeof (dmsg);
-		rv = ldc_read(ldcp->ldc_handle, (caddr_t)&dmsg, &msglen);
+		msglen = ldcp->msglen;
+		rv = ldc_read(ldcp->ldc_handle, (caddr_t)ldcmsg, &msglen);
 
 		if (rv != 0) {
 			DERR(vswp, "%s :ldc_read err id(%lld) rv(%d) len(%d)\n",
@@ -1882,21 +1983,21 @@ vsw_process_pkt(void *arg)
 		 * Figure out what sort of packet we have gotten by
 		 * examining the msg tag, and then switch it appropriately.
 		 */
-		bcopy(&dmsg, &tag, sizeof (vio_msg_tag_t));
+		tagp = (vio_msg_tag_t *)ldcmsg;
 
-		switch (tag.vio_msgtype) {
+		switch (tagp->vio_msgtype) {
 		case VIO_TYPE_CTRL:
-			vsw_dispatch_ctrl_task(ldcp, &dmsg, tag);
+			vsw_dispatch_ctrl_task(ldcp, ldcmsg, tagp);
 			break;
 		case VIO_TYPE_DATA:
-			vsw_process_data_pkt(ldcp, &dmsg, tag);
+			vsw_process_data_pkt(ldcp, ldcmsg, tagp, msglen);
 			break;
 		case VIO_TYPE_ERR:
-			vsw_process_err_pkt(ldcp, &dmsg, tag);
+			vsw_process_err_pkt(ldcp, ldcmsg, tagp);
 			break;
 		default:
 			DERR(vswp, "%s: Unknown tag(%lx) ", __func__,
-			    "id(%lx)\n", tag.vio_msgtype, ldcp->ldc_id);
+			    "id(%lx)\n", tagp->vio_msgtype, ldcp->ldc_id);
 			break;
 		}
 	} while (msglen);
@@ -1908,7 +2009,7 @@ vsw_process_pkt(void *arg)
  * Dispatch a task to process a VIO control message.
  */
 static void
-vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
+vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp)
 {
 	vsw_ctrl_task_t		*ctaskp = NULL;
 	vsw_port_t		*port = ldcp->ldc_port;
@@ -1921,8 +2022,8 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t tag)
 	 * are exchanged it is possible that we will get an
 	 * immediate (legitimate) data packet.
 	 */
-	if ((tag.vio_subtype_env == VIO_RDX) &&
-	    (tag.vio_subtype == VIO_SUBTYPE_ACK)) {
+	if ((tagp->vio_subtype_env == VIO_RDX) &&
+	    (tagp->vio_subtype == VIO_SUBTYPE_ACK)) {
 
 		if (vsw_check_flag(ldcp, INBOUND, VSW_RDX_ACK_RECV))
 			return;
@@ -2136,6 +2237,23 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			ver_pkt->tag.vio_subtype = VIO_SUBTYPE_ACK;
 
 			ldcp->lane_in.lstate |= VSW_VER_ACK_SENT;
+
+			if (vsw_obp_ver_proto_workaround == B_TRUE) {
+				/*
+				 * Send a version info message
+				 * using the accepted version that
+				 * we are about to ack. Also note that
+				 * we send our ver info before we ack.
+				 * Otherwise, as soon as receiving the
+				 * ack, obp sends attr info msg, which
+				 * breaks vsw_check_flag() invoked
+				 * from vsw_process_ctrl_attr_pkt();
+				 * as we also need VSW_VER_ACK_RECV to
+				 * be set in lane_out.lstate, before
+				 * we can receive attr info.
+				 */
+				vsw_send_ver(ldcp);
+			}
 		} else {
 			/*
 			 * NACK back with the next lower major/minor
@@ -2170,8 +2288,8 @@ vsw_process_ctrl_ver_pkt(vsw_ldc_t *ldcp, void *pkt)
 			return;
 
 		/* Store updated values */
-		ldcp->lane_in.ver_major = ver_pkt->ver_major;
-		ldcp->lane_in.ver_minor = ver_pkt->ver_minor;
+		ldcp->lane_out.ver_major = ver_pkt->ver_major;
+		ldcp->lane_out.ver_minor = ver_pkt->ver_minor;
 
 		ldcp->lane_out.lstate |= VSW_VER_ACK_RECV;
 		vsw_next_milestone(ldcp);
@@ -2284,7 +2402,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/*
 		 * If the attributes are unacceptable then we NACK back.
 		 */
-		if (vsw_check_attr(attr_pkt, ldcp->ldc_port)) {
+		if (vsw_check_attr(attr_pkt, ldcp)) {
 
 			DERR(vswp, "%s (chan %d): invalid attributes",
 			    __func__, ldcp->ldc_id);
@@ -2324,10 +2442,12 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		/* setup device specifc xmit routines */
 		mutex_enter(&port->tx_lock);
-		if (ldcp->lane_in.xfer_mode == VIO_DRING_MODE) {
+		if ((VSW_VER_EQ(ldcp, 1, 2) &&
+		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    (VSW_VER_LT(ldcp, 1, 2) &&
+		    (ldcp->lane_in.xfer_mode == VIO_DRING_MODE_V1_0))) {
 			D2(vswp, "%s: mode = VIO_DRING_MODE", __func__);
 			port->transmit = vsw_dringsend;
-			ldcp->lane_out.xfer_mode = VIO_DRING_MODE;
 		} else if (ldcp->lane_in.xfer_mode == VIO_DESC_MODE) {
 			D2(vswp, "%s: mode = VIO_DESC_MODE", __func__);
 			vsw_create_privring(ldcp);
@@ -2852,18 +2972,19 @@ vsw_process_ctrl_rdx_pkt(vsw_ldc_t *ldcp, void *pkt)
 }
 
 static void
-vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
+vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t *tagp,
+	uint32_t msglen)
 {
-	uint16_t	env = tag.vio_subtype_env;
+	uint16_t	env = tagp->vio_subtype_env;
 	vsw_t		*vswp = ldcp->ldc_vswp;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
 	/* session id check */
 	if (ldcp->session_status & VSW_PEER_SESSION) {
-		if (ldcp->peer_session != tag.vio_sid) {
+		if (ldcp->peer_session != tagp->vio_sid) {
 			DERR(vswp, "%s (chan %d): invalid session id (%llx)",
-			    __func__, ldcp->ldc_id, tag.vio_sid);
+			    __func__, ldcp->ldc_id, tagp->vio_sid);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
 			return;
 		}
@@ -2898,7 +3019,7 @@ vsw_process_data_pkt(vsw_ldc_t *ldcp, void *dpkt, vio_msg_tag_t tag)
 	if (env == VIO_DRING_DATA) {
 		vsw_process_data_dring_pkt(ldcp, dpkt);
 	} else if (env == VIO_PKT_DATA) {
-		vsw_process_data_raw_pkt(ldcp, dpkt);
+		ldcp->rx_pktdata(ldcp, dpkt, msglen);
 	} else if (env == VIO_DESC_DATA) {
 		vsw_process_data_ibnd_pkt(ldcp, dpkt);
 	} else {
@@ -3340,9 +3461,6 @@ vsw_recheck_desc:
 				dring_pkt->tag.vio_subtype = VIO_SUBTYPE_INFO;
 				dring_pkt->tag.vio_sid = ldcp->local_session;
 
-				dring_pkt->seq_num =
-				    atomic_inc_64_nv(&ldcp->lane_out.seq_num);
-
 				dring_pkt->start_idx = (end + 1) % len;
 				dring_pkt->end_idx = -1;
 
@@ -3388,18 +3506,60 @@ vsw_recheck_desc:
 }
 
 /*
- * VIO_PKT_DATA (a.k.a raw data mode )
- *
- * Note - currently not supported. Do nothing.
+ * dummy pkt data handler function for vnet protocol version 1.0
  */
 static void
-vsw_process_data_raw_pkt(vsw_ldc_t *ldcp, void *dpkt)
+vsw_process_pkt_data_nop(void *arg1, void *arg2, uint32_t msglen)
 {
-	_NOTE(ARGUNUSED(dpkt))
+	_NOTE(ARGUNUSED(arg1, arg2, msglen))
+}
 
-	D1(NULL, "%s (%lld): enter\n", __func__, ldcp->ldc_id);
-	DERR(NULL, "%s (%lld): currently unsupported", __func__, ldcp->ldc_id);
-	D1(NULL, "%s (%lld): exit\n", __func__, ldcp->ldc_id);
+/*
+ * This function handles raw pkt data messages received over the channel.
+ * Currently, only priority-eth-type frames are received through this mechanism.
+ * In this case, the frame(data) is present within the message itself which
+ * is copied into an mblk before switching it.
+ */
+static void
+vsw_process_pkt_data(void *arg1, void *arg2, uint32_t msglen)
+{
+	vsw_ldc_t		*ldcp = (vsw_ldc_t *)arg1;
+	vio_raw_data_msg_t	*dpkt = (vio_raw_data_msg_t *)arg2;
+	uint32_t		size;
+	mblk_t			*mp;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+	vgen_stats_t		*statsp = &ldcp->ldc_stats;
+
+	size = msglen - VIO_PKT_DATA_HDRSIZE;
+	if (size < ETHERMIN || size > ETHERMAX) {
+		(void) atomic_inc_32(&statsp->rx_pri_fail);
+		DWARN(vswp, "%s(%lld) invalid size(%d)\n", __func__,
+		    ldcp->ldc_id, size);
+		return;
+	}
+
+	mp = vio_multipool_allocb(&ldcp->vmp, size);
+	if (mp == NULL) {
+		mp = allocb(size, BPRI_MED);
+		if (mp == NULL) {
+			(void) atomic_inc_32(&statsp->rx_pri_fail);
+			DWARN(vswp, "%s(%lld) allocb failure, "
+			    "unable to process priority frame\n", __func__,
+			    ldcp->ldc_id);
+			return;
+		}
+	}
+
+	/* copy the frame from the payload of raw data msg into the mblk */
+	bcopy(dpkt->data, mp->b_rptr, size);
+	mp->b_wptr = mp->b_rptr + size;
+
+	/* update stats */
+	(void) atomic_inc_64(&statsp->rx_pri_packets);
+	(void) atomic_add_64(&statsp->rx_pri_bytes, size);
+
+	/* switch the frame to destination */
+	vswp->vsw_switch_frame(vswp, mp, VSW_VNETPORT, ldcp->ldc_port, NULL);
 }
 
 /*
@@ -3504,7 +3664,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* Verify the ACK is valid */
 		idx = ibnd_desc->hdr.desc_handle;
 
-		if (idx >= VSW_RING_NUM_EL) {
+		if (idx >= vsw_ntxds) {
 			cmn_err(CE_WARN, "!vsw%d: corrupted ACK received "
 			    "(idx %ld)", vswp->instance, idx);
 			return;
@@ -3579,7 +3739,7 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* limit check */
 		idx = ibnd_desc->hdr.desc_handle;
 
-		if (idx >= VSW_RING_NUM_EL) {
+		if (idx >= vsw_ntxds) {
 			DERR(vswp, "%s: corrupted NACK received (idx %lld)",
 			    __func__, idx);
 			return;
@@ -3612,12 +3772,12 @@ vsw_process_data_ibnd_pkt(vsw_ldc_t *ldcp, void *pkt)
 }
 
 static void
-vsw_process_err_pkt(vsw_ldc_t *ldcp, void *epkt, vio_msg_tag_t tag)
+vsw_process_err_pkt(vsw_ldc_t *ldcp, void *epkt, vio_msg_tag_t *tagp)
 {
 	_NOTE(ARGUNUSED(epkt))
 
 	vsw_t		*vswp = ldcp->ldc_vswp;
-	uint16_t	env = tag.vio_subtype_env;
+	uint16_t	env = tagp->vio_subtype_env;
 
 	D1(vswp, "%s (%lld): enter\n", __func__, ldcp->ldc_id);
 
@@ -3632,11 +3792,10 @@ vsw_process_err_pkt(vsw_ldc_t *ldcp, void *epkt, vio_msg_tag_t tag)
 
 /* transmit the packet over the given port */
 int
-vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
+vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count)
 {
 	vsw_ldc_list_t 	*ldcl = &port->p_ldclist;
 	vsw_ldc_t 	*ldcp;
-	mblk_t		*tmp;
 	int		status = 0;
 
 	READ_ENTER(&ldcl->lockrw);
@@ -3651,12 +3810,163 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
 		return (1);
 	}
 
+	status = ldcp->tx(ldcp, mp, mpt, count);
+
+	RW_EXIT(&ldcl->lockrw);
+
+	return (status);
+}
+
+/*
+ * Break up frames into 2 seperate chains: normal and
+ * priority, based on the frame type. The number of
+ * priority frames is also counted and returned.
+ *
+ * Params:
+ * 	vswp:	pointer to the instance of vsw
+ *	np:	head of packet chain to be broken
+ *	npt:	tail of packet chain to be broken
+ *
+ * Returns:
+ *	np:	head of normal data packets
+ *	npt:	tail of normal data packets
+ *	hp:	head of high priority packets
+ *	hpt:	tail of high priority packets
+ */
+static uint32_t
+vsw_get_pri_packets(vsw_t *vswp, mblk_t **np, mblk_t **npt,
+	mblk_t **hp, mblk_t **hpt)
+{
+	mblk_t			*tmp = NULL;
+	mblk_t			*smp = NULL;
+	mblk_t			*hmp = NULL;	/* high prio pkts head */
+	mblk_t			*hmpt = NULL;	/* high prio pkts tail */
+	mblk_t			*nmp = NULL;	/* normal pkts head */
+	mblk_t			*nmpt = NULL;	/* normal pkts tail */
+	uint32_t		count = 0;
+	int			i;
+	struct ether_header	*ehp;
+	uint32_t		num_types;
+	uint16_t		*types;
+
+	tmp = *np;
+	while (tmp != NULL) {
+
+		smp = tmp;
+		tmp = tmp->b_next;
+		smp->b_next = NULL;
+		smp->b_prev = NULL;
+
+		ehp = (struct ether_header *)smp->b_rptr;
+		num_types = vswp->pri_num_types;
+		types = vswp->pri_types;
+		for (i = 0; i < num_types; i++) {
+			if (ehp->ether_type == types[i]) {
+				/* high priority frame */
+
+				if (hmp != NULL) {
+					hmpt->b_next = smp;
+					hmpt = smp;
+				} else {
+					hmp = hmpt = smp;
+				}
+				count++;
+				break;
+			}
+		}
+		if (i == num_types) {
+			/* normal data frame */
+
+			if (nmp != NULL) {
+				nmpt->b_next = smp;
+				nmpt = smp;
+			} else {
+				nmp = nmpt = smp;
+			}
+		}
+	}
+
+	*hp = hmp;
+	*hpt = hmpt;
+	*np = nmp;
+	*npt = nmpt;
+
+	return (count);
+}
+
+/*
+ * Wrapper function to transmit normal and/or priority frames over the channel.
+ */
+static int
+vsw_ldctx_pri(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count)
+{
+	vsw_ldc_t 		*ldcp = (vsw_ldc_t *)arg;
+	mblk_t			*tmp;
+	mblk_t			*smp;
+	mblk_t			*hmp;	/* high prio pkts head */
+	mblk_t			*hmpt;	/* high prio pkts tail */
+	mblk_t			*nmp;	/* normal pkts head */
+	mblk_t			*nmpt;	/* normal pkts tail */
+	uint32_t		n = 0;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+
+	ASSERT(VSW_PRI_ETH_DEFINED(vswp));
+	ASSERT(count != 0);
+
+	nmp = mp;
+	nmpt = mpt;
+
+	/* gather any priority frames from the chain of packets */
+	n = vsw_get_pri_packets(vswp, &nmp, &nmpt, &hmp, &hmpt);
+
+	/* transmit priority frames */
+	tmp = hmp;
+	while (tmp != NULL) {
+		smp = tmp;
+		tmp = tmp->b_next;
+		smp->b_next = NULL;
+		vsw_ldcsend_pkt(ldcp, smp);
+	}
+
+	count -= n;
+
+	if (count == 0) {
+		/* no normal data frames to process */
+		return (0);
+	}
+
+	return (vsw_ldctx(ldcp, nmp, nmpt, count));
+}
+
+/*
+ * Wrapper function to transmit normal frames over the channel.
+ */
+static int
+vsw_ldctx(void *arg, mblk_t *mp, mblk_t *mpt, uint32_t count)
+{
+	vsw_ldc_t 	*ldcp = (vsw_ldc_t *)arg;
+	mblk_t		*tmp = NULL;
+
+	ASSERT(count != 0);
 	/*
-	 * If the TX thread is enabled, then queue the packets
-	 * and signal the tx thread.
+	 * If the TX thread is enabled, then queue the
+	 * ordinary frames and signal the tx thread.
 	 */
 	if (ldcp->tx_thread != NULL) {
+
 		mutex_enter(&ldcp->tx_thr_lock);
+
+		if ((ldcp->tx_cnt + count) >= vsw_max_tx_qcount) {
+			/*
+			 * If we reached queue limit,
+			 * do not queue new packets,
+			 * drop them.
+			 */
+			ldcp->ldc_stats.tx_qfull += count;
+			mutex_exit(&ldcp->tx_thr_lock);
+			freemsgchain(mp);
+			goto exit;
+		}
 		if (ldcp->tx_mhead == NULL) {
 			ldcp->tx_mhead = mp;
 			ldcp->tx_mtail = mpt;
@@ -3665,6 +3975,7 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
 			ldcp->tx_mtail->b_next = mp;
 			ldcp->tx_mtail = mpt;
 		}
+		ldcp->tx_cnt += count;
 		mutex_exit(&ldcp->tx_thr_lock);
 	} else {
 		while (mp != NULL) {
@@ -3675,9 +3986,93 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
 		}
 	}
 
-	RW_EXIT(&ldcl->lockrw);
+exit:
+	return (0);
+}
 
-	return (status);
+/*
+ * This function transmits the frame in the payload of a raw data
+ * (VIO_PKT_DATA) message. Thus, it provides an Out-Of-Band path to
+ * send special frames with high priorities, without going through
+ * the normal data path which uses descriptor ring mechanism.
+ */
+static void
+vsw_ldcsend_pkt(vsw_ldc_t *ldcp, mblk_t *mp)
+{
+	vio_raw_data_msg_t	*pkt;
+	mblk_t			*bp;
+	mblk_t			*nmp = NULL;
+	caddr_t			dst;
+	uint32_t		mblksz;
+	uint32_t		size;
+	uint32_t		nbytes;
+	int			rv;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+	vgen_stats_t		*statsp = &ldcp->ldc_stats;
+
+	if ((!(ldcp->lane_out.lstate & VSW_LANE_ACTIVE)) ||
+	    (ldcp->ldc_status != LDC_UP) || (ldcp->ldc_handle == NULL)) {
+		(void) atomic_inc_32(&statsp->tx_pri_fail);
+		DWARN(vswp, "%s(%lld) status(%d) lstate(0x%llx), dropping "
+		    "packet\n", __func__, ldcp->ldc_id, ldcp->ldc_status,
+		    ldcp->lane_out.lstate);
+		goto send_pkt_exit;
+	}
+
+	size = msgsize(mp);
+
+	/* frame size bigger than available payload len of raw data msg ? */
+	if (size > (size_t)(ldcp->msglen - VIO_PKT_DATA_HDRSIZE)) {
+		(void) atomic_inc_32(&statsp->tx_pri_fail);
+		DWARN(vswp, "%s(%lld) invalid size(%d)\n", __func__,
+		    ldcp->ldc_id, size);
+		goto send_pkt_exit;
+	}
+
+	if (size < ETHERMIN)
+		size = ETHERMIN;
+
+	/* alloc space for a raw data message */
+	nmp = vio_allocb(vswp->pri_tx_vmp);
+	if (nmp == NULL) {
+		(void) atomic_inc_32(&statsp->tx_pri_fail);
+		DWARN(vswp, "vio_allocb failed\n");
+		goto send_pkt_exit;
+	}
+	pkt = (vio_raw_data_msg_t *)nmp->b_rptr;
+
+	/* copy frame into the payload of raw data message */
+	dst = (caddr_t)pkt->data;
+	for (bp = mp; bp != NULL; bp = bp->b_cont) {
+		mblksz = MBLKL(bp);
+		bcopy(bp->b_rptr, dst, mblksz);
+		dst += mblksz;
+	}
+
+	/* setup the raw data msg */
+	pkt->tag.vio_msgtype = VIO_TYPE_DATA;
+	pkt->tag.vio_subtype = VIO_SUBTYPE_INFO;
+	pkt->tag.vio_subtype_env = VIO_PKT_DATA;
+	pkt->tag.vio_sid = ldcp->local_session;
+	nbytes = VIO_PKT_DATA_HDRSIZE + size;
+
+	/* send the msg over ldc */
+	rv = vsw_send_msg(ldcp, (void *)pkt, nbytes, B_TRUE);
+	if (rv != 0) {
+		(void) atomic_inc_32(&statsp->tx_pri_fail);
+		DWARN(vswp, "%s(%lld) Error sending priority frame\n", __func__,
+		    ldcp->ldc_id);
+		goto send_pkt_exit;
+	}
+
+	/* update stats */
+	(void) atomic_inc_64(&statsp->tx_pri_packets);
+	(void) atomic_add_64(&statsp->tx_pri_packets, size);
+
+send_pkt_exit:
+	if (nmp != NULL)
+		freemsg(nmp);
+	freemsg(mp);
 }
 
 /*
@@ -3687,15 +4082,9 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt)
  * is retried before it is dropped. Note, the retry is done
  * only for a resource related failure, for all other failures
  * the packet is dropped immediately.
- *
- * The 'tx_failure' counter is used as mechanism to track
- * continuous failures. Once these failures are more than
- * 'vsw_ldc_tx_max_failures' tunable, the packets are tried only
- * once and then they are dropped. This is done to avoid
- * buffering too many packets.
  */
 static int
-vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, int retries)
+vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, uint32_t retries)
 {
 	int i;
 	int rc;
@@ -3715,19 +4104,8 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, int retries)
 			status = (*port->transmit)(ldcp, mp);
 		}
 		if (status == LDC_TX_SUCCESS) {
-			ldcp->tx_failures = 0;
 			mutex_exit(&port->tx_lock);
 			break;
-		} else if (ldcp->tx_failures > vsw_ldc_tx_max_failures) {
-			/*
-			 * If the failures crossed the threshold then
-			 * break here.
-			 */
-			ldcp->ldc_stats.oerrors++;
-			mutex_exit(&port->tx_lock);
-			break;
-		} else {
-			ldcp->tx_failures++;
 		}
 		i++;	/* increment the counter here */
 
@@ -3746,7 +4124,10 @@ vsw_ldcsend(vsw_ldc_t *ldcp, mblk_t *mp, int retries)
 		}
 		READ_ENTER(&ldcp->lane_out.dlistrw);
 		if (((dp = ldcp->lane_out.dringp) != NULL) &&
-		    (ldcp->lane_out.xfer_mode == VIO_DRING_MODE)) {
+		    ((VSW_VER_EQ(ldcp, 1, 2) &&
+		    (ldcp->lane_out.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    ((VSW_VER_LT(ldcp, 1, 2) &&
+		    (ldcp->lane_out.xfer_mode == VIO_DRING_MODE_V1_0))))) {
 			rc = vsw_reclaim_dring(dp, dp->end_idx);
 		} else {
 			/*
@@ -3889,7 +4270,6 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 		/* Note - for now using first ring */
 		dring_pkt.dring_ident = dp->ident;
-		dring_pkt.seq_num = atomic_inc_64_nv(&ldcp->lane_out.seq_num);
 
 		/*
 		 * If last_ack_recv is -1 then we know we've not
@@ -3908,9 +4288,9 @@ vsw_dringsend(vsw_ldc_t *ldcp, mblk_t *mp)
 
 		D3(vswp, "%s(%lld): dring 0x%llx : ident 0x%llx\n", __func__,
 		    ldcp->ldc_id, dp, dring_pkt.dring_ident);
-		D3(vswp, "%s(%lld): start %lld : end %lld : seq %lld\n",
+		D3(vswp, "%s(%lld): start %lld : end %lld :\n",
 		    __func__, ldcp->ldc_id, dring_pkt.start_idx,
-		    dring_pkt.end_idx, dring_pkt.seq_num);
+		    dring_pkt.end_idx);
 
 		RW_EXIT(&ldcp->lane_out.dlistrw);
 
@@ -4023,8 +4403,6 @@ vsw_descrsend(vsw_ldc_t *ldcp, mblk_t *mp)
 	ibnd_msg.hdr.tag.vio_subtype_env = VIO_DESC_DATA;
 	ibnd_msg.hdr.tag.vio_sid = ldcp->local_session;
 
-	ibnd_msg.hdr.seq_num = atomic_inc_64_nv(&ldcp->lane_out.seq_num);
-
 	/*
 	 * Copy the mem cookies describing the data from the
 	 * private region of the descriptor ring into the inband
@@ -4068,8 +4446,15 @@ vsw_send_ver(void *arg)
 	ver_msg.tag.vio_subtype_env = VIO_VER_INFO;
 	ver_msg.tag.vio_sid = ldcp->local_session;
 
-	ver_msg.ver_major = vsw_versions[0].ver_major;
-	ver_msg.ver_minor = vsw_versions[0].ver_minor;
+	if (vsw_obp_ver_proto_workaround == B_FALSE) {
+		ver_msg.ver_major = vsw_versions[0].ver_major;
+		ver_msg.ver_minor = vsw_versions[0].ver_minor;
+	} else {
+		/* use the major,minor that we've ack'd */
+		lane_t	*lpi = &ldcp->lane_in;
+		ver_msg.ver_major = lpi->ver_major;
+		ver_msg.ver_minor = lpi->ver_minor;
+	}
 	ver_msg.dev_class = VDEV_NETWORK_SWITCH;
 
 	lp->lstate |= VSW_VER_INFO_SENT;
@@ -4220,10 +4605,14 @@ vsw_send_rdx(vsw_ldc_t *ldcp)
 static int
 vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 {
-	int		rv;
-	size_t		msglen = size;
-	vio_msg_tag_t	*tag = (vio_msg_tag_t *)msgp;
-	vsw_t		*vswp = ldcp->ldc_vswp;
+	int			rv;
+	size_t			msglen = size;
+	vio_msg_tag_t		*tag = (vio_msg_tag_t *)msgp;
+	vsw_t			*vswp = ldcp->ldc_vswp;
+	vio_dring_msg_t		*dmsg;
+	vio_raw_data_msg_t	*rmsg;
+	vnet_ibnd_desc_t	*imsg;
+	boolean_t		data_msg = B_FALSE;
 
 	D1(vswp, "vsw_send_msg (%lld) enter : sending %d bytes",
 	    ldcp->ldc_id, size);
@@ -4233,16 +4622,38 @@ vsw_send_msg(vsw_ldc_t *ldcp, void *msgp, int size, boolean_t handle_reset)
 	D2(vswp, "send_msg: senv 0x%llx", tag->vio_subtype_env);
 
 	mutex_enter(&ldcp->ldc_txlock);
+
+	if (tag->vio_subtype == VIO_SUBTYPE_INFO) {
+		if (tag->vio_subtype_env == VIO_DRING_DATA) {
+			dmsg = (vio_dring_msg_t *)tag;
+			dmsg->seq_num = ldcp->lane_out.seq_num;
+			data_msg = B_TRUE;
+		} else if (tag->vio_subtype_env == VIO_PKT_DATA) {
+			rmsg = (vio_raw_data_msg_t *)tag;
+			rmsg->seq_num = ldcp->lane_out.seq_num;
+			data_msg = B_TRUE;
+		} else if (tag->vio_subtype_env == VIO_DESC_DATA) {
+			imsg = (vnet_ibnd_desc_t *)tag;
+			imsg->hdr.seq_num = ldcp->lane_out.seq_num;
+			data_msg = B_TRUE;
+		}
+	}
+
 	do {
 		msglen = size;
 		rv = ldc_write(ldcp->ldc_handle, (caddr_t)msgp, &msglen);
 	} while (rv == EWOULDBLOCK && --vsw_wretries > 0);
+
+	if (rv == 0 && data_msg == B_TRUE) {
+		ldcp->lane_out.seq_num++;
+	}
 
 	if ((rv != 0) || (msglen != size)) {
 		DERR(vswp, "vsw_send_msg:ldc_write failed: chan(%lld) rv(%d) "
 		    "size (%d) msglen(%d)\n", ldcp->ldc_id, rv, size, msglen);
 		ldcp->ldc_stats.oerrors++;
 	}
+
 	mutex_exit(&ldcp->ldc_txlock);
 
 	/*
@@ -4340,7 +4751,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 	mutex_init(&dp->dlock, NULL, MUTEX_DRIVER, NULL);
 
 	/* create public section of ring */
-	if ((ldc_mem_dring_create(VSW_RING_NUM_EL,
+	if ((ldc_mem_dring_create(vsw_ntxds,
 	    VSW_PUB_SIZE, &dp->handle)) != 0) {
 
 		DERR(vswp, "vsw_create_dring(%lld): ldc dring create "
@@ -4362,7 +4773,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 		dp->pub_addr = minfo.vaddr;
 	}
 
-	dp->num_descriptors = VSW_RING_NUM_EL;
+	dp->num_descriptors = vsw_ntxds;
 	dp->descriptor_size = VSW_PUB_SIZE;
 	dp->options = VIO_TX_DRING;
 	dp->ncookies = 1;	/* guaranteed by ldc */
@@ -4371,7 +4782,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 	 * create private portion of ring
 	 */
 	dp->priv_addr = (vsw_private_desc_t *)kmem_zalloc(
-	    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL), KM_SLEEP);
+	    (sizeof (vsw_private_desc_t) * vsw_ntxds), KM_SLEEP);
 
 	if (vsw_setup_ring(ldcp, dp)) {
 		DERR(vswp, "%s: unable to setup ring", __func__);
@@ -4419,14 +4830,14 @@ dring_fail_exit:
 create_fail_exit:
 	if (dp->priv_addr != NULL) {
 		priv_addr = dp->priv_addr;
-		for (i = 0; i < VSW_RING_NUM_EL; i++) {
+		for (i = 0; i < vsw_ntxds; i++) {
 			if (priv_addr->memhandle != NULL)
 				(void) ldc_mem_free_handle(
 				    priv_addr->memhandle);
 			priv_addr++;
 		}
 		kmem_free(dp->priv_addr,
-		    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
+		    (sizeof (vsw_private_desc_t) * vsw_ntxds));
 	}
 	mutex_destroy(&dp->dlock);
 
@@ -4457,14 +4868,14 @@ vsw_create_privring(vsw_ldc_t *ldcp)
 	dp->pub_addr = NULL;
 
 	dp->priv_addr = kmem_zalloc(
-	    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL), KM_SLEEP);
+	    (sizeof (vsw_private_desc_t) * vsw_ntxds), KM_SLEEP);
 
-	dp->num_descriptors = VSW_RING_NUM_EL;
+	dp->num_descriptors = vsw_ntxds;
 
 	if (vsw_setup_ring(ldcp, dp)) {
 		DERR(vswp, "%s: setup of ring failed", __func__);
 		kmem_free(dp->priv_addr,
-		    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
+		    (sizeof (vsw_private_desc_t) * vsw_ntxds));
 		mutex_destroy(&dp->dlock);
 		kmem_free(dp, sizeof (dring_info_t));
 		return;
@@ -4522,7 +4933,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * Allocate the region of memory which will be used to hold
 	 * the data the descriptors will refer to.
 	 */
-	dp->data_sz = (VSW_RING_NUM_EL * VSW_RING_EL_DATA_SZ);
+	dp->data_sz = (vsw_ntxds * VSW_RING_EL_DATA_SZ);
 	dp->data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
 
 	D2(vswp, "%s: allocated %lld bytes at 0x%llx\n", name,
@@ -4535,7 +4946,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * Initialise some of the private and public (if they exist)
 	 * descriptor fields.
 	 */
-	for (i = 0; i < VSW_RING_NUM_EL; i++) {
+	for (i = 0; i < vsw_ntxds; i++) {
 		mutex_init(&priv_addr->dstate_lock, NULL, MUTEX_DRIVER, NULL);
 
 		if ((ldc_mem_alloc_handle(ldcp->ldc_handle,
@@ -4645,7 +5056,7 @@ vsw_dring_find_free_desc(dring_info_t *dringp,
 		vsw_private_desc_t **priv_p, int *idx)
 {
 	vsw_private_desc_t	*addr = NULL;
-	int			num = VSW_RING_NUM_EL;
+	int			num = vsw_ntxds;
 	int			ret = 1;
 
 	D1(NULL, "%s enter\n", __func__);
@@ -4722,14 +5133,9 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
 
 	lp->mtu = VSW_MTU;
 	lp->addr_type = ADDR_TYPE_MAC;
-	lp->xfer_mode = VIO_DRING_MODE;
+	lp->xfer_mode = VIO_DRING_MODE_V1_0;
 	lp->ack_freq = 0;	/* for shared mode */
-
-	/*
-	 * As the seq_num is incremented before sending,
-	 * initialize it with VNET_ISS - 1.
-	 */
-	atomic_swap_64(&lp->seq_num, (VNET_ISS - 1));
+	lp->seq_num = VNET_ISS;
 }
 
 /*
@@ -4739,19 +5145,18 @@ vsw_set_lane_attr(vsw_t *vswp, lane_t *lp)
  * our desired values.
  */
 static int
-vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
+vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 {
 	int			ret = 0;
 	struct ether_addr	ea;
+	vsw_port_t		*port = ldcp->ldc_port;
+	lane_t			*lp = &ldcp->lane_out;
+
 
 	D1(NULL, "vsw_check_attr enter\n");
 
-	/*
-	 * Note we currently only support in-band descriptors
-	 * and descriptor rings, not packet based transfer (VIO_PKT_MODE)
-	 */
 	if ((pkt->xfer_mode != VIO_DESC_MODE) &&
-	    (pkt->xfer_mode != VIO_DRING_MODE)) {
+	    (pkt->xfer_mode != lp->xfer_mode)) {
 		D2(NULL, "vsw_check_attr: unknown mode %x\n", pkt->xfer_mode);
 		ret = 1;
 	}
@@ -4780,11 +5185,15 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_port_t *port)
 	 * mode the ring descriptors say whether or not to
 	 * send back an ACK.
 	 */
-	if ((pkt->xfer_mode == VIO_DRING_MODE) &&
-	    (pkt->ack_freq > 0)) {
-		D2(NULL, "vsw_check_attr: non zero ack freq "
-		    " in SHM mode\n");
-		ret = 1;
+	if ((VSW_VER_EQ(ldcp, 1, 2) &&
+	    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+	    (VSW_VER_LT(ldcp, 1, 2) &&
+	    (ldcp->lane_in.xfer_mode == VIO_DRING_MODE_V1_0))) {
+		if (pkt->ack_freq > 0) {
+			D2(NULL, "vsw_check_attr: non zero ack freq "
+			    " in SHM mode\n");
+			ret = 1;
+		}
 	}
 
 	/*
@@ -4892,12 +5301,7 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 	}
 
 	lp->lstate = VSW_LANE_INACTIV;
-
-	/*
-	 * As the seq_num is incremented before sending,
-	 * initialize it with VNET_ISS - 1.
-	 */
-	atomic_swap_64(&lp->seq_num, (VNET_ISS - 1));
+	lp->seq_num = VNET_ISS;
 
 	if (lp->dringp) {
 		if (dir == INBOUND) {
@@ -4948,7 +5352,7 @@ vsw_free_ring(dring_info_t *dp)
 			 * First unbind and free the memory handles
 			 * stored in each descriptor within the ring.
 			 */
-			for (i = 0; i < VSW_RING_NUM_EL; i++) {
+			for (i = 0; i < vsw_ntxds; i++) {
 				paddr = (vsw_private_desc_t *)
 				    dp->priv_addr + i;
 				if (paddr->memhandle != NULL) {
@@ -4981,7 +5385,7 @@ vsw_free_ring(dring_info_t *dp)
 				mutex_destroy(&paddr->dstate_lock);
 			}
 			kmem_free(dp->priv_addr,
-			    (sizeof (vsw_private_desc_t) * VSW_RING_NUM_EL));
+			    (sizeof (vsw_private_desc_t) * vsw_ntxds));
 		}
 
 		/*
@@ -5131,6 +5535,7 @@ vsw_ldc_tx_worker(void *arg)
 		}
 		mp = ldcp->tx_mhead;
 		ldcp->tx_mhead = ldcp->tx_mtail = NULL;
+		ldcp->tx_cnt = 0;
 		mutex_exit(&ldcp->tx_thr_lock);
 		D2(vswp, "%s(%lld):calling vsw_ldcsend\n",
 		    __func__, ldcp->ldc_id);
@@ -5296,7 +5701,7 @@ display_ring(dring_info_t *dringp)
 	vnet_public_desc_t	*pub_addr = NULL;
 	vsw_private_desc_t	*priv_addr = NULL;
 
-	for (i = 0; i < VSW_RING_NUM_EL; i++) {
+	for (i = 0; i < vsw_ntxds; i++) {
 		if (dringp->pub_addr != NULL) {
 			pub_addr = (vnet_public_desc_t *)dringp->pub_addr + i;
 

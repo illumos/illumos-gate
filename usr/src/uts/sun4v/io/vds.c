@@ -127,7 +127,7 @@
 /* Return the virtual disk client's type as a string (for use in messages) */
 #define	VD_CLIENT(vd)							\
 	(((vd)->xfer_mode == VIO_DESC_MODE) ? "in-band client" :	\
-	    (((vd)->xfer_mode == VIO_DRING_MODE) ? "dring client" :	\
+	    (((vd)->xfer_mode == VIO_DRING_MODE_V1_0) ? "dring client" :    \
 		(((vd)->xfer_mode == 0) ? "null client" :		\
 		    "unsupported client")))
 
@@ -1713,7 +1713,7 @@ vd_complete_notify(vd_task_t *task)
 	vd_dring_payload_t	*request	= task->request;
 
 	/* Update the dring element for a dring client */
-	if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE)) {
+	if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE_V1_0)) {
 		status = vd_mark_elem_done(vd, task->index,
 		    request->status, request->nbytes);
 		if (status == ECONNRESET)
@@ -3208,7 +3208,7 @@ vd_process_task(vd_task_t *task)
 		(void) ddi_taskq_dispatch(vd->completionq, vd_complete,
 		    task, DDI_SLEEP);
 
-	} else if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE)) {
+	} else if (!vd->reset_state && (vd->xfer_mode == VIO_DRING_MODE_V1_0)) {
 		/* Update the dring element if it's a dring client */
 		status = vd_mark_elem_done(vd, task->index,
 		    task->request->status, task->request->nbytes);
@@ -3421,7 +3421,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	if ((attr_msg->xfer_mode != VIO_DESC_MODE) &&
-	    (attr_msg->xfer_mode != VIO_DRING_MODE)) {
+	    (attr_msg->xfer_mode != VIO_DRING_MODE_V1_0)) {
 		PR0("Client requested unsupported transfer mode");
 		return (EBADMSG);
 	}
@@ -3994,7 +3994,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 			vd->state = VD_STATE_DATA;
 			return (0);
 
-		case VIO_DRING_MODE:	/* expect register-dring message */
+		case VIO_DRING_MODE_V1_0:  /* expect register-dring message */
 			if ((status =
 			    vd_process_dring_reg_msg(vd, msg, msglen)) != 0)
 				return (status);
@@ -4043,7 +4043,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		case VIO_DESC_MODE:	/* expect in-band-descriptor message */
 			return (vd_process_desc_msg(vd, msg, msglen));
 
-		case VIO_DRING_MODE:	/* expect dring-data or unreg-dring */
+		case VIO_DRING_MODE_V1_0: /* expect dring-data or unreg-dring */
 			/*
 			 * Typically expect dring-data messages, so handle
 			 * them first

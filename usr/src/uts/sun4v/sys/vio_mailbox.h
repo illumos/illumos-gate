@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,8 @@ extern "C" {
  */
 #define	VIO_PKT_MODE	0x1
 #define	VIO_DESC_MODE	0x2
-#define	VIO_DRING_MODE	0x3
+#define	VIO_DRING_MODE_V1_0	0x3
+#define	VIO_DRING_MODE_V1_2	0x4
 
 /*
  * VIO Descriptor Ring registration options
@@ -308,6 +309,9 @@ typedef struct vio_raw_data_msg {
 	uint64_t		seq_num;	/* sequence number */
 	uint64_t		data[VIO_PAYLOAD_ELEMS - 1];
 } vio_raw_data_msg_t;
+
+#define	VIO_PKT_DATA_HDRSIZE	\
+	(sizeof (vio_msg_tag_t) + sizeof (uint64_t))
 
 /*
  * Definitions of the valid states a Descriptor can be in.

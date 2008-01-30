@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,9 @@ typedef struct vsw_mac_ring_s {
  */
 #define		VSW_NCHAINS	8
 
+/* Number of transmit descriptors -  must be power of 2 */
+#define		VSW_RING_NUM_EL	512
+
 /*
  * State of interface if switch plumbed as network device.
  */
@@ -132,6 +135,8 @@ typedef struct vsw_mac_ring_s {
 #define		VSW_LAYER3		0x4	/* Layer 3 - IP switching */
 
 #define		NUM_SMODES	3	/* number of switching modes */
+
+#define	VSW_PRI_ETH_DEFINED(vswp)	((vswp)->pri_num_types != 0)
 
 /*
  * vsw instance state information.
@@ -200,13 +205,9 @@ typedef struct	vsw {
 	kmutex_t		mca_lock;	/* multicast lock */
 	mcst_addr_t		*mcap;		/* list of multicast addrs */
 
-	/* softint related flags */
-	boolean_t		rx_softint;	/* Rx softint enabled */
-	mblk_t			*rx_mhead;	/* received mblks head */
-	mblk_t			*rx_mtail;	/* received mblks tail */
-	ddi_softint_handle_t	soft_handle;	/* soft intr handle */
-	int			soft_pri;	/* soft int priority */
-	kmutex_t		soft_lock;	/* lock for soft intr handler */
+	uint32_t		pri_num_types;	/* # of priority eth types */
+	uint16_t		*pri_types;	/* priority eth types */
+	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
 } vsw_t;
 
 /*

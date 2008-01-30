@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,14 @@ vgen_setup_kstats(char *ks_mod, int instance,
 	/* Tx stats */
 	kstat_named_init(&ldckp->tx_no_desc,		"tx_no_desc",
 	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->tx_qfull,		"tx_qfull",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->tx_pri_fail,		"tx_pri_fail",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->tx_pri_packets,	"tx_pri_packets",
+	    KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ldckp->tx_pri_bytes,		"tx_pri_bytes",
+	    KSTAT_DATA_ULONGLONG);
 
 	/* Rx stats */
 	kstat_named_init(&ldckp->rx_allocb_fail,	"rx_allocb_fail",
@@ -110,6 +118,12 @@ vgen_setup_kstats(char *ks_mod, int instance,
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->rx_lost_pkts,		"rx_lost_pkts",
 	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->rx_pri_fail,		"rx_pri_fail",
+	    KSTAT_DATA_ULONG);
+	kstat_named_init(&ldckp->rx_pri_packets,	"rx_pri_packets",
+	    KSTAT_DATA_ULONGLONG);
+	kstat_named_init(&ldckp->rx_pri_bytes,		"rx_pri_bytes",
+	    KSTAT_DATA_ULONGLONG);
 
 	/* Interrupt stats */
 	kstat_named_init(&ldckp->callbacks,		"callbacks",
@@ -150,20 +164,28 @@ vgen_kstat_update(kstat_t *ksp, int rw)
 	ldckp = (vgen_kstats_t *)ksp->ks_data;
 
 	if (rw == KSTAT_READ) {
-		ldckp->ipackets.value.ul	= (uint32_t)statsp->ipackets;
-		ldckp->ipackets64.value.ull	= statsp->ipackets;
+		ldckp->ipackets.value.ul	= (uint32_t)statsp->ipackets +
+		    (uint32_t)statsp->rx_pri_packets;
+		ldckp->ipackets64.value.ull	= statsp->ipackets +
+		    statsp->rx_pri_packets;
 		ldckp->ierrors.value.ul		= statsp->ierrors;
-		ldckp->opackets.value.ul	= (uint32_t)statsp->opackets;
-		ldckp->opackets64.value.ull	= statsp->opackets;
+		ldckp->opackets.value.ul	= (uint32_t)statsp->opackets +
+		    (uint32_t)statsp->tx_pri_packets;
+		ldckp->opackets64.value.ull	= statsp->opackets +
+		    statsp->tx_pri_packets;
 		ldckp->oerrors.value.ul		= statsp->oerrors;
 
 		/*
 		 * MIB II kstat variables
 		 */
-		ldckp->rbytes.value.ul		= (uint32_t)statsp->rbytes;
-		ldckp->rbytes64.value.ull	= statsp->rbytes;
-		ldckp->obytes.value.ul		= (uint32_t)statsp->obytes;
-		ldckp->obytes64.value.ull	= statsp->obytes;
+		ldckp->rbytes.value.ul		= (uint32_t)statsp->rbytes +
+		    (uint32_t)statsp->rx_pri_bytes;
+		ldckp->rbytes64.value.ull	= statsp->rbytes +
+		    statsp->rx_pri_bytes;
+		ldckp->obytes.value.ul		= (uint32_t)statsp->obytes +
+		    (uint32_t)statsp->tx_pri_bytes;
+		ldckp->obytes64.value.ull	= statsp->obytes +
+		    statsp->tx_pri_bytes;
 		ldckp->multircv.value.ul	= statsp->multircv;
 		ldckp->multixmt.value.ul	= statsp->multixmt;
 		ldckp->brdcstrcv.value.ul	= statsp->brdcstrcv;
@@ -172,10 +194,17 @@ vgen_kstat_update(kstat_t *ksp, int rw)
 		ldckp->noxmtbuf.value.ul	= statsp->noxmtbuf;
 
 		ldckp->tx_no_desc.value.ul	= statsp->tx_no_desc;
+		ldckp->tx_qfull.value.ul	= statsp->tx_qfull;
+		ldckp->tx_pri_fail.value.ul	= statsp->tx_pri_fail;
+		ldckp->tx_pri_packets.value.ull	= statsp->tx_pri_packets;
+		ldckp->tx_pri_bytes.value.ull	= statsp->tx_pri_bytes;
 
 		ldckp->rx_allocb_fail.value.ul	= statsp->rx_allocb_fail;
 		ldckp->rx_vio_allocb_fail.value.ul = statsp->rx_vio_allocb_fail;
 		ldckp->rx_lost_pkts.value.ul	= statsp->rx_lost_pkts;
+		ldckp->rx_pri_fail.value.ul	= statsp->rx_pri_fail;
+		ldckp->rx_pri_packets.value.ull	= statsp->rx_pri_packets;
+		ldckp->rx_pri_bytes.value.ull	= statsp->rx_pri_bytes;
 
 		ldckp->callbacks.value.ul	= statsp->callbacks;
 		ldckp->dring_data_acks.value.ul	= statsp->dring_data_acks;
@@ -200,10 +229,17 @@ vgen_kstat_update(kstat_t *ksp, int rw)
 		statsp->noxmtbuf	= ldckp->noxmtbuf.value.ul;
 
 		statsp->tx_no_desc	= ldckp->tx_no_desc.value.ul;
+		statsp->tx_qfull	= ldckp->tx_qfull.value.ul;
+		statsp->tx_pri_fail	= ldckp->tx_pri_fail.value.ul;
+		statsp->tx_pri_packets	= ldckp->tx_pri_packets.value.ull;
+		statsp->tx_pri_bytes	= ldckp->tx_pri_bytes.value.ull;
 
 		statsp->rx_allocb_fail	= ldckp->rx_allocb_fail.value.ul;
 		statsp->rx_vio_allocb_fail = ldckp->rx_vio_allocb_fail.value.ul;
 		statsp->rx_lost_pkts	= ldckp->rx_lost_pkts.value.ul;
+		statsp->rx_pri_fail	= ldckp->rx_pri_fail.value.ul;
+		statsp->rx_pri_packets	= ldckp->rx_pri_packets.value.ull;
+		statsp->rx_pri_bytes	= ldckp->rx_pri_bytes.value.ull;
 
 		statsp->callbacks	= ldckp->callbacks.value.ul;
 		statsp->dring_data_acks	= ldckp->dring_data_acks.value.ul;

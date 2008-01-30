@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,9 +84,9 @@ static	void vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
     vsw_port_t *port, mac_resource_handle_t);
 static	void vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
     vsw_port_t *port, mac_resource_handle_t);
-static	int vsw_forward_all(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
-    int caller, vsw_port_t *port);
-static	int vsw_forward_grp(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
+static	int vsw_forward_all(vsw_t *vswp, mblk_t *mp,
+	int caller, vsw_port_t *port);
+static	int vsw_forward_grp(vsw_t *vswp, mblk_t *mp,
     int caller, vsw_port_t *port);
 
 /* Forwarding database (FDB) routines */
@@ -101,7 +101,7 @@ int vsw_del_fdb(vsw_t *vswp, vsw_port_t *port);
 
 /* Support functions */
 static mblk_t *vsw_dupmsgchain(mblk_t *mp);
-static int vsw_get_same_dest_list(struct ether_header *ehp,
+static uint32_t vsw_get_same_dest_list(struct ether_header *ehp,
     mblk_t **rhead, mblk_t **rtail, mblk_t **mpp);
 
 
@@ -112,14 +112,13 @@ extern mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 extern mcst_addr_t *vsw_del_addr(uint8_t, void *, uint64_t);
 extern int vsw_mac_open(vsw_t *vswp);
 extern void vsw_mac_close(vsw_t *vswp);
-extern void vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
-    mblk_t *mp, mblk_t *mpt, vsw_macrx_flags_t flags);
-extern void vsw_mac_rx(vsw_t *vswp, int caller, mac_resource_handle_t mrh,
-    mblk_t *mp, mblk_t *mpt, vsw_macrx_flags_t flags);
+extern void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
+    mblk_t *mp, vsw_macrx_flags_t flags);
 extern void vsw_set_addrs(vsw_t *vswp);
 extern int vsw_get_hw_maddr(vsw_t *);
 extern int vsw_mac_attach(vsw_t *vswp);
-extern int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt);
+extern int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt,
+	uint32_t count);
 
 /*
  * Tunables used in this file.
@@ -387,7 +386,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	vsw_port_t		*port = NULL;
 	mblk_t			*bp, *ret_m;
 	mblk_t			*mpt = NULL;
-	int			rv;
+	uint32_t		count;
 	vsw_port_list_t		*plist = &vswp->plist;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
@@ -402,8 +401,8 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	bp = mp;
 	while (bp) {
 		ehp = (struct ether_header *)bp->b_rptr;
-		rv = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
-		ASSERT(rv != 0);
+		count = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
+		ASSERT(count != 0);
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
 		    __func__, MBLKSIZE(mp), MBLKL(mp));
@@ -416,8 +415,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * If the virtual interface is down, drop the packet.
 			 */
 			if (caller != VSW_LOCALDEV) {
-				vsw_mac_rx(vswp, caller, mrh, mp,
-				    mpt, VSW_MACRX_FREEMSG);
+				vsw_mac_rx(vswp, mrh, mp, VSW_MACRX_FREEMSG);
 			} else {
 				freemsgchain(mp);
 			}
@@ -437,8 +435,8 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * If plumbed and in promisc mode then copy msg
 			 * and send up the stack.
 			 */
-			vsw_mac_rx(vswp, caller, mrh, mp,
-			    mpt, VSW_MACRX_PROMISC | VSW_MACRX_COPYMSG);
+			vsw_mac_rx(vswp, mrh, mp,
+			    VSW_MACRX_PROMISC | VSW_MACRX_COPYMSG);
 
 			/*
 			 * If the destination is in FDB, the packet
@@ -446,7 +444,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * vsw_port (connected to a vnet device -
 			 * VSW_VNETPORT)
 			 */
-			(void) vsw_portsend(port, mp, mpt);
+			(void) vsw_portsend(port, mp, mpt, count);
 
 			/*
 			 * Decrement use count in port.
@@ -463,13 +461,11 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * except the caller.
 			 */
 			if (IS_BROADCAST(ehp)) {
-				D3(vswp, "%s: BROADCAST pkt", __func__);
-				(void) vsw_forward_all(vswp, mp, mpt,
-				    caller, arg);
+				D2(vswp, "%s: BROADCAST pkt", __func__);
+				(void) vsw_forward_all(vswp, mp, caller, arg);
 			} else if (IS_MULTICAST(ehp)) {
-				D3(vswp, "%s: MULTICAST pkt", __func__);
-				(void) vsw_forward_grp(vswp, mp, mpt,
-				    caller, arg);
+				D2(vswp, "%s: MULTICAST pkt", __func__);
+				(void) vsw_forward_grp(vswp, mp, caller, arg);
 			} else {
 				/*
 				 * If the destination is unicast, and came
@@ -488,7 +484,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 				 */
 				if (caller == VSW_VNETPORT) {
 					/* promisc check copy etc */
-					vsw_mac_rx(vswp, caller, mrh, mp, mpt,
+					vsw_mac_rx(vswp, mrh, mp,
 					    VSW_MACRX_PROMISC |
 					    VSW_MACRX_COPYMSG);
 
@@ -505,7 +501,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					 * mode. Send up stack if plumbed in
 					 * promisc mode, else drop it.
 					 */
-					vsw_mac_rx(vswp, caller, mrh, mp, mpt,
+					vsw_mac_rx(vswp, mrh, mp,
 					    VSW_MACRX_PROMISC |
 					    VSW_MACRX_FREEMSG);
 
@@ -543,7 +539,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	vsw_port_t		*port = NULL;
 	mblk_t			*bp = NULL;
 	mblk_t			*mpt;
-	int			rv;
+	uint32_t		count;
 	vsw_port_list_t		*plist = &vswp->plist;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
@@ -563,8 +559,8 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	bp = mp;
 	while (bp) {
 		ehp = (struct ether_header *)bp->b_rptr;
-		rv = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
-		ASSERT(rv != 0);
+		count = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
+		ASSERT(count != 0);
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
 		    __func__, MBLKSIZE(mp), MBLKL(mp));
@@ -579,7 +575,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			RW_EXIT(&plist->lockrw);
 
 			D2(vswp, "%s: sending to target port", __func__);
-			(void) vsw_portsend(port, mp, mpt);
+			(void) vsw_portsend(port, mp, mpt, count);
 
 			/*
 			 * Decrement ref count.
@@ -597,12 +593,10 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 */
 			if (IS_BROADCAST(ehp)) {
 				D2(vswp, "%s: BROADCAST pkt", __func__);
-				(void) vsw_forward_all(vswp, mp, mpt,
-				    caller, arg);
+				(void) vsw_forward_all(vswp, mp, caller, arg);
 			} else if (IS_MULTICAST(ehp)) {
 				D2(vswp, "%s: MULTICAST pkt", __func__);
-				(void) vsw_forward_grp(vswp, mp, mpt,
-				    caller, arg);
+				(void) vsw_forward_grp(vswp, mp, caller, arg);
 			} else {
 				/*
 				 * Unicast pkt from vnet that we don't have
@@ -611,8 +605,8 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 				 * IP layer to allow it to deal with it.
 				 */
 				if (caller == VSW_VNETPORT) {
-					vsw_mac_rx(vswp, caller, mrh,
-					    mp, mpt, VSW_MACRX_FREEMSG);
+					vsw_mac_rx(vswp, mrh,
+					    mp, VSW_MACRX_FREEMSG);
 				}
 			}
 		}
@@ -626,8 +620,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
  * except the caller (port on which frame arrived).
  */
 static int
-vsw_forward_all(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
-    int caller, vsw_port_t *arg)
+vsw_forward_all(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 {
 	vsw_port_list_t	*plist = &vswp->plist;
 	vsw_port_t	*portp;
@@ -664,7 +657,7 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
 	 * world (layer 2 only), send up stack if plumbed.
 	 */
 	if ((caller == VSW_PHYSDEV) || (caller == VSW_VNETPORT)) {
-		vsw_mac_rx(vswp, caller, NULL, mp, mpt, VSW_MACRX_COPYMSG);
+		vsw_mac_rx(vswp, NULL, mp, VSW_MACRX_COPYMSG);
 	}
 
 	/* send it to all VNETPORTs */
@@ -681,18 +674,20 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
 		} else {
 			nmp = vsw_dupmsgchain(mp);
 			if (nmp) {
-				mblk_t *mpt = nmp;
+				mblk_t	*mpt = nmp;
+				uint32_t count = 1;
 
 				/* Find tail */
 				while (mpt->b_next != NULL) {
 					mpt = mpt->b_next;
+					count++;
 				}
 				/*
 				 * The plist->lockrw is protecting the
 				 * portp from getting destroyed here.
 				 * So, no ref_cnt is incremented here.
 				 */
-				(void) vsw_portsend(portp, nmp, mpt);
+				(void) vsw_portsend(portp, nmp, mpt, count);
 			} else {
 				DERR(vswp, "vsw_forward_all: nmp NULL");
 			}
@@ -711,8 +706,7 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
  * an interest in them (i.e. multicast groups).
  */
 static int
-vsw_forward_grp(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
-    int caller, vsw_port_t *arg)
+vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 {
 	struct ether_header	*ehp = (struct ether_header *)mp->b_rptr;
 	mfdb_ent_t		*entp = NULL;
@@ -771,7 +765,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
 
 			} else if ((caller == VSW_LOCALDEV) &&
 			    (tpp->d_type == VSW_LOCALDEV)) {
-				D3(vswp, "%s: not sending back up stack",
+				D2(vswp, "%s: not sending back up stack",
 				    __func__);
 				continue;
 			}
@@ -783,23 +777,26 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
 
 				nmp = vsw_dupmsgchain(mp);
 				if (nmp) {
-					mblk_t *mpt = nmp;
+					mblk_t	*mpt = nmp;
+					uint32_t count = 1;
 
 					/* Find tail */
 					while (mpt->b_next != NULL) {
 						mpt = mpt->b_next;
+						count++;
 					}
 					/*
 					 * The vswp->mfdbrw is protecting the
 					 * portp from getting destroyed here.
 					 * So, no ref_cnt is incremented here.
 					 */
-					(void) vsw_portsend(port, nmp, mpt);
+					(void) vsw_portsend(port, nmp, mpt,
+					    count);
 				}
 			} else {
-				vsw_mac_rx(vswp, caller, NULL,
-				    mp, mpt, VSW_MACRX_COPYMSG);
-				D3(vswp, "%s: sending up stack"
+				vsw_mac_rx(vswp, NULL,
+				    mp, VSW_MACRX_COPYMSG);
+				D2(vswp, "%s: sending up stack"
 				    " for addr 0x%llx", __func__, key);
 				check_if = B_FALSE;
 			}
@@ -816,7 +813,7 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, mblk_t *mpt,
 	 */
 	if ((check_if) &&
 	    ((caller == VSW_VNETPORT) || (caller == VSW_PHYSDEV))) {
-		vsw_mac_rx(vswp, caller, NULL, mp, mpt,
+		vsw_mac_rx(vswp, NULL, mp,
 		    VSW_MACRX_PROMISC | VSW_MACRX_COPYMSG);
 	}
 
@@ -1316,17 +1313,17 @@ vsw_del_mcst_vsw(vsw_t *vswp)
 	D1(vswp, "%s: exit", __func__);
 }
 
-static int
+static uint32_t
 vsw_get_same_dest_list(struct ether_header *ehp,
     mblk_t **rhead, mblk_t **rtail, mblk_t **mpp)
 {
-	int count = 0;
-	mblk_t *bp;
-	mblk_t *nbp;
-	mblk_t *head = NULL;
-	mblk_t *tail = NULL;
-	mblk_t *prev = NULL;
-	struct ether_header *behp;
+	uint32_t		count = 0;
+	mblk_t			*bp;
+	mblk_t			*nbp;
+	mblk_t			*head = NULL;
+	mblk_t			*tail = NULL;
+	mblk_t			*prev = NULL;
+	struct ether_header	*behp;
 
 	/* process the chain of packets */
 	bp = *mpp;

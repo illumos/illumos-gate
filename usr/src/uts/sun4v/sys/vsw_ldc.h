@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +181,6 @@ typedef struct ver_sup {
  * The buffer is re-used once the peer has indicated that it is
  * finished with the descriptor.
  */
-#define	VSW_RING_NUM_EL		512	/* Num of entries in ring */
 #define	VSW_RING_EL_DATA_SZ	2048	/* Size of data section (bytes) */
 #define	VSW_PRIV_SIZE	sizeof (vnet_private_desc_t)
 #define	VSW_PUB_SIZE	sizeof (vnet_public_desc_t)
@@ -279,6 +278,12 @@ typedef struct lane {
 #define	VSW_LDC_INIT		0x1	/* Initial non-drain state */
 #define	VSW_LDC_DRAINING	0x2	/* Channel draining */
 
+/*
+ * vnet-protocol-version dependent function prototypes.
+ */
+typedef int	(*vsw_ldctx_t) (void *, mblk_t *, mblk_t *, uint32_t);
+typedef void	(*vsw_ldcrx_pktdata_t) (void *, void *, uint32_t);
+
 /* ldc information associated with a vsw-port */
 typedef struct vsw_ldc {
 	struct vsw_ldc		*ldc_next;	/* next ldc in the list */
@@ -306,6 +311,8 @@ typedef struct vsw_ldc {
 	lane_t			lane_out;	/* Outbound lane */
 	uint8_t			dev_class;	/* Peer device class */
 	vio_multi_pool_t	vmp;		/* Receive mblk pools */
+	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
+	uint64_t		msglen;		/* size of ldcmsg */
 
 	/* tx thread fields */
 	kthread_t		*tx_thread;	/* tx thread */
@@ -314,13 +321,16 @@ typedef struct vsw_ldc {
 	kcondvar_t		tx_thr_cv;	/* cond.var for tx thread */
 	mblk_t			*tx_mhead;	/* tx mblks head */
 	mblk_t			*tx_mtail;	/* tx mblks tail */
-	uint64_t		tx_failures; 	/* tx failures */
+	uint32_t		tx_cnt;		/* # of pkts queued for tx */
 
 	/* receive thread fields */
 	kthread_t		*rx_thread;	/* receive thread */
 	uint32_t		rx_thr_flags;	/* receive thread flags */
 	kmutex_t		rx_thr_lock;	/* lock for receive thread */
 	kcondvar_t		rx_thr_cv;	/* cond.var for recv thread */
+
+	vsw_ldctx_t		tx;		/* transmit function */
+	vsw_ldcrx_pktdata_t	rx_pktdata;	/* process rx raw data msg */
 
 	/* channel statistics */
 	vgen_stats_t		ldc_stats;	/* channel statistics */
