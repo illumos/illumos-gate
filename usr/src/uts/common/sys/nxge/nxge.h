@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1004,11 +1004,10 @@ typedef struct _nxge_fflp_kstat {
 	 * FFLP statistics.
 	 */
 
-	kstat_named_t	fflp_tcam_ecc_err;
 	kstat_named_t	fflp_tcam_perr;
+	kstat_named_t	fflp_tcam_ecc_err;
 	kstat_named_t	fflp_vlan_perr;
 	kstat_named_t	fflp_hasht_lookup_err;
-	kstat_named_t	fflp_access_fail;
 	kstat_named_t	fflp_hasht_data_err[MAX_PARTITION];
 } nxge_fflp_kstat_t, *p_nxge_fflp_kstat_t;
 
