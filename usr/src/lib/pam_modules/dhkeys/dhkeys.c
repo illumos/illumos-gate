@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,30 +168,39 @@ get_and_set_seckey(
 /*
  * int establish_key(pamh, flags, debug, netname)
  *
- * This routine established the Secure RPC Credentials for the
+ * This routine establishes the Secure RPC Credentials for the
  * user specified in PAM_USER, using the password in PAM_AUTHTOK.
+ *
+ * Establishing RPC credentials is considered a "helper" function for the PAM
+ * stack so we should only return failures or PAM_IGNORE. Returning PAM_SUCCESS
+ * may short circuit the stack and circumvent later critical checks.
  *
  * Because this routine is used for both pam_authenticate *and*
  * pam_setcred, we have to be somewhat careful:
  *
  *      - if called from pam_sm_authenticate:
- *		1. if we don't need creds (no NIS+), we don't set them
- *		   and return PAM_IGNORE.
- *              2. else, we always try to establish credentials;
- *                 if (passwd == "*NP*"), not having credentials results
- *                 in PAM_AUTH_ERR.
- *                 if (passwd != "*NP*"), any failure to set credentials
- *                 results in PAM_IGNORE
+ *		1. if no NIS+, we don't set credentials and return PAM_IGNORE.
+ *              2. else, we try to establish credentials;
  *
  *	- if called from pam_sm_setcred:
- *		If we are root (uid == 0), we do nothing and return PAM_IGNORE.
- *		Otherwise, we try to establish the credentials.
- *		Not having credentials in this case results in PAM_IGNORE.
+ *		1. if we are root (uid == 0), we do nothing and return
+ *		   PAM_IGNORE.
+ *		2. else, we try to establish credentials.
  *
- *	For both modi, we return PAM_IGNORE if the creds are established.
- *	If we fail, we return
- *	   - PAM_AUTH_ERR if the password didn't decrypt the cred
- *	   - PAM_SYSTEM_ERR if the cred's could not be stored.
+ *      We return framework errors as appropriate such as PAM_USER_UNKNOWN,
+ *      PAM_BUF_ERR, PAM_PERM_DENIED.
+ *
+ *	If we succeed in establishing credentials we return PAM_IGNORE.
+ *
+ *	If we fail to establish credentials then we return:
+ *	- PAM_IGNORE if we are called from pam_sm_authenticate and we
+ *	  don't need credentials;
+ *	- PAM_SERVICE_ERR (credentials needed) or PAM_SYSTEM_ERR
+ *	  (credentials not needed) if netname could not be created;
+ *	- PAM_AUTH_ERR (credentials needed) or PAM_IGNORE (credentials
+ *	  not needed) if no credentials were retrieved;
+ *	- PAM_AUTH_ERR if the password didn't decrypt the cred;
+ *	- PAM_SYSTEM_ERR if the cred's could not be stored.
  *
  * This routine returns the user's netname in "netname".
  *
@@ -216,7 +225,12 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	char	*scratch;
 	int	scratchlen;
 
-	int	need_cred;	/* is not having credentials set a failure? */
+	/*
+	 * Default is that credentials are needed until we explicitly
+	 * check they are. This means all failure codes are returned
+	 * until then.
+	 */
+	int	need_cred = -1;
 	int	auth_cred_flags;
 				/*
 				 * no_warn if creds not needed and
@@ -274,10 +288,10 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	 * whether not being able to do so is an error or whether we
 	 * can ignore it.
 	 * We need to get the password from the repository that we're
-	 * currently authenticating against. IFF this password equals
-	 * "*NP" *AND* we are authenticating against NIS+, we actually
-	 * do need to set the credentials. In all other cases, we
-	 * can forget about them.
+	 * currently authenticating against. If this is the auth_path
+	 * and the repository isn't NIS+ we can skip establishing credentials.
+	 * Otherwise, we will try to establish credentials but it's only
+	 * critical iff the password is "*NP*" and the repository is NIS+.
 	 */
 	(void) pam_get_item(pamh, PAM_REPOSITORY, (void **)&auth_rep);
 	if (auth_rep != NULL) {
@@ -315,7 +329,8 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 		goto out;
 	}
 
-	need_cred = (strcmp(repository_pass, "*NP*") == 0);
+	need_cred = (strcmp(repository_name, "nisplus") == 0 &&
+	    strcmp(repository_pass, "*NP*") == 0);
 	if (auth_path) {
 		auth_cred_flags =
 		    (need_cred ? flags : flags | PAM_SILENT);
@@ -413,25 +428,25 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	}
 
 	if (good_pw_cnt == 0) {			/* wrong password */
-		if (auth_path) {
-			result = need_cred ? PAM_AUTH_ERR : PAM_IGNORE;
-		} else {
-			result = PAM_AUTH_ERR;
-		}
+		result = PAM_AUTH_ERR;
 		goto out;
 	}
 
 	if (set_seckey_cnt == 0) {
-		if (auth_path) {
-			result = need_cred ? PAM_SYSTEM_ERR : PAM_IGNORE;
-		} else {
-			result = PAM_SYSTEM_ERR;
-		}
+		result = PAM_SYSTEM_ERR;
 		goto out;
 	}
-
+	/* Credentials have been successfully establish, return PAM_IGNORE. */
 	result = PAM_IGNORE;
 out:
+	/*
+	 * If we are authenticating we attempt to establish credentials
+	 * where appropriate. Failure to do so is only an error if we
+	 * definitely needed them. Thus always return PAM_IGNORE
+	 * if we are authenticating and credentials were not needed.
+	 */
+	if (auth_path && !need_cred)
+		result = PAM_IGNORE;
 	if (repository_name)
 		free(repository_name);
 	if (repository_pass)
