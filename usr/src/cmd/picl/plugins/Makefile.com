@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,12 @@ MAPFILES =
 CPPFLAGS	+= -I$(SRC)/lib/libpicl -I$(SRC)/lib/libpicltree
 CPPFLAGS	+= -I$(SRC)/cmd/picl/plugins/inc
 CFLAGS		+= $(CCVERBOSE)
+
+# Some picl plugins have dependencies to which they make no reference.  These
+# dependencies are expected to be loaded so that their .init's fire and thus
+# populate the picl database before the dependency itself adds to the database.
+# Turn off lazy loading so that all plugin dependencies are loaded.  
+DYNFLAGS	+= $(ZNOLAZYLOAD)
 
 ROOTLIBDIR := DIRMODE=	0755
 ROOTLIBDIR := OWNER=		root

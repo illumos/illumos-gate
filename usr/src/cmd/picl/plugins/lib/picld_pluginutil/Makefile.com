@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@ POFILE=	picld_pluginutil.po
 CPPFLAGS +=	-I.. -I$(SRC)/lib/libpicl -I$(SRC)/lib/libpicltree
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
+DYNFLAGS +=	$(ZNOLAZYLOAD)
 LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)
 LDLIBS +=	-lc -lpicltree
 
