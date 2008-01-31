@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -242,6 +242,8 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_ICH9_IFE_GT:
 	case E1000_DEV_ID_ICH9_IFE_G:
 	case E1000_DEV_ID_ICH9_IGP_AMT:
+	case E1000_DEV_ID_ICH9_IGP_M:
+	case E1000_DEV_ID_ICH9_IGP_M_AMT:
 	case E1000_DEV_ID_ICH9_IGP_C:
 		mac->type = e1000_ich9lan;
 		break;

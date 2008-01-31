@@ -555,3 +555,9 @@ Notes on packaging:
    6541233 e1000g driver performs 33X Slower for Tibco RV when running Multiple RVDs
    6572343 e1000g: needs to improve the ip forwarding performance
    6637039 e1000g_recycle() missed a mutex_exit()
+
+5.2.5
+======
+  This version has the following fix:
+   6648775 e1000g: pci8086,10be - e1000g[0]: Identify hardware failed
+
