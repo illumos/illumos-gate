@@ -894,6 +894,7 @@ ire_forward(ipaddr_t dst, enum ire_forward_action *ret_action,
 			sire->ire_last_used_time = lbolt;
 			ire_refrele(sire);
 		}
+		*ret_action = Forward_ok;
 		return (ire);
 	}
 create_irecache:
