@@ -77,76 +77,52 @@ static void spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx);
 /*
  * Add a (source=src, propname=propval) list to an nvlist.
  */
-static int
+static void
 spa_prop_add_list(nvlist_t *nvl, zpool_prop_t prop, char *strval,
     uint64_t intval, zprop_source_t src)
 {
 	const char *propname = zpool_prop_to_name(prop);
 	nvlist_t *propval;
-	int err = 0;
 
-	if (err = nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP))
-		return (err);
+	VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+	VERIFY(nvlist_add_uint64(propval, ZPROP_SOURCE, src) == 0);
 
-	if (err = nvlist_add_uint64(propval, ZPROP_SOURCE, src))
-		goto out;
+	if (strval != NULL)
+		VERIFY(nvlist_add_string(propval, ZPROP_VALUE, strval) == 0);
+	else
+		VERIFY(nvlist_add_uint64(propval, ZPROP_VALUE, intval) == 0);
 
-	if (strval != NULL) {
-		if (err = nvlist_add_string(propval, ZPROP_VALUE, strval))
-			goto out;
-	} else {
-		if (err = nvlist_add_uint64(propval, ZPROP_VALUE, intval))
-			goto out;
-	}
-
-	err = nvlist_add_nvlist(nvl, propname, propval);
-out:
+	VERIFY(nvlist_add_nvlist(nvl, propname, propval) == 0);
 	nvlist_free(propval);
-	return (err);
 }
 
 /*
  * Get property values from the spa configuration.
  */
-static int
+static void
 spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 {
 	uint64_t size = spa_get_space(spa);
 	uint64_t used = spa_get_alloc(spa);
 	uint64_t cap, version;
 	zprop_source_t src = ZPROP_SRC_NONE;
-	int err;
 	char *cachefile;
 	size_t len;
 
 	/*
 	 * readonly properties
 	 */
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_NAME, spa->spa_name,
-	    0, src))
-		return (err);
-
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_SIZE, NULL, size, src))
-		return (err);
-
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_USED, NULL, used, src))
-		return (err);
-
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_AVAILABLE, NULL,
-	    size - used, src))
-		return (err);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_NAME, spa->spa_name, 0, src);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_SIZE, NULL, size, src);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_USED, NULL, used, src);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_AVAILABLE, NULL, size - used, src);
 
 	cap = (size == 0) ? 0 : (used * 100 / size);
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src))
-		return (err);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src);
 
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_GUID, NULL,
-	    spa_guid(spa), src))
-		return (err);
-
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_HEALTH, NULL,
-	    spa->spa_root_vdev->vdev_state, src))
-		return (err);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_GUID, NULL, spa_guid(spa), src);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_HEALTH, NULL,
+	    spa->spa_root_vdev->vdev_state, src);
 
 	/*
 	 * settable properties that are not stored in the pool property object.
@@ -156,20 +132,15 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 		src = ZPROP_SRC_DEFAULT;
 	else
 		src = ZPROP_SRC_LOCAL;
-	if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_VERSION, NULL,
-	    version, src))
-		return (err);
+	spa_prop_add_list(*nvp, ZPOOL_PROP_VERSION, NULL, version, src);
 
-	if (spa->spa_root != NULL) {
-		src = ZPROP_SRC_LOCAL;
-		if (err = spa_prop_add_list(*nvp, ZPOOL_PROP_ALTROOT,
-		    spa->spa_root, 0, src))
-			return (err);
-	}
+	if (spa->spa_root != NULL)
+		spa_prop_add_list(*nvp, ZPOOL_PROP_ALTROOT, spa->spa_root,
+		    0, ZPROP_SRC_LOCAL);
 
 	if (spa->spa_config_dir != NULL) {
 		if (strcmp(spa->spa_config_dir, "none") == 0) {
-			err = spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
+			spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
 			    spa->spa_config_dir, 0, ZPROP_SRC_LOCAL);
 		} else {
 			len = strlen(spa->spa_config_dir) +
@@ -177,16 +148,11 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 			cachefile = kmem_alloc(len, KM_SLEEP);
 			(void) snprintf(cachefile, len, "%s/%s",
 			    spa->spa_config_dir, spa->spa_config_file);
-			err = spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
+			spa_prop_add_list(*nvp, ZPOOL_PROP_CACHEFILE,
 			    cachefile, 0, ZPROP_SRC_LOCAL);
 			kmem_free(cachefile, len);
 		}
-
-		if (err)
-			return (err);
 	}
-
-	return (0);
 }
 
 /*
@@ -200,14 +166,12 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 	objset_t *mos = spa->spa_meta_objset;
 	int err;
 
-	if (err = nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP))
-		return (err);
+	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	/*
 	 * Get properties from the spa config.
 	 */
-	if (err = spa_prop_get_config(spa, nvp))
-		goto out;
+	spa_prop_get_config(spa, nvp);
 
 	mutex_enter(&spa->spa_props_lock);
 	/* If no pool property object, no more prop to get. */
@@ -261,8 +225,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 				intval = za.za_first_integer;
 			}
 
-			err = spa_prop_add_list(*nvp, prop, strval,
-			    intval, src);
+			spa_prop_add_list(*nvp, prop, strval, intval, src);
 
 			if (strval != NULL)
 				kmem_free(strval,
@@ -279,7 +242,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 				kmem_free(strval, za.za_num_integers);
 				break;
 			}
-			err = spa_prop_add_list(*nvp, prop, strval, 0, src);
+			spa_prop_add_list(*nvp, prop, strval, 0, src);
 			kmem_free(strval, za.za_num_integers);
 			break;
 
@@ -292,6 +255,7 @@ spa_prop_get(spa_t *spa, nvlist_t **nvp)
 out:
 	if (err && err != ENOENT) {
 		nvlist_free(*nvp);
+		*nvp = NULL;
 		return (err);
 	}
 
