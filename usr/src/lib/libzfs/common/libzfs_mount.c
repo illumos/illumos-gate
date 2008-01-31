@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -535,6 +535,11 @@ static int (*_sa_enable_share)(sa_share_t, char *);
 static int (*_sa_disable_share)(sa_share_t, char *);
 static char *(*_sa_errorstr)(int);
 static int (*_sa_parse_legacy_options)(sa_group_t, char *, char *);
+static boolean_t (*_sa_needs_refresh)(sa_handle_t *);
+static libzfs_handle_t *(*_sa_get_zfs_handle)(sa_handle_t);
+static int (*_sa_zfs_process_share)(sa_handle_t, sa_group_t, sa_share_t,
+    char *, char *, zprop_source_t, char *, char *, char *);
+static void (*_sa_update_sharetab_ts)(sa_handle_t);
 
 /*
  * _zfs_init_libshare()
@@ -543,6 +548,7 @@ static int (*_sa_parse_legacy_options)(sa_group_t, char *, char *);
  * values to be used later. This is triggered by the runtime loader.
  * Make sure the correct ISA version is loaded.
  */
+
 #pragma init(_zfs_init_libshare)
 static void
 _zfs_init_libshare(void)
@@ -572,10 +578,22 @@ _zfs_init_libshare(void)
 		_sa_errorstr = (char *(*)(int))dlsym(libshare, "sa_errorstr");
 		_sa_parse_legacy_options = (int (*)(sa_group_t, char *, char *))
 		    dlsym(libshare, "sa_parse_legacy_options");
+		_sa_needs_refresh = (boolean_t (*)(sa_handle_t *))
+		    dlsym(libshare, "sa_needs_refresh");
+		_sa_get_zfs_handle = (libzfs_handle_t *(*)(sa_handle_t))
+		    dlsym(libshare, "sa_get_zfs_handle");
+		_sa_zfs_process_share = (int (*)(sa_handle_t, sa_group_t,
+		    sa_share_t, char *, char *, zprop_source_t, char *,
+		    char *, char *))dlsym(libshare, "sa_zfs_process_share");
+		_sa_update_sharetab_ts = (void (*)(sa_handle_t))
+		    dlsym(libshare, "sa_update_sharetab_ts");
 		if (_sa_init == NULL || _sa_fini == NULL ||
 		    _sa_find_share == NULL || _sa_enable_share == NULL ||
 		    _sa_disable_share == NULL || _sa_errorstr == NULL ||
-		    _sa_parse_legacy_options == NULL) {
+		    _sa_parse_legacy_options == NULL ||
+		    _sa_needs_refresh == NULL || _sa_get_zfs_handle == NULL ||
+		    _sa_zfs_process_share == NULL ||
+		    _sa_update_sharetab_ts == NULL) {
 			_sa_init = NULL;
 			_sa_fini = NULL;
 			_sa_disable_share = NULL;
@@ -583,6 +601,10 @@ _zfs_init_libshare(void)
 			_sa_errorstr = NULL;
 			_sa_parse_legacy_options = NULL;
 			(void) dlclose(libshare);
+			_sa_needs_refresh = NULL;
+			_sa_get_zfs_handle = NULL;
+			_sa_zfs_process_share = NULL;
+			_sa_update_sharetab_ts = NULL;
 		}
 	}
 }
@@ -602,6 +624,23 @@ zfs_init_libshare(libzfs_handle_t *zhandle, int service)
 
 	if (_sa_init == NULL)
 		ret = SA_CONFIG_ERR;
+
+	if (ret == SA_OK && zhandle->libzfs_shareflags & ZFSSHARE_MISS) {
+		/*
+		 * We had a cache miss. Most likely it is a new ZFS
+		 * dataset that was just created. We want to make sure
+		 * so check timestamps to see if a different process
+		 * has updated any of the configuration. If there was
+		 * some non-ZFS change, we need to re-initialize the
+		 * internal cache.
+		 */
+		zhandle->libzfs_shareflags &= ~ZFSSHARE_MISS;
+		if (_sa_needs_refresh != NULL &&
+		    _sa_needs_refresh(zhandle->libzfs_sharehdl)) {
+			zfs_uninit_libshare(zhandle);
+			zhandle->libzfs_sharehdl = _sa_init(service);
+		}
+	}
 
 	if (ret == SA_OK && zhandle && zhandle->libzfs_sharehdl == NULL)
 		zhandle->libzfs_sharehdl = _sa_init(service);
@@ -696,9 +735,11 @@ zfs_share_proto(zfs_handle_t *zhp, zfs_share_proto_t *proto)
 {
 	char mountpoint[ZFS_MAXPROPLEN];
 	char shareopts[ZFS_MAXPROPLEN];
+	char sourcestr[ZFS_MAXPROPLEN];
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	sa_share_t share;
 	zfs_share_proto_t *curr_proto;
+	zprop_source_t sourcetype;
 	int ret;
 
 	if (!zfs_is_mountable(zhp, mountpoint, sizeof (mountpoint), NULL))
@@ -707,7 +748,8 @@ zfs_share_proto(zfs_handle_t *zhp, zfs_share_proto_t *proto)
 	if ((ret = zfs_init_libshare(hdl, SA_INIT_SHARE_API)) != SA_OK) {
 		(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s': %s"),
-		    zfs_get_name(zhp), _sa_errorstr(ret));
+		    zfs_get_name(zhp), _sa_errorstr != NULL ?
+		    _sa_errorstr(ret) : "");
 		return (-1);
 	}
 
@@ -716,8 +758,9 @@ zfs_share_proto(zfs_handle_t *zhp, zfs_share_proto_t *proto)
 		 * Return success if there are no share options.
 		 */
 		if (zfs_prop_get(zhp, proto_table[*curr_proto].p_prop,
-		    shareopts, sizeof (shareopts), NULL, NULL,
-		    0, B_FALSE) != 0 || strcmp(shareopts, "off") == 0)
+		    shareopts, sizeof (shareopts), &sourcetype, sourcestr,
+		    ZFS_MAXPROPLEN, B_FALSE) != 0 ||
+		    strcmp(shareopts, "off") == 0)
 			continue;
 
 		/*
@@ -730,6 +773,30 @@ zfs_share_proto(zfs_handle_t *zhp, zfs_share_proto_t *proto)
 			continue;
 
 		share = zfs_sa_find_share(hdl->libzfs_sharehdl, mountpoint);
+		if (share == NULL) {
+			/*
+			 * This may be a new file system that was just
+			 * created so isn't in the internal cache
+			 * (second time through). Rather than
+			 * reloading the entire configuration, we can
+			 * assume ZFS has done the checking and it is
+			 * safe to add this to the internal
+			 * configuration.
+			 */
+			if (_sa_zfs_process_share(hdl->libzfs_sharehdl,
+			    NULL, NULL, mountpoint,
+			    proto_table[*curr_proto].p_name, sourcetype,
+			    shareopts, sourcestr, zhp->zfs_name) != SA_OK) {
+				(void) zfs_error_fmt(hdl,
+				    proto_table[*curr_proto].p_share_err,
+				    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
+				    zfs_get_name(zhp));
+				return (-1);
+			}
+			hdl->libzfs_shareflags |= ZFSSHARE_MISS;
+			share = zfs_sa_find_share(hdl->libzfs_sharehdl,
+			    mountpoint);
+		}
 		if (share != NULL) {
 			int err;
 			err = zfs_sa_enable_share(share,
@@ -1132,13 +1199,13 @@ zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 		else
 			good[i] = 1;
 	}
+
 	/*
 	 * Then share all the ones that need to be shared. This needs
 	 * to be a separate pass in order to avoid excessive reloading
 	 * of the configuration. Good should never be NULL since
 	 * zfs_alloc is supposed to exit if memory isn't available.
 	 */
-	zfs_uninit_libshare(hdl);
 	for (i = 0; i < cb.cb_used; i++) {
 		if (good[i] && zfs_share(cb.cb_datasets[i]) != 0)
 			ret = -1;

@@ -47,13 +47,6 @@
 #include <thread.h>
 #include <synch.h>
 
-#if _NOT_SMF
-#define	CONFIG_FILE	"/var/tmp/share.cfg"
-#define	CONFIG_FILE_TMP	"/var/tmp/share.cfg.tmp"
-#endif
-#define	TSTAMP(tm)	(uint64_t)(((uint64_t)tm.tv_sec << 32) | \
-					(tm.tv_nsec & 0xffffffff))
-
 #define	DFS_LOCK_FILE	"/etc/dfs/fstypes"
 #define	SA_STRSIZE	256	/* max string size for names */
 
@@ -93,6 +86,7 @@ extern void sablocksigs(sigset_t *);
 extern void saunblocksigs(sigset_t *);
 static sa_group_t sa_get_optionset_parent(sa_optionset_t);
 static char *get_node_attr(void *, char *);
+extern void sa_update_sharetab_ts(sa_handle_t);
 
 /*
  * Data structures for finding/managing the document root to access
@@ -375,7 +369,7 @@ set_legacy_timestamp(xmlNodePtr root, char *path, uint64_t tval)
 				    "legacy-timestamp", tstring);
 				if (ret == SA_OK) {
 					(void) sa_end_transaction(
-					    handle->scfhandle);
+					    handle->scfhandle, handle);
 				} else {
 					sa_abort_transaction(handle->scfhandle);
 				}
@@ -967,6 +961,25 @@ sa_init(int init_service)
 					 */
 					(void) lockf(lockfd, F_ULOCK, 0);
 					(void) close(lockfd);
+				}
+				/* Get sharetab timestamp */
+				sa_update_sharetab_ts((sa_handle_t)handle);
+
+				/* Get lastupdate (transaction) timestamp */
+				prop = scf_simple_prop_get(
+				    handle->scfhandle->handle,
+				    (const char *)SA_SVC_FMRI_BASE ":default",
+				    "state", "lastupdate");
+				if (prop != NULL) {
+					char *str;
+					str =
+					    scf_simple_prop_next_astring(prop);
+					if (str != NULL)
+						handle->tstrans =
+						    strtoull(str, NULL, 0);
+					else
+						handle->tstrans = 0;
+					scf_simple_prop_free(prop);
 				}
 				legacy |= sa_get_zfs_shares(handle, "zfs");
 				legacy |= gettransients(handle, &handle->tree);
@@ -1876,7 +1889,8 @@ sa_create_group(sa_handle_t handle, char *groupname, int *error)
 					    "state", "enabled");
 					if (ret == SA_OK) {
 						ret = sa_end_transaction(
-						    impl_handle->scfhandle);
+						    impl_handle->scfhandle,
+						    impl_handle);
 					} else {
 						sa_abort_transaction(
 						    impl_handle->scfhandle);
@@ -1907,7 +1921,8 @@ sa_create_group(sa_handle_t handle, char *groupname, int *error)
 					}
 					if (ret == SA_OK) {
 						ret = sa_end_transaction(
-						    impl_handle->scfhandle);
+						    impl_handle->scfhandle,
+						    impl_handle);
 					} else {
 						sa_abort_transaction(
 						    impl_handle->scfhandle);
@@ -2073,7 +2088,8 @@ sa_set_group_attr(sa_group_t group, char *tag, char *value)
 				    tag, value);
 				if (ret == SA_OK)
 					ret = sa_end_transaction(
-					    impl_handle->scfhandle);
+					    impl_handle->scfhandle,
+					    impl_handle);
 				else
 					sa_abort_transaction(
 					    impl_handle->scfhandle);
@@ -2734,7 +2750,7 @@ sa_commit_properties(sa_optionset_t optionset, int clear)
 				    impl_handle->scfhandle);
 			} else {
 				ret = sa_end_transaction(
-				    impl_handle->scfhandle);
+				    impl_handle->scfhandle, impl_handle);
 			}
 		} else {
 			ret = SA_SYSTEM_ERR;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,11 +40,12 @@
 #include <uuid/uuid.h>
 #include <sys/param.h>
 #include <signal.h>
+#include <sys/time.h>
 
 ssize_t scf_max_name_len;
 extern struct sa_proto_plugin *sap_proto_list;
 extern sa_handle_impl_t get_handle_for_root(xmlNodePtr);
-
+static void set_transaction_tstamp(sa_handle_impl_t);
 /*
  * The SMF facility uses some properties that must exist. We want to
  * skip over these when processing protocol options.
@@ -874,7 +875,7 @@ out:
 
 static int
 sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_instance_t *instance, sa_handle_t sahandle)
+    scf_instance_t *instance, sa_handle_t sahandle)
 {
 	char *buff;
 	xmlNodePtr node;
@@ -1204,6 +1205,8 @@ int
 sa_create_pgroup(scfutilhandle_t *handle, char *pgroup)
 {
 	int ret = SA_OK;
+	int persist = 0;
+
 	/*
 	 * Only create a handle if it doesn't exist. It is ok to exist
 	 * since the pg handle will be set as a side effect.
@@ -1212,14 +1215,24 @@ sa_create_pgroup(scfutilhandle_t *handle, char *pgroup)
 		handle->pg = scf_pg_create(handle->handle);
 
 	/*
+	 * Special case for a non-persistent property group. This is
+	 * internal use only.
+	 */
+	if (*pgroup == '*') {
+		persist = SCF_PG_FLAG_NONPERSISTENT;
+		pgroup++;
+	}
+
+	/*
 	 * If the pgroup exists, we are done. If it doesn't, then we
 	 * need to actually add one to the service instance.
 	 */
 	if (scf_instance_get_pg(handle->instance,
 	    pgroup, handle->pg) != 0) {
+
 		/* Doesn't exist so create one */
 		if (scf_instance_add_pg(handle->instance, pgroup,
-		    SCF_GROUP_APPLICATION, 0, handle->pg) != 0) {
+		    SCF_GROUP_APPLICATION, persist, handle->pg) != 0) {
 			switch (scf_error()) {
 			case SCF_ERROR_PERMISSION_DENIED:
 				ret = SA_NO_PERMISSION;
@@ -1286,6 +1299,9 @@ sa_start_transaction(scfutilhandle_t *handle, char *propgroup)
 	 * Lookup the property group and create it if it doesn't already
 	 * exist.
 	 */
+	if (handle == NULL)
+		return (SA_CONFIG_ERR);
+
 	if (handle->scf_state == SCH_STATE_INIT) {
 		ret = sa_create_pgroup(handle, propgroup);
 		if (ret == SA_OK) {
@@ -1311,25 +1327,28 @@ sa_start_transaction(scfutilhandle_t *handle, char *propgroup)
 	return (ret);
 }
 
+
 /*
- * sa_end_transaction(handle)
+ * sa_end_transaction(scfhandle, sahandle)
  *
  * Commit the changes that were added to the transaction in the
  * handle. Do all necessary cleanup.
  */
 
 int
-sa_end_transaction(scfutilhandle_t *handle)
+sa_end_transaction(scfutilhandle_t *handle, sa_handle_impl_t sahandle)
 {
 	int ret = SA_OK;
 
-	if (handle->trans == NULL) {
+	if (handle == NULL || handle->trans == NULL || sahandle == NULL) {
 		ret = SA_SYSTEM_ERR;
 	} else {
 		if (scf_transaction_commit(handle->trans) < 0)
 			ret = SA_SYSTEM_ERR;
 		scf_transaction_destroy_children(handle->trans);
 		scf_transaction_destroy(handle->trans);
+		if (ret == SA_OK)
+			set_transaction_tstamp(sahandle);
 		handle->trans = NULL;
 	}
 	return (ret);
@@ -1350,6 +1369,49 @@ sa_abort_transaction(scfutilhandle_t *handle)
 		scf_transaction_destroy_children(handle->trans);
 		scf_transaction_destroy(handle->trans);
 		handle->trans = NULL;
+	}
+}
+
+/*
+ * set_transaction_tstamp(sahandle)
+ *
+ * After a successful transaction commit, update the timestamp of the
+ * last transaction. This lets us detect changes from other processes.
+ */
+static void
+set_transaction_tstamp(sa_handle_impl_t sahandle)
+{
+	char tstring[32];
+	struct timeval tv;
+	scfutilhandle_t *scfhandle;
+
+	if (sahandle == NULL || sahandle->scfhandle == NULL)
+		return;
+
+	scfhandle = sahandle->scfhandle;
+
+	if (sa_get_instance(scfhandle, "default") != SA_OK)
+		return;
+
+	if (gettimeofday(&tv, NULL) != 0)
+		return;
+
+	if (sa_start_transaction(scfhandle, "*state") != SA_OK)
+		return;
+
+	sahandle->tstrans = TSTAMP((*(timestruc_t *)&tv));
+	(void) snprintf(tstring, sizeof (tstring), "%lld", sahandle->tstrans);
+	if (sa_set_property(sahandle->scfhandle, "lastupdate", tstring) ==
+	    SA_OK) {
+		/*
+		 * While best if it succeeds, a failure doesn't cause
+		 * problems and we will ignore it anyway.
+		 */
+		(void) scf_transaction_commit(scfhandle->trans);
+		scf_transaction_destroy_children(scfhandle->trans);
+		scf_transaction_destroy(scfhandle->trans);
+	} else {
+		sa_abort_transaction(scfhandle);
 	}
 }
 
@@ -1688,7 +1750,14 @@ sa_commit_share(scfutilhandle_t *handle, sa_group_t group, sa_share_t share)
 			}
 			/* Make sure we cleanup the transaction */
 			if (ret == SA_OK) {
-				ret = sa_end_transaction(handle);
+				sa_handle_impl_t sahandle;
+				sahandle = (sa_handle_impl_t)
+				    sa_find_group_handle(group);
+				if (sahandle != NULL)
+					ret = sa_end_transaction(handle,
+					    sahandle);
+				else
+					ret = SA_SYSTEM_ERR;
 			} else {
 				sa_abort_transaction(handle);
 			}

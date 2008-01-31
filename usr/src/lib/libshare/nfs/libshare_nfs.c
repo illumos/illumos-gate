@@ -1911,6 +1911,7 @@ nfs_disable_share(sa_share_t share, char *path)
 	int ret = SA_OK;
 	int iszfs;
 	sa_group_t parent;
+	sa_handle_t handle;
 
 	if (path == NULL)
 		return (ret);
@@ -1958,8 +1959,9 @@ nfs_disable_share(sa_share_t share, char *path)
 		}
 	}
 	if (ret == SA_OK || ret == SA_NO_SUCH_PATH) {
+		handle = sa_find_group_handle((sa_group_t)share);
 		if (!iszfs)
-			(void) sa_delete_sharetab(path, "nfs");
+			(void) sa_delete_sharetab(handle, path, "nfs");
 		/* just in case it was logged */
 		(void) nfslogtab_deactivate(path);
 	}

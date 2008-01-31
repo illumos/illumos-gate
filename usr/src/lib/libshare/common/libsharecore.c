@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2061,6 +2061,23 @@ sa_emptyshare(struct share *sh)
 }
 
 /*
+ * sa_update_sharetab_ts(handle)
+ *
+ * Update the internal timestamp of when sharetab was last
+ * changed. This needs to be public for ZFS to get at it.
+ */
+
+void
+sa_update_sharetab_ts(sa_handle_t handle)
+{
+	struct stat st;
+	sa_handle_impl_t implhandle = (sa_handle_impl_t)handle;
+
+	if (implhandle != NULL && stat(SA_LEGACY_SHARETAB, &st) == 0)
+		implhandle->tssharetab = TSTAMP(st.st_mtim);
+}
+
+/*
  * sa_update_sharetab(share, proto)
  *
  * Update the sharetab file with info from the specified share.
@@ -2073,17 +2090,29 @@ sa_update_sharetab(sa_share_t share, char *proto)
 	int	ret = SA_OK;
 	share_t	sh;
 	char	*path;
+	sa_handle_t handle;
 
 	path = sa_get_share_attr(share, "path");
 	if (path != NULL) {
 		(void) memset(&sh, '\0', sizeof (sh));
 
-		/*
-		 * Fill in share structure and send it to the kernel.
-		 */
-		(void) sa_fillshare(share, proto, &sh);
-		(void) _sharefs(SHAREFS_ADD, &sh);
-		sa_emptyshare(&sh);
+		handle = sa_find_group_handle((sa_group_t)share);
+		if (handle != NULL) {
+			/*
+			 * Fill in share structure and send it to the kernel.
+			 */
+			(void) sa_fillshare(share, proto, &sh);
+			(void) _sharefs(SHAREFS_ADD, &sh);
+			/*
+			 * We need the timestamp of the sharetab file right
+			 * after the update was done. This lets us detect a
+			 * change that made by a different process.
+			 */
+			sa_update_sharetab_ts(handle);
+			sa_emptyshare(&sh);
+		} else {
+			ret = SA_CONFIG_ERR;
+		}
 		sa_free_attr_string(path);
 	}
 
@@ -2091,18 +2120,18 @@ sa_update_sharetab(sa_share_t share, char *proto)
 }
 
 /*
- * sa_delete_sharetab(path, proto)
+ * sa_delete_sharetab(handle, path, proto)
  *
  * remove the specified share from sharetab.
  */
 
 int
-sa_delete_sharetab(char *path, char *proto)
+sa_delete_sharetab(sa_handle_t handle, char *path, char *proto)
 {
 	int	ret = SA_OK;
+	struct stat st;
 
 	share_t	sh;
-
 	/*
 	 * Both the path and the proto are
 	 * keys into the sharetab.
@@ -2113,10 +2142,62 @@ sa_delete_sharetab(char *path, char *proto)
 		sh.sh_fstype = proto;
 
 		ret = _sharefs(SHAREFS_REMOVE, &sh);
+		if (handle != NULL && stat(SA_LEGACY_SHARETAB, &st) == 0)
+			sa_update_sharetab_ts(handle);
 	}
-
 	return (ret);
 }
+
+/*
+ * sa_needs_refresh(handle)
+ *
+ * Returns B_TRUE if the internal cache needs to be refreshed do to a
+ * change by another process.  B_FALSE returned otherwise.
+ */
+boolean_t
+sa_needs_refresh(sa_handle_t *handle)
+{
+	sa_handle_impl_t implhandle = (sa_handle_impl_t)handle;
+	struct stat st;
+	char *str;
+	uint64_t tstamp;
+	scf_simple_prop_t *prop;
+
+	if (handle == NULL)
+		return (B_TRUE);
+
+	/*
+	 * If sharetab has changed, then there was an external
+	 * change. Check sharetab first since it is updated by ZFS as
+	 * well as sharemgr.  This is where external ZFS changes are
+	 * caught.
+	 */
+	if (stat(SA_LEGACY_SHARETAB, &st) == 0 &&
+	    TSTAMP(st.st_mtim) != implhandle->tssharetab)
+		return (B_TRUE);
+
+	/*
+	 * If sharetab wasn't changed, check whether there were any
+	 * SMF transactions that modified the config but didn't
+	 * initiate a share.  This is less common but does happen.
+	 */
+	prop = scf_simple_prop_get(implhandle->scfhandle->handle,
+	    (const char *)SA_SVC_FMRI_BASE ":default", "state",
+	    "lastupdate");
+	if (prop != NULL) {
+		str = scf_simple_prop_next_astring(prop);
+		if (str != NULL)
+			tstamp = strtoull(str, NULL, 0);
+		else
+			tstamp = 0;
+		scf_simple_prop_free(prop);
+		if (tstamp != implhandle->tstrans)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 /*
  * sa_fix_resource_name(path)
  *

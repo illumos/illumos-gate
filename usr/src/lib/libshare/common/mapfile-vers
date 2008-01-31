@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -128,6 +128,10 @@ SUNWprivate {
 	sa_set_resource_description;
 	sa_get_resource_description;
 	sa_fix_resource_name;
+	sa_needs_refresh;
+	sa_get_zfs_handle;
+	sa_zfs_process_share;
+	sa_update_sharetab_ts;
     local:
 	*;
 };

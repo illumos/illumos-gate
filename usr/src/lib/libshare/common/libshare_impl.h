@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,19 @@ typedef struct propertylist {
 	}			pl_value;
 } property_list_t;
 
+/* internal version of sa_handle_t */
+typedef struct sa_handle_impl {
+	uint64_t	flags;
+	scfutilhandle_t	*scfhandle;
+	libzfs_handle_t *zfs_libhandle;
+	zfs_handle_t	**zfs_list;
+	size_t		zfs_list_count;
+	xmlNodePtr	tree;
+	xmlDocPtr	doc;
+	uint64_t	tssharetab;
+	uint64_t	tstrans;
+} *sa_handle_impl_t;
+
 extern int sa_proto_share(char *, sa_share_t);
 extern int sa_proto_unshare(sa_share_t, char *, char *);
 extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
@@ -115,7 +128,7 @@ extern sa_security_t sa_get_derived_security(void *, char *, char *, int);
 extern void sa_free_derived_security(sa_security_t);
 extern sa_protocol_properties_t sa_create_protocol_properties(char *);
 extern int sa_start_transaction(scfutilhandle_t *, char *);
-extern int sa_end_transaction(scfutilhandle_t *);
+extern int sa_end_transaction(scfutilhandle_t *, sa_handle_impl_t);
 extern void sa_abort_transaction(scfutilhandle_t *);
 extern int sa_commit_share(scfutilhandle_t *, sa_group_t, sa_share_t);
 extern int sa_set_property(scfutilhandle_t *, char *, char *);
@@ -156,16 +169,9 @@ struct sa_proto_plugin {
 	void			*plugin_handle;
 };
 
-/* internal version of sa_handle_t */
-typedef struct sa_handle_impl {
-	uint64_t	flags;
-	scfutilhandle_t	*scfhandle;
-	libzfs_handle_t *zfs_libhandle;
-	zfs_handle_t	**zfs_list;
-	size_t		zfs_list_count;
-	xmlNodePtr	tree;
-	xmlDocPtr	doc;
-} *sa_handle_impl_t;
+#define	TSTAMP(tm)	(uint64_t)(((uint64_t)tm.tv_sec << 32) | \
+					(tm.tv_nsec & 0xffffffff))
+
 
 #ifdef	__cplusplus
 }

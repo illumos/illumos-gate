@@ -501,20 +501,21 @@ smb_disable_resource(sa_resource_t resource)
 			sa_free_attr_string(rname);
 			return (SA_CONFIG_ERR);
 		}
-		sa_free_attr_string(rname);
-		rname = NULL;
 	}
+
+	sa_free_attr_string(rname);
+
 	share = sa_get_resource_parent(resource);
 	if (share != NULL) {
 		rname = sa_get_share_attr(share, "path");
 		if (rname != NULL) {
-			(void) sa_delete_sharetab(rname, "smb");
+			sa_handle_t handle;
+
+			handle = sa_find_group_handle((sa_group_t)resource);
+			(void) sa_delete_sharetab(handle, rname, "smb");
 			sa_free_attr_string(rname);
-			rname = NULL;
 		}
 	}
-	if (rname != NULL)
-		sa_free_attr_string(rname);
 	/*
 	 * Always return OK as smb/server may be down and
 	 * Shares will be picked up when loaded.
@@ -622,6 +623,7 @@ smb_disable_share(sa_share_t share, char *path)
 	sa_group_t parent;
 	boolean_t iszfs;
 	int err = SA_OK;
+	sa_handle_t handle;
 
 	if (path == NULL)
 		return (err);
@@ -666,8 +668,13 @@ smb_disable_share(sa_share_t share, char *path)
 		sa_free_attr_string(rname);
 	}
 done:
-	if (!iszfs)
-		(void) sa_delete_sharetab(path, "smb");
+	if (!iszfs) {
+		handle = sa_find_group_handle((sa_group_t)share);
+		if (handle != NULL)
+			(void) sa_delete_sharetab(handle, path, "smb");
+		else
+			err = SA_SYSTEM_ERR;
+	}
 	return (err);
 }
 

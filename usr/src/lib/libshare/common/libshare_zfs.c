@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@ extern sa_group_t _sa_create_zfs_group(sa_group_t, char *);
 extern char *sa_fstype(char *);
 extern void set_node_attr(void *, char *, char *);
 extern int sa_is_share(void *);
+extern void sa_update_sharetab_ts(sa_handle_t);
 
 /*
  * File system specific code for ZFS. The original code was stolen
@@ -675,11 +676,11 @@ zfs_grp_error(int err)
  * zfs_process_share(handle, share, mountpoint, proto, source,
  *     shareopts, sourcestr)
  *
- * Creates the subgroup, if necessary and adds shares and adds shares
+ * Creates the subgroup, if necessary and adds shares, resources
  * and properties.
  */
-static int
-zfs_process_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
+int
+sa_zfs_process_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
     char *mountpoint, char *proto, zprop_source_t source, char *shareopts,
     char *sourcestr, char *dataset)
 {
@@ -806,7 +807,7 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 				share = NULL;
 			}
 			if (err == SA_OK) {
-				err = zfs_process_share(handle, group,
+				err = sa_zfs_process_share(handle, group,
 				    share, mountpoint, "nfs", source,
 				    shareopts, sourcestr, dataset);
 			}
@@ -833,7 +834,7 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 				share = NULL;
 			}
 			if (err == SA_OK) {
-				err = zfs_process_share(handle, group,
+				err = sa_zfs_process_share(handle, group,
 				    share, mountpoint, "smb", source,
 				    shareopts, sourcestr, dataset);
 			}
@@ -1269,8 +1270,26 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 		SMAX(i, j);
 		err = zfs_deleg_share_nfs(libhandle, dataset, path,
 		    exportdata, sh, i, operation);
+		if (err == SA_OK)
+			sa_update_sharetab_ts(sahandle);
 		libzfs_fini(libhandle);
 	}
 	free(dataset);
 	return (err);
+}
+
+/*
+ * sa_get_zfs_handle(handle)
+ *
+ * Given an sa_handle_t, return the libzfs_handle_t *. This is only
+ * used internally by libzfs. Needed in order to avoid including
+ * libshare_impl.h in libzfs.
+ */
+
+libzfs_handle_t *
+sa_get_zfs_handle(sa_handle_t handle)
+{
+	sa_handle_impl_t implhandle = (sa_handle_impl_t)handle;
+
+	return (implhandle->zfs_libhandle);
 }

@@ -251,7 +251,7 @@ extern int sa_proto_change_notify(sa_share_t, char *);
 extern int sa_delete_legacy(sa_share_t, char *);
 extern int sa_update_legacy(sa_share_t, char *);
 extern int sa_update_sharetab(sa_share_t, char *);
-extern int sa_delete_sharetab(char *, char *);
+extern int sa_delete_sharetab(sa_handle_t, char *, char *);
 
 /* ZFS functions */
 extern int sa_zfs_is_shared(sa_handle_t, char *);
