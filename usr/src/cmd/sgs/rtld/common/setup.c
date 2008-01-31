@@ -805,12 +805,25 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Establish the modes of the initial object.  These modes are
 	 * propagated to any preloaded objects and explicit shared library
-	 * dependencies.  Note, RTLD_NOW may have been established during
-	 * analysis of the application had it been built -z now.
+	 * dependencies.
+	 *
+	 * If we're generating a configuration file using crle(1), remove
+	 * any RTLD_NOW use, as we don't want to trigger any relocation proc-
+	 * essing during crle(1)'s first past (this would just be unnecessary
+	 * overhead).  Any filters are explicitly loaded, and thus RTLD_NOW is
+	 * not required to trigger filter loading.
+	 *
+	 * Note, RTLD_NOW may have been established during analysis of the
+	 * application had the application been built -z now.
 	 */
 	MODE(mlmp) |= (RTLD_NODELETE | RTLD_GLOBAL | RTLD_WORLD);
-	if (rtld_flags & RT_FL_CONFGEN)
+
+	if (rtld_flags & RT_FL_CONFGEN) {
 		MODE(mlmp) |= RTLD_CONFGEN;
+		MODE(mlmp) &= ~RTLD_NOW;
+		rtld_flags2 &= ~RT_FL2_BINDNOW;
+	}
+
 	if ((MODE(mlmp) & RTLD_NOW) == 0) {
 		if (rtld_flags2 & RT_FL2_BINDNOW)
 			MODE(mlmp) |= RTLD_NOW;

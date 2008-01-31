@@ -1308,3 +1308,4 @@ Bugid   Risk Synopsis
 6634436 XFFLAG should be updated.  (link-editor components only)
 6492726 Merge SHF_MERGE|SHF_STRINGS input sections
 4947191 OSNet should use direct bindings  (link-editor components only)
+6654381 lazy loading fall-back needs optimizing

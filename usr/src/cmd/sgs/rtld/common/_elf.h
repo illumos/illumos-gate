@@ -23,8 +23,8 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	__ELF_DOT_H
@@ -52,7 +52,7 @@ extern	int	elf_copy_reloc(char *, Sym *, Rt_map *, void *, Sym *,
 		    Rt_map *, const void *);
 extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *);
 extern	Sym	*elf_lazy_find_sym(Slookup *, Rt_map **, uint_t *);
-extern	Rt_map	*elf_lazy_load(Rt_map *, uint_t, const char *);
+extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *);
 extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t);
 extern	Rt_map	*elf_new_lm(Lm_list *, const char *, const char *, Dyn *,
 		    ulong_t, ulong_t, Aliste, ulong_t, ulong_t, ulong_t,

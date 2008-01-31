@@ -23,7 +23,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,6 +46,27 @@ Rt_lock		rtldlock;
  */
 Lm_list		lml_main =	{ 0 };		/* the `main's link map list */
 Lm_list		lml_rtld =	{ 0 };		/* rtld's link map list */
+
+/*
+ * Entrance count.  Each time ld.so.1 is entered this count is bumped.  This
+ * value serves to identify the present ld.so.1 operation.  Any ld.so.1
+ * operation can result in many symbol lookup requests (ie. loading objects and
+ * relocating all symbolic bindings).  This count is used to protect against
+ * attempting to re-load a failed lazy load within a single call to ld.so.1,
+ * while allowing such attempts across calls.  Should a lazy load fail, the
+ * present operation identifier is saved in the current symbol lookup data
+ * block (Slookup).  Should a lazy load fall back operation be triggered, the
+ * identifier in the symbol lookup  block is compared to the current ld.so.1
+ * entry count, and if the two are equal the fall back is skipped.
+ *
+ * With this count, there is a danger of wrap-around, although as an unsigned
+ * 32-bit value, it is highly unlikely that any application could usefully make
+ * 4.3 giga-calls into ld.so.1.  The worst that can occur is that a fall back
+ * lazy load isn't triggered.  However, most lazy loads that fail typically
+ * continue to fail unless the user takes corrective action (adds the necessary
+ * (fixed) dependencies to the system.
+ */
+ulong_t		ld_entry_cnt = 0;
 
 /*
  * BEGIN: Exposed to rtld_db, don't change without a coordinated handshake with

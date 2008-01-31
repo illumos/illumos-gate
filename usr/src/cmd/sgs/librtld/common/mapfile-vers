@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +39,7 @@ SUNWprivate_1.3 {
 		is_so_loaded =	FUNCTION parent;
 		lookup_sym =	FUNCTION parent;
 
+		ld_entry_cnt =	DATA parent;
 		lml_main =	DATA parent;
 	local:
 		*;

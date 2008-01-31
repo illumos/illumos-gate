@@ -564,15 +564,12 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	llmp = lml->lm_tail;
 
 	/*
-	 * Find definition for symbol.
+	 * Find definition for symbol.  Initialize the symbol lookup data
+	 * structure.
 	 */
-	sl.sl_name = name;
-	sl.sl_cmap = lmp;
-	sl.sl_imap = lml->lm_head;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = rsymndx;
-	sl.sl_rsym = rsym;
-	sl.sl_flags = LKUP_DEFT;
+	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
+	    rsymndx, rsym, 0, LKUP_DEFT);
+
 	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
 		    demangle(name));
@@ -1068,18 +1065,15 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 
 					/*
 					 * Lookup the symbol definition.
+					 * Initialize the symbol lookup data
+					 * structure.
 					 */
 					name = (char *)(STRTAB(lmp) +
 					    symref->st_name);
 
-					sl.sl_name = name;
-					sl.sl_cmap = lmp;
-					sl.sl_imap = 0;
-					sl.sl_hash = 0;
-					sl.sl_rsymndx = rsymndx;
-					sl.sl_rsym = symref;
-					sl.sl_rtype = rtype;
-					sl.sl_flags = LKUP_STDRELOC;
+					SLOOKUP_INIT(sl, name, lmp, 0,
+					    ld_entry_cnt, 0, rsymndx, symref,
+					    rtype, LKUP_STDRELOC);
 
 					symdef = lookup_sym(&sl, &_lmp, &binfo);
 

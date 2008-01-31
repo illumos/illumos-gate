@@ -274,18 +274,11 @@ count_reloc(Cache *cache, Cache *_cache, Rt_map *lmp, int flags, Addr addr,
 		 * the possibility of a dangling .plt relocation.  dldump()
 		 * users might be encouraged to set LD_FLAGS=loadavail (crle(1)
 		 * does this for them).
+		 *
+		 * Initialize the symbol lookup data structure.
 		 */
-		sl.sl_name = name;
-		sl.sl_cmap = lmp;
-		sl.sl_imap = LIST(lmp)->lm_head;
-		sl.sl_hash = 0;
-		sl.sl_rsymndx = rsymndx;
-		sl.sl_rsym = sym;
-
-		if (type == M_R_COPY)
-			sl.sl_flags = LKUP_COPY;
-		else
-			sl.sl_flags = LKUP_DEFT;
+		SLOOKUP_INIT(sl, name, lmp, LIST(lmp)->lm_head, ld_entry_cnt,
+		    0, rsymndx, sym, type, LKUP_STDRELOC);
 
 		_bound = _weak = 0;
 		_sym = sym;

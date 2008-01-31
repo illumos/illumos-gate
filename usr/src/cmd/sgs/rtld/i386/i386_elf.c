@@ -248,15 +248,11 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	llmp = lml->lm_tail;
 
 	/*
-	 * Find definition for symbol.
+	 * Find definition for symbol.  Initialize the symbol lookup data
+	 * structure.
 	 */
-	sl.sl_name = name;
-	sl.sl_cmap = lmp;
-	sl.sl_imap = lml->lm_head;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = rsymndx;
-	sl.sl_rsym = rsym;
-	sl.sl_flags = LKUP_DEFT;
+	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0,
+	    rsymndx, rsym, 0, LKUP_DEFT);
 
 	if ((nsym = lookup_sym(&sl, &nlmp, &binfo)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
@@ -490,13 +486,11 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		if (!relbgn || (relbgn == relend))
 			return (1);
 
-		sl.sl_name = MSG_ORIG(MSG_SYM_PLT);
-		sl.sl_cmap = lmp;
-		sl.sl_imap = lmp;
-		sl.sl_hash = elf_hash(MSG_ORIG(MSG_SYM_PLT));
-		sl.sl_rsymndx = 0;
-		sl.sl_rsym = 0;
-		sl.sl_flags = LKUP_DEFT;
+		/*
+		 * Initialize the symbol lookup data structure.
+		 */
+		SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_PLT), lmp, lmp, ld_entry_cnt,
+		    elf_hash(MSG_ORIG(MSG_SYM_PLT)), 0, 0, 0, LKUP_DEFT);
 
 		if ((symdef = elf_find_sym(&sl, &_lmp, &binfo)) == 0)
 			return (1);
@@ -743,18 +737,15 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 
 					/*
 					 * Lookup the symbol definition.
+					 * Initialize the symbol lookup data
+					 * structure.
 					 */
 					name = (char *)(STRTAB(lmp) +
 					    symref->st_name);
 
-					sl.sl_name = name;
-					sl.sl_cmap = lmp;
-					sl.sl_imap = 0;
-					sl.sl_hash = 0;
-					sl.sl_rsymndx = rsymndx;
-					sl.sl_rsym = symref;
-					sl.sl_rtype = rtype;
-					sl.sl_flags = LKUP_STDRELOC;
+					SLOOKUP_INIT(sl, name, lmp, 0,
+					    ld_entry_cnt, 0, rsymndx, symref,
+					    rtype, LKUP_STDRELOC);
 
 					symdef = lookup_sym(&sl, &_lmp, &binfo);
 
@@ -1017,14 +1008,11 @@ _elf_copy_reloc(const char *name, Rt_map *rlmp, Rt_map *dlmp)
 	/*
 	 * Determine if the special symbol exists as a reference in the dynamic
 	 * executable, and that an associated definition exists in libc.so.1.
+	 *
+	 * Initialize the symbol lookup data structure.
 	 */
-	sl.sl_name = name;
-	sl.sl_cmap = rlmp;
-	sl.sl_imap = rlmp;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = 0;
-	sl.sl_rsym = 0;
-	sl.sl_flags = LKUP_FIRST;
+	SLOOKUP_INIT(sl, name, rlmp, rlmp, ld_entry_cnt, 0, 0, 0, 0,
+	    LKUP_FIRST);
 
 	if ((symref = lookup_sym(&sl, &_lmp, &binfo)) == 0)
 		return (1);

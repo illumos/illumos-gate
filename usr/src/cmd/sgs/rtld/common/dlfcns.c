@@ -1127,22 +1127,23 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	Slookup		sl;
 	uint_t		binfo;
 
-	sl.sl_name = name;
-	sl.sl_cmap = clmp;
-	sl.sl_rsymndx = 0;
-	sl.sl_rsym = 0;
-
 	/*
+	 * Initialize the symbol lookup data structure.
+	 *
 	 * Standard relocations are evaluated using the symbol index of the
 	 * associated relocation symbol.  This index provides for loading
 	 * any lazy dependency and establishing a direct binding if necessary.
 	 * If a dlsym() operation originates from an object that contains a
-	 * symbol table entry for the same name, then establish the symbol
-	 * index so that any dependency requirements can be triggered.
+	 * symbol table entry for the same name, then we need to establish the
+	 * symbol index so that any dependency requirements can be triggered.
+	 *
+	 * Therefore, the first symbol lookup that is carried out is for the
+	 * symbol name within the calling object.  If this symbol exists, the
+	 * symbols index is computed, added to the Slookup data, and thus used
+	 * to seed the real symbol lookup.
 	 */
-	sl.sl_imap = clmp;
-	sl.sl_flags = LKUP_SYMNDX;
-	sl.sl_hash = elf_hash(name);
+	SLOOKUP_INIT(sl, name, clmp, clmp, ld_entry_cnt, elf_hash(name),
+	    0, 0, 0, LKUP_SYMNDX);
 
 	if ((FCT(clmp) == &elf_fct) &&
 	    ((sym = SYMINTP(clmp)(&sl, 0, 0)) != NULL)) {
@@ -1164,7 +1165,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		sl.sl_imap = hlmp;
 		sl.sl_flags = LKUP_SPEC;
 		if (handle == RTLD_PROBE)
-			sl.sl_flags |= LKUP_NOFALBACK;
+			sl.sl_flags |= LKUP_NOFALLBACK;
 		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
 
 	} else if (handle == RTLD_NEXT) {
@@ -1184,7 +1185,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 
 			if ((sip->si_flags & SYMINFO_FLG_DIRECT) &&
 			    (sip->si_boundto < SYMINFO_BT_LOWRESERVE))
-				(void) elf_lazy_load(clmp,
+				(void) elf_lazy_load(clmp, &sl,
 				    sip->si_boundto, name);
 
 			/*
@@ -1252,7 +1253,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		DBG_CALL(Dbg_syms_dlsym(clmp, name, 0, DBG_DLSYM_PROBE));
 
 		sl.sl_imap = hlmp;
-		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALBACK);
+		sl.sl_flags = (LKUP_SPEC | LKUP_NOFALLBACK);
 		sym = LM_LOOKUP_SYM(clmp)(&sl, dlmp, &binfo);
 
 	} else {

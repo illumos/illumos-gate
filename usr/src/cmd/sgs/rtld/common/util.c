@@ -3081,13 +3081,15 @@ nu_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
 }
 
 /*
- * Generic entry point from user code - simply grabs a lock.
+ * Generic entry point from user code - simply grabs a lock, and bumps the
+ * entrance count.
  */
 int
 enter(void)
 {
 	if (rt_bind_guard(THR_FLG_RTLD)) {
 		(void) rt_mutex_lock(&rtldlock);
+		ld_entry_cnt++;
 		return (1);
 	}
 	return (0);
@@ -3419,18 +3421,16 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 void
 set_environ(Lm_list *lml)
 {
-	Rt_map *	dlmp;
-	Sym *		sym;
+	Rt_map		*dlmp;
+	Sym		*sym;
 	Slookup		sl;
 	uint_t		binfo;
 
-	sl.sl_name = MSG_ORIG(MSG_SYM_ENVIRON);
-	sl.sl_cmap = lml->lm_head;
-	sl.sl_imap = lml->lm_head;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = 0;
-	sl.sl_rsym = 0;
-	sl.sl_flags = LKUP_WEAK;
+	/*
+	 * Initialize the symbol lookup data structure.
+	 */
+	SLOOKUP_INIT(sl, MSG_ORIG(MSG_SYM_ENVIRON), lml->lm_head, lml->lm_head,
+	    ld_entry_cnt, 0, 0, 0, 0, LKUP_WEAK);
 
 	if (sym = LM_LOOKUP_SYM(lml->lm_head)(&sl, &dlmp, &binfo)) {
 		lml->lm_environ = (char ***)sym->st_value;

@@ -65,7 +65,7 @@ uint_t	audit_flags = 0;		/* Copy of specific audit flags to */
 					/* simplify boot_elf.s access. */
 
 static Audit_client *
-_audit_client(Audit_info * aip, Rt_map * almp)
+_audit_client(Audit_info *aip, Rt_map *almp)
 {
 	int	ndx;
 
@@ -331,7 +331,7 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 	Lmid_t		lmid = get_linkmap_id(LIST(nlmp));
 	int		appl = 0, respond = 1, ndx = 0;
 	uint_t		clients = 0;
-	Audit_info *	aip;
+	Audit_info	*aip;
 
 	/*
 	 * Determine the total number of audit libraries in use.  This provides
@@ -390,13 +390,13 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
  * la_objclose() entry points found.
  */
 void
-_audit_objclose(List * list, Rt_map * lmp)
+_audit_objclose(List *list, Rt_map *lmp)
 {
-	Audit_list *	alp;
-	Listnode *	lnp;
+	Audit_list	*alp;
+	Listnode	*lnp;
 
 	for (LIST_TRAVERSE(list, lnp, alp)) {
-		Audit_client *	acp;
+		Audit_client	*acp;
 
 		if (alp->al_objclose == 0)
 			continue;
@@ -410,7 +410,7 @@ _audit_objclose(List * list, Rt_map * lmp)
 }
 
 void
-audit_objclose(Rt_map * clmp, Rt_map * lmp)
+audit_objclose(Rt_map *clmp, Rt_map *lmp)
 {
 	int	appl = 0;
 
@@ -862,7 +862,7 @@ static const Aud_info aud_info[] = {
 #define	AI_LAPLTEXIT	9
 
 static Addr
-audit_symget(Audit_list * alp, int info)
+audit_symget(Audit_list *alp, int info)
 {
 	Rt_map		*_lmp, *lmp = alp->al_lmp;
 	const char	*sname = MSG_ORIG(aud_info[info].sname);
@@ -872,13 +872,11 @@ audit_symget(Audit_list * alp, int info)
 	Sym		*sym;
 	Slookup		sl;
 
-	sl.sl_name = sname;
-	sl.sl_cmap = lml_rtld.lm_head;
-	sl.sl_imap = lmp;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = 0;
-	sl.sl_rsym = 0;
-	sl.sl_flags = LKUP_FIRST;
+	/*
+	 * Initialize the symbol lookup data structure.
+	 */
+	SLOOKUP_INIT(sl, sname, lml_rtld.lm_head, lmp, ld_entry_cnt,
+	    0, 0, 0, 0, LKUP_FIRST);
 
 	if (sym = LM_LOOKUP_SYM(lmp)(&sl, &_lmp, &binfo)) {
 		Addr	addr = sym->st_value;

@@ -68,13 +68,14 @@ load_filtees(Rt_map *lmp)
 	if ((FLAGS1(lmp) & MSK_RT_FILTER) &&
 	    ((FLAGS(lmp) & FLG_RT_LOADFLTR) ||
 	    (LIST(lmp)->lm_tflags & LML_TFLG_LOADFLTR))) {
-		Dyninfo *	dip =  DYNINFO(lmp);
+		Dyninfo		*dip =  DYNINFO(lmp);
 		uint_t		cnt, max = DYNINFOCNT(lmp);
 		Slookup		sl;
 
-		sl.sl_name = 0;
-		sl.sl_hash = 0;
-		sl.sl_imap = sl.sl_cmap = lmp;
+		/*
+		 * Initialize the symbol lookup data structure.
+		 */
+		SLOOKUP_INIT(sl, 0, lmp, lmp, ld_entry_cnt, 0, 0, 0, 0, 0);
 
 		for (cnt = 0; cnt < max; cnt++, dip++) {
 			if (((dip->di_flags & MSK_DI_FILTER) == 0) ||
@@ -2716,7 +2717,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 
 			lmp = 0;
 			if (bound < SYMINFO_BT_LOWRESERVE)
-				lmp = elf_lazy_load(clmp, bound, name);
+				lmp = elf_lazy_load(clmp, slp, bound, name);
 
 			/*
 			 * If direct bindings have been disabled, and this isn't
@@ -2828,11 +2829,12 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * outstanding.  If so, and we haven't been able to locate a non-weak
 	 * symbol reference, start bringing in any lazy dependencies to see if
 	 * the reference can be satisfied.  Use of dlsym(RTLD_PROBE) sets the
-	 * LKUP_NOFALBACK flag, and this flag disables this fall back.
+	 * LKUP_NOFALLBACK flag, and this flag disables this fall back.
 	 */
-	if ((sym == NULL) && ((sl.sl_flags & LKUP_NOFALBACK) == 0)) {
+	if ((sym == NULL) && ((sl.sl_flags & LKUP_NOFALLBACK) == 0)) {
 		if ((lmp = ilmp) == 0)
 			lmp = LIST(clmp)->lm_head;
+
 		if ((sl.sl_flags & LKUP_WEAK) || (LIST(lmp)->lm_lazy == 0))
 			return ((Sym *)0);
 
@@ -2850,7 +2852,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 			Lm_cntl	*lmc;
 
 			for (ALIST_TRAVERSE(LIST(clmp)->lm_lists, idx, lmc)) {
-				sl.sl_flags |= LKUP_NOFALBACK;
+				sl.sl_flags |= LKUP_NOFALLBACK;
 				if ((sym = _lazy_find_sym(lmc->lc_head, &sl,
 				    dlmp, binfo)) != 0)
 					break;
@@ -2873,13 +2875,12 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 Sym *
 lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 {
-	const char	*name = slp->sl_name;
 	Rt_map		*clmp = slp->sl_cmap;
 	Sym		*rsym = slp->sl_rsym, *sym = 0;
 	uchar_t		rtype = slp->sl_rtype;
 
 	if (slp->sl_hash == 0)
-		slp->sl_hash = elf_hash(name);
+		slp->sl_hash = elf_hash(slp->sl_name);
 	*binfo = 0;
 
 	/*

@@ -420,11 +420,11 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 /*
  * Traverse an objects dependency list removing callers and dependencies.
  * There's a chicken and egg problem with tearing down link-maps.  Any
- * relationship between link-maps is maintained on a DEPENDS, and associated
- * CALLERS list.  These lists can't be broken down at the time a single link-
- * map is removed as any related link-map may have already been removed.  Thus,
- * lists between link-maps must be broken down before the individual link-maps
- * themselves.
+ * relationship between link-maps is maintained on a DEPENDS list, and an
+ * associated CALLERS list.  These lists can't be broken down at the time a
+ * single link-map is removed, as any related link-map may have already been
+ * removed.  Thus, lists between link-maps must be broken down before the
+ * individual link-maps themselves.
  */
 void
 remove_lists(Rt_map *lmp, int lazy)
@@ -454,6 +454,7 @@ remove_lists(Rt_map *lmp, int lazy)
 	 */
 	for (APLIST_TRAVERSE(CALLERS(lmp), idx1,  bdp)) {
 		Rt_map		*clmp = bdp->b_caller;
+		Dyninfo		*dip;
 
 		/*
 		 * If we're removing an object that was triggered by a lazyload,
@@ -464,23 +465,18 @@ remove_lists(Rt_map *lmp, int lazy)
 		 * failed to relocate, it's possible that one or more of the
 		 * individual objects can be reloaded without a problem.
 		 */
-		if (lazy) {
-			Dyninfo	*dip;
+		if (lazy && ((dip = DYNINFO(clmp)) != NULL)) {
+			uint_t	cnt, max = DYNINFOCNT(clmp);
 
-			if ((dip = DYNINFO(clmp)) != 0) {
-				uint_t	cnt, max = DYNINFOCNT(clmp);
+			for (cnt = 0; cnt < max; cnt++, dip++) {
+				if ((dip->di_flags & FLG_DI_LAZY) == 0)
+					continue;
 
-				for (cnt = 0; cnt < max; cnt++, dip++) {
-					if ((dip->di_flags &
-					    FLG_DI_NEEDED) == 0)
-						continue;
+				if (dip->di_info == (void *)lmp) {
+					dip->di_info = 0;
 
-					if (dip->di_info == (void *)lmp) {
-						dip->di_info = 0;
-
-						if (LAZY(clmp)++ == 0)
-							LIST(clmp)->lm_lazy++;
-					}
+					if (LAZY(clmp)++ == 0)
+						LIST(clmp)->lm_lazy++;
 				}
 			}
 		}

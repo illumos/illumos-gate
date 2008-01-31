@@ -278,10 +278,10 @@ elf_rtld_load()
  * Lazy load an object.
  */
 Rt_map *
-elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
+elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym)
 {
 	Rt_map		*nlmp, *hlmp;
-	Dyninfo		*dip = &DYNINFO(clmp)[ndx];
+	Dyninfo		*dip = &DYNINFO(clmp)[ndx], *pdip;
 	uint_t		flags = 0;
 	Pnode		*pnp;
 	const char	*name;
@@ -293,20 +293,45 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 * If this dependency has already been processed, we're done.
 	 */
 	if (((nlmp = (Rt_map *)dip->di_info) != 0) ||
-	    (dip->di_flags & FLG_DI_PROCESSD))
+	    (dip->di_flags & FLG_DI_LDD_DONE))
 		return (nlmp);
 
 	/*
-	 * Determine the initial dependency name, and indicate that this
-	 * dependencies processing has initiated.
+	 * If we're running under ldd(1), indicate that this dependency has been
+	 * processed (see test above).  It doesn't matter whether the object is
+	 * successfully loaded or not, this flag simply ensures that we don't
+	 * repeatedly attempt to load an object that has already failed to load.
+	 * To do so would create multiple failure diagnostics for the same
+	 * object under ldd(1).
+	 */
+	if (lml->lm_flags & LML_FLG_TRC_ENABLE)
+		dip->di_flags |= FLG_DI_LDD_DONE;
+
+	/*
+	 * Determine the initial dependency name.
 	 */
 	name = STRTAB(clmp) + DYN(clmp)[ndx].d_un.d_val;
 	DBG_CALL(Dbg_file_lazyload(clmp, name, sym));
-	if (lml->lm_flags & LML_FLG_TRC_ENABLE)
-		dip->di_flags |= FLG_DI_PROCESSD;
 
+	/*
+	 * If this object needs to establish its own group, make sure a handle
+	 * is created.
+	 */
 	if (dip->di_flags & FLG_DI_GROUP)
 		flags |= (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+
+	/*
+	 * Lazy dependencies are identified as DT_NEEDED entries with a
+	 * DF_P1_LAZYLOAD flag in the previous DT_POSFLAG_1 element.  The
+	 * dynamic information element that corresponds to the DT_POSFLAG_1
+	 * entry is free, and thus used to store the present entrance
+	 * identifier.  This identifier is used to prevent multiple attempts to
+	 * load a failed lazy loadable dependency within the same runtime linker
+	 * operation.  However, future attempts to reload this dependency are
+	 * still possible.
+	 */
+	if (ndx && (pdip = dip - 1) && (pdip->di_flags & FLG_DI_POSFLAG1))
+		pdip->di_info = (void *)slp->sl_id;
 
 	/*
 	 * Expand the requested name if necessary.
@@ -350,8 +375,8 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 * Finish processing the objects associated with this request, and
 	 * create an association between the caller and this dependency.
 	 */
-	if (nlmp && (((analyze_lmc(lml, lmco, nlmp) == 0)) ||
-	    (bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
+	if (nlmp && ((bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
+	    (analyze_lmc(lml, lmco, nlmp) == 0) ||
 	    (relocate_lmc(lml, lmco, clmp, nlmp) == 0)))
 		dip->di_info = nlmp = 0;
 
@@ -368,6 +393,16 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 	 */
 	if (lmc)
 		remove_cntl(lml, lmco);
+
+	/*
+	 * If this lazy loading failed, record the fact, and bump the lazy
+	 * counts.
+	 */
+	if (nlmp == 0) {
+		dip->di_flags |= FLG_DI_LAZYFAIL;
+		if (LAZY(clmp)++ == 0)
+			LIST(clmp)->lm_lazy++;
+	}
 
 	return (nlmp);
 }
@@ -556,9 +591,9 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 static int
 elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 {
-	Dyn		*dyn;
+	Dyn		*dyn, *pdyn;
 	ulong_t		ndx = 0;
-	uint_t		lazy = 0, flags = 0;
+	uint_t		lazy, flags;
 	Word		lmflags = lml->lm_flags;
 	Word		lmtflags = lml->lm_tflags;
 
@@ -568,7 +603,8 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 	if (DYN(clmp) == 0)
 		return (1);
 
-	for (dyn = (Dyn *)DYN(clmp); dyn->d_tag != DT_NULL; dyn++, ndx++) {
+	for (dyn = (Dyn *)DYN(clmp), pdyn = NULL; dyn->d_tag != DT_NULL;
+	    pdyn = dyn++, ndx++) {
 		Dyninfo	*dip = &DYNINFO(clmp)[ndx];
 		Rt_map	*nlmp = 0;
 		char	*name;
@@ -577,17 +613,25 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 
 		switch (dyn->d_tag) {
 		case DT_POSFLAG_1:
-			if ((dyn->d_un.d_val & DF_P1_LAZYLOAD) &&
-			    !(lmtflags & LML_TFLG_NOLAZYLD))
-				lazy = 1;
-			if (dyn->d_un.d_val & DF_P1_GROUPPERM)
-				flags = (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+			dip->di_flags |= FLG_DI_POSFLAG1;
 			continue;
 		case DT_NEEDED:
 		case DT_USED:
+			lazy = flags = 0;
 			dip->di_flags |= FLG_DI_NEEDED;
-			if (flags)
-				dip->di_flags |= FLG_DI_GROUP;
+
+			if (pdyn && (pdyn->d_tag == DT_POSFLAG_1)) {
+				if ((pdyn->d_un.d_val & DF_P1_LAZYLOAD) &&
+				    ((lmtflags & LML_TFLG_NOLAZYLD) == 0)) {
+					dip->di_flags |= FLG_DI_LAZY;
+					lazy = 1;
+				}
+				if (pdyn->d_un.d_val & DF_P1_GROUPPERM) {
+					dip->di_flags |= FLG_DI_GROUP;
+					flags =
+					    (FLG_RT_SETGROUP | FLG_RT_HANDLE);
+				}
+			}
 
 			name = (char *)STRTAB(clmp) + dyn->d_un.d_val;
 
@@ -634,28 +678,32 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 			break;
 		case DT_AUXILIARY:
 			dip->di_flags |= FLG_DI_AUXFLTR;
-			lazy = flags = 0;
 			continue;
 		case DT_SUNW_AUXILIARY:
 			dip->di_flags |= (FLG_DI_AUXFLTR | FLG_DI_SYMFLTR);
-			lazy = flags = 0;
 			continue;
 		case DT_FILTER:
 			dip->di_flags |= FLG_DI_STDFLTR;
-			lazy = flags = 0;
 			continue;
 		case DT_SUNW_FILTER:
 			dip->di_flags |= (FLG_DI_STDFLTR | FLG_DI_SYMFLTR);
-			lazy = flags = 0;
 			continue;
 		default:
-			lazy = flags = 0;
 			continue;
 		}
 
 		DBG_CALL(Dbg_file_needed(clmp, name));
+
+		/*
+		 * If we're running under ldd(1), indicate that this dependency
+		 * has been processed.  It doesn't matter whether the object is
+		 * successfully loaded or not, this flag simply ensures that we
+		 * don't repeatedly attempt to load an object that has already
+		 * failed to load.  To do so would create multiple failure
+		 * diagnostics for the same object under ldd(1).
+		 */
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE)
-			dip->di_flags |= FLG_DI_PROCESSD;
+			dip->di_flags |= FLG_DI_LDD_DONE;
 
 		/*
 		 * Establish the objects name, load it and establish a binding
@@ -675,7 +723,7 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp)
 			remove_pnode(pnp);
 		if (silent)
 			rtld_flags &= ~RT_FL_SILENCERR;
-		lazy = flags = 0;
+
 		if ((dip->di_info = (void *)nlmp) == 0) {
 			/*
 			 * If the object could not be mapped, continue if error
@@ -1989,7 +2037,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		if ((sip->si_flags & SYMINFO_FLG_FILTER) ||
 		    ((sip->si_flags & SYMINFO_FLG_AUXILIARY) &&
 		    SYMAFLTRCNT(ilmp))) {
-			Sym *	fsym;
+			Sym	*fsym;
 
 			/*
 			 * This symbol has an associated filtee.  Lookup the
@@ -2010,7 +2058,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 	 * Determine if this object provides global filtering.
 	 */
 	if (flags1 & (FL1_RT_OBJSFLTR | FL1_RT_OBJAFLTR)) {
-		Sym *	fsym;
+		Sym	*fsym;
 
 		if (OBJFLTRNDX(ilmp) != FLTR_DISABLED) {
 			/*
@@ -2097,12 +2145,12 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 	 * dynamic structure.
 	 */
 	if (ld) {
-		uint_t		dyncnt = 0;
+		uint_t		dynndx = 0;
 		Xword		pltpadsz = 0;
 		Rti_desc	*rti;
 
 		/* CSTYLED */
-		for ( ; ld->d_tag != DT_NULL; ++ld, dyncnt++) {
+		for ( ; ld->d_tag != DT_NULL; ++ld, dynndx++) {
 			switch ((Xword)ld->d_tag) {
 			case DT_SYMTAB:
 				SYMTAB(lmp) = (void *)(ld->d_un.d_ptr + base);
@@ -2138,8 +2186,8 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			case DT_REL:
 			case DT_RELA:
 				/*
-				 * At this time we can only handle 1 type of
-				 * relocation per object.
+				 * At this time, ld.so. can only handle one
+				 * type of relocation per object.
 				 */
 				REL(lmp) = (void *)(ld->d_un.d_ptr + base);
 				break;
@@ -2207,13 +2255,13 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				break;
 			case DT_FILTER:
 				fltr = ld->d_un.d_val;
-				OBJFLTRNDX(lmp) = dyncnt;
+				OBJFLTRNDX(lmp) = dynndx;
 				FLAGS1(lmp) |= FL1_RT_OBJSFLTR;
 				break;
 			case DT_AUXILIARY:
 				if (!(rtld_flags & RT_FL_NOAUXFLTR)) {
 					fltr = ld->d_un.d_val;
-					OBJFLTRNDX(lmp) = dyncnt;
+					OBJFLTRNDX(lmp) = dynndx;
 				}
 				FLAGS1(lmp) |= FL1_RT_OBJAFLTR;
 				break;
@@ -2435,7 +2483,6 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			}
 		}
 
-
 		if (PLTPAD(lmp)) {
 			if (pltpadsz == (Xword)0)
 				PLTPAD(lmp) = 0;
@@ -2445,14 +2492,14 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 		}
 
 		/*
-		 * Allocate Dynamic Info structure
+		 * Allocate a Dynamic Info structure.
 		 */
-		if ((DYNINFO(lmp) = calloc((size_t)dyncnt,
+		if ((DYNINFO(lmp) = calloc((size_t)dynndx,
 		    sizeof (Dyninfo))) == 0) {
 			remove_so(0, lmp);
 			return (0);
 		}
-		DYNINFOCNT(lmp) = dyncnt;
+		DYNINFOCNT(lmp) = dynndx;
 	}
 
 	/*
@@ -3245,13 +3292,13 @@ elf_lazy_cleanup(APlist *alp)
 	 * Cleanup any link-maps added to this dynamic list and free it.
 	 */
 	for (APLIST_TRAVERSE(alp, idx, lmp))
-		FLAGS(lmp) &= ~FLG_RT_DLSYM;
+		FLAGS(lmp) &= ~FLG_RT_TMPLIST;
 	free(alp);
 }
 
 /*
- * This routine is called upon to search for a symbol from the dependencies of
- * the initial link-map.  To maintain lazy loadings goal of reducing the number
+ * This routine is called as a last fall-back to search for a symbol from a
+ * standard relocation.  To maintain lazy loadings goal of reducing the number
  * of objects mapped, any symbol search is first carried out using the objects
  * that already exist in the process (either on a link-map list or handle).
  * If a symbol can't be found, and lazy dependencies are still pending, this
@@ -3263,7 +3310,6 @@ elf_lazy_cleanup(APlist *alp)
  * as someone elses dependency.  Thus there's a possibility of some symbol
  * search duplication.
  */
-
 Sym *
 elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 {
@@ -3273,35 +3319,65 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 	Rt_map		*lmp1, *lmp = slp->sl_imap;
 	const char	*name = slp->sl_name;
 
+	/*
+	 * Generate a local list of new objects to process.  This list can grow
+	 * as each object supplies its own lazy dependencies.
+	 */
 	if (aplist_append(&alist, lmp, AL_CNT_LAZYFIND) == NULL)
 		return (NULL);
-	FLAGS(lmp) |= FLG_RT_DLSYM;
+	FLAGS(lmp) |= FLG_RT_TMPLIST;
 
 	for (APLIST_TRAVERSE(alist, idx, lmp1)) {
 		uint_t	cnt = 0;
 		Slookup	sl = *slp;
-		Dyninfo	*dip;
+		Dyninfo	*dip, *pdip;
 
 		/*
-		 * Loop through the DT_NEEDED entries examining each object for
-		 * the symbol.  If the symbol is not found the object is in turn
-		 * added to the alist, so that its DT_NEEDED entires may be
-		 * examined.
+		 * Discard any relocation index from further symbol searches.
+		 * This index will have already been used to trigger any
+		 * necessary lazy-loads, and it might be because one of these
+		 * lazy loads have failed that we're here performing this
+		 * fallback.  By removing the relocation index we don't try
+		 * and perform the same failed lazy loading activity again.
+		 */
+		sl.sl_rsymndx = 0;
+
+		/*
+		 * Loop through the lazy DT_NEEDED entries examining each object
+		 * for the required symbol.  If the symbol is not found, the
+		 * object is in turn added to the local alist, so that the
+		 * objects lazy DT_NEEDED entries can be examined.
 		 */
 		lmp = lmp1;
-		for (dip = DYNINFO(lmp); cnt < DYNINFOCNT(lmp); cnt++, dip++) {
+		for (dip = DYNINFO(lmp), pdip = NULL; cnt < DYNINFOCNT(lmp);
+		    cnt++, pdip = dip++) {
 			Rt_map *nlmp;
 
-			if (((dip->di_flags & FLG_DI_NEEDED) == 0) ||
+			if (((dip->di_flags & FLG_DI_LAZY) == 0) ||
 			    dip->di_info)
 				continue;
 
 			/*
-			 * If this entry defines a lazy dependency try loading
-			 * it.  If the file can't be loaded, consider this
-			 * non-fatal and continue the search (lazy loaded
-			 * dependencies need not exist and their loading should
-			 * only be fatal if called from a relocation).
+			 * If this object has already failed to lazy load, and
+			 * we're still processing the same runtime linker
+			 * operation that produced the failure, don't bother
+			 * to try and load the object again.
+			 */
+			if ((dip->di_flags & FLG_DI_LAZYFAIL) && pdip &&
+			    (pdip->di_flags & FLG_DI_POSFLAG1)) {
+				if (pdip->di_info == (void *)ld_entry_cnt)
+					continue;
+
+				dip->di_flags &= ~FLG_DI_LAZYFAIL;
+				pdip->di_info = NULL;
+			}
+
+			/*
+			 * Try loading this lazy dependency.  If the object
+			 * can't be loaded, consider this non-fatal and continue
+			 * the search.  Lazy loaded dependencies need not exist
+			 * and their loading should only turn out to be fatal
+			 * if they are required to satisfy a relocation.
 			 *
 			 * If the file is already loaded and relocated we must
 			 * still inspect it for symbols, even though it might
@@ -3311,7 +3387,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 			 * search, whereas before the object might have been
 			 * skipped.
 			 */
-			if ((nlmp = elf_lazy_load(lmp, cnt, name)) == 0)
+			if ((nlmp = elf_lazy_load(lmp, &sl, cnt, name)) == 0)
 				continue;
 
 			/*
@@ -3320,7 +3396,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 			 * found add the object to the dynamic list so that we
 			 * can inspect its dependencies.
 			 */
-			if (FLAGS(nlmp) & FLG_RT_DLSYM)
+			if (FLAGS(nlmp) & FLG_RT_TMPLIST)
 				continue;
 
 			sl.sl_imap = nlmp;
@@ -3338,7 +3414,7 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo)
 					elf_lazy_cleanup(alist);
 					return (0);
 				}
-				FLAGS(nlmp) |= FLG_RT_DLSYM;
+				FLAGS(nlmp) |= FLG_RT_TMPLIST;
 			}
 		}
 		if (sym)

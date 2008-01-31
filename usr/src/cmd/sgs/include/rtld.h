@@ -500,10 +500,16 @@ typedef struct {
 					/*	and DT_SYMAUXILIARY */
 #define	MSK_DI_FILTER	0x0000f		/* mask for all filter possibilities */
 
-#define	FLG_DI_NEEDED	0x00010		/* entry represents a dependency */
-#define	FLG_DI_GROUP	0x00020		/* open dependency as a group */
-#define	FLG_DI_PROCESSD	0x00040		/* entry has been processed */
+#define	FLG_DI_POSFLAG1	0x00010		/* .dynamic entry for DT_POSFLAG_1 */
+#define	FLG_DI_NEEDED	0x00020		/* .dynamic entry for DT_NEEDED */
+#define	FLG_DI_LAZY	0x00100		/* lazy needed entry - preceded by */
+					/*    DF_P1_LAZYLOAD (DT_POSFLAG_1) */
+#define	FLG_DI_GROUP	0x00200		/* group needed entry - preceded by */
+					/*    DF_P1_GROUPPERM (DT_POSFLAG_1) */
 
+#define	FLG_DI_LDD_DONE	0x01000		/* entry has been processed (ldd) */
+#define	FLG_DI_LAZYFAIL	0x02000		/* the lazy loading of this entry */
+					/*    failed */
 /*
  * Data Structure to track AVL tree for pathnames of objects
  * loaded into memory
@@ -723,7 +729,7 @@ typedef struct rt_map32 {
 #define	MSK_RT_INTPOSE	0x03000000	/* mask for all interposer */
 					/*	possibilities */
 #define	FLG_RT_MOVE	0x04000000	/* object needs move operation */
-#define	FLG_RT_DLSYM	0x08000000	/* dlsym in progress on object */
+#define	FLG_RT_TMPLIST	0x08000000	/* object is part of a temporary list */
 #define	FLG_RT_REGSYMS	0x10000000	/* object has DT_REGISTER entries */
 #define	FLG_RT_INITCLCT	0x20000000	/* init has been collected (tsort) */
 #define	FLG_RT_HANDLE	0x40000000	/* generate a handle for this object */
@@ -864,7 +870,7 @@ typedef struct rt_map32 {
 #define	LKUP_WEAK	0x0040		/* relocation reference is weak */
 #define	LKUP_NEXT	0x0080		/* request originates from RTLD_NEXT */
 #define	LKUP_NODESCENT	0x0100		/* don't descend through dependencies */
-#define	LKUP_NOFALBACK	0x0200		/* don't fall back to loading */
+#define	LKUP_NOFALLBACK	0x0200		/* don't fall back to loading */
 					/*	pending lazy dependencies */
 #define	LKUP_DIRECT	0x0400		/* direct binding request */
 #define	LKUP_SYMNDX	0x0800		/* establish symbol index */
@@ -873,12 +879,47 @@ typedef struct rt_map32 {
 					/* 	head link-map element */
 
 /*
- * Data structure for calling lookup_sym()
+ * For the runtime linker to perform a symbol search, a number of data items
+ * related to the search are required.  An Slookup data structure is used to
+ * convey this data to lookup_sym(), and in special cases, to other core
+ * routines that provide the implementation details for lookup_sym()
+ *
+ * The symbol name (sl_name), the caller (sl_cmap), and the link-map from which
+ * to start the search (sl_imap) are fundamental to the symbol search.  The
+ * initial search link-map might get modified by the core routines that provide
+ * the implementation details for lookup_sym().  This modification accommodates
+ * requirements such as processing a handle, direct binding and interposition.
+ * The association between the caller and the potential destination also
+ * determines whether the destination is a candidate to search.
+ *
+ * The lookup identifier (sl_id) is used to identify a runtime linker operation.
+ * Within this operation, any lazy loads that fail are not re-examined.  This
+ * technique keeps the overhead of processing a failed lazy load to a minimum.
+ *
+ * Symbol searches that originate from a relocation record are accompanied by
+ * the relocation index (sl_rsymndx), the symbol reference (sl_rsym) and
+ * possibly the relocation type (sl_rtype).  This data provides for determining
+ * lazy loading, direct binding, and special symbol processing requirements
+ * such as copy relocations and singleton lookup.
+ *
+ * The symbols hash value is computed by lookup_sym, and propagated throughout
+ * the search engine.  Note, occasionally the Slookup data is passed to a core
+ * routine that provides the implementation details for lookup_sym(), ie.
+ * elf_find_sym(), in which case the caller must initialize the hash value.
+ *
+ * The symbols binding information is established by lookup_sym() when the
+ * symbols relocation type is supplied.  Weak bindings allow relocations to
+ * be set to zero should a symbol lookup fail.
+ *
+ * The flags allow the caller to control aspects of the search, including the
+ * interpretation of copy relocations, etc.  Note, a number of flag settings
+ * are established in lookup_sym() from attributes of the symbol reference.
  */
 typedef struct {
 	const char	*sl_name;	/* symbol name */
 	Rt_map		*sl_cmap;	/* callers link-map */
 	Rt_map		*sl_imap;	/* initial link-map to search */
+	ulong_t		sl_id;		/* identifier for this lookup */
 	ulong_t		sl_hash;	/* symbol hash value */
 	ulong_t		sl_rsymndx;	/* referencing reloc symndx */
 	Sym		*sl_rsym;	/* referencing symbol */
@@ -888,7 +929,16 @@ typedef struct {
 	uint_t		sl_flags;	/* lookup flags */
 } Slookup;
 
+#define	SLOOKUP_INIT(sl, name, cmap, imap, id, hash, rsymndx, rsym, rtype, \
+    flags) \
+	(void) (sl.sl_name = (name), sl.sl_cmap = (cmap), sl.sl_imap = (imap), \
+	    sl.sl_id = (id), sl.sl_hash = (hash), sl.sl_rsymndx = (rsymndx), \
+	    sl.sl_rsym = (rsym), sl.sl_rtype = (rtype), sl.sl_bind = 0, \
+	    sl.sl_flags = (flags))
 
+/*
+ * Define a number of .plt lookup outcomes, for use in binding diagnostics.
+ */
 typedef	enum {
 	PLT_T_NONE = 0,
 	PLT_T_21D,
@@ -903,6 +953,8 @@ typedef	enum {
 /*
  * Prototypes.
  */
+extern ulong_t		ld_entry_cnt;	/* counter bumped on each entry to */
+					/*    ld.so.1. */
 extern Lm_list		lml_main;	/* main's link map list */
 extern Lm_list		lml_rtld;	/* rtld's link map list */
 extern Lm_list		*lml_list[];

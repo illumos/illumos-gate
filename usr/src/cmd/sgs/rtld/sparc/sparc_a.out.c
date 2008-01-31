@@ -111,15 +111,11 @@ aout_bndr(caddr_t pc)
 	llmp = lml->lm_tail;
 
 	/*
-	 * Find definition for symbol.
+	 * Find definition for symbol.  Initialize the symbol lookup data
+	 * structure.
 	 */
-	sl.sl_name = name;
-	sl.sl_cmap = lmp;
-	sl.sl_imap = lml->lm_head;
-	sl.sl_hash = 0;
-	sl.sl_rsymndx = 0;
-	sl.sl_rsym = 0;
-	sl.sl_flags = LKUP_DEFT;
+	SLOOKUP_INIT(sl, name, lmp, lml->lm_head, ld_entry_cnt, 0, 0, 0, 0,
+	    LKUP_DEFT);
 
 	if ((sym = aout_lookup_sym(&sl, &nlmp, &binfo)) == 0) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOSYM), NAME(lmp),
@@ -280,16 +276,11 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 			name = &LM2LP(lmp)->lp_symstr[sp->n_un.n_strx];
 
 			/*
-			 * Locate symbol.
+			 * Locate symbol.  Initialize the symbol lookup data
+			 * structure.
 			 */
-			sl.sl_name = name;
-			sl.sl_cmap = lmp;
-			sl.sl_imap = 0;
-			sl.sl_hash = 0;
-			sl.sl_rsymndx = 0;
-			sl.sl_rsym = 0;
-			sl.sl_rtype = 0;
-			sl.sl_flags = (LKUP_DEFT | LKUP_STDRELOC);
+			SLOOKUP_INIT(sl, name, lmp, 0, ld_entry_cnt, 0, 0, 0, 0,
+			    LKUP_STDRELOC);
 
 			if ((sym = aout_lookup_sym(&sl, &_lmp, &binfo)) == 0) {
 				if (lml->lm_flags & LML_FLG_TRC_WARN) {
