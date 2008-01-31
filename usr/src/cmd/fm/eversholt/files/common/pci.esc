@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1112,7 +1112,7 @@ event ereport.io.device.stall@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.badint_limit@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.intern_corr@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.device.intern_uncorr@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.device.nf-device@pcibus/pcidev/pcifn;
+event ereport.io.device.nf-device@pcibus/pcidev/pcifn{within(5s)};
 
 prop error.io.service.restored@pcibus/pcidev/pcifn { IS_LEAF } (1)->
     ereport.io.service.lost@pcibus/pcidev/pcifn,
@@ -1171,8 +1171,8 @@ prop upset.io.device.nonfatal@pcibus/pcidev/pcifn { IS_LEAF } (1)->
  * no service impact - otherwise fail immediately
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event ereport.io.pci.nf-dpe-d@pcibus/pcidev/pcifn;
-event ereport.io.pci.nf-dpe-u@pcibus/pcidev/pcifn;
+event ereport.io.pci.nf-dpe-d@pcibus/pcidev/pcifn{within(5s)};
+event ereport.io.pci.nf-dpe-u@pcibus/pcidev/pcifn{within(5s)};
 
 engine serd.io.pci.nf-dpe-u@pcibus/pcidev/pcifn,
     N=NONFATAL_DPE_U_COUNT, T=NONFATAL_DPE_U_TIME, method=persistent,

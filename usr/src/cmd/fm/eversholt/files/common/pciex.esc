@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,8 @@ event fault.io.pciex.bus-linkerr@pciexbus/pciexdev/pciexfn,
 event error.io.pciex.corrlink@pciexbus;
 event error.io.pciex.corrlink@pciexrc/pciexbus;
 event error.io.pciex.corrlink@pciexbus/pciexdev/pciexfn/pciexbus;
-event ereport.io.pciex.corrlink_trip@pciexbus;
+event error.io.pciex.corrlink_trip@pciexbus;
+event ereport.io.pciex.corrlink_trip@pciexbus{within(5s)};
 
 engine serd.io.pciex.corrlink@pciexbus,
     N=CORRLINK_COUNT, T=CORRLINK_TIME, method=persistent,
@@ -185,6 +186,12 @@ event upset.io.pciex.corrlink@pciexbus,
 
 prop upset.io.pciex.corrlink@pciexbus (1)->
     error.io.pciex.corrlink@pciexbus;
+
+prop error.io.pciex.corrlink_trip@pciexbus (1)->
+    ereport.io.pciex.corrlink_trip@pciexbus;
+
+prop error.io.pciex.corrlink_trip@pciexbus (0)->
+   error.io.pciex.corrlink@pciexbus;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -202,7 +209,7 @@ event ereport.io.service.lost@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.degraded@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn{within(5s)};
 event ereport.io.service.restored@pciexbus/pciexdev/pciexfn{within(30s)};
-event ereport.io.device.nf-device@pciexbus/pciexdev/pciexfn;
+event ereport.io.device.nf-device@pciexbus/pciexdev/pciexfn{within(5s)};
 
 event error.io.service.restored@pciexbus/pciexdev/pciexfn;
 event error.io.device.nf-device@pciexbus/pciexdev/pciexfn;
@@ -258,8 +265,8 @@ prop upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn (1)->
  * no service impact - otherwise fail immediately
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event ereport.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn;
-event ereport.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn;
+event ereport.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn{within(5s)};
 
 event error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn;
@@ -360,7 +367,7 @@ event error.io.pciex.mtlp-d@pciexrc/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.badreq-d@pciexrc/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-nf-d@pciexrc/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-f-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event ereport.io.pciex.corrlink_trip@pciexrc/pciexbus;
+event error.io.pciex.corrlink_trip@pciexrc/pciexbus;
 event error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn;
 
 prop fault.io.pciex.device-noresp@pciexrc (1)->
@@ -374,7 +381,7 @@ prop fault.io.pciex.device-interr@pciexrc (1)->
     error.io.pciex.flt-f-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
     error.io.pciex.flt-ca-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
     error.io.pciex.mtlp-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
-    ereport.io.pciex.corrlink_trip@pciexrc/pciexbus<>,
+    error.io.pciex.corrlink_trip@pciexrc/pciexbus<>,
     error.io.pciex.fatlink@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
 
 /*
@@ -414,7 +421,7 @@ prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_SWU } (1)->
     error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
     error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn,
     error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.corrlink_trip@pciexbus,
+    error.io.pciex.corrlink_trip@pciexbus,
     error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn;
 
 prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
@@ -424,7 +431,7 @@ prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
     error.io.device.f-device@pciexbus/pciexdev/pciexfn,
     error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
     error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.corrlink_trip@pciexbus,
+    error.io.pciex.corrlink_trip@pciexbus,
     error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn;
 
 /*
@@ -445,7 +452,7 @@ event error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
 event error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event ereport.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus;
+event error.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus;
 event error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
 
 prop fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn { IS_SWD } (1)->
@@ -455,7 +462,7 @@ prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_SWD } (1)->
     error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
     error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
     error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
-    ereport.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus<>,
+    error.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus<>,
     error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
 
 /*
@@ -477,7 +484,7 @@ prop fault.io.pciex.bus-noresp@pciexbus/pciexdev/pciexfn (0)->
 	{ IS_SWU || IS_LEAF || IS_BDG };
 
 prop fault.io.pciex.bus-linkerr@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.corrlink_trip@pciexbus,
+    error.io.pciex.corrlink_trip@pciexbus,
     error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn
 	{ IS_SWU || IS_LEAF || IS_BDG };
 
@@ -534,7 +541,7 @@ prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_BDG } (1)->
     error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
     error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn,
     error.io.pciex.sec-interr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.corrlink_trip@pciexbus,
+    error.io.pciex.corrlink_trip@pciexbus,
     error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn,
     error.io.pci.ta-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
     error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,

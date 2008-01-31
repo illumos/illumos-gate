@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.c -- fault management exercise module
@@ -1226,9 +1226,146 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 		    &tripped[ntrip].ename, &tripped[ntrip].ipp))
 			ntrip++;
 
-	for (i = 0; i < ntrip; i++)
-		fme_receive_report(fmep->hdl, ffep,
-		    tripped[i].ename, tripped[i].ipp, NULL);
+	for (i = 0; i < ntrip; i++) {
+		struct event *ep, *nep;
+		struct fme *nfmep;
+		fmd_case_t *fmcase;
+		const struct ipath *ipp;
+		const char *eventstring;
+		int prev_verbose;
+		unsigned long long my_delay = TIMEVAL_EVENTUALLY;
+		enum fme_state state;
+
+		/*
+		 * First try and evaluate a case with the trip ereport plus
+		 * all the other ereports that cause the trip. If that fails
+		 * to evaluate then try again with just this ereport on its own.
+		 */
+		out(O_ALTFP|O_NONL, "fme_receive_report_serd: ");
+		ipath_print(O_ALTFP|O_NONL, tripped[i].ename, tripped[i].ipp);
+		out(O_ALTFP|O_STAMP, NULL);
+		ep = fmep->e0;
+		eventstring = ep->enode->u.event.ename->u.name.s;
+		ipp = ep->ipp;
+		prune_propagations(eventstring, ipp);
+
+		/*
+		 * create a duplicate fme and case
+		 */
+		fmcase = fmd_case_open(fmep->hdl, NULL);
+		out(O_ALTFP|O_NONL, "duplicate fme for event [");
+		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+		out(O_ALTFP, " ]");
+		if ((nfmep = newfme(eventstring, ipp, fmep->hdl,
+		    fmcase)) == NULL) {
+			out(O_ALTFP|O_NONL, "[");
+			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+			out(O_ALTFP, " CANNOT DIAGNOSE]");
+			publish_undiagnosable(fmep->hdl, ffep, fmcase);
+			continue;
+		}
+		Open_fme_count++;
+		nfmep->pull = fmep->pull;
+		init_fme_bufs(nfmep);
+		out(O_ALTFP|O_NONL, "[");
+		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+		out(O_ALTFP, " created FME%d, case %s]", nfmep->id,
+		    fmd_case_uuid(nfmep->hdl, nfmep->fmcase));
+		if (ffep) {
+			fmd_case_setprincipal(nfmep->hdl, nfmep->fmcase, ffep);
+			nfmep->e0r = ffep;
+		}
+
+		/*
+		 * add the original ereports
+		 */
+		for (ep = fmep->observations; ep; ep = ep->observations) {
+			eventstring = ep->enode->u.event.ename->u.name.s;
+			ipp = ep->ipp;
+			out(O_ALTFP|O_NONL, "adding event [");
+			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+			out(O_ALTFP, " ]");
+			nep = itree_lookup(nfmep->eventtree, eventstring, ipp);
+			if (nep->count++ == 0) {
+				nep->observations = nfmep->observations;
+				nfmep->observations = nep;
+				serialize_observation(nfmep, eventstring, ipp);
+				nep->nvp = evnv_dupnvl(ep->nvp);
+			}
+			if (ffep)
+				fmd_case_add_ereport(nfmep->hdl, nfmep->fmcase,
+				    ffep);
+			stats_counter_bump(nfmep->Rcount);
+		}
+
+		/*
+		 * add the serd trigger ereport
+		 */
+		if ((ep = itree_lookup(nfmep->eventtree, tripped[i].ename,
+		    tripped[i].ipp)) == NULL) {
+			/*
+			 * The trigger ereport is not in the instance tree. It
+			 * was presumably removed by prune_propagations() as
+			 * this combination of events is not present in the
+			 * rules.
+			 */
+			out(O_ALTFP, "upsets_eval: e0 not in instance tree");
+			Undiag_reason = UD_BADEVENTI;
+			goto retry_lone_ereport;
+		}
+		out(O_ALTFP|O_NONL, "adding event [");
+		ipath_print(O_ALTFP|O_NONL, tripped[i].ename, tripped[i].ipp);
+		out(O_ALTFP, " ]");
+		nfmep->ecurrent = ep;
+		ep->nvp = NULL;
+		ep->count = 1;
+		ep->observations = nfmep->observations;
+		nfmep->observations = ep;
+
+		/*
+		 * just peek first.
+		 */
+		nfmep->peek = 1;
+		prev_verbose = Verbose;
+		if (Debug == 0)
+			Verbose = 0;
+		lut_walk(nfmep->eventtree, (lut_cb)clear_arrows, (void *)nfmep);
+		state = hypothesise(nfmep, nfmep->e0, nfmep->ull, &my_delay);
+		nfmep->peek = 0;
+		Verbose = prev_verbose;
+		if (state == FME_DISPROVED) {
+			out(O_ALTFP, "upsets_eval: hypothesis disproved");
+			Undiag_reason = UD_UNSOLVD;
+retry_lone_ereport:
+			/*
+			 * However the trigger ereport on its own might be
+			 * diagnosable, so check for that. Undo the new fme
+			 * and case we just created and call fme_receive_report.
+			 */
+			out(O_ALTFP|O_NONL, "[");
+			ipath_print(O_ALTFP|O_NONL, tripped[i].ename,
+			    tripped[i].ipp);
+			out(O_ALTFP, " retrying with just trigger ereport]");
+			itree_free(nfmep->eventtree);
+			nfmep->eventtree = NULL;
+			structconfig_free(nfmep->config);
+			nfmep->config = NULL;
+			destroy_fme_bufs(nfmep);
+			fmd_case_close(nfmep->hdl, nfmep->fmcase);
+			fme_receive_report(fmep->hdl, ffep,
+			    tripped[i].ename, tripped[i].ipp, NULL);
+			continue;
+		}
+
+		/*
+		 * and evaluate
+		 */
+		serialize_observation(nfmep, tripped[i].ename, tripped[i].ipp);
+		if (ffep)
+			fmd_case_add_ereport(nfmep->hdl, nfmep->fmcase, ffep);
+		stats_counter_bump(nfmep->Rcount);
+		fme_eval(nfmep, ffep);
+	}
 
 	return (ntrip);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.c -- instanced pathname module
@@ -373,6 +373,8 @@ ipath_fini(void)
 {
 	lut_free(Ipaths, ipath_destructor, NULL);
 	Ipaths = NULL;
+	lut_free(Usednames, NULL, NULL);
+	Usednames = NULL;
 
 	if (Nipath) {
 		stats_delete(Nipath);
