@@ -124,6 +124,23 @@ uint32_t nb5000_docmd_pex = DOCMD_PEX;
 
 int nb_mask_mc_set;
 
+typedef struct find_dimm_label {
+	void (*label_function)(int, char *, int);
+} find_dimm_label_t;
+
+static void x8450_dimm_label(int, char *, int);
+
+static struct platform_label {
+	const char *sys_vendor;		/* SMB_TYPE_SYSTEM vendor prefix */
+	const char *sys_product;	/* SMB_TYPE_SYSTEM product prefix */
+	find_dimm_label_t dimm_label;
+	int dimms_per_channel;
+} platform_label[] = {
+	{ "SUN MICROSYSTEMS", "SUN BLADE X8450 SERVER MODULE",
+	    x8450_dimm_label, 8 },
+	{ NULL, NULL, NULL, 0 }
+};
+
 static unsigned short
 read_spd(int bus)
 {
@@ -241,12 +258,15 @@ nb_dimm_init(int channel, int dimm, uint16_t mtr)
 	int i, t;
 	int spd_sz;
 
+	if (MTR_PRESENT(mtr) == 0)
+		return (NULL);
 	t = read_spd_eeprom(channel, dimm, 2) & 0xf;
 
 	if (t != 9)
 		return (NULL);
 
 	dp = kmem_zalloc(sizeof (nb_dimm_t), KM_SLEEP);
+
 	t = read_spd_eeprom(channel, dimm, 0) & 0xf;
 	if (t == 1)
 		spd_sz = 128;
@@ -355,8 +375,7 @@ nb_mc_init()
 			branch_interleave = 0;
 			hole_base = 0;
 			hole_size = 0;
-			DMIR_RANKS(nb_dimms_per_channel, dmir, rank0, rank1,
-			    rank2, rank3);
+			DMIR_RANKS(dmir, rank0, rank1, rank2, rank3);
 			if (rank0 == rank1)
 				interleave = 1;
 			else if (rank0 == rank2)
@@ -453,22 +472,45 @@ memoryarray(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 	return (0);
 }
 
-void
+find_dimm_label_t *
 find_dimms_per_channel()
 {
-	if (nb_dimms_per_channel == 0) {
-		if (ksmbios != NULL) {
+	struct platform_label *pl;
+	smbios_info_t si;
+	smbios_system_t sy;
+	id_t id;
+	int read_memarray = 1;
+	find_dimm_label_t *rt = NULL;
+
+	if (ksmbios != NULL) {
+		if ((id = smbios_info_system(ksmbios, &sy)) != SMB_ERR &&
+		    smbios_info_common(ksmbios, id, &si) != SMB_ERR) {
+			for (pl = platform_label; pl->sys_vendor; pl++) {
+				if (strncmp(pl->sys_vendor,
+				    si.smbi_manufacturer,
+				    strlen(pl->sys_vendor)) == 0 &&
+				    strncmp(pl->sys_product, si.smbi_product,
+				    strlen(pl->sys_product)) == 0) {
+					nb_dimms_per_channel =
+					    pl->dimms_per_channel;
+					read_memarray = 0;
+					rt = &pl->dimm_label;
+					break;
+				}
+			}
+		}
+		if (read_memarray)
 			(void) smbios_iter(ksmbios, memoryarray, 0);
+	}
+	if (nb_dimms_per_channel == 0) {
+		if (ndimms) {
 			nb_dimms_per_channel = ndimms /
 			    (nb_number_memory_controllers * 2);
-		}
-		if (nb_dimms_per_channel == 0) {
-			if (nb_chipset == INTEL_NB_7300)
-				nb_dimms_per_channel = 8;
-			else
-				nb_dimms_per_channel = 4;
+		} else {
+			nb_dimms_per_channel = NB_MAX_DIMMS_PER_CHANNEL;
 		}
 	}
+	return (rt);
 }
 
 static int
@@ -502,9 +544,18 @@ nb_smbios()
 }
 
 static void
-nb_dimms_init()
+x8450_dimm_label(int dimm, char *label, int label_sz)
 {
-	int i, j, k;
+	int channel = dimm >> 3;
+
+	dimm = dimm & 0x7;
+	(void) snprintf(label, label_sz, "D%d", (dimm * 4) + channel);
+}
+
+static void
+nb_dimms_init(find_dimm_label_t *label_function)
+{
+	int i, j, k, l;
 	uint16_t mtr;
 	uint32_t mc, mca;
 	uint32_t spcpc;
@@ -540,15 +591,30 @@ nb_dimms_init()
 				dimm_add_geometry(i, j, dimmpp[j]->nbanks,
 				    dimmpp[j]->width, dimmpp[j]->ncolumn,
 				    dimmpp[j]->nrow);
+				if (label_function) {
+					label_function->label_function(
+					    (k * nb_dimms_per_channel) + j,
+					    dimmpp[j]->label,
+					    sizeof (dimmpp[j]->label));
+				}
 			}
 			dimmpp[j + nb_dimms_per_channel] =
 			    nb_dimm_init(k + 1, j, mtr);
-			if (dimmpp[j + nb_dimms_per_channel])
+			l = j + nb_dimms_per_channel;
+			if (dimmpp[l]) {
+				if (label_function) {
+					label_function->label_function(
+					    (k * nb_dimms_per_channel) + l,
+					    dimmpp[l]->label,
+					    sizeof (dimmpp[l]->label));
+				}
 				nb_ndimm ++;
+			}
 		}
 		dimmpp += nb_dimms_per_channel * 2;
 	}
-	nb_smbios();
+	if (label_function == NULL)
+		nb_smbios();
 }
 
 static void
@@ -959,7 +1025,9 @@ nb_mask_mc_reset()
 int
 nb_dev_init()
 {
-	find_dimms_per_channel();
+	find_dimm_label_t *label_function_p;
+
+	label_function_p = find_dimms_per_channel();
 	mutex_init(&nb_mutex, NULL, MUTEX_DRIVER, NULL);
 	nb_queue = errorq_create("nb_queue", nb_drain, NULL, NB_MAX_ERRORS,
 	    sizeof (nb_logout_t), 1, ERRORQ_VITAL);
@@ -967,11 +1035,11 @@ nb_dev_init()
 		mutex_destroy(&nb_mutex);
 		return (EAGAIN);
 	}
+	nb_int_init();
 	dimm_init();
-	nb_dimms_init();
+	nb_dimms_init(label_function_p);
 	nb_mc_init();
 	nb_pex_init();
-	nb_int_init();
 	nb_fbd_init();
 	nb_fsb_init();
 	nb_scrubber_enable();
@@ -1009,14 +1077,15 @@ nb_dev_reinit()
 	nb_dimm_t *dimmp;
 	nb_dimm_t **old_nb_dimms;
 	int old_nb_dimms_per_channel;
+	find_dimm_label_t *label_function_p;
 
 	old_nb_dimms = nb_dimms;
 	old_nb_dimms_per_channel = nb_dimms_per_channel;
 
 	dimm_fini();
-	find_dimms_per_channel();
+	label_function_p = find_dimms_per_channel();
 	dimm_init();
-	nb_dimms_init();
+	nb_dimms_init(label_function_p);
 	nb_mc_init();
 	nb_pex_init();
 	nb_int_init();

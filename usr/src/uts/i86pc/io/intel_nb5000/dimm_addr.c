@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/cmn_err.h>
 #include <sys/sunddi.h>
+#include <sys/mc_intel.h>
 #include "dimm_addr.h"
 #include "nb_log.h"
 #include "rank.h"

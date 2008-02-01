@@ -36,6 +36,7 @@ extern "C" {
 #include <sys/cpu_module.h>
 
 #define	NB_5000_MAX_MEM_CONTROLLERS	2
+#define	NB_MAX_DIMMS_PER_CHANNEL	(nb_chipset == INTEL_NB_7300 ? 8 : 4)
 #define	NB_MEM_BRANCH_SELECT		3
 #define	NB_MAX_MEM_BRANCH_SELECT	3
 #define	NB_MEM_RANK_SELECT		(nb_chipset == INTEL_NB_7300 ? 7 : 5)
@@ -684,33 +685,33 @@ extern "C" {
 	(nb_number_memory_controllers == 2) ? \
 	nb_pci_getl(0, 22, 0, 0x90 + ((reg)*4), 0) : 0
 
-#define	SPCPC_RD(branch) (nb_dimms_per_channel <= 4 ? \
+#define	SPCPC_RD(branch) (nb_chipset != INTEL_NB_7300 ? \
 	(((branch) == 0) ? \
 	(uint32_t)nb_pci_getb(0, 21, 0, 0x40, 0) : \
 	    (nb_number_memory_controllers == 2) ? \
 	    (uint32_t)nb_pci_getb(0, 22, 0, 0x40, 0) : 0) : \
 	nb_pci_getl(0, ((branch) == 0) ? 21 : 22, 0, 0x40, 0))
 
-#define	SPCPC_SPARE_ENABLE (nb_dimms_per_channel <= 4 ? 1 : 0x20)
-#define	SPCPC_SPRANK(spcpc) (nb_dimms_per_channel <= 4 ? \
+#define	SPCPC_SPARE_ENABLE (nb_chipset != INTEL_NB_7300 ? 1 : 0x20)
+#define	SPCPC_SPRANK(spcpc) (nb_chipset != INTEL_NB_7300 ? \
 	(((spcpc) >> 1) & 7) : ((spcpc) & 0xf))
 
 #define	SPCPS_RD(branch) ((branch) == 0) ? \
-	nb_pci_getb(0, 21, 0, nb_dimms_per_channel <= 4 ? 0x41 : 0x43, 0) : \
+	nb_pci_getb(0, 21, 0, nb_chipset != INTEL_NB_7300 ? 0x41 : 0x43, 0) : \
 	(nb_number_memory_controllers == 2) ? \
-	nb_pci_getb(0, 22, 0, nb_dimms_per_channel <= 4 ? 0x41 : 0x43, 0) : 0
+	nb_pci_getb(0, 22, 0, nb_chipset != INTEL_NB_7300 ? 0x41 : 0x43, 0) : 0
 
 #define	SPCPS_WR(branch) \
 	if ((branch) == 0) { \
-		nb_pci_putb(0, 21, 0, nb_dimms_per_channel <= 4 ? 0x41 : 0x43, \
-		    0); \
+		nb_pci_putb(0, 21, 0, nb_chipset != INTEL_NB_7300 ? 0x41 : \
+		    0x43, 0); \
 	} else if (nb_number_memory_controllers == 2) { \
-		nb_pci_putb(0, 22, 0, nb_dimms_per_channel <= 4 ? 0x41 : 0x43, \
-		    0); \
+		nb_pci_putb(0, 22, 0, nb_chipset != INTEL_NB_7300 ? 0x41 : \
+		    0x43, 0); \
 	}
 
-#define	SPCPS_SPARE_DEPLOYED (nb_dimms_per_channel <= 4 ? 0x11 : 0x60)
-#define	SPCPS_FAILED_RANK(spcps) (nb_dimms_per_channel <= 4 ? \
+#define	SPCPS_SPARE_DEPLOYED (nb_chipset != INTEL_NB_7300 ? 0x11 : 0x60)
+#define	SPCPS_FAILED_RANK(spcps) (nb_chipset != INTEL_NB_7300 ? \
 	(((spcps) >> 1) & 7) : ((spcps) & 0xf))
 
 #define	UERRCNT_RD(branch) ((branch) == 0) ? \
@@ -819,13 +820,13 @@ extern "C" {
 #define	PCISTS_WR(val)		nb_pci_putw(0, 8, 0, 0x6, val)
 #define	PCIDEVSTS_WR(val)	nb_pci_putw(0, 8, 0, 0x76, val)
 
-#define	RANK_MASK	(nb_dimms_per_channel <= 4 ? 7 : 0xf)
-#define	CAS_MASK	(nb_dimms_per_channel <= 4 ? 0xfff : 0x1fff)
-#define	RAS_MASK	(nb_dimms_per_channel <= 4 ? 0x7fff : 0xffff)
+#define	RANK_MASK	(nb_chipset != INTEL_NB_7300 ? 7 : 0xf)
+#define	CAS_MASK	(nb_chipset != INTEL_NB_7300 ? 0xfff : 0x1fff)
+#define	RAS_MASK	(nb_chipset != INTEL_NB_7300 ? 0x7fff : 0xffff)
 #define	BANK_MASK	7
 
-#define	DMIR_RANKS(dimms_per_channel, dmir, rank0, rank1, rank2, rank3) \
-	if ((dimms_per_channel) <= 4) { \
+#define	DMIR_RANKS(dmir, rank0, rank1, rank2, rank3) \
+	if (nb_chipset != INTEL_NB_7300) { \
 		rank0 = (dmir) & 3; \
 		rank1 = ((dmir) >> 3) & 3; \
 		rank2 = ((dmir) >> 6) & 3; \
