@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -678,7 +678,7 @@ main(int argc, char *argv[])
 		    "\n\n%s Release %s Version %s %d-bit\r\n",
 		    un.sysname, un.release, un.version, bits);
 		console(B_FALSE,
-		    "Copyright 1983-2007 Sun Microsystems, Inc. "
+		    "Copyright 1983-2008 Sun Microsystems, Inc. "
 		    " All rights reserved.\r\n");
 		console(B_FALSE,
 		    "Use is subject to license terms.\r\n");

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,8 +251,8 @@ log_init(void)
 	 */
 	printf("\rSunOS Release %s Version %s %u-bit\n",
 	    utsname.release, utsname.version, NBBY * (uint_t)sizeof (void *));
-	printf("Copyright 1983-2007 Sun Microsystems, Inc.  "
-		"All rights reserved.\nUse is subject to license terms.\n");
+	printf("Copyright 1983-2008 Sun Microsystems, Inc.  "
+	    "All rights reserved.\nUse is subject to license terms.\n");
 #ifdef DEBUG
 	printf("DEBUG enabled\n");
 #endif
