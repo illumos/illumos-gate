@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,10 @@ uint32_t
 gintel_error_action(cmi_hdl_t hdl, int ismc, int bank,
     uint64_t status, uint64_t addr, uint64_t misc, void *mslogout)
 {
-	return (gintel_error_action_return);
+	if ((status & MSR_MC_STATUS_PCC) == 0)
+		return (gintel_error_action_return);
+	else
+		return (gintel_error_action_return & ~CMS_ERRSCOPE_POISONED);
 }
 
 /*ARGSUSED*/
