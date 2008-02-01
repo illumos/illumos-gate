@@ -2155,7 +2155,7 @@ sa_delete_sharetab(sa_handle_t handle, char *path, char *proto)
  * change by another process.  B_FALSE returned otherwise.
  */
 boolean_t
-sa_needs_refresh(sa_handle_t *handle)
+sa_needs_refresh(sa_handle_t handle)
 {
 	sa_handle_impl_t implhandle = (sa_handle_impl_t)handle;
 	struct stat st;
