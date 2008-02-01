@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG= tset
@@ -31,8 +31,7 @@ include ../Makefile.ucbcmd
 
 FILEMODE=	755
 
-#LDLIBS +=  -lcurses
-LDLIBS =  -L$(ROOT)/usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
+LDLIBS =  -L$(ROOT)/usr/ucblib -R /usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
 
 CPPFLAGS = -I$(ROOT)/usr/ucbinclude $(CPPFLAGS.master)
 
@@ -43,7 +42,7 @@ ROOTSYMLINK= $(ROOTBIN)/reset
 all: $(PROG) 
 
 $(PROG):	$(PROG).c
-	$(SETRUNPATH) $(LINK.c) -o $@ $(PROG).c $(LDLIBS)
+	$(LINK.c) -o $@ $(PROG).c $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTBIN) $(ROOTPROG) $(ROOTSYMLINK)

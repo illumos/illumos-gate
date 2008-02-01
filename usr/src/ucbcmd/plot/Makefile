@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1989, 2001, 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +52,7 @@ FILEMODE=	755
 
 INC1 = $(ROOT)/usr/ucbinclude
 
-LDFLAGS +=  -L$(ROOT)/usr/ucblib 
+LDFLAGS +=  -L$(ROOT)/usr/ucblib -R /usr/ucblib
 
 LIBPLOT = ./libplot
 
@@ -61,7 +60,6 @@ LIBS.DEF = -lucb
 LIBS.PLOT =
 LDLIBS += $(LIBS.PLOT) $(LIBS.DEF)
 
-#CPPFLAGS.master += -I$(INC1)
 CPPFLAGS = -I$(INC1) $(CPPFLAGS.master)
 
 clean:=		TARGET= clean
@@ -74,94 +72,94 @@ all: $(PROG) debug
 tek:= LDFLAGS += -L$(LIBPLOT)
 tek:= LIBS.PLOT = -lm -lt4014
 tek:	$(DRVOBJ) $(LIBPLOT)/libt4014.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 t4013:= LDFLAGS += -L$(LIBPLOT)
 t4013:= LIBS.PLOT = -lm -lt4013
 t4013:	$(DRVOBJ) $(LIBPLOT)/libt4013.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 t300:= LDFLAGS += -L$(LIBPLOT)
 t300:= LIBS.PLOT = -lm -lt300
 t300:	$(DRVOBJ) $(LIBPLOT)/libt300.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 t300s:= LDFLAGS += -L$(LIBPLOT)
 t300s:= LIBS.PLOT = -lm -lt300s
 t300s:	$(DRVOBJ) $(LIBPLOT)/libt300s.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 t450:= LDFLAGS += -L$(LIBPLOT)
 t450:= LIBS.PLOT = -lm -lt450
 t450:	$(DRVOBJ) $(LIBPLOT)/libt450.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 vplot:	$(VPLOTOBJ)
-	$(SETRUNPATH) $(LINK.c) $(VPLOTOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(VPLOTOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 crtplot:= LDFLAGS += -L$(LIBPLOT)
 crtplot:= LIBS.DEF = -lcurses -ltermcap -lm -lucb
 crtplot:  $(CRTOBJ)
-	$(SETRUNPATH) $(LINK.c) $(CRTOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(CRTOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 aedplot:= LDFLAGS += -L$(LIBPLOT)
 aedplot:= LIBS.PLOT = -laed
 aedplot:	$(DRVOBJ) $(LIBPLOT)/libaed.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 bgplot:= LDFLAGS += -L$(LIBPLOT)
 bgplot:= LIBS.PLOT = -lm -lplotbg
 bgplot:	$(DRVOBJ) $(LIBPLOT)/libplotbg.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 dumbplot:= LDFLAGS += -L$(LIBPLOT)
 dumbplot:= LIBS.DEF = -ltermcap -lm -lucb
 dumbplot:= LIBS.PLOT = -lm -ldumb
 dumbplot:	$(DRVOBJ) $(LIBPLOT)/libdumb.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 gigiplot:= LDFLAGS += -L$(LIBPLOT)
 gigiplot:= LIBS.PLOT = -lm -lgigi
 gigiplot:	$(DRVOBJ) $(LIBPLOT)/libgigi.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 hpplot:= LDFLAGS += -L$(LIBPLOT)
 hpplot:= LIBS.PLOT = -lm -lhp2648
 hpplot:	$(DRVOBJ) $(LIBPLOT)/libhp2648.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 hp7221plot:= LDFLAGS += -L$(LIBPLOT)
 hp7221plot:= LIBS.PLOT = -lm -lhp7221
 hp7221plot:	$(DRVOBJ) $(LIBPLOT)/libhp7221.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 implot:= LDFLAGS += -L$(LIBPLOT)
 implot:= LIBS.PLOT = -lm -limagen
 implot:	$(DRVOBJ) $(LIBPLOT)/libimagen.a
-	$(SETRUNPATH) $(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(DRVOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 atoplot:= LDFLAGS += -L$(LIBPLOT)
 atoplot:= LIBS.PLOT = -lplot
 atoplot:  $(ATOOBJ) $(LIBPLOT)/libplot.a
-	$(SETRUNPATH) $(LINK.c) $(ATOOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(ATOOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 plottoa:  $(TOAOBJ)
-	$(SETRUNPATH) $(LINK.c) $(TOAOBJ) -o $@ $(LDLIBS)
+	$(LINK.c) $(TOAOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 $(LIBPLOT)/libt300.a:	FRC

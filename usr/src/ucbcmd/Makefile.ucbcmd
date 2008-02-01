@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,8 +69,6 @@ LDFLAGS.cmd = \
 	$(MAPFILE.NES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 
 LDFLAGS =       $(LDFLAGS.cmd)
-
-SETRUNPATH=	LD_RUN_PATH=/usr/ucblib
 
 $(ROOTBIN)/%: %
 	$(INS.file)
