@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
 #include <sys/dmu_traverse.h>
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
+#include <sys/zfs_fuid.h>
 #undef ZFS_MAXNAMELEN
 #undef verify
 #include <libzfs.h>
@@ -848,6 +849,64 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	mutex_destroy(&bpl.bpl_lock);
 }
 
+static avl_tree_t idx_tree;
+static avl_tree_t domain_tree;
+static boolean_t fuid_table_loaded;
+
+static void
+fuid_table_destroy()
+{
+	if (fuid_table_loaded) {
+		zfs_fuid_table_destroy(&idx_tree, &domain_tree);
+		fuid_table_loaded = B_FALSE;
+	}
+}
+
+/*
+ * print uid or gid information.
+ * For normal POSIX id just the id is printed in decimal format.
+ * For CIFS files with FUID the fuid is printed in hex followed by
+ * the doman-rid string.
+ */
+static void
+print_idstr(uint64_t id, const char *id_type)
+{
+	if (FUID_INDEX(id)) {
+		char *domain;
+
+		domain = zfs_fuid_idx_domain(&idx_tree, FUID_INDEX(id));
+		(void) printf("\t%s     %llx [%s-%d]\n", id_type,
+		    (u_longlong_t)id, domain, (int)FUID_RID(id));
+	} else {
+		(void) printf("\t%s     %llu\n", id_type, (u_longlong_t)id);
+	}
+
+}
+
+static void
+dump_uidgid(objset_t *os, znode_phys_t *zp)
+{
+	uint32_t uid_idx, gid_idx;
+
+	uid_idx = FUID_INDEX(zp->zp_uid);
+	gid_idx = FUID_INDEX(zp->zp_gid);
+
+	/* Load domain table, if not already loaded */
+	if (!fuid_table_loaded && (uid_idx || gid_idx)) {
+		uint64_t fuid_obj;
+
+		/* first find the fuid object.  It lives in the master node */
+		VERIFY(zap_lookup(os, MASTER_NODE_OBJ, ZFS_FUID_TABLES,
+		    8, 1, &fuid_obj) == 0);
+		(void) zfs_fuid_table_load(os, fuid_obj,
+		    &idx_tree, &domain_tree);
+		fuid_table_loaded = B_TRUE;
+	}
+
+	print_idstr(zp->zp_uid, "uid");
+	print_idstr(zp->zp_gid, "gid");
+}
+
 /*ARGSUSED*/
 static void
 dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
@@ -876,6 +935,7 @@ dump_znode(objset_t *os, uint64_t object, void *data, size_t size)
 	z_ctime = (time_t)zp->zp_ctime[0];
 
 	(void) printf("\tpath	%s\n", path);
+	dump_uidgid(os, zp);
 	(void) printf("\tatime	%s", ctime(&z_atime));
 	(void) printf("\tmtime	%s", ctime(&z_mtime));
 	(void) printf("\tctime	%s", ctime(&z_ctime));
@@ -1230,6 +1290,7 @@ dump_one_dir(char *dsname, void *arg)
 	}
 	dump_dir(os);
 	dmu_objset_close(os);
+	fuid_table_destroy();
 	return (0);
 }
 
@@ -2407,6 +2468,8 @@ main(int argc, char **argv)
 		dump_zpool(spa);
 		spa_close(spa, FTAG);
 	}
+
+	fuid_table_destroy();
 
 	libzfs_fini(g_zfs);
 	kernel_fini();

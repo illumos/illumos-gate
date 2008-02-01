@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -520,6 +520,16 @@ extern int zfs_secpolicy_rename_perms(const char *from, const char *to,
     cred_t *cr);
 extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
 extern zoneid_t getzoneid(void);
+
+/* SID stuff */
+typedef struct ksiddomain {
+	uint_t	kd_ref;
+	uint_t	kd_len;
+	char	*kd_name;
+} ksiddomain_t;
+
+ksiddomain_t *ksid_lookupdomain(const char *);
+void ksiddomain_rele(ksiddomain_t *);
 
 #ifdef	__cplusplus
 }

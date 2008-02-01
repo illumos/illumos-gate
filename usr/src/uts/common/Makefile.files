@@ -1115,6 +1115,7 @@ ZFS_COMMON_OBJS +=		\
 	zap_micro.o		\
 	zfs_byteswap.o		\
 	zfs_fm.o		\
+	zfs_fuid.o		\
 	zfs_znode.o		\
 	zil.o			\
 	zio.o			\
@@ -1137,7 +1138,6 @@ ZFS_OBJS +=			\
 	zfs_acl.o		\
 	zfs_ctldir.o		\
 	zfs_dir.o		\
-	zfs_fuid.o		\
 	zfs_ioctl.o		\
 	zfs_log.o		\
 	zfs_replay.o		\

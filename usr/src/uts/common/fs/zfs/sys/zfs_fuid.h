@@ -28,21 +28,17 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/isa_defs.h>
-#include <sys/types32.h>
 #ifdef _KERNEL
 #include <sys/kidmap.h>
 #include <sys/sid.h>
 #include <sys/dmu.h>
 #include <sys/zfs_vfsops.h>
 #endif
+#include <sys/avl.h>
 
-#ifdef _KERNEL
-typedef struct zfs_fuid_hdl {
-	idmap_get_handle_t	*z_hdl;
-	boolean_t		z_map_needed; /* is mapping required */
-	idmap_stat		z_status; /* needed for kidmap interface */
-} zfs_fuid_hdl_t;
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 typedef enum {
 	ZFS_OWNER,
@@ -50,8 +46,6 @@ typedef enum {
 	ZFS_ACE_USER,
 	ZFS_ACE_GROUP
 } zfs_fuid_type_t;
-
-#endif
 
 /*
  * Estimate space needed for one more fuid table entry.
@@ -107,29 +101,22 @@ typedef struct zfs_fuid_info {
 
 #ifdef _KERNEL
 struct znode;
-extern void zfs_fuid_map_id(zfsvfs_t *, uint64_t, cred_t *, zfs_fuid_type_t,
-    uid_t *);
+extern uid_t zfs_fuid_map_id(zfsvfs_t *, uint64_t, cred_t *, zfs_fuid_type_t);
 extern void zfs_fuid_destroy(zfsvfs_t *);
-extern uint64_t zfs_fuid_create_cred(zfsvfs_t *, uint64_t, zfs_fuid_type_t,
+extern uint64_t zfs_fuid_create_cred(zfsvfs_t *, zfs_fuid_type_t,
     dmu_tx_t *, cred_t *, zfs_fuid_info_t **);
 extern uint64_t zfs_fuid_create(zfsvfs_t *, uint64_t, cred_t *, zfs_fuid_type_t,
     dmu_tx_t *, zfs_fuid_info_t **);
-extern void zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *,
-    uint64_t, cred_t *, zfs_fuid_type_t, uid_t *);
 extern void zfs_fuid_map_ids(struct znode *zp, cred_t *cr, uid_t *uid,
     uid_t *gid);
-extern void zfs_fuid_get_mappings(zfs_fuid_hdl_t *);
-extern char *zfs_fuid_find_by_idx(zfsvfs_t *, uint64_t);
-int zfs_fuid_find_by_domain(zfsvfs_t *, const char *, char **, dmu_tx_t *);
 extern zfs_fuid_info_t *zfs_fuid_info_alloc(void);
 extern void zfs_fuid_info_free();
 extern boolean_t zfs_groupmember(zfsvfs_t *, uint64_t, cred_t *);
-
 #endif
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+char *zfs_fuid_idx_domain(avl_tree_t *, uint32_t);
+uint64_t zfs_fuid_table_load(objset_t *, uint64_t, avl_tree_t *, avl_tree_t *);
+void zfs_fuid_table_destroy(avl_tree_t *, avl_tree_t *);
 
 #ifdef	__cplusplus
 }

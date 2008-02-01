@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -873,4 +873,21 @@ int
 zfs_secpolicy_destroy_perms(const char *name, cred_t *cr)
 {
 	return (0);
+}
+
+ksiddomain_t *
+ksid_lookupdomain(const char *dom)
+{
+	ksiddomain_t *kd;
+
+	kd = umem_zalloc(sizeof (ksiddomain_t), UMEM_NOFAIL);
+	kd->kd_name = spa_strdup(dom);
+	return (kd);
+}
+
+void
+ksiddomain_rele(ksiddomain_t *ksid)
+{
+	spa_strfree(ksid->kd_name);
+	umem_free(ksid, sizeof (ksiddomain_t));
 }

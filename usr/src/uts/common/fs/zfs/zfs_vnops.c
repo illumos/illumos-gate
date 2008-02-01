@@ -1219,7 +1219,8 @@ top:
 
 		tx = dmu_tx_create(os);
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-		if (aclp && aclp->z_has_fuids) {
+		if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(crgetuid(cr)) ||
+		    IS_EPHEMERAL(crgetgid(cr))) {
 			if (zfsvfs->z_fuid_obj == 0) {
 				dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 				dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
@@ -1640,7 +1641,8 @@ top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_zap(tx, dzp->z_id, TRUE, dirname);
 	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
-	if (aclp && aclp->z_has_fuids) {
+	if ((aclp && aclp->z_has_fuids) || IS_EPHEMERAL(crgetuid(cr)) ||
+	    IS_EPHEMERAL(crgetgid(cr))) {
 		if (zfsvfs->z_fuid_obj == 0) {
 			dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
 			dmu_tx_hold_write(tx, DMU_NEW_OBJECT, 0,
@@ -3420,7 +3422,7 @@ top:
 		return (EPERM);
 	}
 
-	zfs_fuid_map_id(zfsvfs, szp->z_phys->zp_uid, cr, ZFS_OWNER, &owner);
+	owner = zfs_fuid_map_id(zfsvfs, szp->z_phys->zp_uid, cr, ZFS_OWNER);
 	if (owner != crgetuid(cr) &&
 	    secpolicy_basic_link(cr) != 0) {
 		ZFS_EXIT(zfsvfs);

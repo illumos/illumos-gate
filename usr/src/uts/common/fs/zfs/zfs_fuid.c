@@ -25,20 +25,20 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/unistd.h>
-#include <sys/sysmacros.h>
+#include <sys/zfs_context.h>
 #include <sys/sunddi.h>
-#include <sys/zfs_vfsops.h>
-#include <sys/zfs_znode.h>
-#include <sys/zfs_fuid.h>
 #include <sys/dmu.h>
-#include <sys/refcount.h>
 #include <sys/avl.h>
 #include <sys/zap.h>
+#include <sys/refcount.h>
 #include <sys/nvpair.h>
+#ifdef _KERNEL
 #include <sys/kidmap.h>
 #include <sys/sid.h>
+#include <sys/zfs_vfsops.h>
+#include <sys/zfs_znode.h>
+#endif
+#include <sys/zfs_fuid.h>
 
 /*
  * FUID Domain table(s).
@@ -59,17 +59,11 @@
 #define	FUID_NVP_ARRAY	"fuid_nvlist"
 
 typedef struct fuid_domain {
-	avl_node_t	f_node;
+	avl_node_t	f_domnode;
+	avl_node_t	f_idxnode;
 	ksiddomain_t	*f_ksid;
-	int		f_idx;
-	uint32_t	f_offset;
+	uint64_t	f_idx;
 } fuid_domain_t;
-
-typedef struct fuid_idx {
-	avl_node_t	f_node;
-	int		f_idx;
-	fuid_domain_t	*f_domain;
-} fuid_idx_t;
 
 /*
  * Compare two indexes.
@@ -77,8 +71,8 @@ typedef struct fuid_idx {
 static int
 idx_compare(const void *arg1, const void *arg2)
 {
-	const fuid_idx_t *node1 = arg1;
-	const fuid_idx_t *node2 = arg2;
+	const fuid_domain_t *node1 = arg1;
+	const fuid_domain_t *node2 = arg2;
 
 	if (node1->f_idx < node2->f_idx)
 		return (-1);
@@ -104,15 +98,100 @@ domain_compare(const void *arg1, const void *arg2)
 }
 
 /*
+ * load initial fuid domain and idx trees.  This function is used by
+ * both the kernel and zdb.
+ */
+uint64_t
+zfs_fuid_table_load(objset_t *os, uint64_t fuid_obj, avl_tree_t *idx_tree,
+    avl_tree_t *domain_tree)
+{
+	dmu_buf_t *db;
+	uint64_t fuid_size;
+
+	avl_create(idx_tree, idx_compare,
+	    sizeof (fuid_domain_t), offsetof(fuid_domain_t, f_idxnode));
+	avl_create(domain_tree, domain_compare,
+	    sizeof (fuid_domain_t), offsetof(fuid_domain_t, f_domnode));
+
+	VERIFY(0 == dmu_bonus_hold(os, fuid_obj, FTAG, &db));
+	fuid_size = *(uint64_t *)db->db_data;
+	dmu_buf_rele(db, FTAG);
+
+	if (fuid_size)  {
+		nvlist_t **fuidnvp;
+		nvlist_t *nvp = NULL;
+		uint_t count;
+		char *packed;
+		int i;
+
+		packed = kmem_alloc(fuid_size, KM_SLEEP);
+		VERIFY(dmu_read(os, fuid_obj, 0, fuid_size, packed) == 0);
+		VERIFY(nvlist_unpack(packed, fuid_size,
+		    &nvp, 0) == 0);
+		VERIFY(nvlist_lookup_nvlist_array(nvp, FUID_NVP_ARRAY,
+		    &fuidnvp, &count) == 0);
+
+		for (i = 0; i != count; i++) {
+			fuid_domain_t *domnode;
+			char *domain;
+			uint64_t idx;
+
+			VERIFY(nvlist_lookup_string(fuidnvp[i], FUID_DOMAIN,
+			    &domain) == 0);
+			VERIFY(nvlist_lookup_uint64(fuidnvp[i], FUID_IDX,
+			    &idx) == 0);
+
+			domnode = kmem_alloc(sizeof (fuid_domain_t), KM_SLEEP);
+
+			domnode->f_idx = idx;
+			domnode->f_ksid = ksid_lookupdomain(domain);
+			avl_add(idx_tree, domnode);
+			avl_add(domain_tree, domnode);
+		}
+		nvlist_free(nvp);
+		kmem_free(packed, fuid_size);
+	}
+	return (fuid_size);
+}
+
+void
+zfs_fuid_table_destroy(avl_tree_t *idx_tree, avl_tree_t *domain_tree)
+{
+	fuid_domain_t *domnode;
+	void *cookie;
+
+	cookie = NULL;
+	while (domnode = avl_destroy_nodes(domain_tree, &cookie))
+		ksiddomain_rele(domnode->f_ksid);
+
+	avl_destroy(domain_tree);
+	cookie = NULL;
+	while (domnode = avl_destroy_nodes(idx_tree, &cookie))
+		kmem_free(domnode, sizeof (fuid_domain_t));
+	avl_destroy(idx_tree);
+}
+
+char *
+zfs_fuid_idx_domain(avl_tree_t *idx_tree, uint32_t idx)
+{
+	fuid_domain_t searchnode, *findnode;
+	avl_index_t loc;
+
+	searchnode.f_idx = idx;
+
+	findnode = avl_find(idx_tree, &searchnode, &loc);
+
+	return (findnode->f_ksid->kd_name);
+}
+
+#ifdef _KERNEL
+/*
  * Load the fuid table(s) into memory.
  */
 static void
 zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 {
-	dmu_buf_t *db;
-	char *packed;
 	int error = 0;
-	int i;
 
 	rw_enter(&zfsvfs->z_fuid_lock, RW_WRITER);
 
@@ -137,70 +216,9 @@ zfs_fuid_init(zfsvfs_t *zfsvfs, dmu_tx_t *tx)
 		}
 	}
 
-	avl_create(&zfsvfs->z_fuid_idx, idx_compare,
-	    sizeof (fuid_idx_t), offsetof(fuid_idx_t, f_node));
-	avl_create(&zfsvfs->z_fuid_domain, domain_compare,
-	    sizeof (fuid_domain_t), offsetof(fuid_domain_t, f_node));
+	zfsvfs->z_fuid_size = zfs_fuid_table_load(zfsvfs->z_os,
+	    zfsvfs->z_fuid_obj, &zfsvfs->z_fuid_idx, &zfsvfs->z_fuid_domain);
 
-	if (zfsvfs->z_fuid_obj) {
-		VERIFY(0 == dmu_bonus_hold(zfsvfs->z_os, zfsvfs->z_fuid_obj,
-		    FTAG, &db));
-		zfsvfs->z_fuid_size = *(uint64_t *)db->db_data;
-		dmu_buf_rele(db, FTAG);
-	}
-
-	if (zfsvfs->z_fuid_size == 0)
-		goto initialized;
-
-	packed = kmem_alloc(zfsvfs->z_fuid_size, KM_SLEEP);
-	error = dmu_read(zfsvfs->z_os, zfsvfs->z_fuid_obj, 0,
-	    zfsvfs->z_fuid_size, packed);
-	if (error == 0)  {
-		nvlist_t **fuidnvp;
-		nvlist_t *nvp = NULL;
-		uint_t count;
-
-		VERIFY(nvlist_unpack(packed, zfsvfs->z_fuid_size,
-		    &nvp, 0) == 0);
-		VERIFY((error = nvlist_lookup_nvlist_array(nvp, FUID_NVP_ARRAY,
-		    &fuidnvp, &count)) == 0);
-
-		for (i = 0; i != count; i++) {
-			fuid_idx_t *idxnode;
-			fuid_domain_t *domnode;
-			char *domain;
-			avl_index_t loc;
-			uint64_t idx, offset;
-
-			VERIFY(nvlist_lookup_string(fuidnvp[i], FUID_DOMAIN,
-			    &domain) == 0);
-			VERIFY(nvlist_lookup_uint64(fuidnvp[i], FUID_IDX,
-			    &idx) == 0);
-			VERIFY(nvlist_lookup_uint64(fuidnvp[i], FUID_OFFSET,
-			    &offset) == 0);
-
-			idxnode = kmem_alloc(sizeof (fuid_idx_t), KM_SLEEP);
-			domnode = kmem_alloc(sizeof (fuid_domain_t), KM_SLEEP);
-
-			domnode->f_idx = idxnode->f_idx = idx;
-			domnode->f_ksid = ksid_lookupdomain(domain);
-			idxnode->f_domain = domnode;
-			domnode->f_offset = offset;
-			if (avl_find(&zfsvfs->z_fuid_idx,
-			    idxnode, &loc) == NULL) {
-				avl_insert(&zfsvfs->z_fuid_idx, idxnode, loc);
-			}
-			if (avl_find(&zfsvfs->z_fuid_domain,
-			    domnode, &loc) == NULL) {
-				avl_insert(&zfsvfs->z_fuid_domain,
-				    domnode, loc);
-			}
-		}
-		nvlist_free(nvp);
-	}
-	kmem_free(packed, zfsvfs->z_fuid_size);
-
-initialized:
 	zfsvfs->z_fuid_loaded = B_TRUE;
 	rw_exit(&zfsvfs->z_fuid_lock);
 }
@@ -232,7 +250,7 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 	if (retdomain) {
 		*retdomain = searchnode.f_ksid->kd_name;
 	}
-	if (zfsvfs->z_fuid_loaded == B_FALSE)
+	if (!zfsvfs->z_fuid_loaded)
 		zfs_fuid_init(zfsvfs, tx);
 
 	rw_enter(&zfsvfs->z_fuid_lock, RW_READER);
@@ -244,7 +262,6 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 		return (findnode->f_idx);
 	} else {
 		fuid_domain_t *domnode;
-		fuid_idx_t *newidxnode;
 		nvlist_t *nvp;
 		nvlist_t **fuids;
 		uint64_t retidx;
@@ -255,17 +272,12 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 
 		domnode = kmem_alloc(sizeof (fuid_domain_t), KM_SLEEP);
 		domnode->f_ksid = searchnode.f_ksid;
-		domnode->f_offset = 0;
-
-		newidxnode = kmem_alloc(sizeof (fuid_idx_t), KM_SLEEP);
-		newidxnode->f_domain = domnode;
 
 		rw_enter(&zfsvfs->z_fuid_lock, RW_WRITER);
-		retidx = domnode->f_idx = newidxnode->f_idx =
-		    avl_numnodes(&zfsvfs->z_fuid_idx) + 1;
+		retidx = domnode->f_idx = avl_numnodes(&zfsvfs->z_fuid_idx) + 1;
 
 		avl_add(&zfsvfs->z_fuid_domain, domnode);
-		avl_add(&zfsvfs->z_fuid_idx, newidxnode);
+		avl_add(&zfsvfs->z_fuid_idx, domnode);
 		/*
 		 * Now resync the on-disk nvlist.
 		 */
@@ -278,8 +290,8 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 			    NV_UNIQUE_NAME, KM_SLEEP) == 0);
 			VERIFY(nvlist_add_uint64(fuids[i], FUID_IDX,
 			    domnode->f_idx) == 0);
-			VERIFY(nvlist_add_uint64(fuids[i], FUID_OFFSET,
-			    domnode->f_offset) == 0);
+			VERIFY(nvlist_add_uint64(fuids[i],
+			    FUID_OFFSET, 0) == 0);
 			VERIFY(nvlist_add_string(fuids[i++], FUID_DOMAIN,
 			    domnode->f_ksid->kd_name) == 0);
 			domnode = AVL_NEXT(&zfsvfs->z_fuid_domain, domnode);
@@ -315,119 +327,56 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
  * Returns a pointer from an avl node of the domain string.
  *
  */
-char *
-zfs_fuid_find_by_idx(zfsvfs_t *zfsvfs, uint64_t idx)
+static char *
+zfs_fuid_find_by_idx(zfsvfs_t *zfsvfs, uint32_t idx)
 {
-	fuid_idx_t searchnode, *findnode;
-	avl_index_t loc;
+	char *domain;
 
-	if (idx == 0 || zfsvfs->z_use_fuids == B_FALSE)
+	if (idx == 0 || !zfsvfs->z_use_fuids)
 		return (NULL);
 
-	if (zfsvfs->z_fuid_loaded == B_FALSE)
+	if (!zfsvfs->z_fuid_loaded)
 		zfs_fuid_init(zfsvfs, NULL);
 
-	searchnode.f_idx = idx;
-
 	rw_enter(&zfsvfs->z_fuid_lock, RW_READER);
-	findnode = avl_find(&zfsvfs->z_fuid_idx, &searchnode, &loc);
+	domain = zfs_fuid_idx_domain(&zfsvfs->z_fuid_idx, idx);
 	rw_exit(&zfsvfs->z_fuid_lock);
 
-	ASSERT(findnode);
-	return (findnode->f_domain->f_ksid->kd_name);
+	ASSERT(domain);
+	return (domain);
 }
 
 void
-zfs_fuid_get_mappings(zfs_fuid_hdl_t *hdl)
+zfs_fuid_map_ids(znode_t *zp, cred_t *cr, uid_t *uidp, uid_t *gidp)
 {
-	VERIFY(hdl != NULL);
-	if (hdl->z_map_needed == B_FALSE)
-		return;
-
-	(void) kidmap_get_mappings(hdl->z_hdl);
-
-	kidmap_get_destroy(hdl->z_hdl);
-	hdl->z_hdl = NULL;
-	hdl->z_map_needed = B_FALSE;
+	*uidp = zfs_fuid_map_id(zp->z_zfsvfs, zp->z_phys->zp_uid,
+	    cr, ZFS_OWNER);
+	*gidp = zfs_fuid_map_id(zp->z_zfsvfs, zp->z_phys->zp_gid,
+	    cr, ZFS_GROUP);
 }
 
-void
-zfs_fuid_queue_map_id(zfsvfs_t *zfsvfs, zfs_fuid_hdl_t *hdl,
-    uint64_t fuid, cred_t *cr, zfs_fuid_type_t type, uid_t *id)
-{
-	uint32_t index = FUID_INDEX(fuid);
-	char *domain;
-	int status;
-
-	VERIFY(hdl);
-
-	if (index == 0 || zfsvfs->z_use_fuids == B_FALSE) {
-		*id = (uid_t)fuid;
-		return;
-	}
-
-	if (hdl->z_hdl == NULL) {
-		hdl->z_hdl = kidmap_get_create(crgetzone(cr));
-		hdl->z_map_needed = B_TRUE;
-	}
-
-	domain = zfs_fuid_find_by_idx(zfsvfs, index);
-	ASSERT(domain != NULL);
-
-	if (type == ZFS_OWNER || type == ZFS_ACE_USER)
-		status = kidmap_batch_getuidbysid(hdl->z_hdl, domain,
-		    FUID_RID(fuid), id, &hdl->z_status);
-	else
-		status = kidmap_batch_getgidbysid(hdl->z_hdl, domain,
-		    FUID_RID(fuid), id, &hdl->z_status);
-	ASSERT(status == 0);
-}
-
-void
-zfs_fuid_map_ids(znode_t *zp, cred_t *cr, uid_t *uid, uid_t *gid)
-{
-	uint32_t uid_index = FUID_INDEX(zp->z_phys->zp_uid);
-	uint32_t gid_index = FUID_INDEX(zp->z_phys->zp_gid);
-
-	/* Favor the common case, neither will be ephemeral */
-	if (uid_index == 0 && gid_index == 0) {
-		*uid = zp->z_phys->zp_uid;
-		*gid = zp->z_phys->zp_gid;
-		return;
-	} else {
-		zfs_fuid_hdl_t hdl = { 0 };
-
-		zfs_fuid_queue_map_id(zp->z_zfsvfs, &hdl,
-		    zp->z_phys->zp_uid, cr, ZFS_OWNER, uid);
-
-		zfs_fuid_queue_map_id(zp->z_zfsvfs, &hdl,
-		    zp->z_phys->zp_gid, cr, ZFS_GROUP, gid);
-
-		zfs_fuid_get_mappings(&hdl);
-	}
-}
-
-void
+uid_t
 zfs_fuid_map_id(zfsvfs_t *zfsvfs, uint64_t fuid,
-    cred_t *cr, zfs_fuid_type_t type, uid_t *id)
+    cred_t *cr, zfs_fuid_type_t type)
 {
 	uint32_t index = FUID_INDEX(fuid);
 	char *domain;
+	uid_t id;
 
-	if (index == 0) {
-		*id = (uid_t)fuid;
-		return;
-	}
+	if (index == 0)
+		return (fuid);
 
 	domain = zfs_fuid_find_by_idx(zfsvfs, index);
 	ASSERT(domain != NULL);
 
-	if (type == ZFS_OWNER || type == ZFS_ACE_USER)
+	if (type == ZFS_OWNER || type == ZFS_ACE_USER) {
 		(void) kidmap_getuidbysid(crgetzone(cr), domain,
-		    FUID_RID(fuid), id);
-	else
+		    FUID_RID(fuid), &id);
+	} else {
 		(void) kidmap_getgidbysid(crgetzone(cr), domain,
-		    FUID_RID(fuid), id);
+		    FUID_RID(fuid), &id);
+	}
+	return (id);
 }
 
 /*
@@ -466,7 +415,7 @@ zfs_fuid_node_add(zfs_fuid_info_t **fuidpp, const char *domain, uint32_t rid,
 		}
 	}
 
-	if (found == B_FALSE) {
+	if (!found) {
 		fuid_domain = kmem_alloc(sizeof (zfs_fuid_domain_t), KM_SLEEP);
 		fuid_domain->z_domain = domain;
 		fuid_domain->z_domidx = idx;
@@ -499,18 +448,24 @@ zfs_fuid_node_add(zfs_fuid_info_t **fuidpp, const char *domain, uint32_t rid,
  * Create a file system FUID, based on information in the users cred
  */
 uint64_t
-zfs_fuid_create_cred(zfsvfs_t *zfsvfs, uint64_t id,
-    zfs_fuid_type_t type, dmu_tx_t *tx, cred_t *cr, zfs_fuid_info_t **fuidp)
+zfs_fuid_create_cred(zfsvfs_t *zfsvfs, zfs_fuid_type_t type,
+    dmu_tx_t *tx, cred_t *cr, zfs_fuid_info_t **fuidp)
 {
 	uint64_t	idx;
 	ksid_t		*ksid;
 	uint32_t	rid;
 	char 		*kdomain;
 	const char	*domain;
+	uid_t		id;
 
 	VERIFY(type == ZFS_OWNER || type == ZFS_GROUP);
 
-	if (zfsvfs->z_use_fuids == B_FALSE || !IS_EPHEMERAL(id))
+	if (type == ZFS_OWNER)
+		id = crgetuid(cr);
+	else
+		id = crgetgid(cr);
+
+	if (!zfsvfs->z_use_fuids || !IS_EPHEMERAL(id))
 		return ((uint64_t)id);
 
 	ksid = crgetsid(cr, (type == ZFS_OWNER) ? KSID_OWNER : KSID_GROUP);
@@ -555,8 +510,12 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
 	/*
 	 * If POSIX ID, or entry is already a FUID then
 	 * just return the id
+	 *
+	 * We may also be handed an already FUID'ized id via
+	 * chmod.
 	 */
-	if (!IS_EPHEMERAL(id) || fuid_idx != 0)
+
+	if (!zfsvfs->z_use_fuids || !IS_EPHEMERAL(id) || fuid_idx != 0)
 		return (id);
 
 	if (is_replay) {
@@ -605,12 +564,11 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
 			rid = UID_NOBODY;
 			domain = "";
 		}
-
 	}
 
 	idx = zfs_fuid_find_by_domain(zfsvfs, domain, &kdomain, tx);
 
-	if (is_replay == B_FALSE)
+	if (!is_replay)
 		zfs_fuid_node_add(fuidpp, kdomain, rid, idx, id, type);
 	else if (zfuid != NULL) {
 		list_remove(&fuidp->z_fuids, zfuid);
@@ -622,25 +580,12 @@ zfs_fuid_create(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr,
 void
 zfs_fuid_destroy(zfsvfs_t *zfsvfs)
 {
-	fuid_domain_t *domnode;
-	fuid_idx_t *idxnode;
-	void *cookie;
-
 	rw_enter(&zfsvfs->z_fuid_lock, RW_WRITER);
-	if (zfsvfs->z_fuid_loaded == B_FALSE) {
+	if (!zfsvfs->z_fuid_loaded) {
 		rw_exit(&zfsvfs->z_fuid_lock);
 		return;
 	}
-	cookie = NULL;
-	while (domnode = avl_destroy_nodes(&zfsvfs->z_fuid_domain, &cookie)) {
-		ksiddomain_rele(domnode->f_ksid);
-		kmem_free(domnode, sizeof (fuid_domain_t));
-	}
-	avl_destroy(&zfsvfs->z_fuid_domain);
-	cookie = NULL;
-	while (idxnode = avl_destroy_nodes(&zfsvfs->z_fuid_idx, &cookie))
-		kmem_free(idxnode, sizeof (fuid_idx_t));
-	avl_destroy(&zfsvfs->z_fuid_idx);
+	zfs_fuid_table_destroy(&zfsvfs->z_fuid_idx, &zfsvfs->z_fuid_domain);
 	rw_exit(&zfsvfs->z_fuid_lock);
 }
 
@@ -723,15 +668,13 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 				ASSERT(domain != NULL);
 
 				if (strcmp(domain,
-				    IDMAP_WK_CREATOR_SID_AUTHORITY) == 0) {
+				    IDMAP_WK_CREATOR_SID_AUTHORITY) == 0)
 					return (B_FALSE);
-				}
 
 				if ((strcmp(domain,
 				    ksid_groups[i].ks_domain->kd_name) == 0) &&
-				    rid == ksid_groups[i].ks_rid) {
+				    rid == ksid_groups[i].ks_rid)
 					return (B_TRUE);
-				}
 			}
 		}
 	}
@@ -739,6 +682,7 @@ zfs_groupmember(zfsvfs_t *zfsvfs, uint64_t id, cred_t *cr)
 	/*
 	 * Not found in ksidlist, check posix groups
 	 */
-	zfs_fuid_map_id(zfsvfs, id, cr, ZFS_GROUP, &gid);
+	gid = zfs_fuid_map_id(zfsvfs, id, cr, ZFS_GROUP);
 	return (groupmember(gid, cr));
 }
+#endif
