@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * rewritten from UCB 4.13 83/09/25
@@ -205,7 +205,7 @@ main(int argc, char **argv)
 	enum snapshot_types types = SNAP_SYSTEM;
 	kstat_ctl_t *kc;
 	long hz;
-	int iiter;
+	int forever;
 	hrtime_t start_n;
 	hrtime_t period_n;
 
@@ -274,7 +274,7 @@ main(int argc, char **argv)
 
 	do_format();
 
-	iiter = iter;
+	forever = (iter == 0);
 	do {
 		if (do_tty || do_cpu) {
 			kstat_t *oldks;
@@ -299,14 +299,13 @@ main(int argc, char **argv)
 			(void) fflush(stdout);
 		}
 
-		/* only doing a single iteration, we are done */
-		if (iiter == 1)
+		/* only remaining/doing a single iteration, we are done */
+		if (iter == 1)
 			continue;
 
-		if (interval > 0 && iter != 1)
+		if (interval > 0)
 			/* Have a kip */
-			sleep_until(&start_n, period_n, iiter == 0,
-			    &caught_cont);
+			sleep_until(&start_n, period_n, forever, &caught_cont);
 
 		free_snapshot(oldss);
 		oldss = newss;
@@ -776,21 +775,21 @@ show_disk(void *v1, void *v2, void *data)
 	}
 
 	switch (do_disk & DISK_IO_MASK) {
-	    case DISK_OLD:
+	case DISK_OLD:
 		if (do_raw == 0)
 			fstr = "%3.0f %3.0f %4.0f  ";
 		else
 			fstr = "%.0f,%.0f,%.0f";
 		push_out(fstr, kps, tps, serv);
 		break;
-	    case DISK_NEW:
+	case DISK_NEW:
 		if (do_raw == 0)
 			fstr = "%3.0f %3.0f %4.1f  ";
 		else
 			fstr = "%.0f,%.0f,%.1f";
 		push_out(fstr, rps, wps, r_pct);
 		break;
-	    case DISK_EXTENDED:
+	case DISK_EXTENDED:
 		if (suppress_zero) {
 			if (fzero(rps) && fzero(wps) && fzero(krps) &&
 			    fzero(kwps) && fzero(avw) && fzero(avr) &&
@@ -809,22 +808,22 @@ show_disk(void *v1, void *v2, void *data)
 			if (!do_conversions) {
 				if (do_raw == 0) {
 					fstr = " %6.1f %6.1f %6.1f %6.1f "
-						"%4.1f %4.1f %6.1f %3.0f "
-						"%3.0f ";
+					    "%4.1f %4.1f %6.1f %3.0f "
+					    "%3.0f ";
 				} else {
 					fstr = "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,"
-						"%.1f,%.0f,%.0f";
+					    "%.1f,%.0f,%.0f";
 				}
 				push_out(fstr, rps, wps, krps, kwps, avw, avr,
 				    serv, w_pct, r_pct);
 			} else {
 				if (do_raw == 0) {
 					fstr = " %6.1f %6.1f %6.1f %6.1f "
-						"%4.1f %4.1f %6.1f %6.1f "
-						"%3.0f %3.0f ";
+					    "%4.1f %4.1f %6.1f %6.1f "
+					    "%3.0f %3.0f ";
 				} else {
 					fstr = "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,"
-						"%.1f,%.1f,%.0f,%.0f";
+					    "%.1f,%.1f,%.0f,%.0f";
 				}
 				push_out(fstr, rps, wps, krps, kwps, avw, avr,
 				    wserv, rserv, w_pct, r_pct);
@@ -883,7 +882,7 @@ show_disk(void *v1, void *v2, void *data)
 
 	if (suppress_zero == 0 || doit == 1) {
 		if ((do_disk & (DISK_EXTENDED | DISK_ERRORS)) &&
-			do_conversions) {
+		    do_conversions) {
 			push_out("%s", disk_name);
 			if (show_mountpts && new->is_dname) {
 				mnt_t *mount_pt;
@@ -1545,7 +1544,7 @@ print_cpu_data(void)
 	kern = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_kernel");
 	wait = kstat_delta(oldks, &newss->s_sys.ss_agg_sys, "cpu_ticks_wait");
 	push_out(fstr, user * percent, kern * percent,
-		wait * percent, idle * percent);
+	    wait * percent, idle * percent);
 }
 
 /*

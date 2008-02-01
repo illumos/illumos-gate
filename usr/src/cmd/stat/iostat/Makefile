@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,7 @@ SRCS =$(OBJS:%.o=%.c) $(COMMON_SRCS)
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/stat/Makefile.stat
 
-LDLIBS += -lkstat -ldevinfo
+LDLIBS += -lkstat -ldevinfo -lavl
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 FILEMODE= 0555
 GROUP= bin

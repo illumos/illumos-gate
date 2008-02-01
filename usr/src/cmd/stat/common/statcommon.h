@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Common routines for acquiring snapshots of kstats for
@@ -45,6 +45,7 @@ extern "C" {
 #include <sys/vmmeter.h>
 #include <sys/processor.h>
 #include <sys/pset.h>
+#include <sys/avl.h>
 
 /* No CPU present at this CPU position */
 #define	ID_NO_CPU -1
@@ -188,6 +189,9 @@ struct iodev_snapshot {
 	kstat_t *is_ksp;
 	struct iodev_snapshot *is_prev;
 	struct iodev_snapshot *is_next;
+	/* AVL structures to speedup insertion */
+	avl_tree_t *avl_list;	/* list this element belongs to */
+	avl_node_t avl_link;
 };
 
 /* which iodevs to show. */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,7 @@ static int
 id_match(struct iodev_id *id1, struct iodev_id *id2)
 {
 	return (id1->id == id2->id &&
-		strcmp(id1->tid, id2->tid) == 0);
+	    strcmp(id1->tid, id2->tid) == 0);
 }
 
 static struct iodev_snapshot *
@@ -145,9 +145,78 @@ find_parent(struct snapshot *ss, struct iodev_snapshot *iodev)
 	return (NULL);
 }
 
+/*
+ * Introduce an index into the list to speed up insert_into looking for the
+ * right position in the list. This index is an AVL tree of all the
+ * iodev_snapshot in the list.
+ */
+
+#define	offsetof(s, m)	(size_t)(&(((s *)0)->m))	/* for avl_create */
+
+static int
+avl_iodev_cmp(const void* is1, const void* is2)
+{
+	int c = iodev_cmp((struct iodev_snapshot *)is1,
+	    (struct iodev_snapshot *)is2);
+
+	if (c > 0)
+		return (1);
+
+	if (c < 0)
+		return (-1);
+
+	return (0);
+}
+
+static void
+ix_new_list(struct iodev_snapshot *elem)
+{
+	avl_tree_t *l = malloc(sizeof (avl_tree_t));
+
+	elem->avl_list = l;
+	if (l == NULL)
+		return;
+
+	avl_create(l, avl_iodev_cmp, sizeof (struct iodev_snapshot),
+	    offsetof(struct iodev_snapshot, avl_link));
+
+	avl_add(l, elem);
+}
+
+static void
+ix_list_del(struct iodev_snapshot *elem)
+{
+	avl_tree_t *l = elem->avl_list;
+
+	if (l == NULL)
+		return;
+
+	elem->avl_list = NULL;
+
+	avl_remove(l, elem);
+	if (avl_numnodes(l) == 0) {
+		avl_destroy(l);
+		free(l);
+	}
+}
+
+static void
+ix_insert_here(struct iodev_snapshot *pos, struct iodev_snapshot *elem, int ba)
+{
+	avl_tree_t *l = pos->avl_list;
+	elem->avl_list = l;
+
+	if (l == NULL)
+		return;
+
+	avl_insert_here(l, elem, pos, ba);
+}
+
 static void
 list_del(struct iodev_snapshot **list, struct iodev_snapshot *pos)
 {
+	ix_list_del(pos);
+
 	if (*list == pos)
 		*list = pos->is_next;
 	if (pos->is_next)
@@ -164,6 +233,7 @@ insert_before(struct iodev_snapshot **list, struct iodev_snapshot *pos,
 	if (pos == NULL) {
 		new->is_prev = new->is_next = NULL;
 		*list = new;
+		ix_new_list(new);
 		return;
 	}
 
@@ -174,6 +244,8 @@ insert_before(struct iodev_snapshot **list, struct iodev_snapshot *pos,
 	else
 		*list = new;
 	pos->is_prev = new;
+
+	ix_insert_here(pos, new, AVL_BEFORE);
 }
 
 static void
@@ -183,6 +255,7 @@ insert_after(struct iodev_snapshot **list, struct iodev_snapshot *pos,
 	if (pos == NULL) {
 		new->is_prev = new->is_next = NULL;
 		*list = new;
+		ix_new_list(new);
 		return;
 	}
 
@@ -191,15 +264,40 @@ insert_after(struct iodev_snapshot **list, struct iodev_snapshot *pos,
 	if (pos->is_next)
 		pos->is_next->is_prev = new;
 	pos->is_next = new;
+
+	ix_insert_here(pos, new, AVL_AFTER);
 }
 
 static void
 insert_into(struct iodev_snapshot **list, struct iodev_snapshot *iodev)
 {
 	struct iodev_snapshot *tmp = *list;
+	avl_tree_t *l;
+	void *p;
+	avl_index_t where;
+
 	if (*list == NULL) {
 		*list = iodev;
+		ix_new_list(iodev);
 		return;
+	}
+
+	/*
+	 * Optimize the search: instead of walking the entire list
+	 * (which can contain thousands of nodes), search in the AVL
+	 * tree the nearest node and reposition the startup point to
+	 * this node rather than always starting from the beginning
+	 * of the list.
+	 */
+	l = tmp->avl_list;
+	if (l != NULL) {
+		p = avl_find(l, iodev, &where);
+		if (p == NULL) {
+			p = avl_nearest(l, where, AVL_BEFORE);
+		}
+		if (p != NULL) {
+			tmp = (struct iodev_snapshot *)p;
+		}
 	}
 
 	for (;;) {
@@ -366,7 +464,7 @@ choose_iodevs(struct snapshot *ss, struct iodev_snapshot *iodevs,
 			pos = pos->is_next;
 
 			if (df && df->if_skip_floppy &&
-				strncmp(tmp->is_name, "fd", 2) == 0)
+			    strncmp(tmp->is_name, "fd", 2) == 0)
 				continue;
 
 			list_del(&iodevs, tmp);
@@ -528,7 +626,7 @@ get_ids(struct iodev_snapshot *iodev, const char *pretty)
 		} else if (iodev->is_type == IODEV_IOPATH_LTI) {
 			iodev->is_parent_id.id = disk;
 			(void) strlcpy(iodev->is_parent_id.tid,
-				target, KSTAT_STRLEN);
+			    target, KSTAT_STRLEN);
 		}
 	}
 
@@ -738,7 +836,7 @@ make_extended_device(int type, struct iodev_snapshot *old)
 		(void) strcpy(tptr->is_pretty, old->is_pretty);
 	}
 	bcopy(&old->is_parent_id, &tptr->is_parent_id,
-	sizeof (old->is_parent_id));
+	    sizeof (old->is_parent_id));
 
 	tptr->is_type = type;
 
@@ -1014,6 +1112,14 @@ free_iodev(struct iodev_snapshot *iodev)
 		struct iodev_snapshot *tmp = iodev->is_children;
 		iodev->is_children = iodev->is_children->is_next;
 		free_iodev(tmp);
+	}
+
+	if (iodev->avl_list) {
+		avl_remove(iodev->avl_list, iodev);
+		if (avl_numnodes(iodev->avl_list) == 0) {
+			avl_destroy(iodev->avl_list);
+			free(iodev->avl_list);
+		}
 	}
 
 	free(iodev->is_errors.ks_data);
