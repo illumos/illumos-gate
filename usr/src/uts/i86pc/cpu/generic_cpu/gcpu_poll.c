@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,9 +199,10 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 static void
 gcpu_ntv_mca_poll_wrapper(cmi_hdl_t hdl, int what)
 {
-	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
+	gcpu_data_t *gcpu;
 
-	if (gcpu->gcpu_mca.gcpu_mca_lgsz == 0)
+	if (hdl == NULL || (gcpu = cmi_hdl_getcmidata(hdl)) == NULL ||
+	    gcpu->gcpu_mca.gcpu_mca_lgsz == 0)
 		return;
 
 	kpreempt_disable();
@@ -225,10 +226,14 @@ gcpu_ntv_mca_poll_online(void *arg, cpu_t *cp, cyc_handler_t *cyh,
 {
 	cmi_hdl_t hdl;
 
-	/* cmi_hdl_lookup holds any handle it finds - release in offline */
-	if ((hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
-	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp))) == NULL)
-		return;
+	/*
+	 * Lookup and hold a handle for this cpu (any hold released in
+	 * our offline function).  If we chose not to initialize a handle
+	 * for this cpu back at cmi_init time then this lookup will return
+	 * NULL, so the cyh_func we appoint must be prepared for that.
+	 */
+	hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(cp),
+	    cmi_ntv_hwcoreid(cp), cmi_ntv_hwstrandid(cp));
 
 	cyt->cyt_when = 0;
 	cyt->cyt_interval = gcpu_mca_poll_interval;
@@ -243,7 +248,8 @@ gcpu_ntv_mca_poll_offline(void *arg, cpu_t *cpu, void *cyh_arg)
 {
 	cmi_hdl_t hdl = (cmi_hdl_t)cyh_arg;
 
-	cmi_hdl_rele(hdl);
+	if (hdl != NULL)
+		cmi_hdl_rele(hdl);
 }
 #endif	/* __xpv */
 

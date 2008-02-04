@@ -94,7 +94,7 @@ typedef struct cmi_hdl_impl {
  * for now we stick with the dumb approach.
  */
 #define	CMI_MAX_CHIPS			16
-#define	CMI_MAX_CORES_PER_CHIP		4
+#define	CMI_MAX_CORES_PER_CHIP		8
 #define	CMI_MAX_STRANDS_PER_CORE	2
 #define	CMI_HDL_HASHSZ (CMI_MAX_CHIPS * CMI_MAX_CORES_PER_CHIP * \
     CMI_MAX_STRANDS_PER_CORE)
