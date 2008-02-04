@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,7 @@ smb_token_t *smb_logon(netr_client_t *clnt);
 void smb_token_destroy(smb_token_t *token);
 uint8_t *smb_token_mkselfrel(smb_token_t *obj, uint32_t *len);
 netr_client_t *netr_client_mkabsolute(uint8_t *buf, uint32_t len);
+void netr_client_xfree(netr_client_t *);
 #else /* _KERNEL */
 smb_token_t *smb_token_mkabsolute(uint8_t *buf, uint32_t len);
 void smb_token_free(smb_token_t *token);

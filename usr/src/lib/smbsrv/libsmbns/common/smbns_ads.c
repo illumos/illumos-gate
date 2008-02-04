@@ -1773,6 +1773,8 @@ ads_get_host_principals(char *fqhost, char *domain, char **princ,
 
 	if (princ != NULL)
 		*princ = p;
+	else
+		free(p);
 
 	return (0);
 }
@@ -2007,6 +2009,8 @@ ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val)
 
 			if (vals[0] != NULL && val)
 				*val = strdup(vals[0]);
+
+			ldap_value_free(vals);
 		}
 	}
 
@@ -2214,7 +2218,7 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	krb5_principal krb5princ;
 	krb5_kvno kvno;
 	char *princ_r;
-	boolean_t des_only, delete = B_TRUE, fini_krbctx = B_TRUE;
+	boolean_t des_only, delete = B_TRUE;
 	adjoin_status_t rc = ADJOIN_SUCCESS;
 	boolean_t new_acct;
 	/*
@@ -2277,7 +2281,6 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	}
 
 	if (smb_krb5_ctx_init(&ctx) != 0) {
-		fini_krbctx = B_FALSE;
 		rc = ADJOIN_ERR_INIT_KRB_CTX;
 		goto adjoin_cleanup;
 	}
@@ -2323,8 +2326,11 @@ adjoin_cleanup:
 	if (new_acct && delete)
 		ads_del_computer(ah);
 
-	if (fini_krbctx)
+	if (rc != ADJOIN_ERR_INIT_KRB_CTX) {
+		if (rc != ADJOIN_ERR_GET_KRB_PRINC)
+			krb5_free_principal(ctx, krb5princ);
 		smb_krb5_ctx_fini(ctx);
+	}
 
 	ads_close(ah);
 	free(princ_r);

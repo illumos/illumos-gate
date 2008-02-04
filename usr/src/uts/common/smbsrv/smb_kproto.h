@@ -486,7 +486,7 @@ void smb_winpipe_fini(void);
 int smb_winpipe_open(int door_id);
 void smb_winpipe_close(void);
 int smb_winpipe_call(smb_request_t *, mlsvc_pipe_t *, mlsvc_stream_t *,
-    uint16_t, uint32_t *);
+    uint16_t, uint32_t *, boolean_t *);
 
 void smb_reconnection_check(struct smb_session *session);
 

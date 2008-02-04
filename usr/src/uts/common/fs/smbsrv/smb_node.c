@@ -270,6 +270,8 @@ smb_node_lookup(
 
 	ASSERT(od_name);
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
+	if (strcmp(od_name, XATTR_DIR) == 0)
+		node->flags |= NODE_XATTR_DIR;
 	node->tree_fsd = fsd;
 
 	if (op)

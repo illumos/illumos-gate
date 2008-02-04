@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,6 +122,9 @@ smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd)
 		    strlen("success") : result_code_string.length,
 		    result_code == 0 ? "success" : result_code_string.data,
 		    result_code, result_string.length, result_string.data);
+
+	free(result_code_string.data);
+	free(result_string.data);
 	return (code);
 }
 
@@ -345,5 +348,7 @@ smb_krb5_ktadd(krb5_context ctx, krb5_keytab kt, const krb5_principal princ,
 	}
 
 	free(entry);
+	if (key.length)
+		krb5_free_keyblock_contents(ctx, &key);
 	return (rc);
 }

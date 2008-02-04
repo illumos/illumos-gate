@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,8 +305,8 @@ smb_kinit(char *user, char *passwd)
 
 	(void) memset(&opts, 0, sizeof (opts));
 	opts.action = INIT_PW;
-	opts.principal_name = strdup(user);
-	opts.principal_passwd = strdup(passwd);
+	opts.principal_name = user;
+	opts.principal_passwd = passwd;
 
 	(void) memset(&k5, 0, sizeof (k5));
 

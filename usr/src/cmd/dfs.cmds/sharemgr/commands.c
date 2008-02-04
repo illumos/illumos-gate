@@ -3229,13 +3229,17 @@ sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			 * on the resource if -r was used otherwise it
 			 * must be on the share.
 			 */
-			if (ret == SA_OK && description != NULL) {
+			if (!dryrun && ret == SA_OK && description != NULL) {
+				char *desc;
+				desc = conv_to_utf8(description);
 				if (resource != NULL)
-					ret = set_resource_desc(resource,
-					    description);
+					ret = sa_set_resource_description(
+					    resource, desc);
 				else
-					ret = set_share_desc(share,
-					    description);
+					ret = sa_set_share_description(share,
+					    desc);
+				if (desc != description)
+					sa_free_share_description(desc);
 			}
 		}
 		if (!dryrun && ret == SA_OK) {

@@ -32,6 +32,7 @@
 #include <synch.h>
 #include <strings.h>
 #include <smbsrv/smb_common_door.h>
+#include <smbsrv/smb_token.h>
 #include <smbsrv/mlsvc_util.h>
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
@@ -190,14 +191,13 @@ smb_dop_user_auth_logon(char *argp, size_t arg_size, door_desc_t *dp,
 	*err = 0;
 	clnt_info = smb_dr_decode_arg_get_token(argp, arg_size);
 	if (clnt_info == NULL) {
-		syslog(LOG_ERR, "smbd: clnt_info is NULL");
 		*err = SMB_DR_OP_ERR_DECODE;
 		return (NULL);
 	}
 
 	token = smbd_user_auth_logon(clnt_info);
 
-	free(clnt_info);
+	netr_client_xfree(clnt_info);
 
 	if (!token) {
 		*err = SMB_DR_OP_ERR_EMPTYBUF;

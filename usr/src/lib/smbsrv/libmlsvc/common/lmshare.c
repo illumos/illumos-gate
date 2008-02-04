@@ -128,19 +128,71 @@ lmshare_stop()
 }
 
 /*
- * Load shares from sharemanager.
+ * lmshare_load_shares
+ *
+ * Helper function for lmshare_load. It attempts to load the shares
+ * contained in the group.
  */
+
+static void
+lmshare_load_shares(sa_group_t group)
+{
+	sa_share_t share;
+	sa_resource_t resource;
+	sa_optionset_t opts;
+	lmshare_info_t si;
+	char *path, *rname;
+
+	/* Don't bother if "smb" isn't set on the group */
+	if (sa_get_optionset(group, SMB_PROTOCOL_NAME) == NULL)
+		return;
+
+	for (share = sa_get_share(group, NULL);
+	    share != NULL; share = sa_get_next_share(share)) {
+		path = sa_get_share_attr(share, "path");
+		if (path == NULL) {
+			continue;
+		}
+		for (resource = sa_get_share_resource(share, NULL);
+		    resource != NULL;
+		    resource = sa_get_next_resource(resource)) {
+			rname = sa_get_resource_attr(resource, "name");
+			if (rname == NULL) {
+				syslog(LOG_ERR, "Invalid share "
+				    "resource for path: %s", path);
+				continue;
+			}
+			opts = sa_get_derived_optionset(resource,
+			    SMB_PROTOCOL_NAME, 1);
+			smb_build_lmshare_info(rname, path, opts, &si);
+			sa_free_derived_optionset(opts);
+			sa_free_attr_string(rname);
+			if (lmshare_add(&si, 0) != NERR_Success) {
+				syslog(LOG_ERR, "Failed to load "
+				    "share %s", si.share_name);
+			}
+		}
+		/* We are done with all shares for same path */
+		sa_free_attr_string(path);
+	}
+}
+
+/*
+ * lmshare_load
+ *
+ * Load shares from sharemanager.  The args argument is currently not
+ * used. The function walks through all the groups in libshare and
+ * calls lmshare_load_shares for each group found. It also looks for
+ * sub-groups and calls lmshare_load_shares for each sub-group found.
+ */
+
 /*ARGSUSED*/
 static void *
 lmshare_load(void *args)
 {
-	lmshare_info_t si;
 	sa_handle_t handle;
-	sa_group_t group;
-	sa_share_t share;
-	sa_resource_t resource;
-	sa_optionset_t opts;
-	char *gstate, *path, *rname;
+	sa_group_t group, subgroup;
+	char *gstate;
 
 	if (lmshare_create_table() != NERR_Success) {
 		syslog(LOG_ERR, "Failed to create share hash table");
@@ -157,43 +209,30 @@ lmshare_load(void *args)
 	for (group = sa_get_group(handle, NULL);
 	    group != NULL; group = sa_get_next_group(group)) {
 		gstate = sa_get_group_attr(group, "state");
-		if ((gstate == NULL) ||
-		    (strcasecmp(gstate, "disabled") == 0)) {
+		if (gstate == NULL)
+			continue;
+		if (strcasecmp(gstate, "disabled") == 0) {
 			/* Skip disabled or unknown state group */
+			sa_free_attr_string(gstate);
 			continue;
 		}
-		/* Check and see if smb protocol is available */
-		if (sa_get_optionset(group, SMB_PROTOCOL_NAME) == NULL)
-			continue;
-		for (share = sa_get_share(group, NULL);
-		    share != NULL; share = sa_get_next_share(share)) {
-			path = sa_get_share_attr(share, "path");
-			if (path == NULL) {
-				syslog(LOG_ERR, "Invalid share NO path");
-				continue;
-			}
-			for (resource = sa_get_share_resource(share, NULL);
-			    resource != NULL;
-			    resource = sa_get_next_resource(resource)) {
-				rname = sa_get_resource_attr(resource, "name");
-				if (rname == NULL) {
-					syslog(LOG_ERR, "Invalid share "
-					    "resource for path: %s", path);
-					continue;
-				}
-				opts = sa_get_derived_optionset(resource,
-				    SMB_PROTOCOL_NAME, 1);
-				smb_build_lmshare_info(rname, path, opts, &si);
-				sa_free_derived_optionset(opts);
-				(void) free(rname);
-				if (lmshare_add(&si, 0) != NERR_Success) {
-					syslog(LOG_ERR, "Failed to load "
-					    "share %s", si.share_name);
-				}
-			}
-			/* We are done with all shares for same path */
-			(void) free(path);
+		sa_free_attr_string(gstate);
+
+		/*
+		 * Attempt to load the shares.  lmshare_load_shares
+		 * will check to see if the protocol is enabled or
+		 * not. We then want to check for any sub-groups on
+		 * this group. This is needed in the ZFS case where
+		 * the top level ZFS group won't have "smb" protocol
+		 * enabled but the sub-groups will.
+		 */
+		lmshare_load_shares(group);
+		for (subgroup = sa_get_sub_group(group);
+		    subgroup != NULL;
+		    subgroup = sa_get_next_group(subgroup)) {
+			lmshare_load_shares(subgroup);
 		}
+
 	}
 
 	sa_fini(handle);

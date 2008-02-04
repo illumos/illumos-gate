@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,12 +299,16 @@ smb_lmshrd_srv_door(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		break;
 
 	case SMB_GET_KCONFIG:
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
+			goto decode_error;
+
 		smb_load_kconfig(&smb_kcfg);
 		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
 		smb_dr_put_kconfig(enc_ctx, &smb_kcfg);
 		break;
 
 	default:
+		dec_status = smb_dr_decode_finish(dec_ctx);
 		goto decode_error;
 	}
 

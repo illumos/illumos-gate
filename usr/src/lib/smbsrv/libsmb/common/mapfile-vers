@@ -69,6 +69,7 @@ SUNWprivate {
 	mts_wcstombs;
 	mts_wctomb;
 	netr_client_mkabsolute;
+	netr_client_xfree;
 	nt_builtin_findfirst;
 	nt_builtin_findnext;
 	nt_builtin_fini;

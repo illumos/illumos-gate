@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -310,6 +310,13 @@ netr_client_mkabsolute(uint8_t *buf, uint32_t len)
 
 	xdr_destroy(&xdrs);
 	return (obj);
+}
+
+void
+netr_client_xfree(netr_client_t *clnt)
+{
+	xdr_free(xdr_netr_client_t, (char *)clnt);
+	free(clnt);
 }
 #else /* _KERNEL */
 /*

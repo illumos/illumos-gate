@@ -72,7 +72,7 @@ dns_msgid_init(void)
 	(void) mutex_lock(&dns_msgid_mtx);
 	dns_msgid = res.id;
 	(void) mutex_unlock(&dns_msgid_mtx);
-	res_nclose(&res);
+	res_ndestroy(&res);
 	return (0);
 }
 

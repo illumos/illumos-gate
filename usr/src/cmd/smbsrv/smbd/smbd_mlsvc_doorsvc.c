@@ -164,6 +164,7 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 	int current_out_len;
 	uint32_t adj_len;
 	char lfp[START_OUTDOOR_SIZE];
+	boolean_t more_data = B_FALSE;
 
 	bufp = argp;
 	bcopy(bufp, &mdhin.md_tid, sizeof (uint64_t));
@@ -244,7 +245,10 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 		context->outlen = outpipe->sp_datalen;
 		if (outpipe->sp_datalen < mdhin.md_length)
 			adj_len = outpipe->sp_datalen;
+		if (outpipe->sp_datalen > mdhin.md_length)
+			more_data = B_TRUE;
 	}
+	outpipe->sp_more_data = (uint32_t)more_data;
 
 	if (mdhin.md_call_type == SMB_RPC_WRITE) {
 		/*
@@ -302,17 +306,19 @@ smb_winpipe_request(void *cookie, char *argp, size_t arg_size,
 	bytes_off += sizeof (uint32_t);
 	bcopy(&mdhout.md_reserved, lfp + bytes_off, sizeof (uint64_t));
 	bytes_off += sizeof (uint64_t);
-	tbytes = 0;
 	tbytes = bytes_off;
 	bcopy(outpipe->sp_pipename, lfp + tbytes, SMB_MAX_PIPENAMELEN);
 	bplen = SMB_MAX_PIPENAMELEN;
 	bcopy(&(outpipe->sp_pipeid), lfp + tbytes + bplen, sizeof (uint32_t));
 	bplen += sizeof (uint32_t);
-
 	bcopy(&(current_out_len), lfp + tbytes + bplen, sizeof (uint32_t));
+	bplen += sizeof (uint32_t);
+	bcopy(&(outpipe->sp_more_data), lfp + tbytes + bplen,
+	    sizeof (uint32_t));
 	bplen += sizeof (uint32_t);
 
 	bcopy(bufp, lfp + tbytes + bplen, current_out_len);
+
 	tbytes += bplen + current_out_len;
 	smb_user_ctx_free(user_ctx);
 	(void) door_return((char *)lfp, tbytes, NULL, 0);

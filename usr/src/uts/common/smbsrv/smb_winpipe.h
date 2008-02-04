@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ typedef struct {
 	uint32_t sp_pipeid;
 	char	 sp_pipename[SMB_MAX_PIPENAMELEN];
 	int32_t  sp_datalen;
+	uint32_t sp_more_data;
 	char	 sp_data[1]; /* any size buffer */
 } smb_pipe_t;
 

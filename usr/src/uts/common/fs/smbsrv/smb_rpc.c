@@ -255,6 +255,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 	int mdrcnt;
 	int nbytes;
 	int rc;
+	boolean_t more_data;
 
 	ASSERT(sr->fid_ofile);
 	ASSERT(sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
@@ -283,7 +284,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 	nbytes = mdrcnt;
 
 	rc = smb_winpipe_call(sr, pipe_info, streamin, SMB_RPC_TRANSACT,
-	    (uint32_t *)&nbytes);
+	    (uint32_t *)&nbytes, &more_data);
 
 	if (rc != 0) {
 		smb_rpc_exit(pipe_info);
@@ -297,7 +298,7 @@ smb_rpc_transact(struct smb_request *sr, struct uio *uio)
 	 * flush it on close: the mbuf chain belongs to the SMB XA.
 	 * Then reassign the stream to refer to the output/response.
 	 */
-	if (nbytes > mdrcnt) {
+	if (more_data == B_TRUE) {
 		/*
 		 * We have more data to return than the client expects in the
 		 * response to this request. So we send as much as the client
@@ -378,6 +379,7 @@ smb_rpc_close(struct smb_ofile *of)
 {
 	mlsvc_pipe_t *pipe_info;
 	uint32_t nbytes = 0;
+	boolean_t more_data;
 
 	ASSERT(of);
 	ASSERT(of->f_ftype == SMB_FTYPE_MESG_PIPE);
@@ -388,7 +390,7 @@ smb_rpc_close(struct smb_ofile *of)
 
 	if (pipe_info->fid != 0) {
 		(void) smb_winpipe_call(0, pipe_info, 0, SMB_RPC_FLUSH,
-		    &nbytes);
+		    &nbytes, &more_data);
 		pipe_info->fid = 0;
 	}
 
@@ -423,6 +425,7 @@ smb_rpc_write(struct smb_request *sr, struct uio *uio)
 	mlsvc_stream_t *streamin;
 	uint32_t mdrcnt;
 	int rc;
+	boolean_t more_data;
 
 	ASSERT(sr->fid_ofile);
 	ASSERT(sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
@@ -445,7 +448,7 @@ smb_rpc_write(struct smb_request *sr, struct uio *uio)
 	mdrcnt = (uint32_t)uio->uio_resid;
 
 	rc = smb_winpipe_call(sr, pipe_info, streamin, SMB_RPC_WRITE,
-	    &mdrcnt);
+	    &mdrcnt, &more_data);
 
 	smb_rpc_exit(pipe_info);
 
@@ -476,6 +479,7 @@ smb_rpc_read(struct smb_request *sr, struct uio *uio)
 	int mdrcnt;
 	int nbytes;
 	int rc = 0;
+	boolean_t more_data;
 
 	ASSERT(sr->fid_ofile);
 	ASSERT(sr->fid_ofile->f_ftype == SMB_FTYPE_MESG_PIPE);
@@ -497,7 +501,7 @@ smb_rpc_read(struct smb_request *sr, struct uio *uio)
 	nbytes = mdrcnt;
 
 	rc = smb_winpipe_call(sr, pinfo, streamin, SMB_RPC_READ,
-	    (uint32_t *)&nbytes);
+	    (uint32_t *)&nbytes, &more_data);
 
 	if (rc != 0 || nbytes == 0) {
 		rc = EIO;

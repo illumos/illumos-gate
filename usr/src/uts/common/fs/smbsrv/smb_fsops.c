@@ -646,12 +646,31 @@ smb_fsop_remove(
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	if (smb_stream_parse_name(name, fname, sname)) {
+	/*
+	 * If the passed-in name is an on-disk name,
+	 * then we need to do a case-sensitive remove.
+	 * This is important if the on-disk name
+	 * corresponds to a mangled name passed in by
+	 * the client.  We want to make sure to remove
+	 * the exact file specified by the client,
+	 * instead of letting the underlying file system
+	 * do a remove on the "first match."
+	 */
+
+	if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
+		flags = SMB_IGNORE_CASE;
+
+	if (dir_snode->flags & NODE_XATTR_DIR) {
+		rc = smb_vop_stream_remove(dir_snode->dir_snode->vp,
+		    name, flags, cr);
+	} else if (smb_stream_parse_name(name, fname, sname)) {
+		/*
+		 * It is assumed that "name" corresponds to the path
+		 * passed in by the client, and no need of suppressing
+		 * case-insensitive lookups is needed.
+		 */
 
 		ASSERT(od == 0);
-
-		if (SMB_TREE_CASE_INSENSITIVE(sr))
-			flags = SMB_IGNORE_CASE;
 
 		/*
 		 * Look up the unnamed stream (i.e. fname).
@@ -678,20 +697,6 @@ smb_fsop_remove(
 
 		smb_node_release(fnode);
 	} else {
-		/*
-		 * If the passed-in name is an on-disk name,
-		 * then we need to do a case-sensitive remove.
-		 * This is important if the on-disk name
-		 * corresponds to a mangled name passed in by
-		 * the client.  We want to make sure to remove
-		 * the exact file specified by the client,
-		 * instead of letting the underlying file system
-		 * do a remove on the "first match."
-		 */
-
-		if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
-			flags = SMB_IGNORE_CASE;
-
 		rc = smb_vop_remove(dir_snode->vp, name, flags, cr);
 
 		if (rc == ENOENT) {

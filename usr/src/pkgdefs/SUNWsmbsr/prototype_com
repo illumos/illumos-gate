@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,12 +31,13 @@ i depend
 i pkginfo
 i i.manifest
 i r.manifest
+i i.preserve
 #
 # SUNWsmbsr
 #
 d none var 0755 root sys
 d none var/smb 0755 root sys
-f none var/smb/smbpasswd 0400 root sys
+e preserve var/smb/smbpasswd 0400 root sys
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/network 0755 root sys

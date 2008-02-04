@@ -195,6 +195,7 @@ smb_process_nic_change()
 	smb_nic_build_info();
 
 	smb_netbios_name_reconfig();
+	smb_browser_config();
 
 	if (ddns_enabled) {
 		if (dyndns_update() != 0) {

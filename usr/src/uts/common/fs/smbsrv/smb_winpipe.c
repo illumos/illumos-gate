@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,8 @@ static kmutex_t smb_winpipe_mutex;
 static kcondvar_t smb_winpipe_cv;
 
 static int smb_winpipe_upcall(mlsvc_pipe_t *, smb_dr_user_ctx_t *,
-    mlsvc_stream_t *, uint16_t, uint32_t, unsigned char *, smb_pipe_t *);
+    mlsvc_stream_t *, uint16_t, uint32_t, unsigned char *, smb_pipe_t *,
+    boolean_t *more_data);
 
 static smb_dr_user_ctx_t *smb_winpipe_ctx_alloc(struct smb_request *);
 static void smb_winpipe_ctx_free(smb_dr_user_ctx_t *);
@@ -127,7 +128,8 @@ smb_winpipe_call(struct smb_request *sr,
 	mlsvc_pipe_t *pi,
 	mlsvc_stream_t *streamin,
 	uint16_t call_type,
-	uint32_t *nbytes)
+	uint32_t *nbytes,
+	boolean_t *more_data)
 {
 	smb_dr_user_ctx_t *ctx;
 	unsigned char *lbuf;
@@ -151,8 +153,7 @@ smb_winpipe_call(struct smb_request *sr,
 	ctx = smb_winpipe_ctx_alloc(sr);
 
 	rc = smb_winpipe_upcall(pi, ctx, streamin, call_type, *nbytes,
-	    lbuf, pp);
-
+	    lbuf, pp, more_data);
 	if (rc == 0) {
 		switch (call_type) {
 		case SMB_RPC_TRANSACT:
@@ -191,7 +192,8 @@ smb_winpipe_upcall(mlsvc_pipe_t *pipe_info,
 	uint16_t call_type,
 	uint32_t req_cnt,
 	unsigned char *lbuf,
-	smb_pipe_t *pp)
+	smb_pipe_t *pp,
+	boolean_t *more_data)
 {
 	door_arg_t da;
 	int user_ctx_bytes;
@@ -208,6 +210,7 @@ smb_winpipe_upcall(mlsvc_pipe_t *pipe_info,
 	 *	copy the pipe hdr into flat buf, this contains the thread id,
 	 *	version and a couple of reserved fields for future expansion
 	 */
+	*more_data = B_FALSE;
 	mdhin.md_tid = (uint64_t)curthread->t_did;
 	mdhin.md_version = SMB_MLSVC_DOOR_VERSION;
 	/*
@@ -312,14 +315,17 @@ smb_winpipe_upcall(mlsvc_pipe_t *pipe_info,
 	total_bytes += sizeof (uint32_t);
 	bcopy(da.data_ptr + total_bytes, &(pp->sp_datalen), sizeof (uint32_t));
 	total_bytes += sizeof (uint32_t);
+	bcopy(da.data_ptr + total_bytes, &(pp->sp_more_data),
+	    sizeof (uint32_t));
+	total_bytes += sizeof (uint32_t);
 
 	if (pp->sp_datalen > 0) {
+		*more_data = (boolean_t)(pp->sp_more_data);
 		pipe_info->outlen = pp->sp_datalen;
 		pipe_info->output = kmem_alloc(pipe_info->outlen, KM_SLEEP);
 		bcopy((char *)(da.data_ptr + total_bytes),
 		    pipe_info->output, pipe_info->outlen);
 	}
-
 	return (0);
 }
 
