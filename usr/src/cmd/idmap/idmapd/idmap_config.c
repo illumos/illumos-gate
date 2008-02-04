@@ -40,14 +40,15 @@
 #include <uuid/uuid.h>
 #include <pthread.h>
 #include <port.h>
+#include <net/route.h>
 #include "addisc.h"
 
-#define	MACHINE_SID_LEN	(9 + UUID_LEN/4 * 11)
-#define	FMRI_BASE "svc:/system/idmap"
-#define	CONFIG_PG "config"
-#define	GENERAL_PG "general"
-/* initial length of the array for policy options/attributes: */
-#define	DEF_ARRAY_LENGTH 16
+#define	MACHINE_SID_LEN		(9 + UUID_LEN/4 * 11)
+#define	FMRI_BASE		"svc:/system/idmap"
+#define	CONFIG_PG		"config"
+#define	GENERAL_PG		"general"
+#define	RECONFIGURE		1
+#define	POKE_AUTO_DISCOVERY	2
 
 /*LINTLIBRARY*/
 
@@ -57,8 +58,8 @@ static const char *me = "idmapd";
 
 static pthread_t update_thread_handle = 0;
 
-int hup_ev_port = -1;
-extern int hupped;
+static int idmapd_ev_port = -1;
+static int rt_sock = -1;
 
 static int
 generate_machine_sid(char **machine_sid)
@@ -434,10 +435,12 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
 {
 	int i;
 
-	if (*new == NULL)
+	if (*value == *new)
+		/* Nothing to do */
 		return (FALSE);
 
-	if (*value != NULL && ad_disc_compare_ds(*value, *new) == 0) {
+	if (*value != NULL && *new != NULL &&
+	    ad_disc_compare_ds(*value, *new) == 0) {
 		free(*new);
 		*new = NULL;
 		return (FALSE);
@@ -446,93 +449,119 @@ update_dirs(ad_disc_ds_t **value, ad_disc_ds_t **new, char *name)
 	if (*value)
 		free(*value);
 
-	for (i = 0; (*new)[i].host[0] != '\0'; i++)
-		idmapdlog(LOG_INFO, "%s: change %s=%s port=%d", me, name,
-		    (*new)[i].host, (*new)[i].port);
 	*value = *new;
 	*new = NULL;
+
+	if (*value == NULL) {
+		/* We're unsetting this DS property */
+		idmapdlog(LOG_INFO, "%s: change %s=<none>", me, name);
+		return (TRUE);
+	}
+
+	/* List all the new DSs */
+	for (i = 0; (*value)[i].host[0] != '\0'; i++)
+		idmapdlog(LOG_INFO, "%s: change %s=%s port=%d", me, name,
+		    (*value)[i].host, (*value)[i].port);
 	return (TRUE);
 }
 
 
-#define	SUBNET_CHECK_TIME	(2 * 60)
-#define	MAX_CHECK_TIME		(10 * 60)
+#define	MAX_CHECK_TIME		(20 * 60)
 
 /*
- * Returns 1 if SIGHUP has been received (see hup_handler elsewhere), 0
- * otherwise.  Uses an event port and a user-defined event.
+ * Returns 1 if the PF_ROUTE socket event indicates that we should rescan the
+ * interfaces.
  *
- * Note that port_get() does not update its timeout argument when EINTR,
- * unlike nanosleep().  We probably don't care very much here because
- * the only signals we expect are ones that will lead to idmapd dying or
- * SIGHUP, and we intend for the latter to cause this function to
- * return.  But if we did care then we could always use a timer event
- * (see timer_create(3RT)) and associate it with the same event port,
+ * Shamelessly based on smb_nics_changed() and other PF_ROUTE uses in ON.
+ */
+static
+int
+pfroute_event_is_interesting(int rt_sock)
+{
+	int nbytes;
+	int64_t msg[2048 / 8];
+	struct rt_msghdr *rtm;
+	int is_interesting = FALSE;
+
+	for (;;) {
+		if ((nbytes = read(rt_sock, msg, sizeof (msg))) <= 0)
+			break;
+		rtm = (struct rt_msghdr *)msg;
+		if (rtm->rtm_version != RTM_VERSION)
+			continue;
+		if (nbytes < rtm->rtm_msglen)
+			continue;
+		switch (rtm->rtm_type) {
+		case RTM_NEWADDR:
+		case RTM_DELADDR:
+		case RTM_IFINFO:
+			is_interesting = TRUE;
+			break;
+		default:
+			break;
+		}
+	}
+	return (is_interesting);
+}
+
+/*
+ * Returns 1 if SIGHUP has been received (see hup_handler() elsewhere) or if an
+ * interface address was added or removed; otherwise it returns 0.
+ *
+ * Note that port_get() does not update its timeout argument when EINTR, unlike
+ * nanosleep().  We probably don't care very much here, but if we did care then
+ * we could always use a timer event and associate it with the same event port,
  * then we could get accurate waiting regardless of EINTRs.
  */
 static
 int
-wait_for_ttl(struct timespec *timeout)
+wait_for_event(int poke_is_interesting, struct timespec *timeout)
 {
 	port_event_t pe;
-	int retries = 1;
-
-	/*
-	 * If event port creation failed earlier and fails now then we
-	 * simply don't learn about SIGHUPs in a timely fashion.  No big
-	 * deal
-	 */
-	if (hup_ev_port == -1 && (hup_ev_port = port_create()) < 0) {
-		(void) nanosleep(timeout, NULL);
-		return (0);
-	}
 
 retry:
-	if (port_get(hup_ev_port, &pe, timeout) != 0) {
+	memset(&pe, 0, sizeof (pe));
+	if (port_get(idmapd_ev_port, &pe, timeout) != 0) {
 		switch (errno) {
-		case EBADF:
-		case EBADFD:
-			hup_ev_port = -1;
-			(void) nanosleep(timeout, NULL);
-			break;
-		case EINVAL:
-			/*
-			 * Shouldn't happen, except, perhaps, near the
-			 * end of time
-			 */
-			timeout->tv_nsec = 0;
-			timeout->tv_sec = MAX_CHECK_TIME;
-			if (retries-- > 0)
-				goto retry;
-			/* NOTREACHED */
-			break;
 		case EINTR:
-			if (!hupped)
-				goto retry;
-			break;
+			goto retry;
 		case ETIME:
 			/* Timeout */
-			break;
+			return (FALSE);
 		default:
-			/* EFAULT */
-			(void) nanosleep(timeout, NULL);
+			/* EBADF, EBADFD, EFAULT, EINVAL (end of time?)? */
+			idmapdlog(LOG_ERR, "Event port failed: %s",
+			    strerror(errno));
+			exit(1);
+			/* NOTREACHED */
 			break;
 		}
 	}
 
-	/*
-	 * We only have one event that we care about, a user event, so
-	 * there's nothing to check or clean up about pe.
-	 *
-	 * If we get here it's either because we had a SIGHUP and a user
-	 * event was sent to our port, or because the port_get() timed
-	 * out (or even both!).
-	 */
+	if (pe.portev_source == PORT_SOURCE_USER &&
+	    pe.portev_events == POKE_AUTO_DISCOVERY)
+		return (poke_is_interesting ? TRUE : FALSE);
 
-	if (hupped) {
+	if (pe.portev_source == PORT_SOURCE_FD && pe.portev_object == rt_sock) {
+		/* PF_ROUTE socket read event, re-associate fd, handle event */
+		if (port_associate(idmapd_ev_port, PORT_SOURCE_FD, rt_sock,
+		    POLLIN, NULL) != 0) {
+			idmapdlog(LOG_ERR, "Failed to re-associate the "
+			    "routing socket with the event port: %s",
+			    strerror(errno));
+			exit(1);
+		}
+		/*
+		 * The network configuration may still be in flux.  No matter,
+		 * the resolver will re-transmit and timout if need be.
+		 */
+		return (pfroute_event_is_interesting(rt_sock));
+	}
+
+	if (pe.portev_source == PORT_SOURCE_USER &&
+	    pe.portev_events == RECONFIGURE) {
 		int rc;
 
-		hupped = 0;
 		/*
 		 * Blow away the ccache, we might have re-joined the
 		 * domain or joined a new one
@@ -553,10 +582,10 @@ retry:
 			    "idmapd: Various errors re-loading configuration "
 			    "may cause AD lookups to fail");
 		UNLOCK_CONFIG();
-		return (1);
+		return (TRUE);
 	}
 
-	return (0);
+	return (FALSE);
 }
 
 void *
@@ -564,113 +593,77 @@ idmap_cfg_update_thread(void *arg)
 {
 
 	idmap_pg_config_t	new_cfg;
-	int			ttl, changed;
+	int			ttl, changed, poke_is_interesting;
 	idmap_cfg_handles_t	*handles = &_idmapdstate.cfg->handles;
 	idmap_pg_config_t	*live_cfg = &_idmapdstate.cfg->pgcfg;
 	ad_disc_t		ad_ctx = handles->ad_ctx;
-	struct timespec		delay;
-	int			first = 1;
+	struct timespec		timeout;
 
 	(void) memset(&new_cfg, 0, sizeof (new_cfg));
 
-	for (;;) {
-		changed = FALSE;
-
-		if (first) {
-			ttl = 1;
-			first = 0;
-		} else {
-			ttl = ad_disc_get_TTL(ad_ctx);
-		}
-
-		if (ttl > MAX_CHECK_TIME)
+	poke_is_interesting = 1;
+	for (ttl = 0, changed = TRUE; ; ttl = ad_disc_get_TTL(ad_ctx)) {
+		if (ttl < 0 || ttl > MAX_CHECK_TIME) {
 			ttl = MAX_CHECK_TIME;
-		while (ttl > 0 || ttl == -1) {
-			if (ttl == -1) {
-				wait_for_ttl(NULL);
-			} else if (ttl > SUBNET_CHECK_TIME) {
-				/*
-				 * We really ought to just monitor
-				 * network interfaces with a PF_ROUTE
-				 * socket...  This crude method of
-				 * discovering subnet changes will do
-				 * for now.  Though might even not want
-				 * to bother: subnet changes leading to
-				 * sitename changes ought never happen,
-				 * and requiring a refresh when they do
-				 * should be no problem (SMF/NWAM ought
-				 * to be able to refresh us).
-				 */
-				delay.tv_sec = SUBNET_CHECK_TIME;
-				delay.tv_nsec = 0;
-				if (wait_for_ttl(&delay)) {
-					/* Got SIGHUP, re-discover */
-					ttl = 0;
-					changed = TRUE;
-					break;
-				}
-				ttl -= SUBNET_CHECK_TIME;
-				if (ad_disc_SubnetChanged(ad_ctx))
-					break;
-			} else {
-				delay.tv_sec = ttl;
-				delay.tv_nsec = 0;
-				if (wait_for_ttl(&delay))
-					changed = TRUE;
-				ttl = 0;
-			}
 		}
+		timeout.tv_sec = ttl;
+		timeout.tv_nsec = 0;
+		changed = wait_for_event(poke_is_interesting, &timeout);
+
+		/*
+		 * If there are no interesting events, and this is not the first
+		 * time through the loop, and we haven't waited the most that
+		 * we're willing to wait, so do nothing but wait some more.
+		 */
+		if (changed == FALSE && ttl > 0 && ttl < MAX_CHECK_TIME)
+			continue;
+
+		(void) ad_disc_SubnetChanged(ad_ctx);
 
 		/*
 		 * Load configuration data into a private copy.
 		 *
-		 * The fixed values (i.e., from SMF) have already been
-		 * set in AD auto discovery, so if all values have been
-		 * set in SMF and they haven't been changed or the
-		 * service been refreshed then the rest of this loop's
-		 * body is one big no-op.
+		 * The fixed values (i.e., from SMF) have already been set in AD
+		 * auto discovery, so if all values have been set in SMF and
+		 * they haven't been changed or the service been refreshed then
+		 * the rest of this loop's body is one big no-op.
 		 */
-		pthread_mutex_lock(&handles->mutex);
-
+		ad_disc_refresh(ad_ctx);
 		new_cfg.default_domain = ad_disc_get_DomainName(ad_ctx);
-		if (new_cfg.default_domain == NULL) {
+		if (new_cfg.default_domain == NULL)
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Default Domain", me);
-		}
 
 		new_cfg.domain_name = ad_disc_get_DomainName(ad_ctx);
-		if (new_cfg.domain_name == NULL) {
+		if (new_cfg.domain_name == NULL)
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Domain Name", me);
-		}
 
 		new_cfg.domain_controller =
 		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
-		if (new_cfg.domain_controller == NULL) {
+		if (new_cfg.domain_controller == NULL)
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Domain Controller", me);
-		}
 
 		new_cfg.forest_name = ad_disc_get_ForestName(ad_ctx);
-		if (new_cfg.forest_name == NULL) {
+		if (new_cfg.forest_name == NULL)
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Forest Name", me);
-		}
 
 		new_cfg.site_name = ad_disc_get_SiteName(ad_ctx);
-		if (new_cfg.site_name == NULL) {
+		if (new_cfg.site_name == NULL)
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Site Name", me);
-		}
 
 		new_cfg.global_catalog =
 		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
 		if (new_cfg.global_catalog == NULL) {
 			idmapdlog(LOG_INFO,
 			    "%s: unable to discover Global Catalog", me);
+			poke_is_interesting = 1;
+		} else {
+			poke_is_interesting = 0;
 		}
-
-		pthread_mutex_unlock(&handles->mutex);
 
 		if (new_cfg.default_domain == NULL &&
 		    new_cfg.domain_name == NULL &&
@@ -680,8 +673,6 @@ idmap_cfg_update_thread(void *arg)
 			idmapdlog(LOG_NOTICE, "%s: Could not auto-discover AD "
 			    "domain and forest names nor domain controllers "
 			    "and global catalog servers", me);
-			idmap_cfg_unload(&new_cfg);
-			continue;
 		}
 
 		/*
@@ -696,9 +687,14 @@ idmap_cfg_update_thread(void *arg)
 		}
 
 		/*
+		 * Update running config and decide whether we want to call
+		 * reload_ad() (i.e., if the default_domain changed or the GC
+		 * list changed).
+		 *
 		 * If default_domain came from SMF then we must not
 		 * auto-discover it.
 		 */
+		changed = FALSE;
 		if (live_cfg->dflt_dom_set_in_smf == FALSE &&
 		    update_value(&live_cfg->default_domain,
 		    &new_cfg.default_domain, "default_domain") == TRUE)
@@ -741,19 +737,52 @@ idmap_cfg_update_thread(void *arg)
 	return (NULL);
 }
 
-
 int
-idmap_cfg_start_updates(idmap_cfg_t *cfg)
+idmap_cfg_start_updates(void)
 {
-	/* Don't check for failure -- see wait_for_ttl() */
-	hup_ev_port = port_create();
+	const char *me = "idmap_cfg_start_updates";
 
-	errno = pthread_create(&update_thread_handle, NULL,
-	    idmap_cfg_update_thread, NULL);
-	if (errno == 0)
-		return (0);
-	else
+	if ((idmapd_ev_port = port_create()) < 0) {
+		idmapdlog(LOG_ERR, "%s: Failed to create event port: %s",
+		    me, strerror(errno));
 		return (-1);
+	}
+
+	if ((rt_sock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
+		idmapdlog(LOG_ERR, "%s: Failed to open routing socket: %s",
+		    me, strerror(errno));
+		(void) close(idmapd_ev_port);
+		return (-1);
+	}
+
+	if (fcntl(rt_sock, F_SETFL, O_NDELAY|O_NONBLOCK) < 0) {
+		idmapdlog(LOG_ERR, "%s: Failed to set routing socket flags: %s",
+		    me, strerror(errno));
+		(void) close(rt_sock);
+		(void) close(idmapd_ev_port);
+		return (-1);
+	}
+
+	if (port_associate(idmapd_ev_port, PORT_SOURCE_FD,
+	    rt_sock, POLLIN, NULL) != 0) {
+		idmapdlog(LOG_ERR, "%s: Failed to associate the routing "
+		    "socket with the event port: %s", me, strerror(errno));
+		(void) close(rt_sock);
+		(void) close(idmapd_ev_port);
+		return (-1);
+	}
+
+	if ((errno = pthread_create(&update_thread_handle, NULL,
+	    idmap_cfg_update_thread, NULL)) != 0) {
+		idmapdlog(LOG_ERR, "%s: Failed to start update thread: %s",
+		    me, strerror(errno));
+		(void) port_dissociate(idmapd_ev_port, PORT_SOURCE_FD, rt_sock);
+		(void) close(rt_sock);
+		(void) close(idmapd_ev_port);
+		return (-1);
+	}
+
+	return (0);
 }
 
 
@@ -1160,4 +1189,17 @@ idmap_cfg_fini(idmap_cfg_t *cfg)
 	free(cfg);
 
 	return (0);
+}
+
+void
+idmap_cfg_poke_updates(void)
+{
+	(void) port_send(idmapd_ev_port, POKE_AUTO_DISCOVERY, NULL);
+}
+
+/*ARGSUSED*/
+void
+idmap_cfg_hup_handler(int sig) {
+	if (idmapd_ev_port >= 0)
+		(void) port_send(idmapd_ev_port, RECONFIGURE, NULL);
 }

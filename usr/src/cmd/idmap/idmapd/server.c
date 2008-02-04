@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <pwd.h>
 #include <auth_attr.h>
 #include <secdb.h>
+#include <sys/u8_textprep.h>
 
 #define	_VALIDATE_LIST_CB_DATA(col, val, siz)\
 	retcode = validate_list_cb_data(cb_data, argc, argv, col,\
@@ -96,6 +97,66 @@ sanitize_mapping_request(idmap_mapping *req)
 	free(req->id2domain);
 	req->id2domain = NULL;
 	req->direction = _IDMAP_F_DONE;
+}
+
+static
+int
+validate_mapped_id_by_name_req(idmap_mapping *req)
+{
+	int e;
+
+	if (IS_REQUEST_UID(*req) || IS_REQUEST_GID(*req))
+		return (IDMAP_SUCCESS);
+
+	if (IS_REQUEST_SID(*req, 1)) {
+		if (!EMPTY_STRING(req->id1name) &&
+		    u8_validate(req->id1name, strlen(req->id1name),
+		    NULL, U8_VALIDATE_ENTIRE, &e) < 0)
+			return (IDMAP_ERR_BAD_UTF8);
+		if (!EMPTY_STRING(req->id1domain) &&
+		    u8_validate(req->id1domain, strlen(req->id1domain),
+		    NULL, U8_VALIDATE_ENTIRE, &e) < 0)
+			return (IDMAP_ERR_BAD_UTF8);
+	}
+
+	return (IDMAP_SUCCESS);
+}
+
+static
+int
+validate_rule(idmap_namerule *rule)
+{
+	int e;
+
+	if (!EMPTY_STRING(rule->winname) &&
+	    u8_validate(rule->winname, strlen(rule->winname),
+	    NULL, U8_VALIDATE_ENTIRE, &e) < 0)
+		return (IDMAP_ERR_BAD_UTF8);
+
+	if (!EMPTY_STRING(rule->windomain) &&
+	    u8_validate(rule->windomain, strlen(rule->windomain),
+	    NULL, U8_VALIDATE_ENTIRE, &e) < 0)
+		return (IDMAP_ERR_BAD_UTF8);
+
+	return (IDMAP_SUCCESS);
+
+}
+
+static
+bool_t
+validate_rules(idmap_update_batch *batch)
+{
+	idmap_update_op	*up;
+	int i;
+
+	for (i = 0; i < batch->idmap_update_batch_len; i++) {
+		up = &(batch->idmap_update_batch_val[i]);
+		if (validate_rule(&(up->idmap_update_op_u.rule))
+		    != IDMAP_SUCCESS)
+			return (IDMAP_ERR_BAD_UTF8);
+	}
+
+	return (IDMAP_SUCCESS);
 }
 
 /* ARGSUSED */
@@ -560,6 +621,10 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 	(void) memset(result, 0, sizeof (*result));
 	lbuf[0] = rbuf[0] = 0;
 
+	result->retcode = validate_rule(&rule);
+	if (result->retcode != IDMAP_SUCCESS)
+		goto out;
+
 	RDLOCK_CONFIG();
 	maxlimit = _idmapdstate.cfg->pgcfg.list_size_limit;
 	UNLOCK_CONFIG();
@@ -585,8 +650,8 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 		(void) snprintf(u2wbuf, sizeof (u2wbuf), "AND u2w_order > 0");
 	}
 
-	retcode = gen_sql_expr_from_rule(&rule, &expr);
-	if (retcode != IDMAP_SUCCESS)
+	result->retcode = gen_sql_expr_from_rule(&rule, &expr);
+	if (result->retcode != IDMAP_SUCCESS)
 		goto out;
 
 	/* Create LIMIT expression. */
@@ -707,6 +772,10 @@ idmap_update_1_svc(idmap_update_batch batch, idmap_update_res *res,
 		goto out;
 	}
 
+	res->retcode = validate_rules(&batch);
+	if (res->retcode != IDMAP_SUCCESS)
+		goto out;
+
 	/* Get db handle */
 	res->retcode = get_db_handle(&db);
 	if (res->retcode != IDMAP_SUCCESS)
@@ -780,6 +849,10 @@ idmap_get_mapped_id_by_name_1_svc(idmap_mapping request,
 
 	/* Init */
 	(void) memset(result, 0, sizeof (*result));
+
+	result->retcode = validate_mapped_id_by_name_req(&request);
+	if (result->retcode != IDMAP_SUCCESS)
+		goto out;
 
 	/* Get cache handle */
 	result->retcode = get_cache_handle(&cache);

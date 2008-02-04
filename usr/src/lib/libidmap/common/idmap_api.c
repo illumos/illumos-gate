@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1701,6 +1701,9 @@ static stat_table_t stattable[] = {
 	{IDMAP_ERR_U2W_NAMERULE_CONFLICT,
 		gettext("Duplicate rule or conflicts with an existing "
 		"Unix to Windows name-based rule"), EINVAL},
+	{IDMAP_ERR_BAD_UTF8,
+		gettext("Invalid or illegal UTF-8 sequence found in "
+		"a given Windows entity name or domain name"), EINVAL},
 	{-1, NULL, 0}
 };
 #undef	gettext

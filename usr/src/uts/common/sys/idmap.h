@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #define	IDMAP_ERR_RETRIABLE_NET_ERR	-9971
 #define	IDMAP_ERR_W2U_NAMERULE_CONFLICT	-9970
 #define	IDMAP_ERR_U2W_NAMERULE_CONFLICT	-9969
+#define	IDMAP_ERR_BAD_UTF8		-9968
 
 /* Reserved GIDs for some well-known SIDs */
 #define	IDMAP_WK_LOCAL_SYSTEM_GID	2147483648U

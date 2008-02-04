@@ -20,12 +20,63 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Active Directory Auto-Discovery.
+ *
+ * This [project private] API allows the caller to provide whatever
+ * details it knows a priori (i.e., provided via configuration so as to
+ * override auto-discovery) and in any order.  Then the caller can ask
+ * for any of the auto-discoverable parameters in any order.
+ *
+ * But there is an actual order in which discovery must be done.  Given
+ * the discovery mechanism implemented here, that order is:
+ *
+ *  - the domain name joined must be discovered first
+ *  - then the domain controllers
+ *  - then the forest name and site name
+ *  - then the global catalog servers, and site-specific domain
+ *    controllers and global catalog servers.
+ *
+ * The API does not require it be called in the same order because there
+ * may be other discovery mechanisms in the future, and exposing
+ * ordering requirements of the current mechanism now can create trouble
+ * down the line.  Also, this makes the API easier to use now, which
+ * means less work to do some day when we make this a public API.
+ *
+ * Domain discovery is done by res_nsearch() of the DNS SRV RR name for
+ * domain controllers.  As long as the joined domain appears in the DNS
+ * resolver's search list then we'll find it.
+ *
+ * Domain controller discovery is a matter of formatting the DNS SRV RR
+ * FQDN for domain controllers and doing a lookup for them.  Knowledge
+ * of the domain name is not fundamentally required, but we separate the
+ * two processes, which in practice can lead to one more DNS lookup than
+ * is strictly required.
+ *
+ * Forest and site name discovery require an LDAP search of the AD
+ * "configuration partition" at a domain controller for the joined
+ * domain.  Forest and site name discovery depend on knowing the joined
+ * domain name and domain controllers for that domain.
+ *
+ * Global catalog server discovery requires knowledge of the forest
+ * name in order to format the DNS SRV RR FQDN to lookup.  Site-specific
+ * domain controller discovery depends on knowing the site name (and,
+ * therefore, joined domain, ...).  Site-specific global catalog server
+ * discovery depends on knowledge of the forest and site names, which
+ * depend on...
+ *
+ * All the work of discovering particular items is done by functions
+ * named validate_<item>().  Each such function calls validate_<item>()
+ * for any items that it depends on.
+ *
+ * This API is not thread-safe.
+ */
 
 
 #include <stdio.h>
@@ -102,6 +153,7 @@ typedef struct ad_subnet {
 
 struct ad_disc {
 	struct __res_state state;
+	int		res_ninitted;
 	ad_subnet_t	*subnets;
 	int		subnets_changed;
 	time_t		subnets_last_check;
@@ -115,16 +167,18 @@ struct ad_disc {
 	ad_item_t	site_global_catalog;
 };
 
-#define	min(x, y)	(((x) > (y)) ? (y) : (x))
-
+/*
+ * We try res_ninit() whenever we don't have one.  res_ninit() fails if
+ * idmapd is running before the network is up!
+ */
+#define	DO_RES_NINIT(ctx)   if (!(ctx)->res_ninitted) \
+		(ctx)->res_ninitted = res_ninit(&ctx->state) != -1
 
 #define	is_fixed(item)					\
 	((item)->type == AD_TYPE_FIXED)
 
-
 #define	is_changed(item, num, param) 			\
 	((item)->param_version[num] != (param)->version)
-
 
 #define	is_valid(item)					\
 	((item)->type != AD_TYPE_INVALID && (item)->value.str != NULL)
@@ -445,8 +499,9 @@ subnets_to_DNs(ad_subnet_t *subnets, const char *base_dn)
 	return (results);
 }
 
+/* Compare DS lists */
 int
-ad_disc_compare_ds(ad_disc_ds_t  *ds1, ad_disc_ds_t  *ds2)
+ad_disc_compare_ds(ad_disc_ds_t *ds1, ad_disc_ds_t *ds2)
 {
 	int	i, j;
 	int	num_ds1;
@@ -477,8 +532,9 @@ ad_disc_compare_ds(ad_disc_ds_t  *ds1, ad_disc_ds_t  *ds2)
 }
 
 
+/* Copy a list of DSs */
 static ad_disc_ds_t *
-dsdup(const ad_disc_ds_t  *srv)
+dsdup(const ad_disc_ds_t *srv)
 {
 	int	i;
 	int	size;
@@ -541,6 +597,9 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 	uint16_t size;
 	char *query_type;
 	char namebuf[NS_MAXDNAME];
+
+	if (state == NULL)
+		return (NULL);
 
 	/* Set negative result TTL */
 	*ttl = 5 * 60;
@@ -684,7 +743,7 @@ ldap_lookup_entry_attr(LDAP **ld, ad_disc_ds_t *domainControllers,
 	int 	i;
 	int	rc, ldversion;
 	int	zero = 0;
-	int 	timeoutms = 30 * 1000;
+	int 	timeoutms = 5 * 1000;
 	char 	*saslmech = "GSSAPI";
 	uint32_t saslflags = LDAP_SASL_INTERACTIVE;
 	int	scope = LDAP_SCOPE_BASE;
@@ -783,15 +842,8 @@ ad_disc_init(void)
 {
 	struct ad_disc *ctx;
 	ctx = calloc(1, sizeof (struct ad_disc));
-	if (ctx != NULL) {
-		if (res_ninit(&ctx->state) == -1) {
-			idmapdlog(LOG_ERR,
-			    "%s: Could not load DNS resolver configuration",
-			    me);
-			free(ctx);
-			return (NULL);
-		}
-	}
+	if (ctx != NULL)
+		DO_RES_NINIT(ctx);
 	return (ctx);
 }
 
@@ -802,7 +854,8 @@ ad_disc_fini(ad_disc_t ctx)
 	if (ctx == NULL)
 		return;
 
-	res_ndestroy(&ctx->state);
+	if (ctx->res_ninitted)
+		res_ndestroy(&ctx->state);
 
 	if (ctx->subnets != NULL)
 		free(ctx->subnets);
@@ -834,9 +887,10 @@ ad_disc_fini(ad_disc_t ctx)
 void
 ad_disc_refresh(ad_disc_t ctx)
 {
-	res_ndestroy(&ctx->state);
+	if (ctx->res_ninitted)
+		res_ndestroy(&ctx->state);
 	(void) memset(&ctx->state, 0, sizeof (ctx->state));
-	(void) res_ninit(&ctx->state);
+	ctx->res_ninitted = res_ninit(&ctx->state) != -1;
 
 	if (ctx->domain_name.type == AD_TYPE_AUTO)
 		ctx->domain_name.type = AD_TYPE_INVALID;
@@ -862,10 +916,7 @@ ad_disc_refresh(ad_disc_t ctx)
 
 
 
-/*
- * Find DNS domainName
- *
- */
+/* Discover joined Active Directory domainName */
 static void
 validate_DomainName(ad_disc_t ctx)
 {
@@ -880,6 +931,7 @@ validate_DomainName(ad_disc_t ctx)
 		return;
 
 	/* Try to find our domain by searching for DCs for it */
+	DO_RES_NINIT(ctx);
 	domain_controller = srv_query(&ctx->state, LDAP_SRV_HEAD
 	    DC_SRV_TAIL, ctx->domain_name.value.str, &srvname, &ttl);
 
@@ -926,10 +978,7 @@ ad_disc_get_DomainName(ad_disc_t ctx)
 }
 
 
-/*
- * Find a Domain Controller
- *
- */
+/* Discover domain controllers */
 static void
 validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 {
@@ -960,9 +1009,10 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 
 		if (is_valid(&ctx->domain_name)) {
 			/*
-			 * The DNS SRV record for
-			 * _ldap._tcp.dc._msdcs.<DnsDominName>
+			 * Lookup DNS SRV RR named
+			 * _ldap._tcp.dc._msdcs.<DomainName>
 			 */
+			DO_RES_NINIT(ctx);
 			domain_controller = srv_query(&ctx->state,
 			    LDAP_SRV_HEAD DC_SRV_TAIL,
 			    ctx->domain_name.value.str, NULL, &ttl);
@@ -985,12 +1035,13 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 		if (is_valid(&ctx->domain_name)) {
 			char rr_name[DNS_MAX_NAME];
 			/*
-			 * The DNS SRV record for
-			 * _ldap._tcp.<SiteName>._sites.dc._msdcs.<DnsDominName>
+			 * Lookup DNS SRV RR named
+			 * _ldap._tcp.<SiteName>._sites.dc._msdcs.<DomainName>
 			 */
 			(void) snprintf(rr_name, sizeof (rr_name),
 			    LDAP_SRV_HEAD SITE_SRV_MIDDLE DC_SRV_TAIL,
 			    ctx->site_name.value.str);
+			DO_RES_NINIT(ctx);
 			domain_controller = srv_query(&ctx->state, rr_name,
 			    ctx->domain_name.value.str, NULL, &ttl);
 		}
@@ -1014,6 +1065,7 @@ ad_disc_get_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 }
 
 
+/* Discover site name (for multi-homed systems the first one found wins) */
 static void
 validate_SiteName(ad_disc_t ctx)
 {
@@ -1032,10 +1084,7 @@ validate_SiteName(ad_disc_t ctx)
 	if (is_fixed(&ctx->site_name))
 		return;
 
-	/*
-	 * We dont want to cause a recursive loop by validating
-	 * the site specific domain controller.
-	 */
+	/* Can't rely on site-specific DCs */
 	validate_DomainController(ctx, AD_DISC_GLOBAL);
 
 	if (is_expired(&ctx->site_name) ||
@@ -1051,95 +1100,99 @@ validate_SiteName(ad_disc_t ctx)
 			update_required = TRUE;
 	}
 
-	if (update_required) {
-		update_version(&ctx->site_name, PARAM1,
-		    &ctx->domain_controller);
-
-		if (is_valid(&ctx->domain_name) &&
-		    is_valid(&ctx->domain_controller) &&
-		    subnets != NULL) {
-			dn_root[0] = "";
-			dn_root[1] = NULL;
-
-			config_naming_context = ldap_lookup_entry_attr(
-			    &ld, ctx->domain_controller.value.ds,
-			    dn_root, "configurationNamingContext");
-			if (config_naming_context == NULL)
-				goto out;
-			/*
-			 * configurationNamingContext also provides
-			 * the Forest Name.
-			 */
-			if (!is_fixed(&ctx->forest_name)) {
-				/*
-				 * The configurationNamingContext should be of
-				 * form:
-				 * CN=Configuration,<DNforestName>
-				 * Remove the first part and convert to DNS form
-				 * (replace ",DC=" with ".")
-				 */
-				char *str = "CN=Configuration,";
-				int len = strlen(str);
-				if (strncasecmp(config_naming_context,
-				    str, len) == 0) {
-					forest_name = DN_to_DNS(
-					    config_naming_context + len);
-					update_string(&ctx->forest_name,
-					    forest_name, AD_TYPE_AUTO, 0);
-				}
-			}
-			dn_subnets =
-			    subnets_to_DNs(subnets, config_naming_context);
-			if (dn_subnets == NULL)
-				goto out;
-
-			site_object = ldap_lookup_entry_attr(
-			    &ld, ctx->domain_controller.value.ds,
-			    dn_subnets, "siteobject");
-			if (site_object != NULL) {
-				/*
-				 * The site object should be of the form
-				 * CN=<site>,CN=Sites,CN=Configuration,
-				 *		<DN Domain>
-				 */
-				if (strncasecmp(site_object, "CN=", 3) == 0) {
-					for (len = 0;
-					    site_object[len + 3] != ','; len++)
-						;
-					site_name = malloc(len + 1);
-					(void) strncpy(site_name,
-					    &site_object[3], len);
-					site_name[len] = '\0';
-				}
-			}
-
-			if (ctx->subnets != NULL) {
-				free(ctx->subnets);
-				ctx->subnets = NULL;
-			}
-			ctx->subnets = subnets;
-			subnets = NULL;
-			ctx->subnets_changed = FALSE;
-		}
-out:
-		if (ld != NULL)
-			(void) ldap_unbind(ld);
-
-		update_string(&ctx->site_name, site_name, AD_TYPE_AUTO, 0);
-
-		if (dn_subnets != NULL) {
-			for (i = 0; dn_subnets[i] != NULL; i++)
-				free(dn_subnets[i]);
-			free(dn_subnets);
-		}
-		if (config_naming_context != NULL)
-			free(config_naming_context);
-		if (site_object != NULL)
-			free(site_object);
+	if (!update_required) {
+		free(subnets);
+		return;
 	}
 
-	if (subnets != NULL)
-		free(subnets);
+	update_version(&ctx->site_name, PARAM1, &ctx->domain_controller);
+
+	if (is_valid(&ctx->domain_name) &&
+	    is_valid(&ctx->domain_controller) &&
+	    subnets != NULL) {
+		dn_root[0] = "";
+		dn_root[1] = NULL;
+
+		config_naming_context = ldap_lookup_entry_attr(
+		    &ld, ctx->domain_controller.value.ds,
+		    dn_root, "configurationNamingContext");
+		if (config_naming_context == NULL)
+			goto out;
+		/*
+		 * configurationNamingContext also provides the Forest
+		 * Name.
+		 */
+		if (!is_fixed(&ctx->forest_name)) {
+			/*
+			 * The configurationNamingContext should be of
+			 * form:
+			 * CN=Configuration,<DNforestName>
+			 * Remove the first part and convert to DNS form
+			 * (replace ",DC=" with ".")
+			 */
+			char *str = "CN=Configuration,";
+			int len = strlen(str);
+			if (strncasecmp(config_naming_context, str, len) == 0) {
+				forest_name = DN_to_DNS(
+				    config_naming_context + len);
+				update_string(&ctx->forest_name,
+				    forest_name, AD_TYPE_AUTO, 0);
+			}
+		}
+		dn_subnets = subnets_to_DNs(subnets, config_naming_context);
+		if (dn_subnets == NULL)
+			goto out;
+
+		site_object = ldap_lookup_entry_attr(
+		    &ld, ctx->domain_controller.value.ds,
+		    dn_subnets, "siteobject");
+		if (site_object != NULL) {
+			/*
+			 * The site object should be of the form
+			 * CN=<site>,CN=Sites,CN=Configuration,
+			 *		<DN Domain>
+			 */
+			if (strncasecmp(site_object, "CN=", 3) == 0) {
+				for (len = 0;
+				    site_object[len + 3] != ','; len++)
+					;
+				site_name = malloc(len + 1);
+				(void) strncpy(site_name, &site_object[3], len);
+				site_name[len] = '\0';
+			}
+		}
+
+		if (ctx->subnets != NULL) {
+			free(ctx->subnets);
+			ctx->subnets = NULL;
+		}
+		ctx->subnets = subnets;
+		subnets = NULL;
+		ctx->subnets_changed = FALSE;
+	}
+out:
+	if (ld != NULL)
+		(void) ldap_unbind(ld);
+
+	update_string(&ctx->site_name, site_name, AD_TYPE_AUTO, 0);
+
+	if (site_name == NULL || *site_name == '\0') {
+		/* No site name -> no site-specific DSs */
+		update_ds(&ctx->site_domain_controller, NULL, AD_TYPE_AUTO, 0);
+		update_ds(&ctx->site_global_catalog, NULL, AD_TYPE_AUTO, 0);
+	}
+
+	if (dn_subnets != NULL) {
+		for (i = 0; dn_subnets[i] != NULL; i++)
+			free(dn_subnets[i]);
+		free(dn_subnets);
+	}
+	if (config_naming_context != NULL)
+		free(config_naming_context);
+	if (site_object != NULL)
+		free(site_object);
+
+	free(subnets);
 
 }
 
@@ -1157,6 +1210,7 @@ ad_disc_get_SiteName(ad_disc_t ctx)
 
 
 
+/* Discover forest name */
 static void
 validate_ForestName(ad_disc_t ctx)
 {
@@ -1168,8 +1222,9 @@ validate_ForestName(ad_disc_t ctx)
 	if (is_fixed(&ctx->forest_name))
 		return;
 	/*
-	 * We dont want to cause a recursive loop by validating
-	 * the site specific domain controller.
+	 * We may not have a site name yet, so we won't rely on
+	 * site-specific DCs.  (But maybe we could replace
+	 * validate_ForestName() with validate_siteName()?)
 	 */
 	validate_DomainController(ctx, AD_DISC_GLOBAL);
 	if (is_expired(&ctx->forest_name) ||
@@ -1223,11 +1278,12 @@ ad_disc_get_ForestName(ad_disc_t ctx)
 }
 
 
+/* Discover global catalog servers */
 static void
 validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 {
 	ad_disc_ds_t *global_catalog = NULL;
-	uint32_t ttl;
+	uint32_t ttl = 0;
 	int	validate_global = FALSE;
 	int	validate_site = FALSE;
 
@@ -1252,11 +1308,10 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 
 		if (is_valid(&ctx->forest_name)) {
 			/*
-			 * The DNS SRV record for the non-site
-			 * Global Catalogue is:
-			 *
-			 * _ldap._tcp.gc._msdcs.<DnsForestName>
+			 * Lookup DNS SRV RR named
+			 * _ldap._tcp.gc._msdcs.<ForestName>
 			 */
+			DO_RES_NINIT(ctx);
 			global_catalog =
 			    srv_query(&ctx->state, LDAP_SRV_HEAD GC_SRV_TAIL,
 			    ctx->forest_name.value.str, NULL, &ttl);
@@ -1277,16 +1332,15 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 		if (is_valid(&ctx->forest_name) && is_valid(&ctx->site_name)) {
 			char 	rr_name[DNS_MAX_NAME];
 			/*
-			 * The DNS SRV record for the site
-			 * Global Catalogue is:
-			 *
-			 * _ldap._tcp.<sitename>._sites.gc.
-			 *	_msdcs.<DnsForestName>
+			 * Lookup DNS SRV RR named:
+			 * _ldap._tcp.<siteName>._sites.gc.
+			 *	_msdcs.<ForestName>
 			 */
 			(void) snprintf(rr_name,
 			    sizeof (rr_name),
 			    LDAP_SRV_HEAD SITE_SRV_MIDDLE GC_SRV_TAIL,
 			    ctx->site_name.value.str);
+			DO_RES_NINIT(ctx);
 			global_catalog =
 			    srv_query(&ctx->state, rr_name,
 			    ctx->forest_name.value.str, NULL, &ttl);
@@ -1421,35 +1475,26 @@ ad_disc_unset(ad_disc_t ctx)
  *		-1 if there are no TTL items
  *		0  if there are expired items
  *		else the number of seconds
+ *
+ * The MIN_GT_ZERO(x, y) macro return the lesser of x and y, provided it
+ * is positive -- min() greater than zero.
  */
+#define	MIN_GT_ZERO(x, y) (((x) <= 0) ? (((y) <= 0) ? \
+		(-1) : (y)) : (((y) <= 0) ? (x) : (((x) > (y)) ? (y) : (x))))
 int
 ad_disc_get_TTL(ad_disc_t ctx)
 {
 	int ttl;
 
-	ttl = ctx->domain_controller.ttl;
+	ttl = MIN_GT_ZERO(ctx->domain_controller.ttl, ctx->global_catalog.ttl);
+	ttl = MIN_GT_ZERO(ttl, ctx->site_domain_controller.ttl);
+	ttl = MIN_GT_ZERO(ttl, ctx->site_global_catalog.ttl);
 
-	if (ttl == 0)
-		ttl = ctx->global_catalog.ttl;
-	else
-		ttl = min(ttl, ctx->global_catalog.ttl);
-
-	if (ttl == 0)
-		ttl = ctx->site_domain_controller.ttl;
-	else
-		ttl = min(ttl, ctx->domain_controller.ttl);
-
-	if (ttl == 0)
-		ttl = ctx->site_global_catalog.ttl;
-	else
-		ttl = min(ttl, ctx->site_global_catalog.ttl);
-
-	if (ttl == 0)
+	if (ttl == -1)
 		return (-1);
 	ttl -= time(NULL);
 	if (ttl < 0)
-		ttl = 0;
-
+		return (0);
 	return (ttl);
 }
 

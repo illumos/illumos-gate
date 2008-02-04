@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,7 @@ extern "C" {
 #define	_IDLE	0
 #define	_SERVED	1
 
-#define	CHECK_NULL(s)	s?s:"null"
+#define	CHECK_NULL(s)	(s?s:"null")
 
 #define	SENTINEL_PID	UINT32_MAX
 
@@ -146,6 +146,9 @@ typedef struct msg_table {
 	const char	*msg;
 } msg_table_t;
 
+#define	IDMAPD_SEARCH_TIMEOUT		3   /* seconds */
+#define	IDMAPD_LDAP_OPEN_TIMEOUT	1   /* secs; initial, w/ exp backoff */
+
 /*
  * The following flags are used by idmapd while processing a
  * given mapping request. Note that idmapd uses multiple passes to
@@ -193,10 +196,10 @@ typedef struct msg_table {
 	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GSID)
 
 #define	IS_BATCH_UID(batch, i) \
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_UID
+	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_UID)
 
 #define	IS_BATCH_GID(batch, i) \
-	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID
+	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_GID)
 
 #define	IS_REQUEST_SID(req, n) \
 	((req).id##n.idtype == IDMAP_SID ||	\
@@ -205,10 +208,10 @@ typedef struct msg_table {
 
 
 #define	IS_REQUEST_UID(request) \
-	(request).id1.idtype == IDMAP_UID
+	((request).id1.idtype == IDMAP_UID)
 
 #define	IS_REQUEST_GID(request) \
-	(request).id1.idtype == IDMAP_GID
+	((request).id1.idtype == IDMAP_GID)
 
 typedef idmap_retcode (*update_list_res_cb)(void *, const char **, uint64_t);
 typedef int (*list_svc_cb)(void *, int, char **, char **);
@@ -222,7 +225,7 @@ extern int	create_directory(const char *, uid_t, gid_t);
 extern int	load_config();
 extern int	reload_ad();
 extern int	idmap_init_tsd_key(void);
-extern void	degrade_svc(void);
+extern void	degrade_svc(const char *);
 extern void	restore_svc(void);
 
 

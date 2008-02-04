@@ -454,11 +454,11 @@ idmap_ad_free(ad_t **ad)
 
 static
 int
-idmap_open_conn(ad_host_t *adh)
+idmap_open_conn(ad_host_t *adh, int timeoutsecs)
 {
 	int zero = 0;
-	int timeoutms = 30 * 1000;
 	int ldversion, rc;
+	int timeoutms = timeoutsecs * 1000;
 
 	if (adh == NULL)
 		return (0);
@@ -528,73 +528,76 @@ ad_host_t *
 idmap_get_conn(ad_t *ad)
 {
 	ad_host_t	*adh = NULL;
-	ad_host_t	*first_adh, *next_adh;
-	int		seen_last;
-	int		tries = -1;
+	int		tries;
+	int		dscount = 0;
+	int		timeoutsecs = IDMAPD_LDAP_OPEN_TIMEOUT;
 
 retry:
 	(void) pthread_mutex_lock(&adhostlock);
 
-	if (host_head == NULL)
+	if (host_head == NULL) {
+		(void) pthread_mutex_unlock(&adhostlock);
 		goto out;
+	}
 
-	/* Try as many DSs as we have, once each; count them once */
-	if (tries < 0) {
-		for (adh = host_head, tries = 0; adh != NULL; adh = adh->next)
-			tries++;
+	if (dscount == 0) {
+		/*
+		 * First try: count the number of DSes.
+		 *
+		 * Integer overflow is not an issue -- we can't have so many
+		 * DSes because they won't fit even DNS over TCP, and SMF
+		 * shouldn't let you set so many.
+		 */
+		for (adh = host_head, tries = 0; adh != NULL; adh = adh->next) {
+			if (adh->owner == ad)
+				dscount++;
+		}
+
+		if (dscount == 0) {
+			(void) pthread_mutex_unlock(&adhostlock);
+			goto out;
+		}
+
+		tries = dscount * 3;	/* three tries per-ds */
+
+		/*
+		 * Begin round-robin at the next DS in the list after the last
+		 * one that we had a connection to, else start with the first
+		 * DS in the list.
+		 */
+		adh = ad->last_adh;
 	}
 
 	/*
-	 * Find a suitable ad_host_t (one associated with this ad_t,
-	 * preferably one that's already connected and not dead),
-	 * possibly round-robining through the ad_host_t list.
-	 *
-	 * If we can't find a non-dead ad_host_t and we've had one
-	 * before (ad->last_adh != NULL) then pick the next one or, if
-	 * there is no next one, the first one (i.e., round-robin).
-	 *
-	 * If we've never had one then (ad->last_adh == NULL) then pick
-	 * the first one.
-	 *
-	 * If we ever want to be more clever, such as preferring DSes
-	 * with better average response times, adjusting for weights
-	 * from SRV RRs, and so on, then this is the place to do it.
+	 * Round-robin -- pick the next one on the list; if the list
+	 * changes on us, no big deal, we'll just potentially go
+	 * around the wrong number of times.
 	 */
-
-	for (adh = host_head, first_adh = NULL, next_adh = NULL, seen_last = 0;
-	    adh != NULL; adh = adh->next) {
-		if (adh->owner != ad)
-			continue;
-		if (first_adh == NULL)
-			first_adh = adh;
-		if (adh == ad->last_adh)
-			seen_last++;
-		else if (seen_last)
-			next_adh = adh;
-
-		/* First time or current adh is live -> done */
-		if (ad->last_adh == NULL || (!adh->dead && adh->ld != NULL))
+	for (;;) {
+		if (adh == NULL || (adh = adh->next) == NULL)
+			adh = host_head;
+		if (adh->owner == ad)
 			break;
 	}
 
-	/* Round-robin */
-	if (adh == NULL)
-		adh = (next_adh != NULL) ? next_adh : first_adh;
-
-	if (adh != NULL)
-		ad->last_adh = adh;
-
-out:
+	ad->last_adh = adh;
 	(void) pthread_mutex_unlock(&adhostlock);
 
+
 	/* Found suitable DS, open it if not already opened */
-	if (idmap_open_conn(adh))
+	if (idmap_open_conn(adh, timeoutsecs))
 		return (adh);
 
-	if (tries-- > 0)
+	tries--;
+
+	if ((tries % dscount) == 0)
+		timeoutsecs *= 2;
+
+	if (tries > 0)
 		goto retry;
 
-	idmapdlog(LOG_ERR, "Couldn't open an LDAP connection to any global "
+out:
+	idmapdlog(LOG_NOTICE, "Couldn't open an LDAP connection to any global "
 	    "catalog server!");
 
 	return (NULL);
@@ -1001,7 +1004,7 @@ idmap_lookup_batch_start(ad_t *ad, int nqueries, idmap_query_state_t **state)
 
 	adh = idmap_get_conn(ad);
 	if (adh == NULL)
-		return (IDMAP_ERR_OTHER);
+		return (IDMAP_ERR_RETRIABLE_NET_ERR);
 
 	new_state = calloc(1, sizeof (idmap_query_state_t) +
 	    (nqueries - 1) * sizeof (idmap_q_t));
@@ -1425,9 +1428,8 @@ idmap_get_adobject_batch(ad_host_t *adh, struct timeval *timeout)
 	/* Get one result */
 	rc = ldap_result(adh->ld, LDAP_RES_ANY, 0,
 	    timeout, &res);
-	if (rc == LDAP_UNAVAILABLE || rc == LDAP_UNWILLING_TO_PERFORM ||
-	    rc == LDAP_CONNECT_ERROR || rc == LDAP_SERVER_DOWN ||
-	    rc == LDAP_BUSY)
+	if ((timeout != NULL && timeout->tv_sec > 0 && rc == LDAP_SUCCESS) ||
+	    rc < 0)
 		adh->dead = 1;
 	(void) pthread_mutex_unlock(&adh->lock);
 
@@ -1560,27 +1562,25 @@ idmap_lookup_release_batch(idmap_query_state_t **state)
 }
 
 idmap_retcode
-idmap_lookup_batch_end(idmap_query_state_t **state,
-	struct timeval *timeout)
+idmap_lookup_batch_end(idmap_query_state_t **state)
 {
 	int		    rc = LDAP_SUCCESS;
 	idmap_retcode	    retcode = IDMAP_SUCCESS;
+	struct timeval	    timeout;
 
 	(*state)->qdead = 1;
+	timeout.tv_sec = IDMAPD_SEARCH_TIMEOUT;
+	timeout.tv_usec = 0;
 
 	/* Process results until done or until timeout, if given */
 	while ((*state)->qinflight > 0) {
 		if ((rc = idmap_get_adobject_batch((*state)->qadh,
-		    timeout)) != 0)
+		    &timeout)) != 0)
 			break;
 	}
 
-	if (rc == LDAP_UNAVAILABLE || rc == LDAP_UNWILLING_TO_PERFORM ||
-	    rc == LDAP_CONNECT_ERROR || rc == LDAP_SERVER_DOWN ||
-	    rc == LDAP_BUSY) {
+	if (rc != 0)
 		retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
-		(*state)->qadh->dead = 1;
-	}
 
 	idmap_lookup_release_batch(state);
 

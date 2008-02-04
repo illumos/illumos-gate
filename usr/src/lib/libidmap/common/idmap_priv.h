@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,9 @@ extern "C" {
 
 #define	IDMAP_MAX_NAME_LEN	512
 
-#define	IDMAP_ERROR(rc)		rc != IDMAP_SUCCESS && rc != IDMAP_NEXT
-#define	IDMAP_FATAL_ERROR(rc)	rc == IDMAP_ERR_MEMORY ||\
-				rc == IDMAP_ERR_DB
+#define	IDMAP_ERROR(rc)		(rc != IDMAP_SUCCESS && rc != IDMAP_NEXT)
+#define	IDMAP_FATAL_ERROR(rc)	(rc == IDMAP_ERR_MEMORY ||\
+				rc == IDMAP_ERR_DB)
 
 /* Direction in which mapping is valid */
 #define	IDMAP_DIRECTION_UNDEF	-1	/* not defined */

@@ -55,7 +55,6 @@
 #include <sys/sid.h>
 #include <sys/idmap.h>
 
-static void	hup_handler(int);
 static void	term_handler(int);
 static void	init_idmapd();
 static void	fini_idmapd();
@@ -70,9 +69,6 @@ int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
 int _rpcsvccount = 0;		/* Number of requests being serviced */
 mutex_t _svcstate_lock;		/* lock for _rpcsvcstate, _rpcsvccount */
 idmapd_state_t	_idmapdstate;
-
-int hupped;
-extern int hup_ev_port;
 
 SVCXPRT *xprt = NULL;
 
@@ -111,16 +107,6 @@ app_krb5_user_uid(void)
 {
 	return (0);
 }
-
-/*ARGSUSED*/
-static void
-hup_handler(int sig)
-{
-	hupped = 1;
-	if (hup_ev_port >= 0)
-		(void) port_send(hup_ev_port, 1, &sig /* any ptr will do */);
-}
-
 
 /*ARGSUSED*/
 static void
@@ -240,7 +226,7 @@ main(int argc, char **argv)
 
 	/* signal handlers that should run only after we're initialized */
 	(void) sigset(SIGTERM, term_handler);
-	(void) sigset(SIGHUP, hup_handler);
+	(void) sigset(SIGHUP, idmap_cfg_hup_handler);
 
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
 	    DAEMON_UID, DAEMON_GID,

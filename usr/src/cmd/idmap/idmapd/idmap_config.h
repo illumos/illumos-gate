@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,7 +94,9 @@ extern int		idmap_cfg_load(idmap_cfg_handles_t *,
 					idmap_pg_config_t *, int);
 extern idmap_cfg_t	*idmap_cfg_init(void);
 extern int		idmap_cfg_fini(idmap_cfg_t *);
-extern int		idmap_cfg_start_updates(idmap_cfg_t *);
+extern int		idmap_cfg_start_updates(void);
+extern void		idmap_cfg_poke_updates(void);
+extern void		idmap_cfg_hup_handler(int);
 
 #ifdef __cplusplus
 }

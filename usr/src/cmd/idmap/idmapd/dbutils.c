@@ -211,9 +211,15 @@ get_fmri(void)
  * have a successful AD name<->SID lookup.
  */
 void
-degrade_svc(void)
+degrade_svc(const char *reason)
 {
 	const char *fmri;
+
+	/*
+	 * If the config update thread is in a state where auto-discovery could
+	 * be re-tried, then this will make it try it -- a sort of auto-refresh.
+	 */
+	idmap_cfg_poke_updates();
 
 	if ((fmri = get_fmri()) == NULL)
 		return;
@@ -221,11 +227,11 @@ degrade_svc(void)
 	membar_consumer();
 	if (degraded)
 		return;
-	(void) smf_degrade_instance(fmri, 0);
 	membar_producer();
 	degraded = 1;
+	(void) smf_degrade_instance(fmri, 0);
+	idmapdlog(LOG_ERR, "idmapd: Degraded operation (%s)", reason);
 }
-
 
 void
 restore_svc(void)
@@ -1737,9 +1743,9 @@ retry:
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
 	    &qs);
 	if (retcode != IDMAP_SUCCESS) {
-		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "Failed to create batch for AD lookup");
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+			goto retry;
+		degrade_svc("failed to create batch for AD lookup");
 		goto out;
 	}
 
@@ -1856,12 +1862,12 @@ retry:
 	}
 
 	if (retcode == IDMAP_SUCCESS && add)
-		retcode = idmap_lookup_batch_end(&qs, NULL);
+		retcode = idmap_lookup_batch_end(&qs);
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		degrade_svc();
+		degrade_svc("some AD lookups timed out repeatedly");
 
 	if (retcode != IDMAP_SUCCESS)
 		idmapdlog(LOG_NOTICE, "Failed to batch AD lookup requests");
@@ -3178,9 +3184,10 @@ ad_lookup_by_winname(lookup_state_t *state,
 retry:
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
 	if (retcode != IDMAP_SUCCESS) {
-		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "Failed to create request for AD lookup by winname");
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+			goto retry;
+		degrade_svc("failed to create request for AD lookup "
+		    "by winname");
 		return (retcode);
 	}
 
@@ -3196,12 +3203,12 @@ retry:
 	if (retcode != IDMAP_SUCCESS)
 		idmap_lookup_release_batch(&qs);
 	else
-		retcode = idmap_lookup_batch_end(&qs, NULL);
+		retcode = idmap_lookup_batch_end(&qs);
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		degrade_svc();
+		degrade_svc("some AD lookups timed out repeatedly");
 
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_NOTICE, "AD lookup by winname failed");
@@ -3653,9 +3660,9 @@ ad_lookup_by_sid(lookup_state_t *state,
 retry:
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
 	if (retcode != IDMAP_SUCCESS) {
-		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "Failed to create request for AD lookup by SID");
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+			goto retry;
+		degrade_svc("failed to create request for AD lookup by SID");
 		return (retcode);
 	}
 
@@ -3671,12 +3678,12 @@ retry:
 	if (retcode != IDMAP_SUCCESS)
 		idmap_lookup_release_batch(&qs);
 	else
-		retcode = idmap_lookup_batch_end(&qs, NULL);
+		retcode = idmap_lookup_batch_end(&qs);
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		degrade_svc();
+		degrade_svc("some AD lookups timed out repeatedly");
 
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_NOTICE, "AD lookup by SID failed");
@@ -4010,9 +4017,10 @@ ad_lookup_by_unixname(lookup_state_t *state,
 retry:
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
 	if (retcode != IDMAP_SUCCESS) {
-		degrade_svc();
-		idmapdlog(LOG_ERR,
-		    "Failed to create request for AD lookup by unixname");
+		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
+			goto retry;
+		degrade_svc("failed to create request for AD lookup "
+		    "by unixname");
 		return (IDMAP_ERR_INTERNAL);
 	}
 
@@ -4028,12 +4036,12 @@ retry:
 	if (retcode != IDMAP_SUCCESS)
 		idmap_lookup_release_batch(&qs);
 	else
-		retcode = idmap_lookup_batch_end(&qs, NULL);
+		retcode = idmap_lookup_batch_end(&qs);
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		degrade_svc();
+		degrade_svc("some AD lookups timed out repeatedly");
 
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_NOTICE, "AD lookup by unixname failed");

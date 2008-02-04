@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,8 +136,7 @@ idmap_retcode idmap_lookup_batch_start(ad_t *ad, int nqueries,
 		idmap_query_state_t **state);
 
 /* End a batch and release its idmap_query_state_t object */
-idmap_retcode idmap_lookup_batch_end(idmap_query_state_t **state,
-		struct timeval *timeout);
+idmap_retcode idmap_lookup_batch_end(idmap_query_state_t **state);
 
 /* Abandon a batch and release its idmap_query_state_t object */
 void idmap_lookup_release_batch(idmap_query_state_t **state);

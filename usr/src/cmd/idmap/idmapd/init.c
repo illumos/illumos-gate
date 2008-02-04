@@ -76,8 +76,7 @@ load_config()
 	int rc;
 	idmap_pg_config_t *pgcfg;
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
-		idmapdlog(LOG_ERR, "%s: failed to initialize config", me);
-		degrade_svc();
+		degrade_svc("failed to initialize config");
 		return (-1);
 	}
 	pgcfg = &_idmapdstate.cfg->pgcfg;
@@ -86,9 +85,7 @@ load_config()
 	    &_idmapdstate.cfg->pgcfg, 0);
 	if (rc < -1) {
 		/* Total failure */
-		degrade_svc();
-		idmapdlog(LOG_ERR, "%s: Fatal error while loading "
-		    "configuration", me);
+		degrade_svc("fatal error while loading configuration");
 		return (rc);
 	}
 
@@ -99,23 +96,24 @@ load_config()
 
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
-		degrade_svc();
-		idmapdlog(LOG_INFO,
-		    "%s: Global catalog server is not configured; AD lookup "
+		degrade_svc(
+		    "global catalog server is not configured; AD lookup "
 		    "will fail until one or more global catalog server names "
 		    "are configured or discovered; auto-discovery will begin "
-		    "shortly", me);
+		    "shortly");
 	} else {
 		restore_svc();
 	}
 
 	(void) reload_ad();
 
-	if (idmap_cfg_start_updates(_idmapdstate.cfg) < 0)
-		idmapdlog(LOG_ERR, "%s: could not start config updater",
-		    me);
+	if ((rc = idmap_cfg_start_updates()) < 0) {
+		/* Total failure */
+		degrade_svc("could not start config updater");
+		return (rc);
+	}
 
-	idmapdlog(LOG_DEBUG, "%s: initial configuration loaded", me);
+	idmapdlog(LOG_DEBUG, "%s: Initial configuration loaded", me);
 
 	return (0);
 }
@@ -143,9 +141,7 @@ reload_ad()
 
 	if (idmap_ad_alloc(&new, pgcfg->default_domain,
 	    IDMAP_AD_GLOBAL_CATALOG) != 0) {
-		if (old == NULL)
-			degrade_svc();
-		idmapdlog(LOG_ERR, "%s: could not initialize AD context", me);
+		degrade_svc("could not initialize AD context");
 		return (-1);
 	}
 
@@ -154,10 +150,7 @@ reload_ad()
 		    pgcfg->global_catalog[i].host,
 		    pgcfg->global_catalog[i].port) != 0) {
 			idmap_ad_free(&new);
-			if (old == NULL)
-				degrade_svc();
-			idmapdlog(LOG_ERR,
-			    "%s: could not initialize AD DS context", me);
+			degrade_svc("could not initialize AD GC context");
 			return (-1);
 		}
 	}
