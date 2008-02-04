@@ -1455,8 +1455,8 @@ do_create_vlan(int argc, char *argv[])
 	if ((status = dladm_vlan_create(vlan, linkid, vid, flags)) !=
 	    DLADM_STATUS_OK) {
 		if (status == DLADM_STATUS_NOTSUP) {
-			die_dlerr(status, "not all links have link up/down "
-			    "detection; must use -f (see dladm(1M))\n");
+			die_dlerr(status, "VLAN over '%s' may require lowered "
+			    "MTU; must use -f (see dladm(1M))\n", link);
 		} else {
 			die_dlerr(status, "create operation failed");
 		}
@@ -1677,6 +1677,7 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 {
 	uint32_t	flags = state->ls_flags;
 	dladm_status_t	status = DLADM_STATUS_OK;
+	char		tmpbuf[MAXLINKNAMELEN];
 
 	if (!state->ls_parseable)
 		(void) sprintf(lbuf->link_over, STR_UNDEF_VAL);
@@ -1697,6 +1698,8 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 		dladm_aggr_grp_attr_t	ginfo;
 		int			i;
 
+		(void) sprintf(lbuf->link_over, "");
+
 		status = dladm_aggr_info(linkid, &ginfo, flags);
 		if (status != DLADM_STATUS_OK)
 			goto done;
@@ -1708,10 +1711,16 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 		for (i = 0; i < ginfo.lg_nports; i++) {
 			status = dladm_datalink_id2info(
 			    ginfo.lg_ports[i].lp_linkid, NULL, NULL, NULL,
-			    lbuf->link_over, sizeof (lbuf->link_over));
+			    tmpbuf, sizeof (tmpbuf));
 			if (status != DLADM_STATUS_OK) {
 				free(ginfo.lg_ports);
 				goto done;
+			}
+			(void) strlcat(lbuf->link_over, tmpbuf,
+			    sizeof (lbuf->link_over));
+			if (i != (ginfo.lg_nports - 1)) {
+				(void) strlcat(lbuf->link_over, " ",
+				    sizeof (lbuf->link_over));
 			}
 		}
 		free(ginfo.lg_ports);

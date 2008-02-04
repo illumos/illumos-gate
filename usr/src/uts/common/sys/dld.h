@@ -275,7 +275,7 @@ typedef enum {
 typedef struct dld_ioc_prop_s {
 	int		pr_version;
 	uint_t		pr_flags;		/* private to libdladm */
-	char		pr_linkname[DLPI_LINKNAME_MAX];	/* interface name */
+	datalink_id_t	pr_linkid;
 	dld_prop_id_t	pr_num;
 	char    	pr_name[DLD_LINKPROP_NAME_MAX];
 	uint_t		pr_valsize;		/* sizeof pr_val */

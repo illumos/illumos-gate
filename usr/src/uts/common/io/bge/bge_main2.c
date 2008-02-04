@@ -1050,6 +1050,7 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 	bge_t *bgep = barg;
 	int err = 0;
 	link_flowctrl_t fl;
+	uint64_t tmp = 0;
 
 	bzero(pr_val, pr_valsize);
 	switch (pr_num) {
@@ -1059,10 +1060,10 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = bgep->param_link_duplex;
 			break;
 		case DLD_PROP_SPEED:
-			if (pr_valsize < sizeof (uint_t))
+			if (pr_valsize < sizeof (uint64_t))
 				return (EINVAL);
-			bcopy(&(bgep->param_link_speed), pr_val,
-			    sizeof (bgep->param_link_speed));
+			tmp = bgep->param_link_speed * 1000000ull;
+			bcopy(&tmp, pr_val, sizeof (tmp));
 			break;
 		case DLD_PROP_STATUS:
 			if (pr_valsize < sizeof (uint8_t))
@@ -1075,8 +1076,6 @@ bge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 			*(uint8_t *)pr_val = bgep->param_adv_autoneg;
 			break;
 		case DLD_PROP_DEFMTU: {
-			uint64_t tmp = 0;
-
 			if (pr_valsize < sizeof (uint64_t))
 				return (EINVAL);
 			tmp = bgep->chipid.default_mtu;
@@ -1272,11 +1271,13 @@ bge_get_priv_prop(bge_t *bge, const char *pr_name, uint_t pr_valsize,
 	}
 
 done:
-	strsize = (uint_t)strlen(valstr);
-	if (pr_valsize < strsize) {
-		err = ENOBUFS;
-	} else {
-		(void) strlcpy(pr_val, valstr, pr_valsize);
+	if (err != 0) {
+		strsize = (uint_t)strlen(valstr);
+		if (pr_valsize < strsize) {
+			err = ENOBUFS;
+		} else {
+			(void) strlcpy(pr_val, valstr, pr_valsize);
+		}
 	}
 	return (err);
 }

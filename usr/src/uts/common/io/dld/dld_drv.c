@@ -529,8 +529,7 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 		goto done;
 	dipp = (dld_ioc_prop_t *)mp->b_cont->b_rptr;
 
-	if ((err = dls_mgmt_get_linkid(dipp->pr_linkname, &linkid)) != 0)
-		goto done;
+	linkid = dipp->pr_linkid;
 
 	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
 		goto done;
