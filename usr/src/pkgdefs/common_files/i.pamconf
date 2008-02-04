@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 CLEANUP_FILE=/tmp/CLEANUP
@@ -71,6 +71,36 @@ cron		account		required	pam_unix_account.so.1
 EOF
 }
 
+#  Returns zero (success) if system is labeled (aka Trusted Extensions).
+#  1 otherwise.
+#
+is_system_labeled() {
+	[ ! -x /bin/plabel ] && return 1
+	/bin/plabel > /dev/null 2>&1
+	return $?
+}
+
+# Add any entries for Trusted Extensions, during initial install.
+# This is dependent on whether TX is enabled.
+add_tx_entries() {
+	is_system_labeled
+	if [ $? = 0 ] ; then
+		grep '^[ 	]*other.*account.*pam_tsol_account' $dest \
+		    > /dev/null 2>&1
+		if [ $? -ne 0 ] ; then
+			# Append new entry
+			cat >> $dest << EOF
+other		account		required	pam_tsol_account.so.1
+EOF
+
+			echo "${dest} entry added for Trusted Extensions; \c" \
+			    >> ${CLEANUP_FILE}
+		fi
+	fi
+
+}
+
+
 #
 setup_kerb_changes
 setup_ppp_changes
@@ -79,6 +109,9 @@ while read src dest
 do
     if [ ! -f $dest ] ; then
 	cp $src $dest
+
+	# Dynamically add any entries for Trusted Extensions if it's enabled
+	add_tx_entries
     else
 	echo "${dest} default entries updated, \c" \
 		>> ${CLEANUP_FILE}
