@@ -664,7 +664,6 @@ lib/sparcv9/libuutil.so			sparc
 lib/sparcv9/llib-luutil.ln		sparc
 usr/lib/libuutil.so			sparc
 usr/lib/sparcv9/libuutil.so		sparc
-usr/include/libuutil.h			sparc
 usr/include/libuutil_impl.h		sparc
 #
 # Private Multidata file.

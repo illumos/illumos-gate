@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,6 +48,7 @@ d none usr 755 root sys
 d none usr/include 755 root bin
 f none usr/include/libbrand.h 644 root bin
 f none usr/include/libzonecfg.h 644 root bin
+f none usr/include/libuutil.h 644 root bin
 d none usr/lib 755 root bin
 s none usr/lib/libbrand.so=./libbrand.so.1
 s none usr/lib/libzonecfg.so=./libzonecfg.so.1

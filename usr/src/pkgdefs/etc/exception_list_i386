@@ -683,7 +683,6 @@ lib/libuutil.so				i386
 lib/llib-luutil				i386
 lib/llib-luutil.ln			i386
 usr/lib/libuutil.so			i386
-usr/include/libuutil.h			i386
 usr/include/libuutil_impl.h		i386
 #
 # Private Multidata file.
