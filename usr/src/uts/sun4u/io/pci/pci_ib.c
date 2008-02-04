@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -598,17 +598,20 @@ ib_delete_ino_pil(ib_t *ib_p, ib_ino_pil_t *ipil_p)
 
 	kmem_free(ipil_p, sizeof (ib_ino_pil_t));
 
-	if (ino_p->ino_lopil == pil) {
-		for (next = ino_p->ino_ipil_p; next;
-		    next = next->ipil_next_p) {
+	if ((--ino_p->ino_ipil_size) && (ino_p->ino_lopil == pil)) {
+		for (next = ino_p->ino_ipil_p, pil = next->ipil_pil;
+		    next; next = next->ipil_next_p) {
+
 			if (pil > next->ipil_pil)
 				pil = next->ipil_pil;
 		}
-
+		/*
+		 * Value stored in pil should be the lowest pil.
+		 */
 		ino_p->ino_lopil = pil;
 	}
 
-	if (--ino_p->ino_ipil_size)
+	if (ino_p->ino_ipil_size)
 		return;
 
 	if (ib_p->ib_ino_lst == ino_p)
