@@ -830,7 +830,7 @@ retrieve_key(const char *essid, const char *bssid, dladm_secobj_class_t req)
 	    DLADM_SECOBJ_NAME_MAX);
 	dprintf("retrieve_key: len = %d, object = %s\n",
 	    strlen(cooked_key->wk_name), cooked_key->wk_name);
-	cooked_key->wk_len = DLADM_SECOBJ_NAME_MAX;
+	cooked_key->wk_len = sizeof (cooked_key->wk_val);
 	cooked_key->wk_idx = 1;
 
 	/* Try the kernel first, then fall back to persistent storage. */

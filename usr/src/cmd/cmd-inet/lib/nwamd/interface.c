@@ -1186,14 +1186,15 @@ find_if_type(const char *name)
 	type = IF_WIRED;
 	if (dladm_name2info(name, NULL, NULL, NULL, &media) !=
 	    DLADM_STATUS_OK) {
-		if (strncmp(name, "ip.tun", 6) == 0) {
+		if (strncmp(name, "ip.tun", 6) == 0 ||
+		    strncmp(name, "ip6.tun", 7) == 0 ||
+		    strncmp(name, "ip.6to4tun", 10) == 0)
 			/*
 			 * We'll need to update our tunnel detection once
-			 * clearview/uv and clearview/tun driver projects
-			 * go back; tunnel names won't necessarily be ip.tunN
+			 * the clearview/tun project is integrated; tunnel
+			 * names won't necessarily be ip.tunN.
 			 */
 			type = IF_TUN;
-		}
 	} else if (media == DL_WIFI) {
 		type = IF_WIRELESS;
 	}
