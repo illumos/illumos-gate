@@ -291,7 +291,16 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	 */
 	if ((self->ul_critical + self->ul_sigdefer) == 0) {
 		call_user_handler(sig, sip, ucp);
-		return;	/* call_user_handler() cannot return */
+		/*
+		 * On the surface, the following call seems redundant
+		 * because call_user_handler() cannot return. However,
+		 * we don't want to return from here because the compiler
+		 * might recycle our frame. We want to keep it on the
+		 * stack to assist debuggers such as pstack in identifying
+		 * signal frames. The call to thr_panic() serves to prevent
+		 * tail-call optimisation here.
+		 */
+		thr_panic("sigacthandler(): call_user_handler() returned");
 	}
 
 	/*
