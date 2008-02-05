@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ initio(struct ionod *iop, int save)
 				fdmap[topfd++].dup_fd = savefd(ioufd);
 			}
 
-			if (iof & IODOC) {
+			if (iof & IODOC_SUBST) {
 				struct tempblk tb;
 
 				subst(chkopen(ion, 0), (fd = tmpfil(&tb)));

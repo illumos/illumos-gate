@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,12 +127,13 @@ extern "C" {
 /* io nodes */
 #define		USERIO		10
 #define		IOUFD		15
-#define		IODOC		16
-#define		IOPUT		32
-#define		IOAPP		64
-#define		IOMOV		128
-#define		IORDW		256
-#define			IOSTRIP		512
+#define		IODOC		0x0010
+#define		IOPUT		0x0020
+#define		IOAPP		0x0040
+#define		IOMOV		0x0080
+#define		IORDW		0x0100
+#define		IOSTRIP		0x0200
+#define		IODOC_SUBST	0x0400
 #define		INPIPE		0
 #define		OTPIPE		1
 

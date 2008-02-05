@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,7 +509,7 @@ inout(lastio)
 	switch (wdval)
 	{
 	case DOCSYM:	/*	<<	*/
-		iof |= IODOC;
+		iof |= IODOC|IODOC_SUBST;
 		break;
 
 	case APPSYM:	/*	>>	*/
