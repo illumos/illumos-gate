@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,23 +421,19 @@ master_file_lookup(char *pnpid, char **devname, char **description,
 {
 	struct master_line *cur = incore_master_head;
 
-	/*
-	 * Caller will pass us a null pointer if _CID not present
-	 */
-	if (pnpid == NULL)
-		return (0);
+	ASSERT(pnpid != NULL);
 
-	if (master_ops_debug & MASTER_OPS_DEBUG_LOOKUP) {
+	if (master_ops_debug & MASTER_OPS_DEBUG_LOOKUP)
 		printf("master_ops: Looking for %s: ", pnpid);
-	}
+
 	while (cur != NULL) {
 		if (strcmp(pnpid, cur->column[0]) == 0) {
 
 			*devname = kmem_zalloc(strlen(cur->column[1]) + 1,
-								    KM_SLEEP);
+			    KM_SLEEP);
 			(void) strcpy(*devname, cur->column[1]);
 			*description = kmem_zalloc(strlen(cur->column[5]) + 1,
-								    KM_SLEEP);
+			    KM_SLEEP);
 			(void) strcpy(*description, cur->column[5]);
 			if (cur->column[6] != NULL) {
 				*properties = kmem_zalloc(
@@ -480,10 +475,13 @@ master_file_lookups(char *pnpid, char **devname, char **description,
 {
 	char *tmp = pnpid;
 
-	if (tmp == NULL) {
-		return (0);
-	}
-	while ((*tmp != NULL) && (tmp <= pnpid + pnpid_size)) {
+	/*
+	 * terminate the loop based on pnpid_size.  If pnpid_size
+	 * is 0, the loop terminates without ever calling
+	 * master_file_lookup(); this happens if there's no
+	 * _CID object present
+	 */
+	while (tmp < pnpid + pnpid_size) {
 		int ret = master_file_lookup(tmp, devname, description,
 		    properties);
 		if (ret == 1) {
