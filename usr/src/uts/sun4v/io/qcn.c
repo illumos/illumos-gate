@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
 #include <sys/hypervisor_api.h>
 #include <sys/hsvc.h>
 #include <sys/machsystm.h>
+#include <sys/consdev.h>
 
 /* dev_ops and cb_ops for device driver */
 static int qcn_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
@@ -74,6 +75,14 @@ static void qcn_receive_getchr(void);
 static void qcn_flush(void);
 static uint_t qcn_hi_intr(caddr_t arg);
 static uint_t qcn_soft_intr(caddr_t arg1, caddr_t arg2);
+
+/* functions required for polled io */
+static boolean_t qcn_polledio_ischar(cons_polledio_arg_t arg);
+static int qcn_polledio_getchar(cons_polledio_arg_t arg);
+static void qcn_polledio_putchar(cons_polledio_arg_t arg, uchar_t c);
+static void qcn_polledio_enter(cons_polledio_arg_t arg);
+static void qcn_polledio_exit(cons_polledio_arg_t arg);
+
 
 static boolean_t abort_charseq_recognize(uchar_t);
 
@@ -414,6 +423,18 @@ qcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&qcn_state->qcn_lock, NULL, MUTEX_DRIVER, NULL);
 
 	/*
+	 * Fill in the polled I/O structure.
+	 */
+	qcn_state->qcn_polledio.cons_polledio_version = CONSPOLLEDIO_V1;
+	qcn_state->qcn_polledio.cons_polledio_argument =
+	    (cons_polledio_arg_t)qcn_state;
+	qcn_state->qcn_polledio.cons_polledio_putchar = qcn_polledio_putchar;
+	qcn_state->qcn_polledio.cons_polledio_getchar = qcn_polledio_getchar;
+	qcn_state->qcn_polledio.cons_polledio_ischar = qcn_polledio_ischar;
+	qcn_state->qcn_polledio.cons_polledio_enter = qcn_polledio_enter;
+	qcn_state->qcn_polledio.cons_polledio_exit = qcn_polledio_exit;
+
+	/*
 	 *  Enable  interrupts
 	 */
 	if (!qcn_state->qcn_polling) {
@@ -682,20 +703,47 @@ qcn_ioctl(queue_t *q, mblk_t *mp)
 #endif
 
 	iocp = (struct iocblk *)mp->b_rptr;
+
 	tty = &(qcn_state->qcn_tty);
 
 	if (tty->t_iocpending != NULL) {
 		freemsg(tty->t_iocpending);
 		tty->t_iocpending = NULL;
 	}
-	data_size = ttycommon_ioctl(tty, q, mp, &error);
-	if (data_size != 0) {
-		if (qcn_state->qcn_wbufcid)
-			unbufcall(qcn_state->qcn_wbufcid);
-		/* call qcn_reioctl() */
-		qcn_state->qcn_wbufcid =
-		    bufcall(data_size, BPRI_HI, qcn_reioctl, qcn_state);
-		return;
+
+	/*
+	 * Handle the POLLEDIO ioctls now because ttycommon_ioctl
+	 * (below) frees up the message block (mp->b_cont) which
+	 * contains the pointer used to pass back results.
+	 */
+	switch (iocp->ioc_cmd) {
+	case CONSOPENPOLLEDIO:
+		error = miocpullup(mp, sizeof (struct cons_polledio *));
+		if (error != 0)
+			break;
+
+		*(struct cons_polledio **)mp->b_cont->b_rptr =
+		    &qcn_state->qcn_polledio;
+
+		mp->b_datap->db_type = M_IOCACK;
+		break;
+
+	case CONSCLOSEPOLLEDIO:
+		mp->b_datap->db_type = M_IOCACK;
+		iocp->ioc_error = 0;
+		iocp->ioc_rval = 0;
+		break;
+
+	default:
+		data_size = ttycommon_ioctl(tty, q, mp, &error);
+		if (data_size != 0) {
+			if (qcn_state->qcn_wbufcid)
+				unbufcall(qcn_state->qcn_wbufcid);
+			/* call qcn_reioctl() */
+			qcn_state->qcn_wbufcid =
+			    bufcall(data_size, BPRI_HI, qcn_reioctl, qcn_state);
+			return;
+		}
 	}
 
 	mutex_enter(&qcn_state->qcn_lock);
@@ -1262,4 +1310,54 @@ qcn_wsrv(queue_t *q)
 	mutex_exit(&qcn_state->qcn_lock);
 
 	return (0);
+}
+
+static boolean_t
+qcn_polledio_ischar(cons_polledio_arg_t arg)
+{
+	qcn_t *state = (qcn_t *)arg;
+
+	if (state->qcn_char_available)
+		return (B_TRUE);
+
+	return (state->qcn_char_available =
+	    (hv_cngetchar(&state->qcn_hold_char) == H_EOK));
+}
+
+
+static int
+qcn_polledio_getchar(cons_polledio_arg_t arg)
+{
+	qcn_t *state = (qcn_t *)arg;
+
+	while (!qcn_polledio_ischar(arg))
+		drv_usecwait(10);
+
+	state->qcn_char_available = B_FALSE;
+
+	return ((int)state->qcn_hold_char);
+}
+
+static void
+qcn_polledio_putchar(cons_polledio_arg_t arg, uchar_t c)
+{
+	if (c == '\n')
+		qcn_polledio_putchar(arg, '\r');
+
+	while (hv_cnputchar((uint8_t)c) == H_EWOULDBLOCK)
+		drv_usecwait(10);
+}
+
+static void
+qcn_polledio_enter(cons_polledio_arg_t arg)
+{
+	qcn_t *state = (qcn_t *)arg;
+
+	state->qcn_char_available = B_FALSE;
+}
+
+/* ARGSUSED */
+static void
+qcn_polledio_exit(cons_polledio_arg_t arg)
+{
 }

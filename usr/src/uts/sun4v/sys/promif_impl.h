@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,7 @@ extern caddr_t promif_stree_getroot(void);
  */
 extern cif_func_t promif_find_cif_callback(char *opname);
 extern int promif_ldom_setprop(char *name, void *value, int valuelen);
+extern char promif_getchar(void);
 
 /*
  * Initialization functions

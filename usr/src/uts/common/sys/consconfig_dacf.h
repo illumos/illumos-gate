@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,9 @@ typedef struct cons_state {
 	kmutex_t	cons_lock;
 
 	cons_prop_t	*cons_km_prop;
+	int		cons_tem_supported;
+	int		cons_stdin_is_kbd;
+	int		cons_stdout_is_fb;
 } cons_state_t;
 
 /*
@@ -123,6 +126,7 @@ extern char	*plat_kbdpath(void);
 extern char	*plat_mousepath(void);
 extern int	plat_stdout_is_framebuffer(void);
 extern int	plat_stdin_is_keyboard(void);
+extern int	plat_virtual_console_path(char **);
 
 extern void	plat_tem_get_inverses(int *, int *);
 extern void	plat_tem_get_prom_font_size(int *, int *);

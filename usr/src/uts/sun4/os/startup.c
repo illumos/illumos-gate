@@ -2130,9 +2130,6 @@ post_startup(void)
 #ifdef	PTL1_PANIC_DEBUG
 	init_ptl1_thread();
 #endif	/* PTL1_PANIC_DEBUG */
-
-	if (&cif_init)
-		cif_init();
 }
 
 #ifdef	PTL1_PANIC_DEBUG
@@ -3137,4 +3134,11 @@ kobj_texthole_free(caddr_t addr, size_t size)
 	ASSERT(arena >= 0 && arena < HEAPTEXT_NARENAS);
 	ASSERT(texthole_arena[arena] != NULL);
 	vmem_free(texthole_arena[arena], addr, size);
+}
+
+void
+release_bootstrap(void)
+{
+	if (&cif_init)
+		cif_init();
 }

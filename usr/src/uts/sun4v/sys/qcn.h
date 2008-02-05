@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@ extern "C" {
 #include <sys/tty.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/consdev.h>
 
 #define	RINGBITS	8		/* # of bits in ring ptrs */
 #define	RINGSIZE	(1<<RINGBITS)	/* size of ring */
@@ -105,6 +106,13 @@ typedef struct qcn {
 	char		*cons_write_buffer;
 	uint64_t	cons_write_buf_ra;
 	uint64_t	cons_read_buf_ra;
+
+	/*
+	 * support for polled io
+	 */
+	cons_polledio_t	qcn_polledio;
+	boolean_t	qcn_char_available;
+	uint8_t		qcn_hold_char;
 } qcn_t;
 
 /* Constants for qcn_soft_pend */

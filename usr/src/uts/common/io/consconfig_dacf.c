@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -477,6 +477,51 @@ consconfig_kbd_abort_disable(ldi_handle_t lh)
 	return (err);
 }
 
+#ifdef _HAVE_TEM_FIRMWARE
+static int
+consconfig_tem_supported(cons_state_t *sp)
+{
+	dev_t			dev;
+	dev_info_t		*dip;
+	int			*int_array;
+	uint_t			nint;
+	int			rv = 0;
+
+	if ((dev = ddi_pathname_to_dev_t(sp->cons_fb_path)) == NODEV)
+		return (0); /* warning printed later by common code */
+
+	/*
+	 * Here we hold the driver and check "tem-support" property.
+	 * We're doing this with e_ddi_hold_devi_by_dev and
+	 * ddi_prop_lookup_int_array without opening the driver since
+	 * some video cards that don't support the kernel terminal
+	 * emulator could hang or crash if opened too early during
+	 * boot.
+	 */
+	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL) {
+		cmn_err(CE_WARN, "consconfig: cannot hold fb dev %s",
+		    sp->cons_fb_path);
+		return (0);
+	}
+
+	/*
+	 * Check that the tem-support property exists AND that
+	 * it is equal to 1.
+	 */
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "tem-support", &int_array, &nint) ==
+	    DDI_SUCCESS) {
+		if (nint > 0)
+			rv = int_array[0] == 1;
+		ddi_prop_free(int_array);
+	}
+
+	ddi_release_devi(dip);
+
+	return (rv);
+}
+#endif /* _HAVE_TEM_FIRMWARE */
+
 /*
  * consconfig_get_polledio:
  * 	Query the console with the CONSPOLLEDIO ioctl.
@@ -619,13 +664,11 @@ consconfig_state_init(void)
 
 	/* Identify the stdout driver */
 	sp->cons_stdout_path = plat_stdoutpath();
-	if (plat_stdout_is_framebuffer()) {
-		sp->cons_fb_path = sp->cons_stdout_path;
-	} else {
-		sp->cons_fb_path = plat_fbpath();
-	}
+	sp->cons_stdout_is_fb = plat_stdout_is_framebuffer();
 
-	if (plat_stdin_is_keyboard() &&
+	sp->cons_stdin_is_kbd = plat_stdin_is_keyboard();
+
+	if (sp->cons_stdin_is_kbd &&
 	    (usb_kb_path != NULL || consconfig_usb_kb_path != NULL))  {
 		sp->cons_stdin_path = sp->cons_keyboard_path;
 	} else {
@@ -637,6 +680,39 @@ consconfig_state_init(void)
 		 * firmware exists and is valid.
 		 */
 		sp->cons_stdin_path = plat_stdinpath();
+	}
+
+	if (sp->cons_stdout_is_fb) {
+		sp->cons_fb_path = sp->cons_stdout_path;
+
+#ifdef _HAVE_TEM_FIRMWARE
+		sp->cons_tem_supported = consconfig_tem_supported(sp);
+
+		/*
+		 * Systems which offer a virtual console must use that
+		 * as a fallback whenever the fb doesn't support tem.
+		 * Such systems cannot render characters to the screen
+		 * using OBP.
+		 */
+		if (!sp->cons_tem_supported) {
+			char *path;
+
+			if (plat_virtual_console_path(&path) >= 0) {
+				sp->cons_stdin_is_kbd = 0;
+				sp->cons_stdout_is_fb = 0;
+				sp->cons_stdin_path = path;
+				sp->cons_stdout_path = path;
+				sp->cons_fb_path = plat_fbpath();
+
+				cmn_err(CE_WARN,
+				    "%s doesn't support terminal emulation "
+				    "mode; switching to virtual console.",
+				    sp->cons_fb_path);
+			}
+		}
+#endif /* _HAVE_TEM_FIRMWARE */
+	} else {
+		sp->cons_fb_path = plat_fbpath();
 	}
 
 	sp->cons_li = ldi_ident_from_anon();
@@ -713,14 +789,8 @@ cons_build_upper_layer(cons_state_t *sp)
 	ldi_handle_t		wc_lh;
 	struct strioctl		strioc;
 	int			rval;
-	dev_t			wc_dev;
 	dev_t			dev;
-#ifdef _HAVE_TEM_FIRMWARE
-	dev_info_t		*dip;
-	int			*int_array;
-	uint_t			nint;
-	boolean_t		kfb_mode;
-#endif /* _HAVE_TEM_FIRMWARE */
+	dev_t			wc_dev;
 
 	/*
 	 * Build the wc->conskbd portion of the keyboard console stream.
@@ -802,7 +872,7 @@ cons_build_upper_layer(cons_state_t *sp)
 
 	if (sp->cons_fb_path == NULL) {
 #if defined(__x86)
-		if (plat_stdout_is_framebuffer())
+		if (sp->cons_stdout_is_fb)
 			cmn_err(CE_WARN, "consconfig: no screen found");
 #endif
 		return;
@@ -819,33 +889,11 @@ cons_build_upper_layer(cons_state_t *sp)
 
 #ifdef _HAVE_TEM_FIRMWARE
 	/*
-	 * Here we hold the driver and check "tem-support" property.
-	 * We're doing this with e_ddi_hold_devi_by_dev and
-	 * ddi_prop_lookup_int_array before opening the driver since
-	 * some video cards that don't support the kernel terminal
-	 * emulator could hang or crash if opened too early during
-	 * boot.
+	 * If the underlying fb device doesn't support terminal emulation,
+	 * we don't want to open the wc device (below) because it depends
+	 * on features which aren't available (polled mode io).
 	 */
-	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL) {
-		cmn_err(CE_WARN, "consconfig: cannot hold fb dev %s",
-		    sp->cons_fb_path);
-		return;
-	}
-
-	/*
-	 * Check the existance of the tem-support property AND that
-	 * it be equal to 1.
-	 */
-	kfb_mode = B_FALSE;
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "tem-support", &int_array, &nint) ==
-	    DDI_SUCCESS) {
-		if (nint > 0)
-			kfb_mode = int_array[0] == 1;
-		ddi_prop_free(int_array);
-	}
-	ddi_release_devi(dip);
-	if (!kfb_mode)
+	if (!sp->cons_tem_supported)
 		return;
 #endif /* _HAVE_TEM_FIRMWARE */
 
@@ -920,7 +968,7 @@ consconfig_load_drivers(cons_state_t *sp)
 static void
 consconfig_init_framebuffer(cons_state_t *sp)
 {
-	if (!plat_stdout_is_framebuffer())
+	if (!sp->cons_stdout_is_fb)
 		return;
 
 	DPRINTF(DPRINT_L0, "stdout is framebuffer\n");
@@ -1151,14 +1199,15 @@ consconfig_relink_consms(cons_state_t *sp, ldi_handle_t new_lh, int *muxid)
 }
 
 static int
-cons_get_input_type(void)
+cons_get_input_type(cons_state_t *sp)
 {
 	int type;
+
 	/*
 	 * Now that we know what all the devices are, we can figure out
 	 * what kind of console we have.
 	 */
-	if (plat_stdin_is_keyboard())  {
+	if (sp->cons_stdin_is_kbd)  {
 		/* Stdin is from the system keyboard */
 		type = CONSOLE_LOCAL;
 	} else if ((stdindev != NODEV) && (stdindev == stdoutdev)) {
@@ -1396,7 +1445,7 @@ dynamic_console_config(void)
 	 * streams if the pathnames are valid.
 	 */
 	consconfig_load_drivers(consconfig_sp);
-	consconfig_sp->cons_input_type = cons_get_input_type();
+	consconfig_sp->cons_input_type = cons_get_input_type(consconfig_sp);
 
 	/*
 	 * This is legacy special case code for the "cool" virtual console

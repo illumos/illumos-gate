@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,4 +242,30 @@ void
 plat_tem_get_prom_pos(uint32_t *row, uint32_t *col)
 {
 	prom_get_tem_pos(row, col);
+}
+
+/*
+ * Find the path of the virtual console (if available on the
+ * current architecture).
+ *
+ * Returns: -1 if not found, else actual path length.
+ */
+int
+plat_virtual_console_path(char **bufp)
+{
+	pnode_t		pnode;
+	int		buflen;
+	static char	buf[OBP_MAXPATHLEN];
+
+	pnode = prom_finddevice("/virtual-devices/console");
+
+	if (pnode == OBP_BADNODE)
+		return (-1);
+
+	if ((buflen = prom_phandle_to_path(pnode, buf, sizeof (buf))) < 0)
+		return (-1);
+
+	*bufp = buf;
+
+	return (buflen);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,35 +51,14 @@ extern int vx_handler(cell_t *argument_array);
 
 #endif
 
-#define	PROMIF_ENTER	0
-#define	PROMIF_EXIT	1
-
 #define	PROMIF_ISPRINT(c)	(((c) >= ' ') && ((c) <= '~'))
 
-static void promif_mon(int mode);
-
-/*ARGSUSED*/
-int
-promif_enter_mon(void *p)
-{
-	PIL_DECL(pil);
-
-	PIL_SET7(pil);
-
-	prom_printf("\n");
-
+static int promif_ask_before_reset =
 #ifdef _KMDB
-	promif_mon(PROMIF_ENTER);
+	1;
 #else
-	idle_other_cpus();
-	promif_mon(PROMIF_ENTER);
-	resume_other_cpus();
+	0;
 #endif
-
-	PIL_REST(pil);
-
-	return (0);
-}
 
 /*ARGSUSED*/
 int
@@ -91,53 +70,43 @@ promif_exit_to_mon(void *p)
 
 	prom_printf("Program terminated\n");
 
-	promif_mon(PROMIF_EXIT);
+	if (promif_ask_before_reset) {
+		prom_printf("Press any key to reboot.");
+		(void) prom_getchar();
+	}
+
+	(void) hv_mach_sir();
+
+	/* should not return */
+	ASSERT(0);
 
 	PIL_REST(pil);
 
 	return (0);
 }
 
-static void
-promif_mon(int mode)
+/*ARGSUSED*/
+int
+promif_enter_mon(void *p)
 {
 	char		cmd;
-	char		*prompt;
-	boolean_t	invalid_option;
-#ifdef _KMDB
-	static char	*exit_prompt  = "r)eboot, h)alt? ";
-#else
-	char		value[ 8 ];	/* holds "true" or "false" */
-	char		*boot_msg;
-	static char	*null_msg = ".\" \"";
-	static char	*ignore_msg =
-	    "cr .\" Ignoring auto-boot? setting for this boot.\" cr";
-	static char	*exit_prompt  = "r)eboot, o)k prompt, h)alt? ";
-#endif
-	static char	*enter_prompt = "c)ontinue, s)ync, r)eboot, h)alt? ";
+	static char	*prompt = "c)ontinue, s)ync, r)eset? ";
+	PIL_DECL(pil);
 
-	prompt = (mode == PROMIF_EXIT) ? exit_prompt : enter_prompt;
+	PIL_SET7(pil);
+
+#ifndef _KMDB
+	idle_other_cpus();
+#endif
 
 	for (;;) {
 		prom_printf("%s", prompt);
-
-		while (hv_cngetchar((uint8_t *)&cmd) != H_EOK)
-			;
-
+		cmd = promif_getchar();
 		prom_printf("%c\n", cmd);
-
-		invalid_option = B_FALSE;
 
 		switch (cmd) {
 
 		case 'r':
-			/*
-			 * Ideally, we would store the boot command string
-			 * as we do in promif_reboot().  However, at this
-			 * point the kernel is single-threaded and running
-			 * at a high PIL.  This environment precludes
-			 * setting ldom variables.
-			 */
 			prom_printf("Resetting...\n");
 
 			(void) hv_mach_sir();
@@ -146,69 +115,37 @@ promif_mon(int mode)
 			ASSERT(0);
 			break;
 
-		case 'h':
-			(void) hv_mach_exit(0);
-			ASSERT(0);
-
-			break;
-
-#ifndef _KMDB
-		case 'o':
-			/*
-			 * This option gives the user an "ok" prompt after
-			 * the system reset regardless of the value of
-			 * auto-boot?  We offer this option because halt(1m)
-			 * doesn't leave the user at the ok prompt (as it
-			 * does on non-ldoms systems).  If auto-boot? is
-			 * true tell user we are overriding the setting
-			 * for this boot only.
-			 */
-			if (mode == PROMIF_EXIT) {
-				bzero(value, sizeof (value));
-				(void) promif_stree_getprop(prom_optionsnode(),
-				    "auto-boot?", value);
-				boot_msg = strcmp(value, "true") ? null_msg :
-					ignore_msg;
-				(void) promif_ldom_setprop("reboot-command",
-				    boot_msg, strlen(boot_msg) + 1);
-				(void) hv_mach_sir();
-			} else {
-				invalid_option = B_TRUE;
-			}
-			break;
-#endif
-
 		case '\r':
 			break;
 
 		case 's':
-			if (mode == PROMIF_ENTER) {
+			{
 #ifdef _KMDB
 				kmdb_dpi_kernpanic(kmdb_dpi_get_master_cpuid());
 #else
 				cell_t arg = p1275_ptr2cell("sync");
+
 				(void) vx_handler(&arg);
 #endif
-			} else {
-				invalid_option = B_TRUE;
 			}
+
+			/* should not return */
+			ASSERT(0);
 			break;
 
 		case 'c':
-			if (mode == PROMIF_ENTER) {
-				return;
-			} else {
-				invalid_option = B_TRUE;
-			}
-			break;
+#ifndef _KMDB
+			resume_other_cpus();
+#endif
+			PIL_REST(pil);
+
+			return (0);
 
 		default:
-			invalid_option = B_TRUE;
+			if (PROMIF_ISPRINT(cmd))
+				prom_printf("invalid option (%c)\n", cmd);
 			break;
 		}
-
-		if (invalid_option && PROMIF_ISPRINT(cmd))
-			prom_printf("invalid option (%c)\n", cmd);
 	}
 
 	_NOTE(NOTREACHED)

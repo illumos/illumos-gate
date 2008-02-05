@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,19 +106,21 @@ extern uint64_t get_cpuaddr(uint64_t, uint64_t);
  * the next boot.
  */
 static void
-store_boot_cmd(char *args)
+store_boot_cmd(char *args, boolean_t add_boot_str)
 {
 	static char	cmd_buf[BOOT_CMD_MAX_LEN];
-	size_t		len;
+	size_t		len = 1;
 	pnode_t		node;
-	size_t		base_len;
+	size_t		base_len = 0;
 	size_t		args_len;
 	size_t		args_max;
 
-	(void) strcpy(cmd_buf, BOOT_CMD_BASE);
+	if (add_boot_str) {
+		(void) strcpy(cmd_buf, BOOT_CMD_BASE);
 
-	base_len = strlen(BOOT_CMD_BASE);
-	len = base_len + 1;
+		base_len = strlen(BOOT_CMD_BASE);
+		len = base_len + 1;
+	}
 
 	if (args != NULL) {
 		args_len = strlen(args);
@@ -170,8 +172,20 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 
 	switch (fcn) {
 	case AD_HALT:
+		/*
+		 * LDoms: By storing a no-op command
+		 * in the 'reboot-command' variable we cause OBP
+		 * to ignore the setting of 'auto-boot?' after
+		 * it completes the reset.  This causes the system
+		 * to stop at the ok prompt.
+		 */
+		if (domaining_enabled() && invoke_cb)
+			store_boot_cmd("noop", B_FALSE);
+		break;
+
 	case AD_POWEROFF:
 		break;
+
 	default:
 		if (bootstr == NULL) {
 			switch (fcn) {
@@ -205,8 +219,7 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		 * only if we are not being called from panic.
 		 */
 		if (domaining_enabled() && invoke_cb)
-			store_boot_cmd(bootstr);
-
+			store_boot_cmd(bootstr, B_TRUE);
 	}
 
 	/*
@@ -307,7 +320,7 @@ panic_idle(void)
 	membar_stld();
 
 	for (;;)
-		continue;
+		;
 }
 
 /*
@@ -1045,7 +1058,7 @@ kdi_tickwait(clock_t nticks)
 	clock_t endtick = gettick() + nticks;
 
 	while (gettick() < endtick)
-		continue;
+		;
 }
 
 static void

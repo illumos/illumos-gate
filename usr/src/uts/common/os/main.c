@@ -474,9 +474,8 @@ main(void)
 	 * and swap have been set up.
 	 */
 	consconfig();
-#if defined(__i386) || defined(__amd64)
 	release_bootstrap();
-#endif
+
 	/*
 	 * attach drivers with ddi-forceattach prop
 	 * This must be done after consconfig() to prevent usb key/mouse
