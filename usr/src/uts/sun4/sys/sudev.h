@@ -3,7 +3,7 @@
  *
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance  with the License.
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +23,7 @@
 /*	  All Rights Reserved 	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -268,6 +268,9 @@ struct asycom {
 	kstat_t		*sukstat;	/* ptr to serial kstats */
 	struct serial_kstats kstats;	/* serial kstats structure */
 	boolean_t	inperim;	/* in streams q perimeter */
+	cons_polledio_t polledio;	/* polled IO functios */
+	uchar_t		polled_icr;	/* the value of ICR on start of poll */
+	boolean_t	polled_enter;	/* if asy_polled_enter was called */
 };
 
 /*
