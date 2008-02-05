@@ -729,7 +729,12 @@ bt_psplit(t, h, l, r, pskip, ilen)
 	 * the right page.
 	 */
 	if (skip <= off) {
-		skip = 0;
+		/*
+		 * If we get here then 'skip' is in the left page.  We do
+		 * not want to mix this with the right page, so we assign
+		 * an unrealistic value (-1).
+		 */
+		skip = (indx_t)-1;
 		rval = l;
 	} else {
 		rval = r;
@@ -739,7 +744,11 @@ bt_psplit(t, h, l, r, pskip, ilen)
 	for (off = 0; nxt < top; ++off) {
 		if (skip == nxt) {
 			++off;
-			skip = 0;
+			/*
+			 * Assign 'skip' an unrealistic value (-1) to ensure
+			 * it is not matched again.
+			 */
+			skip = (indx_t)-1;
 		}
 		switch (h->flags & P_TYPE) {
 		case P_BINTERNAL:
