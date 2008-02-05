@@ -1309,3 +1309,4 @@ Bugid   Risk Synopsis
 6492726 Merge SHF_MERGE|SHF_STRINGS input sections
 4947191 OSNet should use direct bindings  (link-editor components only)
 6654381 lazy loading fall-back needs optimizing
+6658385 ld core dumps when building Xorg on nv_82

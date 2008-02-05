@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -387,7 +387,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 			ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
 			break;
 		case STV_ELIMINATE:
-			sdp->sd_flags1 |= FLG_SY1_ELIM;
+			sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
 			break;
 		default:
 			assert(vis <= STV_ELIMINATE);
@@ -1409,7 +1409,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		/*
 		 * Update the symbol count and the associated name string size.
 		 */
-		if ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_ELIM)) &&
+		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)) {
 			/*
 			 * If any reductions are being processed, keep a count

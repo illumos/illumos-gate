@@ -1157,7 +1157,7 @@ update_osym(Ofl_desc *ofl)
 		 * of the .symtab.  Retain the appropriate index for use in
 		 * version symbol indexing and relocation.
 		 */
-		if ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_ELIM)) &&
+		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
 		    (flags & FLG_OF_PROCRED)) {
 			local = 1;
 			if (!(sdp->sd_flags1 & FLG_SY1_ELIM) && !dynsym)
