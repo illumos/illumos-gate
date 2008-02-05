@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,6 +173,30 @@ zfs_check_version(const char *name, int version)
 		spa_close(spa, FTAG);
 	}
 	return (0);
+}
+
+/*
+ * zpl_check_version
+ *
+ * Return non-zero if the ZPL version is less than requested version.
+ */
+static int
+zpl_check_version(const char *name, int version)
+{
+	objset_t *os;
+	int rc = 1;
+
+	if (dmu_objset_open(name, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, &os) == 0) {
+		uint64_t propversion;
+
+		if (zfs_get_zplprop(os, ZFS_PROP_VERSION,
+		    &propversion) == 0) {
+			rc = !(propversion >= version);
+		}
+		dmu_objset_close(os);
+	}
+	return (rc);
 }
 
 static void
@@ -1380,6 +1404,11 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 
 		case ZFS_PROP_COPIES:
 			if (zfs_check_version(name, SPA_VERSION_DITTO_BLOCKS))
+				return (ENOTSUP);
+			break;
+
+		case ZFS_PROP_SHARESMB:
+			if (zpl_check_version(name, ZPL_VERSION_FUID))
 				return (ENOTSUP);
 			break;
 		}

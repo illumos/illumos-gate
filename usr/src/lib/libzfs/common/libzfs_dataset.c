@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1689,7 +1689,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 
 		case ENOTSUP:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "pool must be upgraded to set this "
+			    "pool and or dataset must be upgraded to set this "
 			    "property or value"));
 			(void) zfs_error(hdl, EZFS_BADVERSION, errbuf);
 			break;
