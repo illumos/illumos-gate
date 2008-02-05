@@ -362,7 +362,7 @@ smb_common_read(struct smb_request *sr, smb_read_param_t *param)
 	struct mbuf *top;
 	int rc;
 
-	vdb = kmem_alloc(sizeof (struct vardata_block), KM_SLEEP);
+	vdb = kmem_zalloc(sizeof (struct vardata_block), KM_SLEEP);
 	vdb->tag = 0;
 	vdb->uio.uio_iov = &vdb->iovec[0];
 	vdb->uio.uio_iovcnt = MAX_IOVEC;

@@ -210,6 +210,22 @@ typedef struct smb_idpool {
  */
 #define	NETBIOS_REQ_MAX_SIZE	(0x1FFFF + 0x4)
 
+#define	SMB_TXBUF_MAGIC		0X54584246	/* 'TXBF' */
+typedef struct {
+	uint32_t	tb_magic;
+	list_node_t	tb_lnd;
+	int		tb_len;
+	uint8_t		tb_data[NETBIOS_REQ_MAX_SIZE];
+} smb_txbuf_t;
+
+#define	SMB_TXLST_MAGIC		0X544C5354	/* 'TLST' */
+typedef struct {
+	uint32_t	tl_magic;
+	kmutex_t	tl_mutex;
+	boolean_t	tl_active;
+	list_t		tl_list;
+} smb_txlst_t;
+
 /*
  * IR104720 Experiments with Windows 2000 indicate that we achieve better
  * SmbWriteX performance with a buffer size of 64KB instead of the 37KB
@@ -639,6 +655,7 @@ struct smb_session {
 	smb_llist_t		s_xa_list;
 	smb_llist_t		s_user_list;
 	smb_idpool_t		s_uid_pool;
+	smb_txlst_t		s_txlst;
 
 	volatile uint32_t	s_tree_cnt;
 	volatile uint32_t	s_file_cnt;

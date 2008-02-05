@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,11 +166,12 @@ smb_correct_keep_alive_values(uint32_t new_keep_alive)
 int
 smb_session_send(smb_session_t *session, uint8_t type, struct mbuf_chain *mbc)
 {
-	struct mbuf	*m = 0;
-	uint8_t *buf;
-	smb_xprt_t hdr;
-	int count = 0;
-	int rc;
+	struct mbuf	*m = NULL;
+	smb_txbuf_t	*txb;
+	int		len = 0;
+	smb_xprt_t	hdr;
+	int		rc;
+	uint8_t		*data;
 
 	switch (session->s_state) {
 	case SMB_SESSION_STATE_DISCONNECTED:
@@ -185,41 +186,44 @@ smb_session_send(smb_session_t *session, uint8_t type, struct mbuf_chain *mbc)
 		break;
 	}
 
-	buf = kmem_alloc(NETBIOS_REQ_MAX_SIZE, KM_SLEEP);
+	txb = smb_net_txb_alloc();
 
 	if ((mbc != NULL) && (mbc->chain != NULL)) {
-		count = NETBIOS_HDR_SZ;	/* Account for the NBT header. */
+		len = NETBIOS_HDR_SZ;	/* Account for the NBT header. */
 		m = mbc->chain;
+		data = &txb->tb_data[len];
 
 		while (m) {
-			if ((count + m->m_len) > NETBIOS_REQ_MAX_SIZE) {
-				kmem_free(buf, NETBIOS_REQ_MAX_SIZE);
+			if ((len + m->m_len) > sizeof (txb->tb_data)) {
+				smb_net_txb_free(txb);
 				m_freem(mbc->chain);
 				mbc->chain = NULL;
 				mbc->flags = 0;
 				return (EMSGSIZE);
 			}
-			bcopy(m->m_data, buf + count, m->m_len);
-			count += m->m_len;
+			bcopy(m->m_data, data, m->m_len);
+			data += m->m_len;
+			len += m->m_len;
 			m = m->m_next;
 		}
 
 		m_freem(mbc->chain);
 		mbc->chain = NULL;
 		mbc->flags = 0;
-		count -= NETBIOS_HDR_SZ;
+		len -= NETBIOS_HDR_SZ;
 	}
 
 	hdr.xh_type = type;
-	hdr.xh_length = count;
+	hdr.xh_length = len;
 
-	rc = smb_session_xprt_puthdr(session, &hdr, buf, NETBIOS_HDR_SZ);
+	rc = smb_session_xprt_puthdr(session, &hdr, txb->tb_data,
+	    NETBIOS_HDR_SZ);
 	if (rc == 0) {
-		count += NETBIOS_HDR_SZ;
-		rc = smb_sosend(session->sock, buf, count);
+		txb->tb_len = len + NETBIOS_HDR_SZ;
+		rc = smb_net_txb_send(session->sock, &session->s_txlst, txb);
+	} else {
+		smb_net_txb_free(txb);
 	}
-
-	kmem_free(buf, NETBIOS_REQ_MAX_SIZE);
 	return (rc);
 }
 
@@ -970,17 +974,18 @@ smb_tcp_daemon(smb_thread_t *thread, void *arg)
 void
 smb_session_reject(smb_session_t *session, char *reason)
 {
-	unsigned char		reply[8];
+	smb_txbuf_t	*txb;
 
 	smb_rwx_rwenter(&session->s_lock, RW_READER);
 	if (session->sock != NULL) {
-		reply[0] = NEGATIVE_SESSION_RESPONSE;
-		reply[1] = 0;
-		reply[2] = 0;
-		reply[3] = 1;
-		reply[4] = SESSION_INSUFFICIENT_RESOURCES;
-
-		(void) smb_sosend(session->sock, reply, 5);
+		txb = smb_net_txb_alloc();
+		txb->tb_data[0] = NEGATIVE_SESSION_RESPONSE;
+		txb->tb_data[1] = 0;
+		txb->tb_data[2] = 0;
+		txb->tb_data[3] = 1;
+		txb->tb_data[4] = SESSION_INSUFFICIENT_RESOURCES;
+		txb->tb_len = 5;
+		(void) smb_net_txb_send(session->sock, &session->s_txlst, txb);
 	}
 	smb_rwx_rwexit(&session->s_lock);
 }
@@ -1020,6 +1025,8 @@ smb_session_create(struct sonode *new_so, uint16_t port)
 	smb_llist_constructor(&session->s_xa_list, sizeof (smb_xa_t),
 	    offsetof(smb_xa_t, xa_lnd));
 
+	smb_net_txl_constructor(&session->s_txlst);
+
 	smb_thread_init(&session->s_thread, "smb_session", &smb_session_daemon,
 	    session, smb_wakeup_session_daemon, session);
 
@@ -1050,6 +1057,7 @@ smb_session_delete(smb_session_t *session)
 
 	smb_rwx_destroy(&session->s_lock);
 	smb_thread_destroy(&session->s_thread);
+	smb_net_txl_destructor(&session->s_txlst);
 	smb_slist_destructor(&session->s_req_list);
 	smb_llist_destructor(&session->s_user_list);
 	smb_llist_destructor(&session->s_xa_list);

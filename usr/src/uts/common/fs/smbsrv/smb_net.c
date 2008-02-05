@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,29 +141,6 @@ smb_sodestroy(struct sonode *so)
 }
 
 int
-smb_sosend(struct sonode *so, void *msg, size_t len)
-{
-	iovec_t iov;
-	int err;
-
-	ASSERT(so != NULL);
-	ASSERT(len != 0);
-
-	/*
-	 * Fill in iovec and receive data
-	 */
-	iov.iov_base = msg;
-	iov.iov_len = len;
-
-	if ((err = smb_iov_sosend(so, &iov, 1, len)) != 0) {
-		return (err);
-	}
-
-	/* Successful receive */
-	return (0);
-}
-
-int
 smb_sorecv(struct sonode *so, void *msg, size_t len)
 {
 	iovec_t iov;
@@ -184,53 +161,6 @@ smb_sorecv(struct sonode *so, void *msg, size_t len)
 
 	/* Successful receive */
 	return (0);
-}
-
-/*
- * smb_iov_sosend - Sends an iovec on a connection.
- *
- * This function puts the data provided on the wire by calling sosendmsg.
- * It will return only when all the data has been sent or if an error
- * occurs.
- *
- * Returns 0 for success, the socket errno value if sosendmsg fails, and
- * -1 if sosendmsg returns success but uio_resid != 0
- */
-int
-smb_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
-{
-	struct msghdr		msg;
-	struct uio		uio;
-	int			error;
-
-	ASSERT(iop != NULL);
-
-	/* Initialization of the message header. */
-	bzero(&msg, sizeof (msg));
-	msg.msg_iov	= iop;
-	msg.msg_flags	= MSG_WAITALL;
-	msg.msg_iovlen	= iovlen;
-
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	= iop;
-	uio.uio_iovcnt	= iovlen;
-	uio.uio_segflg	= UIO_SYSSPACE;
-	uio.uio_resid	= total_len;
-
-	if ((error = sosendmsg(so, &msg, &uio)) == 0) {
-		/* Data sent */
-		if (uio.uio_resid == 0) {
-			/* All data sent.  Success. */
-			return (0);
-		} else {
-			/* Not all data was sent.  Failure */
-			return (-1);
-		}
-	}
-
-	/* Send failed */
-	return (error);
 }
 
 /*
@@ -278,4 +208,155 @@ smb_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
 
 	/* Receive failed */
 	return (error);
+}
+
+/*
+ * smb_net_txl_constructor
+ *
+ *	Transmit list constructor
+ */
+void
+smb_net_txl_constructor(smb_txlst_t *txl)
+{
+	ASSERT(txl->tl_magic != SMB_TXLST_MAGIC);
+
+	mutex_init(&txl->tl_mutex, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&txl->tl_list, sizeof (smb_txbuf_t),
+	    offsetof(smb_txbuf_t, tb_lnd));
+	txl->tl_active = B_FALSE;
+	txl->tl_magic = SMB_TXLST_MAGIC;
+}
+
+/*
+ * smb_net_txl_destructor
+ *
+ *	Transmit list destructor
+ */
+void
+smb_net_txl_destructor(smb_txlst_t *txl)
+{
+	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
+
+	txl->tl_magic = 0;
+	list_destroy(&txl->tl_list);
+	mutex_destroy(&txl->tl_mutex);
+}
+
+/*
+ * smb_net_txb_alloc
+ *
+ *	Transmit buffer allocator
+ */
+smb_txbuf_t *
+smb_net_txb_alloc(void)
+{
+	smb_txbuf_t	*txb;
+
+	txb = kmem_alloc(sizeof (smb_txbuf_t), KM_SLEEP);
+
+	bzero(&txb->tb_lnd, sizeof (txb->tb_lnd));
+	txb->tb_len = 0;
+	txb->tb_magic = SMB_TXBUF_MAGIC;
+
+	return (txb);
+}
+
+/*
+ * smb_net_txb_free
+ *
+ *	Transmit buffer deallocator
+ */
+void
+smb_net_txb_free(smb_txbuf_t *txb)
+{
+	ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
+	ASSERT(!list_link_active(&txb->tb_lnd));
+
+	txb->tb_magic = 0;
+	kmem_free(txb, sizeof (smb_txbuf_t));
+}
+
+/*
+ * smb_net_txb_send
+ *
+ *	This routine puts the transmit buffer passed in on the wire. If another
+ *	thread is already draining the transmit list, the transmit buffer is
+ *	queued and the routine returns immediately.
+ */
+int
+smb_net_txb_send(struct sonode *so, smb_txlst_t *txl, smb_txbuf_t *txb)
+{
+	list_t		local;
+	int		rc = 0;
+	iovec_t		iov;
+	struct msghdr	msg;
+	struct uio	uio;
+
+	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
+
+	mutex_enter(&txl->tl_mutex);
+	list_insert_tail(&txl->tl_list, txb);
+	if (txl->tl_active) {
+		mutex_exit(&txl->tl_mutex);
+		return (0);
+	}
+
+	txl->tl_active = B_TRUE;
+	list_create(&local, sizeof (smb_txbuf_t),
+	    offsetof(smb_txbuf_t, tb_lnd));
+
+	while (!list_is_empty(&txl->tl_list)) {
+		list_move_tail(&local, &txl->tl_list);
+		mutex_exit(&txl->tl_mutex);
+		while ((txb = list_head(&local)) != NULL) {
+			ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
+			list_remove(&local, txb);
+
+			iov.iov_base = (void *)txb->tb_data;
+			iov.iov_len = txb->tb_len;
+
+			bzero(&msg, sizeof (msg));
+			msg.msg_iov	= &iov;
+			msg.msg_flags	= MSG_WAITALL;
+			msg.msg_iovlen	= 1;
+
+			bzero(&uio, sizeof (uio));
+			uio.uio_iov	= &iov;
+			uio.uio_iovcnt	= 1;
+			uio.uio_segflg	= UIO_SYSSPACE;
+			uio.uio_resid	= txb->tb_len;
+
+			rc = sosendmsg(so, &msg, &uio);
+
+			smb_net_txb_free(txb);
+
+			if ((rc == 0) && (uio.uio_resid == 0))
+					continue;
+
+			if (rc == 0)
+				rc = -1;
+
+			while ((txb = list_head(&local)) != NULL) {
+				ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
+				list_remove(&local, txb);
+				smb_net_txb_free(txb);
+			}
+			break;
+		}
+		mutex_enter(&txl->tl_mutex);
+
+		if (rc == 0)
+			continue;
+
+		while ((txb = list_head(&txl->tl_list)) != NULL) {
+			ASSERT(txb->tb_magic == SMB_TXBUF_MAGIC);
+			list_remove(&txl->tl_list, txb);
+			smb_net_txb_free(txb);
+		}
+		break;
+	}
+	txl->tl_active = B_FALSE;
+	mutex_exit(&txl->tl_mutex);
+
+	return (rc);
 }

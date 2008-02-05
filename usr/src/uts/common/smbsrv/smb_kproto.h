@@ -200,12 +200,14 @@ uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 struct sonode *smb_socreate(int domain, int type, int protocol);
 void smb_soshutdown(struct sonode *so);
 void smb_sodestroy(struct sonode *so);
-int smb_sosend(struct sonode *so, void *msg, size_t len);
 int smb_sorecv(struct sonode *so, void *msg, size_t len);
-int smb_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen,
-    size_t total_len);
 int smb_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen,
     size_t total_len);
+void smb_net_txl_constructor(smb_txlst_t *);
+void smb_net_txl_destructor(smb_txlst_t *);
+smb_txbuf_t *smb_net_txb_alloc(void);
+void smb_net_txb_free(smb_txbuf_t *);
+int smb_net_txb_send(struct sonode *, smb_txlst_t *, smb_txbuf_t *);
 
 /*
  * SMB RPC interface
