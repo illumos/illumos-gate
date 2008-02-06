@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,13 +30,13 @@
 # before spawning a shell for doing a release-style builds interactively
 # and incrementally.
 #
-USAGE='Usage: bldenv [-fdt] [ -S E|D|H|O ] <env_file> [ command ]
+USAGE='Usage: bldenv [-fd] [+t] [ -S E|D|H|O ] <env_file> [ command ]
 
 Where:
 	-c	Force the use of csh - ignore $SHELL
 	-f	Invoke csh with -f
 	-d	Setup a DEBUG build (default: non-DEBUG)
-	-t	use the tools in $SRC/tools
+	+t	use the tools in $ONBLD_TOOLS/bin
 	-S	Build a variant of the source product
 		E - build exportable source
 		D - build domestic source (exportable + crypt)
@@ -49,7 +49,7 @@ f_FLAG=n
 d_FLAG=n
 O_FLAG=n
 o_FLAG=n
-t_FLAG=n
+t_FLAG=y
 SE_FLAG=n
 SH_FLAG=n
 SD_FLAG=n
@@ -97,7 +97,7 @@ do
 	  d )	d_FLAG=y
 		SUFFIX=""
 		;;
-	  t )	t_FLAG=y
+	 +t )	t_FLAG=n
 		;;
 	  S )
 		set_S_flag $OPTARG
@@ -172,7 +172,7 @@ do
 		;;
 	  o)	o_FLAG=y
 		;;
-	  t )	t_FLAG=y
+	 +t )	t_FLAG=n
 		;;
 	  S )
 		set_S_flag $OPTARG
