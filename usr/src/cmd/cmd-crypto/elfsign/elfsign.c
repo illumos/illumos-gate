@@ -407,7 +407,7 @@ static ret_t
 getelfobj(char *elfpath)
 {
 	ELFsign_status_t estatus;
-	ret_t	ret;
+	ret_t	ret = EXIT_SIGN_FAILED;
 
 	estatus = elfsign_begin(elfpath, cmd_info.es_action, &(cmd_info.ess));
 	switch (estatus) {
@@ -437,7 +437,7 @@ static ret_t
 setcertpath(void)
 {
 	ELFsign_status_t estatus;
-	ret_t	ret;
+	ret_t	ret = EXIT_SIGN_FAILED;
 
 	if (cmd_info.cert == NULL)
 		return (EXIT_OKAY);
@@ -521,7 +521,6 @@ do_sign(char *object)
 
 	if (cmd_info.token_label &&
 	    !elfcertlib_settoken(cmd_info.ess, cmd_info.token_label)) {
-		elfsign_end(cmd_info.ess);
 		es_error(gettext("Unable to access token: %s"),
 		    cmd_info.token_label);
 		ret = EXIT_SIGN_FAILED;

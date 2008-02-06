@@ -426,11 +426,11 @@ elfsign_setcertpath(ELFsign_t ess, const char *certpath)
 	 * doing it to help provide early failure and better error
 	 * checking, so there is no race condition.
 	 */
-	if (access(certpath, R_OK) != 0) {
-		elfsign_end(ess);
+	if (access(certpath, R_OK) != 0)
 		return (ELFSIGN_INVALID_CERTPATH);
-	}
-	ess->es_certpath = strdup(certpath);
+
+	if ((ess->es_certpath = strdup(certpath)) == NULL)
+		return (ELFSIGN_FAILED);
 
 	if (ES_ACTISUPDATE(ess->es_action)) {
 		ELFCert_t	cert = NULL;
