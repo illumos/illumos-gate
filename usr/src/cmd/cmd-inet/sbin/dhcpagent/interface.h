@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +166,6 @@ extern dhcp_pif_t *v6root;
 dhcp_pif_t	*insert_pif(const char *, boolean_t, int *);
 void		hold_pif(dhcp_pif_t *);
 void		release_pif(dhcp_pif_t *);
-dhcp_pif_t	*lookup_pif_by_index(uint_t, boolean_t);
 dhcp_pif_t	*lookup_pif_by_uindex(uint16_t, dhcp_pif_t *, boolean_t);
 dhcp_pif_t	*lookup_pif_by_name(const char *, boolean_t);
 void		pif_status(dhcp_pif_t *, boolean_t);

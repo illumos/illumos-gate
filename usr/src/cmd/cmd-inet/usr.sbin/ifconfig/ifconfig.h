@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -30,10 +30,10 @@ extern int	getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
 extern int	debug;
 
-extern void	Perror0(char *);
-extern void	Perror0_exit(char *);
-extern void	Perror2(char *, char *);
-extern void	Perror2_exit(char *, char *);
+extern void	Perror0(const char *);
+extern void	Perror0_exit(const char *);
+extern void	Perror2(const char *, const char *);
+extern void	Perror2_exit(const char *, const char *);
 extern void	Perrdlpi(const char *, const char *, int);
 extern void	Perrdlpi_exit(const char *, const char *, int);
 

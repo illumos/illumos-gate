@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -12,8 +12,7 @@
 
 /*
  * Ifparse splits up an ifconfig command line, and was written for use
- * with the networking boot script /etc/init.d/network (which is in the
- * source tree as usr/src/cmd/initpkg/init.d/network).
+ * with the networking boot scripts; see $SRC/cmd/svc/shell/net_include.sh
  *
  * Ifparse can extract selected parts of the ifconfig command line,
  * such as failover address configuration ("ifparse -f"), or everything
@@ -98,7 +97,8 @@
 
 typedef enum { AF_UNSPEC, AF_INET, AF_INET6, AF_ANY } ac_t;
 
-#define	NEXTARG		(-1)
+#define	NEXTARG		(-1)	/* command takes an argument */
+#define	OPTARG		(-2)	/* command takes an optional argument */
 
 #define	END_OF_TABLE	(-1)
 
@@ -131,9 +131,9 @@ boolean_t addint = _B_FALSE;
 
 /*
  * The parser table is based on that in ifconfig.  A command may or
- * may not have an argument, as indicated by whether NEXTARG is in the
- * second column.  Some commands can only be used with certain address
- * families, as indicated in the third column.  The fourth column
+ * may not have an argument, as indicated by whether NEXTARG/OPTARG is
+ * in the second column.  Some commands can only be used with certain
+ * address families, as indicated in the third column.  The fourth column
  * contains flags that control parser action.
  *
  * Ifparse buffers logical interface configuration commands such as "set",
@@ -207,14 +207,13 @@ struct	cmd {
 	{ "encaplimit",		NEXTARG,	AF_ANY,	PARSELOG0 },
 	{ "-encaplimit",	0,		AF_ANY,	PARSELOG0 },
 	{ "thoplimit",		NEXTARG,	AF_ANY, PARSELOG0 },
-#ifdef DEBUG
-	{ "getnd",		NEXTARG,	AF_INET6, PARSELOG0 },
-	{ "setnd",		NEXTARG,	AF_INET6, PARSELOG0 },
-	{ "delnd",		NEXTARG,	AF_INET6, PARSELOG0 },
-#endif
-/* XXX for testing SIOCT* ioctls. Remove */
 	{ "set",		NEXTARG,	AF_ANY, PARSESET },
 	{ "destination",	NEXTARG,	AF_ANY, 0 },
+	{ "zone",		NEXTARG,	AF_ANY, 0 },
+	{ "-zone",		0,		AF_ANY, 0 },
+	{ "all-zones",		0,		AF_ANY, 0 },
+	{ "ether",		OPTARG,		AF_ANY, PARSENOW },
+	{ "usesrc",		NEXTARG,	AF_ANY, PARSENOW },
 	{ 0 /* ether addr */,	0,		AF_UNSPEC, PARSELOG0 },
 	{ 0 /* set */,		0,		AF_ANY, PARSESET },
 	{ 0 /* destination */,	0,		AF_ANY, 0 },
@@ -274,10 +273,8 @@ parse_dump_buf(void)
 	 * If we get to the end of the command, and haven't seen a
 	 * "failover" or "-failover" flag, the command is movable.
 	 */
-	if (!((parsemode  == PARSEFIXED) &&
-		(parsetype & PARSEMOVABLE) != 0) &&
-		(parsemode & parsetype) != 0 &&
-		parsedumplen != 0) {
+	if (!((parsemode == PARSEFIXED) && (parsetype & PARSEMOVABLE) != 0) &&
+	    (parsemode & parsetype) != 0 && parsedumplen != 0) {
 		unsigned i;
 
 		if (parsebuf[parsedumplen] == ' ')
@@ -361,7 +358,7 @@ parsedump(char *cmd, int param, int flags, char *arg)
 		} else
 			cmdname = "";
 	} else {
-		cmdarg = (param == NEXTARG) ? arg : NULL;
+		cmdarg = (param == 0) ? NULL : arg;
 		cmdname = cmd;
 	}
 
@@ -433,32 +430,22 @@ parsedump(char *cmd, int param, int flags, char *arg)
 static int
 ifparse(int argc, char *argv[], struct afswtch *afp)
 {
-	int af;
+	int af = afp->af_af;
 
-	if (argc == 0) {
+	if (argc == 0)
 		return (0);
-	}
-
-	af = afp->af_af;
 
 	if (strcmp(*argv, "auto-dhcp") == 0 || strcmp(*argv, "dhcp") == 0) {
-		if (af == AF_INET) {
-			if ((parsemode & PARSEFIXED) != NULL) {
-				while (argc) {
-					(void) fputs(*argv++, stdout);
-					if (--argc != 0)
-						(void) fputc(' ', stdout);
-					else
-						(void) fputc('\n', stdout);
-				}
+		if ((parsemode & PARSEFIXED) != NULL) {
+			while (argc) {
+				(void) fputs(*argv++, stdout);
+				if (--argc != 0)
+					(void) fputc(' ', stdout);
+				else
+					(void) fputc('\n', stdout);
 			}
-			return (0);
-		} else {
-			(void) fprintf(stderr, "ifparse: dhcp not supported "
-			    "for inet6\n");
-
-			return (1);
 		}
+		return (0);
 	}
 
 	while (argc > 0) {
@@ -504,15 +491,17 @@ ifparse(int argc, char *argv[], struct afswtch *afp)
 			p++;	/* got src, do dst */
 			assert(p->c_parseflags != END_OF_TABLE);
 		}
-		if (p->c_parameter == NEXTARG) {
+
+		if (p->c_parameter == NEXTARG || p->c_parameter == OPTARG) {
 			argc--, argv++;
-			if (argc == 0) {
+			if (argc == 0 && p->c_parameter == NEXTARG) {
 				(void) fprintf(stderr,
 				    "ifparse: no argument for %s\n",
 				    p->c_name);
 				return (1);
 			}
 		}
+
 		/*
 		 *	Dump the command if:
 		 *
@@ -523,8 +512,8 @@ ifparse(int argc, char *argv[], struct afswtch *afp)
 		 *		the address families match
 		 */
 		if ((p->c_af == AF_ANY)	|| (af == p->c_af))
-			parsedump(p->c_name, p->c_parameter,
-				p->c_parseflags, *argv);
+			parsedump(p->c_name, p->c_parameter, p->c_parseflags,
+			    *argv);
 		argc--, argv++;
 	}
 	parse_dump_buf();
@@ -539,7 +528,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-		"usage: ifparse [ -fs ] <addr_family> <commands>\n");
+	    "usage: ifparse [ -fs ] <addr_family> <commands>\n");
 }
 
 int

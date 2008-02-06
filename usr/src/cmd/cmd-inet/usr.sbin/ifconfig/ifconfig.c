@@ -185,7 +185,6 @@ static int	setifdhcp(const char *caller, const char *ifname,
 static int	ip_domux2fd(int *, int *, int *, int *, int *);
 static int	ip_plink(int, int, int, int, int);
 static int	modop(char *arg, char op);
-static int	get_lun(char *);
 static void	selectifs(int argc, char *argv[], int af,
 			struct lifreq *lifrp);
 static int	updownifs(iface_t *ifs, int up);
@@ -284,6 +283,12 @@ struct	cmd {
 	{ "all-zones",	0,		setallzones,	0,	AF_ANY },
 	{ "ether",	OPTARG,		setifether,	0,	AF_ANY },
 	{ "usesrc",	NEXTARG,	setifsrc,	0,	AF_ANY },
+
+	/*
+	 * NOTE: any additions to this table must also be applied to ifparse
+	 *	(usr/src/cmd/cmd-inet/sbin/ifparse/ifparse.c)
+	 */
+
 	{ 0,		0,		setifaddr,	0,	AF_ANY },
 	{ 0,		0,		setifdstaddr,	0,	AF_ANY },
 	{ 0,		0,		0,		0,	0 },
@@ -3483,15 +3488,11 @@ in6_status(int force, uint64_t flags)
 			    lifr.lifr_ifinfo.lir_maxmtu);
 		}
 	}
-	/* If there is a groupname, print it for lun 0 alone */
+	/* If there is a groupname, print it for only the physical interface */
 	if (strchr(name, ':') == NULL) {
-		(void) memset(lifr.lifr_groupname, 0,
-		    sizeof (lifr.lifr_groupname));
-		if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifr) >= 0) {
-			if (strlen(lifr.lifr_groupname) > 0) {
-				(void) printf("\n\tgroupname %s",
-				    lifr.lifr_groupname);
-			}
+		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
+		    lifr.lifr_groupname[0] != '\0') {
+			(void) printf("\n\tgroupname %s", lifr.lifr_groupname);
 		}
 	}
 	(void) putchar('\n');
@@ -3523,7 +3524,7 @@ in_configinfo(int force, uint64_t flags)
 				Perror0_exit("in_configinfo: SIOCGLIFADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_addr;
-		if (get_lun(name) != 0) {
+		if (strchr(name, ':') != NULL) {
 			(void) printf(" addif %s ", inet_ntoa(sin->sin_addr));
 		} else {
 			(void) printf(" set %s ", inet_ntoa(sin->sin_addr));
@@ -3587,15 +3588,11 @@ in_configinfo(int force, uint64_t flags)
 		}
 	}
 
-	/* If there is a groupname, print it for lun 0 alone */
-	if (get_lun(name) == 0) {
-		(void) memset(lifr.lifr_groupname, 0,
-		    sizeof (lifr.lifr_groupname));
-		if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifr) >= 0) {
-			if (strlen(lifr.lifr_groupname) > 0) {
-				(void) printf(" group %s ",
-				    lifr.lifr_groupname);
-			}
+	/* If there is a groupname, print it for only the physical interface */
+	if (strchr(name, ':') == NULL) {
+		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
+		    lifr.lifr_groupname[0] != '\0') {
+			(void) printf(" group %s ", lifr.lifr_groupname);
 		}
 	}
 
@@ -3634,7 +3631,7 @@ in6_configinfo(int force, uint64_t flags)
 				Perror0_exit("in6_configinfo: SIOCGLIFADDR");
 		}
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-		if (get_lun(name) != 0) {
+		if (strchr(name, ':') != NULL) {
 			(void) printf(" addif %s/%d ",
 			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
 			    abuf, sizeof (abuf)),
@@ -3697,15 +3694,11 @@ in6_configinfo(int force, uint64_t flags)
 		    lifr.lifr_addrlen);
 	}
 
-	/* If there is a groupname, print it for lun 0 alone */
-	if (get_lun(name) == 0) {
-		(void) memset(lifr.lifr_groupname, 0,
-		    sizeof (lifr.lifr_groupname));
-		if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifr) >= 0) {
-			if (strlen(lifr.lifr_groupname) > 0) {
-				(void) printf(" group %s ",
-				    lifr.lifr_groupname);
-			}
+	/* If there is a groupname, print it for only the physical interface */
+	if (strchr(name, ':') == NULL) {
+		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
+		    lifr.lifr_groupname[0] != '\0') {
+			(void) printf(" group %s ", lifr.lifr_groupname);
 		}
 	}
 
@@ -3716,25 +3709,6 @@ in6_configinfo(int force, uint64_t flags)
 	if (flags & IFF_NONUD) {
 		(void) printf("-nud ");
 	}
-}
-
-/* ARGSUSED */
-static int
-get_lun(char *rsrc)
-{
-	char resource[LIFNAMSIZ];
-	char *cp;
-
-	(void) strcpy(resource, rsrc);
-
-	/* remove LIF component */
-	cp = strchr(resource, ':');
-	if (cp) {
-		cp++;
-		return (atoi(cp));
-	}
-
-	return (0);
 }
 
 /*
@@ -3840,7 +3814,7 @@ plumb_one_device(int af)
 		/*
 		 * This difference between the way we behave for EEXIST
 		 * and that with other errors exists to preserve legacy
-		 * behaviour. Earlier when foreachinterface() and matcif()
+		 * behaviour. Earlier when foreachinterface() and matchif()
 		 * were doing the duplicate interface name checks, for
 		 * already existing interfaces, inetplumb() returned "0".
 		 * To preserve this behaviour, Perror0() and return are
@@ -4136,42 +4110,13 @@ inetplumb(char *arg, int64_t param)
 }
 
 void
-Perror0(char *cmd)
+Perror0(const char *cmd)
 {
-	int save_errno;
-
-	save_errno = errno;
-	(void) fprintf(stderr, "ifconfig: ");
-	errno = save_errno;
-	switch (errno) {
-
-	case ENXIO:
-		(void) fprintf(stderr, "%s: %s: no such interface\n",
-		    cmd, lifr.lifr_name);
-		break;
-
-	case EPERM:
-		(void) fprintf(stderr, "%s: %s: permission denied\n",
-		    cmd, lifr.lifr_name);
-		break;
-
-	case EEXIST:
-		(void) fprintf(stderr, "%s: %s: already exists\n",
-		    cmd, lifr.lifr_name);
-		break;
-
-	default: {
-		char buf[BUFSIZ];
-
-		(void) snprintf(buf, sizeof (buf), "%s: %s",
-		    cmd, lifr.lifr_name);
-		perror(buf);
-	}
-	}
+	Perror2(cmd, lifr.lifr_name);
 }
 
 void
-Perror0_exit(char *cmd)
+Perror0_exit(const char *cmd)
 {
 	Perror0(cmd);
 	exit(1);
@@ -4179,31 +4124,25 @@ Perror0_exit(char *cmd)
 }
 
 void
-Perror2(char *cmd, char *str)
+Perror2(const char *cmd, const char *str)
 {
-	int save_errno;
+	int error = errno;
 
-	save_errno = errno;
-	(void) fprintf(stderr, "ifconfig: ");
-	errno = save_errno;
-	switch (errno) {
+	(void) fprintf(stderr, "ifconfig: %s: ", cmd);
 
+	switch (error) {
 	case ENXIO:
-		(void) fprintf(stderr, "%s: %s: no such interface\n",
-		    cmd, str);
+		(void) fprintf(stderr, "%s: no such interface\n", str);
 		break;
-
 	case EPERM:
-		(void) fprintf(stderr, "%s: %s: permission denied\n",
-		    cmd, str);
+		(void) fprintf(stderr, "%s: permission denied\n", str);
 		break;
-
-	default: {
-		char buf[BUFSIZ];
-
-		(void) snprintf(buf, sizeof (buf), "%s: %s", cmd, str);
-		perror(buf);
-	}
+	case EEXIST:
+		(void) fprintf(stderr, "%s: already exists\n", str);
+		break;
+	default:
+		errno = error;
+		perror(str);
 	}
 }
 
@@ -4211,7 +4150,7 @@ Perror2(char *cmd, char *str)
  * Print out error message (Perror2()) and exit
  */
 void
-Perror2_exit(char *cmd, char *str)
+Perror2_exit(const char *cmd, const char *str)
 {
 	Perror2(cmd, str);
 	exit(1);

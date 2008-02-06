@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	dhcp_pif_t *pif;
 	struct lifreq lifr;
 	dlpi_handle_t dh = NULL;
+	int fd = isv6 ? v6_sock_fd : v4_sock_fd;
 
 	if ((pif = calloc(1, sizeof (*pif))) == NULL) {
 		dhcpmsg(MSG_ERR, "insert_pif: cannot allocate pif entry for "
@@ -98,20 +99,43 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		goto failure;
 	}
 
-	/* We do not use DLPI with DHCPv6 */
+	/*
+	 * This is a bit gross, but IP has a confused interface.  We must
+	 * assume that the zeroth LIF is plumbed, and must query there to get
+	 * the interface index number.
+	 */
+	(void) strlcpy(lifr.lifr_name, pname, LIFNAMSIZ);
+
+	if (ioctl(fd, SIOCGLIFINDEX, &lifr) == -1) {
+		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFINDEX for %s", pname);
+		goto failure;
+	}
+	pif->pif_index = lifr.lifr_index;
+
+	if (ioctl(fd, SIOCGLIFMTU, &lifr) == -1) {
+		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFMTU for %s", pname);
+		goto failure;
+	}
+	pif->pif_max = lifr.lifr_mtu;
+
+	if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
+		dhcpmsg(MSG_ERROR, "insert_pif: MTU of %s is too small to "
+		    "support DHCP (%u < %u)", pname, pif->pif_max,
+		    DHCP_DEF_MAX_SIZE);
+		*error = DHCP_IPC_E_INVIF;
+		goto failure;
+	}
+
+	/*
+	 * For IPv4, use DLPI to determine the hardware type, hardware
+	 * address, and hardware address length.
+	 */
 	if (!isv6) {
-		int			rc;
-		dlpi_info_t		dlinfo;
+		int		rc;
+		dlpi_info_t	dlinfo;
 
-		/*
-		 * Do the allocations necessary for IPv4 DHCP.
-		 *
-		 *  1. open the interface using DLPI
-		 *  2. get the interface hardware type and hardware length
-		 *  3. get the interface hardware address
-		 */
-
-		/* step 1 */
 		if ((rc = dlpi_open(pname, &dh, 0)) != DLPI_SUCCESS) {
 			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_open: %s",
 			    dlpi_strerror(rc));
@@ -126,9 +150,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 			goto failure;
 		}
 
-		/* step 2 */
-		rc = dlpi_info(dh, &dlinfo, 0);
-		if (rc != DLPI_SUCCESS) {
+		if ((rc = dlpi_info(dh, &dlinfo, 0)) != DLPI_SUCCESS) {
 			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_info: %s",
 			    dlpi_strerror(rc));
 			*error = DHCP_IPC_E_INVIF;
@@ -141,7 +163,6 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		dhcpmsg(MSG_DEBUG, "insert_pif: %s: hwtype %d, hwlen %d",
 		    pname, pif->pif_hwtype, pif->pif_hwlen);
 
-		/* step 3 */
 		if (pif->pif_hwlen > 0) {
 			pif->pif_hwaddr = malloc(pif->pif_hwlen);
 			if (pif->pif_hwaddr == NULL) {
@@ -158,39 +179,9 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		dh = NULL;
 	}
 
-	/*
-	 * This is a bit gross, but IP has a confused interface.  We must
-	 * assume that the zeroth LIF is plumbed, and must query there to get
-	 * the interface index number.
-	 */
-	(void) strlcpy(lifr.lifr_name, pname, LIFNAMSIZ);
-
-	if (ioctl(isv6 ? v6_sock_fd : v4_sock_fd, SIOCGLIFINDEX, &lifr) == -1) {
-		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
-		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFINDEX for %s", pname);
-		goto failure;
-	}
-	pif->pif_index = lifr.lifr_index;
-
-	if (ioctl(isv6 ? v6_sock_fd : v4_sock_fd, SIOCGLIFMTU, &lifr) == -1) {
-		*error = (errno == ENXIO) ? DHCP_IPC_E_INVIF : DHCP_IPC_E_INT;
-		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFMTU for %s", pname);
-		goto failure;
-	}
-	pif->pif_max = lifr.lifr_mtu;
-
-	if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
-		dhcpmsg(MSG_ERROR, "insert_pif: MTU of %s is too small to "
-		    "support DHCP (%u < %u)", pname, pif->pif_max,
-		    DHCP_DEF_MAX_SIZE);
-		*error = DHCP_IPC_E_INVIF;
-		goto failure;
-	}
-
 	insque(pif, isv6 ? &v6root : &v4root);
 
 	return (pif);
-
 failure:
 	if (dh != NULL)
 		dlpi_close(dh);
@@ -240,27 +231,6 @@ release_pif(dhcp_pif_t *pif)
 		dhcpmsg(MSG_DEBUG2, "release_pif: hold count on %s: %u",
 		    pif->pif_name, pif->pif_hold_count);
 	}
-}
-
-/*
- * lookup_pif_by_index(): Looks up PIF entries given regular ifIndex.
- *
- *   input: uint_t: the interface index
- *	    boolean_t: B_TRUE if using DHCPv6, B_FALSE otherwise
- *  output: dhcp_pif_t *: the matching PIF, or NULL if not found
- */
-
-dhcp_pif_t *
-lookup_pif_by_index(uint_t ifindex, boolean_t isv6)
-{
-	dhcp_pif_t *pif;
-
-	for (pif = isv6 ? v6root : v4root; pif != NULL; pif = pif->pif_next) {
-		if (pif->pif_index == ifindex)
-			break;
-	}
-
-	return (pif);
 }
 
 /*
@@ -582,8 +552,6 @@ remove_lif(dhcp_lif_t *lif)
 				dlp->dl_lifs = NULL;
 			else if (dlp->dl_lifs == lif)
 				dlp->dl_lifs = lifnext;
-			if (lif->lif_flags & IFF_DHCPRUNNING)
-				clear_lif_dhcp(lif);
 			if (lif->lif_declined != NULL) {
 				dlp->dl_smach->dsm_lif_down--;
 				lif->lif_declined = NULL;
@@ -1012,7 +980,7 @@ unplumb_lif(dhcp_lif_t *lif)
 		}
 		lif->lif_plumbed = B_FALSE;
 	}
-	lif->lif_flags = 0;
+
 	/*
 	 * Special case: if we're "unplumbing" the main LIF for DHCPv4, then
 	 * just canonize it and remove it from the lease.

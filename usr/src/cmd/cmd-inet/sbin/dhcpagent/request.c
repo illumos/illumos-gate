@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * REQUESTING state of the client state machine.
@@ -992,19 +992,11 @@ dhcp_acknak_global(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	if (plp == NULL)
 		return;
 
-	pif = lookup_pif_by_index(plp->ifindex, isv6);
-	if (pif == NULL) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_global: ignored packet "
-		    "received on v%d ifIndex %d", isv6 ? 6 : 4, plp->ifindex);
-		free_pkt_entry(plp);
-		return;
-	}
-
 	recv_type = pkt_recv_type(plp);
 	pname = pkt_type_to_string(recv_type, isv6);
 
 	/*
-	 * Find the corresponding state machine.
+	 * Find the corresponding state machine and pif.
 	 *
 	 * Note that DHCPv6 Reconfigure would be special: it's not the reply to
 	 * any transaction, and thus we would need to search on transaction ID
@@ -1012,19 +1004,24 @@ dhcp_acknak_global(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	 * is not yet supported.
 	 */
 	xid = pkt_get_xid(plp->pkt, isv6);
-	if (!isv6 && !pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
-		reason = "not ACK or NAK";
-		goto drop;
-	}
 
 	for (dsmp = lookup_smach_by_xid(xid, NULL, isv6); dsmp != NULL;
 	    dsmp = lookup_smach_by_xid(xid, dsmp, isv6)) {
-		if (dsmp->dsm_lif->lif_pif == pif)
+		pif = dsmp->dsm_lif->lif_pif;
+		if (pif->pif_index == plp->ifindex)
 			break;
 	}
 
 	if (dsmp == NULL) {
-		reason = "unknown state machine";
+		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_global: ignored v%d %s packet"
+		    " on ifindex %d: unknown state machine", isv6 ? 6 : 4,
+		    pname, plp->ifindex);
+		free_pkt_entry(plp);
+		return;
+	}
+
+	if (!isv6 && !pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
+		reason = "not ACK or NAK";
 		goto drop;
 	}
 
