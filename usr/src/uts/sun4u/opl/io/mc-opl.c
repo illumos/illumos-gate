@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -1723,7 +1723,6 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 			 * Compare error is result of MAC internal error, so
 			 * simply log it instead of publishing an ereport. SCF
 			 * diagnoses all the MAC internal and its i/f error.
-			 * mc_err_drain(mc_aflt);
 			 */
 			MC_LOG("cmpe error detected\n");
 			return (1);
@@ -1787,7 +1786,6 @@ mc_process_error_mir(mc_opl_t *mcp, mc_aflt_t *mc_aflt, mc_flt_stat_t *flt_stat)
 				 * error, so simply log it instead of
 				 * publishing an ereport. SCF diagnoses all
 				 * the MAC internal and its interface error.
-				 * mc_err_drain(mc_aflt);
 				 */
 				MC_LOG("cmpe error detected\n");
 				/* no more report on this bank */
