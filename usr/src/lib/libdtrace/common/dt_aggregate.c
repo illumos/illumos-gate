@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,21 @@ dt_aggregate_averagecmp(int64_t *lhs, int64_t *rhs)
 		return (DT_LESSTHAN);
 
 	if (lavg > ravg)
+		return (DT_GREATERTHAN);
+
+	return (0);
+}
+
+static int
+dt_aggregate_stddevcmp(int64_t *lhs, int64_t *rhs)
+{
+	uint64_t lsd = dt_stddev((uint64_t *)lhs, 1);
+	uint64_t rsd = dt_stddev((uint64_t *)rhs, 1);
+
+	if (lsd < rsd)
+		return (DT_LESSTHAN);
+
+	if (lsd > rsd)
 		return (DT_GREATERTHAN);
 
 	return (0);
@@ -570,6 +585,7 @@ hashnext:
 		case DTRACEAGG_COUNT:
 		case DTRACEAGG_SUM:
 		case DTRACEAGG_AVG:
+		case DTRACEAGG_STDDEV:
 		case DTRACEAGG_QUANTIZE:
 			h->dtahe_aggregate = dt_aggregate_count;
 			break;
@@ -819,6 +835,10 @@ dt_aggregate_valcmp(const void *lhs, const void *rhs)
 	switch (lrec->dtrd_action) {
 	case DTRACEAGG_AVG:
 		rval = dt_aggregate_averagecmp(laddr, raddr);
+		break;
+
+	case DTRACEAGG_STDDEV:
+		rval = dt_aggregate_stddevcmp(laddr, raddr);
 		break;
 
 	case DTRACEAGG_QUANTIZE:

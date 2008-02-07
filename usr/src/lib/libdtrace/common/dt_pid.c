@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -655,7 +655,7 @@ dt_pid_create_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp, dt_pcb_t *pcb)
 
 	(void) snprintf(provname, sizeof (provname), "pid%d", (int)pid);
 
-	if (strcmp(provname, pdp->dtpd_provider) == 0) {
+	if (gmatch(provname, pdp->dtpd_provider) != 0) {
 		if ((P = dt_proc_grab(dtp, pid, PGRAB_RDONLY | PGRAB_FORCE,
 		    0)) == NULL) {
 			(void) dt_pid_error(dtp, pcb, NULL, NULL, D_PROC_GRAB,
@@ -671,8 +671,12 @@ dt_pid_create_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp, dt_pcb_t *pcb)
 
 		(void) pthread_mutex_unlock(&dpr->dpr_lock);
 		dt_proc_release(dtp, P);
+	}
 
-	} else {
+	/*
+	 * If it's not strictly a pid provider, we might match a USDT provider.
+	 */
+	if (strcmp(provname, pdp->dtpd_provider) != 0) {
 		if ((P = dt_proc_grab(dtp, pid, 0, 1)) == NULL) {
 			(void) dt_pid_error(dtp, pcb, NULL, NULL, D_PROC_GRAB,
 			    "failed to grab process %d", (int)pid);
@@ -703,6 +707,10 @@ dt_pid_create_probes_module(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 	dtrace_probedesc_t *pdp, pd;
 	pid_t pid;
 	int ret = 0, found = B_FALSE;
+	char provname[DTRACE_PROVNAMELEN];
+
+	(void) snprintf(provname, sizeof (provname), "pid%d",
+	    (int)dpr->dpr_pid);
 
 	for (pgp = dt_list_next(&dtp->dt_programs); pgp != NULL;
 	    pgp = dt_list_next(pgp)) {
@@ -719,15 +727,17 @@ dt_pid_create_probes_module(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 
 			pd = *pdp;
 
-			if (strncmp(pdp->dtpd_provider, "pid", 3) == 0) {
-				if (dt_pid_create_pid_probes(&pd, dtp, NULL,
-				    dpr) != 0)
-					ret = 1;
-			} else {
-				if (dt_pid_create_usdt_probes(&pd, dtp, NULL,
-				    dpr) != 0)
-					ret = 1;
-			}
+			if (gmatch(provname, pdp->dtpd_provider) != 0 &&
+			    dt_pid_create_pid_probes(&pd, dtp, NULL, dpr) != 0)
+				ret = 1;
+
+			/*
+			 * If it's not strictly a pid provider, we might match
+			 * a USDT provider.
+			 */
+			if (strcmp(provname, pdp->dtpd_provider) != 0 &&
+			    dt_pid_create_usdt_probes(&pd, dtp, NULL, dpr) != 0)
+				ret = 1;
 		}
 	}
 

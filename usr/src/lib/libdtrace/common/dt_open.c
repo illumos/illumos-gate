@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,8 +102,9 @@
 #define	DT_VERS_1_4	DT_VERSION_NUMBER(1, 4, 0)
 #define	DT_VERS_1_4_1	DT_VERSION_NUMBER(1, 4, 1)
 #define	DT_VERS_1_5	DT_VERSION_NUMBER(1, 5, 0)
-#define	DT_VERS_LATEST	DT_VERS_1_5
-#define	DT_VERS_STRING	"Sun D 1.5"
+#define	DT_VERS_1_6	DT_VERSION_NUMBER(1, 6, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_6
+#define	DT_VERS_STRING	"Sun D 1.6"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -115,6 +116,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_4,	/* D API 1.4 Solaris Express 2/07 */
 	DT_VERS_1_4_1,	/* D API 1.4.1 Solaris Express 4/07 */
 	DT_VERS_1_5,	/* D API 1.5 Solaris Express 7/07 */
+	DT_VERS_1_6,	/* D API 1.6 */
 	0
 };
 
@@ -335,6 +337,8 @@ static const dt_ident_t _dtrace_globals[] = {
 { "stackdepth", DT_IDENT_SCALAR, 0, DIF_VAR_STACKDEPTH,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uint32_t" },
+{ "stddev", DT_IDENT_AGGFUNC, 0, DTRACEAGG_STDDEV, DT_ATTR_STABCMN,
+	DT_VERS_1_6, &dt_idops_func, "void(@)" },
 { "stop", DT_IDENT_ACTFUNC, 0, DT_ACT_STOP, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_func, "void()" },
 { "strchr", DT_IDENT_FUNC, 0, DIF_SUBR_STRCHR, DT_ATTR_STABCMN, DT_VERS_1_1,

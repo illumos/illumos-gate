@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,6 +341,8 @@ static kmutex_t dtrace_errlock;
 #define	DT_BSWAP_16(x)	((DT_BSWAP_8(x) << 8) | DT_BSWAP_8((x) >> 8))
 #define	DT_BSWAP_32(x)	((DT_BSWAP_16(x) << 16) | DT_BSWAP_16((x) >> 16))
 #define	DT_BSWAP_64(x)	((DT_BSWAP_32(x) << 32) | DT_BSWAP_32((x) >> 32))
+
+#define	DT_MASK_LO 0x00000000FFFFFFFFULL
 
 #define	DTRACE_STORE(type, tomax, offset, what) \
 	*((type *)((uintptr_t)(tomax) + (uintptr_t)offset)) = (type)(what);
@@ -939,6 +941,93 @@ dtrace_bzero(void *dst, size_t len)
 
 	for (cp = dst; len != 0; len--)
 		*cp++ = 0;
+}
+
+static void
+dtrace_add_128(uint64_t *addend1, uint64_t *addend2, uint64_t *sum)
+{
+	uint64_t result[2];
+
+	result[0] = addend1[0] + addend2[0];
+	result[1] = addend1[1] + addend2[1] +
+	    (result[0] < addend1[0] || result[0] < addend2[0] ? 1 : 0);
+
+	sum[0] = result[0];
+	sum[1] = result[1];
+}
+
+/*
+ * Shift the 128-bit value in a by b. If b is positive, shift left.
+ * If b is negative, shift right.
+ */
+static void
+dtrace_shift_128(uint64_t *a, int b)
+{
+	uint64_t mask;
+
+	if (b == 0)
+		return;
+
+	if (b < 0) {
+		b = -b;
+		if (b >= 64) {
+			a[0] = a[1] >> (b - 64);
+			a[1] = 0;
+		} else {
+			a[0] >>= b;
+			mask = 1LL << (64 - b);
+			mask -= 1;
+			a[0] |= ((a[1] & mask) << (64 - b));
+			a[1] >>= b;
+		}
+	} else {
+		if (b >= 64) {
+			a[1] = a[0] << (b - 64);
+			a[0] = 0;
+		} else {
+			a[1] <<= b;
+			mask = a[0] >> (64 - b);
+			a[1] |= mask;
+			a[0] <<= b;
+		}
+	}
+}
+
+/*
+ * The basic idea is to break the 2 64-bit values into 4 32-bit values,
+ * use native multiplication on those, and then re-combine into the
+ * resulting 128-bit value.
+ *
+ * (hi1 << 32 + lo1) * (hi2 << 32 + lo2) =
+ *     hi1 * hi2 << 64 +
+ *     hi1 * lo2 << 32 +
+ *     hi2 * lo1 << 32 +
+ *     lo1 * lo2
+ */
+static void
+dtrace_multiply_128(uint64_t factor1, uint64_t factor2, uint64_t *product)
+{
+	uint64_t hi1, hi2, lo1, lo2;
+	uint64_t tmp[2];
+
+	hi1 = factor1 >> 32;
+	hi2 = factor2 >> 32;
+
+	lo1 = factor1 & DT_MASK_LO;
+	lo2 = factor2 & DT_MASK_LO;
+
+	product[0] = lo1 * lo2;
+	product[1] = hi1 * hi2;
+
+	tmp[0] = hi1 * lo2;
+	tmp[1] = 0;
+	dtrace_shift_128(tmp, 32);
+	dtrace_add_128(product, tmp, product);
+
+	tmp[0] = hi2 * lo1;
+	tmp[1] = 0;
+	dtrace_shift_128(tmp, 32);
+	dtrace_add_128(product, tmp, product);
 }
 
 /*
@@ -1642,7 +1731,7 @@ retry:
 static void
 dtrace_aggregate_min(uint64_t *oval, uint64_t nval, uint64_t arg)
 {
-	if (nval < *oval)
+	if ((int64_t)nval < (int64_t)*oval)
 		*oval = nval;
 }
 
@@ -1650,7 +1739,7 @@ dtrace_aggregate_min(uint64_t *oval, uint64_t nval, uint64_t arg)
 static void
 dtrace_aggregate_max(uint64_t *oval, uint64_t nval, uint64_t arg)
 {
-	if (nval > *oval)
+	if ((int64_t)nval > (int64_t)*oval)
 		*oval = nval;
 }
 
@@ -1721,6 +1810,31 @@ dtrace_aggregate_avg(uint64_t *data, uint64_t nval, uint64_t arg)
 {
 	data[0]++;
 	data[1] += nval;
+}
+
+/*ARGSUSED*/
+static void
+dtrace_aggregate_stddev(uint64_t *data, uint64_t nval, uint64_t arg)
+{
+	int64_t snval = (int64_t)nval;
+	uint64_t tmp[2];
+
+	data[0]++;
+	data[1] += nval;
+
+	/*
+	 * What we want to say here is:
+	 *
+	 * data[2] += nval * nval;
+	 *
+	 * But given that nval is 64-bit, we could easily overflow, so
+	 * we do this as 128-bit arithmetic.
+	 */
+	if (snval < 0)
+		snval = -snval;
+
+	dtrace_multiply_128((uint64_t)snval, (uint64_t)snval, tmp);
+	dtrace_add_128(data + 2, tmp, data + 2);
 }
 
 /*ARGSUSED*/
@@ -9163,11 +9277,12 @@ dtrace_ecb_aggregation_create(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 
 	switch (desc->dtad_kind) {
 	case DTRACEAGG_MIN:
-		agg->dtag_initial = UINT64_MAX;
+		agg->dtag_initial = INT64_MAX;
 		agg->dtag_aggregate = dtrace_aggregate_min;
 		break;
 
 	case DTRACEAGG_MAX:
+		agg->dtag_initial = INT64_MIN;
 		agg->dtag_aggregate = dtrace_aggregate_max;
 		break;
 
@@ -9198,6 +9313,11 @@ dtrace_ecb_aggregation_create(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 	case DTRACEAGG_AVG:
 		agg->dtag_aggregate = dtrace_aggregate_avg;
 		size = sizeof (uint64_t) * 2;
+		break;
+
+	case DTRACEAGG_STDDEV:
+		agg->dtag_aggregate = dtrace_aggregate_stddev;
+		size = sizeof (uint64_t) * 4;
 		break;
 
 	case DTRACEAGG_SUM:
