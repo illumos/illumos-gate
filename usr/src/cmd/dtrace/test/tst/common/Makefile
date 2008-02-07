@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,6 +33,11 @@ SNOOPDIR = $(SRC)/cmd/cmd-inet/usr.sbin/snoop
 SNOOPOBJS = nfs4_xdr.o
 SNOOPSRCS = ${SNOOPOBJS:%.o=%.c}
 CLOBBERFILES += nfs/$(SNOOPOBJS)
+
+RPCSVCDIR = $(SRC)/head/rpcsvc
+RPCSVCOBJS = nfs_prot.o
+RPCSVCSRCS = ${RPCSVCOBJS:%o=%c}
+CLOBBERFILES += nfs/$(RPCSVCOBJS) $(RPCSVCDIR)/$(RPCSVCSRCS)
 
 fasttrap/tst.fasttrap.exe := LDLIBS += -ldtrace
 fasttrap/tst.stack.exe := LDLIBS += -ldtrace
@@ -51,6 +56,15 @@ nfs/%.o: $(SNOOPDIR)/%.c
 	$(POST_PROCESS_O)
 nfs/tst.call.exe: nfs/tst.call.o nfs/$(SNOOPOBJS)
 	$(LINK.c) -o $@ nfs/tst.call.o nfs/$(SNOOPOBJS) $(LDLIBS) -lnsl
+	$(POST_PROCESS) ; $(STRIP_STABS)
+$(RPCSVCDIR)/%.c: $(RPCSVCDIR)/%.x
+	$(RPCGEN) -Cc $< > $@
+nfs/$(RPCSVCOBJS): $(RPCSVCDIR)/$(RPCSVCSRCS)
+	$(COMPILE.c) -o $@ $(RPCSVCDIR)/$(RPCSVCSRCS)
+	$(POST_PROCESS_O)
+nfs/tst.call3.exe: nfs/tst.call3.o nfs/$(RPCSVCOBJS)
+	$(LINK.c) -o $@ nfs/tst.call3.o nfs/$(RPCSVCOBJS) \
+	$(LDLIBS) -lnsl -lrpcsvc
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 pid/tst.gcc.exe: pid/tst.gcc.c

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +154,15 @@ extern "C" {
 #define	DTRACE_IO4(name, type1, arg1, type2, arg2, 			\
     type3, arg3, type4, arg4)						\
 	DTRACE_PROBE4(__io_##name, type1, arg1, type2, arg2, 		\
+	    type3, arg3, type4, arg4);
+
+#define	DTRACE_NFSV3_3(name, type1, arg1, type2, arg2, 			\
+    type3, arg3)							\
+	DTRACE_PROBE3(__nfsv3_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3);
+#define	DTRACE_NFSV3_4(name, type1, arg1, type2, arg2, 			\
+    type3, arg3, type4, arg4)						\
+	DTRACE_PROBE4(__nfsv3_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
 
 #define	DTRACE_NFSV4_1(name, type1, arg1) \

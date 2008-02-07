@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,4 +89,20 @@ translator conninfo_t < rfs4_client_t *P > {
 translator nfsv4cbinfo_t < rfs4_deleg_state_t *P > {
 	nci_curpath = (P->finfo->vp == NULL) ? "<unknown>" :
 	    P->finfo->vp->v_path;
+};
+
+typedef struct nfsv3opinfo {
+	uint64_t noi_xid;	/* unique transation ID */
+	cred_t *noi_cred;	/* credentials for operation */
+	string noi_curpath;	/* current file handle path (if any) */
+} nfsv3opinfo_t;
+
+typedef struct nfsv3oparg nfsv3oparg_t;
+
+#pragma D binding "1.5" translator
+translator nfsv3opinfo_t < nfsv3oparg_t *P > {
+	noi_xid = ((struct svc_req *)arg0)->rq_xprt->xp_xid;
+	noi_cred = (cred_t *)arg1;
+	noi_curpath = (arg2 == 0 || ((vnode_t *)arg2)->v_path == NULL) ?
+	    "<unknown>" : ((vnode_t *)arg2)->v_path;
 };

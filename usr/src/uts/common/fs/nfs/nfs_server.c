@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -602,6 +602,17 @@ rpc_null(caddr_t *argp, caddr_t *resp)
 }
 
 /* ARGSUSED */
+void
+rpc_null_v3(caddr_t *argp, caddr_t *resp, struct exportinfo *exi,
+    struct svc_req *req, cred_t *cr)
+{
+	DTRACE_NFSV3_3(op__null__start, struct svc_req *, req,
+	    cred_t *, cr, vnode_t *, NULL);
+	DTRACE_NFSV3_3(op__null__done, struct svc_req *, req,
+	    cred_t *, cr, vnode_t *, NULL);
+}
+
+/* ARGSUSED */
 static void
 rfs_error(caddr_t *argp, caddr_t *resp)
 {
@@ -817,7 +828,7 @@ static struct rpcdisp rfsdisptab_v3[] = {
 	 */
 
 	/* RFS_NULL = 0 */
-	{rpc_null,
+	{rpc_null_v3,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    xdr_void, NULL_xdrproc_t, 0,
 	    nullfree, RPC_IDEMPOTENT,
