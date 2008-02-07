@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +54,8 @@ ON_CLOSED_BINS="$CODEMGR_WS/closed";		export ON_CLOSED_BINS
 
 # This flag controls whether to build the closed source.  If
 # undefined, nightly(1) and bldenv(1) will set it according to whether
-# the closed tree is present.
+# the closed source tree is present.  CLOSED_IS_PRESENT="no" means not
+# building the closed sources.
 # CLOSED_IS_PRESENT="no";		export CLOSED_IS_PRESENT
 
 # Maximum number of dmake jobs.  The recommended number is 2 + (2 *

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,8 @@ CLONE_WS="/ws/onnv-clone";			export CLONE_WS
 
 # This flag controls whether to build the closed source.  If
 # undefined, nightly(1) and bldenv(1) will set it according to whether
-# the closed tree is present.
+# the closed source tree is present.  CLOSED_IS_PRESENT="no" means not
+# building the closed sources.
 # CLOSED_IS_PRESENT="yes";		export CLOSED_IS_PRESENT
 
 # The bringover, if any, is done as STAFFER.
