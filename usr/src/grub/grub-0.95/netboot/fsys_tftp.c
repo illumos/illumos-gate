@@ -825,7 +825,7 @@ tftp_dir_undi(char *dirname)
 		return 1;
 
 	/* name may be space terminated */
-	nul_terminate(dirname);
+	ch = nul_terminate(dirname);
 	saved_name = (char *)&saved_tp;
 	sprintf(saved_name, "%s", dirname);
 
