@@ -13,6 +13,7 @@ daemon::12:root
 sysadmin::14:
 smmsp::25:
 gdm::50:
+mysql::70:
 webservd::80:
 postgres::90:
 nobody::60001:

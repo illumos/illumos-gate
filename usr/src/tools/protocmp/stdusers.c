@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ const struct stdlist usernames[] = {
 	{ "listen", 37 },
 	{ "gdm", 50 },
 	{ "lp", 71 },
+	{ "mysql", 70 },
 	{ "webservd", 80 },
 	{ "postgres", 90 },
 	{ "nobody", 60001 },
@@ -67,6 +68,7 @@ const struct stdlist groupnames[] = {
 	{ "sysadmin", 14 },
 	{ "smmsp", 25 },
 	{ "gdm", 50 },
+	{ "mysql", 70 },
 	{ "webservd", 80 },
 	{ "postgres", 90 },
 	{ "nobody", 60001 },

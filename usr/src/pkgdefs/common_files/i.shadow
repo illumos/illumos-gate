@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -102,6 +102,21 @@ do
 			printf '/^webservd:\*LK\*\na\n%s\n.\nw\nq\n' \
 			    "$POSTGRES_LINE" | ed -s $dest > /dev/null
 		fi
+
+
+
+  	 	#
+                # Add the 'mysql' reserved user if it doesn't exist.
+                #
+                MYSQL_LINE="mysql:NP:::::::"
+                if grep "^mysql:" $dest 2>&1 >/dev/null; then
+                        :
+                else
+                        printf '/^postgres:\*LK\*\na\n%s\n.\nw\nq\n' \
+                            "$MYSQL_LINE" | ed -s $dest > /dev/null
+                fi
+	
+
 
 		#
 		# Add the 'svctag' reserved user if it doesn't exist.
