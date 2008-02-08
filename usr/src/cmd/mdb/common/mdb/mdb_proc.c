@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2059,6 +2059,13 @@ pt_unsetenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+void
+getenv_help(void)
+{
+	mdb_printf("-t  show current process environment"
+	    " instead of initial environment.\n");
+}
+
 static const mdb_dcmd_t pt_dcmds[] = {
 	{ "$c", "?[cnt]", "print stack backtrace", pt_stack },
 	{ "$C", "?[cnt]", "print stack backtrace", pt_stackv },
@@ -2081,7 +2088,7 @@ static const mdb_dcmd_t pt_dcmds[] = {
 	{ "gcore", "[-o prefix] [-c content]",
 	    "produce a core file for the attached process", pt_gcore },
 	{ "getenv", "[-t] [name]", "display an environment variable",
-		pt_getenv, NULL },
+		pt_getenv, getenv_help },
 	{ "kill", NULL, "forcibly kill and release target", pt_kill },
 	{ "release", "[-a]",
 	    "release the previously attached process", pt_detach },
