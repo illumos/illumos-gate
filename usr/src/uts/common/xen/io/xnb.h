@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * xnb.h - definitions for Xen dom0 network driver
@@ -112,6 +112,8 @@ struct xnb {
 
 	uint64_t		xnb_stat_tx_cksum_deferred;
 	uint64_t		xnb_stat_rx_cksum_no_need;
+
+	uint64_t		xnb_stat_tx_rsp_notok;
 
 	uint64_t		xnb_stat_tx_notify_sent;
 	uint64_t		xnb_stat_tx_notify_deferred;

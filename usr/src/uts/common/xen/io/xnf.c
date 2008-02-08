@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,6 +379,7 @@ xnf_setup_rings(xnf_t *xnfp)
 
 	xnfp->xnf_tx_pkt_id_list = 0;
 	xnfp->xnf_tx_ring.rsp_cons = 0;
+	xnfp->xnf_tx_ring.req_prod_pvt = 0;
 	xnfp->xnf_tx_ring.sring->req_prod = 0;
 	xnfp->xnf_tx_ring.sring->rsp_prod = 0;
 	xnfp->xnf_tx_ring.sring->rsp_event = 1;
@@ -422,6 +423,7 @@ xnf_setup_rings(xnf_t *xnfp)
 	 * Hang buffers for any empty ring slots.
 	 */
 	xnfp->xnf_rx_ring.rsp_cons = 0;
+	xnfp->xnf_rx_ring.req_prod_pvt = 0;
 	xnfp->xnf_rx_ring.sring->req_prod = 0;
 	xnfp->xnf_rx_ring.sring->rsp_prod = 0;
 	xnfp->xnf_rx_ring.sring->rsp_event = 1;
@@ -986,7 +988,7 @@ xnf_clean_tx_ring(xnf_t *xnfp)
 
 	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
 
-	do {
+	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_tx_ring)) {
 		/*
 		 * index of next transmission ack
 		 */
@@ -1021,9 +1023,9 @@ xnf_clean_tx_ring(xnf_t *xnfp)
 		}
 		xnfp->xnf_tx_ring.rsp_cons = next_resp;
 		membar_enter();
-	} while (next_resp != xnfp->xnf_tx_ring.sring->rsp_prod);
-	return (NET_TX_RING_SIZE - (xnfp->xnf_tx_ring.sring->req_prod -
-	    next_resp));
+	}
+
+	return (RING_FREE_REQUESTS(&xnfp->xnf_tx_ring));
 }
 
 /*
@@ -1114,7 +1116,7 @@ xnf_send_one(xnf_t *xnfp, mblk_t *mp)
 		return (B_FALSE);	/* Send should be retried */
 	}
 
-	slot = xnfp->xnf_tx_ring.sring->req_prod;
+	slot = xnfp->xnf_tx_ring.req_prod_pvt;
 	/* Count the number of mblks in message and compute packet size */
 	for (i = 0, mptr = mp; mptr != NULL; mptr = mptr->b_cont, i++)
 		pktlen += (mptr->b_wptr - mptr->b_rptr);
@@ -1220,22 +1222,10 @@ xnf_send_one(xnf_t *xnfp, mblk_t *mp)
 		xnfp->xnf_stat_tx_cksum_deferred++;
 	}
 	membar_producer();
-	xnfp->xnf_tx_ring.sring->req_prod = slot + 1;
+	xnfp->xnf_tx_ring.req_prod_pvt = slot + 1;
 
 	txp_info->mp = mp;
 	txp_info->bdesc = xmitbuf;
-
-	txs_out = xnfp->xnf_tx_ring.sring->req_prod -
-	    xnfp->xnf_tx_ring.sring->rsp_prod;
-	if (xnfp->xnf_tx_ring.sring->req_prod - xnfp->xnf_tx_ring.rsp_cons <
-	    XNF_TX_FREE_THRESH) {
-		/*
-		 * The ring is getting full; Set up this packet
-		 * to cause an interrupt.
-		 */
-		xnfp->xnf_tx_ring.sring->rsp_event =
-		    xnfp->xnf_tx_ring.sring->rsp_prod + txs_out;
-	}
 
 	xnfp->xnf_stat_opackets++;
 	xnfp->xnf_stat_obytes += pktlen;
@@ -1278,8 +1268,14 @@ xnf_send(void *arg, mblk_t *mp)
 		sent_something = B_TRUE;
 	}
 
-	if (sent_something)
-		ec_notify_via_evtchn(xnfp->xnf_evtchn);
+	if (sent_something) {
+		boolean_t notify;
+
+		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
+		    notify);
+		if (notify)
+			ec_notify_via_evtchn(xnfp->xnf_evtchn);
+	}
 
 	mutex_exit(&xnfp->xnf_txlock);
 
@@ -1325,34 +1321,17 @@ xnf_intr(caddr_t arg)
 	}
 
 	/*
-	 * Is tx ring nearly full?
+	 * Clean tx ring and try to start any blocked xmit streams if
+	 * there is now some space.
 	 */
-#define	inuse(r) ((r).sring->req_prod - (r).rsp_cons)
-
-	if ((NET_TX_RING_SIZE - inuse(xnfp->xnf_tx_ring)) <
-	    XNF_TX_FREE_THRESH) {
-		/*
-		 * Yes, clean it and try to start any blocked xmit
-		 * streams.
-		 */
-		mutex_enter(&xnfp->xnf_txlock);
-		tx_ring_space = xnf_clean_tx_ring(xnfp);
-		mutex_exit(&xnfp->xnf_txlock);
-		if (tx_ring_space > XNF_TX_FREE_THRESH) {
-			mutex_exit(&xnfp->xnf_intrlock);
-			mac_tx_update(xnfp->xnf_mh);
-			mutex_enter(&xnfp->xnf_intrlock);
-		} else {
-			/*
-			 * Schedule another tx interrupt when we have
-			 * sent enough packets to cross the threshold.
-			 */
-			xnfp->xnf_tx_ring.sring->rsp_event =
-			    xnfp->xnf_tx_ring.sring->rsp_prod +
-			    XNF_TX_FREE_THRESH - tx_ring_space + 1;
-		}
+	mutex_enter(&xnfp->xnf_txlock);
+	tx_ring_space = xnf_clean_tx_ring(xnfp);
+	mutex_exit(&xnfp->xnf_txlock);
+	if (tx_ring_space > XNF_TX_FREE_THRESH) {
+		mutex_exit(&xnfp->xnf_intrlock);
+		mac_tx_update(xnfp->xnf_mh);
+		mutex_enter(&xnfp->xnf_intrlock);
 	}
-#undef inuse
 
 	xnfp->xnf_stat_interrupts++;
 	mutex_exit(&xnfp->xnf_intrlock);

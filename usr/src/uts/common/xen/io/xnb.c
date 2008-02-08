@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,7 @@ static kmutex_t	xnb_alloc_page_lock;
 static char *aux_statistics[] = {
 	"tx_cksum_deferred",
 	"rx_cksum_no_need",
+	"tx_rsp_notok",
 	"tx_notify_deferred",
 	"tx_notify_sent",
 	"rx_notify_deferred",
@@ -172,6 +173,7 @@ xnb_ks_aux_update(kstat_t *ksp, int flag)
 	 */
 	(knp++)->value.ui64 = xnbp->xnb_stat_tx_cksum_deferred;
 	(knp++)->value.ui64 = xnbp->xnb_stat_rx_cksum_no_need;
+	(knp++)->value.ui64 = xnbp->xnb_stat_tx_rsp_notok;
 	(knp++)->value.ui64 = xnbp->xnb_stat_tx_notify_deferred;
 	(knp++)->value.ui64 = xnbp->xnb_stat_tx_notify_sent;
 	(knp++)->value.ui64 = xnbp->xnb_stat_rx_notify_deferred;
@@ -1132,6 +1134,7 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 		if (status != NETIF_RSP_OKAY) {
 			RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod)->status =
 			    status;
+			xnbp->xnb_stat_tx_rsp_notok++;
 		} else {
 			xnbp->xnb_stat_opackets++;
 			xnbp->xnb_stat_obytes += len;
