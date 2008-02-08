@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1532,7 +1532,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	struct sockaddr_in6 *sin6;
 	/* MLS TODO:  Need sensitivity eventually. */
 	int next, token, sa_len, alloclen, totallen = sizeof (msg), prefix;
-	uint32_t spi;
+	uint32_t spi = 0;
 	char *thiscmd, *pstr;
 	boolean_t readstate = B_FALSE, unspec_src = B_FALSE;
 	boolean_t alloc_inner = B_FALSE, use_natt = B_FALSE;
@@ -2145,7 +2145,8 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				    "single encryption key.\n"));
 				break;
 			}
-			if (assoc->sadb_sa_encrypt == SADB_EALG_NULL) {
+			if (assoc != NULL &&
+			    assoc->sadb_sa_encrypt == SADB_EALG_NULL) {
 				FATAL(ep, ebuf, gettext(
 				    "Cannot specify a key with NULL "
 				    "encryption algorithm.\n"));
@@ -2504,6 +2505,9 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		spi = assoc->sadb_sa_spi;
 		free(assoc);
 	} else {
+		if (spi == 0)
+			ERROR1(ep, ebuf, gettext(
+			    "Need to define SPI for %s.\n"), thiscmd);
 		ERROR1(ep, ebuf, gettext(
 		    "Need SA parameters for %s.\n"), thiscmd);
 	}
