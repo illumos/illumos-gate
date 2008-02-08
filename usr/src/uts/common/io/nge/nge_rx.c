@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,8 +49,20 @@
 extern ddi_device_acc_attr_t nge_data_accattr;
 
 /*
- * Callback code invoked from STREAMs when the recv data buffer is free
- * for recycling.
+ * Callback code invoked from STREAMs when the recv data buffer is free for
+ * recycling.
+ *
+ * The following table describes function behaviour:
+ *
+ *                      | mac stopped | mac running
+ * ---------------------------------------------------
+ * buffer delivered     | free buffer | recycle buffer
+ * buffer not delivered | do nothing  | recycle buffer (*)
+ *
+ * Note (*):
+ *   Recycle buffer only if mac state did not change during execution of
+ *   function. Otherwise if mac state changed, set buffer delivered & re-enter
+ *   function by calling freemsg().
  */
 
 void

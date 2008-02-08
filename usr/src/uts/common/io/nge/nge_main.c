@@ -1098,7 +1098,6 @@ nge_m_stop(void *arg)
 	rw_enter(ngep->rwlock, RW_WRITER);
 
 	(void) nge_chip_stop(ngep, B_FALSE);
-	/* Try to wait all the buffer post to upper layer be released */
 	ngep->nge_mac_state = NGE_MAC_STOPPED;
 
 	/* Recycle all the TX BD */
@@ -1130,7 +1129,7 @@ nge_m_start(void *arg)
 	 */
 	if (ngep->suspended) {
 		mutex_exit(ngep->genlock);
-		return (DDI_FAILURE);
+		return (EIO);
 	}
 	rw_enter(ngep->rwlock, RW_WRITER);
 	err = nge_alloc_bufs(ngep);
@@ -1141,17 +1140,17 @@ nge_m_start(void *arg)
 	err = nge_init_rings(ngep);
 	if (err != DDI_SUCCESS) {
 		nge_free_bufs(ngep);
-		nge_problem(ngep, "nge_init_rings() failed,err=%x");
+		nge_problem(ngep, "nge_init_rings() failed,err=%x", err);
 		goto finish;
 	}
 	err = nge_restart(ngep);
 
 	NGE_DEBUG(("nge_m_start($%p) done", arg));
-	finish:
-		rw_exit(ngep->rwlock);
-		mutex_exit(ngep->genlock);
+finish:
+	rw_exit(ngep->rwlock);
+	mutex_exit(ngep->genlock);
 
-		return (err);
+	return (err == DDI_SUCCESS ? 0 : EIO);
 }
 
 static int

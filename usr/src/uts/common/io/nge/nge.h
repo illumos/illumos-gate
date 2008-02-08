@@ -573,7 +573,9 @@ typedef struct buff_ring {
 	dma_area_t		*free_list;	/* available buffer queue */
 	dma_area_t		*recycle_list;	/* recycling buffer queue */
 	kmutex_t		recycle_lock[1];
-	uint32_t		buf_sign;
+	uint32_t		buf_sign;	/* buffer ring signature */
+						/* for deciding to free  */
+						/* or to reuse buffers   */
 	boolean_t		rx_bcopy;
 } buff_ring_t;
 
