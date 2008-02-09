@@ -1081,7 +1081,7 @@ xnf_send_one(xnf_t *xnfp, mblk_t *mp)
 	struct tx_pktinfo	*txp_info;
 	mblk_t			*mptr;
 	ddi_dma_cookie_t	dma_cookie;
-	RING_IDX		slot, txs_out;
+	RING_IDX		slot;
 	int			length = 0, i, pktlen = 0, rc, tx_id;
 	int			tx_ring_freespace, page_oops;
 	uint_t			ncookies;
@@ -1271,6 +1271,7 @@ xnf_send(void *arg, mblk_t *mp)
 	if (sent_something) {
 		boolean_t notify;
 
+		/* LINTED: constant in conditional context */
 		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
 		    notify);
 		if (notify)
