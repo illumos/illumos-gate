@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -466,6 +466,7 @@ extern int zfs_build_perms(zfs_handle_t *, char *, char *,
     zfs_deleg_who_type_t, zfs_deleg_inherit_t, nvlist_t **nvlist_t);
 extern int zfs_perm_get(zfs_handle_t *, zfs_allow_t **);
 extern void zfs_free_allows(zfs_allow_t *);
+extern void zfs_deleg_permissions(void);
 
 /*
  * Mount support functions.

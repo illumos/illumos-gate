@@ -1589,6 +1589,124 @@ abort:
 	return (-1);
 }
 
+static char *
+zfs_deleg_perm_note(zfs_deleg_note_t note)
+{
+	/*
+	 * Don't put newlines on end of lines
+	 */
+	switch (note) {
+	case ZFS_DELEG_NOTE_CREATE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Must also have the 'mount' ability"));
+	case ZFS_DELEG_NOTE_DESTROY:
+		return (dgettext(TEXT_DOMAIN,
+		    "Must also have the 'mount' ability"));
+	case ZFS_DELEG_NOTE_SNAPSHOT:
+		return (dgettext(TEXT_DOMAIN,
+		    "Must also have the 'mount' ability"));
+	case ZFS_DELEG_NOTE_ROLLBACK:
+		return (dgettext(TEXT_DOMAIN,
+		    "Must also have the 'mount' ability"));
+	case ZFS_DELEG_NOTE_CLONE:
+		return (dgettext(TEXT_DOMAIN, "Must also have the 'create' "
+		    "ability and 'mount'\n"
+		    "\t\t\t\tability in the origin file system"));
+	case ZFS_DELEG_NOTE_PROMOTE:
+		return (dgettext(TEXT_DOMAIN, "Must also have the 'mount'\n"
+		    "\t\t\t\tand 'promote' ability in the origin file system"));
+	case ZFS_DELEG_NOTE_RENAME:
+		return (dgettext(TEXT_DOMAIN, "Must also have the 'mount' "
+		    "and 'create' \n\t\t\t\tability in the new parent"));
+	case ZFS_DELEG_NOTE_RECEIVE:
+		return (dgettext(TEXT_DOMAIN, "Must also have the 'mount'"
+		    " and 'create' ability"));
+	case ZFS_DELEG_NOTE_USERPROP:
+		return (dgettext(TEXT_DOMAIN,
+		    "Allows changing any user property"));
+	case ZFS_DELEG_NOTE_ALLOW:
+		return (dgettext(TEXT_DOMAIN,
+		    "Must also have the permission that is being\n"
+		    "\t\t\t\tallowed"));
+	case ZFS_DELEG_NOTE_MOUNT:
+		return (dgettext(TEXT_DOMAIN,
+		    "Allows mount/umount of ZFS datasets"));
+	case ZFS_DELEG_NOTE_SHARE:
+		return (dgettext(TEXT_DOMAIN,
+		    "Allows sharing file systems over NFS or SMB\n"
+		    "\t\t\t\tprotocols"));
+	case ZFS_DELEG_NOTE_NONE:
+	default:
+		return (dgettext(TEXT_DOMAIN, ""));
+	}
+}
+
+typedef enum {
+	ZFS_DELEG_SUBCOMMAND,
+	ZFS_DELEG_PROP,
+	ZFS_DELEG_OTHER
+} zfs_deleg_perm_type_t;
+
+/*
+ * is the permission a subcommand or other?
+ */
+zfs_deleg_perm_type_t
+zfs_deleg_perm_type(const char *perm)
+{
+	if (strcmp(perm, "userprop") == 0)
+		return (ZFS_DELEG_OTHER);
+	else
+		return (ZFS_DELEG_SUBCOMMAND);
+}
+
+static char *
+zfs_deleg_perm_type_str(zfs_deleg_perm_type_t type)
+{
+	switch (type) {
+	case ZFS_DELEG_SUBCOMMAND:
+		return (dgettext(TEXT_DOMAIN, "subcommand"));
+	case ZFS_DELEG_PROP:
+		return (dgettext(TEXT_DOMAIN, "property"));
+	case ZFS_DELEG_OTHER:
+		return (dgettext(TEXT_DOMAIN, "other"));
+	}
+	return ("");
+}
+
+/*ARGSUSED*/
+static int
+zfs_deleg_prop_cb(int prop, void *cb)
+{
+	if (zfs_prop_delegatable(prop))
+		(void) fprintf(stderr, "%-15s %-15s\n", zfs_prop_to_name(prop),
+		    zfs_deleg_perm_type_str(ZFS_DELEG_PROP));
+
+	return (ZPROP_CONT);
+}
+
+void
+zfs_deleg_permissions(void)
+{
+	int i;
+
+	(void) fprintf(stderr, "\n%-15s %-15s\t%s\n\n", "NAME",
+	    "TYPE", "NOTES");
+
+	/*
+	 * First print out the subcommands
+	 */
+	for (i = 0; zfs_deleg_perm_tab[i].z_perm != NULL; i++) {
+		(void) fprintf(stderr, "%-15s %-15s\t%s\n",
+		    zfs_deleg_perm_tab[i].z_perm,
+		    zfs_deleg_perm_type_str(
+		    zfs_deleg_perm_type(zfs_deleg_perm_tab[i].z_perm)),
+		    zfs_deleg_perm_note(zfs_deleg_perm_tab[i].z_note));
+	}
+
+	(void) zprop_iter(zfs_deleg_prop_cb, NULL, B_FALSE, B_TRUE,
+	    ZFS_TYPE_DATASET|ZFS_TYPE_VOLUME);
+}
+
 /*
  * Given a property name and value, set the property for the given dataset.
  */

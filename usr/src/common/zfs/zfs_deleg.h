@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,28 @@ extern "C" {
 #define	ZFS_DELEG_DESCENDENT	'd'
 #define	ZFS_DELEG_NA		'-'
 
-extern char *zfs_deleg_perm_tab[];
+typedef enum {
+	ZFS_DELEG_NOTE_CREATE,
+	ZFS_DELEG_NOTE_DESTROY,
+	ZFS_DELEG_NOTE_SNAPSHOT,
+	ZFS_DELEG_NOTE_ROLLBACK,
+	ZFS_DELEG_NOTE_CLONE,
+	ZFS_DELEG_NOTE_PROMOTE,
+	ZFS_DELEG_NOTE_RENAME,
+	ZFS_DELEG_NOTE_RECEIVE,
+	ZFS_DELEG_NOTE_ALLOW,
+	ZFS_DELEG_NOTE_USERPROP,
+	ZFS_DELEG_NOTE_MOUNT,
+	ZFS_DELEG_NOTE_SHARE,
+	ZFS_DELEG_NOTE_NONE
+} zfs_deleg_note_t;
+
+typedef struct zfs_deleg_perm_tab {
+	char *z_perm;
+	zfs_deleg_note_t z_note;
+} zfs_deleg_perm_tab_t;
+
+extern zfs_deleg_perm_tab_t zfs_deleg_perm_tab[];
 
 int zfs_deleg_verify_nvlist(nvlist_t *nvlist);
 void zfs_deleg_whokey(char *attr, zfs_deleg_who_type_t type,
