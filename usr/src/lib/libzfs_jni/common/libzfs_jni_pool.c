@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1137,7 +1137,7 @@ zjni_pool_status_to_obj(JNIEnv *env, zpool_status_t status)
 int
 zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 {
-	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv);
+	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv, B_FALSE);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2854,7 +2854,8 @@ ztest_verify_blocks(char *pool)
 	isalen = ztest - isa;
 	isa = strdup(isa);
 	/* LINTED */
-	(void) sprintf(bin, "/usr/sbin%.*s/zdb -bc%s%s -U -O %s %s",
+	(void) sprintf(bin,
+	    "/usr/sbin%.*s/zdb -bc%s%s -U /tmp/zpool.cache -O %s %s",
 	    isalen,
 	    isa,
 	    zopt_verbose >= 3 ? "s" : "",

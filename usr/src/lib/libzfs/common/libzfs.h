@@ -292,8 +292,9 @@ extern int zpool_import_props(libzfs_handle_t *, nvlist_t *, const char *,
 /*
  * Search for pools to import
  */
-extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **);
-extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *);
+extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **, boolean_t);
+extern nvlist_t *zpool_find_import_cached(libzfs_handle_t *, const char *,
+boolean_t);
 
 /*
  * Miscellaneous pool functions

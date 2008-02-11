@@ -1438,9 +1438,9 @@ zpool_do_import(int argc, char **argv)
 	}
 
 	if (cachefile)
-		pools = zpool_find_import_cached(g_zfs, cachefile);
+		pools = zpool_find_import_cached(g_zfs, cachefile, B_FALSE);
 	else
-		pools = zpool_find_import(g_zfs, nsearch, searchdirs);
+		pools = zpool_find_import(g_zfs, nsearch, searchdirs, B_FALSE);
 
 	if (pools == NULL) {
 		free(searchdirs);

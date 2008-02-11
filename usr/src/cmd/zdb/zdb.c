@@ -88,13 +88,15 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-udibcsvLUe] [-O order] [-B os:obj:level:blkid] "
+	    "Usage: %s [-udibcsvL] [-U cachefile_path] [-O order] "
+	    "[-B os:obj:level:blkid] "
 	    "dataset [object...]\n"
 	    "       %s -C [pool]\n"
 	    "       %s -l dev\n"
 	    "       %s -R vdev:offset:size:flags\n"
-	    "       %s [-p path_to_vdev_dir]\n",
-	    cmdname, cmdname, cmdname, cmdname, cmdname);
+	    "       %s [-p path_to_vdev_dir]\n"
+	    "       %s -e pool | GUID | devid ...\n",
+	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "	-u uberblock\n");
 	(void) fprintf(stderr, "	-d datasets\n");
@@ -108,12 +110,14 @@ usage(void)
 	(void) fprintf(stderr, "	-L live pool (allows some errors)\n");
 	(void) fprintf(stderr, "	-O [!]<pre|post|prune|data|holes> "
 	    "visitation order\n");
-	(void) fprintf(stderr, "	-U use zpool.cache in /tmp\n");
+	(void) fprintf(stderr, "	-U cachefile_path -- use alternate "
+	    "cachefile\n");
 	(void) fprintf(stderr, "	-B objset:object:level:blkid -- "
 	    "simulate bad block\n");
 	(void) fprintf(stderr, "        -R read and display block from a"
 	    "device\n");
-	(void) fprintf(stderr, "        -e Pool is exported/destroyed\n");
+	(void) fprintf(stderr, "        -e Pool is exported/destroyed/"
+	    "has altroot\n");
 	(void) fprintf(stderr, "	-p <Path to vdev dir> (use with -e)\n");
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
@@ -2221,16 +2225,19 @@ pool_match(nvlist_t *config, char *tgt)
 }
 
 static int
-find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir)
+find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir,
+    char *cachefile)
 {
 	nvlist_t *pools;
 	int error = ENOENT;
 	nvlist_t *match = NULL;
 
 	if (vdev_dir != NULL)
-		pools = zpool_find_import(g_zfs, 1, &vdev_dir);
+		pools = zpool_find_import(g_zfs, 1, &vdev_dir, B_TRUE);
+	else if (cachefile != NULL)
+		pools = zpool_find_import_cached(g_zfs, cachefile, B_TRUE);
 	else
-		pools = zpool_find_import(g_zfs, 0, NULL);
+		pools = zpool_find_import(g_zfs, 0, NULL, B_TRUE);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;
@@ -2269,13 +2276,14 @@ main(int argc, char **argv)
 	int flag, set;
 	int exported = 0;
 	char *vdev_dir = NULL;
+	char *cachefile = NULL;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLO:B:UlRep:")) != -1) {
+	while ((c = getopt(argc, argv, "udibcsvCLO:B:U:lRep:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -2336,7 +2344,7 @@ main(int argc, char **argv)
 			verbose++;
 			break;
 		case 'U':
-			spa_config_dir = "/tmp";
+			cachefile = optarg;
 			break;
 		case 'e':
 			exported = 1;
@@ -2410,7 +2418,7 @@ main(int argc, char **argv)
 	if (dump_opt['C'])
 		dump_config(argv[0]);
 
-	if (exported == 0) {
+	if (exported == 0 && cachefile == NULL) {
 		if (strchr(argv[0], '/') != NULL) {
 			error = dmu_objset_open(argv[0], DMU_OST_ANY,
 			    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
@@ -2423,7 +2431,8 @@ main(int argc, char **argv)
 		 */
 		nvlist_t *exported_conf = NULL;
 
-		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir);
+		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir,
+		    cachefile);
 		if (error == 0) {
 			nvlist_t *nvl = NULL;
 

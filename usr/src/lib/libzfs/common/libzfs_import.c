@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -411,7 +411,7 @@ refresh_config(libzfs_handle_t *hdl, nvlist_t *config)
  * return to the user.
  */
 static nvlist_t *
-get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
+get_configs(libzfs_handle_t *hdl, pool_list_t *pl, boolean_t active_ok)
 {
 	pool_entry_t *pe;
 	vdev_entry_t *ve;
@@ -611,6 +611,13 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 		nvlist_free(nvroot);
 
 		/*
+		 * zdb uses this path to report on active pools that were
+		 * imported or created using -R.
+		 */
+		if (active_ok)
+			goto add_pool;
+
+		/*
 		 * Determine if this pool is currently active, in which case we
 		 * can't actually import it.
 		 */
@@ -673,6 +680,7 @@ get_configs(libzfs_handle_t *hdl, pool_list_t *pl)
 			    hostname) == 0);
 		}
 
+add_pool:
 		/*
 		 * Add this pool to the list of configs.
 		 */
@@ -768,7 +776,8 @@ zpool_read_label(int fd, nvlist_t **config)
  * given (argc is 0), then the default directory (/dev/dsk) is searched.
  */
 nvlist_t *
-zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
+zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv,
+    boolean_t active_ok)
 {
 	int i;
 	DIR *dirp = NULL;
@@ -855,7 +864,7 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 		dirp = NULL;
 	}
 
-	ret = get_configs(hdl, &pools);
+	ret = get_configs(hdl, &pools, active_ok);
 
 error:
 	for (pe = pools.pools; pe != NULL; pe = penext) {
@@ -890,7 +899,8 @@ error:
  * Given a cache file, return the contents as a list of importable pools.
  */
 nvlist_t *
-zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile)
+zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile,
+    boolean_t active_ok)
 {
 	char *buf;
 	int fd;
@@ -962,30 +972,40 @@ zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile)
 		verify(nvlist_lookup_uint64(src, ZPOOL_CONFIG_POOL_GUID,
 		    &guid) == 0);
 
-		if (pool_active(hdl, name, guid, &active) != 0) {
-			nvlist_free(raw);
-			nvlist_free(pools);
-			return (NULL);
-		}
+		if (!active_ok) {
+			if (pool_active(hdl, name, guid, &active) != 0) {
+				nvlist_free(raw);
+				nvlist_free(pools);
+				return (NULL);
+			}
 
-		if (active)
-			continue;
+			if (active)
+				continue;
 
-		if ((dst = refresh_config(hdl, src)) == NULL) {
-			nvlist_free(raw);
-			nvlist_free(pools);
-			return (NULL);
-		}
+			if ((dst = refresh_config(hdl, src)) == NULL) {
+				nvlist_free(raw);
+				nvlist_free(pools);
+				return (NULL);
+			}
 
-		if (nvlist_add_nvlist(pools, nvpair_name(elem), dst) != 0) {
-			(void) no_memory(hdl);
+			if (nvlist_add_nvlist(pools, nvpair_name(elem), dst)
+			    != 0) {
+				(void) no_memory(hdl);
+				nvlist_free(dst);
+				nvlist_free(raw);
+				nvlist_free(pools);
+				return (NULL);
+			}
 			nvlist_free(dst);
-			nvlist_free(raw);
-			nvlist_free(pools);
-			return (NULL);
+		} else {
+			if (nvlist_add_nvlist(pools, nvpair_name(elem), src)
+			    != 0) {
+				(void) no_memory(hdl);
+				nvlist_free(raw);
+				nvlist_free(pools);
+				return (NULL);
+			}
 		}
-
-		nvlist_free(dst);
 	}
 
 	nvlist_free(raw);
