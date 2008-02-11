@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -503,11 +503,10 @@ retry:
 	for (row = -1; ret == 0; row = nxtrow) {
 		ret = snmp_get_nextrow(hdl, OID_entPhysicalDescr,
 		    row, &nxtrow, &snmp_syserr);
-		if (ret == 0) {
+		if (ret == 0)
 			(void) make_node(*subtree_rootp, nxtrow, &snmp_syserr);
-		}
-
-		if (snmp_syserr == ECANCELED) {
+		switch (snmp_syserr) {
+		case ECANCELED:
 			/*
 			 * If we get this error, a link reset must've
 			 * happened and we need to throw away everything
@@ -517,11 +516,26 @@ retry:
 			free_resources(*subtree_rootp);
 			clr_linkreset = 1;
 			goto retry;
+			/*NOTREACHED*/
+			break;
+		case ENOSPC:	/* end of MIB */
+			LOGPRINTF("build_physplat: end of MIB\n");
+			break;
+		case ENOENT:	/* end of table */
+			LOGPRINTF("build_physplat: end of table\n");
+			break;
+		default:
+			/*
+			 * make_node() will print messages so don't
+			 * repeat that exercise here.
+			 */
+			if (ret == -1) {
+				log_msg(LOG_WARNING,
+				    SNMPP_CANT_FETCH_OBJECT_VAL,
+				    snmp_syserr ? snmp_syserr : ret,
+				    OID_entPhysicalDescr, row);
+			}
 		}
-		if (ret == -1)
-			log_msg(LOG_WARNING, SNMPP_CANT_FETCH_OBJECT_VAL,
-			    snmp_syserr ? snmp_syserr : ret,
-			    OID_entPhysicalDescr, row);
 	}
 
 	/*

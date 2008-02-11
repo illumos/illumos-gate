@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -459,8 +459,11 @@ snmp_get_nextrow(picl_snmphdl_t hdl, char *prefix, int row, int *nextrow,
 	char	*nxt_oidstr;
 	int	err = 0;
 
-	if (smd == NULL || prefix == NULL || nextrow == NULL)
+	if (smd == NULL || prefix == NULL || nextrow == NULL) {
+		if (snmp_syserr)
+			*snmp_syserr = EINVAL;
 		return (-1);
+	}
 
 	/*
 	 * The get_nextrow results should *never* go into any cache,
@@ -469,7 +472,6 @@ snmp_get_nextrow(picl_snmphdl_t hdl, char *prefix, int row, int *nextrow,
 	if ((reply_pdu = fetch_next(smd, prefix, row, &err)) == NULL) {
 		if (snmp_syserr)
 			*snmp_syserr = err;
-
 		return (-1);
 	}
 
@@ -479,18 +481,36 @@ snmp_get_nextrow(picl_snmphdl_t hdl, char *prefix, int row, int *nextrow,
 	 * its row number (and whether such an object exists or not).
 	 */
 	vp = reply_pdu->vars;
+
+	/*
+	 * This indicates that we're at the end of the MIB view.
+	 */
 	if (vp == NULL || vp->name == NULL || vp->type == SNMP_NOSUCHOBJECT ||
 	    vp->type == SNMP_NOSUCHINSTANCE || vp->type == SNMP_ENDOFMIBVIEW) {
 		snmp_free_pdu(reply_pdu);
+		if (snmp_syserr)
+			*snmp_syserr = ENOSPC;
 		return (-1);
 	}
+
+	/*
+	 * need to be able to convert the OID
+	 */
 	if ((nxt_oidstr = oid_to_oidstr(vp->name, vp->name_len - 1)) == NULL) {
 		snmp_free_pdu(reply_pdu);
+		if (snmp_syserr)
+			*snmp_syserr = ENOMEM;
 		return (-1);
 	}
+
+	/*
+	 * We're on to the next table.
+	 */
 	if (strcmp(nxt_oidstr, prefix) != 0) {
 		free(nxt_oidstr);
 		snmp_free_pdu(reply_pdu);
+		if (snmp_syserr)
+			*snmp_syserr = ENOENT;
 		return (-1);
 	}
 
@@ -626,10 +646,10 @@ lookup_str(char *prefix, int row, char **valp, int is_vol)
 
 		*valp = val_arr[0];
 	} else {
-	    if (nvlist_lookup_string(mibcache[row], prefix, valp) != 0) {
-		    (void) mutex_unlock(&mibcache_lock);
-		    return (-1);
-	    }
+		if (nvlist_lookup_string(mibcache[row], prefix, valp) != 0) {
+			(void) mutex_unlock(&mibcache_lock);
+			return (-1);
+		}
 	}
 
 	(void) mutex_unlock(&mibcache_lock);
@@ -1188,7 +1208,7 @@ mibcache_populate(snmp_pdu_t *pdu, int is_vol)
 				(void) nvlist_add_int32_array(mibcache[row],
 				    oidstr, ival_arr, 2);
 			} else {
-				nvlist_add_int32(mibcache[row],
+				(void) nvlist_add_int32(mibcache[row],
 				    oidstr, *(vp->val.iptr));
 			}
 
@@ -1235,7 +1255,7 @@ oid_to_oidstr(oid *objid, size_t n_subids)
 	for (i = 0; i < n_subids; i++) {
 		(void) memset(subid_str, 0, sizeof (subid_str));
 		isize = snprintf(subid_str, sizeof (subid_str), "%d",
-			objid[i]);
+		    objid[i]);
 		if (isize >= sizeof (subid_str))
 			return (NULL);
 
