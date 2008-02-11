@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,7 +85,6 @@ static int	getaudit_addr(caddr_t, int);
 static int	setaudit(caddr_t);
 static int	setaudit_addr(caddr_t, int);
 static int	auditdoor(int);
-static int	auditsvc(int, int);
 static int	auditctl(int, caddr_t, int);
 static int	audit_modsysent(char *, int, int (*)());
 static void	au_output_thread();
@@ -131,9 +130,8 @@ _init()
 	 *  create an rw_lock.
 	 */
 
-	if ((audit_modsysent("c2audit",
-		SE_LOADABLE|SE_NOUNLOAD,
-		_auditsys)) == -1)
+	if ((audit_modsysent("c2audit", SE_LOADABLE|SE_NOUNLOAD,
+	    _auditsys)) == -1)
 		return (-1);
 
 	if ((retval = mod_install(&modlinkage)) != 0)
@@ -188,9 +186,6 @@ _auditsys(struct auditcalls *uap, rval_t *rvp)
 		break;
 	case BSM_AUDIT:
 		result = audit((caddr_t)uap->a1, (int)uap->a2);
-		break;
-	case BSM_AUDITSVC:
-		result = auditsvc((int)uap->a1, (int)uap->a2);
 		break;
 	case BSM_AUDITDOOR:
 		result = auditdoor((int)uap->a1);
@@ -412,7 +407,7 @@ setaudit(caddr_t info_p)
 	/* only convert to 64 bit if coming from a 32 bit binary */
 	if (model == DATAMODEL_ILP32)
 		ainfo->ai_termid.at_port =
-			DEVEXPL(STRUCT_FGET(info, ai_termid.port));
+		    DEVEXPL(STRUCT_FGET(info, ai_termid.port));
 	else
 		ainfo->ai_termid.at_port = STRUCT_FGET(info, ai_termid.port);
 #else
@@ -480,7 +475,7 @@ setaudit_addr(caddr_t info_p, int len)
 	/* only convert to 64 bit if coming from a 32 bit binary */
 	if (model == DATAMODEL_ILP32)
 		ainfo->ai_termid.at_port =
-			DEVEXPL(STRUCT_FGET(info, ai_termid.at_port));
+		    DEVEXPL(STRUCT_FGET(info, ai_termid.at_port));
 	else
 		ainfo->ai_termid.at_port = STRUCT_FGET(info, ai_termid.at_port);
 #else
@@ -490,7 +485,7 @@ setaudit_addr(caddr_t info_p, int len)
 	bzero(&ainfo->ai_termid.at_addr[0], sizeof (ainfo->ai_termid.at_addr));
 	for (i = 0; i < (type/sizeof (int)); i++)
 		ainfo->ai_termid.at_addr[i] =
-			STRUCT_FGET(info, ai_termid.at_addr[i]);
+		    STRUCT_FGET(info, ai_termid.at_addr[i]);
 
 	if (ainfo->ai_termid.at_type == AU_IPv6 &&
 	    IN6_IS_ADDR_V4MAPPED(((in6_addr_t *)ainfo->ai_termid.at_addr))) {
@@ -574,11 +569,10 @@ audit(caddr_t record, int length)
 			n = m;
 		}
 		l = MIN(count, AU_BUFSIZE);
-		if (copyin(record, memtod(m, caddr_t),
-			(size_t)l)) {
-				/* copyin failed release au_membuf */
-				au_free_rec(s);
-				return (EFAULT);
+		if (copyin(record, memtod(m, caddr_t), (size_t)l)) {
+			/* copyin failed release au_membuf */
+			au_free_rec(s);
+			return (EFAULT);
 		}
 		record += l;
 		count -= l;
@@ -748,7 +742,6 @@ auditdoor(int fd)
 {
 	struct file	*fp;
 	struct vnode	*vp;
-	int		error = 0;
 	int		do_create = 0;
 	au_kcontext_t	*kctx;
 
@@ -761,35 +754,18 @@ auditdoor(int fd)
 	kctx = GET_KCTX_NGZ;
 
 	/*
-	 * Prevent a second audit daemon from running this code.
-	 * auk_svc_busy == 2 until the output thread terminates.
-	 * Multiple calls to auditdoor() are valid but a call
-	 * to auditsvc() while au_output_thread() is running
-	 * or a call to auditdoor() while auditsvc is running
-	 * is blocked.
-	 */
-	mutex_enter(&(kctx->auk_svc_lock));
-	if (kctx->auk_svc_busy == 1) {		/* active auditsvc? */
-		mutex_exit(&(kctx->auk_svc_lock));
-		return (EBUSY);
-	}
-	kctx->auk_svc_busy = 2;
-	mutex_exit(&(kctx->auk_svc_lock));
-	/*
 	 * convert file pointer to file descriptor
 	 *   Note: fd ref count incremented here.
 	 */
 	if ((fp = (struct file *)getf(fd)) == NULL) {
-		error = EBADF;
-		goto svc_exit;
+		return (EBADF);
 	}
 	vp = fp->f_vnode;
 	if (vp->v_type != VDOOR) {
 		cmn_err(CE_WARN,
 		    "auditdoor() did not get the expected door descriptor\n");
-		error = EINVAL;
 		releasef(fd);
-		goto svc_exit;
+		return (EINVAL);
 	}
 	/*
 	 * If the output thread is already running, then replace the
@@ -820,13 +796,7 @@ auditdoor(int fd)
 		    (task_func_t *)au_output_thread,
 		    kctx, TQ_SLEEP);
 	}
-svc_exit:
-	if (error) {
-		mutex_enter(&(kctx->auk_svc_lock));
-		kctx->auk_svc_busy = 2;
-		mutex_exit(&(kctx->auk_svc_lock));
-	}
-	return (error);
+	return (0);
 }
 
 /*
@@ -878,37 +848,42 @@ au_output_thread(au_kcontext_t *kctx)
 	 */
 
 	while (!error) {
-	    if (kctx->auk_auditstate == AUC_AUDITING) {
-		mutex_enter(&(kctx->auk_queue.lock));
-		while (kctx->auk_queue.head == NULL) {
-		    /* safety check. kick writer awake */
-		    if (kctx->auk_queue.wt_block)
-			cv_broadcast(&(kctx->auk_queue.write_cv));
+		if (kctx->auk_auditstate == AUC_AUDITING) {
+			mutex_enter(&(kctx->auk_queue.lock));
+			while (kctx->auk_queue.head == NULL) {
+				/* safety check. kick writer awake */
+				if (kctx->auk_queue.wt_block) {
+					cv_broadcast(&(kctx->
+					    auk_queue.write_cv));
+				}
 
-		    kctx->auk_queue.rd_block = 1;
-		    AS_INC(as_rblocked, 1, kctx);
+				kctx->auk_queue.rd_block = 1;
+				AS_INC(as_rblocked, 1, kctx);
 
-		    cv_wait(&(kctx->auk_queue.read_cv),
-			&(kctx->auk_queue.lock));
+				cv_wait(&(kctx->auk_queue.read_cv),
+				    &(kctx->auk_queue.lock));
+				kctx->auk_queue.rd_block = 0;
 
-		    kctx->auk_queue.rd_block = 0;
-
-		    if (kctx->auk_auditstate != AUC_AUDITING) {
+				if (kctx->auk_auditstate != AUC_AUDITING) {
+					mutex_exit(&(kctx->auk_queue.lock));
+					(void) timeout(audit_dont_stop, kctx,
+					    au_resid);
+					goto output_exit;
+				}
+				kctx->auk_queue.rd_block = 0;
+			}
 			mutex_exit(&(kctx->auk_queue.lock));
-			(void) timeout(audit_dont_stop, kctx, au_resid);
-			goto output_exit;
-		    }
-		    kctx->auk_queue.rd_block = 0;
-		}
-		mutex_exit(&(kctx->auk_queue.lock));
-		/*
-		 * au_doorio() calls au_door_upcall which holds auk_svc_lock;
-		 * au_doorio empties the queue before returning.
-		 */
+			/*
+			 * au_doorio() calls au_door_upcall which holds
+			 * auk_svc_lock; au_doorio empties the queue before
+			 * returning.
+			 */
 
-		error = au_doorio(kctx);
-	    } else	/* auditing turned off while we slept */
-		break;
+			error = au_doorio(kctx);
+		} else {
+			/* auditing turned off while we slept */
+			break;
+		}
 	}
 output_exit:
 	mutex_enter(&(kctx->auk_svc_lock));
@@ -917,7 +892,6 @@ output_exit:
 	kctx->auk_current_vp = NULL;
 
 	kctx->auk_output_active = 0;
-	kctx->auk_svc_busy = 0;
 
 	mutex_exit(&(kctx->auk_svc_lock));
 }
@@ -1067,12 +1041,13 @@ getkaudit(caddr_t info_p, int len)
 			return (EOVERFLOW);
 		}
 		STRUCT_FSET(info, ai_termid.at_port, dev);
-	} else
+	} else {
 		STRUCT_FSET(info, ai_termid.at_port,
-			kctx->auk_info.ai_termid.at_port);
+		    kctx->auk_info.ai_termid.at_port);
+	}
 #else
 	STRUCT_FSET(info, ai_termid.at_port,
-		kctx->auk_info.ai_termid.at_port);
+	    kctx->auk_info.ai_termid.at_port);
 #endif
 	STRUCT_FSET(info, ai_termid.at_type,
 	    kctx->auk_info.ai_termid.at_type);
@@ -1129,16 +1104,16 @@ setkaudit(caddr_t info_p, int len)
 	/* only convert to 64 bit if coming from a 32 bit binary */
 	if (model == DATAMODEL_ILP32)
 		kctx->auk_info.ai_termid.at_port =
-			DEVEXPL(STRUCT_FGET(info, ai_termid.at_port));
+		    DEVEXPL(STRUCT_FGET(info, ai_termid.at_port));
 	else
 		kctx->auk_info.ai_termid.at_port =
-			STRUCT_FGET(info, ai_termid.at_port);
+		    STRUCT_FGET(info, ai_termid.at_port);
 #else
 	kctx->auk_info.ai_termid.at_port = STRUCT_FGET(info, ai_termid.at_port);
 #endif
 	kctx->auk_info.ai_termid.at_type = STRUCT_FGET(info, ai_termid.at_type);
 	bzero(&kctx->auk_info.ai_termid.at_addr[0],
-		sizeof (kctx->auk_info.ai_termid.at_addr));
+	    sizeof (kctx->auk_info.ai_termid.at_addr));
 	kctx->auk_info.ai_termid.at_addr[0] =
 	    STRUCT_FGET(info, ai_termid.at_addr[0]);
 	kctx->auk_info.ai_termid.at_addr[1] =
@@ -1968,122 +1943,6 @@ auditctl(
 		break;
 	}
 	return (result);
-}
-
-/*
- * auditsvc was EOL'd effective Sol 10
- */
-static int
-auditsvc(int fd, int limit)
-{
-	struct file *fp;
-	struct vnode *vp;
-	int error = 0;
-	au_kcontext_t	*kctx;
-
-	if (secpolicy_audit_config(CRED()) != 0)
-		return (EPERM);
-
-	if (!INGLOBALZONE(curproc))
-		return (EINVAL);
-
-	kctx = GET_KCTX_GZ;
-
-	if (limit < 0 ||
-	    (!(kctx->auk_auditstate == AUC_AUDITING ||
-	    kctx->auk_auditstate == AUC_NOSPACE)))
-		return (EINVAL);
-
-	/*
-	 * Prevent a second audit daemon from running this code
-	 */
-	mutex_enter(&(kctx->auk_svc_lock));
-	if (kctx->auk_svc_busy) {
-		mutex_exit(&(kctx->auk_svc_lock));
-		return (EBUSY);
-	}
-	kctx->auk_svc_busy = 1;
-	mutex_exit(&(kctx->auk_svc_lock));
-
-	/*
-	 * convert file pointer to file descriptor
-	 *   Note: fd ref count incremented here.
-	 */
-	if ((fp = (struct file *)getf(fd)) == NULL) {
-		mutex_enter(&(kctx->auk_svc_lock));
-		kctx->auk_svc_busy = 0;
-		mutex_exit(&(kctx->auk_svc_lock));
-		return (EBADF);
-	}
-
-	vp = fp->f_vnode;
-
-	kctx->auk_file_stat.af_currsz = 0;
-
-	/*
-	 * Wait for work, until a signal arrives,
-	 * or until auditing is disabled.
-	 */
-	while (!error) {
-	    if (kctx->auk_auditstate == AUC_AUDITING) {
-		mutex_enter(&(kctx->auk_queue.lock));
-		    /* nothing on the audit queue */
-		while (kctx->auk_queue.head == NULL) {
-			/* safety check. kick writer awake */
-		    if (kctx->auk_queue.wt_block)
-			cv_broadcast(&(kctx->auk_queue.write_cv));
-			/* sleep waiting for things to to */
-		    kctx->auk_queue.rd_block = 1;
-		    AS_INC(as_rblocked, 1, kctx);
-		    if (!cv_wait_sig(&(kctx->auk_queue.read_cv),
-			&(kctx->auk_queue.lock))) {
-				/* interrupted system call */
-			kctx->auk_queue.rd_block = 0;
-			mutex_exit(&(kctx->auk_queue.lock));
-			error = ((kctx->auk_auditstate == AUC_AUDITING) ||
-			    (kctx->auk_auditstate == AUC_NOSPACE)) ?
-			    EINTR : EINVAL;
-			mutex_enter(&(kctx->auk_svc_lock));
-			kctx->auk_svc_busy = 0;
-			mutex_exit(&(kctx->auk_svc_lock));
-
-		/* decrement file descriptor reference count */
-			releasef(fd);
-			(void) timeout(audit_dont_stop, kctx, au_resid);
-			return (error);
-		    }
-		    kctx->auk_queue.rd_block = 0;
-		}
-		mutex_exit(&(kctx->auk_queue.lock));
-
-			/* do as much as we can */
-		error = au_doio(vp, limit);
-
-		/* if we ran out of space, be sure to fire off timeout */
-		if (error == ENOSPC)
-			(void) timeout(audit_dont_stop, kctx, au_resid);
-
-	    } else	/* auditing turned off while we slept */
-		    break;
-	}
-
-	/*
-	 * decrement file descriptor reference count
-	 */
-	releasef(fd);
-
-	/*
-	 * If auditing has been disabled quit processing
-	 */
-	if (!(kctx->auk_auditstate == AUC_AUDITING ||
-	    kctx->auk_auditstate == AUC_NOSPACE))
-		error = EINVAL;
-
-	mutex_enter(&(kctx->auk_svc_lock));
-	kctx->auk_svc_busy = 0;
-	mutex_exit(&(kctx->auk_svc_lock));
-
-	return (error);
 }
 
 static int

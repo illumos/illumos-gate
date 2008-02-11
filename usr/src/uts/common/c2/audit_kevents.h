@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,7 +172,7 @@ extern "C" {
 #define	AUE_SETAUDIT		133	/* =aa setaudit(2) */
 #define	AUE_GETUSERAUDIT	134	/* =no getuseraudit(2) */
 #define	AUE_SETUSERAUDIT	135	/* =no setuseraudit(2) */
-#define	AUE_AUDITSVC		136	/* =as auditsvc(2) */
+/* 				136	    OBSOLETE */
 /*				137	    OBSOLETE */
 #define	AUE_AUDITON		138	/* =no auditon(2) */
 #define	AUE_AUDITON_GTERMID	139	/* =no auditctl(2): GETTERMID */

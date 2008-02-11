@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -309,7 +309,6 @@ struct au_kcontext {
 
 	struct audit_queue	auk_queue;
 
-	char			*auk_buffer;	/* auditsvc output */
 	au_dbuf_t		*auk_dbuffer;	/* auditdoor output */
 
 	au_stat_t		auk_statistics;
@@ -323,9 +322,9 @@ struct au_kcontext {
 	taskq_t			*auk_taskq;	/* output thread */
 
 	/* Only one audit svc per zone at a time */
+	/* With the elimination of auditsvc, can this also go? see 6648414 */
 	kmutex_t 		auk_svc_lock;
-	/* 1 during auditsvc, 2 during auditdoor */
-	int			auk_svc_busy;
+
 	au_state_t		auk_ets[MAX_KEVENTS + 1];
 };
 #ifndef AUK_CONTEXT_T

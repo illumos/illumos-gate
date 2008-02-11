@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,7 +231,6 @@ extern int	getfauditflags(au_mask_t *, au_mask_t *, au_mask_t *);
 extern int	audit(char *, int);
 extern int	auditon(int, caddr_t, int);
 extern int	auditstat(au_stat_t *);
-extern int	auditsvc(int, int);
 extern int	auditdoor(int);
 extern int	getaudit(auditinfo_t *);
 extern int	getaudit_addr(auditinfo_addr_t *, int);

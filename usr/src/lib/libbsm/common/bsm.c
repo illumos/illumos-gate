@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +32,6 @@
 #include <sys/param.h>
 
 const char *bsm_dom = TEXT_DOMAIN;
-
-int
-auditsvc(int fd, int limit)
-{
-	return (syscall(SYS_auditsys, BSM_AUDITSVC, fd, limit));
-}
 
 int
 auditdoor(int fd)

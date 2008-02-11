@@ -191,7 +191,8 @@
 133:AUE_SETAUDIT:setaudit(2):aa
 134:AUE_GETUSERAUDIT:getuseraudit(2):no
 135:AUE_SETUSERAUDIT:setuseraudit(2):no
-136:AUE_AUDITSVC:auditsvc(2):as
+# AUE_AUDITSVC is a placeholder and will not be generated
+136:AUE_AUDITSVC:auditsvc(2) - place holder:no
 # AUE_AUDITON is a placeholder and will not be generated
 138:AUE_AUDITON:auditon(2) - place holder:no
 139:AUE_AUDITON_GTERMID:auditon(2) - GETTERMID command:no

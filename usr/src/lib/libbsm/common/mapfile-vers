@@ -63,7 +63,6 @@ SUNW_0.7 {
 	au_close;
 	audit;
 	auditon;
-	auditsvc;
 	au_open;
 	au_preselect;
 	au_to_arg;

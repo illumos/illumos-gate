@@ -2,7 +2,7 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+## Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 ## Use is subject to license terms.
 ##
 ## CDDL HEADER START
@@ -424,33 +424,7 @@ label=AUE_AUDITSTAT
   skip=Not used.
 
 label=AUE_AUDITSVC
-# audit_event.c mismatch with old BSM manual
-# audit_event.c code is used
-  # As documented:
-  # case=With a valid file descriptor
-  #   format=[path]:[attr]
-  # case=With an invalid file descriptor
-  #   format=arg1
-  #     comment=1, fd, "no path fd"
-  # As implemented:
-  case=With a valid file descriptor
-    format=[path]:[attr]:[arg]1
-      comment=3, limit, "limit"
-  case=With an invalid file descriptor
-    format=[arg]1:[arg]2
-      comment=1, fd, "no path fd":
-      comment=3, limit, "limit"
-#	header,168,2,auditsvc(2),,Mon May 15 09:19:49 2000, + 9999915 msec
-#	path,/export/home/CC_final/icenine/arv/auditsvc/obj_succ
-#	attribute,100644,root,other,8388608,31279,0
-#	argument,3,0xa,limit
-#	subject,tuser10,root,other,root,other,4132,367,255 197121 tmach1
-#	return,failure: Device busy,-1
-#	trailer,168
-#	header,68,2,auditsvc(2),,Mon May 15 09:20:01 2000, + 409999984 msec
-#	subject,tuser10,tuser10,other,tuser10,other,4261,367,255 197121 tmach1
-#	return,failure: Not owner,-1
-#	trailer,68
+  skip=Not used.
 
 label=AUE_AUDITSYS
   skip=Not used. (Place holder for various auditing events.)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2639,9 +2639,6 @@ aui_auditsys(au_event_t e)
 	case BSM_AUDIT:
 		e = AUE_AUDIT;
 		break;
-	case BSM_AUDITSVC:
-		e = AUE_AUDITSVC;
-		break;
 	case BSM_GETPORTAUDIT:
 		e = AUE_GETPORTAUDIT;
 		break;
@@ -2726,9 +2723,6 @@ aus_auditsys(struct t_audit_data *tad)
 {
 	klwp_t *clwp = ttolwp(curthread);
 	uintptr_t a1, a2;
-	struct file *fp;
-	struct f_audit_data *fad;
-	struct vnode *vp;
 	STRUCT_DECL(auditinfo, ainfo);
 	STRUCT_DECL(auditinfo_addr, ainfo_addr);
 	au_evclass_map_t event;
@@ -2814,28 +2808,6 @@ aus_auditsys(struct t_audit_data *tad)
 		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_mask.as_failure)));
 		au_uwrite(au_to_arg32((char)1, "asid",
 		    (uint32_t)STRUCT_FGET(ainfo_addr, ai_asid)));
-		break;
-	case AUE_AUDITSVC:
-		/*
-		 * convert file pointer to file descriptor
-		 * Note: fd ref count incremented here
-		 */
-		if ((fp = getf((uint_t)a1)) == NULL)
-			return;
-		fad = F2A(fp);
-		if (fad->fad_aupath != NULL) {
-			au_uwrite(au_to_path(fad->fad_aupath));
-		} else {
-			au_uwrite(au_to_arg32(2, "no path: fd", (uint32_t)a1));
-		}
-
-		vp = fp->f_vnode;	/* include vnode attributes */
-		audit_attributes(vp);
-
-		/* decrement file descriptor ref count */
-		releasef((uint_t)a1);
-
-		au_uwrite(au_to_arg32(3, "limit", (uint32_t)a2));
 		break;
 	case AUE_AUDITON_SETKMASK:
 		if (copyin((caddr_t)a2, &mask, sizeof (au_mask_t)))

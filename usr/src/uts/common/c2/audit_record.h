@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,7 +314,6 @@ void	au_zone_setup();
 void	au_enqueue(au_kcontext_t *, au_buff_t *, adr_t *, adr_t *, int, int);
 int	au_doorio(au_kcontext_t *);
 int	au_doormsg(au_kcontext_t *, uint32_t, void *);
-int	au_doio(struct vnode *, int);
 int	au_token_size(token_t *);
 int	au_append_rec(au_buff_t *, au_buff_t *, int);
 int	au_append_buf(const char *, int, au_buff_t *);

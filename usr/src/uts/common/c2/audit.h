@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,7 +219,7 @@ typedef au_id_t auid_t;
 #define	BSM_SETUSERAUDIT	24
 #define	BSM_AUDIT		25
 /* 				26	OBSOLETE */
-#define	BSM_AUDITSVC		27	/* EOL announced for Sol 10 */
+/* 				27	EOL announced for Sol 10 */
 #define	BSM_AUDITON		28
 #define	BSM_AUDITCTL		29
 #define	BSM_GETKERNSTATE	30
