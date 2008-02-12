@@ -53,6 +53,7 @@
 
 /* Debug flags - defined in sata.h */
 int	sata_debug_flags = 0;
+int	sata_msg = 0;
 
 /*
  * Flags enabling selected SATA HBA framework functionality
@@ -5103,19 +5104,22 @@ sata_txlt_download_mcode_cmd_completion(sata_pkt_t *sata_pkt)
 			break;
 
 		case SATA_PKT_TIMEOUT:
-			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
-			scsipkt->pkt_reason = CMD_INCOMPLETE;
+			scsipkt->pkt_reason = CMD_TIMEOUT;
+			scsipkt->pkt_statistics |=
+			    STAT_TIMEOUT | STAT_DEV_RESET;
 			/* No extended sense key ? */
 			break;
 
 		case SATA_PKT_ABORTED:
 			scsipkt->pkt_reason = CMD_ABORTED;
+			scsipkt->pkt_statistics |= STAT_ABORTED;
 			/* No extended sense key ? */
 			break;
 
 		case SATA_PKT_RESET:
 			/* pkt aborted by an explicit reset from a host */
 			scsipkt->pkt_reason = CMD_RESET;
+			scsipkt->pkt_statistics |= STAT_DEV_RESET;
 			break;
 
 		default:
@@ -5707,18 +5711,22 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 			break;
 
 		case SATA_PKT_TIMEOUT:
-			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
-			scsipkt->pkt_reason = CMD_INCOMPLETE;
-			/* No extended sense key ? */
+			scsipkt->pkt_reason = CMD_TIMEOUT;
+			scsipkt->pkt_statistics |=
+			    STAT_TIMEOUT | STAT_DEV_RESET;
+			sense->es_key = KEY_ABORTED_COMMAND;
 			break;
 
 		case SATA_PKT_ABORTED:
 			scsipkt->pkt_reason = CMD_ABORTED;
-			/* No extended sense key ? */
+			scsipkt->pkt_statistics |= STAT_ABORTED;
+			sense->es_key = KEY_ABORTED_COMMAND;
 			break;
 
 		case SATA_PKT_RESET:
 			scsipkt->pkt_reason = CMD_RESET;
+			scsipkt->pkt_statistics |= STAT_DEV_RESET;
+			sense->es_key = KEY_ABORTED_COMMAND;
 			break;
 
 		default:
@@ -5791,19 +5799,22 @@ sata_txlt_nodata_cmd_completion(sata_pkt_t *sata_pkt)
 			break;
 
 		case SATA_PKT_TIMEOUT:
-			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
-			scsipkt->pkt_reason = CMD_INCOMPLETE;
+			scsipkt->pkt_reason = CMD_TIMEOUT;
+			scsipkt->pkt_statistics |=
+			    STAT_TIMEOUT | STAT_DEV_RESET;
 			/* No extended sense key ? */
 			break;
 
 		case SATA_PKT_ABORTED:
 			scsipkt->pkt_reason = CMD_ABORTED;
+			scsipkt->pkt_statistics |= STAT_ABORTED;
 			/* No extended sense key ? */
 			break;
 
 		case SATA_PKT_RESET:
 			/* pkt aborted by an explicit reset from a host */
 			scsipkt->pkt_reason = CMD_RESET;
+			scsipkt->pkt_statistics |= STAT_DEV_RESET;
 			break;
 
 		default:
@@ -7163,14 +7174,12 @@ sata_txlt_atapi_completion(sata_pkt_t *sata_pkt)
 				    STATE_GOT_TARGET | STATE_SENT_CMD |
 				    STATE_GOT_STATUS);
 				sense->es_key = KEY_HARDWARE_ERROR;
-
-				/* No extended sense key - no info available */
-				scsipkt->pkt_reason = CMD_INCOMPLETE;
 				break;
 
 			case SATA_PKT_TIMEOUT:
-				/* scsipkt->pkt_reason = CMD_TIMEOUT; */
-				/* No extended sense key */
+				scsipkt->pkt_reason = CMD_TIMEOUT;
+				scsipkt->pkt_statistics |=
+				    STAT_TIMEOUT | STAT_DEV_RESET;
 				/*
 				 * Need to check if HARDWARE_ERROR/
 				 * TIMEOUT_ON_LOGICAL_UNIT 4/3E/2 would be more
@@ -7180,11 +7189,13 @@ sata_txlt_atapi_completion(sata_pkt_t *sata_pkt)
 
 			case SATA_PKT_ABORTED:
 				scsipkt->pkt_reason = CMD_ABORTED;
+				scsipkt->pkt_statistics |= STAT_ABORTED;
 				/* Should we set key COMMAND_ABPRTED? */
 				break;
 
 			case SATA_PKT_RESET:
 				scsipkt->pkt_reason = CMD_RESET;
+				scsipkt->pkt_statistics |= STAT_DEV_RESET;
 				/*
 				 * May be we should set Unit Attention /
 				 * Reset. Perhaps the same should be
@@ -12643,7 +12654,7 @@ update_sdinfo:
 		 * Cannot get device identification - retry later
 		 */
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "%s cannot re-fetch device identify data\n"));
+		    "%s re-fetch device identify data\n", finfo));
 		rval = SATA_FAILURE;
 	}
 	/* Copy device sata info. */
@@ -13352,15 +13363,14 @@ sata_xlate_errors(sata_pkt_txlate_t *spx)
 		break;
 
 	case SATA_PKT_TIMEOUT:
-		/*
-		 * scsipkt->pkt_reason = CMD_TIMEOUT; This causes problems.
-		 */
-		scsipkt->pkt_reason = CMD_INCOMPLETE;
+		scsipkt->pkt_reason = CMD_TIMEOUT;
+		scsipkt->pkt_statistics |= STAT_TIMEOUT | STAT_DEV_RESET;
 		/* No extended sense key */
 		break;
 
 	case SATA_PKT_ABORTED:
 		scsipkt->pkt_reason = CMD_ABORTED;
+		scsipkt->pkt_statistics |= STAT_ABORTED;
 		/* No extended sense key */
 		break;
 
@@ -13370,6 +13380,7 @@ sata_xlate_errors(sata_pkt_txlate_t *spx)
 		 * a host, or due to error recovery
 		 */
 		scsipkt->pkt_reason = CMD_RESET;
+		scsipkt->pkt_statistics |= STAT_DEV_RESET;
 		break;
 
 	default:
@@ -13410,8 +13421,14 @@ sata_log(sata_hba_inst_t *sata_hba_inst, uint_t level, char *fmt, ...)
 			cmn_err(level, "?%s:\n %s\n", pathname, sata_log_buf);
 		else
 			cmn_err(level, "%s:\n %s\n", pathname, sata_log_buf);
-	} else
-		cmn_err(level, "%s:\n %s", pathname, sata_log_buf);
+	} else {
+		if (level != CE_NOTE) {
+			cmn_err(level, "%s:\n %s", pathname, sata_log_buf);
+		} else if (sata_msg) {
+			cmn_err(level, "%s:\n %s", pathname,
+			    sata_log_buf);
+		}
+	}
 
 	mutex_exit(&sata_log_mutex);
 }
