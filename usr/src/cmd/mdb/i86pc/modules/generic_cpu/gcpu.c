@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,9 @@ typedef struct cmi_hdl_impl {
 	void *cmih_mcdata;			/* Memory-controller data */
 } cmi_hdl_impl_t;
 
-struct cmi_hdl_hashent {
-	volatile uint32_t cmhe_refcnt;
-	cmi_hdl_impl_t *cmhe_hdlp;
+struct cmi_hdl_arr_ent {
+	volatile uint32_t cmae_refcnt;
+	cmi_hdl_impl_t *cmae_hdlp;
 };
 
 typedef struct cmi {
@@ -74,46 +74,46 @@ struct cms_ctl {
 };
 
 #define	CMI_MAX_CHIPS			16
-#define	CMI_MAX_CORES_PER_CHIP		4
+#define	CMI_MAX_CORES_PER_CHIP		8
 #define	CMI_MAX_STRANDS_PER_CORE	2
 #define	CMI_HDL_HASHSZ (CMI_MAX_CHIPS * CMI_MAX_CORES_PER_CHIP * \
     CMI_MAX_STRANDS_PER_CORE)
 
 struct cmih_walk_state {
 	int idx;
-	struct cmi_hdl_hashent *hdlhash;
+	struct cmi_hdl_arr_ent *arrent;
 };
 
 static int
 cmih_walk_init(mdb_walk_state_t *wsp)
 {
-	size_t sz = CMI_HDL_HASHSZ * sizeof (struct cmi_hdl_hashent);
-	struct cmih_walk_state *hwsp;
+	size_t sz = CMI_HDL_HASHSZ * sizeof (struct cmi_hdl_arr_ent);
+	struct cmih_walk_state *awsp;
 	uintptr_t addr;
 
 	if (wsp->walk_addr != NULL) {
-		mdb_warn("cmi_hdl is a global walker\n");
+		mdb_warn("cmihdl is a global walker\n");
 		return (WALK_ERR);
 	}
 
-	if (mdb_readvar(&addr, "cmi_hdl_hash") == -1) {
-		mdb_warn("read of cmi_hdl_hash failed");
+	if (mdb_readvar(&addr, "cmi_hdl_arr") == -1) {
+		mdb_warn("read of cmi_hdl_arr failed");
 		return (WALK_ERR);
 	} else if (addr == NULL) {
 		return (WALK_DONE);
 	}
 
-	wsp->walk_data = hwsp =
+	wsp->walk_data = awsp =
 	    mdb_zalloc(sizeof (struct cmih_walk_state), UM_SLEEP);
-	hwsp->hdlhash = mdb_alloc(sz, UM_SLEEP);
+	awsp->arrent = mdb_alloc(sz, UM_SLEEP);
 
-	if (mdb_vread(hwsp->hdlhash, sz, addr) != sz) {
-		mdb_warn("read of cmi_hdl_hash array at 0x%p failed", addr);
+	if (mdb_vread(awsp->arrent, sz, addr) != sz) {
+		mdb_warn("read of cmi_hdl_arr array at 0x%p failed", addr);
 		return (WALK_ERR);
 	}
 
 	wsp->walk_addr =
-	    (uintptr_t)((struct cmi_hdl_hashent *)wsp->walk_data)->cmhe_hdlp;
+	    (uintptr_t)((struct cmi_hdl_arr_ent *)wsp->walk_data)->cmae_hdlp;
 
 	return (WALK_NEXT);
 }
@@ -121,13 +121,13 @@ cmih_walk_init(mdb_walk_state_t *wsp)
 static int
 cmih_walk_step(mdb_walk_state_t *wsp)
 {
-	struct cmih_walk_state *hwsp = wsp->walk_data;
-	uintptr_t addr = (uintptr_t)(hwsp->hdlhash)[hwsp->idx].cmhe_hdlp;
+	struct cmih_walk_state *awsp = wsp->walk_data;
+	uintptr_t addr = (uintptr_t)(awsp->arrent)[awsp->idx].cmae_hdlp;
 	cmi_hdl_impl_t hdl;
 	int rv;
 
 	if (wsp->walk_addr == NULL || addr == NULL)
-		return (++hwsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
+		return (++awsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
 
 	if (mdb_vread(&hdl, sizeof (hdl), addr) != sizeof (hdl)) {
 		mdb_warn("read of handle at 0x%p failed", addr);
@@ -138,17 +138,17 @@ cmih_walk_step(mdb_walk_state_t *wsp)
 	    wsp->walk_cbdata)) != WALK_NEXT)
 		return (rv);
 
-	return (++hwsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
+	return (++awsp->idx < CMI_HDL_HASHSZ ? WALK_NEXT : WALK_DONE);
 }
 
 static void
 cmih_walk_fini(mdb_walk_state_t *wsp)
 {
-	struct cmih_walk_state *hwsp = wsp->walk_data;
+	struct cmih_walk_state *awsp = wsp->walk_data;
 
-	if (hwsp != NULL) {
-		if (hwsp->hdlhash != NULL)
-			mdb_free(hwsp->hdlhash, CMI_HDL_HASHSZ *
+	if (awsp != NULL) {
+		if (awsp->arrent != NULL)
+			mdb_free(awsp->arrent, CMI_HDL_HASHSZ *
 			    sizeof (struct cmih_walk_state));
 		mdb_free(wsp->walk_data, sizeof (struct cmih_walk_state));
 	}

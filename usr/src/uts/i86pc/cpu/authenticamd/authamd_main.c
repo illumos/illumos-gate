@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -484,14 +484,15 @@ authamd_init(cmi_hdl_t hdl, void **datap)
 
 	if ((sp = authamd_shared[chipid]) == NULL) {
 		sp = kmem_zalloc(sizeof (struct authamd_chipshared), KM_SLEEP);
+		sp->acs_chipid = chipid;
+		sp->acs_family = family;
+		sp->acs_rev = cmi_hdl_chiprev(hdl);
+		membar_producer();
+
 		osp = atomic_cas_ptr(&authamd_shared[chipid], NULL, sp);
 		if (osp != NULL) {
 			kmem_free(sp, sizeof (struct authamd_chipshared));
 			sp = osp;
-		} else {
-			sp->acs_chipid = chipid;
-			sp->acs_family = family;
-			sp->acs_rev = cmi_hdl_chiprev(hdl);
 		}
 	}
 	authamd->amd_shared = sp;

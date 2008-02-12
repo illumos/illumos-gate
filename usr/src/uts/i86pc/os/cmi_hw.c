@@ -93,22 +93,44 @@ typedef struct cmi_hdl_impl {
  * that info is not readily available if we are virtualized so
  * for now we stick with the dumb approach.
  */
-#define	CMI_MAX_CHIPS			16
-#define	CMI_MAX_CORES_PER_CHIP		8
-#define	CMI_MAX_STRANDS_PER_CORE	2
-#define	CMI_HDL_HASHSZ (CMI_MAX_CHIPS * CMI_MAX_CORES_PER_CHIP * \
+#define	CMI_MAX_CHIPS_NBITS		4	/* 16 chips packages max */
+#define	CMI_MAX_CORES_PER_CHIP_NBITS	3	/* 8 cores per chip max */
+#define	CMI_MAX_STRANDS_PER_CORE_NBITS	1	/* 2 strands per core max */
+
+#define	CMI_MAX_CHIPS			(1 << CMI_MAX_CHIPS_NBITS)
+#define	CMI_MAX_CORES_PER_CHIP		(1 << CMI_MAX_CORES_PER_CHIP_NBITS)
+#define	CMI_MAX_STRANDS_PER_CORE	(1 << CMI_MAX_STRANDS_PER_CORE_NBITS)
+
+/*
+ * Handle array indexing.
+ *	[7:4] = Chip package.
+ *	[3:1] = Core in package,
+ *	[0:0] = Strand in core,
+ */
+#define	CMI_HDL_ARR_IDX_CHIP(chipid) \
+	(((chipid) & (CMI_MAX_CHIPS - 1)) << \
+	(CMI_MAX_STRANDS_PER_CORE_NBITS + CMI_MAX_CORES_PER_CHIP_NBITS))
+
+#define	CMI_HDL_ARR_IDX_CORE(coreid) \
+	(((coreid) & (CMI_MAX_CORES_PER_CHIP - 1)) << \
+	CMI_MAX_STRANDS_PER_CORE_NBITS)
+
+#define	CMI_HDL_ARR_IDX_STRAND(strandid) \
+	(((strandid) & (CMI_MAX_STRANDS_PER_CORE - 1)))
+
+#define	CMI_HDL_ARR_IDX(chipid, coreid, strandid) \
+	(CMI_HDL_ARR_IDX_CHIP(chipid) | CMI_HDL_ARR_IDX_CORE(coreid) | \
+	CMI_HDL_ARR_IDX_STRAND(strandid))
+
+#define	CMI_HDL_ARR_SZ (CMI_MAX_CHIPS * CMI_MAX_CORES_PER_CHIP * \
     CMI_MAX_STRANDS_PER_CORE)
 
-struct cmi_hdl_hashent {
-	volatile uint32_t cmhe_refcnt;
-	cmi_hdl_impl_t *cmhe_hdlp;
+struct cmi_hdl_arr_ent {
+	volatile uint32_t cmae_refcnt;
+	cmi_hdl_impl_t *cmae_hdlp;
 };
 
-static struct cmi_hdl_hashent *cmi_hdl_hash;
-
-#define	CMI_HDL_HASHIDX(chipid, coreid, strandid) \
-	((chipid) * CMI_MAX_CHIPS + (coreid) * CMI_MAX_CORES_PER_CHIP + \
-	(strandid))
+static struct cmi_hdl_arr_ent *cmi_hdl_arr;
 
 /*
  * Controls where we will source PCI config space data.
@@ -750,17 +772,17 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_HWOK | CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_HWOK | CMI_MSR_FLAG_WR_INTERPOSEOK;
 
-	if (cmi_hdl_hash == NULL) {
-		size_t sz = CMI_HDL_HASHSZ * sizeof (struct cmi_hdl_hashent);
-		void *hash = kmem_zalloc(sz, KM_SLEEP);
+	if (cmi_hdl_arr == NULL) {
+		size_t sz = CMI_HDL_ARR_SZ * sizeof (struct cmi_hdl_arr_ent);
+		void *arr = kmem_zalloc(sz, KM_SLEEP);
 
-		if (atomic_cas_ptr(&cmi_hdl_hash, NULL, hash) != NULL)
-			kmem_free(hash, sz); /* someone beat us */
+		if (atomic_cas_ptr(&cmi_hdl_arr, NULL, arr) != NULL)
+			kmem_free(arr, sz); /* someone beat us */
 	}
 
-	idx = CMI_HDL_HASHIDX(chipid, coreid, strandid);
-	if (cmi_hdl_hash[idx].cmhe_refcnt != 0 ||
-	    cmi_hdl_hash[idx].cmhe_hdlp != NULL) {
+	idx = CMI_HDL_ARR_IDX(chipid, coreid, strandid);
+	if (cmi_hdl_arr[idx].cmae_refcnt != 0 ||
+	    cmi_hdl_arr[idx].cmae_hdlp != NULL) {
 		/*
 		 * Somehow this (chipid, coreid, strandid) id tuple has
 		 * already been assigned!  This indicates that the
@@ -786,9 +808,9 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	 * cmi_hdl_setcmi if it initializes) so consumers of handles
 	 * should always be ready for that possibility.
 	 */
-	cmi_hdl_hash[idx].cmhe_hdlp = hdl;
-	hdl->cmih_refcntp = &cmi_hdl_hash[idx].cmhe_refcnt;
-	cmi_hdl_hash[idx].cmhe_refcnt = 1;
+	cmi_hdl_arr[idx].cmae_hdlp = hdl;
+	hdl->cmih_refcntp = &cmi_hdl_arr[idx].cmae_refcnt;
+	cmi_hdl_arr[idx].cmae_refcnt = 1;
 
 	return ((cmi_hdl_t)hdl);
 }
@@ -804,15 +826,15 @@ cmi_hdl_hold(cmi_hdl_t ophdl)
 }
 
 static int
-cmi_hdl_canref(int hashidx)
+cmi_hdl_canref(int arridx)
 {
 	volatile uint32_t *refcntp;
 	uint32_t refcnt;
 
-	if (cmi_hdl_hash == NULL)
+	if (cmi_hdl_arr == NULL)
 		return (0);
 
-	refcntp = &cmi_hdl_hash[hashidx].cmhe_refcnt;
+	refcntp = &cmi_hdl_arr[arridx].cmae_refcnt;
 	refcnt = *refcntp;
 
 	if (refcnt == 0) {
@@ -852,9 +874,9 @@ cmi_hdl_rele(cmi_hdl_t ophdl)
 	if (atomic_dec_32_nv(hdl->cmih_refcntp) > 0)
 		return;
 
-	idx = CMI_HDL_HASHIDX(hdl->cmih_chipid, hdl->cmih_coreid,
+	idx = CMI_HDL_ARR_IDX(hdl->cmih_chipid, hdl->cmih_coreid,
 	    hdl->cmih_strandid);
-	cmi_hdl_hash[idx].cmhe_hdlp = NULL;
+	cmi_hdl_arr[idx].cmae_hdlp = NULL;
 
 	kmem_free(hdl, sizeof (*hdl));
 }
@@ -897,17 +919,17 @@ cmi_hdl_t
 cmi_hdl_lookup(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
     uint_t strandid)
 {
-	int idx = CMI_HDL_HASHIDX(chipid, coreid, strandid);
+	int idx = CMI_HDL_ARR_IDX(chipid, coreid, strandid);
 
 	if (!cmi_hdl_canref(idx))
 		return (NULL);
 
-	if (cmi_hdl_hash[idx].cmhe_hdlp->cmih_class != class) {
-		cmi_hdl_rele((cmi_hdl_t)cmi_hdl_hash[idx].cmhe_hdlp);
+	if (cmi_hdl_arr[idx].cmae_hdlp->cmih_class != class) {
+		cmi_hdl_rele((cmi_hdl_t)cmi_hdl_arr[idx].cmae_hdlp);
 		return (NULL);
 	}
 
-	return ((cmi_hdl_t)cmi_hdl_hash[idx].cmhe_hdlp);
+	return ((cmi_hdl_t)cmi_hdl_arr[idx].cmae_hdlp);
 }
 
 cmi_hdl_t
@@ -915,9 +937,9 @@ cmi_hdl_any(void)
 {
 	int i;
 
-	for (i = 0; i < CMI_HDL_HASHSZ; i++) {
+	for (i = 0; i < CMI_HDL_ARR_SZ; i++) {
 		if (cmi_hdl_canref(i))
-			return ((cmi_hdl_t)cmi_hdl_hash[i].cmhe_hdlp);
+			return ((cmi_hdl_t)cmi_hdl_arr[i].cmae_hdlp);
 	}
 
 	return (NULL);
@@ -929,9 +951,9 @@ cmi_hdl_walk(int (*cbfunc)(cmi_hdl_t, void *, void *, void *),
 {
 	int i;
 
-	for (i = 0; i < CMI_HDL_HASHSZ; i++) {
+	for (i = 0; i < CMI_HDL_ARR_SZ; i++) {
 		if (cmi_hdl_canref(i)) {
-			cmi_hdl_impl_t *hdl = cmi_hdl_hash[i].cmhe_hdlp;
+			cmi_hdl_impl_t *hdl = cmi_hdl_arr[i].cmae_hdlp;
 
 			if ((*cbfunc)((cmi_hdl_t)hdl, arg1, arg2, arg3) ==
 			    CMI_HDL_WALK_DONE) {

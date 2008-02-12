@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,12 +97,13 @@ ao_ms_init(cmi_hdl_t hdl, void **datap)
 	 */
 	if ((sp = ao_shared[chipid]) == NULL) {
 		sp = kmem_zalloc(sizeof (struct ao_chipshared), KM_SLEEP);
+		sp->aos_chiprev = cmi_hdl_chiprev(hdl);
+		membar_producer();
+
 		osp = atomic_cas_ptr(&ao_shared[chipid], NULL, sp);
 		if (osp != NULL) {
 			kmem_free(sp, sizeof (struct ao_chipshared));
 			sp = osp;
-		} else {
-			sp->aos_chiprev = cmi_hdl_chiprev(hdl);
 		}
 	}
 	ao->ao_ms_shared = sp;
