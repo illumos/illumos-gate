@@ -1165,6 +1165,12 @@ sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 				    " with protocol %s\n"), groupname,
 				    protocol);
 				ret = SA_DUPLICATE_NAME;
+			} else if (strcmp(groupname, "default") == 0 &&
+			    strcmp(protocol, "nfs") != 0) {
+				(void) printf(gettext(
+				    "Group \"%s\" only allows protocol "
+				    "\"%s\"\n"), groupname, "nfs");
+				ret = SA_INVALID_PROTOCOL;
 			}
 		} else {
 			/* must add new protocol */

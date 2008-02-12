@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <libintl.h>
 
 ssize_t scf_max_name_len;
 extern struct sa_proto_plugin *sap_proto_list;
@@ -141,19 +142,11 @@ sa_scf_init(sa_handle_impl_t ihandle)
 
 	handle->scf_state = SCH_STATE_INIT;
 	if (sa_get_instance(handle, "default") != SA_OK) {
-		char **protolist;
-		int numprotos, i;
 		sa_group_t defgrp;
 		defgrp = sa_create_group((sa_handle_t)ihandle, "default", NULL);
-		if (defgrp != NULL) {
-			numprotos = sa_get_protocols(
-			    &protolist);
-			for (i = 0; i < numprotos; i++)
-				(void) sa_create_optionset(defgrp,
-				    protolist[i]);
-			if (protolist != NULL)
-				free(protolist);
-		}
+		/* Only NFS enabled for "default" group. */
+		if (defgrp != NULL)
+			(void) sa_create_optionset(defgrp, "nfs");
 	}
 
 	return (handle);
@@ -882,9 +875,9 @@ sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
 	scf_iter_t *iter;
 	char *proto;
 	char *sectype;
-	int have_shares = 0;
-	int has_proto = 0;
-	int is_default = 0;
+	boolean_t have_shares = B_FALSE;
+	boolean_t is_default = B_FALSE;
+	boolean_t is_nfs = B_FALSE;
 	int ret = SA_OK;
 	int err;
 
@@ -906,7 +899,7 @@ sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
 		}
 		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)buff);
 		if (strcmp(buff, "default") == 0)
-			is_default++;
+			is_default = B_TRUE;
 
 		sa_extract_attrs(node, handle, instance);
 		/*
@@ -929,78 +922,97 @@ sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
 			/* Have a pgroup so sort it out */
 			ret = scf_pg_get_name(handle->pg, buff,
 			    scf_max_name_len);
-			if (ret  > 0) {
-				if (buff[0] == SA_SHARE_PG_PREFIX[0]) {
-					sa_share_from_pgroup(node, handle,
-					    handle->pg, buff);
-					have_shares++;
-				} else if (strncmp(buff, "optionset", 9) ==
-				    0) {
-					char *nodetype = "optionset";
-					/* Have an optionset */
-					sectype = NULL;
-					proto = strchr(buff, '_');
-					if (proto != NULL) {
-						*proto++ = '\0';
-						sectype = strchr(proto, '_');
-						if (sectype != NULL) {
-							*sectype++ = '\0';
-							nodetype = "security";
-						}
+			if (ret <= 0)
+				continue;
+			is_nfs = B_FALSE;
+
+			if (buff[0] == SA_SHARE_PG_PREFIX[0]) {
+				sa_share_from_pgroup(node, handle,
+				    handle->pg, buff);
+				have_shares = B_TRUE;
+			} else if (strncmp(buff, "optionset", 9) == 0) {
+				char *nodetype = "optionset";
+				/* Have an optionset */
+				sectype = NULL;
+				proto = strchr(buff, '_');
+				if (proto != NULL) {
+					*proto++ = '\0';
+					sectype = strchr(proto, '_');
+					if (sectype != NULL) {
+						*sectype++ = '\0';
+						nodetype = "security";
 					}
+					is_nfs = strcmp(proto, "nfs") == 0;
+				} else if (strlen(buff) > 9) {
+					/*
+					 * This can only occur if
+					 * someone has made changes
+					 * via an SMF command. Since
+					 * this would be an unknown
+					 * syntax, we just ignore it.
+					 */
+					continue;
+				}
+				/*
+				 * If the group is not "default" or is
+				 * "default" and is_nfs, then extract the
+				 * pgroup.  If it is_default and !is_nfs,
+				 * then we have an error and should remove
+				 * the extraneous protocols.  We don't care
+				 * about errors on scf_pg_delete since we
+				 * might not have permission during an
+				 * extract only.
+				 */
+				if (!is_default || is_nfs) {
 					ret = sa_extract_pgroup(node, handle,
 					    handle->pg, nodetype, proto,
 					    sectype);
-					has_proto++;
-				} else if (strncmp(buff, "security", 8) == 0) {
-					/*
-					 * Have a security (note that
-					 * this should change in the
-					 * future)
-					 */
-					proto = strchr(buff, '_');
-					sectype = NULL;
-					if (proto != NULL) {
-						*proto++ = '\0';
-						sectype = strchr(proto, '_');
-						if (sectype != NULL)
-							*sectype++ = '\0';
-						if (strcmp(proto, "default") ==
-						    0)
-							proto = NULL;
-					}
-					ret = sa_extract_pgroup(node, handle,
-					    handle->pg, "security", proto,
-					    sectype);
-					has_proto++;
+				} else {
+					err = scf_pg_delete(handle->pg);
+					if (err == 0)
+						(void) fprintf(stderr,
+						    dgettext(TEXT_DOMAIN,
+						    "Removed protocol \"%s\" "
+						    "from group \"default\"\n"),
+						    proto);
 				}
-				/* Ignore everything else */
+			} else if (strncmp(buff, "security", 8) == 0) {
+				/*
+				 * Have a security (note that
+				 * this should change in the
+				 * future)
+				 */
+				proto = strchr(buff, '_');
+				sectype = NULL;
+				if (proto != NULL) {
+					*proto++ = '\0';
+					sectype = strchr(proto, '_');
+					if (sectype != NULL)
+						*sectype++ = '\0';
+					if (strcmp(proto, "default") == 0)
+						proto = NULL;
+				}
+				ret = sa_extract_pgroup(node, handle,
+				    handle->pg, "security", proto, sectype);
 			}
+			/* Ignore everything else */
 		}
 		/*
 		 * Make sure we have a valid default group.
 		 * On first boot, default won't have any
 		 * protocols defined and won't be enabled (but
-		 * should be).
+		 * should be).  "default" only has NFS enabled on it.
 		 */
 		if (is_default) {
 			char *state = sa_get_group_attr((sa_group_t)node,
 			    "state");
-			char **protos;
-			int numprotos;
-			int i;
 
 			if (state == NULL) {
 				/* set attribute to enabled */
 				(void) sa_set_group_attr((sa_group_t)node,
 				    "state", "enabled");
-				/* We can assume no protocols */
-				numprotos = sa_get_protocols(&protos);
-				for (i = 0; i < numprotos; i++)
-					(void) sa_create_optionset(
-					    (sa_group_t)node, protos[i]);
-				if (numprotos > 0)
-					free(protos);
+				(void) sa_create_optionset((sa_group_t)node,
+				    "nfs");
 			} else {
 				sa_free_attr_string(state);
 			}
