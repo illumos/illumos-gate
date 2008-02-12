@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -687,22 +687,22 @@ ds_ldc_reconnect(ds_port_t *port)
 	ldc_status_t	ldc_state;
 	int		rv;
 	ldc_handle_t	ldc_hdl;
-	int		read_held;
 	int		write_held;
 	char		ebuf[DS_EBUFSIZE];
 
-	ldc_hdl = port->ldc.hdl;
-
-	read_held = RW_READ_HELD(&ds_svcs.rwlock);
+	/*
+	 * We can enter this code holding write lock via ds_handle_init_ack,
+	 * ds_handle_reg_nack, ds_handle_unreg_req, and ds_handle_nack.  We
+	 * do not enter this code ever holding the read lock.
+	 */
 	write_held = RW_WRITE_HELD(&ds_svcs.rwlock);
-	if (read_held) {
-		if (!rw_tryupgrade(&ds_svcs.rwlock)) {
-			rw_exit(&ds_svcs.rwlock);
-			rw_enter(&ds_svcs.rwlock, RW_WRITER);
-		}
-	} else if (!write_held) {
+	if (!write_held) {
 		rw_enter(&ds_svcs.rwlock, RW_WRITER);
 	}
+
+	mutex_enter(&port->lock);
+
+	ldc_hdl = port->ldc.hdl;
 
 	/* reset the port state */
 	ds_port_reset(port);
@@ -725,9 +725,8 @@ ds_ldc_reconnect(ds_port_t *port)
 		DS_DBG_LDC("ds@%lx: ds_ldc_reconnect: succeeded", port->id);
 	}
 
-	if (read_held) {
-		rw_downgrade(&ds_svcs.rwlock);
-	} else if (!write_held) {
+	mutex_exit(&port->lock);
+	if (!write_held) {
 		rw_exit(&ds_svcs.rwlock);
 	}
 
@@ -768,13 +767,7 @@ ds_ldc_cb(uint64_t event, caddr_t arg)
 
 		ASSERT((event & (LDC_EVT_UP | LDC_EVT_READ)) == 0);
 
-		rw_enter(&ds_svcs.rwlock, RW_WRITER);
-		mutex_enter(&port->lock);
-
 		rv = ds_ldc_reconnect(port);
-
-		mutex_exit(&port->lock);
-		rw_exit(&ds_svcs.rwlock);
 
 		return (rv);
 	}
@@ -845,7 +838,6 @@ ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep)
 
 		if ((rv = ldc_read(port->ldc.hdl, msgp, &nbytes)) != 0) {
 			if (rv == ECONNRESET) {
-				(void) ds_ldc_reconnect(port);
 				break;
 			} else if (rv != EAGAIN) {
 				cmn_err(CE_NOTE, "ds@%lx: ds_recv_msg: %s",
@@ -936,7 +928,7 @@ ds_handle_recv(void *arg)
 
 		/* read in the message header */
 		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
-			continue;
+			break;
 		}
 
 		if (read_size < DS_HDR_SZ) {
@@ -964,7 +956,7 @@ ds_handle_recv(void *arg)
 		/* read in the message body */
 		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
 			kmem_free(msg, msglen);
-			continue;
+			break;
 		}
 
 		/* validate the size of the message */
@@ -1001,11 +993,11 @@ ds_handle_recv(void *arg)
 
 	}
 
+	mutex_exit(&port->lock);
+
 	if (rv == ECONNRESET) {
 		(void) ds_ldc_reconnect(port);
 	}
-
-	mutex_exit(&port->lock);
 }
 
 static void
@@ -1594,8 +1586,8 @@ ds_handle_data(ds_port_t *port, caddr_t buf, size_t len)
 	if ((svc = ds_get_svc(data->svc_handle)) == NULL) {
 		cmn_err(CE_NOTE, "ds@%lx: <data: invalid handle 0x%lx",
 		    port->id, data->svc_handle);
-		ds_send_data_nack(port, data->svc_handle);
 		rw_exit(&ds_svcs.rwlock);
+		ds_send_data_nack(port, data->svc_handle);
 		return;
 	}
 
@@ -1669,7 +1661,9 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	do {
 		if ((rv = ldc_write(port->ldc.hdl, currp, &msglen)) != 0) {
 			if (rv == ECONNRESET) {
+				mutex_exit(&port->lock);
 				(void) ds_ldc_reconnect(port);
+				mutex_enter(&port->lock);
 				return (rv);
 			} else if ((rv == EWOULDBLOCK) &&
 			    (loopcnt++ < ds_retries)) {
@@ -2888,6 +2882,9 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 		return (EINVAL);
 	}
 
+	mutex_exit(&port->lock);
+	rw_exit(&ds_svcs.rwlock);
+
 	hdrlen = DS_HDR_SZ + sizeof (ds_data_handle_t);
 
 	msg = kmem_zalloc(len + hdrlen, KM_SLEEP);
@@ -2908,14 +2905,16 @@ ds_cap_send(ds_svc_hdl_t hdl, void *buf, size_t len)
 	DS_DBG("ds@%lx: data>: hdl=0x%09lx, len=%ld, payload_len=%d\n",
 	    port->id, svc->hdl, msglen, hdr->payload_len);
 
+	mutex_enter(&port->lock);
+
 	if ((rv = ds_send_msg(port, msg, msglen)) != 0) {
 		rv = (rv == EIO) ? ECONNRESET : rv;
 	}
 
+	mutex_exit(&port->lock);
+
 	kmem_free(msg, msglen);
 
-	mutex_exit(&port->lock);
-	rw_exit(&ds_svcs.rwlock);
 
 	return (rv);
 }
