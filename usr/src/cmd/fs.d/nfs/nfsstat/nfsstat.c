@@ -803,17 +803,16 @@ req_print(kstat_t *req, kstat_t *req_old, int ver, int field_width,
 			    : knp[j].value.ui64), per);
 			printf("%-*s", field_width, fixlen);
 		}
-		if (zflag) {
-			for (i = 0; i < req->ks_ndata; i++)
-				knp[i].value.ui64 = 0;
-		}
 		printf("\n");
-		if (knp_old != NULL)
-			kstat_copy(req, req_old, 1);
-		else
-			kstat_copy(req, req_old, 0);
-
 	}
+	if (zflag) {
+		for (i = 0; i < req->ks_ndata; i++)
+			knp[i].value.ui64 = 0;
+	}
+	if (knp_old != NULL)
+		kstat_copy(req, req_old, 1);
+	else
+		kstat_copy(req, req_old, 0);
 }
 
 /*
