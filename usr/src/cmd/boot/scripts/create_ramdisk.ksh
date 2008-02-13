@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -186,7 +186,7 @@ function copy_files
 	do
 		if [ $compress = yes ]; then
 			dir="${path%/*}"
-			mkdir -p "$rdmnt/$dir"
+			[ -d "$rdmnt/$dir" ] || mkdir -p "$rdmnt/$dir"
 			$GZIP_CMD -c "$path" > "$rdmnt/$path"
 		else
 			print "$path"
@@ -448,17 +448,18 @@ do
 			(( dirsize64 += size ))
 		fi
 	else
-		filetype=`LC_MESSAGES=C file "$path" 2>/dev/null |\
-		    awk '/ELF/ { print $3 }'`
-		if [ "$filetype" = "64-bit" ]; then
+		case `LC_MESSAGES=C /usr/bin/file -m /dev/null "$path" 2>/dev/null` in
+		*ELF\ 64-bit*)
 			print "$path" >> "$list64"
-		elif [ "$filetype" = "32-bit" ]; then
+			;;
+		*ELF\ 32-bit*)
 			print "$path"
-		else
+			;;
+		*)
 			# put in both lists
 			print "$path"
 			print "$path" >> "$list64"
-		fi
+		esac
 	fi
 done >"$list32"
 
