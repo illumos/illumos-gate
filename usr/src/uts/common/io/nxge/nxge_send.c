@@ -52,7 +52,6 @@ extern uint32_t		nxge_tx_use_bcopy;
 extern uint32_t		nxge_tx_lb_policy;
 extern uint32_t		nxge_no_tx_lb;
 extern nxge_tx_mode_t	nxge_tx_scheme;
-extern uint32_t		nxge_lso_enable;
 uint32_t		nxge_lso_kick_cnt = 2;
 
 typedef struct _mac_tx_hint {
@@ -147,7 +146,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 		}
 	}
 
-	if (nxge_lso_enable) {
+	if (nxgep->soft_lso_enable) {
 		mp_chain = nxge_lso_eliminate(mp);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
 		    "==> nxge_start(0): LSO mp $%p mp_chain $%p",

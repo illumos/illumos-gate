@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1691,6 +1691,18 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		status = NXGE_OK;
 		break;
 	}
+
+	/*
+	 * Get the software LSO enable flag property from the
+	 * driver configuration file (nxge.conf).
+	 * This flag will be set to disable (0) if this property
+	 * does not exist.
+	 */
+	nxgep->soft_lso_enable = ddi_prop_get_int(DDI_DEV_T_ANY, nxgep->dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "soft-lso-enable", 0);
+	NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+	    "nxge_get_config_properties: software lso %d\n",
+	    nxgep->soft_lso_enable));
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " <== nxge_get_config_properties"));
 	return (status);

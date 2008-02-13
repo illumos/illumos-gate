@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -943,6 +943,10 @@ nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	}
+
+	(void) mi_mpprintf(mp, "Software LSO for nxge%d: %s\n",
+	    nxgep->instance,
+	    nxgep->soft_lso_enable ? "enable" : "disable");
 
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_port_mode"));
 	return (0);

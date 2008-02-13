@@ -66,8 +66,6 @@ nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 
 /* MAX LSO size */
 #define		NXGE_LSO_MAXLEN	65535
-/* Enable Software LSO flag */
-uint32_t	nxge_lso_enable = 1;
 uint32_t	nxge_lso_max = NXGE_LSO_MAXLEN;
 
 /*
@@ -3819,7 +3817,7 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	case MAC_CAPAB_LSO: {
 		mac_capab_lso_t *cap_lso = cap_data;
 
-		if (nxge_lso_enable) {
+		if (nxgep->soft_lso_enable) {
 			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
 			if (nxge_lso_max > NXGE_LSO_MAXLEN) {
 				nxge_lso_max = NXGE_LSO_MAXLEN;

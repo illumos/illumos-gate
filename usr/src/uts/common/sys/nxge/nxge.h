@@ -675,6 +675,8 @@ struct _nxge_t {
 	link_mon_enable_t	poll_state;
 #define	NXGE_MAGIC		0x3ab434e3
 	uint32_t		nxge_magic;
+
+	int			soft_lso_enable;
 };
 
 /*
